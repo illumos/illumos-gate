@@ -272,7 +272,7 @@ struct net_data;			/*%< forward */
 struct net_data *net_data_create __P((const char *));
 struct net_data *net_data_init __P((const char *));
 void		net_data_destroy __P((void *));
-	
+
 extern struct group    *getgrent_p __P((struct net_data *));
 extern struct group    *getgrnam_p __P((const char *, struct net_data *));
 extern struct group    *getgrgid_p __P((gid_t, struct net_data *));

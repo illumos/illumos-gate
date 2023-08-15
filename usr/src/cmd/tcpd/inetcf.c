@@ -1,7 +1,7 @@
  /*
   * Routines to parse an inetd.conf or tlid.conf file. This would be a great
   * job for a PERL script.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 
@@ -139,7 +139,7 @@ char   *conf;
 
 	    /*
 	     * We're reading a tlid.conf file, the format is:
-	     * 
+	     *
 	     * ...stuff... path arg_count arguments mod_count modules
 	     */
 	    if ((arg0 = strtok((char *) 0, whitespace)) == 0) {

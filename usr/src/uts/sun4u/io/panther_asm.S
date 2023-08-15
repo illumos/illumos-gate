@@ -148,7 +148,7 @@ retire_l2_start:
 	bnz	%xcc, 2f
 	 nop
 	stxa	%o1, [%o0]ASI_L2_TAG
-	membar #Sync	! still on same cache line 
+	membar #Sync	! still on same cache line
 	! now delay 15 cycles so we don't have hazard when we return
 	mov	16, %o1
 1:
@@ -256,7 +256,7 @@ retire_l3_start:
 	bnz	%xcc, 2f
 	 nop
 	stxa	%o1, [%o0]ASI_EC_DIAG
-	membar #Sync	! still on same cache line 
+	membar #Sync	! still on same cache line
 	! now delay 15 cycles so we don't have hazard when we return
 	mov	16, %o1
 1:
@@ -359,7 +359,7 @@ unretire_l3_end:
 	bnz	%xcc, 2f
 	 nop
 	stxa	%o1, [%o0]ASI_L2_TAG
-	membar #Sync	! still on same cache line 
+	membar #Sync	! still on same cache line
 	! now delay 15 cycles so we don't have hazard when we return
 	mov	16, %o1
 1:
@@ -463,7 +463,7 @@ unretire_l3_end:
 	bnz	%xcc, 2f
 	 nop
 	stxa	%o1, [%o0]ASI_EC_DIAG
-	membar #Sync	! still on same cache line 
+	membar #Sync	! still on same cache line
 	! now delay 15 cycles so we don't have hazard when we return
 	mov	16, %o1
 1:
@@ -539,7 +539,7 @@ unretire_l3_end:
 	ENTRY(get_ecache_dtags_tl1)
 
 
-	PARK_SIBLING_CORE(%g3, %g4, %g5)	
+	PARK_SIBLING_CORE(%g3, %g4, %g5)
 	add	%g2, CH_CLO_DATA + CH_CHD_EC_DATA, %g2
 	rd	%asi, %g4
 	wr	%g0, ASI_N, %asi

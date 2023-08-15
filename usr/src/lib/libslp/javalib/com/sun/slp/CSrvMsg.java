@@ -55,7 +55,7 @@ class CSrvMsg extends SrvLocMsgImpl {
     // Construct a CSrvMsg from the byte input stream. This is a SrvRply.
     //  error code is already parsed.
 
-    CSrvMsg(SLPHeaderV2 hdr, DataInputStream dis) 
+    CSrvMsg(SLPHeaderV2 hdr, DataInputStream dis)
 	throws ServiceLocationException, IOException {
 	super(hdr, SrvLocHeader.SrvRply);
 
@@ -86,7 +86,7 @@ class CSrvMsg extends SrvLocMsgImpl {
 
 	for (i = 0; i < n; i++) {
 
-	    ServiceURL surl = 
+	    ServiceURL surl =
 		hdr.parseServiceURLIn(dis, URLSignatures,
 				      ServiceLocationException.PARSE_ERROR);
 
@@ -113,7 +113,7 @@ class CSrvMsg extends SrvLocMsgImpl {
     CSrvMsg(Locale locale,
 	    ServiceType serviceType,
 	    Vector scopes,
-	    String query) 
+	    String query)
 	throws ServiceLocationException {
 
 	this.initialize(locale, serviceType, scopes, query);
@@ -122,7 +122,7 @@ class CSrvMsg extends SrvLocMsgImpl {
 
     // Initialize as a SLPv2 SrvRqst.
 
-    protected void 
+    protected void
 	initialize(Locale locale,
 		   ServiceType serviceType,
 		   Vector scopes,
@@ -163,7 +163,7 @@ class CSrvMsg extends SrvLocMsgImpl {
 
 	hdr.parseCommaSeparatedListOut(scopes, baos);
 
-	// Write out query. 
+	// Write out query.
 
 	hdr.putString(query, baos);
 
@@ -183,7 +183,7 @@ class CSrvMsg extends SrvLocMsgImpl {
 	return (Hashtable)(URLSignatures.get(URL));
     }
 
-    final void setURLSignature(ServiceURL URL, Hashtable sig) 
+    final void setURLSignature(ServiceURL URL, Hashtable sig)
 	throws IllegalArgumentException {
 
 	if (sig == null) {

@@ -134,13 +134,13 @@ typedef struct {
 LibHalStoragePolicy *libhal_storage_policy_new		    (void) LIBHAL_DEPRECATED;
 void                 libhal_storage_policy_free		    (LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
 
-void                 libhal_storage_policy_set_icon_path    (LibHalStoragePolicy *policy, 
+void                 libhal_storage_policy_set_icon_path    (LibHalStoragePolicy *policy,
 		   					     LibHalStoragePolicyIcon icon,
 							     const char *path) LIBHAL_DEPRECATED;
 
-void                 libhal_storage_policy_set_icon_mapping (LibHalStoragePolicy *policy, 
+void                 libhal_storage_policy_set_icon_mapping (LibHalStoragePolicy *policy,
 							     LibHalStoragePolicyIconPair *pairs) LIBHAL_DEPRECATED;
-const char  	    *libhal_storage_policy_lookup_icon	    (LibHalStoragePolicy *policy, 
+const char  	    *libhal_storage_policy_lookup_icon	    (LibHalStoragePolicy *policy,
 						  	     LibHalStoragePolicyIcon icon) LIBHAL_DEPRECATED;
 
 typedef enum {
@@ -189,9 +189,9 @@ typedef enum {
 	LIBHAL_DRIVE_CDROM_CAPS_HDDVDRW     = 0x10000
 } LibHalDriveCdromCaps;
 
-LibHalDrive         *libhal_drive_from_udi                    (LibHalContext *hal_ctx, 
+LibHalDrive         *libhal_drive_from_udi                    (LibHalContext *hal_ctx,
 							       const char *udi);
-LibHalDrive         *libhal_drive_from_device_file            (LibHalContext *hal_ctx, 
+LibHalDrive         *libhal_drive_from_device_file            (LibHalContext *hal_ctx,
 							       const char *device_file);
 void                 libhal_drive_free                        (LibHalDrive *drive);
 
@@ -220,23 +220,23 @@ const char          *libhal_drive_get_physical_device_udi  (LibHalDrive      *dr
 const char          *libhal_drive_get_dedicated_icon_drive    (LibHalDrive      *drive);
 const char          *libhal_drive_get_dedicated_icon_volume   (LibHalDrive      *drive);
 
-char                *libhal_drive_policy_compute_display_name (LibHalDrive        *drive, 
-							       LibHalVolume        *volume, 
+char                *libhal_drive_policy_compute_display_name (LibHalDrive        *drive,
+							       LibHalVolume        *volume,
 							       LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-char                *libhal_drive_policy_compute_icon_name    (LibHalDrive         *drive, 
-							       LibHalVolume        *volume, 
+char                *libhal_drive_policy_compute_icon_name    (LibHalDrive         *drive,
+							       LibHalVolume        *volume,
 							       LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
 
-dbus_bool_t          libhal_drive_policy_is_mountable            (LibHalDrive         *drive, 
+dbus_bool_t          libhal_drive_policy_is_mountable            (LibHalDrive         *drive,
 								  LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char          *libhal_drive_policy_get_desired_mount_point (LibHalDrive         *drive, 
+const char          *libhal_drive_policy_get_desired_mount_point (LibHalDrive         *drive,
 								  LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char          *libhal_drive_policy_get_mount_options       (LibHalDrive         *drive, 
+const char          *libhal_drive_policy_get_mount_options       (LibHalDrive         *drive,
 							          LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char          *libhal_drive_policy_get_mount_fs            (LibHalDrive      *drive, 
+const char          *libhal_drive_policy_get_mount_fs            (LibHalDrive      *drive,
 								  LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
 
-char               **libhal_drive_find_all_volumes (LibHalContext *hal_ctx, 
+char               **libhal_drive_find_all_volumes (LibHalContext *hal_ctx,
 						    LibHalDrive   *drive,
 						    int 	  *num_volumes);
 
@@ -275,9 +275,9 @@ typedef enum {
 	LIBHAL_VOLUME_DISC_TYPE_HDDVDRW     = 0x0f
 } LibHalVolumeDiscType;
 
-LibHalVolume     *libhal_volume_from_udi                      (LibHalContext *hal_ctx, 
+LibHalVolume     *libhal_volume_from_udi                      (LibHalContext *hal_ctx,
 							       const char *udi);
-LibHalVolume     *libhal_volume_from_device_file              (LibHalContext *hal_ctx, 
+LibHalVolume     *libhal_volume_from_device_file              (LibHalContext *hal_ctx,
 							       const char *device_file);
 void              libhal_volume_free                          (LibHalVolume     *volume);
 dbus_uint64_t     libhal_volume_get_size                      (LibHalVolume     *volume);
@@ -323,35 +323,35 @@ LibHalVolumeDiscType libhal_volume_get_disc_type              (LibHalVolume     
 int               libhal_volume_get_msdos_part_table_type     (LibHalVolume     *volume)  LIBHAL_DEPRECATED;
 dbus_uint64_t     libhal_volume_get_msdos_part_table_start    (LibHalVolume     *volume)  LIBHAL_DEPRECATED;
 dbus_uint64_t     libhal_volume_get_msdos_part_table_size     (LibHalVolume     *volume)  LIBHAL_DEPRECATED;
-	
+
 
 dbus_bool_t       libhal_volume_should_ignore 	              (LibHalVolume     *volume);
 
 char             *libhal_volume_policy_compute_size_as_string (LibHalVolume     *volume) LIBHAL_DEPRECATED;
 
-char             *libhal_volume_policy_compute_display_name   (LibHalDrive         *drive, 
-							       LibHalVolume        *volume, 
+char             *libhal_volume_policy_compute_display_name   (LibHalDrive         *drive,
+							       LibHalVolume        *volume,
 							       LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-char             *libhal_volume_policy_compute_icon_name      (LibHalDrive         *drive, 
-							       LibHalVolume        *volume, 
+char             *libhal_volume_policy_compute_icon_name      (LibHalDrive         *drive,
+							       LibHalVolume        *volume,
 							       LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
 
-dbus_bool_t       libhal_volume_policy_should_be_visible      (LibHalDrive         *drive, 
-							       LibHalVolume        *volume, 
-							       LibHalStoragePolicy *policy, 
+dbus_bool_t       libhal_volume_policy_should_be_visible      (LibHalDrive         *drive,
+							       LibHalVolume        *volume,
+							       LibHalStoragePolicy *policy,
 							       const char          *target_mount_point) LIBHAL_DEPRECATED;
 
-dbus_bool_t       libhal_volume_policy_is_mountable		(LibHalDrive         *drive, 
-								 LibHalVolume        *volume, 
+dbus_bool_t       libhal_volume_policy_is_mountable		(LibHalDrive         *drive,
+								 LibHalVolume        *volume,
 								 LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char       *libhal_volume_policy_get_desired_mount_point  (LibHalDrive         *drive, 
-								 LibHalVolume        *volume, 
+const char       *libhal_volume_policy_get_desired_mount_point  (LibHalDrive         *drive,
+								 LibHalVolume        *volume,
 								 LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char       *libhal_volume_policy_get_mount_options   	(LibHalDrive         *drive, 
-							    	 LibHalVolume        *volume, 
+const char       *libhal_volume_policy_get_mount_options   	(LibHalDrive         *drive,
+							    	 LibHalVolume        *volume,
 							    	 LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
-const char       *libhal_volume_policy_get_mount_fs        	(LibHalDrive         *drive, 
-							    	 LibHalVolume        *volume, 
+const char       *libhal_volume_policy_get_mount_fs        	(LibHalDrive         *drive,
+							    	 LibHalVolume        *volume,
 							    	 LibHalStoragePolicy *policy) LIBHAL_DEPRECATED;
 
 

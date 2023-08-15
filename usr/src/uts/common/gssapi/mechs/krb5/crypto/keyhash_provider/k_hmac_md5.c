@@ -15,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +29,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
 * Implementation of the Microsoft hmac-md5 checksum type.
 * Implemented based on draft-brezak-win2k-krb-rc4-hmac-03
@@ -89,14 +89,14 @@ k5_hmac_md5_hash (krb5_context context,
 #ifdef _KERNEL
   if (key->kef_key.ck_data == NULL) {
 	ret = init_key_kef(krb5_enctypes_list[i].kef_cipher_mt,
-			(krb5_keyblock *)key); 
+			(krb5_keyblock *)key);
 	if (ret)
-		goto cleanup; 
+		goto cleanup;
   }
 
   ret = init_key_kef(krb5_enctypes_list[i].kef_cipher_mt, &ks);
   if (ret)
-	goto cleanup; 
+	goto cleanup;
 #endif /* _KERNEL */
 
   ks_constant.data = "signaturekey";
@@ -142,7 +142,7 @@ cleanup:
   return (ret);
 }
 
- const struct krb5_keyhash_provider 
+ const struct krb5_keyhash_provider
 krb5int_keyhash_hmac_md5 = {
                 	MD5_CKSUM_LENGTH,
 			k5_hmac_md5_hash,

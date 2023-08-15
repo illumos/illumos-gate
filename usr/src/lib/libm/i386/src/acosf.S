@@ -43,12 +43,12 @@ LIBM_ANSI_PRAGMA_WEAK(acosf,function)
 	ja	.ERR
 	fadd	%st(1),%st		/ 1+x,x
 	fldz
-	fucomp	
+	fucomp
 	fstsw	%ax
 	sahf
 	jp	.L1
 	jne	.L1
-	/ x is -1 
+	/ x is -1
 	fstp	%st(0)			/ x
 	fstp	%st(0)			/ empty NPX stack
 	fldpi

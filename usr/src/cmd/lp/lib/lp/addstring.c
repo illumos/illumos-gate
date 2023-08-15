@@ -55,7 +55,7 @@ addstring (dst, src)
 	}
 
 	len = strlen(src) + 1;
-    
+
 	if (*dst) {
 		if (!(*dst = Realloc(*dst, strlen(*dst) + len))) {
 			errno = ENOMEM;

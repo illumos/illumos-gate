@@ -64,7 +64,7 @@ _msg: $(POFILE)
 $(POFILE): $(SRCS)
 	$(RM) talk.po
 	$(COMPILE.cpp) 	$(SRCS)	> $(POFILE).i
-	$(XGETTEXT) $(XGETFLAGS)	$(POFILE).i	
+	$(XGETTEXT) $(XGETFLAGS)	$(POFILE).i
 	sed "/^domain/d" messages.po > $@
 	$(RM) messages.po $(POFILE).i
 

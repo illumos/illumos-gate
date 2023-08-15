@@ -520,9 +520,9 @@ format(wchar_t *s, NODE *a)
 		x = execute(a);
 		a = a->nnext;
 
-		/* 
-		 * Get the string to check length; %s is the usual problem; 
-		 * other conversions can cause overrun if they occur when 
+		/*
+		 * Get the string to check length; %s is the usual problem;
+		 * other conversions can cause overrun if they occur when
 		 * the buffer is almost filled.
 		 */
 		if (flag == 4)	{ /* watch out for converting to numbers! */
@@ -538,13 +538,13 @@ format(wchar_t *s, NODE *a)
 						tbuf);
 			str = tbuf;
 		}
-		/* 
+		/*
 		 * If string overruns the buffer, reallocate;
 		 * consider length of format string
 		 */
 		if (p + wslen(str) + wslen(s) + 1 >= ep) {
 			int newlen, oldlen;
-	
+
 			oldlen = p - buf;
 			/* Add RECSIZE for additional space */
 			newlen = oldlen + wslen(str) + RECSIZE;

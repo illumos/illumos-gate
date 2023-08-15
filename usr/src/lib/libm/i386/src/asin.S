@@ -39,7 +39,7 @@ LIBM_ANSI_PRAGMA_WEAK(asin,function)
 	fabs				/ |x| , 1 , x
 	fucomp
 	fstsw  %ax
-	sahf     
+	sahf
 	ja	.ERR
 	fadd	%st(1),%st		/ 1+x,x
 	fld1				/ 1,1+x,x

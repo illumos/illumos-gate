@@ -812,8 +812,8 @@ xge_hal_restore_link_led(xge_hal_device_h devh)
 	 * handling is done by beacon control register as opposed to gpio
 	 * control register in Xena. Beacon control is used only to toggle
      * and the value written into it does not depend on the link state.
-     * It is upto the ULD to toggle the LED even number of times which 
-     * brings the LED to it's original state. 
+     * It is upto the ULD to toggle the LED even number of times which
+     * brings the LED to it's original state.
 	 */
 	val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
 				      &bar0->beacon_control);

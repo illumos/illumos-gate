@@ -36,10 +36,10 @@
 
 /**
  * @memo	    Superclass for all Exception we'll throw.
- * 
- * @doc		    To ensure 
+ *
+ * @doc		    To ensure
  * no uncaught exceptions squeeze through, all exceptions
- * will map to some HBA_STATUS error code so we can easily 
+ * will map to some HBA_STATUS error code so we can easily
  * handle them in catch blocks in our external API.
  */
 class HBAException {
@@ -202,7 +202,7 @@ public:
 
 /**
  * @memo	    Encapsulate I/O error scenarios.
- * 
+ *
  * @doc		    If logging is enabled, this will
  * automatically log the failure with as much detail as possible.
  */
@@ -217,9 +217,9 @@ public:
 
 /**
  * @memo	    Generic error of unknown type
- * 
- * @doc		    
- * Grab bag for something catastrophic occuring in the internal 
+ *
+ * @doc
+ * Grab bag for something catastrophic occuring in the internal
  * logic of the VSL.  Hopefully, this should never ever happen.
  */
 class InternalError : public HBAException {

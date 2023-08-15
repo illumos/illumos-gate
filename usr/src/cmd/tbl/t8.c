@@ -11,7 +11,7 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-  
+
  /* t8.c: write out one line of output table */
 # include "t..c"
 # include <locale.h>

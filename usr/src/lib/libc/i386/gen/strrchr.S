@@ -37,16 +37,16 @@
 /	char *
 /	strrchr(const char *sp, int c)
 /	{
-/		char	*r = NULL; 
+/		char	*r = NULL;
 /
 /		do {
 /			if (*sp == (char)c)
-/				r = (char *)sp; 
-/		} while (*sp++); 
+/				r = (char *)sp;
+/		} while (*sp++);
 /
-/		return (r); 
+/		return (r);
 /	}
-/	
+/
 
 #include "SYS.h"
 
@@ -55,7 +55,7 @@
 	movl	8(%esp), %eax	/ %eax = string address
 	movb	12(%esp), %cl	/ %cl = char sought
 	movl	$0, %edi	/ %edi = NULL (current occurrence)
-	
+
 	testl	$3, %eax	/ if %eax not word aligned
 	jnz	.L1		/ goto .L1
 	.align	4

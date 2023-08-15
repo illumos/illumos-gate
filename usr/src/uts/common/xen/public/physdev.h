@@ -136,7 +136,7 @@ struct physdev_irq {
 };
 typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
- 
+
 #define MAP_PIRQ_TYPE_MSI               0x0
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
@@ -178,7 +178,7 @@ struct physdev_manage_pci {
     /* IN */
     uint8_t bus;
     uint8_t devfn;
-}; 
+};
 
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);

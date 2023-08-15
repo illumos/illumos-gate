@@ -179,8 +179,8 @@ afsrbuf:
  * Our contract with the boot prom specifies that the MMU is on and the
  * first 16 meg of memory is mapped with a level-1 pte.  We are called
  * with p1275cis ptr in %o0 and kdi_dvec in %o1; we start execution
- * directly from physical memory, so we need to get up into our proper 
- * addresses quickly: all code before we do this must be position 
+ * directly from physical memory, so we need to get up into our proper
+ * addresses quickly: all code before we do this must be position
  * independent.
  *
  * NB: Above is not true for boot/stick kernel, the only thing mapped is
@@ -760,7 +760,7 @@ rtt_ctx_end:
 	call	kpreempt
 	mov	%l6, %o0		! pass original interrupt level
 
-	stub	%g0, [THREAD_REG + T_PREEMPT_LK]	! nuke the lock	
+	stub	%g0, [THREAD_REG + T_PREEMPT_LK]	! nuke the lock
 
 	rdpr	%pil, %o0		! compare old pil level
 	cmp	%l6, %o0		!   with current pil level
@@ -1116,11 +1116,11 @@ auxio_panic:
 	lduwa	[%g2 + PTL1_ENTRY_COUNT] %asi, %g3
 	add	%g3, 1, %g3
 	stuwa	%g3, [%g2 + PTL1_ENTRY_COUNT] %asi
-	! 
+	!
 	! CPU state saving is skipped from the 2nd entry to ptl1_panic since we
 	! do not want to clobber the state from the original failure.  panic()
 	! is responsible for handling multiple or recursive panics.
-	! 
+	!
 	cmp	%g3, 2				! if (ptl1_entry_count >= 2)
 	bge,pn	%icc, state_saved		!	goto state_saved
 	  add	%g2, PTL1_REGS, %g3		! %g3 = &pstate->ptl1_regs[0]
@@ -1312,8 +1312,8 @@ ptl1_panic_tl0:					! ----<-----+	TL:0
 	be,pt  %icc, 0f				! by itself, then skip
 	  nop					! register initialization
 
-	/* 
-	 * Initialize Out Registers to Known Values 
+	/*
+	 * Initialize Out Registers to Known Values
 	 */
 	set	0x01000, %l0			! %i0 is the ...
 						! recursion_depth_count
@@ -1327,31 +1327,31 @@ ptl1_panic_tl0:					! ----<-----+	TL:0
 	  nop
 
 0:	/* Outs = Ins - 1 */
-	sub	%i0, 1, %o0; 
+	sub	%i0, 1, %o0;
 	sub	%i1, 1, %o1;
-	sub	%i2, 1, %o2; 
+	sub	%i2, 1, %o2;
 	sub	%i3, 1, %o3;
-	sub	%i4, 1, %o4; 
+	sub	%i4, 1, %o4;
 	sub	%i5, 1, %o5;
 
 	/* Locals = Ins + 1 */
-1:	add	%i0, 1, %l0; 	
+1:	add	%i0, 1, %l0;
 	add	%i1, 1, %l1;
-	add	%i2, 1, %l2; 
+	add	%i2, 1, %l2;
 	add	%i3, 1, %l3;
-	add	%i4, 1, %l4; 
+	add	%i4, 1, %l4;
 	add	%i5, 1, %l5;
 
 	set     0x0100000, %g5
-	add	%g5, %g0, %g1 
-	add	%g5, %g1, %g2 
-	add	%g5, %g2, %g3 
-	add	%g5, %g3, %g4 
-	add	%g5, %g4, %g5 
+	add	%g5, %g0, %g1
+	add	%g5, %g1, %g2
+	add	%g5, %g2, %g3
+	add	%g5, %g3, %g4
+	add	%g5, %g4, %g5
 
 	brz,pn %i1, ptl1_recurse_trap		! if trpp_count == 0) {
 	  nop					!    trap to ptl1_panic
-						!			
+						!
 	brz,pn %i0, ptl1_recure_exit		! if(depth_count == 0) {
 	  nop					!    skip recursive call
 						! }
@@ -1365,7 +1365,7 @@ ptl1_recure_exit:
 
 ptl1_recurse_trap:
 	ta	PTL1_DEBUG_TRAP; 		! Trap Always to ptl1_panic()
-	  nop 					! NOTREACHED 
+	  nop 					! NOTREACHED
         SET_SIZE(ptl1_recurse)
 
 	/*

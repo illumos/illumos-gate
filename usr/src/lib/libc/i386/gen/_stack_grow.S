@@ -25,7 +25,7 @@
 
 	.file	"_stack_grow.s"
 
-/* 
+/*
  * void *
  * _stack_grow(void *addr)
  * {
@@ -93,7 +93,7 @@
 	pushl	$0
 	SYSTRAP_RVAL1(lwp_kill)
 	addl	$12, %esp
-	
+
 	/
 	/ Try one last time to take out the process.
 	/

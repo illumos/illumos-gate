@@ -145,7 +145,7 @@
 	SET_SIZE(__umul64)
 
 !
-! unsigned remainder 
+! unsigned remainder
 !
 	ENTRY(__urem64)
 	ARGS_TO_64

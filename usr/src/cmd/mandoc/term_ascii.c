@@ -409,7 +409,7 @@ locale_endline(struct termp *p)
 	p->line++;
 	if ((int)p->tcol->offset > p->ti)
 		p->tcol->offset -= p->ti;
-	else 
+	else
 		p->tcol->offset = 0;
 	p->ti = 0;
 	putwchar(L'\n');

@@ -48,7 +48,7 @@ import java.util.*;
 public interface Advertiser {
 
     /**
-     * Return the Advertiser's locale object. 
+     * Return the Advertiser's locale object.
      *
      * @return The Locale object.
      */
@@ -63,7 +63,7 @@ public interface Advertiser {
      * @param serviceLocationAttributes A vector of ServiceLocationAttribute
      *				       objects describing the service.
      * @exception ServiceLocationException An exception is thrown if the
-     *					  registration fails.  
+     *					  registration fails.
      * @exception IllegalArgumentException A  parameter is null or
      *					  otherwise invalid.
      *

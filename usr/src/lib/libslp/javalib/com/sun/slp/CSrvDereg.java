@@ -39,7 +39,7 @@ import java.io.*;
 
 
 /**
- * The SrvDeReg class models the server side SLP service deregistration. 
+ * The SrvDeReg class models the server side SLP service deregistration.
  *
  * @author James Kempf
  */
@@ -54,7 +54,7 @@ class CSrvDereg extends SrvLocMsgImpl {
 	      ServiceURL url,
 	      Vector scopes,
 	      Vector tags,
-	      Hashtable auth)       
+	      Hashtable auth)
 	throws ServiceLocationException {
 
 	// Null tags argument means deregister the service URL, but it
@@ -77,7 +77,7 @@ class CSrvDereg extends SrvLocMsgImpl {
 		    ServiceURL url,
 		    Vector scopes,
 		    Vector tags,
-		    Hashtable auth)       
+		    Hashtable auth)
 	throws ServiceLocationException {
 
 	SLPConfig config = SLPConfig.getSLPConfig();
@@ -95,7 +95,7 @@ class CSrvDereg extends SrvLocMsgImpl {
 	    tags = new Vector();
 
 	}
-      
+
 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
 	// Escape scopes.

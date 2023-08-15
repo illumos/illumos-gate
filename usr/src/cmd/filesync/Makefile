@@ -61,7 +61,7 @@ clean:
 lint:	lint_SRCS
 
 #
-# we need our own rule for building a message catalog because our strings 
+# we need our own rule for building a message catalog because our strings
 # are already extracted, and xgettext expects to find them in situ.
 #
 #	The sed command turns each string define in messages.h into

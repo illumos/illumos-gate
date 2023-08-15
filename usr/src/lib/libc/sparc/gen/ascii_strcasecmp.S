@@ -98,8 +98,8 @@
  *	unsigned int m1 = 0x80808080;
  *	unsigned int m2 = 0x3f3f3f3f;
  *	unsigned int m3 = 0x25252525;
- *	
- *	q = x & ~m1;// newb = byte & 0x7F 
+ *
+ *	q = x & ~m1;// newb = byte & 0x7F
  *	p = q + m2; // newb > 0x5A --> MSB set
  *	q = q + m3; // newb < 0x41 --> MSB clear
  *	p = p & ~q; // newb > 0x40 && newb < 0x5B --> MSB set
@@ -115,7 +115,7 @@
 #include <sys/asm_linkage.h>
 
 	! The first part of this algorithm walks through the beginning of
-	! both strings a byte at a time until the source ptr is  aligned to 
+	! both strings a byte at a time until the source ptr is  aligned to
 	! a word boundary. During these steps, the bytes are translated to
 	! lower-case if they are upper-case, and are checked against
 	! the source string.
@@ -198,7 +198,7 @@
 	! whether or not we can optimize further if we're fortunate
 	! enough to have a word aligned desintation
 
-.s1aligned1:	
+.s1aligned1:
 	sethi	%hi(0x01010101), %i5	! start loading Mycroft's magic2
 .s1aligned2:
 	or	%i4, %lo(0x80808080),%i4! finish loading Mycroft's magic1
@@ -261,11 +261,11 @@
 	andcc	%l5, %l4, %g0		! (word - 0x01010101) & ~word & 0x80808080
 	bz	.cmp			! no null-byte in s1 yet
 	sll	%i0, %l6, %g1		! bytes from old aligned word from s2
-	
+
 	! words are equal but the end of s1 has been reached
 	! this means the strings must be equal
 .stringsequal:
-	ret				! return 
+	ret				! return
 	restore	%g0, %g0, %o0		! return 0, i.e. strings are equal
 	nop				! pad
 

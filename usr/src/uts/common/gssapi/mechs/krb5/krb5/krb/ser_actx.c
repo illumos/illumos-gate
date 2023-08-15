@@ -418,7 +418,7 @@ krb5_auth_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_oc
 	    }
 	    else
 		kret = 0;
-	    
+
 	    /* Peek at next token */
 	    tag = 0;
 	    if (!kret)

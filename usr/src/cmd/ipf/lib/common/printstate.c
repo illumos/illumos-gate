@@ -135,7 +135,7 @@ u_long now;
 	/* a given; no? */
 	if (ips.is_pass & FR_KEEPSTATE) {
 		PRINTF(" keep state");
-		if (ips.is_pass & FR_STATESYNC)	
+		if (ips.is_pass & FR_STATESYNC)
 			PRINTF(" ( sync )");
 	}
 	PRINTF("\tIPv%d", ips.is_v);
@@ -173,7 +173,7 @@ u_long now;
 	if (ips.is_sync != NULL) {
 
 		if (kmemcpy((char *)&ipsync, (u_long)ips.is_sync, sizeof(ipsync))) {
-	
+
 			PRINTF("\tSync status: status could not be retrieved\n");
 			return NULL;
 		}
@@ -181,7 +181,7 @@ u_long now;
 		PRINTF("\tSync status: idx %d num %d v %d pr %d rev %d\n",
 			ipsync.sl_idx, ipsync.sl_num, ipsync.sl_v,
 			ipsync.sl_p, ipsync.sl_rev);
-		
+
 	} else {
 		PRINTF("\tSync status: not synchronized\n");
 	}

@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -35,7 +35,7 @@ krb5_set_principal_realm(krb5_context context, krb5_principal principal, const c
 {
 	size_t	length;
 	char	*newrealm;
-	
+
 	if (!realm || !*realm)
 		return EINVAL; /* Solaris Kerberos */
 
@@ -44,7 +44,7 @@ krb5_set_principal_realm(krb5_context context, krb5_principal principal, const c
 	if (!newrealm)
 		return ENOMEM;  /* Solaris Kerberos */
 	strcpy(newrealm, realm);
-	
+
 	(void) krb5_xfree(krb5_princ_realm(context,principal)->data);
 
 	krb5_princ_realm(context, principal)->length = length;

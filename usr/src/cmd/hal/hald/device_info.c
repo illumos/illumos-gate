@@ -125,7 +125,7 @@ typedef struct {
 
 	/** Current length of CDATA buffer */
 	int cdata_buf_len;
-	
+
 	/** Current depth we are parsing at */
 	int depth;
 
@@ -158,7 +158,7 @@ typedef struct {
 
 } ParsingContext;
 
-/** Resolve a udi-property path as used in .fdi files. 
+/** Resolve a udi-property path as used in .fdi files.
  *
  *  Examples of udi-property paths:
  *
@@ -177,7 +177,7 @@ typedef struct {
  */
 static gboolean
 resolve_udiprop_path (const char *path, const char *source_udi,
-		      char *udi_result, size_t udi_result_size, 
+		      char *udi_result, size_t udi_result_size,
 		      char *prop_result, size_t prop_result_size)
 {
 	int i;
@@ -359,7 +359,7 @@ handle_match (ParsingContext * pc, const char **attr)
 		HAL_ERROR (("Could not find device with udi '%s'", udi_to_check));
 		return FALSE;
 	}
-	
+
 
 	if (strcmp (attr[2], "string") == 0) {
 		const char *value;
@@ -385,10 +385,10 @@ handle_match (ParsingContext * pc, const char **attr)
 
 		/* match integer property */
 		value = strtol (attr[3], NULL, 0);
-		
+
 		/** @todo Check error condition */
 
-		/*HAL_INFO (("Checking that key='%s' is a int that equals %d", 
+		/*HAL_INFO (("Checking that key='%s' is a int that equals %d",
 		  key, value));*/
 
 		if (hal_device_property_get_type (d, prop_to_check) != HAL_PROPERTY_TYPE_INT32)
@@ -404,10 +404,10 @@ handle_match (ParsingContext * pc, const char **attr)
 
 		/* match integer property */
 		value = strtoull (attr[3], NULL, 0);
-		
+
 		/** @todo Check error condition */
 
-		/*HAL_INFO (("Checking that key='%s' is a int that equals %d", 
+		/*HAL_INFO (("Checking that key='%s' is a int that equals %d",
 		  key, value));*/
 
 		if (hal_device_property_get_type (d, prop_to_check) != HAL_PROPERTY_TYPE_UINT64)
@@ -430,10 +430,10 @@ handle_match (ParsingContext * pc, const char **attr)
 		else
 			return FALSE;
 
-		/*HAL_INFO (("Checking that key='%s' is a bool that equals %s", 
+		/*HAL_INFO (("Checking that key='%s' is a bool that equals %s",
 		  key, value ? "TRUE" : "FALSE"));*/
 
-		if (hal_device_property_get_type (d, prop_to_check) != 
+		if (hal_device_property_get_type (d, prop_to_check) !=
 		    HAL_PROPERTY_TYPE_BOOLEAN)
 			return FALSE;
 
@@ -470,7 +470,7 @@ handle_match (ParsingContext * pc, const char **attr)
 
 		type = hal_device_property_get_type (d, prop_to_check);
 		switch (type) {
-		case HAL_PROPERTY_TYPE_STRING: 
+		case HAL_PROPERTY_TYPE_STRING:
 			if (hal_device_has_property (d, prop_to_check))
 				if (strlen (hal_device_property_get_string (d, prop_to_check)) > 0)
 					is_empty = FALSE;
@@ -484,8 +484,8 @@ handle_match (ParsingContext * pc, const char **attr)
 			/* explicit fallthrough */
 			return FALSE;
 			break;
-		} 
-	
+		}
+
 		if (should_be_empty) {
 			if (is_empty)
 				return TRUE;
@@ -569,14 +569,14 @@ handle_match (ParsingContext * pc, const char **attr)
 		if (hal_device_property_get_type (d, prop_to_check) == HAL_PROPERTY_TYPE_STRING) {
 			if (hal_device_has_property (d, prop_to_check)) {
 				const char *haystack;
-				
+
 				haystack = hal_device_property_get_string (d, prop_to_check);
 				if (needle != NULL && haystack != NULL && strstr (haystack, needle)) {
 					contains = TRUE;
 				}
-				
+
 			}
-		} else if (hal_device_property_get_type (d, prop_to_check) == HAL_PROPERTY_TYPE_STRLIST && 
+		} else if (hal_device_property_get_type (d, prop_to_check) == HAL_PROPERTY_TYPE_STRLIST &&
 			   needle != NULL) {
 			GSList *i;
 			GSList *value;
@@ -604,17 +604,17 @@ handle_match (ParsingContext * pc, const char **attr)
 			if (hal_device_has_property (d, prop_to_check)) {
 				char *needle_lowercase;
 				char *haystack_lowercase;
-				
+
 				needle_lowercase   = g_utf8_strdown (needle, -1);
 				haystack_lowercase = g_utf8_strdown (hal_device_property_get_string (d, prop_to_check), -1);
 				if (needle_lowercase != NULL && haystack_lowercase != NULL && strstr (haystack_lowercase, needle_lowercase)) {
 					contains_ncase = TRUE;
 				}
-				
+
 				g_free (needle_lowercase);
 				g_free (haystack_lowercase);
 			}
-		} else if (hal_device_property_get_type (d, prop_to_check) == HAL_PROPERTY_TYPE_STRLIST && 
+		} else if (hal_device_property_get_type (d, prop_to_check) == HAL_PROPERTY_TYPE_STRLIST &&
 			   needle != NULL) {
 			GSList *i;
 			GSList *value;
@@ -658,7 +658,7 @@ handle_match (ParsingContext * pc, const char **attr)
 		else
 			return result >= 0;
 	}
-	
+
 	return FALSE;
 }
 
@@ -855,16 +855,16 @@ handle_clear (ParsingContext * pc, const char **attr)
 
 	if (num_attrib != 4)
 		return;
-	
+
 	if (strcmp (attr[0], "key") != 0)
 		return;
 
 
 	if (strcmp (attr[3], "strlist") != 0)
 		return;
-	
+
 	strncpy (pc->merge_key, attr[1], MAX_KEY_SIZE);
-	
+
 	pc->merge_type = MERGE_TYPE_CLEAR;
 
 	return;
@@ -901,9 +901,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 /*
     for (i = 0; i < pc->depth; i++)
         printf("  ");
-    
+
     printf("%s", el);
-    
+
     for (i = 0; attr[i]; i += 2) {
         printf(" %s='%s'", attr[i], attr[i + 1]);
     }
@@ -915,9 +915,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <match> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -936,9 +936,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <merge> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -953,9 +953,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <append> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -970,9 +970,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <prepend> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -987,9 +987,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <remove> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -1004,9 +1004,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <remove> can only be "
-				    "inside <device> and <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <device> and <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -1020,9 +1020,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "device") == 0) {
 		if (pc->curelem != CURELEM_DEVICE_INFO) {
 			HAL_ERROR (("%s:%d:%d: Element <device> can only be "
-				    "inside <deviceinfo>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <deviceinfo>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -1030,9 +1030,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "deviceinfo") == 0) {
 		if (pc->curelem != CURELEM_UNKNOWN) {
 			HAL_ERROR (("%s:%d:%d: Element <deviceinfo> must be "
-				    "a top-level element", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "a top-level element",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -1040,9 +1040,9 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "spawn") == 0) {
 		if (pc->curelem != CURELEM_MATCH) {
 			HAL_ERROR (("%s:%d:%d: Element <spawn> can only be "
-				    "inside <match>", 
-				    pc->file, 
-				    XML_GetCurrentLineNumber (pc->parser), 
+				    "inside <match>",
+				    pc->file,
+				    XML_GetCurrentLineNumber (pc->parser),
 				    XML_GetCurrentColumnNumber (pc->parser)));
 			parsing_abort (pc);
 		}
@@ -1050,7 +1050,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		pc->curelem = CURELEM_SPAWN;
 		if (pc->match_ok) {
 			handle_spawn (pc, attr);
-		} 
+		}
 
 	} else {
 		HAL_ERROR (("%s:%d:%d: Unknown element <%s>",
@@ -1070,7 +1070,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 
 }
 
-static void 
+static void
 spawned_device_callouts_add_done (HalDevice *d, gpointer userdata1, gpointer userdata2)
 {
 	HAL_INFO (("Add callouts completed udi=%s", d->udi));
@@ -1146,7 +1146,7 @@ end (ParsingContext * pc, const char *el)
 		case MERGE_TYPE_BOOLEAN:
 			hal_device_property_set_bool (pc->device, pc->merge_key,
 					      (strcmp (pc->cdata_buf,
-						       "true") == 0) 
+						       "true") == 0)
 					      ? TRUE : FALSE);
 			break;
 
@@ -1160,7 +1160,7 @@ end (ParsingContext * pc, const char *el)
 			char udi_to_merge_from[256];
 			char prop_to_merge[256];
 
-			/* Resolve key paths like 'someudi/foo/bar/baz:prop.name' 
+			/* Resolve key paths like 'someudi/foo/bar/baz:prop.name'
 			 * '@prop.here.is.an.udi:with.prop.name'
 			 */
 			if (!resolve_udiprop_path (pc->cdata_buf,
@@ -1189,7 +1189,7 @@ end (ParsingContext * pc, const char *el)
 				    pc->merge_type, pc->merge_type));
 			break;
 		}
-	} else if (pc->curelem == CURELEM_APPEND && pc->match_ok && 
+	} else if (pc->curelem == CURELEM_APPEND && pc->match_ok &&
 		   (hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_STRING ||
 		    hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_STRLIST ||
 		    hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_INVALID)) {
@@ -1203,21 +1203,21 @@ end (ParsingContext * pc, const char *el)
 			hal_device_property_strlist_append (pc->device, pc->merge_key, pc->cdata_buf);
 		} else {
 			const char *existing_string;
-			
+
 			switch (pc->merge_type) {
 			case MERGE_TYPE_STRING:
 				strncpy (buf, pc->cdata_buf, sizeof (buf));
 				break;
-				
+
 			case MERGE_TYPE_COPY_PROPERTY:
 				hal_device_property_get_as_string (pc->device, pc->cdata_buf, buf, sizeof (buf));
 				break;
-				
+
 			default:
 				HAL_ERROR (("Unknown merge_type=%d='%c'", pc->merge_type, pc->merge_type));
 				break;
 			}
-			
+
 			existing_string = hal_device_property_get_string (pc->device, pc->merge_key);
 			if (existing_string != NULL) {
 				strncpy (buf2, existing_string, sizeof (buf2));
@@ -1227,7 +1227,7 @@ end (ParsingContext * pc, const char *el)
 			}
 			hal_device_property_set_string (pc->device, pc->merge_key, buf2);
 		}
-	} else if (pc->curelem == CURELEM_PREPEND && pc->match_ok && 
+	} else if (pc->curelem == CURELEM_PREPEND && pc->match_ok &&
 		   (hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_STRING ||
 		    hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_STRLIST ||
 		    hal_device_property_get_type (pc->device, pc->merge_key) == HAL_PROPERTY_TYPE_INVALID)) {
@@ -1241,21 +1241,21 @@ end (ParsingContext * pc, const char *el)
 			hal_device_property_strlist_prepend (pc->device, pc->merge_key, pc->cdata_buf);
 		} else {
 			const char *existing_string;
-			
+
 			switch (pc->merge_type) {
 			case MERGE_TYPE_STRING:
 				strncpy (buf, pc->cdata_buf, sizeof (buf));
 				break;
-				
+
 			case MERGE_TYPE_COPY_PROPERTY:
 				hal_device_property_get_as_string (pc->device, pc->cdata_buf, buf, sizeof (buf));
 				break;
-				
+
 			default:
 				HAL_ERROR (("Unknown merge_type=%d='%c'", pc->merge_type, pc->merge_type));
 				break;
 			}
-			
+
 			existing_string = hal_device_property_get_string (pc->device, pc->merge_key);
 			if (existing_string != NULL) {
 				strncpy (buf2, buf, sizeof (buf2));
@@ -1284,7 +1284,7 @@ end (ParsingContext * pc, const char *el)
 			spawned = hal_device_store_find (hald_get_tdl (), pc->merge_key);
 
 		if (spawned == NULL) {
-			HAL_INFO (("Spawning new device object '%s' caused by <spawn> on udi '%s'", 
+			HAL_INFO (("Spawning new device object '%s' caused by <spawn> on udi '%s'",
 				   pc->merge_key, pc->device->udi));
 
 			spawned = hal_device_new ();
@@ -1292,12 +1292,12 @@ end (ParsingContext * pc, const char *el)
 			hal_device_property_set_string (spawned, "info.udi", pc->merge_key);
 			hal_device_property_set_string (spawned, "info.parent", pc->device->udi);
 			hal_device_set_udi (spawned, pc->merge_key);
-			
+
 			hal_device_store_add (hald_get_tdl (), spawned);
-			
+
 			di_search_and_merge (spawned, DEVICE_INFO_TYPE_INFORMATION);
 			di_search_and_merge (spawned, DEVICE_INFO_TYPE_POLICY);
-			
+
 			hal_util_callout_device_add (spawned, spawned_device_callouts_add_done, NULL, NULL);
 		}
 
@@ -1319,7 +1319,7 @@ end (ParsingContext * pc, const char *el)
 		pc->match_ok = TRUE;
 }
 
-/** Called when there is CDATA 
+/** Called when there is CDATA
  *
  *  @param  pc                  Parsing context
  *  @param  s                   Pointer to data
@@ -1440,10 +1440,10 @@ process_fdi_file (const char *dir, const char *filename,
 	if (rc == 0) {
 		/* error parsing document */
 		HAL_ERROR (("Error parsing XML document %s at line %d, "
-			    "column %d : %s", 
-			    buf, 
-			    XML_GetCurrentLineNumber (parser), 
-			    XML_GetCurrentColumnNumber (parser), 
+			    "column %d : %s",
+			    buf,
+			    XML_GetCurrentLineNumber (parser),
+			    XML_GetCurrentColumnNumber (parser),
 			    XML_ErrorString (XML_GetErrorCode (parser))));
 		device_matched = FALSE;
 	} else {
@@ -1503,7 +1503,7 @@ scan_fdi_files (const char *dir, HalDevice * d)
 	for (i = num_entries - 1; i >= 0; i--) {
 		int len;
 		char *filename;
-		gchar *full_path;					     
+		gchar *full_path;
 
 		filename = name_list[i]->d_name;
 		len = strlen (filename);
@@ -1530,13 +1530,13 @@ scan_fdi_files (const char *dir, HalDevice * d)
 				}
 			}
 
-		} else if (g_file_test (full_path, (G_FILE_TEST_IS_DIR)) 
+		} else if (g_file_test (full_path, (G_FILE_TEST_IS_DIR))
 			   && strcmp (filename, ".") != 0
 			   && strcmp (filename, "..") != 0) {
 			int num_bytes;
 			char *dirname;
 
-			/* Directory; do the recursion thingy but not 
+			/* Directory; do the recursion thingy but not
 			 * for . and ..
 			 */
 

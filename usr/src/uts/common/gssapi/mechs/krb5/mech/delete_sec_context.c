@@ -3,7 +3,7 @@
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -13,7 +13,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -43,7 +43,7 @@ krb5_gss_internal_release_oid(minor_status, oid)
      * This function only knows how to release internal OIDs. It will
      * return GSS_S_CONTINUE_NEEDED for any OIDs it does not recognize.
      */
-   
+
     if ((*oid != gss_mech_krb5) &&
 	(*oid != gss_mech_krb5_old) &&
 	(*oid != gss_mech_krb5_wrong) &&
@@ -194,7 +194,7 @@ krb5_gss_delete_sec_context(minor_status,
 
    if (ctx->mech_used)
        (void) KGSS_RELEASE_OID(minor_status, &ctx->mech_used);
-   
+
    if (ctx->authdata)
 	krb5_free_authdata(context, ctx->authdata);
 

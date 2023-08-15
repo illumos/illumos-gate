@@ -804,7 +804,7 @@ np_up(unit, proto)
 
 	peer_nak_auth = unsolicited_nak_auth = peer_reject_auth =
 	    rejected_peers_auth = naked_peers_auth = 0;
-	nak_auth_proto = nak_auth_orig = unsolicit_auth_proto = 
+	nak_auth_proto = nak_auth_orig = unsolicit_auth_proto =
 	    reject_auth_proto = rejected_auth_proto = naked_auth_orig =
 	    naked_auth_proto = 0;
 
@@ -1175,7 +1175,7 @@ check_passwd(unit, auser, userlen, apasswd, passwdlen, msg)
 
 #ifdef ALLOW_PAM
 /* Static variables used to communicate between the conversation function
- * and the server_login function 
+ * and the server_login function
  */
 static char *PAM_username;
 static char *PAM_password;
@@ -1222,14 +1222,14 @@ static int PAM_conv (int num_msg,
                 reply[replies].resp_retcode = PAM_SUCCESS;
                 reply[replies].resp = NULL;
                 break;
-            default:       
+            default:
                 /* Must be an error of some sort... */
                 free (reply);
                 PAM_error = 1;
                 return PAM_CONV_ERR;
         }
     }
-    *resp = reply;     
+    *resp = reply;
     return PAM_SUCCESS;
 }
 
@@ -1292,7 +1292,7 @@ plogin(user, passwd, msg)
 	 * Validate the user
 	 */
 	pam_error = pam_authenticate (pamh, PAM_SILENT);
-	if (pam_error == PAM_SUCCESS && !PAM_error) {    
+	if (pam_error == PAM_SUCCESS && !PAM_error) {
 	    pam_error = pam_acct_mgmt (pamh, PAM_SILENT);
 	    if (pam_error == PAM_SUCCESS)
 		(void) pam_open_session (pamh, PAM_SILENT);
@@ -1406,7 +1406,7 @@ plogout()
 	/* Apparently the pam stuff does closelog(). */
 	reopen_log();
     } else
-#endif /* ALLOW_PAM */   
+#endif /* ALLOW_PAM */
 
     {
 	tty = devnam;
@@ -1860,7 +1860,7 @@ bad_ip_adrs(addr)
     u_int32_t addr;
 {
     addr = ntohl(addr);
-    return 
+    return
 #ifndef ALLOW_127_NET
 	(addr >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
 #endif

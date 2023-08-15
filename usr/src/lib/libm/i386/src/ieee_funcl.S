@@ -31,7 +31,7 @@
 #include "libm.h"
 
 	ENTRY(isinfl)
-	movl	12(%esp),%eax		/ ax <-- sign and bexp of x 
+	movl	12(%esp),%eax		/ ax <-- sign and bexp of x
 	notl	%eax
 	andl	$0x00007fff,%eax
 	jz	.L6
@@ -52,7 +52,7 @@
 	ENTRY(isnormall)
 					/ TRUE iff (x is finite, but
 					/	    neither subnormal nor zero)
-					/      iff (msb(sgnfcnd(x) /= 0 
+					/      iff (msb(sgnfcnd(x) /= 0
 					/	    &  0 < bexp(x) < 0x7fff)
 	movl	8(%esp),%eax		/ eax <-- hi_32(sgnfcnd(x))
 	andl	$0x80000000,%eax	/ eax[31]  <-- msb(sgnfcnd(x)),

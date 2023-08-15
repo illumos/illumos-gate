@@ -159,7 +159,7 @@ set_size (str, which, putout)
 		return (E_BAD_ARGS);
 	}
 
-	
+
 	if ((isize = R(size)) == curval)
 		return (E_SUCCESS);
 
@@ -307,7 +307,7 @@ set_size (str, which, putout)
 			putp (p1);
 		finale = 0;
 		ret = E_SUCCESS;
-		
+
 	} else if (
 		OKAY(set_both_margins)
 	     && (p1 = tparm(set_both_margins, 0, isize))
@@ -338,7 +338,7 @@ set_size (str, which, putout)
 	 * for setting the page length, because BY DEFINITION the second
 	 * parameter must be 0 for us. But giving 0 won't cause a change
 	 * in the page length, will it!
-	 * 
+	 *
 	 * Anyway, the "smgrp" expects just one parameter (thus will
 	 * ignore a second parameter) so we can safely give the second
 	 * parameter without caring which of width or length we're

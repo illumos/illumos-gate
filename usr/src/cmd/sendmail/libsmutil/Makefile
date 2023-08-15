@@ -59,5 +59,5 @@ lint:	lint_SRCS
 depend obj:
 
 install: all
-	
+
 include		../../Makefile.targ

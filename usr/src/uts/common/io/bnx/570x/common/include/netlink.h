@@ -33,22 +33,22 @@
 
 
 /* Link status codes: definition based on what's in shmem.h */
-#define NETLINK_GET_LINK_STATUS_INIT_VALUE                 0xffffffff 
-#define NETLINK_GET_LINK_STATUS_LINK_UP                    0x1 
-#define NETLINK_GET_LINK_STATUS_LINK_DOWN                  0x0 
+#define NETLINK_GET_LINK_STATUS_INIT_VALUE                 0xffffffff
+#define NETLINK_GET_LINK_STATUS_LINK_UP                    0x1
+#define NETLINK_GET_LINK_STATUS_LINK_DOWN                  0x0
 #define NETLINK_GET_LINK_STATUS_SPEED_MASK                 0x1e
-#define NETLINK_GET_LINK_STATUS_AN_INCOMPLETE              (0<<1) 
+#define NETLINK_GET_LINK_STATUS_AN_INCOMPLETE              (0<<1)
 
-#define NETLINK_GET_LINK_STATUS_10HALF                     (1<<1) 
-#define NETLINK_GET_LINK_STATUS_10FULL                     (2<<1) 
-#define NETLINK_GET_LINK_STATUS_100HALF                    (3<<1) 
-#define NETLINK_GET_LINK_STATUS_100BASE_T4                 (4<<1) 
-#define NETLINK_GET_LINK_STATUS_100FULL                    (5<<1) 
-#define NETLINK_GET_LINK_STATUS_1000HALF                   (6<<1) 
-#define NETLINK_GET_LINK_STATUS_1000FULL                   (7<<1) 
-#define NETLINK_GET_LINK_STATUS_2500HALF                   (8<<1) 
+#define NETLINK_GET_LINK_STATUS_10HALF                     (1<<1)
+#define NETLINK_GET_LINK_STATUS_10FULL                     (2<<1)
+#define NETLINK_GET_LINK_STATUS_100HALF                    (3<<1)
+#define NETLINK_GET_LINK_STATUS_100BASE_T4                 (4<<1)
+#define NETLINK_GET_LINK_STATUS_100FULL                    (5<<1)
+#define NETLINK_GET_LINK_STATUS_1000HALF                   (6<<1)
+#define NETLINK_GET_LINK_STATUS_1000FULL                   (7<<1)
+#define NETLINK_GET_LINK_STATUS_2500HALF                   (8<<1)
 
-#define NETLINK_GET_LINK_STATUS_2500FULL                   (9<<1) 
+#define NETLINK_GET_LINK_STATUS_2500FULL                   (9<<1)
 
 #define NETLINK_GET_LINK_STATUS_AN_ENABLED                 0x000020L
 #define NETLINK_GET_LINK_STATUS_AN_COMPLETE                0x000040L
@@ -87,7 +87,7 @@ u32_t netlink_get_link_status ( u32_t *get_link_attrib );
 
 /* netlink_drv_set_link()
  * Input: A u32_t value indicating the desired link
- * Output: None, in fact, the link may not be effective right away 
+ * Output: None, in fact, the link may not be effective right away
  *         (subject to the time needed to establish the link).
  * Return: 0 for success, non-zero for failure (see NETLINK_CODE_* constants).
  */
@@ -106,11 +106,11 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
 
 #define NETLINK_DRV_SET_LINK_SPEED_10GHALF       (1<<8) // place holder for now.
 #define NETLINK_DRV_SET_LINK_SPEED_10GFULL       (1<<9) // place holder for now.
-#define NETLINK_DRV_SET_LINK_ENABLE_AUTONEG      (1<<10) 
+#define NETLINK_DRV_SET_LINK_ENABLE_AUTONEG      (1<<10)
                         /* (vs Forced): If autoeng enabled, the speed
                          * bits above dictate what capability advertisement.
-                         * Otherwise, only one of the applicable speed/duplex 
-                         * bits above can be set, and it will be used to 
+                         * Otherwise, only one of the applicable speed/duplex
+                         * bits above can be set, and it will be used to
                          * establish the forced link.
                          */
 #define NETLINK_DRV_SET_LINK_PHY_APP_MASK        (1<<11)
@@ -118,8 +118,8 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
 #define NETLINK_DRV_SET_LINK_PHY_APP_LOCAL       (0<<11)
 
                         /* (Local vs Remote): The setting will be stored as
-                         * driver preference. If the media type matches the 
-                         * current setup, the setting will also be applied 
+                         * driver preference. If the media type matches the
+                         * current setup, the setting will also be applied
                          * immediately.
                          */
 
@@ -129,8 +129,8 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
 #define NETLINK_DRV_SET_LINK_ETH_AT_WIRESPEED_ENABLE (1<<14)
 #define NETLINK_DRV_SET_LINK_PHY_RESET           (1<<15)
                         /* Local serdes will be reset. If remote Cu PHY
-                         * is present, MDIO write will be issued to the 
-                         * remote PHY to reset it. Then, whatever other 
+                         * is present, MDIO write will be issued to the
+                         * remote PHY to reset it. Then, whatever other
                          * settings will be applied.
                          */
 
@@ -140,7 +140,7 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
 #define NETLINK_SET_LINK_OVERRIDE              0x80000000
 
 /* Setting this will advertise all capability that the power budget (e.g.
- * overdraw Vaux current in absence of main power) and design capability 
+ * overdraw Vaux current in absence of main power) and design capability
  * (e.g. 2.5G) allow.
  * In case of the 5708 Serdes, fall back is assumed. */
 #define NETLINK_SET_LINK_SPEED_AUTONEG         0x00
@@ -161,7 +161,7 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
 #define NETLINK_SET_LINK_PAUSE_CAP             0x0200
 #define NETLINK_SET_LINK_ASYM_PAUSE            0x0400
 
-/* When selective autoneg is enabled, only one speed will be used for 
+/* When selective autoneg is enabled, only one speed will be used for
  * capability advertisement. */
 #define NETLINK_SET_LINK_SELECTIVE_AUTONEG     0x10000
 
@@ -171,31 +171,31 @@ u32_t netlink_drv_set_link( u32_t drv_link_attrib );
  * Return: 0 for success, non-zero for failure (see NETLINK_CODE_* constants).
  *
  * Example 1: To set 100Full forced speed, the parameter would look like
- *                NETLINK_SET_LINK_SPEED_100MBPS | 
+ *                NETLINK_SET_LINK_SPEED_100MBPS |
  *                NETLINK_SET_LINK_DUPLEX_FULL.
- * Example 2: To set selective autoneg at 100Full with pause capability, 
+ * Example 2: To set selective autoneg at 100Full with pause capability,
  *            the parameter would look like
- *                NETLINK_SET_LINK_SPEED_100MBPS | 
- *                NETLINK_SET_LINK_PAUSE_CAP | 
- *                NETLINK_SET_LINK_SELECTIVE_AUTONEG | 
+ *                NETLINK_SET_LINK_SPEED_100MBPS |
+ *                NETLINK_SET_LINK_PAUSE_CAP |
+ *                NETLINK_SET_LINK_SELECTIVE_AUTONEG |
  *                NETLINK_SET_LINK_DUPLEX_FULL.
  *
- * Note 1: If caller passes any speed settings, and if the system is 
- *         in OSPresent mode, no action will be taken, the actual speed 
- *         advertisement will be done by OS Driver.  
- * Note 2: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter, 
- *         if the system is in OSAbsent mode and if the system has 
+ * Note 1: If caller passes any speed settings, and if the system is
+ *         in OSPresent mode, no action will be taken, the actual speed
+ *         advertisement will be done by OS Driver.
+ * Note 2: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter,
+ *         if the system is in OSAbsent mode and if the system has
  *         Vmain power the link speed 2500/1000/100/10 will be advertised.
- * Note 3: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter, 
- *         if the system is in OSAbsent mode and if the system does 
+ * Note 3: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter,
+ *         if the system is in OSAbsent mode and if the system does
  *         not have Vmain power (Vaux power mode) and the "
- *         PowerOverDrawn" bit is set (OK to consume more power in 
- *         order to acquire highest link speed), the link speed 
+ *         PowerOverDrawn" bit is set (OK to consume more power in
+ *         order to acquire highest link speed), the link speed
  *         2500/1000/100/10 will be advertised.
- * Note 4: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter, 
- *         if the system is in OSAbsent mode, and if the system does 
- *         not have Vmain power (Vaux power mode) and the 
- *         "PowerOverDrawn" bit is cleared (don't consume more power 
+ * Note 4: If caller passes "NETLINK_SET_LINK_SPEED_AUTONEG" parameter,
+ *         if the system is in OSAbsent mode, and if the system does
+ *         not have Vmain power (Vaux power mode) and the
+ *         "PowerOverDrawn" bit is cleared (don't consume more power
  *         than necessary), the link speed 100/10 will be advertised.
  *
  */

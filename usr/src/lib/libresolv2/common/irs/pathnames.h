@@ -23,7 +23,7 @@
 #define	_PATH_IRS_CONF "/etc/irs.conf"
 #endif
 
-#ifndef _PATH_NETWORKS 
+#ifndef _PATH_NETWORKS
 #define _PATH_NETWORKS  "/etc/networks"
 #endif
 
@@ -35,7 +35,7 @@
 #define _PATH_NETGROUP "/etc/netgroup"
 #endif
 
-#ifndef _PATH_SERVICES 
+#ifndef _PATH_SERVICES
 #define _PATH_SERVICES "/etc/services"
 #endif
 

@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * convenience sendauth/recvauth functions
  */
@@ -65,7 +65,7 @@ recvauth_common(krb5_context context,
     krb5_data		  null_server;
     int                   need_error_free = 0;
     int			  local_rcache = 0, local_authcon = 0;
-	
+
 	/*
 	 * Zero out problem variable.  If problem is set at the end of
 	 * the intial version negotiation section, it means that we
@@ -87,7 +87,7 @@ recvauth_common(krb5_context context,
 	}
 	if (flags & KRB5_RECVAUTH_BADAUTHVERS)
 	    problem = KRB5_SENDAUTH_BADAUTHVERS;
-	
+
 	/*
 	 * Do the same thing for the application version string.
 	 */
@@ -157,14 +157,14 @@ recvauth_common(krb5_context context,
          * Setup the replay cache.
          */
         if (server) {
-            problem = krb5_get_server_rcache(context, 
+            problem = krb5_get_server_rcache(context,
 			krb5_princ_component(context, server, 0), &rcache);
         } else {
     	    null_server.length = 7;
     	    null_server.data = "default";
     	    problem = krb5_get_server_rcache(context, &null_server, &rcache);
         }
-        if (!problem) 
+        if (!problem)
 	    problem = krb5_auth_con_setrcache(context, *auth_context, rcache);
 	local_rcache = 1;
     }
@@ -173,7 +173,7 @@ recvauth_common(krb5_context context,
 			      keytab, &ap_option, ticket);
 	krb5_xfree(inbuf.data);
     }
-	
+
     /*
      * If there was a problem, send back a krb5_error message,
      * preceeded by the length of the krb5_error message.  If
@@ -185,7 +185,7 @@ recvauth_common(krb5_context context,
 
 	memset((char *)&error, 0, sizeof(error));
 	krb5_us_timeofday(context, &error.stime, &error.susec);
-	if(server) 
+	if(server)
 		error.server = server;
 	else {
 		/* If this fails - ie. ENOMEM we are hosed
@@ -210,7 +210,7 @@ recvauth_common(krb5_context context,
 	    goto cleanup;
 	}
 	free(error.text.data);
-	if(need_error_free) 
+	if(need_error_free)
 		krb5_free_principal(context, error.server);
 
     } else {

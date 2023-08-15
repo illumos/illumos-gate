@@ -38,7 +38,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): dfshares.o
 	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)

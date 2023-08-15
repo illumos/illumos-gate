@@ -174,7 +174,7 @@ abstract class AbstractStatistic implements Statistic
 	{
 		return (start);
 	}
-	
+
 
 	/**
 	 * Return the end of the sample period for which the
@@ -231,7 +231,7 @@ final class DoubleStatistic extends AbstractStatistic
 	{
 		super(value);
 	}
-	
+
 	/**
 	 * Constructor.
 	 *
@@ -250,7 +250,7 @@ final class DoubleStatistic extends AbstractStatistic
 	{
 		return ((Double) getValue());
 	}
-	
+
 	public Long getLongValue()
 	{
 		return (new Long(((Double) getValue()).longValue()));
@@ -271,7 +271,7 @@ final class DoubleStatistic extends AbstractStatistic
 					    v2.doubleValue()),
 			getStart(), getEnd()));
 	}
-	
+
 	public AggregateStatistic subtract(AggregateStatistic o)
 	{
 		Double v1 = getDoubleValue();
@@ -338,7 +338,7 @@ final class LongStatistic extends AbstractStatistic
 	{
 		return (new Double(((Long) getValue()).longValue()));
 	}
-	
+
 	public Long getLongValue()
 	{
 		return ((Long) getValue());
@@ -399,7 +399,7 @@ final class LongStatistic extends AbstractStatistic
 			last));
 	}
 }
-		
+
 /**
  * A statistic of type UnsignedInt64.
  */
@@ -426,7 +426,7 @@ final class UnsignedInt64Statistic extends AbstractStatistic
 	{
 		return (new Double(((UnsignedInt64) getValue()).longValue()));
 	}
-	
+
 	public Long getLongValue()
 	{
 		return (new Long(((UnsignedInt64) getValue()).longValue()));
@@ -446,7 +446,7 @@ final class UnsignedInt64Statistic extends AbstractStatistic
 		    new UnsignedInt64(v1.add(v2)),
 		        getStart(), getEnd()));
 	}
-	
+
 	public AggregateStatistic subtract(AggregateStatistic o)
 	{
 		UnsignedInt64 v1 = getUnsignedInt64Value();
@@ -472,7 +472,7 @@ final class UnsignedInt64Statistic extends AbstractStatistic
 			}
 			if (first == null)
 				first = s.getStart();
-			
+
 			if (end != null) {
 				if (s.getEnd().compareTo(end) > 0)
 					continue;

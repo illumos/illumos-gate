@@ -31,7 +31,7 @@ include ../../Makefile.cmd
 
 LDLIBS += -lnsl
 
-OBJS = mknetid.o getname.o 
+OBJS = mknetid.o getname.o
 SRCS = $(OBJS:.o=.c)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
@@ -43,7 +43,7 @@ SMATCH=off
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -51,7 +51,7 @@ $(PROG): $(OBJS)
 
 install: all $(ROOTUSRSBINPROG)
 
-clean: 
+clean:
 	$(RM) $(OBJS)
 
 lint:
@@ -60,7 +60,7 @@ lint:
 cstyle:
 	${CSTYLE} ${SRCS}
 
-clobber: clean 
+clobber: clean
 	$(RM) $(PROG)
 
 FRC:

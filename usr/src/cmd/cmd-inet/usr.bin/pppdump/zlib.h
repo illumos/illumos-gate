@@ -39,7 +39,7 @@
 
 /* zconf.h -- configuration of the zlib compression library
  * Copyright (C) 1995 Jean-loup Gailly.
- * For conditions of distribution and use, see copyright notice in zlib.h 
+ * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
 /* From: zconf.h,v 1.12 1995/05/03 17:27:12 jloup Exp */
@@ -132,7 +132,7 @@ typedef uLong FAR uLongf;
 
 #define ZLIB_VERSION "0.95P"
 
-/* 
+/*
      The 'zlib' compression library provides in-memory compression and
   decompression functions, including integrity checks of the uncompressed
   data.  This version of the library supports only one compression method
@@ -249,7 +249,7 @@ extern char *zlib_version;
                         /* basic functions */
 
 extern int deflateInit OF((z_stream *strm, int level));
-/* 
+/*
      Initializes the internal stream state for compression. The fields
    zalloc, zfree and opaque must be initialized before by the caller.
    If zalloc and zfree are set to Z_NULL, deflateInit updates them to
@@ -325,7 +325,7 @@ extern int deflate OF((z_stream *strm, int flush));
   more input data, until it returns with Z_STREAM_END or an error. After
   deflate has returned Z_STREAM_END, the only possible operations on the
   stream are deflateReset or deflateEnd.
-  
+
     Z_FINISH can be used immediately after deflateInit if all the compression
   is to be done in a single step. In this case, avail_out must be at least
   0.1% larger than avail_in plus 12 bytes.  If deflate does not return
@@ -357,7 +357,7 @@ extern int deflateEnd OF((z_stream *strm));
 
 
 extern int inflateInit OF((z_stream *strm));
-/* 
+/*
      Initializes the internal stream state for decompression. The fields
    zalloc and zfree must be initialized before by the caller.  If zalloc and
    zfree are set to Z_NULL, inflateInit updates them to use default allocation
@@ -445,7 +445,7 @@ extern int deflateInit2 OF((z_stream *strm,
                             int  memLevel,
                             int  strategy,
 			    int  minCompression));
-/*   
+/*
      This is another version of deflateInit with more compression options. The
    fields next_in, zalloc and zfree must be initialized before by the caller.
 
@@ -497,7 +497,7 @@ extern int deflateInit2 OF((z_stream *strm,
    deflateInit2 does not perform any compression: this will be done by
    deflate().
 */
-                            
+
 extern int deflateCopy OF((z_stream *dest,
                            z_stream *source));
 /*
@@ -534,7 +534,7 @@ extern int deflateReset OF((z_stream *strm));
 
 extern int inflateInit2 OF((z_stream *strm,
                             int  windowBits));
-/*   
+/*
      This is another version of inflateInit with more compression options. The
    fields next_out, zalloc and zfree must be initialized before by the caller.
 
@@ -566,7 +566,7 @@ extern int inflateInit2 OF((z_stream *strm,
 */
 
 extern int inflateSync OF((z_stream *strm));
-/* 
+/*
     Skips invalid compressed data until the special marker (see deflate()
   above) can be found, or until all available input is skipped. No output
   is provided.

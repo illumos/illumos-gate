@@ -505,7 +505,7 @@ void kdb5_ldap_modify_service(argc, argv)
     char *argv[];
 {
     /* Solaris Kerberos */
-    char *me = progname; 
+    char *me = progname;
     krb5_error_code retval = 0;
     krb5_ldap_service_params *srvparams = NULL;
     krb5_boolean print_usage = FALSE;

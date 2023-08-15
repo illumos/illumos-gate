@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -116,7 +116,7 @@ krb5_get_init_creds_keytab(krb5_context context,
    /*
     * Solaris Kerberos:
     * If "client" was constructed from krb5_sname_to_princ() it may
-    * have a referral realm. This happens when there is no applicable 
+    * have a referral realm. This happens when there is no applicable
     * domain-to-realm mapping in the Kerberos configuration file.
     * If that is the case then the realm of the first principal found
     * in the keytab which matches the client can be used for the client's
@@ -175,7 +175,7 @@ krb5_get_init_creds_keytab(krb5_context context,
 				 start_time, in_tkt_service, opte,
 				 krb5_get_as_key_keytab, (void *) keytab,
 				 &use_master, NULL);
-      
+
       if (ret2 == 0) {
 	 ret = 0;
 	 goto cleanup;
@@ -216,7 +216,7 @@ krb5_get_in_tkt_with_keytab(krb5_context context, krb5_flags options,
     krb5_keytab keytab;
     krb5_principal client_princ, server_princ;
     int use_master = 0;
-    
+
     retval = krb5int_populate_gic_opt(context, &opte,
 				      options, addrs, ktypes,
 				      pre_auth_types, creds);
@@ -229,14 +229,14 @@ krb5_get_in_tkt_with_keytab(krb5_context context, krb5_flags options,
 	    return retval;
     }
     else keytab = arg_keytab;
-    
+
     retval = krb5_unparse_name( context, creds->server, &server);
     if (retval)
 	goto cleanup;
     server_princ = creds->server;
     client_princ = creds->client;
     retval = krb5_get_init_creds (context,
-				  creds, creds->client,  
+				  creds, creds->client,
 				  krb5_prompter_posix,  NULL,
 				  0, server, opte,
 				  krb5_get_as_key_keytab, (void *)keytab,
@@ -252,7 +252,7 @@ krb5_get_in_tkt_with_keytab(krb5_context context, krb5_flags options,
 	    krb5_free_principal( context, creds->client);
 	creds->client = client_princ;
 	creds->server = server_princ;
-	
+
     /* store it in the ccache! */
     if (ccache)
 	if ((retval = krb5_cc_store_cred(context, ccache, creds)))

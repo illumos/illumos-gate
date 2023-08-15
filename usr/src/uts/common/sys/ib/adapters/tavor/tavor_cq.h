@@ -250,7 +250,7 @@ _NOTE(MUTEX_PROTECTS_DATA(tavor_sw_cq_s::cq_lock,
     tavor_sw_cq_s::cq_consindx
     tavor_sw_cq_s::cq_buf
     tavor_sw_cq_s::cq_mrhdl
-    tavor_sw_cq_s::cq_sync 
+    tavor_sw_cq_s::cq_sync
     tavor_sw_cq_s::cq_refcnt
     tavor_sw_cq_s::cq_is_special
     tavor_sw_cq_s::cq_umap_dhp))

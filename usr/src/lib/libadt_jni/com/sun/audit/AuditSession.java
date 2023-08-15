@@ -99,7 +99,7 @@ public class AuditSession implements Serializable
 			ValidSession = false;
 			sh = new byte[8];
 		}
-		catch (java.lang.Error e) { 
+		catch (java.lang.Error e) {
 			ValidSession = false;
 			sh = new byte[8];
 			throw e;
@@ -108,7 +108,7 @@ public class AuditSession implements Serializable
 
 	// getSession() is for use by AuditEvent, not much use to caller of
 	// AuditSession "package protected"  == not public
-	// 
+	//
 	// If you think you need this C pointer (sh), see
 	// exportSession() and the "context" parameter to
 	// startSession() for a way to pass an audit thread from one
@@ -229,7 +229,7 @@ public class AuditSession implements Serializable
 		sh = copy;
 	}
 
-	// popState frees the current handle and pops a handle off a 
+	// popState frees the current handle and pops a handle off a
 	// stack to become the new current handle.
 	// As with pushState, it lets the caller deal with any exceptions.
 

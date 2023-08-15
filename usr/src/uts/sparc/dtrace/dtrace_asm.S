@@ -121,7 +121,7 @@
 1:
 	!
 	! The caller has been flushed to the stack.  This is unlikely
-	! (interrupts are disabled in dtrace_probe()), but possible (the 
+	! (interrupts are disabled in dtrace_probe()), but possible (the
 	! interrupt inducing the spill may have been taken before the
 	! call to dtrace_probe()).
 	!
@@ -159,7 +159,7 @@
 	ld	[%g4 + %lo(nwin_minus_one)], %g4
 
 	!
-	! First we need to see if the frame that we're fishing in is still 
+	! First we need to see if the frame that we're fishing in is still
 	! contained in the register windows.
 	!
 	rdpr	%canrestore, %g2
@@ -188,7 +188,7 @@
 2:
 	!
 	! The frame that we're looking for has been flushed to the stack; the
-	! caller will be forced to 
+	! caller will be forced to
 	!
 	retl
 	add	%g2, 1, %o0		! Failure; return deepest frame + 1
@@ -340,7 +340,7 @@
 	 * %g4	saved %cwp (so we can get back to the original window)
 	 * %g5	iteration count
 	 * %g6	saved %fp
-	 * 
+	 *
 	 * %o0	pcstack / return value (iteration count)
 	 * %o1	pcstack_limit
 	 * %o2	last_fp

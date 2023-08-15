@@ -63,8 +63,8 @@ register FILE	*f;
 	}
 
 	*didrcvlines = TRUE;
-	for (hptr = hdrlines[H_RECEIVED].head; 
-	     hptr != (struct hdrs *)NULL; 
+	for (hptr = hdrlines[H_RECEIVED].head;
+	     hptr != (struct hdrs *)NULL;
 	     hptr = hptr->next) {
 		printhdr(type, H_RECEIVED, hptr, f);
 	}

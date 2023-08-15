@@ -34,7 +34,7 @@ lint:=		TARGET= lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS) 
+all:	$(SUBDIRS)
 
 install: all $(SUBDIRS)
 

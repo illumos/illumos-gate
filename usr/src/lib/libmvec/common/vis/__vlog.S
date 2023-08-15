@@ -138,26 +138,26 @@ TBL:
 ! i2  stridex
 ! i3  y
 ! i4  stridey
-! i5  
+! i5
 
 ! g1  TBL
 
 ! l0  j0
 ! l1  j1
 ! l2  j2
-! l3  
+! l3
 ! l4  0x94000
-! l5  
+! l5
 ! l6  0x000fffff
 ! l7  0x7ff00000
 
 ! o0  py0
 ! o1  py1
 ! o2  py2
-! o3  
-! o4  
-! o5  
-! o7  
+! o3
+! o4
+! o5
+! o7
 
 ! f0  u0,q0
 ! f2  v0,(two-v0)-u0,z0
@@ -666,6 +666,6 @@ TBL:
 	ba,pt	%icc,.loop2
 ! delay slot
 	ld	[%i1+4],%f21
-	
+
 	SET_SIZE(__vlog)
 

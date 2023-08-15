@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -42,7 +42,7 @@
  * <http://www.OpenLDAP.org/license.html>.
  */
 /* Portions Copyright (C) 1999, 2000 Novell, Inc. All Rights Reserved.
- * 
+ *
  * THIS WORK IS SUBJECT TO U.S. AND INTERNATIONAL COPYRIGHT LAWS AND
  * TREATIES. USE, MODIFICATION, AND REDISTRIBUTION OF THIS WORK IS SUBJECT
  * TO VERSION 2.0.1 OF THE OPENLDAP PUBLIC LICENSE, A COPY OF WHICH IS
@@ -50,7 +50,7 @@
  * IN THE TOP-LEVEL DIRECTORY OF THE DISTRIBUTION. ANY USE OR EXPLOITATION
  * OF THIS WORK OTHER THAN AS AUTHORIZED IN VERSION 2.0.1 OF THE OPENLDAP
  * PUBLIC LICENSE, OR OTHER PRIOR WRITTEN CONSENT FROM NOVELL, COULD SUBJECT
- * THE PERPETRATOR TO CRIMINAL AND CIVIL LIABILITY. 
+ * THE PERPETRATOR TO CRIMINAL AND CIVIL LIABILITY.
  */
 
 /*
@@ -91,22 +91,22 @@ k5_utf8s_to_ucs2s(krb5_ucs2 *ucs2str,
     while (*utf8str && ucs2len < count) {
 	/* Get UTF-8 sequence length from 1st byte */
 	utflen = KRB5_UTF8_CHARLEN2(utf8str, utflen);
-		
+
 	if (utflen == 0 || utflen > KRB5_MAX_UTF8_LEN)
 	    return -1;
 
 	/* First byte minus length tag */
 	ch = (krb5_ucs2)(utf8str[0] & mask[utflen]);
-		
+
 	for (i = 1; i < utflen; i++) {
 	    /* Subsequent bytes must start with 10 */
 	    if ((utf8str[i] & 0xc0) != 0x80)
 		return -1;
-		
+
 	    ch <<= 6;			/* 6 bits of data in each subsequent byte */
 	    ch |= (krb5_ucs2)(utf8str[i] & 0x3f);
 	}
-		
+
 	if (ucs2str != NULL) {
 #ifdef K5_BE
 #ifndef SWAP16
@@ -124,7 +124,7 @@ k5_utf8s_to_ucs2s(krb5_ucs2 *ucs2str,
     }
 
     assert(ucs2len < count);
-    
+
     if (ucs2str != NULL) {
 	/* Add null terminator if there's room in the buffer. */
 	ucs2str[ucs2len] = 0;
@@ -289,7 +289,7 @@ k5_ucs2s_to_utf8s(char *utf8str, const krb5_ucs2 *ucs2str,
 
 	return len;
     }
-	
+
     /* Do the actual conversion. */
 
     n = 1;					/* In case of empty ucs2str */
@@ -301,10 +301,10 @@ k5_ucs2s_to_utf8s(char *utf8str, const krb5_ucs2 *ucs2str,
 #endif
 
 	n = krb5int_ucs2_to_utf8(ch, p);
-		
+
 	if (n < 1)
 	    break;
-		
+
 	p += n;
 	count -= n;			/* Space left in output buffer */
     }
@@ -322,7 +322,7 @@ k5_ucs2s_to_utf8s(char *utf8str, const krb5_ucs2 *ucs2str,
     if (n == -1)			/* Conversion encountered invalid wide char. */
 	return -1;
 
-    /* Return the number of bytes written to output buffer, excl null. */ 
+    /* Return the number of bytes written to output buffer, excl null. */
     return (p - utf8str);
 }
 

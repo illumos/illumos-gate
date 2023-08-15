@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1993-2005  by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
- */ 
+ */
 
 #ifdef	IPFILTER_SCAN
 

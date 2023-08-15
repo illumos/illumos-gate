@@ -40,7 +40,7 @@ LINTFLAGS += -u
 
 LDLIBS += -lcmdutils -lsec
 
-all: $(PROG) 
+all: $(PROG)
 
 %.o:  $(SRC)/common/util/%.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<

@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Declarations for policy.c
  */
@@ -66,7 +66,7 @@ krb5_error_code fetch_last_req_info (krb5_db_entry *,
 krb5_error_code kdc_convert_key (krb5_keyblock *,
 					   krb5_keyblock *,
 					   int);
-krb5_error_code kdc_process_tgs_req 
+krb5_error_code kdc_process_tgs_req
 	(krb5_kdc_req *,
 	           const krb5_fulladdr *,
 	           krb5_data *,
@@ -77,11 +77,11 @@ krb5_error_code kdc_get_server_key (krb5_ticket *,
 					      krb5_keyblock **,
 					      krb5_kvno *);
 
-int validate_as_request (krb5_kdc_req *, krb5_db_entry, 
+int validate_as_request (krb5_kdc_req *, krb5_db_entry,
 					  krb5_db_entry, krb5_timestamp,
 					  const char **);
 
-int validate_tgs_request (krb5_kdc_req *, krb5_db_entry, 
+int validate_tgs_request (krb5_kdc_req *, krb5_db_entry,
 					  krb5_ticket *, krb5_timestamp,
 					  const char **);
 
@@ -92,7 +92,7 @@ int
 dbentry_has_key_for_enctype (krb5_context context,
 				       krb5_db_entry *client,
 				       krb5_enctype enctype);
-    
+
 int
 dbentry_supports_enctype (krb5_context context,
 				    krb5_db_entry *client,
@@ -163,13 +163,13 @@ krb5_error_code check_padata
     (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
 	       krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply,
 	       void **padata_context, krb5_data *e_data);
-    
+
 krb5_error_code return_padata
     (krb5_context context, krb5_db_entry *client,
 	       krb5_data *req_pkt, krb5_kdc_req *request, krb5_kdc_rep *reply,
 	       krb5_key_data *client_key, krb5_keyblock *encrypting_key,
 	       void **padata_context);
-    
+
 krb5_error_code free_padata_context
     (krb5_context context, void **padata_context);
 

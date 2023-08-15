@@ -119,15 +119,15 @@ extern const krb5_octet_data dh_oid;
  * (the kdc's identity is at the plugin level, the client's identity
  * information could change per-request.)
  * the identity context is meant to have the entity's cert,
- * a list of trusted and intermediate cas, a list of crls, and any 
+ * a list of trusted and intermediate cas, a list of crls, and any
  * pkcs11 information.  the req context is meant to have the
  * received certificate and the DH related information. the plugin
  * context is meant to have global crypto information, i.e., OIDs
  * and constant DH parameter information.
- */ 
+ */
 
 /*
- * plugin crypto context should keep plugin common information, 
+ * plugin crypto context should keep plugin common information,
  * eg., OIDs, known DHparams
  */
 typedef struct _pkinit_plg_crypto_context *pkinit_plg_crypto_context;
@@ -153,7 +153,7 @@ typedef struct _pkinit_plg_opts {
     int accept_secondary_eku;/* accept secondary EKU (default is false) */
     int allow_upn;	    /* allow UPN-SAN instead of pkinit-SAN */
     int dh_or_rsa;	    /* selects DH or RSA based pkinit */
-    int require_crl_checking; /* require CRL for a CA (default is false) */ 
+    int require_crl_checking; /* require CRL for a CA (default is false) */
     int dh_min_bits;	    /* minimum DH modulus size allowed */
 } pkinit_plg_opts;
 
@@ -257,7 +257,7 @@ typedef struct _pkinit_kdc_req_context *pkinit_kdc_req_context;
 
 /*
  * Functions in pkinit_lib.c
- */ 
+ */
 
 krb5_error_code pkinit_init_req_opts(pkinit_req_opts **);
 void pkinit_fini_req_opts(pkinit_req_opts *);

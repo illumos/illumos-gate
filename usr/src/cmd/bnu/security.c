@@ -55,7 +55,7 @@ struct secXfer			/* Data for construction of security record. */
 			char	srcOwner[MODSTR]; /* source file owner */
 			char	srcFile[MODSTR]; /* source file name */
 			char	srcSize[MODSTR];/* source file size in Bytes .*/
-			char	srcMtime[MODSTR]; /* modification date and time of 
+			char	srcMtime[MODSTR]; /* modification date and time of
 						source file */
 			char	stime[MODSTR]; /* date and time that transfer
  							started */
@@ -94,7 +94,7 @@ static struct secRexe	Rexe;	/* security remote execution data. */
  * Local Function:	newRec - Initialize new record
  */
 
-STATIC_FUNC void	
+STATIC_FUNC void
 newRec(type)
 char * type;
 {
@@ -132,7 +132,7 @@ char * type;
  * Function:	scInit - Initialize Security Package
  *
  * This function allows the security package to initialize its internal
- * data structures.  It should be called when uucico starts running on master 
+ * data structures.  It should be called when uucico starts running on master
  * or slave, or uuxqt is invoked.
  *
  * Parameters:
@@ -225,7 +225,7 @@ char * reqsys;
  * Function:	scRequser - log requestor user name
  *
  * Parameters:
- *	requser: one who issued the command 
+ *	requser: one who issued the command
  */
 
 void
@@ -278,7 +278,7 @@ scEtime()
  * Parameters:
  *	destsys: system where the dest file is sent to
  *	destuser: user where the dest file is sent to
- *	destfile: name of the dest file 
+ *	destfile: name of the dest file
  *
  */
 
@@ -299,13 +299,13 @@ char * destfile;
 }
 
 /*
- * Function:	scSrc - log source node, file owner, file name 
- *			modification time and size 
+ * Function:	scSrc - log source node, file owner, file name
+ *			modification time and size
  *
  * Parameters:
  *	srcsys: system where the source file is recieved from
- *	srcowner: owner of the source file 
- *	srcfile: name of the source file 
+ *	srcowner: owner of the source file
+ *	srcfile: name of the source file
  *	srcmtime: modification date and time of source file
  *	srcsize: size of the source file
  *
@@ -338,7 +338,7 @@ char * srcsize;
  *
  */
 
-char * 
+char *
 scSize(srcfile)
 char * srcfile;
 
@@ -347,7 +347,7 @@ char * srcfile;
 	static char size[MODSTR];
 
 	LOGCHECKC;
-	if (stat(srcfile, &stbuf)) 
+	if (stat(srcfile, &stbuf))
     		return(NOTAVAIL);/* fail, set it ""  */
 	sprintf(size,"%ld",stbuf.st_size);
 	return(size);
@@ -369,7 +369,7 @@ char * srcfile;
 	static char user[MODSTR];
 
 	LOGCHECKC;
-	if (stat(srcfile, &stbuf)) 
+	if (stat(srcfile, &stbuf))
 		return(NOTAVAIL);
 	(void) guinfo(stbuf.st_uid,user);
 	return(user);
@@ -392,7 +392,7 @@ char * srcfile;
 	register struct tm *tp;
 
 	LOGCHECKC;
-	if (stat(srcfile, &stbuf)) 
+	if (stat(srcfile, &stbuf))
 		return(NOTAVAIL);
 	tp = localtime(&stbuf.st_mtime);
 	(void) sprintf(mtime, "%d/%d-%d:%2.2d", tp->tm_mon + 1,
@@ -400,7 +400,7 @@ char * srcfile;
 	return(mtime);
 }
 
-/* 
+/*
  * Function - scRexe: It is called when uuxqt is running
  *
  * Parameter:

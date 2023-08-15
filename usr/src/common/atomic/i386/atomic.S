@@ -686,7 +686,7 @@
 #if !defined(_KERNEL)
 
 	/*
-	 * NOTE: membar_enter, membar_exit, membar_producer, and 
+	 * NOTE: membar_enter, membar_exit, membar_producer, and
 	 * membar_consumer are all identical routines. We define them
 	 * separately, instead of using ALTENTRY definitions to alias them
 	 * together, so that DTrace and debuggers will see a unique address

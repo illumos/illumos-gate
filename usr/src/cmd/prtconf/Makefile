@@ -22,7 +22,7 @@
 # Use is subject to license terms.
 #
 
-PROG= 		prtconf 
+PROG= 		prtconf
 
 include ../Makefile.cmd
 

@@ -274,7 +274,7 @@ nslberi_ber_realloc( BerElement *ber, ber_len_t len )
 	 * a better idea... oh well.
 	 */
 
-	if ( ber->ber_buf != oldbuf ) {	
+	if ( ber->ber_buf != oldbuf ) {
 		ber->ber_ptr = ber->ber_buf + (ber->ber_ptr - oldbuf);
 
 		for ( s = ber->ber_sos; s != NULLSEQORSET; s = s->sos_next ) {
@@ -745,7 +745,7 @@ int
 LDAP_CALL
 ber_set_option( struct berelement *ber, int option, void *value )
 {
-  
+
   /*
    * memory allocation callbacks are global, so it is OK to pass
    * NULL for ber.  Handle this as a special case.
@@ -755,7 +755,7 @@ ber_set_option( struct berelement *ber, int option, void *value )
     nslberi_memalloc_fns = *((struct lber_memalloc_fns *)value);
     return( 0 );
   }
-  
+
   /*
    * lber_debug is global, so it is OK to pass
    * NULL for ber.  Handle this as a special case.
@@ -766,14 +766,14 @@ ber_set_option( struct berelement *ber, int option, void *value )
 #endif
     return( 0 );
   }
-  
+
   /*
    * all the rest require a non-NULL ber
    */
   if ( !NSLBERI_VALID_BERELEMENT_POINTER( ber )) {
     return( -1 );
   }
-  
+
   switch ( option ) {
 	case LBER_OPT_USE_DER:
 	case LBER_OPT_TRANSLATE_STRINGS:
@@ -795,7 +795,7 @@ ber_set_option( struct berelement *ber, int option, void *value )
 	default:
 		return( -1 );
   }
-  
+
   return( 0 );
 }
 
@@ -815,7 +815,7 @@ ber_get_option( struct berelement *ber, int option, void *value )
 		*((struct lber_memalloc_fns *)value) = nslberi_memalloc_fns;
 		return( 0 );
 	}
-	
+
 	/*
 	 * lber_debug is global, so it is OK to pass
 	 * NULL for ber.  Handle this as a special case.
@@ -977,7 +977,7 @@ struct byte_buffer  {
 typedef struct byte_buffer byte_buffer;
 
 
-/* This call allocates us a BerElement structure plus some extra memory. 
+/* This call allocates us a BerElement structure plus some extra memory.
  * It returns a pointer to the BerElement, plus a pointer to the extra memory.
  * This routine also allocates a ber data buffer within the same block, thus
  * saving a call to calloc later when we read data.
@@ -996,7 +996,7 @@ ber_special_alloc(size_t size, BerElement **ppBer)
 	mem = NSLBERI_MALLOC(sizeof(struct berelement) + EXBUFSIZ + size );
 	if (NULL == mem) {
 		return NULL;
-	} 
+	}
 	*ppBer = (BerElement*) (mem + size);
 	memset(*ppBer,0,sizeof(struct berelement));
 	(*ppBer)->ber_tag = LBER_DEFAULT;
@@ -1030,7 +1030,7 @@ read_bytes(byte_buffer *b, unsigned char *return_buffer, int bytes_to_read)
 	}
 	if (1 == bytes_to_copy) {
 		*return_buffer = *(b->p+b->offset++);
-	} else 
+	} else
 	if (0 == bytes_to_copy) {
 		;
 	} else
@@ -1222,7 +1222,7 @@ premature_exit:
  * ber_bvfree().  This routine returns 0 on success and -1 on error.
  * The use of ber_flatten on a BerElement in which all '{' and '}'
  * format modifiers have not been properly matched can result in a
- * berval whose contents are not a valid BER encoding. 
+ * berval whose contents are not a valid BER encoding.
  * Note that the ber_ptr is not modified.
  */
 int
@@ -1246,18 +1246,18 @@ ber_flatten( BerElement *ber, struct berval **bvPtr )
 	    new->bv_val = NULL;
 	    new->bv_len = 0;
 	} else {
- 	    len = ber->ber_ptr - ber->ber_buf; 
+ 	    len = ber->ber_ptr - ber->ber_buf;
 	    if ( ( new->bv_val = (char *)NSLBERI_MALLOC( len + 1 )) == NULL ) {
 		    ber_bvfree( new );
 		    return( -1 );
 	    }
- 	    SAFEMEMCPY( new->bv_val, ber->ber_buf, (size_t)len ); 
+ 	    SAFEMEMCPY( new->bv_val, ber->ber_buf, (size_t)len );
 	    new->bv_val[len] = '\0';
 	    new->bv_len = len;
 	}
 
 	/* set bvPtr pointer to point to the returned berval */
-  	*bvPtr = new; 
+  	*bvPtr = new;
 
         return( 0 );
 }
@@ -1284,7 +1284,7 @@ ber_init( const struct berval *bv )
 			return( NULL );
 		}
 	}
-	
+
 	/*
 	 * reset ber_ptr back to the beginning of buffer so that this new
 	 * and initialized ber element can be READ

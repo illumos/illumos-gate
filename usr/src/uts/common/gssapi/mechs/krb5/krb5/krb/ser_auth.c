@@ -144,7 +144,7 @@ krb5_authenticator_externalize(krb5_context kcontext, krb5_pointer arg, krb5_oct
 	    (required <= remain)) {
 	    /* First write our magic number */
 	    (void) krb5_ser_pack_int32(KV5M_AUTHENTICATOR, &bp, &remain);
-	    
+
 	    /* Now ctime */
 	    (void) krb5_ser_pack_int32((krb5_int32) authenticator->ctime,
 				       &bp, &remain);
@@ -249,7 +249,7 @@ krb5_authenticator_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_o
 
 	/* Get memory for the authenticator */
 	if ((remain >= (3*sizeof(krb5_int32))) &&
-	    (authenticator = (krb5_authenticator *) 
+	    (authenticator = (krb5_authenticator *)
 	     MALLOC(sizeof(krb5_authenticator)))) {
 	    (void) memset(authenticator, 0, sizeof(krb5_authenticator));
 
@@ -264,7 +264,7 @@ krb5_authenticator_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_o
 	    /* Get seq_number */
 	    (void) krb5_ser_unpack_int32(&ibuf, &bp, &remain);
 	    authenticator->seq_number = ibuf;
-	    
+
 	    kret = 0;
 
 	    /* Attempt to read in the client */

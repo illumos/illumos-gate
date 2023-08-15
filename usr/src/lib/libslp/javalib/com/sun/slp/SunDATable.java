@@ -364,7 +364,7 @@ class SunDATable extends DATable {
 
 	for (i = 0; i < n; i++) {
 	    ServiceURL url = (ServiceURL)serviceURLs.elementAt(i);
-	
+
 	    // If the time to live is less than the current minimum,
 	    //  save it.
 

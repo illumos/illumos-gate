@@ -110,7 +110,7 @@
 #endif /* TRAPTRACE */
 	!
 	! clear the iv_pending flag for this interrupt request
-	! 
+	!
 	lduh	[%g2 + IV_FLAGS], %g3		! %g3 = iv->iv_flags
 	andn	%g3, IV_SOFTINT_PEND, %g3	! %g3 = !(iv->iv_flags & PEND)
 	sth	%g3, [%g2 + IV_FLAGS]		! clear IV_SOFTINT_PEND flag
@@ -210,7 +210,7 @@ _spurious:
 	add	cpu,  INTR_HEAD, os1;					\
 	add	os1, os2, os1;						\
 	ldn	[os1], os3;
-		
+
 /*
  * Registers on entry:
  *
@@ -247,7 +247,7 @@ _spurious:
 	mov	os3, ls1;						\
 	mov	os3, ls2;						\
 	SERVE_INTR_TRACE2(os5, os1, os2, os3, os4);
-		
+
 #ifdef TRAPTRACE
 /*
  * inum - not modified, _spurious depends on it.
@@ -323,7 +323,7 @@ _spurious:
  *		%sp       = on current thread's kernel stack
  *		%o7       = return linkage to trap code
  *		%g7       = current thread
- *		%pstate   = normal globals, interrupts enabled, 
+ *		%pstate   = normal globals, interrupts enabled,
  *		            privileged, fp disabled
  *		%pil      = DISP_LEVEL
  *
@@ -350,13 +350,13 @@ _spurious:
 
 	! We have interrupted an interrupt thread. Take a timestamp,
 	! compute its interval, and update its cumulative counter.
-	add	THREAD_REG, T_INTR_START, %o5	
-0:	
+	add	THREAD_REG, T_INTR_START, %o5
+0:
 	ldx	[%o5], %o3
 	brz,pn	%o3, 1f
 	! We came in on top of an interrupt thread that had no timestamp.
 	! This could happen if, for instance, an interrupt thread which had
-	! previously blocked is being set up to run again in resume(), but 
+	! previously blocked is being set up to run again in resume(), but
 	! resume() hasn't yet stored a timestamp for it. Or, it could be in
 	! swtch() after its slice has been accounted for.
 	! Only account for the time slice if the starting timestamp is non-zero.
@@ -368,11 +368,11 @@ _spurious:
 	! only if t_intr_start is non-zero. Since this code is going to account
 	! for the time slice, we want to "atomically" load the thread's
 	! starting timestamp, calculate the interval with %tick, and zero
-	! its starting timestamp. 
+	! its starting timestamp.
 	! To do this, we do a casx on the t_intr_start field, and store 0 to it.
 	! If it has changed since we loaded it above, we need to re-compute the
 	! interval, since a changed t_intr_start implies current_thread placed
-	! a new, later timestamp there after running a high-level interrupt, 
+	! a new, later timestamp there after running a high-level interrupt,
 	! and the %tick val in %o4 had become stale.
 	mov	%g0, %l2
 	casx	[%o5], %o3, %l2
@@ -442,11 +442,11 @@ _spurious:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 0f
-	nop	
+	nop
 	sethi	%hi(intr_thread_actv_bit_set), %o0
 	call	panic
 	or	%o0, %lo(intr_thread_actv_bit_set), %o0
-0:	
+0:
 #endif /* DEBUG */
 	or	%o5, %o4, %o5
 	st	%o5, [%o2 + CPU_INTR_ACTV]
@@ -496,7 +496,7 @@ _spurious:
 	! the timestamp, try again.
 	bne,pn	%xcc, 1b
 	nop
-	
+
 	wrpr	%g0, %l1, %pil			! lower %pil to new level
 	!
 	! Fast event tracing.
@@ -539,7 +539,7 @@ _spurious:
 	! Take timestamp, compute interval, update cumulative counter.
 	!
 	add	THREAD_REG, T_INTR_START, %o5
-1:	
+1:
 	ldx	[%o5], %o0
 #ifdef DEBUG
 	brnz	%o0, 9f
@@ -548,7 +548,7 @@ _spurious:
 	sethi	%hi(panic_quiesce), %o1
 	ld	[%o1 + %lo(panic_quiesce)], %o1
 	brnz,pn	%o1, 9f
-	nop	
+	nop
 	sethi	%hi(intr_thread_t_intr_start_zero), %o0
 	call	panic
 	or	%o0, %lo(intr_thread_t_intr_start_zero), %o0
@@ -562,7 +562,7 @@ _spurious:
 	! 2. replace t_intr_start with %tick (if %o3 is set) or 0.
 	!
 	! The problem is that a high-level interrupt could arrive at any time.
-	! It will account for (%tick - t_intr_start) for us when it starts, 
+	! It will account for (%tick - t_intr_start) for us when it starts,
 	! unless we have set t_intr_start to zero, and then set t_intr_start
 	! to a new %tick when it finishes. To account for this, our first step
 	! is to load t_intr_start and the last is to use casx to store the new
@@ -612,7 +612,7 @@ _spurious:
 	cmp	%o5, %o0
 	bne,pn	%xcc, 1b
 	nop
-	
+
 	!
 	! Don't keep a pinned process pinned indefinitely. Bump cpu_intrcnt
 	! for each interrupt handler we invoke. If we hit INTRCNT_LIMIT, then
@@ -676,7 +676,7 @@ _spurious:
 	!
 	! Restore %pil before calling serve_intr() again. We must check
 	! CPU_BASE_SPL and set %pil to max(our-pil, CPU_BASE_SPL)
-	!	
+	!
 	ld	[%o2 + CPU_BASE_SPL], %o4
 	cmp	%o4, %l1
 	movl	%xcc, %l1, %o4
@@ -701,11 +701,11 @@ _spurious:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 0f
-	nop	
+	nop
 	sethi	%hi(intr_thread_actv_bit_not_set), %o0
 	call	panic
 	or	%o0, %lo(intr_thread_actv_bit_not_set), %o0
-0:	
+0:
 #endif /* DEBUG */
 	andn	%o5, %o4, %o5
 	st	%o5, [%o2 + CPU_INTR_ACTV]
@@ -723,7 +723,7 @@ _spurious:
 	ldn	[%o2 + CPU_INTR_THREAD], %o3
 	stn	%o3, [THREAD_REG + T_LINK]
 	stn	THREAD_REG, [%o2 + CPU_INTR_THREAD]
-	!	
+	!
 	! set the thread state to free so kernel debuggers don't see it
 	!
 	mov	TS_FREE, %o5
@@ -734,7 +734,7 @@ _spurious:
 	stn	%o4, [%o2 + CPU_THREAD]
 	membar	#StoreLoad			! sync with mutex_exit()
 	mov	%o4, THREAD_REG
-	
+
 	! If we pinned an interrupt thread, store its starting timestamp.
 	lduh	[THREAD_REG + T_FLAGS], %o5
 	andcc	%o5, T_INTR_THREAD, %g0
@@ -751,7 +751,7 @@ _spurious:
 	! the timestamp, try again.
 	bne,pn	%xcc, 0b
 	ldn	[THREAD_REG + T_SP], %sp	! delay - restore %sp
-1:			
+1:
 	! If the thread being restarted isn't pinning anyone, and no interrupts
 	! are pending, zero out cpu_intrcnt
 	ldn	[THREAD_REG + T_INTR], %o4
@@ -772,7 +772,7 @@ _spurious:
 	! an interrupt thread stack, but the interrupted process is no longer
 	! there.  This means the interrupt must have blocked.
 	!
-	! There is no longer a thread under this one, so put this thread back 
+	! There is no longer a thread under this one, so put this thread back
 	! on the CPU's free list and resume the idle thread which will dispatch
 	! the next thread to run.
 	!
@@ -809,7 +809,7 @@ _spurious:
 	!
 	! Put thread back on the interrupt thread list.
 	!
-	
+
 	!
 	! Set the CPU's base SPL level.
 	!
@@ -817,7 +817,7 @@ _spurious:
 	!
 	! ASSERT(!(CPU->cpu_intr_actv & (1 << PIL)))
 	!
-	ld	[%o2 + CPU_INTR_ACTV], %o5		
+	ld	[%o2 + CPU_INTR_ACTV], %o5
 	mov	1, %o4
 	sll	%o4, %l1, %o4
 	and	%o5, %o4, %o4
@@ -827,7 +827,7 @@ _spurious:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 0f
-	nop	
+	nop
 	sethi	%hi(intr_thread_exit_actv_bit_set), %o0
 	call	panic
 	or	%o0, %lo(intr_thread_exit_actv_bit_set), %o0
@@ -888,7 +888,7 @@ intr_thread_t_intr_start_zero:
  *		%o4 - %o5 = scratch
  */
 	ENTRY_NP(current_thread)
-	
+
 	mov	%o7, %l0
 	ldn	[THREAD_REG + T_CPU], %o3
 
@@ -933,12 +933,12 @@ no_onfault:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 0f
-	nop	
+	nop
 	sethi	%hi(current_thread_actv_bit_set), %o0
 	call	panic
 	or	%o0, %lo(current_thread_actv_bit_set), %o0
-0:	
-#endif /* DEBUG */	
+0:
+#endif /* DEBUG */
 	or	%o5, %o4, %o4
 	!
 	! See if we are interrupting another high-level interrupt.
@@ -1053,7 +1053,7 @@ no_onfault:
 
 	! We have interrupted an interrupt thread. Take timestamp, compute
 	! interval, update cumulative counter.
-	
+
 	! Check t_intr_start. If it is zero, either intr_thread() or
 	! current_thread() (at a lower PIL, of course) already did
 	! the accounting for the underlying interrupt thread.
@@ -1117,14 +1117,14 @@ no_onfault:
 	add	%o4, MCPU_PIL_HIGH_START, %o4
 	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o5, %l2)
         stx     %o5, [%o3 + %o4]
-	
+
 	wrpr	%g0, %o2, %pil			! enable interrupts
 
 	!
 	! call the handler
 	!
 	SERVE_INTR_PRE(%o1, %o3, %l2, %l3, %o4, %o5, %o2, %o0)
-1:	
+1:
 	SERVE_INTR(%o1, %o3, %l2, %l3, %o4, %o5, %o2, %o0)
 
 	brz,a,pt %o2, 0f			! if %o2, more intrs await
@@ -1177,7 +1177,7 @@ current_thread_complete:
 	!
 	! Clear bit for this level in CPU's interrupt active bitmask.
 	!
-	ld	[%o3 + CPU_INTR_ACTV], %l2	
+	ld	[%o3 + CPU_INTR_ACTV], %l2
 	mov	1, %o5
 	sll	%o5, %o2, %o5
 #ifdef DEBUG
@@ -1191,11 +1191,11 @@ current_thread_complete:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 0f
-	nop	
+	nop
 	sethi	%hi(current_thread_actv_bit_not_set), %o0
 	call	panic
 	or	%o0, %lo(current_thread_actv_bit_not_set), %o0
-0:	
+0:
 #endif /* DEBUG */
 	andn	%l2, %o5, %l2
 	st	%l2, [%o3 + CPU_INTR_ACTV]
@@ -1215,7 +1215,7 @@ current_thread_complete:
 	sethi	%hi(panic_quiesce), %l2
 	ld	[%l2 + %lo(panic_quiesce)], %l2
 	brnz,pn	%l2, 9f
-	nop	
+	nop
 	sethi	%hi(current_thread_timestamp_zero), %o0
 	call	panic
 	or	%o0, %lo(current_thread_timestamp_zero), %o0
@@ -1244,7 +1244,7 @@ current_thread_complete:
 	ldx	[%o3 + %o4], %o0
 	add	%o0, %o5, %o0
 	stx	%o0, [%o3 + %o4]
-	
+
 	!
 	! get back on current thread's stack
 	!
@@ -1301,7 +1301,7 @@ current_thread_complete:
 	! done by the lowest priority high-level interrupt active.
 	ba,pt	%xcc, 7f
 	stx	%o4, [%o3 + %o5]	! delay - store timestamp
-3:	
+3:
 	! If we haven't interrupted another high-level interrupt, we may have
 	! interrupted a low level interrupt thread. If so, store a starting
 	! timestamp in its thread structure.
@@ -1318,29 +1318,29 @@ current_thread_complete:
 	sll	%o4, CPTRSHIFT, %o5
 
 	! Check on_trap saved area and restore as needed
-	add	%o5, CPU_OTD, %o4	
+	add	%o5, CPU_OTD, %o4
 	ldn	[%o3 + %o4], %l2
 	brz,pt %l2, no_ontrp_restore
 	nop
 	stn	%l2, [THREAD_REG + T_ONTRAP] ! restore
 	stn	%g0, [%o3 + %o4]	! clear
-	
+
 no_ontrp_restore:
 	! Check on_fault saved area and restore as needed
-	add	%o5, CPU_OFD, %o4	
+	add	%o5, CPU_OFD, %o4
 	ldn	[%o3 + %o4], %l2
 	brz,pt %l2, 8f
 	nop
 	stn	%l2, [THREAD_REG + T_ONFAULT] ! restore
 	stn	%g0, [%o3 + %o4]	! clear
-	add	%o5, CPU_LFD, %o4	
+	add	%o5, CPU_LFD, %o4
 	ldn	[%o3 + %o4], %l2
 	stn	%l2, [THREAD_REG + T_LOFAULT] ! restore
 	stn	%g0, [%o3 + %o4]	! clear
 
 
 8:
-	! Enable interrupts and return	
+	! Enable interrupts and return
 	jmp	%l0 + 8
 	wrpr	%g0, %o2, %pil			! enable interrupts
 	SET_SIZE(current_thread)
@@ -1422,7 +1422,7 @@ current_thread_nested_PIL_not_found:
 
 
 	ENTRY_NP(kdi_setsoftint)
-	save	%sp, -SA(MINFRAME), %sp	! get a new window 
+	save	%sp, -SA(MINFRAME), %sp	! get a new window
 	rdpr	%pstate, %l5
 	andn	%l5, PSTATE_IE, %l1
 	wrpr	%l1, %pstate		! disable interrupt
@@ -1438,7 +1438,7 @@ current_thread_nested_PIL_not_found:
 	!	%l5 - pstate
 	!	%l1, %l3, %l6 - temps
 	!
-	! check if a softint is pending for this softint, 
+	! check if a softint is pending for this softint,
 	! if one is pending, don't bother queuing another.
 	!
 	lduh	[%i0 + IV_FLAGS], %l1	! %l1 = iv->iv_flags
@@ -1493,7 +1493,7 @@ current_thread_nested_PIL_not_found:
 	ret
 	restore
 	SET_SIZE(kdi_setsoftint)
-	
+
 	!
 	! Register usage
 	!	Arguments:
@@ -1558,7 +1558,7 @@ current_thread_nested_PIL_not_found:
 	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi ! trap_tstate = %tstate
 	stna	%sp, [%g5 + TRAP_ENT_SP]%asi	! trap_sp = %sp
 	stna	%g1, [%g5 + TRAP_ENT_TR]%asi	! trap_tr = iv
-	ldn	[%g1 + IV_PIL_NEXT], %g6	! 
+	ldn	[%g1 + IV_PIL_NEXT], %g6	!
 	stna	%g6, [%g5 + TRAP_ENT_F1]%asi	! trap_f1 = iv->iv_pil_next
 	add	%g4, INTR_HEAD, %g6
 	ldn	[%g6 + %g7], %g6		! %g6=cpu->m_cpu.intr_head[pil]
@@ -1636,8 +1636,8 @@ current_thread_nested_PIL_not_found:
 	! At this point:
 	!	%g1 = softint pil mask
 	!	%g3 = pointer to next intr_vec_t (iv)
-	!	%g4 = cpu 
-	! 
+	!	%g4 = cpu
+	!
 	lduh	[%g3 + IV_PIL], %g2	! %g2 = iv->iv_pil
 	sll	%g2, CPTRSHIFT, %g7	! %g7 = offset to pil entry
 	add	%g4, INTR_TAIL, %g6	! %g6 = &cpu->m_cpu.intr_tail
@@ -1827,7 +1827,7 @@ _intr_flag_table:
  */
 
 	ENTRY_NP(intr_passivate)
-	save	%sp, -SA(MINFRAME), %sp	! get a new window 
+	save	%sp, -SA(MINFRAME), %sp	! get a new window
 
 	flushw				! force register windows to stack
 	!
@@ -1875,7 +1875,7 @@ _intr_flag_table:
 	stn	%i5, [%i3 + STACK_BIAS + (15*GREGSIZE)]
 	stn	%g0, [%i2 + ((8+6)*GREGSIZE)]
 						! clear fp in save area
-	
+
 	! load saved pil for return
 	ldub	[%i0 + T_PIL], %i0
 	ret
@@ -1951,7 +1951,7 @@ _intr_flag_table:
 	sethi	%hi(panic_quiesce), %o0
 	ld	[%o0 + %lo(panic_quiesce)], %o0
 	brnz,pn	%o0, 2f
-	nop	
+	nop
 	!
 	! ASSERT(%pil <= LOCK_LEVEL)
 	!
@@ -1961,7 +1961,7 @@ _intr_flag_table:
 	sethi	%hi(intr_get_time_high_pil), %o0	! delay
 	call	panic
 	or	%o0, %lo(intr_get_time_high_pil), %o0
-0:	
+0:
 	!
 	! ASSERT((t_flags & T_INTR_THREAD) != 0 && t_pil > 0)
 	!
@@ -1970,11 +1970,11 @@ _intr_flag_table:
 	bz,pn	%xcc, 1f
 	ldub	[THREAD_REG + T_PIL], %o1		! delay
 	brnz,pt	%o1, 0f
-1:	
+1:
 	sethi	%hi(intr_get_time_not_intr), %o0
 	call	panic
 	or	%o0, %lo(intr_get_time_not_intr), %o0
-0:	
+0:
 	!
 	! ASSERT(t_intr_start != 0)
 	!
@@ -1983,7 +1983,7 @@ _intr_flag_table:
 	sethi	%hi(intr_get_time_no_start_time), %o0	! delay
 	call	panic
 	or	%o0, %lo(intr_get_time_no_start_time), %o0
-2:	
+2:
 #endif /* DEBUG */
 	!
 	! %o0 = elapsed time and return value

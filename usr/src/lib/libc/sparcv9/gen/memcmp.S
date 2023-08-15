@@ -58,7 +58,7 @@
 	be,pn	%xcc, .cmpeq
 	cmp	%o2, 17
 	bleu,a,pn %xcc, .cmpbyt		! for small counts go do bytes
-	sub	%o1, %o0, %o1		
+	sub	%o1, %o0, %o1
 
 	andcc	%o0, 3, %o3		! is s1 aligned?
 	bz,a,pn	%icc, .iss2		! if so go check s2
@@ -106,7 +106,7 @@
 	b,a	.noteq
 .bytcmp:bgeu,a,pt %xcc, 1b
 	ldub	[%o0], %o4
-.cmpeq:	
+.cmpeq:
 	retl				! strings compare equal
 	clr	%o0
 
@@ -144,13 +144,13 @@
 	bz,pn	%icc, .w4cmp		! if s2 word aligned, compare words
 	cmp	%o4, 2
 	be,pn	%icc, .w2cmp		! s2 half aligned
-	cmp	%o4, 1		
+	cmp	%o4, 1
 
 .w3cmp:
 	dec	4, %o3			! avoid reading beyond the last byte
 	inc	4, %o2
 	ldub	[%o1], %g1		! read a byte to align for word reads
-	inc	1, %o1 
+	inc	1, %o1
 	be,pt	%icc, .w1cmp		! aligned to 1 or 3 bytes
 	sll	%g1, 24, %o5
 
@@ -191,12 +191,12 @@
 	sub	%o1, 3, %o1		! used 1 byte of the last word read
 	b	.bytcmp
 	deccc	%o2
-	
+
 .w2cmp:
 	dec	4, %o3			! avoid reading beyond the last byte
 	inc	4, %o2
 	lduh	[%o1], %g1		! read a halfword to align s2
-	inc	2, %o1	
+	inc	2, %o1
 	sll	%g1, 16, %o5
 	sub	%o1, %o0, %o1
 4:	lduw	[%o0 + %o1], %g1	! read a word from s2

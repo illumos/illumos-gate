@@ -4,7 +4,7 @@
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -14,7 +14,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -60,7 +60,7 @@ GSS_DLLIMP extern const gss_OID_desc * const GSS_KRB5_NT_PRINCIPAL_NAME;
  * "GSS_C_NT_HOSTBASED_SERVICE". */
 
 /* 2.2.1. User Name Form */
-#define GSS_KRB5_NT_USER_NAME GSS_C_NT_USER_NAME    
+#define GSS_KRB5_NT_USER_NAME GSS_C_NT_USER_NAME
 /* This name form shall be represented by the Object Identifier {iso(1)
  * member-body(2) United States(840) mit(113554) infosys(1) gssapi(2)
  * generic(1) user_name(1)}.  The recommended symbolic name for this
@@ -78,7 +78,7 @@ GSS_DLLIMP extern const gss_OID_desc * const GSS_KRB5_NT_PRINCIPAL_NAME;
 /* This name form shall be represented by the Object Identifier {iso(1)
  * member-body(2) United States(840) mit(113554) infosys(1) gssapi(2)
  * generic(1) string_uid_name(3)}.  The recommended symbolic name for
- * this type is "GSS_KRB5_NT_STRING_UID_NAME". */ 
+ * this type is "GSS_KRB5_NT_STRING_UID_NAME". */
 
 GSS_DLLIMP extern const gss_OID_desc * const gss_mech_krb5;
 GSS_DLLIMP extern const gss_OID_desc * const gss_mech_krb5_old;
@@ -208,14 +208,14 @@ OM_uint32 KRB5_CALLCONV gss_krb5_ccache_name
  *
  */
 OM_uint32 KRB5_CALLCONV
-gss_krb5_set_allowable_enctypes(OM_uint32 *minor_status, 
+gss_krb5_set_allowable_enctypes(OM_uint32 *minor_status,
 				gss_cred_id_t cred,
 				OM_uint32 num_ktypes,
 				krb5_enctype *ktypes);
 
 /*
  * Returns a non-opaque (lucid) version of the internal context
- * information.  
+ * information.
  *
  * Note that context_handle must not be used again by the caller
  * after this call.  The GSS implementation is free to release any
@@ -223,7 +223,7 @@ gss_krb5_set_allowable_enctypes(OM_uint32 *minor_status,
  * GSS implementation whether it returns pointers to existing data,
  * or copies of the data.  The caller should treat the returned
  * lucid context as read-only.
- * 
+ *
  * The caller must call gss_krb5_free_lucid_context() to free
  * the context and allocated resources when it is finished with it.
  *
@@ -247,7 +247,7 @@ gss_krb5_set_allowable_enctypes(OM_uint32 *minor_status,
  *
  *	maj_stat = gss_krb5_export_lucid_sec_context(&min_stat,
  *			ctx_handle, 1, &return_ctx);
- *	// Verify success 
+ *	// Verify success
  *
  *	vers = ((gss_krb5_lucid_context_version_t *)return_ctx)->version;
  *	switch (vers) {

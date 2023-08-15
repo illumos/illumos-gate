@@ -88,7 +88,7 @@ static int _confcheck()
 		 */
 		if (__areweinnamed())
 			return (0);
-		
+
 		if (_res.nsaddr.sin_addr.S_un.S_addr == htonl(INADDR_LOOPBACK)) {
 
 			/* Lastly, we try to connect to the TCP port of the
@@ -108,10 +108,10 @@ static int _confcheck()
 				return(0);
 			}
 		}
-	
+
 		return(0);
 	}
-	
+
 	return (0);
 }
 
@@ -139,7 +139,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	if (_res.options & RES_DEBUG)
 		printf("res_mkquery(%d, %s, %d, %d)\n", op, dname, class, type);
 #endif /* DEBUG */
-	
+
 	/*
 	 * Check to see if we can bailout quickly.
 	 * Also rerun res_init if we failed in the past.
@@ -149,7 +149,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 		h_errno = NO_RECOVERY;
 		return(-1);
 	}
-	
+
 	if (_confcheck() == -1) {
 		_res.options &= ~RES_INIT;
 		h_errno = NO_RECOVERY;

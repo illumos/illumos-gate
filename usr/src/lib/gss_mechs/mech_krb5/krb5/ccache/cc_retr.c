@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  */
 
@@ -70,7 +70,7 @@ srvname_match(krb5_context context, const krb5_creds *mcreds, const krb5_creds *
 {
     krb5_boolean retval;
     krb5_principal_data p1, p2;
-    
+
     retval = krb5_principal_compare(context, mcreds->client,creds->client);
     if (retval != TRUE)
 	return retval;
@@ -93,10 +93,10 @@ authdata_match(krb5_authdata *const *mdata, krb5_authdata *const *data)
 
     if (mdata == NULL)
 	return *data == NULL;
-	
+
     if (data == NULL)
 	return *mdata == NULL;
-    
+
     /*LINTED*/
     while ((mdatap = *mdata) && (datap = *data)) {
       if ((mdatap->ad_type != datap->ad_type) ||
@@ -124,7 +124,7 @@ data_match(const krb5_data *data1, const krb5_data *data2)
     if (data1->length != data2->length)
 	return FALSE;
     else
-	return memcmp(data1->data, data2->data, (unsigned) data1->length) 
+	return memcmp(data1->data, data2->data, (unsigned) data1->length)
 	  ? FALSE : TRUE;
 }
 
@@ -144,7 +144,7 @@ pref (krb5_enctype my_ktype, int nktypes, krb5_enctype *ktypes)
  * with the fields specified by whichfields.  If one if found, it is
  * returned in creds, which should be freed by the caller with
  * krb5_free_credentials().
- * 
+ *
  * The fields are interpreted in the following way (all constants are
  * preceded by KRB5_TC_).  MATCH_IS_SKEY requires the is_skey field to
  * match exactly.  MATCH_TIMES requires the requested lifetime to be
@@ -310,24 +310,24 @@ krb5_cc_retrieve_cred_default (krb5_context context, krb5_ccache id, krb5_flags 
 /* returned by the CCAPI is the same creds as the caller passed in.      */
 /* Unlike the code above it requires that all structures be identical.   */
 
-krb5_boolean KRB5_CALLCONV 
+krb5_boolean KRB5_CALLCONV
 krb5_creds_compare (krb5_context in_context,
                     krb5_creds *in_creds,
                     krb5_creds *in_compare_creds)
 {
     /* Set to 0 when we hit the first mismatch and then fall through */
     int equal = 1;
-    
+
     if (equal) {
-        equal = krb5_principal_compare (in_context, in_creds->client, 
+        equal = krb5_principal_compare (in_context, in_creds->client,
                                         in_compare_creds->client);
     }
-    
+
     if (equal) {
-        equal = krb5_principal_compare (in_context, in_creds->server, 
+        equal = krb5_principal_compare (in_context, in_creds->server,
                                         in_compare_creds->server);
     }
-    
+
     if (equal) {
         equal = (in_creds->keyblock.enctype == in_compare_creds->keyblock.enctype &&
                  in_creds->keyblock.length  == in_compare_creds->keyblock.length &&
@@ -335,27 +335,27 @@ krb5_creds_compare (krb5_context in_context,
                   !memcmp (in_creds->keyblock.contents, in_compare_creds->keyblock.contents,
                            in_creds->keyblock.length)));
     }
-    
-    if (equal) {   
+
+    if (equal) {
         equal = (in_creds->times.authtime   == in_compare_creds->times.authtime &&
                  in_creds->times.starttime  == in_compare_creds->times.starttime &&
                  in_creds->times.endtime    == in_compare_creds->times.endtime &&
                  in_creds->times.renew_till == in_compare_creds->times.renew_till);
     }
-    
+
     if (equal) {
         equal = (in_creds->is_skey == in_compare_creds->is_skey);
-    } 
-    
+    }
+
     if (equal) {
         equal = (in_creds->ticket_flags == in_compare_creds->ticket_flags);
     }
-    
+
     if (equal) {
         krb5_address **addresses = in_creds->addresses;
         krb5_address **compare_addresses = in_compare_creds->addresses;
         unsigned int i;
-        
+
         if (addresses && compare_addresses) {
             for (i = 0; (equal && addresses[i] && compare_addresses[i]); i++) {
                 equal = krb5_address_compare (in_context, addresses[i],
@@ -366,31 +366,31 @@ krb5_creds_compare (krb5_context in_context,
             if (equal) { equal = (!addresses && !compare_addresses); }
         }
     }
-    
+
     if (equal) {
         equal = (in_creds->ticket.length  == in_compare_creds->ticket.length &&
                  (!in_creds->ticket.length ||
                   !memcmp (in_creds->ticket.data, in_compare_creds->ticket.data,
                            in_creds->ticket.length)));
     }
-    
+
     if (equal) {
         equal = (in_creds->second_ticket.length  == in_compare_creds->second_ticket.length &&
                  (!in_creds->second_ticket.length ||
                   !memcmp (in_creds->second_ticket.data, in_compare_creds->second_ticket.data,
                            in_creds->second_ticket.length)));
     }
-    
+
     if (equal) {
         krb5_authdata **authdata = in_creds->authdata;
         krb5_authdata **compare_authdata = in_compare_creds->authdata;
         unsigned int i;
-        
-        if (authdata && compare_authdata) { 
+
+        if (authdata && compare_authdata) {
             for (i = 0; (equal && authdata[i] && compare_authdata[i]); i++) {
                 equal = (authdata[i]->ad_type == compare_authdata[i]->ad_type &&
                          authdata[i]->length  == compare_authdata[i]->length &&
-                         (!authdata[i]->length || 
+                         (!authdata[i]->length ||
                           !memcmp (authdata[i]->contents, compare_authdata[i]->contents,
                                    authdata[i]->length)));
             }
@@ -399,6 +399,6 @@ krb5_creds_compare (krb5_context in_context,
             if (equal) { equal = (!authdata && !compare_authdata); }
         }
     }
-    
+
     return equal;
 }

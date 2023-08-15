@@ -227,20 +227,20 @@ hal_property_to_string (HalProperty *prop)
 		GSList *iter;
 		guint i;
 		char buf[256];
-		
+
 		i = 0;
 		buf[0] = '\0';
-		for (iter = hal_property_get_strlist (prop); 
-		     iter != NULL && i < sizeof(buf); 
+		for (iter = hal_property_get_strlist (prop);
+		     iter != NULL && i < sizeof(buf);
 		     iter = g_slist_next (iter)) {
 			guint len;
 			const char *str;
-			
+
 			str = (const char *) iter->data;
 			len = strlen (str);
 			strncpy (buf + i, str, sizeof(buf) - i);
 			i += len;
-			
+
 			if (g_slist_next (iter) != NULL && i < sizeof(buf)) {
 				buf[i] = '\t';
 				i++;
@@ -438,7 +438,7 @@ hal_property_strlist_remove_elem (HalProperty *prop, guint index)
 }
 
 
-gboolean 
+gboolean
 hal_property_strlist_add (HalProperty  *prop, const char *value)
 {
 	GSList *elem;
@@ -455,7 +455,7 @@ hal_property_strlist_add (HalProperty  *prop, const char *value)
 	return hal_property_strlist_append (prop, value);
 }
 
-gboolean 
+gboolean
 hal_property_strlist_remove (HalProperty *prop, const char *value)
 {
 	guint i;
@@ -473,7 +473,7 @@ hal_property_strlist_remove (HalProperty *prop, const char *value)
 	return FALSE;
 }
 
-gboolean 
+gboolean
 hal_property_strlist_clear (HalProperty *prop)
 {
 	GSList *elem;

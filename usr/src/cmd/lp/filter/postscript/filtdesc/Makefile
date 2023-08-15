@@ -43,7 +43,7 @@ FILES=		catv.fd		\
 
 ROOTFILES =	$(FILES:%=$(ROOTETCLPFD)/%)
 
-TXTS =		README 
+TXTS =		README
 
 FILEMODE =	644
 

@@ -25,7 +25,7 @@
 
 /*
  * This file contains routines for establishing, verifying, and any other
- * necessary functions, for utilizing the pre-authentication field of the 
+ * necessary functions, for utilizing the pre-authentication field of the
  * kerberos kdc request, with various hardware/software verification devices.
  */
 
@@ -72,7 +72,7 @@ static krb5_error_code obtain_sam_padata
 	(krb5_context,
 	 krb5_pa_data *,
 	 krb5_etype_info,
-	 krb5_keyblock *, 
+	 krb5_keyblock *,
 	 krb5_error_code ( * )(krb5_context,
 			       const krb5_enctype,
 			       krb5_data *,
@@ -179,24 +179,24 @@ krb5_error_code krb5_obtain_padata(krb5_context context, krb5_pa_data **preauth_
     if (etype_info) {
 	enctype = etype_info[0]->etype;
 	salt.data = (char *) etype_info[0]->salt;
-	if(etype_info[0]->length == KRB5_ETYPE_NO_SALT) 
+	if(etype_info[0]->length == KRB5_ETYPE_NO_SALT)
 	  salt.length = SALT_TYPE_NO_LENGTH; /* XXX */
-	else 
+	else
 	  salt.length = etype_info[0]->length;
     }
     if (salt.length == SALT_TYPE_NO_LENGTH) {
         /*
-	 * This will set the salt length 
+	 * This will set the salt length
 	 */
 	if ((retval = krb5_principal2salt(context, request->client, &salt)))
 	    return(retval);
 	f_salt = 1;
     }
-    
+
     if ((retval = (*key_proc)(context, enctype, &salt, key_seed,
 			      &def_enc_key)))
 	goto cleanup;
-    
+
 
     for (pa = preauth_to_use; *pa; pa++) {
 	if (find_pa_system((*pa)->pa_type, &ops))
@@ -204,7 +204,7 @@ krb5_error_code krb5_obtain_padata(krb5_context context, krb5_pa_data **preauth_
 
 	if (ops->obtain == 0)
 	    continue;
-	
+
 	retval = ((ops)->obtain)(context, *pa, etype_info, def_enc_key,
 				 key_proc, key_seed, creds,
 				 request, send_pa);
@@ -233,7 +233,7 @@ cleanup:
     if (def_enc_key)
 	krb5_free_keyblock(context, def_enc_key);
     return retval;
-    
+
 }
 
 krb5_error_code
@@ -243,7 +243,7 @@ krb5_process_padata(krb5_context context, krb5_kdc_req *request, krb5_kdc_rep *a
     const krb5_preauth_ops * 	ops;
     krb5_pa_data **		pa;
     krb5_int32			done = 0;
-    
+
     *do_more = 0;		/* By default, we don't need to repeat... */
     if (as_reply->padata == 0)
 	return 0;
@@ -254,7 +254,7 @@ krb5_process_padata(krb5_context context, krb5_kdc_req *request, krb5_kdc_rep *a
 
 	if (ops->process == 0)
 	    continue;
-	
+
 	retval = ((ops)->process)(context, *pa, request, as_reply,
 				  key_proc, keyseed, decrypt_proc,
 				  decrypt_key, creds, do_more, &done);
@@ -298,7 +298,7 @@ obtain_enc_ts_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_i
 
     krb5_free_data(context, scratch);
     scratch = 0;
-    
+
     if ((retval = encode_krb5_enc_data(&enc_data, &scratch)) != 0)
 	goto cleanup;
 
@@ -318,7 +318,7 @@ obtain_enc_ts_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_i
     scratch = 0;
 
     retval = 0;
-    
+
 cleanup:
     if (scratch)
 	krb5_free_data(context, scratch);
@@ -332,14 +332,14 @@ process_pw_salt(krb5_context context, krb5_pa_data *padata, krb5_kdc_req *reques
 {
     krb5_error_code	retval;
     krb5_data		salt;
-    
+
     if (*decrypt_key != 0)
 	return 0;
 
     salt.data = (char *) padata->contents;
-    salt.length = 
+    salt.length =
       (padata->pa_type == KRB5_PADATA_AFS3_SALT)?(SALT_TYPE_AFS_LENGTH):(padata->length);
-    
+
     if ((retval = (*key_proc)(context, as_reply->enc_part.enctype,
 			      &salt, keyseed, decrypt_key))) {
 	*decrypt_key = 0;
@@ -348,19 +348,19 @@ process_pw_salt(krb5_context context, krb5_pa_data *padata, krb5_kdc_req *reques
 
     return 0;
 }
-    
+
 static krb5_error_code
 find_pa_system(krb5_preauthtype type, const krb5_preauth_ops **preauth)
 {
     const krb5_preauth_ops *ap = preauth_systems;
-    
+
     while ((ap->type != -1) && (ap->type != type))
 	ap++;
     if (ap->type == -1)
 	return(KRB5_PREAUTH_BAD_TYPE);
     *preauth = ap;
     return 0;
-} 
+}
 
 
 extern const char *krb5_default_pwd_prompt1;
@@ -381,14 +381,14 @@ sam_get_pass_from_user(krb5_context context, krb5_etype_info etype_info, git_key
       krb5_data newpw;
       newpw.data = 0; newpw.length = 0;
       /* we don't keep the new password, just the key... */
-      retval = (*key_proc)(context, enctype, 0, 
+      retval = (*key_proc)(context, enctype, 0,
 			   (krb5_const_pointer)&newpw, new_enc_key);
       krb5_xfree(newpw.data);
     }
     krb5_default_pwd_prompt1 = oldprompt;
     return retval;
 }
-static 
+static
 char *handle_sam_labels(krb5_sam_challenge *sc)
 {
     char *label = sc->sam_challenge_label.data;
@@ -436,7 +436,7 @@ char *handle_sam_labels(krb5_sam_challenge *sc)
 
     /* example:
        Challenge for Digital Pathways mechanism: [134591]
-       Passcode: 
+       Passcode:
      */
     p = prompt1 = malloc(label_len + strlen(sep1) +
 			 challenge_len + strlen(sep2) +
@@ -515,12 +515,12 @@ obtain_sam_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_info
       prompt = handle_sam_labels(sam_challenge);
       if (prompt == NULL)
 	return ENOMEM;
-      retval = sam_get_pass_from_user(context, etype_info, key_proc, 
+      retval = sam_get_pass_from_user(context, etype_info, key_proc,
 				      key_seed, request, &sam_use_key,
 				      prompt);
       free(prompt);
       if (retval)
-	return retval;      
+	return retval;
       enc_sam_response_enc.sam_sad.length = 0;
     } else {
       /* what *was* it? */
@@ -528,15 +528,15 @@ obtain_sam_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_info
     }
 
     /* so at this point, either sam_use_key is generated from the passcode
-     * or enc_sam_response_enc.sam_sad is set to it, and we use 
+     * or enc_sam_response_enc.sam_sad is set to it, and we use
      * def_enc_key instead. */
     /* encode the encoded part of the response */
     if ((retval = encode_krb5_enc_sam_response_enc(&enc_sam_response_enc,
 						   &scratch)) != 0)
       return retval;
 
-    if ((retval = krb5_encrypt_data(context, 
-				    sam_use_key?sam_use_key:def_enc_key, 
+    if ((retval = krb5_encrypt_data(context,
+				    sam_use_key?sam_use_key:def_enc_key,
 				    0, scratch,
 				    &sam_response.sam_enc_nonce_or_ts)))
       goto cleanup;
@@ -556,7 +556,7 @@ obtain_sam_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_info
 
     if ((retval = encode_krb5_sam_response(&sam_response, &scratch)) != 0)
 	return retval;
-    
+
     if ((pa = malloc(sizeof(krb5_pa_data))) == NULL) {
 	retval = ENOMEM;
 	goto cleanup;
@@ -571,7 +571,7 @@ obtain_sam_padata(krb5_context context, krb5_pa_data *in_padata, krb5_etype_info
     *out_padata = pa;
 
     retval = 0;
-    
+
 cleanup:
     if (scratch)
 	krb5_free_data(context, scratch);

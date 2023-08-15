@@ -56,5 +56,5 @@
 	SYSCALL_RVAL1(fstatvfs64)
 	RETC
 	SET_SIZE(fstatvfs64)
-	
+
 #endif

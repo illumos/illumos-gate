@@ -142,7 +142,7 @@ ctl_sa_ntop(const struct sockaddr *sa,
 	    }
 #ifndef NO_SOCKADDR_UN
 	case AF_UNIX: {
-		const struct sockaddr_un *un = 
+		const struct sockaddr_un *un =
 					      (const struct sockaddr_un *) sa;
 		unsigned int x = sizeof un->sun_path;
 

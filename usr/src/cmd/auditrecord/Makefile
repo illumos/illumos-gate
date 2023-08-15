@@ -41,7 +41,7 @@ ADTXMLFILE	= $(LIBBSMDIR)/common/adt.xml
 
 .KEEP_STATE:
 
-all: $(PROG) $(ATTR) 
+all: $(PROG) $(ATTR)
 
 install: all $(ROOTUSRSBINPROG) install_data
 

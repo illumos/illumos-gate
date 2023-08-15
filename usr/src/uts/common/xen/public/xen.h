@@ -1,8 +1,8 @@
 /******************************************************************************
  * xen.h
- * 
+ *
  * Guest OS interface to Xen.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -137,11 +137,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define __HYPERVISOR_dom0_op __HYPERVISOR_platform_op
 #endif
 
-/* 
+/*
  * VIRTUAL INTERRUPTS
- * 
+ *
  * Virtual interrupts that a guest OS may receive from Xen.
- * 
+ *
  * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
  * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
  * The latter can be allocated only once per guest: they must initially be
@@ -170,12 +170,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /*
  * MMU-UPDATE REQUESTS
- * 
+ *
  * HYPERVISOR_mmu_update() accepts a list of (ptr, val) pairs.
  * A foreigndom (FD) can be specified (or DOMID_SELF for none).
  * Where the FD has some effect, it is described below.
  * ptr[1:0] specifies the appropriate MMU_* command.
- * 
+ *
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
  * Updates an entry in a page table. If updating an L1 table, and the new
  * table entry is valid/present, the mapped frame must belong to the FD, if
@@ -185,13 +185,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * FD == DOMID_XEN: Map restricted areas of Xen's heap space.
  * ptr[:2]  -- Machine address of the page-table entry to modify.
  * val      -- Value to write.
- * 
+ *
  * ptr[1:0] == MMU_MACHPHYS_UPDATE:
  * Updates an entry in the machine->pseudo-physical mapping table.
  * ptr[:2]  -- Machine address within the frame whose mapping to modify.
  *             The frame must belong to the FD, if one is specified.
  * val      -- Value to write into the mapping entry.
- * 
+ *
  * ptr[1:0] == MMU_PT_UPDATE_PRESERVE_AD:
  * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
  * with those in @val.
@@ -202,44 +202,44 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /*
  * MMU EXTENDED OPERATIONS
- * 
+ *
  * HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
  * A foreigndom (FD) can be specified (or DOMID_SELF for none).
  * Where the FD has some effect, it is described below.
- * 
+ *
  * cmd: MMUEXT_(UN)PIN_*_TABLE
  * mfn: Machine frame number to be (un)pinned as a p.t. page.
  *      The frame must belong to the FD, if one is specified.
- * 
+ *
  * cmd: MMUEXT_NEW_BASEPTR
  * mfn: Machine frame number of new page-table base to install in MMU.
- * 
+ *
  * cmd: MMUEXT_NEW_USER_BASEPTR [x86/64 only]
  * mfn: Machine frame number of new page-table base to install in MMU
  *      when in user space.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_LOCAL
  * No additional arguments. Flushes local TLB.
- * 
+ *
  * cmd: MMUEXT_INVLPG_LOCAL
  * linear_addr: Linear address to be flushed from the local TLB.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_MULTI
  * vcpumask: Pointer to bitmap of VCPUs to be flushed.
- * 
+ *
  * cmd: MMUEXT_INVLPG_MULTI
  * linear_addr: Linear address to be flushed.
  * vcpumask: Pointer to bitmap of VCPUs to be flushed.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_ALL
  * No additional arguments. Flushes all VCPUs' TLBs.
- * 
+ *
  * cmd: MMUEXT_INVLPG_ALL
  * linear_addr: Linear address to be flushed from all VCPUs' TLBs.
- * 
+ *
  * cmd: MMUEXT_FLUSH_CACHE
  * No additional arguments. Writes back and flushes cache contents.
- * 
+ *
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
@@ -428,7 +428,7 @@ typedef struct vcpu_time_info vcpu_time_info_t;
 struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
-     * a pending notification for a particular VCPU. It is then cleared 
+     * a pending notification for a particular VCPU. It is then cleared
      * by the guest OS /before/ checking for pending work, thus avoiding
      * a set-and-check race. Note that the mask is only accessed by Xen
      * on the CPU that is currently hosting the VCPU. This means that the
@@ -486,7 +486,7 @@ struct shared_info {
      *  3. Virtual interrupts ('events'). A domain can bind an event-channel
      *     port to a virtual interrupt source, such as the virtual-timer
      *     device or the emergency console.
-     * 
+     *
      * Event channels are addressed by a "port index". Each channel is
      * associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
@@ -497,7 +497,7 @@ struct shared_info {
      *     becomes pending while the channel is masked then the 'edge' is lost
      *     (i.e., when the channel is unmasked, the guest must manually handle
      *     pending notifications as no upcall will be scheduled by Xen).
-     * 
+     *
      * To expedite scanning of pending notifications, any 0->1 pending
      * transition on an unmasked channel causes a corresponding bit in a
      * per-vcpu selector word to be set. Each bit in the selector covers a

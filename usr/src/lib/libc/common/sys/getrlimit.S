@@ -52,7 +52,7 @@
 
 /* C library -- getrlimit64					*/
 /* int getrlimit64(int resources, struct rlimit64 *rlp)		*/
-	
+
 	SYSCALL_RVAL1(getrlimit64)
 	RETC
 	SET_SIZE(getrlimit64)

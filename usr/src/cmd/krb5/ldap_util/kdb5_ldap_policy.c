@@ -55,7 +55,7 @@ static char *strdur(time_t duration);
 
 extern char *yes;
 extern kadm5_config_params global_params;
-                 
+
 static krb5_error_code init_ldap_realm (int argc, char *argv[]) {
     /* This operation is being performed in the context of a realm. So,
      * initialize the realm */
@@ -63,14 +63,14 @@ static krb5_error_code init_ldap_realm (int argc, char *argv[]) {
     krb5_error_code retval = 0;
     kdb5_dal_handle *dal_handle = NULL;
     krb5_ldap_context *ldap_context=NULL;
-                                                                                                                             
+
     dal_handle = (kdb5_dal_handle *) util_context->db_context;
     ldap_context = (krb5_ldap_context *) dal_handle->db_context;
     if (!ldap_context) {
         retval = EINVAL;
         goto cleanup;
     }
-                                                                                                                             
+
     if (ldap_context->krbcontainer == NULL) {
         retval = krb5_ldap_read_krbcontainer_params (util_context,
                 &(ldap_context->krbcontainer));
@@ -80,13 +80,13 @@ static krb5_error_code init_ldap_realm (int argc, char *argv[]) {
             goto cleanup;
         }
     }
-                                                                                                                             
+
     if (ldap_context->lrparams == NULL) {
         retval = krb5_ldap_read_realm_params(util_context,
                 global_params.realm,
                 &(ldap_context->lrparams),
                 &mask);
-                                                                                                                             
+
         if (retval != 0) {
             goto cleanup;
         }

@@ -38,14 +38,14 @@
 
 /*******************************************************************************
  * Description:
- * 
+ *
  * Return:
  ******************************************************************************/
 static void
 post_bd_buffer(
     lm_rx_chain_t *rxq,
     u64_t  phy_addr,
-    u32_t bd_len)    
+    u32_t bd_len)
 {
     rx_bd_t *prod_bd;
     rx_bd_t *cur_bd;
@@ -120,7 +120,7 @@ lm_post_buffers(
         ((u32_t *) packet->u1.rx.mem_virt)[1] = 0;
         ((u32_t *) packet->u1.rx.mem_virt)[2] = 0;
         ((u32_t *) packet->u1.rx.mem_virt)[3] = 0;
-    
+
         packet->u1.rx.dbg_bd = cur_bd;
 
         DbgBreakIf(SIG(packet) != L2PACKET_RX_SIG);
@@ -166,7 +166,7 @@ lm_post_buffers(
 
         MBQ_WR32(
             pdev,
-            GET_CID(rxq->cid_addr), 
+            GET_CID(rxq->cid_addr),
             OFFSETOF(l2_bd_chain_context_t, l2ctx_host_bseq),
             rxq->prod_bseq);
     }
@@ -504,7 +504,7 @@ lm_recv_abort(
 #else /* LM_NON_LEGACY_MODE_SUPPORT */
 /*******************************************************************************
  * Description:
- * 
+ *
  * Return:
  ******************************************************************************/
 u32_t
@@ -512,7 +512,7 @@ lm_post_buffers(
     lm_device_t *pdev,
     u32_t chain_idx,
     lm_packet_t *packet,
-    lm_frag_list_t *frags)  
+    lm_frag_list_t *frags)
 {
     lm_rx_chain_t *rxq;
     u32_t pkt_queued;
@@ -536,7 +536,7 @@ lm_post_buffers(
         {
             return pkt_queued;
         }
-        
+
         pkt_info = packet->u1.rx.rx_pkt_info;
 
         cur_bd = rxq->prod_bd;
@@ -556,14 +556,14 @@ lm_post_buffers(
             // The first BD must at least fit the L2 frame header
             DbgBreakIf(frags->cnt != 2);
             DbgBreakIf(frags->frag_arr[0].size < rxq->vmq_lookahead_size);
-            
+
             post_bd_buffer(
                 rxq,
                 frags->frag_arr[0].addr.as_u64,
                 frags->frag_arr[0].size);
             cur_bd->rx_bd_flags |= RX_BD_FLAGS_HEADERSPLIT;
             rxq->prod_bseq += frags->frag_arr[0].size;
-        
+
             #if DBG
             packet->u1.rx.dbg_bd1 = rxq->prod_bd;
             #endif
@@ -587,7 +587,7 @@ lm_post_buffers(
                 cur_bd->rx_bd_flags |= (u16_t)cur_idx << 4;
             }
         }
-        
+
         packet->u1.rx.next_bd_idx = rxq->prod_idx;
         /* Tag this bd for debugging.  The last nibble is the chain cid. */
         if(pdev->params.test_mode & TEST_MODE_RX_BD_TAGGING)
@@ -609,7 +609,7 @@ lm_post_buffers(
 
 /*******************************************************************************
  * DescriptionX_BD_FLAGS_HEADERSPLIT
- * 
+ *
  * Return:
  ******************************************************************************/
 void
@@ -626,7 +626,7 @@ lm_post_rx_bd(
 
     MBQ_WR32(
         pdev,
-        GET_CID(rxq->cid_addr), 
+        GET_CID(rxq->cid_addr),
         OFFSETOF(l2_bd_chain_context_t, l2ctx_host_bseq),
         rxq->prod_bseq);
 }
@@ -667,13 +667,13 @@ get_packets_rcvd(
         pkt = (lm_packet_t *) s_list_pop_head(&rxq->active_descq);
 
         DbgBreakIf(pkt == NULL);
-        if(!pkt) 
+        if(!pkt)
 		{
 			DbgBreakIf(!s_list_is_empty(&rxq->active_descq));
 			break;
 		}
         pkt_info = pkt->u1.rx.rx_pkt_info;
-        
+
         //mm_flush_cache(
         //    pdev,
         //    pkt_info->mem_virt,
@@ -693,9 +693,9 @@ get_packets_rcvd(
         {
             DbgBreakIf(!(rx_hdr->l2_fhdr_errors & L2_FHDR_ERRORS_ABORT_PKT));
             // Set upon the first BD detecting L2_FHDR_ERRORS_ABORT_PKT
-            l2_abort_packet = TRUE;    
+            l2_abort_packet = TRUE;
         }
-        
+
         if(l2_abort_packet)
         {
             pkt->status = LM_STATUS_ABORTED;
@@ -986,9 +986,9 @@ lm_recv_abort(
                 *pkt_arr_ptr = pkt;
                 pkt_arr_ptr++;
         }
-        
+
         mm_indicate_rx(pdev, idx, pkt_arr, pkt_cnt, FALSE);
     }
 } /* lm_recv_abort */
 
-#endif /*LM_NON_LEGACY_MODE_SUPPORT*/ 
+#endif /*LM_NON_LEGACY_MODE_SUPPORT*/

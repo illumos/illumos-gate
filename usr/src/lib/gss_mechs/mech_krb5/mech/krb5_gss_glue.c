@@ -3,7 +3,7 @@
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -13,7 +13,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -543,7 +543,7 @@ gssint_get_mech_configs(void)
 
 static OM_uint32
 k5glue_accept_sec_context(ctx, minor_status, context_handle, verifier_cred_handle,
-		       input_token, input_chan_bindings, src_name, mech_type, 
+		       input_token, input_chan_bindings, src_name, mech_type,
 		       output_token, ret_flags, time_rec, delegated_cred_handle)
     void *ctx;
      OM_uint32 *minor_status;
@@ -969,7 +969,7 @@ k5glue_seal(ctx, minor_status, context_handle, conf_req_flag, qop_req,
 
 static OM_uint32
 k5glue_sign(ctx, minor_status, context_handle,
-	      qop_req, message_buffer, 
+	      qop_req, message_buffer,
 	      message_token)
     void *ctx;
      OM_uint32 *minor_status;
@@ -1061,7 +1061,7 @@ k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
 #if 0
 /* V2 */
 static OM_uint32
-k5glue_unwrap(ctx, minor_status, context_handle, input_message_buffer, 
+k5glue_unwrap(ctx, minor_status, context_handle, input_message_buffer,
 	   output_message_buffer, conf_state, qop_state)
     void *ctx;
     OM_uint32		 *minor_status;
@@ -1197,7 +1197,7 @@ k5glue_duplicate_name(ctx, minor_status, input_name, dest_name)
 #endif
 
 
-OM_uint32 KRB5_CALLCONV 
+OM_uint32 KRB5_CALLCONV
 gss_krb5_copy_ccache(
     OM_uint32 *minor_status,
     gss_cred_id_t cred_handle,
@@ -1221,7 +1221,7 @@ gss_krb5_copy_ccache(
 
 OM_uint32 KRB5_CALLCONV
 gss_krb5_set_allowable_enctypes(
-    OM_uint32 *minor_status, 
+    OM_uint32 *minor_status,
     gss_cred_id_t cred,
     OM_uint32 num_ktypes,
     krb5_enctype *ktypes)

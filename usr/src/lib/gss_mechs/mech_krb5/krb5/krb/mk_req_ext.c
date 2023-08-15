@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_mk_req_extended()
  */
@@ -70,7 +70,7 @@
  returns system errors
 */
 
-static krb5_error_code 
+static krb5_error_code
 krb5_generate_authenticator (krb5_context,
 				       krb5_authenticator *, krb5_principal,
 				       krb5_checksum *, krb5_keyblock *,
@@ -143,14 +143,14 @@ krb5_mk_req_extended(krb5_context context, krb5_auth_context *auth_context,
     request.ap_options = ap_req_options & AP_OPTS_WIRE_MASK;
     request.authenticator.ciphertext.data = 0;
     request.ticket = 0;
-    
-    if (!in_creds->ticket.length) 
+
+    if (!in_creds->ticket.length)
 	return(KRB5_NO_TKT_SUPPLIED);
 
     /* we need a native ticket */
     if ((retval = decode_krb5_ticket(&(in_creds)->ticket, &request.ticket)))
 	return(retval);
-    
+
     /* verify that the ticket is not expired */
     if ((retval = krb5_validate_times(context, &in_creds->times)) != 0)
 	goto cleanup;
@@ -168,18 +168,18 @@ krb5_mk_req_extended(krb5_context context, krb5_auth_context *auth_context,
     }
 
     /* set auth context keyblock */
-    if ((retval = krb5_copy_keyblock(context, &in_creds->keyblock, 
+    if ((retval = krb5_copy_keyblock(context, &in_creds->keyblock,
 				     &((*auth_context)->keyblock))))
 	goto cleanup;
 
     /* generate seq number if needed */
     if ((((*auth_context)->auth_context_flags & KRB5_AUTH_CONTEXT_DO_SEQUENCE)
      || ((*auth_context)->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE))
-      && ((*auth_context)->local_seq_number == 0)) 
+      && ((*auth_context)->local_seq_number == 0))
 	if ((retval = krb5_generate_seq_number(context, &in_creds->keyblock,
 				     &(*auth_context)->local_seq_number)))
 	    goto cleanup;
-	
+
 
     /* generate subkey if needed */
     if (!in_data &&(*auth_context)->checksum_func) {
@@ -207,7 +207,7 @@ krb5_mk_req_extended(krb5_context context, krb5_auth_context *auth_context,
 	    checksum.length = in_data->length;
 	    checksum.contents = (krb5_octet *) in_data->data;
 	} else {
-	    if ((retval = krb5_c_make_checksum(context, 
+	    if ((retval = krb5_c_make_checksum(context,
 					       (*auth_context)->req_cksumtype,
 					       (*auth_context)->keyblock,
 					       KRB5_KEYUSAGE_AP_REQ_AUTH_CKSUM,
@@ -231,12 +231,12 @@ krb5_mk_req_extended(krb5_context context, krb5_auth_context *auth_context,
 					      (*auth_context)->local_seq_number,
 					      (in_creds)->authdata)))
 	goto cleanup_cksum;
-	
+
     /* encode the authenticator */
     if ((retval = encode_krb5_authenticator((*auth_context)->authentp,
 					    &scratch)))
 	goto cleanup_cksum;
-    
+
     /* Null out these fields, to prevent pointer sharing problems;
      * they were supplied by the caller
      */
@@ -280,7 +280,7 @@ static krb5_error_code
 krb5_generate_authenticator(krb5_context context, krb5_authenticator *authent, krb5_principal client, krb5_checksum *cksum, krb5_keyblock *key, krb5_ui_4 seq_number, krb5_authdata **authorization)
 {
     krb5_error_code retval;
-    
+
     authent->client = client;
     authent->checksum = cksum;
     if (key) {

@@ -1,6 +1,6 @@
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -10,7 +10,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -27,7 +27,7 @@
  */
 
 OM_uint32
-krb5_gss_process_context_token(minor_status, context_handle, 
+krb5_gss_process_context_token(minor_status, context_handle,
 			       token_buffer)
      OM_uint32 *minor_status;
      gss_ctx_id_t context_handle;
@@ -51,7 +51,7 @@ krb5_gss_process_context_token(minor_status, context_handle,
 
    /* "unseal" the token */
 
-   if (GSS_ERROR(majerr = kg_unseal(minor_status, context_handle, 
+   if (GSS_ERROR(majerr = kg_unseal(minor_status, context_handle,
                                     token_buffer,
 				    GSS_C_NO_BUFFER, NULL, NULL,
 				    KG_TOK_DEL_CTX)))

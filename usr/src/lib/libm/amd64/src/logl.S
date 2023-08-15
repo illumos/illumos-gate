@@ -32,7 +32,7 @@
 LIBM_ANSI_PRAGMA_WEAK(logl,function)
 
 	ENTRY(logl)
-	fldln2	
+	fldln2
 	fldt	8(%rsp)			/ st = arg, st(1) = loge(2)
 	fyl2x				/ st = ln(arg) = loge(2)*log2(arg)
 	ret

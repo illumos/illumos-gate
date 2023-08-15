@@ -249,8 +249,8 @@ typedef struct iscsi_ctx_offsets
     u32_t task_offset;     // offset of the task array
     u32_t r2tq_offset;     // offset of R2TQ section
 
-    u32_t max_num_of_tasks;     // maximal number of pending tasks 
-    u32_t max_num_of_ccells;    // maximal number of ccells 
+    u32_t max_num_of_tasks;     // maximal number of pending tasks
+    u32_t max_num_of_ccells;    // maximal number of ccells
 } iscsi_ctx_offsets_t;
 
 
@@ -268,7 +268,7 @@ typedef struct rv2ppq_iscsi_sgl_place
 		#define ISCSI_PLACE_OPERAND_FLAGS_DIGEST_EN		(1<<13)
 		#define ISCSI_PLACE_OPERAND_FLAGS_COMPLETE		(1<<14)
         /* overloading bit 14 */
-        #define ISCSI_PLACE_OPERAND_FLAGS_CU_PKT        (1<<14)  
+        #define ISCSI_PLACE_OPERAND_FLAGS_CU_PKT        (1<<14)
 		#define ISCSI_PLACE_OPERAND_FLAGS_FREE_MBUF		(1<<15)
 
 	u8_t	iscsi_sgl_place_tcp_flags;
@@ -331,7 +331,7 @@ typedef struct rv2ppq_iscsi_sgl_flush
 /*
  *  rv2ppq_iscsi_rq_flush definition
  */
-typedef struct rv2ppq_iscsi_rq_flush 
+typedef struct rv2ppq_iscsi_rq_flush
 {
 	u32_t	iscsi_rq_flush_cid;
 	u32_t	iscsi_rq_flush_unsused_a;
@@ -365,15 +365,15 @@ typedef struct comq_iscsi_sgl_place
 
 } comq_iscsi_sgl_place_t;
 
-typedef struct itt32_fields 
+typedef struct itt32_fields
 {
 	u32_t   task_rsrv	: 16;
 	u32_t 	task_type 	: 2;
 	u32_t   task_idx 	: 14;
-	
+
 } itt32_fields_t;
 
-typedef union itt32_union 
+typedef union itt32_union
 {
     itt32_fields_t 	fields;
     u32_t           itt32;
@@ -515,11 +515,11 @@ typedef struct comq_opaque_l5
 
 typedef struct rv2ppq_opaque_iscsi_kcqe_comp
 {
-    u32_t cid;                                           
-    u32_t iscsi_conn_id;                                           
-    u16_t opaque_flags_opcode;                              
-    u8_t reserved1;                                          
-    u8_t opcode;                                         
+    u32_t cid;
+    u32_t iscsi_conn_id;
+    u16_t opaque_flags_opcode;
+    u8_t reserved1;
+    u8_t opcode;
     u16_t unused_a[2];
 	u32_t reserved2[3];
     u32_t unused_b[2];
@@ -529,11 +529,11 @@ typedef struct rv2ppq_opaque_iscsi_kcqe_comp
 
 typedef struct comq_opaque_iscsi_kcqe_comp
 {
-	u32_t cid;                                           
-	u32_t iscsi_conn_id;                                           
-	u16_t opaque_flags_opcode;                              
-	u8_t reserved1;                                          
-	u8_t opcode;                                         
+	u32_t cid;
+	u32_t iscsi_conn_id;
+	u16_t opaque_flags_opcode;
+	u8_t reserved1;
+	u8_t opcode;
 	u32_t reserved2[3];
 	u32_t status_code;
 	u32_t reserved3[2];
@@ -543,10 +543,10 @@ typedef struct comq_opaque_iscsi_kcqe_comp
 // L5 context manager parameters context struct
 typedef struct l5_cm_fixed_connect_context
 {
-    u32_t fixed_seed /* 32 bits of secret passed by the driver for port 0 */; 
-    u32_t rsrv[31] /*  */; 
+    u32_t fixed_seed /* 32 bits of secret passed by the driver for port 0 */;
+    u32_t rsrv[31] /*  */;
 
-} l5_cm_fixed_connect_context_t; 
+} l5_cm_fixed_connect_context_t;
 
 // TCP general message for L5
 typedef struct comq_l5_tcp
@@ -2613,6 +2613,6 @@ typedef struct l5_context_l_xi
     typedef l5_context_b_t l5_context_t;
     typedef l5_context_b_xi_t l5_context_xi_t;
 #endif
-    
+
 
 #endif /* _l5_defs_h_ */

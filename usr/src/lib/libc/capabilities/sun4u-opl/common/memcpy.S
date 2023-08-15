@@ -152,7 +152,7 @@
 ! For SPARC64-VI, prefetch is effective for both integer and fp register
 ! operations. There are no benefits in using the fp registers for
 ! aligned data copying.
-	
+
 .dbmedl32enter:
 	subcc	%o2, 31, %o2		! adjust length to allow cc test
 					! for end of loop

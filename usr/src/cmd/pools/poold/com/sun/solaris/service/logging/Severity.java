@@ -179,9 +179,9 @@ public final class Severity extends Level {
 		Object displaced = severityMap.put(name, this);
 		assert (displaced == null);
 	}
-	
+
 	/**
-	 * Returns the Severity closest in meaning to the given Level. 
+	 * Returns the Severity closest in meaning to the given Level.
 	 * This is meant to be used by SyslogHandler to determine a
 	 * proper Severity for Records which only specify a Level.
 	 *

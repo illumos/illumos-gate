@@ -14,7 +14,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** The code in this file implements execution method of the 
+** The code in this file implements execution method of the
 ** Virtual Database Engine (VDBE).  A separate file ("vdbeaux.c")
 ** handles housekeeping details such as creating and deleting
 ** VDBE instances.  This file is solely interested in executing
@@ -24,10 +24,10 @@
 ** to a VDBE.
 **
 ** The SQL parser generates a program which is then executed by
-** the VDBE to do the work of the SQL statement.  VDBE programs are 
+** the VDBE to do the work of the SQL statement.  VDBE programs are
 ** similar in form to assembly language.  The program consists of
-** a linear sequence of operations.  Each operation has an opcode 
-** and 3 operands.  Operands P1 and P2 are integers.  Operand P3 
+** a linear sequence of operations.  Each operation has an opcode
+** and 3 operands.  Operands P1 and P2 are integers.  Operand P3
 ** is a null-terminated string.   The P2 operand must be non-negative.
 ** Opcodes will typically ignore one or more operands.  Many opcodes
 ** ignore all three operands.
@@ -36,7 +36,7 @@
 ** stack is either an integer, a null-terminated string, a floating point
 ** number, or the SQL "NULL" value.  An inplicit conversion from one
 ** type to the other occurs as necessary.
-** 
+**
 ** Most of the code in this file is taken up by the sqliteVdbeExec()
 ** function which does the work of interpreting a VDBE program.
 ** But other routines are also provided to help in building up
@@ -77,7 +77,7 @@ int sqlite_interrupt_count = 0;
 /*
 ** Advance the virtual machine to the next output row.
 **
-** The return vale will be either SQLITE_BUSY, SQLITE_DONE, 
+** The return vale will be either SQLITE_BUSY, SQLITE_DONE,
 ** SQLITE_ROW, SQLITE_ERROR, or SQLITE_MISUSE.
 **
 ** SQLITE_BUSY means that the virtual machine attempted to open
@@ -318,7 +318,7 @@ static int toInt(const char *zNum, int *pNum){
 ** Convert the given stack entity into a integer if it isn't one
 ** already.
 **
-** Any prior string or real representation is invalidated.  
+** Any prior string or real representation is invalidated.
 ** NULLs are converted into 0.
 */
 #define Integerify(P) if(((P)->flags&MEM_Int)==0){ hardIntegerify(P); }
@@ -601,7 +601,7 @@ int sqliteVdbeExec(
 /* Opcode:  Goto * P2 *
 **
 ** An unconditional jump to address P2.
-** The next instruction executed will be 
+** The next instruction executed will be
 ** the one at index P2 from the beginning of
 ** the program.
 */
@@ -660,7 +660,7 @@ case OP_Return: {
 ** rollback the current transaction.  Do not rollback if P2==OE_Fail.
 ** Do the rollback if P2==OE_Rollback.  If P2==OE_Abort, then back
 ** out all changes that have occurred during this execution of the
-** VDBE, but do not rollback the transaction. 
+** VDBE, but do not rollback the transaction.
 **
 ** There is an implied "Halt 0 0 0" instruction inserted at the very end of
 ** every program.  So a jump past the last instruction of the program
@@ -752,7 +752,7 @@ case OP_Pop: {
 
 /* Opcode: Dup P1 P2 *
 **
-** A copy of the P1-th element of the stack 
+** A copy of the P1-th element of the stack
 ** is made and pushed onto the top of the stack.
 ** The top of the stack is element 0.  So the
 ** instruction "Dup 0 0 0" will make a copy of the
@@ -790,7 +790,7 @@ case OP_Dup: {
 
 /* Opcode: Pull P1 * *
 **
-** The P1-th element is removed from its current location on 
+** The P1-th element is removed from its current location on
 ** the stack and pushed back on top of the stack.  The
 ** top of the stack is element 0, so "Pull 0 0 0" is
 ** a no-op.  "Pull 1 0 0" swaps the top two elements of
@@ -897,8 +897,8 @@ case OP_Callback: {
 
 /* Opcode: Concat P1 P2 P3
 **
-** Look at the first P1 elements of the stack.  Append them all 
-** together with the lowest element first.  Use P3 as a separator.  
+** Look at the first P1 elements of the stack.  Append them all
+** together with the lowest element first.  Use P3 as a separator.
 ** Put the result on the top of the stack.  The original P1 elements
 ** are popped from the stack if P2==0 and retained if P2==1.  If
 ** any element of the stack is NULL, then the result is NULL.
@@ -1125,7 +1125,7 @@ case OP_Function: {
     pTos->z = pTos->zShort;
   }
   if( ctx.isError ){
-    sqliteSetString(&p->zErrMsg, 
+    sqliteSetString(&p->zErrMsg,
        (pTos->flags & MEM_Str)!=0 ? pTos->z : "user function error", (char*)0);
     rc = SQLITE_ERROR;
   }
@@ -1195,7 +1195,7 @@ case OP_ShiftRight: {
 }
 
 /* Opcode: AddImm  P1 * *
-** 
+**
 ** Add the value P1 to whatever is on top of the stack.  The result
 ** is always an integer.
 **
@@ -1243,7 +1243,7 @@ case OP_ForceInt: {
 }
 
 /* Opcode: MustBeInt P1 P2 *
-** 
+**
 ** Force the top of the stack to be an integer.  If the top of the
 ** stack is not an integer and cannot be converted into an integer
 ** with out data loss, then jump immediately to P2, or if P2==0
@@ -1616,13 +1616,13 @@ case OP_StrGe: {
 **
 ** Pop two values off the stack.  Take the logical AND of the
 ** two values and push the resulting boolean value back onto the
-** stack. 
+** stack.
 */
 /* Opcode: Or * * *
 **
 ** Pop two values off the stack.  Take the logical OR of the
 ** two values and push the resulting boolean value back onto the
-** stack. 
+** stack.
 */
 case OP_And:
 case OP_Or: {
@@ -1952,7 +1952,7 @@ case OP_MakeRecord: {
 **
 ** Convert the top P1 entries of the stack into a single entry suitable
 ** for use as the key in an index.  The top P1 records are
-** converted to strings and merged.  The null-terminators 
+** converted to strings and merged.  The null-terminators
 ** are retained and used as separators.
 ** The lowest entry in the stack is the first field and the top of the
 ** stack becomes the last.
@@ -1968,7 +1968,7 @@ case OP_MakeRecord: {
 ** lowest element on the stack.  If P3 is NULL then all arguments are
 ** assumed to be of the numeric type.
 **
-** The type makes a difference in that text-type fields may not be 
+** The type makes a difference in that text-type fields may not be
 ** introduced by 'b' (as described in the next paragraph).  The
 ** first character of a text-type field must be either 'a' (if it is NULL)
 ** or 'c'.  Numeric fields will be introduced by 'b' if their content
@@ -2226,7 +2226,7 @@ case OP_Transaction: {
 case OP_Commit: {
   int i;
   if( db->xCommitCallback!=0 ){
-    if( sqliteSafetyOff(db) ) goto abort_due_to_misuse; 
+    if( sqliteSafetyOff(db) ) goto abort_due_to_misuse;
     if( db->xCommitCallback(db->pCommitArg)!=0 ){
       rc = SQLITE_CONSTRAINT;
     }
@@ -2319,7 +2319,7 @@ case OP_SetCookie: {
 /* Opcode: VerifyCookie P1 P2 *
 **
 ** Check the value of global database parameter number 0 (the
-** schema version) and make sure it is equal to P2.  
+** schema version) and make sure it is equal to P2.
 ** P1 is the database number which is 0 for the main database file
 ** and 1 for the file holding temporary tables and some higher number
 ** for auxiliary databases.
@@ -2346,9 +2346,9 @@ case OP_VerifyCookie: {
 /* Opcode: OpenRead P1 P2 P3
 **
 ** Open a read-only cursor for the database table whose root page is
-** P2 in a database file.  The database file is determined by an 
+** P2 in a database file.  The database file is determined by an
 ** integer from the top of the stack.  0 means the main database and
-** 1 means the database used for temporary tables.  Give the new 
+** 1 means the database used for temporary tables.  Give the new
 ** cursor an identifier of P1.  The P1 values need not be contiguous
 ** but all P1 values should be small integers.  It is an error for
 ** P1 to be negative.
@@ -2395,7 +2395,7 @@ case OP_OpenWrite: {
   int wrFlag;
   Btree *pX;
   int iDb;
-  
+
   assert( pTos>=p->aStack );
   Integerify(pTos);
   iDb = pTos->i;
@@ -2451,7 +2451,7 @@ case OP_OpenWrite: {
 /* Opcode: OpenTemp P1 P2 *
 **
 ** Open a new cursor to a transient table.
-** The transient cursor is always opened read/write even if 
+** The transient cursor is always opened read/write even if
 ** the main database is read-only.  The transient table is deleted
 ** automatically when the cursor is closed.
 **
@@ -2799,7 +2799,7 @@ case OP_NotExists: {
 **
 ** Get a new integer record number used as the key to a table.
 ** The record number is not previously used as a key in the database
-** table that cursor P1 points to.  The new record number is pushed 
+** table that cursor P1 points to.  The new record number is pushed
 ** onto the stack.
 */
 case OP_NewRecno: {
@@ -2824,7 +2824,7 @@ case OP_NewRecno: {
     ** and try again, up to 1000 times.
     **
     ** For a table with less than 2 billion entries, the probability
-    ** of not finding a unused rowid is about 1.0e-300.  This is a 
+    ** of not finding a unused rowid is about 1.0e-300.  This is a
     ** non-zero probability, but it is still vanishingly small and should
     ** never cause a problem.  You are much, much more likely to have a
     ** hardware failure than for this algorithm to fail.
@@ -2833,7 +2833,7 @@ case OP_NewRecno: {
     ** source of random numbers.  Is a library function like lrand48()
     ** good enough?  Maybe. Maybe not. It's hard to know whether there
     ** might be subtle bugs is some implementations of lrand48() that
-    ** could cause problems. To avoid uncertainty, SQLite uses its own 
+    ** could cause problems. To avoid uncertainty, SQLite uses its own
     ** random number generator based on the RC4 algorithm.
     **
     ** To promote locality of reference for repetitive inserts, the
@@ -3235,7 +3235,7 @@ case OP_Column: {
 **
 ** Push onto the stack an integer which is the first 4 bytes of the
 ** the key to the current entry in a sequential scan of the database
-** file P1.  The sequential scan should have been started using the 
+** file P1.  The sequential scan should have been started using the
 ** Next opcode.
 */
 case OP_Recno: {
@@ -3311,7 +3311,7 @@ case OP_FullKey: {
 /* Opcode: NullRow P1 * *
 **
 ** Move the cursor P1 to a null row.  Any OP_Column operations
-** that occur while the cursor is on the null row will always push 
+** that occur while the cursor is on the null row will always push
 ** a NULL onto the stack.
 */
 case OP_NullRow: {
@@ -3325,7 +3325,7 @@ case OP_NullRow: {
 
 /* Opcode: Last P1 P2 *
 **
-** The next use of the Recno or Column or Next instruction for P1 
+** The next use of the Recno or Column or Next instruction for P1
 ** will refer to the last entry in the database table or index.
 ** If the table or index is empty and P2>0, then jump immediately to P2.
 ** If P2 is 0 or if the table or index is not empty, fall through
@@ -3354,7 +3354,7 @@ case OP_Last: {
 
 /* Opcode: Rewind P1 P2 *
 **
-** The next use of the Recno or Column or Next instruction for P1 
+** The next use of the Recno or Column or Next instruction for P1
 ** will refer to the first entry in the database table or index.
 ** If the table or index is empty and P2>0, then jump immediately to P2.
 ** If P2 is 0 or if the table or index is not empty, fall through
@@ -3551,7 +3551,7 @@ case OP_IdxRecno: {
 **
 ** Compare the top of the stack against the key on the index entry that
 ** cursor P1 is currently pointing to.  Ignore the last 4 bytes of the
-** index entry.  If the index entry is greater than or equal to 
+** index entry.  If the index entry is greater than or equal to
 ** the top of the stack
 ** then jump to P2.  Otherwise fall through to the next instruction.
 ** In either case, the stack is popped once.
@@ -3574,7 +3574,7 @@ case OP_IdxGE: {
   assert( pTos>=p->aStack );
   if( (pCrsr = p->aCsr[i].pCursor)!=0 ){
     int res, rc;
- 
+
     Stringify(pTos);
     assert( p->aCsr[i].deferredMoveto==0 );
     rc = sqliteBtreeKeyCompare(pCrsr, pTos->z, pTos->n, 4, &res);
@@ -3807,7 +3807,7 @@ case OP_ListRewind: {
 /* Opcode: ListRead * P2 *
 **
 ** Attempt to read an integer from the temporary storage buffer
-** and push it onto the stack.  If the storage buffer is empty, 
+** and push it onto the stack.  If the storage buffer is empty,
 ** push nothing but instead jump to P2.
 */
 case OP_ListRead: {
@@ -3843,7 +3843,7 @@ case OP_ListReset: {
   break;
 }
 
-/* Opcode: ListPush * * * 
+/* Opcode: ListPush * * *
 **
 ** Save the current Vdbe list such that it can be restored by a ListPop
 ** opcode. The list is empty after this is executed.
@@ -3851,7 +3851,7 @@ case OP_ListReset: {
 case OP_ListPush: {
   p->keylistStackDepth++;
   assert(p->keylistStackDepth > 0);
-  p->keylistStack = sqliteRealloc(p->keylistStack, 
+  p->keylistStack = sqliteRealloc(p->keylistStack,
           sizeof(Keylist *) * p->keylistStackDepth);
   if( p->keylistStack==0 ) goto no_mem;
   p->keylistStack[p->keylistStackDepth - 1] = p->pList;
@@ -3859,7 +3859,7 @@ case OP_ListPush: {
   break;
 }
 
-/* Opcode: ListPop * * * 
+/* Opcode: ListPop * * *
 **
 ** Restore the Vdbe list to the state it was in when ListPush was last
 ** executed.
@@ -3877,7 +3877,7 @@ case OP_ListPop: {
   break;
 }
 
-/* Opcode: ContextPush * * * 
+/* Opcode: ContextPush * * *
 **
 ** Save the current Vdbe context such that it can be restored by a ContextPop
 ** opcode. The context stores the last insert row id, the last statement change
@@ -3886,7 +3886,7 @@ case OP_ListPop: {
 case OP_ContextPush: {
   p->contextStackDepth++;
   assert(p->contextStackDepth > 0);
-  p->contextStack = sqliteRealloc(p->contextStack, 
+  p->contextStack = sqliteRealloc(p->contextStack,
           sizeof(Context) * p->contextStackDepth);
   if( p->contextStack==0 ) goto no_mem;
   p->contextStack[p->contextStackDepth - 1].lastRowid = p->db->lastRowid;
@@ -3895,7 +3895,7 @@ case OP_ContextPush: {
   break;
 }
 
-/* Opcode: ContextPop * * * 
+/* Opcode: ContextPop * * *
 **
 ** Restore the Vdbe context to the state it was in when contextPush was last
 ** executed. The context stores the last insert row id, the last statement
@@ -3987,7 +3987,7 @@ case OP_SortMakeRec: {
 /* Opcode: SortMakeKey * * P3
 **
 ** Convert the top few entries of the stack into a sort key.  The
-** number of stack entries consumed is the number of characters in 
+** number of stack entries consumed is the number of characters in
 ** the string P3.  One character from P3 is prepended to each entry.
 ** The first character of P3 is prepended to the element lowest in
 ** the stack and the last character of P3 is prepended to the top of
@@ -4084,7 +4084,7 @@ case OP_Sort: {
 **
 ** Push the data for the topmost element in the sorter onto the
 ** stack, then remove the element from the sorter.  If the sorter
-** is empty, push nothing on the stack and instead jump immediately 
+** is empty, push nothing on the stack and instead jump immediately
 ** to instruction P2.
 */
 case OP_SortNext: {
@@ -4228,7 +4228,7 @@ case OP_FileRead: {
   for(i=1; *z!=0 && i<=nField; i++){
     int from, to;
     from = to = 0;
-    if( z[0]=='\\' && z[1]=='N' 
+    if( z[0]=='\\' && z[1]=='N'
        && (z[2]==0 || strncmp(&z[2],zDelim,nDelim)==0) ){
       if( i<=nField ) p->azField[i-1] = 0;
       z += 2 + nDelim;
@@ -4506,7 +4506,7 @@ case OP_AggFocus: {
   }
   Release(pTos);
   pTos--;
-  break; 
+  break;
 }
 
 /* Opcode: AggSet * P2 *
@@ -4660,7 +4660,7 @@ case OP_SetFound: {
 /* Opcode: SetNotFound P1 P2 *
 **
 ** Pop the stack once and compare the value popped off with the
-** contents of set P1.  If the element popped does not exists in 
+** contents of set P1.  If the element popped does not exists in
 ** set P1, then jump to P2.  Otherwise fall through.
 */
 case OP_SetNotFound: {
@@ -4688,7 +4688,7 @@ case OP_SetNotFound: {
 ** are no more elements in the set, do not do the push and fall through.
 ** Otherwise, jump to P2 after pushing the next set element.
 */
-case OP_SetFirst: 
+case OP_SetFirst:
 case OP_SetNext: {
   Set *pSet;
   CHECK_FOR_INTERRUPT;
@@ -4727,7 +4727,7 @@ case OP_SetNext: {
 ** a transaction.
 */
 case OP_Vacuum: {
-  if( sqliteSafetyOff(db) ) goto abort_due_to_misuse; 
+  if( sqliteSafetyOff(db) ) goto abort_due_to_misuse;
   rc = sqliteRunVacuum(&p->zErrMsg, db);
   if( sqliteSafetyOn(db) ) goto abort_due_to_misuse;
   break;

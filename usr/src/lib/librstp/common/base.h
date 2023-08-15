@@ -1,27 +1,27 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
 /* Mutual RSTP definitions */
- 
+
 #ifndef _STP_BASE_H__
 #define _STP_BASE_H__
 
@@ -38,7 +38,7 @@
 #else
 #  include <psos.h>
 #  include "comdef.h"
-#  include "comdef.x"                        
+#  include "comdef.x"
 #  include "Bitmap/bitmap.h"
 #  include "Bitmap/bitmap.x"
 #  include "Ui/uid_stp.h"
@@ -106,8 +106,8 @@ typedef enum RSTP_ERRORS RSTP_ERRORS_T;
 #if !defined(__LINUX__) && !defined(__SUN__)
 extern char* strdup (const char *s);
 
-extern USHORT Ntohs (USHORT n); 
-extern ULONG Htonl (ULONG h);   
+extern USHORT Ntohs (USHORT n);
+extern ULONG Htonl (ULONG h);
 extern USHORT Htons (USHORT h);
 extern ULONG Ntohl (ULONG n);
 

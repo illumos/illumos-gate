@@ -55,15 +55,15 @@ lm_mwrite(
         mm_wait(pdev, 40);
     }
 
-    tmp = (phy_addr << 21) | 
-        (reg << 16) | 
+    tmp = (phy_addr << 21) |
+        (reg << 16) |
         val |
         EMAC_MDIO_COMM_COMMAND_WRITE_TE |
         EMAC_MDIO_COMM_START_BUSY |
         EMAC_MDIO_COMM_DISEXT;
 
     REG_WR(pdev, emac.emac_mdio_comm, tmp);
-    
+
     for(cnt = 0; cnt < 1000; cnt++)
     {
         mm_wait(pdev, 10);
@@ -128,7 +128,7 @@ lm_mread(
         mm_wait(pdev, 40);
     }
 
-    val = (phy_addr << 21) | 
+    val = (phy_addr << 21) |
         (reg << 16) |
         EMAC_MDIO_COMM_COMMAND_READ_TE |
         EMAC_MDIO_COMM_DISEXT |
@@ -297,7 +297,7 @@ init_utp(
     for(cnt = 0; cnt < 1000; cnt++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(pdev, pdev->params.phy_addr, PHY_CTRL_REG, &val);
 
         if(!(val & PHY_CTRL_PHY_RESET))
@@ -351,7 +351,7 @@ init_utp(
         /* Enable/Disable Ethernet@WireSpeed. */
         (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x18, 0x7007);
         (void) lm_mread(pdev, pdev->params.phy_addr, 0x18, &val);
-        
+
         val &= 0x0ff8;
 
         if(wire_speed)
@@ -365,14 +365,14 @@ init_utp(
         (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x18, val | 0x8000 | 0x7);
 
         /*
-         * Cont00039501	Issue Description: Auto MDIX mode doesn't work in forced speed 
+         * Cont00039501	Issue Description: Auto MDIX mode doesn't work in forced speed
          * while two 5716 connected back-to-back
          */
         (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x18, 0x7007);
         (void) lm_mread(pdev, pdev->params.phy_addr, 0x18, &val);
         val |= BIT_9; /*auto mdix*/
         (void) lm_mwrite(pdev, pdev->params.phy_addr, BCM5401_AUX_CTRL, val | 0x8000 | 0x7);
-        
+
     }
 
     /* Expansion register 0x8 is the 10BT control register.  BIT 8 of this
@@ -415,7 +415,7 @@ init_utp(
         case LM_MEDIUM_SPEED_10MBPS:
             /* Don't advertise 1000mb.  This register is undefined on a
              * 10/100 Mb PHY. */
-            (void) lm_mwrite(pdev, pdev->params.phy_addr, PHY_1000BASET_CTRL_REG, 0); 
+            (void) lm_mwrite(pdev, pdev->params.phy_addr, PHY_1000BASET_CTRL_REG, 0);
 
             /* Setup AN_AD to advertise 10mb. */
             val = PHY_AN_AD_PROTOCOL_802_3_CSMA_CD;
@@ -454,18 +454,18 @@ init_utp(
                 {
                     DbgMessage(pdev, INFORM, "force 10mb hd\n");
                     (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
-                        PHY_CTRL_REG, 
+                        PHY_CTRL_REG,
                         PHY_CTRL_SPEED_SELECT_10MBPS);
                 }
                 else
                 {
                     DbgMessage(pdev, INFORM, "force 10mb fd\n");
                     (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
-                        PHY_CTRL_REG, 
+                        PHY_CTRL_REG,
                         PHY_CTRL_SPEED_SELECT_10MBPS |
                             PHY_CTRL_FULL_DUPLEX_MODE);
                 }
@@ -476,7 +476,7 @@ init_utp(
         case LM_MEDIUM_SPEED_100MBPS:
             /* Don't advertise 1000mb.  This register is undefined on a
              * 10/100 PHY. */
-            (void) lm_mwrite(pdev, pdev->params.phy_addr, PHY_1000BASET_CTRL_REG, 0); 
+            (void) lm_mwrite(pdev, pdev->params.phy_addr, PHY_1000BASET_CTRL_REG, 0);
 
             /* Setup AN_AD to advertise 10/100mb. */
             val = PHY_AN_AD_PROTOCOL_802_3_CSMA_CD;
@@ -520,7 +520,7 @@ init_utp(
                 {
                     DbgMessage(pdev, INFORM, "force 100mb hd\n");
                     (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         PHY_CTRL_REG,
                         PHY_CTRL_SPEED_SELECT_100MBPS);
@@ -529,7 +529,7 @@ init_utp(
                 {
                     DbgMessage(pdev, INFORM, "force 100mb fd\n");
                     (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         PHY_CTRL_REG,
                         PHY_CTRL_SPEED_SELECT_100MBPS |
@@ -583,9 +583,9 @@ init_utp(
             {
                 /* external loopback at 1gb link. */
                 (void) lm_mwrite(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        PHY_CTRL_REG, 
+                        pdev,
+                        pdev->params.phy_addr,
+                        PHY_CTRL_REG,
                         PHY_CTRL_SPEED_SELECT_1000MBPS);
 
                 (void) lm_mwrite(pdev, pdev->params.phy_addr, BCM5401_AUX_CTRL, 0x7);
@@ -613,7 +613,7 @@ init_utp(
             /* Advertise 1000Mbps.  This register is undefined on a
              * 10/100 Mb PHY. */
             (void) lm_mwrite(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 PHY_1000BASET_CTRL_REG,
                 PHY_AN_AD_1000BASET_HALF |
@@ -637,7 +637,7 @@ init_utp(
         DbgMessage(pdev, INFORM, "phy init - restart autoneg\n");
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             PHY_CTRL_REG,
             PHY_CTRL_AUTO_NEG_ENABLE | PHY_CTRL_RESTART_AUTO_NEG);
@@ -758,7 +758,7 @@ set_5708_serdes_pre_emphasis(
     if(pre_emphasis == 0)
     {
         (void) lm_mread(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_aneg_nxt_pg_rcv2),
             &pre_emphasis);
@@ -772,14 +772,14 @@ set_5708_serdes_pre_emphasis(
 
             /* Switch to Bank 5. */
             (void) lm_mwrite(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 MII_REG(serdes_reg_t, mii_block_addr),
                 MII_BLK_ADDR_TXMISC);
 
             /* Write the new pre-emphasis. */
             (void) lm_mread(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 0x10+MII_REG(serdes_tx_misc_reg_t, mii_txactl3),
                 &val);
@@ -792,21 +792,21 @@ set_5708_serdes_pre_emphasis(
             val = (val & 0x0fff) | pre_emphasis;
 
             (void) lm_mwrite(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 0x10+MII_REG(serdes_tx_misc_reg_t, mii_txactl3),
                 val);
-            
+
             /* Select Bank 0. */
             (void) lm_mwrite(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 MII_REG(serdes_reg_t, mii_block_addr),
                 MII_BLK_ADDR_DIGITAL);
 
             /* Restart autoneg. */
             (void) lm_mwrite(
-                pdev, 
+                pdev,
                 pdev->params.phy_addr,
                 MII_REG(serdes_reg_t, mii_ctrl),
                 MII_CTRL_RESTART_ANEG | MII_CTRL_ANEG_ENA);
@@ -815,19 +815,19 @@ set_5708_serdes_pre_emphasis(
     else
     {
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_block_addr),
             MII_BLK_ADDR_TXMISC);
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_tx_misc_reg_t, mii_txactl3),
             pre_emphasis);
-        
+
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_block_addr),
             MII_BLK_ADDR_DIGITAL);
@@ -890,19 +890,19 @@ init_5708_serdes(
 
     /* Reset the SERDES. */
     (void) lm_mwrite(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_ctrl), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_ctrl),
             MII_CTRL_RESET);
 
     for(cnt = 0; cnt < 1000; cnt++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                MII_REG(serdes_reg_t, mii_ctrl), 
+                pdev,
+                pdev->params.phy_addr,
+                MII_REG(serdes_reg_t, mii_ctrl),
                 &val);
 
         if(!(val & MII_CTRL_RESET))
@@ -924,13 +924,13 @@ init_5708_serdes(
     {
         /* Switch to Bank 5. */
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_block_addr),
             MII_BLK_ADDR_TXMISC);
 
         (void) lm_mread(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_tx_misc_reg_t, mii_txactl1),
             &val);
@@ -938,7 +938,7 @@ init_5708_serdes(
         val &= ~ MII_TXACTL1_DRIVER_VCM;
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_tx_misc_reg_t, mii_txactl1),
             val);
@@ -955,17 +955,17 @@ init_5708_serdes(
 
     /* Get the PHY id. */
     (void) lm_mread(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_phy_id_msb), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_phy_id_msb),
             &val);
     pdev->hw_info.phy_id = val << 16;
     DbgMessage1(pdev, INFORM, "Phy Id1 0x%x\n", val);
 
     (void) lm_mread(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_phy_id_lsb), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_phy_id_lsb),
             &val);
     pdev->hw_info.phy_id |= val & 0xffff;
     DbgMessage1(pdev, INFORM, "Phy Id2 0x%x\n", val);
@@ -975,26 +975,26 @@ init_5708_serdes(
 
     /* Enable 2.5G register set to be accessible in the IEEE registers. */
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_block_addr),
         MII_BLK_ADDR_DIGITAL3);
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         0x10+MII_REG(serdes_digital3_reg_t, mii_digctl_3_0),
         MII_DIG3_USE_IEEE);
 
     /* Switch back to the IEEE Bank. */
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_block_addr),
         MII_BLK_ADDR_DIGITAL);
 
     /* Enable SGMII/Fiber mode autodetection. */
     (void) lm_mread(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
         &val);
@@ -1013,14 +1013,14 @@ init_5708_serdes(
     }
 
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
         val);
 
     /* We should always enable parallel detection. */
     (void) lm_mread(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl2),
         &val);
@@ -1028,14 +1028,14 @@ init_5708_serdes(
     val |= MII_1000X_CTL2_PAR_DET_EN;
 
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl2),
         val);
 
     /* Enable/disable 2.5G capability. */
     (void) lm_mread(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_aneg_nxt_pg_xmit1),
         &val);
@@ -1062,7 +1062,7 @@ init_5708_serdes(
     }
 
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_aneg_nxt_pg_xmit1),
         val);
@@ -1080,13 +1080,13 @@ init_5708_serdes(
         }
 
         (void) lm_mwrite(
-                pdev, 
-                pdev->params.phy_addr, 
-                MII_REG(serdes_reg_t, mii_aneg_advert), 
+                pdev,
+                pdev->params.phy_addr,
+                MII_REG(serdes_reg_t, mii_aneg_advert),
                 val);
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_ctrl),
             MII_CTRL_RESTART_ANEG | MII_CTRL_ANEG_ENA);
@@ -1104,18 +1104,18 @@ init_5708_serdes(
                 }
 
                 (void) lm_mwrite(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        MII_REG(serdes_reg_t, mii_ctrl), 
+                        pdev,
+                        pdev->params.phy_addr,
+                        MII_REG(serdes_reg_t, mii_ctrl),
                         val);
                 /* Switch to SGMII mode and disable auto-detect */
                 (void) lm_mread(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
                         &val);
                 (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
                         val & ~(MII_1000X_CTL1_FIBER_MODE | MII_1000X_CTL1_AUTODET_EN));
@@ -1130,18 +1130,18 @@ init_5708_serdes(
                 val |= MII_CTRL_MANUAL_SPD0;
 
                 (void) lm_mwrite(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        MII_REG(serdes_reg_t, mii_ctrl), 
+                        pdev,
+                        pdev->params.phy_addr,
+                        MII_REG(serdes_reg_t, mii_ctrl),
                         val);
                 /* Switch to SGMII mode and disable auto-detect */
                 (void) lm_mread(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
                         &val);
                 (void) lm_mwrite(
-                        pdev, 
+                        pdev,
                         pdev->params.phy_addr,
                         0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl1),
                         val & ~(MII_1000X_CTL1_FIBER_MODE | MII_1000X_CTL1_AUTODET_EN));
@@ -1156,9 +1156,9 @@ init_5708_serdes(
                 val |= MII_CTRL_MANUAL_SPD1;
 
                 (void) lm_mwrite(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        MII_REG(serdes_reg_t, mii_ctrl), 
+                        pdev,
+                        pdev->params.phy_addr,
+                        MII_REG(serdes_reg_t, mii_ctrl),
                         val);
                 break;
 
@@ -1171,9 +1171,9 @@ init_5708_serdes(
                 val |= MII_CTRL_MANUAL_FORCE_2500;
 
                 (void) lm_mwrite(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        MII_REG(serdes_reg_t, mii_ctrl), 
+                        pdev,
+                        pdev->params.phy_addr,
+                        MII_REG(serdes_reg_t, mii_ctrl),
                         val);
                 break;
         }
@@ -1190,7 +1190,7 @@ init_5708_serdes(
     if(pdev->params.mtu > MAX_ETHERNET_PACKET_SIZE)
     {
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl3),
             MII_1000X_CTL3_FIFO_ELAST_10K);
@@ -1198,7 +1198,7 @@ init_5708_serdes(
     else
     {
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_digital_reg_t, mii_1000x_ctl3),
             0);
@@ -1213,7 +1213,7 @@ init_5708_serdes(
 
     /* Wait for link. */
     (void) lm_mread(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_status),
         &val);
@@ -1221,7 +1221,7 @@ init_5708_serdes(
     for(; ;)
     {
         (void) lm_mread(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_status),
             &val);
@@ -1242,7 +1242,7 @@ init_5708_serdes(
 
     /* Need to read a second time to get the current link status. */
     (void) lm_mread(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         MII_REG(serdes_reg_t, mii_status),
         &val);
@@ -1396,7 +1396,7 @@ init_5709_serdes_for_autoneg(
 
     /* select bam next page block. */
     (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x1f, 0x8350);
-    
+
     /* mp5_next_page_control. */
     (void) lm_mread(pdev, pdev->params.phy_addr, 0x10, &val);
     val &= ~3;
@@ -1444,7 +1444,7 @@ init_5709_serdes_for_autoneg(
 
     /* autoneg_enable and restart. */
     (void) lm_mread(pdev, pdev->params.phy_addr, 0x10, &val);
-    val |= 0x1200; 
+    val |= 0x1200;
     (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x10, val);
 } /* init_5709_serdes_for_autoneg */
 
@@ -1512,7 +1512,7 @@ init_5709_serdes(
     for(idx = 0; idx < 1000; idx++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(pdev, pdev->params.phy_addr, 0x10, &val);
         if(!(val & MII_CTRL_RESET))
         {
@@ -1656,7 +1656,7 @@ init_5706_serdes(
     for(cnt = 0; cnt < 1000; cnt++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(pdev, pdev->params.phy_addr, PHY_CTRL_REG, &val);
 
         if(!(val & PHY_CTRL_PHY_RESET))
@@ -1689,7 +1689,7 @@ init_5706_serdes(
     if(CHIP_NUM(pdev) == CHIP_NUM_5706 &&
         lm_get_medium(pdev) == LM_MEDIUM_TYPE_FIBER)
     {
-        REG_WR(pdev, misc.misc_gp_hw_ctl0, 
+        REG_WR(pdev, misc.misc_gp_hw_ctl0,
                 MISC_GP_HW_CTL0_ENA_SEL_VAUX_B_IN_L2_TE |
                 MISC_GP_HW_CTL0_GRC_BNK_FREE_FIX_TE);
     }
@@ -1850,14 +1850,14 @@ init_serdes_or_phy_loopback(
     u32_t val;
 
     (void) lm_mwrite(
-        pdev, 
-        pdev->params.phy_addr, 
-        PHY_CTRL_REG, 
+        pdev,
+        pdev->params.phy_addr,
+        PHY_CTRL_REG,
         PHY_CTRL_PHY_RESET);
     for(cnt = 0; cnt < 1000; cnt++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(pdev, pdev->params.phy_addr, PHY_CTRL_REG, &val);
 
         if(!(val & PHY_CTRL_PHY_RESET))
@@ -1885,10 +1885,10 @@ init_serdes_or_phy_loopback(
 
     /* Set the phy into loopback mode. */
     (void) lm_mwrite(
-        pdev, 
+        pdev,
         pdev->params.phy_addr,
         PHY_CTRL_REG,
-        PHY_CTRL_LOOPBACK_MODE | 
+        PHY_CTRL_LOOPBACK_MODE |
             PHY_CTRL_FULL_DUPLEX_MODE |
             PHY_CTRL_SPEED_SELECT_1000MBPS);
 } /* init_serdes_or_phy_loopback */
@@ -1919,7 +1919,7 @@ init_5709_serdes_loopback(
     for(idx = 0; idx < 1000; idx++)
     {
         mm_wait(pdev, 5);
-        
+
         (void) lm_mread(pdev, pdev->params.phy_addr, 0x10, &val);
         if(!(val & MII_CTRL_RESET))
         {
@@ -1946,7 +1946,7 @@ init_5709_serdes_loopback(
     (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x1f, 0xffe0);
 
     /*CQ31687:set autoneg_enable bit too.*/
-    /* Set the phy into loopback mode. */ 
+    /* Set the phy into loopback mode. */
     (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x10, 0x5140);
 
 } /* init_5709_serdes_loopback */
@@ -1971,7 +1971,7 @@ init_loopback_mac_link(
 
     if(GET_MEDIUM_TYPE(req_medium) == LM_MEDIUM_TYPE_PHY_LOOPBACK)
     {
-        if(CHIP_NUM(pdev) == CHIP_NUM_5709 && 
+        if(CHIP_NUM(pdev) == CHIP_NUM_5709 &&
             lm_get_medium(pdev) == LM_MEDIUM_TYPE_FIBER)
         {
             init_5709_serdes_loopback(pdev);
@@ -2364,7 +2364,7 @@ lm_init_phy(
             lm_status = init_utp(
                 pdev,
                 req_medium,
-                flow_ctrl, 
+                flow_ctrl,
                 selective_autoneg,
                 wire_speed,
                 wait_link_timeout_us);
@@ -2569,15 +2569,15 @@ set_mac_flow_control(
         else
         {
             (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                PHY_AN_AD_REG, 
+                pdev,
+                pdev->params.phy_addr,
+                PHY_AN_AD_REG,
                 &local_phy_ad);
 
             (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                PHY_LINK_PARTNER_ABILITY_REG, 
+                pdev,
+                pdev->params.phy_addr,
+                PHY_LINK_PARTNER_ABILITY_REG,
                 &remote_phy_ad);
         }
     }
@@ -2593,7 +2593,7 @@ set_mac_flow_control(
     {
         DbgMessage(pdev, INFORM, "   ASYM_PAUSE capable.\n");
     }
-            
+
     DbgMessage(pdev, INFORM, "Remote flow control settings.\n");
 
     if(remote_phy_ad & PHY_LINK_PARTNER_PAUSE_CAPABLE)
@@ -2715,7 +2715,7 @@ set_mac_flow_control(
         else
         {
             // RV2P is checking for non-zero in this byte field
-            val &= ~0xFF;  
+            val &= ~0xFF;
         }
         CTX_WR(
             pdev,
@@ -2801,14 +2801,14 @@ get_copper_phy_link(
 
         /* Get local and remote 1000BASET advertisement. */
         (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                PHY_1000BASET_CTRL_REG, 
+                pdev,
+                pdev->params.phy_addr,
+                PHY_1000BASET_CTRL_REG,
                 &local_adv);
         (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                PHY_1000BASET_STATUS_REG, 
+                pdev,
+                pdev->params.phy_addr,
+                PHY_1000BASET_STATUS_REG,
                 &remote_adv);
 
         val = local_adv & (remote_adv >> 2);
@@ -2830,15 +2830,15 @@ get_copper_phy_link(
         {
             /* Get local and remote 10/100 mb advertisement. */
             (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_AN_AD_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_AN_AD_REG,
                     &local_adv);
 
             (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_LINK_PARTNER_ABILITY_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_LINK_PARTNER_ABILITY_REG,
                     &remote_adv);
 
             val = local_adv & remote_adv;
@@ -3072,7 +3072,7 @@ serdes_fallback(
         DbgMessage(pdev, INFORM, "no cable, default to autoneg.\n");
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             PHY_CTRL_REG,
             PHY_CTRL_AUTO_NEG_ENABLE);
@@ -3104,7 +3104,7 @@ serdes_fallback(
         DbgMessage(pdev, INFORM, "switch to force mode - 1G full\n");
 
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             PHY_CTRL_REG,
             PHY_CTRL_SPEED_SELECT_1000MBPS | PHY_CTRL_FULL_DUPLEX_MODE);
@@ -3117,7 +3117,7 @@ serdes_fallback(
 
         /* Switch to autoneg mode. */
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             PHY_CTRL_REG,
             PHY_CTRL_AUTO_NEG_ENABLE | PHY_CTRL_RESTART_AUTO_NEG);
@@ -3170,14 +3170,14 @@ get_5708_serdes_link(
     /* Check for link.  The first read returns the latched value, the
      * second read returns the current value. */
     (void) lm_mread(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_status), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_status),
             &val);
     (void) lm_mread(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_status), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_status),
             &val);
 
     /* CQ#23742 - Link status in the status block and the link status
@@ -3188,9 +3188,9 @@ get_5708_serdes_link(
         mm_wait(pdev, 10);
 
         (void) lm_mread(
-                pdev, 
-                pdev->params.phy_addr, 
-                MII_REG(serdes_reg_t, mii_status), 
+                pdev,
+                pdev->params.phy_addr,
+                MII_REG(serdes_reg_t, mii_status),
                 &val);
     }
 
@@ -3208,22 +3208,22 @@ get_5708_serdes_link(
 
     /* Determine duplex mode.  Link is present also means autoneg is done. */
     (void) lm_mread(
-            pdev, 
-            pdev->params.phy_addr, 
-            MII_REG(serdes_reg_t, mii_ctrl), 
+            pdev,
+            pdev->params.phy_addr,
+            MII_REG(serdes_reg_t, mii_ctrl),
             &val);
     if(val & MII_CTRL_ANEG_ENA)
     {
         /* Select Bank 0. */
         (void) lm_mwrite(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             MII_REG(serdes_reg_t, mii_block_addr),
             MII_BLK_ADDR_DIGITAL);
 
         /* Get the negotiated speed and duplex mode. */
         (void) lm_mread(
-            pdev, 
+            pdev,
             pdev->params.phy_addr,
             0x10+MII_REG(serdes_digital_reg_t, mii_1000x_stat1),
             &val);
@@ -3260,9 +3260,9 @@ get_5708_serdes_link(
         else
         {
             (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    MII_REG(serdes_reg_t, mii_status), 
+                    pdev,
+                    pdev->params.phy_addr,
+                    MII_REG(serdes_reg_t, mii_status),
                     &val);
             if(val & MII_STAT_ANEG_CMPL)
             {
@@ -3375,7 +3375,7 @@ get_5709_serdes_link(
 
     link = LM_STATUS_LINK_ACTIVE;
     pdev->vars.cable_is_attached = TRUE;
-    
+
     /* select combo ieee0 block. */
     (void) lm_mwrite(pdev, pdev->params.phy_addr, 0x1f, 0xffe0);
 
@@ -3499,14 +3499,14 @@ get_5706_serdes_link(
         if(phy_ctrl & PHY_CTRL_AUTO_NEG_ENABLE)
         {
             (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_AN_AD_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_AN_AD_REG,
                     &local_adv);
             (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_LINK_PARTNER_ABILITY_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_LINK_PARTNER_ABILITY_REG,
                     &remote_adv);
 
             val = local_adv & remote_adv;
@@ -3843,9 +3843,9 @@ lm_init_mac_link(
             {
                 u32_t remote_phy_ad;
                 (void) lm_mread(
-                        pdev, 
-                        pdev->params.phy_addr, 
-                        PHY_1000BASET_STATUS_REG, 
+                        pdev,
+                        pdev->params.phy_addr,
+                        PHY_1000BASET_STATUS_REG,
                         &remote_phy_ad);
 
                 if(remote_phy_ad & PHY_LINK_PARTNER_1000BASET_FULL)
@@ -3854,13 +3854,13 @@ lm_init_mac_link(
                     val |= NETLINK_GET_LINK_STATUS_PARTNER_AD_1000HALF;
 
                 (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_LINK_PARTNER_ABILITY_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_LINK_PARTNER_ABILITY_REG,
                     &remote_phy_ad);
-                if (remote_phy_ad & PHY_LINK_PARTNER_10BASET_HALF)              
+                if (remote_phy_ad & PHY_LINK_PARTNER_10BASET_HALF)
                     val |= NETLINK_GET_LINK_STATUS_PARTNER_AD_10HALF;
-                if (remote_phy_ad & PHY_LINK_PARTNER_10BASET_FULL)               
+                if (remote_phy_ad & PHY_LINK_PARTNER_10BASET_FULL)
                     val |= NETLINK_GET_LINK_STATUS_PARTNER_AD_10FULL;
                 if (remote_phy_ad & PHY_LINK_PARTNER_100BASETX_HALF)
                     val |= NETLINK_GET_LINK_STATUS_PARTNER_AD_100HALF;
@@ -3871,15 +3871,15 @@ lm_init_mac_link(
                 if (remote_phy_ad & PHY_LINK_PARTNER_ASYM_PAUSE)
                     val |= NETLINK_GET_LINK_STATUS_PARTNER_ASYM_PAUSE_CAP;
                 // Read PHY_AN_EXPANSION_REG to see if Link partner support auto
-                // negotiation 
+                // negotiation
                 (void) lm_mread(
-                    pdev, 
-                    pdev->params.phy_addr, 
-                    PHY_AN_EXPANSION_REG, 
+                    pdev,
+                    pdev->params.phy_addr,
+                    PHY_AN_EXPANSION_REG,
                     &remote_phy_ad);
                 // If Link partner does not support auto negotiation,  we assume
                 // parallel detection was used to get link.
-                if ((remote_phy_ad & PHY_LINK_PARTNER_AUTONEG_ABILITY) == 0)              
+                if ((remote_phy_ad & PHY_LINK_PARTNER_AUTONEG_ABILITY) == 0)
                     val |= NETLINK_GET_LINK_STATUS_PARALLEL_DET;
             }
         }
@@ -3901,7 +3901,7 @@ lm_init_mac_link(
         pdev->hw_info.shmem_base +
             OFFSETOF(shmem_region_t, drv_fw_mb.link_status),
         val);
-        
+
     return lm_status;
 } /* lm_init_mac_link */
 

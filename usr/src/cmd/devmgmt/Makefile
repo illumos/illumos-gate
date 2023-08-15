@@ -44,5 +44,5 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
- 
+
 include ../Makefile.targ

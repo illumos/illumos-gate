@@ -33,7 +33,7 @@
 #include <sys/intreg.h>
 #include <sys/vis.h>
 #include <sys/clock.h>
-#include <vm/hat_sfmmu.h>	
+#include <vm/hat_sfmmu.h>
 
 	.weak	cpu_feature_init
 	.type	cpu_feature_init, #function
@@ -83,7 +83,7 @@ tmpstk:
 
 	call	sfmmu_mp_startup
 	sub	%g0, 1, THREAD_REG	! catch any curthread acceses
-	
+
 	! On OPL platforms, context page size TLB programming must be enabled in
 	! ASI_MEMCNTL.  To avoid Olympus-C and Jupiter sTLB errata (strands with
 	! different TLB page size settings), this must be done here before any
@@ -100,13 +100,13 @@ tmpstk:
 0:
 	! SET_KCONTEXTREG(reg0, reg1, reg2, reg3, reg4, label1, label2, label3)
 	SET_KCONTEXTREG(%o0, %g1, %g2, %g3, %l3, l1, l2, l3)
-	
+
 	! We are now running on the kernel's trap table.
-	! 
+	!
 	! It is very important to have a thread pointer and a cpu struct
 	! *before* calling into C routines .
 	! Otherwise, overflow/underflow handlers, etc. can get very upset!
-	! 
+	!
 	!
 	! We don't want to simply increment
 	! ncpus right now because it is in the cache, and

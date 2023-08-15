@@ -71,7 +71,7 @@ static int32_t collect_data __P((HTAB *, PAGE16 *, int32_t));
 /*
  * Big_insert
  *
- * You need to do an insert and the key/data pair is greater than 
+ * You need to do an insert and the key/data pair is greater than
  * MINFILL * the bucket size
  *
  * Returns:

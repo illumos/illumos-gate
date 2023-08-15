@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROG=		pkgtrans	
+PROG=		pkgtrans
 
 OBJS=		main.o
 

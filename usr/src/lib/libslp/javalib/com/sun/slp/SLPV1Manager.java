@@ -271,7 +271,7 @@ abstract class SLPV1Manager extends Object {
 
 	    config.writeLog("v1_init_error",
 			    new Object[] {ex.getMessage()});
-	
+
 	}  catch (UnknownHostException ex) {
 
 	    config.writeLog("v1_init_error",

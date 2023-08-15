@@ -70,7 +70,7 @@ real_code:	cld				# String ops inc
 #
 # Relocate ourself to a lower address so that we have more room to load
 # other sectors.
-# 
+#
 		movw $main-EXEC+LOAD,%si	# Source
 		movw $main,%di			# Destination
 		movw $SECSIZE-(main-start),%cx	# Byte count
@@ -148,7 +148,7 @@ err_noboot: 	movw $msg_noboot,%si		# "Missing boot
 		jmp putstr			#  loader"
 #
 # Output an ASCIZ string to the console via the BIOS.
-# 
+#
 putstr.0:	movw $0x7,%bx	 		# Page:attribute
 		movb $0xe,%ah			# BIOS: Display
 		int $0x10			#  character

@@ -754,7 +754,7 @@ errlab:
 			else {
 				cnt = wcursor - linebuf;
 				/*CSTYLED*/
-				for (wcursor = linebuf; wcursor - linebuf < cnt; ) 
+				for (wcursor = linebuf; wcursor - linebuf < cnt; )
 					wcursor = nextchr(wcursor);
 				if (wcursor - linebuf > cnt)
 					wcursor = lastchr(linebuf, wcursor);

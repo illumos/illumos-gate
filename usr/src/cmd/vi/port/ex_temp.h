@@ -133,7 +133,7 @@ struct 	header {
 	unsigned char	Savedfile[FNSIZE];	/* The current file name */
 	short	Blocks[LBLKS];		/* Blocks where line pointers stashed */
 	short 	encrypted;		/* Encrypted temp file flag */
-}; 
+};
 var struct 	header H;
 
 #define	uid		H.Uid

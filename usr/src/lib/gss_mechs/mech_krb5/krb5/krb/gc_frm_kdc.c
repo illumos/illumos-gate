@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,11 +23,11 @@
  * permission.  Furthermore if you modify this software you must label
  * your software as modified software and not distribute it in such a
  * fashion that it might be confused with the original M.I.T. software.
- * Neither M.I.T., the Open Computing Security Group, nor 
+ * Neither M.I.T., the Open Computing Security Group, nor
  * CyberSAFE Corporation make any representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * krb5_get_cred_from_kdc() and related functions:
  *
  * Get credentials from some KDC somewhere, possibly accumulating TGTs
@@ -565,7 +565,7 @@ try_kdc(struct tr_state *ts, krb5_creds *tgtq)
      * See if the returned creds are different to the requested creds.
      * This can happen when the server returns a TGT "closer" to the
      * desired realm.
-     */ 
+     */
     if (!(krb5_principal_compare(ts->ctx, tgtq->server, tmp_out_cred->server))) {
 	    /* Not equal, ticket may already be in the cache */
 	    retval = try_ccache(ts, tmp_out_cred);
@@ -870,7 +870,7 @@ krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache,
     char **hrealms;
     int referral_count, i;
 
-    /* 
+    /*
      * Set up client and server pointers.  Make a fresh and modifyable
      * copy of the in_cred server and save the supplied version.
      */
@@ -960,8 +960,8 @@ krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache,
         DUMP_PRINC("gc_from_kdc: referral loop: request is for", server);
 #endif
         retval = krb5_get_cred_via_tkt(context, tgtptr,
-				       KDC_OPT_CANONICALIZE | 
-				       FLAGS2OPTS(tgtptr->ticket_flags) |  
+				       KDC_OPT_CANONICALIZE |
+				       FLAGS2OPTS(tgtptr->ticket_flags) |
 				       kdcopt |
 				       (in_cred->second_ticket.length ?
 					KDC_OPT_ENC_TKT_IN_SKEY : 0),
@@ -981,7 +981,7 @@ krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache,
 	    DPRINTF(("gc_from_kdc: referral #%d failed; "
 		     "retrying without option.\n", referral_count + 1));
 	    retval = krb5_get_cred_via_tkt(context, tgtptr,
-					   FLAGS2OPTS(tgtptr->ticket_flags) |  
+					   FLAGS2OPTS(tgtptr->ticket_flags) |
 					   kdcopt |
 					   (in_cred->second_ticket.length ?
 					    KDC_OPT_ENC_TKT_IN_SKEY : 0),
@@ -1022,8 +1022,8 @@ krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache,
 	    /* Re-establish tgs etypes */
 	    context->use_conf_ktypes = old_use_conf_ktypes;
 	    retval = krb5_get_cred_via_tkt(context, tgtptr,
-					   KDC_OPT_CANONICALIZE | 
-					   FLAGS2OPTS(tgtptr->ticket_flags) |  
+					   KDC_OPT_CANONICALIZE |
+					   FLAGS2OPTS(tgtptr->ticket_flags) |
 					   kdcopt |
 					   (in_cred->second_ticket.length ?
 					    KDC_OPT_ENC_TKT_IN_SKEY : 0),
@@ -1229,7 +1229,7 @@ cleanup:
 	(*out_cred)->server= out_supplied_server;
     }
     else {
-        /* 
+        /*
 	 * Failure: free out_supplied_server.  Don't free out_cred here
 	 * since it's either null or a referral TGT that we free below,
 	 * and we may need it to return.

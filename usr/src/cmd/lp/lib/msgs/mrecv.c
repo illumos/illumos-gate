@@ -49,7 +49,7 @@ int	size;
     do
 	n = mread(lp_Md, msgbuf, size);
     while (n < 0 && errno == EINTR);
-    
+
     /*
     **	Return EIDRM on disconnect for binary compatibility.
     */

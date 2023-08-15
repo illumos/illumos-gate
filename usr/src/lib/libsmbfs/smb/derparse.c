@@ -39,7 +39,7 @@
 MECH_OID g_stcMechOIDList [] =
 {
         {(unsigned char *)"\x06\x09\x2a\x86\x48\x82\xf7\x12\x01\x02\x02",
-         11,  9, spnego_mech_oid_Kerberos_V5_Legacy},	// 1.2.840.48018.1.2.2 
+         11,  9, spnego_mech_oid_Kerberos_V5_Legacy},	// 1.2.840.48018.1.2.2
 	{(unsigned char *)"\x06\x09\x2a\x86\x48\x86\xf7\x12\x01\x02\x02",
          11,  9, spnego_mech_oid_Kerberos_V5}, // 1.2.840.113554.1.2.2
 	{(unsigned char *)"\x06\x06\x2b\x06\x01\x05\x05\x02",
@@ -185,7 +185,7 @@ int ASNDerGetLength( unsigned char* pbLengthData, long nBoundaryLength, long* pn
 //    [in]  nLengthWithToken  -  Expected token length (with data)
 //    [in]  nBoundaryLength   -  Length that value must not exceed.
 //    [out] pnLength          -  Filled out with data length
-//    [out] pnTokenLength     -  Filled out with number of bytes 
+//    [out] pnTokenLength     -  Filled out with number of bytes
 //                               consumed by token identifier and length.
 //
 // Returns:
@@ -258,7 +258,7 @@ int ASNDerCheckToken( unsigned char* pbTokenData, unsigned char nToken,
          nReturn = SPNEGO_E_TOKEN_NOT_FOUND;
       }
 
-   }  // IF Boundary Length is at least 2 bytes 
+   }  // IF Boundary Length is at least 2 bytes
 
    return nReturn;
 }
@@ -291,7 +291,7 @@ int ASNDerCheckOID( unsigned char* pbTokenData, SPNEGO_MECH_OID nMechOID, long n
    long  nLength = 0L;
 
    // Verify that we have an OID token
-   if ( ( nReturn = ASNDerCheckToken( pbTokenData, OID, 0L, nBoundaryLength, 
+   if ( ( nReturn = ASNDerCheckToken( pbTokenData, OID, 0L, nBoundaryLength,
                                        &nLength, pnTokenLength ) ) == SPNEGO_E_SUCCESS )
    {
       // Add the data length to the Token Length
@@ -528,7 +528,7 @@ int ASNDerWriteLength( unsigned char* pbData, long nLength )
          {
             // Cast the length to a single byte, since we know that it
             // is 0x7F or less (or we wouldn't only need a single byte).
-      
+
             *pbData = (unsigned char) nLength;
             break;
          }
@@ -573,7 +573,7 @@ int ASNDerWriteLength( unsigned char* pbData, long nLength )
    {
       // Cast the length to a single byte, since we know that it
       // is 0x7F or less (or we wouldn't only need a single byte).
-      
+
       *pbData = (unsigned char) nLength;
    }
 

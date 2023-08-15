@@ -1,27 +1,27 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
  /* STP machine instance : bridge per VLAN: 17.17 */
- 
+
 #include "base.h"
 #include "stpm.h"
 #include "stp_to.h" /* for STP_OUT_flush_lt */
@@ -64,7 +64,7 @@ _stp_stpm_iterate_machines (STPM_T* this,
         mret += iret;
     }
   }
-  
+
   return mret;
 }
 
@@ -86,7 +86,7 @@ static unsigned char
 _check_topoch (STPM_T* this)
 {
   register PORT_T*  port;
-  
+
   for (port = this->ports; port; port = port->next) {
     if (port->tcWhile) {
       return 1;
@@ -109,7 +109,7 @@ STP_stpm_one_second (STPM_T* param)
       if (*(port->timers[iii]) > 0) {
         (*port->timers[iii])--;
       }
-    }    
+    }
     port->uptime++;
   }
 
@@ -132,7 +132,7 @@ STP_stpm_create (int vlan_id, char* name)
   STP_NEW_IN_LIST(this, STPM_T, bridges, "stp instance");
 
   this->admin_state = STP_DISABLED;
-  
+
   this->vlan_id = vlan_id;
   if (name) {
     STP_STRDUP(this->name, name, "stp bridge name");
@@ -168,7 +168,7 @@ STP_stpm_enable (STPM_T* this, UID_STP_MODE_T admin_state)
     this->admin_state = admin_state;
     STP_stpm_stop (this);
   }
-  
+
   return rc;
 }
 
@@ -182,7 +182,7 @@ STP_stpm_delete (STPM_T* this)
   register void*         pv;
 
   (void) STP_stpm_enable (this, STP_DISABLED);
-  
+
   for (stater = this->machines; stater; ) {
     pv = (void*) stater->next;
     STP_state_mach_delete (stater);
@@ -203,7 +203,7 @@ STP_stpm_delete (STPM_T* this)
       } else {
         bridges = this->next;
       }
-      
+
       if (this->name)
         STP_FREE(this->name, "stp bridge name");
       STP_FREE(this, "stp instance");
@@ -267,8 +267,8 @@ STP_stpm_update (STPM_T* this) /* returns number of loops */
   register Bool     need_state_change;
   register int      number_of_loops = 0;
 
-  need_state_change = False; 
-  
+  need_state_change = False;
+
   for (;;) {/* loop until not need changes */
     need_state_change = _stp_stpm_iterate_machines (this,
                                                    STP_check_condition,

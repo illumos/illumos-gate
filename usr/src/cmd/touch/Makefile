@@ -36,7 +36,7 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 	-$(RM) $(ROOTBIN)/settime

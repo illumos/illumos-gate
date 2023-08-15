@@ -755,7 +755,7 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 / big_mul_vec_sse2(uint32_t *r, uint32_t *a, int alen, uint32_t *b, int blen)
 / {
 / 	int i;
-/ 
+/
 / 	r[alen] = big_mul_set_vec_sse2(r, a, alen, b[0]);
 / 	for (i = 1; i < blen; ++i)
 / 		r[alen + i] = big_mul_add_vec_sse2(r+i, a, alen, b[i]);
@@ -822,7 +822,7 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 	popl	%ebp
 	popl	%ebx
 	addl	$0x8, %esp
-	ret	
+	ret
 #if defined(MMX_MANAGE)
 	SET_SIZE(big_mul_vec_sse2_fc)
 #else

@@ -39,8 +39,8 @@ import java.io.*;
 
 
 /**
- * The CSrvReg class models the client side SLP service registration 
- * message. 
+ * The CSrvReg class models the client side SLP service registration
+ * message.
  *
  * @author James Kempf
  */
@@ -57,7 +57,7 @@ class CSrvReg extends SrvLocMsgImpl {
 	    Vector scopes,
 	    Vector attrs,
 	    Hashtable URLSignatures,
-	    Hashtable attrSignatures) 
+	    Hashtable attrSignatures)
 	throws ServiceLocationException {
 
 	this.URL = urlEntry;
@@ -112,7 +112,7 @@ class CSrvReg extends SrvLocMsgImpl {
 		    Vector scopes,
 		    Vector attrs,
 		    Hashtable URLSignatures,
-		    Hashtable attrSignatures) 
+		    Hashtable attrSignatures)
 	throws ServiceLocationException {
 
 	SLPConfig config = SLPConfig.getSLPConfig();

@@ -173,7 +173,7 @@ libhal_volume_policy_compute_size_as_string (LibHalVolume *volume)
 		if (sizes_str[cur_str+1] == NULL || size < cur*step) {
 			/* found the unit, display a comma number if result is a single digit */
 			if (size < cur*base) {
-				snprintf (buf, MAX_STRING_SZ, "%.01f%s", 
+				snprintf (buf, MAX_STRING_SZ, "%.01f%s",
 					  ((double)size)/((double)cur), sizes_str[cur_str]);
 				result = strdup (buf);
 			} else {
@@ -278,7 +278,7 @@ libhal_drive_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *volu
 		}
 		if ((drive_cdrom_caps & LIBHAL_DRIVE_CDROM_CAPS_DVDRW) &&
 		    (drive_cdrom_caps & LIBHAL_DRIVE_CDROM_CAPS_DVDPLUSRW)) {
-                        if(drive_cdrom_caps & LIBHAL_DRIVE_CDROM_CAPS_DVDPLUSRDL || 
+                        if(drive_cdrom_caps & LIBHAL_DRIVE_CDROM_CAPS_DVDPLUSRDL ||
 			   drive_cdrom_caps & LIBHAL_DRIVE_CDROM_CAPS_DVDPLUSRWDL)
                                 second = "/DVD±RW DL";
                         else
@@ -304,7 +304,7 @@ libhal_drive_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *volu
 			snprintf (buf, MAX_STRING_SZ, _("%s%s Drive"), first, second);
 			name = strdup (buf);
 		}
-			
+
 	} else if (drive_type==LIBHAL_DRIVE_TYPE_FLOPPY) {
 
 		/* Floppy Drive handling */
@@ -363,7 +363,7 @@ libhal_volume_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *vol
 
 	size_str = libhal_volume_policy_compute_size_as_string (volume);
 
-	/* If the volume label is available use that 
+	/* If the volume label is available use that
 	 *
 	 * TODO: If label is a fully-qualified UNIX path don't use that
 	 */
@@ -381,39 +381,39 @@ libhal_volume_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *vol
 		case LIBHAL_VOLUME_DISC_TYPE_CDROM:
 			name = strdup (_("CD-ROM "));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_CDR:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank CD-R"));
 			else
 				name = strdup (_("CD-R"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_CDRW:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank CD-RW"));
 			else
 				name = strdup (_("CD-RW"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDROM:
 			name = strdup (_("DVD-ROM"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDRAM:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank DVD-RAM"));
 			else
 				name = strdup (_("DVD-RAM"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDR:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank DVD-R"));
 			else
 				name = strdup (_("DVD-R"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDRW:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank DVD-RW"));
@@ -427,50 +427,50 @@ libhal_volume_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *vol
 			else
 				name = strdup (_("DVD+R"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDPLUSRW:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank DVD+RW"));
 			else
 				name = strdup (_("DVD+RW"));
 			break;
-		
+
 		case LIBHAL_VOLUME_DISC_TYPE_DVDPLUSR_DL:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank DVD+R Dual-Layer"));
 			else
 				name = strdup (_("DVD+R Dual-Layer"));
 			break;
-		
+
 		case LIBHAL_VOLUME_DISC_TYPE_BDROM:
 			name = strdup (_("BD-ROM"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_BDR:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank BD-R"));
 			else
 				name = strdup (_("BD-R"));
 			break;
-		
+
 		case LIBHAL_VOLUME_DISC_TYPE_BDRE:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank BD-RE"));
 			else
 				name = strdup (_("BD-RE"));
 			break;
-		
+
 		case LIBHAL_VOLUME_DISC_TYPE_HDDVDROM:
 			name = strdup (_("HD DVD-ROM"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_HDDVDR:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank HD DVD-R"));
 			else
 				name = strdup (_("HD DVD-R"));
 			break;
-			
+
 		case LIBHAL_VOLUME_DISC_TYPE_HDDVDRW:
 			if (libhal_volume_disc_is_blank (volume))
 				name = strdup (_("Blank HD DVD-RW"));
@@ -479,7 +479,7 @@ libhal_volume_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *vol
 			break;
 
 		}
-		
+
 		/* Special case for pure audio disc */
 		if (libhal_volume_disc_has_audio (volume) && !libhal_volume_disc_has_data (volume)) {
 			free (name);
@@ -578,7 +578,7 @@ out:
 		return NULL;
 }
 
-/** Policy function to determine if a volume should be visible in a desktop 
+/** Policy function to determine if a volume should be visible in a desktop
  *  environment. This is useful to hide certain system volumes as bootstrap
  *  partitions, the /usr partition, swap partitions and other volumes that
  *  a unprivileged desktop user shouldn't know even exists.
@@ -595,7 +595,7 @@ out:
  *                              environment.
  */
 dbus_bool_t
-libhal_volume_policy_should_be_visible (LibHalDrive *drive, LibHalVolume *volume, LibHalStoragePolicy *policy, 
+libhal_volume_policy_should_be_visible (LibHalDrive *drive, LibHalVolume *volume, LibHalStoragePolicy *policy,
 				     const char *target_mount_point)
 {
 	unsigned int i;
@@ -685,7 +685,7 @@ struct LibHalDrive_s {
 	LibHalDriveType type;
 	char *type_textual;
 
-	char *physical_device;  /* UDI of physical device, e.g. the 
+	char *physical_device;  /* UDI of physical device, e.g. the
 				 * IDE, USB, IEEE1394 device */
 
 	char *dedicated_icon_drive;
@@ -740,7 +740,7 @@ struct LibHalVolume_s {
 	int msdos_part_table_type;
 	dbus_uint64_t msdos_part_table_start;
 	dbus_uint64_t msdos_part_table_size;
-	
+
 	dbus_bool_t is_disc;
 	LibHalVolumeDiscType disc_type;
 	dbus_bool_t disc_has_audio;
@@ -885,7 +885,7 @@ out:
  */
 LibHalDrive *
 libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
-{	
+{
 	char *bus_textual;
 	LibHalDrive *drive;
 	LibHalPropertySet *properties;
@@ -922,7 +922,7 @@ libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
 	for (libhal_psi_init (&it, properties); libhal_psi_has_more (&it); libhal_psi_next (&it)) {
 		int type;
 		char *key;
-		
+
 		type = libhal_psi_get_type (&it);
 		key = libhal_psi_get_key (&it);
 
@@ -935,7 +935,7 @@ libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
 		LIBHAL_PROP_EXTRACT_STRING ("storage.vendor",            drive->vendor);
 		LIBHAL_PROP_EXTRACT_STRING ("storage.model",             drive->model);
 		LIBHAL_PROP_EXTRACT_STRING ("storage.drive_type",        drive->type_textual);
-		LIBHAL_PROP_EXTRACT_UINT64 ("storage.size", 		 drive->drive_size); 
+		LIBHAL_PROP_EXTRACT_UINT64 ("storage.size", 		 drive->drive_size);
 
 		LIBHAL_PROP_EXTRACT_STRING ("storage.icon.drive",        drive->dedicated_icon_drive);
 		LIBHAL_PROP_EXTRACT_STRING ("storage.icon.volume",       drive->dedicated_icon_volume);
@@ -943,10 +943,10 @@ libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
 		LIBHAL_PROP_EXTRACT_BOOL   ("storage.hotpluggable",      drive->is_hotpluggable);
 		LIBHAL_PROP_EXTRACT_BOOL   ("storage.removable",         drive->is_removable);
 		LIBHAL_PROP_EXTRACT_BOOL   ("storage.removable.media_available", drive->is_media_detected);
-		LIBHAL_PROP_EXTRACT_UINT64 ("storage.removable.media_size", drive->drive_media_size); 
+		LIBHAL_PROP_EXTRACT_UINT64 ("storage.removable.media_size", drive->drive_media_size);
 		LIBHAL_PROP_EXTRACT_BOOL   ("storage.requires_eject",    drive->requires_eject);
 
-		LIBHAL_PROP_EXTRACT_STRING ("storage.partitioning_scheme", drive->partition_scheme); 
+		LIBHAL_PROP_EXTRACT_STRING ("storage.partitioning_scheme", drive->partition_scheme);
 
 		LIBHAL_PROP_EXTRACT_STRING ("storage.physical_device",   drive->physical_device);
 		LIBHAL_PROP_EXTRACT_STRING ("storage.firmware_version",  drive->firmware_version);
@@ -990,7 +990,7 @@ libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
 			if (drive->is_removable)
 				drive->type = LIBHAL_DRIVE_TYPE_REMOVABLE_DISK;
 			else
-				drive->type = LIBHAL_DRIVE_TYPE_DISK;				
+				drive->type = LIBHAL_DRIVE_TYPE_DISK;
 		} else if (strcmp (drive->type_textual, "tape") == 0) {
 			drive->type = LIBHAL_DRIVE_TYPE_TAPE;
 		} else if (strcmp (drive->type_textual, "compact_flash") == 0) {
@@ -1008,7 +1008,7 @@ libhal_drive_from_udi (LibHalContext *hal_ctx, const char *udi)
 		} else if (strcmp (drive->type_textual, "flashkey") == 0) {
 			drive->type = LIBHAL_DRIVE_TYPE_FLASHKEY;
 		} else {
-		        drive->type = LIBHAL_DRIVE_TYPE_DISK; 
+		        drive->type = LIBHAL_DRIVE_TYPE_DISK;
 		}
 
 	}
@@ -1113,7 +1113,7 @@ libhal_volume_from_udi (LibHalContext *hal_ctx, const char *udi)
 	for (libhal_psi_init (&it, properties); libhal_psi_has_more (&it); libhal_psi_next (&it)) {
 		int type;
 		char *key;
-		
+
 		type = libhal_psi_get_type (&it);
 		key = libhal_psi_get_key (&it);
 
@@ -1127,8 +1127,8 @@ libhal_volume_from_udi (LibHalContext *hal_ctx, const char *udi)
 		LIBHAL_PROP_EXTRACT_STRING ("volume.partition.uuid",                  vol->partition_uuid);
 		LIBHAL_PROP_EXTRACT_STRLIST ("volume.partition.flags",                vol->partition_flags);
 
-		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.start", 		      vol->partition_start_offset); 
-		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.media_size",            vol->partition_media_size); 
+		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.start", 		      vol->partition_start_offset);
+		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.media_size",            vol->partition_media_size);
 		LIBHAL_PROP_EXTRACT_INT    ("volume.partition.msdos_part_table_type", vol->msdos_part_table_type);
 		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.msdos_part_table_start", vol->msdos_part_table_start);
 		LIBHAL_PROP_EXTRACT_UINT64 ("volume.partition.msdos_part_table_size", vol->msdos_part_table_size);
@@ -1143,7 +1143,7 @@ libhal_volume_from_udi (LibHalContext *hal_ctx, const char *udi)
 
 		LIBHAL_PROP_EXTRACT_INT    ("volume.block_size",         vol->block_size);
 		LIBHAL_PROP_EXTRACT_INT    ("volume.num_blocks",         vol->num_blocks);
-		LIBHAL_PROP_EXTRACT_UINT64 ("volume.size", 		 vol->volume_size); 
+		LIBHAL_PROP_EXTRACT_UINT64 ("volume.size", 		 vol->volume_size);
 		LIBHAL_PROP_EXTRACT_STRING ("volume.label",              vol->volume_label);
 		LIBHAL_PROP_EXTRACT_STRING ("volume.mount_point",        vol->mount_point);
 		LIBHAL_PROP_EXTRACT_STRING ("volume.fstype",             vol->fstype);
@@ -1221,7 +1221,7 @@ libhal_volume_from_udi (LibHalContext *hal_ctx, const char *udi)
 			vol->fsusage = LIBHAL_VOLUME_USAGE_OTHER;
 		} else {
 			vol->fsusage = LIBHAL_VOLUME_USAGE_UNKNOWN;
-		} 
+		}
 	}
 
 	libhal_free_string (vol_fsusage_textual);
@@ -1307,7 +1307,7 @@ libhal_drive_from_device_file (LibHalContext *hal_ctx, const char *device_file)
 	found_udi = NULL;
 
 	dbus_error_init (&error);
-	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, "block.device", 
+	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, "block.device",
 								 device_file, &num_hal_udis, &error)) == NULL) {
 		LIBHAL_FREE_DBUS_ERROR(&error);
 		goto out;
@@ -1370,7 +1370,7 @@ libhal_volume_from_device_file (LibHalContext *hal_ctx, const char *device_file)
 	found_udi = NULL;
 
 	dbus_error_init (&error);
-	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, "block.device", 
+	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, "block.device",
 								 device_file, &num_hal_udis, &error)) == NULL)
 		goto out;
 
@@ -1555,25 +1555,25 @@ libhal_volume_get_fsversion (LibHalVolume *volume)
 	return volume->fsversion;
 }
 
-LibHalVolumeUsage 
+LibHalVolumeUsage
 libhal_volume_get_fsusage (LibHalVolume *volume)
 {
 	return volume->fsusage;
 }
 
-dbus_bool_t 
+dbus_bool_t
 libhal_volume_is_mounted (LibHalVolume *volume)
 {
 	return volume->is_mounted;
 }
 
-dbus_bool_t 
+dbus_bool_t
 libhal_volume_is_mounted_read_only (LibHalVolume *volume)
 {
 	return volume->is_mounted_read_only;
 }
 
-dbus_bool_t 
+dbus_bool_t
 libhal_volume_is_partition (LibHalVolume *volume)
 {
 	return volume->is_partition;
@@ -1622,7 +1622,7 @@ libhal_volume_get_partition_flags (LibHalVolume *volume)
 }
 
 
-dbus_uint64_t 
+dbus_uint64_t
 libhal_volume_get_partition_start_offset (LibHalVolume *volume)
 {
 	return volume->partition_start_offset;
@@ -1694,7 +1694,7 @@ libhal_volume_should_ignore (LibHalVolume     *volume)
 	return volume->ignore_volume;
 }
 
-char ** 
+char **
 libhal_drive_find_all_volumes (LibHalContext *hal_ctx, LibHalDrive *drive, int *num_volumes)
 {
 	int i;
@@ -1716,7 +1716,7 @@ libhal_drive_find_all_volumes (LibHalContext *hal_ctx, LibHalDrive *drive, int *
 
 	/* get initial list... */
 	dbus_error_init (&error);
-	if ((udis = libhal_manager_find_device_string_match (hal_ctx, "block.storage_device", 
+	if ((udis = libhal_manager_find_device_string_match (hal_ctx, "block.storage_device",
 							     drive_udi, &num_udis, &error)) == NULL) {
 		LIBHAL_FREE_DBUS_ERROR(&error);
 		goto out;
@@ -1789,7 +1789,7 @@ libhal_drive_policy_default_get_mount_root (LibHalContext *hal_ctx)
 
 	dbus_error_init (&error);
 	if ((result = libhal_device_get_property_string (hal_ctx, "/org/freedesktop/Hal/devices/computer",
-						    "storage.policy.default.mount_root", &error)) == NULL) 
+						    "storage.policy.default.mount_root", &error)) == NULL)
 		LIBHAL_FREE_DBUS_ERROR(&error);
 
 	return result;
@@ -1867,7 +1867,7 @@ libhal_drive_policy_get_desired_mount_point (LibHalDrive *drive, LibHalStoragePo
 
 
 static void
-mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len, 
+mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len,
 	       const char *udi, char *options_string, size_t options_max_len, dbus_bool_t only_collect_imply_opts)
 {
 	LibHalPropertySet *properties;
@@ -1891,7 +1891,7 @@ mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len,
 	for (libhal_psi_init (&it, properties); libhal_psi_has_more (&it); libhal_psi_next (&it)) {
 		int type;
 		char *key;
-		
+
 		type = libhal_psi_get_type (&it);
 		key = libhal_psi_get_key (&it);
 		if (type == LIBHAL_PROPERTY_TYPE_BOOLEAN &&
@@ -1907,7 +1907,7 @@ mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len,
 			    strcmp (option, "pamconsole") == 0)
 				is_imply_opt = TRUE;
 
-			
+
 			if (only_collect_imply_opts) {
 				if (!is_imply_opt)
 					continue;
@@ -1941,7 +1941,7 @@ mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len,
 			}
 		}
 	}
-	
+
 	libhal_free_property_set (properties);
 }
 
@@ -2020,7 +2020,7 @@ const char *libhal_volume_policy_get_mount_fs (LibHalDrive *drive, LibHalVolume 
 	return volume->mount_filesystem;
 }
 
-dbus_bool_t       
+dbus_bool_t
 libhal_drive_no_partitions_hint (LibHalDrive *drive)
 {
 	return drive->no_partitions_hint;

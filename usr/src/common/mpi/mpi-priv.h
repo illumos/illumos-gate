@@ -1,9 +1,9 @@
 /*
- *  mpi-priv.h	- Private header file for MPI 
+ *  mpi-priv.h	- Private header file for MPI
  *  Arbitrary precision integer arithmetic library
  *
  *  NOTE WELL: the content of this header file is NOT part of the "public"
- *  API for the MPI library, and may change at any time.  
+ *  API for the MPI library, and may change at any time.
  *  Application programs that use libmpi should NOT include this header file.
  *
  * ***** BEGIN LICENSE BLOCK *****
@@ -80,7 +80,7 @@
 #if MP_LOGTAB
 /*
   A table of the logs of 2 for various bases (the 0 and 1 entries of
-  this table are meaningless and should not be referenced).  
+  this table are meaningless and should not be referenced).
 
   This table is used to compute output lengths for the mp_toradix()
   function.  Since a number n in radix r takes up about log_r(n)
@@ -90,7 +90,7 @@
   log_r(n) = log_2(n) * log_r(2)
 
   This table, therefore, is a table of log_r(2) for 2 <= r <= 36,
-  which are the output bases supported.  
+  which are the output bases supported.
  */
 
 extern const float s_logv_2[];
@@ -98,7 +98,7 @@ extern const float s_logv_2[];
 
 #else
 
-/* 
+/*
    If MP_LOGTAB is not defined, use the math library to compute the
    logarithms on the fly.  Otherwise, use the table.
    Pick which works best for your system.
@@ -141,7 +141,7 @@ extern const float s_logv_2[];
 
 /* {{{ private function declarations */
 
-/* 
+/*
    If MP_MACRO is false, these will be defined as actual functions;
    otherwise, suitable macro definitions will be used.  This works
    around the fact that ANSI C89 doesn't support an 'inline' keyword
@@ -194,7 +194,7 @@ mp_err   s_mp_pad(mp_int *mp, mp_size min);    /* left pad with zeroes    */
   { mp_size used = MP_USED(mp); \
     while (used > 1 && DIGIT(mp, used - 1) == 0) --used; \
     MP_USED(mp) = used; \
-  } 
+  }
 #endif /* MP_MACRO */
 
 void     s_mp_exch(mp_int *a, mp_int *b);      /* swap a and b in place   */
@@ -206,7 +206,7 @@ void     s_mp_div_2d(mp_int *mp, mp_digit d);  /* divide by 2^d in place  */
 void     s_mp_mod_2d(mp_int *mp, mp_digit d);  /* modulo 2^d in place     */
 void     s_mp_div_2(mp_int *mp);               /* divide by 2 in place    */
 mp_err   s_mp_mul_2(mp_int *mp);               /* multiply by 2 in place  */
-mp_err   s_mp_norm(mp_int *a, mp_int *b, mp_digit *pd); 
+mp_err   s_mp_norm(mp_int *a, mp_int *b, mp_digit *pd);
                                                /* normalize for division  */
 mp_err   s_mp_add_d(mp_int *mp, mp_digit d);   /* unsigned digit addition */
 mp_err   s_mp_sub_d(mp_int *mp, mp_digit d);   /* unsigned digit subtract */
@@ -289,7 +289,7 @@ void     MPI_ASM_DECL s_mpv_mul_d_add(const mp_digit *a, mp_size a_len,
 #endif
 
 void     MPI_ASM_DECL s_mpv_mul_d_add_prop(const mp_digit *a,
-                                                mp_size a_len, mp_digit b, 
+                                                mp_size a_len, mp_digit b,
 			                        mp_digit *c);
 void     MPI_ASM_DECL s_mpv_sqr_add_prop(const mp_digit *a,
                                                 mp_size a_len,
@@ -308,7 +308,7 @@ typedef struct {
   mp_size      b;	/* R == 2 ** b,  also b = # significant bits in N */
 } mp_mont_modulus;
 
-mp_err s_mp_mul_mont(const mp_int *a, const mp_int *b, mp_int *c, 
+mp_err s_mp_mul_mont(const mp_int *a, const mp_int *b, mp_int *c,
 	               mp_mont_modulus *mmm);
 mp_err s_mp_redc(mp_int *T, mp_mont_modulus *mmm);
 

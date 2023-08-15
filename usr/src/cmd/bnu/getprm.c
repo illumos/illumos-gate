@@ -41,7 +41,7 @@ static char *bal();
  *	whsp	-> pointer to use to return leading whitespace
  *	prm	-> pointer to use to return token
  * return:
- *	 s	-> pointer to next character 
+ *	 s	-> pointer to next character
  *		NULL at end
  */
 char *
@@ -207,7 +207,7 @@ char *arg, *sys, *fwd, *file;
 	file[c-arg] = NULLCHAR;
 	return(retval);
 	}
-		
+
 
     mbstowcs(myname, Myname, MAXFULLNAME);
     mbstowcs(wcbuf, arg, MAXFULLNAME);

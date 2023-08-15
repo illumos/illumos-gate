@@ -256,13 +256,13 @@ int
 main(int argc, char **argv )
 {
 	LDAP	*ld;
-	int		i, c, port, cldapflg, errflg, method, id, 
+	int		i, c, port, cldapflg, errflg, method, id,
 		msgtype, delrdn, theInt, sizelimit, err;
 	char	line[256], command1, command2, command3;
 	char	passwd[64], dn[256], rdn[64], attr[64], value[256];
 	char	filter[256], *host, **types;
 	char 	*mechanism;
-	
+
 	char	**exdn;
 	char	*usage = "usage: %s [-u] [-h host] [-d level] [-s dnsuffix] [-p port] [-t file] [-T file]\n";
 	int		bound, all, scope, attrsonly;
@@ -277,7 +277,7 @@ main(int argc, char **argv )
 	extern int	optind;
 	LDAPControl *ctrls[2];
 	LDAPControl aCtrl;
-	
+
 
 #ifdef MACOS
 	if (( argv = get_list( "cmd line arg?" )) == NULL ) {
@@ -294,7 +294,7 @@ main(int argc, char **argv )
 	cldapflg = errflg = 0;
 	ctrls[0] = &aCtrl;
 	ctrls[1] = NULL;
-	
+
 	while (( c = getopt( argc, argv, "uh:d:s:p:t:T:" )) != -1 ) {
 		switch( c ) {
 		case 'u':
@@ -354,7 +354,7 @@ main(int argc, char **argv )
 		fprintf( stderr, usage, argv[ 0 ] );
 		exit( 1 );
 	}
-	
+
 	printf( "%s( %s, %d )\n", cldapflg ? "cldap_open" : "ldap_init",
 		host == NULL ? "(null)" : host, port );
 
@@ -387,7 +387,7 @@ main(int argc, char **argv )
 	timeout.tv_usec = 0;
 	timelimit.tv_sec = 0;
 	timelimit.tv_usec = 0;
-	
+
 	(void) memset( line, '\0', sizeof(line) );
 	while ( getaline( line, sizeof(line), stdin, "\ncommand? " ) != NULL ) {
 		command1 = line[0];
@@ -415,7 +415,7 @@ main(int argc, char **argv )
 					else
 						printf( "Add initiated with id %d\n", id );
 				}
-				
+
 				break;
 
 			case 'b':	/* abandon */
@@ -484,7 +484,7 @@ main(int argc, char **argv )
 			} else {
 				method = LDAP_AUTH_SIMPLE;
 			}
-			
+
 #endif /* KERBEROS */
 			getaline( dn, sizeof(dn), stdin, "dn? " );
 			strcat( dn, dnsuffix );
@@ -508,7 +508,7 @@ main(int argc, char **argv )
 				if (strcmp(mechanism, LDAP_SASL_CRAM_MD5) == 0){
 					cred.bv_val = passwd;
 					cred.bv_len = strlen(passwd);
-					
+
 					if ( ldap_sasl_cram_md5_bind_s(ld, dn, &cred, NULL, NULL) != LDAP_SUCCESS ){
 						fprintf( stderr, "ldap_sasl_cram_md5_bind_s failed\n" );
 						ldap_perror( ld, "ldap_sasl_cram_md5_bind_s" );
@@ -647,7 +647,7 @@ main(int argc, char **argv )
 					all = 1;
 				else
 					all = atoi( line );
-				
+
 				if (( msgtype = ldap_result( ld, id, all,
 				    resultusetimelimit ? &timelimit : &timeout, &res )) < 1 ) {
 					ldap_perror( ld, "ldap_result" );
@@ -820,18 +820,18 @@ main(int argc, char **argv )
 				    printf( " <%s>", ludp->lud_attrs[ i ] );
 				}
 			    }
-			    printf( "\n\t scope: %s\n", ludp->lud_scope == LDAP_SCOPE_UNKNOWN ? "DEFAULT (base)" : 
-						ludp->lud_scope == LDAP_SCOPE_ONELEVEL ? "ONE" : 
+			    printf( "\n\t scope: %s\n", ludp->lud_scope == LDAP_SCOPE_UNKNOWN ? "DEFAULT (base)" :
+						ludp->lud_scope == LDAP_SCOPE_ONELEVEL ? "ONE" :
 						ludp->lud_scope == LDAP_SCOPE_BASE ? "BASE" :
 						ludp->lud_scope == LDAP_SCOPE_SUBTREE ? "SUB" : "**invalid**" );
 			    printf( "\tfilter: <%s>\n", ludp->lud_filter ? ludp->lud_filter : "NONE");
 				if (ludp->lud_extensions){
 					printf("\textensions: \n");
 					for (i = 0; ludp->lud_extensions[i] != NULL; i++)
-						printf("\t\t%s (%s)\n", ludp->lud_extensions[i]->lue_type, 
+						printf("\t\t%s (%s)\n", ludp->lud_extensions[i]->lue_type,
 							   ludp->lud_extensions[i]->lue_iscritical ? "Critical" : "Non critical");
 				}
-				
+
 			    ldap_free_urldesc( ludp );
 			}
 			    break;
@@ -849,9 +849,9 @@ main(int argc, char **argv )
 			i = atoi( line );
 			getaline( line, sizeof(line), stdin, "Maximum memory to use (bytes)? " );
 			if ( ldap_enable_cache( ld, i, atoi( line )) == 0 ) {
-				printf( "local cache is on\n" ); 
+				printf( "local cache is on\n" );
 			} else {
-				printf( "ldap_enable_cache failed\n" ); 
+				printf( "ldap_enable_cache failed\n" );
 			}
 #endif /* NO_CACHE */
 			break;
@@ -930,7 +930,7 @@ main(int argc, char **argv )
 			break;
 
 		case 'k': /* Set some controls */
-			getaline( line, sizeof(line), stdin, 
+			getaline( line, sizeof(line), stdin,
 					 "Set control: (0 for none, 1 for ManageDSA, 2 for preferredLang, 3 for BAD)?");
 			theInt = atoi(line);
 			switch (theInt){
@@ -963,7 +963,7 @@ main(int argc, char **argv )
 				break;
 			}
 			break;
-		  
+
 		case 'O':	/* set cache options */
 #ifdef NO_CACHE
 			printf( NOCACHEERRMSG );
@@ -1029,7 +1029,7 @@ handle_result( LDAP *ld, LDAPMessage *lm )
 		printf( "Search reference\n" );
 		print_search_entry( ld, lm );
 		break;
-		
+
 	case LDAP_RES_SEARCH_ENTRY:
 		printf( "Search entry\n" );
 		print_search_entry( ld, lm );
@@ -1073,12 +1073,12 @@ print_ldap_result( LDAP *ld, LDAPMessage *lm, char *s )
 	int errCode;
 	char *matched = NULL, *errMsg = NULL, **referrals = NULL;
 	LDAPControl **srvctrls = NULL;
-	
+
 	if ((rc = ldap_parse_result(ld, lm, &errCode, &matched, &errMsg, &referrals, &srvctrls, 0)) != LDAP_SUCCESS){
 		fprintf(stderr, "%s: error while parsing result (%s)\n", s, ldap_err2string(rc));
 		return;
 	}
-	
+
 
 	fprintf(stderr, "%s: %s\n", s, ldap_err2string(errCode));
 	if (errCode == LDAP_REFERRAL){
@@ -1117,12 +1117,12 @@ print_search_entry( LDAP *ld, LDAPMessage *res )
 
 		dn = ldap_get_dn( ld, e );
 		printf( "\tDN: %s\n", dn );
-		
+
 		ufn = ldap_dn2ufn( dn );
 		printf( "\tUFN: %s\n", ufn );
 		free( dn );
 		free( ufn );
-			
+
 		if ( e->lm_msgtype == LDAP_RES_SEARCH_REFERENCE ){
 			char **urls = ldap_get_reference_urls(ld, e);
 			if (urls == NULL){
@@ -1141,14 +1141,14 @@ print_search_entry( LDAP *ld, LDAPMessage *res )
 				} else {
 					for ( i = 0; vals[i] != NULL; i++ ) {
 						int	j, nonascii;
-						
+
 						nonascii = 0;
 						for ( j = 0; j < vals[i]->bv_len; j++ )
 							if ( !isascii( vals[i]->bv_val[j] ) ) {
 							nonascii = 1;
 							break;
 							}
-						
+
 						if ( nonascii ) {
 							printf( "\t\t\tlength (%ld) (not ascii)\n", vals[i]->bv_len );
 #ifdef BPRINT_NONASCII
@@ -1165,7 +1165,7 @@ print_search_entry( LDAP *ld, LDAPMessage *res )
 			}
 		}
 	}
-	
+
 	if ( res->lm_msgtype == LDAP_RES_SEARCH_RESULT
 	    || res->lm_chain != NULLMSG )
 		print_ldap_result( ld, res, "search" );

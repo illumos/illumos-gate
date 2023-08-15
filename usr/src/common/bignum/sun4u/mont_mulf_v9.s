@@ -196,7 +196,7 @@ TwoToMinus32:
 /* 0x00b0	  69 */		ble,pt	%icc,.L900000111
 /* 0x00b4	     */		sra	%g2,0,%o0
                        .L77000145:
-/* 0x00b8	     */		retl	! Result = 
+/* 0x00b8	     */		retl	! Result =
 /* 0x00bc	     */		nop
 /* 0x00c0	   0 */		.type	cleanup,2
 /* 0x00c0	   0 */		.size	cleanup,(.-cleanup)
@@ -512,7 +512,7 @@ TwoToMinus32:
 /* 0x03ec	     */		sllx	%g5,2,%g2
 /* 0x03f0	     */		and	%g4,%g3,%g3
 /* 0x03f4	     */		st	%g3,[%l1+%g2]
-/* 0x03f8	     */		ret	! Result = 
+/* 0x03f8	     */		ret	! Result =
 /* 0x03fc	     */		restore	%g0,%g0,%g0
 /* 0x0400	   0 */		.type	conv_d16_to_i32,2
 /* 0x0400	   0 */		.size	conv_d16_to_i32,(.-conv_d16_to_i32)
@@ -630,7 +630,7 @@ TwoToMinus32:
 /* 0x0128	     */		ble,a,pt	%icc,.L900000310
 /* 0x012c	     */		ld	[%o1],%f1
                        .L77000181:
-/* 0x0130	     */		retl	! Result = 
+/* 0x0130	     */		retl	! Result =
 /* 0x0134	     */		nop
 /* 0x0138	   0 */		.type	conv_i32_to_d32,2
 /* 0x0138	   0 */		.size	conv_i32_to_d32,(.-conv_i32_to_d32)
@@ -779,7 +779,7 @@ TwoToMinus32:
 /* 0x0190	     */		std	%f0,[%i0+%g2]
 /* 0x0194	 125 */		fsubd	%f4,%f2,%f0
 /* 0x0198	     */		std	%f0,[%i0+%g3]
-/* 0x019c	     */		ret	! Result = 
+/* 0x019c	     */		ret	! Result =
 /* 0x01a0	     */		restore	%g0,%g0,%g0
                        .L77000201:
 /* 0x01a4	 123 */		ld	[%o1],%g3
@@ -809,7 +809,7 @@ TwoToMinus32:
 /* 0x0200	     */		ble,a,pt	%icc,.L900000411
 /* 0x0204	     */		ld	[%o1],%g3
                        .L77000197:
-/* 0x0208	     */		ret	! Result = 
+/* 0x0208	     */		ret	! Result =
 /* 0x020c	     */		restore	%g0,%g0,%g0
 /* 0x0210	   0 */		.type	conv_i32_to_d16,2
 /* 0x0210	   0 */		.size	conv_i32_to_d16,(.-conv_i32_to_d16)
@@ -1241,7 +1241,7 @@ TwoToMinus32:
 /* 0x0510	     */		bl,pt	%icc,.L900000513
 /* 0x0514	     */		sra	%o7,0,%g3
                        .L77000217:
-/* 0x0518	     */		ret	! Result = 
+/* 0x0518	     */		ret	! Result =
 /* 0x051c	     */		restore	%g0,%g0,%g0
 /* 0x0520	   0 */		.type	conv_i32_to_d32_and_d16,2
 /* 0x0520	   0 */		.size	conv_i32_to_d32_and_d16,(.-conv_i32_to_d32_and_d16)
@@ -1385,7 +1385,7 @@ TwoToMinus32:
 /* 0x015c	     */		ble,a,pt	%icc,.L900000610
 /* 0x0160	     */		ld	[%o2],%o0
                        .L77000256:
-/* 0x0164	     */		retl	! Result = 
+/* 0x0164	     */		retl	! Result =
 /* 0x0168	     */		nop
 /* 0x016c	   0 */		.type	adjust_montf_result,2
 /* 0x016c	   0 */		.size	adjust_montf_result,(.-adjust_montf_result)
@@ -1883,7 +1883,7 @@ TwoToMinus32:
 	ldd [%i1+104],%f34
 	ldd [%i1+112],%f58
 
-	ldd [%i4+8],%f28	
+	ldd [%i4+8],%f28
 	ldd [%i4+104],%f38
 	ldd [%i4+112],%f60
 
@@ -1926,7 +1926,7 @@ TwoToMinus32:
 !11
 	ldd	[%g4+8],%f8
 	faddd	%f20,%f22,%f20
-	fmuld	%f50,%f0,%f50	
+	fmuld	%f50,%f0,%f50
 !12
 	std	%f20,[%g4+16]
 	faddd	%f42,%f44,%f42
@@ -2443,7 +2443,7 @@ TwoToMinus32:
 /* 0x0d34	     */		ble,a,pt	%icc,.L900000739
 /* 0x0d38	     */		ld	[%o1],%g2
                        .L77000307:
-/* 0x0d3c	     */		ret	! Result = 
+/* 0x0d3c	     */		ret	! Result =
 /* 0x0d40	     */		restore	%g0,%g0,%g0
 /* 0x0d44	   0 */		.type	mont_mulf_noconv,2
 /* 0x0d44	   0 */		.size	mont_mulf_noconv,(.-mont_mulf_noconv)

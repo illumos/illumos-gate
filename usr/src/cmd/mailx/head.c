@@ -259,7 +259,7 @@ copy(char *str1, char *str2)
  * Is ch any of the characters in str?
  */
 
-int 
+int
 any(int ch, char *str)
 {
 	register char *f;

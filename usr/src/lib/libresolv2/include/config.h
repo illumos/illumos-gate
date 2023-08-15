@@ -57,7 +57,7 @@
 /* #undef ssize_t */
 /* #undef uintptr_t */
 
-/* Shut up warnings about sputaux in stdio.h on BSD/OS pre-4.1 */ 
+/* Shut up warnings about sputaux in stdio.h on BSD/OS pre-4.1 */
 /* #undef SHUTUP_SPUTAUX */
 #ifdef SHUTUP_SPUTAUX
 struct __sFILE;

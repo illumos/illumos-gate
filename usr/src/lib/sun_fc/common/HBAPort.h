@@ -38,7 +38,7 @@
 
 /**
  * @memo	    Represents a single HBA port
- * 
+ *
  */
 class HBAPort : public Lockable {
 public:

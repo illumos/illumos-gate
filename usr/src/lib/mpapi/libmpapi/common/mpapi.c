@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Description
- * mpapi.c - Implements Multipath Management API Version 1.0 
+ * mpapi.c - Implements Multipath Management API Version 1.0
  *
  * License:
  *  The contents of this file are subject to the SNIA Public License
@@ -30,7 +30,7 @@
  ******************************************************************************
  *
  *   Changes:
- *  1/15/2005	Implemented SNIA MP API specification 1.0 
+ *  1/15/2005	Implemented SNIA MP API specification 1.0
  *  10/11/2005
  * 		- License location was specified in the header comment.
  *  	    	- validate_object() routine was updated per the latest
@@ -40,13 +40,13 @@
  *  		- pplist argument checking added in MP_GetMultipathLus().
  *  		- Corrected typo in MP_GetTaregetPortGroupProperties()
  *  		- MP_RegisterForObjectPropertyChanges() was updated with
- *		  is_zero_oid() routine.		
+ *		  is_zero_oid() routine.
  *  		- MP_DeregisterForObjectPropertyChanges() was updated with
- *		  is_zero_oid() routine.		
+ *		  is_zero_oid() routine.
  *		- MP_RegisterForObjectVisibilityChanges() was updated with
- *		  is_zero_oid() routine.		
+ *		  is_zero_oid() routine.
  *		- MP_DeregisterForObjectVisibilityChanges() was updated with
- *		  is_zero_oid() routine.		
+ *		  is_zero_oid() routine.
  *  		- Added stat() check in MP_RegisterPlugin() to validate the
  *		  the given plugin file name.
  *  		- Made MP_DeregisterPlugin() return MP_STATUS_UNKNOWN_FN
@@ -96,13 +96,13 @@ static int is_zero_oid(MP_OID);
  *
  * Validate the oid.
  *
- * - Return MP_STATUS_OBJECT_NOT_FOUND when no plugin is found or the ownerId 
+ * - Return MP_STATUS_OBJECT_NOT_FOUND when no plugin is found or the ownerId
  *      of input OID is not found.
  * - Return MP_STATUS_INVALID_OBJECT_TYPE when no plugin is found or
- *      the type of input OID is not one of legitimate types defined SNIA 
+ *      the type of input OID is not one of legitimate types defined SNIA
  *      Multipath Management spec.
  * - Return MP_STATUS_INVALID_PARAMETER when the type of input OID is
- *	legitimate but its object type doesn't match with the object type 
+ *	legitimate but its object type doesn't match with the object type
  *      argument.
  * - Otherwise return MP_STATUS_SUCCESS.
  *
@@ -136,7 +136,7 @@ MP_STATUS validate_object(MP_OID obj, MP_OBJECT_TYPE objType,
  *
  * Check if an oid is ZERO_OID or not.
  *
- * - Return 1 if the input OID is ZERO_OID 
+ * - Return 1 if the input OID is ZERO_OID
  *
  * - Return 0 if not.
  *
@@ -168,7 +168,7 @@ static int is_zero_oid(MP_OID oid)
  */
 void InitLibrary()
 {
-	FILE *mpconf;		
+	FILE *mpconf;
 	int fd_mpconf;
 	MP_WCHAR fullline[MAX_LINE_SIZE]; /* line read in from mpapi.conf */
 	MP_WCHAR name[MAX_NAME_SIZE]; 	/* Read in from file mpapi.conf */
@@ -195,7 +195,7 @@ void InitLibrary()
 		(void) pthread_mutex_unlock(&mp_lib_mutex);
 		return;
 	}
-	    
+
 	if (lock_register(fd_mpconf, F_SETLKW, F_RDLCK, 0, SEEK_SET, 0) < 0) {
 		close(fd_mpconf);
 		(void) pthread_mutex_unlock(&mp_lib_mutex);
@@ -225,7 +225,7 @@ void InitLibrary()
 		sol = charPtr;
 
 		/*
-		 * look for first tab or space. 
+		 * look for first tab or space.
 		 */
 		if ((charPtr = wcschr(fullline, L'\t')) == NULL)
 		    charPtr = wcschr(fullline, L' ');
@@ -246,7 +246,7 @@ void InitLibrary()
 
 		/*
 		 * Continue to the next line if library name or path is
-		 * invalid 
+		 * invalid
 		 */
 		if ((wcslen(name) == 0) ||
 			(strlen(path) == 0))
@@ -3296,17 +3296,17 @@ MP_STATUS MP_FreeOidList(MP_OID_LIST *pOidList)
 	if (pOidList == NULL) {
 	    return (MP_STATUS_INVALID_PARAMETER);
 	}
-	
+
 	free(pOidList);
 
 	return (MP_STATUS_SUCCESS);
 }
 
 static MP_CHAR *HDR =
-"#\n" 
+"#\n"
 "# This file contains names and references to MP API plugin libraries\n"
 "#\n"
-"#  Do NOT manually edit this file\n" 
+"#  Do NOT manually edit this file\n"
 "#\n"
 "# Format:\n"
 "#\n"
@@ -3320,7 +3320,7 @@ static MP_CHAR *HDR =
 	} \
 	close(fd); \
 	return (ret)
-	
+
 /*
  * This function sets an advisory lock on the file pointed to by the argument
  * fd, which is a file descriptor. The lock is set using fcntl() which uses
@@ -3371,15 +3371,15 @@ search_line(MP_CHAR *buf, size_t buflen, MP_CHAR *srch_id, size_t id_len,
 	*write_offset = 0;
 
 	if (buf == NULL || buflen <= 0)
-		return (-1);	
+		return (-1);
 
 	if (srch_id == NULL || id_len <= 0)
-		return (0);	
+		return (0);
 
 	sol = cur_pos = buf;
 
 	/*
-	 * mp conf file should not be edited but takes care of 
+	 * mp conf file should not be edited but takes care of
 	 * any extra white space when parsing the line.
 	 *
 	 * The line should have id + delimiter + name + newline.
@@ -3408,7 +3408,7 @@ search_line(MP_CHAR *buf, size_t buflen, MP_CHAR *srch_id, size_t id_len,
 		*bytes_left = buflen - ((cur_pos + 1) - buf);
 	    }
 	    sol = cur_pos = cur_pos + 1;
-	} 	
+	}
 
 	/* Given strings are not found. */
 	*write_offset = buflen;
@@ -3419,7 +3419,7 @@ search_line(MP_CHAR *buf, size_t buflen, MP_CHAR *srch_id, size_t id_len,
  *******************************************************************************
  *
  * Registers a plugin with common library.  The implementation of this routine
- * is based on configuration file /etc/mpapi.conf that contains a list of 
+ * is based on configuration file /etc/mpapi.conf that contains a list of
  * plugin libraries.
  *
  * @param  pPluginId
@@ -3459,7 +3459,7 @@ MP_STATUS MP_RegisterPlugin(
 	MP_UINT32   new_file_flag = 0;
 	MP_UINT32   sizeof_conf_hdr = strlen(HDR);
 	struct stat	stbuf;
-	
+
 	if ((pPluginId == NULL) || (pFileName == NULL)) {
 	    return (MP_STATUS_INVALID_PARAMETER);
 	}
@@ -3480,7 +3480,7 @@ MP_STATUS MP_RegisterPlugin(
 	/* add a new line. */
 	strncat(fullline, "\n",
 	    MAX_LINE_SIZE - strlen(pluginid) - strlen(pFileName) -1);
-	
+
 	/* Open configuration file from known location */
 	strncpy(mpConfFilePath, "/etc/mpapi.conf", MAX_NAME_SIZE);
 
@@ -3488,7 +3488,7 @@ MP_STATUS MP_RegisterPlugin(
 		(errno == ENOENT))  {
 	    new_file_flag = 1;
 	}
-    
+
 	if ((mpconf = open(mpConfFilePath, O_RDWR | O_CREAT)) == -1) {
 		return (MP_STATUS_FAILED);
 	}
@@ -3597,7 +3597,7 @@ MP_STATUS MP_DeregisterPlugin(
 	    /* no file found */
 	    return (MP_STATUS_UNKNOWN_FN);
 	}
-    
+
 	if ((mpconf = open(mpConfFilePath, O_RDWR)) == -1) {
 		return (MP_STATUS_FAILED);
 	}

@@ -43,7 +43,7 @@ LIBM_ANSI_PRAGMA_WEAK(acosl,function)
 	fucomip	%st(1),%st
 	jp	.L1
 	jne	.L1
-	/ x is -1 
+	/ x is -1
 	fstp	%st(0)			/ -1
 	fstp	%st(0)			/ empty NPX stack
 	fldpi

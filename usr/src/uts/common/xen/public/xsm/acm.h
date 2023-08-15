@@ -102,7 +102,7 @@ typedef uint16_t domaintype_t;
  * current accumulated conflict type set:
  * When a domain is started and has a type that is in
  * a conflict set, the conflicting types are incremented in
- * the aggregate set. When a domain is destroyed, the 
+ * the aggregate set. When a domain is destroyed, the
  * conflicting types to its type are decremented.
  * If a domain has multiple types, this procedure works over
  * all those types.

@@ -52,7 +52,7 @@
 
 /*
  * Invalidate either the context of a specific victim or any process
- * currently running on this CPU. 
+ * currently running on this CPU.
  *
  * %g1 = sfmmup whose ctx is being stolen (victim)
  *	 when called from sfmmu_wrap_around, %g1 == INVALID_CONTEXT.
@@ -64,7 +64,7 @@
 	! if (victim == INVALID_CONTEXT) {
 	!	if (sec-ctx > INVALID_CONTEXT)
 	!		write INVALID_CONTEXT to sec-ctx
-	!	if (pri-ctx > INVALID_CONTEXT) 
+	!	if (pri-ctx > INVALID_CONTEXT)
 	!		write INVALID_CONTEXT to pri-ctx
 	!
 	! } else if (current CPU tsbmiss->usfmmup != victim sfmmup) {
@@ -72,7 +72,7 @@
 	! } else {
 	!	if (sec-ctx > INVALID_CONTEXT)
 	!		write INVALID_CONTEXT to sec-ctx
-	!	
+	!
 	!	if (pri-ctx > INVALID_CONTEXT)
 	!		write INVALID_CONTEXT to pri-ctx
 	! }
@@ -85,7 +85,7 @@
 	  mov	PTL1_BAD_RAISE_TSBEXCP, %g1
 
 	set	INVALID_CONTEXT, %g2
-	
+
 	cmp	%g1, INVALID_CONTEXT
 	bne,pt	%xcc, 1f			/* called from wrap_around? */
 	  mov	MMU_SCONTEXT, %g3
@@ -94,11 +94,11 @@
 	cmp	%g5, INVALID_CONTEXT		/* kernel  or invalid ctx ? */
 	ble,pn	%xcc, 0f			/* yes, no need to change */
 	  mov	MMU_PCONTEXT, %g7
-	
+
 	stxa	%g2, [%g3]ASI_MMU_CTX		/* set invalid ctx */
 	membar	#Sync
 
-0:	
+0:
 	ldxa	[%g7]ASI_MMU_CTX, %g5		/* %g5 = pri-ctx */
 	cmp	%g5, INVALID_CONTEXT		/* kernel or invalid ctx? */
 	ble,pn	%xcc, 6f			/* yes, no need to change */
@@ -110,7 +110,7 @@
 6:	/* flushall tlb */
 	mov	%o0, %g3
 	mov	%o1, %g4
-	mov	%o2, %g6 
+	mov	%o2, %g6
 	mov	%o5, %g7
 
         mov     %g0, %o0        ! XXX no cpu list yet
@@ -122,12 +122,12 @@
           nop
      	ba ptl1_panic		/* bad HV call */
 	  mov	PTL1_BAD_RAISE_TSBEXCP, %g1
-5:	
+5:
 	mov	%g3, %o0
 	mov	%g4, %o1
 	mov	%g6, %o2
 	mov	%g7, %o5
-	
+
 	ba	3f
 	  nop
 1:
@@ -251,10 +251,10 @@
 	cmp	%o3, %o0
 	be,pn	%xcc, 7f			! if kernel as, do nothing
 	  nop
-	
+
 	set     MMU_SCONTEXT, %o3
         ldxa    [%o3]ASI_MMU_CTX, %o5
-	
+
 	cmp	%o5, INVALID_CONTEXT		! ctx is invalid?
 	bne,pt	%icc, 1f
 	  nop
@@ -278,7 +278,7 @@
 0:
 	retl
 	  nop
-1:		
+1:
 	/*
 	 * We need to set up the TSB base register, tsbmiss
 	 * area, and pass the TSB information into the hypervisor
@@ -343,10 +343,10 @@
 	btst	TSTAT_TLB_STATS, %o1
 	bnz,a,pn %icc, 5f			! ntsb = 0 if TLB stats enabled
 	  clr	%o0
-	
+
 	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_CNT], %o0
 5:
-	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_PA], %o1	
+	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_PA], %o1
 	mov	MMU_TSB_CTXNON0, %o5
 	ta	FAST_TRAP			! set TSB info for user process
 	brnz,a,pn %o0, panic_bad_hcall
@@ -385,19 +385,19 @@
 	retl
 	  nop
 9:
-	sethi   %hi(panicstr), %g1		! panic if no 3rd TSB  
-        ldx     [%g1 + %lo(panicstr)], %g1                             
+	sethi   %hi(panicstr), %g1		! panic if no 3rd TSB
+        ldx     [%g1 + %lo(panicstr)], %g1
         tst     %g1
-	                                                   
-        bnz,pn  %xcc, 7b                                            
-          nop                                                            
-                                                                        
-        sethi   %hi(sfmmu_panic10), %o0                                 
-        call    panic                                                 
-          or      %o0, %lo(sfmmu_panic10), %o0                         
+
+        bnz,pn  %xcc, 7b
+          nop
+
+        sethi   %hi(sfmmu_panic10), %o0
+        call    panic
+          or      %o0, %lo(sfmmu_panic10), %o0
 
 	SET_SIZE(sfmmu_load_mmustate)
-	
+
 	ENTRY(prefetch_tsbe_read)
 	retl
 	nop

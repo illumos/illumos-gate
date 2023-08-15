@@ -41,34 +41,34 @@
 !    int index, sign, intf, intz;
 !    extern const double __vlibm_TBL_atan1[];
 !    long *pf = (long *) &f, *pz = (long *) &z;
-!  
+!
 !  /*    Power series  atan(x) = x + p1*x**3 + p2*x**5 + p3*x**7
 !   *    Error =  -3.08254E-18   On the interval  |x| < 1/64 */
-!  
+!
 !  /* define dummy names for readability.  Use parray to help compiler optimize loads */
 !  #define p3    parray[0]
 !  #define p2    parray[1]
 !  #define p1    parray[2]
-!  #define soffset      3  
-!  
-!    static const double parray[] = { 
+!  #define soffset      3
+!
+!    static const double parray[] = {
 !     -1.428029046844299722E-01,		/* p[3]		*/
 !      1.999999917247000615E-01, 		/* p[2]		*/
 !     -3.333333333329292858E-01, 		/* p[1]		*/
 !      1.0, 				/* not used for p[0], though		*/
 !     -1.0,				/* used to flip sign of answer 		*/
 !    };
-!  
+!
 !    f        = *x;				/* fetch argument		*/
 !    intf     = pf[0];				/* grab upper half		*/
 !    sign     = intf & 0x80000000;			/* sign of argument		*/
 !    intf    ^= sign;				/* abs(upper argument)		*/
 !    sign     = (unsigned) sign >> 31;		/* sign bit = 0 or 1		*/
 !    pf[0]    = intf;
-!  
+!
 !    if( (intf > 0x43600000) || (intf < 0x3e300000) ) /* filter out special cases */
 !    {
-!      if(  (intf > 0x7ff00000) || 
+!      if(  (intf > 0x7ff00000) ||
 !        ((intf == 0x7ff00000) &&  (pf[1] !=0)) ) return (*x-*x);/* return NaN if x=NaN*/
 !      if( intf < 0x3e300000 ) 			/* avoid underflow for small arg */
 !      {
@@ -84,7 +84,7 @@
 !        return (f);
 !      }
 !    }
-!  
+!
 !    index    = 0;				/* points to 0,0 in table	*/
 !    if (intf > 0x40500000)			/* if(|x| > 64               	*/
 !    { f = -1.0/f;
@@ -134,7 +134,7 @@
 /*
    __vatan(int n, double *x, int stridex, double *y, stridey)
    computes y(i) = atan( x(i) ), for 1=1,n.  Stridex, stridey
-   are the distance between x and y elements			 
+   are the distance between x and y elements
 
 	%i0    n
 	%i1    address of x
@@ -150,7 +150,7 @@
 /*  pre-load constants before beginning main loop */
 
 	ldd	[%o0],%f58		!load p[3]
-	mov	2,%i5			!argcount = 3 
+	mov	2,%i5			!argcount = 3
 
 	ldd	[%o0+WSIZE],%f60	!load p[2]
 	add	%fp,STACK_BIAS-8,%l1		!yaddr1 = &dummy
@@ -160,7 +160,7 @@
 	add	%fp,STACK_BIAS-8,%l2		!yaddr2 = &dummy
 	fzero   %f12			!(poly1) = 0
 
-	ldd 	[%o0+3*WSIZE],%f56	!-1.0 
+	ldd 	[%o0+3*WSIZE],%f56	!-1.0
 	fzero   %f14			!tmp1 = 0
 
 	ldd     [%o0+4*WSIZE],%f52	!load rounding mask
@@ -175,7 +175,7 @@
 	ldd	[%o0+7*WSIZE],%f32	!mask for sign bit
 
 	ldd	[%o4+2*WSIZE],%f46	!pi/2 upper
-	ldd	[%o4+(2*WSIZE+8)],%f48	!pi/2 lower 
+	ldd	[%o4+(2*WSIZE+8)],%f48	!pi/2 lower
 	sethi	%hi(0x40500000),%l6	!64.0
 	sethi	%hi(0x3f900000),%l7	!1/64.0
 	mov     0,%l4			!index1 = 0
@@ -209,7 +209,7 @@
 
 	sub	%o1,%o0,%o1		!(-) if intf > big
 /*6 */  sub	%o0,%o2,%o2		!(-) if intf < small
-	fand 	%f34,%f32,%f40		!sign0 = sign bit 
+	fand 	%f34,%f32,%f40		!sign0 = sign bit
             fmuld   %f38,%f38,%f24      !tmp2= f2*f2
 
 /*7 */  orcc	%o1,%o2,%g0		!(-) if either true
@@ -301,7 +301,7 @@
 
 /*30*/  sub	%o1,%o0,%o1		!(-) if intf > big
 	sub	%o0,%o2,%o2		!(-) if intf < small
-	fand 	%f36,%f32,%f42		!sign1 = sign bit 
+	fand 	%f36,%f32,%f42		!sign1 = sign bit
 
 /*31*/  orcc	%o1,%o2,%g0		!(-) if either true
  	bneg,pn  %icc,.SPECIAL1		!if (-) goto special cases below
@@ -345,7 +345,7 @@
       mov     %i3,%l1			!yaddr1 = address of y
       fmuld   %f34,%f34,%f4             !tmp0= f0*f0
           faddd   %f28,%f22,%f38        !ans2 = ansu2 + ansl2
-        
+
 /*44*/add	%i1,%i2,%i1		!x     += stridex
       add	%i3,%i4,%i3		!y     += stridey
     fmuld   %f58,%f4,%f2                !p[3]*tmp0
@@ -381,7 +381,7 @@
 
 /*51*/  sub	%o1,%o0,%o1		!(-) if intf > big
 	sub	%o0,%o2,%o2		!(-) if intf < small
-	fand 	%f38,%f32,%f44		!sign2 = sign bit 
+	fand 	%f38,%f32,%f44		!sign2 = sign bit
 
 /*52*/  orcc	%o1,%o2,%g0		!(-) if either true
  	bneg,pn  %icc,.SPECIAL2		!if (-) goto special cases below
@@ -421,7 +421,7 @@
 /*61*/    fdivd	  %f20,%f10,%f38	!f = (f - z)/(1.0 + f*z), reduced argument
 	.ENDIF2:
 
-        
+
 /*62*/  sll	%o1,3,%l5		!index2 = index
 	mov	%i3,%l2			!yaddr2 = address of y
       fmuld   %f34,%f4,%f4              !f0*tmp0
@@ -482,7 +482,7 @@
 	  ba	  3f
 	  faddd	  %f34,%f50,%f30		!dummy op just to generate exception (delay slot)
 1:
-	ld	[%o5+4],%o5			!load x lower word  
+	ld	[%o5+4],%o5			!load x lower word
 	sllx	%o0,32,%o0			!left justify intf
 	sllx	%g1,32,%g1		!left justify Inf
 	or	%o0,%o5,%o0			!merge in lower intf
@@ -493,8 +493,8 @@
 	  ba      3f
 	  nop
 2:
-	faddd	%f46,%f48,%f34			!ans = pi/2 upper + pi/2 lower 
-3:   
+	faddd	%f46,%f48,%f34			!ans = pi/2 upper + pi/2 lower
+3:
 	add	%i1,%i2,%i1			!x += stridex
 	for     %f34,%f40,%f34			!sign(ans) = sign of argument
 	std	%f34,[%i3]			!*y = ans
@@ -513,7 +513,7 @@
 	  ba	  3f
 	  faddd	  %f36,%f50,%f30		!dummy op just to generate exception (delay slot)
 1:
-	ld	[%o5+4],%o5			!load x lower word  
+	ld	[%o5+4],%o5			!load x lower word
 	sllx	%o0,32,%o0			!left justify intf
 	sllx	%g1,32,%g1		!left justify Inf
 	or	%o0,%o5,%o0			!merge in lower intf
@@ -524,8 +524,8 @@
 	  ba      3f
 	  nop
 2:
-	faddd	%f46,%f48,%f36			!ans = pi/2 upper + pi/2 lower 
-3:   
+	faddd	%f46,%f48,%f36			!ans = pi/2 upper + pi/2 lower
+3:
 	add	%i1,%i2,%i1			!x += stridex
 	for     %f36,%f42,%f36			!sign(ans) = sign of argument
 	std	%f36,[%i3]			!*y = ans
@@ -544,7 +544,7 @@
 	  ba	  3f
 	  faddd	  %f38,%f50,%f30		!dummy op just to generate exception (delay slot)
 1:
-	ld	[%o5+4],%o5			!load x lower word  
+	ld	[%o5+4],%o5			!load x lower word
 	sllx	%o0,32,%o0			!left justify intf
 	sllx	%g1,32,%g1		!left justify Inf
 	or	%o0,%o5,%o0			!merge in lower intf
@@ -555,8 +555,8 @@
 	  ba      3f
 	  nop
 2:
-	faddd	%f46,%f48,%f38			!ans = pi/2 upper + pi/2 lower 
-3:   
+	faddd	%f46,%f48,%f38			!ans = pi/2 upper + pi/2 lower
+3:
 	add	%i1,%i2,%i1			!x += stridex
 	for     %f38,%f44,%f38			!sign(ans) = sign of argument
 	std	%f38,[%i3]			!*y = ans

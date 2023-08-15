@@ -13,12 +13,12 @@
 #include <locale.h>
 
 
-krb5_error_code 
+krb5_error_code
 krb5int_mk_chpw_req(
-	krb5_context context, 
-	krb5_auth_context auth_context, 
+	krb5_context context,
+	krb5_auth_context auth_context,
 	krb5_data *ap_req,
-	char *passwd, 
+	char *passwd,
 	krb5_data *packet)
 {
     krb5_error_code ret = 0;
@@ -79,11 +79,11 @@ krb5int_mk_chpw_req(
 cleanup:
     if(cipherpw.data != NULL)  /* allocated by krb5_mk_priv */
       free(cipherpw.data);
-      
+
     return(ret);
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context, krb5_data *packet, int *result_code, krb5_data *result_data)
 {
     char *ptr;
@@ -110,7 +110,7 @@ krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context, krb5_d
     plen = (*ptr++ & 0xff);
     plen = (plen<<8) | (*ptr++ & 0xff);
 
-    if (plen != packet->length) 
+    if (plen != packet->length)
 	{
 		/*
 		 * MS KDCs *may* send back a KRB_ERROR.  Although
@@ -133,7 +133,7 @@ krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context, krb5_d
 			return(KRB5KRB_AP_ERR_MODIFIED);
 		}
 	}
-	
+
 
     /* verify version number */
 

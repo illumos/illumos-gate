@@ -7,16 +7,16 @@
 /*
  * prof_tree.c --- these routines maintain the parse tree of the
  * 	config file.
- * 
+ *
  * All of the details of how the tree is stored is abstracted away in
  * this file; all of the other profile routines build, access, and
  * modify the tree via the accessor functions found in this file.
  *
  * Each node may represent either a relation or a section header.
- * 
+ *
  * A section header must have its value field set to 0, and may a one
  * or more child nodes, pointed to by first_child.
- * 
+ *
  * A relation has as its value a pointer to allocated memory
  * containing a string.  Its first_child pointer must be null.
  *
@@ -58,7 +58,7 @@ void profile_free_node(struct profile_node *node)
 
 	if (node->magic != PROF_MAGIC_NODE)
 		return;
-	
+
 	if (node->name)
 		free(node->name);
 	if (node->value)
@@ -69,7 +69,7 @@ void profile_free_node(struct profile_node *node)
 		profile_free_node(child);
 	}
 	node->magic = 0;
-	
+
 	free(node);
 }
 
@@ -164,7 +164,7 @@ errcode_t profile_add_node(struct profile_node *section, const char *name,
 
 	/*
 	 * Find the place to insert the new node.  We look for the
-	 * place *after* the last match of the node name, since 
+	 * place *after* the last match of the node name, since
 	 * order matters.
 	 */
 	for (p=section->first_child, last = 0; p; last = p, p = p->next) {
@@ -238,7 +238,7 @@ const char *profile_get_node_value(struct profile_node *node)
  * section which matches the name; don't return relations.  If value
  * is non-NULL, then only return relations which match the requested
  * value.  (The value argument is ignored if section_flag is non-zero.)
- * 
+ *
  * The first time this routine is called, the state pointer must be
  * null.  When this profile_find_node_relation() returns, if the state
  * pointer is non-NULL, then this routine should be called again.
@@ -257,7 +257,7 @@ errcode_t profile_find_node(struct profile_node *section, const char *name,
 		CHECK_MAGIC(p);
 	} else
 		p = section->first_child;
-	
+
 	for (; p; p = p->next) {
 		if (name && (strcmp(p->name, name)))
 			continue;
@@ -349,7 +349,7 @@ errcode_t profile_find_node_relation(struct profile_node *section,
  *
  * This is (plus accessor functions for the name and value given a
  * profile node) makes this function mostly syntactic sugar for
- * profile_find_node. 
+ * profile_find_node.
  */
 errcode_t profile_find_node_subsection(struct profile_node *section,
 				       const char *name, void **state,
@@ -388,7 +388,7 @@ errcode_t profile_get_node_parent(struct profile_node *section,
 
 /*
  * This is a general-purpose iterator for returning all nodes that
- * match the specified name array.  
+ * match the specified name array.
  */
 struct profile_iterator {
 	prf_magic_t		magic;
@@ -615,9 +615,9 @@ get_new_file:
 	return 0;
 }
 
-/* 
+/*
  * Remove a particular node.
- * 
+ *
  * TYT, 2/25/99
  */
 errcode_t profile_remove_node(struct profile_node *node)
@@ -626,7 +626,7 @@ errcode_t profile_remove_node(struct profile_node *node)
 
 	if (node->parent == 0)
 		return PROF_EINVAL; /* Can't remove the root! */
-	
+
 	node->deleted = 1;
 
 	return 0;
@@ -641,7 +641,7 @@ errcode_t profile_set_relation_value(struct profile_node *node,
 				     const char *new_value)
 {
 	char	*cp;
-	
+
 	CHECK_MAGIC(node);
 
 	if (!node->value)

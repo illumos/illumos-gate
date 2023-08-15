@@ -394,7 +394,7 @@ const struct st_drivetype st_drivetypes[] =
    */
   {                           /* Structure member Description                 */
                               /* ---------------- -----------                 */
-    "Archive Python 4mm Helical Scan", 
+    "Archive Python 4mm Helical Scan",
                               /* .name            Display ("pretty") name     */
     14,                       /* .length          Length of next item...      */
     "ARCHIVE Python",         /* .vid             Vendor-product ID string    */
@@ -536,7 +536,7 @@ const struct st_drivetype st_drivetypes[] =
     MT_DENSITY2,              /* .default_density (.densities[x])             */
     {0, 0, 0, 0}              /* .speeds          Speed codes [Note 2]        */
   },
- 
+
   /*
    * Exabyte 8900 8mm helical scan drive (also called Mammoth)
    *
@@ -673,7 +673,7 @@ const struct st_drivetype st_drivetypes[] =
    *  o This is an unsupported drive.
    *
    *  o This entry uses a shortened Vendor-product ID string for the
-   *    INQUIRY match.   
+   *    INQUIRY match.
    *
    * [1] The Exabyte DC-2000 uses 0 or the "default" density.
    * [2] The Exabyte DC-2000 has only one speed (if the driver ever cares).
@@ -706,7 +706,7 @@ const struct st_drivetype st_drivetypes[] =
    *     -----
    *
    *  o This entry uses a shortened Vendor-product ID string for the
-   *    INQUIRY match.   
+   *    INQUIRY match.
    *
    * [1] The EXABYTE 4mm uses 0 or the "default" density code.
    * [2] The EXABYTE 4mm has only one speed (if the driver ever cares).
@@ -1199,7 +1199,7 @@ const struct st_drivetype st_drivetypes[] =
     ST_BSR              |     /*  0000010           Supports SPACE block rev  */
     ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
     ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */ 
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
     ST_MODE_SEL_COMP    |     /*  0010000           Mode select compression   */
     ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
                               /*  -------                                     */
@@ -1240,7 +1240,7 @@ const struct st_drivetype st_drivetypes[] =
     ST_BSR              |     /*    00010           Supports SPACE block rev  */
     ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
     ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */ 
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
     ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
                               /*    -----                                     */
                               /*    18619                                     */
@@ -1279,7 +1279,7 @@ const struct st_drivetype st_drivetypes[] =
     ST_BSR              |     /*    00010           Supports SPACE block rev  */
     ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
     ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */ 
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
     ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
                               /*    -----                                     */
                               /*    18619                                     */
@@ -1305,7 +1305,7 @@ const struct st_drivetype st_drivetypes[] =
    *  o This is an unsupported drive.
    *
    *  o This entry uses a shortened Vendor-product ID string for the
-   *    INQUIRY match.   
+   *    INQUIRY match.
    *
    * [1] The density code entry requires four values, even if there are less
    *     than four values for the drive.
@@ -1376,7 +1376,7 @@ const struct st_drivetype st_drivetypes[] =
 
   /*
    * Quantum VS 160
-   * 
+   *
    * Notes
    * [1] The VS160 reads several formats which the drive autodetects.
    *     It can write only in VS160 format so all densities set ro 0x50.
@@ -1519,7 +1519,7 @@ const struct st_drivetype st_drivetypes[] =
     "Quantum Super DLT 220",  /* .name            Display ("pretty") name     */
     17,                       /* .length          Length of next item...      */
     "QUANTUM SuperDLT1",      /* .vid             Vendor-product ID string    */
-    ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */  
+    ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
     ST_VARIABLE         |     /*    00001         Supports variable length    */
@@ -1562,7 +1562,7 @@ const struct st_drivetype st_drivetypes[] =
     "Quantum DLT8000",        /* .name            Display ("pretty") name     */
     15,                       /* .length          Length of next item...      */
     "QUANTUM DLT8000",        /* .vid             Vendor-product ID string    */
-    ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */  
+    ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
     ST_VARIABLE         |     /*    00001           Supports variable length  */
@@ -1852,7 +1852,7 @@ const struct st_drivetype st_drivetypes[] =
     ST_BSR              |     /*    00010           Supports SPACE block rev  */
     ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
     ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */ 
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
     ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
                               /*    -----                                     */
                               /*    18619                                     */
@@ -1916,7 +1916,7 @@ const struct st_drivetype st_drivetypes[] =
    *  o This is an unsupported drive.
    *
    *  o This entry uses a shortened Vendor-product ID string for the
-   *    INQUIRY match.   
+   *    INQUIRY match.
    *
    * [1] The SDT-5000 uses 0 or the "default" density code.
    * [2] The SDT-5000 has only one speed (if the driver ever cares).
@@ -1955,7 +1955,7 @@ const struct st_drivetype st_drivetypes[] =
    *     half-inch cartridge drives).
    * [1] Compression on the T10000A is controlled
    *     via the Device Configuration mode page.
-   * [2] The T10000A has only one writable density, 0x4A. 
+   * [2] The T10000A has only one writable density, 0x4A.
    * [3] The T10000A has only one speed (if the driver ever cares).
    * [4] max_rretries and max_wretries are driver anachronisms.
    */
@@ -2166,7 +2166,7 @@ const struct st_drivetype st_drivetypes[] =
     MT_DENSITY1,              /* .default_density    (.densities[x])          */
     {0, 0, 0, 0},             /* .speeds             Speed codes [Note 3]     */
     0,                        /* .non_motion_timeout Nothing Special          */
-    MINUTES(5),               /* .io_timeout         Five Minutes             */ 
+    MINUTES(5),               /* .io_timeout         Five Minutes             */
     0,                        /* .rewind_timeout     Nothing Special          */
     MINUTES(180),             /* .space_timeout      Three Hours     3 x 9840 */
     0,                        /* .load_timeout       Nothing Special          */
@@ -2838,7 +2838,7 @@ const struct st_drivetype st_drivetypes[] =
    *  o This is an unsupported drive.
    *
    *  o This entry uses a shortened Vendor-product ID string for the
-   *    INQUIRY match.   
+   *    INQUIRY match.
    *
    * [1] The Wangtek 4mm RDAT uses 0 or the "default" density code.
    * [2] The Wangtek 4mm RDAT has only one speed (if the driver ever cares).

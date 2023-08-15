@@ -75,7 +75,7 @@
 static PRStatus local_SSLPLCY_Install(void);
 
 /*
- * This little tricky guy keeps us from initializing twice 
+ * This little tricky guy keeps us from initializing twice
  */
 static int		inited = 0;
 #ifdef _SOLARIS_SDK
@@ -288,11 +288,11 @@ buildDBName(const char *basename, const char *dbname)
 		&& PL_strcasecmp( ".db", basename + len - 3 ) == 0 ) {
 		return (ldapssl_strdup(basename));
 	    }
-	    
+
 	    pathlen = len;
 	    len = pathlen + PL_strlen(dbname) + 1;
 	    addslash = ( pathlen > 0 &&
-		(( *(basename + pathlen - 1) != FILE_PATHSEP ) || 
+		(( *(basename + pathlen - 1) != FILE_PATHSEP ) ||
 		( *(basename + pathlen - 1) != '\\'  )));
 
 	    if ( addslash ) {
@@ -306,7 +306,7 @@ buildDBName(const char *basename, const char *dbname)
 		}
 		PL_strcpy(result+pathlen, dbname);
 	    }
-	    
+
 	}
 
 
@@ -318,14 +318,14 @@ GetCertDBName(void *alias, int dbVersion)
 {
     char		*source;
     char dbname[128];
-    
+
     source = (char *)alias;
-    
+
     if (!source)
     {
 	source = "";
     }
-    
+
     sprintf(dbname, "cert%d.db",dbVersion);
     return(buildDBName(source, dbname));
 
@@ -343,11 +343,11 @@ GetDBName(const char *dbname, const char *path)
     char		*result;
     PRUint32	len, pathlen;
     int		addslash;
-    
+
     if ( dbname == NULL ) {
 	dbname = "";
     }
-    
+
     if ((path == NULL) || (*path == 0)) {
 	result = ldapssl_strdup(dbname);
     } else {
@@ -366,7 +366,7 @@ GetDBName(const char *dbname, const char *path)
 	    PL_strcpy(result+pathlen, dbname);
 	}
     }
-    
+
     return result;
 }
 
@@ -396,7 +396,7 @@ GetDBName(const char *dbname, const char *path)
  * If "keydbpath" ends with ".db" (case-insensitive compare), then
  * it is assumed to be a full path to the key db file; otherwise,
  * it is assumed to be a directory that contains a file called
- * "key3.db" 
+ * "key3.db"
  *
  * If certdbhandle is non-NULL< it is assumed to be a pointed to a
  * SECKEYKeyDBHandle structure.  It is fine to pass NULL since this
@@ -405,7 +405,7 @@ GetDBName(const char *dbname, const char *path)
  */
 int
 LDAP_CALL
-ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle, 
+ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
     const int needkeydb, const char *keydbpath, void *keydbhandle )
 
 {
@@ -414,7 +414,7 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
     char *enval;
     int rcenv = 0;
 #endif
-     
+
     /*
      *     LDAPDebug(LDAP_DEBUG_TRACE, "ldapssl_clientauth_init\n",0 ,0 ,0);
      */
@@ -501,7 +501,7 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
  * If "keydbpath" ends with ".db" (case-insensitive compare), then
  * it is assumed to be a full path to the key db file; otherwise,
  * it is assumed to be a directory that contains a file called
- * "key3.db" 
+ * "key3.db"
  *
  * If certdbhandle is non-NULL< it is assumed to be a pointed to a
  * SECKEYKeyDBHandle structure.  It is fine to pass NULL since this
@@ -509,9 +509,9 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
  * used to retrieve the cert db handle).  */
 int
 LDAP_CALL
-ldapssl_advclientauth_init( 
-    const char *certdbpath, void *certdbhandle, 
-    const int needkeydb, const char *keydbpath, void *keydbhandle,  
+ldapssl_advclientauth_init(
+    const char *certdbpath, void *certdbhandle,
+    const int needkeydb, const char *keydbpath, void *keydbhandle,
     const int needsecmoddb, const char *secmoddbpath,
     const int sslstrength )
 {
@@ -575,7 +575,7 @@ ldapssl_advclientauth_init(
  * It is safe to call this more than once.
   */
 
-/* 
+/*
  * XXXceb  This is a hack until the new IO functions are done.
  * this function lives in ldapsinit.c
  */
@@ -595,19 +595,19 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
     char *enval;
     int rcenv = 0;
 #endif
-    
+
     mutex_lock(&inited_mutex);
     if ( inited ) {
 	mutex_unlock(&inited_mutex);
 	return( 0 );
     }
-/* 
+/*
  * XXXceb  This is a hack until the new IO functions are done.
  * this function MUST be called before ldap_enable_clienauth.
- * 
+ *
  */
     set_using_pkcs_functions( 1 );
-    
+
     /*
      *    LDAPDebug(LDAP_DEBUG_TRACE, "ldapssl_pkcs_init\n",0 ,0 ,0);
      */
@@ -658,7 +658,7 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
     }
     ldapssl_free(&enval);
 #endif
-    
+
     if (rc != 0) {
 	if ((rc = PR_GetError()) >= 0)
 	    rc = -1;
@@ -677,11 +677,11 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
 	if (( rc = PR_GetError()) >= 0 ) {
 	    rc = -1;
 	}
-	
+
 	mutex_unlock(&inited_mutex);
 	return( rc );
     }
-    
+
     if (local_SSLPLCY_Install() == PR_FAILURE) {
       mutex_unlock(&inited_mutex);
       return( -1 );
@@ -692,7 +692,7 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
     if ( certdbName != NULL ) {
 	ldapssl_free((void **) &certdbName );
     }
-    
+
     return( ldapssl_set_strength( NULL, LDAPSSL_AUTH_CNCHECK));
 }
 
@@ -762,7 +762,7 @@ static int ldapssl_tls_start(LDAP *ld, int *msgidp)
     /* Send the Start TLS request (OID: 1.3.6.1.4.1.1466.20037) */
     rc = ldap_extended_operation( ld, START_TLS_OID, &extreq_data,
               NULL, NULL, msgidp );
-   
+
     return rc;
 }
 
@@ -780,7 +780,7 @@ static int ldapssl_enableSSL_on_open_connection(LDAP *ld, int defsecure,
     if ( ldapssl_clientauth_init( certdbpath, NULL, 1, keydbpath, NULL ) < 0 ) {
 	goto ssl_setup_failure;
     }
-   
+
     /*
      * Retrieve socket info. so we have the PRFileDesc.
      */
@@ -811,7 +811,7 @@ static int ldapssl_enableSSL_on_open_connection(LDAP *ld, int defsecure,
 	defsecure ? LDAP_OPT_ON : LDAP_OPT_OFF ) < 0 ) {
         goto ssl_setup_failure;
     }
-  
+
     if ( ldapssl_import_fd( ld, defsecure ) < 0 ) {
         goto ssl_setup_failure;
     }

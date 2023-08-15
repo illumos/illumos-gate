@@ -31,7 +31,7 @@
 
 /*
  * This file contains routines for establishing, verifying, and any other
- * necessary functions, for utilizing the pre-authentication field of the 
+ * necessary functions, for utilizing the pre-authentication field of the
  * kerberos kdc request, with various hardware/software verification devices.
  */
 
@@ -62,7 +62,7 @@ typedef krb5_error_code (*pa_function)(krb5_context,
 				       void *prompter_data,
 				       krb5_gic_get_as_key_fct gak_fct,
 				       void *gak_data);
-				 
+
 typedef struct _pa_types_t {
     krb5_preauthtype type;
     pa_function fct;
@@ -258,7 +258,7 @@ krb5_preauth_supply_preauth_data(krb5_context context,
 	pctx = context->preauth_context->modules[i].plugin_context;
 	retval = (*context->preauth_context->modules[i].client_supply_gic_opts)
 				(context, pctx,
-				 (krb5_get_init_creds_opt *)opte, attr, value); 
+				 (krb5_get_init_creds_opt *)opte, attr, value);
 	if (retval) {
 	    emsg = krb5_get_error_message(context, retval);
 	    krb5int_set_error(&context->err, retval, "Preauth plugin %s: %s",
@@ -603,7 +603,7 @@ krb5_error_code pa_salt(krb5_context context,
     tmp.length = in_padata->length;
     krb5_free_data_contents(context, salt);
     krb5int_copy_data_contents(context, &tmp, salt);
-    
+
 
     if (in_padata->pa_type == KRB5_PADATA_AFS3_SALT)
 	salt->length = SALT_TYPE_AFS_LENGTH;
@@ -631,7 +631,7 @@ krb5_error_code pa_enc_timestamp(krb5_context context,
     krb5_data *tmp;
     krb5_enc_data enc_data;
     krb5_pa_data *pa;
-   
+
     if (as_key->length == 0) {
 #ifdef DEBUG
 	/* Solaris Kerberos */
@@ -705,7 +705,7 @@ krb5_error_code pa_enc_timestamp(krb5_context context,
     return(0);
 }
 
-static 
+static
 char *sam_challenge_banner(krb5_int32 sam_type)
 {
     char *label;
@@ -804,7 +804,7 @@ krb5_error_code pa_sam(krb5_context context,
 
     /* If we need the password from the user (USE_SAD_AS_KEY not set),	*/
     /* then get it here.  Exception for "old" KDCs with CryptoCard 	*/
-    /* support which uses the USE_SAD_AS_KEY flag, but still needs pwd	*/ 
+    /* support which uses the USE_SAD_AS_KEY flag, but still needs pwd	*/
 
     if (!(sam_challenge->sam_flags & KRB5_SAM_USE_SAD_AS_KEY) ||
 	(sam_challenge->sam_type == PA_SAM_TYPE_CRYPTOCARD)) {
@@ -856,7 +856,7 @@ krb5_error_code pa_sam(krb5_context context,
 
     enc_sam_response_enc.sam_nonce = sam_challenge->sam_nonce;
     if (sam_challenge->sam_nonce == 0) {
-	if ((ret = krb5_us_timeofday(context, 
+	if ((ret = krb5_us_timeofday(context,
 				&enc_sam_response_enc.sam_timestamp,
 				&enc_sam_response_enc.sam_usec))) {
 		krb5_xfree(sam_challenge);
@@ -934,7 +934,7 @@ krb5_error_code pa_sam(krb5_context context,
 	defsalt.length = 0;
 	salt = NULL;
 #endif
-	    
+
 	/* XXX As of the passwords-04 draft, no enctype is specified,
 	   the server uses ENCTYPE_DES_CBC_MD5. In the future the
 	   server should send a PA-SAM-ETYPE-INFO containing the enctype. */
@@ -972,7 +972,7 @@ krb5_error_code pa_sam(krb5_context context,
 	return(ret);
 
     /*
-     * Solaris Kerberos:  
+     * Solaris Kerberos:
      * Using new crypto interface now so we can get rid of the
      * old modules.
      */
@@ -1148,7 +1148,7 @@ krb5_error_code pa_sam_2(krb5_context context,
 
    /* Generate salt used by string_to_key() */
    if ((salt->length == -1) && (salt->data == NULL)) {
-	if ((retval = 
+	if ((retval =
 	     krb5_principal2salt(context, request->client, &defsalt))) {
 	   krb5_free_sam_challenge_2(context, sc2);
 	   krb5_free_sam_challenge_2_body(context, sc2b);
@@ -1234,7 +1234,7 @@ krb5_error_code pa_sam_2(krb5_context context,
    /* Now we have a key, verify the checksum on the sam_challenge */
 
    cksum = sc2->sam_cksum;
-   
+
    while (*cksum) {
 	/* Check this cksum */
 	retval = krb5_c_verify_checksum(context, as_key,
@@ -1269,7 +1269,7 @@ krb5_error_code pa_sam_2(krb5_context context,
 	 */
 	return(KRB5KRB_AP_ERR_BAD_INTEGRITY);
    }
- 
+
    /* fill in enc_sam_response_enc_2 */
    enc_sam_response_enc_2.magic = KV5M_ENC_SAM_RESPONSE_ENC_2;
    enc_sam_response_enc_2.sam_nonce = sc2b->sam_nonce;
@@ -1548,7 +1548,7 @@ krb5_do_preauth(krb5_context context,
 		else ret = decode_krb5_etype_info(&scratch, &etype_info);
 		if (ret) {
 		    ret = 0; /*Ignore error and etype_info element*/
-		    if (etype_info) 
+		    if (etype_info)
 		      krb5_free_etype_info( context, etype_info);
 		    etype_info = NULL;
 		    continue;
@@ -1580,7 +1580,7 @@ krb5_do_preauth(krb5_context context,
 		    /* Solaris Kerberos */
 		    KRB5_LOG(KRB5_ERR, "error !etype_found, "
 				"valid_etype_found = %d",
-				valid_etype_found); 
+				valid_etype_found);
 		  if (valid_etype_found) {
 			/* supported enctype but not requested */
 		    ret =  KRB5_CONFIG_ETYPE_NOSUPP;
@@ -1596,7 +1596,7 @@ krb5_do_preauth(krb5_context context,
 		scratch.data = (char *) etype_info[l]->salt;
 		scratch.length = etype_info[l]->length;
 		krb5_free_data_contents(context, salt);
-		if (scratch.length == KRB5_ETYPE_NO_SALT) 
+		if (scratch.length == KRB5_ETYPE_NO_SALT)
 		  salt->data = NULL;
 		else
 		    if ((ret = krb5int_copy_data_contents( context, &scratch, salt)) != 0)
@@ -1697,7 +1697,7 @@ krb5_do_preauth(krb5_context context,
     *out_padata = out_pa_list;
     if (etype_info)
       krb5_free_etype_info(context, etype_info);
-    
+
     /* Solaris Kerberos */
     KRB5_LOG0(KRB5_INFO, "krb5_do_preauth() end");
     return(0);

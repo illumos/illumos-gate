@@ -169,7 +169,7 @@ register struct tm *ltp;
 
 	if (ltp->tm_wday == 0 || ltp->tm_wday == 6)
 		return(1);
-	for (i = 0; holidays[i] >= 0; i++) 
+	for (i = 0; holidays[i] >= 0; i++)
 		if (ltp->tm_yday == holidays[i])
 			return(1);
 	return(0);
@@ -284,7 +284,7 @@ inithol()
 			errflag++;
 			break;
 		}
-		doy = day_of_year(thisyear, month, day); 
+		doy = day_of_year(thisyear, month, day);
 		holidays[holindx++] = (doy - 1);
 	}
 	fclose(holptr);

@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * compare two principals, returning a krb5_boolean true if equal, false if
  * not.
@@ -39,9 +39,9 @@
 krb5_boolean KRB5_CALLCONV
 krb5_realm_compare(krb5_context context, krb5_const_principal princ1, krb5_const_principal princ2)
 {
-    if (krb5_princ_realm(context, princ1)->length != 
+    if (krb5_princ_realm(context, princ1)->length !=
 	krb5_princ_realm(context, princ2)->length ||
-	memcmp (krb5_princ_realm(context, princ1)->data, 
+	memcmp (krb5_princ_realm(context, princ1)->data,
 	 	krb5_princ_realm(context, princ2)->data,
 		krb5_princ_realm(context, princ2)->length))
 	return FALSE;

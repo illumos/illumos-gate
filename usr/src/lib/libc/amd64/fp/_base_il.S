@@ -55,9 +55,9 @@ __mul_set(double x, double y, int *pe) {
 	movl	$0x1f80, (%rsp)	/* 0x1f80 == CSR_DEFAULT. */
 	/* Set the MXCSR to its default (i.e. No FP exceptions). */
 	ldmxcsr	(%rsp)	/* Essentially _putmxcsr(CSR_DEFAULT); */
-	
+
 	mulsd	%xmm1, %xmm0	/* Do the multiply. */
-	
+
 	/* Check to see if the multiply caused any exceptions. */
 	stmxcsr	(%rsp)	/* Essentially do _getmxcsr(). */
 	andl	$0x3f, (%rsp)	/* Check it. */
@@ -89,16 +89,16 @@ __div_set(double x, double y, int *pe) {
 }
 
  */
-	
+
 	ENTRY(__div_set)
 	xorl	%eax, %eax	/* Zero-out eax for later... */
 	subq	$0x4, %rsp
 	movl	$0x1f80, (%rsp)	/* 0x1f80 == CSR_DEFAULT. */
 	/* Set the MXCSR to its default (i.e. No FP exceptions). */
 	ldmxcsr	(%rsp)	/* Essentially _putmxcsr(CSR_DEFAULT); */
-	
+
 	divsd	%xmm1, %xmm0	/* Do the divide. */
-	
+
 	/* Check to see if the divide caused any exceptions. */
 	stmxcsr	(%rsp)	/* Essentially do _getmxcsr(). */
 	andl	$0x3f, (%rsp)	/* Check it. */

@@ -387,7 +387,7 @@ class UARequester extends Object implements Locator {
 	    for (j = 0; j < m; j++) {
 		ServiceLocationAttribute attr =
 		    (ServiceLocationAttribute)attrList.elementAt(j);
-	
+
 		ServiceLocationAttribute.mergeDuplicateAttributes(attr,
 								  ht,
 								  ret,

@@ -167,7 +167,7 @@ freeio(struct ionod *iop)
 
 				while (fiop->iolst != iop)
 					fiop = fiop->iolst;
-	
+
 				fiop->iolst = iop->iolst;
 			}
 		}
@@ -398,8 +398,8 @@ prf(struct trenod *t)
 					}
 				}
 				break;
-			} 
-		} 
+			}
+		}
 
 	sigchk();
 }

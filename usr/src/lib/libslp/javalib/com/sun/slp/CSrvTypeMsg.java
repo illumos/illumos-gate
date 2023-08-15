@@ -39,14 +39,14 @@ import java.io.*;
 
 
 /**
- * The CSrvTypeMsg class models the SLP service type reply message. 
+ * The CSrvTypeMsg class models the SLP service type reply message.
  *
  * @author James Kempf
  */
 
 class CSrvTypeMsg extends SrvLocMsgImpl {
 
-    // Names contain both the service type and naming authority. 
+    // Names contain both the service type and naming authority.
 
     Vector serviceTypes = new Vector();  // vector of Strings
 
@@ -57,7 +57,7 @@ class CSrvTypeMsg extends SrvLocMsgImpl {
     // Construct a CSrvTypeMsg from the byte input stream. This will be
     //  a SrvTypeRply.
 
-    CSrvTypeMsg(SLPHeaderV2 hdr, DataInputStream dis) 
+    CSrvTypeMsg(SLPHeaderV2 hdr, DataInputStream dis)
 	throws ServiceLocationException, IOException {
 	super(hdr, SrvLocHeader.SrvTypeRply);
 
@@ -78,7 +78,7 @@ class CSrvTypeMsg extends SrvLocMsgImpl {
 
 	hdr.getString(buf, dis);
 
-	serviceTypes = 
+	serviceTypes =
 	    hdr.parseCommaSeparatedListIn(buf.toString(), true);
 
 	// Validate service types.
@@ -158,9 +158,9 @@ class CSrvTypeMsg extends SrvLocMsgImpl {
 
     }
 
-    // Parse out the naming authority. 
+    // Parse out the naming authority.
 
-    protected void 
+    protected void
 	parseNamingAuthorityOut(SLPHeaderV2 hdr,
 				String name,
 				ByteArrayOutputStream baos) {

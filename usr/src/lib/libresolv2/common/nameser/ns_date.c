@@ -69,7 +69,7 @@ ns_datetosecs(const char *cp, int *errp) {
 	if (*errp)		/*%< Any parse errors? */
 		return (0);
 
-	/* 
+	/*
 	 * OK, now because timegm() is not available in all environments,
 	 * we will do it by hand.  Roll up sleeves, curse the gods, begin!
 	 */

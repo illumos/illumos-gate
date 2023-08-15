@@ -386,7 +386,7 @@ s_quiet_alert(char *m, MESG *md)
 			status = MOK;
 		}
 		break;
-		
+
 	case QA_PRINTER:
 		if (!(pps = search_pstatus(name)))
 			status = MNODEST;
@@ -400,7 +400,7 @@ s_quiet_alert(char *m, MESG *md)
 			status = MOK;
 		}
 		break;
-		
+
 	case QA_PRINTWHEEL:
 		if (!(ppws = search_pwstatus(name)))
 			status = MNODEST;
@@ -415,7 +415,7 @@ s_quiet_alert(char *m, MESG *md)
 		}
 		break;
 	}
-	
+
 	mputm (md, R_QUIET_ALERT, status);
 	return;
 }
@@ -502,7 +502,7 @@ s_paper_changed(char *m, MESG *md)
 		status = MNOTRAY;
 	else {
 		status = MOK;
-		if (*paper && (pfsWas = pps->forms[trayNum-1].form) && 
+		if (*paper && (pfsWas = pps->forms[trayNum-1].form) &&
 		    (!STREQU(pfsWas->form->paper,paper))) {
 			pfs = search_fptable(paper);
 			if (pfs) {

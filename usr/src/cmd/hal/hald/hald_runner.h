@@ -30,18 +30,18 @@
 #include "device.h"
 
 /* Successful run of the program */
-#define HALD_RUN_SUCCESS 0x0 
+#define HALD_RUN_SUCCESS 0x0
 /* Process was killed because of running too long */
-#define  HALD_RUN_TIMEOUT 0x1 
+#define  HALD_RUN_TIMEOUT 0x1
 /* Failed to start for some reason */
 #define HALD_RUN_FAILED 0x2
-/* Killed on purpose, e.g. hal_runner_kill_device */   
+/* Killed on purpose, e.g. hal_runner_kill_device */
 #define HALD_RUN_KILLED 0x4
 
 /* Default sane timeout */
 #define HAL_HELPER_TIMEOUT 10000
 
-typedef void (*HalRunTerminatedCB) (HalDevice *d, guint32 exit_type, 
+typedef void (*HalRunTerminatedCB) (HalDevice *d, guint32 exit_type,
                                        gint return_code, gchar **error,
                                        gpointer data1, gpointer data2);
 
@@ -49,25 +49,25 @@ typedef void (*HalRunTerminatedCB) (HalDevice *d, guint32 exit_type,
 gboolean
 hald_runner_start_runner(void);
 
-/* Start a helper, returns true on a successfull start. 
+/* Start a helper, returns true on a successfull start.
  * cb will be called on abnormal or premature termination
- * only 
+ * only
  */
 gboolean
-hald_runner_start (HalDevice *device, const gchar *command_line, char **extra_env, 
+hald_runner_start (HalDevice *device, const gchar *command_line, char **extra_env,
 		   HalRunTerminatedCB cb, gpointer data1, gpointer data2);
 
 /* Run a helper program using the commandline, with input as infomation on
  * stdin */
 void
 hald_runner_run(HalDevice *device,
-               const gchar *command_line, char **extra_env, 
+               const gchar *command_line, char **extra_env,
                guint32 timeout,
                HalRunTerminatedCB cb,
                gpointer data1, gpointer data2);
 void
-hald_runner_run_method(HalDevice *device,                                                              
-		       const gchar *command_line, char **extra_env, 
+hald_runner_run_method(HalDevice *device,
+		       const gchar *command_line, char **extra_env,
                        gchar *input, gboolean error_on_stderr,
                        guint32 timeout,
                        HalRunTerminatedCB  cb,
@@ -79,4 +79,4 @@ void hald_runner_kill_all();
 /* called by the core to tell the runner a device was finalized */
 void runner_device_finalized (HalDevice *device);
 
-#endif 
+#endif

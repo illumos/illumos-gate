@@ -566,7 +566,7 @@ mbdb_ldap_lookup(name, user)
 	{
 		int rc;
 
-		/*  
+		/*
 		**  We may have gotten an LDAP_RES_SEARCH_RESULT response
 		**  with an error inside it, so we have to extract that
 		**  with ldap_parse_result().  This can happen when talking

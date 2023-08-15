@@ -68,7 +68,7 @@ static char	lastbang[BUFSIZ];
  * and forking a sh -c
  */
 
-int 
+int
 shell(char *str)
 {
 	shell1(str);
@@ -76,7 +76,7 @@ shell(char *str)
 	return(0);
 }
 
-static int 
+static int
 shell1(char *str)
 {
 	void (*sig[2])(int);
@@ -84,7 +84,7 @@ shell1(char *str)
 	pid_t p;
 	char *Shell;
 	char cmd[BUFSIZ];
-	
+
 	nstrcpy(cmd, sizeof (cmd), str);
 	if (bangexp(cmd) < 0)
 		return(-1);
@@ -116,7 +116,7 @@ shell1(char *str)
  * Fork an interactive shell.
  */
 
-int 
+int
 #ifdef	__cplusplus
 dosh(char *)
 #else
@@ -158,7 +158,7 @@ dosh(char *s)
  * Expand the shell escape by expanding unescaped !'s into the
  * last issued command where possible.
  */
-static int 
+static int
 bangexp(char *str)
 {
 	char bangbuf[BUFSIZ];
@@ -209,7 +209,7 @@ overf:
  * Print out a nice help message from some file or another.
  */
 
-int 
+int
 help(void)
 {
 	int c;
@@ -229,7 +229,7 @@ help(void)
  * Change user's working directory.
  */
 
-int 
+int
 schdir(char *str)
 {
 	char *cp;
@@ -274,7 +274,7 @@ schdir(char *str)
  * to only sender of message, depending on setting of "replyall".
  */
 
-int 
+int
 respond(int *msgvec)
 {
 	if (reply2sender())
@@ -283,7 +283,7 @@ respond(int *msgvec)
 		return(Resp1(msgvec, 0));
 }
 
-int 
+int
 followup(int *msgvec)
 {
 	if (reply2sender())
@@ -292,13 +292,13 @@ followup(int *msgvec)
 		return(Resp1(msgvec, 1));
 }
 
-int 
+int
 replyall(int *msgvec)
 {
 	return(resp1(msgvec, 0));
 }
 
-static int 
+static int
 resp1(int *msgvec, int useauthor)
 {
 	struct message *mp;
@@ -315,7 +315,7 @@ resp1(int *msgvec, int useauthor)
 	snprintf(mydomname, sizeof (mydomname), "%s@%s", myname, domain);
 	snprintf(mylocalname, sizeof (mylocalname), "%s@%s", myname, host);
 	returnaddr = value("returnaddr");
-	
+
 	mp = &message[msgvec[0] - 1];
 	dot = mp;
 	reply2 = replyto(mp, &rcv);
@@ -381,7 +381,7 @@ resp1(int *msgvec, int useauthor)
 	return(0);
 }
 
-void 
+void
 getrecf(char *buf, char *recfile, int useauthor, int sz_recfile)
 {
 	char *bp, *cp;
@@ -456,7 +456,7 @@ reedit(char *subj)
  * back to the system mailbox.
  */
 
-int 
+int
 preserve(int *msgvec)
 {
 	struct message *mp;
@@ -479,7 +479,7 @@ preserve(int *msgvec)
 /*
  * Mark all given messages as unread.
  */
-int 
+int
 unread(int msgvec[])
 {
 	int *ip;
@@ -496,7 +496,7 @@ unread(int msgvec[])
  * Print the size of each message.
  */
 
-int 
+int
 messize(int *msgvec)
 {
 	struct message *mp;
@@ -516,7 +516,7 @@ messize(int *msgvec)
  * by returning an error.
  */
 
-int 
+int
 rexit(int e)
 {
 	if (sourcing)
@@ -535,7 +535,7 @@ rexit(int e)
  * of csh.
  */
 
-int 
+int
 set(char **arglist)
 {
 	struct var *vp;
@@ -585,7 +585,7 @@ set(char **arglist)
  * Unset a bunch of variable values.
  */
 
-int 
+int
 unset(char **arglist)
 {
 	int errs;
@@ -601,7 +601,7 @@ unset(char **arglist)
  * Add users to a group.
  */
 
-int 
+int
 group(char **argv)
 {
 	struct grouphead *gh;
@@ -663,7 +663,7 @@ group(char **argv)
  * Remove users from a group.
  */
 
-int 
+int
 ungroup(char **argv)
 {
 	struct grouphead *gh, **ghp;
@@ -708,7 +708,7 @@ ungroup(char **argv)
  * order.
  */
 
-static void 
+static void
 sort(char **list)
 {
 	char **ap;
@@ -724,7 +724,7 @@ sort(char **list)
  * Do a dictionary order comparison of the arguments from
  * qsort.
  */
-static int 
+static int
 diction(const void *a, const void *b)
 {
 	return(strcmp(*(char **)a, *(char **)b));
@@ -734,7 +734,7 @@ diction(const void *a, const void *b)
  * The do nothing command for comments.
  */
 
-int 
+int
 #ifdef	__cplusplus
 null(char *)
 #else
@@ -750,7 +750,7 @@ null(char *s)
  * Otherwise, print the name of the person who's mail
  * we are reading.
  */
-int 
+int
 file(char **argv)
 {
 	char *cp;
@@ -872,7 +872,7 @@ regular:
  * Expand file names like echo
  */
 
-int 
+int
 echo(char **argv)
 {
 	char *cp;
@@ -898,7 +898,7 @@ echo(char **argv)
  * reply.
  */
 
-int 
+int
 Respond(int *msgvec)
 {
 	if (reply2sender())
@@ -907,7 +907,7 @@ Respond(int *msgvec)
 		return(resp1(msgvec, 0));
 }
 
-int 
+int
 Followup(int *msgvec)
 {
 	if (reply2sender())
@@ -916,13 +916,13 @@ Followup(int *msgvec)
 		return(resp1(msgvec, 1));
 }
 
-int 
+int
 replysender(int *msgvec)
 {
 	return(Resp1(msgvec, 0));
 }
 
-static int 
+static int
 Resp1(int *msgvec, int useauthor)
 {
 	struct header head;
@@ -968,7 +968,7 @@ Resp1(int *msgvec, int useauthor)
  * .mailrc and do some things if sending, others if receiving.
  */
 
-int 
+int
 ifcmd(char **argv)
 {
 	char *cp;
@@ -1004,7 +1004,7 @@ ifcmd(char **argv)
  * flip over the conditional flag.
  */
 
-int 
+int
 elsecmd(void)
 {
 
@@ -1041,7 +1041,7 @@ elsecmd(void)
  * End of if statement.  Just set cond back to anything.
  */
 
-int 
+int
 endifcmd(void)
 {
 
@@ -1056,7 +1056,7 @@ endifcmd(void)
 /*
  * Set the list of alternate names.
  */
-int 
+int
 alternates(char **namelist)
 {
 	int c;
@@ -1105,10 +1105,10 @@ replyto(struct message *mp, char **f)
 	return (r);
 }
 
-/* 
+/*
  * reply2sender - determine whether a "reply" command should reply to the
  *                sender of the messages, or to all the recipients of the
- *                message.                
+ *                message.
  *
  *                With the advent of POSIX.2 compliance, this has become
  *                a bit more complicated, and so should be done in one

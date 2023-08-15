@@ -267,7 +267,7 @@ load_pstatus(void)
  ** load_fault_status() - LOAD PRITNER Fault STATUS FILE
  **/
 
-static void 
+static void
 load_fault_status(void)
 {
 	char			*fault_reason = NULL,
@@ -352,7 +352,7 @@ load_cstatus(void)
 
 	(void) time(&now);
 
-	if (!cstatus) 
+	if (!cstatus)
 		cstatus = makepath(Lp_System, CSTATUSFILE, (char *)0);
 
 	if ((fd = open_locked(cstatus, "r", 0)) >= 0) {
@@ -472,7 +472,7 @@ showForms(PSTATUS  *pps)
 				((i + 1 < numForms) ? *LP_SEP : '\0'));
 
 			if (addstring(&formList,buf)) { /* allocation failed */
-				if (formList) {  
+				if (formList) {
 					Free(formList);
 					formList = NULL;
 				}

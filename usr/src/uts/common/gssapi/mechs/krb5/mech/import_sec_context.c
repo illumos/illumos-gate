@@ -50,7 +50,7 @@ gss_OID krb5_gss_convert_static_mech_oid(oid)
 {
 	const gss_OID_desc 	*p;
 	OM_uint32		minor_status;
-	
+
 	for (p = krb5_gss_oid_array; p->length; p++) {
 		if ((oid->length == p->length) &&
 		    (memcmp(oid->elements, p->elements, p->length) == 0)) {
@@ -137,7 +137,7 @@ krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
 
     /* intern the context handle */
     if (! kg_save_ctx_id((gss_ctx_id_t) ctx)) {
-       (void)krb5_gss_delete_sec_context(minor_status, 
+       (void)krb5_gss_delete_sec_context(minor_status,
 					 (gss_ctx_id_t *) &ctx, NULL
 #ifdef _KERNEL
  					,0  /* gssd_ctx_verifier */
@@ -147,7 +147,7 @@ krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
        return(GSS_S_FAILURE);
     }
     ctx->mech_used = krb5_gss_convert_static_mech_oid(ctx->mech_used);
-    
+
     *context_handle = (gss_ctx_id_t) ctx;
 
     *minor_status = 0;

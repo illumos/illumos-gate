@@ -47,7 +47,7 @@ all: $(PROG)
 $(PROG): $(OBJS) $(STAT_COMMON_OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-        
+
 %.o : $(STATCOMMONDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

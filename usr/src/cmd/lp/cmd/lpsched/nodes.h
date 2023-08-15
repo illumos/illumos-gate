@@ -158,11 +158,11 @@ struct rstat_node
 {
     long	status;
     MESG	*md;
-    
+
     char	*req_file;
     char	*slow;
     char	*fast;
-    short	copies;		/* # copies interface is to make */    
+    short	copies;		/* # copies interface is to make */
     short	reason;		/* reason for failing _validate() */
 
     SECURE	*secure;

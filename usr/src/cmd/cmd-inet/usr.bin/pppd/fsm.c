@@ -368,28 +368,28 @@ fsm_input(f, inpacket, l)
     case CODE_CONFREQ:
 	fsm_rconfreq(f, id, inp, len);
 	break;
-    
+
     case CODE_CONFACK:
 	fsm_rconfack(f, id, inp, len);
 	break;
-    
+
     case CODE_CONFNAK:
     case CODE_CONFREJ:
 	fsm_rconfnakrej(f, code, id, inp, len);
 	break;
-    
+
     case CODE_TERMREQ:
 	fsm_rtermreq(f, id, inp, len);
 	break;
-    
+
     case CODE_TERMACK:
 	fsm_rtermack(f);
 	break;
-    
+
     case CODE_CODEREJ:
 	fsm_rcoderej(f, inp, len);
 	break;
-    
+
     default:
 	if (f->callbacks->extcode == NULL ||
 	    !(*f->callbacks->extcode)(f, code, id, inp, len))

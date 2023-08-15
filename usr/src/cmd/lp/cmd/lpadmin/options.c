@@ -279,7 +279,7 @@ void			options (argc, argv)
 			}
 			break;
 		}
-	
+
 		switch (optsw) {
 
 		case 'a':	/* alignment pattern needed for mount */
@@ -302,7 +302,7 @@ void			options (argc, argv)
 		break;
 
 #if	defined(DIRECT_ACCESS)
-		case 'C':	
+		case 'C':
 			C = 1;
 			break;
 #endif
@@ -359,7 +359,7 @@ void			options (argc, argv)
 			*modp++ = 'H';
 			break;
 #endif
-			
+
 		case 'h':	/* hardwired terminal */
 			h = 1;
 			*modp++ = 'h';
@@ -397,7 +397,7 @@ void			options (argc, argv)
 			break;
 
 		case 'm':	/* model interface */
-			if (m) 
+			if (m)
 				LP_ERRMSG1 (WARNING, E_LP_2MANY, 'm');
 			MALLOC(m);
 			*modp++ = 'm';
@@ -422,7 +422,7 @@ void			options (argc, argv)
 			break;
 
 		case 'p':	/* printer name */
-			if (p) 
+			if (p)
 				LP_ERRMSG1 (WARNING, E_LP_2MANY, 'p');
 			MALLOC(p);
 			break;
@@ -451,13 +451,13 @@ void			options (argc, argv)
 			break;
 
 		case 'r':	/* class to remove p from */
-			if (r) 
+			if (r)
 				LP_ERRMSG1 (WARNING, E_LP_2MANY, 'r');
 			MALLOC(r);
 			break;
 
 		case 'S':	/* char_set/print-wheels */
-			if (S) 
+			if (S)
 				LP_ERRMSG1 (WARNING, E_LP_2MANY, 'S');
 			if (!(S = getlist(optarg, LP_WS, LP_SEP))) {
 				LP_ERRMSG (ERROR, E_LP_MALLOC);
@@ -650,7 +650,7 @@ static void		oparse (optarg)
 			if (strcasecmp(ptr, "never") == 0)
 				banner = BAN_NEVER;
 			*modp++ = 'b';
-			
+
 		} else if (STRNEQU(optarg, "length=", 7)) {
 			if (length)
 				LP_ERRMSG1 (

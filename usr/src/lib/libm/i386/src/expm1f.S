@@ -64,7 +64,7 @@ LIBM_ANSI_PRAGMA_WEAK(expm1f,function)
 	fxch				/ z,[z]
 	fsub    %st(1),%st		/ z-[z],[z]
 	f2xm1				/ 2**(z-[z])-1,[z]
-	/ avoid spurious underflow when scaling to compute exp(x) 
+	/ avoid spurious underflow when scaling to compute exp(x)
 	PIC_SETUP(1)
 	flds	PIC_L(.mhundred)
 	PIC_WRAPUP
@@ -96,7 +96,7 @@ LIBM_ANSI_PRAGMA_WEAK(expm1f,function)
 
 .z_integral:				/ here, z is integral
 	fstp	%st(0)			/ ,z
-	/ avoid spurious underflow when scaling to compute exp(x) 
+	/ avoid spurious underflow when scaling to compute exp(x)
 	PIC_SETUP(2)
 	flds	PIC_L(.mhundred)
 	PIC_WRAPUP
@@ -135,7 +135,7 @@ LIBM_ANSI_PRAGMA_WEAK(expm1f,function)
 	ret
 
 .not_finite:
-	ja	.NaN_or_pinf		/ branch if x is NaN 
+	ja	.NaN_or_pinf		/ branch if x is NaN
 	movl	4(%esp),%eax		/ eax <-- x
 	andl	$0x80000000,%eax	/ here, x is infinite, but +/-?
 	jz	.NaN_or_pinf		/ branch if x = +INF

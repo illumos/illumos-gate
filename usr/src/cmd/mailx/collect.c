@@ -741,7 +741,7 @@ err:
 	return(NULL);
 }
 
-static void 
+static void
 resetsigs(int resethup)
 {
 	(void) sigset(SIGINT, savesig);
@@ -1133,7 +1133,7 @@ tabputs(const char *line, FILE *obuf)
  * Print (continue) when continued after ^Z.
  */
 #ifdef SIGCONT
-static void 
+static void
 #ifdef	__cplusplus
 collcont(int)
 #else
@@ -1153,7 +1153,7 @@ collcont(int s)
  * signal routine.  We only come here if signals
  * were previously set anyway.
  */
-static void 
+static void
 collrub(int s)
 {
 	FILE *dbuf;
@@ -1203,7 +1203,7 @@ done:
 /*
  * Acknowledge an interrupt signal from the tty by typing an @
  */
-static void 
+static void
 #ifdef	__cplusplus
 intack(int)
 #else
@@ -1235,7 +1235,7 @@ getaline(char *line, int size, FILE *f, int *hasnulls)
 	return(i);
 }
 
-void 
+void
 #ifdef	__cplusplus
 savedead(int)
 #else
@@ -1288,7 +1288,7 @@ addone(char hf[], char news[])
 	return(linebuf);
 }
 
-static int 
+static int
 nptrs(char **hf)
 {
 	int i;
@@ -1353,7 +1353,7 @@ cpout(char *str, FILE *ofd)
 	fflush(ofd);
 }
 
-static void 
+static void
 xhalt(void)
 {
 	fclose(newo);
@@ -1369,7 +1369,7 @@ xhalt(void)
 /*
  * Strip the nulls from a buffer of length n
  */
-static int 
+static int
 stripnulls(char *linebuf, int nread)
 {
 	int i, j;

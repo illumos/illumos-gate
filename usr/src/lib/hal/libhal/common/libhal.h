@@ -37,10 +37,10 @@ extern "C" {
 #endif
 
 #if defined(__GNUC__)
-#define LIBHAL_DEPRECATED __attribute__ ((deprecated))  
-#else  
-#define LIBHAL_DEPRECATED  
-#endif 
+#define LIBHAL_DEPRECATED __attribute__ ((deprecated))
+#else
+#define LIBHAL_DEPRECATED
+#endif
 
 
 #define LIBHAL_FREE_DBUS_ERROR(_dbus_error_)					\
@@ -67,10 +67,10 @@ extern "C" {
 		}								\
 	} while(0)
 
-/** 
+/**
  * LibHalPropertyType:
  *
- * Possible types for properties on hal device objects 
+ * Possible types for properties on hal device objects
  */
 typedef enum {
         /** Used to report error condition */
@@ -101,7 +101,7 @@ typedef enum {
 
 typedef struct LibHalContext_s LibHalContext;
 
-/** 
+/**
  * LibHalIntegrateDBusIntoMainLoop:
  * @ctx: context for connection to hald
  * @dbus_connection: DBus connection to use in ctx
@@ -112,27 +112,27 @@ typedef struct LibHalContext_s LibHalContext;
 typedef void (*LibHalIntegrateDBusIntoMainLoop) (LibHalContext *ctx,
 						 DBusConnection *dbus_connection);
 
-/** 
+/**
  * LibHalDeviceAdded:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
  *
  * Type for callback when a device is added.
  */
-typedef void (*LibHalDeviceAdded) (LibHalContext *ctx, 
+typedef void (*LibHalDeviceAdded) (LibHalContext *ctx,
 				   const char *udi);
 
-/** 
+/**
  * LibHalDeviceRemoved:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
  *
- * Type for callback when a device is removed. 
+ * Type for callback when a device is removed.
  */
-typedef void (*LibHalDeviceRemoved) (LibHalContext *ctx, 
+typedef void (*LibHalDeviceRemoved) (LibHalContext *ctx,
 				     const char *udi);
 
-/** 
+/**
  * LibHalDeviceNewCapability:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
@@ -141,11 +141,11 @@ typedef void (*LibHalDeviceRemoved) (LibHalContext *ctx,
  * Type for callback when a device gains a new capability.
  *
  */
-typedef void (*LibHalDeviceNewCapability) (LibHalContext *ctx, 
+typedef void (*LibHalDeviceNewCapability) (LibHalContext *ctx,
 					   const char *udi,
 					   const char *capability);
 
-/** 
+/**
  * LibHalDeviceLostCapability:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
@@ -154,11 +154,11 @@ typedef void (*LibHalDeviceNewCapability) (LibHalContext *ctx,
  * Type for callback when a device loses a capability.
  *
  */
-typedef void (*LibHalDeviceLostCapability) (LibHalContext *ctx, 
+typedef void (*LibHalDeviceLostCapability) (LibHalContext *ctx,
 					    const char *udi,
 					    const char *capability);
 
-/** 
+/**
  * LibHalDevicePropertyModified:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
@@ -166,7 +166,7 @@ typedef void (*LibHalDeviceLostCapability) (LibHalContext *ctx,
  * @is_removed: whether or not property was removed
  * @is_added: whether or not property was added
  *
- * Type for callback when a property of a device changes. 
+ * Type for callback when a property of a device changes.
  */
 typedef void (*LibHalDevicePropertyModified) (LibHalContext *ctx,
 					      const char *udi,
@@ -174,7 +174,7 @@ typedef void (*LibHalDevicePropertyModified) (LibHalContext *ctx,
 					      dbus_bool_t is_removed,
 					      dbus_bool_t is_added);
 
-/** 
+/**
  * LibHalDeviceCondition:
  * @ctx: context for connection to hald
  * @udi: the Unique Device Id
@@ -247,118 +247,118 @@ dbus_bool_t   libhal_device_exists   (LibHalContext *ctx, const char *udi,  DBus
 dbus_bool_t   libhal_device_print    (LibHalContext *ctx, const char *udi,  DBusError *error);
 
 /* Determine if a property on a device exists. */
-dbus_bool_t libhal_device_property_exists (LibHalContext *ctx, 
+dbus_bool_t libhal_device_property_exists (LibHalContext *ctx,
 					   const char *udi,
 					   const char *key,
 					   DBusError *error);
 
 /* Get the value of a property of type string. */
-char *libhal_device_get_property_string (LibHalContext *ctx, 
+char *libhal_device_get_property_string (LibHalContext *ctx,
 					 const char *udi,
 					 const char *key,
 					 DBusError *error);
 
 /* Get the value of a property of type signed integer. */
-dbus_int32_t libhal_device_get_property_int (LibHalContext *ctx, 
+dbus_int32_t libhal_device_get_property_int (LibHalContext *ctx,
 					     const char *udi,
 					     const char *key,
 					     DBusError *error);
 
 /* Get the value of a property of type unsigned integer. */
-dbus_uint64_t libhal_device_get_property_uint64 (LibHalContext *ctx, 
+dbus_uint64_t libhal_device_get_property_uint64 (LibHalContext *ctx,
 						 const char *udi,
 						 const char *key,
 						 DBusError *error);
 
 /* Get the value of a property of type double. */
-double libhal_device_get_property_double (LibHalContext *ctx, 
+double libhal_device_get_property_double (LibHalContext *ctx,
 					  const char *udi,
 					  const char *key,
 					  DBusError *error);
 
 /* Get the value of a property of type bool. */
-dbus_bool_t libhal_device_get_property_bool (LibHalContext *ctx, 
+dbus_bool_t libhal_device_get_property_bool (LibHalContext *ctx,
 					     const char *udi,
 					     const char *key,
 					     DBusError *error);
 
 /* Get the value of a property of type string list. */
-char **libhal_device_get_property_strlist (LibHalContext *ctx, 
-					   const char *udi, 
+char **libhal_device_get_property_strlist (LibHalContext *ctx,
+					   const char *udi,
 					   const char *key,
 					   DBusError *error);
 
 /* Set a property of type string. */
-dbus_bool_t libhal_device_set_property_string (LibHalContext *ctx, 
+dbus_bool_t libhal_device_set_property_string (LibHalContext *ctx,
 					       const char *udi,
 					       const char *key,
 					       const char *value,
 					       DBusError *error);
 
 /* Set a property of type signed integer. */
-dbus_bool_t libhal_device_set_property_int (LibHalContext *ctx, 
+dbus_bool_t libhal_device_set_property_int (LibHalContext *ctx,
 					    const char *udi,
 					    const char *key,
 					    dbus_int32_t value,
 					    DBusError *error);
 
 /* Set a property of type unsigned integer. */
-dbus_bool_t libhal_device_set_property_uint64 (LibHalContext *ctx, 
+dbus_bool_t libhal_device_set_property_uint64 (LibHalContext *ctx,
 					       const char *udi,
 					       const char *key,
 					       dbus_uint64_t value,
 					       DBusError *error);
 
 /* Set a property of type double. */
-dbus_bool_t libhal_device_set_property_double (LibHalContext *ctx, 
+dbus_bool_t libhal_device_set_property_double (LibHalContext *ctx,
 					       const char *udi,
 					       const char *key,
 					       double value,
 					       DBusError *error);
 
 /* Set a property of type bool. */
-dbus_bool_t libhal_device_set_property_bool (LibHalContext *ctx, 
+dbus_bool_t libhal_device_set_property_bool (LibHalContext *ctx,
 					     const char *udi,
 					     const char *key,
 					     dbus_bool_t value,
 					     DBusError *error);
 
 /* Append to a property of type strlist. */
-dbus_bool_t libhal_device_property_strlist_append (LibHalContext *ctx, 
+dbus_bool_t libhal_device_property_strlist_append (LibHalContext *ctx,
 						   const char *udi,
 						   const char *key,
 						   const char *value,
 						   DBusError *error);
 
 /* Prepend to a property of type strlist. */
-dbus_bool_t libhal_device_property_strlist_prepend (LibHalContext *ctx, 
+dbus_bool_t libhal_device_property_strlist_prepend (LibHalContext *ctx,
 						    const char *udi,
 						    const char *key,
 						    const char *value,
 						    DBusError *error);
 
 /* Remove a specified string from a property of type strlist. */
-dbus_bool_t libhal_device_property_strlist_remove_index (LibHalContext *ctx, 
+dbus_bool_t libhal_device_property_strlist_remove_index (LibHalContext *ctx,
 							 const char *udi,
 							 const char *key,
 							 unsigned int idx,
 							 DBusError *error);
 
 /* Remove a specified string from a property of type strlist. */
-dbus_bool_t libhal_device_property_strlist_remove (LibHalContext *ctx, 
+dbus_bool_t libhal_device_property_strlist_remove (LibHalContext *ctx,
 						   const char *udi,
 						   const char *key,
 						   const char *value,
 						   DBusError *error);
 
 /* Remove a property. */
-dbus_bool_t libhal_device_remove_property (LibHalContext *ctx, 
+dbus_bool_t libhal_device_remove_property (LibHalContext *ctx,
 					   const char *udi,
 					   const char *key,
 					   DBusError *error);
 
 /* Query a property type of a device. */
-LibHalPropertyType libhal_device_get_property_type (LibHalContext *ctx, 
+LibHalPropertyType libhal_device_get_property_type (LibHalContext *ctx,
 						    const char *udi,
 						    const char *key,
 						    DBusError *error);
@@ -407,7 +407,7 @@ typedef struct LibHalPropertySet_s LibHalPropertySet;
 
 
 /* Retrieve all the properties on a device. */
-LibHalPropertySet *libhal_device_get_all_properties (LibHalContext *ctx, 
+LibHalPropertySet *libhal_device_get_all_properties (LibHalContext *ctx,
 						     const char *udi,
 						     DBusError *error);
 
@@ -439,9 +439,9 @@ dbus_bool_t libhal_ps_get_bool (const LibHalPropertySet *set, const char *key);
 const char * const *libhal_ps_get_strlist (const LibHalPropertySet *set, const char *key);
 
 
-/** 
- * LibHalPropertySetIterator: 
- * 
+/**
+ * LibHalPropertySetIterator:
+ *
  * Iterator for inspecting all properties. Do not access any members;
  * use the libhal_psi_* family of functions instead.
  */
@@ -505,7 +505,7 @@ char *libhal_new_device (LibHalContext *ctx, DBusError *error);
 
 /* When a hidden device has been built using the NewDevice method, ie.
  * libhal_new_device(), and the org.freedesktop.Hal.Device interface
- * this function will commit it to the global device list. 
+ * this function will commit it to the global device list.
  */
 dbus_bool_t libhal_device_commit_to_gdl (LibHalContext *ctx,
 					 const char *temp_udi,
@@ -514,9 +514,9 @@ dbus_bool_t libhal_device_commit_to_gdl (LibHalContext *ctx,
 
 /* This method can be invoked when a device is removed. The HAL daemon
  * will shut down the device. Note that the device may still be in the device
- * list if the Persistent property is set to true. 
+ * list if the Persistent property is set to true.
  */
-dbus_bool_t libhal_remove_device (LibHalContext *ctx, 
+dbus_bool_t libhal_remove_device (LibHalContext *ctx,
 					const char *udi,
 					DBusError *error);
 
@@ -571,12 +571,12 @@ dbus_bool_t libhal_device_property_watch_all (LibHalContext *ctx,
 /* Add a watch on a device, so the device_property_changed callback is
  * invoked when the properties on the given device changes.
  */
-dbus_bool_t libhal_device_add_property_watch (LibHalContext *ctx, 
+dbus_bool_t libhal_device_add_property_watch (LibHalContext *ctx,
 					      const char *udi,
 					      DBusError *error);
 
 /* Remove a watch on a device */
-dbus_bool_t libhal_device_remove_property_watch (LibHalContext *ctx, 
+dbus_bool_t libhal_device_remove_property_watch (LibHalContext *ctx,
 						 const char *udi,
 						 DBusError *error);
 

@@ -85,9 +85,9 @@
 #define _IDCH	(T_IDC|T_DIG)
 #define _META	(T_SPC|T_DIP|T_MET|T_EOR)
 
-extern 
+extern
 #ifdef __STDC__
-const 
+const
 #endif
 unsigned char	_ctype1[];
 
@@ -100,10 +100,10 @@ unsigned char	_ctype1[];
 #define subchar(c)	((c<QUOTE) && _ctype1[c]&(T_SUB|T_QOT))
 #define escchar(c)	((c<QUOTE) && _ctype1[c]&(T_ESC))
 
-extern 
-#ifdef __STDC__ 
-const 
-#endif 
+extern
+#ifdef __STDC__
+const
+#endif
 unsigned char   _ctype2[];
 
 #define	digit(c)	((c<QUOTE) && _ctype2[c]&(T_DIG))

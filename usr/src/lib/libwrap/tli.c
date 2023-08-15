@@ -9,13 +9,13 @@
   * server endpoint. In addition, it provides methods to map a transport
   * address to a printable host name or address. Socket address results are
   * in static memory; tli structures are allocated from the heap.
-  * 
+  *
   * The result from the hostname lookup method is STRING_PARANOID when a host
   * pretends to have someone elses name, or when a host name is available but
   * could not be verified.
-  * 
+  *
   * Diagnostics are reported through syslog(3).
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 
@@ -137,7 +137,7 @@ struct request_info *request;
      * at the sender address of the pending protocol data unit without
      * popping it off the receive queue. This trick works because only the
      * address member of the unitdata structure has been allocated.
-     * 
+     *
      * Beware of successful returns with zero-length netbufs (for example,
      * Solaris 2.3 with ticlts transport). The netdir(3) routines can't
      * handle that. Assume connection-less transport when TI_GETPEERNAME

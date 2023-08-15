@@ -27,7 +27,7 @@
 
 /*
  * tmplout.c:  display template library output routines for LDAP clients
- * 
+ *
  */
 
 #include "ldap-int.h"
@@ -39,7 +39,7 @@
 
 
 /* This is totally lame, since it should be coming from time.h, but isn't. */
-#if defined(SOLARIS) 
+#if defined(SOLARIS)
 char *ctime_r(const time_t *, char *, int);
 #endif
 
@@ -76,7 +76,7 @@ static int searchaction( LDAP *ld, char *buf, char *base, LDAPMessage *entry,
 
 #define DEF_LDAP_URL_PREFIX	"ldap:///"
 
- 
+
 int
 LDAP_CALL
 ldap_entry2text(
@@ -282,7 +282,7 @@ do_entry2text(
 	    }
 
 	    err = do_vals2text( ld, buf, vals, attr, labelwidth,
-		    LDAP_SYN_CASEIGNORESTR, writeproc, writeparm, eol, 
+		    LDAP_SYN_CASEIGNORESTR, writeproc, writeparm, eol,
 		    rdncount, urlprefix );
 	    if ( freevals ) {
 		ldap_value_free( vals );
@@ -378,7 +378,7 @@ do_entry2text(
     return( err );
 }
 
-	
+
 int
 LDAP_CALL
 ldap_entry2text_search(
@@ -554,7 +554,7 @@ do_entry2text_search(
     ldap_msgfree( ldmp );
     return( err );
 }
-	    
+
 
 int
 LDAP_CALL
@@ -986,7 +986,7 @@ static int	dmsize[] = {
 /*
 #define	YEAR(y)		((y) >= 100 ? (y) : (y) + 1900)
 */
-#define YEAR(y)		(((y) < 1900) ? ((y) + 1900) : (y)) 
+#define YEAR(y)		(((y) < 1900) ? ((y) + 1900) : (y))
 
 /*  */
 
@@ -1126,7 +1126,7 @@ searchaction( LDAP *ld, char *buf, char *base, LDAPMessage *entry, char *dn,
 	ldap_msgfree( ldmp );
     }
 
-    
+
     if ( vals != NULL ) {
 	ldap_value_free( vals );
     }

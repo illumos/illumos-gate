@@ -1,11 +1,11 @@
 /******************************************************************************
  * arch-x86/mca.h
- * 
+ *
  * Contributed by Advanced Micro Devices, Inc.
  * Author: Christoph Egger <Christoph.Egger@amd.com>
  *
  * Guest OS machine check interface to x86 Xen.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -156,7 +156,7 @@ struct mcinfo_msr {
 };
 
 /* contains mc information from other
- * or additional mc MSRs */ 
+ * or additional mc MSRs */
 struct mcinfo_extended {
     struct mcinfo_common common;
 
@@ -193,10 +193,10 @@ struct mcinfo_extended {
 /* L3 cache disable Action */
 #define MC_ACTION_CACHE_SHRINK (0x1 << 2)
 
-/* Below interface used between XEN/DOM0 for passing XEN's recovery action 
- * information to DOM0. 
+/* Below interface used between XEN/DOM0 for passing XEN's recovery action
+ * information to DOM0.
  * usage Senario: After offlining broken page, XEN might pass its page offline
- * recovery action result to DOM0. DOM0 will save the information in 
+ * recovery action result to DOM0. DOM0 will save the information in
  * non-volatile memory for further proactive actions, such as offlining the
  * easy broken page earlier when doing next reboot.
 */
@@ -254,8 +254,8 @@ DEFINE_XEN_GUEST_HANDLE(mc_info_t);
 #define MC_CAPS_AMD_ECX	6	/* cpuid level 0x80000001 (%ecx) */
 
 struct mcinfo_logical_cpu {
-    uint32_t mc_cpunr;          
-    uint32_t mc_chipid; 
+    uint32_t mc_cpunr;
+    uint32_t mc_chipid;
     uint16_t mc_coreid;
     uint16_t mc_threadid;
     uint32_t mc_apicid;
@@ -280,7 +280,7 @@ typedef struct mcinfo_logical_cpu xen_mc_logical_cpu_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
 
 
-/* 
+/*
  * OS's should use these instead of writing their own lookup function
  * each with its own bugs and drawbacks.
  * We use macros instead of static inline functions to allow guests

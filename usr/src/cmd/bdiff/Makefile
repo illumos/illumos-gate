@@ -25,7 +25,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-PROG= bdiff 
+PROG= bdiff
 
 include ../Makefile.cmd
 
@@ -39,7 +39,7 @@ SMATCH=off
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

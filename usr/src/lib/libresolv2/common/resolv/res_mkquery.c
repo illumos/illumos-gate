@@ -330,7 +330,7 @@ res_nopt_rdata(res_state statp,
 #ifdef SUNW_CONFCHECK
 
 /*
- * Time out quickly if there is no /etc/resolv.conf and a TCP connection 
+ * Time out quickly if there is no /etc/resolv.conf and a TCP connection
  * to the local DNS server fails.
  */
 static int _confcheck(res_state statp)

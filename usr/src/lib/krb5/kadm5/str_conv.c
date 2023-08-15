@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -303,7 +303,7 @@ krb5_string_to_keysalts(string, tupleseps, ksaltseps, dups, ksaltp, nksaltp)
     const char		*ksseplist;
     const char		*septmp;
     size_t		len;
-    
+
     kret = 0;
     kp = string;
     tseplist = (tupleseps) ? tupleseps : default_tupleseps;
@@ -359,7 +359,7 @@ krb5_string_to_keysalts(string, tupleseps, ksaltseps, dups, ksaltp, nksaltp)
 	    len = (size_t) *nksaltp;
 
 	    /* Get new keysalt array */
-	    *ksaltp = (krb5_key_salt_tuple *) 
+	    *ksaltp = (krb5_key_salt_tuple *)
 		malloc((len + 1) * sizeof(krb5_key_salt_tuple));
 	    if (*ksaltp) {
 

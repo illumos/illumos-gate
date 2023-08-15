@@ -78,5 +78,5 @@ nfslogtab.o:	../lib/nfslogtab.c
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
-clean:     
+clean:
 	$(RM) $(OBJS)

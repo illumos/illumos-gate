@@ -3,26 +3,26 @@
  * Use is subject to license terms.
  */
 
-/* 
+/*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
  * the License at http://www.mozilla.org/NPL/
- *  
+ *
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *  
+ *
  * The Original Code is Mozilla Communicator client code, released
  * March 31, 1998.
- * 
+ *
  * The Initial Developer of the Original Code is Netscape
  * Communications Corporation. Portions created by Netscape are
  * Copyright (C) 1998-1999 Netscape Communications Corporation. All
  * Rights Reserved.
- * 
- * Contributor(s): 
+ *
+ * Contributor(s):
  */
 
 /* ldapsearch.c - generic program to search LDAP */
@@ -41,7 +41,7 @@
 #endif
 
 static void usage( void );
-static int dosearch( LDAP *ld, char *base, int scope, char **attrs, 
+static int dosearch( LDAP *ld, char *base, int scope, char **attrs,
 			 int attrsonly, char *filtpatt, char *value);
 static void write_string_attr_value( char *attrname, char *strval,
 	unsigned long opts );
@@ -206,7 +206,7 @@ main( int argc, char **argv )
 	if (( base = getenv( "LDAP_BASEDN" )) == NULL ) {
 	    usage();
 	}
-    }    
+    }
     if ( sortattr ) {
 	for ( sortsize = 0; sortattr[sortsize] != NULL; sortsize++ ) {
 	    ;       /* NULL */
@@ -302,8 +302,8 @@ main( int argc, char **argv )
 	    char *linep = NULL;
 	    int   increment = 0;
 	    int	  c, index;
-	 
-	    /* allocate initial block of memory */ 
+
+	    /* allocate initial block of memory */
 	    if ((linep = (char *)malloc(BUFSIZ)) == NULL) {
 	        fprintf( stderr, gettext("Out of memory\n") );
 		exit( LDAP_NO_MEMORY );
@@ -330,7 +330,7 @@ main( int argc, char **argv )
 		done = 1;
 		break;
 	    }
-	    
+
 	    linep[index] = '\0';
 
 	    if ( !first ) {
@@ -361,7 +361,7 @@ static void
 options_callback( int option, char *optarg )
 {
     char *s, *temp_arg, *ps_ptr, *ps_arg;
-    
+
     switch( option ) {
     case 'u':	/* include UFN */
 	++includeufn;
@@ -447,10 +447,10 @@ options_callback( int option, char *optarg )
 			fprintf(stderr, gettext("-c wrong format--should be \"\" or \"dn:...\".\n"
 				"\"dn:\" means anonymous user."));
 			usage();
-		} else {		
+		} else {
 			get_effectiverights_control_target_dn = strdup(optarg);
 			do_effective_rights_control = 1;
-		}	
+		}
 	break;
 	case 'X':
 		get_effectiverights_control_attrlist = get_effectiverights_attrlist(optarg);
@@ -478,7 +478,7 @@ options_callback( int option, char *optarg )
     case 'G':  /* do the virtual list setup */
 	use_vlv++;
 	s = strchr(optarg, VLV_PARAM_SEP );
-	
+
 	if (s != NULL)
 	{
 	    vlv_before = atoi(optarg);
@@ -493,7 +493,7 @@ options_callback( int option, char *optarg )
 		 * -G23:23:"wilber:wright"
 		 * -G23:23:'wilber'
 		 * -G23:23:wilber wright
-		 * all of the above are before, after, value -  NOTE: a colon not in a quoted 
+		 * all of the above are before, after, value -  NOTE: a colon not in a quoted
 		 * string will break the parser!!!!
 		 * -G23:23:45:600
 		 * above is index, count encoding
@@ -513,8 +513,8 @@ options_callback( int option, char *optarg )
 		    }
 		    else
 		    {
-			/* we don't have a quote surrounding the assertion value 
-			 * do we need to??? 
+			/* we don't have a quote surrounding the assertion value
+			 * do we need to???
 			 */
 			vlv_value = strdup( s );
 		    }
@@ -525,7 +525,7 @@ options_callback( int option, char *optarg )
 		fprintf( stderr,gettext("Illegal 'after' paramater for virtual list\n") );
 		exit( LDAP_PARAM_ERROR );
 	    }
-	    
+
 	}
 	else
 	{
@@ -539,7 +539,7 @@ options_callback( int option, char *optarg )
 	    perror ("strdup");
 	    exit (LDAP_NO_MEMORY);
 	}
-	
+
 	ps_ptr=strtok(ps_arg, ":");
 	if (ps_ptr == NULL || (strcasecmp(ps_ptr, "ps")) ) {
 	    fprintf (stderr, gettext("Invalid argument for -C\n"));
@@ -549,7 +549,7 @@ options_callback( int option, char *optarg )
 	    if ( (temp_arg = strdup( ps_ptr )) == NULL ) {
 	        perror ("strdup");
 	    	exit (LDAP_NO_MEMORY);
-	    } 
+	    }
 	} else {
 	    fprintf (stderr, gettext("Invalid argument for -C\n"));
 	    usage();
@@ -559,13 +559,13 @@ options_callback( int option, char *optarg )
 		fprintf(stderr, gettext("Invalid option value: %s\n"), ps_ptr);
 		usage();
 	    }
-	}    
+	}
 	if (NULL != (ps_ptr=strtok(NULL, ":"))) {
 	    if ( (return_echg_ctls = ldaptool_boolean_str2value(ps_ptr, 0)) == -1) {
 		fprintf(stderr, gettext("Invalid option value: %s\n"), ps_ptr);
 		usage();
 	    }
-	}    
+	}
 
 	/* Now parse the temp_arg and build chgtype as
 	 * the changetypes are encountered */
@@ -574,15 +574,15 @@ options_callback( int option, char *optarg )
 		usage();
 	} else {
 	    while ( ps_ptr ) {
-		if ((strcasecmp(ps_ptr, "add"))==0) 
+		if ((strcasecmp(ps_ptr, "add"))==0)
 		    chgtype |= LDAP_CHANGETYPE_ADD;
-		else if ((strcasecmp(ps_ptr, "delete"))==0) 
+		else if ((strcasecmp(ps_ptr, "delete"))==0)
 		    chgtype |= LDAP_CHANGETYPE_DELETE;
-		else if ((strcasecmp(ps_ptr, "modify"))==0) 
+		else if ((strcasecmp(ps_ptr, "modify"))==0)
 		    chgtype |= LDAP_CHANGETYPE_MODIFY;
-		else if ((strcasecmp(ps_ptr, "moddn"))==0) 
+		else if ((strcasecmp(ps_ptr, "moddn"))==0)
 		    chgtype |= LDAP_CHANGETYPE_MODDN;
-		else if ((strcasecmp(ps_ptr, "any"))==0) 
+		else if ((strcasecmp(ps_ptr, "any"))==0)
 		    chgtype = LDAP_CHANGETYPE_ANY;
 		else {
 			fprintf(stderr, gettext("Unknown changetype: %s\n"), ps_ptr);
@@ -633,7 +633,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	} else {
 	    filterp = filter;
 	}
-	
+
 #ifdef HAVE_SNPRINTF
 	if ( snprintf( filterp, length, filtpatt, value ) < 0 ) {
 	    perror( gettext("snprintf filter (filter and/or pattern too long?)") );
@@ -643,7 +643,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	sprintf( filterp, filtpatt, value );
 #endif
     }
-    
+
     if ( *filterp == '\0' ) {	/* treat empty filter is a shortcut for oc=* */
 	if (mallocd_filter) {
 	    free(filterp);
@@ -676,7 +676,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
     if ((ldctrl = ldaptool_create_proxyauth_control(ld)) !=NULL) {
 	ldaptool_add_control_to_array(ldctrl, ldaptool_request_ctrls);
     }
-    
+
 #ifndef SOLARIS_LDAP_CMD
     if ( do_effective_rights_control ) {
         if ((ldctrl = ldaptool_create_geteffectiveRights_control(ld,
@@ -689,7 +689,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 
     if (use_psearch) {
 	if ( ldap_create_persistentsearch_control( ld, chgtype,
-                changesonly, return_echg_ctls, 
+                changesonly, return_echg_ctls,
 		1, &ldctrl ) != LDAP_SUCCESS )
 	{
 		ldap_perror( ld, "ldap_create_persistentsearch_control" );
@@ -717,7 +717,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	    fprintf( stderr, gettext("Out of memory\n") );
 	    exit( LDAP_NO_MEMORY );
 	}
-	
+
 	s = sortattrs;
 	for (i = 0; i < sortsize - 1 ; i++) {
 	    memcpy(s, sortattr[i], strlen(sortattr[i]));
@@ -750,9 +750,9 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	vlv_data.ldvlist_before_count = vlv_before;
 	vlv_data.ldvlist_after_count = vlv_after;
 	if ( ldaptool_verbose ) {
-	    printf( gettext("vlv data %lu, %lu, "), 
+	    printf( gettext("vlv data %lu, %lu, "),
 		    vlv_data.ldvlist_before_count,
-		    vlv_data.ldvlist_after_count 
+		    vlv_data.ldvlist_after_count
 		);
 	}
 	if (vlv_value)
@@ -773,7 +773,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 		printf( "(null), %lu, %lu\n", vlv_data.ldvlist_size, vlv_data.ldvlist_index );
 	    }
 	}
-	
+
 	if ( rc != LDAP_SUCCESS ) {
 	    if (mallocd_filter) free(filterp);
 	    return( ldaptool_print_lderror( ld, "ldap_create_sort_control",
@@ -789,10 +789,10 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	}
 
 	ldaptool_add_control_to_array(ldctrl, ldaptool_request_ctrls);
-	
+
     }
 
-    if ( ldap_search_ext( ld, base, scope, filterp, attrs, attrsonly, 
+    if ( ldap_search_ext( ld, base, scope, filterp, attrs, attrsonly,
 	    ldaptool_request_ctrls, NULL, NULL, -1, &msgid )
 	    != LDAP_SUCCESS ) {
 	if (mallocd_filter) free(filterp);
@@ -806,7 +806,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
     if ( sortattr && !server_sort ) {
         rc = ldap_result( ld, LDAP_RES_ANY, 1, NULL, &res );
     } else {
-        while ( (rc = ldap_result( ld, LDAP_RES_ANY, 0, NULL, &res )) != 
+        while ( (rc = ldap_result( ld, LDAP_RES_ANY, 0, NULL, &res )) !=
 		LDAP_RES_SEARCH_RESULT && rc != -1 ) {
 	    if ( rc != LDAP_RES_SEARCH_ENTRY ) {
 		if ( rc == LDAP_RES_SEARCH_REFERENCE ) {
@@ -844,15 +844,15 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	    &ctrl_response_array, 0 ) != LDAP_SUCCESS ) {
 	ldaptool_print_lderror( ld, "ldap_parse_result",
 		LDAPTOOL_CHECK4SSL_IF_APPROP );
-    } else if ( rc != LDAP_SUCCESS ) {                                          
+    } else if ( rc != LDAP_SUCCESS ) {
 	ldaptool_print_lderror( ld, "ldap_search",
 		LDAPTOOL_CHECK4SSL_IF_APPROP );
-    } 
+    }
     /* Parse the returned sort control */
     if (server_sort) {
 	unsigned long result = 0;
 	char *attribute;
-	
+
 	if ( LDAP_SUCCESS != ldap_parse_sort_control(ld,ctrl_response_array,&result,&attribute) ) {
 	    ldaptool_print_lderror(ld, "ldap_parse_sort_control",
 		    LDAPTOOL_CHECK4SSL_IF_APPROP );
@@ -861,7 +861,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	    if (mallocd_filter) free(filterp);
 	    return ( ldap_get_lderrno( ld, NULL, NULL ) );
 	}
-	
+
 	if (0 == result) {
 	    if ( ldaptool_verbose ) {
 		printf( gettext("Server indicated results sorted OK\n"));
@@ -888,26 +888,26 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	    if (mallocd_filter) free(filterp);
 	    return ( ldap_get_lderrno( ld, NULL, NULL ) );
 	}
-	
+
 	if (0 == vresult) {
 	    if ( ldaptool_verbose ) {
 		printf( gettext("Server indicated virtual list positioning OK\n"));
 	    }
 	    printf(gettext("index %lu content count %lu\n"), vpos, vcount);
-	    
+
 	} else {
 	    printf(gettext("Server reported sorting error %d: %s\n"),vresult,sortresult2string(vresult));
 
 	}
 
     }
-    
-    ldap_controls_free(ctrl_response_array);   
-    
+
+    ldap_controls_free(ctrl_response_array);
+
     if ( sortattr != NULL && !server_sort) {
-	
+
 	(void) ldap_multisort_entries( ld, &res,
-				       ( *sortattr == NULL ) ? NULL : sortattr, 
+				       ( *sortattr == NULL ) ? NULL : sortattr,
 				       (LDAP_CMP_CALLBACK *)strcasecmp );
 	matches = 0;
 	first = 1;
@@ -922,7 +922,7 @@ dosearch( ld, base, scope, attrs, attrsonly, filtpatt, value )
 	    print_entry( ld, e, attrsonly );
 	}
     }
-    
+
     if ( ldaptool_verbose ) {
 	printf( gettext("%d matches\n"), matches );
     }
@@ -1200,82 +1200,82 @@ parse_and_display_reference( LDAP *ld, LDAPMessage *ref )
 }
 
 
-/*possible operations a client can invoke -- copied from ldaprot.h */          
+/*possible operations a client can invoke -- copied from ldaprot.h */
 
-#ifndef LDAP_REQ_BIND                                                           
-#define LDAP_REQ_BIND                   0x60L   /* application + constructed */ 
-#define LDAP_REQ_UNBIND                 0x42L   /* application + primitive   */ 
-#define LDAP_REQ_SEARCH                 0x63L   /* application + constructed */ 
-#define LDAP_REQ_MODIFY                 0x66L   /* application + constructed */ 
-#define LDAP_REQ_ADD                    0x68L   /* application + constructed */ 
-#define LDAP_REQ_DELETE                 0x4aL   /* application + primitive   */ 
-#define LDAP_REQ_RENAME                 0x6cL   /* application + constructed */ 
-#define LDAP_REQ_COMPARE                0x6eL   /* application + constructed */ 
-#define LDAP_REQ_ABANDON                0x50L   /* application + primitive   */ 
-#define LDAP_REQ_EXTENDED               0x77L   /* application + constructed */ 
-#endif /* LDAP_REQ_BIND */                                                      
+#ifndef LDAP_REQ_BIND
+#define LDAP_REQ_BIND                   0x60L   /* application + constructed */
+#define LDAP_REQ_UNBIND                 0x42L   /* application + primitive   */
+#define LDAP_REQ_SEARCH                 0x63L   /* application + constructed */
+#define LDAP_REQ_MODIFY                 0x66L   /* application + constructed */
+#define LDAP_REQ_ADD                    0x68L   /* application + constructed */
+#define LDAP_REQ_DELETE                 0x4aL   /* application + primitive   */
+#define LDAP_REQ_RENAME                 0x6cL   /* application + constructed */
+#define LDAP_REQ_COMPARE                0x6eL   /* application + constructed */
+#define LDAP_REQ_ABANDON                0x50L   /* application + primitive   */
+#define LDAP_REQ_EXTENDED               0x77L   /* application + constructed */
+#endif /* LDAP_REQ_BIND */
 
 
 
 struct ldapsearch_type2str {
-    
-    int         ldst2s_type;    /* message type */ 
-    char        *ldst2s_string; /* descriptive string */     
-};  
+
+    int         ldst2s_type;    /* message type */
+    char        *ldst2s_string; /* descriptive string */
+};
 
 #ifdef SOLARIS_LDAP_CMD
 static struct ldapsearch_type2str ldapsearch_msgtypes[] = {
 
-    /* results: */    
+    /* results: */
     { LDAP_RES_BIND,                    NULL },
     { LDAP_RES_SEARCH_REFERENCE,        NULL },
     { LDAP_RES_SEARCH_ENTRY,            NULL },
     { LDAP_RES_SEARCH_RESULT,           NULL },
     { LDAP_RES_MODIFY,                  NULL },
-    { LDAP_RES_ADD,                     NULL }, 
+    { LDAP_RES_ADD,                     NULL },
     { LDAP_RES_DELETE,                  NULL },
     { LDAP_RES_MODDN,                   NULL },
     { LDAP_RES_COMPARE,                 NULL },
     { LDAP_RES_EXTENDED,                NULL },
-    /* requests: */ 
-    { LDAP_REQ_BIND,                    NULL }, 
-    { LDAP_REQ_UNBIND,                  NULL }, 
-    { LDAP_REQ_SEARCH,                  NULL }, 
-    { LDAP_REQ_MODIFY,                  NULL }, 
+    /* requests: */
+    { LDAP_REQ_BIND,                    NULL },
+    { LDAP_REQ_UNBIND,                  NULL },
+    { LDAP_REQ_SEARCH,                  NULL },
+    { LDAP_REQ_MODIFY,                  NULL },
     { LDAP_REQ_ADD,                     NULL },
-    { LDAP_REQ_DELETE,                  NULL }, 
-    { LDAP_REQ_RENAME,                  NULL }, 
-    { LDAP_REQ_COMPARE,                 NULL }, 
-    { LDAP_REQ_ABANDON,                 NULL }, 
+    { LDAP_REQ_DELETE,                  NULL },
+    { LDAP_REQ_RENAME,                  NULL },
+    { LDAP_REQ_COMPARE,                 NULL },
+    { LDAP_REQ_ABANDON,                 NULL },
     { LDAP_REQ_EXTENDED,                NULL },
 
 };
 #else
 static struct ldapsearch_type2str ldapsearch_msgtypes[] = {
-    
-    /* results: */    
+
+    /* results: */
     { LDAP_RES_BIND,                    "bind result" },
     { LDAP_RES_SEARCH_REFERENCE,        "continuation reference" },
     { LDAP_RES_SEARCH_ENTRY,            "entry" },
     { LDAP_RES_SEARCH_RESULT,           "search result" },
     { LDAP_RES_MODIFY,                  "modify result" },
-    { LDAP_RES_ADD,                     "add result" }, 
+    { LDAP_RES_ADD,                     "add result" },
     { LDAP_RES_DELETE,                  "delete result" },
     { LDAP_RES_MODDN,                   "rename result" },
     { LDAP_RES_COMPARE,                 "compare result" },
     { LDAP_RES_EXTENDED,                "extended operation result" },
-    /* requests: */ 
-    { LDAP_REQ_BIND,                    "bind request" }, 
-    { LDAP_REQ_UNBIND,                  "unbind request" }, 
-    { LDAP_REQ_SEARCH,                  "search request" }, 
-    { LDAP_REQ_MODIFY,                  "modify request" }, 
+    /* requests: */
+    { LDAP_REQ_BIND,                    "bind request" },
+    { LDAP_REQ_UNBIND,                  "unbind request" },
+    { LDAP_REQ_SEARCH,                  "search request" },
+    { LDAP_REQ_MODIFY,                  "modify request" },
     { LDAP_REQ_ADD,                     "add request" },
-    { LDAP_REQ_DELETE,                  "delete request" }, 
-    { LDAP_REQ_RENAME,                  "rename request" }, 
-    { LDAP_REQ_COMPARE,                 "compare request" }, 
-    { LDAP_REQ_ABANDON,                 "abandon request" }, 
+    { LDAP_REQ_DELETE,                  "delete request" },
+    { LDAP_REQ_RENAME,                  "rename request" },
+    { LDAP_REQ_COMPARE,                 "compare request" },
+    { LDAP_REQ_ABANDON,                 "abandon request" },
     { LDAP_REQ_EXTENDED,                "extended request" },
-    
+
 };
 #endif	/* SOLARIS_LDAP_CMD */
 
@@ -1313,7 +1313,7 @@ fill_ldapsearch_msgtypes( void )
     			"compare result");
     ldapsearch_msgtypes[i++].ldst2s_string = gettext(
     			"extended operation result");
-    /* requests: */ 
+    /* requests: */
     ldapsearch_msgtypes[i++].ldst2s_string = gettext(
     			"bind request");
     ldapsearch_msgtypes[i++].ldst2s_string = gettext(
@@ -1338,14 +1338,14 @@ fill_ldapsearch_msgtypes( void )
 #endif	/* SOLARIS_LDAP_CMD */
 
 /*
- * Return a descriptive string given an LDAP result message type (tag). 
- */     
-static char * 
+ * Return a descriptive string given an LDAP result message type (tag).
+ */
+static char *
 msgtype2str( int msgtype )
-{    
-    char        *s = gettext("unknown"); 
+{
+    char        *s = gettext("unknown");
     int         i;
-    
+
 #ifdef SOLARIS_LDAP_CMD
     /* Make sure ldapsearch_msgtypes is initialized */
     if (ldapsearch_msgtypes[LDAPSEARCHTOOL_NUMTYPES - 1].ldst2s_string
@@ -1355,9 +1355,9 @@ msgtype2str( int msgtype )
 
     for ( i = 0; i < LDAPSEARCHTOOL_NUMTYPES; ++i ) {
 	if ( msgtype == ldapsearch_msgtypes[ i ].ldst2s_type ) {
-	    s = ldapsearch_msgtypes[ i ].ldst2s_string;	
-	}	
-    }    
+	    s = ldapsearch_msgtypes[ i ].ldst2s_string;
+	}
+    }
     return( s );
 }
 
@@ -1397,10 +1397,10 @@ static char  **get_effectiverights_attrlist(char * optarg) {
 
 	retArray = ldap_str2charray( tmp_str, " "); /* takes copies */
 
-	free(tmp_str);	
+	free(tmp_str);
 
 	/* Oops - somebody left this debug message in for the
-	   getEffectiveRights control 
+	   getEffectiveRights control
 	   fprintf(stderr, "attrlist: "); */
 	i = 0;
 	while( retArray[i] != NULL ) {

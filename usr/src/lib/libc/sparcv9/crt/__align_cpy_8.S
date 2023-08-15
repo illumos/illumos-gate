@@ -82,7 +82,7 @@
 .done:
 	retl				! No bytes to copy.
 	nop
-	
+
 	.align	32
 .wrdbl1:				! Copy 16 bytes at a time.
 	subcc	%o2, 16, %o2

@@ -1025,11 +1025,11 @@ ipf_stack_t *ifs;
 }
 
 
-/*    
+/*
  * This function is not meant to be random, rather just produce a
  * sequence of numbers that isn't linear to show "randomness".
  */
-u_32_t ipf_random() 
+u_32_t ipf_random()
 {
 	static u_int last = 0xa5a5a5a5;
 	static int calls = 0;

@@ -79,7 +79,7 @@ krb5_verify_init_creds(krb5_context context,
    krb5_creds in_creds, *out_creds;
    krb5_auth_context authcon;
    krb5_data ap_req;
-   
+
    /* KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN */
 
    server = NULL;
@@ -92,10 +92,10 @@ krb5_verify_init_creds(krb5_context context,
    /* Solaris Kerberos */
    if (server_arg)
       server = server_arg;
-   else if (ret = krb5_sname_to_principal(context, NULL, NULL, 
+   else if (ret = krb5_sname_to_principal(context, NULL, NULL,
 					KRB5_NT_SRV_HST, &server))
       goto cleanup;
-      
+
    /* first, check if the server is in the keytab.  If not, there's
       no reason to continue.  rd_req does all this, but there's
       no way to know that a given error is caused by a missing
@@ -124,7 +124,7 @@ krb5_verify_init_creds(krb5_context context,
 	   /* first, if options are set then use the option value to set nofail */
 	    nofail = options->ap_req_nofail;
        } else {
-	   /* 
+	   /*
 	    * Solaris Kerberos:
 	    * Check verify_ap_req_nofail if set in config file.  Note this logic
 	    * assumes that krb5_libdefault_boolean will not set nofail to a
@@ -137,7 +137,7 @@ krb5_verify_init_creds(krb5_context context,
        }
        /* Solaris Kerberos: exit without an error ONLY if nofail is false */
        if (!nofail)
-	   ret = 0; 
+	   ret = 0;
 
        goto cleanup;
    }

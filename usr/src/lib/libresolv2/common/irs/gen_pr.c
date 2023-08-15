@@ -129,7 +129,7 @@ pr_byname(struct irs_pr *this, const char *name) {
 	struct irs_rule *rule;
 	struct protoent *rval;
 	struct irs_pr *pr;
-	
+
 	rval = NULL;
 	for (rule = pvt->rules; rule; rule = rule->next) {
 		pr = rule->inst->pr;
@@ -146,7 +146,7 @@ pr_bynumber(struct irs_pr *this, int proto) {
 	struct irs_rule *rule;
 	struct protoent *rval;
 	struct irs_pr *pr;
-	
+
 	rval = NULL;
 	for (rule = pvt->rules; rule; rule = rule->next) {
 		pr = rule->inst->pr;

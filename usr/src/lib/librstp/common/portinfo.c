@@ -1,23 +1,23 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
 #include "base.h"
@@ -205,7 +205,7 @@ updtBPDUVersion (STATE_MACH_T* this)
   if (port->msgBpduVersion < 2) {
     port->rcvdSTP = True;
   }
-  
+
   if (BPDU_RSTP == port->msgBpduType) {
     /* port->port->owner->ForceVersion >= NORMAL_RSTP
        we have checked in STP_info_rx_bpdu */
@@ -219,7 +219,7 @@ updtRcvdInfoWhile (STATE_MACH_T* this)
   register int eff_age, dm, dt;
   register int hello3;
   register PORT_T* port = this->owner.port;
-  
+
   eff_age = ( + port->portTimes.MaxAge) / 16;
   if (eff_age < 1) eff_age = 1;
   eff_age += port->portTimes.MessageAge;
@@ -258,7 +258,7 @@ updtRcvdInfoWhile (STATE_MACH_T* this)
 /* ARGSUSED */
 void
 STP_info_rx_bpdu (PORT_T* port, struct stp_bpdu_t* bpdu, size_t len)
-{  
+{
 #if 0
   _stp_dump ("\nall BPDU", ((unsigned char*) bpdu) - 12, len + 12);
   _stp_dump ("ETH_HEADER", (unsigned char*) &bpdu->eth, 5);
@@ -279,13 +279,13 @@ STP_info_rx_bpdu (PORT_T* port, struct stp_bpdu_t* bpdu, size_t len)
   _stp_dump ("forward_delay", bpdu->body.forward_delay, 2);
   _stp_dump ("ver_1_len", bpdu->ver_1_len, 2);
 #endif
-  
+
   /* check bpdu type */
   switch (bpdu->hdr.bpdu_type) {
     case BPDU_CONFIG_TYPE:
       port->rx_cfg_bpdu_cnt++;
 #ifdef STP_DBG
-      if (port->info->debug) 
+      if (port->info->debug)
         stp_trace ("CfgBpdu on port %s", port->port_name);
 #endif
       if (port->admin_non_stp) return;
@@ -310,7 +310,7 @@ STP_info_rx_bpdu (PORT_T* port, struct stp_bpdu_t* bpdu, size_t len)
       if (port->admin_non_stp) return;
       if (port->owner->ForceVersion >= NORMAL_RSTP) {
         port->rcvdBpdu = True;
-      } else {          
+      } else {
         return;
       }
 #ifdef STP_DBG
@@ -428,7 +428,7 @@ void STP_info_enter_state (STATE_MACH_T* this)
             port->owner->name, port->port_name);
       }
 #endif
-      
+
       port->agreed = True;
       port->proposing = False; /* In AGREEMENT */
       break;
@@ -455,7 +455,7 @@ Bool STP_info_check_conditions (STATE_MACH_T* this)
       if (port->rcvdBpdu) {
         return STP_hop_2_state (this, DISABLED);
       }
-      break; 
+      break;
     case ENABLED: /* IEEE 802.1y, 17.21, Z.14 */
       return STP_hop_2_state (this, AGED);
     case AGED:

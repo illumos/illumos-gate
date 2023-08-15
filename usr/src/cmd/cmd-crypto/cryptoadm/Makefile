@@ -34,7 +34,7 @@ OBJS =  cryptoadm.o \
 
 SRCS = $(OBJS:.o=.c)
 
-include ../../Makefile.cmd 
+include ../../Makefile.cmd
 
 POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_all.po

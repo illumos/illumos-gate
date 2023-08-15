@@ -178,7 +178,7 @@ class SunServerDATable extends ServerDATable {
 	    // If there, then get the old timestamp.
 
 	    if (formerAttrs != null && !(formerAttrs.size() <= 0)) {
-	
+
 		// Get the timestamp into a long.
 
 		attr = (ServiceLocationAttribute)formerAttrs.elementAt(0);

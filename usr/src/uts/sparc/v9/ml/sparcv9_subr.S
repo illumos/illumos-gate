@@ -90,7 +90,7 @@
 1:									\
 	retl;								\
 	mov	%o1, %o0		/* return old PIL */
-	
+
 /*
  * Macro to set the priority to a specified level.
  * Avoid dropping the priority below CPU->cpu_base_spl.
@@ -266,8 +266,8 @@ catch_fault:
  */
 
 	ENTRY(on_trap_trampoline)
-	ldn	[THREAD_REG + T_ONTRAP], %o0    
-	b	longjmp                 
+	ldn	[THREAD_REG + T_ONTRAP], %o0
+	b	longjmp
 	add	%o0, OT_JMPBUF, %o0
 	SET_SIZE(on_trap_trampoline)
 
@@ -370,7 +370,7 @@ catch_fault:
  */
 
 	ENTRY(scanc)
-	tst	%o0	
+	tst	%o0
 	ble,pn	%ncc, 1f		! check length
 	clr	%o4
 0:
@@ -738,7 +738,7 @@ $done3:
 	SUWORD(suword8, stba, CP_SUWORD8)
 
 	ENTRY(fuword8_noerr)
-	lduba	[%o0]ASI_USER, %o0	
+	lduba	[%o0]ASI_USER, %o0
 	retl
 	stb	%o0, [%o1]
 	SET_SIZE(fuword8_noerr)
@@ -856,7 +856,7 @@ $done3:
 
 	ENTRY_NP(dtrace_interrupt_enable)
 	retl
-	wrpr	%g0, %o0, %pstate 
+	wrpr	%g0, %o0, %pstate
 	SET_SIZE(dtrace_interrupt_enable)
 
 #ifdef SF_ERRATA_51
@@ -1141,7 +1141,7 @@ vpanic_common:
 
 	ba,a	vpanic_common
 	SET_SIZE(dtrace_vpanic)
-	
+
 	ENTRY(get_subcc_ccr)
 	wr	%g0, %ccr	! clear condition codes
 	subcc	%o0, %o1, %g0
@@ -1158,6 +1158,6 @@ vpanic_common:
 
 	ENTRY_NP(ftrace_interrupt_enable)
 	retl
-	wrpr	%g0, %o0, %pstate 
+	wrpr	%g0, %o0, %pstate
 	SET_SIZE(ftrace_interrupt_enable)
 

@@ -124,7 +124,7 @@ main(int argc, char *argv[])
 			case 'r':
 				rflg++;
 				break;
-			
+
 			case 'x':
 				xflag++;
 				break;
@@ -135,10 +135,10 @@ main(int argc, char *argv[])
 		}
 	argc -= optind;
 	argv = &argv[optind];
-	
-	if (errflg) 
+
+	if (errflg)
 		exit(2);
-	
+
 	/*
 	 * If given only a -r argument, then list the saved files.
 	 * (NOTE: single -r argument is scheduled to be replaced by -L).
@@ -150,7 +150,7 @@ main(int argc, char *argv[])
 		listfiles((unsigned char *)TMPDIR);
 		exit(0);
 	}
-	
+
 	if (argc != 2)
 		error(gettext(" Wrong number of arguments to exrecover"), 0);
 
@@ -169,7 +169,7 @@ main(int argc, char *argv[])
 		gettext(" [Dated: %s, newest of %d saved]") :
 		gettext(" [Dated: %s]"), cp, vercnt);
 	fprintf(stderr, "\r\n");
-	
+
 	if(H.encrypted) {
 		if(xflag) {
 			kflag = run_setkey(perm, (unsigned char *)getenv("CrYpTkEy"));
@@ -276,7 +276,7 @@ error(str, inf)
 		fprintf(stderr, (char *)str, inf);
 	else
 		fprintf(stderr, (char *)str);
-	
+
 	ioctl(2, TCGETA, &termio);
 	if (termio.c_lflag & ICANON)
 		fprintf(stderr, "\n");
@@ -328,7 +328,7 @@ listfiles(unsigned char *dirname)
 	 */
 	fp = &svbuf[0];
 	ecount = 0;
-	while ((direntry = readdir64(dir)) != NULL) 
+	while ((direntry = readdir64(dir)) != NULL)
 	{
 		filname = (unsigned char *)direntry->d_name;
 		if (filname[0] != 'E')
@@ -522,9 +522,9 @@ searchdir(unsigned char *dirname)
 	DIR *dir;
 	unsigned char dbuf[BUFSIZE];
 	unsigned char *filname;
-	if ((dir = opendir((char *)dirname)) == NULL) 
+	if ((dir = opendir((char *)dirname)) == NULL)
 		return;
-	while ((direntry = readdir64(dir)) != NULL) 
+	while ((direntry = readdir64(dir)) != NULL)
 	{
 		filname = (unsigned char *)direntry->d_name;
 		if (filname[0] != 'E' || filname[1] != 'x')
@@ -781,7 +781,7 @@ getblock(atl)
 	int bno, off;
         unsigned char *p1, *p2;
         int n;
-	
+
 	bno = (atl >> OFFBTS) & BLKMSK;
 #ifdef DEBUG
 	fprintf(stderr,"GETBLOCK: BLK %d\n",bno);
@@ -790,7 +790,7 @@ getblock(atl)
 	if (bno >= NMBLKS)
 		error((unsigned char *)gettext(" Tmp file too large"));
 	nleft = BUFSIZE - off;
-	if (bno == iblock) 
+	if (bno == iblock)
 		return (ibuff + off);
 	iblock = bno;
 	blkio(bno, ibuff, read);
@@ -810,7 +810,7 @@ blkio(short b, unsigned char *buf, int (*iofcn)())
 	int rc;
 	lseek(tfile, (long) (unsigned) b * BUFSIZE, 0);
 	if ((rc =(*iofcn)(tfile, buf, BUFSIZE)) != BUFSIZE) {
-		(void)fprintf(stderr,gettext("Failed on BLK: %d with %d/%d\n"),b,rc,BUFSIZE); 
+		(void)fprintf(stderr,gettext("Failed on BLK: %d with %d/%d\n"),b,rc,BUFSIZE);
 		perror("");
 		rsyserror();
 	}
@@ -840,7 +840,7 @@ unsigned char	*prompt;
 	unsigned char *p;
 	int c;
 	static unsigned char pbuf[9];
-	void	(*sig)(); 
+	void	(*sig)();
 
 	setbuf(stdin, (char*)NULL);
 	sig = signal(SIGINT, catch);

@@ -32,7 +32,7 @@ isc_gethexstring(unsigned char *buf, size_t len, int count, FILE *fp,
 	unsigned char x;
 	char *s;
 	int result = count;
-	
+
 	x = 0; /*%< silence compiler */
 	n = 0;
 	while (count > 0) {

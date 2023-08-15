@@ -1,6 +1,6 @@
 /******************************************************************************
  * include/public/trace.h
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -94,7 +94,7 @@
 #define TRC_PV_PTWR_EMULATION        (TRC_PV + 11)
 #define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV + 12)
   /* Indicates that addresses in trace record are 64 bits */
-#define TRC_64_FLAG               (0x100) 
+#define TRC_64_FLAG               (0x100)
 
 #define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
 #define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)

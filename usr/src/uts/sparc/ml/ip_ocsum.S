@@ -83,7 +83,7 @@
 	subcc	%o1, 16, %o1	! decrement count (in halfwords)
 	bge	4b
 	add	%o0, 32, %o0	! delay slot, increment address
-	
+
 	add	%o1, 16, %o1	! add back in
 	!
 	! Do any remaining halfwords

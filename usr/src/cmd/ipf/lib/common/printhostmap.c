@@ -2,7 +2,7 @@
 
 void printhostmap(hmp, hv)
 hostmap_t *hmp;
-u_int hv;       
+u_int hv;
 {
 	printf("%s,", inet_ntoa(hmp->hm_srcip));
 	printf("%s -> ", inet_ntoa(hmp->hm_dstip));

@@ -44,10 +44,10 @@ lm_send_packet(
     if(packet == NULL)
     {
         // hardcode offset in case of L2_ONLY (e.g Solaris)
-        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd) 
+        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd)
         MBQ_WR16(
             pdev,
-            GET_CID(txq->cid_addr), 
+            GET_CID(txq->cid_addr),
             cmd_offset +
                 OFFSETOF(tcp_context_cmd_cell_te_t, ccell_tx_host_bidx),
             txq->prod_idx);
@@ -129,9 +129,9 @@ lm_send_packet(
             /* TCP option length - bottom 4 bits of TX_BD_FLAGS_SW_OPTION_WORD
              *    in term of the number of 4-byte words.
              * IP header length - bits 1-2 of bd flag, the upper 2 bits of
-             *    tx_bd_reserved, and the upper 1 bit of 
+             *    tx_bd_reserved, and the upper 1 bit of
              *    TX_BD_FLAGS_SW_OPTION_WORD will be used for IPV6 extension
-             *    header length in term of 8-btye words. 
+             *    header length in term of 8-btye words.
              * TX_BD_FLAGS_SW_FLAGS bit will be used to indicate IPV6 LSO. */
             flags |= TX_BD_FLAGS_SW_FLAGS;
 
@@ -303,10 +303,10 @@ lm_send_packet(
     if(!(packet->u1.tx.flags & LM_TX_FLAG_SKIP_MBQ_WRITE))
     {
         // hardcode offset in case of L2_ONLY (e.g Solaris)
-        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd) 
+        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd)
         MBQ_WR16(
             pdev,
-            GET_CID(txq->cid_addr), 
+            GET_CID(txq->cid_addr),
             cmd_offset +
                 OFFSETOF(tcp_context_cmd_cell_te_t, ccell_tx_host_bidx),
             txq->prod_idx);
@@ -350,10 +350,10 @@ lm_send_packet(
     if(packet == NULL)
     {
         // hardcode offset in case of L2_ONLY (e.g Solaris)
-        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd) 
+        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd)
         MBQ_WR16(
             pdev,
-            GET_CID(txq->cid_addr), 
+            GET_CID(txq->cid_addr),
             cmd_offset +
                 OFFSETOF(tcp_context_cmd_cell_te_t, ccell_tx_host_bidx),
             txq->prod_idx);
@@ -447,9 +447,9 @@ lm_send_packet(
             /* TCP option length - bottom 4 bits of TX_BD_FLAGS_SW_OPTION_WORD
              *    in term of the number of 4-byte words.
              * IP header length - bits 1-2 of bd flag, the upper 2 bits of
-             *    tx_bd_reserved, and the upper 1 bit of 
+             *    tx_bd_reserved, and the upper 1 bit of
              *    TX_BD_FLAGS_SW_OPTION_WORD will be used for IPV6 extension
-             *    header length in term of 8-btye words. 
+             *    header length in term of 8-btye words.
              * TX_BD_FLAGS_SW_FLAGS bit will be used to indicate IPV6 LSO. */
             flags |= TX_BD_FLAGS_SW_FLAGS;
 
@@ -621,10 +621,10 @@ lm_send_packet(
     if(!(pkt_info->flags & LM_TX_FLAG_SKIP_MBQ_WRITE))
     {
         // hardcode offset in case of L2_ONLY (e.g Solaris)
-        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd) 
+        u32_t cmd_offset = 34*sizeof(u32_t); //  == OFFSETOF(l4_context_t, l4ctx_cmd)
         MBQ_WR16(
             pdev,
-            GET_CID(txq->cid_addr), 
+            GET_CID(txq->cid_addr),
             cmd_offset +
                 OFFSETOF(tcp_context_cmd_cell_te_t, ccell_tx_host_bidx),
             txq->prod_idx);
@@ -684,7 +684,7 @@ get_packets_sent(
 
         DbgBreakIf(pkt == NULL);
 
-        if(!pkt) 
+        if(!pkt)
 		{
 			DbgBreakIf(!s_list_is_empty(&txq->active_descq));
 			break;

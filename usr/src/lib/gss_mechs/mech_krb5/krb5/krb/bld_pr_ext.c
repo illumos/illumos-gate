@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Build a principal from a list of lengths and strings
  */
@@ -70,7 +70,7 @@ krb5_build_principal_ext(krb5_context context,  krb5_principal * princ,
 	krb5_xfree(princ_data);
 	krb5_xfree(princ_ret);
 	return ENOMEM;
-    }	
+    }
     krb5_princ_set_realm_length(context, princ_ret, rlen);
     krb5_princ_set_realm_data(context, princ_ret, tmpdata);
     memcpy(tmpdata, realm, rlen);

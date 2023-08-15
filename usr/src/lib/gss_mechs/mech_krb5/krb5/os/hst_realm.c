@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_get_host_realm()
  */
@@ -34,7 +34,7 @@
 /*
  Figures out the Kerberos realm names for host, filling in a
  pointer to an argv[] style list of names, terminated with a null pointer.
- 
+
  If host is NULL, the local host's realms are determined.
 
  If there are no known realms for the host, the filled-in pointer is set
@@ -114,7 +114,7 @@ krb5_try_realm_txt_rr(const char *prefix, const char *name, char **realm)
         /* Realm names don't (normally) end with ".", but if the query
            doesn't end with "." and doesn't get an answer as is, the
            resolv code will try appending the local domain.  Since the
-           realm names are absolutes, let's stop that.  
+           realm names are absolutes, let's stop that.
 
            But only if a name has been specified.  If we are performing
            a search on the prefix alone then the intention is to allow
@@ -268,7 +268,7 @@ krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
 	strcpy(cp, KRB5_REFERRAL_REALM);
 	realm = cp;
     }
-    
+
     if (!(retrealms = (char **)calloc(2, sizeof(*retrealms)))) {
 	if (realm != (char *)NULL)
 	    free(realm);
@@ -277,7 +277,7 @@ krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
 
     retrealms[0] = realm;
     retrealms[1] = 0;
-    
+
     *realmsp = retrealms;
     return 0;
 }
@@ -372,7 +372,7 @@ krb5_get_fallback_host_realm(krb5_context context, krb5_data *hdata, char ***rea
         do {
             retval = krb5_try_realm_txt_rr("_kerberos", cp, &realm);
             cp = strchr(cp,'.');
-            if (cp) 
+            if (cp)
                 cp++;
         } while (retval && cp && cp[0]);
     } else
@@ -391,7 +391,7 @@ krb5_get_fallback_host_realm(krb5_context context, krb5_data *hdata, char ***rea
 #endif
     }
 
-      
+
     if (realm == (char *)NULL) {
         /* We are defaulting to the local realm */
         retval = krb5_get_default_realm(context, &realm);
@@ -407,7 +407,7 @@ krb5_get_fallback_host_realm(krb5_context context, krb5_data *hdata, char ***rea
 
     retrealms[0] = realm;
     retrealms[1] = 0;
-    
+
     *realmsp = retrealms;
     return 0;
 }

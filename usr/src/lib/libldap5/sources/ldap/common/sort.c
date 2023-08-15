@@ -117,7 +117,7 @@ ldap_keysort_entries(
 	last = e;
 
 	XP_QSORT( (void*)kt, count, (size_t)sizeof(keything_t*), ldapi_keycmp );
-    
+
 	ep = chain;
 	for ( i = 0; i < count; i++ ) {
 		*ep = kt[i]->kt_msg;
@@ -136,7 +136,7 @@ struct entrything {
 };
 
 typedef int (LDAP_C LDAP_CALLBACK LDAP_CHARCMP_CALLBACK)(char*, char*);
-typedef int (LDAP_C LDAP_CALLBACK LDAP_VOIDCMP_CALLBACK)(const void*, 
+typedef int (LDAP_C LDAP_CALLBACK LDAP_VOIDCMP_CALLBACK)(const void*,
 	const void*);
 
 static LDAP_CHARCMP_CALLBACK *et_cmp_fn;
@@ -151,7 +151,7 @@ ldap_sort_strcasecmp(
 )
 {
     /* XXXceb
-     * I am not 100% sure this is the way this should be handled.  
+     * I am not 100% sure this is the way this should be handled.
      * For now we will return a 0 on invalid.
      */
 	if (NULL == a || NULL == b)
@@ -243,7 +243,7 @@ ldap_multisort_entries(
 				for ( j = 0; j <= i; j++ )
 				    ldap_value_free( et[j].et_vals );
 				NSLDAPI_FREE( (char *) et );
-				LDAP_SET_LDERRNO( ld, LDAP_NO_MEMORY, NULL, 
+				LDAP_SET_LDERRNO( ld, LDAP_NO_MEMORY, NULL,
 				    NULL );
 				return( -1 );
 			    }
@@ -304,7 +304,7 @@ ldap_sort_values(
 		return( LDAP_PARAM_ERROR );
 	}
 
-    if ( NULL == vals) 
+    if ( NULL == vals)
     {
 		LDAP_SET_LDERRNO( ld, LDAP_PARAM_ERROR, NULL, NULL );
 		return( LDAP_PARAM_ERROR );

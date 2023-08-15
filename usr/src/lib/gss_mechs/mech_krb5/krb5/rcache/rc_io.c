@@ -246,7 +246,7 @@ krb5_rc_io_open_internal(krb5_context context, krb5_rc_iostuff *d, char *fn,
 #endif
 	if (lstat(d->fn, &lstatb) == 0) {
 	    /* Make sure fstat() and lstat() have accessed the same file */
-	    if ((lstatb.st_ino != fstatb.st_ino) || 
+	    if ((lstatb.st_ino != fstatb.st_ino) ||
 		    (lstatb.st_dev != fstatb.st_dev)) {
 		retval = KRB5_RC_IO_PERM;
 		goto cleanup;
@@ -321,7 +321,7 @@ krb5_rc_io_open_internal(krb5_context context, krb5_rc_iostuff *d, char *fn,
 	    FREE_RC(d->fn);
 	    d->fn = NULL;
 	}
-	if (d->fd >= 0) 
+	if (d->fd >= 0)
 	     (void) close(d->fd);
     }
     return retval;

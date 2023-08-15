@@ -109,7 +109,7 @@ krb5_authdata_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **
 	    (required <= remain)) {
 	    /* Our identifier */
 	    (void) krb5_ser_pack_int32(KV5M_AUTHDATA, &bp, &remain);
-		
+
 	    /* Our ad_type */
 	    (void) krb5_ser_pack_int32((krb5_int32) authdata->ad_type,
 				       &bp, &remain);

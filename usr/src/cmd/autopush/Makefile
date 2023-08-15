@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROG= autopush 
+PROG= autopush
 ROOTFS_PROG= $(PROG)
 
 include ../Makefile.cmd

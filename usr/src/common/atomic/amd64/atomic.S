@@ -544,10 +544,10 @@
 #if !defined(_KERNEL)
 
 	/*
-	 * NOTE: membar_enter, and membar_exit are identical routines. 
+	 * NOTE: membar_enter, and membar_exit are identical routines.
 	 * We define them separately, instead of using an ALTENTRY
 	 * definitions to alias them together, so that DTrace and
-	 * debuggers will see a unique address for them, allowing 
+	 * debuggers will see a unique address for them, allowing
 	 * more accurate tracing.
 	*/
 

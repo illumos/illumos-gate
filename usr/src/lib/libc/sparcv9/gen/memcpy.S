@@ -142,7 +142,7 @@
 	andn	%o2, 3, %o3		! o3 is aligned word count
 	dec	4, %o3			! avoid reading beyond tail of src
 	sub	%o1, %g5, %o1		! o1 gets the difference
-	
+
 3:	sll	%o4, 16, %g1		! save residual bytes
 	lduw	[%o1+%g5], %o4
 	deccc	4, %o3

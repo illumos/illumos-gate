@@ -34,7 +34,7 @@
 
 /**
  * @memo	    Represents an Adapter Port Statistic Event
- * 
+ *
  * @doc		    When adapter port statistic events occur on the HBA, an
  *		    event of this type will be sent to registered
  *		    listeners

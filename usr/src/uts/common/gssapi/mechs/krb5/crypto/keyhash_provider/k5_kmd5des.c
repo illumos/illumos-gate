@@ -6,14 +6,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -24,7 +24,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -83,7 +83,7 @@ k5_md5des_hash(krb5_context context,
     data.data = (char *) conf;
     if ((ret = krb5_c_random_make_octets(context, &data)))
 	return(ret);
-    
+
     /* hash the confounder, then the input data */
     hash_input = (krb5_data *)MALLOC(sizeof(krb5_data) * 2);
     if (hash_input == NULL)
@@ -116,7 +116,7 @@ k5_md5des_hash(krb5_context context,
      * Put the confounder in the beginning of the buffer to be
      * encrypted.
      */
-    bcopy(conf, output->data, CONFLENGTH); 
+    bcopy(conf, output->data, CONFLENGTH);
 
     bcopy(key->contents, xorkey, sizeof(xorkey));
     for (i=0; i<sizeof(xorkey); i++)
@@ -191,7 +191,7 @@ k5_md5des_verify(krb5_context context,
 	for (i=0; i<sizeof(xorkey); i++)
 	    xorkey[i] ^= 0xf0;
     }
-    
+
     /*
      * Solaris Kerberos:
      * Encryption Framework checks for parity and weak keys

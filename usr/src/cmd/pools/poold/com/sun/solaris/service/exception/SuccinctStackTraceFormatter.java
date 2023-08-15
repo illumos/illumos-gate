@@ -38,7 +38,7 @@ import java.io.*;
  */
 public class SuccinctStackTraceFormatter {
 	/**
-	 * Formats a Throwable and adds an optional description string. 
+	 * Formats a Throwable and adds an optional description string.
 	 * The string should be suitable to precede the top stack
 	 * element, and include any punctuation that should
 	 * differentiate it from the element.
@@ -134,7 +134,7 @@ public class SuccinctStackTraceFormatter {
 	public static final Throwable big() {
 		return new Throwable().initCause(little());
 	}
-	
+
 	public static final Throwable little() {
 		return new Throwable();
 	}

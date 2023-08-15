@@ -45,7 +45,7 @@
 	! copy loop: should do nothing gracefully
 	b	2f
 	subcc	%o2, %o1, %o5		! number of bytes to move
-1:	
+1:
 	ldx	[%g1 + %o1], %o4	! load from old temp area
 	stx	%o4, [%g5 + %o1]	! store to new temp area
 	add	%o1, 8, %o1

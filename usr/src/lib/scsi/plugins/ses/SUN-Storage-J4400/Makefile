@@ -25,7 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-HDRS = 
+HDRS =
 HDRDIR = common
 PLUGINTYPE = vendor
 

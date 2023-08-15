@@ -95,7 +95,7 @@ tree_init(tree **ppr_tree) {
 	*ppr_tree = NULL;
 	RETV
 }
-	
+
 tree_t
 tree_srch(tree **ppr_tree, int (*pfi_compare)(tree_t, tree_t), tree_t	p_user) {
 	ENTER("tree_srch")

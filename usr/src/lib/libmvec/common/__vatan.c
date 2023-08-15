@@ -65,7 +65,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
 #define p2    parray[1]
 #define p1    parray[2]
 
-  static const double parray[] = { 
+  static const double parray[] = {
    -1.428029046844299722E-01,		/* p[3]		*/
     1.999999917247000615E-01, 		/* p[2]		*/
    -3.333333333329292858E-01, 		/* p[1]		*/
@@ -83,11 +83,11 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
     intflo   = LO(x);			/* lower half of x, as integer	*/
     sign     = intf &  0x80000000;		/* sign of argument		*/
     intf     = intf & ~0x80000000;		/* abs(upper argument)		*/
-  
+
     if ((intf > 0x43600000) || (intf < 0x3e300000)) /* filter out special cases */
     {
-      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0))) 
-      {  
+      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0)))
+      {
 	ans   = f - f; 				/* return NaN if x=NaN*/
       }
       else if (intf < 0x3e300000) 		/* avoid underflow for small arg */
@@ -108,7 +108,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       if (--n <=0) break;			/* we are done 			*/
       goto LOOP0;				/* otherwise, examine next arg  */
     }
-  
+
     index    = 0;				/* points to 0,0 in table	*/
     if (intf > 0x40500000)			/* if (|x| > 64               	*/
     { f = -1.0/f;
@@ -123,11 +123,11 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       index  = (intz - 0x3f900000) >> 15;	/* (index >> 16) << 1)		*/
       index  = index + 4;			/* skip over 0,0,pi/2,pi/2	*/
     }
-    yaddr    = y;				/* address to store this answer */ 
+    yaddr    = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 1;				/* we now have 1 good argument  */
-    if (--n <=0) 
+    if (--n <=0)
     {
       f1      = 0.0;				/* put dummy values in args 1,2 */
       f2      = 0.0;
@@ -147,11 +147,11 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
     intflo   = LO(x);			/* lower half of x, as integer	*/
     sign1    = intf &  0x80000000;		/* sign of argument		*/
     intf     = intf & ~0x80000000;		/* abs(upper argument)		*/
-  
+
     if ((intf > 0x43600000) || (intf < 0x3e300000)) /* filter out special cases */
     {
-      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0))) 
-      {  
+      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0)))
+      {
 	ans   = f1 - f1;			/* return NaN if x=NaN*/
       }
       else if (intf < 0x3e300000) 		/* avoid underflow for small arg */
@@ -169,7 +169,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       x      += stridex;
       y      += stridey;
       argcount = 1;				/* we still have 1 good arg 	*/
-      if (--n <=0) 
+      if (--n <=0)
       {
         f1      = 0.0;				/* put dummy values in args 1,2 */
         f2      = 0.0;
@@ -179,7 +179,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       }
       goto LOOP1;				/* otherwise, examine next arg  */
     }
-  
+
     index1   = 0;				/* points to 0,0 in table	*/
     if (intf > 0x40500000)			/* if (|x| > 64               	*/
     { f1 = -1.0/f1;
@@ -194,11 +194,11 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       index1 = (intz - 0x3f900000) >> 15;	/* (index >> 16) << 1)		*/
       index1 = index1 + 4;			/* skip over 0,0,pi/2,pi/2	*/
     }
-    yaddr1   = y;				/* address to store this answer */ 
+    yaddr1   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 2;				/* we now have 2 good arguments */
-    if (--n <=0) 
+    if (--n <=0)
     {
       f2      = 0.0;				/* put dummy value in arg 2 */
       index2  = 0;
@@ -216,11 +216,11 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
     intflo   = LO(x);			/* lower half of x, as integer	*/
     sign2    = intf &  0x80000000;		/* sign of argument		*/
     intf     = intf & ~0x80000000;		/* abs(upper argument)		*/
-  
+
     if ((intf > 0x43600000) || (intf < 0x3e300000)) /* filter out special cases */
     {
-      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0))) 
-      {  
+      if ( (intf > 0x7ff00000) || ((intf == 0x7ff00000) &&  (intflo !=0)))
+      {
 	ans   = f2 - f2;			/* return NaN if x=NaN*/
       }
       else if (intf < 0x3e300000) 		/* avoid underflow for small arg */
@@ -238,7 +238,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       x      += stridex;
       y      += stridey;
       argcount = 2;				/* we still have 2 good args 	*/
-      if (--n <=0) 
+      if (--n <=0)
       {
         f2      = 0.0;				/* put dummy value in arg 2 */
         index2  = 0;
@@ -246,7 +246,7 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       }
       goto LOOP2;				/* otherwise, examine next arg  */
     }
-  
+
     index2   = 0;				/* points to 0,0 in table	*/
     if (intf > 0x40500000)			/* if (|x| > 64               	*/
     { f2 = -1.0/f2;
@@ -261,14 +261,14 @@ __vatan(int n, double * restrict x, int stridex, double * restrict y, int stride
       index2 = (intz - 0x3f900000) >> 15;	/* (index >> 16) << 1)		*/
       index2 = index2 + 4;			/* skip over 0,0,pi/2,pi/2	*/
     }
-    yaddr2   = y;				/* address to store this answer */ 
+    yaddr2   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 3;				/* we now have 3 good arguments */
 
 
-/* here is the 3 way unrolled section, 
-   note, we may actually only have 
+/* here is the 3 way unrolled section,
+   note, we may actually only have
    1,2, or 3 'real' arguments at this point
 */
 
@@ -311,7 +311,7 @@ UNROLL3:
 
   }  while (--n > 0);
 
- if (argcount == 2) 
+ if (argcount == 2)
    {  *yaddr1  = sign1 ? -ans1: ans1;
    }
 }

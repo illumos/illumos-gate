@@ -165,7 +165,7 @@ errcode_t profile_add_node
 
 errcode_t profile_make_node_final
 	(struct profile_node *node);
-	
+
 int profile_is_node_final
 	(struct profile_node *node);
 
@@ -190,11 +190,11 @@ errcode_t profile_find_node_subsection
 	(struct profile_node *section,
 		    const char *name, void **state,
 		    char **ret_name, struct profile_node **subsection);
-		   
+
 errcode_t profile_get_node_parent
 	(struct profile_node *section,
 		   struct profile_node **parent);
-		   
+
 errcode_t profile_delete_node_relation
 	(struct profile_node *section, const char *name);
 
@@ -280,7 +280,7 @@ void end_list(struct profile_string_list *list, char ***ret_list);
 errcode_t add_to_list(struct profile_string_list *list, const char *str);
 
 /* Others included from profile.h */
-	
+
 /* prof_set.c -- included from profile.h */
 
 /* Solaris Kerberos */

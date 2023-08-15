@@ -32,7 +32,7 @@
 /**
  * @memo	    Super-class for all types of events that are
  *		    sent to clients of the API.
- * 
+ *
  */
 class Event { };
 

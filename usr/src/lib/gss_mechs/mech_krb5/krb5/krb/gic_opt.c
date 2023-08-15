@@ -100,7 +100,7 @@ krb5_get_init_creds_opt_set_change_password_prompt(krb5_get_init_creds_opt *opt,
  * with the new krb5_get_init_creds_opt_alloc() function.
  * KRB5_GET_INIT_CREDS_OPT_SHADOWED is set to indicate that the extended
  * structure is a shadow copy of an original krb5_get_init_creds_opt
- * structure.  
+ * structure.
  * If KRB5_GET_INIT_CREDS_OPT_SHADOWED is set after a call to
  * krb5int_gic_opt_to_opte(), the resulting extended structure should be
  * freed (using krb5_get_init_creds_free).  Otherwise, the original
@@ -133,7 +133,7 @@ krb5int_gic_opte_private_free(krb5_context context, krb5_gic_opt_ext *opte)
 {
     if (NULL == opte || !krb5_gic_opt_is_extended(opte))
 	return EINVAL;
-	
+
     /* Free up any private stuff */
     if (opte->opt_private->preauth_data != NULL)
 	free_gic_opt_ext_preauth_data(context, opte);
@@ -197,7 +197,7 @@ krb5_get_init_creds_opt_free(krb5_context context,
     /* Don't touch it if we didn't allocate it */
     if (!krb5_gic_opt_is_extended(opt))
 	return;
-    
+
     opte = (krb5_gic_opt_ext *)opt;
     if (opte->opt_private)
 	krb5int_gic_opte_private_free(context, opte);
@@ -424,7 +424,7 @@ cleanup:
 }
 
 /*
- * This function frees the preauth_data that was returned by 
+ * This function frees the preauth_data that was returned by
  * krb5_get_init_creds_opt_get_pa().
  */
 void KRB5_CALLCONV

@@ -38,7 +38,7 @@ ROOTBINROLES = $(ROLES:%=$(ROOTBIN)/%)
 CPPFLAGS +=	-D_REENTRANT
 LDLIBS +=	-lsecdb
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTBINROLES)
 

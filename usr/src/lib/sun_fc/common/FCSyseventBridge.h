@@ -38,13 +38,13 @@
 #include <libsysevent.h>
 
 /**
- * Note: Even though we take various arguments in within the API, 
+ * Note: Even though we take various arguments in within the API,
  * we don't actually filter anything, since sys-even is either on
  * or off.  The idea is that the actual Listener themselves will perform
- * a final filter pass, so why do the work twice.  If we were going to 
+ * a final filter pass, so why do the work twice.  If we were going to
  * use proprietary IOCTLs or some other event plumbing that allowed filtering,
- * we could use the passed in arguments to do useful work.  In short, 
- * once turned on, we send events of a given type and rely on 
+ * we could use the passed in arguments to do useful work.  In short,
+ * once turned on, we send events of a given type and rely on
  * someone downstream to filter.
  */
 class FCSyseventBridge :
@@ -82,7 +82,7 @@ private:
     void validateRegistration();
     sysevent_handle_t *handle;
     static FCSyseventBridge*	_instance;
-    
+
 
     std::vector<AdapterAddEventListener*>	adapterAddEventListeners;
     std::vector<AdapterEventListener*>		adapterEventListeners;

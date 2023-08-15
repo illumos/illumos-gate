@@ -56,7 +56,7 @@ static char const rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/doupdate.c 1.9 19
 #endif
 
 /*
- * This value is the ideal length for the cursor addressing sequence 
+ * This value is the ideal length for the cursor addressing sequence
  * being four bytes long, ie. "<escape><cursor addressing code><row><col>".
  * eg. VT52 - "\EYrc" or ADM3A - "\E=rc"
  */
@@ -105,7 +105,7 @@ STATIC void block_over(int, int, int);
 
 /*f
  * Wrapper that streams Curses output.
- * 
+ *
  * All escape sequences going to the screen come through here.
  * All ordinary characters go to the screen via the putc in doupdate.c
  */
@@ -120,7 +120,7 @@ int ch;
  * Allocate or grow doupdate() structures.
  */
 int
-__m_doupdate_init() 
+__m_doupdate_init()
 {
 	void *new;
 	static short nlines = 0;
@@ -205,23 +205,23 @@ int y;
 }
 
 /*f
- * Replace a line of text.  
+ * Replace a line of text.
  *
  * The principal scheme is to overwrite the region of a line between
  * the first and last differing characters.  A clear-eol is used to
  * optimise an update region that consist largely of blanks.  This can
  * happen fairly often in the case of scrolled lines or full redraws.
  *
- * Miller's line redraw algorithm, used in the 'S' editor [Mil87], 
- * should be re-investigated to see if it is simple and fast enough for 
- * our needs, and if it can be adapted to handle the ceol_standout_glitch 
+ * Miller's line redraw algorithm, used in the 'S' editor [Mil87],
+ * should be re-investigated to see if it is simple and fast enough for
+ * our needs, and if it can be adapted to handle the ceol_standout_glitch
  * (HP 2392A terminals) and multibyte character sequences.
  *
  * Very early versions of this code applied a Gosling algorithm column
  * wise in addition to the row-wise used in complex().  It was removed
  * in favour of both computation and transmission speed.  The assumption
  * being that overwrites of a line region occured far more frequently
- * than the need to insert/delete several isolated characters. 
+ * than the need to insert/delete several isolated characters.
  *
  * References:
  * [Mil87]	W. Miller, A Software Tools Sampler, Prentice-Hall, 1987
@@ -231,10 +231,10 @@ text_replace(row)
 int row;
 {
 	short npair;
-	attr_t cookie, nattr; 
+	attr_t cookie, nattr;
 	cchar_t *optr, *nptr;
 	int col, last, tail, jump, count;
-	
+
 #ifdef M_CURSES_TYPEAHEAD
 	/* Before replacing a line of text, check for type-ahead. */
 	if (__m_screen->_flags & S_ISATTY) {
@@ -306,7 +306,7 @@ int row;
 			/* If attributes at start of field are different
 			 * force an attribute cookie to be dropped.
 			 */
-			if (ceol_standout_glitch 
+			if (ceol_standout_glitch
 			&& (optr->_at != nptr->_at || optr->_co != nptr->_co))
 				ATTR_STATE |= WA_COOKIE;
                 } else {
@@ -317,7 +317,7 @@ int row;
 		}
 
 		/* Write difference region. */
-		while (col < last 
+		while (col < last
 		&& (!__m_cc_compare(optr, nptr, 1) || 0 < count--)) {
 write_loop:
 			/* Check for clear-to-end-of-line optimization. */
@@ -336,7 +336,7 @@ write_loop:
 			++col;
 
 			/* Make sure we don't scroll the screen by writing
-			 * to the bottom right corner.  
+			 * to the bottom right corner.
 			 */
 			if (COLS <= col && LINES-1 <= row
 			&& auto_right_margin && !eat_newline_glitch) {
@@ -345,7 +345,7 @@ write_loop:
 				 *** hacks for writting into the last
 				 *** column of the last line so as not
 				 *** to scroll.
-				 ***/ 
+				 ***/
 				curscr->_curx = col;
 				goto done;
 			}
@@ -360,7 +360,7 @@ write_loop:
 			 * have to check for attribute cookies that may need
 			 * to be changed.
 			 */
-			if (ATTR_STATE != nattr 
+			if (ATTR_STATE != nattr
 			|| optr->_at != nattr || optr->_co != npair) {
 				(void) vid_puts(
 					nattr, npair, (void *) 0, __m_outc
@@ -371,7 +371,7 @@ write_loop:
 			}
 
 			/* Don't display internal characters. */
-			if (nptr->_f) 
+			if (nptr->_f)
 				(void) __m_cc_write(nptr);
 
 			/* Update copy of screen image. */
@@ -385,13 +385,13 @@ write_loop:
 		 * those of start of the next common region.  If they
 		 * differ, force another iteration of the write-loop
 		 * that will change the attribute state.
-		 */ 
-		if (ceol_standout_glitch && col < COLS 
+		 */
+		if (ceol_standout_glitch && col < COLS
 		&& ATTR_STATE != (optr->_at & ~WA_COOKIE))
 			goto write_loop;
 	}
 done:
-	/* Before leaving this line, check if we have to turn off 
+	/* Before leaving this line, check if we have to turn off
 	 * attributes and record a cookie.
 	 */
 	if (!move_standout_mode && ATTR_STATE != WA_NORMAL) {
@@ -429,7 +429,7 @@ done:
 			(void) tputs(clr_eol, 1, __m_outc);
 			__m_cc_erase(curscr, row, tail, row, COLS-1);
 		}
-	} 
+	}
 
 	/* Line wrapping checks. */
 	if (COLS <= curscr->_curx) {
@@ -442,14 +442,14 @@ done:
 			++curscr->_cury;
 			curscr->_curx = 0;
 		}
-	} 
+	}
 }
 
 /*f
  * Replace a block of lines.
  * Only ever used for complex().
  */
-STATIC void 
+STATIC void
 lines_replace(from, to_1)
 int from, to_1;
 {
@@ -461,7 +461,7 @@ int from, to_1;
  * Delete a block of lines.
  * Only ever used for complex().
  */
-STATIC void 
+STATIC void
 lines_delete(from, to_1)
 int from, to_1;
 {
@@ -474,8 +474,8 @@ int from, to_1;
 		(void) winsdelln(curscr, -count);
 
 		if (parm_delete_line != (char *) 0) {
-			/* Assume that the sequence to delete more than one 
-			 * line is faster than repeated single delete_lines. 
+			/* Assume that the sequence to delete more than one
+			 * line is faster than repeated single delete_lines.
 			 */
 			(void) tputs(
 				tparm(
@@ -497,11 +497,11 @@ int from, to_1;
  * Insert a block of lines.
  * Only ever used for complex().
  *
- * We must assume that insert_line and parm_insert_line reset the 
+ * We must assume that insert_line and parm_insert_line reset the
  * cursor column to zero.  Therefore it is text_replace() responsiblity
  * to move the cursor to the correct column to begin the update.
  */
-STATIC void 
+STATIC void
 lines_insert(from, to_1)
 int from, to_1;
 {
@@ -509,14 +509,14 @@ int from, to_1;
 
 	/* Position the cursor and insert a block of lines into the screen
 	 * image now, insert lines into the physical screen, then draw the
-	 * new screen lines.  
-	 */ 
+	 * new screen lines.
+	 */
 	GOTO(from, 0);
 	(void) winsdelln(curscr, count);
 
 	if (parm_insert_line != (char *) 0) {
 		/* Assume that the sequence to insert more than one line is
-		 * faster than repeated single insert_lines. 
+		 * faster than repeated single insert_lines.
 		 */
 		(void) tputs(
 			tparm(
@@ -557,7 +557,7 @@ int n;
 		GOTO(0, 0);
 		(void) tputs(
 			tparm(
-				parm_delete_line, (long) n, 
+				parm_delete_line, (long) n,
 				0, 0, 0, 0, 0, 0, 0, 0
 			), n, __m_outc
 		);
@@ -577,14 +577,14 @@ int n;
 	(void) __m_cc_erase(curscr, start, 0, finish, curscr->_maxx-1);
 	(void) __m_ptr_move(
 		(void **) curscr->_line, curscr->_maxy, start, finish, to
-	); 
+	);
 
 	simple();
 
 	return 1;
 }
 
-STATIC int 
+STATIC int
 scroll_dn(n)
 int n;
 {
@@ -602,7 +602,7 @@ int n;
 		GOTO(0, 0);
 		(void) tputs(
 			tparm(
-				parm_insert_line, (long) n, 
+				parm_insert_line, (long) n,
 				0, 0, 0, 0, 0, 0, 0, 0
 			), n, __m_outc
 		);
@@ -622,7 +622,7 @@ int n;
 	(void) __m_cc_erase(curscr, start, 0, finish, curscr->_maxx-1);
 	(void) __m_ptr_move(
 		(void **) curscr->_line, curscr->_maxy, start, finish, to
-	); 
+	);
 
 	simple();
 
@@ -647,10 +647,10 @@ int count;
  * Dynamic programming algorithm for the string edit problem.
  *
  * This is a modified Gosling cost algorithm that takes into account
- * null/move operations. 
+ * null/move operations.
  *
  * Costs for move, delete, replace, and insert are 0, 1, 2, and 3
- * repectively. 
+ * repectively.
  */
 STATIC int
 cost(fr, lr)
@@ -663,7 +663,7 @@ int fr, lr;
 	cchar_t **nline = newscr->_line;
 	int linesz = COLS * sizeof **oline;
 
-	/* Prepare initial row and column of cost matrix. 
+	/* Prepare initial row and column of cost matrix.
 	 *
 	 *	0 3 6 9 ...
 	 *	1
@@ -678,8 +678,8 @@ int fr, lr;
 		LC(fr,nr).op = 'i';
 
 		/* Left column is 1, 2, 3, ... */
-		LC(nr,fr).cost = cc; 
-		LC(nr,fr).op = 'd'; 
+		LC(nr,fr).cost = cc;
+		LC(nr,fr).op = 'd';
 	}
 
 	for (--lr, or = fr; or <= lr; ++or) {
@@ -687,13 +687,13 @@ int fr, lr;
 			lcp = &LC(or+1,nr+1);
 
 			/* Assume move op. */
-			lcp->cost = LC(or,nr).cost; 
+			lcp->cost = LC(or,nr).cost;
 			lcp->op = 'm';
 
 			if (ohash[or] != nhash[nr]
 #ifdef NEVER
 /* Should no longer require this code.  Using the POSIX 32-bit CRC to
- * generate a hash value should be sufficient now, since text_replace() 
+ * generate a hash value should be sufficient now, since text_replace()
  * will compare the contents of a line and output only the dirty regions.
  */
 			|| !is_same_line(oline[or], nline[nr], linesz)
@@ -741,14 +741,14 @@ int fr, lr;
 	int i, j;
 	cchar_t *cp;
 
-	i = j = lr + 1;	
+	i = j = lr + 1;
 
 	memset(del, 0, sizeof *del * LINES);
 	memset(ins_rep, 0, sizeof *ins_rep * LINES);
 
 	do {
-		/* We don't have to bounds check i or j becuase row fr and 
-		 * column fr of lc have been preset in order to guarantee the 
+		/* We don't have to bounds check i or j becuase row fr and
+		 * column fr of lc have been preset in order to guarantee the
 		 * correct motion.
 		 */
 		switch (LC(i,j).op) {
@@ -780,18 +780,18 @@ int fr, lr;
 		ins_rep[i] = lines_replace;
 	}
 }
- 
+
 /*f
  * Complex update algorithm using insert/delete line operations.
  *
  * References:
- * [MyM86]	E.W. Myers & W. Miller, Row Replacement Algorithms for 
+ * [MyM86]	E.W. Myers & W. Miller, Row Replacement Algorithms for
  *		Screen Editors, TR 86-19, Dept. Computer Science, U. of Arizona
  * [MyM87]	E.W. Myers & W. Miller, A Simple Row Replacement Method,
  *		TR 86-28, Dept. Computer Science, U. of Arizona
  * [Mil87]	W. Miller, A Software Tools Sampler, Prentice-Hall, 1987
- * [Gos81]	James Gosling, A redisplay algorithm, Proceedings of the 
- *		ACM Symposium on Text Manipulation, SIGPLAN Notices, 
+ * [Gos81]	James Gosling, A redisplay algorithm, Proceedings of the
+ *		ACM Symposium on Text Manipulation, SIGPLAN Notices,
  *		16(6) June 1981, pg 123-129
  *
  * All the above were reviewed and experimented with.  Due to the nature of
@@ -849,7 +849,7 @@ complex()
 			}
 		}
 record:
-		/* _line[], which contains pointers to screen lines, 
+		/* _line[], which contains pointers to screen lines,
 		 * may be shuffled.
 		 */
 		for (i = fr; i <= lr; ++i) {
@@ -866,8 +866,8 @@ record:
 /*f
  * Simple screen update algorithm
  *
- * We perform a simple incremental update of the terminal screen. 
- * Only the segment of a line that was touched is replaced on the 
+ * We perform a simple incremental update of the terminal screen.
+ * Only the segment of a line that was touched is replaced on the
  * line.
  */
 STATIC void
@@ -898,12 +898,12 @@ simple()
  * and delete line sequences in an effort to optimize output.  idlok()
  * should really only be used in applications that want a proper scrolling
  * effect.
- * 
+ *
  * Added scroll heuristic to handle special case where a full size window
  * with full size scroll region, will scroll the window and replace dirty
  * lines instead of performing usual cost/script operations.
  */
-int 
+int
 doupdate()
 {
 #ifdef SIGTSTP
@@ -930,7 +930,7 @@ doupdate()
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"doupdate(void) using %s algorithm.", 
+		"doupdate(void) using %s algorithm.",
 		(__m_screen->_flags & S_INS_DEL_LINE) ? "complex" : "simple"
 	);
 #endif
@@ -962,7 +962,7 @@ doupdate()
 		}
 #endif /* M_CURSES_TYPEAHEAD */
 
-		/* When redrawwing a window, we not only assume that line 
+		/* When redrawwing a window, we not only assume that line
 		 * noise may have lost characters, but line noise may have
 		 * generated bogus characters on the screen outside the
 		 * the window in question, in which case redraw the entire
@@ -1028,14 +1028,14 @@ idcok(WINDOW *w, bool bf)
 #ifdef M_CURSES_TRACE
 	__m_trace("idcok(%p, %d)", w, bf);
 #endif
- 
+
 	__m_screen->_flags &= ~S_INS_DEL_CHAR;
 	if (bf)
 		__m_screen->_flags |= S_INS_DEL_CHAR;
 
 	__m_return_void("idcok");
 }
- 
+
 /*
  * If true, the implementation may use hardware insert, delete,
  * and scroll line features of the terminal.  The window parameter
@@ -1056,7 +1056,7 @@ idlok(WINDOW *w, bool bf)
 }
 
 /*
- * Use the POSIX 32-bit CRC function to compute a hash value 
+ * Use the POSIX 32-bit CRC function to compute a hash value
  * for the window line.
  */
 void
@@ -1067,7 +1067,7 @@ int y;
 {
 	array[y] = 0;
 	m_crcposix(
-		&array[y], (unsigned char *) w->_line[y], 
+		&array[y], (unsigned char *) w->_line[y],
 		(size_t) (w->_maxx * sizeof **w->_line)
 	);
 }

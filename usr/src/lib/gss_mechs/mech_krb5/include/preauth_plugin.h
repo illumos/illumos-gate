@@ -349,7 +349,7 @@ typedef void
 
 /* Return the flags which the KDC should use for this module.  This is a
  * callback instead of a static value because the module may or may not
- * wish to count itself as a hardware preauthentication module (in other 
+ * wish to count itself as a hardware preauthentication module (in other
  * words, the flags may be affected by the configuration, for example if a
  * site administrator can force a particular preauthentication type to be
  * supported using only hardware).  This function is called for each entry

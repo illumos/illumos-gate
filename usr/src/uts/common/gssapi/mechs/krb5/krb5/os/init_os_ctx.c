@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -112,7 +112,7 @@ get_from_module_dir(
  * This will find a profile in the registry.  *pbuffer != 0 if we
  * found something.  Make sure to free(*pbuffer) when done.  It will
  * return an error code if there is an error the user should know
- * about.  We maintain the invariant: return value != 0 => 
+ * about.  We maintain the invariant: return value != 0 =>
  * *pbuffer == 0.
  */
 static krb5_error_code
@@ -138,7 +138,7 @@ get_from_registry(
     }
     *pbuffer = 0;
 
-    if ((rc = RegOpenKeyEx(hBaseKey, key_path, 0, KEY_QUERY_VALUE, 
+    if ((rc = RegOpenKeyEx(hBaseKey, key_path, 0, KEY_QUERY_VALUE,
                            &hKey)) != ERROR_SUCCESS)
     {
         /* not a real error */
@@ -156,7 +156,7 @@ get_from_registry(
         retval = ENOMEM;
         goto cleanup;
     }
-    if ((rc = RegQueryValueEx(hKey, value_name, 0, 0, *pbuffer, &size)) != 
+    if ((rc = RegQueryValueEx(hKey, value_name, 0, 0, *pbuffer, &size)) !=
         ERROR_SUCCESS)
     {
         /*
@@ -189,13 +189,13 @@ free_filespecs(profile_filespec_t *files)
 
     if (files == 0)
         return;
-    
+
     for (cp = files; *cp; cp++)
 	free(*cp);
     free(files);
 }
 
-/* This function is needed by KfM's KerberosPreferences API 
+/* This function is needed by KfM's KerberosPreferences API
  * because it needs to be able to specify "secure" */
 krb5_error_code
 os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
@@ -242,7 +242,7 @@ os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
         return retval;
     if (!name)
         return KRB5_CONFIG_CANTOPEN; /* should never happen */
-    
+
     files = malloc(2 * sizeof(char *));
     files[0] = name;
     files[1] = 0;
@@ -260,7 +260,7 @@ os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
 #endif
     if (secure) {
 	filepath = DEFAULT_SECURE_PROFILE_PATH;
-    } else { 
+    } else {
         filepath = getenv("KRB5_CONFIG");
         if (!filepath) filepath = DEFAULT_PROFILE_PATH;
     }
@@ -362,7 +362,7 @@ os_init_paths(krb5_context ctx, krb5_boolean kdc)
             retval = profile_init(NULL, &ctx->profile);
             if (!retval)
                 ctx->profile_in_memory = 1;
-        }   
+        }
 #endif /* KRB5_DNS_LOOKUP */
     }
 
@@ -415,12 +415,12 @@ krb5_os_init_context(krb5_context ctx, krb5_boolean kdc)
 	 * If there's an error in the profile, return an error.  Just
 	 * ignoring the error is a Bad Thing (tm).
 	 */
-     
+
         if (!retval) {
                 krb5_cc_set_default_name(ctx, NULL);
 
 #ifdef _WIN32
-                /* We initialize winsock to version 1.1 but 
+                /* We initialize winsock to version 1.1 but
                  * we do not care if we succeed or fail.
                  */
                 wVersionRequested = 0x0101;
@@ -438,7 +438,7 @@ krb5_error_code KRB5_CALLCONV
 krb5_get_profile (krb5_context ctx, profile_t *profile)
 {
     return profile_copy (ctx->profile, profile);
-}	
+}
 
 #endif
 
@@ -449,7 +449,7 @@ krb5_set_config_files(krb5_context ctx, const char **filenames)
 {
 	krb5_error_code retval;
 	profile_t	profile;
-	
+
 	retval = profile_init(filenames, &profile);
 	if (retval)
 		return retval;
@@ -487,7 +487,7 @@ krb5_secure_config_files(krb5_context ctx)
 	   This function should be removed next time a major version
 	   number change happens.  */
 	krb5_error_code retval;
-	
+
 	if (ctx->profile) {
 		profile_release(ctx->profile);
 		ctx->profile = 0;
@@ -509,7 +509,7 @@ krb5_os_free_context(krb5_context ctx)
 	krb5_os_context os_ctx;
 
 	os_ctx = ctx->os_context;
-	
+
 	if (os_ctx->default_ccname) {
 		FREE(os_ctx->default_ccname,
 			strlen(os_ctx->default_ccname) + 1);

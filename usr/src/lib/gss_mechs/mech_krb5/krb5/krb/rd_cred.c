@@ -16,7 +16,7 @@
  * decrypt the enc_part of a krb5_cred
  */
 /*ARGSUSED*/
-static krb5_error_code 
+static krb5_error_code
 decrypt_credencdata(krb5_context context, krb5_cred *pcred, krb5_keyblock *pkeyblock, krb5_cred_enc_part *pcredenc)
 {
     krb5_cred_enc_part  * ppart = NULL;
@@ -24,7 +24,7 @@ decrypt_credencdata(krb5_context context, krb5_cred *pcred, krb5_keyblock *pkeyb
     krb5_data 		  scratch;
 
     scratch.length = pcred->enc_part.ciphertext.length;
-    if (!(scratch.data = (char *)malloc(scratch.length))) 
+    if (!(scratch.data = (char *)malloc(scratch.length)))
 	return ENOMEM;
 
     if (pkeyblock != NULL) {
@@ -57,7 +57,7 @@ cleanup:
 }
 /*----------------------- krb5_rd_cred_basic -----------------------*/
 
-static krb5_error_code 
+static krb5_error_code
 krb5_rd_cred_basic(krb5_context context, krb5_data *pcreddata, krb5_keyblock *pkeyblock, krb5_replay_data *replaydata, krb5_creds ***pppcreds)
 {
     krb5_error_code       retval;
@@ -86,8 +86,8 @@ krb5_rd_cred_basic(krb5_context context, krb5_data *pcreddata, krb5_keyblock *pk
     * krb5_free_tgt_creds can be used to free the list.
     */
     for (ncreds = 0; pcred->tickets[ncreds]; ncreds++);
-	
-    if ((*pppcreds = 
+
+    if ((*pppcreds =
         (krb5_creds **)malloc((size_t)(sizeof(krb5_creds *) *
 				       (ncreds + 1)))) == NULL) {
         retval = ENOMEM;
@@ -127,7 +127,7 @@ krb5_rd_cred_basic(krb5_context context, krb5_data *pcreddata, krb5_keyblock *pk
 						  &pcur->keyblock)))
 	    goto cleanup;
 
-        if ((retval = krb5_copy_addresses(context, pinfo->caddrs, 
+        if ((retval = krb5_copy_addresses(context, pinfo->caddrs,
 					  &pcur->addresses)))
 	    goto cleanup;
 
@@ -205,7 +205,7 @@ krb5_rd_cred(krb5_context context, krb5_auth_context auth_context, krb5_data *pc
 	    return retval;
 	}
     }
-    
+
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_TIME) {
         krb5_donot_replay replay;
 

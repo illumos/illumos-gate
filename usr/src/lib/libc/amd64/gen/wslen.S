@@ -37,7 +37,7 @@
  *		;
  *	return (s - s0);
  *}
- */	
+ */
 
 #include <sys/asm_linkage.h>
 
@@ -64,18 +64,18 @@
 	.align	4
 .out1:
 	incq	%rax
-.out0:		
+.out0:
 	ret
-	
+
 	.align	4
 .out2:
 	addq	$2,%rax
 	ret
 
-	.align	4	
+	.align	4
 .out3:
 	addq	$3, %rax
-	ret			
+	ret
 	SET_SIZE(wcslen)
 
 	ENTRY(wslen)

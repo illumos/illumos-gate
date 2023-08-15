@@ -120,7 +120,7 @@
 	dec	4, %o2
 	andn	%o2, 6, %o3		! o3 is aligned word count
 	sub	%o1, %g5, %o1		! g5 gets the difference
-	
+
 3:	sllx	%o4, 32, %g1		! save residual bytes
 	ldx	[%o1+%g5], %o4
 	deccc	8, %o3

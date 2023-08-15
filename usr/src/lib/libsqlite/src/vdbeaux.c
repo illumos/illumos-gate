@@ -305,7 +305,7 @@ void sqliteVdbeChangeP3(Vdbe *p, int addr, const char *zP3, int n){
 
 /*
 ** If the P3 operand to the specified instruction appears
-** to be a quoted string token, then this procedure removes 
+** to be a quoted string token, then this procedure removes
 ** the quotes.
 **
 ** The quoting operator can be either a grave ascent (ASCII 0x27)
@@ -405,7 +405,7 @@ VdbeOp *sqliteVdbeGetOp(Vdbe *p, int addr){
 ** value of the user function to an integer or a double.
 **
 ** These routines are defined here in vdbe.c because they depend on knowing
-** the internals of the sqlite_func structure which is only defined in 
+** the internals of the sqlite_func structure which is only defined in
 ** this source file.
 */
 char *sqlite_set_result_string(sqlite_func *p, const char *zResult, int n){
@@ -491,7 +491,7 @@ void *sqlite_aggregate_context(sqlite_func *p, int nByte){
 }
 
 /*
-** Return the number of times the Step function of a aggregate has been 
+** Return the number of times the Step function of a aggregate has been
 ** called.
 **
 ** This routine is defined here in vdbe.c because it depends on knowing
@@ -537,7 +537,7 @@ int sqliteVdbeList(
   int i;
   int rc = SQLITE_OK;
   static char *azColumnNames[] = {
-     "addr", "opcode", "p1",  "p2",  "p3", 
+     "addr", "opcode", "p1",  "p2",  "p3",
      "int",  "text",   "int", "int", "text",
      0
   };
@@ -584,7 +584,7 @@ int sqliteVdbeList(
 ** Prepare a virtual machine for execution.  This involves things such
 ** as allocating stack space and initializing the program counter.
 ** After the VDBE has be prepped, it can be executed by one or more
-** calls to sqliteVdbeExec().  
+** calls to sqliteVdbeExec().
 */
 void sqliteVdbeMakeReady(
   Vdbe *p,                       /* The VDBE */
@@ -667,7 +667,7 @@ void sqliteVdbeSorterReset(Vdbe *p){
 }
 
 /*
-** Reset an Agg structure.  Delete all its contents. 
+** Reset an Agg structure.  Delete all its contents.
 **
 ** For installable aggregate functions, if the step function has been
 ** called, make sure the finalizer function has also been called.  The

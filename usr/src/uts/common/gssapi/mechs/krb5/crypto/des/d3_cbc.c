@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -98,7 +98,7 @@ final_cleanup:
     if (ret)
         (void) memset(out, 0, length);
 
-    KRB5_LOG(KRB5_INFO, "mit_des3_cbc_encrypt() end ret=%d\n", ret); 
+    KRB5_LOG(KRB5_INFO, "mit_des3_cbc_encrypt() end ret=%d\n", ret);
     return(ret);
 }
 

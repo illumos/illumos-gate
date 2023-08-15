@@ -127,7 +127,7 @@ abstract class Expression
 			throw new IllegalArgumentException("importance value " +
 			    imps + " is not legal");
 		}
-		
+
 		if (imp < 0)
 			throw new IllegalArgumentException("importance value " +
 			    imps + " is not legal (must be positive)");
@@ -312,7 +312,7 @@ final class KVOpExpression extends Expression
 		KVOpExpression other = (KVOpExpression) o;
 		if (getName().compareTo(other.getName()) != 0 ||
 		    op != other.getOp() || val != other.getValue())
-			return (false);		
+			return (false);
 		return (true);
 	}
 
@@ -362,7 +362,7 @@ final class KVOpExpression extends Expression
 				return (false);
 		}
 		return (true);
-	}	
+	}
 }
 
 /**
@@ -483,7 +483,7 @@ final class KVExpression extends Expression
 		KVExpression other = (KVExpression) o;
 		if (getName().compareTo(other.getName()) != 0 ||
 		    val.compareTo(other.getValue()) != 0)
-			return (false);		
+			return (false);
 		return (true);
 	}
 
@@ -521,7 +521,7 @@ final class KVExpression extends Expression
 		if (val.compareTo(other.getValue()) == 0)
 			return (false);
 		return (true);
-	}	
+	}
 }
 
 /**
@@ -615,7 +615,7 @@ final class KExpression extends Expression
 			return (false);
 		KExpression other = (KExpression) o;
 		if (getName().compareTo(other.getName()) != 0)
-			return (false);		
+			return (false);
 		return (true);
 	}
 
@@ -649,5 +649,5 @@ final class KExpression extends Expression
 		if (getName().compareTo(other.getName()) != 0)
 			return (false);
 		return (true);
-	}	
+	}
 }

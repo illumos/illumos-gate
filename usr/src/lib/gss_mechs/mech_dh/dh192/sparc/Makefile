@@ -35,6 +35,6 @@ include ../Makefile.com
 all:    $(LIBS)
 
 #install:    all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) .WAIT $(ROOTLINKS)
-# 
+#
 # We don't actually install. This lib is for debugging only.
 install:     all

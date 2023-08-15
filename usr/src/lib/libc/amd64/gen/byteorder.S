@@ -93,7 +93,7 @@
 	SET_SIZE(ntohs)
 
 /*
- *	uint16_t htobe16(uint16_t in);	
+ *	uint16_t htobe16(uint16_t in);
  *	uint32_t htobe32(uint32_t in);
  *	uint64_t htobe64(uint64_t in);
  *

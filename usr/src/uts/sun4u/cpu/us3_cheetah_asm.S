@@ -190,7 +190,7 @@
 	ldxa	[%g0]ASI_DCU, %g3
 	or	%g3, DCU_IC, %g3
 	stxa	%g3, [%g0]ASI_DCU
-	flush	%g0	
+	flush	%g0
 4:
 
 #ifdef TRAPTRACE
@@ -374,7 +374,7 @@ skip_traptrace:
 	stxa	%g2, [%o0]ASI_MEM
 	mov	8, %g1
 	stxa	%g2, [%o0 + %g1]ASI_MEM
-	
+
 	ECACHE_FLUSH_LINE(%o0, %o1, %o2, %o3)
 	casxa	[%o0]ASI_MEM, %g0, %g0
 	ECACHE_REFLUSH_LINE(%o1, %o2, %o3)

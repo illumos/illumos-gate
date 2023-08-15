@@ -65,5 +65,5 @@ $(LIBPROG):	$(OBJS)
 
 lint:	lint_SRCS
 
-clean:     
+clean:
 	$(RM) $(FSSNAPOBJS) $(TOPOBJS)

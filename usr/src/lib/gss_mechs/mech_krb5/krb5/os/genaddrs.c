@@ -9,7 +9,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Take an IP addr & port and generate a full IP address.
  */
@@ -61,7 +61,7 @@ static void *cvtaddr (struct sockaddr_storage *a, struct addrpair *ap)
 	if (IN6_IS_ADDR_V4MAPPED (&ss2sin6(a)->sin6_addr)) {
 	    ap->addr.addrtype = ADDRTYPE_INET;
 	    /* Solaris Kerberos */
-	    ap->addr.contents = (IPV6_ADDR_LEN - IPV4_ADDR_LEN) + 
+	    ap->addr.contents = (IPV6_ADDR_LEN - IPV4_ADDR_LEN) +
 		(krb5_octet *) &ss2sin6(a)->sin6_addr;
 	    ap->addr.length = IPV4_ADDR_LEN;
 	} else
@@ -91,7 +91,7 @@ krb5_auth_con_genaddrs(krb5_context context, krb5_auth_context auth_context, int
     ssize = sizeof(struct sockaddr_storage);
     if ((flags & KRB5_AUTH_CONTEXT_GENERATE_LOCAL_FULL_ADDR) ||
 	(flags & KRB5_AUTH_CONTEXT_GENERATE_LOCAL_ADDR)) {
-    	if ((retval = getsockname(fd, (GETSOCKNAME_ARG2_TYPE *) &lsaddr, 
+    	if ((retval = getsockname(fd, (GETSOCKNAME_ARG2_TYPE *) &lsaddr,
 				  &ssize)))
 	    return retval;
 
@@ -111,7 +111,7 @@ krb5_auth_con_genaddrs(krb5_context context, krb5_auth_context auth_context, int
     ssize = sizeof(struct sockaddr_storage);
     if ((flags & KRB5_AUTH_CONTEXT_GENERATE_REMOTE_FULL_ADDR) ||
 	(flags & KRB5_AUTH_CONTEXT_GENERATE_REMOTE_ADDR)) {
-        if ((retval = getpeername(fd, (GETPEERNAME_ARG2_TYPE *) &rsaddr, 
+        if ((retval = getpeername(fd, (GETPEERNAME_ARG2_TYPE *) &rsaddr,
 				  &ssize)))
 	    return errno;
 

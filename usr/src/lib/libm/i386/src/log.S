@@ -66,7 +66,7 @@ LIBM_ANSI_PRAGMA_WEAK(log,function)
 	PIC_SETUP(1)
 	pushl	$16
 	jmp	.merge
-	
+
 .maybe_0_or_less:
 	cmpl	$0xfff00000,%eax	/ -INF below hi_32(x)?
 	ja	.neg_nan_reentry

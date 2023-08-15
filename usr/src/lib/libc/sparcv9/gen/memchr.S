@@ -115,7 +115,7 @@
 
 	! here we know "word" contains the searched character, and no byte in
 	! "word" exceeds n. If we had exceeded n, we would have gone to label
-	! .lastword. "tword" has null bytes where "word" had c. After 
+	! .lastword. "tword" has null bytes where "word" had c. After
 	! restoring "tword" from "(tword - 0x01010101)" in %g1, examine "tword"
 
 .foundchar:
@@ -138,14 +138,14 @@
 .done:
 	retl				! done with leaf function
 	add	%o0, %o2, %o0		! return pointer to c in s
-	nop	
+	nop
 	nop
 
 	! Here we know that "word" is the last word in the search, and that
 	! some bytes possibly exceed n. However, "word" might also contain c.
 	! "tword" (in %g1) has null bytes where "word" had c. Examine "tword"
 	! while keeping track of number of remaining bytes
-    
+
 .lastword:
 	set	0xff000000, %o4		! mask for 1st byte
 	sub	%o2, 4, %o2		! n -= 4 (undo counter bumping)
@@ -167,7 +167,7 @@
 	andcc	%g1, 0xff, %g0		! fourth byte zero (= found c) ?
 	bz	%ncc, .done		! yup, done
 	nop
-    
+
 .notfound:
 	retl				! done with leaf function
 	mov	%g0, %o0		! return null pointer

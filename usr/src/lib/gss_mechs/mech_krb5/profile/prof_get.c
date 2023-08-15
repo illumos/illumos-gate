@@ -71,7 +71,7 @@ errcode_t add_to_list(struct profile_string_list *list, const char *str)
 {
 	char 	*newstr, **newlist;
 	int	newmax;
-	
+
 	if (list->num+1 >= list->max) {
 		newmax = list->max + 10;
 		newlist = realloc(list->list, newmax * sizeof(char *));
@@ -105,8 +105,8 @@ static int is_list_member(struct profile_string_list *list, const char *str)
 			return 1;
 	}
 	return 0;
-}	
-	
+}
+
 /*
  * This function frees a null-terminated list as returned by
  * profile_get_values.
@@ -117,7 +117,7 @@ void KRB5_CALLCONV profile_free_list(char **list)
 
     if (list == 0)
 	    return;
-    
+
     for (cp = list; *cp; cp++)
 	free(*cp);
     free(list);
@@ -154,7 +154,7 @@ profile_get_values(profile_t profile, const char *const *names,
 
 	end_list(&values, ret_values);
 	return 0;
-	
+
 cleanup:
 	end_list(&values, 0);
 	return retval;
@@ -183,7 +183,7 @@ errcode_t profile_get_value(profile_t profile, const char **names,
 		*ret_value = value;
 	else
 		retval = PROF_NO_RELATION;
-	
+
 cleanup:
 	profile_node_iterator_free(&state);
 	return retval;
@@ -210,7 +210,7 @@ profile_get_string(profile_t profile, const char *name, const char *subname,
 			return retval;
 	} else
 		value = def_val;
-    
+
 	if (value) {
 		*ret_string = malloc(strlen(value)+1);
 		if (*ret_string == 0)
@@ -261,8 +261,8 @@ profile_get_integer(profile_t profile, const char *name, const char *subname,
 	/* Garbage in string.  */
 	if (end_value != value + strlen (value))
 	    return PROF_BAD_INTEGER;
-	
-   
+
+
 	*ret_int = ret_long;
 	return 0;
 }
@@ -281,7 +281,7 @@ static errcode_t
 profile_parse_boolean(const char *s, int *ret_boolean)
 {
     const char *const *p;
-    
+
     if (ret_boolean == NULL)
     	return PROF_EINVAL;
 
@@ -298,7 +298,7 @@ profile_parse_boolean(const char *s, int *ret_boolean)
 			return 0;
 		}
     }
-	
+
 	return PROF_BAD_BOOLEAN;
 }
 
@@ -325,7 +325,7 @@ profile_get_boolean(profile_t profile, const char *name, const char *subname,
 		return 0;
 	} else if (retval)
 		return retval;
-   
+
 	return profile_parse_boolean (value, ret_boolean);
 }
 
@@ -359,7 +359,7 @@ profile_get_subsection_names(profile_t profile, const char **names,
 
 	end_list(&values, ret_names);
 	return 0;
-	
+
 cleanup:
 	end_list(&values, 0);
 	return retval;
@@ -395,7 +395,7 @@ profile_get_relation_names(profile_t profile, const char **names,
 
 	end_list(&values, ret_names);
 	return 0;
-	
+
 cleanup:
 	end_list(&values, 0);
 	return retval;
@@ -419,7 +419,7 @@ profile_iterator(void **iter_p, char **ret_name, char **ret_value)
 {
 	char *name, *value;
 	errcode_t	retval;
-	
+
 	retval = profile_node_iterator(iter_p, 0, &name, &value);
 	if (retval)
 		return retval;

@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Registration functions for ccache.
  */
@@ -185,7 +185,7 @@ krb5_cc_resolve (krb5_context context, const char *name, krb5_ccache *cache)
     unsigned int pfxlen;
     krb5_error_code err;
     const krb5_cc_ops *ops;
-    
+
     /* Solaris Kerberos */
     if (!name)
         return KRB5_CC_BADNAME;

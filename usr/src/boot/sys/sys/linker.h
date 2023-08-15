@@ -142,7 +142,7 @@ int linker_file_foreach(linker_predicate_t *_predicate, void *_context);
  * Lookup a symbol in a file.  If deps is TRUE, look in dependencies
  * if not found in file.
  */
-caddr_t linker_file_lookup_symbol(linker_file_t _file, const char* _name, 
+caddr_t linker_file_lookup_symbol(linker_file_t _file, const char* _name,
 				  int _deps);
 
 /*
@@ -156,7 +156,7 @@ int linker_file_lookup_set(linker_file_t _file, const char *_name,
 /*
  * List all functions in a file.
  */
-int linker_file_function_listall(linker_file_t, 
+int linker_file_function_listall(linker_file_t,
 				 linker_function_nameval_callback_t, void *);
 
 /*

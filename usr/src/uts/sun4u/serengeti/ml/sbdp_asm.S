@@ -145,7 +145,7 @@
         andn    %o3, PSTATE_IE | PSTATE_AM, %o4
         wrpr    %g0, %o4, %pstate
 
-	! Panther needs to flush L2 before L3 cache. 
+	! Panther needs to flush L2 before L3 cache.
 	PN_L2_FLUSHALL(%o4, %g4, %g5)
 
         ECACHE_FLUSHALL(%o2, %g1, %o1, %o4)

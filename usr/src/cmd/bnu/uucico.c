@@ -396,7 +396,7 @@ char **envp;
 #else
 		(void) versys(Rmtname);	/* in case the real name is longer */
 #endif /* NOSTRANGERS */
-		
+
 		(void) sprintf(lockname, "%ld", (long) getpid());
 		if (umlock(LOCKPRE, lockname)) {
 			omsg('R', "LCK", Ofn);
@@ -569,7 +569,7 @@ char **envp;
 				chmod(ttyn, M_DEVICEMODE);
 			}
 		}
-	
+
 		if (setjmp(Sjbuf)) {
 			delock(LOCKPRE, lockname);
 			Uerror = SS_LOGIN_FAILED;
@@ -637,7 +637,7 @@ char **envp;
 
 		/*  check for rejects from remote */
 		Uerror = 0;
-		if (EQUALS(&msg[1], "LCK")) 
+		if (EQUALS(&msg[1], "LCK"))
 			Uerror = SS_RLOCKED;
 		else if (EQUALS(&msg[1], "LOGIN"))
 			Uerror = SS_RLOGIN;
@@ -779,7 +779,7 @@ int code;
 		(*Teardown)( Role, Ifn, Ofn );
 	alarm(0);			/* Turn off timer. */
 	DEBUG(4, "exit code %d\n", code);
-	CDEBUG(1, "Conversation Complete: Status %s\n\n", 
+	CDEBUG(1, "Conversation Complete: Status %s\n\n",
 	    code ? "FAILED" : "SUCCEEDED");
 
 	cleanTM();
@@ -959,7 +959,7 @@ checkrmt ()
 	pid_t	waitrv;		/* Return value from wait system call. */
 
 	/* here's the place to look the remote system up in the Systems file.
-	 * If the command NOSTRANGERS is executable and 
+	 * If the command NOSTRANGERS is executable and
 	 * If they're not in my file then hang up */
 
 	if (versys(Rmtname) && (access(NOSTRANGERS, 1) == 0)) {

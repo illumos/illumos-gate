@@ -11,14 +11,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +29,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -117,7 +117,7 @@ kadm5_ret_t kadm5_init_with_password(char *client_name, char *pass,
 }
 
 kadm5_ret_t kadm5_init(char *client_name, char *pass,
-		       char *service_name, 
+		       char *service_name,
 		       kadm5_config_params *params,
 		       krb5_ui_4 struct_version,
 		       krb5_ui_4 api_version,
@@ -332,7 +332,7 @@ _kadm5_initialize_rpcsec_gss_handle(kadm5_server_handle_t handle,
 	 * Try to find the kpasswd_server first if this is for the changepw
 	 * service.  If defined then it should be resolvable else return error.
 	 */
-	if (strncmp(service_name, KADM5_CHANGEPW_HOST_SERVICE, 
+	if (strncmp(service_name, KADM5_CHANGEPW_HOST_SERVICE,
 	    strlen(KADM5_CHANGEPW_HOST_SERVICE)) == 0) {
 		if (handle->params.kpasswd_server != NULL)
 			server = handle->params.kpasswd_server;
@@ -378,7 +378,7 @@ _kadm5_initialize_rpcsec_gss_handle(kadm5_server_handle_t handle,
 	/* Transform addr to netbuf */
 	(void) memset(&netaddr, 0, sizeof (netaddr));
 	netaddr.buf = (char *)sin;
-	
+
 	/* get an fd connected to the given address */
 	fd =  get_connection(nconf, netaddr);
 	if (fd == -1) {
@@ -647,7 +647,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
       */
      GENERIC_CHECK_HANDLE(handle, KADM5_OLD_LIB_API_VERSION,
 			  KADM5_NEW_LIB_API_VERSION);
-     
+
      /*
       * Acquire relevant profile entries.  In version 2, merge values
       * in params_in with values from profile, based on
@@ -683,7 +683,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 			KADM5_BAD_CLIENT_PARAMS);
 	  return KADM5_BAD_CLIENT_PARAMS;
      }
-			
+
      if ((code = kadm5_get_config_params(handle->context, 0,
 					 params_in, &handle->params))) {
 	  krb5_free_context(handle->context);
@@ -696,10 +696,10 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 
 #define REQUIRED_PARAMS (KADM5_CONFIG_REALM | \
 			 KADM5_CONFIG_ADMIN_SERVER | \
-			 KADM5_CONFIG_KADMIND_PORT) 
+			 KADM5_CONFIG_KADMIND_PORT)
 #define KPW_REQUIRED_PARAMS (KADM5_CONFIG_REALM | \
 			 KADM5_CONFIG_KPASSWD_SERVER | \
-			 KADM5_CONFIG_KPASSWD_PORT) 
+			 KADM5_CONFIG_KPASSWD_PORT)
 
      if (((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) &&
 	 ((handle->params.mask & KPW_REQUIRED_PARAMS) != KPW_REQUIRED_PARAMS)) {
@@ -712,7 +712,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 			"missing config parameters\n"));
 	  return KADM5_MISSING_KRB5_CONF_PARAMS;
      }
-	
+
 	/*
 	 * Acquire a service ticket for service_name@realm in the name of
 	 * client_name, using password pass (which could be NULL), and
@@ -729,7 +729,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 
 	if (strncmp(service_name, KADM5_CHANGEPW_HOST_SERVICE,
 	    strlen(KADM5_CHANGEPW_HOST_SERVICE)) == 0)
-		cpw = TRUE;	
+		cpw = TRUE;
 
 	if (init_type == INIT_PASS &&
 	    handle->params.kpasswd_protocol == KRB5_CHGPWD_CHANGEPW_V2 &&
@@ -780,11 +780,11 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 		}
 	}
 	serverp = creds.server;
-	
+
 	/* XXX temporarily fix a bug in krb5_cc_get_type */
 #undef krb5_cc_get_type
 #define krb5_cc_get_type(context, cache) ((cache)->ops->prefix)
-     
+
 
      if (init_type == INIT_CREDS) {
 	  ccache = ccache_in;
@@ -815,13 +815,13 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 					  + 3*sizeof(counter));
 	      sprintf(handle->cache_name, "MEMORY:kadm5_%u", counter++);
 	  }
-     
+
 	  if ((code = krb5_cc_resolve(handle->context, handle->cache_name,
-				      &ccache))) 
+				      &ccache)))
 	       goto error;
-	  
+
 	  if ((code = krb5_cc_initialize (handle->context, ccache,
-					  creds.client))) 
+					  creds.client)))
 	       goto error;
 
 	  handle->destroy_cache = 1;
@@ -829,14 +829,14 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
      handle->lhandle->cache_name = handle->cache_name;
 	ADMIN_LOG(LOG_ERR, dgettext(TEXT_DOMAIN,
 		"cache created: %s\n"), handle->cache_name);
-     
+
      if ((code = krb5_timeofday(handle->context, &now)))
 	  goto error;
 
      /*
       * Get a ticket, use the method specified in init_type.
       */
-     
+
      creds.times.starttime = 0; /* start timer at KDC */
      creds.times.endtime = 0; /* endtime will be limited by service */
 
@@ -859,7 +859,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	/*
 	 * Solaris Kerberos:
 	 * Save the original creds.server as krb5_get_init_creds*() always
-	 * sets the realm of the server to the client realm. 
+	 * sets the realm of the server to the client realm.
 	 */
 	code = krb5_copy_principal(handle->context, creds.server, &saved_server);
 	if (code)
@@ -935,7 +935,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 		 * If _kadm5_initialize_rpcsec_gss_handle() fails it will have
 		 * called krb5_gss_release_cred(). If the credential cache is a
 		 * MEMORY cred cache krb5_gss_release_cred() destroys the
-		 * cred cache data. Make sure that the cred-cache is closed 
+		 * cred cache data. Make sure that the cred-cache is closed
 		 * to prevent a double free in the "error" code.
 		 */
 		if (code != 0) {
@@ -949,11 +949,11 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 
 	*server_handle = (void *) handle;
 
-	if (init_type != INIT_CREDS) 
+	if (init_type != INIT_CREDS)
 		krb5_cc_close(handle->context, ccache);
 
 	goto cleanup;
-	
+
 error:
      /*
       * Note that it is illegal for this code to execute if "handle"
@@ -1014,16 +1014,16 @@ kadm5_destroy(void *server_handle)
 
      CHECK_HANDLE(server_handle);
 /* SUNW14resync:
- * krb5_cc_resolve() will resolve a ccache with the same data that 
- * handle->my_cred points to. If the ccache is a MEMORY ccache then 
+ * krb5_cc_resolve() will resolve a ccache with the same data that
+ * handle->my_cred points to. If the ccache is a MEMORY ccache then
  * gss_release_cred() will free that data (it doesn't do this when ccache
  * is a FILE ccache).
- * if'ed out to avoid the double free. 
+ * if'ed out to avoid the double free.
  */
 #if 0
      if (handle->destroy_cache && handle->cache_name) {
 	 if ((code = krb5_cc_resolve(handle->context,
-				     handle->cache_name, &ccache)) == 0) 
+				     handle->cache_name, &ccache)) == 0)
 	     code = krb5_cc_destroy (handle->context, ccache);
      }
 #endif

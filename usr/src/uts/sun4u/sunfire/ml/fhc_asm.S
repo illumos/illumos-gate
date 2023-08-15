@@ -48,7 +48,7 @@
  * Also, note that this function is never run from main memory.
  * Rather it is copied to non-cacheable SRAM (hence the ..._end
  * label at the bottom of the function).  This implies that the
- * function must be position independent code that doesn't reference 
+ * function must be position independent code that doesn't reference
  * cacheable real memory.
  */
 

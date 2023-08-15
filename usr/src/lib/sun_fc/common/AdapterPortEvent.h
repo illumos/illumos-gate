@@ -34,7 +34,7 @@
 
 /**
  * @memo	    Represents an Adapter Port Event
- * 
+ *
  * @doc		    When adapter port events occur on the HBA, an
  *		    event of this type will be sent to registered
  *		    listeners

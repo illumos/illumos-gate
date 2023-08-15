@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROG= mknod 
+PROG= mknod
 
 include ../Makefile.cmd
 
@@ -33,7 +33,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)

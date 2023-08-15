@@ -74,7 +74,7 @@ movq    %rdx,-0x18(%rbp)
 movq    %rsi,-0x10(%rbp)
 subq    $0x50,%rsp
 SET_SIZE(gcc_mov_noorder, gcc_mov_noorder_end)
-        
+
 FUNC(gcc_mov_big_struct_ret)
 pushq   %rbp
 movq    %rsp,%rbp
@@ -197,7 +197,7 @@ pushq   %r8
 pushq   %rcx
 subq    $0x30,%rsp
 SET_SIZE(gcc_push_struct_noorder, gcc_push_struct_noorder_end)
-        
+
 FUNC(gcc_push_big_struct_ret_and_spill)
 pushq   %rbp
 movq    %rsp,%rbp
@@ -465,4 +465,4 @@ movq	%rsp,%rbp
 .word	0x7cff
 .word	0xffff
 .word	0xffff
-SET_SIZE(jmp_table, jmp_table_end)        
+SET_SIZE(jmp_table, jmp_table_end)

@@ -26,7 +26,7 @@
 /*
  * Description
  * mpapi-sun.c - Implements the Sun Extension to the Multipath Management
- * API Version 1.0 
+ * API Version 1.0
  */
 
 #include <dlfcn.h>

@@ -148,4 +148,4 @@
 	movb	$0, (%rdi)		/ null termination
 .L9:
 	ret
-	SET_SIZE(strncat)	
+	SET_SIZE(strncat)

@@ -69,6 +69,6 @@ $(POFILE): $(POFILES)
 	cat $(POFILES) > $@
 
 clean:
-	-$(RM) $(OBJS) $(COMMON_OBJS) 
+	-$(RM) $(OBJS) $(COMMON_OBJS)
 
 include $(SRC)/cmd/Makefile.targ

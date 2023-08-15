@@ -115,8 +115,8 @@ class Transact extends Object implements Runnable {
 	    // Create a new Transact multicast thread.
 
             // The final argument to the constructor of Transact determines
-            // whether to return after the first result or to continue to 
-            // gather more than one result.  The value to this field 
+            // whether to return after the first result or to continue to
+            // gather more than one result.  The value to this field
             // continueAfterFound MUST be set to 'true' or else multicast
             // based discovery will find the first result, not all results,
             // as it should.
@@ -418,7 +418,7 @@ class Transact extends Object implements Runnable {
 	byte[] inbuf = new byte[Defaults.iReadMaxMTU];
 
 	// Construct the datagram packet to send.
-	
+
 	DatagramPacket dpReply =
 	    new DatagramPacket(inbuf, inbuf.length);
 	DatagramPacket dpRequest =
@@ -643,7 +643,7 @@ class Transact extends Object implements Runnable {
 		synchronized (s) {
 
 		    // Send the request.
-	
+
 		    dos.write(outbuf, 0, outbuf.length);
 
 		    // Read reply.
@@ -658,7 +658,7 @@ class Transact extends Object implements Runnable {
 		//  hosed.
 
 		uncacheSocket(addr, s);
-	
+
 		s = null;
 
 		if (!retry) {
@@ -731,7 +731,7 @@ class Transact extends Object implements Runnable {
 	}
 
 	// Check for invalid xid.
-	
+
 	if (mhdr.xid != rhdr.xid) {
 	    if (config.traceDrop()) {
 		config.writeLog("wrong_xid",
@@ -874,7 +874,7 @@ class Transact extends Object implements Runnable {
 
     static protected boolean
 	addPreviousResponder(SrvLocMsg msg, InetAddress addr) {
-			
+
 	// Add incoming result to the vector.
 
 	SrvLocHeader hdr = msg.getHeader();
@@ -1219,7 +1219,7 @@ class Transact extends Object implements Runnable {
 
 		    send(ds, msg, addr);
 		    tries++;
-	
+
 		    lTimeSent = System.currentTimeMillis();
 		    continue; // since we did not receive anything, continue...
 

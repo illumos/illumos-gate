@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,21 +27,21 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * KDC Database interface definitions.
  */
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -52,7 +52,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -96,12 +96,12 @@
  */
 typedef struct _krb5_tl_data {
     struct _krb5_tl_data* tl_data_next;		/* NOT saved */
-    krb5_int16 		  tl_data_type;		
-    krb5_ui_2		  tl_data_length;	
-    krb5_octet 	        * tl_data_contents;	
+    krb5_int16 		  tl_data_type;
+    krb5_ui_2		  tl_data_length;
+    krb5_octet 	        * tl_data_contents;
 } krb5_tl_data;
 
-/* 
+/*
  * If this ever changes up the version number and make the arrays be as
  * big as necessary.
  *
@@ -111,7 +111,7 @@ typedef struct _krb5_key_data {
     krb5_int16 		  key_data_ver;		/* Version */
     krb5_int16		  key_data_kvno;	/* Key Version */
     krb5_int16		  key_data_type[2];	/* Array of types */
-#if 0 
+#if 0
      /*
       * SUNW14resync (mech)
       * This has changed in the mech so we change it here also
@@ -126,14 +126,14 @@ typedef struct _krb5_key_data {
 #define KRB5_KDB_V1_KEY_DATA_ARRAY	2	/* # of array elements */
 
 typedef struct _krb5_keysalt {
-    krb5_int16		  type;	
+    krb5_int16		  type;
     krb5_data		  data;			/* Length, data */
 } krb5_keysalt;
 
 typedef struct _krb5_db_entry_new {
     krb5_magic 		  magic;		/* NOT saved */
-    krb5_ui_2		  len;			
-    krb5_ui_4             mask;                 /* members currently changed/set */	
+    krb5_ui_2		  len;
+    krb5_ui_4             mask;                 /* members currently changed/set */
     krb5_flags 		  attributes;
     krb5_deltat		  max_life;
     krb5_deltat		  max_renewable_life;
@@ -147,7 +147,7 @@ typedef struct _krb5_db_entry_new {
     krb5_ui_2		  e_length;		/* Length of extra data */
     krb5_octet		* e_data;		/* Extra data to be saved */
 
-    krb5_principal 	  princ;		/* Length, data */	
+    krb5_principal 	  princ;		/* Length, data */
     krb5_tl_data	* tl_data;		/* Linked list */
     krb5_key_data       * key_data;		/* Array */
 } krb5_db_entry;
@@ -159,7 +159,7 @@ typedef struct __krb5_key_salt_tuple {
 
 #define	KRB5_KDB_MAGIC_NUMBER		0xdbdbdbdb
 #define KRB5_KDB_V1_BASE_LENGTH		38
-  
+
 #define KRB5_TL_LAST_PWD_CHANGE		0x0001
 #define KRB5_TL_MOD_PRINC		0x0002
 #define KRB5_TL_KADM_DATA		0x0003
@@ -170,7 +170,7 @@ typedef struct __krb5_key_salt_tuple {
 #define KRB5_TL_DB_ARGS                 0x7fff
 #endif /* SECURID */
 #define KRB5_TL_USER_CERTIFICATE        0x0007
-    
+
 /*
  * Determines the number of failed KDC requests before DISALLOW_ALL_TIX is set
  * on the principal.
@@ -219,11 +219,11 @@ extern char *krb5_mkey_pwd_prompt2;
 #define KRB5_KDB_OPEN_RO                1
 
 #ifndef KRB5_KDB_SRV_TYPE_KDC
-#define KRB5_KDB_SRV_TYPE_KDC           0x0100        
+#define KRB5_KDB_SRV_TYPE_KDC           0x0100
 #endif
 
 #ifndef KRB5_KDB_SRV_TYPE_ADMIN
-#define KRB5_KDB_SRV_TYPE_ADMIN         0x0200  
+#define KRB5_KDB_SRV_TYPE_ADMIN         0x0200
 #endif
 
 #ifndef KRB5_KDB_SRV_TYPE_PASSWD
@@ -231,7 +231,7 @@ extern char *krb5_mkey_pwd_prompt2;
 #endif
 
 #ifndef KRB5_KDB_SRV_TYPE_OTHER
-#define KRB5_KDB_SRV_TYPE_OTHER         0x0400  
+#define KRB5_KDB_SRV_TYPE_OTHER         0x0400
 #endif
 
 #define KRB5_KDB_OPT_SET_DB_NAME        0
@@ -288,14 +288,14 @@ krb5_error_code krb5_free_supported_realms ( krb5_context kcontext,
 krb5_error_code krb5_db_set_master_key_ext ( krb5_context kcontext,
 					     char *pwd,
 					     krb5_keyblock *key );
-krb5_error_code krb5_db_set_mkey ( krb5_context context, 
+krb5_error_code krb5_db_set_mkey ( krb5_context context,
 				   krb5_keyblock *key);
 krb5_error_code krb5_db_get_mkey ( krb5_context kcontext,
 				   krb5_keyblock **key );
 krb5_error_code krb5_db_free_master_key ( krb5_context kcontext,
 					  krb5_keyblock *key );
-krb5_error_code krb5_db_store_master_key  ( krb5_context kcontext, 
-					    char *db_arg, 
+krb5_error_code krb5_db_store_master_key  ( krb5_context kcontext,
+					    char *db_arg,
 					    krb5_principal mname,
 					    krb5_keyblock *key,
 					    char *master_pwd);
@@ -319,12 +319,12 @@ krb5_dbe_find_enctype( krb5_context	kcontext,
 		       krb5_key_data	**kdatap);
 
 
-krb5_error_code krb5_dbe_search_enctype ( krb5_context kcontext, 
-					  krb5_db_entry *dbentp, 
-					  krb5_int32 *start, 
-					  krb5_int32 ktype, 
-					  krb5_int32 stype, 
-					  krb5_int32 kvno, 
+krb5_error_code krb5_dbe_search_enctype ( krb5_context kcontext,
+					  krb5_db_entry *dbentp,
+					  krb5_int32 *start,
+					  krb5_int32 ktype,
+					  krb5_int32 stype,
+					  krb5_int32 kvno,
 					  krb5_key_data **kdatap);
 
 krb5_error_code
@@ -354,7 +354,7 @@ krb5_dbe_lookup_mod_princ_data( krb5_context          context,
 				krb5_db_entry       * entry,
 				krb5_timestamp      * mod_time,
 				krb5_principal      * mod_princ);
- 
+
 
 krb5_error_code
 krb5_dbe_update_last_pwd_change( krb5_context          context,
@@ -440,12 +440,12 @@ krb5_dbe_apw( krb5_context	  context,
  */
 
 krb5_error_code
-krb5_dbe_def_search_enctype( krb5_context kcontext, 
-			     krb5_db_entry *dbentp, 
-			     krb5_int32 *start, 
-			     krb5_int32 ktype, 
-			     krb5_int32 stype, 
-			     krb5_int32 kvno, 
+krb5_dbe_def_search_enctype( krb5_context kcontext,
+			     krb5_db_entry *dbentp,
+			     krb5_int32 *start,
+			     krb5_int32 ktype,
+			     krb5_int32 stype,
+			     krb5_int32 kvno,
 			     krb5_key_data **kdatap);
 
 krb5_error_code
@@ -504,32 +504,32 @@ typedef struct _osa_policy_ent_t {
 
 typedef	void	(*osa_adb_iter_policy_func) (void *, osa_policy_ent_t);
 
-krb5_error_code 
-krb5_db_create_policy( krb5_context kcontext, 
+krb5_error_code
+krb5_db_create_policy( krb5_context kcontext,
 		       osa_policy_ent_t policy);
 
-krb5_error_code 
-krb5_db_get_policy ( krb5_context kcontext, 
-		     char *name, 
+krb5_error_code
+krb5_db_get_policy ( krb5_context kcontext,
+		     char *name,
 		     osa_policy_ent_t *policy,
 		     int *nentries);
 
-krb5_error_code 
-krb5_db_put_policy( krb5_context kcontext, 
+krb5_error_code
+krb5_db_put_policy( krb5_context kcontext,
 		    osa_policy_ent_t policy);
 
-krb5_error_code 
+krb5_error_code
 krb5_db_iter_policy( krb5_context kcontext,
 		     char *match_entry,
 		     osa_adb_iter_policy_func func,
 		     void *data);
 
-krb5_error_code 
-krb5_db_delete_policy( krb5_context kcontext, 
+krb5_error_code
+krb5_db_delete_policy( krb5_context kcontext,
 		       char *policy);
 
-void 
-krb5_db_free_policy( krb5_context kcontext, 
+void
+krb5_db_free_policy( krb5_context kcontext,
 		     osa_policy_ent_t policy);
 
 #define KRB5_KDB_DEF_FLAGS	0

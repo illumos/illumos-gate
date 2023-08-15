@@ -157,7 +157,7 @@ kadmin_parse_name(name, principal)
 
     if (name == NULL)
 	return (EINVAL);
-    
+
     /* assumes def_realm is initialized! */
     fullname = (char *)malloc(strlen(name) + 1 + strlen(def_realm) + 1);
     if (fullname == NULL)
@@ -574,7 +574,7 @@ char *kadmin_startup(argc, argv)
 	extern char *krb5_defkeyname;
 	krb5_defkeyname = DEFAULT_KEYTAB;
     }
-    
+
     if ((retval = kadm5_init_iprop(handle)) != 0) {
 	com_err(whoami, retval, gettext("while mapping update log"));
 	exit(1);
@@ -722,7 +722,7 @@ void kadmin_cpw(argc, argv)
     int local_kadmin = 0;
 
     local_kadmin = (strcmp(whoami, KADMIN_LOCAL_NAME) == 0);
-    
+
     if (argc < 2) {
 	goto usage;
     }
@@ -790,7 +790,7 @@ void kadmin_cpw(argc, argv)
     }
     retval = kadmin_parse_name(*argv, &princ);
     if (retval) {
-	com_err("change_password", retval, 
+	com_err("change_password", retval,
 		gettext("while parsing principal name"));
 	if (ks_tuple != NULL)
 	    free(ks_tuple);
@@ -854,7 +854,7 @@ void kadmin_cpw(argc, argv)
 	return;
     } else if (argc == 1) {
 	unsigned int i = sizeof (newpw) - 1;
-	
+
 		snprintf(prompt1, sizeof (prompt1),
 			gettext("Enter password for principal \"%.900s\""),
 			*argv);
@@ -1264,7 +1264,7 @@ void kadmin_addprinc(argc, argv)
 		    canon);
     }
     mask &= ~KADM5_POLICY_CLR;
-    
+
     /*
      * Set 'notix' for randkey principals and also for principals which have
      * specified flag options on the cmdline. This is because we want to apply
@@ -1276,7 +1276,7 @@ void kadmin_addprinc(argc, argv)
     if (randkey || (mask & KADM5_ATTRIBUTES))
 	princ.attributes |= KRB5_KDB_DISALLOW_ALL_TIX;
 
-    if (randkey) {		
+    if (randkey) {
 	mask |= KADM5_ATTRIBUTES;
 	pass = dummybuf;
     } else if (pass == NULL) {

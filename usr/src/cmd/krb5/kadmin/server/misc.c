@@ -32,7 +32,7 @@
 
 /*
  * Function: chpass_principal_wrapper_3
- * 
+ *
  * Purpose: wrapper to kadm5_chpass_principal that checks to see if
  *	    pw_min_life has been reached. if not it returns an error.
  *	    otherwise it calls kadm5_chpass_principal
@@ -49,7 +49,7 @@
  *
  * Requires:
  *	kadm5_init to have been run.
- * 
+ *
  * Effects:
  *	calls kadm5_chpass_principal which changes the kdb and the
  *	the admin db.
@@ -78,7 +78,7 @@ chpass_principal_wrapper_3(void *server_handle,
 
 /*
  * Function: randkey_principal_wrapper_3
- * 
+ *
  * Purpose: wrapper to kadm5_randkey_principal which checks the
  *	    password's min. life.
  *
@@ -94,7 +94,7 @@ chpass_principal_wrapper_3(void *server_handle,
  *
  * Requires:
  *	kadm5_init	 needs to be run
- * 
+ *
  * Effects:
  *	calls kadm5_randkey_principal
  *

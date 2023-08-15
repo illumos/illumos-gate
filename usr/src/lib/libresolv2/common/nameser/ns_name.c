@@ -136,7 +136,7 @@ ns_name_ntop(const u_char *src, char *dst, size_t dstsiz)
 				errno = EMSGSIZE;
 				return (-1);
 			}
-			dn += m; 
+			dn += m;
 			continue;
 		}
 		for ((void)NULL; l > 0; l--) {
@@ -594,7 +594,7 @@ cleanup:
 			*lpp = NULL;
 		errno = EMSGSIZE;
 		return (-1);
-	} 
+	}
 	return (dstp - dst);
 }
 
@@ -613,7 +613,7 @@ ns_name_uncompress(const u_char *msg, const u_char *eom, const u_char *src,
 {
 	u_char tmp[NS_MAXCDNAME];
 	int n;
-	
+
 	if ((n = ns_name_unpack(msg, eom, src, tmp, sizeof tmp)) == -1)
 		return (-1);
 	if (ns_name_ntop(tmp, dst, dstsiz) == -1)
@@ -1004,7 +1004,7 @@ decode_bitstring(const unsigned char **cpp, char *dn, const char *eom)
 	} else if (b > 0) {
 		tc = *cp++;
 		i = SPRINTF((dn, "%1x",
-			       ((tc >> 4) & 0x0f) & (0x0f << (4 - b)))); 
+			       ((tc >> 4) & 0x0f) & (0x0f << (4 - b))));
 		if (i < 0)
 			return (-1);
 		dn += i;
@@ -1064,7 +1064,7 @@ encode_bitsring(const char **bp, const char *end, unsigned char **labelp,
 				if (!isdigit(c&0xff))
 					return (EINVAL);
 				if (beg_blen == NULL) {
-					
+
 					if (c == '0') {
 						/* blen never begings with 0 */
 						return (EINVAL);

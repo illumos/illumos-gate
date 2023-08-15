@@ -4,7 +4,7 @@
  */
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -99,7 +99,7 @@ krb5_error_code     kdb_delete_entry(kadm5_server_handle_t handle,
 				     krb5_principal name);
 krb5_error_code     kdb_iter_entry(kadm5_server_handle_t handle,
 				   char *match_entry,
-				   void (*iter_fct)(void *, krb5_principal), 
+				   void (*iter_fct)(void *, krb5_principal),
 				   void *data);
 
 int		    init_dict(kadm5_config_params *);
@@ -108,16 +108,16 @@ void		    destroy_dict(void);
 
 /* XXX this ought to be in libkrb5.a, but isn't */
 kadm5_ret_t krb5_copy_key_data_contents(krb5_context context,
-					krb5_key_data *from, 
+					krb5_key_data *from,
 					krb5_key_data *to);
-kadm5_ret_t krb5_free_key_data_contents(krb5_context context, 
+kadm5_ret_t krb5_free_key_data_contents(krb5_context context,
 					krb5_key_data *key);
 
 /*
- * *Warning* 
- * *Warning*	    This is going to break if we     
- * *Warning*	    ever go multi-threaded	     
- * *Warning* 
+ * *Warning*
+ * *Warning*	    This is going to break if we
+ * *Warning*	    ever go multi-threaded
+ * *Warning*
  */
 extern	krb5_principal	current_caller;
 

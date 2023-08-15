@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Replay lookaside cache for the KDC, to avoid extra work.
  *
@@ -74,7 +74,7 @@ kdc_check_lookaside(krb5_data *inpkt, krb5_data **outpkt)
     register krb5_kdc_replay_ent *eptr, *last, *hold;
     time_t db_age;
 
-    if (krb5_timeofday(kdc_context, &timenow) || 
+    if (krb5_timeofday(kdc_context, &timenow) ||
 	krb5_db_get_age(kdc_context, 0, &db_age))
 	return FALSE;
 
@@ -122,11 +122,11 @@ kdc_check_lookaside(krb5_data *inpkt, krb5_data **outpkt)
 void
 kdc_insert_lookaside(krb5_data *inpkt, krb5_data *outpkt)
 {
-    register krb5_kdc_replay_ent *eptr;    
+    register krb5_kdc_replay_ent *eptr;
     krb5_int32 timenow;
     time_t db_age;
 
-    if (krb5_timeofday(kdc_context, &timenow) || 
+    if (krb5_timeofday(kdc_context, &timenow) ||
 	krb5_db_get_age(kdc_context, 0, &db_age))
 	return;
 

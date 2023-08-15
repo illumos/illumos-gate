@@ -42,7 +42,7 @@ FILEMODE =	0555
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS) $(EXPOBJ)
 	$(LINK.c) -o $@ $(OBJS) $(EXPOBJ) $(LDLIBS)

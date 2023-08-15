@@ -76,7 +76,7 @@ constants:
 ! the following are 64-bit registers in both V8+ and V9
 
 ! g1  __vlibm_TBL_atan2
-! g5  
+! g5
 
 ! o0  hy
 ! o1  0x00004000
@@ -84,7 +84,7 @@ constants:
 ! o3  0x7fe00000
 ! o4  0x03600000
 ! o5  0x00100000
-! o7  
+! o7
 
 ! f0  y0
 ! f2  x0
@@ -101,9 +101,9 @@ constants:
 ! f24 t2
 ! f26 ah2
 ! f28 al2
-! f30 
-! f32 
-! f34 
+! f30
+! f32
+! f34
 ! f36 sx0
 ! f38 sx1
 ! f40 sx2
@@ -161,7 +161,7 @@ constants:
 	fzero	%f24
 	fzero	%f26
 	fzero	%f46
-	add	%fp,junk,%l6	
+	add	%fp,junk,%l6
 	ld	[%i1],%f0		! *y
 	ld	[%i1+4],%f1
 	ld	[%i3],%f8		! *x
@@ -619,7 +619,7 @@ constants:
 	 fabsd	%f18,%f12
 	 lda	[%i1]%asi,%o0
 	 lda	[%i3]%asi,%l3
-	cmp	%g5,%o5	
+	cmp	%g5,%o5
 	bge,pn	%icc,.return_ah0	! if hx >= 0x7ff00000
 ! delay slot
 	nop
@@ -781,7 +781,7 @@ constants:
 	 fabsd	%f28,%f22
 	 lda	[%i3]%asi,%l3
 	 mov	%i5,%l6
-	cmp	%g5,%o5	
+	cmp	%g5,%o5
 	bge,pn	%icc,.return_ah1
 ! delay slot
 	nop
@@ -856,7 +856,7 @@ constants:
 	faddd	%f16,%f10,%f16
 	sub	%g5,%l1,%o7
 	cmp	%o7,%o5
-	bl,pt	%icc,1f	
+	bl,pt	%icc,1f
 ! delay slot
 	nop
 	ldd	[%fp+pio4],%f10
@@ -950,7 +950,7 @@ constants:
 .big2:
 	fxor	%f36,%f0,%f36
 .big2_from_special2:
-	cmp	%g5,%o5	
+	cmp	%g5,%o5
 	bge,pn	%icc,.return_ah2
 ! delay slot
 	nop
@@ -1008,7 +1008,7 @@ constants:
 	faddd	%f26,%f20,%f26
 	sub	%g5,%l2,%o7
 	cmp	%o7,%o5
-	bl,pt	%icc,1f	
+	bl,pt	%icc,1f
 ! delay slot
 	nop
 	ldd	[%fp+pio4],%f20

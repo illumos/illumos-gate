@@ -30,7 +30,7 @@
 #define	JMP	\
 	pushq	$_CONST(. - brand_handler_table); \
 	jmp	brand_handler;	\
-	.align	16;	
+	.align	16;
 
 #define	JMP4	JMP; JMP; JMP; JMP
 #define JMP16	JMP4; JMP4; JMP4; JMP4

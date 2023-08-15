@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Return default keytab file name.
  */
@@ -61,7 +61,7 @@ krb5_kt_default_name(krb5_context context, char *name, int namesize)
 	strncpy(name, cp, namesize);
     } else if ((profile_get_string(context->profile,
 				   "libdefaults",
-				   "default_keytab_name", NULL, 
+				   "default_keytab_name", NULL,
 				   NULL, &retval) == 0) &&
 	       retval) {
 	if ((size_t) namesize < (strlen(retval)+1))
@@ -90,4 +90,4 @@ krb5_kt_default_name(krb5_context context, char *name, int namesize)
     }
     return 0;
 }
-    
+

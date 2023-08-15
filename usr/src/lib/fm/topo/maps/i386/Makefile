@@ -25,7 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-CLASS = common 
+CLASS = common
 DTDFILE = topology.dtd.1
 TOPOFILE = xfp-hc-topology.xml
 SRCDIR = ../i386

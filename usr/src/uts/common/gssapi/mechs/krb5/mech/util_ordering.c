@@ -6,7 +6,7 @@
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -16,7 +16,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -204,7 +204,7 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
    /* rule 1: expected sequence number */
 
    expected = (QELEM(q,q->start+q->length-1)+1) & q->mask;
-   if (seqnum == expected) { 
+   if (seqnum == expected) {
       queue_insert(q, q->start+q->length-1, seqnum);
       return(GSS_S_COMPLETE);
    }
@@ -235,7 +235,7 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
       for (i=q->start; i<q->start+q->length-1; i++) {
          if (seqnum == QELEM(q,i))
             return (GSS_S_DUPLICATE_TOKEN);
-         if (after(seqnum, QELEM(q,i), q->mask) && 
+         if (after(seqnum, QELEM(q,i), q->mask) &&
              after(QELEM(q,i+1), seqnum, q->mask)) {
             queue_insert(q, i, seqnum);
             if (q->do_replay && !q->do_sequence)
@@ -254,7 +254,7 @@ void
 g_order_free(void **vqueue)
 {
    queue *q;
-   
+
    q = (queue *) (*vqueue);
 
    FREE (q, sizeof (queue));
@@ -280,7 +280,7 @@ g_queue_externalize(void *vqueue, unsigned char **buf, size_t *lenremain)
     (void) memcpy(*buf, vqueue, sizeof(queue));
     *buf += sizeof(queue);
     *lenremain -= sizeof(queue);
-    
+
     return 0;
 }
 

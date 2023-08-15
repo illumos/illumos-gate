@@ -100,7 +100,7 @@ $(POFILE):	$(POFILES)
 
 install: all $(ROOTBINPROG) $(ROOTLIBPROG)
 
-clean:  
+clean:
 	$(RM) $(SOBJS) $(GOBJS) $(YOBJS) $(COBJS) \
 		$(XOBJS) $(LXOBJS) $(BOBJS) $(LOBJS) \
 		$(POFILE) $(POFILES) gnu_po.c y.tab.h xgettext.lx.c

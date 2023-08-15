@@ -1,8 +1,8 @@
 /******************************************************************************
  * vcpu.h
- * 
+ *
  * VCPU initialisation, query, and hotplug.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -36,9 +36,9 @@
  */
 
 /*
- * Initialise a VCPU. Each VCPU can be initialised only once. A 
+ * Initialise a VCPU. Each VCPU can be initialised only once. A
  * newly-initialised VCPU will not run until it is brought up by VCPUOP_up.
- * 
+ *
  * @extra_arg == pointer to vcpu_guest_context structure containing initial
  *               state for the VCPU.
  */
@@ -161,7 +161,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
 #define _VCPU_SSHOTTMR_future (0)
 #define VCPU_SSHOTTMR_future  (1U << _VCPU_SSHOTTMR_future)
 
-/* 
+/*
  * Register a memory location in the guest address space for the
  * vcpu_info structure.  This allows the guest to place the vcpu_info
  * structure in a convenient place, such as in a per-cpu data area.
@@ -182,7 +182,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 /* Send an NMI to the specified VCPU. @extra_arg == NULL. */
 #define VCPUOP_send_nmi             11
 
-/* 
+/*
  * Get the physical ID information for a pinned vcpu's underlying physical
  * processor.  The physical ID informmation is architecture-specific.
  * On x86: id[31:0]=apic_id, id[63:32]=acpi_id, and all values 0xff and

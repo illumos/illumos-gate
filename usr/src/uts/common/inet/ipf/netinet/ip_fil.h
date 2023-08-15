@@ -600,7 +600,7 @@ typedef	struct	frentry {
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
 	u_32_t	fr_collect;	/* collection number */
-	u_int	fr_arg;		/* misc. numeric arg for rule */ 
+	u_int	fr_arg;		/* misc. numeric arg for rule */
 	u_int	fr_loglevel;	/* syslog log facility + priority */
 	u_int	fr_age[2];	/* non-TCP timeouts */
 	u_char	fr_v;
@@ -1568,7 +1568,7 @@ extern	frentry_t 	*fr_dolog __P((fr_info_t *, u_32_t *));
 extern	frentry_t 	*fr_dstgrpmap __P((fr_info_t *, u_32_t *));
 extern	void		fr_fixskip __P((frentry_t **, frentry_t *, int));
 extern	void		fr_forgetifp __P((void *, ipf_stack_t *));
-extern	frentry_t 	*fr_getrulen __P((int, char *, u_32_t, 
+extern	frentry_t 	*fr_getrulen __P((int, char *, u_32_t,
 					  ipf_stack_t *));
 extern	void		fr_getstat __P((struct friostat *, ipf_stack_t *));
 extern	int		fr_ifpaddr __P((int, int, void *,

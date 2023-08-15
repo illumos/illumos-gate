@@ -27,7 +27,7 @@
 /*
  * Assembly language support for sun4v px driver
  */
- 
+
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>
 #include <sys/privregs.h>

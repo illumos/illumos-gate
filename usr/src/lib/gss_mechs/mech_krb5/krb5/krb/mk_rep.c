@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_mk_rep()
  */
@@ -57,8 +57,8 @@ krb5_mk_rep(krb5_context context, krb5_auth_context auth_context, krb5_data *out
             return(retval);
     }
 
-    repl.ctime = auth_context->authentp->ctime;    
-    repl.cusec = auth_context->authentp->cusec;    
+    repl.ctime = auth_context->authentp->ctime;
+    repl.cusec = auth_context->authentp->cusec;
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_USE_SUBKEY) {
 	retval = krb5int_generate_and_save_subkey (context, auth_context,
 						   auth_context->keyblock);
@@ -84,12 +84,12 @@ krb5_mk_rep(krb5_context context, krb5_auth_context auth_context, krb5_data *out
     }
 
     memset(reply.enc_part.ciphertext.data, 0, reply.enc_part.ciphertext.length);
-    free(reply.enc_part.ciphertext.data); 
-    reply.enc_part.ciphertext.length = 0; 
+    free(reply.enc_part.ciphertext.data);
+    reply.enc_part.ciphertext.length = 0;
     reply.enc_part.ciphertext.data = 0;
 
 cleanup_scratch:
-    memset(scratch->data, 0, scratch->length); 
+    memset(scratch->data, 0, scratch->length);
     krb5_free_data(context, scratch);
 
     return retval;

@@ -758,7 +758,7 @@ class SLPHeaderV1 extends SrvLocHeader implements Cloneable {
 
 	return attrForms;
     }
-	
+
     // Parse out a V1 attribute vector.
 
     void

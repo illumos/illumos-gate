@@ -28,14 +28,14 @@
 
 / bootstrap routine for run-time linker
 / we get control from exec which has loaded our text and
-/ data into the process' address space and created the process 
+/ data into the process' address space and created the process
 / stack
 /
 / on entry, the process stack looks like this:
 /
 /			# <- %esp
 /_______________________#  high addresses
-/	strings		#  
+/	strings		#
 /_______________________#
 /	0 word		#
 /_______________________#
@@ -57,7 +57,7 @@
 /	pointers	#
 /	Argc words	#
 /_______________________#
-/	argc		# 
+/	argc		#
 /_______________________# <- %ebp
 
 #include <SYS.h>
@@ -151,7 +151,7 @@ f.PANIC:
 	call	f.WRITE
 	jmp	f.EXIT
 / Not reached
-	
+
 f.OPENAT:
 	movl	$SYS_openat,%eax
 	jmp	__syscall

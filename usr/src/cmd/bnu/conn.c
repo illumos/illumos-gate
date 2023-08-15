@@ -212,7 +212,7 @@ char *flds[], *dev[];
 
 
 /*
- *	rddev - find and unpack a line from device file for this caller type 
+ *	rddev - find and unpack a line from device file for this caller type
  *	lines starting with whitespace of '#' are comments
  *
  *	return codes:
@@ -394,7 +394,7 @@ protoString(valid)
 char *valid;
 {
 	char *save;
-	
+
 	save =strdup(valid);
 	_Protocol[0] = '\0';
 
@@ -437,8 +437,8 @@ char *valid;
 	if ( *(protoPtr = _Protocol) != NULLCHAR ) {
 	    while ( *(protoPtr = nextProto(protoPtr)) != NULLCHAR ) {
 		if ( *(wantPtr = findProto(desired, *protoPtr)) == NULLCHAR ) {
-		    removeProto(valid, *protoPtr);	
-		    removeProto(protoPtr, *protoPtr);	
+		    removeProto(valid, *protoPtr);
+		    removeProto(protoPtr, *protoPtr);
 		} else {
 		    mergeProto(protoPtr, wantPtr);
 		    protoPtr++;
@@ -480,7 +480,7 @@ char *tostring, *fromstring;
 	    else
 		tostring++;
 	}
-	
+
 	if ( *tostring == NULLCHAR ) {
 	    length = nextProto(fromstring + 1) - fromstring;
 	    (void) strncpy(tostring, fromstring, length);
@@ -519,7 +519,7 @@ char *string, letter;
 	}
 }
 
-/* 
+/*
  * nextProto
  *	char *string;
  * return
@@ -536,7 +536,7 @@ char *string;
 	return(string);
 }
 
-/* 
+/*
  * findProto
  *	char *desired,
  *	char protoPtr;
@@ -757,7 +757,7 @@ wait_for_hangup(dcf)
 	}
 	return (SUCCESS);
 }
-	
+
 /*
  *	sendthem(str, fn, phstr1, phstr2)	send line of chat sequence
  *	char *str, *phstr;
@@ -870,7 +870,7 @@ int fn;
 				continue;
 			default:	/* send the backslash */
 				*bptr++ = '\\';
-				*bptr++ = *sptr;	
+				*bptr++ = *sptr;
 				continue;
 
 			/* flush buf, perform action, and continue */
@@ -1299,7 +1299,7 @@ unsigned n;
 
 /*
 
- * altconn - place a telephone call to system 
+ * altconn - place a telephone call to system
  * from cu when telephone number or direct line used
  *
  * return codes:

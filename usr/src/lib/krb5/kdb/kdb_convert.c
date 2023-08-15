@@ -964,7 +964,7 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates)
 				if ((ULOG_ENTRY_TYPE(upd, i).av_type == AT_PW_POLICY) && ULOG_ENTRY(upd, i).av_pw_policy.utf8str_t_val)
 					free(ULOG_ENTRY(upd, i).av_pw_policy.utf8str_t_val);
 
-				/* 
+				/*
 				 * XXX: Free av_pw_hist
 				 *
 				 * For now, we just free the pointer

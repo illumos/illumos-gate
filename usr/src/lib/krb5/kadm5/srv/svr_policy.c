@@ -1,5 +1,5 @@
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -40,7 +40,7 @@ static char *rcsid = "$Header$";
 
 /*
  * Function: kadm5_create_policy
- * 
+ *
  * Purpose: Create Policies in the policy DB.
  *
  * Arguments:
@@ -51,7 +51,7 @@ static char *rcsid = "$Header$";
  *
  * Requires:
  *	Entry must be a valid principal entry, and mask have a valid value.
- * 
+ *
  * Effects:
  *	Verifies that mask does not specify that the refcount should
  *	be set as part of the creation, and calls
@@ -75,7 +75,7 @@ kadm5_create_policy(void *server_handle,
 
 /*
  * Function: kadm5_create_policy_internal
- * 
+ *
  * Purpose: Create Policies in the policy DB.
  *
  * Arguments:
@@ -86,7 +86,7 @@ kadm5_create_policy(void *server_handle,
  *
  * Requires:
  *	Entry must be a valid principal entry, and mask have a valid value.
- * 
+ *
  * Effects:
  *	Writes the data to the database, and does a database sync if
  *	successful.
@@ -110,7 +110,7 @@ kadm5_create_policy_internal(void *server_handle,
 	return KADM5_BAD_POLICY;
     if (!(mask & KADM5_POLICY))
 	return KADM5_BAD_MASK;
-	
+
     pent.name = entry->policy;
     p = entry->policy;
     while(*p != '\0') {
@@ -164,7 +164,7 @@ kadm5_create_policy_internal(void *server_handle,
     else
 	return KADM5_OK;
 }
-	  
+
 kadm5_ret_t
 kadm5_delete_policy(void *server_handle, kadm5_policy_t name)
 {
@@ -228,7 +228,7 @@ kadm5_modify_policy_internal(void *server_handle,
 	return KADM5_BAD_POLICY;
     if((mask & KADM5_POLICY))
 	return KADM5_BAD_MASK;
-		
+
     if ((ret = krb5_db_get_policy(handle->context, entry->policy, &p, &cnt)))
 	return ret;
     if (cnt != 1)
@@ -275,7 +275,7 @@ kadm5_modify_policy_internal(void *server_handle,
 
 kadm5_ret_t
 kadm5_get_policy(void *server_handle, kadm5_policy_t name,
-		 kadm5_policy_ent_t entry) 
+		 kadm5_policy_ent_t entry)
 {
     osa_policy_ent_t		t;
     kadm5_policy_ent_rec	entry_local, **entry_orig, *new;
@@ -296,7 +296,7 @@ kadm5_get_policy(void *server_handle, kadm5_policy_t name,
 	 *entry_orig = NULL;
 	 entry = &entry_local;
     }
-    
+
     if (name == (kadm5_policy_t) NULL)
 	return EINVAL;
     if(strlen(name) == 0)
@@ -330,6 +330,6 @@ kadm5_get_policy(void *server_handle, kadm5_policy_t name,
 	 *new = *entry;
 	 *entry_orig = new;
     }
-    
+
     return KADM5_OK;
 }

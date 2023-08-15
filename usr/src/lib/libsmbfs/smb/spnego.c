@@ -235,8 +235,8 @@ int spnegoCreateNegTokenInit( SPNEGO_MECH_OID MechType,
    {
       // Get the actual token size
 
-      if ( ( nReturn = CalculateMinSpnegoInitTokenSize( ulMechTokenLen, ulMechListMICLen, 
-							&MechType, 1, ( ucContextFlags != 0L ), 
+      if ( ( nReturn = CalculateMinSpnegoInitTokenSize( ulMechTokenLen, ulMechListMICLen,
+							&MechType, 1, ( ucContextFlags != 0L ),
                                                          &nTokenLength, &nInternalTokenLength ) )
                         == SPNEGO_E_SUCCESS )
       {
@@ -308,7 +308,7 @@ int spnegoCreateNegTokenInit( SPNEGO_MECH_OID MechType,
 //
 ////////////////////////////////////////////////////////////////////////////
 
-int spnegoCreateNegTokenTarg( SPNEGO_MECH_OID MechType, 
+int spnegoCreateNegTokenTarg( SPNEGO_MECH_OID MechType,
           SPNEGO_NEGRESULT spnegoNegResult, unsigned char* pbMechToken,
           unsigned long ulMechTokenLen, unsigned char* pbMechListMIC,
           unsigned long ulMechListMICLen, SPNEGO_TOKEN_HANDLE* phSpnegoToken )
@@ -338,7 +338,7 @@ int spnegoCreateNegTokenTarg( SPNEGO_MECH_OID MechType,
       // Get the actual token size
 
       if ( ( nReturn = CalculateMinSpnegoTargTokenSize( MechType, spnegoNegResult, ulMechTokenLen,
-                                                         ulMechListMICLen, &nTokenLength, 
+                                                         ulMechListMICLen, &nTokenLength,
                                                          &nInternalTokenLength ) )
                         == SPNEGO_E_SUCCESS )
       {
@@ -412,7 +412,7 @@ int spnegoTokenGetBinary( SPNEGO_TOKEN_HANDLE hSpnegoToken, unsigned char* pbTok
 {
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters - pbTokenData is optional
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pulDataLen )
@@ -483,7 +483,7 @@ int spnegoGetTokenType( SPNEGO_TOKEN_HANDLE hSpnegoToken, int * piTokenType )
 {
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != piTokenType &&
@@ -531,11 +531,11 @@ int spnegoIsMechTypeAvailable( SPNEGO_TOKEN_HANDLE hSpnegoToken, SPNEGO_MECH_OID
 {
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != piMechTypeIndex &&
-         IsValidMechOid( MechOID ) && 
+         IsValidMechOid( MechOID ) &&
          SPNEGO_TOKEN_INIT == pSpnegoToken->ucTokenType )
    {
 
@@ -583,7 +583,7 @@ int spnegoGetContextFlags( SPNEGO_TOKEN_HANDLE hSpnegoToken, unsigned char* pucC
 {
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pucContextFlags &&
@@ -644,7 +644,7 @@ int spnegoGetNegotiationResult( SPNEGO_TOKEN_HANDLE hSpnegoToken, SPNEGO_NEGRESU
 {
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pnegResult &&
@@ -705,7 +705,7 @@ int spnegoGetSupportedMechType( SPNEGO_TOKEN_HANDLE hSpnegoToken, SPNEGO_MECH_OI
    int   nCtr = 0L;
    long  nLength = 0L;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pMechOID &&
@@ -716,7 +716,7 @@ int spnegoGetSupportedMechType( SPNEGO_TOKEN_HANDLE hSpnegoToken, SPNEGO_MECH_OI
       if ( pSpnegoToken->aElementArray[SPNEGO_TARG_SUPPMECH_ELEMENT].iElementPresent
             == SPNEGO_TOKEN_ELEMENT_AVAILABLE )
       {
-         
+
          for ( nCtr = 0;
                nReturn != SPNEGO_E_SUCCESS &&
                g_stcMechOIDList[nCtr].eMechanismOID != spnego_mech_oid_NotUsed;
@@ -778,7 +778,7 @@ int spnegoGetMechToken( SPNEGO_TOKEN_HANDLE hSpnegoToken, unsigned char* pbToken
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
    SPNEGO_ELEMENT*   pSpnegoElement = NULL;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pulDataLen )
@@ -852,7 +852,7 @@ int spnegoGetMechListMIC( SPNEGO_TOKEN_HANDLE hSpnegoToken, unsigned char* pbMIC
    int   nReturn = SPNEGO_E_INVALID_PARAMETER;
    SPNEGO_TOKEN*  pSpnegoToken = (SPNEGO_TOKEN*) hSpnegoToken;
    SPNEGO_ELEMENT*   pSpnegoElement = NULL;
-   
+
    // Check parameters
    if (  IsValidSpnegoToken( pSpnegoToken ) &&
          NULL != pulDataLen )

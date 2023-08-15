@@ -38,7 +38,7 @@ OBJS =	$(LOCAL_OBJS) $(COMMON_OBJS)
 SRCS = $(LOCAL_SRCS) $(COMMON_SRCS)
 
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
-LDLIBS += -lstmf 
+LDLIBS += -lstmf
 
 MANIFEST    = stmf.xml
 SVCMETHOD   = svc-stmf

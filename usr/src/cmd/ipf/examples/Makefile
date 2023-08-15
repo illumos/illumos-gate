@@ -32,7 +32,7 @@ EXAMPLES=	BASIC.NAT BASIC_1.FW BASIC_2.FW \
 		example.9 example.10 example.11 example.12 \
 		example.13 example.sr firewall ftp-proxy \
 		ftppxy ip_rules nat-setup nat.eg \
-		pool.conf server tcpstate 
+		pool.conf server tcpstate
 
 SHSRCS= $(SHPROG:%=%.sh)
 

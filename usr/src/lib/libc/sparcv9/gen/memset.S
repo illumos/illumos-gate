@@ -51,7 +51,7 @@
  *
  * Algorithm used:
  *	For small stores (6 or fewer bytes), bytes will be stored one at a time.
- *	
+ *
  *	When setting 15 or more bytes, there will be at least 8 bytes aligned
  *	on an 8-byte boundary.  So, leading bytes will be set, then as many
  *	8-byte aligned chunks as possible will be set, followed by any trailing
@@ -76,7 +76,7 @@
 
 	ENTRY(memset)
 	mov	%o0, %o5		! need to return this value
-	cmp	%o2, 7			
+	cmp	%o2, 7
 	blu,pn	%xcc, .wrchar		! small count:  just set bytes
 	and	%o1, 0xff, %o1
 

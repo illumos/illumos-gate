@@ -51,7 +51,7 @@ OM_uint32 krb5_gss_export_name(OM_uint32  *minor_status,
 
 	exported_name->length = 0;
 	exported_name->value = NULL;
-	
+
 	if (! kg_validate_name(input_name)) {
 	    /* Solaris Kerberos: spruce-up the err msg */
 	    krb5_principal princ = (krb5_principal) input_name;
@@ -70,7 +70,7 @@ OM_uint32 krb5_gss_export_name(OM_uint32  *minor_status,
 	    return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
 	}
 
-	if ((code = krb5_unparse_name(context, (krb5_principal) input_name, 
+	if ((code = krb5_unparse_name(context, (krb5_principal) input_name,
 				      &str))) {
 		if (minor_status)
 			*minor_status = code;

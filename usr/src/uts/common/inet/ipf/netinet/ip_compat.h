@@ -747,7 +747,7 @@ struct ip6_ext {
 	u_char	ip6e_len;
 };
 
-typedef	int		ioctlcmd_t;  
+typedef	int		ioctlcmd_t;
 /*
  * Really, any arch where sizeof(long) != sizeof(int).
  */
@@ -799,7 +799,7 @@ typedef struct mbuf mb_t;
 # endif
 
 typedef	struct uio	uio_t;
-typedef	u_long		ioctlcmd_t;  
+typedef	u_long		ioctlcmd_t;
 typedef	int		minor_t;
 typedef	u_int32_t	u_32_t;
 # define	U_32_T	1
@@ -813,10 +813,10 @@ typedef	u_int32_t	u_32_t;
 /* ----------------------------------------------------------------------- */
 #ifdef __FreeBSD__
 # if defined(_KERNEL)
-#  if (__FreeBSD_version >= 500000)                          
+#  if (__FreeBSD_version >= 500000)
 #   include "opt_bpf.h"
 #  else
-#   include "bpf.h"    
+#   include "bpf.h"
 #  endif
 #  if defined(__FreeBSD_version) && (__FreeBSD_version >= 400000)
 #   include "opt_inet6.h"
@@ -1020,7 +1020,7 @@ typedef struct mbuf mb_t;
 # endif
 
 typedef	struct uio	uio_t;
-typedef	u_long		ioctlcmd_t;  
+typedef	u_long		ioctlcmd_t;
 typedef	int		minor_t;
 typedef	u_int32_t	u_32_t;
 # define	U_32_T	1
@@ -1085,7 +1085,7 @@ typedef struct mbuf mb_t;
 # endif
 
 typedef	struct uio	uio_t;
-typedef	int		ioctlcmd_t;  
+typedef	int		ioctlcmd_t;
 typedef	int		minor_t;
 typedef	unsigned int	u_32_t;
 # define	U_32_T	1
@@ -1181,7 +1181,7 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 
 #  define	ifnet		net_device
 #  define	if_xname	name
-#  define	if_unit		ifindex 
+#  define	if_unit		ifindex
 
 #  define	KMALLOC(x,t)	(x) = (t)kmalloc(sizeof(*(x)), \
 				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
@@ -1347,7 +1347,7 @@ struct ip6_ext {
 	u_char	ip6e_len;
 };
 
-typedef	int		ioctlcmd_t;  
+typedef	int		ioctlcmd_t;
 typedef	int		minor_t;
 /*
  * Really, any arch where sizeof(long) != sizeof(int).
@@ -1813,7 +1813,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 
 #if (BSD >= 199306) && !defined(m_act)
 # define	m_act	m_nextpkt
-#endif  
+#endif
 
 /*
  * Security Options for Intenet Protocol (IPSO) as defined in RFC 1108.
@@ -1850,7 +1850,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
  * IP option #defines
  */
 #undef	IPOPT_RR
-#define	IPOPT_RR	7 
+#define	IPOPT_RR	7
 #undef	IPOPT_ZSU
 #define	IPOPT_ZSU	10	/* ZSU */
 #undef	IPOPT_MTUP

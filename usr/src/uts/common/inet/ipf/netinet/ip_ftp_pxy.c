@@ -412,7 +412,7 @@ ifs_ftppxy_t *ifsftp;
 		is = nat2->nat_state;
 		if (is != NULL) {
 			MUTEX_ENTER(&is->is_lock);
-			(void)fr_tcp_age(&is->is_sti, &fi, ifs->ifs_ips_tqtqb, 
+			(void)fr_tcp_age(&is->is_sti, &fi, ifs->ifs_ips_tqtqb,
 				         is->is_flags);
 			MUTEX_EXIT(&is->is_lock);
 		}

@@ -59,17 +59,17 @@ typedef uint64_t   UINTN;
 
 #ifdef EFI_NT_EMULATOR
     #define POST_CODE(_Data)
-#else    
+#else
     #ifdef EFI_DEBUG
 #define POST_CODE(_Data)    __asm mov eax,(_Data) __asm out 0x80,al
     #else
         #define POST_CODE(_Data)
-    #endif  
+    #endif
 #endif
 
 #define EFIERR(a)           (0x8000000000000000 | a)
 #define EFI_ERROR_MASK      0x8000000000000000
-#define EFIERR_OEM(a)       (0xc000000000000000 | a)      
+#define EFIERR_OEM(a)       (0xc000000000000000 | a)
 
 
 #define BAD_POINTER         0xFBFBFBFBFBFBFBFB
@@ -103,18 +103,18 @@ typedef uint64_t   UINTN;
 // BOOTSERVICE - prototype for implementation of a boot service interface
 // RUNTIMESERVICE - prototype for implementation of a runtime service interface
 // RUNTIMEFUNCTION - prototype for implementation of a runtime function that is not a service
-// RUNTIME_CODE - pragma macro for declaring runtime code    
+// RUNTIME_CODE - pragma macro for declaring runtime code
 //
 
 #ifdef	__amd64__
 #define	EFIAPI	__attribute__((ms_abi))
 #endif
 
-#ifndef EFIAPI                  // Forces EFI calling conventions reguardless of compiler options 
+#ifndef EFIAPI                  // Forces EFI calling conventions reguardless of compiler options
     #ifdef _MSC_EXTENSIONS
-        #define EFIAPI __cdecl  // Force C calling convention for Microsoft C compiler 
+        #define EFIAPI __cdecl  // Force C calling convention for Microsoft C compiler
     #else
-        #define EFIAPI          // Substitute expresion to force C calling convention 
+        #define EFIAPI          // Substitute expresion to force C calling convention
     #endif
 #endif
 
@@ -131,7 +131,7 @@ typedef uint64_t   UINTN;
 
 #define VOLATILE    volatile
 
-#define MEMORY_FENCE()    
+#define MEMORY_FENCE()
 
 #ifdef EFI_NO_INTERFACE_DECL
   #define EFI_FORWARD_DECLARATION(x)
@@ -194,7 +194,7 @@ typedef uint64_t   UINTN;
     #define LOAD_INTERNAL_DRIVER(_if, type, name, entry)    \
             (_if)->LoadInternal(type, name, entry)
 
-#endif // EFI_FW_NT 
+#endif // EFI_FW_NT
 
 #define INTERFACE_DECL(x) struct x
 

@@ -146,7 +146,7 @@ GType
 hal_device_get_type (void)
 {
 	static GType type = 0;
-	
+
 	if (!type) {
 		static GTypeInfo type_info = {
 			sizeof (HalDeviceClass),
@@ -182,7 +182,7 @@ hal_device_new (void)
 	return device;
 }
 
-/** Merge all properties from source where the key starts with 
+/** Merge all properties from source where the key starts with
  *  source_namespace and put them onto target replacing source_namespace
  *  with target_namespace
  *
@@ -593,12 +593,12 @@ hal_device_property_get_as_string (HalDevice *device, const char *key, char *buf
 				if (bufsize > 0)
 					buf[0] = '\t';
 				i = 1;
-				for (iter = hal_property_get_strlist (prop); 
-				     iter != NULL && i < bufsize; 
+				for (iter = hal_property_get_strlist (prop);
+				     iter != NULL && i < bufsize;
 				     iter = g_slist_next (iter)) {
 					guint len;
 					const char *str;
-					
+
 					str = (const char *) iter->data;
 					len = strlen (str);
 					strncpy (buf + i, str, bufsize - i);
@@ -946,30 +946,30 @@ hal_device_print (HalDevice *device)
                         fprintf (stderr, "  %s = '%s'  (string)\n", key,
                                 hal_property_get_string (p));
                         break;
- 
+
                 case HAL_PROPERTY_TYPE_INT32:
                         fprintf (stderr, "  %s = %d  0x%x  (int)\n", key,
                                 hal_property_get_int (p),
                                 hal_property_get_int (p));
                         break;
- 
+
                 case HAL_PROPERTY_TYPE_UINT64:
                         fprintf (stderr, "  %s = %llu  0x%llx  (uint64)\n", key,
                                 (long long unsigned int) hal_property_get_uint64 (p),
                                 (long long unsigned int) hal_property_get_uint64 (p));
                         break;
- 
+
                 case HAL_PROPERTY_TYPE_DOUBLE:
                         fprintf (stderr, "  %s = %g  (double)\n", key,
                                 hal_property_get_double (p));
                         break;
- 
+
                 case HAL_PROPERTY_TYPE_BOOLEAN:
                         fprintf (stderr, "  %s = %s  (bool)\n", key,
                                 (hal_property_get_bool (p) ? "true" :
                                  "false"));
                         break;
- 
+
                 default:
                         HAL_WARNING (("Unknown property type %d", type));
                         break;
@@ -1083,7 +1083,7 @@ hal_device_cancel (HalDevice *device)
 
 
 GSList *
-hal_device_property_get_strlist (HalDevice    *device, 
+hal_device_property_get_strlist (HalDevice    *device,
 				 const char   *key)
 {
 	HalProperty *prop;
@@ -1150,7 +1150,7 @@ hal_device_property_strlist_append (HalDevice    *device,
 	return TRUE;
 }
 
-gboolean 
+gboolean
 hal_device_property_strlist_prepend (HalDevice    *device,
 				     const char   *key,
 				     const char *value)
@@ -1197,13 +1197,13 @@ hal_device_property_strlist_remove_elem (HalDevice    *device,
 
 	if (hal_property_get_type (prop) != HAL_PROPERTY_TYPE_STRLIST)
 		return FALSE;
-	
+
 	if (hal_property_strlist_remove_elem (prop, index)) {
 		g_signal_emit (device, signals[PROPERTY_CHANGED], 0,
 			       key, FALSE, FALSE);
 		return TRUE;
 	}
-	
+
 	return FALSE;
 }
 
@@ -1229,13 +1229,13 @@ hal_device_property_strlist_clear (HalDevice    *device,
 
 	if (hal_property_get_type (prop) != HAL_PROPERTY_TYPE_STRLIST)
 		return FALSE;
-	
+
 	if (hal_property_strlist_clear (prop)) {
 		g_signal_emit (device, signals[PROPERTY_CHANGED], 0,
 			       key, FALSE, FALSE);
 		return TRUE;
 	}
-	
+
 	return FALSE;
 }
 
@@ -1294,12 +1294,12 @@ hal_device_property_strlist_remove (HalDevice *device,
 
 	if (hal_property_get_type (prop) != HAL_PROPERTY_TYPE_STRLIST)
 		return FALSE;
-	
+
 	if (hal_property_strlist_remove (prop, value)) {
 		g_signal_emit (device, signals[PROPERTY_CHANGED], 0,
 			       key, FALSE, FALSE);
 	}
-	
+
 	return TRUE;
 }
 
@@ -1311,12 +1311,12 @@ hal_device_property_strlist_is_empty (HalDevice    *device,
 
 	if ( hal_device_has_property (device, key)) {
 		strlist = hal_device_property_get_strlist (device, key);
-		if (strlist == NULL ) 
+		if (strlist == NULL )
 			return TRUE;
 
-		if (g_slist_length (strlist) > 0) 
+		if (g_slist_length (strlist) > 0)
 			return FALSE;
-		else 
+		else
 			return TRUE;
 	}
 	return FALSE;
@@ -1332,7 +1332,7 @@ gboolean
 hal_device_inc_num_ready_addons (HalDevice *device)
 {
 	if (hal_device_are_all_addons_ready (device)) {
-		HAL_ERROR (("In hal_device_inc_num_ready_addons for udi=%s but all addons are already ready!", 
+		HAL_ERROR (("In hal_device_inc_num_ready_addons for udi=%s but all addons are already ready!",
 			    device->udi));
 		return FALSE;
 	}

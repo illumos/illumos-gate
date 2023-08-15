@@ -393,7 +393,7 @@ typedef enum
 	IMA_COMMIT_TYPE_ALL_WITH_RESET
 } IMA_COMMIT_LEVEL;
 
-typedef enum 
+typedef enum
 {
 	IMA_DIGEST_NONE		= 0,
 	IMA_DIGEST_CRC32C		= 1

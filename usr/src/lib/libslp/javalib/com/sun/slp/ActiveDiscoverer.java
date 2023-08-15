@@ -184,7 +184,7 @@ class ActiveDiscoverer extends Thread {
 
 	    for (i = 0; i < n; i++) {
 		InetAddress interfac = (InetAddress)interfaces.elementAt(i);
-		ServiceURL url = new ServiceURL(Defaults.DA_SERVICE_TYPE + 
+		ServiceURL url = new ServiceURL(Defaults.DA_SERVICE_TYPE +
 						"://" +
 						interfac.getHostAddress(),
 						ServiceURL.LIFETIME_MAXIMUM);
@@ -308,7 +308,7 @@ class ActiveDiscoverer extends Thread {
 	    CDAAdvert advert = (CDAAdvert)reply;
 	    SrvLocHeader hdr = advert.getHeader();
 
-	    // We need to make the URL long lived if active 
+	    // We need to make the URL long lived if active
 	    // discovery is off. Otherwise, we let the DA time out like all the
 	    // rest.
 
@@ -319,21 +319,21 @@ class ActiveDiscoverer extends Thread {
 
 	    }
 
-	    // Add the scopes to the configured scopes. Scopes from configured 
+	    // Add the scopes to the configured scopes. Scopes from configured
 	    //  DAs count as configured scopes.
 
 	    config.addPreconfiguredDAScopes(hdr.scopes);
 
 	    // Record it. Note that we don't have to forward here
 	    //  because it's the very beginning.
-      
+
 	    table.recordNewDA(advert.URL,
 			      hdr.scopes,
 			      advert.timestamp,
 			      hdr.version,
 			      advert.attrs,
 			      advert.spis);
-	
+
 	}
     }
 

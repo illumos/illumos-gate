@@ -41,7 +41,7 @@ import com.sun.solaris.service.timer.*;
 
 /**
  * Regularly samples the objective-related utilization statistics of
- * the resource in the pool with the given configuration. 
+ * the resource in the pool with the given configuration.
  */
 class SystemMonitor implements Monitor
 {
@@ -59,7 +59,7 @@ class SystemMonitor implements Monitor
 	/**
 	 * Default sample interval (milliseconds).
 	 */
-	public static final int DEF_SAMPLE_INT = 15000; 
+	public static final int DEF_SAMPLE_INT = 15000;
 
 	/**
 	 * Sample interval (milliseconds, default 15000).
@@ -266,7 +266,7 @@ class SystemMonitor implements Monitor
 						else
 							statsv[i] = statsv[i].
 							    add(value);
-					}					
+					}
 				} catch (KstatException ke) {
 					StaleMonitorException sme =
 					    new StaleMonitorException();
@@ -336,7 +336,7 @@ class SystemMonitor implements Monitor
 		Iterator itMon = monitored.values().iterator();
 		while (itMon.hasNext()) {
 			ResourceMonitor mon = (ResourceMonitor) itMon.next();
-			
+
 			Iterator itSL = mon.values().iterator();
 			while (itSL.hasNext()) {
 				StatisticList sl = (StatisticList) itSL.next();

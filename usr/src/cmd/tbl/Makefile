@@ -59,7 +59,7 @@ $(POFILE):      $(POFILES)
 
 install :	all $(ROOTPROG)
 
-clean : 
+clean :
 		$(RM) $(OBJS)
 
 lint:		lint_SRCS

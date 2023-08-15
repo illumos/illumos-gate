@@ -22,27 +22,27 @@
 
 typedef struct _rxp_hsi_t {
     fw_version_t version;
-    u32_t rxp_knum; 
+    u32_t rxp_knum;
     u32_t rxp_flood;
-    u32_t ric; 
-    u32_t l2_forward_to_mcp; 
-    u32_t tcp_syn_dos_defense; 
-    u32_t rss_enable;   
-    u32_t rss_table_size;   
-    u8_t  rss_table[RSS_TABLE_MAX]; 
-    u32_t rxp_os_flag; 
-    u32_t discard_all;     
-    u32_t rxp_num_discard_all;     
-    u32_t rtca;     
-    u32_t rtcc;     
+    u32_t ric;
+    u32_t l2_forward_to_mcp;
+    u32_t tcp_syn_dos_defense;
+    u32_t rss_enable;
+    u32_t rss_table_size;
+    u8_t  rss_table[RSS_TABLE_MAX];
+    u32_t rxp_os_flag;
+    u32_t discard_all;
+    u32_t rxp_num_discard_all;
+    u32_t rtca;
+    u32_t rtcc;
     u32_t rxp_pm_ctrl;
         #define L2_NORMAL_MODE              0
         #define L2_EMC_RXQ_MODE_ENABLE      1
         #define L2_EMC_RXQ_MODE_DISABLE     2
-    u32_t ooo_pkt_cnt;  
-    u32_t l2_cu_cnt;  
+    u32_t ooo_pkt_cnt;
+    u32_t l2_cu_cnt;
     u32_t rxp_invalid_context_cnt;
-    u64_t rxp_unicast_bytes_rcvd; 
+    u64_t rxp_unicast_bytes_rcvd;
     u64_t rxp_multicast_bytes_rcvd;
     u64_t rxp_broadcast_bytes_rcvd;
     u64_t volatile idle_count;
@@ -59,16 +59,16 @@ typedef struct _rxp_hsi_t {
     u32_t iscsi_teton_l5_cmd_offset;    // Teton only: offset of L5 ccell command array
     u32_t iscsi_task_offset;            // offset of the task array
     u32_t iscsi_r2tq_offset;            // offset of R2TQ section
-    u32_t iscsi_max_num_of_tasks;       // maximal number of pending tasks 
+    u32_t iscsi_max_num_of_tasks;       // maximal number of pending tasks
     u32_t iscsi_max_num_of_ccells;      // maximal number of ccells
 
-    u64_t iscsi_rxp_unicast_bytes_rcvd; 
+    u64_t iscsi_rxp_unicast_bytes_rcvd;
     u64_t iscsi_rxp_multicast_bytes_rcvd;
     u64_t iscsi_rxp_broadcast_bytes_rcvd;
     u32_t after_fin_pkt_cnt;            // number of packets that came after FIN
     u32_t extra_fin_pkt_cnt;            // extra FIN packets that came after FIN
-    u32_t vmq_netq_cnt;                 // number of vmq or netq  
-    u32_t hw_filter_ctx_offset;                         
+    u32_t vmq_netq_cnt;                 // number of vmq or netq
+    u32_t hw_filter_ctx_offset;
     u32_t iooo_rx_cid;
     u32_t iooo_flags;
     u32_t iooo_dbg_size;
@@ -86,8 +86,8 @@ typedef struct _rxp_hsi_t {
 #define RXP_HSI_OFFSETOFF(m)  (OFFSETOF(rxp_hsi_t,m) + 0x10)
 #define RXP_HSI_SIZEOF(m)     (sizeof (((rxp_hsi_t *)0)->m))
 
-// Calling the following macro will actually get optimized during compile 
-// time. Its sole purpose is to ensure HSI variables cannot be modified/moved 
+// Calling the following macro will actually get optimized during compile
+// time. Its sole purpose is to ensure HSI variables cannot be modified/moved
 // unnoticed     scratch[10240] 0xe0000 (RW/Reset: undefined)
 #define TEST_RXP_HSI(){                                                   \
 if (0){                                                                    \

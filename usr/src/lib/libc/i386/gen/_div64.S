@@ -51,29 +51,29 @@
 / #define	LO(X)		((uint32_t)(X) & 0xffffffff)
 / #define	HI(X)		((uint32_t)((X) >> 32) & 0xffffffff)
 / #define	HILO(H, L)	(((uint64_t)(H) << 32) + (L))
-/ 
+/
 / /* give index of highest bit */
 / #define	HIBIT(a, r) \
 /     asm("bsrl %1,%0": "=r"((uint32_t)(r)) : "g" (a))
-/ 
+/
 / /* multiply two uint32_ts resulting in a uint64_t */
 / #define	A_MUL32(a, b, lo, hi) \
 /     asm("mull %2" \
 / 	: "=a"((uint32_t)(lo)), "=d"((uint32_t)(hi)) : "g" (b), "0"(a))
-/ 
+/
 / /* divide a uint64_t by a uint32_t */
 / #define	A_DIV32(lo, hi, b, q, r) \
 /     asm("divl %2" \
 / 	: "=a"((uint32_t)(q)), "=d"((uint32_t)(r)) \
 / 	: "g" (b), "0"((uint32_t)(lo)), "1"((uint32_t)hi))
-/ 
+/
 / /* subtract two uint64_ts (with borrow) */
 / #define	A_SUB2(bl, bh, al, ah) \
 /     asm("subl %4,%0\n\tsbbl %5,%1" \
 / 	: "=&r"((uint32_t)(al)), "=r"((uint32_t)(ah)) \
 / 	: "0"((uint32_t)(al)), "1"((uint32_t)(ah)), "g"((uint32_t)(bl)), \
 / 	"g"((uint32_t)(bh)))
-/ 
+/
 / /*
 /  * Unsigned division with remainder.
 /  * Divide two uint64_ts, and calculate remainder.
@@ -85,7 +85,7 @@
 / 	if (HI(y) == 0) {
 / 		uint32_t	div_hi, div_rem;
 / 		uint32_t 	q0, q1;
-/ 
+/
 / 		/* calculate q1 */
 / 		if (HI(x) < LO(y)) {
 / 			/* result is a single uint32_t, use one division */
@@ -95,25 +95,25 @@
 / 			/* result is a double uint32_t, use two divisions */
 / 			A_DIV32(HI(x), 0, LO(y), q1, div_hi);
 / 		}
-/ 
+/
 / 		/* calculate q0 and remainder */
 / 		A_DIV32(LO(x), div_hi, LO(y), q0, div_rem);
-/ 
+/
 / 		/* return remainder */
 / 		*pmod = div_rem;
-/ 
+/
 / 		/* return result */
 / 		return (HILO(q1, q0));
-/ 
+/
 / 	} else if (HI(x) < HI(y)) {
 / 		/* HI(x) < HI(y) => x < y => result is 0 */
-/ 
+/
 / 		/* return remainder */
 / 		*pmod = x;
-/ 
+/
 / 		/* return result */
 / 		return (0);
-/ 
+/
 / 	} else {
 / 		/*
 / 		 * uint64_t by uint64_t division, resulting in a one-uint32_t
@@ -123,18 +123,18 @@
 / 		uint32_t		x1, x0;
 / 		uint32_t		q0;
 / 		uint32_t		normshift;
-/ 
+/
 / 		/* normalize by shifting x and y so MSB(y) == 1 */
 / 		HIBIT(HI(y), normshift);	/* index of highest 1 bit */
 / 		normshift = 31 - normshift;
-/ 
+/
 / 		if (normshift == 0) {
 / 			/* no shifting needed, and x < 2*y so q <= 1 */
 / 			y1 = HI(y);
 / 			y0 = LO(y);
 / 			x1 = HI(x);
 / 			x0 = LO(x);
-/ 
+/
 / 			/* if x >= y then q = 1 (note x1 >= y1) */
 / 			if (x1 > y1 || x0 >= y0) {
 / 				q0 = 1;
@@ -143,13 +143,13 @@
 / 			} else {
 / 				q0 = 0;
 / 			}
-/ 
+/
 / 			/* return remainder */
 / 			*pmod = HILO(x1, x0);
-/ 
+/
 / 			/* return result */
 / 			return (q0);
-/ 
+/
 / 		} else {
 / 			/*
 / 			 * the last case: result is one uint32_t, but we need to
@@ -157,21 +157,21 @@
 / 			 */
 / 			uint64_t	dt;
 / 			uint32_t		t0, t1, x2;
-/ 
+/
 / 			/* normalize y */
 / 			dt = (y << normshift);
 / 			y1 = HI(dt);
 / 			y0 = LO(dt);
-/ 
+/
 / 			/* normalize x (we need 3 uint32_ts!!!) */
 / 			x2 = (HI(x) >> (32 - normshift));
 / 			dt = (x << normshift);
 / 			x1 = HI(dt);
 / 			x0 = LO(dt);
-/ 
+/
 / 			/* estimate q0, and reduce x to a two uint32_t value */
 / 			A_DIV32(x1, x2, y1, q0, x1);
-/ 
+/
 / 			/* adjust q0 down if too high */
 / 			/*
 / 			 * because of the limited range of x2 we can only be
@@ -186,7 +186,7 @@
 / 			/* subtract product from x to get remainder */
 / 			A_SUB2(t0, t1, x0, x1);
 / 			*pmod = (HILO(x1, x0) >> normshift);
-/ 
+/
 / 			/* return result */
 / 			return (q0);
 / 		}
@@ -375,7 +375,7 @@
 / 		/* simple cases: y is a single uint32_t */
 / 		uint32_t	div_hi, div_rem;
 / 		uint32_t	q0, q1;
-/ 
+/
 / 		/* calculate q1 */
 / 		if (HI(x) < LO(y)) {
 / 			/* result is a single uint32_t, use one division */
@@ -385,19 +385,19 @@
 / 			/* result is a double uint32_t, use two divisions */
 / 			A_DIV32(HI(x), 0, LO(y), q1, div_hi);
 / 		}
-/ 
+/
 / 		/* calculate q0 and remainder */
 / 		A_DIV32(LO(x), div_hi, LO(y), q0, div_rem);
-/ 
+/
 / 		/* return result */
 / 		return (HILO(q1, q0));
-/ 
+/
 / 	} else if (HI(x) < HI(y)) {
 / 		/* HI(x) < HI(y) => x < y => result is 0 */
-/ 
+/
 / 		/* return result */
 / 		return (0);
-/ 
+/
 / 	} else {
 / 		/*
 / 		 * uint64_t by uint64_t division, resulting in a one-uint32_t
@@ -407,18 +407,18 @@
 / 		uint32_t		x1, x0;
 / 		uint32_t		q0;
 / 		unsigned		normshift;
-/ 
+/
 / 		/* normalize by shifting x and y so MSB(y) == 1 */
 / 		HIBIT(HI(y), normshift);	/* index of highest 1 bit */
 / 		normshift = 31 - normshift;
-/ 
+/
 / 		if (normshift == 0) {
 / 			/* no shifting needed, and x < 2*y so q <= 1 */
 / 			y1 = HI(y);
 / 			y0 = LO(y);
 / 			x1 = HI(x);
 / 			x0 = LO(x);
-/ 
+/
 / 			/* if x >= y then q = 1 (note x1 >= y1) */
 / 			if (x1 > y1 || x0 >= y0) {
 / 				q0 = 1;
@@ -427,10 +427,10 @@
 / 			} else {
 / 				q0 = 0;
 / 			}
-/ 
+/
 / 			/* return result */
 / 			return (q0);
-/ 
+/
 / 		} else {
 / 			/*
 / 			 * the last case: result is one uint32_t, but we need to
@@ -438,21 +438,21 @@
 / 			 */
 / 			uint64_t	dt;
 / 			uint32_t		t0, t1, x2;
-/ 
+/
 / 			/* normalize y */
 / 			dt = (y << normshift);
 / 			y1 = HI(dt);
 / 			y0 = LO(dt);
-/ 
+/
 / 			/* normalize x (we need 3 uint32_ts!!!) */
 / 			x2 = (HI(x) >> (32 - normshift));
 / 			dt = (x << normshift);
 / 			x1 = HI(dt);
 / 			x0 = LO(dt);
-/ 
+/
 / 			/* estimate q0, and reduce x to a two uint32_t value */
 / 			A_DIV32(x1, x2, y1, q0, x1);
-/ 
+/
 / 			/* adjust q0 down if too high */
 / 			/*
 / 			 * because of the limited range of x2 we can only be
@@ -648,7 +648,7 @@
 / {
 / 	int		negative;
 / 	uint64_t	xt, yt, r;
-/ 
+/
 / 	if (x < 0) {
 / 		xt = -(uint64_t) x;
 / 		negative = 1;
@@ -733,7 +733,7 @@
 / __rem64(int64_t x, int64_t y)
 / {
 / 	uint64_t	xt, yt, rem;
-/ 
+/
 / 	if (x < 0) {
 / 		xt = -(uint64_t) x;
 / 	} else {
@@ -840,7 +840,7 @@
 / {
 / 	int		negative;
 / 	uint64_t	xt, yt, r, rem;
-/ 
+/
 / 	if (x < 0) {
 / 		xt = -(uint64_t) x;
 / 		negative = 1;

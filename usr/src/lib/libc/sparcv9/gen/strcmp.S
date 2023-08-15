@@ -38,7 +38,7 @@
  *	register const char *s1;
  *	register const char *s2;
  *	{
- *	
+ *
  *		if(s1 == s2)
  *			return(0);
  *		while(*s1 == *s2++)
@@ -115,7 +115,7 @@
 	andcc	%o3, %g1, %g0		! (word - 0x01010101) & ~word & 0x80808080
 	bz,pt	%xcc, .cmp		! no null-byte in s1 yet
 	sllx	%o0, %g5, %g1		! partial unaligned word from s2
-	
+
 	! words are equal but the end of s1 has been reached
 	! this means the strings must be equal
 .strequal:

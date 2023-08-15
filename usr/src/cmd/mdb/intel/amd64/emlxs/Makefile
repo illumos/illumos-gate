@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-MODULE = emlxs.so 
+MODULE = emlxs.so
 MDBTGT = kvm
 
 MODSRCS = emlxs.c

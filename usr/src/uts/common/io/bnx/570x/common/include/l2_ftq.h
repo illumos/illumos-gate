@@ -43,7 +43,7 @@
             struct {
                 u16_t status;
                 u8_t  opcode;
-                u8_t  flags; 
+                u8_t  flags;
             }s1;
             u32_t generic2;
         }u2;
@@ -60,7 +60,7 @@
         } u1;
 	    union{
             struct {
-                u8_t  flags; 
+                u8_t  flags;
                 u8_t  opcode;
                 u16_t status;
             } s1;
@@ -80,41 +80,41 @@ typedef struct rxpq_b
 {
     u32_t bits_errors;
     u32_t bits_status;
-   
+
     u8_t  bit_mcast_hash_idx;
     u8_t  bits_acpi_pat;
     u8_t  knum;
     u8_t  unused1;
-    
+
     u16_t rule_tag;
     u16_t pkt_len;
-    
+
     u16_t vlan_tag;
     u8_t  ip_hdr_offset;
     u8_t  rx_qid;
-    
+
     u16_t ip_xsum;
     // this field has been extended to 2-byte in Xinan
 #if (TARGET_CHIP == 5706)
     u8_t  tcp_udp_hdr_offset;
-    u8_t  unused2;     
+    u8_t  unused2;
 #else
     u16_t tcp_udp_hdr_offset;
-#endif    
+#endif
     u16_t tcp_udp_xsum;
     u16_t tcp_payload_len;
-    
+
     u16_t pseud_xsum;
     u16_t l2_payload_raw_xsum;
     // this field has been extended to 2-byte in Xinan
 #if (TARGET_CHIP == 5706)
     u8_t  data_offset;
-    u8_t  unused3;                                      
+    u8_t  unused3;
 #else
     u16_t data_offset;
 #endif
     u16_t l3_payload_raw_xsum;
-    
+
     u32_t mbuf_cluster;
     u32_t cid;
 
@@ -123,49 +123,49 @@ typedef struct rxpq_b
 
     u16_t ext_status;
     u16_t unused5;
-    
+
 } rxpq_b_t;
 
 typedef struct rxpq_l
 {
     u32_t bits_errors;
     u32_t bits_status;
-   
+
     u8_t  unused1;
     u8_t  knum;
     u8_t  bits_acpi_pat;
     u8_t  bit_mcast_hash_idx;
-    
+
     u16_t pkt_len;
     u16_t rule_tag;
-    
+
     u8_t  rx_qid;
     u8_t  ip_hdr_offset;
     u16_t vlan_tag;
-    
+
     // this field has been extended to 2-byte in Xinan
 #if (TARGET_CHIP == 5706)
-    u8_t  unused2;                                      
+    u8_t  unused2;
     u8_t tcp_udp_hdr_offset;
 #else
     u16_t tcp_udp_hdr_offset;
 #endif
     u16_t ip_xsum;
-    
+
     u16_t tcp_payload_len;
     u16_t tcp_udp_xsum;
-    
+
     u16_t l2_payload_raw_xsum;
     u16_t pseud_xsum;
 
     u16_t l3_payload_raw_xsum;
     // this field has been extended to 2-byte in Xinan
 #if (TARGET_CHIP == 5706)
-    u8_t  unused3;                                      
+    u8_t  unused3;
     u8_t  data_offset;
 #else
     u16_t data_offset;
-#endif    
+#endif
     u32_t mbuf_cluster;
     u32_t cid;
 
@@ -174,7 +174,7 @@ typedef struct rxpq_l
 
     u16_t unused5;
     u16_t ext_status;
-    
+
 } rxpq_l_t;
 
 #if defined(LITTLE_ENDIAN)
@@ -208,7 +208,7 @@ typedef struct rv2ppq_generic_b
         #define GENERIC_OPCODE_RV2PPQ_VALUE_L2_FLUSH_BD_CHAIN   28
         #define GENERIC_OPCODE_RV2PPQ_VALUE_FLR                 29 // X1V only
 
-    u16_t operand16_0;    // Note that 16_0 and 16_1 will be absorbed 
+    u16_t operand16_0;    // Note that 16_0 and 16_1 will be absorbed
     u16_t operand16_1;    // by RDMA and won't be passed to COM
     u16_t operand16_2;
     u16_t operand16_3;
@@ -217,7 +217,7 @@ typedef struct rv2ppq_generic_b
     u16_t operand16_6;
     u16_t operand16_7;
     u32_t operand32_0;    // Note that 32_0 and 32_1 will be absorbed
-    u32_t operand32_1;    // by RDMA and won't be passed to COM 
+    u32_t operand32_1;    // by RDMA and won't be passed to COM
     u32_t operand32_2;
     u32_t operand32_3;
     u32_t operand32_4;
@@ -234,7 +234,7 @@ typedef struct rv2ppq_generic_l
     u8_t  knum;
     u16_t operand_flags;
     u16_t operand16_1;    // by RDMA and won't be passed to COM
-    u16_t operand16_0;    // Note that 16_0 and 16_1 will be absorbed 
+    u16_t operand16_0;    // Note that 16_0 and 16_1 will be absorbed
     u16_t operand16_3;
     u16_t operand16_2;
     u16_t operand16_5;
@@ -242,7 +242,7 @@ typedef struct rv2ppq_generic_l
     u16_t operand16_7;
     u16_t operand16_6;
     u32_t operand32_0;    // Note that 32_0 and 32_1 will be absorbed
-    u32_t operand32_1;    // by RDMA and won't be passed to COM 
+    u32_t operand32_1;    // by RDMA and won't be passed to COM
     u32_t operand32_2;
     u32_t operand32_3;
     u32_t operand32_4;
@@ -286,7 +286,7 @@ typedef struct rv2ppq_l2_place_b
     u16_t ip_xsum;
     u16_t udp_tcp_xsum;
     u16_t unused_0;
-    u16_t packet_length; // represent total packet length 
+    u16_t packet_length; // represent total packet length
     u32_t unused_1[2];
     u16_t unused_2;
     u16_t error_flags;
@@ -301,7 +301,7 @@ typedef struct rv2ppq_l2_place_b
     u8_t rdma_action;  // no need to be cleared by RXP, RV2P will do it
     u8_t cs16_pkt_len;
     u16_t cs16;
-   
+
 } rv2ppq_l2_place_b_t;
 
 typedef struct rv2ppq_l2_place_l
@@ -317,7 +317,7 @@ typedef struct rv2ppq_l2_place_l
     u16_t bits_status;
     u16_t udp_tcp_xsum;
     u16_t ip_xsum;
-    u16_t packet_length; // represent total packet length if VMQ flag is set 
+    u16_t packet_length; // represent total packet length if VMQ flag is set
     u16_t unused_0;
     u32_t unused_1[2];
     u16_t error_flags;
@@ -351,7 +351,7 @@ typedef struct rv2ppq_l2_flush_bd_chain_b
     u8_t rdma_action; // no need to be cleared by RXP, RV2P will do it
     u8_t cs16_pkt_len;
     u16_t cs16;
-    
+
 } rv2ppq_l2_flush_bd_chain_b_t;
 
 typedef struct rv2ppq_l2_flush_bd_chain_l
@@ -365,7 +365,7 @@ typedef struct rv2ppq_l2_flush_bd_chain_l
     u16_t cs16;
     u8_t cs16_pkt_len;
     u8_t rdma_action; // no need to be cleared by RXP, RV2P will do it
-    
+
 } rv2ppq_l2_flush_bd_chain_l_t;
 
 #if defined(LITTLE_ENDIAN)
@@ -377,7 +377,7 @@ typedef struct rv2ppq_l2_flush_bd_chain_l
 /*
  *  comq_generic definition
  */
-typedef enum 
+typedef enum
 {
     GENERIC_OPCODE_COMQ_VALUE_UNUSED                =  0,
     GENERIC_OPCODE_COMQ_VALUE_NOP                   = GENERIC_OPCODE_RV2PPQ_VALUE_NOP      ,
@@ -409,7 +409,7 @@ typedef enum
     GENERIC_OPCODE_COMQ_VALUE_L2_JUMBO_NOBUFFER     = 27,
     GENERIC_OPCODE_COMQ_VALUE_L2_FLUSH_BD_CHAIN     = GENERIC_OPCODE_RV2PPQ_VALUE_L2_FLUSH_BD_CHAIN,
     GENERIC_OPCODE_COMQ_VALUE_FLR                   = GENERIC_OPCODE_RV2PPQ_VALUE_FLR,
-    MAX_COMQ_OPCODE 
+    MAX_COMQ_OPCODE
 }GENERIC_OPCODE_COMQ_t ;
 
 
@@ -509,7 +509,7 @@ typedef struct comq_l2_completion_l
     u16_t cs16;
     u8_t cs16_pkt_len;
     u8_t rdma_action;
-    
+
 } comq_l2_completion_l_t;
 
 #if defined(LITTLE_ENDIAN)
@@ -541,7 +541,7 @@ typedef struct comq_l2_nobuffer_b
     u8_t l2_nobuff_rdma_action;
     u8_t l2_nobuff_cs16_pkt_len;
     u16_t l2_nobuff_cs16;
-    
+
 } comq_l2_nobuffer_b_t;
 
 typedef struct comq_l2_nobuffer_l
@@ -564,7 +564,7 @@ typedef struct comq_l2_nobuffer_l
     u16_t l2_nobuff_cs16;
     u8_t l2_nobuff_cs16_pkt_len;
     u8_t l2_nobuff_rdma_action;
-    
+
 } comq_l2_nobuffer_l_t;
 
 #if defined(LITTLE_ENDIAN)
@@ -597,7 +597,7 @@ typedef struct comq_l2_flr_b
     u8_t  rdma_action;
     u8_t  cs16_pkt_len;
     u16_t cs16;
-    
+
 } comq_l2_flr_b_t;
 
 typedef struct comq_l2_flr_l
@@ -620,7 +620,7 @@ typedef struct comq_l2_flr_l
     u16_t cs16;
     u8_t  cs16_pkt_len;
     u8_t  rdma_action;
-    
+
 } comq_l2_flr_l_t;
 
 #if defined(LITTLE_ENDIAN)
@@ -653,7 +653,7 @@ typedef struct comxq_l
 #elif defined(BIG_ENDIAN)
     typedef comxq_b_t comxq_t;
 #endif
-    
+
 /*
  * comtq_t
  */
@@ -690,7 +690,7 @@ typedef struct csq_b
         // Note that 7 lsb is ALWAYS masked out to be zero by HW
         #define CSQ_SRC_MQ     0
         #define CSQ_SRC_COM    0x80
-        #define CSQ_SRC_MASK   0xFF  
+        #define CSQ_SRC_MASK   0xFF
     u8_t  flags;
     u8_t  unused[3];
 }csq_b_t;
@@ -748,7 +748,7 @@ typedef struct rv2ptq_l
 
 
     /* TX FTQs */
-  
+
 typedef struct tschq_b
 {
     u32_t cid;
@@ -877,7 +877,7 @@ typedef struct tpatq_l
     typedef tpatq_b_t tpatq_t;
 #endif
 
-typedef struct taspq_b    
+typedef struct taspq_b
 {
     u16_t taspq_hdr_skip;
     u16_t taspq_hdr_post_skip;
@@ -895,7 +895,7 @@ typedef struct taspq_b
         #define TASPQ_FLAGS_DEST_RPC_MIRROR         TPATF_TASQ_FLAGS_DEST_RPC_MIRROR
         #define TASPQ_FLAGS_DEST_RPC_LOOPBACK       TPATF_TASQ_FLAGS_DEST_RPC_LOOPBACK
         #define TASPQ_FLAGS_MGMT_PKT_TAG            TPATF_TASQ_FLAGS_MGMT_PKT_TAG
-        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASQ_FLAGS_CS16_VLD          
+        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASQ_FLAGS_CS16_VLD
 #else
         #define TASPQ_FLAGS_PKT_END                 TPATF_TASPQ_FLAGS_PKT_END
         #define TASPQ_FLAGS_MGMT_PACKET             TPATF_TASPQ_FLAGS_MGMT_PACKET
@@ -906,7 +906,7 @@ typedef struct taspq_b
         #define TASPQ_FLAGS_DEST_RPC_MIRROR         TPATF_TASPQ_FLAGS_DEST_RPC_MIRROR
         #define TASPQ_FLAGS_DEST_RPC_LOOPBACK       TPATF_TASPQ_FLAGS_DEST_RPC_LOOPBACK
         #define TASPQ_FLAGS_MGMT_PKT_TAG            TPATF_TASPQ_FLAGS_MGMT_PKT_TAG
-        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASPQ_FLAGS_CS16_VLD          
+        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASPQ_FLAGS_CS16_VLD
 #endif
     u16_t taspq_cs16;
     u16_t taspq_uftq_cmd;  /* Only the upper 16 bit of the ftq cmd is used */
@@ -920,10 +920,10 @@ typedef struct taspq_b
         #define TASPQ_FTQ_CMD_ADD_INTERVEN          TPATF_TASPQ_FTQ_CMD_ADD_INTERVEN
         #define TASPQ_FTQ_CMD_ADD_DATA              TPATF_TASPQ_FTQ_CMD_ADD_DATA
         #define TASPQ_FTQ_CMD_BUSY                  TPATF_TASPQ_FTQ_CMD_BUSY
-#endif    
+#endif
 } taspq_b_t;
 
-typedef struct taspq_l    
+typedef struct taspq_l
 {
     u16_t taspq_hdr_post_skip;
     u16_t taspq_hdr_skip;
@@ -940,7 +940,7 @@ typedef struct taspq_l
         #define TASPQ_FLAGS_DEST_RPC_MIRROR         TPATF_TASQ_FLAGS_DEST_RPC_MIRROR
         #define TASPQ_FLAGS_DEST_RPC_LOOPBACK       TPATF_TASQ_FLAGS_DEST_RPC_LOOPBACK
         #define TASPQ_FLAGS_MGMT_PKT_TAG            TPATF_TASQ_FLAGS_MGMT_PKT_TAG
-        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASQ_FLAGS_CS16_VLD          
+        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASQ_FLAGS_CS16_VLD
 #else
         #define TASPQ_FLAGS_PKT_END                 TPATF_TASPQ_FLAGS_PKT_END
         #define TASPQ_FLAGS_MGMT_PACKET             TPATF_TASPQ_FLAGS_MGMT_PACKET
@@ -951,7 +951,7 @@ typedef struct taspq_l
         #define TASPQ_FLAGS_DEST_RPC_MIRROR         TPATF_TASPQ_FLAGS_DEST_RPC_MIRROR
         #define TASPQ_FLAGS_DEST_RPC_LOOPBACK       TPATF_TASPQ_FLAGS_DEST_RPC_LOOPBACK
         #define TASPQ_FLAGS_MGMT_PKT_TAG            TPATF_TASPQ_FLAGS_MGMT_PKT_TAG
-        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASPQ_FLAGS_CS16_VLD          
+        #define TASPQ_FLAGS_CS16_VLD                TPATF_TASPQ_FLAGS_CS16_VLD
 #endif
     u16_t taspq_payload_size;
     u16_t taspq_uftq_cmd;  /* Only the upper 16 bit of the ftq cmd is used */
@@ -965,7 +965,7 @@ typedef struct taspq_l
         #define TASPQ_FTQ_CMD_ADD_INTERVEN          TPATF_TASPQ_FTQ_CMD_ADD_INTERVEN
         #define TASPQ_FTQ_CMD_ADD_DATA              TPATF_TASPQ_FTQ_CMD_ADD_DATA
         #define TASPQ_FTQ_CMD_BUSY                  TPATF_TASPQ_FTQ_CMD_BUSY
-#endif    
+#endif
     u16_t taspq_cs16;
 } taspq_l_t;
 
@@ -974,5 +974,5 @@ typedef struct taspq_l
 #elif defined(BIG_ENDIAN)
     typedef taspq_b_t taspq_t;
 #endif
-    
+
 #endif /* _l2_ftq_h_ */

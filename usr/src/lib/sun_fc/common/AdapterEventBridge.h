@@ -32,8 +32,8 @@
 
 /**
  * @memo	    Bridge interface for adapter events
- * 
- * @doc		    Used to abstract clients from the specific 
+ *
+ * @doc		    Used to abstract clients from the specific
  *		    underlying details of event management for
  *		    the given HBA/driver stack.
  */

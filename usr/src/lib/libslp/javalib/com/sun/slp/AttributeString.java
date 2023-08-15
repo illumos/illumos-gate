@@ -39,10 +39,10 @@ import java.io.*;
 
 /**
  * The AttributeString class embodies the SLP lower cased, space compressed
- * string matching rules. It precomputes an 
- * efficient string for matching, squeezing out whitespace and lower casing. 
+ * string matching rules. It precomputes an
+ * efficient string for matching, squeezing out whitespace and lower casing.
  * The toString() method returns the original string. Note that it does
- * NOT handle pattern wildcard matching. 
+ * NOT handle pattern wildcard matching.
  *
  * @author James Kempf
  */
@@ -71,7 +71,7 @@ class AttributeString extends Object {
 
 	StringBuffer buf = new StringBuffer();
 
-	StringTokenizer tk = 
+	StringTokenizer tk =
 	    new StringTokenizer(str, ServiceLocationAttribute.WHITESPACE);
 
 	while (tk.hasMoreTokens()) {

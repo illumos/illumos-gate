@@ -59,7 +59,7 @@ $(ROOTMANIFEST)		:= FILEMODE= 444
 #
 CPPFLAGS= 	-I$(SRC)/uts/sun4v $(CPPFLAGS.master) -D_REENTRANT
 
-LINT_FLAGS=	-c -Nlevel=4 -Ncheck 
+LINT_FLAGS=	-c -Nlevel=4 -Ncheck
 
 XGETFLAGS +=	-a -s -x $(PROG).xcl
 

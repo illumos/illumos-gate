@@ -1,4 +1,4 @@
-/*- 
+/*-
  * Copyright (c) 2007-2014, Juniper Networks, Inc.
  * All rights reserved.
  *
@@ -49,8 +49,8 @@ static int   pkg_readdir(struct open_file *, struct dirent *);
 
 struct fs_ops pkgfs_fsops = {
 	"pkg",
-	pkg_open, 
-	pkg_close, 
+	pkg_open,
+	pkg_close,
 	pkg_read,
 	null_write,
 	pkg_seek,

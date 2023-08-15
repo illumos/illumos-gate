@@ -26,7 +26,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG= sync 
+PROG= sync
 ROOTFS_PROG= $(PROG)
 
 include ../Makefile.cmd

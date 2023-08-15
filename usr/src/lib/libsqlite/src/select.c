@@ -100,7 +100,7 @@ int sqliteJoinType(Parse *pParse, Token *pA, Token *pB, Token *pC){
   for(i=0; i<3 && apAll[i]; i++){
     p = apAll[i];
     for(j=0; j<sizeof(keywords)/sizeof(keywords[0]); j++){
-      if( p->n==keywords[j].nChar 
+      if( p->n==keywords[j].nChar
           && sqliteStrNICmp(p->z, keywords[j].zKeyword, p->n)==0 ){
         jointype |= keywords[j].code;
         break;
@@ -124,7 +124,7 @@ int sqliteJoinType(Parse *pParse, Token *pA, Token *pB, Token *pC){
     pParse->nErr++;
     jointype = JT_INNER;
   }else if( jointype & JT_RIGHT ){
-    sqliteErrorMsg(pParse, 
+    sqliteErrorMsg(pParse,
       "RIGHT and FULL OUTER JOINs are not currently supported");
     jointype = JT_INNER;
   }
@@ -195,7 +195,7 @@ static void setJoinExpr(Expr *p){
     ExprSetProperty(p, EP_FromJoin);
     setJoinExpr(p->pLeft);
     p = p->pRight;
-  } 
+  }
 }
 
 /*
@@ -255,7 +255,7 @@ static int sqliteProcessJoin(Parse *pParse, Select *p){
     }
 
     /* Create extra terms on the WHERE clause for each column named
-    ** in the USING clause.  Example: If the two tables to be joined are 
+    ** in the USING clause.  Example: If the two tables to be joined are
     ** A and B and the USING clause names X, Y, and Z, then add this
     ** to the WHERE clause:    A.X=B.X AND A.Y=B.Y AND A.Z=B.Z
     ** Report an error if any column mentioned in the USING clause is
@@ -343,7 +343,7 @@ static void pushOntoSorter(Parse *pParse, Vdbe *v, ExprList *pOrderBy){
 
 /*
 ** This routine adds a P3 argument to the last VDBE opcode that was
-** inserted. The P3 argument added is a string suitable for the 
+** inserted. The P3 argument added is a string suitable for the
 ** OP_MakeKey or OP_MakeIdxKey opcodes.  The string consists of
 ** characters 't' or 'n' depending on whether or not the various
 ** fields of the key to be generated should be treated as numeric
@@ -740,7 +740,7 @@ static void generateColumnNames(
       }else if( fullNames || (!shortNames && pTabList->nSrc>1) ){
         char *zName = 0;
         char *zTab;
- 
+
         zTab = pTabList->a[j].zAlias;
         if( fullNames || zTab==0 ) zTab = pTab->zName;
         sqliteSetString(&zName, zTab, ".", zCol, 0);
@@ -805,7 +805,7 @@ Table *sqliteResultSetOfSelect(Parse *pParse, char *zTabName, Select *pSelect){
     Expr *p, *pR;
     if( pEList->a[i].zName ){
       aCol[i].zName = sqliteStrDup(pEList->a[i].zName);
-    }else if( (p=pEList->a[i].pExpr)->op==TK_DOT 
+    }else if( (p=pEList->a[i].pExpr)->op==TK_DOT
                && (pR=p->pRight)!=0 && pR->token.z && pR->token.z[0] ){
       int cnt;
       sqliteSetNString(&aCol[i].zName, pR->token.z, pR->token.n, 0);
@@ -835,7 +835,7 @@ Table *sqliteResultSetOfSelect(Parse *pParse, char *zTabName, Select *pSelect){
 /*
 ** For the given SELECT statement, do three things.
 **
-**    (1)  Fill in the pTabList->a[].pTab fields in the SrcList that 
+**    (1)  Fill in the pTabList->a[].pTab fields in the SrcList that
 **         defines the set of tables that should be scanned.  For views,
 **         fill pTabList->a[].pSelect with a copy of the SELECT statement
 **         that implements the view.  A copy is made of the view's SELECT
@@ -880,7 +880,7 @@ static int fillInColumnList(Parse *pParse, Select *p){
            (void*)pTabList->a[i].pSelect);
         sqliteSetString(&pTabList->a[i].zAlias, zFakeName, 0);
       }
-      pTabList->a[i].pTab = pTab = 
+      pTabList->a[i].pTab = pTab =
         sqliteResultSetOfSelect(pParse, pTabList->a[i].zAlias,
                                         pTabList->a[i].pSelect);
       if( pTab==0 ){
@@ -893,7 +893,7 @@ static int fillInColumnList(Parse *pParse, Select *p){
       pTab->isTransient = 1;
     }else{
       /* An ordinary table or view name in the FROM clause */
-      pTabList->a[i].pTab = pTab = 
+      pTabList->a[i].pTab = pTab =
         sqliteLocateTable(pParse,pTabList->a[i].zName,pTabList->a[i].zDatabase);
       if( pTab==0 ){
         return 1;
@@ -967,10 +967,10 @@ static int fillInColumnList(Parse *pParse, Select *p){
         for(i=0; i<pTabList->nSrc; i++){
           Table *pTab = pTabList->a[i].pTab;
           char *zTabName = pTabList->a[i].zAlias;
-          if( zTabName==0 || zTabName[0]==0 ){ 
+          if( zTabName==0 || zTabName[0]==0 ){
             zTabName = pTab->zName;
           }
-          if( zTName && (zTabName==0 || zTabName[0]==0 || 
+          if( zTName && (zTabName==0 || zTabName[0]==0 ||
                  sqliteStrICmp(zTName, zTabName)!=0) ){
             continue;
           }
@@ -981,7 +981,7 @@ static int fillInColumnList(Parse *pParse, Select *p){
 
             if( i>0 && (pTabList->a[i-1].jointype & JT_NATURAL)!=0 &&
                 columnIndex(pTabList->a[i-1].pTab, zName)>=0 ){
-              /* In a NATURAL join, omit the join columns from the 
+              /* In a NATURAL join, omit the join columns from the
               ** table on the right */
               continue;
             }
@@ -1129,7 +1129,7 @@ static int matchOrderbyToColumn(
         assert( pE->token.z );
         zLabel = sqliteStrNDup(pE->token.z, pE->token.n);
         sqliteDequote(zLabel);
-        if( sqliteStrICmp(zName, zLabel)==0 ){ 
+        if( sqliteStrICmp(zName, zLabel)==0 ){
           iCol = j;
         }
         sqliteFree(zLabel);
@@ -1151,7 +1151,7 @@ static int matchOrderbyToColumn(
       break;
     }
   }
-  return nErr;  
+  return nErr;
 }
 
 /*
@@ -1170,7 +1170,7 @@ Vdbe *sqliteGetVdbe(Parse *pParse){
 ** This routine sets the Expr.dataType field on all elements of
 ** the pOrderBy expression list.  The pOrderBy list will have been
 ** set up by matchOrderbyToColumn().  Hence each expression has
-** a TK_COLUMN as its root node.  The Expr.iColumn refers to a 
+** a TK_COLUMN as its root node.  The Expr.iColumn refers to a
 ** column in the result set.   The datatype is set to SQLITE_SO_TEXT
 ** if the corresponding column in p and every SELECT to the left of
 ** p has a datatype of SQLITE_SO_TEXT.  If the cooressponding column
@@ -1192,7 +1192,7 @@ Vdbe *sqliteGetVdbe(Parse *pParse){
 ** The secondary key will use the SQLITE_SO_TEXT sort order because
 ** both the (second) "b" in the first SELECT and the "c" in the second
 ** SELECT have a datatype of text.
-*/ 
+*/
 static void multiSelectSortOrder(Select *p, ExprList *pOrderBy){
   int i;
   ExprList *pEList;
@@ -1234,7 +1234,7 @@ static void multiSelectSortOrder(Select *p, ExprList *pOrderBy){
 ** SELECT statements.
 */
 static void computeLimitRegisters(Parse *pParse, Select *p){
-  /* 
+  /*
   ** If the comparison is p->nLimit>0 then "LIMIT 0" shows
   ** all rows.  It is the same as no limit. If the comparision is
   ** p->nLimit>=0 then "LIMIT 0" show no rows at all.
@@ -1267,7 +1267,7 @@ static void computeLimitRegisters(Parse *pParse, Select *p){
 **
 ** "p" points to the right-most of the two queries.  the query on the
 ** left is p->pPrior.  The left query could also be a compound query
-** in which case this routine will be called recursively. 
+** in which case this routine will be called recursively.
 **
 ** The results of the total query are to be written into a destination
 ** of type eDest with parameter iParm.
@@ -1364,7 +1364,7 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
         ** intermediate results.
         */
         unionTab = pParse->nTab++;
-        if( p->pOrderBy 
+        if( p->pOrderBy
         && matchOrderbyToColumn(pParse, p, p->pOrderBy, unionTab, 1) ){
           return 1;
         }
@@ -1404,7 +1404,7 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
 
       /* Convert the data in the temporary table into whatever form
       ** it is that we currently need.
-      */      
+      */
       if( eDest!=priorOp || unionTab!=iParm ){
         int iCont, iBreak, iStart;
         assert( p->pEList );
@@ -1419,7 +1419,7 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
         iStart = sqliteVdbeCurrentAddr(v);
         multiSelectSortOrder(p, p->pOrderBy);
         rc = selectInnerLoop(pParse, p, p->pEList, unionTab, p->pEList->nExpr,
-                             p->pOrderBy, -1, eDest, iParm, 
+                             p->pOrderBy, -1, eDest, iParm,
                              iCont, iBreak);
         if( rc ) return 1;
         sqliteVdbeResolveLabel(v, iCont);
@@ -1485,7 +1485,7 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
       sqliteVdbeAddOp(v, OP_NotFound, tab2, iCont);
       multiSelectSortOrder(p, p->pOrderBy);
       rc = selectInnerLoop(pParse, p, p->pEList, tab1, p->pEList->nExpr,
-                             p->pOrderBy, -1, eDest, iParm, 
+                             p->pOrderBy, -1, eDest, iParm,
                              iCont, iBreak);
       if( rc ) return 1;
       sqliteVdbeResolveLabel(v, iCont);
@@ -1511,13 +1511,13 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
 /*
 ** Scan through the expression pExpr.  Replace every reference to
 ** a column in table number iTable with a copy of the iColumn-th
-** entry in pEList.  (But leave references to the ROWID column 
+** entry in pEList.  (But leave references to the ROWID column
 ** unchanged.)
 **
 ** This routine is part of the flattening procedure.  A subquery
 ** whose result set is defined by pEList appears as entry in the
 ** FROM clause of a SELECT such that the VDBE cursor assigned to that
-** FORM clause entry is iTable.  This routine make the necessary 
+** FORM clause entry is iTable.  This routine make the necessary
 ** changes to pExpr so that it refers directly to the source table
 ** of the subquery rather the result set of the subquery.
 */
@@ -1553,7 +1553,7 @@ static void substExpr(Expr *pExpr, int iTable, ExprList *pEList){
     substExprList(pExpr->pList, iTable, pEList);
   }
 }
-static void 
+static void
 substExprList(ExprList *pList, int iTable, ExprList *pEList){
   int i;
   if( pList==0 ) return;
@@ -1585,7 +1585,7 @@ substExprList(ExprList *pList, int iTable, ExprList *pEList){
 **     SELECT x+y AS a FROM t1 WHERE z<100 AND a>5
 **
 ** The code generated for this simpification gives the same result
-** but only has to scan the data once.  And because indices might 
+** but only has to scan the data once.  And because indices might
 ** exist on the table t1, a complete scan of the data might be
 ** avoided.
 **
@@ -1664,7 +1664,7 @@ static int flattenSubquery(
   if( (p->isDistinct || p->nLimit>=0) && subqueryIsAgg ) return 0;
   if( p->pOrderBy && pSub->pOrderBy ) return 0;
 
-  /* Restriction 3:  If the subquery is a join, make sure the subquery is 
+  /* Restriction 3:  If the subquery is a join, make sure the subquery is
   ** not used as the right operand of an outer join.  Examples of why this
   ** is not allowed:
   **
@@ -1693,7 +1693,7 @@ static int flattenSubquery(
   ** But the t2.x>0 test will always fail on a NULL row of t2, which
   ** effectively converts the OUTER JOIN into an INNER JOIN.
   */
-  if( iFrom>0 && (pSrc->a[iFrom-1].jointype & JT_OUTER)!=0 
+  if( iFrom>0 && (pSrc->a[iFrom-1].jointype & JT_OUTER)!=0
       && pSub->pWhere!=0 ){
     return 0;
   }
@@ -1738,9 +1738,9 @@ static int flattenSubquery(
     pSrc->a[iFrom+nSubSrc-1].jointype = jointype;
   }
 
-  /* Now begin substituting subquery result set expressions for 
+  /* Now begin substituting subquery result set expressions for
   ** references to the iParent in the outer query.
-  ** 
+  **
   ** Example:
   **
   **   SELECT a+5, b*10 FROM (SELECT x*3 AS a, y+10 AS b FROM t1) WHERE a>b;
@@ -1799,7 +1799,7 @@ static int flattenSubquery(
   }
 
   /* The flattened query is distinct if either the inner or the
-  ** outer query is distinct. 
+  ** outer query is distinct.
   */
   p->isDistinct = p->isDistinct || pSub->isDistinct;
 
@@ -1826,7 +1826,7 @@ static int flattenSubquery(
 ** Analyze the SELECT statement passed in as an argument to see if it
 ** is a simple min() or max() query.  If it is and this query can be
 ** satisfied using a single seek to the beginning or end of an index,
-** then generate the code for this SELECT and return 1.  If this is not a 
+** then generate the code for this SELECT and return 1.  If this is not a
 ** simple min() or max() query, then return 0;
 **
 ** A simply min() or max() query looks like this:
@@ -1854,7 +1854,7 @@ static int simpleMinMaxQuery(Parse *pParse, Select *p, int eDest, int iParm){
   ExprList *pEList, *pList, eList;
   struct ExprList_item eListItem;
   SrcList *pSrc;
-  
+
 
   /* Check to see if this query is a simple min() or max() query.  Return
   ** zero if it is  not.
@@ -1949,7 +1949,7 @@ static int simpleMinMaxQuery(Parse *pParse, Select *p, int eDest, int iParm){
   selectInnerLoop(pParse, p, &eList, 0, 0, 0, -1, eDest, iParm, cont, cont);
   sqliteVdbeResolveLabel(v, cont);
   sqliteVdbeAddOp(v, OP_Close, base, 0);
-  
+
   return 1;
 }
 
@@ -1999,7 +1999,7 @@ static int simpleMinMaxQuery(Parse *pParse, Select *p, int eDest, int iParm){
 **      \____________________ outer query ___________________/
 **
 ** This routine is called for the outer query first.   For that call,
-** pParent will be NULL.  During the processing of the outer query, this 
+** pParent will be NULL.  During the processing of the outer query, this
 ** routine is called recursively to handle the subquery.  For the recursive
 ** call, pParent will point to the outer query.  Because the subquery is
 ** the second element in a three-way join, the parentTab parameter will
@@ -2050,7 +2050,7 @@ int sqliteSelect(
   */
   sqliteSrcListAssignCursors(pParse, pTabList);
 
-  /* 
+  /*
   ** Do not even attempt to generate any code if we have already seen
   ** errors before this routine starts.
   */
@@ -2089,7 +2089,7 @@ int sqliteSelect(
   }
 
   /* At this point, we should have allocated all the cursors that we
-  ** need to handle subquerys and temporary tables.  
+  ** need to handle subquerys and temporary tables.
   **
   ** Resolve the column names and do a semantics check on all the expressions.
   */
@@ -2141,7 +2141,7 @@ int sqliteSelect(
              "ORDER BY terms must not be non-integer constants");
           goto select_end;
         }else if( iCol<=0 || iCol>pEList->nExpr ){
-          sqliteErrorMsg(pParse, 
+          sqliteErrorMsg(pParse,
              "ORDER BY column number %d out of range - should be "
              "between 1 and %d", iCol, pEList->nExpr);
           goto select_end;
@@ -2204,7 +2204,7 @@ int sqliteSelect(
     }else{
       needRestoreContext = 0;
     }
-    sqliteSelect(pParse, pTabList->a[i].pSelect, SRT_TempTable, 
+    sqliteSelect(pParse, pTabList->a[i].pSelect, SRT_TempTable,
                  pTabList->a[i].iCursor, p, i, &isAgg);
     if( needRestoreContext ){
       pParse->zAuthContext = zSavedAuthContext;
@@ -2228,7 +2228,7 @@ int sqliteSelect(
   }
 
   /* Check to see if this is a subquery that can be "flattened" into its parent.
-  ** If flattening is a possiblity, do so and return immediately.  
+  ** If flattening is a possiblity, do so and return immediately.
   */
   if( pParent && pParentAgg &&
       flattenSubquery(pParse, pParent, parentTab, *pParentAgg, isAgg) ){
@@ -2323,7 +2323,7 @@ int sqliteSelect(
 
   /* Begin the database scan
   */
-  pWInfo = sqliteWhereBegin(pParse, pTabList, pWhere, 0, 
+  pWInfo = sqliteWhereBegin(pParse, pTabList, pWhere, 0,
                             pGroupBy ? 0 : &pOrderBy);
   if( pWInfo==0 ) goto select_end;
 
@@ -2338,7 +2338,7 @@ int sqliteSelect(
   }
 
   /* If we are dealing with aggregates, then do the special aggregate
-  ** processing.  
+  ** processing.
   */
   else{
     AggExpr *pAgg;

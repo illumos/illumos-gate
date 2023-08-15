@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * libos: krb5_read_password for BSD 4.3
  */
@@ -43,7 +43,7 @@
 krb5_error_code
 krb5_read_password(krb5_context context, const char *prompt, const char *prompt2, char *return_pwd, unsigned int *size_return)
 {
-    krb5_data reply_data;      
+    krb5_data reply_data;
     krb5_prompt k5prompt;
     krb5_error_code retval;
     reply_data.length = *size_return; /* NB: size_return is also an input */
@@ -97,10 +97,10 @@ void center_dialog(HWND hwnd)
     int dlgwidth, dlgheight;
     RECT r;
     HDC hdc;
-    
+
     if (hwnd == NULL)
 	return;
-    
+
     GetWindowRect(hwnd, &r);
     dlgwidth = r.right  - r.left;
     dlgheight = r.bottom - r.top ;
@@ -205,7 +205,7 @@ static int CALLBACK
 read_pwd_proc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     pwd_params *dp;
-    
+
     switch(msg) {
     case WM_INITDIALOG:
 	dp = (pwd_params *) lParam;
@@ -221,11 +221,11 @@ read_pwd_proc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam)
         switch (wParam) {
 	case IDOK:
 	    *(dp->pwd_size_return) =
-		GetDlgItemText(hdlg, ID_READ_PWD_PWD, 
+		GetDlgItemText(hdlg, ID_READ_PWD_PWD,
 			       dp->pwd_return_pwd, *(dp->pwd_size_return));
 	    EndDialog(hdlg, TRUE);
 	    break;
-	    
+
 	case IDCANCEL:
 	    memset(dp->pwd_return_pwd, 0 , *(dp->pwd_size_return));
 	    *(dp->pwd_size_return) = 0;
@@ -233,7 +233,7 @@ read_pwd_proc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	    break;
         }
         return TRUE;
- 
+
     default:
         return FALSE;
     }

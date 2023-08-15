@@ -36,7 +36,7 @@ extern char *getenv();
 int ss_pager_create(void)
 {
 	int filedes[2];
-     
+
 	if (pipe(filedes) != 0)
 		return(-1);
 

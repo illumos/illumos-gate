@@ -25,7 +25,7 @@ __writev(int fd, struct iovec *iov, int iovlen)
 	 * Allow for atomic writes to network.
 	 */
 	if (statbuf.st_mode & S_IFSOCK) {
-		struct msghdr   mesg;		
+		struct msghdr   mesg;
 
 		memset(&mesg, 0, sizeof(mesg));
 		mesg.msg_name = 0;

@@ -26,7 +26,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/nohup/Makefile
-# 
+#
 
 XPG4PROG = nohup
 PROG = nohup

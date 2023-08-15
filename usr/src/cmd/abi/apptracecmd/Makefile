@@ -42,6 +42,6 @@ clean:
 
 lint:		lint_PROG
 
-_msg:		
+_msg:
 
 include ../../Makefile.targ

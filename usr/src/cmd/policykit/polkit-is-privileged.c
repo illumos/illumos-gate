@@ -41,9 +41,9 @@ usage (int argc, char *argv[])
 {
 	fprintf (stderr, "polkit-is-privileged version " PACKAGE_VERSION "\n");
 
-	fprintf (stderr, 
-		 "\n" 
-		 "usage : %s -u <uid> -p <privilege> [-r <resource>]\n" 
+	fprintf (stderr,
+		 "\n"
+		 "usage : %s -u <uid> -p <privilege> [-r <resource>]\n"
 		 "        [-s <system-bus-connection-name>]", argv[0]);
 	fprintf (stderr,
 		 "\n"
@@ -61,7 +61,7 @@ usage (int argc, char *argv[])
 		 "\n");
 }
 
-int 
+int
 main (int argc, char *argv[])
 {
 	int rc;
@@ -88,15 +88,15 @@ main (int argc, char *argv[])
 	DBusConnection *connection = NULL;
 
 	rc = 1;
-	
+
 	while (TRUE) {
 		int c;
-		
+
 		c = getopt_long (argc, argv, "u:r:p:s:hVv", long_options, NULL);
 
 		if (c == -1)
 			break;
-		
+
 		switch (c) {
 		case 's':
 			system_bus_unique_name = g_strdup (optarg);
@@ -105,15 +105,15 @@ main (int argc, char *argv[])
 		case 'u':
 			user = g_strdup (optarg);
 			break;
-			
+
 		case 'r':
 			resource = g_strdup (optarg);
 			break;
-			
+
 		case 'p':
 			privilege = g_strdup (optarg);
 			break;
-			
+
 		case 'v':
 			is_verbose = TRUE;
 			break;
@@ -127,7 +127,7 @@ main (int argc, char *argv[])
 			printf ("polkit-is-privileged version " PACKAGE_VERSION "\n");
 			rc = 0;
 			goto out;
-			
+
 		default:
 			usage (argc, argv);
 			goto out;
@@ -161,7 +161,7 @@ main (int argc, char *argv[])
 		goto out;
 	}
 
-	result = libpolkit_is_uid_allowed_for_privilege (ctx, 
+	result = libpolkit_is_uid_allowed_for_privilege (ctx,
 							 system_bus_unique_name,
 							 user,
 							 privilege,

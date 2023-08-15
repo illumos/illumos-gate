@@ -81,7 +81,7 @@ LIBM_ANSI_PRAGMA_WEAK(exp2l,function)
 .not_finite:
 	movl	12(%rsp),%ecx		/ ecx <-- hi_32(sgnfcnd(x))
 	cmpl	$0x80000000,%ecx	/ hi_32(|x|) = hi_32(INF)?
-	jne	.NaN_or_pinf		/ if not, x is NaN 
+	jne	.NaN_or_pinf		/ if not, x is NaN
 	movl	8(%rsp),%edx		/ edx <-- lo_32(x)
 	cmpl	$0,%edx			/ lo_32(x) = 0?
 	jne	.NaN_or_pinf		/ if not, x is NaN

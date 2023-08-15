@@ -58,7 +58,7 @@
 
 	ENTRY(strcat)
 	pushl	%edi			/ save register variable
-	/ find a null byte in destination string 
+	/ find a null byte in destination string
 	movl	8(%esp), %edi		/ %edi = destination string address
 	testl	$3, %edi		/ if %edi not word aligned
 	jnz	.L1			/ goto .L1
@@ -93,7 +93,7 @@
 	movl	$0x7f7f7f7f, %ecx
 	andl	%edx, %ecx		/ %ecx = %edx & 0x7f7f7f7f
 	addl	$4, %eax		/ next word
-	addl	$0x7f7f7f7f, %ecx	/ %ecx += 0x7f7f7f7f	
+	addl	$0x7f7f7f7f, %ecx	/ %ecx += 0x7f7f7f7f
 	orl	%edx, %ecx		/ %ecx |= %edx
 	andl	$0x80808080, %ecx	/ %ecx &= 0x80808080
 	cmpl	$0x80808080, %ecx	/ if null byte in this word

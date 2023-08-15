@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_parse_name() routine.
  *
@@ -42,13 +42,13 @@
  * converts a single-string representation of the name to the
  * multi-part principal format used in the protocols.
  *
- * principal will point to allocated storage which should be freed by 
+ * principal will point to allocated storage which should be freed by
  * the caller (using krb5_free_principal) after use.
- * 
+ *
  * Conventions:  / is used to separate components.  If @ is present in the
  * string, then the rest of the string after it represents the realm name.
  * Otherwise the local realm name is used.
- * 
+ *
  * error return:
  *	KRB5_PARSE_MALFORMED	badly formatted string
  *
@@ -145,7 +145,7 @@ k5_parse_name(krb5_context context, const char *name,
 	}
 	if (parsed_realm != NULL)
 		realmsize = size;
-	else if (i < FCOMPNUM) 
+	else if (i < FCOMPNUM)
 		fcompsize[i] = size;
 	components = i + 1;
 	/*
@@ -250,7 +250,7 @@ k5_parse_name(krb5_context context, const char *name,
 		for (i=0; i < components; i++)
 			krb5_princ_component(context, principal, i)->length = fcompsize[i];
 	}
-	/*	
+	/*
 	 * Now, we need to allocate the space for the strings themselves.....
 	 */
 	tmpdata = MALLOC(realmsize + 1);
@@ -288,7 +288,7 @@ k5_parse_name(krb5_context context, const char *name,
 		krb5_princ_component(context, principal, i)->data = tmpdata2;
 		krb5_princ_component(context, principal, i)->magic = KV5M_DATA;
 	}
-	
+
 	/*
 	 * Pass 3.  Now we go through the string a *third* time, this
 	 * time filling in the krb5_principal structure which we just

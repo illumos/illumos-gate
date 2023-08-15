@@ -31,6 +31,6 @@ DYNFLAGS += $(DYNFLAGS32)
 
 .KEEP_STATE:
 
-all: $(LIBS) 
+all: $(LIBS)
 
 install: all $(ROOTLIBS)

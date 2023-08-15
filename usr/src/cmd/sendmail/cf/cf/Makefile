@@ -54,7 +54,7 @@ all: $(ALL)
 clean cleandir:
 	$(RM) $(ALL)
 
-depend install: 
+depend install:
 
 # this is overkill, but....
 M4FILES=\

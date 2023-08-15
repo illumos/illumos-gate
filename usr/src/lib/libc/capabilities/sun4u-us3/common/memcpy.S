@@ -35,7 +35,7 @@
  * Fast assembler language version of the following C-program for memcpy
  * which represents the `standard' for the C-library.
  *
- *	void * 
+ *	void *
  *	memcpy(void *s, const void *s0, size_t n)
  *	{
  *		if (n != 0) {
@@ -178,7 +178,7 @@
 	std	%d2, [%o0]
 	add	%o2, 63, %o2		! restore offset adjustment
 	and	%o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
-	wr	%o3, %g0, %fprs         ! fprs = o3   restore fprs	
+	wr	%o3, %g0, %fprs         ! fprs = o3   restore fprs
 .dbmedl32enter:
 	subcc	%o2, 31, %o2		! adjust length to allow cc test
 					! for end of loop
@@ -231,7 +231,7 @@
 	.align	16
 .dbbck:
 	rd	%fprs, %o3		! o3 = fprs
- 
+
 	! if fprs.fef == 0, set it. Checking it, requires 2 instructions.
 	! So set it anyway, without checking.
 	wr      %g0, 0x4, %fprs         ! fprs.fef = 1
@@ -285,7 +285,7 @@
 	ldd	[%o5-16], %d4		! load 8 bytes
 	sub	%o5, 32, %o5		!
 	ldd	[%o5+8], %d6		! load 8 bytes
-	sub	%o0, 32, %o0		! 
+	sub	%o0, 32, %o0		!
 	faligndata %d2, %d0, %d10	! extract 8 bytes out
 	ldd	[%o5], %d0		! load 8 bytes
 	sub     %o2,32, %o2		! 32 less bytes to copy
@@ -333,7 +333,7 @@
 	stb	%o3, [%o0+1]		! store 3rd from last byte
 	subcc	%o2, 4, %o2
 	ldub	[%o1], %o3		! load 4th from last byte
-	stb	%o3, [%o0]		! store 4th from last byte	
+	stb	%o3, [%o0]		! store 4th from last byte
 	bz,pt	%ncc, .dbexit
 .dbbyte:
 	dec	%o1			! decrement src address
@@ -446,10 +446,10 @@
 	.align 16
 .medium:
 	neg	%o0, %o5
-	neg	%o1, %o3	
+	neg	%o1, %o3
 	andcc	%o5, 7, %o5	! bytes till DST 8 byte aligned
 	and	%o3, 7, %o3	! bytes till SRC 8 byte aligned
-	
+
 	bz	%ncc, 2f
 	sub	%o5, %o3, %o3	! -(bytes till SRC aligned after DST aligned)
 				! o3={-7, -6, ... 7}  o3>0 => SRC overaligned
@@ -548,7 +548,7 @@
 .medwexit:
 	retl
 	mov	%g1, %o0		! restore %o0
-	
+
 /*
  * Special case for handling when src and dest are both long word aligned
  * and total data to move is between SMALL_MAX and MED_MAX bytes
@@ -617,10 +617,10 @@
 	prefetch [%o1 + (2 * BLOCK_SIZE)], 21
 .mediumrejoin:
 	rd	%fprs, %o4		! check for unused FPU
-	
+
 	add	%o1, 8, %o1		! prepare to round SRC upward
 
-	sethi	%hi(0x1234567f), %o5	! For GSR.MASK 
+	sethi	%hi(0x1234567f), %o5	! For GSR.MASK
 	or	%o5, 0x67f, %o5
 
 	andcc	%o4, FPRS_FEF, %o4	! test FEF, fprs.du = fprs.dl = 0
@@ -666,7 +666,7 @@
 	andn	%o5, 7, %o5		! 8 byte aligned count
 	neg	%o0, %o5		! 'large' case
 	and	%o5, BLOCK_SIZE-1, %o5  ! bytes till DST block aligned
-4:	
+4:
 	brgez,a	%o3, .beginmedloop
 	ldd	[%o1-8], %d0
 
@@ -678,13 +678,13 @@
 	bnz	%ncc, 5b
 	bshuffle %d0, %d2, %d0		! shifts d0 left 1 byte and or's in d2
 
-.beginmedloop:	
+.beginmedloop:
 	tst	%o5
 	bz	%ncc, .endmedloop
 	sub	%o2, %o5, %o2		! update count for later
 
 	! Main loop to write out doubles.  Note: o5 & 7 == 0
-	
+
 	ldd	[%o1], %d2
 	subcc	%o5, 8, %o5		! update local count
 	bz,pn	%ncc, 1f
@@ -704,27 +704,27 @@
 	bnz,pt	%ncc, .medloop
 	add	%o0, 16, %o0		! update DST
 
-1:	
+1:
 	faligndata %d0, %d2, %d4
 	fmovd	%d2, %d0
 	std	%d4, [%o0]
 	ba	.endmedloop
 	add	%o0, 8, %o0
-	
+
 2:
 	std	%d6, [%o0 + 8]
 	sub	%o1, 8, %o1
 	add	%o0, 16, %o0
-	
+
 
 .endmedloop:
 	! Currently, o1 is pointing to the next double-aligned byte in SRC
 	! The 8 bytes starting at [o1-8] are available in d0
 	! At least one, and possibly all, of these need to be written.
 
-	cmp	%o2, BLOCK_SIZE	
+	cmp	%o2, BLOCK_SIZE
 	bgu	%ncc, .large		! otherwise, less than 16 bytes left
-	
+
 #if 0
 
 	/* This code will use partial stores.  */
@@ -734,13 +734,13 @@
 					! fill %d0 with good (unwritten) data.
 
 	subcc	%o2, 8, %o2		! update count (maybe too much)
-	movl	%ncc, %o2, %o5		
+	movl	%ncc, %o2, %o5
 	addcc	%o3, %o5, %o5		! extra bytes we can stuff into %d0
 	sub	%o3, %o5, %o3		! update o3 (# bad bytes in %d0)
 
 	bz	%ncc, 2f
 	alignaddr %o3, %g0, %g0		! set GSR.ALIGN
-	
+
 1:
 	deccc	%o5
 	ldda	[%o1]ASI_FL8_P, %d2
@@ -754,9 +754,9 @@
 	and	%o3, 7, %o3		! last byte to be stored in [%o0+%o3]
 	edge8n	%g0, %o3, %o5
 	stda	%d0, [%o0]%o5, ASI_PST8_P
-	brlez	%o2, .mediumexit		
+	brlez	%o2, .mediumexit
 	add	%o0, %o3, %o0		! update DST to last stored byte
-3:	
+3:
 	inc	%o0
 	deccc	%o2
 	ldub	[%o1], %o3
@@ -781,19 +781,19 @@
 	bgu	%ncc, 1b
 	bshuffle %d0, %d2, %d0		! shifts d0 left 1 byte and or's in d2
 
-2:	
+2:
 	subcc	%o2, 8, %o2
 	std	%d0, [%o0]
 	bz	%ncc, .mediumexit
 	add	%o0, 8, %o0
-3:	
+3:
 	ldub	[%o1], %o3
 	deccc	%o2
 	inc	%o1
 	stb	%o3, [%o0]
 	bgu	%ncc, 3b
 	inc	%o0
-#endif	
+#endif
 
 .mediumexit:
         wr      %o4, %g0, %fprs		! fprs = o4   restore fprs
@@ -814,7 +814,7 @@
 	sethi	%hi(BSTORE_SIZE),%o5
 	or	%o5,%lo(BSTORE_SIZE),%o5
 	cmp	%o2, %o5
-	bgu	%ncc, .xlarge		
+	bgu	%ncc, .xlarge
 
 	! %o0 I/O DST is 64-byte aligned
 	! %o1 I/O 8-byte aligned (and we've set GSR.ALIGN)
@@ -824,7 +824,7 @@
 	! %o4 I   Not written.  Holds fprs.
 	! %o5   O The number of doubles that remain to be written.
 
-	! Load the rest of the current block 
+	! Load the rest of the current block
 	! Recall that %o1 is further into SRC than %o0 is into DST
 
 	prefetch [%o0 + (0 * BLOCK_SIZE)], 22
@@ -854,7 +854,7 @@
 
 	! Main loop.  Write previous block.  Load rest of current block.
 	! Some bytes will be loaded that won't yet be written.
-1:	
+1:
 	ldd	[%o1], %f2
 	faligndata %f12, %f14, %f44
 	ldd	[%o1 + 0x8], %f4
@@ -890,14 +890,14 @@
 	faligndata %f12, %f14, %f44
 	faligndata %f14, %f0, %f46
 	stda	%f32, [%o0]ASI_BLK_P		! store 64 bytes, bypass cache
-	cmp	%o2, BLOCK_SIZE		
+	cmp	%o2, BLOCK_SIZE
 	bne	%ncc, 2f		! exactly 1 block remaining?
 	add	%o0, BLOCK_SIZE, %o0	! update DST
 	brz,a	%o3, 3f			! is SRC double aligned?
 	ldd	[%o1], %f2
 
-2:	
-	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8 
+2:
+	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8
 	add	%o5, %o3, %o5
 
 	membar	#StoreLoad|#StoreStore
@@ -943,7 +943,7 @@
 	! %o4 I   Not written.  Holds fprs.
 	! %o5   O The number of doubles that remain to be written.
 
-	! Load the rest of the current block 
+	! Load the rest of the current block
 	! Recall that %o1 is further into SRC than %o0 is into DST
 
 	! prefetch [%o1 + (3 * BLOCK_SIZE)], 21
@@ -973,7 +973,7 @@
 
 	! This point is 32-byte aligned since 24 instructions appear since
 	! the previous alignment directive.
-	
+
 
 	! Main loop.  Write previous block.  Load rest of current block.
 	! Some bytes will be loaded that won't yet be written.
@@ -1012,14 +1012,14 @@
 	faligndata %f12, %f14, %f44
 	faligndata %f14, %f0, %f46
 	stda	%f32, [%o0]ASI_BLK_P		! store 64 bytes, bypass cache
-	cmp	%o2, BLOCK_SIZE		
+	cmp	%o2, BLOCK_SIZE
 	bne	%ncc, 2f		! exactly 1 block remaining?
 	add	%o0, BLOCK_SIZE, %o0	! update DST
 	brz,a	%o3, 3f			! is SRC double aligned?
 	ldd	[%o1], %f2
 
-2:	
-	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8 
+2:
+	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8
 	add	%o5, %o3, %o5
 
 	membar	#StoreLoad|#StoreStore
@@ -1049,5 +1049,5 @@
 	wr	%o4, 0, %fprs
 	retl
 	mov	%g1, %o0
-	
+
 	SET_SIZE(memcpy)

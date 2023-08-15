@@ -169,7 +169,7 @@ set(void)
 						viprintf("DOL:\t");
  					label = 1;
  				}
- 				for (k=0; k<=25; k++) 
+ 				for (k=0; k<=25; k++)
  					if (names[k] == (*tmpadr &~ 01)) {
  						if (label > 0)
 							viprintf(
@@ -179,7 +179,7 @@ set(void)
 "Mark:%c\t%d\t", k+'a', names[k]);
  						label=1;
  					}
- 				if (label == 0) 
+ 				if (label == 0)
  					continue;
 
  				if (label == 2)
@@ -212,7 +212,7 @@ set(void)
 						viprintf("UNDDOL:\t");
  					label = 1;
  				}
- 				for (k=0; k<=25; k++) 
+ 				for (k=0; k<=25; k++)
  					if (names[k] == (*tmpadr &~ 01)) {
  						if (label > 0)
 							viprintf(
@@ -235,7 +235,7 @@ set(void)
  			}
  			goto next;
  		}
-#endif 			
+#endif
 		if (cp[0] == 'n' && cp[1] == 'o' && cp[2] != 'v') {
 			cp += 2;
 			no++;
@@ -358,25 +358,25 @@ unterm(void)
 	 *  All terminal mapped statements must be deleted.
 	 *  All user-defined mapped statements, cap=descr,
 	 *  are left unchanged.
-	 */ 
+	 */
 
 	int i;
 
 	for (i=0; i < MAXNOMACS; i++) {
 
 		/*
-		 * Unmap any terminal-defined arrow keys 
+		 * Unmap any terminal-defined arrow keys
 		 */
 
-		if (arrows[i].cap && arrows[i].descr && 
-		    strcmp(arrows[i].cap, arrows[i].descr)) 
+		if (arrows[i].cap && arrows[i].descr &&
+		    strcmp(arrows[i].cap, arrows[i].descr))
 			addmac(arrows[i].cap, NOSTR, NOSTR, arrows);
 
 		/*
-		 * Unmap any terminal-defined function keys 
+		 * Unmap any terminal-defined function keys
 		 */
 
-		if (immacs[i].cap && immacs[i].descr && strcmp(immacs[i].cap, immacs[i].descr)) 
+		if (immacs[i].cap && immacs[i].descr && strcmp(immacs[i].cap, immacs[i].descr))
 			addmac(immacs[i].cap, NOSTR, NOSTR, immacs);
 
 	}

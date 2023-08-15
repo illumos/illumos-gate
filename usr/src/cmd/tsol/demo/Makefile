@@ -38,7 +38,7 @@ DEMOFILES = \
 ROOTDEMODIR = $(ROOT)/usr/demo/tsol
 ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)
 
-all: 
+all:
 
 install: all $(ROOTDEMOFILES)
 

@@ -217,7 +217,7 @@ extern u_32_t getv6optbyvalue __P((int));
 extern void hexdump __P((FILE *, void *, int, int));
 extern int icmpcode __P((char *));
 extern void initparse __P((void));
-extern void ipf_dotuning __P((int, char *, ioctlfunc_t)); 
+extern void ipf_dotuning __P((int, char *, ioctlfunc_t));
 extern void ipf_addrule __P((int, ioctlfunc_t, void *));
 extern int ipf_parsefile __P((int, addfunc_t, ioctlfunc_t *, char *));
 extern int ipf_parsesome __P((int, addfunc_t, ioctlfunc_t *, FILE *));

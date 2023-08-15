@@ -45,7 +45,7 @@ off_t chfiles ( char * * list, uid_t uid, gid_t gid )	/* funcdef */
     size_t	total;
     struct stat	stbuf;
     char	*file;
-    
+
     total = 0;
 
     while(file = *list++)
@@ -71,7 +71,7 @@ off_t chfiles ( char * * list, uid_t uid, gid_t gid )	/* funcdef */
 		Free(file);
 		list[-1] = file = newfile;
 	    }
-	    
+
 	    (void) chownmod(file, uid, gid, 0600);
 	}
 
@@ -307,12 +307,12 @@ _alloc_req_id ( void )
 	}
 
 	wrap = curr;
-	do {	
+	do {
 		ret = curr;
 		if ((curr += incr) > end)
 	    	curr = start;
 
-	} while ( wrap != curr && ((RSTATUS *)request_by_id_num(ret)) ) ; 
+	} while ( wrap != curr && ((RSTATUS *)request_by_id_num(ret)) ) ;
 
 	/* write the new id file */
 	lseek(fd, 0, SEEK_SET);
@@ -373,7 +373,7 @@ _alloc_files (
 	}
 
 	file = makepath(Lp_Temp, base, (char *)0);
-        
+
 	cp = strrchr(file, '-') + 1;
 	while (num--) {
 		sprintf (cp, "%d", num + plus);

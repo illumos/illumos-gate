@@ -55,7 +55,7 @@
  *	then
  *	2^(j/256) * exp(r) = (q+t)(1+p) ~ q + ( t + q*p )
  *	then actual computation is 2^k * ( q + ( t + q*p ) )
- * 
+ *
  ********************************************************************/
 
 	.align	16
@@ -649,23 +649,23 @@ constants:
 ! o7  0x7ff00000
 
 ! f0  x0
-! f2  
-! f4  
-! f6  
-! f8  
+! f2
+! f4
+! f6
+! f8
 ! f10 x1
-! f12 
-! f14 
-! f16 
-! f18 
+! f12
+! f14
+! f16
+! f18
 ! f20 x2
-! f22 
-! f24 
-! f26 
-! f28 
-! f30 
-! f32 
-! f34 
+! f22
+! f24
+! f26
+! f28
+! f30
+! f32
+! f34
 ! f36 0x3ef0...
 ! f38 thresh
 ! f40 tiny
@@ -805,7 +805,7 @@ constants:
 
 	! BUBBLE USIII
 
-	fsubd	%f4,%f2,%f8		! creating k+j/256: sll 
+	fsubd	%f4,%f2,%f8		! creating k+j/256: sll
 	st	%f6,[%l3]		! store previous loop x0
 
 	fsubd	%f14,%f12,%f18
@@ -936,8 +936,8 @@ constants:
 
 	fmuld	%f20,%f34,%f20	! p3 = r3 * R3
 
- 
- 
+
+
 
 
 !!!!!!!!!!!!!!!!!!! poly-reorder - ends here
@@ -1038,7 +1038,7 @@ constants:
 	ld	[%fp+m1],%l1
 	fmuld	%f14,%f12,%f14
 	faddd	%f32,ONE,%f32
-	sra	%l1,8,%o4	
+	sra	%l1,8,%o4
 	and	%o4,0xff0,%o4
 	faddd	%f32,%f14,%f32
 	ldd     [%g1+%o4],%f14
@@ -1078,7 +1078,7 @@ constants:
 	ld	[%fp+m0],%l0
 	fmuld	%f4,%f2,%f4
 	faddd	%f32,ONE,%f32
-	sra	%l0,8,%o4	
+	sra	%l0,8,%o4
 	and	%o4,0xff0,%o4
 	faddd	%f32,%f4,%f32
 	ldd     [%g1+%o4],%f4

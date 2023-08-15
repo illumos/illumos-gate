@@ -493,14 +493,14 @@ MEDIUM:
 	y1_or_zero[3] = 0.0;
 	y2_or_zero[3] = 0.0;
 
-	if (biguns == 3) 
+	if (biguns == 3)
 	{
 		biguns = 0;
 		xsb0 = xsb0 >> 31;
 		xsb1 = xsb1 >> 31;
 		goto loop2;
 	}
-	else if (biguns == 2) 
+	else if (biguns == 2)
 	{
 		xsb0 = xsb0 >> 31;
 		biguns = 0;

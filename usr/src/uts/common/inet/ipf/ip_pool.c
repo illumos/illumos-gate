@@ -600,7 +600,7 @@ ipf_stack_t *ifs;
 				   ipo->ipo_head);
 	KFREE(n);
 
-	ifs->ifs_ipoolstat.ipls_nodes--;	
+	ifs->ifs_ipoolstat.ipls_nodes--;
 
 	return 0;
 }
@@ -855,7 +855,7 @@ ipf_stack_t *ifs;
 				ip_pool_deref(ipo, ifs);
 				RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 			}
-			if (nextipo->ipo_next == NULL) 
+			if (nextipo->ipo_next == NULL)
 				ipf_freetoken(token, ifs);
 		}
 		break;
@@ -872,7 +872,7 @@ ipf_stack_t *ifs;
 				ip_pool_node_deref(node, ifs);
 				RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 			}
-			if (nextnode->ipn_next == NULL) 
+			if (nextnode->ipn_next == NULL)
 				ipf_freetoken(token, ifs);
 		}
 		break;

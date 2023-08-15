@@ -103,8 +103,8 @@ constants:
 
 ! the following are 64-bit registers in both V8+ and V9
 
-! g1  
-! g5  
+! g1
+! g5
 
 ! o0  n0
 ! o1  n1
@@ -112,7 +112,7 @@ constants:
 ! o3  n3
 ! o4  c
 ! o5  stridec
-! o7  
+! o7
 
 ! f0  x0
 ! f2  x1
@@ -129,10 +129,10 @@ constants:
 ! f24 c2
 ! f26 c3
 ! f28 signbit
-! f30 
-! f32 
-! f34 
-! f36 
+! f30
+! f32
+! f34
+! f36
 ! f38 inf
 ! f40 S0
 ! f42 S1

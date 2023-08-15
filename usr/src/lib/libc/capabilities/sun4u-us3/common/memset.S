@@ -81,11 +81,11 @@
 
 	! Set -(%o3) bytes till sp1 double aligned
 1:	stb	%o1, [%o5]		! there is at least 1 byte to set
-	inccc	%o3			! byte clearing loop 
+	inccc	%o3			! byte clearing loop
         bl,pt	%ncc, 1b
-        inc	%o5 
+        inc	%o5
 
-	
+
 	! Now sp1 is double aligned (sp1 is found in %o5)
 .blkchk:
 	sll     %o1, 8, %o3
@@ -93,15 +93,15 @@
 
         sll     %o1, 16, %o3
         or      %o1, %o3, %o1		! now o1 has 4 bytes of c
-	
+
 	cmp     %o2, 4095		! if large count use Block ld/st
-	
+
 	sllx	%o1, 32, %o3
 	or	%o1, %o3, %o1		! now o1 has 8 bytes of c
 
         bgu,a,pn %ncc, .blkwr		! Do block write for large count
         andcc   %o5, 63, %o3            ! is sp1 block aligned?
-	
+
 	and	%o2, 24, %o3		! o3 is {0, 8, 16, 24}
 
 1:	subcc	%o3, 8, %o3		! double-word loop
@@ -120,7 +120,7 @@
 	bnz,pt	%ncc, 2b
 	add	%o5, 32, %o5
 
-3:	
+3:
 	and	%o2, 7, %o2		! o2 has the remaining bytes (<8)
 
 4:
@@ -146,14 +146,14 @@
 	bl,pt	%ncc, 1b
 	add     %o5, 8, %o5
 
-	! sp1 is block aligned                                     
+	! sp1 is block aligned
 .blalign:
         rd      %fprs, %g1              ! g1 = fprs
 
 	and	%o2, 63, %o3		! calc bytes left after blk store.
 
 	andcc	%g1, 0x4, %g1		! fprs.du = fprs.dl = 0
-	bz,a	%ncc, 2f		! Is fprs.fef == 0 
+	bz,a	%ncc, 2f		! Is fprs.fef == 0
         wr      %g0, 0x4, %fprs         ! fprs.fef = 1
 2:
 	brnz,pn	%o1, 3f			! %o1 is safe to check all 64-bits
@@ -175,14 +175,14 @@
 
 	fmovd	%d0, %d2
 	add	%sp, SA(16), %sp	! deallocate the scratch space
-	fmovd	%d0, %d4	
-	fmovd	%d0, %d6	
+	fmovd	%d0, %d4
+	fmovd	%d0, %d6
 	fmovd	%d0, %d8
-	fmovd	%d0, %d10	
-	fmovd	%d0, %d12	
-4:	
+	fmovd	%d0, %d10
+	fmovd	%d0, %d12
+4:
 	fmovd	%d0, %d14
-	
+
 	! 1st quadrant has 64 bytes of c
 	! instructions 32-byte aligned here
 #ifdef PANTHER_ONLY
@@ -197,7 +197,7 @@
 	std	%d0, [%o5 + 40]
 	std	%d0, [%o5 + 48]
 	std	%d0, [%o5 + 56]
-#else	
+#else
 	! Cheetah/Jaguar code
         stda    %d0, [%o5]ASI_BLK_P
 #endif
@@ -210,15 +210,15 @@
 	blu,pn  %ncc, 6f
 	and	%o2, 7, %o2		! calc bytes left after doubles
 
-5:	
+5:
 	std     %d0, [%o5]		! store the doubles
 	subcc   %o3, 8, %o3
 	bgeu,pt	%ncc, 5b
-        add     %o5, 8, %o5      
+        add     %o5, 8, %o5
 6:
 	! Set the remaining bytes
 	brz	%o2, .exit		! safe to check all 64-bits
-	
+
 #if 0
 	! Terminate the copy with a partial store. (bug 1200071 does not apply)
 	! The data should be at d0
@@ -226,14 +226,14 @@
 	edge8n	%g0, %o2, %o4
 	stda	%d0, [%o5]%o4, ASI_PST8_P
 #else
-7:	
+7:
 	deccc	%o2
 	stb	%o1, [%o5]
 	bgu,pt	%ncc, 7b
 	inc	%o5
 #endif
-	
-.exit:	
+
+.exit:
         membar  #StoreLoad|#StoreStore
         retl				! %o0 was preserved
         wr	%g1, %g0, %fprs         ! fprs = g1  restore fprs

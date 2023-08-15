@@ -110,7 +110,7 @@ __log_findckp(lp, lsnp)
 
 		/*
 		 * Keep looping until either you 1) run out of checkpoints,
-		 * 2) you've found a checkpoint before the most recent 
+		 * 2) you've found a checkpoint before the most recent
 		 * checkpoint's LSN and you have at least 2 checkpoints.
 		 */
 	} while (!IS_ZERO_LSN(next_lsn) &&

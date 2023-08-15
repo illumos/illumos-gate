@@ -958,7 +958,7 @@ label:                                                                  ;\
         dec     cnt                                                     ;\
         stx     %g0, [tsbmiss_map]                                      ;\
         brnz,pt cnt, label                                              ;\
-	    add   tsbmiss_map, CLONGSIZE, tsbmiss_map                    
+	    add   tsbmiss_map, CLONGSIZE, tsbmiss_map
 	/* END CSTYLED */
 
 /*

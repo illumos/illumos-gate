@@ -112,7 +112,7 @@
 1:
 	tst	%o5
 	membar #Sync
-	bne,pn	%ncc, 3f		
+	bne,pn	%ncc, 3f
 	andncc	%o5, LOFAULT_SET, %o5
 2:
 	!
@@ -203,7 +203,7 @@
 	btst	(8-1), %o0
 	bz	%icc, .bzl_dword
 	nop
-	
+
 	! Clear words until double-word aligned
 .bzl_word:
 	sta	%g0, [%o0]%asi
@@ -243,12 +243,12 @@
 	cmp	%o3, ASI_P
 	bne,a	%icc, 1f
 	wr	%g0, ASI_BLK_AIUS, %asi
-1:	
+1:
 	mov	256, %o3
 	ba,pt	%ncc, .bzl_doblock
 	nop
 
-.bzl_blkstart:	
+.bzl_blkstart:
       ! stda	%d0, [%o0+192]%asi  ! in dly slot of branch that got us here
 	stda	%d0, [%o0+128]%asi
 	stda	%d0, [%o0+64]%asi
@@ -263,7 +263,7 @@
 
 	cmp	%o1, 64
 	blu	%ncc, .bzl_finish
-	
+
 	andn	%o1, (64-1), %o3
 	srl	%o3, 4, %o2		! using blocks, 1 instr / 16 words
 	set	.bzl_zinst, %o4
@@ -317,7 +317,7 @@
 	! off after we were finished. We're just concerned with
 	! whether t_lofault was set when we came in. We end up
 	! here from either kzero() or bzero(). kzero() *always*
-	! sets a lofault handler. It ors LOFAULT_SET into %o5 
+	! sets a lofault handler. It ors LOFAULT_SET into %o5
 	! to indicate it has done this even if the value of %o5
 	! is otherwise zero. bzero() sets a lofault handler *only*
 	! if one was previously set. Accordingly we need to examine
@@ -325,7 +325,7 @@
 	! before resetting the error handler.
 	!
 	tst	%o5
-	bz,pt	%ncc, 1f	
+	bz,pt	%ncc, 1f
 	andn	%o5, LOFAULT_SET, %o5
 	membar	#Sync				! sync error barrier
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault

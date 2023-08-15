@@ -720,7 +720,7 @@ void kdb5_ldap_create(argc, argv)
 	 * Solaris Kerberos:
 	 * The kadmin/admin principal is unused on Solaris. This principal is used
 	 * in AUTH_GSSAPI but Solaris doesn't support AUTH_GSSAPI. RPCSEC_GSS can only
-	 * be used with host-based principals. 
+	 * be used with host-based principals.
 	 *
 	 */
 #if 0 /* ************ Begin IFDEF'ed OUT ***************************** */
@@ -2628,7 +2628,7 @@ kdb5_ldap_destroy(argc, argv)
 	char stashbuf[MAXPATHLEN+1];
 	int realm_len = strlen(global_params.realm);
 
-	(void) strlcpy(stashbuf, DEFAULT_KEYFILE_STUB, sizeof (stashbuf)); 
+	(void) strlcpy(stashbuf, DEFAULT_KEYFILE_STUB, sizeof (stashbuf));
 
 	if (realm_len <= (MAXPATHLEN-strlen(stashbuf))) {
 	    (void) strncat(stashbuf, global_params.realm,

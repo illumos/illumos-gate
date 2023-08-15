@@ -962,7 +962,7 @@ char shell_line[PATH_MAX];
 ** in the current file, zero is returned.
 */
 
-static off_t 
+static off_t
 command(char *filename, register FILE *f)
 {
     register off_t nlines;

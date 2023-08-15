@@ -98,7 +98,7 @@ public final class SyslogHandler extends Handler {
 	{
 		if (ident == null || facility == null)
 			throw new IllegalArgumentException();
-			
+
 		this.ident = ident;
 		this.facility = facility;
 

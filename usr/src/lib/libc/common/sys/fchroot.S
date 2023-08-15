@@ -31,7 +31,7 @@
 
 /* C library -- fchroot						*/
 /* int fchroot(const int fd)					*/
- 
+
 #include "SYS.h"
 
 	SYSCALL_RVAL1(fchroot)

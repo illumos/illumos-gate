@@ -125,8 +125,8 @@ long retry;
 
 /*
  * check system status for call
- *	name -> system to check	
- * return:  
+ *	name -> system to check
+ * return:
  *	0	-> ok
  *	>0	-> system status
  */

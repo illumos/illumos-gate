@@ -49,13 +49,13 @@ $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 #
 # For pre-5.7 compilers (unless patched with 117551-04 or 117552-05), in the
 # default compilation mode, __STDC_VERSION__ was defined to be 199901L. For
-# 5.7 and on compilers, __STDC_VERSION__ defaults to 199409L in order to 
-# maintain source compatibility. Neither of these cases results in the 
-# importing of /usr/lib/values-xpg6.o, so we need to either manually import 
+# 5.7 and on compilers, __STDC_VERSION__ defaults to 199409L in order to
+# maintain source compatibility. Neither of these cases results in the
+# importing of /usr/lib/values-xpg6.o, so we need to either manually import
 # it via linking with a local version of the object, or set -xc99=%all which
 # by default imports /usr/lib/values-xpg6.o. CSTD=CSTD_GNU99 is equivalent
 # to -xc99=all. If CSTD_GNU99 is defined and we also attempt to link with a
-# local version of values-xpg6.o, an error will occur due to multiple 
+# local version of values-xpg6.o, an error will occur due to multiple
 # definitions for __xpg4 and __xpg6. Because /usr/lib/values-xpg6.o was
 # delivered in Solaris 10 and is a stable interface, there is no need to
 # build and link with a local version of the object.

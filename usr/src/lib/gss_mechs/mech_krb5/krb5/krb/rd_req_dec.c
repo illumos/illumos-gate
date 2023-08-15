@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * CyberSAFE Corporation make any representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_rd_req_decoded()
  */
@@ -43,24 +43,24 @@
  */
 /*
  *  Parses a KRB_AP_REQ message, returning its contents.
- * 
+ *
  *  server specifies the expected server's name for the ticket; if NULL, then
  *  any server will be accepted if the key can be found, and the caller should
  *  verify that the principal is something it trusts.
- * 
+ *
  *  rcache specifies a replay detection cache used to store authenticators and
  *  server names
- * 
+ *
  *  keyproc specifies a procedure to generate a decryption key for the
  *  ticket.  If keyproc is non-NULL, keyprocarg is passed to it, and the result
  *  used as a decryption key. If keyproc is NULL, then fetchfrom is checked;
  *  if it is non-NULL, it specifies a parameter name from which to retrieve the
  *  decryption key.  If fetchfrom is NULL, then the default key store is
  *  consulted.
- * 
+ *
  *  authdat is set to point at allocated storage structures; the caller
- *  should free them when finished. 
- * 
+ *  should free them when finished.
+ *
  *  returns system errors, encryption errors, replay errors
  */
 
@@ -75,7 +75,7 @@ krb5_rd_req_decrypt_tkt_part(krb5_context context, const krb5_ap_req *req, krb5_
     krb5_error_code 	  retval;
     krb5_enctype 	  enctype;
     krb5_keytab_entry 	  ktent;
- 
+
     enctype = req->ticket->enc_part.enctype;
 
     /* Solaris Kerberos: */
@@ -112,7 +112,7 @@ krb5_rd_req_decrypt_tkt_part(krb5_context context, const krb5_ap_req *req, krb5_
 	   krb5_free_unparsed_name(context, s_name);
 	}
     }
-	    
+
     (void) krb5_kt_free_entry(context, &ktent);
     return retval;
 }
@@ -151,7 +151,7 @@ krb5_rd_req_decoded_opt(krb5_context context, krb5_auth_context *auth_context,
     krb5_error_code 	  retval = 0;
     krb5_principal_data princ_data;
     krb5_timestamp	  skew = 0; /* Solaris Kerberos */
-    
+
     req->ticket->enc_part2 == NULL;
     if (server && krb5_is_referral_realm(&server->realm)) {
 	char *realm;
@@ -195,7 +195,7 @@ goto cleanup;
     /* XXX this is an evil hack.  check_valid_flag is set iff the call
        is not from inside the kdc.  we can use this to determine which
        key usage to use */
-    if ((retval = decrypt_authenticator(context, req, 
+    if ((retval = decrypt_authenticator(context, req,
 					&((*auth_context)->authentp),
 					check_valid_flag)))
 	goto cleanup;
@@ -206,8 +206,8 @@ goto cleanup;
 	goto cleanup;
     }
 
-    if ((*auth_context)->remote_addr && 
-      !krb5_address_search(context, (*auth_context)->remote_addr, 
+    if ((*auth_context)->remote_addr &&
+      !krb5_address_search(context, (*auth_context)->remote_addr,
 			   req->ticket->enc_part2->caddrs)) {
 	retval = KRB5KRB_AP_ERR_BADADDR;
 	goto cleanup;
@@ -219,7 +219,7 @@ goto cleanup;
 
     /* Single hop cross-realm tickets only */
 
-    { 
+    {
 	krb5_transited *trans = &(req->ticket->enc_part2->transited);
 
       	/* If the transited list is empty, then we have at most one hop */
@@ -231,17 +231,17 @@ goto cleanup;
 
     /* No cross-realm tickets */
 
-    { 
+    {
 	char		* lrealm;
       	krb5_data      	* realm;
       	krb5_transited 	* trans;
-  
+
 	realm = krb5_princ_realm(context, req->ticket->enc_part2->client);
 	trans = &(req->ticket->enc_part2->transited);
 
 	/*
-      	 * If the transited list is empty, then we have at most one hop 
-      	 * So we also have to check that the client's realm is the local one 
+      	 * If the transited list is empty, then we have at most one hop
+      	 * So we also have to check that the client's realm is the local one
 	 */
       	krb5_get_default_realm(context, &lrealm);
       	if ((trans->tr_contents.data && trans->tr_contents.data[0]) ||
@@ -255,21 +255,21 @@ goto cleanup;
 #else
 
     /* Hierarchical Cross-Realm */
-  
+
     {
       	krb5_data      * realm;
       	krb5_transited * trans;
-  
+
 	realm = krb5_princ_realm(context, req->ticket->enc_part2->client);
 	trans = &(req->ticket->enc_part2->transited);
 
 	/*
-      	 * If the transited list is not empty, then check that all realms 
-      	 * transited are within the hierarchy between the client's realm  
-      	 * and the local realm.                                        
+      	 * If the transited list is not empty, then check that all realms
+      	 * transited are within the hierarchy between the client's realm
+      	 * and the local realm.
   	 */
 	if (trans->tr_contents.data && trans->tr_contents.data[0]) {
-	    retval = krb5_check_transited_list(context, &(trans->tr_contents), 
+	    retval = krb5_check_transited_list(context, &(trans->tr_contents),
 					       realm,
 					       krb5_princ_realm (context,
 								 server));
@@ -287,7 +287,7 @@ goto cleanup;
 	krb5_donot_replay  rep;
         krb5_tkt_authent   tktauthent;
 
-	tktauthent.ticket = req->ticket;	
+	tktauthent.ticket = req->ticket;
 	tktauthent.authenticator = (*auth_context)->authentp;
 	if (!(retval = krb5_auth_to_rep(context, &tktauthent, &rep))) {
 	    retval = krb5_rc_store(context, (*auth_context)->rcache, &rep);
@@ -392,7 +392,7 @@ err_skew:
 				    enctype_name);
 	    goto cleanup;
 	}
-	
+
 	for (i=0; (*auth_context)->permitted_etypes[i]; i++)
 	    if ((*auth_context)->permitted_etypes[i] ==
 		req->ticket->enc_part2->session->enctype)
@@ -408,7 +408,7 @@ err_skew:
 				    enctype_name);
 	    goto cleanup;
 	}
-	
+
 	if ((*auth_context)->authentp->subkey) {
 	    for (i=0; (*auth_context)->permitted_etypes[i]; i++)
 		if ((*auth_context)->permitted_etypes[i] ==
@@ -468,13 +468,13 @@ err_skew:
 	goto cleanup;
 
     /*
-     * If not AP_OPTS_MUTUAL_REQUIRED then and sequence numbers are used 
+     * If not AP_OPTS_MUTUAL_REQUIRED then and sequence numbers are used
      * then the default sequence number is the one's complement of the
      * sequence number sent ot us.
      */
-    if ((!(req->ap_options & AP_OPTS_MUTUAL_REQUIRED)) && 
+    if ((!(req->ap_options & AP_OPTS_MUTUAL_REQUIRED)) &&
       (*auth_context)->remote_seq_number) {
-	(*auth_context)->local_seq_number ^= 
+	(*auth_context)->local_seq_number ^=
 	  (*auth_context)->remote_seq_number;
     }
 
@@ -484,7 +484,7 @@ err_skew:
     if (ap_req_options)
     	*ap_req_options = req->ap_options;
     retval = 0;
-    
+
 cleanup:
     if (server == &princ_data)
 	krb5_free_default_realm(context, princ_data.realm.data);
@@ -506,7 +506,7 @@ krb5_rd_req_decoded(krb5_context context, krb5_auth_context *auth_context,
 {
   krb5_error_code retval;
   retval = krb5_rd_req_decoded_opt(context, auth_context,
-				   req, server, keytab, 
+				   req, server, keytab,
 				   ap_req_options, ticket,
 				   1); /* check_valid_flag */
   return retval;
@@ -521,7 +521,7 @@ krb5_rd_req_decoded_anyflag(krb5_context context,
 {
   krb5_error_code retval;
   retval = krb5_rd_req_decoded_opt(context, auth_context,
-				   req, server, keytab, 
+				   req, server, keytab,
 				   ap_req_options, ticket,
 				   0); /* don't check_valid_flag */
   return retval;

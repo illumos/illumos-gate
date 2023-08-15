@@ -9,7 +9,7 @@
  *   -z Show compression statistics instead of default display
  *
  * History:
- *      perkins@cps.msu.edu: Added compression statistics and alternate 
+ *      perkins@cps.msu.edu: Added compression statistics and alternate
  *                display. 11/94
  *	Brad Parker (brad@cayman.com) 6/92
  *
@@ -393,7 +393,7 @@ intpr()
 		       W(c.inc_packets),
 		       ccs.c.ratio / 256.0);
 	    }
-	
+
 	} else {
 	    if (ratef)
 		(void) printf("%8.3f", KBPS(V(p.ppp_ibytes)));

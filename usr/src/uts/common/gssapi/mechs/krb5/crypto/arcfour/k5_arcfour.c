@@ -48,7 +48,7 @@ krb5int_arcfour_translate_usage(krb5_keyusage usage)
   case 5:			/* tgs-req authz data in subkey */
     return 5;
   case 6:			/* tgs-req authenticator cksum */
-    return 6;			
+    return 6;
   case 7:			/* tgs-req authenticator */
     return 7;
   case 8:
@@ -139,7 +139,7 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
   bcopy(key, &k3, sizeof (krb5_keyblock));
   k3.length=d3.length;
   k3.contents= (void *) d3.data;
-  
+
   salt.length=14;
   salt.data=MALLOC(salt.length);
 
@@ -177,7 +177,7 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
   confounder.data=plaintext.data;
 
   output->length = plaintext.length+hashsize;
-  
+
   /* begin the encryption, computer K1 */
   ms_usage=krb5int_arcfour_translate_usage(usage);
   if (key->enctype == ENCTYPE_ARCFOUR_HMAC_EXP) {
@@ -231,7 +231,7 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
 
   /*
    * The final encryption key is the HMAC of the checksum
-   * using k1 
+   * using k1
    *
    * k3 = HMAC(k1, checksum);
    *  == or (in other terms) ==
@@ -246,7 +246,7 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
     goto cleanup;
 
   ret = (*(enc->encrypt))(context, &k3, ivec, &plaintext, &ciphertext);
-    
+
  cleanup:
   bzero(d1.data, d1.length);
   if (d2.data) {
@@ -304,7 +304,7 @@ krb5_arcfour_decrypt(context, enc, hash, key, usage, ivec, input, output)
   (void) bcopy(key, &k1, sizeof (krb5_keyblock));
   k1.length=d1.length;
   k1.contents= (void *) d1.data;
-  
+
   /*
    * d2 is the contents of key 'k2', which is used to generate the
    * checksum field.  'd2' == 'd1' when not using the exportable

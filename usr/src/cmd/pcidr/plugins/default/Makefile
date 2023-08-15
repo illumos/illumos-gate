@@ -49,7 +49,7 @@ USR_SRC_BASE = ../../../..
 #
 
 SRCDIR = .
-SRCS = $(TOPOBJECTS:%.o=$(USR_SRC_BASE)/cmd/pcidr/%.c) $(LOCOBJECTS:%.o=$(SRCDIR)/%.c) 
+SRCS = $(TOPOBJECTS:%.o=$(USR_SRC_BASE)/cmd/pcidr/%.c) $(LOCOBJECTS:%.o=$(SRCDIR)/%.c)
 
 LIBS = $(DYNLIB)
 

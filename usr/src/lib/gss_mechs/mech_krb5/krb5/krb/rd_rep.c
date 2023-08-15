@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_rd_rep()
  */
@@ -32,12 +32,12 @@
 
 /*
  *  Parses a KRB_AP_REP message, returning its contents.
- * 
+ *
  *  repl is filled in with with a pointer to allocated memory containing
- * the fields from the encrypted response. 
- * 
+ * the fields from the encrypted response.
+ *
  *  the key in kblock is used to decrypt the message.
- * 
+ *
  *  returns system errors, encryption errors, replay errors
  */
 
@@ -107,7 +107,7 @@ krb5_rd_rep(krb5_context context, krb5_auth_context auth_context, const krb5_dat
     auth_context->remote_seq_number = (*repl)->seq_number;
 
 clean_scratch:
-    memset(scratch.data, 0, scratch.length); 
+    memset(scratch.data, 0, scratch.length);
 
     krb5_free_ap_rep(context, reply);
     free(scratch.data);

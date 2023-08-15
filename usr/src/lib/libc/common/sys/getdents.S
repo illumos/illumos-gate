@@ -38,12 +38,12 @@
 	ANSI_PRAGMA_WEAK(getdents,function)
 #else
 	ANSI_PRAGMA_WEAK(getdents64,function)
-#endif	
+#endif
 
 #include "SYS.h"
 
 #if !defined(_LARGEFILE_SOURCE)
-	
+
 	SYSCALL_RVAL1(getdents)
 	RET
 	SET_SIZE(getdents)

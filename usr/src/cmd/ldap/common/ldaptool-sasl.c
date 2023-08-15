@@ -6,7 +6,7 @@
 /*
  * File for ldaptool routines for SASL
  */
- 
+
 #include <ldap.h>
 #include "ldaptool-sasl.h"
 #ifdef SOLARIS_LDAP_CMD
@@ -42,7 +42,7 @@ ldaptool_set_sasl_defaults ( LDAP *ld, char *mech, char *authid, char *username,
 				 char *passwd, char *realm )
 {
         ldaptoolSASLdefaults *defaults;
-         
+
         if ((defaults = calloc(sizeof(defaults[0]), 1)) == NULL)
 		return NULL;
 
@@ -95,7 +95,7 @@ ldaptool_sasl_interact( LDAP *ld, unsigned flags, void *defaults, void *prompts 
 	return (LDAP_SUCCESS);
 }
 
-static int 
+static int
 get_default(ldaptoolSASLdefaults *defaults, sasl_interact_t *interact) {
 	const char	*defvalue = interact->defresult;
 
@@ -122,7 +122,7 @@ get_default(ldaptoolSASLdefaults *defaults, sasl_interact_t *interact) {
 			strcpy((char *)interact->result,defvalue);
 			interact->len = strlen((char *)(interact->result));
 		}
-		
+
 		/* Clear passwd */
 		if (interact->id == SASL_CB_PASS && defaults != NULL) {
 			/* At this point defaults->passwd is not NULL */
@@ -136,7 +136,7 @@ get_default(ldaptoolSASLdefaults *defaults, sasl_interact_t *interact) {
 	return (LDAP_SUCCESS);
 }
 
-static int 
+static int
 get_new_value(sasl_interact_t *interact, unsigned flags) {
 	char	*newvalue, str[1024];
 	int	len;
@@ -151,7 +151,7 @@ get_new_value(sasl_interact_t *interact, unsigned flags) {
 	}
 
 #ifdef SOLARIS_LDAP_CMD
-	tmpstr = ldaptool_UTF82local(interact->prompt); 
+	tmpstr = ldaptool_UTF82local(interact->prompt);
 	snprintf(str, sizeof(str), "%s:", tmpstr?tmpstr:SASL_PROMPT);
 	if (tmpstr != NULL)
 		free(tmpstr);
@@ -197,7 +197,7 @@ get_new_value(sasl_interact_t *interact, unsigned flags) {
 			return (LDAP_UNAVAILABLE);
 		len = strlen(str);
 		if (len > 0 && str[len - 1] == '\n')
-			str[len - 1] = 0; 
+			str[len - 1] = 0;
 	}
 
 	interact->result = (char *) strdup(newvalue);

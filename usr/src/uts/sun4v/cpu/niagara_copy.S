@@ -112,7 +112,7 @@
  * For all of bcopy/copyin/copyout the copy logic is specialized according
  * to how the src and dst is aligned and how much data needs to be moved.
  * The following comments apply to the N2/RF code (#if !defined(NIAGARA_IMPL))
- * 
+ *
  * N2/RF Flow :
  *
  * if (count < FP_COPY) {  (584 bytes)
@@ -128,7 +128,7 @@
  *       copy final 0-31 bytes; go to short_exit
  *     } else {					src/dst not aligned on 8 bytes
  *     if src is word aligned, ld/st words in 32-byte chunks
- *     if src is half word aligned, ld half, ld word, ld half; pack 
+ *     if src is half word aligned, ld half, ld word, ld half; pack
  *		into long word, store long words in 32-byte chunks
  *     if src is byte aligned, ld byte,half,word parts;  pack into long
  *	   word, store long words in 32-byte chunks
@@ -769,7 +769,7 @@ fp_panic_msg:
 /*
  * Handle all cases where src and dest are aligned on word
  * boundaries. Use unrolled loops for better performance.
- * This option wins over standard large data move when 
+ * This option wins over standard large data move when
  * source and destination is in cache for medium
  * to short data moves.
  */
@@ -1093,7 +1093,7 @@ fp_panic_msg:
 	stx	%o4, [%o1-8]
 	ba	.bc_medb7
 	nop
-	
+
 	SET_SIZE(bcopy)
 /*
  * The _more entry points are not intended to be used directly by
@@ -1158,7 +1158,7 @@ fp_panic_msg:
 	andcc	%i0, 7, %o3		! is src long word aligned
 	brnz,pt	%o3, .bc_big_unal8
 	prefetch [%i0 + (2 * CACHE_LINE)], #one_read
-	
+
 	! Src and dst are long word aligned
 	! align dst to 64 byte boundary
 	andcc	%i1, 0x3f, %o3		! %o3 == 0 means dst is 64 byte aligned
@@ -2040,7 +2040,7 @@ fp_panic_msg:
 3:
 	ret
 	restore	%g0, 0, %o0
-	
+
 	SET_SIZE(bcopy_more)
 
 
@@ -2659,7 +2659,7 @@ loop2:
 
 	retl
 	andn	%i2, %o0, %i3		! return size of aligned bytes
-	
+
 	SET_SIZE(bcopy)
 
 #endif	/* NIAGARA_IMPL */
@@ -2727,7 +2727,7 @@ loop2:
 	set	PAGESIZE, %i2
 
 	/*
-	 * Copying exactly one page and PAGESIZE is in mutliple of 0x80. 
+	 * Copying exactly one page and PAGESIZE is in mutliple of 0x80.
 	 */
 	mov	ASI_BLK_INIT_ST_QUAD_LDD_P, %asi
 	prefetch [%i0+0x0], #one_read
@@ -2838,7 +2838,7 @@ loop2:
  *
  * If we don't exceed one of the limits, we store -count in %o3,
  * we store the number of chunks (8, 4, 2 or 1 byte) operated
- * on in our basic copy loop in %o2. Following this we branch 
+ * on in our basic copy loop in %o2. Following this we branch
  * to the appropriate copy loop and copy that many chunks.
  * Since we've been adding the chunk size to %o3 each time through
  * as well as decrementing %o2, we can tell if any data is
@@ -2876,7 +2876,7 @@ loop2:
 #define	SAVED_LOFAULT		%g6
 
 /*
- * Generic copyio fault handler.  This is the first line of defense when a 
+ * Generic copyio fault handler.  This is the first line of defense when a
  * fault occurs in (x)copyin/(x)copyout.  In order for this to function
  * properly, the value of the 'real' lofault handler should be in REAL_LOFAULT.
  * This allows us to share common code for all the flavors of the copy
@@ -2952,7 +2952,7 @@ loop2:
 	ldn	[THREAD_REG + T_LOFAULT], SAVED_LOFAULT
 /*
  * Small copy out code
- * 
+ *
  */
 	sethi	%hi(copyio_fault_nowindow), %o3
 	or	%o3, %lo(copyio_fault_nowindow), %o3
@@ -3123,7 +3123,7 @@ loop2:
 /*
  * Handle all cases where src and dest are aligned on word
  * boundaries. Use unrolled loops for better performance.
- * This option wins over standard large data move when 
+ * This option wins over standard large data move when
  * source and destination is in cache for medium
  * to short data moves.
  */
@@ -4608,7 +4608,7 @@ loop2:
 	nop
 	!
 	! Something is left - do it byte for byte.
-	! 
+	!
 	ba,pt	%ncc, .dcocl
 	ldub	[%o0 + %o3], %o4	! load next byte
 	!
@@ -5112,7 +5112,7 @@ copyout_blalign:
 	ldn	[THREAD_REG + T_LOFAULT], SAVED_LOFAULT
 /*
  * Small copy in code
- * 
+ *
  */
 	sethi	%hi(copyio_fault_nowindow), %o3
 	or	%o3, %lo(copyio_fault_nowindow), %o3
@@ -5282,7 +5282,7 @@ copyout_blalign:
 /*
  * Handle all cases where src and dest are aligned on word
  * boundaries. Use unrolled loops for better performance.
- * This option wins over standard large data move when 
+ * This option wins over standard large data move when
  * source and destination is in cache for medium
  * to short data moves.
  */
@@ -5615,12 +5615,12 @@ copyout_blalign:
 
 /*
  * End of small copy in code (no window)
- * 
+ *
  */
 
 /*
  * Long copy in code (using register window and fp regs)
- * 
+ *
  */
 
 .ci_copy_more:
@@ -6577,7 +6577,7 @@ copyout_blalign:
 	lduba	[%o0 + %o3]ASI_USER, %o4
 	!
 	! We're done. Go home.
-	!	
+	!
 	membar	#Sync
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]
 	retl
@@ -7220,13 +7220,13 @@ copyin_blalign:
 	ldn	[THREAD_REG + T_LOFAULT], %o5
 	or	%o4, %lo(.little_err), %o4
 	membar	#Sync				! sync error barrier
-	stn	%o4, [THREAD_REG + T_LOFAULT]	
+	stn	%o4, [THREAD_REG + T_LOFAULT]
 
 	subcc	%g0, %o2, %o3
 	add	%o0, %o2, %o0
 	bz,pn	%ncc, 2f		! check for zero bytes
 	sub	%o2, 1, %o4
-	add	%o0, %o4, %o0		! start w/last byte	
+	add	%o0, %o4, %o0		! start w/last byte
 	add	%o1, %o2, %o1
 	lduba	[%o0+%o3]ASI_AIUSL, %o4
 
@@ -7497,7 +7497,7 @@ copyin_blalign:
 1:
 	tst	%o5
 	membar #Sync
-	bne,pn	%ncc, 3f		
+	bne,pn	%ncc, 3f
 	andncc	%o5, LOFAULT_SET, %o5
 2:
 	!
@@ -7579,7 +7579,7 @@ copyin_blalign:
 	bz,pt	%ncc, .bzero_blk
 	sub	%o3, 0x40, %o3		! -(bytes till block aligned)
 	add	%o1, %o3, %o1		! o1 is the remainder
-	
+
 	! Clear -(%o3) bytes till block aligned
 1:
 	stxa	%g0, [%o0]%asi
@@ -7684,7 +7684,7 @@ copyin_blalign:
 	ba	.byteclr
 	nop
 
-.wdalign:			
+.wdalign:
 	andcc	%o0, 3, %o3		! is add aligned on a word boundary
 	bz,pn	%ncc, .wdclr
 	andn	%o1, 3, %o3		! create word sized count in %o3

@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_mk_safe()
  */
@@ -90,10 +90,10 @@ krb5_mk_safe_basic(krb5_context context, const krb5_data *userdata,
     safemsg.usec       = replaydata->usec;
     safemsg.seq_number = replaydata->seq;
 
-    /* 
+    /*
      * To do the checksum stuff, we need to encode the message with a
      * zero-length zero-type checksum, then checksum the encoding, then
-     * re-encode with the checksum. 
+     * re-encode with the checksum.
      */
 
     safe_checksum.length = 0;
@@ -130,7 +130,7 @@ krb5_mk_safe_basic(krb5_context context, const krb5_data *userdata,
 cleanup_checksum:
     krb5_xfree(safe_checksum.contents);
 
-    memset((char *)scratch1->data, 0, scratch1->length); 
+    memset((char *)scratch1->data, 0, scratch1->length);
     krb5_free_data(context, scratch1);
     /* Solaris Kerberos */
     KRB5_LOG(KRB5_INFO, "krb5_mk_safe_basic() end, retval=%d", retval);
@@ -190,7 +190,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
 	if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE) {
     	    outdata->seq = replaydata.seq;
 	}
-    } 
+    }
 
 {
     krb5_address * premote_fulladdr = NULL;
@@ -204,7 +204,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
     if (auth_context->local_addr) {
     	if (auth_context->local_port) {
             if (!(retval = krb5_make_fulladdr(context, auth_context->local_addr,
-                                 	      auth_context->local_port, 
+                                 	      auth_context->local_port,
 					      &local_fulladdr))){
             	CLEANUP_PUSH(local_fulladdr.contents, free);
 	    	plocal_fulladdr = &local_fulladdr;
@@ -220,7 +220,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
     if (auth_context->remote_addr) {
     	if (auth_context->remote_port) {
             if (!(retval = krb5_make_fulladdr(context,auth_context->remote_addr,
-                                 	      auth_context->remote_port, 
+                                 	      auth_context->remote_port,
 					      &remote_fulladdr))){
             	CLEANUP_PUSH(remote_fulladdr.contents, free);
 	    	premote_fulladdr = &remote_fulladdr;
@@ -257,7 +257,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
 	sumtype = sumtypes[i];
 	krb5_free_cksumtypes (context, sumtypes);
     }
-    if ((retval = krb5_mk_safe_basic(context, userdata, keyblock, &replaydata, 
+    if ((retval = krb5_mk_safe_basic(context, userdata, keyblock, &replaydata,
 				     plocal_fulladdr, premote_fulladdr,
 				     sumtype, outbuf))) {
 	CLEANUP_DONE();
@@ -270,7 +270,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_TIME) {
 	krb5_donot_replay replay;
 
-	if ((retval = krb5_gen_replay_name(context, auth_context->local_addr, 
+	if ((retval = krb5_gen_replay_name(context, auth_context->local_addr,
 					   "_safe", &replay.client))) {
     	    krb5_xfree(outbuf);
 	    goto error;
@@ -293,7 +293,7 @@ krb5_mk_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
 
 error:
     if ((auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_SEQUENCE) ||
-      (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE)) 
+      (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE))
 	auth_context->local_seq_number--;
 
     /* Solaris Kerberos */

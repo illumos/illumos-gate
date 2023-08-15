@@ -64,7 +64,7 @@
 #define	PORT_ZFree(p, l)		bzero((p), (l)); free((p))
 #endif
 
-/* 
+/*
  * Returns true if pointP is the point at infinity, false otherwise
  */
 PRBool
@@ -79,11 +79,11 @@ ec_point_at_infinity(SECItem *pointP)
     return PR_TRUE;
 }
 
-/* 
+/*
  * Computes scalar point multiplication pointQ = k1 * G + k2 * pointP for
  * the curve whose parameters are encoded in params with base point G.
  */
-SECStatus 
+SECStatus
 ec_points_mul(const ECParams *params, const mp_int *k1, const mp_int *k2,
              const SECItem *pointP, SECItem *pointQ, int kmflag)
 {
@@ -102,7 +102,7 @@ ec_points_mul(const ECParams *params, const mp_int *k1, const mp_int *k2,
     char mpstr[256];
 
     printf("ec_points_mul: params [len=%d]:", params->DEREncoding.len);
-    for (i = 0; i < params->DEREncoding.len; i++) 
+    for (i = 0; i < params->DEREncoding.len; i++)
 	    printf("%02x:", params->DEREncoding.data[i]);
     printf("\n");
 
@@ -122,7 +122,7 @@ ec_points_mul(const ECParams *params, const mp_int *k1, const mp_int *k2,
 
 	if (pointP != NULL) {
 		printf("ec_points_mul: pointP [len=%d]:", pointP->len);
-		for (i = 0; i < pointP->len; i++) 
+		for (i = 0; i < pointP->len; i++)
 			printf("%02x:", pointP->data[i]);
 		printf("\n");
 	}
@@ -172,9 +172,9 @@ ec_points_mul(const ECParams *params, const mp_int *k1, const mp_int *k2,
 #if 0 /* currently don't support non-named curves */
 	if (group == NULL) {
 		/* Set up mp_ints containing the curve coefficients */
-		CHECK_MPI_OK( mp_read_unsigned_octets(&Gx, params->base.data + 1, 
+		CHECK_MPI_OK( mp_read_unsigned_octets(&Gx, params->base.data + 1,
 										  (mp_size) len) );
-		CHECK_MPI_OK( mp_read_unsigned_octets(&Gy, params->base.data + 1 + len, 
+		CHECK_MPI_OK( mp_read_unsigned_octets(&Gy, params->base.data + 1 + len,
 										  (mp_size) len) );
 		SECITEM_TO_MPINT( params->order, &order );
 		SECITEM_TO_MPINT( params->curve.a, &a );
@@ -213,7 +213,7 @@ ec_points_mul(const ECParams *params, const mp_int *k1, const mp_int *k2,
 
 #if EC_DEBUG
     printf("ec_points_mul: pointQ [len=%d]:", pointQ->len);
-    for (i = 0; i < pointQ->len; i++) 
+    for (i = 0; i < pointQ->len; i++)
 	    printf("%02x:", pointQ->data[i]);
     printf("\n");
 #endif
@@ -239,11 +239,11 @@ cleanup:
 }
 
 /* Generates a new EC key pair. The private key is a supplied
- * value and the public key is the result of performing a scalar 
+ * value and the public key is the result of performing a scalar
  * point multiplication of that value with the curve's base point.
  */
-SECStatus 
-ec_NewKey(ECParams *ecParams, ECPrivateKey **privKey, 
+SECStatus
+ec_NewKey(ECParams *ecParams, ECPrivateKey **privKey,
     const unsigned char *privKeyBytes, int privKeyLen, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -328,7 +328,7 @@ int printf();
     /* Compute corresponding public key */
     MP_DIGITS(&k) = 0;
     CHECK_MPI_OK( mp_init(&k, kmflag) );
-    CHECK_MPI_OK( mp_read_unsigned_octets(&k, key->privateValue.data, 
+    CHECK_MPI_OK( mp_read_unsigned_octets(&k, key->privateValue.data,
 	(mp_size) len) );
 
     rv = ec_points_mul(ecParams, &k, NULL, NULL, &(key->publicValue), kmflag);
@@ -341,7 +341,7 @@ cleanup:
 	PORT_FreeArena(arena, PR_TRUE);
 
 #if EC_DEBUG
-    printf("ec_NewKey returning %s\n", 
+    printf("ec_NewKey returning %s\n",
 	(rv == SECSuccess) ? "success" : "failure");
 #endif
 
@@ -350,12 +350,12 @@ cleanup:
 }
 
 /* Generates a new EC key pair. The private key is a supplied
- * random value (in seed) and the public key is the result of 
- * performing a scalar point multiplication of that value with 
+ * random value (in seed) and the public key is the result of
+ * performing a scalar point multiplication of that value with
  * the curve's base point.
  */
-SECStatus 
-EC_NewKeyFromSeed(ECParams *ecParams, ECPrivateKey **privKey, 
+SECStatus
+EC_NewKeyFromSeed(ECParams *ecParams, ECPrivateKey **privKey,
     const unsigned char *seed, int seedlen, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -427,7 +427,7 @@ cleanup:
  * the public key is the result of performing a scalar point multiplication
  * of that value with the curve's base point.
  */
-SECStatus 
+SECStatus
 EC_NewKey(ECParams *ecParams, ECPrivateKey **privKey, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -451,20 +451,20 @@ cleanup:
 	PORT_ZFree(privKeyBytes, len * 2);
     }
 #if EC_DEBUG
-    printf("EC_NewKey returning %s\n", 
+    printf("EC_NewKey returning %s\n",
 	(rv == SECSuccess) ? "success" : "failure");
 #endif
-    
+
     return rv;
 }
 
 /* Validates an EC public key as described in Section 5.2.2 of
  * X9.62. The ECDH primitive when used without the cofactor does
  * not address small subgroup attacks, which may occur when the
- * public key is not valid. These attacks can be prevented by 
+ * public key is not valid. These attacks can be prevented by
  * validating the public key before using ECDH.
  */
-SECStatus 
+SECStatus
 EC_ValidatePublicKey(ECParams *ecParams, SECItem *publicValue, int kmflag)
 {
     mp_int Px, Py;
@@ -477,7 +477,7 @@ EC_ValidatePublicKey(ECParams *ecParams, SECItem *publicValue, int kmflag)
 	PORT_SetError(SEC_ERROR_INVALID_ARGS);
 	return SECFailure;
     }
-	
+
     /* NOTE: We only support uncompressed points for now */
     len = (ecParams->fieldID.size + 7) >> 3;
     if (publicValue->data[0] != EC_POINT_FORM_UNCOMPRESSED) {
@@ -541,7 +541,7 @@ cleanup:
     return rv;
 }
 
-/* 
+/*
 ** Performs an ECDH key derivation by computing the scalar point
 ** multiplication of privateValue and publicValue (with or without the
 ** cofactor) and returns the x-coordinate of the resulting elliptic
@@ -551,8 +551,8 @@ cleanup:
 ** produced. It is the caller's responsibility to free the allocated
 ** buffer containing the derived secret.
 */
-SECStatus 
-ECDH_Derive(SECItem  *publicValue, 
+SECStatus
+ECDH_Derive(SECItem  *publicValue,
             ECParams *ecParams,
             SECItem  *privateValue,
             PRBool    withCofactor,
@@ -569,20 +569,20 @@ ECDH_Derive(SECItem  *publicValue,
     int i;
 #endif
 
-    if (!publicValue || !ecParams || !privateValue || 
+    if (!publicValue || !ecParams || !privateValue ||
 	!derivedSecret) {
 	PORT_SetError(SEC_ERROR_INVALID_ARGS);
 	return SECFailure;
     }
 
     memset(derivedSecret, 0, sizeof *derivedSecret);
-    len = (ecParams->fieldID.size + 7) >> 3;  
+    len = (ecParams->fieldID.size + 7) >> 3;
     pointQ.len = 2*len + 1;
     if ((pointQ.data = PORT_Alloc(2*len + 1, kmflag)) == NULL) goto cleanup;
 
     MP_DIGITS(&k) = 0;
     CHECK_MPI_OK( mp_init(&k, kmflag) );
-    CHECK_MPI_OK( mp_read_unsigned_octets(&k, privateValue->data, 
+    CHECK_MPI_OK( mp_read_unsigned_octets(&k, privateValue->data,
 	                                  (mp_size) privateValue->len) );
 
     if (withCofactor && (ecParams->cofactor != 1)) {
@@ -608,7 +608,7 @@ ECDH_Derive(SECItem  *publicValue,
 
 #if EC_DEBUG
     printf("derived_secret:\n");
-    for (i = 0; i < derivedSecret->len; i++) 
+    for (i = 0; i < derivedSecret->len; i++)
 	printf("%02x:", derivedSecret->data[i]);
     printf("\n");
 #endif
@@ -627,8 +627,8 @@ cleanup:
  * on the digest using the given key and the random value kb (used in
  * computing s).
  */
-SECStatus 
-ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature, 
+SECStatus
+ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
     const SECItem *digest, const unsigned char *kb, const int kblen, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -663,7 +663,7 @@ ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
 
     ecParams = &(key->ecParams);
     flen = (ecParams->fieldID.size + 7) >> 3;
-    olen = ecParams->order.len;  
+    olen = ecParams->order.len;
     if (signature->data == NULL) {
 	/* a call to get the signature length only */
 	goto finish;
@@ -698,7 +698,7 @@ ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
 	goto cleanup;
     }
 
-    /* 
+    /*
     ** ANSI X9.62, Section 5.3.2, Step 2
     **
     ** Compute kG
@@ -710,15 +710,15 @@ ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
 	    != SECSuccess))
 	goto cleanup;
 
-    /* 
+    /*
     ** ANSI X9.62, Section 5.3.3, Step 1
     **
     ** Extract the x co-ordinate of kG into x1
     */
-    CHECK_MPI_OK( mp_read_unsigned_octets(&x1, kGpoint.data + 1, 
+    CHECK_MPI_OK( mp_read_unsigned_octets(&x1, kGpoint.data + 1,
 	                                  (mp_size) flen) );
 
-    /* 
+    /*
     ** ANSI X9.62, Section 5.3.3, Step 2
     **
     ** r = x1 mod n  NOTE: n is the order of the curve
@@ -728,22 +728,22 @@ ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
     /*
     ** ANSI X9.62, Section 5.3.3, Step 3
     **
-    ** verify r != 0 
+    ** verify r != 0
     */
     if (mp_cmp_z(&r) == 0) {
 	PORT_SetError(SEC_ERROR_NEED_RANDOM);
 	goto cleanup;
     }
 
-    /*                                  
+    /*
     ** ANSI X9.62, Section 5.3.3, Step 4
     **
-    ** s = (k**-1 * (HASH(M) + d*r)) mod n 
+    ** s = (k**-1 * (HASH(M) + d*r)) mod n
     */
     SECITEM_TO_MPINT(*digest, &s);        /* s = HASH(M)     */
 
     /* In the definition of EC signing, digests are truncated
-     * to the length of n in bits. 
+     * to the length of n in bits.
      * (see SEC 1 "Elliptic Curve Digit Signature Algorithm" section 4.1.*/
     if (digest->len*8 > ecParams->fieldID.size) {
 	mpl_rsh(&s,&s,digest->len*8 - ecParams->fieldID.size);
@@ -823,10 +823,10 @@ cleanup:
 }
 
 /*
-** Computes the ECDSA signature on the digest using the given key 
+** Computes the ECDSA signature on the digest using the given key
 ** and a random seed.
 */
-SECStatus 
+SECStatus
 ECDSA_SignDigest(ECPrivateKey *key, SECItem *signature, const SECItem *digest,
     int kmflag)
 {
@@ -848,7 +848,7 @@ ECDSA_SignDigest(ECPrivateKey *key, SECItem *signature, const SECItem *digest,
     /* Generate ECDSA signature with the specified k value */
     rv = ECDSA_SignDigestWithSeed(key, signature, digest, kBytes, len, kmflag);
 
-cleanup:    
+cleanup:
     if (kBytes) {
 	PORT_ZFree(kBytes, len * 2);
     }
@@ -864,8 +864,8 @@ cleanup:
 /*
 ** Checks the signature on the given digest using the key provided.
 */
-SECStatus 
-ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature, 
+SECStatus
+ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
                  const SECItem *digest, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -903,8 +903,8 @@ ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
     }
 
     ecParams = &(key->ecParams);
-    flen = (ecParams->fieldID.size + 7) >> 3;  
-    olen = ecParams->order.len;  
+    flen = (ecParams->fieldID.size + 7) >> 3;
+    olen = ecParams->order.len;
     if (signature->len == 0 || signature->len%2 != 0 ||
 	signature->len > 2*olen) {
 	PORT_SetError(SEC_ERROR_INPUT_LEN);
@@ -930,8 +930,8 @@ ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
     */
     CHECK_MPI_OK( mp_read_unsigned_octets(&r_, signature->data, slen) );
     CHECK_MPI_OK( mp_read_unsigned_octets(&s_, signature->data + slen, slen) );
-                                          
-    /* 
+
+    /*
     ** ANSI X9.62, Section 5.4.2, Steps 1 and 2
     **
     ** Verify that 0 < r' < n and 0 < s' < n
@@ -958,7 +958,7 @@ ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
     SECITEM_TO_MPINT(*digest, &u1);                  /* u1 = HASH(M)     */
 
     /* In the definition of EC signing, digests are truncated
-     * to the length of n in bits. 
+     * to the length of n in bits.
      * (see SEC 1 "Elliptic Curve Digit Signature Algorithm" section 4.1.*/
     if (digest->len*8 > ecParams->fieldID.size) {  /* u1 = HASH(M')     */
 	mpl_rsh(&u1,&u1,digest->len*8- ecParams->fieldID.size);
@@ -1065,7 +1065,7 @@ cleanup:
     return rv;
 }
 
-/* 
+/*
  * Copy all of the fields from srcParams into dstParams
  */
 SECStatus

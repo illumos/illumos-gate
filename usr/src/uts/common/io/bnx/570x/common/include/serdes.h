@@ -215,7 +215,7 @@ typedef struct serdes_reg
             /* During SW controlled auto-negotiation, this value reflects the
                11-bit message page or unformatted code field in the last page
                received. */
-    u16_t mii_reserved_9[2];               /* offset 0x09-0x0a */ 
+    u16_t mii_reserved_9[2];               /* offset 0x09-0x0a */
     u16_t mii_aneg_nxt_pg_xmit1;           /* RW offset 0x0b */
             /* If <b>USE_IEEE</b> is set, this page is transmitted after
                the message page of value 1024 is sent.   */
@@ -255,7 +255,7 @@ typedef struct serdes_reg
             /* By BRCM proprietary convention, bits [3:0] of this value are the
                advertized value of pre-emphasis value to be used for backplane
                media and should be non-zero if remote end knows the nature of
-               the backplane media. 
+               the backplane media.
                Firmware must manually move this value to the <b>PREEMPHASIS</b>
                value in 5*0x17 and re-start auto-negotiation with the new
                pre-emphasis value in use.
@@ -308,7 +308,7 @@ typedef struct serdes_reg
 } serdes_reg_t;
 
 
-/*  
+/*
  * DIGITAL Block selected in <b>block</b> section of serdes
  * registers when <b>block_addr</b> value is 0.
  */
@@ -351,7 +351,7 @@ typedef struct serdes_digital_reg
                     /* when set to '1', the PHY will switch between SGMII mode
                        and fiber mode when an auto-negotiation page is
                        received with the wrong selector field in bit 0.
-                       When set to '0', selection of fiber/SGMII mode is 
+                       When set to '0', selection of fiber/SGMII mode is
                        controlled by <b>FIBER_MODE</b> bit. */
        #define MII_1000X_CTL1_INV_SIG_DET (1<<3) /* RW */ /* Reset:0 */
                     /* When set to '1', the signal detect sense of the signal
@@ -525,7 +525,7 @@ typedef struct serdes_digital_reg
        #define MII_1000X_STAT1_EARLY_END_EXT_ERR_DET (1<<8) /* AC */ /* Reset:0 */
                     /* When this bit is '1', a early end extension error code
                        has been detected.  This indicates early_end_ext_state
-                       in PCS receive FSM has been reached since the last 
+                       in PCS receive FSM has been reached since the last
                        read. */
        #define MII_1000X_STAT1_LINK_STATUS (1<<7) /* RO */ /* Reset:0 */
                     /* When this bit is '1', it indicates that link has been up
@@ -537,7 +537,7 @@ typedef struct serdes_digital_reg
                        resolved to allow reception of pause frames locally. */
        #define MII_1000X_STAT1_PAUSE_TX_RESOLVE (1<<5) /* RO */ /* Reset:0 */
                     /* This bit will read as '1' when auto-negotiation has
-                       resolved to allow transmission of pause frames 
+                       resolved to allow transmission of pause frames
                        locally. */
        #define MII_1000X_STAT1_SPEED (3<<3) /* RO */ /* Reset:0 */
                     /* These bits indicate the current speed status. */
@@ -620,7 +620,7 @@ typedef struct serdes_digital_reg
 
 } serdes_digital_reg_t;
 
-/*  
+/*
  * DIGITAL3 Block selected in <b>block</b> section of serdes
  * registers when <b>block_addr</b> value is 2.
  */
@@ -638,7 +638,7 @@ typedef struct serdes_digital3_reg
 
 } serdes_digital3_reg_t;
 
-/*  
+/*
  * TX/Misc Block selected in <b>block</b> section of serdes
  * registers when <b>block_addr</b> value is 5.
  */

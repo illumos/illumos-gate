@@ -34,7 +34,7 @@ SRCS =		postreverse.c
 
 OBJS =		$(SRCS:%.c=%.o)
 
-TXTS=		README 
+TXTS=		README
 
 ENCODING =	2
 CPPFLAGS =	-DDFLTENCODING=$(ENCODING)	\

@@ -31,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,21 +45,21 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Edit a KDC database.
  */
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -70,7 +70,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -142,7 +142,7 @@ krb5_boolean dbactive = FALSE;
 static int open_db_and_mkey(void);
 
 static void add_random_key(int, char **);
-   
+
 typedef void (*cmd_func)(int, char **);
 
 struct _cmd_table {
@@ -169,7 +169,7 @@ static struct _cmd_table *cmd_lookup(name)
 	  else
 	       cmd++;
      }
-     
+
      return NULL;
 }
 
@@ -177,7 +177,7 @@ static struct _cmd_table *cmd_lookup(name)
 
 char **db5util_db_args = NULL;
 int    db5util_db_args_size = 0;
-     
+
 static void extended_com_err_fn (const char *myprog, errcode_t code,
 				 const char *fmt, va_list args)
 {
@@ -212,7 +212,7 @@ int main(argc, argv)
     char *argv[];
 {
     struct _cmd_table *cmd = NULL;
-    char *koptarg, **cmd_argv;	
+    char *koptarg, **cmd_argv;
     char *db_name_tmp = NULL;
     int cmd_argc;
     krb5_error_code retval;
@@ -238,7 +238,7 @@ int main(argc, argv)
 
     retval = kadm5_init_krb5_context(&util_context);
     if (retval) {
-	    com_err (progname, retval, 
+	    com_err (progname, retval,
 		gettext("while initializing Kerberos code"));
 	    exit(1);
     }
@@ -251,7 +251,7 @@ int main(argc, argv)
     }
     memset(cmd_argv, 0, sizeof(char *)*argc);
     cmd_argc = 1;
-	 
+
     argv++; argc--;
     while (*argv) {
        if (strcmp(*argv, "-P") == 0 && ARG_VAL) {
@@ -325,7 +325,7 @@ int main(argc, argv)
 
     if (cmd_argv[0] == NULL)
 	 usage();
-    
+
     if( !util_context->default_realm )
     {
 	char *temp = NULL;
@@ -353,7 +353,7 @@ int main(argc, argv)
      */
     (void) umask(077);
 
-    (void) memset(&master_key, 0, sizeof (krb5_keyblock)); 
+    (void) memset(&master_key, 0, sizeof (krb5_keyblock));
 
     if ((global_params.enctype != ENCTYPE_UNKNOWN) &&
 	(!krb5_c_valid_enctype(global_params.enctype))) {
@@ -445,7 +445,7 @@ static int open_db_and_mkey()
     dbactive = FALSE;
     valid_master_key = 0;
 
-    if ((retval = krb5_db_open(util_context, db5util_db_args, 
+    if ((retval = krb5_db_open(util_context, db5util_db_args,
 			       KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN))) {
 	com_err(progname, retval, "while initializing database");
 	exit_status++;
@@ -456,7 +456,7 @@ static int open_db_and_mkey()
 
     if ((retval = krb5_db_setup_mkey_name(util_context,
 					  global_params.mkey_name,
-					  global_params.realm, 
+					  global_params.realm,
 					  0, &master_princ))) {
 		com_err(progname, retval,
 		    gettext("while setting up master key name"));
@@ -464,7 +464,7 @@ static int open_db_and_mkey()
 	return(1);
     }
     nentries = 1;
-    if ((retval = krb5_db_get_principal(util_context, master_princ, 
+    if ((retval = krb5_db_get_principal(util_context, master_princ,
 					&master_entry, &nentries, &more))) {
 		com_err(progname, retval,
 		    gettext("while retrieving master entry"));
@@ -489,7 +489,7 @@ static int open_db_and_mkey()
 
     /* the databases are now open, and the master principal exists */
     dbactive = TRUE;
-    
+
     if (mkey_password) {
 	pwd.data = mkey_password;
 	pwd.length = strlen(mkey_password);
@@ -511,7 +511,7 @@ static int open_db_and_mkey()
 			global_params.enctype);
 	}
 
-	retval = krb5_c_string_to_key(util_context, global_params.enctype, 
+	retval = krb5_c_string_to_key(util_context, global_params.enctype,
 				      &pwd, &scratch, &master_key);
 	if (retval) {
 	    com_err(progname, retval,
@@ -522,7 +522,7 @@ static int open_db_and_mkey()
 	}
 	free(scratch.data);
 	mkey_password = 0;
-    } else if ((retval = krb5_db_fetch_mkey(util_context, master_princ, 
+    } else if ((retval = krb5_db_fetch_mkey(util_context, master_princ,
 					    global_params.enctype,
 					    manual_mkey, FALSE,
 					    global_params.stash_file,
@@ -540,7 +540,7 @@ static int open_db_and_mkey()
 		exit_status++;
 	return(0);
     }
-    if ((retval = krb5_db_verify_master_key(util_context, master_princ, 
+    if ((retval = krb5_db_verify_master_key(util_context, master_princ,
 		&master_key))) {
 	com_err(progname, retval,
 		gettext("while verifying master key"));
@@ -553,7 +553,7 @@ static int open_db_and_mkey()
     seed.data = (char *)master_key.contents;
 
     if ((retval = krb5_c_random_seed(util_context, &seed))) {
-	com_err(progname, retval, 
+	com_err(progname, retval,
 		gettext("while initializing random key generator"));
 	exit_status++;
 	krb5_free_keyblock_contents(util_context, &master_key);
@@ -569,7 +569,7 @@ static int open_db_and_mkey()
 #undef getwd
 #endif
 
-int 
+int
 quit()
 {
     krb5_error_code retval;

@@ -187,7 +187,7 @@ begin:
 			 * If moved to it from other than beginning of next line,
 			 * then a sentence starts on next line.
 			 */
-			if (linebuf[0] == 0 && !pastatom && 
+			if (linebuf[0] == 0 && !pastatom &&
 			   (wdot != dot - 1 || cursor != linebuf)) {
 				(void) lnext();
 				goto ret;
@@ -312,7 +312,7 @@ endPS(void)
 		linebuf[0] == CTRL('L') ||
 #endif /* XPG4 */
 		isa(svalue(vi_PARAGRAPHS)) || isa(svalue(vi_SECTIONS)));
-	    
+
 }
 
 int

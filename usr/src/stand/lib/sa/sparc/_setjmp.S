@@ -109,7 +109,7 @@ _longjmp(jmp_buf_ptr buf_ptr, int val)
 	save	%sp, -WINDOWSIZE, %sp
 	!
 	! flush all register windows to the stack.
-	! 
+	!
 	set	nwindows, %g7
 	ld	[%g7], %g7
 	sub	%g7, 2, %g6

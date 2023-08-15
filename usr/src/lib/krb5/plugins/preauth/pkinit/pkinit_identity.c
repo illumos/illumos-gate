@@ -502,7 +502,7 @@ static krb5_error_code
 process_option_ca_crl(krb5_context context,
 		      pkinit_plg_crypto_context plg_cryptoctx,
 		      pkinit_req_crypto_context req_cryptoctx,
-		      pkinit_identity_opts *idopts, 
+		      pkinit_identity_opts *idopts,
 		      pkinit_identity_crypto_context id_cryptoctx,
 		      const char *value,
 		      int catype)
@@ -649,7 +649,7 @@ pkinit_identity_initialize(krb5_context context,
 	    goto errout;
 	}
     }
-    
+
     retval = crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,
 				   id_cryptoctx);
     if (retval)

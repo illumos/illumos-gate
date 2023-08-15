@@ -101,14 +101,14 @@ class StatisticList extends LinkedList
 			addStatisticListener(statisticOperations);
 		}
 	}
-	
+
 	/**
 	 * Return the name of the Statistics being sampled.
 	 */
 	public String getName()
 	{
 		return (name);
-	}		
+	}
 
 	/**
 	 * Return a "snapshot" which is the aggregation of all
@@ -171,14 +171,14 @@ class StatisticList extends LinkedList
 		AggregateStatistic f = (AggregateStatistic) getFirst();
 		return (f.getSnapshotForInterval(it, start, end));
 	}
-	
+
 	/**
 	 * Add the supplied object to the list. If the list is full,
 	 * remove the first entry before adding the new entry.
 	 *
 	 * @param o Object to add to the list.
 	 */
-	public boolean add(Object o) 
+	public boolean add(Object o)
 	{
 		boolean ret;
 		if (size() == maxSize)
@@ -194,7 +194,7 @@ class StatisticList extends LinkedList
 	 *
 	 * @param o Object to remove from the list.
 	 */
-	public boolean remove(Object o) 
+	public boolean remove(Object o)
 	{
 		boolean ret;
 		ret = super.remove(o);
@@ -246,7 +246,7 @@ class StatisticList extends LinkedList
 		Iterator listIt = listeners.iterator();
 
 		while (listIt.hasNext()) {
-			
+
 			StatisticListener l = (StatisticListener)listIt.next();
 			l.onStatisticAdd(e);
 		}
@@ -265,7 +265,7 @@ class StatisticList extends LinkedList
 		Iterator listIt = listeners.iterator();
 
 		while (listIt.hasNext()) {
-			
+
 			StatisticListener l = (StatisticListener)listIt.next();
 			l.onStatisticRemove(e);
 		}
@@ -323,7 +323,7 @@ class StatisticList extends LinkedList
 	 * Clear all the data from the StatisticList and reset all the
 	 * statistic counters.
 	 */
-	public void clear() 
+	public void clear()
 	{
 		if (statisticOperations != null) {
 			removeStatisticListener(statisticOperations);
@@ -410,7 +410,7 @@ final class StatisticEvent extends EventObject
 	{
 		return ((StatisticList) source);
 	}
-	
+
 }
 
 /**
@@ -530,7 +530,7 @@ class StatisticOperations implements StatisticListener
 		while (it.hasNext()) {
 			Double val = (Double)((DoubleStatistic)
 			    ((AggregateStatistic)it.next())).getValue();
-			
+
 			sd += java.lang.Math.pow(val.doubleValue() - mean, 2);
 		}
 		sd /= statistics.size();
@@ -721,7 +721,7 @@ class StatisticOperations implements StatisticListener
 	{
 		total = total.add(e.getTarget());
 		process();
-		
+
 	}
 
 	/**
@@ -733,5 +733,5 @@ class StatisticOperations implements StatisticListener
 	{
 		total = total.subtract(e.getTarget());
 		process();
-	}	       
+	}
 }

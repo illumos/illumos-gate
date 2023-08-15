@@ -139,7 +139,7 @@ constants:
 ! the following are 64-bit registers in both V8+ and V9
 
 ! g1  scratch
-! g5  
+! g5
 
 ! o0  py0
 ! o1  py1
@@ -150,31 +150,31 @@ constants:
 ! o7  scratch
 
 ! f0  x0
-! f2  
-! f4  
-! f6  
+! f2
+! f4
+! f6
 ! f8  scratch for table base
 ! f9  signbit0
 ! f10 x1
-! f12 
-! f14 
-! f16 
+! f12
+! f14
+! f16
 ! f18 scratch for table base
 ! f19 signbit1
 ! f20 x2
-! f22 
-! f24 
-! f26 
+! f22
+! f24
+! f26
 ! f28 scratch for table base
 ! f29 signbit2
 ! f30 0x80000000
 ! f31 0x4000
-! f32 
-! f34 
-! f36 
-! f38 
-! f40 
-! f42 
+! f32
+! f34
+! f36
+! f38
+! f40
+! f42
 ! f44 0xffff800000000000
 ! f46 p1
 ! f48 p2
@@ -1390,7 +1390,7 @@ constants:
 ! the following are 64-bit registers in both V8+ and V9
 
 ! g1  scratch
-! g5  
+! g5
 
 ! o0  py0
 ! o1  py1
@@ -1402,28 +1402,28 @@ constants:
 
 ! f0  x0
 ! f2  n0,y0
-! f4  
-! f6  
+! f4
+! f6
 ! f8  scratch for table base
 ! f9  signbit0
 ! f10 x1
 ! f12 n1,y1
-! f14 
-! f16 
+! f14
+! f16
 ! f18 scratch for table base
 ! f19 signbit1
 ! f20 x2
 ! f22 n2,y2
-! f24 
-! f26 
+! f24
+! f26
 ! f28 scratch for table base
 ! f29 signbit2
 ! f30 0x80000000
 ! f31 0x4000
-! f32 
-! f34 
-! f36 
-! f38 
+! f32
+! f34
+! f36
+! f38
 ! f40 invpio2
 ! f42 round
 ! f44 0xffff800000000000
@@ -1461,7 +1461,7 @@ constants:
 	stx	%g0,[%fp+y1_0+8]
 	stx	%g0,[%fp+y2_0+8]
 
-!	branched here in the middle of the array.  Need to adjust 
+!	branched here in the middle of the array.  Need to adjust
 !	for the members of the triple that were selected in the primary
 !	loop.
 

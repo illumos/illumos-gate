@@ -80,7 +80,7 @@ public class LocalityGroup
 		this.cpu_ids = jl_cpus();
 		long nativeChildren[] = jl_children();
 		children = new HashSet();
-		for (int i = 0; i < nativeChildren.length; i++) 
+		for (int i = 0; i < nativeChildren.length; i++)
 			children.add(new LocalityGroup(domain,
 				     nativeChildren[i], this));
 	}

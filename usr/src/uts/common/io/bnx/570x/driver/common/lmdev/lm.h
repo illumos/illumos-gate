@@ -161,34 +161,34 @@ typedef u32_t lm_interrupt_status_t;
  ******************************************************************************/
 
 /* Description:
- *    1.  Retrieves the adapter information, such as IRQ, BAR, chip 
- *        IDs, MAC address, etc. 
- *    2.  Maps the BAR to system address space so hardware registers are 
- *        accessible. 
- *    3.  Initializes the default parameters in 'pdev'. 
- *    4.  Reads user configurations. 
+ *    1.  Retrieves the adapter information, such as IRQ, BAR, chip
+ *        IDs, MAC address, etc.
+ *    2.  Maps the BAR to system address space so hardware registers are
+ *        accessible.
+ *    3.  Initializes the default parameters in 'pdev'.
+ *    4.  Reads user configurations.
  *    5.  Resets the transceiver.
- * This routine calls the following mm routines: 
+ * This routine calls the following mm routines:
  *    mm_map_io_base, mm_get_user_config. */
 lm_status_t
 lm_get_dev_info(
     struct _lm_device_t *pdev);
 
 /* Description:
- *    This routine is called during driver initialization.  It is responsible 
+ *    This routine is called during driver initialization.  It is responsible
  *    for allocating memory resources needed by the driver.  Packet
  *    descriptors are allocated here and put into various queues.  OS
- *    independent initialization of packets descriptors are done here and 
+ *    independent initialization of packets descriptors are done here and
  *    finished up in mm_init_packet_desc.
- * This routine calls the following mm routines: 
+ * This routine calls the following mm routines:
  *    mm_alloc_mem, mm_alloc_phys_mem, and mm_init_packet_desc. */
 lm_status_t
 lm_init_resc(
     struct _lm_device_t *pdev);
 
 /* Description:
- *    This routine is responsible for stopping the hardware from running, 
- *    cleaning up various request queues, aborting transmit requests, and 
+ *    This routine is responsible for stopping the hardware from running,
+ *    cleaning up various request queues, aborting transmit requests, and
  *    reclaiming all the receive buffers.
  * This routine calls the following mm routines:
  *    mm_indicate_tx, mm_free_rx_buf. */
@@ -222,7 +222,7 @@ lm_reset_setup(
 /* Description:
  *    This routine finishes up the final stage of reset.  Various state
  *    machines are enabled here.  Upon exit, interrupt will not yet enabled
- *    and receive buffers are not queued.  However, the chip is initialized 
+ *    and receive buffers are not queued.  However, the chip is initialized
  *    and is ready to send and receive packets.
  *    receive buffers are not queued. */
 lm_status_t
@@ -233,7 +233,7 @@ lm_reset_run(
  *    The main function of this routine is to reset and initialize the
  *    hardware.  Upon exit, interrupt generation is not enable; however,
  *    the hardware is ready to accept transmit requests and receive receive
- *    packets.  'lm_abort' must be called prior to calling 'lm_reset'. 
+ *    packets.  'lm_abort' must be called prior to calling 'lm_reset'.
  *    This routine is a wrapper for lm_reset_setup and lm_reset_run. */
 lm_status_t
 lm_reset(
@@ -241,7 +241,7 @@ lm_reset(
     u32_t reset_reason);
 
 /* Description:
- *    The main responsibility of this routine is to gracefully restore the 
+ *    The main responsibility of this routine is to gracefully restore the
  *    chip to its initial power-on state. */
 void
 lm_chip_reset(
@@ -258,7 +258,7 @@ lm_post_buffers(
     struct _lm_device_t *pdev,
     u32_t chain_idx,
     struct _lm_packet_t *packet,
-    lm_frag_list_t *frags);   
+    lm_frag_list_t *frags);
 #else
 u32_t
 lm_post_buffers(
@@ -277,13 +277,13 @@ lm_send_packet(
     struct _lm_packet_t *packet,
     lm_frag_list_t *frags);
 
-/* Description: 
+/* Description:
  *    This routine is called to get all pending interrupts. */
 lm_interrupt_status_t
 lm_get_interrupt_status(
     struct _lm_device_t *pdev);
 
-/* Description: 
+/* Description:
  *    This routine is called to service receive interrupts.
  * This routine calls the following mm routines:
  *    mm_indicate_rx */
@@ -318,7 +318,7 @@ lm_get_packets_sent(
 
 
 /* Description:
- *    This routine is called to service PHY interrupt. 
+ *    This routine is called to service PHY interrupt.
  * This routine calls the following mm routines:
  *    mm_indicate_link */
 void
@@ -326,7 +326,7 @@ lm_service_phy_int(
     struct _lm_device_t *pdev,
     u32_t force_service_int);
 
-/* Description: 
+/* Description:
  *    This routine is called to mask out interrupt from the hardware. */
 void
 lm_disable_int(
@@ -347,8 +347,8 @@ lm_set_rx_mask(
     lm_rx_mask_t rx_mask);
 
 /* Description:
- *    This routine is called to add a multicast address to the multicast 
- *    address table.  Multicast filtering is enabled independently via 
+ *    This routine is called to add a multicast address to the multicast
+ *    address table.  Multicast filtering is enabled independently via
  *    lm_set_rx_mask call. */
 lm_status_t
 lm_add_mc(
@@ -372,9 +372,9 @@ void
 lm_clear_mc(
     struct _lm_device_t *pdev);
 
-/* Description: 
- *    This routine is called to set the current MAC address.  The 'addr_idx' 
- *    allows the caller to set multiple MAC addresses if the hardware is 
+/* Description:
+ *    This routine is called to set the current MAC address.  The 'addr_idx'
+ *    allows the caller to set multiple MAC addresses if the hardware is
  *    capable of filtering multiple unicast addresses. */
 lm_status_t
 lm_set_mac_addr(
@@ -401,7 +401,7 @@ lm_add_nwuf(
     u8_t *byte_mask,
     u8_t *byte_pattern);
 
-/* Description: 
+/* Description:
  *    This routine is called to remove the wake-up pattern from the main list
  *    that contains all the wake-up frame. */
 lm_status_t
@@ -469,7 +469,7 @@ mm_read_pci(
     u32_t pci_reg,
     u32_t *reg_value);
 
-/* This routine is called to write a PCI configuration register.  The 
+/* This routine is called to write a PCI configuration register.  The
  * register must be 32-bit aligned. */
 lm_status_t
 mm_write_pci(
@@ -538,7 +538,7 @@ mm_alloc_phys_mem(
 //#endif
 
 
-/* This routine is called to indicate completion of a transmit request. 
+/* This routine is called to indicate completion of a transmit request.
  * If 'packet' is not NULL, all the packets in the completion queue will be
  * indicated.  Otherwise, only 'packet' will be indicated. */
 void

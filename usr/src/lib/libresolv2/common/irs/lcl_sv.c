@@ -118,7 +118,7 @@ irs_lcl_sv(struct irs_acc *this) {
 	struct pvt *pvt;
 
 	UNUSED(this);
-	
+
 	if ((sv = memget(sizeof *sv)) == NULL) {
 		errno = ENOMEM;
 		return (NULL);
@@ -150,7 +150,7 @@ irs_lcl_sv(struct irs_acc *this) {
 static void
 sv_close(struct irs_sv *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 #ifdef IRS_LCL_SV_DB
 	if (pvt->dbh != NULL)
 		(*pvt->dbh->close)(pvt->dbh);
@@ -366,7 +366,7 @@ irs_lclsv_fnxt(struct lcl_sv *sv) {
 		while (*p && *p != '\n' && *p != ' ' && *p != '\t' && *p != '#')
 			++p;
 	}
-		
+
 	*p = '\0';
 	*q = NULL;
 	return (&sv->serv);

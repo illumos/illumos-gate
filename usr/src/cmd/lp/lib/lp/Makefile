@@ -87,14 +87,14 @@ POFILE =	lp_lib_lp.po
 
 .KEEP_STATE:
 
-all install :	$(LIBS) 
+all install :	$(LIBS)
 
 include		../../../../lib/Makefile.targ
 
 CLEANFILES	+= llib-llp.ln
 LINTFLAGS = -nvx
 SRCS= $(OBJECTS:%.o=%.c)
-# lint does not take $(C_PICFLAGS) 
+# lint does not take $(C_PICFLAGS)
 LINT_CPPFLAGS =	-I../../include $(CPPFLAGS.master)
 
 lint:	lintlib

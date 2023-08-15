@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -27,7 +27,7 @@
  *
  * $Id: clnt_privs.c 18130 2006-06-14 21:42:02Z raeburn $
  * $Source$
- * 
+ *
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)

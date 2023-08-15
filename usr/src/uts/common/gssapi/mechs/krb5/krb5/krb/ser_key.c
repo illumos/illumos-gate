@@ -107,7 +107,7 @@ krb5_keyblock_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **
 	    (required <= remain)) {
 	    /* Our identifier */
 	    (void) krb5_ser_pack_int32(KV5M_KEYBLOCK, &bp, &remain);
-		
+
 	    /* Our enctype */
 	    (void) krb5_ser_pack_int32((krb5_int32) keyblock->enctype,
 				       &bp, &remain);

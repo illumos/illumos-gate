@@ -46,7 +46,7 @@ ROOTMANIFESTDIR = $(ROOTSVCPLATFORMSUN4V)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all		\
 	$(ROOTCMD)	\

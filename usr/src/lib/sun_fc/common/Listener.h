@@ -34,7 +34,7 @@
 
 /**
  * @memo	    Generic listener super-class for event dispatch
- * 
+ *
  * @doc		    All listener interfaces sub-class this interface
  */
 class Listener {

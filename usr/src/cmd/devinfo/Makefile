@@ -36,7 +36,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 

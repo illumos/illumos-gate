@@ -79,15 +79,15 @@ $(ROOTSADMDIR)/er% \
 $(ROOTBIN)/disp%: $(ROOTBIN)/ck%
 	$(RM) $@; $(LN) $< $@
 
- 
+
 .KEEP_STATE:
 
 .PARALLEL:	 $(PROG) puttext
 
-all: $(PROG) puttext 
- 
+all: $(PROG) puttext
+
 install: all $(ROOTSADMDIR) $(ROOTPROG) $(ROOTPUTTEXT) $(ROOTVCKS) $(ROOTDISPS)
- 
+
 $(ROOTSADMDIR):
 	$(INS.dir)
 
@@ -110,5 +110,5 @@ lint:
 	$(LINT.c) ckuid.c   $(LDLIBS)
 	$(LINT.c) ckgid.c   $(LDLIBS)
 	$(LINT.c) puttext.c $(LDLIBS)
- 
+
 include ../Makefile.targ

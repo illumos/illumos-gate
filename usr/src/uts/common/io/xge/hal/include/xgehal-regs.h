@@ -127,7 +127,7 @@ typedef struct {
 #define XGE_HAL_PCI_32_BIT			BIT(8)
 
 	u8 unused0_1[0x160 - 0x128];
- 
+
 	u64 ric_status;
 
 	u8  unused0_2[0x558 - 0x168];
@@ -578,7 +578,7 @@ typedef struct {
 
 /* Recent add, used only debug purposes. */
 	u64 pcc_enable;
-	
+
 	u64 pfc_monitor_0;
 	u64 pfc_monitor_1;
 	u64 pfc_monitor_2;
@@ -586,9 +586,9 @@ typedef struct {
 	u64 txd_ownership_ctrl;
 	u64 pfc_read_cntrl;
 	u64 pfc_read_data;
-	
+
 	u8  unused10[0x1700 - 0x11B0];
-	
+
 	u64 txdma_debug_ctrl;
 
 	u8 unused11[0x1800 - 0x1708];
@@ -766,7 +766,7 @@ typedef struct {
 #define XGE_HAL_MAC_INT_STATUS_RMAC_INT            BIT(1)
 
 	u64 mac_tmac_err_reg;
-#define XGE_HAL_TMAC_ECC_DB_ERR			BIT(15) 
+#define XGE_HAL_TMAC_ECC_DB_ERR			BIT(15)
 #define XGE_HAL_TMAC_TX_BUF_OVRN		BIT(23)
 #define XGE_HAL_TMAC_TX_CRI_ERR		   	BIT(31)
 #define XGE_HAL_TMAC_TX_SM_ERR			BIT(39)
@@ -912,7 +912,7 @@ typedef struct {
 #define XGE_HAL_RTS_DS_MEM_DATA(n)                 vBIT(n,0,8)
 
 	u8  unused16_1[0x308 - 0x220];
-	
+
 	u64 rts_vid_mem_ctrl;
 	u64 rts_vid_mem_data;
 	u64 rts_p0_p3_map;
@@ -974,9 +974,9 @@ typedef struct {
 #define XGE_HAL_RTH_STATUS_SPDM_USE_L4             BIT(3)
 
 	u8  unused17[0x400 - 0x3E8];
-	
+
 	u64 rmac_red_fine_q0q3;
-	u64 rmac_red_fine_q4q7;    
+	u64 rmac_red_fine_q4q7;
 	u64 rmac_pthresh_cross;
 	u64 rmac_rthresh_cross;
 	u64 rmac_pnum_range[32];
@@ -984,27 +984,27 @@ typedef struct {
 	u64 rmac_mp_crc_0;
 	u64 rmac_mp_mask_a_0;
 	u64 rmac_mp_mask_b_0;
-	
+
 	u64 rmac_mp_crc_1;
 	u64 rmac_mp_mask_a_1;
 	u64 rmac_mp_mask_b_1;
-	
+
 	u64 rmac_mp_crc_2;
 	u64 rmac_mp_mask_a_2;
 	u64 rmac_mp_mask_b_2;
-	
+
 	u64 rmac_mp_crc_3;
 	u64 rmac_mp_mask_a_3;
 	u64 rmac_mp_mask_b_3;
-	
+
 	u64 rmac_mp_crc_4;
 	u64 rmac_mp_mask_a_4;
 	u64 rmac_mp_mask_b_4;
-	
+
 	u64 rmac_mp_crc_5;
 	u64 rmac_mp_mask_a_5;
 	u64 rmac_mp_mask_b_5;
-	
+
 	u64 rmac_mp_crc_6;
 	u64 rmac_mp_mask_a_6;
 	u64 rmac_mp_mask_b_6;
@@ -1015,7 +1015,7 @@ typedef struct {
 
 	u64 mac_ctrl;
 	u64 activity_control;
-	
+
 	u8  unused17_2[0x700 - 0x5F0];
 
 	u64 mac_debug_ctrl;
@@ -1106,7 +1106,7 @@ typedef struct {
 	u64 mc_rldram_test_add_bkg;
 	u8  unused26_5[0x80 - 0x68];
 	u64 mc_rldram_test_d0_bkg;
-	u8  unused26_6[0xD00 - 0xC88];    
+	u8  unused26_6[0xD00 - 0xC88];
 	u64 mc_rldram_test_d1_bkg;
 	u8  unused26_7[0x20 - 0x8];
 	u64 mc_rldram_test_d2_bkg;
@@ -1168,13 +1168,13 @@ typedef struct {
 	u64 xgxs_efifo_cfg; /* CHANGED */
 	u64 rxgxs_ber_0;    /* CHANGED */
 	u64 rxgxs_ber_1;    /* CHANGED */
-	
+
 	u64 spi_control;
 	u64 spi_data;
 	u64 spi_write_protect;
-	
+
 	u8  unused29[0x80 - 0x48];
-	
+
 	u64 xgxs_cfg_1;
 } xge_hal_pci_bar0_t;
 

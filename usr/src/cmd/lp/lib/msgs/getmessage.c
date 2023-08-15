@@ -53,7 +53,7 @@ int getmessage (buf, type, va_alist)
 #else
     va_start(arg);
 #endif
-    
+
     rval = _getmessage(buf, type, arg);
     va_end(arg);
     return(rval);

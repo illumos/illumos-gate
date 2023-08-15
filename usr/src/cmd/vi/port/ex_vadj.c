@@ -595,7 +595,7 @@ vrepaint(unsigned char *curs)
 	 */
 	if (FLAGS(0) & VDIRT)
 		vsync(WTOP);
-	
+
 	/*
 	 * If the current line is after the last displayed line
 	 * or the bottom of the screen, then special effort is needed
@@ -741,7 +741,7 @@ vredraw(int p)
 	 * Now rest of lines (if any) get either a ~ if they
 	 * are past end of file, or an @ if the next line won't fit.
 	 */
-	for (; p <= WBOT && Peekkey != ATTN; p++)			
+	for (; p <= WBOT && Peekkey != ATTN; p++)
 		vclrlin(p, tp);
 	strcLIN(temp);
 	hold = oldhold;
@@ -924,7 +924,7 @@ vsync1(int p)
 }
 
 /*
- * Subtract (logically) cnt physical lines from the 
+ * Subtract (logically) cnt physical lines from the
  * displayed position of lines starting with line l.
  */
 void
@@ -1114,7 +1114,7 @@ void
 vdirty(int base, int i)
 {
 	int l;
-	
+
 	for (l = base; l < vcnt; l++) {
 		if (--i < 0)
 			return;

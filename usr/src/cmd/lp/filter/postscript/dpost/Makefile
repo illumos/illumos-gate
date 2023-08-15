@@ -42,7 +42,7 @@ COMMONOBJS =	$(COMMONDIR)/glob.o \
 		$(COMMONDIR)/request.o \
 		$(COMMONDIR)/tempnam.o
 
-TXTS=		README 
+TXTS=		README
 
 # dpost uses some floating point arithmetic, so if you're running on a system
 # without floating point hardware add the -f option to the definition of CFLAGS.

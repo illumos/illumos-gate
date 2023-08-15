@@ -94,7 +94,7 @@ typedef struct _s_list_t
 
 
 __inline
-void 
+void
 s_list_init(
     s_list_t *s_list,
     s_list_entry_t *head_entry,
@@ -108,7 +108,7 @@ s_list_init(
 
 
 __inline
-void 
+void
 s_list_clear(
     s_list_t *s_list)
 {
@@ -266,9 +266,9 @@ s_list_add_tail(
 __inline
 void
 s_list_split(
-    s_list_t * s_list, 
-    s_list_t * s_list_head, 
-    s_list_entry_t * split_entry, 
+    s_list_t * s_list,
+    s_list_t * s_list_head,
+    s_list_entry_t * split_entry,
     unsigned long entry_cnt)
 {
     if (split_entry->next == NULL) {
@@ -287,7 +287,7 @@ s_list_split(
         s_list->head = split_entry->next;
         s_list->cnt = s_list->cnt - entry_cnt;
         split_entry->next = NULL;
-        
+
     }
 }
 
@@ -340,7 +340,7 @@ s_list_split(
         (_s_list)->head = (_s_entry); \
     } \
     (_s_list)->tail = (_s_entry); \
-    (_s_list)->cnt++ 
+    (_s_list)->cnt++
 
 
 #define s_list_peek_head(_s_list)       ((_s_list)->head)
@@ -429,7 +429,7 @@ typedef struct _d_list_t
 
 
 __inline
-void 
+void
 d_list_init(
     d_list_t *d_list,
     d_list_entry_t *head_entry,
@@ -443,7 +443,7 @@ d_list_init(
 
 
 __inline
-void 
+void
 d_list_clear(
     d_list_t *d_list)
 {
@@ -729,7 +729,7 @@ d_list_add_tail(
         (_d_list)->head->prev = (_d_entry); \
     } \
     (_d_list)->head = (_d_entry); \
-    (_d_list)->cnt++ 
+    (_d_list)->cnt++
 
 
 #define d_list_pop_head(_d_list) \
@@ -930,7 +930,7 @@ typedef struct _q_list_t
 
 
 __inline
-void 
+void
 q_list_init(
     q_list_t *q_list,
     q_list_entry_t q_list_arr[],

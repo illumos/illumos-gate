@@ -80,7 +80,7 @@ typedef void     (*HalDeviceStoreAsyncCallback) (HalDeviceStore *store,
 typedef gboolean (*HalDeviceStoreForeachFn) (HalDeviceStore *store,
 					     HalDevice      *device,
 					     gpointer        user_data);
-					     
+
 GType           hal_device_store_get_type   (void);
 
 HalDeviceStore *hal_device_store_new        (void);

@@ -41,5 +41,5 @@ LINKED_PLATFORMS += SUNW,Sun-Fire-V215
 
 include ../Makefile.com
 
-$(USR_PSM_LIB_DIR): 
+$(USR_PSM_LIB_DIR):
 	cd $(UTSBASE)/sun4u/mpxu; pwd; $(MAKE) $(USR_PSM_LIB_DIR)

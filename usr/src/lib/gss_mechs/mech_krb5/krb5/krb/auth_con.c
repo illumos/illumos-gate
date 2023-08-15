@@ -35,12 +35,12 @@ krb5_auth_con_init(krb5_context context, krb5_auth_context *auth_context)
             (krb5_auth_context)MALLOC(sizeof(struct _krb5_auth_context));
     if (!*auth_context)
 	    return ENOMEM;
-    
+
     /* Solaris Kerberos */
     (void) memset(*auth_context, 0, sizeof(struct _krb5_auth_context));
 
     /* Default flags, do time not seq */
-    (*auth_context)->auth_context_flags = 
+    (*auth_context)->auth_context_flags =
 	    KRB5_AUTH_CONTEXT_DO_TIME |  KRB5_AUTH_CONN_INITIALIZED;
 
     (*auth_context)->req_cksumtype = context->default_ap_req_sumtype;
@@ -54,21 +54,21 @@ krb5_auth_con_init(krb5_context context, krb5_auth_context *auth_context)
 krb5_error_code KRB5_CALLCONV
 krb5_auth_con_free(krb5_context context, krb5_auth_context auth_context)
 {
-    if (auth_context->local_addr) 
+    if (auth_context->local_addr)
 	krb5_free_address(context, auth_context->local_addr);
-    if (auth_context->remote_addr) 
+    if (auth_context->remote_addr)
 	krb5_free_address(context, auth_context->remote_addr);
-    if (auth_context->local_port) 
+    if (auth_context->local_port)
 	krb5_free_address(context, auth_context->local_port);
-    if (auth_context->remote_port) 
+    if (auth_context->remote_port)
 	krb5_free_address(context, auth_context->remote_port);
-    if (auth_context->authentp) 
+    if (auth_context->authentp)
 	krb5_free_authenticator(context, auth_context->authentp);
-    if (auth_context->keyblock) 
+    if (auth_context->keyblock)
 	krb5_free_keyblock(context, auth_context->keyblock);
-    if (auth_context->send_subkey) 
+    if (auth_context->send_subkey)
 	krb5_free_keyblock(context, auth_context->send_subkey);
-    if (auth_context->recv_subkey) 
+    if (auth_context->recv_subkey)
 	krb5_free_keyblock(context, auth_context->recv_subkey);
     /* Solaris Kerberos */
     if (auth_context->rcache)
@@ -333,7 +333,7 @@ krb5_auth_con_setrcache(krb5_context context, krb5_auth_context auth_context, kr
     auth_context->rcache = rcache;
     return 0;
 }
-    
+
 /*ARGSUSED*/
 krb5_error_code
 krb5_auth_con_getrcache(krb5_context context, krb5_auth_context auth_context, krb5_rcache *rcache)
@@ -341,7 +341,7 @@ krb5_auth_con_getrcache(krb5_context context, krb5_auth_context auth_context, kr
     *rcache = auth_context->rcache;
     return 0;
 }
-    
+
 /*ARGSUSED*/
 krb5_error_code
 krb5_auth_con_setpermetypes(krb5_context context, krb5_auth_context auth_context, const krb5_enctype *permetypes)

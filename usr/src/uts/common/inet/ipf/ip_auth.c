@@ -522,12 +522,12 @@ fr_authioctlloop:
 		ifs->ifs_fr_authpkts[i] = NULL;
 		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 #ifdef	_KERNEL
-		if (fra->fra_info.fin_v == 4) { 
+		if (fra->fra_info.fin_v == 4) {
 			net_data_p = ifs->ifs_ipf_ipv4;
-		} else if (fra->fra_info.fin_v == 6) { 
+		} else if (fra->fra_info.fin_v == 6) {
 			net_data_p = ifs->ifs_ipf_ipv6;
-		} else { 
-			return (-1); 
+		} else {
+			return (-1);
 		}
 
 		/*
@@ -764,7 +764,7 @@ ipf_stack_t *ifs;
 
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR))
 		return EIO;
-	
+
 	for (faep = &ifs->ifs_fae_list; ((fae = *faep) != NULL); ) {
 		if (&fae->fae_fr == fr)
 			break;

@@ -30,7 +30,7 @@ ASFLAGS += -D_ASM $(CPPFLAGS)
 CLOBBER_FILES += helper_helper.o annotated_helper.o
 
 # For the helper test we require an executable data section.
-ustack/tst.helper.exe := MAPFILE.NED=  
+ustack/tst.helper.exe := MAPFILE.NED=
 
 ustack/tst.helper.exe: ustack/tst.helper.o ustack/helper_helper.o
 	$(LINK.c) -o ustack/tst.helper.exe \

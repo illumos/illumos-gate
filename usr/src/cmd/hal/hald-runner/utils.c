@@ -24,7 +24,7 @@
  **************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
-#define DBUS_API_SUBJECT_TO_CHANGE 
+#define DBUS_API_SUBJECT_TO_CHANGE
 #include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 
@@ -45,7 +45,7 @@ get_string_array(DBusMessageIter *iter, char *extra)
 		g_array_append_vals(array, &t, 1);
 		dbus_message_iter_next(iter);
 	}
-	if (extra != NULL) 
+	if (extra != NULL)
 		g_array_append_vals(array, &extra, 1);
 	result = (char **) array->data;
 	g_array_free(array, FALSE);
@@ -80,7 +80,7 @@ get_string_array_from_fd(int fd)
 	return result;
 }
 
-void 
+void
 free_string_array(char **array)
 {
 	char **p;

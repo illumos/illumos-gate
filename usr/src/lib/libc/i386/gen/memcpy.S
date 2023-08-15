@@ -66,7 +66,7 @@
 	movl	$3,%eax		/ heavily used constant
 	cmpl	%esi,%edi	/ if (source addr > dest addr)
 	leal	-1(%esi,%ecx),%edx
-	jbe	.CopyRight	/ 
+	jbe	.CopyRight	/
 	cmpl	%edx,%edi
 	jbe	.CopyLeft
 .CopyRight:
@@ -82,7 +82,7 @@
 .SkipAlignRight:
 	movl	%edx,%ecx
 	shrl	$2,%ecx
-	rep;	smovl		/    do the long word part 
+	rep;	smovl		/    do the long word part
 	movl	%edx,%ecx	/    compute bytes left to move
 	andl	%eax,%ecx	/    complete copy of remaining bytes
 	jz	.CleanupReturn
@@ -117,14 +117,14 @@
 	subl	%ecx,%edx		/ copy is done on aligned boundary
 	rep;	smovb
 .SkipAlignLeft:
-	movl	%edx,%ecx	
+	movl	%edx,%ecx
 	subl	%eax,%esi
 	shrl	$2,%ecx			/ do 4 byte copy RtoL
 	subl	%eax,%edi
 	rep;	smovl
 	andl	%eax,%edx		/ do 1 byte copy whats left
 	jz	.CleanupReturnLeft
-	movl	%edx,%ecx	
+	movl	%edx,%ecx
 	addl	%eax,%esi		/ rep; smovl instruction will decrement
 	addl	%eax,%edi		/ %edi, %esi by four after each copy
 					/ adding 3 will restore pointers to byte

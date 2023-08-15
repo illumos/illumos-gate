@@ -127,7 +127,7 @@ hesiod_init(void **context) {
 		errno = ENOEXEC;
 		goto cleanup;
 	}
-	
+
 #if 0
 	if (res_ninit(ctx->res) < 0)
 		goto cleanup;
@@ -241,7 +241,7 @@ hesiod_resolve(void *context, const char *name, const char *type) {
 		free(bindname);
 		return (retvec);
 	}
-	
+
 	if (errno != ENOENT)
 		return (NULL);
 
@@ -285,7 +285,7 @@ parse_config_file(struct hesiod_p *ctx, const char *filename) {
 	 */
 	if (!(fp = fopen(filename, "r")))
 		return (-1);
-	
+
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		cp = buf;
 		if (*cp == '#' || *cp == '\n' || *cp == '\r')
@@ -296,7 +296,7 @@ parse_config_file(struct hesiod_p *ctx, const char *filename) {
 		while(*cp != ' ' && *cp != '\t' && *cp != '=')
 			cp++;
 		*cp++ = '\0';
-		
+
 		while(*cp == ' ' || *cp == '\t' || *cp == '=')
 			cp++;
 		data = cp;
@@ -320,7 +320,7 @@ parse_config_file(struct hesiod_p *ctx, const char *filename) {
 	}
 	fclose(fp);
 	return (0);
-	
+
  cleanup:
 	fclose(fp);
 	if (ctx->RHS)
@@ -489,7 +489,7 @@ __hesiod_res_set(void *context, struct __res_state *res,
 
 static int
 init(struct hesiod_p *ctx) {
-	
+
 	if (!ctx->res && !__hesiod_res_get(ctx))
 		return (-1);
 

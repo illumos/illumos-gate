@@ -99,7 +99,7 @@ half:	.float	0.5
 	flds	PIC_L(half)
 	fcomip	%st(1),%st		/ compare 0.5 with |x-[x]|
 	PIC_WRAPUP
-	je	.halfway		/ if 0.5 = |x-[x]| goto halfway, 
+	je	.halfway		/ if 0.5 = |x-[x]| goto halfway,
 					/ most cases will not take branch.
 .L0:
 	addq	$16,%rsp

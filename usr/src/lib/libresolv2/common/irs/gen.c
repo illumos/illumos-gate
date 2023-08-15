@@ -28,7 +28,7 @@
  * The dispatcher is implemented as an accessor class; it is an
  * accessor class that calls other accessor classes, as controlled by a
  * configuration file.
- * 
+ *
  * A big difference between this accessor class and others is that the
  * map class initializers are NULL, and the map classes are already
  * filled in with method functions that will do the right thing.
@@ -46,7 +46,7 @@
 #include <string.h>
 
 #include <sys/types.h>
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 
@@ -127,7 +127,7 @@ struct irs_acc *
 irs_gen_acc(const char *options, const char *conf_file) {
 	struct irs_acc *acc;
 	struct gen_p *irs;
-		
+
 	if (!(acc = memget(sizeof *acc))) {
 		errno = ENOMEM;
 		return (NULL);
@@ -224,7 +224,7 @@ static void
 gen_close(struct irs_acc *this) {
 	struct gen_p *irs = (struct gen_p *)this->private;
 	int n;
-	
+
 	/* Search rules. */
 	for (n = 0; n < irs_nmap; n++)
 		while (irs->map_rules[n] != NULL)
@@ -406,7 +406,7 @@ init_map_rules(struct gen_p *irs, const char *conf_file) {
 	}
 #endif /* SUNW_HOSTS_FALLBACK */
 
-	if (conf_file == NULL) 
+	if (conf_file == NULL)
 		conf_file = _PATH_IRS_CONF ;
 
 	/* A conf file of "" means compiled in defaults. Irpd wants this */

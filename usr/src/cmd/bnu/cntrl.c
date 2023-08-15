@@ -95,7 +95,7 @@ struct Proto Ptbl[]={
 #ifdef E_PROTOCOL
 	{'e', eturnon, erdmsg, ewrmsg, erddata, ewrdata, eturnoff},
 	{'t', eturnon, trdmsg, twrmsg, trddata, twrdata, eturnoff},
-#endif /* E_PROTOCOL */ 
+#endif /* E_PROTOCOL */
 
 #ifdef	D_PROTOCOL
 	{'d', dturnon, drdmsg, dwrmsg, drddata, dwrdata, dturnoff},
@@ -235,7 +235,7 @@ Pname(fileid, dfile, direct)
 
 
 /*
- * execute the conversation between the two machines 
+ * execute the conversation between the two machines
  * after both programs are running.
  * returns:
  *	SUCCESS 	-> ok
@@ -298,7 +298,7 @@ top:
 		ntfyopt = strchr(W_OPTNS, 'n') != NULL;
 
 		uucpname(localname); /* get real local machine name */
-		acDojob(Jobid, localname, W_USER); 
+		acDojob(Jobid, localname, W_USER);
 		scRequser(W_USER); /* log requestor user id */
 
 		/*
@@ -314,13 +314,13 @@ top:
 
 			/* log destination node, user and file name */
 
-			scDest(Rmtname,NOTAVAIL,W_FILE2); 
+			scDest(Rmtname,NOTAVAIL,W_FILE2);
 
 			/* log source node, file owner, file name, mod time and size */
 
 			scSrc(Myname,scOwn(W_FILE1),W_FILE1,scMtime(W_FILE1)
-						,scSize(W_FILE1)); 
-							
+						,scSize(W_FILE1));
+
 			logent(rqstr, "REQUEST");
 			CDEBUG(1, "Request: %s\n", rqstr);
 			mf = W_SFILE;
@@ -378,11 +378,11 @@ top:
 
 			/* log destination node, user and file name */
 
-			scDest(Myname,NOTAVAIL,W_FILE2); 
+			scDest(Myname,NOTAVAIL,W_FILE2);
 
 			/* log source node, file owner, file name, mod time and size */
 
-			scSrc(Rmtname,NOTAVAIL,W_FILE1,NOTAVAIL,NOTAVAIL); 
+			scSrc(Rmtname,NOTAVAIL,W_FILE1,NOTAVAIL,NOTAVAIL);
 
 			logent(rqstr, "REQUEST");
 			CDEBUG(1, "Request: %s\n", rqstr);
@@ -396,7 +396,7 @@ top:
 			(void) strcpy(Wrkdir, Recspool);
 			expfile(filename);
 
-			/* now change Wrkdir back to what it was 
+			/* now change Wrkdir back to what it was
 			** just being paranoid.
 			*/
 
@@ -406,7 +406,7 @@ top:
 				/* access denied */
 				logent("DENIED", "ACCESS");
 				lnotify(User, rqstr, "access denied");
-				CDEBUG(1, "Failed: Access Denied--File: %s\n", 
+				CDEBUG(1, "Failed: Access Denied--File: %s\n",
 				    filename);
 		    		scWrite();	/* log the security violation */
 				goto top;
@@ -426,7 +426,7 @@ top:
 			 * uux commands.  Such jobs will not be checkpointed.
 			 */
 
-			    
+
 			if (Restart && (strlen(W_RDFILE) > (size_t) 6)) {
 				if (noSpool()) {
 				    strcpy(Dfile, filename);	/* use Dest file directly */
@@ -498,7 +498,7 @@ top:
 				    sprintf(tbuf,"start=0x%lx", startp);
 				else
 				    sprintf(tbuf,"start=%ld", startp);
-	
+
 				logent(tbuf, "RESTART");
 			    }
 
@@ -550,7 +550,7 @@ process:
 		DEBUG(4, "%s\n", "RQSTCMPT:");
 		if (msg[1] == 'N') {
 			i = atoi(&msg[2]);
-			if (i < 0 || i > EM_MAX) 
+			if (i < 0 || i > EM_MAX)
 				i = 0;
 			logent(Em_msg[i], "REQUESTED");
 		}
@@ -631,7 +631,7 @@ process:
 		    /* if remote is out of tmp space, then just hang up */
 		    ASSERT(i != 4, Em_msg[4], Rmtname, i);	/* EM_NOTMP */
 		    unlinkdf(W_DFILE);
-		    scWrite();	/* something is wrong on other side, 
+		    scWrite();	/* something is wrong on other side,
 				   log the security violation */
 		    Seqn++;
 		    goto top;
@@ -647,7 +647,7 @@ process:
 			    stbuf.st_size = 0;  /* for time loop calculation */
 
 			/*
-			 * If checkpoint restart is enabled, seek to the 
+			 * If checkpoint restart is enabled, seek to the
 			 * starting point in the file.  We use hex because
 			 * C doesn't support unsigned long directly.
 			 */
@@ -664,7 +664,7 @@ process:
 				    sprintf(p,", length=0x%lx", stbuf.st_size);
 				else
 				    sprintf(p,", length=%ld", stbuf.st_size);
-	
+
 				logent(tbuf, "RESTART");
 				errno = 0;
 				if (lseek(fileno(fp), startp, 0) == -1) {
@@ -683,15 +683,15 @@ process:
 			scStime(); 	/* log start transfer time for security log */
 
 		/* (ret != 0) implies the trammission error occurred.
-     	           If checkpoint protocol is available then the next 
-		   transfer will restart from the breakpoint of the file, 
+     	           If checkpoint protocol is available then the next
+		   transfer will restart from the breakpoint of the file,
 		   otherwise from the beginning of the file  */
 
 			ret = (*Wrdata)(fp, Ofn);
 
-		/* the second millitick() returns the duration between 
-		   the first and second call. 
-   		   writes "PARTIAL FILE to the transfer log indicating  
+		/* the second millitick() returns the duration between
+		   the first and second call.
+   		   writes "PARTIAL FILE to the transfer log indicating
 		   a transmission error. */
 
 			statlog( "->", getfilesize(), millitick(),
@@ -723,7 +723,7 @@ process:
 			goto process;
 		}
 
-		/* 
+		/*
 		 * SLAVE section of SNDFILE
 		 */
 		ASSERT(Role == SLAVE, Wr_ROLE, "", Role);
@@ -738,11 +738,11 @@ process:
 
 		/* log destination node, user and file name */
 
-		scDest(Myname,NOTAVAIL,W_FILE2); 
+		scDest(Myname,NOTAVAIL,W_FILE2);
 
 		/* log source node, file owner, file name, mod time and size */
 
-		scSrc(Rmtname,NOTAVAIL,W_FILE1,NOTAVAIL,NOTAVAIL); 
+		scSrc(Rmtname,NOTAVAIL,W_FILE1,NOTAVAIL,NOTAVAIL);
 
 		/* Check for bad request */
 		if (i < W_MIN) {
@@ -774,18 +774,18 @@ process:
 		DEBUG(4, "SLAVE - filename: %s\n", filename);
 		if (chkpth(filename, CK_WRITE)
 		     || chkperm(W_FILE1, filename, strchr(W_OPTNS, 'd'))) {
-			WMESG(SNDFILE, EM_RMTACC); /* you(remote master) can't 
+			WMESG(SNDFILE, EM_RMTACC); /* you(remote master) can't
 						send data to this file(directory) */
 			logent("DENIED", "PERMISSION");
 			CDEBUG(1, "Failed: Access Denied\n%s", "");
-		    	scWrite(); /* log security violation */	
+		    	scWrite(); /* log security violation */
 			goto top;
 		}
 		(void) sprintf(User, "%s", W_USER);
 
 		DEBUG(4, "chkpth ok Rmtname - %s\n", Rmtname);
 
-		
+
 
 		if (Restart && (strlen(W_DFILE) > (size_t) 6)) {
 			if (noSpool()) {
@@ -868,7 +868,7 @@ process:
 		    fp->_cnt = 0;
 		    fp->_ptr = fp->_base;
 		    CDEBUG(1," restart msg %s\n", tbuf);
-		    WMESG(SNDFILE, tbuf);	
+		    WMESG(SNDFILE, tbuf);
 		}
 		else
 		    WMESG(SNDFILE, YES);	/* I(slave) clear to send */
@@ -876,17 +876,17 @@ process:
 		pfStrtXfer(SCHAR, RCVFILE);
 		scStime(); 	/* log start transfer time for security log */
 		/* (ret != 0) implies the trammission error occurred.
-     	           If checkpoint protocol is available then the next 
-		   recieve will restart from the breakpoint of the file, 
+     	           If checkpoint protocol is available then the next
+		   recieve will restart from the breakpoint of the file,
 		   otherwise from the beginning of the file  */
 
 		setline(RCVFILE);
 		ret = (*Rddata)(Ifn, fp);
 		setline(SNDFILE);
 
-		/* the second millitick() returns the duration between 
-		   the first and second call. 
-   		   writes "PARTIAL FILE to the transfer log indicating  
+		/* the second millitick() returns the duration between
+		   the first and second call.
+   		   writes "PARTIAL FILE to the transfer log indicating
 		   a transmission error. */
 
 		statlog( "<-", getfilesize(), millitick(),
@@ -943,7 +943,7 @@ process:
 			ret = PREFIX(Dfile, filename);
 			*p = '/';
 		}
-			
+
 		if (noSpool() && ret)
 		{
 		    /*
@@ -1003,7 +1003,7 @@ process:
 	case RCVFILE:
 
 		/*
-		 * MASTER section of RCVFULE 
+		 * MASTER section of RCVFULE
 		 */
 		DEBUG(4, "%s\n", "RCVFILE:");
 		if (msg[1] == 'N') {
@@ -1015,7 +1015,7 @@ process:
 			ASSERT(Role == MASTER, Wr_ROLE, "", Role);
 			(void) fclose(fp);
 			unlinkdf(Dfile);
-		    	scWrite();	/* something is wrong on other side, 
+		    	scWrite();	/* something is wrong on other side,
 					   log the security violation */
 			goto top;
 		}
@@ -1044,15 +1044,15 @@ process:
 			pfStrtXfer(MCHAR, SNDFILE);
 			scStime();
 		/* (ret != 0) implies the trammission error occurred.
-     	           If checkpoint protocol is available then the next 
-		   recieve will restart from the breakpoint of the file, 
+     	           If checkpoint protocol is available then the next
+		   recieve will restart from the breakpoint of the file,
 		   otherwise from the beginning of the file  */
 
 			ret = (*Rddata)(Ifn, fp);
 
-		/* the second millitick() returns the duration between 
-		   the first and second call. 
-   		   writes "PARTIAL FILE to the transfer log indicating  
+		/* the second millitick() returns the duration between
+		   the first and second call.
+   		   writes "PARTIAL FILE to the transfer log indicating
 		   a transmission error. */
 
 			statlog( "<-", getfilesize(), millitick(),
@@ -1103,7 +1103,7 @@ process:
 				ret = PREFIX(Dfile, filename);
 				*p = '/';
 			}
-				
+
 			if (noSpool() && ret)
 			{
 			    /*
@@ -1169,11 +1169,11 @@ process:
 
 		/* log destination node, user and file name */
 
-		scDest(Rmtname,NOTAVAIL,W_FILE2); 
+		scDest(Rmtname,NOTAVAIL,W_FILE2);
 
 		/* log source node, file owner, file name, mod time and size */
 
-		scSrc(Myname,scOwn(W_FILE1),W_FILE1,scMtime(W_FILE1),scSize(W_FILE1)); 
+		scSrc(Myname,scOwn(W_FILE1),W_FILE1,scMtime(W_FILE1),scSize(W_FILE1));
 		/* Check for bad request */
 		if (i < 5) {
 			WMESG(RCVFILE, EM_BADUUCP); /* you(remote master) gave me
@@ -1217,7 +1217,7 @@ process:
 		}
 
 		if (chkpth(filename, CK_READ) || !F_READANY(fileno(fp))) {
-			WMESG(RCVFILE, EM_RMTACC); /* you(remote master) can't 
+			WMESG(RCVFILE, EM_RMTACC); /* you(remote master) can't
 							retrive my file */
 			logent("DENIED", "PERMISSION");
 			CDEBUG(1, "Failed: Access Denied\n%s", "");
@@ -1246,7 +1246,7 @@ process:
 		/*
 		 * ok to send file
 		 */
-		
+
 		if (Restart && i >= 10) {
 		    if (startp = strtol(W_POINT, (char **) 0, FLENRADIX)) {
 			CDEBUG(1,"Restart point=0x%lx\n", startp);
@@ -1286,15 +1286,15 @@ process:
 		scStime();
 		pfStrtXfer(SCHAR, SNDFILE);
 		/* (ret != 0) implies the trammission error occurred.
-     	           If checkpoint protocol is available then the next 
-		   transfer will restart from the breakpoint of the file, 
+     	           If checkpoint protocol is available then the next
+		   transfer will restart from the breakpoint of the file,
 		   otherwise from the beginning of the file  */
 
 		ret = (*Wrdata)(fp, Ofn);
 
-		/* the second millitick() returns the duration between 
-		   the first and second call. 
-   		   writes "PARTIAL FILE to the transfer log indicating  
+		/* the second millitick() returns the duration between
+		   the first and second call.
+   		   writes "PARTIAL FILE to the transfer log indicating
 		   a transmission error. */
 
 		statlog( "->", getfilesize(), millitick(),
@@ -1376,7 +1376,7 @@ char *s, m;
 
 /*
  * mail results of command
- * return: 
+ * return:
  *	none
  */
 void
@@ -1472,7 +1472,7 @@ char	*f, *m;
 }
 
 /*
- * converse with the remote machine, agree upon a 
+ * converse with the remote machine, agree upon a
  * protocol (if possible) and start the protocol.
  * return:
  *	SUCCESS	-> successful protocol selection
@@ -1586,7 +1586,7 @@ char *c;
 		if (*c == p->P_id) {
 
 			/*
-			 * found protocol 
+			 * found protocol
 			 * set routine
 			 */
 			Rdmsg = p->P_rdmsg;

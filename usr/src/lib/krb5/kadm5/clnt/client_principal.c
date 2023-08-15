@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -83,7 +83,7 @@ kadm5_create_principal(void *server_handle,
 	 arg.rec.mod_name = NULL;
     } else
 	 arg.rec.mod_name = NULL;
-    
+
     if(!(mask & KADM5_POLICY))
 	arg.rec.policy = NULL;
     if (! (mask & KADM5_KEY_DATA)) {
@@ -94,7 +94,7 @@ kadm5_create_principal(void *server_handle,
 	 arg.rec.n_tl_data = 0;
 	 arg.rec.tl_data = NULL;
     }
-	 
+
     r = create_principal_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
@@ -144,7 +144,7 @@ kadm5_create_principal_3(void *server_handle,
 	 krb5_parse_name(handle->context, "bogus/bogus", &arg.rec.mod_name);
     } else
 	 arg.rec.mod_name = NULL;
-    
+
     if(!(mask & KADM5_POLICY))
 	arg.rec.policy = NULL;
     if (! (mask & KADM5_KEY_DATA)) {
@@ -155,7 +155,7 @@ kadm5_create_principal_3(void *server_handle,
 	 arg.rec.n_tl_data = 0;
 	 arg.rec.tl_data = NULL;
     }
-	 
+
     r = create_principal3_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
@@ -181,7 +181,7 @@ kadm5_delete_principal(void *server_handle, krb5_principal principal)
     arg.api_version = handle->api_version;
     r = delete_principal_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();    
+	eret();
     return r->code;
 }
 
@@ -227,14 +227,14 @@ kadm5_modify_principal(void *server_handle,
 	 krb5_parse_name(handle->context, "bogus/bogus", &arg.rec.mod_name);
     } else
 	 arg.rec.mod_name = NULL;
-    
+
     r = modify_principal_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
-	 krb5_free_principal(handle->context, arg.rec.mod_name);    
+	 krb5_free_principal(handle->context, arg.rec.mod_name);
 
     if(r == NULL)
-	eret();    
+	eret();
     return r->code;
 }
 
@@ -279,7 +279,7 @@ kadm5_get_principal(void *server_handle,
 	 if (r->code == 0)
 	      memcpy(ent, &r->rec, sizeof(r->rec));
     }
-    
+
     return r->code;
 }
 
@@ -307,7 +307,7 @@ kadm5_get_principals(void *server_handle,
 	 *count = 0;
 	 *princs = NULL;
     }
-    
+
     return r->code;
 }
 
@@ -328,7 +328,7 @@ kadm5_rename_principal(void *server_handle,
 	return EINVAL;
     r = rename_principal_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -350,7 +350,7 @@ kadm5_chpass_principal(void *server_handle,
 	return EINVAL;
     r = chpass_principal_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -377,7 +377,7 @@ kadm5_chpass_principal_3(void *server_handle,
 	return EINVAL;
     r = chpass_principal3_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -400,7 +400,7 @@ kadm5_setv4key_principal(void *server_handle,
 	return EINVAL;
     r = setv4key_principal_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -425,7 +425,7 @@ kadm5_setkey_principal(void *server_handle,
 	return EINVAL;
     r = setkey_principal_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -455,7 +455,7 @@ kadm5_setkey_principal_3(void *server_handle,
 	return EINVAL;
     r = setkey_principal3_2(&arg, handle->clnt);
     if(r == NULL)
-	eret();        
+	eret();
     return r->code;
 }
 
@@ -463,7 +463,7 @@ kadm5_setkey_principal_3(void *server_handle,
  * Solaris Kerberos:
  * This routine implements just the "old" randkey_principal code.
  * The code in the kadmin client sometimes needs to call this
- * directly when the kadm5_randkey_principal_3 call fails.  
+ * directly when the kadm5_randkey_principal_3 call fails.
  *
  * The kadmin client utility uses a specific set of key/salt tuples,
  * so the standard fallback in kadm5_randkey_principal (see below)
@@ -564,7 +564,7 @@ kadm5_randkey_principal_3(void *server_handle,
 	      *n_keys = r->n_keys;
 	 if (key) {
 	      if(r->n_keys) {
-		      *key = (krb5_keyblock *) 
+		      *key = (krb5_keyblock *)
 			      malloc(r->n_keys*sizeof(krb5_keyblock));
 		      if (*key == NULL)
 			      return ENOMEM;
@@ -598,7 +598,7 @@ kadm5_randkey_principal(void *server_handle,
 	 */
 	kret = kadm5_randkey_principal_3(server_handle, princ, FALSE,
 		0, NULL, key, n_keys);
-	
+
 	/*
 	 * We will get an RPC error if the RPC call failed which
 	 * will normally indicate that the remote procedure did not

@@ -158,8 +158,8 @@ typedef struct _mechOID
 {
    unsigned char*    ucOid;            // Byte representation of OID
    int               iLen;             // Length of the OID, length and identifier
-   int               iActualDataLen;   // Length of the actual OID 
-   SPNEGO_MECH_OID   eMechanismOID;     // Which OID is this?   
+   int               iActualDataLen;   // Length of the actual OID
+   SPNEGO_MECH_OID   eMechanismOID;     // Which OID is this?
 } MECH_OID;
 
 

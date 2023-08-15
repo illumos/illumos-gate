@@ -95,23 +95,23 @@ constants:
 ! l1  n1
 ! l2  n2
 ! l3  n3
-! l4  
-! l5  
-! l6  
-! l7  
+! l4
+! l5
+! l6
+! l7
 
 ! the following are 64-bit registers in both V8+ and V9
 
-! g1  
-! g5  
+! g1
+! g5
 
 ! o0  py0
 ! o1  py1
 ! o2  py2
 ! o3  py3
-! o4  
-! o5  
-! o7  
+! o4
+! o5
+! o7
 
 ! f0  x0
 ! f2  x1
@@ -123,15 +123,15 @@ constants:
 ! f14 y2
 ! f16 y3
 ! f18 thresh2 (2^19 pi)
-! f20 
-! f22 
-! f24 
-! f26 
+! f20
+! f22
+! f24
+! f26
 ! f28 signbit
-! f30 
-! f32 
-! f34 
-! f36 
+! f30
+! f32
+! f34
+! f36
 ! f38 inf
 ! f40 S0
 ! f42 S1
@@ -445,16 +445,16 @@ constants:
 
 !.case0:
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f48,%f20
 	faddd	%f10,%f52,%f10
@@ -534,13 +534,13 @@ constants:
 	.align	16
 .case1:
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f44,%f16		! sin(x3)
 
@@ -627,15 +627,15 @@ constants:
 	nop
 
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f48,%f20
 	faddd	%f10,%f52,%f10
@@ -715,10 +715,10 @@ constants:
 	.align	16
 .case3:
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
@@ -812,15 +812,15 @@ constants:
 	nop
 
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f48,%f20
 	faddd	%f10,%f52,%f10
@@ -900,12 +900,12 @@ constants:
 	.align	16
 .case5:
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f44,%f16		! sin(x3)
 
@@ -992,14 +992,14 @@ constants:
 	nop
 
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f48,%f20
 	faddd	%f10,%f52,%f10
@@ -1079,7 +1079,7 @@ constants:
 	.align	16
 .case7:
 	fmuld	%f30,%f54,%f10		! cos(x0)
-	fzero	%f0		
+	fzero	%f0
 
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
@@ -1183,13 +1183,13 @@ constants:
 	fmuld	%f30,%f44,%f10		! sin(x0)
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f40,%f20
 	faddd	%f10,%f42,%f10
@@ -1271,10 +1271,10 @@ constants:
 	fmuld	%f30,%f44,%f10		! sin(x0)
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f44,%f16		! sin(x3)
 
@@ -1363,12 +1363,12 @@ constants:
 	fmuld	%f30,%f44,%f10		! sin(x0)
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f40,%f20
 	faddd	%f10,%f42,%f10
@@ -1450,7 +1450,7 @@ constants:
 	fmuld	%f30,%f44,%f10		! sin(x0)
 
 	fmuld	%f32,%f54,%f12		! cos(x1)
-	fzero	%f2		
+	fzero	%f2
 
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
@@ -1548,10 +1548,10 @@ constants:
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f40,%f20
 	faddd	%f10,%f42,%f10
@@ -1635,7 +1635,7 @@ constants:
 	fmuld	%f32,%f44,%f12		! sin(x1)
 
 	fmuld	%f34,%f54,%f14		! cos(x2)
-	fzero	%f4		
+	fzero	%f4
 
 	fmuld	%f36,%f44,%f16		! sin(x3)
 
@@ -1728,7 +1728,7 @@ constants:
 	fmuld	%f34,%f44,%f14		! sin(x2)
 
 	fmuld	%f36,%f54,%f16		! cos(x3)
-	fzero	%f6		
+	fzero	%f6
 
 	fmuld	%f30,%f40,%f20
 	faddd	%f10,%f42,%f10

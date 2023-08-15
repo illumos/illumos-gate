@@ -159,4 +159,4 @@
 	leave
 	ret
 	SET_SIZE(dtrace_probe_error)
-	
+

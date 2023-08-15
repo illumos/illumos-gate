@@ -37,7 +37,7 @@
  *		;
  *	return (s - s0);
  *}
- */	
+ */
 
 #include "SYS.h"
 
@@ -65,18 +65,18 @@
 	.align	4
 .out1:
 	incl	%eax
-.out0:		
+.out0:
 	ret
-	
+
 	.align	4
 .out2:
 	add	$2,%eax
 	ret
 
-	.align	4	
+	.align	4
 .out3:
 	add	$3, %eax
-	ret			
+	ret
 	SET_SIZE(wcslen)
 
 	ENTRY(wslen)

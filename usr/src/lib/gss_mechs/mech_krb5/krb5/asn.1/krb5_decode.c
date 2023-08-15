@@ -1,6 +1,6 @@
 /*
  * src/lib/krb5/asn.1/krb5_decode.c
- * 
+ *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -175,7 +175,7 @@ get_lenfield_body(len,var,decoder)
       get_lenfield_body(len,var,decoder);				\
     }									\
   }
-  
+
 
 /* clean up ******************************************************/
 /* finish up */
@@ -193,7 +193,7 @@ error_out: \
    return 0; \
 error_out: \
    return retval;
-	
+
 #define cleanup_manual()\
    return 0;
 
@@ -252,7 +252,7 @@ krb5_error_code decode_krb5_ticket(const krb5_data *code, krb5_ticket **rep)
   setup();
   alloc_field(*rep,krb5_ticket);
   clear_field(rep,server);
-  
+
   check_apptag(1);
   { begin_structure();
     { krb5_kvno kvno;
@@ -473,7 +473,7 @@ krb5_error_code decode_krb5_as_req(const krb5_data *code, krb5_kdc_req **rep)
 #ifdef KRB5_MSGTYPE_STRICT
   if((*rep)->msg_type != KRB5_AS_REQ) clean_return(KRB5_BADMSGTYPE);
 #endif
-  
+
   cleanup(free);
 }
 
@@ -488,7 +488,7 @@ krb5_error_code decode_krb5_tgs_req(const krb5_data *code, krb5_kdc_req **rep)
 #ifdef KRB5_MSGTYPE_STRICT
   if((*rep)->msg_type != KRB5_TGS_REQ) clean_return(KRB5_BADMSGTYPE);
 #endif
-  
+
   cleanup(free);
 }
 
@@ -690,7 +690,7 @@ krb5_error_code decode_krb5_error(const krb5_data *code, krb5_error **rep)
   alloc_field(*rep,krb5_error);
   clear_field(rep,server);
   clear_field(rep,client);
-  
+
   check_apptag(30);
   { begin_structure();
     { krb5_kvno kvno;
@@ -1011,7 +1011,7 @@ krb5_error_code decode_krb5_kdc_dh_key_info(const krb5_data *code, krb5_kdc_dh_k
   cleanup(free);
 }
 
-krb5_error_code decode_krb5_principal_name(const krb5_data *code, krb5_principal_data **rep) 
+krb5_error_code decode_krb5_principal_name(const krb5_data *code, krb5_principal_data **rep)
 {
   setup_buf_only();
   alloc_field(*rep, krb5_principal_data);

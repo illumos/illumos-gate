@@ -234,7 +234,7 @@ ttep_calc:	/* idx in %g1 */				\
  *		hmeblkpa = kdi_c_hme_hash_table_search(sfmmup, hmebpa, hmetag);
  *
  *		if (hmeblkpa != NULL) {
- *			uint64_t tte = lddphys(kdi_c_hblk_to_ttep(hmeblkpa, 
+ *			uint64_t tte = lddphys(kdi_c_hblk_to_ttep(hmeblkpa,
  *			    va));
  *
  *			if ((int64_t)tte < 0)

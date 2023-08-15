@@ -231,7 +231,7 @@ chk_badsec(void)
 		}
 	    }
 	}
-	
+
 }
 
 /*
@@ -521,7 +521,7 @@ assign_altsctr(void)
 	    alts_ind = alts_ind - cluster + 1;
 	    (ap->ap_entp)[i].good_start = alts_ind + ap->part.p_start;
 	    for (j = 0; j < cluster; j++) {
-		(ap->ap_memmapp)[alts_ind+j] = ALTS_BAD;		
+		(ap->ap_memmapp)[alts_ind+j] = ALTS_BAD;
 	    }
 
 	}
@@ -748,7 +748,7 @@ ent_bsearch(struct alts_ent buf[], int cnt, struct alts_ent *key)
 		    ind = ind - interval;
 		} else {
  /* 		    if key is larger than the last element then break	*/
-		    if (ind == cnt) break;	
+		    if (ind == cnt) break;
 		    if ((ind+interval) <= cnt)
 		    	ind += interval;
 		}

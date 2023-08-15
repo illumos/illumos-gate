@@ -12,7 +12,7 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
+
  /* t6.c: compute tab stops */
 # define tx(a) (a>(char *)0 && a<(char *)128)
 # include "t..c"

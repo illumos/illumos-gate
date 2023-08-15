@@ -68,7 +68,7 @@
 	or	scr, dest, dest
 
 /*
- * Macro to trigger Jalapeno/Tomatillo speed change 
+ * Macro to trigger Jalapeno/Tomatillo speed change
  *   j_chng_pa - scratch register
  *   scr - scratch register
  */
@@ -169,7 +169,7 @@
 
 /*
  * Macro to force Jalapeno/Tomatillo to full speed
- *   old_lvl - register used to save original cpu, tomatillo speed 
+ *   old_lvl - register used to save original cpu, tomatillo speed
  *   scr2 - scratch register
  *   scr3 - scratch register
  *   scr4 - scratch register
@@ -210,7 +210,7 @@
 
 /*
  * Macro to restore Jalapeno/Tomatillo to original speed
- *     old_lvl - register contains saved original cpu, tomatillo speed 
+ *     old_lvl - register contains saved original cpu, tomatillo speed
  *     scr2 - scratch register
  *     scr3 - scratch register
  *     scr4 - scratch register
@@ -218,7 +218,7 @@
  * If trap had occured in the middle of ppm cpu speed transtion, then
  * old_lvl[31:10] contains the intended new speed written into jbus_config.
  * if old_lvl[9:0] is inconsistent with old_lvl[31:10], then the trap surely
- * interrupted the ppm cpu speed transition, otherwise nothing for sure.  
+ * interrupted the ppm cpu speed transition, otherwise nothing for sure.
  * We'll restore the intended/then-current speed, that should cause no
  * trouble to subsequent ppm cpu speed change code.
  */
@@ -364,7 +364,7 @@ flush_ecache_2:
 	.section ".text"
 	.align	64
 	ENTRY_NP(fast_ecc_err)
-	
+
 	/*
 	 * Turn off CEEN and NCEEN.
 	 */
@@ -825,11 +825,11 @@ scrubphys_2:
 	stxa	%o3, [%g0]ASI_ESTATE_ERR
 	membar	#Sync
 
-	/* align address passed with 64 bytes subblock size */	
+	/* align address passed with 64 bytes subblock size */
 	mov	CH_ECACHE_SUBBLK_SIZE, %o2
 	andn	%o0, (CH_ECACHE_SUBBLK_SIZE - 1), %g1
-	
-	/* move the good data into the W$ */	
+
+	/* move the good data into the W$ */
 1:
 	subcc	%o2, 8, %o2
 	ldxa	[%g1 + %o2]ASI_MEM, %g2

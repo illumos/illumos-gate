@@ -1,8 +1,8 @@
 /******************************************************************************
  * domctl.h
- * 
+ *
  * Domain management operations. For use by node control stack.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -398,7 +398,7 @@ struct xen_domctl_settimeoffset {
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
 
- 
+
 #define XEN_DOMCTL_gethvmcontext     33
 #define XEN_DOMCTL_sethvmcontext     34
 typedef struct xen_domctl_hvmcontext {

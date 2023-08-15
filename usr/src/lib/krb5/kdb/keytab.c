@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 #include <string.h>
 
@@ -85,7 +85,7 @@ krb5_ktkdb_close(context, kt)
      krb5_keytab kt;
 {
   /*
-   * This routine is responsible for freeing all memory allocated 
+   * This routine is responsible for freeing all memory allocated
    * for this keytab.  There are no system resources that need
    * to be freed nor are there any open files.
    *
@@ -184,7 +184,7 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
     if (kerror)
 	goto error;
 
-    if (enctype > 0) {	
+    if (enctype > 0) {
 	kerror = krb5_c_enctype_compare(context, enctype,
 					entry->key.enctype, &similar);
 	if (kerror)

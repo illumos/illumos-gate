@@ -40,7 +40,7 @@
  *	register const char *s2;
  *	{
  *		char *os1 = s1;
- *	
+ *
  *		while(*s1++ = *s2++)
  *			;
  *		return(os1);
@@ -79,7 +79,7 @@
 .chkhalfword:
 	andcc	%g1, 2, %g0		! need to copy half-word ?
 	bz,pn	%ncc, .chkword		! nope, maybe word
-	nop				! 
+	nop				!
 	lduh	[%o2 + %o3], %o5	! load src halfword
 	srl	%o5, 8, %o4		! extract first byte
 	tst	%o4			! first byte == 0 ?
@@ -93,7 +93,7 @@
 .chkword:
 	andcc	%g1, 4, %g0		! need to copy word ?
 	bz,pn	%ncc, .srcaligned	! nope
-	nop				! 
+	nop				!
 	lduw	[%o2 + %o3], %o5	! load src word
 	srl	%o5, 24, %o4		! extract first byte
 	tst	%o4			! is first byte zero ?
@@ -112,7 +112,7 @@
 	bz,pn	%ncc, .done		! yup, fourth byte zero, done
 	add	%o2, 4, %o2		! src += 2
 
-.srcaligned:	
+.srcaligned:
 	sethi	%hi(0x01010101), %o4	! Alan Mycroft's magic1
 	or	%o4, %lo(0x01010101),%o4!  finish loading magic1
 	sllx	%o4, 32, %o1		! spread magic1
@@ -127,8 +127,8 @@
 	be,pn	%ncc, .storehalfword	! yup, store half-word wise
 	andcc	%o2, 7, %g0		! dst word aligned ?
 	bnz,pn	%ncc, .storeword2	! yup, store word wise
-	.empty	
-	
+	.empty
+
 .storedword:
 	ldx	[%o2 + %o3], %o1	! src dword
 	add	%o2, 8, %o2		! src += 8, dst += 8
@@ -144,29 +144,29 @@
 	srlx	%o1, 56, %o3		! %o3<7:0> = first byte
 	andcc	%o1, %o4, %g0		! first byte zero?
 	bz,pn	%ncc, .done		! yup, done
-	stb	%o3, [%o2 - 8]		! store first byte  
+	stb	%o3, [%o2 - 8]		! store first byte
 	srlx	%o4, 8, %o4		! 0x00ff000000000000
 	srlx	%o1, 48, %o3		! %o3<7:0> = second byte
 	andcc	%o1, %o4, %g0		! second byte zero?
 	bz,pn	%ncc, .done		! yup, done
-	stb	%o3, [%o2 - 7]		! store second byte  
+	stb	%o3, [%o2 - 7]		! store second byte
 	srlx	%o4, 8, %o4		! 0x0000ff0000000000
 	srlx	%o1, 40, %o3		! %o3<7:0> = third byte
 	andcc	%o1, %o4, %g0		! third byte zero?
 	bz,pn	%ncc, .done		! yup, done
-	stb	%o3, [%o2 - 6]		! store third byte  
+	stb	%o3, [%o2 - 6]		! store third byte
 	srlx	%o4, 8, %o4		! 0x000000ff00000000
 	srlx	%o1, 32, %o3		! %o3<7:0> = fourth byte
 	andcc	%o1, %o4, %g0		! fourth byte zero?
 	bz,pn	%ncc, .done		! yup, done
-	stb	%o3, [%o2 - 5]		! store fourth byte  
+	stb	%o3, [%o2 - 5]		! store fourth byte
 	srlx	%o4, 8, %o4		! 0x00000000ff000000
 	srlx	%o1, 24, %o3		! %o3<7:0> = fifth byte
 	andcc	%o1, %o4, %g0		! fifth byte zero?
 	bz,pn	%ncc, .done		! yup, done
-	stb	%o3, [%o2 - 4]		! store fifth byte  
+	stb	%o3, [%o2 - 4]		! store fifth byte
 	srlx	%o4, 8, %o4		! 0x0000000000ff0000
-	srlx	%o1, 16, %o3		! %o3<7:0> = sixth byte    
+	srlx	%o1, 16, %o3		! %o3<7:0> = sixth byte
 	andcc	%o1, %o4, %g0		! sixth byte zero?
 	bz,pn	%ncc, .done		! yup, done
 	stb	%o3, [%o2 - 3]		! store sixth byte
@@ -228,7 +228,7 @@
 	bnz,pn	%ncc, .zerobyte		! x has zero byte, handle end cases
 	srlx	%o1, 48, %g1		! get first and second byte
 	sth	%g1, [%o2 - 8]		! store first and second byte; word aligned now
-	srlx	%o1, 16, %g1		! %g1<31:0> = bytes 3, 4, 5, 6	
+	srlx	%o1, 16, %g1		! %g1<31:0> = bytes 3, 4, 5, 6
 	stw	%g1, [%o2 - 6]		! store bytes 3, 4, 5, 6
 	ba	.storehalfword		! next word
 	sth	%o1, [%o2 - 2]		! store seventh and eigth byte

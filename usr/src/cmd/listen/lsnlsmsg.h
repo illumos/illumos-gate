@@ -26,7 +26,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.1	*/
 
 /*
- * The Network Listener Process Service (NLPS) 
+ * The Network Listener Process Service (NLPS)
  * protocol message sent by client machines to
  * a listener process to request a service on the listener's
  * machine. The message is sent to "netnodename(r_nodename)"

@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * util_helper.c - HAL utilities for helper (as e.g. prober/addons) et al. 
+ * util_helper.c - HAL utilities for helper (as e.g. prober/addons) et al.
  *
  * Copyright (C) 2006 David Zeuthen, <david@fubar.dk>
  *
@@ -141,22 +141,22 @@ hal_set_proc_title_init (int argc, char *argv[])
 	/* This code is really really ugly. We make some memory layout
 	 * assumptions and reuse the environment array as memory to store
 	 * our process title in */
-	
+
 	for (i = 0; environ[i] != NULL; i++)
 		;
-	
+
 	endptr = i ? environ[i-1] + strlen (environ[i-1]) : argv[argc-1] + strlen (argv[argc-1]);
-	
+
 	argv_buffer = argv;
 	argv_size = endptr - argv_buffer[0];
-	
+
 	/* Make a copy of environ */
-	
+
 	new_environ = malloc (sizeof(char*) * (i + 1));
 	for (i = 0; environ[i] != NULL; i++)
 		new_environ[i] = strdup (environ[i]);
 	new_environ[i] = NULL;
-	
+
 	environ = new_environ;
 #endif
 }
@@ -171,13 +171,13 @@ hal_set_proc_title (const char *format, ...)
 
 	if (argv_buffer == NULL)
 		goto out;
-		
+
 	va_start (ap, format);
 	vsnprintf (argv_buffer[0], argv_size, format, ap);
 	va_end (ap);
- 	
+
 	len = strlen (argv_buffer[0]);
- 	   
+
 	memset (argv_buffer[0] + len, 0, argv_size - len);
 	argv_buffer[1] = NULL;
 out:

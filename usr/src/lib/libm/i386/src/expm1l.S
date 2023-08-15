@@ -102,7 +102,7 @@ ln2_lo:	.long	0x4c67fc0d, 0x8654361c, 0x0000bfce
 .not_finite:
 	movl	8(%esp),%ecx		/ ecx <-- hi_32(sgnfcnd(x))
 	cmpl	$0x80000000,%ecx	/ hi_32(|x|) = hi_32(INF)?
-	jne	.NaN_or_pinf		/ if not, x is NaN 
+	jne	.NaN_or_pinf		/ if not, x is NaN
 	movl	4(%esp),%edx		/ edx <-- lo_32(x)
 	cmpl	$0,%edx			/ lo_32(x) = 0?
 	jne	.NaN_or_pinf		/ if not, x is NaN

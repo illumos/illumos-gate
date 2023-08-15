@@ -33,16 +33,16 @@ include ../Makefile.cmd
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(PROG).sh
 	$(RM) $@
 	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(PROG).sh > $@
 	chmod +x $@
-	
+
 #
 # For message catalogue file.
-#	
+#
 $(POFILE):
 	grep gettext $(PROG).sh | tr '`' ' ' | sed -e "s/TEXT_DOMAIN/\(/" | sed -e "s/$$/);/"  > $(PROG).i
 	$(XGETTEXT) $(PROG).i

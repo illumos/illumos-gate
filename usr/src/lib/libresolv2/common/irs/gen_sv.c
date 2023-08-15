@@ -97,7 +97,7 @@ irs_gen_sv(struct irs_acc *this) {
 static void
 sv_close(struct irs_sv *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	memput(pvt, sizeof *pvt);
 	memput(this, sizeof *this);
 }
@@ -107,7 +107,7 @@ sv_next(struct irs_sv *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
 	struct servent *rval;
 	struct irs_sv *sv;
-	
+
 	while (pvt->rule) {
 		sv = pvt->rule->inst->sv;
 		rval = (*sv->next)(sv);
@@ -130,7 +130,7 @@ sv_byname(struct irs_sv *this, const char *name, const char *proto) {
 	struct irs_rule *rule;
 	struct servent *rval;
 	struct irs_sv *sv;
-	
+
 	rval = NULL;
 	for (rule = pvt->rules; rule; rule = rule->next) {
 		sv = rule->inst->sv;
@@ -147,7 +147,7 @@ sv_byport(struct irs_sv *this, int port, const char *proto) {
 	struct irs_rule *rule;
 	struct servent *rval;
 	struct irs_sv *sv;
-	
+
 	rval = NULL;
 	for (rule = pvt->rules; rule; rule = rule->next) {
 		sv = rule->inst->sv;

@@ -43,7 +43,7 @@
 #ifndef lserror_h	/* avoid multiple inclusions of lserror.h */
 #define lserror_h
 
-/* 
+/*
  * parameters to error/exit routines
  */
 
@@ -87,7 +87,7 @@
  *		    (someone else on the machine/net took it?)
  *	E_T_FREE:  t_free failed -- listener/tli bug or reboot
  *	E_IN_TLI:  System call failed in a TLI routine.
- *	
+ *
  */
 
 #define E_T_ALLOC	14		/* TLI: t_alloc failed		*/
@@ -119,7 +119,7 @@
 /*
  * E_OPENBIND: problem during t_open in initialization
  * actually means the driver ran out of minor devices or the
- * system file table is full -- reboot or wait recommended 
+ * system file table is full -- reboot or wait recommended
  */
 
 #define E_OPENBIND	29		/* open/bind err during init	*/
@@ -144,7 +144,7 @@
 #define E_BADVER	40		/* data base file at wrong version */
 
 #define E_FDNOMATCH	41		/* fd the call came in did not match
-					   with fd in private_tab */ 
+					   with fd in private_tab */
 typedef struct {
 	char	*err_msg;
 	int	err_code;

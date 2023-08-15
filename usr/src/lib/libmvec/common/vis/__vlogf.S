@@ -492,7 +492,7 @@
 	sra	ival0,14,ival0			! (Y0_1) i  = ival >> 14;
 	bneg,pn	%icc,.tail
 	faddd	%f22,K2,%f48			! (Y2_0) dtmp1 = dtmp0 + K2
-	
+
 	ba	.main_loop
 	nop
 
@@ -886,13 +886,13 @@
 	or	%g0,0,counter
 	ba	.cont2
 	nop
-        
+
 	.align	16
 .update3:
 	cmp	counter,0
 	ble	.cont3
 	nop
- 
+
 	add	x0,stridex,x0
 	stx	x0,[%fp+tmp5]
 	sub	x0,stridex,x0
@@ -900,39 +900,39 @@
 	or	%g0,0,counter
 	ba	.cont3
 	nop
-                
+
 	.align	16
 .update4:
 	cmp	counter,1
 	ble	.cont4
 	nop
- 
+
 	stx	x1,[%fp+tmp5]
 	sub	counter,1,counter
 	st	counter,[%fp+tmp0]
 	or	%g0,1,counter
 	ba	.cont4
 	nop
-                
+
 	.align	16
 .update5:
 	cmp	counter,1
 	ble	.cont5
 	nop
- 
+
 	stx	x1,[%fp+tmp5]
 	sub	counter,1,counter
 	st	counter,[%fp+tmp0]
 	or	%g0,1,counter
 	ba	.cont5
 	nop
-                
+
 	.align	16
 .update6:
 	cmp	counter,2
 	ble	.cont6
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1,stridex,x1
@@ -941,13 +941,13 @@
 	or	%g0,2,counter
 	ba	.cont6
 	nop
-                
+
 	.align	16
 .update7:
 	cmp	counter,2
 	ble	.cont7
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1,stridex,x1
@@ -956,7 +956,7 @@
 	or	%g0,2,counter
 	ba	.cont7
 	nop
-                
+
 	.align	16
 .update8:
 	cmp	counter,3
@@ -969,7 +969,7 @@
 	or	%g0,3,counter
 	ba	.cont8
 	nop
-        
+
 	.align	16
 .update9:
 	cmp	counter,3
@@ -982,7 +982,7 @@
 	or	%g0,3,counter
 	ba	.cont9
 	nop
-        
+
 	.align	16
 .update10:
 	cmp	counter,4
@@ -997,13 +997,13 @@
 	or	%g0,4,counter
 	ba	.cont10
 	nop
-        
+
 	.align	16
 .update11:
 	cmp	counter,4
 	ble	.cont11
 	nop
- 
+
 	add	x0,stridex,x0
 	stx	x0,[%fp+tmp5]
 	sub	x0,stridex,x0
@@ -1012,39 +1012,39 @@
 	or	%g0,4,counter
 	ba	.cont11
 	nop
-                
+
 	.align	16
 .update12:
 	cmp	counter,5
 	ble	.cont12
 	nop
- 
+
 	stx	x1,[%fp+tmp5]
 	sub	counter,5,counter
 	st	counter,[%fp+tmp0]
 	or	%g0,5,counter
 	ba	.cont12
 	nop
-                
+
 	.align	16
 .update13:
 	cmp	counter,5
 	ble	.cont13
 	nop
- 
+
 	stx	x1,[%fp+tmp5]
 	sub	counter,5,counter
 	st	counter,[%fp+tmp0]
 	or	%g0,5,counter
 	ba	.cont13
 	nop
-                
+
 	.align	16
 .update14:
 	cmp	counter,6
 	ble	.cont14
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1, stridex, x1
@@ -1053,13 +1053,13 @@
 	or	%g0,6,counter
 	ba 	.cont14
 	nop
-                
+
 	.align	16
 .update15:
 	cmp	counter,6
 	ble	.cont15
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1, stridex, x1
@@ -1068,7 +1068,7 @@
 	or	%g0,6,counter
 	ba	.cont15
 	nop
-                
+
 	.align	16
 .update16:
 	cmp	counter,0
@@ -1080,19 +1080,19 @@
 	or	%g0,0,counter
 	ba	.cont16
 	nop
-        
+
 	.align	16
 .update17:
 	cmp	counter,0
 	ble,pt	%icc, .cont17
 	nop
- 
+
 	stx	x0,[%fp+tmp5]
 	st	counter,[%fp+tmp0]
 	or	%g0,0,counter
 	ba	.cont17
 	nop
-                
+
 	.align	16
 .update18:
 	cmp	counter,1
@@ -1107,13 +1107,13 @@
 	or	%g0,1,counter
 	ba	.cont18
 	nop
-        
+
 	.align	16
 .update19:
 	cmp	counter,1
 	ble,pt	%icc, .cont19
 	nop
- 
+
 	add	x0,stridex,x0
 	sub	counter,1,counter
 	stx	x0,[%fp+tmp5]
@@ -1122,39 +1122,39 @@
 	or	%g0,1,counter
 	ba	.cont19
 	nop
-                
+
 	.align	16
 .update20:
 	cmp	counter,2
 	ble,pt	%icc, .cont20
 	nop
- 
+
 	stx	x1,[%fp+tmp5]
 	sub	counter,2,counter
 	st	counter,[%fp+tmp0]
 	or	%g0,2,counter
 	ba	.cont20
 	nop
-                
+
 	.align	16
 .update21:
 	cmp	counter,2
 	ble,pt	%icc, .cont21
 	nop
- 
+
 	stx x1,[%fp+tmp5]
 	sub	counter, 2, counter
 	st	counter,[%fp+tmp0]
 	or	%g0,2,counter
 	ba	.cont21
 	nop
-                
+
 	.align	16
 .update22:
 	cmp	counter,3
 	ble,pt	%icc, .cont22
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1,stridex,x1
@@ -1163,13 +1163,13 @@
 	or	%g0,3,counter
 	ba	.cont22
 	nop
-                
+
 	.align	16
 .update23:
 	cmp	counter,3
 	ble,pt	%icc, .cont23
 	nop
- 
+
 	add	x1,stridex,x1
 	stx	x1,[%fp+tmp5]
 	sub	x1,stridex,x1
@@ -1178,7 +1178,7 @@
 	or	%g0,3,counter
 	ba	.cont23
 	nop
-                
+
 	.align	16
 .spec:
 	or	%g0,1,ind3			! ind3 = 1
@@ -1246,7 +1246,7 @@
 
 	ba	.begin1
 	st	%f4,[y]				! write into memory
-        
+
 	.align	16
 .spec0:
 	ld	[%fp+tmp1],%f12			! value = *(float*) &ival
@@ -1256,8 +1256,8 @@
 	fmuls	%f12,%f2,%f2
 	ba	.begin1
 	st	%f2,[y]				! write into memory
-                
-	.align	16                
+
+	.align	16
 .spec1:
 	cmp	iy0,0				! if ((ival & 0x7fffffff) == 0)
 	bne,pn	%icc,.spec2			! if ((ival & 0x7fffffff) == 0)
@@ -1266,7 +1266,7 @@
 	fdivs	%f4,ZERO,%f6			! y[0] = -1.0f / 0f
 	ba	.begin1
 	st	%f6,[y]				! write into memory
-                
+
 	.align	16
 .spec2:
 	fdivs	ZERO,ZERO,%f6			! y[0] = 0f / 0f

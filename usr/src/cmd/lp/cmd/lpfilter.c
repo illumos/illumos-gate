@@ -402,7 +402,7 @@ int			add_filter (filter, input)
 			LP_ERRMSG (ERROR, E_LP_MALLOC);
 			return (1);
 		}
-		
+
 		for (ps = store; (pf = getfilter(filter)); )
 			*ps++ = *pf;
 		ps->name = 0;
@@ -430,7 +430,7 @@ int			add_filter (filter, input)
 			LP_ERRMSG (ERROR, E_LP_MALLOC);
 			return (1);
 		}
-		
+
 		if ((pf = getfilter(filter))) {
 			store[0] = *pf;
 		} else
@@ -461,7 +461,7 @@ int			add_filter (filter, input)
 			}
 
 		store[1].name = 0;
-		
+
 	}
 
 	at_least_one = ret = 0;
@@ -619,7 +619,7 @@ int			reload_filter (filter)
 			LP_ERRMSG (ERROR, E_LP_MALLOC);
 			return (1);
 		}
-		
+
 		for (ps = store; (pf = getfilter(filter)); )
 			*ps++ = *pf;
 		ps->name = 0;
@@ -647,7 +647,7 @@ int			reload_filter (filter)
 			LP_ERRMSG (ERROR, E_LP_MALLOC);
 			return (1);
 		}
-		
+
 		if (!(pf = getfilter(filter))) switch (errno) {
 		case ENOENT:
 			LP_ERRMSG (ERROR, E_FL_FACTYNM);
@@ -659,7 +659,7 @@ int			reload_filter (filter)
 
 		store[0] = *pf;
 		store[1].name = 0;
-		
+
 	}
 
 	/*

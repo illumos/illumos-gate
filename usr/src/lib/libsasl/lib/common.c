@@ -8,7 +8,7 @@
  * Tim Martin
  * $Id: common.c,v 1.92 2003/04/16 19:36:00 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -138,7 +138,7 @@ static int sasl_mutex_lock(void *mutex)
 
     if (mutex != NULL)
 	ret = pthread_mutex_lock((pthread_mutex_t *)mutex);
-	
+
     return ret;
 }
 
@@ -148,7 +148,7 @@ static int sasl_mutex_unlock(void *mutex)
 
     if (mutex != NULL)
 	ret = pthread_mutex_unlock((pthread_mutex_t *)mutex);
-	
+
     return ret;
 }
 
@@ -252,7 +252,7 @@ int _sasl_add_string(char **out, size_t *alloclen,
 /* return the version of the cyrus sasl library as compiled,
  * using 32 bits: high byte is major version, second byte is minor version,
  * low 16 bits are step # */
-void sasl_version(const char **implementation, int *version) 
+void sasl_version(const char **implementation, int *version)
 {
 #ifdef _SUN_SDK_
     const char *implementation_string = "Sun SASL";
@@ -260,7 +260,7 @@ void sasl_version(const char **implementation, int *version)
     const char *implementation_string = "Cyrus SASL";
 #endif /* _SUN_SDK_ */
     if(implementation) *implementation = implementation_string;
-    if(version) *version = (SASL_VERSION_MAJOR << 24) | 
+    if(version) *version = (SASL_VERSION_MAJOR << 24) |
 		           (SASL_VERSION_MINOR << 16) |
 		           (SASL_VERSION_STEP);
 }
@@ -277,7 +277,7 @@ int sasl_encode(sasl_conn_t *conn, const char *input,
     if(!conn) return SASL_BADPARAM;
     if(!input || !inputlen || !output || !outputlen)
 	PARAMERROR(conn);
-    
+
     /* maxoutbuf checking is done in sasl_encodev */
 
     /* Note: We are casting a const pointer here, but it's okay
@@ -285,7 +285,7 @@ int sasl_encode(sasl_conn_t *conn, const char *input,
      * alternative is an absolute mess, performance-wise. */
     tmp.iov_base = (void *)input;
     tmp.iov_len = inputlen;
-    
+
     result = sasl_encodev(conn, &tmp, 1, output, outputlen);
 
     RETURN(conn, result);
@@ -330,7 +330,7 @@ int sasl_encodev(sasl_conn_t *conn,
 	    PARAMERROR(conn);
 #endif /* _SUN_SDK_ */
 	total_size += invec[i].iov_len;
-    }    
+    }
     if(total_size > conn->oparams.maxoutbuf)
 	PARAMERROR(conn);
 
@@ -341,7 +341,7 @@ int sasl_encodev(sasl_conn_t *conn,
 	result = _iovec_to_buf(invec, numiov, &conn->encode_buf);
 #endif /* _SUN_SDK_ */
 	if(result != SASL_OK) INTERROR(conn, result);
-       
+
 	*output = conn->encode_buf->data;
 	*outputlen = conn->encode_buf->curlen;
 
@@ -356,7 +356,7 @@ int sasl_encodev(sasl_conn_t *conn,
 
     RETURN(conn, result);
 }
- 
+
 /* output is only valid until next call to sasl_decode */
 int sasl_decode(sasl_conn_t *conn,
 		const char *input, unsigned inputlen,
@@ -407,14 +407,14 @@ int sasl_decode(sasl_conn_t *conn,
 
 	if(!conn->decode_buf)
 	    conn->decode_buf = sasl_ALLOC(conn->props.maxbufsize + 1);
-	if(!conn->decode_buf)	
+	if(!conn->decode_buf)
 	    MEMERROR(conn);
-	
+
 	memcpy(conn->decode_buf, input, inputlen);
 	conn->decode_buf[inputlen] = '\0';
 	*output = conn->decode_buf;
 	*outputlen = inputlen;
-	
+
         return SASL_OK;
 #ifdef _INTEGRATED_SOLARIS_
     } else if (!conn->sun_reg) {
@@ -470,28 +470,28 @@ void sasl_done(void)
 	_sasl_server_idle_hook = NULL;
 	_sasl_server_cleanup_hook = NULL;
     }
-    
+
     if (_sasl_client_cleanup_hook && _sasl_client_cleanup_hook() == SASL_OK) {
-	_sasl_client_idle_hook = NULL;	
+	_sasl_client_idle_hook = NULL;
 	_sasl_client_cleanup_hook = NULL;
     }
-    
+
     if(_sasl_server_cleanup_hook || _sasl_client_cleanup_hook)
 	return;
-  
-    
+
+
     _sasl_canonuser_free();
     _sasl_done_with_plugins();
-    
+
 #ifdef _SUN_SDK_
     sasl_config_free();
 #endif /* _SUN_SDK_ */
 
     sasl_MUTEX_FREE(free_mutex);
     free_mutex = NULL;
-    
+
     _sasl_free_utils(&sasl_global_utils);
-    
+
     if(global_mech_list) sasl_FREE(global_mech_list);
     global_mech_list = NULL;
 #endif /* _SUN_SDK_ */
@@ -516,7 +516,7 @@ int _sasl_conn_init(sasl_conn_t *conn,
   conn->type = type;
 
   result = _sasl_strdup(service, &conn->service, NULL);
-  if (result != SASL_OK) 
+  if (result != SASL_OK)
       MEMERROR(conn);
 
   memset(&conn->oparams, 0, sizeof(sasl_out_params_t));
@@ -527,11 +527,11 @@ int _sasl_conn_init(sasl_conn_t *conn,
   result = sasl_setprop(conn, SASL_IPLOCALPORT, iplocalport);
   if(result != SASL_OK)
       RETURN(conn, result);
-  
+
   result = sasl_setprop(conn, SASL_IPREMOTEPORT, ipremoteport);
   if(result != SASL_OK)
       RETURN(conn, result);
-  
+
   conn->encode_buf = NULL;
   conn->context = NULL;
 #ifndef _SUN_SDK_
@@ -548,14 +548,14 @@ int _sasl_conn_init(sasl_conn_t *conn,
   conn->errdetail_buf = conn->error_buf = NULL;
   conn->errdetail_buf_len = conn->error_buf_len = 150;
 
-  result = _buf_alloc(&conn->error_buf, &conn->error_buf_len, 150);     
+  result = _buf_alloc(&conn->error_buf, &conn->error_buf_len, 150);
   if(result != SASL_OK) MEMERROR(conn);
   result = _buf_alloc(&conn->errdetail_buf, &conn->errdetail_buf_len, 150);
   if(result != SASL_OK) MEMERROR(conn);
-  
+
   conn->error_buf[0] = '\0';
   conn->errdetail_buf[0] = '\0';
-  
+
   conn->decode_buf = NULL;
 
   if(serverFQDN) {
@@ -565,12 +565,12 @@ int _sasl_conn_init(sasl_conn_t *conn,
       char name[MAXHOSTNAMELEN];
       memset(name, 0, sizeof(name));
       gethostname(name, MAXHOSTNAMELEN);
-      
+
       result = _sasl_strdup(name, &conn->serverFQDN, NULL);
   } else {
       conn->serverFQDN = NULL;
   }
-  
+
 
   if(result != SASL_OK) MEMERROR( conn );
 
@@ -622,7 +622,7 @@ int _sasl_common_init(_sasl_global_context_t *gctx,
 int _sasl_common_init(sasl_global_callbacks_t *global_callbacks)
 {
     int result;
-    
+
     /* Setup the global utilities */
     if(!sasl_global_utils) {
 	sasl_global_utils = _sasl_alloc_utils(NULL, global_callbacks);
@@ -631,7 +631,7 @@ int _sasl_common_init(sasl_global_callbacks_t *global_callbacks)
 
     /* Init the canon_user plugin */
     result = sasl_canonuser_add_plugin("INTERNAL", internal_canonuser_init);
-    if(result != SASL_OK) return result;    
+    if(result != SASL_OK) return result;
 
     if (!free_mutex)
 	free_mutex = sasl_MUTEX_ALLOC();
@@ -663,7 +663,7 @@ void sasl_dispose(sasl_conn_t **pconn)
 #endif /* _SUN_SDK_ */
   result = sasl_MUTEX_LOCK(free_mutex);
   if (result!=SASL_OK) return;
-  
+
   /* *pconn might have become NULL by now */
 #ifdef _SUN_SDK_
   if (! (*pconn)) {
@@ -699,7 +699,7 @@ void _sasl_conn_dispose(sasl_conn_t *conn) {
 
   if(conn->error_buf)
       sasl_FREE(conn->error_buf);
-  
+
   if(conn->errdetail_buf)
       sasl_FREE(conn->errdetail_buf);
 
@@ -730,7 +730,7 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
   int result = SASL_OK;
   sasl_getopt_t *getopt;
   void *context;
-  
+
   if (! conn) return SASL_BADPARAM;
   if (! pvalue) PARAMERROR(conn);
 
@@ -742,14 +742,14 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
 	conn->oparams.mech_ssf = 0;
 #endif /* _INTEGRATED_SOLARIS_ */
       *(sasl_ssf_t **)pvalue= &conn->oparams.mech_ssf;
-      break;      
+      break;
   case SASL_MAXOUTBUF:
       *(unsigned **)pvalue = &conn->oparams.maxoutbuf;
       break;
   case SASL_GETOPTCTX:
       result = _sasl_getcallback(conn, SASL_CB_GETOPT, &getopt, &context);
       if(result != SASL_OK) break;
-      
+
       *(void **)pvalue = context;
       break;
   case SASL_CALLBACK:
@@ -769,7 +769,7 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
       else {
 	  *(const char **)pvalue = NULL;
 	  result = SASL_NOTDONE;
-      }	  
+      }
       break;
   case SASL_USERNAME:
       if(! conn->oparams.user)
@@ -831,7 +831,7 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
       } else {
 	  result = SASL_BADPARAM;
       }
-      
+
       if(!(*pvalue) && result == SASL_OK) result = SASL_NOTDONE;
       break;
   case SASL_PLUGERR:
@@ -846,7 +846,7 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
   case SASL_SEC_PROPS:
       *((const sasl_security_properties_t **)pvalue) = &conn->props;
       break;
-  default: 
+  default:
       result = SASL_BADPARAM;
   }
 
@@ -864,7 +864,7 @@ int sasl_getprop(sasl_conn_t *conn, int propnum, const void **pvalue)
   } else if(result != SASL_OK) {
       INTERROR(conn, result);
   } else
-      RETURN(conn, result); 
+      RETURN(conn, result);
 #ifdef _SUN_SDK_
   return SASL_OK;
 #endif /* _SUN_SDK_ */
@@ -971,12 +971,12 @@ int sasl_setprop(sasl_conn_t *conn, int propnum, const void *value)
 
       break;
   }
-      
+
   case SASL_IPREMOTEPORT:
   {
       const char *ipremoteport = (const char *)value;
       if(!value) {
-	  conn->got_ip_remote = 0; 
+	  conn->got_ip_remote = 0;
 #ifdef _SUN_SDK_
       } else if (strlen(ipremoteport) >= sizeof (conn->ipremoteport)) {
 	  RETURN(conn, SASL_BADPARAM);
@@ -993,7 +993,7 @@ int sasl_setprop(sasl_conn_t *conn, int propnum, const void *value)
 	  strcpy(conn->ipremoteport, ipremoteport);
 	  conn->got_ip_remote = 1;
       }
-      
+
       if(conn->got_ip_remote) {
 	  if(conn->type == SASL_CONN_CLIENT) {
 	      ((sasl_client_conn_t *)conn)->cparams->ipremoteport
@@ -1013,7 +1013,7 @@ int sasl_setprop(sasl_conn_t *conn, int propnum, const void *value)
 	      ((sasl_client_conn_t *)conn)->cparams->ipremlen = 0;
 	  } else if (conn->type == SASL_CONN_SERVER) {
 	      ((sasl_server_conn_t *)conn)->sparams->ipremoteport
-		  = NULL;	      
+		  = NULL;
 	      ((sasl_server_conn_t *)conn)->sparams->ipremlen = 0;
 	  }
       }
@@ -1025,7 +1025,7 @@ int sasl_setprop(sasl_conn_t *conn, int propnum, const void *value)
   {
       const char *iplocalport = (const char *)value;
       if(!value) {
-	  conn->got_ip_local = 0;	  
+	  conn->got_ip_local = 0;
 #ifdef _SUN_SDK_
       } else if (strlen(iplocalport) >= sizeof (conn->iplocalport)) {
 	  RETURN(conn, SASL_BADPARAM);
@@ -1077,7 +1077,7 @@ int sasl_setprop(sasl_conn_t *conn, int propnum, const void *value)
 #endif /* _SUN_SDK_ */
       result = SASL_BADPARAM;
   }
-  
+
   RETURN(conn, result);
 }
 
@@ -1187,7 +1187,7 @@ const char *sasl_errstring(int saslerr,
     default:   s = gettext("undefined error!");
 	break;
   }
- 
+
   if (use_locale(langlist, 0))
     s_locale = dgettext(TEXT_DOMAIN, s);
   else
@@ -1254,9 +1254,9 @@ const char *sasl_errstring(int saslerr,
 
 }
 
-/* Return the sanitized error detail about the last error that occured for 
+/* Return the sanitized error detail about the last error that occured for
  * a connection */
-const char *sasl_errdetail(sasl_conn_t *conn) 
+const char *sasl_errdetail(sasl_conn_t *conn)
 {
     unsigned need_len;
     const char *errstr;
@@ -1271,11 +1271,11 @@ const char *sasl_errdetail(sasl_conn_t *conn)
 #else
     if(!conn) return NULL;
 #endif /* _SUN_SDK_ */
-    
+
     errstr = sasl_errstring(conn->error_code, NULL, NULL);
     snprintf(leader,128,"SASL(%d): %s: ",
 	     sasl_usererr(conn->error_code), errstr);
-    
+
     need_len = strlen(leader) + strlen(conn->error_buf) + 12;
 #ifdef _SUN_SDK_
     ret = _buf_alloc(&conn->errdetail_buf, &conn->errdetail_buf_len, need_len);
@@ -1286,7 +1286,7 @@ const char *sasl_errdetail(sasl_conn_t *conn)
 #endif /* _SUN_SDK_ */
 
     snprintf(conn->errdetail_buf, need_len, "%s%s", leader, conn->error_buf);
-   
+
     return conn->errdetail_buf;
 }
 
@@ -1386,7 +1386,7 @@ static int _sasl_global_getopt(void *context,
 	}
       }
   }
-  
+
   /* look it up in our configuration file */
 #ifdef _SUN_SDK_
   *result = sasl_config_getstring(gctx, option, NULL);
@@ -1470,10 +1470,10 @@ static int _sasl_syslog(void *context __attribute__((unused)),
 	syslog_priority = LOG_DEBUG;
 	break;
     }
-    
+
     /* do the syslog call. do not need to call openlog */
     syslog(syslog_priority | LOG_AUTH, "%s", message);
-    
+
     return SASL_OK;
 }
 #endif				/* HAVE_SYSLOG */
@@ -1524,7 +1524,7 @@ _sasl_getsimple(void *context,
 	DWORD i;
 	BOOL rval;
 	static char sender[128];
-	
+
 	i = sizeof(sender);
 	rval = GetUserName(sender, &i);
 	if ( rval) { /* got a userid */
@@ -1717,7 +1717,7 @@ _sasl_log (sasl_conn_t *conn,
 
   va_start(ap, fmt); /* start varargs */
   ___sasl_log(gctx, log_cb, log_ctx, level, fmt, ap);
-  va_end(ap);    
+  va_end(ap);
 }
 
 void
@@ -1747,13 +1747,13 @@ __sasl_log(const _sasl_global_context_t *gctx,
     if (result != SASL_OK || ! log_cb)
 	return;
   }
-  
+
   if (gctx == NULL)
     gctx = _sasl_gbl_ctx();
 
   va_start(ap, fmt); /* start varargs */
   ___sasl_log(gctx, log_cb, log_ctx, level, fmt, ap);
-  va_end(ap);    
+  va_end(ap);
 }
 
 static void
@@ -1775,7 +1775,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
   sasl_log_t *log_cb;
   void *log_ctx;
 #endif /* !_SUN_SDK_ */
-  
+
   int ival;
   char *cval;
 #ifndef _SUN_SDK_
@@ -1784,7 +1784,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 
   if(!fmt) goto done;
   if(!out) return;
-  
+
   formatlen = strlen(fmt);
 
 #ifndef _SUN_SDK_
@@ -1793,7 +1793,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
   if (result == SASL_OK && ! log_cb)
     result = SASL_FAIL;
   if (result != SASL_OK) goto done;
-  
+
   va_start(ap, fmt); /* start varargs */
 #endif /* !_SUN_SDK_ */
 
@@ -1823,7 +1823,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 	    cval = va_arg(ap, char *); /* get the next arg */
 	    result = _sasl_add_string(&out, &alloclen,
 				&outlen, cval);
-	      
+
 	    if (result != SASL_OK) /* add the string */
 		goto done;
 
@@ -1834,7 +1834,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 	    result = _buf_alloc(&out,&alloclen,outlen+1);
 	    if (result != SASL_OK)
 		goto done;
-	    
+
 	    out[outlen]='%';
 	    outlen++;
 	    done=1;
@@ -1845,7 +1845,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 				strerror(va_arg(ap, int)));
 	    if (result != SASL_OK)
 		goto done;
-	    
+
 	    done=1;
 	    break;
 
@@ -1854,7 +1854,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 				(char *) sasl_errstring(va_arg(ap, int),NULL,NULL));
 	    if (result != SASL_OK)
 		goto done;
-	    
+
 	    done=1;
 	    break;
 
@@ -1865,12 +1865,12 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 #endif /* !_SUN_SDK_ */
 	    tempbuf[0] = (char) va_arg(ap, int); /* get the next arg */
 	    tempbuf[1]='\0';
-	    
+
 	    /* now add the character */
 	    result = _sasl_add_string(&out, &alloclen, &outlen, tempbuf);
 	    if (result != SASL_OK)
 		goto done;
-		
+
 	    done=1;
 	    break;
 
@@ -1889,13 +1889,13 @@ ___sasl_log(const _sasl_global_context_t *gctx,
 	    done=1;
 
 	    break;
-	  default: 
+	  default:
 	    frmt[frmtpos++]=fmt[pos]; /* add to the formating */
-	    frmt[frmtpos]=0;	    
+	    frmt[frmtpos]=0;
 #ifdef _SUN_SDK_
-	    if (frmtpos > sizeof (frmt) - 2) 
+	    if (frmtpos > sizeof (frmt) - 2)
 #else
-	    if (frmtpos>9) 
+	    if (frmtpos>9)
 #endif /* _SUN_SDK_ */
 	      done=1;
 	  }
@@ -1912,7 +1912,7 @@ ___sasl_log(const _sasl_global_context_t *gctx,
   if (result != SASL_OK) goto done;
   out[outlen]=0;
 
-  va_end(ap);    
+  va_end(ap);
 
   /* send log message */
   result = log_cb(log_ctx, level, out);
@@ -1987,7 +1987,7 @@ _sasl_alloc_utils(sasl_conn_t *conn,
   utils->mutex_unlock = _sasl_mutex_utils.unlock;
   utils->mutex_free = _sasl_mutex_utils.free;
 #endif /* _SUN_SDK_ */
-  
+
 #ifdef _SUN_SDK_
   utils->MD5Init  = (void (*)(MD5_CTX *))&MD5Init;
   utils->MD5Update= (void (*)
@@ -2006,12 +2006,12 @@ _sasl_alloc_utils(sasl_conn_t *conn,
   utils->mkchal = &sasl_mkchal;
   utils->utf8verify = &sasl_utf8verify;
   utils->rand=&sasl_rand;
-  utils->churn=&sasl_churn;  
+  utils->churn=&sasl_churn;
   utils->checkpass=NULL;
-  
+
   utils->encode64=&sasl_encode64;
   utils->decode64=&sasl_decode64;
-  
+
   utils->erasebuffer=&sasl_erasebuffer;
 
   utils->getprop=&sasl_getprop;
@@ -2040,9 +2040,9 @@ _sasl_alloc_utils(sasl_conn_t *conn,
 
   /* Spares */
   utils->spare_fptr = NULL;
-  utils->spare_fptr1 = utils->spare_fptr2 = 
+  utils->spare_fptr1 = utils->spare_fptr2 =
       utils->spare_fptr3 = NULL;
-  
+
   return utils;
 }
 
@@ -2121,7 +2121,7 @@ _sasl_find_getpath_callback(const sasl_callback_t *callbacks)
 	++callbacks;
       }
     }
-  
+
   return &default_getpath_cb;
 }
 
@@ -2145,7 +2145,7 @@ _sasl_find_getconf_callback(const sasl_callback_t *callbacks)
 	++callbacks;
       }
     }
-  
+
   return &default_getconf_cb;
 }
 #endif /* _SUN_SDK_ */
@@ -2169,7 +2169,7 @@ _sasl_find_verifyfile_callback(const sasl_callback_t *callbacks)
 	++callbacks;
       }
     }
-  
+
   return &default_verifyfile_cb;
 }
 
@@ -2178,7 +2178,7 @@ _sasl_find_verifyfile_callback(const sasl_callback_t *callbacks)
 int __buf_alloc(const _sasl_global_context_t *gctx, char **rwbuf,
 		size_t *curlen, size_t newlen)
 #else
-int _buf_alloc(char **rwbuf, size_t *curlen, size_t newlen) 
+int _buf_alloc(char **rwbuf, size_t *curlen, size_t newlen)
 #endif /* _SUN_SDK_ */
 {
     if(!(*rwbuf)) {
@@ -2195,13 +2195,13 @@ int _buf_alloc(char **rwbuf, size_t *curlen, size_t newlen)
 	    needed *= 2;
 
 	*rwbuf = sasl_REALLOC(*rwbuf, needed);
-	
+
 	if (*rwbuf == NULL) {
 	    *curlen = 0;
 	    return SASL_NOMEM;
 	}
 	*curlen = needed;
-    } 
+    }
 
     return SASL_OK;
 }
@@ -2220,7 +2220,7 @@ int _iovec_to_buf(const _sasl_global_context_t *gctx, const struct iovec *vec,
 		  unsigned numiov, buffer_info_t **output)
 #else
 int _iovec_to_buf(const struct iovec *vec,
-		  unsigned numiov, buffer_info_t **output) 
+		  unsigned numiov, buffer_info_t **output)
 #endif /* _SUN_SDK_ */
 {
     unsigned i;
@@ -2237,7 +2237,7 @@ int _iovec_to_buf(const struct iovec *vec,
     }
 
     out = *output;
-    
+
     out->curlen = 0;
     for(i=0; i<numiov; i++)
 	out->curlen += vec[i].iov_len;
@@ -2245,10 +2245,10 @@ int _iovec_to_buf(const struct iovec *vec,
     ret = _buf_alloc(&out->data, &out->reallen, out->curlen);
 
     if(ret != SASL_OK) return SASL_NOMEM;
-    
+
     memset(out->data, 0, out->reallen);
     pos = out->data;
-    
+
     for(i=0; i<numiov; i++) {
 	memcpy(pos, vec[i].iov_base, vec[i].iov_len);
 	pos += vec[i].iov_len;
@@ -2262,7 +2262,7 @@ int _iovec_to_buf(const struct iovec *vec,
 int _sasl_iptostring(const struct sockaddr *addr, socklen_t addrlen,
 		     char *out, unsigned outlen) {
     char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
-    
+
     if(!addr || !out) return SASL_BADPARAM;
 
     getnameinfo(addr, addrlen, hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
@@ -2293,7 +2293,7 @@ static int can_be_ipv6(const char *addr)
 #endif /* _SUN_SDK_ */
 
 int _sasl_ipfromstring(const char *addr,
-		       struct sockaddr *out, socklen_t outlen) 
+		       struct sockaddr *out, socklen_t outlen)
 {
     int i, j;
     struct addrinfo hints, *ai = NULL;
@@ -2302,7 +2302,7 @@ int _sasl_ipfromstring(const char *addr,
     const char *start, *end, *p;
     int addr_only = 1;
 #endif /* _SUN_SDK_ */
-    
+
     /* A NULL out pointer just implies we don't do a copy, just verify it */
 
     if(!addr) return SASL_BADPARAM;
@@ -2399,7 +2399,7 @@ int _sasl_ipfromstring(const char *addr,
 #ifdef _SUN_SDK_
 int _sasl_build_mechlist(_sasl_global_context_t *gctx)
 #else
-int _sasl_build_mechlist(void) 
+int _sasl_build_mechlist(void)
 #endif /* _SUN_SDK_ */
 {
     int count = 0;
@@ -2424,7 +2424,7 @@ int _sasl_build_mechlist(void)
 	olist = slist;
     } else {
 	int flag;
-	
+
 	/* append slist to clist, and set olist to clist */
 	for(p = slist; p; p = p_next) {
 	    flag = 0;
@@ -2461,7 +2461,7 @@ int _sasl_build_mechlist(void)
     }
 
     for (p = olist; p; p = p->next) count++;
-    
+
     if(global_mech_list) {
 	sasl_FREE(global_mech_list);
 #ifdef _SUN_SDK_
@@ -2470,15 +2470,15 @@ int _sasl_build_mechlist(void)
 	global_mech_list = NULL;
 #endif /* _SUN_SDK_ */
     }
-    
+
     global_mech_list = sasl_ALLOC((count + 1) * sizeof(char *));
     if(!global_mech_list) return SASL_NOMEM;
-    
+
     memset(global_mech_list, 0, (count + 1) * sizeof(char *));
 #ifdef _SUN_SDK_
     gctx->global_mech_list = global_mech_list;
 #endif /* _SUN_SDK_ */
-    
+
     count = 0;
     for (p = olist; p; p = p_next) {
 	p_next = p->next;
@@ -2495,7 +2495,7 @@ int _sasl_build_mechlist(void)
     return SASL_OK;
 }
 
-const char ** sasl_global_listmech(void) 
+const char ** sasl_global_listmech(void)
 {
 #ifdef _SUN_SDK_
     _sasl_global_context_t *gctx = _sasl_gbl_ctx();
@@ -2524,7 +2524,7 @@ int sasl_listmech(sasl_conn_t *conn,
 	RETURN(conn, _sasl_client_listmech(conn, prefix, sep, suffix,
 					   result, plen, pcount));
     }
-    
+
     PARAMERROR(conn);
 }
 
@@ -2592,13 +2592,13 @@ static void _sasl_dispose_context(_sasl_global_context_t *gctx)
 	gctx->sasl_server_idle_hook = NULL;
 	gctx->sasl_server_cleanup_hook = NULL;
   }
-    
+
   if (gctx->sasl_client_cleanup_hook &&
 		gctx->sasl_client_cleanup_hook(gctx) == SASL_OK) {
-	gctx->sasl_client_idle_hook = NULL;	
+	gctx->sasl_client_idle_hook = NULL;
 	gctx->sasl_client_cleanup_hook = NULL;
   }
-    
+
   if(gctx->sasl_server_cleanup_hook || gctx->sasl_client_cleanup_hook)
 	return;
 
@@ -2676,9 +2676,9 @@ _sasl_getconf(void *context __attribute__((unused)), const char **conf)
 
 #ifdef _INTEGRATED_SOLARIS_
 #pragma fini(sasl_fini)
-int 
-sasl_fini(void) 
-{ 
+int
+sasl_fini(void)
+{
     reg_list_t *next;
 
     while (reg_list_base != NULL) {
@@ -2687,7 +2687,7 @@ sasl_fini(void)
 	reg_list_base = next;
     }
     return (0);
-} 
+}
 #endif /* _INTEGRATED_SOLARIS_ */
 
 #endif /* _SUN_SDK_ */
@@ -2752,10 +2752,10 @@ _sasl_getpath(void *context __attribute__((unused)), const char **path)
 		       KEY_READ,
 		       &hKey);
 
-    if (ret != ERROR_SUCCESS) { 
+    if (ret != ERROR_SUCCESS) {
 		/* no registry entry */
 		*path = PLUGINDIR;
-		return SASL_OK; 
+		return SASL_OK;
 	}
 
     /* figure out value type and required buffer size */
@@ -2766,7 +2766,7 @@ _sasl_getpath(void *context __attribute__((unused)), const char **path)
 		     &ValueType,
 		     NULL,
 		     &cbData);
- 
+
     /* Only accept string related types */
     if (ValueType != REG_EXPAND_SZ &&
 	ValueType != REG_MULTI_SZ &&

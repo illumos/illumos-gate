@@ -1,5 +1,5 @@
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -49,7 +49,7 @@ kadm5_ret_t
      kadm5_free_name_list(void *server_handle, char **names, int count)
 {
     _KADM5_CHECK_HANDLE(server_handle);
-	  
+
     while (count--)
 	  free(names[count]);
      free(names);
@@ -62,7 +62,7 @@ kadm5_ret_t krb5_free_key_data_contents(context, key)
    krb5_key_data *key;
 {
      int i, idx;
-     
+
      idx = (key->key_data_ver == 1 ? 1 : 2);
      for (i = 0; i < idx; i++) {
 	  if (key->key_data_contents[i]) {
@@ -84,7 +84,7 @@ kadm5_ret_t kadm5_free_key_data(void *server_handle,
 
      if (key_data == NULL)
 	  return KADM5_OK;
-     
+
      for (i = 0; i < nkeys; i++)
 	  krb5_free_key_data_contents(handle->context, &key_data[i]);
      free(key_data);
@@ -101,7 +101,7 @@ kadm5_free_principal_ent(void *server_handle,
     _KADM5_CHECK_HANDLE(server_handle);
 
     if(val) {
-	if(val->principal) 
+	if(val->principal)
 	    krb5_free_principal(handle->context, val->principal);
 	if(val->mod_name)
 	    krb5_free_principal(handle->context, val->mod_name);
@@ -116,7 +116,7 @@ kadm5_free_principal_ent(void *server_handle,
 	     }
 	     if (val->tl_data) {
 		  krb5_tl_data *tl;
-		  
+
 		  while (val->tl_data) {
 		       tl = val->tl_data->tl_data_next;
 		       free(val->tl_data->tl_data_contents);
@@ -125,7 +125,7 @@ kadm5_free_principal_ent(void *server_handle,
 		  }
 	     }
 	}
-	
+
 	if (handle->api_version == KADM5_API_VERSION_1)
 	     free(val);
     }

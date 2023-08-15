@@ -37,16 +37,16 @@
 /	char *
 /	strrchr(const char *sp, int c)
 /	{
-/		char	*r = NULL; 
+/		char	*r = NULL;
 /
 /		do {
 /			if (*sp == (char)c)
-/				r = (char *)sp; 
-/		} while (*sp++); 
+/				r = (char *)sp;
+/		} while (*sp++);
 /
-/		return (r); 
+/		return (r);
 /	}
-/	
+/
 
 #include "SYS.h"
 

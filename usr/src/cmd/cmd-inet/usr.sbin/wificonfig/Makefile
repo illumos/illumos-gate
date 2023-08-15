@@ -25,7 +25,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-PROG=		wificonfig	
+PROG=		wificonfig
 OBJS=		wificonfig.o
 SRCS=		$(OBJS:%.o=%.c)
 

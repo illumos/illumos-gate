@@ -93,9 +93,9 @@ extern _Thread_local const _RuneLocale *_ThreadRuneLocale;
 static __inline const _RuneLocale *__getCurrentRuneLocale(void)
 {
 
-	if (_ThreadRuneLocale) 
+	if (_ThreadRuneLocale)
 		return _ThreadRuneLocale;
-	if (_CurrentRuneLocale) 
+	if (_CurrentRuneLocale)
 		return _CurrentRuneLocale;
 	return &_DefaultRuneLocale;
 }

@@ -42,7 +42,7 @@ typedef void (*AdapterPortCallback)(
 
 /**
  * @memo	    Encapsulates the callback routine for event dispatch
- * 
+ *
  * @doc		    This class encapsulates the event callback routine
  *		    registered in the public HBA API.  When dispatch
  *		    is called, the stored callback routine will be called.

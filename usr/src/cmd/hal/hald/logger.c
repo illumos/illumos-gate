@@ -1,7 +1,7 @@
 /***************************************************************************
  * CVSID: $Id$
  *
- * logger.c : Logging 
+ * logger.c : Logging
  *
  * Copyright (C) 2003 David Zeuthen, <david@fubar.dk>
  * Copyright (C) 2006 Danny Kukawka, <danny.kukawka@web.de>
@@ -60,7 +60,7 @@ static int syslog_enabled = 0;
 /** Disable all logging
  *
  */
-void 
+void
 logger_disable (void)
 {
 	is_enabled = 0;
@@ -69,31 +69,31 @@ logger_disable (void)
 /** Enable all logging
  *
  */
-void 
+void
 logger_enable (void)
 {
 	is_enabled = 1;
 }
 
-/** enable usage of syslog for logging  
+/** enable usage of syslog for logging
  *
  */
-void 
+void
 logger_enable_syslog (void)
 {
 	syslog_enabled = 1;
 }
 
-/** disable usage of syslog for logging  
+/** disable usage of syslog for logging
  *
  */
-void 
+void
 logger_disable_syslog (void)
 {
 	syslog_enabled = 0;
 }
 
-/** allow setup logger from a addon/prober via the env 
+/** allow setup logger from a addon/prober via the env
  *
  */
 void
@@ -182,11 +182,11 @@ logger_emit (const char *format, ...)
 	} else {
 		snprintf (logmsg, sizeof(logmsg), "%s.%03d %s %s:%d: %s\n", tbuf, (int)(tnow.tv_usec/1000), pri, file, line, buf);
 	}
-		
+
 	/** @todo Make programmatic interface to logging */
 	if (priority != HAL_LOGPRI_TRACE && !syslog_enabled ) {
 		fprintf (stderr, "%s", logmsg );
-	} else if (priority != HAL_LOGPRI_TRACE && syslog_enabled ) {   
+	} else if (priority != HAL_LOGPRI_TRACE && syslog_enabled ) {
 		/* use syslog for debug/log messages if HAL started as daemon */
 		switch (priority) {
 			case HAL_LOGPRI_DEBUG:

@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Network code for Kerberos v5 KDC.
  */
@@ -367,7 +367,7 @@ setup_a_tcp_listener(struct socksetup *data, struct sockaddr *addr)
 
     sock = socket(addr->sa_family, SOCK_STREAM, 0);
     if (sock == -1) {
-	com_err(data->prog, errno, 
+	com_err(data->prog, errno,
 		gettext("Cannot create TCP server socket on %s"),
 		paddr(addr));
 	return -1;
@@ -389,7 +389,7 @@ setup_a_tcp_listener(struct socksetup *data, struct sockaddr *addr)
 	return -1;
     }
     if (listen(sock, 5) < 0) {
-	com_err(data->prog, errno, 
+	com_err(data->prog, errno,
 		gettext("Cannot listen on TCP server socket on %s"),
 		paddr(addr));
 	close(sock);
@@ -403,7 +403,7 @@ setup_a_tcp_listener(struct socksetup *data, struct sockaddr *addr)
 	return -1;
     }
     if (setnolinger(sock)) {
-	com_err(data->prog, errno, 
+	com_err(data->prog, errno,
 		gettext("disabling SO_LINGER on TCP socket on %s"),
 		paddr(addr));
 	close(sock);
@@ -1088,7 +1088,7 @@ listen_and_process(const char *prog)
 
     if (conns == (struct connection **) NULL)
 	return KDC5_NONET;
-    
+
     while (!signal_requests_exit) {
 	if (signal_requests_hup) {
 	    krb5_klog_reopen(kdc_context);

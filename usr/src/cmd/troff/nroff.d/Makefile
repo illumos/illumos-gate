@@ -81,7 +81,7 @@ $(PROG) :	$(OBJS) $(COMMONOBJS)
 install :	$(PROG) $(ROOTPROG) $(SUBDIRS)
 
 catalog:        $(POFILE)
- 
+
 $(POFILE):      $(POFILES)
 	 $(RM)	$@
 	 cat $(POFILES)  >       $@

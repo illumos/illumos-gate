@@ -2861,7 +2861,7 @@ gatherq(qgrp, qdir, doall, full, more, pnentries)
 #if _FFR_EXPDELAY
 				if (MaxQueueAge > 0)
 				{
-					time_t lasttry, delay;    
+					time_t lasttry, delay;
 
 					lasttry = (time_t) atol(&lbuf[1]);
 					delay = MIN(lasttry - w->w_ctime,

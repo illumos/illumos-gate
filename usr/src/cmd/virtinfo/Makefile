@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-PROG= virtinfo 
+PROG= virtinfo
 
 include ../Makefile.cmd
 

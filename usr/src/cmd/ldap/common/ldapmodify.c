@@ -3,26 +3,26 @@
  * Use is subject to license terms.
  */
 
-/* 
+/*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
  * the License at http://www.mozilla.org/NPL/
- *  
+ *
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *  
+ *
  * The Original Code is Mozilla Communicator client code, released
  * March 31, 1998.
- * 
+ *
  * The Initial Developer of the Original Code is Netscape
  * Communications Corporation. Portions created by Netscape are
  * Copyright (C) 1998-1999 Netscape Communications Corporation. All
  * Rights Reserved.
- * 
- * Contributor(s): 
+ *
+ * Contributor(s):
  */
 
 /* ldapmodify.c - generic program to modify or add entries using LDAP */
@@ -50,7 +50,7 @@ static int		error = 0, replace, nbthreads = 1;
 static int		thr_create_errors = 0;
 static pthread_mutex_t	read_mutex = {0};
 static pthread_mutex_t	wait_mutex = {0};
-static pthread_cond_t	wait_cond  = {0}; 
+static pthread_cond_t	wait_cond  = {0};
 #else
 /*
  * For Solaris, ld is defined local to process() because
@@ -133,7 +133,7 @@ usage( void )
     fprintf( stderr, gettext("    -B suffix\tbulk import to \"suffix\"\n"));
     fprintf( stderr, gettext("    -q\t\tbe quiet when adding/modifying entries\n") );
 #ifdef SOLARIS_LDAP_CMD
-    fprintf( stderr, gettext("    -r\t\treplace values\n")); 
+    fprintf( stderr, gettext("    -r\t\treplace values\n"));
     fprintf( stderr, gettext("    -l nb-connections\tnumber of LDAP connections\n"));
 #endif	/* SOLARIS_LDAP_CMD */
     exit( LDAP_PARAM_ERROR );
@@ -197,7 +197,7 @@ main( int argc, char **argv )
 	return( rc );
     }
 
-    for ( i=0; i<nbthreads; ++i ) { 
+    for ( i=0; i<nbthreads; ++i ) {
  	if ( thr_create(NULL, 0, process, NULL, NULL, NULL) != 0 )
 		++thr_create_errors;
     }
@@ -245,7 +245,7 @@ process( void *arg )
 #ifdef SOLARIS_LDAP_CMD
     LDAP	*ld;
 #endif  /* SOLARIS_LDAP_CMD */
-    
+
     ld = ldaptool_ldap_init( 0 );
 
     if ( !ldaptool_not ) {
@@ -257,7 +257,7 @@ process( void *arg )
 
     if (( ldctrl = ldaptool_create_manage_dsait_control()) != NULL ) {
 	ldaptool_add_control_to_array( ldctrl, ldaptool_request_ctrls);
-    } 
+    }
 
     if ((ldctrl = ldaptool_create_proxyauth_control(ld)) !=NULL) {
 	ldaptool_add_control_to_array( ldctrl, ldaptool_request_ctrls);
@@ -380,11 +380,11 @@ process( void *arg )
     }
 
 #ifdef SOLARIS_LDAP_CMD
-    mutex_lock(&read_mutex);	
+    mutex_lock(&read_mutex);
 #endif
     ldaptool_cleanup( ld );
 #ifdef SOLARIS_LDAP_CMD
-    mutex_unlock(&read_mutex);	
+    mutex_unlock(&read_mutex);
 #endif
     return( rc );
 }
@@ -470,7 +470,7 @@ process_ldif_rec( char *rbuf )
 	if ( expect_sep && strcasecmp( line, T_MODSEPSTR ) == 0 ) {
 	    expect_sep = 0;
 	    expect_modop = 1;
-	    
+
 	    /*If we see a separator in the input stream,
 	     but we didn't get a value from the last modify
 	     then we have to fill pmods with an empty value*/
@@ -481,7 +481,7 @@ process_ldif_rec( char *rbuf )
 	    got_value = 0;
 	    continue;
 	}
-	
+
 #ifdef SOLARIS_LDAP_CMD
 	if ( str_parse_line( line, &type, &value, &vlen ) < 0 ) {
 #else
@@ -529,7 +529,7 @@ evaluate_line:
 		    printf( gettext("Processing a version %d LDIF file...\n"),
 			    ldif_version );
 		}
-		
+
 		/* Now check if there's something left to process   */
 		/* and if not, go get the new record, else continue */
 		if ( *rbuf == '\0' ) {
@@ -557,7 +557,7 @@ evaluate_line:
 #ifndef SOLARIS_LDAP_CMD
 	    if ( strcasecmp( type, "control" ) == 0 ) {
 		value = strdup_and_trim( value );
-		if (ldaptool_parse_ctrl_arg(value, ' ', &ctrl_oid, 
+		if (ldaptool_parse_ctrl_arg(value, ' ', &ctrl_oid,
 			&ctrl_criticality, &ctrl_value, &vlen)) {
 			    usage();
 		}
@@ -614,7 +614,7 @@ evaluate_line:
 	    } else {
 	      /*The user MUST put in changetype: blah
 	       unless adding a new entry with either -a or ldapadd*/
-		fprintf(stderr, gettext("%s: Missing changetype operation specification.\n\tThe dn line must be followed by \"changetype: operation\"\n\t(unless ldapmodify is called with -a option)\n\twhere operation is add|delete|modify|modrdn|moddn|rename\n\t\"%s\" is not a valid changetype operation specification\n\t(line %d of entry %s)\n"), 
+		fprintf(stderr, gettext("%s: Missing changetype operation specification.\n\tThe dn line must be followed by \"changetype: operation\"\n\t(unless ldapmodify is called with -a option)\n\twhere operation is add|delete|modify|modrdn|moddn|rename\n\t\"%s\" is not a valid changetype operation specification\n\t(line %d of entry %s)\n"),
 		ldaptool_progname, type, linenum, dn);
 		rc = LDAP_PARAM_ERROR;
 		/*expect_modop = 1;	 missing changetype => modify */
@@ -639,8 +639,8 @@ evaluate_line:
 		modop = replace ? LDAP_MOD_REPLACE : LDAP_MOD_ADD;
 	    }
 #else
-	    }  else { /*Bug 27479. Remove default add operation*/ 
-	      fprintf(stderr, gettext("%s: Invalid parameter \"%s\" specified for changetype modify (line %d of entry %s)\n"), 
+	    }  else { /*Bug 27479. Remove default add operation*/
+	      fprintf(stderr, gettext("%s: Invalid parameter \"%s\" specified for changetype modify (line %d of entry %s)\n"),
 		      ldaptool_progname, type, linenum, dn);
 	      rc = LDAP_PARAM_ERROR;
 	    }
@@ -687,7 +687,7 @@ evaluate_line:
 		 * the current line to be re-evaluated if newparent doesn't
 		 * follow deleteoldrdn.
 		 */
-		newparent = NULL;  
+		newparent = NULL;
 		goto evaluate_line;
 	    }
 	} else if ( expect_deleteoldrdn ) {
@@ -748,8 +748,8 @@ evaluate_line:
 	  if (modop == LDAP_MOD_REPLACE && !got_value && expect_sep){
 	    addmodifyop( &pmods, modop, value, NULL, 0);
 	  }/*End Patch*/
-	  
-	  
+
+
 #ifdef SOLARIS_LDAP_CMD
 	  rc = domodify( ld, dn, pmods, new_entry );
 #else
@@ -865,7 +865,7 @@ process_ldapmod_rec( char *rbuf )
 		    modop = replace ? LDAP_MOD_REPLACE : LDAP_MOD_ADD;
 #else
 		    /*Bug 27479. Remove the add default*/
-		      fprintf(stderr, gettext("%s: Invalid parameter specified for changetype modify (line %d of entry %s)\n"), 
+		      fprintf(stderr, gettext("%s: Invalid parameter specified for changetype modify (line %d of entry %s)\n"),
 		      ldaptool_progname, linenum, dn);
 		      rc = LDAP_PARAM_ERROR;
 #endif	/* SOLARIS_LDAP_CMD */
@@ -890,7 +890,7 @@ process_ldapmod_rec( char *rbuf )
 	  rc = 0;
 	}
       }
-    
+
     if ( pmods != NULL ) {
 	freepmods( pmods );
     }
@@ -963,7 +963,7 @@ addmodifyop( LDAPMod ***pmodsp, int modop, char *attr, char *value, int vlen )
 	}
 	pmods[ i ]->mod_bvalues[ j ] = bvp;
 
-#ifdef notdef 
+#ifdef notdef
 	if (ldaptool_verbose) {
 		printf(gettext("%s: value: %s vlen: %d\n"), "ldapmodify", value, vlen);
 	}
@@ -1034,11 +1034,11 @@ domodify( char *dn, LDAPMod **pmods, int newentry )
 #ifdef SOLARIS_LDAP_CMD
 	    /* Backward compatibility with old Solaris command */
 	    unsigned int nb = 0;
-	    timestruc_t to; 
+	    timestruc_t to;
 	    while ((i = ldaptool_add_ext_s( ld, dn, pmods,
 			ldaptool_request_ctrls, NULL, "ldap_add" ))
 			!= LDAP_SUCCESS) {
-		if (i == LDAP_BUSY) {		
+		if (i == LDAP_BUSY) {
 			if ( sleep_interval > 3600 ) {
 				printf(gettext("ldap_add: Unable to complete "
 						"request.  Server is too "
@@ -1063,14 +1063,14 @@ domodify( char *dn, LDAPMod **pmods, int newentry )
 			++nb;
 			if (nb >= nbthreads)
 				break;
-			mutex_lock(&wait_mutex); 
-			to.tv_sec = 5; 
-			to.tv_nsec = 0; 
+			mutex_lock(&wait_mutex);
+			to.tv_sec = 5;
+			to.tv_nsec = 0;
 			if (cond_reltimedwait(&wait_cond, &wait_mutex, &to)
 				== ETIME) {
-					nb = nbthreads; /* last chance */ 
-			} 
-			mutex_unlock(&wait_mutex); 
+					nb = nbthreads; /* last chance */
+			}
+			mutex_unlock(&wait_mutex);
 		} else {
 			break;
 		}
@@ -1089,7 +1089,7 @@ domodify( char *dn, LDAPMod **pmods, int newentry )
 		if ( !ldapmodify_quiet ) {
 			printf("ldap_add: LDAP_BUSY returned by server. ");
 			printf("Will retry operation ");
-			printf("in %d seconds\n", sleep_interval); 
+			printf("in %d seconds\n", sleep_interval);
 		}
 		sleep( sleep_interval );
 		sleep_interval *= 2;
@@ -1210,10 +1210,10 @@ read_one_record( FILE *fp )
     gotnothing = 1;
 
 #ifdef SOLARIS_LDAP_CMD
-    mutex_lock(&read_mutex);	
+    mutex_lock(&read_mutex);
 
     if (fp == NULL) {
-    	mutex_unlock(&read_mutex);	
+    	mutex_unlock(&read_mutex);
 	return(NULL);
     }
 #endif
@@ -1232,7 +1232,7 @@ read_one_record( FILE *fp )
 	    if ( gotnothing ) {
 		continue;
 	    } else {
-		break; 
+		break;
 	      }
 	}
 
@@ -1247,7 +1247,7 @@ read_one_record( FILE *fp )
 	    if (( buf = (char *)LDAPTOOL_SAFEREALLOC( buf, lmax )) == NULL ) {
 		perror( "realloc" );
 		#ifdef SOLARIS_LDAP_CMD
-    			mutex_unlock(&read_mutex);	
+    			mutex_unlock(&read_mutex);
 		#endif
 		exit( LDAP_NO_MEMORY );
 	    }
@@ -1257,7 +1257,7 @@ read_one_record( FILE *fp )
     }
 
 #ifdef SOLARIS_LDAP_CMD
-    mutex_unlock(&read_mutex);	
+    mutex_unlock(&read_mutex);
 #endif
 
     return( buf );

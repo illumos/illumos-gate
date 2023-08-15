@@ -29,7 +29,7 @@
 
 .KEEP_STATE:
 
-SUBDIRS	= parser spec2map spec2trace	
+SUBDIRS	= parser spec2map spec2trace
 
 all		:=	TARGET= all
 install		:=	TARGET= install

@@ -43,8 +43,8 @@ typedef struct bd_scan_b{
     u16_t vlan_tag;
     u16_t reserved;
     u16_t unused_13;
-    tx_bidx_boff_t bidx_boff_current;                        
-    tx_bidx_boff_t bidx_boff_prev;                           
+    tx_bidx_boff_t bidx_boff_current;
+    tx_bidx_boff_t bidx_boff_prev;
     u32_t bseq_current;
     u32_t bseq_prev;
 }bd_scan_b_t;
@@ -59,8 +59,8 @@ typedef struct bd_scan_l{
 
     u16_t unused_13;
     u16_t reserved;
-    tx_bidx_boff_t bidx_boff_current;                        
-    tx_bidx_boff_t bidx_boff_prev;                           
+    tx_bidx_boff_t bidx_boff_current;
+    tx_bidx_boff_t bidx_boff_prev;
     u32_t bseq_current;
     u32_t bseq_prev;
 }bd_scan_l_t;
@@ -90,8 +90,8 @@ union idx16_union_t {
 };
 
 // Refer to Timer Architecture document.
-// The timers have different sizes, however, the LSB of each timer indicates 
-// whether the timer is armed or dis-armed (a value of '1' indicates that the 
+// The timers have different sizes, however, the LSB of each timer indicates
+// whether the timer is armed or dis-armed (a value of '1' indicates that the
 // timer is dis-armed, a value of '0' indicates that the timer is armed). The
 // MSB of each timer indicates whether the timer value has rolled over during
 // the course of operation. Thus a 32-bit timer is essentially a 30-bit timer
@@ -139,9 +139,9 @@ typedef struct l2_bd_chain_context_b
 
     u8_t  l2ctx_ctx_size;
     u8_t  l2ctx_bd_pre_read;
-    // L2 flow control watermarks b0-b3 and b4-b7 are the low and high 
+    // L2 flow control watermarks b0-b3 and b4-b7 are the low and high
     // watermark respectively
-    u8_t  l2ctx_watermarks;    
+    u8_t  l2ctx_watermarks;
     u8_t  l2ctx_sb_num;
     u8_t  l2ctx_krnlq_id;
     u16_t l2ctx_host_bdidx;
@@ -151,16 +151,16 @@ typedef struct l2_bd_chain_context_b
     u32_t l2ctx_nx_bdhaddr_lo;
     u16_t l2ctx_v2p_flags;
         // only valid in Linux for Flow control (maintained by RV2P)
-        #define L2CTX_V2P_FLAGS_PAUSE    (1<<0)  
+        #define L2CTX_V2P_FLAGS_PAUSE    (1<<0)
     u16_t l2ctx_nx_bdidx;
-    u8_t  unused_1;               
-    u8_t  l2ctx_queue_type;        
+    u8_t  unused_1;
+    u8_t  l2ctx_queue_type;
     u8_t  l2ctx_filter_type;
     u8_t  reserved;
     u16_t unused_2;
     u16_t l2ctx_max_pkt_len;       // max L2 pkt length the RX BD can accomodate
-    u32_t unused[7];                
-    u16_t l2ctx_vmq_lookahead_sz;   /* VMQ look ahead size */     
+    u32_t unused[7];
+    u16_t l2ctx_vmq_lookahead_sz;   /* VMQ look ahead size */
     // Following fields are for LINUX only (jumbo pkt mode)
     u8_t  l2ctx_pg_bd_pre_read;
     u8_t  unused_4;
@@ -183,9 +183,9 @@ typedef struct l2_bd_chain_context_b
  */
 typedef struct l2_bd_chain_context_l
 {
-    // L2 flow control watermarks b0-b3 and b4-b7 are the low and high 
+    // L2 flow control watermarks b0-b3 and b4-b7 are the low and high
     // watermark respectively  (Linux L2 flow control only)
-    u8_t  l2ctx_watermarks;    
+    u8_t  l2ctx_watermarks;
     u8_t  l2ctx_bd_pre_read;
     u8_t  l2ctx_ctx_size;
     u8_t  l2ctx_ctx_type;
@@ -203,14 +203,14 @@ typedef struct l2_bd_chain_context_l
     u16_t l2ctx_nx_bdidx;
     u16_t l2ctx_v2p_flags;
         // only valid in Linux for Flow control (maintained by RV2P)
-        #define L2CTX_V2P_FLAGS_PAUSE    (1<<0)  
+        #define L2CTX_V2P_FLAGS_PAUSE    (1<<0)
     u8_t  reserved;
     u8_t  l2ctx_filter_type;
-    u8_t  l2ctx_queue_type;        
-    u8_t  unused_1;               
+    u8_t  l2ctx_queue_type;
+    u8_t  unused_1;
     u16_t l2ctx_max_pkt_len;       // max L2 pkt length the RX BD can accomodate
     u16_t unused_2;
-    u32_t unused[7];  
+    u32_t unused[7];
     u8_t  unused_4;
     u8_t  l2ctx_pg_bd_pre_read;     // Linux jumbo pkt mode only
     u16_t l2ctx_vmq_lookahead_sz;
@@ -258,17 +258,17 @@ typedef struct tcp_context_cmd_cell_b_te
     u32_t ccell_tbdr_bseq;
     tx_bidx_boff_t  ccell_tbdr_bidx_boff;
 #if defined(_ANSI_C_)
-    // compiler switch is to avoid complaints from some ANSI compilers 
+    // compiler switch is to avoid complaints from some ANSI compilers
     // (e.g. Solaris) that don't support unnamed union
-    struct {        
+    struct {
         u32_t hi;
-        u32_t lo;                             
+        u32_t lo;
     } ccell_tbdr_bhaddr;
 #else
     union {
-        struct {        
+        struct {
             u32_t ccell_tbdr_bhaddr_hi;
-            u32_t ccell_tbdr_bhaddr_lo;                             
+            u32_t ccell_tbdr_bhaddr_lo;
         };
         u64_t ccell_tbdr_bhaddr;
     };
@@ -293,9 +293,9 @@ typedef struct tcp_context_cmd_cell_l_te
     u32_t ccell_tsch_bseq;
     u32_t ccell_tbdr_bseq;
     tx_bidx_boff_t  ccell_tbdr_bidx_boff;
-    struct {        
+    struct {
         u32_t hi;
-        u32_t lo;                             
+        u32_t lo;
     } ccell_tbdr_bhaddr;
     tx_bidx_boff_t ccell_txp_bidx_boff;
     u32_t ccell_txp_bseq;
@@ -351,17 +351,17 @@ typedef struct tcp_context_cmd_cell_b_xi
     u32_t ccell_tbdr_bseq;
     tx_bidx_boff_t  ccell_tbdr_bidx_boff;
 #if defined(_ANSI_C_)
-    // compiler switch is to avoid complaints from some ANSI compilers 
+    // compiler switch is to avoid complaints from some ANSI compilers
     // (e.g. Solaris) that don't support unnamed union
-    struct {        
+    struct {
         u32_t hi;
-        u32_t lo;                             
+        u32_t lo;
     } ccell_tbdr_bhaddr;
 #else
     union {
-        struct {        
+        struct {
             u32_t ccell_tbdr_bhaddr_hi;
-            u32_t ccell_tbdr_bhaddr_lo;                             
+            u32_t ccell_tbdr_bhaddr_lo;
         };
         u64_t ccell_tbdr_bhaddr;
     };
@@ -429,9 +429,9 @@ typedef struct tcp_context_cmd_cell_l_xi
     u32_t ccell_tsch_bseq;
     u32_t ccell_tbdr_bseq;
     tx_bidx_boff_t  ccell_tbdr_bidx_boff;
-    struct {        
+    struct {
         u32_t hi;
-        u32_t lo;                             
+        u32_t lo;
     } ccell_tbdr_bhaddr;
     tx_bidx_boff_t ccell_txp_bidx_boff;
     u32_t ccell_txp_bseq;

@@ -53,8 +53,8 @@ commitall()
 	int n;
 
 	for (i = 0; i < ncsave; i++) {
-		if (Sgrades) {  
-			if ((job_size(&csave[i]) == FAIL) || 
+		if (Sgrades) {
+			if ((job_size(&csave[i]) == FAIL) ||
 			    (fgrade(&csave[i]) == FAIL)) {
 				wfremove(csave[i].file);
 				continue;
@@ -101,7 +101,7 @@ commitall()
  *	returns
  *		SUCCESS	-> found one
  *		FAIL	-> none saved
- *		
+ *
  */
 
 int
@@ -115,12 +115,12 @@ char	*file, *sys;
 			(void) strncpy(file, csave[i].file, NAMESIZE-1);
 			return(SUCCESS);
 		}
-	
+
 	return(FAIL);
 }
 
 /*
- *	jid - returns the real job id of this uucp file transfer 
+ *	jid - returns the real job id of this uucp file transfer
  *
  *	returns
  *		jobid
@@ -199,7 +199,7 @@ char	*wfile1, *wfile2, *sys;
 	fileBase = BASENAME(wfile2, '/');
 	sprintf(cmitfile, "%s/%s", RemSpool, fileBase);
 	DEBUG(6, "to %s\n", cmitfile);
-	
+
 	ASSERT(access(cmitfile, 0) != 0, Fl_EXISTS, cmitfile, 0);
 	ASSERT(xmv(wfile1, cmitfile) == 0, Ct_LINK, cmitfile, errno);
 	return;

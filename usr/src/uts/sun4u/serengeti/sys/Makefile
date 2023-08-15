@@ -36,7 +36,7 @@ include ../Makefile.serengeti
 #
 FILEMODE	 = 644
 
-HDRS=	
+HDRS=
 
 ROOTHDRS=		$(HDRS:%=$(USR_SERENGETI_ISYS_DIR)/%)
 

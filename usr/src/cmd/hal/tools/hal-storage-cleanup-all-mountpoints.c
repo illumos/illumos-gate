@@ -107,10 +107,10 @@ do_cleanup (void)
 #endif
 
 			/* just try to rmdir the entry; if it's non-empty or something is mounted on it,
-			 * this will fail 
+			 * this will fail
 			 */
 			mount_point = line_elements[5];
-			
+
 			/* remove directory */
 			if (g_rmdir (mount_point) == 0) {
 				char *line_to_free;

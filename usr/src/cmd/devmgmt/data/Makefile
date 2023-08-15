@@ -33,7 +33,7 @@ FILEMODE=	444
 
 .KEEP_STATE:
 
-all: $(FILES) 
+all: $(FILES)
 
 install: all $(ROOTETCFILES)
 

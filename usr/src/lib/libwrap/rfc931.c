@@ -8,9 +8,9 @@
   * 1413 protocols. It queries an RFC 931 etc. compatible daemon on a remote
   * host to look up the owner of a connection. The information should not be
   * used for authentication purposes. This routine intercepts alarm signals.
-  * 
+  *
   * Diagnostics are reported through syslog(3).
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

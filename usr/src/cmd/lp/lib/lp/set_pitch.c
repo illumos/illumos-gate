@@ -91,7 +91,7 @@ set_pitch (str, which, putout)
 
 		tidbit ((char *)0, "lpi", &change_pitch);;
 		tidbit ((char *)0, "cvr", &change_res);;
-		
+
 		output_res_inch_p = &output_res_vert_inch;
 		if (output_res_vert_inch == -1)
 			tidbit ((char *)0, "orvi", output_res_inch_p);

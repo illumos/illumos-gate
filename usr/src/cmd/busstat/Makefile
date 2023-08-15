@@ -24,7 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-PROG= busstat 
+PROG= busstat
 
 include ../Makefile.cmd
 
@@ -32,7 +32,7 @@ LDLIBS += -lkstat
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

@@ -29,14 +29,14 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
-CPPFLAGS += -D_FILE_OFFSET_BITS=64 
+CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 LDLIBS += -lcmdutils -lsec
 
 XGETFLAGS += -a -x unpack.xcl
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 pcat: $(PROG)
 

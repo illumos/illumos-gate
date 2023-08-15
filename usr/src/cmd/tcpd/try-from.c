@@ -2,11 +2,11 @@
   * This program can be called via a remote shell command to find out if the
   * hostname and address are properly recognized, if username lookup works,
   * and (SysV only) if the TLI on top of IP heuristics work.
-  * 
+  *
   * Example: "rsh host /some/where/try-from".
-  * 
+  *
   * Diagnostics are reported through syslog(3) and redirected to stderr.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

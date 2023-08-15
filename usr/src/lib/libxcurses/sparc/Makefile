@@ -29,6 +29,6 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-all: $(LIBS) 
+all: $(LIBS)
 
 install: all $(ROOTLIBS)

@@ -32,7 +32,7 @@ FILEMODE= 0555
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)

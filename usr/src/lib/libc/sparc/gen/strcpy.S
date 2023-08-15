@@ -40,7 +40,7 @@
  *	register const char *s2;
  *	{
  *		char *os1 = s1;
- *	
+ *
  *		while(*s1++ = *s2++)
  *			;
  *		return(os1);
@@ -75,10 +75,10 @@
 	bz	.done			! yup, done
 	cmp	%o4, 3			! only one byte needed to align?
 	bz	.srcaligned		! yup
-	inc	%o2			! src++, dst++  
-     
+	inc	%o2			! src++, dst++
+
 .s2aligned:
-	lduh	[%o2 + %o3], %o1	! src[]     
+	lduh	[%o2 + %o3], %o1	! src[]
 	srl	%o1, 8, %o4		! %o4<7:0> = first byte
 	tst	%o4			! first byte zero ?
 	bz	.done			! yup, done
@@ -111,9 +111,9 @@
 	srl	%o1, 24, %o3		! %o3<7:0> = first byte
 	andcc	%o1, %o4, %g0		! first byte zero?
 	bz	.done			! yup, done
-	stb	%o3, [%o2 - 4]		! store first byte  
+	stb	%o3, [%o2 - 4]		! store first byte
 	set	0x00ff0000, %o5		! mask for 2nd byte
-	srl	%o1, 16, %o3		! %o3<7:0> = second byte    
+	srl	%o1, 16, %o3		! %o3<7:0> = second byte
 	andcc	%o1, %o5, %g0		! second byte zero?
 	bz	.done			! yup, done
 	stb	%o3, [%o2 - 3]		! store second byte
@@ -159,7 +159,7 @@
 	sth	%g1, [%o2 - 4]		! store first and second byte
 	ba	.storehalfword		! next word
 	sth	%o1, [%o2 - 2]		! store third and fourth byte
-	
+
 	! DO NOT remove these NOPs. It will slow down the halfword loop by 15%
 
 	nop				! padding

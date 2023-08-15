@@ -31,7 +31,7 @@
 
 /* C library -- vhangup						*/
 /* int vhangup()						*/
- 
+
 #include "SYS.h"
 
 	SYSCALL_RVAL1(vhangup)

@@ -73,7 +73,7 @@ class LogDRM implements DRM
 		Poold.CONF_LOG.log(Severity.INFO, "DRM protocol version:" +
 		    version + ", server: " + url);
 	}
-	
+
 
 	/**
 	 * Disconnect from a higher level partitioning agent.
@@ -84,7 +84,7 @@ class LogDRM implements DRM
 	{
 		Poold.CONF_LOG.log(Severity.INFO, "Disconnected from " + url);
 	}
-	
+
 
 	/**
 	 * Request resources via a higher level partitioning agent.
@@ -98,7 +98,7 @@ class LogDRM implements DRM
 		Poold.MON_LOG.log(Severity.INFO, "Requesting additional " +
 		    "resources ");
 	}
-	
+
 
 	/**
 	 * Offer resources via a higher level partitioning agent.

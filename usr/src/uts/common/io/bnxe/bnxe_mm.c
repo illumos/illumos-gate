@@ -291,7 +291,7 @@ lm_status_t mm_get_user_config(lm_device_t * pLM)
         pLM->params.l2_fw_flow_ctrl = (pUM->devParams.l2_fw_flow_ctrl) ? 1 : 0;
     }
 
-    pLM->params.rcv_buffer_offset = BNXE_DMA_RX_OFFSET; 
+    pLM->params.rcv_buffer_offset = BNXE_DMA_RX_OFFSET;
 
     pLM->params.debug_cap_flags = DEFAULT_DEBUG_CAP_FLAGS_VAL;
 
@@ -1460,7 +1460,7 @@ lm_status_t mm_event_log_generic_arg_fwd(lm_device_t *     pDev,
         /*
          * expected parametrs:
          * u8 port
-         */ 
+         */
         port = va_arg(argp, int);
 
         BnxeLogWarn(pUM, "SFP+ over current, power failure! (port=%d)", port);

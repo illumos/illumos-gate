@@ -9,7 +9,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,11 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -37,7 +37,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -173,7 +173,7 @@ typedef struct _krb5_gss_cred_id_rec {
    krb5_ccache ccache;
    krb5_timestamp tgt_expire;
    krb5_enctype *req_enctypes;	/* limit negotiated enctypes to this list */
-} krb5_gss_cred_id_rec, *krb5_gss_cred_id_t; 
+} krb5_gss_cred_id_rec, *krb5_gss_cred_id_t;
 
 typedef struct _krb5_gss_ctx_id_rec {
    unsigned int initiate : 1;	/* nonzero if initiating, zero if accepting */
@@ -238,8 +238,8 @@ extern k5_mutex_t gssint_krb5_keytab_lock;
 
 /** helper functions **/
 
-OM_uint32 kg_get_defcred 
-	(OM_uint32 *minor_status, 
+OM_uint32 kg_get_defcred
+	(OM_uint32 *minor_status,
 		   gss_cred_id_t *cred);
 
 krb5_error_code kg_checksum_channel_bindings
@@ -263,10 +263,10 @@ krb5_error_code kg_make_seed (krb5_context context,
 
 int kg_confounder_size (krb5_context context, krb5_keyblock *key);
 
-krb5_error_code kg_make_confounder (krb5_context context, 
+krb5_error_code kg_make_confounder (krb5_context context,
 	    krb5_keyblock *key, unsigned char *buf);
 
-krb5_error_code kg_encrypt (krb5_context context, 
+krb5_error_code kg_encrypt (krb5_context context,
 				      krb5_keyblock *key, int usage,
 				      krb5_pointer iv,
 				      krb5_const_pointer in,
@@ -326,13 +326,13 @@ krb5_error_code kg_ctx_internalize (krb5_context kcontext,
 
 OM_uint32 kg_sync_ccache_name (krb5_context context, OM_uint32 *minor_status);
 
-OM_uint32 kg_caller_provided_ccache_name (OM_uint32 *minor_status, 
+OM_uint32 kg_caller_provided_ccache_name (OM_uint32 *minor_status,
                                           int *out_caller_provided_name);
 
-OM_uint32 kg_get_ccache_name (OM_uint32 *minor_status, 
+OM_uint32 kg_get_ccache_name (OM_uint32 *minor_status,
                               const char **out_name);
 
-OM_uint32 kg_set_ccache_name (OM_uint32 *minor_status, 
+OM_uint32 kg_set_ccache_name (OM_uint32 *minor_status,
                               const char *name);
 
 /** declarations of internal name mechanism functions **/
@@ -635,7 +635,7 @@ OM_uint32 krb5_gss_canonicalize_name
 	    const gss_OID,		/* mech_type */
 	    gss_name_t *		/* output_name */
 	 );
-	
+
 OM_uint32 krb5_gss_export_name
 (OM_uint32  *,		/* minor_status */
 	    const gss_name_t,		/* input_name */
@@ -659,7 +659,7 @@ krb5_gss_validate_cred_1(OM_uint32 * /* minor_status */,
 			 krb5_context /* context */);
 
 gss_OID krb5_gss_convert_static_mech_oid(gss_OID oid);
-	
+
 krb5_error_code gss_krb5int_make_seal_token_v3(krb5_context,
 					       krb5_gss_ctx_id_rec *,
 					       const gss_buffer_desc *,
@@ -671,7 +671,7 @@ OM_uint32 gss_krb5int_unseal_token_v3(krb5_context *contextptr,
 				      krb5_gss_ctx_id_rec *ctx,
 				      unsigned char *ptr, int bodysize,
 				      gss_buffer_t message_buffer,
-				      int *conf_state, int *qop_state, 
+				      int *conf_state, int *qop_state,
 				      int toktype);
 
 /*
@@ -745,7 +745,7 @@ OM_uint32
 gss_krb5int_inq_session_key(OM_uint32 *, const gss_ctx_id_t, const gss_OID, gss_buffer_set_t *);
 
 OM_uint32 KRB5_CALLCONV
-gss_krb5int_set_allowable_enctypes(OM_uint32 *minor_status, 
+gss_krb5int_set_allowable_enctypes(OM_uint32 *minor_status,
 				   gss_cred_id_t cred,
 				   OM_uint32 num_ktypes,
 				   krb5_enctype *ktypes);

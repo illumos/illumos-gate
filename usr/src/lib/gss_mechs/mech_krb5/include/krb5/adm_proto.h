@@ -104,7 +104,7 @@ krb5_flags_to_string (krb5_flags,
 		      char *,
 		      size_t);
 krb5_error_code
-krb5_input_flag_to_string (int, 
+krb5_input_flag_to_string (int,
 			   char *,
 			   size_t);
 
@@ -121,7 +121,7 @@ krb5_keysalt_iterate (krb5_key_salt_tuple *,
 		      krb5_error_code (*) (krb5_key_salt_tuple *,
 					   krb5_pointer),
 		      krb5_pointer);
-				     
+
 krb5_error_code
 krb5_string_to_keysalts (char *,
 			 const char *,

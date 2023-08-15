@@ -167,7 +167,7 @@ ids_find_pci (int vendor_id, int product_id,
 			/* vendor names */
 			vendor_matched = FALSE;
 
-			/* first check subsys_vendor_id, if haven't done 
+			/* first check subsys_vendor_id, if haven't done
 			 * already */
 			if (*subsys_vendor_name == NULL
 			    && subsys_vendor_id != 0) {
@@ -276,7 +276,7 @@ pci_ids_free ()
 /** Load the PCI database used for mapping vendor, product, subsys_vendor
  *  and subsys_product numbers into names.
  *
- *  @param  path                Path of the pci.ids file, e.g. 
+ *  @param  path                Path of the pci.ids file, e.g.
  *                              /usr/share/hwdata/pci.ids
  *  @return                     #TRUE if the file was succesfully loaded
  */
@@ -493,7 +493,7 @@ usb_ids_free ()
 /** Load the USB database used for mapping vendor, product, subsys_vendor
  *  and subsys_product numbers into names.
  *
- *  @param  path                Path of the usb.ids file, e.g. 
+ *  @param  path                Path of the usb.ids file, e.g.
  *                              /usr/share/hwdata/usb.ids
  *  @return                     #TRUE if the file was succesfully loaded
  */
@@ -535,7 +535,7 @@ usb_ids_load (const char *path)
 }
 
 
-void 
+void
 ids_init (void)
 {
 	/* Load /usr/share/hwdata/pci.ids */
@@ -547,7 +547,7 @@ ids_init (void)
 
 
 /* This, somewhat incomplete, list is from this sources:
- * http://www.plasma-online.de/english/identify/serial/pnp_id_pnp.html 
+ * http://www.plasma-online.de/english/identify/serial/pnp_id_pnp.html
  * http://www-pc.uni-regensburg.de/hardware/TECHNIK/PCI_PNP/pnpid.txt
  *
  * Keep this sorted!
@@ -805,7 +805,7 @@ struct pnp_id {
 	{"PNP8114", "Racal NI5210/8 or NI5210/16"},
 	{"PNP8119", "Ungermann-Bass pcNIU"},
 	{"PNP811A", "Ungermann-Bass pcNIU/ex 128K"},
-	{"PNP811B", "Ungermann-Bass pcNIU/ex 512K"}, 
+	{"PNP811B", "Ungermann-Bass pcNIU/ex 512K"},
 	{"PNP811C", "Ungermann-Bass NIUpc"},
 	{"PNP811D", "Ungermann-Bass NIUpc/3270"},
 	{"PNP8120", "Ungermann-Bass NIUpc/EOTP"},
@@ -964,7 +964,7 @@ struct pnp_id {
 	{"WACf006", "Wacom Serial Tablet PC Pen Tablet/Digitizer"}
 };
 
-static int 
+static int
 ids_comp_pnp(const void *id1, const void *id2) {
         struct pnp_id *pnp_id1 = (struct pnp_id *) id1;
         struct pnp_id *pnp_id2 = (struct pnp_id *) id2;
@@ -976,21 +976,21 @@ ids_find_pnp (const char *pnp_id, char **pnp_description)
 {
 	static gboolean sorted = FALSE;
 	struct pnp_id search, *res;
-        
+
 	if (!sorted) {
 		/* sort the list, to be sure that all is in correc order */
-		qsort(pnp_ids_list, sizeof(pnp_ids_list)/sizeof(pnp_ids_list[0]), 
+		qsort(pnp_ids_list, sizeof(pnp_ids_list)/sizeof(pnp_ids_list[0]),
 		      sizeof(struct pnp_id), ids_comp_pnp);
 		sorted = TRUE;
 	}
 
         search.id = (char *) pnp_id;
-        res = bsearch(&search, pnp_ids_list, sizeof(pnp_ids_list)/sizeof(pnp_ids_list[0]), 
+        res = bsearch(&search, pnp_ids_list, sizeof(pnp_ids_list)/sizeof(pnp_ids_list[0]),
 		      sizeof(struct pnp_id), ids_comp_pnp);
 
         if (res != NULL)
         	*pnp_description = res->desc;
 	else
-        	*pnp_description = NULL; 
+        	*pnp_description = NULL;
         return;
 }

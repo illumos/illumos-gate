@@ -27,7 +27,7 @@
 /*
  * Assembly language support for the iospc IO performance counter driver.
  */
- 
+
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 #include "rfios_acc.h"

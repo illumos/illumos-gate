@@ -730,7 +730,7 @@ __hal_lro_check_for_session_match(lro_t	*lro, tcplro_t *tcp, iplro_t *ip)
 	/* Match Destination Port field	*/
 	if ((lro->tcp_hdr->dest	!= tcp->dest))
 		return XGE_HAL_FAIL;
-		
+
 	return XGE_HAL_OK;
 }
 
@@ -815,7 +815,7 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 	if (TCP_FAST_PATH_HDR_MASK1	!= tcp->doff_res) {
 		u16	tcp_hdr_len	= tcp->doff_res	>> 2; /* TCP header	len	*/
 		u16	off	= 20; /* Start of tcp options */
-		int	i, diff; 
+		int	i, diff;
 
 		/* Does	Packet can contain time	stamp */
 		if (tcp_hdr_len	< 32) {
@@ -880,12 +880,12 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 			u8 byte	= ((u8 *)tcp)[off+i];
 
 			/* Ignore No-operation 0x1 */
-			if ((byte == 0x0) || (byte == 0x1))	
+			if ((byte == 0x0) || (byte == 0x1))
 				continue;
 			xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	: pkt received with	tcp	options	in addition	to time	stamp after	the	session	is opened %02x %02x	", tcp->doff_res,	tcp->ctrl);
 			return XGE_HAL_FAIL;
 		}
-	
+
 		/*
 		 * Update the time stamp of	LRO	frame.
 		 */
@@ -1029,7 +1029,7 @@ __hal_lro_get_free_slot	(xge_hal_lro_desc_t	*ring_lro)
 		if (!lro_temp->in_use)
 			return i;
 	}
-	return -1;	
+	return -1;
 }
 
 /*
@@ -1059,7 +1059,7 @@ __hal_get_lro_session (u8 *eth_hdr,
 
 	*lro = lro_match = NULL;
 	/*
-	 * Compare the incoming	frame with the lro session left	from the 
+	 * Compare the incoming	frame with the lro session left	from the
 	 * previous	call.  There is	a good chance that this	incoming frame
 	 * matches the lro session.
 	 */
@@ -1069,10 +1069,10 @@ __hal_get_lro_session (u8 *eth_hdr,
 							== XGE_HAL_OK)
 			lro_match =	ring_lro->lro_recent;
 	}
-	
+
 	if (!lro_match)	{
 		/*
-		 * Search in the pool of LROs for the session that matches 
+		 * Search in the pool of LROs for the session that matches
 		 * the incoming	frame.
 		 */
 		for	(i = 0;	i <	XGE_HAL_LRO_MAX_BUCKETS; i++) {
@@ -1082,7 +1082,7 @@ __hal_get_lro_session (u8 *eth_hdr,
 				if (free_slot == -1)
 					free_slot =	i;
 				continue;
-			}	
+			}
 
 			if (__hal_lro_check_for_session_match(lro_temp,	tcp,
 							  ip) == XGE_HAL_OK) {
@@ -1092,11 +1092,11 @@ __hal_get_lro_session (u8 *eth_hdr,
 		}
 	}
 
-	
+
 	if (lro_match) {
 		/*
 		 * Matching	LRO	Session	found
-		 */			
+		 */
 		*lro = lro_match;
 
 		if (lro_match->tcp_next_seq_num	!= xge_os_ntohl(tcp->seq)) {
@@ -1117,7 +1117,7 @@ __hal_get_lro_session (u8 *eth_hdr,
 			 * Close the current session and open a	new
 			 * LRO session with	this packet,
 			 * provided	it has tcp payload
-			 */	
+			 */
 			tcp_seg_len	= __hal_tcp_seg_len(ip,	tcp);
 			if (tcp_seg_len	== 0)
       {
@@ -1131,7 +1131,7 @@ __hal_get_lro_session (u8 *eth_hdr,
 				return XGE_HAL_INF_LRO_END_2;
       }
 
-			/* 
+			/*
 			 * Open	a new LRO session
 			 */
 			__hal_open_lro_session (eth_hdr,	ip,	tcp, lro_end3,
@@ -1157,20 +1157,20 @@ __hal_get_lro_session (u8 *eth_hdr,
 		lro_match->frags_len +=	__hal_tcp_seg_len(ip, tcp);
 
 		ring_lro->lro_recent =	lro_match;
-	
+
 		return XGE_HAL_INF_LRO_CONT;
 	}
 
 	/* ********** New Session ***************/
 	if (free_slot == -1)
 		return XGE_HAL_INF_LRO_UNCAPABLE;
-	
+
 	if (XGE_HAL_FAIL ==	__hal_ip_lro_capable(ip, ext_info))
 		return XGE_HAL_INF_LRO_UNCAPABLE;
 
 	if (XGE_HAL_FAIL ==	__hal_tcp_lro_capable(ip, tcp, NULL, &ts_off))
 		return XGE_HAL_INF_LRO_UNCAPABLE;
-		
+
 	xge_debug_ring(XGE_TRACE, "Creating	lro	session.");
 
 	/*
@@ -1201,7 +1201,7 @@ __hal_lro_under_optimal_thresh (iplro_t	*ip,
 {
 	if (!lro) return XGE_HAL_FAIL;
 
-	if ((lro->total_length + __hal_tcp_seg_len(ip, tcp)	) >	
+	if ((lro->total_length + __hal_tcp_seg_len(ip, tcp)	) >
 						hldev->config.lro_frm_len) {
 		xge_debug_ring(XGE_TRACE, "Max LRO frame len exceeded:"
 		 "max length %d	", hldev->config.lro_frm_len);

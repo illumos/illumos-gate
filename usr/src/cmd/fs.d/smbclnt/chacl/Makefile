@@ -47,7 +47,7 @@ install:	$(ROOTLIBFSTYPEPROG)
 
 lint:	lint_SRCS
 
-clean:     
+clean:
 	$(RM) $(OBJS)
 
 .KEEP_STATE:

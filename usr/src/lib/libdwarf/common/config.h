@@ -191,7 +191,7 @@
 #  define WORDS_BIGENDIAN 1
 # else
 #  undef WORDS_BIGENDIAN
-# endif         
+# endif
 #endif
 
 /* Define to the type of a signed integer type wide enough to hold a pointer,

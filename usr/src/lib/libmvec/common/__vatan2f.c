@@ -84,7 +84,7 @@ loop0:
 			i = hx;
 			hx = hy0;
 			hy0 = i;
-			if (sy) 
+			if (sy)
 			{
 				x0 = -x0;
 				sign0 = -sign0;
@@ -104,7 +104,7 @@ loop0:
 		{
 			y0 = *y;
 			x0 = *x;
-			if (sy) 
+			if (sy)
 			{
 				y0 = -y0;
 				sign0 = -sign0;
@@ -130,7 +130,7 @@ loop0:
 			}
 			else if ((int) ah0 == 0)
 				ah0 = y0 / x0;
-			*z = (sign0 == one) ? ah0 : -ah0; 
+			*z = (sign0 == one) ? ah0 : -ah0;
 /* sign0*ah0 would change nan behavior relative to previous release */
 			x += stridex;
 			y += stridey;
@@ -161,14 +161,14 @@ loop0:
 
 		k0 = (hy0 - hx + 0x3f800000) & 0xfff80000;
 		if (k0 >= 0x3C800000)          /* if |x| >= (1/64)... */
-    		{ 
+    		{
 			*(int*)&base0 = k0;
        		 	k0 = (k0 - 0x3C800000) >> 18; /* (index >> 19) << 1) */
 			k0 += 4;
 				/* skip over 0,0,pi/2,pi/2 */
-    		}  
+    		}
     		else                            /* |x| < 1/64 */
-    		{ 
+    		{
 			k0 = 0;
 			base0 = zero;
     		}
@@ -198,7 +198,7 @@ loop1:
 			i = hx;
 			hx = hy1;
 			hy1 = i;
-			if (sy) 
+			if (sy)
 			{
 				x1 = -x1;
 				sign1 = -sign1;
@@ -218,7 +218,7 @@ loop1:
 		{
 			y1 = *y;
 			x1 = *x;
-			if (sy) 
+			if (sy)
 			{
 				y1 = -y1;
 				sign1 = -sign1;
@@ -274,14 +274,14 @@ loop1:
 
 		k1 = (hy1 - hx + 0x3f800000) & 0xfff80000;
 		if (k1 >= 0x3C800000)          /* if |x| >= (1/64)... */
-    		{ 
+    		{
 			*(int*)&base1 = k1;
        		 	k1 = (k1 - 0x3C800000) >> 18; /* (index >> 19) << 1) */
 			k1 += 4;
 				/* skip over 0,0,pi/2,pi/2 */
-    		}  
+    		}
     		else                            /* |x| < 1/64 */
-    		{ 
+    		{
        			k1 = 0;
 			base1 = zero;
     		}
@@ -310,7 +310,7 @@ loop2:
 			i = hx;
 			hx = hy2;
 			hy2 = i;
-			if (sy) 
+			if (sy)
 			{
 				x2 = -x2;
 				sign2 = -sign2;
@@ -330,7 +330,7 @@ loop2:
 		{
 			y2 = *y;
 			x2 = *x;
-			if (sy) 
+			if (sy)
 			{
 				y2 = -y2;
 				sign2 = -sign2;
@@ -387,14 +387,14 @@ loop2:
 
 		k2 = (hy2 - hx + 0x3f800000) & 0xfff80000;
 		if (k2 >= 0x3C800000)          /* if |x| >= (1/64)... */
-    		{ 
+    		{
 			*(int*)&base2 = k2;
        		 	k2 = (k2 - 0x3C800000) >> 18; /* (index >> 19) << 1) */
 			k2 += 4;
 				/* skip over 0,0,pi/2,pi/2 */
-    		}  
+    		}
     		else                            /* |x| < 1/64 */
-    		{ 
+    		{
 			k2 = 0;
 			base2 = zero;
     		}
@@ -403,9 +403,9 @@ loop2:
 
 endloop:
 
-		ah2 += __vlibm_TBL_atan1[k2];	
-		ah1 += __vlibm_TBL_atan1[k1];	
-		ah0 += __vlibm_TBL_atan1[k0];	
+		ah2 += __vlibm_TBL_atan1[k2];
+		ah1 += __vlibm_TBL_atan1[k1];
+		ah0 += __vlibm_TBL_atan1[k0];
 
 		db2 = base2;
 		db1 = base1;
@@ -433,7 +433,7 @@ endloop:
 		sx2 = t2 * t2;
 		sx1 = t1 * t1;
 		sx0 = t0 * t0;
- 
+
 		t2 += t2 * sx2 * (q1 + sx2 * q2);
  		t1 += t1 * sx1 * (q1 + sx1 * q2);
  		t0 += t0 * sx0 * (q1 + sx0 * q2);
@@ -454,8 +454,8 @@ endloop:
 
 	if (i > 1)
 	{
-		ah1 += __vlibm_TBL_atan1[k1];	
-		t1 = (y1 - x1 * (double)base1) / 
+		ah1 += __vlibm_TBL_atan1[k1];
+		t1 = (y1 - x1 * (double)base1) /
 			(x1 + y1 * (double)base1);
 		sx1 = t1 * t1;
  		t1 += t1 * sx1 * (q1 + sx1 * q2);
@@ -465,8 +465,8 @@ endloop:
 
 	if (i > 0)
 	{
-		ah0 += __vlibm_TBL_atan1[k0];	
-		t0 = (y0 - x0 * (double)base0) / 
+		ah0 += __vlibm_TBL_atan1[k0];
+		t0 = (y0 - x0 * (double)base0) /
 			(x0 + y0 * (double)base0);
 		sx0 = t0 * t0;
  		t0 += t0 * sx0 * (q1 + sx0 * q2);

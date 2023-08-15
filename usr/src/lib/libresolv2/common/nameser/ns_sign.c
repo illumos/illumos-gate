@@ -136,7 +136,7 @@ ns_sign2(u_char *msg, int *msglen, int msgsize, int error, void *k,
 		return (NS_TSIG_ERROR_NO_SPACE);
 	alg = cp;
 	cp += n;
-	
+
 	/* Time. */
 	BOUNDS_CHECK(cp, INT16SZ + INT32SZ + INT16SZ);
 	PUTSHORT(0, cp);
@@ -328,7 +328,7 @@ ns_sign_tcp2(u_char *msg, int *msglen, int msgsize, int error,
 	if (n < 0)
 		return (NS_TSIG_ERROR_NO_SPACE);
 	cp += n;
-	
+
 	/* Time. */
 	BOUNDS_CHECK(cp, INT16SZ + INT32SZ + INT16SZ);
 	PUTSHORT(0, cp);

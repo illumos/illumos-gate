@@ -1,16 +1,16 @@
  /*
   * tcpdchk - examine all tcpd access control rules and inetd.conf entries
-  * 
+  *
   * Usage: tcpdchk [-a] [-d] [-i inet_conf] [-v]
-  * 
+  *
   * -a: complain about implicit "allow" at end of rule.
-  * 
+  *
   * -d: rules in current directory.
-  * 
+  *
   * -i: location of inetd.conf file.
-  * 
+  *
   * -v: show all rules.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

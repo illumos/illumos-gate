@@ -31,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,7 +45,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * kdb_dest(roy): destroy the named database.
  *
@@ -93,7 +93,7 @@ kdb5_destroy(argc, argv)
 	com_err(progname, retval1, "while setting default realm name");
 	exit(1);
     }
-    
+
 /* Solaris Kerberos */
 #if 0
     if (strrchr(argv[0], '/'))
@@ -122,7 +122,7 @@ kdb5_destroy(argc, argv)
 	    exit_status++; return;
         }
 	if ((strncmp(buf, gettext("yes\n"),
-	 	strlen(gettext("yes\n"))) != 0) && 
+	 	strlen(gettext("yes\n"))) != 0) &&
 	(strncmp(buf, gettext("y\n"),
 		strlen(gettext("y\n"))) != 0)) {
 	printf(gettext("database not deleted !! '%s'...\n"),
@@ -140,7 +140,7 @@ kdb5_destroy(argc, argv)
 	char stash[MAXPATHLEN+1];
 	extern krb5_principal master_princ;
 	krb5_data *realm = krb5_princ_realm(context, master_princ);
-	(void) strlcpy(stash, DEFAULT_KEYFILE_STUB, sizeof (stash)); 
+	(void) strlcpy(stash, DEFAULT_KEYFILE_STUB, sizeof (stash));
 	/*
 	 * realm->data is not necessarily NULL terminated so be
 	 * careful how much data is copied here.  Don't overrun

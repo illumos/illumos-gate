@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Given a tkt, and a target cred, get it.
  * Assumes that the kdc_rep has been decrypted.
@@ -39,9 +39,9 @@
 static krb5_error_code
 krb5_kdcrep2creds(krb5_context context, krb5_kdc_rep *pkdcrep, krb5_address *const *address, krb5_data *psectkt, krb5_creds **ppcreds)
 {
-    krb5_error_code retval;  
+    krb5_error_code retval;
     krb5_data *pdata;
-  
+
     if ((*ppcreds = (krb5_creds *)malloc(sizeof(krb5_creds))) == NULL) {
         return ENOMEM;
     }
@@ -56,7 +56,7 @@ krb5_kdcrep2creds(krb5_context context, krb5_kdc_rep *pkdcrep, krb5_address *con
 				      &(*ppcreds)->server)))
         goto cleanup;
 
-    if ((retval = krb5_copy_keyblock_contents(context, 
+    if ((retval = krb5_copy_keyblock_contents(context,
 					      pkdcrep->enc_part2->session,
 					      &(*ppcreds)->keyblock)))
         goto cleanup;
@@ -98,7 +98,7 @@ cleanup:
     free (*ppcreds);
     return retval;
 }
- 
+
 static krb5_error_code
 check_reply_server(krb5_context context, krb5_flags kdcoptions,
 		   krb5_creds *in_cred, krb5_kdc_rep *dec_rep)
@@ -193,7 +193,7 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
     if (!tkt->ticket.length)
 	return KRB5_NO_TKT_SUPPLIED;
 
-    if ((kdcoptions & KDC_OPT_ENC_TKT_IN_SKEY) && 
+    if ((kdcoptions & KDC_OPT_ENC_TKT_IN_SKEY) &&
 	(!in_cred->second_ticket.length))
         return(KRB5_NO_2ND_TKT);
 
@@ -204,7 +204,7 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 /*
     {
     krb5_principal tempprinc;
-        if (retval = krb5_tgtname(context, 
+        if (retval = krb5_tgtname(context,
 		     krb5_princ_realm(context, in_cred->server),
 		     krb5_princ_realm(context, tkt->server), &tempprinc))
     	    return(retval);
@@ -224,11 +224,11 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	enctypes[0] = in_cred->keyblock.enctype;
 	enctypes[1] = 0;
     }
-    
-    retval = krb5_send_tgs2(context, kdcoptions, &in_cred->times, enctypes, 
+
+    retval = krb5_send_tgs2(context, kdcoptions, &in_cred->times, enctypes,
 			   in_cred->server, address, in_cred->authdata,
 			   0,		/* no padata */
-			   (kdcoptions & KDC_OPT_ENC_TKT_IN_SKEY) ? 
+			   (kdcoptions & KDC_OPT_ENC_TKT_IN_SKEY) ?
 			   &in_cred->second_ticket : NULL,
 			    tkt, &tgsrep, &hostname_used);
     if (enctypes)
@@ -270,7 +270,7 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
             case KDC_ERR_S_PRINCIPAL_UNKNOWN:
                 {
                     char *s_name;
-                    if (krb5_unparse_name(context, in_cred->server, &s_name) == 
+                    if (krb5_unparse_name(context, in_cred->server, &s_name) ==
 0) {
 			/* Solaris Kerberos - added dgettext */
                         krb5_set_error_message(context, retval,
@@ -391,7 +391,7 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	retval = KRB5KRB_AP_ERR_MSG_TYPE;
 	goto error_3;
     }
-   
+
     /* make sure the response hasn't been tampered with..... */
     retval = 0;
 
@@ -433,8 +433,8 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	retval = KRB5_KDCREP_SKEW;
 	goto error_3;
     }
-    
-    retval = krb5_kdcrep2creds(context, dec_rep, address, 
+
+    retval = krb5_kdcrep2creds(context, dec_rep, address,
 			       &in_cred->second_ticket,  out_cred);
 
 error_3:;

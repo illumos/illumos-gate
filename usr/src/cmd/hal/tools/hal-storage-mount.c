@@ -161,17 +161,17 @@ canonicalize_filename (gchar *filename)
 {
 	gchar *p, *q;
 	gboolean last_was_slash = FALSE;
-	
+
 	p = filename;
 	q = filename;
-	
+
 	while (*p)
 	{
 		if (*p == G_DIR_SEPARATOR)
 		{
 			if (!last_was_slash)
 				*q++ = G_DIR_SEPARATOR;
-			
+
 			last_was_slash = TRUE;
 		}
 		else
@@ -183,7 +183,7 @@ canonicalize_filename (gchar *filename)
 				{
 					if (*(p + 1) == '\0')
 						break;
-					
+
 					p += 1;
 				}
 				else if (*(p + 1) == '.' &&
@@ -197,10 +197,10 @@ canonicalize_filename (gchar *filename)
 						       *(q - 1) != G_DIR_SEPARATOR)
 							q--;
 					}
-					
+
 					if (*(p + 2) == '\0')
 						break;
-					
+
 					p += 2;
 				}
 				else
@@ -215,13 +215,13 @@ canonicalize_filename (gchar *filename)
 				last_was_slash = FALSE;
 			}
 		}
-		
+
 		p++;
 	}
-	
+
 	if (q > filename + 1 && *(q - 1) == G_DIR_SEPARATOR)
 		q--;
-	
+
 	*q = '\0';
 }
 
@@ -245,7 +245,7 @@ resolve_symlink (const char *file)
 			f = NULL;
 			goto out;
 		}
-		
+
 		dir = g_path_get_dirname (f);
 		f1 = g_strdup_printf ("%s/%s", dir, link);
 		g_free (dir);
@@ -271,7 +271,7 @@ volume_findby (LibHalContext *hal_ctx, const char *property, const char *value)
 	DBusError error;
 
 	dbus_error_init (&error);
-	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, property, 
+	if ((hal_udis = libhal_manager_find_device_string_match (hal_ctx, property,
 								 value, &num_hal_udis, &error)) == NULL) {
 		LIBHAL_FREE_DBUS_ERROR (&error);
 		goto out;
@@ -307,7 +307,7 @@ bailout_if_in_fstab (LibHalContext *hal_ctx, const char *device, const char *lab
 	/* check if /etc/fstab mentions this device... (with symlinks etc) */
 	if (! fstab_open (&handle)) {
 		printf ("cannot open /etc/fstab\n");
-		unknown_error ("Cannot open /etc/fstab");		
+		unknown_error ("Cannot open /etc/fstab");
 	}
 	while ((entry = fstab_next (handle, &_mount_point)) != NULL) {
 		char *resolved;
@@ -352,7 +352,7 @@ bailout_if_in_fstab (LibHalContext *hal_ctx, const char *device, const char *lab
 						if (mounted_vol_device_file != NULL &&
 						    strcmp (mounted_vol_device_file, device) !=0) {
 #ifdef DEBUG
-							printf ("Wanting to mount %s that has label %s, but /etc/fstab says LABEL=%s is to be mounted at mount point '%s'. However %s (that also has label %s), is already mounted at said mount point. So, skipping said /etc/fstab entry.\n", 
+							printf ("Wanting to mount %s that has label %s, but /etc/fstab says LABEL=%s is to be mounted at mount point '%s'. However %s (that also has label %s), is already mounted at said mount point. So, skipping said /etc/fstab entry.\n",
 								   device, label, label, _mount_point, mounted_vol_device_file, _mount_point);
 #endif
 							skip_fstab_entry = TRUE;
@@ -360,7 +360,7 @@ bailout_if_in_fstab (LibHalContext *hal_ctx, const char *device, const char *lab
 						libhal_volume_free (mounted_vol);
 					}
 				}
-				
+
 				if (!skip_fstab_entry) {
 					printf ("%s found in /etc/fstab. Not mounting.\n", entry);
 					permission_denied_etc_fstab (device);
@@ -400,7 +400,7 @@ device_is_mounted (const char *device, char **mount_point)
 	/* check if /proc/mounts mentions this device... (with symlinks etc) */
 	if (! mtab_open (&handle)) {
 		printf ("cannot open mount list\n");
-		unknown_error ("Cannot open /etc/mtab or equivalent");		
+		unknown_error ("Cannot open /etc/mtab or equivalent");
 	}
 	while (((entry = mtab_next (handle, mount_point)) != NULL) && (ret == FALSE)) {
 		char *resolved;
@@ -442,12 +442,12 @@ map_fstype (const char *fstype)
 }
 
 static void
-handle_mount (LibHalContext *hal_ctx, 
+handle_mount (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-	      LibPolKitContext *pol_ctx, 
+	      LibPolKitContext *pol_ctx,
 #endif
 	      const char *udi,
-	      LibHalVolume *volume, LibHalDrive *drive, const char *device, 
+	      LibHalVolume *volume, LibHalDrive *drive, const char *device,
 	      const char *invoked_by_uid, const char *invoked_by_syscon_name,
 	      DBusConnection *system_bus)
 {
@@ -502,9 +502,9 @@ handle_mount (LibHalContext *hal_ctx,
 	printf ("invoked by system bus connection = %s\n", invoked_by_syscon_name);
 #endif
 
-	if (volume != NULL) {		
+	if (volume != NULL) {
 		dbus_error_init (&error);
-		if (libhal_device_get_property_bool (hal_ctx, udi, "volume.ignore", &error) || 
+		if (libhal_device_get_property_bool (hal_ctx, udi, "volume.ignore", &error) ||
 		    dbus_error_is_set (&error)) {
 			if (dbus_error_is_set (&error)) {
 				LIBHAL_FREE_DBUS_ERROR (&error);
@@ -631,19 +631,19 @@ handle_mount (LibHalContext *hal_ctx,
 		if (strlen (mount_point) == 0) {
 			char *p;
 			const char *label;
-			
+
 			if (volume != NULL)
 				label = libhal_volume_get_label (volume);
 			else
 				label = NULL;
-			
+
 			model = libhal_drive_get_model (drive);
 			drive_type = libhal_drive_get_type_textual (drive);
 
 			if (label != NULL) {
 				/* best - use label */
 				g_strlcpy (mount_point, label, sizeof (mount_point));
-				
+
 			} else if ((model != NULL) && (strlen (model) > 0)) {
 				g_strlcpy (mount_point, model, sizeof (mount_point));
 			} else if ((drive_type != NULL) && (strlen (drive_type) > 0)) {
@@ -652,7 +652,7 @@ handle_mount (LibHalContext *hal_ctx,
 				/* fallback - use "disk" */
 				g_snprintf (mount_point, sizeof (mount_point), "disk");
 			}
-			
+
 			/* sanitize computed mount point name, e.g. replace invalid chars with '-' */
 			p = mount_point;
 			while (TRUE) {
@@ -661,7 +661,7 @@ handle_mount (LibHalContext *hal_ctx,
 					break;
 				*p = '-';
 			};
-			
+
 		} else {
 			explicit_mount_point_given = TRUE;
 		}
@@ -677,7 +677,7 @@ handle_mount (LibHalContext *hal_ctx,
 #ifdef sun
 		}
 #endif
-		
+
 		/* check if mount point is available - append number to mount point */
 		i = 0;
 		mount_dir = NULL;
@@ -705,7 +705,7 @@ handle_mount (LibHalContext *hal_ctx,
 			if (explicit_mount_point_given) {
 				mount_point_not_available (mount_dir);
 			}
-			
+
 			i++;
 		}
 	}
@@ -738,7 +738,7 @@ handle_mount (LibHalContext *hal_ctx,
 				goto option_ok;
 			}
 
-			if ((allow[allow_len - 1] == '=') && 
+			if ((allow[allow_len - 1] == '=') &&
 			    (strncmp (given, allow, allow_len) == 0) &&
 			    (int) strlen (given) > allow_len) {
 
@@ -780,12 +780,12 @@ handle_mount (LibHalContext *hal_ctx,
 		pol_is_fixed = FALSE;
 
 	pol_change_uid = FALSE;
-	/* don't consider uid= on non-pollable drives for the purpose of policy 
+	/* don't consider uid= on non-pollable drives for the purpose of policy
 	 * (since these drives normally use vfat)
 	 */
 	if (volume != NULL) {
 		/* don't consider uid= on vfat, iso9660, udf change-uid for the purpose of policy
-		 * (since these doesn't contain uid/gid bits) 
+		 * (since these doesn't contain uid/gid bits)
 		 */
 		if (strcmp (libhal_volume_get_fstype (volume), "vfat") != 0 &&
 		    strcmp (libhal_volume_get_fstype (volume), "iso9660") != 0 &&
@@ -809,12 +809,12 @@ handle_mount (LibHalContext *hal_ctx,
 	}
 
 #ifdef DEBUG
-	printf ("using privilege %s for uid %s, system_bus_connection %s\n", privilege, invoked_by_uid, 
+	printf ("using privilege %s for uid %s, system_bus_connection %s\n", privilege, invoked_by_uid,
 		invoked_by_syscon_name);
 #endif
 
 #ifdef HAVE_POLKIT
-	if (libpolkit_is_uid_allowed_for_privilege (pol_ctx, 
+	if (libpolkit_is_uid_allowed_for_privilege (pol_ctx,
 						    invoked_by_syscon_name,
 						    invoked_by_uid,
 						    privilege,
@@ -847,7 +847,7 @@ handle_mount (LibHalContext *hal_ctx,
 			printf ("Cannot create '%s'\n", mount_dir);
 			unknown_error ("Cannot create mount directory");
 		}
-		
+
 #ifdef __FreeBSD__
 		calling_uid = (uid_t) strtol (invoked_by_uid, (char **) NULL, 10);
 		pw = getpwuid (calling_uid);
@@ -899,7 +899,7 @@ handle_mount (LibHalContext *hal_ctx,
 	args[na++] = mount_dir;
 	args[na++] = NULL;
 
-	/* TODO FIXME XXX HACK: OK, so we should rewrite the options in /media/.hal-mtab .. 
+	/* TODO FIXME XXX HACK: OK, so we should rewrite the options in /media/.hal-mtab ..
 	 *                      but it doesn't really matter much at this point */
 	if (!is_remount) {
 		FILE *hal_mtab;
@@ -909,7 +909,7 @@ handle_mount (LibHalContext *hal_ctx,
 		int num_read;
 		char *hal_mtab_buf;
 		char *hal_mtab_buf_old;
-		
+
 		/* Maintain a list in /media/.hal-mtab with entries of the following format
 		 *
 		 *  <device_file>\t<uid>\t<session-id>\t<fstype>\t<options_sep_by_comma>\t<mount point>\n
@@ -922,8 +922,8 @@ handle_mount (LibHalContext *hal_ctx,
 		 *  /dev/sda4	500	0	ntfs	noexec,nosuid,nodev,umask=222	/media/Windows
 		 *  /dev/sdb1	500	0	vfat	noexec,nosuid,nodev,shortname=winnt,uid=500	/media/davidz
 		 */
-		
-		
+
+
 		if (g_file_test ("/media/.hal-mtab", G_FILE_TEST_EXISTS)) {
 			hal_mtab_orig = fopen ("/media/.hal-mtab", "r");
 			if (hal_mtab_orig == NULL) {
@@ -946,7 +946,7 @@ handle_mount (LibHalContext *hal_ctx,
 		} else {
 			hal_mtab_buf = g_strdup ("");
 		}
-		
+
 		mount_dir_escaped = g_strescape (mount_dir, NULL);
 #ifdef DEBUG
 		printf ("%d: XYA creating /media/.hal-mtab~\n", getpid ());
@@ -956,9 +956,9 @@ handle_mount (LibHalContext *hal_ctx,
 			unknown_error ("Cannot create /media/.hal-mtab~");
 		}
 		hal_mtab_buf_old = hal_mtab_buf;
-		hal_mtab_buf = g_strdup_printf ("%s%s\t%s\t0\t%s\t%s\t%s\n", 
+		hal_mtab_buf = g_strdup_printf ("%s%s\t%s\t0\t%s\t%s\t%s\n",
 						hal_mtab_buf_old,
-						device, invoked_by_uid, mount_do_fstype, 
+						device, invoked_by_uid, mount_do_fstype,
 						mount_option_commasep, mount_dir_escaped);
 		g_free (hal_mtab_buf_old);
 		if (hal_mtab_buf_old == NULL) {
@@ -974,7 +974,7 @@ handle_mount (LibHalContext *hal_ctx,
 		printf ("%d: XYA closing /media/.hal-mtab~\n", getpid ());
 #endif
 	} /* !is_remount */
-		
+
 	/* now try to mount */
 	if (!g_spawn_sync ("/",
 			   args,
@@ -1004,8 +1004,8 @@ handle_mount (LibHalContext *hal_ctx,
 		}
 
 		if (strncmp (errstr, serr, sizeof (errstr) - 1) == 0) {
-			unknown_filesystem (strlen (mount_fstype) > 0 ? 
-					    mount_fstype : 
+			unknown_filesystem (strlen (mount_fstype) > 0 ?
+					    mount_fstype :
 					    (volume != NULL ? libhal_volume_get_fstype (volume) : "") );
 		} else {
 			int n;
@@ -1119,11 +1119,11 @@ main (int argc, char *argv[])
 		if (drive == NULL) {
 			usage ();
 		} else {
-			handle_mount (hal_ctx, 
+			handle_mount (hal_ctx,
 #ifdef HAVE_POLKIT
-				      pol_ctx, 
+				      pol_ctx,
 #endif
-				      udi, NULL, drive, device, invoked_by_uid, 
+				      udi, NULL, drive, device, invoked_by_uid,
 				      invoked_by_syscon_name, system_bus);
 		}
 
@@ -1132,18 +1132,18 @@ main (int argc, char *argv[])
 		LibHalDrive *drive;
 
 		drive_udi = libhal_volume_get_storage_device_udi (volume);
-		
+
 		if (drive_udi == NULL)
 			unknown_error ("Cannot get drive_udi from volume");
 		drive = libhal_drive_from_udi (hal_ctx, drive_udi);
 		if (drive == NULL)
 			unknown_error ("Cannot get drive from hal");
-		
-		handle_mount (hal_ctx, 
+
+		handle_mount (hal_ctx,
 #ifdef HAVE_POLKIT
-			      pol_ctx, 
+			      pol_ctx,
 #endif
-			      udi, volume, drive, device, invoked_by_uid, 
+			      udi, volume, drive, device, invoked_by_uid,
 			      invoked_by_syscon_name, system_bus);
 
 	}

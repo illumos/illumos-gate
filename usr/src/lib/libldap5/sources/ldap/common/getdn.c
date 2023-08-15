@@ -239,7 +239,7 @@ ldap_explode( const char *dn, const int notypes, const int nametype )
 				 * semicolon and comma are not valid RDN
 				 * separators.
 				 */
-				if ( nametype == LDAP_RDN && 
+				if ( nametype == LDAP_RDN &&
 					( *p == ';' || *p == ',' || !goteq)) {
 					ldap_charray_free( rdns );
 					return NULL;
@@ -276,7 +276,7 @@ ldap_explode( const char *dn, const int notypes, const int nametype )
 					if ( *rdnstart == '"' ) {
 						++rdnstart;
 					}
-					
+
 					if ( *(p-1) == '"' ) {
 						endquote = 1;
 						--p;

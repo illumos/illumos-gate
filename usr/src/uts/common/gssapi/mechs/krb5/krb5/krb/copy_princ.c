@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_copy_principal()
  */
@@ -71,7 +71,7 @@ krb5_copy_principal(krb5_context context, krb5_const_principal inprinc, krb5_pri
             ((krb5_princ_component(context, tempprinc, i)->data =
 	      MALLOC(len + 1)) == 0)) {
 	    while (--i >= 0)
-		FREE(krb5_princ_component(context, tempprinc, i)->data, 
+		FREE(krb5_princ_component(context, tempprinc, i)->data,
 			krb5_princ_component(context, inprinc, i)->length + 1);
 	    FREE (tempprinc->data, nelems * sizeof(krb5_data));
 	    FREE (tempprinc,sizeof(krb5_principal_data));

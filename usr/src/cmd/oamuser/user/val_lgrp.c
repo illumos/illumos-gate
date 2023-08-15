@@ -91,7 +91,7 @@ valid_lgroup(char *list, gid_t gid)
 				grplist[ i++ ] = g_ptr->gr_gid;
 			else {
 				/* Keep out duplicates */
-				for( j = 0; j < i; j++ ) 
+				for( j = 0; j < i; j++ )
 					if( g_ptr->gr_gid == grplist[j] )
 						break;
 
@@ -100,7 +100,7 @@ valid_lgroup(char *list, gid_t gid)
 					grplist[i++] = g_ptr->gr_gid;
 			}
 			break;
-				
+
 		}
 		if (warning)
 			warningmsg(warning, ptr);

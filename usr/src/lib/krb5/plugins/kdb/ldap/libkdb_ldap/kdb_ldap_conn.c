@@ -149,9 +149,9 @@ krb5_ldap_bind(ldap_context, ldap_server_handle)
 	/* password based simple bind */
         bv.bv_val = ldap_context->bind_pwd;
         bv.bv_len = strlen(ldap_context->bind_pwd);
-        st = ldap_sasl_bind_s(ldap_server_handle->ldap_handle, 
+        st = ldap_sasl_bind_s(ldap_server_handle->ldap_handle,
                                 ldap_context->bind_dn,
-                                LDAP_SASL_SIMPLE, &bv, NULL, 
+                                LDAP_SASL_SIMPLE, &bv, NULL,
                                 NULL, NULL);
     }
     return st;
@@ -173,7 +173,7 @@ krb5_ldap_initialize(ldap_context, server_info)
 	goto err_out;
     }
     else {
-	/* 
+	/*
 	 * Solaris Kerbreros: need ldap_handle to be NULL so calls to
 	 * ldap_initialize won't leak handles
 	 */
@@ -197,7 +197,7 @@ krb5_ldap_initialize(ldap_context, server_info)
 	 */
 	if (ldap_context->root_certificate_file == NULL) {
 	    if (ldap_context->kcontext)
-		krb5_set_error_message (ldap_context->kcontext, KRB5_KDB_ACCESS_ERROR, 
+		krb5_set_error_message (ldap_context->kcontext, KRB5_KDB_ACCESS_ERROR,
 		    gettext("ldap_cert_path not set, can not create SSL connection"));
 	    st = KRB5_KDB_ACCESS_ERROR;
 	    goto err_out;

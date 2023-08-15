@@ -34,7 +34,7 @@ extern char	*getlogin();
 
 /*
  * get passwd file info for logname or uid
- *	uid	-> uid #	
+ *	uid	-> uid #
  *	name	-> address of buffer to return ascii user name
  *		This will be set to pw->pw_name.
  *

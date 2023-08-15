@@ -475,7 +475,7 @@ generic_gss_oid_compose(
     i = -1;
     while (suffix) {
 	op[i] = (unsigned char)suffix & 0x7f;
-	if (i != -1) 
+	if (i != -1)
 	    op[i] |= 0x80;
 	i--;
 	suffix >>= 7;

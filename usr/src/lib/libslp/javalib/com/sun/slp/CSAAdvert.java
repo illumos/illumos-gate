@@ -53,7 +53,7 @@ class CSAAdvert extends SrvLocMsgImpl {
 
     // Construct a CSAAdvert from the input stream.
 
-    CSAAdvert(SLPHeaderV2 hdr, DataInputStream dis) 
+    CSAAdvert(SLPHeaderV2 hdr, DataInputStream dis)
 	throws ServiceLocationException, IOException {
 	super(hdr, SrvLocHeader.SAAdvert);
 
@@ -69,7 +69,7 @@ class CSAAdvert extends SrvLocMsgImpl {
 
 	} catch (IllegalArgumentException ex) {
 
-	    throw 
+	    throw
 		new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"malformed_url",
@@ -82,9 +82,9 @@ class CSAAdvert extends SrvLocMsgImpl {
 	ServiceType serviceType = URL.getServiceType();
 
 	if (!serviceType.equals(Defaults.SA_SERVICE_TYPE)) {
-	    throw 
+	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"not_right_url",
 				new Object[] {URL, "SA"});
 
@@ -93,8 +93,8 @@ class CSAAdvert extends SrvLocMsgImpl {
 	// Parse in the scope list.
 
 	byte[] scopeBytes = hdr.getString(buf, dis);
-   
-	hdr.scopes = 
+
+	hdr.scopes =
 	    hdr.parseCommaSeparatedListIn(buf.toString(), true);
 
 	// Unescape scopes.

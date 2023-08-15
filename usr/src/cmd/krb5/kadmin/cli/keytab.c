@@ -13,14 +13,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -31,7 +31,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -68,7 +68,7 @@ static void add_usage()
 	"ktadd [-k[eytab] keytab] [-q] [-e keysaltlist] "
 	"[principal | -glob princ-exp] [...]\n");
 }
-     
+
 static void rem_usage()
 {
 	fprintf(stderr, "%s: %s\n",
@@ -78,11 +78,11 @@ static void rem_usage()
 }
 
 static int process_keytab(krb5_context my_context, char **keytab_str,
-		   krb5_keytab *keytab) 
+		   krb5_keytab *keytab)
 {
      int code;
      char buf[BUFSIZ];
-     
+
      if (*keytab_str == NULL) {
 	if (code = krb5_kt_default(my_context, keytab)) {
 		com_err(whoami, code, gettext("while opening default keytab"));
@@ -116,7 +116,7 @@ static int process_keytab(krb5_context my_context, char **keytab_str,
 	       }
 	       sprintf(*keytab_str, "WRFILE:%s", tmp);
 	  }
-	  
+
 	  code = krb5_kt_resolve(my_context, *keytab_str, keytab);
 	  if (code != 0) {
 			com_err(whoami, code,
@@ -125,11 +125,11 @@ static int process_keytab(krb5_context my_context, char **keytab_str,
 	       return 1;
 	  }
      }
-     
+
      return 0;
 }
 
-     
+
 void kadmin_keytab_add(int argc, char **argv)
 {
      krb5_keytab keytab = 0;
@@ -179,14 +179,14 @@ void kadmin_keytab_add(int argc, char **argv)
 
      if (process_keytab(context, &keytab_str, &keytab))
 	  return;
-     
+
      while (*argv) {
 	  if (strcmp(*argv, "-glob") == 0) {
 	       if (*++argv == NULL) {
 		    add_usage();
 		    break;
 	       }
-	       
+
 	       code = kadm5_get_principals(handle, *argv, &princs, &num);
 	       if (code) {
 				com_err(whoami, code,
@@ -196,11 +196,11 @@ void kadmin_keytab_add(int argc, char **argv)
 		    argv++;
 		    continue;
 	       }
-	       
-	       for (i = 0; i < num; i++) 
+
+	       for (i = 0; i < num; i++)
 		    (void) add_principal(handle, keytab_str, keytab,
 					 keepold, n_ks_tuple, ks_tuple,
-					 princs[i]); 
+					 princs[i]);
 	       kadm5_free_name_list(handle, princs, num);
 	  } else
 	       (void) add_principal(handle, keytab_str, keytab,
@@ -208,7 +208,7 @@ void kadmin_keytab_add(int argc, char **argv)
 				    *argv);
 	  argv++;
      }
-	  
+
      code = krb5_kt_close(context, keytab);
      if (code != 0)
 		com_err(whoami, code, gettext("while closing keytab"));
@@ -255,11 +255,11 @@ void kadmin_keytab_remove(int argc, char **argv)
      free(keytab_str);
 }
 
-static 
+static
 int add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
 		  krb5_boolean keepold, int n_ks_tuple,
 		  krb5_key_salt_tuple *ks_tuple,
-		  char *princ_str) 
+		  char *princ_str)
 {
      kadm5_principal_ent_rec princ_rec;
      krb5_principal princ;
@@ -422,7 +422,7 @@ cleanup:
 }
 
 int remove_principal(char *keytab_str, krb5_keytab keytab, char
-		     *princ_str, char *kvno_str) 
+		     *princ_str, char *kvno_str)
 {
      krb5_principal princ;
      krb5_keytab_entry entry;
@@ -555,7 +555,7 @@ int remove_principal(char *keytab_str, krb5_keytab keytab, char
 		    whoami, princ_str, keytab_str);
 	  return 1;
      }
-     
+
      return 0;
 }
 

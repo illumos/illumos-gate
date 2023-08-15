@@ -5,7 +5,7 @@
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -15,7 +15,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -27,14 +27,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,7 +45,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -103,7 +103,7 @@ u_int krb5_log = 0;
  * The OID of the proposed standard krb5 v2 mechanism is:
  * 	iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
  * 	krb5v2(3) = 1.2.840.113554.1.2.3
- *	
+ *
  */
 
 /*
@@ -171,10 +171,10 @@ kg_get_defcred(minor_status, cred)
      gss_cred_id_t *cred;
 {
     OM_uint32 major;
-    
-    if ((major = krb5_gss_acquire_cred(minor_status, 
-				      (gss_name_t) NULL, GSS_C_INDEFINITE, 
-				      GSS_C_NULL_OID_SET, GSS_C_INITIATE, 
+
+    if ((major = krb5_gss_acquire_cred(minor_status,
+				      (gss_name_t) NULL, GSS_C_INDEFINITE,
+				      GSS_C_NULL_OID_SET, GSS_C_INITIATE,
 				      cred, NULL, NULL)) && GSS_ERROR(major)) {
       return(major);
    }
@@ -186,37 +186,37 @@ OM_uint32
 kg_sync_ccache_name (krb5_context context, OM_uint32 *minor_status)
 {
     OM_uint32 err = 0;
-    
-    /* 
+
+    /*
      * Sync up the context ccache name with the GSSAPI ccache name.
-     * If kg_ccache_name is NULL -- normal unless someone has called 
-     * gss_krb5_ccache_name() -- then the system default ccache will 
+     * If kg_ccache_name is NULL -- normal unless someone has called
+     * gss_krb5_ccache_name() -- then the system default ccache will
      * be picked up and used by resetting the context default ccache.
      * This is needed for platforms which support multiple ccaches.
      */
-    
+
     if (!err) {
         /* if NULL, resets the context default ccache */
         err = krb5_cc_set_default_name(context,
 				       (char *) k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME));
     }
-    
+
     *minor_status = err;
     return (*minor_status == 0) ? GSS_S_COMPLETE : GSS_S_FAILURE;
 }
 
 /* This function returns whether or not the caller set a cccache name.  Used by
- * gss_acquire_cred to figure out if the caller wants to only look at this 
+ * gss_acquire_cred to figure out if the caller wants to only look at this
  * ccache or search the cache collection for the desired name */
 OM_uint32
-kg_caller_provided_ccache_name (OM_uint32 *minor_status, 
+kg_caller_provided_ccache_name (OM_uint32 *minor_status,
 int *out_caller_provided_name)
 {
     if (out_caller_provided_name) {
-        *out_caller_provided_name = 
+        *out_caller_provided_name =
 	  (k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME) != NULL);
     }
-    
+
     *minor_status = 0;
     return GSS_S_COMPLETE;
 }
@@ -229,7 +229,7 @@ kg_get_ccache_name (OM_uint32 *minor_status, const char **out_name)
     char *kg_ccache_name;
 
     kg_ccache_name = k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME);
-    
+
     if (kg_ccache_name != NULL) {
 	name = strdup(kg_ccache_name);
 	if (name == NULL)
@@ -261,7 +261,7 @@ kg_get_ccache_name (OM_uint32 *minor_status, const char **out_name)
             *out_name = name;
         }
     }
-    
+
     *minor_status = err;
     return (*minor_status == 0) ? GSS_S_COMPLETE : GSS_S_FAILURE;
 }

@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -117,7 +117,7 @@ int krb5int_utf8_charlen(const char *p)
 
 /*
  * Make sure the UTF-8 char used the shortest possible encoding
- * returns charlen if valid, 0 if not. 
+ * returns charlen if valid, 0 if not.
  *
  * Here are the valid UTF-8 encodings, taken from RFC 2279 page 4.
  * The table is slightly modified from that of the RFC.
@@ -336,7 +336,7 @@ int krb5int_utf8_copy(char* dst, const char *src)
 
     for (i=1; i<6; i++) {
 	if ((u[i] & 0xc0) != 0x80) {
-	    return i; 
+	    return i;
 	}
 	dst[i] = src[i];
     }

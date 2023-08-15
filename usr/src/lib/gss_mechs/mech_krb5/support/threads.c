@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Preliminary thread support.
  */
@@ -82,7 +82,7 @@ void krb5int_thread_detach_hook (void)
     }
 }
 
-/* Stub function not used on Windows. */ 
+/* Stub function not used on Windows. */
 int krb5int_pthread_loaded (void)
 {
     return 0;
@@ -182,15 +182,15 @@ static void thread_termination (void *tptr)
     if (err == 0) {
         int i, pass, none_found;
         struct tsd_block *t = tptr;
-        
+
         /* Make multiple passes in case, for example, a libkrb5 cleanup
             function wants to print out an error message, which causes
             com_err to allocate a thread-specific buffer, after we just
             freed up the old one.
-            
+
             Shouldn't actually happen, if we're careful, but check just in
             case.  */
-        
+
         pass = 0;
         none_found = 0;
         while (pass < 4 && !none_found) {
@@ -207,7 +207,7 @@ static void thread_termination (void *tptr)
         free (t);
         err = k5_mutex_unlock(&key_lock);
    }
-    
+
     /* remove thread from global linked list */
 }
 

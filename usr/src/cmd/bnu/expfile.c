@@ -39,7 +39,7 @@
  *	~/	-> prepended with Pubdir
  *	default	-> prepended with current directory
  *	file	-> filename to expand
- * returns: 
+ * returns:
  *	0	-> ok
  *      FAIL	-> no Wrkdir name available
  */
@@ -87,7 +87,7 @@ register char *file;
  * make all necessary directories
  *	name	-> directory to make
  *	mask	-> mask to use during directory creation
- * return: 
+ * return:
  *	0	-> success
  * 	FAIL	-> failure
  */
@@ -131,7 +131,7 @@ register char *name;
  * expand file name and check return
  * print error if it failed.
  *	file	-> file name to check
- * returns: 
+ * returns:
  *      0	-> ok
  *      FAIL	-> if expfile failed
  */

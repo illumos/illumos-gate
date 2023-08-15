@@ -24,7 +24,7 @@
 # cmd/vi/Makefile
 
 SUBDIRS=	misc port
-TXTS=		PRESERVE README 
+TXTS=		PRESERVE README
 POFILES=        $(SUBDIRS:%=%/%.po)
 
 include ../Makefile.cmd

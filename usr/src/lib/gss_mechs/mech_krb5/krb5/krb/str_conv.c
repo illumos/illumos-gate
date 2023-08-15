@@ -216,7 +216,7 @@ krb5_timestamp_to_string(krb5_timestamp timestamp, char *buffer, size_t buflen)
     int ret;
     time_t timestamp2 = timestamp;
     struct tm tmbuf;
-    const char *fmt = "%c"; /* This is to get around gcc -Wall warning that 
+    const char *fmt = "%c"; /* This is to get around gcc -Wall warning that
 			       the year returned might be two digits */
 
 #ifdef HAVE_LOCALTIME_R

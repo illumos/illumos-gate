@@ -49,7 +49,7 @@ $(ROOTLIBB) :=	FILEMODE =	$(LIBFILEMODE)
 
 .KEEP_STATE:
 
-all: $(PROG) $(XPG6) $(LIBB) 
+all: $(PROG) $(XPG6) $(LIBB)
 
 $(PROG): $(EXOBJS)
 	$(LINK.c) -o $@ $(EXOBJS) $(LDLIBS)

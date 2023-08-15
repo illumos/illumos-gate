@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = storage volume printer network-printer acpi xkb 
+SUBDIRS = storage volume printer network-printer acpi xkb
 
 all :=		TARGET= all
 install :=	TARGET= install

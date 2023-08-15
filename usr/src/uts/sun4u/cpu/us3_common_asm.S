@@ -215,7 +215,7 @@
 	 * %o3 = FLUSH_ADDR
 	 */
 	SFMMU_CPU_CNUM(%o1, %g1, %g2)		! %g1 = sfmmu cnum on this CPU
-	
+
 	ldub	[%o1 + SFMMU_CEXT], %o4		! %o4 = sfmmup->sfmmu_cext
 	sll	%o4, CTXREG_EXT_SHIFT, %o4
 	or	%g1, %o4, %g1			! %g1 = primary pgsz | cnum
@@ -227,7 +227,7 @@
 	srlx	%o2, CTXREG_NEXT_SHIFT, %o1	! need to preserve nucleus pgsz
 	sllx	%o1, CTXREG_NEXT_SHIFT, %o1	! %o1 = nucleus pgsz
 	or	%g1, %o1, %g1			! %g1 = nucleus pgsz | primary pgsz | cnum
-	stxa	%g1, [%o4]ASI_DMMU		! wr new ctxum 
+	stxa	%g1, [%o4]ASI_DMMU		! wr new ctxum
 
 	stxa	%g0, [%o0]ASI_DTLB_DEMAP
 	stxa	%g0, [%o0]ASI_ITLB_DEMAP
@@ -264,7 +264,7 @@
 	 * assumes TSBE_TAG = 0
 	 */
 	srln	%g1, MMU_PAGESHIFT, %g1
-		
+
 	sethi   %hi(ksfmmup), %g3
         ldx     [%g3 + %lo(ksfmmup)], %g3
         cmp     %g3, %g2
@@ -281,7 +281,7 @@
 	or	DEMAP_PRIMARY | DEMAP_PAGE_TYPE, %g1, %g1
 
 	SFMMU_CPU_CNUM(%g2, %g6, %g3)	! %g6 = sfmmu cnum on this CPU
-	
+
 	ldub	[%g2 + SFMMU_CEXT], %g4		! %g4 = sfmmup->cext
 	sll	%g4, CTXREG_EXT_SHIFT, %g4
 	or	%g6, %g4, %g6			! %g6 = pgsz | cnum
@@ -348,7 +348,7 @@
 	 * g3 = pgcnt
 	 */
 	SFMMU_CPU_CNUM(%g2, %g5, %g6)		! %g5 = sfmmu cnum on this CPU
-		
+
 	or	DEMAP_PRIMARY | DEMAP_PAGE_TYPE, %g1, %g1
 
 	ldub	[%g2 + SFMMU_CEXT], %g4		! %g4 = sfmmup->cext
@@ -570,7 +570,7 @@ _dispatch_status_busy:
 	ldxa	[%g0]ASI_EC_CFG_TIMING, %o0	! read Jaguar shared E$ ctrl reg
 	b	2f
 	  nop
-1:	
+1:
 	ldxa	[%g0]ASI_EC_CTRL, %o0		! read Ch/Ch+ E$ control reg
 2:
 	retl
@@ -704,7 +704,7 @@ flush_icache_1:
 	 * |  -   | DC_parity  | DC_parity  | DC_parity  | DC_parity  |
 	 * |  -   | for word 3 | for word 2 | for word 1 | for word 0 |
 	 * +------+------------+------------+------------+------------+
-	 *  63:32     31:24        23:16         15:8          7:0     
+	 *  63:32     31:24        23:16         15:8          7:0
 	 */
 	add	%o1, CH_DC_PN_DATA_PARITY - CH_DC_DATA + 7, %o1
 
@@ -723,7 +723,7 @@ flush_icache_1:
 	  add	%o3, 8, %o3
 4:
 	retl
-	  wrpr	%g0, %o5, %pstate	
+	  wrpr	%g0, %o5, %pstate
 	SET_SIZE(get_dcache_dtag)
 
 
@@ -765,7 +765,7 @@ flush_icache_1:
 	  add	%o3, 8, %o3
 
 	retl
-	  wrpr	%g0, %o5, %pstate	
+	  wrpr	%g0, %o5, %pstate
 	SET_SIZE(get_icache_dtag)
 
 /*
@@ -800,7 +800,7 @@ flush_icache_1:
 	  add	%o3, 8, %o3
 
 	retl
-	  wrpr	%g0, %o5, %pstate	
+	  wrpr	%g0, %o5, %pstate
 	SET_SIZE(get_pcache_dtag)
 
 #endif	/* CPU_IMP_L1_CACHE_PARITY */
@@ -907,7 +907,7 @@ flush_icache_1:
  * AFAR and one of the following traps is generated (provided that it
  * is enabled in External Cache Error Enable Register) to handle that
  * error:
- * 1. trap 0x70: Precise trap 
+ * 1. trap 0x70: Precise trap
  *    tt0_fecc for errors at trap level(TL)>=0
  * 2. trap 0x0A and 0x32: Deferred trap
  *    async_err for errors at TL>=0
@@ -983,7 +983,7 @@ flush_icache_1:
 /*
  * Cheetah ecc-protected E$ trap (Trap 70) at TL=0
  * tt0_fecc is replaced by fecc_err_instr in cpu_init_trap of the various
- * architecture-specific files.  
+ * architecture-specific files.
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
@@ -1122,7 +1122,7 @@ fast_ecc_err_5:
         call ptl1_panic
           mov   PTL1_BAD_ECC, %g1
 
-7:	
+7:
 	/*
 	 * Otherwise, if the logout structure was busy but we have not
 	 * nested more times than our maximum value, then we simply
@@ -1358,7 +1358,7 @@ ce_err_1:
 	 */
 	stxa	%g1, [%g0]ASI_DCU
 	flush	%g0	/* flush required after changing the IC bit */
-	
+
 	/*
 	 * Make sure our CPU logout operation was successful.
 	 */
@@ -1414,9 +1414,9 @@ ce_err_1:
 
 	SET_SIZE(ce_err_tl1)
 
-	
+
 /*
- * The async_err function handles deferred trap types 0xA 
+ * The async_err function handles deferred trap types 0xA
  * (instruction_access_error) and 0x32 (data_access_error) at TL>=0.
  *
  * AFSR errors bits which cause this trap are:
@@ -1509,8 +1509,8 @@ ce_err_1:
 	 *   %g3 = scr3
 	 *   %g4 = scr4
 	 */
-	andcc	%g5, T_TL1, %g0	
-	clr	%g6	
+	andcc	%g5, T_TL1, %g0
+	clr	%g6
 	movnz	%xcc, 1, %g6			! set %g6 if T_TL1 set
 	sllx	%g6, CLO_FLAGS_TL_SHIFT, %g6
 	sllx	%g5, CLO_FLAGS_TT_SHIFT, %g4
@@ -1524,7 +1524,7 @@ ce_err_1:
 
 	/*
 	 * If the logout struct was busy, we may need to pass the
-	 * TT, TL, and CEEN information to the TL=0 handler via 
+	 * TT, TL, and CEEN information to the TL=0 handler via
 	 * systrap parameter so save it off here.
 	 */
 	cmp	%g3, %g0
@@ -1573,7 +1573,7 @@ async_err_1:
 	 */
 	stxa	%g1, [%g0]ASI_DCU
 	flush	%g0	/* flush required after changing the IC bit */
-	
+
 	/*
 	 * Make sure our CPU logout operation was successful.
 	 */
@@ -1980,7 +1980,7 @@ ipe_tl1_skip_tt:
 3:
 	jmp	%g4 + 4
 	wrpr	%g0, %g1, %pstate	/* restore processor state */
-	
+
 	SET_SIZE(cpu_clearticknpt)
 
 
@@ -2199,7 +2199,7 @@ icache_inval_all_1:
 
 
 /*
- * cache_scrubreq_tl1 is the crosstrap handler called on offlined cpus via a 
+ * cache_scrubreq_tl1 is the crosstrap handler called on offlined cpus via a
  * crosstrap.  It atomically increments the outstanding request counter and,
  * if there was not already an outstanding request, branches to setsoftint_tl1
  * to enqueue an intr_vec for the given inum.
@@ -2479,7 +2479,7 @@ icache_inval_all_1:
 	ENTRY(copy_tsb_entry)
 	ldda	[%o0]ASI_NQUAD_LD, %o2		! %o2 = tag, %o3 = data
 	stx	%o2, [%o1]
-	stx	%o3, [%o1 + 8 ]	
+	stx	%o3, [%o1 + 8 ]
 	retl
 	nop
 	SET_SIZE(copy_tsb_entry)

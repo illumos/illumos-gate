@@ -174,7 +174,7 @@ make_seal_token_v1 (krb5_context context,
 	sign_usage = 15;
       break;
     default:
-	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, error2 signalg=%d\n", 
+	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, error2 signalg=%d\n",
 		signalg);
 #ifndef	_KERNEL
       abort ();
@@ -213,7 +213,7 @@ make_seal_token_v1 (krb5_context context,
     /* compute the checksum */
 
     /* 8 = head of token body as specified by mech spec */
-    if (! (data_ptr = (char *) xmalloc(8 + 
+    if (! (data_ptr = (char *) xmalloc(8 +
 		(bigend ? text->length : msglen)))) {
 	xfree_wrap(plain, msglen ? msglen : 1);
 	xfree_wrap(t, tlen);
@@ -247,7 +247,7 @@ make_seal_token_v1 (krb5_context context,
 			     md5cksum.contents, md5cksum.contents, 16))) {
 	xfree_wrap(md5cksum.contents, md5cksum.length);
 	xfree_wrap(t, tlen);
-	
+
 	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, kg_encrypt() "
 	        "error code=%d\n", code);
 	return code;
@@ -268,7 +268,7 @@ make_seal_token_v1 (krb5_context context,
 	{
 		KRB5_LOG1(KRB5_ERR, "make_seal_token_v1() end, error "
 				   "md5cksum.length %u != "
-				   "cksum_size %u\n", 
+				   "cksum_size %u\n",
 				   (unsigned int)md5cksum.length,
 				   (unsigned int) cksum_size);
 #ifndef	_KERNEL
@@ -316,11 +316,11 @@ make_seal_token_v1 (krb5_context context,
 	      xfree_wrap(plain, msglen ? msglen : 1);
 	      xfree_wrap(t, tlen);
 	      return(code);
-	    }	      
+	    }
 	  for (i = 0; i <= 15; i++)
 	    ((char *) enc_key->contents)[i] ^=0xf0;
 	  code = kg_arcfour_docrypt (context, enc_key, 0,
-				     bigend_seqnum, 4, 
+				     bigend_seqnum, 4,
 				     plain, tmsglen,
 				     ptr+14+cksum_size);
 	  krb5_free_keyblock (context, enc_key);

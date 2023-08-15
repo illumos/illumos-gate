@@ -120,7 +120,7 @@ profile_init_path(const_profile_filespec_list_t filepath,
 		if (*s == ':')
 			n_entries++;
 	}
-	
+
 	/* the array is NULL terminated */
 	filenames = (profile_filespec_t*) malloc((n_entries+1) * sizeof(char*));
 	if (filenames == 0)
@@ -148,7 +148,7 @@ profile_init_path(const_profile_filespec_list_t filepath,
 	/* cap the array */
 	filenames[i] = 0;
 
-	retval = profile_init((const_profile_filespec_t *) filenames, 
+	retval = profile_init((const_profile_filespec_t *) filenames,
 			      ret_profile);
 
 	/* count back down and free the entries */
@@ -163,13 +163,13 @@ profile_is_writable(profile_t profile, int *writable)
 {
     if (!profile || profile->magic != PROF_MAGIC_PROFILE)
         return PROF_MAGIC_PROFILE;
-    
-    if (!writable) 
+
+    if (!writable)
         return EINVAL;
-    
+
     if (profile->first_file)
         *writable = (profile->first_file->data->flags & PROFILE_FILE_RW);
-    
+
     return 0;
 }
 
@@ -178,13 +178,13 @@ profile_is_modified(profile_t profile, int *modified)
 {
     if (!profile || profile->magic != PROF_MAGIC_PROFILE)
         return PROF_MAGIC_PROFILE;
-    
-    if (!modified) 
+
+    if (!modified)
         return EINVAL;
-    
+
     if (profile->first_file)
         *modified = (profile->first_file->data->flags & PROFILE_FILE_DIRTY);
-    
+
     return 0;
 }
 
@@ -361,19 +361,19 @@ errcode_t profile_ser_internalize(const char *unused, profile_t *profilep,
 		(void) unpack_int32(&tmp, &bp, &remain);
 	else
 		tmp = 0;
-	
+
 	if (tmp != PROF_MAGIC_PROFILE) {
 		retval = EINVAL;
 		goto cleanup;
 	}
-	
+
 	(void) unpack_int32(&fcount, &bp, &remain);
 	retval = ENOMEM;
 
 	flist = (profile_filespec_t *) malloc(sizeof(profile_filespec_t) * (fcount + 1));
 	if (!flist)
 		goto cleanup;
-	
+
 	memset(flist, 0, sizeof(char *) * (fcount+1));
 	for (i=0; i<fcount; i++) {
 		if (!unpack_int32(&tmp, &bp, &remain)) {
@@ -393,13 +393,13 @@ errcode_t profile_ser_internalize(const char *unused, profile_t *profilep,
 		goto cleanup;
 	}
 
-	if ((retval = profile_init((const_profile_filespec_t *) flist, 
+	if ((retval = profile_init((const_profile_filespec_t *) flist,
 				   profilep)))
 		goto cleanup;
-	
+
 	*bufpp = bp;
 	*remainp = remain;
-    
+
 cleanup:
 	if (flist) {
 		for (i=0; i<fcount; i++) {
@@ -448,7 +448,7 @@ profile_get_options_boolean(profile, section, options)
 		else
 		    *(options[i].value) = 0;
 		options[i].found = 1;
-			
+
 		}
 	}
 	free(actual_section);

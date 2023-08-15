@@ -44,7 +44,7 @@ GSList *hotplug_events_in_progress = NULL;
 
 static void hotplug_event_begin (HotplugEvent *hotplug_event);
 
-void 
+void
 hotplug_event_end (void *end_token)
 {
 	HotplugEvent *hotplug_event = (HotplugEvent *) end_token;
@@ -96,9 +96,9 @@ hotplug_event_begin_devfs_add (HotplugEvent *hotplug_event, HalDevice *d)
 	if (begin_add_func == NULL) {
 		begin_add_func = hotplug_event_begin_add_devinfo;
 	}
-	begin_add_func (hotplug_event->d, 
+	begin_add_func (hotplug_event->d,
 			 parent,
-			 hotplug_event->un.devfs.handler, 
+			 hotplug_event->un.devfs.handler,
 			 (void *) hotplug_event);
 	 return;
 
@@ -119,8 +119,8 @@ hotplug_event_begin_devfs_remove (HotplugEvent *hotplug_event, HalDevice *d)
 	}
 	HAL_INFO (("hotplug_event_begin_devfs_remove %s", hal_device_get_udi (d)));
 
-	hotplug_event_begin_remove_devinfo(d, 
-			 hotplug_event->un.devfs.devfs_path, 
+	hotplug_event_begin_remove_devinfo(d,
+			 hotplug_event->un.devfs.devfs_path,
 			 (void *) hotplug_event);
 }
 
@@ -162,7 +162,7 @@ hotplug_event_begin (HotplugEvent *hotplug_event)
 	}
 }
 
-void 
+void
 hotplug_event_enqueue (HotplugEvent *hotplug_event, int front)
 {
 	if (hotplug_event_queue == NULL)
@@ -175,12 +175,12 @@ hotplug_event_enqueue (HotplugEvent *hotplug_event, int front)
 	}
 }
 
-void 
+void
 hotplug_event_process_queue (void)
 {
 	HotplugEvent *hotplug_event;
 
-	if (hotplug_events_in_progress == NULL && 
+	if (hotplug_events_in_progress == NULL &&
 	    (hotplug_event_queue == NULL || g_queue_is_empty (hotplug_event_queue))) {
 		hotplug_queue_now_empty ();
 		goto out;
@@ -198,5 +198,5 @@ hotplug_event_process_queue (void)
 	hotplug_event_begin (hotplug_event);
 
 out:
-	;	
+	;
 }

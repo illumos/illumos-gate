@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -265,7 +265,7 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		}
 
 
-		/* if the value is negative, r3 has a 2's complement 
+		/* if the value is negative, r3 has a 2's complement
 		 * high value */
 		r3b = (int)(r3 >>32);
 		while (r3b > 0) {
@@ -321,7 +321,7 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 }
 
 /* Compute the square of polynomial a, reduce modulo p224. Store the
- * result in r.  r could be a.  Uses optimized modular reduction for p224. 
+ * result in r.  r could be a.  Uses optimized modular reduction for p224.
  */
 mp_err
 ec_GFp_nistp224_sqr(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -362,7 +362,7 @@ ec_GFp_nistp224_div(const mp_int *a, const mp_int *b, mp_int *r,
 	if (a == NULL) {
 		return  mp_invmod(b, &meth->irr, r);
 	} else {
-		/* MPI doesn't support divmod, so we implement it using invmod and 
+		/* MPI doesn't support divmod, so we implement it using invmod and
 		 * mulmod. */
 		MP_CHECKOK(mp_init(&t, FLAG(b)));
 		MP_CHECKOK(mp_invmod(b, &meth->irr, &t));

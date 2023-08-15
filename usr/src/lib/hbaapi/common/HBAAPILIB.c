@@ -105,7 +105,7 @@ int _hbaapi_sysloginit = 0;
 	}\
     }
 #endif /* WIN32*/
- 
+
 #else /* Not both USESYSLOG and USELOGFILE */
 #if defined(USESYSLOG)
 int _hbaapi_sysloginit = 0;
@@ -145,11 +145,11 @@ FILE *_hbaapi_debug_fd = NULL;
 #endif /* WIN32 */
 #endif /* USELOGFILE */
 #endif /* Not both USELOGFILE and USESYSLOG */
- 
+
 #ifdef POSIX_THREADS
 #include <pthread.h>
 /*
- * When multiple mutex's are grabed, they must be always be grabbed in 
+ * When multiple mutex's are grabed, they must be always be grabbed in
  * the same order, or deadlock can result.  There are three levels
  * of mutex's involved in this API.  If LL_mutex is grabbed, always grap
  * it first.  If AL_mutex is grabbed, it may not be grabbed before
@@ -170,16 +170,16 @@ FILE *_hbaapi_debug_fd = NULL;
 #define RELEASE_MUTEX(M)
 #define RELEASE_MUTEX_RETURN(M,RET)	return(RET)
 #endif
- 
+
 /*
- * Vendor library information 
+ * Vendor library information
  */
 typedef enum {
     HBA_LIBRARY_UNKNOWN,
     HBA_LIBRARY_LOADED,
     HBA_LIBRARY_NOT_LOADED
 } HBA_LIBRARY_STATUS;
- 
+
 typedef struct hba_library_info {
     struct hba_library_info
 			*next;
@@ -368,7 +368,7 @@ freevendorhandlelist(HBA_VENDORCALLBACK_ELEM *vhlist) {
 
     for(vhlp = vhlist; vhlp != NULL; vhlp = vnext) {
 	vnext = vhlp->next;
-	registeredfunc = 
+	registeredfunc =
 	    vhlp->lib_info->functionTable.RemoveCallbackHandler;
 	if(registeredfunc == NULL) {
 	    continue;
@@ -434,7 +434,7 @@ local_remove_callback(HBA_CALLBACKHANDLE cbhandle) {
     GRAB_MUTEX(&_hbaapi_AAE_mutex);
     /* if it wasnt in the simple lists, look in the list for adapteraddevents */
     lap = &_hbaapi_adapteraddevents_callback_list;
-    for(allcbp = _hbaapi_adapteraddevents_callback_list; 
+    for(allcbp = _hbaapi_adapteraddevents_callback_list;
 	allcbp != NULL;
 	allcbp = allcbp->next) {
 	if(cbhandle != (HBA_CALLBACKHANDLE)allcbp) {
@@ -443,7 +443,7 @@ local_remove_callback(HBA_CALLBACKHANDLE cbhandle) {
 	}
 	for(vhlp = allcbp->vendorhandlelist; vhlp != NULL; vhlp = vnext) {
 	    vnext = vhlp->next;
-	    registeredfunc = 
+	    registeredfunc =
 		vhlp->lib_info->functionTable.RemoveCallbackHandler;
 	    if(registeredfunc == NULL) {
 		continue;
@@ -547,7 +547,7 @@ HBA_LoadLibrary(void) {
      */
     for (i = 0; ; i++) {
 	dwSize = 255;	/* how big the buffer is */
-	lStatus = RegEnumKeyEx(hkSniaHba, i, 
+	lStatus = RegEnumKeyEx(hkSniaHba, i,
 			       (char *)&cSubKeyName, &dwSize, NULL,
 			       NULL, NULL, &ftLastWriteTime);
 	if (lStatus == ERROR_NO_MORE_ITEMS) {
@@ -722,7 +722,7 @@ HBA_LoadLibrary(void) {
 	    (strlen(librarypath) == 0)) {
 	    continue;
 	}
-	/* 
+	/*
 	 * Special case....
 	 * Look for loglevel
 	 */
@@ -790,7 +790,7 @@ HBA_LoadLibrary(void) {
 	}
 
 	/* successfully loaded library */
-	if((GetVersionFunc = lib_infop->functionTable.GetVersionHandler) 
+	if((GetVersionFunc = lib_infop->functionTable.GetVersionHandler)
 	   == NULL) {
 	    continue;
 	}
@@ -818,7 +818,7 @@ HBA_LoadLibrary(void) {
 	/* Initialize this library */
 	if((status = ((LoadLibraryFunc)())) != HBA_STATUS_OK) {
 	    /* maybe this should be a printf so that we CANNOT miss it */
-	    fprintf(stderr, 
+	    fprintf(stderr,
 		    "HBA_LoadLibrary: Encounterd and error loading: %s",
 		    librarypath);
 	    DEBUG(0, "Encounterd and error loading: %s", librarypath, 0, 0);
@@ -939,7 +939,7 @@ HBA_FreeLibrary(void) {
 
     RELEASE_MUTEX(&_hbaapi_AL_mutex);
     RELEASE_MUTEX(&_hbaapi_LL_mutex);
-    
+
 #ifdef USESYSLOG
     closelog();
 #endif
@@ -969,7 +969,7 @@ HBA_FreeLibrary(void) {
     DeleteCriticalSection(&_hbaapi_TE_mutex);
     DeleteCriticalSection(&_hbaapi_LE_mutex);
 #endif
-    
+
     return HBA_STATUS_OK;
 }
 
@@ -1016,10 +1016,10 @@ HBA_GetNumberOfAdapters(void) {
 	}
 	num_adapters = ((GetNumberOfAdaptersFunc)());
 #ifndef WIN32
-	DEBUG(1, "HBAAPI: num_adapters for %s = %d\n", 
+	DEBUG(1, "HBAAPI: num_adapters for %s = %d\n",
 	      lib_infop->LibraryName, num_adapters, 0);
 #else
-	DEBUG(1, "HBAAPI: num_adapters for %s = %d\n", 
+	DEBUG(1, "HBAAPI: num_adapters for %s = %d\n",
 	      lib_infop->LibraryPath, num_adapters, 0);
 #endif
 
@@ -1068,7 +1068,7 @@ HBA_GetNumberOfAdapters(void) {
 		adapt_infop->name = strdup(adaptername);
 	    } else {
 		char dummyname[512];
-		sprintf(dummyname, "NULLADAPTER-%s-%03d", 
+		sprintf(dummyname, "NULLADAPTER-%s-%03d",
 			lib_infop->LibraryPath, _hbaapi_total_adapter_count);
 		dummyname[255] = '\0';
 		adapt_infop->name = strdup(dummyname);
@@ -1108,7 +1108,7 @@ HBA_GetAdapterName(
 	adapt_infop = adapt_infop->next) {
 
 	if(adapt_infop->index == adapterindex) {
-	    if(adapt_infop->name != NULL && 
+	    if(adapt_infop->name != NULL &&
 	       adapt_infop->GNstatus == HBA_STATUS_OK) {
 		strcpy(adaptername, adapt_infop->name);
 	    } else {
@@ -1204,7 +1204,7 @@ HBA_OpenAdapterByWWN(HBA_HANDLE *phandle, HBA_WWN nodeWWN) {
 
 	/* look for new hardware */
 	(void) ((GetNumberOfAdaptersFunc)());
- 
+
 	OpenAdapterFunc = lib_infop->functionTable.OpenAdapterByWWNHandler;
 	if (OpenAdapterFunc == NULL) {
 	    continue;
@@ -1237,7 +1237,7 @@ HBA_GetVersion() {
     return HBA_LIBVERSION;
 }
 
-/* 
+/*
  * This function is VERY OS dependent.  Wing it as best you can.
  */
 HBA_UINT32
@@ -1402,7 +1402,7 @@ HBA_RegisterForAdapterAddEvents (
      * callback.  We will grap the mutex later to attach the vendor handle list
      * to the callback structure */
     RELEASE_MUTEX(&_hbaapi_AAE_mutex);
-    
+
 
     /*
      * now create a list of vendors (vendor libraryies, NOT ADAPTERS) that have
@@ -1476,7 +1476,7 @@ HBA_RegisterForAdapterAddEvents (
     } else {
 	/* we have had atleast some success, now finish up */
 	GRAB_MUTEX(&_hbaapi_AAE_mutex);
-	/* this seems silly, but what if another thread called 
+	/* this seems silly, but what if another thread called
 	 * the callback remove */
 	for(cbp = _hbaapi_adapteraddevents_callback_list;
 	    cbp != NULL; cbp = cbp->next) {
@@ -1492,7 +1492,7 @@ HBA_RegisterForAdapterAddEvents (
 	    /* bummer, somebody removed the callback before we finished
 	     * registration, probably will never happen */
 	    freevendorhandlelist(vendorhandlelist);
-	    DEBUG(0, 
+	    DEBUG(0,
 		  "HBA_RegisterForAdapterAddEvents: HBA_RemoveCallback was "
 		  "called for a handle before registration was finished.",
 		  0, 0, 0);
@@ -1513,7 +1513,7 @@ adapterevents_callback (void *data,
 
     DEBUG(3, "AdapterEvent, port:%s, eventType:%d", WWN2STR1(&PortWWN),
 	  eventType, 0);
-    
+
     GRAB_MUTEX(&_hbaapi_AE_mutex);
     for(acbp = _hbaapi_adapterevents_callback_list;
 	acbp != NULL;
@@ -1562,7 +1562,7 @@ HBA_RegisterForAdapterEvents (
      * caller, and as userdata to the vendor call so that on
      * callback the specific registration may be recalled
      */
-    acbp = (HBA_ADAPTERCALLBACK_ELEM *) 
+    acbp = (HBA_ADAPTERCALLBACK_ELEM *)
 	calloc(1, sizeof(HBA_ADAPTERCALLBACK_ELEM));
     if(acbp == NULL) {
 #ifndef WIN32
@@ -1604,7 +1604,7 @@ adapterportevents_callback (void *data,
 
     DEBUG(3, "AdapterPortEvent, port:%s, eventType:%d fabricPortID:0X%06x",
 	  WWN2STR1(&PortWWN), eventType, fabricPortID);
-    
+
     GRAB_MUTEX(&_hbaapi_APE_mutex);
 
     for(acbp = _hbaapi_adapterportevents_callback_list;
@@ -1646,7 +1646,7 @@ HBA_RegisterForAdapterPortEvents (
     CHECKLIBRARY();
     /* we now have the _hbaapi_LL_mutex */
 
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.RegisterForAdapterPortEventsHandler;
     if(registeredfunc == NULL) {
 	RELEASE_MUTEX_RETURN(&_hbaapi_LL_mutex, HBA_STATUS_ERROR_NOT_SUPPORTED);
@@ -1657,7 +1657,7 @@ HBA_RegisterForAdapterPortEvents (
      * caller, and as userdata to the vendor call so that on
      * callback the specific registration may be recalled
      */
-    acbp = (HBA_ADAPTERCALLBACK_ELEM *) 
+    acbp = (HBA_ADAPTERCALLBACK_ELEM *)
 	calloc(1, sizeof(HBA_ADAPTERCALLBACK_ELEM));
     if(acbp == NULL) {
 #ifndef WIN32
@@ -1701,7 +1701,7 @@ adapterportstatevents_callback (void *data,
 
     DEBUG(3, "AdapterPortStateEvent, port:%s, eventType:%d", WWN2STR1(&PortWWN),
 	  eventType, 0);
-    
+
     GRAB_MUTEX(&_hbaapi_APSE_mutex);
     for(acbp = _hbaapi_adapterportstatevents_callback_list;
 	acbp != NULL;
@@ -1733,7 +1733,7 @@ HBA_RegisterForAdapterPortStatEvents (
     HBA_LIBRARY_INFO		*lib_infop;
     HBA_HANDLE			vendorHandle;
 
-    DEBUG(2, "HBA_RegisterForAdapterPortStatEvents for port: %s", 
+    DEBUG(2, "HBA_RegisterForAdapterPortStatEvents for port: %s",
 	  WWN2STR1(&PortWWN), 0, 0);
 
     if (callbackHandle == NULL) {
@@ -1754,7 +1754,7 @@ HBA_RegisterForAdapterPortStatEvents (
      * caller, and as userdata to the vendor call so that on
      * callback the specific registration may be recalled
      */
-    acbp = (HBA_ADAPTERCALLBACK_ELEM *) 
+    acbp = (HBA_ADAPTERCALLBACK_ELEM *)
 	calloc(1, sizeof(HBA_ADAPTERCALLBACK_ELEM));
     if(acbp == NULL) {
 #ifndef WIN32
@@ -1800,7 +1800,7 @@ targetevents_callback (void *data,
 
     DEBUG(3, "TargetEvent, hbaPort:%s, discoveredPort:%s eventType:%d",
 	  WWN2STR1(&hbaPortWWN), WWN2STR2(&discoveredPortWWN), eventType);
-    
+
     GRAB_MUTEX(&_hbaapi_TE_mutex);
     for(acbp = _hbaapi_targetevents_callback_list;
 	acbp != NULL;
@@ -1835,7 +1835,7 @@ HBA_RegisterForTargetEvents (
     HBA_STATUS		status;
     HBA_LIBRARY_INFO	*lib_infop;
     HBA_HANDLE		vendorHandle;
-    
+
     DEBUG(2, "HBA_RegisterForTargetEvents, hbaPort: %s, discoveredPort: %s",
 	  WWN2STR1(&hbaPortWWN), WWN2STR2(&discoveredPortWWN), 0);
 
@@ -1856,7 +1856,7 @@ HBA_RegisterForTargetEvents (
      * caller, and as userdata to the vendor call so that on
      * callback the specific registration may be recalled
      */
-    acbp = (HBA_ADAPTERCALLBACK_ELEM *) 
+    acbp = (HBA_ADAPTERCALLBACK_ELEM *)
 	calloc(1, sizeof(HBA_ADAPTERCALLBACK_ELEM));
     if(acbp == NULL) {
 #ifndef WIN32
@@ -1902,7 +1902,7 @@ linkevents_callback (void *data,
 
     DEBUG(3, "LinkEvent, hbaWWN:%s, eventType:%d",
 	  WWN2STR1(&adapterWWN), eventType, 0);
-    
+
     GRAB_MUTEX(&_hbaapi_LE_mutex);
     for(acbp = _hbaapi_linkevents_callback_list;
 	acbp != NULL;
@@ -1955,7 +1955,7 @@ HBA_RegisterForLinkEvents (
      * caller, and as userdata to the vendor call so that on
      * callback the specific registration may be recalled
      */
-    acbp = (HBA_ADAPTERCALLBACK_ELEM *) 
+    acbp = (HBA_ADAPTERCALLBACK_ELEM *)
 	calloc(1, sizeof(HBA_ADAPTERCALLBACK_ELEM));
     if(acbp == NULL) {
 #ifndef WIN32
@@ -2017,7 +2017,7 @@ HBA_CloseAdapter(HBA_HANDLE handle) {
 HBA_STATUS
 HBA_GetAdapterAttributes (
     HBA_HANDLE		handle,
-    HBA_ADAPTERATTRIBUTES 
+    HBA_ADAPTERATTRIBUTES
 			*hbaattributes)
 {
     HBA_STATUS		status;
@@ -2028,7 +2028,7 @@ HBA_GetAdapterAttributes (
     DEBUG(2, "HBA_GetAdapterAttributes", 0, 0, 0);
 
     CHECKLIBRARY();
-    GetAdapterAttributesFunc = 
+    GetAdapterAttributesFunc =
 	lib_infop->functionTable.GetAdapterAttributesHandler;
     if (GetAdapterAttributesFunc != NULL) {
 	status = ((GetAdapterAttributesFunc)(vendorHandle, hbaattributes));
@@ -2053,7 +2053,7 @@ HBA_GetAdapterPortAttributes (
     DEBUG(2, "HBA_GetAdapterPortAttributes", 0, 0, 0);
 
     CHECKLIBRARY();
-    GetAdapterPortAttributesFunc = 
+    GetAdapterPortAttributesFunc =
 	lib_infop->functionTable.GetAdapterPortAttributesHandler;
     if (GetAdapterPortAttributesFunc != NULL) {
 	status = ((GetAdapterPortAttributesFunc)
@@ -2066,7 +2066,7 @@ HBA_GetAdapterPortAttributes (
 
 HBA_STATUS
 HBA_GetPortStatistics (
-    HBA_HANDLE		handle, 
+    HBA_HANDLE		handle,
     HBA_UINT32		portindex,
     HBA_PORTSTATISTICS	*portstatistics)
 {
@@ -2079,7 +2079,7 @@ HBA_GetPortStatistics (
     DEBUG(2, "HBA_GetPortStatistics", 0, 0, 0);
 
     CHECKLIBRARY();
-    GetPortStatisticsFunc = 
+    GetPortStatisticsFunc =
 	lib_infop->functionTable.GetPortStatisticsHandler;
     if (GetPortStatisticsFunc != NULL) {
 	status = ((GetPortStatisticsFunc)
@@ -2092,9 +2092,9 @@ HBA_GetPortStatistics (
 
 HBA_STATUS
 HBA_GetDiscoveredPortAttributes (
-    HBA_HANDLE		handle, 
-    HBA_UINT32		portindex, 
-    HBA_UINT32		discoveredportindex, 
+    HBA_HANDLE		handle,
+    HBA_UINT32		portindex,
+    HBA_UINT32		discoveredportindex,
     HBA_PORTATTRIBUTES	*portattributes)
 {
     HBA_STATUS		status;
@@ -2106,11 +2106,11 @@ HBA_GetDiscoveredPortAttributes (
     DEBUG(2, "HBA_GetDiscoveredPortAttributes", 0, 0, 0);
 
     CHECKLIBRARY();
-    GetDiscoveredPortAttributesFunc = 
+    GetDiscoveredPortAttributesFunc =
 	lib_infop->functionTable.GetDiscoveredPortAttributesHandler;
     if (GetDiscoveredPortAttributesFunc != NULL)  {
 	status = ((GetDiscoveredPortAttributesFunc)
-		  (vendorHandle, portindex, discoveredportindex, 
+		  (vendorHandle, portindex, discoveredportindex,
 		   portattributes));
     } else {
 	status = HBA_STATUS_ERROR_NOT_SUPPORTED;
@@ -2133,7 +2133,7 @@ HBA_GetPortAttributesByWWN (
     DEBUG(2, "HBA_GetPortAttributesByWWN: %s", WWN2STR1(&PortWWN), 0, 0);
 
     CHECKLIBRARY();
-    GetPortAttributesByWWNFunc = 
+    GetPortAttributesByWWNFunc =
 	lib_infop->functionTable.GetPortAttributesByWWNHandler;
     if (GetPortAttributesByWWNFunc != NULL) {
 	status = ((GetPortAttributesByWWNFunc)
@@ -2335,7 +2335,7 @@ HBA_RefreshInformation (HBA_HANDLE handle) {
 
     status = HBA_CheckLibrary(handle, &lib_infop, &vendorHandle);
     if(status == HBA_STATUS_OK) {
-	RefreshInformationFunc = 
+	RefreshInformationFunc =
 	    lib_infop->functionTable.RefreshInformationHandler;
 	if (RefreshInformationFunc != NULL) {
 	    ((RefreshInformationFunc)(vendorHandle));
@@ -2400,7 +2400,7 @@ HBA_GetFcpTargetMappingV2 (
     DEBUG(2, "HBA_GetFcpTargetMapping", 0, 0, 0);
 
     CHECKLIBRARY();
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.GetFcpTargetMappingV2Handler;
     if (registeredfunc != NULL) {
 	status = ((registeredfunc)(vendorHandle, hbaPortWWN, pmapping));
@@ -2906,7 +2906,7 @@ HBA_RemovePersistentBinding (
     DEBUG(2, "HBA_RemovePersistentBinding", 0, 0, 0);
 
     CHECKLIBRARY();
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.RemovePersistentBindingHandler;
     if (registeredfunc != NULL) {
 	status =(registeredfunc)(vendorHandle, hbaPortWWN, pbinding);
@@ -2930,7 +2930,7 @@ HBA_RemoveAllPersistentBindings (
     DEBUG(2, "HBA_RemoveAllPersistentBindings", 0, 0, 0);
 
     CHECKLIBRARY();
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.RemoveAllPersistentBindingsHandler;
     if (registeredfunc != NULL) {
 	status =(registeredfunc)(vendorHandle, hbaPortWWN);
@@ -2956,7 +2956,7 @@ HBA_GetFC4Statistics (
     DEBUG(2, "HBA_GetFC4Statistics port: %s", WWN2STR1(&portWWN), 0, 0);
 
     CHECKLIBRARY();
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.GetFC4StatisticsHandler;
     if (registeredfunc != NULL) {
 	status =(registeredfunc)
@@ -2982,7 +2982,7 @@ HBA_GetFCPStatistics (
     DEBUG(2, "HBA_GetFCPStatistics", 0, 0, 0);
 
     CHECKLIBRARY();
-    registeredfunc = 
+    registeredfunc =
 	lib_infop->functionTable.GetFCPStatisticsHandler;
     if (registeredfunc != NULL) {
 	status =(registeredfunc)(vendorHandle, lunit, pstatistics);
@@ -3042,7 +3042,7 @@ HBA_GetVendorLibraryAttributes (
 	    }
 	    if (attributes->LibPath[0] == '\0') {
 		if(strlen(adapt_infop->library->LibraryPath) < 256) {
-		    strcpy(attributes->LibPath, 
+		    strcpy(attributes->LibPath,
 			   adapt_infop->library->LibraryPath);
 		}
 	    }

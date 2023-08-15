@@ -20,24 +20,24 @@
 
 typedef struct _txp_hsi_t {
     fw_version_t version;
-    u32_t cu_rate_limiter_enable;  
-    u32_t min_rto_tick;    
-    u32_t max_rto_tick;    
-    u32_t txp_os_flag;                  
+    u32_t cu_rate_limiter_enable;
+    u32_t min_rto_tick;
+    u32_t max_rto_tick;
+    u32_t txp_os_flag;
         #define OS_LH      (1<<0)
     u32_t invalid_ctx_cnt;               // unknown context type entries
     u32_t cmpl_cnt;            // count of tx completion
-    u32_t non_zero_slot_cnt; 
-    u32_t txp_cid_last;              
-    u32_t txp_oubits;                
-    u32_t txpq_protocol_flags; 
-    u32_t txp_append_context;   
-    u32_t txp_overide_catchup; 
+    u32_t non_zero_slot_cnt;
+    u32_t txp_cid_last;
+    u32_t txp_oubits;
+    u32_t txpq_protocol_flags;
+    u32_t txp_append_context;
+    u32_t txp_overide_catchup;
     u32_t txp_comxq_seq;
     u32_t tsch_reset;
     u32_t iscsi_ctx_num_tasks;          // size of task array in iSCSI context
     u32_t iscsi_ctx_num_ccells;         // size of command queue in iSCSI context
-    u32_t txp_tdbcThrhld;                                       
+    u32_t txp_tdbcThrhld;
     u32_t num_retx_flushes;             // number of retransmit flush
     u64_t volatile idle_count;
     u64_t volatile idle_tdma;
@@ -49,11 +49,11 @@ typedef struct _txp_hsi_t {
     u32_t neg_slot_cnt;
     u32_t sws_prevention_ticks;  // sws (silly window syndrome) prevention timer (in Timer1 tick resolution)
     u32_t tx_after_fin_cnt;      // number of tx occurs after FIN
-    u32_t mtu_size;      
-    u32_t bd_validation;      
+    u32_t mtu_size;
+    u32_t bd_validation;
 } txp_hsi_t;
 
-// This the default cache line parameter that used by tcp nagle alogrithm 
+// This the default cache line parameter that used by tcp nagle alogrithm
 #define DEFAULT_TDBCTRHLD           29    /* 29 cached line free */
 #define NAGLE_TDBCTRHLD             22    /* 22 cached line free */
 
@@ -61,8 +61,8 @@ typedef struct _txp_hsi_t {
 #define TXP_HSI_OFFSETOFF(m)  (OFFSETOF(txp_hsi_t,m) + 0x10)
 #define TXP_HSI_SIZEOF(m)     (sizeof (((txp_hsi_t *)0)->m))
 
-// Calling the following macro will actually get optimized during compile 
-// time. Its sole purpose is to ensure HSI variables cannot be modified/moved 
+// Calling the following macro will actually get optimized during compile
+// time. Its sole purpose is to ensure HSI variables cannot be modified/moved
 // unnoticed   scratch[8192]  0x60000  (RW/Reset: undefined)
 #define TEST_TXP_HSI(){                                                    \
 if (0){                                                                    \

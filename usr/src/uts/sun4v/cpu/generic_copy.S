@@ -419,7 +419,7 @@
 	mov     %i1,    %o0     ! store destination address for flushing
 
 	/*
-	 * Copying exactly one page and PAGESIZE is in mutliple of 0x80. 
+	 * Copying exactly one page and PAGESIZE is in mutliple of 0x80.
 	 */
 1:
 	ldx	[%i0+0x0], %l0
@@ -553,7 +553,7 @@
 #define	SAVED_LOFAULT		%g6
 
 /*
- * Generic copyio fault handler.  This is the first line of defense when a 
+ * Generic copyio fault handler.  This is the first line of defense when a
  * fault occurs in (x)copyin/(x)copyout.  In order for this to function
  * properly, the value of the 'real' lofault handler should be in REAL_LOFAULT.
  * This allows us to share common code for all the flavors of the copy
@@ -709,7 +709,7 @@
 	nop
 	!
 	! Something is left - do it byte for byte.
-	! 
+	!
 	ba,pt	%ncc, .dcocl
 	ldub	[%o0 + %o3], %o4	! load next byte
 	!
@@ -873,7 +873,7 @@
 	lduba	[%o0 + %o3]ASI_USER, %o4
 	!
 	! We're done. Go home.
-	!	
+	!
 	membar	#Sync
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]
 	retl
@@ -1030,13 +1030,13 @@
 	ldn	[THREAD_REG + T_LOFAULT], %o5
 	or	%o4, %lo(.little_err), %o4
 	membar	#Sync				! sync error barrier
-	stn	%o4, [THREAD_REG + T_LOFAULT]	
+	stn	%o4, [THREAD_REG + T_LOFAULT]
 
 	subcc	%g0, %o2, %o3
 	add	%o0, %o2, %o0
 	bz,pn	%ncc, 2f		! check for zero bytes
 	sub	%o2, 1, %o4
-	add	%o0, %o4, %o0		! start w/last byte	
+	add	%o0, %o4, %o0		! start w/last byte
 	add	%o1, %o2, %o1
 	lduba	[%o0+%o3]ASI_AIUSL, %o4
 
@@ -1201,7 +1201,7 @@
 1:
 	tst	%o5
 	membar #Sync
-	bne,pn	%ncc, 3f		
+	bne,pn	%ncc, 3f
 	andncc	%o5, LOFAULT_SET, %o5
 2:
 	!
@@ -1270,7 +1270,7 @@
 	bz,pt	%ncc, .bzero_blk
 	sub	%o3, 0x40, %o3		! -(bytes till block aligned)
 	add	%o1, %o3, %o1		! o1 is the remainder
-	
+
 	! Clear -(%o3) bytes till block aligned
 1:
 	stxa	%g0, [%o0]%asi
@@ -1367,7 +1367,7 @@
 	ba	.byteclr
 	nop
 
-.wdalign:			
+.wdalign:
 	andcc	%o0, 3, %o3		! is add aligned on a word boundary
 	bz,pn	%ncc, .wdclr
 	andn	%o1, 3, %o3		! create word sized count in %o3

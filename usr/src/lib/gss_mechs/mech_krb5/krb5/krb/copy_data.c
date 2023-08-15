@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_copy_data()
  */
@@ -42,7 +42,7 @@ krb5_copy_data(krb5_context context, const krb5_data *indata, krb5_data **outdat
 	*outdata = 0;
 	return 0;
     }
-    
+
     if (!(tempdata = (krb5_data *)malloc(sizeof(*tempdata))))
 	return ENOMEM;
 
@@ -60,7 +60,7 @@ krb5_copy_data(krb5_context context, const krb5_data *indata, krb5_data **outdat
     return 0;
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_copy_data_contents(krb5_context context, const krb5_data *indata, krb5_data *outdata)
 {
     if (!indata) {

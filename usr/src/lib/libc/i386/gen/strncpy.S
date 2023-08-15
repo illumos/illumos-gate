@@ -39,13 +39,13 @@
 /	{
 /		char	*os1 = s1;
 /
-/		n++; 
+/		n++;
 /		while ((--n != 0) && ((*s1++ = *s2++) != '\0'))
 /			;
 /		if (n != 0)
 /			while (--n != 0)
-/				*s1++ = '\0'; 
-/		return (os1); 
+/				*s1++ = '\0';
+/		return (os1);
 /	}
 /
 / In this assembly language version, the following expression is used
@@ -126,7 +126,7 @@
 	shrl	$2, %ecx		/ %ecx = words to copy null bytes
 	rep ; sstol			/ rep;sstol is optimal
 	andl	$3, %esi		/ %esi = leftover bytes
-.L6:	
+.L6:
 	cmpl	$0, %esi		/ if number of bytes == 0
 	jz	.L7			/ goto .L7 (finished)
 	movb	$0, (%edi)		/ move a null byte to (%edi)

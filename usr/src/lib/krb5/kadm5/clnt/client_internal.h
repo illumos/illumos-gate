@@ -29,7 +29,7 @@
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
  * $Header$
- * 
+ *
  * $Log$
  * Revision 1.1  1996/07/24 22:22:43  tlyu
  * 	* Makefile.in, configure.in: break out client lib into a

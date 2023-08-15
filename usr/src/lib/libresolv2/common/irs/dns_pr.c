@@ -140,7 +140,7 @@ pr_bynumber(struct irs_pr *this, int num) {
 	sprintf(numstr, "%d", num);
 	if (!(hes_list = hesiod_resolve(dns->hes_ctx, numstr, "protonum")))
 		return (NULL);
-	
+
 	proto = parse_hes_list(this, hes_list);
 	hesiod_free_list(dns->hes_ctx, hes_list);
 	return (proto);
@@ -190,7 +190,7 @@ parse_hes_list(struct irs_pr *this, char **hes_list) {
 	char *p, *cp, **cpp, **new;
 	int num = 0;
 	int max = 0;
-	
+
 	for (cpp = hes_list; *cpp; cpp++) {
 		cp = *cpp;
 
@@ -248,7 +248,7 @@ parse_hes_list(struct irs_pr *this, char **hes_list) {
 		pvt->proto.p_aliases[num] = NULL;
 		return (&pvt->proto);
 	}
-	
+
  cleanup:
 	if (pvt->proto.p_aliases) {
 		free(pvt->proto.p_aliases);

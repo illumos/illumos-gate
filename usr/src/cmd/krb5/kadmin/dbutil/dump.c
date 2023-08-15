@@ -31,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,7 +45,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Dump a KDC database
  */
@@ -82,7 +82,7 @@ static int	recursive;
 #define	PEEKC()		(*sp)
 #define	UNGETC(c)	(--sp)
 #define	RETURN(c)	return(c)
-#define	ERROR(c)	
+#define	ERROR(c)
 #define	RE_BUF_SIZE	1024
 #include <regexp.h>
 #endif	/* !HAVE_REGCOMP && HAVE_REGEXP_H */
@@ -319,7 +319,7 @@ static const char ctx_err_fmt[] =
 	gettext("%s: cannot initialize Kerberos context\n");
 static const char stdin_name[] =
 	gettext("standard input");
-static const char remaster_err_fmt[] = 
+static const char remaster_err_fmt[] =
 	gettext("while re-encoding keys for principal %s with new master key");
 static const char restfail_fmt[] =
 	gettext("%s: %s restore failed\n");
@@ -522,7 +522,7 @@ name_matches(name, arglist)
 	 * Compile the regular expression.
 	 */
 	compile(arglist->names[i],
-		regexp_buffer, 
+		regexp_buffer,
 		&regexp_buffer[RE_BUF_SIZE],
 		'\0');
 	if (step(name, regexp_buffer)) {
@@ -578,7 +578,7 @@ find_enctype(dbentp, enctype, salttype, kentp)
 	*kentp = datap;
 	return(0);
     }
-    return(ENOENT);    
+    return(ENOENT);
 }
 
 #if 0
@@ -641,7 +641,7 @@ dump_k5beta_iterator(ptr, entry)
 	    return retval;
 	}
     }
-    
+
     /*
      * If we don't have any match strings, or if our name matches, then
      * proceed with the dump, otherwise, just forget about it.
@@ -820,7 +820,7 @@ dump_k5beta6_iterator_ext(ptr, entry, kadm)
 	    return retval;
 	}
     }
-    
+
     /*
      * If we don't have any match strings, or if our name matches, then
      * proceed with the dump, otherwise, just forget about it.
@@ -867,7 +867,7 @@ dump_k5beta6_iterator_ext(ptr, entry, kadm)
 		  break;
 	     }
 	}
-	
+
 	if (counter + skip == entry->n_tl_data) {
 	    /* Pound out header */
 	    fprintf(arg->ofile, "%d\t%d\t%d\t%d\t%d\t%s\t",
@@ -938,7 +938,7 @@ dump_k5beta6_iterator_ext(ptr, entry, kadm)
 	else {
 			fprintf(stderr, gettext(sdump_tl_inc_err),
 		    arg->programname, name, counter+skip,
-		    (int) entry->n_tl_data); 
+		    (int) entry->n_tl_data);
 	    retval = EINVAL;
 	}
     }
@@ -986,7 +986,7 @@ dump_iprop_iterator(ptr, entry)
 	    return retval;
 	}
     }
-    
+
     /*
      * If we don't have any match strings, or if our name matches, then
      * proceed with the dump, otherwise, just forget about it.
@@ -1015,7 +1015,7 @@ dump_iprop_iterator(ptr, entry)
 	counter = 0;
 	for (tlp = entry->tl_data; tlp; tlp = tlp->tl_data_next)
 		  counter++;
-	
+
 	if (counter == entry->n_tl_data) {
 	    /* Pound out header */
 	    fprintf(arg->ofile, "%d\t%d\t%d\t%d\t%d\t%s\t",
@@ -1095,7 +1095,7 @@ dump_iprop_iterator(ptr, entry)
 		} else {
 			fprintf(stderr, gettext(sdump_tl_inc_err),
 		    arg->programname, name, counter,
-		    (int) entry->n_tl_data); 
+		    (int) entry->n_tl_data);
 	    retval = EINVAL;
 	}
     }
@@ -1145,7 +1145,7 @@ dump_k5beta7_princ_ext(ptr, entry, kadm)
       */
      if (!arg->nnames || name_matches(name, arg)) {
 	  fprintf(arg->ofile, "princ\t");
-	  
+
 	  /* save the callee from matching the name again */
 	  tmp_nnames = arg->nnames;
 	  arg->nnames = 0;
@@ -1191,7 +1191,7 @@ dump_iprop_princ(ptr, entry)
       */
      if (!arg->nnames || name_matches(name, arg)) {
 	  fprintf(arg->ofile, "princ\t");
-	  
+
 	  /* save the callee from matching the name again */
 	  tmp_nnames = arg->nnames;
 	  arg->nnames = 0;
@@ -1224,17 +1224,17 @@ void dump_k5beta7_policy(void *data, osa_policy_ent_t entry)
 static void print_key_data(FILE *f, krb5_key_data *key_data)
 {
      int c;
-     
+
      fprintf(f, "%d\t%d\t", key_data->key_data_type[0],
 	     key_data->key_data_length[0]);
-     for(c = 0; c < key_data->key_data_length[0]; c++) 
+     for(c = 0; c < key_data->key_data_length[0]; c++)
 	  fprintf(f, "%02x ",
 		  key_data->key_data_contents[0][c]);
 }
 
 /*
  * Function: print_princ
- * 
+ *
  * Purpose: output osa_adb_princ_ent data in a human
  *	    readable format (which is a format suitable for
  *	    ovsec_adm_import consumption)
@@ -1247,13 +1247,13 @@ static void print_key_data(FILE *f, krb5_key_data *key_data)
  *
  * Requires:
  *	nuttin
- * 
+ *
  * Effects:
  *	writes data to the specified file pointerp.
  *
  * Modifies:
  *	nuttin
- * 
+ *
  */
 static krb5_error_code dump_ov_princ(krb5_pointer ptr, krb5_db_entry *kdb)
 {
@@ -1288,7 +1288,7 @@ static krb5_error_code dump_ov_princ(krb5_pointer ptr, krb5_db_entry *kdb)
 	 return(KADM5_XDR_FAILURE);
     }
     xdr_destroy(&xdrs);
-    
+
     krb5_unparse_name(arg->kcontext, kdb->princ, &princstr);
     fprintf(arg->ofile, "princ\t%s\t", princstr);
     if(adb.policy == NULL)
@@ -1359,7 +1359,7 @@ dump_db(argc, argv)
     /* Solaris Kerberos: adding support for -rev/recurse flags */
     int			db_arg_index = 0;
     char		*db_args[3] = {NULL, NULL, NULL};
-	
+
     /*
      * Parse the arguments.
      */
@@ -1476,13 +1476,13 @@ dump_db(argc, argv)
 	    }
 	    if (!new_mkey_file)
 		    printf(gettext("Please enter new master key....\n"));
-	    if ((retval = krb5_db_fetch_mkey(util_context, master_princ, 
+	    if ((retval = krb5_db_fetch_mkey(util_context, master_princ,
 					     global_params.enctype,
-					     (new_mkey_file == 0) ? 
-					        (krb5_boolean) 1 : 0, 
-					     TRUE, 
+					     (new_mkey_file == 0) ?
+					        (krb5_boolean) 1 : 0,
+					     TRUE,
 					     new_mkey_file, 0,
-					     &new_master_key))) { 
+					     &new_master_key))) {
 		    /* Solaris Kerberos */
 		    com_err(progname, retval,
 			    gettext("while reading new master key"));
@@ -1501,7 +1501,7 @@ dump_db(argc, argv)
 	/*
 	 * Make sure that we don't open and truncate on the fopen,
 	 * since that may hose an on-going kprop process.
-	 * 
+	 *
 	 * We could also control this by opening for read and
 	 * write, doing an flock with LOCK_EX, and then
 	 * truncating the file once we have gotten the lock,
@@ -1564,7 +1564,7 @@ dump_db(argc, argv)
 
 	if (dump->header[strlen(dump->header)-1] != '\n')
 	     fputc('\n', arglist.ofile);
-	
+
 	/* Solaris Kerberos: adding support for -rev/recurse flags */
 	/* don't pass in db_args if there aren't any */
 	if ((kret = krb5_db_iterate(util_context,
@@ -1581,7 +1581,7 @@ dump_db(argc, argv)
 	}
 	if (dump->dump_policy &&
 	    (kret = krb5_db_iter_policy( util_context, "*", dump->dump_policy,
-					 &arglist))) { 
+					 &arglist))) {
 	     /* Solaris Kerberos */
 	     fprintf(stderr, gettext(dumprec_err),
 		progname, dump->name,
@@ -1826,16 +1826,16 @@ process_k5beta_record(fname, kcontext, filep, verbose, linenop)
 	if ((name = (char *) malloc((size_t) (name_len + 1))) &&
 	    (mod_name = (char *) malloc((size_t) (mod_name_len + 1))) &&
 	    (!key_len ||
-	     (pkey->key_data_contents[0] = 
+	     (pkey->key_data_contents[0] =
 	      (krb5_octet *) malloc((size_t) (key_len + 1)))) &&
 	    (!alt_key_len ||
-	     (akey->key_data_contents[0] = 
+	     (akey->key_data_contents[0] =
 	      (krb5_octet *) malloc((size_t) (alt_key_len + 1)))) &&
 	    (!salt_len ||
-	     (pkey->key_data_contents[1] = 
+	     (pkey->key_data_contents[1] =
 	      (krb5_octet *) malloc((size_t) (salt_len + 1)))) &&
 	    (!alt_salt_len ||
-	     (akey->key_data_contents[1] = 
+	     (akey->key_data_contents[1] =
 	      (krb5_octet *) malloc((size_t) (alt_salt_len + 1))))
 	    ) {
 	    error = 0;
@@ -1882,7 +1882,7 @@ process_k5beta_record(fname, kcontext, filep, verbose, linenop)
 			error++;
 		    }
 	    }
-	      
+
 	    /* Read principal attributes */
 	    if (!error && (fscanf(filep,
 				  "\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t",
@@ -1960,7 +1960,7 @@ process_k5beta_record(fname, kcontext, filep, verbose, linenop)
 			error++;
 		    }
 	    }
-	      
+
 	    /* Read alternate salt type */
 	    if (!error && (fscanf(filep, "\t%u\t", &tmpint1) != 1)) {
 		try2read = read_asalt_type;
@@ -1986,7 +1986,7 @@ process_k5beta_record(fname, kcontext, filep, verbose, linenop)
 		if (!error)
 		    find_record_end(filep, fname, *linenop);
 	    }
-	
+
 	    /*
 	     * If no error, then we're done reading.  Now parse the names
 	     * and store the database dbent.
@@ -2229,7 +2229,7 @@ process_k5beta6_record(fname, kcontext, filep, verbose, linenop)
 				    XDR xdrs;
 				    osa_princ_ent_rec osa_princ_ent;
 
-				    /* 
+				    /*
 				     * Assuming aux_attributes will always be
 				     * there
 				     */
@@ -2394,7 +2394,7 @@ process_k5beta6_record(fname, kcontext, filep, verbose, linenop)
     return(retval);
 }
 
-static int 
+static int
 process_k5beta7_policy(fname, kcontext, filep, verbose, linenop, pol_db)
     char		*fname;
     krb5_context	kcontext;
@@ -2433,7 +2433,7 @@ process_k5beta7_policy(fname, kcontext, filep, verbose, linenop, pol_db)
     }
     if (verbose)
 		fprintf(stderr, gettext("created policy %s\n"), rec.name);
-    
+
     return 0;
 }
 
@@ -2525,7 +2525,7 @@ restore_dump(programname, kcontext, dumpfile, f, verbose, dump)
     int			verbose;
     dump_version	*dump;
 {
-    int		error;	
+    int		error;
     int		lineno;
 
     error = 0;
@@ -2535,7 +2535,7 @@ restore_dump(programname, kcontext, dumpfile, f, verbose, dump)
      * Process the records.
      */
     while (!(error = (*dump->load_record)(dumpfile,
-					  kcontext, 
+					  kcontext,
 					  f,
 					  verbose,
 					  &lineno)))
@@ -2675,7 +2675,7 @@ load_db(argc, argv)
 			/* Solaris Kerberos */
 			fprintf(stderr, gettext(dfile_err_fmt),
 			    progname, dumpfile,
-		     error_message(errno)); 
+		     error_message(errno));
 	     exit_status++;
 	     return;
 	}
@@ -2761,14 +2761,14 @@ load_db(argc, argv)
 	     exit(1);
 	 }
     }
-    
+
     /*
      * If not an update restoration, create the database. otherwise open
      */
     if (!update) {
 	if((kret = krb5_db_create(kcontext, db5util_db_args))) {
 	    const char *emsg = krb5_get_error_message(kcontext, kret);
-	    /* 
+	    /*
 	     * See if something (like DAL KDB plugin) has set a specific error
 	     * message and use that otherwise use default.
 	     */
@@ -2792,10 +2792,10 @@ load_db(argc, argv)
 	    /*
 	     * Initialize the database.
 	     */
-	    if ((kret = krb5_db_open(kcontext, db5util_db_args, 
+	    if ((kret = krb5_db_open(kcontext, db5util_db_args,
 				     KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN))) {
 		const char *emsg = krb5_get_error_message(kcontext, kret);
-		/* 
+		/*
 		 * See if something (like DAL KDB plugin) has set a specific
 		 * error message and use that otherwise use default.
 		 */
@@ -2820,7 +2820,7 @@ load_db(argc, argv)
      * the update fails.
      */
     if ((kret = krb5_db_lock(kcontext, update?KRB5_DB_LOCKMODE_PERMANENT: KRB5_DB_LOCKMODE_EXCLUSIVE))) {
-	/* 
+	/*
 	 * Ignore a not supported error since there is nothing to do about it
 	 * anyway.
 	 */
@@ -2834,7 +2834,7 @@ load_db(argc, argv)
     } else {
 	db_locked = 1;
     }
-    
+
 	if (log_ctx && log_ctx->iproprole) {
 		if (add_update)
 			caller = FKCOMMAND;
@@ -2862,7 +2862,7 @@ load_db(argc, argv)
 		 */
 		if (!update) {
                         memset(log_ctx->ulog, 0, sizeof (kdb_hlog_t));
- 
+
                         log_ctx->ulog->kdb_hmagic = KDB_HMAGIC;
                         log_ctx->ulog->db_version_num = KDB_VERSION;
                         log_ctx->ulog->kdb_state = KDB_STABLE;
@@ -2897,7 +2897,7 @@ load_db(argc, argv)
 	 /* error message printed by create_magic_princs */
 	 exit_status++;
     }
-    
+
     if (db_locked && (kret = krb5_db_unlock(kcontext))) {
 	 /* change this error? */
 		/* Solaris Kerberos */
@@ -2919,7 +2919,7 @@ load_db(argc, argv)
 
     if (exit_status == 0 && !update) {
 	kret = krb5_db_promote(kcontext, db5util_db_args);
-	/* 
+	/*
 	 * Ignore a not supported error since there is nothing to do about it
 	 * anyway.
 	 */
@@ -2941,7 +2941,7 @@ error:
     if (!update) {
 	 if (exit_status) {
 	      kret = krb5_db_destroy(kcontext, db5util_db_args);
-	      /* 
+	      /*
 	       * Ignore a not supported error since there is nothing to do about
 	       * it anyway.
 	       */

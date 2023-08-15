@@ -49,7 +49,7 @@
 
 static int		icsubstr(char *s1, char *s2);
 
-void 
+void
 receipt(struct message *mp)
 {
 	char	head[LINESIZE];
@@ -93,7 +93,7 @@ receipt(struct message *mp)
 	}
 }
 
-static int 
+static int
 icsubstr(char *s1, char *s2)
 {
 	char	buf[LINESIZE];

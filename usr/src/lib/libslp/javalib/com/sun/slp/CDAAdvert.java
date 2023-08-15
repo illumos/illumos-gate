@@ -56,7 +56,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 
     // Construct a CDAAdvert from the input stream.
 
-    CDAAdvert(SrvLocHeader hdr, DataInputStream dis) 
+    CDAAdvert(SrvLocHeader hdr, DataInputStream dis)
 	throws ServiceLocationException, IOException {
 	super(hdr, SrvLocHeader.DAAdvert);
 
@@ -90,7 +90,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 	// Parse in the scope list.
 
 	byte[] scopeBytes = hdr.getString(buf, dis);
-   
+
 	hdr.scopes = hdr.parseCommaSeparatedListIn(buf.toString(), true);
 
 	// Unescape scope strigns.
@@ -152,7 +152,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 
 	} catch (IllegalArgumentException ex) {
 
-	    throw 
+	    throw
 		new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"malformed_url",
@@ -165,9 +165,9 @@ class CDAAdvert extends SrvLocMsgImpl {
 	ServiceType serviceType = URL.getServiceType();
 
 	if (!serviceType.equals(Defaults.DA_SERVICE_TYPE)) {
-	    throw 
+	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"not_right_url",
 				new Object[] {URL, "DA"});
 
@@ -178,7 +178,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 	hdr.iNumReplies = 1;
     }
 
-      
+
     // Get the timestamp.
 
     static private long getInt32(SrvLocHeader hdr,
@@ -224,7 +224,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 
     void setIsUnsolicited(boolean flag) {
 
-    }	
+    }
 
     // Calcualte DA URL lifetime, based on active discovery interval and
     //  granularity.
@@ -252,7 +252,7 @@ class CDAAdvert extends SrvLocMsgImpl {
 	    int lifetime = disInt + granInt;
 
 	    return
-		(lifetime > ServiceURL.LIFETIME_MAXIMUM ? 
+		(lifetime > ServiceURL.LIFETIME_MAXIMUM ?
 		 ServiceURL.LIFETIME_MAXIMUM:lifetime);
 
 	}

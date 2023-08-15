@@ -25,14 +25,14 @@
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
-PROG= killall 
+PROG= killall
 
 include ../Makefile.cmd
 
 FILEMODE=555
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)

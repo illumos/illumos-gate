@@ -60,14 +60,14 @@
 	be	%ncc, .cmpeq
 	prefetch [%o0], #one_read
 	prefetch [%o1], #one_read
-	
+
 	! for small counts byte compare immediately
 	cmp	%o2, 48
 	bleu,a 	%ncc, .bytcmp
 	mov	%o2, %o3		! o3 <= 48
-	
-	! Count > 48. We will byte compare (8 + num of bytes to dbl align) 
-	! bytes. We assume that most miscompares will occur in the 1st 8 bytes 
+
+	! Count > 48. We will byte compare (8 + num of bytes to dbl align)
+	! bytes. We assume that most miscompares will occur in the 1st 8 bytes
 
 	prefetch [%o0 + (1 * BLOCK_SIZE)], #one_read
 	prefetch [%o1 + (1 * BLOCK_SIZE)], #one_read
@@ -106,7 +106,7 @@
         ! double word compare - using ldd and faligndata. Compares upto
         ! 8 byte multiple count and does byte compare for the residual.
 
-.dwcmp: 
+.dwcmp:
 	prefetch [%o0 + (2 * BLOCK_SIZE)], #one_read
 	prefetch [%o1 + (2 * BLOCK_SIZE)], #one_read
 
@@ -128,7 +128,7 @@
         faligndata %d0, %d2, %d8
 	fcmpne32 %d6, %d8, %o5
 	fsrc1	%d6, %d6		! 2 fsrc1's added since o5 cannot
-	fsrc1	%d8, %d8		! be used for 3 cycles else we 
+	fsrc1	%d8, %d8		! be used for 3 cycles else we
 	fmovd	%d2, %d0		! create 9 bubbles in the pipeline
 	brnz,a,pn %o5, 6f
 	sub     %o1, %o0, %o1           ! o1 gets the difference
@@ -150,16 +150,16 @@
         deccc   %o2
         bgeu,a	%ncc, 5b
         ldub    [%o0], %o4
-	
+
 	and     %o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
 	wr      %o3, %g0, %fprs         ! fprs = o3 - restore fprs
 	retl
-	sub	%g0, %g0, %o0		! strings compare equal 
-        
+	sub	%g0, %g0, %o0		! strings compare equal
+
 .dnoteq:
 	and     %o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
 	wr      %o3, %g0, %fprs         ! fprs = o3 - restore fprs
 	retl
 	sub	%o4, %o5, %o0		! return(*s1 - *s2)
-        
+
 	SET_SIZE(memcmp)

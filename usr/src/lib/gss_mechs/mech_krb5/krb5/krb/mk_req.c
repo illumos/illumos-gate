@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_mk_req() routine.
  */
@@ -44,7 +44,7 @@
  TGS request with default parameters is used in an attempt to obtain
  such credentials, and they are stored in ccache.
 
- kdc_options specifies the options requested for the 
+ kdc_options specifies the options requested for the
  ap_req_options specifies the KRB_AP_REQ options desired.
 
  checksum specifies the checksum to be used in the authenticator.
@@ -65,7 +65,7 @@ krb5_mk_req(krb5_context context, krb5_auth_context *auth_context,
     krb5_creds 		* credsp;
     krb5_creds 		  creds;
 
-    retval = krb5_sname_to_principal(context, hostname, service, 
+    retval = krb5_sname_to_principal(context, hostname, service,
 				     KRB5_NT_SRV_HST, &server);
     if (retval)
       return retval;
@@ -84,7 +84,7 @@ krb5_mk_req(krb5_context context, krb5_auth_context *auth_context,
 				       ccache, &creds, &credsp)) != 0)
 	goto cleanup_creds;
 
-    retval = krb5_mk_req_extended(context, auth_context, ap_req_options, 
+    retval = krb5_mk_req_extended(context, auth_context, ap_req_options,
 				  in_data, credsp, outbuf);
 
     krb5_free_creds(context, credsp);

@@ -153,7 +153,7 @@ res_findzonecut(res_state statp, const char *dname, ns_class class, int opts,
 	int result, i;
 	union res_sockaddr_union *u;
 
-	
+
 	opts |= RES_IPV4ONLY;
 	opts &= ~RES_IPV6ONLY;
 

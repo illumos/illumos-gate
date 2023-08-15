@@ -43,7 +43,7 @@ all: $(PROG) $(XPG4)
 
 install: all $(ROOTPROG) $(ROOTXPG4PROG)
 
-$(PROG): $(RMOBJ) 
+$(PROG): $(RMOBJ)
 	$(LINK.c) $(RMOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

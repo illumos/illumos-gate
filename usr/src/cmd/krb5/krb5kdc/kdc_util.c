@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Utility functions for the KDC implementation.
  */
@@ -104,7 +104,7 @@ concat_authorization_data(krb5_authdata **first, krb5_authdata **second,
     if (second)
 	for (ptr = second; *ptr; ptr++)
 	    i++;
-    
+
     retdata = (krb5_authdata **)malloc((i+1)*sizeof(*retdata));
     if (!retdata)
 	return ENOMEM;
@@ -172,7 +172,7 @@ comp_cksum(krb5_context kcontext, krb5_data *source, krb5_ticket *ticket,
     krb5_error_code 	  retval;
     krb5_boolean	  valid;
 
-    if (!krb5_c_valid_cksumtype(his_cksum->checksum_type)) 
+    if (!krb5_c_valid_cksumtype(his_cksum->checksum_type))
 	return KRB5KDC_ERR_SUMTYPE_NOSUPP;
 
     /* must be collision proof */
@@ -191,7 +191,7 @@ comp_cksum(krb5_context kcontext, krb5_data *source, krb5_ticket *ticket,
     return(0);
 }
 
-krb5_error_code 
+krb5_error_code
 kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 		    krb5_data *pkt, krb5_ticket **ticket,
 		    krb5_keyblock **subkey)
@@ -221,7 +221,7 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     scratch1.data = (char *)(*tmppa)->contents;
     if ((retval = decode_krb5_ap_req(&scratch1, &apreq)))
 	return retval;
-    
+
     if (isflagset(apreq->ap_options, AP_OPTS_USE_SESSION_KEY) ||
 	isflagset(apreq->ap_options, AP_OPTS_MUTUAL_REQUIRED)) {
 	krb5_klog_syslog(LOG_INFO, "TGS_REQ: SESSION KEY or MUTUAL");
@@ -232,11 +232,11 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     /* If the "server" principal in the ticket is not something
        in the local realm, then we must refuse to service the request
        if the client claims to be from the local realm.
-       
+
        If we don't do this, then some other realm's nasty KDC can
        claim to be authenticating a client from our realm, and we'll
        give out tickets concurring with it!
-       
+
        we set a flag here for checking below.
        */
     if ((krb5_princ_realm(kdc_context, apreq->ticket->server)->length !=
@@ -264,18 +264,18 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 */
 
     /*
-     * XXX This is currently wrong but to fix it will require making a 
+     * XXX This is currently wrong but to fix it will require making a
      * new keytab for groveling over the kdb.
      */
 /*
     retval = krb5_auth_con_setuseruserkey(kdc_context, auth_context, key);
     krb5_free_keyblock(kdc_context, key);
-    if (retval) 
+    if (retval)
 	goto cleanup_auth_context;
 */
 
-    if ((retval = krb5_rd_req_decoded_anyflag(kdc_context, &auth_context, apreq, 
-				      apreq->ticket->server, 
+    if ((retval = krb5_rd_req_decoded_anyflag(kdc_context, &auth_context, apreq,
+				      apreq->ticket->server,
 				      kdc_active_realm->realm_keytab,
 				      NULL, ticket))) {
 #ifdef USE_RCACHE
@@ -302,9 +302,9 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 		    goto cleanup_auth_context;
 	    }
 	} else
-	    goto cleanup_auth_context; 
+	    goto cleanup_auth_context;
 #else
-	goto cleanup_auth_context; 
+	goto cleanup_auth_context;
 #endif
     }
 
@@ -325,13 +325,13 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 
     /* Check for a checksum */
     if (!(his_cksum = authenticator->checksum)) {
-	retval = KRB5KRB_AP_ERR_INAPP_CKSUM; 
+	retval = KRB5KRB_AP_ERR_INAPP_CKSUM;
 	goto cleanup_authenticator;
     }
 
     /* make sure the client is of proper lineage (see above) */
     if (foreign_server) {
-	krb5_data *tkt_realm = krb5_princ_realm(kdc_context, 
+	krb5_data *tkt_realm = krb5_princ_realm(kdc_context,
 						(*ticket)->enc_part2->client);
 	krb5_data *tgs_realm = krb5_princ_realm(kdc_context, tgs_server);
 	if (tkt_realm->length == tgs_realm->length &&
@@ -345,7 +345,7 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 
     /*
      * Check application checksum vs. tgs request
-     * 	 
+     *
      * We try checksumming the req-body two different ways: first we
      * try reaching into the raw asn.1 stream (if available), and
      * checksum that directly; if that fails, then we try encoding
@@ -354,7 +354,7 @@ kdc_process_tgs_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     if (pkt && (fetch_asn1_field((unsigned char *) pkt->data,
 				 1, 4, &scratch1) >= 0)) {
 	if (comp_cksum(kdc_context, &scratch1, *ticket, his_cksum)) {
-	    if (!(retval = encode_krb5_kdc_req_body(request, &scratch))) 
+	    if (!(retval = encode_krb5_kdc_req_body(request, &scratch)))
 	        retval = comp_cksum(kdc_context, scratch, *ticket, his_cksum);
 	    krb5_free_data(kdc_context, scratch);
 	}
@@ -375,8 +375,8 @@ cleanup:
     return retval;
 }
 
-/* XXX This function should no longer be necessary. 
- * The KDC should take the keytab associated with the realm and pass that to 
+/* XXX This function should no longer be necessary.
+ * The KDC should take the keytab associated with the realm and pass that to
  * the krb5_rd_req_decode(). --proven
  *
  * It's actually still used by do_tgs_req() for u2u auth, and not too
@@ -459,13 +459,13 @@ check_hot_list(krb5_ticket *ticket)
 #define MAX_REALM_LN 500
 
 
-/* 
+/*
  * subrealm - determine if r2 is a subrealm of r1
  *
- *            SUBREALM takes two realms, r1 and r2, and 
- *            determines if r2 is a subrealm of r1.   
+ *            SUBREALM takes two realms, r1 and r2, and
+ *            determines if r2 is a subrealm of r1.
  *            r2 is a subrealm of r1 if (r1 is a prefix
- *            of r2 AND r1 and r2 begin with a /) or if 
+ *            of r2 AND r1 and r2 begin with a /) or if
  *            (r1 is a suffix of r2 and neither r1 nor r2
  *            begin with a /).
  *
@@ -497,7 +497,7 @@ subrealm(char *r1, char *r2)
  *                   ticket granting ticket on which the new ticket to
  *                   be issued is based (note that this is the same as
  *                   the realm of the server listed in the ticket
- *                   granting ticket. 
+ *                   granting ticket.
  *
  * ASSUMPTIONS:  This procedure assumes that the transited field from
  *               the existing ticket granting ticket already appears
@@ -528,21 +528,21 @@ subrealm(char *r1, char *r2)
  *
  * MODIFIES:  new_trans:  ->length will contain the length of the new
  *                        transited field.
- * 
+ *
  *                        If ->data was not null when this procedure
  *                        is called, the memory referenced by ->data
- *                        will be deallocated. 
+ *                        will be deallocated.
  *
  *                        Memory will be allocated for the new transited field
  *                        ->data will be updated to point to the newly
- *                        allocated memory.  
+ *                        allocated memory.
  *
  * BUGS:  The space allocated for the new transited field is the
  *        maximum that might be needed given the old transited field,
  *        and the realm to be added.  This length is calculated
  *        assuming that no compression of the new realm is possible.
  *        This has no adverse consequences other than the allocation
- *        of more space than required.  
+ *        of more space than required.
  *
  *        This procedure will not yet use the null subfield notation,
  *        and it will get confused if it sees it.
@@ -563,7 +563,7 @@ data2string (krb5_data *d)
     return s;
 }
 
-krb5_error_code 
+krb5_error_code
 add_to_transited(krb5_data *tgt_trans, krb5_data *new_trans,
 		 krb5_principal tgs, krb5_principal client,
 		 krb5_principal server)
@@ -597,7 +597,7 @@ add_to_transited(krb5_data *tgt_trans, krb5_data *new_trans,
   /* Keep track of start so we can free */
   otrans_ptr = otrans;
 
-  /* +1 for null, 
+  /* +1 for null,
      +1 for extra comma which may be added between
      +1 for potential space when leading slash in realm */
   if (!(trans = (char *) malloc(strlen(realm) + strlen(otrans) + 3))) {
@@ -851,7 +851,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 		    const char **status)
 {
     int		errcode;
-    
+
     /*
      * If an option is set that is only allowed in TGS requests, complain.
      */
@@ -889,7 +889,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
     }
 
     /*
-     * If the client requires password changing, then only allow the 
+     * If the client requires password changing, then only allow the
      * pwchange service.
      */
     if (isflagset(client.attributes, KRB5_KDB_REQUIRES_PWCHANGE) &&
@@ -900,13 +900,13 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 
     /* Client and server must allow postdating tickets */
     if ((isflagset(request->kdc_options, KDC_OPT_ALLOW_POSTDATE) ||
-	 isflagset(request->kdc_options, KDC_OPT_POSTDATED)) && 
+	 isflagset(request->kdc_options, KDC_OPT_POSTDATED)) &&
 	(isflagset(client.attributes, KRB5_KDB_DISALLOW_POSTDATED) ||
 	 isflagset(server.attributes, KRB5_KDB_DISALLOW_POSTDATED))) {
 	*status = "POSTDATE NOT ALLOWED";
 	return(KDC_ERR_CANNOT_POSTDATE);
     }
-    
+
     /* Client and server must allow forwardable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_FORWARDABLE) &&
 	(isflagset(client.attributes, KRB5_KDB_DISALLOW_FORWARDABLE) ||
@@ -914,7 +914,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 	*status = "FORWARDABLE NOT ALLOWED";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Client and server must allow renewable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_RENEWABLE) &&
 	(isflagset(client.attributes, KRB5_KDB_DISALLOW_RENEWABLE) ||
@@ -922,7 +922,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 	*status = "RENEWABLE NOT ALLOWED";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Client and server must allow proxiable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_PROXIABLE) &&
 	(isflagset(client.attributes, KRB5_KDB_DISALLOW_PROXIABLE) ||
@@ -930,7 +930,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 	*status = "PROXIABLE NOT ALLOWED";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Check to see if client is locked out */
     if (isflagset(client.attributes, KRB5_KDB_DISALLOW_ALL_TIX)) {
 	*status = "CLIENT LOCKED OUT";
@@ -942,7 +942,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 	*status = "SERVICE LOCKED OUT";
 	return(KDC_ERR_S_PRINCIPAL_UNKNOWN);
     }
-	
+
     /* Check to see if server is allowed to be a service */
     if (isflagset(server.attributes, KRB5_KDB_DISALLOW_SVR)) {
 	*status = "SERVICE NOT ALLOWED";
@@ -953,7 +953,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
      * Check against local policy
      */
     errcode = against_local_policy_as(request, server, client,
-				      kdc_time, status); 
+				      kdc_time, status);
     if (errcode)
 	return errcode;
 
@@ -962,7 +962,7 @@ validate_as_request(register krb5_kdc_req *request, krb5_db_entry client,
 
 #define ASN1_ID_CLASS	(0xc0)
 #define ASN1_ID_TYPE    (0x20)
-#define ASN1_ID_TAG	(0x1f)	
+#define ASN1_ID_TAG	(0x1f)
 #define ASN1_CLASS_UNIV	(0)
 #define ASN1_CLASS_APP	(1)
 #define ASN1_CLASS_CTX	(2)
@@ -985,8 +985,8 @@ asn1length(unsigned char **astream)
 {
     int length;		/* resulting length */
     int sublen;		/* sublengths */
-    int blen;		/* bytes of length */ 
-    unsigned char *p;	/* substring searching */	
+    int blen;		/* bytes of length */
+    unsigned char *p;	/* substring searching */
 
     if (**astream & 0x80) {
         blen = **astream & 0x7f;
@@ -1012,12 +1012,12 @@ asn1length(unsigned char **astream)
 		    break;
 		}
 	    }
-	    length = p - *astream;	 
+	    length = p - *astream;
 	}
     } else {
 	length = **astream;
 	++*astream;
-    } 
+    }
    return(length);
 }
 
@@ -1027,7 +1027,7 @@ asn1length(unsigned char **astream)
  * this routine is passed a context-dependent tag number and "level" and returns
  * the size and length of the corresponding level subfield.
  *
- * levels and are numbered starting from 1.  
+ * levels and are numbered starting from 1.
  *
  * returns 0 on success, -1 otherwise.
  */
@@ -1044,7 +1044,7 @@ fetch_asn1_field(unsigned char *astream, unsigned int level,
     unsigned char savelen;      /* saved length of our field */
 
     classes = -1;
-    /* we assume that the first identifier/length will tell us 
+    /* we assume that the first identifier/length will tell us
        how long the entire stream is. */
     astream++;
     estream = astream;
@@ -1064,11 +1064,11 @@ fetch_asn1_field(unsigned char *astream, unsigned int level,
                 levels++;
                 classes = -1;
             }
-            lastlevel = tag; 
+            lastlevel = tag;
             if (levels == level) {
 	        /* in our context-dependent class, is this the one we're looking for ? */
 	        if (tag == field) {
-		    /* return length and data */ 
+		    /* return length and data */
 		    astream++;
 		    savelen = *astream;
 		    if ((data->length = asn1length(&astream)) < 0) {
@@ -1077,7 +1077,7 @@ fetch_asn1_field(unsigned char *astream, unsigned int level,
 		    /* if the field length is indefinite, we will have to subtract two
                        (terminating octets) from the length returned since we don't want
                        to pass any info from the "wrapper" back.  asn1length will always return
-                       the *total* length of the field, not just what's contained in it */ 
+                       the *total* length of the field, not just what's contained in it */
 		    if ((savelen & 0xff) == 0x80) {
 		      data->length -=2 ;
 		    }
@@ -1101,7 +1101,7 @@ fetch_asn1_field(unsigned char *astream, unsigned int level,
 	}
     }
     return(-1);
-}	
+}
 
 /*
  * Routines that validate a TGS request; checks a lot of things.  :-)
@@ -1193,7 +1193,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	    return(KDC_ERR_POLICY);
 	}
     }
-	    
+
     /* TGS must be forwardable to get forwarded or forwardable ticket */
     if ((isflagset(request->kdc_options, KDC_OPT_FORWARDED) ||
 	 isflagset(request->kdc_options, KDC_OPT_FORWARDABLE)) &&
@@ -1203,7 +1203,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	return KDC_ERR_BADOPTION;
     }
 
-    /* TGS must be proxiable to get proxiable ticket */    
+    /* TGS must be proxiable to get proxiable ticket */
     if ((isflagset(request->kdc_options, KDC_OPT_PROXY) ||
 	 isflagset(request->kdc_options, KDC_OPT_PROXIABLE)) &&
 	!isflagset(ticket->enc_part2->flags, TKT_FLG_PROXIABLE)) {
@@ -1243,35 +1243,35 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	*status = "CAN'T PROXY TGT";
 	return KDC_ERR_BADOPTION;
     }
-    
+
     /* Server must allow forwardable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_FORWARDABLE) &&
 	isflagset(server.attributes, KRB5_KDB_DISALLOW_FORWARDABLE)) {
 	*status = "NON-FORWARDABLE TICKET";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Server must allow renewable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_RENEWABLE) &&
 	isflagset(server.attributes, KRB5_KDB_DISALLOW_RENEWABLE)) {
 	*status = "NON-RENEWABLE TICKET";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Server must allow proxiable tickets */
     if (isflagset(request->kdc_options, KDC_OPT_PROXIABLE) &&
 	isflagset(server.attributes, KRB5_KDB_DISALLOW_PROXIABLE)) {
 	*status = "NON-PROXIABLE TICKET";
 	return(KDC_ERR_POLICY);
     }
-    
+
     /* Server must allow postdated tickets */
     if (isflagset(request->kdc_options, KDC_OPT_ALLOW_POSTDATE) &&
 	isflagset(server.attributes, KRB5_KDB_DISALLOW_POSTDATED)) {
 	*status = "NON-POSTDATABLE TICKET";
 	return(KDC_ERR_CANNOT_POSTDATE);
     }
-    
+
     /* Server must allow DUP SKEY requests */
     if (isflagset(request->kdc_options, KDC_OPT_ENC_TKT_IN_SKEY) &&
 	isflagset(server.attributes, KRB5_KDB_DISALLOW_DUP_SKEY)) {
@@ -1284,7 +1284,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	*status = "SERVER LOCKED OUT";
 	return(KDC_ERR_S_PRINCIPAL_UNKNOWN);
     }
-	
+
     /* Server must be allowed to be a service */
     if (isflagset(server.attributes, KRB5_KDB_DISALLOW_SVR)) {
 	*status = "SERVER NOT ALLOWED";
@@ -1296,7 +1296,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	*status = "HOT_LIST";
 	return(KRB_AP_ERR_REPEAT);
     }
-    
+
     /* Check the start time vs. the KDC time */
     if (isflagset(request->kdc_options, KDC_OPT_VALIDATE)) {
 	if (ticket->enc_part2->times.starttime > kdc_time) {
@@ -1304,7 +1304,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	    return(KRB_AP_ERR_TKT_NYV);
 	}
     }
-    
+
     /*
      * Check the renew_till time.  The endtime was already
      * been checked in the initial authentication check.
@@ -1314,7 +1314,7 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	*status = "TKT_EXPIRED";
 	return(KRB_AP_ERR_TKT_EXPIRED);
     }
-    
+
     /*
      * Checks for ENC_TKT_IN_SKEY:
      *
@@ -1348,15 +1348,15 @@ validate_tgs_request(register krb5_kdc_req *request, krb5_db_entry server,
 	*status = "NO PREAUTH";
 	return KRB_ERR_GENERIC;
     }
-    
+
     /*
      * Check local policy
      */
     errcode = against_local_policy_tgs(request, server, ticket, status);
     if (errcode)
 	return errcode;
-    
-    
+
+
     return 0;
 }
 
@@ -1403,9 +1403,9 @@ dbentry_supports_enctype(krb5_context context, krb5_db_entry *client,
     /*
      * We are assuming that all entries can support MD5; this information
      * need not be kept in the database.
-    */ 
- 
-		
+    */
+
+
     if (enctype == ENCTYPE_DES_CBC_MD5)
 	return 1;
 
@@ -1414,7 +1414,7 @@ dbentry_supports_enctype(krb5_context context, krb5_db_entry *client,
      */
     if (enctype == ENCTYPE_DES_CBC_CRC)
 	return 1;
-    
+
     /*
      * If we have a key for the encryption system, we assume it's
      * supported.
@@ -1432,7 +1432,7 @@ select_session_keytype(krb5_context context, krb5_db_entry *server,
 		       int nktypes, krb5_enctype *ktype)
 {
     int		i;
-    
+
     for (i = 0; i < nktypes; i++) {
 	if (!krb5_c_valid_enctype(ktype[i]))
 	    continue;
@@ -1455,10 +1455,10 @@ get_salt_from_key(krb5_context context, krb5_principal client,
 {
     krb5_error_code		retval;
     krb5_data *			realm;
-    
+
     salt->data = 0;
     salt->length = SALT_TYPE_NO_LENGTH;
-    
+
     if (client_key->key_data_ver == 1)
 	return 0;
 

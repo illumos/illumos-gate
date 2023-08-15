@@ -89,15 +89,15 @@ krb5_locate_kpasswd(krb5_context context, const krb5_data *realm,
  * This routine is used for a callback in sendto_kdc.c code. Simply
  * put, we need the client addr to build the krb_priv portion of the
  * password request.
- */  
+ */
 
 
 static void kpasswd_sendto_msg_cleanup (void* callback_context, krb5_data* message)
 {
     struct sendto_callback_context *ctx = callback_context;
-    krb5_free_data_contents(ctx->context, message); 
+    krb5_free_data_contents(ctx->context, message);
 }
- 
+
 
 static int kpasswd_sendto_msg_callback(struct conn_state *conn, void *callback_context, krb5_data* message)
 {
@@ -156,21 +156,21 @@ static int kpasswd_sendto_msg_callback(struct conn_state *conn, void *callback_c
 
 
     if ((code = krb5_auth_con_setaddrs(ctx->context, ctx->auth_context,
-				       &local_kaddr, NULL))) 
+				       &local_kaddr, NULL)))
 	goto cleanup;
 
     if (ctx->set_password_for)
-	code = krb5int_mk_setpw_req(ctx->context, 
-				    ctx->auth_context, 
-				    &ctx->ap_req, 
-				    ctx->set_password_for, 
-				    ctx->newpw, 
+	code = krb5int_mk_setpw_req(ctx->context,
+				    ctx->auth_context,
+				    &ctx->ap_req,
+				    ctx->set_password_for,
+				    ctx->newpw,
 				    &output);
     else
-	code = krb5int_mk_chpw_req(ctx->context, 
-				   ctx->auth_context, 
+	code = krb5int_mk_chpw_req(ctx->context,
+				   ctx->auth_context,
 				   &ctx->ap_req,
-				   ctx->newpw, 
+				   ctx->newpw,
 				   &output);
     if (code)
 	goto cleanup;
@@ -185,7 +185,7 @@ cleanup:
 
 /*
 ** The logic for setting and changing a password is mostly the same
-** krb5_change_set_password handles both cases 
+** krb5_change_set_password handles both cases
 **	if set_password_for is NULL, then a password change is performed,
 **  otherwise, the password is set for the principal indicated in set_password_for
 */
@@ -202,7 +202,7 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
     krb5_error_code 		code = 0;
     char 			*code_string;
     int				local_result_code;
-    
+
     struct sendto_callback_context  callback_ctx;
     struct sendto_callback_info	callback_info;
     struct sockaddr_storage	remote_addr;
@@ -213,15 +213,15 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
     callback_ctx.newpw = newpw;
     callback_ctx.set_password_for = set_password_for;
 
-    if ((code = krb5_auth_con_init(callback_ctx.context, 
+    if ((code = krb5_auth_con_init(callback_ctx.context,
 				   &callback_ctx.auth_context)))
 	goto cleanup;
 
-    if ((code = krb5_mk_req_extended(callback_ctx.context, 
+    if ((code = krb5_mk_req_extended(callback_ctx.context,
 				     &callback_ctx.auth_context,
 				     AP_OPTS_USE_SUBKEY,
-				     NULL, 
-				     creds, 
+				     NULL,
+				     creds,
 				     &callback_ctx.ap_req)))
 	goto cleanup;
 
@@ -238,9 +238,9 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
 	callback_info.pfn_callback = kpasswd_sendto_msg_callback;
 	callback_info.pfn_cleanup = kpasswd_sendto_msg_cleanup;
 
-	if ((code = krb5int_sendto(callback_ctx.context, 
-				   NULL, 
-				   &al, 
+	if ((code = krb5int_sendto(callback_ctx.context,
+				   NULL,
+				   &al,
 				   &callback_info,
 				   &chpw_rep,
 				   NULL,
@@ -263,23 +263,23 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
 	remote_kaddr.length = sizeof(ss2sin(&remote_addr)->sin_addr);
 	remote_kaddr.contents = (krb5_octet *) &ss2sin(&remote_addr)->sin_addr;
 
-	if ((code = krb5_auth_con_setaddrs(callback_ctx.context,  
-					   callback_ctx.auth_context,  
-					   NULL, 
+	if ((code = krb5_auth_con_setaddrs(callback_ctx.context,
+					   callback_ctx.auth_context,
+					   NULL,
 					   &remote_kaddr)))
 	    break;
 
 	if (set_password_for)
-	    code = krb5int_rd_setpw_rep(callback_ctx.context, 
-					callback_ctx.auth_context, 
-					&chpw_rep, 
-					&local_result_code, 
+	    code = krb5int_rd_setpw_rep(callback_ctx.context,
+					callback_ctx.auth_context,
+					&chpw_rep,
+					&local_result_code,
 					result_string);
 	else
-	    code = krb5int_rd_chpw_rep(callback_ctx.context, 
-				       callback_ctx.auth_context, 
-				       &chpw_rep, 
-				       &local_result_code, 
+	    code = krb5int_rd_chpw_rep(callback_ctx.context,
+				       callback_ctx.auth_context,
+				       &chpw_rep,
+				       &local_result_code,
 				       result_string);
 
 	if (code) {
@@ -294,15 +294,15 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
 
 	if (result_code)
 	    *result_code = local_result_code;
-	
+
 	if (result_code_string) {
 	    if (set_password_for)
-		code = krb5int_setpw_result_code_string(callback_ctx.context, 
-							local_result_code, 
+		code = krb5int_setpw_result_code_string(callback_ctx.context,
+							local_result_code,
 							(const char **)&code_string);
 	    else
-		code = krb5_chpw_result_code_string(callback_ctx.context, 
-						    local_result_code, 
+		code = krb5_chpw_result_code_string(callback_ctx.context,
+						    local_result_code,
 						    &code_string);
 	    if(code)
 		goto cleanup;
@@ -321,7 +321,7 @@ krb5_change_set_password(krb5_context context, krb5_creds *creds, char *newpw,
 	    useTcp = 1;
         } else {
 	    break;
-	} 
+	}
     } while (TRUE);
 
 cleanup:
@@ -381,7 +381,7 @@ krb5_set_password_using_ccache(
     */
     code = krb5_cc_get_principal (context, ccache, &creds.client);
     if (!code) {
-	code = krb5_build_principal(context, &creds.server, 
+	code = krb5_build_principal(context, &creds.server,
 				    krb5_princ_realm(context, change_password_for)->length,
 				    krb5_princ_realm(context, change_password_for)->data,
 				    "kadmin", "changepw", NULL);

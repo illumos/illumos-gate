@@ -31,7 +31,7 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE :
 
-all:		$(PROG) 
+all:		$(PROG)
 
 install :	all $(ROOTPROG)
 

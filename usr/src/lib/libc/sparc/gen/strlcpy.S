@@ -49,7 +49,7 @@
 	! Once this has occurred, we copy based upon destination alignment.
 	! This is either by word, halfword, or byte.  As this occurs, we
 	! check for a zero-byte.  If one is found, we branch to a method
-	! which checks for the exact location of a zero-byte within a 
+	! which checks for the exact location of a zero-byte within a
 	! larger word/half-word quantity.
 
 	ENTRY(strlcpy)

@@ -320,8 +320,8 @@ typedef IMA_STATUS (* IMA_AddPhbaStaticDiscoveryTargetFn)(
 );
 
 typedef IMA_STATUS (* IMA_RemovePhbaStaticDiscoveryTargetFn)(
-		IMA_OID phbaOid, 
-		IMA_OID targetOid 
+		IMA_OID phbaOid,
+		IMA_OID targetOid
 );
 
 typedef IMA_STATUS (* IMA_GetPnpOidListFn)(
@@ -558,19 +558,19 @@ typedef IMA_STATUS (* IMA_GetStaticDiscoveryTargetOidListFn)(
 );
 
 typedef IMA_STATUS (* IMA_GetDiscoveryPropertiesFn)(
-				IMA_OID oid, 
+				IMA_OID oid,
 				IMA_DISCOVERY_PROPERTIES *pProps
 );
 
 typedef IMA_STATUS (* IMA_AddDiscoveryAddressFn)(
-				IMA_OID oid, 
-				const IMA_TARGET_ADDRESS discoveryAddress, 
-				IMA_OID *pDiscoveryAddressOid 
+				IMA_OID oid,
+				const IMA_TARGET_ADDRESS discoveryAddress,
+				IMA_OID *pDiscoveryAddressOid
 );
 
 typedef IMA_STATUS (* IMA_AddStaticDiscoveryTargetFn)(
 				IMA_OID oid,
-				const IMA_STATIC_DISCOVERY_TARGET staticDiscoveryTarget, 
+				const IMA_STATIC_DISCOVERY_TARGET staticDiscoveryTarget,
 				IMA_OID *pStaticDiscoveryTargetOid
 );
 

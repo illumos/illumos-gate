@@ -34,7 +34,7 @@
  * Fast assembler language version of the following C-program for memcpy
  * which represents the `standard' for the C-library.
  *
- *	void * 
+ *	void *
  *	memcpy(void *s, const void *s0, size_t n)
  *	{
  *		if (n != 0) {
@@ -138,7 +138,7 @@
 	andn	%o2, 3, %o3		! o3 is aligned word count
 	dec	4, %o3			! avoid reading beyond tail of src
 	sub	%o1, %o0, %o1		! o1 gets the difference
-	
+
 3:	sll	%o4, 16, %g1		! save residual bytes
 	ld	[%o1+%o0], %o4
 	deccc	4, %o3

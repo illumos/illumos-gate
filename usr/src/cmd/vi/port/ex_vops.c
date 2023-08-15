@@ -401,7 +401,7 @@ vmove(void)
 			vfixcurs();
 			for (cp = cursor; *cp && cp < wcursor;) {
 				length = mbtowc(&wchar, (char *)cp, MULTI_BYTE_MAX);
-				if(length == 0)	
+				if(length == 0)
 					putchar(' ');
 				else if(length < 0) {
 					putoctal = 1;
@@ -621,7 +621,7 @@ vchange(unsigned char c)
 		}
 
 		/*
-		 * Open the line (logically) on the screen, and 
+		 * Open the line (logically) on the screen, and
 		 * update the screen tail.  Unless we are really a delete
 		 * go off and gather up inserted characters.
 		 */
@@ -681,7 +681,7 @@ smallchange:
 	 * Put out the \\'s indicating changed text in hardcopy,
 	 * or mark the end of the change with $ if not hardcopy.
 	 */
-	if (state == HARDOPEN) 
+	if (state == HARDOPEN)
 		bleep(i, cp);
 	else {
 		vcursbef(wcursor);

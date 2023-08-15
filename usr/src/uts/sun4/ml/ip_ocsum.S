@@ -35,7 +35,7 @@
 
 /*
  * Prefetch considerations
- * 
+ *
  * We prefetch one cacheline ahead.  This may not be enough on Serengeti
  * systems - see default_copyout() etc which prefetch 5 lines ahead.
  * On the other hand, we expect most of the source buffers to be
@@ -44,12 +44,12 @@
  * On US-I the prefetches are inoperative.  On US-II they preload the E$;
  * the mainloop unrolling and load-buffer should cover loads from E$.
  * The stores appear to be the slow point on US-II.
- * 
+ *
  * On US-IIICu the prefetch preloads the L2$ too, but there is no load
  * buffer so the loads will stall for D$ miss, L2$ hit.  The hardware
  * auto-prefetch is not activated by integer loads.  No solution
  * in sight for this, barring odd games with FP read, write, integer read.
- * 
+ *
  * US-IV (Panther) appears similar to US-IIICu, except that a strong
  * variant of prefetch is available which can take TLB traps.  We don't
  * use this.  The h/w prefetch stride can be set to 64, 128 or 192,
@@ -195,7 +195,7 @@
 	srlx	%o2, 32, %o4	! delay: hi32
 
 	lduh	[%o0], %o3	! tmp16 = *src++
-1:	
+1:
 	inc	2, %o0
 				! stall for D-cache
 
@@ -390,7 +390,7 @@
 .dotail_dw:
 	bz,a,pn	%icc, .dotail_hw
 	tst	%i1		! delay: any at all left?
-8:	
+8:
 	ldx	[%i0], %l0	! tmp64 = *src++
 	inc	8, %i0
 	dec	4, %i1		! decrement count, 4 halfwords
@@ -412,7 +412,7 @@
 	bz,a	.fold
 	srlx	%i2, 32, %o0	! delay: hi32
 	lduh	[%i0], %l0	! tmp16 = *src++
-1:	
+1:
 	inc	2, %i0
 				! stall for D-cache
 

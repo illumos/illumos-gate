@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Allocate & prepare a default replay cache for a server.
  */
@@ -54,10 +54,10 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
     unsigned long tens;
     unsigned long uid = geteuid();
 #endif
-    
+
     if (piece == NULL)
 	return ENOMEM;
-    
+
     cachetype = krb5_rc_default_type(context);
 
     /*
@@ -100,7 +100,7 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
     for (tens = 1; (uid / tens) > 9 ; tens *= 10)
 	len++;
 #endif
-    
+
     cachename = malloc(strlen(cachetype) + 5 + len);
     if (!cachename) {
 	retval = ENOMEM;

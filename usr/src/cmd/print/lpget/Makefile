@@ -44,7 +44,7 @@ LDLIBS +=	$(LIBNPRT)
 
 all:		$(PROG)
 
-install:	all $(ROOTBIN) $(ROOTBINPROG) 
+install:	all $(ROOTBIN) $(ROOTBINPROG)
 
 $(ROOTBIN):
 	$(INS.dir)

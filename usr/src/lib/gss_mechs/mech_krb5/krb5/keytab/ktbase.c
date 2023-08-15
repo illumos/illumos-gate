@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Registration functions for keytab.
  */
@@ -134,7 +134,7 @@ krb5_kt_resolve (krb5_context context, const char *name, krb5_keytab *ktid)
     unsigned int pfxlen;
     const char *cp, *resid;
     krb5_error_code err;
-    
+
     cp = strchr (name, ':');
     if (!cp) {
 	    return (*krb5_kt_dfl_ops.resolve)(context, name, ktid);
@@ -151,7 +151,7 @@ krb5_kt_resolve (krb5_context context, const char *name, krb5_keytab *ktid)
         resid = name;
     } else {
         resid = name + pfxlen + 1;
-	
+
         pfx = malloc (pfxlen+1);
         if (!pfx)
             return ENOMEM;

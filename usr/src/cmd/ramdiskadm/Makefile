@@ -27,7 +27,7 @@
 PROG= ramdiskadm
 OBJS= main.o utils.o
 SRCS= $(OBJS:%.o=%.c)
-POFILES= $(OBJS:%.o=%.po) 
+POFILES= $(OBJS:%.o=%.po)
 
 include ../Makefile.cmd
 

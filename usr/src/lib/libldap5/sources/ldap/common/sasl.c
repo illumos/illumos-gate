@@ -133,7 +133,7 @@ nsldapi_sasl_pktlen( char *buf, int maxbufsize )
 #else
 	size = ntohl(*(uint32_t *)buf);
 #endif
-   
+
 	if ( size < 0 || size > maxbufsize ) {
 		return (-1 );
 	}
@@ -151,7 +151,7 @@ nsldapi_sasl_read( int s, void *buf, int  len,
 	char		*cp;
 	int		ret;
 	unsigned	dlen, blen;
-   
+
 	if (sb == NULL) {
 		return( -1 );
 	}
@@ -178,7 +178,7 @@ nsldapi_sasl_read( int s, void *buf, int  len,
 	/* buffer is empty - fill it */
 	cp = sb->sb_sasl_ibuf;
 	dlen = 0;
-	
+
 	/* Read the length of the packet */
 	while ( dlen < 4 ) {
 		if (sb->sb_sasl_fns.lbextiofn_read != NULL) {
@@ -241,7 +241,7 @@ nsldapi_sasl_read( int s, void *buf, int  len,
 		LDAP_SET_ERRNO(ld, EIO);
 		return( -1 );
 	}
-	
+
 	/* copy decrypted packet to the input buffer */
 	SAFEMEMCPY( sb->sb_sasl_ibuf, dbuf, dlen );
 	sb->sb_sasl_iptr = sb->sb_sasl_ibuf;
@@ -313,7 +313,7 @@ nsldapi_sasl_write( int s, const void *buf, int  len,
 static int
 nsldapi_sasl_poll(
 	LDAP_X_PollFD fds[], int nfds, int timeout,
-	struct lextiof_session_private *arg ) 
+	struct lextiof_session_private *arg )
 {
 	Sockbuf		*sb = (Sockbuf *)arg;
 	LDAP		*ld;
@@ -349,7 +349,7 @@ nsldapi_sasl_ne_read( int s, void *buf, int  len,
 	struct lextiof_socket_private *arg)
 {
 	Sockbuf		*sb = (Sockbuf *)arg;
-   
+
 	if (sb == NULL) {
 		return( -1 );
 	}
@@ -373,7 +373,7 @@ nsldapi_sasl_ne_write( int s, const void *buf, int  len,
 }
 
 static int
-nsldapi_sasl_close_socket(int s, struct lextiof_socket_private *arg ) 
+nsldapi_sasl_close_socket(int s, struct lextiof_socket_private *arg )
 {
 	Sockbuf		*sb = (Sockbuf *)arg;
 	LDAP		*ld;
@@ -676,7 +676,7 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 		if( rc < 0 )  {
 			return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
 		}
-	}   
+	}
 
 	/* should have a valid ld connection - now create sasl connection */
 	if ((rc = nsldapi_sasl_open(ld)) != LDAP_SUCCESS) {
@@ -854,7 +854,7 @@ nsldapi_get_sasl_mechs ( LDAP *ld, char **pmech )
 	if ( rc != LDAP_SUCCESS ) {
 		return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
 	}
-		
+
 	e = ldap_first_entry( ld, res );
 	if ( e == NULL ) {
 		ldap_msgfree( res );
@@ -880,7 +880,7 @@ nsldapi_get_sasl_mechs ( LDAP *ld, char **pmech )
 		ldap_msgfree( res );
 		LDAP_SET_LDERRNO( ld, LDAP_NO_MEMORY, NULL, NULL );
 		return( LDAP_NO_MEMORY );
-	} 
+	}
 	m = mech;
 	for(v = values; *v; v++) {
 		if (v != values) {
@@ -926,7 +926,7 @@ int nsldapi_sasl_secprops(
 	}
 	props = ldap_str2charray( inp, "," );
 	NSLDAPI_FREE( inp );
-	
+
 	if( props == NULL || secprops == NULL ) {
 		return LDAP_PARAM_ERROR;
 	}

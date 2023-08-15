@@ -34,5 +34,5 @@ package com.sun.solaris.service.timer;
  */
 public interface RecurringEventTimer
 {
-	public void waitUntilNextFiring() throws InterruptedException; 
+	public void waitUntilNextFiring() throws InterruptedException;
 }

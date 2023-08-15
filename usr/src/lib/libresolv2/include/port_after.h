@@ -428,7 +428,7 @@ int getnetgrent_r(NGR_R_CONST char **machinep, NGR_R_CONST char **userp,
 		  NGR_R_CONST char **domainp, NGR_R_ARGS);
 #endif
 
-/* setnetgrent and endnetgrent are defined in sunw_port_after.h 
+/* setnetgrent and endnetgrent are defined in sunw_port_after.h
 #ifdef SETNETGRENT_ARGS
 void setnetgrent(SETNETGRENT_ARGS);
 #else

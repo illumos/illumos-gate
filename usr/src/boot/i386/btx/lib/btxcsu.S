@@ -30,8 +30,8 @@
 #
 _start: 	cld
 		pushl %eax
-		movl $_edata,%edi 
-		movl $_end,%ecx 
+		movl $_edata,%edi
+		movl $_end,%ecx
 		subl %edi, %ecx
 		xorb %al, %al
 		rep

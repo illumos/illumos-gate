@@ -8,7 +8,7 @@
  * Tim Martin
  * $Id: saslint.h,v 1.48 2003/04/16 19:36:01 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -129,7 +129,7 @@ typedef struct {
 #endif /* _SUN_SDK_ */
 } sasl_global_callbacks_t;
 
-typedef struct _sasl_external_properties 
+typedef struct _sasl_external_properties
 {
     sasl_ssf_t ssf;
     char *auth_id;
@@ -142,7 +142,7 @@ typedef struct sasl_string_list
 } sasl_string_list_t;
 
 typedef struct buffer_info
-{ 
+{
     char *data;
     size_t curlen;
     size_t reallen;
@@ -155,7 +155,7 @@ typedef int add_plugin_t(struct _sasl_global_context_s *gctx,
 typedef int add_plugin_t(const char *, void *);
 #endif /* _SUN_SDK_ */
 
-typedef struct add_plugin_list 
+typedef struct add_plugin_list
 {
     const char *entryname;
     add_plugin_t *add_plugin;
@@ -240,7 +240,7 @@ typedef struct mechanism
 #endif /* _INTEGRATED_SOLARIS_ */
     sasl_server_plug_t *plug;
 	/*
-	 * The global context needs to be stored with separately from the	
+	 * The global context needs to be stored with separately from the
 	 * the plugin because it will be overwritten when the plugin is
 	 * relloaded
 	 */
@@ -256,12 +256,12 @@ typedef struct mechanism
 typedef struct mech_list {
   const sasl_utils_t *utils;  /* gotten from plug_init */
 
-  void *mutex;            /* mutex for this data */ 
+  void *mutex;            /* mutex for this data */
   mechanism_t *mech_list; /* list of mechanisms */
   int mech_length;       /* number of mechanisms */
 } mech_list_t;
 
-typedef struct context_list 
+typedef struct context_list
 {
     mechanism_t *mech;
     void *context;     /* if NULL, this mech is disabled for this connection
@@ -293,7 +293,7 @@ typedef struct cmechanism
     int sun_reg;
 #endif /* _INTEGRATED_SOLARIS_ */
 	/*
-	 * The global context needs to be stored with separately from the	
+	 * The global context needs to be stored with separately from the
 	 * the plugin because it will be overwritten when the plugin is
 	 * relloaded
 	 */
@@ -303,13 +303,13 @@ typedef struct cmechanism
     const sasl_client_plug_t *plug;
 #endif /* _SUN_SDK_ */
 
-    struct cmechanism *next;  
+    struct cmechanism *next;
 } cmechanism_t;
 
 typedef struct cmech_list {
-  const sasl_utils_t *utils; 
+  const sasl_utils_t *utils;
 
-  void *mutex;            /* mutex for this data */ 
+  void *mutex;            /* mutex for this data */
   cmechanism_t *mech_list; /* list of mechanisms */
   int mech_length;       /* number of mechanisms */
 
@@ -429,7 +429,7 @@ LIBSASL_API const sasl_utils_t *sasl_global_utils;
 extern int (*_sasl_client_idle_hook)(sasl_conn_t *conn);
 extern int (*_sasl_server_idle_hook)(sasl_conn_t *conn);
 
-/* These return SASL_OK if we've actually finished cleanup, 
+/* These return SASL_OK if we've actually finished cleanup,
  * SASL_NOTINIT if that part of the library isn't inited, and
  * SASL_CONTINUE if we need to call them again */
 extern int (*_sasl_client_cleanup_hook)(void);

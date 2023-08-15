@@ -41,7 +41,7 @@
 #include "k5-int.h"
 
 /*
- * This module contains routines to [de]serialize 
+ * This module contains routines to [de]serialize
  *	krb5_gss_enc_desc and krb5_gss_ctx_id_t.
  * XXX This whole serialization abstraction is unnecessary in a
  * non-messaging environment, which krb5 is.  Someday, this should
@@ -62,7 +62,7 @@ kg_oid_externalize(kcontext, arg, buffer, lenremain)
 {
      gss_OID oid = (gss_OID) arg;
      krb5_error_code err;
-     
+
      err = krb5_ser_pack_int32(KV5M_GSS_OID, buffer, lenremain);
      if (err)
 	 return err;
@@ -120,7 +120,7 @@ kg_oid_internalize(kcontext, argp, buffer, lenremain)
          FREE(oid, sizeof(gss_OID_desc));
 	 return EINVAL;
      }
-     
+
      /* Read in and check our trailing magic number */
      if (krb5_ser_unpack_int32(&ibuf, &bp, &remain)) {
          FREE(oid->elements, oid->length);
@@ -381,7 +381,7 @@ kg_ctx_externalize(kcontext, arg, buffer, lenremain)
     krb5int_access kaccess;
 
     kret = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
-    if (kret) 
+    if (kret)
         return(kret);
 #endif
 
@@ -440,8 +440,8 @@ kg_ctx_externalize(kcontext, arg, buffer, lenremain)
 
 	    if (!kret && ctx->mech_used)
 		 kret = kg_oid_externalize(kcontext, ctx->mech_used,
-					   &bp, &remain); 
-	    
+					   &bp, &remain);
+
 	    if (!kret && ctx->here)
 		kret = krb5_externalize_opaque(kcontext,
 					       KV5M_PRINCIPAL,
@@ -653,7 +653,7 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
 		if (kret == EINVAL)
 		    kret = 0;
 	    }
-		
+
 #ifndef PROVIDE_KERNEL_IMPORT
 	    if (!kret)
 		kret = krb5_internalize_opaque(kcontext,

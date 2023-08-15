@@ -33,7 +33,7 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 
-all: $(PROG) $(SHFILES) 
+all: $(PROG) $(SHFILES)
 
 $(SHFILES): $(SHFILES).sh
 	$(RM) $(SHFILES)

@@ -488,7 +488,7 @@ u_32_t *frfp;
 		ipfo.ipfo_size = sizeof(ipfrstat_t);
 		ipfo.ipfo_ptr = (void *)*ifrstpp;
 		ipfo.ipfo_type = IPFOBJ_FRAGSTAT;
-	
+
 		if (ioctl(ipf_fd, SIOCGFRST, &ipfo) == -1) {
 			perror("ioctl(SIOCGFRST)");
 			exit(-1);
@@ -1455,14 +1455,14 @@ int topclosed;
 		printw("Src: %s, Dest: %s, Proto: %s, Sorted by: %s\n\n",
 		       str1, str2, str3, str4);
 
-		/* 
+		/*
 		 * For an IPv4 IP address we need at most 15 characters,
 		 * 4 tuples of 3 digits, separated by 3 dots. Enforce this
 		 * length, so the colums do not change positions based
 		 * on the size of the IP address. This length makes the
-		 * output fit in a 80 column terminal. 
+		 * output fit in a 80 column terminal.
 		 * We are lacking a good solution for IPv6 addresses (that
-		 * can be longer that 15 characters), so we do not enforce 
+		 * can be longer that 15 characters), so we do not enforce
 		 * a maximum on the IP field size.
 		 */
 		if (srclen < 15)

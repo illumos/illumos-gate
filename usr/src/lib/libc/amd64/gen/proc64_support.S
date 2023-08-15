@@ -78,7 +78,7 @@
 	mov	%ebx,0x4(%rsi)
 	mov	%ecx,0x8(%rsi)
 	mov	%edx,0xc(%rsi)
-	pop	%rbx              
+	pop	%rbx
 	ret
 	SET_SIZE(__libc_get_cpuid)
 
