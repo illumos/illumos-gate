@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -660,7 +660,7 @@ vmspace_map(vmspace_t *vms, vm_object_t *vmo, uintptr_t obj_off, uintptr_t addr,
 		 * Make sure the GPT has tables ready for leaf entries across
 		 * the entire new mapping.
 		 */
-		vmm_gpt_populate_region(vms->vms_gpt, addr, addr + len);
+		vmm_gpt_populate_region(vms->vms_gpt, addr, len);
 	}
 	vmspace_hold_exit(vms, false);
 	return (res);
@@ -673,19 +673,19 @@ vmspace_map(vmspace_t *vms, vm_object_t *vmo, uintptr_t obj_off, uintptr_t addr,
  * call to vmspace_map().
  */
 int
-vmspace_unmap(vmspace_t *vms, uintptr_t start, uintptr_t end)
+vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 {
-	const size_t size = (size_t)(end - start);
+	const uintptr_t end = addr + len;
 	vmspace_mapping_t *vmsm;
 	vm_client_t *vmc;
 	uint64_t gen = 0;
 
-	ASSERT(start < end);
+	ASSERT3U(addr, <, end);
 
 	vmspace_hold_enter(vms);
 	/* expect to match existing mapping exactly */
-	if ((vmsm = vm_mapping_find(vms, start, size)) == NULL ||
-	    vmsm->vmsm_addr != start || vmsm->vmsm_len != size) {
+	if ((vmsm = vm_mapping_find(vms, addr, len)) == NULL ||
+	    vmsm->vmsm_addr != addr || vmsm->vmsm_len != len) {
 		vmspace_hold_exit(vms, false);
 		return (ENOENT);
 	}
@@ -693,16 +693,16 @@ vmspace_unmap(vmspace_t *vms, uintptr_t start, uintptr_t end)
 	/* Prepare clients (and their held pages) for the unmap. */
 	for (vmc = list_head(&vms->vms_clients); vmc != NULL;
 	    vmc = list_next(&vms->vms_clients, vmc)) {
-		vmc_space_unmap(vmc, start, size, vmsm->vmsm_object);
+		vmc_space_unmap(vmc, addr, len, vmsm->vmsm_object);
 	}
 
 	/* Clear all PTEs for region */
-	if (vmm_gpt_unmap_region(vms->vms_gpt, start, end) != 0) {
+	if (vmm_gpt_unmap_region(vms->vms_gpt, addr, len) != 0) {
 		vms->vms_pt_gen++;
 		gen = vms->vms_pt_gen;
 	}
 	/* ... and the intermediate (directory) PTEs as well */
-	vmm_gpt_vacate_region(vms->vms_gpt, start, end);
+	vmm_gpt_vacate_region(vms->vms_gpt, addr, len);
 
 	/*
 	 * If pages were actually unmapped from the GPT, provide clients with
@@ -711,7 +711,7 @@ vmspace_unmap(vmspace_t *vms, uintptr_t start, uintptr_t end)
 	if (gen != 0) {
 		for (vmc = list_head(&vms->vms_clients); vmc != NULL;
 		    vmc = list_next(&vms->vms_clients, vmc)) {
-			vmc_space_invalidate(vmc, start, size, vms->vms_pt_gen);
+			vmc_space_invalidate(vmc, addr, len, vms->vms_pt_gen);
 		}
 	}
 
@@ -786,15 +786,13 @@ vmspace_lookup_map(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
  * call to vmspace_map().
  */
 int
-vmspace_populate(vmspace_t *vms, uintptr_t start, uintptr_t end)
+vmspace_populate(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 {
-	const size_t size = end - start;
 	vmspace_mapping_t *vmsm;
-
 	mutex_enter(&vms->vms_lock);
 
 	/* For the time being, only exact-match mappings are expected */
-	if ((vmsm = vm_mapping_find(vms, start, size)) == NULL) {
+	if ((vmsm = vm_mapping_find(vms, addr, len)) == NULL) {
 		mutex_exit(&vms->vms_lock);
 		return (FC_NOMAP);
 	}
@@ -803,7 +801,8 @@ vmspace_populate(vmspace_t *vms, uintptr_t start, uintptr_t end)
 	const int prot = vmsm->vmsm_prot;
 	const uint8_t attr = vmo->vmo_attr;
 	size_t populated = 0;
-	for (uintptr_t gpa = start & PAGEMASK; gpa < end; gpa += PAGESIZE) {
+	const size_t end = addr + len;
+	for (uintptr_t gpa = addr & PAGEMASK; gpa < end; gpa += PAGESIZE) {
 		const pfn_t pfn = vm_object_pfn(vmo, VMSM_OFFSET(vmsm, gpa));
 		VERIFY(pfn != PFN_INVALID);
 
