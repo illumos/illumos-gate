@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WRACCT 8 "Jul 13, 2005"
+.TH WRACCT 8 "August 13, 2023"
 .SH NAME
 wracct \- write extended accounting records for active processes and tasks
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/sbin/wracct\fR \fB-i\fR \fIid_list\fR [\fB-t\fR \fIrecord_type\fR]
+\fB/usr/bin/wracct\fR \fB-i\fR \fIid_list\fR [\fB-t\fR \fIrecord_type\fR]
      {process | task}
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBwracct\fR utility allows the administrator to invoke the extended
 accounting system, if active, to write intermediate records representing the
 resource usage of a selected set of processes or tasks. For tasks, a
@@ -35,8 +32,6 @@ an interval record, which reflects task usage since a previous interval record
 a partial record, which reflects usage since task creation.
 .RE
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -61,8 +56,6 @@ default type, and the only type available for process records.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -85,7 +78,6 @@ and writing an extended accounting record.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRWriting a Partial Record
 .sp
 .LP
@@ -94,7 +86,7 @@ Write a partial record for all active \fBsendmail\fR processes.
 .sp
 .in +2
 .nf
-# /usr/sbin/wracct -i "`pgrep sendmail`" process
+# /usr/bin/wracct -i "`pgrep sendmail`" process
 .fi
 .in -2
 .sp
@@ -108,14 +100,12 @@ Write an interval record for the task with \fBID 182\fR.
 .sp
 .in +2
 .nf
-# /usr/sbin/wracct -t interval -i 182 task
+# /usr/bin/wracct -t interval -i 182 task
 .fi
 .in -2
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -154,7 +144,6 @@ Pertinent components of extended accounting facility are not active.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/exacct/task\fR\fR
@@ -173,7 +162,5 @@ Extended accounting data files.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR attributes (7),
 .BR acctadm (8)

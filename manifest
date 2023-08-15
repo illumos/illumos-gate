@@ -2048,6 +2048,10 @@ f platform/i86pc/ucode/AuthenticAMD/8A00-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A010-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A011-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A012-00 0444 root sys
+f platform/i86pc/ucode/AuthenticAMD/A111-00 0444 root sys
+f platform/i86pc/ucode/AuthenticAMD/A112-00 0444 root sys
+f platform/i86pc/ucode/AuthenticAMD/AA01-00 0444 root sys
+f platform/i86pc/ucode/AuthenticAMD/AA02-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/container 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/equivalence-table 0444 root sys
 d platform/i86pc/ucode/GenuineIntel 0755 root sys

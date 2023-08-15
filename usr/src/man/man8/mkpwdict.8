@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MKPWDICT 8 "Jun 1, 2004"
+.TH MKPWDICT 8 "August 13, 2023"
 .SH NAME
 mkpwdict \- maintain password-strength checking database
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/sbin/mkpwdict\fR [\fB-s\fR \fIdict1\fR,... ,\fIdictN\fR]
+\fB/usr/bin/mkpwdict\fR [\fB-s\fR \fIdict1\fR,... ,\fIdictN\fR]
      [\fB-d\fR \fIdestination-path\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmkpwdict\fR command adds words to the dictionary-lookup database used by
 \fBpam_authtok_check\fR(7) and \fBpasswd\fR(1).
 .sp
@@ -34,8 +31,6 @@ this option is omitted, \fBmkpwdict\fR uses the value of \fBDICTIONDBDIR\fR
 specified in \fB/etc/default/passwd\fR (see \fBpasswd\fR(1)). The default
 location is \fB/var/passwd\fR.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -57,7 +52,6 @@ Specifies the target location of the dictionary-database.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/passwd\fR\fR
@@ -76,8 +70,6 @@ default destination directory
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -92,8 +84,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR passwd (1),
 .BR attributes (7),
 .BR pam_authtok_check (7)
