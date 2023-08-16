@@ -67,7 +67,7 @@ extern "C" {
  */
 struct sata_address {
 	uint8_t		cport;		/* Controller's SATA port number */
-	uint8_t 	pmport;		/* Port Multiplier SATA port number */
+	uint8_t		pmport;		/* Port Multiplier SATA port number */
 	uint8_t		qual;		/* Address Qualifier flags */
 	uint8_t		pad;		/* Reserved */
 };
@@ -102,7 +102,7 @@ struct sata_port_scr
 	uint32_t	serror;		/* Port SError register */
 	uint32_t	scontrol;	/* Port SControl register */
 	uint32_t	sactive;	/* Port SActive register */
-	uint32_t	snotific; 	/* Port SNotification register */
+	uint32_t	snotific;	/* Port SNotification register */
 };
 
 typedef struct sata_port_scr sata_port_scr_t;
@@ -127,10 +127,10 @@ typedef struct sata_pmult_gscr sata_pmult_gscr_t;
  * SATA Device Structure (rev 1)
  * Used to request/return state of the controller, port, port multiplier
  * or an attached drive:
- *  	The satadev_addr.cport, satadev_addr.pmport and satadev_addr.qual
- *  	fields are used to specify SATA address (see sata_address structure
- *  	description).
- * 	The satadev_scr structure is used to pass the content of a port
+ *	The satadev_addr.cport, satadev_addr.pmport and satadev_addr.qual
+ *	fields are used to specify SATA address (see sata_address structure
+ *	description).
+ *	The satadev_scr structure is used to pass the content of a port
  *	status and control registers.
  *	The satadev_add_info field is used by SATA HBA driver to return an
  *	additional information, which type depends on the function using
@@ -149,7 +149,7 @@ struct sata_device
 	struct sata_address satadev_addr;	/* sata port/device address */
 	uint32_t	satadev_state;		/* Port or device state */
 	uint32_t	satadev_type;		/* Attached device type */
-	struct sata_port_scr satadev_scr; 	/* Port status and ctrl regs */
+	struct sata_port_scr satadev_scr;	/* Port status and ctrl regs */
 	uint32_t	satadev_add_info;	/* additional information, */
 						/* function specific */
 };
@@ -350,10 +350,10 @@ struct sata_cmd {
 		uint32_t	sata_copy_out_error_reg : 1;	 /* 26 */
 		uint32_t	sata_max_queue_depth: 5;	 /* 27-31 */
 	} satacmd_flags;
-	uint8_t 	satacmd_addr_type; 	/* addr type: LBA28, LBA48 */
+	uint8_t		satacmd_addr_type;	/* addr type: LBA28, LBA48 */
 	uint8_t		satacmd_features_reg_ext; /* features reg extended */
 	uint8_t		satacmd_sec_count_msb;	/* sector count MSB (LBA48) */
-	uint8_t		satacmd_lba_low_msb; 	/* LBA Low MSB (LBA48) */
+	uint8_t		satacmd_lba_low_msb;	/* LBA Low MSB (LBA48) */
 	uint8_t		satacmd_lba_mid_msb;	/* LBA Mid MSB (LBA48) */
 	uint8_t		satacmd_lba_high_msb;	/* LBA High MSB (LBA48) */
 	uint8_t		satacmd_sec_count_lsb;	/* sector count LSB */
@@ -371,7 +371,7 @@ struct sata_cmd {
 						/* kept for binary compat. */
 	uint8_t		*pad1;			/* unused */
 
-	uint8_t 	satacmd_rqsense[SATA_ATAPI_RQSENSE_LEN];
+	uint8_t		satacmd_rqsense[SATA_ATAPI_RQSENSE_LEN];
 						/*
 						 * Error retrieval buffer
 						 * dma handle pointer
@@ -412,8 +412,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
 
 /*
  * Tagged Queuing type flags
- * 	satacmd_flags.sata_queue_stag
- * 	satacmd_flags.sata_queue_otag
+ *	satacmd_flags.sata_queue_stag
+ *	satacmd_flags.sata_queue_otag
  *
  * These flags indicate how the SATA command should be queued.
  *
@@ -491,7 +491,7 @@ struct sata_pkt {
 	struct sata_cmd	satapkt_cmd;		/* composite sata command */
 	int		satapkt_time;		/* time allotted to command */
 	void		(*satapkt_comp)(struct sata_pkt *); /* callback */
-	int		satapkt_reason; 	/* completion reason */
+	int		satapkt_reason;		/* completion reason */
 };
 
 typedef struct sata_pkt sata_pkt_t;
@@ -516,8 +516,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pkt))
  * satapkt_reason values:
  *
  * SATA_PKT_QUEUE_FULL - cmd not sent because of queue full (detected
- * 	by the controller). If a device reject command for this reason, it
- * 	should be reported as SATA_PKT_DEV_ERROR
+ *	by the controller). If a device reject command for this reason, it
+ *	should be reported as SATA_PKT_DEV_ERROR
  *
  * SATA_PKT_CMD_NOT_SUPPORTED - command not supported by a controller
  *	Controller is unable to send such command to a device.
@@ -667,7 +667,7 @@ typedef struct sata_hba_tran sata_hba_tran_t;
  */
 
 #define	SATA_CTLF_ATAPI			0x001 /* ATAPI support */
-#define	SATA_CTLF_PORT_MULTIPLIER 	0x010 /* Port Multiplier suport */
+#define	SATA_CTLF_PORT_MULTIPLIER	0x010 /* Port Multiplier suport */
 #define	SATA_CTLF_HOTPLUG		0x020 /* Hotplug support */
 #define	SATA_CTLF_ASN			0x040 /* Asynchronous Event Support */
 #define	SATA_CTLF_QCMD			0x080 /* Queued commands support */
@@ -739,14 +739,14 @@ typedef struct sata_hba_tran sata_hba_tran_t;
 /*
  * SATA Framework interface entry points
  */
-int 	sata_hba_init(struct modlinkage *);
-int 	sata_hba_attach(dev_info_t *, sata_hba_tran_t *, ddi_attach_cmd_t);
-int 	sata_hba_detach(dev_info_t *, ddi_detach_cmd_t);
-void 	sata_hba_fini(struct modlinkage *);
-void 	sata_hba_event_notify(dev_info_t *, sata_device_t *, int);
+int	sata_hba_init(struct modlinkage *);
+int	sata_hba_attach(dev_info_t *, sata_hba_tran_t *, ddi_attach_cmd_t);
+int	sata_hba_detach(dev_info_t *, ddi_detach_cmd_t);
+void	sata_hba_fini(struct modlinkage *);
+void	sata_hba_event_notify(dev_info_t *, sata_device_t *, int);
 sata_pkt_t *sata_get_error_retrieval_pkt(dev_info_t *, sata_device_t *, int);
 void	sata_free_error_retrieval_pkt(sata_pkt_t *);
-sata_pkt_t *sata_get_rdwr_pmult_pkt(dev_info_t *, sata_device_t *, uint8_t,
+sata_pkt_t *sata_get_rdwr_pmult_pkt(dev_info_t *, sata_device_t *, uint16_t,
     uint32_t, uint32_t);
 void	sata_free_rdwr_pmult_pkt(sata_pkt_t *);
 void	sata_register_pmult(dev_info_t *, sata_device_t *, sata_pmult_gscr_t *);

@@ -25,7 +25,7 @@
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd November 5, 2022
+.Dd July 29, 2023
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -399,6 +399,19 @@ The VNIC to use for the network connection.
 .It feature_mask Ta integer Ta 0 Ta
 Specify a mask to apply to the virtio features advertised to the guest.
 .El
+.Pp
+Viona network devices have the ability to lend out their TX buffers, which
+can occasionally cause issues if they are not returned.
+This will result in the guest not being able to send any network packets,
+including TCP ACKs, resulting in the guest becoming completely unreachable.
+The default has changed to now always copy TX buffers.
+A temporary tunable has been added
+.Pq which will be removed when this has been properly addressed
+to restore the ability for the driver to loan out TX buffers, which is enabled
+by setting the variable
+.Sy viona:viona_default_tx_copy
+to 0 in
+.Xr system 5 .
 .Ss Other Network Backend Settings
 Other network devices use the following settings to configure their backend.
 .Bl -column "feature_flags" "string" "Default"
