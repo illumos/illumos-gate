@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #include <sys/auxv.h>
@@ -56,13 +57,13 @@ lx_auxv_stol(const auxv_t *ap, auxv_t *oap, const lx_elf_data_t *edp)
 		loap->la_val = ap->a_un.a_val;
 		return (0);
 	case AT_SUN_AUXFLAGS:
+		loap->la_type = AT_SECURE;
 		if ((ap->a_un.a_val & AF_SUN_SETUGID) != 0) {
-			loap->la_type = AT_SECURE;
 			loap->la_val = 1;
-			return (0);
 		} else {
-			return (1);
+			loap->la_val = 0;
 		}
+		return (0);
 	case AT_SUN_GID:
 		loap->la_type = AT_LX_EGID;
 		loap->la_val = ap->a_un.a_val;
