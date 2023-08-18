@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -298,6 +298,29 @@ smb_vop_ioctl(vnode_t *vp, int cmd, void *arg, cred_t *cr)
 
 	return (rval);
 }
+
+/*
+ * Support for zero-copy read/write
+ * Request buffers and return them.
+ */
+int
+smb_vop_reqzcbuf(vnode_t *vp, int ioflag, xuio_t *xuio, cred_t *cr)
+{
+	int error;
+
+	error = VOP_REQZCBUF(vp, ioflag, xuio, cr, &smb_ct);
+	return (error);
+}
+
+int
+smb_vop_retzcbuf(vnode_t *vp, xuio_t *xuio, cred_t *cr)
+{
+	int error;
+
+	error = VOP_RETZCBUF(vp, xuio, cr, &smb_ct);
+	return (error);
+}
+
 
 /*
  * smb_vop_getattr()

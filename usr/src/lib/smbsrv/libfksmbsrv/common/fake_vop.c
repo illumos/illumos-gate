@@ -38,6 +38,8 @@
 #include <sys/fcntl.h>
 #include <sys/poll.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <sys/sysmacros.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -54,6 +56,16 @@ int fop__getxvattr(vnode_t *, xvattr_t *);
 int fop__setxvattr(vnode_t *, xvattr_t *);
 
 static void fake_inactive_xattrdir(vnode_t *);
+
+typedef struct fake_xuio {
+	off_t map_foff;		// file offset at start of mapping
+	char *map_addr;		// mapped address
+	size_t map_len;		// length of mapping
+	iovec_t iovec[2];
+} fake_xuio_t;
+
+int fake_xuio_blksz = 4096;
+
 
 /* ARGSUSED */
 int
@@ -130,6 +142,46 @@ fop_read(
 	resid = uio->uio_resid;
 	if ((uio->uio_loffset + resid) > st.st_size)
 		resid = st.st_size - uio->uio_loffset;
+	if (resid == 0)
+		return (0);
+
+	/*
+	 * Simulating zero-copy support with mmap.  See:
+	 * fop_reqzcbuf(), fop_retzcbuf()
+	 */
+	if ((uio->uio_extflg == UIO_XUIO) &&
+	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY)) {
+		xuio_t *xuio = (xuio_t *)uio;
+		int poff;
+
+		fake_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+
+		/*
+		 * Sanity check mapped range overlaps this I/O:
+		 * uio_offset >= mapped base
+		 * uio_resid <= (mapped length - page offset)
+		 */
+		if (uio->uio_loffset < priv->map_foff)
+			return (EINVAL);
+		poff = uio->uio_loffset - priv->map_foff;
+		if ((uio->uio_resid + poff) > priv->map_len)
+			return (EINVAL);
+
+		/*
+		 * Setup the uio with our loaned buffers,
+		 * and update offset, resid.
+		 */
+		uio->uio_iovcnt = 1;
+		uio->uio_iov = &priv->iovec[0];
+		iov = uio->uio_iov;
+		iov->iov_base = priv->map_addr + poff;
+		iov->iov_len = priv->map_len - poff;
+
+		uio->uio_loffset += iov->iov_len;
+		uio->uio_resid   -= iov->iov_len;
+
+		return (0);
+	}
 
 	while (resid > 0) {
 
@@ -1318,17 +1370,84 @@ fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm,
 
 /* ARGSUSED */
 int
-fop_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *uiop, cred_t *cr,
+fop_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *xuio, cred_t *cr,
     caller_context_t *ct)
 {
-	return (ENOSYS);
+	fake_xuio_t *priv;
+	uio_t *uio = &xuio->xu_uio;
+	int blksz = fake_xuio_blksz;
+	off_t foff, moff;
+	size_t flen, mlen;
+	int poff;
+	char *ma;
+	struct stat st;
+
+	if (xuio->xu_type != UIOTYPE_ZEROCOPY)
+		return (EINVAL);
+
+	foff = uio->uio_loffset;
+	flen = uio->uio_resid;
+
+	if (fstat(vp->v_fd, &st) == -1)
+		return (errno);
+
+	if (foff >= st.st_size)
+		return (EINVAL);
+	if ((foff + flen) > st.st_size)
+		flen = st.st_size - foff;
+
+	switch (ioflag) {
+	case UIO_READ:
+		if (flen < blksz/2)
+			return (EINVAL);
+		break;
+
+	case UIO_WRITE:
+	default:
+		return (EINVAL);
+	}
+
+	/*
+	 * See if we can map the file for read.
+	 * Round down start offset for mmap.
+	 */
+	poff = P2PHASE((int)foff, blksz);
+	moff = foff - poff;
+	mlen = flen + poff;
+
+	ma = mmap(NULL, mlen, PROT_READ, MAP_SHARED, vp->v_fd, moff);
+	if (ma == MAP_FAILED) {
+		/* Can't use loaned buffers. */
+		return (EINVAL);
+	}
+
+	priv = kmem_zalloc(sizeof (*priv), KM_SLEEP);
+	priv->map_foff = foff;
+	priv->map_addr = ma;
+	priv->map_len = mlen;
+
+	XUIO_XUZC_PRIV(xuio) = priv;
+	XUIO_XUZC_RW(xuio) = ioflag;
+	uio->uio_extflg = UIO_XUIO;
+
+	return (0);
 }
 
 /* ARGSUSED */
 int
-fop_retzcbuf(vnode_t *vp, xuio_t *uiop, cred_t *cr, caller_context_t *ct)
+fop_retzcbuf(vnode_t *vp, xuio_t *xuio, cred_t *cr, caller_context_t *ct)
 {
-	return (ENOSYS);
+	fake_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
+	int ioflag = XUIO_XUZC_RW(xuio);
+
+	ASSERT(xuio->xu_type == UIOTYPE_ZEROCOPY);
+	ASSERT(ioflag == UIO_READ);
+
+	munmap(priv->map_addr, priv->map_len);
+	kmem_free(priv, sizeof (fake_xuio_t));
+	XUIO_XUZC_PRIV(xuio) = NULL;
+
+	return (0);
 }
 
 
@@ -1420,7 +1539,7 @@ stat_to_vattr(const struct stat *st, vattr_t *vap)
 /* ARGSUSED */
 void
 flk_init_callback(flk_callback_t *flk_cb,
-	callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *), void *cbdata)
+    callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *), void *cbdata)
 {
 }
 
