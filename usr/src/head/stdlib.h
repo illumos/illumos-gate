@@ -29,6 +29,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -322,6 +323,8 @@ extern void freezero(void *, size_t);
 extern void *reallocarray(void *, size_t, size_t);
 extern void *recallocarray(void *, size_t, size_t, size_t);
 extern long long strtonum(const char *, long long, long long, const char **);
+extern long long strtonumx(const char *, long long, long long, const char **,
+    int);
 extern void *reallocf(void *, size_t);
 
 extern void qsort_r(void *, size_t, size_t,

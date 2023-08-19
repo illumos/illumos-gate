@@ -15,6 +15,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -22,10 +26,13 @@
 #define	INVALID		1
 #define	TOOSMALL	2
 #define	TOOLARGE	3
+#define	BADBASE		4
+
+#define	MBASE		('z' - 'a' + 1 + 10)
 
 long long
-strtonum(const char *numstr, long long minval, long long maxval,
-    const char **errstrp)
+strtonumx(const char *numstr, long long minval, long long maxval,
+    const char **errstrp, int base)
 {
 	long long ll = 0;
 	int error = 0;
@@ -33,19 +40,22 @@ strtonum(const char *numstr, long long minval, long long maxval,
 	struct errval {
 		const char *errstr;
 		int err;
-	} ev[4] = {
+	} ev[5] = {
 		{ NULL,		0 },
 		{ "invalid",	EINVAL },
 		{ "too small",	ERANGE },
 		{ "too large",	ERANGE },
+		{ "unparsable; invalid base specified", EINVAL },
 	};
 
 	ev[0].err = errno;
 	errno = 0;
 	if (minval > maxval) {
 		error = INVALID;
+	} else if (base < 0 || base > MBASE || base == 1) {
+		error = BADBASE;
 	} else {
-		ll = strtoll(numstr, &ep, 10);
+		ll = strtoll(numstr, &ep, base);
 		if (numstr == ep || *ep != '\0')
 			error = INVALID;
 		else if ((ll == LLONG_MIN && errno == ERANGE) || ll < minval)
@@ -56,8 +66,15 @@ strtonum(const char *numstr, long long minval, long long maxval,
 	if (errstrp != NULL)
 		*errstrp = ev[error].errstr;
 	errno = ev[error].err;
-	if (error)
+	if (error != 0)
 		ll = 0;
 
 	return (ll);
+}
+
+long long
+strtonum(const char *numstr, long long minval, long long maxval,
+    const char **errstrp)
+{
+	return (strtonumx(numstr, minval, maxval, errstrp, 10));
 }
