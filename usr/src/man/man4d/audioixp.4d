@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOIXP 4D "May 12, 2009"
+.TH AUDIOIXP 4D "June 8, 2023"
 .SH NAME
 audioixp \- ATI IXP400 south bridge audio digital controller interface
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudioixp\fR device uses the IXP400 south bridge audio digital controller
 and a AC-97 Codec to implement the audio device interface.
 .sp
@@ -16,22 +14,12 @@ and a AC-97 Codec to implement the audio device interface.
 The \fBaudioixp\fR  device  provides  support  for  the internal speaker,
 headphone, line out, line in, and microphone.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/audioixp.conf\fR\fR
 .ad
 .RS 30n
 Driver configuration file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/audioixp\fR\fR
-.ad
-.RS 30n
-32-bit kernel driver module
 .RE
 
 .sp
@@ -44,9 +32,7 @@ Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for a descriptions of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -62,8 +48,6 @@ Stability level	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR audio (4I),
 .BR mixer (4I),
@@ -72,38 +56,3 @@ Stability level	Uncommitted
 .sp
 .LP
 \fIATI IXP400 South Bridge Data Sheet\fR
-.SH DIAGNOSTICS
-.sp
-.LP
-In addition to being logged, the following messages may appear on the system
-console:
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too low\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too low\fR\fR
-.ad
-.RS 30n
-The interrupt rate in \fBaudioixp.conf\fR is set too low. It has been reset to
-the rate specified in the message. Update \fBaudioixp.conf\fR to a higher
-interrupt rate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too high\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too high\fR\fR
-.ad
-.RS 30n
-The interrupt rate set in \fBaudioixp.conf\fR is set too high. It has been
-reset to the rate specified in the message. Update \fBaudioixp.conf\fR to a
-lower interrupt rate.
-.RE
-

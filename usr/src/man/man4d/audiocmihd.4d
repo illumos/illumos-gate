@@ -11,27 +11,14 @@
 .\"
 .\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.TH AUDIOCMIHD 4D "Mar 18, 2011"
+.TH AUDIOCMIHD 4D "June 8, 2023"
 .SH NAME
 audiocmihd \- CMI8788 HD audio driver
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudiocmihd\fR driver provides support for audio devices based on
 the CMedia 8788 and similar parts.  Most often these are seen in
 devices sold under the Asus Xonar brand.
 .SH FILES
-.sp
-.ne 2
-.na
-\fB/kernel/drv/audiocmihd\fR
-.ad
-.sp .6
-.RS 4n
-32-bit kernel module
-.RE
-
-.sp
 .ne 2
 .na
 \fB/kernel/drv/amd64/audiocmihd\fR
@@ -42,8 +29,6 @@ devices sold under the Asus Xonar brand.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -58,8 +43,6 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR audio (4I),
 .BR dsp (4I),
 .BR mixer (4I),

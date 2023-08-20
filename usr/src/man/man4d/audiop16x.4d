@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOP16X 4D "Sep 8, 2009"
+.TH AUDIOP16X 4D "June 8, 2023"
 .SH NAME
 audiop16x \- Creative Sound Blaster Live! OEM support
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudiop16x\fR driver provides support for the Creative Sound Blaster
 Live! products based on the P16X device. These chips are also known as the
 \fBEMU10K1X\fR device, not to be confused with the \fBEMU10K1\fR.
@@ -20,17 +18,6 @@ model numbers SB0200 or SB0213.
 .LP
 This device is capable of 5.1 surround sound.
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/audiop16x\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit kernel driver module
-.RE
-
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/amd64/audiop16x\fR\fR
@@ -40,20 +27,8 @@ This device is capable of 5.1 surround sound.
 64-bit x86 kernel driver module
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/sparcv9/audiop16x\fR\fR
-.ad
-.sp .6
-.RS 4n
-64-bit SPARC kernel driver module
-.RE
-
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for a descriptions of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -63,12 +38,10 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	x86, SPARC
+Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR audio (4I),
 .BR mixer (4I),

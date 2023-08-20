@@ -3,31 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOHD 4D "May 12, 2009"
+.TH AUDIOHD 4D "June 8, 2023"
 .SH NAME
 audiohd \- Intel High Definition Audio Controller support
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudiohd\fR driver provides support for the generic codec chips which are
 compatible with the Intel High-Definition Audio Controller 1.0 specification.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/audiohd.conf\fR\fR
 .ad
 .RS 29n
 \fBaudiohd\fR driver configuration file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/audiohd\fR\fR
-.ad
-.RS 29n
-32-bit x86 kernel driver module
 .RE
 
 .sp
@@ -40,9 +28,7 @@ compatible with the Intel High-Definition Audio Controller 1.0 specification.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for a descriptions of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -58,8 +44,6 @@ Stability level	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR audio (4I),
 .BR mixer (4I),
@@ -71,38 +55,3 @@ Stability level	Uncommitted
 .sp
 .LP
 \fIALC880 Specification\fR \(em Realtek Inc.
-.SH DIAGNOSTICS
-.sp
-.LP
-In addition to being logged, the following messages can appear on the system
-console:
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too low\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too low\fR\fR
-.ad
-.RS 30n
-The interrupt rate in \fBaudiohd.conf\fR is set too low. It has been reset to
-the rate specified in the message. Update \fBaudiohd.conf\fR to a higher
-interrupt rate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBredcord-interrupts too low\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too high\fR\fR
-.ad
-.RS 30n
-The interrupt rate in \fBaudiohd.conf\fR is set too low. It has been reset to
-the rate specified in the message. Update \fBaudiohd.conf\fR to a higher
-interrupt rate
-.RE
-

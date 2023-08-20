@@ -11,12 +11,10 @@
 .\"
 .\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.TH AUDIOEMU10K 4D "Mar 18, 2011"
+.TH AUDIOEMU10K 4D "June 8, 2023"
 .SH NAME
 audioemu10k \- EMU10K audio driver
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudioemu10\fR driver provides support for audio devices based on
 the Creative EMU10K1 and EMU10K2 chips.  Most often these are seen in
 devices sold under the Audigy or Sound Blaster Live! brand names.
@@ -24,17 +22,6 @@ devices sold under the Audigy or Sound Blaster Live! brand names.
 The \fBaudioemu10k\fR driver provides support for surround sound and
 SPDIF features on devices with such capabilities.
 .SH FILES
-.sp
-.ne 2
-.na
-\fB/kernel/drv/audioemu10k\fR
-.ad
-.sp .6
-.RS 4n
-32-bit kernel module
-.RE
-
-.sp
 .ne 2
 .na
 \fB/kernel/drv/amd64/audioemu10k\fR
@@ -45,8 +32,6 @@ SPDIF features on devices with such capabilities.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -61,8 +46,6 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR audio (4I),
 .BR dsp (4I),
 .BR mixer (4I),

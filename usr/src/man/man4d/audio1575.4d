@@ -3,20 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIO1575 4D "May 13, 2009"
+.TH AUDIO1575 4D "June 8, 2023"
 .SH NAME
 audio1575 \- Uli M1575 Super South Bridge audio digital controller interface
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaudio1575\fR device uses the Uli M1575 AC97-compatible audio digital
 controller and an AC-97 Codec to implement the audio device interface. This
 interface allows analog only inputs and outputs.
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/kernel/drv/sparcv9/audio1575\fR\fR
+\fB\fB/kernel/drv/amd64/audio1575\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -34,8 +31,6 @@ Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -46,14 +41,12 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	SPARC, x86
+Architecture	x86
 _
 Stability level	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR audio (4I),
 .BR mixer (4I),
@@ -65,38 +58,3 @@ Stability level	Uncommitted
 .sp
 .LP
 \fIAD1981B AC '97 SoundMAX(R) Codec Data Sheet\fR\(em Analog Devices Inc.
-.SH DIAGNOSTICS
-.sp
-.LP
-In addition to being logged, the following messages might appear on the system
-console:
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too low\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too low\fR\fR
-.ad
-.RS 30n
-The interrupt rate specified in \fBaudio1575.conf\fR is set too low. It has
-been reset to the rate specified in the message. Update \fBaudio1575.conf\fR to
-a higher interrupt rate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too high\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too high\fR\fR
-.ad
-.RS 30n
-The interrupt rate specified in \fBaudio1575.conf\fR is set too high. It has
-been reset to the rate specified in the message. Update \fBaudio1575.conf\fR to
-a lower interrupt rate.
-.RE
-
