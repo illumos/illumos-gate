@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SM_ACCT_MGMT 3PAM "Nov 18, 2003"
+.TH PAM_SM_ACCT_MGMT 3PAM "August 19, 2023"
 .SH NAME
 pam_sm_acct_mgmt \- service provider implementation for pam_acct_mgmt
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 #include <security/pam_appl.h>
@@ -20,8 +19,6 @@ pam_sm_acct_mgmt \- service provider implementation for pam_acct_mgmt
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 In response to a call to \fBpam_acct_mgmt\fR(3PAM), the  \fBPAM\fR framework
 calls \fBpam_sm_acct_mgmt()\fR from the modules listed in the \fBpam.conf\fR(5)
 file. The account management provider supplies the back-end functionality for
@@ -66,11 +63,9 @@ logged through \fBsyslog\fR(3C) and the option ignored.
 .LP
 If an account management module determines that the user password has aged or
 expired, it should save this information as state in the authentication handle,
-\fIpamh\fR, using  \fBpam_set_data()\fR. \fBpam_chauthok()\fR uses this
+\fIpamh\fR, using  \fBpam_set_data()\fR. \fBpam_chauthtok()\fR uses this
 information to determine which passwords have expired.
 .SH RETURN VALUES
-.sp
-.LP
 If there are no restrictions to logging in,  \fBPAM_SUCCESS\fR is returned.
 The following error values may also be returned upon error:
 .sp
@@ -116,12 +111,10 @@ User denied access to account at this time.
 .ad
 .RS 24n
 Ignore underlying account module regardless of whether the control flag is
-\fIrequired,\fR \fIoptional\fR or \fIsufficient\fR.
+\fIrequired\fR, \fIoptional\fR or \fIsufficient\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -138,8 +131,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
@@ -149,10 +140,8 @@ MT-Level	MT-Safe with exceptions
 .BR pam.conf (5),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
-The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
-multithreaded application uses its own  \fBPAM\fR handle.
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.
 .sp
 .LP
 If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is set and a service module does

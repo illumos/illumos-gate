@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_DHKEYS 7 "Feb 25, 2017"
+.TH PAM_DHKEYS 7 "August 19, 2023"
 .SH NAME
 pam_dhkeys \- authentication Diffie-Hellman keys management module
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_dhkeys.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBpam_dhkeys.so.1\fR service module provides functionality to two
 \fBPAM\fR services: Secure \fBRPC\fR authentication and Secure \fBRPC\fR
 authentication token management.
@@ -43,7 +41,6 @@ Turn off warning messages
 .RE
 
 .SS "Authentication Services"
-.LP
 If the user has Diffie-Hellman keys, \fBpam_sm_authenticate()\fR establishes
 secret keys for the user specified by the \fBPAM_USER\fR (equivalent to running
 \fBkeylogin\fR(1)), using the authentication token found in the
@@ -62,14 +59,12 @@ is equivalent to running \fBkeylogout\fR(1).
 \fBPAM_REINITIALIZE_CRED\fR and \fBPAM_REFRESH_CRED\fR are not supported and
 return \fBPAM_IGNORE\fR.
 .SS "Authentication Token Management"
-.LP
 The \fBpam_sm_chauthtok()\fR implementation checks whether the old login
 password decrypts the users secret keys. If it doesn't this module prompts the
 user for an old Secure \fBRPC\fR password and stores it in a pam data item
 called \fBSUNW_OLDRPCPASS\fR. This data item can be used by the store module to
 effectively update the users secret keys.
 .SH ERRORS
-.LP
 The authentication service returns the following error codes:
 .sp
 .ne 2
@@ -166,7 +161,6 @@ Module ran out of memory.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -183,7 +177,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.LP
 .BR keylogin (1),
 .BR keylogout (1),
 .BR syslog (3C),
@@ -191,10 +184,10 @@ MT Level	MT-Safe with exceptions
 .BR pam (3PAM),
 .BR pam_authenticate (3PAM),
 .BR pam_chauthtok (3PAM),
-.BR pam_get_data (3PAM),
-.BR pam_get_item (3PAM),
-.BR pam_set_data (3PAM),
 .BR pam_setcred (3PAM),
+.BR pam_sm_authenticate (3PAM),
+.BR pam_sm_chauthtok (3PAM),
+.BR pam_sm_setcred (3PAM),
 .BR pam.conf (5),
 .BR attributes (7),
 .BR pam_authtok_check (7),
@@ -205,7 +198,6 @@ MT Level	MT-Safe with exceptions
 .BR pam_unix_auth (7),
 .BR pam_unix_session (7)
 .SH NOTES
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .sp

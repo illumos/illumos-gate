@@ -3,27 +3,23 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_TSOL_ACCOUNT 7 "Jul 20, 2007"
+.TH PAM_TSOL_ACCOUNT 7 "August 19, 2023"
 .SH NAME
 pam_tsol_account \- PAM account management module for Trusted Extensions
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/lib/security/pam_tsol_account.so.1\fR
+\fBpam_tsol_account.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The Solaris Trusted Extensions service module for \fBPAM\fR,
-\fB/usr/lib/security/pam_tsol_account.so.1\fR, checks account limitations that
-are related to labels. The \fBpam_tsol_account.so.1\fR module is a shared
-object that can be dynamically loaded to provide the necessary functionality
-upon demand. Its path is specified in the \fBPAM\fR configuration file.
+The Trusted Extensions service module for \fBPAM\fR,
+\fBpam_tsol_account.so.1\fR, checks account limitations that
+are related to labels.
 .sp
 .LP
 \fBpam_tsol_account.so.1\fR contains a function to perform account management,
-\fBpam_sm_acct_mgmt()\fR. The function checks for the allowed label range for
+\fBpam_sm_acct_mgmt\fR(3PAM).
+The function checks for the allowed label range for
 the user.  The allowable label range is set by the defaults in the
 \fBlabel_encodings\fR(5) file. These defaults can be overridden by entries in
 the \fBuser_attr\fR(5) database.
@@ -42,8 +38,6 @@ other  account required    pam_tsol_account allow_unlabeled
 .sp
 
 .SH OPTIONS
-.sp
-.LP
 The following options can be passed to the module:
 .sp
 .ne 2
@@ -65,8 +59,6 @@ Provides debugging information at the \fBLOG_DEBUG\fR level. See
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The following values are returned:
 .sp
 .ne 2
@@ -99,8 +91,6 @@ information on error-related return values, see the \fBpam\fR(3PAM) man page.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -121,8 +111,6 @@ MT Level	MT-Safe with exceptions
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .SH SEE ALSO
-.sp
-.LP
 .BR keylogin (1),
 .BR syslog (3C),
 .BR libpam (3LIB),
@@ -133,12 +121,6 @@ multi-threaded application uses its own PAM handle.
 .BR pam.conf (5),
 .BR user_attr (5),
 .BR attributes (7)
-.sp
-.LP
-Chapter 17, \fIUsing PAM,\fR in \fISystem Administration Guide: Security
-Services\fR
 .SH NOTES
-.sp
-.LP
 The functionality described on this manual page is available only if the system
 is configured with Trusted Extensions.

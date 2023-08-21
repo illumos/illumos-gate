@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_START 3PAM "Feb 22, 2005"
+.TH PAM_START 3PAM "August 19, 2023"
 .SH NAME
 pam_start, pam_end \- PAM authentication transaction functions
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 #include <security/pam_appl.h>
@@ -22,8 +21,6 @@ pam_start, pam_end \- PAM authentication transaction functions
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_start()\fR function is called to initiate an authentication
 transaction. It takes as arguments the name of the current service,
 \fIservice\fR, the name of the user to be authenticated, \fIuser\fR, the
@@ -165,18 +162,9 @@ the authentication module. The argument, \fIstatus\fR, is passed to the
 determine what module-specific state must be purged.  A cleanup function is
 attached to the handle by the underlying \fBPAM\fR modules through a call to
 \fBpam_set_data\fR(3PAM) to free module-specific data.
-.sp
-.LP
-Refer to \fISolaris Security for Developers Guide\fR for information about
-providing authentication, account management, session management, and password
-management through PAM modules.
 .SH RETURN VALUES
-.sp
-.LP
 Refer to the RETURN VALUES section on \fBpam\fR(3PAM).
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -193,8 +181,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_acct_mgmt (3PAM),
@@ -205,11 +191,6 @@ MT-Level	MT-Safe with exceptions
 .BR pam_setcred (3PAM),
 .BR pam_strerror (3PAM),
 .BR attributes (7)
-.sp
-.LP
-\fISolaris Security for Developers Guide\fR
 .SH NOTES
-.sp
-.LP
-The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multithreaded application uses its own \fBPAM\fR handle.

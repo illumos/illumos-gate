@@ -4,20 +4,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_AUTHTOK_CHECK 7 "Mar 1, 2005"
+.TH PAM_AUTHTOK_CHECK 7 "August 19, 2023"
 .SH NAME
 pam_authtok_check \- authentication and password management module
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_authtok_check.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBpam_authtok_check\fR provides functionality to the Password Management
-stack. The implementation of \fBpam_sm_chauthtok()\fR performs a number of
+stack. The implementation of \fBpam_sm_chauthtok\fR(3PAM) performs a number of
 checks on the construction of the newly entered password.
 \fBpam_sm_chauthtok()\fR is invoked twice by the PAM framework, once with flags
 set to \fBPAM_PRELIM_CHECK\fR, and once with flags set to
@@ -136,12 +133,9 @@ flag. The \fBPAM_NO_AUTHTOK_CHECK\fR flag can be set to bypass password checks
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 If the password in \fBPAM_AUTHTOK\fR passes all tests, \fBPAM_SUCCESS\fR is
 returned. If any of the tests fail, \fBPAM_AUTHTOK_ERR\fR is returned.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB/etc/default/passwd\fR
@@ -151,8 +145,6 @@ See \fBpasswd\fR(1) for a description of the contents.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -169,13 +161,12 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR passwd (1),
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_chauthtok (3PAM),
+.BR pam_sm_chauthtok (3PAM),
 .BR pam.conf (5),
 .BR passwd (5),
 .BR shadow (5),
@@ -189,8 +180,6 @@ MT Level	MT-Safe with exceptions
 .BR pam_unix_session (7),
 .BR mkpwdict (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
 .sp

@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_UNIX_AUTH 7 "Apr 23, 2008"
+.TH PAM_UNIX_AUTH 7 "August 19, 2023"
 .SH NAME
 pam_unix_auth \- PAM authentication module for UNIX
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_unix_auth.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The \fBpam_unix_auth\fR module implements \fBpam_sm_authenticate()\fR, which
+The \fBpam_unix_auth\fR module implements \fBpam_sm_authenticate\fR(3PAM), which
 provides functionality to the PAM authentication stack. It provides functions
 that use \fBcrypt\fR(3C) to verify that the password contained in the \fBPAM\fR
 item \fBPAM_AUTHTOK\fR is the correct password for the user specified in the
@@ -81,8 +78,6 @@ option allows for exempting account locking on a per service basis.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The following error codes are returned from \fBpam_sm_authenticate()\fR:
 .sp
 .ne 2
@@ -178,8 +173,6 @@ Ignores this module regardless of the control flag.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -196,16 +189,15 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR login (1),
 .BR passwd (1),
 .BR crypt (3C),
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
-.BR pam_authenticate (3PAM),
 .BR pam_setcred (3PAM),
+.BR pam_sm_authenticate (3PAM),
+.BR pam_sm_setcred (3PAM),
 .BR nsswitch.conf (5),
 .BR pam.conf (5),
 .BR passwd (5),
@@ -219,14 +211,9 @@ MT Level	MT-Safe with exceptions
 .BR pam_dhkeys (7),
 .BR pam_passwd_auth (7),
 .BR pam_unix_account (7),
+.BR pam_unix_cred (7),
 .BR pam_unix_session (7),
-.BR roleadd (8),
-.BR rolemod (8),
-.BR useradd (8),
-.BR usermod (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
 .sp

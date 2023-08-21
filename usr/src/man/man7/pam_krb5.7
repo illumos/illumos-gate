@@ -3,30 +3,24 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_KRB5 7 "Apr 8, 2008"
+.TH PAM_KRB5 7 "August 19, 2023"
 .SH NAME
 pam_krb5 \- authentication, account, session, and password management PAM
 modules for Kerberos V5
 .SH SYNOPSIS
-.LP
 .nf
-/usr/lib/security/pam_krb5.so.1
+pam_krb5.so.1
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The Kerberos V5 service module for \fBPAM\fR provides functionality for all
+The Kerberos V5 service module for \fBPAM\fR, \fBpam_krb5.so.1\fR,
+provides functionality for all
 four \fBPAM\fR modules: authentication, account management, session management,
-and password management. The service module is a shared object that can be
-dynamically loaded to provide the necessary functionality upon demand. Its path
-is specified in the \fBPAM\fR configuration file.
+and password management.
 .SS "Kerberos Authentication Module"
-.sp
-.LP
 The Kerberos V5 authentication component provides functions to verify the
-identity of a user, \fBpam_sm_authenticate()\fR, and to manage the Kerberos
-credentials cache, \fBpam_sm_setcred()\fR.
+identity of a user, \fBpam_sm_authenticate\fR(3PAM), and to manage the Kerberos
+credentials cache, \fBpam_sm_setcred\fR(3PAM).
 .sp
 .LP
 \fBpam_sm_authenticate()\fR authenticates a user principal through the Kerberos
@@ -140,8 +134,6 @@ Turns off warning messages.
 .RE
 
 .SS "Kerberos V5 Account Management Module"
-.sp
-.LP
 The Kerberos account management component provides a function to perform
 account management, \fBpam_sm_acct_mgmt()\fR. This function checks to see if
 the \fBpam_krb5\fR authentication module has noted that the user's password has
@@ -167,15 +159,11 @@ expiration information used to warn the user.
 .RE
 
 .SS "Kerberos V5 Session Management Module"
-.sp
-.LP
 The Kerberos V5 session management component provides functions to initiate
 \fBpam_sm_open_session()\fR and terminate \fBpam_sm_close_session()\fR Kerberos
 sessions. For Kerberos V5, both \fBpam_sm_open_session\fR and
 \fBpam_sm_close_session()\fR are null functions, returning \fBPAM_IGNORE\fR.
 .SS "Kerberos V5 Password Management Module"
-.sp
-.LP
 The Kerberos V5 password management component provides a function to change
 passwords, \fBpam_sm_chauthtok()\fR, in the Key Distribution Center (\fBKDC\fR)
 database. The following flags may be passed to \fBpam_sm_chauthtok\fR(3PAM):
@@ -225,8 +213,6 @@ Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The following error codes are returned for \fBpam_sm_authenticate()\fR:
 .sp
 .ne 2
@@ -479,7 +465,6 @@ Successfully changed the user's Kerberos password.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAuthenticate Users Through Kerberos as First Choice
 .sp
 .LP
@@ -665,8 +650,6 @@ Non-Kerberos users should specify their respective repositories by using the
 \fB-r\fR option when changing their password with the \fBpasswd\fR(1) command.
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -681,8 +664,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR kdestroy (1),
 .BR kinit (1),
 .BR kpasswd (1),
@@ -703,8 +684,6 @@ Interface Stability	Evolving
 .BR krb5envvar (7),
 .BR ktkt_warnd (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
 .sp

@@ -3,22 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SMB_PASSWD 7 "Apr 29, 2008"
+.TH PAM_SMB_PASSWD 7 "August 19, 2023"
 .SH NAME
 pam_smb_passwd \- SMB password management module
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_smb_passwd.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_smb_passwd\fR module enhances the PAM password management stack.
 This functionality supports the changing or adding of SMB passwords for local
-Solaris users. The Solaris CIFS server uses SMB passwords to authenticate
-connected Solaris users. This module includes the \fBpam_sm_chauthtok\fR(3PAM)
+users. The CIFS server uses SMB passwords to authenticate
+connected users. This module includes the \fBpam_sm_chauthtok\fR(3PAM)
 function.
 .sp
 .LP
@@ -83,19 +80,16 @@ Suppresses warning messages.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/smb/smbpasswd\fR\fR
 .ad
 .sp .6
 .RS 4n
-Stores SMB passwords for Solaris users.
+Stores SMB passwords for users.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 Upon successful completion of \fBpam_sm_chauthtok()\fR, \fBPAM_SUCCESS\fR is
 returned. The following error codes are returned upon error:
 .sp
@@ -149,8 +143,6 @@ User is unknown
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See the \fBattributes\fR(7) man page for descriptions of the following
 attributes:
 .sp
@@ -168,8 +160,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
@@ -180,10 +170,8 @@ MT Level	MT-Safe with exceptions
 .BR attributes (7),
 .BR smbd (8)
 .SH NOTES
-.sp
-.LP
-The interfaces in \fBlibpam\fR(3LIB) are MT-Safe \fBonly\fR if each thread
-within the multi-threaded application uses its own PAM handle.
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own PAM handle.
 .sp
 .LP
 The \fBpam_smb_passwd.so.1\fR module should be stacked following all password

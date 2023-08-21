@@ -3,17 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_KRB5_MIGRATE 7 "November 22, 2021"
+.TH PAM_KRB5_MIGRATE 7 "August 19, 2023"
 .SH NAME
 pam_krb5_migrate \- authentication PAM module for the KerberosV5 auto-migration
 of users feature
 .SH SYNOPSIS
 .nf
-\fB/usr/lib/security/pam_krb5_migrate.so.1\fR
+\fBpam_krb5_migrate.so.1\fR
 .fi
 
 .SH DESCRIPTION
-The KerberosV5 auto-migrate service module for PAM provides functionality for
+The KerberosV5 auto-migrate service module for \fBPAM\fR,
+\fBpam_krb5_migrate.so.1\fR, provides functionality for
 the PAM authentication component. The service module helps in the automatic
 migration of \fBPAM_USER\fR to the client's local Kerberos realm, using
 \fBPAM_AUTHTOK\fR (the PAM authentication token associated with \fBPAM_USER\fR)
@@ -44,7 +45,8 @@ unless instructed otherwise by the presence of the \fBquiet\fR option.
 .LP
 The authentication component always returns \fBPAM_IGNORE\fR and is meant to be
 stacked in \fBpam.conf\fR with a requirement that it be listed below
-pam_authtok_get(7) in the authentication stack. Also, if \fBpam_krb5_migrate\fR
+\fBpam_authtok_get\fR(7) in the authentication stack.
+Also, if \fBpam_krb5_migrate\fR
 is used in the authentication stack of a particular service, it is mandatory
 that \fBpam_krb5\fR(7) be listed in the PAM account stack of that service for
 proper operation (see EXAMPLES).

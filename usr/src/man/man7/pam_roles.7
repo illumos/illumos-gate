@@ -3,25 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_ROLES 7 "Mar 6, 2007"
+.TH PAM_ROLES 7 "August 19, 2023"
 .SH NAME
-pam_roles \- Solaris Roles account management module
+pam_roles \- Roles account management module
 .SH SYNOPSIS
-.LP
 .nf
 pam_roles.so.1
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_roles\fR module implements \fBpam_sm_acct_mgmt\fR(3PAM). It provides
 functionality to verify that a user is authorized to assume a role. It also
 prevents direct logins to a role. The \fBuser_attr\fR(5) database is used to
 determine which users can assume which roles.
 .sp
 .LP
-The \fBPAM\fR items \fBPAM_USER\fR and \fBPAM_AUSER\fR, and \fBPAM_RHOST\fR are
+The \fBPAM\fR items \fBPAM_USER\fR, \fBPAM_AUSER\fR, and \fBPAM_RHOST\fR are
 used to determine the outcome of this module. \fBPAM_USER\fR represents the new
 identity being verified. \fBPAM_AUSER\fR, if set, represents the user asserting
 a new identity. If \fBPAM_AUSER\fR is not set, the real user \fBID\fR of the
@@ -52,8 +49,6 @@ Provides \fBsyslog\fR(3C) debugging information at the \fBLOG_DEBUG\fR level.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The following values are returned:
 .sp
 .ne 2
@@ -87,7 +82,6 @@ identity name in its list of roles.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fBpam_roles.so.1\fR Module
 .sp
 .LP
@@ -119,27 +113,25 @@ for that role.
 .sp
 .LP
 Remote roles should only be allowed from remote services that can be trusted to
-provide an accurate \fBPAM_AUSER\fRname. This trust is a function of the
-protocol (such as \fBsshd\fR-hostbased).
+provide an accurate \fBPAM_AUSER\fR name. This trust is a function of the
+protocol (such as \fBsshd-hostbased\fR).
 
 .sp
 .LP
 The following is a sample entry for a \fBpam.conf\fR(5) file. It demonstrates
 the use of \fBpam_roles\fR configuration for remote roles for the
-\fBsshd\fR-hostbased service.
+\fBsshd-hostbased\fR service.
 
 .sp
 .in +2
 .nf
 sshd-hostbased account requisite pam_roles.so.1 allow_remote
-sshd-hostbased account required pam_unix_account
+sshd-hostbased account required pam_unix_account.so.1
 .fi
 .in -2
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -156,8 +148,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR roles (1),
 .BR syslog (3C),
 .BR libpam (3LIB),
@@ -180,8 +170,6 @@ MT Level	MT-Safe with exceptions
 .BR sshd (8),
 .BR su (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
 .sp
@@ -191,7 +179,7 @@ as it never makes a positive decision.
 .sp
 .LP
 The \fBallow_remote\fR option should only be specified for services that are
-trusted to correctly identify the remote user (that is, \fBsshd\fR-hostbased).
+trusted to correctly identify the remote user (that is, \fBsshd-hostbased\fR).
 .sp
 .LP
 \fBPAM_AUSER\fR has replaced \fBPAM_RUSER\fR whose definition is limited to the

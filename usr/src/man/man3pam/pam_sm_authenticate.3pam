@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SM_AUTHENTICATE 3PAM "Jan 27, 2005"
+.TH PAM_SM_AUTHENTICATE 3PAM "August 19, 2023"
 .SH NAME
 pam_sm_authenticate \- service provider implementation for pam_authenticate
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpam\fR [ \fIlibrary\fR... ]
 #include <security/pam_appl.h>
@@ -19,8 +18,6 @@ pam_sm_authenticate \- service provider implementation for pam_authenticate
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 In response to a call to \fBpam_authenticate\fR(3PAM), the  \fBPAM\fR framework
 calls \fBpam_sm_authenticate()\fR from the modules listed in the
 \fBpam.conf\fR(5) file. The authentication provider supplies the back-end
@@ -39,7 +36,7 @@ mask this error and continue to prompt the user for a password. It should then
 return the error, \fBPAM_USER_UNKNOWN\fR.
 .sp
 .LP
-The following flag may be passed in to \fBpam_sm_authenticate()\fR:
+The following flags may be passed in to \fBpam_sm_authenticate()\fR:
 .sp
 .ne 2
 .na
@@ -88,8 +85,6 @@ for failure) as state in the authentication handle using
 \fBpam_set_data\fR(3PAM). This information is intended for use by
 \fBpam_setcred()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion,  \fBPAM_SUCCESS\fR must be returned. In addition,
 the following values may be returned:
 .sp
@@ -144,12 +139,10 @@ User not known to underlying authentication module.
 .ad
 .RS 25n
 Ignore underlying authentication module regardless of whether the control flag
-is \fIrequired\fR,\fIoptional,\fR or \fIsufficient\fR1.
+is \fIrequired\fR, \fIoptional\fR, or \fIsufficient\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -166,8 +159,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_authenticate (3PAM),
@@ -179,15 +170,13 @@ MT-Level	MT-Safe with exceptions
 .BR pam.conf (5),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 Modules should not retry the authentication in the event of a failure.
 Applications handle authentication retries and maintain the retry count. To
 limit the number of retries, the module can return a \fBPAM_MAXTRIES\fR error.
 .sp
 .LP
-The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
-multithreaded application uses its own  \fBPAM\fR handle.
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.
 .sp
 .LP
 If the \fBPAM_REPOSITORY\fR \fIitem_type\fR is set and a service module does

@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SM_CHAUTHTOK 3PAM "Mar 1, 2005"
+.TH PAM_SM_CHAUTHTOK 3PAM "August 19, 2023"
 .SH NAME
 pam_sm_chauthtok \- service provider implementation for pam_chauthtok
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ...] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 #include <security/pam_appl.h>
@@ -18,10 +17,8 @@ pam_sm_chauthtok \- service provider implementation for pam_chauthtok
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-In response to a call to \fBpam_chauthtok()\fR the \fBPAM\fR framework calls
-pam_sm_chauthtok(3PAM) from the modules listed in the \fBpam.conf\fR(5) file.
+In response to a call to \fBpam_chauthtok\fR(3PAM) the \fBPAM\fR framework calls
+\fBpam_sm_chauthtok\fR() from the modules listed in the \fBpam.conf\fR(5) file.
 The password management provider supplies the back-end functionality for this
 interface function.
 .sp
@@ -31,7 +28,7 @@ associated with a particular user referenced by the authentication handle
 \fIpamh\fR.
 .sp
 .LP
-The following flag may be passed to \fBpam_chauthtok()\fR:
+The following flags may be passed to \fBpam_chauthtok()\fR:
 .sp
 .ne 2
 .na
@@ -110,8 +107,6 @@ and retrieve both \fBPAM_AUTHTOK\fR and \fBPAM_OLDAUTHTOK\fR. If both are
 \fINULL\fR, \fBpam_sm_chauthtok()\fR should set them to the new and old
 passwords as entered by the user.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBPAM_SUCCESS\fR must be returned. The following
 values may also be returned:
 .sp
@@ -178,8 +173,6 @@ Preliminary check by password service failed.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -196,8 +189,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_chauthtok (3PAM),
@@ -208,8 +199,6 @@ MT-Level	MT-Safe with exceptions
 .BR attributes (7),
 .BR ping (8)
 .SH NOTES
-.sp
-.LP
 The \fBPAM\fR framework invokes the password services twice. The first time the
 modules are invoked with the flag, \fBPAM_PRELIM_CHECK\fR. During this stage,
 the password modules should only perform preliminary checks. For example, they
@@ -237,7 +226,7 @@ this information using \fBpam_get_data()\fR to determine whether or not it
 should prompt the user to update the password for this particular module.
 .sp
 .LP
-The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multithreaded application uses its own \fBPAM\fR handle.
 .sp
 .LP

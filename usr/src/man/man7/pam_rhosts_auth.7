@@ -4,28 +4,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_RHOSTS_AUTH 7 "Oct 28, 1996"
+.TH PAM_RHOSTS_AUTH 7 "August 19, 2023"
 .SH NAME
 pam_rhosts_auth \- authentication management PAM module using ruserok()
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/lib/security/pam_rhosts_auth.so.1\fR
+\fBpam_rhosts_auth.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The rhosts  \fBPAM\fR module,  \fB/usr/lib/security/pam_rhosts_auth.so.1\fR,
+The rhosts \fBPAM\fR module, \fBpam_rhosts_auth.so.1\fR,
 authenticates a user via the \fBrlogin\fR authentication protocol. Only
-\fBpam_sm_authenticate()\fR is implemented within this module.
+\fBpam_sm_authenticate\fR(3PAM) is implemented within this module.
 \fBpam_sm_authenticate()\fR uses the \fBruserok\fR(3SOCKET) library function to
-authenticate the \fBrlogin\fR or \fBrsh\fR user. \fBpam_sm_setcred()\fR is a
+authenticate the \fBrlogin\fR or \fBrsh\fR user. \fBpam_sm_setcred\fR(3PAM) is a
 null function.
 .sp
 .LP
-\fB/usr/lib/security/pam_rhosts_auth.so.1\fR is designed to be stacked on top
-of  the \fB/usr/lib/security/pam_unix.so.1\fR module for both the \fBrlogin\fR
+\fBpam_rhosts_auth.so.1\fR is designed to be stacked on top
+of  the \fBpam_unix.so.1\fR module for both the \fBrlogin\fR
 and \fBrsh\fR services. This module is normally configured as \fIsufficient\fR
 so that subsequent authentication is performed only on failure of
 \fBpam_sm_authenticate()\fR. The following option may be passed in to this
@@ -40,8 +37,6 @@ service module:
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -56,17 +51,14 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
-.BR pam_authenticate (3PAM),
+.BR pam_sm_authenticate (3PAM),
+.BR pam_sm_setcred (3PAM),
 .BR ruserok (3SOCKET),
 .BR pam.conf (5),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
-The interfaces in  \fBlibpam()\fR are MT-Safe only if each thread within the
-multi-threaded application uses its own  \fBPAM\fR handle.
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own \fBPAM\fR handle.

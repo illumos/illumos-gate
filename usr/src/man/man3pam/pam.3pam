@@ -3,36 +3,26 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM 3PAM "Feb 22, 2005"
+.TH PAM 3PAM "August 19, 2023"
 .SH NAME
 pam \- PAM (Pluggable Authentication Module)
 .SH SYNOPSIS
-.LP
 .nf
 #include <security/pam_appl.h>
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBPAM\fR framework, \fBlibpam\fR, consists of an interface library and
 multiple authentication  service modules.  The \fBPAM\fR interface library is
-the layer implementing the  Application Programming Interface ( \fBAPI\fR ).
+the layer implementing the  Application Programming Interface (\fBAPI\fR).
 The authentication service modules are a set of dynamically loadable objects
 invoked by the \fBPAM\fR \fBAPI\fR to provide a particular type of user
 authentication. \fBPAM\fR gives system administrators the flexibility of
 choosing any authentication service available on the system to perform
 authentication. This framework also allows new authentication service modules
 to be plugged in and made available without modifying the applications.
-.sp
-.LP
-Refer to  \fISolaris Security for Developers Guide\fR for information about
-providing authentication, account management, session management, and password
-management through PAM modules.
 .SS "Interface Overview"
-.sp
-.LP
 The \fBPAM\fR library interface consists of six categories of functions,  the
 names for which all start with the prefix  \fBpam_\fR.
 .sp
@@ -83,8 +73,6 @@ extra parameters to pass service\(mispecific options to the shared modules.
 Refer to \fBpam_sm\fR(3PAM) for an overview of the \fBPAM\fR service module
 \fBAPIs.\fR
 .SS "Stateful Interface"
-.sp
-.LP
 A sequence of calls sharing a common set of state information is referred to as
 an authentication transaction.  An authentication  transaction begins with a
 call to \fBpam_start()\fR. \fBpam_start()\fR allocates space, performs various
@@ -123,8 +111,6 @@ To terminate an authentication transaction, the application simply calls
 \fBpam_end()\fR, which frees previously allocated space used to store
 authentication information.
 .SS "Application\(miAuthentication Service Interactive Interface"
-.sp
-.LP
 The authentication service in \fBPAM\fR does not communicate directly with the
 user; instead it relies on the application to perform all such interactions.
 The application passes a pointer to the function, \fBconv()\fR, along with any
@@ -134,8 +120,6 @@ call to \fBpam_start()\fR. The service will then use the function,
 \fBconv()\fR, to prompt the user for data,  output error messages, and display
 text information. Refer to \fBpam_start\fR(3PAM) for more information.
 .SS "Stacking Multiple Schemes"
-.sp
-.LP
 The \fBPAM\fR architecture enables authentication by multiple authentication
 services through \fIstacking\fR. System entry applications, such as
 \fBlogin\fR(1), stack multiple service modules to authenticate users with
@@ -144,15 +128,11 @@ modules are stacked is specified in the configuration file, \fBpam.conf\fR(5).
 A system administrator determines this ordering, and also determines  whether
 the same password can be used for all authentication services.
 .SS "Administrative Interface"
-.sp
-.LP
 The authentication library, \fB/usr/lib/libpam.so.1\fR, implements the
 framework interface. Various authentication services are  implemented by their
 own loadable modules whose paths are specified through the \fBpam.conf\fR(5)
 file.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBPAM\fR functions may return one of the following generic values,  or one
 of the values defined in the specific man pages:
 .sp
@@ -228,8 +208,6 @@ Permission denied.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -244,8 +222,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR login (1),
 .BR pam_authenticate (3PAM),
 .BR pam_chauthtok (3PAM),
@@ -257,11 +233,6 @@ MT Level	MT-Safe with exceptions
 .BR pam_strerror (3PAM),
 .BR pam.conf (5),
 .BR attributes (7)
-.sp
-.LP
-\fISolaris Security for Developers Guide\fR
 .SH NOTES
-.sp
-.LP
-The interfaces in  \fBlibpam()\fR are MT-Safe only if each thread within the
-multithreaded application uses its own  \fBPAM\fR handle.
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

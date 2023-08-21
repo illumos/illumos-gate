@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_UNIX_CRED 7 "Mar 9, 2005"
+.TH PAM_UNIX_CRED 7 "August 19, 2023"
 .SH NAME
-pam_unix_cred \- PAM user credential authentication module for UNIX
+pam_unix_cred \- PAM user credential module for UNIX
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_unix_cred.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_unix_cred\fR module implements \fBpam_sm_setcred\fR(3PAM). It
 provides functions that establish user credential information. It is a module
 separate from the \fBpam_unix_auth\fR(7) module to allow replacement of the
@@ -101,8 +98,6 @@ Disables any warning messages.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 Upon successful completion of \fBpam_sm_setcred()\fR, \fBPAM_SUCCESS\fR is
 returned. The following error codes are returned upon error:
 .sp
@@ -172,8 +167,6 @@ Ignores this module regardless of the control flag
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -190,34 +183,18 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-.BR ssh (1),
-.BR settaskid (2),
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
-.BR pam_set_item (3PAM),
 .BR pam_sm_authenticate (3PAM),
-.BR getprojent (3PROJECT),
-.BR setproject (3PROJECT),
-.BR nsswitch.conf (5),
+.BR pam_sm_setcred (3PAM),
 .BR pam.conf (5),
 .BR project (5),
 .BR attributes (7),
-.BR pam_authtok_check (7),
-.BR pam_authtok_get (7),
-.BR pam_authtok_store (7),
-.BR pam_dhkeys (7),
-.BR pam_passwd_auth (7),
-.BR pam_unix_account (7),
 .BR pam_unix_auth (7),
 .BR pam_unix_session (7),
-.BR privileges (7),
 .BR su (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
 .sp
