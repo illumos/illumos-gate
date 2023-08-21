@@ -25,7 +25,8 @@
 #define	MEM_LOC_GDT		0x206000
 #define	MEM_LOC_TSS		0x206200
 #define	MEM_LOC_IDT		0x207000
-#define	MEM_LOC_STACK		0x400000
+#define	MEM_LOC_HEAP		0x400000
+#define	MEM_LOC_STACK		0x7fff00
 #define	MEM_LOC_PAYLOAD		0x800000
 #define	MEM_LOC_ROM		0xffff000
 
