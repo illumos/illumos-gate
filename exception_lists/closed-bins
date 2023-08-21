@@ -75,6 +75,8 @@
 ./usr/kernel/drv/amd64/llc2
 ./usr/kernel/drv/llc2.conf
 ./usr/kernel/drv/llc2
+./usr/lib/amd64/libike.so
+./usr/lib/amd64/llib-like.ln
 ./usr/lib/inet/i86
 ./usr/lib/inet/i86/in.iked
 ./usr/lib/libike.so
@@ -87,6 +89,8 @@
 ./usr/lib/llc2/llc2_tparser
 ./usr/lib/llc2/llc2_tcap
 ./usr/lib/llc2/llc2_loop2
+./usr/lib/llib-like
+./usr/lib/llib-like.ln
 ./usr/lib/locale/iso_8859_1
 ./usr/lib/locale/iso_8859_1/LC_CTYPE
 ./usr/lib/locale/iso_8859_1/amd64
