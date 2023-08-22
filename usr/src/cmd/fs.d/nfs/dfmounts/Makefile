@@ -30,8 +30,8 @@ ATTMK=		$(LIBPROG)
 
 include ../../Makefile.fstype
 
-OBJS= 	$(LIBPROG).o
-SRCS=	$(OBJS:%.o=%.c)
+OBJS=	$(LIBPROG).o clnt_subr.o
+SRCS=	$(LIBPROG).c ../lib/clnt_subr.c
 
 #
 # Message catalog
@@ -40,22 +40,20 @@ POFILES= $(OBJS:%.o=%.po)
 POFILE= dfmounts.po
 
 LDLIBS +=	-lrpcsvc -lnsl
-
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-parentheses
-
-# unknown type for func
-SMATCH =	off
+CPPFLAGS +=	-I../lib
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
+clnt_subr.o:	../lib/clnt_subr.c
+	$(COMPILE.c)	../lib/clnt_subr.c
+
 #
 # message catalog
 #
 catalog: $(POFILE)
- 
+
 $(POFILE): $(SRCS)
 	 $(RM) $@
 	 $(COMPILE.cpp)   $(SRCS) > $(POFILE).i
@@ -63,7 +61,5 @@ $(POFILE): $(SRCS)
 	 sed "/^domain/d" messages.po > $@
 	 $(RM) messages.po $(POFILE).i
 
-lint:	lint_SRCS
-
-clean:     
+clean:
 	$(RM) $(OBJS)

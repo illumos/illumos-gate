@@ -3,27 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOVIA823X 4D "May 12, 2009"
+.TH AUDIOVIA823X 4D "June 8, 2023"
 .SH NAME
-audiovia823x \- VIA VT8233, VT8235, and VT8237) support
+audiovia823x \- VIA VT8233, VT8235, and VT8237 support
 .SH DESCRIPTION
-.sp
-.LP
-The \fBaudiovia823\fR\fIx\fR driver provides support for the VIA VT8233,
+The \fBaudiovia823x\fR driver provides support for the VIA VT8233,
 VT8235, and VT8237 AC'97 devices found on motherboards with certain VIA chip
 sets.
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/audiovia823x\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit x86 kernel module
-.RE
-
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/amd64/audiovia823x\fR\fR
@@ -34,8 +21,6 @@ sets.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -52,8 +37,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR audio (4I),
 .BR dsp (4I),
 .BR mixer (4I),

@@ -47,6 +47,7 @@ extern "C" {
 #ifndef	_ASM
 #include <sys/types.h>
 #include <sys/machelf.h>
+#include <sys/stddef.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <libelf.h>
@@ -81,20 +82,20 @@ extern const char link_ver_string[];
  * General align and round macros.
  */
 #define	S_ALIGN(x, a)	((x) & ~(((a) ? (a) : 1) - 1))
-#define	S_ROUND(x, a)   ((x) + (((a) ? (a) : 1) - 1) & ~(((a) ? (a) : 1) - 1))
+#define	S_ROUND(x, a)   (((x) + (((a) ? (a) : 1) - 1)) & ~(((a) ? (a) : 1) - 1))
 
 /*
  * Bit manipulation macros; generic bit mask and is `v' in the range
  * supportable in `n' bits?
  */
-#define	S_MASK(n)	((1 << (n)) -1)
+#define	S_MASK(n)	((1 << (n)) - 1)
 #define	S_INRANGE(v, n)	(((-(1 << (n)) - 1) < (v)) && ((v) < (1 << (n))))
 
 
 /*
  * Yet another definition of the OFFSETOF macro, used with the AVL routines.
  */
-#define	SGSOFFSETOF(s, m)	((size_t)(&(((s *)0)->m)))
+#define	SGSOFFSETOF(s, m)	offsetof(s, m)
 
 /*
  * When casting between integer and pointer types, gcc will complain

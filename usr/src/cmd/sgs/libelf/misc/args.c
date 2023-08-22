@@ -59,8 +59,7 @@ typedef struct {
 
 /* initialize Arg_Remem */
 static void
-mkar(r)
-Arg_Remem *r;
+mkar(Arg_Remem *r)
 {
 	r->ptr = mk_String((String *)0);
 	r->Sign = r->Uns = r->Cons = r->Vol = 0;
@@ -68,8 +67,7 @@ Arg_Remem *r;
 
 /* free data for Arg_Remem */
 static void
-delar(r)
-Arg_Remem *r;
+delar(Arg_Remem *r)
 {
 	free_String(r->ptr);
 }
@@ -109,11 +107,9 @@ setarg(String ** sptr, Arg_Remem * r, const char * c)
  * Returns the number of characters processed from c.
  */
 int
-demangle_doarg(sptr,c)
-String **sptr;
-char *c;
+demangle_doarg(String **sptr, char *c)
 {
-	register int i;
+	int i;
 	Arg_Remem ar;
 	mkar(&ar);
 
@@ -339,15 +335,13 @@ char *c;
  * Returns the number of characters processed from c.
  */
 int
-demangle_doargs(sptr,c)
-String **sptr;
-char *c;
+demangle_doargs(String **sptr, char *c)
 {
-	int i,n = 0;
+	int i = 0, n = 0;
 	here.pos = 0;
 
 	*sptr = app_String(*sptr,MSG_ORIG(MSG_STR_OPENPAR));
-	while(*c && (i = demangle_doarg(sptr,c)) > 0) {
+	while (*c && (i = demangle_doarg(sptr,c)) > 0) {
 		c += i;
 		n += i;
 		(*sptr) = app_String(*sptr,(*c && *c == 'e') ?

@@ -50,8 +50,6 @@ CFLAGS64 +=	$(CCVERBOSE) $(DEBUG)
 
 NATIVE_CFLAGS +=	$(CCVERBOSE) $(DEBUG)
 
-CERRWARN +=	-_gcc=-Wno-type-limits
-CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-value
 
 #

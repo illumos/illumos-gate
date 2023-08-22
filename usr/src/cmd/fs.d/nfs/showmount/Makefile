@@ -33,8 +33,8 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 
 include		../../Makefile.fstype
 
-OBJS= 		$(LIBPROG).o
-SRCS=		$(OBJS:%.o=%.c)
+OBJS=		$(LIBPROG).o clnt_subr.o
+SRCS=		$(LIBPROG).c ../lib/clnt_subr.c
 
 #
 # Message catalog
@@ -42,23 +42,17 @@ SRCS=		$(OBJS:%.o=%.c)
 POFILE= showmount.po
 
 LDLIBS +=	-lrpcsvc -lnsl
-
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	$(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
+CPPFLAGS +=	-I../lib
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-lint:	lint_SRCS
-
 $(ROOTUSRSBIN)/$(LIBPROG):
 		$(RM) $@; $(SYMLINK) $(LINKVALUE) $@
+
+clnt_subr.o:	../lib/clnt_subr.c
+	$(COMPILE.c)	../lib/clnt_subr.c
 
 #
 # message catalog
@@ -73,5 +67,5 @@ $(POFILE):      $(SRCS)
 	sed "/^domain/d"        messages.po     > $@
 	$(RM) messages.po $(POFILE).i
 
-clean:     
+clean:
 	$(RM) $(OBJS)

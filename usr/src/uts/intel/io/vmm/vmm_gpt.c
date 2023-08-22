@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -44,14 +44,13 @@
  * well as a pointer to the root node in the tree.
  *
  * A node in the GPT keep pointers to its parent (NULL for the root), its
- * left-most child, and its rightward siblings.  The node understands its
- * position in the tree in terms of its level it appears at and the index it
- * occupies at its parent's level, as well as how many children it has.  It also
- * owns the physical memory page for the hardware page table entries that map
- * its children.  Thus, for a node at any given level in the tree, the nested
- * PTE for that node's child at index $i$ is the i'th uint64_t in that node's
- * entry page and the entry page is part of the paging structure consumed by
- * hardware.
+ * left-most child, and its siblings.  The node understands its position in the
+ * tree in terms of the level it appears at and the index it occupies at its
+ * parent's level, as well as how many children it has.  It also owns the
+ * physical memory page for the hardware page table entries that map its
+ * children.  Thus, for a node at any given level in the tree, the nested PTE
+ * for that node's child at index $i$ is the i'th uint64_t in that node's entry
+ * page and the entry page is part of the paging structure consumed by hardware.
  *
  * The GPT interface provides functions for populating and vacating the tree for
  * regions in the guest physical address space, and for mapping and unmapping
@@ -74,10 +73,10 @@
  * A GPT node.
  *
  * Each node contains pointers to its parent, its left-most child, and its
- * rightward siblings.  Interior nodes also maintain a reference count, and
- * each node contains its level and index in its parent's table.  Finally,
- * each node contains the host PFN of the page that it links into the page
- * table, as well as a kernel pointer to table.
+ * siblings.  Interior nodes also maintain a reference count, and each node
+ * contains its level and index in its parent's table.  Finally, each node
+ * contains the host PFN of the page that it links into the page table, as well
+ * as a kernel pointer to table.
  *
  * On leaf nodes, the reference count tracks how many entries in the table are
  * covered by mapping from the containing vmspace.  This is maintained during
@@ -95,11 +94,15 @@ struct vmm_gpt_node {
 	uint32_t	vgn_ref_cnt;
 	vmm_gpt_node_t	*vgn_parent;
 	vmm_gpt_node_t	*vgn_children;
-	vmm_gpt_node_t	*vgn_siblings;
+	vmm_gpt_node_t	*vgn_sib_next;
+	vmm_gpt_node_t	*vgn_sib_prev;
 	uint64_t	*vgn_entries;
 	uint64_t	vgn_gpa;
-	uint64_t	_vgn_pad;
 };
+
+/* Maximum node index determined by number of entries in page table (512) */
+#define	PTE_PER_TABLE	512
+#define	MAX_NODE_IDX	(PTE_PER_TABLE - 1)
 
 /*
  * A VMM Generic Page Table.
@@ -114,10 +117,6 @@ struct vmm_gpt {
 	vmm_gpt_node_t	*vgpt_root;
 	vmm_pte_ops_t	*vgpt_pte_ops;
 };
-
-/*
- * VMM Guest Page Tables
- */
 
 /*
  * Allocates a vmm_gpt_node_t structure with corresponding page of memory to
@@ -158,9 +157,9 @@ vmm_gpt_alloc(vmm_pte_ops_t *pte_ops)
 }
 
 /*
- * Frees the given node, first nulling out all of its links to other nodes in
- * the tree, adjusting its parents reference count, and unlinking itself from
- * its parents page table.
+ * Frees a given node.  The node is expected to have no familial (parent,
+ * children, siblings) associations at this point.  Accordingly, its reference
+ * count should be zero.
  */
 static void
 vmm_gpt_node_free(vmm_gpt_node_t *node)
@@ -169,54 +168,172 @@ vmm_gpt_node_free(vmm_gpt_node_t *node)
 	ASSERT3U(node->vgn_ref_cnt, ==, 0);
 	ASSERT(node->vgn_host_pfn != PFN_INVALID);
 	ASSERT(node->vgn_entries != NULL);
-	if (node->vgn_parent != NULL) {
-		uint64_t *parent_entries = node->vgn_parent->vgn_entries;
-		parent_entries[node->vgn_index] = 0;
-		node->vgn_parent->vgn_ref_cnt--;
-	}
+	ASSERT(node->vgn_parent == NULL);
+
 	kmem_free(node->vgn_entries, PAGESIZE);
 	kmem_free(node, sizeof (*node));
 }
 
 /*
- * Frees the portion of the radix tree rooted at the given node.
- */
-static void
-vmm_gpt_node_tree_free(vmm_gpt_node_t *node)
-{
-	ASSERT(node != NULL);
-
-	for (vmm_gpt_node_t *child = node->vgn_children, *next = NULL;
-	    child != NULL;
-	    child = next) {
-		next = child->vgn_siblings;
-		vmm_gpt_node_tree_free(child);
-	}
-	vmm_gpt_node_free(node);
-}
-
-/*
- * Cleans up a vmm_gpt_t by removing any lingering vmm_gpt_node_t entries
- * it refers to.
+ * Frees a vmm_gpt_t.  Any lingering nodes in the GPT will be freed too.
  */
 void
 vmm_gpt_free(vmm_gpt_t *gpt)
 {
-	vmm_gpt_node_tree_free(gpt->vgpt_root);
+	/* Empty anything remaining in the tree */
+	vmm_gpt_vacate_region(gpt, 0, UINT64_MAX & PAGEMASK);
+
+	VERIFY(gpt->vgpt_root != NULL);
+	VERIFY3U(gpt->vgpt_root->vgn_ref_cnt, ==, 0);
+
+	vmm_gpt_node_free(gpt->vgpt_root);
 	kmem_free(gpt, sizeof (*gpt));
 }
 
 /*
- * Return the index in the paging structure for the given level.
+ * Given a GPA, return its corresponding index in a paging structure at the
+ * provided level.
  */
 static inline uint16_t
-vmm_gpt_node_index(uint64_t gpa, enum vmm_gpt_node_level level)
+vmm_gpt_lvl_index(vmm_gpt_node_level_t level, uint64_t gpa)
 {
-	const int SHIFTS[MAX_GPT_LEVEL] = { 39, 30, 21, 12 };
-	const uint_t MASK = (1U << 9) - 1;
 	ASSERT(level < MAX_GPT_LEVEL);
-	return ((gpa >> SHIFTS[level]) & MASK);
+
+	const uint_t shifts[] = {
+		[LEVEL4] = 39,
+		[LEVEL3] = 30,
+		[LEVEL2] = 21,
+		[LEVEL1] = 12,
+	};
+	const uint16_t mask = (1U << 9) - 1;
+	return ((gpa >> shifts[level]) & mask);
 }
+
+/* Get mask for addresses of entries at a given table level. */
+static inline uint64_t
+vmm_gpt_lvl_mask(vmm_gpt_node_level_t level)
+{
+	ASSERT(level < MAX_GPT_LEVEL);
+
+	const uint64_t gpa_mask[] = {
+		[LEVEL4] = 0xffffff8000000000ul, /* entries cover 512G */
+		[LEVEL3] = 0xffffffffc0000000ul, /* entries cover 1G */
+		[LEVEL2] = 0xffffffffffe00000ul, /* entries cover 2M */
+		[LEVEL1] = 0xfffffffffffff000ul, /* entries cover 4K */
+	};
+	return (gpa_mask[level]);
+}
+
+/* Get length of GPA covered by entries at a given table level. */
+static inline uint64_t
+vmm_gpt_lvl_len(vmm_gpt_node_level_t level)
+{
+	ASSERT(level < MAX_GPT_LEVEL);
+
+	const uint64_t gpa_len[] = {
+		[LEVEL4] = 0x8000000000ul,	/* entries cover 512G */
+		[LEVEL3] = 0x40000000ul,	/* entries cover 1G */
+		[LEVEL2] = 0x200000ul,		/* entries cover 2M */
+		[LEVEL1] = 0x1000ul,		/* entries cover 4K */
+	};
+	return (gpa_len[level]);
+}
+
+/*
+ * Get the ending GPA which this node could possibly cover given its base
+ * address and level.
+ */
+static inline uint64_t
+vmm_gpt_node_end(vmm_gpt_node_t *node)
+{
+	ASSERT(node->vgn_level > LEVEL4);
+	return (node->vgn_gpa + vmm_gpt_lvl_len(node->vgn_level - 1));
+}
+
+/*
+ * Is this node the last entry in its parent node, based solely by its GPA?
+ */
+static inline bool
+vmm_gpt_node_is_last(vmm_gpt_node_t *node)
+{
+	return (node->vgn_index == MAX_NODE_IDX);
+}
+
+/*
+ * How many table entries (if any) in this node are covered by the range of
+ * [start, end).
+ */
+static uint16_t
+vmm_gpt_node_entries_covered(vmm_gpt_node_t *node, uint64_t start, uint64_t end)
+{
+	const uint64_t node_end = vmm_gpt_node_end(node);
+
+	/* Is this node covered at all by the region? */
+	if (start >= node_end || end <= node->vgn_gpa) {
+		return (0);
+	}
+
+	const uint64_t mask = vmm_gpt_lvl_mask(node->vgn_level);
+	const uint64_t covered_start = MAX(node->vgn_gpa, start & mask);
+	const uint64_t covered_end = MIN(node_end, end & mask);
+	const uint64_t per_entry = vmm_gpt_lvl_len(node->vgn_level);
+
+	return ((covered_end - covered_start) / per_entry);
+}
+
+/*
+ * Find the next node (by address) in the tree at the same level.
+ *
+ * Returns NULL if this is the last node in the tree or if `only_seq` was true
+ * and there is an address gap between this node and the next.
+ */
+static vmm_gpt_node_t *
+vmm_gpt_node_next(vmm_gpt_node_t *node, bool only_seq)
+{
+	ASSERT3P(node->vgn_parent, !=, NULL);
+	ASSERT3U(node->vgn_level, >, LEVEL4);
+
+	/*
+	 * Next node sequentially would be the one at the address starting at
+	 * the end of what is covered by this node.
+	 */
+	const uint64_t gpa_match = vmm_gpt_node_end(node);
+
+	/* Try our next sibling */
+	vmm_gpt_node_t *next = node->vgn_sib_next;
+	if (next != NULL) {
+		if (next->vgn_gpa == gpa_match || !only_seq) {
+			return (next);
+		}
+	} else {
+		/*
+		 * If the next-sibling pointer is NULL on the node, it can mean
+		 * one of two things:
+		 *
+		 * 1. This entry represents the space leading up to the trailing
+		 *    boundary of what this node covers.
+		 *
+		 * 2. The node is not entirely populated, and there is a gap
+		 *    between the last populated entry, and the trailing
+		 *    boundary of the node.
+		 *
+		 * Either way, the proper course of action is to check the first
+		 * child of our parent's next sibling.
+		 */
+		vmm_gpt_node_t *pibling = node->vgn_parent->vgn_sib_next;
+		if (pibling != NULL) {
+			next = pibling->vgn_children;
+			if (next != NULL) {
+				if (next->vgn_gpa == gpa_match || !only_seq) {
+					return (next);
+				}
+			}
+		}
+	}
+
+	return (NULL);
+}
+
 
 /*
  * Finds the child for the given GPA in the given parent node.
@@ -225,18 +342,102 @@ vmm_gpt_node_index(uint64_t gpa, enum vmm_gpt_node_level level)
 static vmm_gpt_node_t *
 vmm_gpt_node_find_child(vmm_gpt_node_t *parent, uint64_t gpa)
 {
-	if (parent == NULL)
-		return (NULL);
-
-	const uint16_t index = vmm_gpt_node_index(gpa, parent->vgn_level);
+	const uint16_t index = vmm_gpt_lvl_index(parent->vgn_level, gpa);
 	for (vmm_gpt_node_t *child = parent->vgn_children;
 	    child != NULL && child->vgn_index <= index;
-	    child = child->vgn_siblings) {
+	    child = child->vgn_sib_next) {
 		if (child->vgn_index == index)
 			return (child);
 	}
 
 	return (NULL);
+}
+
+/*
+ * Add a child node to the GPT at a position determined by GPA, parent, and (if
+ * present) preceding sibling.
+ *
+ * If `parent` node contains any children, `prev_sibling` must be populated with
+ * a pointer to the node preceding (by GPA) the to-be-added child node.
+ */
+static void
+vmm_gpt_node_add(vmm_gpt_t *gpt, vmm_gpt_node_t *parent,
+    vmm_gpt_node_t *child, uint64_t gpa, vmm_gpt_node_t *prev_sibling)
+{
+	ASSERT3U(parent->vgn_level, <, LEVEL1);
+	ASSERT3U(child->vgn_parent, ==, NULL);
+
+	const uint16_t idx = vmm_gpt_lvl_index(parent->vgn_level, gpa);
+	child->vgn_index = idx;
+	child->vgn_level = parent->vgn_level + 1;
+	child->vgn_gpa = gpa & vmm_gpt_lvl_mask(parent->vgn_level);
+
+	/* Establish familial connections */
+	child->vgn_parent = parent;
+	if (prev_sibling != NULL) {
+		ASSERT3U(prev_sibling->vgn_gpa, <, child->vgn_gpa);
+
+		child->vgn_sib_next = prev_sibling->vgn_sib_next;
+		if (child->vgn_sib_next != NULL) {
+			child->vgn_sib_next->vgn_sib_prev = child;
+		}
+		child->vgn_sib_prev = prev_sibling;
+		prev_sibling->vgn_sib_next = child;
+	} else if (parent->vgn_children != NULL) {
+		vmm_gpt_node_t *next_sibling = parent->vgn_children;
+
+		ASSERT3U(next_sibling->vgn_gpa, >, child->vgn_gpa);
+		ASSERT3U(next_sibling->vgn_sib_prev, ==, NULL);
+
+		child->vgn_sib_next = next_sibling;
+		child->vgn_sib_prev = NULL;
+		next_sibling->vgn_sib_prev = child;
+		parent->vgn_children = child;
+	} else {
+		parent->vgn_children = child;
+		child->vgn_sib_next = NULL;
+		child->vgn_sib_prev = NULL;
+	}
+
+	/* Configure PTE for child table */
+	parent->vgn_entries[idx] =
+	    gpt->vgpt_pte_ops->vpeo_map_table(child->vgn_host_pfn);
+	parent->vgn_ref_cnt++;
+}
+
+/*
+ * Remove a child node from its relatives (parent, siblings) and free it.
+ */
+static void
+vmm_gpt_node_remove(vmm_gpt_node_t *child)
+{
+	ASSERT3P(child->vgn_children, ==, NULL);
+	ASSERT3U(child->vgn_ref_cnt, ==, 0);
+	ASSERT3P(child->vgn_parent, !=, NULL);
+
+	/* Unlink child from its siblings and parent */
+	vmm_gpt_node_t *parent = child->vgn_parent;
+	vmm_gpt_node_t *prev = child->vgn_sib_prev;
+	vmm_gpt_node_t *next = child->vgn_sib_next;
+	if (prev != NULL) {
+		ASSERT3P(prev->vgn_sib_next, ==, child);
+		prev->vgn_sib_next = next;
+	}
+	if (next != NULL) {
+		ASSERT3P(next->vgn_sib_prev, ==, child);
+		next->vgn_sib_prev = prev;
+	}
+	if (prev == NULL) {
+		ASSERT3P(parent->vgn_children, ==, child);
+		parent->vgn_children = next;
+	}
+	child->vgn_parent = NULL;
+	child->vgn_sib_next = NULL;
+	child->vgn_sib_prev = NULL;
+	parent->vgn_entries[child->vgn_index] = 0;
+	parent->vgn_ref_cnt--;
+
+	vmm_gpt_node_free(child);
 }
 
 /*
@@ -246,7 +447,7 @@ vmm_gpt_node_find_child(vmm_gpt_node_t *parent, uint64_t gpa)
  */
 void
 vmm_gpt_walk(vmm_gpt_t *gpt, uint64_t gpa, uint64_t **entries,
-    enum vmm_gpt_node_level depth)
+    vmm_gpt_node_level_t depth)
 {
 	uint64_t *current_entries, entry;
 	pfn_t pfn;
@@ -258,7 +459,7 @@ vmm_gpt_walk(vmm_gpt_t *gpt, uint64_t gpa, uint64_t **entries,
 			entries[i] = NULL;
 			continue;
 		}
-		entries[i] = &current_entries[vmm_gpt_node_index(gpa, i)];
+		entries[i] = &current_entries[vmm_gpt_lvl_index(i, gpa)];
 		entry = *entries[i];
 		if (!gpt->vgpt_pte_ops->vpeo_pte_is_present(entry)) {
 			current_entries = NULL;
@@ -283,96 +484,134 @@ vmm_gpt_lookup(vmm_gpt_t *gpt, uint64_t gpa)
 }
 
 /*
- * Adds a node for the given GPA to the GPT as a child of the given parent.
+ * Populate child table nodes for a given level between the provided interval
+ * of [addr, addr + len).  Caller is expected to provide a pointer to the parent
+ * node which would contain the child node for GPA at `addr`.  A pointer to said
+ * child node will be returned when the operation is complete.
  */
-static void
-vmm_gpt_add_child(vmm_gpt_t *gpt, vmm_gpt_node_t *parent, vmm_gpt_node_t *child,
-    uint64_t gpa)
+static vmm_gpt_node_t *
+vmm_gpt_populate_region_lvl(vmm_gpt_t *gpt, uint64_t addr, uint64_t len,
+    vmm_gpt_node_t *node_start)
 {
-	vmm_gpt_node_t **prevp;
-	vmm_gpt_node_t *node;
-	uint64_t *parent_entries, entry;
+	const vmm_gpt_node_level_t lvl = node_start->vgn_level;
+	const uint64_t end = addr + len;
+	const uint64_t incr = vmm_gpt_lvl_len(lvl);
+	uint64_t gpa = addr & vmm_gpt_lvl_mask(lvl);
+	vmm_gpt_node_t *parent = node_start;
 
-	ASSERT(gpt != NULL);
-	ASSERT(gpt->vgpt_pte_ops != NULL);
-	ASSERT(parent != NULL);
-	ASSERT(child != NULL);
-	ASSERT3U(parent->vgn_level, <, LEVEL1);
-
-	const uint64_t gpa_mask[3] = {
-		[LEVEL4] = 0xffffff8000000000ul, /* entries cover 512G */
-		[LEVEL3] = 0xffffffffc0000000ul, /* entries cover 1G */
-		[LEVEL2] = 0xffffffffffe00000ul, /* entries cover 2M */
-	};
-	const int index = vmm_gpt_node_index(gpa, parent->vgn_level);
-	child->vgn_index = index;
-	child->vgn_level = parent->vgn_level + 1;
-	child->vgn_parent = parent;
-	child->vgn_gpa = gpa & gpa_mask[parent->vgn_level];
-	parent_entries = parent->vgn_entries;
-	entry = gpt->vgpt_pte_ops->vpeo_map_table(child->vgn_host_pfn);
-	parent_entries[index] = entry;
-
-	for (prevp = &parent->vgn_children, node = parent->vgn_children;
-	    node != NULL;
-	    prevp = &node->vgn_siblings, node = node->vgn_siblings) {
-		if (node->vgn_index > child->vgn_index) {
-			break;
-		}
-	}
-	if (node != NULL)
-		ASSERT3U(node->vgn_index, !=, child->vgn_index);
-	child->vgn_siblings = node;
-	*prevp = child;
-	parent->vgn_ref_cnt++;
-}
-
-/*
- * Populate the GPT with nodes so that a entries for the given GPA exist.  Note
- * that this does not actually map the entry, but simply ensures that the
- * entries exist.
- */
-static void
-vmm_gpt_populate_entry(vmm_gpt_t *gpt, uint64_t gpa)
-{
-	vmm_gpt_node_t *node, *child;
-
-	ASSERT(gpt != NULL);
-	ASSERT0(gpa & PAGEOFFSET);
-
-	node = gpt->vgpt_root;
-	for (uint_t i = 0; i < LEVEL1; i++) {
-		ASSERT(node != NULL);
-		child = vmm_gpt_node_find_child(node, gpa);
-		if (child == NULL) {
-			child = vmm_gpt_node_alloc();
-			ASSERT(child != NULL);
-			vmm_gpt_add_child(gpt, node, child, gpa);
-		}
-		node = child;
+	/* Try to locate node at starting address */
+	vmm_gpt_node_t *prev = NULL, *node = parent->vgn_children;
+	while (node != NULL && node->vgn_gpa < gpa) {
+		prev = node;
+		node = node->vgn_sib_next;
 	}
 
 	/*
-	 * Bump the reference count for this leaf for the PTE that is now usable
-	 * by the mapping covering its GPA.
+	 * If no node exists at the starting address, create one and link it
+	 * into the parent.
 	 */
-	ASSERT3U(node->vgn_level, ==, LEVEL1);
-	ASSERT3U(node->vgn_ref_cnt, <, 512);
-	node->vgn_ref_cnt++;
+	if (node == NULL || node->vgn_gpa > gpa) {
+		/* Need to insert node for starting GPA */
+		node = vmm_gpt_node_alloc();
+		vmm_gpt_node_add(gpt, parent, node, gpa, prev);
+	}
+
+	vmm_gpt_node_t *front_node = node;
+	prev = node;
+	gpa += incr;
+
+	/*
+	 * With a node at the starting address, walk forward creating nodes in
+	 * any of the gaps.
+	 */
+	for (; gpa < end; gpa += incr, prev = node) {
+		node = vmm_gpt_node_next(prev, true);
+		if (node != NULL) {
+			ASSERT3U(node->vgn_gpa, ==, gpa);
+
+			/* We may have crossed into a new parent */
+			parent = node->vgn_parent;
+			continue;
+		}
+
+		if (vmm_gpt_node_is_last(prev)) {
+			/*
+			 * The node preceding this was the last one in its
+			 * containing parent, so move on to that parent's
+			 * sibling.  We expect (demand) that it exist already.
+			 */
+			parent = vmm_gpt_node_next(parent, true);
+			ASSERT(parent != NULL);
+
+			/*
+			 * Forget our previous sibling, since it is of no use
+			 * for assigning the new node to the a now-different
+			 * parent.
+			 */
+			prev = NULL;
+
+		}
+		node = vmm_gpt_node_alloc();
+		vmm_gpt_node_add(gpt, parent, node, gpa, prev);
+	}
+
+	return (front_node);
 }
 
 /*
  * Ensures that PTEs for the region of address space bounded by
- * [start, end) exist in the tree.
+ * [addr, addr + len) exist in the tree.
  */
 void
-vmm_gpt_populate_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
+vmm_gpt_populate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 {
-	ASSERT0(start & PAGEOFFSET);
-	ASSERT0(end & PAGEOFFSET);
+	ASSERT0(addr & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
 
-	for (uint64_t page = start; page < end; page += PAGESIZE) {
-		vmm_gpt_populate_entry(gpt, page);
+	/*
+	 * Starting at the top of the tree, ensure that tables covering the
+	 * requested region exist at each level.
+	 */
+	vmm_gpt_node_t *node = gpt->vgpt_root;
+	for (uint_t lvl = LEVEL4; lvl < LEVEL1; lvl++) {
+		ASSERT3U(node->vgn_level, ==, lvl);
+
+		node = vmm_gpt_populate_region_lvl(gpt, addr, len, node);
+	}
+
+
+	/*
+	 * Establish reference counts for the soon-to-be memory PTEs which will
+	 * be filling these LEVEL1 tables.
+	 */
+	uint64_t gpa = addr;
+	const uint64_t end = addr + len;
+	while (gpa < end) {
+		ASSERT(node != NULL);
+		ASSERT3U(node->vgn_level, ==, LEVEL1);
+
+		const uint16_t covered =
+		    vmm_gpt_node_entries_covered(node, addr, end);
+
+		ASSERT(covered != 0);
+		ASSERT3U(node->vgn_ref_cnt, <, PTE_PER_TABLE);
+		ASSERT3U(node->vgn_ref_cnt + covered, <=, PTE_PER_TABLE);
+
+		node->vgn_ref_cnt += covered;
+
+		vmm_gpt_node_t *next = vmm_gpt_node_next(node, true);
+		if (next != NULL) {
+			gpa = next->vgn_gpa;
+			node = next;
+		} else {
+			/*
+			 * We do not expect to find a subsequent node after
+			 * filling the last node in the table, completing PTE
+			 * accounting for the specified range.
+			 */
+			VERIFY3U(end, <=, vmm_gpt_node_end(node));
+			break;
+		}
 	}
 }
 
@@ -415,78 +654,70 @@ vmm_gpt_map(vmm_gpt_t *gpt, uint64_t gpa, pfn_t pfn, uint_t prot, uint8_t attr)
 }
 
 /*
- * Removes a child node from its parent's list of children, and then frees
- * the now-orphaned child.
- */
-static void
-vmm_gpt_node_remove_child(vmm_gpt_node_t *parent, vmm_gpt_node_t *child)
-{
-	ASSERT(parent != NULL);
-
-	ASSERT3P(child->vgn_children, ==, NULL);
-	vmm_gpt_node_t **prevp = &parent->vgn_children;
-	for (vmm_gpt_node_t *node = parent->vgn_children;
-	    node != NULL;
-	    prevp = &node->vgn_siblings, node = node->vgn_siblings) {
-		if (node == child) {
-			*prevp = node->vgn_siblings;
-			vmm_gpt_node_free(node);
-			break;
-		}
-	}
-}
-
-/*
- * Cleans up unused inner nodes in the GPT.  Asserts that the leaf corresponding
- * to the entry does not map any additional pages.
- */
-static void
-vmm_gpt_vacate_entry(vmm_gpt_t *gpt, uint64_t gpa)
-{
-	vmm_gpt_node_t *nodes[MAX_GPT_LEVEL], *node;
-
-	node = gpt->vgpt_root;
-	for (uint_t i = 0; i < MAX_GPT_LEVEL; i++) {
-		nodes[i] = node;
-		node = vmm_gpt_node_find_child(node, gpa);
-	}
-	for (uint_t i = LEVEL1; i > 0; i--) {
-		node = nodes[i];
-
-		if (node == NULL)
-			continue;
-
-		if (i == LEVEL1) {
-			ASSERT0(node->vgn_entries[vmm_gpt_node_index(gpa, i)]);
-			ASSERT3U(node->vgn_ref_cnt, !=, 0);
-
-			/*
-			 * Just as vmm_gpt_populate_entry() increments the
-			 * reference count for leaf PTEs which become usable,
-			 * here we decrement it as they become unusable as the
-			 * mapping covering its GPA is removed.
-			 */
-			node->vgn_ref_cnt--;
-		}
-
-		if (node->vgn_ref_cnt != 0)
-			break;
-		vmm_gpt_node_remove_child(nodes[i - 1], nodes[i]);
-	}
-}
-
-/*
  * Cleans up the unused inner nodes in the GPT for a region of guest physical
- * address space of [start, end).  The region must map no pages.
+ * address space of [addr, addr + len).  The region must map no pages.
  */
 void
-vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
+vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 {
-	ASSERT0(start & PAGEOFFSET);
-	ASSERT0(end & PAGEOFFSET);
+	ASSERT0(addr & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
 
-	for (uint64_t page = start; page < end; page += PAGESIZE) {
-		vmm_gpt_vacate_entry(gpt, page);
+	const uint64_t end = addr + len;
+	vmm_gpt_node_t *node, *starts[MAX_GPT_LEVEL] = {
+		[LEVEL4] = gpt->vgpt_root,
+	};
+
+	for (vmm_gpt_node_level_t lvl = LEVEL4; lvl < LEVEL1; lvl++) {
+		node = vmm_gpt_node_find_child(starts[lvl], addr);
+		if (node == NULL) {
+			break;
+		}
+		starts[lvl + 1] = node;
+	}
+
+	/*
+	 * Starting at the bottom of the tree, ensure that PTEs for pages have
+	 * been cleared for the region, and remove the corresponding reference
+	 * counts from the containing LEVEL1 tables.
+	 */
+	uint64_t gpa = addr;
+	node = starts[LEVEL1];
+	while (gpa < end && node != NULL) {
+		const uint16_t covered =
+		    vmm_gpt_node_entries_covered(node, addr, end);
+
+		ASSERT3U(node->vgn_ref_cnt, >=, covered);
+		node->vgn_ref_cnt -= covered;
+
+		node = vmm_gpt_node_next(node, false);
+		if (node != NULL) {
+			gpa = node->vgn_gpa;
+		}
+	}
+
+	/*
+	 * With the page PTE references eliminated, work up from the bottom of
+	 * the table, removing nodes which have no remaining references.
+	 *
+	 * This stops short of LEVEL4, which is the root table of the GPT.  It
+	 * is left standing to be cleaned up when the vmm_gpt_t is destroyed.
+	 */
+	for (vmm_gpt_node_level_t lvl = LEVEL1; lvl > LEVEL4; lvl--) {
+		gpa = addr;
+		node = starts[lvl];
+
+		while (gpa < end && node != NULL) {
+			vmm_gpt_node_t *next = vmm_gpt_node_next(node, false);
+
+			if (node->vgn_ref_cnt == 0) {
+				vmm_gpt_node_remove(node);
+			}
+			if (next != NULL) {
+				gpa = next->vgn_gpa;
+			}
+			node = next;
+		}
 	}
 }
 
@@ -514,14 +745,15 @@ vmm_gpt_unmap(vmm_gpt_t *gpt, uint64_t gpa)
  * Returns the number of pages that are unmapped.
  */
 size_t
-vmm_gpt_unmap_region(vmm_gpt_t *gpt, uint64_t start, uint64_t end)
+vmm_gpt_unmap_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 {
-	ASSERT0(start & PAGEOFFSET);
-	ASSERT0(end & PAGEOFFSET);
+	ASSERT0(addr & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
 
+	const uint64_t end = addr + len;
 	size_t num_unmapped = 0;
-	for (uint64_t page = start; page < end; page += PAGESIZE) {
-		if (vmm_gpt_unmap(gpt, page) != 0) {
+	for (uint64_t gpa = addr; gpa < end; gpa += PAGESIZE) {
+		if (vmm_gpt_unmap(gpt, gpa) != 0) {
 			num_unmapped++;
 		}
 	}

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIO810 4D "September 12, 2020"
+.TH AUDIO810 4D "June 8, 2023"
 .SH NAME
 audio810 \- Intel ICH series, nVidia nForce series and AMD 8111 audio core
 support
@@ -11,15 +11,6 @@ support
 The \fBaudio810\fR driver provides support for AC 97 audio controllers embedded
 in Intel ICH, nVidia nForce, and AMD 8111 chips.
 .SH FILES
-.ne 2
-.na
-\fB\fB/kernel/drv/audio810\fR\fR
-.ad
-.RS 30n
-32-bit kernel driver module
-.RE
-
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/amd64/audio810\fR\fR
@@ -38,7 +29,7 @@ in Intel ICH, nVidia nForce, and AMD 8111 chips.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(7) for a descriptions of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -70,38 +61,5 @@ Inc.
 Some laptops (including Sony VAIO, among others), have their on-board amplifier
 powered down by default, meaning that audio is suppressed even if hardware and
 the \fBaudio810\fR driver are working normally. To correct this, set the
-\fBac97-invert-amp=1\fR property in the \fB/kernel/drv/audio810.conf\fR to
+\fBac97-amplifier=0\fR property in the \fB/kernel/drv/audio810.conf\fR to
 power-up the amplifier.
-.SH DIAGNOSTICS
-In addition to being logged, the following messages may appear on the system
-console:
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too low\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too low\fR\fR
-.ad
-.RS 30n
-The interrupt rate in \fBaudio810.conf\fR is set too low. It has been reset to
-the rate specified in the message. Update \fBaudio810.conf\fR to a higher
-interrupt rate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBplay-interrupts too high\fR\fR
-.ad
-.br
-.na
-\fB\fBrecord-interrupts too high\fR\fR
-.ad
-.RS 30n
-The interrupt rate set in \fBaudio810.conf\fR is set too high. It has been
-reset to the rate specified in the message. Update \fBaudio810.conf\fR to a
-lower interrupt rate.
-.RE
-

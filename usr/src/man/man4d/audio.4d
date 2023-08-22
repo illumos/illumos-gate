@@ -3,12 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIO 4D "Jan 10, 2020"
+.TH AUDIO 4D "June 8, 2023"
 .SH NAME
 audio \- common audio framework
 .SH DESCRIPTION
 The \fBaudio\fR driver provides common support routines for audio devices in
-Solaris.
+illumos.
 .sp
 .LP
 The audio framework supports multiple \fBpersonalities\fR, allowing for devices
@@ -83,7 +83,7 @@ telephone companies in the United States, Canada, and Japan. A-Law encoding is
 also part of CCITT G.711 and is the standard encoding for telephony elsewhere
 in the world. A-Law and u-Law audio data are sampled at a rate of 8000 samples
 per second with 12-bit precision, with the data compressed to 8-bit samples.
-The resulting audio data quality is equivalent to that of stan dard analog
+The resulting audio data quality is equivalent to that of standard analog
 telephone service.
 .sp
 .LP
@@ -142,15 +142,6 @@ Device driver (x86)
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/sparcv9/audio\fR\fR
-.ad
-.RS 29n
-Device driver (SPARC)
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/kernel/drv/audio.conf\fR\fR
 .ad
 .RS 29n
@@ -168,7 +159,7 @@ l | l
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	SPARC, x86
+Architecture	x86
 _
 Interface Stability	Uncommitted
 .TE

@@ -25,13 +25,13 @@
  * the root of the tree is referred to as "LEVEL4" while the
  * leaf level is "LEVEL1".
  */
-enum vmm_gpt_node_level {
+typedef enum vmm_gpt_node_level {
 	LEVEL4 = 0,
 	LEVEL3,
 	LEVEL2,
 	LEVEL1,
 	MAX_GPT_LEVEL,
-};
+} vmm_gpt_node_level_t;
 
 /*
  * The vmm_pte_ops structure contains function pointers for format-specific
@@ -77,7 +77,7 @@ vmm_gpt_t *vmm_gpt_alloc(vmm_pte_ops_t *);
 void vmm_gpt_free(vmm_gpt_t *);
 
 uint64_t *vmm_gpt_lookup(vmm_gpt_t *, uint64_t);
-void vmm_gpt_walk(vmm_gpt_t *, uint64_t, uint64_t **, enum vmm_gpt_node_level);
+void vmm_gpt_walk(vmm_gpt_t *, uint64_t, uint64_t **, vmm_gpt_node_level_t);
 void vmm_gpt_populate_region(vmm_gpt_t *, uint64_t, uint64_t);
 bool vmm_gpt_map_at(vmm_gpt_t *, uint64_t *, pfn_t, uint_t, uint8_t);
 void vmm_gpt_vacate_region(vmm_gpt_t *, uint64_t, uint64_t);

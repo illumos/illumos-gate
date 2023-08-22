@@ -80,12 +80,14 @@ size_t
 _elf_outsync(int fd, char *p, size_t sz, unsigned int flag)
 {
 	if (flag != 0) {
-		int	err;
+		int	rv, err;
 
-		if ((fd = msync(p, sz, MS_ASYNC)) == -1)
+		err = ENOTSUP; /* msync should only return 0 or -1 */
+		rv = msync(p, sz, MS_ASYNC);
+		if (rv == -1)
 			err = errno;
 		(void) munmap(p, sz);
-		if (fd == 0)
+		if (rv == 0)
 			return (sz);
 		_elf_seterr(EIO_SYNC, err);
 		return (0);

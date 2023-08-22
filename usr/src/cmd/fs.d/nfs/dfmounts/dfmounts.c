@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -53,6 +53,8 @@
 #include <nfs/nfs.h>
 #include <rpcsvc/mount.h>
 #include <locale.h>
+#include <unistd.h>
+#include <clnt_subr.h>
 
 static int hflg;
 
@@ -60,7 +62,6 @@ static void pr_mounts(char *);
 static void freemntlist(struct mountbody *);
 static int sortpath(const void *, const void *);
 static void usage(void);
-static void pr_err(char *, ...);
 
 int
 main(int argc, char *argv[])
@@ -111,8 +112,7 @@ static struct timeval	rpc_totout_new = {15, 0};
  */
 
 static void
-pr_mounts(host)
-	char *host;
+pr_mounts(char *host)
 {
 	CLIENT *cl;
 	struct mountbody *ml = NULL;
@@ -126,32 +126,18 @@ pr_mounts(host)
 	(void) __rpc_control(CLCR_GET_RPCB_TIMEOUT, &rpc_totout_old);
 	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_new);
 
-	/*
-	 * First try circuit, then drop back to datagram if
-	 * circuit is unavailable (an old version of mountd perhaps)
-	 * Using circuit is preferred because it can handle
-	 * arbitrarily long export lists.
-	 */
-	cl = clnt_create(host, MOUNTPROG, MOUNTVERS, "circuit_n");
+	cl = mountprog_client_create(host, &rpc_totout_old);
 	if (cl == NULL) {
-		if (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED)
-			cl = clnt_create(host, MOUNTPROG, MOUNTVERS,
-					"datagram_n");
-		if (cl == NULL) {
-			pr_err(gettext("can't contact server: %s\n"),
-				clnt_spcreateerror(host));
-			(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT,
-						&rpc_totout_old);
-			return;
-		}
+		return;
 	}
 
 	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_old);
 	tout.tv_sec = 10;
 	tout.tv_usec = 0;
 
-	if (err = clnt_call(cl, MOUNTPROC_DUMP, xdr_void,
-			    0, xdr_mountlist, (caddr_t)&ml, tout)) {
+	err = clnt_call(cl, MOUNTPROC_DUMP, xdr_void, 0, xdr_mountlist,
+	    (caddr_t)&ml, tout);
+	if (err != 0) {
 		pr_err("%s\n", clnt_sperrno(err));
 		clnt_destroy(cl);
 		return;
@@ -162,8 +148,8 @@ pr_mounts(host)
 
 	if (!hflg) {
 		printf("%-8s %10s %-24s  %s",
-			gettext("RESOURCE"), gettext("SERVER"),
-			gettext("PATHNAME"), gettext("CLIENTS"));
+		    gettext("RESOURCE"), gettext("SERVER"),
+		    gettext("PATHNAME"), gettext("CLIENTS"));
 		hflg++;
 	}
 
@@ -175,7 +161,7 @@ pr_mounts(host)
 		*tb++ = ml;
 	if (ml != NULL && tb == &table[NTABLEENTRIES])
 		pr_err(gettext("table overflow:  only %d entries shown\n"),
-			NTABLEENTRIES);
+		    NTABLEENTRIES);
 	endtb = tb;
 	qsort(table, endtb - table, sizeof (struct mountbody *), sortpath);
 
@@ -191,11 +177,11 @@ pr_mounts(host)
 			continue;
 		if (strcmp(lastpath, (*tb)->ml_directory) == 0) {
 			if (strcmp(lastclient, (*tb)->ml_hostname) == 0) {
-				continue; 	/* ignore duplicate */
+				continue;	/* ignore duplicate */
 			}
 		} else {
 			printf("\n%-8s %10s %-24s ",
-				"  -", host, (*tb)->ml_directory);
+			    "  -", host, (*tb)->ml_directory);
 			lastpath = (*tb)->ml_directory;
 			tail = 0;
 		}
@@ -211,10 +197,9 @@ pr_mounts(host)
 }
 
 static void
-freemntlist(ml)
-	struct mountbody *ml;
+freemntlist(struct mountbody *ml)
 {
-	register struct mountbody *old;
+	struct mountbody *old;
 
 	while (ml) {
 		if (ml->ml_hostname)
@@ -238,8 +223,7 @@ freemntlist(ml)
  */
 
 static int
-sortpath(a, b)
-	const void *a, *b;
+sortpath(const void *a, const void *b)
 {
 	const struct mountbody **m1, **m2;
 	int result;
@@ -256,13 +240,12 @@ sortpath(a, b)
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext("Usage: dfmounts [-h] [host ...]\n"));
 }
 
-/* VARARGS1 */
-static void
+void
 pr_err(char *fmt, ...)
 {
 	va_list ap;
