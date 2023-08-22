@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_DENY 7 "Jun 16, 2005"
+.TH PAM_DENY 7 "August 19, 2023"
 .SH NAME
 pam_deny \- PAM authentication, account, session and password management PAM
 module to deny operations
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_deny.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_deny\fR module implements all the PAM service module functions and
 returns the module type default failure return code for all calls.
 .sp
@@ -32,8 +29,6 @@ levels
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The following error codes are returned:
 .sp
 .ne 2
@@ -56,7 +51,7 @@ If \fBpam_sm_authenticate\fR is called.
 .sp
 .ne 2
 .na
-\fB\fBPAM_AUTHOK_ERR\fR\fR
+\fB\fBPAM_AUTHTOK_ERR\fR\fR
 .ad
 .RS 20n
 If \fBpam_sm_chauthtok\fR is called.
@@ -81,7 +76,6 @@ If \fBpam_sm_open_session\fR or \fBpam_sm_close_session\fR is called.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisallowing ssh none authentication
 .sp
 .in +2
@@ -108,8 +102,6 @@ If \fBpam_sm_open_session\fR or \fBpam_sm_close_session\fR is called.
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
@@ -126,8 +118,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
@@ -146,8 +136,6 @@ MT Level	MT-Safe with exceptions
 .BR privileges (7),
 .BR su (8)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .sp

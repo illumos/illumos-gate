@@ -3,25 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_ALLOW 7 "Aug 25, 2005"
+.TH PAM_ALLOW 7 "August 19, 2023"
 .SH NAME
 pam_allow \- PAM authentication, account, session and password management PAM
 module to allow operations
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_allow.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_allow\fR module implements all the PAM service module functions and
 returns \fBPAM_SUCCESS\fR for all calls. Opposite functionality is available in
 the \fBpam_deny\fR(7) module.
 .sp
 .LP
-Proper Solaris authentication operation requires \fBpam_unix_cred\fR(7) be
+Proper authentication operation requires \fBpam_unix_cred\fR(7) be
 stacked above \fBpam_allow\fR.
 .sp
 .LP
@@ -37,11 +34,8 @@ LOG_DEBUG\fR level.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 \fBPAM_SUCCESS\fR is always returned.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAllowing \fBssh none\fR
 .sp
 .LP
@@ -75,8 +69,6 @@ gdm-autologin auth  sufficient  pam_allow.so.1
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -93,8 +85,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
@@ -104,8 +94,6 @@ MT Level	MT-Safe with exceptions
 .BR pam_deny (7),
 .BR pam_unix_cred (7)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .sp

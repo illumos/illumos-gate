@@ -3,25 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_SAMPLE 7 "Apr 4, 2007"
+.TH PAM_SAMPLE 7 "August 19, 2023"
 .SH NAME
 pam_sample \- a sample PAM module
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/lib/security/pam_sample.so.1\fR
+\fBpam_sample.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The SAMPLE service module for \fBPAM\fR is divided into four components:
+The SAMPLE service module for \fBPAM\fR, \fBpam_sample.so.1\fR,
+is divided into four components:
 authentication, account management, password management, and session
-management. The sample module is a shared object that is dynamically loaded to
-provide the necessary functionality.
+management.
 .SH SAMPLE AUTHENTICATION COMPONENT
-.sp
-.LP
 The SAMPLE authentication module provides functions to test the \fBPAM\fR
 framework functionality using the \fBpam_sm_authenticate\fR(3PAM) call. The
 SAMPLE module implementation of the \fBpam_sm_authenticate\fR(3PAM) function
@@ -124,8 +119,6 @@ The SAMPLE module \fBpam_sm_setcred\fR(3PAM) function always returns
 .RE
 
 .SH SAMPLE ACCOUNT MANAGEMENT COMPONENT
-.sp
-.LP
 The SAMPLE Account Management Component implements a simple access control
 scheme that limits machine access to a list of authorized users. The list of
 authorized users is supplied as option arguments to the entry for the SAMPLE
@@ -156,19 +149,13 @@ su	account	require	pam_sample.so.1	allow=sam,eric
 .LP
 The debug and nowarn options are also supported.
 .SH SAMPLE PASSWORD MANAGEMENT COMPONENT
-.sp
-.LP
 The SAMPLE Password Management Component function (
 \fBpam_sm_chauthtok\fR(3PAM)), always returns \fBPAM_SUCCESS.\fR
 .SH SAMPLE SESSION MANAGEMENT COMPONENT
-.sp
-.LP
 The SAMPLE Session Management Component functions (
 \fBpam_sm_open_session\fR(3PAM), \fBpam_sm_close_session\fR(3PAM)) always
 return \fBPAM_SUCCESS.\fR
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -183,8 +170,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_sm_authenticate (3PAM),
@@ -195,13 +180,9 @@ MT Level	MT-Safe with exceptions
 .BR pam.conf (5),
 .BR attributes (7)
 .SH WARNINGS
-.sp
-.LP
 This module should never be used outside of a closed debug environment. The
 examples of the \fBuse_first_pass\fR and \fBtry_first_pass\fR options are
-obsolete for all other Solaris delivered PAM service modules
+obsolete for all other delivered PAM service modules
 .SH NOTES
-.sp
-.LP
-The interfaces in \fBlibpam()\fR are MT-Safe only if each thread within the
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.

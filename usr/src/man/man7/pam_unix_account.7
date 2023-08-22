@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_UNIX_ACCOUNT 7 "Feb 14, 2005"
+.TH PAM_UNIX_ACCOUNT 7 "August 19, 2023"
 .SH NAME
 pam_unix_account \- PAM account management module for UNIX
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_unix_account.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-\fBpam_unix_account\fR module implements \fBpam_sm_acct_mgmt()\fR, which
+The \fBpam_unix_account\fR module implements \fBpam_sm_acct_mgmt\fR(3PAM), which
 provides functionality to the \fBPAM\fR account management stack. The module
 provides functions to validate that the user's account is not locked or expired
 and that the user's password does not need to be changed. The module retrieves
@@ -54,13 +51,11 @@ switch.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 The following values are returned:
 .sp
 .ne 2
 .na
-\fB\fBPAM_UNIX_ACCOUNT\fR\fR
+\fB\fBPAM_ACCT_EXPIRED\fR\fR
 .ad
 .RS 24n
 User account has expired
@@ -139,8 +134,6 @@ No account is present for the user
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -157,18 +150,15 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
 .BR pam_authenticate (3PAM),
+.BR pam_sm_acct_mgmt (3PAM),
 .BR nsswitch.conf (5),
 .BR pam.conf (5),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .sp

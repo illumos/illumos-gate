@@ -5,18 +5,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_UNIX_SESSION 7 "Jan 3, 2016"
+.TH PAM_UNIX_SESSION 7 "August 19, 2023"
 .SH NAME
-pam_unix_session \- session management PAM module for UNIX
+pam_unix_session \- PAM session management module for UNIX
 .SH SYNOPSIS
-.LP
 .nf
 \fBpam_unix_session.so.1\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpam_unix_session\fR module implements \fBpam_sm_open_session\fR(3PAM)
 and \fBpam_sm_close_session\fR(3PAM).
 .sp
@@ -50,8 +47,6 @@ Turn off last login PAM_TEXT_INFO message.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 Upon successful completion, \fBPAM_SUCCESS\fR is returned. The following error
 codes are returned upon error:
 .sp
@@ -74,8 +69,6 @@ No account is present for \fIuser\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -92,12 +85,11 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR libpam (3LIB),
 .BR pam (3PAM),
-.BR pam_authenticate (3PAM),
+.BR pam_sm_close_session (3PAM),
+.BR pam_sm_open_session (3PAM),
 .BR nsswitch.conf (5),
 .BR pam.conf (5),
 .BR attributes (7),
@@ -109,8 +101,6 @@ MT Level	MT-Safe with exceptions
 .BR pam_unix_account (7),
 .BR pam_unix_auth (7)
 .SH NOTES
-.sp
-.LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.
 .sp
