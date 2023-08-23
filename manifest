@@ -3670,6 +3670,7 @@ f usr/include/nfs/lm.h 0644 root bin
 f usr/include/nfs/mapid.h 0644 root bin
 f usr/include/nfs/mount.h 0644 root bin
 f usr/include/nfs/nfs.h 0644 root bin
+f usr/include/nfs/nfs4x.h 0644 root bin
 f usr/include/nfs/nfs4.h 0644 root bin
 f usr/include/nfs/nfs4_attr.h 0644 root bin
 f usr/include/nfs/nfs4_clnt.h 0644 root bin

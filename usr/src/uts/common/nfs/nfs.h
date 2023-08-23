@@ -2400,6 +2400,8 @@ extern mblk_t	*rfs_read_alloc(uint_t, struct iovec **, int *);
 extern void	rfs_rndup_mblks(mblk_t *, uint_t, int);
 extern void	rfs_free_xuio(void *);
 
+extern time_t nfs_sys_uptime(void);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
