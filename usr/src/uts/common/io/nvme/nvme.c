@@ -380,7 +380,7 @@ CTASSERT(sizeof (nvme_nschange_list_t) == 4096);
 
 
 /* NVMe spec version supported */
-static const int nvme_version_major = 1;
+static const int nvme_version_major = 2;
 
 /* tunable for admin command timeout in seconds, default is 1s */
 int nvme_admin_cmd_timeout = 1;
