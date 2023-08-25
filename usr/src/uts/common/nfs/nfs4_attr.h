@@ -94,12 +94,6 @@ extern "C" {
 #define	FATTR4_TIME_MODIFY_SET_MASK	(1ULL << (FATTR4_WORD1 + 22))
 #define	FATTR4_MOUNTED_ON_FILEID_MASK	(1ULL << (FATTR4_WORD1 + 23))
 
-/* nfsv4.1 */
-
-/* Overload to fit to 64-bits bitmap4 */
-#define	FATTR4_SUPPATTR_EXCLCREAT_MASK_LOCAL	(1ULL << (FATTR4_WORD1 + 24))
-#define	FATTR4_SEC_LABEL_MASK_LOCAL	(1ULL << (FATTR4_WORD1 + 25))
-
 /*
  * Common bitmap4 of file attributes to be gathered
  */
@@ -305,20 +299,12 @@ extern "C" {
 	FATTR4_MOUNTED_ON_FILEID_MASK	\
 )
 
-/* nfsv4.1  */
-#define	RFS4_SUPPATTR_EXCLCREAT (		\
-	FATTR4_SIZE_MASK		|	\
-	FATTR4_MODE_MASK		|	\
-	FATTR4_ACL_MASK			|	\
-	FATTR4_OWNER_MASK		|	\
-	FATTR4_OWNER_GROUP_MASK		|	\
-	FATTR4_TIME_ACCESS_SET_MASK)
 
 #define	FATTR4_FSID_EQ(a, b)	\
 	((a)->major == (b)->major && (a)->minor == (b)->minor)
 
 #define	NFS4_MAXNUM_BITWORDS	2
-#define	NFS4_MAXNUM_ATTRS	57
+#define	NFS4_MAXNUM_ATTRS	56
 
 union nfs4_attr_u {
 	fattr4_supported_attrs		supported_attrs;
@@ -377,7 +363,6 @@ union nfs4_attr_u {
 	fattr4_time_modify		time_modify;
 	fattr4_time_modify_set		time_modify_set;
 	fattr4_mounted_on_fileid	mounted_on_fileid;
-	fattr4_suppattr_exclcreat	supp_exclcreat;
 };
 
 /*

@@ -21,8 +21,6 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -419,25 +417,6 @@ static const kstat_named_t rfsproccnt_v4_tmpl[] = {
 	{ "verify",	KSTAT_DATA_UINT64 },
 	{ "write",	KSTAT_DATA_UINT64 },
 	{ "release_lockowner",	KSTAT_DATA_UINT64 },
-	{ "backchannel_ctl",	KSTAT_DATA_UINT64 },
-	{ "bind_conn_to_session",	KSTAT_DATA_UINT64 },
-	{ "exchange_id",	KSTAT_DATA_UINT64 },
-	{ "create_session",	KSTAT_DATA_UINT64 },
-	{ "destroy_session",	KSTAT_DATA_UINT64 },
-	{ "free_stateid",	KSTAT_DATA_UINT64 },
-	{ "get_dir_delegation",		KSTAT_DATA_UINT64 },
-	{ "getdeviceinfo",	KSTAT_DATA_UINT64 },
-	{ "getdevicelist",	KSTAT_DATA_UINT64 },
-	{ "layoutcommit",	KSTAT_DATA_UINT64 },
-	{ "layoutget",	KSTAT_DATA_UINT64 },
-	{ "layoutreturn",	KSTAT_DATA_UINT64 },
-	{ "secinfo_no_name",	KSTAT_DATA_UINT64 },
-	{ "sequence",	KSTAT_DATA_UINT64 },
-	{ "set_ssv",	KSTAT_DATA_UINT64 },
-	{ "test_stateid",	KSTAT_DATA_UINT64 },
-	{ "want_delegation",	KSTAT_DATA_UINT64 },
-	{ "destroy_clientid",	KSTAT_DATA_UINT64 },
-	{ "reclaim_complete",	KSTAT_DATA_UINT64 },
 	{ "illegal",	KSTAT_DATA_UINT64 },
 };
 

@@ -169,9 +169,9 @@ rfs4_dbe_cv_broadcast(rfs4_dbe_t *entry)
 	cv_broadcast(entry->dbe_cv);
 }
 
+/* ARGSUSED */
 static int
-rfs4_dbe_kmem_constructor(void *obj, void *private __unused,
-    int kmflag __unused)
+rfs4_dbe_kmem_constructor(void *obj, void *private, int kmflag)
 {
 	rfs4_dbe_t *entry = obj;
 
@@ -182,9 +182,11 @@ rfs4_dbe_kmem_constructor(void *obj, void *private __unused,
 }
 
 static void
-rfs4_dbe_kmem_destructor(void *obj, void *private __unused)
+rfs4_dbe_kmem_destructor(void *obj, void *private)
 {
 	rfs4_dbe_t *entry = obj;
+	/*LINTED*/
+	rfs4_table_t *table = private;
 
 	mutex_destroy(entry->dbe_lock);
 	cv_destroy(entry->dbe_cv);

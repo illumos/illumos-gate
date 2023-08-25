@@ -1110,16 +1110,14 @@ NFS_OBJS +=	nfs_client.o	nfs_common.o	nfs_dump.o \
 		nfs4_acache.o	nfs4_common.o	nfs4_client_state.o \
 		nfs4_callback.o	nfs4_recovery.o nfs4_client_secinfo.o \
 		nfs4_client_debug.o	nfs_stats.o \
-		nfs4_acl.o	nfs4_stub_vnops.o	nfs_cmd.o \
-		nfs4x_xdr.o
+		nfs4_acl.o	nfs4_stub_vnops.o	nfs_cmd.o
 
 NFSSRV_OBJS +=	nfs_server.o	nfs_srv.o	nfs3_srv.o \
 		nfs_acl_srv.o	nfs_auth.o	nfs_auth_xdr.o \
 		nfs_export.o	nfs_log.o	nfs_log_xdr.o \
 		nfs4_srv.o	nfs4_state.o	nfs4_srv_attr.o \
 		nfs4_srv_ns.o	nfs4_db.o	nfs4_srv_deleg.o \
-		nfs4_deleg_ops.o nfs4_srv_readdir.o nfs4_dispatch.o \
-		nfs4x_srv.o	nfs4x_state.o	nfs4x_dispatch.o
+		nfs4_deleg_ops.o nfs4_srv_readdir.o nfs4_dispatch.o
 
 SMBSRV_SHARED_OBJS += \
 		smb_cfg_util.o \

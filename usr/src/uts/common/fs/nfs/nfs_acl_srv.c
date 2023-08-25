@@ -443,9 +443,10 @@ acl2_getxattrdir_getfh(GETXATTRDIR2args *args)
 	return (&args->fh);
 }
 
+/* ARGSUSED */
 void
 acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
-    struct svc_req *req __unused, cred_t *cr, bool_t ro __unused)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -520,10 +521,9 @@ out:
 	if (curthread->t_flag & T_WOULDBLOCK) {
 		curthread->t_flag &= ~T_WOULDBLOCK;
 		resp->status = NFS3ERR_JUKEBOX;
-	} else {
+	} else
 		resp->status = puterrno3(error);
-	}
-
+out1:
 	if (vp != NULL)
 		VN_RELE(vp);
 	vattr_to_post_op_attr(vap, &resp->resfail.attr);
