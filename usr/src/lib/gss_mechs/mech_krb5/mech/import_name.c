@@ -3,7 +3,7 @@
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -13,7 +13,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -49,7 +49,7 @@
  */
 
 OM_uint32
-krb5_gss_import_name(minor_status, input_name_buffer, 
+krb5_gss_import_name(minor_status, input_name_buffer,
 		     input_name_type, output_name)
      OM_uint32 *minor_status;
      gss_buffer_t input_name_buffer;
@@ -194,7 +194,7 @@ krb5_gss_import_name(minor_status, input_name_buffer,
 	 }
 	 strncpy(tmp2, cp, length);
 	 tmp2[length] = 0;
-	 
+
 	 stringrep = tmp2;
      } else {
 	 xfree(tmp);
@@ -221,7 +221,7 @@ krb5_gss_import_name(minor_status, input_name_buffer,
 	  krb5_free_context(context);
 	  return(GSS_S_BAD_NAME);
       }
-      
+
       if (tmp2)
 	      xfree(tmp2);
       xfree(tmp);

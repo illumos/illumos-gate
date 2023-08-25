@@ -10,7 +10,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -24,11 +24,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -38,7 +38,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -50,14 +50,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -68,7 +68,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -266,7 +266,7 @@ cleanup:
  * does not have yet
  */
 OM_uint32
-krb5_gss_accept_sec_context(minor_status, context_handle, 
+krb5_gss_accept_sec_context(minor_status, context_handle,
 			    verifier_cred_handle, input_token,
 			    input_chan_bindings, src_name, mech_type,
 			    output_token, ret_flags, time_rec,
@@ -347,7 +347,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    reqcksum.contents = 0;
    ap_req.data = 0;
    ap_rep.data = 0;
-   
+
    if (mech_type)
       *mech_type = GSS_C_NULL_OID;
    /* initialize the delegated cred handle to NO_CREDENTIAL for now */
@@ -425,7 +425,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    TREAD_STR(sptr, ap_req.data, ap_req.length);
 
    /*
-    * Solaris Kerberos: 
+    * Solaris Kerberos:
     *  We need to decode the request now so that we can get the
     *  service principal in order to try and acquire a cred for it.
     *  below in the "handle default cred handle" code block.
@@ -442,10 +442,10 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    }
 
    /* handle default cred handle */
-   /* 
+   /*
     * Solaris Kerberos:
     * If there is no princ associated with the cred then treat it the
-    * the same as GSS_C_NO_CREDENTIAL. 
+    * the same as GSS_C_NO_CREDENTIAL.
     */
    if (verifier_cred_handle == GSS_C_NO_CREDENTIAL ||
     ((krb5_gss_cred_id_t)verifier_cred_handle)->princ == NULL) {
@@ -579,7 +579,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	      "krb5_rd_req() error code %d", code);
        if (code == KRB5_KT_KVNONOTFOUND) {
 	   char *s_name;
-	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {	
+	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {
 	       krb5_set_error_message(context, KRB5KRB_AP_ERR_BADKEYVER,
 				    dgettext(TEXT_DOMAIN,
 					    "Key version %d is not available for principal %s"),
@@ -591,7 +591,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	   code = KRB5KRB_AP_ERR_BADKEYVER;
        } else if (code == KRB5_KT_NOTFOUND) {
 	   char *s_name;
-	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {	
+	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {
 	       krb5_set_error_message(context, KRB5KRB_AP_ERR_NOKEY,
 				    dgettext(TEXT_DOMAIN,
 					    "Service key %s not available"),
@@ -700,7 +700,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	  byte order */
 
 
-       /* 
+       /*
           The following section of code attempts to implement the
           optional channel binding facility as described in RFC2743.
 
@@ -715,7 +715,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
           to see whether the client specified GSS_C_NO_CHANNEL_BINDINGS.
           If either test succeeds we continue without error.
         */
-       if ((code = kg_checksum_channel_bindings(context, 
+       if ((code = kg_checksum_channel_bindings(context,
 						input_chan_bindings,
 						&reqcksum, bigend))) {
 	   /* Solaris Kerberos */
@@ -743,7 +743,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
                    goto fail;
 		}
            }
-           
+
        }
 
        TREAD_INT(ptr, gss_flags, bigend);
@@ -884,11 +884,11 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    }
 
    if ((code = krb5_auth_con_getrecvsubkey(context, auth_context,
-					   &ctx->subkey))) { 
+					   &ctx->subkey))) {
 	/* Solaris Kerberos */
        KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
 	      "krb5_auth_con_getremotesubkey() error code %d", code);
-       major_status = GSS_S_FAILURE;      
+       major_status = GSS_S_FAILURE;
        goto fail;
    }
 
@@ -1013,7 +1013,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 		(ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0,
 		(ctx->gss_flags & GSS_C_SEQUENCE_FLAG) != 0, ctx->proto);
 
-   /* at this point, the entire context structure is filled in, 
+   /* at this point, the entire context structure is filled in,
       so it can be released.  */
 
    /* generate an AP_REP if necessary */
@@ -1196,7 +1196,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    /* from here on is the real "fail" code */
 
    if (ctx)
-       (void) krb5_gss_delete_sec_context(minor_status, 
+       (void) krb5_gss_delete_sec_context(minor_status,
 					  (gss_ctx_id_t *) &ctx, NULL);
    if (deleg_cred) { /* free memory associated with the deleg credential */
        if (deleg_cred->ccache)
@@ -1239,7 +1239,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	     * SUNW17PACresync / Solaris Kerberos
 	     * Set e-data to Windows constant.
 	     * (verified by MSFT)
-	     * 
+	     *
 	     * This facilitates the Windows CIFS client clock skew
 	     * recovery feature.
 	     */
@@ -1289,7 +1289,7 @@ cleanup:
    /* Solaris Kerberos */
    if (krb_error_data.e_data.data != NULL)
         free(krb_error_data.e_data.data);
-	
+
    if (!verifier_cred_handle && cred_handle) {
 	krb5_gss_release_cred(&t_minor_status, &cred_handle);
    }

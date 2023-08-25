@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Dispatch an incoming packet.
  */
@@ -50,7 +50,7 @@ dispatch(krb5_data *pkt, const krb5_fulladdr *from, krb5_data **response)
     krb5_error_code retval;
     krb5_kdc_req *as_req;
     krb5_int32 now, now_usec;
-    
+
     /* decode incoming packet, and dispatch */
 
 #ifndef NOCACHE
@@ -83,10 +83,10 @@ dispatch(krb5_data *pkt, const krb5_fulladdr *from, krb5_data **response)
 	krb5_c_random_os_entropy(kdc_context, 0, NULL);
 	last_os_random = now;
       }
-      
+
       data.length = sizeof(krb5_int32);
       data.data = (void *) &usec_difference;
-      
+
       krb5_c_random_add_entropy(kdc_context,
 				KRB5_C_RANDSOURCE_TIMING, &data);
       last_usec = now_usec;

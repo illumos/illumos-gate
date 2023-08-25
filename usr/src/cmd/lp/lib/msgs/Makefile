@@ -75,7 +75,7 @@ include		../../../../lib/Makefile.targ
 CLEANFILES	+= llib-llpmsg.ln
 LINTFLAGS = -nvx
 SRCS= $(OBJECTS:%.o=%.c)
-LINT_CPPFLAGS =	-I../../include $(CPPFLAGS.master) 
+LINT_CPPFLAGS =	-I../../include $(CPPFLAGS.master)
 
 lint:	lintlib
 	$(LINT) $(LINTFLAGS) $(LINT_CPPFLAGS) $(SRCS)

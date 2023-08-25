@@ -26,7 +26,7 @@
 
 /*
  * slk.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -160,7 +160,7 @@ slk_color(short co)
 	return __m_return_code("slk_color", code);
 }
 
-int 
+int
 slk_touch()
 {
 	int code = ERR;
@@ -175,7 +175,7 @@ slk_touch()
 	return __m_return_code("slk_touch", code);
 }
 
-int 
+int
 slk_clear()
 {
 	int code = ERR;
@@ -192,11 +192,11 @@ slk_clear()
 		(void) fflush(__m_screen->_of);
 		code = OK;
 	}
-	
+
 	return __m_return_code("slk_clear", code);
 }
 
-int 
+int
 slk_restore()
 {
 	int i, code = ERR;
@@ -221,12 +221,12 @@ slk_restore()
 		(void) fflush(__m_screen->_of);
 		code = OK;
 	}
-	
+
 	return __m_return_code("slk_clear", code);
 }
 
 int
-slk_noutrefresh() 
+slk_noutrefresh()
 {
 	int code = ERR;
 
@@ -275,7 +275,7 @@ slk_set(int index, const char *label, int justify)
 	__m_trace("slk_set(%d, %p, %d)", index, label, justify);
 #endif
 
-	if (0 < mbstowcs(wcs, label, sizeof wcs)) 
+	if (0 < mbstowcs(wcs, label, sizeof wcs))
 		code = slk_wset(index, wcs, justify);
 
 	return __m_return_code("slk_set", code);
@@ -290,7 +290,7 @@ slk_wset(int index, const wchar_t *label, int justify)
 	wchar_t wcs[M_CCHAR_MAX * 8 + 1], *wp;
 	char mbs[MB_LEN_MAX * ((1 + M_CCHAR_MAX) * 8) + 1];
 
-	/* 
+	/*
 	 * These label start columns assume 80 columns in order to
 	 * fit 8 _slk._labels of 8 columns.
 	 */
@@ -312,7 +312,7 @@ slk_wset(int index, const wchar_t *label, int justify)
 	/* Copy the characters that fill the first 8 columns of the label. */
 	for (wp = wcs, width = 0; *label != '\0'; label += i, wp += cc._n) {
 		if ((i = __m_wcs_cc(label, A_NORMAL, 0, &cc)) < 0)
-			goto error1;	
+			goto error1;
 
 
 		if (8 < (width += __m_cc_width(&cc)))
@@ -331,7 +331,7 @@ slk_wset(int index, const wchar_t *label, int justify)
 		free(__m_screen->_slk._labels[index]);
 	if ((__m_screen->_slk._labels[index] = m_strdup(mbs)) == NULL)
 		goto error1;
-	
+
 	if (__m_screen->_slk._w != NULL) {
 		/* Write the justified label into the slk window. */
 		i = format[__m_slk_format][index];
@@ -364,8 +364,8 @@ slk_wset(int index, const wchar_t *label, int justify)
 		if (cur_term->_str[**k] != NULL) {
 			(void) tputs(
 				tparm(
-					pkey_plab, (long) index, 
-					(long) cur_term->_str[**k], 
+					pkey_plab, (long) index,
+					(long) cur_term->_str[**k],
 					(long) mbs, 0L, 0L, 0L, 0L, 0L, 0L
 				), 1, __m_outc
 			);

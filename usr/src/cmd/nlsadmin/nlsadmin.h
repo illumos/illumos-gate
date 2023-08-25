@@ -41,7 +41,7 @@
 #define	NLPSSVCCODE	"0"		/* (string!) protoserv service code */
 #define	TTYSVCCODE	"1"		/* (string!) ttyserv service code */
 
-/* 
+/*
  * bit flags for argument processing
  */
 

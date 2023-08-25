@@ -25,7 +25,7 @@
 
 PROG= isalist
 SHFILES= optisa
-OBJS= isalist.o  
+OBJS= isalist.o
 
 include ../Makefile.cmd
 

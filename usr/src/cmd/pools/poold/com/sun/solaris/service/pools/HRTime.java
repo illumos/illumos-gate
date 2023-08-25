@@ -49,7 +49,7 @@ public class HRTime implements Comparable {
 	{
 		this.value = timestamp();
 	}
-	
+
 	/**
 	 * Constructs a new HRTime with the value of the given
 	 * UnsignedInt64.

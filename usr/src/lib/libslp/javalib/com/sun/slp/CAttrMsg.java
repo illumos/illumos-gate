@@ -25,8 +25,8 @@
  */
 
 //  CAttrMsg.java: Message class for SLP attribute
-//                 reply.  
-//  Author: James Kempf Created On: Thu Oct 9 15:17:36 1997 
+//                 reply.
+//  Author: James Kempf Created On: Thu Oct 9 15:17:36 1997
 //  Last Modified By: James Kempf
 //  Last Modified On: Tue Oct 27 10:57:38 1998
 //  Update Count: 107
@@ -47,16 +47,16 @@ import java.io.*;
 class CAttrMsg extends SrvLocMsgImpl {
 
     // Vector of ServiceLocationAttribute objects
-    Vector attrList = new Vector();  
+    Vector attrList = new Vector();
     Hashtable attrAuthBlock = null;  // auth block list for objects
 
     // Only used for testing.
 
     protected CAttrMsg() { }
 
-    // Construct a CAttrMsg from the byte input stream. 
+    // Construct a CAttrMsg from the byte input stream.
 
-    CAttrMsg(SLPHeaderV2 hdr, DataInputStream dis) 
+    CAttrMsg(SLPHeaderV2 hdr, DataInputStream dis)
 	throws ServiceLocationException, IOException {
 
 	super(hdr, SrvLocHeader.AttrRply);
@@ -70,14 +70,14 @@ class CAttrMsg extends SrvLocMsgImpl {
 
 	// Ignore if overflow.
 
-	if (hdr.overflow) { 
+	if (hdr.overflow) {
 	    return;
 
 	}
 
 	// Parse in the potentially authenticated attribute list.
 
-	attrAuthBlock = 
+	attrAuthBlock =
 	    hdr.parseAuthenticatedAttributeVectorIn(attrList, dis, true);
 
 	// Verify authentication, if necessary.
@@ -95,7 +95,7 @@ class CAttrMsg extends SrvLocMsgImpl {
     // Construct a CAttrMsg payload from the arguments. This will be
     //   an AttrRqst message.
 
-    CAttrMsg(Locale locale, ServiceURL url, Vector scopes, Vector tags) 
+    CAttrMsg(Locale locale, ServiceURL url, Vector scopes, Vector tags)
 	throws ServiceLocationException {
 
 	this.hdr = new SLPHeaderV2(SrvLocHeader.AttrRqst, false, locale);
@@ -107,7 +107,7 @@ class CAttrMsg extends SrvLocMsgImpl {
     // Construct a CAttrMsg payload from the arguments. This will be
     //   an AttrRqst message.
 
-    CAttrMsg(Locale locale, ServiceType type, Vector scopes, Vector tags) 
+    CAttrMsg(Locale locale, ServiceType type, Vector scopes, Vector tags)
 	throws ServiceLocationException {
 
 	this.hdr = new SLPHeaderV2(SrvLocHeader.AttrRqst, false, locale);
@@ -120,7 +120,7 @@ class CAttrMsg extends SrvLocMsgImpl {
 
     protected void constructPayload(String typeOrURL,
 				    Vector scopes,
-				    Vector tags) 
+				    Vector tags)
 	throws ServiceLocationException {
 
 	SLPHeaderV2 hdr = (SLPHeaderV2)this.hdr;

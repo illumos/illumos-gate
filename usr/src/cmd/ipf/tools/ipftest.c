@@ -97,7 +97,7 @@ char *argv[];
         ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
 	ipftuneable_alloc(ifs);
-	
+
 	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock");
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");

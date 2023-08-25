@@ -124,9 +124,9 @@ alert (int type, ...)
 				FORMMESSAGEFILE, (char * )NULL);
 		else
 			formPath = fp->alert->msgfile;
-			
+
 		fformat(formPath, fp,isFormMessage);
-		 
+
 		if (isFormMessage) {
 			  Free(formPath);
 			  schedule (EV_FORM_MESSAGE, fp);

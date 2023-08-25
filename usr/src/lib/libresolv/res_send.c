@@ -123,10 +123,10 @@ static int _confcheck()
 				return(0);
 			}
 		}
-	
+
 		return(0);
 	}
-	
+
 	return (0);
 }
 

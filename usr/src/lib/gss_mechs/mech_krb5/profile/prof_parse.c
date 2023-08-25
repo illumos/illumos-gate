@@ -87,7 +87,7 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 	struct profile_node	*node;
 	int do_subsection = 0;
 	void *iter = 0;
-	
+
 	if (*line == 0)
 		return 0;
 	cp = skip_over_blanks(line);
@@ -126,7 +126,7 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 			cp++;
 		}
 		/*
-		 * A space after ']' should not be fatal 
+		 * A space after ']' should not be fatal
 		 */
 		cp = skip_over_blanks(cp);
 		if (*cp)
@@ -209,7 +209,7 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 static errcode_t parse_line(char *line, struct parse_state *state)
 {
 	char	*cp;
-	
+
 	switch (state->state) {
 	case STATE_INIT_COMMENT:
 		if (line[0] != '[')
@@ -389,7 +389,7 @@ static void dump_profile(struct profile_node *root, int level,
 	void *iter;
 	long retval;
 	char *name, *value;
-	
+
 	iter = 0;
 	do {
 		retval = profile_find_node_relation(root, 0, &iter,

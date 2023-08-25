@@ -89,7 +89,7 @@ test6: dispsyms FRC
 	@ echo "<<< Test 6 >>>"
 	@ echo "Display symbols in dispsyms itself."
 	dispsyms dispsyms | egrep -v "LOCL|ABS|SECT|UNDEF"
-	
+
 test-extra: tpcom FRC
 	@ echo ""
 	@ echo "<<< Test-extra >>>"

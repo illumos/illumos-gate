@@ -224,7 +224,7 @@ extern "C" {
  * CPU logout code.
  *   afar:	input AFAR, not modified
  *   datap:	Ptr to ch_ec_data_t, at end pts just past ch_ec_data_t.
- *   ec_way:	Constant value (way number) 
+ *   ec_way:	Constant value (way number)
  *   scr1:      Scratch
  *   scr2:	Scratch.
  *   scr3:	Scratch.
@@ -303,7 +303,7 @@ extern "C" {
 /*
  * Serrano gets primary AFSR and AFAR.  All bits in the AFSR except
  * the fatal error bits are cleared.  For Serrano, we also save the
- * AFAR2 register. 
+ * AFAR2 register.
  *	datap:	pointer to cpu logout structure.
  *	afar:	returned primary AFAR value.
  *	scr1:	scratch
@@ -855,7 +855,7 @@ extern "C" {
 #if defined(JALAPENO) || defined(SERRANO)
 
 /*
- * ASI access to the L2 tag or L2 flush can hang the cpu when interacting 
+ * ASI access to the L2 tag or L2 flush can hang the cpu when interacting
  * with combinations of L2 snoops, victims and stores.
  *
  * A possible workaround is to surround each L2 ASI access with membars
@@ -998,7 +998,7 @@ extern "C" {
  * this macro returns the TLB index for that mapping based on a 512 entry
  * (2-way set associative) TLB. Aaside from the 16 entry fully associative
  * TLBs, all TLBs in Panther are 512 entry, 2-way set associative.
- *  
+ *
  * To find the index, we shift the VA right by 13 + (3 * pg_sz) and then
  * mask out all but the lower 8 bits because:
  *

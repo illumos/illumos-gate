@@ -23,8 +23,8 @@
 #      Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
 #      All Rights Reserved
 #
-# Portions of this source code were derived from Berkeley 
-# under license from the Regents of the University of  
+# Portions of this source code were derived from Berkeley
+# under license from the Regents of the University of
 # California.
 #
 #----
@@ -33,7 +33,7 @@
 # "." in a special way.
 #
 # Set the following variable to "-b" to have NIS servers use the domain name
-# resolver for hosts not in the current domain. 
+# resolver for hosts not in the current domain.
 #B=-b
 B=
 DIR =/etc
@@ -103,17 +103,17 @@ passwd.time: $(PWDIR)/passwd $(PWDIR)/shadow
 		(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(PWDIR)/passwd  $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/passwd.byname; \
 		(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { printf("%-10d ", $$3); print $$0 }' $(PWDIR)/passwd $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/passwd.byuid; \
 	fi
-	@touch passwd.time; 
-	@echo "updated passwd"; 
+	@touch passwd.time;
+	@echo "updated passwd";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) passwd.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) passwd.byuid; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed passwd"; fi
 
 group.time: $(DIR)/group
-	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(DIR)/group $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/group.byname; 
-	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { printf("%-10d ", $$3); print $$0 }' $(DIR)/group $(CHKPIPE)) | $(MAKEDBM) - $(YPDBDIR)/$(DOM)/group.bygid; 
-	@touch group.time; 
-	@echo "updated group"; 
+	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(DIR)/group $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/group.byname;
+	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { printf("%-10d ", $$3); print $$0 }' $(DIR)/group $(CHKPIPE)) | $(MAKEDBM) - $(YPDBDIR)/$(DOM)/group.bygid;
+	@touch group.time;
+	@echo "updated group";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) group.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) group.bygid; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed group"; fi
@@ -131,9 +131,9 @@ ipnodes.time: $(INETDIR)/ipnodes
 	@($(MULTI) -n $(B) -l $(INETDIR)/ipnodes);
 	@($(STDHOSTS) -wn $(INETDIR)/ipnodes $(CHKPIPE))| \
 	(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$1, $$0 }' $(CHKPIPE)) | \
-	$(MAKEDBM) $(B) - $(YPDBDIR)/$(DOM)/ipnodes.byaddr; 
-	@touch ipnodes.time; 
-	@echo "updated ipnodes"; 
+	$(MAKEDBM) $(B) - $(YPDBDIR)/$(DOM)/ipnodes.byaddr;
+	@touch ipnodes.time;
+	@echo "updated ipnodes";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) ipnodes.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) ipnodes.byaddr; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed ipnodes"; fi
@@ -142,9 +142,9 @@ hosts.time: $(DIR)/hosts
 	@($(MULTI) $(B) -l $(DIR)/hosts);
 	@($(STDHOSTS) -w $(DIR)/hosts $(CHKPIPE))| \
 	(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$1, $$0 }' $(CHKPIPE)) | \
-	$(MAKEDBM) $(B) - $(YPDBDIR)/$(DOM)/hosts.byaddr; 
-	@touch hosts.time; 
-	@echo "updated hosts"; 
+	$(MAKEDBM) $(B) - $(YPDBDIR)/$(DOM)/hosts.byaddr;
+	@touch hosts.time;
+	@echo "updated hosts";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) hosts.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) hosts.byaddr; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed hosts"; fi
@@ -152,13 +152,13 @@ hosts.time: $(DIR)/hosts
 ethers.time: $(DIR)/ethers
 	@($(STDETHERS) $(DIR)/ethers $(CHKPIPE)) \
 	|(awk '{print $$1, $$0; for (i = 3;i <= NF;i++) print $$i,$$0}' $(CHKPIPE)) \
-	| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/ethers.byaddr 
+	| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/ethers.byaddr
 
 	@(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$2, $$0 }' \
 	   $(DIR)/ethers $(CHKPIPE)) | \
 	$(MAKEDBM) - $(YPDBDIR)/$(DOM)/ethers.byname;
-	@touch ethers.time; 
-	@echo "updated ethers"; 
+	@touch ethers.time;
+	@echo "updated ethers";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) ethers.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) ethers.byaddr; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed ethers"; fi
@@ -166,11 +166,11 @@ ethers.time: $(DIR)/ethers
 networks.time: $(DIR)/networks
 	@(sed -e "/^#/d" -e s/#.*$$// $(DIR)/networks $(CHKPIPE)) |( awk \
 	    '{print $$1, $$0; for (i = 3;i <= NF;i++) print $$i,$$0}' \
-	    $(CHKPIPE) )| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/networks.byname; 
+	    $(CHKPIPE) )| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/networks.byname;
 	@(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$2, $$0 }' \
 	   $(DIR)/networks $(CHKPIPE)) | $(MAKEDBM) - $(YPDBDIR)/$(DOM)/networks.byaddr;
-	@touch networks.time; 
-	@echo "updated networks"; 
+	@touch networks.time;
+	@echo "updated networks";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) networks.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) networks.byaddr; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed networks"; fi
@@ -189,8 +189,8 @@ services.time: $(DIR)/services
 		$(DIR)/services $(CHKPIPE)) | \
 	$(MAKEDBM) $(B) - $(YPDBDIR)/$(DOM)/services.byservicename
 
-	@touch services.time; 
-	@echo "updated services"; 
+	@touch services.time;
+	@echo "updated services";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) services.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) services.byservicename; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed services"; fi
@@ -198,22 +198,22 @@ services.time: $(DIR)/services
 rpc.time: $(DIR)/rpc
 	@(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$2, $$0 }' \
 	    $(DIR)/rpc $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/rpc.bynumber;
-	@touch rpc.time; 
-	@echo "updated rpc"; 
+	@touch rpc.time;
+	@echo "updated rpc";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) rpc.bynumber; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed rpc"; fi
 
 protocols.time: $(DIR)/protocols
 	@(awk 'BEGIN { OFS="\t"; } $$1 !~ /^#/ { print $$2, $$0 }' \
 	    $(DIR)/protocols $(CHKPIPE)) | $(MAKEDBM) - \
-	    $(YPDBDIR)/$(DOM)/protocols.bynumber; 
+	    $(YPDBDIR)/$(DOM)/protocols.bynumber;
 
 	@(sed -e "/^#/d" -e s/#.*$$// $(DIR)/protocols $(CHKPIPE)) |( awk \
 	    '{print $$1,$$0; for (i = 3;i <= NF;i++) print $$i, $$0}' \
-	    $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/protocols.byname; 
+	    $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/protocols.byname;
 
-	@touch protocols.time; 
-	@echo "updated protocols"; 
+	@touch protocols.time;
+	@echo "updated protocols";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) protocols.byname; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) protocols.bynumber; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed protocols"; fi
@@ -222,8 +222,8 @@ netgroup.time: $(DIR)/netgroup
 	@$(MAKEDBM) $(DIR)/netgroup $(YPDBDIR)/$(DOM)/netgroup
 	@($(REVNETGROUP) < $(DIR)/netgroup -u $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/netgroup.byuser
 	@($(REVNETGROUP) < $(DIR)/netgroup -h $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/netgroup.byhost
-	@touch netgroup.time; 
-	@echo "updated netgroup"; 
+	@touch netgroup.time;
+	@echo "updated netgroup";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) netgroup; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) netgroup.byuser; fi
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) netgroup.byhost; fi
@@ -235,8 +235,8 @@ bootparams.time: $(DIR)/bootparams
 	|( awk '/ $$/ {printf "%s", $$0} !/ $$/ {print}' $(CHKPIPE))\
 	|( sed -e 's/[	 ][	 ]*/ /g' $(CHKPIPE))\
 	| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/bootparams;
-	@touch bootparams.time; 
-	@echo "updated bootparams"; 
+	@touch bootparams.time;
+	@echo "updated bootparams";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) bootparams; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed bootparams"; fi
 
@@ -252,26 +252,26 @@ aliases.time: $(ALIASES)
 	@if [ ! $(NOPUSH) ]; then echo "pushed aliases"; fi
 
 netmasks.time: $(DIR)/netmasks
-	$(MAKEDBM) $(DIR)/netmasks $(YPDBDIR)/$(DOM)/netmasks.byaddr; 
-	@touch netmasks.time; 
-	@echo "updated netmasks"; 
+	$(MAKEDBM) $(DIR)/netmasks $(YPDBDIR)/$(DOM)/netmasks.byaddr;
+	@touch netmasks.time;
+	@echo "updated netmasks";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) netmasks.byaddr; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed netmasks"; fi
 
 
 publickey.time: $(DIR)/publickey
-	@(sed "/^#/d" < $(DIR)/publickey $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/publickey.byname; 
-	@touch publickey.time; 
-	@echo "updated publickey"; 
+	@(sed "/^#/d" < $(DIR)/publickey $(CHKPIPE))| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/publickey.byname;
+	@touch publickey.time;
+	@echo "updated publickey";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) publickey.byname; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed publickey"; fi
 
 netid.time: $(PWDIR)/passwd $(DIR)/group $(DIR)/hosts $(DIR)/netid
-	@$(MKNETID) -q -p $(PWDIR)/passwd -g $(DIR)/group -h $(DIR)/hosts -m $(DIR)/netid > .ypjunk; 
-	@$(MAKEDBM) .ypjunk $(YPDBDIR)/$(DOM)/netid.byname; 
-	@rm -f .ypjunk; 
-	@touch netid.time; 
-	@echo "updated netid"; 
+	@$(MKNETID) -q -p $(PWDIR)/passwd -g $(DIR)/group -h $(DIR)/hosts -m $(DIR)/netid > .ypjunk;
+	@$(MAKEDBM) .ypjunk $(YPDBDIR)/$(DOM)/netid.byname;
+	@rm -f .ypjunk;
+	@touch netid.time;
+	@echo "updated netid";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) netid.byname; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed netid"; fi
 
@@ -280,10 +280,10 @@ netid.time: $(PWDIR)/passwd $(DIR)/group $(DIR)/hosts $(DIR)/netid
 #passwd.adjunct.time: $(PWDIR)/security/passwd.adjunct
 #	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(PWDIR)/security/passwd.adjunct $(CHKPIPE)) | \
 #		$(MAKEDBM) -s - $(YPDBDIR)/$(DOM)/passwd.adjunct.byname;
-#	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.dir; 
-#	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.pag; 
-#	@touch passwd.adjunct.time 
-#	@echo "updated passwd.adjunct"; 
+#	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.dir;
+#	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.pag;
+#	@touch passwd.adjunct.time
+#	@echo "updated passwd.adjunct";
 #	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) passwd.adjunct.byname; fi
 #	@if [ ! $(NOPUSH) ]; then echo "pushed passwd.adjunct"; fi
 
@@ -294,20 +294,20 @@ passwd.adjunct.time: $(PWDIR)/security/passwd.adjunct $(PWDIR)/shadow
 		(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(PWDIR)/security/passwd.adjunct $(CHKPIPE)) | \
 		$(MAKEDBM) -s - $(YPDBDIR)/$(DOM)/passwd.adjunct.byname; \
 	fi
-	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.dir; 
-	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.pag; 
-	@touch passwd.adjunct.time 
-	@echo "updated passwd.adjunct"; 
+	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.dir;
+	@chmod 600 $(YPDBDIR)/$(DOM)/passwd.adjunct.byname.pag;
+	@touch passwd.adjunct.time
+	@echo "updated passwd.adjunct";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) passwd.adjunct.byname; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed passwd.adjunct"; fi
 
 group.adjunct.time: $(PWDIR)/security/group.adjunct
 	@(awk 'BEGIN { FS=":"; OFS="\t"; } /^[a-zA-Z0-9_]/ { print $$1, $$0 }' $(PWDIR)/security/group.adjunct $(CHKPIPE)) | \
-	$(MAKEDBM) -s - $(YPDBDIR)/$(DOM)/group.adjunct.byname; 
-	@chmod 600 $(YPDBDIR)/$(DOM)/group.adjunct.byname.dir; 
-	@chmod 600 $(YPDBDIR)/$(DOM)/group.adjunct.byname.pag; 
-	@touch group.adjunct.time 
-	@echo "updated group.adjunct"; 
+	$(MAKEDBM) -s - $(YPDBDIR)/$(DOM)/group.adjunct.byname;
+	@chmod 600 $(YPDBDIR)/$(DOM)/group.adjunct.byname.dir;
+	@chmod 600 $(YPDBDIR)/$(DOM)/group.adjunct.byname.pag;
+	@touch group.adjunct.time
+	@echo "updated group.adjunct";
 	@if [ ! $(NOPUSH) ]; then $(YPPUSH) -d $(DOM) group.adjunct.byname; fi
 	@if [ ! $(NOPUSH) ]; then echo "pushed group.adjunct"; fi
 

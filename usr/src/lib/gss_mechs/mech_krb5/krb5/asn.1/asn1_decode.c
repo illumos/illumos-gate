@@ -1,6 +1,6 @@
 /*
  * src/lib/krb5/asn.1/asn1_decode.c
- * 
+ *
  * Copyright 1994, 2003 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -51,7 +51,7 @@ retval = asn1_get_tag_2(buf,&tinfo);\
 if(retval) return retval;\
 if(asn1class != UNIVERSAL || construction != PRIMITIVE || tagnum != type)\
   return ASN1_BAD_ID
-  
+
 #define cleanup()\
 return 0
 

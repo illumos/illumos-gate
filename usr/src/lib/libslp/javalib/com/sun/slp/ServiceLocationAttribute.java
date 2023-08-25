@@ -234,7 +234,7 @@ public class ServiceLocationAttribute extends Object
 		o = Boolean.valueOf(value);
 
 	    } else {
-	
+
 		// Process the string to remove escapes.
 
 		String val = (String)value;
@@ -564,7 +564,7 @@ public class ServiceLocationAttribute extends Object
 
 	    if (canEscape(c)) {
 		buf.append(ESCAPE);
-	
+
 		String str = escapeChar(c);
 
 		// Pad with zero if less than 2 characters.
@@ -642,7 +642,7 @@ public class ServiceLocationAttribute extends Object
 
 		// Check whether the character is reserved.
 
-		if (isReserved(c)) {	
+		if (isReserved(c)) {
 		    throw
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
@@ -674,8 +674,8 @@ public class ServiceLocationAttribute extends Object
 
     private static boolean canEscape(char c) {
 
-	return ((ESCAPED.indexOf(c) != -1) || 	
-		((c >= CTL_LOWER && c <= CTL_UPPER) || c == DEL));	
+	return ((ESCAPED.indexOf(c) != -1) ||
+		((c >= CTL_LOWER && c <= CTL_UPPER) || c == DEL));
 
     }
 
@@ -683,8 +683,8 @@ public class ServiceLocationAttribute extends Object
 
     private static boolean isReserved(char c) {
 
-	return ((RESERVED.indexOf(c) != -1) || 	
-		((c >= CTL_LOWER && c <= CTL_UPPER) || c == DEL));	
+	return ((RESERVED.indexOf(c) != -1) ||
+		((c >= CTL_LOWER && c <= CTL_UPPER) || c == DEL));
 
     }
 
@@ -768,7 +768,7 @@ public class ServiceLocationAttribute extends Object
 	byte b0 = 0, b1 = 0, b2 = 0, b3 = 0;
 	byte b[] = null;
 
-	b0 = (byte) (code & 0xFF);			
+	b0 = (byte) (code & 0xFF);
 	b1 = (byte) ((code >> 8) & 0xFF);
 	b2 = (byte) ((code >> 16) & 0xFF);
 	b3 = (byte) ((code >> 24) & 0xFF);
@@ -1051,9 +1051,9 @@ public class ServiceLocationAttribute extends Object
 		    s.append(",");
 
 		}
-	
+
 		// Stringify object.
-	
+
 		s.append(o.toString());
 
 	    }

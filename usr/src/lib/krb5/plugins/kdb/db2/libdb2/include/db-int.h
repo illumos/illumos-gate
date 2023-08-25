@@ -74,7 +74,7 @@ extern "C" {
    similarily - as big endian. See definition of "WORDS_BIGENDIAN" in
    db-config.h.
 */
-#if 0 
+#if 0
 /* Handle both BIG and LITTLE defined and BYTE_ORDER matches one, or
    just one defined; both with and without leading underscores.
 

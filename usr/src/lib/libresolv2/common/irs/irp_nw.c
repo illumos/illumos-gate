@@ -72,7 +72,7 @@ static void		free_nw(struct nwent *nw);
 /* Public */
 
 /*%
- * struct irs_nw * irs_irp_nw(struct irs_acc *this) 
+ * struct irs_nw * irs_irp_nw(struct irs_acc *this)
  *
  */
 
@@ -108,7 +108,7 @@ irs_irp_nw(struct irs_acc *this) {
 /* Methods */
 
 /*%
- * void nw_close(struct irs_nw *this) 
+ * void nw_close(struct irs_nw *this)
  *
  */
 
@@ -125,8 +125,8 @@ nw_close(struct irs_nw *this) {
 }
 
 /*%
- * struct nwent * nw_byaddr(struct irs_nw *this, void *net, 
- * 				int length, int type) 
+ * struct nwent * nw_byaddr(struct irs_nw *this, void *net,
+ * 				int length, int type)
  *
  */
 
@@ -166,16 +166,16 @@ nw_byaddr(struct irs_nw *this, void *net, int length, int type) {
 	} else {
 		nw = NULL;
 	}
-		
+
 	if (body != NULL) {
 		memput(body, bodylen);
 	}
-	
+
 	return (nw);
 }
 
 /*%
- * struct nwent * nw_byname(struct irs_nw *this, const char *name, int type) 
+ * struct nwent * nw_byname(struct irs_nw *this, const char *name, int type)
  *
  */
 
@@ -215,16 +215,16 @@ nw_byname(struct irs_nw *this, const char *name, int type) {
 	} else {
 		nw = NULL;
 	}
-	
+
 	if (body != NULL) {
 		memput(body, bodylen);
 	}
-	
+
 	return (nw);
 }
 
 /*%
- * void nw_rewind(struct irs_nw *this) 
+ * void nw_rewind(struct irs_nw *this)
  *
  */
 
@@ -248,12 +248,12 @@ nw_rewind(struct irs_nw *this) {
 			syslog(LOG_WARNING, "setnetent failed: %s", text);
 		}
 	}
-	
+
 	return;
 }
 
 /*%
- * 	Prepares the cache if necessary and returns the first, or 
+ * 	Prepares the cache if necessary and returns the first, or
  * 	next item from it.
  */
 
@@ -295,7 +295,7 @@ nw_next(struct irs_nw *this) {
 }
 
 /*%
- * void nw_minimize(struct irs_nw *this) 
+ * void nw_minimize(struct irs_nw *this)
  *
  */
 

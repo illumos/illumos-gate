@@ -572,7 +572,7 @@ abstract class SrvLocHeader extends Object implements SrvLocMsg, Cloneable {
 		    el += tok;
 
 		} else if (tok.equals(")")) {
-	
+
 		    // Decrement level if not ignoring parens.
 
 		    if (!ignoreParens) {

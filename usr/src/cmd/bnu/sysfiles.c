@@ -45,7 +45,7 @@
  *    allow arbitrary classes of service.
  *    need verifysys() for uucheck.
  *    nameserver interface?
- *    pass sysname (or 0) to getsysline().  (might want reg. exp. or NS processing 
+ *    pass sysname (or 0) to getsysline().  (might want reg. exp. or NS processing
  */
 
 /* private variables */
@@ -160,7 +160,7 @@ char *service;
 
 	Systems[0] = Devices[0] = Dialers[0] = NULL;
 	if ((f = fopen(SYSFILES, "r")) != 0) {
-		while (getaline(f, buf) > 0) { 
+		while (getaline(f, buf) > 0) {
 			/* got a (logical) line from Sysfiles */
 			/* strtok's of this buf continue in tokenize() */
 			tok = strtok(buf, " \t");
@@ -245,7 +245,7 @@ char *line;
 	lptr = line;
 	while (fgets(lptr, (line + BUFSIZ) - lptr, f) != NULL) {
 		lend = lptr + strlen(lptr);
-		if (lend == lptr || lend[-1] != '\n')	
+		if (lend == lptr || lend[-1] != '\n')
 			/* empty buf or line too long! */
 			break;
 		*--lend = '\0'; /* lop off ending '\n' */
@@ -314,7 +314,7 @@ tokenize()
 /*
  * look at top token in array: should be line of the form
  *	name=item1:item2:item3...
- * if name is one we recognize, then call set[file|ioctl] to set up 
+ * if name is one we recognize, then call set[file|ioctl] to set up
  * corresponding list.  otherwise, log bad name.
  */
 static void
@@ -431,7 +431,7 @@ sysreset()
 /*
  * reset Devices files
  */
-GLOBAL void		
+GLOBAL void
 devreset()
 {
 	if (fdevices)
@@ -445,7 +445,7 @@ devreset()
 /*
  * reset Dialers files
  */
-GLOBAL void		
+GLOBAL void
 dialreset()
 {
 	if (fdialers)
@@ -512,7 +512,7 @@ nextsystems()
 			return(TRUE);
 	return(FALSE);
 }
-		
+
 /*
  * get next line from Devices file
  * return TRUE if successful, FALSE if not
@@ -562,7 +562,7 @@ nextdevices()
 	return(FALSE);
 }
 
-		
+
 /*
  * get next line from Dialers file
  * return TRUE if successful, FALSE if not
@@ -607,7 +607,7 @@ nextdialers()
 	} else {
 		ndialers = 0;
 	}
-	
+
 	for ( ; Dialers[ndialers] != NULL; ndialers++)
 		if ((fdialers = fopen(Dialers[ndialers], "r")) != NULL)
 			return(TRUE);
@@ -748,7 +748,7 @@ setconfig()
     extern char _ProtoCfg[];
 
     if ((f = fopen(CONFIG, "r")) != 0) {
-	while (getaline(f, buf) > 0) { 
+	while (getaline(f, buf) > 0) {
 	    /* got a (logical) line from Config file */
 	    tok = strtok(buf, " \t");
 	    if ( (tok != NULL) && (*tok != '#') ) {

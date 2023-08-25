@@ -69,7 +69,7 @@ $(PROG):	$(OBJS)
 	$(POST_PROCESS_O)
 
 clean:
-	$(RM) $(OBJS)   
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

@@ -133,7 +133,7 @@ typedef int               mp_flag;
 
 #define MP_32BIT_MAX 4294967295U
 
-#if !defined(ULONG_MAX) 
+#if !defined(ULONG_MAX)
 #error "ULONG_MAX not defined"
 #elif !defined(UINT_MAX)
 #error "UINT_MAX not defined"
@@ -162,7 +162,7 @@ typedef unsigned long     mp_digit;
 #define MP_USE_LONG_DIGIT 1
 #undef  MP_USE_LONG_LONG_DIGIT
 
-#elif !defined(MP_USE_UINT_DIGIT) && defined(MP_ULONG_LONG_MAX) 
+#elif !defined(MP_USE_UINT_DIGIT) && defined(MP_ULONG_LONG_MAX)
 typedef unsigned long long mp_digit;
 #define MP_DIGIT_MAX       MP_ULONG_LONG_MAX
 #define MP_DIGIT_FMT      "%016llX"  /* printf() format for 1 digit */
@@ -184,7 +184,7 @@ typedef unsigned int      mp_digit;
 #undef  MP_USE_LONG_DIGIT
 #endif
 
-#if !defined(MP_NO_MP_WORD) 
+#if !defined(MP_NO_MP_WORD)
 #if  defined(MP_USE_UINT_DIGIT) && \
     (defined(MP_ULONG_LONG_MAX) || (ULONG_MAX > UINT_MAX))
 
@@ -199,7 +199,7 @@ typedef          long long mp_sword;
 #define MP_WORD_MAX       MP_ULONG_LONG_MAX
 #endif
 
-#else 
+#else
 #define MP_NO_MP_WORD 1
 #endif
 #endif /* !defined(MP_NO_MP_WORD) */
@@ -220,8 +220,8 @@ typedef          int      mp_sword;
 
 #define MP_HALF_DIGIT_BIT (MP_DIGIT_BIT/2)
 #define MP_HALF_RADIX     (1+(mp_digit)MP_HALF_DIGIT_MAX)
-/* MP_HALF_RADIX really ought to be called MP_SQRT_RADIX, but it's named 
-** MP_HALF_RADIX because it's the radix for MP_HALF_DIGITs, and it's 
+/* MP_HALF_RADIX really ought to be called MP_SQRT_RADIX, but it's named
+** MP_HALF_RADIX because it's the radix for MP_HALF_DIGITs, and it's
 ** consistent with the other _HALF_ names.
 */
 

@@ -73,7 +73,7 @@ clean:
 depend obj:
 
 install: all
-	
+
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 

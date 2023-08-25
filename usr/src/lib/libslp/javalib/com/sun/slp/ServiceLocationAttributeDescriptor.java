@@ -55,7 +55,7 @@ public interface ServiceLocationAttributeDescriptor {
      * @return A <b>String</b> for the attribute's id.
      */
 
-    public String getId();		
+    public String getId();
 
     /**
      * Return the fully qualified Java type of the attribute. SLP types
@@ -73,7 +73,7 @@ public interface ServiceLocationAttributeDescriptor {
      *	      attribute values.
      */
 
-    public String getValueType();		
+    public String getValueType();
 
     /**
      * Return attribute's help text.
@@ -81,7 +81,7 @@ public interface ServiceLocationAttributeDescriptor {
      * @return A <b>String</b> containing the attribute's help text.
      */
 
-    public String getDescription();	
+    public String getDescription();
 
     /**
      * Return an <b>Enumeration</b> of allowed values for the attribute type.
@@ -115,7 +115,7 @@ public interface ServiceLocationAttributeDescriptor {
      * @return True if the <i>"M"</i> flag is set.
      */
 
-    public boolean getIsMultivalued();	
+    public boolean getIsMultivalued();
 
     /**
      * Returns true if the <i>"O"</i>" flag is set.
@@ -123,7 +123,7 @@ public interface ServiceLocationAttributeDescriptor {
      * @return True if the <i>"O"</i>" flag is set.
      */
 
-    public boolean getIsOptional();		
+    public boolean getIsOptional();
 
     /**
      * Returns true if the <i>"X"</i>" flag is set.
@@ -139,7 +139,7 @@ public interface ServiceLocationAttributeDescriptor {
      * @return True if the <i>"L"</i> flag is set.
      */
 
-    public boolean getIsLiteral();		
+    public boolean getIsLiteral();
 
     /**
      * Returns <i>true</i> if the attribute is a keyword attribute.
@@ -147,6 +147,6 @@ public interface ServiceLocationAttributeDescriptor {
      * @return <i>true</i> if the attribute is a keyword attribute
      */
 
-    public boolean getIsKeyword();		
+    public boolean getIsKeyword();
 
 }

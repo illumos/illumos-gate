@@ -1138,7 +1138,7 @@ static int BnxeKstatDcbxUpdate(kstat_t * kstats,
         PRIORITY_TAGGING_IS_CURRENTLY_OPERATIONAL)
     {
         snprintf(pStats->prio_tag.value.c, 16, "operational");
-    
+
         app_table = dcbx_params.local_priority_app_table;
 
         for (i = 0; i <= 3; i++)

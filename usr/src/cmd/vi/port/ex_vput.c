@@ -277,7 +277,7 @@ vsetcurs(unsigned char *nc)
 	if (linebuf[0])
 		col--;
 	vgotoCL(col);
-	cursor = nc; 
+	cursor = nc;
 }
 
 /*
@@ -605,7 +605,7 @@ vmaktop(int p, wchar_t *cp)
  * Insert character c at current cursor position.
  * Multi-character inserts occur only as a result
  * of expansion of tabs (i.e. inssize == 1 except
- * for tabs or multibyte characters) 
+ * for tabs or multibyte characters)
  * and code assumes this in several place
  * to make life simpler.
  */
@@ -651,7 +651,7 @@ vinschar(wchar_t c)
 		}
 		return (0);
 	}
-	
+
 	/*
 	 * Compute the number of positions in the line image of the
 	 * current line.  This is done from the physical image
@@ -713,7 +713,7 @@ vinschar(wchar_t c)
 		} while (inssiz);
 		return (0);
 	}
-	
+
 	/*
 	 * Have to really do some insertion, thus
 	 * stake out the bounds of the first following
@@ -1017,7 +1017,7 @@ viin(wchar_t c)
 			}
 		}
 
-	/* 
+	/*
 	 * Now put out the characters of the actual insertion.
 	 */
 	vigotoCL(inscol);
@@ -1114,7 +1114,7 @@ viin(wchar_t c)
 	tp = vtube0 + tabstart; up = tp + inssiz - doomed;
 	for (i = tabstart; i > inscol + doomed; i--)
 		*--up = *--tp;
-	for (i = inssiz; i > 0; i--) 
+	for (i = inssiz; i > 0; i--)
 		if((c & QUOTE) == 0) {
 			int width = wcwidth(c);
 			if (width < 0)
@@ -1408,7 +1408,7 @@ def:
 		 */
 		if (insmode)
 			vputp(insert_padding, DEPTH(vcline));
-		destcol += length; 
+		destcol += length;
 		outcol += length;
 
 		/*

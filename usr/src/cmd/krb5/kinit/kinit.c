@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Initialize a credentials cache.
  */
@@ -77,7 +77,7 @@ extern int getopt();
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
-static 
+static
 char * get_name_from_os()
 {
     struct passwd *pw;
@@ -275,7 +275,7 @@ usage(progname)
 	    USAGE_BREAK
 	    "[-S service_name]"
 	    "[-X <attribute>[=<value>]] [principal]"
-	    "\n\n", 
+	    "\n\n",
 	    gettext("Usage"), progname);
 
 #define KRB_AVAIL_STRING(x) ((x)?gettext("available"):gettext("not available"))
@@ -550,9 +550,9 @@ parse_options(argc, argv, opts, progname)
 
     /* Now, we encode the OPTTYPE stuff here... */
     if (!use_k5 &&
-	(opts->starttime || opts->rlife || opts->forwardable || 
-	 opts->proxiable || opts->addresses || opts->not_forwardable || 
-	 opts->not_proxiable || opts->no_addresses || 
+	(opts->starttime || opts->rlife || opts->forwardable ||
+	 opts->proxiable || opts->addresses || opts->not_forwardable ||
+	 opts->not_proxiable || opts->no_addresses ||
 	 (opts->action == VALIDATE) || opts->k5_cache_name))
     {
 	fprintf(stderr, gettext("Specified option that requires Kerberos 5\n"));
@@ -570,7 +570,7 @@ parse_options(argc, argv, opts, progname)
 #else
 	use_k4
 #endif
-	&& (opts->service_name || opts->keytab_name || 
+	&& (opts->service_name || opts->keytab_name ||
 	    (opts->action == INIT_KT) || (opts->action == RENEW))
 	)
     {
@@ -615,7 +615,7 @@ struct k4_data* k4;
 		    opts->k5_cache_name);
 	    return 0;
 	}
-    } 
+    }
     else
     {
 	if ((code = krb5_cc_default(k5->ctx, &k5->cc))) {
@@ -627,9 +627,9 @@ struct k4_data* k4;
     if (opts->principal_name)
     {
 	/* Use specified name */
-	if ((code = krb5_parse_name(k5->ctx, opts->principal_name, 
+	if ((code = krb5_parse_name(k5->ctx, opts->principal_name,
 				    &k5->me))) {
-	    com_err(progname, code, gettext("when parsing name %s"), 
+	    com_err(progname, code, gettext("when parsing name %s"),
 		    opts->principal_name);
 	    return 0;
 	}
@@ -648,7 +648,7 @@ struct k4_data* k4;
 	  }
 	} else {
 	  /* Get default principal from cache if one exists */
-	  code = krb5_cc_get_principal(k5->ctx, k5->cc, 
+	  code = krb5_cc_get_principal(k5->ctx, k5->cc,
 				       &k5->me);
 	  if (code)
 	    {
@@ -668,10 +668,10 @@ struct k4_data* k4;
                                 return 0;
                         }
                 } else
-	      if ((code = krb5_parse_name(k5->ctx, name, 
+	      if ((code = krb5_parse_name(k5->ctx, name,
 					  &k5->me)))
 		{
-		  com_err(progname, code, gettext("when parsing name %s"), 
+		  com_err(progname, code, gettext("when parsing name %s"),
 			  name);
 		  return 0;
 		}
@@ -738,11 +738,11 @@ k4_begin(opts, k4)
     if (opts->principal_name)
     {
 	/* Use specified name */
-        k_errno = kname_parse(k4->aname, k4->inst, k4->realm, 
+        k_errno = kname_parse(k4->aname, k4->inst, k4->realm,
 			      opts->principal_name);
 	if (k_errno)
 	{
-	    fprintf(stderr, "%s: %s\n", progname, 
+	    fprintf(stderr, "%s: %s\n", progname,
 		    krb_get_err_text(k_errno));
 	    return 0;
 	}
@@ -756,7 +756,7 @@ k4_begin(opts, k4)
 	    return 0;
 	} else {
 	    /* Get default principal from cache if one exists */
-	    k_errno = krb_get_tf_fullname(tkt_string(), k4->aname, 
+	    k_errno = krb_get_tf_fullname(tkt_string(), k4->aname,
 					  k4->inst, k4->realm);
 	    if (k_errno)
 	    {
@@ -770,7 +770,7 @@ k4_begin(opts, k4)
 				      name);
 		if (k_errno)
 		{
-		    fprintf(stderr, "%s: %s\n", progname, 
+		    fprintf(stderr, "%s: %s\n", progname,
 			    krb_get_err_text(k_errno));
 		    return 0;
 		}
@@ -931,10 +931,10 @@ k5_kinit(opts, k5)
 	    opts->lifetime = krb5_max_duration;
 
 
-    profile_get_options_boolean(k5->ctx->profile, 
-				realmdef, config_option); 
-    profile_get_options_boolean(k5->ctx->profile, 
-				appdef, config_option); 
+    profile_get_options_boolean(k5->ctx->profile,
+				realmdef, config_option);
+    profile_get_options_boolean(k5->ctx->profile,
+				appdef, config_option);
 
 
     /* cmdline opts take precedence over krb5.conf file values */
@@ -991,7 +991,7 @@ k5_kinit(opts, k5)
     {
 	code = krb5_kt_resolve(k5->ctx, opts->keytab_name, &keytab);
 	if (code != 0) {
-	    com_err(progname, code, gettext("resolving keytab %s"), 
+	    com_err(progname, code, gettext("resolving keytab %s"),
 		    opts->keytab_name);
 	    goto cleanup;
 	}
@@ -1012,14 +1012,14 @@ k5_kinit(opts, k5)
     case INIT_PW:
 	code = krb5_get_init_creds_password(k5->ctx, &my_creds, k5->me,
 					    0, kinit_prompter, 0,
-					    opts->starttime, 
+					    opts->starttime,
 					    opts->service_name,
 					    options);
 	break;
     case INIT_KT:
 	code = krb5_get_init_creds_keytab(k5->ctx, &my_creds, k5->me,
 					  keytab,
-					  opts->starttime, 
+					  opts->starttime,
 					  opts->service_name,
 					  options);
 	break;
@@ -1084,7 +1084,7 @@ k5_kinit(opts, k5)
     if (opts->action == RENEW) {
         _kwarnd_del_warning(progname, opts->principal_name);
         _kwarnd_add_warning(progname, opts->principal_name, my_creds.times.endtime);
-    } else if ((opts->action == INIT_KT) || (opts->action == INIT_PW)) { 
+    } else if ((opts->action == INIT_KT) || (opts->action == INIT_PW)) {
         _kwarnd_add_warning(progname, opts->principal_name, my_creds.times.endtime);
     }
 
@@ -1158,14 +1158,14 @@ k4_kinit(opts, k4, ctx)
 	    }
 	    got_password = 1;
 	}
-	k_errno = krb_get_pw_in_tkt(k4->aname, k4->inst, k4->realm, "krbtgt", 
+	k_errno = krb_get_pw_in_tkt(k4->aname, k4->inst, k4->realm, "krbtgt",
 				    k4->realm, k4->lifetime, stash_password);
 
 	if (k_errno) {
-	    fprintf(stderr, "%s: %s\n", progname, 
+	    fprintf(stderr, "%s: %s\n", progname,
 		    krb_get_err_text(k_errno));
 	    if (authed_k5)
-	        fprintf(stderr, gettext("Maybe your KDC does not support v4.  " 
+	        fprintf(stderr, gettext("Maybe your KDC does not support v4.  "
 			"Try the -5 option next time.\n"));
 	    return 0;
 	}
@@ -1179,9 +1179,9 @@ k4_kinit(opts, k4, ctx)
 		progname);
 	return 0;
 #else
-    /* These cases are handled by the 524 code - this prevents the compiler 
+    /* These cases are handled by the 524 code - this prevents the compiler
        warnings of not using all the enumerated types.
-    */ 
+    */
     case INIT_KT:
     case RENEW:
     case VALIDATE:
@@ -1228,7 +1228,7 @@ static int try_convert524(k5)
     */
 
     if ((code = krb5_build_principal(k5->ctx,
-				     &kpcserver, 
+				     &kpcserver,
 				     krb5_princ_realm(k5->ctx, k5->me)->length,
 				     krb5_princ_realm(k5->ctx, k5->me)->data,
 				     "krbtgt",
@@ -1246,9 +1246,9 @@ static int try_convert524(k5)
 
     increds.times.endtime = 0;
     increds.keyblock.enctype = ENCTYPE_DES_CBC_CRC;
-    if ((code = krb5_get_credentials(k5->ctx, 0, 
+    if ((code = krb5_get_credentials(k5->ctx, 0,
 				     k5->cc,
-				     &increds, 
+				     &increds,
 				     &v5creds))) {
 	com_err(progname, code,
 		gettext("getting V5 credentials"));
@@ -1257,7 +1257,7 @@ static int try_convert524(k5)
     if ((icode = krb524_convert_creds_kdc(k5->ctx,
 					  v5creds,
 					  &v4creds))) {
-	com_err(progname, icode, 
+	com_err(progname, icode,
 		gettext("converting to V4 credentials"));
 	goto cleanup;
     }
@@ -1272,11 +1272,11 @@ static int try_convert524(k5)
     /* stash ticket, session key, etc. for future use */
     if ((icode = krb_save_credentials(v4creds.service,
 				      v4creds.instance,
-				      v4creds.realm, 
+				      v4creds.realm,
 				      v4creds.session,
 				      v4creds.lifetime,
 				      v4creds.kvno,
-				      &(v4creds.ticket_st), 
+				      &(v4creds.ticket_st),
 				      v4creds.issue_date))) {
 	com_err(progname, icode, gettext(
 		"trying to save the V4 ticket"));
@@ -1375,22 +1375,22 @@ main(argc, argv)
     return 0;
 }
 
-static void 
-_kwarnd_add_warning(char *progname, char *me, time_t endtime) 
-{ 
-    if (kwarn_add_warning(me, endtime) != 0) 
+static void
+_kwarnd_add_warning(char *progname, char *me, time_t endtime)
+{
+    if (kwarn_add_warning(me, endtime) != 0)
         fprintf(stderr, gettext(
-            "%s:  no ktkt_warnd warning possible\n"), progname); 
-    return; 
+            "%s:  no ktkt_warnd warning possible\n"), progname);
+    return;
 }
 
 
-static void 
-_kwarnd_del_warning(char *progname, char *me) 
+static void
+_kwarnd_del_warning(char *progname, char *me)
 {
     if (kwarn_del_warning(me) != 0)
-        fprintf(stderr, gettext( 
-            "%s:  unable to delete ktkt_warnd message for %s\n"), 
-            progname, me); 
-    return; 
+        fprintf(stderr, gettext(
+            "%s:  unable to delete ktkt_warnd message for %s\n"),
+            progname, me);
+    return;
 }

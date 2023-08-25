@@ -105,7 +105,7 @@ struct irs_pr *
 irs_lcl_pr(struct irs_acc *this) {
 	struct irs_pr *pr;
 	struct pvt *pvt;
-	
+
 	if (!(pr = memget(sizeof *pr))) {
 		errno = ENOMEM;
 		return (NULL);
@@ -144,7 +144,7 @@ pr_close(struct irs_pr *this) {
 
 static struct protoent *
 pr_byname(struct irs_pr *this, const char *name) {
-		
+
 	struct protoent *p;
 	char **cp;
 
@@ -174,7 +174,7 @@ pr_bynumber(struct irs_pr *this, int proto) {
 static void
 pr_rewind(struct irs_pr *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	if (pvt->fp) {
 		if (fseek(pvt->fp, 0L, SEEK_SET) == 0)
 			return;

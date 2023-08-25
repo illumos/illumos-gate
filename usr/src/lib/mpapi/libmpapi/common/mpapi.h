@@ -33,21 +33,21 @@
  *
  *   Changes:
  *  1/15/2005   Implemented SNIA MP API specification 1.0
- *  10/11/2005 
+ *  10/11/2005
  *		- Added the license location in the header comment.
  *	  	- Added an implementation note in constants and macros
  *		  declarations section.
  *		- Fixed field name value in struct _MP_PROPRIETARY_PROPERTY.
- *		- Fixed typo in logicalUnitGroupID in 
+ *		- Fixed typo in logicalUnitGroupID in
  *		  _MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES
  *		- Fixed typo in desiredState in struct _MP_TPG_STATE_PAIR.
  *		- Fixed typo in API name MP_GetTargetPortGroupProperties.
  *		- Clarified description of MP_STATUS_INVALID_PARAMETER error
  *		  in MP_GetObjectType().
- *		- Fixed typo in API name 
+ *		- Fixed typo in API name
  *		  MP_GetProprietaryLoadBalanceProperties().
- *  3/6/2006 
- *		- mpapi.h header file is updated for 
+ *  3/6/2006
+ *		- mpapi.h header file is updated for
  *		  MP_LOAD_BALANCE_TYPE change in the spec.
  *****************************************************************************/
 
@@ -98,7 +98,7 @@ extern "C" {
 #define MAX_NAME_SIZE		256
 #define MAX_LINE_SIZE		515
 
- 
+
 /**
  ******************************************************************************
  *
@@ -152,14 +152,14 @@ typedef MP_UINT32 MP_XBOOL;
  *			  returns the following errors.
  *
  *		1. MP_STATUS_INVALID_OBJECT_TYPE when input OID type is not
- *		   one of legitimate types defined SNIA Multipath Management 
+ *		   one of legitimate types defined SNIA Multipath Management
  *		   Spec.
  *		2. MP_STATUS_INVALID_PARAMETER when input OID type is
  *		   legitimate but not a proper type for API.
  *		3. MP_STATUS_OBJECT_NOT_FOUND when the ownerId of input OID is
  *		   not found or no object instance with matching
- *		   sequenceNumber is found. 
- *		   The ownerId is validated by the common library and the 
+ *		   sequenceNumber is found.
+ *		   The ownerId is validated by the common library and the
  *		   sequence number is validated by the plugin library.
  *
  ******************************************************************************
@@ -398,7 +398,7 @@ typedef struct _MP_OID
 
 } MP_OID;
 
-#define ZERO_OID ((const MP_OID){MP_OBJECT_TYPE_UNKNOWN,0,0}) 
+#define ZERO_OID ((const MP_OID){MP_OBJECT_TYPE_UNKNOWN,0,0})
 
 /**
  *******************************************************************************
@@ -615,7 +615,7 @@ typedef struct _MP_PLUGIN_PROPERTIES
 
     /**
      * The current plugin-wide auto-failback polling rate (in seconds).
-     * Undefined if autofailbackSupport is MP_AUTOFAILBACK_SUPPORT_NONE or 
+     * Undefined if autofailbackSupport is MP_AUTOFAILBACK_SUPPORT_NONE or
      * MP_AUTOFAILBACK_SUPPORT_MPLU. Cannot be more that plooingRateMax.
      */
     MP_UINT32 currentFailbackPollingRate;
@@ -736,7 +736,7 @@ typedef struct _MP_PATH_LOGICAL_UNIT_PROPERTIES
 {
     MP_UINT32	    weight;
     MP_PATH_STATE   pathState;
-    MP_BOOL	    disabled;		
+    MP_BOOL	    disabled;
     MP_OID	    initiatorPortOid;
     MP_OID	    targetPortOid;
     MP_OID	    logicalUnitOid;
@@ -1541,7 +1541,7 @@ MP_STATUS MP_GetProprietaryLoadBalanceOidList(
  * Gets the properties of the specified load balance properties structure.
  *
  * @param  oid
- *         The object ID of the proprietary load balance structure. 
+ *         The object ID of the proprietary load balance structure.
  *
  * @param  pProps
  *      A pointer to an MP_PROPRIETARY_LOAD_BALANCE_PROPERTIES structure

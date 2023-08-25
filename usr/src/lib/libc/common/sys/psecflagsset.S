@@ -15,7 +15,7 @@
 
 #include <sys/asm_linkage.h>
 #include "SYS.h"
-        
+
         SYSCALL2_RVAL1(__psecflagsset,psecflags)
         RET
         SET_SIZE(__psecflagsset)

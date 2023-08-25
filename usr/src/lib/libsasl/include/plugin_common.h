@@ -8,7 +8,7 @@
  * $Id: plugin_common.h,v 1.16 2003/04/07 16:03:43 rjs3 Exp $
  */
 
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -141,7 +141,7 @@ PLUG_API int sasl_canonuser_init(const sasl_utils_t *utils, \
 #endif
 
 #ifndef SASLINT_H
-typedef struct buffer_info 
+typedef struct buffer_info
 {
     char *data;
     unsigned curlen;   /* Current length of data in buffer */
@@ -199,7 +199,7 @@ int _plug_decode(const sasl_utils_t *utils,
 				   char **output, unsigned *outputlen));
 
 int _plug_parseuser(const sasl_utils_t *utils,
-		    char **user, char **realm, const char *user_realm, 
+		    char **user, char **realm, const char *user_realm,
 		    const char *serverFQDN, const char *input);
 
 #ifdef _INTEGRATED_SOLARIS_

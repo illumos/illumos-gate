@@ -535,7 +535,7 @@ xge_hal_ring_dtr_pre_post(xge_hal_channel_h	channelh, xge_hal_dtr_h	dtrh)
  * xge_hal_ring_dtr_post_post -	FIXME.
  * @channelh: Channel handle.
  * @dtrh: Descriptor handle.
- * 
+ *
  * TBD
  */
 __HAL_STATIC_RING __HAL_INLINE_RING	void
@@ -569,7 +569,7 @@ xge_hal_ring_dtr_post_post(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
  * xge_hal_ring_dtr_post_post_wmb.
  * @channelh: Channel handle.
  * @dtrh: Descriptor handle.
- * 
+ *
  * Similar as xge_hal_ring_dtr_post_post, but in addition it does memory barrier.
  */
 __HAL_STATIC_RING __HAL_INLINE_RING	void
@@ -582,7 +582,7 @@ xge_hal_ring_dtr_post_post_wmb(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 #endif
     /* Do memory barrier before changing the ownership */
     xge_os_wmb();
-    
+
 	/* do POST */
 	rxdp->control_1	|= XGE_HAL_RXD_POSTED_4_XFRAME;
 

@@ -894,7 +894,7 @@ class RequestHandler extends Thread {
 							  discoveredScopes,
 							  daAttributes});
 		    }
-		
+
 
 		    // We don't reply, which means that the client will
 		    // time out.
@@ -1073,7 +1073,7 @@ class RequestHandler extends Thread {
 
 	    if (hdr.errCode == ServiceLocationException.OK) {
 		toForward = rqst;
-	
+
 	    }
 	}
 
@@ -1297,7 +1297,7 @@ class RequestHandler extends Thread {
 	    // We report error for unicast SA service request.
 
 	    if (!mcast) {
-	
+
 		if (config.traceDrop()) {
 
 		    config.writeLog("rh_no_srv_uni",

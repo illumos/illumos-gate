@@ -59,7 +59,7 @@ BSMSUBDIRS=
 #
 # commands not owned by the systems group
 #
-BWOSDIRS= 
+BWOSDIRS=
 
 all :=		TARGET= all
 install :=	TARGET= install

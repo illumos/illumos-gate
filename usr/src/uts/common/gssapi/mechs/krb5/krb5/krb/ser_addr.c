@@ -109,7 +109,7 @@ krb5_address_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 	    (required <= remain)) {
 	    /* Our identifier */
 	    (void) krb5_ser_pack_int32(KV5M_ADDRESS, &bp, &remain);
-		
+
 	    /* Our addrtype */
 	    (void) krb5_ser_pack_int32((krb5_int32) address->addrtype,
 				       &bp, &remain);

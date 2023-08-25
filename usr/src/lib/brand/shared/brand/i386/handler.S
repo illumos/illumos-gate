@@ -31,7 +31,7 @@
 #define	JMP	\
 	pushl	$_CONST(. - brand_handler_table); \
 	jmp	brand_handler;	\
-	.align	16;	
+	.align	16;
 
 #define	JMP4	JMP; JMP; JMP; JMP
 #define JMP16	JMP4; JMP4; JMP4; JMP4
@@ -146,9 +146,9 @@ brand_handler(void)
 	 * %ecx == number of arguments.
 	 */
 	movl	%ebp, %esi			/* args are at 12(%ebp) */
-	addl	$EH_ARGS_OFFSET(3), %esi	
+	addl	$EH_ARGS_OFFSET(3), %esi
 	movl	%esp, %edi			/* copy args to 4(%esp) */
-	addl	$EH_ARGS_OFFSET(1), %edi	
+	addl	$EH_ARGS_OFFSET(1), %edi
 	rep;	smovl				/* copy: (%esi) -> (%edi) */
 						/* copy: %ecx 32-bit words */
 	movl	EH_LOCALS_GREG(ESI)(%ebp), %esi	/* restore %esi */

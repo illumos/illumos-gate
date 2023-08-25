@@ -154,7 +154,7 @@ uproc()
 	while (rdfulline(cfd, line, BUFSIZ) != 0) {
 
 		na = getargs(line, carray, C_MAX);
-		
+
 		if (upermit(carray, na) != FAIL)
 			insert(carray[0]);
 	}

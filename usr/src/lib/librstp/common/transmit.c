@@ -1,27 +1,27 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
 /* Port Transmit state machine : 17.27 */
-  
+
 #include "base.h"
 #include "stpm.h"
 #include "stp_to.h" /* for STP_OUT_get_port_mac & STP_OUT_tx_bpdu */
@@ -108,7 +108,7 @@ build_bpdu_header (int port_index,
 
   /* NOTE: I suppose, that sizeof(unsigned short)=2 ! */
   len8023 = htons ((unsigned short) (pkt_len + 3));
-  (void) memcpy (&bpdu_packet.eth.len8023, &len8023, 2); 
+  (void) memcpy (&bpdu_packet.eth.len8023, &len8023, 2);
 
   if (pkt_len < MIN_FRAME_LENGTH) pkt_len = MIN_FRAME_LENGTH;
   return pkt_len;
@@ -189,12 +189,12 @@ txConfig (STATE_MACH_T* this)
   if (port->admin_non_stp) return 1;
   port_index = port->port_index;
   vlan_id = port->owner->vlan_id;
-  
+
   pkt_len = build_bpdu_header (port->port_index,
                                BPDU_CONFIG_TYPE,
                                sizeof (BPDU_HEADER_T) + sizeof (BPDU_BODY_T));
   build_config_bpdu (port, True);
- 
+
 #ifdef STP_DBG
   if (this->debug)
     stp_trace ("port %s txConfig flags=0X%lx",
@@ -281,7 +281,7 @@ txRstp (STATE_MACH_T* this)
         port->port_name,
         (unsigned long) bpdu_packet.body.flags);
 #endif
-   
+
   return STP_OUT_tx_bpdu (port_index, vlan_id,
                           (unsigned char *) &bpdu_packet,
                           pkt_len);
@@ -326,7 +326,7 @@ STP_transmit_enter_state (STATE_MACH_T* this)
       break;
   };
 }
-  
+
 Bool
 STP_transmit_check_conditions (STATE_MACH_T* this)
 {

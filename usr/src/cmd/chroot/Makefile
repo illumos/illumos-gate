@@ -31,7 +31,7 @@ include ../Makefile.cmd
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	$(RM) $(ROOTETCPROG)

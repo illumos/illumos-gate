@@ -109,7 +109,7 @@ krb5_checksum_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **
 	    (required <= remain)) {
 	    /* Our identifier */
 	    (void) krb5_ser_pack_int32(KV5M_CHECKSUM, &bp, &remain);
-		
+
 	    /* Our checksum_type */
 	    (void) krb5_ser_pack_int32((krb5_int32) checksum->checksum_type,
 				       &bp, &remain);
@@ -171,7 +171,7 @@ krb5_checksum_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet 
 
 	    /* Get the string */
 	    /* Solaris Kerberos */
-	    if (ibuf) 
+	    if (ibuf)
 		checksum->contents = (krb5_octet *)
 		 			 MALLOC((size_t) (ibuf));
 

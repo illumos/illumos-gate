@@ -135,7 +135,7 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	dbus_error_init (&error);	
+	dbus_error_init (&error);
 	if ((hal_ctx = libhal_ctx_new ()) == NULL) {
 		fprintf (stderr, "error: libhal_ctx_new\n");
 		LIBHAL_FREE_DBUS_ERROR (&error);

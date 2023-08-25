@@ -33,7 +33,7 @@ include ../Makefile.cmd
 
 .KEEP_STATE:
 
-all: $(PROG) $(SHFILES) 
+all: $(PROG) $(SHFILES)
 
 install: all $(ROOTPROG) $(ROOTLIBSHFILES)
 

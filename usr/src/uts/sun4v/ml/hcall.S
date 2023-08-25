@@ -126,7 +126,7 @@
 	mov	TOD_GET, %o5
 	ta	FAST_TRAP
 	retl
-	  stx	%o1, [%o4] 
+	  stx	%o1, [%o4]
 	SET_SIZE(hv_tod_get)
 
 	ENTRY(hv_tod_set)
@@ -398,7 +398,7 @@
 	SET_SIZE(hv_mem_scrub)
 
 	/*
-	 * Flush ecache 
+	 * Flush ecache
 	 * int hv_mem_sync(uint64_t real_addr, uint64_t length,
 	 * 	uint64_t *flushed_len);
 	 * Retun %o0 -- status
@@ -524,7 +524,7 @@
 	 * arg3 Third arg to OS function
 	 * ret0 Returned value from function
 	 */
-	
+
 	ENTRY(hv_hpriv)
 	mov	HV_HPRIV, %o5
 	ta	FAST_TRAP
@@ -533,7 +533,7 @@
 	SET_SIZE(hv_hpriv)
 
 	/*
-         * hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base, 
+         * hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base,
 	 *	uint64_t nentries);
 	 */
 	ENTRY(hv_ldc_tx_qconf)
@@ -545,7 +545,7 @@
 
 
 	/*
-         * hv_ldc_tx_qinfo(uint64_t channel, uint64_t *ra_base, 
+         * hv_ldc_tx_qinfo(uint64_t channel, uint64_t *ra_base,
 	 *	uint64_t *nentries);
 	 */
 	ENTRY(hv_ldc_tx_qinfo)
@@ -560,7 +560,7 @@
 
 
 	/*
-	 * hv_ldc_tx_get_state(uint64_t channel, 
+	 * hv_ldc_tx_get_state(uint64_t channel,
 	 *	uint64_t *headp, uint64_t *tailp, uint64_t *state);
 	 */
 	ENTRY(hv_ldc_tx_get_state)
@@ -585,9 +585,9 @@
 	retl
 	SET_SIZE(hv_ldc_tx_set_qtail)
 
-	
+
 	/*
-         * hv_ldc_rx_qconf(uint64_t channel, uint64_t ra_base, 
+         * hv_ldc_rx_qconf(uint64_t channel, uint64_t ra_base,
 	 *	uint64_t nentries);
 	 */
 	ENTRY(hv_ldc_rx_qconf)
@@ -599,7 +599,7 @@
 
 
 	/*
-         * hv_ldc_rx_qinfo(uint64_t channel, uint64_t *ra_base, 
+         * hv_ldc_rx_qinfo(uint64_t channel, uint64_t *ra_base,
 	 *	uint64_t *nentries);
 	 */
 	ENTRY(hv_ldc_rx_qinfo)
@@ -614,7 +614,7 @@
 
 
 	/*
-	 * hv_ldc_rx_get_state(uint64_t channel, 
+	 * hv_ldc_rx_get_state(uint64_t channel,
 	 *	uint64_t *headp, uint64_t *tailp, uint64_t *state);
 	 */
 	ENTRY(hv_ldc_rx_get_state)
@@ -640,7 +640,7 @@
 	SET_SIZE(hv_ldc_rx_set_qhead)
 
 	/*
-	 * hv_ldc_set_map_table(uint64_t channel, uint64_t tbl_ra, 
+	 * hv_ldc_set_map_table(uint64_t channel, uint64_t tbl_ra,
 	 *		uint64_t tbl_entries)
 	 */
 	ENTRY(hv_ldc_set_map_table)
@@ -652,7 +652,7 @@
 
 
 	/*
-	 * hv_ldc_get_map_table(uint64_t channel, uint64_t *tbl_ra, 
+	 * hv_ldc_get_map_table(uint64_t channel, uint64_t *tbl_ra,
 	 *		uint64_t *tbl_entries)
 	 */
 	ENTRY(hv_ldc_get_map_table)
@@ -662,7 +662,7 @@
 	ta      FAST_TRAP
 	stx     %o1, [%g1]
 	retl
-	  stx     %o2, [%g2]	  
+	  stx     %o2, [%g2]
 	SET_SIZE(hv_ldc_get_map_table)
 
 
@@ -680,7 +680,7 @@
 
 
 	/*
-	 * hv_ldc_mapin(uint64_t channel, uint64_t cookie, uint64_t *raddr, 
+	 * hv_ldc_mapin(uint64_t channel, uint64_t cookie, uint64_t *raddr,
 	 *		uint64_t *perm)
 	 */
 	ENTRY(hv_ldc_mapin)
@@ -690,7 +690,7 @@
 	ta      FAST_TRAP
 	stx     %o1, [%g1]
 	retl
-	  stx     %o2, [%g2]	  
+	  stx     %o2, [%g2]
 	SET_SIZE(hv_ldc_mapin)
 
 
@@ -750,7 +750,7 @@
 	  nop
 	SET_SIZE(hvldc_intr_setcookie)
 
-	
+
 	/*
 	 * hvldc_intr_getvalid(uint64_t dev_hdl, uint32_t devino,
 	 *			int *intr_valid_state);

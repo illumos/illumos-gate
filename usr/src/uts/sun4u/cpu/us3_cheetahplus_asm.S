@@ -344,7 +344,7 @@ skip_traptrace:
 	/*
 	 * If a UCU or L3_UCU followed by a WDU has occurred go ahead
 	 * and panic since a UE will occur (on the retry) before the
-	 * UCU and WDU messages are enqueued.  On a Panther processor, 
+	 * UCU and WDU messages are enqueued.  On a Panther processor,
 	 * we need to also see an L3_WDU before panicking.  Note that
 	 * we avoid accessing the _EXT ASIs if not on a Panther.
 	 */
@@ -473,7 +473,7 @@ scrubphys_2:
 	mov	CH_ECACHE_SUBBLK_SIZE, %o2
 	andn	%o0, (CH_ECACHE_SUBBLK_SIZE - 1), %g1
 
-	/* move the good data into the W$ */	
+	/* move the good data into the W$ */
 clearphys_1:
 	subcc	%o2, 8, %o2
 	ldxa	[%g1 + %o2]ASI_MEM, %g2
@@ -485,7 +485,7 @@ clearphys_1:
 	stxa	%g2, [%o0]ASI_MEM
 	mov	8, %g1
 	stxa	%g2, [%o0 + %g1]ASI_MEM
-	
+
 	GET_CPU_IMPL(%o3)		! Panther Ecache is flushed differently
 	cmp	%o3, PANTHER_IMPL
 	bne	clearphys_2
@@ -810,7 +810,7 @@ dtlb_parity_trap_1:
 	  nop
 
 	/*
-	 * Record the logout information. %g4 contains our DTLB_0 
+	 * Record the logout information. %g4 contains our DTLB_0
 	 * index + TLB ID and %g7 contains our DTLB_1 index + TLB ID
 	 * both of which will be used for ASI_DTLB_ACCESS and
 	 * ASI_DTLB_TAGREAD. %g1 contains the pointer to our logout

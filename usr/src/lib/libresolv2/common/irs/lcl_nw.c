@@ -149,7 +149,7 @@ irs_lcl_nw(struct irs_acc *this) {
 static void
 nw_close(struct irs_nw *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	nw_minimize(this);
 	if (pvt->res && pvt->free_res)
 		(*pvt->free_res)(pvt->res);
@@ -162,7 +162,7 @@ nw_close(struct irs_nw *this) {
 static struct nwent *
 nw_byaddr(struct irs_nw *this, void *net, int length, int type) {
 	struct nwent *p;
-	
+
 	if (init(this) == -1)
 		return(NULL);
 
@@ -178,7 +178,7 @@ static struct nwent *
 nw_byname(struct irs_nw *this, const char *name, int type) {
 	struct nwent *p;
 	char **ap;
-	
+
 	if (init(this) == -1)
 		return(NULL);
 
@@ -199,7 +199,7 @@ nw_byname(struct irs_nw *this, const char *name, int type) {
 static void
 nw_rewind(struct irs_nw *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	if (pvt->fp) {
 		if (fseek(pvt->fp, 0L, SEEK_SET) == 0)
 			return;
@@ -358,7 +358,7 @@ nw_res_set(struct irs_nw *this, struct __res_state *res,
 static int
 init(struct irs_nw *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	if (!pvt->res && !nw_res_get(this))
 		return (-1);
 	if (((pvt->res->options & RES_INIT) == 0U) &&

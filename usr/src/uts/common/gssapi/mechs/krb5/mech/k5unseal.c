@@ -635,7 +635,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 
     retval = g_order_check(&(ctx->seqstate), (gssint_uint64)seqnum);
 
-    /* It got through unscathed, adjust the output message buffer. */ 
+    /* It got through unscathed, adjust the output message buffer. */
     if (retval == 0 && toktype == KG_TOK_SEAL_MSG)
 	*message_buffer = token;
 

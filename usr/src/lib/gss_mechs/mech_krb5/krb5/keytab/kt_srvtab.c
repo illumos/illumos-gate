@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -43,7 +43,7 @@
 
 #define KRB5_KT_DEFAULT_VNO KRB5_KT_VNO
 
-/* 
+/*
  * Types
  */
 typedef struct _krb5_ktsrvtab_data {
@@ -107,13 +107,13 @@ static krb5_error_code krb5_ktsrvint_close
 	(krb5_context,
 		   krb5_keytab);
 
-static krb5_error_code krb5_ktsrvint_read_entry 
+static krb5_error_code krb5_ktsrvint_read_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
 /*
- * This is an implementation specific resolver.  It returns a keytab id 
+ * This is an implementation specific resolver.  It returns a keytab id
  * initialized with srvtab keytab routines.
  */
 
@@ -132,7 +132,7 @@ krb5_ktsrvtab_resolve(krb5_context context, const char *name, krb5_keytab *id)
 
     if ((*id = (krb5_keytab) malloc(sizeof(**id))) == NULL)
 	return(ENOMEM);
-    
+
     (*id)->ops = &krb5_kts_ops;
     data = (krb5_ktsrvtab_data *)malloc(sizeof(krb5_ktsrvtab_data));
     if (data == NULL) {
@@ -163,7 +163,7 @@ krb5_ktsrvtab_resolve(krb5_context context, const char *name, krb5_keytab *id)
 krb5_error_code KRB5_CALLCONV
 krb5_ktsrvtab_close(krb5_context context, krb5_keytab id)
   /*
-   * This routine is responsible for freeing all memory allocated 
+   * This routine is responsible for freeing all memory allocated
    * for this keytab.  There are no system resources that need
    * to be freed nor are there any open files.
    *
@@ -256,7 +256,7 @@ krb5_ktsrvtab_get_entry(krb5_context context, krb5_keytab id, krb5_const_princip
 
 krb5_error_code KRB5_CALLCONV
 krb5_ktsrvtab_get_name(krb5_context context, krb5_keytab id, char *name, unsigned int len)
-  /* 
+  /*
    * This routine returns the name of the name of the file associated with
    * this srvtab-based keytab.  The name is prefixed with PREFIX:, so that
    * trt will happen if the name is passed back to resolve.
@@ -343,7 +343,7 @@ const struct _krb5_kt_ops krb5_kts_ops = {
     0,
     "SRVTAB", 	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktsrvtab_resolve,
-    krb5_ktsrvtab_get_name, 
+    krb5_ktsrvtab_get_name,
     krb5_ktsrvtab_close,
     krb5_ktsrvtab_get_entry,
     krb5_ktsrvtab_start_seq_get,
@@ -368,7 +368,7 @@ const struct _krb5_kt_ops krb5_kts_ops = {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -382,7 +382,7 @@ const struct _krb5_kt_ops krb5_kts_ops = {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * This function contains utilities for the srvtab based implementation
  * of the keytab.  There are no public functions in this file.

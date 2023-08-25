@@ -60,7 +60,7 @@ vec_uiii_irdr_tab:
 	.empty
 
 
-vec_interrupt_resume:	
+vec_interrupt_resume:
 	set	KERNELBASE, %g4
 	cmp	%g5, %g4
 	bl,a,pt	%xcc, 0f			! an interrupt number found
@@ -171,7 +171,7 @@ vec_interrupt_resume:
 	SET_SIZE(vec_interrupt)
 
 
-!	
+!
 !   See usr/src/uts/sun4u/sys/dmv.h for the Databearing Mondo Vector
 !	 interrupt format
 !
@@ -198,21 +198,21 @@ vec_interrupt_resume:
 	cmp	%g2, %g3
 	bge,pn	%xcc, 2f		   ! inum >= dmv_totalints
 	nop
-	
+
 	set	dmv_dispatch_table, %g3
 	ldn	[%g3], %g4
 	brz,pn	%g4, 2f
 	sll	%g2, DMV_DISP_SHIFT, %g3   ! %g3 = inum*sizeof(struct dmv_disp)
-		
+
 	add	%g4, %g3, %g4		! %g4 = &dmv_dispatch_table[inum]
 #if (DMV_FUNC != 0) || (DMV_ARG != 8)
 #error "DMV_FUNC or DMV_SIZE has changed"
 #endif
 	ldda	[%g4]ASI_NQUAD_LD, %g2  ! %g2=handler %g3=argument
 	mov	%g3, %g1
-	brz,pn  %g2, 2f	
+	brz,pn  %g2, 2f
 	nop
-	
+
 	! we have a handler, so call it
 	! On entry to the handler, the %g registers are set as follows:
 	!
@@ -221,7 +221,7 @@ vec_interrupt_resume:
 	!
 	jmp	%g2
 	mov	%g5, %g2
-		
+
 	! No handler was listed in the table, so just record it
 	! as an error condition and continue.  There is a race
 	! window here updating the counter, but that's ok since
@@ -233,7 +233,7 @@ vec_interrupt_resume:
 	inc	%g2
 	ba,pt	%xcc,3f
 	st	%g2, [%g1]
-	
+
 	!	When the handler's processing (which should be as quick as
 	!	possible) is complete, the handler must exit by jumping to
 	!	the label dmv_finish_intr.  The contents of %g1 at this time
@@ -254,7 +254,7 @@ vec_interrupt_resume:
 	ba,pt	%xcc,vec_interrupt_resume
 	mov	%g1, %g5
 	!	We are done
-3:	
+3:
 	stxa	%g0, [%g0]ASI_INTR_RECEIVE_STATUS ! clear the busy bit
 	retry
 	SET_SIZE(dmv_vector)

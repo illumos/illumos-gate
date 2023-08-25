@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -153,7 +153,7 @@ get_princs_2(gprincs_arg *argp, CLIENT *clnt)
 	if (clnt_call(clnt, GET_PRINCS,
 		      (xdrproc_t) xdr_gprincs_arg, (caddr_t) argp,
 		      (xdrproc_t) xdr_gprincs_ret, (caddr_t) &clnt_res,
-		      TIMEOUT) != RPC_SUCCESS) { 
+		      TIMEOUT) != RPC_SUCCESS) {
 	     return (NULL);
 	}
 	return (&clnt_res);
@@ -369,7 +369,7 @@ get_pols_2(gpols_arg *argp, CLIENT *clnt)
 	if (clnt_call(clnt, GET_POLS,
 		      (xdrproc_t) xdr_gpols_arg, (caddr_t) argp,
 		      (xdrproc_t) xdr_gpols_ret, (caddr_t) &clnt_res,
-		      TIMEOUT) != RPC_SUCCESS) { 
+		      TIMEOUT) != RPC_SUCCESS) {
 	     return (NULL);
 	}
 	return (&clnt_res);

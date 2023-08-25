@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# 
+#
 
 PROG= userattr
 

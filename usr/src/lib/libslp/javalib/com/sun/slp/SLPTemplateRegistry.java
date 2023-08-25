@@ -425,8 +425,8 @@ class SLPTemplateRegistry extends TemplateRegistry {
 	    ServiceType type = new ServiceType(TEMPLATE_SERVICE_TYPE);
 
 	    results =
-		userAgent.findServices(type,	
-				       scopes,	
+		userAgent.findServices(type,
+				       scopes,
 				       query);
 
 	} catch (ServiceLocationException ex) {
@@ -462,7 +462,7 @@ class SLPTemplateRegistry extends TemplateRegistry {
 	    if (version == null) {
 
 		// Get the version attribute from the URL.
-	
+
 		String token = ";"+VERSION_ATTR_ID+"=";
 
 		int idx = urlPath.indexOf(token);

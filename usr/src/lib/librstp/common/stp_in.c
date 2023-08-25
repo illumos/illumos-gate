@@ -1,23 +1,23 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
 /* This file contains API from an operation system to the RSTP library */
@@ -63,7 +63,7 @@ _stp_in_stpm_enable (int vlan_id, char* name,
 
   /* stp_trace ("_stp_in_stpm_enable(%s)", name); */
   this = stpapi_stpm_find (vlan_id);
-  
+
   if (STP_DISABLED != admin_state) {
     if (! vlan_id) { /* STP_IN_stop_all (); */
         register STPM_T* stpm;
@@ -103,7 +103,7 @@ _stp_in_stpm_enable (int vlan_id, char* name,
   if (rc && created_here) {
     STP_stpm_delete (this);
   }
-    
+
   return rc;
 }
 
@@ -200,17 +200,17 @@ _stp_in_enable_port_on_stpm (STPM_T* stpm, int port_index, Bool enable)
   register PORT_T* port;
 
   port = _stpapi_port_find (stpm, port_index);
-  if (! port) return; 
+  if (! port) return;
   if (port->portEnabled == enable) {/* nothing to do :) */
     return;
   }
 
   port->uptime = 0;
-  if (enable) { /* clear port statistics */ 
+  if (enable) { /* clear port statistics */
     port->rx_cfg_bpdu_cnt =
     port->rx_rstp_bpdu_cnt =
     port->rx_tcn_bpdu_cnt = 0;
-  }  
+  }
 
 #ifdef STP_DBG
   if (port->edge->debug) {
@@ -224,10 +224,10 @@ _stp_in_enable_port_on_stpm (STPM_T* stpm, int port_index, Bool enable)
   STP_port_init (port, stpm, False);
 
   port->reselect = True;
-  port->selected = False;  
+  port->selected = False;
 }
 
-void 
+void
 STP_IN_init (STP_VECTORS_T *vectors)
 {
   RSTP_INIT_CRITICAL_PATH_PROTECTIO;
@@ -240,8 +240,8 @@ STP_IN_stpm_get_cfg (IN int vlan_id, OUT UID_STP_CFG_T* uid_cfg)
   register STPM_T* this;
 
   uid_cfg->field_mask = 0;
-  
-  RSTP_CRITICAL_PATH_START;  
+
+  RSTP_CRITICAL_PATH_START;
   this = stpapi_stpm_find (vlan_id);
 
   if (!this) { /* it had not yet been created :( */
@@ -278,22 +278,22 @@ STP_IN_stpm_get_cfg (IN int vlan_id, OUT UID_STP_CFG_T* uid_cfg)
     uid_cfg->field_mask |= BR_CFG_DELAY;
   }
   uid_cfg->forward_delay = this->BrTimes.ForwardDelay;
-  
+
   uid_cfg->hold_time = TxHoldCount;
 
   RSTP_CRITICAL_PATH_END;
   return 0;
 }
-    
+
 int
 STP_IN_port_get_cfg (int vlan_id, int port_index, UID_STP_PORT_CFG_T* uid_cfg)
 {
   register STPM_T* this;
   register PORT_T* port;
-  
+
   RSTP_CRITICAL_PATH_START;
   this = stpapi_stpm_find (vlan_id);
-    
+
   if (!this) { /* it had not yet been created :( */
     RSTP_CRITICAL_PATH_END;
     return STP_Vlan_Had_Not_Yet_Been_Created;
@@ -417,9 +417,9 @@ STP_IN_port_get_state (IN int vlan_id, INOUT UID_STP_PORT_STATE_T* entry)
   entry->rcvdInfoWhile = port->rcvdInfoWhile;
   entry->top_change_ack = port->tcAck;
   entry->tc = port->tc;
-  
+
   RSTP_CRITICAL_PATH_END;
-  return 0; 
+  return 0;
 }
 
 int
@@ -451,7 +451,7 @@ STP_IN_stpm_get_state (IN int vlan_id, OUT UID_STP_STATE_T* entry)
   entry->timeSince_Topo_Change = this->timeSince_Topo_Change;
   entry->Topo_Change_Count = this->Topo_Change_Count;
   entry->Topo_Change = this->Topo_Change;
-  
+
   RSTP_CRITICAL_PATH_END;
   return 0;
 }
@@ -493,7 +493,7 @@ STP_IN_enable_port (int port_index, Bool enable)
 
   for (stpm = STP_stpm_get_the_list (); stpm; stpm = stpm->next) {
     if (STP_ENABLED != stpm->admin_state) continue;
-    
+
     _stp_in_enable_port_on_stpm (stpm, port_index, enable);
   	/* STP_stpm_update (stpm);*/
   }
@@ -511,9 +511,9 @@ STP_IN_changed_port_speed (int port_index, long speed)
   RSTP_CRITICAL_PATH_START;
   for (stpm = STP_stpm_get_the_list (); stpm; stpm = stpm->next) {
     if (STP_ENABLED != stpm->admin_state) continue;
-    
+
     port = _stpapi_port_find (stpm, port_index);
-    if (! port) continue; 
+    if (! port) continue;
     port->operSpeed = speed;
 #ifdef STP_DBG
     if (port->pcost->debug) {
@@ -537,9 +537,9 @@ STP_IN_changed_port_duplex (int port_index)
   RSTP_CRITICAL_PATH_START;
   for (stpm = STP_stpm_get_the_list (); stpm; stpm = stpm->next) {
     if (STP_ENABLED != stpm->admin_state) continue;
-    
+
     port = _stpapi_port_find (stpm, port_index);
-    if (! port) continue; 
+    if (! port) continue;
 #ifdef STP_DBG
     if (port->p2p->debug) {
       stp_trace ("STP_IN_changed_port_duplex(%s)", port->port_name);
@@ -585,7 +585,7 @@ STP_IN_check_bpdu_header (BPDU_T* bpdu, size_t len)
 
 #if 0
   if (bpdu->hdr.version != BPDU_VERSION_ID) {
-    return STP_Invalid_Version;  
+    return STP_Invalid_Version;
   }
 #endif
   /* see also 9.3.4: think & TBD :( */
@@ -668,7 +668,7 @@ STP_IN_rx_bpdu (int vlan_id, int port_index, BPDU_T* bpdu, size_t len)
 
   port->operEdge = False;
   port->wasInitBpdu = True;
-  
+
   iret = STP_port_rx_bpdu (port, bpdu, len);
   (void) STP_stpm_update (this);
   RSTP_CRITICAL_PATH_END;
@@ -690,7 +690,7 @@ STP_IN_one_second (void)
       dbg_cnt++;
     }
   }
-  
+
   RSTP_CRITICAL_PATH_END;
 
   return dbg_cnt;
@@ -704,12 +704,12 @@ STP_IN_stpm_set_cfg (IN int vlan_id,
   Bool created_here, enabled_here;
   register STPM_T* this;
   UID_STP_CFG_T old;
-           
+
   /* stp_trace ("STP_IN_stpm_set_cfg"); */
   if (0 != STP_IN_stpm_get_cfg (vlan_id, &old)) {
     STP_OUT_get_init_stpm_cfg (vlan_id, &old);
   }
-  
+
   RSTP_CRITICAL_PATH_START;
   if (BR_CFG_PRIO & uid_cfg->field_mask) {
     old.bridge_priority = uid_cfg->bridge_priority;
@@ -831,16 +831,16 @@ STP_IN_port_set_cfg (IN int vlan_id, IN int port_index,
   if (PT_CFG_COST & uid_cfg->field_mask) {
     port->adminPCost = uid_cfg->admin_port_path_cost;
   }
-  
+
   if (PT_CFG_PRIO & uid_cfg->field_mask) {
     port->port_id = (uid_cfg->port_priority << 8) + port_index;
   }
-  
+
   if (PT_CFG_P2P & uid_cfg->field_mask) {
     port->adminPointToPointMac = uid_cfg->admin_point2point;
     port->p2p_recompute = True;
   }
-  
+
   if (PT_CFG_EDGE & uid_cfg->field_mask) {
     port->adminEdge = uid_cfg->admin_edge;
     port->operEdge = port->adminEdge;
@@ -877,9 +877,9 @@ STP_IN_port_set_cfg (IN int vlan_id, IN int port_index,
 
   port->reselect = True;
   port->selected = False;
-  
+
   (void) STP_stpm_update (this);
-  
+
   RSTP_CRITICAL_PATH_END;
 
   return 0;
@@ -908,7 +908,7 @@ STP_IN_dbg_set_port_trace (char* mach_name, int enadis,
     return STP_Port_Is_Absent_In_The_Vlan;
   }
   rc = STP_port_trace_state_machine (port, mach_name, enadis);
-  
+
   RSTP_CRITICAL_PATH_END;
 
   return rc;
@@ -928,7 +928,7 @@ static char* rstp_error_names[] = RSTP_ERRORS;
   if (rstp_err_no >= STP_LAST_DUMMY) {
     return "Too big error code :(";
   }
-  
+
   return rstp_error_names[rstp_err_no];
 }
 
@@ -941,7 +941,7 @@ STP_IN_port_add(int vlan_id, int port_index)
 
   RSTP_CRITICAL_PATH_START;
   this = stpapi_stpm_find (vlan_id);
-    
+
   if (!this) { /* it had not yet been created :( */
     RSTP_CRITICAL_PATH_END;
     return STP_Vlan_Had_Not_Yet_Been_Created;
@@ -972,7 +972,7 @@ STP_IN_port_remove(int vlan_id, int port_index)
 
   RSTP_CRITICAL_PATH_START;
   this = stpapi_stpm_find (vlan_id);
-    
+
   if (!this) { /* it had not yet been created :( */
     RSTP_CRITICAL_PATH_END;
     return STP_Vlan_Had_Not_Yet_Been_Created;

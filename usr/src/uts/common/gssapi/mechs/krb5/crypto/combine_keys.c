@@ -11,7 +11,7 @@
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the software,
  * derivative works or modified versions, and any portions thereof.
- * 
+ *
  * NRL ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION AND
  * DISCLAIMS ANY LIABILITY OF ANY KIND FOR ANY DAMAGES WHATSOEVER
  * RESULTING FROM THE USE OF THIS SOFTWARE.
@@ -64,7 +64,7 @@ unsigned char *outdata, const krb5_data *in_constant);
  * We don't implement that yet.
  */
 
-static krb5_boolean  enctype_ok (krb5_enctype e) 
+static krb5_boolean  enctype_ok (krb5_enctype e)
 {
     switch (e) {
     case ENCTYPE_DES_CBC_CRC:
@@ -89,7 +89,7 @@ krb5_error_code krb5int_c_combine_keys
     int i, myalloc = 0;
     if (!(enctype_ok(key1->enctype)&&enctype_ok(key2->enctype)))
 	return (KRB5_CRYPTO_INTERNAL);
-    
+
 
     if (key1->length != key2->length || key1->enctype != key2->enctype)
 	return (KRB5_CRYPTO_INTERNAL);
@@ -299,9 +299,9 @@ cleanup:
     /* Solaris Kerberos */
 static krb5_error_code dr
 (	krb5_context context,
-	const struct krb5_enc_provider *enc, 
-	const krb5_keyblock *inkey, 
-	unsigned char *out, 
+	const struct krb5_enc_provider *enc,
+	const krb5_keyblock *inkey,
+	unsigned char *out,
 	const krb5_data *in_constant)
 {
     size_t blocksize, keybytes, keylength, n;

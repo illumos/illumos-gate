@@ -26,7 +26,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-MODULE = xfp 
+MODULE = xfp
 CLASS = common
 
 MODULESRCS = xfp.c

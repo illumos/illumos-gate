@@ -193,7 +193,7 @@ abstract class ServerDATable extends DATable {
 
 	} else {
 	    SSrvDereg smsg = (SSrvDereg)msg;
-	
+
 	    // Only remove if tags are null. Otherwise, the updated record
 	    //  will be sought.
 
@@ -585,7 +585,7 @@ abstract class ServerDATable extends DATable {
 		rply = rqst;
 
 	    }
-		
+
 	    rply = Transact.transactTCPMsg(addr, rply, false);
 
 	} catch (ServiceLocationException ex) {

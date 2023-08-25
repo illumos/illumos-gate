@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_send_tgs()
  */
@@ -38,23 +38,23 @@
  Sends a request to the TGS and waits for a response.
  options is used for the options in the KRB_TGS_REQ.
  timestruct values are used for from, till, rtime " " "
- enctype is used for enctype " " ", and to encrypt the authorization data, 
+ enctype is used for enctype " " ", and to encrypt the authorization data,
  sname is used for sname " " "
  addrs, if non-NULL, is used for addresses " " "
  authorization_dat, if non-NULL, is used for authorization_dat " " "
  second_ticket, if required by options, is used for the 2nd ticket in the req.
  in_cred is used for the ticket & session key in the KRB_AP_REQ header " " "
  (the KDC realm is extracted from in_cred->server's realm)
- 
+
  The response is placed into *rep.
  rep->response.data is set to point at allocated storage which should be
  freed by the caller when finished.
 
  returns system errors
  */
-static krb5_error_code 
+static krb5_error_code
 krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cred, krb5_data *outbuf)
-{   
+{
     krb5_error_code       retval;
     krb5_checksum         checksum;
     krb5_authenticator 	  authent;
@@ -100,7 +100,7 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
 	/* Cleanup scratch and scratch data */
         goto cleanup_data;
 
-    /* call the encryption routine */ 
+    /* call the encryption routine */
     if ((retval = krb5_encrypt_helper(context, &in_cred->keyblock,
 				      KRB5_KEYUSAGE_TGS_REQ_AUTH,
 				      scratch, &request.authenticator)))
@@ -170,7 +170,7 @@ krb5_send_tgs2(krb5_context context, krb5_flags kdcoptions,
     krb5_pa_data ap_req_padata;
     int tcp_only = 0, use_master;
 
-    /* 
+    /*
      * in_creds MUST be a valid credential NOT just a partially filled in
      * place holder for us to get credentials for the caller.
      */
@@ -300,7 +300,7 @@ krb5_send_tgs2(krb5_context context, krb5_flags kdcoptions,
     /* now send request & get response from KDC */
 send_again:
     use_master = 0;
-    retval = krb5_sendto_kdc2(context, scratch, 
+    retval = krb5_sendto_kdc2(context, scratch,
 			    krb5_princ_realm(context, sname),
 			    &rep->response, &use_master, tcp_only,
 			    hostname_used);
@@ -328,9 +328,9 @@ send_again:
     }
 
     krb5_free_data(context, scratch);
-    
+
 send_tgs_error_2:;
-    if (sec_ticket) 
+    if (sec_ticket)
 	krb5_free_ticket(context, sec_ticket);
 
 send_tgs_error_1:;
@@ -338,7 +338,7 @@ send_tgs_error_1:;
 	krb5_xfree(tgsreq.ktype);
     if (tgsreq.authorization_data.ciphertext.data) {
 	memset(tgsreq.authorization_data.ciphertext.data, 0,
-               tgsreq.authorization_data.ciphertext.length); 
+               tgsreq.authorization_data.ciphertext.length);
 	krb5_xfree(tgsreq.authorization_data.ciphertext.data);
     }
 

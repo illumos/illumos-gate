@@ -44,7 +44,7 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
   float poly0, poly1, poly2;
   float sign0, sign1, sign2;
   int intf, intz, argcount;
-  int index0, index1, index2; 
+  int index0, index1, index2;
   float z,*yaddr0,*yaddr1,*yaddr2;
   int *pz = (int *) &z;
 #ifdef UNROLL4
@@ -72,11 +72,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 		f0 = -f0;
 		sign0 = -sign0;
 	}
-  
+
     if ((intf > 0x5B000000) || (intf < 0x31800000)) /* filter out special cases */
     {
-      if (intf > 0x7f800000) 
-      {  
+      if (intf > 0x7f800000)
+      {
 	ansf  = f0- f0; 				/* return NaN if x=NaN*/
       }
       else if (intf < 0x31800000) 		/* avoid underflow for small arg */
@@ -97,9 +97,9 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
       if (--n <=0) break;			/* we are done 			*/
       goto LOOP0;				/* otherwise, examine next arg  */
     }
-  
+
     if (intf > 0x42800000)			/* if (|x| > 64               	*/
-    { 
+    {
     f0 = -pone/f0;
 	index0 = 2; 				/* point to pi/2 upper, lower	*/
     }
@@ -110,16 +110,16 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
     f0 = (f0 - z)/(pone + f0*z);
 	index0 = (intz - 0x3C800000) >> 18;	/* (index >> 19) << 1)		*/
 	index0 = index0+ 4;			/* skip over 0,0,pi/2,pi/2	*/
-    } 
+    }
     else					/* |x| < 1/64 */
     {
 	index0   = 0;				/* points to 0,0 in table	*/
     }
-    yaddr0   = y;				/* address to store this answer */ 
+    yaddr0   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 1;				/* we now have 1 good argument  */
-    if (--n <=0) 
+    if (--n <=0)
     {
       goto UNROLL;				/* finish up with 1 good arg 	*/
     }
@@ -138,11 +138,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 		f1 = -f1;
 		sign1 = -sign1;
 	}
-  
+
     if ((intf > 0x5B000000) || (intf < 0x31800000)) /* filter out special cases */
     {
-      if (intf > 0x7f800000) 
-      {  
+      if (intf > 0x7f800000)
+      {
 	ansf   = f1 - f1;			/* return NaN if x=NaN*/
       }
       else if (intf < 0x31800000) 		/* avoid underflow for small arg */
@@ -160,15 +160,15 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
       x      += stridex;
       y      += stridey;
       argcount = 1;				/* we still have 1 good arg 	*/
-      if (--n <=0) 
+      if (--n <=0)
       {
         goto UNROLL;				/* finish up with 1 good arg 	*/
       }
       goto LOOP1;				/* otherwise, examine next arg  */
     }
-  
+
     if (intf > 0x42800000)			/* if (|x| > 64               	*/
-    { 
+    {
     f1 = -pone/f1;
       index1 = 2; 				/* point to pi/2 upper, lower	*/
     }
@@ -176,7 +176,7 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
     {
       intz   = (intf + 0x00040000) & 0x7ff80000;/* round arg, keep upper	*/
       pz[0]  = intz;				/* store as a float (z)		*/
-    f1 = (f1 - z)/(pone + f1*z); 
+    f1 = (f1 - z)/(pone + f1*z);
       index1 = (intz - 0x3C800000) >> 18;	/* (index >> 19) << 1)		*/
       index1 = index1 + 4;			/* skip over 0,0,pi/2,pi/2	*/
     }
@@ -185,11 +185,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 	index1   = 0;				/* points to 0,0 in table	*/
     }
 
-    yaddr1   = y;				/* address to store this answer */ 
+    yaddr1   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 2;				/* we now have 2 good arguments */
-    if (--n <=0) 
+    if (--n <=0)
     {
       goto UNROLL;				/* finish up with 2 good args 	*/
     }
@@ -208,11 +208,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 		f2 = -f2;
 		sign2 = -sign2;
 	}
-  
+
     if ((intf > 0x5B000000) || (intf < 0x31800000)) /* filter out special cases */
     {
-      if (intf > 0x7f800000) 
-      {  
+      if (intf > 0x7f800000)
+      {
 	ansf   = f2 - f2;			/* return NaN if x=NaN*/
       }
       else if (intf < 0x31800000) 		/* avoid underflow for small arg */
@@ -230,15 +230,15 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
       x      += stridex;
       y      += stridey;
       argcount = 2;				/* we still have 2 good args 	*/
-      if (--n <=0) 
+      if (--n <=0)
       {
         goto UNROLL;				/* finish up with 2 good args 	*/
       }
       goto LOOP2;				/* otherwise, examine next arg  */
     }
-  
+
     if (intf > 0x42800000)			/* if (|x| > 64               	*/
-    { 
+    {
     f2 = -pone/f2;
       index2 = 2; 				/* point to pi/2 upper, lower	*/
     }
@@ -254,11 +254,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
     {
 	index2   = 0;				/* points to 0,0 in table	*/
     }
-    yaddr2   = y;				/* address to store this answer */ 
+    yaddr2   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 3;				/* we now have 3 good arguments */
-    if (--n <=0) 
+    if (--n <=0)
     {
       goto UNROLL;				/* finish up with 2 good args 	*/
     }
@@ -279,11 +279,11 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 		f3 = -f3;
 		sign3 = -sign3;
 	}
-  
+
     if ((intf > 0x5B000000) || (intf < 0x31800000)) /* filter out special cases */
     {
-      if (intf > 0x7f800000) 
-      {  
+      if (intf > 0x7f800000)
+      {
 	ansf   = f3 - f3;			/* return NaN if x=NaN*/
       }
       else if (intf < 0x31800000) 		/* avoid underflow for small arg */
@@ -301,15 +301,15 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
       x      += stridex;
       y      += stridey;
       argcount = 3;				/* we still have 3 good args 	*/
-      if (--n <=0) 
+      if (--n <=0)
       {
         goto UNROLL;				/* finish up with 3 good args 	*/
       }
       goto LOOP3;				/* otherwise, examine next arg  */
     }
-  
+
     if (intf > 0x42800000)			/* if (|x| > 64               	*/
-    { 
+    {
 	n3 = -pone;
         d3 = f3;
     f3 = n3/d3;
@@ -331,18 +331,18 @@ __vatanf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 	d3 = pone;
 	index3   = 0;				/* points to 0,0 in table	*/
     }
-    yaddr3   = y;				/* address to store this answer */ 
+    yaddr3   = y;				/* address to store this answer */
     x       += stridex;				/* point to next arg		*/
     y       += stridey;				/* point to next result		*/
     argcount = 4;				/* we now have 4 good arguments */
-    if (--n <=0) 
+    if (--n <=0)
     {
       goto UNROLL;				/* finish up with 3 good args 	*/
     }
 #endif /* UNROLL4 */
 
-/* here is the n-way unrolled section, 
-   but we may actually have less than n 
+/* here is the n-way unrolled section,
+   but we may actually have less than n
    arguments at this point
 */
 
@@ -368,7 +368,7 @@ UNROLL:
     *yaddr2  = ans2;
     *yaddr3  = ans3;
     }
-    else 
+    else
 #endif
     if (argcount == 3)
     {
@@ -385,7 +385,7 @@ UNROLL:
     *yaddr1  = ans1;
     *yaddr2  = ans2;
     }
-    else 
+    else
     if (argcount == 2)
     {
     conup0   = __vlibm_TBL_atan1[index0];
@@ -397,7 +397,7 @@ UNROLL:
     *yaddr0  = ans0;
     *yaddr1  = ans1;
     }
-    else 
+    else
     if (argcount == 1)
     {
     conup0   = __vlibm_TBL_atan1[index0];

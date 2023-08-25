@@ -195,7 +195,7 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
 {
     unsigned char * buffer_ptr;
     int length;
-    
+
     /*
      * This routine reads the prefix of "token" in order to determine
      * its mechanism type. It assumes the encoding suggested in
@@ -218,15 +218,15 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
      *
      * The routine fills in the OID value and returns an error as necessary.
      */
-    
+
 	if (OID == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	if ((token == NULL) || (token->value == NULL))
 	return (GSS_S_DEFECTIVE_TOKEN);
-    
+
     /* Skip past the APP/Sequnce byte and the token length */
-    
+
     buffer_ptr = (unsigned char *) token->value;
 
     if (*(buffer_ptr++) != 0x60)
@@ -242,10 +242,10 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
 	    return (GSS_S_DEFECTIVE_TOKEN);
 	buffer_ptr += length & 0x7f;
     }
-    
+
     if (*(buffer_ptr++) != 0x06)
 	return (GSS_S_DEFECTIVE_TOKEN);
-    
+
     OID->length = (OM_uint32) *(buffer_ptr++);
     OID->elements = (void *) buffer_ptr;
     return (GSS_S_COMPLETE);
@@ -299,7 +299,7 @@ OM_uint32 gssint_get_mech_type(OID, token)
 #include "mglueP.h"
 #endif
 
-OM_uint32 gssint_import_internal_name (minor_status, mech_type, union_name, 
+OM_uint32 gssint_import_internal_name (minor_status, mech_type, union_name,
 				internal_name)
 OM_uint32		*minor_status;
 gss_OID			mech_type;
@@ -452,7 +452,7 @@ OM_uint32 gssint_export_internal_name(minor_status, mech_type,
     return (GSS_S_COMPLETE);
 } /*  gssint_export_internal_name */
 
-OM_uint32 gssint_display_internal_name (minor_status, mech_type, internal_name, 
+OM_uint32 gssint_display_internal_name (minor_status, mech_type, internal_name,
 				 external_name, name_type)
 OM_uint32	*minor_status;
 gss_OID		mech_type;
@@ -580,7 +580,7 @@ OM_uint32 gssint_convert_name_to_union_name(minor_status, mech,
 	    *minor_status = ENOMEM;
 	    goto allocation_failure;
     }
-	
+
     union_name->external_name->length = 0;
     union_name->external_name->value = 0;
 

@@ -39,7 +39,7 @@
 	ANSI_PRAGMA_WEAK(gettimeofday,function)
 
 /*
- * The interface below calls the trap (0x27) to get the timestamp in 
+ * The interface below calls the trap (0x27) to get the timestamp in
  * secs and nsecs. It than converts the nsecs value into usecs before
  * it returns.
  *
@@ -51,7 +51,7 @@
  * Multiplication". SIGPLAN Notices, Vol. 29, June 1994, page 61.
  *
  * Magenheimer, D.J.; et al: "Integer Multiplication and Division on the HP
- * Precision Architecture". IEEE Transactions on Computers, Vol 37, No. 8, 
+ * Precision Architecture". IEEE Transactions on Computers, Vol 37, No. 8,
  * August 1988, page 980.
  *
  * Steele G.; Warren H.: Hacker's Delight. 2002 Pearson Education, Ch 10

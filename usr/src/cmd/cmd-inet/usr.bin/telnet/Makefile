@@ -52,7 +52,7 @@ CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-label
 LDLIBS +=	-lsocket -lnsl -ltermlib
-LDLIBS +=	-lmech_krb5 
+LDLIBS +=	-lmech_krb5
 LDFLAGS +=	$(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
 
 # "missing type for func"

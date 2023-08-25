@@ -89,7 +89,7 @@ gai_strerror(int ecode) {
 		}
         }
 #endif
-	/* 
+	/*
 	 * XXX This really should be snprintf(buf, EAI_BUFSIZE, ...).
 	 * It is safe until message catalogs are used.
 	 */

@@ -146,7 +146,7 @@ pathsrch:
 		h->cost += cost;
 		return(h->data);
 	}
-	else 
+	else
 	{
 		return(-count);
 	}
@@ -167,7 +167,7 @@ zaphash()
 	relcmd.next = 0;
 }
 
-void 
+void
 zapcd()
 {
 	ENTRY *ptr = relcmd.next;
@@ -365,7 +365,7 @@ what_is_path(unsigned char *name)
 				}
 			}
 
-			case COMMAND:					
+			case COMMAND:
 				prs_buff(_gettext(" is hashed ("));
 				pr_path(name, hashval);
 				prs_buff(")\n");
@@ -423,7 +423,7 @@ findpath(unsigned char *name, int oldpath)
 			else
 				return(oldpath);
 		}
-		else 
+		else
 			count = dotpath;
 	}
 
@@ -447,18 +447,18 @@ findpath(unsigned char *name, int oldpath)
 /*
  * Determine if file given by name is accessible with permissions
  * given by mode.
- * Regflag argument non-zero means not to consider 
- * a non-regular file as executable. 
+ * Regflag argument non-zero means not to consider
+ * a non-regular file as executable.
  */
 
 int
 chk_access(unsigned char *name, mode_t mode, int regflag)
-{	
+{
 	static int flag;
-	static uid_t euid; 
+	static uid_t euid;
 	struct stat statb;
 	mode_t ftype;
-	
+
 	if(flag == 0) {
 		euid = geteuid();
 		flag = 1;
@@ -472,7 +472,7 @@ chk_access(unsigned char *name, mode_t mode, int regflag)
 			if(euid == 0) {
 				if (ftype != S_IFREG || mode != S_IEXEC)
 					return(0);
-		    		/* root can execute file as long as it has execute 
+		    		/* root can execute file as long as it has execute
 			   	permission for someone */
 				if (statb.st_mode & (S_IEXEC|(S_IEXEC>>3)|(S_IEXEC>>6)))
 					return(0);
@@ -510,7 +510,7 @@ argpath(struct argnod *arg)
 		s = arg->argval;
 		start = s;
 
-		if (letter(*s))		
+		if (letter(*s))
 		{
 			while (alphanum(*s))
 				s++;

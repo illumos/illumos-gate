@@ -156,7 +156,7 @@ sv_byport(struct irs_sv *this, int port, const char *proto) {
 	sprintf(portstr, "%d", ntohs(port));
 	if (!(hes_list = hesiod_resolve(dns->hes_ctx, portstr, "port")))
 		return (NULL);
-	
+
 	s = parse_hes_list(this, hes_list, proto);
 	hesiod_free_list(dns->hes_ctx, hes_list);
 	return (s);
@@ -184,7 +184,7 @@ parse_hes_list(struct irs_sv *this, char **hes_list, const char *proto) {
 	int proto_len;
 	int num = 0;
 	int max = 0;
-	
+
 	for (cpp = hes_list; *cpp; cpp++) {
 		cp = *cpp;
 
@@ -255,7 +255,7 @@ parse_hes_list(struct irs_sv *this, char **hes_list, const char *proto) {
 		pvt->serv.s_aliases[num] = NULL;
 		return (&pvt->serv);
 	}
-	
+
  cleanup:
 	if (pvt->serv.s_aliases) {
 		free(pvt->serv.s_aliases);

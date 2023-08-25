@@ -143,10 +143,10 @@ typedef struct _rule_component {
     kw_value_type kwval_type;
     regex_t regexp;	    /* Compiled regular expression */
     char *regsrc;	    /* The regular expression source (for debugging) */
-    unsigned int ku_bits;   
+    unsigned int ku_bits;
     unsigned int eku_bits;
 } rule_component;
- 
+
 /* Set rule components */
 typedef struct _rule_set {
     relation_type relation;
@@ -192,7 +192,7 @@ free_rule_set(krb5_context context,
 /* ARGSUSED */
 static krb5_error_code
 parse_list_value(krb5_context context,
-		 keyword_type type, 
+		 keyword_type type,
 		 char *value,
 		 rule_component *rc)
 {
@@ -627,7 +627,7 @@ nextcert:
     pkiDebug("%s: After checking %d certs, we found %d matches\n",
 	     __FUNCTION__, certs_checked, total_cert_matches);
     if (total_cert_matches == 1) {
-	*match_found = 1;	
+	*match_found = 1;
 	*matching_cert = save_match;
     }
 
@@ -787,7 +787,7 @@ pkinit_cert_matching(krb5_context context,
 	if (retval) {
 	    if (retval == EINVAL) {
 		pkiDebug("%s: Ignoring invalid rule pkinit_cert_match = '%s'\n",
-			 __FUNCTION__, rules[x]); 
+			 __FUNCTION__, rules[x]);
 		continue;
 	    }
 	    goto cleanup;

@@ -32,7 +32,7 @@
 LIBM_ANSI_PRAGMA_WEAK(log10l,function)
 
 	ENTRY(log10l)
-	fldlg2	
+	fldlg2
 	fldt	4(%esp)			/ st = arg, st(1) = log10(2)
 	fyl2x				/ st = log10(arg) = log10(2)*log2(arg)
 	ret

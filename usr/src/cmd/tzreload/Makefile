@@ -30,7 +30,7 @@ CPPFLAGS += -I../cron
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTSBINPROG)
 	$(RM) $(ROOTUSRSBIN)/$(PROG)

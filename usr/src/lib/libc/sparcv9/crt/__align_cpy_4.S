@@ -56,7 +56,7 @@
  */
 
 #include <sys/asm_linkage.h>
- 
+
 	ENTRY(__align_cpy_4)
 	brz,pn %o2, .done		! Skip out if no bytes to copy.
 	cmp	%o0, %o1
@@ -117,7 +117,7 @@
 
 	retl
 	nop
-	
+
 .wrword:				! Copy final word.
 	st	%o3, [%g1]
 

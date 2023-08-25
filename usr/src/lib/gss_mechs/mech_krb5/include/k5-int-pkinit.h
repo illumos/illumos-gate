@@ -3,7 +3,7 @@
  * COPYRIGHT (C) 2006
  * THE REGENTS OF THE UNIVERSITY OF MICHIGAN
  * ALL RIGHTS RESERVED
- * 
+ *
  * Permission is granted to use, copy, create derivative works
  * and redistribute this software and such derivative works
  * for any purpose, so long as the name of The University of
@@ -14,7 +14,7 @@
  * University of Michigan is included in any copy of any
  * portion of this software, then the disclaimer below must
  * also be included.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED AS IS, WITHOUT REPRESENTATION
  * FROM THE UNIVERSITY OF MICHIGAN AS TO ITS FITNESS FOR ANY
  * PURPOSE, AND WITHOUT WARRANTY BY THE UNIVERSITY OF
@@ -247,7 +247,7 @@ krb5_error_code decode_krb5_auth_pack
 krb5_error_code decode_krb5_auth_pack_draft9
 	(const krb5_data *, krb5_auth_pack_draft9 **);
 
-krb5_error_code decode_krb5_kdc_dh_key_info 
+krb5_error_code decode_krb5_kdc_dh_key_info
 	(const krb5_data *, krb5_kdc_dh_key_info **);
 
 krb5_error_code decode_krb5_principal_name

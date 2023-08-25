@@ -33,7 +33,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1995 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -51,7 +51,7 @@ static char copyright[] = "@(#) Copyright (c) 1995 Regents of the University of 
 #ifdef _WINDOWS
 #define NSLDAPI_INVALID_OS_SOCKET( s )	((s) == INVALID_SOCKET)
 #else
-#define NSLDAPI_INVALID_OS_SOCKET( s )	((s) < 0 )	
+#define NSLDAPI_INVALID_OS_SOCKET( s )	((s) < 0 )
 #endif
 
 
@@ -356,7 +356,7 @@ nsldapi_os_connect_with_to(LBER_SOCKET sockfd, struct sockaddr *saptr,
 	/* failure on select call */
 	if (n == SOCKET_ERROR) {
 		perror("select error: SOCKET_ERROR returned");
-		return (-1);		
+		return (-1);
 	}
 #else
 	/*
@@ -665,7 +665,7 @@ nsldapi_try_each_host( LDAP *ld, const char *hostlist,
 				sigprocmask( SIG_BLOCK, &ints_off, &oldset );
 #endif /* LDAP_CONNECT_MUST_NOT_BE_INTERRUPTED */
 
-				if ( NULL != connectwithtofn  ) {	
+				if ( NULL != connectwithtofn  ) {
 					err = (*connectwithtofn)(s,
 						(struct sockaddr *)&sin,
 						sizeof(struct sockaddr_in),
@@ -766,7 +766,7 @@ nsldapi_host_connected_to( Sockbuf *sb )
 	 * hostname is used as the kerberos instance.
 	 */
 #error XXXmcs: need to use DNS callbacks here
-	if (( hp = gethostbyaddr((char *) &sin.sin_addr, 
+	if (( hp = gethostbyaddr((char *) &sin.sin_addr,
 	    sizeof( sin.sin_addr ), AF_INET)) != NULL ) {
 	    if ( hp->h_name != NULL ) {
 		return( nsldapi_strdup( hp->h_name ));
@@ -1081,7 +1081,7 @@ nsldapi_iostatus_free( LDAP *ld )
 		return;
 	}
 
-		
+
 	/* clean up classic I/O compatibility glue */
 	if ( ld->ld_io_fns_ptr != NULL ) {
 		if ( ld->ld_ext_session_arg != NULL ) {
@@ -1206,7 +1206,7 @@ nsldapi_iostatus_poll( LDAP *ld, struct timeval *timeout )
 		 * We always pass the session extended I/O argument to
 		 * the extended poll() callback.
 		 */
-		rc = ld->ld_extpoll_fn( 
+		rc = ld->ld_extpoll_fn(
 		    iosp->ios_status.ios_cbinfo.cbsi_pollfds,
 		    iosp->ios_status.ios_cbinfo.cbsi_pollfds_size,
 		    nsldapi_tv2ms( timeout ), ld->ld_ext_session_arg );
@@ -1508,7 +1508,7 @@ typedef struct nsldapi_compat_socket_info {
     LBER_SOCKET		csi_socket;
     LDAP		*csi_ld;
 } NSLDAPICompatSocketInfo;
-    
+
 static int LDAP_CALLBACK
 nsldapi_ext_compat_read( int s, void *buf, int len,
 	struct lextiof_socket_private *arg )
@@ -1555,7 +1555,7 @@ nsldapi_ext_compat_poll( LDAP_X_PollFD fds[], int nfds, int timeout,
 			LDAP_SET_ERRNO( csip->csi_ld, EINVAL );
 			return( -1 );
 		}
-		
+
 		if ( 0 != ( fds[i].lpoll_events & LDAP_X_POLLIN )) {
 			FD_SET( fds[i].lpoll_fd, &readfds );
 		}
@@ -1705,7 +1705,7 @@ nsldapi_ext_compat_connect( const char *hostlist, int defport, int timeout,
 		connectfn = iofns->liof_connect;
 	}
 	closefn = ( iofns->liof_close == NULL ) ?
-		    nsldapi_os_closesocket : iofns->liof_close;	
+		    nsldapi_os_closesocket : iofns->liof_close;
 
 	s = nsldapi_try_each_host( defcsip->csi_ld, hostlist, defport,
 			secure, socketfn, ioctlfn, connectwithtofn,

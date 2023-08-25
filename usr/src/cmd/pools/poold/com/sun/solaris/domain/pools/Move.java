@@ -68,7 +68,7 @@ abstract class Move
 	{
 		return (from);
 	}
-	
+
 	/**
 	 * Return the destination of this move.
 	 */

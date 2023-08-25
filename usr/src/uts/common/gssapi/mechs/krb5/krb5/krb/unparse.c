@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_unparse_name() routine
  *
@@ -66,8 +66,8 @@ krb5int_realloc(
 
 /*
  * converts the multi-part principal format used in the protocols to a
- * single-string representation of the name. 
- *  
+ * single-string representation of the name.
+ *
  * The name returned is in allocated storage and should be freed by
  * the caller when finished.
  *
@@ -230,7 +230,7 @@ k5_unparse_name(krb5_context context, krb5_const_principal principal,
 	/*
 	 * Allocate space for the ascii string; if space has been
 	 * provided, use it, realloc'ing it if necessary.
-	 * 
+	 *
 	 * We need only n-1 seperators for n components, but we need
 	 * an extra byte for the NUL at the end.
 	 */
@@ -253,7 +253,7 @@ k5_unparse_name(krb5_context context, krb5_const_principal principal,
 	}
 
 	q = *name;
-	
+
 	for (i = 0; i < (int) nelem; i++) {
 #if 0
 		/* SUNW17PACresync - lint - cp/length not used */

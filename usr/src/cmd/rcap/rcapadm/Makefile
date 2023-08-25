@@ -69,7 +69,7 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS)
-	$(RM) rcapd_conf.c 
+	$(RM) rcapd_conf.c
 
 %.ln: $(COMMON_DIR)/%.c
 	$(LINT.c) -c $<

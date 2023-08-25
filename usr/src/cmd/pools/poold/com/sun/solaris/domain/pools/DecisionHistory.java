@@ -39,7 +39,7 @@ import com.sun.solaris.service.pools.*;
  * This class maintains history about previous decisions.  It can be
  * used to ratify that a decision made on the basis of observed behavior
  * over a limited time was historically shown to not degrade
- * performance.  The class maintains historical data in a history file. 
+ * performance.  The class maintains historical data in a history file.
  * The format of this data is project-private and very likely to change
  * as the implementation improves.
  */
@@ -72,9 +72,9 @@ public final class DecisionHistory implements Serializable {
 	public DecisionHistory()
 	{
 	}
-	
+
 	/**
-	 * Record a decision that's been made regarding a processor. 
+	 * Record a decision that's been made regarding a processor.
 	 * Such a decision is a (cpuid, from-pset-name, to-pset-name,
 	 * (from-pset-composition), (to-pset-composition),
 	 * original-utilization-class) tuple.
@@ -92,7 +92,7 @@ public final class DecisionHistory implements Serializable {
 		/*
 		 * Remember the most-recently-made decision regarding a
 		 * resource until the next utilization sample is taken,
-		 * so the next solve() may then reocrd the improvement. 
+		 * so the next solve() may then reocrd the improvement.
 		 * If another decision is made regarding this resource,
 		 * the previous ones are forgotten, and their
 		 * improvement fields are left 0.
@@ -343,7 +343,7 @@ public final class DecisionHistory implements Serializable {
 
 		/**
 		 * Constructs a ComponentMoveDecision based on the
-		 * ComponentMove. 
+		 * ComponentMove.
 		 * @throws IllegalArgumentException if the ComponentMove
 		 * can't be interpreted.
 		 */
@@ -409,7 +409,7 @@ public final class DecisionHistory implements Serializable {
 			if (!(o instanceof ComponentMoveDecision))
 				return false;
 			else {
-				ComponentMoveDecision cmd = 
+				ComponentMoveDecision cmd =
 				    (ComponentMoveDecision)o;
 				return (cpuid.equals(cmd.cpuid) &&
 				    fromPsetName.equals(cmd.fromPsetName) &&
@@ -426,7 +426,7 @@ public final class DecisionHistory implements Serializable {
 		/**
 		 * Returns the group that this decision's utilization
 		 * falls into.  Presently, there is only one group, but
-		 * ostensibly decisions will later be grouped (e.g. 
+		 * ostensibly decisions will later be grouped (e.g.
 		 * into control-zone-wide groups).
 		 */
 		private String computeUtilizationClass(
@@ -456,7 +456,7 @@ public final class DecisionHistory implements Serializable {
 
 		private static final long serialVersionUID = 0xf7860687;
 	}
-		
+
 	/**
 	 * Vetoes a Move only if there is a prior decision that showed a
 	 * degradation in resource utilization.
@@ -510,7 +510,7 @@ public final class DecisionHistory implements Serializable {
 	    throws IOException, ClassNotFoundException
 	{
 		ObjectInputStream ois = new ObjectInputStream(is);
-	
+
 		DecisionHistory dh = (DecisionHistory)ois.readObject();
 		return (dh);
 	}

@@ -13,12 +13,12 @@
 #include "auth_con.h"
 
 
-krb5_error_code 
+krb5_error_code
 krb5int_mk_chpw_req(
-	krb5_context context, 
-	krb5_auth_context auth_context, 
+	krb5_context context,
+	krb5_auth_context auth_context,
 	krb5_data *ap_req,
-	char *passwd, 
+	char *passwd,
 	krb5_data *packet)
 {
     krb5_error_code ret = 0;
@@ -76,11 +76,11 @@ krb5int_mk_chpw_req(
 cleanup:
     if(cipherpw.data != NULL)  /* allocated by krb5_mk_priv */
       free(cipherpw.data);
-      
+
     return(ret);
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context, krb5_data *packet, int *result_code, krb5_data *result_data)
 {
     char *ptr;
@@ -107,7 +107,7 @@ krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context, krb5_d
     plen = (*ptr++ & 0xff);
     plen = (plen<<8) | (*ptr++ & 0xff);
 
-    if (plen != packet->length) 
+    if (plen != packet->length)
 	{
 		/*
 		 * MS KDCs *may* send back a KRB_ERROR.  Although
@@ -273,7 +273,7 @@ krb5_chpw_result_code_string(krb5_context context, int result_code, char **code_
    return(0);
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_mk_setpw_req(
      krb5_context context,
      krb5_auth_context auth_context,
@@ -291,7 +291,7 @@ krb5int_mk_setpw_req(
 
     cipherpw.data = NULL;
     cipherpw.length = 0;
-     
+
     if ((ret = krb5_auth_con_setflags(context, auth_context,
 				      KRB5_AUTH_CONTEXT_DO_SEQUENCE)))
 		return(ret);
@@ -309,7 +309,7 @@ krb5int_mk_setpw_req(
 	return(ret);
     }
     krb5_free_data( context, encoded_setpw);
-    
+
 
     packet->length = 6 + ap_req->length + cipherpw.length;
     packet->data = (char *) malloc(packet->length);
@@ -348,7 +348,7 @@ krb5int_mk_setpw_req(
     return ret;
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_rd_setpw_rep( krb5_context context, krb5_auth_context auth_context, krb5_data *packet,
      int *result_code, krb5_data *result_data )
 {
@@ -384,12 +384,12 @@ krb5int_rd_setpw_rep( krb5_context context, krb5_auth_context auth_context, krb5
 	krberror->e_data.data  = NULL; /*So we can free it later*/
 	krberror->e_data.length = 0;
 	krb5_free_error(context, krberror);
-		
+
     } else { /* Not an error*/
 
 /*
 ** validate the message length -
-** length is big endian 
+** length is big endian
 */
 	message_length = (((ptr[0] << 8)&0xff) | (ptr[1]&0xff));
 	ptr += 2;
@@ -469,7 +469,7 @@ krb5int_rd_setpw_rep( krb5_context context, krb5_auth_context auth_context, krb5
     } /*Response instead of error*/
 
 /*
-** validate the cleartext length 
+** validate the cleartext length
 */
     if (clearresult.length < 2) {
 	ret = KRB5KRB_AP_ERR_MODIFIED;
@@ -519,7 +519,7 @@ krb5int_rd_setpw_rep( krb5_context context, krb5_auth_context auth_context, krb5
     return(ret);
 }
 
-krb5_error_code 
+krb5_error_code
 krb5int_setpw_result_code_string( krb5_context context, int result_code, const char **code_string )
 {
    switch (result_code)

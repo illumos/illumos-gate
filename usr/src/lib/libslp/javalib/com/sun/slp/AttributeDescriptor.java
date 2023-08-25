@@ -38,7 +38,7 @@ import java.util.*;
 
 
 /**
- * The instances of the AttributeDescriptor class 
+ * The instances of the AttributeDescriptor class
  * return information on a particular service location attribute. This
  * information is primarily for GUI tools. Programmatic attribute
  * verification should be done through the ServiceLocationAttributeVerifier.
@@ -104,7 +104,7 @@ class AttributeDescriptor
     }
 
     /**
-     * Return an Enumeration of allowed values for the attribute type. 
+     * Return an Enumeration of allowed values for the attribute type.
      * For keyword attributes returns null. For no allowed values
      * (i.e. unrestricted) returns an empty Enumeration. Small memory
      * implementations may want to parse values on demand rather
@@ -115,7 +115,7 @@ class AttributeDescriptor
      */
 
     final public Enumeration getAllowedValues() {
-    
+
 	if (getIsKeyword()) {
 	    return null;
 	} else {
@@ -125,7 +125,7 @@ class AttributeDescriptor
 
 
     /**
-     * Return an Enumeration of default values for the attribute type. 
+     * Return an Enumeration of default values for the attribute type.
      * For keyword attributes returns null. For no allowed values
      * (i.e. unrestricted) returns an empty Enumeration. Small memory
      * implementations may want to parse values on demand rather
@@ -312,17 +312,17 @@ class AttributeDescriptor
 	ret += "\nid:" + id + "\n";
 	ret += "valueType:" + valueType + "\n";
 	ret += "description:" + description + "\n";
-	ret += 
-	    "defaultValues:" + 
-	    (defaultValues == null ? "<null>": 
+	ret +=
+	    "defaultValues:" +
+	    (defaultValues == null ? "<null>":
 	    (valueType.equals(JAVA_OPAQUE_TYPE) ?
-	    formatByteArrays(defaultValues) : defaultValues.toString())) + 
+	    formatByteArrays(defaultValues) : defaultValues.toString())) +
 	    "\n";
-	ret += 
-	    "allowedValues:" + 
-	    (allowedValues == null ? "<null>": 
+	ret +=
+	    "allowedValues:" +
+	    (allowedValues == null ? "<null>":
 	    (valueType.equals(JAVA_OPAQUE_TYPE) ?
-	    formatByteArrays(allowedValues) : allowedValues.toString())) + 
+	    formatByteArrays(allowedValues) : allowedValues.toString())) +
 	    "\n";
 	ret += "isMultivalued:" + (isMultivalued ? "true":"false") + "\n";
 	ret += "isOptional:" + (isOptional ? "true":"false") + "\n";
@@ -341,7 +341,7 @@ class AttributeDescriptor
 	StringBuffer ret = new StringBuffer();
 
 	ret.append("[");
-    
+
 	for (i = 0; i < n; i++) {
 	    byte array[] = (byte[])arrays.elementAt(i);
 

@@ -53,7 +53,7 @@ all:		$(PROG)
 
 install:	all .WAIT $(ROOTUSRBINPROG) $(ROOTUSRUCBSYMLINK)
 
-$(ROOTUSRUCBSYMLINK):	
+$(ROOTUSRUCBSYMLINK):
 		$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
 
 clean:

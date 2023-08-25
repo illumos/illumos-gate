@@ -51,10 +51,10 @@ all: $(SCRIPTS) $(MODULES)
 #
 # install targets
 #	Note: Makefile.cmd has a rule to cover $(ROOTSHFILES), but
-# 	$(ROOTLIBABIFILES) are special install targets (go into 
-#	dirs not covered by Makefile.cmd), so we provide an explicit 
+# 	$(ROOTLIBABIFILES) are special install targets (go into
+#	dirs not covered by Makefile.cmd), so we provide an explicit
 #	rule for that.
-# 
+#
 
 install: all .WAIT $(ROOTPROG) $(ROOTLIBABIDIR) .WAIT $(ROOTLIBABIFILES)
 
@@ -64,13 +64,13 @@ _msg: $(MSGDOMAIN) $(MESSAGES)
 $(MSGDOMAIN):
 	$(INS.dir)
 
-clean:	
+clean:
 	-$(RM) $(CLEANFILES)
 
 $(ROOTBINPROG): $(PROG)
 	$(INS.file)
 
-$(ROOTLIBABIDIR): 
+$(ROOTLIBABIDIR):
 	$(INS.dir)
 
 $(ROOTLIBABIDIR)/%: %

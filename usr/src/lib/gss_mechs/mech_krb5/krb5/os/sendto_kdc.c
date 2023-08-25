@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Send packet to KDC for realm; wait for response, retransmitting
  * as necessary.
@@ -88,7 +88,7 @@ static void default_debug_handler (const void *data, size_t len)
 
 void (*krb5int_sendtokdc_debug_handler) (const void *, size_t) = default_debug_handler;
 
-/* 
+/*
  * Solaris Kerberos: only including the debug stuff if DEBUG defined outside
  * this file.
  */
@@ -134,7 +134,7 @@ krb5int_debug_fprint (const char *fmt, ...)
 #endif
     char tmpbuf[max(NI_MAXHOST + NI_MAXSERV + 30, 200)];
 
-    /* 
+    /*
      * Solaris kerberos: modified this function to create a string to pass to
      * syslog()
      */
@@ -477,7 +477,7 @@ krb5_sendto_kdc2 (krb5_context context, const krb5_data *message,
              */
             if (*use_master == 0) {
                 struct addrlist addrs3;
-                retval = krb5_locate_kdc(context, realm, &addrs3, 1, 
+                retval = krb5_locate_kdc(context, realm, &addrs3, 1,
                                          addrs.addrs[addr_used].ai->ai_socktype,
                                          addrs.addrs[addr_used].ai->ai_family);
                 if (retval == 0) {
@@ -653,7 +653,7 @@ static int service_udp_fd (struct conn_state *conn,
 static void
 set_conn_state_msg_length (struct conn_state *state, const krb5_data *message)
 {
-    if (!message || message->length == 0) 
+    if (!message || message->length == 0)
 	return;
 
     if (!state->is_udp) {
@@ -694,7 +694,7 @@ setup_connection (struct conn_state *state, struct addrinfo *ai,
 	SG_SET(&state->x.out.sgbuf[1], message->data, message->length);
 	state->x.out.sg_count = 2;
 	*/
-	
+
 	state->is_udp = 0;
 	state->service = service_tcp_fd;
 	set_conn_state_msg_length (state, message);
@@ -726,8 +726,8 @@ setup_connection (struct conn_state *state, struct addrinfo *ai,
 }
 
 static int
-start_connection (struct conn_state *state, 
-		  struct select_state *selstate, 
+start_connection (struct conn_state *state,
+		  struct select_state *selstate,
 		  struct sendto_callback_info* callback_info,
                   krb5_data* callback_buffer)
 {
@@ -796,8 +796,8 @@ start_connection (struct conn_state *state,
      */
     if (callback_info) {
 
-	e = callback_info->pfn_callback(state, 
-					callback_info->context, 
+	e = callback_info->pfn_callback(state,
+					callback_info->context,
 					callback_buffer);
 	if (e != 0) {
 	    dprint("callback failed: %m\n", e);
@@ -808,9 +808,9 @@ start_connection (struct conn_state *state,
 	    return -3;
 	}
 
-	dprint("callback %p (message=%d@%p)\n", 
+	dprint("callback %p (message=%d@%p)\n",
 	       state,
-	       callback_buffer->length, 
+	       callback_buffer->length,
 	       callback_buffer->data);
 
 	set_conn_state_msg_length( state, callback_buffer );
@@ -870,8 +870,8 @@ start_connection (struct conn_state *state,
    Otherwise, the caller should immediately move on to process the
    next connection.  */
 static int
-maybe_send (struct conn_state *conn, 
-	    struct select_state *selstate, 
+maybe_send (struct conn_state *conn,
+	    struct select_state *selstate,
 	    struct sendto_callback_info* callback_info,
 	    krb5_data* callback_buffer)
 {
@@ -1338,9 +1338,9 @@ krb5int_sendto (krb5_context context, const krb5_data *message,
 
     /* Set up connections.  */
     for (host = 0; host < n_conns; host++) {
-	retval = setup_connection(&conns[host], 
+	retval = setup_connection(&conns[host],
 				  addrs->addrs[host].ai,
-				  message, 
+				  message,
 				  &udpbuf);
 	if (retval)
 	    continue;
@@ -1355,7 +1355,7 @@ krb5int_sendto (krb5_context context, const krb5_data *message,
 	    dprint("host %d\n", host);
 
 	    /* Send to the host, wait for a response, then move on. */
-	    if (maybe_send(&conns[host], 
+	    if (maybe_send(&conns[host],
 			   sel_state,
 			   callback_info,
 			   (callback_info ? &callback_data[host] : NULL)))
@@ -1435,7 +1435,7 @@ egress:
 	}
     }
 
-    if (callback_data) 
+    if (callback_data)
 	free(callback_data);
 
     free(conns);

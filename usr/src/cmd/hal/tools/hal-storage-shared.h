@@ -51,22 +51,22 @@ void unlock_hal_mtab (void);
 
 void unknown_error (const char *detail);
 
-void handle_unmount (LibHalContext *hal_ctx, 
+void handle_unmount (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-		     LibPolKitContext *pol_ctx, 
+		     LibPolKitContext *pol_ctx,
 #endif
 		     const char *udi,
-		     LibHalVolume *volume, LibHalDrive *drive, const char *device, 
+		     LibHalVolume *volume, LibHalDrive *drive, const char *device,
 		     const char *invoked_by_uid, const char *invoked_by_syscon_name,
 		     gboolean option_lazy, gboolean option_force,
 		     DBusConnection *system_bus);
 
-void handle_eject (LibHalContext *hal_ctx, 
+void handle_eject (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-		   LibPolKitContext *pol_ctx, 
+		   LibPolKitContext *pol_ctx,
 #endif
 		   const char *udi,
-		   LibHalDrive *drive, const char *device, 
+		   LibHalDrive *drive, const char *device,
 		   const char *invoked_by_uid, const char *invoked_by_syscon_name,
 		   gboolean closetray, DBusConnection *system_bus);
 
@@ -75,6 +75,6 @@ char *auth_from_privilege(const char *privilege);
 void audit_volume(const adt_export_data_t *imported_state, au_event_t event_id, int result,
     const char *auth_used, const char *mount_point, const char *device, const char *options);
 #endif /* sun */
-		
+
 #endif /* HAL_STORAGE_SHARED_H */
 

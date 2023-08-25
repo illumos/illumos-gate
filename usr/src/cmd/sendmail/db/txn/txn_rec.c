@@ -60,7 +60,7 @@ static const char sccsid[] = "@(#)txn_rec.c	10.15 (Sleepycat) 1/3/99";
 static int __txn_restore_txn __P((DB_ENV *, DB_LSN *, __txn_xa_regop_args *));
 
 #define	IS_XA_TXN(R) (R->xid.size != 0)
-	
+
 /*
  * PUBLIC: int __txn_regop_recover
  * PUBLIC:    __P((DB_LOG *, DBT *, DB_LSN *, int, void *));

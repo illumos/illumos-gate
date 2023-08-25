@@ -214,7 +214,7 @@ class SSrvMsg extends SrvLocMsgImpl {
 		break;
 
 	    }
-	
+
 	    nurls++;
 
 	}

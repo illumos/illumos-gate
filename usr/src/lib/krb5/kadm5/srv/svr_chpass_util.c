@@ -26,7 +26,7 @@
 
 kadm5_ret_t kadm5_chpass_principal_util(void *server_handle,
 					krb5_principal princ,
-					char *new_pw, 
+					char *new_pw,
 					char **ret_pw,
 					char *msg_ret,
 					unsigned int msg_len)

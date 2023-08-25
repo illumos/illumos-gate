@@ -849,7 +849,7 @@ char    *expbuf;
 	if(*tsp != sseof) {
 		if(*tsp == '\0')
 			comperr("Ending delimiter missing on string: %s");
-		else 
+		else
 			comperr("Transform strings not the same size: %s");
 	}
 	cp = ++tsp;

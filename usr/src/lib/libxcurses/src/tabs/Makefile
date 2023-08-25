@@ -57,7 +57,7 @@
 #EXE	= tabs$E
 #
 #$O$E :
-#	$(LD) $(LDFLAGS) $(CFLAGS) -o $@ $< -lcurses 
+#	$(LD) $(LDFLAGS) $(CFLAGS) -o $@ $< -lcurses
 #
 #all :: $(EXE)
 #

@@ -43,7 +43,7 @@ import java.io.*;
  * element in the parts vector is a PatternPart object. A PatternPart
  * object is a pattern consisting of (maximally) a beginning wildcard and
  * string pattern. A PatternPart may be lacking the
- * any of these, but will always have at least one. 
+ * any of these, but will always have at least one.
  *
  * @author James Kempf
  */
@@ -57,8 +57,8 @@ class AttributePattern extends AttributeString {
     /**
      * The PatternPart class models a single component of a pattern.
      * It may have a beginning wildcard and string
-     * pattern in the middle. Any of the parts may be missing, but it will 
-     * always have at least one. 
+     * pattern in the middle. Any of the parts may be missing, but it will
+     * always have at least one.
      *
      * @author James Kempf
      */
@@ -196,7 +196,7 @@ class AttributePattern extends AttributeString {
 
 	    } else {
 
-		// The pattern string must match the beginning part of the 
+		// The pattern string must match the beginning part of the
 		// argument string.
 
 		if (!cstring.regionMatches(offset,

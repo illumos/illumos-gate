@@ -79,7 +79,7 @@ remount_form(register PSTATUS *pps, FSTATUS *pfs, short trayNum)
 	if (pfs) {
 		syslog(LOG_DEBUG, "remount_form add %x(%s) to tray %d\n",
 			 pfs, (pfs ? pfs->form->name : "NULL"), trayNum);
-               
+
 		if (pps && !pps->forms) {
                         pps->forms = (PFSTATUS *)calloc((trayNum +1),
 							sizeof(PFSTATUS));
@@ -621,7 +621,7 @@ s_unload_form(char *m, MESG *md)
 			free(FStatus);
 			FStatus = NULL;
 		}
-			
+
 	} else if (!*form || !(pfs = search_fstatus(form)))
 		/* Have we seen this form before? */
 		status = MNODEST;
@@ -737,7 +737,7 @@ _unload_pwheel(register PWSTATUS *ppws)
 
 	/*
 	 * Cancel any alert pending. Here we're different from the
-	 * similar code for unloading a form, because, to be able to 
+	 * similar code for unloading a form, because, to be able to
 	 * unload a form we first require NO requests pending. If no
 	 * requests are pending there should be no alert to cancel.
 	 * Print wheels, on the other hand, only exist as names and

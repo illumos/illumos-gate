@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_aname_to_localname()
  */
@@ -82,7 +82,7 @@ aname_full_to_mapping_name(char *fprincname)
 	if (!atp)
 	    atp = &fprincname[strlen(fprincname)];
 	mlen = (size_t) (atp - fprincname);
-	
+
 	if ((mname = (char *) malloc(mlen+1))) {
 	    strncpy(mname, fprincname, mlen);
 	    mname[mlen] = '\0';
@@ -187,7 +187,7 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
  *	<rule> ...
  *		Where:	<rule> is of the form:
  *			"s/" <regexp> "/" <text> "/" ["g"]
- * 
+ *
  * In order to be able to select rule validity, the native system must support
  * one of compile(3), re_comp(3) or regcomp(3).  In order to be able to
  * transform (e.g. substitute), the native system must support regcomp(3) or
@@ -197,7 +197,7 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
 /*
  * aname_do_match() 	- Does our name match the parenthesized regular
  *			  expression?
- * 
+ *
  * Chew up the match portion of the regular expression and update *contextp.
  * If no re_comp() or regcomp(), then always return a match.
  */
@@ -368,7 +368,7 @@ do_replacement(char *regexp, char *repl, int doall, char *in, char *out)
     	regfree(&match_exp);
 #endif
 	return 0;
-	
+
 }
 #undef use_bytes
 
@@ -690,7 +690,7 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname, const unsigne
     unsigned int realm_length;
 
     realm_length = krb5_princ_realm(context, aname)->length;
-    
+
     if ((retval = krb5_get_default_realm(context, &def_realm))) {
 	return(retval);
     }
@@ -727,7 +727,7 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname, const unsigne
     }
 
     free(def_realm);
-    strncpy(lname, krb5_princ_component(context, aname,0)->data, 
+    strncpy(lname, krb5_princ_component(context, aname,0)->data,
 	    min(krb5_princ_component(context, aname,0)->length,lnsize));
     if (lnsize <= krb5_princ_component(context, aname,0)->length ) {
 	retval = KRB5_CONFIG_NOTENUFSPACE;

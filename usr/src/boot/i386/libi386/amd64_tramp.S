@@ -67,7 +67,7 @@ gdt:
 	.long	0x00000000		# %ds
 	.long	0x00008000
 gdtend:
-	
+
 	.text
 	.code32
 

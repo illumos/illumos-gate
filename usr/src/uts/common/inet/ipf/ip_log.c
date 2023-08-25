@@ -169,7 +169,7 @@ int fr_loginit(ifs)
 ipf_stack_t *ifs;
 {
 	int	i;
-	
+
 	for (i = IPL_LOGMAX; i >= 0; i--) {
 		ifs->ifs_iplt[i] = NULL;
 		ifs->ifs_ipll[i] = NULL;
@@ -275,7 +275,7 @@ u_int flags;
 			struct icmp *icmp;
 
 			icmp = (struct icmp *)fin->fin_dp;
-	
+
 			/*
 			 * For ICMP, if the packet is an error packet, also
 			 * include the information about the packet which

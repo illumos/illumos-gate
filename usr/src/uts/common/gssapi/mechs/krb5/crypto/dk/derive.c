@@ -5,14 +5,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +23,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -109,7 +109,7 @@ krb5_create_derived_keyblock(int keysize)
 	KRB5_LOG0(KRB5_INFO, "krb5_create_derived_keyblock()");
 	if (key == NULL)
 		return (NULL);
-	
+
 	bzero(key, sizeof(krb5_keyblock));
 
 	key->length = keysize;
@@ -161,7 +161,7 @@ init_derived_keydata(krb5_context context,
 		}
 
 		(*d_encr_key)->enctype = key->enctype;
-		
+
 		constantdata[0] = (usage>>24)&0xff;
 		constantdata[1] = (usage>>16)&0xff;
 		constantdata[2] = (usage>>8)&0xff;
@@ -170,7 +170,7 @@ init_derived_keydata(krb5_context context,
 
 		d1.data = (char *)constantdata;
 		d1.length = sizeof(constantdata);
-		rv = krb5_derive_key(context, enc, key, 
+		rv = krb5_derive_key(context, enc, key,
 				    *d_encr_key, &d1);
 		if (rv != 0) {
 			krb5_free_keyblock(context, *d_encr_key);
@@ -302,7 +302,7 @@ krb5_derive_key(context, enc, inkey, outkey, in_constant)
     if (in_constant->length == inblock.length) {
 	(void) memcpy(inblock.data, in_constant->data, inblock.length);
     } else {
-	krb5_nfold(in_constant->length*8, 
+	krb5_nfold(in_constant->length*8,
 		(krb5_const unsigned char *) in_constant->data,
 		   inblock.length*8, (unsigned char *) inblock.data);
     }

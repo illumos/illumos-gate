@@ -147,7 +147,7 @@ struct ECFieldIDStr {
         SECItem  poly;  /* irreducible binary polynomial for (GF2m) */
     } u;
     int         k1;     /* first coefficient of pentanomial or
-                         * the only coefficient of trinomial 
+                         * the only coefficient of trinomial
                          */
     int         k2;     /* two remaining coefficients of pentanomial */
     int         k3;
@@ -156,7 +156,7 @@ typedef struct ECFieldIDStr ECFieldID;
 
 struct ECCurveStr {
 	SECItem a;	/* contains octet stream encoding of
-			 * field element (X9.62 section 4.3.3) 
+			 * field element (X9.62 section 4.3.3)
 			 */
 	SECItem b;
 	SECItem seed;
@@ -169,9 +169,9 @@ struct ECParamsStr {
     PRArenaPool * arena;
     ECParamsType  type;
     ECFieldID     fieldID;
-    ECCurve       curve; 
+    ECCurve       curve;
     SECItem       base;
-    SECItem       order; 
+    SECItem       order;
     int           cofactor;
     SECItem       DEREncoding;
     ECCurveName   name;
@@ -180,15 +180,15 @@ struct ECParamsStr {
 typedef struct ECParamsStr ECParams;
 
 struct ECPublicKeyStr {
-    ECParams ecParams;   
-    SECItem publicValue;   /* elliptic curve point encoded as 
+    ECParams ecParams;
+    SECItem publicValue;   /* elliptic curve point encoded as
 			    * octet stream.
 			    */
 };
 typedef struct ECPublicKeyStr ECPublicKey;
 
 struct ECPrivateKeyStr {
-    ECParams ecParams;   
+    ECParams ecParams;
     SECItem publicValue;   /* encoded ec point */
     SECItem privateValue;  /* private big integer */
     SECItem version;       /* As per SEC 1, Appendix C, Section C.4 */
@@ -209,7 +209,7 @@ typedef enum _SECStatus {
 	(pkcs11_get_nzero_urandom((p), (l)) < 0 ? CKR_DEVICE_ERROR : CKR_OK)
 #endif
 #define	CHECK_MPI_OK(func) if (MP_OKAY > (err = func)) goto cleanup
-#define	MP_TO_SEC_ERROR(err) 
+#define	MP_TO_SEC_ERROR(err)
 
 #define	SECITEM_TO_MPINT(it, mp)					\
 	CHECK_MPI_OK(mp_read_unsigned_octets((mp), (it).data, (it).len))

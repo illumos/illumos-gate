@@ -149,7 +149,7 @@ static	int	nat_match __P((fr_info_t *, ipnat_t *));
 static	INLINE	int nat_newmap __P((fr_info_t *, nat_t *, natinfo_t *));
 static	INLINE	int nat_newrdr __P((fr_info_t *, nat_t *, natinfo_t *));
 static	hostmap_t *nat_hostmap __P((ipnat_t *, struct in_addr,
-				    struct in_addr, struct in_addr, u_32_t, 
+				    struct in_addr, struct in_addr, u_32_t,
 				    ipf_stack_t *));
 static	INLINE	int nat_icmpquerytype4 __P((int));
 static	int	nat_ruleaddrinit __P((ipnat_t *));
@@ -1379,7 +1379,7 @@ finished:
 /*									    */
 /* Some facts about chksum, we should remember:				    */
 /*	IP header chksum covers IP header only				    */
-/*									    */	
+/*									    */
 /*	TCP/UDP chksum covers data payload and so called pseudo header	    */
 /*		SRC, DST IP address					    */
 /*		SRC, DST Port						    */
@@ -1414,10 +1414,10 @@ nat_t *nat;
 	 * the switch calculates operands for CALC_SUMD(),
 	 * which will compute the partial chksum delta.
 	 */
-	switch (nat->nat_dir) 
+	switch (nat->nat_dir)
 	{
 	case NAT_INBOUND:
-		/* 
+		/*
 		 * we are dealing with RDR rule (DST address gets
 		 * modified on packet from client)
 		 */
@@ -1430,7 +1430,7 @@ nat_t *nat;
 		}
 		break;
 	case NAT_OUTBOUND:
-		/* 
+		/*
 		 * we are dealing with MAP rule (SRC address gets
 		 * modified on packet from client)
 		 */
@@ -1447,25 +1447,25 @@ nat_t *nat;
 	}
 
 	/*
-	 * we also preserve CALC_SUMD() operands here, for IP chksum delta 
+	 * we also preserve CALC_SUMD() operands here, for IP chksum delta
 	 * calculation, which happens at the end of function.
 	 */
 	ipsum_changed = sum_changed;
 	ipsum_orig = sum_orig;
 	/*
-	 * NOTE: the order of operands for partial chksum adjustment 
+	 * NOTE: the order of operands for partial chksum adjustment
 	 * computation has to be swapped!
 	 */
 	CALC_SUMD(sum_changed, sum_orig, sumd);
 	nat->nat_sumd[1] = (sumd & 0xffff) + (sumd >> 16);
 
 	if (nat->nat_flags & (IPN_TCPUDP | IPN_ICMPQUERY)) {
-		
+
 		/*
 		 * switch calculates operands for CALC_SUMD(), which will
 		 * compute the full chksum delta.
 		 */
-		switch (nat->nat_dir) 
+		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND:
 			if (nat->nat_v == 4) {
@@ -2315,7 +2315,7 @@ natinfo_t *ni;
 		nat->nat_inport = port;
 		nat->nat_outport = port;
 	}
-	
+
 	ni->nai_ip.s_addr = in.s_addr;
 	ni->nai_port = port;
 	ni->nai_nport = dport;
@@ -2944,7 +2944,7 @@ int dir;
 			return nat;
 		}
 	}
-		
+
 	if (flags & IPN_TCPUDP) {
 		minlen += 8;		/* + 64bits of data to get ports */
 		if (fin->fin_plen < ICMPERR_IPICMPHLEN + minlen)
@@ -3571,7 +3571,7 @@ struct in_addr src , dst;
 			nat->nat_ifps[1] = ifp;
 
 		nflags = nat->nat_flags;
- 
+
 		if (nat->nat_inip.s_addr == srcip &&
 		    nat->nat_oip.s_addr == dst.s_addr &&
 		    (((p == 0) && (sflags == (nflags & NAT_TCPUDPICMP)))
@@ -3917,7 +3917,7 @@ u_32_t *passp;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP))
 			tcp = fin->fin_dp;
 	}
@@ -4077,7 +4077,7 @@ u_32_t nflags;
 
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG))
 		(void) fr_nat_newfrag(fin, 0, nat);
-	
+
 	/*
 	 * Fix up checksums, not by recalculating them, but
 	 * simply computing adjustments.
@@ -4236,12 +4236,12 @@ u_32_t *passp;
 			 */
 			if (nat_icmpquerytype4(icmp->icmp_type)) {
 				nflags = IPN_ICMPQUERY;
-				dport = icmp->icmp_id;	
+				dport = icmp->icmp_id;
 			} break;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
 			dport = tcp->th_dport;
@@ -4315,7 +4315,7 @@ maskloop:
 				np->in_hits++;
 				MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 				break;
-			}	
+			}
 			natfailed = -1;
 			npnext = np->in_rnext;
 			fr_ipnatderef(&np, ifs);
@@ -4623,7 +4623,7 @@ ipf_stack_t *ifs;
 		ifs->ifs_nat_table[1] = NULL;
 	}
 	if (ifs->ifs_nat_rules != NULL) {
-		KFREES(ifs->ifs_nat_rules, 
+		KFREES(ifs->ifs_nat_rules,
 		       sizeof(ipnat_t *) * ifs->ifs_ipf_natrules_sz);
 		ifs->ifs_nat_rules = NULL;
 	}
@@ -4633,7 +4633,7 @@ ipf_stack_t *ifs;
 		ifs->ifs_rdr_rules = NULL;
 	}
 	if (ifs->ifs_maptable != NULL) {
-		KFREES(ifs->ifs_maptable, 
+		KFREES(ifs->ifs_maptable,
 		       sizeof(hostmap_t *) * ifs->ifs_ipf_hostmap_sz);
 		ifs->ifs_maptable = NULL;
 	}
@@ -5031,10 +5031,10 @@ int icmptype;
 	 * altough it seems silly to call a reply a query, this is exactly
 	 * as it is defined in the IPv4 specification
 	 */
-	
+
 	switch (icmptype)
 	{
-	
+
 	case ICMP_ECHOREPLY:
 	case ICMP_ECHO:
 	/* route aedvertisement/solliciation is currently unsupported: */
@@ -5673,10 +5673,10 @@ ipf_stack_t *ifs;
 		default :
 			break;
 		}
- 
+
 		if ((count == 1) || (error != 0))
 			break;
- 
+
 		READ_ENTER(&ifs->ifs_ipf_nat);
 	}
 

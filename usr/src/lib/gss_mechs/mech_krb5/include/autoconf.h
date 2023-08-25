@@ -22,8 +22,8 @@
 
 #define ANSI_STDIO 1
 #define HAS_SETVBUF 1
-#define HAVE_STDLIB_H 1	
-#define HAVE_STRDUP 1	
+#define HAVE_STDLIB_H 1
+#define HAVE_STRDUP 1
 #define HAVE_LABS 1
 #define HAS_VOID_TYPE 1
 
@@ -42,7 +42,7 @@
 /* Define if dlopen should be used */
 #define USE_DLOPEN 1
 
-#define HAVE_STRING_H 1	
+#define HAVE_STRING_H 1
 #define WAIT_USES_INT 1
 #define krb5_sigtype void
 #define HAVE_UNISTD_H 1
@@ -174,7 +174,7 @@
 /* Define if you have sockaddr_storage */
 #define HAVE_STRUCT_SOCKADDR_STORAGE 1
 
-/* SUNW14resync start */ 
+/* SUNW14resync start */
 
 /* Define if thread support enabled */
 #define ENABLE_THREADS 1
@@ -226,4 +226,4 @@
 #ifndef KRB5_PRIVATE
 #define KRB5_PRIVATE 1
 #endif
-/* SUNW14resync end */ 
+/* SUNW14resync end */

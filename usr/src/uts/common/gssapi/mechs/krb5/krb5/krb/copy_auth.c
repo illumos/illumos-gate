@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_copy_authdata()
  */
@@ -90,9 +90,9 @@ krb5_merge_authdata(krb5_context context, krb5_authdata *const *inauthdat1, krb5
 	    return 0;
     }
 
-    if (inauthdat1) 
+    if (inauthdat1)
 	while (inauthdat1[nelems]) nelems++;
-    if (inauthdat2) 
+    if (inauthdat2)
 	while (inauthdat2[nelems2]) nelems2++;
 
     /* one more for a null terminated list */
@@ -220,8 +220,8 @@ static krb5_error_code grow_find_authdata
   return retval;
 }
 
-  
-  
+
+
 
 static krb5_error_code find_authdata_1
 (krb5_context context, krb5_authdata *const *in_authdat, krb5_authdatatype ad_type,
@@ -229,7 +229,7 @@ static krb5_error_code find_authdata_1
 {
   int i = 0;
   krb5_error_code retval=0;
-  
+
   for (i = 0; in_authdat[i]; i++) {
     krb5_authdata *ad = in_authdat[i];
     if (ad->ad_type == ad_type && retval ==0)

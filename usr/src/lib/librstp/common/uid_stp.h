@@ -134,7 +134,7 @@ typedef enum {
                    PT_CFG_P2P    | \
                    PT_CFG_EDGE   | \
                    PT_CFG_MCHECK | \
-                   PT_CFG_NON_STP                  
+                   PT_CFG_NON_STP
 
 #define ADMIN_PORT_PATH_COST_AUTO   0
 

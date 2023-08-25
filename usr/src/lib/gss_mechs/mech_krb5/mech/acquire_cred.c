@@ -9,7 +9,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,11 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -37,7 +37,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -49,14 +49,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -67,7 +67,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -142,7 +142,7 @@ krb5_gss_register_acceptor_identity(const char *keytab)
    If successful, set the keytab-specific fields in cred
    */
 
-static OM_uint32 
+static OM_uint32
 acquire_accept_cred(context, minor_status, desired_name, output_princ, cred)
      krb5_context context;
      OM_uint32 *minor_status;
@@ -230,7 +230,7 @@ acquire_accept_cred(context, minor_status, desired_name, output_princ, cred)
    If successful, set the ccache-specific fields in cred.
    */
 
-static OM_uint32 
+static OM_uint32
 acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
      krb5_context context;
      OM_uint32 *minor_status;
@@ -250,11 +250,11 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    cred->ccache = NULL;
 
    /* load the GSS ccache name into the kg_context */
-   
+
    if (GSS_ERROR(kg_sync_ccache_name(context, minor_status)))
        return(GSS_S_FAILURE);
 
-   /* check to see if the caller provided a ccache name if so 
+   /* check to see if the caller provided a ccache name if so
     * we will just use that and not search the cache collection */
    if (GSS_ERROR(kg_caller_provided_ccache_name (minor_status, &caller_provided_ccache_name))) {
        return(GSS_S_FAILURE);
@@ -269,7 +269,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 
        err = __KLCreatePrincipalFromKerberos5Principal ((krb5_principal) desired_name,
                                                         &kl_desired_princ);
-       
+
        if (!err) {
            err = KLAcquireInitialTickets (kl_desired_princ, NULL, NULL, &ccache_name);
        }
@@ -277,15 +277,15 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
        if (!err) {
            err = krb5_cc_resolve (context, ccache_name, &ccache);
        }
-       
+
        if (err) {
            *minor_status = err;
            return(GSS_S_CRED_UNAVAIL);
        }
-       
+
        if (kl_desired_princ != NULL) { KLDisposePrincipal (kl_desired_princ); }
        if (ccache_name      != NULL) { KLDisposeString (ccache_name); }
-       
+
 #elif defined(USE_LEASH)
        if ( hLeashDLL == INVALID_HANDLE_VALUE ) {
 	   hLeashDLL = LoadLibrary(LEASH_DLL);
@@ -294,7 +294,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 		   GetProcAddress(hLeashDLL, "not_an_API_Leash_AcquireInitialTicketsIfNeeded");
 	   }
        }
-    
+
        if ( pLeash_AcquireInitialTicketsIfNeeded ) {
 	   char ccname[256]="";
 	   pLeash_AcquireInitialTicketsIfNeeded(context, (krb5_principal) desired_name, ccname, sizeof(ccname));
@@ -309,7 +309,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 	   }
        } else {
 	   /* leash dll not available, open the default credential cache */
-   
+
 	   if ((code = krb5int_cc_default(context, &ccache))) {
 	       *minor_status = code;
 	       return(GSS_S_NO_CRED);
@@ -320,7 +320,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 #endif /* USE_LOGIN_LIBRARY || USE_LEASH */
    {
        /* open the default credential cache */
-   
+
        if ((code = krb5int_cc_default(context, &ccache))) {
 	   *minor_status = code;
 	   return(GSS_S_NO_CRED);
@@ -452,7 +452,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    /* minor_status is set while we are iterating over the ccache */
    return(GSS_S_COMPLETE);
 }
-   
+
 /*ARGSUSED*/
 OM_uint32
 krb5_gss_acquire_cred(minor_status, desired_name, time_req,
@@ -500,7 +500,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
    /*SUPPRESS 29*/
    if ((desired_name != (gss_name_t) NULL) &&
        (! kg_validate_name(desired_name))) {
-	*minor_status = (OM_uint32) G_VALIDATE_FAILED;	
+	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
 	krb5_free_context(context);
 	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
    }

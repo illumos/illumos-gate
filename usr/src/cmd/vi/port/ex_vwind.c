@@ -494,7 +494,7 @@ vnline(unsigned char *curs)
 			if(wcursor - linebuf > j)
 				wcursor = owcursor;
 		}
-			
+
 	} else if (vmoving)
 		wcursor = vfindcol(vmovcol);
 	else

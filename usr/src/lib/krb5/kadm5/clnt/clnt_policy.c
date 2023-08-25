@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -58,7 +58,7 @@ kadm5_create_policy(void *server_handle,
     memcpy(&arg.rec, policy, sizeof(kadm5_policy_ent_rec));
     r = create_policy_2(&arg, handle->clnt);
     if(r == NULL)
-	return KADM5_RPC_ERROR;    
+	return KADM5_RPC_ERROR;
 
     return r->code;
 }
@@ -69,7 +69,7 @@ kadm5_delete_policy(void *server_handle, char *name)
     dpol_arg		arg;
     generic_ret		*r;
     kadm5_server_handle_t handle = server_handle;
-	 
+
     CHECK_HANDLE(server_handle);
 
     if(name == NULL)
@@ -80,7 +80,7 @@ kadm5_delete_policy(void *server_handle, char *name)
 
     r = delete_policy_2(&arg, handle->clnt);
     if(r == NULL)
-	return KADM5_RPC_ERROR;    
+	return KADM5_RPC_ERROR;
 
     return r->code;
 }
@@ -97,14 +97,14 @@ kadm5_modify_policy(void *server_handle,
 
     if(policy == (kadm5_policy_ent_t) NULL)
 	return EINVAL;
-	
+
     arg.mask = mask;
     arg.api_version = handle->api_version;
 
     memcpy(&arg.rec, policy, sizeof(kadm5_policy_ent_rec));
     r = modify_policy_2(&arg, handle->clnt);
     if(r == NULL)
-	return KADM5_RPC_ERROR;    
+	return KADM5_RPC_ERROR;
 
     return r->code;
 }
@@ -123,7 +123,7 @@ kadm5_get_policy(void *server_handle, char *name, kadm5_policy_ent_t ent)
 
     if(name == NULL)
 	return EINVAL;
-	
+
     r = get_policy_2(&arg, handle->clnt);
     if(r == NULL)
 	return KADM5_RPC_ERROR;
@@ -143,7 +143,7 @@ kadm5_get_policy(void *server_handle, char *name, kadm5_policy_ent_t ent)
 	 if (r->code == 0)
 	      memcpy(ent, &r->rec, sizeof(r->rec));
     }
-	 
+
     return r->code;
 }
 
@@ -171,6 +171,6 @@ kadm5_get_policies(void *server_handle,
 	 *count = 0;
 	 *pols = NULL;
     }
-    
+
     return r->code;
 }

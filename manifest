@@ -2052,7 +2052,6 @@ f platform/i86pc/ucode/AuthenticAMD/A111-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A112-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/AA01-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/AA02-00 0444 root sys
-f platform/i86pc/ucode/AuthenticAMD/container 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/equivalence-table 0444 root sys
 d platform/i86pc/ucode/GenuineIntel 0755 root sys
 f platform/i86pc/ucode/GenuineIntel/00000650-01 0444 root sys
@@ -4901,6 +4900,8 @@ f usr/include/sys/u8_textprep.h 0644 root bin
 f usr/include/sys/u8_textprep_data.h 0644 root bin
 f usr/include/sys/uadmin.h 0644 root bin
 f usr/include/sys/ucode.h 0644 root bin
+f usr/include/sys/ucode_amd.h 0644 root bin
+f usr/include/sys/ucode_intel.h 0644 root bin
 f usr/include/sys/ucontext.h 0644 root bin
 f usr/include/sys/ucred.h 0644 root bin
 f usr/include/sys/uio.h 0644 root bin

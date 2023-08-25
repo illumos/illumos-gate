@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-# 
+#
 
 i386_SUBDIRS=           \
 	i386

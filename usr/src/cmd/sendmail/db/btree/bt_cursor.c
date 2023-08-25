@@ -457,7 +457,7 @@ __bam_c_get(dbc, key, data, flags)
 		 * may be referencing off-page duplicates.
 		 *
 		 * If we're referencing off-page duplicates, move off-page.
-		 * If we moved off-page, move to the next non-deleted record.  
+		 * If we moved off-page, move to the next non-deleted record.
 		 * If we moved to the next non-deleted record, check to make
 		 * sure we didn't switch records because our current record
 		 * had no non-deleted data items.

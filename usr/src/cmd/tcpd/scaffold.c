@@ -1,6 +1,6 @@
  /*
   * Routines for testing only. Not really industrial strength.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

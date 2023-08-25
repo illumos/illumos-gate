@@ -497,7 +497,7 @@
 
 /*
  * We got here because of a fault during kcopy or bcopy if a fault
- * handler existed when bcopy was called. 
+ * handler existed when bcopy was called.
  * Errno value is in %g1.
  */
 .copyerr:
@@ -760,7 +760,7 @@ fp_panic_msg:
 	deccc	%o3
 	bgu	%ncc, 2b
 	stb	%o4, [%i0 - 1]
-blkcpy:	
+blkcpy:
 	andcc	%i0, 63, %i3
 	bz,pn	%ncc, blalign		! now block aligned
 	sub	%i3, 64, %i3
@@ -790,7 +790,7 @@ blkcpy:
 	add	%i1, 8, %i1
 	bgu,pn	%ncc, 6b
 	add	%i0, 8, %i0
- 
+
 blalign:
 	membar	#StoreLoad
 	! %i2 = total length
@@ -841,7 +841,7 @@ sqtr:
 
 hlf:
 	bgeu,a	 fqtr
-	nop	 
+	nop
 	cmp	 %i5, 5
 	be,a	 seg5
 	nop
@@ -852,7 +852,7 @@ fqtr:
 	nop
 	ba,pt	 %ncc, seg7
 	nop
-	
+
 
 seg0:
 	! 1st chunk - %d0 low, %d16 high, %d32 pre, %d48 dst
@@ -1514,7 +1514,7 @@ blkdone:
 	ldda	[%o2]ASI_BLK_P, %d48
 	membar	#Sync
 
-	ba,pt	%ncc, 2f	
+	ba,pt	%ncc, 2f
 	  wr	%o3, 0, %fprs		! restore fprs
 
 4:
@@ -1547,7 +1547,7 @@ blkdone:
 	! Here via bcopy. Check to see if the handler was NULL.
 	! If so, just return quietly. Otherwise, reset the
 	! handler and go home.
-	! 
+	!
 	bnz,pn	%ncc, 3f
 	  nop
 
@@ -2057,7 +2057,7 @@ blkdone:
  *
  * If we don't exceed one of the limits, we store -count in %o3,
  * we store the number of chunks (8, 4, 2 or 1 byte) operated
- * on in our basic copy loop in %o2. Following this we branch 
+ * on in our basic copy loop in %o2. Following this we branch
  * to the appropriate copy loop and copy that many chunks.
  * Since we've been adding the chunk size to %o3 each time through
  * as well as decrementing %o2, we can tell if any data is
@@ -2103,7 +2103,7 @@ blkdone:
 #define	SAVED_LOFAULT		%g6
 
 /*
- * Generic copyio fault handler.  This is the first line of defense when a 
+ * Generic copyio fault handler.  This is the first line of defense when a
  * fault occurs in (x)copyin/(x)copyout.  In order for this to function
  * properly, the value of the 'real' lofault handler should be in REAL_LOFAULT.
  * This allows us to share common code for all the flavors of the copy
@@ -2423,7 +2423,7 @@ blkdone:
 	nop
 	!
 	! Something is left - do it byte for byte.
-	! 
+	!
 	ba,pt	%ncc, .dcocl
 	ldub	[%o0 + %o3], %o4	! load next byte
 	!
@@ -2537,7 +2537,7 @@ blkdone:
 	! Set the lower bit in the saved t_lofault to indicate
 	! that we need to clear the %fprs register on the way
 	! out
-	or	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT 
+	or	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
 
 	! Swap src/dst since the code below is memcpy code
 	! and memcpy/bcopy have different calling sequences
@@ -2593,7 +2593,7 @@ copyout_blkcpy:
 	add	%i1, 8, %i1
 	bgu,pn	%ncc, 6b
 	add	%i0, 8, %i0
- 
+
 copyout_blalign:
 	membar	#StoreLoad
 	! %i2 = total length
@@ -2645,7 +2645,7 @@ copyout_sqtr:
 
 copyout_hlf:
 	bgeu,a	 copyout_fqtr
-	nop	 
+	nop
 	cmp	 %i5, 5
 	be,a	 copyout_seg5
 	nop
@@ -2656,7 +2656,7 @@ copyout_fqtr:
 	nop
 	ba,pt	 %ncc, copyout_seg7
 	nop
-	
+
 copyout_seg0:
 	! 1st chunk - %d0 low, %d16 high, %d32 pre, %d48 dst
 	FALIGN_D0
@@ -3446,7 +3446,7 @@ copyout_blkdone:
 	lduba	[%o0 + %o3]ASI_USER, %o4
 	!
 	! We're done. Go home.
-	!	
+	!
 	membar	#Sync
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]
 	retl
@@ -3801,7 +3801,7 @@ copyin_blkcpy:
 	add	%i1, 8, %i1
 	bgu,pn	%ncc, 6b
 	add	%i0, 8, %i0
- 
+
 copyin_blalign:
 	membar	#StoreLoad
 	! %i2 = total length
@@ -3853,7 +3853,7 @@ copyin_sqtr:
 
 copyin_hlf:
 	bgeu,a	 copyin_fqtr
-	nop	 
+	nop
 	cmp	 %i5, 5
 	be,a	 copyin_seg5
 	nop
@@ -3864,7 +3864,7 @@ copyin_fqtr:
 	nop
 	ba,pt	 %ncc, copyin_seg7
 	nop
-	
+
 copyin_seg0:
 	! 1st chunk - %d0 low, %d16 high, %d32 pre, %d48 dst
 	FALIGN_D0
@@ -4567,13 +4567,13 @@ copyin_blkdone:
 	ldn	[THREAD_REG + T_LOFAULT], %o5
 	or	%o4, %lo(.little_err), %o4
 	membar	#Sync				! sync error barrier
-	stn	%o4, [THREAD_REG + T_LOFAULT]	
+	stn	%o4, [THREAD_REG + T_LOFAULT]
 
 	subcc	%g0, %o2, %o3
 	add	%o0, %o2, %o0
 	bz,pn	%ncc, 2f		! check for zero bytes
 	sub	%o2, 1, %o4
-	add	%o0, %o4, %o0		! start w/last byte	
+	add	%o0, %o4, %o0		! start w/last byte
 	add	%o1, %o2, %o1
 	lduba	[%o0+%o3]ASI_AIUSL, %o4
 
@@ -4710,7 +4710,7 @@ copyin_blkdone:
 	ba	.pz_doblock
 	  nop
 
-.pz_blkstart:	
+.pz_blkstart:
       ! stda	%d0, [%i0+192]%asi  ! in dly slot of branch that got us here
 	stda	%d0, [%i0+128]%asi
 	stda	%d0, [%i0+64]%asi
@@ -4725,7 +4725,7 @@ copyin_blkdone:
 
 	cmp	%i1, 64
 	blu	%ncc, .pz_finish
-	
+
 	andn	%i1, (64-1), %i3
 	srl	%i3, 4, %i2		! using blocks, 1 instr / 16 words
 	set	.pz_zinst, %i4

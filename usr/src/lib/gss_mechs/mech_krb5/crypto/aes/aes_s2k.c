@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5int_aes_string_to_key
  */
@@ -99,7 +99,7 @@ krb5int_aes_string_to_key(krb5_context context,
     }
 
     /*
-     * Solaris Kerberos: 
+     * Solaris Kerberos:
      * The derive key operation below will not work correctly
      * if the input and output key pointers are to the same
      * data.  This is because the key object handle (PKCS#11)

@@ -114,7 +114,7 @@ GType
 hal_device_store_get_type (void)
 {
 	static GType type = 0;
-	
+
 	if (!type) {
 		static GTypeInfo type_info = {
 			sizeof (HalDeviceStoreClass),
@@ -175,7 +175,7 @@ hal_device_store_add (HalDeviceStore *store, HalDevice *device)
 	const char buf[] = "/org/freedesktop/Hal/devices/";
 
 	if (strncmp(device->udi, buf, sizeof (buf) - 1) != 0) {
-		
+
 		HAL_ERROR(("Can't add HalDevice with incorrect UDI. Valid "
 			   "UDI must start with '/org/freedesktop/Hal/devices/'"));
 		goto out;
@@ -263,15 +263,15 @@ hal_device_store_print_foreach_fn (HalDeviceStore *store,
 	return TRUE;
 }
 
-void 
+void
 hal_device_store_print (HalDeviceStore *store)
 {
 	fprintf (stderr, "===============================================\n");
-        fprintf (stderr, "Dumping %d devices\n", 
+        fprintf (stderr, "Dumping %d devices\n",
 		 g_slist_length (store->devices));
 	fprintf (stderr, "===============================================\n");
-	hal_device_store_foreach (store, 
-				  hal_device_store_print_foreach_fn, 
+	hal_device_store_foreach (store,
+				  hal_device_store_print_foreach_fn,
 				  NULL);
 	fprintf (stderr, "===============================================\n");
 }

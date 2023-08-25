@@ -48,7 +48,7 @@ extern short putoctal;
  * printf is more general (and is much larger) and includes
  * provisions for floating point.
  */
- 
+
 
 #define MAXOCT	11	/* Maximum octal digits in a long */
 #define MAXINT	32767	/* largest normal length positive integer */
@@ -111,7 +111,7 @@ viprintf(unsigned char *fmt, ...)
 			fill--;
 			fmt++;
 		}
-		
+
 		/* Now comes a digit string which may be a '*' */
 		if (*fmt == '*') {
 			width = va_arg(ap, int);
@@ -126,7 +126,7 @@ viprintf(unsigned char *fmt, ...)
 			while (*fmt>='0' && *fmt<='9')
 				width = width * 10 + (*fmt++ - '0');
 		}
-		
+
 		/* maybe a decimal point followed by more digits (or '*') */
 		if (*fmt=='.') {
 			if (*++fmt == '*') {
@@ -141,7 +141,7 @@ viprintf(unsigned char *fmt, ...)
 		}
 		else
 			prec = -1;
-		
+
 		/*
 		 * At this point, "sign" is nonzero if there was
 		 * a sign, "fill" is 0 if there was a leading
@@ -163,7 +163,7 @@ viprintf(unsigned char *fmt, ...)
 				fmt++;
 				break;
 		}
-		
+
 		/*
 		 * At exit from the following switch, we will
 		 * emit the characters starting at "bptr" and
@@ -217,7 +217,7 @@ viprintf(unsigned char *fmt, ...)
 				    else
 					*--bptr = ((int) num & mask1) + 0127;
 				while (num = (num >> nbits) & mask2);
-				
+
 				if (fcode=='o') {
 					if (n)
 						*--bptr = '0';
@@ -263,7 +263,7 @@ viprintf(unsigned char *fmt, ...)
 				ptr = buf + MAXDIGS + 1;
 				break;
 			default:
-				/* not a control character, 
+				/* not a control character,
 				 * print it.
 				 */
 				ptr = bptr = &fcode;
@@ -295,16 +295,16 @@ _p_dconv(value, buffer)
 	int svalue;
 	int n;
 	long lval;
-	
+
 	bp = buffer;
-	
+
 	/* zero is a special case */
 	if (value == 0) {
 		bp += MAXDIGS;
 		*bp = '0';
 		return(bp);
 	}
-	
+
 	/* develop the leading digit of the value in "n" */
 	n = 0;
 	while (value < 0) {
@@ -315,7 +315,7 @@ _p_dconv(value, buffer)
 		value = lval;
 		n++;
 	}
-	
+
 	/* stash it in buffer[1] to allow for a sign */
 	bp[1] = n + '0';
 	/*
@@ -329,14 +329,14 @@ _p_dconv(value, buffer)
 		*--bp = (int)(value % 10) + '0';
 		value /= 10;
 	}
-	
+
 	/* cannot lose precision */
 	svalue = value;
 	while (svalue > 0) {
 		*--bp = (svalue % 10) + '0';
 		svalue /= 10;
 	}
-	
+
 	/* fill in intermediate zeroes if needed */
 	if (buffer[1] != '0') {
 		while (bp > buffer + 2)
@@ -365,12 +365,12 @@ _p_emit(unsigned char *s, unsigned char *send)
 	int alen;
 	int npad, length;
 	wchar_t wchar;
-	
+
 	alen = send - s;
 	if (alen > width)
 		width = alen;
 	cfill = fill>0? ' ': '0';
-	
+
 	/* we may want to print a leading '-' before anything */
 	if (*s == '-' && fill < 0) {
 		putchar(*s++);
@@ -378,12 +378,12 @@ _p_emit(unsigned char *s, unsigned char *send)
 		width--;
 	}
 	npad = width - alen;
-	
+
 	/* emit any leading pad characters */
 	if (!sign)
 		while (--npad >= 0)
 			putchar(cfill);
-			
+
 	/* emit the string itself */
 	while (--alen >= 0) {
 		length = mbtowc(&wchar, (char *)s, MB_LEN_MAX);
@@ -396,7 +396,7 @@ _p_emit(unsigned char *s, unsigned char *send)
 			s += length;
 			alen = alen - length + 1;
 		}
-	}	
+	}
 	/* emit trailing pad characters */
 	if (sign)
 		while (--npad >= 0)

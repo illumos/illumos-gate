@@ -9,7 +9,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,18 +23,18 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,7 +45,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -68,7 +68,7 @@ OM_uint32
 krb5_gss_add_cred(minor_status, input_cred_handle,
 		  desired_name, desired_mech, cred_usage,
 		  initiator_time_req, acceptor_time_req,
-		  output_cred_handle, actual_mechs, 
+		  output_cred_handle, actual_mechs,
 		  initiator_time_rec, acceptor_time_rec)
     OM_uint32		*minor_status;
     gss_cred_id_t	input_cred_handle;
@@ -165,7 +165,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
     /*SUPPRESS 29*/
     if ((desired_name != (gss_name_t) NULL) &&
 	(! kg_validate_name(desired_name))) {
-	*minor_status = (OM_uint32) G_VALIDATE_FAILED;	
+	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
 	krb5_free_context(context);
 	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
     }
@@ -214,7 +214,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 	    return(GSS_S_FAILURE);
 	}
 	memset(new_cred, 0, sizeof(krb5_gss_cred_id_rec));
-	
+
 	new_cred->usage = cred_usage;
 	new_cred->prerfc_mech = cred->prerfc_mech;
 	new_cred->rfc_mech = cred->rfc_mech;
@@ -230,7 +230,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 	    krb5_free_context(context);
 	    return(GSS_S_FAILURE);
 	}
-	    
+
 	if (cred->keytab) {
 	    kttype = krb5_kt_get_type(context, cred->keytab);
 	    if ((strlen(kttype)+2) > sizeof(ktboth)) {
@@ -247,7 +247,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 	    ktboth[sizeof(ktboth) - 1] = '\0';
 	    strncat(ktboth, ":", sizeof(ktboth) - 1 - strlen(ktboth));
 
-	    code = krb5_kt_get_name(context, cred->keytab, 
+	    code = krb5_kt_get_name(context, cred->keytab,
 				    ktboth+strlen(ktboth),
 				    sizeof(ktboth)-strlen(ktboth));
 	    if (code) {
@@ -275,7 +275,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 	} else {
 	    new_cred->keytab = NULL;
 	}
-		
+
 	if (cred->rcache) {
 	    /* Open the replay cache for this principal. */
 	    if ((code = krb5_get_server_rcache(context,
@@ -359,7 +359,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 
 	cred = new_cred;
     }
-		
+
     /* set the flag for the new mechanism */
 
     if (g_OID_equal(desired_mech, gss_mech_krb5_old))
@@ -369,12 +369,12 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 
     /* set the outputs */
 
-    if (GSS_ERROR(major_status = krb5_gss_inquire_cred(minor_status, 
+    if (GSS_ERROR(major_status = krb5_gss_inquire_cred(minor_status,
 						       (gss_cred_id_t)cred,
 						       NULL, &lifetime,
 						       NULL, actual_mechs))) {
 	OM_uint32 dummy;
-	
+
 	if (output_cred_handle)
 	    (void) krb5_gss_release_cred(&dummy, (gss_cred_id_t *) &cred);
 	krb5_free_context(context);

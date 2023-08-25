@@ -251,9 +251,9 @@ typedef struct _lm_tx_statistics_t
 {
     lm_u64_t ipv4_lso_frames;
     lm_u64_t ipv6_lso_frames;
-    lm_u64_t ip_cso_frames;      
-    lm_u64_t ipv4_tcp_udp_cso_frames; 
-    lm_u64_t ipv6_tcp_udp_cso_frames; 
+    lm_u64_t ip_cso_frames;
+    lm_u64_t ipv4_tcp_udp_cso_frames;
+    lm_u64_t ipv6_tcp_udp_cso_frames;
     u32_t aborted;
     u32_t no_bd;
     u32_t no_desc;
@@ -549,7 +549,7 @@ typedef struct _lm_params_t
     /* disable PCIe non-FATAL error reporting */
     u32_t disable_pcie_nfr;
 
-    // setting for L2 flow control 0 for disable 1 for enable: 
+    // setting for L2 flow control 0 for disable 1 for enable:
     u32_t fw_flow_control;
     // This parameter dictates how long to wait before dropping L2 packet
     // due to insufficient posted buffers
@@ -766,7 +766,7 @@ typedef struct _lm_variables_t
     u32_t serdes_pre_emphasis;
 
     u32_t interrupt_mode;
-    
+
     u32_t cu_mbuf_cnt; /*5709 only */
 
     u32_t hw_filter_ctx_offset;
@@ -1227,7 +1227,7 @@ void
 lm_set_pcie_nfe_report(
     lm_device_t *pdev);
 
-void 
+void
 lm_clear_coalescing_ticks(
     lm_device_t *pdev);
 
@@ -1237,27 +1237,27 @@ lm_post_rx_bd(
     lm_rx_chain_t *rxq
     );
 
-void 
+void
 lm_create_q_group(
     lm_device_t *pdev,
     u32_t q_group_id,
-    u32_t lookahead_sz 
+    u32_t lookahead_sz
     );
 
-lm_status_t 
+lm_status_t
 lm_destroy_q_group(
     lm_device_t *pdev,
     u32_t q_group_id,
     u32_t num_queues
     );
 
-void 
+void
 lm_update_defq_filter_ctx(
     lm_device_t *pdev,
     u8_t valid
     );
 
-lm_status_t 
+lm_status_t
 lm_chng_q_group_filter(
     lm_device_t *pdev,
     u32_t q_group_id,

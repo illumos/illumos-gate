@@ -67,7 +67,7 @@ duplist (src)
 			Free ((char *)dst);
 			errno = ENOMEM;
 			return (0);
-		} 
+		}
 	dst[nitems] = 0;
 
 	return (dst);

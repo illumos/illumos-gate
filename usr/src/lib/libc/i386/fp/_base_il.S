@@ -53,10 +53,10 @@ __mul_set(double x, double y, int *pe) {
 	subl	$0x8, %esp	/* Give us an extra 8 bytes to play with. */
 	/* Clear the floating point exception register. */
 	fnclex			/* Equivalent of _putsw(0); */
-	
+
 	fldl	0xc(%esp)	/* Load up x */
 	fmull	0x14(%esp)	/* And multiply! */
-	
+
 	/* Check to see if the multiply caused any exceptions. */
 	fstsw	(%esp)		/* Equivalent of... */
 	xorl	%edx, %edx
@@ -90,15 +90,15 @@ __div_set(double x, double y, int *pe) {
 }
 
  */
-	
+
 	ENTRY(__div_set)
 	subl	$0x8, %esp	/* Give us an extra 8 bytes to play with. */
 	/* Clear the floating point exception register. */
 	fnclex			/* Equivalent of _putsw(0); */
-	
+
 	fldl	0xc(%esp)	/* Load up x */
 	fdivl	0x14(%esp)	/* And divide! */
-	
+
 	/* Check to see if the divide caused any exceptions. */
 	fstsw	(%esp)		/* Equivalent of... */
 	xorl	%edx, %edx

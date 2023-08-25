@@ -161,12 +161,12 @@ krb5_rc_default(krb5_context context, krb5_rcache *id)
     if (!(*id = (krb5_rcache )malloc(sizeof(**id))))
 	return KRB5_RC_MALLOC;
 
-    if ((retval = krb5_rc_resolve_type(context, id, 
+    if ((retval = krb5_rc_resolve_type(context, id,
 				       krb5_rc_default_type(context)))) {
 	FREE_RC(*id);
 	return retval;
     }
-    if ((retval = krb5_rc_resolve(context, *id, 
+    if ((retval = krb5_rc_resolve(context, *id,
 				  krb5_rc_default_name(context)))) {
 	k5_mutex_destroy(&(*id)->lock);
 	FREE_RC(*id);
@@ -186,7 +186,7 @@ krb5_error_code krb5_rc_resolve_full(krb5_context context, krb5_rcache *id, char
 
     if (!(residual = strchr(string_name,':')))
 	return KRB5_RC_PARSE;
- 
+
     diff = residual - string_name;
     if (!(type = malloc(diff + 1)))
 	return KRB5_RC_MALLOC;

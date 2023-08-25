@@ -153,10 +153,10 @@ constants:
 #define C_ONE_LO	%f55
 
 ! masks
-#define MSK_SIGN	%i5	
-#define MSK_BIT31	%f30	
-#define MSK_BIT13	%f31	
-#define MSK_BITSHI17	%f44	
+#define MSK_SIGN	%i5
+#define MSK_BIT31	%f30
+#define MSK_BIT13	%f31
+#define MSK_BITSHI17	%f44
 
 
 ! constants for pp and qq
@@ -176,7 +176,7 @@ constants:
 
 !--------------------------------------------------------------------
 
-  
+
 	ENTRY(__vcos)
 	save	%sp,-SA(MINFRAME)-tmps,%sp
 	PIC_SETUP(g5)
@@ -209,7 +209,7 @@ constants:
 ! the following are 64-bit registers in both V8+ and V9
 
 ! g1  scratch
-! g5  
+! g5
 
 ! o0  py0
 ! o1  py1
@@ -220,31 +220,31 @@ constants:
 ! o7  scratch
 
 ! f0  x0
-! f2  
-! f4  
-! f6  
+! f2
+! f4
+! f6
 ! f8  scratch for table base
 ! f9  signbit0
 ! f10 x1
-! f12 
-! f14 
-! f16 
+! f12
+! f14
+! f16
 ! f18 scratch for table base
 ! f19 signbit1
 ! f20 x2
-! f22 
-! f24 
-! f26 
+! f22
+! f24
+! f26
 ! f28 scratch for table base
 ! f29 signbit2
 ! f30 0x80000000
 ! f31 0x4000
-! f32 
-! f34 
-! f36 
-! f38 
-! f40 
-! f42 
+! f32
+! f34
+! f36
+! f38
+! f40
+! f42
 ! f44 0xffff800000000000
 ! f46 p1
 ! f48 p2
@@ -293,7 +293,7 @@ constants:
 	ld	[%i1+4],P0_f1
 	andn	%l0,MSK_SIGN,%l0		! hx &= ~0x80000000
 	add	%i1,%i2,%i1		! x += stridex
-	
+
 	ba,pt	%icc,.loop0
 !delay slot
 	nop
@@ -1461,7 +1461,7 @@ constants:
 ! the following are 64-bit registers in both V8+ and V9
 
 ! g1  scratch
-! g5  
+! g5
 
 ! o0  py0
 ! o1  py1
@@ -1473,28 +1473,28 @@ constants:
 
 ! f0  x0
 ! f2  n0,y0
-! f4  
-! f6  
+! f4
+! f6
 ! f8  scratch for table base
 ! f9  signbit0
 ! f10 x1
 ! f12 n1,y1
-! f14 
-! f16 
+! f14
+! f16
 ! f18 scratch for table base
 ! f19 signbit1
 ! f20 x2
 ! f22 n2,y2
-! f24 
-! f26 
+! f24
+! f26
 ! f28 scratch for table base
 ! f29 signbit2
 ! f30 0x80000000
 ! f31 0x4000
-! f32 
-! f34 
-! f36 
-! f38 
+! f32
+! f34
+! f36
+! f38
 ! f40 invpio2
 ! f42 round
 ! f44 0xffff800000000000
@@ -1508,10 +1508,10 @@ constants:
 ! f60 qq1
 ! f62 qq2
 
-	
+
 	PIC_SET(g5,constants,l5)
 
-	! %o3,%o4,%o5 need to be stored 
+	! %o3,%o4,%o5 need to be stored
 	st      P0_f6,[%o3]
 	sethi	%hi(0x413921fb),%l7
 	st      P0_f7,[%o3+4]
@@ -1533,7 +1533,7 @@ constants:
 	stx	%g0,[%fp+y1_0+8]
 	stx	%g0,[%fp+y2_0+8]
 
-!	branched here in the middle of the array.  Need to adjust 
+!	branched here in the middle of the array.  Need to adjust
 !	for the members of the triple that were selected in the primary
 !	loop.
 

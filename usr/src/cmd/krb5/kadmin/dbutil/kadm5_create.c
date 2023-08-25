@@ -12,14 +12,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -30,7 +30,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -77,7 +77,7 @@ extern char *progname;
  * Purpose: create admin principals in KDC database
  *
  * Arguments:	params	(r) configuration parameters to use
- *      
+ *
  * Effects:  Creates KADM5_ADMIN_SERVICE and KADM5_CHANGEPW_SERVICE
  * principals in the KDC database and sets their attributes
  * appropriately.
@@ -117,7 +117,7 @@ int kadm5_create_magic_princs(kadm5_config_params *params,
 {
      int retval;
      void *handle;
-     
+
      retval = krb5_klog_init(context, "admin_server", progname, 0);
      if (retval)
 	  return retval;
@@ -175,11 +175,11 @@ static char *build_name_with_realm(char *name, char *realm)
  * 	rseed		(input) random seed
  * 	realm		(input) realm, or NULL for default realm
  *      <return value>  (output) status, 0 for success, 1 for serious error
- *      
+ *
  * Requires:
- *      
+ *
  * Effects:
- *      
+ *
  * add_admin_princs creates KADM5_ADMIN_SERVICE,
  * KADM5_CHANGEPW_SERVICE.  If any of these exist a message is
  * printed.  If any of these existing principal do not have the proper
@@ -193,9 +193,9 @@ static int add_admin_princs(void *handle, krb5_context context, char *realm)
  * Solaris Kerberos:
  * The kadmin/admin principal is unused on Solaris. This principal is used
  * in AUTH_GSSAPI but Solaris doesn't support AUTH_GSSAPI. RPCSEC_GSS can only
- * be used with host-based principals. 
+ * be used with host-based principals.
  *
- */ 
+ */
 
 #if 0
   if ((ret = add_admin_old_princ(handle, context,
@@ -203,15 +203,15 @@ static int add_admin_princs(void *handle, krb5_context context, char *realm)
   		     KRB5_KDB_DISALLOW_TGT_BASED,
   		     ADMIN_LIFETIME)))
      goto clean_and_exit;
-#endif 
+#endif
 
 	if ((ret = add_admin_old_princ(handle, context,
-			     KADM5_CHANGEPW_SERVICE, realm, 
+			     KADM5_CHANGEPW_SERVICE, realm,
 			     KRB5_KDB_DISALLOW_TGT_BASED |
 			     KRB5_KDB_PWCHANGE_SERVICE,
 			     CHANGEPW_LIFETIME)))
        goto clean_and_exit;
-  
+
 	if ((ret = add_admin_sname_princ(handle, context,
 		    KADM5_ADMIN_HOST_SERVICE,
 		    KRB5_KDB_DISALLOW_TGT_BASED,
@@ -256,7 +256,7 @@ clean_and_exit:
  * 	ERR on serious errors
  *
  * Effects:
- * 
+ *
  * If the principal is not unique, not_unique is printed (but this
  * never happens).  If the principal exists, then exists is printed
  * and if the principals attributes != attrs, wrong_attrs is printed.
@@ -279,7 +279,7 @@ static int add_admin_princ(void *handle, krb5_context context,
      ent.principal = principal;
      ent.max_life = lifetime;
      ent.attributes = attrs | KRB5_KDB_DISALLOW_ALL_TIX;
-     
+
      ret = kadm5_create_principal(handle, &ent,
 				  (KADM5_PRINCIPAL | KADM5_MAX_LIFE |
 				   KADM5_ATTRIBUTES),
@@ -358,7 +358,7 @@ static int add_admin_princ(void *handle, krb5_context context,
 	       free(fullname);
 	       return ERR;
 	  }
-	  
+
 	  ent.attributes = attrs;
 	  ret = kadm5_modify_principal(handle, &ent, KADM5_ATTRIBUTES);
 	  if (ret) {
@@ -369,7 +369,7 @@ static int add_admin_princ(void *handle, krb5_context context,
 	       return ERR;
 	  }
      }
-     
+
      krb5_free_principal(context, ent.principal);
      free(fullname);
 
@@ -411,4 +411,4 @@ add_admin_sname_princ(void *handle, krb5_context context,
 }
 
 
-		
+

@@ -138,7 +138,7 @@ class SystemSolver implements Solver {
 	 * target elements are identified and stored in an objective
 	 * map which associates elements with the set of their
 	 * objectives.
-	 * 
+	 *
 	 * @param conf The configuration to be manipulated.
 	 * @throws PoolsException If the initialization fails.
 	 */
@@ -159,7 +159,7 @@ class SystemSolver implements Solver {
 		 * Remove any old objectives
 		 */
 		objMap.clear();
-		
+
 		/*
 		 * Extract any configuration objectives
 		 */
@@ -237,7 +237,7 @@ class SystemSolver implements Solver {
 		}
 		Poold.CONF_LOG.log(Severity.DEBUG, "objective map: " +
 		    objMap.toString());
-		
+
 		/*
 		 * Capture the LocalityDomain details.
 		 */
@@ -277,7 +277,7 @@ class SystemSolver implements Solver {
 				}
 				/*
 				 * Use current DecisionHistory instead,
-				 * if any. 
+				 * if any.
 				 */
 				if (dh == null)
 					dh = new DecisionHistory();
@@ -300,7 +300,7 @@ class SystemSolver implements Solver {
 
 	/**
 	 * Determine if the given resource has non-workload-dependent
-	 * objectives. 
+	 * objectives.
 	 * @param elem The element to examine.
 	 */
 	private boolean hasNonWorkloadDependentObjectives(Element elem)
@@ -462,7 +462,7 @@ class SystemSolver implements Solver {
 		 */
 		Configuration rwConf = new Configuration(conf.getLocation(),
 		    PoolInternal.PO_RDWR);
-		
+
 		try {
 			/*
 			 * Build a resource set importance map for use
@@ -491,7 +491,7 @@ class SystemSolver implements Solver {
 							    new Long(newImp));
 					} else
 						resImp.put(res,
-						    new Long(newImp));	
+						    new Long(newImp));
 				}
 			}
 			/*
@@ -604,7 +604,7 @@ class SystemSolver implements Solver {
 							    resImp.get(elem)).
 							    longValue();
 						}
-						
+
 						totalContrib += contrib *
 						    obj.getExpression().
 						    getImportance();
@@ -650,7 +650,7 @@ class SystemSolver implements Solver {
 	 * @param scores The areay of scored moves to be tried.
 	 * @param ignoreDH Ignore Decision History details.
 	 */
-	private boolean processMoves(Configuration rwConf, Object scores[], 
+	private boolean processMoves(Configuration rwConf, Object scores[],
 	    boolean ignoreDH) throws PoolsException, StaleMonitorException
 	{
 		boolean madeMove = false;
@@ -670,7 +670,7 @@ class SystemSolver implements Solver {
 		}
 		return (madeMove);
 	}
-	
+
 	/*
 	 * Attempt to apply the supplied move to the
 	 * configuration. Return true if the move could be applied,
@@ -790,7 +790,7 @@ class SystemSolver implements Solver {
 				    "contradictory objectives:" + other +
 				    ", " + o);
 		}
-		
+
 		if (oSet.add(o) != true)
 			throw new IllegalArgumentException(
 			    "duplicate objective:" + o);
@@ -807,7 +807,7 @@ class SystemSolver implements Solver {
 	 * recipients will be chosen
 	 * @throws PoolsException if there is an error manipulation
 	 * the pool resources
-	 */	  
+	 */
 	private List getRecipients(List resList) throws PoolsException
 	{
 		List recipientList = new ArrayList();
@@ -823,7 +823,7 @@ class SystemSolver implements Solver {
 		}
 		return (recipientList);
 	}
-	
+
 	/**
 	 * Return a list of resource sets prepared to donate resources
 	 *
@@ -934,7 +934,7 @@ class SystemSolver implements Solver {
 		 * The score of the move.
 		 */
 		private final double score;
-		
+
 		/**
 		 * Score formatter.
 		 */
@@ -982,5 +982,5 @@ class SystemSolver implements Solver {
 		{
 			return (m);
 		}
-	}	
+	}
 }

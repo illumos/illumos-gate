@@ -1,6 +1,6 @@
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -52,7 +52,7 @@ static unsigned int word_count = 0;	    /* number of words */
 
 /*
  * Function: word_compare
- * 
+ *
  * Purpose: compare two words in the dictionary.
  *
  * Arguments:
@@ -62,7 +62,7 @@ static unsigned int word_count = 0;	    /* number of words */
  *
  * Requires:
  *	w1 and w2 to point to valid memory
- * 
+ *
  */
 
 static int
@@ -73,7 +73,7 @@ word_compare(const void *s1, const void *s2)
 
 /*
  * Function: init-dict
- * 
+ *
  * Purpose: Initialize in memory word dictionary
  *
  * Arguments:
@@ -84,7 +84,7 @@ word_compare(const void *s1, const void *s2)
  * Requires:
  *	If WORDFILE exists, it must contain a list of words,
  *	one word per-line.
- * 
+ *
  * Effects:
  *	If WORDFILE exists, it is read into memory sorted for future
  * use.  If it does not exist, it syslogs an error message and returns
@@ -94,7 +94,7 @@ word_compare(const void *s1, const void *s2)
  *	word_list to point to a chunck of allocated memory containing
  *	pointers to words
  *	word_block to contain the dictionary.
- * 
+ *
  */
 
 int init_dict(kadm5_config_params *params)
@@ -105,12 +105,12 @@ int init_dict(kadm5_config_params *params)
     char	    *p,
 		    *t;
     struct  stat    sb;
-    
+
     if(word_list != NULL && word_block != NULL)
 	return KADM5_OK;
     if (! (params->mask & KADM5_CONFIG_DICT_FILE)) {
 	/* Solaris Kerberos */
-	 krb5_klog_syslog(LOG_INFO, 
+	 krb5_klog_syslog(LOG_INFO,
 		dgettext(TEXT_DOMAIN,
 			"No dictionary file specified, continuing "
 			"without one."));
@@ -119,7 +119,7 @@ int init_dict(kadm5_config_params *params)
     if ((fd = open(params->dict_file, O_RDONLY)) == -1) {
 	 if (errno == ENOENT) {
 	/* Solaris Kerberos */
-	      krb5_klog_syslog(LOG_ERR, 
+	      krb5_klog_syslog(LOG_ERR,
 		     dgettext(TEXT_DOMAIN,
 			"WARNING!  Cannot find dictionary file %s, "
 			     "continuing without one."), params->dict_file);
@@ -127,7 +127,7 @@ int init_dict(kadm5_config_params *params)
 	 } else
 	      return errno;
     }
-    if (fstat(fd, &sb) == -1) 
+    if (fstat(fd, &sb) == -1)
 	return errno;
     if ((word_block = (char *) malloc(sb.st_size + 1)) == NULL)
 	return errno;
@@ -140,7 +140,7 @@ int init_dict(kadm5_config_params *params)
     len = sb.st_size;
     while(len > 0 && (t = memchr(p, '\n', len)) != NULL) {
 	*t = '\0';
-	len -= t - p + 1;	
+	len -= t - p + 1;
 	p = t + 1;
 	word_count++;
     }
@@ -157,7 +157,7 @@ int init_dict(kadm5_config_params *params)
 
 /*
  * Function: find_word
- * 
+ *
  * Purpose: See if the specified word exists in the in-core dictionary
  *
  * Arguments:
@@ -170,12 +170,12 @@ int init_dict(kadm5_config_params *params)
  * Requires:
  *	word to be a null terminated string.
  *	That word_list and word_block besetup
- * 
+ *
  * Effects:
  *	finds word in dictionary.
  * Modifies:
  *	nothing.
- * 
+ *
  */
 
 int
@@ -183,7 +183,7 @@ find_word(const char *word)
 {
     char    **value;
 
-    if(word_list == NULL || word_block == NULL) 
+    if(word_list == NULL || word_block == NULL)
 	    return WORD_NOT_FOUND;
     if ((value = (char **) bsearch(&word, word_list, word_count, sizeof(char *),
 				   word_compare)) == NULL)
@@ -194,7 +194,7 @@ find_word(const char *word)
 
 /*
  * Function: destroy_dict
- * 
+ *
  * Purpose: destroy in-core copy of dictionary.
  *
  * Arguments:
@@ -208,7 +208,7 @@ find_word(const char *word)
  *
  * Modifies:
  *	word_list, word_block, and word_count.
- * 
+ *
  */
 
 void

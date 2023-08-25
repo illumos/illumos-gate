@@ -67,7 +67,7 @@ LIBM_ANSI_PRAGMA_WEAK(lroundl,function)
 	PIC_WRAPUP
 	fnstsw	%ax
 	sahf
-	jae	2f			/ if |x-[x]| = 0.5 goto halfway, 
+	jae	2f			/ if |x-[x]| = 0.5 goto halfway,
 					/ most cases will not take branch.
 0:
 	fstp	%st(0)

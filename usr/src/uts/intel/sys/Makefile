@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2023 Oxide Computer Company
 
 include ../../../Makefile.master
 
@@ -85,6 +86,9 @@ HDRS	=			\
 	trap.h			\
 	traptrace.h		\
 	tss.h			\
+	ucode.h			\
+	ucode_amd.h		\
+	ucode_intel.h		\
 	ucontext.h		\
 	utrap.h			\
 	vmparam.h		\

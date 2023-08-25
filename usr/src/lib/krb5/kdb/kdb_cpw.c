@@ -6,14 +6,14 @@
 /*
  * lib/kdb/kdb_cpw.c
  *
- * Copyright 1995 by the Massachusetts Institute of Technology. 
+ * Copyright 1995 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,19 +27,19 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -50,7 +50,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -140,7 +140,7 @@ add_key_rnd(context, master_key, ks_tuple, ks_tuple_count, db_entry, kvno)
 	krb5_db_free_principal(context, &krbtgt_entry, one);
 	return KRB5KDC_ERR_PRINCIPAL_NOT_UNIQUE;
     }
-    if (!one) 
+    if (!one)
 	return KRB5_KDB_NOENTRY;
 
     /* Get max kvno */
@@ -174,7 +174,7 @@ add_key_rnd(context, master_key, ks_tuple, ks_tuple_count, db_entry, kvno)
 	if (similar)
 	    continue;
 
-        if ((retval = krb5_dbe_create_key_data(context, db_entry))) 
+        if ((retval = krb5_dbe_create_key_data(context, db_entry)))
 	    goto add_key_rnd_err;
 
 	/* there used to be code here to extract the old key, and derive
@@ -190,9 +190,9 @@ add_key_rnd(context, master_key, ks_tuple, ks_tuple_count, db_entry, kvno)
 	/* db library will free this. Since, its a so, it could actually be using different memory management
 	   function. So, its better if the memory is allocated by the db's malloc. So, a temporary memory is used
 	   here which will later be copied to the db_entry */
-    	retval = krb5_dbekd_encrypt_key_data(context, master_key, 
-					     &key, NULL, kvno, 
-					     &tmp_key_data); 
+    	retval = krb5_dbekd_encrypt_key_data(context, master_key,
+					     &key, NULL, kvno,
+					     &tmp_key_data);
 
 	krb5_free_keyblock_contents(context, &key);
 	if( retval )
@@ -243,7 +243,7 @@ add_key_rnd_err:
 }
 
 /*
- * Change random key for a krb5_db_entry 
+ * Change random key for a krb5_db_entry
  * Assumes the max kvno
  *
  * As a side effect all old keys are nuked if keepold is false.
@@ -300,7 +300,7 @@ krb5_dbe_crk(context, master_key, ks_tuple, ks_tuple_count, keepold, db_entry)
 }
 
 /*
- * Add random key for a krb5_db_entry 
+ * Add random key for a krb5_db_entry
  * Assumes the max kvno
  *
  * As a side effect all old keys older than the max kvno are nuked.
@@ -329,7 +329,7 @@ krb5_dbe_ark(context, master_key, ks_tuple, ks_tuple_count, db_entry)
     /* increment the kvno */
     kvno++;
 
-    if ((retval = add_key_rnd(context, master_key, ks_tuple, 
+    if ((retval = add_key_rnd(context, master_key, ks_tuple,
 			     ks_tuple_count, db_entry, kvno))) {
 	cleanup_key_data(context, db_entry->n_key_data, db_entry->key_data);
 	db_entry->n_key_data = key_data_count;
@@ -354,11 +354,11 @@ krb5_dbe_ark(context, master_key, ks_tuple, ks_tuple_count, db_entry)
 }
 
 /*
- * Add key_data for a krb5_db_entry 
+ * Add key_data for a krb5_db_entry
  * If passwd is NULL the assumes that the caller wants a random password.
  */
 static krb5_error_code
-add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd, 
+add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 	    db_entry, kvno)
     krb5_context	  context;
     krb5_keyblock       * master_key;
@@ -405,7 +405,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 	if (j < i)
 	    continue;
 
-	if ((retval = krb5_dbe_create_key_data(context, db_entry))) 
+	if ((retval = krb5_dbe_create_key_data(context, db_entry)))
 	    return(retval);
 
 	/* Convert password string to key using appropriate salt */
@@ -422,12 +422,12 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 		break;
     	case KRB5_KDB_SALTTYPE_NOREALM:
             if ((retval=krb5_principal2salt_norealm(context, db_entry->princ,
-						    &key_salt.data))) 
+						    &key_salt.data)))
 		return(retval);
             break;
 	case KRB5_KDB_SALTTYPE_NORMAL:
             if ((retval = krb5_principal2salt(context, db_entry->princ,
-					      &key_salt.data))) 
+					      &key_salt.data)))
 		return(retval);
             break;
     	case KRB5_KDB_SALTTYPE_V4:
@@ -447,7 +447,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 #else
 	    /* Why do we do this? Well, the afs_mit_string_to_key needs to
 	       use strlen, and the realm is not NULL terminated.... */
-	    unsigned int slen = 
+	    unsigned int slen =
 		(*krb5_princ_realm(context,db_entry->princ)).length;
 	    if(!(key_salt.data.data = (char *) malloc(slen+1)))
 	        return ENOMEM;
@@ -469,7 +469,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 
 	/* Solaris Kerberos */
 	memset(&key, 0, sizeof (krb5_keyblock));
-	
+
 	/* AFS string to key will happen here */
 	if ((retval = krb5_c_string_to_key(context, ks_tuple[i].ks_enctype,
 					   &pwd, &key_salt.data, &key))) {
@@ -479,7 +479,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 	}
 
 	if (key_salt.data.length == SALT_TYPE_AFS_LENGTH)
-	    key_salt.data.length = 
+	    key_salt.data.length =
 	      krb5_princ_realm(context, db_entry->princ)->length;
 
 	/* memory allocation to be done by db. So, use temporary block and later copy
@@ -538,7 +538,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
 }
 
 /*
- * Change password for a krb5_db_entry 
+ * Change password for a krb5_db_entry
  * Assumes the max kvno
  *
  * As a side effect all old keys are nuked if keepold is false.
@@ -570,7 +570,7 @@ krb5_dbe_def_cpw(context, master_key, ks_tuple, ks_tuple_count, passwd,
     db_entry->key_data = NULL;
     db_entry->n_key_data = 0;
 
-    /* increment the kvno.  if the requested kvno is too small, 
+    /* increment the kvno.  if the requested kvno is too small,
        increment the old kvno */
     if (new_kvno < old_kvno+1)
        new_kvno = old_kvno+1;
@@ -601,7 +601,7 @@ krb5_dbe_def_cpw(context, master_key, ks_tuple, ks_tuple_count, passwd,
 }
 
 /*
- * Add password for a krb5_db_entry 
+ * Add password for a krb5_db_entry
  * Assumes the max kvno
  *
  * As a side effect all old keys older than the max kvno are nuked.

@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -12,7 +12,7 @@
  * copyright notice(s) and this permission notice appear in all copies of
  * the Software and that both the above copyright notice(s) and this
  * permission notice appear in supporting documentation.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -22,7 +22,7 @@
  * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
  * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- * 
+ *
  * Except as contained in this notice, the name of a copyright holder
  * shall not be used in advertising or otherwise to promote the sale, use
  * or other dealings in this Software without prior written authorization
@@ -146,7 +146,7 @@ struct GlhLineNode {
  * Encapsulate the time-ordered list of historical lines.
  */
 typedef struct {
-  FreeList *node_mem;  /* A freelist of GlhLineNode objects */ 
+  FreeList *node_mem;  /* A freelist of GlhLineNode objects */
   GlhLineNode *head;   /* The oldest line in the list */
   GlhLineNode *tail;   /* The newest line in the list */
 } GlhLineList;
@@ -821,7 +821,7 @@ char *_glh_oldest_line(GlHistory *glh, char *line, size_t dim)
 /*
  * Locate the oldest line that belongs to the current group.
  */
-  for(node=glh->list.head; node && node->group != glh->group; 
+  for(node=glh->list.head; node && node->group != glh->group;
       node = node->next)
     ;
 /*
@@ -1312,7 +1312,7 @@ static int _glh_decode_timestamp(char *string, char **endp, time_t *timestamp)
 /*
  * There are 14 characters in the date format yyyymmddhhmmss.
  */
-  enum {TSLEN=14};                    
+  enum {TSLEN=14};
   char timestr[TSLEN+1];   /* The timestamp part of the string */
 /*
  * If the time wasn't available at the time that the line was recorded
@@ -1418,7 +1418,7 @@ int _glh_set_group(GlHistory *glh, unsigned group)
  * Input:
  *  glh        GlHistory *  The input-line history maintenance object.
  * Output:
- *  return      unsigned    The group identifier.    
+ *  return      unsigned    The group identifier.
  */
 int _glh_get_group(GlHistory *glh)
 {
@@ -1481,7 +1481,7 @@ int _glh_show_history(GlHistory *glh, GlWriteFn *write_fn, void *data,
     return 0;
 /*
  * Work out the length to display ID numbers, choosing the length of
- * the biggest number in the buffer. Smaller numbers will be padded 
+ * the biggest number in the buffer. Smaller numbers will be padded
  * with leading zeroes if needed.
  */
   snprintf(buffer, sizeof(buffer), "%lu", (unsigned long) glh->list.tail->id);
@@ -1994,7 +1994,7 @@ int _glh_lookup_history(GlHistory *glh, GlhLineID id, const char **line,
  * Assign the lookup buffer as the returned line pointer.
  */
     *line = glh->lbuf;
-  };    
+  };
 /*
  * Does the caller want to know the group of the line?
  */
@@ -2608,7 +2608,7 @@ static int glh_contains_glob(GlhHashNode *prefix)
     switch(pstr.c) {
     case '\\':                      /* Skip escaped characters */
       glh_step_stream(&pstr);
-      break; 
+      break;
     case '*': case '?': case '[':   /* A wildcard character? */
       return 1;
       break;

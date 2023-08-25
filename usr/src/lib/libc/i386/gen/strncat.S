@@ -150,4 +150,4 @@
 	popl	%esi			/ restore register variables
 	popl	%edi
 	ret
-	SET_SIZE(strncat)	
+	SET_SIZE(strncat)

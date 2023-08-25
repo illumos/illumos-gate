@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -50,8 +50,8 @@
 #include <stdlib.h>
 #endif
 
-/* Fast modular reduction for p256 = 2^256 - 2^224 + 2^192+ 2^96 - 1.  a can be r. 
- * Uses algorithm 2.29 from Hankerson, Menezes, Vanstone. Guide to 
+/* Fast modular reduction for p256 = 2^256 - 2^224 + 2^192+ 2^96 - 1.  a can be r.
+ * Uses algorithm 2.29 from Hankerson, Menezes, Vanstone. Guide to
  * Elliptic Curve Cryptography. */
 mp_err
 ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -71,7 +71,7 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 	mp_digit r0, r1, r2, r3;
 	int r4; /* must be a signed value ! */
 #endif
-	/* for polynomials larger than twice the field size 
+	/* for polynomials larger than twice the field size
 	 * use regular reduction */
 	if (a_bits < 256) {
 		if (a == r) return MP_OKAY;
@@ -247,13 +247,13 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		/* final reduction if necessary */
 		if ((r7 == MP_DIGIT_MAX) &&
 			((r6 > 1) || ((r6 == 1) &&
-			(r5 || r4 || r3 || 
+			(r5 || r4 || r3 ||
 				((r2 == MP_DIGIT_MAX) && (r1 == MP_DIGIT_MAX)
 				  && (r0 == MP_DIGIT_MAX)))))) {
 			MP_CHECKOK(mp_sub(r, &meth->irr, r));
 		}
 #ifdef notdef
-			
+
 
 		/* smooth the negatives */
 		while (MP_SIGN(r) != MP_ZPOS) {
@@ -389,13 +389,13 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 
 		/* final reduction if necessary */
 		if ((r3 > 0xFFFFFFFF00000001ULL) ||
-			((r3 == 0xFFFFFFFF00000001ULL) && 
-			(r2 || (r1 >> 32)|| 
+			((r3 == 0xFFFFFFFF00000001ULL) &&
+			(r2 || (r1 >> 32)||
 			       (r1 == 0xFFFFFFFFULL && r0 == MP_DIGIT_MAX)))) {
 			/* very rare, just use mp_sub */
 			MP_CHECKOK(mp_sub(r, &meth->irr, r));
 		}
-			
+
 		s_mp_clamp(r);
 #endif
 	}
@@ -405,7 +405,7 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 }
 
 /* Compute the square of polynomial a, reduce modulo p256. Store the
- * result in r.  r could be a.  Uses optimized modular reduction for p256. 
+ * result in r.  r could be a.  Uses optimized modular reduction for p256.
  */
 mp_err
 ec_GFp_nistp256_sqr(const mp_int *a, mp_int *r, const GFMethod *meth)

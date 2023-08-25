@@ -18,14 +18,14 @@
 
 /*******************************************************************************
  * Description:
- * 
+ *
  * Return:
  ******************************************************************************/
 lm_status_t
 lm_set_mac_addr(
     lm_device_t *pdev,
     u32_t addr_idx,
-    u8_t *mac_addr) 
+    u8_t *mac_addr)
 {
     u32_t val;
 
@@ -39,7 +39,7 @@ lm_set_mac_addr(
     val = (mac_addr[0]<<8) | mac_addr[1];
     REG_WR(pdev, emac.emac_mac_match[addr_idx*2], val);
 
-    val = (mac_addr[2]<<24) | (mac_addr[3]<<16) | 
+    val = (mac_addr[2]<<24) | (mac_addr[3]<<16) |
         (mac_addr[4]<<8) | mac_addr[5];
     REG_WR(pdev, emac.emac_mac_match[addr_idx*2+1], val);
 
@@ -55,7 +55,7 @@ lm_set_mac_addr(
  *    None.
  *
  * Note:
- *    The caller is responsible for synchronizing calls to lm_reg_rd_ind and 
+ *    The caller is responsible for synchronizing calls to lm_reg_rd_ind and
  *    lm_reg_wr_ind.
  ******************************************************************************/
 void
@@ -83,7 +83,7 @@ lm_reg_rd_ind(
  *    None.
  *
  * Note:
- *    The caller is responsible for synchronizing calls to lm_reg_rd_ind and 
+ *    The caller is responsible for synchronizing calls to lm_reg_rd_ind and
  *    lm_reg_wr_ind.
  ******************************************************************************/
 void
@@ -106,7 +106,7 @@ lm_reg_wr_ind(
 
 /*******************************************************************************
  * Description:
- * 
+ *
  * Return:
  ******************************************************************************/
 void
@@ -162,7 +162,7 @@ lm_ctx_wr(
 
 /*******************************************************************************
  * Description:
- * 
+ *
  * Return:
  ******************************************************************************/
 u32_t
@@ -478,7 +478,7 @@ lm_submit_fw_cmd(
     if((val & FW_MSG_ACK) != (pdev->vars.fw_wr_seq & DRV_MSG_SEQ))
     {
         DbgMessage(pdev, WARN, "command pending.\n");
-        
+
         return LM_STATUS_FAILURE;
     }
 
@@ -557,7 +557,7 @@ lm_mb_get_cid_addr(
     {
         DbgBreakIf(cid < pdev->hw_info.first_l4_l5_bin);
 
-        mq_offset = 0x10000 + 
+        mq_offset = 0x10000 +
                     ((((cid - pdev->hw_info.first_l4_l5_bin) /
                     pdev->hw_info.bin_size) + 256) << MB_KERNEL_CTX_SHIFT);
     }
@@ -585,7 +585,7 @@ lm_mb_get_bypass_addr(
 
     if(cid < 256 || pdev->params.bin_mq_mode == FALSE)
     {
-        mq_offset = 0x10000 + 
+        mq_offset = 0x10000 +
                     MB_KERNEL_CTX_SIZE * MAX_CID_CNT +
                     cid * LM_PAGE_SIZE;
     }
@@ -593,7 +593,7 @@ lm_mb_get_bypass_addr(
     {
         DbgBreakIf(cid < pdev->hw_info.first_l4_l5_bin);
 
-        mq_offset = 0x10000 + 
+        mq_offset = 0x10000 +
                     MB_KERNEL_CTX_SIZE * MAX_CID_CNT +
                     (((cid - pdev->hw_info.first_l4_l5_bin) /
                     pdev->hw_info.bin_size) + 256) * LM_PAGE_SIZE;

@@ -25,7 +25,7 @@
  **************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
-#define DBUS_API_SUBJECT_TO_CHANGE 
+#define DBUS_API_SUBJECT_TO_CHANGE
 #include <dbus/dbus-glib-lowlevel.h>
 
 #include <glib.h>
@@ -42,7 +42,7 @@ parse_udi (run_request *r, DBusMessage *msg, DBusMessageIter *iter)
 	char *tmpstr;
 
 	/* Should be the device UDI */
-	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_STRING) 
+	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_STRING)
 		goto malformed;
 	dbus_message_iter_get_basic(iter, &tmpstr);
 	r->udi = g_strdup(tmpstr);
@@ -75,7 +75,7 @@ parse_environment(run_request *r, DBusMessage *msg, DBusMessageIter *iter)
 	r->environment = get_string_array(&sub_iter, tmpstr);
 
 	/* Then argv */
-	if (!dbus_message_iter_next(iter) || dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY) 
+	if (!dbus_message_iter_next(iter) || dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY)
 		goto malformed;
 	dbus_message_iter_recurse(iter, &sub_iter);
 	r->argv = get_string_array(&sub_iter, NULL);
@@ -110,12 +110,12 @@ handle_run(DBusConnection *con, DBusMessage *msg)
 	r->input = g_strdup(tmpstr);
 
 	/* Then an bool to indicate if we should grab stderr */
-	if (!dbus_message_iter_next(&iter) || dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_BOOLEAN) 
+	if (!dbus_message_iter_next(&iter) || dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_BOOLEAN)
 		goto malformed;
 	dbus_message_iter_get_basic(&iter, &(r->error_on_stderr));
 
 	/* Then an uint32 timeout for it */
-	if (!dbus_message_iter_next(&iter) || dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_UINT32) 
+	if (!dbus_message_iter_next(&iter) || dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_UINT32)
 		goto malformed;
 	dbus_message_iter_get_basic(&iter, &(r->timeout));
 
@@ -160,10 +160,10 @@ handle_start(DBusConnection *con, DBusMessage *msg, gboolean is_singleton)
 	if (run_request_run(r, con, NULL, &pid)) {
 		gint64 ppid = pid;
 		reply = dbus_message_new_method_return(msg);
-		dbus_message_append_args (reply, 
+		dbus_message_append_args (reply,
 					  DBUS_TYPE_INT64, &ppid,
 					  DBUS_TYPE_INVALID);
-					  
+
 	} else {
 		reply = dbus_message_new_error(msg, "org.freedesktop.HalRunner.Failed",
 					       "Start request failed");
@@ -190,7 +190,7 @@ handle_kill(DBusConnection *con, DBusMessage *msg)
 	if (!dbus_message_get_args(msg, &error,
 				   DBUS_TYPE_STRING, &udi,
 				   DBUS_TYPE_INVALID)) {
-		reply = dbus_message_new_error (msg, "org.freedesktop.HalRunner.Malformed", 
+		reply = dbus_message_new_error (msg, "org.freedesktop.HalRunner.Malformed",
 						"Malformed kill message");
 		g_assert(reply);
 		dbus_connection_send (con, reply, NULL);

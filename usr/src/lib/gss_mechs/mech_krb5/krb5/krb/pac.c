@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -342,7 +342,7 @@ krb5_pac_get_buffer(krb5_context context,
     ret = k5_pac_locate_buffer(context, pac, type, &d);
     if (ret != 0)
 	return ret;
- 
+
     data->data = malloc(d.length);
     if (data->data == NULL)
 	return ENOMEM;
@@ -529,7 +529,7 @@ k5_time_to_seconds_since_1970(krb5_context context, krb5_int64 ntTime, krb5_time
     *elapsedSeconds = abstime;
 
     return 0;
-}    
+}
 
 static krb5_error_code
 k5_seconds_since_1970_to_time(krb5_timestamp elapsedSeconds, krb5_ui_8 *ntTime)
@@ -540,7 +540,7 @@ k5_seconds_since_1970_to_time(krb5_timestamp elapsedSeconds, krb5_ui_8 *ntTime)
 	*ntTime += NT_TIME_EPOCH;
 
     *ntTime *= 10000000;
-   
+
     return 0;
 }
 
@@ -878,7 +878,7 @@ k5_insert_client_info(krb5_context context,
 
     /* copy in principal name */
     memcpy(p, princ_name_ucs2, princ_name_ucs2_len);
- 
+
 cleanup:
     if (princ_name_utf8 != NULL)
 	free(princ_name_utf8);

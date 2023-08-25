@@ -160,14 +160,14 @@ main (int argc, char *argv[])
 	}
 
 	/* use handle_eject() with the closetray option */
-	handle_eject (hal_ctx, 
+	handle_eject (hal_ctx,
 #ifdef HAVE_POLKIT
-		      pol_ctx, 
+		      pol_ctx,
 #endif
 		      libhal_drive_get_udi (drive),
 		      drive,
 		      libhal_drive_get_device_file (drive),
-		      invoked_by_uid, 
+		      invoked_by_uid,
 		      invoked_by_syscon_name,
 		      TRUE /* closetray option */,
 		      system_bus);

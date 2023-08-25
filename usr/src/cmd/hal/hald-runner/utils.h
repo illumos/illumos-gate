@@ -25,7 +25,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#define DBUS_API_SUBJECT_TO_CHANGE 
+#define DBUS_API_SUBJECT_TO_CHANGE
 #include <dbus/dbus-glib-lowlevel.h>
 
 char **get_string_array(DBusMessageIter *iter, gchar *extra);

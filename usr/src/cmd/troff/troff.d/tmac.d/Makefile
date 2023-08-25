@@ -44,7 +44,7 @@ ROOTFILES =	$(FILES:%=$(ROOTTMAC)/%)
 
 .KEEP_STATE:
 
-all:		$(FILES) 
+all:		$(FILES)
 
 install:	all $(ROOTTMAC) $(ROOTFILES)
 

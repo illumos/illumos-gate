@@ -31,7 +31,7 @@ int opts;
 #ifdef USE_INET6
 		char addinfo[INET6_ADDRSTRLEN];
 		PRINTF("\tAddress: %s",
-			inet_ntop(ipe.ipe_family, (void *)&ipe.ipe_addr.in4, 
+			inet_ntop(ipe.ipe_family, (void *)&ipe.ipe_addr.in4,
 				  addinfo, sizeof(addinfo)));
 #else
 		PRINTF("\tAddress: %s",
@@ -55,7 +55,7 @@ int opts;
 		putchar(' ');
 #ifdef USE_INET6
 		if (ipe.ipe_family == AF_INET6)
-			printhostmask(6, (u_32_t *)&ipe.ipe_addr.in6, 
+			printhostmask(6, (u_32_t *)&ipe.ipe_addr.in6,
 					 (u_32_t *)&ipe.ipe_mask.in6);
 		else
 #endif

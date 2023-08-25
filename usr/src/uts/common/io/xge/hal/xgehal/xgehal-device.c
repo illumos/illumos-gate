@@ -3707,8 +3707,8 @@ __hal_device_handle_txdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->tda_err_reg);
 		hldev->stats.sw_dev_info_stats.tda_err_cnt++;
-		temp64 = XGE_HAL_TDA_Fn_ECC_DB_ERR|XGE_HAL_TDA_SM0_ERR_ALARM 
-			|XGE_HAL_TDA_SM1_ERR_ALARM;	
+		temp64 = XGE_HAL_TDA_Fn_ECC_DB_ERR|XGE_HAL_TDA_SM0_ERR_ALARM
+			|XGE_HAL_TDA_SM1_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3732,7 +3732,7 @@ __hal_device_handle_txdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->tti_err_reg);
 		hldev->stats.sw_dev_info_stats.tti_err_cnt++;
-		temp64 = XGE_HAL_TTI_SM_ERR_ALARM; 
+		temp64 = XGE_HAL_TTI_SM_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3743,7 +3743,7 @@ __hal_device_handle_txdma(xge_hal_device_t *hldev, u64 reason)
 				err, &isrbar0->lso_err_reg);
 		hldev->stats.sw_dev_info_stats.lso_err_cnt++;
 		temp64 = XGE_HAL_LSO6_ABORT|XGE_HAL_LSO7_ABORT
-			|XGE_HAL_LSO6_SM_ERR_ALARM|XGE_HAL_LSO7_SM_ERR_ALARM; 
+			|XGE_HAL_LSO6_SM_ERR_ALARM|XGE_HAL_LSO7_SM_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3753,7 +3753,7 @@ __hal_device_handle_txdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->tpa_err_reg);
 		hldev->stats.sw_dev_info_stats.tpa_err_cnt++;
-		temp64 = XGE_HAL_TPA_SM_ERR_ALARM; 
+		temp64 = XGE_HAL_TPA_SM_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3763,7 +3763,7 @@ __hal_device_handle_txdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->sm_err_reg);
 		hldev->stats.sw_dev_info_stats.sm_err_cnt++;
-		temp64 = XGE_HAL_SM_SM_ERR_ALARM; 
+		temp64 = XGE_HAL_SM_SM_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3885,7 +3885,7 @@ __hal_device_handle_rxdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->rpa_err_reg);
 		hldev->stats.sw_dev_info_stats.rpa_err_cnt++;
-		temp64 = XGE_HAL_RPA_SM_ERR_ALARM|XGE_HAL_RPA_CREDIT_ERR; 
+		temp64 = XGE_HAL_RPA_SM_ERR_ALARM|XGE_HAL_RPA_CREDIT_ERR;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -3908,7 +3908,7 @@ __hal_device_handle_rxdma(xge_hal_device_t *hldev, u64 reason)
 		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
 				err, &isrbar0->rti_err_reg);
 		hldev->stats.sw_dev_info_stats.rti_err_cnt++;
-		temp64 = XGE_HAL_RTI_SM_ERR_ALARM; 
+		temp64 = XGE_HAL_RTI_SM_ERR_ALARM;
 		if (val64 & temp64)
 			goto reset;
 	}
@@ -5412,7 +5412,7 @@ xge_hal_device_initialize(xge_hal_device_t *hldev, xge_hal_device_attr_t *attr,
 #endif
 	 /* Getting VPD data */
         __hal_device_get_vpd_data(hldev);
-	
+
 	hldev->is_initialized = 1;
 
 	return XGE_HAL_OK;
@@ -5593,7 +5593,7 @@ __hal_device_get_vpd_data(xge_hal_device_t *hldev)
         xge_os_pci_read32(hldev->pdev, hldev->cfgh,(vpd_addr + 4),
                 (u32 *)&vpd_data[index]);
     }
-    
+
     if(!fail) {
 
         /* read serial number of adapter */
@@ -5618,7 +5618,7 @@ __hal_device_get_vpd_data(xge_hal_device_t *hldev)
     xge_os_free(hldev->pdev, vpd_data, XGE_HAL_VPD_BUFFER_SIZE + 16);
 }
 
-    
+
 /**
  * xge_hal_device_handle_tcode - Handle transfer code.
  * @channelh: Channel handle.
@@ -6775,7 +6775,7 @@ xge_hal_device_poll(xge_hal_device_h devh)
 	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
 
   xge_os_memzero(item_buf, (sizeof(xge_queue_item_t) +
-                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));  
+                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));
 
 _again:
 	if (!hldev->is_initialized ||

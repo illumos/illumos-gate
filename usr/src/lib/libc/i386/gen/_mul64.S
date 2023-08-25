@@ -34,12 +34,12 @@
 /	     x 	c       d	parameter B
 /		---------
 /               ad      bd
-/       ac	bc         
+/       ac	bc
 /       -----------------
 /       ac	ad+bc	bd
-/       
+/
 /       We can ignore ac and top 32 bits of ad+bc: if <> 0, overflow happened.
-/       
+/
 
 #include "SYS.h"
 

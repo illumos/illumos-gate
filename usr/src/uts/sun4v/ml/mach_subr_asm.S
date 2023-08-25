@@ -55,13 +55,13 @@
 	SET_SIZE(ultra_gettick)
 
 	ENTRY(set_mmfsa_scratchpad)
-	stxa	%o0, [%g0]ASI_SCRATCHPAD 
+	stxa	%o0, [%g0]ASI_SCRATCHPAD
 	retl
 	nop
 	SET_SIZE(set_mmfsa_scratchpad)
 
 	ENTRY(get_mmfsa_scratchpad)
-	ldxa	[%g0]ASI_SCRATCHPAD, %o0 
+	ldxa	[%g0]ASI_SCRATCHPAD, %o0
 	retl
 	nop
 	SET_SIZE(get_mmfsa_scratchpad)
@@ -76,7 +76,7 @@
 	ENTRY(cpu_intrq_unregister_powerdown)
 
 	CPU_ADDR(%g2, %g3)
-	add %g2, CPU_MCPU, %g2 
+	add %g2, CPU_MCPU, %g2
 	/*
 	 * Save %o regs
 	 */
@@ -218,7 +218,7 @@
 	 * r[11]	%o3
 	 * r[10]	%o2
 	 * r[9]		%o1
-	 * r[8]		%o0	
+	 * r[8]		%o0
 	 * r[7]		%g7
 	 * r[6]		%g6
 	 * r[5]		%g5

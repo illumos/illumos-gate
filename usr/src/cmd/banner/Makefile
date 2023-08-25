@@ -25,13 +25,13 @@
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
-PROG= banner 
+PROG= banner
 
 include ../Makefile.cmd
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

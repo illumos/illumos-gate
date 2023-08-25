@@ -72,7 +72,7 @@ searchchar:
 	add $4, %eax			/ increment src by four
 	mov %esi, %ebx			/ copy word
 	lea -0x01010101(%esi), %ecx	/ (word - 0x01010101)
-	xor %edx, %ebx			/ tmpword = word ^ char	
+	xor %edx, %ebx			/ tmpword = word ^ char
 	not %esi			/ ~word
 	and $0x80808080, %esi		/ ~word & 0x80808080
 	and %ecx, %esi			/ (wd - 0x01010101) & ~wd & 0x80808080

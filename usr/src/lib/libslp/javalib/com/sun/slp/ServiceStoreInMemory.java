@@ -149,7 +149,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		    findMatchingAttributes(rec, attrTags, ht, ret);
 
 		} catch (ServiceLocationException ex) {
-	
+
 		    Assert.slpassert(false,
 				  "ssim_attrbvc_botch",
 				  new Object[] {ex.getMessage()});
@@ -413,9 +413,9 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 	    for (i = 0; i < n; i++) {
 		RegRecord rec = (RegRecord)contents.elementAt(i);
-	
+
 		if (!compareEqual(rec.value, pattern)) {
-	
+
 		    // Add to prospective returns.
 
 		    noMatch.addElement(rec);
@@ -491,7 +491,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 	    for (i = 0; i < n; i++) {
 		RegRecord rec = (RegRecord)contents.elementAt(i);
-	
+
 		if (!compareEqual(rec.value, pattern)) {
 		    match = match | rec.setReturn(returns);
 
@@ -661,7 +661,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 			rec = null;
 			RegRecord trec = (RegRecord)contents.elementAt(bottom);
-	
+
 			if (update) {
 			    rec = new RegRecord(pattern);
 
@@ -748,7 +748,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 				// Pattern is less than top, so insert at
 				// top, causing top to move up.
-		
+
 				contents.insertElementAt(rec, top);
 
 			    }
@@ -817,7 +817,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    return false;
 
 	}
-	
+
 	// Add any registrations that are less than or equal to the pattern.
 
 	boolean
@@ -860,7 +860,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    return false;
 
 	}
-	
+
 	// Add any registrations that are greater than or equal to the pattern.
 
 	boolean
@@ -973,7 +973,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		// ...but only if invert isn't on.
 
 		if (!invert) {
-	
+
 		    // We use attrLevelNot to get all, because it
 		    //  will also pick up keywords. There are
 		    //  no keywords in attrLevel because keywords
@@ -988,7 +988,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 	    // We know that the type table is fully initialized with
 	    //  BtreeVectors for each type.
-	
+
 	    // Get the pattern's class. Pattern will not be null because
 	    //  the parser has checked for it and PRESENT has been
 	    //  filtered out above.
@@ -1091,7 +1091,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
     private class ServiceRecordInMemory extends Object
 	implements ServiceStore.ServiceRecord {
-	
+
 	private ServiceURL serviceURL = null;	// the service URL
 	private Vector attrList = null;		// the attribute list
 	private Locale locale = null;		// the locale
@@ -1450,7 +1450,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		ServiceURL url = rec.getServiceURL();
 		Vector scopes = rec.getScopes();
 		Locale locale = rec.getLocale();
-	
+
 		if (traceDrop) {
 		    conf.writeLog("ssim_ageout",
 				  new Object[] {
@@ -1786,7 +1786,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    String scope = (String)en.nextElement();
 	    Hashtable langLevel = (Hashtable)scopeLevel.get(scope);
 	    Enumeration een = langLevel.keys();
-	
+
 	    Assert.slpassert(een.hasMoreElements(),
 			  "ssim_empty_lang_table",
 			  new Object[] {url});
@@ -1805,7 +1805,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    List elem = (List)listVec.elementAt(0);
 	    ServiceRecordInMemory rec = elem.record;
 	    Locale loc = rec.getLocale();
-	
+
 	    // If we've done this one already, go on.
 
 	    if (ht.get(rec) != null) {
@@ -1833,7 +1833,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		deleteAttributes(rec, attrPatterns);
 
 	    }
-	
+
 	    // Reregister the record.
 
 	    registerInternal(rec);
@@ -2162,7 +2162,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 			continue;
 
 		    }
-	
+
 		    // Get the service record.
 
 		    List elem = (List)listVec.elementAt(0);
@@ -2598,7 +2598,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    String typeKey = null;
 
 	    if (values == null) {
-	
+
 		// We're done, since there are no attributes to add.
 
 		continue;
@@ -3022,7 +3022,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		}
 	    }
 	}
-	
+
 	if (!ok) {
 	    throw
 		new ServiceLocationException(errCode,
@@ -3111,7 +3111,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 		(ServerAttribute)newAttrs.elementAt(i);
 
 	    ht.put(attr.getId().toLowerCase(), attr);
-	
+
 	}
 
 	// Merge in the old attributes.

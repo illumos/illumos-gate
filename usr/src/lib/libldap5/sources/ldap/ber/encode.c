@@ -195,8 +195,8 @@ ber_put_int_or_enum( BerElement *ber, ber_int_t num, ber_tag_t tag )
 		return( -1 );
 	i++;
 	netnum = LBER_HTONL( num );
-	if ( ber_write( ber, (char *) &netnum + (sizeof(ber_int_t) - i), i, 0 ) 
-		== i) 
+	if ( ber_write( ber, (char *) &netnum + (sizeof(ber_int_t) - i), i, 0 )
+		== i)
 		/* length of tag + length + contents */
 		return( taglen + lenlen + i );
 
@@ -252,8 +252,8 @@ ber_put_ostring( BerElement *ber, char *str, ber_len_t len,
 	}
 #endif /* STR_TRANSLATION */
 
-    /*  
-     *  Note:  below is a spot where we limit ber_write 
+    /*
+     *  Note:  below is a spot where we limit ber_write
      *         to signed long (instead of unsigned long)
      */
 
@@ -492,7 +492,7 @@ ber_put_seqorset( BerElement *ber )
 		    sizeof(ber_int_t) - taglen, taglen );
 
 		if ( ber->ber_options & LBER_OPT_USE_DER ) {
-			ltag = (lenlen == 1) ? (unsigned char)len :  
+			ltag = (lenlen == 1) ? (unsigned char)len :
                 (unsigned char) (0x80 + (lenlen - 1));
 		}
 

@@ -59,7 +59,7 @@
 #include "SYS.h"
 
 	ENTRY(strcat)	/* (char *s1, char *s2) */
-	/ find a null byte in destination string 
+	/ find a null byte in destination string
 	movq	%rdi,%rax		/ prepare return value
 	movabsq	$0x7f7f7f7f7f7f7f7f, %r8	/ %r8 = 0x7f...
 	movq	%r8, %r9
@@ -96,7 +96,7 @@
 	movq	%r8, %rcx
 	andq	%rdx, %rcx		/ %rcx = %rdx & 0x7f7f7f7f7f7f7f7f
 	addq	$8, %rsi		/ next quadword
-	addq	%r8, %rcx		/ %rcx += 0x7f7f7f7f7f7f7f7f	
+	addq	%r8, %rcx		/ %rcx += 0x7f7f7f7f7f7f7f7f
 	orq	%rdx, %rcx		/ %rcx |= %rdx
 	andq	%r9, %rcx		/ %rcx &= 0x8080808080808080
 	cmpq	%r9, %rcx		/ if null byte in this quadaword

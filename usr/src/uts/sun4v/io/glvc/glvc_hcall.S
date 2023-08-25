@@ -68,9 +68,9 @@
 	stx	%o1, [%i3]
 1:
 	ret
-	restore	
+	restore
 	SET_SIZE(hv_service_send)
-	
+
 	/*
 	 * hv_service_getstatus(uint64_t s_id, uint64_t *vreg);
 	 */
@@ -84,7 +84,7 @@
 	retl
 	nop
 	SET_SIZE(hv_service_getstatus)
-	
+
 	/*
 	 * hv_service_setstatus(uint64_t s_id, uint64_t bits);
 	 */

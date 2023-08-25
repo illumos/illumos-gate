@@ -225,13 +225,13 @@ init() {
 		net_data->nw = (*net_data->irs->nw_map)(net_data->irs);
 
 		if (!net_data->nw || !net_data->res) {
- error:		
+ error:
 			errno = EIO;
 			return (NULL);
 		}
 		(*net_data->nw->res_set)(net_data->nw, net_data->res, NULL);
 	}
-	
+
 	return (net_data);
 }
 

@@ -1,8 +1,8 @@
 /******************************************************************************
  * sysctl.h
- * 
+ *
  * System management operations. For use by node control stack.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -50,7 +50,7 @@ struct xen_sysctl_readconsole {
      * IN:  Start index for consuming from ring buffer (if @incremental);
      * OUT: End index after consuming from ring buffer.
      */
-    uint32_t index; 
+    uint32_t index;
     /* IN: Virtual address to write console data. */
     XEN_GUEST_HANDLE_64(char) buffer;
     /* IN: Size of buffer; OUT: Bytes written to buffer. */
@@ -190,16 +190,16 @@ struct xen_sysctl_cpuinfo {
     uint64_aligned_t idletime;
 };
 typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t);
 struct xen_sysctl_getcpuinfo {
     /* IN variables. */
     uint32_t max_cpus;
     XEN_GUEST_HANDLE_64(xen_sysctl_cpuinfo_t) info;
     /* OUT variables. */
     uint32_t nr_cpus;
-}; 
+};
 typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t);
 
 #define XEN_SYSCTL_availheap         9
 struct xen_sysctl_availheap {
@@ -283,7 +283,7 @@ typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
 
 /*
- * Get/set xen power management, include 
+ * Get/set xen power management, include
  * 1. cpufreq governors and related parameters
  */
 #define XEN_SYSCTL_pm_op        12
@@ -301,8 +301,8 @@ struct xen_ondemand {
 };
 typedef struct xen_ondemand xen_ondemand_t;
 
-/* 
- * cpufreq para name of this structure named 
+/*
+ * cpufreq para name of this structure named
  * same as sysfs file name of native linux
  */
 #define CPUFREQ_NAME_LEN 16

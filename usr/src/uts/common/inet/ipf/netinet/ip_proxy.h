@@ -149,7 +149,7 @@ typedef	struct	aproxy	{
  * This is the scratch buffer size used to hold strings from the TCP stream
  * that we may want to parse.  It's an arbitrary size, really, but it must
  * be at least as large as IPF_FTPBUFSZ.
- */ 
+ */
 #define	FTP_BUFSZ	120
 
 /*

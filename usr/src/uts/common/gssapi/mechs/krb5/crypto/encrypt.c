@@ -5,14 +5,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +23,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -118,11 +118,11 @@ init_key_uef(CK_SESSION_HANDLE hSession, krb5_keyblock *key)
         CK_ATTRIBUTE template[6];
 
 	/* If its already initialized, return OK */
-	/* 
+	/*
 	 * fork safety: if the key->pid != __krb5_current_pid then a fork has
 	 * taken place and the pkcs11 key handle must be re-acquired.
 	 */
-	if ((key->hKey != CK_INVALID_HANDLE) && 
+	if ((key->hKey != CK_INVALID_HANDLE) &&
 	    (key->pid == __krb5_current_pid))
 		return (rv);
 
@@ -171,7 +171,7 @@ init_key_uef(CK_SESSION_HANDLE hSession, krb5_keyblock *key)
 #endif /* _KERNEL */
 
 /*ARGSUSED*/
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_c_encrypt(krb5_context context, const krb5_keyblock *key,
 	       krb5_keyusage usage, const krb5_data *ivec,
 	       const krb5_data *input, krb5_enc_data *output)

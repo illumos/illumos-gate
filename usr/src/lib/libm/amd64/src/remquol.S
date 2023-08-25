@@ -52,7 +52,7 @@ LIBM_ANSI_PRAGMA_WEAK(remquol,function)
 	andw	$0x200,%ax		/ get C1
 	sarw	$9,%ax
 	addw	%dx,%ax
-	cwtl	
+	cwtl
 	movl	16(%rsp),%edx		/ sign and bexp of x
 	movl	32(%rsp),%ecx		/ sign and bexp of y
 	andl	$0x8000,%edx		/ edx <- sign(x)

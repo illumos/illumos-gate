@@ -575,7 +575,7 @@ normalize_name(char *name) {
 static int
 init(struct irs_nw *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	if (!pvt->res && !nw_res_get(this))
 		return (-1);
 	if (((pvt->res->options & RES_INIT) == 0U) &&

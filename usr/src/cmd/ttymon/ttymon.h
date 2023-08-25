@@ -41,7 +41,7 @@
 
 /*
  *	flags to indicate the field of /etc/ttydefs
- *	Note: order is important because it corresponds to 
+ *	Note: order is important because it corresponds to
  *	      the order of fields in the file
  */
 #define		T_TTYLABEL	1
@@ -52,7 +52,7 @@
 
 /*
  *	flags to indicate the field of pmtab
- *	Note: order is important because it corresponds to 
+ *	Note: order is important because it corresponds to
  *	      the order of fields in the file
  */
 #define		P_TAG		1
@@ -96,7 +96,7 @@
 				 */
 
 #define	SPAWN_LIMIT	15	/* respawn allowed within SPAWN_INTERVAL */
-#define	SPAWN_INTERVAL	(2*60)	
+#define	SPAWN_INTERVAL	(2*60)
 
 #define		UUCP		"uucp"	/* owner of bi-directional devices */
 #define		TTY		"tty"	/* group name of all devices 	   */
@@ -153,7 +153,7 @@
 /*
  * flag value for strcheck()
  */
-#define	NUM		0	
+#define	NUM		0
 #define	ALNUM		1
 
 #define	ALARMTIME	60

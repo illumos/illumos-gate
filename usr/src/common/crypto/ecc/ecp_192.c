@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -61,7 +61,7 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 	mp_err res = MP_OKAY;
 	mp_size a_used = MP_USED(a);
 	mp_digit r3;
-#ifndef MPI_AMD64_ADD 
+#ifndef MPI_AMD64_ADD
 	mp_digit carry;
 #endif
 #ifdef ECL_THIRTY_TWO_BIT
@@ -133,7 +133,7 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		MP_ADD_CARRY(r1b, a5b, r1b, carry, carry);
 		MP_ADD_CARRY(r2a, a5a, r2a, carry, carry);
 		MP_ADD_CARRY(r2b, a5b, r2b, carry, carry);
-		r3 += carry; 
+		r3 += carry;
 		MP_ADD_CARRY(r1a, a4a, r1a, 0,     carry);
 		MP_ADD_CARRY(r1b, a4b, r1b, carry, carry);
 		MP_ADD_CARRY(r2a,   0, r2a, carry, carry);
@@ -155,17 +155,17 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		/*
 		 * our field is 0xffffffffffffffff, 0xfffffffffffffffe,
 		 * 0xffffffffffffffff. That means we can only be over and need
-		 * one more reduction 
-		 *  if r2 == 0xffffffffffffffffff (same as r2+1 == 0) 
+		 * one more reduction
+		 *  if r2 == 0xffffffffffffffffff (same as r2+1 == 0)
 		 *     and
 		 *     r1 == 0xffffffffffffffffff   or
 		 *     r1 == 0xfffffffffffffffffe and r0 = 0xfffffffffffffffff
-		 * In all cases, we subtract the field (or add the 2's 
+		 * In all cases, we subtract the field (or add the 2's
 		 * complement value (1,1,0)).  (r0, r1, r2)
 		 */
-		if (((r2b == 0xffffffff) && (r2a == 0xffffffff) 
+		if (((r2b == 0xffffffff) && (r2a == 0xffffffff)
 			&& (r1b == 0xffffffff) ) &&
-			   ((r1a == 0xffffffff) || 
+			   ((r1a == 0xffffffff) ||
 			    (r1a == 0xfffffffe) && (r0a == 0xffffffff) &&
 					(r0b == 0xffffffff)) ) {
 			/* do a quick subtract */
@@ -202,20 +202,20 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
                 r0 = MP_DIGIT(a, 0);
 
 		/* implement r = (a2,a1,a0)+(a5,a5,a5)+(a4,a4,0)+(0,a3,a3) */
-#ifndef MPI_AMD64_ADD 
+#ifndef MPI_AMD64_ADD
 		MP_ADD_CARRY(r0, a3, r0, 0,     carry);
 		MP_ADD_CARRY(r1, a3, r1, carry, carry);
 		MP_ADD_CARRY(r2, a4, r2, carry, carry);
-		r3 = carry; 
+		r3 = carry;
 		MP_ADD_CARRY(r0, a5, r0, 0,     carry);
 		MP_ADD_CARRY(r1, a5, r1, carry, carry);
 		MP_ADD_CARRY(r2, a5, r2, carry, carry);
-		r3 += carry; 
+		r3 += carry;
 		MP_ADD_CARRY(r1, a4, r1, 0,     carry);
 		MP_ADD_CARRY(r2,  0, r2, carry, carry);
 		r3 += carry;
 
-#else 
+#else
                 r2 = MP_DIGIT(a, 2);
                 r1 = MP_DIGIT(a, 1);
                 r0 = MP_DIGIT(a, 0);
@@ -234,12 +234,12 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
                 "addq   %5,%1           \n\t"
                 "adcq   $0,%2           \n\t"
                 "adcq   $0,%3           \n\t"
-                : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3), "=r"(a3), 
+                : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3), "=r"(a3),
 		  "=r"(a4), "=r"(a5)
-                : "0" (r0), "1" (r1), "2" (r2), "3" (r3), 
+                : "0" (r0), "1" (r1), "2" (r2), "3" (r3),
 		  "4" (a3), "5" (a4), "6"(a5)
                 : "%cc" );
-#endif 
+#endif
 
 		/* reduce out the carry */
 		while (r3) {
@@ -266,16 +266,16 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		/*
 		 * our field is 0xffffffffffffffff, 0xfffffffffffffffe,
 		 * 0xffffffffffffffff. That means we can only be over and need
-		 * one more reduction 
-		 *  if r2 == 0xffffffffffffffffff (same as r2+1 == 0) 
+		 * one more reduction
+		 *  if r2 == 0xffffffffffffffffff (same as r2+1 == 0)
 		 *     and
 		 *     r1 == 0xffffffffffffffffff   or
 		 *     r1 == 0xfffffffffffffffffe and r0 = 0xfffffffffffffffff
-		 * In all cases, we subtract the field (or add the 2's 
+		 * In all cases, we subtract the field (or add the 2's
 		 * complement value (1,1,0)).  (r0, r1, r2)
 		 */
 		if (r3 || ((r2 == MP_DIGIT_MAX) &&
-		      ((r1 == MP_DIGIT_MAX) || 
+		      ((r1 == MP_DIGIT_MAX) ||
 			((r1 == (MP_DIGIT_MAX-1)) && (r0 == MP_DIGIT_MAX))))) {
 			/* do a quick subtract */
 			r0++;
@@ -299,10 +299,10 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 #ifndef ECL_THIRTY_TWO_BIT
 /* Compute the sum of 192 bit curves. Do the work in-line since the
  * number of words are so small, we don't want to overhead of mp function
- * calls.  Uses optimized modular reduction for p192. 
+ * calls.  Uses optimized modular reduction for p192.
  */
 mp_err
-ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -343,15 +343,15 @@ ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r,
                 "adcq   %6,%2           \n\t"
                 "adcq   $0,%3           \n\t"
                 : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(carry)
-                : "r" (a0), "r" (a1), "r" (a2), "0" (r0), 
+                : "r" (a0), "r" (a1), "r" (a2), "0" (r0),
 		  "1" (r1), "2" (r2)
                 : "%cc" );
 #endif
 
-	/* Do quick 'subract' if we've gone over 
+	/* Do quick 'subract' if we've gone over
 	 * (add the 2's complement of the curve field) */
 	if (carry || ((r2 == MP_DIGIT_MAX) &&
-		      ((r1 == MP_DIGIT_MAX) || 
+		      ((r1 == MP_DIGIT_MAX) ||
 			((r1 == (MP_DIGIT_MAX-1)) && (r0 == MP_DIGIT_MAX))))) {
 #ifndef MPI_AMD64_ADD
 		MP_ADD_CARRY(r0, 1, r0, 0,     carry);
@@ -368,7 +368,7 @@ ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r,
 #endif
 	}
 
-	
+
 	MP_CHECKOK(s_mp_pad(r, 3));
 	MP_DIGIT(r, 2) = r2;
 	MP_DIGIT(r, 1) = r1;
@@ -384,10 +384,10 @@ ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* Compute the diff of 192 bit curves. Do the work in-line since the
  * number of words are so small, we don't want to overhead of mp function
- * calls.  Uses optimized modular reduction for p192. 
+ * calls.  Uses optimized modular reduction for p192.
  */
 mp_err
-ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -429,7 +429,7 @@ ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r,
                 "sbbq   %6,%2           \n\t"
                 "adcq   $0,%3           \n\t"
                 : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(borrow)
-                : "r" (b0), "r" (b1), "r" (b2), "0" (r0), 
+                : "r" (b0), "r" (b1), "r" (b2), "0" (r0),
 		  "1" (r1), "2" (r2)
                 : "%cc" );
 #endif
@@ -467,7 +467,7 @@ ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r,
 #endif
 
 /* Compute the square of polynomial a, reduce modulo p192. Store the
- * result in r.  r could be a.  Uses optimized modular reduction for p192. 
+ * result in r.  r could be a.  Uses optimized modular reduction for p192.
  */
 mp_err
 ec_GFp_nistp192_sqr(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -508,7 +508,7 @@ ec_GFp_nistp192_div(const mp_int *a, const mp_int *b, mp_int *r,
 	if (a == NULL) {
 		return  mp_invmod(b, &meth->irr, r);
 	} else {
-		/* MPI doesn't support divmod, so we implement it using invmod and 
+		/* MPI doesn't support divmod, so we implement it using invmod and
 		 * mulmod. */
 		MP_CHECKOK(mp_init(&t, FLAG(b)));
 		MP_CHECKOK(mp_invmod(b, &meth->irr, &t));

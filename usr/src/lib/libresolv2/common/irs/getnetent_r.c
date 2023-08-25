@@ -30,7 +30,7 @@
 
 #ifdef NET_R_RETURN
 
-static NET_R_RETURN 
+static NET_R_RETURN
 copy_netent(struct netent *, struct netent *, NET_R_COPY_ARGS);
 
 NET_R_RETURN
@@ -154,7 +154,7 @@ copy_netent(struct netent *ne, struct netent *nptr, NET_R_COPY_ARGS) {
 	}
 	len += strlen(ne->n_name) + 1;
 	len += numptr * sizeof(char*);
-	
+
 	if (len > (int)buflen) {
 		errno = ERANGE;
 		return (NET_R_BAD);

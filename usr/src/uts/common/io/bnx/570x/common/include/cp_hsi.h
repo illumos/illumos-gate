@@ -38,18 +38,18 @@ typedef struct _fio_dbg_l_t {
     typedef fio_dbg_b_t fio_dbg_t;
 #endif
 
-/* 
- * Runtime Configurable Parameters 
+/*
+ * Runtime Configurable Parameters
  */
 typedef struct _cp_hsi_t {
     fw_version_t  version;
-    u32_t fw_doorbell;    
+    u32_t fw_doorbell;
 	    #define  KWQ_READY     (1<<0)
         #define  KWQ1_READY    (1<<1)
         #define  KWQ2_READY    (1<<2)
         #define  KWQ3_READY    (1<<3)
     u32_t iscsi_sq_size;				// Number of elements in queue. Its k lsb bits must be 0.
-    u32_t cp_cpq_kwq[2];      
+    u32_t cp_cpq_kwq[2];
     u32_t iscsi_xinan_unit;				// Xinan only: number of VCIDs for an iscsi connection
     u32_t pg_ctx_map;                   /* Xinan only: pg ctx start and end */
     u64_t volatile idle_count;
@@ -61,13 +61,13 @@ typedef struct _cp_hsi_t {
     u32_t iscsi_teton_l5_cmd_offset;   	// Teton Only: offset of L5 ccell command array
     u32_t iscsi_task_offset;     		// offset of the task array
     u32_t iscsi_r2tq_offset;     		// offset of R2TQ section
-    u32_t iscsi_max_num_of_tasks;     	// maximal number of pending tasks 
+    u32_t iscsi_max_num_of_tasks;     	// maximal number of pending tasks
     u32_t iscsi_max_num_of_ccells;    	// maximal number of ccells
     u32_t iscsi_dbg_ctx_addr_h;
 	u32_t iscsi_dbg_ctx_addr_l;
 	u32_t iscsi_dbg_ctx_cid;
     u32_t iscsi_ctx_map;                /* Xinan only: iscsi ctx start and end */
-    u32_t num_tcp_nagle_allow;          /* threshold of num of TOE conn that we allow 
+    u32_t num_tcp_nagle_allow;          /* threshold of num of TOE conn that we allow
                                            for stricter tcp nagle alogrithm. */
     u32_t timer_scan_freq;              /* Xinan only: control timer scan frequency */
 	u32_t iscsi_max_conn;				/* Read only parameter for the host to read */
@@ -84,8 +84,8 @@ typedef struct _cp_hsi_t {
 #define CP_HSI_OFFSETOFF(m)  (OFFSETOF(cp_hsi_t,m) + 0x10)
 #define CP_HSI_SIZEOF(m)     (sizeof (((cp_hsi_t *)0)->m))
 
-// Calling the following macro will actually get optimized during compile 
-// time. Its sole purpose is to ensure HSI variables cannot be modified/moved 
+// Calling the following macro will actually get optimized during compile
+// time. Its sole purpose is to ensure HSI variables cannot be modified/moved
 // unnoticed  scratch[10240]  0x1a0000  (RW/Reset: undefined)
 #define TEST_CP_HSI(){                                                    \
 if (0){                                                                   \

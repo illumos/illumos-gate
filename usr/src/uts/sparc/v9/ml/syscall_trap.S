@@ -44,7 +44,7 @@
 #if (1 << SYSENT_SHIFT) != SYSENT_SIZE
 #error	"SYSENT_SHIFT does not correspond to size of sysent structure"
 #endif
-	
+
 /*
  * Native System call trap handler.
  *
@@ -137,14 +137,14 @@
 	mov	LMS_USER, %o0
 	call	syscall_mstate
 	mov	LMS_SYSTEM, %o1
-	
+
 	ldx	[%l1 + O0_OFF], %o0		! restore %o0
 	ldx	[%l1 + O1_OFF], %o1		! restore %o1
 	ldx	[%l1 + O2_OFF], %o2
 	ldx     [%l1 + O3_OFF], %o3
 	ldx     [%l1 + O4_OFF], %o4
 	ldx	[%l1 + O5_OFF], %o5
-	
+
 	! lwp_arg now set up
 3:
 	!
@@ -155,7 +155,7 @@
 	cmp	%g1, NSYSCALL			! check range
 	sth	%g1, [THREAD_REG + T_SYSNUM]	! save syscall code
 	bgeu,pn	%ncc, _syscall_ill
-	  sll	%g1, SYSENT_SHIFT, %g4			! delay - get index 
+	  sll	%g1, SYSENT_SHIFT, %g4			! delay - get index
 	add	%g3, %g4, %l4
 	ldn	[%l4 + SY_CALLC], %g3		! load system call handler
 
@@ -371,7 +371,7 @@ _syscall_post:
 	mov	LMS_USER, %o0
 	call 	syscall_mstate
 	mov	LMS_SYSTEM, %o1
-		
+
  	lduw	[%l1 + O0_OFF + 4], %o0		! reload 32-bit args
 	lduw	[%l1 + O1_OFF + 4], %o1
 	lduw	[%l1 + O2_OFF + 4], %o2
@@ -389,7 +389,7 @@ _syscall_post:
 	cmp	%g1, NSYSCALL			! check range
 	sth	%g1, [THREAD_REG + T_SYSNUM]	! save syscall code
 	bgeu,pn	%ncc, _syscall_ill32
-	  sll	%g1, SYSENT_SHIFT, %g4		! delay - get index 
+	  sll	%g1, SYSENT_SHIFT, %g4		! delay - get index
 	add	%g3, %g4, %g5			! g5 = addr of sysentry
 	ldx	[%g5 + SY_CALLC], %g3		! load system call handler
 
@@ -413,7 +413,7 @@ _syscall_post:
 	!
 	! If handler returns long long then we need to split the 64 bit
 	! return value in %o0 into %o0 and %o1 for ILP32 clients.
-	!	
+	!
 	lduh    [%l4 + SY_FLAGS], %g4           ! load sy_flags
 	andcc	%g4, SE_64RVAL | SE_32RVAL2, %g0 ! check for 64-bit return
 	bz,a,pt	%xcc, 5f

@@ -28,25 +28,25 @@
 /
 / memchr(sptr, c1, n)
 /
-/ Returns the pointer in sptr at which the character c1 appears; 
+/ Returns the pointer in sptr at which the character c1 appears;
 / or NULL if not found in chars; doesn't stop at \0.
 /
 / Fast assembly language version of the following C-program memchr
 / which represents the `standard' for the C-library.
-/ 
+/
 /	void *
 /	memchr(const void *sptr, int c1, size_t n)
 /	{
 /		if (n != 0) {
-/			unsigned char	c = (unsigned char)c1; 
-/			const unsigned char	*sp = sptr; 
+/			unsigned char	c = (unsigned char)c1;
+/			const unsigned char	*sp = sptr;
 /
 /			do {
 /				if (*sp++ == c)
-/					return ((void *)--sp); 
-/			} while (--n != 0); 
+/					return ((void *)--sp);
+/			} while (--n != 0);
 /		}
-/		return (NULL); 
+/		return (NULL);
 /	}
 /
 
@@ -86,7 +86,7 @@
 	incq	%rdi		/ next byte
 	jmp	.L1		/ goto .L1
 	.align	4
-.L8:	
+.L8:
 	xorl	%eax, %eax	/ not found
 	ret			/ return (0)
 	.align	4
@@ -104,16 +104,16 @@
 	jmp	.L1		/ goto .L1
 	.align	4
 .L7:
-	/ found at the fourth byte	
+	/ found at the fourth byte
 	incq	%rdi
 .L6:
 	/ found at the third byte
 	incq	%rdi
 .L5:
-	/ found at the second byte	
+	/ found at the second byte
 	incq	%rdi
 .L4:
-	/ found at the first byte	
+	/ found at the first byte
 	movq	%rdi,%rax
-	ret			 
+	ret
 	SET_SIZE(memchr)

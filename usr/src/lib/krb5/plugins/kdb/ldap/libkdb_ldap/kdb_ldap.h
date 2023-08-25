@@ -176,7 +176,7 @@ extern void prepend_err_str (krb5_context ctx, const char *s, krb5_error_code er
 					      && ldap_context->server_info_list)) { \
 					  return KRB5_KDB_DBNOTINITED; \
 					}
-     
+
 #define HNDL_LOCK(lcontext) k5_mutex_lock(&lcontext->hndl_lock)
 #define HNDL_UNLOCK(lcontext) k5_mutex_unlock(&lcontext->hndl_lock)
 
@@ -218,7 +218,7 @@ struct _krb5_ldap_server_info {
 
 /* ldap server structure */
 
-typedef enum {SERVICE_DN_TYPE_SERVER, SERVICE_DN_TYPE_CLIENT} krb5_ldap_servicetype; 
+typedef enum {SERVICE_DN_TYPE_SERVER, SERVICE_DN_TYPE_CLIENT} krb5_ldap_servicetype;
 
 typedef struct _krb5_ldap_context {
   krb5_ldap_servicetype         service_type;
@@ -264,16 +264,16 @@ krb5_ldap_rebind(krb5_ldap_context *, krb5_ldap_server_handle **);
 krb5_error_code
 krb5_ldap_db_get_age(krb5_context, char *, time_t *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_lib_init(void);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_lib_cleanup(void);
 
-void * 
+void *
 krb5_ldap_alloc( krb5_context kcontext,  void *ptr, size_t size );
 
-void 
+void
 krb5_ldap_free( krb5_context kcontext, void *ptr );
 krb5_error_code
 krb5_ldap_get_mkey(krb5_context, krb5_keyblock **);
@@ -284,11 +284,11 @@ krb5_ldap_set_mkey(krb5_context, char *, krb5_keyblock *);
 krb5_error_code
 krb5_ldap_create(krb5_context , char *, char **);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_open( krb5_context , char *,
 		char **db_args,
 		int mode );
-krb5_error_code 
+krb5_error_code
 krb5_ldap_close( krb5_context );
 
 krb5_error_code

@@ -38,7 +38,7 @@ ROOTBINAUTHS = $(AUTHS:%=$(ROOTBIN)/%)
 CPPFLAGS +=	-D_REENTRANT
 LDLIBS +=	-lsecdb
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTBINAUTHS)
 

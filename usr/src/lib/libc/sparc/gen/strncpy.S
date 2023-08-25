@@ -39,8 +39,8 @@
  *	strncpy(char *s1, const char *s2, size_t n)
  *	{
  *		char *os1 = s1;
- *	
- *		n++;				
+ *
+ *		n++;
  *		while ((--n != 0) &&  ((*s1++ = *s2++) != '\0'))
  *			;
  *		if (n != 0)
@@ -69,7 +69,7 @@
 	bz	.doneshort		! if n == 0, done
 	cmp	%o2, 7			! n < 7 ?
 	add	%o1, %o2, %o3		! src = src + n
-	blu	.shortcpy		! n < 7, use byte-wise copy 
+	blu	.shortcpy		! n < 7, use byte-wise copy
 	add	%o0, %o2, %o2		! dst = dst + n
 	andcc	%o1, 3, %o5		! src word aligned ?
 	bz	.wordaligned		! yup
@@ -90,7 +90,7 @@
 	bnz	.alignsrc		! no, copy another byte
 	.empty
 
-.wordaligned:	
+.wordaligned:
 	add	%i2, %i4, %l0		! dst
 	sethi	%hi(0x01010101), %l1	! Alan Mycroft's magic1
 	sub	%i2, 4, %i2		! adjust for dest pre-incr in cpy loops
@@ -98,7 +98,7 @@
 	andcc	%l0, 3, %g1		! destination word aligned ?
 	bnz	.dstnotaligned		! nope
 	sll	%l1, 7, %i5		! create Alan Mycroft's magic2
-	
+
 .storeword:
 	lduw	[%i3 + %i4], %i1	! src dword
 	addcc	%i4, 4, %i4		! n += 4, src += 4, dst += 4
@@ -109,9 +109,9 @@
 	bz,a	.storeword		! no zero byte if magic expression == 0
 	stw	%i1, [%i2 + %i4]	! store word to dst (address pre-incremented)
 
-	! n has not expired, but src is at the end. we need to push out the 
+	! n has not expired, but src is at the end. we need to push out the
 	! remaining src bytes and then start padding with null bytes
-	
+
 .zerobyte:
 	add	%i2, %i4, %l0		! pointer to dest string
 	srl	%i1, 24, %g1		! first byte
@@ -138,7 +138,7 @@
 	andcc	%l0, 3, %l1		! dst offset relative to word boundary
 	bz	.fillaligned		! dst already word aligned
 
-	! here there is a least one more byte to zero out: otherwise we would 
+	! here there is a least one more byte to zero out: otherwise we would
 	! have exited through label .lastword
 
 	sub	%l1, 4, %l1		! bytes to align dst to word boundary
@@ -164,8 +164,8 @@
 	add	%i4, %i2, %i4		! if word count odd, n -= 4
 	bz	.bytepad		! if word count == 1, pad bytes left
 	add	%l0, %i2, %l0		! bump dst if word count odd
-		
-.fillword:	
+
+.fillword:
 	addcc	%l1, 8, %l1		! count -= 8
 	stw	%g0, [%l0]		! dst[n] = 0
 	stw	%g0, [%l0 + 4]		! dst[n+4] = 0
@@ -180,7 +180,7 @@
 	stb	%g0, [%l0]		! store first byte
 	addcc	%i4, %i2, %i4		! byte count == 1 ?
 	bz	.done			! yup, we are done
-	add	%l0, %i2, %l0		! bump pointer if odd		
+	add	%l0, %i2, %l0		! bump pointer if odd
 
 .fillbyte:
 	addcc	%i4, 2, %i4		! n -= 2
@@ -193,13 +193,13 @@
 	ret				! done
 	restore	%i0, %g0, %o0		! restore reg window, return dst
 
-	! this is the last word. It may contain null bytes. store bytes 
+	! this is the last word. It may contain null bytes. store bytes
 	! until n == 0. if null byte encountered, continue
 
 .lastword:
 	sub	%i4, 4, %i4		! undo counter pre-increment
 	add	%i2, 4, %i2		! adjust dst for counter un-bumping
-	
+
 	srl	%i1, 24, %g1		! first byte
 	stb	%g1, [%i2 + %i4]	! store it
 	inccc	%i4			! n--
@@ -239,7 +239,7 @@
 	andcc	%l0, %g1, %g0		! ((x - 0x01010101) & ~x & 0x80808080)
 	bnz	.zerobyte		! end of src found, may need to pad
 	add	%i2, %i4, %l0		! dst (in pointer form)
-	srl	%i1, 24, %g1		! %g1<7:0> = 1st byte; half-word aligned now 
+	srl	%i1, 24, %g1		! %g1<7:0> = 1st byte; half-word aligned now
 	stb	%g1, [%l0]		! store first byte
 	srl	%i1, 8, %g1		! %g1<15:0> = bytes 2, 3
 	sth	%g1, [%l0 + 1]		! store bytes 2, 3
@@ -262,7 +262,7 @@
 	sth	%g1, [%l0]		! store bytes 1, 2
 	ba	.storehalfword		! next dword
 	sth	%i1, [%l0 + 2]		! store bytes 3, 4
-	
+
 .shortcpy:
 	ldub	[%o3 + %o4], %o5	! src[]
 	stb	%o5, [%o2 + %o4]	! dst[] = src[]
@@ -271,7 +271,7 @@
 	tst	%o5			! src[] == 0 ?
 	bnz,a	.shortcpy		! nope, next byte
 	nop				! empty delay slot
-	
+
 .padbyte:
 	stb	%g0, [%o2 + %o4]	! dst[] = 0
 .padbyte2:

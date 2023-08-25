@@ -589,7 +589,7 @@ command(union reptr *ipc)
 			hspend = p2 - 1;
 			break;
 
-		case YCOM: 
+		case YCOM:
 			p1 = linebuf;
 			p2 = ipc->r1.re1;
 			while(*p1 = p2[(unsigned char)*p1])	p1++;

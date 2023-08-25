@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
- 
+
 /*
  * Process switching routines.
  */
@@ -46,7 +46,7 @@
  * processor is capable of being dispatched by another processor.
  * some overlap between outgoing and incoming threads can happen
  * when they are the same thread. in this case where the threads
- * are the same, resume() on one processor will spin on the incoming 
+ * are the same, resume() on one processor will spin on the incoming
  * thread until resume() on the other processor has finished with
  * the outgoing thread.
  *
@@ -55,7 +55,7 @@
  * The MMU context, therefore, only changes when resuming a thread in
  * a process different from curproc.
  *
- * resume_from_intr() is called when the thread being resumed was not 
+ * resume_from_intr() is called when the thread being resumed was not
  * passivated by resume (e.g. was interrupted).  This means that the
  * resume lock is already held and that a restore context is not needed.
  * Also, the MMU context is not changed on the resume in this case.
@@ -92,7 +92,7 @@
 
 	!
 	! kernel thread
-	!	
+	!
 	! we save fprs at the beginning the stack so we know
 	! where to check at resume time
 	ldn	[THREAD_REG + T_STACK], %i2
@@ -100,7 +100,7 @@
 	andcc	%g4, FPRS_FEF, %g0		! is FPRS_FEF set
 	bz,pt	%icc, 1f			! nope, skip
 	  st	%g4, [%i2 + SA(MINFRAME) + FPU_FPRS]	! save fprs
-	  
+
 	! save kernel fp state in stack
 	add	%i2, SA(MINFRAME), %o0		! o0 = kfpu_t ptr
 	rd	%gsr, %g5
@@ -172,9 +172,9 @@
 	!	%i1 = cpu pointer
 	!	%i2 = old proc pointer
 	!	%i3 = new proc pointer
-	!	
+	!
 	! Here we are in the idle thread, have dropped the old thread.
-	! 
+	!
 	ALTENTRY(_resume_from_idle)
 
 	! SET_KCONTEXTREG(reg0, reg1, reg2, reg3, reg4, label1, label2, label3)
@@ -208,7 +208,7 @@
 	membar	#LoadLoad|#StoreLoad
 
 0:
-	! 
+	!
 	! disable interrupts
 	!
 	! if resume from user to kernel thread
@@ -236,7 +236,7 @@
 
 	call	sfmmu_setctx_sec		! switch to kernel context
 	  or	%o0, %o1, %o0
-	
+
 	ba,a,pt	%icc, 4f
 
 	!
@@ -261,19 +261,19 @@
 	set	SFMMU_SHARED, %o3		! %o3 = sfmmu shared flag
 	call	sfmmu_alloc_ctx
 	  mov	1, %o1				! %o1 = allocate flag = 1
-	
+
 4:
 	call	sfmmu_load_mmustate		! program MMU registers
 	  mov	%i5, %o0
 
 	wrpr    %g0, %i4, %pstate               ! enable interrupts
-	
+
 5:
 	!
 	! spin until dispatched thread's mutex has
 	! been unlocked. this mutex is unlocked when
 	! it becomes safe for the thread to run.
-	! 
+	!
 	ldstub	[%i0 + T_LOCK], %o0	! lock curthread's t_lock
 6:
 	brnz,pn	%o0, 7f			! lock failed
@@ -410,7 +410,7 @@
 	andcc	%o0, T_INTR_THREAD, %g0
 	bnz,pn	%xcc, 0f
 	  nop
-5:		
+5:
 	call	__dtrace_probe___sched_on__cpu	! DTrace probe
 	nop
 
@@ -418,7 +418,7 @@
 	restore
 0:
 	add	THREAD_REG, T_INTR_START, %o2
-1:	
+1:
 	ldx	[%o2], %o1
 	RD_CLOCK_TICK(%o0,%o3,%g5,__LINE__)
 	casx	[%o2], %o1, %o0
@@ -448,7 +448,7 @@
 	mov	%i0, %o0			! arg for DTrace probe
 
 	ldn	[THREAD_REG + T_CPU], %i1	! cpu pointer
-					
+
 	flushw					! flushes all but this window
 	ldn	[THREAD_REG + T_PROCP], %i2	! old procp for mmu ctx
 
@@ -463,7 +463,7 @@
 	!
 	! Set the idle thread as the current thread.
 	! Put the zombie on death-row.
-	! 	
+	!
 	mov	THREAD_REG, %o0			! save %g7 = curthread for arg
 	mov	%o2, THREAD_REG			! set %g7 to idle
 	stn	%g0, [%i1 + CPU_MPCB]		! clear mpcb
@@ -480,7 +480,7 @@
 	!	%i1 = cpu
 	!	%i2 = old proc
 	!	%i3 = new proc
-	!	
+	!
 	b	_resume_from_idle		! finish job of resume
 	ldn	[%i0 + T_PROCP], %i3		! new process
 	SET_SIZE(resume_from_zombie)
@@ -566,7 +566,7 @@
 	! Reset cpu_intrcnt if we aren't pinning anyone
 	brz,a,pt %l1, 2f
 	stub	%g0, [%i1 + CPU_INTRCNT]
-2:	
+2:
 	ba,pt	%xcc, 1b
 	nop
 3:

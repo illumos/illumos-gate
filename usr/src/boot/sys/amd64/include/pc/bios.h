@@ -58,7 +58,7 @@ struct bios_smap_xattr {
     u_int32_t	type;
     u_int32_t	xattr;
 } __packed;
-	
+
 /*
  * System Management BIOS
  */

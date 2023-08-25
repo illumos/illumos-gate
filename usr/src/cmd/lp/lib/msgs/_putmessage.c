@@ -118,7 +118,7 @@ int _putmessage (buf, type, arg)
 		    }
 		    else
 			*(buf + size) = '\0';
-		
+
 		size +=	t_short;
 		break;
 	}

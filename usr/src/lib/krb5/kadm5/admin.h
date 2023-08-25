@@ -36,7 +36,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -50,7 +50,7 @@ extern "C" {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
@@ -73,7 +73,7 @@ extern "C" {
  * Solaris Kerberos:
  * The kadmin/admin principal is unused on Solaris. This principal is used
  * in AUTH_GSSAPI but Solaris doesn't support AUTH_GSSAPI. RPCSEC_GSS can only
- * be used with host-based principals. 
+ * be used with host-based principals.
  *
  */
 /* #define KADM5_ADMIN_SERVICE	"kadmin/admin" */
@@ -373,7 +373,7 @@ krb5_error_code kadm5_get_config_params(krb5_context context,
 					kadm5_config_params *params_in,
 					kadm5_config_params *params_out);
 
-krb5_error_code kadm5_free_config_params(krb5_context context, 
+krb5_error_code kadm5_free_config_params(krb5_context context,
 					 kadm5_config_params *params);
 
 krb5_error_code kadm5_free_realm_params(krb5_context kcontext,
@@ -395,7 +395,7 @@ kadm5_ret_t    kadm5_init(char *client_name, char *pass,
 			  char **db_args,
 			  void **server_handle);
 kadm5_ret_t    kadm5_init_with_password(char *client_name,
-					char *pass, 
+					char *pass,
 					char *service_name,
 #if USE_KADM5_API_VERSION == 1
 					char *realm,
@@ -561,7 +561,7 @@ kadm5_ret_t    kadm5_get_privs(void *server_handle,
 
 kadm5_ret_t    kadm5_chpass_principal_util(void *server_handle,
 					   krb5_principal princ,
-					   char *new_pw, 
+					   char *new_pw,
 					   char **ret_pw,
 					   char *msg_ret,
 					   unsigned int msg_len);
@@ -586,7 +586,7 @@ kadm5_ret_t    kadm5_free_key_data(void *server_handle,
 				   krb5_key_data *key_data);
 #endif
 
-kadm5_ret_t    kadm5_free_name_list(void *server_handle, char **names, 
+kadm5_ret_t    kadm5_free_name_list(void *server_handle, char **names,
 				    int count);
 
 krb5_error_code kadm5_init_krb5_context (krb5_context *);
@@ -623,7 +623,7 @@ enum	ovsec_kadm_saltmod  { OVSEC_KADM_MOD_KEEP, OVSEC_KADM_MOD_V4, OVSEC_KADM_MO
  * Successful return code
  */
 #define OVSEC_KADM_OK	0
- 
+
 /*
  * Create/Modify masks
  */
@@ -705,9 +705,9 @@ ovsec_kadm_ret_t    ovsec_kadm_init(char *client_name, char *pass,
 				    char **db_args,
 				    void **server_handle);
 ovsec_kadm_ret_t    ovsec_kadm_init_with_password(char *client_name,
-						  char *pass, 
+						  char *pass,
 						  char *service_name,
-						  char *realm, 
+						  char *realm,
 						  krb5_ui_4 struct_version,
 						  krb5_ui_4 api_version,
 						  char ** db_args,
@@ -775,7 +775,7 @@ ovsec_kadm_ret_t    ovsec_kadm_get_privs(void *server_handle,
 
 ovsec_kadm_ret_t    ovsec_kadm_chpass_principal_util(void *server_handle,
 						     krb5_principal princ,
-						     char *new_pw, 
+						     char *new_pw,
 						     char **ret_pw,
 						     char *msg_ret);
 

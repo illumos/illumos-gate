@@ -352,7 +352,7 @@ init_context_5709(
             }
 
             DbgBreakIf(val & CTX_HOST_PAGE_TBL_CTRL_WRITE_REQ);
-            
+
             mem_virt += LM_PAGE_SIZE;
             LM_INC64(&mem_phy, LM_PAGE_SIZE);
             mem_size -= LM_PAGE_SIZE;
@@ -523,7 +523,7 @@ lm_chip_reset(
                 OFFSETOF(shmem_region_t, drv_fw_cap_mb.drv_ack_cap_mb),
             val);
     }
-    
+
     /* Wait for the firmware to tell us it is ok to issue a reason. */
     (void) fw_reset_sync(pdev, reason, DRV_MSG_DATA_WAIT0, FW_ACK_TIME_OUT_MS*1000);
 
@@ -683,15 +683,15 @@ lm_chip_reset(
     if(CHIP_NUM(pdev) == CHIP_NUM_5709)
     {
         /* make sure the MSI-X setting is preserved */
-        REG_WR(pdev, 
-               pci.pci_grc_window_addr, 
-               (pdev->hw_info.shmem_base & ~0x7fff) | 
+        REG_WR(pdev,
+               pci.pci_grc_window_addr,
+               (pdev->hw_info.shmem_base & ~0x7fff) |
                 PCI_GRC_WINDOW_ADDR_SEP_WIN);
-        
-        REG_WR(pdev, 
-               pci.pci_grc_window1_addr, 
+
+        REG_WR(pdev,
+               pci.pci_grc_window1_addr,
                (pdev->hw_info.shmem_base & ~0x7fff) + 0x6000 /*0x16e000 */);
-    
+
         REG_WR(pdev,
                pci.pci_grc_window2_addr,
                MSIX_TABLE_ADDR /*MSIX vector addr */);
@@ -702,7 +702,7 @@ lm_chip_reset(
         REG_WR(pdev, pci.pci_msix_pba_off_bit, PCI_GRC_WINDOW3_BASE);
         if(pdev->params.ena_large_grc_timeout)
         {
-            /* this workaround cause IBM minnow to reboot randomly */ 
+            /* this workaround cause IBM minnow to reboot randomly */
             /* set large GRC timeout in MSIX mode */
             REG_RD(pdev, misc.misc_eco_hw_ctl, &val);
             val |= MISC_ECO_HW_CTL_LARGE_GRC_TMOUT_EN;
@@ -720,7 +720,7 @@ lm_chip_reset(
         /* Default 32k window. */
         REG_WR(pdev, pci.pci_grc_window_addr, pdev->hw_info.shmem_base & ~0x7fff);
     }
-    
+
     /* 5706A0 workaround. */
     if(CHIP_ID(pdev) == CHIP_ID_5706_A0)
     {
@@ -1041,7 +1041,7 @@ init_l2txq(
         val = (L4CTX_TYPE_TYPE_L2 << 24) |
               (((sizeof(l4_context_t) + 0x1f) & ~0x1f) / 0x20) << 16;
 #else
-        // This is equivalent as above, but some constants/structures are not 
+        // This is equivalent as above, but some constants/structures are not
         // defined for Solaris
         val = (0x10 << 24) |
               (((80 * sizeof(u32_t) + 0x1f) & ~0x1f) / 0x20) << 16;
@@ -1158,15 +1158,15 @@ init_l2rxq(
             WORD_ALIGNED_OFFSETOF(l2_bd_chain_context_t, l2ctx_nx_bdhaddr_lo),
             val);
 
-        //  In case we are coming out from hibernation, we need to restore 
-        //  previous MTU setting. Otherwise, we would initialize max packet 
+        //  In case we are coming out from hibernation, we need to restore
+        //  previous MTU setting. Otherwise, we would initialize max packet
         //  length to default (i.e. initial power-up)
         CTX_WR(
             pdev,
             rxq->cid_addr,
             WORD_ALIGNED_OFFSETOF(l2_bd_chain_context_t, l2ctx_max_pkt_len),
             rxq->max_pkt_len ?
-                rxq->max_pkt_len:  
+                rxq->max_pkt_len:
                 pdev->params.mtu + 4);  // + 4 L2CRC
 
 
@@ -1306,29 +1306,29 @@ init_kq(
 
 /*******************************************************************************
  * Description:  Determines the flow control, MAC, and CU trip values
- * 
+ *
  * xoff = processing_q_delay + propagation_delay + response_delay +
  *        propagation_delay for return path + drop_margin_delay
  * xon = xoff + (mtu/mbuf_size)
- *  
- * MAC_drop = drop_margin_low*mtu/mbuf_size 
- * MAC_keep = drop_margin_high*mtu/mbuf_size 
- *  
- * CU_drop =  (drop_margin_low+1)*mtu/mbuf_size 
- * CU_keep =  (drop_margin_high)*mtu/mbuf_size  
- *  
+ *
+ * MAC_drop = drop_margin_low*mtu/mbuf_size
+ * MAC_keep = drop_margin_high*mtu/mbuf_size
+ *
+ * CU_drop =  (drop_margin_low+1)*mtu/mbuf_size
+ * CU_keep =  (drop_margin_high)*mtu/mbuf_size
+ *
  * processing_q_delay = ((mtu+20)/(64+20))+1)
  * propagation_delay = 1
  * response_time = 2 (quanta)
  * mbuf_size = 128
  * response_delay = (response_time*512)/(mbuf_size*8) + (mtu/mbuf_size)
- * drop_margin_low = 0.5 
- * drop_margin_high = 2.5 
- * drop_margin_mid = 1.5 
+ * drop_margin_low = 0.5
+ * drop_margin_high = 2.5
+ * drop_margin_mid = 1.5
  * drop_margin_delay = (mtu*drop_margin_mid/mbuf_size)
- * 
- * Table: 
- *  
+ *
+ * Table:
+ *
  * Return:  Flow control, MAC, and CU trip values
  ******************************************************************************/
 typedef enum
@@ -1373,7 +1373,7 @@ get_trip_val(
             *val += isolate_rbuf_trip_tbl[type][1];
         else
             *val += trip_tbl[type][1];
-            
+
         mtu -= MTU_STEP;
     }
     if(enable_cu_rate_limiter)
@@ -1510,16 +1510,16 @@ init_5709_for_msix(
 
     DbgBreakIf(CHIP_NUM(pdev) != CHIP_NUM_5709);
 
-    REG_WR(pdev, 
-           pci.pci_grc_window_addr, 
-           (pdev->hw_info.shmem_base & ~0x7fff) | 
+    REG_WR(pdev,
+           pci.pci_grc_window_addr,
+           (pdev->hw_info.shmem_base & ~0x7fff) |
             PCI_GRC_WINDOW_ADDR_SEP_WIN);
-    
-    REG_WR(pdev, 
-           pci.pci_grc_window1_addr, 
+
+    REG_WR(pdev,
+           pci.pci_grc_window1_addr,
            (pdev->hw_info.shmem_base & ~0x7fff) + 0x6000 /*0x16e000 */);
-    
-    REG_RD(pdev, pci_config.pcicfg_msix_control, &val); 
+
+    REG_RD(pdev, pci_config.pcicfg_msix_control, &val);
     switch(pdev->vars.interrupt_mode)
     {
         case IRQ_MODE_MSIX_BASED:
@@ -1531,13 +1531,13 @@ init_5709_for_msix(
 
         case IRQ_MODE_MSI_BASED:
             /* enable 16 messages so hardware will
-             * generate maximum of 9 messages 
+             * generate maximum of 9 messages
              */
             REG_RD(pdev,
                    pci_config.pcicfg_msi_control,
                    &val);
             val &= PCICFG_MSI_CONTROL_MENA;
-            val |= PCICFG_MSI_CONTROL_MENA_16; 
+            val |= PCICFG_MSI_CONTROL_MENA_16;
             REG_WR(pdev,
                    pci_config.pcicfg_msi_control,
                    (u16_t)val);
@@ -1548,7 +1548,7 @@ init_5709_for_msix(
             if(val & PCICFG_MSIX_CONTROL_MSIX_ENABLE)
             {
                 u32_t idx, addr_l, addr_h, vec_data;
-                
+
                 REG_WR(pdev,
                        hc.hc_msix_bit_vector,
                        HC_MSIX_BIT_VECTOR_VAL);
@@ -1569,20 +1569,20 @@ init_5709_for_msix(
                 {
                     REG_WR_IND(
                         pdev,
-                        OFFSETOF(reg_space_t, 
-                                 hc1.hc1_msix_vector0_addr_l) + 
+                        OFFSETOF(reg_space_t,
+                                 hc1.hc1_msix_vector0_addr_l) +
                                  idx*4*sizeof(u32_t),
                         addr_l);
                     REG_WR_IND(
                         pdev,
-                        OFFSETOF(reg_space_t, 
-                                 hc1.hc1_msix_vector0_addr_h) + 
+                        OFFSETOF(reg_space_t,
+                                 hc1.hc1_msix_vector0_addr_h) +
                                  idx*4*sizeof(u32_t),
                         addr_h);
                     REG_WR_IND(
                         pdev,
-                        OFFSETOF(reg_space_t, 
-                                 hc1.hc1_msix_vector0_data) + 
+                        OFFSETOF(reg_space_t,
+                                 hc1.hc1_msix_vector0_data) +
                                  idx*4*sizeof(u32_t),
                         vec_data);
                 }
@@ -1602,12 +1602,12 @@ init_5709_for_msix(
         case IRQ_MODE_LINE_BASED:
             /* do nothing */
         break;
-        
+
         default:
             DbgBreakMsg("Unknown interrupt mode\n");
             break;
     }
-    
+
     REG_WR(pdev,
            pci.pci_grc_window2_addr,
            MSIX_TABLE_ADDR /*MSIX vector addr */);
@@ -1661,7 +1661,7 @@ init_hc(
         val &= ~HC_CONFIG_SET_MASK_AT_RD;
         //if(pdev->vars.interrupt_mode > IRQ_MODE_SIMD)
         //{
-        //    val |= HC_CONFIG_ONE_SHOT; 
+        //    val |= HC_CONFIG_ONE_SHOT;
         //}
     }
 
@@ -1946,13 +1946,13 @@ init_hc_for_57728(
  * Return:
  ******************************************************************************/
 
-// Refer to TetonII Register spec, setting bits in krl_???_mask1 and 
-// krl_???_mask2 will cause the corresponding engine (CP or RV2P) to be 
-// activated when any word enabled by this mask is written. Mask1 is 
-// for first 128 bytes and mask2 is for second 128 bytes. 
+// Refer to TetonII Register spec, setting bits in krl_???_mask1 and
+// krl_???_mask2 will cause the corresponding engine (CP or RV2P) to be
+// activated when any word enabled by this mask is written. Mask1 is
+// for first 128 bytes and mask2 is for second 128 bytes.
 // Each bit in the mask correspond to a 32 bit word in the kernal area.
 // e.g. Writing 0x2000 to the mask2 means activating the engine
-// when context location 0xB4 is being written 
+// when context location 0xB4 is being written
 // (i.e. (0xB4 - 128)/sizeof(u32_t) = bit 13
 #define KNL_L4_MASK(field)    \
     (1<<(OFFSETOF(l4_context_t, l4ctx_l4_bd_chain_##field) & ~0x80)/sizeof(u32_t))
@@ -2109,18 +2109,18 @@ lm_reset_setup(
     {
         lm_init_cpus(pdev, CPU_ALL);
     }
-   
+
     if(CHIP_NUM(pdev) == CHIP_NUM_5709)
     {
         REG_RD_IND(
             pdev,
             OFFSETOF(reg_space_t, rxp.rxp_scratch[0])+
-            RXP_HSI_OFFSETOFF(hw_filter_ctx_offset), 
+            RXP_HSI_OFFSETOFF(hw_filter_ctx_offset),
             &pdev->vars.hw_filter_ctx_offset);
-        
+
         init_5709_for_msix(pdev);
     }
-    
+
     lm_nvram_init(pdev, FALSE);
 
     /* tcp_syn_dos_defense - let the firmware route all the packets with
@@ -2196,7 +2196,7 @@ lm_reset_setup(
              * frame size of 9018 ( note: each mbuf cluster is 128 bytes) */
             pdev->vars.cu_mbuf_cnt = 0x48;
         }
-        
+
         if(pdev->vars.cu_mbuf_cnt == 0)
         {
             /* chip default use 8k cu mbuf */
@@ -2209,24 +2209,24 @@ lm_reset_setup(
     }
     /* Added flow control trip setup, JF or non-JF */
     get_trip_val(
-        TRIP_FLOW, 
-        pdev->params.mtu, 
-        &val, 
+        TRIP_FLOW,
+        pdev->params.mtu,
+        &val,
         pdev->vars.enable_cu_rate_limiter,
         mbuf_adj);
-    
+
     REG_WR_IND(
             pdev,
             OFFSETOF(reg_space_t, rbuf.rbuf_config),
             val);
 
     get_trip_val(
-        TRIP_MAC, 
-        pdev->params.mtu, 
-        &val, 
+        TRIP_MAC,
+        pdev->params.mtu,
+        &val,
         pdev->vars.enable_cu_rate_limiter,
         mbuf_adj);
-    
+
     REG_WR_IND(
             pdev,
             OFFSETOF(reg_space_t, rbuf.rbuf_config2),
@@ -2252,7 +2252,7 @@ lm_reset_setup(
             pdev,
             OFFSETOF(reg_space_t, rbuf.rbuf_command),
             val);
-        
+
         REG_WR_IND(
                 pdev,
                 OFFSETOF(reg_space_t, rbuf.rbuf_config3),
@@ -2269,7 +2269,7 @@ lm_reset_setup(
         {
             /* get default cu_mbuf_cnt from chip */
             REG_RD_IND(
-                pdev, 
+                pdev,
                 OFFSETOF(reg_space_t, rbuf.rbuf_cu_buffer_size),
                 &val);
         }
@@ -2359,18 +2359,18 @@ lm_reset_setup(
     /* Enable Command Scheduler notification when we write to either
      * the Send Queue or Receive Queue producer indexes of the kernel
      * bypass contexts. */
-    REG_WR(pdev, mq.mq_knl_byp_cmd_mask1, KNL_L5_MASK(cq_cidx)|                                         
+    REG_WR(pdev, mq.mq_knl_byp_cmd_mask1, KNL_L5_MASK(cq_cidx)|
                                           KNL_L5_MASK(sq_pidx)|
                                           KNL_L5_MASK(rq_pidx));
-    REG_WR(pdev, mq.mq_knl_byp_write_mask1,  KNL_L5_MASK(cq_cidx)|  
+    REG_WR(pdev, mq.mq_knl_byp_write_mask1,  KNL_L5_MASK(cq_cidx)|
                                              KNL_L5_MASK(sq_pidx)|
                                              KNL_L5_MASK(rq_pidx));
 
     /* Use kernel mailbox for L5 context (iSCSI and rdma). */
-    REG_WR(pdev, mq.mq_knl_cmd_mask1,   KNL_L5_MASK(cq_cidx)|  
+    REG_WR(pdev, mq.mq_knl_cmd_mask1,   KNL_L5_MASK(cq_cidx)|
                                         KNL_L5_MASK(sq_pidx)|
                                         KNL_L5_MASK(rq_pidx));
-    REG_WR(pdev, mq.mq_knl_write_mask1,  KNL_L5_MASK(cq_cidx)|  
+    REG_WR(pdev, mq.mq_knl_write_mask1,  KNL_L5_MASK(cq_cidx)|
                                          KNL_L5_MASK(sq_pidx)|
                                          KNL_L5_MASK(rq_pidx));
 #ifndef L2_ONLY
@@ -2378,7 +2378,7 @@ lm_reset_setup(
     {
         /* Notify CP when the driver post an application buffer. (i.e. writing to host_bseq) */
         REG_WR(pdev, mq.mq_knl_cmd_mask2, KNL_L4_MASK(host_bseq));
-    }    
+    }
     else  // CHIP_NUM_5709
     {
         /* Notify RV2P when the driver post an application buffer. (i.e. writing to host_bseq) */

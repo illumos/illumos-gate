@@ -55,7 +55,7 @@ public class SLPTokenizer implements Enumeration
 	bRetDel = b;
 	index = 0;
     }
-    
+
     public SLPTokenizer(String s)
     {
 	initialize(s, "", false);
@@ -72,18 +72,18 @@ public class SLPTokenizer implements Enumeration
     }
 
     /**
-     * Calculates the number of times that this tokenizer's 
-     * nextToken method can be called before it generates an 
+     * Calculates the number of times that this tokenizer's
+     * nextToken method can be called before it generates an
      * exception.
      */
     public int countTokens()
     {
 	int i = 0;
-	
+
 	if (str.length() < 1) {
             return 0;
         }
-	
+
 	char c = str.charAt(0);
 	boolean inToken = false;
 
@@ -98,7 +98,7 @@ public class SLPTokenizer implements Enumeration
 		if (bRetDel) {
 		    i++;
 		}
-		
+
 		if (inToken == true) {
 		    i++; // we were in a token, now completed it
 		    inToken = false;
@@ -116,11 +116,11 @@ public class SLPTokenizer implements Enumeration
 
 	return i;
     }
-          
+
     /**
      * Returns the same value as the hasMoreTokens method.
      */
-    
+
     public boolean hasMoreElements()
     {
 	if (str.length() < 1) {
@@ -174,13 +174,13 @@ public class SLPTokenizer implements Enumeration
 	throws NoSuchElementException
     {
 	if (index >= str.length()) throw new NoSuchElementException();
-	
+
 	StringBuffer sb = new StringBuffer();
         char c = str.charAt(index);
 
 	if (bRetDel == true)
         {
-	    
+
 	    if (delims.indexOf(c) != -1) {
 
 		// We begin at a delimiter.  Return it & advance over.
@@ -237,7 +237,7 @@ public class SLPTokenizer implements Enumeration
 	    return sb.toString();
 	}
     }
-    
+
     /**
      * Returns the next token in this string tokenizer's string.
      */

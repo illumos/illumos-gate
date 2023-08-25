@@ -1,7 +1,7 @@
  /*
   * This module intercepts syslog() library calls and redirects their output
   * to the standard output stream. For interactive testing.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

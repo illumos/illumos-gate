@@ -473,7 +473,7 @@ idle_timeout(evContext opaqueCtx,
 
 	UNUSED(due);
 	UNUSED(inter);
-	
+
 	idle = evSubTime(ctx->lastEventTime, this->lastTouched);
 	if (evCmpTime(idle, this->max_idle) >= 0) {
 		(this->func)(opaqueCtx, this->uap, this->timer->due,

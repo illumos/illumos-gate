@@ -36,7 +36,7 @@
  *	krb5_context_size();
  *	krb5_context_externalize();
  *	krb5_context_internalize();
- * 
+ *
  * Routines to deal with externalizing the krb5_os_context:
  *	krb5_oscontext_size();
  *	krb5_oscontext_externalize();
@@ -90,7 +90,7 @@ static const krb5_ser_entry krb5_profile_ser_entry = {
     profile_ser_externalize,		/* Externalize routine	*/
     profile_ser_internalize		/* Internalize routine	*/
 };
-#endif 
+#endif
 
 /*
  * krb5_context_size()	- Determine the size required to externalize the
@@ -187,23 +187,23 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 
     if (required > remain)
 	return (ENOMEM);
-    
+
     /* First write our magic number */
     kret = krb5_ser_pack_int32(KV5M_CONTEXT, &bp, &remain);
     if (kret)
 	return (kret);
-    
+
     /* Now sizeof default realm */
     kret = krb5_ser_pack_int32((context->default_realm) ?
 			       (krb5_int32) strlen(context->default_realm) : 0,
 			       &bp, &remain);
     if (kret)
 	return (kret);
-    
+
     /* Now default_realm bytes */
     if (context->default_realm) {
 	kret = krb5_ser_pack_bytes((krb5_octet *) context->default_realm,
-				   strlen(context->default_realm), 
+				   strlen(context->default_realm),
 				   &bp, &remain);
 	if (kret)
 	    return (kret);
@@ -214,7 +214,7 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 			       &bp, &remain);
     if (kret)
 	return (kret);
-    
+
     /* Now serialize ktypes */
     for (i=0; i<context->in_tkt_ktype_count; i++) {
 	kret = krb5_ser_pack_int32((krb5_int32) context->in_tkt_ktypes[i],
@@ -222,13 +222,13 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 	if (kret)
 	    return (kret);
     }
-    
+
     /* Now number of default ktypes */
     kret = krb5_ser_pack_int32((krb5_int32) context->tgs_ktype_count,
 			       &bp, &remain);
     if (kret)
 	return (kret);
-	
+
     /* Now serialize ktypes */
     for (i=0; i<context->tgs_ktype_count; i++) {
 	kret = krb5_ser_pack_int32((krb5_int32) context->tgs_ktypes[i],
@@ -236,19 +236,19 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 	if (kret)
 	    return (kret);
     }
-	
+
     /* Now allowable clockskew */
     kret = krb5_ser_pack_int32((krb5_int32) context->clockskew,
 			       &bp, &remain);
     if (kret)
 	return (kret);
-	
+
     /* Now kdc_req_sumtype */
     kret = krb5_ser_pack_int32((krb5_int32) context->kdc_req_sumtype,
 			       &bp, &remain);
     if (kret)
 	return (kret);
-	
+
     /* Now default ap_req_sumtype */
     kret = krb5_ser_pack_int32((krb5_int32) context->default_ap_req_sumtype,
 			       &bp, &remain);
@@ -272,7 +272,7 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 			       &bp, &remain);
     if (kret)
 	return (kret);
-	
+
     /* Now profile_secure */
     kret = krb5_ser_pack_int32((krb5_int32) context->profile_secure,
 			       &bp, &remain);
@@ -299,7 +299,7 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 	if (kret)
 	    return (kret);
     }
-	
+
     /* Now handle database context, if appropriate */
     if (context->db_context) {
 	kret = krb5_externalize_opaque(kcontext, KV5M_DB_CONTEXT,
@@ -317,7 +317,7 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
 	if (kret)
 	    return (kret);
     }
-	
+
     /*
      * If we were successful, write trailer then update the pointer and
      * remaining length;
@@ -325,7 +325,7 @@ krb5_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **b
     kret = krb5_ser_pack_int32(KV5M_CONTEXT, &bp, &remain);
     if (kret)
 	return (kret);
-    
+
     *buffer = bp;
     *lenremain = remain;
 
@@ -376,14 +376,14 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
 				     (size_t) ibuf, &bp, &remain);
 	if (kret)
 	    goto cleanup;
-	
+
 	context->default_realm[ibuf] = '\0';
     }
-	
+
     /* Get the number of in_tkt_ktypes */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
-    
+
     context->in_tkt_ktype_count = (int) ibuf;
     context->in_tkt_ktypes = (krb5_enctype *) MALLOC(sizeof(krb5_enctype) *
 				     (context->in_tkt_ktype_count+1));
@@ -393,7 +393,7 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
     }
     (void) memset(context->in_tkt_ktypes, 0, (sizeof(krb5_enctype) *
 				       (context->in_tkt_ktype_count + 1)));
-    
+
     for (i=0; i<context->in_tkt_ktype_count; i++) {
 	if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	    goto cleanup;
@@ -403,7 +403,7 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
     /* Get the number of tgs_ktypes */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
-    
+
     context->tgs_ktype_count = (int) ibuf;
     context->tgs_ktypes = (krb5_enctype *) MALLOC(sizeof(krb5_enctype) *
 				  (context->tgs_ktype_count+1));
@@ -423,17 +423,17 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
     context->clockskew = (krb5_deltat) ibuf;
-    
+
     /* kdc_req_sumtype */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
     context->kdc_req_sumtype = (krb5_cksumtype) ibuf;
-    
+
     /* default ap_req_sumtype */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
     context->default_ap_req_sumtype = (krb5_cksumtype) ibuf;
-    
+
     /* default_safe_sumtype */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
@@ -463,7 +463,7 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
     context->scc_default_format = (int) ibuf;
-    
+
     /* Attempt to read in the os_context.  It's an array now, but
        we still treat it in most places as a separate object with
        a pointer.  */
@@ -487,8 +487,8 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
 				   &bp, &remain);
     if (kret && (kret != EINVAL) && (kret != ENOENT))
 	goto cleanup;
-    
-#ifndef _KERNEL 
+
+#ifndef _KERNEL
     /* Attempt to read in the profile */
     kret = krb5_internalize_opaque(kcontext, PROF_MAGIC_PROFILE,
 				   (krb5_pointer *) &context->profile,
@@ -496,7 +496,7 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
 #endif
     if (kret && (kret != EINVAL) && (kret != ENOENT))
 	goto cleanup;
-    
+
     /* Finally, find the trailer */
     if ((kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)))
 	goto cleanup;
@@ -597,7 +597,7 @@ krb5_oscontext_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet
 	kret = ENOMEM;
 
 	/* Get memory for the context */
-	if ((os_ctx = (krb5_os_context) 
+	if ((os_ctx = (krb5_os_context)
 	     MALLOC(sizeof(struct _krb5_os_context))) &&
 	    (remain >= 4*sizeof(krb5_int32))) {
 	    (void) memset(os_ctx, 0, sizeof(struct _krb5_os_context));
@@ -642,11 +642,11 @@ krb5_ser_context_init(krb5_context kcontext)
     /* Profile nformation need not be serialzied when we are importing the
      * context into kernel. Besides the function pointers to file access
      * routines can't be used in the kernel.
- 
+
      * Any info needed from the profile is already a part of the
      * exported context obviating the need for importer to know about
      * profile config files.
- 
+
     */
 
 #ifndef _KERNEL

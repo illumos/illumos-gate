@@ -1,6 +1,6 @@
 /*
  * src/lib/krb5/asn.1/asn1_get.c
- * 
+ *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -81,7 +81,7 @@ asn1_get_tag_2(asn1buf *buf, taginfo *t)
 	} else {
 	    int num;
 	    int len=0;
-    
+
 	    for (num = (int)(o&0x7F); num>0; num--) {
 		retval = asn1buf_remove_octet(buf,&o);
 		if(retval) return retval;

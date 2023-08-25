@@ -41,7 +41,7 @@ POFILES = $(LOCAL_OBJS:%.o=%.po) $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.po)
 
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
 CERRWARN += -_gcc=-Wno-unused-label
-LDLIBS += -lstmf 
+LDLIBS += -lstmf
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
 .KEEP_STATE:

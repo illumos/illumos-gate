@@ -53,7 +53,7 @@ FILEMODE=	04555
 
 .KEEP_STATE:
 
-all:		$(ROOTFS_PROG) 
+all:		$(ROOTFS_PROG)
 
 $(PROG):	$(OBJECTS) $$(LIBDUMP)
 	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS)

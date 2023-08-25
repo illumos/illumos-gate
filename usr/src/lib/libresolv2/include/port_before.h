@@ -63,7 +63,7 @@ struct timespec {
 #define HAVE_MD5 1
 #define SOLARIS2 1
 
-/* DO_PTHREADS is conditionally defined in sunw_port_before.h 
+/* DO_PTHREADS is conditionally defined in sunw_port_before.h
  * #define DO_PTHREADS 1 */
 #define GETGROUPLIST_ARGS const char *name, gid_t basegid, gid_t *groups, int *ngroups
 #define GETNETBYADDR_ADDR_T long
@@ -161,7 +161,7 @@ struct timespec {
 #define SERV_R_COPY buf, buflen
 #define SERV_R_COPY_ARGS SERV_R_ARGS
 #define SERV_R_END_RESULT(x) /*empty*/
-#define SERV_R_END_RETURN void 
+#define SERV_R_END_RETURN void
 #undef SERV_R_ENT_ARGS /*empty*/
 #undef SERV_R_ENT_UNUSED /*empty*/
 #define SERV_R_OK sptr

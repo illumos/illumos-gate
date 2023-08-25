@@ -93,7 +93,7 @@ struct mod_metadata {
 	const char	*md_cval;	/* common string label */
 };
 
-struct mod_pnp_match_info 
+struct mod_pnp_match_info
 {
 	const char *descr;	/* Description of the table */
 	const char *bus;	/* Name of the bus for this table */

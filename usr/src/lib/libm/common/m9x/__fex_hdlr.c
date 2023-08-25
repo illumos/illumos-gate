@@ -637,7 +637,7 @@ __fex_hdlr(int sig, siginfo_t *sip, ucontext_t *uap)
 	addr = (unsigned long)uap->uc_mcontext.fpregs.fp_reg_set.
 	    fpchip_state.state[3];
 #endif
-	accrued = uap->uc_mcontext.fpregs.fp_reg_set.fpchip_state.status & 
+	accrued = uap->uc_mcontext.fpregs.fp_reg_set.fpchip_state.status &
 	    ~te_bit[(int)e];
 	if (test_sse_hw)
 		accrued |= uap->uc_mcontext.fpregs.fp_reg_set.fpchip_state.

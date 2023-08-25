@@ -302,7 +302,7 @@ prldap_try_one_address( struct lextiof_socket_private *prsockp,
      * Set up address and open a TCP socket:
      */
     if ( PR_SUCCESS != PR_SetNetAddr( PR_IpAddrNull, /* don't touch IP addr. */
-		PRLDAP_DEFAULT_ADDRESS_FAMILY, (PRUint16)port, addrp )) { 
+		PRLDAP_DEFAULT_ADDRESS_FAMILY, (PRUint16)port, addrp )) {
 	return( -1 );
     }
 
@@ -408,20 +408,20 @@ prldap_connect( const char *hostlist, int defport, int timeout,
 		parse_err = ldap_x_hostlist_next( &host, &port, status )) {
 
 	if ( PR_SUCCESS == PR_StringToNetAddr( host, &addr )) {
-		
+
 		if ( PRLDAP_DEFAULT_ADDRESS_FAMILY == PR_AF_INET6 &&
 				PR_AF_INET == PR_NetAddrFamily( &addr )) {
 			PRUint32	ipv4ip = addr.inet.ip;
 			memset( &addr, 0, sizeof(addr));
 			PR_ConvertIPv4AddrToIPv6( ipv4ip, &addr.ipv6.ip );
 			addr.ipv6.family = PR_AF_INET6;
-			
+
 		}
 	    rc = prldap_try_one_address( prsockp, &addr, port,
 			timeout, options );
 	} else {
 	    if ( PR_SUCCESS == PR_GetIPNodeByName( host,
-			PRLDAP_DEFAULT_ADDRESS_FAMILY, PR_AI_DEFAULT | PR_AI_ALL, hbuf, 
+			PRLDAP_DEFAULT_ADDRESS_FAMILY, PR_AI_DEFAULT | PR_AI_ALL, hbuf,
 			sizeof( hbuf ), &hent )) {
 		PRIntn enumIndex = 0;
 

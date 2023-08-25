@@ -48,7 +48,7 @@
 ! 	} ll;
 ! 	long double	d;
 ! };
-! 
+!
 ! /*
 !  * __quad_mag_add(x, y, z, fsr)
 !  *
@@ -64,7 +64,7 @@
 ! 	unsigned long	lx, ly, frac, sticky;
 ! 	unsigned int	ex, ey, round, rm;
 ! 	int		e, uflo;
-! 
+!
 ! 	/* get the leading significand double-words and exponents */
 ! 	ex = (x->ll.msll >> 48) & 0x7fff;
 ! 	lx = x->ll.msll & ~0xffff000000000000ul;
@@ -72,14 +72,14 @@
 ! 		ex = 1;
 ! 	else
 ! 		lx |= 0x0001000000000000ul;
-! 
+!
 ! 	ey = (y->ll.msll >> 48) & 0x7fff;
 ! 	ly = y->ll.msll & ~0xffff000000000000ul;
 ! 	if (ey == 0)
 ! 		ey = 1;
 ! 	else
 ! 		ly |= 0x0001000000000000ul;
-! 
+!
 ! 	/* prenormalize y */
 ! 	e = (int) ex - (int) ey;
 ! 	round = sticky = 0;
@@ -101,13 +101,13 @@
 ! 			frac = (frac >> e) | (ly << (64 - e));
 ! 			ly >>= e;
 ! 		}
-! 
+!
 ! 		/* add, propagating carries */
 ! 		frac += x->ll.frac;
 ! 		lx += ly;
 ! 		if (frac < x->ll.frac)
 ! 			lx++;
-! 
+!
 ! 		/* postnormalize */
 ! 		if (lx >= 0x0002000000000000ul) {
 ! 			sticky |= round;
@@ -117,20 +117,20 @@
 ! 			ex++;
 ! 		}
 ! 	}
-! 
+!
 ! 	/* keep track of whether the result before rounding is tiny */
 ! 	uflo = (lx < 0x0001000000000000ul);
-! 
+!
 ! 	/* get the rounding mode, fudging directed rounding modes
 ! 	   as though the result were positive */
 ! 	rm = *fsr >> 30;
 ! 	if (z->l.msw)
 ! 		rm ^= (rm >> 1);
-! 
+!
 ! 	/* see if we need to round */
 ! 	if (round | sticky) {
 ! 		*fsr |= FSR_NXC;
-! 
+!
 ! 		/* round up if necessary */
 ! 		if (rm == FSR_RP || (rm == FSR_RN && round &&
 ! 			(sticky || (frac & 1)))) {
@@ -141,7 +141,7 @@
 ! 				}
 ! 		}
 ! 	}
-! 
+!
 ! 	/* check for overflow */
 ! 	if (ex >= 0x7fff) {
 ! 		/* store the default overflowed result */
@@ -162,7 +162,7 @@
 ! 		z->l.msw |= (lx >> 32) & 0xffff;
 ! 		z->l.frac2 = (lx & 0xffffffff);
 ! 		z->ll.frac = frac;
-! 
+!
 ! 		/* if the pre-rounded result was tiny and underflow trapping
 ! 		   is enabled, simulate underflow */
 ! 		if (uflo && (*fsr & FSR_UFM))
@@ -182,7 +182,7 @@
 	ldx	[%i0],%o0
 	srlx	%o0,48,%l0
 	andcc	%l0,%l7,%l0		! l0 = ex
-	beq,pn	%icc,1f	
+	beq,pn	%icc,1f
 	andn	%o0,%g1,%o0		! o0 = lx
 	ba,pt	%icc,2f
 	sub	%o0,%g1,%o0
@@ -357,7 +357,7 @@
 ! 	unsigned long	lx, ly, frac, sticky;
 ! 	unsigned int	ex, ey, gr, borrow, rm;
 ! 	int		e;
-! 
+!
 ! 	/* get the leading significand double-words and exponents */
 ! 	ex = (x->ll.msll >> 48) & 0x7fff;
 ! 	lx = x->ll.msll & ~0xffff000000000000ul;
@@ -365,14 +365,14 @@
 ! 		ex = 1;
 ! 	else
 ! 		lx |= 0x0001000000000000ul;
-! 
+!
 ! 	ey = (y->ll.msll >> 48) & 0x7fff;
 ! 	ly = y->ll.msll & ~0xffff000000000000ul;
 ! 	if (ey == 0)
 ! 		ey = 1;
 ! 	else
 ! 		ly |= 0x0001000000000000ul;
-! 
+!
 ! 	/* prenormalize y */
 ! 	e = (int) ex - (int) ey;
 ! 	gr = sticky = 0;
@@ -400,7 +400,7 @@
 ! 			ly >>= 1;
 ! 		}
 ! 	}
-! 
+!
 ! 	/* complement guard, round, and sticky as need be */
 ! 	gr <<= 1;
 ! 	if (sticky)
@@ -409,23 +409,23 @@
 !	if (gr)
 !		if (++frac == 0)
 !			ly++;
-! 
+!
 ! 	/* subtract, propagating borrows */
 ! 	frac = x->ll.frac - frac;
 ! 	lx -= ly;
 ! 	if (frac > x->ll.frac)
 ! 		lx--;
-! 
+!
 ! 	/* get the rounding mode */
 ! 	rm = *fsr >> 30;
-! 
+!
 ! 	/* handle zero result */
 ! 	if (!(lx | frac | gr)) {
 ! 		z->l.msw = ((rm == FSR_RM)? 0x80000000 : 0);
 ! 		z->l.frac2 = z->l.frac3 = z->l.frac4 = 0;
 ! 		return;
 ! 	}
-! 
+!
 ! 	/* postnormalize */
 ! 	if (lx < 0x0001000000000000ul) {
 ! 		/* if cancellation occurred or the exponent is 1,
@@ -449,14 +449,14 @@
 ! 			z->l.msw |= ((lx >> 32) & 0xffff);
 ! 			z->l.frac2 = (lx & 0xffffffff);
 ! 			z->ll.frac = frac;
-! 
+!
 ! 			/* if the result is tiny and underflow trapping is
 ! 			   enabled, simulate underflow */
 ! 			if (lx < 0x0001000000000000ul && (*fsr & FSR_UFM))
 ! 				*fsr |= FSR_UFC;
 ! 			return;
 ! 		}
-! 
+!
 ! 		/* otherwise we only borrowed one place */
 ! 		lx = (lx << 1) | (frac >> 63);
 ! 		frac = (frac << 1) | (gr >> 2);
@@ -465,15 +465,15 @@
 ! 	}
 ! 	else
 ! 		gr = (gr >> 1) | (gr & 1);
-! 
+!
 ! 	/* fudge directed rounding modes as though the result were positive */
 ! 	if (z->l.msw)
 ! 		rm ^= (rm >> 1);
-! 
+!
 ! 	/* see if we need to round */
 ! 	if (gr) {
 ! 		*fsr |= FSR_NXC;
-! 
+!
 ! 		/* round up if necessary */
 ! 		if (rm == FSR_RP || (rm == FSR_RN && (gr & 2) &&
 ! 			((gr & 1) || (frac & 1)))) {
@@ -484,7 +484,7 @@
 ! 				}
 ! 		}
 ! 	}
-! 
+!
 ! 	/* store the result */
 ! 	z->l.msw |= (ex << 16) | ((lx >> 32) & 0xffff);
 ! 	z->l.frac2 = (lx & 0xffffffff);

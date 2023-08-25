@@ -43,7 +43,7 @@
 #define	todigit(c)	((int)((c) - '0'))	/* char to digit */
 #define	toxdigit(c)	((isdigit(c))?todigit(c):(toupper(c)-(int)'A'+10))
 #define	isodigit(c)	(isdigit(c) && ((c) != '9') && ((c) != '8'))
-#define	itoac(i)	(((i) > 9) ? ((char)((i)-10) + 'A'):((char)(i) + '0'))	
+#define	itoac(i)	(((i) > 9) ? ((char)((i)-10) + 'A'):((char)(i) + '0'))
 #define	MASK(n)		((1 << (n)) - 1)
 
 #define	SBUFSIZE	128
@@ -196,7 +196,7 @@ int	n;
 }
 
 /* transfer block to a given destination or allocate one of the
-    right size 
+    right size
     if max = 0 : ignore max
 */
 

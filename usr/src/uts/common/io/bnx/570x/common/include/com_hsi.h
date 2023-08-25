@@ -21,31 +21,31 @@
 
 typedef struct _com_hsi_t {
     fw_version_t version;
-    u32_t fw_doorbell;        
+    u32_t fw_doorbell;
         #define KCQ_READY        (1<<0)
         #define KCQ1_READY       (1<<1)
         #define KCQ2_READY       (1<<2)
         #define KCQ3_READY       (1<<3)
-    u32_t dups;        
+    u32_t dups;
     u32_t dacks;
     u32_t pushs;
     u32_t compbits;
-    u32_t num_comq;  
-    u32_t num_comtq; 
-    u32_t num_comxq; 
-    u32_t unused_num_fail_reloads;   
-    u32_t rx_place;      
+    u32_t num_comq;
+    u32_t num_comtq;
+    u32_t num_comxq;
+    u32_t unused_num_fail_reloads;
+    u32_t rx_place;
     u32_t rtxs;          //  max_retx_cnt : maximum number of tcp retries
     u32_t min_rto_tick;  //  min_rto (in ticks of retx timer)
     u32_t max_rto_tick;  //  max_rto (in ticks of retx timer)
-    u32_t max_caf;       // max allowed ack frequency 
-    u32_t false_ooo_fin_cnt;   
-    u32_t l2_forward_to_mcp; 
-    u32_t l2_drop_mcpq_busy;  
+    u32_t max_caf;       // max allowed ack frequency
+    u32_t false_ooo_fin_cnt;
+    u32_t l2_forward_to_mcp;
+    u32_t l2_drop_mcpq_busy;
     u32_t drtxs;        // doubt reacheability tx count threshold (rfc 2923)
-                        // drtxs - maximum number of times that the offload target should 
-                        // retransmit a segment before indicating to the host stack that 
-                        // the reachability of a neighbor is in doubt.  
+                        // drtxs - maximum number of times that the offload target should
+                        // retransmit a segment before indicating to the host stack that
+                        // the reachability of a neighbor is in doubt.
     u32_t abort_ooo_fin_cnt;
     u32_t total_ooo_fin_cnt;
     u32_t caus;
@@ -53,15 +53,15 @@ typedef struct _com_hsi_t {
     u32_t defer_ooo_fin_cnt;
     u32_t l4_drop_cnt;  // number of l4 packets dropped by RV2P
     u32_t cozr;
-    u32_t com_l2_no_buffer; 
-    u32_t com_cu_host_bseq;  
-    u32_t tnda;  
-    u32_t tcnas; 
-    u32_t tccas; 
+    u32_t com_l2_no_buffer;
+    u32_t com_cu_host_bseq;
+    u32_t tnda;
+    u32_t tcnas;
+    u32_t tccas;
     u32_t caf;          // ack frequency
-    u32_t cmpl_dbg_cnt;  
-    u32_t hcwa_kwq_cons_idx;  
-    u32_t hcwa_last_kwq_cons_idx; 
+    u32_t cmpl_dbg_cnt;
+    u32_t hcwa_kwq_cons_idx;
+    u32_t hcwa_last_kwq_cons_idx;
     u32_t eaiv;
     u32_t reload_aft_fin_cnt;           // Number of reload after FIN
     u32_t enable_fast_iscsi_response;
@@ -71,7 +71,7 @@ typedef struct _com_hsi_t {
     u32_t iscsi_cq_size;                // Number of elements in queue. Its k lsb bits must be 0. bit 0 - arm bit - means CQ is armed
     u32_t iscsi_cq_cqes_per_page;       // Number of CQEs per page
     u32_t iscsi_cq_num_pages;           // Number of pages of CQ ( = entries in page table)
-    u32_t iscsi_cq_cqes_per_page_log2;  // Log2 of the Number of CQEs per page 
+    u32_t iscsi_cq_cqes_per_page_log2;  // Log2 of the Number of CQEs per page
     u32_t iscsi_data_dig_err;           // Indication on Error="1" / Warning="0" of data digest
     u32_t iscsi_tcp_config;             // Configuration register - Enable/Disable of DA/KA mechanisms
     u32_t iscsi_teton_l4_cmd_offset;    // Teton Only: offset of L4 ccell command array
@@ -79,14 +79,14 @@ typedef struct _com_hsi_t {
     u32_t iscsi_teton_l5_cmd_offset;    // Teton Only: offset of L5 ccell command array
     u32_t iscsi_task_offset;            // offset of the task array
     u32_t iscsi_r2tq_offset;            // offset of R2TQ section
-    u32_t iscsi_max_num_of_tasks;       // maximal number of pending tasks 
-    u32_t iscsi_max_num_of_ccells;      // maximal number of ccells                                 
-    u32_t com_cu_buf_size;                                               
-    u32_t com_l2_iscsi_no_buffer; 
-    u32_t com_unicast_no_buffer; 
-    u32_t com_mcast_no_buffer; 
-    u32_t com_bcast_no_buffer; 
-    u32_t l2_drop_pkt_cnt;  // keep tracks of packet drop requested by RXP (e.g. not enough bytes in BD to place the pkt)                                                
+    u32_t iscsi_max_num_of_tasks;       // maximal number of pending tasks
+    u32_t iscsi_max_num_of_ccells;      // maximal number of ccells
+    u32_t com_cu_buf_size;
+    u32_t com_l2_iscsi_no_buffer;
+    u32_t com_unicast_no_buffer;
+    u32_t com_mcast_no_buffer;
+    u32_t com_bcast_no_buffer;
+    u32_t l2_drop_pkt_cnt;  // keep tracks of packet drop requested by RXP (e.g. not enough bytes in BD to place the pkt)
     u32_t com_cu_free_cnt;
     u32_t cu_rate_limiter_enable;
 }com_hsi_t;
@@ -95,8 +95,8 @@ typedef struct _com_hsi_t {
 #define COM_HSI_OFFSETOFF(m)  (OFFSETOF(com_hsi_t,m) + 0x10)
 #define COM_HSI_SIZEOF(m)     (sizeof (((com_hsi_t *)0)->m))
 
-// Calling the following macro will actually get optimized during compile 
-// time. Its sole purpose is to ensure HSI variables cannot be modified/moved 
+// Calling the following macro will actually get optimized during compile
+// time. Its sole purpose is to ensure HSI variables cannot be modified/moved
 // unnoticed   scratch[10240] 0x120000 (RW/Reset: undefined)
 #define TEST_COM_HSI(){                                                    \
 if (0){                                                                    \

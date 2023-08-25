@@ -71,7 +71,7 @@ LIBM_ANSI_PRAGMA_WEAK(exp2f,function)
 	ret
 
 .not_finite:
-	ja	.NaN_or_pinf		/ branch if x is NaN 
+	ja	.NaN_or_pinf		/ branch if x is NaN
 	movl	4(%esp),%eax		/ eax <-- x
 	andl	$0x80000000,%eax	/ here, x is infinite, but +/-?
 	jz	.NaN_or_pinf		/ branch if x = +INF

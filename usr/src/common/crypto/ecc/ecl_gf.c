@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -136,7 +136,7 @@ GFMethod_consGFp(const mp_int *irr)
 
 /* Construct a generic GFMethod for arithmetic over binary polynomial
  * fields with irreducible irr that has array representation irr_arr (see
- * ecl-priv.h for description of the representation).  If irr_arr is NULL, 
+ * ecl-priv.h for description of the representation).  If irr_arr is NULL,
  * then it is constructed from the bitstring representation. */
 GFMethod *
 GFMethod_consGF2m(const mp_int *irr, const unsigned int irr_arr[5])
@@ -262,12 +262,12 @@ ec_GFp_sub(const mp_int *a, const mp_int *b, mp_int *r,
   CLEANUP:
 	return res;
 }
-/* 
+/*
  * Inline adds for small curve lengths.
  */
 /* 3 words */
 mp_err
-ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -320,7 +320,7 @@ ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r,
 	MP_SIGN(r) = MP_ZPOS;
 	MP_USED(r) = 3;
 
-	/* Do quick 'subract' if we've gone over 
+	/* Do quick 'subract' if we've gone over
 	 * (add the 2's complement of the curve field) */
 	 a2 = MP_DIGIT(&meth->irr,2);
 	if (carry ||  r2 >  a2 ||
@@ -345,7 +345,7 @@ ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r,
 		MP_DIGIT(r, 1) = r1;
 		MP_DIGIT(r, 0) = r0;
 	}
-	
+
 	s_mp_clamp(r);
 
   CLEANUP:
@@ -354,7 +354,7 @@ ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 4 words */
 mp_err
-ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -416,7 +416,7 @@ ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r,
 	MP_SIGN(r) = MP_ZPOS;
 	MP_USED(r) = 4;
 
-	/* Do quick 'subract' if we've gone over 
+	/* Do quick 'subract' if we've gone over
 	 * (add the 2's complement of the curve field) */
 	 a3 = MP_DIGIT(&meth->irr,3);
 	if (carry ||  r3 >  a3 ||
@@ -445,7 +445,7 @@ ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r,
 		MP_DIGIT(r, 1) = r1;
 		MP_DIGIT(r, 0) = r0;
 	}
-	
+
 	s_mp_clamp(r);
 
   CLEANUP:
@@ -454,7 +454,7 @@ ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 5 words */
 mp_err
-ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -510,7 +510,7 @@ ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r,
 	MP_SIGN(r) = MP_ZPOS;
 	MP_USED(r) = 5;
 
-	/* Do quick 'subract' if we've gone over 
+	/* Do quick 'subract' if we've gone over
 	 * (add the 2's complement of the curve field) */
 	 a4 = MP_DIGIT(&meth->irr,4);
 	if (carry ||  r4 >  a4 ||
@@ -530,7 +530,7 @@ ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r,
 		MP_DIGIT(r, 1) = r1;
 		MP_DIGIT(r, 0) = r0;
 	}
-	
+
 	s_mp_clamp(r);
 
   CLEANUP:
@@ -539,7 +539,7 @@ ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 6 words */
 mp_err
-ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -603,7 +603,7 @@ ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r,
 	MP_SIGN(r) = MP_ZPOS;
 	MP_USED(r) = 6;
 
-	/* Do quick 'subract' if we've gone over 
+	/* Do quick 'subract' if we've gone over
 	 * (add the 2's complement of the curve field) */
 	a5 = MP_DIGIT(&meth->irr,5);
 	if (carry ||  r5 >  a5 ||
@@ -626,7 +626,7 @@ ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r,
 		MP_DIGIT(r, 1) = r1;
 		MP_DIGIT(r, 0) = r0;
 	}
-	
+
 	s_mp_clamp(r);
 
   CLEANUP:
@@ -640,7 +640,7 @@ ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r,
  * ... 3 words
  */
 mp_err
-ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -681,7 +681,7 @@ ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r,
                 "sbbq   %6,%2           \n\t"
                 "adcq   $0,%3           \n\t"
                 : "=r"(r0), "=r"(r1), "=r"(r2), "=r" (borrow)
-                : "r" (b0), "r" (b1), "r" (b2), 
+                : "r" (b0), "r" (b1), "r" (b2),
 		  "0" (r0), "1" (r1), "2" (r2)
                 : "%cc" );
 #endif
@@ -710,9 +710,9 @@ ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r,
 
 #ifdef MPI_AMD64_ADD
 	/* compiler fakeout? */
-	if ((r2 == b0) && (r1 == b0) && (r0 == b0)) { 
+	if ((r2 == b0) && (r1 == b0) && (r0 == b0)) {
 		MP_CHECKOK(s_mp_pad(r, 4));
-	} 
+	}
 #endif
 	MP_CHECKOK(s_mp_pad(r, 3));
 	MP_DIGIT(r, 2) = r2;
@@ -728,7 +728,7 @@ ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 4 words */
 mp_err
-ec_GFp_sub_4(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_sub_4(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -808,9 +808,9 @@ ec_GFp_sub_4(const mp_int *a, const mp_int *b, mp_int *r,
 	}
 #ifdef MPI_AMD64_ADD
 	/* compiler fakeout? */
-	if ((r3 == b0) && (r1 == b0) && (r0 == b0)) { 
+	if ((r3 == b0) && (r1 == b0) && (r0 == b0)) {
 		MP_CHECKOK(s_mp_pad(r, 4));
-	} 
+	}
 #endif
 	MP_CHECKOK(s_mp_pad(r, 4));
 	MP_DIGIT(r, 3) = r3;
@@ -827,7 +827,7 @@ ec_GFp_sub_4(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 5 words */
 mp_err
-ec_GFp_sub_5(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_sub_5(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -903,7 +903,7 @@ ec_GFp_sub_5(const mp_int *a, const mp_int *b, mp_int *r,
 
 /* 6 words */
 mp_err
-ec_GFp_sub_6(const mp_int *a, const mp_int *b, mp_int *r, 
+ec_GFp_sub_6(const mp_int *a, const mp_int *b, mp_int *r,
 			const GFMethod *meth)
 {
 	mp_err res = MP_OKAY;
@@ -1024,7 +1024,7 @@ ec_GFp_div(const mp_int *a, const mp_int *b, mp_int *r,
 	if (a == NULL) {
 		return mp_invmod(b, &meth->irr, r);
 	} else {
-		/* MPI doesn't support divmod, so we implement it using invmod and 
+		/* MPI doesn't support divmod, so we implement it using invmod and
 		 * mulmod. */
 		MP_CHECKOK(mp_init(&t, FLAG(b)));
 		MP_CHECKOK(mp_invmod(b, &meth->irr, &t));

@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -57,7 +57,7 @@ krb5_set_real_time(krb5_context context, krb5_timestamp seconds, krb5_int32 micr
  * the seconds and microseconds value as input to this function.  This
  * is useful for running the krb5 routines through test suites
  */
-krb5_error_code 
+krb5_error_code
 krb5_set_debugging_time(krb5_context context, krb5_timestamp seconds, krb5_int32 microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
@@ -73,7 +73,7 @@ krb5_set_debugging_time(krb5_context context, krb5_timestamp seconds, krb5_int32
  * This routine turns off the time correction fields, so that the krb5
  * routines return the "natural" time.
  */
-krb5_error_code 
+krb5_error_code
 krb5_use_natural_time(krb5_context context)
 {
     krb5_os_context os_ctx = context->os_context;
@@ -102,7 +102,7 @@ krb5_get_time_offsets(krb5_context context, krb5_timestamp *seconds, krb5_int32 
 /*
  * This routine sets the time offsets directly.
  */
-krb5_error_code 
+krb5_error_code
 krb5_set_time_offsets(krb5_context context, krb5_timestamp seconds, krb5_int32 microseconds)
 {
     krb5_os_context os_ctx = context->os_context;

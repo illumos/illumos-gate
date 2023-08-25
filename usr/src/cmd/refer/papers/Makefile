@@ -24,7 +24,7 @@ $(ROOTDIRS)/% :	%
 
 .KEEP_STATE:
 
-all :		$(PAPERS) 
+all :		$(PAPERS)
 
 install: 	all $(ROOTDIRS) $(ROOTPAPERS)
 

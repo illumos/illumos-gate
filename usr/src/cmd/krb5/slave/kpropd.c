@@ -1,14 +1,14 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -19,7 +19,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -35,7 +35,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -49,7 +49,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * XXX We need to modify the protocol so that an acknowledge is set
  * after each block, instead after the entire series is sent over.
@@ -193,7 +193,7 @@ static void usage()
 
 	fprintf(stderr,
 		gettext("\t[-F kerberos_db_file ] [-p kdb5_util_pathname]\n"));
-		
+
 	fprintf(stderr, gettext("\t[-P port] [-a acl_file]\n"));
 
 	exit(1);
@@ -338,7 +338,7 @@ retry:
     if (finet < 0 ) {
 	com_err(progname, errno, gettext("while obtaining socket"));
 	exit(1);
-    } 
+    }
 
     if(!port) {
 	sp = getservbyname(KPROP_SERVICE, "tcp");
@@ -393,7 +393,7 @@ retry:
 		    "with SO_REUSEADDR\n"), progname);
 	    if (setsockopt(finet, SOL_SOCKET, SO_REUSEADDR,
 			(char *)&on, sizeof(on)) < 0) {
-		com_err(progname, errno, 
+		com_err(progname, errno,
 			gettext("while setting socket option (SO_REUSEADDR)"));
 	    }
 	    ret = bind(finet, (struct sockaddr *) &sin6, sizeof(sin6));
@@ -407,7 +407,7 @@ retry:
 #if 0
 		perror(gettext("bind"));
 #endif
-		com_err(progname, errno, 
+		com_err(progname, errno,
 		    gettext("while binding listener socket"));
 		exit(1);
 	    }
@@ -444,30 +444,30 @@ retry:
 		s = accept(finet, (struct sockaddr *) &sin6, &sin6_size);
 
 		if (s < 0) {
-			int e = errno; 
-			if (e != EINTR) { 
-				/* 
-				 * Solaris Kerberos: Keep error messages 
-				 * consistent 
-				 */ 
-				com_err(progname, e, 
-				    gettext("while accepting connection")); 
+			int e = errno;
+			if (e != EINTR) {
+				/*
+				 * Solaris Kerberos: Keep error messages
+				 * consistent
+				 */
+				com_err(progname, e,
+				    gettext("while accepting connection"));
 				backoff_timer = INITIAL_TIMER;
 			}
-			/* 
-			 * If we got EBADF, an alarm signal handler closed 
-			 * the file descriptor on us. 
-			 */ 
-			if (e != EBADF) 
-				close(finet); 
-			/* 
-			 * An alarm could have been set and the fd closed, we 
-			 * should retry in case of transient network error for 
-			 * up to a couple of minutes. 
-			 */ 
-			if (backoff_timer > 120) 
-				return (EINTR); 
-			goto retry; 
+			/*
+			 * If we got EBADF, an alarm signal handler closed
+			 * the file descriptor on us.
+			 */
+			if (e != EBADF)
+				close(finet);
+			/*
+			 * An alarm could have been set and the fd closed, we
+			 * should retry in case of transient network error for
+			 * up to a couple of minutes.
+			 */
+			if (backoff_timer > 120)
+				return (EINTR);
+			goto retry;
 		}
 		alarm(0);
 		gfd = -1;
@@ -596,7 +596,7 @@ void doit(fd)
 
 	if (from.ss_family == AF_INET || from.ss_family == AF_INET6) {
 
-		if (from.ss_family == AF_INET6 && 
+		if (from.ss_family == AF_INET6 &&
 			IN6_IS_ADDR_V4MAPPED(&ss2sin6(&from)->sin6_addr)) {
 
 			ipaddr_t v4addr;
@@ -616,7 +616,7 @@ void doit(fd)
 
 	} else {
 		/* address family isn't either AF_INET || AF_INET6 */
-		syslog(LOG_INFO, 
+		syslog(LOG_INFO,
 		    gettext("Connection from unknown address family:%d"),
 		    from.ss_family);
 
@@ -657,10 +657,10 @@ void doit(fd)
 	omask = umask(077);
 	lock_fd = open(temp_file_name, O_RDWR|O_CREAT, 0600);
 	(void) umask(omask);
-	retval = krb5_lock_file(doit_context, lock_fd, 
+	retval = krb5_lock_file(doit_context, lock_fd,
 				KRB5_LOCKMODE_EXCLUSIVE|KRB5_LOCKMODE_DONTBLOCK);
 	if (retval) {
-	    com_err(progname, retval, 
+	    com_err(progname, retval,
 			gettext("while trying to lock '%s'"),
 		    temp_file_name);
 	    exit(1);
@@ -675,7 +675,7 @@ void doit(fd)
 	recv_database(doit_context, fd, database_fd, &confmsg);
 	if (rename(temp_file_name, file)) {
 		/* Solaris Kerberos: Keep error messages consistent */
-		com_err(progname, errno, 
+		com_err(progname, errno,
 			gettext("while renaming %s to %s"),
 			temp_file_name, file);
 		exit(1);
@@ -690,7 +690,7 @@ void doit(fd)
 	load_database(doit_context, kdb5_util, file);
 	retval = krb5_lock_file(doit_context, lock_fd, KRB5_LOCKMODE_UNLOCK);
 	if (retval) {
-	    com_err(progname, retval, 
+	    com_err(progname, retval,
 		gettext("while unlocking '%s'"), temp_file_name);
 	    exit(1);
 	}
@@ -701,7 +701,7 @@ void doit(fd)
 	 * recv_database, then close the socket.
 	 */
 	retval = krb5_write_message(doit_context, (void *) &fd, &confmsg);
-	if (retval) { 
+	if (retval) {
 		krb5_free_data_contents(doit_context, &confmsg);
 		com_err(progname, retval,
 			gettext("while sending # of received bytes"));
@@ -713,7 +713,7 @@ void doit(fd)
 			gettext("while trying to close database file"));
 		exit(1);
 	}
-	
+
 	exit(0);
 }
 
@@ -836,7 +836,7 @@ krb5_error_code do_iprop(kdb_log_context *log_ctx) {
 		    "keytab"));
 		krb5_free_principal(kpropd_context, iprop_svc_principal);
 		exit(1);
-	} 
+	}
 
 	if (retval = krb5_kt_get_entry(kpropd_context, kt, iprop_svc_principal,
 	    0, 0, &entry)) {
@@ -908,7 +908,7 @@ reinit:
 	 * Reset the handle to the correct type for the RPC call
 	 */
 	handle = server_handle;
-	
+
 	/*
 	 * If we have reached this far, we have succesfully established
 	 * a RPCSEC_GSS connection; we now start polling for updates
@@ -985,7 +985,7 @@ reinit:
 			switch (full_ret->ret) {
 			case UPDATE_OK:
 				backoff_cnt = 0;
-				/* 
+				/*
 				 * We now listen on the kprop port for
 				 * the full dump
 				 */
@@ -1246,7 +1246,7 @@ void PRS(argc,argv)
 
 	retval = krb5_init_context(&kpropd_context);
 	if (retval) {
-		com_err(argv[0], retval, 
+		com_err(argv[0], retval,
 			gettext("while initializing krb5"));
 		exit(1);
 	}
@@ -1297,7 +1297,7 @@ void PRS(argc,argv)
 			params.mask |= KADM5_CONFIG_REALM;
 			break;
 		case 's':
-			srvtab = optarg; 
+			srvtab = optarg;
 			if (!srvtab)
 				usage();
 			break;
@@ -1313,7 +1313,7 @@ void PRS(argc,argv)
 				default:
 					usage();
 				}
-				
+
 			}
 	/*
 	 * If not in debug mode, switch com_err reporting to syslog
@@ -1342,7 +1342,7 @@ void PRS(argc,argv)
 	if (realm) {
 	    retval = krb5_set_principal_realm(kpropd_context, server, realm);
 	    if (retval) {
-	        com_err(progname, errno, 
+	        com_err(progname, errno,
 			gettext("while constructing my service realm"));
 		exit(1);
 	    }
@@ -1369,12 +1369,12 @@ void PRS(argc,argv)
 		ulog_set_role(kpropd_context, IPROP_SLAVE);
 		poll_time = params.iprop_polltime;
 
-		if (ulog_map(kpropd_context, &params, FKPROPD)) { 
+		if (ulog_map(kpropd_context, &params, FKPROPD)) {
 		/* Solaris Kerberos: Keep error messages consistent */
  			com_err(progname, errno,
-			    gettext("while mapping log")); 
-			exit(1); 
-		} 
+			    gettext("while mapping log"));
+			exit(1);
+		}
 	}
 
 	/*
@@ -1414,20 +1414,20 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
      */
     /* Solaris Kerberos */
     if (cvtkaddr(ss, &sender_addr) == NULL) {
-	com_err(progname, errno, 
+	com_err(progname, errno,
 		gettext("while converting socket address"));
 	exit(1);
     }
 
     ss_length = sizeof (r_ss);
     if (getsockname(fd, (struct sockaddr *) &r_ss, &ss_length)) {
-	com_err(progname, errno, 
+	com_err(progname, errno,
 		gettext("while getting local socket address"));
 	exit(1);
     }
 
     if (cvtkaddr(&r_ss, &receiver_addr) == NULL) {
-	com_err(progname, errno, 
+	com_err(progname, errno,
 		gettext("while converting socket address"));
 	exit(1);
     }
@@ -1453,7 +1453,7 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
     	exit(1);
     }
 
-    retval = krb5_auth_con_setflags(context, auth_context, 
+    retval = krb5_auth_con_setflags(context, auth_context,
 				    KRB5_AUTH_CONTEXT_DO_SEQUENCE);
     if (retval) {
 	syslog(LOG_ERR, gettext("Error in krb5_auth_con_setflags: %s"),
@@ -1486,7 +1486,7 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
 
     retval = krb5_copy_principal(context, ticket->enc_part2->client, clientp);
     if (retval) {
-	syslog(LOG_ERR, gettext("Error in krb5_copy_prinicpal: %s"), 
+	syslog(LOG_ERR, gettext("Error in krb5_copy_prinicpal: %s"),
 	       error_message(retval));
 	exit(1);
     }
@@ -1500,7 +1500,7 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
 	retval = krb5_unparse_name(context, *clientp, &name);
 	if (retval) {
 	    /* Solaris Kerberos: Keep error messages consistent */
-	    com_err(progname, retval, 
+	    com_err(progname, retval,
 		gettext("while unparsing client name"));
 	    exit(1);
 	}
@@ -1531,7 +1531,7 @@ authorized_principal(context, p, auth_etype)
     FILE		*acl_file;
     int			end;
     krb5_enctype	acl_etype;
-    
+
     retval = krb5_unparse_name(context, p, &name);
     if (retval)
 	return FALSE;
@@ -1643,7 +1643,7 @@ recv_database(context, fd, database_fd, confmsg)
 		}
 		if (krb5_is_krb_error(&inbuf))
 			recv_error(context, &inbuf);
-		retval = krb5_rd_priv(context, auth_context, &inbuf, 
+		retval = krb5_rd_priv(context, auth_context, &inbuf,
 				      &outbuf, NULL);
 		if (retval) {
 			snprintf(buf, sizeof (buf),
@@ -1718,12 +1718,12 @@ send_error(context, fd, err_code, err_text)
 	krb5_us_timeofday(context, &error.stime, &error.susec);
 	error.server = server;
 	error.client = client;
-	
+
 	if (err_text)
 		text = err_text;
 	else
 		text = error_message(err_code);
-	
+
 	error.error = err_code - ERROR_TABLE_BASE_krb5;
 	if (error.error > 127) {
 		error.error = KRB_ERR_GENERIC;
@@ -1732,7 +1732,7 @@ send_error(context, fd, err_code, err_text)
 				err_text);
 			text = buf;
 		}
-	} 
+	}
 	error.text.length = strlen(text) + 1;
 	error.text.data = malloc(error.text.length);
 	if (error.text.data) {
@@ -1808,8 +1808,8 @@ load_database(context, kdb_util, database_file_name)
 	edit_av[0] = kdb_util;
 	count = 1;
 	if (realm) {
-		edit_av[count++] = "-r";	
-		edit_av[count++] = realm;	
+		edit_av[count++] = "-r";
+		edit_av[count++] = realm;
 	}
 	edit_av[count++] = "load";
 	if (kerb_database) {
@@ -1857,7 +1857,7 @@ load_database(context, kdb_util, database_file_name)
 			exit(1);
 		}
 	}
-	
+
 	error_ret = WEXITSTATUS(waitb);
 	if (error_ret) {
 		com_err(progname, 0,

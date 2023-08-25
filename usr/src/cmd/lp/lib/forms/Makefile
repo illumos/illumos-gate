@@ -53,7 +53,7 @@ POFILE =	lp_lib_forms.po
 
 .KEEP_STATE:
 
-all install :	$(LIBS) 
+all install :	$(LIBS)
 
 include		../../../../lib/Makefile.targ
 

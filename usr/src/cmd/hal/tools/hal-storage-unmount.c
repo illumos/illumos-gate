@@ -148,7 +148,7 @@ main (int argc, char *argv[])
 			break;
 		given_options[i] = NULL;
 	}
-	
+
 	use_lazy = FALSE;
 	use_force = FALSE;
 
@@ -175,11 +175,11 @@ main (int argc, char *argv[])
 		if (drive == NULL) {
 			usage ();
 		} else {
-			handle_unmount (hal_ctx, 
+			handle_unmount (hal_ctx,
 #ifdef HAVE_POLKIT
-					pol_ctx, 
+					pol_ctx,
 #endif
-					udi, NULL, drive, device, invoked_by_uid, 
+					udi, NULL, drive, device, invoked_by_uid,
 					invoked_by_syscon_name, use_lazy, use_force,
 					system_bus);
 		}
@@ -189,18 +189,18 @@ main (int argc, char *argv[])
 		LibHalDrive *drive;
 
 		drive_udi = libhal_volume_get_storage_device_udi (volume);
-		
+
 		if (drive_udi == NULL)
 			unknown_error ("Cannot get drive_udi from volume");
 		drive = libhal_drive_from_udi (hal_ctx, drive_udi);
 		if (drive == NULL)
 			unknown_error ("Cannot get drive from hal");
 
-		handle_unmount (hal_ctx, 
+		handle_unmount (hal_ctx,
 #ifdef HAVE_POLKIT
-				pol_ctx, 
+				pol_ctx,
 #endif
-				udi, volume, drive, device, invoked_by_uid, 
+				udi, volume, drive, device, invoked_by_uid,
 				invoked_by_syscon_name, use_lazy, use_force,
 				system_bus);
 

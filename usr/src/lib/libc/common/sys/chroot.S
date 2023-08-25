@@ -31,7 +31,7 @@
 
 /* C library -- chroot						*/
 /* int chroot(const char *path)					*/
- 
+
 #include <sys/asm_linkage.h>
 
 	ANSI_PRAGMA_WEAK(chroot,function)

@@ -41,8 +41,8 @@ package com.sun.solaris.service.pools;
  * other publicly visible classes for more details.
  */
 public class PoolInternal {
-	static { 
-		System.loadLibrary("jpool"); 
+	static {
+		System.loadLibrary("jpool");
 		PoolInternal.init();
 	}
 

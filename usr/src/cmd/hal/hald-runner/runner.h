@@ -25,7 +25,7 @@
 #ifndef RUNNER_H
 #define RUNNER_H
 
-#define DBUS_API_SUBJECT_TO_CHANGE 
+#define DBUS_API_SUBJECT_TO_CHANGE
 #include <dbus/dbus-glib-lowlevel.h>
 
 #include <glib.h>

@@ -502,7 +502,7 @@ BnxeRxRingProcess_sendup:
         tail->b_next = NULL;
 
 #if 0
-        BnxeDumpPkt(pUM, 
+        BnxeDumpPkt(pUM,
                     (BNXE_FCOE(pUM) && (idx == FCOE_CID(&pUM->lm_dev))) ?
                         "<- FCoE L2 RX <-" : "<- L2 RX <-",
                     pMblk, B_TRUE);

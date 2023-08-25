@@ -499,6 +499,7 @@ mlsetup(struct regs *rp)
 	/*
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
+	ucode_init();
 	ucode_check(CPU);
 	cpuid_pass_ucode(CPU, x86_featureset);
 

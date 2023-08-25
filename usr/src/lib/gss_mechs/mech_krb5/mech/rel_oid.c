@@ -72,7 +72,7 @@ krb5_gss_internal_release_oid(minor_status, oid)
      * This function only knows how to release internal OIDs. It will
      * return GSS_S_CONTINUE_NEEDED for any OIDs it does not recognize.
      */
-   
+
     if ((*oid != gss_mech_krb5) &&
 	(*oid != gss_mech_krb5_old) &&
 	(*oid != gss_mech_krb5_wrong) &&

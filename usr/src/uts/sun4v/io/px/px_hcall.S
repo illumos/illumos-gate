@@ -471,7 +471,7 @@
 	retl
 	nop
 	SET_SIZE(hvio_msg_setvalid)
-	
+
 	/*
 	 * arg0 - devhandle
 	 * arg1 - devino

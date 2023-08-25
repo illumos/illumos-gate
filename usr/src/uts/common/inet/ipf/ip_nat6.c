@@ -524,7 +524,7 @@ natinfo_t *ni;
 		nat->nat_inport = port;
 		nat->nat_outport = port;
 	}
-	
+
 	ni->nai_port = port;
 	ni->nai_nport = dport;
 	return 0;
@@ -1781,7 +1781,7 @@ struct in6_addr *src , *dst;
 			nat->nat_ifps[1] = ifp;
 
 		nflags = nat->nat_flags;
- 
+
 		if (IP6_EQ(&nat->nat_inip6, src) &&
 		    IP6_EQ(&nat->nat_oip6, dst) &&
 		    (((p == 0) && (sflags == (nflags & NAT_TCPUDPICMP))) ||
@@ -2227,7 +2227,7 @@ u_32_t nflags;
 	nat->nat_bytes[1] += fin->fin_plen;
 	nat->nat_pkts[1]++;
 	MUTEX_EXIT(&nat->nat_lock);
-	
+
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
 		if ((nat->nat_outport != 0) && (nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
@@ -2351,12 +2351,12 @@ u_32_t *passp;
 			 */
 			if ((fin->fin_flx & FI_ICMPQUERY) != 0) {
 				nflags = IPN_ICMPQUERY;
-				dport = icmp6->icmp6_id;	
+				dport = icmp6->icmp6_id;
 			} break;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
 			dport = tcp->th_dport;

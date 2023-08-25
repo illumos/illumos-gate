@@ -83,7 +83,7 @@ class ServerAttribute extends ServiceLocationAttribute {
 	   }
 	}
     }
-	
+
     // Construct a ServerAttribute object from a ServiceLocationAttribute
     //  object.
 

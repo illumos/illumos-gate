@@ -89,7 +89,7 @@ class SLPV1SSrvDereg extends SSrvDereg {
 	    tag =
 		ServiceLocationAttributeV1.unescapeAttributeString(tag,
 								hdr.charCode);
-	
+
 	    if (tag.startsWith("*") || tag.endsWith("*")) {
 		throw
 		    new ServiceLocationException(

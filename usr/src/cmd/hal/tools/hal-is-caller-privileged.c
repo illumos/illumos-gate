@@ -40,12 +40,12 @@
 #include <libpolkit.h>
 #endif
 
-/** 
+/**
  *  usage:
  *  @argc:                Number of arguments given to program
  *  @argv:                Arguments given to program
  *
- *  Print out program usage. 
+ *  Print out program usage.
  */
 static void
 usage (int argc, char *argv[])
@@ -83,14 +83,14 @@ permission_denied_privilege (const char *privilege, const char *uid)
 }
 #endif
 
-/** 
+/**
  *  main:
  *  @argc:                Number of arguments given to program
  *  @argv:                Arguments given to program
  *
  *  Returns:              Return code
  *
- *  Main entry point 
+ *  Main entry point
  */
 int
 main (int argc, char *argv[])

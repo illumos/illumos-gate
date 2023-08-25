@@ -39,7 +39,7 @@ struct _HalDevice {
 	GObject parent;
 
 	char *udi;
-	
+
 	GSList *properties;
 
 	int num_addons;
@@ -182,7 +182,7 @@ gboolean      hal_device_property_strlist_is_empty (HalDevice    *device,
 gboolean      hal_device_property_remove     (HalDevice    *device,
 					      const char   *key);
 
-gboolean      hal_device_copy_property       (HalDevice *from_device, 
+gboolean      hal_device_copy_property       (HalDevice *from_device,
 					      const char *from,
 					      HalDevice *to_device,
 					      const char *to);

@@ -487,7 +487,7 @@ typedef struct _quad { int val[2]; } quad;	/* used by UFS */
 
 #ifndef	volatile
 #define	volatile
-#endif 
+#endif
 /* END CSTYLED */
 
 #endif /* __STDC__ */

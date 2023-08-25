@@ -28,7 +28,7 @@
 /
 / memcmp(s1, s2, n)
 /
-/ Compares n bytes:  s1>s2: >0  s1==s2:  0  s1<s2:  <0	
+/ Compares n bytes:  s1>s2: >0  s1==s2:  0  s1<s2:  <0
 /
 / Fast assembly language version of the following C-program strcat
 / which represents the `standard' for the C-library.
@@ -37,15 +37,15 @@
 /	memcmp(const void *s1, const void *s2, size_t n)
 /	{
 /		if (s1 != s2 && n != 0) {
-/			const unsigned char	*ps1 = s1; 
-/			const unsigned char	*ps2 = s2; 
+/			const unsigned char	*ps1 = s1;
+/			const unsigned char	*ps2 = s2;
 /
 /			do {
 /				if (*ps1++ != *ps2++)
-/					return (ps1[-1] - ps2[-1]); 
-/			} while (--n != 0); 
+/					return (ps1[-1] - ps2[-1]);
+/			} while (--n != 0);
 /		}
-/		return (NULL); 
+/		return (NULL);
 /	}
 /
 / This implementation conforms to SVID but does not implement
@@ -84,7 +84,7 @@
 .word_not_equal:
 	leal	4(%edi), %edi	/ %edi += 4 (post-decremented)
 	.align	4
-.byte_loop:	
+.byte_loop:
 	movb	(%ecx),	%dl	/ move 1 byte from (%ecx) to %dl
 	cmpb	%dl, (%eax)	/ compare %dl with 1 byte from (%eax)
 	jne	.not_equal	/ if not equal, goto .not_equal

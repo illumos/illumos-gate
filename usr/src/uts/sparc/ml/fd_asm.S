@@ -168,7 +168,7 @@
 	ldub	[Fdc + FD_AUXIODATA2], Tmp2
 	andn	Tmp, Tmp2, Tmp
 	stb	Tmp, [Adr]
-	
+
 	!
 	! set opmode to 3 to indicate going into status mode
 	!
@@ -259,11 +259,11 @@
 .notify:
 	!
 	! if fast traps are enabled, use the platform dependent
-	! impl_setintreg_on function. 
+	! impl_setintreg_on function.
 	!
 	ldub    [Fdc + FD_FASTTRAP], Tmp
 	tst     Tmp
-	bnz	.fast	
+	bnz	.fast
 	nop
 
 	!
@@ -312,18 +312,18 @@
 	add	Fdc, FD_HILOCK, %l6
 
 	!
-	! schedule the soft interrupt if needed 
+	! schedule the soft interrupt if needed
 	!
-	cmp	Tmp2, TRIGGER 
+	cmp	Tmp2, TRIGGER
 	bne	.end
 	nop
 
-   	!	
+   	!
 	! set new opmode to 4
         !
 	mov     0x4, Tmp
         stb     Tmp, [Fdc + FD_OPMODE]
-         
+
 	! invoke ddi_trigger_softintr.  load
 	! softid parameter in the delay slot
 	!

@@ -243,7 +243,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 	case SrvLocHeader.DAAdvert:
 	    rply = new CDAAdvert(this, dis);
 	    break;
-	
+
 	case SrvLocHeader.SrvAck:
 
 	    // We act as a SrvAck.
@@ -547,20 +547,20 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 
 
 	    } else {
-	
+
 		try {
 
 		    // Parse the option.
 
 		    OptionParser optParser =
 			(OptionParser)optClass.newInstance();
-	
+
 		    SLPOption opt = optParser.parse(this, dsr);
 
 		    // Insert option into option table.
 
 		    optTable.put(key, opt);
-	
+
 		} catch (InstantiationException ex) {
 
 		    throw
@@ -630,7 +630,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 		putInt(0, baos);
 
 	    }
-	
+
 	    byte[] bytes = obaos.toByteArray();
 
 	    baos.write(bytes, 0, bytes.length);
@@ -675,7 +675,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 		available = available - bytes.length;
 
 	    } else {
-	
+
 		// Throw exception, upper layers need to break off multicast.
 		//  This exception should *never* be surfaced.
 
@@ -773,7 +773,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 	if (auth != null) {
 
 	    // Put it in the auth block for this URL.
-	
+
 	    authTable.put(url, auth);
 
 	}
@@ -954,7 +954,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 	    while (en.hasMoreElements()) {
 		ServiceLocationAttribute attr =
 		    (ServiceLocationAttribute)en.nextElement();
-	
+
 		strings.addElement(attr.externalize());
 
 	    }

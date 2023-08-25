@@ -26,7 +26,7 @@
 # Copyright 2015 RackTop Systems.
 #
 
-PROG= link 
+PROG= link
 XPG4PROG= link
 OBJS= link.o
 

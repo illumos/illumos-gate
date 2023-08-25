@@ -29,7 +29,7 @@
  * no easy place to save the extra parameters that would be required, so
  * each brand module needs its own copy of this code.  We #include this and
  * use brand-specific #defines to replace the XXX_brand_... definitions.
- */ 
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>

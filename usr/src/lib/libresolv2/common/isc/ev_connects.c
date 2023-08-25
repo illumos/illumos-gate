@@ -169,7 +169,7 @@ evCancelConn(evContext opaqueCtx, evConnID id) {
 #endif
 		}
 	}
-	
+
 	/* Unlink from ctx->conns. */
 	if (this->prev != NULL)
 		this->prev->next = this->next;
@@ -281,7 +281,7 @@ listener(evContext opaqueCtx, void *uap, int fd, int evmask) {
 		struct sockaddr_un un;
 #endif
 	} la, ra;
-	int new; 
+	int new;
 	ISC_SOCKLEN_T lalen = 0, ralen;
 
 	REQUIRE((evmask & EV_READ) != 0);

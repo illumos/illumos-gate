@@ -20,36 +20,36 @@
 
 typedef struct _tpat_hsi_t {
     fw_version_t version;
-    u32_t l2_pseudo_checksum;         
-    u32_t num_catchup_processed;      
-    u32_t num_catchup_pause ;         
+    u32_t l2_pseudo_checksum;
+    u32_t num_catchup_processed;
+    u32_t num_catchup_pause ;
     // Debug
-    u32_t tpat_num_complete;          
-    u32_t tpat_udp_patchup;           
-    u32_t fault_insertion;          
-    u32_t l4_segment_count;         
+    u32_t tpat_num_complete;
+    u32_t tpat_udp_patchup;
+    u32_t fault_insertion;
+    u32_t l4_segment_count;
     // Catchup overide for RSS
     u32_t catchup_overide;
 	u64_t unicast_bytes_xmit;
 	u64_t multicast_bytes_xmit;
 	u64_t broadcast_bytes_xmit;
-    u64_t volatile idle_count;       
+    u64_t volatile idle_count;
     u32_t iscsi_ctx_num_tasks;          // size of task array in iSCSI context
     u32_t iscsi_ctx_num_ccells;         // size of command queue in iSCSI context
-	u64_t iscsi_unicast_bytes_xmit; 
+	u64_t iscsi_unicast_bytes_xmit;
 	u64_t iscsi_multicast_bytes_xmit;
 	u64_t iscsi_broadcast_bytes_xmit;
     u32_t iscsi_teton_task_offset;      // Teton only: offset of the task array
     u32_t iscsi_teton_l5_offset;        // Teton only: offset of L5 section
-    u64_t total_bytes_xmit;                       
+    u64_t total_bytes_xmit;
 }tpat_hsi_t;
 
 // This macro can be used for little or big endian 32-bit system
 #define TPAT_HSI_OFFSETOFF(m)  (OFFSETOF(tpat_hsi_t,m) + 0x410)
 #define TPAT_HSI_SIZEOF(m)     (sizeof (((tpat_hsi_t *)0)->m))
 
-// Calling the following macro will actually get optimized during compile 
-// time. Its sole purpose is to ensure HSI variables cannot be modified/moved 
+// Calling the following macro will actually get optimized during compile
+// time. Its sole purpose is to ensure HSI variables cannot be modified/moved
 // unnoticed   scratch[3072] 0xa0000 (RW/Reset: undefined)
 #define TEST_TPAT_HSI(){                                                    \
 if (0){                                                                     \

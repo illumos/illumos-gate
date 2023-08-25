@@ -511,7 +511,7 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 		return XGE_HAL_BADCFG_MAX_SPLITS_TRANS;
 	}
 
-	if (new_config->mmrb_count != XGE_HAL_DEFAULT_BIOS_MMRB_COUNT) 
+	if (new_config->mmrb_count != XGE_HAL_DEFAULT_BIOS_MMRB_COUNT)
 	{
 	    if ((new_config->mmrb_count < XGE_HAL_MIN_MMRB_COUNT) ||
 		    (new_config->mmrb_count > XGE_HAL_MAX_MMRB_COUNT)) {

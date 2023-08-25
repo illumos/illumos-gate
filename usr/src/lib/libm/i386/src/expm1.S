@@ -62,7 +62,7 @@ LIBM_ANSI_PRAGMA_WEAK(expm1,function)
 	fxch				/ z,[z]
 	fsub    %st(1),%st		/ z-[z],[z]
 	f2xm1				/ 2**(z-[z])-1,[z]
-	/ avoid spurious underflow when scaling to compute exp(x) 
+	/ avoid spurious underflow when scaling to compute exp(x)
 	PIC_SETUP(1)
 	flds	PIC_L(.mhundred)
 	PIC_WRAPUP
@@ -109,7 +109,7 @@ LIBM_ANSI_PRAGMA_WEAK(expm1,function)
 .not_finite:
 	/ Here, flags still have settings from execution of
 	/	cmpl	$0x7ff00000,%ecx	/ hi_32(|x|) > hi_32(INF)?
-	ja	.NaN_or_pinf		/ if not, x may be +/- INF 
+	ja	.NaN_or_pinf		/ if not, x may be +/- INF
 	movl	4(%esp),%edx		/ edx <-- lo_32(x)
 	cmpl	$0,%edx			/ lo_32(x) = 0?
 	jne	.NaN_or_pinf		/ if not, x is NaN

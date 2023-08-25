@@ -76,7 +76,7 @@ gss_buffer_t status_string;
 	    message_context == NULL ||
 	    status_string == GSS_C_NO_BUFFER)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	
+
 	/* we handle major status codes, and the mechs do the minor */
 	if (status_type == GSS_C_GSS_CODE)
 		return (displayMajor(status_value, message_context,

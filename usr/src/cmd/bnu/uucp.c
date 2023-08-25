@@ -30,7 +30,7 @@
 
 /*
  * uucp
- * user id 
+ * user id
  * make a copy in spool directory
  */
 int Copy = 0;
@@ -108,7 +108,7 @@ char	**envp;
 	Optns[3] = Nuser[0] = Sfile[0] = NULLCHAR;
 
 	/*
-	 * find id of user who spawned command to 
+	 * find id of user who spawned command to
 	 * determine
 	 */
 	(void) guinfo(Uid, User);
@@ -151,7 +151,7 @@ char	**envp;
 		case 'g':
 			snprintf(Xopts, sizeof (Xopts), "-g%s", optarg);
 			if (!Sgrades) {
-				if (strlen(optarg) < (size_t)2 && isalnum(*optarg)) 
+				if (strlen(optarg) < (size_t)2 && isalnum(*optarg))
 					Grade = *optarg;
 				else {
 					(void) fprintf(stderr, gettext("No"
@@ -201,7 +201,7 @@ char	**envp;
 
 			/*
 			 * We do the copy multiple times when multiple
-			 * -n options are specified, but 
+			 * -n options are specified, but
 			 * only the last -n value is used.
 	 		 */
 			(void) snprintf(Uopts, sizeof (Uopts), "-n%s ", Nuser);
@@ -527,7 +527,7 @@ char *s1, *f1, *s2, *f2;
 		/*
 		 * copy file locally
 		 *
-		 * Changed from uidxcp() to fic file made and owner 
+		 * Changed from uidxcp() to fic file made and owner
 		 * being modified for existing files, and local file
 		 * name expansion.
 		 */
@@ -589,7 +589,7 @@ char *s1, *f1, *s2, *f2;
 		 * insert JCL card in file
 		 */
 		cfp = syscfile(cfile, s1);
-		(void) fprintf(cfp, 
+		(void) fprintf(cfp,
 	       	"R %s %s %s %s %s %o %s %s\n", file1, file2,
 			User, Optns,
 			*Sfile ? Sfile : "dummy",
@@ -669,7 +669,7 @@ char *s1, *f1, *s2, *f2;
  *
  *	returns
  *		stream pointer to open cfile
- *		
+ *
  */
 
 static FILE	*

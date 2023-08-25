@@ -256,12 +256,12 @@ permission_denied_volume_ignore (const char *device)
 }
 
 void
-handle_unmount (LibHalContext *hal_ctx, 
+handle_unmount (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-		LibPolKitContext *pol_ctx, 
+		LibPolKitContext *pol_ctx,
 #endif
 		const char *udi,
-		LibHalVolume *volume, LibHalDrive *drive, const char *device, 
+		LibHalVolume *volume, LibHalDrive *drive, const char *device,
 		const char *invoked_by_uid, const char *invoked_by_syscon_name,
 		gboolean option_lazy, gboolean option_force,
 		DBusConnection *system_bus)
@@ -295,7 +295,7 @@ handle_unmount (LibHalContext *hal_ctx,
 
 	if (volume != NULL) {
 		dbus_error_init (&error);
-		if (libhal_device_get_property_bool (hal_ctx, udi, "volume.ignore", &error) || 
+		if (libhal_device_get_property_bool (hal_ctx, udi, "volume.ignore", &error) ||
 		    dbus_error_is_set (&error)) {
 			if (dbus_error_is_set (&error)) {
 				LIBHAL_FREE_DBUS_ERROR (&error);
@@ -415,7 +415,7 @@ line_found:
 	}
 
 	/* bail out, unless if we got the "hal-storage-can-unmount-volumes-mounted-by-others" privilege only
-	 * if mounted_by_other_uid==TRUE 
+	 * if mounted_by_other_uid==TRUE
 	 *
 	 * We allow uid 0 to actually ensure that Unmount(options=["lazy"], "/dev/blah") works from addon-storage.
 	 */
@@ -457,7 +457,7 @@ line_found:
 	args[na++] = NULL;
 
 #ifdef DEBUG
-	printf ("will umount %s (mounted at '%s'), mounted_by_other_uid=%d\n", 
+	printf ("will umount %s (mounted at '%s'), mounted_by_other_uid=%d\n",
 		device, mount_point_to_unmount, mounted_by_other_uid);
 #endif
 
@@ -530,12 +530,12 @@ line_found:
 #define EJECT "/usr/bin/eject"
 
 void
-handle_eject (LibHalContext *hal_ctx, 
+handle_eject (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-	      LibPolKitContext *pol_ctx, 
+	      LibPolKitContext *pol_ctx,
 #endif
 	      const char *udi,
-	      LibHalDrive *drive, const char *device, 
+	      LibHalDrive *drive, const char *device,
 	      const char *invoked_by_uid, const char *invoked_by_syscon_name,
 	      gboolean closetray, DBusConnection *system_bus)
 {
@@ -656,7 +656,7 @@ tryagain:
 	return TRUE;
 }
 
-void 
+void
 unlock_hal_mtab (void)
 {
 #if sun

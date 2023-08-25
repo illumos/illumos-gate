@@ -87,7 +87,7 @@
 .notequal_0:
 	popl	%esi		/ restore registers
 	clc			/ clear carry bit
-	subb	(%edi),%al	
+	subb	(%edi),%al
 	movl	%edx,%edi
 	movl	$-1, %eax	/ possibly wasted instr
 	jc	.neg		/ did we overflow in the sub

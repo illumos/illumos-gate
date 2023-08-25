@@ -15,7 +15,7 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*! \file 
+/*! \file
  * \brief
  * This file is primarily maintained by <tytso@mit.edu> and <ghudson@mit.edu>.
  */

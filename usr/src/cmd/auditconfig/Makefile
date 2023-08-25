@@ -31,7 +31,7 @@ LIBBSM = $(SRC)/lib/libbsm/common
 
 LDLIBS += -lnsl -lbsm -lsecdb
 
-OBJS = auditconfig.o 
+OBJS = auditconfig.o
 SRCS = $(OBJS:%.o=%.c)
 
 POFILE = $(PROG).po

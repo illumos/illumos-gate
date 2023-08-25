@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Convert a hostname and service name to a principal in the "standard"
  * form.
@@ -231,7 +231,7 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
 		if (*cp == '.')
 			*cp = 0;
 	}
-	
+
 
 	if ((retval = krb5_get_host_realm(context, remote_host, &hrealms))) {
 	    free(remote_host);

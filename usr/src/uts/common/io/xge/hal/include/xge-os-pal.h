@@ -63,7 +63,7 @@ extern xge_os_tracebuf_t *g_xge_os_tracebuf;
 extern xge_os_tracebuf_t *g_xge_os_tracebuf;
 extern char *dmesg_start;
 
-/* Calculate the size of the msg and copy it into the global buffer */  
+/* Calculate the size of the msg and copy it into the global buffer */
 #define __xge_trace(tb) { \
 	int msgsize = xge_os_strlen(tb->msg) + 2; \
 	int offset = tb->offset; \

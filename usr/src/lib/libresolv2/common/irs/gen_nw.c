@@ -140,7 +140,7 @@ nw_byname(struct irs_nw *this, const char *name, int type) {
 	struct irs_rule *rule;
 	struct nwent *rval;
 	struct irs_nw *nw;
-	
+
 	if (init(this) == -1)
 		return(NULL);
 
@@ -163,7 +163,7 @@ nw_byaddr(struct irs_nw *this, void *net, int length, int type) {
 	struct irs_rule *rule;
 	struct nwent *rval;
 	struct irs_nw *nw;
-	
+
 	if (init(this) == -1)
 		return(NULL);
 
@@ -248,7 +248,7 @@ nw_res_set(struct irs_nw *this, struct __res_state *res,
 static int
 init(struct irs_nw *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
-	
+
 	if (!pvt->res && !nw_res_get(this))
 		return (-1);
 	if (((pvt->res->options & RES_INIT) == 0U) &&

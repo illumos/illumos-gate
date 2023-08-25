@@ -1,8 +1,8 @@
 /******************************************************************************
  * memory.h
- * 
+ *
  * Memory reservation and information.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -38,9 +38,9 @@
 
 #if __XEN_INTERFACE_VERSION__ >= 0x00030209
 /*
- * Maximum # bits addressable by the user of the allocated region (e.g., I/O 
- * devices often have a 32-bit limitation even in 64-bit systems). If zero 
- * then the user has no addressing restriction. This field is not used by 
+ * Maximum # bits addressable by the user of the allocated region (e.g., I/O
+ * devices often have a 32-bit limitation even in 64-bit systems). If zero
+ * then the user has no addressing restriction. This field is not used by
  * XENMEM_decrease_reservation.
  */
 #define XENMEMF_address_bits(x)     (x)
@@ -105,7 +105,7 @@ struct xen_memory_exchange {
      * [IN/OUT] Details of new memory extents.
      * We require that:
      *  1. @in.domid == @out.domid
-     *  2. @in.nr_extents  << @in.extent_order == 
+     *  2. @in.nr_extents  << @in.extent_order ==
      *     @out.nr_extents << @out.extent_order
      *  3. @in.extent_start and @out.extent_start lists must not overlap
      *  4. @out.extent_start lists GPFN bases to be populated

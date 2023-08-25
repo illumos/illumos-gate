@@ -48,8 +48,8 @@ errlist err_list[] = {
 {"cannot initialize properly (listener can't fork itself)",6},
 {"cannot initialize properly (pidfile write)",		7},
 
-{"cannot open channel to network (FD1)",			11}, 
-{"cannot open channel to network (FD2)",			12}, 
+{"cannot open channel to network (FD1)",			11},
+{"cannot open channel to network (FD2)",			12},
 {"cannot open channel to network (FD3)",			13},
 {"uname system call error",				14},
 {"caught SIGTERM (exiting)",				15},

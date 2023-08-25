@@ -29,7 +29,7 @@
 #include <errno.h>
 
 #include <sys/types.h>
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #ifdef T_NULL
 #undef T_NULL			/* Silence re-definition warning of T_NULL. */
 #endif

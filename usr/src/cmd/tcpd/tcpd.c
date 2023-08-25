@@ -6,7 +6,7 @@
   * REAL_DAEMON_DIR macro. This arrangement requires that the network daemons
   * are started by inetd or something similar. Connections and diagnostics
   * are logged through syslog(3).
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

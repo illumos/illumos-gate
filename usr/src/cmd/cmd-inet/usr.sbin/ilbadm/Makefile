@@ -63,7 +63,7 @@ $(POFILE): $(POFILES)
 
 install: all $(ROOTUSRSBINPROG)
 
-clean:	
+clean:
 	$(RM) $(OBJS) $(POFILES)
 
 lint:	$(SRCS)

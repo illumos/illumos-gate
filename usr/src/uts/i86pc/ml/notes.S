@@ -35,7 +35,7 @@
  */
 	.section        .note
 	.align          4
-	.4byte           .name1_end - .name1_begin 
+	.4byte           .name1_end - .name1_begin
 	.4byte           .desc1_end - .desc1_begin
 	.4byte		ELF_NOTE_PAGESIZE_HINT
 .name1_begin:

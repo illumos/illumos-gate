@@ -426,7 +426,7 @@ smb_net_send_uio(smb_session_t *s, mbuf_t *mbuf_head)
 	cv_signal(&txl->tl_wait_cv);
 	mutex_exit(&txl->tl_mutex);
 
-out:	
+out:
 	if (vdb != NULL)
 		kmem_free(vdb, sizeof (*vdb));
 	m_freem(mbuf_head);

@@ -160,11 +160,11 @@ ipf_stack_t *ifs;
 #endif
 	int i;
 
-	KMALLOCS(ifs->ifs_ips_table, ipstate_t **, 
+	KMALLOCS(ifs->ifs_ips_table, ipstate_t **,
 		 ifs->ifs_fr_statesize * sizeof(ipstate_t *));
 	if (ifs->ifs_ips_table == NULL)
 		return -1;
-	bzero((char *)ifs->ifs_ips_table, 
+	bzero((char *)ifs->ifs_ips_table,
 	      ifs->ifs_fr_statesize * sizeof(ipstate_t *));
 
 	KMALLOCS(ifs->ifs_ips_seed, u_long *,
@@ -213,7 +213,7 @@ ipf_stack_t *ifs;
 		 ifs->ifs_fr_statesize * sizeof(u_long));
 	if (ifs->ifs_ips_stats.iss_bucketlen == NULL)
 		return -1;
-	bzero((char *)ifs->ifs_ips_stats.iss_bucketlen, 
+	bzero((char *)ifs->ifs_ips_stats.iss_bucketlen,
 	      ifs->ifs_fr_statesize * sizeof(u_long));
 
 	if (ifs->ifs_fr_state_maxbucket == 0) {
@@ -316,19 +316,19 @@ ipf_stack_t *ifs;
 	}
 
 	if (ifs->ifs_ips_table != NULL) {
-		KFREES(ifs->ifs_ips_table, 
+		KFREES(ifs->ifs_ips_table,
 		       ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_table));
 		ifs->ifs_ips_table = NULL;
 	}
 
 	if (ifs->ifs_ips_seed != NULL) {
-		KFREES(ifs->ifs_ips_seed, 
+		KFREES(ifs->ifs_ips_seed,
 		       ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_seed));
 		ifs->ifs_ips_seed = NULL;
 	}
 
 	if (ifs->ifs_ips_stats.iss_bucketlen != NULL) {
-		KFREES(ifs->ifs_ips_stats.iss_bucketlen, 
+		KFREES(ifs->ifs_ips_stats.iss_bucketlen,
 		       ifs->ifs_fr_statesize * sizeof(u_long));
 		ifs->ifs_ips_stats.iss_bucketlen = NULL;
 	}
@@ -1144,7 +1144,7 @@ u_int flags;
 	 * If the max number of state entries has been reached, and there is no
 	 * limit on the state count for the rule, then do not continue.  In the
 	 * case where a limit exists, it's ok allow the entries to be created as
-	 * long as specified limit itself has not been reached. 
+	 * long as specified limit itself has not been reached.
 	 *
 	 * Note that because the lock isn't held on fr, it is possible to exceed
 	 * the specified size of the table.  However, the cost of this is being
@@ -1155,7 +1155,7 @@ u_int flags;
 	 * Also note that, since the automatic flush should have been triggered
 	 * well before we reach the maximum number of state table entries, the
 	 * likelihood of reaching the max (and thus exceedng it) is minimal.
-	 */ 
+	 */
 	fr = fin->fin_fr;
 	if (fr != NULL) {
 		if ((ifs->ifs_ips_num >= ifs->ifs_fr_statemax) &&
@@ -1434,13 +1434,13 @@ u_int flags;
 	if (fr != NULL) {
 		(void) strncpy(is->is_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_age[0] != 0) {
-			is->is_tqehead[0] = 
+			is->is_tqehead[0] =
 			    fr_addtimeoutqueue(&ifs->ifs_ips_utqe,
 					       fr->fr_age[0], ifs);
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
 		if (fr->fr_age[1] != 0) {
-			is->is_tqehead[1] = 
+			is->is_tqehead[1] =
 			    fr_addtimeoutqueue(&ifs->ifs_ips_utqe,
 					       fr->fr_age[1], ifs);
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
@@ -1657,7 +1657,7 @@ ipstate_t *is;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 	source = !fin->fin_rev;
-	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) && 
+	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) &&
 	    (ntohs(is->is_sport) != fin->fin_data[0]))
 		source = 0;
 	fdata = &is->is_tcp.ts_data[!source];
@@ -1895,7 +1895,7 @@ int flags;
 	);
 	if (
 #if defined(_KERNEL)
-		/* 
+		/*
 		 * end <-> s + n
 		 * maxend <-> ack + win
 		 * this is upperbound check
@@ -3401,7 +3401,7 @@ ipf_stack_t *ifs;
 		}
 		is->is_pnext = NULL;
 	}
- 
+
 	if (ifs->ifs_ipstate_logging != 0 && why != 0)
 		ipstate_log(is, why, ifs);
 	/*
@@ -3889,7 +3889,7 @@ int flags;
 			 * If we would allow the state to time out here, while
 			 * there would still be packets being retransmitted, we
 			 * would cut off line between the two peers preventing
-			 * them to close connection properly. 
+			 * them to close connection properly.
 			 */
 			rval = 1;
 			break;

@@ -1,4 +1,4 @@
-/* 
+/*
  * kadmin/ldap_util/kdb5_ldap_util.h
  */
 
@@ -51,7 +51,7 @@
 #define LIST_REALM            5
 
 #ifdef HAVE_EDIRECTORY
-# define CREATE_SERVICE        6 
+# define CREATE_SERVICE        6
 # define MODIFY_SERVICE        7
 # define VIEW_SERVICE          8
 # define DESTROY_SERVICE       9

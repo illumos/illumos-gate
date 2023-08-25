@@ -3,26 +3,26 @@
  * Use is subject to license terms.
  */
 
-/* 
+/*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
  * the License at http://www.mozilla.org/NPL/
- *  
+ *
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *  
+ *
  * The Original Code is Mozilla Communicator client code, released
  * March 31, 1998.
- * 
+ *
  * The Initial Developer of the Original Code is Netscape
  * Communications Corporation. Portions created by Netscape are
  * Copyright (C) 1998-1999 Netscape Communications Corporation. All
  * Rights Reserved.
- * 
- * Contributor(s): 
+ *
+ * Contributor(s):
  */
 
 /* ldapdelete.c - simple program to delete an entry using LDAP */
@@ -90,7 +90,7 @@ main( int argc, char **argv )
 #endif
 
     optind = ldaptool_process_args( argc, argv, "c", 0, options_callback );
-	
+
     if ( optind == -1 ) {
 	usage();
     }
@@ -108,12 +108,12 @@ main( int argc, char **argv )
 
     if (( ldctrl = ldaptool_create_manage_dsait_control()) != NULL ) {
 	ldaptool_add_control_to_array( ldctrl, ldaptool_request_ctrls);
-    } 
+    }
 
     if ((ldctrl = ldaptool_create_proxyauth_control(ld)) !=NULL) {
 	ldaptool_add_control_to_array( ldctrl, ldaptool_request_ctrls);
     }
-   
+
     if ( ldaptool_fp == NULL ) {
 	for ( ; optind < argc; ++optind ) {
             char *conv;
@@ -182,7 +182,7 @@ static int
 dodelete( LDAP *ld, char *dn, LDAPControl **serverctrls )
 {
     int rc;
-    Head HeadNode; 
+    Head HeadNode;
     Element *datalist;
     char ch;
 
@@ -191,7 +191,7 @@ dodelete( LDAP *ld, char *dn, LDAPControl **serverctrls )
     }
     if ( ldaptool_not ) {
         rc = LDAP_SUCCESS;
-    } 
+    }
     else { /* else 1 */
        L_Init(&HeadNode);
 

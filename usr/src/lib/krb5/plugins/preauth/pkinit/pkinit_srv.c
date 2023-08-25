@@ -152,7 +152,7 @@ pkinit_server_get_edata(krb5_context context,
 
     /*
      * If we don't have a realm context for the given realm,
-     * don't tell the client that we support pkinit! 
+     * don't tell the client that we support pkinit!
      */
     plgctx = pkinit_find_realm_context(context, pa_plugin_context,
 				       request->server);
@@ -176,7 +176,7 @@ verify_client_san(krb5_context context,
 #ifdef DEBUG_SAN_INFO
     char *client_string = NULL, *san_string;
 #endif
-    
+
     retval = crypto_retrieve_cert_sans(context, plgctx->cryptoctx,
 				       reqctx->cryptoctx, plgctx->idctx,
 				       &princs,
@@ -330,7 +330,7 @@ pkinit_server_verify_padata(krb5_context context,
 			    krb5_data **e_data,
 			    krb5_authdata ***authz_data)
 {
-    krb5_error_code retval = 0;	
+    krb5_error_code retval = 0;
     krb5_octet_data authp_data = {0, 0, NULL}, krb5_authz = {0, 0, NULL};
     krb5_data *encoded_pkinit_authz_data = NULL;
     krb5_pa_pk_as_req *reqp = NULL;
@@ -391,7 +391,7 @@ pkinit_server_verify_padata(krb5_context context,
 		reqctx->cryptoctx, plgctx->idctx, CMS_SIGN_CLIENT,
 		plgctx->opts->require_crl_checking,
 		reqp->signedAuthPack.data, reqp->signedAuthPack.length,
-		&authp_data.data, &authp_data.length, &krb5_authz.data, 
+		&authp_data.data, &authp_data.length, &krb5_authz.data,
 		&krb5_authz.length);
 	    break;
 	case KRB5_PADATA_PK_AS_REP_OLD:
@@ -412,7 +412,7 @@ pkinit_server_verify_padata(krb5_context context,
 		reqctx->cryptoctx, plgctx->idctx, CMS_SIGN_DRAFT9,
 		plgctx->opts->require_crl_checking,
 		reqp9->signedAuthPack.data, reqp9->signedAuthPack.length,
-		&authp_data.data, &authp_data.length, &krb5_authz.data, 
+		&authp_data.data, &authp_data.length, &krb5_authz.data,
 		&krb5_authz.length);
 	    break;
 	default:
@@ -460,7 +460,7 @@ pkinit_server_verify_padata(krb5_context context,
 	    }
 
 	    /* check dh parameters */
-	    if (auth_pack->clientPublicValue != NULL) {	
+	    if (auth_pack->clientPublicValue != NULL) {
 		retval = server_check_dh(context, plgctx->cryptoctx,
 		    reqctx->cryptoctx, plgctx->idctx,
 		    &auth_pack->clientPublicValue->algorithm.parameters,
@@ -477,12 +477,12 @@ pkinit_server_verify_padata(krb5_context context,
 	     * came from the client.  Therefore, we use the original
 	     * packet contents.
 	     */
-	    retval = k5int_decode_krb5_as_req(req_pkt, &tmp_as_req); 
+	    retval = k5int_decode_krb5_as_req(req_pkt, &tmp_as_req);
 	    if (retval) {
 		pkiDebug("decode_krb5_as_req returned %d\n", (int)retval);
 		goto cleanup;
 	    }
-		
+
 	    retval = k5int_encode_krb5_kdc_req_body(tmp_as_req, &der_req);
 	    if (retval) {
 		pkiDebug("encode_krb5_kdc_req_body returned %d\n", (int) retval);
@@ -541,7 +541,7 @@ pkinit_server_verify_padata(krb5_context context,
 		pkiDebug("failed to decode krb5_auth_pack_draft9\n");
 		goto cleanup;
 	    }
-	    if (auth_pack9->clientPublicValue != NULL) {	
+	    if (auth_pack9->clientPublicValue != NULL) {
 		retval = server_check_dh(context, plgctx->cryptoctx,
 		    reqctx->cryptoctx, plgctx->idctx,
 		    &auth_pack9->clientPublicValue->algorithm.parameters,
@@ -594,7 +594,7 @@ pkinit_server_verify_padata(krb5_context context,
 	     */
 	    pkinit_authz_data->contents = krb5_authz.data;
 	    pkinit_authz_data->length = krb5_authz.length;
-	    retval = k5int_encode_krb5_authdata_elt(pkinit_authz_data, 
+	    retval = k5int_encode_krb5_authdata_elt(pkinit_authz_data,
 			    &encoded_pkinit_authz_data);
 #ifdef DEBUG_ASN1
 	    print_buffer_bin((unsigned char *)encoded_pkinit_authz_data->data,
@@ -613,12 +613,12 @@ pkinit_server_verify_padata(krb5_context context,
 			    (krb5_octet *) encoded_pkinit_authz_data->data;
 	    my_authz_data[0]->length = encoded_pkinit_authz_data->length;
 	    *authz_data = my_authz_data;
-	    pkiDebug("Returning %d bytes of authorization data\n", 
+	    pkiDebug("Returning %d bytes of authorization data\n",
 		     krb5_authz.length);
 	    encoded_pkinit_authz_data->data = NULL; /* Don't free during cleanup*/
 	    free(encoded_pkinit_authz_data);
 	    break;
-	default: 
+	default:
 	    *authz_data = NULL;
     }
     /* remember to set the PREAUTH flag in the reply */
@@ -647,7 +647,7 @@ pkinit_server_verify_padata(krb5_context context,
 	    free_krb5_pa_pk_as_req_draft9(&reqp9);
     }
     if (tmp_as_req != NULL)
-	k5int_krb5_free_kdc_req(context, tmp_as_req); 
+	k5int_krb5_free_kdc_req(context, tmp_as_req);
     if (authp_data.data != NULL)
 	free(authp_data.data);
     if (krb5_authz.data != NULL)
@@ -716,7 +716,7 @@ pkinit_server_return_padata(krb5_context context,
 	pkiDebug("missing request context \n");
 	return EINVAL;
     }
-    
+
     plgctx = pkinit_find_realm_context(context, pa_plugin_context,
 				       request->server);
     if (plgctx == NULL) {
@@ -795,14 +795,14 @@ pkinit_server_return_padata(krb5_context context,
 	pkiDebug("received DH key delivery AS REQ\n");
 	retval = server_process_dh(context, plgctx->cryptoctx,
 	    reqctx->cryptoctx, plgctx->idctx, subjectPublicKey,
-	    subjectPublicKey_len, &dh_pubkey, &dh_pubkey_len, 
+	    subjectPublicKey_len, &dh_pubkey, &dh_pubkey_len,
 	    &server_key, &server_key_len);
 	if (retval) {
 	    pkiDebug("failed to process/create dh paramters\n");
 	    goto cleanup;
 	}
     }
-	
+
     if ((rep9 != NULL &&
 	    rep9->choice == choice_pa_pk_as_rep_draft9_dhSignedData) ||
 	(rep != NULL && rep->choice == choice_pa_pk_as_rep_dhInfo)) {
@@ -879,7 +879,7 @@ pkinit_server_return_padata(krb5_context context,
 	pkiDebug("%s: return checksum instead of nonce = %d\n",
 		 __FUNCTION__, fixed_keypack);
 
-	/* if this is an RFC reply or draft9 client requested a checksum 
+	/* if this is an RFC reply or draft9 client requested a checksum
 	 * in the reply instead of the nonce, create an RFC-style keypack
 	 */
 	if ((int)padata->pa_type == KRB5_PADATA_PK_AS_REQ || fixed_keypack) {
@@ -906,7 +906,7 @@ pkinit_server_return_padata(krb5_context context,
 	    pkiDebug("calculating checksum on buf size = %d\n", req_pkt->length);
 	    print_buffer(req_pkt->data, req_pkt->length);
 	    pkiDebug("checksum size = %d\n", key_pack->asChecksum.length);
-	    print_buffer(key_pack->asChecksum.contents, 
+	    print_buffer(key_pack->asChecksum.contents,
 			 key_pack->asChecksum.length);
 	    pkiDebug("encrypting key (%d)\n", encrypting_key->length);
 	    print_buffer(encrypting_key->contents, encrypting_key->length);
@@ -927,7 +927,7 @@ pkinit_server_return_padata(krb5_context context,
 	    case KRB5_PADATA_PK_AS_REQ:
 		rep->choice = choice_pa_pk_as_rep_encKeyPack;
 		retval = cms_envelopeddata_create(context, plgctx->cryptoctx,
-		    reqctx->cryptoctx, plgctx->idctx, padata->pa_type, 1, 
+		    reqctx->cryptoctx, plgctx->idctx, padata->pa_type, 1,
 		    (unsigned char *)encoded_key_pack->data,
 		    encoded_key_pack->length,
 		    &rep->u.encKeyPack.data, &rep->u.encKeyPack.length);
@@ -935,7 +935,7 @@ pkinit_server_return_padata(krb5_context context,
 	    case KRB5_PADATA_PK_AS_REP_OLD:
 	    case KRB5_PADATA_PK_AS_REQ_OLD:
 		/* if the request is from the broken draft9 client that
-		 * expects back a nonce, create it now 
+		 * expects back a nonce, create it now
 		 */
 		if (!fixed_keypack) {
 		    init_krb5_reply_key_pack_draft9(&key_pack9);
@@ -953,11 +953,11 @@ pkinit_server_return_padata(krb5_context context,
 			pkiDebug("failed to encode reply_key_pack\n");
 			goto cleanup;
 		    }
-		} 
+		}
 
 		rep9->choice = choice_pa_pk_as_rep_draft9_encKeyPack;
 		retval = cms_envelopeddata_create(context, plgctx->cryptoctx,
-		    reqctx->cryptoctx, plgctx->idctx, padata->pa_type, 1, 
+		    reqctx->cryptoctx, plgctx->idctx, padata->pa_type, 1,
 		    (unsigned char *)encoded_key_pack->data,
 		    encoded_key_pack->length,
 		    &rep9->u.encKeyPack.data, &rep9->u.encKeyPack.length);

@@ -87,7 +87,7 @@ static Action	set_action();
 
 void			usage ()
 {
-	(void) printf (gettext( 
+	(void) printf (gettext(
 "usage:\n"
 "\n"
 "  (add or change form)\n"
@@ -313,7 +313,7 @@ main(int argc, char *argv[])
 		case 'l':
 			action = set_action(list_form, "-l");
 			break;
-		
+
 		case 'd':
 			d = 1;
 			action = set_action(add_form, "-d");
@@ -605,7 +605,7 @@ add_form (form, input, new_alert, u)
 			alert.shcmd = 0;
 			alert.W = alert.Q = -1;
 			new_form = 1;
-			
+
 		} else if (getform(form, &fbuf, &alert, (FILE **)0) == -1)
 			switch (errno) {
 
@@ -1196,14 +1196,14 @@ _quiet_alert (form)
 		LP_ERRMSG (ERROR, E_LP_MSEND);
 		mclose ();
 		return (1);
-	}	
- 
+	}
+
 	if (mrecv(msgbuf, size) == -1) {
 		LP_ERRMSG (ERROR, E_LP_MRECV);
 		mclose ();
 		return (1);
 	}
- 
+
 	mtype = getmessage(msgbuf, R_QUIET_ALERT, &status);
 	free (msgbuf);
 	mclose ();

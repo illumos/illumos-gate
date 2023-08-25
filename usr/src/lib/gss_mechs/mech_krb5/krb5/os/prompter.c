@@ -280,7 +280,7 @@ krb5_prompter_posix(krb5_context context,
 	    do {
 		scratchchar = getchar();
 	    } while (scratchchar != EOF && scratchchar != '\n');
-    
+
 	prompts[i].reply->length = strlen(prompts[i].reply->data);
 
 	if (!SetConsoleMode(handle, old_mode)) {

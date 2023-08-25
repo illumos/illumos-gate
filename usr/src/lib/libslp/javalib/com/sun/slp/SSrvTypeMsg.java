@@ -116,7 +116,7 @@ class SSrvTypeMsg extends SrvLocMsgImpl {
 	if (len == 0) {
 	    return "";
 
-	} else if (len == 0xFFFF) {	
+	} else if (len == 0xFFFF) {
 	    return Defaults.ALL_AUTHORITIES;
 
 	}

@@ -61,7 +61,7 @@ LIBM_ANSI_PRAGMA_WEAK(hypotf,function)
 	/ returns |x|
 	flds	4(%esp)
 .take_abs:
-	fabs	
+	fabs
 	ret
 	.align	4
 	SET_SIZE(hypotf)

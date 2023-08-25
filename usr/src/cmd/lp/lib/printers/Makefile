@@ -55,7 +55,7 @@ POFILE =	lp_lib_printers.po
 
 .KEEP_STATE:
 
-all install :		$(LIBS) 
+all install :		$(LIBS)
 
 include		../../../../lib/Makefile.targ
 

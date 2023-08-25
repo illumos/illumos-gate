@@ -542,7 +542,7 @@ ipf_stack_t *ifs;
 	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 }
 
-	
+
 int ip_lookup_iterate(data, uid, ctx, ifs)
 void *data;
 int uid;

@@ -43,11 +43,11 @@ static krb5_error_code appdefault_get(krb5_context context, const char *appname,
 	krb5_error_code retval;
 	const char * realmstr =  realm?realm->data:NULL;
 
-	    if (!context || (context->magic != KV5M_CONTEXT)) 
+	    if (!context || (context->magic != KV5M_CONTEXT))
 	    return KV5M_CONTEXT;
 
 	    profile = context->profile;
-	    
+
 	/*
 	 * Try number one:
 	 *
@@ -97,7 +97,7 @@ static krb5_error_code appdefault_get(krb5_context context, const char *appname,
 	 *	realm = {
 	 *		option = <boolean>
 	 */
-	
+
 	if (realmstr) {
 		names[1] = realmstr;
 		names[2] = option;
@@ -135,7 +135,7 @@ goodbye:
 	return 0;
 }
 
-void KRB5_CALLCONV 
+void KRB5_CALLCONV
 krb5_appdefault_boolean(krb5_context context, const char *appname, const krb5_data *realm, const char *option, int default_value, int *ret_value)
 {
 	char *string = NULL;
@@ -150,7 +150,7 @@ krb5_appdefault_boolean(krb5_context context, const char *appname, const krb5_da
 		*ret_value = default_value;
 }
 
-void KRB5_CALLCONV 
+void KRB5_CALLCONV
 krb5_appdefault_string(krb5_context context, const char *appname, const krb5_data *realm, const char *option, const char *default_value, char **ret_value)
 {
 	krb5_error_code retval;

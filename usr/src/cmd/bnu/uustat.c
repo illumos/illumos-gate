@@ -67,7 +67,7 @@ struct userdate {
 };
 
 struct userdate userformat;
-struct userdate *friendlyptr = &userformat;	
+struct userdate *friendlyptr = &userformat;
 
 extern long atol();
 static int whattodo();
@@ -102,7 +102,7 @@ extern void qsort();		/* qsort(3) and comparison test */
 int sortcnt = -1;
 extern int machcmp();
 extern int _age();		/* find the age of a file */
-static long calcnum;	
+static long calcnum;
 extern char Jobid[];	/* jobid for status or kill option */
 short Kill;		/*  == 1 if -k specified */
 short Rejuvenate;	/*  == 1 for -r specified */
@@ -136,7 +136,7 @@ char **envp;
 	int i, chkid;
 	char fullpath[MAXFULLNAME];
 	long temp;
-	
+
 	char arglist[MAXSTATE+1];
 
 	/* Set locale environment variables local definitions */
@@ -244,7 +244,7 @@ char **envp;
 			procState(arglist);
 			break;
 		default:
-			errortn();		
+			errortn();
 			exit(1);
 		}
 	}
@@ -296,13 +296,13 @@ char **envp;
 		   DEBUG(9, "calling complete %d\n",Complete);
 		   complete();
 		}
-	
+
 	if (Calctime) {
 		count = readperf(calcnum);
 
 		if (count != 0)
 			docalc();
-		
+
 	}
 
 	if (Psopt) {
@@ -331,7 +331,7 @@ char **envp;
 		str = rindex(m->stst, ' ');
 		(void) machine(++str);	/* longer name? */
 		*str = '\0';
-			
+
 	    }
 	    closedir(spooldir);
 	}
@@ -367,7 +367,7 @@ char **envp;
 	while (gnamef(spooldir, f) == TRUE) {
 	 /* at /var/spool/uucp directory */
 	 /* f will contain remote machine names */
-	   
+
           if (EQUALSN("LCK..", f, 5))
 		continue;
 
@@ -385,7 +385,7 @@ char **envp;
 		machdir = opendir(fullpath);
 		if (machdir == NULL)
 			exit(101);
-				
+
 		m = machine(f);
 		while (gnamef(machdir, gradef) == TRUE) {
 			/* at /var/spool/uucp/remote_name */
@@ -405,7 +405,7 @@ char **envp;
 
 					if (Kill || Rejuvenate)
 					    kprocessC(gradef, subf);
-					else if (Uopt | Sysopt | Queued | Running | Interrupted) 
+					else if (Uopt | Sysopt | Queued | Running | Interrupted)
 				 	   /* go print out C. file info */
 				  	   uprocessC(f ,gradef, subf);
 
@@ -425,10 +425,10 @@ char **envp;
 			}
 		}
 		closedir(machdir);
-	  }	
+	  }
 	  /* cd back to /var/spoool/uucp dir */
 	  if (chdir(SPOOL) != 0)
-		exit(101);	
+		exit(101);
 	} /* while more files in spooldir */
 	closedir(spooldir);
 
@@ -530,7 +530,7 @@ char   *machine, *dir, *file;
 
 	    goodRecord = 0;
 
-	    if (User[0] != '\0' && (!EQUALS(User, user)) ) 
+	    if (User[0] != '\0' && (!EQUALS(User, user)) )
 		continue;
 
 
@@ -543,8 +543,8 @@ char   *machine, *dir, *file;
 		   state function to determine this job's state */
 
 		if (State)
-		{ 
-		   statefound = state(dir, file);		
+		{
+		   statefound = state(dir, file);
 	           DEBUG(9, "uprocessC: statefound value = %d\n", statefound);
  		   if ((whattodo(statefound) != TRUE))
 			{
@@ -631,9 +631,9 @@ char   *machine, *dir, *file;
         outbuf[0] = NULLCHAR;
 	goodRecord = 1;
        } /* end of while more data in buffer */
-	
+
        /* successful processing of a job, increment job count
-	  counter */	
+	  counter */
 	if (goodRecord)
             jobcount++;
 
@@ -645,7 +645,7 @@ char   *machine, *dir, *file;
 }
 /*
  * whattodo - determine what to do with current C dot file
- *  	     depending on any combination (2**3 - 1) of input 
+ *  	     depending on any combination (2**3 - 1) of input
  *	     job states
  */
 static int
@@ -675,7 +675,7 @@ int inputint;
 	Now do you understand.  All  possible combinations have to
 	be evaluated to determine whether or not to print the C dot
 	information out or not! Well, all but 000, because if neither
-	of these states are input by the user we would not be 
+	of these states are input by the user we would not be
 	examing the C dot file anyway!
 	*/
 
@@ -685,13 +685,13 @@ int inputint;
 		return(TRUE);
 	else if ((Running && !Queued && !Interrupted) && (inputint == 2))				return(TRUE);
 	else if ((Interrupted && !Queued && !Running) && (inputint == 3))				return(TRUE);
-	else if ((Queued && Running && !Interrupted) && 
+	else if ((Queued && Running && !Interrupted) &&
 		(inputint == 1 || inputint == 2))
 	  		return(TRUE);
-	else if ((!Queued && Running && Interrupted) && 
+	else if ((!Queued && Running && Interrupted) &&
 		(inputint == 2 || inputint == 3))
 			return(TRUE);
-	else if ((Queued && !Running && Interrupted) && 
+	else if ((Queued && !Running && Interrupted) &&
 		(inputint ==1 || inputint == 3))
 			return(TRUE);
 	else return(FALSE);
@@ -753,7 +753,7 @@ char *file, *dir;
 	}
 
  	times.actime = times.modtime = time((time_t *)NULL);
- 
+
 	while (fgets(buf, BUFSIZ, fp) != NULL) {
 	    if (sscanf(buf,"%s%s%s%s%s%s", type, file1, file2,
 	      user, opt, file3) <6) {
@@ -797,7 +797,7 @@ char *file, *dir;
 	    /* remove D. file */
 	    (void) sprintf(rfullname, "%s/%s", dir, file3);
 	    DEBUG(4, "Remove %s\n", rfullname);
-	    if (Kill) 
+	    if (Kill)
 		ret = unlink(rfullname);
 	    else /* Rejuvenate */
  		ret = utime(rfullname, &times);
@@ -818,7 +818,7 @@ char *file, *dir;
 	    ret = unlink(fullname);
 	else /* Rejuvenate */
 		ret = utime(fullname, &times);
-	
+
 	if (ret != 0) {
 	    /* program error?? */
 	    if(Kill)
@@ -833,7 +833,7 @@ char *file, *dir;
 	else if (!EQUALS(Loginuser, user))
 	   {
 		sprintf(mailmsg, "%s %s", KILLMSG, Jobid);
-		mailst(user, "job killed", mailmsg, "", ""); 
+		mailst(user, "job killed", mailmsg, "", "");
 	   }
 	fclose(fp);
 	if (!nonotf) {
@@ -1128,7 +1128,7 @@ char * dir;	/* system spool directory */
  * Look thru the /var/uucp/.Admin/account file (if present)
  * for all jobs initiated by user and print.
  *
- * Parameters:	
+ * Parameters:
  *
  *		Username - user that initiated uustat request
  *
@@ -1210,26 +1210,26 @@ while (fgets(abuf, BUFSIZ, fp) != NULL)
 
 /* Function: state - determine if Cdotfile is queued or running
  *
- * This function searches thru the directory jcdir for a Adotfile 
+ * This function searches thru the directory jcdir for a Adotfile
  * that matches the Cdotfile.  If found then look for a matching
  * lock file.  If a Adotfile and a lock file is found then the
  * job is in the running state.  If no Adotfile is found then the
  * job is in the queued state.  If a Adotfile is found and no
  * lock file is found then the job is queued.
- * 
+ *
  * Parameters:
  *
  *	jcdir    -   the job grade directory to search
  *	cdotfile -   the Cdotfile whose state is to be determined
  *
- * Returns: 
+ * Returns:
  *
  */
 static int
 state(jcdir, cdotfile)
 char *jcdir, *cdotfile;
 {
-	short found, foundlck, CequalA;	
+	short found, foundlck, CequalA;
 	char comparef[MAXBASENAME+1], afile[MAXBASENAME+1], cfile[MAXBASENAME+1];
 	char lckfile[MAXBASENAME+1], lockname[MAXBASENAME+1];
 	char lckdir[BUFSIZ+1];
@@ -1259,7 +1259,7 @@ char *jcdir, *cdotfile;
 			(void) strcpy(lckdir, LOCKPRE);
 			*strrchr(lckdir, '/') = '\0';
 			/* open lock directory */
-			
+
 			subjcdir = opendir(lckdir);
 			if (subjcdir == NULL)
 			   exit(101); /* I know, I know! */
@@ -1270,10 +1270,10 @@ char *jcdir, *cdotfile;
 			    if (EQUALS(lockname, lckfile))
 			          foundlck = 1;
 			  }
-			closedir(subjcdir);	
+			closedir(subjcdir);
 
 			}
-		}	
+		}
 
 	}
 
@@ -1293,17 +1293,17 @@ char *jcdir, *cdotfile;
 
 
 
-static int 
+static int
 readperf(timerange)
 long timerange;
 {
-	
+
 	char proto[2], jc[2], role[2];
 	char rectype[5],  time[MAXDATE+1], pid[10],wmachine[10];
 	char remote[10],device[10], netid[20], jobid[20];
 	static float queuetime, tat;
 	static long size;
-        struct tm tm_tmp;	
+        struct tm tm_tmp;
 	time_t t_time, t_starttime, t_upperlimit;
 
 	char options[10];
@@ -1322,8 +1322,8 @@ long timerange;
 	totalxfer=totalbytes=recordcnt=totaljob=totalque=0;
 	lowerlimit[0] = '\0';
 	upperlimit[0] = '\0';
-	
- 
+
+
 	inputsecs = convert(timerange);
 	startime = gmts();
 	strncpy(lowerlimit, startime, MAXDATE);
@@ -1353,7 +1353,7 @@ long timerange;
 		    *strptr = ' ';
 	    DEBUG(9, "READPERF: abuf = %s\n",abuf);
 
-	    x = sscanf(abuf, "%s%*s%s%s%s%s%s%s%*s%s%s%f%f%ld%s%f%f%f%f%f%f%f%f%f%*s", 
+	    x = sscanf(abuf, "%s%*s%s%s%s%s%s%s%*s%s%s%f%f%ld%s%f%f%f%f%f%f%f%f%f%*s",
 		rectype, time, pid, wmachine, role, remote, device, netid,
 		jobid, &queuetime, &tat, &size, options, &rst,
 		&ust, &kst, &xferrate, &utt, &ktt, &rtt, &wfield,
@@ -1369,7 +1369,7 @@ long timerange;
 		DEBUG(9, "READPERF: xferrate = %f\n",xferrate);
 
 		abuf[0] = '\0';
-		
+
 		if (!EQUALS(Rmtname, remote))
 			continue;
 
@@ -1396,7 +1396,7 @@ long timerange;
 		DEBUG(9, "READPERF: t_upperlimit = %d\n", t_upperlimit);
 		if (t_starttime <= t_time && t_upperlimit >= t_time)
 		{
-			totaljob++;	
+			totaljob++;
 			totalque = totalque + queuetime;
 			totalxfer = totalxfer + xferrate;
 			totalbytes = totalbytes + size;

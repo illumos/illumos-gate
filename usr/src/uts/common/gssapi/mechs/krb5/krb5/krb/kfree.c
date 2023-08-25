@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_free_address()
  */
@@ -171,7 +171,7 @@ krb5_free_cred(krb5_context context, register krb5_cred *val)
 
 /*
  * krb5_free_cred_contents zeros out the session key, and then frees
- * the credentials structures 
+ * the credentials structures
  */
 
 void KRB5_CALLCONV
@@ -206,11 +206,11 @@ krb5_free_cred_contents(krb5_context context, krb5_creds *val)
     }
 }
 
-void KRB5_CALLCONV 
+void KRB5_CALLCONV
 krb5_free_cred_enc_part(krb5_context context, register krb5_cred_enc_part *val)
 {
     register krb5_cred_info **temp;
-    
+
     if (val->r_address) {
 	krb5_free_address(context, val->r_address);
 	val->r_address = 0;
@@ -281,7 +281,7 @@ void krb5_free_etype_info(krb5_context context, krb5_etype_info info)
   }
   free(info);
 }
-    
+
 
 void KRB5_CALLCONV
 krb5_free_enc_kdc_rep_part(krb5_context context, register krb5_enc_kdc_rep_part *val)
@@ -409,7 +409,7 @@ cleanup_dk_list(krb5_context context, krb5_keyblock *key)
 {
 	krb5_dk_node *dn = key->dk_list;
 	krb5_dk_node *nxt;
-	
+
 	while (dn != NULL) {
 		nxt = dn->next;
 
@@ -509,17 +509,17 @@ krb5_free_principal(krb5_context context, krb5_principal val)
 
     if (!val)
 	return;
-    
+
     if (val->data) {
 	i = krb5_princ_size(context, val);
 	while(--i >= 0)
             FREE(krb5_princ_component(context, val, i)->data,
                 krb5_princ_component(context, val, i)->length+1);
 	krb5_xfree_wrap(val->data,
-		sizeof(krb5_data) * krb5_princ_size(context, val));	
+		sizeof(krb5_data) * krb5_princ_size(context, val));
     }
     if (val->realm.data)
-	krb5_xfree_wrap(val->realm.data, val->realm.length+1); 
+	krb5_xfree_wrap(val->realm.data, val->realm.length+1);
     krb5_xfree_wrap(val, sizeof (krb5_principal_data));
 }
 
@@ -738,7 +738,7 @@ krb5_free_sam_challenge_2_body_contents(krb5_context ctx,
 {
     if (!sc2)
 	return;
-    if (sc2->sam_type_name.data) 
+    if (sc2->sam_type_name.data)
 	krb5_free_data_contents(ctx, &sc2->sam_type_name);
     if (sc2->sam_track_id.data)
 	krb5_free_data_contents(ctx, &sc2->sam_track_id);
@@ -830,7 +830,7 @@ krb5_free_enc_sam_response_enc(krb5_context ctx,
     krb5_xfree(esre);
 }
 
-void KRB5_CALLCONV 
+void KRB5_CALLCONV
 krb5_free_enc_sam_response_enc_2(krb5_context ctx,
 				 krb5_enc_sam_response_enc_2 *esre2)
 {

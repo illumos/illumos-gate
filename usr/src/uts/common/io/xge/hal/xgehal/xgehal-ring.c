@@ -85,7 +85,7 @@ __hal_ring_rxdblock_link(xge_hal_mempool_h mempoolh,
 	xge_assert(from_item);
 
 	/* get "to" RxD block */
-	to_item = (xge_hal_ring_block_t *) 
+	to_item = (xge_hal_ring_block_t *)
               __hal_mempool_item((xge_hal_mempool_t *) mempoolh, to);
 	xge_assert(to_item);
 
@@ -436,7 +436,7 @@ __hal_ring_prc_enable(xge_hal_channel_h channelh)
 	if (hldev->config.bimodal_interrupts)
 		if (xge_hal_device_check_id(hldev) == XGE_HAL_CARD_HERC)
 			val64 |= XGE_HAL_PRC_CTRL_BIMODAL_INTERRUPT;
-	
+
 	xge_os_pio_mem_write64(ring->channel.pdev, ring->channel.regh0,
 			val64, &bar0->prc_ctrl_n[ring->channel.post_qid]);
 

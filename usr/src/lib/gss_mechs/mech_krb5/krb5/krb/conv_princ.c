@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,10 +28,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * Build a principal from a V4 specification, or separate a V5
  * principal into name, instance, and realm.
- * 
+ *
  * NOTE: This is highly site specific, and is only really necessary
  * for sites who need to convert from V4 to V5.  It is used by both
  * the KDC and the kdb5_convert program.  Since its use is highly
@@ -134,12 +134,12 @@ static const struct krb_convert sconv_list[] = {
  * This falls in the "should have been in the ANSI C library"
  * category. :-)
  */
-static char *strnchr(register char *s, register char c, 
+static char *strnchr(register char *s, register char c,
 		     register unsigned int n)
 {
-     if (n < 1) 
+     if (n < 1)
 	  return 0;
-     
+
      while (n-- && *s) {
 	  if (*s == c)
 	       return s;
@@ -161,7 +161,7 @@ krb5_524_conv_principal(krb5_context context, krb5_const_principal princ,
      const krb5_data *compo;
      char *c, *tmp_realm, *tmp_prealm;
      unsigned int tmp_realm_len;
-     int retval; 
+     int retval;
 
      *name = *inst = '\0';
      switch (krb5_princ_size(context, princ)) {
@@ -224,7 +224,7 @@ krb5_524_conv_principal(krb5_context context, krb5_const_principal princ,
      strncpy(tmp_prealm, compo->data, compo->length);
      tmp_prealm[compo->length] = '\0';
 
-     /* Ask for v4_realm corresponding to 
+     /* Ask for v4_realm corresponding to
 	krb5 principal realm from krb5.conf realms stanza */
 
      if (context->profile == 0)
@@ -233,7 +233,7 @@ krb5_524_conv_principal(krb5_context context, krb5_const_principal princ,
 				 tmp_prealm, "v4_realm", 0,
 				 &tmp_realm);
      free(tmp_prealm);
-     if (retval) { 
+     if (retval) {
 	 return retval;
      } else {
 	 if (tmp_realm == 0) {
@@ -269,9 +269,9 @@ krb5_425_conv_principal(krb5_context context, const char *name,
      char** v4realms = NULL;
      char* realm_name = NULL;
      char* dummy_value = NULL;
-     
+
      /* First, convert the realm, since the v4 realm is not necessarily the same as the v5 realm
-        To do that, iterate over all the realms in the config file, looking for a matching 
+        To do that, iterate over all the realms in the config file, looking for a matching
         v4_realm line */
      names2 [0] = "realms";
      names2 [1] = NULL;
@@ -308,7 +308,7 @@ krb5_425_conv_principal(krb5_context context, const char *name,
      		dummy_value = NULL;
      	}
      }
-     
+
      if (instance) {
 	  if (instance[0] == '\0') {
 	       instance = 0;
@@ -351,7 +351,7 @@ krb5_425_conv_principal(krb5_context context, const char *name,
 	      }
 	  }
      }
-     
+
 not_service:
      retval = krb5_build_principal(context, princ, strlen(realm), realm, name,
 				   instance, NULL);

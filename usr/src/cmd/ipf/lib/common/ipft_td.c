@@ -128,12 +128,12 @@ int	cnt, *dir;
 		pkt.ti_sport = htons(atoi(s));
 		*--s = '.';
 		s = strrchr(dst, '.');
-	
+
 		*s++ = '\0';
 		(void) inet_aton(src, &ip->ip_dst);
 		pkt.ti_dport = htons(atoi(s));
 		*--s = '.';
-	
+
 	} else {
 		(void) inet_aton(src, &ip->ip_src);
 		(void) inet_aton(src, &ip->ip_dst);

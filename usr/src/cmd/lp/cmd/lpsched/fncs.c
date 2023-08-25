@@ -99,7 +99,7 @@ list_remove(void ***list, void *item)
 
         	if ((tmp = (void **)calloc(new_size, sizeof (void *))) == NULL)
 			tmp = *list;
-	
+
 		/* copy up to item */
         	for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
 			tmp[i] = (*list)[i];
@@ -249,7 +249,7 @@ PSTATUS *
 new_pstatus(PRINTER *p)
 {
 	PSTATUS *result = calloc(1, sizeof (*result));
-	
+
 	if (result != NULL) {
 		static int i = 0;
     		char	**paperDenied = NULL;
@@ -284,7 +284,7 @@ CLSTATUS *
 new_cstatus(CLASS *c)
 {
 	CLSTATUS *result = calloc(1, sizeof (*result));
-	
+
 	if (result != NULL) {
 		if (c != NULL)
 			result->class = c;
@@ -325,7 +325,7 @@ FSTATUS *
 new_fstatus(_FORM *f)
 {
 	FSTATUS *result = calloc(1, sizeof (*result));
-	
+
 	if (result != NULL) {
 		static int i = 0;
 
@@ -338,7 +338,7 @@ new_fstatus(_FORM *f)
 		result->alert->exec = new_exec(EX_FALERT, result);
 		result->trigger = result->form->alert.Q;
 
-		if (f != NULL) {	
+		if (f != NULL) {
 			load_userform_access(f->name, &(result->users_allowed),
 		    			&(result->users_denied));
 			load_sdn (&(result->cpi), f->cpi);
@@ -374,10 +374,10 @@ new_pwstatus(PWHEEL *p)
 		static int i = 0;
 
 		if (p != NULL)
-			result->pwheel = p;	
+			result->pwheel = p;
 		else
 			result->pwheel = calloc(1, sizeof (*result));
-			
+
 		result->alert = new_alert("P-%d", i++);
 		result->alert->exec = new_exec(EX_PALERT, result);
 		result->trigger = result->pwheel->alert.Q;
@@ -446,7 +446,7 @@ new_rstatus(REQUEST *r, SECURE *s)
 
 PSTATUS *
 search_pstatus(register char *name)
-{ 
+{
 	PSTATUS	*ps = NULL;
 
 	if (name != NULL) {
@@ -460,13 +460,13 @@ search_pstatus(register char *name)
 	} else
 		ps = new_pstatus(NULL);
 
-	return (ps); 
+	return (ps);
 }
 
 
 FSTATUS *
 search_fstatus(register char *name)
-{ 
+{
 	FSTATUS	*ps = NULL;
 
 	if (name != NULL) {
@@ -480,12 +480,12 @@ search_fstatus(register char *name)
 	} else
 		ps = new_fstatus(NULL);
 
-	return (ps); 
+	return (ps);
 }
 
 FSTATUS *
 search_fptable(register char *paper)
-{ 
+{
 	FSTATUS	*ps = NULL;
 	int i;
 
@@ -497,12 +497,12 @@ search_fptable(register char *paper)
 			}
 	}
 
-	return (ps); 
+	return (ps);
 }
 
 CLSTATUS *
 search_cstatus(register char *name)
-{ 
+{
 	CLSTATUS	*ps = NULL;
 
 	if (name != NULL) {
@@ -516,12 +516,12 @@ search_cstatus(register char *name)
 	} else
 		ps = new_cstatus(NULL);
 
-	return (ps); 
+	return (ps);
 }
 
 PWSTATUS *
 search_pwstatus(register char *name)
-{ 
+{
 	PWSTATUS	*ps = NULL;
 
 	if (name != NULL) {
@@ -535,7 +535,7 @@ search_pwstatus(register char *name)
 	} else
 		ps = new_pwstatus(NULL);
 
-	return (ps); 
+	return (ps);
 }
 
 
@@ -897,7 +897,7 @@ void GetRequestFiles(REQUEST *req, char *buffer, int length)
 		}
 	} else if (req->file_list)
 		strlcpy(buf, *req->file_list, sizeof (buf));
-	
+
 	if (*buf == '\0' || !strncmp(buf, SPOOLDIR, sizeof(SPOOLDIR)-1))
 		strcpy(buf, "<File name not available>");
 
@@ -908,8 +908,8 @@ void GetRequestFiles(REQUEST *req, char *buffer, int length)
 			r++;
 		else
 			r = buf;
-	
-		snprintf(buffer, length, "%-.24s", r);	
+
+		snprintf(buffer, length, "%-.24s", r);
 	} else
 		strlcpy(buffer, buf, length);
 	return;

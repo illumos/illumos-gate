@@ -4,7 +4,7 @@
 
 #include "gssapiP_krb5.h"
 
-OM_uint32 KRB5_CALLCONV 
+OM_uint32 KRB5_CALLCONV
 gss_krb5int_copy_ccache(minor_status, cred_handle, out_ccache)
      OM_uint32 *minor_status;
      gss_cred_id_t cred_handle;
@@ -21,7 +21,7 @@ gss_krb5int_copy_ccache(minor_status, cred_handle, out_ccache)
    stat = krb5_gss_validate_cred(minor_status, cred_handle);
    if (stat)
        return(stat);
-   
+
    k5creds = (krb5_gss_cred_id_t) cred_handle;
    code = k5_mutex_lock(&k5creds->lock);
    if (code) {
@@ -49,7 +49,7 @@ gss_krb5int_copy_ccache(minor_status, cred_handle, out_ccache)
        krb5_free_context(context);
        return(GSS_S_FAILURE);
    }
-   while (!code && !krb5_cc_next_cred(context, k5creds->ccache, &cursor, &creds)) 
+   while (!code && !krb5_cc_next_cred(context, k5creds->ccache, &cursor, &creds))
        code = krb5_cc_store_cred(context, out_ccache, &creds);
    krb5_cc_end_seq_get(context, k5creds->ccache, &cursor);
    k5_mutex_unlock(&k5creds->lock);

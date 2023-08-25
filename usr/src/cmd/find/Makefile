@@ -27,7 +27,7 @@ PROG=		find
 XPG4PROG=	find
 FINDOBJS1=	find.o
 FINDOBJS=	$(FINDOBJS1) getresponse.o
-XPG4FINDOBJS=	$(FINDOBJS:%.o=xpg4_%.o)		
+XPG4FINDOBJS=	$(FINDOBJS:%.o=xpg4_%.o)
 SRCS=		$(FINDOBJS1:%.o=%.c) $(SRC)/common/util/getresponse.c
 
 include ../Makefile.cmd

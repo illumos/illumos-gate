@@ -1608,7 +1608,7 @@ extern	frentry_t 	*fr_dolog __P((fr_info_t *, u_32_t *));
 extern	frentry_t 	*fr_dstgrpmap __P((fr_info_t *, u_32_t *));
 extern	void		fr_fixskip __P((frentry_t **, frentry_t *, int));
 extern	void		fr_forgetifp __P((void *, ipf_stack_t *));
-extern	frentry_t 	*fr_getrulen __P((int, char *, u_32_t, 
+extern	frentry_t 	*fr_getrulen __P((int, char *, u_32_t,
 					  ipf_stack_t *));
 extern	void		fr_getstat __P((struct friostat *, ipf_stack_t *));
 extern	int		fr_ifpaddr __P((int, int, void *,

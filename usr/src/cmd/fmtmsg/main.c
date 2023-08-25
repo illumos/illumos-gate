@@ -258,7 +258,7 @@ exttok(tok, delims)
 	 *    1.  Get the starting address (new string or where we
 	 *	  left off).  If nothing to search, return (char *) NULL
 	 *    2.  Find the end of the string
-	 *    3.  Look for the first unescaped delimiter closest to the 
+	 *    3.  Look for the first unescaped delimiter closest to the
 	 *	  beginning of the string
 	 *    4.  Remember where we left off
 	 *    5.  Return a pointer to the delimiter we found
@@ -284,7 +284,7 @@ exttok(tok, delims)
 
 /*
  * char *noesc(str)
- *	
+ *
  *	This function squeezes out all of the escaped character sequences
  *	from the string <str>.  It returns a pointer to that string.
  *
@@ -300,7 +300,7 @@ exttok(tok, delims)
  */
 
 char *
-noesc(str) 
+noesc(str)
 	char   *str;		/* String to remove escaped characters from */
 {
 	char   *p;		/* Temp string pointer */
@@ -311,9 +311,9 @@ noesc(str)
 	while (*p && (*p != '\\')) p++;
 
 
-	/* 
-	 * If there was at least one, squeeze them out 
-	 * Otherwise, don't touch the argument string 
+	/*
+	 * If there was at least one, squeeze them out
+	 * Otherwise, don't touch the argument string
 	 */
 
 	if (*p) {
@@ -709,7 +709,7 @@ main(int argc, char **argv)
 		/* If found in list and no conflict, remember in class */
 		if ((class_info->keyword != (char *) NULL) && ((class & class_info->conflict) == 0L))
 		    class |= class_info->value;
-		else 
+		else
 		    errflg = TRUE;
 
 	    } while (!errflg && ((tokenptr = strtok((char *) NULL, ",")) != (char *) NULL)) ;

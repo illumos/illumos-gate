@@ -83,11 +83,11 @@
 	!
 	! spill traps increment %cwp by 2,
 	! but user_trap wants the trap %cwp
-	! 
+	!
 	rdpr	%tstate, %g5
 	and	%g5, TSTATE_CWP, %g5
 	ba,pt	%xcc, user_trap
-	wrpr	%g0, %g5, %cwp	
+	wrpr	%g0, %g5, %cwp
 	SET_SIZE(fault_32bit_sn0)
 
 	!
@@ -217,11 +217,11 @@
 	!
 	! spill traps increment %cwp by 2,
 	! but user_trap wants the trap %cwp
-	! 
+	!
 	rdpr	%tstate, %g5
 	and	%g5, TSTATE_CWP, %g5
 	ba,pt	%xcc, user_trap
-	  wrpr	%g0, %g5, %cwp	
+	  wrpr	%g0, %g5, %cwp
 	SET_SIZE(fault_64bit_sn0)
 
 	!
@@ -358,7 +358,7 @@
 	!
 	FAULT_WINTRACE(%g1, %g2, %g3, TT_F32_FN1)
 	!
-.fault_fn1_common:	
+.fault_fn1_common:
 	!
 	! Fill normal tl1 fault.
 	! This happens when user_rtt's restore fills from an unmapped or

@@ -33,7 +33,7 @@ ROOTUSRSBINTPROG= $(PROG:%=$(ROOTUSRSBIN)/%)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINTPROG)
 	$(MV) $(ROOTUSRSBINPROG) $(ROOTUSRSBIN)/install

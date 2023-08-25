@@ -207,7 +207,7 @@ import com.sun.solaris.service.exception.*;
  *	SystemSolver
  *	UtilizationObjective
  *	WeightedLoadObjective
- *	
+ *
  * Configuration:
  *
  * pools services are provided by the com.sun.solaris.service.pools
@@ -385,7 +385,7 @@ final class Poold
 
 		/**
 		 * Indicates whether logging semantics should be changed
-		 * to facilitate debugging.  
+		 * to facilitate debugging.
 		 */
 		private static final boolean loggingDebugging = false;
 
@@ -467,11 +467,11 @@ final class Poold
 						ch = (ConsoleHandler)handler[i];
 				/*
 				 * If none was previously, install a
-				 * ConsoleHandler. 
+				 * ConsoleHandler.
 				 */
 				if (ch == null) {
 					ch = new ConsoleHandler();
-					
+
 					ch.setFormatter(
 					    new SysloglikeFormatter());
 					ch.setLevel(consoleSeverity);
@@ -496,7 +496,7 @@ final class Poold
 		 * Configure loggers based on the logging-related
 		 * configuration properties.  Outputs a description of
 		 * any changes to the configuration logger.
-		 * 
+		 *
 		 * @throws ConfigurationException if there is an error
 		 * applying libpool configuration properties to
 		 * <code>poold</code>
@@ -691,7 +691,7 @@ final class Poold
 	 * configuration property-controlled logging behavior is to be
 	 * overridden (the <code>-l</code> option was specified), and
 	 * messages are to be logged only to the console, with (at most)
-	 * the given maximum severity.	
+	 * the given maximum severity.
 	 * @throws IllegalArgumentException if the given console
 	 * severity doesn't match that of an existing instance.
 	 */

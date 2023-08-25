@@ -38,7 +38,7 @@ typedef struct tx_bd_b
     u32_t tx_bd_haddr_lo;
     u16_t tx_bd_reserved;
         #define TX_BD_RESERVED_MSS                          (0x3fff<<0)
-        #define TX_BD_RESERVED_BIT14_15                     (0x03<<14) 
+        #define TX_BD_RESERVED_BIT14_15                     (0x03<<14)
     u16_t tx_bd_nbytes;
     u16_t tx_bd_vlan_tag;
     u16_t tx_bd_flags;
@@ -70,7 +70,7 @@ typedef struct tx_bd_l
     u16_t tx_bd_nbytes;
     u16_t tx_bd_reserved;
         #define TX_BD_RESERVED_MSS                          (0x3fff<<0)
-        #define TX_BD_RESERVED_BIT14_15                     (0x03<<14) 
+        #define TX_BD_RESERVED_BIT14_15                     (0x03<<14)
     u16_t tx_bd_flags;
         #define TX_BD_FLAGS_CONN_FAULT                      (1<<0)
         #define TX_BD_FLAGS_TCP_UDP_CKSUM                   (1<<1)
@@ -151,7 +151,7 @@ typedef struct hqc_basic_l
             #define HQC_TYPE_VALUE_LSO_DUPLICATE            (4<<4)
             #define HQC_TYPE_VALUE_IWARP_STD                (5<<4)
             #define HQC_TYPE_VALUE_IWARP_EDGE               (6<<4)
-            #define HQC_TYPE_VALUE_ISCSI                    (7<<4)  
+            #define HQC_TYPE_VALUE_ISCSI                    (7<<4)
     u32_t unused_0;
 } hqc_basic_l_t;
 
@@ -449,7 +449,7 @@ typedef struct rx_bd_b
         #define RX_BD_FLAGS_END                             (1<<2)
         #define RX_BD_FLAGS_START                           (1<<3)
         #define RX_BD_FLAGS_INTRMDT                         (1<<4)       // intermediate boundary for partial io buffer
-        #define RX_BD_FLAGS_HEADERSPLIT                     (1<<5)       
+        #define RX_BD_FLAGS_HEADERSPLIT                     (1<<5)
 } rx_bd_b_t;
 
 
@@ -467,7 +467,7 @@ typedef struct rx_bd_l
         #define RX_BD_FLAGS_END                             (1<<2)
         #define RX_BD_FLAGS_START                           (1<<3)
         #define RX_BD_FLAGS_INTRMDT                         (1<<4)       // intermediate boundary for partial io buffer
-        #define RX_BD_FLAGS_HEADERSPLIT                     (1<<5)       
+        #define RX_BD_FLAGS_HEADERSPLIT                     (1<<5)
     u16_t unused_0;
 } rx_bd_l_t;
 
@@ -920,7 +920,7 @@ typedef struct l2_fhdr_l
         #define L2_FHDR_STATUS_IP_DATAGRAM                  (1<<13)
         #define L2_FHDR_STATUS_TCP_SEGMENT                  (1<<14)
         #define L2_FHDR_STATUS_UDP_DATAGRAM                 (1<<15)
-    
+
     u16_t l2_fhdr_errors;
         #define L2_FHDR_ERRORS_ABORT_PKT                    (1<<0)
         #define L2_FHDR_ERRORS_BAD_CRC                      (1<<1)
@@ -966,7 +966,7 @@ typedef struct l2_fhdr_ooo_b
     u8_t  l2_fhdr_drop_size;
     u8_t  l2_fhdr_drop_block_idx;
     u32_t l2_fhdr_icid;
-    
+
     u16_t l2_fhdr_pkt_len;
     u16_t l2_fhdr_vlan_tag;
     u16_t l2_fhdr_ip_xsum;
@@ -984,7 +984,7 @@ typedef struct l2_fhdr_ooo_l
     u8_t  l2_fhdr_opcode;
     u8_t  l2_fhdr_block_idx;
     u32_t l2_fhdr_icid;
-    
+
     u16_t l2_fhdr_vlan_tag;
     u16_t l2_fhdr_pkt_len;
     u16_t l2_fhdr_tcp_udp_xsum;
@@ -8081,11 +8081,11 @@ typedef struct rbdc_reg
         #define RBDC_CONTROL_SWAP_MODE                      (1UL<<0)
         #define RBDC_CONTROL_PRIORITY                       (1UL<<1)
         //  This bit forces RBDC to run in a single channel mode, in other words
-        //  it will only have outstanding DMA read request. This bit is 
-        //  available starting from Xinan 65nm.  
+        //  it will only have outstanding DMA read request. This bit is
+        //  available starting from Xinan 65nm.
         #define RBDC_CONTROL_ONE_CHNL                       (1UL<<4)
-        // The bit forces RBDC to limit the DMA requests to 64bytes at a time. 
-        // This bit is available starting from Xinan 65nm.  
+        // The bit forces RBDC to limit the DMA requests to 64bytes at a time.
+        // This bit is available starting from Xinan 65nm.
         #define REQ64_MODE                                  (1UL<<5)
     u32_t rbdc_bd_haddr_hi;
     u32_t rbdc_bd_haddr_lo;
@@ -14866,13 +14866,13 @@ typedef struct rxp_fio
     u8_t unused_3;
     u16_t rxpf_rxpq_ip_xsum;
     u8_t  rxpf_rxpq_tcp_udp_hdr_offset;
-    u8_t  unused_4;                                      
+    u8_t  unused_4;
     u16_t rxpf_rxpq_tcp_udp_xsum;
     u16_t rxpf_rxpq_tcp_payload_len;
     u16_t rxpf_rxpq_pseud_xsum;
     u16_t rxpf_rxpq_l2_payload_raw_xsum;
-    u8_t  rxpf_rxpq_data_offset;                             
-    u8_t  unused_5[3];                                   
+    u8_t  rxpf_rxpq_data_offset;
+    u8_t  unused_5[3];
     u32_t rxpf_rxpq_mbuf_cluster;
     u32_t rxpf_rxpq_cid;
     u32_t unused_6[3];
@@ -14892,7 +14892,7 @@ typedef struct rxp_fio
     u16_t rxpf_rv2ppq_operand_flags;
     u8_t rxpf_rv2ppq_knum;
     u8_t rxpf_rv2ppq_opcode;
-    u16_t rxpf_rv2ppq_operand16_0;  // Note that 16_0 and 16_1 will be absorbed 
+    u16_t rxpf_rv2ppq_operand16_0;  // Note that 16_0 and 16_1 will be absorbed
     u16_t rxpf_rv2ppq_operand16_1;  // by RDMA and won't be passed to COM
     u16_t rxpf_rv2ppq_operand16_2;
     u16_t rxpf_rv2ppq_operand16_3;
@@ -14900,7 +14900,7 @@ typedef struct rxp_fio
     u16_t rxpf_rv2ppq_operand16_5;
     u16_t rxpf_rv2ppq_operand16_6;
     u16_t rxpf_rv2ppq_operand16_7;
-    u32_t rxpf_rv2ppq_operand32_0;   // Note that 32_0 and 32_1 will be absorbed 
+    u32_t rxpf_rv2ppq_operand32_0;   // Note that 32_0 and 32_1 will be absorbed
     u32_t rxpf_rv2ppq_operand32_1;   // by RDMA and won't be passed to COM
     u32_t rxpf_rv2ppq_operand32_2;
     u32_t rxpf_rv2ppq_operand32_3;
@@ -15594,7 +15594,7 @@ typedef struct rxp_fio_xi
     u32_t rxpf_ctx_window4[32768];
 } rxp_fio_xi_t;
 
-             
+
 /*
  *  com_fio definition
  *  offset: 0x80000000

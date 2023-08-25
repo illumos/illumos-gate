@@ -39,10 +39,10 @@ void (*_siguhandler[NSIG])() = { 0 };
 
 /*
  * sigstack is emulated with sigaltstack by guessing an appropriate
- * value for the stack size - on machines that have stacks that grow 
- * upwards, the ss_sp arguments for both functions mean the same thing, 
- * (the initial stack pointer sigstack() is also the stack base 
- * sigaltstack()), so a "very large" value should be chosen for the 
+ * value for the stack size - on machines that have stacks that grow
+ * upwards, the ss_sp arguments for both functions mean the same thing,
+ * (the initial stack pointer sigstack() is also the stack base
+ * sigaltstack()), so a "very large" value should be chosen for the
  * stack size - on machines that have stacks that grow downwards, the
  * ss_sp arguments mean opposite things, so 0 should be used (hopefully
  * these machines don't have hardware stack bounds registers that pay
@@ -62,18 +62,18 @@ void (*_siguhandler[NSIG])() = { 0 };
  */
 
 static void
-sigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp) 
+sigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp)
 {
 	struct sigcontext sc;
 	int code;
 	char *addr;
 	int i, j;
 	int gwinswitch = 0;
-	
+
 	sc.sc_onstack = ((ucp->uc_stack.ss_flags & SS_ONSTACK) != 0);
 	sc.sc_mask = set2mask(&ucp->uc_sigmask);
 
-	/* 
+	/*
 	 * Machine dependent code begins
 	 */
 	sc.sc_sp = ucp->uc_mcontext.gregs[REG_O6];
@@ -107,7 +107,7 @@ sigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp)
 			addr = (char *)sip->si_addr;
 	else
 		addr = SIG_NOADDR;
-	
+
 	(*_siguhandler[sig])(sig, code, &sc, addr);
 
 	if (sc.sc_onstack)
@@ -116,7 +116,7 @@ sigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		ucp->uc_stack.ss_flags &= ~SS_ONSTACK;
 	mask2set(sc.sc_mask, &ucp->uc_sigmask);
 
-	/* 
+	/*
 	 * Machine dependent code begins
 	 */
 	ucp->uc_mcontext.gregs[REG_O6] = sc.sc_sp;
@@ -194,7 +194,7 @@ sigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 
         if (nvec) {
 		_sigaction(sig, (struct sigaction *)0, &nact);
-                nhandler = nvec->sv_handler; 
+                nhandler = nvec->sv_handler;
                 _siguhandler[sig] = nhandler;
                 if (nhandler != SIG_DFL && nhandler != SIG_IGN)
                         nact.sa_handler = (void (*)())sigvechandler;
@@ -234,7 +234,7 @@ sigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 		if (!(oact.sa_flags & SA_RESTART))
 			ovec->sv_flags |= SV_INTERRUPT;
 	}
-			
+
         return 0;
 }
 

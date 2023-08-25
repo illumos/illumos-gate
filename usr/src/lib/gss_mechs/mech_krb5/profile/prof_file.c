@@ -29,7 +29,7 @@
 
 #if defined(_WIN32)
 #include <io.h>
-#define HAVE_STAT	
+#define HAVE_STAT
 #define stat _stat
 #endif
 
@@ -412,7 +412,7 @@ static errcode_t write_data_to_file(prf_data_t data, const char *outfile,
 	errcode_t	retval = 0;
 
 	retval = ENOMEM;
-	
+
 	new_file = old_file = 0;
 	new_file = malloc(strlen(outfile) + 5);
 	if (!new_file)
@@ -510,7 +510,7 @@ errcode_t profile_flush_file_data(prf_data_t data)
 	retval = k5_mutex_lock(&data->lock);
 	if (retval)
 	    return retval;
-	
+
 	if ((data->flags & PROFILE_FILE_DIRTY) == 0) {
 	    k5_mutex_unlock(&data->lock);
 	    return 0;
@@ -606,7 +606,7 @@ static void profile_free_file_data(prf_data_t data)
 errcode_t profile_close_file(prf_file_t prf)
 {
 	errcode_t	retval;
-	
+
 	retval = profile_flush_file(prf);
 	if (retval)
 		return retval;

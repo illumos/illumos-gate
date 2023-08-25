@@ -297,7 +297,7 @@ typedef struct xge_hal_ring_rxd_priv_t {
  *                     entry in this array is available for allocation
  *                     (via xge_hal_ring_dtr_reserve()) and posting.
  * @cmpl_cnt: Completion counter. Is reset to zero upon entering the ISR.
- *            Used in conjunction with @indicate_max_pkts. 
+ *            Used in conjunction with @indicate_max_pkts.
  * Ring channel.
  *
  * Note: The structure is cache line aligned to better utilize

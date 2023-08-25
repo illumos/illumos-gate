@@ -51,13 +51,13 @@ const char *chpw_error_message(kadm5_ret_t code);
  *
  * Arguments:
  *
- *      princ          (input) a krb5b_principal structure for the 
+ *      princ          (input) a krb5b_principal structure for the
  *                     principal whose password we should change.
  *
- *      new_password   (input) NULL or a null terminated string with the 
+ *      new_password   (input) NULL or a null terminated string with the
  *                     the principal's desired new password.  If new_password
  *                     is NULL then this routine will read a new password.
- *    
+ *
  *	pw_ret		(output) if non-NULL, points to a static buffer
  *			containing the new password (if password is prompted
  *			internally), or to the new_password argument (if
@@ -68,15 +68,15 @@ const char *chpw_error_message(kadm5_ret_t code);
  *
  *      msg_ret         (output) a useful message is copied here.
  *
- *      <return value>  exit status of 0 for success, else the com err code 
+ *      <return value>  exit status of 0 for success, else the com err code
  *                      for the last significant routine called.
- *      
+ *
  * Requires:
- *      
+ *
  *      A msg_ret should point to a buffer large enough for the messasge.
  *
  * Effects:
- *      
+ *
  * Modifies:
  *
  *
@@ -85,7 +85,7 @@ const char *chpw_error_message(kadm5_ret_t code);
 kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 					 void *lhandle,
 					 krb5_principal princ,
-					 char *new_pw, 
+					 char *new_pw,
 					 char **ret_pw,
 					 char *msg_ret,
 					 unsigned int msg_len)
@@ -116,12 +116,12 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
       krb5_free_context(context);
     }
 
-    if (code == 0) 
+    if (code == 0)
       new_password = buffer;
     else {
-#ifdef ZEROPASSWD    
+#ifdef ZEROPASSWD
       memset(buffer, 0, sizeof(buffer));
-#endif      
+#endif
       if (code == KRB5_LIBOS_BADPWDMATCH) {
 	(void) strncpy(msg_ret, string_text(CHPASS_UTIL_NEW_PASSWORD_MISMATCH),
 		msg_len - 1);
@@ -139,9 +139,9 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
       }
     }
     if (pwsize == 0) {
-#ifdef ZEROPASSWD    
+#ifdef ZEROPASSWD
       memset(buffer, 0, sizeof(buffer));
-#endif      
+#endif
       strncpy(msg_ret, string_text(CHPASS_UTIL_NO_PASSWORD_READ), msg_len - 1);
       msg_ret[msg_len - 1] = '\0';
       return(KRB5_LIBOS_CANTREADPWD); /* could do better */
@@ -181,7 +181,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 #ifdef ZEROPASSWD
   if (!ret_pw)
     memset(buffer, 0, sizeof(buffer)); /* in case we read a new password */
-#endif    
+#endif
 
   if (code == KADM5_OK) {
     strncpy(msg_ret, string_text(CHPASS_UTIL_PASSWORD_CHANGED), msg_len - 1);
@@ -189,13 +189,13 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     return(0);
   }
 
-  if ((code != KADM5_PASS_Q_TOOSHORT) && 
-      (code != KADM5_PASS_REUSE) &&(code != KADM5_PASS_Q_CLASS) && 
+  if ((code != KADM5_PASS_Q_TOOSHORT) &&
+      (code != KADM5_PASS_REUSE) &&(code != KADM5_PASS_Q_CLASS) &&
       (code != KADM5_PASS_Q_DICT) && (code != KADM5_PASS_TOOSOON)) {
     /* Can't get more info for other errors */
-    sprintf(buffer, "%s %s", error_message(code), 
+    sprintf(buffer, "%s %s", error_message(code),
 	    string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE));
-    sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED), 
+    sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
 	    buffer);
     return(code);
   }
@@ -214,7 +214,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     msg_ret[msg_len - 1] = '\0';
     return(code);
   }
-  
+
   /* Look up policy for the remaining messages */
 
   code2 = kadm5_get_principal (lhandle, princ, &princ_ent,
@@ -235,7 +235,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     msg_ret[msg_len - 1] = '\0';
     return(code);
   }
-  
+
   if ((princ_ent.aux_attributes & KADM5_POLICY) == 0) {
     strncpy(msg_ret, error_message(code), msg_len - 1 - strlen(msg_ret));
     strncat(msg_ret, " ", msg_len - 1 - strlen(msg_ret));
@@ -253,7 +253,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   code2 = kadm5_get_policy(lhandle, princ_ent.policy,
 			   &policy_ent);
   if (code2 != 0) {
-    sprintf(msg_ret, "%s %s\n%s %s\n\n%s\n ", error_message(code2), 
+    sprintf(msg_ret, "%s %s\n%s %s\n\n%s\n ", error_message(code2),
 	    string_text(CHPASS_UTIL_GET_POLICY_INFO),
 	    error_message(code),
 	    string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE),
@@ -261,9 +261,9 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     return(code);
   }
-  
+
   if (code == KADM5_PASS_Q_TOOSHORT) {
-    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SHORT), 
+    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SHORT),
 	    policy_ent.pw_min_length);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
@@ -272,7 +272,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 
 
   if (code == KADM5_PASS_Q_CLASS) {
-    sprintf(msg_ret, string_text(CHPASS_UTIL_TOO_FEW_CLASSES), 
+    sprintf(msg_ret, string_text(CHPASS_UTIL_TOO_FEW_CLASSES),
 	    policy_ent.pw_min_classes);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
@@ -289,7 +289,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     if (*(ptr = &time_string[strlen(time_string)-1]) == '\n')
       *ptr = '\0';
 
-    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SOON), 
+    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SOON),
 	    time_string);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
@@ -297,9 +297,9 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   } else {
 
   /* We should never get here, but just in case ... */
-  sprintf(buffer, "%s %s", error_message(code), 
+  sprintf(buffer, "%s %s", error_message(code),
 	  string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE));
-  sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED), 
+  sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
 	  buffer);
   (void) kadm5_free_principal_ent(lhandle, &princ_ent);
   (void) kadm5_free_policy_ent(lhandle, &policy_ent);

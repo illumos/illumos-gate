@@ -30,7 +30,7 @@ FILEMODE = 4555
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTLIBPROG)
 

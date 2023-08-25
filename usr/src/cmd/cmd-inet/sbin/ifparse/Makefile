@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Makefile for "ifparse" 
+# Makefile for "ifparse"
 #
 # Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -40,7 +40,7 @@ CPPFLAGS += -I$(CMDINETCOMMONDIR)
 LINTFLAGS +=	-m
 
 # these #defines are required to use UNIX 98 interfaces
-$(OBJS)		:= CPPFLAGS +=-D_POSIX_C_SOURCE	
+$(OBJS)		:= CPPFLAGS +=-D_POSIX_C_SOURCE
 LINTFLAGS	+= -D_POSIX_C_SOURCE -I$(CMDINETCOMMONDIR)
 
 .KEEP_STATE:

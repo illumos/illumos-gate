@@ -167,7 +167,7 @@ class SLPV1SSrvMsg extends SSrvMsg {
 		if (scope.length() > 0) {
 
 		    // Validate the scope name.
-	
+
 		    hdr.validateScope(scope);
 		}
 	    }
@@ -186,7 +186,7 @@ class SLPV1SSrvMsg extends SSrvMsg {
 	    hdr.scopes.addElement(scope.toLowerCase().trim());
 
 	    // Parsing the query is complicated by opaques having slashes.
-	
+
 	    String q = "";
 
 	    while (st.hasMoreTokens()) {
@@ -355,10 +355,10 @@ class SLPV1SSrvMsg extends SSrvMsg {
 				"v1_query_error",
 				new Object[] {query});
 
-		} else {	
+		} else {
 		    lastTokComma = true;
 		}
-	
+
 	    } else {
 		lastTokComma = false;
 
@@ -462,11 +462,11 @@ class SLPV1SSrvMsg extends SSrvMsg {
 
 	    // We should be at the beginning a parenthesized
 	    //  where list.
-	
+
 	    if (tok == OPEN_PAREN) {
 
 		// Get the next token. Eat whitespace in the process.
-	
+
 		tok = eatWhite(tk);
 
 		// If it's a logOp, then process as a logical expression.
@@ -540,7 +540,7 @@ class SLPV1SSrvMsg extends SSrvMsg {
 	    tok = eatWhite(tk);
 
 	    if (tok != StreamTokenizer.TT_EOF) {
-	
+
 		// The line should have ended by now.
 
 		throw
@@ -579,7 +579,7 @@ class SLPV1SSrvMsg extends SSrvMsg {
 		// Go back to parseInternal.
 
 		parseInternal(tk, buf, false);
-	
+
 	    } else if (tok == CLOSE_PAREN) {
 
 		// Append the character to the buffer and return.
@@ -850,7 +850,7 @@ class SLPV1SSrvMsg extends SSrvMsg {
 
 	    } else if ((char)tk.ttype == AND_OP) {
 		value = value + "&";
-	
+
 	    } else {
 		break;
 

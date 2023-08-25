@@ -6,13 +6,13 @@
 
 include ../Makefile.cmd
 
-SUBDIRS=	$(MACH)	
+SUBDIRS=	$(MACH)
 POFILE=		ldapcmd.po
 NS_FILES=	ldapclient ldaplist mapping printResult ldapaddent ldapaddrbac \
 		standalone
 COMM_FILES=	ldapsearch ldapmodify ldapmodrdn ldapdelete common  \
 		fileurl ldaptool-sasl
-NS_POFILES=	$(NS_FILES:%=ns_ldap/%.po) 
+NS_POFILES=	$(NS_FILES:%=ns_ldap/%.po)
 POFILES=	$(NS_POFILES) $(COMM_FILES:%=common/%.po)
 
 all :=		TARGET= all

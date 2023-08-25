@@ -31,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,21 +45,21 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Store the master database key in a file.
  */
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -70,7 +70,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -156,27 +156,27 @@ kdb5_stash(argc, argv)
 	    /* Solaris Kerberos */
 	    com_err(progname, KRB5_PROG_KEYTYPE_NOSUPP, tmp);
 	}
-	exit_status++; return; 
+	exit_status++; return;
     }
 
     /* assemble & parse the master key name */
-    retval = krb5_db_setup_mkey_name(context, mkey_name, realm, 
+    retval = krb5_db_setup_mkey_name(context, mkey_name, realm,
 				     &mkey_fullname, &master_princ);
     if (retval) {
 	/* Solaris Kerberos */
 	com_err(progname, retval,
 		gettext("while setting up master key name"));
-	exit_status++; return; 
+	exit_status++; return;
     }
 
-    retval = krb5_db_open(context, db5util_db_args, 
+    retval = krb5_db_open(context, db5util_db_args,
 			  KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_OTHER);
     if (retval) {
 	/* Solaris Kerberos */
 	com_err(progname, retval,
 		gettext("while initializing the database '%s'"),
 		dbname);
-	exit_status++; return; 
+	exit_status++; return;
     }
 
     /* TRUE here means read the keyboard, but only once */
@@ -188,7 +188,7 @@ kdb5_stash(argc, argv)
 	/* Solaris Kerberos */
 	com_err(progname, retval, gettext("while reading master key"));
 	(void) krb5_db_fini(context);
-	exit_status++; return; 
+	exit_status++; return;
     }
 
     retval = krb5_db_verify_master_key(context, master_princ, &mkey);
@@ -197,17 +197,17 @@ kdb5_stash(argc, argv)
 	com_err(progname, retval, gettext("while verifying master key"));
 	krb5_free_keyblock_contents(context, &mkey);
 	(void) krb5_db_fini(context);
-	exit_status++; return; 
-    }	
+	exit_status++; return;
+    }
 
-    retval = krb5_db_store_master_key(context, keyfile, master_princ, 
+    retval = krb5_db_store_master_key(context, keyfile, master_princ,
 				    &mkey, NULL);
     if (retval) {
 	/* Solaris Kerberos */
 	com_err(progname, errno, gettext("while storing key"));
 	krb5_free_keyblock_contents(context, &mkey);
 	(void) krb5_db_fini(context);
-	exit_status++; return; 
+	exit_status++; return;
     }
     krb5_free_keyblock_contents(context, &mkey);
 
@@ -216,10 +216,10 @@ kdb5_stash(argc, argv)
 	/* Solaris Kerberos */
 	com_err(progname, retval,
 		gettext("closing database '%s'"), dbname);
-	exit_status++; return; 
+	exit_status++; return;
     }
 
     krb5_free_context(context);
     exit_status = 0;
-    return; 
+    return;
 }

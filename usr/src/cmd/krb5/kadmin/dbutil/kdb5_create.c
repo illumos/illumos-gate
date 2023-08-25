@@ -31,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -45,7 +45,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Generate (from scratch) a Kerberos KDC database.
  */
@@ -99,7 +99,7 @@ struct iterate_args {
     krb5_db_entry	*dbentp;
 };
 
-static krb5_error_code add_principal 
+static krb5_error_code add_principal
 	(krb5_context,
 	 krb5_principal,
 	 enum ap_op,
@@ -169,12 +169,12 @@ void kdb5_create(argc, argv)
     kdb_log_context *log_ctx;
     krb5_keyblock mkey;
     krb5_data master_salt = { 0 };
-	
+
     /* Solaris Kerberos */
     (void) memset(&mkey, 0, sizeof (mkey));
 
-/* Solaris Kerberos */ 
-#if 0  
+/* Solaris Kerberos */
+#if 0
     if (strrchr(argv[0], '/'))
 	argv[0] = strrchr(argv[0], '/')+1;
 #endif
@@ -214,12 +214,12 @@ void kdb5_create(argc, argv)
       com_err (progname, retval, "Loading random data");
       exit_status++; return;
     }
-#endif    
+#endif
     /* assemble & parse the master key name */
 
     if ((retval = krb5_db_setup_mkey_name(util_context,
 					  global_params.mkey_name,
-					  global_params.realm,  
+					  global_params.realm,
 					  &mkey_fullname, &master_princ))) {
 	/* Solaris Kerberos */
 	com_err(progname, retval,
@@ -246,7 +246,7 @@ void kdb5_create(argc, argv)
 
 	pw_size = 1024;
 	pw_str = malloc(pw_size);
-	
+
 	retval = krb5_read_password(util_context,
 			    gettext("Enter KDC database master key"),
 			    gettext("Re-enter KDC database "
@@ -286,7 +286,7 @@ void kdb5_create(argc, argv)
     if (retval) {
 	/* Solaris Kerberos */
 	com_err(progname, retval, gettext("while copying master key"));
-	exit_status++; 
+	exit_status++;
 	goto cleanup;
     }
 
@@ -295,14 +295,14 @@ void kdb5_create(argc, argv)
 
     if ((retval = krb5_c_random_seed(util_context, &seed))) {
 	/* Solaris Kerberos */
-	com_err(progname, retval, 
+	com_err(progname, retval,
 		gettext("while initializing random key generator"));
-	exit_status++; 
+	exit_status++;
 	goto cleanup;
     }
     if ((retval = krb5_db_create(util_context, db5util_db_args))) {
 	/* Solaris Kerberos */
-	com_err(progname, retval, 
+	com_err(progname, retval,
 		gettext("while creating database '%s'"),
 		global_params.dbname);
 	exit_status++;
@@ -331,7 +331,7 @@ void kdb5_create(argc, argv)
 	exit_status++;
 	goto cleanup;
     }
-#endif /**************** END IFDEF'ed OUT *******************************/	
+#endif /**************** END IFDEF'ed OUT *******************************/
 
     /* Solaris Kerberos: for iprop */
     if (log_ctx && log_ctx->iproprole) {
@@ -349,7 +349,7 @@ void kdb5_create(argc, argv)
 	 */
 	(void) memset(log_ctx->ulog, 0, sizeof (kdb_hlog_t));
 
-	log_ctx->ulog->kdb_hmagic = KDB_HMAGIC;        
+	log_ctx->ulog->kdb_hmagic = KDB_HMAGIC;
 	log_ctx->ulog->db_version_num = KDB_VERSION;
 	log_ctx->ulog->kdb_state = KDB_STABLE;
 	log_ctx->ulog->kdb_block = ULOG_BLOCK;
@@ -446,7 +446,7 @@ tgt_keysalt_iterate(ksent, ptr)
 					    &key))) {
 	    kret = krb5_dbekd_encrypt_key_data(context,
 					       iargs->rblock->key,
-					       &key, 
+					       &key,
 					       NULL,
 					       1,
 					       &iargs->dbentp->key_data[ind]);

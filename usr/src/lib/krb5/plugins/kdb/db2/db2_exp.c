@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -32,7 +32,7 @@
 *
 *	C %name:		db2_exp.c %
 *	Instance:		idc_sec_2
-*	Description:	
+*	Description:
 *	%created_by:	spradeep %
 *	%date_created:	Tue Apr  5 11:44:00 2005 %
 *
@@ -116,8 +116,8 @@ WRAP_K (krb5_db2_db_get_age,
 	 time_t *t),
 	(ctx, s, t));
 WRAP_K (krb5_db2_db_set_option,
-	( krb5_context kcontext, 
-	  int option, 
+	( krb5_context kcontext,
+	  int option,
 	  void *value ),
 	(kcontext, option, value));
 
@@ -186,8 +186,8 @@ WRAP_VOID (krb5_db2_free_policy,
 	   (kcontext, entry));
 
 WRAP (krb5_db2_alloc, void *,
-      ( krb5_context kcontext,  
-	void *ptr, 
+      ( krb5_context kcontext,
+	void *ptr,
 	size_t size ),
       (kcontext, ptr, size), NULL);
 WRAP_VOID (krb5_db2_free,

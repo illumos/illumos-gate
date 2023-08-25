@@ -19,7 +19,7 @@ FILEMODE =		644
 
 .KEEP_STATE :
 
-all :			$(FILES) 
+all :			$(FILES)
 
 install :		$(ROOTSHPUB) $(ROOTSHPUBFILES)
 

@@ -30,7 +30,7 @@
  * strlen(s)
  *
  * Given string s, return length (not including the terminating null).
- *	
+ *
  * Fast assembler language version of the following C-program strlen
  * which represents the `standard' for the C-library.
  *
@@ -39,7 +39,7 @@
  *	register const char *s;
  *	{
  *		register const char *s0 = s + 1;
- *	
+ *
  *		while (*s++ != '\0')
  *			;
  *		return (s - s0);
@@ -67,7 +67,7 @@
 	cmp		%o4, 2		! is src half-word aligned
 	be,a,pn		%icc, .s2algn
 	lduh		[%o2], %o1
-	
+
 	ldub		[%o2], %o1
 	tst		%o1		! byte zero?
 	bz,pn		%icc, .done
@@ -104,7 +104,7 @@
 
 	ld		[%o2+4], %o1
 	inc		4, %o2
-	
+
 .loop:						! this should be aligned to 32
 	inc		4, %o2
 	andn		%o5, %o1, %o3		! %o5 = ~word & 0x80808080
@@ -115,7 +115,7 @@
 
 	dec		4, %o2
 	sethi		%hi(0xff000000), %o4
-.nullfound:	
+.nullfound:
 	andcc		%o1, %o4, %g0
 	bz,pn		%icc, .done		! first byte zero
 	srl		%o4, 8, %o4
@@ -128,7 +128,7 @@
 	andcc		%o1, %o4, %g0
 	bz,pn		%icc, .done		! thrid byte zero
 	inc		1, %o2
-	
+
 	inc		1, %o2			! fourth byte zero
 .done:
 	retl

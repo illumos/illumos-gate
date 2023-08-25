@@ -31,7 +31,7 @@
 #include	"defs.h"
 
 #ifdef __STDC__
-const 
+const
 #endif
 unsigned char	_ctype1[] =
 {
@@ -83,7 +83,7 @@ unsigned char	_ctype1[] =
 };
 
 #ifdef __STDC__
-const 
+const
 #endif
 unsigned char	_ctype2[] =
 {

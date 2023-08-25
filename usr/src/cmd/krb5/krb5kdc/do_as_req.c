@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * KDC Routines to deal with AS_REQ's
  */
@@ -52,7 +52,7 @@
 #include "adm_proto.h"
 #include "extern.h"
 
-static krb5_error_code prepare_error_as (krb5_kdc_req *, int, krb5_data *, 
+static krb5_error_code prepare_error_as (krb5_kdc_req *, int, krb5_data *,
 					 krb5_data **, const char *);
 
 /*ARGSUSED*/
@@ -128,7 +128,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 	goto errout;
     }
     limit_string(sname);
-    
+
     c_nprincs = 1;
     if ((errcode = krb5_db_get_principal(kdc_context, request->client,
 					 &client, &c_nprincs, &more))) {
@@ -149,7 +149,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 #endif
 	goto errout;
     }
-    
+
     s_nprincs = 1;
     if ((errcode = krb5_db_get_principal(kdc_context, request->server, &server,
 					 &s_nprincs, &more))) {
@@ -173,12 +173,12 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 
     if ((errcode = validate_as_request(request, client, server,
 				      kdc_time, &status))) {
-	if (!status) 
+	if (!status)
 	    status = "UNKNOWN_REASON";
 	errcode += ERROR_TABLE_BASE_krb5;
 	goto errout;
     }
-      
+
     /*
      * Select the keytype for the ticket session key.
      */
@@ -229,7 +229,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 	enc_tkt_reply.times.starttime = request->from;
     } else
 	enc_tkt_reply.times.starttime = kdc_time;
-    
+
     until = (request->till == 0) ? kdc_infinity : request->till;
 	/* These numbers could easily be large
 	 * use long long variables to ensure that they don't
@@ -262,7 +262,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     if (isflagset(request->kdc_options, KDC_OPT_RENEWABLE)) {
 	/*
 	 * XXX Should we squelch the output renew_till to be no
-	 * earlier than the endtime of the ticket? 
+	 * earlier than the endtime of the ticket?
 	 */
 	setflag(enc_tkt_reply.flags, TKT_FLG_RENEWABLE);
 	tmp_client_times = (double) enc_tkt_reply.times.starttime + client.max_renewable_life;
@@ -270,7 +270,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     	tmp_server_times = (double) enc_tkt_reply.times.starttime + server.max_renewable_life;
 
     	tmp_realm_times = (double) enc_tkt_reply.times.starttime + max_renewable_life_for_realm;
-	
+
 	enc_tkt_reply.times.renew_till =
 	    min(rtime, min(tmp_client_times,
 		       min(tmp_server_times,
@@ -286,7 +286,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     enc_tkt_reply.caddrs = request->addresses;
     enc_tkt_reply.authorization_data = 0;
 
-    /* 
+    /*
      * Check the preauthentication if it is there.
      */
     if (request->padata) {
@@ -301,7 +301,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 	     */
 	    if (client.fail_auth_count < KRB5_MAX_FAIL_COUNT) {
 		client.fail_auth_count = client.fail_auth_count + 1;
-		if (client.fail_auth_count == KRB5_MAX_FAIL_COUNT) { 
+		if (client.fail_auth_count == KRB5_MAX_FAIL_COUNT) {
 		    client.attributes |= KRB5_KDB_DISALLOW_ALL_TIX;
 		}
 	    }
@@ -313,7 +313,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 	    errcode = KRB5KRB_ERR_GENERIC;
 #endif
 	    goto errout;
-	} 
+	}
     }
 
     /*
@@ -344,13 +344,13 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 
     /* convert server.key into a real key (it may be encrypted
        in the database) */
-    if ((errcode = krb5_dbekd_decrypt_key_data(kdc_context, &master_keyblock, 
+    if ((errcode = krb5_dbekd_decrypt_key_data(kdc_context, &master_keyblock,
 					       server_key, &encrypting_key,
 					       NULL))) {
 	status = "DECRYPT_SERVER_KEY";
 	goto errout;
     }
-	
+
     errcode = krb5_encrypt_tkt_part(kdc_context, &encrypting_key, &ticket_reply);
     krb5_free_keyblock_contents(kdc_context, &encrypting_key);
     encrypting_key.contents = 0;
@@ -382,7 +382,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     }
 
     /* convert client.key_data into a real key */
-    if ((errcode = krb5_dbekd_decrypt_key_data(kdc_context, &master_keyblock, 
+    if ((errcode = krb5_dbekd_decrypt_key_data(kdc_context, &master_keyblock,
 					       client_key, &encrypting_key,
 					       NULL))) {
 	status = "DECRYPT_CLIENT_KEY";
@@ -409,7 +409,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     else
 	etime = client.expiration ? client.expiration : client.pw_expiration;
 
-    reply_encpart.key_exp = etime; 
+    reply_encpart.key_exp = etime;
     reply_encpart.flags = enc_tkt_reply.flags;
     reply_encpart.server = ticket_reply.server;
 
@@ -432,7 +432,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 
     reply.enc_part.enctype = encrypting_key.enctype;
 
-    errcode = krb5_encode_kdc_rep(kdc_context, KRB5_AS_REP, &reply_encpart, 
+    errcode = krb5_encode_kdc_rep(kdc_context, KRB5_AS_REP, &reply_encpart,
 				  0, &encrypting_key,  &reply, response);
     krb5_free_keyblock_contents(kdc_context, &encrypting_key);
     encrypting_key.contents = 0;
@@ -442,7 +442,7 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
 	status = "ENCODE_KDC_REP";
 	goto errout;
     }
-    
+
     /* these parts are left on as a courtesy from krb5_encode_kdc_rep so we
        can use them in raw form if needed.  But, we don't... */
     memset(reply.enc_part.ciphertext.data, 0, reply.enc_part.ciphertext.length);
@@ -451,9 +451,9 @@ process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
     /* SUNW14resync:
      * The third argument to audit_krb5kdc_as_req() is zero as the local
      * portnumber is no longer passed to process_as_req().
-     */ 
-    audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port, 0, 
-                        cname, sname, 0);  
+     */
+    audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port, 0,
+                        cname, sname, 0);
     rep_etypes2str(rep_etypestr, sizeof(rep_etypestr), &reply);
     krb5_klog_syslog(LOG_INFO,
 		     "AS_REQ (%s) %s: ISSUE: authtime %d, "
@@ -478,7 +478,7 @@ errout:
 
     if (status) {
 	const char *emsg = NULL;
-	if (errcode) 
+	if (errcode)
 	    emsg = krb5_get_error_message (kdc_context, errcode);
 
 	audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port,
@@ -502,7 +502,7 @@ errout:
 	errcode -= ERROR_TABLE_BASE_krb5;
 	if (errcode < 0 || errcode > 128)
 	    errcode = KRB_ERR_GENERIC;
-	    
+
 	errcode = prepare_error_as(request, errcode, &e_data, response,
 				   status);
 	if (got_err) {
@@ -551,7 +551,7 @@ errout:
     }
 
     krb5_free_data_contents(kdc_context, &e_data);
-    
+
     return errcode;
 }
 
@@ -562,7 +562,7 @@ prepare_error_as (krb5_kdc_req *request, int error, krb5_data *e_data,
     krb5_error errpkt;
     krb5_error_code retval;
     krb5_data *scratch;
-    
+
     errpkt.ctime = request->nonce;
     errpkt.cusec = 0;
 
@@ -592,7 +592,7 @@ prepare_error_as (krb5_kdc_req *request, int error, krb5_data *e_data,
     free(errpkt.text.data);
     if (retval)
 	free(scratch);
-    else 
+    else
 	*response = scratch;
 
     return retval;

@@ -4,7 +4,7 @@
  */
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -87,7 +87,7 @@ krb5_error_code kdb_init_master(kadm5_server_handle_t handle,
 			     &handle->master_keyblock);
     if (ret)
 	goto done;
-				 
+
     /* Solaris Kerberos */
     if ((ret = krb5_db_verify_master_key(handle->context, master_princ,
 					 &handle->master_keyblock))) {
@@ -370,8 +370,8 @@ kdb_put_entry(kadm5_server_handle_t handle,
 					 handle->current_caller);
     if (ret)
 	return(ret);
-    
-    xdralloc_create(&xdrs, XDR_ENCODE); 
+
+    xdralloc_create(&xdrs, XDR_ENCODE);
     if(! xdr_osa_princ_ent_rec(&xdrs, adb)) {
 	xdr_destroy(&xdrs);
 	return(KADM5_XDR_FAILURE);
@@ -402,7 +402,7 @@ kdb_delete_entry(kadm5_server_handle_t handle, krb5_principal name)
 {
     int one = 1;
     krb5_error_code ret;
-    
+
     ret = krb5_db_delete_principal(handle->context, name, &one);
 
     return ret;

@@ -69,9 +69,9 @@
  */
 #define     M_ESCAPE '\033'         /* ASCII default code for <ESC> */
 
-#define	SETVBUF(fp,bp,f,s) setvbuf(fp,f,bp,s)	/* for some SysV and Xenix 
+#define	SETVBUF(fp,bp,f,s) setvbuf(fp,f,bp,s)	/* for some SysV and Xenix
 						 * systems, which have unusual
-						 * calling sequences 
+						 * calling sequences
 						 */
 
 #define	M_DEFAULT_PATH	"/bin:/usr/bin"
@@ -191,26 +191,26 @@
 				 * to deallocate when finished accessing the
 				 * user getpw*() routines
 				 * This is the case for conventional
-				 * UNIX systems 
+				 * UNIX systems
 				 */
 
 #undef M_SHBLTIN_ANYCMD 	/* set to 1 if you want ability to create an
 				 * executable with any name, using shbltin.c.
-				 * [ shbltin.c was created to satisfy 
+				 * [ shbltin.c was created to satisfy
 				 *   POSIX.2-1992 Section 2.3 "regular built-in
 				 *   utilities". ]
 				 * If this is undefined, then the only valid
 				 * command names are those listed in an
 				 * internal table in shbltin.c which are
-				 * are checked at run-time against 
+				 * are checked at run-time against
 				 * basename(argv[0]).
 				 * If the command name is not listed in the
 				 * table, then program will exit
-				 * with an error message. 
+				 * with an error message.
 				 *
 				 * Normally, this is undefined, since
 				 * it becomes too easy to get into an infinite
-				 * loop if you name this executable to a 
+				 * loop if you name this executable to a
 				 * non-bltin command.
 				 */
 
@@ -228,7 +228,7 @@
 				 * matches *unless* the environment variable
 				 * at runtime has DUALCASE set.
 				 * For a conforming system, this should *not*
-				 * be defined. <mks.h> will default to 
+				 * be defined. <mks.h> will default to
 				 * undefined.
 				 */
 
@@ -246,7 +246,7 @@
 				 * 1) ANSI does not specify returning a valid
 				 *    errno if malloc() returns NULL.
 				 *    But, MKS code assumes a valid errno
-				 *    as is returned in most UNIX systems. 
+				 *    as is returned in most UNIX systems.
 				 * 2) ANSI says it is implementation defined
 				 *    whether or not malloc(0) returns a valid
 				 *    pointer.
@@ -260,7 +260,7 @@
 				 */
 
 #define M_REALLOC	1	/* Defining M_REALLOC will cause
-				 * m_realloc() to be used in place of the 
+				 * m_realloc() to be used in place of the
 				 * systems realloc().
 				 * This is necessary:
 				 *  a) if you do not have an ANSI realloc()
@@ -269,7 +269,7 @@
 				 *     - ANSI does not specify returning a valid
 				 *       errno if malloc() returns NULL.
 				 *       But, MKS code assumes a valid errno
-				 *       as is returned in most UNIX systems. 
+				 *       as is returned in most UNIX systems.
 				 *
 				 * Defining M_REALLOC requires an m_realloc()
 				 * function, which MKS provides.
@@ -277,7 +277,7 @@
 				 * renamed to malloc().  (See mks.h)
 				 */
 #ifdef M_REALLOC
-#define M_WANT_ANSI_REALLOC  1	/* Use #undef M_WANT_ANSI_REALLOC 
+#define M_WANT_ANSI_REALLOC  1	/* Use #undef M_WANT_ANSI_REALLOC
 				 * if your system has an ANSI realloc() function
 				 *
 				 * Defining M_WANT_ANSI_REALLOC can only be
@@ -286,10 +286,10 @@
 				 * does not support either of the following
 				 * 2 features:
 				 *
-				 * 1) ANSI says that if the ptr passed to 
+				 * 1) ANSI says that if the ptr passed to
 				 *    realloc is NULL, then it will act like
-				 *    a malloc() 
-				 * 2) ANSI says that if the ptr passed is 
+				 *    a malloc()
+				 * 2) ANSI says that if the ptr passed is
 				 *    not NULL and the size is 0, then the
 				 *    object that ptr points to is freed.
 				 *
@@ -326,8 +326,8 @@
 
 #ifndef PATH_MAX
 #define	M_PATH_MAX	2048	/* For systems where pathconf(file,_PC_PATH_MAX)
-				 * can return -1 and NOT set errno 
-				 * (which means that PATH_MAX for 'file' 
+				 * can return -1 and NOT set errno
+				 * (which means that PATH_MAX for 'file'
 				 *  is unlimited),
 				 * we provide a suitable LARGE value
 				 * that can be returned by m_pathmax().
@@ -351,7 +351,7 @@
 #undef ROOTUID			/* Some systems may use a different user id
 				 * to indicate the superuser.
 				 * If it is not defined here, then <mks.h>
-				 * will define it to be 0 which is the 
+				 * will define it to be 0 which is the
 				 * value used in conventional UNIX.
 				 */
 
@@ -371,7 +371,7 @@
 				 * if M_AUDIT defined.  Define as `0' if no
 				 * second audit word.
 				 */
-				
+
 #undef M_DEVIO			/* use #define	M_DEVIO	1  on systems that
 				 * requires special interfaces
 				 * to perform I/O on devices.
@@ -383,7 +383,7 @@
 				 * interface is used.
 				 */
 
-#undef	M_DEVBIN		/* Use #define M_DEVBIN 1 
+#undef	M_DEVBIN		/* Use #define M_DEVBIN 1
 				 * on systems that have devices that do not
 				 * allow raw I/O be written directly
 				 * to the device.
@@ -399,7 +399,7 @@
 				 * the prototypes m_devbin() and m_devstd()
 				 * Otherwise it undefines m_devstd()
 				 * and set m_devbin to return a dummy value of 0
-				 * 
+				 *
 				 * MKS has selected some utilities
 				 * to recognize this fact and to handle
 				 * these I/O cases specially.
@@ -473,12 +473,12 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * by m_wallow(), mesg, talk, and write.
 				 * If undefined, it is assumed that no security
 				 * is available on tty's.
-				 */ 
+				 */
 
 #undef M_CONSOLE		/* This is defined to indicate that a pc
 				 * style console is used instead of a tty.
 				 * This allows for the elimination of
-				 * unnecessary calls to m_wallow() from 
+				 * unnecessary calls to m_wallow() from
 				 * pc compiles.
 				 * Default is undef; m_wallow calls are made.
 				 */
@@ -530,7 +530,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * the calling sequence of these routines.
 				 */
 
-#undef M_COMPRESSION_AVAIL	/* 
+#undef M_COMPRESSION_AVAIL	/*
 				 * Not defining M_COMPRESSION_AVAIL indicates
 				 * that the compression libary code is not
 				 * available.
@@ -556,7 +556,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * Two %c's field specifiers can be included
 				 * in the file name;
 				 * the first is replaced with tapenumber,
-				 * the 2nd with tape density 
+				 * the 2nd with tape density
 				 *    (l, m, or h, for low, medium or high).
 				 * If you either don't have multiple
 				 * tapes, or densities, you can leave off extra
@@ -617,7 +617,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 #define M_MAKE_STRING_SIZE 8192	/* make macro expansion max string size */
 #define M_MAKE_PATSUB_SIZE 1024	/* make pattern/substitution max string size */
 
-#define	M_FLDSEP	':'	/* The field separator character used in 
+#define	M_FLDSEP	':'	/* The field separator character used in
 				 * the PATH environment variable (for sh),
 				 * and for the entries in the group database
 				 * (e.g /etc/group) and the user database
@@ -642,7 +642,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 #define __CLK_TCK 100		/* units for times() */
 
 #undef	M_NOOWNER		/* for systems which don't have user/group
-				 * owners on files. 
+				 * owners on files.
 				 * <mks.h> will default to undefined.
 				 * Used by pax
 				 */
@@ -664,7 +664,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 
 #define	M_DIRSTAT(pathname, dirp, statbuf)	stat((pathname), (statbuf))
 				/* prototype definition:
-				 * int M_DIRSTAT(char*	pathname, 
+				 * int M_DIRSTAT(char*	pathname,
 				 *               DIR*  	dirp,
 				 *               struct stat*	statbuf);
 				 * On POSIX and conventional UNIX systems
@@ -692,7 +692,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * modified
 				 *
 				 * If this is not defined, then
-				 * <mks.h> defaults to traditional unix, a 
+				 * <mks.h> defaults to traditional unix, a
 				 * leading `.'.
 				 */
 
@@ -810,11 +810,11 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 */
 #define	M_FSALL		"/etc/fstab"
 				/* this pathname identifies a file that
-				 * is similar to M_FSMOUNT, but instead of 
-				 * the actively mounted file systems, it 
+				 * is similar to M_FSMOUNT, but instead of
+				 * the actively mounted file systems, it
 				 * has a list of ALL possible filesystems
 				 * that could be mounted.
-				 * This file normally used by the mount 
+				 * This file normally used by the mount
 				 * command to find all the file systems
 				 * to mount by default.
 				 */
@@ -829,7 +829,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				/* This macro is used after an unsuccessful
 				 * read() or m_devread() to determine
 				 * if end-of-volume has been encountered.
-				 * This macro should be invoked using the 
+				 * This macro should be invoked using the
 				 * errno returned by the read().
 				 * The macro should evaluate to 1 (true)
 				 * if it can determine the EOV condition
@@ -852,7 +852,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * be set to the vendor's product code used
 				 * for Curses.
 				 */
- 
+
 #undef	M_CURSES_MEMMAPPED	/* Define this symbol to compile up curses
 				 * for a memory mapped display, such as the PC.
 				 * Rather than allocating memory for the main
@@ -873,7 +873,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * NOTE: Only define this macro if curses
 				 *	 is available on this system since
 				 *	 this macro is also used to
-				 *       determine if "curses" is available 
+				 *       determine if "curses" is available
 				 */
 
 #define M_BSD_SPRINTF	1	/* Defined if sprintf on this system has BSD
@@ -921,7 +921,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * from the end of available stack size.
 				 * Return 0 if it is -- i.e. unsafe to
 				 * recurse further.
-				 * <mks.h> defaults to undefined; 
+				 * <mks.h> defaults to undefined;
 				 * i.e. no stack bounds checking.
 				 * This is only called from a few programs
 				 * which allow the user to perform recursion.
@@ -933,7 +933,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 *
 				 * Return the major device number given
 				 * a "struct stat *".
-				 * Assumes the stat structure pointer 
+				 * Assumes the stat structure pointer
 				 * represents a special device file.
 				 * MKS recommends all systems define
 				 * some method of extracting this information
@@ -946,7 +946,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 
 #define M_DEVMINOR(statp)	((uint)minor((statp)->st_rdev))
 				/* Prototype: uint M_DEVMINOR(struct stat *);
-				 * 
+				 *
 				 * Return the minor device number given
 				 * a "struct stat *".
 				 * Same recommendations as M_DEVMAJOR above.
@@ -959,12 +959,12 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 */
 
 #define M_INODIRENT(name, dirbuf)	((ino_t)((dirbuf)->d_ino))
-				/* Prototype: 
+				/* Prototype:
 				 *  ino_t M_INODIRENT(char *, struct dirent *);
 				 *
 				 * Return the inode belonging to the directory
 				 * entry corresponding to dirbuf.  The name
-				 * parameter is the path name given to a 
+				 * parameter is the path name given to a
 				 * previous call to opendir().
 				 */
 
@@ -980,7 +980,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * different member of the stat structure.
 				 *
 				 * These macros are not required.
-				 * Programs that use these macros 
+				 * Programs that use these macros
 				 * will fall back on computing these
 				 * values from the st_size field.
 				 */
@@ -1038,7 +1038,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
  * example of a posix file system, with say a dos floppy file system, such
  * as is available on many unix systems today.
  * If your system is posix conformant, do not set any of these variables
- * or functions; <mks.h> will default to a #define for m_fstype to 
+ * or functions; <mks.h> will default to a #define for m_fstype to
  * a POSIX style naming convention.
  */
 #undef	M_FSTYPE		/* If m_fstype is defined in mkslocal.h,
@@ -1056,7 +1056,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * path arg given.  Either M_FSTYPE_POSIX or
 				 * M_FSTYPE_FAT, should be or'ed with any of
 				 * M_FSATTR_ONE_DOT, M_FSATTR_SHORT_EXT and
-				 * M_FSATTR_NO_LEADING_DOT.  These three 
+				 * M_FSATTR_NO_LEADING_DOT.  These three
 				 * M_FSATTR_ bit flags conform to the three
 				 * following obsolete defines.
 				 */
@@ -1089,7 +1089,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 
 /*
  * customizations for ps field specifiers and widths
- * This will vary from system to system depending on the max size 
+ * This will vary from system to system depending on the max size
  * of the values in the different fields
  * The following are UNIX (e.g SYSV and BSD) std defaults
  */
@@ -1140,7 +1140,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 			 * which is independent of semantics of rootname().
 			 * Depending on the implementation of rootname(),
 			 * it may prefix the path with $ROOTDIR environment
-			 * variable or it may return a path relative to 
+			 * variable or it may return a path relative to
 			 * the know location of where the product has
 			 * been installed (or maybe something else!)
 			 *
@@ -1158,7 +1158,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 
 
 /* Cron configuration options:
- * M_CRON_USESFIFO	define this (to 1) if your cron is implemented 
+ * M_CRON_USESFIFO	define this (to 1) if your cron is implemented
  *			using a FIFO (normally found in /usr/lib/cron/FIFO)
  *			to accept communication from the at/batch/crontab
  *			utilities when notifying cron of changes to the
@@ -1174,7 +1174,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
  *                           M_LIBDIR macros )
  *
  *			This can be used to override cronvars.c definitions
- *			This is useful on systems that you don't want to 
+ *			This is useful on systems that you don't want to
  *			use MKS's cron daemon and thus, you have to define
  *			the directories/files where the system cron expects
  *			things.
@@ -1198,7 +1198,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * is defined
 				 */
 /*
- * M_CRON_MAILER: 
+ * M_CRON_MAILER:
  *     This is a string that specifies a utility names
  *     or a shell filter (e.g pipeline) that gets executed by the
  *     cron daemon to deliver mail messages.
@@ -1235,14 +1235,14 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
  * (e.g the absolute directory name defined by M_PRESERVEDIR will be used)
  */
 #define M_PRESERVEDIR    "/var/recover"
- 
+
 /*
- * Defining M_SYSTEM_MAILDIR will cause mailx to use this 
+ * Defining M_SYSTEM_MAILDIR will cause mailx to use this
  * absolute directory name - e.g bypass the call to rootname() so
  * it doesn't become relative to product installation directory.
  */
 #define M_SYSTEM_MAILDIR       "/usr/mail"
- 
+
 
 #undef M_ULIMIT_AVAIL	/* define this if your system provides the SystemV
 			 * ulimit() API and the <ulimit.h> header file
@@ -1265,7 +1265,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 *
 				 * NOTE: This may be defined in mkslocal.mk
 				 * along with the build configuration required
-				 * for shbltin.c.  
+				 * for shbltin.c.
 				 */
 /* M_SH_GETCWD removed, no longer used. default for physical cd/pwd */
 #define	M_SH_BGNICE	0	/* Set -o bgnice for interactive shell.
@@ -1312,7 +1312,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * used to prevent a crash.
 				 */
 
-#undef M_SPAWN			/* This code is prototype code only.  It 
+#undef M_SPAWN			/* This code is prototype code only.  It
 				 * has not been tested, and should not be
 				 * used.
 				 * This code is not supported, except through
@@ -1330,7 +1330,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * accessible by specifying the new '-W' flag
 				 */
 
-#undef M_RE_SUB_ANCHOR		/* Define this if you wish your baisc regular 
+#undef M_RE_SUB_ANCHOR		/* Define this if you wish your baisc regular
 				 * expressions to support anchors
 				 * (^ and $) inside of subexpressions.
 				 * See POSIX.2 section 2.8.3.5.
@@ -1377,7 +1377,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * MKS's implementation, and you must write
 				 * your own code for m_collrange(), collequiv()
 				 * ...
-				 *   note: there are some routines like 
+				 *   note: there are some routines like
 				 *         localedtconv which can  obtain the
 				 *         necessary info from nl_langinfo()
 				 *         if this is supported
@@ -1424,7 +1424,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				 * (e.g POSIX, C, en_US, fr, ...)
 				 * It is assumed that there is one entry here
 				 * for each supported locale.
-				 * If these entries are sub-directories, 
+				 * If these entries are sub-directories,
 				 * then this macro is defined.
 				 * If these entries are files, then do not
 				 * define this macro.
@@ -1437,20 +1437,20 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 
 #undef M_VARIANTS		/* This can be defined on EBCDIC systems
 				 * where the POSIX.2 portable characters are not
-				 * invariant across all the code pages 
+				 * invariant across all the code pages
 				 * supported.
 				 * By defineing this, user is allowed
 				 * to define the encodings
 				 * for these characters as they switch between
 				 * the various code pages by setting up
-				 * the VARIANTS environment variable.. 
+				 * the VARIANTS environment variable..
 				 * so that the various utilities will cope
 				 * with the different encodings gracefully.
 				 */
 				 /* Source code hints:
 				  * if you define this, you will need
 				  *    h/variant.h, h/m_invari.h
-				  *    libc/mks/getsyntx.c, 
+				  *    libc/mks/getsyntx.c,
 				  *    libc/mks/m_varian.c
 				  *
 				  * If this is not defined, then all you need
@@ -1641,8 +1641,8 @@ typedef unsigned long	ulong;
 	 * that contains the password for group 'grp'.
 	 * If no password is available, then an empty string should be
 	 * returned.
-	 * 
-	 * On historical UNIX systems, group passwords are found in 
+	 *
+	 * On historical UNIX systems, group passwords are found in
 	 * the gr_passwd member in struct group.
 	 * Thus, this macro should be defined as
 	 *    #define M_GROUP_PASSWD(grp)	grp->gr_passwd

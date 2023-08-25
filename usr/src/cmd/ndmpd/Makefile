@@ -58,7 +58,7 @@ SMATCH=off
 CSTD = $(CSTD_GNU99)
 
 # lint does not like unused _umem_*_init
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 
+LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 
 # function argument declared inconsistently
 LINTFLAGS += -xerroff=E_INCONS_ARG_DECL2
@@ -67,7 +67,7 @@ LINTFLAGS += -xerroff=E_INCONS_VAL_TYPE_USED2
 # value type declared inconsistently
 LINTFLAGS += -xerroff=E_INCONS_VAL_TYPE_DECL2
 # argument used inconsistently
-LINTFLAGS += -xerroff=E_INCONS_ARG_USED2 
+LINTFLAGS += -xerroff=E_INCONS_ARG_USED2
 
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-switch
@@ -140,7 +140,7 @@ $(ROOTNDMPDDIR)/%: %
 
 all: $(PROG)
 
-install: all $(ROOTNDMPDDIR)  $(ROOTNDMPDFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) 
+install: all $(ROOTNDMPDDIR)  $(ROOTNDMPDFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST)
 
 check:	$(CHKMANIFEST)
 

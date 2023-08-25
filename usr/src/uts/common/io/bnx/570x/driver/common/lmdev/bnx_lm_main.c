@@ -152,7 +152,7 @@ build_ver_string(
         *p = '.';
         p++;
     }
-    
+
     if(buf_size - (u32_t) PTR_SUB(p, str_buf) > 1)
     {
         p = val_to_decimal_string(
@@ -1184,7 +1184,7 @@ lm_get_dev_info(
         // would spend excessive time scanning for end bit.
         pdev->params.limit_l4_rx_bd_cnt = 110;
     }
-    
+
     /* Override the defaults with user configurations. */
     lm_status = mm_get_user_config(pdev);
     if(lm_status != LM_STATUS_SUCCESS)
@@ -1517,7 +1517,7 @@ init_ofld_resc(
         ofld->state_blks[idx].params.ticks_per_second = 100;
         ofld->state_blks[idx].params.ack_frequency = 2;
         ofld->state_blks[idx].params.delayed_ack_ticks = 20;
-        ofld->state_blks[idx].params.max_retx = 10; 
+        ofld->state_blks[idx].params.max_retx = 10;
         ofld->state_blks[idx].params.doubt_reachability_retx = 8;
         ofld->state_blks[idx].params.sws_prevention_ticks = 10;
         ofld->state_blks[idx].params.dup_ack_threshold = 3;
@@ -1727,7 +1727,7 @@ init_l2tx_resc(
         pdev->params.l2_tx_bd_page_cnt[idx] = 0;
     }
     num_tx_chains = pdev->tx_info.num_txq;
-#endif    
+#endif
     for(idx = 0; idx < num_tx_chains; idx++)
     {
         txq = &pdev->tx_info.chain[idx];
@@ -2041,7 +2041,7 @@ init_l2rx_resc(
         pdev->params.l2_rx_desc_cnt[idx] = 0;
         pdev->params.l2_rx_bd_page_cnt[idx] = 0;
     }
-#endif    
+#endif
     for(idx = 0; idx < pdev->rx_info.num_rxq ; idx++)
     {
         rxq = &pdev->rx_info.chain[idx];
@@ -2747,7 +2747,7 @@ lm_get_stats(
             stats->as_u32.high += sb->stat_IfHCInBroadcastPkts_hi;
             REG_RD_IND(
                 pdev,
-                OFFSETOF(reg_space_t, 
+                OFFSETOF(reg_space_t,
                          com.com_scratch[0])+
                          COM_HSI_OFFSETOFF(com_l2_iscsi_no_buffer),
                          &val);
@@ -2767,7 +2767,7 @@ lm_get_stats(
 
             REG_RD_IND(
                 pdev,
-                OFFSETOF(reg_space_t, 
+                OFFSETOF(reg_space_t,
                          com.com_scratch[0])+
                          COM_HSI_OFFSETOFF(com_l2_no_buffer),
                          &val);
@@ -2840,7 +2840,7 @@ lm_get_stats(
             stats->as_u32.high = sb->stat_IfHCInUcastPkts_hi;
             REG_RD_IND(
                 pdev,
-                OFFSETOF(reg_space_t, 
+                OFFSETOF(reg_space_t,
                          com.com_scratch[0])+
                          COM_HSI_OFFSETOFF(com_unicast_no_buffer),
                          &val);
@@ -2864,11 +2864,11 @@ lm_get_stats(
             stats->as_u32.high = sb->stat_IfHCInMulticastPkts_hi;
             REG_RD_IND(
                 pdev,
-                OFFSETOF(reg_space_t, 
+                OFFSETOF(reg_space_t,
                          com.com_scratch[0])+
                          COM_HSI_OFFSETOFF(com_mcast_no_buffer),
                          &val);
-                
+
             if((stats->as_u32.high == 0 && stats->as_u32.low) &&
                (stats->as_u32.low < val))
             {
@@ -2889,7 +2889,7 @@ lm_get_stats(
             stats->as_u32.high = sb->stat_IfHCInBroadcastPkts_hi;
             REG_RD_IND(
                 pdev,
-                OFFSETOF(reg_space_t, 
+                OFFSETOF(reg_space_t,
                          com.com_scratch[0])+
                          COM_HSI_OFFSETOFF(com_bcast_no_buffer),
                          &val);
@@ -3017,7 +3017,7 @@ lm_get_stats(
             REG_RD_IND(
                 pdev,
                 OFFSETOF(reg_space_t, tpat.tpat_scratch[0])+TPAT_HSI_OFFSETOFF(unicast_bytes_xmit)+4,
-                &stats->as_u32.low);                        
+                &stats->as_u32.low);
             REG_RD_IND(
                 pdev,
                 OFFSETOF(reg_space_t, tpat.tpat_scratch[0])+TPAT_HSI_OFFSETOFF(unicast_bytes_xmit),
@@ -3081,7 +3081,7 @@ find_nwuf(
     u32_t idx;
     u32_t j;
     u32_t k;
-    
+
     for(idx = 0; idx < max_nwuf_cnt; idx++)
     {
         nwuf = &nwuf_list->nwuf_arr[idx];
@@ -3154,15 +3154,15 @@ lm_add_nwuf(
     {
         max_nwuf_cnt = LM_MAX_NWUF_CNT;
     }
-    
+
     combind_size = (pattern_size<<16) & 0xffff0000;
     combind_size |= mask_size;
     pattern_size &= 0xffff;
     mask_size &= 0xffff;
 
-    
+
         //DbgBreakIf(mask_size == 0xc &&pattern_size == 0x4a);
-    
+
 
     if(mask_size == 0 || mask_size > LM_NWUF_PATTERN_MASK_SIZE)
     {
@@ -3173,9 +3173,9 @@ lm_add_nwuf(
 
     /* If this is a duplicate entry, we are done. */
     nwuf = find_nwuf(
-            &pdev->nwuf_list, 
-            mask_size, 
-            byte_mask, pattern, 
+            &pdev->nwuf_list,
+            mask_size,
+            byte_mask, pattern,
             max_nwuf_cnt);
 
     if(nwuf)
@@ -3207,10 +3207,10 @@ lm_add_nwuf(
         LH_PRINTK(("%02x ", byte_mask[i]));
     }
     LH_PRINTK(("\npattern:\n"));
-    
+
     for (i=0;i<mask_size;i++)
     {
-        for (j=0;j<8;j++) 
+        for (j=0;j<8;j++)
         {
             if (0 == (i*8+j)%16)
             {
@@ -3230,7 +3230,7 @@ lm_add_nwuf(
                 {
                     LH_PRINTK((" %02x  ",pattern[i*8+j]));
                 }
-                
+
             }
         }
     }
@@ -3249,12 +3249,12 @@ lm_add_nwuf(
     /* Save nwuf data. */
     nwuf->size = mask_size;
 
-    if (pattern_size) 
+    if (pattern_size)
     {
         nwuf->size = combind_size;
         goto _handle_win7_pattern;
     }
-    
+
     for(j = 0; j < mask_size; j++)
     {
         nwuf->mask[j] = byte_mask[j];
@@ -3309,9 +3309,9 @@ lm_add_nwuf(
         {
             LH_PRINTK(("\n"));
         }
-        
+
         LH_PRINTK(("%02x ",nwuf->pattern[i]));
-        
+
     }
     LH_PRINTK(("\nEnd of add_nwuf\n"));
 */
@@ -3365,9 +3365,9 @@ _handle_win7_pattern:
         {
             LH_PRINTK(("\n"));
         }
-        
+
         LH_PRINTK(("%02x ",nwuf->pattern[i]));
-        
+
     }
     LH_PRINTK(("\nEnd of add_nwuf\n"));
 */
@@ -3410,9 +3410,9 @@ lm_del_nwuf(
 
     /* Look for a matching pattern. */
     nwuf = find_nwuf(
-            &pdev->nwuf_list, 
-            mask_size, 
-            byte_mask, 
+            &pdev->nwuf_list,
+            mask_size,
+            byte_mask,
             pattern,
             max_nwuf_cnt);
 
@@ -3461,7 +3461,7 @@ lm_clear_nwuf(
     {
         max_nwuf_cnt = LM_MAX_NWUF_CNT;
     }
-    
+
     for(j = 0; j < max_nwuf_cnt; j++)
     {
         pdev->nwuf_list.nwuf_arr[j].size = 0;
@@ -3586,7 +3586,7 @@ init_nwuf_5709(
         {
             nwuf = &nwuf_list->nwuf_arr[idx];
             pattern_size = nwuf_size[idx]>>16;
-            
+
             if(nwuf->size == 0 || offset > nwuf->size * 8)
             {
                 continue;
@@ -3756,7 +3756,7 @@ init_nwuf_5706(
     u8_t idx;
     u32_t nwuf_size[LM_MAX_NWUF_CNT];
     lm_nwuf_t *nwuf;
-    
+
     /*
      * 06/08 doesn't seem to have pattern size like those of 09
      */
@@ -5312,7 +5312,7 @@ void lm_set_pcie_nfe_report(lm_device_t *pdev)
         REG_RD(pdev,pci_config.pcicfg_device_control,&pci_devctl);
         pci_devctl &= ~PCICFG_DEVICE_CONTROL_NON_FATAL_REP_ENA;
         REG_WR(pdev,pci_config.pcicfg_device_control,pci_devctl);
-    } 
+    }
 }
 
 /*******************************************************************************
@@ -5338,12 +5338,12 @@ void lm_clear_coalescing_ticks(lm_device_t *pdev)
     pdev->params.rx_ticks = 0;
     pdev->params.rx_ticks_int = 0;
     pdev->params.stats_ticks = 0;
-    
+
     /* Xinan per-processor HC configuration. */
     pdev->params.psb_tx_cons_trip = 0x10001;
     pdev->params.psb_rx_cons_trip = 0x10001;
     pdev->params.psb_comp_prod_trip = 0x10001;
-    
+
     pdev->params.psb_tx_ticks = 0;
     pdev->params.psb_rx_ticks = 0;
     pdev->params.psb_com_ticks = 0;
@@ -5371,7 +5371,7 @@ u8_t lm_is_mmio_ok(lm_device_t *pdev)
  *
  * Return:
  ******************************************************************************/
-void 
+void
 lm_create_q_group(
     lm_device_t *pdev,
     u32_t q_group_id,
@@ -5380,7 +5380,7 @@ lm_create_q_group(
 {
     u32_t val;
     lm_rx_chain_t *rxq;
-    
+
     rxq = &pdev->rx_info.chain[q_group_id];
     rxq->vmq_lookahead_size = lookahead_sz;
 
@@ -5398,7 +5398,7 @@ lm_create_q_group(
  *
  * Return:
  ******************************************************************************/
-lm_status_t 
+lm_status_t
 lm_destroy_q_group(
     lm_device_t *pdev,
     u32_t q_group_id,
@@ -5409,9 +5409,9 @@ lm_destroy_q_group(
     kwqe_t *prod_qe;
     u16_t prod_idx;
     l2_kwqe_vm_free_rx_queue_t *kwqe_free_rxq;
-    
+
     num_kwqes_needed = num_queues;
-   
+
     if(pdev->kq_info.kwqe_left < num_kwqes_needed)
     {
         DbgMessage(pdev, WARN, "No more KWQE left.\n");
@@ -5425,7 +5425,7 @@ lm_destroy_q_group(
     prod_idx = pdev->kq_info.kwq_prod_idx;
 
     kwqe_free_rxq = (l2_kwqe_vm_free_rx_queue_t *) prod_qe;
-    
+
     if(q_group_id <= RX_CHAIN_IDX3)
     {
         if(q_group_id == RX_CHAIN_IDX0)
@@ -5436,7 +5436,7 @@ lm_destroy_q_group(
             {
                 kwqe_free_rxq->flags = L2_KWQE_FLAGS_LAYER_MASK_L2;
                 kwqe_free_rxq->queue_type = L2_NORMAL_QUEUE;
-                
+
                 if(idx == 0)
                     kwqe_free_rxq->qid = (u8_t)q_group_id;
                 else
@@ -5444,8 +5444,8 @@ lm_destroy_q_group(
                     kwqe_free_rxq->qid = idx + 3;
                 }
 
-                kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;  
-                
+                kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;
+
                 /* Advance to the next KWQE. */
                 if(prod_qe == pdev->kq_info.kwq_last_qe)
                 {
@@ -5476,13 +5476,13 @@ lm_destroy_q_group(
             kwqe_free_rxq->queue_type = L2_NORMAL_QUEUE;
             kwqe_free_rxq->qid = (u8_t)q_group_id;
             pdev->kq_info.kwqe_left -= 1;
-#if INCLUDE_OFLD_SUPPORT            
+#if INCLUDE_OFLD_SUPPORT
             if(q_group_id == RX_CHAIN_IDX2 &&
                !s_list_is_empty(&pdev->rx_info.chain[RX_CHAIN_IDX1].active_descq))
             {
                 kwqe_free_rxq->flags = L2_KWQE_FLAGS_LAYER_MASK_L2;
-                kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;  
-                
+                kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;
+
                 /* Advance to the next KWQE. */
                 if(prod_qe == pdev->kq_info.kwq_last_qe)
                 {
@@ -5493,14 +5493,14 @@ lm_destroy_q_group(
                     prod_qe++;
                 }
                 prod_idx++;
-                
+
                 /* flush the catchup RX queue too */
                 kwqe_free_rxq = (l2_kwqe_vm_free_rx_queue_t *) prod_qe;
                 kwqe_free_rxq->queue_type = L2_NORMAL_QUEUE;
                 kwqe_free_rxq->qid = (u8_t)RX_CHAIN_IDX1;
                 pdev->kq_info.kwqe_left -= 1;
             }
-#endif            
+#endif
         }
     }
     else
@@ -5510,7 +5510,7 @@ lm_destroy_q_group(
         pdev->kq_info.kwqe_left -= 1;
     }
     kwqe_free_rxq->flags = L2_KWQE_FLAGS_LAYER_MASK_L2;
-    kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;  
+    kwqe_free_rxq->opcode = L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE;
 
     /* Advance to the next KWQE. */
     if(prod_qe == pdev->kq_info.kwq_last_qe)
@@ -5525,14 +5525,14 @@ lm_destroy_q_group(
 
     pdev->kq_info.kwq_prod_qe = prod_qe;
     pdev->kq_info.kwq_prod_idx = prod_idx;
-    
+
     MBQ_WR16(
         pdev,
         GET_CID(pdev->kq_info.kwq_cid_addr),
         OFFSETOF(krnlq_context_t, krnlq_host_qidx),
         prod_idx);
-    
-    return LM_STATUS_SUCCESS; 
+
+    return LM_STATUS_SUCCESS;
 }
 
 /*******************************************************************************
@@ -5540,7 +5540,7 @@ lm_destroy_q_group(
  *
  * Return:
  ******************************************************************************/
-VOID 
+VOID
 lm_update_defq_filter_ctx(
     lm_device_t *pdev,
     u8_t valid
@@ -5551,7 +5551,7 @@ lm_update_defq_filter_ctx(
 
     if(valid)
         val |= L2_VM_FILTER_MAC << 16;
-    
+
     REG_WR_IND(
         pdev,
         OFFSETOF(reg_space_t, rxp.rxp_scratch[0])+ctx_offset,
@@ -5574,7 +5574,7 @@ lm_chng_q_group_filter(
 {
     kwqe_t *prod_qe;
     u16_t prod_idx;
-    
+
     if(pdev->kq_info.kwqe_left < 1)
     {
         DbgMessage(pdev, WARN, "No more KWQE left.\n");
@@ -5591,17 +5591,17 @@ lm_chng_q_group_filter(
     if(dest_mac == NULL && vlan_ptr == NULL)
     {
         /* clear filter operation */
-        l2_kwqe_vm_remove_rx_filter_t * kwqe_remove_rx_filter = 
+        l2_kwqe_vm_remove_rx_filter_t * kwqe_remove_rx_filter =
             (l2_kwqe_vm_remove_rx_filter_t *) prod_qe;
         kwqe_remove_rx_filter->flags = L2_KWQE_FLAGS_LAYER_MASK_L2;
         kwqe_remove_rx_filter->qid = (u8_t)q_group_id;
         kwqe_remove_rx_filter->filter_id = (u8_t)filter_id;
-        kwqe_remove_rx_filter->opcode = L2_KWQE_OPCODE_VALUE_VM_REMOVE_RX_FILTER;  
+        kwqe_remove_rx_filter->opcode = L2_KWQE_OPCODE_VALUE_VM_REMOVE_RX_FILTER;
     }
     else
     {
         /* set filter operation */
-        l2_kwqe_vm_set_rx_filter_t * kwqe_set_rx_filter = 
+        l2_kwqe_vm_set_rx_filter_t * kwqe_set_rx_filter =
             (l2_kwqe_vm_set_rx_filter_t *) prod_qe;
 
         kwqe_set_rx_filter->flags = L2_KWQE_FLAGS_LAYER_MASK_L2;
@@ -5610,15 +5610,15 @@ lm_chng_q_group_filter(
         if(vlan_ptr)
         {
             kwqe_set_rx_filter->vlan = *vlan_ptr;
-            kwqe_set_rx_filter->filter_type = L2_VM_FILTER_MAC_VLAN; 
+            kwqe_set_rx_filter->filter_type = L2_VM_FILTER_MAC_VLAN;
         }
         else
         {
-            kwqe_set_rx_filter->filter_type = L2_VM_FILTER_MAC; 
+            kwqe_set_rx_filter->filter_type = L2_VM_FILTER_MAC;
         }
-        kwqe_set_rx_filter->opcode = L2_KWQE_OPCODE_VALUE_VM_SET_RX_FILTER;  
+        kwqe_set_rx_filter->opcode = L2_KWQE_OPCODE_VALUE_VM_SET_RX_FILTER;
     }
-    
+
     /* Advance to the next KWQE. */
     if(prod_qe == pdev->kq_info.kwq_last_qe)
     {
@@ -5632,13 +5632,13 @@ lm_chng_q_group_filter(
 
     pdev->kq_info.kwq_prod_qe = prod_qe;
     pdev->kq_info.kwq_prod_idx = prod_idx;
-    
+
     MBQ_WR16(
         pdev,
         GET_CID(pdev->kq_info.kwq_cid_addr),
         OFFSETOF(krnlq_context_t, krnlq_host_qidx),
         prod_idx);
-    return LM_STATUS_PENDING;    
+    return LM_STATUS_PENDING;
 }
 
 /*******************************************************************************
@@ -5657,7 +5657,7 @@ lm_service_l2_kcqes(
     u8_t success;
     kcqe_t *kcqe;
     lm_status_t lm_status;
-    
+
     cqe_serviced_cnt = 0;
     while(num_cqes)
     {
@@ -5674,7 +5674,7 @@ lm_service_l2_kcqes(
 
         kcqe = *cqe_ptr;
 
-        DbgBreakIf((kcqe->kcqe_flags & KCQE_FLAGS_LAYER_MASK) != 
+        DbgBreakIf((kcqe->kcqe_flags & KCQE_FLAGS_LAYER_MASK) !=
                     KCQE_FLAGS_LAYER_MASK_L2);
 
         switch(kcqe->kcqe_opcode)
@@ -5683,14 +5683,14 @@ lm_service_l2_kcqes(
                 /* initiate rx buffer abort */
                 {
                     l2_kcqe_vm_free_rx_queue_t *kcqe_free_rxq;
-                    
+
                     kcqe_free_rxq = (l2_kcqe_vm_free_rx_queue_t *)kcqe;
                     mm_q_grp_abort_rx_request(
-                        pdev, 
+                        pdev,
                         kcqe_free_rxq->qid);
                 }
                 break;
-                
+
             case L2_KCQE_OPCODE_VALUE_VM_SET_RX_FILTER:
             case L2_KCQE_OPCODE_VALUE_VM_REMOVE_RX_FILTER:
                 {
@@ -5706,8 +5706,8 @@ lm_service_l2_kcqes(
                         lm_status = LM_STATUS_FAILURE;
                     }
                     mm_comp_l2_filter_chng_req(
-                        pdev, 
-                        lm_status, 
+                        pdev,
+                        lm_status,
                         kcqe_filter->qid);
                 }
                 break;
@@ -5720,17 +5720,17 @@ lm_service_l2_kcqes(
             case L2_KCQE_OPCODE_VALUE_FLUSH_BD_CHAIN:
                 /* no need to do anything in the driver */
                 break;
-                
+
             default:
                 DbgBreakMsg("invalid l2 kcqe.\n");
                 break;
         }
-        
+
         cqe_ptr += cqe_cnt;
         num_cqes -= cqe_cnt;
         cqe_serviced_cnt += cqe_cnt;
     }
-    
+
     return cqe_serviced_cnt;
 }
 #endif /* LM_NON_LEGACY_MODE_SUPPORT */

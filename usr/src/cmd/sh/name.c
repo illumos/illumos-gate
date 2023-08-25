@@ -50,7 +50,7 @@ struct namnod ps2nod =
 	&acctnod,
 	(unsigned char *)ps2name
 };
-struct namnod cdpnod = 
+struct namnod cdpnod =
 {
 	(struct namnod *)NIL,
 	(struct namnod *)NIL,
@@ -334,7 +334,7 @@ readvar(unsigned char **names)
 	/*
 	 * strip leading IFS characters
 	 */
-	for (;;) 
+	for (;;)
 	{
 		d = nextwc();
 		if(eolchar(d))
@@ -393,7 +393,7 @@ readvar(unsigned char **names)
 				pc = c;
 				while(d = *pc++) {
 					if (staktop >= brkend)
-						growstak(staktop); 
+						growstak(staktop);
 					pushstak(d);
 				}
 				if(!anys(c, ifsnod.namval))
@@ -403,7 +403,7 @@ readvar(unsigned char **names)
 
 			if (eolchar(d))
 				staktop = oldstak;
-			else 
+			else
 			{
 				rest = readw(d);
 				pc = c;
@@ -669,7 +669,7 @@ findnam(nam)
 		else
 			nscan = nscan->namrgt;
 	}
-	return(0); 
+	return(0);
 }
 
 void
@@ -763,7 +763,7 @@ dolocale(nm)
 	int i;
 
 	/*
-	 * Take advantage of fact that names of these vars all start 
+	 * Take advantage of fact that names of these vars all start
 	 * with 'L' to avoid unnecessary work.
 	 * Do locale processing only if /usr is mounted.
 	 */
@@ -776,12 +776,12 @@ dolocale(nm)
 	 * setlocale() has all the smarts built into it, but
 	 * it works by examining the environment.  Unfortunately,
 	 * when you set an environment variable, the shell does
-	 * not modify its own environment; it just remembers that the 
-	 * variable needs to be exported to any children.  We hack around 
-	 * this by consing up a fake environment for the use of setlocale() 
+	 * not modify its own environment; it just remembers that the
+	 * variable needs to be exported to any children.  We hack around
+	 * this by consing up a fake environment for the use of setlocale()
 	 * and substituting it for the real env before calling setlocale().
 	 */
-	
+
 	/*
 	 * Build the fake environment.
 	 * Look up the value of each of the special environment
@@ -812,7 +812,7 @@ dolocale(nm)
 		}
 	}
 	fake_env[fe] = (char *)0;
-	
+
 	/*
 	 * Switch fake env for real and call setlocale().
 	 */

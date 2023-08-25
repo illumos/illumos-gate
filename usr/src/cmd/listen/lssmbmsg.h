@@ -36,7 +36,7 @@
 #define	SMBIDSZ		3
 
 /*
- * SMB command codes 
+ * SMB command codes
  */
 
 #define FSPnil		-1		/* no command currently in progress */

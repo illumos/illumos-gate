@@ -26,9 +26,9 @@ typedef	struct	ipmon_action	{
 	int	ac_second;
 	int	ac_result;
 	u_32_t	ac_sip;
-	u_32_t	ac_smsk;	
+	u_32_t	ac_smsk;
 	u_32_t	ac_dip;
-	u_32_t	ac_dmsk;	
+	u_32_t	ac_dmsk;
 	u_short	ac_sport;
 	u_short	ac_dport;
 	char	*ac_exec;	/* execute argument */

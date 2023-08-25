@@ -112,7 +112,7 @@ void sqliteExprDelete(Expr *p){
 ** without effecting the originals.
 **
 ** The expression list, ID, and source lists return by sqliteExprListDup(),
-** sqliteIdListDup(), and sqliteSrcListDup() can not be further expanded 
+** sqliteIdListDup(), and sqliteSrcListDup() can not be further expanded
 ** by subsequent calls to sqlite*ListAppend() routines.
 **
 ** Any tables that the SrcList might point to are not duplicated.
@@ -168,7 +168,7 @@ ExprList *sqliteExprListDup(ExprList *p){
       ** the names of columns in the result set needs this information */
       sqliteTokenCopy(&pNewExpr->span, &pOldExpr->span);
     }
-    assert( pNewExpr==0 || pNewExpr->span.z!=0 
+    assert( pNewExpr==0 || pNewExpr->span.z!=0
             || pOldExpr->span.z==0 || sqlite_malloc_failed );
     pItem->zName = sqliteStrDup(p->a[i].zName);
     pItem->sortOrder = p->a[i].sortOrder;
@@ -382,7 +382,7 @@ int sqliteIsRowid(const char *z){
 
 /*
 ** Given the name of a column of the form X.Y.Z or Y.Z or just Z, look up
-** that name in the set of source tables in pSrcList and make the pExpr 
+** that name in the set of source tables in pSrcList and make the pExpr
 ** expression node refer back to that source column.  The following changes
 ** are made to pExpr:
 **
@@ -481,7 +481,7 @@ static int lookupName(
     }
   }
 
-  /* If we have not already resolved the name, then maybe 
+  /* If we have not already resolved the name, then maybe
   ** it is a new.* or old.* trigger argument reference
   */
   if( zDb==0 && zTab!=0 && cnt==0 && pParse->trigStack!=0 ){
@@ -497,10 +497,10 @@ static int lookupName(
       pTab = pTriggerStack->pTab;
     }
 
-    if( pTab ){ 
+    if( pTab ){
       int j;
       Column *pCol = pTab->aCol;
-      
+
       pExpr->iDb = pTab->iDb;
       cntTab++;
       for(j=0; j < pTab->nCol; j++, pCol++) {
@@ -547,7 +547,7 @@ static int lookupName(
         assert( zTab==0 && zDb==0 );
         return 0;
       }
-    } 
+    }
   }
 
   /*
@@ -598,12 +598,12 @@ static int lookupName(
 /*
 ** This routine walks an expression tree and resolves references to
 ** table columns.  Nodes of the form ID.ID or ID resolve into an
-** index to the table in the table list and a column offset.  The 
+** index to the table in the table list and a column offset.  The
 ** Expr.opcode for such nodes is changed to TK_COLUMN.  The Expr.iTable
 ** value is changed to the index of the referenced table in pTabList
 ** plus the "base" value.  The base value will ultimately become the
 ** VDBE cursor number for a cursor that is pointing into the referenced
-** table.  The Expr.iColumn value is changed to the index of the column 
+** table.  The Expr.iColumn value is changed to the index of the column
 ** of the referenced table.  The Expr.iColumn value for the special
 ** ROWID column is -1.  Any INTEGER PRIMARY KEY column is tried as an
 ** alias for ROWID.
@@ -616,7 +616,7 @@ static int lookupName(
 **           expr IN (SELECT ...)
 **
 ** The first form is handled by creating a set holding the list
-** of allowed values.  The second form causes the SELECT to generate 
+** of allowed values.  The second form causes the SELECT to generate
 ** a temporary table.
 **
 ** This routine also looks for scalar SELECTs that are part of an expression.
@@ -654,9 +654,9 @@ int sqliteExprResolveIds(
       if( lookupName(pParse, 0, 0, &pExpr->token, pSrcList, pEList, pExpr) ){
         return 1;
       }
-      break; 
+      break;
     }
-  
+
     /* A table name and column name:     ID.ID
     ** Or a database, table and column:  ID.ID.ID
     */
@@ -760,7 +760,7 @@ int sqliteExprResolveIds(
       && sqliteExprResolveIds(pParse, pSrcList, pEList, pExpr->pLeft) ){
         return 1;
       }
-      if( pExpr->pRight 
+      if( pExpr->pRight
       && sqliteExprResolveIds(pParse, pSrcList, pEList, pExpr->pRight) ){
         return 1;
       }
@@ -782,9 +782,9 @@ int sqliteExprResolveIds(
 /*
 ** pExpr is a node that defines a function of some kind.  It might
 ** be a syntactic function like "count(x)" or it might be a function
-** that implements an operator, like "a LIKE b".  
+** that implements an operator, like "a LIKE b".
 **
-** This routine makes *pzName point to the name of the function and 
+** This routine makes *pzName point to the name of the function and
 ** *pnName hold the number of characters in the function name.
 */
 static void getFunctionName(Expr *pExpr, const char **pzName, int *pnName){
@@ -873,7 +873,7 @@ int sqliteExprCheck(Parse *pParse, Expr *pExpr, int allowAgg, int *pIsAgg){
         /* Already reported an error */
       }else if( pDef->dataType>=0 ){
         if( pDef->dataType<n ){
-          pExpr->dataType = 
+          pExpr->dataType =
              sqliteExprType(pExpr->pList->a[pDef->dataType].pExpr);
         }else{
           pExpr->dataType = SQLITE_SO_NUM;
@@ -1284,7 +1284,7 @@ int sqliteExprCodeExprList(
   for(pItem=pList->a, i=0; i<n; i++, pItem++){
     sqliteExprCode(pParse, pItem->pExpr);
     if( includeTypes ){
-      sqliteVdbeOp3(v, OP_String, 0, 0, 
+      sqliteVdbeOp3(v, OP_String, 0, 0,
          sqliteExprType(pItem->pExpr)==SQLITE_SO_NUM ? "numeric" : "text",
          P3_STATIC);
     }

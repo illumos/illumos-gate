@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -37,7 +37,7 @@
 #include "gssapiP_krb5.h"
 #include "gss_libinit.h"
 
-OM_uint32 KRB5_CALLCONV 
+OM_uint32 KRB5_CALLCONV
 gss_krb5_ccache_name(minor_status, name, out_name)
 	OM_uint32 *minor_status;
 	const char *name;
@@ -66,7 +66,7 @@ gss_krb5_ccache_name(minor_status, name, out_name)
             old_name = gss_out_name;
             /* Solaris Kerberos */
             gss_out_name = (char *)tmp_name;
-        }            
+        }
     }
     /* If out_name was NULL, we keep the same gss_out_name value, and
        don't free up any storage (leave old_name NULL).  */
@@ -89,11 +89,11 @@ gss_krb5_ccache_name(minor_status, name, out_name)
             *out_name = gss_out_name;
         }
     }
-    
+
     if (old_name != NULL) {
         free (old_name);
     }
-    
+
     *minor_status = err;
     return (*minor_status == 0) ? GSS_S_COMPLETE : GSS_S_FAILURE;
 }

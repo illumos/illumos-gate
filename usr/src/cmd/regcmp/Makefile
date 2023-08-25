@@ -24,7 +24,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-PROG= regcmp 
+PROG= regcmp
 
 include		../Makefile.cmd
 

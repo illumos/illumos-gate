@@ -1,8 +1,8 @@
 /******************************************************************************
  * sched.h
- * 
+ *
  * Scheduler state interactions
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -34,7 +34,7 @@
  *  long sched_op(int cmd, void *arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == Operation-specific extra argument(s), as described below.
- * 
+ *
  * Versions of Xen prior to 3.0.2 provided only the following legacy version
  * of this hypercall, supporting only the commands yield, block and shutdown:
  *  long sched_op(int cmd, unsigned long arg)

@@ -25,7 +25,7 @@
 
 	.file	"_stack_grow.s"
 
-/* 
+/*
  * void *
  * _stack_grow(void *addr)
  * {
@@ -91,7 +91,7 @@
 	movl	$SIGSEGV, %esi
 	movl	%eax, %edi
 	SYSTRAP_RVAL1(lwp_kill)
-	
+
 	/
 	/ Try one last time to take out the process.
 	/

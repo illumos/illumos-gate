@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Destroy the contents of your credential cache.
  */
@@ -83,7 +83,7 @@ static void usage()
 {
 #define KRB_AVAIL_STRING(x) ((x)?gettext("available"):gettext("not available"))
 
-    fprintf(stderr, gettext("Usage"), ": %s [-5] [-4] [-q] [-c cache_name]\n", 
+    fprintf(stderr, gettext("Usage"), ": %s [-5] [-4] [-q] [-c cache_name]\n",
             progname);
     fprintf(stderr, "\t-5 Kerberos 5 (%s)\n", KRB_AVAIL_STRING(got_k5));
     fprintf(stderr, "\t-4 Kerberos 4 (%s)\n", KRB_AVAIL_STRING(got_k4));
@@ -126,14 +126,14 @@ main(argc, argv)
     int use_k4 = 0;
 
     progname = GET_PROGNAME(argv[0]);
-    /* set locale and domain for internationalization */ 
-    (void) setlocale(LC_ALL, ""); 
+    /* set locale and domain for internationalization */
+    (void) setlocale(LC_ALL, "");
 
-#if !defined(TEXT_DOMAIN) 
+#if !defined(TEXT_DOMAIN)
 #define TEXT_DOMAIN "SYS_TEST"
 #endif /* !TEXT_DOMAIN */
 
-    (void) textdomain(TEXT_DOMAIN); 
+    (void) textdomain(TEXT_DOMAIN);
 
     got_k5 = 1;
 #ifdef KRB5_KRB4_COMPAT
@@ -144,7 +144,7 @@ main(argc, argv)
 	switch (c) {
 	case 'q':
 	    quiet = 1;
-	    break;	
+	    break;
 	case 'c':
 	    if (cache_name) {
 		fprintf(stderr, gettext("Only one -c option allowed\n"));
@@ -182,7 +182,7 @@ main(argc, argv)
 
     if (optind != argc)
 	errflg++;
-    
+
     if (errflg) {
 	usage();
     }
@@ -205,25 +205,25 @@ main(argc, argv)
 	    exit(1);
 	}
 
-    	/* 
+    	/*
      	 *  Solaris Kerberos
-     	 *  Let us destroy the kernel cache first  
-     	 */ 
-    	desarg.version = 1; 
-    	desarg.uid_1 = geteuid(); 
-    	desarg.rpcsec_flavor_1 = RPCSEC_GSS; 
-    	desarg.flavor_data_1 = (void *) krb5_mech_type; 
-    	code = krpc_sys(KRPC_REVAUTH, (void *)&desarg); 
+     	 *  Let us destroy the kernel cache first
+     	 */
+    	desarg.version = 1;
+    	desarg.uid_1 = geteuid();
+    	desarg.rpcsec_flavor_1 = RPCSEC_GSS;
+    	desarg.flavor_data_1 = (void *) krb5_mech_type;
+    	code = krpc_sys(KRPC_REVAUTH, (void *)&desarg);
 
     	if (code != 0) {
-        	fprintf(stderr, 
-            		gettext("%s: kernel creds cache error %d \n"), 
-            		progname, code); 
+        	fprintf(stderr,
+            		gettext("%s: kernel creds cache error %d \n"),
+            		progname, code);
     	}
 
-    	if (cache == NULL) { 
+    	if (cache == NULL) {
         	if (code = krb5_cc_default(kcontext, &cache)) {
-            	com_err(progname, code, 
+            	com_err(progname, code,
                 	gettext("while getting default ccache"));
             	exit(1);
         	}
@@ -246,18 +246,18 @@ main(argc, argv)
 	    }
 	}
 
-	/* 
+	/*
 	 * Solaris Kerberos
          * Get client name for kwarn_del_warning.
 	 */
-        code = krb5_cc_get_principal(kcontext, cache, &me); 
-        if (code != 0) 
-            fprintf(stderr, gettext 
-                ("%s: Could not obtain principal name from cache\n"), progname); 
-        else 
-            if ((code = krb5_unparse_name(kcontext, me, &client_name))) 
-                fprintf(stderr, gettext 
-                    ("%s: Could not unparse principal name found in cache\n"), progname); 
+        code = krb5_cc_get_principal(kcontext, cache, &me);
+        if (code != 0)
+            fprintf(stderr, gettext
+                ("%s: Could not obtain principal name from cache\n"), progname);
+        else
+            if ((code = krb5_unparse_name(kcontext, me, &client_name)))
+                fprintf(stderr, gettext
+                    ("%s: Could not unparse principal name found in cache\n"), progname);
 
 	code = krb5_cc_destroy (kcontext, cache);
 	if (code != 0) {
@@ -266,7 +266,7 @@ main(argc, argv)
 		if (quiet)
 		    fprintf(stderr, gettext("Ticket cache NOT destroyed!\n"));
 		else {
-		    fprintf(stderr, gettext("Ticket cache %cNOT%c destroyed!\n"), 
+		    fprintf(stderr, gettext("Ticket cache %cNOT%c destroyed!\n"),
 			    BELL_CHAR, BELL_CHAR);
 		}
 		errflg = 1;
@@ -293,8 +293,8 @@ main(argc, argv)
     if (!errflg && client_name)
         kwarn_del_warning(client_name);
     else
-        fprintf(stderr, gettext 
-            ("%s: TGT expire warning NOT deleted\n"), progname); 
+        fprintf(stderr, gettext
+            ("%s: TGT expire warning NOT deleted\n"), progname);
 
     return errflg;
 }

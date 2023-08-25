@@ -15,7 +15,7 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*! \file 
+/*! \file
  * \brief private interfaces for eventlib
  * \author vix 09sep95 [initial]
  *
@@ -177,36 +177,36 @@ typedef struct evEvent_p {
 } evEvent_p;
 
 #ifdef USE_POLL
-typedef struct { 
-	void		*ctx;	/* pointer to the evContext_p   */ 
-	uint32_t	type;	/* READ, WRITE, EXCEPT, nonblk  */ 
-	uint32_t	result;	/* 1 => revents, 0 => events    */ 
-} __evEmulMask; 
+typedef struct {
+	void		*ctx;	/* pointer to the evContext_p   */
+	uint32_t	type;	/* READ, WRITE, EXCEPT, nonblk  */
+	uint32_t	result;	/* 1 => revents, 0 => events    */
+} __evEmulMask;
 
 #define emulMaskInit(ctx, field, ev, lastnext) \
 	ctx->field.ctx = ctx; \
 	ctx->field.type = ev; \
-	ctx->field.result = lastnext; 
-  
-extern short	*__fd_eventfield(int fd, __evEmulMask *maskp); 
-extern short	__poll_event(__evEmulMask *maskp); 
-extern void		__fd_clr(int fd, __evEmulMask *maskp); 
-extern void		__fd_set(int fd, __evEmulMask *maskp); 
+	ctx->field.result = lastnext;
 
-#undef  FD_ZERO 
-#define FD_ZERO(maskp) 
-  
-#undef  FD_SET 
+extern short	*__fd_eventfield(int fd, __evEmulMask *maskp);
+extern short	__poll_event(__evEmulMask *maskp);
+extern void		__fd_clr(int fd, __evEmulMask *maskp);
+extern void		__fd_set(int fd, __evEmulMask *maskp);
+
+#undef  FD_ZERO
+#define FD_ZERO(maskp)
+
+#undef  FD_SET
 #define FD_SET(fd, maskp) \
-	__fd_set(fd, maskp) 
+	__fd_set(fd, maskp)
 
-#undef  FD_CLR 
+#undef  FD_CLR
 #define FD_CLR(fd, maskp) \
-	__fd_clr(fd, maskp) 
+	__fd_clr(fd, maskp)
 
-#undef  FD_ISSET 
+#undef  FD_ISSET
 #define FD_ISSET(fd, maskp) \
-	((*__fd_eventfield(fd, maskp) & __poll_event(maskp)) != 0) 
+	((*__fd_eventfield(fd, maskp) & __poll_event(maskp)) != 0)
 
 #endif /* USE_POLL */
 
@@ -229,17 +229,17 @@ typedef struct {
 	int		fdMax, fdCount, highestFD;
 	evFile		*fdTable[FD_SETSIZE];
 #else
-	struct pollfd	*pollfds;	/* Allocated as needed  */ 
-	evFile		**fdTable;	/* Ditto                */ 
-	int		maxnfds;	/* # elements in above  */ 
-	int		firstfd;	/* First active fd      */ 
-	int		fdMax;		/* Last active fd       */ 
-	int		fdCount;	/* # fd:s with I/O      */ 
-	int		highestFD;	/* max fd allowed by OS */ 
-	__evEmulMask	rdLast, rdNext; 
-	__evEmulMask	wrLast, wrNext; 
-	__evEmulMask	exLast, exNext; 
-	__evEmulMask	nonblockBefore; 
+	struct pollfd	*pollfds;	/* Allocated as needed  */
+	evFile		**fdTable;	/* Ditto                */
+	int		maxnfds;	/* # elements in above  */
+	int		firstfd;	/* First active fd      */
+	int		fdMax;		/* Last active fd       */
+	int		fdCount;	/* # fd:s with I/O      */
+	int		highestFD;	/* max fd allowed by OS */
+	__evEmulMask	rdLast, rdNext;
+	__evEmulMask	wrLast, wrNext;
+	__evEmulMask	exLast, exNext;
+	__evEmulMask	nonblockBefore;
 #endif /* USE_POLL */
 #ifdef EVENTLIB_TIME_CHECKS
 	struct timespec	lastSelectTime;

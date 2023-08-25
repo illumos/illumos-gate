@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_get_credentials()
  */
@@ -91,7 +91,7 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
     mcreds->authdata = in_creds->authdata;
     mcreds->server = in_creds->server;
     mcreds->client = in_creds->client;
-    
+
     *fields = KRB5_TC_MATCH_TIMES /*XXX |KRB5_TC_MATCH_SKEY_TYPE */
 	| KRB5_TC_MATCH_AUTHDATA
 	| KRB5_TC_SUPPORTED_KTYPES;
@@ -204,8 +204,8 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 	retval = KRB5_CC_NOT_KTYPE;
 
     if (!retval) {
-        /* the purpose of the krb5_get_credentials call is to 
-         * obtain a set of credentials for the caller.  the 
+        /* the purpose of the krb5_get_credentials call is to
+         * obtain a set of credentials for the caller.  the
          * krb5_cc_store_cred() call is to optimize performance
          * for future calls.  Ignore any errors, since the credentials
          * are still valid even if we fail to store them in the cache.
@@ -222,7 +222,7 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 #define INT_GC_RENEW 2
 
 /*ARGSUSED*/
-static krb5_error_code 
+static krb5_error_code
 krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 				    krb5_ccache ccache, krb5_creds *in_creds,
 				    krb5_creds **out_creds, int which)
@@ -233,11 +233,11 @@ krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 
     switch(which) {
     case INT_GC_VALIDATE:
-	    retval = krb5_get_cred_from_kdc_validate(context, ccache, 
+	    retval = krb5_get_cred_from_kdc_validate(context, ccache,
 					     in_creds, out_creds, &tgts);
 	    break;
     case INT_GC_RENEW:
-	    retval = krb5_get_cred_from_kdc_renew(context, ccache, 
+	    retval = krb5_get_cred_from_kdc_renew(context, ccache,
 					     in_creds, out_creds, &tgts);
 	    break;
     default:
@@ -250,7 +250,7 @@ krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 
     retval = krb5_cc_get_principal(context, ccache, &tmp);
     if (retval) return retval;
-    
+
     retval = krb5_cc_initialize(context, ccache, tmp);
     /* Solaris Kerberos */
     if (retval) {
@@ -268,8 +268,8 @@ krb5_get_credentials_validate(krb5_context context, krb5_flags options,
 			      krb5_ccache ccache, krb5_creds *in_creds,
 			      krb5_creds **out_creds)
 {
-    return(krb5_get_credentials_val_renew_core(context, options, ccache, 
-					       in_creds, out_creds, 
+    return(krb5_get_credentials_val_renew_core(context, options, ccache,
+					       in_creds, out_creds,
 					       INT_GC_VALIDATE));
 }
 
@@ -279,8 +279,8 @@ krb5_get_credentials_renew(krb5_context context, krb5_flags options,
 			   krb5_creds **out_creds)
 {
 
-    return(krb5_get_credentials_val_renew_core(context, options, ccache, 
-					       in_creds, out_creds, 
+    return(krb5_get_credentials_val_renew_core(context, options, ccache,
+					       in_creds, out_creds,
 					       INT_GC_RENEW));
 }
 
@@ -335,12 +335,12 @@ krb5_validate_or_renew_creds(krb5_context context, krb5_creds *creds,
     }
 
     if (validate)
-	ret = krb5_get_cred_from_kdc_validate(context, ccache, 
+	ret = krb5_get_cred_from_kdc_validate(context, ccache,
 					      &in_creds, &out_creds, &tgts);
     else
-	ret = krb5_get_cred_from_kdc_renew(context, ccache, 
+	ret = krb5_get_cred_from_kdc_renew(context, ccache,
 					   &in_creds, &out_creds, &tgts);
-   
+
     /* ick.  copy the struct contents, free the container */
     if (out_creds) {
 	*creds = *out_creds;

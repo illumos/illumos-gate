@@ -292,7 +292,7 @@ getipnodebyname(const char *name, int af, int flags, int *error_num) {
 		v6 = inet_pton(AF_INET6, name, &in6);
 
 	/* Impossible combination? */
-	 
+
 	if ((af == AF_INET6 && (flags & AI_V4MAPPED) == 0 && v4 == 1) ||
 	    (af == AF_INET && v6 == 1) ||
 	    (have_v4 == 0 && v4 == 1) ||
@@ -343,7 +343,7 @@ getipnodebyname(const char *name, int af, int flags, int *error_num) {
 		if (he1 == NULL && he2 == NULL) {
 			*error_num = net_data->res->res_h_errno;
 			return (NULL);
-		} 
+		}
 	} else
 		*error_num = tmp_err;
 
@@ -371,7 +371,7 @@ getipnodebyaddr(const void *src, size_t len, int af, int *error_num) {
 		*error_num = NO_RECOVERY;
 		return (NULL);
 	}
-	
+
 	switch (af) {
 	case AF_INET:
 		if (len != (size_t)INADDRSZ) {
@@ -477,7 +477,7 @@ freehostent(struct hostent *he) {
  */
 
 #if defined(SIOCGLIFCONF) && defined(SIOCGLIFADDR) && \
-    !defined(IRIX_EMUL_IOCTL_SIOCGIFCONF) 
+    !defined(IRIX_EMUL_IOCTL_SIOCGIFCONF)
 
 #ifdef __hpux
 #define lifc_len iflc_len
@@ -488,7 +488,7 @@ freehostent(struct hostent *he) {
 #define SETFAMILYFLAGS
 #define LIFCONF lifconf
 #endif
- 
+
 #ifdef __hpux
 #define lifr_addr iflr_addr
 #define lifr_name iflr_name
@@ -532,7 +532,7 @@ scan_interfaces6(int *have_v4, int *have_v6) {
 			/*
 			 * Some OS's just return what will fit rather
 			 * than set EINVAL if the buffer is too small
-			 * to fit all the interfaces in.  If 
+			 * to fit all the interfaces in.  If
 			 * lifc.lifc_len is too near to the end of the
 			 * buffer we will grow it just in case and
 			 * retry.
@@ -592,7 +592,7 @@ scan_interfaces6(int *have_v4, int *have_v6) {
 				if ((lifreq.lifr_flags & IFF_UP) == 0)
 					break;
 				*have_v4 = 1;
-			} 
+			}
 			break;
 		case AF_INET6:
 			if (*have_v6 == 0) {
@@ -640,7 +640,7 @@ scan_linux6(int *have_v6) {
 	char address[33];
 	char name[IF_NAMESIZE+1];
 	int ifindex, prefix, flag3, flag4;
-	
+
 	proc = fopen("/proc/net/if_inet6", "r");
 	if (proc == NULL)
 		return;
@@ -671,7 +671,7 @@ scan_interfaces(int *have_v4, int *have_v6) {
 	*have_v4 = *have_v6 = 0;
 
 #if defined(SIOCGLIFCONF) && defined(SIOCGLIFADDR) && \
-    !defined(IRIX_EMUL_IOCTL_SIOCGIFCONF) 
+    !defined(IRIX_EMUL_IOCTL_SIOCGIFCONF)
 	/*
 	 * Try to scan the interfaces using IPv6 ioctls().
 	 */
@@ -710,7 +710,7 @@ scan_interfaces(int *have_v4, int *have_v6) {
 			/*
 			 * Some OS's just return what will fit rather
 			 * than set EINVAL if the buffer is too small
-			 * to fit all the interfaces in.  If 
+			 * to fit all the interfaces in.  If
 			 * ifc.ifc_len is too near to the end of the
 			 * buffer we will grow it just in case and
 			 * retry.
@@ -773,7 +773,7 @@ scan_interfaces(int *have_v4, int *have_v6) {
 				if ((u.ifreq.ifr_flags & IFF_UP) == 0)
 					break;
 				*have_v4 = 1;
-			} 
+			}
 			break;
 		case AF_INET6:
 			if (*have_v6 == 0) {
@@ -978,10 +978,10 @@ init() {
 				RES_SET_H_ERRNO(net_data->res, NETDB_INTERNAL);
 			return (NULL);
 		}
-	
+
 		(*net_data->ho->res_set)(net_data->ho, net_data->res, NULL);
 	}
-	
+
 	return (net_data);
 }
 

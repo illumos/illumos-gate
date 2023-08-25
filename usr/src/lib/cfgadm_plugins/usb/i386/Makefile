@@ -29,4 +29,4 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS) $(ROOTLINKS) 
+install: all $(ROOTLIBS) $(ROOTLINKS)

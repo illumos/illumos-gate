@@ -37,7 +37,7 @@ include ../Makefile.lw8
 #
 FILEMODE	 = 644
 
-HDRS=	
+HDRS=
 
 ROOTHDRS=		$(HDRS:%=$(USR_LW8_ISYS_DIR)/%)
 

@@ -50,7 +50,7 @@ clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 lint	:=	TARGET= lint
 
-all:	$(CONF) 
+all:	$(CONF)
 
 install:	$(ROOTLIBDIR) $(ROOTCONF)
 

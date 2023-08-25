@@ -1,5 +1,5 @@
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -20,7 +20,7 @@
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
  * $Header$
- * 
+ *
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
@@ -39,7 +39,7 @@ kadm5_free_principal_ent(void *server_handle,
     CHECK_HANDLE(server_handle);
 
     if(val) {
-	if(val->principal) 
+	if(val->principal)
 	    krb5_free_principal(handle->context, val->principal);
 	if(val->mod_name)
 	    krb5_free_principal(handle->context, val->mod_name);

@@ -55,7 +55,7 @@ typedef struct _cpu_reg_t
 
 
 /*******************************************************************************
- * Firmware info. 
+ * Firmware info.
  ******************************************************************************/
 
 typedef struct _fw_info_t
@@ -263,7 +263,7 @@ init_5706_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, rxp.rxp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, rxp.rxp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = RXP_b06FwReleaseMajor;
         fw.ver_minor = RXP_b06FwReleaseMinor;
         fw.ver_fix = RXP_b06FwReleaseFix;
@@ -311,7 +311,7 @@ init_5706_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, txp.txp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, txp.txp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = TXP_b06FwReleaseMajor;
         fw.ver_minor = TXP_b06FwReleaseMinor;
         fw.ver_fix = TXP_b06FwReleaseFix;
@@ -359,7 +359,7 @@ init_5706_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, tpat.tpat_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, tpat.tpat_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = TPAT_b06FwReleaseMajor;
         fw.ver_minor = TPAT_b06FwReleaseMinor;
         fw.ver_fix = TPAT_b06FwReleaseFix;
@@ -407,7 +407,7 @@ init_5706_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, com.com_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, com.com_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = COM_b06FwReleaseMajor;
         fw.ver_minor = COM_b06FwReleaseMinor;
         fw.ver_fix = COM_b06FwReleaseFix;
@@ -455,7 +455,7 @@ init_5706_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, cp.cp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, cp.cp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = CP_b06FwReleaseMajor;
         fw.ver_minor = CP_b06FwReleaseMinor;
         fw.ver_fix = CP_b06FwReleaseFix;
@@ -521,7 +521,7 @@ init_5709_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, rxp.rxp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, rxp.rxp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = RXP_b09FwReleaseMajor;
         fw.ver_minor = RXP_b09FwReleaseMinor;
         fw.ver_fix = RXP_b09FwReleaseFix;
@@ -569,7 +569,7 @@ init_5709_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, txp.txp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, txp.txp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = TXP_b09FwReleaseMajor;
         fw.ver_minor = TXP_b09FwReleaseMinor;
         fw.ver_fix = TXP_b09FwReleaseFix;
@@ -617,7 +617,7 @@ init_5709_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, tpat.tpat_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, tpat.tpat_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = TPAT_b09FwReleaseMajor;
         fw.ver_minor = TPAT_b09FwReleaseMinor;
         fw.ver_fix = TPAT_b09FwReleaseFix;
@@ -665,7 +665,7 @@ init_5709_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, com.com_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, com.com_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = COM_b09FwReleaseMajor;
         fw.ver_minor = COM_b09FwReleaseMinor;
         fw.ver_fix = COM_b09FwReleaseFix;
@@ -713,7 +713,7 @@ init_5709_cpus(
         cpu_reg.bp = OFFSETOF(reg_space_t, cp.cp_cpu_hw_breakpoint);
         cpu_reg.spad_base = OFFSETOF(reg_space_t, cp.cp_scratch[0]);
         cpu_reg.mips_view_base = 0x8000000;
-        
+
         fw.ver_major = CP_b09FwReleaseMajor;
         fw.ver_minor = CP_b09FwReleaseMinor;
         fw.ver_fix = CP_b09FwReleaseFix;
@@ -769,7 +769,7 @@ lm_init_cpus(
     {
         if(cpu_mask & CPU_RV2P_1)
         {
-            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT 
+            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT
             // This parameter dictates how long to wait before dropping L2 packet
             // due to insufficient posted buffers
             // 0 mean no waiting before dropping, 0xFFFF means maximum wait
@@ -778,7 +778,7 @@ lm_init_cpus(
                 RV2P_PROC1_CHG_POST_WAIT_TIMEOUT(pdev->params.fw_flow_control_wait);
             }
             else
-            {   
+            {
                 // No waiting if fw_flow_control is not enabled
                 RV2P_PROC1_CHG_POST_WAIT_TIMEOUT(0);
             }
@@ -796,7 +796,7 @@ lm_init_cpus(
     {
         if(cpu_mask & CPU_RV2P_1)
         {
-            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT 
+            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT
             // This parameter dictates how long to wait before dropping L2 packet
             // due to insufficient posted buffers
             // 0 mean no waiting before dropping, 0xFFFF means maximum wait
@@ -805,7 +805,7 @@ lm_init_cpus(
                 XI90_RV2P_PROC1_CHG_POST_WAIT_TIMEOUT(pdev->params.fw_flow_control_wait);
             }
             else
-            {   
+            {
                 // No waiting if fw_flow_control is not enabled
                 XI90_RV2P_PROC1_CHG_POST_WAIT_TIMEOUT(0);
             }
@@ -831,7 +831,7 @@ lm_init_cpus(
     {
         if(cpu_mask & CPU_RV2P_1)
         {
-            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT 
+            // Calling this macro prior to loading will change value of POST_WAIT_TIMEOUT
             // This parameter dictates how long to wait before dropping L2 packet
             // due to insufficient posted buffers
             // 0 mean no waiting before dropping, 0xFFFF means maximum wait

@@ -42,7 +42,7 @@ COMMONOBJS =	$(COMMONDIR)/glob.o	\
 		$(COMMONDIR)/misc.o	\
 		$(COMMONDIR)/tempnam.o
 
-TXTS =		README 
+TXTS =		README
 
 ENCODING =	2
 CPPFLAGS =	-DDFLTENCODING=$(ENCODING)	\
@@ -55,7 +55,7 @@ POFILE =	lp_filter_postscript_download.po
 
 all:		$(TXTS) $(PROG)
 
-install:	all $(ROOTLIBLPPOSTPROG)	
+install:	all $(ROOTLIBLPPOSTPROG)
 
 $(PROG):	$(OBJS) $(COMMONOBJS)
 		$(LINK.c) -o $@ $(OBJS) $(COMMONOBJS) $(LDLIBS)

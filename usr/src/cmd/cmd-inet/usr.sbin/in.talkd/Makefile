@@ -42,7 +42,7 @@ LDLIBS +=	-lsocket -lnsl
 
 .PARALLEL: $(OBJS)
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

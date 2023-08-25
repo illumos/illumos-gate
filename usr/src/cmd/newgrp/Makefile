@@ -32,7 +32,7 @@ XGETFLAGS += -a -x newgrp.xcl
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

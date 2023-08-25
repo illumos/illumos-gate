@@ -12,7 +12,7 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-  
+
  /* t4.c: read table specification */
 # include "t..c"
 int oncol;
@@ -237,12 +237,12 @@ while (c=get1char())
 			}
 
 			snp = cll [icol-1];
-		/* Dale Smith didn't like this check 
+		/* Dale Smith didn't like this check
 		 * possible to have two text blocks
 		 *  of different widths now ....
 			if (*snp)
 				{
-				fprintf(tabout, 
+				fprintf(tabout,
 				gettext("Ignored second width specification"));
 				continue;
 				}
@@ -275,7 +275,7 @@ while (c=get1char())
 			evenflg=1;
 			continue;
 		case '0': case '1': case '2': case '3': case '4':
-		case '5': case '6': case '7': case '8': case '9': 
+		case '5': case '6': case '7': case '8': case '9':
 			sn[0] = c;
 			snp=sn+1;
 			while (digit(*snp++ = c = get1char()))

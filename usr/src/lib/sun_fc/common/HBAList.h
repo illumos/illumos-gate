@@ -66,7 +66,7 @@ public:
 protected:
     HBAList(); // Singleton
 
-    // Prevent ambiguity 
+    // Prevent ambiguity
     using Lockable::lock;
     using Lockable::unlock;
 

@@ -148,7 +148,7 @@ inet_cidr_ntop_ipv4(const u_char *src, int bits, char *dst, size_t size) {
 	errno = EMSGSIZE;
 	return (NULL);
 }
- 
+
 static char *
 inet_cidr_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) {
 	/*
@@ -241,7 +241,7 @@ inet_cidr_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) {
 	}
 
 	/* Was it a trailing run of 0x00's? */
-	if (best.base != -1 && (best.base + best.len) == 
+	if (best.base != -1 && (best.base + best.len) ==
 	    (NS_IN6ADDRSZ / NS_INT16SZ))
 		*tp++ = ':';
 	*tp = '\0';

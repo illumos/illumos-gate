@@ -603,7 +603,7 @@ page_clear_transient_ue(page_t *pp)
 	uint64_t	pa;
 	uint32_t	pa_hi, pa_lo;
 	on_trap_data_t	otd;
-	int		errors; 
+	int		errors;
 	int		i;
 
 	ASSERT(PAGE_EXCL(pp));

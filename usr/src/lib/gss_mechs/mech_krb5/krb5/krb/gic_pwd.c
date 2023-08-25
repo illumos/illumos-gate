@@ -238,14 +238,14 @@ __krb5_get_init_creds_password(
 	  krb5_free_kdc_rep( context, as_reply);
 	  as_reply = NULL;
       }
-      
+
       err_msg_1 = krb5_get_error_message(context, ret);
 
       ret2 = krb5_get_init_creds(context, creds, client, prompter, data,
 				 start_time, in_tkt_service, opte,
 				 krb5_get_as_key_password, (void *) &pw0,
 				 &use_master, &as_reply);
-      
+
       if (ret2 == 0) {
 	 ret = 0;
 	 goto cleanup;
@@ -559,7 +559,7 @@ krb5_error_code krb5int_populate_gic_opt (
  Attempts to get an initial ticket for creds->client to use server
  creds->server, (realm is taken from creds->client), with options
  options, and using creds->times.starttime, creds->times.endtime,
- creds->times.renew_till as from, till, and rtime.  
+ creds->times.renew_till as from, till, and rtime.
  creds->times.renew_till is ignored unless the RENEWABLE option is requested.
 
  If addrs is non-NULL, it is used for the addresses requested.  If it is
@@ -614,7 +614,7 @@ krb5_get_in_tkt_with_password(krb5_context context, krb5_flags options,
     server_princ = creds->server;
     client_princ = creds->client;
         retval = krb5_get_init_creds (context,
-					   creds, creds->client,  
+					   creds, creds->client,
 					   krb5_prompter_posix,  NULL,
 					   0, server, opte,
 				      krb5_get_as_key_password, &pw0,

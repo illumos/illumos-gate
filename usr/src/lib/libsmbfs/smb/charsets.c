@@ -123,71 +123,71 @@ get_windows_encoding_equivalent( void )
 			else /* US region */
 				encoding = kCFStringEncodingDOSLatinUS;
 			break;
-			
+
 		case	kCFStringEncodingMacJapanese:
 			encoding = kCFStringEncodingDOSJapanese;
 			break;
-		
-		case	kCFStringEncodingMacChineseTrad:		
+
+		case	kCFStringEncodingMacChineseTrad:
 			encoding = kCFStringEncodingDOSChineseTrad;
 			break;
-		
+
 		case	kCFStringEncodingMacKorean:
 			encoding = kCFStringEncodingDOSKorean;
 			break;
-		
-		case	kCFStringEncodingMacArabic:				
+
+		case	kCFStringEncodingMacArabic:
 			encoding = kCFStringEncodingDOSArabic;
 			break;
-		
-		case	kCFStringEncodingMacHebrew:	
+
+		case	kCFStringEncodingMacHebrew:
 			encoding = kCFStringEncodingDOSHebrew;
 			break;
-		
+
 		case	kCFStringEncodingMacGreek:
 			encoding = kCFStringEncodingDOSGreek;
 			break;
-		
-		case	kCFStringEncodingMacCyrillic:	
+
+		case	kCFStringEncodingMacCyrillic:
 			encoding = kCFStringEncodingDOSCyrillic;
 			break;
-		
+
 		case	kCFStringEncodingMacThai:
 			encoding = kCFStringEncodingDOSThai;
 			break;
-		
+
 		case	kCFStringEncodingMacChineseSimp:
 			encoding = kCFStringEncodingDOSChineseSimplif;
 			break;
-		
+
 		case	kCFStringEncodingMacCentralEurRoman:
 			encoding = kCFStringEncodingDOSLatin2;
 			break;
-		
+
 		case	kCFStringEncodingMacTurkish:
 			encoding = kCFStringEncodingDOSTurkish;
 			break;
-		
+
 		case	kCFStringEncodingMacCroatian:
 			encoding = kCFStringEncodingDOSLatin2;
 			break;
-		
+
 		case	kCFStringEncodingMacIcelandic:
 			encoding = kCFStringEncodingDOSIcelandic;
 			break;
-		
+
 		case	kCFStringEncodingMacRomanian:
 			encoding = kCFStringEncodingDOSLatin2;
 			break;
-		
+
 		case	kCFStringEncodingMacFarsi:
 			encoding = kCFStringEncodingDOSArabic;
 			break;
-		
+
 		case	kCFStringEncodingMacUkrainian:
 			encoding = kCFStringEncodingDOSCyrillic;
 			break;
-			
+
 		default:
 			encoding = kCFStringEncodingDOSLatin1;
 			break;
@@ -209,14 +209,14 @@ convert_wincs_to_utf8(const char *windows_string)
 	CFIndex maxlen;
 	char *result;
 
-	s = CFStringCreateWithCString(NULL, windows_string, 
+	s = CFStringCreateWithCString(NULL, windows_string,
 		get_windows_encoding_equivalent());
 	if (s == NULL) {
 		smb_error("CFStringCreateWithCString for Windows code page failed on \"%s\" ", -1,
 		    windows_string);
 
 		/* kCFStringEncodingMacRoman should always succeed */
-		s = CFStringCreateWithCString(NULL, windows_string, 
+		s = CFStringCreateWithCString(NULL, windows_string,
 		    kCFStringEncodingMacRoman);
 		if (s == NULL) {
 			smb_error("CFStringCreateWithCString for Windows code page failed on \"%s\" with kCFStringEncodingMacRoman - skipping",

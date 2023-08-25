@@ -93,19 +93,19 @@ runner_device_finalized (HalDevice *device)
 }
 
 
-static DBusHandlerResult 
-runner_server_message_handler (DBusConnection *connection, 
-			       DBusMessage *message, 
+static DBusHandlerResult
+runner_server_message_handler (DBusConnection *connection,
+			       DBusMessage *message,
 			       void *user_data)
 {
 
-	/*HAL_INFO (("runner_server_message_handler: destination=%s obj_path=%s interface=%s method=%s", 
-		   dbus_message_get_destination (message), 
-		   dbus_message_get_path (message), 
+	/*HAL_INFO (("runner_server_message_handler: destination=%s obj_path=%s interface=%s method=%s",
+		   dbus_message_get_destination (message),
+		   dbus_message_get_path (message),
 		   dbus_message_get_interface (message),
 		   dbus_message_get_member (message)));*/
-	if (dbus_message_is_signal (message, 
-				    "org.freedesktop.HalRunner", 
+	if (dbus_message_is_signal (message,
+				    "org.freedesktop.HalRunner",
 				    "StartedProcessExited")) {
 		dbus_uint64_t dpid;
 		DBusError error;
@@ -137,22 +137,22 @@ runner_server_unregister_handler (DBusConnection *connection, void *user_data)
 }
 
 
-static void 
+static void
 handle_connection(DBusServer *server,
                   DBusConnection *new_connection,
                   void *data)
 {
 
 	if (runner_connection == NULL) {
-		DBusObjectPathVTable vtable = { &runner_server_unregister_handler, 
-						&runner_server_message_handler, 
+		DBusObjectPathVTable vtable = { &runner_server_unregister_handler,
+						&runner_server_message_handler,
 						NULL, NULL, NULL, NULL};
-		
+
 		runner_connection = new_connection;
 		dbus_connection_ref (new_connection);
 		dbus_connection_setup_with_g_main (new_connection, NULL);
 
-		dbus_connection_register_fallback (new_connection, 
+		dbus_connection_register_fallback (new_connection,
 						   "/org/freedesktop",
 						   &vtable,
 						   NULL);
@@ -190,7 +190,7 @@ hald_runner_start_runner(void)
   }
 
   dbus_server_setup_with_g_main(server, NULL);
-  dbus_server_set_new_connection_function(server, handle_connection, 
+  dbus_server_set_new_connection_function(server, handle_connection,
                                           NULL, NULL);
 
 
@@ -206,9 +206,9 @@ hald_runner_start_runner(void)
   }
 
   /*env[2] = "DBUS_VERBOSE=1";*/
-  
-  
-  if (!g_spawn_async(NULL, argv, env, G_SPAWN_DO_NOT_REAP_CHILD|G_SPAWN_SEARCH_PATH, 
+
+
+  if (!g_spawn_async(NULL, argv, env, G_SPAWN_DO_NOT_REAP_CHILD|G_SPAWN_SEARCH_PATH,
         NULL, NULL, &pid, &error)) {
     HAL_ERROR (("Could not spawn runner : '%s'", error->message));
     g_error_free (error);
@@ -233,16 +233,16 @@ error:
 }
 
 static gboolean
-add_property_to_msg (HalDevice *device, HalProperty *property, 
+add_property_to_msg (HalDevice *device, HalProperty *property,
                                      gpointer user_data)
 {
   char *prop_upper, *value;
   char *c;
   gchar *env;
   DBusMessageIter *iter = (DBusMessageIter *)user_data;
-  
+
   prop_upper = g_ascii_strup (hal_property_get_key (property), -1);
- 
+
   /* periods aren't valid in the environment, so replace them with
    * underscores. */
   for (c = prop_upper; *c; c++) {
@@ -317,12 +317,12 @@ add_command(DBusMessageIter *iter, const gchar *command_line) {
   DBusMessageIter array_iter;
 
   if (!g_shell_parse_argv(command_line, &argc, &argv, &err)) {
-    HAL_ERROR (("Error parsing commandline '%s': %s", 
+    HAL_ERROR (("Error parsing commandline '%s': %s",
                  command_line, err->message));
     g_error_free (err);
     return FALSE;
   }
-  if (!dbus_message_iter_open_container(iter, 
+  if (!dbus_message_iter_open_container(iter,
                                    DBUS_TYPE_ARRAY,
                                    DBUS_TYPE_STRING_AS_STRING,
                                    &array_iter))
@@ -345,7 +345,7 @@ add_first_part(DBusMessageIter *iter, HalDevice *device,
   udi = hal_device_get_udi(device);
   dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &udi);
 
-  dbus_message_iter_open_container(iter, 
+  dbus_message_iter_open_container(iter,
                                    DBUS_TYPE_ARRAY,
                                    DBUS_TYPE_STRING_AS_STRING,
                                    &array_iter);
@@ -362,7 +362,7 @@ add_first_part(DBusMessageIter *iter, HalDevice *device,
 
 /* Start a helper, returns true on a successfull start */
 gboolean
-hald_runner_start (HalDevice *device, const gchar *command_line, char **extra_env, 
+hald_runner_start (HalDevice *device, const gchar *command_line, char **extra_env,
 		   HalRunTerminatedCB cb, gpointer data1, gpointer data2)
 {
   DBusMessage *msg, *reply;
@@ -374,19 +374,19 @@ hald_runner_start (HalDevice *device, const gchar *command_line, char **extra_en
                                      "/org/freedesktop/HalRunner",
                                      "org.freedesktop.HalRunner",
                                      "Start");
-  if (msg == NULL) 
+  if (msg == NULL)
     DIE(("No memory"));
   dbus_message_iter_init_append(msg, &iter);
 
-  if (!add_first_part(&iter, device, command_line, extra_env)) 
+  if (!add_first_part(&iter, device, command_line, extra_env))
     goto error;
- 
+
   /* Wait for the reply, should be almost instantanious */
-  reply = 
-    dbus_connection_send_with_reply_and_block(runner_connection, 
+  reply =
+    dbus_connection_send_with_reply_and_block(runner_connection,
                                               msg, -1, &err);
   if (reply) {
-    gboolean ret = 
+    gboolean ret =
       (dbus_message_get_type(reply) == DBUS_MESSAGE_TYPE_METHOD_RETURN);
 
     if (ret) {
@@ -437,12 +437,12 @@ call_notify(DBusPendingCall *pending, void *user_data)
     goto malformed;
 
   if (!dbus_message_iter_init(m, &iter) ||
-       dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_UINT32) 
+       dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_UINT32)
     goto malformed;
   dbus_message_iter_get_basic(&iter, &exitt);
 
-  if (!dbus_message_iter_next(&iter) || 
-        dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INT32) 
+  if (!dbus_message_iter_next(&iter) ||
+        dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_INT32)
     goto malformed;
   dbus_message_iter_get_basic(&iter, &return_code);
 
@@ -453,7 +453,7 @@ call_notify(DBusPendingCall *pending, void *user_data)
     g_array_append_vals(error, &value, 1);
   }
 
-  hb->cb(hb->d, exitt, return_code, 
+  hb->cb(hb->d, exitt, return_code,
       (gchar **)error->data, hb->data1, hb->data2);
 
   g_object_unref (hb->d);
@@ -479,7 +479,7 @@ malformed:
  * stdin */
 void
 hald_runner_run_method(HalDevice *device,
-                           const gchar *command_line, char **extra_env, 
+                           const gchar *command_line, char **extra_env,
                            gchar *input, gboolean error_on_stderr,
                            guint32 timeout,
                            HalRunTerminatedCB  cb,
@@ -492,18 +492,18 @@ hald_runner_run_method(HalDevice *device,
                              "/org/freedesktop/HalRunner",
                              "org.freedesktop.HalRunner",
                              "Run");
-  if (msg == NULL) 
+  if (msg == NULL)
     DIE(("No memory"));
   dbus_message_iter_init_append(msg, &iter);
-  
-  if (!add_first_part(&iter, device, command_line, extra_env)) 
+
+  if (!add_first_part(&iter, device, command_line, extra_env))
     goto error;
 
   dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &input);
   dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &error_on_stderr);
   dbus_message_iter_append_basic(&iter, DBUS_TYPE_UINT32, &timeout);
 
-  if (!dbus_connection_send_with_reply(runner_connection, 
+  if (!dbus_connection_send_with_reply(runner_connection,
                                               msg, &call, INT_MAX))
     DIE (("No memory"));
 
@@ -530,11 +530,11 @@ error:
 
 void
 hald_runner_run(HalDevice *device,
-                    const gchar *command_line, char **extra_env, 
+                    const gchar *command_line, char **extra_env,
                     guint timeout,
                     HalRunTerminatedCB  cb,
                     gpointer data1, gpointer data2) {
-  hald_runner_run_method(device, command_line, extra_env, 
+  hald_runner_run_method(device, command_line, extra_env,
                              "", FALSE, timeout, cb, data1, data2);
 }
 
@@ -548,12 +548,12 @@ hald_runner_kill_device(HalDevice *device) {
   const char *udi;
 
   running_processes_remove_device (device);
-  
+
   msg = dbus_message_new_method_call("org.freedesktop.HalRunner",
                              "/org/freedesktop/HalRunner",
                              "org.freedesktop.HalRunner",
                              "Kill");
-  if (msg == NULL) 
+  if (msg == NULL)
     DIE(("No memory"));
   dbus_message_iter_init_append(msg, &iter);
   udi = hal_device_get_udi(device);
@@ -561,7 +561,7 @@ hald_runner_kill_device(HalDevice *device) {
 
   /* Wait for the reply, should be almost instantanious */
   dbus_error_init(&err);
-  reply = 
+  reply =
     dbus_connection_send_with_reply_and_block(runner_connection, msg, -1, &err);
   if (reply) {
     dbus_message_unref(reply);
@@ -574,7 +574,7 @@ void
 hald_runner_kill_all(HalDevice *device) {
   DBusMessage *msg, *reply;
   DBusError err;
-  
+
   /* hald_runner has not yet started, just return */
   if (runner_connection == NULL) {
     return;
@@ -586,12 +586,12 @@ hald_runner_kill_all(HalDevice *device) {
                              "/org/freedesktop/HalRunner",
                              "org.freedesktop.HalRunner",
                              "KillAll");
-  if (msg == NULL) 
+  if (msg == NULL)
     DIE(("No memory"));
 
   /* Wait for the reply, should be almost instantanious */
   dbus_error_init(&err);
-  reply = 
+  reply =
     dbus_connection_send_with_reply_and_block(runner_connection,
                                               msg, -1, &err);
   if (reply) {

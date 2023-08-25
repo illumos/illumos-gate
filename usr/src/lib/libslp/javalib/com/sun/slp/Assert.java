@@ -51,7 +51,7 @@ class Assert {
     }
 
     // Print message and die. Used within SLPConfig during initialization.
-    static void 
+    static void
 	printMessageAndDie(SLPConfig conf, String msgTag, Object[] params) {
 	ResourceBundle msgs = conf.getMessageBundle(conf.getLocale());
 	String failed = msgs.getString("assert_failed");
@@ -60,14 +60,14 @@ class Assert {
 	(new Exception()).printStackTrace();  // tells where we are at...
 	System.exit(-1);
     }
-  
+
     // Assert that a parameter is nonnull.
     // Throw IllegalArgumentException if so.
 
     static void nonNullParameter(Object obj, String param) {
 	if (obj == null) {
 	    SLPConfig conf = SLPConfig.getSLPConfig();
-	    String msg = 
+	    String msg =
 		conf.formatMessage("null_parameter", new Object[] {param});
 	    throw
 		new IllegalArgumentException(msg);

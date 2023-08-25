@@ -18,7 +18,7 @@
 #ifndef OHASH_H
 #define OHASH_H
 
-/* Open hashing support. 
+/* Open hashing support.
  * Open hashing was chosen because it is much lighter than other hash
  * techniques, and more efficient in most cases.
  */

@@ -51,46 +51,46 @@
 	!
 	!	Register Usage:-
 	!	%g5	PC for fasttrap TL>0 handler
-	!	%g1	arg 1	
-	!	%g2	arg 2	
-	!	%g3	queue base VA 
-	!	%g4 	queue size mask	
+	!	%g1	arg 1
+	!	%g2	arg 2
+	!	%g3	queue base VA
+	!	%g4 	queue size mask
 	!	%g6	head ptr
-	!	%g7	tail ptr	
-	mov	CPU_MONDO_Q_HD, %g3	
-	ldxa	[%g3]ASI_QUEUE, %g6	! %g6 = head ptr 
-	mov	CPU_MONDO_Q_TL, %g4	
-	ldxa	[%g4]ASI_QUEUE, %g7	! %g7 = tail ptr 
+	!	%g7	tail ptr
+	mov	CPU_MONDO_Q_HD, %g3
+	ldxa	[%g3]ASI_QUEUE, %g6	! %g6 = head ptr
+	mov	CPU_MONDO_Q_TL, %g4
+	ldxa	[%g4]ASI_QUEUE, %g7	! %g7 = tail ptr
 	cmp	%g6, %g7
 	be,pn	%xcc, 3f		! head == tail
 	nop
-	
+
 	CPU_ADDR(%g1,%g2)
 	add	%g1, CPU_MCPU, %g2
 	ldx	[%g2 + MCPU_CPU_Q_BASE], %g3	! %g3 = queue base PA
 	ldx	[%g2 + MCPU_CPU_Q_SIZE], %g4	! queue size
-	sub	%g4, 1, %g4		! %g4 = queue size mask	
+	sub	%g4, 1, %g4		! %g4 = queue size mask
 
 	! Load interrupt receive data registers 1 and 2 to fetch
 	! the arguments for the fast trap handler.
 	!
-	! XXX - Since the data words in the interrupt report are not defined yet 
+	! XXX - Since the data words in the interrupt report are not defined yet
 	! we assume that the consective words contain valid data and preserve
-	! sun4u's xcall mondo arguments. 
+	! sun4u's xcall mondo arguments.
 	! Register usage:
 	!	%g5	PC for fasttrap TL>0 handler
-	!	%g1	arg 1	
-	!	%g2	arg 2	
+	!	%g1	arg 1
+	!	%g2	arg 2
 
 	ldxa	[%g3 + %g6]ASI_MEM, %g5	! get PC from q base + head
 	add	%g6, 0x8, %g6		! inc head
 	ldxa	[%g3 + %g6]ASI_MEM, %g1 ! read data word 1
 	add	%g6, 0x8, %g6		! inc head
 	ldxa	[%g3 + %g6]ASI_MEM, %g2	! read data word 2
-	add	%g6, (INTR_REPORT_SIZE - 16) , %g6 ! inc head to next record	
-	and	%g6, %g4, %g6 		! and size mask for wrap around	
-	mov	CPU_MONDO_Q_HD, %g3	
-	stxa	%g6, [%g3]ASI_QUEUE	! store head pointer 
+	add	%g6, (INTR_REPORT_SIZE - 16) , %g6 ! inc head to next record
+	and	%g6, %g4, %g6 		! and size mask for wrap around
+	mov	CPU_MONDO_Q_HD, %g3
+	stxa	%g6, [%g3]ASI_QUEUE	! store head pointer
 	membar	#Sync
 
 #ifdef TRAPTRACE
@@ -122,7 +122,7 @@
 	cmp	%g5, %g4
 	bl,pn	%xcc, 2f		! branch if bad %pc
 	  nop
-	
+
 
 	/*
 	 * If this platform supports shared contexts and we are jumping
@@ -142,9 +142,9 @@ sfmmu_shctx_cpu_mondo_patch:
 	cmp	%g5, %g4
 	bl,pt %xcc, 1f
 	  nop
-	set	OFW_END_ADDR, %g4	
+	set	OFW_END_ADDR, %g4
 	cmp	%g5, %g4
-	bg,pn %xcc, 1f		
+	bg,pn %xcc, 1f
 	  nop
 	mov	MMU_PCONTEXT, %g3
 	ldxa	[%g3]ASI_MMU_CTX, %g4
@@ -195,16 +195,16 @@ sfmmu_shctx_cpu_mondo_patch:
 	!
 	!	Register Usage:-
 	!	%g5	PC for fasttrap TL>0 handler
-	!	%g1	arg 1	
-	!	%g2	arg 2	
-	!	%g3	queue base PA 
-	!	%g4 	queue size mask	
+	!	%g1	arg 1
+	!	%g2	arg 2
+	!	%g3	queue base PA
+	!	%g4 	queue size mask
 	!	%g6	head ptr
-	!	%g7	tail ptr	
-	mov	DEV_MONDO_Q_HD, %g3	
-	ldxa	[%g3]ASI_QUEUE, %g6	! %g6 = head ptr 
-	mov	DEV_MONDO_Q_TL, %g4	
-	ldxa	[%g4]ASI_QUEUE, %g7	! %g7 = tail ptr 
+	!	%g7	tail ptr
+	mov	DEV_MONDO_Q_HD, %g3
+	ldxa	[%g3]ASI_QUEUE, %g6	! %g6 = head ptr
+	mov	DEV_MONDO_Q_TL, %g4
+	ldxa	[%g4]ASI_QUEUE, %g7	! %g7 = tail ptr
 	cmp	%g6, %g7
 	be,pn	%xcc, 0f		! head == tail
 	nop
@@ -215,7 +215,7 @@ sfmmu_shctx_cpu_mondo_patch:
 
 	! Register usage:
 	!	%g5 - inum
-	!	%g1 - cpu struct pointer used below in TRAPTRACE 
+	!	%g1 - cpu struct pointer used below in TRAPTRACE
 	!
 	ldxa	[%g3 + %g6]ASI_MEM, %g5	! get inum from q base + head
 
@@ -251,9 +251,9 @@ sfmmu_shctx_cpu_mondo_patch:
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g4	! queue size - delay slot
 
 	!
-	!	Now move 64 byte payload from mondo queue to buf	
+	!	Now move 64 byte payload from mondo queue to buf
 	!
-	mov	%g6, %g7			! %g7 = head ptr 
+	mov	%g6, %g7			! %g7 = head ptr
 	ldxa	[%g3 + %g7]ASI_MEM, %g4
 	stx	%g4, [%g1 + 0]			! byte 0 - 7
 	add	%g7, 8, %g7
@@ -279,11 +279,11 @@ sfmmu_shctx_cpu_mondo_patch:
 	stx	%g4, [%g1 + 56]			! byte 56 - 63
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g4	! queue size
 
-1:	sub	%g4, 1, %g4		! %g4 = queue size mask	
-	add	%g6, INTR_REPORT_SIZE , %g6 ! inc head to next record	
-	and	%g6, %g4, %g6 		! and mask for wrap around	
-	mov	DEV_MONDO_Q_HD, %g3	
-	stxa	%g6, [%g3]ASI_QUEUE	! increment head offset 
+1:	sub	%g4, 1, %g4		! %g4 = queue size mask
+	add	%g6, INTR_REPORT_SIZE , %g6 ! inc head to next record
+	and	%g6, %g4, %g6 		! and mask for wrap around
+	mov	DEV_MONDO_Q_HD, %g3
+	stxa	%g6, [%g3]ASI_QUEUE	! increment head offset
 	membar	#Sync
 
 #ifdef TRAPTRACE
@@ -300,12 +300,12 @@ sfmmu_shctx_cpu_mondo_patch:
 	! move head to sp
 	ldx	[%g2 + MCPU_DEV_Q_BASE], %g6
 	stna	%g6, [%g4 + TRAP_ENT_SP]%asi	! Device Queue Base PA
-	stna	%g5, [%g4 + TRAP_ENT_TR]%asi	! Inum 
-	mov	DEV_MONDO_Q_HD, %g6	
-	ldxa	[%g6]ASI_QUEUE, %g6		! New head offset 
+	stna	%g5, [%g4 + TRAP_ENT_TR]%asi	! Inum
+	mov	DEV_MONDO_Q_HD, %g6
+	ldxa	[%g6]ASI_QUEUE, %g6		! New head offset
 	stna	%g6, [%g4 + TRAP_ENT_F1]%asi
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g6
-	stna	%g6, [%g4 + TRAP_ENT_F2]%asi	! Q Size	
+	stna	%g6, [%g4 + TRAP_ENT_F2]%asi	! Q Size
 	stna	%g7, [%g4 + TRAP_ENT_F3]%asi	! tail offset
 	stna	%g0, [%g4 + TRAP_ENT_F4]%asi
 	TRACE_NEXT(%g4, %g6, %g3)
@@ -317,7 +317,7 @@ sfmmu_shctx_cpu_mondo_patch:
 	ba,pt	%xcc, setvecint_tl1
 	mov	%g5, %g1		! setvecint_tl1 expects inum in %g1
 
-0:	retry 
+0:	retry
 
 	/* Never Reached */
 	SET_SIZE(dev_mondo)
@@ -341,7 +341,7 @@ cpu_mondo_inval:
  */
 	ENTRY_NP(resumable_error)
 	mov	CPU_RQ_HD, %g4
-	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset 
+	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset
 	mov	CPU_RQ_TL, %g4
 	ldxa	[%g4]ASI_QUEUE, %g3		! %g3 = Q tail offset
 	mov	%g2, %g6			! save head in %g2
@@ -354,7 +354,7 @@ cpu_mondo_inval:
 
 2:	set	CPU_RQ_BASE_OFF, %g4
 	ldx	[%g1 + %g4], %g4		! %g4 = queue base PA
-	add	%g6, %g4, %g4			! %g4 = PA of ER in Q		
+	add	%g6, %g4, %g4			! %g4 = PA of ER in Q
 	set	CPU_RQ_SIZE, %g7
 	add	%g4, %g7, %g7			! %g7=PA of ER in kernel buf
 
@@ -366,7 +366,7 @@ cpu_mondo_inval:
 	/* Now we can move 64 bytes from queue to buf */
 	set	0, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
-	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 0 - 7	
+	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 0 - 7
 	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 8 - 15
@@ -400,13 +400,13 @@ cpu_mondo_inval:
 	nop
 
 	/*
-	 * head equals to tail now, we can update the queue head 
+	 * head equals to tail now, we can update the queue head
 	 * and call sys_trap
 	 */
 	mov	CPU_RQ_HD, %g4
 	stxa	%g6, [%g4]ASI_QUEUE		! update head offset
 	membar	#Sync
-	
+
 	/*
 	 * Call sys_trap at PIL 14 unless we're already at PIL 15. %g2.l is
 	 * head offset(arg2) and %g3 is tail
@@ -424,13 +424,13 @@ cpu_mondo_inval:
 	 * been cleared. We update head to tail and call sys_trap to
 	 * print out an error message
 	 */
-	
+
 1:	mov	CPU_RQ_HD, %g4
 	stxa	%g3, [%g4]ASI_QUEUE		! set head equal to tail
 	membar	#Sync
 
 	/*
-	 * Set %g2 to %g6, which is current head offset. %g2 
+	 * Set %g2 to %g6, which is current head offset. %g2
 	 * is arg2 of the C routine. %g3 is the tail offset,
 	 * which is arg3 of the C routine.
 	 * Call rq_overflow at PIL 14 unless we're already at PIL 15.
@@ -457,7 +457,7 @@ cpu_mondo_inval:
  */
 	ENTRY_NP(nonresumable_error)
 	mov	CPU_NRQ_HD, %g4
-	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset 
+	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset
 	mov	CPU_NRQ_TL, %g4
 	ldxa	[%g4]ASI_QUEUE, %g3		! %g3 = Q tail offset
 
@@ -468,7 +468,7 @@ cpu_mondo_inval:
 	/* force %gl to 1 as sys_trap requires */
 	wrpr	%g0, 1, %gl
 	mov	CPU_NRQ_HD, %g4
-	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset 
+	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset
 	mov	CPU_NRQ_TL, %g4
 	ldxa	[%g4]ASI_QUEUE, %g3		! %g3 = Q tail offset
 	mov	%g2, %g6			! save head in %g2
@@ -477,7 +477,7 @@ cpu_mondo_inval:
 
 2:	set	CPU_NRQ_BASE_OFF, %g4
 	ldxa	[%g1 + %g4]ASI_MEM, %g4		! %g4 = queue base PA
-	add	%g6, %g4, %g4			! %g4 = PA of ER in Q		
+	add	%g6, %g4, %g4			! %g4 = PA of ER in Q
 	set	CPU_NRQ_SIZE, %g7
 	add	%g4, %g7, %g7			! %g7 = PA of ER in kernel buf
 
@@ -489,7 +489,7 @@ cpu_mondo_inval:
 	/* Now we can move 64 bytes from queue to buf */
 	set	0, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
-	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 0 - 7	
+	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 0 - 7
 	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 8 - 15
@@ -523,7 +523,7 @@ cpu_mondo_inval:
 	nop
 
 	/*
-	 * head equals to tail now, we can update the queue head 
+	 * head equals to tail now, we can update the queue head
 	 * and call sys_trap
 	 */
 	mov	CPU_NRQ_HD, %g4
@@ -560,7 +560,7 @@ cpu_mondo_inval:
 	 * - We need to lower TL to 1 to get the trap type and tstate.
 	 *   We don't go back to TL = 2 so no need to save states.
 	 */
-	cmp	%g2, 2	
+	cmp	%g2, 2
 	bne,pt	%xcc, 3f			! if tl != 2
 	nop
 	/* Check to see if the trap pc is in a window spill/fill handling */
@@ -573,7 +573,7 @@ cpu_mondo_inval:
 	set	etrap_table, %g5
 	cmp	%g4, %g5
 	bgeu,pt	%xcc, 3f
-	nop	
+	nop
 	/* Set tl to 1 in order to read tt[1] and tstate[1] */
 	wrpr	%g0, 1, %tl
 	rdpr	%tt, %g4			! %g4 = tt[1]
@@ -593,7 +593,7 @@ cpu_mondo_inval:
 	mov	1, %g4
 	sllx	%g4, ERRH_U_SPILL_FILL_SHIFT, %g4
 	or	%g2, %g4, %g2			! turn on flag in %g2
-	
+
 3:	sub	%g2, 1, %g2			! %g2.l = previous tl
 
 	set	process_nonresumable_error, %g1

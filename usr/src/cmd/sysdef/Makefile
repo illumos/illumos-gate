@@ -22,7 +22,7 @@
 # Use is subject to license terms.
 #
 
-PROG= 		sysdef 
+PROG= 		sysdef
 
 include ../Makefile.cmd
 

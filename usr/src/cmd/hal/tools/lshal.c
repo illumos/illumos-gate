@@ -597,7 +597,7 @@ main (int argc, char *argv[])
 
 		while (1) {
 			int c;
-			
+
 			c = getopt_long (argc, argv, "mlstu:hUV", long_options, NULL);
 
 			if (c == -1) {
@@ -606,12 +606,12 @@ main (int argc, char *argv[])
 					usage (argc, argv);
 					return 1;
 				}
-				
+
 				break;
 			}
 
 			switch (c) {
-			case 'm': 
+			case 'm':
 				do_monitor = TRUE;
 				break;
 
@@ -623,11 +623,11 @@ main (int argc, char *argv[])
 				short_list = TRUE;
 				long_list = FALSE;
 				break;
-			
+
 			case 't':
 				tree_view = TRUE;
 				break;
-				
+
 			case 'u':
 				if (strchr(optarg, '/') != NULL)
 					show_device = strdup(optarg);
@@ -636,14 +636,14 @@ main (int argc, char *argv[])
 					memcpy(show_device, UDI_BASE, strlen(UDI_BASE));
 					memcpy(show_device + strlen(UDI_BASE), optarg, strlen(optarg) + 1);
 				}
-				
+
 				break;
-			
+
 			case 'h':
 			case 'U':
 				usage (argc, argv);
 				return 0;
-			
+
 			case 'V':
 				printf ("lshal version " PACKAGE_VERSION "\n");
 				return 0;
@@ -654,7 +654,7 @@ main (int argc, char *argv[])
 			}
 		}
 	}
-	
+
 	if (do_monitor)
 		loop = g_main_loop_new (NULL, FALSE);
 	else
@@ -707,7 +707,7 @@ main (int argc, char *argv[])
 	if (do_monitor && loop != NULL) {
 		if( long_list || short_list || tree_view )
 			dump_devices ();
-		
+
 		if ( libhal_device_property_watch_all (hal_ctx, &error) == FALSE) {
 			fprintf (stderr, "error: monitoring devicelist - libhal_device_property_watch_all: %s: %s\n",
 				 error.name, error.message);

@@ -35,7 +35,7 @@ ROOTSYMLINK= $(ROOTETCPROG)
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG) $(ROOTSYMLINK)
 

@@ -1,6 +1,6 @@
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -191,7 +191,7 @@ static void get_princs_iter(void *data, krb5_principal princ)
 {
      struct iter_data *id = (struct iter_data *) data;
      char *name;
-     
+
      if (krb5_unparse_name(id->context, princ, &name) != 0)
 	  return;
      get_either_iter(data, name);
@@ -210,7 +210,7 @@ static kadm5_ret_t kadm5_get_either(int princ,
      char *regexp;
      int i, ret;
      kadm5_server_handle_t handle = server_handle;
-     
+
      *count = 0;
      if (exp == NULL)
 	  exp = "*";
@@ -253,7 +253,7 @@ static kadm5_ret_t kadm5_get_either(int princ,
      } else {
 	  ret = krb5_db_iter_policy(handle->context, exp, get_pols_iter, (void *)&data);
      }
-     
+
      free(regexp);
 #ifdef POSIX_REGEXPS
      regfree(&data.preg);

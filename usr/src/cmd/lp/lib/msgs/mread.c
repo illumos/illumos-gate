@@ -92,7 +92,7 @@ int	size;
 	ctl.len = 0;
 	flag = Lp_prio_msg;
 	Lp_prio_msg = 0;	/* clean this up so there are no surprises */
-	
+
 	if (Getmsg(md, &ctl, &dat, &flag) < 0)
 	{
 	    if (errno == EBADF)

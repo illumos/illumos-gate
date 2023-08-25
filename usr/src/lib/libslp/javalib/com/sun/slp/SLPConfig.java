@@ -93,17 +93,17 @@ class SLPConfig {
 		}
 
 		// Parse out equals sign, if any. Note that we trim any
-		//  white space preceding or following data strings.   
-		//  Although the grammar doesn't allow it, users may 
+		//  white space preceding or following data strings.
+		//  Although the grammar doesn't allow it, users may
 		//  enter blanks in their configuration files.
 		// NOTE:  White space is not allowed in the data of
 		//  property tag or values.  If included, according
-		//  to RFC 2614, Section 2.1 these MUST be escaped, 
-		//  ie. space would be represented with '\20'.  
-		//  Therefore, it is *completely* safe to perform 
-		//  these trim()s.  They will catch errors resulting 
-		//  from sloppy data entry in slp.conf files and 
-		//  never corrupt or alter correctly formatted 
+		//  to RFC 2614, Section 2.1 these MUST be escaped,
+		//  ie. space would be represented with '\20'.
+		//  Therefore, it is *completely* safe to perform
+		//  these trim()s.  They will catch errors resulting
+		//  from sloppy data entry in slp.conf files and
+		//  never corrupt or alter correctly formatted
 		//  properties.
 
 		SLPTokenizer tk = new SLPTokenizer(ln, "=");
@@ -512,7 +512,7 @@ class SLPConfig {
 				Defaults.MIN_REFRESH_INTERVAL_ATTR_ID)) {
 		    Vector values = attr.getValues();
 		    boolean errorp = true;
-	
+
 		    if (values != null && values.size() == 1) {
 			Object val = values.elementAt(0);
 
@@ -731,7 +731,7 @@ class SLPConfig {
 		    broadSocket = castSocket;
 		}
 	    } catch (SocketException ex) {
-		throw 	
+		throw
 		    new ServiceLocationException(
 				ServiceLocationException.NETWORK_INIT_FAILED,
 				"socket_creation_failure",
@@ -923,7 +923,7 @@ class SLPConfig {
 		     new Object[] {
 		prop,
 		    sScopes});
-	
+
 
 	}
 
@@ -1223,7 +1223,7 @@ class SLPConfig {
 		// Add local host.
 
 		interfaces.addElement(iaLocal);
-	
+
 		return interfaces;
 
 	    }
@@ -1658,7 +1658,7 @@ class SLPConfig {
 	    try {
 		pattern = bundle.getString("cant_find_resource");
 		msg = MessageFormat.format(pattern, new Object[] {msgTag});
-	
+
 	    } catch (MissingResourceException exx) {
 
 	    }

@@ -77,8 +77,8 @@ struct execsw {
 #ifdef _KERNEL
 #include <sys/cdefs.h>
 
-int exec_map_first_page(struct image_params *);        
-void exec_unmap_first_page(struct image_params *);       
+int exec_map_first_page(struct image_params *);
+void exec_unmap_first_page(struct image_params *);
 
 int exec_register(const struct execsw *);
 int exec_unregister(const struct execsw *);

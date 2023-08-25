@@ -52,7 +52,7 @@
 
 /*
  * Invalidate either the context of a specific victim or any process
- * currently running on this CPU. 
+ * currently running on this CPU.
  *
  * %g1 = sfmmup whose ctx is being invalidated
  *	 when called from sfmmu_wrap_around, %g1 == INVALID_CONTEXT
@@ -109,7 +109,7 @@
 
 	stxa	%g2, [%g3]ASI_MMU_CTX		/* set invalid ctx */
 	membar	#Sync
-	
+
 2:
 	ldxa	[%g7]ASI_MMU_CTX, %g3		/* get pgz | pri-ctx */
 	and     %g3, %g4, %g5			/* %g5 = pri-ctx */
@@ -118,12 +118,12 @@
 	  srlx	%g3, CTXREG_NEXT_SHIFT, %g3	/* %g3 = nucleus pgsz */
 	sllx	%g3, CTXREG_NEXT_SHIFT, %g3	/* need to preserve nucleus pgsz */
 	or	%g3, %g2, %g2			/* %g2 = nucleus pgsz | INVALID_CONTEXT */
-	
+
 	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid */
 3:
 	retry
 	SET_SIZE(sfmmu_raise_tsb_exception)
-	
+
 
 
 	/*
@@ -229,7 +229,7 @@
 	ldx	[%o1], %g1
 
 	set	MMU_TAG_ACCESS, %o5
-	
+
 	set	cpu_impl_dual_pgsz, %o2
 	ld	[%o2], %o2
 	brz	%o2, 1f
@@ -276,7 +276,7 @@
 #ifdef	CHEETAHPLUS_ERRATUM_34
 	!
 	! If this is a Cheetah or derivative, we must work around Erratum 34
-	! for the DTLB.  Erratum 34 states that under certain conditions, 
+	! for the DTLB.  Erratum 34 states that under certain conditions,
 	! a locked entry 0 TTE may be improperly displaced.  To avoid this,
 	! we do not place a locked TTE in entry 0.
 	!
@@ -412,7 +412,7 @@
         ldx     [%o3 + %lo(ksfmmup)], %o3
         cmp     %o3, %o0
         be,pn   %xcc, 8f			! if kernel as, do nothing
-          nop      
+          nop
         /*
          * We need to set up the TSB base register, tsbmiss
          * area, and load locked TTE(s) for the TSB.
@@ -423,10 +423,10 @@
 #ifdef UTSB_PHYS
         /*
          * UTSB_PHYS accesses user TSBs via physical addresses.  The first
-         * TSB is in the MMU I/D TSB Base registers.  The 2nd, 3rd and 
+         * TSB is in the MMU I/D TSB Base registers.  The 2nd, 3rd and
 	 * 4th TSBs use designated ASI_SCRATCHPAD regs as pseudo TSB base regs.
 	 */
-	 
+
         /* create/set first UTSBREG actually loaded into MMU_TSB  */
         MAKE_UTSBREG(%o1, %o2, %o3)             ! %o2 = first utsbreg
  	LOAD_TSBREG(%o2, %o3, %o4)              ! write TSB base register
@@ -476,15 +476,15 @@
         tst     %g1
 
         bnz,pn  %xcc, 8f
-          nop    
+          nop
 
         sethi   %hi(sfmmu_panic10), %o0
         call    panic
           or     %o0, %lo(sfmmu_panic10), %o0
-	  
+
 #else /* UTSBREG_PHYS */
 
-        brz,pt  %g2, 4f	
+        brz,pt  %g2, 4f
           nop
         /*
          * We have a second TSB for this process, so we need to

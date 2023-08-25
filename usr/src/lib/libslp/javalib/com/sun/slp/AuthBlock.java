@@ -471,21 +471,21 @@ class AuthBlock {
 	    abBytes = sig.sign();
 	} catch (InvalidKeyException e) {	// @@@ will change for AMI
 	  SLPConfig conf = SLPConfig.getSLPConfig();
-	    throw 
+	    throw
 		new IllegalArgumentException(
 				conf.formatMessage(
 					"cant_sign_for_spi",
-					new Object[] { 
-						spi, 
+					new Object[] {
+						spi,
 						e.getMessage() }));
 	} catch (SignatureException e) {
 	  SLPConfig conf = SLPConfig.getSLPConfig();
-	    throw 
+	    throw
 		new IllegalArgumentException(
 				conf.formatMessage(
 					"cant_sign_for_spi",
-					new Object[] { 
-						spi, 
+					new Object[] {
+						spi,
 						e.getMessage() }));
 	}
 
@@ -602,7 +602,7 @@ class AuthBlock {
 	    ks = KeyStore.getInstance("amicerts", "SunAMI");
 	    ks.load(null, null);
 	} catch (Exception e) {
-	    throw 
+	    throw
 		new ServiceLocationException(
 			ServiceLocationException.AUTHENTICATION_FAILED,
 			"no_keystore",
@@ -654,7 +654,7 @@ class AuthBlock {
 	try {
 	    sig.initVerify(cert.getPublicKey());
 	} catch (InvalidKeyException ex) {
-	    throw 
+	    throw
 		new ServiceLocationException(
 			ServiceLocationException.INTERNAL_SYSTEM_ERROR,
 			"init_verify_failure",
@@ -791,7 +791,7 @@ class AuthBlock {
 
 	if (v == null || size == 0) {
 	    SLPConfig conf = SLPConfig.getSLPConfig();
-	    String msg = 
+	    String msg =
 		conf.formatMessage("null_or_empty_vector",
 				   new Object[] {param});
 	    throw
@@ -1094,7 +1094,7 @@ class AuthBlock {
 	    keystore = KeyStore.getInstance("amicerts", "SunAMI");
 	    keystore.load(null, null);
 	} catch (Exception e) {
-	    throw 
+	    throw
 		new ServiceLocationException(
 			ServiceLocationException.AUTHENTICATION_FAILED,
 			"no_keystore",

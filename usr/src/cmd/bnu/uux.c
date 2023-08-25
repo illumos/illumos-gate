@@ -138,7 +138,7 @@ char *envp[];
 	*_Sfile = '\0';
 
 	/*
-	 * determine id of user starting remote 
+	 * determine id of user starting remote
 	 * execution
 	 */
 	guinfo(Uid, User);
@@ -148,7 +148,7 @@ char *envp[];
 
 	/*
 	 * this is a check to see if we are using the administrator
-	 * defined service grade. The GRADES file will determine if 
+	 * defined service grade. The GRADES file will determine if
 	 * we are. If so then setup the default grade variables.
 	 */
 
@@ -300,7 +300,7 @@ char *envp[];
 	gwd(Wrkdir);
 	if(fopt){
 		if(*fopt != '/') {
-			(void) snprintf(_Sfile, (sizeof(_Sfile) - 1), 
+			(void) snprintf(_Sfile, (sizeof(_Sfile) - 1),
 					"%s/%s", Wrkdir, fopt);
 			_Sfile[sizeof(_Sfile) - 1] = '\0';
 		}
@@ -320,7 +320,7 @@ char *envp[];
 	}
 	/*
 	 * find remote system name
-	 * remote name is first to know that 
+	 * remote name is first to know that
 	 * is not > or <
 	 */
 	ap = inargs;
@@ -379,7 +379,7 @@ char *envp[];
 	 * fpc is the C. file for the local site.
 	 * collect commands into cfile.
 	 * commit if not empty (at end).
-	 * 
+	 *
 	 * the appropriate C. file.
 	 */
 	gename(CMDPRE, xsys, Grade, cfile);
@@ -398,7 +398,7 @@ char *envp[];
 	 * a local X. file, otherwise we send it as a D. file to the
 	 * remote site.
 	 */
-	
+
 	gename(DATAPRE, xsys, 'X', rxfile);
 	DEBUG(9, "rxfile = %s\n", rxfile);
 	ASSERT(access(rxfile, 0) != 0, Fl_EXISTS, rxfile, errno);
@@ -450,9 +450,9 @@ char *envp[];
 		 * fpd is the D. file into which we now read
 		 * input from stdin
 		 */
-		
+
 		gename(DATAPRE, Myname, 'B', dfile);
-		
+
 		ASSERT(access(dfile, 0) != 0, Fl_EXISTS, dfile, errno);
 		fpd = fdopen(ret = creat(dfile, DFILEMODE), "w");
 		ASSERT(ret >= 0 && fpd != NULL, Ct_OPEN, dfile, errno);
@@ -691,7 +691,7 @@ char *envp[];
 				APPCMD(BASENAME(rest, '/'));;
 				/*
 				 * generate X. JCL card that specifies
-				 * F file 
+				 * F file
 				 */
 				(void) fprintf(fprx, "%c %s %s\n", X_RQDFILE,
 				 dfile, BASENAME(rest, '/'));
@@ -714,7 +714,7 @@ char *envp[];
 			 * we can run the command.
 			 *
 			 * tfile is command file for receive from remote.
-			 * we defer commiting until later so 
+			 * we defer commiting until later so
 			 * that only one C. file is created per site.
 			 *
 			 * dfile is name of data file to receive into;
@@ -740,7 +740,7 @@ char *envp[];
 			 */
 			if (gtcfile(tfile, syspart) != SUCCESS) {
 				gename(CMDPRE, syspart, 'R', tfile);
-				
+
 				ASSERT(access(tfile, 0) != 0,
 				    Fl_EXISTS, tfile, errno);
 				svcfile(tfile, syspart, Sgrade);
@@ -817,7 +817,7 @@ char *envp[];
 			/* build (or append to) C.syspart... */
 			if (gtcfile(tfile, syspart) != SUCCESS) {
 				gename(CMDPRE, syspart, 'R', tfile);
-				
+
 				ASSERT(access(tfile, 0) != 0,
 				    Fl_EXISTS, tfile, errno);
 				svcfile(tfile, syspart, Sgrade);
@@ -893,7 +893,7 @@ char *envp[];
 		/* local xeqn -- use X_ file here */
 		/* this use of the X_ file can not collide with the earlier one */
 		wfcommit(rxfile, tfile, xsys);
-		
+
 		/*
 		 * see if -r option requested JCL to be queued only
 		 */

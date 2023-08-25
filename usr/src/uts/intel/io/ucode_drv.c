@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -47,7 +49,6 @@ static dev_info_t *ucode_devi;
 static uint32_t ucode_max_combined_size;
 static kmutex_t ucode_update_lock;
 
-/*ARGSUSED*/
 static int
 ucode_getinfo(dev_info_t *devi, ddi_info_cmd_t cmd, void *arg, void **result)
 {
@@ -126,24 +127,15 @@ ucode_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	}
 }
 
-/*ARGSUSED1*/
 static int
 ucode_open(dev_t *dev, int flag, int otyp, cred_t *cr)
 {
 	return (getminor(*dev) == UCODE_MINOR ? 0 : ENXIO);
 }
 
-
-/*ARGSUSED*/
 static int
 ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 {
-	/*
-	 * Make sure that the ucode ops pointer has been set up.
-	 */
-	if (!ucode)
-		return (EIO);
-
 	switch (cmd) {
 	case UCODE_GET_VERSION: {
 		int size;
@@ -229,7 +221,7 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 			return (EFAULT);
 		}
 
-		if ((rc = ucode->validate(ucodep, size)) != EM_OK) {
+		if ((rc = ucode_validate(ucodep, size)) != EM_OK) {
 			kmem_free(ucodep, size);
 			STRUCT_FSET(h, uw_errno, rc);
 			if (ddi_copyout(STRUCT_BUF(h), (void *)arg,

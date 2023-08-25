@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -33,14 +33,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -51,7 +51,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -59,7 +59,7 @@
 
 #include "k5-int.h"
 
-/* 
+/*
  * Solaris Kerberos: the code related to EF/pkcs11 and fork safety are mods Sun
  * has made to the MIT code.
  */
@@ -138,9 +138,9 @@ krb5_error_code
 krb5_open_pkcs11_session(CK_SESSION_HANDLE *hSession)
 {
 	krb5_error_code retval = 0;
-	CK_RV rv; 
-	CK_SLOT_ID_PTR slotlist = NULL_PTR; 
-	CK_ULONG slotcount; 
+	CK_RV rv;
+	CK_SLOT_ID_PTR slotlist = NULL_PTR;
+	CK_ULONG slotcount;
 	CK_ULONG i;
 
 	/* List of all Slots */
@@ -157,13 +157,13 @@ krb5_open_pkcs11_session(CK_SESSION_HANDLE *hSession)
 		goto cleanup;
 	}
 
-	slotlist = (CK_SLOT_ID_PTR)malloc(slotcount * sizeof(CK_SLOT_ID));	
+	slotlist = (CK_SLOT_ID_PTR)malloc(slotcount * sizeof(CK_SLOT_ID));
 	if (slotlist == NULL) {
 		KRB5_LOG0(KRB5_ERR, "malloc failed for slotcount.");
 		retval = PKCS_ERR;
 		goto cleanup;
 	}
-	
+
 	rv = C_GetSlotList(FALSE, slotlist, &slotcount);
 	if (rv != CKR_OK) {
 		KRB5_LOG(KRB5_ERR, "C_GetSlotList failed with 0x%x", rv);
@@ -214,7 +214,7 @@ krb5_reinit_ef_handle(krb5_context ctx)
     }
 
     /* reset the ctx pid since we're in a new process (child) */
-    ctx->pid = __krb5_current_pid; 
+    ctx->pid = __krb5_current_pid;
 
     /* If the RC4 handles were initialized, reset them here */
     if (ctx->arcfour_ctx.initialized) {
@@ -236,7 +236,7 @@ krb5_reinit_ef_handle(krb5_context ctx)
 	}
     }
 
-    /* 
+    /*
      * It is safe for this function to access ctx->hSession directly.  Do
      * NOT use the krb_ctx_hSession() here.
      */
@@ -251,9 +251,9 @@ krb5_reinit_ef_handle(krb5_context ctx)
 void
 krb5_pthread_atfork_child_handler()
 {
-    /* 
+    /*
      * __krb5_current_pid should always be set to current process ID, see the
-     * definition of krb_ctx_hSession() for more info 
+     * definition of krb_ctx_hSession() for more info
      */
     __krb5_current_pid = getpid();
 }
@@ -265,12 +265,12 @@ krb5_pthread_atfork_child_handler()
 void
 krb5_ld_init()
 {
-    /* 
+    /*
      * fork safety: __krb5_current_pid should always be set to current process
-     * ID, see the definition of krb_ctx_hSession() for more info 
+     * ID, see the definition of krb_ctx_hSession() for more info
      */
     __krb5_current_pid = getpid();
-    /* 
+    /*
      * The child handler below will help reduce the number of times getpid() is
      * called by updating a global PID var. with the current PID whenever a fork
      * occurrs.
@@ -288,9 +288,9 @@ krb5_init_ef_handle(krb5_context ctx)
 	if ((rv != CKR_OK) && (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
 		KRB5_LOG(KRB5_ERR, "C_Initialize failed with 0x%x.", rv);
 		return (PKCS_ERR);
-		
+
 	}
-	/* 
+	/*
 	 * It is safe for this function to access ctx->hSession directly.  Do
 	 * NOT use the krb_ctx_hSession() here.
 	 */
@@ -315,13 +315,13 @@ krb5_init_ef_handle(krb5_context ctx)
 krb5_error_code
 krb5_free_ef_handle(krb5_context ctx)
 {
-	/* 
+	/*
 	 * fork safety: Don't free any PKCS state if we've forked since
 	 * allocating the pkcs handles.
 	 */
 	if (ctx->cryptoki_initialized == TRUE &&
 	    ctx->pid == __krb5_current_pid) {
-		/* 
+		/*
 		 * It is safe for this function to access ctx->hSession
 		 * directly.  Do NOT use the krb_ctx_hSession() here.
 		 */
@@ -391,7 +391,7 @@ init_common (krb5_context *context, krb5_boolean secure, krb5_boolean kdc)
 #endif
 
 #if (defined(_WIN32))
-	/* 
+	/*
 	 * Load the krbcc32.dll if necessary.  We do this here so that
 	 * we know to use API: later on during initialization.
 	 * The context being NULL is ok.
@@ -480,7 +480,7 @@ init_common (krb5_context *context, krb5_boolean secure, krb5_boolean kdc)
 	/* DCE 1.1 and below only support CKSUMTYPE_RSA_MD4 (2)  */
 	/* DCE add kdc_req_checksum_type = 2 to krb5.conf */
 	profile_get_integer(ctx->profile, "libdefaults",
-			    "kdc_req_checksum_type", 0, CKSUMTYPE_RSA_MD5, 
+			    "kdc_req_checksum_type", 0, CKSUMTYPE_RSA_MD5,
 			    &tmp);
 	ctx->kdc_req_sumtype = tmp;
 
@@ -589,7 +589,7 @@ krb5_set_default_in_tkt_ktypes(krb5_context context, const krb5_enctype *ktypes)
 
     if (ktypes) {
 	for (i = 0; ktypes[i]; i++) {
-	    if (!krb5_c_valid_enctype(ktypes[i])) 
+	    if (!krb5_c_valid_enctype(ktypes[i]))
 		return KRB5_PROG_ETYPE_NOSUPP;
 	}
 
@@ -604,7 +604,7 @@ krb5_set_default_in_tkt_ktypes(krb5_context context, const krb5_enctype *ktypes)
 	new_ktypes = 0;
     }
 
-    if (context->in_tkt_ktypes) 
+    if (context->in_tkt_ktypes)
         free(context->in_tkt_ktypes);
     context->in_tkt_ktypes = new_ktypes;
     context->in_tkt_ktype_count = i;
@@ -619,7 +619,7 @@ get_profile_etype_list(krb5_context context, krb5_enctype **ktypes, char *profst
 
     if (ctx_count) {
 	/* application-set defaults */
-	if ((old_ktypes = 
+	if ((old_ktypes =
 	     (krb5_enctype *)malloc(sizeof(krb5_enctype) *
 				    (ctx_count + 1)))) {
 	    (void) memcpy(old_ktypes, ctx_list,
@@ -661,12 +661,12 @@ get_profile_etype_list(krb5_context context, krb5_enctype **ktypes, char *profst
 	    count++;
 	    sp = ep;
 	}
-	
+
 	if ((old_ktypes =
 	     (krb5_enctype *)malloc(sizeof(krb5_enctype) * (count + 1))) ==
 	    (krb5_enctype *) NULL)
 	    return ENOMEM;
-	
+
 	sp = retval;
 	j = checked_enctypes = 0;
 	/*CONSTCOND*/
@@ -727,7 +727,7 @@ krb5_set_default_tgs_enctypes (krb5_context context, const krb5_enctype *ktypes)
 
     if (ktypes) {
 	for (i = 0; ktypes[i]; i++) {
-	    if (!krb5_c_valid_enctype(ktypes[i])) 
+	    if (!krb5_c_valid_enctype(ktypes[i]))
 		return KRB5_PROG_ETYPE_NOSUPP;
 	}
 
@@ -742,7 +742,7 @@ krb5_set_default_tgs_enctypes (krb5_context context, const krb5_enctype *ktypes)
 	new_ktypes = (krb5_enctype *)NULL;
     }
 
-    if (context->tgs_ktypes) 
+    if (context->tgs_ktypes)
         krb5_free_ktypes(context, context->tgs_ktypes);
     context->tgs_ktypes = new_ktypes;
     context->tgs_ktype_count = i;
@@ -798,7 +798,7 @@ krb5_is_permitted_enctype(krb5_context context, krb5_enctype etype)
     if (krb5_get_permitted_enctypes(context, &list))
 	return(0);
 
-    
+
     ret = 0;
 
     for (ptr = list; *ptr; ptr++)

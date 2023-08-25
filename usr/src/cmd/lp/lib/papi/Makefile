@@ -31,7 +31,7 @@ VERS=.1
 LPSCHED_OBJS =	lpsched-msgs.o lpsched-service.o lpsched-printers.o \
 		lpsched-jobs.o lpsched-misc.o
 OBJECTS =	$(LPSCHED_OBJS) service.o printer.o job.o ppd.o library.o
-		
+
 
 include		../../../../lib/Makefile.lib
 include         ../../Makefile.lp
@@ -58,7 +58,7 @@ MAPFILES =	mapfile
 
 LIBS = $(DYNLIB)
 SRCS= $(OBJECTS:%.o=%.c)
- 
+
 #${ROOTLIBDIR}:
 #	$(INS.dir)
 
@@ -66,7 +66,7 @@ POFILE =	lp_lib_papi_psm.po
 
 .KEEP_STATE:
 
-all:		$(LIBS) 
+all:		$(LIBS)
 
 _msg:	$(POFILE)
 

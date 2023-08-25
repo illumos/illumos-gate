@@ -22,7 +22,7 @@
 #
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
+#
 
 LIBRARY = libtcp.a
 OBJECTS = tcp.o tcp_sack.o

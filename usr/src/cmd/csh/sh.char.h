@@ -27,7 +27,7 @@
 /* macros of macros to reduce further #ifdef MBCHAR later. Please be patient!*/
 #define	iswdigit(c)	isdigit(c)
 #define	iswalpha(c)	isalpha(c)
-#define	isphonogram(c)	0	
+#define	isphonogram(c)	0
 #define	isideogram(c)	0
 #define	isauxsp(c) 	0
 #define	isauxspZ 	0
@@ -55,7 +55,7 @@ extern unsigned int Z; 	/* A place to save macro arg to avoid side-effect!*/
 #define isglob(c)	cmap(c, _GLOB)
 #define ismeta(c)	cmap(c, _META)
 #define digit(c)	cmap(c, _DIG)
-#define issp(c)		(Z=((unsigned)(c)), cmapZ( _SP)||isauxspZ) 
+#define issp(c)		(Z=((unsigned)(c)), cmapZ( _SP)||isauxspZ)
 /*WAS isspace(c)*/
 #define isspnl(c)	(Z=((unsigned)(c)), cmapZ( _SP|_NL)||isauxspZ)
 #define letter(c)	\

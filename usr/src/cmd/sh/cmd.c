@@ -270,7 +270,7 @@ item(flag)
 	case CASYM:
 		{
 			struct swnod *t;
-			
+
 			t = (struct swnod *)getstor(sizeof(struct swnod));
 			r = (struct trenod *)t;
 
@@ -341,7 +341,7 @@ item(flag)
 		{
 			struct whnod *t;
 
-			t = (struct whnod *)getstor(sizeof(struct whnod));	
+			t = (struct whnod *)getstor(sizeof(struct whnod));
 			r = (struct trenod *)t;
 
 			t->whtyp = (wdval == WHSYM ? TWH : TUN);

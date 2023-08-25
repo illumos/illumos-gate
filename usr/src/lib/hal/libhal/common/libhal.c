@@ -57,8 +57,8 @@
 
 /**
  * LIBHAL_CHECK_PARAM_VALID:
- * @_param_: the prameter to check for 
- * @_name_:  the name of the prameter (for debug output) 
+ * @_param_: the prameter to check for
+ * @_name_:  the name of the prameter (for debug output)
  * @_ret_:   what to use for return value if the prameter is NULL
  *
  * Handy macro for checking whether a parameter is valid and not NULL.
@@ -75,8 +75,8 @@
 
 /**
  * LIBHAL_CHECK_UDI_VALID:
- * @_udi_: the UID to check for 
- * @_ret_:   what to use for return value if udi is invalid 
+ * @_udi_: the UID to check for
+ * @_ret_:   what to use for return value if udi is invalid
  *
  * Handy macro for checking whether a UID is valid and not NULL.
  */
@@ -151,7 +151,7 @@ libhal_get_string_array_from_iter (DBusMessageIter *iter, int *num_elements)
 	while (dbus_message_iter_get_arg_type (iter) == DBUS_TYPE_STRING) {
 		const char *value;
 		char *str;
-		
+
 		if ((count % 8) == 0 && count != 0) {
 			t = realloc (buffer, sizeof (char *) * (count + 8));
 			if (t == NULL)
@@ -159,7 +159,7 @@ libhal_get_string_array_from_iter (DBusMessageIter *iter, int *num_elements)
 			else
 				buffer = t;
 		}
-		
+
 		dbus_message_iter_get_basic (iter, &value);
 		str = strdup (value);
 		if (str == NULL)
@@ -244,7 +244,7 @@ struct LibHalProperty_s {
 		char **strlist_value; /**< List of UTF-8 zero-terminated strings */
 	} v;
 
-	LibHalProperty *next;	     /**< Next property or NULL if this is 
+	LibHalProperty *next;	     /**< Next property or NULL if this is
 				      *	  the last */
 };
 
@@ -316,11 +316,11 @@ libhal_ctx_get_user_data(LibHalContext *ctx)
 
 
 /**
- * libhal_property_fill_value_from_variant: 
+ * libhal_property_fill_value_from_variant:
  * @p: the property to fill in
  * @var_iter: variant iterator to extract the value from
  *
- * Fills in the value for the LibHalProperty given a variant iterator. 
+ * Fills in the value for the LibHalProperty given a variant iterator.
  *
  * Returns: Whether the value was put in.
  */
@@ -340,7 +340,7 @@ libhal_property_fill_value_from_variant (LibHalProperty *p, DBusMessageIter *var
 		dbus_message_iter_recurse (var_iter, &iter_array);
 		p->v.strlist_value = libhal_get_string_array_from_iter (&iter_array, NULL);
 
-		p->type = LIBHAL_PROPERTY_TYPE_STRLIST; 
+		p->type = LIBHAL_PROPERTY_TYPE_STRLIST;
 
 		break;
 	case DBUS_TYPE_STRING:
@@ -350,32 +350,32 @@ libhal_property_fill_value_from_variant (LibHalProperty *p, DBusMessageIter *var
 		dbus_message_iter_get_basic (var_iter, &v);
 
 		p->v.str_value = strdup (v);
-		if (p->v.str_value == NULL) 
+		if (p->v.str_value == NULL)
 			return FALSE;
-		p->type = LIBHAL_PROPERTY_TYPE_STRING; 
+		p->type = LIBHAL_PROPERTY_TYPE_STRING;
 
 		break;
 	}
 	case DBUS_TYPE_INT32:
 	{
 		dbus_int32_t v;
-		
+
 		dbus_message_iter_get_basic (var_iter, &v);
-		
+
 		p->v.int_value = v;
-		p->type = LIBHAL_PROPERTY_TYPE_INT32; 
+		p->type = LIBHAL_PROPERTY_TYPE_INT32;
 
 		break;
 	}
 	case DBUS_TYPE_UINT64:
 	{
 		dbus_uint64_t v;
-		
+
 		dbus_message_iter_get_basic (var_iter, &v);
 
 		p->v.uint64_value = v;
-		p->type = LIBHAL_PROPERTY_TYPE_UINT64; 
-		
+		p->type = LIBHAL_PROPERTY_TYPE_UINT64;
+
 		break;
 	}
 	case DBUS_TYPE_DOUBLE:
@@ -385,7 +385,7 @@ libhal_property_fill_value_from_variant (LibHalProperty *p, DBusMessageIter *var
 		dbus_message_iter_get_basic (var_iter, &v);
 
 		p->v.double_value = v;
-		p->type = LIBHAL_PROPERTY_TYPE_DOUBLE; 
+		p->type = LIBHAL_PROPERTY_TYPE_DOUBLE;
 
 		break;
 	}
@@ -396,7 +396,7 @@ libhal_property_fill_value_from_variant (LibHalProperty *p, DBusMessageIter *var
 		dbus_message_iter_get_basic (var_iter, &v);
 
 		p->v.double_value = v;
-		p->type = LIBHAL_PROPERTY_TYPE_BOOLEAN; 
+		p->type = LIBHAL_PROPERTY_TYPE_BOOLEAN;
 
 		break;
 	}
@@ -420,7 +420,7 @@ libhal_property_fill_value_from_variant (LibHalProperty *p, DBusMessageIter *var
  */
 LibHalPropertySet *
 libhal_device_get_all_properties (LibHalContext *ctx, const char *udi, DBusError *error)
-{	
+{
 	DBusMessage *message;
 	DBusMessage *reply;
 	DBusMessageIter reply_iter;
@@ -466,7 +466,7 @@ libhal_device_get_all_properties (LibHalContext *ctx, const char *udi, DBusError
 	dbus_message_iter_init (reply, &reply_iter);
 
 	result = malloc (sizeof (LibHalPropertySet));
-	if (result == NULL) 
+	if (result == NULL)
 		goto oom;
 
 /*
@@ -528,7 +528,7 @@ libhal_device_get_all_properties (LibHalContext *ctx, const char *udi, DBusError
 
 
 		p->type = dbus_message_iter_get_arg_type (&var_iter);
-	
+
 		result->num_properties++;
 
 		if(!libhal_property_fill_value_from_variant (p, &var_iter))
@@ -550,7 +550,7 @@ oom:
 	return NULL;
 }
 
-/** 
+/**
  * libhal_free_property_set:
  * @set: property-set to free
  *
@@ -578,21 +578,21 @@ libhal_free_property_set (LibHalPropertySet * set)
 }
 
 /**
- * libhal_property_set_get_num_elems: 
+ * libhal_property_set_get_num_elems:
  * @set: property set to consider
  *
  * Get the number of properties in a property set.
  *
  * Returns: number of properties in given property set
  */
-unsigned int 
+unsigned int
 libhal_property_set_get_num_elems (LibHalPropertySet *set)
 {
 	unsigned int num_elems;
 	LibHalProperty *p;
 
 	LIBHAL_CHECK_PARAM_VALID(set, "*set", 0);
-	
+
 	num_elems = 0;
 	for (p = set->properties_head; p != NULL; p = p->next)
 		num_elems++;
@@ -620,9 +620,9 @@ property_set_lookup (const LibHalPropertySet *set, const char *key)
  * @set: property set
  * @key: name of property to inspect
  *
- * Get the type of a given property. 
+ * Get the type of a given property.
  *
- * Returns: the #LibHalPropertyType of the given property, 
+ * Returns: the #LibHalPropertyType of the given property,
  * LIBHAL_PROPERTY_TYPE_INVALID if property is not in the set
  */
 LibHalPropertyType
@@ -653,7 +653,7 @@ const char *
 libhal_ps_get_string  (const LibHalPropertySet *set, const char *key)
 {
 	LibHalProperty *p;
-	
+
 	LIBHAL_CHECK_PARAM_VALID(set, "*set", NULL);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
 
@@ -668,7 +668,7 @@ libhal_ps_get_string  (const LibHalPropertySet *set, const char *key)
  * @set: property set
  * @key: name of property to inspect
  *
- * Get the value of a property of type signed integer. 
+ * Get the value of a property of type signed integer.
  *
  * Returns: property value (32-bit signed integer)
  */
@@ -676,10 +676,10 @@ dbus_int32_t
 libhal_ps_get_int32 (const LibHalPropertySet *set, const char *key)
 {
 	LibHalProperty *p;
-	
+
 	LIBHAL_CHECK_PARAM_VALID(set, "*set", 0);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", 0);
-	
+
 	p = property_set_lookup (set, key);
 	if (p && p->type == LIBHAL_PROPERTY_TYPE_INT32)
 		return p->v.int_value;
@@ -691,7 +691,7 @@ libhal_ps_get_int32 (const LibHalPropertySet *set, const char *key)
  * @set: property set
  * @key: name of property to inspect
  *
- * Get the value of a property of type unsigned integer. 
+ * Get the value of a property of type unsigned integer.
  *
  * Returns: property value (64-bit unsigned integer)
  */
@@ -737,7 +737,7 @@ libhal_ps_get_double (const LibHalPropertySet *set, const char *key)
  * @set: property set
  * @key: name of property to inspect
  *
- * Get the value of a property of type bool. 
+ * Get the value of a property of type bool.
  *
  * Returns: property value (bool)
  */
@@ -748,7 +748,7 @@ libhal_ps_get_bool (const LibHalPropertySet *set, const char *key)
 
 	LIBHAL_CHECK_PARAM_VALID(set, "*set", FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
+
 	p = property_set_lookup (set, key);
 	if (p && p->type == LIBHAL_PROPERTY_TYPE_BOOLEAN)
 		return p->v.bool_value;
@@ -760,7 +760,7 @@ libhal_ps_get_bool (const LibHalPropertySet *set, const char *key)
  * @set: property set
  * @key: name of property to inspect
  *
- * Get the value of a property of type string list. 
+ * Get the value of a property of type string list.
  *
  * Returns: pointer to array of strings, this is owned by the property set
  */
@@ -771,7 +771,7 @@ libhal_ps_get_strlist (const LibHalPropertySet *set, const char *key)
 
 	LIBHAL_CHECK_PARAM_VALID(set, "*set", NULL);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
-	
+
 	p = property_set_lookup (set, key);
 	if (p && p->type == LIBHAL_PROPERTY_TYPE_STRLIST)
 		return (const char *const *) p->v.strlist_value;
@@ -844,7 +844,7 @@ libhal_psi_get_type (LibHalPropertySetIterator * iter)
  * libhal_psi_get_key:
  * @iter: iterator object
  *
- * Get the key of a property. 
+ * Get the key of a property.
  *
  * Returns: ASCII nul-terminated string. This pointer is only valid
  * until libhal_free_property_set() is invoked on the property set
@@ -876,7 +876,7 @@ libhal_psi_get_string (LibHalPropertySetIterator * iter)
  * libhal_psi_get_int:
  * @iter: iterator object
  *
- * Get the value of a property of type signed integer. 
+ * Get the value of a property of type signed integer.
  *
  * Returns: property value (32-bit signed integer)
  */
@@ -890,7 +890,7 @@ libhal_psi_get_int (LibHalPropertySetIterator * iter)
  * libhal_psi_get_uint64:
  * @iter: iterator object
  *
- * Get the value of a property of type unsigned integer. 
+ * Get the value of a property of type unsigned integer.
  *
  * Returns: property value (64-bit unsigned integer)
  */
@@ -918,7 +918,7 @@ libhal_psi_get_double (LibHalPropertySetIterator * iter)
  * libhal_psi_get_bool:
  * @iter: iterator object
  *
- * Get the value of a property of type bool. 
+ * Get the value of a property of type bool.
  *
  * Returns: property value (bool)
  */
@@ -932,7 +932,7 @@ libhal_psi_get_bool (LibHalPropertySetIterator * iter)
  * libhal_psi_get_strlist:
  * @iter: iterator object
  *
- * Get the value of a property of type string list. 
+ * Get the value of a property of type string list.
  *
  * Returns: pointer to array of strings
  */
@@ -958,9 +958,9 @@ filter_func (DBusConnection * connection,
 
 	object_path = dbus_message_get_path (message);
 
-	/*fprintf (stderr, "*** libhal filer_func: connection=%p obj_path=%s interface=%s method=%s\n", 
+	/*fprintf (stderr, "*** libhal filer_func: connection=%p obj_path=%s interface=%s method=%s\n",
 		   connection,
-		   dbus_message_get_path (message), 
+		   dbus_message_get_path (message),
 		   dbus_message_get_interface (message),
 		   dbus_message_get_member (message));
         */
@@ -1027,7 +1027,7 @@ filter_func (DBusConnection * connection,
 			int num_modifications;
 			DBusMessageIter iter;
 			DBusMessageIter iter_array;
-	
+
 			dbus_message_iter_init (message, &iter);
 			dbus_message_iter_get_basic (&iter, &num_modifications);
 			dbus_message_iter_next (&iter);
@@ -1044,15 +1044,15 @@ filter_func (DBusConnection * connection,
 				dbus_message_iter_get_basic (&iter_struct, &removed);
 				dbus_message_iter_next (&iter_struct);
 				dbus_message_iter_get_basic (&iter_struct, &added);
-				
-				ctx->device_property_modified (ctx, 
+
+				ctx->device_property_modified (ctx,
 							       object_path,
 							       key, removed,
 							       added);
-				
+
 				dbus_message_iter_next (&iter_array);
 			}
-			
+
 		}
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
@@ -1078,7 +1078,7 @@ static dbus_bool_t libhal_already_initialized_once = FALSE;
  */
 char **
 libhal_get_all_devices (LibHalContext *ctx, int *num_devices, DBusError *error)
-{	
+{
 	DBusMessage *message;
 	DBusMessage *reply;
 	DBusMessageIter iter_array, reply_iter;
@@ -1119,11 +1119,11 @@ libhal_get_all_devices (LibHalContext *ctx, int *num_devices, DBusError *error)
 		dbus_message_unref (reply);
 		return NULL;
 	}
-	
+
 	dbus_message_iter_recurse (&reply_iter, &iter_array);
 
 	hal_device_names = libhal_get_string_array_from_iter (&iter_array, num_devices);
-		      
+
 	dbus_message_unref (reply);
 	return hal_device_names;
 }
@@ -1193,7 +1193,7 @@ libhal_device_get_property_type (LibHalContext *ctx, const char *udi, const char
  * @key: name of the property
  * @error: pointer to an initialized dbus error object for returning errors or NULL
  *
- * Get the value of a property of type string list. 
+ * Get the value of a property of type string list.
  *
  * Returns: Array of pointers to UTF8 nul-terminated strings
  * terminated by NULL. The caller is responsible for freeing this
@@ -1202,13 +1202,13 @@ libhal_device_get_property_type (LibHalContext *ctx, const char *udi, const char
  */
 char **
 libhal_device_get_property_strlist (LibHalContext *ctx, const char *udi, const char *key, DBusError *error)
-{	
+{
 	DBusMessage *message;
 	DBusMessage *reply;
 	DBusMessageIter iter, iter_array, reply_iter;
 	char **our_strings;
 	DBusError _error;
-	
+
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, NULL);
 	LIBHAL_CHECK_UDI_VALID(udi, NULL);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", NULL);
@@ -1248,11 +1248,11 @@ libhal_device_get_property_strlist (LibHalContext *ctx, const char *udi, const c
 		dbus_message_unref (reply);
 		return NULL;
 	}
-	
+
 	dbus_message_iter_recurse (&reply_iter, &iter_array);
 
 	our_strings = libhal_get_string_array_from_iter (&iter_array, NULL);
-		      
+
 	dbus_message_unref (reply);
 	return our_strings;
 }
@@ -1263,8 +1263,8 @@ libhal_device_get_property_strlist (LibHalContext *ctx, const char *udi, const c
  * @udi: the Unique Device Id
  * @key: the name of the property
  * @error: pointer to an initialized dbus error object for returning errors or NULL
- * 
- * Get the value of a property of type string. 
+ *
+ * Get the value of a property of type string.
  *
  * Returns: UTF8 nul-terminated string. The caller is responsible for
  * freeing this string with the function libhal_free_string(). Returns
@@ -1273,7 +1273,7 @@ libhal_device_get_property_strlist (LibHalContext *ctx, const char *udi, const c
 char *
 libhal_device_get_property_string (LibHalContext *ctx,
 				   const char *udi, const char *key, DBusError *error)
-{	
+{
 	DBusMessage *message;
 	DBusMessage *reply;
 	DBusMessageIter iter, reply_iter;
@@ -1341,12 +1341,12 @@ libhal_device_get_property_string (LibHalContext *ctx,
  * @key: name of the property
  * @error: pointer to an initialized dbus error object for returning errors or NULL
  *
- * Get the value of a property of type integer. 
+ * Get the value of a property of type integer.
  *
  * Returns: Property value (32-bit signed integer)
  */
 dbus_int32_t
-libhal_device_get_property_int (LibHalContext *ctx, 
+libhal_device_get_property_int (LibHalContext *ctx,
 				const char *udi, const char *key, DBusError *error)
 {
 	DBusMessage *message;
@@ -1417,7 +1417,7 @@ libhal_device_get_property_int (LibHalContext *ctx,
  * Returns: Property value (64-bit unsigned integer)
  */
 dbus_uint64_t
-libhal_device_get_property_uint64 (LibHalContext *ctx, 
+libhal_device_get_property_uint64 (LibHalContext *ctx,
 				   const char *udi, const char *key, DBusError *error)
 {
 	DBusMessage *message;
@@ -1487,7 +1487,7 @@ libhal_device_get_property_uint64 (LibHalContext *ctx,
  * Returns: Property value (IEEE754 double precision float)
  */
 double
-libhal_device_get_property_double (LibHalContext *ctx, 
+libhal_device_get_property_double (LibHalContext *ctx,
 				   const char *udi, const char *key, DBusError *error)
 {
 	DBusMessage *message;
@@ -1552,12 +1552,12 @@ libhal_device_get_property_double (LibHalContext *ctx,
  * @key: name of the property
  * @error: pointer to an initialized dbus error object for returning errors or NULL
  *
- * Get the value of a property of type bool. 
+ * Get the value of a property of type bool.
  *
  * Returns: Property value (boolean)
  */
 dbus_bool_t
-libhal_device_get_property_bool (LibHalContext *ctx, 
+libhal_device_get_property_bool (LibHalContext *ctx,
 				 const char *udi, const char *key, DBusError *error)
 {
 	DBusMessage *message;
@@ -1582,7 +1582,7 @@ libhal_device_get_property_bool (LibHalContext *ctx,
 
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &key);
-	
+
 	dbus_error_init (&_error);
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
@@ -1618,7 +1618,7 @@ libhal_device_get_property_bool (LibHalContext *ctx,
 
 /* generic helper */
 static dbus_bool_t
-libhal_device_set_property_helper (LibHalContext *ctx, 
+libhal_device_set_property_helper (LibHalContext *ctx,
 				   const char *udi,
 				   const char *key,
 				   int type,
@@ -1692,7 +1692,7 @@ libhal_device_set_property_helper (LibHalContext *ctx,
 		break;
 	}
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -1725,9 +1725,9 @@ libhal_device_set_property_helper (LibHalContext *ctx,
  * exist or the property had a different type.
  */
 dbus_bool_t
-libhal_device_set_property_string (LibHalContext *ctx, 
+libhal_device_set_property_string (LibHalContext *ctx,
 				   const char *udi,
-				   const char *key, 
+				   const char *key,
 				   const char *value,
 				   DBusError *error)
 {
@@ -1735,7 +1735,7 @@ libhal_device_set_property_string (LibHalContext *ctx,
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
 	LIBHAL_CHECK_PARAM_VALID(value, "*value", FALSE);
-	
+
 	return libhal_device_set_property_helper (ctx, udi, key,
 						  DBUS_TYPE_STRING,
 						  value, 0, 0, 0.0f, FALSE, error);
@@ -1761,7 +1761,7 @@ libhal_device_set_property_int (LibHalContext *ctx, const char *udi,
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
+
 	return libhal_device_set_property_helper (ctx, udi, key,
 						  DBUS_TYPE_INT32,
 						  NULL, value, 0, 0.0f, FALSE, error);
@@ -1787,7 +1787,7 @@ libhal_device_set_property_uint64 (LibHalContext *ctx, const char *udi,
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
+
 	return libhal_device_set_property_helper (ctx, udi, key,
 						  DBUS_TYPE_UINT64,
 						  NULL, 0, value, 0.0f, FALSE, error);
@@ -1813,7 +1813,7 @@ libhal_device_set_property_double (LibHalContext *ctx, const char *udi,
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
+
 	return libhal_device_set_property_helper (ctx, udi, key,
 						  DBUS_TYPE_DOUBLE,
 						  NULL, 0, 0, value, FALSE, error);
@@ -1839,7 +1839,7 @@ libhal_device_set_property_bool (LibHalContext *ctx, const char *udi,
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
+
 	return libhal_device_set_property_helper (ctx, udi, key,
 						  DBUS_TYPE_BOOLEAN,
 						  NULL, 0, 0, 0.0f, value, error);
@@ -1859,14 +1859,14 @@ libhal_device_set_property_bool (LibHalContext *ctx, const char *udi,
  * exist
  */
 dbus_bool_t
-libhal_device_remove_property (LibHalContext *ctx, 
+libhal_device_remove_property (LibHalContext *ctx,
 			       const char *udi, const char *key, DBusError *error)
 {
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 	LIBHAL_CHECK_PARAM_VALID(key, "*key", FALSE);
-	
-	return libhal_device_set_property_helper (ctx, udi, key, DBUS_TYPE_INVALID,	
+
+	return libhal_device_set_property_helper (ctx, udi, key, DBUS_TYPE_INVALID,
 						  /* DBUS_TYPE_INVALID means remove */
 						  NULL, 0, 0, 0.0f, FALSE, error);
 }
@@ -1885,7 +1885,7 @@ libhal_device_remove_property (LibHalContext *ctx,
  * exist or the property had a different type.
  */
 dbus_bool_t
-libhal_device_property_strlist_append (LibHalContext *ctx, 
+libhal_device_property_strlist_append (LibHalContext *ctx,
 				       const char *udi,
 				       const char *key,
 				       const char *value,
@@ -1912,7 +1912,7 @@ libhal_device_property_strlist_append (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &key);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &value);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -1944,10 +1944,10 @@ libhal_device_property_strlist_append (LibHalContext *ctx,
  * didn't exist or the property had a different type.
  */
 dbus_bool_t
-libhal_device_property_strlist_prepend (LibHalContext *ctx, 
+libhal_device_property_strlist_prepend (LibHalContext *ctx,
 					const char *udi,
 					const char *key,
-					const char *value, 
+					const char *value,
 					DBusError *error)
 {
 	DBusMessage *message;
@@ -1971,7 +1971,7 @@ libhal_device_property_strlist_prepend (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &key);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &value);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2003,7 +2003,7 @@ libhal_device_property_strlist_prepend (LibHalContext *ctx,
  * exist or the property had a different type.
  */
 dbus_bool_t
-libhal_device_property_strlist_remove_index (LibHalContext *ctx, 
+libhal_device_property_strlist_remove_index (LibHalContext *ctx,
 					     const char *udi,
 					     const char *key,
 					     unsigned int idx,
@@ -2029,7 +2029,7 @@ libhal_device_property_strlist_remove_index (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &key);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32, &idx);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2061,7 +2061,7 @@ libhal_device_property_strlist_remove_index (LibHalContext *ctx,
  * exist or the property had a different type.
  */
 dbus_bool_t
-libhal_device_property_strlist_remove (LibHalContext *ctx, 
+libhal_device_property_strlist_remove (LibHalContext *ctx,
 				       const char *udi,
 				       const char *key,
 				       const char *value, DBusError *error)
@@ -2087,7 +2087,7 @@ libhal_device_property_strlist_remove (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &key);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &value);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2149,7 +2149,7 @@ libhal_device_lock (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &reason_to_lock);
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2211,7 +2211,7 @@ libhal_device_unlock (LibHalContext *ctx,
 		return FALSE;
 	}
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2265,7 +2265,7 @@ libhal_new_device (LibHalContext *ctx, DBusError *error)
 		return NULL;
 	}
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2323,7 +2323,7 @@ libhal_new_device (LibHalContext *ctx, DBusError *error)
  * Returns: FALSE if the given unique device id is already in use.
  */
 dbus_bool_t
-libhal_device_commit_to_gdl (LibHalContext *ctx, 
+libhal_device_commit_to_gdl (LibHalContext *ctx,
 			     const char *temp_udi, const char *udi, DBusError *error)
 {
 	DBusMessage *message;
@@ -2349,7 +2349,7 @@ libhal_device_commit_to_gdl (LibHalContext *ctx,
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &temp_udi);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &udi);
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2406,7 +2406,7 @@ libhal_remove_device (LibHalContext *ctx, const char *udi, DBusError *error)
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &udi);
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2504,7 +2504,7 @@ libhal_device_exists (LibHalContext *ctx, const char *udi, DBusError *error)
  * Returns: TRUE if the device exists, FALSE otherwise
  */
 dbus_bool_t
-libhal_device_property_exists (LibHalContext *ctx, 
+libhal_device_property_exists (LibHalContext *ctx,
 			       const char *udi, const char *key, DBusError *error)
 {
 	DBusMessage *message;
@@ -2573,7 +2573,7 @@ libhal_device_property_exists (LibHalContext *ctx,
  * Returns: TRUE if the properties were merged, FALSE otherwise
  */
 dbus_bool_t
-libhal_merge_properties (LibHalContext *ctx, 
+libhal_merge_properties (LibHalContext *ctx,
 			 const char *target_udi, const char *source_udi, DBusError *error)
 {
 	DBusMessage *message;
@@ -2599,7 +2599,7 @@ libhal_merge_properties (LibHalContext *ctx,
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &target_udi);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &source_udi);
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2625,7 +2625,7 @@ libhal_merge_properties (LibHalContext *ctx,
  * @property_namespace: the namespace for set of devices, e.g. "usb"
  * @error: pointer to an initialized dbus error object for returning errors or NULL
  *
- * Check a set of properties for two devices matches. 
+ * Check a set of properties for two devices matches.
  *
  * Checks that all properties where keys, starting with a given value
  * (namespace), of the first device is in the second device and that
@@ -2639,7 +2639,7 @@ libhal_merge_properties (LibHalContext *ctx,
  * parameter from one device is in the other and have the same value.
  */
 dbus_bool_t
-libhal_device_matches (LibHalContext *ctx, 
+libhal_device_matches (LibHalContext *ctx,
 		       const char *udi1, const char *udi2,
 		       const char *property_namespace, DBusError *error)
 {
@@ -2797,7 +2797,7 @@ libhal_device_print (LibHalContext *ctx, const char *udi, DBusError *error)
  * Returns: UDI of devices; free with libhal_free_string_array()
  */
 char **
-libhal_manager_find_device_string_match (LibHalContext *ctx, 
+libhal_manager_find_device_string_match (LibHalContext *ctx,
 					 const char *key,
 					 const char *value, int *num_devices, DBusError *error)
 {
@@ -2847,11 +2847,11 @@ libhal_manager_find_device_string_match (LibHalContext *ctx,
 		fprintf (stderr, "%s %d : wrong reply from hald.  Expecting an array.\n", __FILE__, __LINE__);
 		return NULL;
 	}
-	
+
 	dbus_message_iter_recurse (&reply_iter, &iter_array);
 
 	hal_device_names = libhal_get_string_array_from_iter (&iter_array, num_devices);
-		      
+
 	dbus_message_unref (reply);
 	return hal_device_names;
 }
@@ -2869,7 +2869,7 @@ libhal_manager_find_device_string_match (LibHalContext *ctx,
  * Returns: TRUE if the capability was added, FALSE if the device didn't exist
  */
 dbus_bool_t
-libhal_device_add_capability (LibHalContext *ctx, 
+libhal_device_add_capability (LibHalContext *ctx,
 			      const char *udi, const char *capability, DBusError *error)
 {
 	DBusMessage *message;
@@ -2893,7 +2893,7 @@ libhal_device_add_capability (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &capability);
 
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -2962,7 +2962,7 @@ libhal_device_query_capability (LibHalContext *ctx, const char *udi, const char 
  * Returns: UDI of devices; free with libhal_free_string_array()
  */
 char **
-libhal_find_device_by_capability (LibHalContext *ctx, 
+libhal_find_device_by_capability (LibHalContext *ctx,
 				  const char *capability, int *num_devices, DBusError *error)
 {
 	DBusMessage *message;
@@ -3009,11 +3009,11 @@ libhal_find_device_by_capability (LibHalContext *ctx,
 		fprintf (stderr, "%s %d : wrong reply from hald.  Expecting an array.\n", __FILE__, __LINE__);
 		return NULL;
 	}
-	
+
 	dbus_message_iter_recurse (&reply_iter, &iter_array);
 
 	hal_device_names = libhal_get_string_array_from_iter (&iter_array, num_devices);
-		      
+
 	dbus_message_unref (reply);
 	return hal_device_names;
 }
@@ -3060,9 +3060,9 @@ libhal_device_property_watch_all (LibHalContext *ctx, DBusError *error)
  */
 dbus_bool_t
 libhal_device_add_property_watch (LibHalContext *ctx, const char *udi, DBusError *error)
-{	
+{
 	char buf[512];
-	
+
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 
@@ -3091,9 +3091,9 @@ libhal_device_add_property_watch (LibHalContext *ctx, const char *udi, DBusError
  */
 dbus_bool_t
 libhal_device_remove_property_watch (LibHalContext *ctx, const char *udi, DBusError *error)
-{	
+{
 	char buf[512];
-	
+
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
 	LIBHAL_CHECK_UDI_VALID(udi, FALSE);
 
@@ -3125,13 +3125,13 @@ libhal_ctx_new (void)
 	if (!libhal_already_initialized_once) {
 		bindtextdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
 		bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
-		
+
 		libhal_already_initialized_once = TRUE;
 	}
 
 	ctx = calloc (1, sizeof (LibHalContext));
 	if (ctx == NULL) {
-		fprintf (stderr, 
+		fprintf (stderr,
 			 "%s %d : Failed to allocate %lu bytes\n",
 			 __FILE__, __LINE__, (unsigned long) sizeof (LibHalContext));
 		return NULL;
@@ -3211,7 +3211,7 @@ libhal_ctx_get_dbus_connection (LibHalContext *ctx)
  *
  * Returns: TRUE if initialization succeeds, FALSE otherwise
  */
-dbus_bool_t 
+dbus_bool_t
 libhal_ctx_init (LibHalContext *ctx, DBusError *error)
 {
 	DBusError _error;
@@ -3233,12 +3233,12 @@ libhal_ctx_init (LibHalContext *ctx, DBusError *error)
 		return FALSE;
 	}
 
-	
+
 	if (!dbus_connection_add_filter (ctx->connection, filter_func, ctx, NULL)) {
 		return FALSE;
 	}
 
-	dbus_bus_add_match (ctx->connection, 
+	dbus_bus_add_match (ctx->connection,
 			    "type='signal',"
 			    "interface='org.freedesktop.Hal.Manager',"
 			    "sender='org.freedesktop.Hal',"
@@ -3303,9 +3303,9 @@ out:
  *
  * Returns: TRUE if connection successfully shut down, FALSE otherwise
  */
-dbus_bool_t    
+dbus_bool_t
 libhal_ctx_shutdown (LibHalContext *ctx, DBusError *error)
-{	
+{
 	DBusError myerror;
 
 	LIBHAL_CHECK_LIBHALCONTEXT(ctx, FALSE);
@@ -3315,14 +3315,14 @@ libhal_ctx_shutdown (LibHalContext *ctx, DBusError *error)
 		/*dbus_connection_unref (ctx->connection);*/
 	} else {
 		dbus_error_init (&myerror);
-		dbus_bus_remove_match (ctx->connection, 
+		dbus_bus_remove_match (ctx->connection,
 				       "type='signal',"
 				       "interface='org.freedesktop.Hal.Manager',"
 				       "sender='org.freedesktop.Hal',"
 				       "path='/org/freedesktop/Hal/Manager'", &myerror);
 		dbus_move_error (&myerror, error);
 		if (error != NULL && dbus_error_is_set (error)) {
-			fprintf (stderr, "%s %d : Error unsubscribing to signals, error=%s\n", 
+			fprintf (stderr, "%s %d : Error unsubscribing to signals, error=%s\n",
 				 __FILE__, __LINE__, error->message);
 			/** @todo  clean up */
 		}
@@ -3345,7 +3345,7 @@ libhal_ctx_shutdown (LibHalContext *ctx, DBusError *error)
  *
  * Returns: TRUE
  */
-dbus_bool_t    
+dbus_bool_t
 libhal_ctx_free (LibHalContext *ctx)
 {
 	free (ctx);
@@ -3468,7 +3468,7 @@ libhal_ctx_set_device_condition (LibHalContext *ctx, LibHalDeviceCondition callb
  *
  * Returns: Number of strings in array
  */
-unsigned int 
+unsigned int
 libhal_string_array_length (char **str_array)
 {
 	unsigned int i;
@@ -3493,7 +3493,7 @@ libhal_string_array_length (char **str_array)
  *
  * Returns: Whether the operation succeeded
  */
-dbus_bool_t 
+dbus_bool_t
 libhal_device_rescan (LibHalContext *ctx, const char *udi, DBusError *error)
 {
 	DBusMessage *message;
@@ -3514,7 +3514,7 @@ libhal_device_rescan (LibHalContext *ctx, const char *udi, DBusError *error)
 			 __FILE__, __LINE__);
 		return FALSE;
 	}
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -3572,7 +3572,7 @@ libhal_device_reprobe (LibHalContext *ctx, const char *udi, DBusError *error)
 			 __FILE__, __LINE__);
 		return FALSE;
 	}
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -3643,7 +3643,7 @@ dbus_bool_t libhal_device_emit_condition (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &condition_name);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &condition_details);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -3677,10 +3677,10 @@ dbus_bool_t libhal_device_emit_condition (LibHalContext *ctx,
 
 	dbus_message_unref (reply);
 
-	return result;	
+	return result;
 }
 
-/** 
+/**
  * libhal_device_addon_is_ready:
  * @ctx: the context for the connection to hald
  * @udi: the Unique Device Id this addon is handling
@@ -3718,7 +3718,7 @@ libhal_device_addon_is_ready (LibHalContext *ctx, const char *udi, DBusError *er
 	}
 
 	dbus_message_iter_init_append (message, &iter);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -3739,7 +3739,7 @@ libhal_device_addon_is_ready (LibHalContext *ctx, const char *udi, DBusError *er
 	dbus_message_iter_get_basic (&reply_iter, &result);
 
 	dbus_message_unref (reply);
-	return result;	
+	return result;
 }
 
 /**
@@ -3788,7 +3788,7 @@ libhal_device_claim_interface (LibHalContext *ctx,
 	dbus_message_iter_init_append (message, &iter);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &interface_name);
 	dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &introspection_xml);
-	
+
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
@@ -3811,7 +3811,7 @@ libhal_device_claim_interface (LibHalContext *ctx,
 
 	dbus_message_unref (reply);
 
-	return result;	
+	return result;
 }
 
 
@@ -3847,7 +3847,7 @@ struct LibHalChangeSet_s {
  *
  * Request a new changeset object. Used for changing multiple properties at once. Useful when
  * performance is critical and also for atomically updating several properties.
- * 
+ *
  * Returns: A new changeset object or NULL on error
  */
 LibHalChangeSet *
@@ -3898,11 +3898,11 @@ libhal_changeset_append (LibHalChangeSet *changeset, LibHalChangeSetElement *ele
 /**
  * libhal_changeset_set_property_string:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -3941,11 +3941,11 @@ out:
 /**
  * libhal_changeset_set_property_int:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -3977,11 +3977,11 @@ out:
 /**
  * libhal_changeset_set_property_uint64:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -4013,11 +4013,11 @@ out:
 /**
  * libhal_changeset_set_property_double:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -4049,11 +4049,11 @@ out:
 /**
  * libhal_changeset_set_property_bool:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -4085,11 +4085,11 @@ out:
 /**
  * libhal_changeset_set_property_strlist:
  * @changeset: the changeset
- * @key: key of property 
+ * @key: key of property
  * @value: the value to set - NULL terminated array of strings
- * 
+ *
  * Set a property.
- * 
+ *
  * Returns: FALSE on OOM
  */
 dbus_bool_t
@@ -4153,9 +4153,9 @@ out:
  * @ctx: the context for the connection to hald
  * @changeset: the changeset to commit
  * @error: pointer to an initialized dbus error object for returning errors or NULL
- * 
+ *
  * Commit a changeset to the daemon.
- * 
+ *
  * Returns: True if the changeset was committed on the daemon side
  */
 dbus_bool_t
@@ -4190,7 +4190,7 @@ libhal_device_commit_changeset (LibHalContext *ctx, LibHalChangeSet *changeset, 
 
 	dbus_message_iter_init_append (message, &iter);
 
-	dbus_message_iter_open_container (&iter, 
+	dbus_message_iter_open_container (&iter,
 					  DBUS_TYPE_ARRAY,
 					  DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
 					  DBUS_TYPE_STRING_AS_STRING
@@ -4212,12 +4212,12 @@ libhal_device_commit_changeset (LibHalContext *ctx, LibHalChangeSet *changeset, 
 			dbus_message_iter_close_container (&sub2, &sub3);
 			break;
 		case LIBHAL_PROPERTY_TYPE_STRLIST:
-			dbus_message_iter_open_container (&sub2, DBUS_TYPE_VARIANT, 
+			dbus_message_iter_open_container (&sub2, DBUS_TYPE_VARIANT,
 							  DBUS_TYPE_ARRAY_AS_STRING DBUS_TYPE_STRING_AS_STRING, &sub3);
-			dbus_message_iter_open_container (&sub3, DBUS_TYPE_ARRAY, 
+			dbus_message_iter_open_container (&sub3, DBUS_TYPE_ARRAY,
 							  DBUS_TYPE_STRING_AS_STRING, &sub4);
 			for (i = 0; elem->value.val_strlist[i] != NULL; i++) {
-				dbus_message_iter_append_basic (&sub4, DBUS_TYPE_STRING, 
+				dbus_message_iter_append_basic (&sub4, DBUS_TYPE_STRING,
 								&(elem->value.val_strlist[i]));
 			}
 			dbus_message_iter_close_container (&sub3, &sub4);
@@ -4252,7 +4252,7 @@ libhal_device_commit_changeset (LibHalContext *ctx, LibHalChangeSet *changeset, 
 
 	dbus_message_iter_close_container (&iter, &sub);
 
-	
+
 	dbus_error_init (&_error);
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
@@ -4279,7 +4279,7 @@ libhal_device_commit_changeset (LibHalContext *ctx, LibHalChangeSet *changeset, 
 /**
  * libhal_device_free_changeset:
  * @changeset: the changeset to free
- * 
+ *
  * Free a changeset.
  */
 void

@@ -173,10 +173,10 @@ __log_open_file(lp, argp)
 	__log_register_args *argp;
 {
 	DB_ENTRY *dbe;
-  
+
 	if (argp->name.size == 0)
 		return(0);
-  
+
 	/*
 	 * Because of reference counting, we cannot automatically close files
 	 * during recovery, so when we're opening, we have to check that the
@@ -290,7 +290,7 @@ __log_add_logid(logp, dbp, name, ndx)
 
 	/* Make space for the name and copy it in. */
 	if (name != NULL) {
-		if ((ret = __os_malloc(strlen(name) + 1, 
+		if ((ret = __os_malloc(strlen(name) + 1,
 		    NULL, &logp->dbentry[ndx].name)) != 0)
 			goto err;
 		strcpy(logp->dbentry[ndx].name, name);
@@ -330,7 +330,7 @@ __db_fileid_to_db(logp, dbpp, ndx)
 
 	/*
 	 * Under XA, a process different than the one issuing DB
-	 * operations may abort a transaction.  In this case, 
+	 * operations may abort a transaction.  In this case,
 	 * recovery routines are run by a process that does not
 	 * necessarily have the file open.  In this case, we must
 	 * open the file explicitly.

@@ -131,7 +131,7 @@ ns_samedomain(const char *a, const char *b) {
 			break;
 	if (escaped)
 		return (0);
-	  
+
 	/* Now compare aligned trailing substring. */
 	cp = a + diff;
 	return (strncasecmp(cp, b, lb) == 0);

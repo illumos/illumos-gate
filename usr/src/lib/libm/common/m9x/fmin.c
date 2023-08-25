@@ -50,7 +50,7 @@ __fmin(double x, double y) {
 		double d;
 	} xx, yy;
 	unsigned s;
-	
+
 	/* if y is nan, replace it by x */
 	if (y != y)
 		y = x;

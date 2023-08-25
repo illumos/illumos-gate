@@ -111,7 +111,7 @@ res_nupdate(res_state statp, ns_updrec *rrecp_in, ns_tsig_key *key) {
 		tgrp.z_class = rrecp->r_class;
 		nscnt = res_findzonecut2(statp, rrecp->r_dname, tgrp.z_class,
 					 RES_EXHAUSTIVE, tgrp.z_origin,
-					 sizeof tgrp.z_origin, 
+					 sizeof tgrp.z_origin,
 					 tgrp.z_nsaddrs, MAXNS);
 		if (nscnt <= 0) {
 			DPRINTF(("res_findzonecut failed (%d)", nscnt));

@@ -99,7 +99,7 @@ error_out:
 	    memset(obuffer, 0, bufsize);
 	    xfree(obuffer);
     }
-    if (*minor_status == 0) 
+    if (*minor_status == 0)
 	    *minor_status = (OM_uint32) kret;
     return(retval);
 }

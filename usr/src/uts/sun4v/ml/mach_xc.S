@@ -115,7 +115,7 @@
 /*
  * In the case of a cpuset of greater size than a long we
  * grab extra trace buffers just to store the cpuset.
- * Seems like a waste but popular opinion opted for this 
+ * Seems like a waste but popular opinion opted for this
  * rather than increase the size of the buffer.
  */
 #if CPUSET_SIZE > CLONGSIZE
@@ -153,7 +153,7 @@
 	ldn	[%o1], %g2
 	stna	%g2, [%g3 + TRAP_ENT_F4]%asi
 	add	%o1, CLONGSIZE, %o1
-2:	
+2:
 	TRACE_NEXT(%g2, %g3, %g4)
 	cmp	%o1, %g5
 	bl	1b
@@ -224,7 +224,7 @@
  */
 	ENTRY_NP(xt_sync_tl1)
 	CPU_INDEX(%g3, %g4)		/* %g3 = cpu id */
-	stb	%g0, [%g1 + %g3] 
+	stb	%g0, [%g1 + %g3]
 	retry
 	SET_SIZE(xt_sync_tl1)
 

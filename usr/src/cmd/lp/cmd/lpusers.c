@@ -74,7 +74,7 @@ main(int argc, char *argv[])
 
     if(argc == 1) {
 usage:
-	(void) printf(gettext("usage: \n"));	
+	(void) printf(gettext("usage: \n"));
   	(void) printf(gettext("(assign priority limit to users)\n"));
 	(void) printf(gettext("\tlpusers -q priority -u user-list\n"));
 

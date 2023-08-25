@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_rd_req()
  */
@@ -32,28 +32,28 @@
 
 /*
  *  Parses a KRB_AP_REQ message, returning its contents.
- * 
+ *
  *  server specifies the expected server's name for the ticket.
- * 
+ *
  *  keyproc specifies a procedure to generate a decryption key for the
  *  ticket.  If keyproc is non-NULL, keyprocarg is passed to it, and the result
  *  used as a decryption key. If keyproc is NULL, then fetchfrom is checked;
  *  if it is non-NULL, it specifies a parameter name from which to retrieve the
  *  decryption key.  If fetchfrom is NULL, then the default key store is
  *  consulted.
- * 
+ *
  *  returns system errors, encryption errors, replay errors
  */
 
 krb5_error_code KRB5_CALLCONV
 krb5_rd_req(krb5_context context, krb5_auth_context *auth_context, const krb5_data *inbuf, krb5_const_principal server, krb5_keytab keytab, krb5_flags *ap_req_options, krb5_ticket **ticket)
-                 	          
-                                     
-                    	         
+
+
+
                                  	/* XXX do we really need this */
-               		         
-              		                  
-               	           
+
+
+
 {
     krb5_error_code 	  retval;
     krb5_ap_req 	* request;
@@ -65,7 +65,7 @@ krb5_rd_req(krb5_context context, krb5_auth_context *auth_context, const krb5_da
     if ((retval = decode_krb5_ap_req(inbuf, &request))) {
     	switch (retval) {
 	case KRB5_BADMSGTYPE:
-	    return KRB5KRB_AP_ERR_BADVERSION; 
+	    return KRB5KRB_AP_ERR_BADVERSION;
 	default:
 	    return(retval);
 	}
@@ -98,7 +98,7 @@ krb5_rd_req(krb5_context context, krb5_auth_context *auth_context, const krb5_da
 	keytab = new_keytab;
     }
 
-    retval = krb5_rd_req_decoded(context, auth_context, request, server, 
+    retval = krb5_rd_req_decoded(context, auth_context, request, server,
 				 keytab, ap_req_options, ticket);
 
     if (new_keytab != NULL)

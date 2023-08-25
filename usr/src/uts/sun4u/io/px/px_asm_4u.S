@@ -27,7 +27,7 @@
 /*
  * Assembly language support for px driver
  */
- 
+
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>
 #include <sys/privregs.h>
@@ -77,7 +77,7 @@
 	lduwa	[%o1]%asi, %g1
 	ba	.peekdone
 	stuw	%g1, [%o2]
-	
+
 .peek_half:
 	bne	.peek_byte
 	nop
@@ -88,7 +88,7 @@
 .peek_byte:
 	lduba	[%o1]%asi, %g1	! 8-bit!
 	stub	%g1, [%o2]
- 
+
 .peekdone:
 	membar	#Sync			! Make sure the loads take
 	tst	%g2			! No need to reenable interrupts
@@ -150,4 +150,4 @@
 	retl
 	mov	%g0, %o0
 	SET_SIZE(px_phys_poke_4u)
- 
+

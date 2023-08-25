@@ -5,7 +5,7 @@
 
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -585,7 +585,7 @@ kadm5int_acl_match_data(e1, e2, targetflag, ws)
 {
     krb5_boolean	retval;
 
-    DPRINT(DEBUG_CALLS, acl_debug_level, 
+    DPRINT(DEBUG_CALLS, acl_debug_level,
 	   ("* acl_match_entry(%s, %s)\n", e1->data, e2->data));
     retval = 0;
     if (!strncmp(e1->data, "*", e1->length)) {
@@ -611,7 +611,7 @@ kadm5int_acl_match_data(e1, e2, targetflag, ws)
 	else if ((ws->backref[n]->length == e2->length) &&
 		 (!strncmp(ws->backref[n]->data, e2->data, e2->length)))
 	    retval = 1;
-	
+
     }
     else {
 	if ((e1->length == e2->length) &&

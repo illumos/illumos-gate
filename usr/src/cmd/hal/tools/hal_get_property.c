@@ -153,7 +153,7 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	dbus_error_init (&error);	
+	dbus_error_init (&error);
 	if ((hal_ctx = libhal_ctx_new ()) == NULL) {
 		fprintf (stderr, "error: libhal_ctx_new\n");
 		return 1;
@@ -236,15 +236,15 @@ main (int argc, char *argv[])
 	{
 		unsigned int i;
 		char **strlist;
-		
+
 		if ((strlist = libhal_device_get_property_strlist (hal_ctx, udi, key, &error)) != NULL) {
-			
+
 			for (i = 0; strlist[i] != 0; i++) {
 				printf ("%s", strlist[i]);
 				if (strlist[i+1] != NULL)
 					printf (" ");
 			}
-		} 
+		}
 		break;
 	}
 	default:

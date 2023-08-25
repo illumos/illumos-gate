@@ -80,7 +80,7 @@ class ServiceTable extends Object {
 
     // Time to sleep. Adjusted depending on incoming URLs.
 
-    private static long sleepyTime = Defaults.lMaxSleepTime;	
+    private static long sleepyTime = Defaults.lMaxSleepTime;
 
     //
     // Creation of singleton.
@@ -330,7 +330,7 @@ class ServiceTable extends Object {
 
 		    urlSig = sreg.URLSignature;
 		    attrSig = sreg.attrSignature;
-	
+
 		}
 
 		store.register(surl, attrs, scopes, locale, urlSig, attrSig);
@@ -360,7 +360,7 @@ class ServiceTable extends Object {
 	    } catch (ServiceLocationException ex) {
 
 		String msg = ex.getMessage();
-	
+
 		conf.writeLog("st_serialized_seex",
 			      new Object[] {
 		    new Integer(ex.getErrorCode()),
@@ -370,7 +370,7 @@ class ServiceTable extends Object {
 	    } catch (Exception ex) {
 
 		String msg = ex.getMessage();
-	
+
 		conf.writeLog("st_serialized_seex",
 			      new Object[] {
 		    surl,
@@ -621,7 +621,7 @@ class ServiceTable extends Object {
 	    // Store register or update.
 
 	    boolean existing = false;
-	
+
 	    if (fresh) {
 		existing = store.register(surl,
 					  attrs,
@@ -639,7 +639,7 @@ class ServiceTable extends Object {
 		store.updateRegistration(surl, attrs, scopes, locale);
 
 	    }
-	
+
 	    // Create the reply.
 
 	    SrvLocMsg ack = req.makeReply(existing);
@@ -1114,7 +1114,7 @@ class ServiceTable extends Object {
 			attributes = new Vector();
 		    }
 		}
-	
+
 	    } else {
 
 		if (!req.spi.equals("")) {
@@ -1416,7 +1416,7 @@ class ServiceTable extends Object {
 	// Check if we support scopes first. If not, return an
 	//  error reply unless the scope vector is zero. Upper layers
 	//  must sort out whether this is a unicast or multicast.
-	
+
 	if (scopes.size() > 0 && !areSupportedScopes(scopes)) {
 	    throw
 		new ServiceLocationException(

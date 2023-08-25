@@ -29,7 +29,7 @@ include $(SRC)/cmd/Makefile.cmd
 TEXT_DOMAIN=SUNW_OST_OSCMD
 POFILE=$(PROG).po
 
-LDLIBS += -lbsm -lsecdb -lscf 
+LDLIBS += -lbsm -lsecdb -lscf
 
 LIBBSM = $(SRC)/lib/libbsm/common
 

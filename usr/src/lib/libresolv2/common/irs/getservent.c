@@ -160,13 +160,13 @@ init() {
 		net_data->sv = (*net_data->irs->sv_map)(net_data->irs);
 
 		if (!net_data->sv || !net_data->res) {
- error:		
+ error:
 			errno = EIO;
 			return (NULL);
 		}
 		(*net_data->sv->res_set)(net_data->sv, net_data->res, NULL);
 	}
-	
+
 	return (net_data);
 }
 

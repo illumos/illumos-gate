@@ -9,7 +9,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,11 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -37,7 +37,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -49,14 +49,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -67,7 +67,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -141,7 +141,7 @@ static krb5_error_code get_credentials(context, cred, server, now,
 	code = KRB5KRB_AP_ERR_TKT_EXPIRED;
 	goto cleanup;
     }
-    
+
 cleanup:
     if (in_creds.client)
 	    krb5_free_principal(context, in_creds.client);
@@ -255,7 +255,7 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
     *out = &data->checksum_data;
     return 0;
 }
-    
+
 static krb5_error_code
 make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
     krb5_context context;
@@ -349,7 +349,7 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
    token->value = (void *) t;
 
    code = 0;
-    
+
  cleanup:
    if (checksum_data && checksum_data->data)
        krb5_free_data_contents(context, checksum_data);
@@ -531,7 +531,7 @@ new_connection(
 
    ctx->initiate = 1;
    ctx->gss_flags = (GSS_C_INTEG_FLAG | GSS_C_CONF_FLAG |
-                     GSS_C_TRANS_FLAG | 
+                     GSS_C_TRANS_FLAG |
                      ((req_flags) & (GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
                                      GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG)));
    ctx->seed_init = 0;
@@ -549,7 +549,7 @@ new_connection(
 
    if ((code = krb5_copy_principal(context, cred->princ, &ctx->here)))
       goto fail;
-      
+
    if ((code = krb5_copy_principal(context, (krb5_principal) target_name,
 				   &ctx->there)))
       goto fail;
@@ -577,7 +577,7 @@ new_connection(
       /* gsskrb5 v1 */
       krb5_ui_4 seq_temp;
       if ((code = make_ap_req_v1(context, ctx,
-				 cred, k_cred, input_chan_bindings, 
+				 cred, k_cred, input_chan_bindings,
 				 mech_type, &token))) {
 	 if ((code == KRB5_FCC_NOFILE) || (code == KRB5_CC_NOTFOUND) ||
 	     (code == KG_EMPTY_CCACHE))
@@ -600,7 +600,7 @@ new_connection(
       krb5_free_creds(context, k_cred);
       k_cred = 0;
    }
-      
+
    /* at this point, the context is constructed and valid,
       hence, releaseable */
 
@@ -638,7 +638,7 @@ new_connection(
    } else {
       ctx->seq_recv = ctx->seq_send;
       g_order_init(&(ctx->seqstate), ctx->seq_recv,
-		   (ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0, 
+		   (ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0,
 		   (ctx->gss_flags & GSS_C_SEQUENCE_FLAG) != 0, ctx->proto);
       ctx->gss_flags |= GSS_C_PROT_READY_FLAG;
       ctx->established = 1;
@@ -719,7 +719,7 @@ mutual_auth(
       goto fail;
    }
 
-   if (! krb5_principal_compare(context, ctx->there, 
+   if (! krb5_principal_compare(context, ctx->there,
 				(krb5_principal) target_name)) {
        /* Solaris Kerberos: spruce-up the err msg */
        krb5_principal tname = (krb5_principal) target_name;
@@ -739,7 +739,7 @@ mutual_auth(
        if (s_princ)
 	   krb5_free_unparsed_name(context, s_princ);
 
-       (void)krb5_gss_delete_sec_context(minor_status, 
+       (void)krb5_gss_delete_sec_context(minor_status,
 					context_handle, NULL);
        major_status = GSS_S_BAD_NAME;
        goto fail;
@@ -748,7 +748,7 @@ mutual_auth(
    /* verify the token and leave the AP_REP message in ap_rep */
 
    if (input_token == GSS_C_NO_BUFFER) {
-      (void)krb5_gss_delete_sec_context(minor_status, 
+      (void)krb5_gss_delete_sec_context(minor_status,
 					context_handle, NULL);
       code = 0;
       major_status = GSS_S_DEFECTIVE_TOKEN;
@@ -770,7 +770,7 @@ mutual_auth(
 
 	 sptr = (char *) ptr;           /* PC compiler bug */
 	 TREAD_STR(sptr, ap_rep.data, ap_rep.length);
-		      
+
 	 code = krb5_rd_error(context, &ap_rep, &krb_error);
 	 if (code)
 	    goto fail;
@@ -794,7 +794,7 @@ mutual_auth(
 			   &ap_rep_data))) {
       /*
        * XXX A hack for backwards compatiblity.
-       * To be removed in 1999 -- proven 
+       * To be removed in 1999 -- proven
        */
       krb5_auth_con_setuseruserkey(context, ctx->auth_context,
 				   ctx->subkey);
@@ -985,7 +985,7 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
    } else {
        err = 1;
    }
-   
+
    if (err) {
       k5_mutex_unlock(&cred->lock);
       if (claimant_cred_handle == GSS_C_NO_CREDENTIAL)
@@ -1103,7 +1103,7 @@ principal_ignore_inst_compare(context, princ1, princ2)
 
     /*
      * Solaris Kerberos:
-     * Don't bother to compare the realms as princ1 will always have a 
+     * Don't bother to compare the realms as princ1 will always have a
      * referral realm set.
      */
 
@@ -1113,7 +1113,7 @@ principal_ignore_inst_compare(context, princ1, princ2)
      */
     if (nelem == 2) {
         const krb5_data *p = krb5_princ_component(context, princ1, 1);
- 
+
 	if (p->length == 1) {
 	    const char *s = p->data;
 
@@ -1124,12 +1124,12 @@ principal_ignore_inst_compare(context, princ1, princ2)
 		if (p1->length != p2->length ||
 		        memcmp(p1->data, p2->data, p1->length))
 		    return FALSE;
- 
+
 		return TRUE;
 	    }
 	}
     }
-    
+
     return FALSE;
 }
 
@@ -1309,7 +1309,7 @@ ktfile_get_entry(context, id, principal, kvno, enctype, entry)
 
 /*
  * Solaris Kerberos
- * Given a princ of name/instance@LOCALREALM, search the keytab 
+ * Given a princ of name/instance@LOCALREALM, search the keytab
  * for a match of name and LOCALREALM and if found, return instance
  * as a string.
  *
@@ -1323,8 +1323,8 @@ get_instance_keytab(
 	char  **instance)  /* out */
 {
 	krb5_error_code ret=0;
-	krb5_keytab_entry kt_ent; 
-	krb5_int32 nelem, free_kt_ent=0; 
+	krb5_keytab_entry kt_ent;
+	krb5_int32 nelem, free_kt_ent=0;
 	register const krb5_data *p;
 	char *realm=NULL, *s=NULL;
 	krb5_principal client=NULL, princ=NULL;
@@ -1345,7 +1345,7 @@ get_instance_keytab(
 		goto out;
 
 	ret = ktfile_get_entry(context, keytab, client,
-				0, /* don't have vno available */ 
+				0, /* don't have vno available */
 				0, &kt_ent);
 	if (ret)
 		goto out;
@@ -1353,13 +1353,13 @@ get_instance_keytab(
 	free_kt_ent++;  /* kt_ent is not a ptr */
 
 	princ = kt_ent.principal;
-	nelem = krb5_princ_size(context, princ); 
+	nelem = krb5_princ_size(context, princ);
 	if (nelem != 2) {
 		ret = KRB5_PRINC_NOMATCH;
 		goto out;
 	}
 
-	p = krb5_princ_component(context, princ, 1); 
+	p = krb5_princ_component(context, princ, 1);
 	s = calloc(p->length + sizeof(char), sizeof(char));
 	if (!s) {
 		ret = ENOMEM;
@@ -1375,7 +1375,7 @@ out:
 		krb5_free_principal(context, client);
 	if (free_kt_ent)
 		(void) krb5_kt_free_entry(context, &kt_ent);
-		
+
 	if (ret == 0)
 		*instance = s;
 	return ret;
@@ -1560,7 +1560,7 @@ load_root_cred_using_keytab(
 
 		return (GSS_S_FAILURE);
 	}
-	
+
 	KRB5_LOG0(KRB5_INFO, "load_root_cred_using_keytab() end \n");
 
 	return (GSS_S_COMPLETE);
@@ -1617,13 +1617,13 @@ renew_ccache(OM_uint32 *minor_status, krb5_context context, uid_t uid)
 
 	creds.server = server;
 	creds.ticket_flags = TKT_FLG_RENEWABLE;
-	
+
 	if ((krb5_cc_retrieve_cred(context, ccache, KRB5_TC_MATCH_FLAGS,
 			&creds, &tmpcreds))) {
 		(void) krb5_cc_close(context, ccache);
 		return (KDC_ERR_BADOPTION);
 	}
-				
+
 	creds.ticket_flags = 0;
         code = krb5_get_credentials_renew(context, options, ccache,
 						&creds, &out_creds);
@@ -1719,7 +1719,7 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 
 	/* We've got a gss cred handle that is a kerberos cred handle. */
 	cred = (krb5_gss_cred_id_t)*cred_handle;
-	
+
 	/* If we can't get the time, assume the worst. */
 	if (krb5_timeofday(context, &now)) {
 		(void) krb5_gss_release_cred(&mntmp, cred_handle);
@@ -1747,7 +1747,7 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 		major = kg_get_defcred(minor_status, cred_handle);
 		if (major != GSS_S_COMPLETE)
 			return (major);
-		
+
 	/* Any body else is SOL unless we can renew their credential cache */
 	} else if ((cred->tgt_expire < now + MIN_RENEW_TIME) &&
 			(cred->tgt_expire > now)) {

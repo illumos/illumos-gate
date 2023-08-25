@@ -163,9 +163,9 @@ typedef s8_t	S8;
 
   #if defined(IA64)  || defined(AMD64)
         typedef U64  int_ptr_t;
-  #else   
-    #ifndef UEFI64    
-        typedef unsigned long       int_ptr_t; 
+  #else
+    #ifndef UEFI64
+        typedef unsigned long       int_ptr_t;
     #endif
   #endif
 #elif defined(LP64)
@@ -178,8 +178,8 @@ typedef s8_t	S8;
   typedef signed int          S32;
   typedef signed short        S16;
   typedef signed char         S8;
-  typedef unsigned long       int_ptr_t; 
-#elif defined(__WATCOMC__) 
+  typedef unsigned long       int_ptr_t;
+#elif defined(__WATCOMC__)
   typedef unsigned __int64    U64;
   typedef unsigned long       U32;
   typedef unsigned short      U16;
@@ -188,7 +188,7 @@ typedef s8_t	S8;
   typedef signed long         S32;
   typedef signed short        S16;
   typedef signed char         S8;
-  typedef unsigned long       int_ptr_t;  
+  typedef unsigned long       int_ptr_t;
 #else
   /* assume others: 16-bit */
   typedef unsigned char       U64[8];
@@ -198,11 +198,11 @@ typedef s8_t	S8;
   typedef signed char         S64[8];
   typedef signed long         S32;
   typedef signed short        S16;
-  typedef signed char         S8;     
-  typedef unsigned long       int_ptr_t;  
+  typedef signed char         S8;
+  typedef unsigned long       int_ptr_t;
 #endif /*  */
 
- 
+
 
 /*
  * define lower case types

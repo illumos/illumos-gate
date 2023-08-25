@@ -99,7 +99,7 @@ static void printlin(void);
 static void prctmp(struct ctmp *);
 
 int
-main(int argc, char **argv) 
+main(int argc, char **argv)
 {
 	char *prog = argv[0];
 
@@ -145,7 +145,7 @@ main(int argc, char **argv)
 				printf("\t%s", time_buf);
 			} else
 				fixup(stdout);
-			
+
 		}
 		exit(exitcode);
 	}
@@ -177,7 +177,7 @@ static size_t
 wread()
 {
 	return (fread(&wb, sizeof(wb), 1, stdin) == 1);
-	
+
 }
 
 /*

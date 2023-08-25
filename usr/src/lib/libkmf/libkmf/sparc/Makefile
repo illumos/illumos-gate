@@ -33,4 +33,4 @@ include ../Makefile.com
 #
 $(DYNLIB):=	LD_LIBRARY_PATH=/usr/lib
 
-install: all $(ROOTLIBS) $(ROOTLINKS) 
+install: all $(ROOTLIBS) $(ROOTLINKS)

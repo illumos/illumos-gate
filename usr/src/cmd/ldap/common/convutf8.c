@@ -65,7 +65,7 @@ static char *
 ldaptool_convert( const char *src, const char *fcode,
 				 const char *tcode) {
     char	*dest, *tptr, *tmp;
-    const char	*fptr;	
+    const char	*fptr;
     iconv_t	cd;
     size_t	ileft, oleft, ret, size;
 
@@ -121,7 +121,7 @@ ldaptool_convert( const char *src, const char *fcode,
 		size *= 2;
 		if ((tmp = (char *) realloc(dest, size)) == NULL)
 			break;
-		tptr = tmp + (tptr - dest); 
+		tptr = tmp + (tptr - dest);
 		dest = tmp;
 		continue;
 	} else {
@@ -136,10 +136,10 @@ ldaptool_convert( const char *src, const char *fcode,
 		free(dest);
 		dest = NULL;
 	} else if (oleft > 0) {
-		/* NULL terminate the return value */	
+		/* NULL terminate the return value */
 		*(dest + (size - oleft)) = '\0';
 	} else {
-		/* realloc one more byte and NULL terminate */	
+		/* realloc one more byte and NULL terminate */
 		if ((tmp = (char *) realloc(dest, size + 1)) == NULL) {
 			free(dest);
 			dest = NULL;
@@ -216,10 +216,10 @@ char *
 GetNormalizedLocaleName(void)
 {
 #ifdef _HPUX_SOURCE
- 
+
     int    len;
     char    *locale;
- 
+
     locale = setlocale(LC_CTYPE, "");
     if (locale && *locale) {
         len = strlen(locale);
@@ -227,31 +227,31 @@ GetNormalizedLocaleName(void)
         locale = "C";
         len = 1;
     }
- 
+
     if ((!strncmp(locale, "/\x03:", 3)) &&
         (!strcmp(&locale[len - 2], ";/"))) {
         locale += 3;
         len -= 5;
     }
- 
+
     locale = strdup(locale);
     if (locale) {
         locale[len] = 0;
     }
- 
+
     return locale;
- 
+
 #else
- 
+
     char    *locale;
- 
+
     locale = setlocale(LC_CTYPE, "");
     if (locale && *locale) {
         return strdup(locale);
     }
- 
+
     return strdup("C");
- 
+
 #endif
 }
 
@@ -558,9 +558,9 @@ const char *CHARCONVTABLE[] =
 NULL
 };
 #endif
- 
+
 #define BSZ     256
- 
+
 char *
 GetCharsetFromLocale(char *locale)
 {
@@ -569,28 +569,28 @@ GetCharsetFromLocale(char *locale)
     char *p;
     const char *line;
     int i=0;
- 
+
     line = CHARCONVTABLE[i];
     while (line != NULL)
     {
        if (*line == 0)
-       { 
+       {
           break;
-       } 
- 
+       }
+
        strcpy(buf, line);
        line = CHARCONVTABLE[++i];
- 
+
        if (strlen(buf) == 0 || buf[0] == '!')
-       { 
+       {
           continue;
-       } 
+       }
        p = strchr(buf, ':');
        if (p == NULL)
-       { 
+       {
           tmpcharset = NULL;
           break;
-       } 
+       }
        *p = 0;
        if (strcmp(buf, locale) == 0) {
           while (*++p == ' ' || *p == '\t')
@@ -599,13 +599,13 @@ GetCharsetFromLocale(char *locale)
              tmpcharset = strdup(p);
           } else
              tmpcharset = NULL;
- 
+
           break;
        }
     }
     return tmpcharset;
 }
- 
+
 #endif /* Not defined XP_WIN32 */
 
 #ifdef XP_WIN32
@@ -614,25 +614,25 @@ char *_convertor(const char *instr, int bFromUTF8)
     char  *outstr = NULL;
     int    inlen, wclen, outlen;
     LPWSTR wcstr;
-         
+
     if (instr == NULL)
             return NULL;
 
     if ((inlen = strlen(instr)) <= 0)
             return NULL;
- 
+
     /* output never becomes longer than input,
      * thus we don't have to ask for the length
      */
     wcstr = (LPWSTR) malloc( sizeof( WCHAR ) * (inlen+1) );
     if (!wcstr)
         return NULL;
- 
+
     wclen = MultiByteToWideChar(bFromUTF8 ? CP_UTF8 : CP_ACP, 0, instr,
                                  inlen, wcstr, inlen);
     outlen = WideCharToMultiByte(bFromUTF8 ? CP_ACP : CP_UTF8, 0, wcstr,
                                   wclen, NULL, 0, NULL, NULL);
- 
+
     if (outlen > 0) {
         outstr = (char *) malloc(outlen + 2);
         outlen = WideCharToMultiByte(bFromUTF8 ? CP_ACP : CP_UTF8, 0, wcstr,
@@ -656,19 +656,19 @@ ldaptool_local2UTF8( const char *src )
     size_t outLen, resultLen;
     UErrorCode err = U_ZERO_ERROR;
     UConverter *cnv;
- 
+
     if (src == NULL)
     {
       return NULL;
     }
-    else if (*src == 0 || (ldaptool_charset == NULL) 
+    else if (*src == 0 || (ldaptool_charset == NULL)
 	     || (!strcmp( ldaptool_charset, "" )))
     {
 	/* no option specified, so assume it's already in utf-8 */
         utf8 = strdup(src);
         return utf8;
     }
- 
+
     if( !strcmp( ldaptool_charset, "0" )
 	    && (!charsetset) )
     {
@@ -681,7 +681,7 @@ ldaptool_local2UTF8( const char *src )
 	    ldaptool_charset = strdup(newcharset);
 	    if (ldaptool_charset == NULL) {
 		return strdup(src);
-	    } 
+	    }
 	}
 	charsetset = 1;
     }
@@ -694,7 +694,7 @@ ldaptool_local2UTF8( const char *src )
 
     /* do the preflight - get the size needed for the target buffer */
     outLen = (size_t) ucnv_convert( "utf-8", ldaptool_charset, NULL, 0, src,
-                                      strlen( src ) * sizeof(char), &err); 
+                                      strlen( src ) * sizeof(char), &err);
 
     if ((err != U_BUFFER_OVERFLOW_ERROR) || (outLen == 0)) {
       /* default to just a copy of the string - this covers
@@ -702,7 +702,7 @@ ldaptool_local2UTF8( const char *src )
       return strdup(src);
     }
 
-    utf8 =  (char *) malloc( outLen + 1); 
+    utf8 =  (char *) malloc( outLen + 1);
     if( utf8 == NULL ) {
       /* if we're already out of memory, does strdup just return NULL? */
        return strdup(src);
@@ -710,20 +710,20 @@ ldaptool_local2UTF8( const char *src )
 
     /* do the actual conversion this time */
     err = U_ZERO_ERROR;
-    resultLen = ucnv_convert( "utf-8", ldaptool_charset, utf8, (outLen + 1), src, 
-		       strlen(src) * sizeof(char), &err ); 
+    resultLen = ucnv_convert( "utf-8", ldaptool_charset, utf8, (outLen + 1), src,
+		       strlen(src) * sizeof(char), &err );
 
     if (!U_SUCCESS(err)) {
       free(utf8);
       return strdup(src);
     }
- 
+
 #else
     utf8 = _convertor(src, FALSE);
     if( utf8 == NULL )
         utf8 = strdup(src);
 #endif
- 
+
     return utf8;
 }
 #endif /* HAVE_LIBICU */

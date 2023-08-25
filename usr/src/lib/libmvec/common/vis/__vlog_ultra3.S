@@ -2139,14 +2139,14 @@ CONSTANTS:
 ! i2  stridex
 ! i3  y
 ! i4  stridey
-! i5  
+! i5
 
 ! g1  TBL
 
 ! l0  j0
 ! l1  j1
 ! l2  j2
-! l3  
+! l3
 ! l4  0x94000
 ! l5  CONSTANTS
 ! l6  0x000fffff
@@ -2328,7 +2328,7 @@ CONSTANTS:
 	fzero	P1_f16
 	sub	YPTR,YSTR,YPTR
 	fzero	P1_f42
-	mov	%g0,%l1				! zero out for first pass 
+	mov	%g0,%l1				! zero out for first pass
 	mov	%g0,%l2				! zero out for first pass
 	fzero	P1_f44
 	fzero	P1_f46
@@ -2359,7 +2359,7 @@ CONSTANTS:
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 1
 	fpsub32s P0_X1,P0_f2,P0_X1		! X - n -> x	!	X1
-	add	XPTR,XSTR,XPTR		! x += stridex		
+	add	XPTR,XSTR,XPTR		! x += stridex
 	add	YPTR,YSTR,YPTR		! y += stridey	!
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 2
@@ -2397,7 +2397,7 @@ CONSTANTS:
 	! x-roundedup & 0xffff8000  -> xT  i.e 11bit value of x
 	fand	P0_f4,FP50_MASK,P0_f4	! xT			!	X1
 
-	
+
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 9
 	faddd	P0_f36,P0_f32,P0_f36	! + (x-xT)			X1-2
@@ -2478,7 +2478,7 @@ CONSTANTS:
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 22
 	fpsub32s P1_X2,P1_f12,P1_X2		! X - n -> x	!	X2
-	add	XPTR,XSTR,XPTR		! x += stridex		
+	add	XPTR,XSTR,XPTR		! x += stridex
 	add	YPTR,YSTR,YPTR		! y += stridey	!
 .cont1:
 
@@ -2582,7 +2582,7 @@ CONSTANTS:
 	nop
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 42
 	fpsub32s P2_X3,P2_f22,P2_X3		! X - n -> x	!	X3
-	add	XPTR,XSTR,XPTR		! x += stridex		
+	add	XPTR,XSTR,XPTR		! x += stridex
 	add	YPTR,YSTR,YPTR		! y += stridey	!
 .cont2:
 
@@ -2688,7 +2688,7 @@ CONSTANTS:
 	addcc	ICNT,-1,ICNT		!
 ! FALL THROUGH if running out of X array here
 	bg,pt	%icc,.loop0		!62
-! delay slot		
+! delay slot
 	fdivd	P2_f52,P2_f26,P2_f26	! -> s			!	X3
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!CYCLE 63

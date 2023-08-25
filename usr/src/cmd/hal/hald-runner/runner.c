@@ -32,7 +32,7 @@
 #include <signal.h>
 #include <string.h>
 
-#define DBUS_API_SUBJECT_TO_CHANGE 
+#define DBUS_API_SUBJECT_TO_CHANGE
 #include <dbus/dbus-glib-lowlevel.h>
 
 #include <glib.h>
@@ -40,12 +40,12 @@
 #include "runner.h"
 
 /* Successful run of the program */
-#define HALD_RUN_SUCCESS 0x0 
+#define HALD_RUN_SUCCESS 0x0
 /* Process was killed because of running too long */
-#define  HALD_RUN_TIMEOUT 0x1 
+#define  HALD_RUN_TIMEOUT 0x1
 /* Failed to start for some reason */
 #define HALD_RUN_FAILED 0x2
-/* Killed on purpose, e.g. hal_util_kill_device_helpers */   
+/* Killed on purpose, e.g. hal_util_kill_device_helpers */
 #define HALD_RUN_KILLED 0x4
 
 GHashTable *udi_hash = NULL;
@@ -112,7 +112,7 @@ send_reply(DBusConnection *con, DBusMessage *msg, guint32 exit_type, gint32 retu
 	DBusMessageIter iter;
 	int i;
 
-	if (con == NULL || msg == NULL) 
+	if (con == NULL || msg == NULL)
 		return;
 
 	reply = dbus_message_new_method_return(msg);
@@ -151,7 +151,7 @@ run_exited(GPid pid, gint status, gpointer data)
 	run_data *rd = (run_data *)data;
 	char **error = NULL;
 
-	printf("pid %d: rc=%d signaled=%d: %s\n", 
+	printf("pid %d: rc=%d signaled=%d: %s\n",
                pid, WEXITSTATUS(status), WIFSIGNALED(status), rd->r->argv[0]);
 	rd->watch = 0;
 	if (rd->sent_kill == TRUE) {
@@ -178,7 +178,7 @@ run_exited(GPid pid, gint status, gpointer data)
 
 out:
 	remove_run_data (rd);
-		
+
 	/* emit a signal that this PID exited */
 	if(rd->con != NULL && rd->emit_pid_exited) {
 		DBusMessage *signal;
@@ -186,21 +186,21 @@ out:
 		signal = dbus_message_new_signal ("/org/freedesktop/HalRunner",
 						  "org.freedesktop.HalRunner",
 						  "StartedProcessExited");
-		dbus_message_append_args (signal, 
+		dbus_message_append_args (signal,
 					  DBUS_TYPE_INT64, &(ppid),
 					  DBUS_TYPE_INVALID);
 		dbus_connection_send(rd->con, signal, NULL);
 	}
-	
+
 	del_run_data(rd);
 }
 
 static gboolean
 run_timedout(gpointer data) {
 	run_data *rd = (run_data *)data;
-	/* Time is up, kill the process, send reply that it was killed! 
+	/* Time is up, kill the process, send reply that it was killed!
 	 * Don't wait for exit, because it could hang in state D
-	 */ 
+	 */
 	kill(rd->pid, SIGTERM);
 	/* Ensure the timeout is not removed in the delete */
 	rd->timeout = 0;
@@ -219,7 +219,7 @@ find_program(char **argv)
 	char *program;
 	char *path = NULL;
 
-	if (argv[0] == NULL) 
+	if (argv[0] == NULL)
 		return FALSE;
 
 	program = g_path_get_basename(argv[0]);
@@ -255,7 +255,7 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 	printf("Run started %s (%u) (%d) \n!", r->argv[0], r->timeout,
 		r->error_on_stderr);
 	if (r->input != NULL) {
-		stdin_p = &stdin_v; 
+		stdin_p = &stdin_v;
 	}
 	if (r->error_on_stderr) {
 		stderr_p = &stderr_v;
@@ -357,21 +357,21 @@ do_kill_udi(gchar *udi)
 }
 
 /* Kill all running request for a udi */
-void 
+void
 run_kill_udi(gchar *udi)
 {
 	do_kill_udi(udi);
 	g_hash_table_remove(udi_hash, udi);
 }
 
-static gboolean 
+static gboolean
 hash_kill_udi(gpointer key, gpointer value, gpointer user_data) {
 	do_kill_udi(key);
 	return TRUE;
 }
 
 /* Kill all running request*/
-void 
+void
 run_kill_all()
 {
 	g_hash_table_foreach_remove(udi_hash, hash_kill_udi, NULL);

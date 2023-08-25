@@ -139,7 +139,7 @@ krb5_rcache_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **bu
 		/* Put the length of the file name */
 		(void) krb5_ser_pack_int32((krb5_int32) strlen(rcname),
 					   &bp, &remain);
-		
+
 		/* Put the name */
 		(void) krb5_ser_pack_bytes((krb5_octet *) rcname,
 					   strlen(rcname),
@@ -190,7 +190,7 @@ krb5_rcache_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **
 	    rcname[ibuf] = '\0';
 	    if (!(kret = krb5_rc_resolve_full(kcontext, &rcache, rcname))) {
 		(void) krb5_rc_recover(kcontext, rcache);
-		if (!kret && 
+		if (!kret &&
 		    !(kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)) &&
 		    (ibuf == KV5M_RCACHE)) {
 		    *buffer = bp;

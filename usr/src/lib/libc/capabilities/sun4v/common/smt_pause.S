@@ -46,7 +46,7 @@
 	rd	%ccr, %g0
 	rd	%ccr, %g0
 	retl
-	rd	%ccr, %g0 
+	rd	%ccr, %g0
 #else	/* NIAGARA2_IMPL */
 #define	BANKS	(4 * 64)	/* 4 cachelines, cover all banks */
 	save %sp, -SA(MINFRAME+BANKS), %sp

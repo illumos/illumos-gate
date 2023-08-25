@@ -179,7 +179,7 @@ main (int argc, char *argv[])
 		LibHalVolume *volume_to_unmount;
 
 		volume_udi = volume_udis[i];
-			
+
 #ifdef DEBUG
 		printf ("processing drive's volume %s (%d of %d)\n", volume_udi, i + 1, num_volumes);
 #endif
@@ -198,12 +198,12 @@ main (int argc, char *argv[])
 			if (!lock_hal_mtab ()) {
 				unknown_eject_error ("Cannot obtain lock on /media/.hal-mtab");
 			}
-			handle_unmount (hal_ctx, 
+			handle_unmount (hal_ctx,
 #ifdef HAVE_POLKIT
-					pol_ctx, 
+					pol_ctx,
 #endif
 					volume_udi, volume_to_unmount, drive,
-					libhal_volume_get_device_file (volume_to_unmount), 
+					libhal_volume_get_device_file (volume_to_unmount),
 					invoked_by_uid, invoked_by_syscon_name,
 					FALSE, FALSE, system_bus); /* use neither lazy nor force */
 			unlock_hal_mtab ();
@@ -219,14 +219,14 @@ main (int argc, char *argv[])
 	libhal_free_string_array (volume_udis);
 
 	/* now attempt the eject */
-	handle_eject (hal_ctx, 
+	handle_eject (hal_ctx,
 #ifdef HAVE_POLKIT
-		      pol_ctx, 
+		      pol_ctx,
 #endif
 		      libhal_drive_get_udi (drive),
 		      drive,
 		      libhal_drive_get_device_file (drive),
-		      invoked_by_uid, 
+		      invoked_by_uid,
 		      invoked_by_syscon_name,
 		      FALSE, system_bus);
 

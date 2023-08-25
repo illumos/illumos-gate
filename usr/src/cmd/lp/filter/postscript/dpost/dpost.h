@@ -115,7 +115,7 @@
  * is the total width of the string, and spaces is the number of space characters
  * in the current string. *str points to the start of the string in the strings[]
  * array. The Line structure is only used in the higher level encoding schemes.
- * 
+ *
  */
 
 #define	MAXSTACK	50		/* most strings we'll save at once */
@@ -184,7 +184,7 @@ typedef struct {
 	char	use[3];			/* into this one */
 
 } Devfontmap;
- 
+
 /*
  *
  * Some of the non-integer valued functions in dpost.c.

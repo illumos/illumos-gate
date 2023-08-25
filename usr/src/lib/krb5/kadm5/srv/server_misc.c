@@ -1,6 +1,6 @@
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -45,7 +45,7 @@ adb_policy_init(kadm5_server_handle_t handle)
     if( krb5_db_inited( handle->context ) == 0 )
 	return KADM5_OK;
 
-    return krb5_db_open( handle->context, NULL, 
+    return krb5_db_open( handle->context, NULL,
 			 KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN );
 }
 
@@ -72,9 +72,9 @@ reverse(str)
 	p = str+i-1;
 	q = newstr;
 	q[i]='\0';
-	for(; i > 0; i--) 
+	for(; i > 0; i--)
 		*q++ = *p--;
-	
+
 	return(newstr);
 }
 #endif /* HESIOD */
@@ -104,7 +104,7 @@ str_check_gecos(gecos, pwstr)
 	char	*pwstr;
 {
 	char		*cp, *ncp, *tcp;
-	
+
 	for (cp = gecos; *cp; ) {
 		/* Skip past punctuation */
 		for (; *cp; cp++)
@@ -124,7 +124,7 @@ str_check_gecos(gecos, pwstr)
 			tcp = reverse(cp);
 			if (!strcasecmp(pwstr, tcp))
 				return 1;
-			cp = ncp;				
+			cp = ncp;
 		} else
 			break;
 	}
@@ -140,7 +140,7 @@ passwd_check(kadm5_server_handle_t handle,
 {
     int	    nupper = 0,
 	    nlower = 0,
-	    ndigit = 0, 
+	    ndigit = 0,
 	    npunct = 0,
 	    nspec = 0;
     char    c, *s, *cp;
@@ -148,7 +148,7 @@ passwd_check(kadm5_server_handle_t handle,
     extern  struct passwd *hes_getpwnam();
     struct  passwd *ent;
 #endif
-    
+
     if(use_policy) {
 	if(strlen(password) < pol->pw_min_length)
 	    return KADM5_PASS_Q_TOOSHORT;
@@ -172,11 +172,11 @@ passwd_check(kadm5_server_handle_t handle,
 		continue;
 	    }
 	}
-	if ((nupper + nlower + ndigit + npunct + nspec) < pol->pw_min_classes) 
+	if ((nupper + nlower + ndigit + npunct + nspec) < pol->pw_min_classes)
 	    return KADM5_PASS_Q_CLASS;
 	if((find_word(password) == KADM5_OK))
 	    return KADM5_PASS_Q_DICT;
-	else { 
+	else {
 	    int	i, n = krb5_princ_size(handle->context, principal);
 	    cp = krb5_princ_realm(handle->context, principal)->data;
 	    if (strcasecmp(cp, password) == 0)
@@ -198,7 +198,7 @@ passwd_check(kadm5_server_handle_t handle,
 	if (strlen(password) < 1)
 	    return KADM5_PASS_Q_TOOSHORT;
     }
-    return KADM5_OK;    
+    return KADM5_OK;
 }
 
 void

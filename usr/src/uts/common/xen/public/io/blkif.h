@@ -1,8 +1,8 @@
 /******************************************************************************
  * blkif.h
- * 
+ *
  * Unified block-device I/O interface for Xen guest OSes.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -35,7 +35,7 @@
  * notification can be made conditional on req_event (i.e., the generic
  * hold-off mechanism provided by the ring macros). Backends must set
  * req_event appropriately (e.g., using RING_FINAL_CHECK_FOR_REQUESTS()).
- * 
+ *
  * Back->front notifications: When enqueuing a new response, sending a
  * notification can be made conditional on rsp_event (i.e., the generic
  * hold-off mechanism provided by the ring macros). Frontends must set
@@ -84,7 +84,7 @@
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-/* 
+/*
  * NB. first_sect and last_sect in blkif_request_segment, as well as
  * sector_number in blkif_request, are always expressed in 512-byte units.
  * However they must be properly aligned to the real sector size of the

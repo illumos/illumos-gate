@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * do DNS SRV RR queries
  */
@@ -81,7 +81,7 @@ krb5int_make_srv_query_realm(const krb5_data *realm,
 
     if (memchr(realm->data, 0, realm->length))
 	return 0;
-    if ( strlen(service) + strlen(protocol) + realm->length + 6 
+    if ( strlen(service) + strlen(protocol) + realm->length + 6
          > MAXDNAME )
 	return 0;
     sprintf(host, "%s.%s.%.*s", service, protocol, (int) realm->length,
@@ -90,7 +90,7 @@ krb5int_make_srv_query_realm(const krb5_data *realm,
     /* Realm names don't (normally) end with ".", but if the query
        doesn't end with "." and doesn't get an answer as is, the
        resolv code will try appending the local domain.  Since the
-       realm names are absolutes, let's stop that.  
+       realm names are absolutes, let's stop that.
 
        But only if a name has been specified.  If we are performing
        a search on the prefix alone then the intention is to allow
@@ -136,7 +136,7 @@ krb5int_make_srv_query_realm(const krb5_data *realm,
 	srv = (struct srv_dns_entry *) malloc(sizeof(struct srv_dns_entry));
 	if (srv == NULL)
 	    goto out;
-	
+
 	srv->priority = priority;
 	srv->weight = weight;
 	srv->port = port;

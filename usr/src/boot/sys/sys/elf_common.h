@@ -418,9 +418,9 @@ typedef struct {
 #define	SHT_AMD64_UNWIND	0x70000001	/* unwind information */
 
 #define	SHT_ARM_EXIDX		0x70000001	/* Exception index table. */
-#define	SHT_ARM_PREEMPTMAP	0x70000002	/* BPABI DLL dynamic linking 
+#define	SHT_ARM_PREEMPTMAP	0x70000002	/* BPABI DLL dynamic linking
 						   pre-emption map. */
-#define	SHT_ARM_ATTRIBUTES	0x70000003	/* Object file compatibility 
+#define	SHT_ARM_ATTRIBUTES	0x70000003	/* Object file compatibility
 						   attributes. */
 #define	SHT_ARM_DEBUGOVERLAY	0x70000004	/* See DBGOVL for details. */
 #define	SHT_ARM_OVERLAYSECTION	0x70000005	/* See DBGOVL for details. */

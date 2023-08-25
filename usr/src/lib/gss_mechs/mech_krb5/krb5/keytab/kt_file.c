@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 
 #include "k5-int.h"
@@ -51,7 +51,7 @@
 
 #define KRB5_KT_DEFAULT_VNO KRB5_KT_VNO
 
-/* 
+/*
  * Types
  */
 typedef struct _krb5_ktfile_data {
@@ -81,27 +81,27 @@ extern krb5_boolean KRB5_CALLCONV
 __krb5_principal_compare_case_ins(krb5_context context,
     krb5_const_principal princ1, krb5_const_principal princ2);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_resolve 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_resolve
 	(krb5_context,
 		   const char *,
 		   krb5_keytab *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_wresolve 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_wresolve
 	(krb5_context,
 		   const char *,
 		   krb5_keytab *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_name 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_name
 	(krb5_context,
 		   krb5_keytab,
 		   char *,
 		   unsigned int);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_close 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_close
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_const_principal,
@@ -109,72 +109,72 @@ krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry
 		   krb5_enctype,
 		   krb5_keytab_entry *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_start_seq_get 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_start_seq_get
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_kt_cursor *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_next 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_next
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *,
 		   krb5_kt_cursor *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_end_get 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_end_get
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_kt_cursor *);
 
 /* routines to be included on extended version (write routines) */
-krb5_error_code KRB5_CALLCONV krb5_ktfile_add 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_add
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_remove 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_remove
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_openr 
+krb5_error_code krb5_ktfileint_openr
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_openw 
+krb5_error_code krb5_ktfileint_openw
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_close 
+krb5_error_code krb5_ktfileint_close
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_read_entry 
+krb5_error_code krb5_ktfileint_read_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_write_entry 
+krb5_error_code krb5_ktfileint_write_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_delete_entry 
+krb5_error_code krb5_ktfileint_delete_entry
 	(krb5_context,
 		   krb5_keytab,
                    krb5_int32);
 
-krb5_error_code krb5_ktfileint_internal_read_entry 
+krb5_error_code krb5_ktfileint_internal_read_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *,
                    krb5_int32 *);
 
-krb5_error_code krb5_ktfileint_size_entry 
+krb5_error_code krb5_ktfileint_size_entry
 	(krb5_context,
 		   krb5_keytab_entry *,
                    krb5_int32 *);
 
-krb5_error_code krb5_ktfileint_find_slot 
+krb5_error_code krb5_ktfileint_find_slot
 	(krb5_context,
 		   krb5_keytab,
                    krb5_int32 *,
@@ -182,11 +182,11 @@ krb5_error_code krb5_ktfileint_find_slot
 
 
 /*
- * This is an implementation specific resolver.  It returns a keytab id 
+ * This is an implementation specific resolver.  It returns a keytab id
  * initialized with file keytab routines.
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_resolve(krb5_context context, const char *name, krb5_keytab *id)
 {
     krb5_ktfile_data *data;
@@ -194,7 +194,7 @@ krb5_ktfile_resolve(krb5_context context, const char *name, krb5_keytab *id)
 
     if ((*id = (krb5_keytab) malloc(sizeof(**id))) == NULL)
 	return(ENOMEM);
-    
+
     (*id)->ops = &krb5_ktf_ops;
     if ((data = (krb5_ktfile_data *)malloc(sizeof(krb5_ktfile_data))) == NULL) {
 	krb5_xfree(*id);
@@ -230,10 +230,10 @@ krb5_ktfile_resolve(krb5_context context, const char *name, krb5_keytab *id)
  * free memory hidden in the structures.
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_close(krb5_context context, krb5_keytab id)
   /*
-   * This routine is responsible for freeing all memory allocated 
+   * This routine is responsible for freeing all memory allocated
    * for this keytab.  There are no system resources that need
    * to be freed nor are there any open files.
    *
@@ -275,9 +275,9 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
 	KTUNLOCK(id);
 	return(kerror);
     }
-    
-    /* 
-     * For efficiency and simplicity, we'll use a while true that 
+
+    /*
+     * For efficiency and simplicity, we'll use a while true that
      * is exited with a break statement.
      */
     cur_entry.principal = 0;
@@ -317,7 +317,7 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
 	   and continue to the next */
 
 	if (enctype != IGNORE_ENCTYPE) {
-	    if ((kerror = krb5_c_enctype_compare(context, enctype, 
+	    if ((kerror = krb5_c_enctype_compare(context, enctype,
 						 new_entry.key.enctype,
 						 &similar))) {
 		krb5_kt_free_entry(context, &new_entry);
@@ -414,7 +414,7 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
 
 krb5_error_code KRB5_CALLCONV
 krb5_ktfile_get_name(krb5_context context, krb5_keytab id, char *name, unsigned int len)
-  /* 
+  /*
    * This routine returns the name of the name of the file associated with
    * this file-based keytab.  name is zeroed and the filename is truncated
    * to fit in name if necessary.  The name is prefixed with PREFIX:, so that
@@ -475,7 +475,7 @@ krb5_ktfile_start_seq_get(krb5_context context, krb5_keytab id, krb5_kt_cursor *
  * krb5_ktfile_get_next()
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_get_next(krb5_context context, krb5_keytab id, krb5_keytab_entry *entry, krb5_kt_cursor *cursor)
 {
     long *fileoff = (long *)*cursor;
@@ -507,7 +507,7 @@ krb5_ktfile_get_next(krb5_context context, krb5_keytab id, krb5_keytab_entry *en
  * krb5_ktfile_end_get()
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_end_get(krb5_context context, krb5_keytab id, krb5_kt_cursor *cursor)
 {
     krb5_error_code kerror;
@@ -665,7 +665,7 @@ krb5_ktf_keytab_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet 
 		/* Put the length of the file name */
 		(void) krb5_ser_pack_int32((krb5_int32) strlen(ktname),
 					   &bp, &remain);
-		
+
 		/* Put the name */
 		(void) krb5_ser_pack_bytes((krb5_octet *) ktname,
 					   strlen(ktname),
@@ -799,7 +799,7 @@ krb5_ktf_keytab_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octe
 }
 
 /*
- * This is an implementation specific resolver.  It returns a keytab id 
+ * This is an implementation specific resolver.  It returns a keytab id
  * initialized with file keytab routines.
  */
 
@@ -811,7 +811,7 @@ krb5_ktfile_wresolve(krb5_context context, const char *name, krb5_keytab *id)
 
     if ((*id = (krb5_keytab) malloc(sizeof(**id))) == NULL)
 	return(ENOMEM);
-    
+
     (*id)->ops = &krb5_ktf_writable_ops;
     if ((data = (krb5_ktfile_data *)malloc(sizeof(krb5_ktfile_data))) == NULL) {
 	krb5_xfree(*id);
@@ -846,7 +846,7 @@ krb5_ktfile_wresolve(krb5_context context, const char *name, krb5_keytab *id)
  * krb5_ktfile_add()
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_add(krb5_context context, krb5_keytab id, krb5_keytab_entry *entry)
 {
     krb5_error_code retval;
@@ -872,7 +872,7 @@ krb5_ktfile_add(krb5_context context, krb5_keytab id, krb5_keytab_entry *entry)
  * krb5_ktfile_remove()
  */
 
-krb5_error_code KRB5_CALLCONV 
+krb5_error_code KRB5_CALLCONV
 krb5_ktfile_remove(krb5_context context, krb5_keytab id, krb5_keytab_entry *entry)
 {
     krb5_keytab_entry   cur_entry;
@@ -888,8 +888,8 @@ krb5_ktfile_remove(krb5_context context, krb5_keytab id, krb5_keytab_entry *entr
 	return kerror;
     }
 
-    /* 
-     * For efficiency and simplicity, we'll use a while true that 
+    /*
+     * For efficiency and simplicity, we'll use a while true that
      * is exited with a break statement.
      */
     while (TRUE) {
@@ -936,7 +936,7 @@ const struct _krb5_kt_ops krb5_ktf_ops = {
     0,
     "FILE", 	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktfile_resolve,
-    krb5_ktfile_get_name, 
+    krb5_ktfile_get_name,
     krb5_ktfile_close,
     krb5_ktfile_get_entry,
     krb5_ktfile_start_seq_get,
@@ -955,7 +955,7 @@ const struct _krb5_kt_ops krb5_ktf_writable_ops = {
     0,
     "WRFILE", 	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktfile_wresolve,
-    krb5_ktfile_get_name, 
+    krb5_ktfile_get_name,
     krb5_ktfile_close,
     krb5_ktfile_get_entry,
     krb5_ktfile_start_seq_get,
@@ -974,7 +974,7 @@ const krb5_kt_ops krb5_kt_dfl_ops = {
     0,
     "FILE", 	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktfile_resolve,
-    krb5_ktfile_get_name, 
+    krb5_ktfile_get_name,
     krb5_ktfile_close,
     krb5_ktfile_get_entry,
     krb5_ktfile_start_seq_get,
@@ -999,7 +999,7 @@ const krb5_kt_ops krb5_kt_dfl_ops = {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -1013,16 +1013,16 @@ const krb5_kt_ops krb5_kt_dfl_ops = {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
  *
- * This function contains utilities for the file based implementation of 
+ *
+ * This function contains utilities for the file based implementation of
  * the keytab.  There are no public functions in this file.
  *
  * This file is the only one that has knowledge of the format of a
  * keytab file.
  *
  * The format is as follows:
- * 
+ *
  * <file format vno>
  * <record length>
  * principal timestamp vno key
@@ -1032,21 +1032,21 @@ const krb5_kt_ops krb5_kt_dfl_ops = {
  *
  * A length field (sizeof(krb5_int32)) exists between entries.  When this
  * length is positive it indicates an active entry, when negative a hole.
- * The length indicates the size of the block in the file (this may be 
+ * The length indicates the size of the block in the file (this may be
  * larger than the size of the next record, since we are using a first
  * fit algorithm for re-using holes and the first fit may be larger than
  * the entry we are writing).  Another (compatible) implementation could
- * break up holes when allocating them to smaller entries to minimize 
+ * break up holes when allocating them to smaller entries to minimize
  * wasted space.  (Such an implementation should also coalesce adjacent
  * holes to reduce fragmentation).  This implementation does neither.
  *
- * There are no separators between fields of an entry.  
+ * There are no separators between fields of an entry.
  * A principal is a length-encoded array of length-encoded strings.  The
- * length is a krb5_int16 in each case.  The specific format, then, is 
- * multiple entries concatinated with no separators.  An entry has this 
+ * length is a krb5_int16 in each case.  The specific format, then, is
+ * multiple entries concatinated with no separators.  An entry has this
  * exact format:
  *
- * sizeof(krb5_int16) bytes for number of components in the principal; 
+ * sizeof(krb5_int16) bytes for number of components in the principal;
  * then, each component listed in ordser.
  * For each component, sizeof(krb5_int16) bytes for the number of bytes
  * in the component, followed by the component.
@@ -1297,11 +1297,11 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
     ret_entry->principal = (krb5_principal)malloc(sizeof(krb5_principal_data));
     if (!ret_entry->principal)
         return ENOMEM;
-    
+
     u_count = count;
     ret_entry->principal->magic = KV5M_PRINCIPAL;
     ret_entry->principal->length = u_count;
-    ret_entry->principal->data = (krb5_data *) 
+    ret_entry->principal->data = (krb5_data *)
                                  calloc(u_count, sizeof(krb5_data));
     if (!ret_entry->principal->data) {
 	free(ret_entry->principal);
@@ -1337,7 +1337,7 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
 				/* termination...  ``Be conservative in */
 				/* what you send out'' */
     krb5_princ_set_realm_data(context, ret_entry->principal, tmpdata);
-    
+
     for (i = 0; i < count; i++) {
 	princ = krb5_princ_component(context, ret_entry->principal, i);
 	if (!xfread(&princ_size, sizeof(princ_size), 1, KTFILEP(id))) {
@@ -1351,7 +1351,7 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
 	    goto fail;
         }
 
-	u_princ_size = princ_size; 
+	u_princ_size = princ_size;
 	princ->length = u_princ_size;
 	princ->data = malloc(u_princ_size+1);
 	if (!princ->data) {
@@ -1374,7 +1374,7 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
 	    }
 	    ret_entry->principal->type = ntohl(ret_entry->principal->type);
     }
-    
+
     /* read in the timestamp */
     if (!xfread(&ret_entry->timestamp, sizeof(ret_entry->timestamp), 1, KTFILEP(id))) {
 	error = KRB5_KT_END;
@@ -1382,14 +1382,14 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
     }
     if (KTVERSION(id) != KRB5_KT_VNO_1)
 	ret_entry->timestamp = ntohl(ret_entry->timestamp);
-    
+
     /* read in the version number */
     if (!xfread(&vno, sizeof(vno), 1, KTFILEP(id))) {
 	error = KRB5_KT_END;
 	goto fail;
     }
     ret_entry->vno = (krb5_kvno)vno;
-    
+
     /* key type */
     if (!xfread(&enctype, sizeof(enctype), 1, KTFILEP(id))) {
 	error = KRB5_KT_END;
@@ -1399,10 +1399,10 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
 
     if (KTVERSION(id) != KRB5_KT_VNO_1)
 	ret_entry->key.enctype = ntohs(ret_entry->key.enctype);
-    
+
     /* key contents */
     ret_entry->key.magic = KV5M_KEYBLOCK;
-    
+
     if (!xfread(&count, sizeof(count), 1, KTFILEP(id))) {
 	error = KRB5_KT_END;
 	goto fail;
@@ -1416,12 +1416,12 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
 
     u_count = count;
     ret_entry->key.length = u_count;
-    
+
     ret_entry->key.contents = (krb5_octet *)malloc(u_count);
     if (!ret_entry->key.contents) {
 	error = ENOMEM;
 	goto fail;
-    }		
+    }
     if (!xfread(ret_entry->key.contents, sizeof(krb5_octet), count,
 		KTFILEP(id))) {
 	error = KRB5_KT_END;
@@ -1434,7 +1434,7 @@ krb5_ktfileint_internal_read_entry(krb5_context context, krb5_keytab id, krb5_ke
     fseek(KTFILEP(id), start_pos + size, SEEK_SET);
     return 0;
 fail:
-    
+
     for (i = 0; i < krb5_princ_size(context, ret_entry->principal); i++) {
 	    princ = krb5_princ_component(context, ret_entry->principal, i);
 	    if (princ->data)
@@ -1488,7 +1488,7 @@ krb5_ktfileint_write_entry(krb5_context context, krb5_keytab id, krb5_keytab_ent
     } else {
 	    count = htons((u_short) krb5_princ_size(context, entry->principal));
     }
-    
+
     if (!xfwrite(&count, sizeof(count), 1, KTFILEP(id))) {
     abend:
 	return KRB5_KT_IOERR;
@@ -1527,7 +1527,7 @@ krb5_ktfileint_write_entry(krb5_context context, krb5_keytab id, krb5_keytab_ent
 		    goto abend;
 	    }
     }
-    
+
     /*
      * Fill in the time of day the entry was written to the keytab.
      */
@@ -1541,7 +1541,7 @@ krb5_ktfileint_write_entry(krb5_context context, krb5_keytab id, krb5_keytab_ent
     if (!xfwrite(&timestamp, sizeof(timestamp), 1, KTFILEP(id))) {
 	goto abend;
     }
-    
+
     /* key version number */
     vno = (krb5_octet)entry->vno;
     if (!xfwrite(&vno, sizeof(vno), 1, KTFILEP(id))) {
@@ -1566,7 +1566,7 @@ krb5_ktfileint_write_entry(krb5_context context, krb5_keytab id, krb5_keytab_ent
     if (!xfwrite(entry->key.contents, sizeof(krb5_octet),
 		 entry->key.length, KTFILEP(id))) {
 	goto abend;
-    }	
+    }
 
     if (fflush(KTFILEP(id)))
 	goto abend;
@@ -1604,10 +1604,10 @@ krb5_ktfileint_size_entry(krb5_context context, krb5_keytab_entry *entry, krb5_i
     krb5_error_code retval = 0;
 
     count = (krb5_int16) krb5_princ_size(context, entry->principal);
-        
+
     total_size = sizeof(count);
     total_size += krb5_princ_realm(context, entry->principal)->length + (sizeof(krb5_int16));
-    
+
     for (i = 0; i < count; i++) {
 	    total_size += krb5_princ_component(context, entry->principal,i)->length
 		    + (sizeof(krb5_int16));
@@ -1633,7 +1633,7 @@ krb5_ktfileint_size_entry(krb5_context context, krb5_keytab_entry *entry, krb5_i
  * The size_needed argument may be adjusted if we find a hole that is
  * larger than the size needed.  (Recall that size_needed will be used
  * to commit the write, but that this field must indicate the size of the
- * block in the file rather than the size of the actual entry)  
+ * block in the file rather than the size of the actual entry)
  */
 krb5_error_code
 krb5_ktfileint_find_slot(krb5_context context, krb5_keytab id, krb5_int32 *size_needed, krb5_int32 *commit_point)
@@ -1670,13 +1670,13 @@ krb5_ktfileint_find_slot(krb5_context context, krb5_keytab id, krb5_int32 *size_
             {
                 return errno;
             }
-	    
+
 #ifdef notdef
 	    /* We don't have to do this because htonl(0) == 0 */
 	    if (KTVERSION(id) != KRB5_KT_VNO_1)
 		    size = htonl(size);
 #endif
-	    
+
             if (!xfwrite(&size, sizeof(size), 1, KTFILEP(id))) {
                 return KRB5_KT_IOERR;
             }
@@ -1694,7 +1694,7 @@ krb5_ktfileint_find_slot(krb5_context context, krb5_keytab id, krb5_int32 *size_
             size = -size;
             if (size >= *size_needed) {
                 *size_needed = size;
-                found = TRUE;	
+                found = TRUE;
             } else if (size > 0) {
                 /*
                  * The current hole is not large enough, so skip it

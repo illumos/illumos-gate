@@ -27,7 +27,7 @@
 /*
  * Assembly language support for the n2piupc N2 PIU performance counter driver.
  */
- 
+
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 #include "n2piupc_acc.h"

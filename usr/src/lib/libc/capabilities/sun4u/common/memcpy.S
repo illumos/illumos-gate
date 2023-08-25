@@ -34,7 +34,7 @@
  * Fast assembler language version of the following C-program for memcpy
  * which represents the `standard' for the C-library.
  *
- *	void * 
+ *	void *
  *	memcpy(void *s, const void *s0, size_t n)
  *	{
  *		if (n != 0) {
@@ -66,8 +66,8 @@
         !
         ! an overlapped copy that must be done "backwards"
         !
-.ovbc:  
-	mov	%o0, %o5		! save des address for return val	
+.ovbc:
+	mov	%o0, %o5		! save des address for return val
 	add     %o1, %o2, %o1           ! get to end of source space
         add     %o0, %o2, %o0           ! get to end of destination space
 
@@ -76,7 +76,7 @@
 	bgeu,pn	%ncc, .dbalign
 	nop
 
-        
+
 .byte:
 1:	deccc	%o2			! decrement count
 	blu,pn	%ncc, exit		! loop until done
@@ -100,8 +100,8 @@
 .dbbck:
 
         rd      %fprs, %o3              ! o3 = fprs
- 
- 
+
+
         ! if fprs.fef == 0, set it. Checking it, reqires 2 instructions.
         ! So set it anyway, without checking.
         wr      %g0, 0x4, %fprs         ! fprs.fef = 1
@@ -116,19 +116,19 @@
 	sub	%o0, 8, %o0		! since we are at the end
 					! when we first enter the loop
         ldd	[%g1], %d2
-        faligndata %d2, %d0, %d8	! extract 8 bytes out 
+        faligndata %d2, %d0, %d8	! extract 8 bytes out
         std	%d8, [%o0]		! store it
 
 	sub	%g1, 8, %g1
         sub	%o2, 8, %o2		! 8 less bytes to copy
 	cmp	%o2, 8			! or do we have < 8 bytes
-        bgeu,pt	%ncc, 2b	
+        bgeu,pt	%ncc, 2b
 	fmovd	%d2, %d0
 
         and     %o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
         ba      .byte
         wr      %o3, %g0, %fprs         ! fprs = o3 - restore fprs
- 
+
 	SET_SIZE(memmove)
 
 
@@ -266,7 +266,7 @@ blkcpy:
 
 	save    %sp, -SA(MINFRAME), %sp
         rd      %fprs, %l3              ! l3 = fprs
-         
+
         ! if fprs.fef == 0, set it. Checking it, reqires 2 instructions.
         ! So set it anyway, without checking.
         wr      %g0, 0x4, %fprs         ! fprs.fef = 1
@@ -299,7 +299,7 @@ blkcpy:
         add     %i1, 8, %i1
         bgu,pn	%ncc, 6b
         add     %i0, 8, %i0
- 
+
 blalign:
 	membar  #StoreLoad
 	! %i2 = total length
@@ -367,7 +367,7 @@ sqtr:
 
 hlf:
 	bgeu,a	 fqtr
-	nop	 
+	nop
 	cmp	 %l6, 5
 	be,a	 seg5
 	nop
@@ -378,7 +378,7 @@ fqtr:
 	nop
 	ba	 seg7
 	nop
-	
+
 #define	FALIGN_D0			\
 	faligndata %d0, %d2, %d48	;\
 	faligndata %d2, %d4, %d50	;\
@@ -1253,7 +1253,7 @@ blkdone:
         deccc   %i2
         bgu  	%ncc, 7b
         stb     %i4, [%i0 - 1]
-	
+
 blkexit:
         and     %l3, 0x4, %l3           ! fprs.du = fprs.dl = 0
 	wr      %l3, %g0, %fprs         ! fprs = l3 - restore fprs.fef

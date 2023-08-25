@@ -85,12 +85,12 @@ typedef struct _osa_policy_ent_t {
 
 typedef	void	(*osa_adb_iter_princ_func) (void *, osa_princ_ent_t);
 typedef	void	(*osa_adb_iter_policy_func) (void *, osa_policy_ent_t);
-  
+
 
 /*
  * Return Code (the rest are in adb_err.h)
  */
- 
+
 #define OSA_ADB_OK		0
 
 /*

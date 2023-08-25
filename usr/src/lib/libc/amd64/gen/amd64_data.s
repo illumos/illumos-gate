@@ -28,7 +28,7 @@
 / This file contains
 / the definition of the
 / global symbol errno
-/ 
+/
 / int errno;
 
 	.globl	errno

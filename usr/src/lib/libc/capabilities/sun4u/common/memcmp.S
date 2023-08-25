@@ -56,14 +56,14 @@
 	ENTRY(memcmp)
 	cmp	%o0, %o1		! s1 == s2?
 	be	%ncc, .cmpeq
-	
+
 	! for small counts byte compare immediately
 	cmp	%o2, 48
 	bleu,a 	%ncc, .bytcmp
 	mov	%o2, %o3		! o3 <= 48
-	
-	! Count > 48. We will byte compare (8 + num of bytes to dbl align) 
-	! bytes. We assume that most miscompares will occur in the 1st 8 bytes 
+
+	! Count > 48. We will byte compare (8 + num of bytes to dbl align)
+	! bytes. We assume that most miscompares will occur in the 1st 8 bytes
 
 .chkdbl:
         and     %o0, 7, %o4             ! is s1 aligned on a 8 byte bound
@@ -101,12 +101,12 @@
 .blkchk:
         bgeu,a   %ncc, blkcmp                  ! do block cmp
         andcc   %o0, 63, %o3            ! is src1 block aligned
- 
+
         ! double word compare - using ldd and faligndata. Compares upto
         ! 8 byte multiple count and does byte compare for the residual.
 
-.dwcmp: 
-        
+.dwcmp:
+
         rd      %fprs, %o3              ! o3 = fprs
 
         ! if fprs.fef == 0, set it. Checking it, reqires 2 instructions.
@@ -124,7 +124,7 @@
         faligndata %d0, %d2, %d8
 	fcmpne32 %d6, %d8, %o5
 	fsrc1	%d6, %d6		! 2 fsrc1's added since o5 cannot
-	fsrc1	%d8, %d8		! be used for 3 cycles else we 
+	fsrc1	%d8, %d8		! be used for 3 cycles else we
 	fmovd	%d2, %d0		! create 9 bubbles in the pipeline
 	brnz,a,pn %o5, 6f
 	sub     %o1, %o0, %o1           ! o1 gets the difference
@@ -146,20 +146,20 @@
         deccc   %o2
         bgeu,a	%ncc, 5b
         ldub    [%o0], %o4
-	
+
 	and     %o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
 	wr      %o3, %g0, %fprs         ! fprs = o3 - restore fprs
 	retl
-	sub	%g0, %g0, %o0		! strings compare equal 
-        
+	sub	%g0, %g0, %o0		! strings compare equal
+
 .dnoteq:
 	and     %o3, 0x4, %o3           ! fprs.du = fprs.dl = 0
 	wr      %o3, %g0, %fprs         ! fprs = o3 - restore fprs
 	retl
 	sub	%o4, %o5, %o0		! return(*s1 - *s2)
-        
 
-blkcmp:  
+
+blkcmp:
 	save    %sp, -SA(MINFRAME), %sp
         rd      %fprs, %l5              ! l5 = fprs
 
@@ -183,19 +183,19 @@ blkcmp:
         faligndata %d0, %d2, %d8
         fcmpne32 %d6, %d8, %i5
 	fsrc1	%d6, %d6		! 2 fsrc1's added since i5 cannot
-	fsrc1	%d8, %d8		! be used for 3 cycles else we 
+	fsrc1	%d8, %d8		! be used for 3 cycles else we
 	fmovd	%d2, %d0		! create 9 bubbles in the pipeline
-        brnz,a,pn  %i5, .remcmp  
+        brnz,a,pn  %i5, .remcmp
         sub     %i1, %i0, %i1           ! i1 gets the difference
         subcc   %i3, 8, %i3
         add     %i0, 8, %i0
         add     %i1, 8, %i1
         bgu,pt	%ncc, 7b
         sub     %i2, 8, %i2
- 
-.blalign: 
 
-	! src1 is block aligned 
+.blalign:
+
+	! src1 is block aligned
         membar  #StoreLoad
         srl     %i1, 3, %l6             ! bits 3,4,5 are now least sig in  %l6
         andcc   %l6, 7, %l6             ! mask everything except bits 1,2 3
@@ -226,10 +226,10 @@ blkcmp:
         add     %l7, 64, %l7
 	ldda	[%i0]ASI_BLK_P, %d32
 	sub     %i3, 128, %i3
- 
+
         ! switch statement to get us to the right 8 byte blk within a
         ! 64 byte block
- 
+
         cmp      %l6, 4
         bgeu,a	hlf
         cmp      %l6, 6
@@ -241,14 +241,14 @@ blkcmp:
         nop
         ba       seg0
         nop
-sqtr:    
+sqtr:
         be,a     seg2
         nop
 
         ba,a     seg3
         nop
-         
-hlf:     
+
+hlf:
         bgeu,a	fqtr
         nop
         cmp      %l6, 5
@@ -256,7 +256,7 @@ hlf:
         nop
         ba       seg4
         nop
-fqtr:    
+fqtr:
         be,a     seg6
         nop
         ba       seg7
@@ -264,7 +264,7 @@ fqtr:
 
 ! The fsrc1 instructions are to make sure that the results of the fcmpne32
 ! are used 3 cycles later - else spitfire adds 9 bubbles.
-         
+
 #define	FCMPNE32_D32_D48			\
 	fcmpne32	%d48, %d32, %l0		;\
 	fcmpne32	%d50, %d34, %l1		;\
@@ -309,7 +309,7 @@ add:
         faligndata %d10, %d12, %d58     ;\
         faligndata %d12, %d14, %d60     ;\
         faligndata %d14, %d16, %d62
- 
+
 #define FALIGN_D16                      \
         faligndata %d16, %d18, %d48     ;\
         faligndata %d18, %d20, %d50     ;\
@@ -319,7 +319,7 @@ add:
         faligndata %d26, %d28, %d58     ;\
         faligndata %d28, %d30, %d60     ;\
         faligndata %d30, %d0, %d62
- 
+
 seg0:
         FALIGN_D0
         ldda    [%l7]ASI_BLK_P, %d0
@@ -329,9 +329,9 @@ seg0:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D16
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -340,7 +340,7 @@ seg0:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg0
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -353,7 +353,7 @@ seg0:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd16
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -363,7 +363,7 @@ seg0:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd0
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D2                       \
         faligndata %d2, %d4, %d48       ;\
@@ -395,9 +395,9 @@ seg1:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D18
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -406,7 +406,7 @@ seg1:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg1
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -419,7 +419,7 @@ seg1:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd18
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -429,7 +429,7 @@ seg1:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd2
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D4                       \
         faligndata %d4, %d6, %d48       ;\
@@ -440,7 +440,7 @@ seg1:
         faligndata %d14, %d16, %d58     ;\
         faligndata %d16, %d18, %d60     ;\
         faligndata %d18, %d20, %d62
- 
+
 #define FALIGN_D20                      \
         faligndata %d20, %d22, %d48     ;\
         faligndata %d22, %d24, %d50     ;\
@@ -450,7 +450,7 @@ seg1:
         faligndata %d30, %d0, %d58      ;\
         faligndata %d0, %d2, %d60       ;\
         faligndata %d2, %d4, %d62
- 
+
 seg2:
 	FALIGN_D4
         ldda    [%l7]ASI_BLK_P, %d0
@@ -460,9 +460,9 @@ seg2:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D20
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -471,7 +471,7 @@ seg2:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg2
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -484,7 +484,7 @@ seg2:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd20
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -494,7 +494,7 @@ seg2:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd4
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D6                       \
         faligndata %d6, %d8, %d48       ;\
@@ -516,7 +516,7 @@ seg2:
         faligndata %d2, %d4, %d60       ;\
         faligndata %d4, %d6, %d62
 
- 
+
 seg3:
         FALIGN_D6
         ldda    [%l7]ASI_BLK_P, %d0
@@ -526,9 +526,9 @@ seg3:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D22
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -537,11 +537,11 @@ seg3:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg3
 	ldda	[%i0]ASI_BLK_P, %d32
- 
+
 
 0:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -551,7 +551,7 @@ seg3:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd22
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -561,7 +561,7 @@ seg3:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd6
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D8                       \
         faligndata %d8, %d10, %d48      ;\
@@ -593,9 +593,9 @@ seg4:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D24
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -604,7 +604,7 @@ seg4:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg4
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -618,7 +618,7 @@ seg4:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd24
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -628,7 +628,7 @@ seg4:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd8
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D10                      \
         faligndata %d10, %d12, %d48     ;\
@@ -660,9 +660,9 @@ seg5:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D26
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -671,7 +671,7 @@ seg5:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg5
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -685,7 +685,7 @@ seg5:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd26
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -695,7 +695,7 @@ seg5:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd10
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D12                      \
         faligndata %d12, %d14, %d48     ;\
@@ -727,9 +727,9 @@ seg6:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D28
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -738,7 +738,7 @@ seg6:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg6
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -752,7 +752,7 @@ seg6:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd28
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -762,7 +762,7 @@ seg6:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd12
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 #define FALIGN_D14                      \
         faligndata %d14, %d16, %d48     ;\
@@ -793,9 +793,9 @@ seg7:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 1f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
         ldda    [%i0]ASI_BLK_P, %d32
-        
+
         FALIGN_D30
         ldda    [%l7]ASI_BLK_P, %d16
         add     %l7, 64, %l7
@@ -804,7 +804,7 @@ seg7:
         add     %i1, 64, %i1
         subcc   %i3, 64, %i3
         bz,pn   %ncc, 0f
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
         ba	%ncc, seg7
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -817,7 +817,7 @@ seg7:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd30
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 1:
 	ldda	[%i0]ASI_BLK_P, %d32
@@ -827,7 +827,7 @@ seg7:
         add     %i0, 64, %i0
         add     %i1, 64, %i1
 	ba	%ncc, blkd14
-        sub     %i2, 64, %i2 
+        sub     %i2, 64, %i2
 
 
 blkd0:
@@ -1097,8 +1097,8 @@ blkleft:
         deccc   %i2
         bgeu,a   %ncc, 6b
         ldub    [%i0], %i4
-         
-exit:    
+
+exit:
 	and     %l5, 0x4, %l5           ! fprs.du = fprs.dl = 0
 	wr      %l5, %g0, %fprs         ! fprs = l5 - restore fprs
 	membar  #StoreLoad|#StoreStore

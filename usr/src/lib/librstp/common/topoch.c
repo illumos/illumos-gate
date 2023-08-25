@@ -1,31 +1,31 @@
-/************************************************************************ 
- * RSTP library - Rapid Spanning Tree (802.1t, 802.1w) 
- * Copyright (C) 2001-2003 Optical Access 
- * Author: Alex Rozin 
- * 
- * This file is part of RSTP library. 
- * 
- * RSTP library is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as published by the 
- * Free Software Foundation; version 2.1 
- * 
- * RSTP library is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser 
- * General Public License for more details. 
- * 
- * You should have received a copy of the GNU Lesser General Public License 
- * along with RSTP library; see the file COPYING.  If not, write to the Free 
- * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 
- * 02111-1307, USA. 
+/************************************************************************
+ * RSTP library - Rapid Spanning Tree (802.1t, 802.1w)
+ * Copyright (C) 2001-2003 Optical Access
+ * Author: Alex Rozin
+ *
+ * This file is part of RSTP library.
+ *
+ * RSTP library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation; version 2.1
+ *
+ * RSTP library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with RSTP library; see the file COPYING.  If not, write to the Free
+ * Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ * 02111-1307, USA.
  **********************************************************************/
 
 /* Topolgy Change state machine : 17.25 */
-  
+
 #include "base.h"
 #include "stpm.h"
 #include "stp_to.h" /* for STP_OUT_flush_lt */
-  
+
 #define STATES { \
   CHOOSE(INIT),             \
   CHOOSE(INACTIVE),         \
@@ -41,7 +41,7 @@
 #include "choose.h"
 
 #ifndef STRONGLY_SPEC_802_1W
-/* 
+/*
  * In many kinds of hardware the function
  * STP_OUT_flush_lt is a) is very hard and b) cannot
  * delete learning emtries per port. The alternate
@@ -132,12 +132,12 @@ STP_topoch_enter_state (STATE_MACH_T* this)
     case DETECTED:
       port->tcWhile = newTcWhile (this);
 #ifdef STP_DBG
-  if (this->debug) 
-    stp_trace("DETECTED: tcWhile=%d on port %s", 
+  if (this->debug)
+    stp_trace("DETECTED: tcWhile=%d on port %s",
         port->tcWhile, port->port_name);
 #endif
       setTcPropBridge (this, "DETECTED");
-      port->tc = False;  
+      port->tc = False;
       break;
     case NOTIFIED_TC:
       port->rcvdTcn = port->rcvdTc = False;
@@ -149,8 +149,8 @@ STP_topoch_enter_state (STATE_MACH_T* this)
     case PROPAGATING:
       port->tcWhile = newTcWhile (this);
 #ifdef STP_DBG
-  if (this->debug) 
-    stp_trace("PROPAGATING: tcWhile=%d on port %s", 
+  if (this->debug)
+    stp_trace("PROPAGATING: tcWhile=%d on port %s",
         port->tcWhile, port->port_name);
 #endif
 #ifdef STRONGLY_SPEC_802_1W
@@ -161,8 +161,8 @@ STP_topoch_enter_state (STATE_MACH_T* this)
     case ACKNOWLEDGED:
       port->tcWhile = 0;
 #ifdef STP_DBG
-  if (this->debug) 
-    stp_trace("ACKNOWLEDGED: tcWhile=%d on port %s", 
+  if (this->debug)
+    stp_trace("ACKNOWLEDGED: tcWhile=%d on port %s",
         port->tcWhile, port->port_name);
 #endif
       port->rcvdTcAck = False;
@@ -170,8 +170,8 @@ STP_topoch_enter_state (STATE_MACH_T* this)
     case NOTIFIED_TCN:
       port->tcWhile = newTcWhile (this);
 #ifdef STP_DBG
-  if (this->debug) 
-    stp_trace("NOTIFIED_TCN: tcWhile=%d on port %s", 
+  if (this->debug)
+    stp_trace("NOTIFIED_TCN: tcWhile=%d on port %s",
         port->tcWhile, port->port_name);
 #endif
       break;

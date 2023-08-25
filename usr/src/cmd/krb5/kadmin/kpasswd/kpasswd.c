@@ -24,7 +24,7 @@
 
 /*
  * Copyright 1993-1994 OpenVision Technologies, Inc., All Rights Reserved.
- * 
+ *
  * $Header$
  *
  *
@@ -66,7 +66,7 @@ extern long read_new_password();
  *	read_new_password (f) function to read new and change password
  *	display_intro_message (f) function to display intro message
  *	whoami		(extern) argv[0]
- *	
+ *
  * Returns:
  *                      exit status of 0 for success
  *			1 principal unknown
@@ -76,10 +76,10 @@ extern long read_new_password();
  *                      5 password not typed
  *                      6 misc error
  *                      7 incorrect usage
- *      
+ *
  * Requires:
  *	Passwords cannot be more than 255 characters long.
- *      
+ *
  * Effects:
  *
  * If argc is 2, the password for the principal specified in argv[1]
@@ -92,7 +92,7 @@ extern long read_new_password();
  * read_new_password is called to read the new password and change the
  * principal's password (presumably ovsec_kadm_chpass_principal).
  * admin system is de-initialized before the function returns.
- *      
+ *
  * Modifies:
  *
  * Changes the principal's password.
@@ -129,7 +129,7 @@ kpasswd(context, argc, argv)
     }
 
   /************************************
-   *  Get principal name to change    * 
+   *  Get principal name to change    *
    ************************************/
 
   /* Look on the command line first, followed by the default credential
@@ -174,8 +174,8 @@ kpasswd(context, argc, argv)
       }
       princ_str = strdup(pw->pw_name);
     }
-  }    
-  
+  }
+
   display_intro_message(string_text(KPW_STR_CHANGING_PW_FOR), princ_str);
 
   /* Need to get a krb5_principal, unless we started from with one from
@@ -189,7 +189,7 @@ kpasswd(context, argc, argv)
 	  return(MISC_EXIT_STATUS);
       }
   }
-  
+
   pwsize = sizeof(password);
   code = read_old_password(context, password, &pwsize);
 
@@ -341,7 +341,7 @@ kpasswd(context, argc, argv)
   free(princ_str);
 
   (void) kadm5_destroy(server_handle);
-  
+
   if (code == KRB5_LIBOS_CANTREADPWD)
      return(5);
   else if (code)

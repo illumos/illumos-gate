@@ -141,7 +141,7 @@ krb5_error_code cms_signeddata_create
 	unsigned char **signed_data,			/* OUT
 		    for CMS_SIGN_CLIENT receives DER encoded
 		    SignedAuthPack (CMS_SIGN_CLIENT) or DER
-		    encoded DHInfo (CMS_SIGN_SERVER) */ 
+		    encoded DHInfo (CMS_SIGN_SERVER) */
 	unsigned int *signed_data_len);			/* OUT
 		    receives length of signed_data */
 
@@ -182,12 +182,12 @@ krb5_error_code cms_signeddata_verify
 /*
  * this function creates a CMS message where eContentType is EnvelopedData
  */
-krb5_error_code cms_envelopeddata_create	
+krb5_error_code cms_envelopeddata_create
 	(krb5_context context,				/* IN */
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
-	krb5_preauthtype pa_type,			/* IN */ 
+	krb5_preauthtype pa_type,			/* IN */
 	int include_certchain,				/* IN
 		    specifies whether the certificates field in
 		    SignedData should contain certificate path */
@@ -215,7 +215,7 @@ krb5_error_code cms_envelopeddata_verify
 	unsigned char *envel_data,			/* IN
 		    contains DER encoded encKeyPack */
 	unsigned int envel_data_len,			/* IN
-		    contains length of envel_data */ 
+		    contains length of envel_data */
 	unsigned char **signed_data,			/* OUT
 		    receives ReplyKeyPack */
 	unsigned int *signed_data_len);			/* OUT
@@ -227,7 +227,7 @@ krb5_error_code cms_envelopeddata_verify
  * upn_sans, or kdc_hostnames must be non-NULL.
  */
 krb5_error_code crypto_retrieve_cert_sans
-	(krb5_context context,				/* IN */ 
+	(krb5_context context,				/* IN */
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
@@ -242,7 +242,7 @@ krb5_error_code crypto_retrieve_cert_sans
 	unsigned char ***kdc_hostname);			/* OUT
 		    if non-NULL, a null-terminated array of
 		    dNSName (hostname) SAN values found in the
-		    certificate are returned */ 
+		    certificate are returned */
 
 /*
  * this function checks for acceptable key usage values
@@ -306,14 +306,14 @@ krb5_error_code client_create_dh
 	unsigned int *dh_params_len,			/* OUT
 		    contains length of dh_parmas */
 	unsigned char **dh_pubkey,			/* OUT
-		    receives DER encoded DH pub key */ 
+		    receives DER encoded DH pub key */
 	unsigned int *dh_pubkey_len);			/* OUT
 		    receives length of dh_pubkey */
 
 /*
  * this function completes client's the DH protocol. client
  * processes received DH pub key from the KDC and computes
- * the DH secret key 
+ * the DH secret key
  */
 krb5_error_code client_process_dh
 	(krb5_context context,				/* IN */
@@ -358,7 +358,7 @@ krb5_error_code server_process_dh
 	unsigned int received_pub_len,			/* IN
 		    contains length of received_pubkey */
 	unsigned char **dh_pubkey,			/* OUT
-		    receives KDC's DER encoded DH pub key */ 
+		    receives KDC's DER encoded DH pub key */
 	unsigned int *dh_pubkey_len,			/* OUT
 		    receives length of dh_pubkey */
 	unsigned char **server_key,			/* OUT
@@ -527,7 +527,7 @@ krb5_error_code crypto_load_cas_and_crls
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_opts *idopts,			/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN/OUT */
-	int idtype,					/* IN 
+	int idtype,					/* IN
 		    defines the storage type (file, directory, etc) */
 	int catype,					/* IN
 		    defines the ca type (anchor, intermediate, crls) */
@@ -577,7 +577,7 @@ krb5_error_code pkinit_process_td_dh_params
 krb5_error_code pkinit_create_td_invalid_certificate
 	(krb5_context context,				/* IN */
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
-	pkinit_req_crypto_context req_cryptoctx,	/* IN */ 
+	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
 	krb5_data **edata);				/* OUT */
 
@@ -592,7 +592,7 @@ krb5_error_code pkinit_create_td_trusted_certifiers
 	krb5_data **edata);				/* OUT */
 
 /*
- * this function processes edata that contains either 
+ * this function processes edata that contains either
  * TD-TRUSTED-CERTIFICATES or TD-INVALID-CERTIFICATES.
  * current implementation only decodes the received message
  * but does not act on it

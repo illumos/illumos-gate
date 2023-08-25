@@ -38,7 +38,7 @@
  *	register const char *s1;
  *	register const char *s2;
  *	{
- *	
+ *
  *		if(s1 == s2)
  *			return(0);
  *		while(*s1 == *s2++)
@@ -82,7 +82,7 @@
 	bnz	.aligns1		! nope, compare another pair of bytes
 	inc	%o1			! s1++, s2++
 
-.s1aligned:	
+.s1aligned:
 	andcc	%o1, 3, %o3		! s2 word aligned ?
 	bz	.word4			! yup
 	cmp	%o3, 2			! s2 half-word aligned ?
@@ -115,7 +115,7 @@
 	andcc	%o3, %g1, %g0		! (word - 0x01010101) & ~word & 0x80808080
 	bz	.cmp1			! no null-byte in s1 yet
 	sll	%o0, 8, %g1		! partial unaligned word from s2
-	
+
 	! words are equal but the end of s1 has been reached
 	! this means the strings must be equal
 .stringsequal1:
@@ -148,7 +148,7 @@
 	andcc	%o3, %g1, %g0		! (word - 0x01010101) & ~word & 0x80808080
 	bz	.cmp2			! no null-byte in s1 yet
 	sll	%o0, 16, %g1		! partial unaligned word from s2
-	
+
 	! words are equal but the end of s1 has been reached
 	! this means the strings must be equal
 .stringsequal2:
@@ -174,7 +174,7 @@
 	andcc	%o3, %g1, %g0		! (word - 0x01010101) & ~word & 0x80808080
 	bz	.cmp3			! no null-byte in s1 yet
 	sll	%o0, 24, %g1		! partial unaligned word from s2
-	
+
 	! words are equal but the end of s1 has been reached
 	! this means the strings must be equal
 .stringsequal3:

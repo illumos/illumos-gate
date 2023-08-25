@@ -403,7 +403,7 @@ devinfo_device_rescan (HalDevice *d)
 		return (devinfo_storage_device_rescan (d));
 	} else if (hal_device_has_capability (d, "button")) {
 		return (devinfo_lid_rescan (d));
-        } else { 
+        } else {
 		return (FALSE);
 	}
 }

@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_walk_realm_tree()
  */
@@ -295,7 +295,7 @@ krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_d
 	tmpcrealm.data = client->data;
 	tmpcrealm.length = client->length;
 	while( i-1 <= links) {
-			
+
 	    tmpsrealm.data = cap_nodes[i-1];
 	    /* don't count trailing whitespace from profile_get */
 	    tmpsrealm.length = strcspn(cap_nodes[i-1],"\t ");
@@ -315,7 +315,7 @@ krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_d
 		krb5_xfree((char *)cap_nodes);
 		return retval;
 	    }
-	    tmpcrealm.data = tmpsrealm.data;	
+	    tmpcrealm.data = tmpsrealm.data;
 	    tmpcrealm.length = tmpsrealm.length;
 	    i++;
 	}
@@ -433,7 +433,7 @@ krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_d
 void krb5int_dbgref_dump_principal(char *d, krb5_principal p)
 {
     int n;
-	      
+
     printf("  **%s: ",d);
     for (n=0;n<p->length;n++)
 	printf("%s<%.*s>",(n>0)?"/":"",p->data[n].length,p->data[n].data);

@@ -35,7 +35,7 @@ MANLINKS =				\
 		AVL_PREV.3avl		\
 		avl_insert_here.3avl	\
 		avl_last.3avl		\
-		avl_remove.3avl	
+		avl_remove.3avl
 
 # avl_add.3avl
 avl_remove.3avl		:= LINKSRC = avl_add.3avl

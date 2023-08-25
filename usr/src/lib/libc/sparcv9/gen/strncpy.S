@@ -39,8 +39,8 @@
  *	strncpy(char *s1, const char *s2, size_t n)
  *	{
  *		char *os1 = s1;
- *	
- *		n++;				
+ *
+ *		n++;
  *		while ((--n != 0) &&  ((*s1++ = *s2++) != '\0'))
  *			;
  *		if (n != 0)
@@ -87,7 +87,7 @@
 	nop				! pad
 	nop				! pad
 
-.dwordaligned:	
+.dwordaligned:
 	sethi	%hi(0x01010101), %o4	! Alan Mycroft's magic1
 	add	%o2, %g4, %g5		! dst
 	or	%o4, %lo(0x01010101),%o4!  finish loading magic1
@@ -105,7 +105,7 @@
 	andcc	%g5, 7, %g0		! dst word aligned ?
 	bnz,pn	%ncc, .storeword2	! yup, store word wise
 	nop				! ensure loop is 16-byte aligned
-	
+
 .storedword:
 	ldx	[%o3 + %g4], %o1	! src dword
 	addcc	%g4, 8, %g4		! n += 8, src += 8, dst += 8
@@ -116,9 +116,9 @@
 	bz,a,pt	%ncc, .storedword	! no zero byte if magic expression == 0
 	stx	%o1, [%o2 + %g4]	! store word to dst (address pre-incremented)
 
-	! n has not expired, but src is at the end. we need to push out the 
+	! n has not expired, but src is at the end. we need to push out the
 	! remaining src bytes and then start padding with null bytes
-	
+
 .zerobyte:
 	add	%o2, %g4, %o3		! pointer to dest string
 	srlx	%o1, 56, %g1		! first byte
@@ -156,7 +156,7 @@
 	andcc	%o3, 7, %o4		! dst offset relative to dword boundary
 	bz,pn	%ncc, .fillaligned	! dst already dword aligned
 
-	! here there is a least one more byte to zero out: otherwise we would 
+	! here there is a least one more byte to zero out: otherwise we would
 	! have exited through label .lastword
 
 	sub	%o4, 8, %o4		! bytes to align dst to dword boundary
@@ -183,8 +183,8 @@
 	add	%g4, %o2, %g4		! if dword count odd, n -= 8
 	bz,pt	%ncc, .bytepad		! if dword count == 1, pad leftover bytes
 	add	%o3, %o2, %o3		! bump dst if dword count odd
-		
-.filldword:	
+
+.filldword:
 	addcc	%o4, 16, %o4		! count -= 16
 	stx	%g0, [%o3]		! dst[n] = 0
 	stx	%g0, [%o3 + 8]		! dst[n+8] = 0
@@ -198,7 +198,7 @@
 	stb	%g0, [%o3]		! store first byte
 	addcc	%g4, %o2, %g4		! byte count == 1 ?
 	bz,pt	%ncc, .done		! yup, we are done
-	add	%o3, %o2, %o3		! bump pointer if odd		
+	add	%o3, %o2, %o3		! bump pointer if odd
 
 .fillbyte:
 	addcc	%g4, 2, %g4		! n -= 2
@@ -212,13 +212,13 @@
 	nop				! pad to align loops below
 	nop				! pad to align loops below
 
-	! this is the last word. It may contain null bytes. store bytes 
+	! this is the last word. It may contain null bytes. store bytes
 	! until n == 0. if null byte encountered, continue
 
 .lastword:
 	sub	%g4, 8, %g4		! undo counter pre-increment
 	add	%o2, 8, %o2		! adjust dst for counter un-bumping
-	
+
 	srlx	%o1, 56, %g1		! first byte
 	stb	%g1, [%o2 + %g4]	! store it
 	inccc	%g4			! n--
@@ -338,5 +338,5 @@
 
 	nop				! pad
 	nop				! pad
-	
+
 	SET_SIZE(strncpy)

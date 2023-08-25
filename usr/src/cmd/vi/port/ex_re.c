@@ -35,11 +35,11 @@
 /* from libgen */
 char *_compile(const char *, char *, char *, int);
 
-/* 
+/*
  * The compiled-regular-expression storage areas (re, scanre, and subre)
  * have been changed into dynamically allocated memory areas, in both the
  * Solaris and XPG4 versions.
- * 
+ *
  * In the Solaris version, which uses the original libgen(3g) compile()
  * and step() calls, these areas are allocated once, and then data are
  * copied between them subsequently, as they were in the original
@@ -80,7 +80,7 @@ global(k)
 	char	multi[MB_LEN_MAX + 1];
 	wchar_t	wc;
 	int	len;
-	
+
 
 	Cwas = Command;
 	/*
@@ -299,7 +299,7 @@ gettext("Substitute pattern match failed"));
 int
 compsub(int ch)
 {
-	int seof, c, uselastre; 
+	int seof, c, uselastre;
 	static int gsubf;
 	static unsigned char remem[RHSSIZE];
 	static int remflg = -1;
@@ -536,7 +536,7 @@ confirmed(line *a)
 	ugo(lcolumn(loc2) - c, '^');
 	flush();
 	cnt = 0;
-bkup:	
+bkup:
 	ch = c = getkey();
 again:
 	if (c == '\b') {
@@ -546,7 +546,7 @@ again:
 			putchar(' ');
 			putchar('\b' | QUOTE), flush();
 			cnt --;
-		} 
+		}
 		goto bkup;
 	}
 	if (c == '\r')
@@ -931,7 +931,7 @@ gettext("Replacement pattern contains \\d - cannot use in re"));
 					c = getchar();
 				}
 
-				do { 
+				do {
 					if (!isascii(c) && c != EOF) {
 						ungetchar(c);
 						if ((len = _mbftowc(multi, &wc, getchar, &peekc)) >= 1) {
@@ -944,7 +944,7 @@ gettext("Replacement pattern contains \\d - cannot use in re"));
 						}
 						(void) getchar();
 					}
-				
+
 					if (gp >= &genbuf[LBSIZE-4])
 						goto complex;
 					if(c == '\\' && peekchar() == ']') {
@@ -1033,12 +1033,12 @@ out:
 	    + regexc_size);
 #else /* !XPG4 */
 	(void) _compile((const char *)genbuf, (char *)re->Expbuf,
-		(char *)(re->Expbuf + sizeof (re->Expbuf)), 1); 
+		(char *)(re->Expbuf + sizeof (re->Expbuf)), 1);
 #endif /* XPG4 */
 
 	if(regerrno)
 		switch(regerrno) {
-	
+
 		case 42:
 cerror((unsigned char *)gettext("\\( \\) Imbalance"));
 			/* FALLTHROUGH */
@@ -1193,7 +1193,7 @@ void savere(struct regexp ** a)
 #else /* !XPG4 */
 	memcpy(*a, re, sizeof(struct regexp));
 #endif /* XPG4 */
-} 
+}
 
 
 /*

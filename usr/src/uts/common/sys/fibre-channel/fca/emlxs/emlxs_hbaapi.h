@@ -139,28 +139,28 @@ typedef HBA_UINT32	HBA_STATUS;
 					     * or deactivated */
 #define HBA_STATUS_ERROR_ELS_REJECT	13  /* The requested ELS was rejected by
 					     * the local adapter */
-#define HBA_STATUS_ERROR_INVALID_LUN	14  /* The specified LUN is not provided 
+#define HBA_STATUS_ERROR_INVALID_LUN	14  /* The specified LUN is not provided
 					     *  the specified adapter */
 #define HBA_STATUS_ERROR_INCOMPATIBLE	15  /* An incompatibility has been
-				* detected among the library and driver modules 
-				* invoked which will cause one or more functions 
-				* in the highest version that all support to 
-				* operate incorrectly.  The differing function 
+				* detected among the library and driver modules
+				* invoked which will cause one or more functions
+				* in the highest version that all support to
+				* operate incorrectly.  The differing function
 				* sets of software modules implementing different
-				* versions of the HBA API specification does not 
-				* in itself constitute an incompatibility.  Known 
-				* interoperability bugs among supposedly 
-				* compatible versions should be reported as 
-				* incompatibilities, but not all such 
+				* versions of the HBA API specification does not
+				* in itself constitute an incompatibility.  Known
+				* interoperability bugs among supposedly
+				* compatible versions should be reported as
+				* incompatibilities, but not all such
 				* interoperability bugs may be known.  This value
-				* may be returned by any function that calls a 
-				* Vendor Specific Library and returns an 
-				* HBA_STATUS, and by HBA_LoadLibrary and 
+				* may be returned by any function that calls a
+				* Vendor Specific Library and returns an
+				* HBA_STATUS, and by HBA_LoadLibrary and
 				* HBA_GetAdapterName. */
 
 #define HBA_STATUS_ERROR_AMBIGUOUS_WWN	16  /* Multiple adapters have a matching
 					     * WWN. This could occur if the
-					     * NodeWWN of multiple adapters is 
+					     * NodeWWN of multiple adapters is
 					     * identical */
 #define HBA_STATUS_ERROR_LOCAL_BUS	17  /* A persistent binding request
 					     * included a bad local SCSI bus
@@ -178,7 +178,7 @@ typedef HBA_UINT32	HBA_STATUS;
 #define HBA_STATUS_ERROR_TARGET_FCID	21  /* A persistent binding request
 					     * included a bad or unlocatable FCP
 					     * Target FCID */
-#define HBA_STATUS_ERROR_TARGET_NODE_WWN 22 /* A persistent binding request 
+#define HBA_STATUS_ERROR_TARGET_NODE_WWN 22 /* A persistent binding request
 					     * included a bad FCP Target Node
 					     * WWN */
 #define HBA_STATUS_ERROR_TARGET_PORT_WWN 23 /* A persistent binding request
@@ -186,7 +186,7 @@ typedef HBA_UINT32	HBA_STATUS;
 					     * WWN */
 #define HBA_STATUS_ERROR_TARGET_LUN	24  /* A persistent binding request
 					     * included an FCP Logical Unit Number
-					     * not defined by the identified 
+					     * not defined by the identified
 					     * Target*/
 #define HBA_STATUS_ERROR_TARGET_LUID	25  /* A persistent binding request
 					     * included an undefined or otherwise
@@ -199,13 +199,13 @@ typedef HBA_UINT32	HBA_STATUS;
 #define HBA_STATUS_ERROR_NOT_A_TARGET	27  /* A SCSI command was requested to an
 					     * Nx_Port that was not a SCSI
 					     * Target Port */
-#define HBA_STATUS_ERROR_UNSUPPORTED_FC4 28 /* A request was made concerning an 
+#define HBA_STATUS_ERROR_UNSUPPORTED_FC4 28 /* A request was made concerning an
 					     * unsupported FC-4 protocol */
 
 
-#define HBA_STATUS_ERROR_INCAPABLE	29  /* A request was made to enable 
-					     * unimplemented capabilities for a 
-					     * port */ 
+#define HBA_STATUS_ERROR_INCAPABLE	29  /* A request was made to enable
+					     * unimplemented capabilities for a
+					     * port */
 
 /* 4.2.3	Port Operational Modes Values */
 typedef HBA_UINT32 HBA_PORTTYPE;

@@ -165,7 +165,7 @@ _start:
 	leaq	_MUL(FASTBOOT_BOOTARCHIVE, FI_FILES_INCR)(%rbx), %rdi
 	call	map_copy
 
-	/* Copy sections if there are any */ 
+	/* Copy sections if there are any */
 	leaq	_MUL(FASTBOOT_UNIX, FI_FILES_INCR)(%rbx), %rdi
 	movl	FB_SECTCNT(%rdi), %esi
 	cmpl	$0, %esi
@@ -267,7 +267,7 @@ dboot_jump:
 	jmp	2b
 1:
 	ret
-	SET_SIZE(map_copy)	
+	SET_SIZE(map_copy)
 
 idt_info:
 	.value	0x3ff

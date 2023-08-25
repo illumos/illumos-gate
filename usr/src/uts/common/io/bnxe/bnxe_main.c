@@ -390,7 +390,7 @@ static void BnxeFmInit(um_device_t * pUM)
         bnxeTxCbDmaAttrib.dma_attr_flags = DDI_DMA_FLAGERR;
     }
 
-    if (pUM->fmCapabilities) 
+    if (pUM->fmCapabilities)
     {
         /* Register capabilities with IO Fault Services */
         ddi_fm_init(pUM->pDev, &pUM->fmCapabilities, &iblk);
@@ -414,7 +414,7 @@ static void BnxeFmInit(um_device_t * pUM)
 static void BnxeFmFini(um_device_t * pUM)
 {
     /* Only unregister FMA capabilities if we registered some */
-    if (pUM->fmCapabilities) 
+    if (pUM->fmCapabilities)
     {
         /* Release any resources allocated by pci_ereport_setup() */
         if (DDI_FM_EREPORT_CAP(pUM->fmCapabilities) ||
@@ -534,7 +534,7 @@ static boolean_t BnxeAttachDevice(um_device_t * pUM)
         lm_set_virt_mode(&pUM->lm_dev, DEVICE_TYPE_PF, VT_ASSIGNED_TO_VM_PF);
     }
 #endif
- 
+
     /* check if FCoE is enabled on this function */
 #if 0
     pUM->do_fcoe =

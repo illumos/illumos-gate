@@ -901,7 +901,7 @@ int BnxeTxSendMblk(um_device_t * pUM,
     pTxPkt->pMblk            = pMblk;
 
 #if 0
-    BnxeDumpPkt(pUM, 
+    BnxeDumpPkt(pUM,
                 (BNXE_FCOE(pUM) && (idx == FCOE_CID(&pUM->lm_dev))) ?
                     "-> FCoE L2 TX ->" : "-> L2 TX ->",
                 pMblk, B_TRUE);

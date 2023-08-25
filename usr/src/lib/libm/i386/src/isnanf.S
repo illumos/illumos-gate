@@ -47,7 +47,7 @@ _isnanf	= __isnanf
 	ret				/ %eax = 0 here
 .got_nan:
 	movl	$1,%eax			/ %eax was 0, must be made 1 to
-					/ indicate TRUE 
+					/ indicate TRUE
 	ret
 	.align	4
 	SET_SIZE(isnanf)

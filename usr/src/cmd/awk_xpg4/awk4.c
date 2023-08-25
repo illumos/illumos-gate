@@ -408,7 +408,7 @@ f_split(NODE *np)
 		} else {
 			sep = exprreduce(sep);
 			seplen = wcslen(cp = (wchar_t *)exprstring(varFS));
-			(void) memcpy(savesep, cp, 
+			(void) memcpy(savesep, cp,
 				(seplen+1) * sizeof(wchar_t));
 			(void) assign(varFS, sep);
 		}

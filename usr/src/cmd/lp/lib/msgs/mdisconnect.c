@@ -49,7 +49,7 @@ int mdisconnect (md)
     int		retvalue = 0;
     void	(**fnp)();
     MQUE	*p;
-    
+
     if (!md)
     {
 	errno = ENXIO;
@@ -85,7 +85,7 @@ int mdisconnect (md)
 
     if (md->file)
 	Free(md->file);
-    
+
     if (md->mque)
     {
 	while ((p = md->mque) != NULL)
@@ -135,7 +135,7 @@ static void disconnect3_2 (md)
     {
 	(void) Unlink (md->file);
 	Free (md->file);
-    }	
+    }
 
     discon3_2_is_running = 0;
 }

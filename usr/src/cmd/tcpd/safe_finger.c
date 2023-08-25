@@ -2,15 +2,15 @@
   * safe_finger - finger client wrapper that protects against nasty stuff
   * from finger servers. Use this program for automatic reverse finger
   * probes, not the raw finger command.
-  * 
+  *
   * Build with: cc -o safe_finger safe_finger.c
-  * 
+  *
   * The problem: some programs may react to stuff in the first column. Other
   * programs may get upset by thrash anywhere on a line. File systems may
   * fill up as the finger server keeps sending data. Text editors may bomb
   * out on extremely long lines. The finger server may take forever because
   * it is somehow wedged. The code below takes care of all this badness.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

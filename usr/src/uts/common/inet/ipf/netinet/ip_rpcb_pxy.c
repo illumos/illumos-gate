@@ -943,14 +943,14 @@ ippr_rpcb_decoderep(fin, nat, rs, rm, rxp, ifsrpcb)
 		/* There must be only one 4 byte argument. */
 		if (!RPCB_BUF_EQ(rm, p, 4))
 			return(-1);
-		
+
 		rr->rr_v2 = p;
 		xdr = B(rr->rr_v2);
-		
+
 		/* Reply w/ a 0 port indicates service isn't registered */
 		if (xdr == 0)
 			return(0);
-		
+
 		/* Is the value sane? */
 		if (xdr > 65535)
 			return(-1);
@@ -1149,7 +1149,7 @@ ippr_rpcb_getproto(rm, xp, p)
 	else {
 		return(-1);
 	}
-	
+
 	/* Advance past the string. */
 	(*p)++;
 
@@ -1359,7 +1359,7 @@ ippr_rpcb_modv3(fin, nat, rm, m, off)
 
 	/* Write new string. */
 	COPYBACK(m, off, xlen, uaddr);
-	
+
 	/* Determine difference in data lengths. */
 	diff = xlen - XDRALIGN(B(rr->rr_v3.xu_xslen));
 

@@ -24,7 +24,7 @@
  *
  */
 
-//  AttributeVerifier.java: An attribute verifier for SLP attributes. 
+//  AttributeVerifier.java: An attribute verifier for SLP attributes.
 //  Author:           James Kempf
 //  Created On:       Thu Jun 19 10:51:32 1997
 //  Last Modified By: James Kempf
@@ -42,11 +42,11 @@ import java.io.*;
  * interface, but without committment to a particular mechanism for
  * obtaining the template defintion. Subclasses provide the mechanism,
  * and pass in the template to the parent as a Reader during object
- * creation. The AttributeVerifier class parses tokens from the Reader and 
+ * creation. The AttributeVerifier class parses tokens from the Reader and
  * constructs the attribute descriptor objects describing the attribute. These
  * are used during verification of the attribute. The AttributeVerifier
  * and implementations of the attribute descriptors are free to optimize
- * space utilization by lazily evaluating portions of the attribute 
+ * space utilization by lazily evaluating portions of the attribute
  * template.
  *
  * @author James Kempf
@@ -73,11 +73,11 @@ class AttributeVerifier
     private static final int DESCRIPTION_MASK = 0x08;
     private static final int URL_PATH_RULES_MASK = 0x10;
 
-    // When all template attribute assignments are found. 
+    // When all template attribute assignments are found.
 
-    private static final int TEMPLATE_FOUND = (SERVICE_MASK | 
-					       VERSION_MASK | 
-					       DESCRIPTION_MASK | 
+    private static final int TEMPLATE_FOUND = (SERVICE_MASK |
+					       VERSION_MASK |
+					       DESCRIPTION_MASK |
 					       URL_PATH_RULES_MASK);
 
     // These are the valid SLP types.
@@ -93,7 +93,7 @@ class AttributeVerifier
 
     static final String JAVA_STRING_TYPE =
 	"java.lang.String";
-    static final String JAVA_INTEGER_TYPE = 
+    static final String JAVA_INTEGER_TYPE =
 	"java.lang.Integer";
     static final String JAVA_BOOLEAN_TYPE =
 	"java.lang.Boolean";
@@ -130,7 +130,7 @@ class AttributeVerifier
     private static final char TT_FIELD = '#';
     private static final char TT_ESCAPE = '\\';
 
-    // This token is for checking version number 
+    // This token is for checking version number
     // attribute assignment.
 
     private static final char TT_PERIOD = '.';
@@ -179,7 +179,7 @@ class AttributeVerifier
 
     }
 
-    // Initialize the attribute verifier with a reader. Subclasses or clients 
+    // Initialize the attribute verifier with a reader. Subclasses or clients
     // pass in a Reader on the template that is used for parsing. This
     // method is used when the template includes the template attributes
     // and URL rules.
@@ -201,7 +201,7 @@ class AttributeVerifier
 
     // Initialize with this method when no template attributes are involved.
 
-    void initializeAttributesOnly(Reader r) 
+    void initializeAttributesOnly(Reader r)
 	throws ServiceLocationException {
 
 	// Use a StreamTokenizer to parse.
@@ -278,7 +278,7 @@ class AttributeVerifier
 
     /**
      * Returns the ServiceLocationAttributeDescriptor object for the
-     * attribute having the named id. IF no such attribute exists in the 
+     * attribute having the named id. IF no such attribute exists in the
      * template, returns null. This method is primarily for GUI tools to
      * display attribute information. Programmatic verification of attributes
      * should use the verifyAttribute() method.
@@ -288,10 +288,10 @@ class AttributeVerifier
      * 	     to the parameter, or null if none.
      */
 
-    public ServiceLocationAttributeDescriptor 
+    public ServiceLocationAttributeDescriptor
 	getAttributeDescriptor(String attrId) {
 
-	return 
+	return
 	    (ServiceLocationAttributeDescriptor)
 	    attributeDescriptors.get(attrId.toLowerCase());
 
@@ -301,13 +301,13 @@ class AttributeVerifier
      * Returns an Enumeration of
      * ServiceLocationAttributeDescriptors for the template. This method
      * is primarily for GUI tools to display attribute information.
-     * Programmatic verification of attributes should use the 
+     * Programmatic verification of attributes should use the
      * verifyAttribute() method. Note that small memory implementations
      * may want to implement the Enumeration so that attributes are
      * parsed on demand rather than at creation time.
      *
      * @return A Dictionary with attribute id's as the keys and
-     *	      ServiceLocationAttributeDescriptor objects for the 
+     *	      ServiceLocationAttributeDescriptor objects for the
      *	      attributes as the values.
      */
 
@@ -319,7 +319,7 @@ class AttributeVerifier
 
     /**
      * Verify that the attribute parameter is a valid SLP attribute.
-     * 
+     *
      * @param attribute The ServiceLocationAttribute to be verified.
      */
 
@@ -327,7 +327,7 @@ class AttributeVerifier
 	throws ServiceLocationException {
 
 	String id = attribute.getId().toLowerCase();
-	ServiceLocationAttributeDescriptor des = 
+	ServiceLocationAttributeDescriptor des =
 	    (ServiceLocationAttributeDescriptor)attributeDescriptors.get(id);
 
 	if (des == null) {
@@ -357,7 +357,7 @@ class AttributeVerifier
 	} else {
 
 	    int i, n;
-	
+
 	    // Check that a values vector exists, and, if the attribute is
 	    //  not multivalued, only one element is in it.
 
@@ -368,7 +368,7 @@ class AttributeVerifier
 				"template_null",
 				new Object[] { id });
 
-	    } 
+	    }
 
 	    n = vals.size();
 
@@ -481,7 +481,7 @@ class AttributeVerifier
 
 		if (!attDesc.getIsOptional()) {
 
-		    throw 
+		    throw
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"template_missing_required",
@@ -529,7 +529,7 @@ class AttributeVerifier
 		if (!attDesc.getIsOptional() &&
 		    incoming.get(attrId.toLowerCase()) == null) {
 
-		    throw 
+		    throw
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"template_missing_required",
@@ -538,7 +538,7 @@ class AttributeVerifier
 	    }
 	}
 
-    } 
+    }
 
     //
     // Private implementation. This is the template attribute parser.
@@ -593,8 +593,8 @@ class AttributeVerifier
 
     }
 
-    // Initialize tokenizer for parsing attribute name, 
-    // attribute type and flags, 
+    // Initialize tokenizer for parsing attribute name,
+    // attribute type and flags,
     // and for boolean initializer lists.
 
     private void initIdChar(StreamTokenizer tk) {
@@ -695,7 +695,7 @@ class AttributeVerifier
 
 	tk.wordChars((int)'0', (int)'9');
 	tk.wordChars((int)'-', (int)'-');
-	tk.wordChars((int)'+', (int)'+'); 
+	tk.wordChars((int)'+', (int)'+');
 
 	// Integer value list parsing ignores white space.
 
@@ -740,7 +740,7 @@ class AttributeVerifier
 
     // Parse a template from the tokenizer.
 
-    private void parseTemplate(StreamTokenizer tk) 
+    private void parseTemplate(StreamTokenizer tk)
 	throws ServiceLocationException {
 
 	// First parse past the template attributes.
@@ -755,9 +755,9 @@ class AttributeVerifier
 
     // Parse the template attributes from the tokenizer.
 
-    private void parseTemplateAttributes(StreamTokenizer tk) 
+    private void parseTemplateAttributes(StreamTokenizer tk)
 	throws ServiceLocationException {
-  
+
 	int found = 0;
 
 	// Parse each of the template attributes. Note that we are parsing
@@ -778,13 +778,13 @@ class AttributeVerifier
 				ServiceLocationException.INTERNAL_SYSTEM_ERROR,
 				"template_io_error",
 				new Object[] {Integer.toString(tk.lineno())});
-	    
+
 	}
     }
 
     // Parse a template attribute.
 
-    private int parseTemplateAttribute(StreamTokenizer tk, int found) 
+    private int parseTemplateAttribute(StreamTokenizer tk, int found)
 	throws ServiceLocationException, IOException {
 
 	// Get line including id and equals.
@@ -795,7 +795,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_assign_error",
 				new Object[] {Integer.toString(tk.lineno())});
 	}
@@ -811,9 +811,9 @@ class AttributeVerifier
 
 	if ((tt = tk.nextToken()) == StreamTokenizer.TT_EOF) {
 
-	    throw 
+	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -821,9 +821,9 @@ class AttributeVerifier
 
 	if (tt != StreamTokenizer.TT_EOL) {
 
-	    throw 
+	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -834,9 +834,9 @@ class AttributeVerifier
 
 	if ((tt = stk.nextToken()) != StreamTokenizer.TT_WORD) {
 
-	    throw 
+	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_missing_id",
 				new Object[] {Integer.toString(tk.lineno())});
 	}
@@ -851,7 +851,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_missing_eq ",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -868,7 +868,7 @@ class AttributeVerifier
 		if ((tt = stk.nextToken()) != StreamTokenizer.TT_WORD) {
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_srv_type_err",
 				new Object[] {Integer.toString(tk.lineno())});
 		}
@@ -876,7 +876,7 @@ class AttributeVerifier
 		// Check for characters which are not alphanumerics, + and -.
 		//  Service type names are more heavily restricted.
 
-		StreamTokenizer sttk = 
+		StreamTokenizer sttk =
 		    new StreamTokenizer(new StringReader(stk.sval));
 
 		initSchemeIdChar(sttk);
@@ -885,7 +885,7 @@ class AttributeVerifier
 		    !stk.sval.equals(sttk.sval)) {
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_srv_type_err",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -909,7 +909,7 @@ class AttributeVerifier
 		if ((tt = stk.nextToken()) != StreamTokenizer.TT_EOF) {
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_srv_type_err",
 				new Object[] {Integer.toString(tk.lineno())});
 		}
@@ -928,7 +928,7 @@ class AttributeVerifier
 		if ((tt = stk.nextToken()) != StreamTokenizer.TT_WORD) {
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_vers_err",
 				new Object[] {Integer.toString(tk.lineno())});
 		}
@@ -941,7 +941,7 @@ class AttributeVerifier
 
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_vers_mssing",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -954,7 +954,7 @@ class AttributeVerifier
 
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_vers_err",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -967,7 +967,7 @@ class AttributeVerifier
 		if ((tt = stk.nextToken()) != StreamTokenizer.TT_EOF) {
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_vers_err",
 				new Object[] {Integer.toString(tk.lineno())});
 		}
@@ -986,7 +986,7 @@ class AttributeVerifier
 
 		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {Integer.toString(tk.lineno())});
 	    }
@@ -999,7 +999,7 @@ class AttributeVerifier
 		String helpText = "";
 
 		do {
-		    int ptt = tt;  
+		    int ptt = tt;
 		    tt = tk.nextToken();
 
 		    if (tt == StreamTokenizer.TT_WORD) {
@@ -1024,17 +1024,17 @@ class AttributeVerifier
 			    break;
 			}
 		    } else if (tt == StreamTokenizer.TT_EOF) {
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
 		    } else {
 
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1068,7 +1068,7 @@ class AttributeVerifier
 		// Need to continue parsing service URL syntax until we
 		// reach a blank line.
 
-		tt = StreamTokenizer.TT_EOL;  
+		tt = StreamTokenizer.TT_EOL;
 
 		do {
 		    int ptt = tt;
@@ -1096,17 +1096,17 @@ class AttributeVerifier
 			    break;
 			}
 		    } else if (tt == StreamTokenizer.TT_EOF) {
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
 		    } else {
 
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1123,7 +1123,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_nontattribute_err",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1135,7 +1135,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_dup_def",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1148,7 +1148,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1161,7 +1161,7 @@ class AttributeVerifier
 
     // Parse the attributes from the tokenizer.
 
-    private void parseAttributes(StreamTokenizer tk) 
+    private void parseAttributes(StreamTokenizer tk)
 	throws ServiceLocationException {
 
 	try {
@@ -1196,9 +1196,9 @@ class AttributeVerifier
 
 		if (attributeDescriptors.get(attrId) != null) {
 
-		    throw 
+		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_dup_def",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1223,7 +1223,7 @@ class AttributeVerifier
 
     // Parse a single attribute description from the tokenizer.
 
-    private AttributeDescriptor 
+    private AttributeDescriptor
 	parseAttribute(StreamTokenizer tk) throws ServiceLocationException {
 
 	AttributeDescriptor attDesc = new AttributeDescriptor();
@@ -1245,7 +1245,7 @@ class AttributeVerifier
 				new Object[] {Integer.toString(tk.lineno())});
 	    }
 
-	    StreamTokenizer stk = 
+	    StreamTokenizer stk =
 		new StreamTokenizer(new StringReader(tk.sval));
 
 	    initIdChar(stk);
@@ -1253,7 +1253,7 @@ class AttributeVerifier
 	    // Parse the attribute id.
 
 	    parseId(stk, attDesc, lineno);
-      
+
 	    // Parse the type and flags.
 
 	    parseTypeAndFlags(stk, attDesc, lineno);
@@ -1262,9 +1262,9 @@ class AttributeVerifier
 
 	    if (tt == StreamTokenizer.TT_EOF) {
 
-		throw 
+		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1272,9 +1272,9 @@ class AttributeVerifier
 
 	    if (tt != StreamTokenizer.TT_EOL) {
 
-		throw 
+		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1319,7 +1319,7 @@ class AttributeVerifier
 
 			}
 
-		    } else if (tt == StreamTokenizer.TT_EOL) { 
+		    } else if (tt == StreamTokenizer.TT_EOL) {
 
 			if (ptt == StreamTokenizer.TT_EOL) {
 			    // end of attribute definition.
@@ -1336,17 +1336,17 @@ class AttributeVerifier
 
 			}
 		    } else if (tt == StreamTokenizer.TT_EOF) {
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
 		    } else {
 
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1368,11 +1368,11 @@ class AttributeVerifier
 		    // Check for start of help text.
 
 		    String line = tk.sval.trim();
-	  
+
 		    if (line.charAt(0) != TT_FIELD) {
 			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1383,17 +1383,17 @@ class AttributeVerifier
 		    }
 
 		} else if (tt == StreamTokenizer.TT_EOF) {
-		    throw 
+		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
 		} else {
 
-		    throw 
+		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1406,7 +1406,7 @@ class AttributeVerifier
 	    String helpText = "";
 
 	    do {
-		int ptt = tt;  
+		int ptt = tt;
 		lineno = tk.lineno();
 		tt = tk.nextToken();
 
@@ -1415,12 +1415,12 @@ class AttributeVerifier
 		    // Check for end of help text.
 
 		    String line = tk.sval.trim();
-	  
+
 		    if (line.charAt(0) == TT_FIELD) {
 
 			// Help text is collected verbatim after '#'.
 
-			helpText = 
+			helpText =
 			    helpText + line.substring(1) + "\n";
 
 		    } else {
@@ -1463,18 +1463,18 @@ class AttributeVerifier
 
 			// Error if previous token wasn't EOL.
 
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 		    }
 
 		} else {
 
-		    throw 
+		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 		}
@@ -1500,7 +1500,7 @@ class AttributeVerifier
 
 			tok = tok + tk.sval;
 
-		    } else if (tt == StreamTokenizer.TT_EOL) { 
+		    } else if (tt == StreamTokenizer.TT_EOL) {
 
 			if (ptt == StreamTokenizer.TT_EOL) {
 			    // end of attribute definition.
@@ -1517,9 +1517,9 @@ class AttributeVerifier
 
 			}
 		    } else if (tt == StreamTokenizer.TT_EOF) {
-			throw 
+			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_end_error",
 				new Object[] {Integer.toString(tk.lineno())});
 
@@ -1527,7 +1527,7 @@ class AttributeVerifier
 
 			throw
 			    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_unk_token",
 				new Object[] {Integer.toString(tk.lineno())});
 		    }
@@ -1538,10 +1538,10 @@ class AttributeVerifier
 
 		// Error. Keyword attribute should have ended during help text
 		//  parsing or before.
-	
+
 		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {Integer.toString(tk.lineno())});
 	    }
@@ -1553,7 +1553,7 @@ class AttributeVerifier
 				ServiceLocationException.INTERNAL_SYSTEM_ERROR,
 				"template_io_error",
 				new Object[] {
-		    Integer.toString(tk.lineno()), 
+		    Integer.toString(tk.lineno()),
 			ex.getMessage()});
 	}
 
@@ -1561,7 +1561,7 @@ class AttributeVerifier
 
     // Check whether the default values, if any, are correct.
 
-    private void checkDefaultValues(AttributeDescriptor attDesc) 
+    private void checkDefaultValues(AttributeDescriptor attDesc)
 	throws ServiceLocationException {
 
 	// Don't bother if it's a keyword attribute, parsing has checked.
@@ -1604,7 +1604,7 @@ class AttributeVerifier
 
 		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_no_init",
 				new Object[] {attDesc.getId()});
 
@@ -1634,7 +1634,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_wrong_init",
 				new Object[] {
 		    val.toString(), attDesc.getId()});
@@ -1659,7 +1659,7 @@ class AttributeVerifier
 	if (tt != TT_EQUALS) {
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {
 		    Integer.toString(tk.lineno() + baseLineno)});
@@ -1673,7 +1673,7 @@ class AttributeVerifier
 
 	// Expand out character escapes.
 
-	id = 
+	id =
 	    ServiceLocationAttribute.unescapeAttributeString(id, true);
 
 
@@ -1682,7 +1682,7 @@ class AttributeVerifier
 
     // Parse the attribute's type and flags.
 
-    private void 
+    private void
 	parseTypeAndFlags(StreamTokenizer tk,
 			  AttributeDescriptor attDesc,
 			  int baseLineno)
@@ -1720,7 +1720,7 @@ class AttributeVerifier
 	    if (attDesc.getIsKeyword()) {
 		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {
 			Integer.toString(tk.lineno() + baseLineno)});
@@ -1728,8 +1728,8 @@ class AttributeVerifier
 
 
 	    // Check and assign it to the attribute.
-	  
-	    existingFlags = 
+
+	    existingFlags =
 		existingFlags | checkAndAddFlag(flag,
 						existingFlags,
 						attDesc,
@@ -1755,7 +1755,7 @@ class AttributeVerifier
 	if (!attDesc.getIsMultivalued() && vals.size() > 1) {
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {
 		    Integer.toString(tk.lineno() + baseLineno)});
@@ -1766,7 +1766,7 @@ class AttributeVerifier
 
     // Parse the attribute's allowed values.
 
-    private void 
+    private void
 	parseAllowedValues(StreamTokenizer tk,
 			   AttributeDescriptor attDesc,
 			   int baseLineno)
@@ -1871,7 +1871,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_attr_syntax",
 				new Object[] {Integer.toString(lineno)});
 	}
@@ -1884,7 +1884,7 @@ class AttributeVerifier
 
     private void checkAndAddType(String type,
 				 AttributeDescriptor attDesc,
-				 int lineno) 
+				 int lineno)
 	throws ServiceLocationException {
 
 	// Check token against recognized types.
@@ -1908,19 +1908,19 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_not_slp_type",
 				new Object[] {Integer.toString(lineno)});
 	}
 
     }
-	    
+
     // Check the flag and add it to the attribute descriptor.
 
     private int checkAndAddFlag(String flag,
 				int matched,
 				AttributeDescriptor attDesc,
-				int lineno) 
+				int lineno)
 	throws ServiceLocationException {
 
 	boolean duplicate = false;
@@ -1942,7 +1942,7 @@ class AttributeVerifier
 
 		    throw
 			new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_boolean_multi",
 				new Object[] {Integer.toString(lineno)});
 		}
@@ -1986,7 +1986,7 @@ class AttributeVerifier
 
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_invalid_attr_flag",
 				new Object[] {Integer.toString(lineno)});
 	}
@@ -1995,7 +1995,7 @@ class AttributeVerifier
 	if (duplicate) {
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_dup_attr_flag",
 				new Object[] {Integer.toString(lineno)});
 	}
@@ -2006,7 +2006,7 @@ class AttributeVerifier
     // Parse a word out of the tokenizer. The exact characters
     //  will depend on what the syntax tables have been set to.
 
-    private String parseWord(StreamTokenizer tk, int baseLineno) 
+    private String parseWord(StreamTokenizer tk, int baseLineno)
 	throws ServiceLocationException, IOException {
 
 	int tt = tk.nextToken();
@@ -2029,10 +2029,10 @@ class AttributeVerifier
 	    } else {
 		errorToken = (new Character((char)tt)).toString();
 	    }
-	    
+
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_invalid_tok",
 				new Object[] {
 		    Integer.toString(tk.lineno() + baseLineno)});
@@ -2045,14 +2045,14 @@ class AttributeVerifier
 
     private Object convertValue(String type,
 				String reqTok,
-				int lineno) 
+				int lineno)
 	throws ServiceLocationException,
 	       IOException {
 
 	Object reqVal = null;
 
 	if (type.equals(JAVA_STRING_TYPE)) {
-      
+
 	    // Expand out any escaped ``#''. It won't be handled by
 	    //  SLA.
 
@@ -2060,7 +2060,7 @@ class AttributeVerifier
 
 	    // Expand out character escapes.
 
-	    reqVal = 
+	    reqVal =
 		ServiceLocationAttribute.unescapeAttributeString(reqTok,
 								 false);
 
@@ -2072,9 +2072,9 @@ class AttributeVerifier
 
 	    } catch (NumberFormatException ex) {
 
-		throw 
+		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_expect_int",
 				new Object[] {
 			Integer.toString(lineno), reqTok });
@@ -2088,20 +2088,20 @@ class AttributeVerifier
 		reqVal = new Boolean(true);
 
 	    } else if (reqTok.equalsIgnoreCase(FALSE_TOKEN)) {
-	      
+
 		reqVal = new Boolean(false);
 
 	    } else {
 
 		throw
 		    new ServiceLocationException(
-				ServiceLocationException.PARSE_ERROR, 
+				ServiceLocationException.PARSE_ERROR,
 				"template_expect_bool",
 				new Object[] {
 			Integer.toString(lineno), reqTok});
 	    }
 	} else if (type.equals(JAVA_OPAQUE_TYPE)) {
-	    
+
 	    reqVal = Opaque.unescapeByteArray(reqTok);
 
 	} else {
@@ -2123,7 +2123,7 @@ class AttributeVerifier
 	int i, j = 0;
 
 	for (i = str.indexOf(ESC_HASH, j);
-	    i != -1; 
+	    i != -1;
 	    i = str.indexOf(ESC_HASH, j)) {
 
 	    buf.append(str.substring(j, i));

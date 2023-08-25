@@ -1045,7 +1045,7 @@ __ham_dup_return(dbc, val, flags)
 				    hcp->dup_len)
 					tmp_val.dlen =
 					    hcp->dup_len - tmp_val.doff;
-				
+
 				/*
 				 * Calculate the new offset.
 				 */

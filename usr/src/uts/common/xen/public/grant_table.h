@@ -1,9 +1,9 @@
 /******************************************************************************
  * grant_table.h
- * 
+ *
  * Interface for granting foreign access to page frames, and receiving
  * page-ownership transfers.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -36,10 +36,10 @@
 /* Some rough guidelines on accessing and updating grant-table entries
  * in a concurrency-safe manner. For more information, Linux contains a
  * reference implementation for guest OSes (arch/xen/kernel/grant_table.c).
- * 
+ *
  * NB. WMB is a no-op on current-generation x86 processors. However, a
  *     compiler barrier will still be required.
- * 
+ *
  * Introducing a valid entry into the grant table:
  *  1. Write ent->domid.
  *  2. Write ent->frame:
@@ -48,7 +48,7 @@
  *                           frame, or zero if none.
  *  3. Write memory barrier (WMB).
  *  4. Write ent->flags, inc. valid type.
- * 
+ *
  * Invalidating an unused GTF_permit_access entry:
  *  1. flags = ent->flags.
  *  2. Observe that !(flags & (GTF_reading|GTF_writing)).
@@ -60,7 +60,7 @@
  *  This cannot be done directly. Request assistance from the domain controller
  *  which can set a timeout on the use of a grant entry and take necessary
  *  action. (NB. This is not yet implemented!).
- * 
+ *
  * Invalidating an unused GTF_accept_transfer entry:
  *  1. flags = ent->flags.
  *  2. Observe that !(flags & GTF_transfer_committed). [*]
@@ -78,7 +78,7 @@
  *
  * Changing a GTF_permit_access from writable to read-only:
  *  Use SMP-safe CMPXCHG to set GTF_readonly, while checking !GTF_writing.
- * 
+ *
  * Changing a GTF_permit_access from read-only to writable:
  *  Use SMP-safe bit-setting instruction.
  */
@@ -175,7 +175,7 @@ typedef uint32_t grant_handle_t;
  *  2. If GNTMAP_host_map is specified then a mapping will be added at
  *     either a host virtual address in the current address space, or at
  *     a PTE at the specified machine address.  The type of mapping to
- *     perform is selected through the GNTMAP_contains_pte flag, and the 
+ *     perform is selected through the GNTMAP_contains_pte flag, and the
  *     address is specified in <host_addr>.
  *  3. Mappings should only be destroyed via GNTTABOP_unmap_grant_ref. If a
  *     host mapping is destroyed by other means then it is *NOT* guaranteed
@@ -258,7 +258,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
  * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
  * foreign domain has previously registered its interest in the transfer via
  * <domid, ref>.
- * 
+ *
  * Note that, even if the transfer fails, the specified page no longer belongs
  * to the calling domain *unless* the error is GNTST_bad_page.
  */

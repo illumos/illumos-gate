@@ -31,13 +31,13 @@
         .align  8; \
         .globl  x; \
         .type   x, @function; \
-	x:	
+	x:
 #define SET_SIZE(x) \
         .size   x, .-x
 #else
 #include "SYS.h"
 #endif
-	
+
 /*
  * ====================
  * _Unw_capture_regs()

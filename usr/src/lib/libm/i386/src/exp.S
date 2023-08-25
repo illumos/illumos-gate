@@ -136,7 +136,7 @@ LIBM_ANSI_PRAGMA_WEAK(exp,function)
 .not_finite:
 	/ Here, flags still have settings from execution of
 	/	cmpl	$0x7ff00000,%ecx	/ hi_32(|x|) > hi_32(INF)?
-	ja	.NaN_or_pinf		/ if not, x may be +/- INF 
+	ja	.NaN_or_pinf		/ if not, x may be +/- INF
 	movl	4(%esp),%edx		/ edx <-- lo_32(x)
 	cmpl	$0,%edx			/ lo_32(x) = 0?
 	jne	.NaN_or_pinf		/ if not, x is NaN

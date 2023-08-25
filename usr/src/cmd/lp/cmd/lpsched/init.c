@@ -34,7 +34,7 @@
 CLSTATUS	**CStatus = NULL;		/* Status of same          */
 PSTATUS		**PStatus = NULL;		/* Status of same          */
 FSTATUS		**FStatus = NULL;		/* status of same	   */
-PWSTATUS	**PWStatus = NULL;		/* Status of same          */ 
+PWSTATUS	**PWStatus = NULL;		/* Status of same          */
 EXEC		**Exec_Table = NULL;		/* Running processes       */
 EXEC		**Exec_Slow = NULL;		/*   Slow filters	   */
 EXEC		**Exec_Notify = NULL;		/*   Notifications	   */
@@ -117,7 +117,7 @@ init_pwheels()
 {
     PWHEEL	*p;
     int i = 0;
-    
+
     while((p = Getpwheel(NAME_ALL)) != NULL || errno != ENOENT)
     {
 	if (!p)			/* NULL, ignore it. */
@@ -148,7 +148,7 @@ init_requests(void)
 	sysdir = makepath(Lp_Requests, sysname, NULL);
 
 	while((name = next_file(sysdir, &sysaddr)) != NULL) {
-	    reqfile = makepath(sysname, name, NULL);	
+	    reqfile = makepath(sysname, name, NULL);
 	    Free(name);
 
 	    if ((s = Getsecure(reqfile)) == NULL) {
@@ -241,7 +241,7 @@ init_requests(void)
 	Free(sysname);
 	sysaddr = -1;
     }
-   
+
     if (table != NULL) {
 	unsigned long i;
 

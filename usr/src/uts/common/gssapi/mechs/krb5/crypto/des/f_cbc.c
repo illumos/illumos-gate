@@ -127,7 +127,7 @@ final_cleanup:
  */
 
 /* ARGSUSED */
-int 
+int
 mit_des_cbc_encrypt(krb5_context context,
 	const mit_des_cblock *in,
 	mit_des_cblock *out,

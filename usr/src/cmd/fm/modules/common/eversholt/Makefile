@@ -35,7 +35,7 @@ MODULE = eft
 CLASS = common
 DMOD = $(MODULE).so
 
-YSRCS=escparse.y 
+YSRCS=escparse.y
 SRCS =	alloc.c check.c config.c eft.c eftread.c esclex.c eval.c evnv.c \
 	fme.c iexpr.c io.c ipath.c itree.c lut.c literals.c out.c platform.c \
 	ptree.c stable.c stats.c tree.c

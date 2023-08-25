@@ -59,7 +59,7 @@
  *		store using ASI_BLK_INIT_ST_QUAD_LDD_P
  *	}
  *	Store as many 8-byte chunks, followed by trialing bytes.
- *		
+ *
  */
 
 #include <sys/asm_linkage.h>
@@ -97,9 +97,9 @@
 
 	! Set -(%o3) bytes till sp1 double aligned
 1:	stb	%o1, [%o5]		! there is at least 1 byte to set
-	inccc	%o3			! byte clearing loop 
+	inccc	%o3			! byte clearing loop
 	bl,pt	%ncc, 1b
-	inc	%o5 
+	inc	%o5
 
 	! Now sp1 is double aligned (sp1 is found in %o5)
 .blkalign:
@@ -178,7 +178,7 @@
 	cmp	%o4, 0x40		! check if 64 bytes to set
 	blu	%ncc, 5f
 	nop
-4:	
+4:
 	stxa	%o1, [%o5+0x0]%asi
 	stxa	%o1, [%o5+0x8]%asi
 	stxa	%o1, [%o5+0x10]%asi
@@ -210,7 +210,7 @@
 	ba	.wrchar
 	nop
 
-.wdalign:			
+.wdalign:
 	andcc	%o5, 3, %o3		! is sp1 aligned on a word boundary
 	bz,pn	%ncc, .wrword
 	andn	%o2, 3, %o3		! create word sized count in %o3

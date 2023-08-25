@@ -79,8 +79,8 @@ typedef struct SpnegoElement
 
    unsigned char*        pbData;             // Points to actual Data
 
-   unsigned long         nDatalength;        // Actual Data Length   
-   
+   unsigned long         nDatalength;        // Actual Data Length
+
 } SPNEGO_ELEMENT;
 
 // Structure size in case we later choose to extend the structure
@@ -137,7 +137,7 @@ int ValidateMechList( unsigned char* pbMechListData, long nBoundaryLength );
 int CalculateMinSpnegoInitTokenSize( long nMechTokenLength, long nMechListMICLength,
          SPNEGO_MECH_OID *mechOid, int mechOidCnt, int nReqFlagsAvailable,
                                     long* plTokenSize, long* plInternalLength );
-int CalculateMinSpnegoTargTokenSize( SPNEGO_MECH_OID MechType, SPNEGO_NEGRESULT spnegoNegResult, 
+int CalculateMinSpnegoTargTokenSize( SPNEGO_MECH_OID MechType, SPNEGO_NEGRESULT spnegoNegResult,
                                     long nMechTokenLen,
                                     long nMechTokenMIC, long* pnTokenSize,
                                     long* pnInternalTokenLength );

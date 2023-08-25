@@ -46,7 +46,7 @@
 	andw	$0x3f,%di	/ make sure bits > B5 are all zero
 	xorw	%di,%cx		/ cx <-- present_cw, with new xcptn_masks
 	movw	%cx,(%rsp)
-	fldcw	(%rsp)		/ load new cw 
+	fldcw	(%rsp)		/ load new cw
 	stmxcsr	(%rsp)
 	movq	(%rsp),%rcx
 	orw	$0x1f80,%cx	/ cx <-- current mxcsr, but masking all xcptns
@@ -72,7 +72,7 @@
 	andq	$0x3f,%rdi
 	jnz	.L1
 				/ input ex=0, clear all exception
-	fnclex	
+	fnclex
 	subq	$8,%rsp
 	stmxcsr	(%rsp)
 	movq	(%rsp),%rcx

@@ -54,7 +54,7 @@ static char *stripquotes(char *str);
  * pipe messages to cmd.
  */
 
-int 
+int
 dopipe(char str[])
 {
 	int *ip, mesg;
@@ -183,7 +183,7 @@ err:
 /*
  * Load the named message from the named file.
  */
-int 
+int
 loadmsg(char str[])
 {
 	char *file;
@@ -261,7 +261,7 @@ loadmsg(char str[])
 /*
  * Display the named field.
  */
-int 
+int
 field(char str[])
 {
 	int *ip;

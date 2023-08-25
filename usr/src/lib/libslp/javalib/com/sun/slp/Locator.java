@@ -49,7 +49,7 @@ import java.util.*;
 public interface Locator {
 
     /**
-     * Return the Locator's locale object. 
+     * Return the Locator's locale object.
      *
      * @return The Locale object.
      */
@@ -65,7 +65,7 @@ public interface Locator {
      * @param namingAuthority	The naming authority, "" for default,
      *                           '*' for any naming authority.
      * @param scopes	The SLP scopes of the types.
-     * @return ServiceLocationEnumeration of ServiceType objects for 
+     * @return ServiceLocationEnumeration of ServiceType objects for
      *	      the service type names.
      * @exception IllegalArgumentException If any of the parameters are
      *					  null or syntactically incorrect.
@@ -85,9 +85,9 @@ public interface Locator {
      * @param type	The type of the service (e.g. printer, etc.).
      * @param scopes	The SLP scopes of the service types.
      * @param query		A string with the SLP query.
-     * @return ServiceLocationEnumeration of ServiceURL objects for 
+     * @return ServiceLocationEnumeration of ServiceURL objects for
      *	      services matching the
-     *         attributes. 
+     *         attributes.
      * @exception ServiceLocationException An exception is returned if the
      *					  operation fails.
      * @see ServiceURL
@@ -112,7 +112,7 @@ public interface Locator {
      *                     ids which begin with a given prefix, or begin
      *                     and end with '*' to do substring matching for
      *                     ids containing the given partial id.
-     * @return ServiceLocationEnumeration of ServiceLocationAttribute 
+     * @return ServiceLocationEnumeration of ServiceLocationAttribute
      *         objects matching the ids.
      * @exception ServiceLocationException An exception is returned if the
      *					  operation fails.
@@ -129,7 +129,7 @@ public interface Locator {
 
     /**
      * Return all attributes for all service URL's having this
-     * service type in the locale of the Locator. 
+     * service type in the locale of the Locator.
      *
      * @param type The service type.
      * @param scopes	The SLP scopes of the service type.
@@ -141,7 +141,7 @@ public interface Locator {
      *                     ids which begin with a given prefix, or begin
      *                     and end with '*' to do substring matching for
      *                     ids containing the given partial id.
-     * @return ServiceLocationEnumeration of ServiceLocationAttribute 
+     * @return ServiceLocationEnumeration of ServiceLocationAttribute
      *         objects matching the ids.
      * @exception ServiceLocationException An exception is returned if the
      *					  operation fails.

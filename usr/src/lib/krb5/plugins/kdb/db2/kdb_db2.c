@@ -265,7 +265,7 @@ k5db2_dbopen(krb5_db2_context *dbc, char *fname, int flags, int mode, int tempdb
 	errno = ENOMEM;
 	return NULL;
     }
-    
+
 
     hashi.bsize = 4096;
     hashi.cachesize = 0;
@@ -645,7 +645,7 @@ krb5_db2_db_lock(krb5_context context, int in_mode)
 	} else if (retval == EBADF && mode == KRB5_DB_LOCKMODE_EXCLUSIVE) {
 	    /* tried to exclusive-lock something we don't have */
 	    /* write access to */
-	    
+
 	    /* Solaris Kerberos: Better error logging */
 	    snprintf(errbuf, sizeof(errbuf),
 	        gettext("Failed to exclusively lock \"%s\": "),
@@ -1903,7 +1903,7 @@ krb5_db2_db_rename(context, from, to)
     krb5_error_code retval;
     krb5_db2_context *s_context, *db_ctx;
     kdb5_dal_handle *dal_handle = context->db_context;
-    
+
     s_context = dal_handle->db_context;
     dal_handle->db_context = NULL;
     if ((retval = k5db2_init_context(context)))
@@ -1926,7 +1926,7 @@ krb5_db2_db_rename(context, from, to)
 		    goto errout;
 	    }
 	    else {
-		/* 
+		/*
 		 * XXX assuming we should bail if there is some other stat error
 		 */
 		retval = errno;

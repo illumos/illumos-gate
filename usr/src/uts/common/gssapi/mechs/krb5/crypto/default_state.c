@@ -12,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -26,7 +26,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * Section 6 (Encryption) of the Kerberos revisions document defines
  * cipher states to be used to chain encryptions and decryptions
  * together.  Examples of cipher states include initialization vectors
@@ -70,5 +70,5 @@ krb5_error_code krb5int_default_free_state
   return 0;
 }
 
-    
-  
+
+

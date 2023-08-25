@@ -99,7 +99,7 @@ extern void __fenv_setmxcsr(const unsigned int *);
 #define __fenv_get_ex(X)	(X&0x3d)
 #define __fenv_set_ex(X,Y)	X=(X&~0x0000003d)|(Y)
 
-/* 
+/*
  * These macros define some useful distinctions between various
  * SSE instructions.  In some cases, distinctions are made for
  * the purpose of simplifying the decoding of instructions, while

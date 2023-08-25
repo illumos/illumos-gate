@@ -204,7 +204,7 @@ int clear_abort_next = 0;
 
 char *report_string[MAX_REPORTS] ;
 char  report_buffer[50] ;
-int n_reports = 0, report_next = 0, report_gathering = 0 ; 
+int n_reports = 0, report_next = 0, report_gathering = 0 ;
 int clear_report_next = 0;
 
 int say_next = 0, hup_next = 0;
@@ -373,7 +373,7 @@ main(argc, argv)
     }
 
     init();
-    
+
     if (chat_file != NULL) {
 	arg = ARG(argc, argv);
 	if (arg != NULL)
@@ -693,7 +693,7 @@ int sending;  /* set to 1 when sending (putting) this string. */
 	    }
 	    continue;
 	}
-	
+
 	if (use_env && cur_chr == '$') {		/* ARI */
 	    phchar = env_str;
 	    while (isalnumx(*s))
@@ -743,7 +743,7 @@ int sending;  /* set to 1 when sending (putting) this string. */
 
 	case 'T':
 	    if (sending && phone_num) {
-		for (phchar = phone_num; *phchar != '\0'; phchar++) 
+		for (phchar = phone_num; *phchar != '\0'; phchar++)
 		    *s1++ = *phchar;
 	    }
 	    else {
@@ -754,7 +754,7 @@ int sending;  /* set to 1 when sending (putting) this string. */
 
 	case 'U':
 	    if (sending && phone_num2) {
-		for (phchar = phone_num2; *phchar != '\0'; phchar++) 
+		for (phchar = phone_num2; *phchar != '\0'; phchar++)
 		    *s1++ = *phchar;
 	    }
 	    else {
@@ -791,7 +791,7 @@ int sending;  /* set to 1 when sending (putting) this string. */
 	    else
 		*s1++ = 'N';
 	    break;
-	    
+
 	case '$':			/* ARI */
 	    if (use_env) {
 		*s1++ = cur_chr;
@@ -903,7 +903,7 @@ char *s;
 	++hup_next;
         return;
     }
- 
+
     if (strcmp(s, "ABORT") == 0) {
 	++abort_next;
 	return;
@@ -1034,14 +1034,14 @@ register char *s;
 
     if (abort_next) {
 	char *s1;
-	
+
 	abort_next = 0;
-	
+
 	if (n_aborts >= MAX_ABORTS)
 	    fatal(2, "Too many ABORT strings");
-	
+
 	s1 = clean(s, 0);
-	
+
 	if (strlen(s1) > strlen(s)
 	    || strlen(s1) + 1 > sizeof(fail_buffer))
 	    fatal(1, "Illegal or too-long ABORT string ('%v')", s);
@@ -1058,11 +1058,11 @@ register char *s;
 	int   i;
         int   old_max;
 	int   pack = 0;
-	
+
 	clear_abort_next = 0;
-	
+
 	s1 = clean(s, 0);
-	
+
 	if (strlen(s1) > strlen(s)
 	    || strlen(s1) + 1 > sizeof(fail_buffer))
 	    fatal(1, "Illegal or too-long CLR_ABORT string ('%v')", s);
@@ -1086,18 +1086,18 @@ register char *s;
 
     if (report_next) {
 	char *s1;
-	
+
 	report_next = 0;
 	if (n_reports >= MAX_REPORTS)
 	    fatal(2, "Too many REPORT strings");
-	
+
 	s1 = clean(s, 0);
-	
+
 	if (strlen(s1) > strlen(s) || strlen(s1) > sizeof fail_buffer - 1)
 	    fatal(1, "Illegal or too-long REPORT string ('%v')", s);
-	
+
 	report_string[n_reports++] = s1;
-	
+
 	if (verbose)
 	    logf("report (%v)", s);
 	return;
@@ -1108,11 +1108,11 @@ register char *s;
 	int   i;
 	int   old_max;
 	int   pack = 0;
-	
+
 	clear_report_next = 0;
-	
+
 	s1 = clean(s, 0);
-	
+
 	if (strlen(s1) > strlen(s) || strlen(s1) > sizeof fail_buffer - 1)
 	    fatal(1, "Illegal or too-long REPORT string ('%v')", s);
 
@@ -1130,14 +1130,14 @@ register char *s;
         free(s1);
         if (pack)
 	    pack_array(report_string,old_max);
-	
+
 	return;
     }
 
     if (timeout_next) {
 	timeout_next = 0;
 	timeout = atoi(s);
-	
+
 	if (timeout <= 0)
 	    timeout = DEFAULT_CHAT_TIMEOUT;
 
@@ -1214,7 +1214,7 @@ int get_char()
 
 	if (fcntl(0, F_SETFL, status & ~O_NONBLOCK) == -1)
 	    fatal(2, "Can't set file mode flags on stdin: %m");
-	
+
 	return (-1);
     }
 }
@@ -1484,7 +1484,7 @@ register char *string;
     }
 
     alarm(0);
-    
+
     if (verbose && printed) {
 	if (alarmed)
 	    logf(" -- read timed out");

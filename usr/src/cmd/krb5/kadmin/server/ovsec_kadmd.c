@@ -28,14 +28,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -46,7 +46,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -160,7 +160,7 @@ int nofork = 0; /* global; don't fork (debug mode) */
 
 /*
  * Function: usage
- * 
+ *
  * Purpose: print out the server usage message
  *
  * Arguments:
@@ -212,16 +212,16 @@ static void display_status_1(m, code, type)
 	OM_uint32 min_stat;
 	gss_buffer_desc msg;
 	OM_uint32 msg_ctx;
-     
+
 	msg_ctx = 0;
 	while (1) {
 		(void) gss_display_status(&min_stat, code,
 					      type, GSS_C_NULL_OID,
 					      &msg_ctx, &msg);
 		fprintf(stderr, "GSS-API error %s: %s\n", m,
-			(char *)msg.value); 
+			(char *)msg.value);
 		(void) gss_release_buffer(&min_stat, &msg);
-	  
+
 		if (!msg_ctx)
 			break;
 	}
@@ -229,12 +229,12 @@ static void display_status_1(m, code, type)
 
 
 /*
- * Solaris Kerberos: the following prototypes are needed because these are 
- * private interfaces that do not have prototypes in any .h 
+ * Solaris Kerberos: the following prototypes are needed because these are
+ * private interfaces that do not have prototypes in any .h
  */
 
-extern struct hostent   *res_getipnodebyaddr(const void *, size_t, int, int *); 
-extern void             res_freehostent(struct hostent *); 
+extern struct hostent   *res_getipnodebyaddr(const void *, size_t, int, int *);
+extern void             res_freehostent(struct hostent *);
 
 static void
 freedomnames(char **npp)
@@ -253,7 +253,7 @@ freedomnames(char **npp)
 /*
  * Construct a list of uniq FQDNs of all the net interfaces (except
  * krb5.conf master dups) and return it in arg 'dnames'.
- * 
+ *
  * On successful return (0), caller must call freedomnames()
  * to free memory.
  */
@@ -272,20 +272,20 @@ getdomnames(krb5_context ctx, char *realm, char ***dnames)
 		return (ret);
 	}
 
-	ret = krb5_os_localaddr(ctx, &addresses); 
-	if (ret != 0) { 
+	ret = krb5_os_localaddr(ctx, &addresses);
+	if (ret != 0) {
 		if (nofork)
 			(void) fprintf(stderr,
 				    "kadmind: get localaddrs failed: %s",
 				    error_message(ret));
 		result = ret;
 		goto err;
-	} 
+	}
 
 
 	for (i=0; addresses[i]; i++) {
 		a = addresses[i];
-		hp = res_getipnodebyaddr(a->contents, a->length, 
+		hp = res_getipnodebyaddr(a->contents, a->length,
 					a->addrtype == ADDRTYPE_INET
 					? AF_INET : AF_INET6,
 					&error);
@@ -293,11 +293,11 @@ getdomnames(krb5_context ctx, char *realm, char ***dnames)
 
 			/* skip master host in krb5.conf */
 			if (strcasecmp(cfhost, hp->h_name) == 0) {
-				res_freehostent(hp); 
-				hp = NULL; 
+				res_freehostent(hp);
+				hp = NULL;
 				continue;
 			}
-				
+
 			dup = 0;
 			tpp = npp;
 			/* skip if hostname already exists in list */
@@ -309,8 +309,8 @@ getdomnames(krb5_context ctx, char *realm, char ***dnames)
 			}
 
 			if (dup) {
-				res_freehostent(hp); 
-				hp = NULL; 
+				res_freehostent(hp);
+				hp = NULL;
 				continue;
 			}
 
@@ -327,11 +327,11 @@ getdomnames(krb5_context ctx, char *realm, char ***dnames)
 			npp[n+1] = NULL;
 			n++;
 
-			res_freehostent(hp); 
-			hp = NULL; 
+			res_freehostent(hp);
+			hp = NULL;
 			result = 0;
 		}
-			
+
 	}
 
 #ifdef DEBUG
@@ -351,7 +351,7 @@ err:
 	}
 
 	if (hp) {
-		res_freehostent(hp); 
+		res_freehostent(hp);
 		hp = NULL;
 	}
 
@@ -388,7 +388,7 @@ set_svc_domnames(char *svcname, char **dnames,
 		/* MAX_NAME_LEN from rpc/rpcsec_gss.h */
 		char name[MAXHOSTNAMELEN+MAX_NAME_LEN+2] = {0};
 		(void) snprintf(name, sizeof(name), "%s@%s",
-				svcname, *(tpp-1)); 
+				svcname, *(tpp-1));
 		ret = rpc_gss_set_svc_name(name,
 					"kerberos_v5", 0,
 					program, version);
@@ -432,12 +432,12 @@ int main(int argc, char *argv[])
      struct opthdr *opt;
      char reqbuf[128];
      struct rlimit rl;
-     
+
      char *kiprop_name = NULL; /* IProp svc name */
      kdb_log_context *log_ctx;
      kadm5_server_handle_t handle;
      krb5_context ctx;
-     
+
      kadm5_config_params params;
      char **db_args      = NULL;
      int    db_args_size = 0;
@@ -448,10 +448,10 @@ int main(int argc, char *argv[])
 
      /* Solaris Kerberos: Stores additional error messages */
      char *emsg = NULL;
-     
+
      /* Solaris Kerberos: Indicates whether loalhost is master or not */
      krb5_boolean is_master;
-     
+
      /* Solaris Kerberos: Used for checking acl file */
      gss_name_t name;
 
@@ -574,7 +574,7 @@ int main(int argc, char *argv[])
      {
 	 free(db_args), db_args=NULL;
      }
-     
+
      if ((ret = kadm5_get_config_params(context, 1, &params,
 					&params))) {
 	  const char *e_txt = krb5_get_error_message (context, ret);
@@ -819,7 +819,7 @@ int main(int argc, char *argv[])
  	  krb5_klog_close(context);
 	  exit(1);
      }
-     
+
      transp = svc_tli_create(fd, nconf, NULL, 0, 0);
      (void) t_free((char *) tres, T_BIND);
      (void) endnetconfig(handlep);
@@ -827,14 +827,14 @@ int main(int argc, char *argv[])
 	  fprintf(stderr, gettext("%s: Cannot create RPC service.\n"), whoami);
 	  krb5_klog_syslog(LOG_ERR, gettext("Cannot create RPC service: %m"));
 	  kadm5_destroy(global_server_handle);
-	  krb5_klog_close(context);	  
+	  krb5_klog_close(context);
 	  exit(1);
      }
      if(!svc_register(transp, KADM, KADMVERS, kadm_1, 0)) {
 	  fprintf(stderr, gettext("%s: Cannot register RPC service.\n"), whoami);
 	  krb5_klog_syslog(LOG_ERR, gettext("Cannot register RPC service, failing."));
 	  kadm5_destroy(global_server_handle);
-	  krb5_klog_close(context);	  
+	  krb5_klog_close(context);
 	  exit(1);
      }
 
@@ -870,7 +870,7 @@ int main(int argc, char *argv[])
 		    gettext("Cannot get host based service name for changepw "
 		    "principal in realm %s: %s"), params.realm,
 		    error_message(ret));
-		fprintf(stderr, 
+		fprintf(stderr,
 		    gettext("%s: Cannot get host based service name for "
 		    "changepw principal in realm %s: %s\n"), whoami, params.realm,
 		    error_message(ret));
@@ -939,7 +939,7 @@ kterr:
       * Try to acquire creds for the old OV services as well as the
       * new names, but if that fails just fall back on the new names.
       */
-     
+
 	if (rpc_gss_set_svc_name(names[5].name,
 				"kerberos_v5", 0, KADM, KADMVERS) &&
 	    rpc_gss_set_svc_name(names[4].name,
@@ -1008,7 +1008,7 @@ kterr:
 	gssbuf.length = strlen("x/admin@___default_realm___");
 	gssbuf.value = "x/admin@___default_realm___";
 	/* Use any value as the first component - 'x' in this case */
-	if (gss_import_name(&minor_status, &gssbuf, GSS_C_NT_USER_NAME, &name) 
+	if (gss_import_name(&minor_status, &gssbuf, GSS_C_NT_USER_NAME, &name)
 	    == GSS_S_COMPLETE) {
 		if (kadm5int_acl_check(context, name, ACL_MODIFY, NULL, NULL)) {
 			krb5_klog_syslog(LOG_WARNING,
@@ -1042,14 +1042,14 @@ kterr:
 	  ret = errno;
 	  errmsg = krb5_get_error_message (context, ret);
 	  krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot detach from tty: %s"), errmsg); 
+		    gettext("Cannot detach from tty: %s"), errmsg);
 	  fprintf(stderr, gettext("%s: Cannot detach from tty: %s\n"),
 		  whoami, errmsg);
 	  kadm5_destroy(global_server_handle);
 	  krb5_klog_close(context);
 	  exit(1);
      }
-     
+
     /* SUNW14resync */
 #if 0
      krb5_klog_syslog(LOG_INFO, "Seeding random number generator");
@@ -1062,7 +1062,7 @@ kterr:
 	  exit(1);
      }
 #endif
-	  
+
 
 	handle = global_server_handle;
 	ctx = handle->context;
@@ -1225,7 +1225,7 @@ kterr:
 
 /*
  * Function: kadm_svc_run
- * 
+ *
  * Purpose: modified version of sunrpc svc_run.
  *	    which closes the database every TIMEOUT seconds.
  *
@@ -1296,7 +1296,7 @@ void kadm_svc_run(void)
 /*
  * Function: setup_signal_handlers
  *
- * Purpose: Setup signal handling functions with either 
+ * Purpose: Setup signal handling functions with either
  * System V's signal() or POSIX_SIGNALS.
  */
 void setup_signal_handlers(iprop_role iproprole) {
@@ -1337,7 +1337,7 @@ void setup_signal_handlers(iprop_role iproprole) {
 
 /*
  * Function: request_exit
- * 
+ *
  * Purpose: sets flags saying the server got a signal and that it
  *	    should exit when convient.
  *

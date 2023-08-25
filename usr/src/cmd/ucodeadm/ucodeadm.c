@@ -26,17 +26,23 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
 #include <sys/processor.h>
+#include <sys/sysmacros.h>
 #include <sys/ucode.h>
+#include <sys/ucode_intel.h>
+#include <sys/ucode_amd.h>
+#include <sys/utsname.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -47,8 +53,12 @@
 #include <ctype.h>
 #include <assert.h>
 #include <libgen.h>
+#include <limits.h>
 #include <locale.h>
 #include <libintl.h>
+#include <ucode/ucode_errno.h>
+#include <ucode/ucode_utils_intel.h>
+#include <ucode/ucode_utils_amd.h>
 
 #define	UCODE_OPT_INSTALL	0x0001
 #define	UCODE_OPT_UPDATE	0x0002
@@ -59,10 +69,16 @@ static const char ucode_dev[] = "/dev/" UCODE_DRIVER_NAME;
 
 static char	*cmdname;
 
-static char	ucode_vendor_str[UCODE_MAX_VENDORS_NAME_LEN];
-static char	ucode_install_path[] = UCODE_INSTALL_PATH;
+#define	UCODE_INSTALL_COMMON_PATH ".f"
 
-static int	ucode_debug = 0;
+/*
+ * The maximum directory path length that can be provided via -R has
+ * to allow for appending the files within the microcode bundles.
+ */
+#define	UCODE_MAX_PATH_LEN (PATH_MAX - \
+    MAX(UCODE_MAX_NAME_LEN_INTEL, UCODE_MAX_NAME_LEN_AMD) - 1)
+
+static bool ucode_debug = false;
 
 static int ucode_convert_amd(const char *, uint8_t *, size_t);
 static int ucode_convert_intel(const char *, uint8_t *, size_t);
@@ -73,22 +89,35 @@ static ucode_errno_t ucode_gen_files_intel(uint8_t *, int, char *);
 static void ucode_list_amd(uint8_t *, int);
 static void ucode_list_intel(uint8_t *, int);
 
-static const struct ucode_ops ucode_ops[] = {
+typedef struct ucode_source {
+	const char	*us_prefix;
+	const char	*us_vendor;
+	int		(*us_convert)(const char *, uint8_t *, size_t);
+	ucode_errno_t	(*us_gen_files)(uint8_t *, int, char *);
+	ucode_errno_t	(*us_validate)(uint8_t *, int);
+	void		(*us_list)(uint8_t *, int);
+} ucode_source_t;
+
+static const ucode_source_t ucode_sources[] = {
 	{
-		.convert	= ucode_convert_intel,
-		.gen_files	= ucode_gen_files_intel,
-		.validate	= ucode_validate_intel,
-		.list		= ucode_list_intel,
+		.us_prefix	= "intel",
+		.us_vendor	= "GenuineIntel",
+		.us_convert	= ucode_convert_intel,
+		.us_gen_files	= ucode_gen_files_intel,
+		.us_validate	= ucode_validate_intel,
+		.us_list	= ucode_list_intel,
 	},
 	{
-		.convert	= ucode_convert_amd,
-		.gen_files	= ucode_gen_files_amd,
-		.validate	= ucode_validate_amd,
-		.list		= ucode_list_amd,
+		.us_prefix	= "amd",
+		.us_vendor	= "AuthenticAMD",
+		.us_convert	= ucode_convert_amd,
+		.us_gen_files	= ucode_gen_files_amd,
+		.us_validate	= ucode_validate_amd,
+		.us_list	= ucode_list_amd,
 	},
 };
 
-const struct ucode_ops *ucode;
+const ucode_source_t *ucode;
 
 static void
 dprintf(const char *format, ...)
@@ -102,7 +131,7 @@ dprintf(const char *format, ...)
 }
 
 static void
-usage(int verbose)
+usage(bool verbose)
 {
 	(void) fprintf(stderr, gettext("usage:\n"));
 	(void) fprintf(stderr, "\t%s -v\n", cmdname);
@@ -111,26 +140,30 @@ usage(int verbose)
 		    gettext("\t\t Shows running microcode version.\n\n"));
 	}
 
-	(void) fprintf(stderr, "\t%s -u microcode-file\n", cmdname);
+	(void) fprintf(stderr, "\t%s -u [-t type] microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Updates microcode to the "
 		    "latest matching version found in\n"
 		    "\t\t microcode-file.\n\n"));
 	}
 
-	(void) fprintf(stderr, "\t%s -l microcode-file\n", cmdname);
+	(void) fprintf(stderr, "\t%s -l [-t type] microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Displays details of the "
 		    "microcode file's contents.\n\n"));
 	}
 
-	(void) fprintf(stderr, "\t%s -i [-R path] microcode-file\n", cmdname);
+	(void) fprintf(stderr,
+	    "\t%s -i [-t type] [-R path] microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Installs microcode to be "
-		    "used for subsequent boots.\n\n"));
-		(void) fprintf(stderr, gettext("Microcode file name must start "
-		    "with vendor name, such as \"intel\" or \"amd\".\n\n"));
+		    "used for subsequent boots.\n"));
 	}
+	(void) fprintf(stderr, gettext(
+	    "\nThe type of the microcode file must either be specified with "
+	    "the -t option\nor microcode-file must start with the vendor name "
+	    "prefix, either \"intel\"\nor \"amd\", so that the type can be "
+	    "inferred from it.\n\n"));
 }
 
 static void
@@ -295,7 +328,7 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 
 	/* equivalence table uses special name */
 	(void) snprintf(common_path, PATH_MAX, "%s/%s", path,
-	    "equivalence-table");
+	    UCODE_AMD_EQUIVALENCE_TABLE_NAME);
 
 	for (;;) {
 		dprintf("path = %s\n", common_path);
@@ -616,12 +649,14 @@ main(int argc, char *argv[])
 	int	c;
 	int	action = 0;
 	int	actcount = 0;
+	int	typeindex = -1;
 	char	*path = NULL;
 	char	*filename = NULL;
 	int	errflg = 0;
 	int	dev_fd = -1;
 	int	fd = -1;
-	int	verbose = 0;
+	bool	verbose = false;
+	bool	needfile = false;
 	uint8_t	*buf = NULL;
 	ucode_errno_t	rc = EM_OK;
 	processorid_t	cpuid_max;
@@ -637,31 +672,56 @@ main(int argc, char *argv[])
 
 	cmdname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "idhluvVR:")) != EOF) {
+	while ((c = getopt(argc, argv, "idhluvVR:t:")) != EOF) {
 		switch (c) {
+
+		case 'd':
+			ucode_debug = true;
+			break;
 
 		case 'i':
 			action |= UCODE_OPT_INSTALL;
 			actcount++;
+			needfile = true;
 			break;
 
 		case 'l':
 			action |= UCODE_OPT_LIST;
 			actcount++;
+			needfile = true;
+			break;
+
+		case 't':
+			if (typeindex != -1) {
+				(void) fprintf(stderr, gettext(
+				    "-t can only be specified once\n"));
+				errflg++;
+				break;
+			}
+			for (uint_t i = 0; i < ARRAY_SIZE(ucode_sources); i++) {
+				if (strcmp(optarg,
+				    ucode_sources[i].us_prefix) == 0) {
+					typeindex = i;
+					break;
+				}
+			}
+			if (typeindex == -1) {
+				(void) fprintf(stderr,
+				    gettext("Unknown microcode type, %s\n"),
+				    optarg);
+				errflg++;
+			}
 			break;
 
 		case 'u':
 			action |= UCODE_OPT_UPDATE;
 			actcount++;
+			needfile = true;
 			break;
 
 		case 'v':
 			action |= UCODE_OPT_VERSION;
 			actcount++;
-			break;
-
-		case 'd':
-			ucode_debug = 1;
 			break;
 
 		case 'R':
@@ -678,11 +738,11 @@ main(int argc, char *argv[])
 			break;
 
 		case 'V':
-			verbose = 1;
+			verbose = true;
 			break;
 
 		case 'h':
-			usage(1);
+			usage(true);
 			return (0);
 
 		default:
@@ -705,9 +765,16 @@ main(int argc, char *argv[])
 		return (2);
 	}
 
+	if (typeindex != -1 && !needfile) {
+		(void) fprintf(stderr, gettext("%s: option -t requires one of "
+		    "-i, -l or -u\n"), cmdname);
+		usage(verbose);
+		return (2);
+	}
+
 	if (optind <= argc - 1)
 		filename = argv[optind];
-	else if (action != UCODE_OPT_VERSION)
+	else if (needfile)
 		errflg++;
 
 	if (errflg || action == 0) {
@@ -716,33 +783,38 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Convert from the vendor-shipped format (text for Intel, binary
-	 * container for AMD) to individual microcode files.
+	 * Convert from the vendor-shipped format to individual microcode files.
 	 */
-	if ((action &
-	    (UCODE_OPT_INSTALL | UCODE_OPT_UPDATE | UCODE_OPT_LIST))) {
-		int i;
-		UCODE_VENDORS;
+	if (needfile) {
+		if (typeindex != -1) {
+			ucode = &ucode_sources[typeindex];
+		} else {
+			for (uint_t i = 0; i < ARRAY_SIZE(ucode_sources); i++) {
+				const ucode_source_t *src = &ucode_sources[i];
 
-		for (i = 0; ucode_vendors[i].filestr != NULL; i++) {
-			dprintf("i = %d, filestr = %s, filename = %s\n",
-			    i, ucode_vendors[i].filestr, filename);
-			if (strncasecmp(ucode_vendors[i].filestr,
-			    basename(filename),
-			    strlen(ucode_vendors[i].filestr)) == 0) {
-				ucode = &ucode_ops[i];
-				(void) strncpy(ucode_vendor_str,
-				    ucode_vendors[i].vendorstr,
-				    sizeof (ucode_vendor_str));
-				break;
+				dprintf("i = %d, filestr = %s, filename = %s\n",
+				    i, src->us_prefix, filename);
+				if (strncasecmp(src->us_prefix,
+				    basename(filename),
+				    strlen(src->us_prefix)) == 0) {
+					ucode = src;
+					break;
+				}
 			}
 		}
 
-		if (ucode_vendors[i].filestr == NULL) {
+		if (ucode == NULL) {
 			rc = EM_NOVENDOR;
-			ucode_perror(basename(filename), rc);
+			(void) fprintf(stderr, "%s: %s.\n\n"
+			    "Either specify the type with the -t option, "
+			    "or rename the file such that\nits name begins "
+			    "with a vendor string.\n",
+			    cmdname, ucode_strerror(rc));
 			goto out;
 		}
+
+		dprintf("Selected microcode type %s (%s)\n",
+		    ucode->us_prefix, ucode->us_vendor);
 
 		if ((stat(filename, &filestat)) < 0) {
 			rc = EM_SYS;
@@ -763,7 +835,7 @@ main(int argc, char *argv[])
 			goto out;
 		}
 
-		ucode_size = ucode->convert(filename, buf, filestat.st_size);
+		ucode_size = ucode->us_convert(filename, buf, filestat.st_size);
 
 		dprintf("ucode_size = %d\n", ucode_size);
 
@@ -773,35 +845,38 @@ main(int argc, char *argv[])
 			goto out;
 		}
 
-		if ((rc = ucode->validate(buf, ucode_size)) != EM_OK) {
+		if ((rc = ucode->us_validate(buf, ucode_size)) != EM_OK) {
 			ucode_perror(filename, rc);
 			goto out;
 		}
 	}
 
 	if (action & UCODE_OPT_LIST) {
-		ucode->list(buf, ucode_size);
+		ucode->us_list(buf, ucode_size);
 		goto out;
 	}
 
-	/*
-	 * For the install option, the microcode file must start with
-	 * "intel" for Intel microcode, and "amd" for AMD microcode.
-	 */
 	if (action & UCODE_OPT_INSTALL) {
 		/*
 		 * If no path is provided by the -R option, put the files in
-		 * /ucode_install_path/ucode_vendor_str/.
+		 * /platform/<arch>/ucode/<ucode_vendor_str>/.
 		 */
 		if (path == NULL) {
+			struct utsname uts;
+
+			if (uname(&uts) == -1) {
+				perror("Unable to retrieve system uname");
+				goto out;
+			}
+
 			if ((path = malloc(PATH_MAX)) == NULL) {
 				rc = EM_SYS;
 				ucode_perror("malloc", rc);
 				goto out;
 			}
 
-			(void) snprintf(path, PATH_MAX, "/%s/%s",
-			    ucode_install_path, ucode_vendor_str);
+			(void) snprintf(path, PATH_MAX, "/platform/%s/ucode/%s",
+			    uts.machine, ucode->us_vendor);
 		}
 
 		if (mkdirp(path, 0755) == -1 && errno != EEXIST) {
@@ -810,7 +885,7 @@ main(int argc, char *argv[])
 			goto out;
 		}
 
-		rc = ucode->gen_files(buf, ucode_size, path);
+		rc = ucode->us_gen_files(buf, ucode_size, path);
 
 		goto out;
 	}
@@ -825,11 +900,7 @@ main(int argc, char *argv[])
 		int tmprc;
 		uint32_t *revp = NULL;
 		int i;
-#if defined(_SYSCALL32_IMPL)
-		struct ucode_get_rev_struct32 inf32;
-#else
 		struct ucode_get_rev_struct info;
-#endif
 
 		cpuid_max = (processorid_t)sysconf(_SC_CPUID_MAX);
 
@@ -843,19 +914,11 @@ main(int argc, char *argv[])
 		for (i = 0; i < cpuid_max; i++)
 			revp[i] = (uint32_t)-1;
 
-#if defined(_SYSCALL32_IMPL)
-		info32.ugv_rev = (caddr32_t)revp;
-		info32.ugv_size = cpuid_max;
-		info32.ugv_errno = EM_OK;
-		tmprc = ioctl(dev_fd, UCODE_GET_VERSION, &info32);
-		rc = info32.ugv_errno;
-#else
 		info.ugv_rev = revp;
 		info.ugv_size = cpuid_max;
 		info.ugv_errno = EM_OK;
 		tmprc = ioctl(dev_fd, UCODE_GET_VERSION, &info);
 		rc = info.ugv_errno;
-#endif
 
 		if (tmprc && rc == EM_OK) {
 			rc = EM_SYS;
@@ -878,26 +941,13 @@ main(int argc, char *argv[])
 
 	if (action & UCODE_OPT_UPDATE) {
 		int tmprc;
-#if defined(_SYSCALL32_IMPL)
-		struct ucode_write_struct32 uw_struct32;
-#else
 		struct ucode_write_struct uw_struct;
-#endif
 
-#if defined(_SYSCALL32_IMPL)
-		uw_struct32.uw_size = ucode_size;
-		uw_struct32.uw_ucode = (caddr32_t)buf;
-		uw_struct32.uw_errno = EM_OK;
-		tmprc = ioctl(dev_fd, UCODE_UPDATE, &uw_struct32);
-		rc = uw_struct32.uw_errno;
-
-#else
 		uw_struct.uw_size = ucode_size;
 		uw_struct.uw_ucode = buf;
 		uw_struct.uw_errno = EM_OK;
 		tmprc = ioctl(dev_fd, UCODE_UPDATE, &uw_struct);
 		rc = uw_struct.uw_errno;
-#endif
 
 		if (rc == EM_OK) {
 			if (tmprc) {

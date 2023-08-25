@@ -38,7 +38,7 @@ ROOTBINPROFILES = $(PROFILES:%=$(ROOTBIN)/%)
 CPPFLAGS +=	-D_REENTRANT
 LDLIBS +=	-lsecdb
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTBINPROFILES)
 

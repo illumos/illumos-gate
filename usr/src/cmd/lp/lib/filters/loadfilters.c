@@ -237,7 +237,7 @@ getfields(int fd, char *fields[], char *buf, int bufsiz, int max, char *seps)
 						*q++ = *p++;
 					} else if (*p == '"') { /* end of literal read */
 						p++;
-						eMode = NORMAL_PARSING; 
+						eMode = NORMAL_PARSING;
 					} else {
 						*q++ = *p++; /* capture as is */
 					}

@@ -77,7 +77,7 @@ $(ROOTLIBIPQOSCONF):
 $(ROOTLIBIPQOSCONF)/%:	%
 	$(INS.file)
 
-clean:	
+clean:
 	$(RM) $(OBJS)
 
 lint:	lint_SRCS

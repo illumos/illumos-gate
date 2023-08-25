@@ -176,7 +176,7 @@ unsigned char	*ogcursor;
 
 static int 	INSCDCNT; /* number of ^D's (backtabs) in insertion buffer */
 
-static int 	inscdcnt; /* 
+static int 	inscdcnt; /*
 			   * count of ^D's (backtabs) not seen yet when doing
 		 	   * repeat of insertion
 			   */
@@ -247,7 +247,7 @@ vappend(int ch, int cnt, int indent)
 		unsigned char x;
 		gcursor = genindent(indent);
 		*gcursor = 0;
-		vgotoCL(nqcolumn(lastchr(linebuf, cursor), genbuf)); 
+		vgotoCL(nqcolumn(lastchr(linebuf, cursor), genbuf));
 	} else {
 		gcursor = genbuf;
 		*gcursor = 0;
@@ -956,7 +956,7 @@ vgetline(cnt, gcursor, aescaped, commch)
 	wchar_t wchar = 0;
 	unsigned char	*p;
 	int	len;
-	
+
 
 	/*
 	 * Clear the output state and counters
@@ -1093,7 +1093,7 @@ vbackup:
 				*cp = 0;
 				c = cindent();
 				vgotoCL(nqcolumn(lastchr(linebuf, cursor), genbuf));
-					
+
 				if (doomed >= 0)
 					doomed += c - cindent();
 				gcursor = cp;
@@ -1160,7 +1160,7 @@ vbackup:
 			if((length = _mbftowc((char *)multic, &wchar, getkey, &Peekkey)) <= 0) {
 				(void) beep();
 				continue;
-			} 
+			}
 		} else {
 			length = 1;
 			multic[0] = '\\';
@@ -1199,7 +1199,7 @@ vbackup:
 #endif /* PRESUNEUC */
 						(void) beep();
 						continue;
-					} 
+					}
 					strncpy(gcursor, multic, length);
 					gcursor += length;
 				}
@@ -1212,7 +1212,7 @@ vbackup:
 #ifdef PRESUNEUC
 				/* find screen width of previous word */
 				width = 0;
-				for(wp = cp; *wp; ) 
+				for(wp = cp; *wp; )
 #else
 				/* count screen width of pending characters */
 				width = 0;
@@ -1228,8 +1228,8 @@ vbackup:
 						else
 							width += curwidth;
 						wp += bytelength;
-					}	
-						
+					}
+
 #ifdef PRESUNEUC
 				if (outcol+(backsl?OCOLUMNS:0) - width >= OCOLUMNS - value(vi_WRAPMARGIN)) {
 #else
@@ -1273,7 +1273,7 @@ vbackup:
 /* 7tabs */	if (wdbdg && (!iswascii(wc1) || !iswascii(wc2))) {
 /* 7tabs */		if ((*wdbdg)(wc1, wc2, 2) < 5) {
 /* 7tabs */			goto ws;
-/* 7tabs */		}	
+/* 7tabs */		}
 /* 7tabs */	}
 /* 7tabs */	wc2 = wc1;
 /* 7tabs */	wc1 = 0;
@@ -1565,7 +1565,7 @@ vmaxrep(unsigned char ch, int cnt)
 		}
 		/*
 		 * if number of characters in replacement string
-		 * (repcnt) is less than number of characters following 
+		 * (repcnt) is less than number of characters following
 		 * cursor (oldcnt), find end of repcnt
 		 * characters after cursor
 		 */
@@ -1591,8 +1591,8 @@ vmaxrep(unsigned char ch, int cnt)
 
 /*
  * Determine how many occurrences of word 'CAP' are in 'MAPTO'.  To be
- * considered an occurrence there must be both a nonword-prefix, a 
- * complete match of 'CAP' within 'MAPTO', and a nonword-suffix. 
+ * considered an occurrence there must be both a nonword-prefix, a
+ * complete match of 'CAP' within 'MAPTO', and a nonword-suffix.
  * Note that the beginning and end of 'MAPTO' are considered to be
  * valid nonword delimiters.
  */
@@ -1604,7 +1604,7 @@ reccnt(unsigned char *cap, unsigned char *mapto)
 	cnt = 0;
 	final = strlen(mapto) - strlen(cap);
 
-	for (i=0; i <= final; i++) 
+	for (i=0; i <= final; i++)
 	  if ((strncmp(cap, mapto+i, strlen(cap)) == 0)       /* match */
 	  && (i == 0     || !wordch(&mapto[i-1]))	      /* prefix ok */
 	  && (i == final || !wordch(&mapto[i+strlen(cap)])))  /* suffix ok */

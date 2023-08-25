@@ -67,10 +67,10 @@ typedef struct hmackey {
 } HMAC_Key;
 
 
-/************************************************************************** 
+/**************************************************************************
  * dst_hmac_md5_sign
  *     Call HMAC signing functions to sign a block of data.
- *     There are three steps to signing, INIT (initialize structures), 
+ *     There are three steps to signing, INIT (initialize structures),
  *     UPDATE (hash (more) data), FINAL (generate a signature).  This
  *     routine performs one or more of these steps.
  * Parameters
@@ -81,15 +81,15 @@ typedef struct hmackey {
  *     len	 length in bytes of data.
  *     signature   location to store signature.
  *     sig_len     size of the signature location
- * returns 
+ * returns
  *	N  Success on SIG_MODE_FINAL = returns signature length in bytes
  *	0  Success on SIG_MODE_INIT  and UPDATE
  *	 <0  Failure
  */
 
 static int
-dst_hmac_md5_sign(const int mode, DST_KEY *d_key, void **context, 
-		  const u_char *data, const int len, 
+dst_hmac_md5_sign(const int mode, DST_KEY *d_key, void **context,
+		  const u_char *data, const int len,
 		  u_char *signature, const int sig_len)
 {
 	HMAC_Key *key;
@@ -99,11 +99,11 @@ dst_hmac_md5_sign(const int mode, DST_KEY *d_key, void **context,
 	if (d_key == NULL || d_key->dk_KEY_struct == NULL)
 		return (-1);
 
-	if (mode & SIG_MODE_INIT) 
+	if (mode & SIG_MODE_INIT)
 		ctx = (MD5_CTX *) malloc(sizeof(*ctx));
 	else if (context)
 		ctx = (MD5_CTX *) *context;
-	if (ctx == NULL) 
+	if (ctx == NULL)
 		return (-1);
 
 	key = (HMAC_Key *) d_key->dk_KEY_struct;
@@ -129,20 +129,20 @@ dst_hmac_md5_sign(const int mode, DST_KEY *d_key, void **context,
 		sign_len = MD5_LEN;
 		SAFE_FREE(ctx);
 	}
-	else { 
-		if (context == NULL) 
+	else {
+		if (context == NULL)
 			return (-1);
 		*context = (void *) ctx;
-	}		
+	}
 	return (sign_len);
 }
 
 
-/************************************************************************** 
- * dst_hmac_md5_verify() 
- *     Calls HMAC verification routines.  There are three steps to 
- *     verification, INIT (initialize structures), UPDATE (hash (more) data), 
- *     FINAL (generate a signature).  This routine performs one or more of 
+/**************************************************************************
+ * dst_hmac_md5_verify()
+ *     Calls HMAC verification routines.  There are three steps to
+ *     verification, INIT (initialize structures), UPDATE (hash (more) data),
+ *     FINAL (generate a signature).  This routine performs one or more of
  *     these steps.
  * Parameters
  *     mode	SIG_MODE_INIT, SIG_MODE_UPDATE and/or SIG_MODE_FINAL.
@@ -151,8 +151,8 @@ dst_hmac_md5_sign(const int mode, DST_KEY *d_key, void **context,
  *     len	 length in bytes of data.
  *     signature   signature.
  *     sig_len     length in bytes of signature.
- * returns 
- *     0  Success 
+ * returns
+ *     0  Success
  *    <0  Failure
  */
 
@@ -167,11 +167,11 @@ dst_hmac_md5_verify(const int mode, DST_KEY *d_key, void **context,
 	if (d_key == NULL || d_key->dk_KEY_struct == NULL)
 		return (-1);
 
-	if (mode & SIG_MODE_INIT) 
+	if (mode & SIG_MODE_INIT)
 		ctx = (MD5_CTX *) malloc(sizeof(*ctx));
 	else if (context)
 		ctx = (MD5_CTX *) *context;
-	if (ctx == NULL) 
+	if (ctx == NULL)
 		return (-1);
 
 	key = (HMAC_Key *) d_key->dk_KEY_struct;
@@ -198,16 +198,16 @@ dst_hmac_md5_verify(const int mode, DST_KEY *d_key, void **context,
 		if (memcmp(digest, signature, MD5_LEN) != 0)
 			return (VERIFY_FINAL_FAILURE);
 	}
-	else { 
-		if (context == NULL) 
+	else {
+		if (context == NULL)
 			return (-1);
 		*context = (void *) ctx;
-	}		
+	}
 	return (0);
 }
 
 
-/************************************************************************** 
+/**************************************************************************
  * dst_buffer_to_hmac_md5
  *     Converts key from raw data to an HMAC Key
  *     This function gets in a pointer to the data
@@ -261,13 +261,13 @@ dst_buffer_to_hmac_md5(DST_KEY *dkey, const u_char *key, const int keylen)
 }
 
 
-/************************************************************************** 
+/**************************************************************************
  *  dst_hmac_md5_key_to_file_format
  *	Encodes an HMAC Key into the portable file format.
- *  Parameters 
- *	hkey      HMAC KEY structure 
+ *  Parameters
+ *	hkey      HMAC KEY structure
  *	buff      output buffer
- *	buff_len  size of output buffer 
+ *	buff_len  size of output buffer
  *  Return
  *	0  Failure - null input hkey
  *     -1  Failure - not enough space in output area
@@ -283,7 +283,7 @@ dst_hmac_md5_key_to_file_format(const DST_KEY *dkey, char *buff,
 	u_char key[HMAC_LEN];
 	HMAC_Key *hkey;
 
-	if (dkey == NULL || dkey->dk_KEY_struct == NULL) 
+	if (dkey == NULL || dkey->dk_KEY_struct == NULL)
 		return (0);
 	/*
 	 * Using snprintf() would be so much simpler here.
@@ -313,7 +313,7 @@ dst_hmac_md5_key_to_file_format(const DST_KEY *dkey, char *buff,
 	bp += strlen("Key: ");
 
 	len = b64_ntop(key, key_len, bp, buff_len - (bp - buff));
-	if (len < 0) 
+	if (len < 0)
 		return (-1);
 	bp += len;
 	if (buff_len - (bp - buff) < 2)
@@ -325,16 +325,16 @@ dst_hmac_md5_key_to_file_format(const DST_KEY *dkey, char *buff,
 }
 
 
-/************************************************************************** 
+/**************************************************************************
  * dst_hmac_md5_key_from_file_format
- *     Converts contents of a key file into an HMAC key. 
- * Parameters 
- *     hkey    structure to put key into 
- *     buff       buffer containing the encoded key 
+ *     Converts contents of a key file into an HMAC key.
+ * Parameters
+ *     hkey    structure to put key into
+ *     buff       buffer containing the encoded key
  *     buff_len   the length of the buffer
  * Return
- *     n >= 0 Foot print of the key converted 
- *     n <  0 Error in conversion 
+ *     n >= 0 Foot print of the key converted
+ *     n <  0 Error in conversion
  */
 
 static int
@@ -378,15 +378,15 @@ dst_hmac_md5_key_from_file_format(DST_KEY *dkey, const char *buff,
 }
 
 /*%
- * dst_hmac_md5_to_dns_key() 
- *         function to extract hmac key from DST_KEY structure 
- * intput: 
- *      in_key:  HMAC-MD5 key 
- * output: 
+ * dst_hmac_md5_to_dns_key()
+ *         function to extract hmac key from DST_KEY structure
+ * intput:
+ *      in_key:  HMAC-MD5 key
+ * output:
  *	out_str: buffer to write ot
- *      out_len: size of output buffer 
+ *      out_len: size of output buffer
  * returns:
- *      number of bytes written to output buffer 
+ *      number of bytes written to output buffer
  */
 static int
 dst_hmac_md5_to_dns_key(const DST_KEY *in_key, u_char *out_str,
@@ -395,7 +395,7 @@ dst_hmac_md5_to_dns_key(const DST_KEY *in_key, u_char *out_str,
 
 	HMAC_Key *hkey;
 	int i;
-	
+
 	if (in_key == NULL || in_key->dk_KEY_struct == NULL ||
 	    out_len <= in_key->dk_key_size || out_str == NULL)
 		return (-1);
@@ -406,7 +406,7 @@ dst_hmac_md5_to_dns_key(const DST_KEY *in_key, u_char *out_str,
 	return (i);
 }
 
-/************************************************************************** 
+/**************************************************************************
  *  dst_hmac_md5_compare_keys
  *	Compare two keys for equality.
  *  Return
@@ -422,7 +422,7 @@ dst_hmac_md5_compare_keys(const DST_KEY *key1, const DST_KEY *key2)
 	return memcmp(hkey1->hk_ipad, hkey2->hk_ipad, HMAC_LEN);
 }
 
-/************************************************************************** 
+/**************************************************************************
  * dst_hmac_md5_free_key_structure
  *     Frees all (none) dynamically allocated structures in hkey
  */
@@ -436,11 +436,11 @@ dst_hmac_md5_free_key_structure(void *key)
 }
 
 
-/*************************************************************************** 
+/***************************************************************************
  * dst_hmac_md5_generate_key
  *     Creates a HMAC key of size size with a maximum size of 63 bytes
- *     generating a HMAC key larger than 63 bytes makes no sense as that key 
- *     is digested before use. 
+ *     generating a HMAC key larger than 63 bytes makes no sense as that key
+ *     is digested before use.
  */
 
 static int
@@ -453,7 +453,7 @@ dst_hmac_md5_generate_key(DST_KEY *key, const int nothing)
 
 /*%
  * dst_hmac_md5_init()  Function to answer set up function pointers for HMAC
- *	   related functions 
+ *	   related functions
  */
 int
 dst_hmac_md5_init()
@@ -476,7 +476,7 @@ dst_hmac_md5_init()
 	return (1);
 }
 
-#else 
+#else
 #define	dst_hmac_md5_init	__dst_hmac_md5_init
 
 int

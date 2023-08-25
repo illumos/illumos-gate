@@ -1573,7 +1573,7 @@ fr_info_t *fin;
  *	fin: packet information
  *	m: the message block where ip head starts
  *
- * Send a new packet through the IP stack. 
+ * Send a new packet through the IP stack.
  *
  * For IPv4 packets, ip_len must be in host byte order, and ip_v,
  * ip_ttl, ip_off, and ip_sum are ignored (filled in by this
@@ -1741,8 +1741,8 @@ int dst;
 	icmp = (struct icmp *)(m->b_rptr + hlen);
 	icmp->icmp_type = type & 0xff;
 	icmp->icmp_code = code & 0xff;
-	phy = (phy_if_t)qpi->qpi_ill; 
-	if (type == ICMP_UNREACH && (phy != 0) && 
+	phy = (phy_if_t)qpi->qpi_ill;
+	if (type == ICMP_UNREACH && (phy != 0) &&
 	    fin->fin_icode == ICMP_UNREACH_NEEDFRAG)
 		icmp->icmp_nextmtu = net_getmtu(ifs->ifs_ipf_ipv4, phy,0 );
 
@@ -2158,12 +2158,12 @@ fr_info_t *fin;
 	struct sockaddr	sin;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fin->fin_v == 4) { 
+	if (fin->fin_v == 4) {
 		net_data_p = ifs->ifs_ipf_ipv4;
-	} else if (fin->fin_v == 6) { 
+	} else if (fin->fin_v == 6) {
 		net_data_p = ifs->ifs_ipf_ipv6;
-	} else { 
-		return (0); 
+	} else {
+		return (0);
 	}
 
 	/* Get the index corresponding to the if name */
@@ -2171,7 +2171,7 @@ fr_info_t *fin;
 	bcopy(&fin->fin_saddr, &sin.sa_data, sizeof (struct in_addr));
 	phy_ifdata_routeto = net_routeto(net_data_p, &sin, NULL);
 
-	return (((phy_if_t)fin->fin_ifp == phy_ifdata_routeto) ? 1 : 0); 
+	return (((phy_if_t)fin->fin_ifp == phy_ifdata_routeto) ? 1 : 0);
 }
 
 /*
@@ -2633,7 +2633,7 @@ int ipf_hook(hook_data_t info, int out, int loopback, void *arg)
 	qpktinfo_t qpi;
 	int rval, hlen;
 	u_short swap;
-	phy_if_t phy; 
+	phy_if_t phy;
 	ip_t *ip;
 
 	ifs = arg;
@@ -2683,7 +2683,7 @@ int ipf_hook6(hook_data_t info, int out, int loopback, void *arg)
 	hook_pkt_event_t *fw;
 	int rval, hlen;
 	qpktinfo_t qpi;
-	phy_if_t phy; 
+	phy_if_t phy;
 
 	fw = (hook_pkt_event_t *)info;
 
@@ -3050,7 +3050,7 @@ fr_info_t *fin;
 	 */
 	tcp = (tcphdr_t *) fin->fin_dp;
 
-	if ((fin->fin_p == IPPROTO_TCP) && 
+	if ((fin->fin_p == IPPROTO_TCP) &&
 	    ((tcp == NULL) || ((tcp->th_flags & (TH_SYN | TH_FIN)) == 0)))
 		return (-1);
 
@@ -3172,7 +3172,7 @@ fr_info_t *fin;
 	 */
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
-	icmp->icmp_cksum = ~sum; 
+	icmp->icmp_cksum = ~sum;
 
 	/*
 	 * Step (6)
@@ -3237,7 +3237,7 @@ fr_info_t *fin;
 	 */
 	tcp = (tcphdr_t *) fin->fin_dp;
 
-	if ((fin->fin_p == IPPROTO_TCP) && 
+	if ((fin->fin_p == IPPROTO_TCP) &&
 	    ((tcp == NULL) || ((tcp->th_flags & (TH_SYN | TH_FIN)) == 0)))
 		return (-1);
 
@@ -3263,14 +3263,14 @@ fr_info_t *fin;
 
 	if (mblk_icmp == NULL)
 		return (-1);
-	
+
 	MTYPE(mblk_icmp) = M_DATA;
 	icmp6 =  (struct icmp6_hdr *) mblk_icmp->b_wptr;
 	icmp6->icmp6_type = ICMP6_DST_UNREACH;
 	icmp6->icmp6_code = fin->fin_icode & 0xFF;
 	icmp6->icmp6_data32[0] = 0;
 	mblk_icmp->b_wptr += sizeof (struct icmp6_hdr);
-	
+
 	/*
 	 * Step (3)
 	 *
@@ -3278,7 +3278,7 @@ fr_info_t *fin;
 	 */
 	linkb(mblk_icmp, mblk_ip);
 
-	/* 
+	/*
 	 * Step (4)
 	 *
 	 * Calculate chksum - this is much more easier task than in case of
@@ -3380,7 +3380,7 @@ int fr_make_icmp(fin)
 fr_info_t *fin;
 {
 	int rv;
-	
+
 	if (fin->fin_v == 4)
 		rv = fr_make_icmp_v4(fin);
 #ifdef USE_INET6

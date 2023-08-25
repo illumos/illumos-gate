@@ -331,12 +331,12 @@ static void BnxeServiceDefSbIntr(um_device_t * pUM,
     {
         /* Check for L4 TOE/iSCSI/FCoE Rx completions. */
 
-        if (lm_is_rx_completion(pLM, ISCSI_CID(pLM)))  
+        if (lm_is_rx_completion(pLM, ISCSI_CID(pLM)))
         {
             BnxeDbgBreakMsg(pUM, "Unknown iSCSI Rx completion!");
         }
 
-        if (lm_is_rx_completion(pLM, FCOE_CID(pLM)))  
+        if (lm_is_rx_completion(pLM, FCOE_CID(pLM)))
         {
             *pPktsRxed = B_TRUE;
         }
@@ -767,7 +767,7 @@ uint_t BnxeIntrMISR(caddr_t arg1, caddr_t arg2)
         BnxeIntrIguSbDisable(pUM, idx, B_TRUE);
 
         BnxeServiceSbIntr(pUM, sb_id, &pktsRxed, &pktsTxed);
- 
+
         if (pktsTxed) BnxeTxRingProcess(pUM, sb_id);
         if (pktsRxed) BnxeRxRingProcess(pUM, sb_id, B_FALSE, 0);
 

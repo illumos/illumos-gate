@@ -110,8 +110,8 @@ typedef struct _drv_fw_mb_t
         #define BIOS_MSG_DATA_REQ                          0x00010000  /* OEM specific */
         #define BIOS_MSG_DATA_CONFIRM                      0x00020000  /* OEM specific */
         /* Used by BIOS_MSG_CODE_HANDSHAKE command and...
-           The VIRT_*_MAC command requires two arguments in mb_args[]. 
-           The top 16 bit of the first argument needs to be 
+           The VIRT_*_MAC command requires two arguments in mb_args[].
+           The top 16 bit of the first argument needs to be
            VIRT_MAC_SIGNATURE. The remaining six bytes (two from first
            argument, four from the second one) will be the MAC address.
            However, if all F's are used as MAC, boot code will treat
@@ -647,7 +647,7 @@ typedef struct _bc_state_t
         #define CONDITION_INIT_POR               0x00000001
         #define CONDITION_INIT_VAUX_AVAIL        0x00000002
         #define CONDITION_INIT_PCI_AVAIL         0x00000004
-        /* The INIT_PCI_RESET is really a reset type, but defining as 
+        /* The INIT_PCI_RESET is really a reset type, but defining as
          * RESET_TYPE may break backward compatibility. */
         #define CONDITION_INIT_PCI_RESET         0x00000008
         #define CONDITION_INIT_HD_RESET          0x00000010 /* Xinan only */
@@ -751,9 +751,9 @@ typedef struct drv_fw_cap_mb
         #define FW_ACK_DRV_SIGNATURE                       0x52500000
     u32_t fw_cap_mb;
         #define FW_CAP_SIGNATURE                           0xAA550000
-        
+
         #define FW_CAP_REMOTE_PHY_CAPABLE                  0x00000001
-        #define FW_CAP_REMOTE_PHY_PRESENT                  0x00000002   //bit 1 indicates absence or presence of remote phy HW        
+        #define FW_CAP_REMOTE_PHY_PRESENT                  0x00000002   //bit 1 indicates absence or presence of remote phy HW
         #define FW_CAP_UNUSED_BIT3                         0x00000004
         #define FW_CAP_MFW_CAN_KEEP_VLAN                   0x00000008
         #define FW_CAP_BC_CAN_UPDATE_VLAN                  0x00000010
@@ -767,23 +767,23 @@ typedef struct remotephy
         #define	REMOTE_PHY_LEGACY_MODE_SIGNATURE           0xFFDEADFF
 
     u32_t   flags;
-    
+
     u32_t   serdes_link_pref;
-    
+
     u32_t   copper_phy_link_pref;
-    
+
     u32_t   serdes_autoneg_pref;     /* Xinan only, not supported in TetonII */
     u32_t   copper_autoneg_pref;     /* Xinan only, not supported in TetonII */
         /* The bit definitions follow those in netlink.h */
 
     u32_t   link_backup;             /* Teton II only; Xinan does not restart on driver load */
-    
+
 } remotephy_t;
 
 typedef struct _rt_param_t
 {
     /* These parameters are loaded with defaults by bootcode just before
-     * ack'ing WAIT1. Since there are two instances of shmem, if the 
+     * ack'ing WAIT1. Since there are two instances of shmem, if the
      * parameter is shared for both ports, only the parameter of the
      * first instance counts. */
     u32_t drv_timeout_val;           /* Xinan only, in (val * 1.5) sec */
@@ -806,11 +806,11 @@ typedef struct _shmem_region_t
     mgmtfw_state_t   mgmtfw_state;     /* 0x214 - 0x353 */
     fw_evt_mb_t      fw_evt_mb;        /* 0x354 - 0x363 */
     drv_fw_cap_mb_t  drv_fw_cap_mb;    /* 0x364 - 0x36b */
-    remotephy_t      remotephy;        /* 0x36c - 0x387 */                              
-    u32_t            dpfw_mb;          /* 0x388 - 0x38b */                              
+    remotephy_t      remotephy;        /* 0x36c - 0x387 */
+    u32_t            dpfw_mb;          /* 0x388 - 0x38b */
     rt_param_t       rt_param;         /* 0x38c - 0x39f */
         #define DPFW_MB_FW_ALIVE                           0x00000001
-        /* Xinan only: Datapath firmware keeps writing 1 to it and 
+        /* Xinan only: Datapath firmware keeps writing 1 to it and
          * BC keeps clearing it. */
 #ifdef SOLARIS
     u32_t            reserved[256 \

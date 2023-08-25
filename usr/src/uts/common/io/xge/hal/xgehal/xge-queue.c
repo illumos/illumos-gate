@@ -153,8 +153,8 @@ xge_queue_produce(xge_queue_h queueh, int event_type, void *context,
 				XGE_DEFAULT_EVENT_MAX_DATA_SIZE];
 		xge_queue_item_t *item = (xge_queue_item_t *)(void *)item_buf;
     xge_os_memzero(item_buf, (sizeof(xge_queue_item_t) +
-                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));  
-	
+                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));
+
 	        while (__queue_consume(queue,
 				       XGE_DEFAULT_EVENT_MAX_DATA_SIZE,
 				       item) != XGE_QUEUE_IS_EMPTY)
@@ -416,8 +416,8 @@ void xge_queue_flush(xge_queue_h queueh)
 				XGE_DEFAULT_EVENT_MAX_DATA_SIZE];
 	xge_queue_item_t *item = (xge_queue_item_t *)(void *)item_buf;
   xge_os_memzero(item_buf, (sizeof(xge_queue_item_t) +
-                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));  
-	  
+                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));
+
 	/* flush queue by consuming all enqueued items */
 	while (xge_queue_consume(queueh,
 				    XGE_DEFAULT_EVENT_MAX_DATA_SIZE,

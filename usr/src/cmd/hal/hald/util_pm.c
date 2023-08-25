@@ -85,7 +85,7 @@ util_get_battery_technology (const char *type)
  *  @param  chargeLastFull      The last "full" charge of the battery (typically mWh)
  *  @return                     Percentage, -1 if invalid
  */
-int 
+int
 util_compute_percentage_charge (const char *id,
 			     int chargeLevel,
 			     int chargeLastFull)
@@ -116,7 +116,7 @@ util_compute_percentage_charge (const char *id,
 	return percentage;
 }
 
-/** Given all the required parameters, this function will return the number 
+/** Given all the required parameters, this function will return the number
  *  of seconds until the battery is charged (if charging) or the number
  *  of seconds until empty (if discharging)
  *
@@ -129,7 +129,7 @@ util_compute_percentage_charge (const char *id,
  *  @param  guessChargeRate     If ignore chargeRate and guess them.
  *  @return                     Number of seconds, or -1 if invalid
  */
-int 
+int
 util_compute_time_remaining (const char *id,
 			     int chargeRate,
 			     int chargeLevel,
@@ -150,7 +150,7 @@ util_compute_time_remaining (const char *id,
 		HAL_WARNING (("isDischarging & isCharging TRUE, returning -1"));
 		return -1;
 	}
-	/* 
+	/*
 	 * Some laptops don't supply any rate info, but that's no reason for HAL not
 	 * to. We use the current and previous chargeLevel to estimate the rate.
 	 * The info is stored in a GHashTable because there could be more than one battery.
@@ -160,13 +160,13 @@ util_compute_time_remaining (const char *id,
 		time_t cur_time = time(NULL);
 
 		/* Initialize the save_battery_info GHashTable */
-		if (!saved_battery_info) 
+		if (!saved_battery_info)
 			saved_battery_info = g_hash_table_new(g_str_hash, g_str_equal);
 
 		if ((battery_info = g_hash_table_lookup(saved_battery_info, id))) {
 			/* check this to prevent division by zero */
 			if ((cur_time == battery_info->last_time) || (chargeLevel == battery_info->last_level)) {
-				/* if we can't calculate because nothing changed, use last 
+				/* if we can't calculate because nothing changed, use last
 				 * chargeRate to prevent removing battery.remaining_time.
 				 */
 				chargeRate = battery_info->last_chargeRate;
@@ -176,9 +176,9 @@ util_compute_time_remaining (const char *id,
 				 * During discharging chargeRate would be negative, which would
 				 * mess up the the calculation below, so we make sure it's always
 				 * positive.
-				 */ 
+				 */
 				chargeRate = (chargeRate > 0) ? chargeRate : -chargeRate;
-	
+
 				battery_info->last_level = chargeLevel;
 				battery_info->last_time = cur_time;
 				battery_info->last_chargeRate = chargeRate;
@@ -192,16 +192,16 @@ util_compute_time_remaining (const char *id,
 			battery_info->last_chargeRate = 0;
  			return -1;
 		}
-	} 
+	}
 
 	if (chargeRate == 0)
 		return -1;
 
-	if (isDischarging) { 
+	if (isDischarging) {
 		remaining_time = ((double) chargeLevel / (double) chargeRate) * 60 * 60;
 	} else if (isCharging) {
-		/* 
-		 * Some ACPI BIOS's don't update chargeLastFull, 
+		/*
+		 * Some ACPI BIOS's don't update chargeLastFull,
 		 * so return 0 as we don't know how much more there is left
 		 */
 		if (chargeLevel > chargeLastFull ) {
@@ -210,7 +210,7 @@ util_compute_time_remaining (const char *id,
 		}
 		remaining_time = ((double) (chargeLastFull - chargeLevel) / (double) chargeRate) * 60 * 60;
 	}
-	
+
 	/* This shouldn't happen, but check for completeness */
 	if (remaining_time < 0) {
 		HAL_WARNING (("remaining_time %i, returning -1", remaining_time));

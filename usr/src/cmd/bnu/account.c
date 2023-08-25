@@ -50,12 +50,12 @@ struct acData			/* Data for construction of account record. */
 			off_t	jobsize;	/* Bytes transferred in a job.*/
 			char	status; /* transaction status */
 			char	service; /* service grade */
-			char	jobgrade[MODSTR]; /* job grade */	
+			char	jobgrade[MODSTR]; /* job grade */
 			char	time[MODSTR]; /* date and time the job execed */
 			char	origSystem[MODSTR]; /* originating system's 							   name */
-			char	origUser[MODSTR]; /* originator's login 
+			char	origUser[MODSTR]; /* originator's login
 							   name */
-			char	rmtSystem[MODSTR]; /* system's name of 
+			char	rmtSystem[MODSTR]; /* system's name of
 							   first hop */
 			char	rmtUser[MODSTR]; /* user's name of first
 							   hop */
@@ -63,7 +63,7 @@ struct acData			/* Data for construction of account record. */
 			char	netid[MODSTR]; /* Network ID in use */
 			char	type[MODSTR]; /* type of transaction */
 			char	path[BUFSIZ]; /* path of the rest of the hops */
-			
+
 		};
 
 /*
@@ -161,7 +161,7 @@ char *	device;
 
 /* Function:	acDojob - Found Another Job
 *
-* acDojob  is called when a new job has been found.  
+* acDojob  is called when a new job has been found.
 *
 * Parameters:
 *
@@ -184,7 +184,7 @@ char *	user;
 
 struct passwd *passent;
 	LOGCHECK;
-	if (strcmp(acptr->jobID,jobid) == 0) 
+	if (strcmp(acptr->jobID,jobid) == 0)
 		return;
 	if ((*acptr->jobID != NULLCHAR) && (acptr->jobsize != 0)){
 		reportJob();
@@ -193,7 +193,7 @@ struct passwd *passent;
 	copyText(acptr->origSystem, sizeof(acptr->origSystem), system);
 	copyText(acptr->origUser, sizeof(acptr->origUser), user);
 	copyText(acptr->time, sizeof(acptr->time), timeStamp());
-	acptr->jobgrade[0] = jobid[strlen(jobid)-5]; 
+	acptr->jobgrade[0] = jobid[strlen(jobid)-5];
 	acptr->jobgrade[1] = NULLCHAR;/* get job grade from jobid */
 	acptr->jobsize = 0;
 	while ((passent = getpwent()) != NULL){
@@ -236,7 +236,7 @@ acInc()
 * Function:	acInit - Initialize Accounting Package
 *
 * This function allows the accounting package to initialize its internal
-* data structures.  It should be called when uucico starts running on master 
+* data structures.  It should be called when uucico starts running on master
 * or changes the role from slave to master, or uuxqt is invoked.
 *
 * Parameters:
@@ -275,13 +275,13 @@ char * type;
 		Collecting = FALSE;
 }
 
-/* 
+/*
 * It is called when uuxqt is running
 *
 *	jobid - jobid after X. prefix
 *	origsys - Originating system's name.
 *	origuser - Originator's login name.
-*	connsys - local system 
+*	connsys - local system
 *	connuser - login user
 *	cmd - command to be execed by uuxqt
 */
@@ -334,7 +334,7 @@ cpucycle()
 	struct tms	tbuf;
  	time_t	rval;
  	static time_t	utime,stime;	/* guaranteed 0 first time called */
- 
+
  	times(&tbuf);
  	rval = ((tbuf.tms_utime-utime) + (tbuf.tms_stime-stime))*1000/HZ;
  	utime = tbuf.tms_utime;

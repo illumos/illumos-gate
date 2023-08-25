@@ -43,8 +43,8 @@ class HandleNPIVPort;
 
 /**
  * @memo	    Represents this handles state for each HBA port.
- * 
- * @doc		    
+ *
+ * @doc
  * This is required to track the state change value for
  * a given port for this open handle.  This class is used exclusivly
  * by instances of the Handle class.

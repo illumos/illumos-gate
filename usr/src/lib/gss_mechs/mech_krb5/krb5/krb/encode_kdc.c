@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_encode_kdc_rep() function.
  */
@@ -75,7 +75,7 @@ krb5_encode_kdc_rep(krb5_context context, krb5_msgtype type,
      * We don't want to modify encpart, but we need to be able to pass
      * in the message type to the encoder, so it can set the ASN.1
      * type correct.
-     * 
+     *
      * Although note that it may be doing nothing with the message
      * type, to be compatible with old versions of Kerberos that always
      * encode this as a TGS_REP regardly of what it really should be;

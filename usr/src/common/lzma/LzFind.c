@@ -507,7 +507,7 @@ static UInt32 Bt3_MatchFinder_GetMatches(CMatchFinder *p, UInt32 *distances)
 
   delta2 = p->pos - p->hash[hash2Value];
   curMatch = p->hash[kFix3HashSize + hashValue];
-  
+
   p->hash[hash2Value] =
   p->hash[kFix3HashSize + hashValue] = p->pos;
 
@@ -541,7 +541,7 @@ static UInt32 Bt4_MatchFinder_GetMatches(CMatchFinder *p, UInt32 *distances)
   delta2 = p->pos - p->hash[                hash2Value];
   delta3 = p->pos - p->hash[kFix3HashSize + hash3Value];
   curMatch = p->hash[kFix4HashSize + hashValue];
-  
+
   p->hash[                hash2Value] =
   p->hash[kFix3HashSize + hash3Value] =
   p->hash[kFix4HashSize + hashValue] = p->pos;

@@ -34,4 +34,4 @@ DYNFLAGS += $(DYNFLAGS32)
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS) $(ROOTLINKS) 
+install: all $(ROOTLIBS) $(ROOTLINKS)

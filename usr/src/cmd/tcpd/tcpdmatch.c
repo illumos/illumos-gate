@@ -1,15 +1,15 @@
  /*
   * tcpdmatch - explain what tcpd would do in a specific case
-  * 
+  *
   * usage: tcpdmatch [-d] [-i inet_conf] daemon[@host] [user@]host
-  * 
+  *
   * -d: use the access control tables in the current directory.
-  * 
+  *
   * -i: location of inetd.conf file.
-  * 
+  *
   * All errors are reported to the standard error stream, including the errors
   * that would normally be reported via the syslog daemon.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

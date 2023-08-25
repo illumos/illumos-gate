@@ -38,7 +38,7 @@ SRCS=		postio.c ifdef.c slowsend.c parallel.c
 
 OBJS =		$(SRCS:%.c=%.o)
 
-TXTS=		README 
+TXTS=		README
 
 ENCODING=	2
 CPPFLAGS =	-DDFLTENCODING=$(ENCODING)	\

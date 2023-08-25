@@ -43,7 +43,7 @@
 #include "SYS.h"
 
 #if !defined(_LARGEFILE_SOURCE)
-	
+
 	SYSCALL_RVAL1(lseek)
 	RET
 	SET_SIZE(lseek)

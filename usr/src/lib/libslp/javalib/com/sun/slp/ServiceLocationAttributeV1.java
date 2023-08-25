@@ -226,7 +226,7 @@ class ServiceLocationAttributeV1 extends ServiceLocationAttribute {
 		char v[] = new char[4];
 
 		for (int x = 0; x < 4; x++) {
-	
+
 		    while ((scan < s.length()) &&
 			   Character.isWhitespace(s.charAt(scan))) {
 			scan++; // eat white
@@ -481,7 +481,7 @@ class ServiceLocationAttributeV1 extends ServiceLocationAttribute {
 		o = Boolean.valueOf(value);
 
 	    } else {
-	
+
 		// Process the string to remove escapes.
 
 		String val = (String)value;
@@ -631,7 +631,7 @@ class ServiceLocationAttributeV1 extends ServiceLocationAttribute {
 	    // Check for invalids.
 
 	    int idx = -1;
-	
+
 	    if ((idx = UNESCAPABLE_CHARS.indexOf(c)) != -1) {
 		throw
 		    new ServiceLocationException(
@@ -647,7 +647,7 @@ class ServiceLocationAttributeV1 extends ServiceLocationAttribute {
 		buf.append(c);
 
 	    } else {
-	
+
 		// Check to be sure we've got enough characters left. We need
 		// at least 3.
 

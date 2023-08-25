@@ -56,7 +56,7 @@
 #         ------------------          ------------------
 #         |		  |	     |		       |
 #    syseventd	syseventconfd	devfsadmd_mod	sysevent_conf_mod
-#	
+#
 #     Makefile	   Makefile	   Makefile	    Makefile
 #
 

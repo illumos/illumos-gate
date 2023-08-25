@@ -74,7 +74,7 @@
 	! initialize cpuid into scratchpad register
 	mov	SCRATCHPAD_CPUID, %g1
 	stxa	%o0, [%g1]ASI_SCRATCHPAD
-	
+
 	! sanity check the data section
 	setx	LPAD_MAGIC_VAL, %g2, %g1
 	ldx	[%l1 + LPAD_MAGIC], %g2
@@ -134,7 +134,7 @@
 	cmp	%o0, %g0
 	bne	startup_error
 	  nop
-	
+
 	sub	%l2, 1, %l2			! decrement counter
 	add	%l3, LPAD_MAP_SIZE, %l3		! increment pointer
 

@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Return the protocol addresses supported by this host.
  * Exports from this file:
@@ -134,7 +134,7 @@
 /*
  * BSD 4.4 defines the size of an ifreq to be
  * max(sizeof(ifreq), sizeof(ifreq.ifr_name)+ifreq.ifr_addr.sa_len
- * However, under earlier systems, sa_len isn't present, so the size is 
+ * However, under earlier systems, sa_len isn't present, so the size is
  * just sizeof(struct ifreq).
  */
 #ifdef HAVE_SA_LEN
@@ -1185,7 +1185,7 @@ add_addr (void *P_data, struct sockaddr *a)
     case AF_INET6:
     {
 	const struct sockaddr_in6 *in = (const struct sockaddr_in6 *) a;
-	
+
 	if (IN6_IS_ADDR_LINKLOCAL (&in->sin6_addr))
 	    break;
 
@@ -1478,8 +1478,8 @@ static struct hostent *local_addr_fallback_kludge()
 }
 #endif
 
-/* No ioctls in winsock so we just assume there is only one networking 
- * card per machine, so gethostent is good enough. 
+/* No ioctls in winsock so we just assume there is only one networking
+ * card per machine, so gethostent is good enough.
  */
 krb5_error_code KRB5_CALLCONV
 krb5_os_localaddr (krb5_context context, krb5_address ***addr) {
@@ -1491,7 +1491,7 @@ krb5_os_localaddr (krb5_context context, krb5_address ***addr) {
     *addr = 0;
     paddr = 0;
     err = 0;
-    
+
     if (gethostname (host, sizeof(host))) {
         err = SOCKET_ERRNO;
     }

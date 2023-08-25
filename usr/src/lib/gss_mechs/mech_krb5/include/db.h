@@ -154,7 +154,7 @@ typedef struct {
 	int	lorder;		/* byte order */
 	size_t	reclen;		/* record length (fixed-length records) */
 	u_char	bval;		/* delimiting byte (variable-length records */
-	char	*bfname;	/* btree file name */ 
+	char	*bfname;	/* btree file name */
 } RECNOINFO;
 
 #if defined(__cplusplus)

@@ -78,7 +78,7 @@ vmain(void)
 	int tag_reset_wrap = 0;
 	int onumber, olist, (*OPline)(), (*OPutchar)();
 
-	
+
 	vch_mac = VC_NOTINMAC;
 	ixlatctl(0);
 
@@ -670,8 +670,8 @@ reread:
 							(wc = towupper(wc)));
 					tmp += len - 1;
 #endif /* PRESUNEUC */
-					if(*ccursor) 
-				/* 
+					if(*ccursor)
+				/*
 				 * If at end of line do not advance
 				 * to the next character, else use a
 				 * space to advance 1 column.
@@ -707,13 +707,13 @@ appnd:
 		case 'a':
 			if (*cursor) {
 				wchar_t wchar;
-				int length = mbtowc(&wchar, (char *)cursor, MULTI_BYTE_MAX); 
+				int length = mbtowc(&wchar, (char *)cursor, MULTI_BYTE_MAX);
 				if (state == HARDOPEN) {
 					if(length < 0) {
 						putoctal = 1;
 						putchar(*cursor);
 						putoctal = 0;
-					} else 
+					} else
 						putchar(wchar);
 				}
 				if(length < 0)
@@ -854,7 +854,7 @@ insrt:
 			globp = (unsigned char *)"x";
 			vclrech(0);
 			goto gogo;
-			
+
 		/*
 		 * P		Put back text before cursor or before current
 		 *		line.  If text was whole lines goes back
@@ -1046,7 +1046,7 @@ pfixup:
 			oglobp = globp;
 			globp = (unsigned char *)"&";
 			goto gogo;
-			
+
 		/*
 		 * ^G		Bring up a status line at the bottom of
 		 *		the screen, like a :file command.
@@ -1216,7 +1216,7 @@ fixup:
 			 * in open mode and . moved, then redraw.
 			 */
 			i = vcline + (dot - addr);
-			if(windowchg) 
+			if(windowchg)
 				windowinit();
 			if (i < 0 || i >= vcnt && i >= -vcnt || state != VISUAL && dot != addr) {
 				if (state == CRTOPEN)
@@ -1246,7 +1246,7 @@ fixup:
 				i = vcline + lineDOL() - lineDOT() + 1;
 				if (i < vcnt)
 					vcnt = i;
-				
+
 				/*
 				 * Dirty and repaint.
 				 */

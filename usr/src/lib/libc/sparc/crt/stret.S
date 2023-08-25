@@ -74,7 +74,7 @@
 	 */
 .L14:
 	ld	[%fp+STRUCT_VAL_OFF],TO		/* (DELAY SLOT) */
-	/* 
+	/*
 	 * copy the struct using the same loop the compiler does
 	 * for large structure assignment
 	 */

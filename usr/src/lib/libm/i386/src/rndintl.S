@@ -102,7 +102,7 @@ half:	.float	0.5
 	PIC_WRAPUP
 	fnstsw	%ax
 	sahf
-	jae	.halfway		/ if |x-[x]| = 0.5 goto halfway, 
+	jae	.halfway		/ if |x-[x]| = 0.5 goto halfway,
 					/ most cases will not take branch.
 .L0:
 	addl	$8,%esp

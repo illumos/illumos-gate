@@ -131,7 +131,7 @@ w2cp:	ld	[%i1], %i4
 	andn	%i2, 3, %i3		! i3 is aligned word count
 	dec	4, %i3			! avoid reading beyond tail of src
 	sub	%i1, %i0, %i1		! i1 gets the difference
-	
+
 3:	sll	%i4, 16, %g1		! save residual bytes
 	ld	[%i1+%i0], %i4
 	deccc	4, %i3
@@ -183,7 +183,7 @@ ovbc:	add	%i1, %i2, %i1		! get to end of source space
 	deccc	%i2			! decrement count
 	bg	5b			! loop until done
 	stb	%i3, [%i0]		! write byte
-	ret	
+	ret
 	restore %l6, %g0, %o0		! return pointer to destination
 
 	SET_SIZE(memmove)

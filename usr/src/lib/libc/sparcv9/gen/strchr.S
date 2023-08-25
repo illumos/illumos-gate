@@ -27,7 +27,7 @@
 	.file	"strchr.s"
 
 /*
- * The strchr() function returns a pointer to the first occurrence of c 
+ * The strchr() function returns a pointer to the first occurrence of c
  * (converted to a char) in string s, or a null pointer if c does not occur
  * in the string.
  */
@@ -109,7 +109,7 @@
 	bz,pn	%ncc, .done		! yup, done
 	set	0x00ff0000, %o5		! mask for 2nd byte
 	inc	%o0			! str++
-	andcc	%g1, %o5, %g0		! second byte zero (= found search char) ?	
+	andcc	%g1, %o5, %g0		! second byte zero (= found search char) ?
 	bz,pn	%ncc, .done		! yup, done
 	srl	%o4, 16, %o4		! 0x0000ff00 = mask for 3rd byte
 	inc	%o0			! str++
@@ -125,7 +125,7 @@
 	! end of the string. However, "word" might also contain findchar
 	! "tword" (in %g1) has null bytes where "word" had findchar. So
 	! check both "tword" and "word"
-    
+
 .haszerobyte:
 	set	0xff000000, %o4		! mask for 1st byte
 	andcc	%g1, %o4, %g0		! first byte == findchar ?
@@ -147,7 +147,7 @@
 	andcc	%g1, 0xff, %g0		! fourth byte == findchar ?
 	bz,pn	%ncc, .done		! yup, done
 	inc	%o0			! str++
-    
+
 .notfound:
 	retl				! done with leaf function
 	xor	%o0, %o0, %o0		! return null pointer
@@ -170,10 +170,10 @@
 
 	! check to see if we're half word aligned, which it better than
 	! not being aligned at all.  Search the first half of the word
-	! if we are, and then search by whole word.	
+	! if we are, and then search by whole word.
 
 .s2aligned:
-	lduh	[%o0], %o1		! str[]     
+	lduh	[%o0], %o1		! str[]
 	srl	%o1, 8, %o4		! %o4<7:0> = first byte
 	tst	%o4			! first byte zero ?
 	bz,pn	%ncc, .done2		! yup, done

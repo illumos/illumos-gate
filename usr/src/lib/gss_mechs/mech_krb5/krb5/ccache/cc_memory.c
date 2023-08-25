@@ -14,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * implementation of memory-based credentials cache
  */
@@ -38,47 +38,47 @@
 static krb5_error_code KRB5_CALLCONV krb5_mcc_close
 	(krb5_context, krb5_ccache id );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_destroy 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_destroy
 	(krb5_context, krb5_ccache id );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_end_seq_get 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_end_seq_get
 	(krb5_context, krb5_ccache id , krb5_cc_cursor *cursor );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_generate_new 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_generate_new
 	(krb5_context, krb5_ccache *id );
 
-static const char * KRB5_CALLCONV krb5_mcc_get_name 
+static const char * KRB5_CALLCONV krb5_mcc_get_name
 	(krb5_context, krb5_ccache id );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_get_principal 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_get_principal
 	(krb5_context, krb5_ccache id , krb5_principal *princ );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_initialize 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_initialize
 	(krb5_context, krb5_ccache id , krb5_principal princ );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_next_cred 
-	(krb5_context, 
-		   krb5_ccache id , 
-		   krb5_cc_cursor *cursor , 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_next_cred
+	(krb5_context,
+		   krb5_ccache id ,
+		   krb5_cc_cursor *cursor ,
 		   krb5_creds *creds );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_resolve 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_resolve
 	(krb5_context, krb5_ccache *id , const char *residual );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_retrieve 
-	(krb5_context, 
-		   krb5_ccache id , 
-		   krb5_flags whichfields , 
-		   krb5_creds *mcreds , 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_retrieve
+	(krb5_context,
+		   krb5_ccache id ,
+		   krb5_flags whichfields ,
+		   krb5_creds *mcreds ,
 		   krb5_creds *creds );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_start_seq_get 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_start_seq_get
 	(krb5_context, krb5_ccache id , krb5_cc_cursor *cursor );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_store 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_store
 	(krb5_context, krb5_ccache id , krb5_creds *creds );
 
-static krb5_error_code KRB5_CALLCONV krb5_mcc_set_flags 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_set_flags
 	(krb5_context, krb5_ccache id , krb5_flags flags );
 
 static krb5_error_code KRB5_CALLCONV krb5_mcc_ptcursor_new(
@@ -140,7 +140,7 @@ static void krb5_mcc_free (krb5_context context, krb5_ccache id);
 krb5_error_code KRB5_CALLCONV
 krb5_mcc_initialize(krb5_context context, krb5_ccache id, krb5_principal princ)
 {
-    krb5_error_code ret; 
+    krb5_error_code ret;
 
     krb5_mcc_free(context, id);
     ret = krb5_copy_principal(context, princ,
@@ -214,7 +214,7 @@ krb5_mcc_destroy(krb5_context context, krb5_ccache id)
     krb5_mcc_free(context, id);
     krb5_xfree(d->name);
     k5_mutex_destroy(&d->lock);
-    krb5_xfree(d); 
+    krb5_xfree(d);
     krb5_xfree(id);
 
     krb5_change_cache ();
@@ -227,11 +227,11 @@ krb5_mcc_destroy(krb5_context context, krb5_ccache id)
  *
  * Modifies:
  * id
- * 
+ *
  * Effects:
  * creates a file-based cred cache that will reside in the file
  * residual.  The cache is not opened, but the filename is reserved.
- * 
+ *
  * Returns:
  * A filled in krb5_ccache structure "id".
  *
@@ -277,7 +277,7 @@ krb5_mcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
     }
     k5_mutex_unlock(&krb5int_mcc_mutex);
     lid->data = d;
-    *id = lid; 
+    *id = lid;
     return KRB5_OK;
 }
 
@@ -319,7 +319,7 @@ krb5_mcc_start_seq_get(krb5_context context, krb5_ccache id,
  *
  * Modifes:
  * cursor, creds
- * 
+ *
  * Effects:
  * Fills in creds with the "next" credentals structure from the cache
  * id.  The actual order the creds are returned in is arbitrary.
@@ -346,7 +346,7 @@ krb5_mcc_next_cred(krb5_context context, krb5_ccache id,
      mcursor = (krb5_mcc_cursor) *cursor;
      if (mcursor == NULL)
 	return KRB5_CC_END;
-     memset(creds, 0, sizeof(krb5_creds));     
+     memset(creds, 0, sizeof(krb5_creds));
      if (mcursor->creds) {
 	*creds = *mcursor->creds;
 	retval = krb5_copy_principal(context, mcursor->creds->client, &creds->client);
@@ -467,13 +467,13 @@ new_mcc_data (const char *name, krb5_mcc_data **dataptr)
 }
 
 static krb5_error_code random_string (krb5_context, char *, unsigned int);
- 
+
 /*
  * Effects:
  * Creates a new file cred cache whose name is guaranteed to be
  * unique.  The name begins with the string TKT_ROOT (from mcc.h).
  * The cache is not opened, but the new filename is reserved.
- *  
+ *
  * Returns:
  * The filled in krb5_ccache id.
  *
@@ -497,19 +497,19 @@ krb5_mcc_generate_new (krb5_context context, krb5_ccache *id)
 	return KRB5_CC_NOMEM;
 
     lid->ops = &krb5_mcc_ops;
-    
+
     err = k5_mutex_lock(&krb5int_mcc_mutex);
     if (err) {
 	free(lid);
 	return err;
     }
-    
+
     /* Check for uniqueness with mutex locked to avoid race conditions */
     while (1) {
         krb5_mcc_list_node *ptr;
 
         random_string (context, uniquename, sizeof (uniquename));
-        
+
 	for (ptr = mcc_head; ptr; ptr=ptr->next) {
             if (!strcmp(ptr->cache->name, uniquename)) {
 		break;  /* got a match, loop again */
@@ -517,7 +517,7 @@ krb5_mcc_generate_new (krb5_context context, krb5_ccache *id)
 	}
         if (!ptr) break; /* got to the end without finding a match */
     }
-    
+
     err = new_mcc_data(uniquename, &d);
 
     k5_mutex_unlock(&krb5int_mcc_mutex);
@@ -531,8 +531,8 @@ krb5_mcc_generate_new (krb5_context context, krb5_ccache *id)
     return KRB5_OK;
 }
 
-/* Utility routine: Creates a random memory ccache name. 
- * This algorithm was selected because it creates readable 
+/* Utility routine: Creates a random memory ccache name.
+ * This algorithm was selected because it creates readable
  * random ccache names in a fixed size buffer.  */
 
 static krb5_error_code
@@ -543,19 +543,19 @@ random_string (krb5_context context, char *string, unsigned int length)
     krb5_error_code err = 0;
     unsigned char *bytes = NULL;
     unsigned int bytecount = length - 1;
-    
+
     if (!err) {
         bytes = malloc (bytecount);
         if (bytes == NULL) { err = ENOMEM; }
     }
-    
+
     if (!err) {
         krb5_data data;
         data.length = bytecount;
         data.data = (char *) bytes;
         err = krb5_c_random_make_octets (context, &data);
     }
-    
+
     if (!err) {
         unsigned int i;
         for (i = 0; i < bytecount; i++) {
@@ -563,16 +563,16 @@ random_string (krb5_context context, char *string, unsigned int length)
         }
         string[length - 1] = '\0';
     }
-    
+
     if (bytes != NULL) { free (bytes); }
-    
+
     return err;
 }
 
 /*
  * Requires:
  * id is a file credential cache
- * 
+ *
  * Returns:
  * The name of the file cred cache id.
  */
@@ -614,9 +614,9 @@ krb5_mcc_retrieve(krb5_context context, krb5_ccache id, krb5_flags whichfields,
 					  mcreds, creds);
 }
 
-/* 
+/*
  * Non-functional stub implementation for krb5_mcc_remove
- * 
+ *
  * Errors:
  *    KRB5_CC_NOSUPP - not implemented
  */
@@ -635,7 +635,7 @@ krb5_mcc_remove_cred(krb5_context context, krb5_ccache cache, krb5_flags flags,
  *
  * Modifies:
  * id
- * 
+ *
  * Effects:
  * Sets the operational flags of id to flags.
  */

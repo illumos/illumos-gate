@@ -33,8 +33,8 @@
 
 /**
  * @memo	    Represents an AdapterAdd Event
- * 
- * @doc		    When a new adapter is added to the system, 
+ *
+ * @doc		    When a new adapter is added to the system,
  *		    events of this type will be sent to registered
  *		    listeners
  */

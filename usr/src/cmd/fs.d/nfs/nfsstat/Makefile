@@ -69,7 +69,7 @@ install:	all $(ROOTPROG)
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
-clean:     
+clean:
 	$(RM) $(OBJS)
 
 include ../../../Makefile.targ

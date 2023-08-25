@@ -414,7 +414,7 @@ drop_privileges ()
 	priv_freeset(lPrivSet);
 }
 
-int 
+int
 main (int argc, char *argv[])
 {
 	int fd, rfd;

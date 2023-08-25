@@ -38,7 +38,7 @@ include ../Makefile.pools
 CFLAGS +=	-I$(POOLSCOMMONDIR)
 LDLIBS +=	-lpool
 XGETFLAGS =	-a
-CLOBBERFILES += $(POFILES) 
+CLOBBERFILES += $(POFILES)
 
 lint := LINTFLAGS += -I$(POOLSCOMMONDIR)
 

@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -39,14 +39,14 @@
 /* Get a TGT for use at the remote host */
 krb5_error_code KRB5_CALLCONV
 krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *rhost, krb5_principal client, krb5_principal server, krb5_ccache cc, int forwardable, krb5_data *outbuf)
-                         
-                                   
-                
-                          
-                          
-                   
+
+
+
+
+
+
                           /* Should forwarded TGT also be forwardable? */
-                      
+
 {
     krb5_replay_data replaydata;
     krb5_data * scratch = 0;
@@ -101,7 +101,7 @@ krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *r
 
     if ((retval = krb5_copy_principal(context, client, &creds.client)))
 	goto errout;
-    
+
     if ((retval = krb5_build_principal_ext(context, &creds.server,
 					   client->realm.length,
 					   client->realm.data,
@@ -111,7 +111,7 @@ krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *r
 					   client->realm.data,
 					   0)))
 	goto errout;
-	
+
     /* fetch tgt directly from cache */
     context->use_conf_ktypes = 1;
     retval = krb5_cc_retrieve_cred (context, cc, KRB5_TC_SUPPORTED_KTYPES,
@@ -121,7 +121,7 @@ krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *r
 	goto errout;
 
     /* tgt->client must be equal to creds.client */
-    if (!krb5_principal_compare(context, tgt.client, creds.client)) {	
+    if (!krb5_principal_compare(context, tgt.client, creds.client)) {
         /* Solaris Kerberos */
         char *r_name = NULL;
 	char *t_name = NULL;
@@ -145,7 +145,7 @@ krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *r
 	retval = KRB5_NO_TKT_SUPPLIED;
 	goto errout;
     }
-    
+
     if (tgt.addresses && *tgt.addresses) {
       if (rhost == NULL) {
 	if (krb5_princ_type(context, server) != KRB5_NT_SRV_HST) {
@@ -157,7 +157,7 @@ retval = KRB5_FWD_BAD_PRINCIPAL;
 	  retval = KRB5_CC_BADNAME;
 	  goto errout;
 	}
-	
+
 	rhost = malloc(server->data[1].length+1);
 	if (!rhost) {
 	  retval = ENOMEM;
@@ -173,7 +173,7 @@ retval = KRB5_FWD_BAD_PRINCIPAL;
 	if (retval)
 	    goto errout;
     }
-    
+
     creds.keyblock.enctype = enctype;
     creds.times = tgt.times;
     creds.times.starttime = 0;
@@ -187,7 +187,7 @@ retval = KRB5_FWD_BAD_PRINCIPAL;
 	if (enctype) {
 	    creds.keyblock.enctype = 0;
 	    if ((retval = krb5_get_cred_via_tkt(context, &tgt, kdcoptions,
-						addrs, &creds, &pcreds))) 
+						addrs, &creds, &pcreds)))
 		goto errout;
 	}
 	else goto errout;
@@ -203,12 +203,12 @@ retval = KRB5_FWD_BAD_PRINCIPAL;
     if (scratch) {
 	if (retval)
 	    krb5_free_data(context, scratch);
-	else {                                 
+	else {
 	    *outbuf = *scratch;
 	    krb5_xfree(scratch);
-	}                      
+	}
     }
-        
+
 errout:
     if (addrs)
 	krb5_free_addresses(context, addrs);

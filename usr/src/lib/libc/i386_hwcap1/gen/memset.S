@@ -44,16 +44,16 @@
 
 	cld			/ make sure we go the right way...
 	cmpl	$20,%ecx	/ strings with fewer than 20 chars should be byte set
-	jbe	.byteset	
+	jbe	.byteset
 
 	andl	$0xff, %eax	/ trim anything above low byte
 	imul	$0x01010101, %eax	/ extend low byte to each byte
-	
+
 	cmpl	$256, %ecx	/ smaller areas don't benefit from alignment
 	jbe	.wordset
 
 	cmpl	$511, %ecx	/ areas smaller than this should be wordset
-	jbe	.check_wordset	
+	jbe	.check_wordset
 
 	/
 	/ prep work for sse temporal and non-temporal
@@ -69,7 +69,7 @@
 	movl	%ecx, %ebx	/ save byte count
 	movl	%edi, %esi	/ esi is scratch register
 	andl	$63, %esi	/ bytes to align to 64 byte align addr
-	neg	%esi		/ compute count of bytes 
+	neg	%esi		/ compute count of bytes
 	addl	$64, %esi	/ needed to align
 	andl	$63, %esi	/ to 64 byte align addr
 	jz	.sse_aligned	/ skip alignment if not needed
@@ -83,7 +83,7 @@
 	movl	%ebx, %ecx	/ remainder to be set
 
 .sse_aligned:
-	
+
 	shr	$6, %ecx	/ number of 64 byte blocks to set
 
 	/
@@ -96,14 +96,14 @@
 	movl	%eax,12(%esp)	/
 	movups	(%esp), %xmm0	/ unaligned load from stack into xmm0
 	addl	$16,%esp	/ restore stack position
-	
+
 	cmpl	$262143, %ebx	/ blocks smaller than this allocate in the cache
 	jbe	.sse_loop
 	jmp	.sse_nt_loop	/ branch across alignment nops
-		
+
 	.align 16
 
-.sse_nt_loop:	
+.sse_nt_loop:
 	movntps %xmm0, (%edi)	/ block non-temporal store
 	movntps %xmm0, 16(%edi)	/ use sse rather than sse2
 	movntps %xmm0, 32(%edi)	/ so we work more places
@@ -126,7 +126,7 @@
 #endif
 	cmpl	$20, %ecx	/ compare and jump accordingly
 	jbe	.byteset
-	jmp	.wordset	
+	jmp	.wordset
 
 	.align 16
 .sse_loop:
@@ -143,7 +143,7 @@
 	movl	%ebx, %ecx	/ in %ecx as normal
 	popl	%esi		/ restore stack config
 	popl	%ebx		/
-	cmpl	$20, %ecx	
+	cmpl	$20, %ecx
 	jbe	.byteset
 	jmp	.wordset
 
@@ -151,12 +151,12 @@
 	movl	%edi, %edx	/ save current store ptr
 	andl	$7, %edi	/ check alignment
 	movl	%edx,%edi	/ %edi = string address
-	jz	.wordset	/ all ok 
-	
+	jz	.wordset	/ all ok
 
-.align_wordset:	
+
+.align_wordset:
 	pushl	%ebx		/ more registers are needed
-	pushl	%esi		
+	pushl	%esi
 
 	movl	%ecx, %ebx
 	movl	%edi, %esi
@@ -166,7 +166,7 @@
 	andl	$7, %esi
 	subl	%esi, %ebx	/ ebx contains remainder of bytes to copy
 	movl	%esi, %ecx
-	rep; sstob	 
+	rep; sstob
 	movl	%ebx, %ecx
 	popl	%esi		/ restore stack config
 	popl	%ebx		/

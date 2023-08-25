@@ -54,45 +54,45 @@ struct file_data {
 
 extern const krb5_rc_ops krb5_rc_file_ops;
 
-krb5_error_code KRB5_CALLCONV krb5_rc_file_init 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_init
     	(krb5_context,
 		   krb5_rcache,
 		   krb5_deltat);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_recover 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_recover
 	(krb5_context,
-		   krb5_rcache); 
-krb5_error_code KRB5_CALLCONV krb5_rc_file_recover_or_init 
+		   krb5_rcache);
+krb5_error_code KRB5_CALLCONV krb5_rc_file_recover_or_init
     	(krb5_context,
 		   krb5_rcache,
-		   krb5_deltat); 
-krb5_error_code KRB5_CALLCONV krb5_rc_file_destroy 
+		   krb5_deltat);
+krb5_error_code KRB5_CALLCONV krb5_rc_file_destroy
 	(krb5_context,
 		   krb5_rcache);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_close 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_close
 	(krb5_context,
 		   krb5_rcache);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_store 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_store
 	(krb5_context,
 		   krb5_rcache,
 		   krb5_donot_replay *);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_expunge 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_expunge
 	(krb5_context,
 		   krb5_rcache);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_get_span 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_get_span
 	(krb5_context,
 		   krb5_rcache,
 		   krb5_deltat *);
-char * KRB5_CALLCONV krb5_rc_file_get_name 
+char * KRB5_CALLCONV krb5_rc_file_get_name
 	(krb5_context,
 		   krb5_rcache);
-krb5_error_code KRB5_CALLCONV krb5_rc_file_resolve 
+krb5_error_code KRB5_CALLCONV krb5_rc_file_resolve
 	(krb5_context,
 		   krb5_rcache,
 		   char *);
 krb5_error_code krb5_rc_file_close_no_free
 	(krb5_context,
 		   krb5_rcache);
-void krb5_rc_free_entry 
+void krb5_rc_free_entry
 	(krb5_context,
 		   krb5_donot_replay **);
 #endif

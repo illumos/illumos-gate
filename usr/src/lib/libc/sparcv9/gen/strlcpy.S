@@ -50,7 +50,7 @@
 	! Once this has occurred, we copy based upon destination alignment.
 	! This is either by xword, word, halfword, or byte.  As this occurs, we
 	! check for a zero-byte.  If one is found, we branch to a method
-	! which checks for the exact location of a zero-byte within a 
+	! which checks for the exact location of a zero-byte within a
 	! larger xword/word/half-word quantity.
 
 
@@ -79,7 +79,7 @@
 	bnz,a	%ncc, .alignsrc		! no, copy another byte
 	nop				! pad
 
-.dwordaligned:	
+.dwordaligned:
 	sethi	%hi(0x01010101), %i4	! Alan Mycroft's magic1
 	add	%i2, %g4, %l0		! dst
 	or	%i4, %lo(0x01010101),%i4!  finish loading magic1
@@ -98,7 +98,7 @@
 	bnz,pn	%ncc, .storeword2	! yup, store word wise
 	nop				! ensure loop is 16-byte aligned
 	nop				! ensure loop is 16-byte aligned
-	
+
 .storedword:
 	ldx	[%i3 + %g4], %l1	! src dword
 	addcc	%g4, 8, %g4		! n += 8, src += 8, dst += 8
@@ -109,11 +109,11 @@
 	bz,a,pt	%ncc, .storedword	! no zero byte if magic expression == 0
 	stx	%l1, [%i2 + %g4]	! store word to dst (address pre-incremented)
 
-	! n has not expired, but src is at the end. we need to push out the 
+	! n has not expired, but src is at the end. we need to push out the
 	! remaining src bytes. Since strlen(dts) == strlen(src), we can
 	! compute the return value as the difference of final dst pointer
 	! and the pointer to the start of dst
-	
+
 .zerobyte:
 	add	%i2, %g4, %i2		! pointer to dest string
 	srlx	%l1, 56, %g1		! first byte
@@ -159,7 +159,7 @@
 	restore	%i0, %g0, %o0		! restore register window, return len
 
 	! n expired, so this is the last word. It may contain null bytes.
-	! Store bytes until n == 0. If a null byte is encountered during 
+	! Store bytes until n == 0. If a null byte is encountered during
 	! processing of this last src word, we are done. Otherwise continue
 	! to scan src until we hit the end, and compute strlen from the
 	! difference between the pointer past the last byte of src and the
@@ -169,7 +169,7 @@
 	add	%i2, %g4, %i2		! we want a single dst pointer here
 	sub	%g4, 8, %g4		! undo counter pre-increment
 	add	%i3, %g4, %i3		! we want a single src pointer here
-		
+
 	srlx	%l1, 56, %g1		! first byte
 	andcc	%g1, 0xff, %g0		! end of src reached ?
 	bz,pn	%ncc, .done		! yup
@@ -222,7 +222,7 @@
 	add	%i2, 1, %i2		! dst++
 	bz,pn	%ncc, .done		! yup
 	stb	%l1, [%i2]		! store eigth byte
-	
+
 	! we need to force a null byte in the last position of dst
 	! %i2 points to the location
 
@@ -243,7 +243,7 @@
 
 	mov	0xff, %i5		! create byte mask for null byte scanning
 	sllx	%i5, 56, %i5		! mask for 1st byte = 0xff0000000000000000
-.searchbyte:	
+.searchbyte:
 	andcc	%l1, %i5, %g0		! current byte zero?
 	srlx	%i5, 8, %i5		! byte mask for next byte
 	bnz,a	%ncc, .searchbyte	! current byte != zero, continue search
@@ -323,7 +323,7 @@
 	ba	.storeword2		! next dword
 	stw	%l1, [%l0 + 4]		! store bytes 5, 6, 7, 8
 
-	! n expired, i.e. end of destination buffer reached. Force null 
+	! n expired, i.e. end of destination buffer reached. Force null
 	! null termination of dst, then scan src until end foudn for
 	! determination of strlen(src)
 	!

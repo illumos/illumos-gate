@@ -460,7 +460,7 @@ intx31: 	pushl $-1			# Dummy int no for btx_v86
  * -0x3c %fs
  * -0x40 %ds
  * -0x44 %es
- * -0x48 zero %eax (hardware int only)	
+ * -0x48 zero %eax (hardware int only)
  * -0x4c zero %ecx (hardware int only)
  * -0x50 zero %edx (hardware int only)
  * -0x54 zero %ebx (hardware int only)
@@ -615,7 +615,7 @@ rret_tramp:	movw $MEM_ESPR-0x08,%sp		# Reset stack pointer
 		pushfl				# Save %eflags
 		pushl $PSL_RESERVED_DEFAULT|PSL_D # Use clean %eflags with
 		popfl				#  string ops dec
-		xorw %ax,%ax			# Reset seg 
+		xorw %ax,%ax			# Reset seg
 		movw %ax,%ds			#  regs
 		movw %ax,%es			#  (%ss is already 0)
 		lidt idtdesc	 		# Set IDT
@@ -978,7 +978,7 @@ intr20: 	push $0x8			# Int 0x20: IRQ0
 int_hwr: 	push %ax			# Save
 		push %ds			# Save
 		push %bp			# Save
-		mov %sp,%bp			# Address stack frame 
+		mov %sp,%bp			# Address stack frame
 		xchg %bx,6(%bp)			# Swap BX, int no
 		xor %ax,%ax			# Set %ds:%bx to
 		shl $2,%bx			#  point to

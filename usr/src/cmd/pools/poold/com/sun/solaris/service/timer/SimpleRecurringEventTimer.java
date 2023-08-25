@@ -71,7 +71,7 @@ public class SimpleRecurringEventTimer implements RecurringEventTimer
 	public void waitUntilNextFiring() throws InterruptedException
 	{
 		long delta;
-		
+
 		while ((delta = nextFiring - System.currentTimeMillis()) > 0)
 			Thread.sleep(delta);
 

@@ -50,7 +50,7 @@ POFILE =	lp_lib_access.po
 
 .KEEP_STATE :
 
-all install :	$(LIBS) 
+all install :	$(LIBS)
 
 include		../../../../lib/Makefile.targ
 
@@ -59,9 +59,9 @@ LINTFLAGS = -nvx
 SRCS= $(OBJECTS:%.o=%.c)
 
 lint:	lintlib
-	$(LINT.c) $(LINTFLAGS) $(SRCS) 
+	$(LINT.c) $(LINTFLAGS) $(SRCS)
 
 lintlib:
-	$(LINT.c) $(LINTFLAGS) -o lpacc llib-llpacc 
+	$(LINT.c) $(LINTFLAGS) -o lpacc llib-llpacc
 
 include		../Makefile.msg

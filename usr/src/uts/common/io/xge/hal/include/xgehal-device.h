@@ -279,7 +279,7 @@ typedef struct lro {
 
 	/* LRO frame contains time stamp, if (ts_off != -1) */
 	int 			ts_off;
-		
+
 } lro_t;
 #endif
 
@@ -310,7 +310,7 @@ typedef struct {
 #endif
 /*
  * xge_hal_vpd_data_t
- * 
+ *
  * Represents vpd capabilty structure
  */
 typedef struct xge_hal_vpd_data_t {
@@ -975,7 +975,7 @@ __hal_append_lro(iplro_t *ip, tcplro_t **tcp, u32 *seg_len, lro_t *lro,
 		xge_hal_device_t *hldev);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
-xge_hal_lro_process_rx(int ring, u8 *eth_hdr, u8 *ip_hdr, tcplro_t **tcp, 
+xge_hal_lro_process_rx(int ring, u8 *eth_hdr, u8 *ip_hdr, tcplro_t **tcp,
                        u32 *seglen, lro_t **p_lro,
                        xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
                        lro_t **lro_end3);

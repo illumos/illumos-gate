@@ -63,5 +63,5 @@ lint: $(PROG:%=%.c)
 	$(LINT.c) putdev.c	$(LDLIBS)
 
 FRC:
- 
+
 include ../../Makefile.targ

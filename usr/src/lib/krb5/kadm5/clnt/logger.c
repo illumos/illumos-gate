@@ -67,7 +67,7 @@
 #define LOG_EMERG_STRING	6
 #define LOG_ALERT_STRING	7
 #define LOG_CRIT_STRING		8
-#define LOG_ERR_STRING		9	
+#define LOG_ERR_STRING		9
 #define LOG_WARNING_STRING	10
 #define LOG_NOTICE_STRING	11
 #define LOG_INFO_STRING	12
@@ -285,7 +285,7 @@ klog_rotate(struct log_entry *le)
 			le->lfu_rotate_versions - 1);
 
 		/*
-		 * Rename file.N-2 to file.N-1, file.N-3 to file.N-2, ... 
+		 * Rename file.N-2 to file.N-1, file.N-3 to file.N-2, ...
 		 * file.0 to file.1
 		 */
 		for (i = le->lfu_rotate_versions - 1; i > 0; i--) {
@@ -318,7 +318,7 @@ klog_rotate(struct log_entry *le)
 		 * Default log file creation mode should be read-only
 		 * by owner(root), but the admin can override with
 		 * chmod(1) if desired.
-		 */ 
+		 */
 
 		old_umask = umask(077);
 		fp = fopen(old_name, le->lfu_fopen_mode);
@@ -336,7 +336,7 @@ klog_rotate(struct log_entry *le)
 			 * log file will cause us to dispose of the
 			 * old one, and created a new one. We have just
 			 * renamed the old one to file.-1, so remove it.
-			 */ 
+			 */
 			if (le->lfu_rotate_versions <= 0)
 				(void) unlink(new_name);
 
@@ -390,7 +390,7 @@ klog_com_err_proc(const char *whoami, long code, const char *format, va_list ap)
 	krb5_free_error_message(err_context, emsg);
     }
     cp = &outbuf[strlen(outbuf)];
-    
+
     actual_format = format;
 #ifdef	HAVE_SYSLOG
     /*
@@ -444,7 +444,7 @@ klog_com_err_proc(const char *whoami, long code, const char *format, va_list ap)
 	    break;
 #endif /* LOG_DEBUG */
 	}
-    } 
+    }
 #endif	/* HAVE_SYSLOG */
 
     /* Now format the actual message */
@@ -457,7 +457,7 @@ klog_com_err_proc(const char *whoami, long code, const char *format, va_list ap)
 	    ((int *) ap)[2], ((int *) ap)[3],
 	    ((int *) ap)[4], ((int *) ap)[5]);
 #endif	/* HAVE_VSPRINTF */
-    
+
     /*
      * Now that we have the message formatted, perform the output to each
      * logging specification.
@@ -508,7 +508,7 @@ klog_com_err_proc(const char *whoami, long code, const char *format, va_list ap)
 	    else
 		log_pri = log_control.log_entries[lindex].lsu_facility |
 		    log_control.log_entries[lindex].lsu_severity;
-					       
+
 	    /* Log the message with our header trimmed off */
 	    syslog(log_pri, syslogp);
 	    break;
@@ -616,7 +616,7 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
 		     * Check for append/overwrite, then open the file.
 		     */
 		    if (cp[4] == ':' || cp[4] == '=') {
-			log_control.log_entries[i].lfu_fopen_mode = 
+			log_control.log_entries[i].lfu_fopen_mode =
 				(cp[4] == ':') ? "a+F" : "wF";
 			old_umask = umask(077);
 			f = fopen(&cp[5],
@@ -628,13 +628,13 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
 			    log_control.log_entries[i].lfu_filep = f;
 			    log_control.log_entries[i].log_type = K_LOG_FILE;
 			    log_control.log_entries[i].lfu_fname = &cp[5];
-			    log_control.log_entries[i].lfu_rotate_period = 
+			    log_control.log_entries[i].lfu_rotate_period =
 				K_LOG_DEF_FILE_ROTATE_PERIOD;
 			    log_control.log_entries[i].lfu_rotate_versions =
 				K_LOG_DEF_FILE_ROTATE_VERSIONS;
 			    log_control.log_entries[i].lfu_last_rotated =
 				time(0);
-				
+
 			/*
 			 * Now parse for ename_"rotate" = {
 			 *	period = XXX
@@ -664,7 +664,7 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
 					    free(time);
 					}
 				    }
-				
+
 				    if (!profile_get_integer(
 					kcontext->profile, "logging",
 					rotate_kw, "versions",
@@ -672,7 +672,7 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
 					&vers)) {
 			log_control.log_entries[i].lfu_rotate_versions = vers;
 				    }
-			
+
 			   }
 			} else {
 			    fprintf(stderr, gettext("Couldn't open log file %s: %s\n"),
@@ -852,7 +852,7 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
 		     * We handle devices very similarly to files.
 		     */
 		    if (cp[6] == '=') {
-			log_control.log_entries[i].ldu_filep = 
+			log_control.log_entries[i].ldu_filep =
 			    DEVICE_OPEN(&cp[7], "wF");
 			if (log_control.log_entries[i].ldu_filep) {
 			    log_control.log_entries[i].log_type = K_LOG_DEVICE;
@@ -1145,7 +1145,7 @@ klog_vsyslog(int priority, const char *format, va_list arglist)
 	    /*
 	     * System log.
 	     */
-					       
+
 	    /* Log the message with our header trimmed off */
 	    syslog(priority, "%s", syslogp);
 	    break;

@@ -681,7 +681,7 @@ clgrgid(gid_t gid)
 			    strlen(instroot) + strlen(GROUP), "buf");
 			return (NULL);
 		}
-			
+
 		if ((gr_ptr = fopen(buf, "r")) == NULL) {
 			free(buf);
 			return (NULL);

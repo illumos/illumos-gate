@@ -76,7 +76,7 @@ void KRB5_CALLCONV profile_free_list
 	(char **list);
 
 long KRB5_CALLCONV profile_get_string
-	(profile_t profile, const char *name, const char *subname, 
+	(profile_t profile, const char *name, const char *subname,
 			const char *subsubname, const char *def_val,
 			char **ret_string);
 long KRB5_CALLCONV profile_get_integer
@@ -101,25 +101,25 @@ long KRB5_CALLCONV profile_iterator_create
 
 void KRB5_CALLCONV profile_iterator_free
 	(void **iter_p);
-	
+
 long KRB5_CALLCONV profile_iterator
 	(void	**iter_p, char **ret_name, char **ret_value);
 
 void KRB5_CALLCONV profile_release_string (char *str);
 
 long KRB5_CALLCONV profile_update_relation
-	(profile_t profile, const char **names, 
+	(profile_t profile, const char **names,
 		   const char *old_value, const char *new_value);
 
 long KRB5_CALLCONV profile_clear_relation
 	(profile_t profile, const char **names);
 
 long KRB5_CALLCONV profile_rename_section
-	(profile_t profile, const char **names, 
+	(profile_t profile, const char **names,
 		   const char *new_name);
 
 long KRB5_CALLCONV profile_add_relation
-	(profile_t profile, const char **names, 
+	(profile_t profile, const char **names,
 		   const char *new_value);
 
 /*
