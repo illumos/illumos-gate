@@ -26,7 +26,6 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/systm.h>
@@ -127,24 +126,8 @@ static int rfs4_fattr4_time_modify_set();
 /*
  * Initialize the supported attributes
  */
-bitmap4 supported_attrs[3];
-
-static void
-init_supported_attrs(void)
-{
-	supported_attrs[0] = supported_attrs[1] = supported_attrs[2] =
-	    rfs4_supported_attrs;
-
-	/* restrict to nfsv4.0 */
-	supported_attrs[0] &= ~(FATTR4_SUPPATTR_EXCLCREAT_MASK_LOCAL |
-	    FATTR4_SEC_LABEL_MASK_LOCAL);
-
-	/* restrict to nfsv4.1 */
-	supported_attrs[1] &= ~FATTR4_SEC_LABEL_MASK_LOCAL;
-}
-
 void
-rfs4_attr_init(void)
+rfs4_attr_init()
 {
 	int i;
 	struct nfs4_svgetit_arg sarg;
@@ -160,7 +143,6 @@ rfs4_attr_init(void)
 	cs.vp = rootvp;
 	cs.fh.nfs_fh4_val = NULL;
 	cs.cr = kcred;
-	cs.minorversion = 2;
 
 	/*
 	 * Get all the supported attributes
@@ -187,8 +169,6 @@ rfs4_attr_init(void)
 			rfs4_supported_attrs |= nfs4_ntov_map[i].fbit;
 		}
 	}
-
-	init_supported_attrs();
 }
 
 /*
@@ -239,7 +219,6 @@ rfs4_fattr4_supported_attrs(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
     union nfs4_attr_u *na)
 {
 	int	error = 0;
-	bitmap4 supported = supported_attrs[sarg->cs->minorversion];
 
 	switch (cmd) {
 	case NFS4ATTR_SUPPORTED:
@@ -247,7 +226,7 @@ rfs4_fattr4_supported_attrs(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 			error = EINVAL;
 		break;		/* this attr is supported */
 	case NFS4ATTR_GETIT:
-		na->supported_attrs = supported;
+		na->supported_attrs = rfs4_supported_attrs;
 		break;
 	case NFS4ATTR_SETIT:
 		/*
@@ -259,7 +238,7 @@ rfs4_fattr4_supported_attrs(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		/*
 		 * Compare the input bitmap to the server's bitmap
 		 */
-		if (na->supported_attrs != supported) {
+		if (na->supported_attrs != rfs4_supported_attrs) {
 			error = -1;	/* no match */
 		}
 		break;
@@ -2835,40 +2814,6 @@ rfs4_fattr4_time_modify_set(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	return (error);
 }
 
-/* ARGSUSED */
-static int
-rfs4_fattr4_suppattr_exclcreat(nfs4_attr_cmd_t cmd,
-    struct nfs4_svgetit_arg *sarg, union nfs4_attr_u *na)
-{
-	int error = 0;
-
-	/* Not supported for nfs4.0 */
-	if (sarg->cs->minorversion == 0)
-		return (ENOTSUP);
-
-	switch (cmd) {
-	case NFS4ATTR_SUPPORTED:
-		if (sarg->op == NFS4ATTR_SETIT)
-			error = EINVAL;
-		break;		/* this attr is supported */
-	case NFS4ATTR_GETIT:
-		na->supp_exclcreat = RFS4_SUPPATTR_EXCLCREAT;
-		break;
-	case NFS4ATTR_SETIT:
-		/*
-		 * read-only attr
-		 */
-		error = EINVAL;
-		break;
-	case NFS4ATTR_VERIT:
-		if (na->supp_exclcreat != RFS4_SUPPATTR_EXCLCREAT)
-			error = -1; /* no match */
-		break;
-	case NFS4ATTR_FREEIT:
-		break;
-	}
-	return (error);
-}
 
 static void
 rfs4_ntov_init(void)
@@ -2930,5 +2875,4 @@ rfs4_ntov_init(void)
 	nfs4_ntov_map[53].sv_getit = rfs4_fattr4_time_modify;
 	nfs4_ntov_map[54].sv_getit = rfs4_fattr4_time_modify_set;
 	nfs4_ntov_map[55].sv_getit = rfs4_fattr4_mounted_on_fileid;
-	nfs4_ntov_map[56].sv_getit = rfs4_fattr4_suppattr_exclcreat;
 }

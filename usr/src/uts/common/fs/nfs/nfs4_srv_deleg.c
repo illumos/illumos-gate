@@ -51,11 +51,13 @@
 
 #define	MAX_READ_DELEGATIONS 5
 
+static int rfs4_deleg_wlp = 5;
 static int rfs4_deleg_disabled;
 static int rfs4_max_setup_cb_tries = 5;
 
 #ifdef DEBUG
 
+static int rfs4_test_cbgetattr_fail = 0;
 int rfs4_cb_null;
 int rfs4_cb_debug;
 int rfs4_deleg_debug;
@@ -1848,7 +1850,7 @@ rfs4_revoke_file(rfs4_file_t *fp)
 	 * rfs4_return_deleg()
 	 */
 	rfs4_dbe_lock(fp->rf_dbe);
-	while (dsp = list_head(&fp->rf_delegstatelist)) {
+	while ((dsp = list_head(&fp->rf_delegstatelist)) != NULL) {
 		rfs4_dbe_hold(dsp->rds_dbe);
 		rfs4_dbe_unlock(fp->rf_dbe);
 		rfs4_return_deleg(dsp, TRUE);

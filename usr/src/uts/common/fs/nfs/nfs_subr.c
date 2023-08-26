@@ -5277,13 +5277,3 @@ do_xattr_exists_check(vnode_t *vp, ulong_t *valp, cred_t *cr)
 	kmem_free(dbuf, dlen);
 	return (0);
 }
-
-/*
- * NFS specific function that returns time since
- * system boot in seconds.
- */
-time_t
-nfs_sys_uptime(void)
-{
-	return (TICK_TO_SEC(ddi_get_lbolt()));
-}

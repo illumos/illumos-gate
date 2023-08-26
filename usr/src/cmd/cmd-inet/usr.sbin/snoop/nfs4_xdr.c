@@ -38,7 +38,7 @@
  *
  * CAUTION:  This file is kept in sync with it's uts counterpart:
  *
- *	usr/src/uts/common/fs/nfs/nfs4_xdr.c
+ * 	usr/src/uts/common/fs/nfs/nfs4_xdr.c
  *
  * However, it is not an exact copy.  NEVER copy uts's nfs4_xdr.c
  * directly over this file.   Changes from the uts version must be
@@ -153,6 +153,15 @@ xdr_pathname4(register XDR *xdrs, pathname4 *objp)
 	if (!xdr_array(xdrs, (char **)&objp->pathname4_val,
 	    (uint_t *)&objp->pathname4_len, NFS4_MAX_PATHNAME4,
 	    sizeof (component4), (xdrproc_t)xdr_component4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_nfs_lockid4(register XDR *xdrs, nfs_lockid4 *objp)
+{
+
+	if (!xdr_uint64_t(xdrs, objp))
 		return (FALSE);
 	return (TRUE);
 }
@@ -913,9 +922,9 @@ bool_t
 xdr_clientaddr4(register XDR *xdrs, clientaddr4 *objp)
 {
 
-	if (!xdr_string(xdrs, &objp->na_r_netid, ~0))
+	if (!xdr_string(xdrs, &objp->r_netid, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->na_r_addr, ~0))
+	if (!xdr_string(xdrs, &objp->r_addr, ~0))
 		return (FALSE);
 	return (TRUE);
 }

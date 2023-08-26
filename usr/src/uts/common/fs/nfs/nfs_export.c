@@ -1273,7 +1273,8 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	STRUCT_SET_HANDLE(uap, model, args);
 
 	/* Read in pathname from userspace */
-	if (error = pn_get(STRUCT_FGETP(uap, dname), UIO_USERSPACE, &lookpn))
+	error = pn_get(STRUCT_FGETP(uap, dname), UIO_USERSPACE, &lookpn);
+	if (error != 0)
 		return (error);
 
 	/* Walk the export list looking for that pathname */
@@ -1342,7 +1343,8 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 * call not the AUTOFS node itself.
 	 */
 	if (vn_mountedvfs(vp) != NULL) {
-		if (error = traverse(&vp)) {
+		error = traverse(&vp);
+		if (error != 0) {
 			VN_RELE(vp);
 			if (dvp != NULL)
 				VN_RELE(dvp);
@@ -1679,12 +1681,14 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 			error = EINVAL;
 			goto out5;
 		}
-		if (error = loadindex(kex))
+		error = loadindex(kex);
+		if (error != 0)
 			goto out5;
 	}
 
 	if (kex->ex_flags & EX_LOG) {
-		if (error = nfslog_setup(exi))
+		error = nfslog_setup(exi);
+		if (error != 0)
 			goto out6;
 	}
 
@@ -2041,7 +2045,8 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 	 * call not the AUTOFS node itself.
 	 */
 	if (vn_mountedvfs(vp) != NULL) {
-		if (error = traverse(&vp)) {
+		error = traverse(&vp);
+		if (error != 0) {
 			VN_RELE(vp);
 			if (dvp != NULL)
 				VN_RELE(dvp);
@@ -2855,7 +2860,8 @@ loadindex(struct exportdata *kex)
 	 * returns the len with the NULL byte included in the calculation
 	 * as long as the max length is not exceeded.
 	 */
-	if (error = copyinstr(kex->ex_index, index, sizeof (index), &len))
+	error = copyinstr(kex->ex_index, index, sizeof (index), &len);
+	if (error != 0)
 		return (error);
 
 	kex->ex_index = kmem_alloc(len, KM_SLEEP);

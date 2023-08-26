@@ -261,6 +261,7 @@ static SVC_CALLOUT_TABLE nfs_sct_rdma = {
  */
 nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 
+int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
 bool_t rfs4_minorvers_mismatch(struct svc_req *, SVCXPRT *, void *);
 
 /*
@@ -495,8 +496,9 @@ nfs_svc(struct nfs_svc_args *arg, model_t model)
 		ng->nfs_versmax = NFS_VERSMAX_DEFAULT;
 	}
 
-	if (error = nfs_srv_set_sc_versions(fp, &sctp, ng->nfs_versmin,
-	    ng->nfs_versmax)) {
+	error = nfs_srv_set_sc_versions(fp, &sctp, ng->nfs_versmin,
+	    ng->nfs_versmax);
+	if (error != 0) {
 		releasef(STRUCT_FGET(uap, fd));
 		kmem_free(addrmask.buf, addrmask.maxlen);
 		return (error);
@@ -1055,32 +1057,16 @@ static struct rpcdisp rfsdisptab_v4[] = {
 	 */
 
 	/* RFS_NULL = 0 */
-	[NFSPROC4_NULL] = {
-	    .dis_proc = NULL,
-	    .dis_xdrargs = xdr_void,
-	    .dis_fastxdrargs = NULL_xdrproc_t,
-	    .dis_argsz = 0,
-	    .dis_xdrres = xdr_void,
-	    .dis_fastxdrres = NULL_xdrproc_t,
-	    .dis_ressz = 0,
-	    .dis_resfree = nullfree,
-	    .dis_flags = RPC_IDEMPOTENT,
-	    .dis_getfh = NULL
-	},
+	{rpc_null,
+	    xdr_void, NULL_xdrproc_t, 0,
+	    xdr_void, NULL_xdrproc_t, 0,
+	    nullfree, RPC_IDEMPOTENT, 0},
 
 	/* RFS4_compound = 1 */
-	[NFSPROC4_COMPOUND] = {
-	    .dis_proc = NULL,
-	    .dis_xdrargs = xdr_COMPOUND4args_srv,
-	    .dis_fastxdrargs = NULL_xdrproc_t,
-	    .dis_argsz = sizeof (COMPOUND4args),
-	    .dis_xdrres = xdr_COMPOUND4res_srv,
-	    .dis_fastxdrres = NULL_xdrproc_t,
-	    .dis_ressz = sizeof (COMPOUND4res),
-	    .dis_resfree = rfs4_compound_free,
-	    .dis_flags = 0,
-	    .dis_getfh = NULL
-	},
+	{rfs4_compound,
+	    xdr_COMPOUND4args_srv, NULL_xdrproc_t, sizeof (COMPOUND4args),
+	    xdr_COMPOUND4res_srv, NULL_xdrproc_t, sizeof (COMPOUND4res),
+	    rfs4_compound_free, 0, 0},
 };
 
 union rfs_args {
@@ -2128,7 +2114,8 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 		break;
 
 	case AUTH_UNIX:
-		if (!stat || crgetuid(cr) == 0 && !(access & NFSAUTH_UIDMAP)) {
+		if (!stat || (crgetuid(cr) == 0 &&
+		    !(access & NFSAUTH_UIDMAP))) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
 			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
@@ -2905,7 +2892,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 	 * access to this new export then it will get an access error when it
 	 * tries to use the filehandle
 	 */
-	if (error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi)) {
+	error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi);
+	if (error != 0) {
 		VN_RELE(*vpp);
 		goto publicfh_done;
 	}
@@ -2959,7 +2947,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 			exi_rele(*exi);
 			*exi = NULL;
 
-			if (error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi)) {
+			error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi);
+			if (error != 0) {
 				VN_RELE(*vpp);
 				goto publicfh_done;
 			}
@@ -3028,7 +3017,8 @@ rfs_pathname(
 		/*
 		 * This thread used a pathname > TYPICALMAXPATHLEN bytes long.
 		 */
-		if (error = pn_get(path, UIO_SYSSPACE, &pn))
+		error = pn_get(path, UIO_SYSSPACE, &pn);
+		if (error != 0)
 			return (error);
 		if (pn.pn_pathlen != 0 && pathflag == URLPATH) {
 			URLparse(pn.pn_path);

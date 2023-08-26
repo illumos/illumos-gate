@@ -1276,6 +1276,10 @@ struct rfs_async_write_list {
 	struct rfs_async_write_list *next;
 };
 
+static struct rfs_async_write_list *rfs_async_write_head = NULL;
+static kmutex_t rfs_async_write_lock;
+static int rfs_write_async = 1;	/* enables write clustering if == 1 */
+
 #define	MAXCLIOVECS	42
 #define	RFSWRITE_INITVAL (enum nfsstat) -1
 
