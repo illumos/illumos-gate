@@ -134,16 +134,17 @@ nfsl_getconfig_list(nfsl_config_t **listpp)
 	 */
 	assert(global == NULL);
 	global = create_config(DEFAULTTAG, DEFAULTDIR, BUFFERPATH, NULL,
-			FHPATH, LOGPATH, TRANSLOG_BASIC, B_TRUE, &error);
+	    FHPATH, LOGPATH, TRANSLOG_BASIC, B_TRUE, &error);
 	*listpp = global;
 	if (global == NULL) {
 		free_config(global_raw);
 		return (error);
 	}
 
-	if (error = getconfiglist(listpp, B_FALSE))
+	error = getconfiglist(listpp, B_FALSE);
+	if (error != 0) {
 		nfsl_freeconfig_list(listpp);
-	else {
+	} else {
 		assert(global != NULL);
 		/*
 		 * The global entry was replaced with the one in the file,
@@ -165,9 +166,8 @@ create_global_raw(int *error)
 	nfsl_config_t *p;
 
 	*error = 0;
-	if (p = (nfsl_config_t *)malloc(sizeof (*p)))
-		(void) memset((void *)p, 0, sizeof (*p));
-	else
+	p = calloc(1, sizeof (*p));
+	if (p == NULL)
 		*error = ENOMEM;
 
 	return (p);
@@ -200,12 +200,12 @@ nfsl_checkconfig_list(nfsl_config_t **listpp, boolean_t *updated)
 		error = errno;
 		if (nfsl_errs_to_syslog) {
 			syslog(LOG_ERR, gettext(
-				"Can't stat %s - %s"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+			    "Can't stat %s - %s"), NFSL_CONFIG_FILE_PATH,
+			    strerror(error));
 		} else {
 			(void) fprintf(stderr, gettext(
-				"Can't stat %s - %s\n"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+			    "Can't stat %s - %s\n"), NFSL_CONFIG_FILE_PATH,
+			    strerror(error));
 		}
 		return (0);
 	}
@@ -246,11 +246,11 @@ getconfiglist(nfsl_config_t **listpp, boolean_t updating)
 	if (fp == NULL) {
 		if (updating) {
 			(void) sprintf(errorbuf, "Can't open %s",
-				NFSL_CONFIG_FILE_PATH);
+			    NFSL_CONFIG_FILE_PATH);
 		} else {
 			(void) sprintf(errorbuf,
-				"Can't open %s - using hardwired defaults",
-				NFSL_CONFIG_FILE_PATH);
+			    "Can't open %s - using hardwired defaults",
+			    NFSL_CONFIG_FILE_PATH);
 		}
 
 		/*
@@ -270,12 +270,12 @@ getconfiglist(nfsl_config_t **listpp, boolean_t updating)
 		error = errno;
 		if (nfsl_errs_to_syslog) {
 			syslog(LOG_ERR, gettext(
-				"Can't lock %s - %s"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+			    "Can't lock %s - %s"), NFSL_CONFIG_FILE_PATH,
+			    strerror(error));
 		} else {
 			(void) fprintf(stderr, gettext(
-				"Can't lock %s - %s\n"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+			    "Can't lock %s - %s\n"), NFSL_CONFIG_FILE_PATH,
+			    strerror(error));
 		}
 		goto done;
 	}
@@ -291,18 +291,20 @@ getconfiglist(nfsl_config_t **listpp, boolean_t updating)
 			continue;
 		}
 
-		if (error = get_info(linebuf, &tag, &defaultdir, &bufferpath,
-		    &rpclogpath, &fhpath, &logpath, &logformat))
+		error = get_info(linebuf, &tag, &defaultdir, &bufferpath,
+		    &rpclogpath, &fhpath, &logpath, &logformat);
+		if (error != 0)
 			break;
 
-		if (listp = findconfig(listpp, tag, B_FALSE, &tail)) {
+		listp = findconfig(listpp, tag, B_FALSE, &tail);
+		if (listp != NULL) {
 			/*
 			 * An entry with the same tag name exists,
 			 * update the fields that changed.
 			 */
 			error = update_config(listp, tag, defaultdir,
-					bufferpath, rpclogpath, fhpath, logpath,
-					logformat, B_TRUE, B_TRUE);
+			    bufferpath, rpclogpath, fhpath, logpath,
+			    logformat, B_TRUE, B_TRUE);
 			if (error)
 				break;
 		} else {
@@ -310,8 +312,8 @@ getconfiglist(nfsl_config_t **listpp, boolean_t updating)
 			 * New entry, create it.
 			 */
 			listp = create_config(tag, defaultdir,
-					bufferpath, rpclogpath, fhpath,
-					logpath, logformat, B_TRUE, &error);
+			    bufferpath, rpclogpath, fhpath,
+			    logpath, logformat, B_TRUE, &error);
 			if (listp == NULL)
 				break;
 
@@ -325,20 +327,23 @@ getconfiglist(nfsl_config_t **listpp, boolean_t updating)
 		assert(global != NULL);
 	}
 
-	if (!error) {
+	if (error == 0) {
 		/*
 		 * Get mtime while we have file locked
 		 */
-		if (error = fstat(fileno(fp), &st)) {
+		error = fstat(fileno(fp), &st);
+		if (error != 0) {
 			error = errno;
 			if (nfsl_errs_to_syslog) {
 				syslog(LOG_ERR, gettext(
-				"Can't stat %s - %s"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+				    "Can't stat %s - %s"),
+				    NFSL_CONFIG_FILE_PATH,
+				    strerror(error));
 			} else {
 				(void) fprintf(stderr, gettext(
-				"Can't stat %s - %s\n"), NFSL_CONFIG_FILE_PATH,
-				strerror(error));
+				    "Can't stat %s - %s\n"),
+				    NFSL_CONFIG_FILE_PATH,
+				    strerror(error));
 			}
 		}
 		config_last_modification = st.st_mtim;
@@ -362,26 +367,26 @@ done:
  */
 static nfsl_config_t *
 create_config(
-	char *tag,
-	char *defaultdir,
-	char *bufferpath,
-	char *rpclogpath,
-	char *fhpath,
-	char *logpath,
-	int   logformat,
-	boolean_t complete,
-	int  *error)
+    char *tag,
+    char *defaultdir,
+    char *bufferpath,
+    char *rpclogpath,
+    char *fhpath,
+    char *logpath,
+    int   logformat,
+    boolean_t complete,
+    int  *error)
 {
 	nfsl_config_t *config;
 
-	if ((config = (nfsl_config_t *)malloc(sizeof (*config))) == NULL) {
+	config = calloc(1, sizeof (*config));
+	if (config == NULL) {
 		*error = ENOMEM;
 		return (NULL);
 	}
-	(void) memset((void *)config, 0, sizeof (*config));
 
 	*error = update_config(config, tag, defaultdir, bufferpath, rpclogpath,
-			fhpath, logpath, logformat, complete, B_TRUE);
+	    fhpath, logpath, logformat, complete, B_TRUE);
 	if (*error) {
 		free(config);
 		return (NULL);
@@ -426,12 +431,12 @@ update_config(
 		 */
 		if (nfsl_errs_to_syslog) {
 			syslog(LOG_ERR, gettext(
-			"update_config: \"%s\" not a complete config entry."),
-			tag);
+			    "update_config: \"%s\" not a complete "
+			    "config entry."), tag);
 		} else {
 			(void) fprintf(stderr, gettext(
-			"update_config: \"%s\" not a complete config entry.\n"),
-			tag);
+			    "update_config: \"%s\" not a complete "
+			    "config entry.\n"), tag);
 		}
 		return (EINVAL);
 	}
@@ -445,11 +450,13 @@ update_config(
 			error = ENOMEM;
 			goto errout;
 		}
-	} else
+	} else {
 		assert(strcmp(config->nc_name, tag) == 0);
+	}
 
-	if (error = update_field(
-	    &config->nc_defaultdir, defaultdir, NULL, &updated))
+	error = update_field(
+	    &config->nc_defaultdir, defaultdir, NULL, &updated);
+	if (error != 0)
 		goto errout;
 	if (!prepend) {
 		/*
@@ -458,20 +465,24 @@ update_config(
 		defaultdir = NULL;
 	}
 	config_updated |= updated;
-	if (error = update_field(
-	    &config->nc_bufferpath, bufferpath, defaultdir, &updated))
+	error = update_field(
+	    &config->nc_bufferpath, bufferpath, defaultdir, &updated);
+	if (error != 0)
 		goto errout;
 	config_updated |= updated;
-	if (error = update_field(
-	    &config->nc_rpclogpath, rpclogpath, defaultdir, &updated))
+	error = update_field(
+	    &config->nc_rpclogpath, rpclogpath, defaultdir, &updated);
+	if (error != 0)
 		goto errout;
 	config_updated |= updated;
-	if (error = update_field(
-	    &config->nc_fhpath, fhpath, defaultdir, &updated))
+	error = update_field(
+	    &config->nc_fhpath, fhpath, defaultdir, &updated);
+	if (error != 0)
 		goto errout;
 	config_updated |= updated;
-	if (error = update_field(
-	    &config->nc_logpath, logpath, defaultdir, &updated))
+	error = update_field(
+	    &config->nc_logpath, logpath, defaultdir, &updated);
+	if (error != 0)
 		goto errout;
 	config_updated |= updated;
 	updated = (config->nc_logformat != logformat);
@@ -492,10 +503,11 @@ update_config(
 		 * Update the global_raw configuration entry.
 		 * Make sure no expanding of paths occurs.
 		 */
-		if (error = update_config(global_raw, DEFAULTRAWTAG, defaultdir,
-			bufferpath, rpclogpath, fhpath, logpath, logformat,
-			complete, B_FALSE))
-				goto errout;
+		error = update_config(global_raw, DEFAULTRAWTAG, defaultdir,
+		    bufferpath, rpclogpath, fhpath, logpath, logformat,
+		    complete, B_FALSE);
+		if (error != 0)
+			goto errout;
 	}
 
 	return (error);
@@ -503,12 +515,12 @@ update_config(
 errout:
 	if (nfsl_errs_to_syslog) {
 		syslog(LOG_ERR, gettext(
-			"update_config: Can't process \"%s\" config entry: %s"),
-			tag, strerror(error));
+		    "update_config: Can't process \"%s\" config entry: %s"),
+		    tag, strerror(error));
 	} else {
 		(void) fprintf(stderr, gettext(
-		"update_config: Can't process \"%s\" config entry: %s\n"),
-		tag, strerror(error));
+		    "update_config: Can't process \"%s\" config entry: %s\n"),
+		    tag, strerror(error));
 	}
 	return (error);
 }
@@ -717,7 +729,8 @@ nfsl_findconfig(nfsl_config_t *listp, char *tag, int *error)
 		/*
 		 * Rebuild our list if the file has changed.
 		 */
-		if (*error = nfsl_checkconfig_list(&listp, &updated)) {
+		*error = nfsl_checkconfig_list(&listp, &updated);
+		if (*error != 0) {
 			/*
 			 * List may be corrupted, notify caller.
 			 */
@@ -728,7 +741,7 @@ nfsl_findconfig(nfsl_config_t *listp, char *tag, int *error)
 			 * Search for tag again.
 			 */
 			config = findconfig(&listp, tag, B_FALSE,
-				(nfsl_config_t **)NULL);
+			    (nfsl_config_t **)NULL);
 		}
 	}
 
@@ -794,7 +807,7 @@ get_info(
 	*fhpath = *logpath = NULL;
 	*logformat = 0;
 
-	while (tok = strtok(NULL, whitespace)) {
+	while ((tok = strtok(NULL, whitespace)) != NULL) {
 		if (strncmp(tok, "defaultdir=", strlen("defaultdir=")) == 0) {
 			*defaultdir = tok + strlen("defaultdir=");
 		} else if (strncmp(tok, "buffer=", strlen("buffer=")) == 0) {
@@ -806,7 +819,7 @@ get_info(
 		} else if (strncmp(tok, "log=", strlen("log=")) == 0) {
 			*logpath = tok + strlen("log=");
 		} else if (strncmp(tok, "logformat=",
-				strlen("logformat=")) == 0) {
+		    strlen("logformat=")) == 0) {
 			tmp = tok + strlen("logformat=");
 			if (strncmp(tmp, "extended", strlen("extended")) == 0) {
 				*logformat = TRANSLOG_EXTENDED;
@@ -826,7 +839,7 @@ get_info(
 		 * this tag is not the global tag.
 		 */
 		complete_with_global(defaultdir, bufferpath,
-			rpclogpath, fhpath, logpath, logformat);
+		    rpclogpath, fhpath, logpath, logformat);
 	}
 
 	return (0);
@@ -834,10 +847,10 @@ get_info(
 badtag:
 	if (nfsl_errs_to_syslog) {
 		syslog(LOG_ERR, gettext(
-			"Bad tag found in config file."));
+		    "Bad tag found in config file."));
 	} else {
 		(void) fprintf(stderr, gettext(
-			"Bad tag found in config file.\n"));
+		    "Bad tag found in config file.\n"));
 	}
 	return (-1);
 }
@@ -942,9 +955,10 @@ is_legal_tag(char *tag)
  * line on success, a NULL on EOF, and an empty string on lines > linesz.
  */
 static char *
-gataline(FILE *fp, char *path, char *line, int linesz) {
-	register char *p = line;
-	register int len;
+gataline(FILE *fp, char *path, char *line, int linesz)
+{
+	char *p = line;
+	int len;
 	int excess = 0;
 
 	*p = '\0';
@@ -978,7 +992,7 @@ trim:
 
 		/* trim trailing white space */
 		while (p >= line && isspace(*(uchar_t *)p))
-		*p-- = '\0';
+			*p-- = '\0';
 		if (p < line) {			/* empty line */
 			p = line;
 			continue;
@@ -996,7 +1010,7 @@ trim:
 		 */
 		p = line;
 
-		while (p = strchr(p, '#')) {
+		while ((p = strchr(p, '#')) != NULL) {
 			if (p == line || isspace(*(p-1))) {
 				*p-- = '\0';
 				goto trim;
@@ -1025,12 +1039,12 @@ trim:
 		}
 		if (nfsl_errs_to_syslog) {
 			syslog(LOG_ERR, gettext(
-				"%s: line too long - ignored (max %d chars)"),
-				path, linesz-1);
+			    "%s: line too long - ignored (max %d chars)"),
+			    path, linesz-1);
 		} else {
 			(void) fprintf(stderr, gettext(
-				"%s: line too long - ignored (max %d chars)\n"),
-				path, linesz-1);
+			    "%s: line too long - ignored (max %d chars)\n"),
+			    path, linesz-1);
 		}
 		*line = '\0';
 	}

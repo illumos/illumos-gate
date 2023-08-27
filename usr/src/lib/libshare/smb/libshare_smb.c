@@ -967,7 +967,7 @@ range_check_validator_zero_ok(int index, char *value)
 		else {
 			if (val < smb_proto_options[index].minval ||
 			    val > smb_proto_options[index].maxval)
-			ret = SA_BAD_VALUE;
+				ret = SA_BAD_VALUE;
 		}
 	}
 	return (ret);
@@ -1531,7 +1531,7 @@ smb_set_proto_prop(sa_property_t prop)
 	if (opt->smb_index == SMB_CI_MAX_PROTOCOL ||
 	    opt->smb_index == SMB_CI_MIN_PROTOCOL)
 		if (strcmp(value, "3.1.1") == 0)
-			strcpy(value, "3.11");
+			(void) strcpy(value, "3.11");
 
 	/* Test for valid value */
 	if (opt->validator != NULL &&

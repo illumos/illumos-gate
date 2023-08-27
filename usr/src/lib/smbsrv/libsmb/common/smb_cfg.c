@@ -269,7 +269,7 @@ smb_base64_encode(char *str_to_encode)
 			arr_4[3] = arr_3[2] & 0x3f;
 
 			for (i = 0; i < 4; i++)
-				ret[ret_cnt++] = b64_data[arr_4[i]];
+				ret[ret_cnt++] = b64_data[(int)arr_4[i]];
 			i = 0;
 		}
 	}
@@ -286,7 +286,7 @@ smb_base64_encode(char *str_to_encode)
 		arr_4[3] = arr_3[2] & 0x3f;
 
 		for (j = 0; j < (i + 1); j++)
-			ret[ret_cnt++] = b64_data[arr_4[j]];
+			ret[ret_cnt++] = b64_data[(int)arr_4[j]];
 
 		while (i++ < 3)
 			ret[ret_cnt++] = '=';
@@ -323,8 +323,10 @@ smb_base64_decode(char *encoded_str)
 		en_ind++;
 		if (i == 4) {
 			for (i = 0; i < 4; i++) {
-				if ((p = strchr(b64_data, arr_4[i])) == NULL)
+				if ((p = strchr(b64_data, arr_4[i])) == NULL) {
+					free(ret);
 					return (NULL);
+				}
 
 				arr_4[i] = (int)(p - b64_data);
 			}
@@ -348,8 +350,10 @@ smb_base64_decode(char *encoded_str)
 			arr_4[j] = 0;
 
 		for (j = 0; j < 4; j++) {
-			if ((p = strchr(b64_data, arr_4[j])) == NULL)
+			if ((p = strchr(b64_data, arr_4[j])) == NULL) {
+				free(ret);
 				return (NULL);
+			}
 
 			arr_4[j] = (int)(p - b64_data);
 		}
@@ -1262,7 +1266,7 @@ smb_convert_encrypt_ciphers(char *value)
 	if (strlen(value) >= SMB_CIPHERS_MAXLEN)
 		return (-1);
 
-	strlcpy(buf, value, sizeof (buf));
+	(void) strlcpy(buf, value, sizeof (buf));
 
 	cn = strtok_r(buf, sep, &last);
 	while (cn != NULL) {

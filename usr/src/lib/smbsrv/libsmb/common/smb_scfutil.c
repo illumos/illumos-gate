@@ -228,10 +228,8 @@ smb_smf_set_string_property(smb_scfhandle_t *handle,
 		ret = SMBD_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBD_SMF_SYSTEM_ERR) {
-		switch (scf_error()) {
-		case SCF_ERROR_PERMISSION_DENIED:
+		if (scf_error() == SCF_ERROR_PERMISSION_DENIED) {
 			ret = SMBD_SMF_NO_PERMISSION;
-			break;
 		}
 	}
 
@@ -323,10 +321,8 @@ smb_smf_set_integer_property(smb_scfhandle_t *handle, char *propname,
 		ret = SMBD_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBD_SMF_SYSTEM_ERR) {
-		switch (scf_error()) {
-		case SCF_ERROR_PERMISSION_DENIED:
+		if (scf_error() == SCF_ERROR_PERMISSION_DENIED) {
 			ret = SMBD_SMF_NO_PERMISSION;
-			break;
 		}
 	}
 	/*
@@ -418,10 +414,8 @@ smb_smf_set_boolean_property(smb_scfhandle_t *handle, char *propname,
 		ret = SMBD_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBD_SMF_SYSTEM_ERR) {
-		switch (scf_error()) {
-		case SCF_ERROR_PERMISSION_DENIED:
+		if (scf_error() == SCF_ERROR_PERMISSION_DENIED) {
 			ret = SMBD_SMF_NO_PERMISSION;
-			break;
 		}
 	}
 	/*
@@ -517,10 +511,8 @@ smb_smf_set_opaque_property(smb_scfhandle_t *handle, char *propname,
 		ret = SMBD_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBD_SMF_SYSTEM_ERR) {
-		switch (scf_error()) {
-		case SCF_ERROR_PERMISSION_DENIED:
+		if (scf_error() == SCF_ERROR_PERMISSION_DENIED) {
 			ret = SMBD_SMF_NO_PERMISSION;
-			break;
 		}
 	}
 	/*

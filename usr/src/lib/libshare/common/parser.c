@@ -47,7 +47,7 @@ _sa_get_token(char *string)
 	char *ret;
 	int state = TK_INIT;
 	int c;
-	int quotechar;
+	int quotechar = 0;
 
 	if (string != orig || string == NULL) {
 		orig = string;

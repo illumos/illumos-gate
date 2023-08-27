@@ -318,7 +318,7 @@ finddfsentry(xfs_sharelist_t *list, char *path)
 
 	for (item = list; item != NULL; item = item->next) {
 		if (item->path != NULL && strcmp(item->path, path) == 0)
-		return (item);
+			return (item);
 	}
 	return (NULL);
 }
@@ -782,7 +782,7 @@ sa_is_share(void *object)
 {
 	if (object != NULL) {
 		if (strcmp((char *)((xmlNodePtr)object)->name, "share") == 0)
-		return (1);
+			return (1);
 	}
 	return (0);
 }
@@ -1081,7 +1081,7 @@ dfs_free_list(xfs_sharelist_t *list)
 		if (entry->group != NULL)
 			free(entry->group);
 		list = list->next;
-			free(entry);
+		free(entry);
 	}
 }
 

@@ -66,8 +66,8 @@ int debug = 0;
 #define	NFS_CLIENT_SVC	(char *)"svc:/network/nfs/client:default"
 
 /* internal functions */
-static int nfs_init();
-static void nfs_fini();
+static int nfs_init(void);
+static void nfs_fini(void);
 static int nfs_enable_share(sa_share_t);
 static int nfs_disable_share(sa_share_t, char *);
 static int nfs_validate_property(sa_handle_t, sa_property_t, sa_optionset_t);
@@ -77,9 +77,9 @@ static int nfs_parse_legacy_options(sa_group_t, char *);
 static char *nfs_format_options(sa_group_t, int);
 static int nfs_set_proto_prop(sa_property_t);
 static sa_protocol_properties_t nfs_get_proto_set();
-static char *nfs_get_status();
+static char *nfs_get_status(void);
 static char *nfs_space_alias(char *);
-static uint64_t nfs_features();
+static uint64_t nfs_features(void);
 
 /*
  * ops vector that provides the protocol specific info and operations
@@ -2546,7 +2546,7 @@ findprotoopt(char *name, int whichname)
 	for (i = 0; proto_options[i].tag != NULL; i++) {
 		if (whichname == 1) {
 			if (strcasecmp(proto_options[i].name, name) == 0)
-			return (i);
+				return (i);
 		} else {
 			if (strcasecmp(proto_options[i].tag, name) == 0)
 				return (i);
@@ -2682,7 +2682,7 @@ getsvcname(uint32_t svcs)
  * values.
  */
 static int
-initprotofromsmf()
+initprotofromsmf(void)
 {
 	char name[PATH_MAX];
 	char value[PATH_MAX];
@@ -2723,7 +2723,7 @@ initprotofromsmf()
  */
 
 static void
-add_defaults()
+add_defaults(void)
 {
 	int i;
 	char number[MAXDIGITS];
@@ -2767,7 +2767,7 @@ add_defaults()
 }
 
 static void
-free_protoprops()
+free_protoprops(void)
 {
 	if (protoset != NULL) {
 		xmlFreeNode(protoset);
@@ -2782,7 +2782,7 @@ free_protoprops()
  */
 
 static int
-nfs_init()
+nfs_init(void)
 {
 	int ret = SA_OK;
 
@@ -2811,7 +2811,7 @@ nfs_init()
  */
 
 static void
-nfs_fini()
+nfs_fini(void)
 {
 	free_protoprops();
 }
@@ -2824,7 +2824,7 @@ nfs_fini()
  */
 
 static sa_protocol_properties_t
-nfs_get_proto_set()
+nfs_get_proto_set(void)
 {
 	return (protoset);
 }
@@ -3156,7 +3156,7 @@ nfs_set_proto_prop(sa_property_t prop)
  */
 
 static char *
-nfs_get_status()
+nfs_get_status(void)
 {
 	return (smf_get_state(NFSD));
 }
@@ -3195,7 +3195,7 @@ nfs_space_alias(char *space)
  */
 
 static uint64_t
-nfs_features()
+nfs_features(void)
 {
 	return ((uint64_t)SA_FEATURE_DFSTAB | SA_FEATURE_SERVER);
 }
