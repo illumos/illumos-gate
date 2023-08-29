@@ -15,6 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
+# Copyright 2023 Oxide Computer Company
 #
 
 [DEFAULT]
@@ -135,6 +136,8 @@ timeout = 600
 [/opt/libc-tests/tests/set_constraint_handler_s.32]
 [/opt/libc-tests/tests/set_constraint_handler_s.64]
 [/opt/libc-tests/tests/strerror]
+[/opt/libc-tests/tests/strtonum.32]
+[/opt/libc-tests/tests/strtonum.64]
 [/opt/libc-tests/tests/thread_name]
 [/opt/libc-tests/tests/timespec_get.32]
 [/opt/libc-tests/tests/timespec_get.64]
