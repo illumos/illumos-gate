@@ -58,6 +58,9 @@ static uint_t ucode_eqtbl_amd_entries;
 static bool
 ucode_select_amd(cpu_t *cp)
 {
+	if ((get_hwenv() & HW_VIRTUAL) != 0)
+		return (false);
+
 	return (cpuid_getvendor(cp) == X86_VENDOR_AMD);
 }
 
