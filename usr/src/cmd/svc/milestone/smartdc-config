@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2023 MNX Cloud, Inc.
 #
 
 #
@@ -141,6 +142,15 @@ case "$1" in
             if [[ "${CONFIG_admin_network}" != "..." ]]; then
                 ntp_aflag="-a ${CONFIG_admin_network}/${CONFIG_admin_netmask}"
             fi
+        fi
+        #
+        # Add any additional networks that should be permitted to use this
+        # host as a time server. This is most often used by RAN networks.
+        #
+        if [[ -n ${CONFIG_ntp_allow_networks} ]]; then
+            for i in ${CONFIG_ntp_allow_networks//,/ }; do
+                ntp_aflag="${ntp_aflag} -a $i"
+            done
         fi
 
         #
