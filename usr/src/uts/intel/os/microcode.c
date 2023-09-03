@@ -324,14 +324,13 @@ ucode_check(cpu_t *cp)
 				}
 			}
 
-			if (ucode == NULL) {
-				cmn_err(CE_CONT,
-				    "?ucode: unsupported processor\n");
+			if (ucode == NULL)
 				goto out;
-			}
 
+#ifdef DEBUG
 			cmn_err(CE_CONT, "?ucode: selected %s\n",
 			    ucode->us_name);
+#endif
 		}
 	}
 

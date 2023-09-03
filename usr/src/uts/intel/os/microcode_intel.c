@@ -56,6 +56,9 @@ static ucode_file_intel_t intel_ucodef;
 static bool
 ucode_select_intel(cpu_t *cp)
 {
+	if ((get_hwenv() & HW_VIRTUAL) != 0)
+		return (false);
+
 	return (cpuid_getvendor(cp) == X86_VENDOR_Intel);
 }
 
