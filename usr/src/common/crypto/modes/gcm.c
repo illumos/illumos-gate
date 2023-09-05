@@ -21,8 +21,42 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2023-2026 RackTop Systems, Inc.
  */
 
+/*
+ * This file implements GCM and GMAC, as decribed in
+ *	NIST Special Publication 800-38D
+ *	Recommendation for Block Cipher Modes of Operation:
+ *	Galois/Counter Mode (GCM) and GMAC
+ *
+ * Briefly, GMAC uses GCM just for "authentication" (sign/verify),
+ * discarding the ouptut data (cipher/clear) that GCM would produce.
+ *
+ * Some functions below serve both GCM and GMAC, adjusting behavior
+ * based on (ctx->gcm_flags & GMAC_MODE) to skip output production
+ * or actions needed only when actually doing encrypt or decrypt.
+ *
+ * Some non-obvious things to note:
+ *
+ * The struct member gcm_len_a_len_c[] is an array of two uint64_t
+ * (AAD length and input data length, in that order, in BITS).
+ * The values are needed in that form for a hash computation that
+ * happens in the "final" function for GCM or GMAC.  Just before the
+ * "final" hash computation, the values are converted to big-endian
+ * form as required by the altgorithm specification. Before that
+ * point those values are in host order (always BITS).
+ *
+ * The calling framework (one of uts/common/crypto/io/aes.c
+ * or lib/pkcs11/pkcs11_softtoken/common/softAESCrypt.c)
+ * uses different "alloc", "init", and "final" functions
+ * for GCM vs GMAC.  See calls to:
+ *	gcm_alloc_ctx, gmac_alloc_ctx,
+ *	gcm_init_ctx,  gmac_init_ctx,
+ *	gcm_encrypt_final, gmac_mode_final
+ * Operation of the GCM vs GMAC varints of those functions are
+ * similar other than encrypt/decrypt in GCM, skipped in GMAC.
+ */
 
 #ifndef _KERNEL
 #include <strings.h>
@@ -122,10 +156,73 @@ gcm_mul(uint64_t *x_in, uint64_t *y, uint64_t *res)
 	gcm_mul((uint64_t *)(void *)(c)->gcm_ghash, (c)->gcm_H, \
 	(uint64_t *)(void *)(t));
 
+/*
+ * helper factored out of gcm_mode_encrypt_contiguous_blocks
+ */
+static inline void
+gcm_encrypt_block(gcm_ctx_t *ctx, uint8_t *datap, crypto_data_t *out,
+    size_t block_size, uint8_t *blockp, void *iov_or_mp, offset_t *offset,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *))
+{
+	uint8_t *out_data_1;
+	uint8_t *out_data_2;
+	size_t out_data_1_len;
+	uint64_t counter;
+	uint64_t counter_mask = ntohll(0x00000000ffffffffULL);
+
+	/*
+	 * Increment counter. Counter bits are confined
+	 * to the bottom 32 bits of the counter block.
+	 */
+	counter = ntohll(ctx->gcm_cb[1] & counter_mask);
+	counter = htonll(counter + 1);
+	counter &= counter_mask;
+	ctx->gcm_cb[1] = (ctx->gcm_cb[1] & ~counter_mask) | counter;
+
+	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_cb,
+	    (uint8_t *)ctx->gcm_tmp);
+	xor_block(blockp, (uint8_t *)ctx->gcm_tmp);
+
+	if (out == NULL) {
+		if (ctx->gcm_remainder_len > 0) {
+			bcopy(blockp, ctx->gcm_copy_to,
+			    ctx->gcm_remainder_len);
+			bcopy(blockp + ctx->gcm_remainder_len, datap,
+			    block_size - ctx->gcm_remainder_len);
+		}
+	} else {
+		uint8_t *tmpp = (uint8_t *)ctx->gcm_tmp;
+		crypto_get_ptrs(out, iov_or_mp, offset, &out_data_1,
+		    &out_data_1_len, &out_data_2, block_size);
+
+		/* copy block to where it belongs */
+		if (out_data_1_len == block_size) {
+			copy_block(tmpp, out_data_1);
+		} else {
+			bcopy(tmpp, out_data_1, out_data_1_len);
+			if (out_data_2 != NULL) {
+				bcopy(tmpp + out_data_1_len,
+				    out_data_2,
+				    block_size - out_data_1_len);
+			}
+		}
+		/* update offset */
+		out->cd_offset += block_size;
+	}
+}
 
 /*
  * Encrypt multiple blocks of data in GCM mode.  Decrypt for GCM mode
- * is done in another function.
+ * is done in another function: gcm_mode_decrypt_contiguous_blocks().
+ *
+ * When doing GCM, gcm_processed_data_len is advanced (which is the
+ * encrypted/decrypted data bytes, excluding AAD).  When this is doing
+ * GMAC (serving C_Sign) it advances the "input" pointers instead:
+ * gcm_len_a_len_c[0] is the ADD input length, and
+ * gcm_len_a_len_c[1] is the data input length.
+ * (Details at the top of this file).
  */
 int
 gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
@@ -138,14 +235,8 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 	size_t need;
 	uint8_t *datap = (uint8_t *)data;
 	uint8_t *blockp;
-	uint8_t *lastp;
 	void *iov_or_mp;
 	offset_t offset;
-	uint8_t *out_data_1;
-	uint8_t *out_data_2;
-	size_t out_data_1_len;
-	uint64_t counter;
-	uint64_t counter_mask = ntohll(0x00000000ffffffffULL);
 
 	if (length + ctx->gcm_remainder_len < block_size) {
 		/* accumulate bytes here and return */
@@ -157,7 +248,6 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 		return (CRYPTO_SUCCESS);
 	}
 
-	lastp = (uint8_t *)ctx->gcm_cb;
 	if (out != NULL)
 		crypto_init_ptrs(out, &iov_or_mp, &offset);
 
@@ -177,51 +267,19 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 			blockp = datap;
 		}
 
-		/*
-		 * Increment counter. Counter bits are confined
-		 * to the bottom 32 bits of the counter block.
-		 */
-		counter = ntohll(ctx->gcm_cb[1] & counter_mask);
-		counter = htonll(counter + 1);
-		counter &= counter_mask;
-		ctx->gcm_cb[1] = (ctx->gcm_cb[1] & ~counter_mask) | counter;
-
-		encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_cb,
-		    (uint8_t *)ctx->gcm_tmp);
-		xor_block(blockp, (uint8_t *)ctx->gcm_tmp);
-
-		lastp = (uint8_t *)ctx->gcm_tmp;
-
-		ctx->gcm_processed_data_len += block_size;
-
-		if (out == NULL) {
-			if (ctx->gcm_remainder_len > 0) {
-				bcopy(blockp, ctx->gcm_copy_to,
-				    ctx->gcm_remainder_len);
-				bcopy(blockp + ctx->gcm_remainder_len, datap,
-				    need);
-			}
+		if ((ctx->gcm_flags & GMAC_MODE) != 0) {
+			/* add AAD to the hash */
+			ctx->gcm_len_a_len_c[0] +=
+			    CRYPTO_BYTES2BITS(block_size);
+			GHASH(ctx, blockp, ctx->gcm_ghash);
 		} else {
-			crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-			    &out_data_1_len, &out_data_2, block_size);
-
-			/* copy block to where it belongs */
-			if (out_data_1_len == block_size) {
-				copy_block(lastp, out_data_1);
-			} else {
-				bcopy(lastp, out_data_1, out_data_1_len);
-				if (out_data_2 != NULL) {
-					bcopy(lastp + out_data_1_len,
-					    out_data_2,
-					    block_size - out_data_1_len);
-				}
-			}
-			/* update offset */
-			out->cd_offset += block_size;
+			gcm_encrypt_block(ctx, datap, out, block_size, blockp,
+			    &iov_or_mp, &offset, encrypt_block, copy_block,
+			    xor_block);
+			/* add ciphertext to the hash */
+			ctx->gcm_processed_data_len += block_size;
+			GHASH(ctx, ctx->gcm_tmp, ctx->gcm_ghash);
 		}
-
-		/* add ciphertext to the hash */
-		GHASH(ctx, ctx->gcm_tmp, ctx->gcm_ghash);
 
 		/* Update pointer to next block of data to be processed. */
 		if (ctx->gcm_remainder_len != 0) {
@@ -243,6 +301,7 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 		ctx->gcm_copy_to = NULL;
 
 	} while (remainder > 0);
+
 out:
 	return (CRYPTO_SUCCESS);
 }
@@ -300,6 +359,11 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		ctx->gcm_processed_data_len += ctx->gcm_remainder_len;
 	}
 
+	/*
+	 * The gcm_len_a_len_c values are in host order until final,
+	 * where we convert them to network order before GHASH
+	 */
+	ctx->gcm_len_a_len_c[0] = htonll(ctx->gcm_len_a_len_c[0]);
 	ctx->gcm_len_a_len_c[1] =
 	    htonll(CRYPTO_BYTES2BITS(ctx->gcm_processed_data_len));
 	GHASH(ctx, ctx->gcm_len_a_len_c, ghash);
@@ -314,6 +378,65 @@ gcm_encrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	}
 	out->cd_offset += ctx->gcm_remainder_len;
 	ctx->gcm_remainder_len = 0;
+	rv = crypto_put_output_data(ghash, out, ctx->gcm_tag_len);
+	if (rv != CRYPTO_SUCCESS)
+		return (rv);
+	out->cd_offset += ctx->gcm_tag_len;
+
+	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * This is used in the AES encrypt operations when we're using them
+ * for MAC computations. In these cases encrypted data is discarded
+ * and we keep only the final data block (used as the MAC).
+ */
+int
+gmac_mode_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *))
+{
+	uint8_t *ghash;
+	int rv;
+
+	/* Unlike encrypt_final, this has no output but the tag. */
+	if (out->cd_length < ctx->gcm_tag_len)
+		return (CRYPTO_DATA_LEN_RANGE);
+
+	ghash = (uint8_t *)ctx->gcm_ghash;
+
+	if (ctx->gcm_remainder_len > 0) {
+		uint8_t *macp;
+
+		/*
+		 * Here is where we deal with data that is not a
+		 * multiple of the block size.
+		 *
+		 * Not encrypting, so no counter, gcm_cb[].
+		 */
+
+		macp = (uint8_t *)ctx->gcm_remainder;
+		bzero(macp + ctx->gcm_remainder_len,
+		    block_size - ctx->gcm_remainder_len);
+
+		ctx->gcm_len_a_len_c[0] +=
+		    CRYPTO_BYTES2BITS(ctx->gcm_remainder_len);
+		ctx->gcm_remainder_len = 0;
+		/* add AAD to the hash */
+		GHASH(ctx, macp, ghash);
+	}
+
+	/*
+	 * We've stored the total auth data in bits here, but before we
+	 * add it to the hash, we need to convert to network order.
+	 * GMAC keeps gcm_len_a_len_c[1] = 0.
+	 */
+	ctx->gcm_len_a_len_c[0] = htonll(ctx->gcm_len_a_len_c[0]);
+	GHASH(ctx, ctx->gcm_len_a_len_c, ghash);
+	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_J0,
+	    (uint8_t *)ctx->gcm_J0);
+	xor_block((uint8_t *)ctx->gcm_J0, ghash);
+
 	rv = crypto_put_output_data(ghash, out, ctx->gcm_tag_len);
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
@@ -365,7 +488,10 @@ gcm_decrypt_incomplete_block(gcm_ctx_t *ctx, size_t block_size, size_t index,
 	}
 }
 
-/* ARGSUSED */
+/*
+ * See notes above gcm_mode_encrypt_contiguous_blocks for GMAC
+ * cases (serving C_Verify here) -- same applies here.
+ */
 int
 gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
     crypto_data_t *out, size_t block_size,
@@ -375,6 +501,27 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 {
 	size_t new_len;
 	uint8_t *new;
+
+	if ((ctx->gcm_flags & GMAC_MODE) != 0 &&
+	    ctx->gcm_remainder_len != 0) {
+		/*
+		 * For GMAC we need to hash the AAD as we go because
+		 * we don't save the data for _final like GCM does.
+		 */
+		uint8_t *macp, *ghash;
+
+		macp = (uint8_t *)ctx->gcm_remainder;
+		ghash = (uint8_t *)ctx->gcm_ghash;
+
+		bzero(macp + ctx->gcm_remainder_len,
+		    block_size - ctx->gcm_remainder_len);
+
+		/* remainder AAD len in bits */
+		ctx->gcm_len_a_len_c[0] +=
+		    CRYPTO_BYTES2BITS(ctx->gcm_remainder_len);
+		/* add AAD to the hash */
+		GHASH(ctx, macp, ghash);
+	}
 
 	/*
 	 * Copy contiguous ciphertext input blocks to plaintext buffer.
@@ -425,6 +572,11 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	ghash = (uint8_t *)ctx->gcm_ghash;
 	blockp = ctx->gcm_pt_buf;
 	remainder = pt_len;
+
+	if ((ctx->gcm_flags & GMAC_MODE) != 0) {
+		ASSERT3U(remainder, ==, 0);
+	}
+
 	while (remainder > 0) {
 		/* Incomplete last block */
 		if (remainder < block_size) {
@@ -461,7 +613,13 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		blockp += block_size;
 		remainder -= block_size;
 	}
+
 out:
+	/*
+	 * We've stored the total auth data in bits here, but before we
+	 * add it to the hash, we need to change byte order.
+	 */
+	ctx->gcm_len_a_len_c[0] = htonll(ctx->gcm_len_a_len_c[0]);
 	ctx->gcm_len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(pt_len));
 	GHASH(ctx, ctx->gcm_len_a_len_c, ghash);
 	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_J0,
@@ -587,6 +745,18 @@ gcm_init(gcm_ctx_t *ctx, unsigned char *iv, size_t iv_len,
 	remainder = auth_data_len;
 	do {
 		if (remainder < block_size) {
+			if ((ctx->gcm_flags & GMAC_MODE) != 0) {
+				/*
+				 * GMAC does not encrypt or decrypt, and
+				 * therefore doesn't keep any out buffer,
+				 * so gcm_remainder holds any remainder
+				 * that GMAC needs to handle.
+				 */
+				bcopy(&(auth_data[processed]),
+				    ctx->gcm_remainder, remainder);
+				ctx->gcm_remainder_len = remainder;
+				break;
+			}
 			/*
 			 * There's not a block full of data, pad rest of
 			 * buffer with zero
@@ -605,6 +775,11 @@ gcm_init(gcm_ctx_t *ctx, unsigned char *iv, size_t iv_len,
 		GHASH(ctx, datap, ghash);
 
 	} while (remainder > 0);
+
+	if ((ctx->gcm_flags & GMAC_MODE) != 0) {
+		ctx->gcm_len_a_len_c[0] =
+		    CRYPTO_BYTES2BITS(auth_data_len - remainder);
+	}
 
 	return (CRYPTO_SUCCESS);
 }
@@ -630,8 +805,8 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
 		gcm_ctx->gcm_processed_data_len = 0;
 
 		/* these values are in bits */
-		gcm_ctx->gcm_len_a_len_c[0]
-		    = htonll(CRYPTO_BYTES2BITS(gcm_param->ulAADLen));
+		gcm_ctx->gcm_len_a_len_c[0] =
+		    CRYPTO_BYTES2BITS(gcm_param->ulAADLen);
 
 		rv = CRYPTO_SUCCESS;
 		gcm_ctx->gcm_flags |= GCM_MODE;
@@ -658,29 +833,27 @@ gmac_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
 	int rv;
 	CK_AES_GMAC_PARAMS *gmac_param;
 
-	if (param != NULL) {
-		gmac_param = (CK_AES_GMAC_PARAMS *)(void *)param;
+	if (param == NULL)
+		return (CRYPTO_MECHANISM_PARAM_INVALID);
 
-		gcm_ctx->gcm_tag_len = CRYPTO_BITS2BYTES(AES_GMAC_TAG_BITS);
-		gcm_ctx->gcm_processed_data_len = 0;
+	gmac_param = (CK_AES_GMAC_PARAMS *)(void *)param;
 
-		/* these values are in bits */
-		gcm_ctx->gcm_len_a_len_c[0]
-		    = htonll(CRYPTO_BYTES2BITS(gmac_param->ulAADLen));
+	gcm_ctx->gcm_tag_len = CRYPTO_BITS2BYTES(AES_GMAC_TAG_BITS);
+	gcm_ctx->gcm_processed_data_len = 0;
 
-		rv = CRYPTO_SUCCESS;
-		gcm_ctx->gcm_flags |= GMAC_MODE;
-	} else {
-		rv = CRYPTO_MECHANISM_PARAM_INVALID;
-		goto out;
-	}
+	/* these values are in bits */
+	gcm_ctx->gcm_len_a_len_c[0] = 0;
+	gcm_ctx->gcm_len_a_len_c[1] = 0;
+
+	rv = CRYPTO_SUCCESS;
+	gcm_ctx->gcm_flags |= GMAC_MODE;
 
 	if (gcm_init(gcm_ctx, gmac_param->pIv, AES_GMAC_IV_LEN,
 	    gmac_param->pAAD, gmac_param->ulAADLen, block_size,
 	    encrypt_block, copy_block, xor_block) != 0) {
 		rv = CRYPTO_MECHANISM_PARAM_INVALID;
 	}
-out:
+
 	return (rv);
 }
 
@@ -689,6 +862,7 @@ gcm_alloc_ctx(int kmflag)
 {
 	gcm_ctx_t *gcm_ctx;
 
+	/* Free in crypto_free_mode_ctx() */
 #ifdef _KERNEL
 	if ((gcm_ctx = kmem_zalloc(sizeof (gcm_ctx_t), kmflag)) == NULL)
 #else
@@ -705,6 +879,7 @@ gmac_alloc_ctx(int kmflag)
 {
 	gcm_ctx_t *gcm_ctx;
 
+	/* Free in crypto_free_mode_ctx() */
 #ifdef _KERNEL
 	if ((gcm_ctx = kmem_zalloc(sizeof (gcm_ctx_t), kmflag)) == NULL)
 #else

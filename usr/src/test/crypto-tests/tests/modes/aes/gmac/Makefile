@@ -13,11 +13,21 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2023 RackTop Systems, Inc.
+# Copyright 2023-2025 RackTop Systems, Inc.
 #
 
-.PARALLEL: $(SUBDIRS)
+ALGS	= aes_gmac aes_gmac_enc
 
-SUBDIRS = cbc cbc_pad ccm cmac ctr ecb gcm gmac
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
 
-include $(SRC)/test/Makefile.com
+.KEEP_STATE:
+
+all clean clobber install: $(ALGS)
+
+$(ALGS): FRC
+	$(MAKE) -e -f Makefile.gmac BASEPROG=$@ $(TARGET)
+
+FRC:

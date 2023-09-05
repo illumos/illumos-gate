@@ -24,6 +24,7 @@
  *
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef	_COMMON_CRYPTO_MODES_H
@@ -344,6 +345,10 @@ int ccm_encrypt_final(ccm_ctx_t *, crypto_data_t *, size_t,
 int gcm_encrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
+int gmac_mode_final(gcm_ctx_t *, crypto_data_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int ccm_decrypt_final(ccm_ctx_t *, crypto_data_t *, size_t,

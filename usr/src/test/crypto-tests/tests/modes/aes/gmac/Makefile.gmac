@@ -10,14 +10,16 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2023 RackTop Systems, Inc.
+# Copyright 2023-2025 RackTop Systems, Inc.
 #
 
-.PARALLEL: $(SUBDIRS)
+# Note: BASEPROG comes from the command line
 
-SUBDIRS = cbc cbc_pad ccm cmac ctr ecb gcm gmac
+# GMAC is currently only supported by KCF.
+CRYPTO		= kcf # pkcs
+CRYPTO_pkcs	= $(POUND_SIGN)
 
-include $(SRC)/test/Makefile.com
+TESTROOT	= $(ROOT)/opt/crypto-tests/tests/aes
+
+include $(SRC)/test/crypto-tests/tests/Makefile.crypto

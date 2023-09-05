@@ -532,6 +532,7 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
 	    CRYPTO_FG_MAC_DECRYPT_ATOMIC |
+	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC |
 	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
 	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
@@ -2671,7 +2672,8 @@ dprov_valid_sign_verif_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == ECDSA_SHA1_MECH_INFO_TYPE ||
 	    mech_type == ECDSA_MECH_INFO_TYPE ||
-	    mech_type == AES_CMAC_MECH_INFO_TYPE);
+	    mech_type == AES_CMAC_MECH_INFO_TYPE ||
+	    mech_type == AES_GMAC_MECH_INFO_TYPE);
 }
 
 static int

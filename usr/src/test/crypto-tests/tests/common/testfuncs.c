@@ -126,7 +126,7 @@ test_setup(cryptotest_t *args, test_fg_t *funcs, crypto_op_t **opp)
 			return (CRYPTO_FAILED);
 		break;
 	case CRYPTO_FG_MAC:
-		if (args->in == NULL || args->key == NULL)
+		if (args->key == NULL)
 			return (CRYPTO_FAILED);
 		break;
 	case CRYPTO_FG_DIGEST:

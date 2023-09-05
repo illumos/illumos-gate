@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -463,27 +464,7 @@ knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 static int
 compare_data(crypto_data_t *data, uchar_t *buf)
 {
-	int len;
-	uchar_t *dptr;
-
-	len = data->cd_length;
-	switch (data->cd_format) {
-	case CRYPTO_DATA_RAW:
-		dptr = (uchar_t *)(data->cd_raw.iov_base +
-		    data->cd_offset);
-
-		return (bcmp(dptr, buf, len));
-
-	case CRYPTO_DATA_UIO:
-		return (crypto_uio_data(data, buf, len,
-		    COMPARE_TO_DATA, NULL, NULL));
-
-	case CRYPTO_DATA_MBLK:
-		return (crypto_mblk_data(data, buf, len,
-		    COMPARE_TO_DATA, NULL, NULL));
-	}
-
-	return (CRYPTO_FAILED);
+	return (crypto_compare_data(data, buf, data->cd_length));
 }
 
 /* ARGSUSED */
