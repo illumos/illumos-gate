@@ -2035,9 +2035,9 @@ print_certcache(ike_certcache_t *c)
 
 	(void) printf(gettext("CERTIFICATE CACHE ID: %d\n"), c->cache_id);
 	(void) printf(gettext("\tSubject Name: <%s>\n"),
-	    (c->subject != NULL) ? c->subject : gettext("Name unavailable"));
+	    (*c->subject != '\0') ? c->subject : gettext("Name unavailable"));
 	(void) printf(gettext("\t Issuer Name: <%s>\n"),
-	    (c->issuer != NULL) ? c->issuer : gettext("Name unavailable"));
+	    (*c->issuer != '\0') ? c->issuer : gettext("Name unavailable"));
 	if ((int)c->certclass == -1)
 		(void) printf(gettext("\t\t[trusted certificate]\n"));
 	switch (c->linkage) {
