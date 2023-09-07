@@ -54,6 +54,7 @@
 #include <nfs/nfs.h>
 #include <nfs/nfssys.h>
 #include <netconfig.h>
+#include <sys/debug.h>
 #include "smfcfg.h"
 
 /* should really be in some global place */
@@ -80,6 +81,16 @@ static sa_protocol_properties_t nfs_get_proto_set();
 static char *nfs_get_status(void);
 static char *nfs_space_alias(char *);
 static uint64_t nfs_features(void);
+static int boolean_check(char *);
+
+/* validators for protocol properties */
+static int range_check_validator(uint_t, char *);
+static int range_check_validator_client(uint_t, char *);
+static int range_check_validator_server(uint_t, char *);
+static int onoff_validator(uint_t, char *);
+static int domain_validator(uint_t, char *);
+static int boolean_validator(uint_t, char *);
+static int protocol_validator(uint_t, char *);
 
 /*
  * ops vector that provides the protocol specific info and operations
@@ -181,7 +192,6 @@ struct option_defs optdefs[] = {
 #define	OPT_VOLFH	21
 	{SHOPT_VOLFH, OPT_VOLFH},
 #endif /* VOLATILE_FH_TEST */
-	NULL
 };
 
 /*
@@ -263,7 +273,7 @@ findopt(char *name)
 {
 	int i;
 	if (name != NULL) {
-		for (i = 0; optdefs[i].tag != NULL; i++) {
+		for (i = 0; i < ARRAY_SIZE(optdefs); i++) {
 			if (strcmp(optdefs[i].tag, name) == 0)
 				return (optdefs[i].index);
 		}
@@ -2191,15 +2201,7 @@ nfs_validate_property(sa_handle_t handle, sa_property_t property,
 				break;
 
 			case OPT_TYPE_BOOLEAN:
-				if (strlen(value) == 0 ||
-				    strcasecmp(value, "true") == 0 ||
-				    strcmp(value, "1") == 0 ||
-				    strcasecmp(value, "false") == 0 ||
-				    strcmp(value, "0") == 0) {
-					ret = SA_OK;
-				} else {
-					ret = SA_BAD_VALUE;
-				}
+				ret = boolean_check(value);
 				break;
 
 			case OPT_TYPE_USER:
@@ -2431,7 +2433,7 @@ nfs_validate_property(sa_handle_t handle, sa_property_t property,
 struct proto_option_defs {
 	char *tag;
 	char *name;	/* display name -- remove protocol identifier */
-	int index;
+	uint_t index;
 	int type;
 	union {
 	    int intval;
@@ -2440,98 +2442,488 @@ struct proto_option_defs {
 	uint32_t svcs;
 	int32_t minval;
 	int32_t maxval;
-	char *other;
-	int compare;
-#define	OPT_CMP_GE	0
-#define	OPT_CMP_LE	1
-	int (*check)(char *);
+	int (*validator)(uint_t, char *);
 } proto_options[] = {
 #define	PROTO_OPT_NFSD_SERVERS			0
-	{"nfsd_servers",
-	    "servers", PROTO_OPT_NFSD_SERVERS, OPT_TYPE_NUMBER, 1024, SVC_NFSD,
-	    1, INT32_MAX},
+	{
+		.tag = "nfsd_servers",
+		.name = "servers",
+		.index = PROTO_OPT_NFSD_SERVERS,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 1024,
+		.svcs = SVC_NFSD,
+		.minval = 1,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_LOCKD_LISTEN_BACKLOG		1
-	{"lockd_listen_backlog",
-	    "lockd_listen_backlog", PROTO_OPT_LOCKD_LISTEN_BACKLOG,
-	    OPT_TYPE_NUMBER, 32, SVC_LOCKD, 32, INT32_MAX},
+	{
+		.tag = "lockd_listen_backlog",
+		.name = "lockd_listen_backlog",
+		.index = PROTO_OPT_LOCKD_LISTEN_BACKLOG,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 32,
+		.svcs = SVC_LOCKD,
+		.minval = 32,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_LOCKD_SERVERS			2
-	{"lockd_servers",
-	    "lockd_servers", PROTO_OPT_LOCKD_SERVERS, OPT_TYPE_NUMBER, 256,
-	    SVC_LOCKD, 1, INT32_MAX},
+	{
+		.tag = "lockd_servers",
+		.name = "lockd_servers",
+		.index = PROTO_OPT_LOCKD_SERVERS,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 256,
+		.svcs = SVC_LOCKD,
+		.minval = 1,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_LOCKD_RETRANSMIT_TIMEOUT	3
-	{"lockd_retransmit_timeout",
-	    "lockd_retransmit_timeout", PROTO_OPT_LOCKD_RETRANSMIT_TIMEOUT,
-	    OPT_TYPE_NUMBER, 5, SVC_LOCKD, 0, INT32_MAX},
+	{
+		.tag = "lockd_retransmit_timeout",
+		.name = "lockd_retransmit_timeout",
+		.index = PROTO_OPT_LOCKD_RETRANSMIT_TIMEOUT,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 5,
+		.svcs = SVC_LOCKD,
+		.minval = 0,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_GRACE_PERIOD			4
-	{"grace_period",
-	    "grace_period", PROTO_OPT_GRACE_PERIOD, OPT_TYPE_NUMBER, 90,
-	    SVC_LOCKD, 0, INT32_MAX},
+	{
+		.tag = "grace_period",
+		.name = "grace_period",
+		.index = PROTO_OPT_GRACE_PERIOD,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 90,
+		.svcs = SVC_LOCKD,
+		.minval = 0,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_NFS_SERVER_VERSMIN		5
-	{"nfs_server_versmin",
-	    "server_versmin", PROTO_OPT_NFS_SERVER_VERSMIN, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMIN_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, "server_versmax", OPT_CMP_LE},
+	{
+		.tag = "nfs_server_versmin",
+		.name = "server_versmin",
+		.index = PROTO_OPT_NFS_SERVER_VERSMIN,
+		.type = OPT_TYPE_STRING,
+		.defvalue.string = "2",
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval =  NFS_VERSMIN,
+		.maxval = NFS_VERSMAX,
+		.validator = range_check_validator_server
+	},
 #define	PROTO_OPT_NFS_SERVER_VERSMAX		6
-	{"nfs_server_versmax",
-	    "server_versmax", PROTO_OPT_NFS_SERVER_VERSMAX, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMAX_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, "server_versmin", OPT_CMP_GE},
+	{
+		.tag = "nfs_server_versmax",
+		.name = "server_versmax",
+		.index = PROTO_OPT_NFS_SERVER_VERSMAX,
+		.type = OPT_TYPE_STRING,
+		.defvalue.string = "4",
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval = NFS_VERSMIN,
+		.maxval = NFS_VERSMAX,
+		.validator = range_check_validator_server
+	},
 #define	PROTO_OPT_NFS_CLIENT_VERSMIN		7
-	{"nfs_client_versmin",
-	    "client_versmin", PROTO_OPT_NFS_CLIENT_VERSMIN, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMIN_DEFAULT, SVC_CLIENT, NFS_VERSMIN, NFS_VERSMAX,
-	    "client_versmax", OPT_CMP_LE},
+	{
+		.tag = "nfs_client_versmin",
+		.name = "client_versmin",
+		.index = PROTO_OPT_NFS_CLIENT_VERSMIN,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = NFS_VERSMIN_DEFAULT,
+		.svcs = SVC_CLIENT,
+		.minval = NFS_VERSMIN,
+		.maxval = NFS_VERSMAX,
+		.validator = range_check_validator_client
+	},
 #define	PROTO_OPT_NFS_CLIENT_VERSMAX		8
-	{"nfs_client_versmax",
-	    "client_versmax", PROTO_OPT_NFS_CLIENT_VERSMAX, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMAX_DEFAULT, SVC_CLIENT, NFS_VERSMIN, NFS_VERSMAX,
-	    "client_versmin", OPT_CMP_GE},
+	{
+		.tag = "nfs_client_versmax",
+		.name = "client_versmax",
+		.index = PROTO_OPT_NFS_CLIENT_VERSMAX,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = NFS_VERSMAX_DEFAULT,
+		.svcs = SVC_CLIENT,
+		.minval = NFS_VERSMIN,
+		.maxval = NFS_VERSMAX,
+		.validator = range_check_validator_client
+	},
 #define	PROTO_OPT_NFS_SERVER_DELEGATION		9
-	{"nfs_server_delegation",
-	    "server_delegation", PROTO_OPT_NFS_SERVER_DELEGATION,
-	    OPT_TYPE_ONOFF, NFS_SERVER_DELEGATION_DEFAULT, SVC_NFSD, 0, 0},
+	{
+		.tag = "nfs_server_delegation",
+		.name = "server_delegation",
+		.index = PROTO_OPT_NFS_SERVER_DELEGATION,
+		.type = OPT_TYPE_ONOFF,
+		.defvalue.intval = NFS_SERVER_DELEGATION_DEFAULT,
+		.svcs = SVC_NFSD,
+		.validator = onoff_validator
+	},
 #define	PROTO_OPT_NFSMAPID_DOMAIN		10
-	{"nfsmapid_domain",
-	    "nfsmapid_domain", PROTO_OPT_NFSMAPID_DOMAIN, OPT_TYPE_DOMAIN,
-	    0, SVC_NFSMAPID, 0, 0},
+	{
+		.tag = "nfsmapid_domain",
+		.name = "nfsmapid_domain",
+		.index = PROTO_OPT_NFSMAPID_DOMAIN,
+		.type =  OPT_TYPE_DOMAIN,
+		.defvalue.string = NULL,
+		.svcs = SVC_NFSMAPID,
+		.validator = domain_validator
+	},
 #define	PROTO_OPT_NFSD_MAX_CONNECTIONS		11
-	{"nfsd_max_connections",
-	    "max_connections", PROTO_OPT_NFSD_MAX_CONNECTIONS,
-	    OPT_TYPE_NUMBER, -1, SVC_NFSD, -1, INT32_MAX},
+	{
+		.tag = "nfsd_max_connections",
+		.name = "max_connections",
+		.index = PROTO_OPT_NFSD_MAX_CONNECTIONS,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = -1,
+		.svcs = SVC_NFSD,
+		.minval = -1,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_NFSD_PROTOCOL			12
-	{"nfsd_protocol",
-	    "protocol", PROTO_OPT_NFSD_PROTOCOL, OPT_TYPE_PROTOCOL, 0,
-	    SVC_NFSD, 0, 0},
+	{
+		.tag = "nfsd_protocol",
+		.name = "protocol",
+		.index = PROTO_OPT_NFSD_PROTOCOL,
+		.type = OPT_TYPE_PROTOCOL,
+		.defvalue.intval = 0,
+		.svcs = SVC_NFSD,
+		.validator = protocol_validator
+	},
 #define	PROTO_OPT_NFSD_LISTEN_BACKLOG		13
-	{"nfsd_listen_backlog",
-	    "listen_backlog", PROTO_OPT_NFSD_LISTEN_BACKLOG,
-	    OPT_TYPE_NUMBER, 0, SVC_NFSD, 0, INT32_MAX},
+	{
+		.tag = "nfsd_listen_backlog",
+		.name = "listen_backlog",
+		.index = PROTO_OPT_NFSD_LISTEN_BACKLOG,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 0,
+		.svcs = SVC_NFSD,
+		.minval = 0,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_NFSD_DEVICE			14
-	{"nfsd_device",
-	    "device", PROTO_OPT_NFSD_DEVICE,
-	    OPT_TYPE_STRING, 0, SVC_NFSD, 0, 0},
+	{
+		.tag = "nfsd_device",
+		.name = "device",
+		.index = PROTO_OPT_NFSD_DEVICE,
+		.type = OPT_TYPE_STRING,
+		.defvalue.string = NULL,
+		.svcs = SVC_NFSD
+	},
 #define	PROTO_OPT_MOUNTD_LISTEN_BACKLOG		15
-	{"mountd_listen_backlog",
-	    "mountd_listen_backlog", PROTO_OPT_MOUNTD_LISTEN_BACKLOG,
-	    OPT_TYPE_NUMBER, 64, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+	{
+		.tag = "mountd_listen_backlog",
+		.name = "mountd_listen_backlog",
+		.index = PROTO_OPT_MOUNTD_LISTEN_BACKLOG,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 64,
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval = 1,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_MOUNTD_MAX_THREADS		16
-	{"mountd_max_threads",
-	    "mountd_max_threads", PROTO_OPT_MOUNTD_MAX_THREADS,
-	    OPT_TYPE_NUMBER, 16, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+	{
+		.tag = "mountd_max_threads",
+		.name = "mountd_max_threads",
+		.index = PROTO_OPT_MOUNTD_MAX_THREADS,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 16,
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval = 1,
+		.maxval = INT32_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_MOUNTD_PORT			17
-	{"mountd_port",
-	    "mountd_port", PROTO_OPT_MOUNTD_PORT,
-	    OPT_TYPE_NUMBER, 0, SVC_NFSD|SVC_MOUNTD, 1, UINT16_MAX},
+	{
+		.tag = "mountd_port",
+		.name = "mountd_port",
+		.index = PROTO_OPT_MOUNTD_PORT,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 0,
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval = 1,
+		.maxval = UINT16_MAX,
+		.validator = range_check_validator
+	},
 #define	PROTO_OPT_MOUNTD_REMOTE_DUMP		18
-	{"mountd_remote_dump",
-	    "mountd_remote_dump", PROTO_OPT_MOUNTD_REMOTE_DUMP,
-	    OPT_TYPE_BOOLEAN, B_FALSE, SVC_NFSD|SVC_MOUNTD, B_FALSE, B_TRUE},
+	{
+		.tag = "mountd_remote_dump",
+		.name = "mountd_remote_dump",
+		.index = PROTO_OPT_MOUNTD_REMOTE_DUMP,
+		.type = OPT_TYPE_BOOLEAN,
+		.defvalue.intval = B_FALSE,
+		.svcs = SVC_NFSD | SVC_MOUNTD,
+		.minval = B_FALSE,
+		.maxval = B_TRUE,
+		.validator = boolean_validator
+	},
 #define	PROTO_OPT_STATD_PORT			19
-	{"statd_port",
-	    "statd_port", PROTO_OPT_STATD_PORT,
-	    OPT_TYPE_NUMBER, 0, SVC_STATD, 1, UINT16_MAX},
-	{NULL}
+	{
+		.tag = "statd_port",
+		.name = "statd_port",
+		.index = PROTO_OPT_STATD_PORT,
+		.type = OPT_TYPE_NUMBER,
+		.defvalue.intval = 0,
+		.svcs = SVC_STATD,
+		.minval = 1,
+		.maxval = UINT16_MAX,
+		.validator = range_check_validator
+	}
 };
+
+/*
+ * Check the range of value as int range.
+ */
+static int
+range_check_validator_value(uint_t index, int type, char *value, int *intval)
+{
+	int val;
+	const char *errstr;
+
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	if (!is_a_number(value))
+		return (SA_BAD_VALUE);
+
+	val = strtonumx(value, proto_options[index].minval,
+	    proto_options[index].maxval, &errstr, 0);
+	if (errstr != NULL) {
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "bad option value: %s: %s\n"), proto_options[index].name,
+		    errstr);
+		return (SA_BAD_VALUE);
+	}
+
+	if (intval != NULL)
+		*intval = val;
+	return (SA_OK);
+}
+
+static int
+range_check_validator(uint_t index, char *value)
+{
+	return (range_check_validator_value(index, OPT_TYPE_NUMBER,
+	    value, NULL));
+}
+
+/*
+ * Return integer value of versmin or versmax property.
+ * This will need update, once we add support for minor versions.
+ */
+static int
+nfs_get_vers_minmax(uint_t index)
+{
+	char *pvalue;
+	sa_property_t prop;
+	sa_optionset_t opts;
+	int rval;
+	const char *errstr;
+
+	opts = nfs_get_proto_set();
+	prop = sa_get_property(opts, proto_options[index].name);
+
+	/* in case of failure, return default */
+	if (prop == NULL) {
+		rval = proto_options[index].defvalue.intval;
+	} else {
+		pvalue = sa_get_property_attr(prop, "value");
+		rval = strtonumx(pvalue,
+		    proto_options[index].minval,
+		    proto_options[index].maxval,
+		    &errstr, 0);
+		sa_free_attr_string(pvalue);
+		if (errstr != NULL)
+			rval = proto_options[index].defvalue.intval;
+	}
+	return (rval);
+}
+
+/*
+ * Verify that the value for the property specified by index is valid
+ * relative to the opposite value in the case of a min/max variable.
+ */
+static int
+range_check_validator_client(uint_t index, char *value)
+{
+	int ret, val;
+
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	ret = range_check_validator_value(index, OPT_TYPE_NUMBER, value, &val);
+	if (ret != SA_OK)
+		return (ret);
+
+	switch (index) {
+	case PROTO_OPT_NFS_CLIENT_VERSMIN:
+		/* versmin must be <= versmax */
+		if (val > nfs_get_vers_minmax(PROTO_OPT_NFS_CLIENT_VERSMAX))
+			ret = SA_VALUE_CONFLICT;
+		break;
+
+	case PROTO_OPT_NFS_CLIENT_VERSMAX:
+		/* versmax must be >= versmin */
+		if (val < nfs_get_vers_minmax(PROTO_OPT_NFS_CLIENT_VERSMIN))
+			ret = SA_VALUE_CONFLICT;
+		break;
+
+	default:
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "Unexpected nfs protocol validator index: %u\n"), index);
+		ret = SA_BAD_VALUE;
+		break;
+	}
+
+	return (ret);
+}
+
+/*
+ * Verify that the value for the property specified by index is valid
+ * relative to the opposite value in the case of a min/max variable.
+ */
+static int
+range_check_validator_server(uint_t index, char *value)
+{
+	int ret, val;
+
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	ret = range_check_validator_value(index, OPT_TYPE_STRING, value, &val);
+	if (ret != SA_OK)
+		return (ret);
+
+	switch (index) {
+	case PROTO_OPT_NFS_SERVER_VERSMIN:
+		/* versmin must be <= versmax */
+		if (val > nfs_get_vers_minmax(PROTO_OPT_NFS_SERVER_VERSMAX))
+			ret = SA_VALUE_CONFLICT;
+		break;
+
+	case PROTO_OPT_NFS_SERVER_VERSMAX:
+		/* versmax must be >= versmin */
+		if (val < nfs_get_vers_minmax(PROTO_OPT_NFS_SERVER_VERSMIN))
+			ret = SA_VALUE_CONFLICT;
+		break;
+
+	default:
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "Unexpected nfs protocol validator index: %u\n"), index);
+		ret = SA_BAD_VALUE;
+		break;
+	}
+
+	return (ret);
+}
+
+static int
+onoff_validator(uint_t index, char *value)
+{
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	if (strcasecmp(value, "on") != 0 &&
+	    strcasecmp(value, "off") != 0) {
+		return (SA_BAD_VALUE);
+	}
+	return (SA_OK);
+}
+
+static int
+domain_validator(uint_t index, char *value)
+{
+	char *cp;
+
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	/*
+	 * needs to be a qualified domain so will have at
+	 * least one period and other characters on either
+	 * side of it.  A zero length string is also allowed
+	 * and is the way to turn off the override.
+	 */
+	if (strlen(value) == 0)
+		return (SA_OK);
+
+	cp = strchr(value, '.');
+	if (cp == NULL || cp == value || strchr(value, '@') != NULL)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+static int
+boolean_check(char *value)
+{
+	if (strlen(value) == 0 ||
+	    strcasecmp(value, "true") == 0 ||
+	    strcasecmp(value, "1") == 0 ||
+	    strcasecmp(value, "false") == 0 ||
+	    strcasecmp(value, "0") == 0)
+		return (SA_OK);
+
+	return (SA_BAD_VALUE);
+}
+
+static int
+boolean_validator(uint_t index, char *value)
+{
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	return (boolean_check(value));
+}
+
+static int
+protocol_validator(uint_t index, char *value)
+{
+	struct netconfig *nconf;
+	void *nc;
+	boolean_t pfound = B_FALSE;
+
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	if (strcasecmp(value, "all") == 0)
+		return (SA_OK);
+
+	nc = setnetconfig();
+	if (nc == NULL) {
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "setnetconfig failed: %s\n"), strerror(errno));
+	} else {
+		while ((nconf = getnetconfig(nc)) != NULL) {
+			if (strcmp(nconf->nc_proto, value) == 0) {
+				pfound = B_TRUE;
+				break;
+			}
+		}
+		(void) endnetconfig(nc);
+	}
+
+	if (!pfound)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
 
 /*
  * the protoset holds the defined options so we don't have to read
@@ -2540,17 +2932,12 @@ struct proto_option_defs {
 static sa_protocol_properties_t protoset;
 
 static int
-findprotoopt(char *name, int whichname)
+findprotoopt(char *name)
 {
 	int i;
-	for (i = 0; proto_options[i].tag != NULL; i++) {
-		if (whichname == 1) {
-			if (strcasecmp(proto_options[i].name, name) == 0)
-				return (i);
-		} else {
-			if (strcasecmp(proto_options[i].tag, name) == 0)
-				return (i);
-		}
+	for (i = 0; i < ARRAY_SIZE(proto_options); i++) {
+		if (strcasecmp(proto_options[i].name, name) == 0)
+			return (i);
 	}
 	return (-1);
 }
@@ -2604,7 +2991,7 @@ extractprop(char *name, char *value)
 	 */
 	name = skipwhitespace(name);
 
-	index = findprotoopt(name, 1);
+	index = findprotoopt(name);
 	if (index >= 0) {
 		fixcaselower(name);
 		prop = sa_create_property(proto_options[index].name, value);
@@ -2690,7 +3077,7 @@ initprotofromsmf(void)
 
 	protoset = sa_create_protocol_properties("nfs");
 	if (protoset != NULL) {
-		for (i = 0; proto_options[i].tag != NULL; i++) {
+		for (i = 0; i < ARRAY_SIZE(proto_options); i++) {
 			scf_type_t ptype;
 			char *svc_name;
 
@@ -2728,7 +3115,7 @@ add_defaults(void)
 	int i;
 	char number[MAXDIGITS];
 
-	for (i = 0; proto_options[i].tag != NULL; i++) {
+	for (i = 0; i < ARRAY_SIZE(proto_options); i++) {
 		sa_property_t prop;
 		prop = sa_get_protocol_property(protoset,
 		    proto_options[i].name);
@@ -2754,6 +3141,15 @@ add_defaults(void)
 				    "on" : "off");
 				break;
 
+			case OPT_TYPE_STRING:
+				if (proto_options[i].defvalue.string != NULL) {
+					prop = sa_create_property(
+					    proto_options[i].name,
+					    proto_options[i].defvalue.string);
+					break;
+				}
+
+				/* FALLTHROUGH */
 			default:
 				/* treat as strings of zero length */
 				prop = sa_create_property(proto_options[i].name,
@@ -2942,162 +3338,6 @@ restart_service(uint32_t svcs)
 }
 
 /*
- * nfs_minmax_check(name, value)
- *
- * Verify that the value for the property specified by index is valid
- * relative to the opposite value in the case of a min/max variable.
- * Currently, server_minvers/server_maxvers and
- * client_minvers/client_maxvers are the only ones to check.
- */
-
-static int
-nfs_minmax_check(int index, int value)
-{
-	int val;
-	char *pval;
-	sa_property_t prop;
-	sa_optionset_t opts;
-	int ret = B_TRUE;
-
-	if (proto_options[index].other != NULL) {
-		/* have a property to compare against */
-		opts = nfs_get_proto_set();
-		prop = sa_get_property(opts, proto_options[index].other);
-		/*
-		 * If we don't find the property, assume default
-		 * values which will work since the max will be at the
-		 * max and the min at the min.
-		 */
-		if (prop != NULL) {
-			pval = sa_get_property_attr(prop, "value");
-			if (pval != NULL) {
-				val = strtoul(pval, NULL, 0);
-				if (proto_options[index].compare ==
-				    OPT_CMP_LE) {
-					ret = value <= val ? B_TRUE : B_FALSE;
-				} else if (proto_options[index].compare ==
-				    OPT_CMP_GE) {
-					ret = value >= val ? B_TRUE : B_FALSE;
-				}
-				sa_free_attr_string(pval);
-			}
-		}
-	}
-	return (ret);
-}
-
-/*
- * nfs_validate_proto_prop(index, name, value)
- *
- * Verify that the property specified by name can take the new
- * value. This is a sanity check to prevent bad values getting into
- * the default files. All values need to be checked against what is
- * allowed by their defined type. If a type isn't explicitly defined
- * here, it is treated as a string.
- *
- * Note that OPT_TYPE_NUMBER will additionally check that the value is
- * within the range specified and potentially against another property
- * value as well as specified in the proto_options members other and
- * compare.
- */
-
-static int
-nfs_validate_proto_prop(int index, char *name, char *value)
-{
-	int ret = SA_OK;
-	char *cp;
-#ifdef lint
-	name = name;
-#endif
-	switch (proto_options[index].type) {
-	case OPT_TYPE_NUMBER:
-		if (!is_a_number(value))
-			ret = SA_BAD_VALUE;
-		else {
-			int val;
-			val = strtoul(value, NULL, 0);
-			if (val < proto_options[index].minval ||
-			    val > proto_options[index].maxval)
-				ret = SA_BAD_VALUE;
-			/*
-			 * For server_versmin/server_versmax and
-			 * client_versmin/client_versmax, the value of the
-			 * min(max) should be checked to be correct relative
-			 * to the current max(min).
-			 */
-			if (!nfs_minmax_check(index, val)) {
-				ret = SA_BAD_VALUE;
-			}
-		}
-		break;
-
-	case OPT_TYPE_DOMAIN:
-		/*
-		 * needs to be a qualified domain so will have at
-		 * least one period and other characters on either
-		 * side of it.  A zero length string is also allowed
-		 * and is the way to turn off the override.
-		 */
-		if (strlen(value) == 0)
-			break;
-		cp = strchr(value, '.');
-		if (cp == NULL || cp == value || strchr(value, '@') != NULL)
-			ret = SA_BAD_VALUE;
-		break;
-
-	case OPT_TYPE_BOOLEAN:
-		if (strlen(value) == 0 ||
-		    strcasecmp(value, "true") == 0 ||
-		    strcmp(value, "1") == 0 ||
-		    strcasecmp(value, "false") == 0 ||
-		    strcmp(value, "0") == 0) {
-			ret = SA_OK;
-		} else {
-			ret = SA_BAD_VALUE;
-		}
-		break;
-
-	case OPT_TYPE_ONOFF:
-		if (strcasecmp(value, "on") != 0 &&
-		    strcasecmp(value, "off") != 0) {
-			ret = SA_BAD_VALUE;
-		}
-		break;
-
-	case OPT_TYPE_PROTOCOL: {
-		struct netconfig *nconf;
-		void *nc;
-		boolean_t pfound = B_FALSE;
-
-		if (strcasecmp(value, "all") == 0)
-			break;
-
-		if ((nc = setnetconfig()) == NULL) {
-			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
-			    "setnetconfig failed: %s\n"), strerror(errno));
-		} else {
-			while ((nconf = getnetconfig(nc)) != NULL) {
-				if (strcmp(nconf->nc_proto, value) == 0) {
-					pfound = B_TRUE;
-					break;
-				}
-			}
-			(void) endnetconfig(nc);
-		}
-
-		if (!pfound)
-			ret = SA_BAD_VALUE;
-		break;
-	}
-
-	default:
-		/* treat as a string */
-		break;
-	}
-	return (ret);
-}
-
-/*
  * nfs_set_proto_prop(prop)
  *
  * check that prop is valid.
@@ -3109,38 +3349,50 @@ nfs_set_proto_prop(sa_property_t prop)
 	int ret = SA_OK;
 	char *name;
 	char *value;
+	struct proto_option_defs *opt;
 
 	name = sa_get_property_attr(prop, "type");
 	value = sa_get_property_attr(prop, "value");
-	if (name != NULL && value != NULL) {
+	if (name == NULL || value == NULL) {
+		ret = SA_NO_SUCH_PROP;
+		goto out;
+	}
+
+	int index = findprotoopt(name);
+	if (index < 0) {
+		ret = SA_NO_SUCH_PROP;
+		goto out;
+	}
+	opt = &proto_options[index];
+
+	if (opt->validator != NULL)
+		ret = opt->validator(index, value);
+
+	if (ret == SA_OK) {
 		scf_type_t sctype;
 		char *svc_name;
 		char *instance = NULL;
-		int index = findprotoopt(name, 1);
 
-		ret = nfs_validate_proto_prop(index, name, value);
+		sctype = getscftype(opt->type);
+		svc_name = getsvcname(opt->svcs);
+		if (sctype == SCF_TYPE_BOOLEAN) {
+			if (value != NULL)
+				sa_free_attr_string(value);
+			if (string_to_boolean(value) == 0)
+				value = strdup("0");
+			else
+				value = strdup("1");
+		}
+		ret = nfs_smf_set_prop(name, value, instance, sctype, svc_name);
 		if (ret == SA_OK) {
-			sctype = getscftype(proto_options[index].type);
-			svc_name = getsvcname(proto_options[index].svcs);
-			if (sctype == SCF_TYPE_BOOLEAN) {
-				if (value != NULL)
-					sa_free_attr_string(value);
-				if (string_to_boolean(value) == 0)
-					value = strdup("0");
-				else
-					value = strdup("1");
-			}
-			ret = nfs_smf_set_prop(name, value, instance, sctype,
-			    svc_name);
-			if (ret == SA_OK) {
-				restart_service(proto_options[index].svcs);
-			} else {
-				(void) printf(dgettext(TEXT_DOMAIN,
-				    "Cannot restart NFS services : %s\n"),
-				    sa_errorstr(ret));
-			}
+			restart_service(opt->svcs);
+		} else {
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "Cannot restart NFS services : %s\n"),
+			    sa_errorstr(ret));
 		}
 	}
+out:
 	if (name != NULL)
 		sa_free_attr_string(name);
 	if (value != NULL)
