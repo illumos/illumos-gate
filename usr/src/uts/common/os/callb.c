@@ -44,14 +44,12 @@
 #include <sys/ddi.h>	/* for delay() */
 #include <sys/taskq.h>  /* For TASKQ_NAMELEN */
 
-#define	CB_MAXNAME	TASKQ_NAMELEN
-
 /*
  * The callb mechanism provides generic event scheduling/echoing.
  * A callb function is registered and called on behalf of the event.
  */
 typedef struct callb {
-	struct callb	*c_next; 	/* next in class or on freelist */
+	struct callb	*c_next;	/* next in class or on freelist */
 	kthread_id_t	c_thread;	/* ptr to caller's thread struct */
 	char		c_flag;		/* info about the callb state */
 	uchar_t		c_class;	/* this callb's class */
@@ -77,10 +75,10 @@ typedef struct callb {
  */
 typedef struct callb_table {
 	kmutex_t ct_lock;		/* protect all callb states */
-	callb_t	*ct_freelist; 		/* free callb structures */
+	callb_t	*ct_freelist;		/* free callb structures */
 	int	ct_busy;		/* != 0 prevents additions */
 	kcondvar_t ct_busy_cv;		/* to wait for not busy    */
-	int	ct_ncallb; 		/* num of callbs allocated */
+	int	ct_ncallb;		/* num of callbs allocated */
 	callb_t	*ct_first_cb[NCBCLASS];	/* ptr to 1st callb in a class */
 } callb_table_t;
 

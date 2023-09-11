@@ -33,6 +33,7 @@
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 /*
@@ -1078,12 +1079,15 @@ static void
 spa_thread(void *arg)
 {
 	callb_cpr_t cprinfo;
-
 	spa_t *spa = arg;
+	char spa_id_readable[CB_MAXNAME + 1];
 	user_t *pu = PTOU(curproc);
 
+	(void) snprintf(spa_id_readable, sizeof (spa_id_readable), "SPA:0x%p",
+	    spa);
+
 	CALLB_CPR_INIT(&cprinfo, &spa->spa_proc_lock, callb_generic_cpr,
-	    spa->spa_name);
+	    spa_id_readable);
 
 	ASSERT(curproc != &p0);
 	(void) snprintf(pu->u_psargs, sizeof (pu->u_psargs),
