@@ -1256,6 +1256,7 @@ file path=usr/share/man/man3c/strtol.3c
 link path=usr/share/man/man3c/strtold.3c target=strtod.3c
 link path=usr/share/man/man3c/strtoll.3c target=strtol.3c
 file path=usr/share/man/man3c/strtonum.3c
+link path=usr/share/man/man3c/strtonumx.3c target=strtonum.3c
 file path=usr/share/man/man3c/strtoul.3c
 link path=usr/share/man/man3c/strtoull.3c target=strtoul.3c
 link path=usr/share/man/man3c/strtoumax.3c target=strtoimax.3c
