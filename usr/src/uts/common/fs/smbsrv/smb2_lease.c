@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -52,12 +52,23 @@ smb2_lease_fini()
 	}
 }
 
-static void
+/*
+ * Take a ref on the lease if it's not being destroyed.
+ * Returns false when the lease is being destroyed.
+ * Otherwise, returns true.
+ */
+static boolean_t
 smb2_lease_hold(smb_lease_t *ls)
 {
+	boolean_t ret;
+
 	mutex_enter(&ls->ls_mutex);
-	ls->ls_refcnt++;
+	ret = !ls->ls_destroying;
+	if (ret)
+		ls->ls_refcnt++;
 	mutex_exit(&ls->ls_mutex);
+
+	return (ret);
 }
 
 static void
@@ -76,10 +87,11 @@ smb2_lease_rele(smb_lease_t *ls)
 
 	mutex_enter(&ls->ls_mutex);
 	ls->ls_refcnt--;
-	if (ls->ls_refcnt != 0) {
+	if (ls->ls_refcnt != 0 || ls->ls_destroying) {
 		mutex_exit(&ls->ls_mutex);
 		return;
 	}
+	ls->ls_destroying = B_TRUE;
 	mutex_exit(&ls->ls_mutex);
 
 	/*
@@ -93,6 +105,8 @@ smb2_lease_rele(smb_lease_t *ls)
 	if (ls->ls_refcnt == 0) {
 		smb_llist_remove(bucket, ls);
 		destroy = B_TRUE;
+	} else {
+		ls->ls_destroying = B_FALSE;
 	}
 	mutex_exit(&ls->ls_mutex);
 
@@ -176,36 +190,36 @@ smb2_lease_create(smb_request_t *sr, uint8_t *clnt)
 		 */
 		if (bcmp(lease->ls_key, key, UUID_LEN) == 0 &&
 		    bcmp(lease->ls_clnt, clnt, UUID_LEN) == 0 &&
-		    (lease->ls_node->flags & NODE_FLAGS_DELETING) == 0)
+		    (lease->ls_node->flags & NODE_FLAGS_DELETING) == 0 &&
+		    smb2_lease_hold(lease))
 			break;
 	}
-	if (lease != NULL) {
-		/*
-		 * Found existing lease.  Make sure it refers to
-		 * the same node...
-		 */
-		if (lease->ls_node == of->f_node) {
-			smb2_lease_hold(lease);
-		} else {
-			/* Same lease ID, different node! */
-#ifdef DEBUG
-			cmn_err(CE_NOTE, "new lease on node %p (%s) "
-			    "conflicts with existing node %p (%s)",
-			    (void *) of->f_node,
-			    of->f_node->od_name,
-			    (void *) lease->ls_node,
-			    lease->ls_node->od_name);
-#endif
-			DTRACE_PROBE2(dup_lease, smb_request_t *, sr,
-			    smb_lease_t *, lease);
-			lease = NULL; /* error */
-		}
-	} else {
+
+	if (lease == NULL) {
 		lease = newlease;
 		smb_llist_insert_head(bucket, lease);
 		newlease = NULL; /* don't free */
 	}
 	smb_llist_exit(bucket);
+
+	/*
+	 * If we found an existing lease, make sure it refers to the same node.
+	 */
+	if (lease->ls_node != of->f_node) {
+		/* Same lease ID, different node! */
+#ifdef DEBUG
+		cmn_err(CE_NOTE, "new lease on node %p (%s) "
+		    "conflicts with existing node %p (%s)",
+		    (void *) of->f_node,
+		    of->f_node->od_name,
+		    (void *) lease->ls_node,
+		    lease->ls_node->od_name);
+#endif
+		DTRACE_PROBE2(dup_lease, smb_request_t *, sr,
+		    smb_lease_t *, lease);
+		smb2_lease_rele(lease);
+		lease = NULL; /* error */
+	}
 
 	if (newlease != NULL) {
 		lease_destroy(newlease);
@@ -241,10 +255,9 @@ lease_lookup(smb_request_t *sr, uint8_t *lease_key)
 	lease = smb_llist_head(bucket);
 	while (lease != NULL) {
 		if (bcmp(lease->ls_key, lease_key, UUID_LEN) == 0 &&
-		    bcmp(lease->ls_clnt, clnt_uuid, UUID_LEN) == 0) {
-			smb2_lease_hold(lease);
+		    bcmp(lease->ls_clnt, clnt_uuid, UUID_LEN) == 0 &&
+		    smb2_lease_hold(lease))
 			break;
-		}
 		lease = smb_llist_next(bucket, lease);
 	}
 	smb_llist_exit(bucket);

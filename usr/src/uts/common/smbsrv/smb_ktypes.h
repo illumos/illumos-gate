@@ -640,6 +640,7 @@ typedef struct smb_lease {
 	uint16_t		ls_epoch;
 	uint16_t		ls_version;
 	boolean_t		ls_breaking;
+	boolean_t		ls_destroying;
 	kcondvar_t		ls_ack_cv;	/* Wait for ACK */
 	uint8_t			ls_key[SMB_LEASE_KEY_SZ];
 	uint8_t			ls_clnt[SMB_LEASE_KEY_SZ];
