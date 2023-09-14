@@ -19,57 +19,53 @@
 # CDDL HEADER END
 #
 #
+
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-MANIFEST  = group.xml
-
-PROG= sharemgr
-
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
-#
-# To build sharemgr as both 32- and 64-bit objects, using isaexec, set
-# SHAREMGR64= in your build environment.
-#
-SHAREMGR64= $(POUND_SIGN)
+MANIFEST=	group.xml
+PROG=		sharemgr
 
-#
-# One for each ISA.
-#
-SUBDIRS =	$(MACH)
-$(SHAREMGR64)$(BUILD64)SUBDIRS += $(MACH64)
-
-LINKS= share unshare
-ROOTLINKS= $(LINKS:%=$(ROOTUSRSBIN)/%)
-ROOTLINKS32= $(LINKS:%=$(ROOTUSRSBIN32)/%)
-ROOTLINKS64= $(LINKS:%=$(ROOTUSRSBIN64)/%)
-$(SHAREMGR64)ROOTLINKS += $(ROOTLINKS32) $(ROOTLINKS64)
-
+LINKS=		share unshare
+ROOTLINKS=	$(LINKS:%=$(ROOTUSRSBIN)/%)
+$(ROOTLINKS)	:= INSLINKTARGET = $(ROOTUSRSBINPROG)
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORKSHARES)
-$(ROOTMANIFEST)		:= FILEMODE= 444
+$(ROOTMANIFEST)	:= FILEMODE= 444
 
-all	:=	TARGET= all
-install	:=	TARGET= install
-clean	:=	TARGET= clean
-clobber	:=	TARGET= clobber
-_msg	:=	TARGET= _msg
-lint	:=	TARGET= lint
+OBJS	= sharemgr_main.o commands.o shareutil.o
+
+CPPFLAGS += -I../../../lib/libfsmgt/common
+CPPFLAGS += -I$(ADJUNCT_PROTO)/usr/include/libxml2
+LDLIBS += -lshare -lscf -lsecdb -lumem -lxml2
+NATIVE_LIBS += libxml2.so
+
+POFILES = $(OBJS:.o=.po)
+POFILE  = sharemgr.po
 
 .KEEP_STATE:
 
-all clean clobber lint _msg:	$(SUBDIRS)
+all: $(PROG)
 
-install: $(SUBDIRS) $(ROOTMANIFEST) .WAIT $(ROOTLINKS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(ROOTLINKS): FRC
-	-$(RM) $@
-	-$(LN) $(@D)/$(PROG) $@
+$(ROOTLINKS): $(ROOTUSRSBINPROG)
+	$(INS.link)
+
+install: all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTLINKS)
 
 check:	$(CHKMANIFEST)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+clean:
+	$(RM) $(OBJS)
 
-FRC:
+include ../../Makefile.targ
+
+$(POFILE):      $(POFILES)
+	$(RM) $@; cat $(POFILES) > $@

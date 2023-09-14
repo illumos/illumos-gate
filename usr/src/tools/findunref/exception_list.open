@@ -150,13 +150,6 @@
 ./usr/src/cmd/sgs/rtld/common/mapfile-order-gcc
 
 #
-# The sharemgr command is built 32-bit only by default, but support
-# for building 64-bit is latent in the Makefiles.
-#
-./usr/src/cmd/dfs.cmds/sharemgr/amd64/Makefile
-./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
-
-#
 # Legitimately unreferenced license/copying files.  Please include
 # explanatory comments when adding items here.
 #

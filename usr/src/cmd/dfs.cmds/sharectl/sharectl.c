@@ -197,6 +197,7 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 
 				/* get and display the property and value */
 				name = sa_get_property_attr(prop, "type");
+				value = NULL;
 				if (name != NULL) {
 					value = sa_get_property_attr(prop,
 					    "value");

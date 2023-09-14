@@ -27,7 +27,6 @@
 PROG	  = findunref
 MAN1ONBLDFILES = findunref.1onbld
 CFLAGS += $(CCVERBOSE)
-LINTFLAGS += -ux
 
 include ../Makefile.tools
 
@@ -43,8 +42,6 @@ CLOBBERFILES += exception_list
 all:    $(PROG) exception_list
 
 install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
-
-lint:	lint_PROG
 
 exception_list: $(EXCEPTION_LISTS)
 	-$(RM) $@
