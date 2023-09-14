@@ -433,7 +433,7 @@ uint32_def:
 			(void) nvpair_value_uint32_array(pv_nvp, &val, &nelem);
 			(void) printf(" [ ");
 			for (i = 0; i < nelem; i++)
-				(void) printf("%u ", val[i]);
+				(void) printf("0x%x ", val[i]);
 			(void) printf("]");
 			break;
 		}
@@ -453,7 +453,7 @@ uint32_def:
 			(void) nvpair_value_uint64_array(pv_nvp, &val, &nelem);
 			(void) printf(" [ ");
 			for (i = 0; i < nelem; i++)
-				(void) printf("%llu ", val[i]);
+				(void) printf("0x%llx ", val[i]);
 			(void) printf("]");
 			break;
 		}
