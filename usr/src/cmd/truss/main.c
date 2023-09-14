@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1217,7 +1217,7 @@ worker_thread(void *arg)
 					}
 				}
 			}
-			if (what == SYS_execve && pri->Errno == 0) {
+			if (what == SYS_execve && Lsp->pr_errno == 0) {
 				/*
 				 * Refresh the data model on exec() in case it
 				 * is different from the parent.  Lwait()

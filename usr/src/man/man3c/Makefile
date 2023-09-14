@@ -1302,6 +1302,7 @@ MANLINKS=	FD_CLR.3c				\
 		strtok_r.3c				\
 		strtold.3c				\
 		strtoll.3c				\
+		strtonumx.3c				\
 		strtoull.3c				\
 		strtoumax.3c				\
 		strxfrm_l.3c				\
@@ -2443,6 +2444,8 @@ atoll.3c				:= LINKSRC = strtol.3c
 lltostr.3c				:= LINKSRC = strtol.3c
 strtoll.3c				:= LINKSRC = strtol.3c
 ulltostr.3c				:= LINKSRC = strtol.3c
+
+strtonumx.3c				:= LINKSRC = strtonum.3c
 
 strtoull.3c				:= LINKSRC = strtoul.3c
 
