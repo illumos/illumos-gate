@@ -446,14 +446,16 @@ get_special_prop(lua_State *state, dsl_dataset_t *ds, const char *dsname,
 		break;
 	}
 	case ZFS_PROP_VOLSIZE:
-		ASSERT(ds_type == ZFS_TYPE_VOLUME);
+		ASSERT(ds_type == ZFS_TYPE_VOLUME ||
+		    ds_type == ZFS_TYPE_SNAPSHOT);
 		error = dmu_objset_from_ds(ds, &os);
 		if (error == 0) {
 			error = zap_lookup(os, ZVOL_ZAP_OBJ, "size",
 			    sizeof (numval), 1, &numval);
 		}
 		if (error == 0)
-			(void) strcpy(setpoint, dsname);
+			(void) strlcpy(setpoint, dsname,
+			    ZFS_MAX_DATASET_NAME_LEN);
 
 		break;
 	case ZFS_PROP_VOLBLOCKSIZE: {
