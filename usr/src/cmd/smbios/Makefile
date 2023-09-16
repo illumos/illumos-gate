@@ -24,7 +24,7 @@
 #
 
 PROG = smbios
-OBJS = smbios.o
+OBJS = smbios.o bitext.o
 SRCS = $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
@@ -42,6 +42,10 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
+
+%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 clean:
 	$(RM) $(OBJS)

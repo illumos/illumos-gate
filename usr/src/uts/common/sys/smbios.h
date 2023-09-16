@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -556,6 +556,14 @@ typedef struct smbios_processor {
 #define	SMB_PRU_LGA2422		0x46	/* Socket LGA2422 */
 #define	SMB_PRU_LGA5773		0x47	/* Socket LGA5773 */
 #define	SMB_PRU_BGA5773		0x48	/* Socket BGA5773 */
+#define	SMB_PRU_AM5		0x49	/* Socket AM5 */
+#define	SMB_PRU_SP5		0x4A	/* Socket SP5 */
+#define	SMB_PRU_SP6		0x4B	/* Socket SP6 */
+#define	SMB_PRU_BGA883		0x4C	/* Socket BGA883 */
+#define	SMB_PRU_BGA1190		0x4D	/* Socket BGA1190 */
+#define	SMB_PRU_BGA4129		0x4E	/* Socket BGA4129 */
+#define	SMB_PRU_LGA4710		0x4F	/* Socket LBA4710 */
+#define	SMB_PRU_LGA7529		0x50	/* Socket LBA7529 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -588,6 +596,7 @@ typedef struct smbios_processor {
 #define	SMB_PRF_M2		0x13	/* M2 */
 #define	SMB_PRF_CELERON_M	0x14	/* Celeron M */
 #define	SMB_PRF_PENTIUMIV_HT	0x15	/* Pentium 4 HT */
+#define	SMB_PRF_INTC_PROC	0x16	/* Intel Processor */
 #define	SMB_PRF_DURON		0x18	/* AMD Duron */
 #define	SMB_PRF_K5		0x19	/* K5 */
 #define	SMB_PRF_K6		0x1A	/* K6 */
@@ -1126,6 +1135,7 @@ typedef struct smbios_slot {
 #define	SMB_SLCH2_SURPREM	0x10	/* slot supports surprise removal */
 #define	SMB_SLCH2_CXL1		0x20	/* Flexbus slot, CXL 1.0 capable */
 #define	SMB_SLCH2_CXL2		0x40	/* Flexbus slot, CXL 2.0 capable */
+#define	SMB_SLCH2_CXL3		0x80	/* Flexbus slot, CXL 3.0 capable */
 
 #define	SMB_SLHT_NA		0x00	/* not applicable */
 #define	SMB_SLHT_OTHER		0x01	/* other */
@@ -1313,7 +1323,14 @@ typedef struct smbios_memdevice {
 	uint64_t smbmd_logical_size;	/* logical size in bytes */
 	uint64_t smbmd_extspeed;	/* extended device speed */
 	uint64_t smbmd_extclkspeed;	/* extended configured speed */
+	uint16_t smbmd_pmic0_mfgid;	/* JEDEC PMIC0 mfg id */
+	uint16_t smbmd_pmic0_rev;	/* JEDEC PMIC0 revision id */
+	uint16_t smbmd_rcd_mfgid;	/* JEDEC RCD mfg id */
+	uint16_t smbmd_rcd_rev;		/* JEDEC RCD revision id */
 } smbios_memdevice_t;
+
+#define	SMB_MD_MFG_UNKNOWN	0x0000
+#define	SMB_MD_REV_UNKNOWN	0xff00
 
 #define	SMB_MDFF_OTHER		0x01	/* other */
 #define	SMB_MDFF_UNKNOWN	0x02	/* unknown */
@@ -2009,7 +2026,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_34	0x0304		/* SMBIOS encoding for DMTF spec 3.4 */
 #define	SMB_VERSION_35	0x0305		/* SMBIOS encoding for DMTF spec 3.5 */
 #define	SMB_VERSION_36	0x0306		/* SMBIOS encoding for DMTF spec 3.6 */
-#define	SMB_VERSION	SMB_VERSION_36	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_37	0x0307		/* SMBIOS encoding for DMTF spec 3.7 */
+#define	SMB_VERSION	SMB_VERSION_37	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */

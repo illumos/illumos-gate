@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -314,6 +314,14 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_desc = "memory device 3.2 % 3.3"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_32,
+	    .st_libvers = SMB_VERSION_37,
+	    .st_mktable = smbios_test_memdevice_mktable_32,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_memdevice_verify_32_37,
+	    .st_desc = "memory device 3.2 % 3.7"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_33,
 	    .st_libvers = SMB_VERSION_33,
 	    .st_mktable = smbios_test_memdevice_mktable_33,
@@ -327,7 +335,15 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_mktable = smbios_test_memdevice_mktable_33ext,
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_memdevice_verify_33ext,
-	    .st_desc = "memory device 3.3"
+	    .st_desc = "memory device 3.3 with extended data"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_37,
+	    .st_libvers = SMB_VERSION_37,
+	    .st_mktable = smbios_test_memdevice_mktable_37,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_memdevice_verify_37,
+	    .st_desc = "memory device 3.7"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION,

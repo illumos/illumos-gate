@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1217,6 +1217,27 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 		} else {
 			mdp->smbmd_extclkspeed = m.smbmdev_clkspeed;
 		}
+	}
+
+	/*
+	 * The unknown key for missing revision information for the RCD and
+	 * PMIC0 is not all zeros. As such, we need to look if the device SMBIOS
+	 * table is not 3.7 then we need to fix up the bits that we copied.
+	 * After that we need to go back and check the consumer's version to
+	 * actually place this data there.
+	 */
+	if (!smb_gteq(shp, SMB_VERSION_37)) {
+		m.smbmdev_pmic0mfgid = SMB_MD_MFG_UNKNOWN;
+		m.smbmdev_pmic0rev = SMB_MD_REV_UNKNOWN;
+		m.smbmdev_rcdmfgid = SMB_MD_MFG_UNKNOWN;
+		m.smbmdev_rcdrev = SMB_MD_REV_UNKNOWN;
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_37)) {
+		mdp->smbmd_pmic0_mfgid = m.smbmdev_pmic0mfgid;
+		mdp->smbmd_pmic0_rev = m.smbmdev_pmic0rev;
+		mdp->smbmd_rcd_mfgid = m.smbmdev_rcdmfgid;
+		mdp->smbmd_rcd_rev = m.smbmdev_rcdrev;
 	}
 
 	return (0);
