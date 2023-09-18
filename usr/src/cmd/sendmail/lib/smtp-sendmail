@@ -31,7 +31,7 @@ SERVER_PID_FILE="/var/run/sendmail.pid"
 ALIASES_FILE="/etc/mail/aliases"
 SENDMAIL_CF="/etc/mail/sendmail.cf"
 
-case "$1" in 
+case "$1" in
 'refresh')
         [ -f $SERVER_PID_FILE ] && kill -1 `head -1 $SERVER_PID_FILE`
         ;;
@@ -44,7 +44,8 @@ case "$1" in
 	fi
 	if [ ! -f $ALIASES_FILE.db ] && [ ! -f $ALIASES_FILE.dir ] \
 	    && [ ! -f $ALIASES_FILE.pag ]; then
-		/usr/sbin/newaliases
+		# Create the aliases database
+		$SENDMAIL -bi
 	fi
 	MODE="-bd"
 	[ -f $DEFAULT_FILE ] && . $DEFAULT_FILE

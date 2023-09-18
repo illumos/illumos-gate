@@ -102,7 +102,7 @@ exp="1de
 8086"
 pcidb_match "$exp" -v -p -o vid pci8086 pci1de
 pcidb_match "Advanced Micro Devices, Inc. [AMD]" -v -p -o vendor pci1022
-pcidb_match "1af4:1044:Virtio RNG" -p -o vid,did,device pci1af4,1044
+pcidb_match "1af4:1044:Virtio 1.0 RNG" -p -o vid,did,device pci1af4,1044
 pcidb_match "Dell:HBA330 Adapter" -s -p -o subvendor,subsystem \
 	pci1000,97.1028,1f45
 pcidb_match "c:3:30:XHCI" -i -p -o bcc,scc,pi,interface pciclass,0c0330
