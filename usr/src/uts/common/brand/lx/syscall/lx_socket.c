@@ -3351,6 +3351,12 @@ lx_setsockopt_ipv6(sonode_t *so, int optname, void *optval, socklen_t optlen)
 	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
 
 	switch (optname) {
+	case LX_IPV6_RECVERR:
+		/*
+		 * Ping and glibc's resolver set this.  See lx_setsockopt_ip()'s
+		 * handling of LX_IP_RECVERR for more.
+		 */
+		return (0);
 	case LX_IPV6_MTU:
 		/*
 		 * There isn't a good translation for IPV6_MTU and certain apps
