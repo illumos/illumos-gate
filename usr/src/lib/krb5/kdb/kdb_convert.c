@@ -427,13 +427,11 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 				break;
 
 			case AT_FAIL_AUTH_COUNT:
-				if (ent->fail_auth_count >= (krb5_kvno)0) {
-					ULOG_ENTRY_TYPE(upd, ++final).av_type =
-						AT_FAIL_AUTH_COUNT;
-					ULOG_ENTRY(upd,
-						final).av_fail_auth_count =
-						(uint32_t)ent->fail_auth_count;
-				}
+				ULOG_ENTRY_TYPE(upd, ++final).av_type =
+					AT_FAIL_AUTH_COUNT;
+				ULOG_ENTRY(upd,
+					final).av_fail_auth_count =
+					(uint32_t)ent->fail_auth_count;
 				break;
 
 			case AT_PRINC:
