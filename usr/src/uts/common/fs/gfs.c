@@ -85,19 +85,19 @@
  *    v_data must be a gfs_file_t or a gfs_dir_t.  This hands over all control
  *    to GFS.
  *
- * 	gfs_file_create()
- * 	gfs_dir_create()
- * 	gfs_root_create()
+ *	gfs_file_create()
+ *	gfs_dir_create()
+ *	gfs_root_create()
  *
  *	gfs_file_inactive()
  *	gfs_dir_inactive()
  *	gfs_dir_lookup()
  *	gfs_dir_readdir()
  *
- * 	gfs_vop_inactive()
- * 	gfs_vop_lookup()
- * 	gfs_vop_readdir()
- * 	gfs_vop_map()
+ *	gfs_vop_inactive()
+ *	gfs_vop_lookup()
+ *	gfs_vop_readdir()
+ *	gfs_vop_map()
  *
  * 3) Single File pseudo-filesystems
  *
@@ -108,7 +108,7 @@
  *    technically keeping such a file from utilizing the "Complete GFS
  *    management" set of routines.
  *
- * 	gfs_root_create_file()
+ *	gfs_root_create_file()
  */
 
 /*
@@ -450,9 +450,9 @@ gfs_lookup_dot(vnode_t **vpp, vnode_t *dvp, vnode_t *pvp, const char *nm)
  *
  * Given these constraints, this routine will automatically:
  *
- * 	- Allocate v_data for the vnode
- * 	- Initialize necessary fields in the vnode
- * 	- Hold the parent
+ *	- Allocate v_data for the vnode
+ *	- Initialize necessary fields in the vnode
+ *	- Hold the parent
  */
 vnode_t *
 gfs_file_create(size_t size, vnode_t *pvp, vnodeops_t *ops)
@@ -739,7 +739,7 @@ gfs_dir_inactive(vnode_t *vp)
  *		ignored here; when lookup was performed case-insensitively,
  *		this field contains the "real" name of the file.
  *
- * 	Returns 0 on success, non-zero on error.
+ *	Returns 0 on success, non-zero on error.
  */
 static int
 gfs_dir_lookup_dynamic(gfs_lookup_cb callback, gfs_dir_t *dp,
@@ -969,10 +969,10 @@ out:
  *
  *	ino_t gfs_inode_cb(vnode_t *vp, int index);
  *
- * 	vp	- vnode for the directory
- * 	index	- index in original gfs_dirent_t array
+ *	vp	- vnode for the directory
+ *	index	- index in original gfs_dirent_t array
  *
- * 	Returns the inode number for the given entry.
+ *	Returns the inode number for the given entry.
  *
  * For directories with dynamic entries, a readdir callback must be provided.
  * This is significantly more complex, thanks to the particulars of
@@ -1111,8 +1111,6 @@ gfs_vop_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 #endif
 	if (vp->v_flag & VNOMAP)
 		return (ENOTSUP);
-	if (off > MAXOFF_T)
-		return (EFBIG);
 	if ((long)off < 0 || (long)(off + len) < 0)
 		return (EINVAL);
 	if (vp->v_type != VREG)
