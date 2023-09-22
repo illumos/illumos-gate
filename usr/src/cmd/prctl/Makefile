@@ -20,40 +20,43 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/prctl/Makefile
-#
-
-PROG=	prctl
-
-include ../Makefile.cmd
-
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+PROG=	prctl
+OBJS=	prctl.o utils.o
 
-clean clobber lint:	$(SUBDIRS)
+include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+CFLAGS	+= $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += $(CNOWARN_UNINIT)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+# not linted
+SMATCH=off
 
-FRC:
+LDLIBS	+= -lproc -lproject
+
+ROOTBINLINK = $(PROG:%=$(ROOTBIN64)/%)
+
+.KEEP_STATE:
+
+all: $(PROG)
+
+install: all $(ROOTPROG) $(ROOTBINLINK)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+$(ROOTBINLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
+
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ

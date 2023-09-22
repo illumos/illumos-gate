@@ -20,40 +20,31 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/plimit/Makefile
 #
 
 PROG=	plimit
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+CFLAGS64	+= $(CCVERBOSE)
+CERRWARN	+= $(CNOWARN_UNINIT)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+LDLIBS	+= -lproc
+
+ROOTLINK = $(PROG:%=$(ROOTBIN64)/%)
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all: $(PROG)
 
-clean clobber lint:	$(SUBDIRS)
+install: all $(ROOTPROG) $(ROOTLINK)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
 
 include ../Makefile.targ

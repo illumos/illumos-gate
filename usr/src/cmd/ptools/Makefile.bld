@@ -108,7 +108,7 @@ ptree :=		CSTD = $(CSTD_GNU99)
 
 INSTALL_NEW=
 INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
-	$(LN) -s ../../bin/$(PROG) $(ROOTPROCBINSYMLINK)
+	$(SYMLINK) ../../bin/$(PROG) $(ROOTPROCBINSYMLINK)
 
 .KEEP_STATE:
 
@@ -124,7 +124,7 @@ pmap_common.o:	$(PMAP)/pmap_common.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-all:	$(PROG) $(LN_$(PROG))
+all:	$(PROG)
 
 ROOTBINLN=$(LN_$(PROG):%=$(ROOTBIN)/%)
 ROOTBINPROG=$(ROOTBIN)/$(PROG)
@@ -138,25 +138,18 @@ $(PROG): $$(OBJS)
 # Install the ptool, symlinking it into /usr/proc/bin if PTOOL_TYPE is set
 # to LEGACY.
 #
-install: all $(ROOTISAPROG) $(ROOTISALN) $(ROOTBINLN)
-	-$(RM) $(ROOTBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTBINPROG)
+install: all $(ROOTPROG) $(ROOTISAPROG) $(ROOTISALN) $(ROOTBINLN)
 	-$(INSTALL_$(PTOOL_TYPE))
 
-$(ROOTBINLN): $(ROOTISAPROG)
-	-$(RM) $@
-	-$(LN) $(ISAEXEC) $@
+$(ROOTISAPROG):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
 
-$(ROOTISALN): $(ROOTISAPROG)
-	-$(RM) $@
-	-$(LN) $(ROOTISAPROG) $@
+$(ROOTISALN):
+	$(RM) $@
+	$(SYMLINK) ../../bin/$(@F) $@
 
-$(LN_$(PROG)): $(PROG)
-	-$(RM) $@
-	-$(LN) $(PROG) $@
+$(ROOTBINLN): $(ROOTPROG)
+	$(RM) $@; $(LN) $(ROOTPROG) $@
 
 clean:
 	$(RM) $(OBJS)
-
-lint:
-	$(LINT.c) $(SRCS) $(LDLIBS)

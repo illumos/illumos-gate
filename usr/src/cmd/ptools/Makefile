@@ -63,7 +63,6 @@ all	:=	TARGET = all
 install	:=	TARGET = install
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 _msg	:=	TARGET = _msg
 
 
@@ -81,10 +80,8 @@ POFILE = ptools.po
 
 .PARALLEL: $(SUBDIRS)
 
-all install clean lint: $(SUBDIRS)
-clobber: $(SUBDIRS) clobber_local
-clobber_local:
-	$(RM) $(CLOBBERFILES)
+all install clean: $(SUBDIRS)
+clobber: $(SUBDIRS)
 
 $(NEW_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) PTOOL_TYPE=NEW -f ../Makefile.ptool $(TARGET)
