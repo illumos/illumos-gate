@@ -321,12 +321,10 @@ prt_ioa(private_t *pri, int raw, long val)	/* print ioctl argument */
 	/* kstat ioctl()s */
 	case KSTAT_IOC_READ:
 	case KSTAT_IOC_WRITE:
-#ifdef _LP64
 		if (data_model == PR_MODEL_ILP32)
 			prt_stg(pri, raw,
 			    val + offsetof(kstat32_t, ks_name[0]));
 		else
-#endif
 			prt_stg(pri, raw,
 			    val + offsetof(kstat_t, ks_name[0]));
 		break;
@@ -1733,7 +1731,6 @@ prt_mif(private_t *pri, int raw, long val)
 {
 	struct meminfo	minfo;
 
-#ifdef _LP64
 	if (data_model == PR_MODEL_ILP32) {
 		struct meminfo32 minfo32;
 
@@ -1760,7 +1757,6 @@ prt_mif(private_t *pri, int raw, long val)
 		prt_hex(pri, 0, minfo32.mi_validity);
 		return;
 	}
-#endif
 	if (Pread(Proc, &minfo, sizeof (struct meminfo), val) !=
 		sizeof (struct meminfo)) {
 		prt_dec(pri, 0, pri->sys_args[1]);	/* addr_count */

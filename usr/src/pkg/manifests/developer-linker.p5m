@@ -33,7 +33,6 @@ set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/bin
 dir  path=usr/bin/$(ARCH32)
-file path=usr/bin/$(ARCH32)/truss mode=0555
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/elfwrap mode=0555
 link path=usr/bin/$(ARCH64)/gcore target=../../bin/gcore
@@ -42,7 +41,7 @@ link path=usr/bin/$(ARCH64)/ldd target=../../bin/ldd
 link path=usr/bin/$(ARCH64)/plimit target=../../bin/plimit
 link path=usr/bin/$(ARCH64)/pvs target=../../bin/pvs
 link path=usr/bin/$(ARCH64)/strings target=../../bin/strings
-file path=usr/bin/$(ARCH64)/truss mode=0555
+link path=usr/bin/$(ARCH64)/truss target=../../bin/truss
 link path=usr/bin/ctags target=../has/bin/ctags mediator=ctags \
     mediator-implementation=illumos
 file path=usr/bin/elfsign mode=0555
@@ -57,7 +56,7 @@ file path=usr/bin/pvs mode=0555
 file path=usr/bin/regcmp mode=0555
 file path=usr/bin/sotruss mode=0755
 file path=usr/bin/strings mode=0555
-hardlink path=usr/bin/truss target=../../usr/lib/isaexec
+file path=usr/bin/truss mode=0555
 file path=usr/bin/whocalls mode=0755
 dir  path=usr/ccs
 dir  path=usr/ccs/bin

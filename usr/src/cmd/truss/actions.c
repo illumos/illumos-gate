@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -675,7 +675,6 @@ sysexit(private_t *pri, int dotrace)
 			long rv1 = pri->Rval1;
 			long rv2 = pri->Rval2;
 
-#ifdef _LP64
 			/*
 			 * 32-bit system calls return 32-bit values. We
 			 * later mask out the upper bits if we want to
@@ -685,7 +684,6 @@ sysexit(private_t *pri, int dotrace)
 				rv1 = (int)rv1;
 				rv2 = (int)rv2;
 			}
-#endif
 
 			switch (what) {
 			case SYS_llseek:
@@ -710,10 +708,8 @@ sysexit(private_t *pri, int dotrace)
 			case SYS_lseek:
 			case SYS_ulimit:
 				if (rv1 & 0xff000000) {
-#ifdef _LP64
 					if (data_model == PR_MODEL_ILP32)
 						rv1 &= 0xffffffff;
-#endif
 					fmt = "= 0x%.8lX";
 				}
 				break;
@@ -726,43 +722,33 @@ sysexit(private_t *pri, int dotrace)
 				}
 				break;
 			case SYS_port:
-#ifdef _LP64
 				if (data_model == PR_MODEL_LP64) {
 					rv2 = rv1 & 0xffffffff;
 					rv1 = rv1 >> 32;
 				}
-#endif
 				break;
 			}
 
 			if (fmt == NULL) {
 				switch (stp->rval[0]) {
 				case HEX:
-#ifdef _LP64
 					if (data_model == PR_MODEL_ILP32)
 						rv1 &= 0xffffffff;
-#endif
 					fmt = "= 0x%.8lX";
 					break;
 				case HHX:
-#ifdef _LP64
 					if (data_model == PR_MODEL_ILP32)
 						rv1 &= 0xffffffff;
-#endif
 					fmt = "= 0x%.4lX";
 					break;
 				case OCT:
-#ifdef _LP64
 					if (data_model == PR_MODEL_ILP32)
 						rv1 &= 0xffffffff;
-#endif
 					fmt = "= %#lo";
 					break;
 				case UNS:
-#ifdef _LP64
 					if (data_model == PR_MODEL_ILP32)
 						rv1 &= 0xffffffff;
-#endif
 					fmt = "= %lu";
 					break;
 				default:
@@ -778,31 +764,23 @@ sysexit(private_t *pri, int dotrace)
 				fmt = NULL;
 				break;
 			case HEX:
-#ifdef _LP64
 				if (data_model == PR_MODEL_ILP32)
 					rv2 &= 0xffffffff;
-#endif
 				fmt = " [0x%.8lX]";
 				break;
 			case HHX:
-#ifdef _LP64
 				if (data_model == PR_MODEL_ILP32)
 					rv2 &= 0xffffffff;
-#endif
 				fmt = " [0x%.4lX]";
 				break;
 			case OCT:
-#ifdef _LP64
 				if (data_model == PR_MODEL_ILP32)
 					rv2 &= 0xffffffff;
-#endif
 				fmt = " [%#lo]";
 				break;
 			case UNS:
-#ifdef _LP64
 				if (data_model == PR_MODEL_ILP32)
 					rv2 &= 0xffffffff;
-#endif
 				fmt = " [%lu]";
 				break;
 			default:
@@ -999,7 +977,6 @@ dumpargs(private_t *pri, long ap, const char *str)
 	if (interrupt)
 		return;
 
-#ifdef _LP64
 	if (data_model == PR_MODEL_LP64) {
 		argaddr = (char *)&arg;
 		ptrsize = 8;
@@ -1011,10 +988,6 @@ dumpargs(private_t *pri, long ap, const char *str)
 #endif
 		ptrsize = 4;
 	}
-#else
-	argaddr = (char *)&arg;
-	ptrsize = 4;
-#endif
 	putpname(pri);
 	(void) fputc(' ', stdout);
 	(void) fputs(str, stdout);

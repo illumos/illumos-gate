@@ -1003,21 +1003,15 @@ callstack_info(uintptr_t sp, uintptr_t fp, int makeid)
 		uint_t minsize;
 
 #if defined(i386) || defined(__amd64)
-#ifdef _LP64
 		if (data_model == PR_MODEL_LP64)
 			minsize = 2 * sizeof (uintptr_t);	/* fp + pc */
 		else
-#endif
 			minsize = 2 * sizeof (uint32_t);
 #else
-#ifdef _LP64
 		if (data_model != PR_MODEL_LP64)
 			minsize = SA32(MINFRAME32);
 		else
 			minsize = SA64(MINFRAME64);
-#else
-		minsize = SA(MINFRAME);
-#endif
 #endif	/* i386 */
 		stkend = sp + minsize;
 
@@ -1175,7 +1169,7 @@ reestablish_traps(void)
 
 void
 show_function_call(private_t *pri,
-	struct callstack *Stk, struct dynlib *Dp, struct bkpt *Bp)
+    struct callstack *Stk, struct dynlib *Dp, struct bkpt *Bp)
 {
 	long arg[8];
 	int narg;
@@ -1206,7 +1200,7 @@ show_function_call(private_t *pri,
 /* ARGSUSED */
 void
 show_function_return(private_t *pri, long rval, int stret,
-	struct callstack *Stk, struct dynlib *Dp, struct bkpt *Bp)
+    struct callstack *Stk, struct dynlib *Dp, struct bkpt *Bp)
 {
 	int i;
 
@@ -1449,12 +1443,10 @@ function_entry(private_t *pri, struct bkpt *Bp, struct callstack *Stk)
 	int oldframe = FALSE;
 	int i;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		sp = (uint32_t)sp;
 		rpc = (uint32_t)rpc;
 	}
-#endif
 
 	/*
 	 * If the sp is not within the stack bounds, forget it.
@@ -1509,12 +1501,10 @@ function_return(private_t *pri, struct callstack *Stk)
 	uintptr_t fp = Lsp->pr_reg[R_FP];
 	int i;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		sp = (uint32_t)sp;
 		fp = (uint32_t)fp;
 	}
-#endif
 
 	if (fp < sp + 8)
 		fp = sp + 8;
@@ -1670,7 +1660,6 @@ previous_fp(uintptr_t sp, uintptr_t *rpc)
 	uintptr_t fp = 0;
 	uintptr_t pc = 0;
 
-#ifdef _LP64
 	if (data_model == PR_MODEL_LP64) {
 		struct rwindow64 rwin;
 		if (Pread(Proc, &rwin, sizeof (rwin), sp + STACK_BIAS)
@@ -1684,9 +1673,6 @@ previous_fp(uintptr_t sp, uintptr_t *rpc)
 			fp = pc = 0;
 	} else {
 		struct rwindow32 rwin;
-#else	/* _LP64 */
-		struct rwindow rwin;
-#endif	/* _LP64 */
 		if (Pread(Proc, &rwin, sizeof (rwin), sp) == sizeof (rwin)) {
 			fp = (uint32_t)rwin.rw_fp;
 			pc = (uint32_t)rwin.rw_rtn;
@@ -1694,9 +1680,7 @@ previous_fp(uintptr_t sp, uintptr_t *rpc)
 		if (fp != 0 &&
 		    Pread(Proc, &rwin, sizeof (rwin), fp) != sizeof (rwin))
 			fp = pc = 0;
-#ifdef _LP64
 	}
-#endif
 	if (rpc)
 		*rpc = pc;
 	return (fp);
@@ -1829,7 +1813,6 @@ get_return_address32(uintptr_t *psp)
 uintptr_t
 get_return_address(uintptr_t *psp)
 {
-#ifdef _LP64
 	uintptr_t rpc;
 	uintptr_t sp = *psp;
 
@@ -1842,7 +1825,6 @@ get_return_address(uintptr_t *psp)
 		 */
 		return (rpc);
 	} else
-#endif
 		return (get_return_address32(psp));
 }
 
@@ -1884,7 +1866,6 @@ get_arguments32(long *argp)
 int
 get_arguments(long *argp)
 {
-#ifdef _LP64
 	private_t *pri = get_private();
 	const lwpstatus_t *Lsp = pri->lwpstat;
 
@@ -1904,7 +1885,6 @@ get_arguments(long *argp)
 		argp[5] = Lsp->pr_reg[REG_R9];
 		return (6);
 	} else
-#endif
 		return (get_arguments32(argp));
 }
 
