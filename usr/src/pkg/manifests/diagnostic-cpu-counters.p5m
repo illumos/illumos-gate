@@ -33,11 +33,8 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/bin
-$(i386_ONLY)dir path=usr/bin/$(ARCH32)
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/cputrack mode=0555
-dir  path=usr/bin/$(ARCH64)
-file path=usr/bin/$(ARCH64)/cputrack mode=0555
-hardlink path=usr/bin/cputrack target=../lib/isaexec
+link path=usr/bin/$(ARCH64)/cputrack target=../../bin/cputrack
+file path=usr/bin/cputrack mode=0555
 dir  path=usr/include
 file path=usr/include/libcpc.h
 file path=usr/include/libpctx.h
