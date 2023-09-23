@@ -193,20 +193,15 @@ dir  path=usr/lib/mdb/raw/$(ARCH64) group=sys
 file path=usr/lib/mdb/raw/$(ARCH64)/dof.so group=sys mode=0555
 file path=usr/lib/mdb/raw/dof.so group=sys mode=0555
 dir  path=usr/sbin
-dir  path=usr/sbin/$(ARCH32)
-file path=usr/sbin/$(ARCH32)/dtrace mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/intrstat mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/lockstat mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/plockstat mode=0555
 dir  path=usr/sbin/$(ARCH64)
-file path=usr/sbin/$(ARCH64)/dtrace mode=0555
-file path=usr/sbin/$(ARCH64)/intrstat mode=0555
-file path=usr/sbin/$(ARCH64)/lockstat mode=0555
-file path=usr/sbin/$(ARCH64)/plockstat mode=0555
-hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
-hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
-hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
+link path=usr/sbin/$(ARCH64)/dtrace target=../../sbin/dtrace
+link path=usr/sbin/$(ARCH64)/intrstat target=../../sbin/intrstat
+link path=usr/sbin/$(ARCH64)/lockstat target=../../sbin/lockstat
+link path=usr/sbin/$(ARCH64)/plockstat target=../../sbin/plockstat
+file path=usr/sbin/dtrace mode=0555
+file path=usr/sbin/intrstat mode=0555
+file path=usr/sbin/lockstat mode=0555
+file path=usr/sbin/plockstat mode=0555
 dir  path=usr/share
 dir  path=usr/share/lib
 dir  path=usr/share/lib/java group=sys

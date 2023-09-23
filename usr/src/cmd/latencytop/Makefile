@@ -18,30 +18,60 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright (c) 2008-2009, Intel Corporation.
 # All Rights Reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 PROG = latencytop
+OBJS = latencytop.o display.o dwrapper.o klog.o stat.o table.o util.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+CFLAGS += $(CCVERBOSE)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CERRWARN += $(CNOWARN_UNINIT)
+
+# smatch has problems parsing the glib header files
+SMATCH=off
+
+CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
+	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
+CSTD = $(CSTD_GNU99)
+LDLIBS += -lcurses -ldtrace
+NATIVE_LIBS += libglib-2.0.so
+all install	:= LDLIBS += -lglib-2.0
+
+FILEMODE = 0555
+
+WRAPOBJ = latencytop_wrap.o
+
+CLEANFILES += $(OBJS) $(WRAPOBJ) ./latencytop_d ./latencytop_trans
 
 .KEEP_STATE:
 
-all install clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+install: all $(ROOTPROG)
 
-FRC:
+$(PROG): $(OBJS) $(WRAPOBJ)
+	$(LINK.c) -o $@ $(OBJS) $(WRAPOBJ) $(LDLIBS)
+	$(POST_PROCESS)
+
+latencytop_d: latencytop.d
+	$(CP) $^ $@
+
+latencytop_trans: latencytop.trans
+	$(CP) $^ $@
+
+$(WRAPOBJ): latencytop_d latencytop_trans
+	$(ELFWRAP) -64 -o $(WRAPOBJ) latencytop_d \
+		latencytop_trans
+
+clean:
+	$(RM) $(CLEANFILES)
 
 include ../Makefile.targ

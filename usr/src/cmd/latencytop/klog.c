@@ -180,7 +180,7 @@ lt_klog_deinit(void)
 /* ARGSUSED */
 void
 lt_klog_log(int level, pid_t pid, char *stack,
-	lt_stat_type_t type, uint64_t value)
+    lt_stat_type_t type, uint64_t value)
 {
 	lt_stat_data_t *entry = NULL;
 	char *psargs;

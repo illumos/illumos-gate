@@ -63,7 +63,8 @@ typedef enum {
  * returns FALSE otherwise.
  */
 static int
-check_opt_dup(lt_cmd_option_id_t id, uint64_t value) {
+check_opt_dup(lt_cmd_option_id_t id, uint64_t value)
+{
 
 	static int opt_set[(int)LT_CMDOPT__LAST];
 	static uint64_t opt_val[(int)LT_CMDOPT__LAST];
