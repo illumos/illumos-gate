@@ -1249,6 +1249,7 @@ nxge_map_regs(p_nxge_t nxgep)
 			nxgep->function_num = func_num;
 			if (isLDOMguest(nxgep)) {
 				nxgep->function_num /= 2;
+				kmem_free(dev_regs, sizeof (dev_regs_t));
 				return (NXGE_OK);
 			}
 			ddi_prop_free(prop_val);
