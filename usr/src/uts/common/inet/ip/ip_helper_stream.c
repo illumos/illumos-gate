@@ -127,11 +127,10 @@ ip_helper_stream_setup(queue_t *q, dev_t *devp, int flag, int sflag,
 		/*
 		 * numbers in the large arena are exhausted
 		 * Try small arena.
-		 * Or this is a 32 bit system, 32 bit systems do not have
-		 * ip_minor_arena_la
 		 */
 		ip_minfop->ip_minfo_dev = inet_minor_alloc(ip_minor_arena_sa);
 		if (ip_minfop->ip_minfo_dev == 0) {
+			kmem_free(ip_minfop, sizeof (ip_helper_minfo_t));
 			return (EBUSY);
 		}
 		ip_minfop->ip_minfo_arena = ip_minor_arena_sa;
