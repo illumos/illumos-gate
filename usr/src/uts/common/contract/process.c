@@ -676,6 +676,8 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 		contract_status_common(ct, zone, status, model);
 		local_svc_zone_enter = ctp->conp_svc_zone_enter;
 		mutex_exit(&ct->ct_lock);
+		pids = NULL;
+		ctids = NULL;
 	} else {
 		contract_t *cnext;
 		proc_t *pnext;
@@ -729,9 +731,11 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 		    refstr_value(ctp->conp_svc_aux)) == 0);
 		VERIFY(nvlist_add_string(nvl, CTPS_SVC_CREATOR,
 		    refstr_value(ctp->conp_svc_creator)) == 0);
-		kmem_free(pids, spids * sizeof (uint32_t));
-		kmem_free(ctids, sctids * sizeof (uint32_t));
 	}
+	if (ctids != NULL)
+		kmem_free(ctids, sctids * sizeof (uint32_t));
+	if (pids != NULL)
+		kmem_free(pids, spids * sizeof (uint32_t));
 
 	/*
 	 * if we are in a local zone and svc_fmri was inherited from
