@@ -324,7 +324,7 @@ proto_attach_req(dld_str_t *dsp, mblk_t *mp)
 	queue_t		*q = dsp->ds_wq;
 
 	if (MBLKL(mp) < sizeof (dl_attach_req_t) ||
-	    dlp->dl_ppa < 0 || dsp->ds_style == DL_STYLE1) {
+	    dsp->ds_style == DL_STYLE1) {
 		dl_err = DL_BADPRIM;
 		goto failed;
 	}
