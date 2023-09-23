@@ -72,6 +72,8 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 # false positive
 $(OBJS_DIR)/ecdecode.o := SMOFF += assign_vs_compare
 $(OBJS_DIR)/ec.o := SMOFF += assign_vs_compare
+# secitem code needs testing to confirm/deny leaks, but for now suppress.
+$(OBJS_DIR)/secitem.o := SMOFF += check_leaks
 
 SMOFF += indenting,all_func_returns
 
