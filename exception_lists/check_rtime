@@ -112,7 +112,7 @@ UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
 # so that the underlying libraries use that implementation for memory
 # management. Since ksh itself doesn't perform any memory allocations in
 # the stub, ldd -U determines that libumem is an unreferenced object.
-UNREF_OBJ	/libumem\.so\.1.*/usr/bin/(i86|amd64)/r?ksh(93)?\b
+UNREF_OBJ	/libumem\.so\.1.*/usr/bin/(i86/)?r?ksh(93)?\b
 
 # Unused runpaths due to dlopen() use
 UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd

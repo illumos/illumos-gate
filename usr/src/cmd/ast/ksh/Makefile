@@ -67,8 +67,6 @@ install: $(SUBDIRS)
 	@(set -o xtrace ; \
 	builtin ln ; \
 	builtin rm ; \
-	rm -f $(ROOTPROG) ; \
-	ln $(ISAEXEC) $(ROOTPROG) ; \
 	for i in $(USRKSH_ALIAS_LIST) ; do \
 		[[ "$$i" == "$(PROG)" ]] && continue ; \
 		rm -f "$(ROOTBIN)/$$i" ; \
