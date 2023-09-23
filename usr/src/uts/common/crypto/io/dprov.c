@@ -9165,8 +9165,6 @@ dprov_create_object_from_template(dprov_state_t *softc,
 
 	/* allocate new object */
 	object = kmem_zalloc(sizeof (dprov_object_t), KM_SLEEP);
-	if (object == NULL)
-		return (CRYPTO_HOST_MEMORY);
 
 	/* is it a token object? */
 	/* check CKA_TOKEN attribute value */
@@ -9177,9 +9175,11 @@ dprov_create_object_from_template(dprov_state_t *softc,
 		for (i = 0; i < DPROV_MAX_OBJECTS; i++)
 			if (softc->ds_objects[i] == NULL)
 				break;
-		if (i == DPROV_MAX_OBJECTS)
+		if (i == DPROV_MAX_OBJECTS) {
+			kmem_free(object, sizeof (dprov_object_t));
 			/* no free slot */
 			return (CRYPTO_HOST_MEMORY);
+		}
 		softc->ds_objects[i] = object;
 		object->do_token_idx = i;
 		DPROV_OBJECT_REFHOLD(object);
