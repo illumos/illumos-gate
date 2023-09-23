@@ -66,8 +66,8 @@
 ./usr/src/cmd/ldap/common/*test.c
 ./usr/src/cmd/logadm/tester
 ./usr/src/cmd/sendmail/libsm/t-*.c
-./usr/src/cmd/sort/common/convert.c
-./usr/src/cmd/sort/common/invoke.c
+./usr/src/cmd/sort/convert.c
+./usr/src/cmd/sort/invoke.c
 ./usr/src/lib/crypt_modules/sha256/test.c
 ./usr/src/lib/libkvm/common/test.c
 ./usr/src/lib/libsaveargs/tests/
@@ -76,7 +76,7 @@
 # Ignore debugging code.
 #
 ./usr/src/cmd/fs.d/pcfs/fsck/inject.c
-./usr/src/cmd/sort/common/statistics.c
+./usr/src/cmd/sort/statistics.c
 
 #
 # Ignore internal packages, scripts, and tools that are intentionally not

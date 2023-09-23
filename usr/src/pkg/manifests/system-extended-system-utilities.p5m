@@ -34,8 +34,6 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/bin
-$(i386_ONLY)dir path=usr/bin/$(ARCH32)
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/sort mode=0555
 dir  path=usr/bin/$(ARCH64)
 link path=usr/bin/$(ARCH64)/pargs target=../../bin/pargs
 link path=usr/bin/$(ARCH64)/pauxv target=../../bin/pauxv
@@ -59,7 +57,7 @@ link path=usr/bin/$(ARCH64)/ptime target=../../bin/ptime
 link path=usr/bin/$(ARCH64)/ptree target=../../bin/ptree
 link path=usr/bin/$(ARCH64)/pwait target=../../bin/pwait
 link path=usr/bin/$(ARCH64)/pwdx target=../../bin/pwdx
-file path=usr/bin/$(ARCH64)/sort mode=0555
+link path=usr/bin/$(ARCH64)/sort target=../../bin/sort
 file path=usr/bin/asa mode=0555
 file path=usr/bin/awk mode=0555
 file path=usr/bin/banner mode=0555
@@ -117,7 +115,7 @@ file path=usr/bin/ptree mode=0555
 file path=usr/bin/pwait mode=0555
 file path=usr/bin/pwdx mode=0555
 file path=usr/bin/sdiff mode=0555
-hardlink path=usr/bin/sort target=../../usr/lib/isaexec
+file path=usr/bin/sort mode=0555
 file path=usr/bin/spell mode=0555
 file path=usr/bin/split mode=0555
 link path=usr/bin/strace target=../sbin/strace

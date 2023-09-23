@@ -360,7 +360,7 @@ merge_n_streams(sort_t *S, stream_t *head_streamp, int n_streams,
 				die(EMSG_BADPRIME);
 
 			cur_streamp->s_current.l_collate_bufsize =
-				INITIAL_COLLATION_SIZE;
+			    INITIAL_COLLATION_SIZE;
 			cur_streamp->s_current.l_collate.sp =
 			    safe_realloc(NULL, INITIAL_COLLATION_SIZE);
 			(void) mg_coll_convert(S->m_fields_head,
