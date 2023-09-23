@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,41 +18,64 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1990-1997 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-# cmd/savecore/Makefile
+# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
-PROG=	savecore
+PROG= savecore
+OBJS= savecore.o compress.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-SUBDIRS =	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+CSTD = $(CSTD_GNU99)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -DBZ_NO_STDIO -I$(SRC)/common -I$(SRC)/uts/common
+
+LDLIBS += -L$(ROOT)/usr/lib/fm/64 -lfmevent -lnvpair
+LDFLAGS += -R/usr/lib/fm/64
+
+# not linted
+SMATCH=off
+
+#
+# savecore is compiled with bits from $(SRC)/common/bzip2 and some function
+# symbols there are defined as weak; if you leave them out of
+# savecore.c it will compile, but trying to call that function
+# will jump to 0.  So we use -ztext to avoid that.
+#
+LDFLAGS += $(ZTEXT)
+
+BZIP2OBJS =	bz2blocksort.o	\
+		bz2compress.o	\
+		bz2decompress.o	\
+		bz2randtable.o	\
+		bz2bzlib.o	\
+		bz2crctable.o	\
+		bz2huffman.o
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all: $(PROG)
 
-clean clobber lint:	$(SUBDIRS)
+install: all $(ROOTPROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+$(PROG): $(OBJS) $(BZIP2OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(BZIP2OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
+	$(RM) $(OBJS) $(BZIP2OBJS)
 
 include ../Makefile.targ
+
+%.o: ../../uts/common/os/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+bz2%.o: ../../common/bzip2/%.c
+	$(COMPILE.c) -o $@ -I$(SRC)/common/bzip2 $<
+	$(POST_PROCESS_O)

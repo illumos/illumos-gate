@@ -532,7 +532,6 @@ link path=usr/adm target=../var/adm
 dir  path=usr/bin
 dir  path=usr/bin/$(ARCH32)
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
-file path=usr/bin/$(ARCH32)/savecore mode=0555
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/amt mode=0555
 file path=usr/bin/$(ARCH64)/crle mode=0555
@@ -546,7 +545,6 @@ link path=usr/bin/$(ARCH64)/newtask target=../../bin/newtask
 link path=usr/bin/$(ARCH64)/nohup target=../../bin/nohup
 link path=usr/bin/$(ARCH64)/prctl target=../../bin/prctl
 link path=usr/bin/$(ARCH64)/prstat target=../../bin/prstat
-file path=usr/bin/$(ARCH64)/savecore mode=0555
 $(i386_ONLY)file path=usr/bin/addbadsec mode=0555
 file path=usr/bin/amt mode=0555
 file path=usr/bin/arch mode=0555
@@ -709,7 +707,7 @@ file path=usr/bin/rmdir mode=0555
 file path=usr/bin/roles mode=0555
 file path=usr/bin/rpcinfo mode=0555
 file path=usr/bin/runat mode=0555
-hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
+file path=usr/bin/savecore mode=0555
 file path=usr/bin/script mode=0555
 file path=usr/bin/sed mode=0555
 file path=usr/bin/setfacl mode=0555
