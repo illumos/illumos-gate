@@ -532,19 +532,15 @@ link path=usr/adm target=../var/adm
 dir  path=usr/bin
 dir  path=usr/bin/$(ARCH32)
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
-file path=usr/bin/$(ARCH32)/decrypt mode=0555
-file path=usr/bin/$(ARCH32)/digest mode=0555
-hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
-hardlink path=usr/bin/$(ARCH32)/mac target=digest
 file path=usr/bin/$(ARCH32)/savecore mode=0555
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/amt mode=0555
 file path=usr/bin/$(ARCH64)/crle mode=0555
-file path=usr/bin/$(ARCH64)/decrypt mode=0555
-file path=usr/bin/$(ARCH64)/digest mode=0555
-hardlink path=usr/bin/$(ARCH64)/encrypt target=decrypt
+link path=usr/bin/$(ARCH64)/decrypt target=../../bin/decrypt
+link path=usr/bin/$(ARCH64)/digest target=../../bin/digest
+link path=usr/bin/$(ARCH64)/encrypt target=../../bin/encrypt
 file path=usr/bin/$(ARCH64)/ls mode=0555
-hardlink path=usr/bin/$(ARCH64)/mac target=digest
+link path=usr/bin/$(ARCH64)/mac target=../../bin/mac
 file path=usr/bin/$(ARCH64)/moe mode=0555
 link path=usr/bin/$(ARCH64)/newtask target=../../bin/newtask
 link path=usr/bin/$(ARCH64)/nohup target=../../bin/nohup
@@ -591,12 +587,12 @@ file path=usr/bin/ctstat mode=0555
 file path=usr/bin/ctwatch mode=0555
 file path=usr/bin/date mode=0555
 file path=usr/bin/dd mode=0555
-hardlink path=usr/bin/decrypt target=../../usr/lib/isaexec
+file path=usr/bin/decrypt mode=0555
 file path=usr/bin/devattr mode=0555
 file path=usr/bin/devfree mode=0555
 file path=usr/bin/devreserv mode=0555
 link path=usr/bin/df target=../sbin/df
-hardlink path=usr/bin/digest target=../../usr/lib/isaexec
+file path=usr/bin/digest mode=0555
 file path=usr/bin/dirname mode=0555
 $(i386_ONLY)file path=usr/bin/diskscan mode=0555
 hardlink path=usr/bin/dispgid target=../../usr/bin/ckgid
@@ -610,7 +606,7 @@ file path=usr/bin/ed mode=0555
 hardlink path=usr/bin/edit target=../has/bin/edit
 hardlink path=usr/bin/egrep target=../../usr/bin/grep
 file path=usr/bin/eject mode=0555
-hardlink path=usr/bin/encrypt target=../../usr/lib/isaexec
+hardlink path=usr/bin/encrypt target=../bin/decrypt
 file path=usr/bin/env mode=0555
 file path=usr/bin/expr mode=0555
 file path=usr/bin/false mode=0555
@@ -659,7 +655,7 @@ file path=usr/bin/logins mode=0750
 file path=usr/bin/logname mode=0555
 file path=usr/bin/ls mode=0555
 file path=usr/bin/m4 mode=0555
-hardlink path=usr/bin/mac target=../../usr/lib/isaexec
+hardlink path=usr/bin/mac target=../bin/digest
 file path=usr/bin/mach mode=0555
 file path=usr/bin/mail group=mail mode=2511
 file path=usr/bin/mailx group=mail mode=2511

@@ -22,42 +22,47 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-PROG= decrypt
+PROG = decrypt
+
+ROOTLINK64= $(ROOTBIN64)/encrypt
 ROOTLINK= $(ROOTBIN)/encrypt
+ROOTDECLINK = $(PROG:%=$(ROOTBIN64)/%)
+
 DCFILE=$(PROG).dc
 
 include ../../Makefile.cmd
+include ../../Makefile.cmd.64
 
-SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+CFLAGS += $(CCVERBOSE)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += $(CNOWARN_UNINIT)
+
+LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all:    $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG) $(ROOTLINK)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTLINK)
+install: $(ROOTPROG) $(ROOTLINK) $(ROOTLINK64) $(ROOTDECLINK)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(ROOTDECLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
+
+$(ROOTLINK): $(ROOTPROG)
+	$(RM) $@; $(LN) $(ROOTPROG) $@
+
+$(ROOTLINK64):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
+
+clean:
+	$(RM) $(PROG)
 
 $(DCFILE):
 	$(RM) messages.po
 	$(XGETTEXT) $(XGETFLAGS) -t $(PROG).c
 	$(SED) -e '/^domain/d' messages.po > $@
 	$(RM) messages.po
-
-FRC:
 
 include ../../Makefile.targ
