@@ -24,6 +24,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/conf.h>
@@ -2345,10 +2346,31 @@ sbd_parse_mgmt_url(char **url_addr)
 static uint_t sbd_write_same_optimal_chunk = 128 * 1024;
 
 static sbd_status_t
+sbd_write_same_data_common(sbd_lu_t *sl, struct scsi_task *task, uint64_t addr,
+    uint8_t *buf, uint32_t bufsz, uint32_t xfer_size, uint64_t len)
+{
+	uint64_t sz_done;
+	sbd_status_t ret = SBD_SUCCESS;
+
+	/* Do the actual I/O.  Recycle xfer_size now to be write size. */
+	DTRACE_PROBE1(write__same__io__begin, uint64_t, len);
+	for (sz_done = 0; sz_done < len; sz_done += (uint64_t)xfer_size) {
+		xfer_size = ((bufsz + sz_done) <= len) ? bufsz :
+		    len - sz_done;
+		ret = sbd_data_write(sl, task, addr + sz_done,
+		    (uint64_t)xfer_size, buf);
+		if (ret != SBD_SUCCESS)
+			break;
+	}
+	DTRACE_PROBE2(write__same__io__end, uint64_t, len, uint64_t, sz_done);
+	return (ret);
+}
+
+static sbd_status_t
 sbd_write_same_data(struct scsi_task *task, sbd_cmd_t *scmd)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
-	uint64_t addr, len, sz_done;
+	uint64_t addr, len;
 	uint32_t big_buf_size, xfer_size, off;
 	uint8_t *big_buf;
 	sbd_status_t ret;
@@ -2390,15 +2412,14 @@ sbd_write_same_data(struct scsi_task *task, sbd_cmd_t *scmd)
 	 * reclaim memory.  Trade higher I/Os if in a low-memory situation.
 	 */
 	big_buf = kmem_alloc(big_buf_size, KM_NOSLEEP_LAZY);
-
 	if (big_buf == NULL) {
 		/*
 		 * Just send it in terms of of the transmitted data.  This
 		 * will be very slow.
 		 */
 		DTRACE_PROBE1(write__same__low__memory, uint64_t, big_buf_size);
-		big_buf = scmd->trans_data;
-		big_buf_size = scmd->trans_data_len;
+		ret = sbd_write_same_data_common(sl, task, addr,
+		    scmd->trans_data, scmd->trans_data_len, xfer_size, len);
 	} else {
 		/*
 		 * We already ASSERT()ed big_buf_size is an integral multiple
@@ -2406,22 +2427,12 @@ sbd_write_same_data(struct scsi_task *task, sbd_cmd_t *scmd)
 		 */
 		for (off = 0; off < big_buf_size; off += xfer_size)
 			bcopy(scmd->trans_data, big_buf + off, xfer_size);
-	}
 
-	/* Do the actual I/O.  Recycle xfer_size now to be write size. */
-	DTRACE_PROBE1(write__same__io__begin, uint64_t, len);
-	for (sz_done = 0; sz_done < len; sz_done += (uint64_t)xfer_size) {
-		xfer_size = ((big_buf_size + sz_done) <= len) ? big_buf_size :
-		    len - sz_done;
-		ret = sbd_data_write(sl, task, addr + sz_done,
-		    (uint64_t)xfer_size, big_buf);
-		if (ret != SBD_SUCCESS)
-			break;
-	}
-	DTRACE_PROBE2(write__same__io__end, uint64_t, len, uint64_t, sz_done);
+		ret = sbd_write_same_data_common(sl, task, addr, big_buf,
+		    big_buf_size, xfer_size, len);
 
-	if (big_buf != scmd->trans_data)
 		kmem_free(big_buf, big_buf_size);
+	}
 
 	return (ret);
 }
