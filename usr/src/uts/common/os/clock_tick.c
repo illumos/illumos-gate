@@ -152,8 +152,6 @@ ulong_t			clock_tick_intr;
 static uint_t	clock_tick_execute(caddr_t, caddr_t);
 static void	clock_tick_execute_common(int, int, int, clock_t, int);
 
-#define	CLOCK_TICK_ALIGN	64	/* cache alignment */
-
 /*
  * Clock tick initialization is done in two phases:
  *
@@ -170,14 +168,18 @@ clock_tick_init_pre(void)
 	clock_tick_cpu_t	*ctp;
 	int			i, n;
 	clock_tick_set_t	*csp;
-	uintptr_t		buf;
+	uintptr_t		abuf, buf;
 	size_t			size;
 
 	clock_tick_single_threaded = 1;
 
-	size = P2ROUNDUP(sizeof (clock_tick_cpu_t), CLOCK_TICK_ALIGN);
-	buf = (uintptr_t)kmem_zalloc(size * NCPU + CLOCK_TICK_ALIGN, KM_SLEEP);
-	buf = P2ROUNDUP(buf, CLOCK_TICK_ALIGN);
+	/*
+	 * We will not free this memory, but to avoid the false sharing,
+	 * align to cache line size.
+	 */
+	size = P2ROUNDUP(sizeof (clock_tick_cpu_t), _CACHE_LINE_SIZE);
+	abuf = (uintptr_t)kmem_zalloc(size * NCPU + _CACHE_LINE_SIZE, KM_SLEEP);
+	buf = P2ROUNDUP(abuf, _CACHE_LINE_SIZE);
 
 	/*
 	 * Perform initialization in case multi-threading is chosen later.
@@ -527,7 +529,7 @@ clock_tick_schedule(int one_sec)
 
 static void
 clock_tick_execute_common(int start, int scan, int end, clock_t mylbolt,
-	int pending)
+    int pending)
 {
 	cpu_t		*cp;
 	int		i;
