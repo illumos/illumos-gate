@@ -473,22 +473,18 @@ ibtl_dprintf1(char *name, char *fmt, ...)
  *      ibtf_dprintf0
  * Input:
  *      name	- Name of the subsystem generating the debug message
- *  	fmt	- The message to be displayed.
+ *	fmt	- The message to be displayed.
  * Output:
  *      none
  * Returns:
  *      none
  * Description:
- *  	A generic log function to display IBTF debug messages.
+ *	A generic log function to display IBTF debug messages.
  */
 void
 ibtl_dprintf0(char *name, char *fmt, ...)
 {
 	va_list ap;
-
-	/* check if global errlevel matches or not */
-	if (ibtf_errlevel < IBTF_LOG_L0)
-		return;
 
 	va_start(ap, fmt);
 	ibtf_vlog(name, IBTF_LOG_L0, fmt, ap);
