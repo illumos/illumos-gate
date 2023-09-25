@@ -1744,7 +1744,7 @@ static int
 hsfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
     caller_context_t *ct)
 {
-	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
+	return (*noffp < 0 ? EINVAL : 0);
 }
 
 /* ARGSUSED */
