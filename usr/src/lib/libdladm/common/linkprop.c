@@ -274,6 +274,14 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_EN_2500FDX_CAP, sizeof (uint8_t),	"en_2500fdx_cap"},
 
+	{ MAC_PROP_ADV_400GFDX_CAP, sizeof (uint8_t),	"adv_400gfdx_cap"},
+
+	{ MAC_PROP_EN_400GFDX_CAP, sizeof (uint8_t),	"en_400gfdx_cap"},
+
+	{ MAC_PROP_ADV_200GFDX_CAP, sizeof (uint8_t),	"adv_200gfdx_cap"},
+
+	{ MAC_PROP_EN_200GFDX_CAP, sizeof (uint8_t),	"en_200gfdx_cap"},
+
 	{ MAC_PROP_ADV_100GFDX_CAP, sizeof (uint8_t),	"adv_100gfdx_cap"},
 
 	{ MAC_PROP_EN_100GFDX_CAP, sizeof (uint8_t),	"en_100gfdx_cap"},
@@ -710,6 +718,26 @@ static prop_desc_t	prop_table[] = {
 	    set_secondary_macs, NULL,
 	    get_secondary_macs, check_secondary_macs, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_VNIC, DL_ETHER },
+
+	{ "adv_400gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_400gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_200gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_200gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_100gfdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),

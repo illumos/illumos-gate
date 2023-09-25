@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -400,6 +400,11 @@ typedef struct smb_memdevice {
 	/* Added in SMBIOS 3.3 */
 	uint32_t smbmdev_extspeed;	/* Extended device speed */
 	uint32_t smbmdev_extclkspeed;	/* Extended clock speed */
+	/* Added in SMBIOS 3.7 */
+	uint16_t smbmdev_pmic0mfgid;	/* PMIC0 Manufacturer ID */
+	uint16_t smbmdev_pmic0rev;	/* PMIC0 Revision */
+	uint16_t smbmdev_rcdmfgid;	/* RCD Manufacturer ID */
+	uint16_t smbmdev_rcdrev;	/* RCD Revision */
 } smb_memdevice_t;
 
 #define	SMB_MDS_KBYTES		0x8000	/* size in specified in kilobytes */
@@ -813,8 +818,8 @@ enum {
 extern const smb_struct_t *smb_lookup_type(smbios_hdl_t *, uint_t);
 extern const smb_struct_t *smb_lookup_id(smbios_hdl_t *, uint_t);
 extern const char *smb_strptr(const smb_struct_t *, uint_t);
-extern int smb_gteq(smbios_hdl_t *, int);
-extern int smb_libgteq(smbios_hdl_t *, int);
+extern boolean_t smb_gteq(smbios_hdl_t *, int);
+extern boolean_t smb_libgteq(smbios_hdl_t *, int);
 
 extern int smb_set_errno(smbios_hdl_t *, int);
 extern smbios_hdl_t *smb_open_error(smbios_hdl_t *, int *, int);

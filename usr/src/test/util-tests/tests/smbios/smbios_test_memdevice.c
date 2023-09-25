@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -24,15 +25,31 @@
  * 3. Using a 3.3 table with only the old values as valid.
  * 4. Using a 3.3 table with both the old and new values as valid.
  * memory.
+ *
+ * We also test the 3.7 extensions in two ways:
+ *
+ * 1. Using a 3.2 table with a 3.7 library to make sure that the new fields are
+ * properly set to the right spec mandated unknown values.
+ * 2. Using a 3.7 table with a 3.7 library.
  */
 
 #include <stdlib.h>
 #include "smbios_test.h"
 
-static uint16_t smbios_memdevice_speed = 0xdeed;
-static uint16_t smbios_memdevice_clkspeed = 0xf00f;
-static uint32_t smbios_memdevice_extspeed = 0xbaddeed;
-static uint32_t smbios_memdevice_extclkspeed = 0xbadf00f;
+static const uint16_t smbios_memdevice_speed = 0xdeed;
+static const uint16_t smbios_memdevice_clkspeed = 0xf00f;
+static const uint32_t smbios_memdevice_extspeed = 0xbaddeed;
+static const uint32_t smbios_memdevice_extclkspeed = 0xbadf00f;
+static const uint16_t smbios_memdevice_pmic0_mfg = 0x1234;
+static const uint16_t smbios_memdevice_pmic0_rev = 0x5600;
+static const uint16_t smbios_memdevice_rcd_mfg = 0x4321;
+static const uint16_t smbios_memdevice_rcd_rev = 0x6500;
+
+/*
+ * Fixed sizes from older versions.
+ */
+static const size_t smbios_memdevice_len_v3p2 = 0x54;
+static const size_t smbios_memdevice_len_v3p3 = 0x5c;
 
 /*
  * Fill in the basics of a single memory device. Callers need to fill in the
@@ -79,7 +96,6 @@ boolean_t
 smbios_test_memdevice_mktable_32(smbios_test_table_t *table)
 {
 	smb_memdevice_t mem;
-	size_t len = 0x54;
 
 	smbios_test_memdevice_fill(&mem);
 	mem.smbmdev_speed = htole16(smbios_memdevice_speed);
@@ -87,12 +103,8 @@ smbios_test_memdevice_mktable_32(smbios_test_table_t *table)
 	mem.smbmdev_extspeed = htole32(0);
 	mem.smbmdev_extclkspeed = htole32(0);
 
-	/*
-	 * Because we're emulating an SMBIOS 3.2 table, we have to set it to the
-	 * specification's defined size for that revision - 0x54.
-	 */
-	mem.smbmdev_hdr.smbh_len = len;
-	(void) smbios_test_table_append(table, &mem, len);
+	mem.smbmdev_hdr.smbh_len = smbios_memdevice_len_v3p2;
+	(void) smbios_test_table_append(table, &mem, smbios_memdevice_len_v3p2);
 	smbios_test_table_append_eot(table);
 
 	return (B_TRUE);
@@ -109,7 +121,8 @@ smbios_test_memdevice_mktable_33(smbios_test_table_t *table)
 	mem.smbmdev_extspeed = htole32(0);
 	mem.smbmdev_extclkspeed = htole32(0);
 
-	(void) smbios_test_table_append(table, &mem, sizeof (mem));
+	mem.smbmdev_hdr.smbh_len = smbios_memdevice_len_v3p3;
+	(void) smbios_test_table_append(table, &mem, smbios_memdevice_len_v3p3);
 	smbios_test_table_append_eot(table);
 
 	return (B_TRUE);
@@ -126,9 +139,31 @@ smbios_test_memdevice_mktable_33ext(smbios_test_table_t *table)
 	mem.smbmdev_extspeed = htole32(smbios_memdevice_extspeed);
 	mem.smbmdev_extclkspeed = htole32(smbios_memdevice_extclkspeed);
 
-	(void) smbios_test_table_append(table, &mem, sizeof (mem));
+	mem.smbmdev_hdr.smbh_len = smbios_memdevice_len_v3p3;
+	(void) smbios_test_table_append(table, &mem, smbios_memdevice_len_v3p3);
 	smbios_test_table_append_eot(table);
 
+	return (B_TRUE);
+}
+
+boolean_t
+smbios_test_memdevice_mktable_37(smbios_test_table_t *table)
+{
+	smb_memdevice_t mem;
+
+	smbios_test_memdevice_fill(&mem);
+	mem.smbmdev_speed = htole16(0xffff);
+	mem.smbmdev_clkspeed = htole16(0xffff);
+	mem.smbmdev_extspeed = htole32(smbios_memdevice_extspeed);
+	mem.smbmdev_extclkspeed = htole32(smbios_memdevice_extclkspeed);
+
+	mem.smbmdev_pmic0mfgid = htole16(smbios_memdevice_pmic0_mfg);
+	mem.smbmdev_pmic0rev = htole16(smbios_memdevice_pmic0_rev);
+	mem.smbmdev_rcdmfgid = htole16(smbios_memdevice_rcd_mfg);
+	mem.smbmdev_rcdrev = htole16(smbios_memdevice_rcd_rev);
+
+	(void) smbios_test_table_append(table, &mem, sizeof (mem));
+	smbios_test_table_append_eot(table);
 	return (B_TRUE);
 }
 
@@ -262,6 +297,56 @@ smbios_test_memdevice_verify_32_33(smbios_hdl_t *hdl)
 	return (ret);
 }
 
+/*
+ * This is similar to the 3.2/3.3 variant above except we're checking the newer
+ * 3.7 fields related to the PMIC0 and RCD.
+ */
+boolean_t
+smbios_test_memdevice_verify_32_37(smbios_hdl_t *hdl)
+{
+	smbios_struct_t sp;
+	smbios_memdevice_t mem;
+	boolean_t ret = B_TRUE;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_MEMDEVICE, &sp) == -1) {
+		warnx("failed to lookup SMBIOS memory device: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_memdevice(hdl, sp.smbstr_id, &mem) != 0) {
+		warnx("failed to get SMBIOS memory device info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_memdevice_verify_32_33(hdl)) {
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_pmic0_mfgid != SMB_MD_MFG_UNKNOWN) {
+		warnx("found wrong PMIC0 mfg id: 0x%x", mem.smbmd_pmic0_mfgid);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_pmic0_rev != SMB_MD_REV_UNKNOWN) {
+		warnx("found wrong PMIC0 revision: 0x%x", mem.smbmd_pmic0_rev);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_rcd_mfgid != SMB_MD_MFG_UNKNOWN) {
+		warnx("found wrong RCD mfg id: 0x%x", mem.smbmd_rcd_mfgid);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_rcd_rev != SMB_MD_REV_UNKNOWN) {
+		warnx("found wrong RCD revision: 0x%x", mem.smbmd_rcd_rev);
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
 boolean_t
 smbios_test_memdevice_verify_33(smbios_hdl_t *hdl)
 {
@@ -348,6 +433,56 @@ smbios_test_memdevice_verify_33ext(smbios_hdl_t *hdl)
 
 	if (mem.smbmd_extclkspeed != smbios_memdevice_extclkspeed) {
 		warnx("found wrong device clkspeed: %u", mem.smbmd_extclkspeed);
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
+/*
+ * Note, the 3.7 table is based upon 3.3ext so we use that for checking the
+ * first chunk of this.
+ */
+boolean_t
+smbios_test_memdevice_verify_37(smbios_hdl_t *hdl)
+{
+	smbios_struct_t sp;
+	smbios_memdevice_t mem;
+	boolean_t ret = B_TRUE;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_MEMDEVICE, &sp) == -1) {
+		warnx("failed to lookup SMBIOS memory device: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_memdevice(hdl, sp.smbstr_id, &mem) != 0) {
+		warnx("failed to get SMBIOS memory device info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_memdevice_verify_33ext(hdl)) {
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_pmic0_mfgid != smbios_memdevice_pmic0_mfg) {
+		warnx("found wrong PMIC0 mfg id: 0x%x", mem.smbmd_pmic0_mfgid);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_pmic0_rev != smbios_memdevice_pmic0_rev) {
+		warnx("found wrong PMIC0 revision: 0x%x", mem.smbmd_pmic0_rev);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_rcd_mfgid != smbios_memdevice_rcd_mfg) {
+		warnx("found wrong RCD mfg id: 0x%x", mem.smbmd_rcd_mfgid);
+		ret = B_FALSE;
+	}
+
+	if (mem.smbmd_rcd_rev != smbios_memdevice_rcd_rev) {
+		warnx("found wrong RCD revision: 0x%x", mem.smbmd_rcd_rev);
 		ret = B_FALSE;
 	}
 

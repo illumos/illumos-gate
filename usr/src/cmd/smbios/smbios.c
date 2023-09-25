@@ -22,13 +22,14 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/sysmacros.h>
 #include <sys/param.h>
+#include <sys/bitext.h>
 
 #include <smbios.h>
 #include <alloca.h>
@@ -196,6 +197,23 @@ jedec_print(FILE *fp, const char *desc, uint_t id)
 		oprintf(fp, "  %s: Bank: 0x%x Vendor: 0x%x (%s)\n", desc,
 		    cont + 1, vendor, name);
 	}
+}
+
+/*
+ * Convert an SMBIOS encoded JEDEDC component revision into its actual form. In
+ * general, JEDEC revisions are single byte values; however, the SMBIOS fields
+ * are two bytes wide. The byte that we care about is the "first" byte which
+ * translates into the upper bits here. The revision is binary coded decimal
+ * (BCD) represented with each nibble as major.minor. The major is the upper
+ * nibble and the minor is the lower one.
+ */
+static void
+jedec_rev_print(FILE *fp, const char *desc, uint16_t raw_rev)
+{
+	uint8_t rev = (uint8_t)bitx16(raw_rev, 15, 8);
+	uint8_t maj = bitx8(rev, 7, 4);
+	uint8_t min = bitx8(rev, 3, 0);
+	oprintf(fp, "  %s: %x.%x\n", desc, maj, min);
 }
 
 /*
@@ -1162,7 +1180,7 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 		str_print(fp, "  Firmware Revision", md.smbmd_firmware_rev);
 	}
 
-	if (md.smbmd_modmfg_id != 0) {
+	if (md.smbmd_modmfg_id != SMB_MD_MFG_UNKNOWN) {
 		jedec_print(fp, "Module Manufacturer ID", md.smbmd_modmfg_id);
 	}
 
@@ -1170,7 +1188,7 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 		jedec_print(fp, "Module Product ID", md.smbmd_modprod_id);
 	}
 
-	if (md.smbmd_cntrlmfg_id != 0) {
+	if (md.smbmd_cntrlmfg_id != SMB_MD_MFG_UNKNOWN) {
 		jedec_print(fp, "Memory Subsystem Controller Manufacturer ID",
 		    md.smbmd_cntrlmfg_id);
 	}
@@ -1206,6 +1224,22 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	} else if (md.smbmd_logical_size != 0) {
 		oprintf(fp, "  Logical Size: %llu bytes\n",
 		    (u_longlong_t)md.smbmd_logical_size);
+	}
+
+	if (md.smbmd_pmic0_mfgid != SMB_MD_MFG_UNKNOWN) {
+		jedec_print(fp, "PMIC0 Manufacturer ID", md.smbmd_pmic0_mfgid);
+	}
+
+	if (md.smbmd_pmic0_rev != SMB_MD_REV_UNKNOWN) {
+		jedec_rev_print(fp, "PMIC0 Revision", md.smbmd_pmic0_rev);
+	}
+
+	if (md.smbmd_rcd_mfgid != SMB_MD_MFG_UNKNOWN) {
+		jedec_print(fp, "RCD Manufacturer ID", md.smbmd_rcd_mfgid);
+	}
+
+	if (md.smbmd_rcd_rev != SMB_MD_REV_UNKNOWN) {
+		jedec_rev_print(fp, "RCD Revision", md.smbmd_rcd_rev);
 	}
 }
 

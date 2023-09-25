@@ -2100,6 +2100,54 @@ The
 .Dv MAC_PROP_EN_100GFDX_CAP
 property describes whether or not 100 Gbit/s full-duplex support is
 enabled.
+.It Dv MAC_PROP_ADV_200GFDX_CAP
+.Bd -filled -compact
+Type:
+.Vt uint8_t |
+Permissions:
+.Sy Read-Only
+.Ed
+.Pp
+The
+.Dv MAC_PROP_ADV_200GFDX_CAP
+property describes whether or not 200 Gbit/s full-duplex support is
+advertised.
+.It Dv MAC_PROP_EN_200GFDX_CAP
+.Bd -filled -compact
+Type:
+.Vt uint8_t |
+Permissions:
+.Sy Read/Write
+.Ed
+.Pp
+The
+.Dv MAC_PROP_EN_200GFDX_CAP
+property describes whether or not 200 Gbit/s full-duplex support is
+enabled.
+.It Dv MAC_PROP_ADV_400GFDX_CAP
+.Bd -filled -compact
+Type:
+.Vt uint8_t |
+Permissions:
+.Sy Read-Only
+.Ed
+.Pp
+The
+.Dv MAC_PROP_ADV_400GFDX_CAP
+property describes whether or not 400 Gbit/s full-duplex support is
+advertised.
+.It Dv MAC_PROP_EN_400GFDX_CAP
+.Bd -filled -compact
+Type:
+.Vt uint8_t |
+Permissions:
+.Sy Read/Write
+.Ed
+.Pp
+The
+.Dv MAC_PROP_EN_400GFDX_CAP
+property describes whether or not 400 Gbit/s full-duplex support is
+enabled.
 .El
 .Ss Private Properties
 In addition to the defined properties above, drivers are allowed to

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -95,10 +95,13 @@ extern boolean_t smbios_test_verify_badids(smbios_hdl_t *);
 extern boolean_t smbios_test_memdevice_mktable_32(smbios_test_table_t *);
 extern boolean_t smbios_test_memdevice_mktable_33(smbios_test_table_t *);
 extern boolean_t smbios_test_memdevice_mktable_33ext(smbios_test_table_t *);
+extern boolean_t smbios_test_memdevice_mktable_37(smbios_test_table_t *);
 extern boolean_t smbios_test_memdevice_verify_32(smbios_hdl_t *);
 extern boolean_t smbios_test_memdevice_verify_32_33(smbios_hdl_t *);
+extern boolean_t smbios_test_memdevice_verify_32_37(smbios_hdl_t *);
 extern boolean_t smbios_test_memdevice_verify_33(smbios_hdl_t *);
 extern boolean_t smbios_test_memdevice_verify_33ext(smbios_hdl_t *);
+extern boolean_t smbios_test_memdevice_verify_37(smbios_hdl_t *);
 
 extern boolean_t smbios_test_pinfo_mktable_amd64(smbios_test_table_t *);
 extern boolean_t smbios_test_pinfo_verify_amd64(smbios_hdl_t *);
