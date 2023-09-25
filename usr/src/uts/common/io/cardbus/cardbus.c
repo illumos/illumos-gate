@@ -1623,6 +1623,7 @@ cardbus_parse_devprop(cbus_t *cbp, char *cp)
 				cmn_err(CE_CONT, "cardbus_parse_devprop: "
 				    "escape not allowed outside "
 				    "of quotes at [%s]\n", token);
+				cardbus_devprops_free(cdsp);
 				return (DDI_FAILURE);
 
 			} /* if (!qm) */
@@ -1660,6 +1661,7 @@ cardbus_parse_devprop(cbus_t *cbp, char *cp)
 					    "cardbus_parse_devprop: "
 					    "unexpected string [%s] after "
 					    "[%s]\n", quote, token);
+					cardbus_devprops_free(cdsp);
 					return (DDI_FAILURE);
 				} else {
 					if (strcmp(token, cb_bnamestr) == 0) {
