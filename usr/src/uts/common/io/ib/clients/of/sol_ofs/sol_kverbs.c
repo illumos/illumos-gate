@@ -141,9 +141,9 @@ static void
 ofs_async_handler(void *clntp, ibt_hca_hdl_t hdl, ibt_async_code_t code,
     ibt_async_event_t *event)
 {
-	ofs_client_t 	*ofs_client = (ofs_client_t *)clntp;
+	ofs_client_t	*ofs_client = (ofs_client_t *)clntp;
 	struct ib_event ib_event;
-	struct ib_qp 	*qpp;
+	struct ib_qp	*qpp;
 	struct ib_cq	*cqp;
 
 
@@ -823,6 +823,7 @@ ib_alloc_pd(struct ib_device *device)
 		SOL_OFS_DPRINTF_L2(sol_kverbs_dbg_str,
 		    "ib_alloc_pd: device: 0x%p => invalid device state (%d)",
 		    device, device->reg_state);
+		kmem_free(pd, sizeof (struct ib_pd));
 		return ((struct ib_pd *)-ENXIO);
 	}
 
@@ -839,11 +840,11 @@ ib_alloc_pd(struct ib_device *device)
 		    "rtn: 0x%x", device, pd, pd->ibt_pd, rtn);
 		return (pd);
 	}
-	kmem_free(pd, sizeof (struct ib_pd));
 
 	SOL_OFS_DPRINTF_L2(sol_kverbs_dbg_str,
 	    "ib_alloc_pd: device: 0x%p, pd: 0x%p, ibt_pd: 0x%p => "
 	    "ibt_alloc_pd failed w/ 0x%x", device, pd, pd->ibt_pd, rtn);
+	kmem_free(pd, sizeof (struct ib_pd));
 
 	switch (rtn) {
 	case IBT_INSUFF_RESOURCE:
@@ -963,6 +964,7 @@ ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
 		    "comp_vector: %p => invalid device state (%d)", device,
 		    comp_handler, event_handler, cq_context, cqe, comp_vector,
 		    device->reg_state);
+		kmem_free(cq, sizeof (struct ib_cq));
 		return ((struct ib_cq *)-ENXIO);
 	}
 
@@ -992,11 +994,11 @@ ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
 		    "rtn: 0x%x", device, cqe, cq->ibt_cq, rtn);
 		return (cq);
 	}
-	kmem_free(cq, sizeof (struct ib_cq));
 
 	SOL_OFS_DPRINTF_L2(sol_kverbs_dbg_str,
 	    "ib_create_cq: device: 0x%p, cqe: 0x%x, ibt_cq: 0x%p => "
 	    "ibt_alloc_cq failed w/ 0x%x", device, cqe, cq->ibt_cq, rtn);
+	kmem_free(cq, sizeof (struct ib_cq));
 
 	switch (rtn) {
 	case IBT_HCA_CQ_EXCEEDED:
