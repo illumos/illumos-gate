@@ -25,7 +25,7 @@
  */
 
 /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
-/*      All Rights Reserved   */
+/*	All Rights Reserved */
 
 /*
  *	devfree key [device [...]]
@@ -42,7 +42,6 @@
 #include	<values.h>
 #include	<devtab.h>
 
-
 /*
  *  Local definitions
  *	TRUE		Boolean TRUE value
@@ -102,11 +101,12 @@
  *	msg			Buffer for the text-component of a message.
  */
 
-#define	stdmsg(r,l,s,m)	(void) fmtmsg(MM_PRINT|MM_UTIL|r,l,s,m,MM_NULLACT,MM_NULLTAG)
+#define	stdmsg(r, l, s, m)	\
+	(void) fmtmsg(MM_PRINT | MM_UTIL | r, l, s, m, MM_NULLACT, MM_NULLTAG)
 
 static	char	lbl[MM_MXLABELLN+1];
 static	char	msg[MM_MXTXTLN+1];
-
+
 /*
  *  devfree key [device [device [...]]]
  *
@@ -132,12 +132,12 @@ int
 main(int argc, char *argv[])
 {
 	/* Automatics */
-	char		      **argp;		/* Ptr to current argument */
-	struct reservdev      **rsvd;		/* Ptr to list of locks */
-	struct reservdev      **plk;		/* Running ptr to locks */
-	char		       *devtab;		/* Ptr to device table name */
-	char		       *rsvtab;		/* Ptr to dev-rsv-tbl name */
-	char		       *p;		/* Temp char pointer */
+	char			**argp;		/* Ptr to current argument */
+	struct reservdev	**rsvd;		/* Ptr to list of locks */
+	struct reservdev	**plk;		/* Running ptr to locks */
+	char			*devtab;	/* Ptr to device table name */
+	char			*rsvtab;	/* Ptr to dev-rsv-tbl name */
+	char			*p;		/* Temp char pointer */
 	int			argcount;	/* Number of args on cmd */
 	long			lkey;		/* Key for locking (long) */
 	int			key;		/* Key for locking */
@@ -147,6 +147,7 @@ main(int argc, char *argv[])
 	int			syntaxerr;	/* Flag, TRUE if syntax error */
 	int			exitcd;		/* Value for exit() */
 	int			c;		/* Option character */
+	const char		*errstr;
 
 
 	/*
@@ -154,11 +155,16 @@ main(int argc, char *argv[])
 	 */
 
 	/* Build a message label */
-	if (p = strrchr(argv[0], '/')) p++;
-	else p = argv[0];
-	(void) strlcat(strcpy(lbl, "UX:"), p, sizeof(lbl));
+	if (p = strrchr(argv[0], '/'))
+		p++;
+	else
+		p = argv[0];
+	(void) strlcat(strcpy(lbl, "UX:"), p, sizeof (lbl));
 
-	/* Make only the text component of messages appear (remove this in SVR4.1) */
+	/*
+	 * Make only the text component of messages appear
+	 * (remove this in SVR4.1)
+	 */
 	(void) putenv("MSGVERB=text");
 
 
@@ -168,65 +174,71 @@ main(int argc, char *argv[])
 
 	opterr = 0;
 	syntaxerr = FALSE;
-	while ((c = getopt(argc, argv, "")) != EOF) switch(c) {
-	default:
-	    syntaxerr = FALSE;
-	    break;
+	while ((c = getopt(argc, argv, "")) != EOF) {
+		switch (c) {
+		default:
+			syntaxerr = FALSE;
+			break;
+		}
 	}
 
 
 	/* Argument initializations */
 	argp = &argv[optind];
-	if ((argcount = argc-optind) < 1) syntaxerr = TRUE;
+	if ((argcount = argc-optind) < 1)
+		syntaxerr = TRUE;
 
 
 	/* If there's (an obvious) syntax error, write a message and quit */
 	if (syntaxerr) {
-	    stdmsg(MM_NRECOV, lbl, MM_ERROR, M_USAGE);
-	    exit(EX_ERROR);
+		stdmsg(MM_NRECOV, lbl, MM_ERROR, M_USAGE);
+		exit(EX_ERROR);
 	}
 
 
 	/*
 	 *  devfree key
 	 *
-	 *  	Free all devices that have been reserved using the key "key".
+	 *	Free all devices that have been reserved using the key "key".
 	 */
 
 	if (argcount == 1) {
 
-	    /* Extract the key from the command */
-	    lkey = strtol(*argp, &p, 10);
-	    if (*p || (lkey <= 0) || (lkey > MAXINT)) {
-		(void) snprintf(msg, sizeof (msg), M_INVKEY, *argp);
-		stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		exit(EX_ERROR);
-	    }
-	    key = (int) lkey;
-
-	    /* Get the list of devices currently reserved */
-	    if (rsvd = reservdev()) {
-		exitcd = EX_OK;
-		for (plk = rsvd ; *plk ; plk++) {
-		    if ((*plk)->key == key)
-			if (devfree(key, (*plk)->devname) != 0)
-			    exitcd = EX_NOFREE;
+		/* Extract the key from the command */
+		lkey = strtonum(*argp, 1, MAXINT, &errstr);
+		if (errstr != NULL) {
+			(void) snprintf(msg, sizeof (msg), M_INVKEY, *argp);
+			stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
+			exit(EX_ERROR);
 		}
-	    } else {
-		if (((errno == ENOENT) || (errno == EACCES)) && (rsvtab = _rsvtabpath())) {
-		    (void) snprintf(msg, sizeof(msg), M_RSVTAB, rsvtab);
-		    exitcd = EX_TBLERR;
-		    sev = MM_ERROR;
+		key = (int)lkey;
+
+		/* Get the list of devices currently reserved */
+		if (rsvd = reservdev()) {
+			exitcd = EX_OK;
+			for (plk = rsvd; *plk; plk++) {
+				if ((*plk)->key == key)
+					if (devfree(key, (*plk)->devname) != 0)
+						exitcd = EX_NOFREE;
+			}
 		} else {
-		    (void) snprintf(msg, sizeof (msg), M_ERROR, errno);
-		    exitcd = EX_ERROR;
-		    sev = MM_HALT;
+			if (((errno == ENOENT) || (errno == EACCES)) &&
+			    (rsvtab = _rsvtabpath())) {
+				(void) snprintf(msg, sizeof (msg), M_RSVTAB,
+				    rsvtab);
+				exitcd = EX_TBLERR;
+				sev = MM_ERROR;
+			} else {
+				(void) snprintf(msg, sizeof (msg), M_ERROR,
+				    errno);
+				exitcd = EX_ERROR;
+				sev = MM_HALT;
+			}
+			stdmsg(MM_NRECOV, lbl, sev, msg);
 		}
-		stdmsg(MM_NRECOV, lbl, sev, msg);
-	    }
 
-	    /* Done */
-	    exit(exitcd);
+		/* Done */
+		exit(exitcd);
 	}
 
 
@@ -238,27 +250,27 @@ main(int argc, char *argv[])
 
 	/* Open the device file (if there's one to be opened) */
 	if (!_opendevtab("r")) {
-	    if (devtab = _devtabpath()) {
-		(void) snprintf(msg, sizeof(msg), M_DEVTAB, devtab);
-		exitcd = EX_TBLERR;
-		sev = MM_ERROR;
-	    } else {
-		(void) snprintf(msg, sizeof (msg), M_ERROR, errno);
-		exitcd = EX_ERROR;
-		sev = MM_HALT;
-	    }
-	    stdmsg(MM_NRECOV, lbl, sev, msg);
-	    exit(exitcd);
+		if (devtab = _devtabpath()) {
+			(void) snprintf(msg, sizeof (msg), M_DEVTAB, devtab);
+			exitcd = EX_TBLERR;
+			sev = MM_ERROR;
+		} else {
+			(void) snprintf(msg, sizeof (msg), M_ERROR, errno);
+			exitcd = EX_ERROR;
+			sev = MM_HALT;
+		}
+		stdmsg(MM_NRECOV, lbl, sev, msg);
+		exit(exitcd);
 	}
 
 	/* Extract the key from the command */
-	lkey = strtol(*argp, &p, 10);
-	if (*p || (lkey <= 0) || (lkey > MAXINT)) {
-	    (void) snprintf(msg, sizeof(msg), M_INVKEY, *argp);
-	    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-	    exit(EX_ERROR);
+	lkey = strtonum(*argp, 1, MAXINT, &errstr);
+	if (errstr != NULL) {
+		(void) snprintf(msg, sizeof (msg), M_INVKEY, *argp);
+		stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
+		exit(EX_ERROR);
 	}
-	key = (int) lkey;
+	key = (int)lkey;
 	argp++;
 
 	/* Loop through the list of devices to free */
@@ -266,52 +278,51 @@ main(int argc, char *argv[])
 	halt = FALSE;
 	while (!halt && *argp) {
 
-	    /* Try to free the device */
-	    if (devfree(key, *argp) != 0) {
-		if ((errno == EACCES) || (errno == ENOENT)) {
+		/* Try to free the device */
+		if (devfree(key, *argp) != 0) {
+			if ((errno == EACCES) || (errno == ENOENT)) {
 
-		    /* Can't get at reservation file */
-		    if (rsvtab = _rsvtabpath()) {
-			exitcode = EX_TBLERR;
-			(void) snprintf(msg, sizeof(msg), M_RSVTAB, rsvtab);
-			sev = MM_ERROR;
-		    }
-		    else {
-			exitcode = EX_ERROR;
-			(void) snprintf(msg, sizeof (msg), M_ERROR, errno);
-			sev = MM_HALT;
-		    }
-		    stdmsg(MM_NRECOV, lbl, sev, msg);
-		    halt = TRUE;
+				/* Can't get at reservation file */
+				if (rsvtab = _rsvtabpath()) {
+					exitcode = EX_TBLERR;
+					(void) snprintf(msg, sizeof (msg),
+					    M_RSVTAB, rsvtab);
+					sev = MM_ERROR;
+				} else {
+					exitcode = EX_ERROR;
+					(void) snprintf(msg, sizeof (msg),
+					    M_ERROR, errno);
+					sev = MM_HALT;
+				}
+				stdmsg(MM_NRECOV, lbl, sev, msg);
+				halt = TRUE;
+			} else if (errno == EPERM) {
+
+				/* Wrong key */
+				(void) snprintf(msg, sizeof (msg), M_NOTONKEY,
+				    *argp);
+				stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
+				exitcode = EX_NOFREE;
+			} else if (errno == EINVAL) {
+
+				/* Device not reserved */
+				(void) snprintf(msg, sizeof (msg), M_NOTRSVD,
+				    *argp);
+				stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
+				exitcode = EX_NOFREE;
+			} else {
+
+				/* Some other strange error occurred */
+				(void) snprintf(msg, sizeof (msg), M_ERROR,
+				    errno);
+				stdmsg(MM_NRECOV, lbl, MM_HALT, msg);
+				exitcode = EX_ERROR;
+				halt = TRUE;
+			}
 		}
-	        else if (errno == EPERM) {
-
-		    /* Wrong key */
-		    (void) snprintf(msg, sizeof(msg), M_NOTONKEY, *argp);
-		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcode = EX_NOFREE;
-		}
-		else if (errno == EINVAL) {
-
-		    /* Device not reserved */
-		    (void) snprintf(msg, sizeof(msg), M_NOTRSVD, *argp);
-		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcode = EX_NOFREE;
-		}
-
-		else {
-
-		    /* Some other strange error occurred */
-		    (void) snprintf(msg, sizeof (msg), M_ERROR, errno);
-		    stdmsg(MM_NRECOV, lbl, MM_HALT, msg);
-		    exitcode = EX_ERROR;
-		    halt = TRUE;
-		}
-	    }
-	    argp++;
+		argp++;
 	}
 
-
 	/* Exit with the appropriate code */
-	return(exitcode);
+	return (exitcode);
 }
