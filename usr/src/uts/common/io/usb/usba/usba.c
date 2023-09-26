@@ -1095,7 +1095,9 @@ usba_add_to_list(usba_list_entry_t *head, usba_list_entry_t *element)
 	    "usba_add_to_list: head=0x%p element=0x%p count=%d",
 	    (void *)head, (void *)element, head->count);
 
+#ifdef DEBUG
 done:
+#endif
 	mutex_exit(&head->list_mutex);
 	mutex_exit(&element->list_mutex);
 }
