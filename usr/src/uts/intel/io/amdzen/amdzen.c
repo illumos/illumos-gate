@@ -1015,7 +1015,7 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		 * Genoa.
 		 */
 		if (amdzen_is_rome_style(df->adf_funcs[0]->azns_did)) {
-			if (inst > ARRAY_SIZE(amdzen_df_rome_ids)) {
+			if (inst >= ARRAY_SIZE(amdzen_df_rome_ids)) {
 				dev_err(azn->azn_dip, CE_WARN, "Rome family "
 				    "processor reported more ids than the PPR, "
 				    "resetting %u to instance zero", inst);
