@@ -873,7 +873,6 @@ typedef union {
 } Oppbuf;
 
 static int prom_fd;
-static uchar_t *prom_snapshot;
 
 static int
 is_openprom(void)
@@ -894,6 +893,8 @@ int
 do_prominfo(void)
 {
 	uint_t arg = 0;
+	uint_t *ptr;
+	uchar_t *prom_snapshot;
 
 	if (promopen(O_RDONLY))  {
 		err(-1, "openeepr device open failed");
@@ -918,15 +919,19 @@ do_prominfo(void)
 	if (ioctl(prom_fd, OPROMSNAPSHOT, &arg) < 0)
 		err(-1, "OPROMSNAPSHOT");
 
-	if (arg == 0)
+	/*
+	 * ioctl OPROMCOPYOUT is expecting buffer with at least
+	 * sizeof (uint_t).
+	 */
+	if (arg < sizeof (uint_t))
 		return (1);
 
-	if ((prom_snapshot = malloc(arg)) == NULL)
+	if ((ptr = malloc(arg)) == NULL)
 		err(-1, "failed to allocate memory");
 
 	/* copy out the snapshot for printing */
-	/*LINTED*/
-	*(uint_t *)prom_snapshot = arg;
+	*ptr = arg;
+	prom_snapshot = (uchar_t *)ptr;
 	if (ioctl(prom_fd, OPROMCOPYOUT, prom_snapshot) < 0)
 		err(-1, "OPROMCOPYOUT");
 
@@ -934,7 +939,7 @@ do_prominfo(void)
 
 	/* print out information */
 	walk(prom_snapshot, arg, 0);
-	free(prom_snapshot);
+	free(ptr);
 
 	return (0);
 }
