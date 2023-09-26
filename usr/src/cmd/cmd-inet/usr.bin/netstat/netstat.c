@@ -6645,7 +6645,7 @@ mrt_report(mib_item_t *item)
 			if (Xflag)
 				(void) printf("%u records for ipVifTable:\n",
 				    item->length/sizeof (struct vifctl));
-			if (item->length/sizeof (struct vifctl) == 0) {
+			if (item->length < sizeof (struct vifctl)) {
 				(void) puts("\nVirtual Interface Table is "
 				    "empty");
 				break;
@@ -6686,7 +6686,7 @@ mrt_report(mib_item_t *item)
 			if (Xflag)
 				(void) printf("%u records for ipMfcTable:\n",
 				    item->length/sizeof (struct vifctl));
-			if (item->length/sizeof (struct vifctl) == 0) {
+			if (item->length < sizeof (struct vifctl)) {
 				(void) puts("\nMulticast Forwarding Cache is "
 				    "empty");
 				break;
