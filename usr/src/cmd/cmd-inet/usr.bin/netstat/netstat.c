@@ -7740,10 +7740,8 @@ uds_report(kstat_ctl_t *kc)
 	struct sockinfo	*psi;
 	boolean_t	print_uds_hdr_once = B_TRUE;
 
-	if (kc == NULL) {
+	if (kc == NULL)
 		fail(0, "uds_report: No kstat");
-		exit(3);
-	}
 
 	if ((ksp = kstat_lookup(kc, "sockfs", 0, "sock_unix_list")) == NULL)
 		fail(0, "kstat_data_lookup failed\n");
