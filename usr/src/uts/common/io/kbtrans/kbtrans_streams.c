@@ -1470,8 +1470,8 @@ kbtrans_putcode(register struct kbtrans *upper, uint_t code)
 	 */
 	if ((bp = allocb(sizeof (uint_t), BPRI_HI)) == NULL) {
 
-		cmn_err(CE_WARN, "kbtrans_putcode: Can't allocate block\
-			for keycode.");
+		cmn_err(CE_WARN, "kbtrans_putcode: "
+		    "Can't allocate block for keycode.");
 
 		return;
 	}
@@ -1553,8 +1553,8 @@ kbtrans_queueevent(struct kbtrans *upper, Firm_event *fe)
 		upper->kbtrans_overflow_cnt++;
 	} else {
 		if ((bp = allocb(sizeof (Firm_event), BPRI_HI)) == NULL) {
-			cmn_err(CE_WARN, "kbtrans_queueevent: Can't allocate \
-					block for event.");
+			cmn_err(CE_WARN, "kbtrans_queueevent: "
+			    "Can't allocate block for event.");
 		} else {
 			uniqtime32(&fe->time);
 			*(Firm_event *)bp->b_wptr = *fe;
