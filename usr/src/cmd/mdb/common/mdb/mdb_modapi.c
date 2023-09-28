@@ -25,6 +25,7 @@
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -104,6 +105,62 @@ mdb_nicenum(uint64_t num, char *buf)
 		(void) mdb_snprintf(buf, MDB_NICENUM_BUFLEN, "%llu%s",
 		    (u_longlong_t)n, u);
 	}
+}
+
+void
+mdb_nicetime(int64_t delta, char *buf, size_t buflen)
+{
+	const char	*sign = (delta < 0) ? "-" : "+";
+	char		daybuf[32] = { 0 };
+	char		fracbuf[32] = { 0 };
+
+	if (delta < 0)
+		delta = -delta;
+
+	if (delta == 0) {
+		(void) mdb_snprintf(buf, buflen, "0ns");
+		return;
+	}
+
+	/* Handle values < 1s */
+	if (delta < NANOSEC) {
+		static const char f_units[] = "num";
+
+		uint_t idx = 0;
+		while (delta >= 1000) {
+			delta /= 1000;
+			idx++;
+		}
+
+		(void) mdb_snprintf(buf, buflen, "t%s%lld%cs",
+		    sign, delta, f_units[idx]);
+		return;
+	}
+
+	uint64_t days, hours, mins, secs, frac;
+
+	frac = delta % NANOSEC;
+	delta /= NANOSEC;
+
+	secs = delta % 60;
+	delta /= 60;
+
+	mins = delta % 60;
+	delta /= 60;
+
+	hours = delta % 24;
+	delta /= 24;
+
+	days = delta;
+
+	if (days > 0)
+		(void) mdb_snprintf(daybuf, sizeof (daybuf), "%llud ", days);
+
+	if (frac > 0)
+		(void) mdb_snprintf(fracbuf, sizeof (fracbuf), ".%llu", frac);
+
+	(void) mdb_snprintf(buf, buflen, "t%s%s%02llu:%02llu:%02llu%s",
+	    sign, daybuf, hours, mins, secs, fracbuf);
 }
 
 ssize_t

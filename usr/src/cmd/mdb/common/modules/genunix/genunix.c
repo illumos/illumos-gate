@@ -24,6 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_param.h>
@@ -4332,7 +4333,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "lgrp_set", "", "display bitmask of lgroups as a list", lgrp_set},
 
 	/* from log.c */
-	{ "msgbuf", "?[-v]", "print most recent console messages", msgbuf },
+	{ "msgbuf", "?[-tTv]", "print most recent console messages", msgbuf,
+		msgbuf_help },
 
 	/* from mdi.c */
 	{ "mdipi", NULL, "given a path, dump mdi_pathinfo "

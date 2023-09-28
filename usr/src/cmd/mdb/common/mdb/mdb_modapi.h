@@ -23,6 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef	_MDB_MODAPI_H
@@ -261,6 +262,7 @@ extern void mdb_free(void *, size_t);
 
 extern int mdb_snprintfrac(char *, int, uint64_t, uint64_t, int);
 extern void mdb_nicenum(uint64_t, char *);
+extern void mdb_nicetime(int64_t, char *, size_t);
 
 extern size_t mdb_snprintf(char *, size_t, const char *, ...);
 extern void mdb_printf(const char *, ...);
