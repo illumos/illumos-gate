@@ -98,7 +98,6 @@ CPPFLAGS += $(MYCPPFLAGS)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

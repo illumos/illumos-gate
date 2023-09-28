@@ -870,8 +870,7 @@ rt2860_alloc_rx_ring(struct rt2860_softc *sc, struct rt2860_rx_ring *ring)
 
 	RT2860_DMA_SYNC(ring->rxdesc_dma, DDI_DMA_SYNC_FORDEV);
 	return (DDI_SUCCESS);
-fail2:
-	rt2860_free_dma_mem(&ring->rxdesc_dma);
+
 fail1:
 	return (err);
 }
@@ -3082,7 +3081,6 @@ fail7:
 	mutex_destroy(&sc->sc_genlock);
 	mutex_destroy(&sc->sc_txlock);
 	mutex_destroy(&sc->sc_rxlock);
-fail6:
 	rt2860_free_tx_pool(sc);
 fail5:
 	rt2860_free_rx_ring(sc, &sc->rxq);

@@ -124,7 +124,9 @@ ECCurveParams_dup(const ECCurveParams * params, int kmflag)
 	}
 	ret->cofactor = params->cofactor;
 
+#ifndef _KERNEL
   CLEANUP:
+#endif
 	if (res != 1) {
 		EC_FreeCurveParams(ret);
 		return NULL;

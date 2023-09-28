@@ -1634,8 +1634,8 @@ errout2:
 	ec_unbind_evtchn(vdp->xdf_evtchn);
 #else /* !XPV_HVM_DRIVER */
 	(void) ddi_remove_intr(vdp->xdf_dip, 0, NULL);
-#endif /* !XPV_HVM_DRIVER */
 errout1:
+#endif /* !XPV_HVM_DRIVER */
 	xvdi_free_evtchn(dip);
 	vdp->xdf_evtchn = INVALID_EVTCHN;
 errout:

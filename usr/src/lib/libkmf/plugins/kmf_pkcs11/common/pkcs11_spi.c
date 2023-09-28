@@ -1071,7 +1071,6 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 	/* Finally, encode the entire SPKI record */
 	ret = DerEncodeSPKI(&spki, eData);
 
-cleanup:
 	if (EncodedKey) {
 		if (pKey->keyalg != KMF_ECDSA)
 			free(EncodedKey->bv_val);
@@ -1398,7 +1397,6 @@ KMFPK11_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	if (rv == KMF_OK && numObjects == 0)
 		rv = KMF_ERR_CERT_NOT_FOUND;
 
-out:
 	return (rv);
 }
 

@@ -328,7 +328,6 @@ ioat_ioctl_test(ioat_state_t *state, void *arg, int mode)
 
 	return (0);
 
-testfail_data_compare:
 testfail_poll:
 testfail_post:
 	dcopy_cmd_free(&cmd);

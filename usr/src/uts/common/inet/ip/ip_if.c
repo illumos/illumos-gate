@@ -13222,7 +13222,6 @@ ill_mcast_send_queued(ill_t *ill)
 	}
 	mutex_exit(&ill->ill_lock);
 
-done:
 	if (release_ill != NULL)
 		ill_refrele(release_ill);
 }
@@ -18961,7 +18960,7 @@ ip_sioctl_ilb_cmd(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ret = EINVAL;
 		break;
 	}
-done:
+
 	return (ret);
 }
 

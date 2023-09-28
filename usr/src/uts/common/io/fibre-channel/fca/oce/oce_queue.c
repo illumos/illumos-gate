@@ -534,8 +534,6 @@ oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
 	OCE_LIST_CREATE(&wq->wqe_desc_list, DDI_INTR_PRI(dev->intr_pri));
 	return (wq);
 
-wqcq_fail:
-	destroy_ring_buffer(dev, wq->ring);
 wq_ringfail:
 	kmem_cache_destroy(wq->wqed_cache);
 wqed_fail:

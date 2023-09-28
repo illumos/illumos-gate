@@ -94,7 +94,6 @@ mit_des3_cbc_encrypt(krb5_context context, const mit_des_cblock *in, mit_des_cbl
     }
 cleanup:
 
-final_cleanup:
     if (ret)
         (void) memset(out, 0, length);
 

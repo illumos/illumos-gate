@@ -34,8 +34,9 @@ main(int argc, char **argv)
 {
 	int i, r;
 
-	argc--, argv++;
-again:
+	argc--;
+	argv++;
+
 	if (argc && strcmp(argv[0], "-f") == 0) {
 		fflag++;
 		argv++;

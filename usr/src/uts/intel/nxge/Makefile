@@ -60,7 +60,6 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
 CFLAGS += -DSOLARIS
 #
 
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)

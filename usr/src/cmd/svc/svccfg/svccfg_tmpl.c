@@ -3643,7 +3643,6 @@ tmpl_validate_values(pgroup_t *prop_pattern, property_t *prop, pgroup_t *pg,
 		}
 	}
 
-out:
 	av_destroy(legal);
 	return (rc);
 }

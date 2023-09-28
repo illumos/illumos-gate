@@ -1402,7 +1402,6 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 		}
 	}
 
-done:
 	VN_RELE(dirvp);
 	kmem_free(dbuf, dlen);
 
@@ -2767,7 +2766,6 @@ sdev_modctl_readdir(const char *dir, char ***dirlistp, int *npathsp,
 		}
 	}
 
-exit:
 	VN_RELE(vp);
 
 	if (dbuf)

@@ -621,7 +621,6 @@ enum_servers(struct mapent *me, char *preferred)
 	if (m1)
 		free_mfs(m1);
 
-done:
 	dump_mfs(mfs_head, "  enum_servers: output: ", 1);
 	return (mfs_head);
 }
@@ -3664,7 +3663,6 @@ nfsunmount(struct mnttab *mnt)
 	if (trace > 1)
 		trace_prt(1, "	nfsunmount: umount %s OK\n", mnt->mnt_mountp);
 
-done:
 	return (0);
 }
 

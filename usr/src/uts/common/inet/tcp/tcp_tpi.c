@@ -292,7 +292,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 		error = tcp_do_bind(connp, sa, len, DB_CRED(mp),
 		    tbr->PRIM_type != O_T_BIND_REQ);
 	}
-done:
+
 	if (error > 0) {
 		tcp_err_ack(tcp, mp, TSYSERR, error);
 	} else if (error < 0) {
@@ -734,7 +734,6 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 	 * Note: Code below is the "failure" case
 	 */
 	/* return error ack and blow away saved option results if any */
-connect_failed:
 	if (mp != NULL)
 		putnext(connp->conn_rq, mp);
 	else {

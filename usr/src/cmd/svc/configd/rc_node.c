@@ -4777,7 +4777,6 @@ rc_node_delete(rc_node_ptr_t *npp)
 	np_orig = np;
 	rc_node_hold_locked(np);	/* simplifies rest of the code */
 
-again:
 	/*
 	 * The following loop is to deal with the fact that snapshots and
 	 * property groups are moving targets -- changes to them result

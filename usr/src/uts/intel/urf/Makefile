@@ -38,8 +38,6 @@ LDFLAGS		+= -N misc/mac -N drv/ip -N misc/usba -N misc/usbgem
 
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-unused-label
-
 
 #
 #	Define targets

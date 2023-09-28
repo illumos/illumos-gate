@@ -264,7 +264,6 @@ nfs_purge_rddir_cache(vnode_t *vp)
 	rddir_cache *nrdc;
 
 	rp = VTOR(vp);
-top:
 	mutex_enter(&rp->r_statelock);
 	rp->r_direof = NULL;
 	rp->r_flags &= ~RLOOKUP;

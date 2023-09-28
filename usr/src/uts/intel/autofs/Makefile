@@ -67,7 +67,6 @@ LDFLAGS += -N strmod/rpcmod -N misc/rpcsec -N fs/mntfs
 #
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= $(CNOWARN_UNINIT)
 

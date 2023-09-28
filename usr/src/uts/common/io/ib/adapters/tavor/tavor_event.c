@@ -1012,7 +1012,6 @@ eqalloc_fail2:
 	tavor_rsrc_free(state, &eqc);
 eqalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
-eqalloc_fail:
 	return (status);
 }
 

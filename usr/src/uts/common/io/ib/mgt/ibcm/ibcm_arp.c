@@ -191,8 +191,6 @@ arp_ibaddr_done:
 	ret = ib_s->status;
 	mutex_exit(&ib_s->lock);
 
-arp_ibaddr_error:
-
 	mutex_destroy(&ib_s->lock);
 	cv_destroy(&ib_s->cv);
 	kmem_free(ib_s, sizeof (ibcm_arp_streams_t));

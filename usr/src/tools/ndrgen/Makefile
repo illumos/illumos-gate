@@ -29,13 +29,14 @@ MAN1ONBLDFILES=	ndrgen.1onbld
 
 OBJS=	ndr_main.o ndr_lex.o ndr_anal.o \
 	ndr_gen.o ndr_parse.o ndr_print.o
-SRCS=	$(OBJS:%.o=%.c)
 
 include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-unused
+
+# because of labels from yacc
+ndr_parse.o := CERRWARN += -_gcc=-Wno-unused-label
 
 CLEANFILES += $(OBJS) y.tab.c y.tab.h
 
@@ -48,8 +49,6 @@ $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 all:	$(PROG) $(MAN1ONBLDFILES)
 
 install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1ONBLDFILES)
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(CLEANFILES)

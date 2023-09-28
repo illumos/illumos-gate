@@ -2380,7 +2380,6 @@ NSS_StoreCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 
 	ret = store_cert(handle, nss_slot, cert, label, trust_flag);
 
-out:
 	if (nss_slot != NULL) {
 		PK11_FreeSlot(nss_slot);
 	}

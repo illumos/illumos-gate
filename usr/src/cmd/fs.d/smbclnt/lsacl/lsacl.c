@@ -75,7 +75,6 @@ main(int argc, char **argv)
 			Vflag++;
 			break;
 
-		badopt:
 		default:
 			fprintf(stderr, "%s: bad option: %c\n",
 			    progname, c);

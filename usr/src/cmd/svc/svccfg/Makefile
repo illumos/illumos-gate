@@ -51,7 +51,11 @@ LDFLAGS +=	$(MAPOPTS)
 LDLIBS += -lxml2 -lscf -ll -luutil -lumem -lmd -lnvpair -ltecla
 NATIVE_LIBS += libxml2.so
 
+# because of labels from yacc
 svccfg_lex.o svccfg_grammar.o := CCVERBOSE =
+svccfg_lex.o svccfg_grammar.o := CERRWARN += -_gcc=-Wno-unused-label
+svccfg_lex-native.o := CERRWARN += -_gcc=-Wno-unused-label
+svccfg_grammar-native.o := CERRWARN += -_gcc=-Wno-unused-label
 
 svccfg_help.po := XGETFLAGS =	-a
 

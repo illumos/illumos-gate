@@ -635,7 +635,6 @@ softmac_unbind_req(softmac_upper_t *sup, mblk_t *mp)
 	}
 	mutex_exit(&softmac->smac_active_mutex);
 
-done:
 	qreply(sup->su_wq, ackmp);
 }
 

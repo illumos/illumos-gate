@@ -358,7 +358,6 @@ crypto_register_provider(crypto_provider_info_t *info,
 	mutex_exit(&prov_desc->pd_lock);
 	kcf_do_notify(prov_desc, B_TRUE);
 
-exit:
 	*handle = prov_desc->pd_kcf_prov_handle;
 	KCF_PROV_REFRELE(prov_desc);
 	return (CRYPTO_SUCCESS);

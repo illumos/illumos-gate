@@ -4205,8 +4205,6 @@ hermon_pci_read_vpd(ddi_acc_handle_t hdl, uint_t offset, uint32_t addr,
 		    "!Failed to see flag bit after VPD addr write\n");
 	debug_vpd++;
 
-
-vpd_read_fail:
 	return (DDI_FAILURE);
 }
 

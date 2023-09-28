@@ -946,7 +946,7 @@ cpr_resume(int sleeptype)
 		goto rb_others;
 	}
 
-rb_all:
+#if defined(__sparc)
 	/*
 	 * perform platform-dependent initialization
 	 */
@@ -957,6 +957,7 @@ rb_all:
 	 * system did not really go down if we jump here
 	 */
 rb_dump:
+#endif
 	/*
 	 * IMPORTANT:  SENSITIVE RESUME SEQUENCE
 	 *

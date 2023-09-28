@@ -1820,7 +1820,6 @@ pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
 		return (0);
 	}
 
-again:
 	switch (mdb_ctf_type_kind(base)) {
 	case CTF_K_POINTER:
 		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as,

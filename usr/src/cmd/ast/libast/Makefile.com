@@ -88,7 +88,6 @@ CERRWARN += -_gcc=-Wno-unused-but-set-variable
 CERRWARN += -_gcc=-Wno-unused-but-set-parameter
 CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-empty-body
 CERRWARN += -_gcc=-Wno-type-limits
@@ -107,6 +106,8 @@ pics/path/pathprobe.o := CERRWARN += -_gcc14=-Wno-return-local-addr
 # The code layout after macro expansion is upsetting gcc 14, silence it.
 pics/sfio/sfdisc.o := CERRWARN += -_gcc14=-Wno-misleading-indentation
 pics/sfio/sfstack.o := CERRWARN += -_gcc14=-Wno-misleading-indentation
+
+pics/port/astconf.o := CERRWARN += -_gcc=-Wno-unused-label
 
 SMATCH= off
 

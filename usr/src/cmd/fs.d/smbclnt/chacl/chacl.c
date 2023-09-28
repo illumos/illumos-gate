@@ -154,7 +154,6 @@ main(int argc, char **argv)
 	for (; optind < argc; optind++)
 		chacl(argv[optind], selector, uid, gid, acl);
 
-done:
 	acl_free(acl);
 	return (0);
 }

@@ -3331,7 +3331,6 @@ yge_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 	}
 
-err:
 	DEV_UNLOCK(port->p_dev);
 
 	return (err);

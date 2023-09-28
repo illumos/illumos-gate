@@ -29,7 +29,6 @@ PROG= deroff
 include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-char-subscripts
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
 
 # too hairy for smatch
@@ -42,7 +41,5 @@ all: $(PROG)
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

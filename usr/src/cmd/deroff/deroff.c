@@ -461,7 +461,6 @@ comline(void)
 {
 	int c1, c2;
 
-com:
 	while ((C == ' ') || (c == '\t'))
 		;
 comx:

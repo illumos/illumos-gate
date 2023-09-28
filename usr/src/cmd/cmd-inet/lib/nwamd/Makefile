@@ -56,7 +56,6 @@ LDLIBS +=	-ldhcpagent -ldhcputil -ldladm -ldlpi -lgen \
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

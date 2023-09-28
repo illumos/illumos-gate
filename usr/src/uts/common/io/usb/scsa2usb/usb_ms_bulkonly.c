@@ -236,7 +236,6 @@ Cmd_Phase:
 	SCSA2USB_FREE_MSG(req->bulk_data);
 	req->bulk_data = NULL;
 
-Data_Phase:
 	/*
 	 * Start Data Phase
 	 * re-set timeout
@@ -281,7 +280,6 @@ Data_Phase:
 		req->bulk_data = NULL;
 	}
 
-Status_Phase:
 	/*
 	 * Start status phase
 	 * read in CSW

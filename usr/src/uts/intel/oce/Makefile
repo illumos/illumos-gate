@@ -55,7 +55,6 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/oce
 LDFLAGS		+= -Nmisc/mac
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 

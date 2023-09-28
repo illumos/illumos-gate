@@ -1155,7 +1155,6 @@ soft_keystore_getpin(char **hashed_pin, boolean_t lock_held)
 		ret_val = 0;
 	}
 
-cleanup:
 	if (!lock_held) {
 		if (lock_file(fd, B_TRUE, B_FALSE) < 0) {
 			ret_val = -1;

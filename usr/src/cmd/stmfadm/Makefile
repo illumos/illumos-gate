@@ -40,9 +40,7 @@ POFILE = stmfadm_all.po
 POFILES = $(LOCAL_OBJS:%.o=%.po) $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.po)
 
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
-CERRWARN += -_gcc=-Wno-unused-label
 LDLIBS += -lstmf
-LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
 .KEEP_STATE:
 
@@ -67,7 +65,5 @@ cmdparse.o: $(COMMONBASE)/cmdparse/cmdparse.c
 
 clean:
 	$(RM) $(OBJS) $(POFILES) $(POFILE)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -65,9 +65,6 @@ ALL_BUILDS      = $(ALL_BUILDS64)
 #
 CFLAGS		+= -D_SOLARIS
 
-
-CERRWARN	+= -_gcc=-Wno-unused-label
-
 #
 #	Default build targets.
 #

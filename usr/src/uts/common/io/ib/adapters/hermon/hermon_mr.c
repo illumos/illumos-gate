@@ -642,7 +642,6 @@ fmralloc_fail2:
 	hermon_rsrc_free(state, &mpt);
 fmralloc_fail1:
 	hermon_pd_refcnt_dec(pd);
-fmralloc_fail:
 	return (status);
 }
 

@@ -233,8 +233,6 @@ dcopy_init()
 
 	return (0);
 
-dcopyinitfail_cback:
-	dcopy_list_fini(&dcopy_statep->d_globalchan_list);
 dcopyinitfail_global:
 	dcopy_list_fini(&dcopy_statep->d_device_list);
 dcopyinitfail_device:

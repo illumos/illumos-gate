@@ -92,7 +92,6 @@ LDFLAGS		+=  -N misc/mac -N drv/ip
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-empty-body
 CERRWARN	+= $(CNOWARN_UNINIT)
 

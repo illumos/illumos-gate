@@ -56,7 +56,6 @@ LDFLAGS += -Nfs/sockfs -Ndrv/ip
 # Please do not carry these forward to new Makefiles.
 #
 CFLAGS		+= $(CCVERBOSE)
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #

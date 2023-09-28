@@ -31,7 +31,6 @@ include ../Makefile.ucbcmd
 FILEMODE=	755
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

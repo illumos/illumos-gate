@@ -30,12 +30,10 @@ ROOTFS_PROG=	$(LIBPROG)
 include		../../Makefile.fstype
 
 OBJS=	$(LIBPROG).o
-SRCS=	$(LIBPROG).c $(FSLIBSRC)
 
 LDLIBS += -lsmbfs -lsec
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-unused-label
 
 CLOBBERFILES	+= $(LIBPROG)
 

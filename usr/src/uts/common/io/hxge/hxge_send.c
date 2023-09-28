@@ -182,7 +182,6 @@ hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	}
 
 	MUTEX_ENTER(&tx_ring_p->lock);
-start_again:
 	ngathers = 0;
 	sop_index = tx_ring_p->wr_index;
 #ifdef	HXGE_DEBUG

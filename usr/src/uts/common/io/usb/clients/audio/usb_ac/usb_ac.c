@@ -4795,7 +4795,6 @@ usb_audio_write_stero_rec(void *arg, uint64_t cval)
 {
 	usb_audio_ctrl_t *ctrlp = arg;
 	usb_ac_state_t *statep = ctrlp->statep;
-	int rv = EIO;
 	int left, right;
 	uint_t count = 0;
 
@@ -4823,11 +4822,9 @@ usb_audio_write_stero_rec(void *arg, uint64_t cval)
 	    USB_AUDIO_FEATURE_UNIT, 2,
 	    USB_AUDIO_VOLUME_CONTROL,
 	    USB_AC_FIND_ALL, &count, right, usb_ac_set_gain);
-	rv = 0;
 
-done:
 	mutex_exit(&statep->usb_ac_mutex);
-	return (rv);
+	return (0);
 }
 
 static int
@@ -4835,7 +4832,6 @@ usb_audio_write_ster_vol(void *arg, uint64_t cval)
 {
 	usb_audio_ctrl_t *ctrlp = arg;
 	usb_ac_state_t *statep = ctrlp->statep;
-	int rv = EIO;
 	int left, right;
 	uint_t count = 0;
 
@@ -4862,11 +4858,9 @@ usb_audio_write_ster_vol(void *arg, uint64_t cval)
 	    USB_AUDIO_FEATURE_UNIT, 2,
 	    USB_AUDIO_VOLUME_CONTROL,
 	    USB_AC_FIND_ALL, &count, right, usb_ac_set_gain);
-	rv = 0;
 
-OUT:
 	mutex_exit(&statep->usb_ac_mutex);
-	return (rv);
+	return (0);
 }
 
 
@@ -4878,7 +4872,6 @@ usb_audio_write_mono_vol(void *arg, uint64_t cval)
 {
 	usb_audio_ctrl_t *ctrlp = arg;
 	usb_ac_state_t *statep = ctrlp->statep;
-	int rv = EIO;
 	int gain;
 
 	uint_t count = 0;
@@ -4899,11 +4892,9 @@ usb_audio_write_mono_vol(void *arg, uint64_t cval)
 	    USB_AUDIO_VOLUME_CONTROL,
 	    USB_AC_FIND_ALL, &count, gain, usb_ac_set_gain);
 
-	rv = 0;
-OUT:
 	mutex_exit(&statep->usb_ac_mutex);
 
-	return (rv);
+	return (0);
 }
 
 
@@ -4915,7 +4906,6 @@ usb_audio_write_monitor_gain(void *arg, uint64_t cval)
 {
 	usb_audio_ctrl_t *ctrlp = arg;
 	usb_ac_state_t *statep = ctrlp->statep;
-	int rv = EIO;
 	int gain;
 	uint_t count = 0;
 
@@ -4937,10 +4927,8 @@ usb_audio_write_monitor_gain(void *arg, uint64_t cval)
 	    USB_AC_FIND_ALL, &count, gain,
 	    usb_ac_set_monitor_gain);
 
-	rv = 0;
-OUT:
 	mutex_exit(&statep->usb_ac_mutex);
-	return (rv);
+	return (0);
 }
 
 static int
@@ -4948,7 +4936,6 @@ usb_audio_write_mono_rec(void *arg, uint64_t cval)
 {
 	usb_audio_ctrl_t *ctrlp = arg;
 	usb_ac_state_t *statep = ctrlp->statep;
-	int rv = EIO;
 	int gain;
 
 	uint_t count = 0;
@@ -4970,10 +4957,8 @@ usb_audio_write_mono_rec(void *arg, uint64_t cval)
 	    USB_AUDIO_VOLUME_CONTROL,
 	    USB_AC_FIND_ALL, &count, gain, usb_ac_set_gain);
 
-	rv = 0;
-
 	mutex_exit(&statep->usb_ac_mutex);
-	return (rv);
+	return (0);
 }
 
 static int
@@ -5010,9 +4995,7 @@ usb_audio_write_rec_src(void *arg, uint64_t cval)
 		rv = EINVAL;
 	}
 	mutex_exit(&statep->usb_ac_mutex);
-	rv = 0;
 
-OUT:
 	return (rv);
 
 }
@@ -5194,9 +5177,7 @@ usb_ac_rem_controls(usb_ac_state_t *statep)
 static int
 usb_ac_add_controls(usb_ac_state_t *statep)
 {
-	int rv = USB_FAILURE;
 	usb_audio_format_t *format;
-
 
 	if (statep->engines[0].af_engp) {
 		/* Init controls for play format */
@@ -5236,17 +5217,8 @@ usb_ac_add_controls(usb_ac_state_t *statep)
 
 	}
 
-
-	rv = USB_SUCCESS;
-
-OUT:
-	if (rv != USB_SUCCESS)
-		usb_ac_rem_controls(statep);
-	return (rv);
+	return (USB_SUCCESS);
 }
-
-
-
 
 
 /*ARGSUSED*/
@@ -5504,14 +5476,11 @@ usb_engine_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 		goto OUT;
 	}
 
-
-
 	mutex_enter(&statep->usb_ac_mutex);
 	statep->flags |= AD_SETUP;
 	mutex_exit(&statep->usb_ac_mutex);
 
 	rv = 0;
-
 
 OUT:
 	if (rv != 0)
@@ -5577,7 +5546,6 @@ usb_engine_start(void *arg)
 		    "failed to start %d engine", engp->af_eflags);
 		rv = EIO;
 	}
-
 
 	return (rv);
 }

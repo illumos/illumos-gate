@@ -2057,7 +2057,6 @@ sol_uverbs_modify_srq(uverbs_uctxt_uobj_t *uctxt, char *buf,
 		goto err_deref;
 	}
 
-done:
 	sol_ofs_uobj_put(&usrq->uobj);
 	return (DDI_SUCCESS);
 

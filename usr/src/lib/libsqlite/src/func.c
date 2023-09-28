@@ -255,7 +255,6 @@ lower_utf8Func(sqlite_func *context, int argc, const char **argv)
 	if (argv[0] != NULL)
 		lower = utf8textprep(argv[0], U8_TEXTPREP_TOLOWER);
 
-out:
 	(void) sqlite_set_result_string(context, lower, -1);
 	free(lower);
 }
@@ -275,7 +274,6 @@ upper_utf8Func(sqlite_func *context, int argc, const char **argv)
 	if (argv[0] != NULL)
 		upper = utf8textprep(argv[0], U8_TEXTPREP_TOUPPER);
 
-out:
 	(void) sqlite_set_result_string(context, upper, -1);
 	free(upper);
 }

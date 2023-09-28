@@ -49,7 +49,6 @@ include ../../../Makefile.module
 
 dmod/$(MODULE) := LDLIBS += -lproc -lm
 
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 

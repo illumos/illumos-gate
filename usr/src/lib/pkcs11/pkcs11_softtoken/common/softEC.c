@@ -449,13 +449,11 @@ soft_ecc_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	rv = soft_ecc_sign(session_p, hash, hash_len, pSigned, pulSignedLen);
 
-clean_exit:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	/* soft_digest_common() has freed the digest context */
 	session_p->digest.flags = 0;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
-clean1:
 	return (rv);
 }
 
@@ -621,7 +619,6 @@ soft_ecc_digest_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	rv = soft_ecc_verify(session_p, hash, hash_len,
 	    pSigned, ulSignedLen);
 
-clean_exit:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	/* soft_digest_common() has freed the digest context */
 	session_p->digest.flags = 0;

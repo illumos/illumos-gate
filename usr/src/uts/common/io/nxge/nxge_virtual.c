@@ -1580,9 +1580,6 @@ nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 
 	return;
 
-nxge_map_myargs_to_gmii_fail9:
-	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "adv-10hdx-cap");
-
 nxge_map_myargs_to_gmii_fail8:
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "adv-10fdx-cap");
 
@@ -3868,8 +3865,6 @@ got_mac_addr:
 	nxgep->nxge_mmac_info.num_factory_mmac =
 	    ((nxgep->nxge_mmac_info.total_factory_macs >>
 	    (nxgep->nports >> 1))) - 1;
-
-got_mmac_info:
 
 	if ((nxgep->function_num < 2) &&
 	    (nxgep->nxge_mmac_info.num_factory_mmac >

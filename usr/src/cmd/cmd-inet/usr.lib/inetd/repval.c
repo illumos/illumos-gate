@@ -605,7 +605,6 @@ retry_fopen:
 		}
 	}
 
-out:
 	return (ret);
 }
 

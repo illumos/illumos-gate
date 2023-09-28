@@ -807,7 +807,6 @@ findmntent(char *path, struct stat64 *pstat, struct mntlist *mlist)
 	}
 	(void) sprintf(canon, "%s%s", chrootpath ? chrootpath : "", scratch);
 
-again:
 	for (mlp = mlist; mlp; mlp = mlp->mntl_next) {
 		struct mnttab *mnt = mlp->mntl_mnt;
 

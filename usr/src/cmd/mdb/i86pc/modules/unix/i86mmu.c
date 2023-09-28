@@ -626,7 +626,6 @@ do_va2pa(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap,
 		}
 	}
 
-done:
 	if (!found)
 		return (DCMD_ERR);
 	return (DCMD_OK);
@@ -791,7 +790,6 @@ do_report_maps(pfn_t pfn)
 		}
 	}
 
-done:
 	return (DCMD_OK);
 }
 
@@ -912,7 +910,6 @@ found_it:
 		do_pte_dcmd(level, pte);
 	}
 
-done:
 	return (DCMD_OK);
 }
 

@@ -469,7 +469,7 @@ sosdp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 		msg->msg_controllen = 0;
 		msg->msg_namelen = 0;
 	}
-done:
+
 	mutex_enter(&so->so_lock);
 	so_unlock_read(so);
 	mutex_exit(&so->so_lock);

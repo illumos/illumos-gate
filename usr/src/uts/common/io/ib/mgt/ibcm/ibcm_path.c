@@ -3815,7 +3815,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibcm_process_get_ip_paths: "
 				    "ibcm_arp_get_ibaddr failed: %d", retval);
-				goto ippath_error2;
+				goto ippath_error1;
 			}
 			dinfo->d_gid[i] = dgid2;
 
@@ -3834,7 +3834,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibcm_process_get_ip_paths: "
 				    "Invalid DGIDs specified w/ APM Flag");
-				goto ippath_error2;
+				goto ippath_error1;
 			}
 			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths: "
 			    "Found %d Comp DGID", dnum);
@@ -3873,7 +3873,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
 		    "NO HCA found");
 		retval = IBT_HCA_BUSY_DETACHING;
-		goto ippath_error2;
+		goto ippath_error1;
 	}
 
 	/* Get SA Access Handle. */
@@ -3886,7 +3886,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 				    "ibcm_process_get_ip_paths: HCA (%llX): "
 				    "APM NOT SUPPORTED", sl[i].p_hca_guid);
 				retval = IBT_APM_NOT_SUPPORTED;
-				goto ippath_error3;
+				goto ippath_error2;
 			}
 		}
 
@@ -3896,7 +3896,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 			    "SAA HDL NULL, HCA (%llX:%d) NOT ACTIVE",
 			    sl[i].p_hca_guid, sl[i].p_port_num);
 			retval = IBT_HCA_PORT_NOT_ACTIVE;
-			goto ippath_error3;
+			goto ippath_error2;
 		}
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sl))
 		sl[i].p_saa_hdl = saa_handle;
@@ -3906,14 +3906,13 @@ ibcm_process_get_ip_paths(void *tq_arg)
 	/* Get Path Records. */
 	retval = ibcm_saa_ip_pr(p_arg, sl, dinfo, &num_path);
 
-ippath_error3:
+ippath_error2:
 	ibcm_dec_hca_acc_cnt(hcap);
 
-ippath_error2:
+ippath_error1:
 	if (dinfo && len)
 		kmem_free(dinfo, len);
 
-ippath_error1:
 	if (sl)
 		ibtl_cm_free_active_plist(sl);
 

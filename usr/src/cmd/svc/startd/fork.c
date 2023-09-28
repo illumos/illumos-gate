@@ -922,7 +922,6 @@ emi_is_disabled()
 		disconnected = 0;
 	}
 
-out:
 	if (inst != NULL)
 		scf_instance_destroy(inst);
 	scf_handle_destroy(hndl);

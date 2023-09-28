@@ -1309,7 +1309,6 @@ add_ip_ncu_to_ncp(nwam_ncp_handle_t ncph, const char *name)
 	/* IP NCU has the default values, so nothing else to do */
 	err = nwam_ncu_commit(ncuh, 0);
 
-finish:
 	nwam_ncu_free(ncuh);
 	if (err != NWAM_SUCCESS) {
 		nlog(LOG_ERR,

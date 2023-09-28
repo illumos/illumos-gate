@@ -1285,7 +1285,6 @@ _exit3:
 	pci_config_teardown(&attr.cfgh);
 _exit2a:
 	kmem_free(hldev, sizeof (xge_hal_device_t));
-_exit2:
 	ddi_regs_map_free(&attr.regh2);
 _exit1a:
 	ddi_regs_map_free(&attr.regh1);

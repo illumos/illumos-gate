@@ -54,8 +54,11 @@ CFLAGS +=	$(CCVERBOSE)
 CSTD=	$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
+
+# because of labels from yacc
+m4objs.xpg4/m4y_xpg4.o := CERRWARN += -_gcc=-Wno-unused-label
+m4objs/m4y.o := CERRWARN += -_gcc=-Wno-unused-label
 
 CLEANFILES +=	$(BLTSRCS)
 

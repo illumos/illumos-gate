@@ -2951,7 +2951,7 @@ emlxs_sli4_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 			if (! sge) {
 				return (1);
 			}
-sgl_done:
+
 			if (hba->sli.sli4.flag & EMLXS_SLI4_PHON) {
 				sge_addr = cp_data->dmac_laddress;
 				wqe->FirstData.addrHigh = PADDR_HI(sge_addr);
@@ -3296,7 +3296,6 @@ emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		iocbq = emlxs_tx_get(cp, 1);
 	}
 
-sendit:
 	/* Process each iocbq */
 	while (iocbq) {
 		sbp = iocbq->sbp;

@@ -554,7 +554,6 @@ sgen_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		break;
 	}
 
-done:
 	sgen_log(NULL, SGEN_DIAG2, "%s sgen_attach(), device unit-address @%s",
 	    err == DDI_SUCCESS ? "done" : "failed", ddi_get_name_addr(dip));
 	return (err);

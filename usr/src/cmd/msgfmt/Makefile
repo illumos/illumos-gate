@@ -53,7 +53,6 @@ LIBPROG= gmsgfmt
 PROG=  $(BINPROG) $(LIBPROG)
 
 YFLAGS += -d
-LINTFLAGS +=	-um
 
 POFILE= msgfmt_all.po
 POFILES= $(SOBJS:%.o=%.po) $(GOBJS:%.o=%.po) $(COBJS:%.o=%.po) \
@@ -65,9 +64,12 @@ ROOTBINPROG= $(BINPROG:%=$(ROOTBIN)/%)
 ROOTLIBPROG= $(LIBPROG:%=$(ROOTLIB)/%)
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# because of labels from yacc
+gnu_po.o := CERRWARN += -_gcc=-Wno-unused-label
+xgettext.lx.o := CERRWARN += -_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

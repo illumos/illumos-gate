@@ -1102,7 +1102,6 @@ audioixp_rd97(void *arg, uint8_t reg)
 		drv_usecwait(10);
 	}
 
-done:
 	audio_dev_warn(statep->adev, "time out reading codec reg %d", reg);
 	return (0xffff);
 }

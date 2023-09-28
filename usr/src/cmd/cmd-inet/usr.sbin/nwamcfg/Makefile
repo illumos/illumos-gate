@@ -36,12 +36,14 @@ LFLAGS =	-t
 LDLIBS +=	-ll -ltecla -lnwam -lumem
 YFLAGS +=	-d -b nwamcfg_grammar
 CLEANFILES +=	nwamcfg_lex.c nwamcfg_grammar.tab.c nwamcfg_grammar.tab.h
-CLEANFILES +=	$(PROG).ln
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# because of labels from yacc
+nwamcfg_lex.o := CERRWARN += -_gcc=-Wno-unused-label
+nwamcfg_grammar.tab.o := CERRWARN += -_gcc=-Wno-unused-label
 
 SMOFF += all_func_returns
 

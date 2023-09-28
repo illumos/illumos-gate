@@ -1133,7 +1133,6 @@ OpenSSL_FindCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			rv = KMF_ERR_CERT_NOT_FOUND;
 		if (*num_certs > 0)
 			rv = KMF_OK;
-exit:
 		(void) closedir(dirp);
 	} else {
 		KMF_DATA *certlist = NULL;
@@ -1334,7 +1333,6 @@ OpenSSL_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		}
 	}
 
-out:
 	if (fullpath != NULL)
 		free(fullpath);
 
@@ -1376,7 +1374,6 @@ OpenSSL_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	}
 	keydata->Length = n;
 
-cleanup:
 	if (rv != KMF_OK) {
 		if (keydata->Data)
 			free(keydata->Data);
@@ -1872,7 +1869,7 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	} else {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
-cleanup:
+
 	return (ret);
 }
 

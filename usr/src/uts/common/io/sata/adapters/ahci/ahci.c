@@ -3083,7 +3083,7 @@ ahci_reset_hba_reject_pkts(ahci_ctl_t *ahci_ctlp)
 		    reset_tags[port]); /* reset tags */
 		mutex_exit(&ahci_portp->ahciport_mutex);
 	}
-out:
+
 	return (ret);
 }
 
@@ -4526,7 +4526,7 @@ ahci_rdwr_pmult(ahci_ctl_t *ahci_ctlp, ahci_addr_t *addrp,
 		    AHCI_ADDR_IS_PMULT(addrp)?"gscr":"pscr", regn, portstr);
 		rval = AHCI_FAILURE;
 	}
-out:
+
 	/* Restore the interrupt mask */
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxIE(ahci_ctlp, port), intr_mask);

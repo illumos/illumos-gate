@@ -270,7 +270,6 @@ find_manifests(scf_handle_t *hndl, const char *dir,
 		status = 0;
 	}
 
-out:
 	if (status == 0) {
 		*arrayp = tsdp->tsd_array;
 		count = tsdp->tsd_count;

@@ -428,7 +428,7 @@ dlmgmt_drop_privileges(void)
 	}
 	if (err == 0 && setppriv(PRIV_SET, ptype, pset) == -1)
 		err = errno;
-done:
+
 	priv_freeset(pset);
 	return (err);
 }
@@ -461,7 +461,6 @@ dlmgmt_set_privileges(void)
 		err = errno;
 	else
 		err = dlmgmt_drop_privileges();
-done:
 	return (err);
 }
 

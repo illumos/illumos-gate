@@ -885,7 +885,6 @@ eqalloc_fail2:
 	hermon_rsrc_free(state, &eqc);
 eqalloc_fail1:
 	hermon_pd_refcnt_dec(pd);
-eqalloc_fail:
 	return (status);
 }
 

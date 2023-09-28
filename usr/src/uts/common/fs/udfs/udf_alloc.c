@@ -1210,7 +1210,6 @@ error:
 
 	return (0);
 
-noinodes:
 	cmn_err(CE_NOTE, "%s: out of inodes\n", pip->i_udf->udf_volid);
 	return (ENOSPC);
 }

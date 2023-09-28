@@ -168,7 +168,6 @@ meta_WrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	rv = meta_wrap_key(session, pMechanism, wrappingKey,
 	    inputKey, pWrappedKey, pulWrappedKeyLen);
 
-finish:
 	OBJRELEASE(inputKey);
 	OBJRELEASE(wrappingKey);
 	REFRELEASE(session);

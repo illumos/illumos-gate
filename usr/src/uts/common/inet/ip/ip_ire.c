@@ -2581,7 +2581,7 @@ retry:
 		mutex_exit(&ill->ill_lock);
 		rw_exit(&ill->ill_ipst->ips_ill_g_lock);
 	}
-done:
+
 	ASSERT(nce->nce_ill == ill);
 	if (need_refrele)
 		ill_refrele(ill);

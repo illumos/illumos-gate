@@ -55,7 +55,6 @@ CPPFLAGS	+=	-D_REENTRANT $(KMFINC) \
 # See also https://www.illumos.org/issues/16916
 CPPFLAGS	+=	-DOPENSSL_API_COMPAT=10101
 
-CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
 CERRWARN	+=	$(CNOWARN_UNINIT)
 

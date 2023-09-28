@@ -399,7 +399,7 @@ iptun_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	default:
 		err = ENOTSUP;
 	}
-done:
+
 	iptun_exit(iptun);
 	return (err);
 }
@@ -1684,7 +1684,6 @@ iptun_info(iptun_kparams_t *ik, cred_t *credp)
 		mutex_exit(&iptun->iptun_itp->itp_lock);
 	}
 
-done:
 	iptun_exit(iptun);
 	return (err);
 }

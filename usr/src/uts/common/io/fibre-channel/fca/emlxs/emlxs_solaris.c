@@ -6084,7 +6084,6 @@ emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
 		rval = EINVAL;
 	}
 
-done:
 	return (rval);
 
 } /* emlxs_ioctl() */

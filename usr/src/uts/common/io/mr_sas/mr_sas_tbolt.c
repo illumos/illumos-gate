@@ -609,25 +609,6 @@ mrsas_alloc_cmd_pool_tbolt(struct mrsas_instance *instance)
 	}
 
 	return (DDI_SUCCESS);
-
-mrsas_undo_cmds:
-	if (count > 0) {
-		/* free each cmd */
-		for (i = 0; i < count; i++) {
-			if (instance->cmd_list[i] != NULL) {
-				kmem_free(instance->cmd_list[i],
-				    sizeof (struct mrsas_cmd));
-			}
-			instance->cmd_list[i] = NULL;
-		}
-	}
-
-mrsas_undo_cmd_list:
-	if (instance->cmd_list != NULL)
-		kmem_free(instance->cmd_list, sz);
-	instance->cmd_list = NULL;
-
-	return (DDI_FAILURE);
 }
 
 

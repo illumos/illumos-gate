@@ -1133,7 +1133,6 @@ cache_update(rcm_handle_t *hd)
 		aggr = next;
 	}
 
-done:
 	(void) mutex_unlock(&cache_lock);
 	(void) mutex_unlock(&aggr_list_lock);
 	return (ret);

@@ -39,8 +39,6 @@ ENC_OBJS=	enc_des.o encrypt.o
 
 OBJS +=		$(AUTH_OBJS) $(ENC_OBJS)
 
-SRCS=		$(OBJS:%.o=%.c)
-
 include		../../../Makefile.cmd
 
 CPPFLAGS +=	-DKLUDGELINEMODE -DUSE_TERMIO -DENV_HACK -DOLD_ENVIRON
@@ -50,7 +48,6 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-unused-label
 LDLIBS +=	-lsocket -lnsl -ltermlib
 LDLIBS +=	-lmech_krb5
 LDFLAGS +=	$(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
@@ -70,7 +67,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:   lint_SRCS
 
 include		../../../Makefile.targ

@@ -1165,7 +1165,6 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 	fct_log_remote_port_event(port, ESC_SUNFC_TARGET_ADD,
 	    rp->rp_pwwn, rp->rp_id);
 
-register_rp_done:;
 	rw_exit(&irp->irp_lock);
 	rw_exit(&iport->iport_lock);
 	return (FCT_SUCCESS);

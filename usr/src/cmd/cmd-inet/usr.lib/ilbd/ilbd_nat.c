@@ -180,7 +180,6 @@ ilbd_show_nat(void *cli, const ilb_comm_t *ic, uint32_t *rbuf, size_t *rbufsz)
 		nat_ret++;
 	}
 
-end:
 	free(kcmd);
 	return (ret);
 }
@@ -289,7 +288,6 @@ ilbd_show_sticky(void *cli, const ilb_comm_t *ic, uint32_t *rbuf,
 		st_ret++;
 	}
 
-end:
 	free(kcmd);
 	return (ret);
 }

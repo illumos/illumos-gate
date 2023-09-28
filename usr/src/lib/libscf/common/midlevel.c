@@ -1794,7 +1794,6 @@ scf_simple_prop_get(scf_handle_t *hin, const char *instance, const char *pgname,
 error1:
 	scf_service_destroy(svc);
 	scf_property_destroy(prop);
-error2:
 	free(fmri_buf);
 	if (local_h)
 		scf_handle_destroy(h);

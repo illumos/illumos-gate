@@ -273,7 +273,6 @@ k5_arcfour_encrypt(krb5_context context,
             ret = PKCS_ERR;
     }
 cleanup:
-final_cleanup:
     if (ret)
 	bzero(output->data, input->length);
 

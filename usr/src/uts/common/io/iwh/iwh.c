@@ -956,7 +956,6 @@ attach_fail13:
 attach_fail12:
 	ieee80211_detach(ic);
 
-attach_fail11:
 	iwh_free_fw_dma(sc);
 
 attach_fail10:

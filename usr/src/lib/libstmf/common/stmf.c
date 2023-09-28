@@ -343,7 +343,6 @@ groupIoctl(int fd, int cmd, stmfGroupName *groupName)
 				break;
 		}
 	}
-done:
 	return (ret);
 }
 
@@ -424,7 +423,6 @@ groupMemberIoctl(int fd, int cmd, stmfGroupName *groupName, stmfDevid *devid)
 				break;
 		}
 	}
-done:
 	return (ret);
 }
 

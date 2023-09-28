@@ -42,7 +42,6 @@ CONF_SRCDIR	= $(UTSBASE)/intel/io/scsi/adapters/arcmsr
 include $(UTSBASE)/intel/Makefile.intel
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 

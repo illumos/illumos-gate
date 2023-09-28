@@ -2975,7 +2975,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 done_err:
 	kmem_free(buf, EFI_MIN_ARRAY_SIZE);
 	mutex_enter(CMLB_MUTEX(cl));
-done_err1:
+
 	/*
 	 * if we didn't find something that could look like a VTOC
 	 * and the disk is over 1TB, we know there isn't a valid label.
@@ -4953,7 +4953,6 @@ cmlb_write_label(struct cmlb_lun *cl, void *tg_cookie)
 	mutex_exit(CMLB_MUTEX(cl));
 
 	rval = cmlb_set_vtoc(cl, dkl, tg_cookie);
-exit:
 	kmem_free(dkl, cl->cl_sys_blocksize);
 	mutex_enter(CMLB_MUTEX(cl));
 	return (rval);

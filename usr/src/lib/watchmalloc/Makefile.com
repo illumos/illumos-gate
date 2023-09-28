@@ -40,8 +40,6 @@ CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -I../common -I../../common/inc -D_REENTRANT
 DYNFLAGS += $(ZINTERPOSE)
 
-CERRWARN += -_gcc=-Wno-unused-label
-
 # not linted
 SMATCH=off
 

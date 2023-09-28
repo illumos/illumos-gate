@@ -1348,9 +1348,6 @@ srpt_ioc_ds_alloc_dbuf(struct scsi_task *task, uint32_t size,
 
 	return (stmf_dbuf);
 
-buf_mr_err:
-	stmf_free(stmf_dbuf);
-
 stmf_alloc_err:
 	srpt_vmem_free(ioc->ioc_dbuf_pool, buf, size);
 

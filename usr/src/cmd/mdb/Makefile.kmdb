@@ -88,25 +88,7 @@ SUPPORTED_TERMS	= \
 	xterm \
 	xterms
 
-LINTFLAGS += -n -errtags=yes
-
-# The prom interfaces (the prom_* files) are compiled with -D_KERNEL, which
-# teaches them about the kernel version of the synchronization functions, while
-# the core of kmdb, which is compiled without -D_KERNEL, knows about the
-# userland versions.  Even though nobody actually uses either one, lint
-# complains that both know about different versions.  The same thing applies
-# to the driver, parts of which are executed directly by the kernel, and other
-# parts which are called by kmdb via the auxv.
-ALLLINTFLAGS = $(LINTFLAGS) \
-	-xerroff=E_FUNC_DECL_VAR_ARG2 \
-	-xerroff=E_INCONS_ARG_DECL \
-	-xerroff=E_INCONS_ARG_DECL2 \
-	-xerroff=E_INCONS_ARG_USED2 \
-	-xerroff=E_INCONS_VAL_TYPE_DECL2 \
-	-xerroff=E_INCONS_VAL_TYPE_USED2
-
 CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -127,8 +109,10 @@ MAPFILE_SOURCES_COMMON = \
 	../../../common/mdb/mdb_whatis.h
 
 mdb_lex.o mdb_grammar.o := CCVERBOSE =
+# because of labels from yacc
+mdb_lex.o mdb_grammar.o := CERRWARN += -_gcc=-Wno-unused-label
 
-kmdb_ctf_open.o kmdb_ctf_open.ln	:= CPPFLAGS += -I$(SRC)/common/ctf
+kmdb_ctf_open.o := CPPFLAGS += -I$(SRC)/common/ctf
 
 PROMTGTS	= $(PROMOBJS) $(PROMOBJS:%.o=%.ln)
 VERSTGTS	= $(VERSOBJS) $(VERSOBJS:%.o=%.ln)

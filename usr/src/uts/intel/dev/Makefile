@@ -64,7 +64,6 @@ INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-function
 

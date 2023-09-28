@@ -466,7 +466,6 @@ retry:
 				(void) ioctl(f, TIOCSPGRP,  (char *)&shpgrp);
 				(void) fcntl(dcopy(f, FSHTTY), F_SETFD, 1);
 			} else {
-notty:
 printf("Warning: no access to tty; thus no job control in this shell...\n");
 				tpgrp = -1;
 			}

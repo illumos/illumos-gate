@@ -276,7 +276,6 @@ xdrrdma_getrdmablk(XDR *xdrs, struct clist **rlist, uint_t *sizep,
 
 	}
 
-out:
 	if (prev != NULL)
 		prev->c_next = NULL;
 

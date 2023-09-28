@@ -848,7 +848,7 @@ complex()
 				i = j-1;
 			}
 		}
-record:
+
 		/* _line[], which contains pointers to screen lines,
 		 * may be shuffled.
 		 */

@@ -2386,7 +2386,6 @@ notmds:
 	hmep->hme_wantw = B_TRUE;
 	hmereclaim(hmep);
 	retval = B_FALSE;
-done:
 	mutex_exit(&hmep->hme_xmitlock);
 
 	return (retval);
@@ -2764,7 +2763,6 @@ init_fail:
 	CHECK_ERXREG();
 	CHECK_ETXREG();
 
-init_exit:
 	return (ret);
 }
 

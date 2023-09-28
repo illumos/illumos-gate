@@ -115,12 +115,12 @@ rdsv3_ib_add_one(ib_device_t *device)
 		goto free_dev;
 
 	if (rdsv3_ib_create_mr_pool(rds_ibdev) != 0) {
-		goto free_dev;
+		goto err_pd;
 	}
 
 	if (rdsv3_ib_create_inc_pool(rds_ibdev) != 0) {
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
-		goto free_dev;
+		goto err_pd;
 	}
 
 	(void) snprintf(name, 64, "RDSV3_IB_FRAG_%llx",
@@ -134,7 +134,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 		    device->name);
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
 		rdsv3_ib_destroy_inc_pool(rds_ibdev);
-		goto free_dev;
+		goto err_pd;
 	}
 
 	rds_ibdev->aft_hcagp = rdsv3_af_grp_create(rds_ibdev->ibt_hca_hdl,
@@ -143,7 +143,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
 		rdsv3_ib_destroy_inc_pool(rds_ibdev);
 		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
-		goto free_dev;
+		goto err_pd;
 	}
 	rds_ibdev->fmr_soft_cq = rdsv3_af_thr_create(rdsv3_ib_drain_mrlist_fn,
 	    (void *)rds_ibdev->fmr_pool, SCQ_HCA_BIND_CPU,
@@ -153,7 +153,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
 		rdsv3_ib_destroy_inc_pool(rds_ibdev);
 		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
-		goto free_dev;
+		goto err_pd;
 	}
 
 	rds_ibdev->inc_soft_cq = rdsv3_af_thr_create(rdsv3_ib_drain_inclist,
@@ -165,7 +165,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
 		rdsv3_ib_destroy_inc_pool(rds_ibdev);
 		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
-		goto free_dev;
+		goto err_pd;
 	}
 
 	list_create(&rds_ibdev->ipaddr_list, sizeof (struct rdsv3_ib_ipaddr),

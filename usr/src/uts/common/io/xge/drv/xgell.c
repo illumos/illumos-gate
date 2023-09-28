@@ -955,7 +955,6 @@ xgell_ring_tx(void *arg, mblk_t *mp)
 	boolean_t used_copy;
 	uint64_t sent_bytes;
 
-_begin:
 	handle_cnt = frag_cnt = 0;
 	sent_bytes = 0;
 

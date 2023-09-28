@@ -103,7 +103,7 @@ derive_cksum_key(krb5_context context,
 			    DK_CKSUM_KEY_BYTE,
 			    *outkey);
 	}
-finish:
+
 	KRB5_LOG0(KRB5_INFO, "derive_cksum_key() end.");
 	return (ret);
 }

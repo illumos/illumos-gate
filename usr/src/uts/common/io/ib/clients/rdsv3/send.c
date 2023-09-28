@@ -153,7 +153,6 @@ rdsv3_send_xmit(struct rdsv3_connection *conn)
 	int was_empty = 0;
 	list_t to_be_dropped;
 
-restart:
 	if (!rdsv3_conn_up(conn))
 		goto out;
 

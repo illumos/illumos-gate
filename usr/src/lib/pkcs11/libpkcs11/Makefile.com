@@ -74,7 +74,6 @@ CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(INCDIR) -I$(SRCDIR) -D_REENTRANT
 
 
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted

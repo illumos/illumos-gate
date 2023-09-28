@@ -2031,8 +2031,6 @@ emlxs_offline(emlxs_hba_t *hba, uint32_t reset_requested)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_offline_msg, NULL);
 
-done:
-
 	return (rval);
 
 } /* emlxs_offline() */

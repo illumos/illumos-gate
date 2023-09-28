@@ -576,7 +576,6 @@ libscf_read_states(const scf_propertygroup_t *pg,
 		ret = LIBSCF_PROPERTY_ERROR;
 	}
 
-read_states_out:
 	return (ret);
 }
 
@@ -2640,7 +2639,6 @@ libscf_write_method_status(scf_instance_t *s_inst, const char *name,
 	e_stat = safe_scf_entry_create(h);
 	v_stat = safe_scf_value_create(h);
 
-get_pg:
 	ret = libscf_inst_get_or_add_pg(s_inst, SCF_PG_RESTARTER,
 	    SCF_PG_RESTARTER_TYPE, SCF_PG_RESTARTER_FLAGS, pg);
 	switch (ret) {

@@ -41,8 +41,6 @@ CSTD=	$(CSTD_GNU99)
 LDLIBS +=	-lc -lnvpair -lscf -lm
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
-CERRWARN +=	-_gcc=-Wno-unused-label
-
 # not linted
 SMATCH=off
 

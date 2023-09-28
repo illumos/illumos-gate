@@ -509,7 +509,7 @@ extract_attribute(idmap_nm_handle_t *p, LDAPMessage *entry, char *name,
 		if (*value == NULL)
 			rc = IDMAP_ERR_MEMORY;
 	}
-errout:
+
 	ldap_value_free(values);
 	return (rc);
 }

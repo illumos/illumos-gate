@@ -2491,13 +2491,6 @@ hxge_map_rxdma_channel(p_hxge_t hxgep, uint16_t channel,
 	}
 	goto hxge_map_rxdma_channel_exit;
 
-hxge_map_rxdma_channel_fail3:
-	/* Free rbr, rcr */
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-	    "==> hxge_map_rxdma_channel: free rbr/rcr (status 0x%x channel %d)",
-	    status, channel));
-	hxge_unmap_rxdma_channel_cfg_ring(hxgep, *rcr_p, *rx_mbox_p);
-
 hxge_map_rxdma_channel_fail2:
 	/* Free buffer blocks */
 	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -3016,7 +3009,6 @@ hxge_map_rxdma_channel_buf_ring_fail1:
 		}
 	}
 
-hxge_map_rxdma_channel_buf_ring_fail:
 	MUTEX_DESTROY(&rbrp->post_lock);
 	MUTEX_DESTROY(&rbrp->lock);
 	KMEM_FREE(ring_info, sizeof (rxring_info_t));

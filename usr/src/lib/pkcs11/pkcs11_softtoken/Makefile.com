@@ -126,7 +126,6 @@ CSTD =	$(CSTD_GNU99)
 
 CFLAGS	+=      $(CCVERBOSE)
 
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-type-limits

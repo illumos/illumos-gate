@@ -285,11 +285,6 @@ nxge_txc_tdc_unbind(
 	    "<== nxge_txc_tdc_unbind(port %d, channel %d)", port, channel));
 
 	return (NXGE_OK);
-fail:
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-	    "nxge_txc_tdc_unbind(port %d, channel %d) failed", port, channel));
-
-	return (NXGE_ERROR | rs);
 }
 
 void

@@ -128,11 +128,14 @@ CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-switch
+
+# because of labels from yacc
+pics/dt_grammar.o := CERRWARN += -_gcc=-Wno-unused-label
+pics/dt_lex.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

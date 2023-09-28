@@ -49,12 +49,15 @@ CLEANFILES =	$(OBJS) y.tab.c y.tab.h lex.yy.c \
 
 CPPFLAGS	+= -I. -I$(SRCDIR)
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
 YFLAGS		+= -d
 CFLAGS		+= -D_FILE_OFFSET_BITS=64
+
+# because of labels from yacc
+lex.yy.o := CERRWARN += -_gcc=-Wno-unused-label
+y.tab.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # dump_expr() is too hairy
 SMATCH=off

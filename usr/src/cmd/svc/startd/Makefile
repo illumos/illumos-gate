@@ -70,7 +70,6 @@ CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I. -I../common -I$(SRC)/common/definit
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += $(CNOWARN_UNINIT)
 

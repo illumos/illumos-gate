@@ -2448,7 +2448,6 @@ ud_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
 		}
 	}
 
-outmiss:
 	pvn_plist_init(pp, pl, plsz, (offset_t)off, io_len, rw);
 	return (err);
 }

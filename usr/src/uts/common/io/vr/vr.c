@@ -402,7 +402,6 @@ fail5:
 	vr_remove_intr(vrp);
 fail3:
 	vr_remove_kstats(vrp);
-fail2:
 	vr_rings_fini(vrp);
 fail1:
 	vr_bus_unconfig(vrp);

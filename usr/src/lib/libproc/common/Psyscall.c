@@ -542,7 +542,10 @@ bad17:	Perr++;
 	Perr++;
 	Perr++;
 bad10:	Perr++;
-bad9:	Perr++;
+#ifndef _LP64
+bad9:
+#endif
+	Perr++;
 bad8:	Perr++;
 bad7:	Perr++;
 bad6:	Perr++;

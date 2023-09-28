@@ -33,7 +33,8 @@ SRCS=		$(OBJS:%.o=%.c)
 
 CPPFLAGS +=	-I$(SRC)/lib/libc/port/locale
 
-CERRWARN +=	-_gcc=-Wno-unused-label
+# because of labels from yacc
+parser.tab.o := CERRWARN += -_gcc=-Wno-unused-label
 
 YFLAGS=		-d -b parser
 

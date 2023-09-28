@@ -413,7 +413,6 @@ hermon_srq_alloc(hermon_state_t *state, hermon_srq_info_t *srqinfo,
  */
 srqalloc_fail8:
 	hermon_wrid_wqhdr_destroy(srq->srq_wq_wqhdr);
-srqalloc_fail7:
 	if (hermon_mr_deregister(state, &mr, HERMON_MR_DEREG_ALL,
 	    HERMON_SLEEPFLAG_FOR_CONTEXT()) != DDI_SUCCESS) {
 		HERMON_WARNING(state, "failed to deregister SRQ memory");
@@ -432,7 +431,6 @@ srqalloc_fail2:
 	hermon_rsrc_free(state, &srqc);
 srqalloc_fail1:
 	hermon_pd_refcnt_dec(pd);
-srqalloc_fail:
 	return (status);
 }
 

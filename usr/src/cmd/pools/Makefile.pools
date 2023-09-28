@@ -31,6 +31,5 @@ COMMON_OBJS = utils.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(POOLSCOMMONDIR)/%.c)
 
 CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-implicit-function-declaration

@@ -32,7 +32,6 @@ include $(SRC)/tools/Makefile.tools
 
 CPPFLAGS	= -I. -I$(SRCDIR)
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-implicit-function-declaration

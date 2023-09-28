@@ -1055,7 +1055,7 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		    ctx->cc_session, NULL, NULL, NULL, ct, mac, NULL, NULL);
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
-out:
+
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);

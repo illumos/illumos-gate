@@ -50,10 +50,12 @@ CPPFLAGS += -I. -I$(CMDINETCOMMONDIR) \
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-function
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	$(CNOWARN_UNINIT)
+
+# because of labels from yacc
+gram.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

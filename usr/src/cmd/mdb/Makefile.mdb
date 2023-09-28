@@ -109,7 +109,6 @@ CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 
 PROG = mdb
@@ -147,6 +146,8 @@ mdb_grammar.h mdb_grammar.c: ../../../common/mdb/mdb_grammar.y
 	@$(MV) y.tab.c mdb_grammar.c
 
 mdb_lex.o mdb_grammar.o := CCVERBOSE =
+# because of labels from yacc
+mdb_lex.o mdb_grammar.o := CERRWARN += -_gcc=-Wno-unused-label
 
 mdb_conf.o := CPPFLAGS += -DMDB_VERSION='$(MDB_VERSION)'
 

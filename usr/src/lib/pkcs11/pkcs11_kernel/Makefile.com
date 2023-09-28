@@ -87,7 +87,6 @@ LDLIBS  +=      -lc -lcryptoutil -lmd
 CFLAGS  +=      $(CCVERBOSE)
 
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

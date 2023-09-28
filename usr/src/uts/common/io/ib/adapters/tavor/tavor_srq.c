@@ -434,7 +434,6 @@ srqalloc_fail2:
 	tavor_rsrc_free(state, &srqc);
 srqalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
-srqalloc_fail:
 	return (status);
 }
 

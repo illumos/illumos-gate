@@ -62,10 +62,12 @@ CPPFLAGS =      -I. $(CPPFLAGS.master)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+# because of labels from yacc
+awk.lx.o awk.g.o := CERRWARN +=	-_gcc=-Wno-unused-label
 
 # missing type declarations
 SMATCH =	off

@@ -1698,31 +1698,21 @@ hxge_map_txdma_channel(p_hxge_t hxgep, uint16_t channel,
 	 */
 	status = hxge_map_txdma_channel_buf_ring(hxgep, channel,
 	    dma_buf_p, tx_desc_p, num_chunks);
-	if (status != HXGE_OK) {
+	if (status == HXGE_OK) {
+		/*
+		 * Transmit block ring, and mailbox.
+		 */
+		hxge_map_txdma_channel_cfg_ring(hxgep, channel, dma_cntl_p,
+		    *tx_desc_p, tx_mbox_p);
+	} else {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_map_txdma_channel (channel %d): "
 		    "map buffer failed 0x%x", channel, status));
-		goto hxge_map_txdma_channel_exit;
 	}
-	/*
-	 * Transmit block ring, and mailbox.
-	 */
-	hxge_map_txdma_channel_cfg_ring(hxgep, channel, dma_cntl_p, *tx_desc_p,
-	    tx_mbox_p);
 
-	goto hxge_map_txdma_channel_exit;
-
-hxge_map_txdma_channel_fail1:
-	HXGE_DEBUG_MSG((hxgep, MEM3_CTL,
-	    "==> hxge_map_txdma_channel: unmap buf"
-	    "(status 0x%x channel %d)", status, channel));
-	hxge_unmap_txdma_channel_buf_ring(hxgep, *tx_desc_p);
-
-hxge_map_txdma_channel_exit:
 	HXGE_DEBUG_MSG((hxgep, MEM3_CTL,
 	    "<== hxge_map_txdma_channel: (status 0x%x channel %d)",
 	    status, channel));
-
 	return (status);
 }
 

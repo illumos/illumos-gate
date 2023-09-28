@@ -1414,8 +1414,6 @@ create_rxtx_rings(unm_adapter *adapter)
 
 	return (DDI_SUCCESS);
 
-attach_free_tx_buffers:
-	unm_free_tx_buffers(adapter);
 attach_free_tx_dmahdl:
 	unm_free_tx_dmahdl(adapter);
 attach_free_cmdbufs:

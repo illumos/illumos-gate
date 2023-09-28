@@ -2178,7 +2178,6 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 		uasp->usb_as_alts[alternate].alt_valid++;
 	}
 
-done:
 	usb_as_prepare_registration_data(uasp);
 
 	return (rval);

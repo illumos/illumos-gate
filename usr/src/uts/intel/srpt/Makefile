@@ -56,8 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LDFLAGS		+= -Ndrv/stmf -Nmisc/ibtl -Nmisc/ibcm
 
-CERRWARN	+= -_gcc=-Wno-unused-label
-
 # needs work
 $(OBJS_DIR)/srpt_stp.o := SMOFF += all_func_returns
 

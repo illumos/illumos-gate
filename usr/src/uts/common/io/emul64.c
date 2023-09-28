@@ -1048,7 +1048,6 @@ emul64_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 	}
 
-done:
 	ASSERT(mutex_owned(EMUL64_REQ_MUTEX(emul64)) == 0 || ddi_in_panic());
 	ASSERT(mutex_owned(EMUL64_RESP_MUTEX(emul64)) == 0 || ddi_in_panic());
 

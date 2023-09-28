@@ -1441,7 +1441,6 @@ get_svc:
 		goto out;
 	}
 
-get_inst:
 	if (scf_service_get_instance(svc, istr, inst) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
@@ -8394,7 +8393,6 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 	if (uu_error() != UU_ERROR_CALLBACK_FAILED)
 		bad_error("uu_list_walk", uu_error());
 
-printerr:
 	/* If the error hasn't been printed yet, do so here. */
 	switch (cbdata.sc_err) {
 	case ECONNABORTED:
@@ -13273,7 +13271,6 @@ display_documentation(scf_iter_t *iter, scf_propertygroup_t *pg)
 	if (rv == -1)
 		scfdie();
 
-done:
 	free(pg_name);
 }
 

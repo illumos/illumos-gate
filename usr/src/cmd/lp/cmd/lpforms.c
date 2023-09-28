@@ -1276,7 +1276,7 @@ set_action (action, option)
 		exit (1);
 	}
 
-OK:	prev_action = action;
+	prev_action = action;
 	prev_option = option;
 	return (action);
 }

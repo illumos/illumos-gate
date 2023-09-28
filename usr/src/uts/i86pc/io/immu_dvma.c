@@ -2075,7 +2075,9 @@ PTE_set_one(immu_t *immu, hw_pdte_t *hwp, paddr_t paddr,
 
 	pte |= immu->immu_ptemask;
 
+#ifndef BUGGY_DRIVERS
 out:
+#endif
 #endif /* DEBUG */
 #ifdef BUGGY_DRIVERS
 	PDTE_SET_READ(pte);
@@ -2220,7 +2222,9 @@ PDE_set_one(immu_t *immu, hw_pdte_t *hwp, pgtable_t *next,
 	 * by the Vt-d spec
 	 */
 
+#ifndef  BUGGY_DRIVERS
 out:
+#endif
 #ifdef  BUGGY_DRIVERS
 	PDTE_SET_READ(pde);
 	PDTE_SET_WRITE(pde);

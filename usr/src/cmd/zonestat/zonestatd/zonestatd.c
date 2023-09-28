@@ -4081,7 +4081,6 @@ zsd_open(zsd_ctl_t *ctl)
 	ctl->zsctl_proc_open = 0;
 	ctl->zsctl_proc_open_next = 0;
 
-check_exacct:
 	(void) zsd_enable_cpu_stats();
 
 	/* Create structures to track usage */
@@ -4846,7 +4845,6 @@ main(int argc, char *argv[])
 	g_quit = B_TRUE;
 	(void) cond_signal(&g_usage_cache_kick);
 	(void) mutex_unlock(&g_usage_cache_lock);
-end:
 	(void) thr_join(tid, NULL, NULL);
 	return (0);
 }

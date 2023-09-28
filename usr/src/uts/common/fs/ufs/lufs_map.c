@@ -1891,7 +1891,6 @@ logmap_logscan_add(ml_unit_t *ul, struct delta *dp, off_t lof, size_t *nbp)
 		break;
 	}
 
-sizeofdelta:
 	/*
 	 * return #bytes till next delta header
 	 */

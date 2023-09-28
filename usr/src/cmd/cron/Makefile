@@ -36,7 +36,6 @@ ROOTMETHOD =	$(ROOTLIBSVCMETHOD)/svc-cron
 
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-value
@@ -152,6 +151,13 @@ parsetest :=	CFLAGS += -DPARSETEST
 $(ROOTSVCSYSTEM)/cron.xml := FILEMODE = 0444
 $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 
+# because of labels from yacc
+att1.o := CERRWARN += -_gcc=-Wno-unused-label
+att2.o := CERRWARN += -_gcc=-Wno-unused-label
+objs.xpg4/att1.o := CERRWARN += -_gcc=-Wno-unused-label
+objs.xpg4/att2.o := CERRWARN += -_gcc=-Wno-unused-label
+objs.xpg6/att1.o := CERRWARN += -_gcc=-Wno-unused-label
+objs.xpg6/att2.o := CERRWARN += -_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

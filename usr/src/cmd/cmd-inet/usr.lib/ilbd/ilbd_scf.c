@@ -1276,7 +1276,6 @@ ilbd_scf_load_prop(scf_propertygroup_t *pg, const char *prop_name, void *arg)
 	 */
 	ret = ilbd_scfval_to_data(prop_name, val_type, val, ilb_data);
 
-out:
 	if (val != NULL)
 		scf_value_destroy(val);
 

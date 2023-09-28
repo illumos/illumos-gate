@@ -58,7 +58,6 @@ CFLAGS		+= $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off
@@ -66,6 +65,5 @@ SMATCH=off
 .KEEP_STATE:
 
 all:	$(LIBS)
-
 
 include ../../Makefile.targ

@@ -54,7 +54,6 @@ CPPFLAGS += -I. -I$(KMFDIR)/include -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 
 CFLAGS += $(CCVERBOSE) -DDEBUG
 CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted, too much mess, but it should be
 SMATCH=off
@@ -76,7 +75,5 @@ install : all $(ROOTPROG)
 
 clean :
 	$(RM) $(OBJS)
-
-lint : lint_SRCS
 
 include ../../Makefile.targ

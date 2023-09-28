@@ -65,7 +65,6 @@ LDFLAGS += -N misc/kgssapi -N misc/md5
 #
 
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 

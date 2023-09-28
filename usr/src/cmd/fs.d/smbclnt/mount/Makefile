@@ -36,7 +36,6 @@ ROOTFS_PROG=	$(LIBPROG)
 include		../../Makefile.fstype
 
 OBJS=	$(LIBPROG).o
-SRCS=	$(LIBPROG).c
 POFILE=	$(LIBPROG).po
 CLOBBERFILES	+= $(LIBPROG)
 
@@ -44,7 +43,6 @@ $(ROOTLIBFSTYPE)/mount := FILEMODE= 0555
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
 
 LDLIBS += -lsmbfs
 

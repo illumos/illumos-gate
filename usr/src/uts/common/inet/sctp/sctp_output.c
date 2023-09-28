@@ -2003,7 +2003,7 @@ try_bundle:
 		seglen = new_len;
 		mp = mp->b_next;
 	}
-done_bundle:
+
 	if ((seglen > fp->sf_pmss) && fp->sf_isv4) {
 		ipha_t *iph = (ipha_t *)head->b_rptr;
 

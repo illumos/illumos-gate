@@ -10502,7 +10502,6 @@ emlxs_dfc_get_fcflist(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	bcopy((void *)fcflist, dfc->buf1, i);
 
-done:
 	kmem_free(fcflist, size);
 	return (rval);
 
@@ -11020,7 +11019,6 @@ emlxs_dfc_set_be_dcbx(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_DRV_ERROR;
 	}
 
-done:
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}

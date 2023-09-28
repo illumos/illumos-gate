@@ -371,7 +371,6 @@ gettext("Too many file names"));
 	str = G.argv[G.argc0 - 1];
 	if (strlen(str) > FNSIZE - 4)
 		error(gettext("Filename too long"));
-samef:
 	CP(file, str);
 }
 

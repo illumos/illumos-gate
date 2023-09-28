@@ -57,14 +57,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LDFLAGS		+= -Nmisc/usba -Ndrv/usb_ac
 
 #
-# For now, disable these warnings; maintainers should endeavor
-# to investigate and remove these for maximum coverage.
-# Please do not carry these forward to new Makefiles.
-#
-
-CERRWARN	+= -_gcc=-Wno-unused-label
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

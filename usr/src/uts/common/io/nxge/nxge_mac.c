@@ -1293,7 +1293,7 @@ nxge_pcs_init(p_nxge_t nxgep)
 	} else {
 		goto fail;
 	}
-pass:
+
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_pcs_init: port<%d>", portn));
 	return (NXGE_OK);
 fail:
@@ -6758,14 +6758,8 @@ nxge_mif_intr(void *arg1, void *arg2)
 	}
 	nxgep = ldvp->nxgep;
 #endif
-	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_mif_intr"));
-
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_mif_intr"));
 	return (DDI_INTR_CLAIMED);
-
-mif_intr_fail:
-	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_mif_intr"));
-	return (DDI_INTR_UNCLAIMED);
 }
 
 /*ARGSUSED*/
@@ -8307,8 +8301,6 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		    "Unsupported neptune type 19"));
 		goto error_exit;
 	}
-
-scan_exit:
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_scan_ports_phy, "
 	    "niu type [0x%x]\n", hw_p->niu_type));

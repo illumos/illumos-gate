@@ -1006,7 +1006,6 @@ object_mgr_destroy_token_objects(TSS_HCONTEXT hContext)
 		    MAX_TOK_OBJS * sizeof (TOK_OBJ_ENTRY));
 	}
 
-done:
 	(void) pthread_mutex_unlock(&obj_list_mutex);
 
 	if (locked2 == TRUE) (void) XProcUnLock(xproclock);

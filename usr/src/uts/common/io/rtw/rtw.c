@@ -3357,7 +3357,6 @@ attach_fail9:
 attach_fail8:
 	ddi_remove_intr(devinfo, 0, rsc->sc_iblock);
 attach_fail7:
-attach_fail6:
 	rtw_mutex_destroy(rsc);
 attach_fail5:
 	ieee80211_detach(ic);

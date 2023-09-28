@@ -1505,7 +1505,6 @@ rsrc_usage_info(char **rsrcnames, uint_t flag, int seq_num, rcm_info_t **info)
 			info_req_remove(seq_num);
 	}
 
-out:
 	(void) rcm_append_info(info, result);
 	return (rv);
 }

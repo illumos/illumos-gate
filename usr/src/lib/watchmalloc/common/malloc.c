@@ -257,7 +257,6 @@ malloc_unlocked(size_t size)
 	ASSERT(ISBIT0(SIZE(tmp)));
 	protect(tmp);
 
-leftover:
 	/* if the leftover is enough for a new free piece */
 	if ((n = (SIZE(sp) - size)) >= MINSIZE + WORDSIZE) {
 		n -= WORDSIZE;

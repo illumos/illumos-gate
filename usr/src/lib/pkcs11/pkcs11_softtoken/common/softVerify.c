@@ -252,7 +252,6 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 
 	rv = soft_verify_final(session_p, pSignature, ulSignatureLen);
 
-clean_exit:
 	/* Clear contexts, free key, and release session counter */
 	soft_sign_verify_cleanup(session_p, B_FALSE, B_FALSE);
 	return (rv);

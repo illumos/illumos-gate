@@ -39,7 +39,6 @@ POFILE = luxadm.po
 include ../Makefile.cmd
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-address
 
 # not linted

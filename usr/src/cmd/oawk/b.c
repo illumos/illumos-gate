@@ -850,7 +850,6 @@ insert_table(ccl_chars_t *table_base, int table_size, int ns, wchar_t cs,
 			/*
 			 * Quick! insert to font of current table entries.
 			 */
-qinsert:
 			table_size++;
 			for (; i < table_size; i++, table++) {
 				tns = table->cc_ns;

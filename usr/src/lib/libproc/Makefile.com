@@ -101,7 +101,6 @@ CPPFLAGS +=	-I$(SRCDIR)
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-type-limits
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

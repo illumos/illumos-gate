@@ -21,15 +21,14 @@ include ../Makefile.ctf
 
 OBJS = iconv_main.o iconv_list.o charmap.o parser.tab.o scanner.o
 
-SRCS	= $(OBJS:%.o=%.c)
-
 CSTD=	$(CSTD_GNU99)
 LDLIBS		+= -lcmdutils -lavl
 YFLAGS		= -d -b parser
 CPPFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 $(RELEASE_BUILD) CPPFLAGS += -DNDEBUG
 
-CERRWARN +=	-_gcc=-Wno-unused-label
+# because of labels from yacc
+parser.tab.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off
@@ -52,9 +51,6 @@ $(PIFILES):	parser.tab.h
 
 parser.tab.c parser.tab.h: parser.y
 	$(YACC) $(YFLAGS) parser.y
-
-lint:	$(SRCS)
-	$(LINT.c) $(CPPFLAGS) $(SRCS)
 
 clean:
 	$(RM) $(CLEANFILES)

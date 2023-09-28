@@ -1729,7 +1729,7 @@ find_lib_hp(
 
 	if (find_lib_impl(name, libloc_p) == CFGA_OK)
 		goto found;
-fail:
+
 	return (CFGA_NO_LIB);
 
 found:

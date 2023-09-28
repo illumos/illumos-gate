@@ -871,10 +871,7 @@ urfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_SUCCESS);
 		}
 
-err_free_mem:
 		kmem_free(lp, sizeof (struct urf_dev));
-err_close_pipe:
-err:
 		return (DDI_FAILURE);
 	}
 	if (cmd == DDI_RESUME) {

@@ -1373,10 +1373,7 @@ chip_found:
 			return (DDI_SUCCESS);
 		}
 
-err_free_mem:
 		kmem_free(lp, sizeof (struct axf_dev));
-err_close_pipe:
-err:
 		return (DDI_FAILURE);
 	}
 

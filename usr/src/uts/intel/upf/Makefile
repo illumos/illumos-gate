@@ -38,7 +38,6 @@ LDFLAGS		+= -N misc/mac -N drv/ip -N misc/usba -N misc/usbgem
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-unused-label
 
 # needs work
 $(OBJS_DIR)/upf_usbgem.o := SMOFF += all_func_returns

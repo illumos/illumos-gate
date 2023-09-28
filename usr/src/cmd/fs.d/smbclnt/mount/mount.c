@@ -602,7 +602,6 @@ setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, char *subopt)
 		break;
 
 	default:
-	badopt:
 		if (!qflg)
 			warnx(gettext("unknown option %s"), subopt);
 		rc = EX_OPT;

@@ -73,25 +73,12 @@ LIBREQ	=	$(LPLIB)/requests/liblpreq.a
 LIBSEC	=	$(LPLIB)/secure/liblpsec.a
 LIBUSR	=	$(LPLIB)/users/liblpusr.a
 
-LINTACC	=	$(LPLIB)/access/llib-llpacc.ln
-LINTCLS	=	$(LPLIB)/class/llib-llpcls.ln
-LINTFLT	=	$(LPLIB)/filters/llib-llpflt.ln
-LINTFRM	=	$(LPLIB)/forms/llib-llpfrm.ln
-LINTLP	=	$(LPLIB)/lp/llib-llp.ln
-LINTMSG	=	$(LPLIB)/msgs/llib-llpmsg.ln
-LINTOAM	=	$(LPLIB)/oam/llib-llpoam.ln
-LINTPRT	=	$(LPLIB)/printers/llib-llpprt.ln
-LINTREQ	=	$(LPLIB)/requests/llib-llpreq.ln
-LINTSEC	=	$(LPLIB)/secure/llib-llpsec.ln
-LINTUSR	=	$(LPLIB)/users/llib-llpusr.ln
-
 CERRWARN +=	-_gcc=-Wno-sequence-point
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-value
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-empty-body
@@ -105,7 +92,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 strip:=		TARGET= strip
 catalog:=	TARGET= catalog
 _msg:=		TARGET= catalog

@@ -3393,7 +3393,6 @@ die:
 	nfs4_server_rele(sp);		/* free the list's reference */
 	sp = NULL;
 
-done:
 	mutex_enter(&cpr_lock);
 	CALLB_CPR_EXIT(&cpr_info);	/* drops cpr_lock */
 	mutex_destroy(&cpr_lock);

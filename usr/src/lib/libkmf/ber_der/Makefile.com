@@ -47,8 +47,6 @@ CPPFLAGS64	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 			-I$(INCDIR) -I../../include
 LDLIBS		+=	-lc
 
-CERRWARN	+=	-_gcc=-Wno-unused-label
-
 # not linted
 SMATCH=off
 

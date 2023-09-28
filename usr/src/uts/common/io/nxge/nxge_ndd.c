@@ -2462,7 +2462,6 @@ nxge_param_link_update(p_nxge_t nxgep)
 		RW_EXIT(&nxgep->filter_lock);
 	}
 
-nxge_param_hw_update_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 	    "<== nxge_param_link_update status = 0x%08x", status));
 	return (status);

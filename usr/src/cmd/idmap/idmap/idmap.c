@@ -2303,7 +2303,6 @@ do_export(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	/* List the requested types: */
 	rc = list_name_mappings(format, fi);
 
-cleanup:
 	if (fi != NULL && fi != stdout)
 		(void) fclose(fi);
 	return (rc);
@@ -2742,7 +2741,6 @@ do_remove_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (rc == 0)
 		rc = positions_add(pos);
 
-cleanup:
 	name_mapping_fini(nm);
 	if (fini_udt_command(1, pos))
 		rc = -1;

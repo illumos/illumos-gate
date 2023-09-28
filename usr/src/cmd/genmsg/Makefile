@@ -34,9 +34,12 @@ LEXSRCS=	genmsg.l
 LEXINTSRCS=	lex.yy.c
 LEXOBJS=	lex.yy.o
 
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# because of labels from yacc
+genmsg.o := CERRWARN +=	-_gcc=-Wno-unused-label
+genmsg.o := SMATCH=off
 
 LDLIBS += -ll
 YFLAGS = -d

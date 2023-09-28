@@ -824,7 +824,6 @@ attach_fail8:
 	sc->sc_soft_hdl = NULL;
 attach_fail7:
 	ieee80211_detach(ic);
-attach_fail6:
 	iwk_free_fw_dma(sc);
 attach_fail5:
 	iwk_ring_free(sc);

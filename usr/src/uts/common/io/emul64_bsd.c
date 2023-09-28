@@ -1193,8 +1193,6 @@ bsd_writeblks(struct emul64 *emul64, ushort_t target, ushort_t lun,
 	 * nowrite list.
 	 */
 	rw_exit(&tgt->emul64_tgt_nw_lock);
-
-errout:
 	mutex_exit(&tgt->emul64_tgt_blk_lock);
 
 unlocked_out:

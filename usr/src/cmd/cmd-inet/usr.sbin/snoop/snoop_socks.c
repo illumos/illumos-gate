@@ -243,7 +243,6 @@ interpret_socks_call(flags, line, fraglen)
 				show_string(line, fraglen, 20));
 	}
 
-out:
 	return (fraglen);
 }
 
@@ -334,7 +333,6 @@ interpret_socks_reply(flags, line, fraglen)
 		show_space();
 	}
 
-out:
 	return (fraglen);
 }
 

@@ -378,7 +378,6 @@ arch_match(FILE *fp, int arch)
 		buf2 = NULL;
 	}
 
-end:
 	free(buf2);
 	free(p);
 

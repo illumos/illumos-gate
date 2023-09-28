@@ -3923,8 +3923,6 @@ Reject:
 	    ReasonCodeExplanation);
 	emlxs_dhc_auth_complete(port, ndlp, 1);
 
-out:
-
 	return (node_dhc->state);
 
 } /* emlxs_rcv_auth_msg_dhchap_challenge_cmpl_wait4next */
@@ -4294,8 +4292,6 @@ Reject:
 	(void) emlxs_issue_auth_reject(port, ndlp, 0, 0, ReasonCode,
 	    ReasonCodeExplanation);
 	emlxs_dhc_auth_complete(port, ndlp, 1);
-
-out:
 
 	return (node_dhc->state);
 

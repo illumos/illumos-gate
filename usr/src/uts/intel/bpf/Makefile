@@ -69,7 +69,6 @@ INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 # Please do not carry these forward to new Makefiles.
 #
 
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work

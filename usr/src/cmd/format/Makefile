@@ -48,7 +48,6 @@ include ../Makefile.cmd
 
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-clobbered
 
 # not linted

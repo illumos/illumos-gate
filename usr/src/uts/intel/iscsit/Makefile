@@ -56,7 +56,6 @@ LDFLAGS		+= -Ndrv/stmf -Nmisc/idm -Nfs/sockfs -Nmisc/md5 -Nmisc/ksocket
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-unused-label
 
 # needs work
 SMOFF += cast_assign,strcpy_overflow

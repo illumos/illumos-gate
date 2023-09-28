@@ -559,7 +559,6 @@ rdsv3_setsockopt(sock_lower_handle_t proto_handle, int level,
 		ret = -ENOPROTOOPT;
 #endif
 	}
-out:
 	return (ret);
 }
 
@@ -1024,8 +1023,6 @@ rdsv3_init()
 
 	goto out;
 
-out_stats:
-	rdsv3_stats_exit();
 out_sysctl:
 	rdsv3_sysctl_exit();
 out_threads:

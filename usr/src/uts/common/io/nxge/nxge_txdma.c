@@ -2311,15 +2311,6 @@ nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	nxge_map_txdma_channel_cfg_ring(nxgep, channel, dma_cntl_p, *tx_desc_p,
 	    tx_mbox_p);
 
-	goto nxge_map_txdma_channel_exit;
-
-nxge_map_txdma_channel_fail1:
-	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
-	    "==> nxge_map_txdma_channel: unmap buf"
-	    "(status 0x%x channel %d)",
-	    status, channel));
-	nxge_unmap_txdma_channel_buf_ring(nxgep, *tx_desc_p);
-
 nxge_map_txdma_channel_exit:
 	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
 	    "<== nxge_map_txdma_channel: "

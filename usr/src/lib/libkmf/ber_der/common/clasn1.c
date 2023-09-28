@@ -620,7 +620,6 @@ DerDecodeSPKI(KMF_DATA *EncodedSPKI, KMF_X509_SPKI *spki)
 
 	ret = get_spki(asn1, spki);
 
-cleanup:
 	if (ret != KMF_OK) {
 		free_decoded_spki(spki);
 	}
@@ -1541,7 +1540,6 @@ DerDecodeExtension(KMF_DATA *Data, KMF_X509_EXTENSION **extn)
 
 	ret = get_one_extension(asn1, extn, NULL);
 
-cleanup:
 	if (ret != KMF_OK) {
 		if (*extn != NULL) {
 			free(*extn);

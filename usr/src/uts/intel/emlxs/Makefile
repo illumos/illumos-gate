@@ -79,7 +79,6 @@ LDFLAGS		+= -Nmisc/md5 -Nmisc/sha1
 LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work

@@ -717,7 +717,7 @@ auto_lookup_request(
 			break;
 		}
 	}
-done:
+
 	xdr_free(xdr_autofs_lookupres, (char *)resp);
 	kmem_free(resp, sizeof (*resp));
 	AUTOFS_DPRINT((5, "auto_lookup_request: path=%s name=%s error=%d\n",
@@ -1342,7 +1342,6 @@ mount:
 
 	crfree(zcred);
 
-done:
 	/*
 	 * Return failure if daemon didn't mount anything, and all
 	 * kernel mounts attempted failed.

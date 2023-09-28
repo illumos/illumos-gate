@@ -44,7 +44,6 @@ PROG = fminject
 ROOTPDIR = $(ROOT)/usr/lib/fm/fmd
 ROOTPROG = $(ROOTPDIR)/$(PROG)
 OBJS = $(SRCS:%.c=%.o) inj_grammar.o inj_lex.o
-LINTFILES = $(SRCS:%.c=%.ln)
 CLEANFILES += inj_grammar.c inj_grammar.h inj_lex.c y.tab.h y.tab.c
 
 CPPFLAGS += -I. -I../common
@@ -52,17 +51,18 @@ CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lsysevent -lnvpair -lumem
 LDFLAGS += -R/usr/lib/fm
-LINTFLAGS = -mnux
 STRIPFLAG =
+
+# because of labels from yacc
+inj_grammar.o inj_lex.o := CERRWARN += -_gcc=-Wno-unused-label
 
 LFLAGS = -t -v
 YFLAGS = -d
 
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -92,15 +92,6 @@ clean:
 
 clobber: clean
 	$(RM) $(PROG)
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT.c) $(LINTFILES) $(LDLIBS)
 
 $(ROOT)/usr/lib/fm:
 	$(INS.dir)

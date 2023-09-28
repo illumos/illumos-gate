@@ -997,8 +997,6 @@ ipw2100_config(struct ipw2100_softc *sc)
 	if (err != DDI_SUCCESS)
 		return (err);
 
-en_adapter:
-
 	IPW2100_DBG(IPW2100_DBG_WIFI, (sc->sc_dip, CE_CONT,
 	    "ipw2100_config(): Enabling adapter\n"));
 

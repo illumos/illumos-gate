@@ -29,7 +29,6 @@ CERRWARN += -_gcc=-Wno-implicit-int
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-clobbered
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-extra
 
 LDLIBS += -lcurses

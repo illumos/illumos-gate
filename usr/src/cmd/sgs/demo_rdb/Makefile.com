@@ -60,9 +60,12 @@ CLEANFILES +=	$(BLTSRC) $(BLTHDR) simp libsub.so.1
 # DEMO DELETE START
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 SMOFF +=	buffer_too_small_for_struct
+
+# because of labels from yacc
+objs/lex.o objs/gram.o := CERRWARN += -_gcc=-Wno-unused-label
+
 # DEMO DELETE END
 
 test-sparc=	test-sparc-regs

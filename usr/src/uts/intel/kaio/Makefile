@@ -61,7 +61,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #

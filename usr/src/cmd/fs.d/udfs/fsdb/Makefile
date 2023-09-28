@@ -43,11 +43,12 @@ LDFLAGS +=	$(MAPOPTS)
 YFLAGS =	"-d"
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-unused-function
 
+# because of labels from yacc
+fsdb_yacc.o fsdb_lex.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

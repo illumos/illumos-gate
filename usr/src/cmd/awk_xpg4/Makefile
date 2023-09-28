@@ -36,18 +36,19 @@ OBJ1= awk0.o awk1.o awk2.o awk3.o awk4.o
 OBJ2= awk.o
 XPG4AWKOBJ= values-xpg4.o
 OBJS= $(OBJ2) $(OBJ1) $(XPG4AWKOBJ)
-SRCS= $(OBJ1:%.o=%.c)
 
 include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 YFLAGS += -d
 LDLIBS += -lm
 CLEANFILES= awk.c y.tab.h
+
+# because of labels from yacc
+awk.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off
@@ -79,8 +80,6 @@ values-xpg4.o: ../../lib/crt/common/values-xpg4.c
 
 clean:
 	$(RM) $(OBJS) $(XPG4) $(CLEANFILES)
-
-lint: lint_SRCS
 
 awk.c + y.tab.h: awk.y
 

@@ -278,8 +278,6 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	}
 	port = &PPORT;
 
-out:
-
 	if (IpDropped) {
 		HBASTATS.IpDropped++;
 	}

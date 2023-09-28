@@ -383,7 +383,6 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	else
 		rval = EFAULT;
 
-finish:
 	if (rval == 0) {
 		if (ddi_copyout(fibp,
 #ifdef _LP64

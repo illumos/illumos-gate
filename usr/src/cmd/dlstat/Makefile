@@ -31,7 +31,6 @@ ROOTFS_PROG=	$(PROG)
 include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += $(CNOWARN_UNINIT)
 
@@ -51,7 +50,5 @@ install: all $(ROOTSBINPROG)
 	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

@@ -43,7 +43,6 @@ LDLIBS +=	-lscf -luutil -lmd5
 CLOBBERFILES += $(POFILES)
 
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 .KEEP_STATE:
 

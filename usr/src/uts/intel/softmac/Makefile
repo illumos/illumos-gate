@@ -59,7 +59,6 @@ LDFLAGS		+= -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
 #
 CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-unused-label
 
 #
 #	Default build targets.

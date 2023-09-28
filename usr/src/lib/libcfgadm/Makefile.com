@@ -37,7 +37,6 @@ SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-type-limits
-CERRWARN +=	-_gcc=-Wno-unused-label
 
 SMOFF += snprintf_overflow
 

@@ -5008,7 +5008,6 @@ err_free_ring:
 	gem_free_memory(dp);
 err_free_regs:
 	ddi_regs_map_free(&dp->regs_handle);
-err_free_locks:
 	mutex_destroy(&dp->xmitlock);
 	mutex_destroy(&dp->intrlock);
 	cv_destroy(&dp->tx_drain_cv);

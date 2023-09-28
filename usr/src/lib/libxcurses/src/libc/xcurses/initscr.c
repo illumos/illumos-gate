@@ -111,7 +111,6 @@ initscr()
 	return __m_return_pointer("initscr", stdscr);
 error_3:
 	(void) delwin(stdscr);
-error_2:
 	(void) endwin();
 	(void) delscreen(sp);
 error_1:
@@ -122,7 +121,6 @@ error_1:
 		term = M_TERM_NAME;
 
 	(void) fprintf(stderr, m_strmsg(err), term);
-error_0:
 	exit(1);
 	return (0);	/* keep gcc happy */
 }

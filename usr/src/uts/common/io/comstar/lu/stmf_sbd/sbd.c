@@ -2147,7 +2147,7 @@ sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg, uint32_t proxy_reg_arg_len)
 		cmn_err(CE_WARN, "could not find and lock logical unit");
 		stret = STMF_FAILURE;
 	}
-out:
+
 	return (stret);
 }
 
@@ -3107,7 +3107,6 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
 	    int, ret, scsi_task_t *, task);
 
-over_sl_data_read:
 	if (ret || resid) {
 		stmf_trace(0, "UIO_READ failed, ret = %d, resid = %d", ret,
 		    resid);
@@ -3184,7 +3183,7 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 	    (sl->sl_flags & SL_FLUSH_ON_DISABLED_WRITECACHE)) {
 		sret = sbd_flush_data_cache(sl, 1);
 	}
-over_sl_data_write:
+
 	if ((ret || resid) || (sret != SBD_SUCCESS)) {
 		return (SBD_FAILURE);
 	} else if ((offset + size) > sl->sl_data_readable_size) {

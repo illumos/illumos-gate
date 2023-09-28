@@ -318,7 +318,6 @@ get_template_attr_scalar_common(crypto_object_attribute_t *template,
 		return (CRYPTO_ATTRIBUTE_VALUE_INVALID);
 	}
 
-do_copy:
 	bcopy(template[attr_idx].oa_value, (uchar_t *)value + offset,
 	    oa_value_len);
 

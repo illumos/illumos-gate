@@ -6776,7 +6776,7 @@ dprov_random_task(dprov_req_t *taskq_req)
 
 	switch (taskq_req->dr_type) {
 
-	DPROV_REQ_RANDOM_SEED:
+	case DPROV_REQ_RANDOM_SEED:
 		/*
 		 * Since we don't really generate random numbers
 		 * nothing to do.

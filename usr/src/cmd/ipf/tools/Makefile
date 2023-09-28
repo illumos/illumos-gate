@@ -86,6 +86,12 @@ ipnat		:=	OBJS += $(IPNAT_OBJS)
 ippool		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
 ippool		:=	OBJS += $(IPPOOL_OBJS)
 
+# because of labels from yacc
+ipf_y.o		:= CERRWARN += -_gcc=-Wno-unused-label
+ipmon_y.o	:= CERRWARN += -_gcc=-Wno-unused-label
+ipnat_y.o	:= CERRWARN += -_gcc=-Wno-unused-label
+ippool_y.o	:= CERRWARN += -_gcc=-Wno-unused-label
+
 CLEANFILES	+= $(IPF_OBJS) $(IPFS_OBJS) $(IPFTEST_OBJS) $(IPFSTAT_OBJS)
 CLEANFILES	+= $(IPMON_OBJS) $(IPNAT_OBJS) $(IPPOOL_OBJS)
 CLOBBERFILES	+= $(IPFPROG)

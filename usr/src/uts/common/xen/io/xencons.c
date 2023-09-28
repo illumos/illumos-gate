@@ -426,8 +426,6 @@ xenconsopen(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 	async = xcp->priv;
 	mutex_enter(&xcp->excl);
 
-again:
-
 	if ((async->async_flags & ASYNC_ISOPEN) == 0) {
 		async->async_ttycommon.t_iflag = 0;
 		async->async_ttycommon.t_iocpending = NULL;
@@ -493,7 +491,6 @@ xenconsclose(queue_t *q, int flag, cred_t *credp)
 		freeb(async->async_xmitblk);
 	async->async_xmitblk = NULL;
 
-out:
 	ttycommon_close(&async->async_ttycommon);
 
 	/*

@@ -1453,7 +1453,6 @@ dma_alloc_fail:
 	ddi_dma_free_handle(&dma_handle);
 
 fail:
-alloc_err:
 	if (hdr.u0.req.opcode == OPCODE_WRITE_COMMON_FLASHROM) {
 		dev->cookie = 0;
 	}

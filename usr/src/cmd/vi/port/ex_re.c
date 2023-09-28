@@ -993,7 +993,6 @@ cerror(value(vi_TERSE) ? (unsigned char *)gettext("Badly formed re") :
 			if(c != '~')
 				*gp++ = '\\';
 			/* FALLTHROUGH */
-defchar:
 		default:
 			*gp++ = (value(vi_IGNORECASE) ? tolower(c) : c);
 			continue;

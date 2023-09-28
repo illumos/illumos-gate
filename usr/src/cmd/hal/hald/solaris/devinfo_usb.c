@@ -235,7 +235,6 @@ devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devic
 		}
 	}
 
-out:
 	if (nd != NULL) {
 		return (nd);
 	} else {

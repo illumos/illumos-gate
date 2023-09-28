@@ -1047,7 +1047,6 @@ kmt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 	if (n == 0)
 		return (set_errno(EMDB_NOSYM));
 
-found:
 	bcopy(&sym, symp, sizeof (GElf_Sym));
 	sip->sym_id = symid;
 	sip->sym_table = MDB_TGT_SYMTAB;
@@ -2553,11 +2552,6 @@ kmdb_kvm_create(mdb_tgt_t *t, int argc, const char *argv[])
 	bzero(&kmt_defbp_list, sizeof (mdb_list_t));
 
 	return (0);
-
-create_err:
-	kmt_destroy(t);
-
-	return (-1);
 }
 
 /*

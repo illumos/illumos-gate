@@ -720,17 +720,12 @@ udmf_attach_chip(struct usbgem_dev *dp)
 #if DEBUG_LEVEL > 0
 	udmf_eeprom_dump(dp, /* 0x3f + 1 */ 128);
 #endif
-{
+
 	static uint8_t bcst[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	DPRINTF(0, (CE_CONT, "!%s: %s: hash of bcast:%x",
 	    dp->name, __func__, usbgem_ether_crc_be(bcst)));
-}
-	return (USB_SUCCESS);
 
-usberr:
-	cmn_err(CE_WARN, "%s: %s: usb error detected (%d)",
-	    dp->name, __func__, err);
-	return (USB_FAILURE);
+	return (USB_SUCCESS);
 }
 
 static int
@@ -866,10 +861,7 @@ udmfattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_SUCCESS);
 		}
 
-err_free_mem:
 		kmem_free(lp, sizeof (struct udmf_dev));
-err_close_pipe:
-err:
 		return (DDI_FAILURE);
 	}
 

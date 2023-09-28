@@ -555,9 +555,6 @@ soft_hmac_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	*pulSignedLen = hmac_ctx->hmac_len;
 
-
-clean_exit:
-
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 
 	if (sign_op) {

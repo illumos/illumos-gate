@@ -5221,7 +5221,7 @@ e1000g_pp_ioctl(struct e1000g *e1000gp, struct iocblk *iocp, mblk_t *mp)
 		peek = B_FALSE;
 		break;
 
-	deault:
+	default:
 		E1000G_DEBUGLOG_1(e1000gp, E1000G_INFO_LEVEL,
 		    "e1000g_diag_ioctl: invalid ioctl command 0x%X\n",
 		    iocp->ioc_cmd);

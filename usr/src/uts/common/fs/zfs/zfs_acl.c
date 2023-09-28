@@ -2083,7 +2083,6 @@ top:
 	if (fuidp)
 		zfs_fuid_info_free(fuidp);
 	dmu_tx_commit(tx);
-done:
 	mutex_exit(&zp->z_lock);
 	rw_exit(&zp->z_acl_lock);
 

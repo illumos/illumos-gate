@@ -40,8 +40,10 @@ include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += $(CNOWARN_UNINIT)
+
+# because of labels from yacc
+loadkeys := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off
@@ -73,16 +75,12 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 _msg:=          TARGET= catalog
 
 clobber:	$(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
 
 clean:	$(SUBDIRS)
-
-lint:
-	$(LINT.c) dumpkeys.c $(LDLIBS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

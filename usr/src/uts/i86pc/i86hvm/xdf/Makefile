@@ -57,7 +57,6 @@ CPPFLAGS	+= -DHVMPV_XDF_VERS=2
 LDFLAGS		+= -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 
 #

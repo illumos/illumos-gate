@@ -97,7 +97,6 @@ mit_des_cbc_encrypt(context, in, out, length, key, ivec, encrypt)
     }
 cleanup:
 
-final_cleanup:
     if (ret)
         (void) memset(out, 0, length);
 

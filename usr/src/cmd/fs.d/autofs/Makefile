@@ -76,9 +76,9 @@ LOCAL=		autod_main.o \
 TYPEOBJS=	$(LOCAL) $(COMMON) replica.o nfs_sec.o nfs_resolve.o nfs_subr.o \
 		$(FSLIB) webnfs_xdr.o webnfs_client.o selfcheck.o
 
-SHAREOBJS=	$(SHARESRCS:%.c=%.o)
+SHAREOBJS=	$(SHARE:%=%.o)
 
-UNSHAREOBJS=	$(UNSHARESRCS:%.c=%.o)
+UNSHAREOBJS=	$(UNSHARE:%=%.o)
 
 POFILE= autofs.po
 
@@ -96,7 +96,6 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-function
 
 # not linted
@@ -104,17 +103,6 @@ SMATCH=off
 
 OBJS=		$(AUTOOBJS) $(MOUNTOBJS) $(TYPEOBJS) \
 		$(SHAREOBJS) $(UNSHAREOBJS)
-
-AUTOSRCS=	automount.c $(COMMON:%.o=%.c) $(FSLIBSRC)
-MOUNTSRCS=	mount.c $(FSLIBSRC)
-TYPESRCS=	$(LOCAL:%.o=%.c) $(COMMON:%.o=%.c) \
-		../nfs/lib/replica.c ../nfs/lib/nfs_sec.c \
-		../nfs/lib/nfs_subr.c $(FSLIBSRC) ../nfs/lib/selfcheck.c \
-		../nfs/lib/nfs_resolve.c ../nfs/lib/smfcfg.c
-SHARESRCS=	$(SHARE:%=%.c)
-UNSHARESRCS=	$(UNSHARE:%=%.c)
-DFSHARESSRCS=	$(DFSHARES:%=%.sh)
-SRCS=		$(OBJS:%.o=%.c)
 
 nfs_sec.o :=	CPPFLAGS += -DWNFS_SEC_NEGO
 

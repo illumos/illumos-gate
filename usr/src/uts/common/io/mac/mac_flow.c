@@ -1494,7 +1494,6 @@ mac_link_flow_modify(char *flow_name, mac_resource_props_t *mrp)
 		(void) mac_flow_modify_props(flent, mrp);
 	}
 
-done:
 	mac_perim_exit(mph);
 	return (err);
 }

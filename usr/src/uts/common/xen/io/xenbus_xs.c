@@ -762,7 +762,6 @@ xs_register_xenbus_callback(void (*callback)(int))
 	}
 	xnp = xbn;
 	list_insert_tail(&notify_list, xbn);
-done:
 	if (xenstore_up)
 		xnp->notify_func(XENSTORE_UP);
 	mutex_exit(&notify_list_lock);

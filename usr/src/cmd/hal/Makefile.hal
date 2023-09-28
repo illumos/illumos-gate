@@ -68,7 +68,6 @@ HAL_GLIB_CPPFLAGS =	-I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
 HAL_GETTEXT_PACKAGE =	$(TEXT_DOMAIN)
 
 CERRWARN +=		-_gcc=-Wno-unused-variable
-CERRWARN +=		-_gcc=-Wno-unused-label
 CERRWARN +=		-_gcc=-Wno-unused-value
 CERRWARN +=		-_gcc=-Wno-extra
 CERRWARN +=		-_gcc=-Wno-parentheses

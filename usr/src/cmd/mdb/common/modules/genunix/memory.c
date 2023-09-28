@@ -1186,7 +1186,6 @@ anon_walk_init_common(mdb_walk_state_t *wsp, ulong_t minslot, ulong_t maxslot)
 	aw->aw_minslot = minslot;
 	aw->aw_maxslot = maxslot;
 
-out:
 	wsp->walk_data = aw;
 	return (0);
 }

@@ -30,8 +30,6 @@ include ../Makefile.cmd
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -lvrrpadm -lnsl -lofmt
 
-CERRWARN += -_gcc=-Wno-unused-label
-
 .KEEP_STATE:
 
 all: $(PROG)
@@ -40,7 +38,5 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.targ

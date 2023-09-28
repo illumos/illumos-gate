@@ -414,7 +414,6 @@ hxge_save_cntrs(p_hxge_t hxgep)
 	statsp->vmac_stats.rx_mcast_fr_cnt +=
 	    rx_mcast_fr_cnt.bits.rx_mcast_fr_cnt;
 
-hxge_save_cntrs_exit:
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_save_cntrs"));
 }
 

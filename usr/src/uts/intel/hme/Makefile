@@ -57,7 +57,6 @@ CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -Nmisc/mii -Nmisc/mac
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work

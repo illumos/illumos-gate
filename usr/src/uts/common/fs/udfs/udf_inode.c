@@ -1676,7 +1676,6 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 		}
 	}
 
-done:
 	return (0);
 }
 

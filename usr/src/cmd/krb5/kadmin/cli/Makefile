@@ -14,7 +14,6 @@ COMMON_OBJS   = kadmin.o kadmin_ct.o ss_wrapper.o getdate.o keytab.o
 RMT_OBJS= $(COMMON_OBJS) kadmin_rmt.o
 LOC_OBJS= $(COMMON_OBJS) kadmin_loc.o
 OBJS	= $(COMMON_OBJS) $(RMT_OBJS) $(LOC_OBJS)
-SRCS	= $(OBJS:.o=.c)
 
 include ../../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
@@ -33,10 +32,12 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include/ \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include $(DEFS)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# because of labels from yacc
+getdate.o := CERRWARN += -_gcc=-Wno-unused-label
 
 SMATCH=off
 

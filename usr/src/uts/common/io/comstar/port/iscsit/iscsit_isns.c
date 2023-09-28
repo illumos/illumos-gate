@@ -3195,7 +3195,6 @@ isnst_esi_thread(void *arg)
 	esi.esi_thread_running = B_FALSE;
 	cv_signal(&esi.esi_cv);
 	mutex_exit(&esi.esi_mutex);
-esi_thread_exit:
 	thread_exit();
 }
 

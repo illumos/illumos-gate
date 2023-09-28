@@ -626,8 +626,6 @@ emlxs_mem_pool_free(emlxs_hba_t *hba, MEMSEG *seg, uint32_t count)
 		goto vmem_pool;
 	}
 
-dma_pool:
-
 	/* Free memory associated with all buffers on get buffer pool */
 	while (count && ((bp = seg->fc_memget_ptr) != NULL)) {
 		/* Remove buffer from list */

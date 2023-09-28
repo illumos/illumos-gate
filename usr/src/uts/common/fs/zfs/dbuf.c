@@ -2951,7 +2951,6 @@ dbuf_hold_impl(dnode_t *dn, uint8_t level, uint64_t blkid,
 	ASSERT3U(dn->dn_nlevels, >, level);
 
 	*dbp = NULL;
-top:
 	/* dbuf_find() returns with db_mtx held */
 	db = dbuf_find(dn->dn_objset, dn->dn_object, level, blkid);
 

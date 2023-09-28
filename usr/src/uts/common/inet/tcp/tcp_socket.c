@@ -332,7 +332,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		(*connp->conn_upcalls->su_set_proto_props)(
 		    connp->conn_upper_handle, &sopp);
 	}
-done:
+
 	/*
 	 * Indicate (via SQ_PROCESS) that it is acceptable for the squeue to
 	 * attempt to drain a pending request relevant to this connection when

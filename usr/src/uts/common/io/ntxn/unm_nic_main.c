@@ -2015,7 +2015,6 @@ unm_nic_do_ioctl(unm_adapter *adapter, queue_t *wq, mblk_t *mp)
 		goto error_out;
 	}
 
-work_done:
 	miocack(wq, mp, data.size, data.rv);
 	return (DDI_SUCCESS);
 

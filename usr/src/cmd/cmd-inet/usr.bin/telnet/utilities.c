@@ -957,7 +957,6 @@ common2:
 			    break;
 
 			default:
-			def_case:
 			    if (isprint(pointer[i]) && pointer[i] != '"') {
 				if (noquote) {
 				    (void) putc('"', NetTrace);

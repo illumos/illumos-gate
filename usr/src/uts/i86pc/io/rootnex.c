@@ -2126,7 +2126,6 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	else
 		rootnex_get_sgl(dmao, dma->dp_cookies, &dma->dp_sglinfo);
 
-out:
 	ASSERT(sinfo->si_sgl_size <= sinfo->si_max_pages);
 	/* if we don't need a copy buffer, we don't need to sync */
 	if (sinfo->si_copybuf_req == 0) {
@@ -2149,7 +2148,9 @@ out:
 	if ((sinfo->si_copybuf_req == 0) &&
 	    (sinfo->si_sgl_size <= (unsigned)attr->dma_attr_sgllen) &&
 	    (dmao->dmao_size <= dma->dp_maxxfer)) {
+#if !defined(__xpv)
 fast:
+#endif
 		/*
 		 * If the driver supports FMA, insert the handle in the FMA DMA
 		 * handle cache.

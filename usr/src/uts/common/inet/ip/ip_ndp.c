@@ -1409,7 +1409,7 @@ ip_ndp_resolve(ncec_t *ncec)
 	} else {
 		nce_restart_timer(ncec, (clock_t)ms);
 	}
-done:
+
 	ill_refrele(src_ill);
 }
 
@@ -2854,7 +2854,7 @@ nce_timer(void *arg)
 		mutex_exit(&ncec->ncec_lock);
 		break;
 	}
-done:
+
 	ncec_refrele(ncec);
 	ill_refrele(src_ill);
 }

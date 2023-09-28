@@ -2846,11 +2846,6 @@ rpc_msg_dup(struct rpc_msg *src)
 		dst->rm_call.cb_verf = oa_dst;
 	}
 	return (dst);
-
-error:
-	kmem_free(dst->rm_call.cb_cred.oa_base,	dst->rm_call.cb_cred.oa_length);
-	kmem_free(dst, sizeof (*dst));
-	return (NULL);
 }
 
 void

@@ -117,7 +117,6 @@ genkeypair_pkcs11(KMF_HANDLE_T kmfhandle,
 		return (kmfrv);
 	}
 
-cleanup:
 	if (kmfrv == KMF_OK) {
 		if (outPriKey != NULL)
 			*outPriKey = prik;
@@ -304,7 +303,7 @@ genkeypair_nss(KMF_HANDLE_T kmfhandle,
 	if (kmfrv != KMF_OK) {
 		return (kmfrv);
 	}
-cleanup:
+
 	if (kmfrv == KMF_OK) {
 		if (outPriKey != NULL)
 			*outPriKey = prik;

@@ -674,7 +674,6 @@ bpfread(dev_t dev, struct uio *uio, cred_t *cred)
 	d->bd_fbuf = d->bd_hbuf;
 	d->bd_hbuf = 0;
 	d->bd_hlen = 0;
-done:
 	mutex_exit(&d->bd_lock);
 	return (error);
 }

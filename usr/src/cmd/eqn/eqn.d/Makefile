@@ -34,8 +34,10 @@ CPPFLAGS =	-I. -I.. $(CPPFLAGS.master)
 LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
+
+# because of labels from yacc
+e.o := CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted
 SMATCH=off

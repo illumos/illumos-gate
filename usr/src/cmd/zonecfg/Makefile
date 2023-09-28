@@ -44,7 +44,6 @@ LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h
 
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
@@ -52,8 +51,6 @@ SMOFF += all_func_returns
 
 # false positive
 zonecfg_lex.o := SMOFF += free
-
-CLOBBERFILES += $(PROG).ln
 
 .KEEP_STATE:
 
@@ -71,7 +68,9 @@ zonecfg_lex.c:	zonecfg_lex.l zonecfg_grammar.tab.h zonecfg.h
 zonecfg_grammar.tab.h zonecfg_grammar.tab.c:	zonecfg_grammar.y zonecfg.h
 	$(YACC) $(YFLAGS) zonecfg_grammar.y
 
+# because of labels from yacc
 zonecfg_lex.o zonecfg_grammar.tab.o := CCVERBOSE =
+zonecfg_lex.o zonecfg_grammar.tab.o := CERRWARN += -_gcc=-Wno-unused-label
 
 check:	$(PROG).c $(PROG).h
 	$(CSTYLE) -pP $(PROG).c $(PROG).h

@@ -1712,7 +1712,7 @@ si_cachei_get(struct inode *ip, si_t **spp)
 	si_t	*sp;
 
 	rw_enter(&si_cache_lock, RW_READER);
-loop:
+
 	for (sp = si_cachei[SI_HASH(ip->i_shadow)]; sp; sp = sp->s_forw)
 		if (sp->s_shadow == ip->i_shadow && sp->s_dev == ip->i_dev)
 			break;
@@ -1724,7 +1724,6 @@ loop:
 	}
 	/* Found it */
 	rw_enter(&sp->s_lock, RW_WRITER);
-alldone:
 	rw_exit(&si_cache_lock);
 	*spp = sp;
 	return (0);
@@ -1755,7 +1754,7 @@ si_cachea_get(struct inode *ip, si_t *spi, si_t **spp)
 	spi->s_dev = ip->i_dev;
 	spi->s_signature = si_signature(spi);
 	rw_enter(&si_cache_lock, RW_READER);
-loop:
+
 	for (sp = si_cachea[SI_HASH(spi->s_signature)]; sp; sp = sp->s_next) {
 		if (sp->s_signature == spi->s_signature &&
 		    sp->s_dev == spi->s_dev &&
@@ -1772,7 +1771,6 @@ loop:
 	}
 	/* Found it */
 	rw_enter(&sp->s_lock, RW_WRITER);
-alldone:
 	spi->s_shadow = sp->s_shadow; /* XXX For debugging */
 	rw_exit(&si_cache_lock);
 	*spp = sp;

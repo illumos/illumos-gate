@@ -1272,7 +1272,6 @@ loop_cleanup:
 		}
 	}
 
-finish:
 	/* Save the session in case it can be used later */
 	if (rv == CKR_OK) {
 		/*

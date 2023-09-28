@@ -1195,7 +1195,7 @@ bail:
 	}
 	if (need_ill_refrele)
 		ill_refrele(ill);
-done:
+
 	freemsg(mp);
 	freemsg(mp1);
 }

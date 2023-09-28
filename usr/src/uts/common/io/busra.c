@@ -447,7 +447,6 @@ ndi_ra_free(dev_info_t *dip, uint64_t base, uint64_t len, char *type,
 	 * resource to the pool.
 	 */
 	(void) pci_put_available_prop(dipmap->ra_dip, base, len, type);
-done:
 	return (NDI_SUCCESS);
 
 overlap:

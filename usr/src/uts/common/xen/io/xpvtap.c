@@ -970,8 +970,6 @@ xpvtap_user_thread_init(xpvtap_state_t *state)
 
 	return (DDI_SUCCESS);
 
-userinitthrfail_taskq_dispatch:
-	ddi_taskq_destroy(thread->ut_taskq);
 userinitthrfail_taskq_create:
 	cv_destroy(&thread->ut_exit_done_cv);
 	cv_destroy(&thread->ut_wake_cv);

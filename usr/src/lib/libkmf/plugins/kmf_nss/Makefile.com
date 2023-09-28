@@ -52,7 +52,6 @@ CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(NSSINC)  \
 PICS=	$(OBJECTS:%=pics/%)
 
 
-CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
 CERRWARN	+=	$(CNOWARN_UNINIT)
 

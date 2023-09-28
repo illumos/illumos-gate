@@ -568,17 +568,6 @@ hxge_attach_fail:
 	hxge_unattach(hxgep);
 	goto hxge_attach_fail1;
 
-hxge_attach_fail5:
-	/*
-	 * Tear down the ndd parameters setup.
-	 */
-	hxge_destroy_param(hxgep);
-
-	/*
-	 * Tear down the kstat setup.
-	 */
-	hxge_destroy_kstats(hxgep);
-
 hxge_attach_fail4:
 	if (hxgep->hxge_hw_p) {
 		hxge_uninit_common_dev(hxgep);
@@ -832,11 +821,6 @@ hxge_map_regs(p_hxge_t hxgep)
 	    " handle 0x%0llx", dev_regs->hxge_regp, dev_regs->hxge_regh));
 
 	goto hxge_map_regs_exit;
-
-hxge_map_regs_fail3:
-	if (dev_regs->hxge_msix_regh) {
-		ddi_regs_map_free(&dev_regs->hxge_msix_regh);
-	}
 
 hxge_map_regs_fail2:
 	if (dev_regs->hxge_regh) {

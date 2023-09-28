@@ -3373,7 +3373,7 @@ try_again:;
 			}
 		} while ((mp2 = mp2->b_cont) != NULL);
 	}
-ok:;
+
 	/*
 	 * TCP should check ECN info for segments inside the window only.
 	 * Therefore the check should be done here.

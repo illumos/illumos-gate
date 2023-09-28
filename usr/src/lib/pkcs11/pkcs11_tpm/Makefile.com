@@ -94,7 +94,6 @@ CPPFLAGS64 += $(CPPFLAGS)
 CSTD=        $(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted

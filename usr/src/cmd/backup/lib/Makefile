@@ -65,9 +65,11 @@ GLOBAL=		../../../head
 CPPFLAGS=	-I$(GENERAL) -I$(GLOBAL) $(CPPFLAGS.master)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CLEANFILES=	$(OBJECTS) $(DEBUGS) $(YSRC) $(LIBRARY)
+
+# because of labels from yacc
+objs/getdate.o := CERRWARN +=	-_gcc=-Wno-unused-label
 
 # support for -g library
 GLIB=		libdump_g.a
@@ -99,8 +101,6 @@ install:	all
 
 $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
-
-lint:
 
 check:	$(HDRS)
 	$(CSTYLE) $(CSTYLEFLAGS) `echo $(SRCS) | sed -e s/getdate.c//` $(HDRS)

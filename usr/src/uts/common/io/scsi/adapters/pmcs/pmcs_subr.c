@@ -2571,7 +2571,6 @@ pmcs_discover(pmcs_hw_t *pwp)
 		goto restart;
 	}
 
-out:
 	DTRACE_PROBE2(pmcs__discover__exit, ulong_t, pwp->work_flags,
 	    boolean_t, pwp->config_changed);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "Discovery end");

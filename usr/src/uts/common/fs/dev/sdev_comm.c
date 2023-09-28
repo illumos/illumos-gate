@@ -427,7 +427,6 @@ sdev_config_all_thread(struct sdev_node *dv)
 	}
 
 	kmem_free(argp, sizeof (sdev_door_arg_t));
-done:
 	sdcmn_err6(("sdev_config_all_thread: stopping, devfsadm state 0x%x\n",
 	    devfsadm_state));
 	thread_exit();

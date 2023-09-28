@@ -2249,7 +2249,6 @@ printExtLuProps(stmfGuid *guid)
 		ret++;
 	}
 
-done:
 	(void) stmfFreeLuResource(hdl);
 	return (ret);
 

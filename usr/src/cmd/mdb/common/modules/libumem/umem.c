@@ -1260,7 +1260,6 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 		status = WALK_ERR;
 	}
 
-out1:
 	if (status == WALK_ERR) {
 		if (umw->umw_valid)
 			mdb_free(umw->umw_valid, slabsize / chunksize);

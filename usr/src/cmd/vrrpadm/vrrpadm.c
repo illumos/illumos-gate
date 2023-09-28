@@ -289,7 +289,6 @@ do_create(int argc, char *argv[], const char *usage)
 	if (!conf.vvc_accept && conf.vvc_pri == VRRP_PRI_OWNER)
 		err_exit("accept_mode must be true for virtual IP owner");
 
-done:
 	if ((err = vrrp_create(vrrp_vh, &conf)) == VRRP_SUCCESS)
 		return;
 
