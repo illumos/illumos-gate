@@ -73,48 +73,37 @@
  * selects the socket type by either (model & 0x3) for family 0fh or the CPUID
  * pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[][8] = {
+static uint32_t amd_skts[][16] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
 #define	A_SKTS_0			0
 	{
-		X86_SOCKET_754,		/* 0b000 */
-		X86_SOCKET_940,		/* 0b001 */
-		X86_SOCKET_754,		/* 0b010 */
-		X86_SOCKET_939,		/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_754,
+		[1] = X86_SOCKET_940,
+		[2] = X86_SOCKET_754,
+		[3] = X86_SOCKET_939,
 	},
 	/*
 	 * Family 0xf revisions F and G
 	 */
 #define	A_SKTS_1			1
 	{
-		X86_SOCKET_S1g1,	/* 0b000 */
-		X86_SOCKET_F1207,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_AM2,		/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_S1g1,
+		[1] = X86_SOCKET_F1207,
+		[3] = X86_SOCKET_AM2
 	},
 	/*
 	 * Family 0x10
 	 */
 #define	A_SKTS_2			2
 	{
-		X86_SOCKET_F1207,	/* 0b000 */
-		X86_SOCKET_AM2R2,	/* 0b001 */
-		X86_SOCKET_S1g3,	/* 0b010 */
-		X86_SOCKET_G34,		/* 0b011 */
-		X86_SOCKET_ASB2,	/* 0b100 */
-		X86_SOCKET_C32,		/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_F1207,
+		[1] = X86_SOCKET_AM2R2,
+		[2] = X86_SOCKET_S1g3,
+		[3] = X86_SOCKET_G34,
+		[4] = X86_SOCKET_ASB2,
+		[5] = X86_SOCKET_C32
 	},
 
 	/*
@@ -122,14 +111,7 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_3			3
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_S1g2,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[2] = X86_SOCKET_S1g2
 	},
 
 	/*
@@ -137,14 +119,8 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_4			4
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_FS1,		/* 0b001 */
-		X86_SOCKET_FM1,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[1] = X86_SOCKET_FS1,
+		[2] = X86_SOCKET_FM1
 	},
 
 	/*
@@ -152,14 +128,7 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_5			5
 	{
-		X86_SOCKET_FT1,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FT1
 	},
 
 	/*
@@ -167,14 +136,9 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_6			6
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_AM3R2,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_G34,		/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_C32,		/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[1] = X86_SOCKET_AM3R2,
+		[3] = X86_SOCKET_G34,
+		[5] = X86_SOCKET_C32
 	},
 
 	/*
@@ -182,14 +146,9 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_7			7
 	{
-		X86_SOCKET_FP2,		/* 0b000 */
-		X86_SOCKET_FS1R2,	/* 0b001 */
-		X86_SOCKET_FM2,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP2,
+		[1] = X86_SOCKET_FS1R2,
+		[2] = X86_SOCKET_FM2
 	},
 
 	/*
@@ -197,14 +156,8 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_8			8
 	{
-		X86_SOCKET_FP3,		/* 0b000 */
-		X86_SOCKET_FM2R2,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP3,
+		[1] = X86_SOCKET_FM2R2
 	},
 
 	/*
@@ -212,14 +165,9 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_9			9
 	{
-		X86_SOCKET_FP4,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_FM2R2,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP4,
+		[2] = X86_SOCKET_AM4,
+		[3] = X86_SOCKET_FM2R2
 	},
 
 	/*
@@ -227,14 +175,9 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_10			10
 	{
-		X86_SOCKET_FP4,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_FT4,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP4,
+		[2] = X86_SOCKET_AM4,
+		[4] = X86_SOCKET_FT4
 	},
 
 	/*
@@ -242,14 +185,8 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_11			11
 	{
-		X86_SOCKET_FT3,		/* 0b000 */
-		X86_SOCKET_FS1B,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FT3,
+		[1] = X86_SOCKET_FS1B
 	},
 
 	/*
@@ -257,29 +194,18 @@ static uint32_t amd_skts[][8] = {
 	 */
 #define	A_SKTS_12			12
 	{
-		X86_SOCKET_FT3B,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_FP4,		/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FT3B,
+		[3] = X86_SOCKET_FP4
 	},
 
 	/*
 	 * Family 0x17 models 00-0f	(Zen 1 - Naples, Ryzen)
 	 */
-#define	A_SKTS_13			13
+#define	A_SKTS_NAPLES			13
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_SP3,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_SP3R2	/* 0b111 */
+		[2] = X86_SOCKET_AM4,
+		[4] = X86_SOCKET_SP3,
+		[7] = X86_SOCKET_SP3R2
 	},
 
 	/*
@@ -287,226 +213,143 @@ static uint32_t amd_skts[][8] = {
 	 *				(Zen 1 - APU: Banded Kestrel)
 	 *				(Zen 1 - APU: Dali)
 	 */
-#define	A_SKTS_14			14
+#define	A_SKTS_RAVEN			14
 	{
-		X86_SOCKET_FP5,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP5,
+		[2] = X86_SOCKET_AM4
 	},
 
 	/*
 	 * Family 0x17 models 30-3f	(Zen 2 - Rome)
 	 */
-#define	A_SKTS_15			15
+#define	A_SKTS_ROME			15
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_SP3,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_SP3R2	/* 0b111 */
+		[4] = X86_SOCKET_SP3,
+		[7] = X86_SOCKET_SP3R2
 	},
 
 	/*
 	 * Family 0x17 models 60-6f	(Zen 2 - Renoir)
 	 */
-#define	A_SKTS_16			16
+#define	A_SKTS_RENOIR			16
 	{
-		X86_SOCKET_FP6,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP6,
+		[2] = X86_SOCKET_AM4
 	},
 
 	/*
 	 * Family 0x17 models 70-7f	(Zen 2 - Matisse)
 	 */
-#define	A_SKTS_17			17
+#define	A_SKTS_MATISSE			17
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[2] = X86_SOCKET_AM4,
 	},
 
 	/*
 	 * Family 0x18 models 00-0f	(Dhyana)
 	 */
-#define	A_SKTS_18			18
+#define	A_SKTS_DHYANA			18
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_SL1,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_DM1,		/* 0b110 */
-		X86_SOCKET_SL1R2	/* 0b111 */
+		[4] = X86_SOCKET_SL1,
+		[6] = X86_SOCKET_DM1,
+		[7] = X86_SOCKET_SL1R2
 	},
 
 	/*
 	 * Family 0x19 models 00-0f	(Zen 3 - Milan)
 	 */
-#define	A_SKTS_19			19
+#define	A_SKTS_MILAN			19
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_SP3,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_STRX4	/* 0b111 */
+		[4] = X86_SOCKET_SP3,
+		[7] = X86_SOCKET_STRX4
 	},
 
 	/*
 	 * Family 0x19 models 20-2f	(Zen 3 - Vermeer)
 	 */
-#define	A_SKTS_20			20
+#define	A_SKTS_VERMEER			20
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[2] = X86_SOCKET_AM4,
 	},
 
 	/*
 	 * Family 0x19 models 50-5f	(Zen 3 - Cezanne)
 	 */
-#define	A_SKTS_21			21
+#define	A_SKTS_CEZANNE			21
 	{
-		X86_SOCKET_FP6,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_AM4,		/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_FP6,
+		[2] = X86_SOCKET_AM4
 	},
 
 	/*
 	 * Family 0x19 models 10-1f	(Zen 4 - Genoa)
-	 * Family 0x19 models a0-af	(Zen 4 - Bergamo)
 	 */
-#define	A_SKTS_22			22
+#define	A_SKTS_GENOA			22
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_SP5,		/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[4] = X86_SOCKET_SP5,
+		[8] = X86_SOCKET_TR5
 	},
 
 	/*
 	 * Family 0x19 models 40-4f	(Zen 3 - Rembrandt)
 	 */
-#define	A_SKTS_23			23
+#define	A_SKTS_REMBRANDT			23
 	{
-		X86_SOCKET_AM5,		/* 0b000 */
-		X86_SOCKET_FP7,		/* 0b001 */
-		X86_SOCKET_FP7R2,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_AM5,
+		[1] = X86_SOCKET_FP7,
+		[2] = X86_SOCKET_FP7R2
 	},
 
 	/*
 	 * Family 0x19 models 60-6f	(Zen 4 - Raphael)
 	 */
-#define	A_SKTS_24			24
+#define	A_SKTS_RAPHAEL			24
 	{
-		X86_SOCKET_AM5,		/* 0b000 */
-		X86_SOCKET_FL1,		/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_AM5,
+		[1] = X86_SOCKET_FL1
 	},
 
 	/*
 	 * The always-unknown socket group, used for undocumented parts.  It
-	 * need not be last; the position is arbitrary.
+	 * need not be last; the position is arbitrary. The default initializer
+	 * for this is zero which is x86 socket unknown.
 	 */
 #define	A_SKTS_UNKNOWN			25
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
 	/*
 	 * Family 0x17 models 90-97	(Zen 2 - Van Gogh)
 	 */
-#define	A_SKTS_26			26
+#define	A_SKTS_VANGOGH			26
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_FF3,		/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[3] = X86_SOCKET_FF3
 	},
 	/*
 	 * Family 0x17 models a0-af	(Zen 2 - Mendocino)
 	 */
-#define	A_SKTS_27			27
+#define	A_SKTS_MENDOCINO			27
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b000 */
-		X86_SOCKET_FT6,		/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_UNKNOWN,	/* 0b100 */
-		X86_SOCKET_UNKNOWN,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[1] = X86_SOCKET_FT6
 	},
 
 	/*
 	 * Family 0x19 models 70-7f	(Zen 4 - Phoenix)
 	 */
-#define	A_SKTS_28			28
+#define	A_SKTS_PHOENIX			28
 	{
-		X86_SOCKET_AM5,		/* 0b000 */
-		X86_SOCKET_FP8,		/* 0b001 */
-		X86_SOCKET_UNKNOWN,	/* 0b010 */
-		X86_SOCKET_UNKNOWN,	/* 0b011 */
-		X86_SOCKET_FP7,		/* 0b100 */
-		X86_SOCKET_FP7R2,	/* 0b101 */
-		X86_SOCKET_UNKNOWN,	/* 0b110 */
-		X86_SOCKET_UNKNOWN	/* 0b111 */
+		[0] = X86_SOCKET_AM5,
+		[1] = X86_SOCKET_FP8,
+		[4] = X86_SOCKET_FP7,
+		[5] = X86_SOCKET_FP7R2,
+	},
+
+	/*
+	 * Family 0x19 models a0-af	(Zen 4c - Bergamo/Siena)
+	 */
+#define	A_SKTS_BERGAMO			29
+	{
+		[4] = X86_SOCKET_SP5,
+		[8] = X86_SOCKET_SP6
 	}
 };
 
@@ -561,6 +404,8 @@ static struct amd_sktmap_s amd_sktmap_strs[] = {
 	{ X86_SOCKET_FT6,	"FT6" },
 	{ X86_SOCKET_FP8,	"FP8" },
 	{ X86_SOCKET_FL1,	"FL1" },
+	{ X86_SOCKET_SP6,	"SP6" },
+	{ X86_SOCKET_TR5,	"TR5" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }	/* Must be last! */
 };
 
@@ -791,140 +636,146 @@ static const struct amd_rev_mapent {
 	 */
 	/* Naples == Zeppelin == ZP */
 	{ 0x17, 0x00, 0x00, 0x0, 0x0, X86_CHIPREV_AMD_NAPLES_A0, "ZP-A0",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_13 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_NAPLES },
 	{ 0x17, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_NAPLES_B1, "ZP-B1",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_13 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_NAPLES },
 	{ 0x17, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_NAPLES_B2, "ZP-B2",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_13 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_NAPLES },
 	{ 0x17, 0x00, 0x07, 0x0, 0xf, X86_CHIPREV_AMD_NAPLES_UNKNOWN, "ZP-??",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_13 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_NAPLES },
 	{ 0x17, 0x08, 0x08, 0x2, 0x2, X86_CHIPREV_AMD_PINNACLE_RIDGE_B2,
-	    "PiR-B2", X86_UARCHREV_AMD_ZENPLUS, A_SKTS_13 },
+	    "PiR-B2", X86_UARCHREV_AMD_ZENPLUS, A_SKTS_NAPLES },
 	{ 0x17, 0x08, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_PINNACLE_RIDGE_UNKNOWN,
-	    "PiR-??", X86_UARCHREV_AMD_ZENPLUS, A_SKTS_13 },
+	    "PiR-??", X86_UARCHREV_AMD_ZENPLUS, A_SKTS_NAPLES },
 
 	{ 0x17, 0x11, 0x11, 0x0, 0x0, X86_CHIPREV_AMD_RAVEN_RIDGE_B0,
-	    "RV-B0", X86_UARCHREV_AMD_ZEN1, A_SKTS_14 },
+	    "RV-B0", X86_UARCHREV_AMD_ZEN1, A_SKTS_RAVEN },
 	{ 0x17, 0x11, 0x11, 0x1, 0x1, X86_CHIPREV_AMD_RAVEN_RIDGE_B1,
-	    "RV-B1", X86_UARCHREV_AMD_ZEN1, A_SKTS_14 },
+	    "RV-B1", X86_UARCHREV_AMD_ZEN1, A_SKTS_RAVEN },
 	{ 0x17, 0x10, 0x17, 0x0, 0xf, X86_CHIPREV_AMD_RAVEN_RIDGE_UNKNOWN,
-	    "RV-??", X86_UARCHREV_AMD_ZEN1, A_SKTS_14 },
+	    "RV-??", X86_UARCHREV_AMD_ZEN1, A_SKTS_RAVEN },
 	{ 0x17, 0x18, 0x18, 0x1, 0x1, X86_CHIPREV_AMD_PICASSO_B1, "PCO-B1",
-	    X86_UARCHREV_AMD_ZENPLUS, A_SKTS_14 },
+	    X86_UARCHREV_AMD_ZENPLUS, A_SKTS_RAVEN },
 	{ 0x17, 0x18, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_PICASSO_UNKNOWN, "PCO-??",
-	    X86_UARCHREV_AMD_ZENPLUS, A_SKTS_14 },
+	    X86_UARCHREV_AMD_ZENPLUS, A_SKTS_RAVEN },
 
 	{ 0x17, 0x20, 0x20, 0x1, 0x1, X86_CHIPREV_AMD_DALI_A1, "RV2X-A1",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_14 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_RAVEN },
 	{ 0x17, 0x20, 0x2f, 0x0, 0xf, X86_CHIPREV_AMD_DALI_UNKNOWN, "RV2X-??",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_14 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_RAVEN },
 
 	/* Rome == Starship == SSP */
 	{ 0x17, 0x30, 0x30, 0x0, 0x0, X86_CHIPREV_AMD_ROME_A0, "SSP-A0",
-	    X86_UARCHREV_AMD_ZEN2_A0, A_SKTS_15 },
+	    X86_UARCHREV_AMD_ZEN2_A0, A_SKTS_ROME },
 	{ 0x17, 0x31, 0x31, 0x0, 0x0, X86_CHIPREV_AMD_ROME_B0, "SSP-B0",
-	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_15 },
+	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_ROME },
 	{ 0x17, 0x30, 0x3f, 0x0, 0xf, X86_CHIPREV_AMD_ROME_UNKNOWN, "SSP-??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_15 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_ROME },
 
 	{ 0x17, 0x60, 0x60, 0x1, 0x1, X86_CHIPREV_AMD_RENOIR_A1, "RN-A1",
-	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_16 },
+	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_RENOIR },
 	{ 0x17, 0x60, 0x67, 0x0, 0xf, X86_CHIPREV_AMD_RENOIR_UNKNOWN, "RN-??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_16 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_RENOIR },
 	{ 0x17, 0x68, 0x68, 0x1, 0x1, X86_CHIPREV_AMD_RENOIR_LCN_A1, "LCN-A1",
-	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_16 },
+	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_RENOIR },
 	{ 0x17, 0x68, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_RENOIR_UNKNOWN, "LCN-??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_16 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_RENOIR },
 
 	{ 0x17, 0x71, 0x71, 0x0, 0x0, X86_CHIPREV_AMD_MATISSE_B0, "MTS-B0",
-	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_17 },
+	    X86_UARCHREV_AMD_ZEN2_B0, A_SKTS_MATISSE },
 	{ 0x17, 0x70, 0x7f, 0x0, 0xf, X86_CHIPREV_AMD_MATISSE_UNKNOWN, "MTS-??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_17 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_MATISSE },
 
 	{ 0x17, 0x90, 0x97, 0x0, 0xf, X86_CHIPREV_AMD_VAN_GOGH_UNKNOWN, "??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_26 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_VANGOGH },
 	{ 0x17, 0x98, 0x9f, 0x0, 0xf, X86_CHIPREV_AMD_VAN_GOGH_UNKNOWN, "??",
 	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_UNKNOWN },
 
 	{ 0x17, 0xa0, 0xaf, 0x0, 0xf, X86_CHIPREV_AMD_MENDOCINO_UNKNOWN, "??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_27 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_MENDOCINO },
 
 	/*
 	 * =============== HygonGenuine Family 0x18 ===============
 	 */
 	{ 0x18, 0x00, 0x00, 0x1, 0x1, X86_CHIPREV_HYGON_DHYANA_A1, "DN_A1",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_18 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_DHYANA },
 	{ 0x18, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_HYGON_DHYANA_UNKNOWN, "DN_??",
-	    X86_UARCHREV_AMD_ZEN1, A_SKTS_18 },
+	    X86_UARCHREV_AMD_ZEN1, A_SKTS_DHYANA },
 
 	/*
 	 * =============== AuthenticAMD Family 0x19 ===============
 	 */
 	/* Milan == Genesis == GN */
 	{ 0x19, 0x00, 0x00, 0x0, 0x0, X86_CHIPREV_AMD_MILAN_A0, "GN-A0",
-	    X86_UARCHREV_AMD_ZEN3_A0, A_SKTS_19 },
+	    X86_UARCHREV_AMD_ZEN3_A0, A_SKTS_MILAN },
 	{ 0x19, 0x01, 0x01, 0x0, 0x0, X86_CHIPREV_AMD_MILAN_B0, "GN-B0",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_19 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_MILAN },
 	{ 0x19, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_MILAN_B1, "GN-B1",
-	    X86_UARCHREV_AMD_ZEN3_B1, A_SKTS_19 },
+	    X86_UARCHREV_AMD_ZEN3_B1, A_SKTS_MILAN },
 	/* Marketed as Milan-X but still GN */
 	{ 0x19, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_MILAN_B2, "GN-B2",
-	    X86_UARCHREV_AMD_ZEN3_B2, A_SKTS_19 },
+	    X86_UARCHREV_AMD_ZEN3_B2, A_SKTS_MILAN },
 	{ 0x19, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_MILAN_UNKNOWN, "GN-??",
-	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_19 },
+	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_MILAN },
 
 	/* Genoa == Stones == RS */
 	{ 0x19, 0x10, 0x10, 0x0, 0x0, X86_CHIPREV_AMD_GENOA_A0, "RS-A0",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_GENOA },
 	{ 0x19, 0x10, 0x10, 0x1, 0x1, X86_CHIPREV_AMD_GENOA_A1, "RS-A1",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_GENOA },
 	{ 0x19, 0x11, 0x11, 0x0, 0x0, X86_CHIPREV_AMD_GENOA_B0, "RS-B0",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_GENOA },
 	{ 0x19, 0x11, 0x11, 0x1, 0x1, X86_CHIPREV_AMD_GENOA_B1, "RS-B1",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_GENOA },
 	{ 0x19, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_GENOA_UNKNOWN, "RS-??",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_GENOA },
 
 	{ 0x19, 0x20, 0x20, 0x0, 0x0, X86_CHIPREV_AMD_VERMEER_A0, "VMR-A0",
-	    X86_UARCHREV_AMD_ZEN3_A0, A_SKTS_20 },
+	    X86_UARCHREV_AMD_ZEN3_A0, A_SKTS_VERMEER },
 	{ 0x19, 0x21, 0x21, 0x0, 0x0, X86_CHIPREV_AMD_VERMEER_B0, "VMR-B0",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_20 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_VERMEER },
 	{ 0x19, 0x21, 0x21, 0x2, 0x2, X86_CHIPREV_AMD_VERMEER_B2, "VMR-B2",
-	    X86_UARCHREV_AMD_ZEN3_B2, A_SKTS_20 },
+	    X86_UARCHREV_AMD_ZEN3_B2, A_SKTS_VERMEER },
 	{ 0x19, 0x20, 0x2f, 0x0, 0xf, X86_CHIPREV_AMD_VERMEER_UNKNOWN, "VMR-??",
-	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_20 },
+	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_VERMEER },
 
 	/* Rev guide is missing AM5 information, including A0 and B0 */
 	{ 0x19, 0x40, 0x40, 0x0, 0x0, X86_CHIPREV_AMD_REMBRANDT_A0, "RMB-A0",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_23 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_REMBRANDT },
 	{ 0x19, 0x44, 0x44, 0x0, 0x0, X86_CHIPREV_AMD_REMBRANDT_B0, "RMB-B0",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_23 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_REMBRANDT },
 	{ 0x19, 0x44, 0x44, 0x1, 0x1, X86_CHIPREV_AMD_REMBRANDT_B1, "RMB-B1",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_23 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_REMBRANDT },
 	{ 0x19, 0x40, 0x4f, 0x0, 0xf, X86_CHIPREV_AMD_REMBRANDT_UNKNOWN,
-	    "RMB-??", X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_23 },
+	    "RMB-??", X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_REMBRANDT },
 
 	/* Cezanne */
 	{ 0x19, 0x50, 0x50, 0x0, 0x0, X86_CHIPREV_AMD_CEZANNE_A0, "CZN-A0",
-	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_21 },
+	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_CEZANNE },
 	{ 0x19, 0x50, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_CEZANNE_UNKNOWN, "CZN-??",
-	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_21 },
+	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_CEZANNE },
 
 	/* Raphael */
 	{ 0x19, 0x61, 0x61, 0x2, 0x2, X86_CHIPREV_AMD_RAPHAEL_B2, "RPL-B2",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_24 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_RAPHAEL },
 	{ 0x19, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_RAPHAEL_UNKNOWN, "RPL-??",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_24 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_RAPHAEL },
 
 	/* Phoenix */
 	{ 0x19, 0x74, 0x74, 0x1, 0x1, X86_CHIPREV_AMD_PHOENIX_A1, "PHX-A1",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_28 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_PHOENIX },
 	{ 0x19, 0x70, 0x7f, 0x0, 0xf, X86_CHIPREV_AMD_PHOENIX_UNKNOWN, "PHX-??",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_28 },
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_PHOENIX },
 
-	/* Bergamo */
+	/* Bergamo / Siena */
+	{ 0x19, 0xa0, 0xaf, 0x0, 0x0, X86_CHIPREV_AMD_BERGAMO_A0, "RSDN-A0",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_BERGAMO },
+	{ 0x19, 0xa0, 0xaf, 0x1, 0x1, X86_CHIPREV_AMD_BERGAMO_A1, "RSDN-A1",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_BERGAMO },
+	{ 0x19, 0xa0, 0xaf, 0x2, 0x2, X86_CHIPREV_AMD_BERGAMO_A2, "RSDN-A2",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_BERGAMO },
 	{ 0x19, 0xa0, 0xaf, 0x0, 0xf, X86_CHIPREV_AMD_BERGAMO_UNKNOWN, "???",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 }
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_BERGAMO }
 };
 
 /*
@@ -941,10 +792,6 @@ synth_amd_skt_cpuid(uint_t family, uint_t sktid)
 
 	/* PkgType bits */
 	idx = BITX(cp.cp_ebx, 31, 28);
-
-	if (idx > 7) {
-		return (X86_SOCKET_UNKNOWN);
-	}
 
 	if (family == 0x10) {
 		uint32_t val;
