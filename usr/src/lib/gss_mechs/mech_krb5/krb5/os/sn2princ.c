@@ -56,7 +56,7 @@ extern struct hostent	*res_getipnodebyaddr(const void *, size_t, int, int *);
 extern void		res_freehostent(struct hostent *);
 
 static int
-maybe_use_reverse_dns (krb5_context context, int defalt)
+maybe_use_reverse_dns (krb5_context context, int def_val)
 {
     krb5_error_code code;
     char * value = NULL;
@@ -65,10 +65,10 @@ maybe_use_reverse_dns (krb5_context context, int defalt)
     code = profile_get_string(context->profile, "libdefaults",
                               "rdns", 0, 0, &value);
     if (code)
-        return defalt;
+        return def_val;
 
     if (value == 0)
-	return defalt;
+	return def_val;
 
     use_rdns = _krb5_conf_boolean(value);
     profile_release_string(value);

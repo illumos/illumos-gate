@@ -135,8 +135,8 @@
 06-11-11 getconf.c: fix deferred getconf path search
 06-11-11 fmt.c: handle two char { \t \n } in --usage ouput
 06-10-31 global edit to eliminate most non-const static data0
-06-10-31 use <cmd.h> for all b_*() implementations; drop <cmdlib.h> 
-06-10-31 cmd.h: add CMD_ prefix to { BUILTIN DYNAMIC STANDALONE } 
+06-10-31 use <cmd.h> for all b_*() implementations; drop <cmdlib.h>
+06-10-31 cmd.h: add CMD_ prefix to { BUILTIN DYNAMIC STANDALONE }
 06-10-31 join.c: tone down /tmp usage vi SFSK_DISCARD
 06-10-31 cp.c,rm.c: update to <fts.h> to accomodate non-static data
 06-10-29 date.c: "...%H%..." => "...%H" "%..." to avoid SCCS conflict
@@ -266,7 +266,7 @@
 	 cat: fix -n (was ignored, wow)
 00-01-27 getconf: add "-a" and "-v spec" for sol7.* compatibility
 99-09-09 join: fix -j1 vs. -j 1, add --ignorecase
-99-06-22 paste: defualt delim in writable string
+99-06-22 paste: default delim in writable string
 99-06-16 cat: fix --dos-ouput typo
 99-06-11 cp: tighten chown() diagnostics
 99-06-08 expr: nothing for NULL string bug fix

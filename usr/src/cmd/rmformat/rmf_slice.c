@@ -1219,7 +1219,7 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 
 
 /*
- * wrrite_defualt_label(int32_t fd)
+ * write_default_label(int32_t fd)
  *	fd = file descriptor for the device.
  *
  * For sparc solaris

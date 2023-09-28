@@ -474,7 +474,7 @@ npi_rxdma_cfg_rdc_reset(npi_handle_t handle, uint8_t rdc)
 }
 
 /*
- * npi_rxdma_cfg_defualt_port_rdc()
+ * npi_rxdma_cfg_default_port_rdc()
  * Set the default rdc for the port
  *
  * Inputs:
