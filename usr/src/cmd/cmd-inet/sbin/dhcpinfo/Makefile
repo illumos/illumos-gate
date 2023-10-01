@@ -23,8 +23,6 @@
 # Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/cmd-inet/sbin/dhcpinfo/Makefile
 #
 
@@ -33,6 +31,7 @@ ROOTFS_PROG = $(PROG)
 OBJS    = $(PROG).o
 
 include ../../../Makefile.cmd
+include ../../../Makefile.ctf
 
 LDLIBS  += -ldhcpagent -ldhcputil
 LINTFLAGS += -u	# due to problems with libgen
@@ -42,13 +41,13 @@ LINTFLAGS += -u	# due to problems with libgen
 all:		$(ROOTFS_PROG)
 
 $(PROG):	$(OBJS)
-	  	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	  	$(POST_PROCESS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
 
 install:	all $(ROOTSBINPROG)
 
 clean:
-	  	$(RM) $(OBJS)
+		$(RM) $(OBJS)
 
 lint:		lint_PROG
 
