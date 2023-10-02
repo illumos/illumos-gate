@@ -675,7 +675,7 @@ smb_vop_lookup(
 		 */
 		VN_HOLD(dvp);
 		*vpp = dvp;
-		return (0);
+		goto attr_out;
 	}
 
 	ASSERT(vpp);
@@ -686,7 +686,7 @@ smb_vop_lookup(
 		if (rootvp && (dvp == rootvp)) {
 			VN_HOLD(dvp);
 			*vpp = dvp;
-			return (0);
+			goto attr_out;
 		}
 
 		if (dvp->v_flag & VROOT) {
@@ -737,28 +737,27 @@ smb_vop_lookup(
 	error = VOP_LOOKUP(dvp, np, vpp, NULL, option_flags, NULL, cr,
 	    &smb_ct, direntflags, &rpn);
 
-	if (error == 0) {
-		if (od_name) {
-			bzero(od_name, MAXNAMELEN);
-			if ((option_flags & FIGNORECASE) != 0 &&
-			    rpn.pn_buf[0] != '\0')
-				np = rpn.pn_buf;
-			else
-				np = name;
-			if (flags & SMB_CATIA)
-				smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
-			else
-				(void) strlcpy(od_name, np, MAXNAMELEN);
-		}
+	if (error == 0 && od_name != NULL) {
+		bzero(od_name, MAXNAMELEN);
+		if ((option_flags & FIGNORECASE) != 0 &&
+		    rpn.pn_buf[0] != '\0')
+			np = rpn.pn_buf;
+		else
+			np = name;
+		if (flags & SMB_CATIA)
+			smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
+		else
+			(void) strlcpy(od_name, np, MAXNAMELEN);
+	}
+	pn_free(&rpn);
 
-		if (attr != NULL) {
-			attr->sa_mask = SMB_AT_ALL;
-			(void) smb_vop_getattr(*vpp, NULL, attr, 0,
-			    zone_kcred());
-		}
+attr_out:
+	if (error == 0 && attr != NULL) {
+		attr->sa_mask = SMB_AT_ALL;
+		(void) smb_vop_getattr(*vpp, NULL, attr, 0,
+		    zone_kcred());
 	}
 
-	pn_free(&rpn);
 	return (error);
 }
 
