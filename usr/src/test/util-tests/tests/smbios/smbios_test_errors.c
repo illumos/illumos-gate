@@ -50,7 +50,6 @@ static smbios_info_func_t smbios_lookup_funcs[] = {
 	{ (smbios_lookup_f)smbios_info_extmemarray, "extmemarray" },
 	{ (smbios_lookup_f)smbios_info_memarrmap, "memarrmap" },
 	{ (smbios_lookup_f)smbios_info_memdevice, "memdevice" },
-	{ (smbios_lookup_f)smbios_info_extmemdevice, "extmemdevice" },
 	{ (smbios_lookup_f)smbios_info_memdevmap, "memdevmap" },
 	{ (smbios_lookup_f)smbios_info_vprobe, "vprobe" },
 	{ (smbios_lookup_f)smbios_info_cooldev, "cooldev" },

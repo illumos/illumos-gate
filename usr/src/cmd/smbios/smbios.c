@@ -1822,7 +1822,8 @@ print_extmemarray(smbios_hdl_t *shp, id_t id, FILE *fp)
 static void
 print_extmemdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
-	int i;
+	uint_t i, ncs;
+	uint8_t *cs;
 	smbios_memdevice_ext_t emd;
 
 	if (check_oem(shp) != 0)
@@ -1837,9 +1838,18 @@ print_extmemdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	oprintf(fp, "  DRAM Channel: %u\n", emd.smbmdeve_drch);
 	oprintf(fp, "  Number of Chip Selects: %u\n", emd.smbmdeve_ncs);
 
-	for (i = 0; i < emd.smbmdeve_ncs; i++) {
-		oprintf(fp, "  Chip Select: %u\n", emd.smbmdeve_cs[i]);
+	if (emd.smbmdeve_ncs == 0)
+		return;
+
+	if (smbios_info_extmemdevice_cs(shp, id, &ncs, &cs) != 0) {
+		smbios_warn(shp, "failed to read extmemdevice cs information");
+		return;
 	}
+
+	for (i = 0; i < ncs; i++) {
+		oprintf(fp, "  Chip Select: %u\n", cs[i]);
+	}
+	smbios_info_extmemdevice_cs_free(shp, ncs, cs);
 }
 
 static void

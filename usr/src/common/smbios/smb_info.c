@@ -1579,10 +1579,59 @@ smbios_info_extmemdevice(smbios_hdl_t *shp, id_t id,
 
 	emdp->smbmdeve_md = exmd.smbmdeve_mdev;
 	emdp->smbmdeve_drch = exmd.smbmdeve_dchan;
-	emdp->smbmdeve_ncs  = exmd.smbmdeve_ncs;
-	emdp->smbmdeve_cs = exmd.smbmdeve_cs;
+	emdp->smbmdeve_ncs = exmd.smbmdeve_ncs;
 
 	return (0);
+}
+
+int
+smbios_info_extmemdevice_cs(smbios_hdl_t *shp, id_t id, uint_t *ncsp,
+    uint8_t **csp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_memdevice_ext_t exmd;
+	size_t size;
+	void *buf;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SUN_OEM_EXT_MEMDEVICE)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	smb_info_bcopy(stp->smbst_hdr, &exmd, sizeof (exmd));
+	if (exmd.smbmdeve_ncs == 0) {
+		*ncsp = 0;
+		*csp = NULL;
+		return (0);
+	}
+
+	size = exmd.smbmdeve_ncs * sizeof (*exmd.smbmdeve_cs);
+
+	if (stp->smbst_hdr->smbh_len < sizeof (exmd) + size)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	buf = smb_alloc(size);
+	if (buf == NULL)
+		return (smb_set_errno(shp, ESMB_NOMEM));
+	smb_info_bcopy_offset(stp->smbst_hdr, buf, size, sizeof (exmd));
+
+	*ncsp = exmd.smbmdeve_ncs;
+	*csp = buf;
+	return (0);
+}
+
+void
+smbios_info_extmemdevice_cs_free(smbios_hdl_t *shp __unused, uint_t ncs,
+    uint8_t *csp)
+{
+	size_t size = ncs * sizeof (uint8_t);
+
+	if (size == 0) {
+		ASSERT3P(csp, ==, NULL);
+		return;
+	}
+	smb_free(csp, size);
 }
 
 int

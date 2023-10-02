@@ -83,7 +83,7 @@ goto_rootnode(int prom_fd)
 static char *
 return_property(int prom_fd, const char *prop)
 {
-	int 			proplen;
+	int			proplen;
 	char			*result;
 	struct openpromio	*opp = opp_zalloc(strlen(prop) + 1, prop);
 

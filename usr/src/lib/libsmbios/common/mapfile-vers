@@ -111,6 +111,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_memarrmap;
 	smbios_info_memdevice;
 	smbios_info_extmemdevice;
+	smbios_info_extmemdevice_cs;
+	smbios_info_extmemdevice_cs_free;
 	smbios_info_memdevmap;
 	smbios_info_obdevs;
 	smbios_info_obdevs_ext;

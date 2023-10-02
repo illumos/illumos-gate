@@ -157,6 +157,13 @@ extern boolean_t smbios_test_proc_verify_25(smbios_hdl_t *);
 extern boolean_t smbios_test_proc_verify_36(smbios_hdl_t *);
 extern boolean_t smbios_test_proc_verify_36_25(smbios_hdl_t *);
 
+extern boolean_t smbios_test_extmem_mktable_invlen_cs(smbios_test_table_t *);
+extern boolean_t smbios_test_extmem_mktable_nocs(smbios_test_table_t *);
+extern boolean_t smbios_test_extmem_mktable_cs(smbios_test_table_t *);
+extern boolean_t smbios_test_extmem_verify_invlen_cs(smbios_hdl_t *);
+extern boolean_t smbios_test_extmem_verify_nocs(smbios_hdl_t *);
+extern boolean_t smbios_test_extmem_verify_cs(smbios_hdl_t *);
+
 #ifdef __cplusplus
 }
 #endif

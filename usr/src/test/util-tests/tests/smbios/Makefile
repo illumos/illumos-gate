@@ -22,6 +22,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/
 OBJS =	smbios.o \
 	smbios_test_chassis.o \
 	smbios_test_errors.o \
+	smbios_test_extmemdevice.o \
 	smbios_test_fwinfo.o \
 	smbios_test_memdevice.o \
 	smbios_test_proc.o \

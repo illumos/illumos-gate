@@ -98,7 +98,7 @@ extdimmslot_to_dimmslot(topo_mod_t *mod, id_t chip_smbid, int channum,
 {
 	smbios_memdevice_ext_t emd;
 	smbios_memdevice_t md;
-	int i, j, k;
+	int i, j;
 	int match = 0;
 	smbios_hdl_t *shp;
 
@@ -108,14 +108,35 @@ extdimmslot_to_dimmslot(topo_mod_t *mod, id_t chip_smbid, int channum,
 
 	if (chip_smbid == IGNORE_ID && bb_count <= 1 && nmct_ids <= 1) {
 		for (i = 0; i < ndimm_ids; i++) {
-			(void) smbios_info_extmemdevice(shp,
-			    dimmsmb[i].extdimm_id, &emd);
+			if (smbios_info_extmemdevice(shp, dimmsmb[i].extdimm_id,
+			    &emd) != 0) {
+				continue;
+			}
+
 			if (emd.smbmdeve_drch == channum) {
-				if (csnum == SKIP_CS)
+				uint_t ncs;
+				uint8_t *cs;
+
+				if (csnum == SKIP_CS) {
 					return (emd.smbmdeve_md);
-				for (k = 0; k < emd.smbmdeve_ncs; k++)
-					if (emd.smbmdeve_cs[k] == csnum)
-						return (emd.smbmdeve_md);
+				}
+
+				if (smbios_info_extmemdevice_cs(shp,
+				    dimmsmb[i].extdimm_id, &ncs, &cs) != 0) {
+					continue;
+				}
+
+				for (uint_t k = 0; k < ncs; k++) {
+					if (cs[k] != csnum) {
+						continue;
+					}
+
+					smbios_info_extmemdevice_cs_free(shp,
+					    ncs, cs);
+					return (emd.smbmdeve_md);
+				}
+
+				smbios_info_extmemdevice_cs_free(shp, ncs, cs);
 			}
 		}
 	}
@@ -123,8 +144,11 @@ extdimmslot_to_dimmslot(topo_mod_t *mod, id_t chip_smbid, int channum,
 	for (j = 0; j < nmct_ids; j++) {
 		if (mctsmb[j].p_id == chip_smbid) {
 			for (i = 0; i < ndimm_ids; i++) {
-				(void) smbios_info_extmemdevice(shp,
-				    dimmsmb[i].extdimm_id, &emd);
+				if (smbios_info_extmemdevice(shp,
+				    dimmsmb[i].extdimm_id, &emd) != 0) {
+					continue;
+				}
+
 				(void) smbios_info_memdevice(shp,
 				    emd.smbmdeve_md, &md);
 				if (md.smbmd_array == mctsmb[j].mct_id &&
@@ -134,11 +158,28 @@ extdimmslot_to_dimmslot(topo_mod_t *mod, id_t chip_smbid, int channum,
 				}
 			}
 			if (match) {
-				if (csnum == SKIP_CS)
+				uint_t ncs;
+				uint8_t *cs;
+
+				if (csnum == SKIP_CS) {
 					return (emd.smbmdeve_md);
-				for (k = 0; k < emd.smbmdeve_ncs; k++)
-					if (emd.smbmdeve_cs[k] == csnum)
-						return (emd.smbmdeve_md);
+				}
+
+				if (smbios_info_extmemdevice_cs(shp,
+				    dimmsmb[i].extdimm_id, &ncs, &cs) != 0) {
+					continue;
+				}
+
+				for (uint_t k = 0; k < ncs; k++) {
+					if (cs[k] != csnum) {
+						continue;
+					}
+
+					smbios_info_extmemdevice_cs_free(shp,
+					    ncs, cs);
+					return (emd.smbmdeve_md);
+				}
+				smbios_info_extmemdevice_cs_free(shp, ncs, cs);
 			}
 		}
 	}
