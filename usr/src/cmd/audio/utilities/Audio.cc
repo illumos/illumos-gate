@@ -412,6 +412,6 @@ AsyncCopy(
 			}
 		}
 	}
-	delete bptr;
+	delete[] bptr;
 	return (err);
 }

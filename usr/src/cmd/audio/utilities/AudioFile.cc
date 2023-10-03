@@ -266,15 +266,15 @@ OpenPath(
 			pathname = new char[strlen(prefix) + flen + 2];
 			(void) sprintf(pathname, "%s/%s", prefix, filename);
 			err = tryopen(pathname, openmode);
-			delete pathname;
+			delete[] pathname;
 			switch (err) {
 			case AUDIO_SUCCESS:	// found the file
-				delete wrk;
+				delete[] wrk;
 				return (RaiseError(err));
 			// XXX - if file found but not audio, stop looking??
 			}
 		}
-		delete wrk;
+		delete[] wrk;
 	}
 	// Can't find file.  Return the original error condition.
 	return (RaiseError(tryopen(filename, openmode)));

@@ -642,6 +642,6 @@ FormatParse(
 	if (!err)
 		*this = newhdr;
 errret:
-	delete pstr;
+	delete[] pstr;
 	return (err);
 }

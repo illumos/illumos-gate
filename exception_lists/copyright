@@ -497,7 +497,7 @@ usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4.descrip
 usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash.descrip
 usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
 usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload.descrip
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/*
+usr/src/uts/common/sys/scsi/adapters/mpi/*
 usr/src/uts/sparc/nsmb/ioc_check.ref
 
 # bhyve sources

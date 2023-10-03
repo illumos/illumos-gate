@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 /*
@@ -74,13 +75,13 @@
 
 #pragma pack(1)
 
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
+#include <sys/scsi/adapters/mpi/mpi2_type.h>
+#include <sys/scsi/adapters/mpi/mpi2.h>
+#include <sys/scsi/adapters/mpi/mpi2_cnfg.h>
+#include <sys/scsi/adapters/mpi/mpi2_init.h>
+#include <sys/scsi/adapters/mpi/mpi2_ioc.h>
+#include <sys/scsi/adapters/mpi/mpi2_raid.h>
+#include <sys/scsi/adapters/mpi/mpi2_tool.h>
 
 #pragma pack()
 

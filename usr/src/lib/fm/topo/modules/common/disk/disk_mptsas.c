@@ -10,6 +10,7 @@
  */
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 #include <stdlib.h>
@@ -24,9 +25,9 @@
 #include <fm/topo_mod.h>
 #include <fm/topo_list.h>
 
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
+#include <sys/scsi/adapters/mpi/mpi2_type.h>
+#include <sys/scsi/adapters/mpi/mpi2.h>
+#include <sys/scsi/adapters/mpi/mpi2_init.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 
 #include "disk.h"

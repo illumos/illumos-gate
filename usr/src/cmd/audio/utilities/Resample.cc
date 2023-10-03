@@ -202,7 +202,7 @@ decimate_noadjust(short	*in,
 	down_offset = i - size;
 
 	updateState(in_buf, size);
-	delete in_buf;
+	delete[] in_buf;
 	return (out_ptr - out);
 }
 
@@ -236,7 +236,7 @@ decimate_flush(short	*out)
 	memset(in, 0, num_in * sizeof (short));
 	int num_out = decimate_noadjust(in, num_in, out);
 	delay += num_in;
-	delete in;
+	delete[] in;
 	return (num_out);
 }
 
@@ -283,7 +283,7 @@ interpolate_noadjust(short	*in,
 		coef_offset++;
 	}
 	updateState(in_buf, size);
-	delete in_buf;
+	delete[] in_buf;
 	return (out_ptr - out);
 }
 
@@ -297,7 +297,7 @@ interpolate_flush(short	*out)
 	memset(in, 0, num * sizeof (short));
 	int out_num = interpolate_noadjust(in, num, out);
 	delay += num * up;
-	delete in;
+	delete[] in;
 	return (out_num);
 }
 
@@ -318,7 +318,7 @@ interpolate(short *in,
 		double *in_buf = new double[delay_in];
 		short2double(in_buf, in, delay_in);
 		updateState(in_buf, delay_in);
-		delete in_buf;
+		delete[] in_buf;
 		delay -= delay_in * up;
 		up_offset = delay;
 		return (interpolate_noadjust(in + delay_in, size -
@@ -377,7 +377,7 @@ filter_noadjust(short	*in,		// non-integer sampling rate conversion
 	down_offset = j - (up + up_offset);
 
 	updateState(in_buf, size);
-	delete in_buf;
+	delete[] in_buf;
 	return (out - init_out);
 }
 
@@ -402,7 +402,7 @@ flush(short	*out)		// flush resampling filter
 	short *in = new short[num];
 	memset(in, 0, num * sizeof (short));
 	int out_num = filter_noadjust(in, num, out);
-	delete in;
+	delete[] in;
 	delay += num * up;
 	return (out_num);
 }
@@ -431,7 +431,7 @@ filter(
 		double *in_buf = new double[delay_in];
 		short2double(in_buf, in, delay_in);
 		updateState(in_buf, delay_in);
-		delete in_buf;
+		delete[] in_buf;
 		delay -= up * delay_in;
 		if (delay <= 0) {
 			up_offset = delay;

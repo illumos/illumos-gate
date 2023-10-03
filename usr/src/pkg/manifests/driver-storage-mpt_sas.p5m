@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014, Nexenta Systems, Inc. All Rights Reserved
+# Copyright 2023 Racktop Systems, Inc.
 #
 
 #
@@ -97,5 +98,5 @@ legacy pkg=SUNWmptsas desc="LSI MPT SAS 2.0/2.5 Controller HBA Driver" \
     name="LSI MPT SAS 2.0/2.5 Controller HBA Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE \
-    license=usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE
+license usr/src/uts/common/sys/scsi/adapters/mpi/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/sys/scsi/adapters/mpi/THIRDPARTYLICENSE

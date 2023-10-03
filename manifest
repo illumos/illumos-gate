@@ -711,6 +711,7 @@ f kernel/drv/amd64/keysock 0755 root sys
 f kernel/drv/amd64/ksensor 0755 root sys
 f kernel/drv/amd64/kmdb 0755 root sys
 f kernel/drv/amd64/llc1 0755 root sys
+f kernel/drv/amd64/lmrc 0755 root sys
 f kernel/drv/amd64/lockstat 0755 root sys
 f kernel/drv/amd64/lofi 0755 root sys
 f kernel/drv/amd64/log 0755 root sys
@@ -886,6 +887,7 @@ f kernel/drv/keysock.conf 0644 root sys
 f kernel/drv/kmdb.conf 0644 root sys
 f kernel/drv/ksensor.conf 0644 root sys
 f kernel/drv/llc1.conf 0644 root sys
+f kernel/drv/lmrc.conf 0644 root sys
 f kernel/drv/lockstat.conf 0644 root sys
 f kernel/drv/lofi.conf 0644 root sys
 f kernel/drv/log.conf 0644 root sys
@@ -18925,6 +18927,7 @@ f usr/share/man/man4d/ksensor.4d 0444 root bin
 f usr/share/man/man4d/kstat.4d 0444 root bin
 f usr/share/man/man4d/ksyms.4d 0444 root bin
 f usr/share/man/man4d/llc1.4d 0444 root bin
+f usr/share/man/man4d/lmrc.4d 0444 root bin
 s usr/share/man/man4d/lo0.4d=ipnet.4d
 f usr/share/man/man4d/lockstat.4d 0444 root bin
 f usr/share/man/man4d/lofi.4d 0444 root bin
