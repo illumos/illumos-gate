@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -41,7 +41,7 @@
  */
 
 /*
- * 	Swap administrative interface
+ *	Swap administrative interface
  *	Used to add/delete/list swap devices.
  */
 
@@ -96,11 +96,11 @@ int
 main(int argc, char **argv)
 {
 	int c, flag = 0;
-	int ret;
+	int ret = 0;
 	int error = 0;
 	off_t s_offset = 0;
 	off_t length = 0;
-	char *pathname;
+	char *pathname = NULL;
 	char *msg;
 
 	(void) setlocale(LC_ALL, "");
@@ -119,7 +119,7 @@ main(int argc, char **argv)
 	while ((c = getopt(argc, argv, "khlsd:a:12")) != EOF) {
 		char *char_p;
 		switch (c) {
-		case 'l': 	/* list all the swap devices */
+		case 'l':	/* list all the swap devices */
 			flag |= LFLAG;
 			break;
 		case 's':
@@ -251,8 +251,8 @@ main(int argc, char **argv)
 			} else {
 				(void) fprintf(stderr, "%s", msg);
 				free(msg);
-				exit(1);
 			}
+			exit(1);
 		}
 		if ((ret = valid(pathname,
 		    s_offset * 512, length * 512)) == 0) {
@@ -368,11 +368,11 @@ doswap(int flag)
 static int
 list(int flag)
 {
-	struct swaptable 	*st;
+	struct swaptable	*st;
 	struct swapent	*swapent;
 	int	i;
 	struct stat64 statbuf;
-	char		*path;
+	char		*path, *ptr;
 	char		fullpath[MAXPATHLEN+1];
 	int		num;
 	numbuf_t numbuf;
@@ -397,17 +397,21 @@ list(int flag)
 		(void) fprintf(stderr,
 		    gettext("Malloc failed. Please try later.\n"));
 		perror(prognamep);
+		free(st);
 		return (2);
 	}
 	swapent = st->swt_ent;
+	ptr = path;
 	for (i = 0; i < num; i++, swapent++) {
-		swapent->ste_path = path;
-		path += MAXPATHLEN;
+		swapent->ste_path = ptr;
+		ptr += MAXPATHLEN;
 	}
 
 	st->swt_n = num;
 	if ((num = swapctl(SC_LIST, st)) == -1) {
 		perror(prognamep);
+		free(path);
+		free(st);
 		return (2);
 	}
 
@@ -419,7 +423,7 @@ list(int flag)
 	 *	of the header changes, change the next 5 formats as needed
 	 *	to make alignment of output agree with alignment of the header.
 	 * The next four translations are four cases for printing the
-	 * 	1st & 2nd fields.
+	 *	1st & 2nd fields.
 	 * The next translation is for printing the 3rd, 4th & 5th fields.
 	 *
 	 * Translations (if any) of the following keywords should match the
@@ -489,6 +493,8 @@ list(int flag)
 		else
 			(void) printf("\n");
 	}
+	free(path);
+	free(st);
 	return (0);
 }
 
@@ -686,7 +692,7 @@ valid(char *pathname, off_t offset, off_t length)
 		 */
 
 		if (f.st_size < (length - offset) || f.st_size == 0 ||
-		    f.st_size > MAXOFF_T || f.st_blocks < 8 || length < 0) {
+		    f.st_blocks < 8 || length < 0) {
 			(void) fprintf(stderr, gettext("%s: size is invalid\n"),
 			    pathname);
 			return (EINVAL);
