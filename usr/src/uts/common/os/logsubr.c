@@ -263,7 +263,7 @@ log_init(void)
 	printf("Copyright (c) 1983, 2010, Oracle and/or its affiliates. "
 	    "All rights reserved.\n");
 #else
-	bootbanner_print(log_bootbanner_print, KM_SLEEP);
+	bootbanner_print(log_bootbanner_print);
 #endif
 #ifdef DEBUG
 	printf("DEBUG enabled\n");

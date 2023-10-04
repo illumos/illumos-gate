@@ -71,6 +71,9 @@ $(i386_ONLY)dir path=opt/os-tests/tests/i386
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
+dir  path=opt/os-tests/tests/ilstr
+file path=opt/os-tests/tests/ilstr/ilstr_basic.32 mode=0555
+file path=opt/os-tests/tests/ilstr/ilstr_basic.64 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/imc_test mode=0555
 dir  path=opt/os-tests/tests/ksensor
 file path=opt/os-tests/tests/ksensor/ksensor_basic.32 mode=0555

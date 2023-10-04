@@ -177,3 +177,6 @@ tests = [ 'bad_xregs.32', 'bad_xregs.64', 'mdb_xregs', 'proc_writes',
     'xregs_roundtrip.32', 'xregs_roundtrip.64', 'xsave_baducontext',
     'fpregs_xbv.32', 'fpregs_xbv.64', 'swapcontext_extd.32',
     'swapcontext_extd.64' ]
+
+[/opt/os-tests/tests/ilstr]
+tests = ['ilstr_basic.32', 'ilstr_basic.64']

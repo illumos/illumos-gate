@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 
 PROG= init
@@ -34,7 +34,7 @@ DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
 
-OBJS = init.o bootbanner.o definit.o
+OBJS = init.o bootbanner.o definit.o ilstr.o
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lpam -lbsm -lcontract -lscf
 CERRWARN += -_gcc=-Wno-parentheses
@@ -73,6 +73,10 @@ $(PROG):	$(OBJS)
 	$(POST_PROCESS_O)
 
 %.o:	$(SRC)/common/definit/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o:	$(SRC)/common/ilstr/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

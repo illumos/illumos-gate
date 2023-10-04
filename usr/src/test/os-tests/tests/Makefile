@@ -24,6 +24,7 @@ SUBDIRS =       \
 		ddi_ufm \
 		definit \
 		file-locking \
+		ilstr \
 		ksensor \
 		ksid \
 		libtopo \
