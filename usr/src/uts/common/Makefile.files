@@ -83,6 +83,7 @@ COMMON_CORE_OBJS +=		\
 		strtoul.o	\
 		strtoll.o	\
 		strtoull.o	\
+		ilstr.o		\
 		thread_intr.o	\
 		vm_page.o	\
 		vm_pagelist.o	\

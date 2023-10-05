@@ -42,8 +42,6 @@ LDLIBS +=	-lshare -lscf -lumem -luuid -lc -lxml2 -lsmbfs
 NATIVE_LIBS +=	libxml2.so
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	$(CNOWARN_UNINIT)
 CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(SRCDIR)/../common -I$(SRC)/lib/libsmbfs -I$(SRC)/uts/common
 

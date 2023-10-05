@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -903,6 +904,14 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
 
 		rw_downgrade(&ddv->dv_contents);
 	}
+
+	/*
+	 * Even if the dv node was not stale at entry to this function, it may
+	 * be stale now if another process got in between the rw_exit/rw_enter
+	 * calls above and unlinked it.
+	 */
+	if (DV_STALE(ddv))
+		return (ESTALE);
 
 	soff = uiop->uio_loffset;
 	bufsz = uiop->uio_iov->iov_len;

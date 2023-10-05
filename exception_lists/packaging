@@ -472,6 +472,10 @@ usr/include/sys/u8_textprep_data.h
 #
 usr/include/sys/bootbanner.h
 #
+# Private, for ilstr string handling routines:
+#
+usr/include/sys/ilstr.h
+#
 # SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #
 usr/include/sqlite-sys

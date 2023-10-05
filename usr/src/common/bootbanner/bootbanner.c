@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifdef _KERNEL
@@ -24,187 +24,11 @@
 #include <sys/systeminfo.h>
 #endif
 #include <sys/debug.h>
+#include <sys/ilstr.h>
 
 /*
  * Rendering of the boot banner, used on the system and zone consoles.
  */
-
-typedef enum ilstr_errno {
-	ILSTR_ERROR_OK = 0,
-	ILSTR_ERROR_NOMEM,
-	ILSTR_ERROR_OVERFLOW,
-} ilstr_errno_t;
-
-typedef struct ilstr {
-	char *ils_data;
-	size_t ils_datalen;
-	size_t ils_strlen;
-	uint_t ils_errno;
-	int ils_kmflag;
-} ilstr_t;
-
-static void
-ilstr_init(ilstr_t *ils, int kmflag)
-{
-	bzero(ils, sizeof (*ils));
-	ils->ils_kmflag = kmflag;
-}
-
-static void
-ilstr_reset(ilstr_t *ils)
-{
-	if (ils->ils_strlen > 0) {
-		/*
-		 * Truncate the string but do not free the buffer so that we
-		 * can use it again without further allocation.
-		 */
-		ils->ils_data[0] = '\0';
-		ils->ils_strlen = 0;
-	}
-	ils->ils_errno = ILSTR_ERROR_OK;
-}
-
-static void
-ilstr_fini(ilstr_t *ils)
-{
-	if (ils->ils_data != NULL) {
-#ifdef _KERNEL
-		kmem_free(ils->ils_data, ils->ils_datalen);
-#else
-		free(ils->ils_data);
-#endif
-	}
-}
-
-static void
-ilstr_append_str(ilstr_t *ils, const char *s)
-{
-	size_t len;
-	size_t chunksz = 64;
-
-	if (ils->ils_errno != ILSTR_ERROR_OK) {
-		return;
-	}
-
-	if ((len = strlen(s)) < 1) {
-		return;
-	}
-
-	/*
-	 * Check to ensure that the new string length does not overflow,
-	 * leaving room for the termination byte:
-	 */
-	if (len >= SIZE_MAX - ils->ils_strlen - 1) {
-		ils->ils_errno = ILSTR_ERROR_OVERFLOW;
-		return;
-	}
-	size_t new_strlen = ils->ils_strlen + len;
-
-	if (new_strlen + 1 >= ils->ils_datalen) {
-		size_t new_datalen = ils->ils_datalen;
-		char *new_data;
-
-		/*
-		 * Grow the string buffer to make room for the new string.
-		 */
-		while (new_datalen < new_strlen + 1) {
-			if (chunksz >= SIZE_MAX - new_datalen) {
-				ils->ils_errno = ILSTR_ERROR_OVERFLOW;
-				return;
-			}
-			new_datalen += chunksz;
-		}
-
-#ifdef _KERNEL
-		new_data = kmem_alloc(new_datalen, ils->ils_kmflag);
-#else
-		new_data = malloc(new_datalen);
-#endif
-		if (new_data == NULL) {
-			ils->ils_errno = ILSTR_ERROR_NOMEM;
-			return;
-		}
-
-		if (ils->ils_data != NULL) {
-			bcopy(ils->ils_data, new_data, ils->ils_strlen + 1);
-#ifdef _KERNEL
-			kmem_free(ils->ils_data, ils->ils_datalen);
-#else
-			free(ils->ils_data);
-#endif
-		}
-
-		ils->ils_data = new_data;
-		ils->ils_datalen = new_datalen;
-	}
-
-	bcopy(s, ils->ils_data + ils->ils_strlen, len + 1);
-	ils->ils_strlen = new_strlen;
-}
-
-#ifdef _KERNEL
-static void
-ilstr_append_uint(ilstr_t *ils, uint_t n)
-{
-	char buf[64];
-
-	if (ils->ils_errno != ILSTR_ERROR_OK) {
-		return;
-	}
-
-	VERIFY3U(snprintf(buf, sizeof (buf), "%u", n), <, sizeof (buf));
-
-	ilstr_append_str(ils, buf);
-}
-#endif
-
-static void
-ilstr_append_char(ilstr_t *ils, char c)
-{
-	char buf[2];
-
-	if (ils->ils_errno != ILSTR_ERROR_OK) {
-		return;
-	}
-
-	buf[0] = c;
-	buf[1] = '\0';
-
-	ilstr_append_str(ils, buf);
-}
-
-static ilstr_errno_t
-ilstr_errno(ilstr_t *ils)
-{
-	return (ils->ils_errno);
-}
-
-static const char *
-ilstr_cstr(ilstr_t *ils)
-{
-	return (ils->ils_data);
-}
-
-static size_t
-ilstr_len(ilstr_t *ils)
-{
-	return (ils->ils_strlen);
-}
-
-static const char *
-ilstr_errstr(ilstr_t *ils)
-{
-	switch (ils->ils_errno) {
-	case ILSTR_ERROR_OK:
-		return ("ok");
-	case ILSTR_ERROR_NOMEM:
-		return ("could not allocate memory");
-	case ILSTR_ERROR_OVERFLOW:
-		return ("tried to construct too large a string");
-	default:
-		return ("unknown error");
-	}
-}
 
 /*
  * Expand a boot banner template string.  The following expansion tokens
@@ -269,7 +93,7 @@ bootbanner_expand_template(const char *input, ilstr_t *output)
 				ilstr_append_str(output, utsname.version);
 			} else if (c == 'w') {
 #ifdef _KERNEL
-				ilstr_append_uint(output,
+				ilstr_aprintf(output, "%u",
 				    NBBY * (uint_t)sizeof (void *));
 #else
 				char *bits;
@@ -333,16 +157,21 @@ bootbanner_print_one(ilstr_t *s, void (*printfunc)(const char *, uint_t),
  * The "printfunc" argument is a callback function.  When passed a string, the
  * function must print it in a fashion appropriate for the context.  The
  * callback will only be called while within the call to bootbanner_print().
- * The "kmflag" value accepts the same values as kmem_alloc(9F) in the kernel,
- * and is ignored otherwise.
  */
 void
-bootbanner_print(void (*printfunc)(const char *, uint_t), int kmflag)
+bootbanner_print(void (*printfunc)(const char *, uint_t))
 {
+	/*
+	 * To avoid the need to allocate in early boot, we'll use a static
+	 * buffer four times the size of a tasteful terminal width.  Note that
+	 * ilstr will allow us to produce diagnostic output if this buffer
+	 * would have been overrun.
+	 */
+	char sbuf[80 * 4];
 	ilstr_t s;
 	uint_t num = 0;
 
-	ilstr_init(&s, kmflag);
+	ilstr_init_prealloc(&s, sbuf, sizeof (sbuf));
 
 	bootbanner_print_one(&s, printfunc, BOOTBANNER1, &num);
 	bootbanner_print_one(&s, printfunc, BOOTBANNER2, &num);

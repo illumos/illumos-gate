@@ -704,7 +704,7 @@ main(int argc, char *argv[])
 		    un.sysname, un.release, un.version, bits);
 		console(B_FALSE, "Copyright 2010-2020 Joyent, Inc.\r\n");
 #else
-		bootbanner_print(init_bootbanner_print, 0);
+		bootbanner_print(init_bootbanner_print);
 #endif
 	}
 

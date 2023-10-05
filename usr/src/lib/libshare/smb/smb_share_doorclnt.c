@@ -224,8 +224,9 @@ smb_share_list(int offset, smb_shrlist_t *list)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);
 	}
@@ -268,8 +269,9 @@ smb_share_count(void)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (-1);
 	}
@@ -311,8 +313,9 @@ smb_share_delete(char *share_name)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);
 	}
@@ -356,8 +359,9 @@ smb_share_rename(char *from, char *to)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);
 	}
@@ -399,8 +403,9 @@ smb_share_create(smb_share_t *si)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);
 	}
@@ -443,8 +448,9 @@ smb_share_modify(smb_share_t *si)
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
+	if (dec_ctx == NULL || smb_share_dchk(dec_ctx) != 0) {
+		if (dec_ctx != NULL)
+			(void) smb_dr_decode_finish(dec_ctx);
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);
 	}

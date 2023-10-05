@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_BOOTBANNER_H
@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-extern void bootbanner_print(void (*)(const char *, uint_t), int kmflag);
+extern void bootbanner_print(void (*)(const char *, uint_t));
 
 #ifdef __cplusplus
 }

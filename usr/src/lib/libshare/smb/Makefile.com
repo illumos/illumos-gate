@@ -49,15 +49,13 @@ LDLIBS +=	-lshare -lscf -luuid -ldlpi -lnsl -lnvpair -lxml2 -lumem -lc
 NATIVE_LIBS +=	libxml2.so
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-char-subscripts
-CERRWARN +=	-_gcc=-Wno-switch
-
-# not linted
-SMATCH=off
 
 CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(SRCDIR)/../common
 $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
+
+# workaround for smatch 0.6.1-rc1-il-7
+pics/smb_share_doorclnt.o := SMOFF += check_free
 
 .KEEP_STATE:
 

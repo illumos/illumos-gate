@@ -265,7 +265,7 @@ log_init(void)
 	/* NOTE: We might switch to BOOTBANNER after this. */
 	printf("Copyright 2022-2023 MNX Cloud, Inc.\n");
 #else
-	bootbanner_print(log_bootbanner_print, KM_SLEEP);
+	bootbanner_print(log_bootbanner_print);
 #endif
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
