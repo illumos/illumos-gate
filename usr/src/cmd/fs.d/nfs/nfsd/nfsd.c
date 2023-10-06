@@ -143,8 +143,8 @@ main(int ac, char *av[])
 	int logmaxservers = 0;
 	int pid;
 	int i;
-	char *provider = (char *)NULL;
-	char *df_provider = (char *)NULL;
+	char *provider = NULL;
+	char *df_provider = NULL;
 	struct protob *protobp0, *protobp;
 	NETSELDECL(proto) = NULL;
 	NETSELDECL(df_proto) = NULL;
@@ -156,8 +156,8 @@ main(int ac, char *av[])
 	sigset_t sgset;
 	char name[PATH_MAX], value[PATH_MAX];
 	int ret, bufsz;
-
 	int pipe_fd = -1;
+	const char *errstr;
 
 	MyName = *av;
 
@@ -177,6 +177,9 @@ main(int ac, char *av[])
 	}
 
 	(void) enable_extended_FILE_stdio(-1, -1);
+
+	/* Upgrade SMF settings, if necessary. */
+	nfs_config_upgrade(NFSD);
 
 	/*
 	 * Read in the values from SMF first before we check
@@ -238,15 +241,29 @@ main(int ac, char *av[])
 
 	bufsz = 4;
 	ret = nfs_smf_get_prop("server_versmin", value, DEFAULT_INSTANCE,
-	    SCF_TYPE_INTEGER, NFSD, &bufsz);
-	if (ret == SA_OK)
-		nfs_server_vers_min = strtol(value, (char **)NULL, 10);
+	    SCF_TYPE_ASTRING, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		ret = strtonum(value, NFS_VERSMIN, NFS_VERSMAX, &errstr);
+		if (errstr != NULL) {
+			(void) fprintf(stderr, "invalid server_versmin: %s\n",
+			    errstr);
+		} else {
+			nfs_server_vers_min = ret;
+		}
+	}
 
 	bufsz = 4;
 	ret = nfs_smf_get_prop("server_versmax", value, DEFAULT_INSTANCE,
-	    SCF_TYPE_INTEGER, NFSD, &bufsz);
-	if (ret == SA_OK)
-		nfs_server_vers_max = strtol(value, (char **)NULL, 10);
+	    SCF_TYPE_ASTRING, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		ret = strtonum(value, NFS_VERSMIN, NFS_VERSMAX, &errstr);
+		if (errstr != NULL) {
+			(void) fprintf(stderr, "invalid server_versmax: %s\n",
+			    errstr);
+		} else {
+			nfs_server_vers_max = ret;
+		}
+	}
 
 	bufsz = PATH_MAX;
 	ret = nfs_smf_get_prop("server_delegation", value, DEFAULT_INSTANCE,

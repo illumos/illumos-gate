@@ -30,10 +30,11 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <stdarg.h>
+#include <rpcsvc/daemon_utils.h>
 #include "smfcfg.h"
 
 fs_smfhandle_t *
-fs_smf_init(char *fmri, char *instance)
+fs_smf_init(const char *fmri, const char *instance)
 {
 	fs_smfhandle_t *handle = NULL;
 	char *svcname, srv[MAXPATHLEN];
@@ -437,4 +438,117 @@ string_to_boolean(const char *str)
 		return (B_TRUE);
 	} else
 		return (B_FALSE);
+}
+
+/*
+ * upgrade server_versmin and server_versmax from int to string.
+ * This is needed to allow to specify version as major.minor.
+ */
+static void
+nfs_upgrade_server_vers(const char *fmri)
+{
+	fs_smfhandle_t *phandle;
+	scf_handle_t *handle;
+	scf_propertygroup_t *pg;
+	scf_instance_t *inst;
+	scf_value_t *vmin = NULL, *vmax = NULL;
+	scf_transaction_t *tran = NULL;
+	scf_transaction_entry_t *emin = NULL, *emax = NULL;
+	char versmax[32];
+	char versmin[32];
+	int bufsz;
+
+	/*
+	 * Read old integer values, stop in case of error - apparently
+	 * the upgrade is already done.
+	 */
+	bufsz = sizeof (versmax);
+	if (nfs_smf_get_prop("server_versmax", versmax, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, (char *)fmri, &bufsz) != SA_OK) {
+		return;
+	}
+	bufsz = sizeof (versmin);
+	if (nfs_smf_get_prop("server_versmin", versmin, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, (char *)fmri, &bufsz) != SA_OK) {
+		return;
+	}
+
+	/* Write back as SCF_TYPE_ASTRING */
+	phandle = fs_smf_init(fmri, NULL);
+	if (phandle == NULL)
+		return;
+
+	handle = phandle->fs_handle;
+	if (handle == NULL)
+		goto done;
+	pg = phandle->fs_pg;
+	inst = phandle->fs_instance;
+	tran = scf_transaction_create(handle);
+	vmin = scf_value_create(handle);
+	vmax = scf_value_create(handle);
+	emin = scf_entry_create(handle);
+	emax = scf_entry_create(handle);
+
+	if (pg == NULL || inst == NULL || tran == NULL ||
+	    emin == NULL || emax == NULL || vmin == NULL || vmax == NULL) {
+		goto done;
+	}
+
+	if (scf_handle_decode_fmri(handle, (char *)fmri,
+	    phandle->fs_scope, phandle->fs_service, inst, NULL, NULL, 0) != 0) {
+		goto done;
+	}
+
+	if (scf_instance_get_pg(inst, NFS_PROPS_PGNAME, pg) == -1)
+		goto done;
+
+	if (scf_pg_update(pg) == -1)
+		goto done;
+
+	if (scf_transaction_start(tran, pg) == -1)
+		goto done;
+
+	if (scf_transaction_property_change_type(tran, emax,
+	    "server_versmax", SCF_TYPE_ASTRING) != 0) {
+		goto done;
+	}
+	if (scf_value_set_astring(vmax, versmax) == 0) {
+		if (scf_entry_add_value(emax, vmax) != 0)
+			goto done;
+	} else {
+		goto done;
+	}
+
+	if (scf_transaction_property_change_type(tran, emin,
+	    "server_versmin", SCF_TYPE_ASTRING) != 0) {
+		goto done;
+	}
+	if (scf_value_set_astring(vmin, versmin) == 0) {
+		if (scf_entry_add_value(emin, vmin) != 0)
+			goto done;
+	} else {
+		goto done;
+	}
+
+	(void) scf_transaction_commit(tran);
+done:
+	if (tran != NULL)
+		scf_transaction_destroy(tran);
+	if (emin != NULL)
+		scf_entry_destroy(emin);
+	if (emax != NULL)
+		scf_entry_destroy(emax);
+	if (vmin != NULL)
+		scf_value_destroy(vmin);
+	if (vmax != NULL)
+		scf_value_destroy(vmax);
+	fs_smf_fini(phandle);
+}
+
+void
+nfs_config_upgrade(const char *svc_name)
+{
+	if (strcmp(svc_name, NFSD) == 0) {
+		nfs_upgrade_server_vers(svc_name);
+	}
 }

@@ -175,8 +175,8 @@
 	   <propval name='max_connections' type='integer' value='-1'/>
 	   <propval name='protocol' type='astring' value='ALL'/>
 	   <propval name='server_delegation' type='astring' value='on'/>
-	   <propval name='server_versmax' type='integer' value='4'/>
-	   <propval name='server_versmin' type='integer' value='2'/>
+	   <propval name='server_versmax' type='astring' value='4'/>
+	   <propval name='server_versmin' type='astring' value='2'/>
 	   <propval name='servers' type='integer' value='256'/>
 	   <propval name='mountd_listen_backlog' type='integer' value='64'/>
 	   <propval name='mountd_max_threads' type='integer' value='16'/>

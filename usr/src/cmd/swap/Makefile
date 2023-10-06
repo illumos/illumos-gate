@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,42 +18,45 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/swap/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
-PROG= swap
+PROG=	swap
+OBJS=	$(PROG).o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-SUBDIRS += $(MACH64)
+CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CFLAGS64 +=	$(CCVERBOSE)
+LDLIBS	+=	-ldiskmgt -lcmdutils
 
-CPPFLAGS += -D_LARGEFILE64_SOURCE
+CSTD=		$(CSTD_GNU99)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+FILEMODE=02555
 
-ROOTSYMLINK = 	$(ROOTETCPROG)
+CLEANFILES +=	$(OBJS)
+
+ROOTSYMLINK =	$(ROOTETCPROG)
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all: $(PROG)
+
+install: all $(ROOTUSRSBINPROG) $(ROOTSYMLINK)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 $(ROOTSYMLINK):
 	$(RM) $@; $(SYMLINK) ../usr/sbin/$(PROG) $@
 
-clean clobber lint:	$(SUBDIRS)
-
-install: $(SUBDIRS) $(ROOTSYMLINK)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clean:
+	$(RM) $(CLEANFILES)
 
 include ../Makefile.targ
-
