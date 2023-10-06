@@ -933,6 +933,10 @@ typedef struct mptsas {
 	mptsas_fw_diagnostic_buffer_t
 		m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_COUNT];
 
+	/* IOC type flags */
+	uint8_t			m_is_sea_ioc;
+	uint8_t			m_is_gen35_ioc;
+
 	/* GEN3 support */
 	uint8_t			m_MPI25;
 
@@ -950,6 +954,11 @@ typedef struct mptsas {
 	 * Is HBA processing a diag reset?
 	 */
 	uint8_t			m_in_reset;
+
+	/*
+	 * index for the pci memory BAR
+	 */
+	uint8_t			m_mem_bar;
 
 	/*
 	 * per instance cmd data structures for task management cmds
@@ -1135,7 +1144,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 #define	MPTSAS_QUIESCE_TIMEOUT	1		/* 1 sec */
 #define	MPTSAS_PM_IDLE_TIMEOUT	60		/* 60 seconds */
 
-#define	MPTSAS_GET_ISTAT(mpt)  (ddi_get32((mpt)->m_datap, \
+#define	MPTSAS_GET_ISTAT(mpt)  (mptsas_hirrd((mpt), \
 			&(mpt)->m_reg->HostInterruptStatus))
 
 #define	MPTSAS_SET_SIGP(P) \
@@ -1144,7 +1153,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 #define	MPTSAS_RESET_SIGP(P) (void) ddi_get8(mpt->m_datap, \
 			(uint8_t *)(mpt->m_devaddr + NREG_CTEST2))
 
-#define	MPTSAS_GET_INTCODE(P) (ddi_get32(mpt->m_datap, \
+#define	MPTSAS_GET_INTCODE(P) (mptsas_hirrd(mpt, \
 			(uint32_t *)(mpt->m_devaddr + NREG_DSPS)))
 
 
@@ -1179,7 +1188,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 
 #define	ClrSetBits32(hdl, reg, clr, set) \
 	ddi_put32(hdl, (reg), \
-	    ((ddi_get32(mpt->m_datap, (reg)) & ~(clr)) | (set)))
+	    ((mptsas_hirrd(mpt, (reg)) & ~(clr)) | (set)))
 
 #define	ClrSetBits(reg, clr, set) \
 	ddi_put8(mpt->m_datap, (uint8_t *)(reg), \
@@ -1312,6 +1321,7 @@ int mptsas_dma_addr_create(mptsas_t *mpt, ddi_dma_attr_t dma_attr,
     ddi_dma_handle_t *dma_hdp, ddi_acc_handle_t *acc_hdp, caddr_t *dma_memp,
     uint32_t alloc_size, ddi_dma_cookie_t *cookiep);
 void mptsas_dma_addr_destroy(ddi_dma_handle_t *, ddi_acc_handle_t *);
+uint32_t mptsas_hirrd(mptsas_t *mpt, uint32_t *regaddr);
 
 /*
  * impl functions

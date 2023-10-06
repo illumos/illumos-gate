@@ -101,6 +101,26 @@ static m_event_struct_t *mptsas_ioc_event_find_by_cmd(mptsas_t *mpt,
     struct mptsas_cmd *cmd);
 
 /*
+ * Use to read Host interface registers.  May read up to 3 times for
+ * certain IOC's due to chip bug where zero can be erroneously returned
+ * when under high i/o load.
+ */
+uint32_t
+mptsas_hirrd(mptsas_t *mpt, uint32_t *regaddr)
+{
+	int i, ntries;
+	uint32_t ret;
+
+	ntries = (mpt->m_is_sea_ioc == 1) ? 3 : 1;
+	for (i = 0; i < ntries; i++) {
+		if ((ret = ddi_get32(mpt->m_datap, regaddr)) != 0)
+			break;
+	}
+	return (ret);
+}
+
+
+/*
  * add ioc evnet cmd into the queue
  */
 static void
@@ -694,7 +714,7 @@ mptsas_ioc_wait_for_response(mptsas_t *mpt)
 {
 	int	polls = 0;
 
-	while ((ddi_get32(mpt->m_datap,
+	while ((mptsas_hirrd(mpt,
 	    &mpt->m_reg->HostInterruptStatus) & MPI2_HIS_IOP_DOORBELL_STATUS)) {
 		drv_usecwait(1000);
 		if (polls++ > 60000) {
@@ -709,7 +729,7 @@ mptsas_ioc_wait_for_doorbell(mptsas_t *mpt)
 {
 	int	polls = 0;
 
-	while ((ddi_get32(mpt->m_datap,
+	while ((mptsas_hirrd(mpt,
 	    &mpt->m_reg->HostInterruptStatus) & MPI2_HIM_DIM) == 0) {
 		drv_usecwait(1000);
 		if (polls++ > 300000) {
@@ -791,7 +811,7 @@ mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
 	 * data we will be getting
 	 */
 	for (i = 0; i < 2; i++, memp += 2) {
-		val = (ddi_get32(mpt->m_datap,
+		val = (mptsas_hirrd(mpt,
 		    &mpt->m_reg->Doorbell) & MPI2_DOORBELL_DATA_MASK);
 		ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptStatus, 0);
 		if (mptsas_ioc_wait_for_doorbell(mpt)) {
@@ -820,7 +840,7 @@ mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
 	 * Get the rest of the data
 	 */
 	for (i = 0; i < bytesleft; i++, memp += 2) {
-		val = (ddi_get32(mpt->m_datap,
+		val = (mptsas_hirrd(mpt,
 		    &mpt->m_reg->Doorbell) & MPI2_DOORBELL_DATA_MASK);
 		ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptStatus, 0);
 		if (mptsas_ioc_wait_for_doorbell(mpt)) {
@@ -839,8 +859,7 @@ mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
 	 */
 	if (totalbytes > (numbytes / 2)) {
 		for (i = (numbytes / 2); i < totalbytes; i++) {
-			val = (ddi_get32(mpt->m_datap,
-			    &mpt->m_reg->Doorbell) &
+			val = (mptsas_hirrd(mpt, &mpt->m_reg->Doorbell) &
 			    MPI2_DOORBELL_DATA_MASK);
 			ddi_put32(mpt->m_datap,
 			    &mpt->m_reg->HostInterruptStatus, 0);
@@ -878,8 +897,8 @@ mptsas_kick_start(mptsas_t *mpt)
 	/*
 	 * Read the current Diag Reg and save the Host Controlled Boot size.
 	 */
-	diag_reg = ddi_get32(mpt->m_datap, &mpt->m_reg->HostDiagnostic);
-	saved_HCB_size = ddi_get32(mpt->m_datap, &mpt->m_reg->HCBSize);
+	diag_reg = mptsas_hirrd(mpt, &mpt->m_reg->HostDiagnostic);
+	saved_HCB_size = mptsas_hirrd(mpt, &mpt->m_reg->HCBSize);
 
 	/*
 	 * Set Reset Adapter bit and wait 50 mSeconds.
@@ -894,8 +913,7 @@ mptsas_kick_start(mptsas_t *mpt)
 	 * If no more adapter (all FF's), just return failure.
 	 */
 	for (polls = 0; polls < 600000; polls++) {
-		diag_reg = ddi_get32(mpt->m_datap,
-		    &mpt->m_reg->HostDiagnostic);
+		diag_reg = mptsas_hirrd(mpt, &mpt->m_reg->HostDiagnostic);
 		if (diag_reg == 0xFFFFFFFF) {
 			mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 			ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
@@ -945,7 +963,7 @@ mptsas_kick_start(mptsas_t *mpt)
 	 * Wait 60 seconds max for FW to come to ready state.
 	 */
 	for (polls = 0; polls < 60000; polls++) {
-		ioc_state = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
+		ioc_state = mptsas_hirrd(mpt, &mpt->m_reg->Doorbell);
 		if (ioc_state == 0xFFFFFFFF) {
 			mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 			ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
@@ -978,7 +996,7 @@ mptsas_ioc_reset(mptsas_t *mpt, int first_time)
 	uint32_t	reset_msg;
 	uint32_t	ioc_state;
 
-	ioc_state = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
+	ioc_state = mptsas_hirrd(mpt, &mpt->m_reg->Doorbell);
 	/*
 	 * If chip is already in ready state then there is nothing to do.
 	 */
@@ -1014,7 +1032,7 @@ mptsas_ioc_reset(mptsas_t *mpt, int first_time)
 			 * Wait no more than 60 seconds for chip to become
 			 * ready.
 			 */
-			while ((ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell) &
+			while ((mptsas_hirrd(mpt, &mpt->m_reg->Doorbell) &
 			    MPI2_IOC_STATE_READY) == 0x0) {
 				drv_usecwait(1000);
 				if (polls++ > 60000) {

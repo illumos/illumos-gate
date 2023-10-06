@@ -1097,7 +1097,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char			doneq_thread_create = 0;
 	char			added_watchdog = 0;
 	scsi_hba_tran_t		*hba_tran;
-	uint_t			mem_bar = MEM_SPACE;
+	uint_t			mem_bar;
 	int			rval = DDI_FAILURE;
 
 	/* CONSTCOND */
@@ -1279,6 +1279,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	config_setup++;
 
+	mem_bar = mpt->m_mem_bar;
 	if (ddi_regs_map_setup(dip, mem_bar, (caddr_t *)&mpt->m_reg,
 	    0, 0, &mpt->m_reg_acc_attr, &mpt->m_datap) != DDI_SUCCESS) {
 		mptsas_log(mpt, CE_WARN, "map setup failed");
@@ -2476,7 +2477,7 @@ mptsas_power(dev_info_t *dip, int component, int level)
 		/*
 		 * Wait up to 30 seconds for IOC to come out of reset.
 		 */
-		while (((ioc_status = ddi_get32(mpt->m_datap,
+		while (((ioc_status = mptsas_hirrd(mpt,
 		    &mpt->m_reg->Doorbell)) &
 		    MPI2_IOC_STATE_MASK) == MPI2_IOC_STATE_RESET) {
 			if (polls++ > 3000) {
@@ -2512,6 +2513,60 @@ mptsas_power(dev_info_t *dip, int component, int level)
 	mutex_exit(&mpt->m_mutex);
 	return (rval);
 }
+
+/*
+ * Check for newer v2.6 SAS chips.
+ */
+static void
+mptsas_ioc_check_rev(mptsas_t *mpt)
+{
+	switch (mpt->m_devid) {
+	case MPI26_MFGPAGE_DEVID_SAS3816:
+	case MPI26_MFGPAGE_DEVID_SAS3816_1:
+		mpt->m_is_sea_ioc = 1;
+		mptsas_log(mpt, CE_NOTE, "!mptsas3%d: SAS3816 IOC Detected",
+		    mpt->m_instance);
+		/* fallthrough */
+	case MPI26_MFGPAGE_DEVID_SAS3616:
+	case MPI26_MFGPAGE_DEVID_SAS3708:
+	case MPI26_MFGPAGE_DEVID_SAS3716:
+		mptsas_log(mpt, CE_NOTE, "!mptsas3%d: gen3.5 IOC Detected",
+		    mpt->m_instance);
+		mpt->m_is_gen35_ioc = 1;
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * Search through the reg property for the first memory BAR.
+ */
+static void
+mptsas_find_mem_bar(mptsas_t *mpt)
+{
+	int		i, rcount;
+	pci_regspec_t	*reg_data;
+	int		reglen;
+
+	mpt->m_mem_bar = MEM_SPACE; /* old default */
+	/*
+	 * Lookup the 'reg' property.
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, mpt->m_dip,
+	    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg_data, &reglen) ==
+	    DDI_PROP_SUCCESS) {
+		rcount = reglen / sizeof (pci_regspec_t);
+		for (i = 0; i < rcount; i++) {
+			if (PCI_REG_ADDR_G(reg_data[i].pci_phys_hi) ==
+			    PCI_REG_ADDR_G(PCI_ADDR_MEM64)) {
+				mpt->m_mem_bar = i;
+				break;
+			}
+		}
+	}
+}
+
 
 /*
  * Initialize configuration space and figure out which
@@ -2568,6 +2623,8 @@ mptsas_config_space_init(mptsas_t *mpt)
 	pci_config_put8(mpt->m_config_handle, PCI_CONF_LATENCY_TIMER,
 	    MPTSAS_LATENCY_TIMER);
 
+	mptsas_ioc_check_rev(mpt);
+	mptsas_find_mem_bar(mpt);
 	(void) mptsas_get_pci_cap(mpt);
 	return (TRUE);
 }
@@ -5197,7 +5254,7 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 	 * Get the current interrupt mask and disable interrupts.  When
 	 * re-enabling ints, set mask to saved value.
 	 */
-	int_mask = ddi_get32(mpt->m_datap, &mpt->m_reg->HostInterruptMask);
+	int_mask = mptsas_hirrd(mpt, &mpt->m_reg->HostInterruptMask);
 	MPTSAS_DISABLE_INTR(mpt);
 
 	/*
@@ -10165,7 +10222,7 @@ mptsas_watch(void *arg)
 		/*
 		 * Check if controller is in a FAULT state. If so, reset it.
 		 */
-		doorbell = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
+		doorbell = mptsas_hirrd(mpt, &mpt->m_reg->Doorbell);
 		if ((doorbell & MPI2_IOC_STATE_MASK) == MPI2_IOC_STATE_FAULT) {
 			doorbell &= MPI2_DOORBELL_DATA_MASK;
 			mptsas_log(mpt, CE_WARN, "MPT Firmware Fault, "
@@ -12655,7 +12712,7 @@ mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data, int mode)
 				break;
 
 			case REG_MEM_READ:
-				driverdata.RegData = ddi_get32(mpt->m_datap,
+				driverdata.RegData = mptsas_hirrd(mpt,
 				    (uint32_t *)(void *)mpt->m_reg +
 				    driverdata.RegOffset);
 				if (ddi_copyout(&driverdata.RegData,
@@ -13184,9 +13241,18 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	int			rval;
 
 	/*
+	 * Setup configuration space
+	 */
+	if (mptsas_config_space_init(mpt) == FALSE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_config_space_init "
+		    "failed!");
+		goto fail;
+	}
+
+	/*
 	 * Check to see if the firmware image is valid
 	 */
-	if (ddi_get32(mpt->m_datap, &mpt->m_reg->HostDiagnostic) &
+	if (mptsas_hirrd(mpt, &mpt->m_reg->HostDiagnostic) &
 	    MPI2_DIAG_FLASH_BAD_SIG) {
 		mptsas_log(mpt, CE_WARN, "mptsas bad flash signature!");
 		goto fail;
@@ -13204,15 +13270,6 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	if ((rval == MPTSAS_SUCCESS_MUR) && (!first_time)) {
 		goto mur;
 	}
-	/*
-	 * Setup configuration space
-	 */
-	if (mptsas_config_space_init(mpt) == FALSE) {
-		mptsas_log(mpt, CE_WARN, "mptsas_config_space_init "
-		    "failed!");
-		goto fail;
-	}
-
 	/*
 	 * IOC facts can change after a diag reset so all buffers that are
 	 * based on these numbers must be de-allocated and re-allocated.  Get
