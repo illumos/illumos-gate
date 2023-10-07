@@ -60,6 +60,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 1, 0x80, 0,	"Mass storage controller",		"unknown" },
 
 	{ 2, 0, 0,	"Ethernet controller",			"etherne" },
+	{ 2, 0, 1,	"Ethernet controller IDPF compliant",	"idpf" },
 	{ 2, 1, 0,	"Token ring controller",		"tokenrg" },
 	{ 2, 2, 0,	"FDDI controller",			"fddi" },
 	{ 2, 3, 0,	"ATM controller",			"atm" },

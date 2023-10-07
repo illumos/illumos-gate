@@ -4833,7 +4833,8 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_FLIT_PERF, "fltperf",
 	    "Flit Performance Measurement" },
 	{ PCIE_EXT_CAP_ID_FLIT_ERR, "flterr", "Flit Error Injection" },
-	{ PCIE_EXT_CAP_ID_SVC, "svc", "Streamlined Virtual Channel" }
+	{ PCIE_EXT_CAP_ID_SVC, "svc", "Streamlined Virtual Channel" },
+	{ PCIE_EXT_CAP_ID_MMIO_RBL, "mrbl", "MMIO Register Block Locator" }
 };
 
 static const pcieadm_pci_cap_t *

@@ -606,6 +606,7 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_FLIT_PERF	0x33	/* Flit Perf. Measurement */
 #define	PCIE_EXT_CAP_ID_FLIT_ERR	0x34	/* Flit Error Injection */
 #define	PCIE_EXT_CAP_ID_SVC		0x35	/* Streamlined Virtual Chan. */
+#define	PCIE_EXT_CAP_ID_MMIO_RBL	0x36	/* MMIO Register Block Loc. */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets
