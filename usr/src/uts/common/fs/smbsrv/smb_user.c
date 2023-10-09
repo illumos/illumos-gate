@@ -978,6 +978,7 @@ smb_user_netinfo_init(smb_user_t *user, smb_netuserinfo_t *info)
 	ASSERT(session->workstation);
 
 	info->ui_session_id = session->s_kid;
+	info->ui_user_id = user->u_ssnid;
 	info->ui_native_os = session->native_os;
 	info->ui_ipaddr = session->ipaddr;
 	info->ui_numopens = session->s_file_cnt;

@@ -627,7 +627,7 @@ smb_tree_chkaccess(smb_request_t *sr, smb_kshare_t *shr, vnode_t *vp)
 		return (0);
 	}
 
-	if ((shr->shr_flags & SMB_SHRF_ADMIN) && !smb_user_is_admin(user)) {
+	if ((shr->shr_flags & SMB_SHRF_ADMIN) && !SMB_USER_IS_ADMIN(user)) {
 		smb_tree_log(sr, sharename, "access denied: not admin");
 		return (0);
 	}
@@ -638,6 +638,9 @@ smb_tree_chkaccess(smb_request_t *sr, smb_kshare_t *shr, vnode_t *vp)
 		return (0);
 	}
 
+	/*
+	 * This checks the "share" ACL, which is normally "open"
+	 */
 	acl_access = smb_tree_acl_access(sr, shr, vp);
 	if ((acl_access & ACE_ALL_PERMS) == 0) {
 		smb_tree_log(sr, sharename, "access denied: share ACL");

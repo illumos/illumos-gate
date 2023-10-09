@@ -769,6 +769,7 @@ f kernel/drv/amd64/sgen 0755 root sys
 f kernel/drv/amd64/si3124 0755 root sys
 f kernel/drv/amd64/simnet 0755 root sys
 f kernel/drv/amd64/skd 0755 root sys
+f kernel/drv/amd64/smartpqi 0755 root sys
 f kernel/drv/amd64/smbios 0755 root sys
 f kernel/drv/amd64/smntemp 0755 root sys
 f kernel/drv/amd64/smp 0755 root sys
@@ -929,6 +930,7 @@ f kernel/drv/ses.conf 0644 root sys
 f kernel/drv/sgen.conf 0644 root sys
 f kernel/drv/simnet.conf 0644 root sys
 f kernel/drv/skd.conf 0644 root sys
+f kernel/drv/smartpqi.conf 0644 root sys
 f kernel/drv/smbios.conf 0644 root sys
 f kernel/drv/smp.conf 0644 root sys
 f kernel/drv/smrt.conf 0644 root sys
@@ -1076,6 +1078,7 @@ f kernel/kmdb/amd64/sata 0555 root sys
 f kernel/kmdb/amd64/scsi_vhci 0555 root sys
 f kernel/kmdb/amd64/sctp 0555 root sys
 f kernel/kmdb/amd64/sd 0555 root sys
+f kernel/kmdb/amd64/smartpqi 0555 root sys
 f kernel/kmdb/amd64/sockfs 0555 root sys
 f kernel/kmdb/amd64/specfs 0555 root sys
 f kernel/kmdb/amd64/sppp 0555 root sys
@@ -10169,6 +10172,7 @@ f usr/lib/mdb/kvm/amd64/sata.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/scsi_vhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sctp.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sd.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/smartpqi.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbfs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbios.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbsrv.so 0555 root sys
@@ -18980,6 +18984,7 @@ f usr/share/man/man4d/sfxge.4d 0444 root bin
 f usr/share/man/man4d/sgen.4d 0444 root bin
 f usr/share/man/man4d/si3124.4d 0444 root bin
 f usr/share/man/man4d/skd.4d 0444 root bin
+f usr/share/man/man4d/smartpqi.4d 0444 root bin
 f usr/share/man/man4d/smbios.4d 0444 root bin
 f usr/share/man/man4d/smntemp.4d 0444 root bin
 f usr/share/man/man4d/st.4d 0444 root bin

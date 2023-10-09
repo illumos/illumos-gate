@@ -66,6 +66,7 @@ $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/sata group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/scsi_vhci group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/sctp group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/sd group=sys mode=0555
+file path=kernel/kmdb/$(ARCH64)/smartpqi group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/sockfs group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/specfs group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/sppp group=sys mode=0555
@@ -147,6 +148,7 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/sata.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/scsi_vhci.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/sctp.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/sd.so group=sys mode=0555
+file path=usr/lib/mdb/kvm/$(ARCH64)/smartpqi.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/smbios.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/sockfs.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/specfs.so group=sys mode=0555

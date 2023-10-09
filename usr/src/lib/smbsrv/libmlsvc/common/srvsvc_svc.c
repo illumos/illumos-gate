@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -128,6 +129,7 @@ static DWORD mlsvc_NetShareEnumCommon(ndr_xa_t *, smb_svcenum_t *,
 static boolean_t srvsvc_add_autohome(ndr_xa_t *, smb_svcenum_t *, void *);
 static char *srvsvc_share_mkpath(ndr_xa_t *, char *);
 static uint32_t srvsvc_share_getsd(ndr_xa_t *, smb_share_t *, srvsvc_sd_t *);
+static boolean_t srvsvc_share_access(ndr_xa_t *, smb_share_t *);
 
 static int srvsvc_netconnect_qualifier(const char *);
 static void srvsvc_estimate_limit(smb_svcenum_t *, uint32_t);
@@ -879,6 +881,13 @@ srvsvc_s_NetShareGetInfo(void *arg, ndr_xa_t *mxa)
 	if (status != NERR_Success) {
 		bzero(param, sizeof (struct mlsm_NetShareGetInfo));
 		param->status = status;
+		return (NDR_DRC_OK);
+	}
+
+	if ((si.shr_flags & SMB_SHRF_ABE) != 0 &&
+	    !srvsvc_share_access(mxa, &si)) {
+		bzero(param, sizeof (struct mlsm_NetShareGetInfo));
+		param->status = ERROR_ACCESS_DENIED;
 		return (NDR_DRC_OK);
 	}
 
@@ -2299,6 +2308,10 @@ mlsvc_NetShareEnumLevel0(ndr_xa_t *mxa, srvsvc_infonres_t *infonres,
 
 		++se->se_resume;
 
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
+
 		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
@@ -2359,6 +2372,10 @@ mlsvc_NetShareEnumLevel1(ndr_xa_t *mxa, srvsvc_infonres_t *infonres,
 
 		++se->se_resume;
 
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
+
 		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
@@ -2418,6 +2435,10 @@ mlsvc_NetShareEnumLevel2(ndr_xa_t *mxa, srvsvc_infonres_t *infonres,
 		}
 
 		++se->se_resume;
+
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
 
 		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
@@ -2480,6 +2501,10 @@ mlsvc_NetShareEnumLevel501(ndr_xa_t *mxa, srvsvc_infonres_t *infonres,
 
 		++se->se_resume;
 
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
+
 		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
@@ -2540,6 +2565,10 @@ mlsvc_NetShareEnumLevel502(ndr_xa_t *mxa, srvsvc_infonres_t *infonres,
 		}
 
 		++se->se_resume;
+
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
 
 		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
@@ -2670,6 +2699,52 @@ mlsvc_NetShareEnumCommon(ndr_xa_t *mxa, smb_svcenum_t *se,
 }
 
 /*
+ * srvsvc_share_access()
+ * Return TRUE if the client has access to this share.
+ * Called for shares with the ABE flag.
+ *
+ * Similar to: smb_kshare_hostaccess()
+ */
+static boolean_t
+srvsvc_share_access(ndr_xa_t *xa, smb_share_t *si)
+{
+	smb_netuserinfo_t *ui;
+	uint32_t host_access;
+
+	if (xa->pipe == NULL || xa->pipe->np_user == NULL)
+		return (B_FALSE);
+	ui = xa->pipe->np_user;
+
+	/*
+	 * Administrators see all shares
+	 */
+	if (ndr_is_admin(xa))
+		return (B_TRUE);
+
+	/*
+	 * Check host-based access
+	 */
+	if ((si->shr_flags & SMB_SHRF_ACC_ALL) != SMB_SHRF_ACC_OPEN) {
+		host_access = smb_shr_hostaccess(
+		    &ui->ui_ipaddr,
+		    si->shr_access_none,
+		    si->shr_access_ro,
+		    si->shr_access_rw,
+		    si->shr_flags & SMB_SHRF_ACC_ALL);
+		if (host_access == SMB_SHRF_ACC_NONE)
+			return (B_FALSE);
+	}
+
+	/*
+	 * Check share root ACL
+	 */
+	if (smb_kmod_shareaccess(ui, si) != 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * srvsvc_add_autohome
  *
  * Add the autohome share for the user. The share must not be a permanent
@@ -2772,6 +2847,10 @@ srvsvc_s_NetShareCheck(void *arg, ndr_xa_t *mxa)
 
 	while ((si = smb_shr_iterate(&iterator)) != NULL) {
 		path = srvsvc_share_mkpath(mxa, si->shr_path);
+
+		if ((si->shr_flags & SMB_SHRF_ABE) != 0 &&
+		    !srvsvc_share_access(mxa, si))
+			continue;
 
 		if (smb_strcasecmp(path, (char *)param->path, 0) == 0) {
 			param->stype = (si->shr_type & STYPE_MASK);

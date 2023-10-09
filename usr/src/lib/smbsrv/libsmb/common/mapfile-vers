@@ -241,6 +241,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_kmod_setcfg;
 	smb_kmod_setgmtoff;
 	smb_kmod_share;
+	smb_kmod_shareaccess;
 	smb_kmod_shareinfo;
 	smb_kmod_start			{ FLAGS = NODIRECT };
 	smb_kmod_stop			{ FLAGS = NODIRECT };

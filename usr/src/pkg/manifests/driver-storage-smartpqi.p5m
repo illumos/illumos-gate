@@ -1,0 +1,49 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2018, Nexenta Systems, Inc. All Rights Reserved
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/storage/smartpqi@$(PKGVERS)
+set name=pkg.summary value="Microsemi SmartPQI"
+set name=pkg.description value="Microsemi SmartPQI"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=variant.arch value=i386
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/smartpqi group=sys
+file path=kernel/drv/smartpqi.conf group=sys \
+    original_name=SUNWsmartpqi:kernel/drv/smartpqi.conf preserve=true
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/smartpqi.4d
+driver name=smartpqi class=scsi-self-identifying \
+    alias=pci9005,28f \
+    alias=pciex9005,28f
+license lic_CDDL license=lic_CDDL
