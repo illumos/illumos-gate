@@ -2079,6 +2079,7 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 	smb_llist_t	*sess_list;
 	smb_session_t	*sess;
 	smb_user_t	*user = NULL;
+	boolean_t	do_logoff = B_FALSE;
 
 	SMB_SERVER_VALID(sv);
 
@@ -2112,11 +2113,8 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 		user = smb_session_lookup_uid_st(sess, ssnid, 0,
 		    SMB_USER_STATE_LOGGED_ON);
 		if (user != NULL) {
-
 			if (smb_is_same_user(user->u_cred, sr->user_cr)) {
-				/* Treat this as if we lost the connection */
-				user->preserve_opens = SMB2_DH_PRESERVE_SOME;
-				smb_user_logoff(user);
+				do_logoff = B_TRUE;
 				break;
 			}
 			smb_user_release(user);
@@ -2139,7 +2137,19 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 
 	smb_llist_exit(sess_list);
 
+	/*
+	 * Note that smb_user_logoff() can block for a while if
+	 * smb_session_disconnect_owned_trees, smb_ofile_close_all
+	 * ends up blocked on locks held by running requests.
+	 * Do that while not holding the session list rwlock.
+	 */
 	if (user != NULL) {
+		if (do_logoff) {
+			/* Treat this as if we lost the connection */
+			user->preserve_opens = SMB2_DH_PRESERVE_SOME;
+			smb_user_logoff(user);
+		}
+
 		/*
 		 * Wait for durable handles to be orphaned.
 		 * Note: not holding the sess list rwlock.
