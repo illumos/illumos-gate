@@ -536,10 +536,6 @@ file path=usr/bin/$(ARCH32)/decrypt mode=0555
 file path=usr/bin/$(ARCH32)/digest mode=0555
 hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
 hardlink path=usr/bin/$(ARCH32)/mac target=digest
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/newtask group=sys mode=4555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/nohup mode=0555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/prctl mode=0555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/prstat mode=0555
 file path=usr/bin/$(ARCH32)/savecore mode=0555
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/amt mode=0555
@@ -550,10 +546,10 @@ hardlink path=usr/bin/$(ARCH64)/encrypt target=decrypt
 file path=usr/bin/$(ARCH64)/ls mode=0555
 hardlink path=usr/bin/$(ARCH64)/mac target=digest
 file path=usr/bin/$(ARCH64)/moe mode=0555
-file path=usr/bin/$(ARCH64)/newtask group=sys mode=4555
-file path=usr/bin/$(ARCH64)/nohup mode=0555
-file path=usr/bin/$(ARCH64)/prctl mode=0555
-file path=usr/bin/$(ARCH64)/prstat mode=0555
+link path=usr/bin/$(ARCH64)/newtask target=../../bin/newtask
+link path=usr/bin/$(ARCH64)/nohup target=../../bin/nohup
+link path=usr/bin/$(ARCH64)/prctl target=../../bin/prctl
+link path=usr/bin/$(ARCH64)/prstat target=../../bin/prstat
 file path=usr/bin/$(ARCH64)/savecore mode=0555
 $(i386_ONLY)file path=usr/bin/addbadsec mode=0555
 file path=usr/bin/amt mode=0555
@@ -679,9 +675,9 @@ file path=usr/bin/mt mode=0555
 hardlink path=usr/bin/mv target=../../usr/bin/cp
 file path=usr/bin/netstat mode=0555
 file path=usr/bin/newgrp group=sys mode=4755
-hardlink path=usr/bin/newtask target=../../usr/lib/isaexec
+file path=usr/bin/newtask group=sys mode=4555
 file path=usr/bin/nice mode=0555
-hardlink path=usr/bin/nohup target=../../usr/lib/isaexec
+file path=usr/bin/nohup mode=0555
 file path=usr/bin/optisa mode=0555
 hardlink path=usr/bin/page target=../../usr/bin/more
 file path=usr/bin/pagesize mode=0555
@@ -698,12 +694,12 @@ file path=usr/bin/pgrep mode=0555
 hardlink path=usr/bin/pkill target=../../usr/bin/pgrep
 file path=usr/bin/pktool mode=0555
 file path=usr/bin/pr mode=0555
-hardlink path=usr/bin/prctl target=../../usr/lib/isaexec
+file path=usr/bin/prctl mode=0555
 file path=usr/bin/printf mode=0555
 file path=usr/bin/priocntl mode=0555
 file path=usr/bin/profiles mode=0555
 file path=usr/bin/projects mode=0555
-hardlink path=usr/bin/prstat target=../../usr/lib/isaexec
+file path=usr/bin/prstat mode=0555
 file path=usr/bin/ps mode=0555
 file path=usr/bin/putdev mode=0555
 file path=usr/bin/putdgrp mode=0555

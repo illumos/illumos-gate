@@ -20,40 +20,31 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/ppgsz/Makefile
 #
 
 PROG=	ppgsz
+OBJS=	ppgsz.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+ROOTLINK = $(PROG:%=$(ROOTBIN64)/%)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CPPFLAGS	+= -D_SYSCALL32
+
+LDLIBS	+= -lproc
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all: $(PROG)
 
-clean clobber lint:	$(SUBDIRS)
+install: all $(ROOTPROG) $(ROOTLINK)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+clean:
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
 
 include ../Makefile.targ
