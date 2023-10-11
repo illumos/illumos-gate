@@ -49,7 +49,9 @@ $(POFILE):      clear_locks.c
 	$(RM) messages.po $(POFILE).i
 
 
-CFLAGS		+=	$(CCVERBOSE)
+CSTD= $(CSTD_GNU99)
+
+CFLAGS += $(CCVERBOSE)
 
 # not linted
 SMATCH=off
@@ -61,7 +63,5 @@ all: $(PROG)
 install: all $(ROOTUSRSBINPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../../../Makefile.targ

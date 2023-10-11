@@ -38,7 +38,5 @@ CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 
 SMOFF += all_func_returns
 
-lint:		lint_PROG
-
 $(ROOTUSRSBIN)/$(LIBPROG):
 	$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

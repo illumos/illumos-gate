@@ -97,9 +97,6 @@ $(PROG): $(OBJS)
 clean:
 	-$(RM) $(OBJS)
 
-# lots of lint due to mixing kernel+user stuff.  give up.
-lint:	# lint_SRCS
-
 include ../../../Makefile.targ
 
 install: all $(ROOTSMBDFILE)

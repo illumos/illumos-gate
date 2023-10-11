@@ -34,7 +34,6 @@ SRCS=	$(TYPEPROG).c
 POFILE=	$(TYPEPROG).po
 
 CFLAGS += $(CCVERBOSE)
-CSTD= $(CSTD_GNU99)
 
 CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
@@ -48,8 +47,6 @@ ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 all:	$(TYPEPROG)
 
 catalog:	$(POFILE)
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(OBJS) $(POFILE)

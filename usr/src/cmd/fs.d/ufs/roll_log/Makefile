@@ -45,7 +45,5 @@ $(MACH):
 $(MACH)/%.o:	%.c
 	$(COMPILE.c) -o $@ $<
 
-lint:	lint_SRCS
-
 clean:
 	$(RM) $(OBJS)

@@ -843,8 +843,14 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 	    != PARSE_OK)
 		return (rc);
 
-	if (dirname[0] != '\0')
-		sprintf(traversed_path, "%s/%s", traversed_path, dirname);
+	if (dirname[0] != '\0') {
+		if (strlcat(traversed_path, "/", sizeof (traversed_path)) >=
+		    sizeof (traversed_path))
+			return (PARSE_ERROR);
+		if (strlcat(traversed_path, dirname, sizeof (traversed_path)) >=
+		    sizeof (traversed_path))
+			return (PARSE_ERROR);
+	}
 
 	prevnode = rootnode;
 	currnode = rootnode->subdir;
@@ -858,10 +864,16 @@ set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
 			if ((rc = get_dir_from_path(dirname, &subdir_child,
 			    sizeof (dirname))) != PARSE_OK)
 				return (rc);
-			if (dirname[0] != '\0')
-				sprintf(traversed_path, "%s/%s",
-				    traversed_path, dirname);
-
+			if (dirname[0] != '\0') {
+				if (strlcat(traversed_path, "/",
+				    sizeof (traversed_path)) >=
+				    sizeof (traversed_path))
+					return (PARSE_ERROR);
+				if (strlcat(traversed_path, dirname,
+				    sizeof (traversed_path)) >=
+				    sizeof (traversed_path))
+					return (PARSE_ERROR);
+			}
 		} else {
 			/* try next leveldir */
 			prevnode = currnode;

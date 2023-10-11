@@ -36,7 +36,3 @@ CERRWARN += -_gcc=-Wno-unused-variable
 
 # not linted
 SMATCH=off
-
-lint := PROG = $(LIBPROG)
-
-lint:	lint_PROG

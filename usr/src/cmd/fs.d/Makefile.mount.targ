@@ -39,7 +39,5 @@ $(LIBPROG):	$(OBJS)
 clean:
 	$(RM) $(CLEANFILES)
 
-lint:		lint_SRCS
-
 catalog:	$(POFILE)
 		cp $(POFILE) $(FSTYPE).po

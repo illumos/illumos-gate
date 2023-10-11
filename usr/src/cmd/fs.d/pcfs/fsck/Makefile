@@ -54,20 +54,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	$(CNOWARN_UNINIT)
 
-#
-# We need to tell lint not to complain about the routines
-# we are grabbing from the kernel as being undefined.
-#
-LINTFLAGS += -u
-
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
-
-lint_LSRCS:
-	$(LINT.c) $(LSRCS) $(LDLIBS)
-
-lint:	lint_LSRCS
 
 clean:
 	$(RM) $(FSCKOBJS) $(DEBUGOBJS)

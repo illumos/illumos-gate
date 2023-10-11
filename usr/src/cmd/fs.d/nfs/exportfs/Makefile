@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 1.11 */
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 # cmd/fs.d/nfs/exportfs/Makefile

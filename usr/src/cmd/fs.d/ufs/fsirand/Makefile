@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -36,10 +33,6 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 include		../../Makefile.fstype
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
-
-lint		:=	PROG= $(LIBPROG)
-
-lint:		lint_PROG
 
 $(ROOTUSRSBIN)/$(LIBPROG):
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

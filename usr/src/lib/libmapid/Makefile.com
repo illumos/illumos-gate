@@ -49,6 +49,8 @@ LIBSRCS	= $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 
 LDLIBS	+=	-lresolv -lc -lscf
 
+CSTD	=	$(CSTD_GNU99)
+
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I$(SMF_DIR) -D_REENTRANT
 

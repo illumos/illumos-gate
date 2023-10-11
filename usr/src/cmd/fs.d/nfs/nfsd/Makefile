@@ -63,5 +63,3 @@ smfcfg.o:	../lib/smfcfg.c
 
 clean:
 		$(RM) $(OBJS)
-
-lint:		$(SRCS) lint_SRCS

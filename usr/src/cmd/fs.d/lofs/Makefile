@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"	/* 	*/
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 # cmd/fs.d/lofs/Makefile
@@ -36,13 +33,12 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

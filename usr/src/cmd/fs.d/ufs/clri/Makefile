@@ -50,8 +50,5 @@ $(LIBPROG):	$(OBJS)
 clean:
 		$(RM) $(LIBPROG).o
 
-lint :=		PROG=$(LIBPROG)
-lint:		lint_PROG
-
 $(ROOTLIBFSTYPE)/$(DCOPY):	$(ROOTLIBFSTYPE)/$(LIBPROG)
 		-$(RM) $@; $(LN) $(ROOTLIBFSTYPE)/$(LIBPROG) $@

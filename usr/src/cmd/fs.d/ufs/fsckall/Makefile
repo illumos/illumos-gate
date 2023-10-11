@@ -23,7 +23,6 @@
 # Copyright (c) 2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 FSTYPE=		ufs
 LIBPROG=	fsckall

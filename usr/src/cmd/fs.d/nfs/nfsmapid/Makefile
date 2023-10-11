@@ -79,5 +79,3 @@ $(POFILE):	$(SRCS)
 
 clean:
 		$(RM) $(OBJS) $(TESTPROG) $(TESTOBJS) $(DOBJ) $(POFILE)
-
-lint:		$(SRCS) lint_SRCS

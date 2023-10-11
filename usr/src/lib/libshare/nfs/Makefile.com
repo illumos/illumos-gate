@@ -43,6 +43,8 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lshare -lnsl -lscf -lumem -lc -lxml2
 NATIVE_LIBS +=	libxml2.so
 
+CSTD =		$(CSTD_GNU99)
+
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) \

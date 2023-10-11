@@ -36,6 +36,4 @@ CLOBBERFILES+=	$(LIBPROG) $(POFILE)
 
 catalog:	$(POFILE)
 
-lint:
-
 .KEEP_STATE:

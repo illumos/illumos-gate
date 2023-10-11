@@ -35,7 +35,3 @@ CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 
 # not linted
 SMATCH=off
-
-lint :=		PROG=$(LIBPROG)
-
-lint:		lint_PROG
