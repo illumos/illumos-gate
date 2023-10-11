@@ -21,14 +21,24 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Co.
  */
 
 #ifndef	_SYS_HOTPLUG_PCI_PCIEHPC_H
 #define	_SYS_HOTPLUG_PCI_PCIEHPC_H
 
+#ifdef _KERNEL
+#include <sys/ddi_hp.h>
+#include <sys/pcie_impl.h>
+#include <sys/stdbool.h>
+#include <sys/hotplug/pci/pcie_hp.h>
+#endif /* _KERNEL */
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#ifdef	_KERNEL
 
 /*
  * Interfaces exported by PCI-E nexus Hot Plug Controller extension module
@@ -47,9 +57,13 @@ void pciehpc_reg_put8(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint8_t val);
 void pciehpc_reg_put16(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint16_t val);
 void pciehpc_reg_put32(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint32_t val);
 void pciehpc_led_init(pcie_hp_slot_t *slot_p);
+extern bool pciehpc_slot_kstat_init(pcie_hp_slot_t *);
+extern void pciehpc_slot_kstat_fini(pcie_hp_slot_t *);
 #if	defined(__i386) || defined(__amd64)
 extern void pciehpc_update_ops(pcie_hp_ctrl_t *ctrl_p);
 #endif	/* defined(__i386) || defined(__amd64) */
+
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 }

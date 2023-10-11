@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Co.
  */
 
 /*
@@ -45,6 +46,7 @@
 #include <sys/pci_impl.h>
 #include <sys/pcie_acpi.h>
 #include <sys/hotplug/pci/pcie_hp.h>
+#include <sys/hotplug/pci/pciehpc.h>
 #include <sys/hotplug/pci/pciehpc_acpi.h>
 
 /* local static functions */
@@ -274,9 +276,16 @@ pciehpc_acpi_slotinfo_init(pcie_hp_ctrl_t *ctrl_p)
 
 	mutex_exit(&ctrl_p->hc_mutex);
 
-	/* setup Notify() handler for hot plug events from ACPI BIOS */
-	if (pciehpc_acpi_install_event_handler(ctrl_p) != AE_OK)
+	if (!pciehpc_slot_kstat_init(slot_p)) {
+		(void) pciehpc_acpi_slotinfo_uninit(ctrl_p);
 		return (DDI_FAILURE);
+	}
+
+	/* setup Notify() handler for hot plug events from ACPI BIOS */
+	if (pciehpc_acpi_install_event_handler(ctrl_p) != AE_OK) {
+		(void) pciehpc_acpi_slotinfo_uninit(ctrl_p);
+		return (DDI_FAILURE);
+	}
 
 	PCIE_DBG("ACPI hot plug is enabled for slot #%d\n",
 	    slot_p->hs_phy_slot_num);
@@ -298,6 +307,8 @@ pciehpc_acpi_slotinfo_uninit(pcie_hp_ctrl_t *ctrl_p)
 	if (slot_p->hs_info.cn_name)
 		kmem_free(slot_p->hs_info.cn_name,
 		    strlen(slot_p->hs_info.cn_name) + 1);
+
+	pciehpc_slot_kstat_fini(slot_p);
 
 	return (DDI_SUCCESS);
 }

@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_HP_H
@@ -259,6 +259,8 @@ typedef struct pciehpc_led_plat_state {
 	pcie_hp_led_act_t plps_acts[PCIEHPC_LED_NLEDS];
 } pciehpc_led_plat_state_t;
 
+struct pciehpc_stat_data;
+
 /*
  * PCI and PCI Express Hotplug slot structure
  */
@@ -317,6 +319,10 @@ struct pcie_hp_slot {
 	kthread_t	*hs_attn_btn_threadp;	/* ATTN button event thread */
 	boolean_t	hs_attn_btn_thread_exit;
 	kcondvar_t	hs_dll_active_cv;	/* DLL State Changed intr */
+
+	/* Event counters and timestamps */
+	kstat_t		*hs_kstat;
+	struct pciehpc_stat_data *hs_stat_data;
 
 	pcie_hp_ctrl_t	*hs_ctrl;		/* Hotplug ctrl for this slot */
 };

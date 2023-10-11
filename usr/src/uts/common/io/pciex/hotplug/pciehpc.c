@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -371,6 +371,8 @@
 #include <sys/sysmacros.h>
 #include <sys/sysevent/dr.h>
 #include <sys/pci_impl.h>
+#include <sys/kstat.h>
+#include <sys/zone.h>
 #include <sys/hotplug/pci/pcie_hp.h>
 #include <sys/hotplug/pci/pciehpc.h>
 
@@ -485,6 +487,34 @@ static void pciehpc_power_fault_handler(void *arg);
 #ifdef	DEBUG
 static void pciehpc_dump_hpregs(pcie_hp_ctrl_t *ctrl_p);
 #endif	/* DEBUG */
+
+typedef struct pciehpc_stat_data {
+	kstat_named_t psd_attnsw_count;
+	kstat_named_t psd_attnsw_ts;
+	kstat_named_t psd_pwrflt_count;
+	kstat_named_t psd_pwrflt_ts;
+	kstat_named_t psd_mrl_chg_count;
+	kstat_named_t psd_mrl_chg_ts;
+	kstat_named_t psd_pres_chg_count;
+	kstat_named_t psd_pres_chg_ts;
+	kstat_named_t psd_cmd_cpl_count;
+	kstat_named_t psd_cmd_cpl_ts;
+	kstat_named_t psd_dll_chg_count;
+	kstat_named_t psd_dll_chg_ts;
+	kstat_named_t psd_intr_count;
+	kstat_named_t psd_intr_ts;
+} pciehpc_stat_data_t;
+
+static inline void
+pciehpc_kstat_event(kstat_named_t *countp, kstat_named_t *tsp, hrtime_t now)
+{
+	atomic_inc_64(&countp->value.ui64);
+	tsp->value.ui64 = now;
+}
+
+#define	KSTAT_EVENT(_slotp, _evname, _now)	\
+    pciehpc_kstat_event((&(_slotp)->hs_stat_data->psd_ ## _evname ## _count), \
+	(&(_slotp)->hs_stat_data->psd_ ## _evname ## _ts), (_now))
 
 /*
  * Global functions (called by other drivers/modules)
@@ -681,10 +711,13 @@ pciehpc_intr(dev_info_t *dip)
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
 	uint16_t	status, control;
 	boolean_t	clear_pend = B_FALSE;
+	hrtime_t	now;
 
 	/* get the soft state structure for this dip */
 	if ((ctrl_p = PCIE_GET_HP_CTRL(dip)) == NULL)
 		return (DDI_INTR_UNCLAIMED);
+
+	now = gethrtime();
 
 	mutex_enter(&ctrl_p->hc_mutex);
 
@@ -713,12 +746,16 @@ pciehpc_intr(dev_info_t *dip)
 		return (DDI_INTR_UNCLAIMED);
 	}
 
+	/* We are now committed to claiming the interrupt; record it. */
+	KSTAT_EVENT(slot_p, intr, now);
+
 	/* clear the interrupt status bits */
 	pciehpc_reg_put16(ctrl_p,
 	    bus_p->bus_pcie_off + PCIE_SLOTSTS, status);
 
 	/* check for CMD COMPLETE interrupt */
 	if (status & PCIE_SLOTSTS_COMMAND_COMPLETED) {
+		KSTAT_EVENT(slot_p, cmd_cpl, now);
 		PCIE_DBG("pciehpc_intr(): CMD COMPLETED interrupt received\n");
 		/* wake up any one waiting for Command Completion event */
 		cv_signal(&ctrl_p->hc_cmd_comp_cv);
@@ -726,6 +763,7 @@ pciehpc_intr(dev_info_t *dip)
 
 	/* check for ATTN button interrupt */
 	if (status & PCIE_SLOTSTS_ATTN_BTN_PRESSED) {
+		KSTAT_EVENT(slot_p, attnsw, now);
 		PCIE_DBG("pciehpc_intr(): ATTN BUTTON interrupt received\n");
 
 		/* if ATTN button event is still pending then cancel it */
@@ -740,7 +778,7 @@ pciehpc_intr(dev_info_t *dip)
 
 	/* check for power fault interrupt */
 	if (status & PCIE_SLOTSTS_PWR_FAULT_DETECTED) {
-
+		KSTAT_EVENT(slot_p, pwrflt, now);
 		PCIE_DBG("pciehpc_intr(): POWER FAULT interrupt received"
 		    " on slot %d\n", slot_p->hs_phy_slot_num);
 		control =  pciehpc_reg_get16(ctrl_p,
@@ -760,6 +798,7 @@ pciehpc_intr(dev_info_t *dip)
 
 	/* check for MRL SENSOR CHANGED interrupt */
 	if (status & PCIE_SLOTSTS_MRL_SENSOR_CHANGED) {
+		KSTAT_EVENT(slot_p, mrl_chg, now);
 		/* For now (phase-I), no action is taken on this event */
 		PCIE_DBG("pciehpc_intr(): MRL SENSOR CHANGED interrupt received"
 		    " on slot %d\n", slot_p->hs_phy_slot_num);
@@ -767,7 +806,7 @@ pciehpc_intr(dev_info_t *dip)
 
 	/* check for PRESENCE CHANGED interrupt */
 	if (status & PCIE_SLOTSTS_PRESENCE_CHANGED) {
-
+		KSTAT_EVENT(slot_p, pres_chg, now);
 		PCIE_DBG("pciehpc_intr(): PRESENCE CHANGED interrupt received"
 		    " on slot %d\n", slot_p->hs_phy_slot_num);
 
@@ -840,6 +879,7 @@ pciehpc_intr(dev_info_t *dip)
 	/* check for DLL state changed interrupt */
 	if (ctrl_p->hc_dll_active_rep &&
 	    (status & PCIE_SLOTSTS_DLL_STATE_CHANGED)) {
+		KSTAT_EVENT(slot_p, dll_chg, now);
 		PCIE_DBG("pciehpc_intr(): DLL STATE CHANGED interrupt received"
 		    " on slot %d\n", slot_p->hs_phy_slot_num);
 
@@ -1342,6 +1382,99 @@ pciehpc_led_init(pcie_hp_slot_t *slot_p)
 	slot_p->hs_led_plat_en[PCIE_LL_BASE] = true;
 }
 
+bool
+pciehpc_slot_kstat_init(pcie_hp_slot_t *slot_p)
+{
+	/*
+	 * Many if not most PCs have firmware bugs that cause multiple slots to
+	 * end up with the same physical slot number in the slot cap register.
+	 * This is a clear and direct violation of PCIe4 7.5.3.9, but that
+	 * doesn't seem to matter to the people who write firmware.  This is
+	 * going to end up confusing the hotplug subsystem and the time to deal
+	 * with it is probably before we arrive here, but in order to avoid
+	 * additional warning messages during boot on such machines, we will use
+	 * the hotplug-capable bridge's instance number when creating event
+	 * counter kstats instead of hs_phy_slot_num (or hs_info.cn_num, which
+	 * is usually the same).  In the unlikely event that the broken firmware
+	 * has given us unique names (even if not slot numbers) for a slot,
+	 * we'll still have a unique name for each kstat, just as we will for
+	 * each AP.  Otherwise the kstat names will at least match the still
+	 * possibly duplicated AP names.
+	 */
+	int inst = ddi_get_instance(slot_p->hs_ctrl->hc_dip);
+
+	/*
+	 * Although the interrupts we are counting are generated by the hotplug
+	 * controller, they are conceptually associated with the slot so we
+	 * store them with it.  The PCIe hotplug controller as currently defined
+	 * supports only a single slot (0), but in principle a future controller
+	 * might support multiple slots and we would have some way of
+	 * determining the set of events that have been detected for each slot
+	 * even the state changes for all slots share a single interrupt.
+	 *
+	 * The statistics are persistent because we want to keep counting them
+	 * over the entire lifetime of this kernel; if the slot's occupant is
+	 * removed and that leads to pciehpc_uninit() being called, we don't
+	 * want to lose the previous statistics.  Indeed, observing what led up
+	 * to such an event is a key purpose of this infrastructure.
+	 */
+	slot_p->hs_kstat = kstat_create_zone("pcie", inst,
+	    slot_p->hs_info.cn_name, "controller", KSTAT_TYPE_NAMED,
+	    sizeof (pciehpc_stat_data_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT, GLOBAL_ZONEID);
+
+	if (slot_p->hs_kstat == NULL) {
+		PCIE_DBG("pciehpc_slot_kstat_init: %d:%s kstat_create failed",
+		    inst, slot_p->hs_info.cn_name);
+		return (false);
+	}
+
+	slot_p->hs_stat_data = (pciehpc_stat_data_t *)slot_p->hs_kstat->ks_data;
+
+	/*
+	 * We would like to report only the set of kstats that correspond to the
+	 * events for which the controller advertises support.  However, it is
+	 * possible for a buggy controller to set status bits that correspond to
+	 * bits that aren't set in the capabilities register.  If this were to
+	 * occur, we'll still increment the counters and the kstat framework
+	 * doesn't really guarantee that we're allowed to do so.  Therefore we
+	 * will initialise all the counters, even those that should not or
+	 * cannot have meaningful values for this slot.
+	 */
+	kstat_named_init(&slot_p->hs_stat_data->psd_attnsw_count,
+	    "attention_switch_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_attnsw_ts,
+	    "attention_switch_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_pwrflt_count,
+	    "power_fault_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_pwrflt_ts,
+	    "power_fault_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_mrl_chg_count,
+	    "mrl_change_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_mrl_chg_ts,
+	    "mrl_change_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_pres_chg_count,
+	    "presence_change_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_pres_chg_ts,
+	    "presence_change_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_cmd_cpl_count,
+	    "command_completion_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_cmd_cpl_ts,
+	    "command_completion_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_dll_chg_count,
+	    "dll_active_change_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_dll_chg_ts,
+	    "dll_active_change_ts", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_intr_count,
+	    "interrupt_count", KSTAT_DATA_UINT64);
+	kstat_named_init(&slot_p->hs_stat_data->psd_intr_ts,
+	    "interrupt_ts", KSTAT_DATA_UINT64);
+
+	kstat_install(slot_p->hs_kstat);
+
+	return (true);
+}
+
 /*
  * Setup slot information for use with DDI HP framework. Per the theory
  * statement, this is where we need to go through and look at whether or not we
@@ -1365,6 +1498,12 @@ pciehpc_slotinfo_init(pcie_hp_ctrl_t *ctrl_p)
 	have_child = ddi_get_child(ctrl_p->hc_dip) != NULL;
 	ndi_devi_exit(ctrl_p->hc_dip);
 
+	/*
+	 * There's no expectation for two threads to be here at the same time:
+	 * we arrive here through the attach path and the DDI guarantees
+	 * exclusion.  We take the mutex because some of the functions we call
+	 * assert that we have it.
+	 */
 	mutex_enter(&ctrl_p->hc_mutex);
 	/*
 	 * setup DDI HP framework slot information structure
@@ -1457,7 +1596,22 @@ pciehpc_slotinfo_init(pcie_hp_ctrl_t *ctrl_p)
 		slot_p->hs_condition = AP_COND_OK;
 	mutex_exit(&ctrl_p->hc_mutex);
 
+	if (!pciehpc_slot_kstat_init(slot_p)) {
+		(void) pciehpc_slotinfo_uninit(ctrl_p);
+		return (DDI_FAILURE);
+	}
+
 	return (DDI_SUCCESS);
+}
+
+void
+pciehpc_slot_kstat_fini(pcie_hp_slot_t *slot_p)
+{
+	if (slot_p->hs_kstat != NULL) {
+		kstat_delete(slot_p->hs_kstat);
+		slot_p->hs_kstat = NULL;
+		slot_p->hs_stat_data = NULL;
+	}
 }
 
 static int
@@ -1483,6 +1637,8 @@ pciehpc_slotinfo_uninit(pcie_hp_ctrl_t *ctrl_p)
 	if (slot_p->hs_info.cn_name)
 		kmem_free(slot_p->hs_info.cn_name,
 		    strlen(slot_p->hs_info.cn_name) + 1);
+
+	pciehpc_slot_kstat_fini(slot_p);
 
 	return (DDI_SUCCESS);
 }
