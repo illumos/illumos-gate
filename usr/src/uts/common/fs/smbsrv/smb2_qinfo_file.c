@@ -213,6 +213,7 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
  *	FileStandardInformation
  *	FileInternalInformation
  *	FileEaInformation
+ *	FileAccessInformation
  *	FilePositionInformation
  *	FileModeInformation
  *	FileAlignmentInformation
@@ -237,6 +238,9 @@ smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
 	status = smb2_qif_ea_size(sr, qi);
 	if (status)
 		return (status);
+	status = smb2_qif_access(sr, qi);
+	if (status)
+		return (status);
 	status = smb2_qif_position(sr, qi);
 	if (status)
 		return (status);
@@ -253,7 +257,7 @@ smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
 		status = smb2_qif_name(sr, qi);
 	} else {
 		/* Win2016 and later just put zeros. */
-		int rc = smb_mbc_encodef(&sr->raw_data, "10.");
+		int rc = smb_mbc_encodef(&sr->raw_data, "6.");
 		status = (rc == 0) ? 0 : NT_STATUS_BUFFER_OVERFLOW;
 	}
 
@@ -399,6 +403,7 @@ smb2_qif_access(smb_request_t *sr, smb_queryinfo_t *qi)
  * See also:
  *	SMB_QUERY_FILE_NAME_INFO
  *	SMB_FILE_NAME_INFORMATION
+ * MS-FSCC 2.1.7 FILE_NAME_INFORMATION
  */
 static uint32_t
 smb2_qif_name(smb_request_t *sr, smb_queryinfo_t *qi)
@@ -416,8 +421,7 @@ smb2_qif_name(smb_request_t *sr, smb_queryinfo_t *qi)
 	}
 
 	rc = smb_mbc_encodef(
-	    &sr->raw_data, "llU",
-	    0, /* FileIndex	 (l) */
+	    &sr->raw_data, "lU",
 	    nlen,	/* l */
 	    name);	/* U */
 	if (rc != 0)
