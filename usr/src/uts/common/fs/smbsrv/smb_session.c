@@ -421,15 +421,23 @@ smb_request_cancel(smb_request_t *sr)
 		/*
 		 * These are states that have a cancel_method.
 		 * Make the state change now, to ensure that
-		 * we call cancel_method exactly once.  Do the
-		 * method call below, after we drop sr_mutex.
+		 * we call cancel_method exactly once.
+		 *
+		 * Do the method call with sr_mutex not held.
 		 * When the cancelled request thread resumes,
-		 * it should re-take sr_mutex and set sr_state
-		 * to CANCELLED, then return STATUS_CANCELLED.
+		 * it should re-take sr_mutex and wait for
+		 * sr_state != CANCEL_PENDING, ensuring that
+		 * the cancel method has completed.
 		 */
 		sr->sr_state = SMB_REQ_STATE_CANCEL_PENDING;
 		cancel_method = sr->cancel_method;
 		VERIFY(cancel_method != NULL);
+		mutex_exit(&sr->sr_mutex);
+		cancel_method(sr);
+		mutex_enter(&sr->sr_mutex);
+		if (sr->sr_state == SMB_REQ_STATE_CANCEL_PENDING)
+			sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		cv_broadcast(&sr->sr_st_cv);
 		break;
 
 	case SMB_REQ_STATE_WAITING_FCN2:
@@ -447,10 +455,6 @@ smb_request_cancel(smb_request_t *sr)
 		SMB_PANIC();
 	}
 	mutex_exit(&sr->sr_mutex);
-
-	if (cancel_method != NULL) {
-		cancel_method(sr);
-	}
 }
 
 /*
@@ -1337,6 +1341,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	bzero(sr, sizeof (smb_request_t));
 
 	mutex_init(&sr->sr_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sr->sr_st_cv, NULL, CV_DEFAULT, NULL);
 	smb_srm_init(sr);
 	sr->session = session;
 	sr->sr_server = session->s_server;
@@ -1368,6 +1373,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 		/* Disallow new requests in these states. */
 		sr->session = NULL;
 		sr->sr_magic = 0;
+		cv_destroy(&sr->sr_st_cv);
 		mutex_destroy(&sr->sr_mutex);
 		kmem_cache_free(smb_cache_request, sr);
 		sr = NULL;

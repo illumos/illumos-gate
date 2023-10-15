@@ -748,24 +748,29 @@ smb_oplock_wait_ack(smb_request_t *sr, uint32_t NewLevel)
 	mutex_exit(&ol->ol_mutex);
 
 	/*
-	 * Clear cancellation callback and see if it fired.
+	 * See if it completed or if it was cancelled.
 	 */
 	mutex_enter(&sr->sr_mutex);
-	sr->cancel_method = NULL;
-	sr->cancel_arg2 = NULL;
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_OLBRK:
+		/* Normal wakeup.  Keep status from above. */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
 		/* status from above */
 		break;
 	case SMB_REQ_STATE_CANCEL_PENDING:
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
+	case SMB_REQ_STATE_CANCELLED:
 		status = NT_STATUS_CANCELLED;
 		break;
 	default:
 		status = NT_STATUS_INTERNAL_ERROR;
 		break;
 	}
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 	mutex_exit(&sr->sr_mutex);
 
 	return (status);
@@ -819,6 +824,9 @@ smb_oplock_wait_break(smb_request_t *sr, smb_node_t *node, int timeout)
 		timeout = smb_oplock_timeout_def;
 	time = MSEC_TO_TICK(timeout) + ddi_get_lbolt();
 
+	/*
+	 * Setup cancellation callback
+	 */
 	mutex_enter(&sr->sr_mutex);
 	if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
 		mutex_exit(&sr->sr_mutex);
@@ -855,25 +863,31 @@ smb_oplock_wait_break(smb_request_t *sr, smb_node_t *node, int timeout)
 			break;
 		}
 	}
-
 	mutex_exit(&ol->ol_mutex);
 
+	/*
+	 * Check whether it completed or was cancelled.
+	 */
 	mutex_enter(&sr->sr_mutex);
-	sr->cancel_method = NULL;
-	sr->cancel_arg2 = NULL;
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_OLBRK:
+		/* Normal wakeup.  Keep status from above. */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
-		/* status from above */
 		break;
 	case SMB_REQ_STATE_CANCEL_PENDING:
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
+	case SMB_REQ_STATE_CANCELLED:
 		status = NT_STATUS_CANCELLED;
 		break;
 	default:
 		status = NT_STATUS_INTERNAL_ERROR;
 		break;
 	}
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 	mutex_exit(&sr->sr_mutex);
 
 	return (status);
