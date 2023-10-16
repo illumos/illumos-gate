@@ -23,11 +23,13 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
  * Dispatch function for SMB2_QUERY_DIRECTORY
+ * MS-SMB2 sec. 3.3.5.18
+ * and MS-FSA sec. 2.1.15
  *
  * Similar to smb_trans2_find.c (from SMB1)
  */
@@ -262,17 +264,7 @@ smb2_query_dir(smb_request_t *sr)
 errout:
 	sr->smb2_status = status;
 	DTRACE_SMB2_DONE(op__QueryDirectory, smb_request_t *, sr);
-
-	/*
-	 * Note: NT_STATUS_NO_MORE_FILES is a warning
-	 * used to tell the client that this data return
-	 * is the last of the enumeration.  Returning this
-	 * warning now (with the data) saves the client a
-	 * round trip that would otherwise be needed to
-	 * find out it's at the end.
-	 */
-	if (status != 0 &&
-	    status != NT_STATUS_NO_MORE_FILES) {
+	if (status != 0) {
 		smb2sr_put_error(sr, status);
 		return (SDRC_SUCCESS);
 	}
@@ -283,15 +275,13 @@ errout:
 	StructSize = 9;
 	DataOff = SMB2_HDR_SIZE + 8;
 	DataLen = MBC_LENGTH(&sr->raw_data);
+	ASSERT(DataLen != 0);
 	rc = smb_mbc_encodef(
 	    &sr->reply, "wwlC",
 	    StructSize,		/* w */
 	    DataOff,		/* w */
 	    DataLen,		/* l */
 	    &sr->raw_data);	/* C */
-	if (DataLen == 0)
-		(void) smb_mbc_encodef(&sr->reply, ".");
-
 	if (rc)
 		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 
