@@ -28,10 +28,10 @@ driver has no configurable options.
 .Sh ARCHITECTURE
 .Sy x86
 .Sh SEE ALSO
-.Xr prtconf 1M ,
-.Xr driver.conf 4 ,
-.Xr pci 4 ,
-.Xr attributes 5 ,
+.Xr driver.conf 5 ,
+.Xr pci 5 ,
+.Xr attributes 7 ,
+.Xr prtconf 8 ,
 .Xr scsi_abort 9F ,
 .Xr scsi_hba_attach_setup 9F ,
 .Xr scsi_ifgetcap 9F ,
