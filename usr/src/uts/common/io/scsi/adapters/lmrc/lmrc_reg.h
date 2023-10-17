@@ -67,9 +67,6 @@ typedef struct lmrc_ctrl_info		lmrc_ctrl_info_t;
  */
 #define	LMRC_SENSE_LEN		96
 
-#define	MFI_FUSION_ENABLE_INTERRUPT_MASK	0x00000009
-
-
 #define	LMRC_MPI2_RAID_DEFAULT_IO_FRAME_SIZE	256
 
 #define	LMRC_SPECIFIC_MPI2_FUNCTION(x)		\
@@ -284,41 +281,6 @@ typedef struct lmrc_ctrl_info		lmrc_ctrl_info_t;
 #define	LMRC_MAX_LUN			8
 #define	LMRC_DEFAULT_CMD_PER_LUN	256
 
-/*
- * Register offsets
- */
-#define	LMRC_DOORBELL			0x0000
-#define	LMRC_WRITE_SEQUENCE		0x0004
-#define	LMRC_HOST_DIAG			0x0008
-
-#define	LMRC_IB_MSG0			0x0010
-#define	LMRC_IB_MSG1			0x0014
-#define	LMRC_OB_MSG0			0x0018
-#define	LMRC_OB_MSG1			0x001C
-
-#define	LMRC_IB_DOORBELL		0x0020
-#define	LMRC_IB_INTR_STATUS		0x0024
-#define	LMRC_IB_INTR_MASK		0x0028
-
-#define	LMRC_OB_DOORBELL		0x002C
-#define	LMRC_OB_INTR_STATUS		0x0030
-#define	LMRC_OB_INTR_MASK		0x0034
-
-#define	LMRC_IB_QUEUE_PORT		0x0040
-#define	LMRC_OB_QUEUE_PORT		0x0044
-
-#define	LMRC_REPLY_POST_HOST_INDEX	0x006C
-
-#define	LMRC_OB_DOORBELL_CLR		0x00A0
-
-#define	LMRC_OB_SCRATCH_PAD(x)		(0x00B0 + (x) * 4)
-
-#define	LMRC_IB_LO_QUEUE_PORT		0x00C0
-#define	LMRC_IB_HI_QUEUE_PORT		0x00C4
-#define	LMRC_IB_SINGLE_QUEUE_PORT	0x00C8
-
-#define	LMRC_SUP_REPLY_POST_HOST_INDEX	0x030C
-
 #define	LMRC_MAX_REPLY_POST_HOST_INDEX	16
 
 
@@ -326,8 +288,6 @@ typedef struct lmrc_ctrl_info		lmrc_ctrl_info_t;
 #define	LMRC_MFI_MIN_MEM	4096
 #define	LMRC_MFI_DEF_MEM	8192
 #define	LMRC_MFI_MAX_CMD	16
-
-#define	LMRC_MAX_SGE_CNT	0x50
 
 
 #pragma pack(1)

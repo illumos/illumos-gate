@@ -102,45 +102,55 @@ lmrc_write_reg64(lmrc_t *lmrc, uint32_t reg, uint64_t val)
 /*
  * Interrupt control
  *
- * The hardware supports 4 interrupt registers:
- * - inbound interrupt status
- * - inbound interrupt mask
- * - outbound interrupt status
- * - outbound interrupt mask
- *
- * The following code uses only the outbound interrupt registers, the function
- * and use of inbound interrupt register is unknown.
+ * There are two interrupt registers for host driver use, HostInterruptStatus
+ * and HostInterruptMask. Most of the bits in each register are reserved and
+ * must masked and/or preserved when used.
  */
 void
 lmrc_disable_intr(lmrc_t *lmrc)
 {
-	uint32_t mask = 0xFFFFFFFF;
+	uint32_t mask = lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET);
 
-	lmrc_write_reg(lmrc, LMRC_OB_INTR_MASK, mask);
-	/* Dummy read to force pci flush */
-	(void) lmrc_read_reg(lmrc, LMRC_OB_INTR_MASK);
+	/* Disable all known interrupt: reset, reply, and doorbell. */
+	mask |= MPI2_HIM_RESET_IRQ_MASK;
+	mask |= MPI2_HIM_REPLY_INT_MASK;
+	mask |= MPI2_HIM_IOC2SYS_DB_MASK;
+
+	lmrc_write_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET, mask);
+
+	/* Dummy read to force pci flush. Probably bogus but harmless. */
+	(void) lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET);
 }
 
 void
 lmrc_enable_intr(lmrc_t *lmrc)
 {
-	uint32_t mask = MFI_FUSION_ENABLE_INTERRUPT_MASK;
+	uint32_t mask = lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET);
 
-	lmrc_write_reg(lmrc, LMRC_OB_INTR_STATUS, ~0);
-	(void) lmrc_read_reg(lmrc, LMRC_OB_INTR_STATUS);
+	/* Enable the reply interrupts and the doorbell interrupts. */
+	mask &= ~MPI2_HIM_REPLY_INT_MASK;
+	mask &= ~MPI2_HIM_IOC2SYS_DB_MASK;
 
-	lmrc_write_reg(lmrc, LMRC_OB_INTR_MASK, ~mask);
-	(void) lmrc_read_reg(lmrc, LMRC_OB_INTR_MASK);
+	/* Clear outstanding interrupts before enabling any. */
+	lmrc_write_reg(lmrc, MPI2_HOST_INTERRUPT_STATUS_OFFSET, 0);
+	/* Dummy read to force pci flush. Probably bogus but harmless. */
+	(void) lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_STATUS_OFFSET);
+
+	lmrc_write_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET, mask);
+	/* Dummy read to force pci flush. Probably bogus but harmless. */
+	(void) lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_MASK_OFFSET);
 }
 
 uint_t
 lmrc_intr_ack(lmrc_t *lmrc)
 {
+	uint32_t mask =
+	    MPI2_HIS_REPLY_DESCRIPTOR_INTERRUPT | MPI2_HIS_IOC2SYS_DB_STATUS;
 	uint32_t status;
 
-	status = lmrc_read_reg(lmrc, LMRC_OB_INTR_STATUS);
+	status = lmrc_read_reg(lmrc, MPI2_HOST_INTERRUPT_STATUS_OFFSET);
 
-	if ((status & MFI_FUSION_ENABLE_INTERRUPT_MASK) == 0)
+	if ((status & mask) == 0)
 		return (DDI_INTR_UNCLAIMED);
 
 	if (lmrc_check_acc_handle(lmrc->l_reghandle) != DDI_SUCCESS) {
@@ -174,7 +184,8 @@ void
 lmrc_send_atomic_request(lmrc_t *lmrc, lmrc_atomic_req_desc_t req_desc)
 {
 	if (lmrc->l_atomic_desc_support) {
-		lmrc_write_reg(lmrc, LMRC_IB_SINGLE_QUEUE_PORT,
+		lmrc_write_reg(lmrc,
+		    MPI26_ATOMIC_REQUEST_DESCRIPTOR_POST_OFFSET,
 		    req_desc.rd_reg);
 	} else {
 		lmrc_req_desc_t rd;
@@ -189,7 +200,8 @@ lmrc_send_atomic_request(lmrc_t *lmrc, lmrc_atomic_req_desc_t req_desc)
 void
 lmrc_send_request(lmrc_t *lmrc, lmrc_req_desc_t req_desc)
 {
-	lmrc_write_reg64(lmrc, LMRC_IB_LO_QUEUE_PORT, req_desc.rd_reg);
+	lmrc_write_reg64(lmrc, MPI2_REQUEST_DESCRIPTOR_POST_LOW_OFFSET,
+	    req_desc.rd_reg);
 }
 
 lmrc_atomic_req_desc_t
@@ -864,7 +876,7 @@ out:
 static boolean_t
 lmrc_check_fw_fault(lmrc_t *lmrc)
 {
-	uint32_t status = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+	uint32_t status = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 	uint32_t fw_state = LMRC_FW_STATE(status);
 
 	if (fw_state == LMRC_FW_STATE_FAULT)
@@ -880,10 +892,10 @@ lmrc_check_fw_fault(lmrc_t *lmrc)
  */
 static boolean_t
 lmrc_wait_for_reg(lmrc_t *lmrc, uint32_t reg, uint32_t bits, uint32_t exp,
-    uint8_t max_wait)
+    uint64_t max_wait)
 {
 	uint32_t val;
-	int i;
+	uint64_t i;
 
 	max_wait *= MILLISEC / 100;
 
@@ -896,6 +908,60 @@ lmrc_wait_for_reg(lmrc_t *lmrc, uint32_t reg, uint32_t bits, uint32_t exp,
 	}
 
 	return (B_FALSE);
+}
+
+static int
+lmrc_hard_reset(lmrc_t *lmrc)
+{
+	int ret = DDI_SUCCESS;
+
+	/* Write the reset key sequence. */
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_FLUSH_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_1ST_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_2ND_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_3RD_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_4TH_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_5TH_KEY_VALUE);
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_6TH_KEY_VALUE);
+
+	/* Check diag write enable. */
+	if (!lmrc_wait_for_reg(lmrc, MPI2_HOST_DIAGNOSTIC_OFFSET,
+	    MPI2_DIAG_DIAG_WRITE_ENABLE, MPI2_DIAG_DIAG_WRITE_ENABLE,
+	    LMRC_RESET_TIMEOUT)) {
+		dev_err(lmrc->l_dip, CE_WARN, "diag unlock failed");
+		return (DDI_FAILURE);
+	}
+
+	/* Reset IOC. */
+	lmrc_write_reg(lmrc, MPI2_HOST_DIAGNOSTIC_OFFSET,
+	    lmrc_read_reg(lmrc, MPI2_HOST_DIAGNOSTIC_OFFSET) |
+	    MPI2_DIAG_RESET_ADAPTER);
+	delay(drv_usectohz(MPI2_HARD_RESET_PCIE_FIRST_READ_DELAY_MICRO_SEC));
+
+	/* Check the reset adapter bit. */
+	if ((lmrc_read_reg(lmrc, MPI2_HOST_DIAGNOSTIC_OFFSET) &
+	    MPI2_DIAG_RESET_ADAPTER) == 0)
+		goto out;
+
+	delay(drv_usectohz(MPI2_HARD_RESET_PCIE_SECOND_READ_DELAY_MICRO_SEC));
+
+	/* Check the reset adapter bit again. */
+	if ((lmrc_read_reg(lmrc, MPI2_HOST_DIAGNOSTIC_OFFSET) &
+	    MPI2_DIAG_RESET_ADAPTER) == 0)
+		goto out;
+
+	ret = DDI_FAILURE;
+out:
+	lmrc_write_reg(lmrc, MPI2_WRITE_SEQUENCE_OFFSET,
+	    MPI2_WRSEQ_FLUSH_KEY_VALUE);
+	return (ret);
 }
 
 /*
@@ -914,7 +980,7 @@ lmrc_reset_ctrl(lmrc_t *lmrc)
 	if (lmrc->l_disable_online_ctrl_reset)
 		return (DDI_FAILURE);
 
-	status = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+	status = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 	fw_state = LMRC_FW_STATE(status);
 	reset_adapter = LMRC_FW_RESET_ADAPTER(status);
 
@@ -927,46 +993,13 @@ lmrc_reset_ctrl(lmrc_t *lmrc)
 	for (i = 0; i < LMRC_MAX_RESET_TRIES; i++) {
 		dev_err(lmrc->l_dip, CE_WARN, "resetting...");
 
-		/* Write the reset key sequence. */
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_FLUSH_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_1ST_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_2ND_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_3RD_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_4TH_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_5TH_KEY_VALUE);
-		lmrc_write_reg(lmrc, LMRC_WRITE_SEQUENCE,
-		    MPI2_WRSEQ_6TH_KEY_VALUE);
-
-		/* Check diag write enable. */
-		if (!lmrc_wait_for_reg(lmrc, LMRC_HOST_DIAG,
-		    MPI2_DIAG_DIAG_WRITE_ENABLE, MPI2_DIAG_DIAG_WRITE_ENABLE,
-		    LMRC_RESET_TIMEOUT)) {
-			dev_err(lmrc->l_dip, CE_WARN, "diag unlock failed");
+		if (lmrc_hard_reset(lmrc) != DDI_SUCCESS)
 			continue;
-		}
-
-		/* Reset chip. */
-		lmrc_write_reg(lmrc, LMRC_HOST_DIAG, lmrc_read_reg(lmrc,
-		    LMRC_HOST_DIAG) | MPI2_DIAG_RESET_ADAPTER);
-		delay(drv_usectohz(3 * MICROSEC));
-
-		/* Check the reset adapter bit. */
-		if (!lmrc_wait_for_reg(lmrc, LMRC_HOST_DIAG,
-		    MPI2_DIAG_RESET_ADAPTER, 0, LMRC_RESET_TIMEOUT)) {
-			dev_err(lmrc->l_dip, CE_WARN, "diag reset not cleared");
-			continue;
-		}
 
 		/* Wait for the FW state to move beyond INIT. */
 		max_wait = LMRC_IO_TIMEOUT * MILLISEC / 100;
 		do {
-			status = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+			status = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 			fw_state = LMRC_FW_STATE(status);
 
 			if (fw_state <= LMRC_FW_STATE_FW_INIT)
@@ -986,8 +1019,8 @@ lmrc_reset_ctrl(lmrc_t *lmrc)
 	dev_err(lmrc->l_dip, CE_WARN, "reset failed");
 out:
 	/* Stop the controller. */
-	lmrc_write_reg(lmrc, LMRC_DOORBELL, MFI_STOP_ADP);
-	(void) lmrc_read_reg(lmrc, LMRC_DOORBELL);
+	lmrc_write_reg(lmrc, MPI2_DOORBELL_OFFSET, MFI_STOP_ADP);
+	(void) lmrc_read_reg(lmrc, MPI2_DOORBELL_OFFSET);
 
 	return (DDI_FAILURE);
 }
@@ -1221,7 +1254,7 @@ lmrc_transition_to_ready(lmrc_t *lmrc)
 	uint8_t max_wait;
 	uint_t i;
 
-	status = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+	status = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 	fw_state = LMRC_FW_STATE(status);
 	max_wait = LMRC_RESET_TIMEOUT;
 
@@ -1235,21 +1268,22 @@ lmrc_transition_to_ready(lmrc_t *lmrc)
 
 		case LMRC_FW_STATE_WAIT_HANDSHAKE:
 			/* Set the CLR bit in inbound doorbell */
-			lmrc_write_reg(lmrc, LMRC_DOORBELL,
+			lmrc_write_reg(lmrc, MPI2_DOORBELL_OFFSET,
 			    MFI_INIT_CLEAR_HANDSHAKE | MFI_INIT_HOTPLUG);
 			break;
 
 		case LMRC_FW_STATE_BOOT_MSG_PENDING:
-			lmrc_write_reg(lmrc, LMRC_DOORBELL,
+			lmrc_write_reg(lmrc, MPI2_DOORBELL_OFFSET,
 			    MFI_INIT_HOTPLUG);
 			break;
 
 		case LMRC_FW_STATE_OPERATIONAL:
 			/* Bring it to READY state, wait up to 10s */
 			lmrc_disable_intr(lmrc);
-			lmrc_write_reg(lmrc, LMRC_DOORBELL, MFI_RESET_FLAGS);
-			(void) lmrc_wait_for_reg(lmrc, LMRC_DOORBELL, 1, 0, 10);
-
+			lmrc_write_reg(lmrc, MPI2_DOORBELL_OFFSET,
+			    MFI_RESET_FLAGS);
+			(void) lmrc_wait_for_reg(lmrc, MPI2_DOORBELL_OFFSET, 1,
+			    0, 10);
 			break;
 
 		case LMRC_FW_STATE_UNDEFINED:
@@ -1272,7 +1306,7 @@ lmrc_transition_to_ready(lmrc_t *lmrc)
 		 */
 		for (i = 0; i < max_wait * 1000; i++) {
 			new_status = lmrc_read_reg(lmrc,
-			    LMRC_OB_SCRATCH_PAD(0));
+			    MPI26_SCRATCHPAD0_OFFSET);
 
 			if (status != new_status)
 				break;
@@ -1317,28 +1351,28 @@ lmrc_adapter_init(lmrc_t *lmrc)
 	/*
 	 * Get maximum RAID map size.
 	 */
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(2));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD2_OFFSET);
 	lmrc->l_max_raid_map_sz = LMRC_MAX_RAID_MAP_SZ(reg);
 
 	lmrc->l_max_reply_queues = 1;
-	lmrc->l_rphi[0] = LMRC_REPLY_POST_HOST_INDEX;
+	lmrc->l_rphi[0] = MPI2_REPLY_POST_HOST_INDEX_OFFSET;
 
 	/*
 	 * Apparently, bit 27 of the scratch pad register indicates whether
 	 * MSI-X is supported by the firmware.
 	 */
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 
 	if (LMRC_FW_MSIX_ENABLED(reg)) {
 		lmrc->l_fw_msix_enabled = B_TRUE;
 
-		reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(1));
+		reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD1_OFFSET);
 		lmrc->l_max_reply_queues = LMRC_MAX_REPLY_QUEUES_EXT(reg);
 
 		if (lmrc->l_max_reply_queues > LMRC_MAX_REPLY_POST_HOST_INDEX) {
 			lmrc->l_msix_combined = B_TRUE;
 			lmrc->l_rphi[0] =
-			    LMRC_SUP_REPLY_POST_HOST_INDEX;
+			    MPI25_SUP_REPLY_POST_HOST_INDEX_OFFSET;
 		}
 
 		/*
@@ -1346,7 +1380,7 @@ lmrc_adapter_init(lmrc_t *lmrc)
 		 */
 		for (i = 1; i < LMRC_MAX_REPLY_POST_HOST_INDEX; i++) {
 			lmrc->l_rphi[i] = i * 0x10 +
-			    LMRC_SUP_REPLY_POST_HOST_INDEX;
+			    MPI25_SUP_REPLY_POST_HOST_INDEX_OFFSET;
 		}
 	}
 
@@ -1354,7 +1388,7 @@ lmrc_adapter_init(lmrc_t *lmrc)
 	 * Get the number of commands the firmware supports. Use one less,
 	 * because reply_q_depth is based on one more than this. XXX: Why?
 	 */
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(0));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD0_OFFSET);
 	lmrc->l_max_fw_cmds = LMRC_FW_MAX_CMD(reg) - 1;
 
 	if (lmrc->l_max_fw_cmds < LMRC_MAX_MFI_CMDS) {
@@ -1396,7 +1430,7 @@ lmrc_adapter_init(lmrc_t *lmrc)
 	 * Legacy Firmware frame size is (8 * 128) = 1K
 	 * 1M IO Firmware frame size is (8 * 128 * 4) = 4K
 	 */
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(1));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD1_OFFSET);
 	lmrc->l_max_chain_frame_sz = LMRC_MAX_CHAIN_SIZE(reg) *
 	    (LMRC_EXT_CHAIN_SIZE_SUPPORT(reg) ? LMRC_1MB_IO : LMRC_256K_IO);
 
@@ -1449,18 +1483,18 @@ lmrc_adapter_init(lmrc_t *lmrc)
 	    offsetof(Mpi25SCSIIORequest_t, SGL) / sizeof (Mpi25SGEIOUnion_t);
 
 
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(3));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD3_OFFSET);
 	if (LMRC_NVME_PAGE_SHIFT(reg) > LMRC_DEFAULT_NVME_PAGE_SHIFT) {
 		lmrc->l_nvme_page_sz = 1 << LMRC_NVME_PAGE_SHIFT(reg);
 		dev_err(lmrc->l_dip, CE_NOTE, "!NVME page size: %ld",
 		    lmrc->l_nvme_page_sz);
 	}
 
-	reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(1));
+	reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD1_OFFSET);
 	lmrc->l_fw_sync_cache_support = LMRC_SYNC_CACHE_SUPPORT(reg);
 
 	if (lmrc->l_class == LMRC_ACLASS_AERO) {
-		reg = lmrc_read_reg(lmrc, LMRC_OB_SCRATCH_PAD(1));
+		reg = lmrc_read_reg(lmrc, MPI26_SCRATCHPAD1_OFFSET);
 		lmrc->l_atomic_desc_support =
 		    LMRC_ATOMIC_DESCRIPTOR_SUPPORT(reg);
 	}
@@ -1535,7 +1569,7 @@ lmrc_ioc_init(lmrc_t *lmrc)
 	req_desc.rd_mfa_io.RequestFlags = LMRC_REQ_DESCRIPT_FLAGS_MFA;
 
 	lmrc_disable_intr(lmrc);
-	if (!lmrc_wait_for_reg(lmrc, LMRC_DOORBELL, 1, 0, 10))
+	if (!lmrc_wait_for_reg(lmrc, MPI2_DOORBELL_OFFSET, 1, 0, 10))
 		return (DDI_FAILURE);
 
 	(void) ddi_dma_sync(dma.ld_hdl, 0, dma.ld_len, DDI_DMA_SYNC_FORDEV);
