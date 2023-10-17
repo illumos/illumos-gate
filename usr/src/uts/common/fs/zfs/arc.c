@@ -350,7 +350,7 @@ int arc_grow_retry = 60;
 int arc_kmem_cache_reap_retry_ms = 1000;
 
 /* shift of arc_c for calculating overflow limit in arc_get_data_impl */
-int zfs_arc_overflow_shift = 3;
+int zfs_arc_overflow_shift = 8;
 
 /* shift of arc_c for calculating both min and max arc_p */
 int arc_p_min_shift = 4;
@@ -7125,8 +7125,18 @@ arc_init(void)
 	mutex_init(&arc_adjust_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&arc_adjust_waiters_cv, NULL, CV_DEFAULT, NULL);
 
-	/* set min cache to 1/32 of all memory, or 64MB, whichever is more */
-	arc_c_min = MAX(allmem / 32, 64 << 20);
+	/*
+	 * Set the minimum cache size to 1/64 of all memory, with a hard
+	 * minimum of 64MB.
+	 */
+	arc_c_min = MAX(allmem / 64, 64 << 20);
+	/*
+	 * In a system with a lot of physical memory this will still result in
+	 * an ARC size floor that is quite large in absolute terms.  Cap the
+	 * growth of the value at 1GB.
+	 */
+	arc_c_min = MIN(arc_c_min, 1 << 30);
+
 	/* set max to 3/4 of all memory, or all but 1GB, whichever is more */
 	if (allmem >= 1 << 30)
 		arc_c_max = allmem - (1 << 30);
@@ -7173,13 +7183,6 @@ arc_init(void)
 	/* Allow the tunable to override if it is reasonable */
 	if (zfs_arc_meta_limit > 0 && zfs_arc_meta_limit <= arc_c_max)
 		arc_meta_limit = zfs_arc_meta_limit;
-
-	if (arc_c_min < arc_meta_limit / 2 && zfs_arc_min == 0)
-		arc_c_min = arc_meta_limit / 2;
-
-	/* On larger-memory machines, we clamp the minimum at 1GB */
-	if (zfs_arc_min == 0)
-		arc_c_min = MIN(arc_c_min, (1 << 30));
 
 	if (zfs_arc_meta_min > 0) {
 		arc_meta_min = zfs_arc_meta_min;
