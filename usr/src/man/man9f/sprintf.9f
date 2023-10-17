@@ -19,7 +19,7 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd Dec 1, 2016
+.Dd Oct 20, 2023
 .Dt SPRINTF 9F
 .Os
 .Sh NAME
@@ -288,12 +288,14 @@ The first character of the format string should be the output base encoded as a
 control character.
 This base is used to print the integer argument.
 The remaining groups of characters in the format string consist of a bit number
-.Pq between 1 and 32, also encoded as a control character
+.Pq between 1 and 32, also encoded as a control character ,
 and the next characters
-.Pq up to the next control character or '\e0'
-give the name of the bit field.
-The string corresponding to the bit fields set in the integer argument is
-printed after the numerical value.
+.Pq up to the next control character, or space, or '\e0'
+give the name of the bit.
+As the bit number 32 encoded as a control character is the same as a space
+character, the names of the bits cannot contain a space.
+The strings corresponding to the bits set in the integer argument are printed
+after the numerical value, enclosed in angle brackets and separated by commata.
 .It Sy p
 The argument is taken to be a pointer; the value of the pointer is printed in
 unsigned hexadecimal.

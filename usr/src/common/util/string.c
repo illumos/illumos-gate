@@ -318,11 +318,11 @@ next_fmt:
 				if (ul & (1 << (c - 1))) {
 					if (any++ == 0)
 						ADDCHAR('<');
-					while ((c = *bs++) >= 32)
+					while ((c = *bs++) > 32)
 						ADDCHAR(c);
 					ADDCHAR(',');
 				} else {
-					while ((c = *bs++) >= 32)
+					while ((c = *bs++) > 32)
 						continue;
 				}
 			}
