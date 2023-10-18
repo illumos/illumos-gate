@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -1193,8 +1194,64 @@ mdb_get_soft_state_byname(char *softstatep_name, uint_t instance,
 	    state_buf_p, sizeof_state));
 }
 
+static void
+tdelta_help(void)
+{
+	mdb_printf(
+"Prints the difference between two nanosecond (hrtime_t) timestamps.\n\n"
+"The time used for comparison depends on the context in which mdb is invoked:\n"
+"	Live system	The current time (gethrtime()).\n"
+"	Crash dump	The time the dump started writing to the dump device.\n"
+"	KMDB		The most recent time the system entered KMDB.\n"
+"\n"
+"Note that with crash dumps, the dump time is often a few milliseconds\n"
+"after the time of the panic (panic_hrtime).\n"
+"\n"
+"The following options are supported:\n"
+"	-h	Print the delta in human readable form.\n"
+"	-t %<u>ts%</u>	Use %<u>ts%</u> as the comparison timestamp.\n");
+}
+
+static int
+tdelta(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	int64_t	val = 0;
+	int64_t	delta = 0;
+	int	do_nice = FALSE;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("dcmd requires an input hrtime_t");
+		return (DCMD_ERR);
+	}
+
+	val = (int64_t)mdb_gethrtime();
+
+	if (mdb_getopts(argc, argv,
+	    'h', MDB_OPT_SETBITS, TRUE, &do_nice,
+	    't', MDB_OPT_UINT64, &val,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	delta = (int64_t)addr - val;
+
+	if (do_nice) {
+		char buf[32] = { 0 };
+
+		mdb_nicetime(delta, buf, sizeof (buf));
+		mdb_printf("%s\n", buf);
+	} else {
+		mdb_printf("%ll#R\n", delta);
+	}
+
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "dnlc", NULL, "print DNLC contents", dnlcdump },
+	{
+	    "tdelta", "?[-h][-t ts]", "compute ns time delta", tdelta,
+	    tdelta_help },
 	{ NULL }
 };
 

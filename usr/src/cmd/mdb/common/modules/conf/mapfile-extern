@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright 2023 RackTop Systems, Inc.
 #
 # CDDL HEADER START
 #
@@ -125,6 +126,7 @@ SYMBOL_SCOPE {
 		mdb_name_to_major		{ FLAGS = EXTERN };
 		mdb_nhconvert			{ FLAGS = EXTERN };
 		mdb_nicenum			{ FLAGS = EXTERN };
+		mdb_nicetime			{ FLAGS = EXTERN };
 		mdb_object_iter			{ FLAGS = EXTERN };
 		mdb_one_bit			{ FLAGS = EXTERN };
 		mdb_page2pfn			{ FLAGS = EXTERN };

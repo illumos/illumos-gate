@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -39,6 +40,8 @@ msgbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	log_ctl_t lctl;
 	char line[1024];
 	uint_t verbose = FALSE;
+	uint_t delta = FALSE;
+	uint_t abstime = FALSE;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_readsym(&qp, sizeof (qp), "log_recentq") == -1) {
@@ -60,15 +63,32 @@ msgbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
+	    't', MDB_OPT_SETBITS, TRUE, &delta,
+	    'T', MDB_OPT_SETBITS, TRUE, &abstime,
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc)
 		return (DCMD_USAGE);
 
+	/* For backwards compatability, -v implies -T */
+	if (verbose)
+		abstime = TRUE;
+
 	if (DCMD_HDRSPEC(flags)) {
-		if (verbose)
-			mdb_printf("%<u>%20s %?s %-40s%</u>\n",
-			    "TIMESTAMP", "LOGCTL", "MESSAGE");
-		else
-			mdb_printf("%<u>%-70s%</u>\n", "MESSAGE");
+		int amt = 80;
+
+		mdb_printf("%<u>");
+		if (abstime) {
+			mdb_printf("%-20s ", "TIMESTAMP");
+			amt -= 21;
+		}
+		if (delta) {
+			mdb_printf("%-20s ", "DELTA");
+			amt -= 21;
+		}
+		if (verbose) {
+			mdb_printf("%?s ", "LOGCTL");
+			amt -= 17;
+		}
+		mdb_printf("%-*s%</u>\n", amt, "MESSAGE");
 	}
 
 	if (mdb_vread(&next, sizeof (next), addr) == -1) {
@@ -91,8 +111,32 @@ msgbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (abstime)
+		mdb_printf("%Y ", lctl.ttime);
+
+	if (delta) {
+		timestruc_t	hr_time;
+		int64_t		diff;
+		char		buf[32] = { 0 };
+
+		if (mdb_readvar(&hr_time, "panic_hrestime") == -1) {
+			mdb_warn("failed to read panic_hrestime");
+			return (DCMD_ERR);
+		}
+
+		if (hr_time.tv_sec == 0 &&
+		    mdb_readvar(&hr_time, "hrestime") == -1) {
+			mdb_warn("failed to read hrestime");
+			return (DCMD_ERR);
+		}
+
+		diff = (int64_t)lctl.ttime - hr_time.tv_sec;
+		mdb_nicetime(SEC2NSEC(diff), buf, sizeof (buf));
+		mdb_printf("%-20s ", buf);
+	}
+
 	if (verbose)
-		mdb_printf("%Y %?p ", lctl.ttime,  next.b_rptr);
+		mdb_printf("%?p ", next.b_rptr);
 
 	/* skip leading CR to avoid extra lines */
 	if (line[0] == 0x0d)
@@ -101,4 +145,15 @@ msgbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%s", &line[0]);
 
 	return (DCMD_OK);
+}
+
+void
+msgbuf_help(void)
+{
+	mdb_printf("Print the most recent console messages.\n\n"
+	    "%<b>OPTIONS%</b>\n"
+	    "\t-t\tInclude the age of the message from now.\n"
+	    "\t-T\tInclude the date/time of the message.\n"
+	    "\t-vInclude the date/time of the message as well as the address of"
+	    " its log_ctl_t.\n");
 }
