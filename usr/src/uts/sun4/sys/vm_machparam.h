@@ -98,7 +98,7 @@ extern "C" {
  * It is related to human patience and other factors which don't really
  * change over time.
  */
-#define	MAXSLP 		20
+#define	MAXSLP		20
 
 /*
  * A swapped in process is given a small amount of core without being bothered
@@ -121,7 +121,7 @@ extern "C" {
  *
  * XXX - The system doesn't account for multiple swap devices.
  */
-#define	DISKRPM		60
+#define	DISKRPM		600
 
 /*
  * The maximum value for handspreadpages which is the the distance
