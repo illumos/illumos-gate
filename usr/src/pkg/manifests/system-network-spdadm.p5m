@@ -22,28 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
-#
-# The default for payload-bearing actions in this package is to appear in the
-# global zone only.  See the include file for greater detail, as well as
-# information about overriding the defaults.
-#
-<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/spdadm@$(PKGVERS)
-set name=pkg.summary value="Sun InfiniBand pseudo Sockets Direct Protocol Admin"
-set name=pkg.description value="Sun InfiniBand Sockets Direct Protocol Admin"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.renamed value=true
 set name=variant.arch value=$(ARCH)
-dir  path=usr group=sys
-dir  path=usr/lib
-dir  path=usr/lib/rcm
-dir  path=usr/lib/rcm/scripts
-file path=usr/lib/rcm/scripts/SUNW,ibsdpu.sh mode=0555
-dir  path=usr/sbin
-file path=usr/sbin/sdpadm mode=0555
-dir  path=usr/share/man/man8
-file path=usr/share/man/man8/sdpadm.8
-legacy pkg=SUNWibsdpu desc="Sun InfiniBand Sockets Direct Protocol Admin" \
-    name="Sun InfiniBand pseudo Sockets Direct Protocol Admin"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+depend type=require fmri=pkg:/driver/network/sdp
