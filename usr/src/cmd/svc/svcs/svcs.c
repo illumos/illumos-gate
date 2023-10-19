@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2023 Michael Zeller.
  */
 
 /*
@@ -3121,16 +3122,25 @@ list_svc_or_inst_fmri(void *complain, scf_walkinfo_t *wip)
 	char *fmri;
 	const char *svc_name, *inst_name, *pg_name, *save;
 	scf_iter_t *iter;
-	int ret;
+	int type, ret;
 
 	fmri = safe_strdup(wip->fmri);
 
-	if (scf_parse_svc_fmri(fmri, NULL, &svc_name, &inst_name, &pg_name,
+	if (scf_parse_fmri(fmri, &type, NULL, &svc_name, &inst_name, &pg_name,
 	    NULL) != SCF_SUCCESS) {
 		if (complain)
 			uu_warn(gettext("FMRI \"%s\" is invalid.\n"),
 			    wip->fmri);
 		exit_status = UU_EXIT_FATAL;
+		free(fmri);
+		return (0);
+	}
+
+	/*
+	 * Skip over file dependencies as there is no state we can report on
+	 * them.
+	 */
+	if (type == SCF_FMRI_TYPE_FILE) {
 		free(fmri);
 		return (0);
 	}

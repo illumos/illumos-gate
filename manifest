@@ -2597,7 +2597,7 @@ h usr/bin/amd64/rksh93=usr/bin/amd64/ksh93
 h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
 f usr/bin/amd64/savecore 0555 root bin
 s usr/bin/amd64/size=../size
-f usr/bin/amd64/sort 0555 root bin
+s usr/bin/amd64/sort=../sort
 f usr/bin/amd64/strings 0555 root bin
 f usr/bin/amd64/truss 0555 root bin
 f usr/bin/amt 0555 root bin
@@ -2949,7 +2949,7 @@ f usr/bin/size 0555 root bin
 f usr/bin/sleep 0555 root bin
 f usr/bin/smbutil 0555 root bin
 f usr/bin/soelim 0555 root bin
-h usr/bin/sort=usr/lib/isaexec
+f usr/bin/sort 0555 root bin
 f usr/bin/sotruss 0755 root bin
 h usr/bin/sparc=usr/bin/sun
 f usr/bin/spell 0555 root bin

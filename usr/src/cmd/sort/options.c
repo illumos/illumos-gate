@@ -45,9 +45,9 @@
  *
  *   is equivalent to
  *
- * 	undefined		when z == 0, U contains b, and -t is set
- * 	-k w+1.x+1T,y.0U	when z == 0 otherwise
- * 	-k w+1.x+1T,y+1.zU	when z > 0
+ *	undefined		when z == 0, U contains b, and -t is set
+ *	-k w+1.x+1T,y.0U	when z == 0 otherwise
+ *	-k w+1.x+1T,y+1.zU	when z > 0
  *
  *   Undoubtedly, this seemed logical at the time.  (Using only the field head
  *   as the coordinate, as done in the obsolete version, seems much simpler.)
@@ -57,7 +57,7 @@
  *
  *   is equivalent to
  *
- * 	undefined		when z == 0, U contains b, and -t is set
+ *	undefined		when z == 0, U contains b, and -t is set
  *	+w-1.x-1T,y.0U		when z == 0 otherwise
  *	+w-1.x-1T,y-1.z		when z > 0
  *

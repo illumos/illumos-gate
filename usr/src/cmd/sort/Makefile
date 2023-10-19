@@ -1,72 +1,132 @@
 #
-# CDDL HEADER START
-#
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
-#
-# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2018, Joyent, Inc.
+
 #
-# cmd/sort/Makefile
+# Debugging targets
+#   sort provides a number of debugging options to simplify failure analysis.
+#
+#   debug		provides symbol information and sets DEBUG; includes
+#			convert, invoke
+#   stats		builds binaries with statistics reporting enabled
+#   convert		builds convert binaries (converts input to collation
+#			vectors)
+#   invoke		builds invoke binaries (allows inspection of options
+#			parser outcome)
+#
+# Debugging #defines
+#   DEBUG		activate assertions; allow wider range of memory
+#			settings (-S)
+#   DEBUG_FORCE_WIDE	force all i/o through wide streams
+#   DEBUG_DISALLOW_MMAP	force all i/o through stdio or wide streams
+#   DEBUG_NO_CACHE_TEMP	do not cache last sorted portion in memory; write all
+#			data to temporary files before merge
 #
 
 PROG = sort
 XPG4PROG = sort
 
-include ../Makefile.cmd
+BASE_OBJS =		\
+	check.o		\
+	fields.o	\
+	initialize.o	\
+	internal.o	\
+	merge.o		\
+	options.o	\
+	streams.o	\
+	streams_array.o \
+	streams_mmap.o	\
+	streams_stdio.o \
+	streams_wide.o	\
+	utility.o
 
-SRCS =	common/check.c common/fields.c common/initialize.c common/internal.c \
-	common/main.c common/merge.c common/options.c common/streams.c \
-	common/streams_array.c common/streams_mmap.c common/streams_stdio.c \
-	common/streams_wide.c common/utility.c
-POFILES = $(SRCS:common/%.c=./%.po)
+OBJS =	main.o $(BASE_OBJS)
+INVOKE_OBJS = invoke.o $(BASE_OBJS)
+CONVERT_OBJS = convert.o $(BASE_OBJS)
+STATS_OBJS = main.o statistics.o $(BASE_OBJS)
+
+XPG4OBJS = $(OBJS:%.o=xpg4_%.o)
+CLEANFILES = $(OBJS) $(XPG4OBJS)
+
+include ../Makefile.cmd
+include ../Makefile.cmd.64
+
+DCFILE =	$(PROG).dc
+
+CFLAGS +=	$(SORT_DEBUG)
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	$(CNOWARN_UNINIT)
+CERRWARN +=	-_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
+
+$(XPG4)	:=	CFLAGS += -DXPG4
+
+debug :=	SORT_DEBUG = $(CCGDEBUG) -DDEBUG
+debug :=	COPTFLAG =
+debug :=	COPTFLAG64 =
+stats	:=	SORT_DEBUG = $(CCGDEBUG) -DSTATS -DDEBUG
+stats	:=	COPTFLAG =
+stats	:=	COPTFLAG64 =
+
+.KEEP_STATE :
+
+.PARALLEL : $(OBJS) $(XPG4OBJS) $(LNTS)
+
+all : $(PROG) $(XPG4)
+
+debug : $(PROG) convert invoke
+
+clean :
+	$(RM) $(CLEANFILES)
+
+$(PROG) : $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+$(XPG4) : $(XPG4OBJS)
+	$(LINK.c) -o $@ $(XPG4OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+invoke: $(INVOKE_OBJS)
+	$(LINK.c) -o $@ $(INVOKE_OBJS) $(LDLIBS)
+
+convert: $(CONVERT_OBJS)
+	$(LINK.c) -o $@ $(CONVERT_OBJS) $(LDLIBS)
+
+stats: $(STATS_OBJS)
+	$(LINK.c) -o $@ $(STATS_OBJS) $(LDLIBS)
+
+%.o : %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+xpg4_%.o : %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+SRCS =	check.c fields.c initialize.c internal.c \
+	main.c merge.c options.c streams.c \
+	streams_array.c streams_mmap.c streams_stdio.c \
+	streams_wide.c utility.c
+
+POFILES = $(SRCS:.c=.po)
+XGETFLAGS += -a -x sort.xcl
 CLOBBERFILES = $(DCFILE) $(POFILE) $(POFILES)
+
+ROOTLINK = $(PROG:%=$(ROOTBIN64)/%)
 
 .KEEP_STATE:
 
-$(XPG4) := CPPFLAGS += -DXPG4
-XGETFLAGS += -a -x sort.xcl
+install : $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTLINK)
 
-SUBDIRS =        $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all     :=      TARGET = all
-install :=      TARGET = install
-clean   :=      TARGET = clean
-clobber :=      TARGET = clobber
-lint    :=      TARGET = lint
-debug	:=	TARGET = debug
-convert :=      TARGET = convert
-invoke  :=      TARGET = invoke
-stats   :=      TARGET = stats
-
-all : $(SUBDIRS)
-
-clean clobber lint : $(SUBDIRS)
-
-debug convert invoke stats : $(SUBDIRS)
-
-install : $(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
 
 $(POFILE) : $(POFILES)
 	echo $(SRCS)
@@ -74,15 +134,10 @@ $(POFILE) : $(POFILES)
 	-$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-%.po : common/%.c
+%.po : %.c
 	$(RM) messages.po
 	$(XGETTEXT) -c TRANSLATION_NOTE $<
 	$(SED) -e '/^domain/d' messages.po > $@
 	$(RM) messages.po
-
-$(SUBDIRS) : FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC :
 
 include ../Makefile.targ
