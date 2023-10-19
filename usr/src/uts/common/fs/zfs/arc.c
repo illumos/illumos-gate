@@ -7124,9 +7124,9 @@ arc_init(void)
 	/*
 	 * In a system with a lot of physical memory this will still result in
 	 * an ARC size floor that is quite large in absolute terms.  Cap the
-	 * growth of the value at 2GB.
+	 * growth of the value at 1GB.
 	 */
-	arc_c_min = MIN(arc_c_min, 2 << 30);
+	arc_c_min = MIN(arc_c_min, 1 << 30);
 
 	/* set max to 3/4 of all memory, or all but 1GB, whichever is more */
 	if (allmem >= 1 << 30)
