@@ -643,8 +643,8 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 {
 	struct preloaded_file *fp;
 	char *name;
-	int fd, got;
-	vm_offset_t laddr;
+	int fd;
+	ssize_t got;
 	struct stat st;
 
 	/* We can't load first */
@@ -685,26 +685,17 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		return (NULL);
 	}
 
-	laddr = loadaddr;
-	for (;;) {
-		/* read in 4k chunks; size is not really important */
-		got = archsw.arch_readin(fd, laddr, 4096);
-		if (got == 0)			/* end of file */
-			break;
-		if (got < 0) {			/* error */
-			(void) snprintf(command_errbuf, sizeof (command_errbuf),
-			    "error reading '%s': %s", name, strerror(errno));
-			free(name);
-			(void) close(fd);
-			if (archsw.arch_free_loadaddr != NULL &&
-			    st.st_size != 0) {
-				archsw.arch_free_loadaddr(loadaddr,
-				    (uint64_t)
-				    (roundup2(st.st_size, PAGE_SIZE) >> 12));
-			}
-			return (NULL);
+	got = archsw.arch_readin(fd, loadaddr, st.st_size);
+	if ((size_t)got != st.st_size) {
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
+		    "error reading '%s': %s", name, strerror(errno));
+		free(name);
+		(void) close(fd);
+		if (archsw.arch_free_loadaddr != NULL && st.st_size != 0) {
+			archsw.arch_free_loadaddr(loadaddr,
+			    (uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
 		}
-		laddr += got;
+		return (NULL);
 	}
 
 	/* Looks OK so far; create & populate control structure */
@@ -726,7 +717,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	fp->f_metadata = NULL;
 	fp->f_loader = -1;
 	fp->f_addr = loadaddr;
-	fp->f_size = laddr - loadaddr;
+	fp->f_size = st.st_size;
 
 	if (fp->f_type == NULL ||
 	    (argc != 0 && fp->f_args == NULL)) {
@@ -737,7 +728,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		return (NULL);
 	}
 	/* recognise space consumption */
-	loadaddr = laddr;
+	loadaddr += st.st_size;
 
 	/* Add to the list of loaded files */
 	if (insert != 0)
