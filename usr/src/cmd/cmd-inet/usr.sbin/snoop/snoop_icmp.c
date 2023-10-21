@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +45,7 @@
 #include <inet/ip6.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <resolv.h>
 #include "snoop.h"
 #include "snoop_mip.h"
 
@@ -213,8 +217,8 @@ interpret_icmp(int flags, struct icmp *icmp, int iplen, int ilen)
 			break;
 		}
 		(void) sprintf(buff, "%s %s to %s",
-			pc, addrtoname(AF_INET, &icmp->icmp_ip.ip_dst),
-			addrtoname(AF_INET, &icmp->icmp_gwaddr));
+		    pc, addrtoname(AF_INET, &icmp->icmp_ip.ip_dst),
+		    addrtoname(AF_INET, &icmp->icmp_gwaddr));
 		pc = buff;
 		break;
 	case ICMP_ECHO:
@@ -252,11 +256,11 @@ interpret_icmp(int flags, struct icmp *icmp, int iplen, int ilen)
 				    addrtoname(AF_INET, &sin),
 				    ntohl(ra->preference));
 				if (strlcat(buff, ra_buf, sizeof (buff)) >=
-					sizeof (buff)) {
+				    sizeof (buff)) {
 					buff[sizeof (buff) -
 					    strlen("<Too Long>)")] = '\0';
 					(void) strlcat(buff, "<Too Long>",
-						sizeof (buff));
+					    sizeof (buff));
 					break;
 				}
 				ra++;
@@ -272,34 +276,33 @@ interpret_icmp(int flags, struct icmp *icmp, int iplen, int ilen)
 				extbuff[0] = '\0';
 
 				while (curr_len > 0) {
-				    /* Append Mobile-IP description */
-				    (void) snprintf(ra_ext_buf,
-					sizeof (ra_ext_buf), ", %s",
-					get_mip_adv_desc(exthdr->type));
-				    (void) strlcat(extbuff, ra_ext_buf,
-					sizeof (extbuff));
+					/* Append Mobile-IP description */
+					(void) snprintf(ra_ext_buf,
+					    sizeof (ra_ext_buf), ", %s",
+					    get_mip_adv_desc(exthdr->type));
+					(void) strlcat(extbuff, ra_ext_buf,
+					    sizeof (extbuff));
 
-				    /* Special case for padding */
-				    if (exthdr->type ==
-					ICMP_ADV_MSG_PADDING_EXT) {
+					/* Special case for padding */
+					if (exthdr->type ==
+					    ICMP_ADV_MSG_PADDING_EXT) {
 
-					curr_len--;
-					exthdr = (exthdr_t *)
-						((char *)exthdr + 1);
-					continue;
-				    }
+						curr_len--;
+						exthdr = (exthdr_t *)
+						    ((char *)exthdr + 1);
+						continue;
+					}
 
-				    /* else normal extension */
-				    ocurr_len = curr_len;
-				    curr_len -= sizeof (*exthdr) +
-							exthdr->length;
-				    /* detect bad length */
-				    if (ocurr_len < curr_len)
+					/* else normal extension */
+					ocurr_len = curr_len;
+					curr_len -= sizeof (*exthdr) +
+					    exthdr->length;
+					/* detect bad length */
+					if (ocurr_len < curr_len)
 						break;
-				    exthdr = (exthdr_t *)
-						((char *)exthdr +
-						sizeof (*exthdr) +
-						exthdr->length);
+					exthdr = (exthdr_t *)
+					    ((char *)exthdr + sizeof (*exthdr) +
+					    exthdr->length);
 				}
 				px = extbuff;
 			}
@@ -422,7 +425,7 @@ interpret_icmp(int flags, struct icmp *icmp, int iplen, int ilen)
 				show_space();
 				icmp_ra_len = ICMP_MINLEN +
 				    num_rtr_addrs *
-					sizeof (struct icmp_ra_addr);
+				    sizeof (struct icmp_ra_addr);
 				prot_nest_prefix = "";
 				if (ilen > icmp_ra_len) {
 					interpret_icmp_mip_ext(
@@ -437,10 +440,7 @@ interpret_icmp(int flags, struct icmp *icmp, int iplen, int ilen)
 
 /*ARGSUSED*/
 void
-interpret_icmpv6(flags, icmp6, iplen, ilen)
-	int flags;
-	icmp6_t *icmp6;
-	int iplen, ilen;
+interpret_icmpv6(int flags, icmp6_t *icmp6, int iplen, int ilen)
 {
 	char *pt, *pc;
 	char *line;
@@ -773,15 +773,29 @@ interpret_icmpv6(flags, icmp6, iplen, ilen)
 	}
 }
 
+#define	LIFETIME_INFINITY		0xffffffffUL
+
 static void
-interpret_options(optc, ilen)
-	char *optc;
-	int ilen;
+interpret_lifetime(char *buf, uint32_t net_lifetime)
+{
+	uint32_t lifetime = ntohl(net_lifetime);
+
+	if (lifetime == 0) {
+		sprintf(buf, "INVALID");
+		return;
+	}
+	if (lifetime == LIFETIME_INFINITY) {
+		sprintf(buf, "INFINITY");
+		return;
+	}
+	sprintf(buf, "%lu", lifetime);
+}
+
+static void
+interpret_options(char *optc, int ilen)
 {
 #define	PREFIX_OPTION_LENGTH    4
 #define	MTU_OPTION_LENGTH	1
-
-#define	PREFIX_INFINITY		0xffffffffUL
 
 	struct nd_opt_hdr *opt;
 
@@ -827,7 +841,7 @@ interpret_options(optc, ilen)
 					chbuf[sizeof (chbuf) -
 					    strlen("<Too Long>)")] = '\0';
 					(void) strlcat(chbuf, "<Too Long>",
-						sizeof (chbuf));
+					    sizeof (chbuf));
 					break;
 				}
 			}
@@ -872,19 +886,10 @@ interpret_options(optc, ilen)
 			    popt->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_AUTO ? "SET" : "NOT SET");
 
-			if (ntohl(popt->nd_opt_pi_valid_time) ==
-			    PREFIX_INFINITY)
-				sprintf(validstr, "INFINITY");
-			else
-				sprintf(validstr, "%lu",
-				    ntohl(popt->nd_opt_pi_valid_time));
-
-			if (ntohl(popt->nd_opt_pi_preferred_time) ==
-			    PREFIX_INFINITY)
-				sprintf(preferredstr, "INFINITY");
-			else
-				sprintf(preferredstr, "%lu",
-				    ntohl(popt->nd_opt_pi_preferred_time));
+			interpret_lifetime(validstr,
+			    popt->nd_opt_pi_valid_time);
+			interpret_lifetime(preferredstr,
+			    popt->nd_opt_pi_preferred_time);
 
 			(void) sprintf(get_line(0, 0),
 			    "Valid Lifetime %s, Preferred Lifetime %s",
@@ -894,6 +899,78 @@ interpret_options(optc, ilen)
 			    (char *)&popt->nd_opt_pi_prefix, prefixstr,
 			    INET6_ADDRSTRLEN));
 			show_space();
+			break;
+		}
+		case ND_OPT_DNS_RESOLVER: {
+			char addrstr[INET6_ADDRSTRLEN];
+			char lifestr[30];
+			int i, naddr;
+			struct nd_opt_dns_resolver *optr =
+			    (struct nd_opt_dns_resolver *)optc;
+
+			if (opt->nd_opt_len < 3 || ilen < opt->nd_opt_len * 8)
+				break;
+
+			(void) sprintf(get_line(0, 0),
+			    "+++ ICMPv6 Recursive DNS Server option +++");
+
+			interpret_lifetime(lifestr, optr->nd_opt_dnsr_lifetime);
+			(void) sprintf(get_line(0, 0), "Lifetime %s", lifestr);
+
+			naddr = (opt->nd_opt_len - 1) / 2;
+
+			for (i = 0; i < naddr; i++) {
+				const char *ns = inet_ntop(AF_INET6,
+				    &optr->nd_opt_dnsr_addr[i],
+				    addrstr,
+				    INET6_ADDRSTRLEN);
+				sprintf(get_line(0, 0), "Nameserver %s", ns);
+			}
+			show_space();
+			break;
+		}
+		case ND_OPT_DNS_SEARCHLIST: {
+			struct nd_opt_dns_sl *opts =
+			    (struct nd_opt_dns_sl *)optc;
+			char lifestr[30];
+			uchar_t *msg, *namep, *end;
+
+			(void) sprintf(get_line(0, 0),
+			    "+++ ICMPv6 DNS Search List option +++");
+			interpret_lifetime(lifestr, opts->nd_opt_dnss_lifetime);
+			(void) sprintf(get_line(0, 0), "Lifetime %s", lifestr);
+
+			msg = &opts->nd_opt_dnss_names[0];
+			end = (uint8_t *)(optc + opt->nd_opt_len * 8);
+			namep = msg;
+
+			/*
+			 * Names are encoded in DNS wire format and then
+			 * padded with zero bytes to the end of the option.
+			 * dn_expand() returns the length of the
+			 * wire-format name so the parser can advance
+			 * to the next name in the message, or -1 on failure.
+			 *
+			 * The only 1-byte encoded DNS name is '.' (the root),
+			 * which is meaningless in a DNS search path.
+			 * It is encoded as a single zero byte, so if we
+			 * see it we can quit parsing.
+			 */
+			while (namep < end) {
+				char namebuf[256];
+
+				int count = dn_expand(msg, end, namep,
+				    namebuf, sizeof (namebuf));
+
+				if (count <= 1)
+					break;
+
+				(void) sprintf(get_line(0, 0),
+				    "Name: %s", namebuf);
+				namep += count;
+			}
+			show_space();
+			break;
 		}
 		default:
 			break;
