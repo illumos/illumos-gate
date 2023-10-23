@@ -2598,7 +2598,7 @@ h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
 f usr/bin/amd64/savecore 0555 root bin
 s usr/bin/amd64/size=../size
 s usr/bin/amd64/sort=../sort
-f usr/bin/amd64/strings 0555 root bin
+s usr/bin/amd64/strings=../strings
 f usr/bin/amd64/truss 0555 root bin
 f usr/bin/amt 0555 root bin
 h usr/bin/apropos=usr/bin/man
@@ -2959,7 +2959,7 @@ f usr/bin/strchg 0555 root root
 s usr/bin/strclean=../sbin/strclean
 f usr/bin/strconf 0555 root root
 s usr/bin/strerr=../sbin/strerr
-h usr/bin/strings=usr/lib/isaexec
+f usr/bin/strings 0555 root bin
 f usr/bin/strip 0555 root bin
 f usr/bin/stty 0555 root bin
 f usr/bin/su 4555 root sys

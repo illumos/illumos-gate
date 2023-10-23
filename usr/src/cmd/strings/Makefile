@@ -19,36 +19,32 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/strings/Makefile
 
-PROG:sh=	basename `pwd`
+PROG= strings
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-SUBDIRS	= 	$(MACH) $(MACH64)
+LDLIBS += -lelf
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+ROOTLINK = $(PROG:%=$(ROOTBIN64)/%)
+
+CFLAGS += $(CCVERBOSE)
+CERRWARN += -_gcc=-Wno-switch
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+all: $(PROG)
 
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTPROG)
-	-$(LN) $(ISAEXEC) $(ROOTPROG)
+install: all $(ROOTPROG) $(ROOTLINK)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
 
-FRC:
+clean:
 
 include ../Makefile.targ
