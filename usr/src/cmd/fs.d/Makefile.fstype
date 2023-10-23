@@ -43,8 +43,8 @@
 include		$(SRC)/cmd/Makefile.cmd
 
 FSCOMMONDIR=	$(SRC)/cmd/fs.d
-FSLIB=		$(FSCOMMONDIR)/fslib.o
-FSLIBSRC=	$(FSLIB:%.o=%.c)
+FSLIB=		fslib.o
+FSLIBSRC=	$(FSCOMMONDIR)/fslib.c
 
 ROOTETCFS=	$(ROOTETC)/fs
 ROOTLIBFS=	$(ROOTLIB)/fs
@@ -70,7 +70,7 @@ all:		$(PROG) $(ETCPROG) $(LIBPROG) $(TYPEPROG)
 # but it is easier to handle them as a class.  "install" will not remake
 # a directory that already exists.
 
-$(FSTYPEDIRS): 
+$(FSTYPEDIRS):
 		$(INS.dir)
 
 $(ROOTETCFSTYPE)/%:	$(ROOTETCFSTYPE) %
@@ -85,13 +85,13 @@ $(ROOTLIBTYPE)/%:	$(ROOTLIBTYPE) %
 $(ROOTETCTYPE)/%:	$(ROOTETCTYPE) %
 		$(INS.file)
 
-# Prevent fslib.o from being build in the sub makefiles.
-$(FSLIB):
-	@:
-
 include		$(SRC)/cmd/Makefile.targ
 
 install:	all $(FSTYPEPROG) $(OTHERINSTALL)
+
+$(FSLIB):	$(FSLIBSRC)
+	$(COMPILE.c) -c $(FSLIBSRC)
+	$(POST_PROCESS_O)
 
 clean:
 

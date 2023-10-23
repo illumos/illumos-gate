@@ -64,7 +64,7 @@ $(LIBPROG):	$(OBJS)
 lint:	lint_SRCS
 
 clean:
-	$(RM) $(LIBPROG).o replica.o
+	$(RM) $(OBJS)
 
 replica.o: ../lib/replica.c
 	$(COMPILE.c) ../lib/replica.c

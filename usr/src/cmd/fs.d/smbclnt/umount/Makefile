@@ -64,4 +64,4 @@ $(LIBPROG):	$(OBJS)
 lint:	lint_SRCS
 
 clean:
-	$(RM) $(LIBPROG).o
+	$(RM) $(OBJS)

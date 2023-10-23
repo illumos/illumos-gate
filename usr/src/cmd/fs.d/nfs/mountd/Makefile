@@ -67,4 +67,4 @@ smfcfg.o:	../lib/smfcfg.c
 		$(COMPILE.c) ../lib/smfcfg.c
 
 clean:
-	$(RM) $(COMMON) $(LOCAL) $(DOBJ)
+	$(RM) $(OBJS) $(DOBJ)

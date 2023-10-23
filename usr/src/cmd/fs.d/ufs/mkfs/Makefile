@@ -69,5 +69,5 @@ $(LIBPROG):	$(OBJS)
 lint:		lint_SRCS
 
 clean:
-	$(RM) $(MKFSOBJS)
+	$(RM) $(MKFSOBJS) $(FSLIB)
 

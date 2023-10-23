@@ -63,7 +63,7 @@ $(LIBPROG):	$(OBJS)
 	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
 
 clean:
-	$(RM) $(FSCKOBJS) $(UFSOBJS)
+	$(RM) $(FSCKOBJS) $(UFSOBJS) $(FSLIB)
 
 include ../../../../Makefile.xref
 
