@@ -285,6 +285,15 @@ class FileInfo(object):
 
         return out
 
+class ActionInfoError(Exception):
+    def __init__(self, action, error):
+        Exception.__init__(self)
+        self.action = action
+        self.error = error
+
+    def __str__(self):
+        return "Error in '%s': %s" % (self.action, self.error)
+
 
 class ActionInfo(FileInfo):
     """Object to track information about manifest actions.
@@ -309,18 +318,28 @@ class ActionInfo(FileInfo):
             if "preserve" in action.attrs:
                 self.editable = True
         elif action.name == "link":
-            target = action.attrs["target"]
-            self.target = os.path.normpath(target)
-            self.mediator = action.attrs.get("mediator")
+            try:
+                target = action.attrs["target"]
+            except KeyError:
+                raise ActionInfoError(str(action),
+                    "Missing 'target' attribute")
+            else:
+                self.target = os.path.normpath(target)
+                self.mediator = action.attrs.get("mediator")
         elif action.name == "dir":
             self.owner = action.attrs["owner"]
             self.group = action.attrs["group"]
             self.mode = action.attrs["mode"]
             self.isdir = True
         elif action.name == "hardlink":
-            target = os.path.normpath(action.get_target_path())
-            self.hardkey = target
-            self.hardpaths.add(target)
+            try:
+                target = os.path.normpath(action.get_target_path())
+            except KeyError:
+                raise ActionInfoError(str(action),
+                    "Missing 'target' attribute")
+            else:
+                self.hardkey = target
+                self.hardpaths.add(target)
 
     @staticmethod
     def supported(action):
@@ -568,7 +587,6 @@ class ManifestParsingError(Exception):
     def __str__(self):
         return "unable to parse manifest %s: %s" % (self.mfile, self.error)
 
-
 class ManifestTree(DirectoryTree):
     """Describes one or more directories containing arbitrarily
     many manifests as a dictionary of ActionInfo objects, indexed
@@ -655,7 +673,11 @@ class ManifestTree(DirectoryTree):
             if "variant.arch" in var and arch not in var["variant.arch"]:
                 return
 
-            self[path] = ActionInfo(action)
+            try:
+                self[path] = ActionInfo(action)
+            except ActionInfoError as e:
+                sys.stderr.write("warning: %s\n" % str(e))
+
             if modechecks is not None and path not in exceptions:
                 modewarnings.update(self[path].checkmodes(modechecks))
 
