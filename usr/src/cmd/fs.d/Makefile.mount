@@ -36,6 +36,5 @@ POFILE= $(LIBPROG).po
 
 CPPFLAGS += -I$(FSCOMMONDIR)
 
-# not $(OBJS) due to ../fslib.o
-CLEANFILES   += $(LIBPROG).o
+CLEANFILES   += $(OBJS)
 CLOBBERFILES += $(LIBPROG) $(POFILE) $(FSTYPE).po

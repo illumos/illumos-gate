@@ -48,3 +48,4 @@ $(MACH)/%.o:	%.c
 lint:	lint_SRCS
 
 clean:
+	$(RM) $(OBJS)

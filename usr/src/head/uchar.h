@@ -53,7 +53,7 @@ typedef __mbstate_t	mbstate_t;
  * C++11 also defines these types and they are considered built in, so we should
  * not define them in that context.
  */
-#if __cplusplus < 2011103L
+#if __cplusplus < 201103L
 typedef unsigned short	char16_t;
 typedef unsigned int	char32_t;
 #endif
