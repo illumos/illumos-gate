@@ -5998,6 +5998,7 @@ f usr/lib/fm/topo/plugins/ipmi.so 0555 root bin
 f usr/lib/fm/topo/plugins/nic.so 0555 root bin
 f usr/lib/fm/topo/plugins/ses.so 0555 root bin
 f usr/lib/fm/topo/plugins/smbios.so 0555 root bin
+f usr/lib/fm/topo/plugins/ufm.so 0555 root bin
 f usr/lib/fm/topo/plugins/usb.so 0555 root bin
 f usr/lib/fm/topo/plugins/xfp.so 0555 root bin
 d usr/lib/fs 0755 root sys
