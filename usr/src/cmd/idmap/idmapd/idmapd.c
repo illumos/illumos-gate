@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 
@@ -694,3 +695,22 @@ trace(idmap_mapping *req, idmap_id_res *res, char *fmt, ...)
 
 	return (0);
 }
+
+/*
+ * Enable libumem debugging by default on DEBUG builds.
+ * idmapd uses rpcgen, so we can't use #ifdef DEBUG without causing
+ * undesirable behavior.
+ */
+#ifdef IDMAPD_DEBUG
+const char *
+_umem_debug_init(void)
+{
+	return ("default,verbose"); /* $UMEM_DEBUG setting */
+}
+
+const char *
+_umem_logging_init(void)
+{
+	return ("fail,contents"); /* $UMEM_LOGGING setting */
+}
+#endif
