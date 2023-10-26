@@ -2606,9 +2606,9 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 		pgcfg->machine_sid = NULL;
 	}
 	if (pgcfg->cfg_domain_controller) {
-		char *host = pgcfg->cfg_domain_controller[0];
-		while (host != NULL)
-			free(host++);
+		char **host = &pgcfg->cfg_domain_controller[0];
+		while (*host != NULL)
+			free(*host++);
 		free(pgcfg->cfg_domain_controller);
 		pgcfg->cfg_domain_controller = NULL;
 	}
@@ -2617,9 +2617,9 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 		pgcfg->domain_controller = NULL;
 	}
 	if (pgcfg->cfg_preferred_dc) {
-		char *host = pgcfg->cfg_preferred_dc[0];
-		while (host != NULL)
-			free(host++);
+		char **host = &pgcfg->cfg_preferred_dc[0];
+		while (*host != NULL)
+			free(*host++);
 		free(pgcfg->cfg_preferred_dc);
 		pgcfg->cfg_preferred_dc = NULL;
 	}
@@ -2636,9 +2636,9 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 		pgcfg->site_name = NULL;
 	}
 	if (pgcfg->cfg_global_catalog) {
-		char *host = pgcfg->cfg_global_catalog[0];
-		while (host != NULL)
-			free(host++);
+		char **host = &pgcfg->cfg_global_catalog[0];
+		while (*host != NULL)
+			free(*host++);
 		free(pgcfg->cfg_global_catalog);
 		pgcfg->cfg_global_catalog = NULL;
 	}
