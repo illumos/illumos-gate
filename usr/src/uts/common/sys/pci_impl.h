@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_PCI_IMPL_H
@@ -105,10 +106,14 @@ struct pci_bus_resource {
 	uchar_t sub_bus;	/* highest bus number beyond this bridge */
 	uchar_t root_addr;	/* legacy peer bus address assignment */
 	uchar_t num_cbb;	/* # of CardBus Bridges on the bus */
+	uchar_t num_bridge;	/* number of bridges under this bus */
 	boolean_t io_reprogram;	/* need io reprog on this bus */
 	boolean_t mem_reprogram;	/* need mem reprog on this bus */
 	boolean_t subtractive;	/* subtractive PPB */
 	uint64_t mem_size;	/* existing children required MEM space size */
+	uint64_t pmem_size;	/* existing children required PMEM space size */
+	uint64_t mem_buffer;	/* memory available for proactively */
+				/* allocating to bridges for hotplug */
 	uint_t io_size;		/* existing children required I/O space size */
 };
 

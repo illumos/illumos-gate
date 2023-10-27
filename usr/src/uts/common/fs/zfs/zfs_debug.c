@@ -79,6 +79,7 @@ zfs_dbgmsg(const char *fmt, ...)
 	 */
 	zdm = kmem_alloc(sizeof (zfs_dbgmsg_t) + size, KM_SLEEP);
 	zdm->zdm_timestamp = gethrestime_sec();
+	zdm->zdm_hrtime = gethrtime();
 
 	va_start(adx, fmt);
 	(void) vsnprintf(zdm->zdm_msg, size + 1, fmt, adx);

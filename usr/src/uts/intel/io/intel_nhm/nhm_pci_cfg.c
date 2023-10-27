@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
@@ -52,10 +56,8 @@ nhm_pci_cfg_setup(dev_info_t *dip)
 	for (i = 0; i < MAX_CPU_NODES; i++) {
 		for (j = 0; j < CPU_PCI_DEVS; j++) {
 			for (k = 0; k < CPU_PCI_FUNCS; k++) {
-				reg.pci_phys_hi = ((SOCKET_BUS(i))
-				    << PCI_REG_BUS_SHIFT) +
-				    (j << PCI_REG_DEV_SHIFT) +
-				    (k << PCI_REG_FUNC_SHIFT);
+				reg.pci_phys_hi = PCI_REG_MAKE_BDFR(
+				    SOCKET_BUS(i), j, k, 0);
 				if (ddi_prop_update_int_array(
 				    DDI_MAJOR_T_UNKNOWN, dip, "reg",
 				    (int *)&reg, sizeof (reg)/sizeof (int)) !=

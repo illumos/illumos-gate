@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCI_H
@@ -107,8 +108,10 @@ extern "C" {
 
 #define	PCI_BCNF_IO_MASK	0xf0
 #define	PCI_BCNF_IO_SHIFT	8
+#define	PCI_BCNF_IO_LIMIT_BITS	0xfff
 #define	PCI_BCNF_MEM_MASK	0xfff0
 #define	PCI_BCNF_MEM_SHIFT	16
+#define	PCI_BCNF_MEM_LIMIT_BITS	0xfffff
 #define	PCI_BCNF_ADDR_MASK	0x000f
 
 #define	PCI_BCNF_IO_32BIT	0x01
@@ -1188,6 +1191,11 @@ typedef struct pci_phys_spec pci_regspec_t;
 #define	PCI_REG_BUS_G(x)	(((x) & PCI_REG_BUS_M) >> PCI_REG_BUS_SHIFT)
 #define	PCI_REG_ADDR_G(x)	(((x) & PCI_REG_ADDR_M) >> PCI_REG_ADDR_SHIFT)
 #define	PCI_REG_BDFR_G(x)	((x) & PCI_REG_BDFR_M)
+
+#define	PCI_REG_MAKE_BDFR(b, d, f, r)	( \
+	    (uint_t)(b) << PCI_REG_BUS_SHIFT | \
+	    (uint_t)(d) << PCI_REG_DEV_SHIFT | \
+	    (uint_t)(f) << PCI_REG_FUNC_SHIFT | (r))
 
 /*
  * PCI bit encodings of pci_phys_hi of PCI 1275 address cell.
