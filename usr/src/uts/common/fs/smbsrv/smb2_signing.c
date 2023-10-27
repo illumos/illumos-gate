@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB2 server.
@@ -49,39 +49,6 @@
 #define	SMB2_SIG_OFFS	48
 #define	SMB2_SIG_SIZE	16
 
-typedef struct mac_ops {
-	int (*mac_init)(smb_sign_ctx_t *, smb_crypto_mech_t *,
-			uint8_t *, size_t);
-	int (*mac_update)(smb_sign_ctx_t, uint8_t *, size_t);
-	int (*mac_final)(smb_sign_ctx_t, uint8_t *);
-} mac_ops_t;
-
-static int smb2_sign_calc_common(smb_request_t *, struct mbuf_chain *,
-    uint8_t *, mac_ops_t *);
-
-/*
- * SMB2 wrapper functions
- */
-
-static mac_ops_t
-smb2_sign_ops = {
-	smb2_hmac_init,
-	smb2_hmac_update,
-	smb2_hmac_final
-};
-
-static int
-smb2_sign_calc(smb_request_t *sr,
-    struct mbuf_chain *mbc,
-    uint8_t *digest16)
-{
-	int rv;
-
-	rv = smb2_sign_calc_common(sr, mbc, digest16, &smb2_sign_ops);
-
-	return (rv);
-}
-
 /*
  * Called during session destroy.
  */
@@ -96,35 +63,11 @@ smb2_sign_fini(smb_session_t *s)
 	}
 }
 
-/*
- * SMB3 wrapper functions
- */
-
-static struct mac_ops
-smb3_sign_ops = {
-	smb3_cmac_init,
-	smb3_cmac_update,
-	smb3_cmac_final
-};
-
-static int
-smb3_sign_calc(smb_request_t *sr,
-    struct mbuf_chain *mbc,
-    uint8_t *digest16)
-{
-	int rv;
-
-	rv = smb2_sign_calc_common(sr, mbc, digest16, &smb3_sign_ops);
-
-	return (rv);
-}
-
 void
 smb2_sign_init_mech(smb_session_t *s)
 {
 	smb_crypto_mech_t *mech;
 	int (*get_mech)(smb_crypto_mech_t *);
-	int (*sign_calc)(smb_request_t *, struct mbuf_chain *, uint8_t *);
 	int rc;
 
 	if (s->sign_mech != NULL)
@@ -132,10 +75,8 @@ smb2_sign_init_mech(smb_session_t *s)
 
 	if (s->dialect >= SMB_VERS_3_0) {
 		get_mech = smb3_cmac_getmech;
-		sign_calc = smb3_sign_calc;
 	} else {
 		get_mech = smb2_hmac_getmech;
-		sign_calc = smb2_sign_calc;
 	}
 
 	mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
@@ -145,7 +86,6 @@ smb2_sign_init_mech(smb_session_t *s)
 		return;
 	}
 	s->sign_mech = mech;
-	s->sign_calc = sign_calc;
 	s->sign_fini = smb2_sign_fini;
 }
 
@@ -236,7 +176,7 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 }
 
 /*
- * smb2_sign_calc_common
+ * smb2_sign_calc
  *
  * Calculates MAC signature for the given buffer and returns
  * it in the mac_sign parameter.
@@ -248,11 +188,11 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
  */
 
 static int
-smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
-    uint8_t *digest, mac_ops_t *ops)
+smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
+    uint8_t *digest)
 {
 	uint8_t tmp_hdr[SMB2_HDR_SIZE];
-	smb_sign_ctx_t ctx = 0;
+	smb_enc_ctx_t ctx;
 	smb_session_t *s = sr->session;
 	smb_user_t *u = sr->uid_user;
 	struct smb_key *sign_key = &u->u_sign_key;
@@ -262,8 +202,13 @@ smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
 	if (s->sign_mech == NULL || sign_key->len == 0)
 		return (-1);
 
-	/* smb2_hmac_init or smb3_cmac_init */
-	rc = ops->mac_init(&ctx, s->sign_mech, sign_key->key, sign_key->len);
+	bzero(&ctx, sizeof (ctx));
+	ctx.mech = *((smb_crypto_mech_t *)s->sign_mech);
+
+	if (s->dialect < SMB_VERS_3_0)
+		smb2_sign_init_hmac_param(&ctx, SMB2_SIG_SIZE);
+
+	rc = smb2_mac_init(&ctx, sign_key->key, sign_key->len);
 	if (rc != 0)
 		return (rc);
 
@@ -279,7 +224,7 @@ smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
 		return (-1);
 	bzero(tmp_hdr + SMB2_SIG_OFFS, SMB2_SIG_SIZE);
 	/* smb2_hmac_update or smb3_cmac_update */
-	if ((rc = ops->mac_update(ctx, tmp_hdr, tlen)) != 0)
+	if ((rc = smb2_mac_update(&ctx, tmp_hdr, tlen)) != 0)
 		return (rc);
 	offset += tlen;
 	resid -= tlen;
@@ -307,8 +252,7 @@ smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
 	tlen = mbuf->m_len - offset;
 	if (tlen > resid)
 		tlen = resid;
-	/* smb2_hmac_update or smb3_cmac_update */
-	rc = ops->mac_update(ctx, (uint8_t *)mbuf->m_data + offset, tlen);
+	rc = smb2_mac_update(&ctx, (uint8_t *)mbuf->m_data + offset, tlen);
 	if (rc != 0)
 		return (rc);
 	resid -= tlen;
@@ -323,20 +267,17 @@ smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
 		tlen = mbuf->m_len;
 		if (tlen > resid)
 			tlen = resid;
-		rc = ops->mac_update(ctx, (uint8_t *)mbuf->m_data, tlen);
+		rc = smb2_mac_update(&ctx, (uint8_t *)mbuf->m_data, tlen);
 		if (rc != 0)
 			return (rc);
 		resid -= tlen;
 	}
 
 	/*
-	 * smb2_hmac_final or smb3_cmac_final
 	 * Note: digest is _always_ SMB2_SIG_SIZE,
 	 * even if the mech uses a longer one.
-	 *
-	 * smb2_hmac_update or smb3_cmac_update
 	 */
-	if ((rc = ops->mac_final(ctx, digest)) != 0)
+	if ((rc = smb2_mac_final(&ctx, digest)) != 0)
 		return (rc);
 
 	return (0);
@@ -372,8 +313,15 @@ smb2_sign_check_request(smb_request_t *sr)
 	if (sr->smb2_ssnid == 0 || u == NULL)
 		return (0);
 
-	/* In case _sign_begin failed. */
-	if (s->sign_calc == NULL)
+	/*
+	 * If the negotiated signing mechanism is unavailable
+	 * (which is not expected, so this is mostly paranoia)
+	 * smb2_sign_init_mech would leave s->sign_fini = NULL
+	 * and s->sign_mech invalid.  Checking s->sign_fini is
+	 * easiest (type of s->sign_mech varies K vs U).
+	 * If the mech is unsupported, return failure.
+	 */
+	if (s->sign_fini == NULL)
 		return (-1);
 
 	/* Get the request signature. */
@@ -383,9 +331,8 @@ smb2_sign_check_request(smb_request_t *sr)
 
 	/*
 	 * Compute the correct signature and compare.
-	 * smb2_sign_calc() or smb3_sign_calc()
 	 */
-	if (s->sign_calc(sr, mbc, vfy_sig) != 0)
+	if (smb2_sign_calc(sr, mbc, vfy_sig) != 0)
 		return (-1);
 
 	if (memcmp(vfy_sig, req_sig, SMB2_SIG_SIZE) == 0) {
@@ -416,7 +363,18 @@ smb2_sign_reply(smb_request_t *sr)
 
 	if (u == NULL)
 		return;
-	if (s->sign_calc == NULL)
+
+	/*
+	 * If the negotiated signing mechanism is unavailable
+	 * (which is not expected, so this is mostly paranoia)
+	 * smb2_sign_init_mech would leave s->sign_fini = NULL
+	 * and s->sign_mech invalid.  Checking s->sign_fini is
+	 * easiest (type of s->sign_mech varies K vs U).
+	 * If the mech is unsupported, just don't sign.
+	 * The (un-signed) reponse will probably cause the
+	 * client to drop the connection.
+	 */
+	if (s->sign_fini == NULL)
 		return;
 
 	msg_len = sr->reply.chain_offset - sr->smb2_reply_hdr;
@@ -425,9 +383,8 @@ smb2_sign_reply(smb_request_t *sr)
 
 	/*
 	 * Calculate the MAC signature for this reply.
-	 * smb2_sign_calc() or smb3_sign_calc()
 	 */
-	if (s->sign_calc(sr, &tmp_mbc, reply_sig) != 0)
+	if (smb2_sign_calc(sr, &tmp_mbc, reply_sig) != 0)
 		return;
 
 	/*

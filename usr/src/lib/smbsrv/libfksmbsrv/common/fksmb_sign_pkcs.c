@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -123,30 +123,54 @@ smb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 int
 smb2_hmac_getmech(smb_crypto_mech_t *mech)
 {
-	return (find_mech(mech, CKM_SHA256_HMAC));
+	return (find_mech(mech, CKM_SHA256_HMAC_GENERAL));
+}
+
+int
+smb3_cmac_getmech(smb_crypto_mech_t *mech)
+{
+	return (find_mech(mech, CKM_AES_CMAC));
+}
+
+/*
+ * Note, the SMB2 signature is the first 16 bytes of the digest,
+ * even in the case of SHA256 HMAC (32-byte digest).
+ *
+ * CMAC has no parameter.
+ */
+void
+smb2_sign_init_hmac_param(smb_enc_ctx_t *ctx, ulong_t hmac_len)
+{
+	ctx->param.hmac = hmac_len;
+
+	ctx->mech.pParameter = (caddr_t)&ctx->param.hmac;
+	ctx->mech.ulParameterLen = sizeof (ctx->param.hmac);
 }
 
 /*
  * Start PKCS#11 session, load the key.
  */
 int
-smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
-    uint8_t *key, size_t key_len)
+smb2_mac_init(smb_enc_ctx_t *ctxp, uint8_t *key, size_t key_len)
 {
 	CK_OBJECT_HANDLE hkey = 0;
 	CK_RV rv;
 
-	rv = SUNW_C_GetMechSession(mech->mechanism, ctxp);
+	rv = SUNW_C_GetMechSession(ctxp->mech.mechanism, &ctxp->ctx);
 	if (rv != CKR_OK)
 		return (-1);
 
-	rv = SUNW_C_KeyToObject(*ctxp, mech->mechanism,
+	rv = SUNW_C_KeyToObject(ctxp->ctx, ctxp->mech.mechanism,
 	    key, key_len, &hkey);
 	if (rv != CKR_OK)
 		return (-1);
 
-	rv = C_SignInit(*ctxp, mech, hkey);
-	(void) C_DestroyObject(*ctxp, hkey);
+	rv = C_SignInit(ctxp->ctx, &ctxp->mech, hkey);
+	(void) C_DestroyObject(ctxp->ctx, hkey);
+	if (rv != CKR_OK) {
+		(void) C_CloseSession(ctxp->ctx);
+		return (-1);
+	}
 
 	return (rv == CKR_OK ? 0 : -1);
 }
@@ -155,34 +179,25 @@ smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
  * Digest one segment
  */
 int
-smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
+smb2_mac_update(smb_enc_ctx_t *ctxp, uint8_t *in, size_t len)
 {
 	CK_RV rv;
 
-	rv = C_SignUpdate(ctx, in, len);
+	rv = C_SignUpdate(ctxp->ctx, in, len);
 	if (rv != CKR_OK)
-		(void) C_CloseSession(ctx);
+		(void) C_CloseSession(ctxp->ctx);
 
 	return (rv == CKR_OK ? 0 : -1);
 }
 
-/*
- * Note, the SMB2 signature is the first 16 bytes of the
- * 32-byte SHA256 HMAC digest.  This is specifically for
- * SMB2 signing, and NOT a generic HMAC function.
- */
 int
-smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
+smb2_mac_final(smb_enc_ctx_t *ctxp, uint8_t *digest16)
 {
-	uint8_t full_digest[SHA256_DIGEST_LENGTH];
-	CK_ULONG len = SHA256_DIGEST_LENGTH;
+	CK_ULONG len = SMB2_SIG_SIZE;
 	CK_RV rv;
 
-	rv = C_SignFinal(ctx, full_digest, &len);
-	if (rv == CKR_OK)
-		bcopy(full_digest, digest16, 16);
-
-	(void) C_CloseSession(ctx);
+	rv = C_SignFinal(ctxp->ctx, digest16, &len);
+	(void) C_CloseSession(ctxp->ctx);
 
 	return (rv == CKR_OK ? 0 : -1);
 }
@@ -199,6 +214,7 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 	CK_SESSION_HANDLE hssn = 0;
 	CK_OBJECT_HANDLE hkey = 0;
 	CK_ULONG ck_maclen = mac_len;
+	CK_MAC_GENERAL_PARAMS out_len = mac_len;
 	CK_RV rv;
 	int rc = 0;
 
@@ -212,6 +228,9 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 		rc = -2;
 		goto out;
 	}
+
+	mech->pParameter = (caddr_t)&out_len;
+	mech->ulParameterLen = sizeof (out_len);
 
 	rv = C_SignInit(hssn, mech, hkey);
 	if (rv != CKR_OK) {
@@ -236,82 +255,8 @@ out:
 		(void) C_DestroyObject(hssn, hkey);
 	if (hssn != 0)
 		(void) C_CloseSession(hssn);
+	mech->pParameter = NULL;
+	mech->ulParameterLen = 0;
 
 	return (rc);
-}
-
-/*
- * SMB3 signing helpers:
- * (getmech, init, update, final)
- */
-
-/*
- * Find out if we have this mech.
- */
-int
-smb3_cmac_getmech(smb_crypto_mech_t *mech)
-{
-	return (find_mech(mech, CKM_AES_CMAC));
-}
-
-/*
- * Start PKCS#11 session, load the key.
- */
-int
-smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
-    uint8_t *key, size_t key_len)
-{
-	CK_OBJECT_HANDLE hkey = 0;
-	CK_RV rv;
-
-	rv = SUNW_C_GetMechSession(mech->mechanism, ctxp);
-	if (rv != CKR_OK)
-		return (-1);
-
-	rv = SUNW_C_KeyToObject(*ctxp, mech->mechanism,
-	    key, key_len, &hkey);
-	if (rv != CKR_OK) {
-		(void) C_CloseSession(*ctxp);
-		return (-1);
-	}
-
-	rv = C_SignInit(*ctxp, mech, hkey);
-	(void) C_DestroyObject(*ctxp, hkey);
-	if (rv != CKR_OK) {
-		(void) C_CloseSession(*ctxp);
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * Digest one segment
- */
-int
-smb3_cmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
-{
-	CK_RV rv;
-
-	rv = C_SignUpdate(ctx, in, len);
-	if (rv != CKR_OK)
-		(void) C_CloseSession(ctx);
-
-	return (rv == CKR_OK ? 0 : -1);
-}
-
-/*
- * Note, the SMB2 signature is just the AES CMAC digest.
- * (both are 16 bytes long)
- */
-int
-smb3_cmac_final(smb_sign_ctx_t ctx, uint8_t *digest)
-{
-	CK_ULONG len = SMB2_SIG_SIZE;
-	CK_RV rv;
-
-	rv = C_SignFinal(ctx, digest, &len);
-	(void) C_CloseSession(ctx);
-
-	return (rv == CKR_OK ? 0 : -1);
 }

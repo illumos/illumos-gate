@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017-2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_KCRYPT_H_
@@ -57,6 +57,7 @@ typedef crypto_context_t	smb_sign_ctx_t;
 typedef union {
 	CK_AES_CCM_PARAMS	ccm;
 	CK_AES_GCM_PARAMS	gcm;
+	ulong_t			hmac;
 } smb_crypto_param_t;
 
 typedef struct smb_enc_ctx {
@@ -74,8 +75,9 @@ typedef CK_MECHANISM		smb_crypto_mech_t;
 typedef CK_SESSION_HANDLE	smb_sign_ctx_t;
 
 typedef union {
-	CK_CCM_PARAMS	ccm;
-	CK_GCM_PARAMS	gcm;
+	CK_CCM_PARAMS		ccm;
+	CK_GCM_PARAMS		gcm;
+	CK_MAC_GENERAL_PARAMS	hmac;
 } smb_crypto_param_t;
 
 typedef struct smb_enc_ctx {
@@ -103,17 +105,15 @@ int smb_md5_final(smb_sign_ctx_t, uint8_t *);
  */
 
 int smb2_hmac_getmech(smb_crypto_mech_t *);
-int smb2_hmac_init(smb_sign_ctx_t *, smb_crypto_mech_t *, uint8_t *, size_t);
-int smb2_hmac_update(smb_sign_ctx_t, uint8_t *, size_t);
-int smb2_hmac_final(smb_sign_ctx_t, uint8_t *);
+int smb3_cmac_getmech(smb_crypto_mech_t *);
+void smb2_sign_init_hmac_param(smb_enc_ctx_t *, ulong_t);
+
+int smb2_mac_init(smb_enc_ctx_t *, uint8_t *, size_t);
+int smb2_mac_update(smb_enc_ctx_t *, uint8_t *, size_t);
+int smb2_mac_final(smb_enc_ctx_t *, uint8_t *);
 
 int smb2_hmac_one(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
     uint8_t *data, size_t data_len, uint8_t *mac, size_t mac_len);
-
-int smb3_cmac_getmech(smb_crypto_mech_t *);
-int smb3_cmac_init(smb_sign_ctx_t *, smb_crypto_mech_t *, uint8_t *, size_t);
-int smb3_cmac_update(smb_sign_ctx_t, uint8_t *, size_t);
-int smb3_cmac_final(smb_sign_ctx_t, uint8_t *);
 
 int smb3_kdf(uint8_t *outbuf, uint32_t outbuf_len,
     uint8_t *key, size_t key_len,

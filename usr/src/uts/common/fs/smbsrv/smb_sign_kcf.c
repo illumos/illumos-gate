@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -123,25 +123,44 @@ smb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 int
 smb2_hmac_getmech(smb_crypto_mech_t *mech)
 {
-	return (find_mech(mech, SUN_CKM_SHA256_HMAC));
+	return (find_mech(mech, SUN_CKM_SHA256_HMAC_GENERAL));
+}
+
+int
+smb3_cmac_getmech(smb_crypto_mech_t *mech)
+{
+	return (find_mech(mech, SUN_CKM_AES_CMAC));
+}
+
+/*
+ * Note, the SMB2 signature is the first 16 bytes of the digest,
+ * even in the case of SHA256 HMAC (32-byte digest).
+ *
+ * CMAC has no parameter.
+ */
+void
+smb2_sign_init_hmac_param(smb_enc_ctx_t *ctx, ulong_t hmac_len)
+{
+	ctx->param.hmac = hmac_len;
+
+	ctx->mech.cm_param = (caddr_t)&ctx->param.hmac;
+	ctx->mech.cm_param_len = sizeof (ctx->param.hmac);
 }
 
 /*
  * Start the KCF session, load the key
  */
 int
-smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
-    uint8_t *key, size_t key_len)
+smb2_mac_init(smb_enc_ctx_t *ctxp, uint8_t *key, size_t key_len)
 {
-	crypto_key_t ckey;
 	int rv;
 
-	bzero(&ckey, sizeof (ckey));
-	ckey.ck_format = CRYPTO_KEY_RAW;
-	ckey.ck_data = key;
-	ckey.ck_length = key_len * 8; /* in bits */
+	bzero(&ctxp->ckey, sizeof (ctxp->ckey));
+	ctxp->ckey.ck_format = CRYPTO_KEY_RAW;
+	ctxp->ckey.ck_data = key;
+	ctxp->ckey.ck_length = key_len * 8; /* in bits */
 
-	rv = crypto_mac_init(mech, &ckey, NULL, ctxp, NULL);
+	rv = crypto_mac_init(&ctxp->mech, &ctxp->ckey, NULL, &ctxp->ctx, NULL);
 
 	return (rv == CRYPTO_SUCCESS ? 0 : -1);
 }
@@ -150,7 +169,7 @@ smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
  * Digest one segment
  */
 int
-smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
+smb2_mac_update(smb_enc_ctx_t *ctxp, uint8_t *in, size_t len)
 {
 	crypto_data_t data;
 	int rv;
@@ -161,37 +180,29 @@ smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
 	data.cd_raw.iov_base = (void *)in;
 	data.cd_raw.iov_len = len;
 
-	rv = crypto_mac_update(ctx, &data, 0);
+	rv = crypto_mac_update(ctxp->ctx, &data, 0);
 
 	if (rv != CRYPTO_SUCCESS) {
-		crypto_cancel_ctx(ctx);
+		crypto_cancel_ctx(ctxp->ctx);
 		return (-1);
 	}
 
 	return (0);
 }
 
-/*
- * Note, the SMB2 signature is the first 16 bytes of the
- * 32-byte SHA256 HMAC digest.  This is specifically for
- * SMB2 signing, and NOT a generic HMAC function.
- */
 int
-smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
+smb2_mac_final(smb_enc_ctx_t *ctxp, uint8_t *digest16)
 {
-	uint8_t full_digest[SHA256_DIGEST_LENGTH];
 	crypto_data_t out;
 	int rv;
 
 	bzero(&out, sizeof (out));
 	out.cd_format = CRYPTO_DATA_RAW;
-	out.cd_length = SHA256_DIGEST_LENGTH;
-	out.cd_raw.iov_len = SHA256_DIGEST_LENGTH;
-	out.cd_raw.iov_base = (void *)full_digest;
+	out.cd_length = SMB2_SIG_SIZE;
+	out.cd_raw.iov_len = SMB2_SIG_SIZE;
+	out.cd_raw.iov_base = (void *)digest16;
 
-	rv = crypto_mac_final(ctx, &out, 0);
-	if (rv == CRYPTO_SUCCESS)
-		bcopy(full_digest, digest16, 16);
+	rv = crypto_mac_final(ctxp->ctx, &out, 0);
 
 	return (rv == CRYPTO_SUCCESS ? 0 : -1);
 }
@@ -209,6 +220,7 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 	crypto_data_t cdata;
 	crypto_data_t cmac;
 	int rv;
+	ulong_t hmac_len = mac_len;
 
 	bzero(&ckey, sizeof (ckey));
 	ckey.ck_format = CRYPTO_KEY_RAW;
@@ -227,84 +239,14 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 	cmac.cd_raw.iov_base = (void *)mac;
 	cmac.cd_raw.iov_len = mac_len;
 
+	mech->cm_param = (caddr_t)&hmac_len;
+	mech->cm_param_len = sizeof (hmac_len);
+
 	rv = crypto_mac(mech, &cdata, &ckey, NULL, &cmac, NULL);
 
-	return (rv == CRYPTO_SUCCESS ? 0 : -1);
-}
-
-/*
- * SMB3 signing helpers:
- * (getmech, init, update, final)
- */
-
-int
-smb3_cmac_getmech(smb_crypto_mech_t *mech)
-{
-	return (find_mech(mech, SUN_CKM_AES_CMAC));
-}
-
-/*
- * Start the KCF session, load the key
- */
-int
-smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
-    uint8_t *key, size_t key_len)
-{
-	crypto_key_t ckey;
-	int rv;
-
-	bzero(&ckey, sizeof (ckey));
-	ckey.ck_format = CRYPTO_KEY_RAW;
-	ckey.ck_data = key;
-	ckey.ck_length = key_len * 8; /* in bits */
-
-	rv = crypto_mac_init(mech, &ckey, NULL, ctxp, NULL);
-
-	return (rv == CRYPTO_SUCCESS ? 0 : -1);
-}
-
-/*
- * Digest one segment
- */
-int
-smb3_cmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
-{
-	crypto_data_t data;
-	int rv;
-
-	bzero(&data, sizeof (data));
-	data.cd_format = CRYPTO_DATA_RAW;
-	data.cd_length = len;
-	data.cd_raw.iov_base = (void *)in;
-	data.cd_raw.iov_len = len;
-
-	rv = crypto_mac_update(ctx, &data, 0);
-
-	if (rv != CRYPTO_SUCCESS) {
-		crypto_cancel_ctx(ctx);
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * Note, the SMB2 signature is just the AES CMAC digest.
- * (both are 16 bytes long)
- */
-int
-smb3_cmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
-{
-	crypto_data_t out;
-	int rv;
-
-	bzero(&out, sizeof (out));
-	out.cd_format = CRYPTO_DATA_RAW;
-	out.cd_length = SMB2_SIG_SIZE;
-	out.cd_raw.iov_len = SMB2_SIG_SIZE;
-	out.cd_raw.iov_base = (void *)digest16;
-
-	rv = crypto_mac_final(ctx, &out, 0);
+	/* Not used after this point. */
+	mech->cm_param = NULL;
+	mech->cm_param_len = 0;
 
 	return (rv == CRYPTO_SUCCESS ? 0 : -1);
 }

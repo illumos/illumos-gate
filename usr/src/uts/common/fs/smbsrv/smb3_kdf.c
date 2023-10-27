@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kcrypt.h>
@@ -104,7 +104,6 @@ smb3_kdf(uint8_t *outbuf, uint32_t keylen,
     uint8_t *context, size_t context_len)
 {
 	smb_crypto_mech_t mech;
-	uint8_t digest32[SHA256_DIGEST_LENGTH];
 	uint8_t kdfbuf[KDF_BUFLEN];
 	uint32_t L = keylen << 3; /* key len in bits */
 	int pos = 0;
@@ -143,10 +142,7 @@ smb3_kdf(uint8_t *outbuf, uint32_t keylen,
 	rc = smb2_hmac_one(&mech,
 	    ssn_key, ssn_keylen,
 	    kdfbuf, pos,
-	    digest32, SHA256_DIGEST_LENGTH);
-	if (rc != 0)
-		return (rc);
+	    outbuf, keylen);
 
-	bcopy(digest32, outbuf, keylen);
-	return (0);
+	return (rc);
 }
