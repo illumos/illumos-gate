@@ -118,6 +118,7 @@ kcf_soft_config_init(void)
 	 * CKM_SHA1_RSA_PKCS,CKM_SHA256_RSA_PKCS,CKM_SHA384_RSA_PKCS,\
 	 * CKM_SHA512_RSA_PKCS
 	 * swrand:supportedlist=random
+	 * viorand:supportedlist=random
 	 *
 	 * WARNING: If you add a new kernel crypto provider or mechanism,
 	 * you must update these structures.
@@ -162,6 +163,8 @@ kcf_soft_config_init(void)
 		"CKM_SHA512_RSA_PKCS", ""};
 	static crypto_mech_name_t	swrand_mechs[] = {
 		"random", ""};
+	static crypto_mech_name_t	viorand_mechs[] = {
+		"random", ""};
 	static initial_soft_config_entry_t
 		initial_soft_config_entry[] = {
 			"des", des_mechs,
@@ -174,7 +177,8 @@ kcf_soft_config_init(void)
 			"md4", md4_mechs,
 			"md5", md5_mechs,
 			"rsa", rsa_mechs,
-			"swrand", swrand_mechs
+			"swrand", swrand_mechs,
+			"viorand", viorand_mechs
 		};
 	const int initial_soft_config_entries =
 	    sizeof (initial_soft_config_entry)

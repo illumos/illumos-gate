@@ -407,6 +407,7 @@ DRV_KMODS	+= vr
 DRV_KMODS	+= virtio
 DRV_KMODS	+= vioblk
 DRV_KMODS	+= vioif
+DRV_KMODS	+= viorand
 DRV_KMODS	+= vioscsi
 
 # Virtio 9P transport driver
