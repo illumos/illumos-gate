@@ -1,6 +1,6 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
-.\" Copyright 2022, RackTop Systems, Inc. All Rights Reserved.
+.\" Copyright 2020-2023, RackTop Systems, Inc. All Rights Reserved.
 .\" Copyright 2022 Jason King
 .\" Copyright 2023 Bill Sommerfeld
 .\" The contents of this file are subject to the terms of the
@@ -18,7 +18,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd March 13, 2023
+.Dd November 8, 2023
 .Dt SMB 5
 .Os
 .Sh NAME
@@ -363,6 +363,37 @@ The default value is
 because modern SMB clients do not need short names, and
 using short names has some performance cost while listing directories
 and opening or renaming files.
+.It Sy sign_algs
+Specifies a list of enabled SMB 3.1.1 signing algorithms.
+This property is only used when the negotiated SMB dialect is 3.1.1 or higher
+.Po
+see
+.Sy max_protocol
+property
+.Pc
+and the client provides the appropriate negotiation context.
+Otherwise it is ignored.
+.Pp
+When the property is set, a list of comma separated algorithms should be
+specified, or the value
+.Ql all
+should be used instead to enable all supported algorithms.
+When the property is empty, it is equivalent to the value
+.Ql aes128-cmac .
+.Pp
+The list of algorithms should contain these values:
+.Bl -tag -width "sha256-hmac"
+.It Sy sha256-hmac
+SHA-256-HMAC algorithm is enabled.
+SMB2 always uses SHA-256-HMAC and ignores this setting.
+.It Sy aes128-cmac
+AES-128-CMAC algorithm is enabled.
+This is the default for SMB 3.1.1.
+SMB3.0 always uses AES-128-CMAC and ignores this setting.
+.It Sy all
+All algorithms are enabled, including those currently implemented
+and any future algorithms that might be implemented.
+.El
 .It Sy signing_enabled
 .Pp
 Enables SMB signing.

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -166,6 +166,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_secmode = smb_config_get_secmode();
 	kcfg->skc_encrypt = smb_config_get_require(SMB_CI_ENCRYPT);
 	kcfg->skc_encrypt_ciphers = smb_config_get_encrypt_ciphers();
+	kcfg->skc_sign_algs = smb_config_get_signing_algs();
 
 	(void) smb_getdomainname(kcfg->skc_nbdomain,
 	    sizeof (kcfg->skc_nbdomain));

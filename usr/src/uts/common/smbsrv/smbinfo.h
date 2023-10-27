@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -166,6 +166,7 @@ typedef struct smb_kmod_cfg {
 	uint32_t skc_execflags;
 	uint32_t skc_negtok_len;
 	uint32_t skc_max_opens;		/* per client */
+	uint32_t skc_sign_algs;
 	smb_version_t skc_version;
 	uint16_t skc_initial_credits;
 	uint16_t skc_maximum_credits;
@@ -241,20 +242,25 @@ const char *smbnative_lm_str(smb_version_t *);
 #define	SMB_VERS_3_11		0x311	/* "3.11" */
 
 /*
- * Maxiumum currently supported encryption cipher.
+ * SMB3 Encryption cipher IDs as bit flags.
  */
-#define	SMB3_CIPHER_MAX		SMB3_CIPHER_AES256_GCM
-
-/*
- * SMB 3.x encryption ciphers bits.
- */
-#define	SMB3_CIPHER_BIT(c)	(1 << ((c) - 1))
-#define	SMB3_CIPHER_FLAGS_ALL	((1 << (SMB3_CIPHER_MAX)) - 1)
+#define	SMB3_CIPHER_BIT(c)	(1 << (c))
+#define	SMB3_CIPHER_FLAGS_ALL	((1 << (SMB3_CIPHER_ID_MAX)) - 1)
 
 #define	SMB3_CIPHER_FLAG_AES128_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_CCM)
 #define	SMB3_CIPHER_FLAG_AES128_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_GCM)
 #define	SMB3_CIPHER_FLAG_AES256_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES256_CCM)
 #define	SMB3_CIPHER_FLAG_AES256_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES256_GCM)
+
+/*
+ * SMB2/3 Signing algorithm IDs as bit flags.
+ */
+#define	SMB3_SIGN_ALG_BIT(c)	(1 << (c))
+#define	SMB3_SIGN_FLAGS_ALL	((1 << (SMB3_SIGN_ID_MAX)) - 1)
+
+#define	SMB3_SIGN_FLAG_AES128_CMAC	SMB3_SIGN_ALG_BIT(SMB3_SIGN_AES128_CMAC)
+#define	SMB3_SIGN_FLAG_AES128_GMAC	SMB3_SIGN_ALG_BIT(SMB3_SIGN_AES128_GMAC)
+#define	SMB3_SIGN_FLAG_SHA256_HMAC	SMB3_SIGN_ALG_BIT(SMB3_SIGN_SHA256_HMAC)
 
 #ifdef __cplusplus
 }

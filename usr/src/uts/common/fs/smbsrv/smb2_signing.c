@@ -73,10 +73,16 @@ smb2_sign_init_mech(smb_session_t *s)
 	if (s->sign_mech != NULL)
 		return;
 
-	if (s->dialect >= SMB_VERS_3_0) {
-		get_mech = smb3_cmac_getmech;
-	} else {
+	switch (s->smb31_sign_algid) {
+	case SMB3_SIGN_SHA256_HMAC:
 		get_mech = smb2_hmac_getmech;
+		break;
+	case SMB3_SIGN_AES128_CMAC:
+		get_mech = smb3_cmac_getmech;
+		break;
+	case SMB3_SIGN_AES128_GMAC:
+	default:
+		return;
 	}
 
 	mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
@@ -207,8 +213,18 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 
 	mech = *((smb_crypto_mech_t *)s->sign_mech);
 
-	if (s->dialect < SMB_VERS_3_0)
+	switch (s->smb31_sign_algid) {
+	case SMB3_SIGN_AES128_CMAC:
+		/* CMAC has no parameter */
+		break;
+	case SMB3_SIGN_SHA256_HMAC:
 		smb2_sign_init_hmac_param(&mech, &param, SMB2_SIG_SIZE);
+		break;
+	case SMB3_SIGN_AES128_GMAC:
+	default:
+		ASSERT(0);
+		return (-1);
+	}
 
 	/*
 	 * Work with a copy of the SMB2 header so we can

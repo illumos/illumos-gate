@@ -959,6 +959,10 @@ typedef struct smb_session {
 
 	/* SMB2/SMB3 signing support */
 	void			(*sign_fini)(struct smb_session *);
+	smb3_sign_id_t		smb31_sign_algid;
+	smb3_encrypt_id_t	smb31_enc_cipherid;
+	uint16_t		smb31_preauth_hashid;
+	uint8_t			smb31_preauth_hashval[SMB3_PREAUTH_HASHVAL_SZ];
 
 	ksocket_t		sock;
 
@@ -992,10 +996,6 @@ typedef struct smb_session {
 	uint16_t		smb_max_mpx;
 	smb_srqueue_t		*s_srqueue;
 	uint64_t		start_time;
-
-	uint16_t		smb31_enc_cipherid;
-	uint16_t		smb31_preauth_hashid;
-	uint8_t			smb31_preauth_hashval[SMB3_PREAUTH_HASHVAL_SZ];
 
 	unsigned char		MAC_key[44];
 	char			ip_addr_str[INET6_ADDRSTRLEN];

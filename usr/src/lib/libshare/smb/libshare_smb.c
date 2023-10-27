@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems.
+ * Copyright 2020-2023 RackTop Systems.
  */
 
 /*
@@ -88,6 +88,7 @@ static int disposition_validator(int, char *);
 static int protocol_validator(int, char *);
 static int require_validator(int, char *);
 static int ciphers_validator(int, char *);
+static int sign_algs_validator(int, char *);
 
 static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
@@ -905,6 +906,8 @@ struct smb_proto_option_defs {
 	{ SMB_CI_OPLOCK_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_SHORT_NAMES, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_SIGN_ALGS, 0, MAX_VALUE_BUFLEN, sign_algs_validator,
 	    SMB_REFRESH_REFRESH },
 };
 
@@ -2444,6 +2447,23 @@ ciphers_validator(int index, char *value)
 		return (SA_OK);
 
 	if (smb_convert_encrypt_ciphers(value) <= 0)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+static int
+sign_algs_validator(int index __unused, char *value)
+{
+
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	/* Allow setting back to empty (use defaults) */
+	if (*value == '\0')
+		return (SA_OK);
+
+	if (smb_convert_signing_algs(value) <= 0)
 		return (SA_BAD_VALUE);
 
 	return (SA_OK);

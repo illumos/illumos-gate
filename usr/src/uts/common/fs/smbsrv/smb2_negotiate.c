@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -90,11 +90,17 @@ static uint16_t smb2_versions[] = {
 static uint16_t smb2_nversions =
     sizeof (smb2_versions) / sizeof (smb2_versions[0]);
 
+/*
+ * [MS-SMB2] 2.2.3.1 SMB2 NEGOTIATE_CONTEXT Request Values
+ */
 enum smb2_neg_ctx_type {
 	SMB2_PREAUTH_INTEGRITY_CAPS		= 1,
 	SMB2_ENCRYPTION_CAPS			= 2,
-	SMB2_COMPRESSION_CAPS			= 3,	/* not imlemented */
-	SMB2_NETNAME_NEGOTIATE_CONTEXT_ID	= 5	/* not imlemented */
+	SMB2_COMPRESSION_CAPS			= 3,
+	SMB2_NETNAME_NEGOTIATE_CONTEXT_ID	= 5,
+	SMB2_TRANSPORT_CAPS			= 6,
+	SMB2_RDMA_TRANSFORM_CAPS		= 7,
+	SMB2_SIGNING_CAPS			= 8,
 };
 
 typedef struct smb2_negotiate_ctx {
@@ -116,7 +122,7 @@ typedef struct smb2_negotiate_ctx {
 typedef struct smb2_preauth_integrity_caps {
 	uint16_t	picap_hash_count;
 	uint16_t	picap_salt_len;
-	uint16_t	picap_hash_id;
+	uint16_t	picap_hash_ids[MAX_HASHID_NUM];
 	uint8_t		picap_salt[SMB31_PREAUTH_CTX_SALT_LEN];
 } smb2_preauth_caps_t;
 
@@ -124,6 +130,11 @@ typedef struct smb2_encryption_caps {
 	uint16_t	encap_cipher_count;
 	uint16_t	encap_cipher_ids[MAX_CIPHER_NUM];
 } smb2_encrypt_caps_t;
+
+typedef struct smb2_signing_caps {
+	uint16_t	sicap_alg_count;
+	uint16_t	sicap_alg_ids[MAX_CIPHER_NUM];
+} smb2_sign_caps_t;
 
 /*
  * The contexts we support
@@ -138,11 +149,20 @@ typedef struct smb2_encrypt_neg_ctx {
 	smb2_encrypt_caps_t	encrypt_caps;
 } smb2_encrypt_neg_ctx_t;
 
+typedef struct smb2_sign_neg_ctx {
+	smb2_neg_ctx_t		neg_ctx;
+	smb2_sign_caps_t	sign_caps;
+} smb2_sign_neg_ctx_t;
+
 typedef struct smb2_neg_ctxs {
 	uint32_t		offset;
 	uint16_t		count;
 	smb2_preauth_neg_ctx_t	preauth_ctx;
 	smb2_encrypt_neg_ctx_t	encrypt_ctx;
+	smb2_sign_neg_ctx_t	sign_ctx;
+	boolean_t		has_preauth;
+	boolean_t		has_encrypt;
+	boolean_t		has_signing;
 } smb2_neg_ctxs_t;
 
 #define	NEG_CTX_INFO_OFFSET	(SMB2_HDR_SIZE + 28)
@@ -150,14 +170,16 @@ typedef struct smb2_neg_ctxs {
 #define	NEG_CTX_MAX_COUNT	(16)
 #define	NEG_CTX_MAX_DATALEN	(256)
 
-#define	STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP	(0xC05D0000)
+#define	STATUS_SMB_NO_PREAUTH_INTEGRITY_HASH_OVERLAP	(0xC05D0000)
 
 #define	STATUS_PREAUTH_HASH_OVERLAP \
-    STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP
+    STATUS_SMB_NO_PREAUTH_INTEGRITY_HASH_OVERLAP
 
 typedef struct smb2_arg_negotiate {
 	struct smb2_neg_ctxs	neg_in_ctxs;
 	struct smb2_neg_ctxs	neg_out_ctxs;
+	smb2_neg_ctx_t		neg_cur_ctx;
+	const char		*neg_err_rsn;
 	uint16_t		neg_dialect_cnt;
 	uint16_t		neg_dialects[SMB2_NEGOTIATE_MAX_DIALECTS];
 	uint16_t		neg_highest_dialect;
@@ -197,99 +219,111 @@ smb2_find_best_dialect(smb_session_t *s, uint16_t cl_versions[],
  * This function should be called only for dialect >= 0x311
  * Negotiate context list should contain exactly one
  * SMB2_PREAUTH_INTEGRITY_CAPS context.
- * Otherwise STATUS_INVALID_PARAMETER.
- * It should contain at least 1 hash algorith what server does support.
- * Otehrwise STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP.
+ * Otherwise return STATUS_INVALID_PARAMETER.
+ * It should contain at least 1 supported hash algorithm.
+ * Otherwise return STATUS_SMB_NO_PREAUTH_INTEGRITY_HASH_OVERLAP.
  */
 static uint32_t
 smb31_decode_neg_ctxs(smb_request_t *sr)
 {
-	smb_session_t *s = sr->session;
 	smb2_arg_negotiate_t *nego = sr->arg.other;
 	smb2_neg_ctxs_t *neg_ctxs = &nego->neg_in_ctxs;
 	smb2_preauth_caps_t *picap = &neg_ctxs->preauth_ctx.preauth_caps;
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
-	boolean_t found_sha512 = B_FALSE;
-	boolean_t found_cipher = B_FALSE;
-	uint32_t ciphers = sr->sr_server->sv_cfg.skc_encrypt_ciphers;
+	smb2_sign_caps_t *sicap = &neg_ctxs->sign_ctx.sign_caps;
 	uint32_t status = 0;
+	int32_t ctx_next_off;
 	int32_t skip;
 	int found_preauth_ctx = 0;
 	int found_encrypt_ctx = 0;
+	int found_signing_ctx = 0;
 	int cnt, i;
 	int rc;
 
 	/*
 	 * There should be exactly 1 SMB2_PREAUTH_INTEGRITY_CAPS negotiate ctx.
-	 * SMB2_ENCRYPTION_CAPS is optional one.
-	 * If there is no contexts or there are to many then stop parsing.
+	 * Everything else is optional, but no more than one of each type.
+	 * If there are no contexts or there are too many then stop parsing.
 	 */
 	cnt = neg_ctxs->count;
 	if (cnt < 1 || cnt > NEG_CTX_MAX_COUNT) {
 		status = NT_STATUS_INVALID_PARAMETER;
+		nego->neg_err_rsn = "Bad context count";
 		goto errout;
 	}
 
 	/*
-	 * Cannot proceed parsing if the first context isn't aligned by 8.
+	 * The first context MUST be 8-byte aligned.
 	 */
 	if (neg_ctxs->offset % 8 != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
+		nego->neg_err_rsn = "First context unaligned";
 		goto errout;
 	}
 
-	if ((skip = neg_ctxs->offset - sr->command.chain_offset) != 0 &&
-	    smb_mbc_decodef(&sr->command, "#.", skip) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		goto errout;
-	}
+	ctx_next_off = neg_ctxs->offset;
 
 	/*
 	 * Parse negotiate contexts. Ignore non-decoding errors to fill
 	 * as much as possible data for dtrace probe.
 	 */
 	for (i = 0; i < cnt; i++) {
-		smb2_neg_ctx_t neg_ctx;
-		int32_t ctx_end_off;
-		int32_t ctx_next_off;
-
-		if (i > 0) {
-			if ((skip = ctx_next_off - ctx_end_off) != 0 &&
-			    smb_mbc_decodef(&sr->command, "#.", skip) != 0) {
-				status = NT_STATUS_INVALID_PARAMETER;
-				goto errout;
-			}
+		/*
+		 * Advance to the start of the context.
+		 * This skips alignment bytes and any bytes left undecoded
+		 * by the below switch case (errors, unsupported types).
+		 * skip < 0 means someone gave us a bad 'datalen' value.
+		 */
+		skip = ctx_next_off - sr->command.chain_offset;
+		if (skip < 0) {
+			status = NT_STATUS_INVALID_PARAMETER;
+			nego->neg_err_rsn = "skip < 0";
+			goto errout;
+		}
+		if (skip > 0 &&
+		    smb_mbc_decodef(&sr->command, "#.", skip) != 0) {
+			status = NT_STATUS_INVALID_PARAMETER;
+			nego->neg_err_rsn = "Failed to skip to context";
+			goto errout;
 		}
 
 		rc = smb_mbc_decodef(
 		    &sr->command, "ww4.",
-		    &neg_ctx.type,	/* w */
-		    &neg_ctx.datalen);	/* w */
+		    &nego->neg_cur_ctx.type,	/* w */
+		    &nego->neg_cur_ctx.datalen);	/* w */
+
+		DTRACE_PROBE2(new__ctx, smb_request_t *, sr,
+		    smb2_arg_negotiate_t *, nego);
+
 		if (rc != 0) {
 			status = NT_STATUS_INVALID_PARAMETER;
+			nego->neg_err_rsn = "Decoding header failed";
 			goto errout;
 		}
 
 		/*
 		 * We got something crazy
 		 */
-		if (neg_ctx.datalen > NEG_CTX_MAX_DATALEN) {
+		if (nego->neg_cur_ctx.datalen > NEG_CTX_MAX_DATALEN) {
 			status = NT_STATUS_INVALID_PARAMETER;
+			nego->neg_err_rsn = "Invalid context length";
 			goto errout;
 		}
 
-		ctx_end_off = sr->command.chain_offset + neg_ctx.datalen;
-		ctx_next_off = P2ROUNDUP(ctx_end_off, 8);
+		ctx_next_off = P2ROUNDUP(
+		    sr->command.chain_offset + nego->neg_cur_ctx.datalen, 8);
 
-		switch (neg_ctx.type) {
+		switch (nego->neg_cur_ctx.type) {
 		case SMB2_PREAUTH_INTEGRITY_CAPS:
-			memcpy(&neg_ctxs->preauth_ctx.neg_ctx, &neg_ctx,
-			    sizeof (neg_ctx));
+			neg_ctxs->preauth_ctx.neg_ctx = nego->neg_cur_ctx;
 
 			if (found_preauth_ctx++ != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn = "Multiple preauth contexts";
 				continue;
 			}
+
+			neg_ctxs->has_preauth = B_TRUE;
 
 			rc = smb_mbc_decodef(
 			    &sr->command, "ww",
@@ -298,6 +332,7 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 			if (rc != 0 || picap->picap_hash_count >
 			    MAX_HASHID_NUM) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn = "Bad preauth lengths";
 				goto errout;
 			}
 
@@ -307,9 +342,11 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 			rc = smb_mbc_decodef(
 			    &sr->command, "#w",
 			    picap->picap_hash_count,
-			    &picap->picap_hash_id);	/* w */
+			    &picap->picap_hash_ids[0]);	/* w */
 			if (rc != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Failed to decode preauth hashes";
 				goto errout;
 			}
 
@@ -322,37 +359,32 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 			    &picap->picap_salt[0]);	/* w */
 			if (rc != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Failed to decode preauth salt";
 				goto errout;
 			}
 
-			/*
-			 * In SMB 0x311 there should be exactly 1 preauth
-			 * negotiate context, and there should be exactly 1
-			 * hash value in the list - SHA512.
-			 */
-			if (picap->picap_hash_count != 1) {
-				status = NT_STATUS_INVALID_PARAMETER;
-				continue;
-			}
-
-			if (picap->picap_hash_id == SMB3_HASH_SHA512)
-				found_sha512 = B_TRUE;
 			break;
 		case SMB2_ENCRYPTION_CAPS:
-			memcpy(&neg_ctxs->preauth_ctx.neg_ctx, &neg_ctx,
-			    sizeof (neg_ctx));
+			neg_ctxs->encrypt_ctx.neg_ctx = nego->neg_cur_ctx;
 
 			if (found_encrypt_ctx++ != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn = "Multiple encrypt contexts";
 				continue;
 			}
+
+			neg_ctxs->has_encrypt = B_TRUE;
 
 			rc = smb_mbc_decodef(
 			    &sr->command, "w",
 			    &encap->encap_cipher_count);	/* w */
+			/* Unlike other contexts, a 0 count is NOT an error */
 			if (rc != 0 || encap->encap_cipher_count >
 			    MAX_CIPHER_NUM) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Bad encryption cipher count";
 				goto errout;
 			}
 
@@ -365,66 +397,224 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 			    &encap->encap_cipher_ids[0]);	/* w */
 			if (rc != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Failed to decode encryption ciphers";
+				goto errout;
+			}
+
+			break;
+		case SMB2_SIGNING_CAPS:
+			neg_ctxs->sign_ctx.neg_ctx = nego->neg_cur_ctx;
+
+			if (found_signing_ctx++ != 0) {
+				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn = "Multiple signing contexts";
+				continue;
+			}
+
+			neg_ctxs->has_signing = B_TRUE;
+
+			rc = smb_mbc_decodef(
+			    &sr->command, "w",
+			    &sicap->sicap_alg_count);	/* w */
+			if (rc != 0 || sicap->sicap_alg_count >
+			    MAX_CIPHER_NUM || sicap->sicap_alg_count == 0) {
+				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Bad signing algorithm count";
 				goto errout;
 			}
 
 			/*
-			 * Select the first enabled cipher.
-			 * Client should list more prioritized ciphers first.
+			 * Get algorithm list
 			 */
-			for (int k = 0; k < encap->encap_cipher_count; k++) {
-				uint16_t c = encap->encap_cipher_ids[k];
-
-				if (c <= SMB3_CIPHER_MAX &&
-				    (SMB3_CIPHER_BIT(c) & ciphers) != 0) {
-					s->smb31_enc_cipherid = c;
-					found_cipher = B_TRUE;
-					break;
-				}
+			rc = smb_mbc_decodef(
+			    &sr->command, "#w",
+			    sicap->sicap_alg_count,
+			    &sicap->sicap_alg_ids[0]);	/* w */
+			if (rc != 0) {
+				status = NT_STATUS_INVALID_PARAMETER;
+				nego->neg_err_rsn =
+				    "Failed to decode signing algorithms";
+				goto errout;
 			}
+
 			break;
 		default:
-			;
+			DTRACE_PROBE2(unknown, smb_request_t *, sr,
+			    smb2_arg_negotiate_t *, nego);
+			break;
 		}
 	}
 
-	if (status)
-		goto errout;
-
-	/* Not found mandatory SMB2_PREAUTH_INTEGRITY_CAPS ctx */
-	if (found_preauth_ctx != 1 || found_encrypt_ctx > 1) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		goto errout;
-	}
-
-	if (!found_sha512) {
-		status = STATUS_PREAUTH_HASH_OVERLAP;
-		goto errout;
-	}
-
-	s->smb31_preauth_hashid = SMB3_HASH_SHA512;
-
-	if (!found_cipher)
-		s->smb31_enc_cipherid = 0;
-
-	/* Initialize out = in */
-	nego->neg_out_ctxs = nego->neg_in_ctxs;
-
 errout:
+	DTRACE_PROBE3(decode, smb_request_t *, sr, smb2_arg_negotiate_t *, nego,
+	    uint32_t, status);
+	return (status);
+}
+
+static uint32_t
+smb31_process_preauth_caps(smb_request_t *sr, smb2_neg_ctxs_t *in_ctx,
+    smb2_neg_ctxs_t *out_ctx)
+{
+	smb2_preauth_caps_t *in_caps = &in_ctx->preauth_ctx.preauth_caps;
+	smb2_preauth_caps_t *out_caps = &out_ctx->preauth_ctx.preauth_caps;
+	smb_session_t *s = sr->session;
+
+	/* No preauth CTX? That's a protocol error */
+	if (!in_ctx->has_preauth)
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	/*
+	 * Select the first enabled algorithm.
+	 * Client sends these in order of preference.
+	 */
+	for (int i = 0; i < in_caps->picap_hash_count; i++) {
+		uint16_t c = in_caps->picap_hash_ids[i];
+
+		/* SHA512 is the only currently supported preauth algorithm */
+		if (c == SMB3_HASH_SHA512) {
+			uint16_t salt_len = sizeof (out_caps->picap_salt);
+
+			s->smb31_preauth_hashid = c;
+			out_caps->picap_hash_count = 1;
+			out_caps->picap_hash_ids[0] = c;
+			out_caps->picap_salt_len = salt_len;
+			out_ctx->has_preauth = B_TRUE;
+			(void) random_get_pseudo_bytes(out_caps->picap_salt,
+			    salt_len);
+
+			return (NT_STATUS_SUCCESS);
+		}
+	}
+
+	/*
+	 * No matching algorithm; this is a protocol error.
+	 */
+	s->smb31_preauth_hashid = 0;
+	out_caps->picap_hash_count = 0;
+
+	return (STATUS_PREAUTH_HASH_OVERLAP);
+}
+
+static void
+smb31_process_encrypt_caps(smb_request_t *sr, smb2_neg_ctxs_t *in_ctx,
+    smb2_neg_ctxs_t *out_ctx)
+{
+	smb2_encrypt_caps_t *in_caps = &in_ctx->encrypt_ctx.encrypt_caps;
+	smb2_encrypt_caps_t *out_caps = &out_ctx->encrypt_ctx.encrypt_caps;
+	smb_session_t *s = sr->session;
+
+	/* No in ctx? Encryption isn't supported, no out ctx */
+	if (!in_ctx->has_encrypt) {
+		s->smb31_enc_cipherid = 0;
+		return;
+	}
+
+	/* If we get an Encryption ctx, we always return one */
+	out_ctx->has_encrypt = B_TRUE;
+	out_caps->encap_cipher_count = 1;
+
+	/*
+	 * Select the first enabled cipher.
+	 * Client sends these in order of preference.
+	 */
+	for (int i = 0; i < in_caps->encap_cipher_count; i++) {
+		uint16_t c = in_caps->encap_cipher_ids[i];
+		uint32_t ciphers = sr->sr_server->sv_cfg.skc_encrypt_ciphers;
+
+		if (c < SMB3_CIPHER_ID_MAX &&
+		    (SMB3_CIPHER_BIT(c) & ciphers) != 0) {
+			s->smb31_enc_cipherid = c;
+			out_caps->encap_cipher_ids[0] = c;
+			return;
+		}
+	}
+
+	/*
+	 * No matching ciphers; Set cipher ID to 0 ('none').
+	 * The connection doesn't support encryption.
+	 */
+	s->smb31_enc_cipherid = 0;
+	out_caps->encap_cipher_ids[0] = 0;
+}
+
+static void
+smb31_process_signing_caps(smb_request_t *sr, smb2_neg_ctxs_t *in_ctx,
+    smb2_neg_ctxs_t *out_ctx)
+{
+	smb2_sign_caps_t *in_caps = &in_ctx->sign_ctx.sign_caps;
+	smb2_sign_caps_t *out_caps = &out_ctx->sign_ctx.sign_caps;
+	smb_session_t *s = sr->session;
+
+	/* No in ctx? The default is CMAC, no out ctx */
+	if (!in_ctx->has_signing) {
+		s->smb31_sign_algid = SMB3_SIGN_AES128_CMAC;
+		return;
+	}
+
+	out_caps->sicap_alg_count = 1;
+	out_ctx->has_signing = B_TRUE;
+
+	/*
+	 * Select the first enabled algorithm.
+	 * Client sends these in order of preference.
+	 */
+	for (int i = 0; i < in_caps->sicap_alg_count; i++) {
+		uint16_t c = in_caps->sicap_alg_ids[i];
+		uint32_t sign_algs = sr->sr_server->sv_cfg.skc_sign_algs;
+
+		if (c < SMB3_SIGN_ID_MAX &&
+		    (SMB3_SIGN_ALG_BIT(c) & sign_algs) != 0) {
+			s->smb31_sign_algid = c;
+			out_caps->sicap_alg_ids[0] = c;
+			return;
+		}
+	}
+
+	/*
+	 * No matching algorithms; Set algorithm ID to CMAC.
+	 * [MS-SMB2] is silent on what we return here, but dochelp told us
+	 * that we're meant to return a signing context with the default (CMAC).
+	 * Note that samba's behavior differs here; they don't return a context.
+	 */
+	s->smb31_sign_algid = SMB3_SIGN_AES128_CMAC;
+	out_caps->sicap_alg_ids[0] = SMB3_SIGN_AES128_CMAC;
+}
+
+static uint32_t
+smb31_process_neg_ctxs(smb_request_t *sr)
+{
+	smb2_arg_negotiate_t *nego = sr->arg.other;
+	uint32_t status;
+
+	status = smb31_process_preauth_caps(sr, &nego->neg_in_ctxs,
+	    &nego->neg_out_ctxs);
+
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
+
+	smb31_process_encrypt_caps(sr, &nego->neg_in_ctxs,
+	    &nego->neg_out_ctxs);
+
+	smb31_process_signing_caps(sr, &nego->neg_in_ctxs,
+	    &nego->neg_out_ctxs);
+
 	return (status);
 }
 
 static int
 smb31_encode_neg_ctxs(smb_request_t *sr)
 {
-	smb_session_t *s = sr->session;
 	smb2_arg_negotiate_t *nego = sr->arg.other;
 	smb2_neg_ctxs_t *neg_ctxs = &nego->neg_out_ctxs;
 	smb2_preauth_caps_t *picap = &neg_ctxs->preauth_ctx.preauth_caps;
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
-	uint16_t salt_len = sizeof (picap->picap_salt);
+	smb2_sign_caps_t *sicap = &neg_ctxs->sign_ctx.sign_caps;
+	uint16_t salt_len = picap->picap_salt_len;
 	uint32_t preauth_ctx_len = 6 + salt_len;
 	uint32_t enc_ctx_len = 4;
+	uint32_t sign_ctx_len = 4;
 	uint32_t neg_ctx_off = NEG_CTX_OFFSET_OFFSET +
 	    P2ROUNDUP(sr->sr_cfg->skc_negtok_len, 8);
 	uint32_t rc;
@@ -434,11 +624,6 @@ smb31_encode_neg_ctxs(smb_request_t *sr)
 
 	ASSERT3S(neg_ctx_off, ==, sr->reply.chain_offset);
 
-	picap->picap_hash_id = s->smb31_preauth_hashid;
-	picap->picap_salt_len = salt_len;
-
-	(void) random_get_pseudo_bytes(picap->picap_salt, salt_len);
-
 	rc = smb_mbc_encodef(
 	    &sr->reply, "ww4.",
 	    SMB2_PREAUTH_INTEGRITY_CAPS,
@@ -447,40 +632,69 @@ smb31_encode_neg_ctxs(smb_request_t *sr)
 	if (rc != 0)
 		return (rc);
 
+	ASSERT3U(picap->picap_hash_count, ==, 1);
 	rc = smb_mbc_encodef(
 	    &sr->reply, "www#c",
-	    1,				/* hash algo count */
-	    salt_len,			/* salt length */
-	    s->smb31_preauth_hashid,	/* hash id */
-	    salt_len,			/* salt length */
+	    picap->picap_hash_count,	/* hash algo count */
+	    picap->picap_salt_len,	/* salt length */
+	    picap->picap_hash_ids[0],	/* hash id */
+	    picap->picap_salt_len,	/* salt length */
 	    picap->picap_salt);
 	if (rc != 0)
 		return (rc);
 
-	/*
-	 * If we did not get SMB2_ENCRYPTION_CAPS, don't send one.
-	 */
-	if (encap->encap_cipher_count == 0)
-		return (0);
+	if (neg_ctxs->has_encrypt) {
+		/*
+		 * Encode SMB2_ENCRYPTION_CAPS response.
+		 */
+		if ((rc = smb_mbc_put_align(&sr->reply, 8)) != 0)
+			return (rc);
 
-	/*
-	 * Encode SMB2_ENCRYPTION_CAPS response.
-	 */
-	if ((rc = smb_mbc_put_align(&sr->reply, 8)) != 0)
-		return (rc);
+		rc = smb_mbc_encodef(
+		    &sr->reply, "ww4.",
+		    SMB2_ENCRYPTION_CAPS,
+		    enc_ctx_len
+		    /* 4. */); /* reserved */
 
-	rc = smb_mbc_encodef(
-	    &sr->reply, "ww4.",
-	    SMB2_ENCRYPTION_CAPS,
-	    enc_ctx_len
-	    /* 4. */); /* reserved */
+		if (rc != 0)
+			return (rc);
 
-	rc = smb_mbc_encodef(
-	    &sr->reply, "ww",
-	    1,				/* cipher count */
-	    s->smb31_enc_cipherid);	/* encrypt. cipher id */
+		ASSERT3U(encap->encap_cipher_count, ==, 1);
+		rc = smb_mbc_encodef(
+		    &sr->reply, "ww",
+		    encap->encap_cipher_count,	 /* cipher count */
+		    encap->encap_cipher_ids[0]); /* encrypt. cipher id */
 
-	return (rc);
+		if (rc != 0)
+			return (rc);
+	}
+
+	if (neg_ctxs->has_signing) {
+		/*
+		 * Encode SMB2_SIGNING_CAPS response.
+		 */
+		if ((rc = smb_mbc_put_align(&sr->reply, 8)) != 0)
+			return (rc);
+
+		rc = smb_mbc_encodef(
+		    &sr->reply, "ww4.",
+		    SMB2_SIGNING_CAPS,
+		    sign_ctx_len
+		    /* 4. */); /* reserved */
+
+		if (rc != 0)
+			return (rc);
+
+		ASSERT3U(sicap->sicap_alg_count, ==, 1);
+		rc = smb_mbc_encodef(
+		    &sr->reply, "ww",
+		    sicap->sicap_alg_count,	/* algorithm count */
+		    sicap->sicap_alg_ids[0]);	/* algorithm id */
+		if (rc != 0)
+			return (rc);
+	}
+
+	return (0);
 }
 
 /*
@@ -721,6 +935,12 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	s->s_state = SMB_SESSION_STATE_NEGOTIATED;
 	s->newrq_func = smb2sr_newrq;
 
+	if (s->dialect >= SMB_VERS_3_11) {
+		status = smb31_process_neg_ctxs(sr);
+		if (status != NT_STATUS_SUCCESS)
+			goto errout;
+	}
+
 	if (smb2_negotiate_common(sr, best_version) != 0)
 		status = NT_STATUS_INTERNAL_ERROR;
 
@@ -796,12 +1016,6 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	now_tv.tv_sec = gethrestime_sec();
 	now_tv.tv_nsec = 0;
 
-	/*
-	 * If the version is 0x2FF, we haven't completed negotiate.
-	 * Don't initialize until we have our final request.
-	 */
-	if (version != 0x2FF)
-		smb2_sign_init_mech(s);
 	if (version >= 0x311)
 		smb31_preauth_init_mech(s);
 
@@ -824,13 +1038,16 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	} else if (s->dialect < SMB_VERS_3_0) {
 		/* SMB 2.x */
 		s->srv_cap = smb2srv_capabilities & SMB_2X_CAPS;
+		s->smb31_sign_algid = SMB3_SIGN_SHA256_HMAC;
 	} else {
 		/* SMB 3.0 or later */
 		s->srv_cap = smb2srv_capabilities &
 		    (SMB_2X_CAPS | s->capabilities);
 
-		if (s->dialect < SMB_VERS_3_11)
+		if (s->dialect < SMB_VERS_3_11) {
 			s->smb31_enc_cipherid = SMB3_CIPHER_AES128_CCM;
+			s->smb31_sign_algid = SMB3_SIGN_AES128_CMAC;
+		}
 		/* else from negotiate context */
 
 		if ((s->srv_cap & SMB2_CAP_ENCRYPTION) != 0 &&
@@ -840,11 +1057,15 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 
 		if (s->dialect >= SMB_VERS_3_11) {
 			smb2_encrypt_caps_t *encap =
-			    &nego->neg_in_ctxs.encrypt_ctx.encrypt_caps;
+			    &nego->neg_out_ctxs.encrypt_ctx.encrypt_caps;
+			smb2_sign_caps_t *sicap =
+			    &nego->neg_out_ctxs.sign_ctx.sign_caps;
 
 			neg_ctx_cnt = 1; // always have preauth
 
 			if (encap->encap_cipher_count != 0)
+				neg_ctx_cnt++;
+			if (sicap->sicap_alg_count != 0)
 				neg_ctx_cnt++;
 
 			neg_ctx_off = NEG_CTX_OFFSET_OFFSET +
@@ -859,6 +1080,13 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 				    "failed");
 		}
 	}
+
+	/*
+	 * If the version is 0x2FF, we haven't completed negotiation.
+	 * Don't initialize until we have our final request.
+	 */
+	if (version != 0x2FF)
+		smb2_sign_init_mech(s);
 
 	/*
 	 * See notes above smb2_max_rwsize, smb2_old_rwsize

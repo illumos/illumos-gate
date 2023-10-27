@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -114,6 +114,7 @@ smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 	ioc.maximum_credits = cfg->skc_maximum_credits;
 	ioc.encrypt = cfg->skc_encrypt;
 	ioc.encrypt_ciphers = cfg->skc_encrypt_ciphers;
+	ioc.sign_algs = cfg->skc_sign_algs;
 
 	(void) memcpy(ioc.machine_uuid, cfg->skc_machine_uuid, sizeof (uuid_t));
 	(void) memcpy(ioc.negtok, cfg->skc_negtok, sizeof (ioc.negtok));

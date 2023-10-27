@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2022 RackTop Systems, Inc.
+# Copyright 2022-2023 RackTop Systems, Inc.
 #
 
 #
@@ -126,6 +126,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_config_setstr;
 	smb_config_upgrade;
 	smb_convert_encrypt_ciphers;
+	smb_convert_signing_algs;
 	smb_convert_version_str;
 	smb_crc_gen;
 	smb_ctxbuf_init;

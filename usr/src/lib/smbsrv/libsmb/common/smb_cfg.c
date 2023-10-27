@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -162,6 +162,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_NETLOGON_FLAGS, "netlogon_flags", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_SHORT_NAMES, "short_names", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_MAX_OPENS, "max_opens", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_SIGN_ALGS, "sign_algs", SCF_TYPE_ASTRING, 0},
 
 	/* SMB_CI_MAX */
 };
@@ -198,8 +199,17 @@ smb31_encrypt_ciphers[] = {
 	{ "all",	SMB3_CIPHER_FLAGS_ALL },
 	{ NULL,		0 }
 };
-/* Buffer large enough to hold all cipher names. */
-#define	SMB_CIPHERS_MAXLEN	64
+
+/*
+ * Supported signing algorithms.
+ */
+static struct str_val
+smb31_sign_algs[] = {
+	{ "aes128-cmac",	SMB3_SIGN_FLAG_AES128_CMAC },	/* SMB 3.x */
+	{ "sha256-hmac",	SMB3_SIGN_FLAG_SHA256_HMAC },	/* SMB 2.x */
+	{ "all",		SMB3_SIGN_FLAGS_ALL },
+	{ NULL,		0 }
+};
 
 static smb_cfg_param_t *smb_config_getent(smb_cfg_id_t);
 
@@ -1247,26 +1257,30 @@ smb_config_get_min_protocol(void)
 }
 
 /*
- * Convert a list of ciphers to a bitmask.
+ * Convert a delineated list of strings to a bitmask.
  * Returns mask or -1 for errors.
  *
  * Note this is used both below and in libshare_smb
  * for validation of new setting.
  */
-int
-smb_convert_encrypt_ciphers(char *value)
+
+/* Buffer large enough to hold all current flag strings. */
+#define	SMB_STRFLAGS_MAXLEN	64
+
+static int
+smb_convert_str2flags(const char *value, const struct str_val *table)
 {
 	const char *sep = ",:";
-	char buf[SMB_CIPHERS_MAXLEN];
+	char buf[SMB_STRFLAGS_MAXLEN];
 	char *last;
 	char *cn;
-	struct str_val *sv;
-	int ciphers = 0;
+	const struct str_val *sv;
+	int flags = 0;
 
 	if (value == NULL)
 		return (-1);
 
-	if (strlen(value) >= SMB_CIPHERS_MAXLEN)
+	if (strlen(value) >= SMB_STRFLAGS_MAXLEN)
 		return (-1);
 
 	(void) strlcpy(buf, value, sizeof (buf));
@@ -1274,10 +1288,10 @@ smb_convert_encrypt_ciphers(char *value)
 	cn = strtok_r(buf, sep, &last);
 	while (cn != NULL) {
 		boolean_t valid = B_FALSE;
-		/* # of ciphers is small - don't care about O(n2) */
-		for (sv = smb31_encrypt_ciphers; sv->str != NULL; sv++) {
+		/* # of entries is small - don't care about O(n2) */
+		for (sv = table; sv->str != NULL; sv++) {
 			if (strcmp(cn, sv->str) == 0) {
-				ciphers |= sv->val;
+				flags |= sv->val;
 				valid = B_TRUE;
 			}
 		}
@@ -1285,7 +1299,19 @@ smb_convert_encrypt_ciphers(char *value)
 			return (-1);
 		cn = strtok_r(NULL, sep, &last);
 	}
-	return (ciphers);
+	return (flags);
+}
+
+int
+smb_convert_encrypt_ciphers(const char *value)
+{
+	return (smb_convert_str2flags(value, smb31_encrypt_ciphers));
+}
+
+int
+smb_convert_signing_algs(const char *value)
+{
+	return (smb_convert_str2flags(value, smb31_sign_algs));
 }
 
 /*
@@ -1296,7 +1322,7 @@ smb_convert_encrypt_ciphers(char *value)
 uint32_t
 smb_config_get_encrypt_ciphers(void)
 {
-	char buf[SMB_CIPHERS_MAXLEN];
+	char buf[SMB_STRFLAGS_MAXLEN];
 	int ciphers = 0;
 
 	if (smb_config_getstr(SMB_CI_ENCRYPT_CIPHERS, buf, sizeof (buf))
@@ -1309,6 +1335,27 @@ smb_config_get_encrypt_ciphers(void)
 		ciphers = SMB3_CIPHER_FLAGS_ALL;
 
 	return ((uint32_t)ciphers);
+}
+
+const int smb_default_signing_algs =
+    SMB3_SIGN_FLAG_AES128_CMAC;
+
+uint32_t
+smb_config_get_signing_algs(void)
+{
+	char buf[SMB_STRFLAGS_MAXLEN];
+	int algs = 0;
+
+	if (smb_config_getstr(SMB_CI_SIGN_ALGS, buf, sizeof (buf))
+	    != SMBD_SMF_OK)
+		buf[0] = '\0';
+
+	algs = smb_convert_signing_algs(buf);
+
+	if (algs <= 0)
+		algs = smb_default_signing_algs;
+
+	return ((uint32_t)algs);
 }
 
 /*

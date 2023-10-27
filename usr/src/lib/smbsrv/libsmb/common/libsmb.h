@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #ifndef	_LIBSMB_H
@@ -165,6 +165,7 @@ typedef enum {
 	SMB_CI_NETLOGON_FLAGS,
 	SMB_CI_SHORT_NAMES,
 	SMB_CI_MAX_OPENS,
+	SMB_CI_SIGN_ALGS,
 
 	SMB_CI_MAX
 } smb_cfg_id_t;
@@ -227,7 +228,9 @@ extern uint32_t smb_config_get_min_protocol(void);
 extern uint32_t smb_convert_version_str(const char *);
 extern void smb_config_upgrade(void);
 extern uint32_t smb_config_get_encrypt_ciphers(void);
-extern int smb_convert_encrypt_ciphers(char *);
+extern int smb_convert_encrypt_ciphers(const char *);
+extern uint32_t smb_config_get_signing_algs(void);
+extern int smb_convert_signing_algs(const char *);
 
 extern smb_cfg_val_t smb_config_get_require(smb_cfg_id_t);
 
