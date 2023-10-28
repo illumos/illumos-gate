@@ -435,7 +435,7 @@ static gs_ops_t do_gs_func[] = {
 };
 
 #define	N_FUNC		sizeof (do_func) / sizeof (cmd_ops_t)
-#define	N_GS_FUNC 	sizeof (do_gs_func) / sizeof (gs_ops_t)
+#define	N_GS_FUNC	sizeof (do_gs_func) / sizeof (gs_ops_t)
 
 /*
  * valid rate value
@@ -3148,7 +3148,7 @@ do_wlanlist(int fd, int argc, char **argv)
 
 /*
  * do_showstatus: show the basic status of the interface, including
- * linkstauts, essid, encryption and signal strength.
+ * linkstatus, essid, encryption and signal strength.
  */
 /*ARGSUSED*/
 static boolean_t
@@ -4004,7 +4004,7 @@ do_get_wlanlist(int fd)
 static boolean_t
 do_get_linkstatus(int fd)
 {
-	PRTDBG(("do_get_linkstauts(%d)\n", fd));
+	PRTDBG(("do_get_linkstatus(%d)\n", fd));
 	return (call_ioctl(fd, WLAN_GET_PARAM, WL_LINKSTATUS, 0));
 }
 

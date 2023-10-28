@@ -548,7 +548,7 @@ extern ACPI_STATUS acpidev_walk_apic(ACPI_BUFFER *bufp, ACPI_HANDLE hdl,
  * Evaluate _OST method under object, which is used to support hotplug event.
  * hdl: object handle
  * code: _OST source event code
- * stauts: _OST result status code
+ * status: _OST result status code
  * bufp and len: optional third parameter for _OST.
  */
 extern ACPI_STATUS acpidev_eval_ost(ACPI_HANDLE hdl, uint32_t code,
