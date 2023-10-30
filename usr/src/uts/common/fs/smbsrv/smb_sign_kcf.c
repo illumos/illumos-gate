@@ -139,114 +139,78 @@ smb3_cmac_getmech(smb_crypto_mech_t *mech)
  * CMAC has no parameter.
  */
 void
-smb2_sign_init_hmac_param(smb_enc_ctx_t *ctx, ulong_t hmac_len)
+smb2_sign_init_hmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
+    ulong_t hmac_len)
 {
-	ctx->param.hmac = hmac_len;
+	param->hmac = hmac_len;
 
-	ctx->mech.cm_param = (caddr_t)&ctx->param.hmac;
-	ctx->mech.cm_param_len = sizeof (ctx->param.hmac);
+	mech->cm_param = (caddr_t)&param->hmac;
+	mech->cm_param_len = sizeof (param->hmac);
 }
 
 /*
- * Start the KCF session, load the key
+ * Digest a whole message as described by: crypto_data_t *input
+ * and store the resulting MAC in *mac_buf / mac_len.
+ * Returns zero on success, else non-zero.
  */
-int
-smb2_mac_init(smb_enc_ctx_t *ctxp, uint8_t *key, size_t key_len)
+static int
+smb2_mac(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
+    crypto_data_t *input, void *mac_buf, size_t mac_len)
 {
+	crypto_data_t out_cd = {
+	    .cd_format = CRYPTO_DATA_RAW,
+	    .cd_length = mac_len,
+	    .cd_raw.iov_len = mac_len,
+	    .cd_raw.iov_base = mac_buf
+	};
+	crypto_key_t ckey = {
+	    .ck_format = CRYPTO_KEY_RAW,
+	    .ck_data = key,
+	    .ck_length = key_len * 8 /* in bits */
+	};
 	int rv;
 
-	bzero(&ctxp->ckey, sizeof (ctxp->ckey));
-	ctxp->ckey.ck_format = CRYPTO_KEY_RAW;
-	ctxp->ckey.ck_data = key;
-	ctxp->ckey.ck_length = key_len * 8; /* in bits */
-
-	rv = crypto_mac_init(&ctxp->mech, &ctxp->ckey, NULL, &ctxp->ctx, NULL);
-
-	return (rv == CRYPTO_SUCCESS ? 0 : -1);
-}
-
-/*
- * Digest one segment
- */
-int
-smb2_mac_update(smb_enc_ctx_t *ctxp, uint8_t *in, size_t len)
-{
-	crypto_data_t data;
-	int rv;
-
-	bzero(&data, sizeof (data));
-	data.cd_format = CRYPTO_DATA_RAW;
-	data.cd_length = len;
-	data.cd_raw.iov_base = (void *)in;
-	data.cd_raw.iov_len = len;
-
-	rv = crypto_mac_update(ctxp->ctx, &data, 0);
-
+	rv = crypto_mac(mech, input, &ckey, NULL, &out_cd, NULL);
 	if (rv != CRYPTO_SUCCESS) {
-		crypto_cancel_ctx(ctxp->ctx);
+		cmn_err(CE_WARN, "crypto_mac failed: 0x%x", rv);
 		return (-1);
 	}
 
 	return (0);
 }
 
+/*
+ * Digest a whole message with scatter/gather (UIO)
+ * Returns zero on success, else non-zero.
+ */
 int
-smb2_mac_final(smb_enc_ctx_t *ctxp, uint8_t *digest16)
+smb2_mac_uio(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
+    uio_t *in_uio, uint8_t *digest16)
 {
-	crypto_data_t out;
-	int rv;
+	crypto_data_t in_cd = {
+	    .cd_format = CRYPTO_DATA_UIO,
+	    .cd_length = in_uio->uio_resid,
+	    .cd_uio = in_uio
+	};
 
-	bzero(&out, sizeof (out));
-	out.cd_format = CRYPTO_DATA_RAW;
-	out.cd_length = SMB2_SIG_SIZE;
-	out.cd_raw.iov_len = SMB2_SIG_SIZE;
-	out.cd_raw.iov_base = (void *)digest16;
-
-	rv = crypto_mac_final(ctxp->ctx, &out, 0);
-
-	return (rv == CRYPTO_SUCCESS ? 0 : -1);
+	return (smb2_mac(mech, key, key_len, &in_cd, digest16, SMB2_SIG_SIZE));
 }
 
 /*
- * One-shot HMAC function used in smb3_kdf
+ * Digest a whole message that fits in a single buffer
  */
 int
-smb2_hmac_one(smb_crypto_mech_t *mech,
+smb2_mac_raw(smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len,
     uint8_t *data, size_t data_len,
     uint8_t *mac, size_t mac_len)
 {
-	crypto_key_t ckey;
-	crypto_data_t cdata;
-	crypto_data_t cmac;
-	int rv;
-	ulong_t hmac_len = mac_len;
+	crypto_data_t in_cd = {
+	    .cd_format = CRYPTO_DATA_RAW,
+	    .cd_length = data_len,
+	    .cd_raw.iov_base = (void *)data,
+	    .cd_raw.iov_len = data_len
+	};
 
-	bzero(&ckey, sizeof (ckey));
-	ckey.ck_format = CRYPTO_KEY_RAW;
-	ckey.ck_data = key;
-	ckey.ck_length = key_len * 8; /* in bits */
-
-	bzero(&cdata, sizeof (cdata));
-	cdata.cd_format = CRYPTO_DATA_RAW;
-	cdata.cd_length = data_len;
-	cdata.cd_raw.iov_base = (void *)data;
-	cdata.cd_raw.iov_len = data_len;
-
-	bzero(&cmac, sizeof (cmac));
-	cmac.cd_format = CRYPTO_DATA_RAW;
-	cmac.cd_length = mac_len;
-	cmac.cd_raw.iov_base = (void *)mac;
-	cmac.cd_raw.iov_len = mac_len;
-
-	mech->cm_param = (caddr_t)&hmac_len;
-	mech->cm_param_len = sizeof (hmac_len);
-
-	rv = crypto_mac(mech, &cdata, &ckey, NULL, &cmac, NULL);
-
-	/* Not used after this point. */
-	mech->cm_param = NULL;
-	mech->cm_param_len = 0;
-
-	return (rv == CRYPTO_SUCCESS ? 0 : -1);
+	return (smb2_mac(mech, key, key_len, &in_cd, mac, mac_len));
 }

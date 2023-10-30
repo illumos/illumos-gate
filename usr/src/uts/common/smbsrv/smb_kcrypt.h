@@ -106,14 +106,12 @@ int smb_md5_final(smb_sign_ctx_t, uint8_t *);
 
 int smb2_hmac_getmech(smb_crypto_mech_t *);
 int smb3_cmac_getmech(smb_crypto_mech_t *);
-void smb2_sign_init_hmac_param(smb_enc_ctx_t *, ulong_t);
+void smb2_sign_init_hmac_param(smb_crypto_mech_t *, smb_crypto_param_t *,
+    ulong_t);
 
-int smb2_mac_init(smb_enc_ctx_t *, uint8_t *, size_t);
-int smb2_mac_update(smb_enc_ctx_t *, uint8_t *, size_t);
-int smb2_mac_final(smb_enc_ctx_t *, uint8_t *);
-
-int smb2_hmac_one(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
-    uint8_t *data, size_t data_len, uint8_t *mac, size_t mac_len);
+int smb2_mac_uio(smb_crypto_mech_t *, uint8_t *, size_t, uio_t *, uint8_t *);
+int smb2_mac_raw(smb_crypto_mech_t *, uint8_t *, size_t, uint8_t *, size_t,
+    uint8_t *, size_t);
 
 int smb3_kdf(uint8_t *outbuf, uint32_t outbuf_len,
     uint8_t *key, size_t key_len,

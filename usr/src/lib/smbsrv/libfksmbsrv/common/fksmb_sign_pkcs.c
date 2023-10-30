@@ -139,74 +139,17 @@ smb3_cmac_getmech(smb_crypto_mech_t *mech)
  * CMAC has no parameter.
  */
 void
-smb2_sign_init_hmac_param(smb_enc_ctx_t *ctx, ulong_t hmac_len)
+smb2_sign_init_hmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
+    ulong_t hmac_len)
 {
-	ctx->param.hmac = hmac_len;
+	param->hmac = hmac_len;
 
-	ctx->mech.pParameter = (caddr_t)&ctx->param.hmac;
-	ctx->mech.ulParameterLen = sizeof (ctx->param.hmac);
-}
-
-/*
- * Start PKCS#11 session, load the key.
- */
-int
-smb2_mac_init(smb_enc_ctx_t *ctxp, uint8_t *key, size_t key_len)
-{
-	CK_OBJECT_HANDLE hkey = 0;
-	CK_RV rv;
-
-	rv = SUNW_C_GetMechSession(ctxp->mech.mechanism, &ctxp->ctx);
-	if (rv != CKR_OK)
-		return (-1);
-
-	rv = SUNW_C_KeyToObject(ctxp->ctx, ctxp->mech.mechanism,
-	    key, key_len, &hkey);
-	if (rv != CKR_OK)
-		return (-1);
-
-	rv = C_SignInit(ctxp->ctx, &ctxp->mech, hkey);
-	(void) C_DestroyObject(ctxp->ctx, hkey);
-	if (rv != CKR_OK) {
-		(void) C_CloseSession(ctxp->ctx);
-		return (-1);
-	}
-
-	return (rv == CKR_OK ? 0 : -1);
-}
-
-/*
- * Digest one segment
- */
-int
-smb2_mac_update(smb_enc_ctx_t *ctxp, uint8_t *in, size_t len)
-{
-	CK_RV rv;
-
-	rv = C_SignUpdate(ctxp->ctx, in, len);
-	if (rv != CKR_OK)
-		(void) C_CloseSession(ctxp->ctx);
-
-	return (rv == CKR_OK ? 0 : -1);
+	mech->pParameter = (caddr_t)&param->hmac;
+	mech->ulParameterLen = sizeof (param->hmac);
 }
 
 int
-smb2_mac_final(smb_enc_ctx_t *ctxp, uint8_t *digest16)
-{
-	CK_ULONG len = SMB2_SIG_SIZE;
-	CK_RV rv;
-
-	rv = C_SignFinal(ctxp->ctx, digest16, &len);
-	(void) C_CloseSession(ctxp->ctx);
-
-	return (rv == CKR_OK ? 0 : -1);
-}
-
-/*
- * One-shot HMAC function used in smb3_kdf
- */
-int
-smb2_hmac_one(smb_crypto_mech_t *mech,
+smb2_mac_raw(smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len,
     uint8_t *data, size_t data_len,
     uint8_t *mac, size_t mac_len)
@@ -214,7 +157,6 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 	CK_SESSION_HANDLE hssn = 0;
 	CK_OBJECT_HANDLE hkey = 0;
 	CK_ULONG ck_maclen = mac_len;
-	CK_MAC_GENERAL_PARAMS out_len = mac_len;
 	CK_RV rv;
 	int rc = 0;
 
@@ -228,9 +170,6 @@ smb2_hmac_one(smb_crypto_mech_t *mech,
 		rc = -2;
 		goto out;
 	}
-
-	mech->pParameter = (caddr_t)&out_len;
-	mech->ulParameterLen = sizeof (out_len);
 
 	rv = C_SignInit(hssn, mech, hkey);
 	if (rv != CKR_OK) {
@@ -257,6 +196,89 @@ out:
 		(void) C_CloseSession(hssn);
 	mech->pParameter = NULL;
 	mech->ulParameterLen = 0;
+
+	return (rc);
+}
+
+/*
+ * Digest a whole message with scatter/gather (UIO)
+ *
+ * Returns zero on success, else non-zero.  The error return values
+ * are arbitrary, and different from each other just to make it easy
+ * to see which error path was taken when looking at dtrace returns.
+ */
+int
+smb2_mac_uio(smb_crypto_mech_t *mech, uint8_t *key, size_t key_len,
+    uio_t *in_uio, uint8_t *digest16)
+{
+	CK_SESSION_HANDLE hssn = 0;
+	CK_OBJECT_HANDLE hkey = 0;
+	CK_ULONG mac_len = SMB2_SIG_SIZE;
+	CK_ULONG ck_maclen = mac_len;
+	CK_RV rv;
+	int rc = 0;
+
+	if (in_uio->uio_resid <= 0)
+		return (EIO);
+
+	if (in_uio->uio_segflg != UIO_USERSPACE &&
+	    in_uio->uio_segflg != UIO_SYSSPACE) {
+		return (EINVAL);
+	}
+
+	rv = SUNW_C_GetMechSession(mech->mechanism, &hssn);
+	if (rv != CKR_OK)
+		return (-1);
+
+	rv = SUNW_C_KeyToObject(hssn, mech->mechanism,
+	    key, key_len, &hkey);
+	if (rv != CKR_OK) {
+		rc = -2;
+		goto out;
+	}
+
+	rv = C_SignInit(hssn, mech, hkey);
+	if (rv != CKR_OK) {
+		rc = -3;
+		goto out;
+	}
+
+	/* Like uiomove() */
+	while (in_uio->uio_resid > 0) {
+		struct iovec *iov = in_uio->uio_iov;
+		CK_ULONG data_len = MIN(in_uio->uio_resid, iov->iov_len);
+
+		if (data_len == 0) {
+			in_uio->uio_iov++;
+			in_uio->uio_iovcnt--;
+			continue;
+		}
+
+		rv = C_SignUpdate(hssn, (CK_BYTE_PTR)iov->iov_base, data_len);
+		if (rv != CKR_OK) {
+			rc = -4;
+			goto out;
+		}
+
+		iov->iov_base += data_len;
+		iov->iov_len -= data_len;
+		in_uio->uio_resid -= data_len;
+		in_uio->uio_loffset += data_len;
+	}
+	rv = C_SignFinal(hssn, digest16, &ck_maclen);
+
+	if (rv != CKR_OK)
+		rc = -5;
+	else if (ck_maclen != mac_len)
+		rc = -6;
+	else
+		rc = 0;
+
+out:
+	if (hkey != 0)
+		(void) C_DestroyObject(hssn, hkey);
+	if (hssn != 0)
+		(void) C_CloseSession(hssn);
 
 	return (rc);
 }

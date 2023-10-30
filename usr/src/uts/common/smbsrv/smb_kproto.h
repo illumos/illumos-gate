@@ -799,11 +799,13 @@ void smb_xa_close(smb_xa_t *xa);
 int smb_xa_complete(smb_xa_t *xa);
 smb_xa_t *smb_xa_find(smb_session_t *session, uint32_t pid, uint16_t mid);
 
+smb_vdb_t *smb_get_vdb(smb_request_t *sr);
 struct mbuf *smb_mbuf_get(uchar_t *buf, int nbytes);
 struct mbuf *smb_mbuf_alloc_kmem(int len);
 struct mbuf *smb_mbuf_alloc_chain(int nbytes);
 struct mbuf *smb_mbuf_allocate(struct uio *uio);
 int smb_mbuf_mkuio(mbuf_t *m, uio_t *uio);
+int smb_mbuf_mkuio_cont(mbuf_t *m, uio_t *uio, int iovcnt);
 void smb_mbuf_trim(struct mbuf *mhead, int nbytes);
 
 int32_t smb_time_gmt_to_local(smb_request_t *, int32_t);

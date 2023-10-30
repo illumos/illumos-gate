@@ -104,6 +104,7 @@ smb3_kdf(uint8_t *outbuf, uint32_t keylen,
     uint8_t *context, size_t context_len)
 {
 	smb_crypto_mech_t mech;
+	smb_crypto_param_t param;
 	uint8_t kdfbuf[KDF_BUFLEN];
 	uint32_t L = keylen << 3; /* key len in bits */
 	int pos = 0;
@@ -129,7 +130,7 @@ smb3_kdf(uint8_t *outbuf, uint32_t keylen,
 	bcopy(context, &kdfbuf[pos], context_len);
 	pos += context_len;
 
-	/* Key lemgth in bits, big-endian, possibly misaligned */
+	/* Key length in bits, big-endian, possibly misaligned */
 	kdfbuf[pos++] = 0;
 	kdfbuf[pos++] = 0;
 	kdfbuf[pos++] = (uint8_t)(L >> 8);
@@ -139,7 +140,9 @@ smb3_kdf(uint8_t *outbuf, uint32_t keylen,
 	if ((rc = smb2_hmac_getmech(&mech)) != 0)
 		return (rc);
 
-	rc = smb2_hmac_one(&mech,
+	smb2_sign_init_hmac_param(&mech, &param, keylen);
+
+	rc = smb2_mac_raw(&mech,
 	    ssn_key, ssn_keylen,
 	    kdfbuf, pos,
 	    outbuf, keylen);

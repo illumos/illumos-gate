@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -290,6 +291,24 @@ smb_mbuf_alloc_chain(int nbytes)
 }
 
 /*
+ * Get an smb_vdb_t and initialize it.
+ * Free'd via smb_request_free
+ */
+smb_vdb_t *
+smb_get_vdb(smb_request_t *sr)
+{
+	smb_vdb_t *vdb;
+
+	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
+	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
+	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+
+	return (vdb);
+}
+
+/*
  * Allocate enough mbufs to accommodate the residual count in uio,
  * and setup the uio_iov to point to them.  Note that uio->uio_iov
  * is allocated by the call and has MAX_IOVEC elements.  Currently
@@ -318,7 +337,12 @@ smb_mbuf_allocate(struct uio *uio)
 }
 
 /*
- * Build an iovec for an mbuf chain.
+ * Build an iovec for an mbuf chain. with some portion of the iovec
+ * already filled in. This may only ever be called once per uio_t.
+ *
+ * smb2_sign_calc uses this to build a UIO where the first segment
+ * is a copy of the SMB header (with the signature zero'ed out)
+ * and the rest if the remainder of the message (in mbufs).
  *
  * The resulting iovec covers uio_resid length in the chain,
  * which could be shorter than the mbuf chain total length.
@@ -327,7 +351,7 @@ smb_mbuf_allocate(struct uio *uio)
  * Errors if iovec too small or mbuf chain too short.
  */
 int
-smb_mbuf_mkuio(mbuf_t *m, uio_t *uio)
+smb_mbuf_mkuio_cont(mbuf_t *m, uio_t *uio, int iov_off)
 {
 	iovec_t	*iov;
 	ssize_t off = 0;
@@ -335,6 +359,14 @@ smb_mbuf_mkuio(mbuf_t *m, uio_t *uio)
 	int tlen;
 
 	iov = uio->uio_iov;
+
+	while (iov_off > iovcnt) {
+		if (iovcnt >= uio->uio_iovcnt)
+			return (E2BIG);
+		iovcnt++;
+		off += iov->iov_len;
+		iov++;
+	}
 	while (off < uio->uio_resid) {
 		if (m == NULL)
 			return (EFAULT);
@@ -353,6 +385,12 @@ smb_mbuf_mkuio(mbuf_t *m, uio_t *uio)
 	uio->uio_iovcnt = iovcnt;
 
 	return (0);
+}
+
+int
+smb_mbuf_mkuio(mbuf_t *m, uio_t *uio)
+{
+	return (smb_mbuf_mkuio_cont(m, uio, 0));
 }
 
 /*

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017-2021 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -267,24 +267,6 @@ smb3_encode_tform_header(smb_request_t *sr, struct mbuf_chain *mbc)
 }
 
 /*
- * Get an smb_vdb_t and initialize it.
- * Free'd via smb_request_free
- */
-static smb_vdb_t *
-smb3_get_vdb(smb_request_t *sr)
-{
-	smb_vdb_t *vdb;
-
-	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
-	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
-	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
-	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
-	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
-
-	return (vdb);
-}
-
-/*
  * Decrypt the request in mbc_in into out_mbc which as been
  * setup by the caller.  The caller will replace sr->command
  * with out_mbc if this succeeds, or will free which ever one
@@ -430,7 +412,7 @@ smb3_decrypt_sr(smb_request_t *sr,
 	 * b: all subsequent segments of this message
 	 * c: final 16 byte signature from the transform header
 	 */
-	in_vdb = smb3_get_vdb(sr);
+	in_vdb = smb_get_vdb(sr);
 	in_vdb->vdb_uio.uio_resid = sr->th_msglen;
 	rc = smb_mbuf_mkuio(in_mbc->chain, &in_vdb->vdb_uio);
 	if (rc != 0)
@@ -448,7 +430,7 @@ smb3_decrypt_sr(smb_request_t *sr,
 	/*
 	 * Build a UIO vector for the cleartext (out)
 	 */
-	out_vdb = smb3_get_vdb(sr);
+	out_vdb = smb_get_vdb(sr);
 	out_vdb->vdb_uio.uio_resid = sr->th_msglen;
 	rc = smb_mbuf_mkuio(out_mbc->chain, &out_vdb->vdb_uio);
 	if (rc != 0)
@@ -592,7 +574,7 @@ smb3_encrypt_sr(smb_request_t *sr,
 	/*
 	 * Build a UIO vector for the cleartext (in)
 	 */
-	in_vdb = smb3_get_vdb(sr);
+	in_vdb = smb_get_vdb(sr);
 	in_vdb->vdb_uio.uio_resid = sr->th_msglen;
 	rc = smb_mbuf_mkuio(in_mbc->chain, &in_vdb->vdb_uio);
 	if (rc != 0)
@@ -607,7 +589,7 @@ smb3_encrypt_sr(smb_request_t *sr,
 	 * Caller puts transform header in its own mblk so we can
 	 * just skip the first mlbk when building the uio.
 	 */
-	out_vdb = smb3_get_vdb(sr);
+	out_vdb = smb_get_vdb(sr);
 	out_vdb->vdb_uio.uio_resid = sr->th_msglen;
 	rc = smb_mbuf_mkuio(out_mbc->chain->m_next, &out_vdb->vdb_uio);
 	if (rc != 0)

@@ -184,7 +184,7 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
  * The signature algorithm is to compute HMAC SHA256 or AES_CMAC
  * over the entire command, with the signature field set to zeros.
  *
- * Return 0 if  success else -1
+ * Return 0 if  success else non-zero
  */
 
 static int
@@ -192,25 +192,23 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
     uint8_t *digest)
 {
 	uint8_t tmp_hdr[SMB2_HDR_SIZE];
-	smb_enc_ctx_t ctx;
+	smb_crypto_mech_t mech;
+	smb_crypto_param_t param;
 	smb_session_t *s = sr->session;
 	smb_user_t *u = sr->uid_user;
 	struct smb_key *sign_key = &u->u_sign_key;
 	struct mbuf *mbuf;
+	smb_vdb_t *in_vdb = NULL;
 	int offset, resid, tlen, rc;
+	int hdr_iov_cnt = 0;
 
 	if (s->sign_mech == NULL || sign_key->len == 0)
 		return (-1);
 
-	bzero(&ctx, sizeof (ctx));
-	ctx.mech = *((smb_crypto_mech_t *)s->sign_mech);
+	mech = *((smb_crypto_mech_t *)s->sign_mech);
 
 	if (s->dialect < SMB_VERS_3_0)
-		smb2_sign_init_hmac_param(&ctx, SMB2_SIG_SIZE);
-
-	rc = smb2_mac_init(&ctx, sign_key->key, sign_key->len);
-	if (rc != 0)
-		return (rc);
+		smb2_sign_init_hmac_param(&mech, &param, SMB2_SIG_SIZE);
 
 	/*
 	 * Work with a copy of the SMB2 header so we can
@@ -223,9 +221,14 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 	if (smb_mbc_peek(mbc, offset, "#c", tlen, tmp_hdr) != 0)
 		return (-1);
 	bzero(tmp_hdr + SMB2_SIG_OFFS, SMB2_SIG_SIZE);
-	/* smb2_hmac_update or smb3_cmac_update */
-	if ((rc = smb2_mac_update(&ctx, tmp_hdr, tlen)) != 0)
-		return (rc);
+
+	/* Build a UIO vector for the auth data. */
+	in_vdb = smb_get_vdb(sr);
+	in_vdb->vdb_uio.uio_resid = resid;
+
+	in_vdb->vdb_uio.uio_iov[hdr_iov_cnt].iov_base = (char *)tmp_hdr;
+	in_vdb->vdb_uio.uio_iov[hdr_iov_cnt++].iov_len = tlen;
+
 	offset += tlen;
 	resid -= tlen;
 
@@ -252,32 +255,23 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 	tlen = mbuf->m_len - offset;
 	if (tlen > resid)
 		tlen = resid;
-	rc = smb2_mac_update(&ctx, (uint8_t *)mbuf->m_data + offset, tlen);
-	if (rc != 0)
-		return (rc);
-	resid -= tlen;
+
+	in_vdb->vdb_uio.uio_iov[hdr_iov_cnt].iov_base = mbuf->m_data + offset;
+	in_vdb->vdb_uio.uio_iov[hdr_iov_cnt++].iov_len = tlen;
 
 	/*
 	 * Digest any more mbufs in the chain.
 	 */
-	while (resid > 0) {
-		mbuf = mbuf->m_next;
-		if (mbuf == NULL)
-			return (-1);
-		tlen = mbuf->m_len;
-		if (tlen > resid)
-			tlen = resid;
-		rc = smb2_mac_update(&ctx, (uint8_t *)mbuf->m_data, tlen);
-		if (rc != 0)
-			return (rc);
-		resid -= tlen;
-	}
+	rc = smb_mbuf_mkuio_cont(mbuf->m_next, &in_vdb->vdb_uio, hdr_iov_cnt);
+	if (rc != 0)
+		return (-1);
 
 	/*
 	 * Note: digest is _always_ SMB2_SIG_SIZE,
 	 * even if the mech uses a longer one.
 	 */
-	if ((rc = smb2_mac_final(&ctx, digest)) != 0)
+	if ((rc = smb2_mac_uio(&mech, sign_key->key, sign_key->len,
+	    &in_vdb->vdb_uio, digest)) != 0)
 		return (rc);
 
 	return (0);
