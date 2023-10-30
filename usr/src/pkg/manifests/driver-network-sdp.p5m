@@ -47,12 +47,23 @@ file path=kernel/drv/sdp.conf group=sys
 dir  path=kernel/socketmod group=sys
 dir  path=kernel/socketmod/$(ARCH64) group=sys
 file path=kernel/socketmod/$(ARCH64)/socksdp group=sys mode=0755
+dir  path=usr group=sys
+dir  path=usr/lib
+dir  path=usr/lib/rcm
+dir  path=usr/lib/rcm/scripts
+file path=usr/lib/rcm/scripts/SUNW,ibsdpu.sh mode=0555
+dir  path=usr/sbin
+file path=usr/sbin/sdpadm mode=0555
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/sdp.4d
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/sdpadm.8
 driver name=sdp perms="* 0644 root sys" perms="sdp 0666 root sys"
 legacy pkg=SUNWibsdp desc="Sun InfiniBand layered Sockets Direct Protocol" \
     name="Sun InfiniBand layered Sockets Direct Protocol"
+legacy pkg=SUNWibsdpu desc="Sun InfiniBand Sockets Direct Protocol Admin" \
+    name="Sun InfiniBand pseudo Sockets Direct Protocol Admin"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL

@@ -20,16 +20,16 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
+* Copyright 2014-2017 Cavium, Inc.
+* The contents of this file are subject to the terms of the Common Development
 * and Distribution License, v.1,  (the "License").
 
 * You may not use this file except in compliance with the License.
 
-* You can obtain a copy of the License at available 
+* You can obtain a copy of the License at available
 * at http://opensource.org/licenses/CDDL-1.0
 
-* See the License for the specific language governing permissions and 
+* See the License for the specific language governing permissions and
 * limitations under the License.
 */
 
@@ -651,7 +651,7 @@ void ecore_llh_clear_all_filters(struct ecore_hwfn *p_hwfn,
 			     struct ecore_ptt *p_ptt);
 
 /**
- * @brief ecore_llh_set_function_as_default - set function as defult per port
+ * @brief ecore_llh_set_function_as_default - set function as default per port
  *
  * @param p_hwfn
  * @param p_ptt

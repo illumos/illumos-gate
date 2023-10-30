@@ -114,7 +114,7 @@ struct whitelist {
  * ascii set and box drawing chars.
  */
 static struct whitelist c_list[] = {
-	{ .c = 0, .len = 0 },		/* deault char */
+	{ .c = 0, .len = 0 },		/* default char */
 	{ .c = 0x20, .len = 0x5f },
 	{ .c = 0x2500, .len = 0 },	/* single frame */
 	{ .c = 0x2502, .len = 0 },
@@ -134,7 +134,7 @@ static struct whitelist c_list[] = {
  * can program font into the vga card.
  */
 static struct whitelist s_list[] = {
-	{ .c = 0, .len = 0 },		/* deault char */
+	{ .c = 0, .len = 0 },		/* default char */
 	{ .c = 0x20, .len = 0x5f },	/* ascii set */
 	{ .c = 0xA0, .len = 0x5f },	/* latin 1 */
 	{ .c = 0x0192, .len = 0 },

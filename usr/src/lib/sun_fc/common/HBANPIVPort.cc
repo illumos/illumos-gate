@@ -44,7 +44,7 @@ using namespace std;
 
 
 /**
- * @memo            Construct a new deafult HBA Port
+ * @memo            Construct a new default HBA Port
  * @version         1.7
  */
 HBANPIVPort::HBANPIVPort() {

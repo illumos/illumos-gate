@@ -20,21 +20,21 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
+* Copyright 2014-2017 Cavium, Inc.
+* The contents of this file are subject to the terms of the Common Development
 * and Distribution License, v.1,  (the "License").
 
 * You may not use this file except in compliance with the License.
 
-* You can obtain a copy of the License at available 
+* You can obtain a copy of the License at available
 * at http://opensource.org/licenses/CDDL-1.0
 
-* See the License for the specific language governing permissions and 
+* See the License for the specific language governing permissions and
 * limitations under the License.
 */
 
 #ifndef __COMMON_HSI__
-#define __COMMON_HSI__ 
+#define __COMMON_HSI__
 /********************************/
 /* PROTOCOL COMMON FW CONSTANTS */
 /********************************/
@@ -391,7 +391,7 @@
 #define QM_PF_QUEUE_GROUP_SIZE		8
 
 /* the size of a single queue element in bytes */
-#define QM_PQ_ELEMENT_SIZE			4 
+#define QM_PQ_ELEMENT_SIZE			4
 
 /* base number of Tx PQs in the CM PQ representation.
    should be used when storing PQ IDs in CM PQ registers and context */
@@ -418,7 +418,7 @@
 #define CAU_FSM_ETH_TX  1
 
 /* Number of Protocol Indices per Status Block */
-#define PIS_PER_SB    12  
+#define PIS_PER_SB    12
 
 
 #define CAU_HC_STOPPED_STATE		3			/* fsm is stopped or not valid for this sb */
@@ -638,7 +638,7 @@
 /******************/
 
 /* Number of PBF command queue lines. Each line is 32B. */
-#define PBF_MAX_CMD_LINES 3328 
+#define PBF_MAX_CMD_LINES 3328
 
 /* Number of BTB blocks. Each block is 256B. */
 #define BTB_MAX_BLOCKS 1440
@@ -650,7 +650,7 @@
 #define PRS_GFT_CAM_LINES_NO_MATCH  31
 
 /*
- * Async data KCQ CQE 
+ * Async data KCQ CQE
  */
 struct async_data
 {
@@ -711,7 +711,7 @@ struct iscsi_eqe_data
 	__le16 conn_id /* Task Id of the task (for error that happened on a a task) */;
 	u8 error_code /* error code - relevant only if the opcode indicates its an error */;
 	u8 error_pdu_opcode_reserved;
-#define ISCSI_EQE_DATA_ERROR_PDU_OPCODE_MASK        0x3F /* The processed PDUs opcode on which happened the error - updated for specific error codes, by defualt=0xFF */
+#define ISCSI_EQE_DATA_ERROR_PDU_OPCODE_MASK        0x3F /* The processed PDUs opcode on which happened the error - updated for specific error codes, by default=0xFF */
 #define ISCSI_EQE_DATA_ERROR_PDU_OPCODE_SHIFT       0
 #define ISCSI_EQE_DATA_ERROR_PDU_OPCODE_VALID_MASK  0x1 /* Indication for driver is the error_pdu_opcode field has valid value */
 #define ISCSI_EQE_DATA_ERROR_PDU_OPCODE_VALID_SHIFT 6

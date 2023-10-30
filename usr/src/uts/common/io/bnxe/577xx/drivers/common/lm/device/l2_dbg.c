@@ -9,7 +9,7 @@
 static void dbg_zero_all_attn(lm_device_t *pdev)
 {
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgMessage(pdev, INFORMi, "dbg_zero_all_attn() inside!\n");
 
     def_sb = lm_get_default_status_block(pdev);
@@ -30,7 +30,7 @@ static void dbg_zero_all_attn(lm_device_t *pdev)
 static void dbg_assert_attn_lines(lm_device_t *pdev, u16_t lines_to_assert)
 {
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgMessage1(pdev, INFORMi, "dbg_assert_attn_lines() inside! lines_to_assert:0x%x\n", lines_to_assert);
 
     def_sb = lm_get_default_status_block(pdev);
@@ -56,7 +56,7 @@ static void dbg_assert_attn_lines(lm_device_t *pdev, u16_t lines_to_assert)
 static void dbg_deassert_attn_lines(lm_device_t *pdev, u16_t lines_to_deassert)
 {
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgMessage1(pdev, INFORMi, "dbg_deassert_attn_lines() inside! lines_to_deassert:0x%x\n", lines_to_deassert);
 
     def_sb = lm_get_default_status_block(pdev);
@@ -81,7 +81,7 @@ static void dbg_deassert_attn_lines(lm_device_t *pdev, u16_t lines_to_deassert)
 static void dbg_ack_assert_attn_lines(lm_device_t *pdev, u16_t assert_lines_to_ack)
 {
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgMessage1(pdev, INFORMi, "dbg_ack_assert_attn_lines() inside! assert_lines_to_ack:0x%x\n", assert_lines_to_ack);
 
     def_sb = lm_get_default_status_block(pdev);
@@ -107,7 +107,7 @@ static void dbg_ack_assert_attn_lines(lm_device_t *pdev, u16_t assert_lines_to_a
 static void dbg_ack_deassert_attn_lines(lm_device_t *pdev, u16_t deassert_lines_to_ack)
 {
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgMessage1(pdev, INFORMi, "dbg_ack_deassert_attn_lines() inside! deassert_lines_to_ack:0x%x\n", deassert_lines_to_ack);
 
     def_sb = lm_get_default_status_block(pdev);
@@ -128,7 +128,7 @@ static void dbg_change_sb_index(lm_device_t *pdev, u8_t rss_id)
 {
 	volatile struct host_status_block *rss_sb	  = NULL;
 	volatile struct host_def_status_block *def_sb = NULL;
-	
+
 	DbgBreakIf(!pdev || rss_id > MAX_RSS_CHAINS);
 	DbgMessage(pdev, INFORMi, "dbg_change_sb_index() inside!\n");
 	//this is the default status block
@@ -146,7 +146,7 @@ static void dbg_change_sb_index(lm_device_t *pdev, u8_t rss_id)
 		DbgMessage6(pdev, INFORMi, "dbg_change_sb_index():sb#%d indices are now: c_def_prod_idx:%d, u_def_prod_idx:%d, x_def_prod_idx:%d, t_def_prod_idx:%d\n",
 			rss_id,
 			mm_le16_to_cpu(def_sb->c_def_status_block.status_block_index),
-			mm_le16_to_cpu(def_sb->u_def_status_block.status_block_index), 
+			mm_le16_to_cpu(def_sb->u_def_status_block.status_block_index),
 			mm_le16_to_cpu(def_sb->x_def_status_block.status_block_index),
 			mm_le16_to_cpu(def_sb->t_def_status_block.status_block_index),
 			mm_le16_to_cpu(def_sb->atten_status_block.attn_bits_index));
@@ -167,8 +167,8 @@ static void dbg_change_sb_index(lm_device_t *pdev, u8_t rss_id)
 	}
 }
 
-/* UM calls this in case there was a change in the default status block. 
- * This function does the work of the DPC. 
+/* UM calls this in case there was a change in the default status block.
+ * This function does the work of the DPC.
  * Parameters:
  * pdev   - this is the LM device
  * sb_idx - this is the index where the status block lies in the array under the lm_device
@@ -189,15 +189,15 @@ static void dbg_def_sb_dpc(lm_device_t *pdev)
 
 	DbgBreakIf(!pdev);
 	DbgMessage(pdev, INFORMi, "dbg_def_sb_dpc(): inside!\n");
-	
+
 	//check if the default status block has changed, thus have a new status index.
 	//it is possible that even here, there is no difference in the index due to hw queues races(the DMA op is delayed)so bail out.
 	if ((is_updated = lm_is_def_sb_updated(pdev)) == 0)
 	{
 		//Agreed with Shay that we don't need to ack the index in case it matches the local copy, just enable ints
 		DbgMessage(pdev, INFORMi, "dbg_def_sb_dpc(): no change in status index so get out!\n");
-		lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, TSTORM_ID, DEF_SB_INDEX_OF_TSTORM(pdev), IGU_INT_ENABLE, 0);	
-		
+		lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, TSTORM_ID, DEF_SB_INDEX_OF_TSTORM(pdev), IGU_INT_ENABLE, 0);
+
 
 		return;
 	}
@@ -210,7 +210,7 @@ static void dbg_def_sb_dpc(lm_device_t *pdev)
 
         total_activ_to_ack |= activity_flg;
 
-        //attn bits handling   
+        //attn bits handling
         if (activity_flg & LM_DEF_ATTN_ACTIVE)
         {
             lcl_attn_bits = 0;
@@ -249,25 +249,25 @@ static void dbg_def_sb_dpc(lm_device_t *pdev)
     DbgMessage2(pdev, INFORMi, "um_bdrv_def_dpc(): cnt_acks:%d, total_activ_to_ack:0x%x\n", cnt_acks, total_activ_to_ack);
 
     if (total_activ_to_ack & LM_DEF_ATTN_ACTIVE)
-        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, ATTENTION_ID, DEF_SB_INDEX_OF_ATTN(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);    
+        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, ATTENTION_ID, DEF_SB_INDEX_OF_ATTN(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);
 
     if (total_activ_to_ack & LM_DEF_USTORM_ACTIVE)
         lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, USTORM_ID, DEF_SB_INDEX_OF_USTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);
 
     if (total_activ_to_ack & LM_DEF_CSTORM_ACTIVE)
-        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, CSTORM_ID, DEF_SB_INDEX_OF_CSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);	
+        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, CSTORM_ID, DEF_SB_INDEX_OF_CSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);
 
     if (total_activ_to_ack & LM_DEF_XSTORM_ACTIVE)
-        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, XSTORM_ID, DEF_SB_INDEX_OF_XSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);	
+        lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, XSTORM_ID, DEF_SB_INDEX_OF_XSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);
 
     if (total_activ_to_ack & LM_DEF_TSTORM_ACTIVE)
-		lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, TSTORM_ID, DEF_SB_INDEX_OF_TSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);	
+		lm_int_ack_sb(pdev, DEF_STATUS_BLOCK_INDEX, TSTORM_ID, DEF_SB_INDEX_OF_TSTORM(pdev), --cnt_acks ? IGU_INT_NOP : IGU_INT_ENABLE, 1);
 
 		DbgMessage(pdev, INFORMi, "dbg_def_sb_dpc(): FINISH _______________________________________________\n");
 }
 
-/* UM calls this in case there was a change in the status block. 
- * This function does the work of the DPC. 
+/* UM calls this in case there was a change in the status block.
+ * This function does the work of the DPC.
  * Parameters:
  * pdev   - this is the LM device
  * sb_idx - this is the index where the status block lies in the array under the lm_device
@@ -308,7 +308,7 @@ static void dbg_sb_dpc(lm_device_t *pdev, u8_t rss_id)
         if (activity_flg & LM_NON_DEF_USTORM_ACTIVE)
         {
             //Check for Rx completions
-    		if (lm_is_rx_completion(pdev, rss_id))  
+    		if (lm_is_rx_completion(pdev, rss_id))
     		{
     			//Call here service_rx_intr(pdev, rss_id);
     		}
@@ -317,7 +317,7 @@ static void dbg_sb_dpc(lm_device_t *pdev, u8_t rss_id)
         if (activity_flg & LM_NON_DEF_CSTORM_ACTIVE)
         {
             //Check for Tx completions
-    		if (lm_is_tx_completion(pdev, rss_id))  
+    		if (lm_is_tx_completion(pdev, rss_id))
     		{
     			//Call here service_tx_intr(pdev, rss_id);
     		}
@@ -350,20 +350,20 @@ static u8_t dbg_isr(lm_device_t *pdev, u32_t intr_status)
 	u8_t rss_id = 0;
 
     intr_recognized = FALSE;
-	
+
 	DbgBreakIf(!pdev);
 	DbgMessage(pdev, INFORMi, "dbg_isr() inside!\n");
 
-	//get the relevant status blocks for which we need to schedule the appropriate DPC 
+	//get the relevant status blocks for which we need to schedule the appropriate DPC
 	//please note this implicitly de-asserts the interrupt line, which must not be forgotten to be enabled via the DPC
 	//the LSB(bit 0) describes the default status blocks and bit 1-16 describe the RSS non-default status blocks.
-	//In case RSS not supported, everything will arrive on RSS 0, that means that lm_get_interrupt_status() 
+	//In case RSS not supported, everything will arrive on RSS 0, that means that lm_get_interrupt_status()
 	//will return on the maximum bit0 and bit1 toggled in that case.
 
     //intr_status = lm_get_interrupt_status(pdev);
 
 	//this is not our interrupt so bail out!
-	if (!intr_status) 
+	if (!intr_status)
 	{
 		return intr_recognized;
 	}
@@ -371,9 +371,9 @@ static u8_t dbg_isr(lm_device_t *pdev, u32_t intr_status)
     //TODO: In Windows, must assure that there is only one DPC running!
 	//TODO: Get the CPU number on which this ISR is running (needed for RSS)
 
-	//go over all the status blocks updates we received from reading the single ISR/multiple DPCs register, 
+	//go over all the status blocks updates we received from reading the single ISR/multiple DPCs register,
 	//and queue the corresponding DPCs for them.
-	//Currently, RSS is not supported, but still, a scenario might occur where we need to queue both the fast-path DPC as well as 
+	//Currently, RSS is not supported, but still, a scenario might occur where we need to queue both the fast-path DPC as well as
 	//the slow-path DPC
 	while(intr_status)
     {
@@ -382,7 +382,7 @@ static u8_t dbg_isr(lm_device_t *pdev, u32_t intr_status)
 			//this means that there is a change in the default sb, so queue the relevant DPC of the default sb.
 			if (rss_id == 0)
 			{
-				//This is the interface for Xdiag. In Windows, this will be the function which will get queued 
+				//This is the interface for Xdiag. In Windows, this will be the function which will get queued
 				//within the DPC object.
 				dbg_def_sb_dpc(pdev);
 			}
@@ -390,7 +390,7 @@ static u8_t dbg_isr(lm_device_t *pdev, u32_t intr_status)
 			//take care of the non-default sb according to RSS.
 			else
 			{
-				//(rss_id - 1) is used since the non-default sbs are located in lm_device at indices 0-15 
+				//(rss_id - 1) is used since the non-default sbs are located in lm_device at indices 0-15
 				dbg_sb_dpc(pdev, rss_id - 1);
 			}
         }
@@ -402,7 +402,7 @@ static u8_t dbg_isr(lm_device_t *pdev, u32_t intr_status)
 	intr_recognized = TRUE;
 
 	DbgMessage1(pdev, INFORMi, "dbg_isr(): intr_recognized is:%s\n", intr_recognized ? "TRUE" : "FALSE");
-     
+
     return intr_recognized;
 } /* dbg_isr */
 
@@ -414,21 +414,21 @@ void dbg_sb_ints_test_suite(lm_device_t *pdev)
     def_sb = lm_get_default_status_block(pdev);
 
     //This part is dedicated to checking the entire status block mechanism and Interrupts API.
-	//The test should change the default/non-defualt status block parameters and print as debug information
+	//The test should change the default/non-default status block parameters and print as debug information
 	//the whole status block fields.
-	
+
 	//print entire info of all status blocks!
 	print_sb_info(pdev);
-	
+
 	//handle default status block (=DPC of status block) - nothing should happen yet!
 	dbg_def_sb_dpc(pdev);
-	
+
 	//handle all rss non-default status blocks - nothing should happen yet
 	for(index = 0; index < MAX_RSS_CHAINS; index++)
 	{
 		dbg_sb_dpc(pdev, index);
 	}
-	
+
 	//now it's time to change the status index of "some" of the status block as if there
 	//was a change regarding them
 	for(index = 0; index <= MAX_RSS_CHAINS; index++)
@@ -441,33 +441,33 @@ void dbg_sb_ints_test_suite(lm_device_t *pdev)
 	}
     //assert groups: 0,1
     dbg_assert_attn_lines(pdev, 0x3);
-    
+
     //This part is hardcoded for simulating a change on the default status block(0) and RSS sb: 1,3,5,7,9,11,13,15
     dbg_isr(pdev, 0x15555);
 
     //now we have for groups 0,1:
-    //             attn_bits: 1 1 
+    //             attn_bits: 1 1
     //             attn_ack:  0 0
     //             mask:      0 0
-    //             state:     1 1 
+    //             state:     1 1
 
     //simulate as if the chip wrote 1 1 to the attn_ack
     dbg_ack_assert_attn_lines(pdev, 0x3);
 
     //now we have for groups 0,1:
-    //             attn_bits: 1 1 
+    //             attn_bits: 1 1
     //             attn_ack:  1 1
     //             mask:      0 0
-    //             state:     1 1 
+    //             state:     1 1
 
     //simulate as if due to the mask of the AEU line, 0 has arrived at the line and written by chip to attn_bits
     dbg_deassert_attn_lines(pdev, 0x3);
 
     //now we have for groups 0,1:
-    //             attn_bits: 0 0 
+    //             attn_bits: 0 0
     //             attn_ack:  1 1
     //             mask:      0 0
-    //             state:     1 1 
+    //             state:     1 1
 
     //simulate an increment of the attn producer by chip due to change in attn bits/attn_ack from monitored state.
     def_sb->atten_status_block.attn_bits_index = mm_cpu_to_le16(mm_le16_to_cpu(def_sb->atten_status_block.attn_bits_index) + 1) ;
@@ -487,10 +487,10 @@ void dbg_sb_ints_test_suite(lm_device_t *pdev)
     dbg_ack_assert_attn_lines(pdev, 0x3);
 
     //now we have for groups 0,1:
-    //             attn_bits: 1 1 
+    //             attn_bits: 1 1
     //             attn_ack:  1 1
     //             mask:      0 0
-    //             state:     0 0 
+    //             state:     0 0
 
     def_sb->atten_status_block.attn_bits_index = mm_cpu_to_le16(mm_le16_to_cpu(def_sb->atten_status_block.attn_bits_index) + 1);
 

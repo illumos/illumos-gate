@@ -50,7 +50,7 @@ const int HBAPort::RNID_GENERAL_TOPOLOGY_DATA_FORMAT = 0xDF;
 const uint8_t HBAPort::HBA_NPIV_PORT_MAX = UCHAR_MAX;
 
 /**
- * @memo	    Construct a new deafult HBA Port
+ * @memo	    Construct a new default HBA Port
  */
 HBAPort::HBAPort() {
 }

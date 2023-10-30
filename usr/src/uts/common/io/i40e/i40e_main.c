@@ -2163,7 +2163,7 @@ i40e_add_vsi(i40e_t *i40e, i40e_hw_t *hw, uint_t idx)
 
 	/*
 	 * The default VSI is created by the controller. This function
-	 * creates new, non-defualt VSIs only.
+	 * creates new, non-default VSIs only.
 	 */
 	ASSERT3U(idx, !=, 0);
 

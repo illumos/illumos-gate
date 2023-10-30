@@ -952,7 +952,7 @@ typedef struct _lm_params_t
     u8_t mf_mode; //use enum mf_mode
     u8_t sd_mode;
     u8_t pad[2];
-    
+
     #define IS_MF_AFEX(_pdev) IS_MF_AFEX_MODE(_pdev)
     #define IS_MF_AFEX_MODE(_pdev) (IS_MULTI_VNIC(_pdev) && ((_pdev)->params.mf_mode == MULTI_FUNCTION_AFEX))
     #define IS_MF_SI_MODE(_pdev)  (IS_MULTI_VNIC(_pdev) && ((_pdev)->params.mf_mode == MULTI_FUNCTION_SI))
@@ -1566,10 +1566,10 @@ typedef struct _lm_intr_blk_info_t
 
 #ifdef VF_INVOLVED
 #define GET_NUM_VFS_PER_PF(_pdev) ((_pdev)->hw_info.sriov_info.total_vfs)
-#define GET_NUM_VFS_PER_PATH(_pdev) (64) 
+#define GET_NUM_VFS_PER_PATH(_pdev) (64)
 #else
-#define GET_NUM_VFS_PER_PF(_pdev) (0) 
-#define GET_NUM_VFS_PER_PATH(_pdev) (0) 
+#define GET_NUM_VFS_PER_PF(_pdev) (0)
+#define GET_NUM_VFS_PER_PATH(_pdev) (0)
 #endif
 typedef struct _lm_sriov_info_t {
 //    #define MAX_VF_BAR 3 Fix it when emulation supports 3 bars
@@ -1952,7 +1952,7 @@ typedef struct _lm_vf_pf_message_t
     u16_t           do_not_arm_trigger;
     u16_t           old_version;
 #ifdef VF_INVOLVED
-    union 
+    union
     {
         struct pf_vf_msg_hdr    sw_channel_hdr;
         struct pfvf_tlv         hw_channel_hdr;
@@ -2509,9 +2509,9 @@ typedef struct _lm_tpa_info_t
     volatile void * update_cookie;
     volatile u32_t  ramrod_recv_cnt;    // Number of ramrods received.Decrement by using Interlockeddecrement.
     volatile u32_t  state;
-    #define TPA_STATE_NONE          0 
+    #define TPA_STATE_NONE          0
     #define TPA_STATE_RAMROD_SENT   1
-    
+
     u8_t            ipvx_enabled_required;
     u8_t            ipvx_enabled_current;
     #define TPA_IPVX_DISABLED (0)
@@ -3078,13 +3078,13 @@ typedef struct _lm_debug_info_t
     u32_t   toe_tx_comp_upon_er;
 
     u32_t   toe_prealloc_alloc_fail;
-    
+
 } lm_debug_info_t;
 
-/* 
- * CQ 70040  
- * Support for NSCI get OS driver version 
-*/ 
+/*
+ * CQ 70040
+ * Support for NSCI get OS driver version
+*/
 typedef struct _lm_cli_drv_ver_to_shmem_t
 {
     struct os_drv_ver cli_drv_ver;
@@ -3148,11 +3148,11 @@ typedef struct _lm_device_t
 
     lm_debug_info_t debug_info;
 
-    /* 
-     * 08/01/2014 
-     * CQ 70040  
-     * Support for NSCI get OS driver version 
-    */ 
+    /*
+     * 08/01/2014
+     * CQ 70040
+     * Support for NSCI get OS driver version
+    */
     lm_cli_drv_ver_to_shmem_t lm_cli_drv_ver_to_shmem;
 
     /* Turned on if a panic occured in the device... (viewed by functions that wait and get a timeout... - do not assert... )
@@ -3218,7 +3218,7 @@ lm_status_t lm_reset_mcp_prep(lm_device_t *pde, u32_t * magic_val);
 lm_status_t lm_reset_mcp_comp(lm_device_t *pdev, u32_t magic_val);
 
 
-/* Initalize the whole status blocks per port - overall: 1 defalt sb, 16 non-default sbs
+/* Initialize the whole status blocks per port - overall: 1 default sb, 16 non-default sbs
  *
  * Parameters:
  * pdev - the LM device which holds the sbs

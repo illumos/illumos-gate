@@ -88,7 +88,7 @@
 #define DEFAULT_LOOKUP_REALM 0
 
 static int
-maybe_use_dns (krb5_context context, const char *name, int defalt)
+maybe_use_dns (krb5_context context, const char *name, int def_val)
 {
     krb5_error_code code;
     char * value = NULL;
@@ -100,10 +100,10 @@ maybe_use_dns (krb5_context context, const char *name, int defalt)
 	code = profile_get_string(context->profile, "libdefaults",
 				  "dns_fallback", 0, 0, &value);
     if (code)
-        return defalt;
+        return def_val;
 
     if (value == 0)
-	return defalt;
+	return def_val;
 
     use_dns = _krb5_conf_boolean(value);
     profile_release_string(value);

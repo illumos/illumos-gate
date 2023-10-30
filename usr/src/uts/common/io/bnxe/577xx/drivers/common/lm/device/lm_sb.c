@@ -133,7 +133,7 @@ lm_status_t lm_set_interrupt_moderation(struct _lm_device_t *pdev, u8_t is_enabl
         DbgMessage(pdev, WARN, "HC is not supported (disabled) in driver\n");
         return LM_STATUS_SUCCESS;
     }
-    if (IS_PFDEV(pdev)) 
+    if (IS_PFDEV(pdev))
     {
         LM_FOREACH_SB_ID(pdev, sb_id)
         {
@@ -149,7 +149,7 @@ lm_status_t lm_set_interrupt_moderation(struct _lm_device_t *pdev, u8_t is_enabl
                 break;
             if ((lm_status = lm_set_hc_flag(pdev, sb_id, HC_INDEX_ETH_TX_CQ_CONS_COS2, is_enable)) != LM_STATUS_SUCCESS)
                 break;
-    
+
         }
     }
 
@@ -653,7 +653,7 @@ static void lm_init_sp_status_block(struct _lm_device_t *pdev)
 
 }
 
-/* Initalize the whole status blocks per port - overall: 1 defalt sb, 16 non-default sbs
+/* Initialize the whole status blocks per port - overall: 1 default sb, 16 non-default sbs
  *
  * Parameters:
  * pdev - the LM device which holds the sbs
@@ -802,7 +802,7 @@ void lm_set_int_coal_info(struct _lm_device_t *pdev)
     }
 #endif
 
-    /* by default set hc period for x/t/c/u defualt sb to NONE.
+    /* by default set hc period for x/t/c/u default sb to NONE.
       (that was already implicitly done by memset 0 above) */
 
 
@@ -911,7 +911,7 @@ void lm_int_igu_ack_sb(lm_device_t *pdev, u8_t igu_sb_id, u8_t segment_access, u
     /*
      * We may get here with IGU disabled. In that case, no IGU access is permitted.
      */
-    if (!pdev->vars.enable_intr) 
+    if (!pdev->vars.enable_intr)
     {
         return;
     }
@@ -1062,7 +1062,7 @@ void lm_int_ack_sb_disable(lm_device_t *pdev, u8_t rss_id)
 //                REG_WR(PFDEV(pdev), IGU_REG_ECO_RESERVED, 8);
 //                DbgBreak();
             }
-            if (IS_PFDEV(pdev)) 
+            if (IS_PFDEV(pdev))
             {
                 lm_int_igu_ack_sb(pdev, rss_id  + IGU_BASE_NDSB(pdev), IGU_SEG_ACCESS_NORM, 0, IGU_INT_DISABLE, 0);
             }
@@ -1086,7 +1086,7 @@ void lm_int_ack_sb_enable(lm_device_t *pdev, u8_t rss_id)
             pdev->debug_info.ack_en[rss_id]++;
         } else {
             if (rss_id >= IGU_U_NDSB_OFFSET(pdev)) {
-                if (IS_PFDEV(pdev)) 
+                if (IS_PFDEV(pdev))
                 {
                     lm_int_igu_ack_sb(pdev, rss_id  + IGU_BASE_NDSB(pdev), IGU_SEG_ACCESS_NORM, SB_RX_INDEX(pdev,rss_id), IGU_INT_ENABLE, 1);
                 }
@@ -1241,7 +1241,7 @@ lm_status_t lm_enable_igu_int(struct _lm_device_t *pdev)
             val = 0xffff;
         }
         if (CHIP_IS_E3(pdev)) {
-            val &= ~ATTN_SW_TIMER_4_FUNC; // To prevent Timer4 expiration attention 
+            val &= ~ATTN_SW_TIMER_4_FUNC; // To prevent Timer4 expiration attention
         }
         REG_WR(pdev,  IGU_REG_TRAILING_EDGE_LATCH, val);
         REG_WR(pdev,  IGU_REG_LEADING_EDGE_LATCH, val);
@@ -1359,7 +1359,7 @@ void lm_init_non_def_status_block(struct _lm_device_t *pdev,
     DbgBreakIf((CSTORM_STATUS_BLOCK_SIZE % 4) != 0);
     DbgBreakIf((CSTORM_STATUS_BLOCK_DATA_SIZE % 4) != 0);
     DbgBreakIf((CSTORM_SYNC_BLOCK_SIZE % 4) != 0);
-    
+
     for (index = 0; index < CSTORM_SYNC_BLOCK_SIZE / sizeof(u32_t); index++) {
         LM_INTMEM_WRITE32(PFDEV(pdev), CSTORM_SYNC_BLOCK_OFFSET(fw_sb_id) + 4*index, 0, BAR_CSTRORM_INTMEM);
     }
@@ -1460,14 +1460,14 @@ void lm_init_non_def_status_block(struct _lm_device_t *pdev,
             break;
 
         case HC_INDEX_ETH_TX_CQ_CONS_COS0:
-        case HC_INDEX_ETH_TX_CQ_CONS_COS1: 
-        case HC_INDEX_ETH_TX_CQ_CONS_COS2: 
+        case HC_INDEX_ETH_TX_CQ_CONS_COS1:
+        case HC_INDEX_ETH_TX_CQ_CONS_COS2:
             if (pdev->params.ndsb_type != LM_SINGLE_SM) {
                 sm_idx = SM_TX_ID;
             } else {
             sm_idx = SM_RX_ID;
             }
-            // TODO Shayh: HC_PARAMS_ETH_INDEX (DYNAMIC_HC_ETH_INDEX) Should be handeled better from registry 
+            // TODO Shayh: HC_PARAMS_ETH_INDEX (DYNAMIC_HC_ETH_INDEX) Should be handled better from registry
             // (not as part of this submit) .
             timeout = (u8_t)(ic->hc_usec_c_sb[1] / HC_TIMEOUT_RESOLUTION_IN_US);
             break;
@@ -1509,11 +1509,11 @@ void lm_init_non_def_status_block(struct _lm_device_t *pdev,
 
 /**
  * @description
- * Get the HC_INDEX_ETH_TX_CQ_CONS_COSX index from chain. 
- * @param pdev 
- * @param chain 
- * 
- * @return STATIC u8_t 
+ * Get the HC_INDEX_ETH_TX_CQ_CONS_COSX index from chain.
+ * @param pdev
+ * @param chain
+ *
+ * @return STATIC u8_t
  */
 u8_t
 lm_eth_tx_hc_cq_cons_cosx_from_chain(IN         lm_device_t *pdev,
@@ -1661,7 +1661,7 @@ lm_status_t lm_pf_init_vf_non_def_sb(struct _lm_device_t *pdev, lm_vf_info_t *vf
         } else {
                 sm_idx = SM_RX_ID;
         }
-            // TODO Shayh: HC_PARAMS_ETH_INDEX (DYNAMIC_HC_ETH_INDEX) Should be handeled better from registry 
+            // TODO Shayh: HC_PARAMS_ETH_INDEX (DYNAMIC_HC_ETH_INDEX) Should be handled better from registry
             // (not as part of this submit) .
             timeout = (u8_t)(ic->hc_usec_c_sb[1] / HC_TIMEOUT_RESOLUTION_IN_US);
             break;
@@ -1722,7 +1722,7 @@ void lm_clear_non_def_status_block(struct _lm_device_t *pdev, u8_t  fw_sb_id)
     LM_INTMEM_WRITE8(pdev, CSTORM_STATUS_BLOCK_DATA_STATE_OFFSET(fw_sb_id),
                       SB_DISABLED, BAR_CSTRORM_INTMEM);
 
-    
+
     for (index = 0; index < CSTORM_SYNC_BLOCK_SIZE / sizeof(u32_t); index++) {
         LM_INTMEM_WRITE32(PFDEV(pdev), CSTORM_SYNC_BLOCK_OFFSET(fw_sb_id) + 4*index, 0, BAR_CSTRORM_INTMEM);
     }
