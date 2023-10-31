@@ -526,7 +526,7 @@ asn1_error_code asn1_decode_krb5_flags(asn1buf *buf, krb5_flags *val)
   }
   if (length <= 4) {
     /* Mask out unused bits, but only if necessary. */
-    f &= ~(krb5_flags)0 << unused;
+    f &= VALID_UINT_BITS << unused;
   }
   /* left-justify */
   if (length < 4)
