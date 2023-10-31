@@ -29,6 +29,7 @@ uint64_t rdmsr(uint32_t);
 void wrmsr(uint32_t, uint64_t);
 void cpuid(uint32_t, uint32_t, uint32_t *);
 uint64_t rdtsc(void);
+void ud2a(void);
 
 void test_result_pass(void);
 void test_result_fail(void);

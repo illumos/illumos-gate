@@ -2275,7 +2275,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 
 	switch (reason) {
 	case EXIT_REASON_TRIPLE_FAULT:
-		(void) vm_suspend(vmx->vm, VM_SUSPEND_TRIPLEFAULT);
+		(void) vm_suspend(vmx->vm, VM_SUSPEND_TRIPLEFAULT, vcpu);
 		handled = HANDLED;
 		break;
 	case EXIT_REASON_TASK_SWITCH:

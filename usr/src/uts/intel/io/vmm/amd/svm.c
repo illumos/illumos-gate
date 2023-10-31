@@ -1466,7 +1466,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_INOUT, 1);
 		break;
 	case VMCB_EXIT_SHUTDOWN:
-		(void) vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT);
+		(void) vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT, vcpu);
 		handled = 1;
 		break;
 	case VMCB_EXIT_INVLPGA:

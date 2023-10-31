@@ -119,9 +119,9 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_setup_pptdev_msix;
 		vm_suspend;
 		vm_suspend_cpu;
-		vm_suspended_cpus;
 		vm_unassign_pptdev;
 		vm_unmap_pptdev_mmio;
+		vm_vcpu_barrier;
 		vm_wrlock_cycle;
 
 	local:

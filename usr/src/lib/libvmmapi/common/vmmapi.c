@@ -893,6 +893,13 @@ vm_suspend(struct vmctx *ctx, enum vm_suspend_how how)
 
 	bzero(&vmsuspend, sizeof(vmsuspend));
 	vmsuspend.how = how;
+#ifndef __FreeBSD__
+	/*
+	 * The existing userspace does not (currently) inject targeted
+	 * triple-fault suspend states, so it does not need to specify source.
+	 */
+	vmsuspend.source = -1;
+#endif /* __FreeBSD__ */
 	return (ioctl(ctx->fd, VM_SUSPEND, &vmsuspend));
 }
 
@@ -1868,12 +1875,14 @@ vm_active_cpus(struct vmctx *ctx, cpuset_t *cpus)
 	return (vm_get_cpus(ctx, VM_ACTIVE_CPUS, cpus));
 }
 
+#ifdef __FreeBSD__
 int
 vm_suspended_cpus(struct vmctx *ctx, cpuset_t *cpus)
 {
 
 	return (vm_get_cpus(ctx, VM_SUSPENDED_CPUS, cpus));
 }
+#endif /* __FreeBSD__ */
 
 int
 vm_debug_cpus(struct vmctx *ctx, cpuset_t *cpus)
@@ -2110,6 +2119,15 @@ vm_set_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state state,
 	return (0);
 }
 
+int
+vm_vcpu_barrier(struct vmctx *ctx, int vcpu)
+{
+	if (ioctl(ctx->fd, VM_VCPU_BARRIER, vcpu) != 0) {
+		return (errno);
+	}
+
+	return (0);
+}
 #endif /* __FreeBSD__ */
 
 #ifdef __FreeBSD__

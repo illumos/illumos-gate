@@ -25,10 +25,13 @@ PROG =	rdmsr \
 PROG +=	triple_fault \
 	exit_paging \
 	page_dirty \
-	exit_consistent
+	exit_consistent \
+	suspend_info \
+	vcpu_barrier
 
 # C-based payloads need additional utils object
-CPAYLOADS =	cpuid
+CPAYLOADS =	cpuid \
+		suspend_info
 
 PAYLOADS = $(PROG)
 include ../Makefile.in_guest
