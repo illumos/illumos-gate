@@ -77,7 +77,7 @@ extern "C" {
 #if !defined(__lint) && defined(__GNUC__)
 /* use GNU inline */
 	/* works for both i386 and amd64 */
-	extern __inline__ uint32_t dapls_byteswap32(uint32_t value)
+	static __inline__ uint32_t dapls_byteswap32(uint32_t value)
 	{
 		__asm__("bswap %0" : "+r" (value));
 		return (value);
@@ -85,7 +85,7 @@ extern "C" {
 
 #if defined(__amd64)
 
-	extern __inline__ uint64_t dapls_byteswap64(uint64_t value)
+	static __inline__ uint64_t dapls_byteswap64(uint64_t value)
 	{
 		__asm__("bswapq %0" : "+r" (value));
 		return (value);
@@ -93,7 +93,7 @@ extern "C" {
 
 #else /* defined(__i386) */
 
-	extern __inline__ uint64_t dapls_byteswap64(uint64_t value)
+	static __inline__ uint64_t dapls_byteswap64(uint64_t value)
 	{
 		union {
 			struct { uint32_t a, b; } s;
