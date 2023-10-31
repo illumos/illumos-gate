@@ -206,14 +206,6 @@ uu_panic(const char *format, ...)
 			(void) pause();
 }
 
-int
-assfail(const char *astring, const char *file, int line)
-{
-	__assert(astring, file, line);
-	/*NOTREACHED*/
-	return (0);
-}
-
 static void
 uu_lockup(void)
 {
