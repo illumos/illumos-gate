@@ -45,8 +45,9 @@ extern "C" {
 #define	SMB2_KEYLEN		16	/* SMB2/3 Signing Key length */
 #define	SMB2_SSN_KEYLEN		16	/* Max size of the SMB2 Session Key */
 
-#define	SMB3_AES_CCM_NONCE_SIZE	11
-#define	SMB3_AES_GCM_NONCE_SIZE	12
+#define	SMB3_AES_CCM_NONCE_SIZE		11
+#define	SMB3_AES_GCM_NONCE_SIZE		12
+#define	SMB3_AES_GMAC_NONCE_SIZE	12
 
 #ifdef	_KERNEL
 
@@ -58,6 +59,7 @@ typedef union {
 	CK_AES_CCM_PARAMS	ccm;
 	CK_AES_GCM_PARAMS	gcm;
 	ulong_t			hmac;
+	CK_AES_GMAC_PARAMS	gmac;
 } smb_crypto_param_t;
 
 typedef struct smb_enc_ctx {
@@ -78,6 +80,7 @@ typedef union {
 	CK_CCM_PARAMS		ccm;
 	CK_GCM_PARAMS		gcm;
 	CK_MAC_GENERAL_PARAMS	hmac;
+	CK_BYTE_PTR		gmac;	/* Just IV[12] */
 } smb_crypto_param_t;
 
 typedef struct smb_enc_ctx {
@@ -106,8 +109,11 @@ int smb_md5_final(smb_sign_ctx_t, uint8_t *);
 
 int smb2_hmac_getmech(smb_crypto_mech_t *);
 int smb3_cmac_getmech(smb_crypto_mech_t *);
+int smb3_gmac_getmech(smb_crypto_mech_t *);
 void smb2_sign_init_hmac_param(smb_crypto_mech_t *, smb_crypto_param_t *,
     ulong_t);
+void smb3_sign_init_gmac_param(smb_crypto_mech_t *, smb_crypto_param_t *,
+    uint8_t *);
 
 int smb2_mac_uio(smb_crypto_mech_t *, uint8_t *, size_t, uio_t *, uint8_t *);
 int smb2_mac_raw(smb_crypto_mech_t *, uint8_t *, size_t, uint8_t *, size_t,

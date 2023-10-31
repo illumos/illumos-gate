@@ -132,6 +132,12 @@ smb3_cmac_getmech(smb_crypto_mech_t *mech)
 	return (find_mech(mech, SUN_CKM_AES_CMAC));
 }
 
+int
+smb3_gmac_getmech(smb_crypto_mech_t *mech)
+{
+	return (find_mech(mech, SUN_CKM_AES_GMAC));
+}
+
 /*
  * Note, the SMB2 signature is the first 16 bytes of the digest,
  * even in the case of SHA256 HMAC (32-byte digest).
@@ -146,6 +152,18 @@ smb2_sign_init_hmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
 
 	mech->cm_param = (caddr_t)&param->hmac;
 	mech->cm_param_len = sizeof (param->hmac);
+}
+
+void
+smb3_sign_init_gmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
+    uint8_t *iv)
+{
+	param->gmac.pIv = iv;
+	param->gmac.pAAD = NULL;
+	param->gmac.ulAADLen = 0;
+
+	mech->cm_param = (caddr_t)&param->gmac;
+	mech->cm_param_len = sizeof (param->gmac);
 }
 
 /*

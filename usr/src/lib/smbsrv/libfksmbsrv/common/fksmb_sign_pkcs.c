@@ -132,6 +132,12 @@ smb3_cmac_getmech(smb_crypto_mech_t *mech)
 	return (find_mech(mech, CKM_AES_CMAC));
 }
 
+int
+smb3_gmac_getmech(smb_crypto_mech_t *mech)
+{
+	return (find_mech(mech, CKM_AES_GMAC));
+}
+
 /*
  * Note, the SMB2 signature is the first 16 bytes of the digest,
  * even in the case of SHA256 HMAC (32-byte digest).
@@ -146,6 +152,26 @@ smb2_sign_init_hmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
 
 	mech->pParameter = (caddr_t)&param->hmac;
 	mech->ulParameterLen = sizeof (param->hmac);
+}
+
+/*
+ * GMAC parameters are just the initialization vector: CK_BYTE IV[12]
+ *
+ * Most other smb2_sign_init_... functions use a data structure, and
+ * those that do have a union arm in smb_crypto_param_t parem->X.
+ * However, GMAC is unusual in that it uses no such struct.
+ * Just to be helpful with debugging, store the IV pointer in the
+ * param->gmac arm of that union (just a pointer), though only
+ * the mech->pParameter pointer is actually used.
+ */
+void
+smb3_sign_init_gmac_param(smb_crypto_mech_t *mech, smb_crypto_param_t *param,
+    uint8_t *iv)
+{
+	param->gmac = iv;	/* see above */
+
+	mech->pParameter = (caddr_t)iv;
+	mech->ulParameterLen = SMB3_AES_GMAC_NONCE_SIZE;
 }
 
 int
@@ -178,16 +204,12 @@ smb2_mac_raw(smb_crypto_mech_t *mech,
 	}
 
 	rv = C_Sign(hssn, data, data_len, mac, &ck_maclen);
-	if (rv != CKR_OK) {
+	if (rv != CKR_OK)
 		rc = -4;
-		goto out;
-	}
-
-	if (ck_maclen != mac_len) {
+	else if (ck_maclen != mac_len)
 		rc = -5;
-		goto out;
-	}
-	rc = 0;
+	else
+		rc = 0;
 
 out:
 	if (hkey != 0)

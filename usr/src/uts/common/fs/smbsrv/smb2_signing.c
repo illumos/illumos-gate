@@ -81,6 +81,8 @@ smb2_sign_init_mech(smb_session_t *s)
 		get_mech = smb3_cmac_getmech;
 		break;
 	case SMB3_SIGN_AES128_GMAC:
+		get_mech = smb3_gmac_getmech;
+		break;
 	default:
 		return;
 	}
@@ -181,13 +183,48 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 		sr->smb2_hdr_flags |= SMB2_FLAGS_SIGNED;
 }
 
+static void
+smb2_construct_gmac_iv(smb_request_t *sr, boolean_t is_server_msg, uint8_t *iv)
+{
+	uint64_t msgid = sr->smb2_messageid;
+	int i;
+
+	/*
+	 * [MS-SMB2] 3.1.4.1 "Signing an Outgoing Message"
+	 * The 12-byte IV for AES-GMAC is created as follows:
+	 *
+	 * First 8 bytes are the messageid (wire order)
+	 */
+	for (i = 0; i < 8; i++) {
+		iv[i] = msgid & 0xff;
+		msgid >>= 8;
+	}
+
+	/*
+	 * Next byte:
+	 * LSB is 1 iff the message is from the server;
+	 * 2nd LSB is 1 iff this is a cancel op;
+	 * Rest are 0.
+	 */
+
+	iv[i] = 0;
+	if (is_server_msg)
+		iv[i] |= 1;
+	if (sr->smb2_cmd_code == SMB2_CANCEL)
+		iv[i] |= 2;
+
+	/* Last 3 bytes are 0 */
+	for (i++; i < SMB3_AES_GMAC_NONCE_SIZE; i++)
+		iv[i] = 0;
+}
+
 /*
  * smb2_sign_calc
  *
  * Calculates MAC signature for the given buffer and returns
- * it in the mac_sign parameter.
+ * it in the 'digest' parameter.
  *
- * The signature algorithm is to compute HMAC SHA256 or AES_CMAC
+ * The signature algorithm is to compute HMAC SHA256, AES_CMAC, or AES_GMAC
  * over the entire command, with the signature field set to zeros.
  *
  * Return 0 if  success else non-zero
@@ -195,9 +232,10 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 
 static int
 smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
-    uint8_t *digest)
+    uint8_t *digest, boolean_t is_server_msg)
 {
 	uint8_t tmp_hdr[SMB2_HDR_SIZE];
+	uint8_t iv[SMB3_AES_GMAC_NONCE_SIZE];
 	smb_crypto_mech_t mech;
 	smb_crypto_param_t param;
 	smb_session_t *s = sr->session;
@@ -221,6 +259,9 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 		smb2_sign_init_hmac_param(&mech, &param, SMB2_SIG_SIZE);
 		break;
 	case SMB3_SIGN_AES128_GMAC:
+		smb2_construct_gmac_iv(sr, is_server_msg, iv);
+		smb3_sign_init_gmac_param(&mech, &param, iv);
+		break;
 	default:
 		ASSERT(0);
 		return (-1);
@@ -342,7 +383,7 @@ smb2_sign_check_request(smb_request_t *sr)
 	/*
 	 * Compute the correct signature and compare.
 	 */
-	if (smb2_sign_calc(sr, mbc, vfy_sig) != 0)
+	if (smb2_sign_calc(sr, mbc, vfy_sig, B_FALSE) != 0)
 		return (-1);
 
 	if (memcmp(vfy_sig, req_sig, SMB2_SIG_SIZE) == 0) {
@@ -394,7 +435,7 @@ smb2_sign_reply(smb_request_t *sr)
 	/*
 	 * Calculate the MAC signature for this reply.
 	 */
-	if (smb2_sign_calc(sr, &tmp_mbc, reply_sig) != 0)
+	if (smb2_sign_calc(sr, &tmp_mbc, reply_sig, B_TRUE) != 0)
 		return;
 
 	/*

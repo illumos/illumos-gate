@@ -379,7 +379,7 @@ specified, or the value
 .Ql all
 should be used instead to enable all supported algorithms.
 When the property is empty, it is equivalent to the value
-.Ql aes128-cmac .
+.Ql aes128-cmac,aes128-gmac .
 .Pp
 The list of algorithms should contain these values:
 .Bl -tag -width "sha256-hmac"
@@ -390,6 +390,8 @@ SMB2 always uses SHA-256-HMAC and ignores this setting.
 AES-128-CMAC algorithm is enabled.
 This is the default for SMB 3.1.1.
 SMB3.0 always uses AES-128-CMAC and ignores this setting.
+.It Sy aes128-gmac
+AES-128-GMAC algorithm is enabled.
 .It Sy all
 All algorithms are enabled, including those currently implemented
 and any future algorithms that might be implemented.

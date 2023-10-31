@@ -206,6 +206,7 @@ smb31_encrypt_ciphers[] = {
 static struct str_val
 smb31_sign_algs[] = {
 	{ "aes128-cmac",	SMB3_SIGN_FLAG_AES128_CMAC },	/* SMB 3.x */
+	{ "aes128-gmac",	SMB3_SIGN_FLAG_AES128_GMAC },	/* SMB 3.1.1 */
 	{ "sha256-hmac",	SMB3_SIGN_FLAG_SHA256_HMAC },	/* SMB 2.x */
 	{ "all",		SMB3_SIGN_FLAGS_ALL },
 	{ NULL,		0 }
@@ -1337,8 +1338,13 @@ smb_config_get_encrypt_ciphers(void)
 	return ((uint32_t)ciphers);
 }
 
+/*
+ * Note: SMB3_SIGN_FLAG_SHA256_HMAC is always available,
+ * because SMB 2 does not negotiate signing algorithms.
+ */
 const int smb_default_signing_algs =
-    SMB3_SIGN_FLAG_AES128_CMAC;
+    SMB3_SIGN_FLAG_AES128_CMAC |
+    SMB3_SIGN_FLAG_AES128_GMAC;
 
 uint32_t
 smb_config_get_signing_algs(void)
