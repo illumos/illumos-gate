@@ -1135,23 +1135,6 @@ file path=usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtZoneMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtZoneSecurity.html
 file path=usr/lib/hotplugd mode=0555
-dir  path=usr/lib/iconv
-file path=usr/lib/iconv/646da.8859.t mode=0444
-file path=usr/lib/iconv/646de.8859.t mode=0444
-file path=usr/lib/iconv/646en.8859.t mode=0444
-file path=usr/lib/iconv/646es.8859.t mode=0444
-file path=usr/lib/iconv/646fr.8859.t mode=0444
-file path=usr/lib/iconv/646it.8859.t mode=0444
-file path=usr/lib/iconv/646sv.8859.t mode=0444
-file path=usr/lib/iconv/8859.646.t mode=0444
-file path=usr/lib/iconv/8859.646da.t mode=0444
-file path=usr/lib/iconv/8859.646de.t mode=0444
-file path=usr/lib/iconv/8859.646en.t mode=0444
-file path=usr/lib/iconv/8859.646es.t mode=0444
-file path=usr/lib/iconv/8859.646fr.t mode=0444
-file path=usr/lib/iconv/8859.646it.t mode=0444
-file path=usr/lib/iconv/8859.646sv.t mode=0444
-file path=usr/lib/iconv/iconv_data mode=0444
 file path=usr/lib/idmapd mode=0555
 dir  path=usr/lib/inet
 dir  path=usr/lib/inet/$(ARCH64)
