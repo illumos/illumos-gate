@@ -70,6 +70,7 @@ print_address_ps(struct ps_prochandle *ph, ulong_t address, unsigned flags)
 	GElf_Sym	sym;
 	char		*str;
 	ulong_t		val;
+	size_t		len;
 
 	if (addr_to_sym(ph, address, &sym, &str) == RET_OK) {
 		map_info_t	*mip;
@@ -105,26 +106,32 @@ print_address_ps(struct ps_prochandle *ph, ulong_t address, unsigned flags)
 
 					if (addr_to_sym(ph, rp.pi_baddr,
 					    &_sym, &_str) == RET_OK) {
-						(void) snprintf(buf, 256,
-						    "%s0x%lx:plt(%s)",
-						    buf, address, _str);
+						len = strlen(buf);
+						(void) snprintf(buf + len,
+						    256 - len,
+						    "0x%lx:plt(%s)",
+						    address, _str);
 						return (buf);
 					}
 				}
 			}
 			val = sym.st_value;
-			(void) snprintf(buf, 256, "%s0x%lx:plt(unbound)+0x%lx",
-			    buf, address, address - val);
+			len = strlen(buf);
+			(void) snprintf(buf + len, 256 - len,
+			    "0x%lx:plt(unbound)+0x%lx",
+			    address, address - val);
 			return (buf);
 		} else {
 
 			val = sym.st_value;
 
-			if (val < address)
-				(void) snprintf(buf, 256, "%s%s+0x%lx", buf,
-				    str, address - val);
-			else
-				(void) snprintf(buf, 256, "%s%s", buf, str);
+			len = strlen(buf);
+			if (val < address) {
+				(void) snprintf(buf + len, 256 - len,
+				    "%s+0x%lx", str, address - val);
+			} else {
+				(void) strlcat(buf, str, 256);
+			}
 			return (buf);
 		}
 	} else {
@@ -146,7 +153,7 @@ print_address(unsigned long address)
 retc_t
 disasm_addr(struct ps_prochandle *ph, ulong_t addr, int num_inst)
 {
-	ulong_t 	offset, end;
+	ulong_t		offset, end;
 	int		vers = V8_MODE;
 
 	if (ph->pp_dmodel == PR_MODEL_LP64)
