@@ -744,13 +744,12 @@ fatal_tty_error(char *doing_what)
  *	or a block-until-something-happens operation.
  *
  *	The return value is 1 if something happened, 0 if not.
+ *	If poll == 0, then block until something to do.
  */
-
 int
-process_rings(netin, netout, netex, ttyin, ttyout, poll)
-	int poll;		/* If 0, then block until something to do */
+process_rings(int netin, int netout, int netex, int ttyin, int ttyout, int poll)
 {
-	register int c;
+	int c;
 	/*
 	 * One wants to be a bit careful about setting returnValue
 	 * to one, since a one implies we did some useful work,

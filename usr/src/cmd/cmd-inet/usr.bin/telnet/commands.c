@@ -207,7 +207,7 @@ makeargv()
 		shellcmd = B_TRUE;
 	}
 	while ((c = *cp) != '\0') {
-		register int inquote = 0;
+		int inquote = 0;
 		while (isspace(c))
 			c = *++cp;
 		if (c == '\0')
@@ -256,11 +256,10 @@ makeargv()
  * Todo:  1.  Could take random integers (12, 0x12, 012, 0b1).
  */
 
-	static int
-special(s)
-	register char *s;
+static int
+special(char *s)
 {
-	register char c;
+	char c;
 	char b;
 
 	switch (*s) {
@@ -283,9 +282,8 @@ special(s)
  * Construct a control character sequence
  * for a special character.
  */
-	static char *
-control(c)
-	register cc_t c;
+static char *
+control(cc_t c)
 {
 	static char buf[5];
 	/*
@@ -295,7 +293,7 @@ control(c)
 	 * was to assign "c" to an unsigned int variable...
 	 * Arggg....
 	 */
-	register unsigned int uic = (unsigned int)c;
+	unsigned int uic = (unsigned int)c;
 
 	if (uic == 0x7f)
 		return ("^?");
@@ -325,8 +323,7 @@ control(c)
  * escape_valid.
  */
 	static char *
-esc_control(c)
-	register cc_t c;
+esc_control(cc_t c)
 {
 	static char buf[5];
 	/*
@@ -336,7 +333,7 @@ esc_control(c)
 	 * was to assign "c" to an unsigned int variable...
 	 * Arggg....
 	 */
-	register unsigned int uic = (unsigned int)c;
+	unsigned int uic = (unsigned int)c;
 
 	if (escape_valid == B_FALSE)
 		return ("off");
@@ -542,16 +539,14 @@ send_wontcmd(name)
 }
 
 int
-send_tncmd(func, cmd, name)
-	void	(*func)();
-	char	*cmd, *name;
+send_tncmd(void (*func)(), char *cmd, char *name)
 {
 	char **cpp;
 	extern char *telopts[];
-	register int val = 0;
+	int val = 0;
 
 	if (isprefix(name, "help") || isprefix(name, "?")) {
-		register int col, len;
+		int col, len;
 
 		(void) printf("Usage: send %s <value|option>\n", cmd);
 		(void) printf("\"value\" must be from 0 to 255\n");
@@ -580,7 +575,7 @@ send_tncmd(func, cmd, name)
 	if (cpp) {
 		val = cpp - telopts;
 	} else {
-		register char *cp = name;
+		char *cp = name;
 
 		while (*cp >= '0' && *cp <= '9') {
 			val *= 10;
@@ -1118,13 +1113,11 @@ setcmd(argc, argv)
 }
 
 static int
-unsetcmd(argc, argv)
-	int  argc;
-	char *argv[];
+unsetcmd(int argc, char *argv[])
 {
 	struct setlist *ct;
 	struct togglelist *c;
-	register char *name;
+	char *name;
 
 	if (argc < 2) {
 		(void) fprintf(stderr, "Need an argument to 'unset' command.  "
@@ -1267,13 +1260,13 @@ dolmmode(bit, on)
 }
 
 static int
-setmode(bit)
+setmode(int bit)
 {
 	return (dolmmode(bit, 1));
 }
 
 static int
-clearmode(bit)
+clearmode(int bit)
 {
 	return (dolmmode(bit, 0));
 }
@@ -1447,12 +1440,10 @@ display(argc, argv)
 /*
  * Set the escape character.
  */
-	static int
-setescape(argc, argv)
-	int argc;
-	char *argv[];
+static int
+setescape(int argc, char *argv[])
 {
-	register char *arg;
+	char *arg;
 	char *buf = NULL;
 
 	if (argc > 2)
@@ -1520,9 +1511,7 @@ suspend(argc, argv)
 
 /*ARGSUSED*/
 static int
-shell(argc, argv)
-	int argc;
-	char *argv[];
+shell(int argc, char *argv[])
 {
 	unsigned short oldrows, oldcols, newrows, newcols;
 	int err;
@@ -1540,7 +1529,7 @@ shell(argc, argv)
 		/*
 		 * Fire up the shell in the child.
 		 */
-		register char *shellp, *shellname;
+		char *shellp, *shellname;
 
 		shellp = getenv("SHELL");
 		if (shellp == NULL)
@@ -1806,10 +1795,9 @@ struct env_lst {
 static struct env_lst envlisthead;
 
 static struct env_lst *
-env_find(var)
-	unsigned char *var;
+env_find(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	for (ep = envlisthead.next; ep; ep = ep->next) {
 		if (strcmp((char *)ep->var, (char *)var) == 0)
@@ -1819,13 +1807,9 @@ env_find(var)
 }
 
 int
-env_init()
+env_init(void)
 {
-#ifdef	lint
-	char **environ = NULL;
-#else	/* lint */
 	extern char **environ;
-#endif	/* lint */
 	char **epp, *cp;
 	struct env_lst *ep;
 
@@ -1884,8 +1868,7 @@ env_init()
 }
 
 static struct env_lst *
-env_define(var, value)
-	unsigned char *var, *value;
+env_define(unsigned char *var, unsigned char *value)
 {
 	unsigned char *tmp_value;
 	unsigned char *tmp_var;
@@ -1937,10 +1920,9 @@ env_define(var, value)
 }
 
 static void
-env_undefine(var)
-	unsigned char *var;
+env_undefine(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	if (ep = env_find(var)) {
 		ep->prev->next = ep->next;
@@ -1955,30 +1937,27 @@ env_undefine(var)
 }
 
 static void
-env_export(var)
-	unsigned char *var;
+env_export(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	if (ep = env_find(var))
 		ep->export = 1;
 }
 
 static void
-env_unexport(var)
-	unsigned char *var;
+env_unexport(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	if (ep = env_find(var))
 		ep->export = 0;
 }
 
 static void
-env_send(var)
-	unsigned char *var;
+env_send(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	if (my_state_is_wont(TELOPT_NEW_ENVIRON)
 #ifdef	OLD_ENVIRON
@@ -2002,9 +1981,9 @@ env_send(var)
 }
 
 static void
-env_list()
+env_list(void)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	for (ep = envlisthead.next; ep; ep = ep->next) {
 		(void) printf("%c %-20s %s\n", ep->export ? '*' : ' ',
@@ -2012,9 +1991,8 @@ env_list()
 	}
 }
 
-	unsigned char *
-env_default(init, welldefined)
-	int init;
+unsigned char *
+env_default(int init, int welldefined)
 {
 	static struct env_lst *nep = NULL;
 
@@ -2032,11 +2010,10 @@ env_default(init, welldefined)
 	return (NULL);
 }
 
-	unsigned char *
-env_getvalue(var)
-	unsigned char *var;
+unsigned char *
+env_getvalue(unsigned char *var)
 {
-	register struct env_lst *ep;
+	struct env_lst *ep;
 
 	if (ep = env_find(var))
 		return (ep->value);
@@ -2045,8 +2022,7 @@ env_getvalue(var)
 
 #if defined(OLD_ENVIRON) && defined(ENV_HACK)
 static void
-env_varval(what)
-	unsigned char *what;
+env_varval(unsigned char *what)
 {
 	extern int old_env_var, old_env_value, env_auto;
 	int len = strlen((char *)what);
@@ -2135,9 +2111,7 @@ auth_help(void)
 
 
 static int
-auth_cmd(argc, argv)
-	int  argc;
-	char *argv[];
+auth_cmd(int argc, char *argv[])
 {
 	struct authlist *c;
 
@@ -2914,9 +2888,7 @@ prepare_optbuf6(struct gateway *gw_addrs, int num_gw, char **opt_bufpp,
 }
 
 int
-tn(argc, argv)
-	int argc;
-	char *argv[];
+tn(int argc, char *argv[])
 {
 	struct addrinfo *host = NULL;
 	struct addrinfo *h;
@@ -3447,8 +3419,7 @@ call(int n_ptrs, ...)
 
 
 static Command *
-getcmd(name)
-	char *name;
+getcmd(char *name)
 {
 	Command *cm;
 
@@ -3458,10 +3429,7 @@ getcmd(name)
 }
 
 void
-command(top, tbuf, cnt)
-	int top;
-	char *tbuf;
-	int cnt;
+command(int top, char *tbuf, int cnt)
 {
 	Command *c;
 
@@ -3536,12 +3504,10 @@ command_exit:
 /*
  * Help command.
  */
-	static int
-help(argc, argv)
-	int argc;
-	char *argv[];
+static int
+help(int argc, char *argv[])
 {
-	register Command *c;
+	Command *c;
 
 	if (argc == 1) {
 		(void) printf(
@@ -3555,7 +3521,7 @@ help(argc, argv)
 		return (0);
 	}
 	while (--argc > 0) {
-		register char *arg;
+		char *arg;
 		arg = *++argv;
 		c = getcmd(arg);
 		if (Ambiguous(c))
