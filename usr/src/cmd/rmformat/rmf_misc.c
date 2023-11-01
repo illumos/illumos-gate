@@ -60,7 +60,7 @@
 #define	WRITE_10_CMD		0x2A
 #define	READ_INFO_CMD		0x51
 #define	SYNC_CACHE_CMD		0x35
-#define	CLOSE_TRACK_CMD 	0x5B
+#define	CLOSE_TRACK_CMD		0x5B
 #define	MODE_SENSE_10_CMD	0x5A
 #define	DEVFS_PREFIX		"/devices"
 
@@ -69,7 +69,7 @@ char		rqbuf[RQBUFLEN];
 static uint_t	total_retries;
 static struct	uscsi_cmd uscmd;
 static char	ucdb[16];
-uchar_t 	uscsi_status, rqstatus, rqresid;
+uchar_t		uscsi_status, rqstatus, rqresid;
 int		total_devices_found = 0;
 int		removable_found = 0;
 
@@ -661,8 +661,10 @@ is not a raw device.\n"));
 			DPRINTF1("Found %s\n", dp->d_name);
 			if ((strcmp(dp->d_name, ".") != 0) &&
 			    (strcmp(dp->d_name, "..") != 0)) {
-				(void) snprintf(tmp_path_name, PATH_MAX,
-				    "%s/%s", tmp_path_name, dp->d_name);
+				size_t len = strlen(tmp_path_name);
+
+				(void) snprintf(tmp_path_name + len,
+				    PATH_MAX - len, "/%s", dp->d_name);
 
 				DPRINTF1("tmp_pathname is %s\n", tmp_path_name);
 				break;
@@ -910,7 +912,7 @@ intr_sig_handler()
 
 static struct sigaction act, oact;
 void
-trap_SIGINT()
+trap_SIGINT(void)
 {
 
 	act.sa_handler = intr_sig_handler;
@@ -923,7 +925,7 @@ trap_SIGINT()
 }
 
 void
-release_SIGINT()
+release_SIGINT(void)
 {
 	if (sigaction(SIGINT, &oact, (struct sigaction *)NULL) < 0) {
 		DPRINTF("sigunset failed\n");
@@ -933,8 +935,8 @@ release_SIGINT()
 
 int32_t
 verify(smedia_handle_t handle, int32_t fd, diskaddr_t start_sector,
-	uint32_t nblocks, char *buf,
-	int32_t flag, int32_t blocksize, int32_t no_raw_rw)
+    uint32_t nblocks, char *buf,
+    int32_t flag, int32_t blocksize, int32_t no_raw_rw)
 {
 	uint64_t ret;
 
@@ -1501,10 +1503,10 @@ void
 print_header(void)
 {
 	/* l10n_NOTE : Column spacing should be kept same */
-	(void) printf(gettext("    Node 		       "
+	(void) printf(gettext("    Node			       "
 	    "Connected Device"));
 	/* l10n_NOTE : Column spacing should be kept same */
-	(void) printf(gettext(" 		Device type\n"));
+	(void) printf(gettext("			Device type\n"));
 	(void) printf(
 	    "---------------------------+---------------------------");
 	(void) printf("-----+----------------\n");
@@ -1842,8 +1844,7 @@ read_scsi16(void *addr)
  * Use destroy_data() to free when no longer used.
  */
 char *
-alloc_string(s)
-	char    *s;
+alloc_string(char *s)
 {
 	char    *ns;
 
