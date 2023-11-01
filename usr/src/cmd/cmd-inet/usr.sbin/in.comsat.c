@@ -88,8 +88,7 @@ int	reapchildren();
 	((mask) == -1 ? sigfillset(setp) : (((setp)->__sigbits[0]) = (mask)))
 
 static int
-sigsetmask(mask)
-int mask;
+sigsetmask(int mask)
 {
 	sigset_t oset;
 	sigset_t nset;
@@ -101,8 +100,7 @@ int mask;
 }
 
 static int
-sigblock(mask)
-int mask;
+sigblock(int mask)
 {
 	sigset_t oset;
 	sigset_t nset;
@@ -125,11 +123,9 @@ void notify(struct utmpx *utp, int offset);
 void onalrm(int sig);
 
 int
-main(argc, argv)
-int argc;
-char *argv[];
+main(int argc, char *argv[])
 {
-	register int cc;
+	int cc;
 	char buf[BUFSIZ];
 	char msgbuf[100];
 	struct sockaddr_in from;
@@ -241,11 +237,10 @@ onalrm(int sig)
 }
 
 void
-mailfor(name)
-char *name;
+mailfor(char *name)
 {
 	struct utmpx *utp = &utmp[nutmp];
-	register char *cp;
+	char *cp;
 	char *rindex();
 	int offset;
 
@@ -266,16 +261,15 @@ char *name;
 	*cp = 0;
 	offset = atoi(cp+1);
 	while (--utp >= utmp)
-		if ((utp->ut_type == USER_PROCESS) &&
-		    (!strncmp(utp->ut_name, name, sizeof (utmp[0].ut_name))))
+		if (utp->ut_type == USER_PROCESS &&
+		    strncmp(utp->ut_name, name, sizeof (utmp[0].ut_name)) == 0)
 			notify(utp, offset);
 }
 
 char	*cr;
 
 void
-notify(utp, offset)
-struct utmpx *utp;
+notify(struct utmpx *utp, int offset)
 {
 	FILE *tp;
 	struct sgttyb gttybuf;
@@ -399,13 +393,10 @@ struct utmpx *utp;
 }
 
 void
-jkfprintf(tp, name, mbox, offset)
-register FILE *tp;
-char *name;
-int mbox;
+jkfprintf(FILE *tp, char *name, int mbox, int offset)
 {
-	register FILE *fi;
-	register int linecnt, charcnt;
+	FILE *fi;
+	int linecnt, charcnt;
 	char line[BUFSIZ];
 	int inheader;
 
@@ -429,7 +420,7 @@ int mbox;
 
 
 	while (fgets(line, sizeof (line), fi) != NULL) {
-		register char *cp;
+		char *cp;
 		char *index();
 		int cnt;
 		int i;
