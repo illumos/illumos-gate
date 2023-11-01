@@ -64,10 +64,15 @@ static struct hours {
 	int	h_hour;		/* initialized from holidays file (time/100) */
 	long	h_type;		/* prime/nonprime of previous period */
 } h[4];
-int	daysend[] = {0, 60, 23};	/* the sec, min, hr of the day's end */
 
-struct tm *localtime();
-long	tmsecs();
+/* the sec, min, hr of the day's end */
+struct tm daysend = {
+	.tm_sec = 0,
+	.tm_min = 60,
+	.tm_hour = 23
+};
+
+long tmsecs(struct tm *, struct tm *);
 
 /*
  * split interval of length etime, starting at start into prime/nonprime
@@ -75,16 +80,13 @@ long	tmsecs();
  * input values in seconds
  */
 int
-pnpsplit(start, etime, result)
-long start, result[2];
-ulong_t etime;
+pnpsplit(long start, ulong_t etime, long result[2])
 {
-	struct tm cur, end;
+	struct tm cur, end, hours;
 	time_t tcur, tend;
 	long tmp;
 	int sameday;
-	register struct hours *hp;
-	char *memcpy();
+	struct hours *hp;
 
 	/* once holidays file is read, this is zero */
 	if(thisyear && (checkhol() == 0)) {
@@ -105,7 +107,7 @@ ulong_t etime;
 
 				break;
 			} else {
-				tmp = tmsecs(&cur, daysend);
+				tmp = tmsecs(&cur, &daysend);
 				result[NONPRIME] += tmp;
 				tcur += tmp;
 			}
@@ -118,7 +120,10 @@ ulong_t etime;
 					tcur = tend;
 					break;	/* all done */
 				} else {	/* time to next PRIME /NONPRIME change */
-					tmp = tmsecs(&cur, hp);
+					hours.tm_sec = hp->h_sec;
+					hours.tm_min = hp->h_min;
+					hours.tm_hour = hp->h_hour;
+					tmp = tmsecs(&cur, &hours);
 					result[hp->h_type] += tmp;
 					tcur += tmp;
 					cur.tm_sec = hp->h_sec;
@@ -136,9 +141,9 @@ ulong_t etime;
  *	This code is only executed once per program invocation.
  */
 int
-checkhol()
+checkhol(void)
 {
-	register struct tm *tp;
+	struct tm *tp;
 	time_t t;
 
 	if(inithol() == 0) {
@@ -162,8 +167,7 @@ checkhol()
  * ssh returns 1 if Sat, Sun, or Holiday
  */
 int
-ssh(ltp)
-register struct tm *ltp;
+ssh(struct tm *ltp)
 {
 	int i;
 
@@ -181,11 +185,11 @@ register struct tm *ltp;
  * holidays array.
  */
 int
-inithol()
+inithol(void)
 {
-	FILE		*fopen(), *holptr;
-	char		*fgets(), holbuf[128];
-	register int	line = 0,
+	FILE		*holptr;
+	char		holbuf[128];
+	int		line = 0,
 			holindx = 0,
 			errflag = 0;
 	int		pstart, npstart;
@@ -303,8 +307,7 @@ inithol()
  */
 
 long
-tmsecs(t1, t2)
-register struct tm *t1, *t2;
+tmsecs(struct tm *t1, struct tm *t2)
 {
 	return((t2->tm_sec - t1->tm_sec) +
 		60*(t2->tm_min - t1->tm_min) +
@@ -317,8 +320,7 @@ register struct tm *t1, *t2;
  */
 
 int
-tmless(t1, t2)
-register struct tm *t1, *t2;
+tmless(struct tm *t1, struct tm *t2)
 {
 	if (t1->tm_hour != t2->tm_hour)
 		return(t1->tm_hour < t2->tm_hour);
@@ -330,7 +332,7 @@ register struct tm *t1, *t2;
 /* set day of year from month and day */
 
 int
-day_of_year(year, month, day)
+day_of_year(int year, int month, int day)
 {
 	int i, leap;
 
