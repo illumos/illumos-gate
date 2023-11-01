@@ -64,8 +64,7 @@ usage()
 }
 
 int
-main(argc, argv)
-	char **argv;
+main(int argc, char **argv)
 {
 	char line[INPUTSIZ];
 	char adr[INPUTSIZ];

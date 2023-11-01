@@ -119,8 +119,7 @@ static char usage[] =
 	ypalias mapname\n";
 
 int
-main(argc, argv)
-char **argv;
+main(int argc, char **argv)
 {
 	char result[MAXNAMLEN] = {NULL};
 

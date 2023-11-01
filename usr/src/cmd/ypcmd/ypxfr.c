@@ -74,6 +74,7 @@
 #define	DATUM
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <time.h>
 #include <ctype.h>
@@ -158,7 +159,7 @@ int interdomain_sz = 0;		/* Size of the interdomain value */
 struct timeval udp_timeout = { UDPTIMEOUT, 0};
 struct timeval tcp_timeout = { 180, 0}; /* Timeout for map enumeration */
 
-char *interdomain_value; 	/* place to store the interdomain value */
+char *interdomain_value;	/* place to store the interdomain value */
 char *tid;
 char *proto;
 int entry_count;		/* counts entries in the map */
@@ -209,7 +210,7 @@ bool add_private_entries();
 bool new_mapfiles();
 void del_mapfiles();
 void set_output();
-void logprintf();
+void logprintf(char *, ...);
 bool send_ypclear();
 void xfr_exit();
 void send_callback();
@@ -347,18 +348,19 @@ set_output()
  * This constructs a logging record.
  */
 void
-logprintf(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-/*VARARGS*/
+logprintf(char *fmt, ...)
 {
 	struct timeval t;
+	va_list ap;
 
+	va_start(ap, fmt);
 	fseek(stderr, 0, 2);
 	if (logging) {
 		(void) gettimeofday(&t, NULL);
 		(void) fprintf(stderr, "%19.19s: ", ctime(&t.tv_sec));
 	}
-	(void) fprintf(stderr, (char *)arg1, arg2, arg3, arg4, arg5,
-				arg6, arg7);
+	(void) vfprintf(stderr, fmt, ap);
+	va_end(ap);
 	fflush(stderr);
 }
 
