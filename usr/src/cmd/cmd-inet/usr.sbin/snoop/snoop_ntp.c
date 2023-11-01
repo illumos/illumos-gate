@@ -479,8 +479,8 @@ show_time(struct l_fixedpt pkt_time)
 
 	fracsec = net_time.fraction / 42949;	/* fract / (2**32/10**6) */
 
-	(void) strlcpy(buff, iso_date_time(net_time.int_part), sizeof (buff));
-	(void) snprintf(buff, sizeof (buff), "%s.%05lu", buff, fracsec);
+	(void) snprintf(buff, sizeof (buff), "%s.%05lu",
+	    iso_date_time(net_time.int_part), fracsec);
 
 	return (buff);
 }
