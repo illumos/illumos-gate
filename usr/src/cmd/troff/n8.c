@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -100,7 +100,7 @@ hyphen(wp)
 
 
 int
-punct(i)
+punct(int i)
 {
 	if (!i || alph(i))
 		return(0);
@@ -110,7 +110,7 @@ punct(i)
 
 
 int
-alph(i)
+alph(int i)
 {
 	if (i >= 'a' && i <= 'z' || i >= 'A' && i <= 'Z')
 		return(1);

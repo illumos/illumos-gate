@@ -553,7 +553,7 @@ ptlead()
 
 
 int
-ptesc()
+ptesc(void)
 {
 	hpos += esc;
 	if (esc > 0) {
@@ -572,7 +572,7 @@ ptesc()
 
 
 int
-newpage(n)	/* called at end of each output page (we hope) */
+newpage(int n)	/* called at end of each output page (we hope) */
 {
 	int i;
 
@@ -592,7 +592,7 @@ newpage(n)	/* called at end of each output page (we hope) */
 }
 
 int
-pttrailer()
+pttrailer(void)
 {
 	fdprintf(ptid, "x trailer\n");
 
@@ -600,7 +600,7 @@ pttrailer()
 }
 
 int
-ptstop()
+ptstop(void)
 {
 	fdprintf(ptid, "x stop\n");
 
@@ -608,7 +608,7 @@ ptstop()
 }
 
 int
-dostop()
+dostop(void)
 {
 	if (ascii)
 		return (0);

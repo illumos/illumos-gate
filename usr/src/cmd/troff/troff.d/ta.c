@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -85,6 +85,7 @@ x ...\n	device control functions:
 */
 
 #include	<stdio.h>
+#include	<stdarg.h>
 #include	<signal.h>
 #include	<ctype.h>
 
@@ -98,9 +99,10 @@ int	olist[20];	/* pairs of page numbers */
 int	erase	= 1;
 float	aspect	= 1.5;	/* default aspect ratio */
 int	wflag	= 0;	/* wait, looping, for new input if on */
-void	(*sigint)();
-void	(*sigquit)();
-void	done();
+void	(*sigint)(int);
+void	(*sigquit)(int);
+void	done(void);
+int	error(int, char *, ...);
 
 struct dev dev;
 struct font *fontbase[NFONT];
@@ -175,8 +177,7 @@ main(int argc, char **argv)
 }
 
 int
-outlist(s)	/* process list of page numbers to be printed */
-char *s;
+outlist(char *s)	/* process list of page numbers to be printed */
 {
 	int n1, n2, i;
 
@@ -214,8 +215,7 @@ char *s;
 }
 
 int
-in_olist(n)	/* is n in olist? */
-int n;
+in_olist(int n)	/* is n in olist? */
 {
 	int i;
 
@@ -228,8 +228,7 @@ int n;
 }
 
 int
-conv(fp)
-FILE *fp;
+conv(FILE *fp)
 {
 	int c, k;
 	int m, n, i, n1, m1;
@@ -358,8 +357,7 @@ FILE *fp;
 }
 
 int
-devcntrl(fp)	/* interpret device control functions */
-FILE *fp;
+devcntrl(FILE *fp)	/* interpret device control functions */
 {
 	char str[20];
 	int c, n;
@@ -397,38 +395,38 @@ FILE *fp;
 }
 
 int
-fileinit()	/* read in font and code files, etc. */
+fileinit(void)	/* read in font and code files, etc. */
 {
 	return (0);
 }
 
 int
-fontprint(i)	/* debugging print of font i (0,...) */
+fontprint(int i)	/* debugging print of font i (0,...) */
 {
 	return (0);
 }
 
 int
-loadcode(n, nw)	/* load codetab on position n (0...); #chars is nw */
-int n, nw;
+loadcode(int n, int nw)	/* load codetab on position n (0...); #chars is nw */
 {
 	return (0);
 }
 
 int
-loadfont(n, s)	/* load font info for font s on position n (1...) */
-int n;
-char *s;
+loadfont(int n, char *s) /* load font info for font s on position n (1...) */
 {
 	return (0);
 }
 
 int
-error(f, s, a1, a2, a3, a4, a5, a6, a7)
-char *s;
+error(int f, char *fmt, ...)
 {
+	va_list ap;
+
 	fprintf(stderr, "ta: ");
-	fprintf(stderr, s, a1, a2, a3, a4, a5, a6, a7);
+	va_start(ap, fmt);
+	(void) vfprintf(stderr, fmt, ap);
+	va_end(ap);
 	fprintf(stderr, "\n");
 	if (f)
 		exit(1);
@@ -464,8 +462,7 @@ int	drawdot	= '.';	/* draw with this character */
 int	drawsize = 1;	/* shrink by this factor when drawing */
 
 int
-t_init(reinit)	/* initialize device */
-int reinit;
+t_init(int reinit)	/* initialize device */
 {
 	int i, j;
 
@@ -489,7 +486,7 @@ struct	state	state[MAXSTATE];
 struct	state	*statep = state;
 
 int
-t_push()	/* begin a new block */
+t_push(void)	/* begin a new block */
 {
 	hflush();
 	statep->ssize = size;
@@ -509,7 +506,7 @@ t_push()	/* begin a new block */
 }
 
 int
-t_pop()	/* pop to previous state */
+t_pop(void)	/* pop to previous state */
 {
 	if (--statep < state)
 		error(FATAL, "extra }");
@@ -529,7 +526,7 @@ int	pgnum[40];	/* their actual numbers */
 long	pgadr[40];	/* their seek addresses */
 
 int
-t_page(n)	/* do whatever new page functions */
+t_page(int n)	/* do whatever new page functions */
 {
 	long ftell();
 	int c, m, i;
@@ -629,7 +626,7 @@ t_page(n)	/* do whatever new page functions */
 }
 
 int
-putpage()
+putpage(void)
 {
 	int i, j, k;
 
@@ -639,7 +636,7 @@ putpage()
 }
 
 int
-t_newline()	/* do whatever for the end of a line */
+t_newline(void)	/* do whatever for the end of a line */
 {
 	printf("\n");
 	hpos = 0;
@@ -648,22 +645,19 @@ t_newline()	/* do whatever for the end of a line */
 }
 
 int
-t_size(n)	/* convert integer to internal size number*/
-int n;
+t_size(int n)	/* convert integer to internal size number*/
 {
 	return (0);
 }
 
 int
-t_font(s)	/* convert string to internal font number */
-char *s;
+t_font(char *s)	/* convert string to internal font number */
 {
 	return (0);
 }
 
 int
-t_text(s)	/* print string s as text */
-char *s;
+t_text(char *s)	/* print string s as text */
 {
 	int c, w=0;
 	char str[100];
@@ -694,7 +688,7 @@ char *s;
 }
 
 int
-t_reset(c)
+t_reset(int c)
 {
 	int n;
 
@@ -707,13 +701,13 @@ t_reset(c)
 }
 
 int
-t_trailer()
+t_trailer(void)
 {
 	return (0);
 }
 
 int
-hgoto(n)
+hgoto(int n)
 {
 	hpos = n;	/* this is where we want to be */
 			/* before printing a character, */
@@ -723,8 +717,7 @@ hgoto(n)
 }
 
 int
-hmot(n)	/* generate n units of horizontal motion */
-int n;
+hmot(int n)	/* generate n units of horizontal motion */
 {
 	hgoto(hpos + n);
 
@@ -732,13 +725,13 @@ int n;
 }
 
 int
-hflush()	/* actual horizontal output occurs here */
+hflush(void)	/* actual horizontal output occurs here */
 {
 	return (0);
 }
 
 int
-vgoto(n)
+vgoto(int n)
 {
 	vpos = n;
 
@@ -746,8 +739,7 @@ vgoto(n)
 }
 
 int
-vmot(n)	/* generate n units of vertical motion */
-int n;
+vmot(int n)	/* generate n units of vertical motion */
 {
 	vgoto(vpos + n);	/* ignores rounding */
 
@@ -755,8 +747,7 @@ int n;
 }
 
 int
-put1s(s)	/* s is a funny char name */
-char *s;
+put1s(char *s)	/* s is a funny char name */
 {
 	int i;
 	char *p;
@@ -785,8 +776,7 @@ char *s;
 }
 
 int
-put1(c)	/* output char c */
-int c;
+put1(int c)	/* output char c */
 {
 	if (!output)
 		return (0);
@@ -796,28 +786,24 @@ int c;
 }
 
 int
-setsize(n)	/* set point size to n (internal) */
-int n;
+setsize(int n)	/* set point size to n (internal) */
 {
 	return (0);
 }
 
 int
-t_fp(n, s)	/* font position n now contains font s */
-int n;
-char *s;
+t_fp(int n, char *s)	/* font position n now contains font s */
 {
 	return (0);
 }
 
 int
-setfont(n)	/* set font to n */
-int n;
+setfont(int n)	/* set font to n */
 {
 	return (0);
 }
 
-void done()
+void done(void)
 {
 	output = 1;
 	putpage();
@@ -826,8 +812,7 @@ void done()
 }
 
 int
-callunix(line)
-char line[];
+callunix(char line[])
 {
 	int rc, status, unixpid;
 	if( (unixpid=fork())==0 ) {
@@ -840,14 +825,15 @@ char line[];
 		return (0);
 	else{	signal(SIGINT, SIG_IGN); signal(SIGQUIT, SIG_IGN);
 		while( (rc = wait(&status)) != unixpid && rc != -1 ) ;
-		signal(SIGINT,(void(*)())done); signal(SIGQUIT,(void(*)())sigquit);
+		signal(SIGINT,(void(*)())done); signal(SIGQUIT,sigquit);
 	}
 
 	return (0);
 }
 
 int
-readch(){
+readch(void)
+{
 	char c;
 	if (read(2,&c,1)<1) c=0;
 	return(c);
