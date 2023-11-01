@@ -20,10 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
+/*	  All Rights Reserved	*/
 
 #include "signal.h"
 
@@ -47,7 +44,7 @@ static
  **/
 
 static void
-catch (sig)
+catch (int sig __unused)
 {
 	(void)signal (SIGHUP, SIG_IGN);
 	(void)signal (SIGINT, SIG_IGN);
