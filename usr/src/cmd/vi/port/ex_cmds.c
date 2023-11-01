@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
@@ -34,6 +34,8 @@
 #include "ex_temp.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
+
+extern int getchar(void);
 
 bool	pflag, nflag;
 int	poffset;
