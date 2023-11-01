@@ -77,6 +77,16 @@
 ./usr/kernel/drv/llc2
 ./usr/lib/amd64/libike.so
 ./usr/lib/amd64/llib-like.ln
+./usr/lib/locale
+./usr/lib/locale/C
+./usr/lib/locale/C/LC_COLLATE
+./usr/lib/locale/C/LC_CTYPE
+./usr/lib/locale/C/LC_MESSAGES
+./usr/lib/locale/C/LC_MONETARY
+./usr/lib/locale/C/LC_NUMERIC
+./usr/lib/locale/C/LC_TIME
+./usr/lib/locale/C/locale_description
+./usr/lib/locale/POSIX
 ./usr/lib/inet/i86
 ./usr/lib/inet/i86/in.iked
 ./usr/lib/libike.so

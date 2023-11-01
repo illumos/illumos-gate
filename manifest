@@ -2548,20 +2548,20 @@ d usr/bin/amd64 0755 root bin
 f usr/bin/amd64/amt 0555 root bin
 f usr/bin/amd64/cputrack 0555 root bin
 f usr/bin/amd64/crle 0555 root bin
-h usr/bin/amd64/decrypt=usr/bin/amd64/encrypt
-h usr/bin/amd64/digest=usr/bin/amd64/mac
+s usr/bin/amd64/decrypt=../decrypt
+s usr/bin/amd64/digest=../digest
 s usr/bin/amd64/dump=../dump
 s usr/bin/amd64/elfdump=../elfdump
 f usr/bin/amd64/elfedit 0555 root bin
 f usr/bin/amd64/elfwrap 0555 root bin
-f usr/bin/amd64/encrypt 0555 root bin
+s usr/bin/amd64/encrypt=../encrypt
 f usr/bin/amd64/gcore 0555 root bin
 f usr/bin/amd64/ksh93 0555 root bin
 h usr/bin/amd64/ksh=usr/bin/amd64/ksh93
 s usr/bin/amd64/ld=../ld
 s usr/bin/amd64/ldd=../ldd
 f usr/bin/amd64/ls 0555 root bin
-f usr/bin/amd64/mac 0555 root bin
+s usr/bin/amd64/mac=../mac
 f usr/bin/amd64/mcs 0555 root bin
 f usr/bin/amd64/mdb 0555 root bin
 f usr/bin/amd64/moe 0555 root bin
@@ -2668,7 +2668,7 @@ h usr/bin/cut=usr/bin/alias
 f usr/bin/date 0555 root bin
 f usr/bin/dc 0555 root bin
 f usr/bin/dd 0555 root bin
-h usr/bin/decrypt=usr/lib/isaexec
+f usr/bin/decrypt 0555 root bin
 f usr/bin/demangle 0555 root bin
 f usr/bin/deroff 0555 root bin
 f usr/bin/devattr 0555 root bin
@@ -2678,7 +2678,7 @@ s usr/bin/df=../sbin/df
 f usr/bin/diff 0555 root bin
 f usr/bin/diff3 0555 root bin
 f usr/bin/diffmk 0555 root bin
-h usr/bin/digest=usr/lib/isaexec
+f usr/bin/digest 0555 root bin
 f usr/bin/dircmp 0555 root bin
 f usr/bin/dirname 0555 root bin
 f usr/bin/dis 0555 root bin
@@ -2703,7 +2703,7 @@ f usr/bin/elfdump 0555 root bin
 f usr/bin/elfedit 0555 root bin
 f usr/bin/elfsign 0555 root bin
 f usr/bin/elfwrap 0555 root bin
-h usr/bin/encrypt=usr/lib/isaexec
+h usr/bin/encrypt=usr/bin/decrypt
 f usr/bin/enhance 0555 root bin
 f usr/bin/env 0555 root bin
 f usr/bin/eqn 0555 root bin
@@ -2808,7 +2808,7 @@ f usr/bin/lorder 0555 root bin
 # also matches the setup on a stock solaris box.
 f usr/bin/ls 0555 root bin
 f usr/bin/m4 0555 root bin
-h usr/bin/mac=usr/lib/isaexec
+h usr/bin/mac=usr/bin/digest
 f usr/bin/mach 0555 root bin
 f usr/bin/mail 2511 root mail
 s usr/bin/mailq=../lib/mailwrapper
