@@ -1637,7 +1637,7 @@ dumpailing(void)
 }
 
 void
-Exit(status)
+Exit(int status)
 {
 	/*
 	 * Clean up message system
