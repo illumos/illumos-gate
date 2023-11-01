@@ -43,15 +43,12 @@
 
 #include <fcntl.h>
 #include <strings.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
 
-#ifdef lint
-#define	ALIGN(ptr)	(ptr ? 0 : 0)
-#else
 #define	ALIGN(ptr)	(ptr)
-#endif
 
 #ifdef SYSV
 #define	signal(s, f)	sigset(s, (void (*)(int))f)
@@ -80,7 +77,7 @@ struct icmp_ra_addr {
 
 /* Router constants */
 #define	MAX_INITIAL_ADVERT_INTERVAL	16
-#define	MAX_INITIAL_ADVERTISEMENTS 	3
+#define	MAX_INITIAL_ADVERTISEMENTS	3
 #define	MAX_RESPONSE_DELAY		2	/* Not used */
 
 /* Host constants */
@@ -190,7 +187,10 @@ char		*pr_name(struct in_addr addr);
 char		*pr_type(int t);
 
 static void	initlog(void);
-void		logerr(), logtrace(), logdebug(), logperror();
+static void	logerr(char *, ...);
+static void	logtrace(char *, ...);
+static void	logdebug(char *, ...);
+static void	logperror(char *);
 
 /* Local variables */
 
@@ -231,7 +231,7 @@ ulong_t g_preference = 0;	/* Setable with -p option */
 /* Host variables */
 int max_solicitations = MAX_SOLICITATIONS;
 unsigned int solicitation_interval = SOLICITATION_INTERVAL;
-int best_preference = 1; 	/* Set to record only the router(s) with the */
+int best_preference = 1;	/* Set to record only the router(s) with the */
 				/* best preference in the kernel. Not set   */
 				/* puts all routes in the kernel.	    */
 
@@ -2233,42 +2233,54 @@ initlog(void)
 	openlog("in.rdisc", LOG_PID | LOG_CONS, LOG_DAEMON);
 }
 
-/* VARARGS1 */
-void
-logerr(fmt, a, b, c, d, e, f, g, h)
-	char *fmt;
+static void
+logimpl(int pri, char *fmt, va_list ap)
 {
-	if (logging)
-		syslog(LOG_ERR, fmt, a, b, c, d, e, f, g, h);
+	FILE *log;
+
+	if (pri == LOG_ERR)
+		log = stderr;
 	else
-		(void) fprintf(stderr, fmt, a, b, c, d, e, f, g, h);
+		log = stdout;
+
+	if (logging)
+		vsyslog(pri, fmt, ap);
+	else
+		(void) vfprintf(log, fmt, ap);
 }
 
-/* VARARGS1 */
-void
-logtrace(fmt, a, b, c, d, e, f, g, h)
-	char *fmt;
+static void
+logerr(char *fmt, ...)
 {
-	if (logging)
-		syslog(LOG_INFO, fmt, a, b, c, d, e, f, g, h);
-	else
-		(void) fprintf(stdout, fmt, a, b, c, d, e, f, g, h);
+	va_list ap;
+
+	va_start(ap, fmt);
+	logimpl(LOG_ERR, fmt, ap);
+	va_end(ap);
 }
 
-/* VARARGS1 */
-void
-logdebug(fmt, a, b, c, d, e, f, g, h)
-	char *fmt;
+static void
+logtrace(char *fmt, ...)
 {
-	if (logging)
-		syslog(LOG_DEBUG, fmt, a, b, c, d, e, f, g, h);
-	else
-		(void) fprintf(stdout, fmt, a, b, c, d, e, f, g, h);
+	va_list ap;
+
+	va_start(ap, fmt);
+	logimpl(LOG_INFO, fmt, ap);
+	va_end(ap);
 }
 
-void
-logperror(str)
-	char *str;
+static void
+logdebug(char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	logimpl(LOG_DEBUG, fmt, ap);
+	va_end(ap);
+}
+
+static void
+logperror(char *str)
 {
 	if (logging)
 		syslog(LOG_ERR, "%s: %s\n", str, strerror(errno));
