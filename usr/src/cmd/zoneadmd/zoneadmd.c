@@ -282,7 +282,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	char *arg, *lasts, **argv = NULL, **argv_save;
 	char zonecfg_args[BOOTARGS_MAX];
 	char scratchargs[BOOTARGS_MAX], *sargs;
-	char c;
+	char c, argsw[5];
 
 	bzero(outargs, BOOTARGS_MAX);
 	bzero(badarg, BOOTARGS_MAX);
@@ -386,8 +386,10 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 		case 'm':
 		case 's':
 			/* These pass through unmolested */
-			(void) snprintf(outargs, BOOTARGS_MAX,
-			    "%s -%c %s ", outargs, c, optarg ? optarg : "");
+			(void) snprintf(argsw, sizeof (argsw), " -%c ", c);
+			(void) strlcat(outargs, argsw, BOOTARGS_MAX);
+			if (optarg)
+				(void) strlcat(outargs, optarg, BOOTARGS_MAX);
 			break;
 		case '?':
 			/*
@@ -397,10 +399,9 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 			 * args they want.
 			 */
 			err = Z_INVAL;
-			(void) snprintf(outargs, BOOTARGS_MAX,
-			    "%s -%c", outargs, optopt);
-			(void) snprintf(badarg, BOOTARGS_MAX,
-			    "%s -%c", badarg, optopt);
+			(void) snprintf(argsw, sizeof (argsw), " -%c", optopt);
+			(void) strlcat(outargs, argsw, BOOTARGS_MAX);
+			(void) strlcat(badarg, argsw, BOOTARGS_MAX);
 			break;
 		}
 	}
@@ -412,13 +413,14 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	 * and warn on them as a group.
 	 */
 	if (optind < argc) {
+		const char *prefix = "";
+
 		err = Z_INVAL;
-		while (optind < argc) {
-			(void) snprintf(badarg, BOOTARGS_MAX, "%s%s%s",
-			    badarg, strlen(badarg) > 0 ? " " : "",
-			    argv[optind]);
-			optind++;
-		}
+		do {
+			(void) strlcat(badarg, prefix, BOOTARGS_MAX);
+			(void) strlcat(badarg, argv[optind], BOOTARGS_MAX);
+			prefix = " ";
+		} while (++optind < argc);
 		zerror(zlogp, B_FALSE, "WARNING: Unused or invalid boot "
 		    "arguments `%s'.", badarg);
 	}
