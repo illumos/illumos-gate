@@ -181,6 +181,6 @@ int i1, i2;
 /*VARARGS*/
 /*ARGSUSED*/
 void
-errent(s1, s2, i1, file, line)
-char *s1, *s2, *file;
-{ }
+errent(char *s1, char *s2, int i1, char *file, int line)
+{
+}

@@ -87,8 +87,7 @@ gturnoff()
 
 /*ARGSUSED*/
 int
-gwrmsg(type, str, fn)
-char type, *str;
+gwrmsg(char type, char *str, int fn)
 {
 	char bufr[BUFSIZ], *s;
 	int len, i;
@@ -114,8 +113,7 @@ char type, *str;
 
 /*ARGSUSED*/
 int
-grdmsg(str, fn)
-char *str;
+grdmsg(char *str, int fn)
 {
 	unsigned len;
 
@@ -135,8 +133,7 @@ char *str;
 
 /*ARGSUSED*/
 int
-gwrdata(fp1, fn)
-FILE *fp1;
+gwrdata(FILE *fp1, int fn)
 {
 	char bufr[BUFSIZ];
 	int fd1;
@@ -164,8 +161,7 @@ FILE *fp1;
 
 /*ARGSUSED*/
 int
-grddata(fn, fp2)
-FILE *fp2;
+grddata(int fn, FILE *fp2)
 {
 	int ret = SUCCESS;
 	int fd2;
@@ -197,8 +193,7 @@ FILE *fp2;
 
 static
 int
-grdblk(blk, len)
-char *blk;
+grdblk(char *blk, int len)
 {
 	int i, ret;
 
@@ -215,8 +210,7 @@ char *blk;
 
 
 static int
-gwrblk(blk, len)
-char *blk;
+gwrblk(char *blk, int len)
 {
 	return(pkwrite(blk, len));
 }

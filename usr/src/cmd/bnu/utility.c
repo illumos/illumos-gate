@@ -22,11 +22,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:utility.c 2.9 */
-
 #include "uucp.h"
-
 
 static void logError();
 extern int cuantos(), gnamef();
@@ -44,8 +40,7 @@ extern int cuantos(), gnamef();
  *	line - __LINE__ of calling module
  */
 void
-assert(s1, s2, i1, file, line)
-char *s1, *s2, *file;
+assert(char *s1, char *s2, int i1, char *file, int line)
 {
 	logError(s1, s2, i1, TY_ASSERT, file, line);
 	return;
@@ -57,8 +52,7 @@ char *s1, *s2, *file;
  * input: -- same as assert
  */
 void
-errent(s1, s2, i1, file, line)
-char *s1, *s2, *file;
+errent(char *s1, char *s2, int i1, char *file, int line)
 {
 	logError(s1, s2, i1, TY_ERROR, file, line);
 	return;
@@ -67,10 +61,9 @@ char *s1, *s2, *file;
 #define EFORMAT	"%sERROR (%.9s)  pid: %ld (%s) %s %s (%d) [FILE: %s, LINE: %d]\n"
 
 static void
-logError(s1, s2, i1, type, file, line)
-char *s1, *s2, *file;
+logError(char *s1, char *s2, int i1, int type, char *file, int line)
 {
-	register FILE *errlog;
+	FILE *errlog;
 	char text[BUFSIZ];
 	pid_t pid;
 

@@ -272,9 +272,7 @@ static char *P_TELLENGTH = "Telno cannot exceed 58 digits!\r\n";
  ***************************************************************/
 
 int
-main(argc, argv)
-int argc;
-char *argv[];
+main(int argc, char *argv[])
 {
     extern void setservice();
     extern int sysaccess();
@@ -625,7 +623,7 @@ char *argv[];
  */
 
 static void
-recfork()
+recfork(void)
 {
     int ret, status;
     if (Child) {
@@ -662,7 +660,7 @@ recfork()
 #endif
 
 int
-transmit()
+transmit(void)
 {
     char b[BUFSIZ];
     char *p;
@@ -764,7 +762,7 @@ transmit()
  *	routine to halt input from remote and flush buffers
  ***************************************************************/
 static void
-_flush()
+_flush(void)
 {
     (void)ioctl(TTYOUT, TCXONC, 0);	/* stop tty output */
     (void)ioctl(Cn, TCFLSH, 0);		/* flush remote input */
@@ -891,8 +889,7 @@ char	*cmd;
 #endif
 
 static void
-_shell(str)
-char	*str;
+_shell(char *str)
 {
     pid_t	fk, w_ret;
     void	(*xx)(), (*yy)();
@@ -972,8 +969,7 @@ char	*str;
  ***************************************************************/
 
 static void
-_dopercen(cmd)
-char *cmd;
+_dopercen(char *cmd)
 {
     char	*arg[5];
     char	*getpath;
@@ -1220,7 +1216,7 @@ char *cmd;
  ***************************************************************/
 
 static void
-_receive()
+_receive(void)
 {
     int silent = NO, file = -1;
     char *p;
@@ -1362,7 +1358,7 @@ _receive()
  *	2 means like 1 but accept interrupts from the keyboard.
  ***************************************************************/
 static void
-_mode(arg)
+_mode(int arg)
 {
     int i;
 
@@ -1414,7 +1410,7 @@ _mode(arg)
 
 
 static pid_t
-dofork()
+dofork(void)
 {
     int i;
     pid_t x;
@@ -1432,7 +1428,7 @@ dofork()
 }
 
 static int
-r_char(fd)
+r_char(int fd)
 {
     int rtn = 1, rfd;
     char *riobuf;
@@ -1486,7 +1482,7 @@ r_char(fd)
 }
 
 static int
-w_char(fd)
+w_char(int fd)
 {
     int wfd;
     char *wiobuf;
@@ -1506,8 +1502,7 @@ w_char(fd)
 
 /* wioflsh	flush output buffer	*/
 static int
-wioflsh(fd)
-int fd;
+wioflsh(int fd)
 {
     int wfd;
     char *wiobuf;
@@ -1537,8 +1532,7 @@ int fd;
 
 
 static void
-_w_str(string)
-char *string;
+_w_str(char *string)
 {
     int len;
 
@@ -1548,10 +1542,8 @@ char *string;
     return;
 }
 
-/* ARGSUSED */
 static void
-_onintrpt(sig)
-int sig;
+_onintrpt(int sig __unused)
 {
     (void)signal(SIGINT, _onintrpt);
     (void)signal(SIGQUIT, _onintrpt);
@@ -1560,8 +1552,7 @@ int sig;
 }
 
 static void
-_rcvdead(arg)	/* this is executed only in the receive process */
-int arg;
+_rcvdead(int arg)	/* this is executed only in the receive process */
 {
     CDEBUG(4,"call _rcvdead(%d)\r\n", arg);
     (void)kill(getppid(), SIGUSR1);
@@ -1570,8 +1561,7 @@ int arg;
 }
 
 static void
-_quit(arg)	/* this is executed only in the parent process */
-int arg;
+_quit(int arg)	/* this is executed only in the parent process */
 {
     CDEBUG(4,"call _quit(%d)\r\n", arg);
     (void)kill(Child, SIGKILL);
@@ -1580,8 +1570,7 @@ int arg;
 }
 
 static void
-_bye(arg)	/* this is executed only in the parent proccess */
-int arg;
+_bye(int arg)	/* this is executed only in the parent proccess */
 {
     int status;
     pid_t obit;
@@ -1616,8 +1605,7 @@ int arg;
 
 
 void
-cleanup(code) 	/*this is executed only in the parent process*/
-int code;	/*Closes device; removes lock files	  */
+cleanup(int code) 	/*this is executed only in the parent process*/
 {
 
     CDEBUG(4,"call cleanup(%d)\r\n", code);
@@ -1643,8 +1631,7 @@ int code;	/*Closes device; removes lock files	  */
 
 
 void
-tdmp(arg)
-int arg;
+tdmp(int arg)
 {
 
     struct termio xv;
@@ -1677,8 +1664,7 @@ int arg;
 
 
 static void
-sysname(name)
-char * name;
+sysname(char *name)
 {
 
     char *s;
@@ -1694,8 +1680,7 @@ char * name;
 
 
 static void
-blckcnt(count)
-long count;
+blckcnt(long count)
 {
     static long lcharcnt = 0;
     long c1, c2;
@@ -1727,16 +1712,13 @@ long count;
     return;
 }
 
-/*VARARGS*/
-/*ARGSUSED*/
 void
-assert (s1, s2, i1, s3, i2)
-char *s1, *s2, *s3;
-int i1, i2;
-{ }		/* for ASSERT in gnamef.c */
+assert (char *s1 __unused, char *s2 __unused, int i1 __unused,
+    char *s3 __unused, int i2 __unused)
+{ 		/* for ASSERT in gnamef.c */
+}
 
-/*ARGSUSED*/
 void
-logent (s1, s2)
-char *s1, *s2;
-{ }		/* so we can load ulockf() */
+logent (char *s1 __unused, char *s2 __unused)
+{ 		/* so we can load ulockf() */
+}

@@ -114,6 +114,10 @@ char *s1, *s2, *file; int i1, line;
 /*ARGSUSED*/
 void logent(s1, s2)
 char *s1, *s2;
-{}
+{
+}
 
-void cleanup(code) 	{ exit(code);	}
+void cleanup(int code)
+{
+	exit(code);
+}

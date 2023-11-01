@@ -1380,9 +1380,7 @@ char *s, m;
  *	none
  */
 void
-notify(mailopt, user, msgin, sys, msgcode)
-char *user, *msgin, *sys;
-char *msgcode;
+notify(int mailopt, char *user, char *msgin, char *sys, char *msgcode)
 {
 	int i;
 	char str[BUFSIZ];
@@ -1626,8 +1624,7 @@ char *file;
  *	none
  */
 void
-arrived(opt, file, nuser, rmtsys, rmtuser)
-char *file, *nuser, *rmtsys, *rmtuser;
+arrived(int opt, char *file, char *nuser, char *rmtsys, char *rmtuser)
 {
 	char mbuf[200];
 
