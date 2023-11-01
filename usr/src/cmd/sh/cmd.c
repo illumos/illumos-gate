@@ -156,7 +156,7 @@ cmd(sym, flg)
  *	list || term
  */
 static struct trenod *
-list(flg)
+list(int flg)
 {
 	struct trenod *r;
 	int		b;
@@ -172,7 +172,7 @@ list(flg)
  *	item |^ term
  */
 static struct trenod *
-term(flg)
+term(int flg)
 {
 	struct trenod *t;
 
