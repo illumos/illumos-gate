@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "mail.h"
 /*
@@ -35,8 +35,7 @@
 	that is taken as the text for the message, otherwise the
 	text for the err_val message is gotten from the errlist[] array.
 */
-void errmsg(err_val,err_txt)
-char	*err_txt;
+void errmsg(int err_val, char *err_txt)
 {
 	static char pn[] = "errmsg";
 	error = err_val;

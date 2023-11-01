@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "mail.h"
 /*
@@ -32,8 +32,7 @@
 	as it will terminate mail(1) on failure.
 */
 FILE *
-doopen(file, type, errnum)
-char	*type, *file;
+doopen(char *file, char *type, int errnum)
 {
 	static char pn[] = "doopen";
 	FILE *fptr;

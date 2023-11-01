@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "mail.h"
 #include <sys/param.h>
@@ -32,14 +32,13 @@
  * Send mail - High level sending routine
  */
 void
-sendmail(argc, argv)
-char **argv;
+sendmail(int argc, char **argv)
 {
 	char		**args;
 	char		*tp, *zp;
 	char		buf[2048], last1c;
 	FILE		*input;
-	struct stat64 	sbuf;
+	struct stat64	sbuf;
 	int		aret;
 	int		i, n;
 	int		oldn = 1;
@@ -90,7 +89,7 @@ char **argv;
 	sprintf(datestring, "%.16s %.3s %.5s", tp, zp, tp+20);
 	trimnl(datestring);
 	/* asctime: Fri Sep 30 00:00:00 1986\n */
-	/* 	0123456789012345678901234  */
+	/*	0123456789012345678901234  */
 	/* RFCtime: Fri, 28 Jul 89 10:30 EDT   */
 	sprintf(RFC822datestring, "%.3s, %.2s %.3s %.4s %.5s %.3s",
 		tp, tp+8, tp+4, tp+20, tp+11, zp);
