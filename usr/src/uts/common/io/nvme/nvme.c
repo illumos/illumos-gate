@@ -5614,17 +5614,22 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	switch (action) {
 	case NVME_FWC_SAVE:
 	case NVME_FWC_SAVE_ACTIVATE:
-		timeout = nvme_commit_save_cmd_timeout;
 		if (slot == 1 && nvme->n_idctl->id_frmw.fw_readonly)
 			return (EROFS);
 		break;
 	case NVME_FWC_ACTIVATE:
 	case NVME_FWC_ACTIVATE_IMMED:
-		timeout = nvme_admin_cmd_timeout;
 		break;
 	default:
 		return (EINVAL);
 	}
+
+	/*
+	 * Use the extended timeout for all firmware operations here as we've
+	 * seen examples in the field where an activate may take longer than the
+	 * 1s period that we've asked for.
+	 */
+	timeout = nvme_commit_save_cmd_timeout;
 
 	fc_dw10.b.fc_slot = slot;
 	fc_dw10.b.fc_action = action;
