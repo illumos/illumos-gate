@@ -370,6 +370,7 @@ scan_proc_dir(const char *dirpath, DIR *dirp, psexp_t *psexp,
 	}
 
 	if ((g_flags & (F_NEWEST | F_OLDEST)) && ovalid) {
+		get_argv(g_flags, &ops, argv, sizeof (argv));
 		(*funcp)(&ops, argv, sizeof (argv));
 
 		nmatches++;
