@@ -12,6 +12,7 @@
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -65,7 +66,7 @@ smb2_flush(smb_request_t *sr)
 	 * SMB2 Flush reply
 	 */
 	(void) smb_mbc_encodef(
-	    &sr->reply, "wwl",
+	    &sr->reply, "ww",
 	    4,	/* StructSize */	/* w */
 	    0); /* reserved */		/* w */
 

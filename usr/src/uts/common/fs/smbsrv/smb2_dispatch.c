@@ -979,10 +979,13 @@ cmd_done:
 	 * If there's a next command, figure out where it starts,
 	 * and fill in the next header offset for the reply.
 	 * Note: We sanity checked smb2_next_command above.
+	 * Once we've gone async, replies are not compounded.
 	 */
 	if (sr->smb2_next_command != 0) {
 		sr->command.chain_offset =
 		    sr->smb2_cmd_hdr + sr->smb2_next_command;
+	}
+	if (sr->smb2_next_command != 0 && !sr->smb2_async) {
 		sr->smb2_next_reply =
 		    sr->reply.chain_offset - sr->smb2_reply_hdr;
 	} else {
