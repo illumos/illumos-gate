@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_PLAT_PCI_PRD_H
@@ -117,11 +117,41 @@ typedef boolean_t (*pci_prd_root_complex_f)(uint32_t, void *);
 extern void pci_prd_root_complex_iter(pci_prd_root_complex_f, void *);
 
 /*
- * Give the chance for a platform file to go through and use knowledge that it
+ * Give the chance for a platform to go through and use knowledge that it
  * has (such as the traditional BIOS PCI IRQ routing table) to name the PCI(e)
  * slot.
  */
 extern void pci_prd_slot_name(uint32_t, dev_info_t *);
+
+/*
+ * These are a series of flags that indicate how certain compatibility options
+ * should be specified and handled throughout the generic PCI stack. Unless
+ * there is history here (i.e. you are on some kind of x86 system), this should
+ * probably just return PCI_PRD_COMPAT_NONE.
+ */
+typedef enum {
+	PCI_PRD_COMPAT_NONE	= 0,
+	/*
+	 * Indicates that ISA is supported and ISA bridge nodes should be
+	 * created.
+	 */
+	PCI_PRD_COMPAT_ISA		= 1 << 0,
+	/*
+	 * Indicates that the node name should only be "pci" and we should not
+	 * entertain "pciex" for reasons of platform tradition. This also tells
+	 * us that we should generate PCI alises for PCI Express devices.
+	 */
+	PCI_PRD_COMPAT_PCI_NODE_NAME	= 1 << 1,
+	/*
+	 * Indicates that we need subsystem compatibility. In particular this
+	 * means that bridges will not use subsystem IDs for their node names
+	 * and unqualified (',p' and ',s') aliases will be created for PCI.  See
+	 * uts/common/io/pciex/pcie_props.c.
+	 */
+	PCI_PRD_COMPAT_SUBSYS		= 1 << 2
+} pci_prd_compat_flags_t;
+
+extern pci_prd_compat_flags_t pci_prd_compat_flags(void);
 
 #ifdef __cplusplus
 }

@@ -997,7 +997,8 @@ VUIDPS2_OBJS += vuidmice.o vuidps2.o
 
 HPCSVC_OBJS += hpcsvc.o
 
-PCIE_MISC_OBJS += pcie.o pcie_fault.o pcie_hp.o pciehpc.o pcishpc.o pcie_pwr.o pciev.o
+PCIE_MISC_OBJS += pcie.o pcie_fault.o pcie_hp.o pciehpc.o pcishpc.o pcie_pwr.o \
+	pciev.o pci_props.o
 
 PCIHPNEXUS_OBJS += pcihp.o
 

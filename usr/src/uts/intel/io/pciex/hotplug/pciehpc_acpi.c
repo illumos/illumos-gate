@@ -265,6 +265,8 @@ pciehpc_acpi_slotinfo_init(pcie_hp_ctrl_t *ctrl_p)
 	ctrl_p->hc_has_emi_lock = (slot_capabilities &
 	    PCIE_SLOTCAP_EMI_LOCK_PRESENT) ? B_TRUE : B_FALSE;
 
+	pciehpc_led_init(slot_p);
+
 	/* get current slot state from the hw */
 	pciehpc_get_slot_state(slot_p);
 	if (slot_p->hs_info.cn_state >= DDI_HP_CN_STATE_ENABLED)
@@ -395,7 +397,6 @@ pciehpc_acpi_slot_poweroff(pcie_hp_slot_t *slot_p, ddi_hp_cn_state_t *result)
 		/* slot is in the 'disconnected' state */
 		PCIE_DBG("slot %d already disconnected\n",
 		    slot_p->hs_phy_slot_num);
-		ASSERT(slot_p->hs_power_led_state == PCIE_HP_LED_OFF);
 
 		*result = slot_p->hs_info.cn_state;
 		return (DDI_SUCCESS);

@@ -65,9 +65,6 @@
 #include <librcm.h>
 #include "../../../../common/pci/pci_strings.h"
 
-extern const struct pci_class_strings_s class_pci[];
-extern int class_pci_items;
-
 /*
  * Set the version number
  */
@@ -1302,7 +1299,7 @@ find_physical_slot_names(const char *devcomp, struct searcharg *slotarg)
 static void
 get_type(hpc_board_type_t boardtype, hpc_card_info_t cardinfo, char *buf)
 {
-	int i;
+	size_t i;
 
 	DBG(1, ("class: %i\n", cardinfo.base_class));
 	DBG(1, ("subclass: %i\n", cardinfo.sub_class));

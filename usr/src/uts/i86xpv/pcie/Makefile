@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/pcie/Makefile
+# uts/i86xpv/pcie/Makefile
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -43,7 +43,7 @@ ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/i86xpv/Makefile.i86xpv
 
 #
 #	Dependency
@@ -81,4 +81,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/i86xpv/Makefile.targ

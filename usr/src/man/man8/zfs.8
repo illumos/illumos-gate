@@ -28,8 +28,9 @@
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright (c) 2018 Datto Inc.
+.\" Copyright 2023 RackTop Systems, Inc.
 .\"
-.Dd Jul 22, 2019
+.Dd January 24, 2023
 .Dt ZFS 8
 .Os
 .Sh NAME
@@ -1090,6 +1091,33 @@ on a file or directory with a non-trivial ACL when
 is set to
 .Sy restricted ,
 you must first remove all ACEs except for those that represent the current mode.
+.It Sy aclimplicit  Ns = Ns Sy on Ns | Ns Sy off
+Controls whether the owner of an object has "implicit owner rights".
+If this property is set to
+.Sy on ,
+then the owner of an object can always
+.Xr chmod 2
+as is expected with traditional
+.Em POSIX
+file permissions.
+If this property is set to
+.Sy off ,
+then the owner may only
+.Xr chmod 2
+an object where the ACL grants
+.Sy write_acl
+to the user attempting the action.
+The default value is
+.Sy on .
+Note that
+.Sy aclimplicit  Ns = Ns Sy off
+is only fully effective with
+.Sy aclmode  Ns = Ns Sy passthrough
+and
+.Sy aclinherit  Ns = Ns Sy passthrough
+because in other configurations, objects can end up having
+.Sy write_acl
+granted to the object owner.
 .It Sy atime Ns = Ns Sy on Ns | Ns Sy off
 Controls whether the access time for files is updated when they are read.
 Turning this property off avoids producing write traffic when reading files and

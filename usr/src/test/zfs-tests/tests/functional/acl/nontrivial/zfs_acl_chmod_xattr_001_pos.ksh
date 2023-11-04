@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -160,7 +161,7 @@ function test_chmod_basic_access #node g_usr o_usr
 			check_chmod_results "$node" "$flag" \
 				"$acl_t" "$g_usr" "$o_usr"
 
-			log_must usr_exec chmod A0- $node
+			log_pos usr_exec chmod A-$flag:$acl_t $node
 		done
 	done
 }

@@ -235,4 +235,4 @@ const pci_class_strings_t class_pci[] = {
 	{ 19, 0, 0,	"Non-essential Instrumentation",	"unknown" },
 };
 
-int class_pci_items = sizeof (class_pci) / sizeof (class_pci[0]);
+size_t class_pci_items = sizeof (class_pci) / sizeof (class_pci[0]);

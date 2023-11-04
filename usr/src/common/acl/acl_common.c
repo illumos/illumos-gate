@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -1677,6 +1678,16 @@ acl_trivial_create(mode_t mode, boolean_t isdir, ace_t **acl, int *count)
 }
 
 /*
+ * Convenience macro for ACE rights implied for owner in a trivial ACL:
+ * write_owner/write_acl/write_attributes/write_xattr
+ */
+#define	ACE_OWNER_MASK	(\
+	ACE_WRITE_OWNER|\
+	ACE_WRITE_ACL|\
+	ACE_WRITE_ATTRIBUTES|\
+	ACE_WRITE_NAMED_ATTRS)
+
+/*
  * ace_trivial:
  * determine whether an ace_t acl is trivial
  *
@@ -1684,6 +1695,8 @@ acl_trivial_create(mode_t mode, boolean_t isdir, ace_t **acl, int *count)
  * owner, group, everyone entries.  ACL can't
  * have read_acl denied, and write_owner/write_acl/write_attributes
  * can only be owner@ entry.
+ *
+ * Returns zero if this is a "trivial" ACL, else 1.
  */
 int
 ace_trivial_common(void *acep, int aclcnt,
@@ -1694,6 +1707,8 @@ ace_trivial_common(void *acep, int aclcnt,
 	uint32_t mask;
 	uint16_t type;
 	uint64_t cookie = 0;
+	uint32_t owner_allow = 0;
+	uint32_t owner_deny = 0;
 
 	while ((cookie = walk(acep, cookie, aclcnt, &flags, &type, &mask))
 	    != 0) {
@@ -1739,12 +1754,31 @@ ace_trivial_common(void *acep, int aclcnt,
 		 * write_acl/write_owner/write_attributes/write_xattr/
 		 */
 		if (type == ACE_ACCESS_ALLOWED_ACE_TYPE &&
-		    (!(flags & ACE_OWNER) && (mask &
-		    (ACE_WRITE_OWNER|ACE_WRITE_ACL| ACE_WRITE_ATTRIBUTES|
-		    ACE_WRITE_NAMED_ATTRS))))
+		    (flags & ACE_OWNER) == 0 &&
+		    (mask & ACE_OWNER_MASK) != 0)
 			return (1);
 
+		/* Accumulate owner masks */
+		if ((flags & ACE_OWNER) != 0) {
+			if (type == ACE_ACCESS_ALLOWED_ACE_TYPE)
+				owner_allow |= mask;
+			if (type == ACE_ACCESS_DENIED_ACE_TYPE)
+				owner_deny |= mask;
+		}
 	}
+
+	/*
+	 * If owner was not allowed the usual implied rights,
+	 * then this should not be considered a trivial ACL.
+	 * In cases like mode 0745 we may have owner@ on
+	 * multiple ACEs, so we have to check the combined
+	 * access masks.
+	 */
+	if ((owner_deny & ACE_OWNER_MASK) != 0)
+		return (1);
+	if ((owner_allow & ACE_OWNER_MASK) != ACE_OWNER_MASK)
+		return (1);
+
 	return (0);
 }
 

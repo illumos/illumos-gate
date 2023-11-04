@@ -1143,7 +1143,6 @@ f kernel/misc/amd64/nfs_dlboot 0755 root sys
 f kernel/misc/amd64/nfssrv 0755 root sys
 f kernel/misc/amd64/pci_autoconfig 0755 root sys
 f kernel/misc/amd64/pcicfg 0755 root sys
-f kernel/misc/amd64/pcie 0755 root sys
 f kernel/misc/amd64/pcihp 0755 root sys
 f kernel/misc/amd64/pcmcia 0755 root sys
 f kernel/misc/amd64/rpcsec 0755 root sys
@@ -1977,6 +1976,7 @@ f platform/i86pc/kernel/misc/amd64/cpr 0755 root sys
 f platform/i86pc/kernel/misc/amd64/drmach_acpi 0755 root sys
 f platform/i86pc/kernel/misc/amd64/gfx_private 0755 root sys
 f platform/i86pc/kernel/misc/amd64/pci_prd 0755 root sys
+f platform/i86pc/kernel/misc/amd64/pcie 0755 root sys
 d platform/i86pc/kernel/pcbe 0755 root sys
 d platform/i86pc/kernel/pcbe/amd64 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.AuthenticAMD 0755 root sys
@@ -5993,6 +5993,7 @@ d usr/lib/fm/topo/plugins 0755 root bin
 f usr/lib/fm/topo/plugins/disk.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ahci.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ipmi.so 0555 root bin
+f usr/lib/fm/topo/plugins/fac_prov_libhp.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_mptsas.so 0555 root bin
 f usr/lib/fm/topo/plugins/ipmi.so 0555 root bin
 f usr/lib/fm/topo/plugins/nic.so 0555 root bin

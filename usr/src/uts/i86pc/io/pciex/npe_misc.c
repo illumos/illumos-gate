@@ -84,15 +84,17 @@ npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl)
 int
 npe_disable_empty_bridges_workaround(dev_info_t *child)
 {
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(child);
+
 	/*
 	 * Do not bind drivers to empty bridges.
 	 * Fail above, if the bridge is found to be hotplug capable
 	 */
 	if (ddi_driver_major(child) == ddi_name_to_major("pcieb") &&
-	    ddi_get_child(child) == NULL &&
-	    ddi_prop_get_int(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-	    "pci-hotplug-type", INBAND_HPC_NONE) == INBAND_HPC_NONE)
+	    ddi_get_child(child) == NULL && bus_p->bus_hp_sup_modes ==
+	    PCIE_NONE_HP_MODE) {
 		return (1);
+	}
 
 	return (0);
 }

@@ -171,6 +171,7 @@
 #include <sys/pci.h>
 #include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
+#include <sys/pci_props.h>
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
 #include <sys/pci_cfgacc.h>
@@ -268,7 +269,6 @@ struct pci_devfunc {
 };
 
 extern int apic_nvidia_io_max;
-extern int pseudo_isa;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
 int pci_boot_maxbus;
 
@@ -286,15 +286,11 @@ extern dev_info_t *pcie_get_rc_dip(dev_info_t *);
  */
 static void enumerate_bus_devs(uchar_t bus, int config_op);
 static void create_root_bus_dip(uchar_t bus);
-static void process_devfunc(uchar_t, uchar_t, uchar_t, uchar_t,
-    ushort_t, int);
-static void add_compatible(dev_info_t *, ushort_t, ushort_t,
-    ushort_t, ushort_t, uchar_t, uint_t, int);
+static void process_devfunc(uchar_t, uchar_t, uchar_t, int);
 static boolean_t add_reg_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int,
     boolean_t);
-static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int,
-    ushort_t);
-static void add_model_prop(dev_info_t *, uint_t);
+static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, boolean_t,
+    boolean_t);
 static void add_bus_range_prop(int);
 static void add_ranges_prop(int, boolean_t);
 static void add_bus_available_prop(int);
@@ -303,7 +299,6 @@ static void fix_ppb_res(uchar_t, boolean_t);
 static void alloc_res_array(void);
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
-static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 static void populate_bus_res(uchar_t bus);
 static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
@@ -1942,8 +1937,7 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 				 * resource assignment, which will be
 				 * done on the second, CONFIG_NEW, pass.
 				 */
-				process_devfunc(bus, dev, func, header,
-				    venid, config_op);
+				process_devfunc(bus, dev, func, config_op);
 
 			}
 		}
@@ -2045,13 +2039,12 @@ check_pciide_prop(uchar_t revid, ushort_t venid, ushort_t devid,
 }
 
 static boolean_t
-is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
-    ushort_t venid, ushort_t devid, ushort_t subvenid, ushort_t subdevid)
+is_pciide(const pci_prop_data_t *prop)
 {
 	struct ide_table {
 		ushort_t venid;
 		ushort_t devid;
-	} *entry;
+	};
 
 	/*
 	 * Devices which need to be matched specially as pci-ide because of
@@ -2063,48 +2056,32 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 		{0x1095, 0x3114}, /* Silicon Image 3114 SATALink/SATARaid */
 		{0x1095, 0x3512}, /* Silicon Image 3512 SATALink/SATARaid */
 		{0x1095, 0x680},  /* Silicon Image PCI0680 Ultra ATA-133 */
-		{0x1283, 0x8211}, /* Integrated Technology Express 8211F */
-		{0, 0}
+		{0x1283, 0x8211} /* Integrated Technology Express 8211F */
 	};
 
-	if (basecl != PCI_CLASS_MASS)
+	if (prop->ppd_class != PCI_CLASS_MASS)
 		return (B_FALSE);
 
-	if (subcl == PCI_MASS_IDE) {
+	if (prop->ppd_subclass == PCI_MASS_IDE) {
 		return (B_TRUE);
 	}
 
-	if (check_pciide_prop(revid, venid, devid, subvenid, subdevid))
+	if (check_pciide_prop(prop->ppd_rev, prop->ppd_vendid,
+	    prop->ppd_devid, prop->ppd_subvid, prop->ppd_subsys)) {
 		return (B_TRUE);
+	}
 
-	if (subcl != PCI_MASS_OTHER && subcl != PCI_MASS_SATA) {
+	if (prop->ppd_subclass != PCI_MASS_OTHER &&
+	    prop->ppd_subclass != PCI_MASS_SATA) {
 		return (B_FALSE);
 	}
 
-	entry = &ide_other[0];
-	while (entry->venid != 0) {
-		if (entry->venid == venid && entry->devid == devid)
+	for (size_t i = 0; i < ARRAY_SIZE(ide_other); i++) {
+		if (ide_other[i].venid == prop->ppd_vendid &&
+		    ide_other[i].devid == prop->ppd_devid)
 			return (B_TRUE);
-		entry++;
 	}
 	return (B_FALSE);
-}
-
-static int
-is_display(uint_t classcode)
-{
-	static uint_t disp_classes[] = {
-		0x000100,	/* pre-class code VGA Compatible */
-		0x030000,	/* VGA Compatible */
-		0x030001	/* VGA+8514 Compatible */
-	};
-	int i, nclasses = sizeof (disp_classes) / sizeof (uint_t);
-
-	for (i = 0; i < nclasses; i++) {
-		if (classcode == disp_classes[i])
-			return (1);
-	}
-	return (0);
 }
 
 static void
@@ -2243,100 +2220,65 @@ set_devpm_d0(uchar_t bus, uchar_t dev, uchar_t func)
 
 }
 
-#define	is_isa(bc, sc)	\
-	(((bc) == PCI_CLASS_BRIDGE) && ((sc) == PCI_BRIDGE_ISA))
-
 static void
-process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
-    ushort_t vendorid, int config_op)
+process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, int config_op)
 {
-	char nodename[32], unitaddr[5];
+	pci_prop_data_t prop_data;
+	pci_prop_failure_t prop_ret;
 	dev_info_t *dip;
-	uchar_t basecl, subcl, progcl, intr, revid;
-	ushort_t subvenid, subdevid, status;
-	ushort_t slot_num;
-	uint_t classcode, revclass;
 	boolean_t reprogram = B_FALSE;
 	boolean_t pciide = B_FALSE;
 	int power[2] = {1, 1};
-	int pciex = 0;
-	ushort_t is_pci_bridge = 0;
 	struct pci_devfunc *devlist = NULL, *entry = NULL;
-	boolean_t slot_valid;
 	gfx_entry_t *gfxp;
 	pcie_req_id_t bdf;
 
-	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
+	prop_ret = pci_prop_data_fill(NULL, bus, dev, func, &prop_data);
+	if (prop_ret != PCI_PROP_OK) {
+		cmn_err(CE_WARN, MSGHDR "failed to get basic PCI data: 0x%x",
+		    "pci", bus, dev, func, prop_ret);
+		return;
+	}
 
-	switch (header & PCI_HEADER_TYPE_M) {
-	case PCI_HEADER_ZERO:
-		subvenid = pci_getw(bus, dev, func, PCI_CONF_SUBVENID);
-		subdevid = pci_getw(bus, dev, func, PCI_CONF_SUBSYSID);
-		break;
-	case PCI_HEADER_CARDBUS:
-		subvenid = pci_getw(bus, dev, func, PCI_CBUS_SUBVENID);
-		subdevid = pci_getw(bus, dev, func, PCI_CBUS_SUBSYSID);
+	if (prop_data.ppd_header == PCI_HEADER_CARDBUS &&
+	    config_op == CONFIG_INFO) {
 		/* Record the # of cardbus bridges found on the bus */
-		if (config_op == CONFIG_INFO)
-			pci_bus_res[bus].num_cbb++;
-		break;
-	default:
-		subvenid = 0;
-		subdevid = 0;
-		break;
+		pci_bus_res[bus].num_cbb++;
 	}
 
 	if (config_op == CONFIG_FIX) {
-		if (vendorid == VENID_AMD && deviceid == DEVID_AMD8111_LPC) {
+		if (prop_data.ppd_vendid == VENID_AMD &&
+		    prop_data.ppd_devid == DEVID_AMD8111_LPC) {
 			pci_fix_amd8111(bus, dev, func);
 		}
 		return;
 	}
 
-	/* XXX should be use generic names? derive from class? */
-	revclass = pci_getl(bus, dev, func, PCI_CONF_REVID);
-	classcode = revclass >> 8;
-	revid = revclass & 0xff;
-
-	/* figure out if this is pci-ide */
-	basecl = classcode >> 16;
-	subcl = (classcode >> 8) & 0xff;
-	progcl = classcode & 0xff;
-
-
-	if (is_display(classcode))
-		(void) snprintf(nodename, sizeof (nodename), "display");
-	else if (!pseudo_isa && is_isa(basecl, subcl))
-		(void) snprintf(nodename, sizeof (nodename), "isa");
-	else if (subvenid != 0)
-		(void) snprintf(nodename, sizeof (nodename),
-		    "pci%x,%x", subvenid, subdevid);
-	else
-		(void) snprintf(nodename, sizeof (nodename),
-		    "pci%x,%x", vendorid, deviceid);
-
 	/* make sure parent bus dip has been created */
 	if (pci_bus_res[bus].dip == NULL)
 		create_root_bus_dip(bus);
 
-	ndi_devi_alloc_sleep(pci_bus_res[bus].dip, nodename,
+	ndi_devi_alloc_sleep(pci_bus_res[bus].dip, DEVI_PSEUDO_NEXNAME,
 	    DEVI_SID_NODEID, &dip);
-
-	if (check_if_device_is_pciex(dip, bus, dev, func, &slot_valid,
-	    &slot_num, &is_pci_bridge) == B_TRUE)
-		pciex = 1;
+	prop_ret = pci_prop_name_node(dip, &prop_data);
+	if (prop_ret != PCI_PROP_OK) {
+		cmn_err(CE_WARN, MSGHDR "failed to set node name: 0x%x; "
+		    "devinfo node not created", "pci", bus, dev, func,
+		    prop_ret);
+		(void) ndi_devi_free(dip);
+		return;
+	}
 
 	bdf = PCI_GETBDF(bus, dev, func);
 	/*
 	 * Record BAD AMD bridges which don't support MMIO config access.
 	 */
-	if (IS_BAD_AMD_NTBRIDGE(vendorid, deviceid) ||
-	    IS_AMD_8132_CHIP(vendorid, deviceid)) {
+	if (IS_BAD_AMD_NTBRIDGE(prop_data.ppd_vendid, prop_data.ppd_devid) ||
+	    IS_AMD_8132_CHIP(prop_data.ppd_vendid, prop_data.ppd_devid)) {
 		uchar_t secbus = 0;
 		uchar_t subbus = 0;
 
-		if ((basecl == PCI_CLASS_BRIDGE) &&
-		    (subcl == PCI_BRIDGE_PCI)) {
+		if (pci_prop_class_is_pcibridge(&prop_data)) {
 			secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
 			subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
 		}
@@ -2354,71 +2296,19 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		(void) pcie_init_bus(dip, bdf, PCIE_BUS_INITIAL);
 	}
 
-	/* add properties */
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "device-id", deviceid);
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "vendor-id", vendorid);
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "revision-id", revid);
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-	    "class-code", classcode);
-	if (func == 0)
-		(void) snprintf(unitaddr, sizeof (unitaddr), "%x", dev);
-	else
-		(void) snprintf(unitaddr, sizeof (unitaddr),
-		    "%x,%x", dev, func);
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-	    "unit-address", unitaddr);
-
-	/* add device_type for display nodes */
-	if (is_display(classcode)) {
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-		    "device_type", "display");
-	}
-	/* add special stuff for header type */
-	if ((header & PCI_HEADER_TYPE_M) == PCI_HEADER_ZERO) {
-		uchar_t mingrant = pci_getb(bus, dev, func, PCI_CONF_MIN_G);
-		uchar_t maxlatency = pci_getb(bus, dev, func, PCI_CONF_MAX_L);
-
-		if (subvenid != 0) {
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			    "subsystem-id", subdevid);
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			    "subsystem-vendor-id", subvenid);
-		}
-		if (!pciex)
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			    "min-grant", mingrant);
-		if (!pciex)
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			    "max-latency", maxlatency);
-	}
-
-	/* interrupt, record if not 0 */
-	intr = pci_getb(bus, dev, func, PCI_CONF_IPIN);
-	if (intr != 0)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "interrupts", intr);
-
 	/*
-	 * Add support for 133 mhz pci eventually
+	 * Go through and set all of the devinfo proprties on this function.
 	 */
-	status = pci_getw(bus, dev, func, PCI_CONF_STAT);
-
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-	    "devsel-speed", (status & PCI_STAT_DEVSELT) >> 9);
-	if (!pciex && (status & PCI_STAT_FBBC))
-		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
-		    "fast-back-to-back");
-	if (!pciex && (status & PCI_STAT_66MHZ))
-		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
-		    "66mhz-capable");
-	if (status & PCI_STAT_UDF)
-		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
-		    "udf-supported");
-	if (pciex && slot_valid) {
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "physical-slot#", slot_num);
-		if (!is_pci_bridge)
-			pciex_slot_names_prop(dip, slot_num);
+	prop_ret = pci_prop_set_common_props(dip, &prop_data);
+	if (prop_ret != PCI_PROP_OK) {
+		cmn_err(CE_WARN, MSGHDR "failed to set properties: 0x%x; "
+		    "devinfo node not created", "pci", bus, dev, func,
+		    prop_ret);
+		if (pcie_get_rc_dip(dip) != NULL) {
+			pcie_fini_bus(dip, PCIE_BUS_FINAL);
+		}
+		(void) ndi_devi_free(dip);
+		return;
 	}
 
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
@@ -2427,9 +2317,12 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	/* Set the device PM state to D0 */
 	set_devpm_d0(bus, dev, func);
 
-	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
+	if (pci_prop_class_is_pcibridge(&prop_data)) {
+		boolean_t pciex = (prop_data.ppd_flags & PCI_PROP_F_PCIE) != 0;
+		boolean_t is_pci_bridge = pciex &&
+		    prop_data.ppd_pcie_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI;
 		add_ppb_props(dip, bus, dev, func, pciex, is_pci_bridge);
-	else {
+	} else {
 		/*
 		 * Record the non-PPB devices on the bus for possible
 		 * reprogramming at 2nd bus enumeration.
@@ -2444,26 +2337,25 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		pci_bus_res[bus].privdata = entry;
 	}
 
-	if (IS_CLASS_IOAPIC(basecl, subcl, progcl)) {
-		create_ioapic_node(bus, dev, func, vendorid, deviceid);
+	if (pci_prop_class_is_ioapic(&prop_data)) {
+		create_ioapic_node(bus, dev, func, prop_data.ppd_vendid,
+		    prop_data.ppd_devid);
 	}
 
 	/* check for NVIDIA CK8-04/MCP55 based LPC bridge */
-	if (NVIDIA_IS_LPC_BRIDGE(vendorid, deviceid) && (dev == 1) &&
-	    (func == 0)) {
+	if (NVIDIA_IS_LPC_BRIDGE(prop_data.ppd_vendid, prop_data.ppd_devid) &&
+	    dev == 1 && func == 0) {
 		add_nvidia_isa_bridge_props(dip, bus, dev, func);
 		/* each LPC bridge has an integrated IOAPIC */
 		apic_nvidia_io_max++;
 	}
 
-	if (pciex && is_pci_bridge)
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
-		    (char *)"PCIe-PCI bridge");
-	else
-		add_model_prop(dip, classcode);
-
-	add_compatible(dip, subvenid, subdevid, vendorid, deviceid,
-	    revid, classcode, pciex);
+	prop_ret = pci_prop_set_compatible(dip, &prop_data);
+	if (prop_ret != PCI_PROP_OK) {
+		cmn_err(CE_WARN, MSGHDR "failed to set compatible property: "
+		    "0x%x;  device may not bind to a driver", "pci", bus, dev,
+		    func, prop_ret);
+	}
 
 	/*
 	 * See if this device is a controller that advertises
@@ -2479,8 +2371,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	 * and then let the special pci-ide handling for registers and
 	 * child pci-ide nodes proceed below.
 	 */
-	if (is_pciide(basecl, subcl, revid, vendorid, deviceid,
-	    subvenid, subdevid)) {
+	if (is_pciide(&prop_data)) {
 		if (ddi_compatible_driver_major(dip, NULL) == (major_t)-1) {
 			(void) ndi_devi_set_nodename(dip, "pci-ide", 0);
 			pciide = B_TRUE;
@@ -2521,7 +2412,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		reprogram = B_FALSE;	/* don't reprogram pci-ide bridge */
 	}
 
-	if (is_display(classcode)) {
+	if (pci_prop_class_is_vga(&prop_data)) {
 		gfxp = kmem_zalloc(sizeof (*gfxp), KM_SLEEP);
 		gfxp->g_dip = dip;
 		gfxp->g_prev = NULL;
@@ -2531,183 +2422,8 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 			gfxp->g_next->g_prev = gfxp;
 	}
 
-	/* special handling for isa */
-	if (!pseudo_isa && is_isa(basecl, subcl)) {
-		/* add device_type */
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-		    "device_type", "isa");
-	}
-
 	if (reprogram && (entry != NULL))
 		entry->reprogram = B_TRUE;
-}
-
-/*
- * Some vendors do not use unique subsystem IDs in their products, which
- * makes the use of form 2 compatible names (pciSSSS,ssss) inappropriate.
- * Allow for these compatible forms to be excluded on a per-device basis.
- */
-static boolean_t
-subsys_compat_exclude(ushort_t venid, ushort_t devid, ushort_t subvenid,
-    ushort_t subdevid, uchar_t revid, uint_t classcode)
-{
-	/* Nvidia display adapters */
-	if ((venid == 0x10de) && (is_display(classcode)))
-		return (B_TRUE);
-
-	/*
-	 * 8086,166 is the Ivy Bridge built-in graphics controller on some
-	 * models. Unfortunately 8086,2044 is the Skylake Server processor
-	 * memory channel device. The Ivy Bridge device uses the Skylake
-	 * ID as its sub-device ID. The GPU is not a memory controller DIMM
-	 * channel.
-	 */
-	if (venid == 0x8086 && devid == 0x166 && subvenid == 0x8086 &&
-	    subdevid == 0x2044) {
-		return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
-
-/*
- * Set the compatible property to a value compliant with rev 2.1 of the IEEE1275
- * PCI binding. This is also used for PCI express devices and we have our own
- * minor additions.
- *
- *   pciVVVV,DDDD.SSSS.ssss.RR	(0)
- *   pciVVVV,DDDD.SSSS.ssss	(1)
- *   pciSSSS,ssss,s		(2+)
- *   pciSSSS,ssss		(2)
- *   pciVVVV,DDDD.RR		(3)
- *   pciVVVV,DDDD,p		(4+)
- *   pciVVVV,DDDD		(4)
- *   pciclass,CCSSPP		(5)
- *   pciclass,CCSS		(6)
- *
- * The Subsystem (SSSS) forms are not inserted if subsystem-vendor-id is 0 or if
- * it is a case where we know that the IDs overlap.
- *
- * NOTE: For PCI-Express devices "pci" is replaced with "pciex" in 0-6 above and
- * property 2 is not created as per "1275 bindings for PCI Express
- * Interconnect".
- *
- * Unlike on SPARC, we generate both the "pciex" and "pci" versions of the
- * above. The problem with property 2 is that it has an ambiguity with
- * property 4. To make sure that drivers can specify either form of 2 or 4
- * without ambiguity we add a suffix. The 'p' suffix represents the primary ID,
- * meaning that it is guaranteed to be form 4. The 's' suffix means that it is
- * sub-vendor and sub-device form, meaning it is guaranteed to be form 2.
- *
- * Set with setprop and \x00 between each to generate the encoded string array
- * form.
- */
-void
-add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
-    ushort_t vendorid, ushort_t deviceid, uchar_t revid, uint_t classcode,
-    int pciex)
-{
-	int i = 0;
-	int size = COMPAT_BUFSIZE;
-	char *compat[15];
-	char *buf, *curr;
-
-	curr = buf = kmem_alloc(size, KM_SLEEP);
-
-	if (pciex) {
-		if (subvenid) {
-			compat[i++] = curr;	/* form 0 */
-			(void) snprintf(curr, size, "pciex%x,%x.%x.%x.%x",
-			    vendorid, deviceid, subvenid, subdevid, revid);
-			size -= strlen(curr) + 1;
-			curr += strlen(curr) + 1;
-
-			compat[i++] = curr;	/* form 1 */
-			(void) snprintf(curr, size, "pciex%x,%x.%x.%x",
-			    vendorid, deviceid, subvenid, subdevid);
-			size -= strlen(curr) + 1;
-			curr += strlen(curr) + 1;
-
-		}
-		compat[i++] = curr;	/* form 3 */
-		(void) snprintf(curr, size, "pciex%x,%x.%x",
-		    vendorid, deviceid, revid);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-
-		compat[i++] = curr;	/* form 4 */
-		(void) snprintf(curr, size, "pciex%x,%x", vendorid, deviceid);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-
-		compat[i++] = curr;	/* form 5 */
-		(void) snprintf(curr, size, "pciexclass,%06x", classcode);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-
-		compat[i++] = curr;	/* form 6 */
-		(void) snprintf(curr, size, "pciexclass,%04x",
-		    (classcode >> 8));
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-	}
-
-	if (subvenid) {
-		compat[i++] = curr;	/* form 0 */
-		(void) snprintf(curr, size, "pci%x,%x.%x.%x.%x",
-		    vendorid, deviceid, subvenid, subdevid, revid);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-
-		compat[i++] = curr;	/* form 1 */
-		(void) snprintf(curr, size, "pci%x,%x.%x.%x",
-		    vendorid, deviceid, subvenid, subdevid);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
-
-		if (subsys_compat_exclude(vendorid, deviceid, subvenid,
-		    subdevid, revid, classcode) == B_FALSE) {
-			compat[i++] = curr;	/* form 2+ */
-			(void) snprintf(curr, size, "pci%x,%x,s", subvenid,
-			    subdevid);
-			size -= strlen(curr) + 1;
-			curr += strlen(curr) + 1;
-
-			compat[i++] = curr;	/* form 2 */
-			(void) snprintf(curr, size, "pci%x,%x", subvenid,
-			    subdevid);
-			size -= strlen(curr) + 1;
-			curr += strlen(curr) + 1;
-		}
-	}
-	compat[i++] = curr;	/* form 3 */
-	(void) snprintf(curr, size, "pci%x,%x.%x", vendorid, deviceid, revid);
-	size -= strlen(curr) + 1;
-	curr += strlen(curr) + 1;
-
-	compat[i++] = curr;	/* form 4+ */
-	(void) snprintf(curr, size, "pci%x,%x,p", vendorid, deviceid);
-	size -= strlen(curr) + 1;
-	curr += strlen(curr) + 1;
-
-	compat[i++] = curr;	/* form 4 */
-	(void) snprintf(curr, size, "pci%x,%x", vendorid, deviceid);
-	size -= strlen(curr) + 1;
-	curr += strlen(curr) + 1;
-
-	compat[i++] = curr;	/* form 5 */
-	(void) snprintf(curr, size, "pciclass,%06x", classcode);
-	size -= strlen(curr) + 1;
-	curr += strlen(curr) + 1;
-
-	compat[i++] = curr;	/* form 6 */
-	(void) snprintf(curr, size, "pciclass,%04x", (classcode >> 8));
-	size -= strlen(curr) + 1;
-	curr += strlen(curr) + 1;
-
-	(void) ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-	    "compatible", compat, i);
-	kmem_free(buf, COMPAT_BUFSIZE);
 }
 
 /*
@@ -3350,7 +3066,7 @@ done:
 
 static void
 add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
-    int pciex, ushort_t is_pci_bridge)
+    boolean_t pciex, boolean_t is_pci_bridge)
 {
 	char *dev_type;
 	int i;
@@ -3414,7 +3130,7 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	/*
 	 * Update the number of bridges on the bus.
 	 */
-	if (is_pci_bridge == 0)
+	if (!is_pci_bridge)
 		pci_bus_res[bus].num_bridge++;
 
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
@@ -3571,37 +3287,6 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	dump_memlists("add_ppb_props end bus", bus);
 	dump_memlists("add_ppb_props end secbus", secbus);
-}
-
-extern const struct pci_class_strings_s class_pci[];
-extern int class_pci_items;
-
-static void
-add_model_prop(dev_info_t *dip, uint_t classcode)
-{
-	const char *desc;
-	int i;
-	uchar_t baseclass = classcode >> 16;
-	uchar_t subclass = (classcode >> 8) & 0xff;
-	uchar_t progclass = classcode & 0xff;
-
-	if ((baseclass == PCI_CLASS_MASS) && (subclass == PCI_MASS_IDE)) {
-		desc = "IDE controller";
-	} else {
-		for (desc = 0, i = 0; i < class_pci_items; i++) {
-			if ((baseclass == class_pci[i].base_class) &&
-			    (subclass == class_pci[i].sub_class) &&
-			    (progclass == class_pci[i].prog_class)) {
-				desc = class_pci[i].actual_desc;
-				break;
-			}
-		}
-		if (i == class_pci_items)
-			desc = "Unknown class of pci/pnpbios device";
-	}
-
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
-	    (char *)desc);
 }
 
 static void
@@ -3885,31 +3570,6 @@ create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
 	/* reg */
 	(void) ndi_prop_update_int64(DDI_DEV_T_NONE, ioapic_node,
 	    "reg", physaddr);
-}
-
-/*
- * NOTE: For PCIe slots, the name is generated from the slot number
- * information obtained from Slot Capabilities register.
- * For non-PCIe slots, it is generated based on the slot number
- * information in the PCI IRQ table.
- */
-static void
-pciex_slot_names_prop(dev_info_t *dip, ushort_t slot_num)
-{
-	char slotprop[256];
-	int len;
-
-	bzero(slotprop, sizeof (slotprop));
-
-	/* set mask to 1 as there is only one slot (i.e dev 0) */
-	*(uint32_t *)slotprop = 1;
-	len = 4;
-	(void) snprintf(slotprop + len, sizeof (slotprop) - len, "pcie%d",
-	    slot_num);
-	len += strlen(slotprop + len) + 1;
-	len += len % 4;
-	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "slot-names",
-	    (int *)slotprop, len / sizeof (int));
 }
 
 /*

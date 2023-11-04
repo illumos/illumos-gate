@@ -339,7 +339,17 @@ ddihp_cn_run_event(void *arg)
 	ddi_hp_cn_async_event_entry_t	*eventp =
 	    (ddi_hp_cn_async_event_entry_t *)arg;
 	dev_info_t			*dip = eventp->dip;
+	dev_info_t			*pdip;
 	ddi_hp_cn_handle_t		*hdlp;
+
+	/*
+	 * See notes in ddihp_modctl().  This is another essentially identical
+	 * path we get to internally rather than from userland, but the same
+	 * problem applies here.
+	 */
+	pdip = ddi_get_parent(dip);
+	if (pdip != NULL)
+		ndi_devi_enter(pdip);
 
 	/* Lock before access */
 	ndi_devi_enter(dip);
@@ -355,6 +365,8 @@ ddihp_cn_run_event(void *arg)
 	}
 
 	ndi_devi_exit(dip);
+	if (pdip != NULL)
+		ndi_devi_exit(pdip);
 
 	/* Release the devi's ref that is held from interrupt context. */
 	ndi_rele_devi((dev_info_t *)DEVI(dip));

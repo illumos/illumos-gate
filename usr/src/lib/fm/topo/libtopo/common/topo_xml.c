@@ -1265,29 +1265,6 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 		    "pad_process: dcnt=%d, pgcnt=%d, ecnt=%d, joined_set=%d\n",
 		    dcnt, pgcnt, ecnt, joined_set);
 		/*
-		 * If an enum-method element was found, AND we're a child of a
-		 * node element, then we invoke the enumerator so that it can do
-		 * post-processing of the node.
-		 */
-		if (ecnt && (strcmp((const char *)pxn->name, Node) == 0)) {
-			if ((tmp_rd.rd_einfo = enum_attributes_process(mp, ecn))
-			    == NULL)
-				return (-1);
-			tmp_rd.rd_mod = mp;
-			tmp_rd.rd_name = rd->rd_name;
-			tmp_rd.rd_min = rd->rd_min;
-			tmp_rd.rd_max = rd->rd_max;
-			tmp_rd.rd_pn = ptn;
-			if (enum_run(mp, &tmp_rd) < 0) {
-				/*
-				 * Note the failure but continue on
-				 */
-				topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
-				    "pad_process: enumeration failed.\n");
-			}
-			tf_edata_free(mp, tmp_rd.rd_einfo);
-		}
-		/*
 		 * Here we allocate an element in an intermediate data structure
 		 * which keeps track property groups and dependents of the range
 		 * currently being processed.
@@ -1364,6 +1341,30 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 	if (new->tpad_pgcnt > 0)
 		if (pgroups_create(mp, new, ptn) < 0)
 			return (-1);
+
+	/*
+	 * If an enum-method element was found, AND we're a child of a
+	 * node element, then we invoke the enumerator so that it can do
+	 * post-processing of the node.
+	 */
+	if (ecnt && (strcmp((const char *)pxn->name, Node) == 0)) {
+		if ((tmp_rd.rd_einfo = enum_attributes_process(mp, ecn))
+		    == NULL)
+			return (-1);
+		tmp_rd.rd_mod = mp;
+		tmp_rd.rd_name = rd->rd_name;
+		tmp_rd.rd_min = rd->rd_min;
+		tmp_rd.rd_max = rd->rd_max;
+		tmp_rd.rd_pn = ptn;
+		if (enum_run(mp, &tmp_rd) < 0) {
+			/*
+			 * Note the failure but continue on
+			 */
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+			    "pad_process: enumeration failed.\n");
+		}
+		tf_edata_free(mp, tmp_rd.rd_einfo);
+	}
 
 	if (new->tpad_dcnt > 0)
 		if (dependents_create(mp, rd->rd_finfo, new, pxn, ptn) < 0)

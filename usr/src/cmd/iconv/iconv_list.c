@@ -206,7 +206,7 @@ scan_dir(DIR *dh, char sep, char *suffix)
 		    sizeof (namebuf))
 			continue;
 
-		/* Find suffix (.so | .t) */
+		/* Find suffix */
 		p2 = strrchr(namebuf, *suffix);
 		if (p2 == NULL)
 			continue;
@@ -269,8 +269,6 @@ list_codesets(void)
 		return (1);
 	}
 	scan_dir(dh, '%', ".so");
-	rewinddir(dh);
-	scan_dir(dh, '.', ".t");
 	(void) closedir(dh);
 
 	dh = opendir(PATH_BTABLES);

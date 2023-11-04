@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <err.h>
@@ -35,6 +35,9 @@ typedef struct pcieadm_show_devs {
 typedef enum pcieadm_show_devs_otype {
 	PCIEADM_SDO_VID,
 	PCIEADM_SDO_DID,
+	PCIEADM_SDO_REV,
+	PCIEADM_SDO_SUBVID,
+	PCIEADM_SDO_SUBSYS,
 	PCIEADM_SDO_BDF,
 	PCIEADM_SDO_BDF_BUS,
 	PCIEADM_SDO_BDF_DEV,
@@ -45,6 +48,8 @@ typedef enum pcieadm_show_devs_otype {
 	PCIEADM_SDO_TYPE,
 	PCIEADM_SDO_VENDOR,
 	PCIEADM_SDO_DEVICE,
+	PCIEADM_SDO_SUBVENDOR,
+	PCIEADM_SDO_SUBSYSTEM,
 	PCIEADM_SDO_PATH,
 	PCIEADM_SDO_MAXSPEED,
 	PCIEADM_SDO_MAXWIDTH,
@@ -56,12 +61,17 @@ typedef enum pcieadm_show_devs_otype {
 typedef struct pcieadm_show_devs_ofmt {
 	int psdo_vid;
 	int psdo_did;
+	int psdo_rev;
+	int psdo_subvid;
+	int psdo_subsys;
 	uint_t psdo_bus;
 	uint_t psdo_dev;
 	uint_t psdo_func;
 	const char *psdo_path;
 	const char *psdo_vendor;
 	const char *psdo_device;
+	const char *psdo_subvendor;
+	const char *psdo_subsystem;
 	const char *psdo_driver;
 	int psdo_instance;
 	int psdo_mwidth;
@@ -181,6 +191,30 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 			return (B_FALSE);
 		}
 		break;
+	case PCIEADM_SDO_REV:
+		if (psdo->psdo_rev == -1) {
+			(void) strlcat(buf, "--", buflen);
+		} else if (snprintf(buf, buflen, "%x", psdo->psdo_rev) >=
+		    buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_SUBVID:
+		if (psdo->psdo_subvid == -1) {
+			(void) strlcat(buf, "--", buflen);
+		} else if (snprintf(buf, buflen, "%x", psdo->psdo_subvid) >=
+		    buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_SUBSYS:
+		if (psdo->psdo_subsys == -1) {
+			(void) strlcat(buf, "--", buflen);
+		} else if (snprintf(buf, buflen, "%x", psdo->psdo_subsys) >=
+		    buflen) {
+			return (B_FALSE);
+		}
+		break;
 	case PCIEADM_SDO_VENDOR:
 		if (strlcat(buf, psdo->psdo_vendor, buflen) >= buflen) {
 			return (B_FALSE);
@@ -188,6 +222,16 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		break;
 	case PCIEADM_SDO_DEVICE:
 		if (strlcat(buf, psdo->psdo_device, buflen) >= buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_SUBVENDOR:
+		if (strlcat(buf, psdo->psdo_subvendor, buflen) >= buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_SUBSYSTEM:
+		if (strlcat(buf, psdo->psdo_subsystem, buflen) >= buflen) {
 			return (B_FALSE);
 		}
 		break;
@@ -271,6 +315,9 @@ static const char *pcieadm_show_dev_speeds =
 static const ofmt_field_t pcieadm_show_dev_ofmt[] = {
 	{ "VID", 6, PCIEADM_SDO_VID, pcieadm_show_devs_ofmt_cb },
 	{ "DID", 6, PCIEADM_SDO_DID, pcieadm_show_devs_ofmt_cb },
+	{ "REV", 6, PCIEADM_SDO_REV, pcieadm_show_devs_ofmt_cb },
+	{ "SUBVID", 6, PCIEADM_SDO_SUBVID, pcieadm_show_devs_ofmt_cb },
+	{ "SUBSYS", 6, PCIEADM_SDO_SUBSYS, pcieadm_show_devs_ofmt_cb },
 	{ "BDF", 8, PCIEADM_SDO_BDF, pcieadm_show_devs_ofmt_cb },
 	{ "DRIVER", 15, PCIEADM_SDO_DRIVER, pcieadm_show_devs_ofmt_cb },
 	{ "INSTANCE", 15, PCIEADM_SDO_INSTANCE, pcieadm_show_devs_ofmt_cb },
@@ -278,6 +325,8 @@ static const ofmt_field_t pcieadm_show_dev_ofmt[] = {
 	{ "TYPE", 15, PCIEADM_SDO_TYPE, pcieadm_show_devs_ofmt_cb },
 	{ "VENDOR", 30, PCIEADM_SDO_VENDOR, pcieadm_show_devs_ofmt_cb },
 	{ "DEVICE", 30, PCIEADM_SDO_DEVICE, pcieadm_show_devs_ofmt_cb },
+	{ "SUBVENDOR", 30, PCIEADM_SDO_SUBVENDOR, pcieadm_show_devs_ofmt_cb },
+	{ "SUBSYSTEM", 30, PCIEADM_SDO_SUBSYSTEM, pcieadm_show_devs_ofmt_cb },
 	{ "PATH", 30, PCIEADM_SDO_PATH, pcieadm_show_devs_ofmt_cb },
 	{ "BUS", 4, PCIEADM_SDO_BDF_BUS, pcieadm_show_devs_ofmt_cb },
 	{ "DEV", 4, PCIEADM_SDO_BDF_DEV, pcieadm_show_devs_ofmt_cb },
@@ -347,12 +396,13 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
 static int
 pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 {
-	int nprop, *regs = NULL, *did, *vid, *mwidth, *cwidth;
+	int nprop, *regs = NULL, *did, *vid, *mwidth, *cwidth, *rev;
+	int *subvid, *subsys;
 	int64_t *mspeed, *cspeed, *sspeeds;
 	char *path = NULL;
 	pcieadm_show_devs_t *psd = arg;
 	int ret = DI_WALK_CONTINUE;
-	char venstr[64], devstr[64];
+	char venstr[64], devstr[64], subvenstr[64], subsysstr[64];
 	pcieadm_show_devs_ofmt_t oarg;
 	pcidb_hdl_t *pcidb = psd->psd_pia->pia_pcidb;
 
@@ -396,6 +446,29 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 		oarg.psdo_vid = (uint16_t)*vid;
 	}
 
+	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "revision-id", &rev);
+	if (nprop != 1) {
+		oarg.psdo_rev = -1;
+	} else {
+		oarg.psdo_rev = (uint16_t)*rev;
+	}
+
+	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "subsystem-vendor-id",
+	    &subvid);
+	if (nprop != 1) {
+		oarg.psdo_subvid = -1;
+	} else {
+		oarg.psdo_subvid = (uint16_t)*subvid;
+	}
+
+	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "subsystem-id",
+	    &subsys);
+	if (nprop != 1) {
+		oarg.psdo_subsys = -1;
+	} else {
+		oarg.psdo_subsys = (uint16_t)*subsys;
+	}
+
 	oarg.psdo_vendor = "--";
 	if (oarg.psdo_vid != -1) {
 		pcidb_vendor_t *vend = pcidb_lookup_vendor(pcidb,
@@ -421,6 +494,40 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 			oarg.psdo_device = devstr;
 		}
 	}
+
+	/*
+	 * The pci.ids database organizes subsystems under devices. We look at
+	 * the subsystem vendor separately because even if the device or other
+	 * information is not known, we may still be able to figure out what it
+	 * is.
+	 */
+	oarg.psdo_subvendor = "--";
+	oarg.psdo_subsystem = "--";
+	if (oarg.psdo_subvid != -1) {
+		pcidb_vendor_t *vend = pcidb_lookup_vendor(pcidb,
+		    oarg.psdo_subvid);
+		if (vend != NULL) {
+			oarg.psdo_subvendor = pcidb_vendor_name(vend);
+		} else {
+			(void) snprintf(subvenstr, sizeof (subvenstr),
+			    "Unknown vendor: 0x%x", oarg.psdo_vid);
+			oarg.psdo_subvendor = subvenstr;
+		}
+	}
+
+	if (oarg.psdo_vid != -1 && oarg.psdo_did != -1 &&
+	    oarg.psdo_subvid != -1 && oarg.psdo_subsys != -1) {
+		pcidb_subvd_t *subvd = pcidb_lookup_subvd(pcidb, oarg.psdo_vid,
+		    oarg.psdo_did, oarg.psdo_subvid, oarg.psdo_subsys);
+		if (subvd != NULL) {
+			oarg.psdo_subsystem = pcidb_subvd_name(subvd);
+		} else {
+			(void) snprintf(subsysstr, sizeof (subsysstr),
+			    "Unknown subsystem: 0x%x", oarg.psdo_subsys);
+			oarg.psdo_subsystem = subsysstr;
+		}
+	}
+
 
 	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node,
 	    "pcie-link-maximum-width", &mwidth);
@@ -510,8 +617,13 @@ pcieadm_show_devs_help(const char *fmt, ...)
 	    "The following fields are supported:\n"
 	    "\tvid\t\tthe PCI vendor ID in hex\n"
 	    "\tdid\t\tthe PCI device ID in hex\n"
+	    "\trev\t\tthe PCI device revision in hex\n"
+	    "\tsubvid\t\tthe PCI subsystem vendor ID in hex\n"
+	    "\tsubsys\t\tthe PCI subsystem ID in hex\n"
 	    "\tvendor\t\tthe name of the PCI vendor\n"
 	    "\tdevice\t\tthe name of the PCI device\n"
+	    "\tsubvendor\t\tthe name of the PCI subsystem vendor\n"
+	    "\tsubsystem\t\tthe name of the PCI subsystem\n"
 	    "\tinstance\tthe name of this particular instance, e.g. igb0\n"
 	    "\tdriver\t\tthe name of the driver attached to the device\n"
 	    "\tinstnum\t\tthe instance number of a device, e.g. 2 for nvme2\n"

@@ -23,6 +23,7 @@
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -1231,11 +1232,36 @@ secpolicy_vnode_utime_modify(const cred_t *cred)
 int
 secpolicy_vnode_setdac(const cred_t *cred, uid_t owner)
 {
+	boolean_t allzone = (owner == 0);
+
 	if (owner == cred->cr_uid)
 		return (0);
 
-	return (PRIV_POLICY(cred, PRIV_FILE_OWNER, owner == 0, EPERM, NULL));
+	return (PRIV_POLICY(cred, PRIV_FILE_OWNER, allzone, EPERM, NULL));
 }
+
+/*
+ * Name:	secpolicy_vnode_setdac3()
+ *
+ * Normal:	Variant of secpolicy_vnode_setdac() that conditionally
+ *		grants implicit rights to the owner of a file.
+ *		allzone privilege needed when modifying root owned object.
+ *
+ * Output:	EPERM - if access denied.
+ */
+
+int
+secpolicy_vnode_setdac3(const cred_t *cred, uid_t owner,
+    boolean_t owner_implicit_rights)
+{
+	boolean_t allzone = (owner == 0);
+
+	if (owner_implicit_rights && owner == cred->cr_uid)
+		return (0);
+
+	return (PRIV_POLICY(cred, PRIV_FILE_OWNER, allzone, EPERM, NULL));
+}
+
 /*
  * Name:	secpolicy_vnode_stky_modify()
  *
@@ -1440,6 +1466,7 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 	int mask = vap->va_mask;
 	int error = 0;
 	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
+	boolean_t implicit = (flags & ATTR_NOIMPLICIT) ? B_FALSE : B_TRUE;
 
 	if (mask & AT_SIZE) {
 		if (vp->v_type == VDIR) {
@@ -1467,7 +1494,8 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		 * In the specific case of creating a set-uid root
 		 * file, we need even more permissions.
 		 */
-		if ((error = secpolicy_vnode_setdac(cr, ovap->va_uid)) != 0)
+		error = secpolicy_vnode_setdac3(cr, ovap->va_uid, implicit);
+		if (error != 0)
 			goto out;
 
 		if ((error = secpolicy_setid_setsticky_clear(vp, vap,
@@ -1495,7 +1523,9 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		 *	chown from other to any		PRIV_FILE_CHOWN
 		 *
 		 */
-		if (cr->cr_uid != ovap->va_uid) {
+		if (!implicit) {
+			checkpriv = B_TRUE;
+		} else if (cr->cr_uid != ovap->va_uid) {
 			checkpriv = B_TRUE;
 		} else {
 			if (((mask & AT_UID) && vap->va_uid != ovap->va_uid) ||

@@ -164,13 +164,6 @@ void		add_nvidia_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 	    NVIDIA_MCP61_DEVICE_ID(did) || \
 	    NVIDIA_MCP65_DEVICE_ID(did))
 
-/*
- * Defines to figure out what kind of hotplug is supported
- */
-#define	INBAND_HPC_NONE		0x0	/* No hotplug supported */
-#define	INBAND_HPC_PCIE		0x1	/* PCIe based hotplug supported */
-#define	INBAND_HPC_SHPC		0x2	/* SHPC based hotplug supported */
-
 #ifdef	__cplusplus
 }
 #endif

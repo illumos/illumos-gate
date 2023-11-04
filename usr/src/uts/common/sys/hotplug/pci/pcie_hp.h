@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_HP_H
@@ -34,6 +34,7 @@ extern "C" {
 #ifdef _KERNEL
 #include <sys/ddi_hp.h>
 #include <sys/pcie_impl.h>
+#include <sys/stdbool.h>
 #endif /* _KERNEL */
 #include "../../../../../common/pci/pci_strings.h"
 #include <sys/hotplug/pci/pcihp.h>
@@ -52,12 +53,14 @@ extern "C" {
 #define	PCIEHPC_PROP_VALUE_ON		"on"
 #define	PCIEHPC_PROP_VALUE_OFF		"off"
 #define	PCIEHPC_PROP_VALUE_BLINK	"blink"
+#define	PCIEHPC_PROP_VALUE_DEFAULT	"default"
 #define	PCIEHPC_PROP_VALUE_PCIHOTPLUG	"pci hotplug"
 #define	PCIEHPC_PROP_VALUE_OK		"ok"
 #define	PCIEHPC_PROP_VALUE_FAILING	"failing"
 #define	PCIEHPC_PROP_VALUE_FAILED	"failed"
 #define	PCIEHPC_PROP_VALUE_UNUSABLE	"unusable"
 #define	PCIEHPC_PROP_VALUE_LED		"<on|off|blink>"
+#define	PCIEHPC_PROP_VALUE_LED_DEF	"<on|off|blink|default>"
 #define	PCIEHPC_PROP_VALUE_TYPE		"<type description>"
 #define	PCIEHPC_PROP_VALUE_CONDITION	"<unknown|ok|failing|failed|unusable>"
 
@@ -77,7 +80,7 @@ extern "C" {
 #define	PCIE_HP_POWER_GOOD_WAIT_TIME	220000	/* Wait time after issuing a */
 						/* cmd to change slot state */
 
-/* definations for PCIEHPC/PCISHPC */
+/* Definitions for PCIEHPC/PCISHPC */
 #define	PCIE_NATIVE_HP_TYPE	"PCIe-Native"		/* PCIe Native type */
 #define	PCIE_ACPI_HP_TYPE	"PCIe-ACPI"		/* PCIe ACPI type */
 #define	PCIE_PROP_HP_TYPE	"PCIe-Proprietary"	/* PCIe Prop type */
@@ -161,7 +164,9 @@ typedef struct pcie_hp_occupant_info {
 /*
  * pcie_hp_led_t
  *
- * Type definitions for LED type
+ * Type definitions for LED type. These are all the types of LEDs that the
+ * subsystem knows about; however, both PCIe and SHPC only implement the Power
+ * and Attention LEDs.
  */
 typedef	enum {
 	PCIE_HP_FAULT_LED,
@@ -173,13 +178,86 @@ typedef	enum {
 /*
  * pcie_hp_led_state_t
  *
- * Type definitions for LED state
+ * Type definitions for LED state. This structure represents the underlying
+ * hardware state and not what we are using for tracking the meta state
+ * ourselves.
  */
 typedef	enum {
-	PCIE_HP_LED_OFF,
+	PCIE_HP_LED_OFF = 0,
 	PCIE_HP_LED_ON,
 	PCIE_HP_LED_BLINK
 } pcie_hp_led_state_t;
+
+/*
+ * The following enumerations and structures are used to track the way that we
+ * manage LEDs for the native PCIe hotplug subsystem. See the 'LED Management'
+ * section of the theory statement of uts/common/io/pciex/hotplug/pciehpc.c for
+ * more information. While this is all specific to the native PCIe
+ * implementation there and not used for the SHPC bits, because everything uses
+ * a shared structure for slots, we must track that here.
+ *
+ * Roughly the pcie_hp_led_act_t is used to describe what we can do to an LED in
+ * our table. The pciehpc_logical_led_t describes the different LED states that
+ * we can be in. Finally, the pciehpc_led_plat_id_t is yet another LED
+ * definition. This would be much simpler if the pcie_hp_led_t reflected
+ * reality.
+ */
+typedef enum pcie_hp_led_act {
+	PCIE_HLA_PASS,
+	PCIE_HLA_OFF,
+	PCIE_HLA_ON,
+	PCIE_HLA_BLINK
+} pcie_hp_led_act_t;
+
+typedef enum pciehpc_logical_led {
+	/*
+	 * The base case here indicates what should happen when we have a slot
+	 * without power and no device present.
+	 */
+	PCIE_LL_BASE			= 0,
+	/*
+	 * This is the state that the system should be in when a device is
+	 * powered.
+	 */
+	PCIE_LL_POWERED,
+	/*
+	 * This indicates what should happen when an explicit power transition
+	 * has been requested. The standard PCIe activity is to blink the power
+	 * LED.
+	 */
+	PCIE_LL_POWER_TRANSITION,
+	/*
+	 * This is the activity to take when a device driver probe has failed.
+	 * This lasts until another state transition or acknowledgement.
+	 */
+	PCIE_LL_PROBE_FAILED,
+	/*
+	 * This is the activity to take when a power fault occurs. This will
+	 * remain until a device is removed or an active state transition
+	 * occurs.
+	 */
+	PCIE_LL_POWER_FAULT,
+	/*
+	 * This is the activity to take when the attention button has been
+	 * pushed during the 5 second window that is used to confirm behavior.
+	 */
+	PCIE_LL_ATTENTION_BUTTON
+} pciehpc_logical_led_t;
+
+#define	PCIEHPC_LED_NSTATES	6
+CTASSERT(PCIEHPC_LED_NSTATES == PCIE_LL_ATTENTION_BUTTON + 1);
+
+typedef enum {
+	PCIEHPC_PLAT_ID_POWER,
+	PCIEHPC_PLAT_ID_ATTN
+} pciehpc_led_plat_id_t;
+
+#define	PCIEHPC_LED_NLEDS	2
+CTASSERT(PCIEHPC_LED_NLEDS == PCIEHPC_PLAT_ID_ATTN + 1);
+
+typedef struct pciehpc_led_plat_state {
+	pcie_hp_led_act_t plps_acts[PCIEHPC_LED_NLEDS];
+} pciehpc_led_plat_state_t;
 
 /*
  * PCI and PCI Express Hotplug slot structure
@@ -192,10 +270,43 @@ struct pcie_hp_slot {
 	ddi_hp_cn_info_t hs_info;		/* Slot information */
 	ddi_hp_cn_state_t hs_state;		/* Slot state */
 
+	/*
+	 * LED states are split into three groups. The first group is the state
+	 * that we believe we should have set into hardware. This state is the
+	 * only state the SHPC form of the hotplug controller uses. While there
+	 * are four LEDs here, only two are actually supported by the SHPC and
+	 * PCIe controllers: the attention and power LEDs.
+	 *
+	 * The subsequent two groups are only used by the PCIe backend. In the
+	 * future we should consider whether or not these structures really
+	 * should be shared by all hotplug backends (especially when we add the
+	 * ACPI/PCI hotplug scheme that virtual machines use).
+	 */
 	pcie_hp_led_state_t hs_power_led_state;		/* Power LED state */
 	pcie_hp_led_state_t hs_attn_led_state;		/* Attn LED state */
 	pcie_hp_led_state_t hs_active_led_state;	/* Active LED state */
 	pcie_hp_led_state_t hs_fault_led_state;		/* Fault LED state */
+
+	/*
+	 * The second of three LED groups. This is used to track when a user
+	 * overrides an LED. This is separate from the third group so we can
+	 * always return to the expected LED behavior when the override is
+	 * disabled again. Currently only used by the PCIe backend.
+	 */
+	pcie_hp_led_state_t hs_power_usr_ovr_state;
+	pcie_hp_led_state_t hs_attn_usr_ovr_state;
+	bool hs_power_usr_ovr;
+	bool hs_attn_usr_ovr;
+
+	/*
+	 * The final group of LED state. This array tracks logical events that
+	 * have occurred in the hotplug controller. Higher indexed events that
+	 * are true take priority over lower indexed ones. The actual mapping of
+	 * states to LEDs is in hs_led_plat_conf. For more information see the
+	 * pciehpc.c theory statement.
+	 */
+	bool hs_led_plat_en[PCIEHPC_LED_NSTATES];
+	const pciehpc_led_plat_state_t *hs_led_plat_conf;
 
 	ap_condition_t	hs_condition;		/* Condition of the slot. */
 						/* For cfgadm condition. */
@@ -238,6 +349,7 @@ struct pcie_hp_ctrl {
 	/* PCI Express Hotplug specific fields */
 	boolean_t	hc_has_emi_lock;	/* Do we have EMI Lock? */
 	boolean_t	hc_dll_active_rep;	/* Report DLL DL_Active state */
+	taskqid_t	hc_startup_sync;	/* Startup synched? */
 	pcie_hp_ops_t	hc_ops;			/* Platform specific ops */
 						/* (Native, ACPI) */
 
@@ -295,6 +407,14 @@ typedef struct pcie_hp_port_state {
 
 /* hc_flags */
 #define	PCIE_HP_INITIALIZED_FLAG	(1 << 0) /* HPC initialized */
+/*
+ * These two flags are all related to initial synchronization. See
+ * uts/common/io/pciex/hotplug/pciehpc.c for more information. The first is used
+ * to track that this is required while the second indicates that it's actively
+ * occurring.
+ */
+#define	PCIE_HP_SYNC_PENDING		(1 << 1)
+#define	PCIE_HP_SYNC_RUNNING		(1 << 2)
 
 /* PCIe hotplug friendly functions */
 extern int pcie_hp_init(dev_info_t *dip, caddr_t arg);
@@ -321,9 +441,6 @@ extern int pcie_create_minor_node(pcie_hp_ctrl_t *, int);
 extern void pcie_remove_minor_node(pcie_hp_ctrl_t *, int);
 extern void pcie_hp_gen_sysevent_req(char *slot_name, int hint,
     dev_info_t *self, int kmflag);
-
-extern const struct pci_class_strings_s class_pci[];
-extern int class_pci_items;
 
 #endif /* _KERNEL */
 

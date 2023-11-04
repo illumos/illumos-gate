@@ -23,7 +23,7 @@
  * Copyright 2016 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -822,6 +822,19 @@ boolean_t
 pci_prd_multi_root_ok(void)
 {
 	return (acpi_resource_discovery > 0);
+}
+
+/*
+ * These compatibility flags generally exist for i86pc. We need to still
+ * enumerate ISA bridges and the naming of device nodes and aliases must be kept
+ * consistent lest we break boot. See uts/common/io/pciex/pci_props.c theory
+ * statement for more information.
+ */
+pci_prd_compat_flags_t
+pci_prd_compat_flags(void)
+{
+	return (PCI_PRD_COMPAT_ISA | PCI_PRD_COMPAT_PCI_NODE_NAME |
+	    PCI_PRD_COMPAT_SUBSYS);
 }
 
 int

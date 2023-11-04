@@ -27,6 +27,7 @@
 
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -54,7 +55,7 @@ log_assert "aclinherit=passthrough-x should inherit the execute permission" \
 log_onexit cleanup
 
 set -A aces \
-    "owner@:rwxp:f:allow" \
+    "owner@:rwxpC:f:allow" \
     "group@:rxp:f:allow" \
     "everyone@:rxp:f:allow"
 

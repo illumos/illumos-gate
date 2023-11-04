@@ -25,6 +25,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2015-2023 RackTop Systems, Inc.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -3357,8 +3358,12 @@ top:
 		 * has the ability to modify mode.  In that case remove
 		 * UID|GID and or MODE from mask so that
 		 * secpolicy_vnode_setattr() doesn't revoke it.
+		 * If acl_implicit (implicit owner rights) is false,
+		 * tell secpolicy about that via the flags.
 		 */
 
+		if (zfsvfs->z_acl_implicit == B_FALSE)
+			flags |= ATTR_NOIMPLICIT;
 		if (trim_mask) {
 			saved_mask = vap->va_mask;
 			vap->va_mask &= ~trim_mask;
