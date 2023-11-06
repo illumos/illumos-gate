@@ -22,29 +22,51 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#cmd/ipf/lib/Makefile
-#
+
+LIBRARY=	libipf.a
+VERS= .1
+
+OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
+		binprint.o buildopts.o checkrev.o count6bits.o \
+		count4bits.o debug.o extras.o facpri.o flags.o \
+		fill6bits.o genmask.o gethost.o getifname.o \
+		getline.o getnattype.o getport.o getportproto.o \
+		getproto.o getsumd.o hostname.o \
+		icmpcode.o inet_addr.o initparse.o \
+		ionames.o v6ionames.o ipoptsec.o ipf_dotuning.o \
+		ipft_ef.o ipft_hx.o ipft_pc.o ipft_sn.o ipft_td.o \
+		ipft_tx.o kmem.o kmemcpywrap.o kvatoname.o \
+		load_hash.o load_pool.o load_hashnode.o \
+		load_poolnode.o loglevel.o mutex_emul.o nametokva.o \
+		nat_setgroupmap.o ntomask.o optname.o optprint.o \
+		optprintv6.o optvalue.o \
+		portname.o portnum.o ports.o print_toif.o \
+		printactivenat.o printaps.o printbuf.o printhash.o \
+		printhashnode.o printip.o printpool.o \
+		printpoolnode.o printfr.o printfraginfo.o \
+		printhostmap.o printifname.o printhostmask.o \
+		printlog.o printlookup.o printmask.o printnat.o printpacket.o \
+		printpacket6.o printportcmp.o printproto.o \
+		printsbuf.o printstate.o printtunable.o ratoi.o \
+		remove_pool.o remove_poolnode.o remove_hash.o \
+		remove_hashnode.o resetlexer.o rwlock_emul.o \
+		tcpflags.o var.o verbose.o \
+		v6ionames.o v6optvalue.o printpool_live.o \
+		printpooldata.o printhash_live.o printhashdata.o \
+		printactiveaddr.o printactivenat.o printaddr.o
 
 include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.lib.64
+include ../Makefile.ipf
 
-SUBDIRS = 	$(MACH)
+LIBS=		$(LIBRARY)
 
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CPPFLAGS	+= -I../tools
 
 .KEEP_STATE:
 
-all clean clobber install lint:	$(SUBDIRS)
+all:    $(LIBS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+install: all
 
 include $(SRC)/lib/Makefile.targ
-include ../Makefile.ipf

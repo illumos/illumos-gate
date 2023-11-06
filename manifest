@@ -6638,10 +6638,7 @@ f usr/lib/inet/wpad 0555 root bin
 f usr/lib/intrd 0555 root bin
 d usr/lib/ipf 0755 root bin
 f usr/lib/ipf/IPFILTER.LICENCE 0644 root bin
-d usr/lib/ipf/amd64 0755 root sys
-f usr/lib/ipf/amd64/ipftest 0555 root bin
-d usr/lib/ipf/i86 0755 root sys
-h usr/lib/ipf/ipftest=usr/lib/isaexec
+f usr/lib/ipf/ipftest 0555 root bin
 d usr/lib/ipqosconf 0755 root bin
 f usr/lib/ipqosconf/dlcosmk.types 0444 root bin
 f usr/lib/ipqosconf/dscpmk.types 0444 root bin
@@ -10859,12 +10856,6 @@ f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
 f usr/sbin/amd64/dtrace 0555 root bin
 f usr/sbin/amd64/intrstat 0555 root bin
-f usr/sbin/amd64/ipf 0555 root bin
-f usr/sbin/amd64/ipfs 0555 root bin
-f usr/sbin/amd64/ipfstat 0555 root bin
-f usr/sbin/amd64/ipmon 0555 root bin
-f usr/sbin/amd64/ipnat 0555 root bin
-f usr/sbin/amd64/ippool 0555 root bin
 f usr/sbin/amd64/lockstat 0555 root bin
 f usr/sbin/amd64/plockstat 0555 root bin
 f usr/sbin/arp 0555 root bin
@@ -10977,13 +10968,13 @@ h usr/sbin/intrstat=usr/lib/isaexec
 f usr/sbin/ipaddrsel 0555 root bin
 s usr/sbin/ipadm=../../sbin/ipadm
 f usr/sbin/ipdadm 0555 root bin
-h usr/sbin/ipf=usr/lib/isaexec
-h usr/sbin/ipfs=usr/lib/isaexec
-h usr/sbin/ipfstat=usr/lib/isaexec
-h usr/sbin/ipmon=usr/lib/isaexec
+f usr/sbin/ipf 0555 root bin
+f usr/sbin/ipfs 0555 root bin
+f usr/sbin/ipfstat 0555 root bin
+f usr/sbin/ipmon 0555 root bin
 s usr/sbin/ipmpstat=../../sbin/ipmpstat
-h usr/sbin/ipnat=usr/lib/isaexec
-h usr/sbin/ippool=usr/lib/isaexec
+f usr/sbin/ipnat 0555 root bin
+f usr/sbin/ippool 0555 root bin
 f usr/sbin/ipsecalgs 0555 root bin
 f usr/sbin/ipsecconf 0555 root bin
 f usr/sbin/ipseckey 0555 root bin
