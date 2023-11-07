@@ -154,6 +154,6 @@ msgbuf_help(void)
 	    "%<b>OPTIONS%</b>\n"
 	    "\t-t\tInclude the age of the message from now.\n"
 	    "\t-T\tInclude the date/time of the message.\n"
-	    "\t-vInclude the date/time of the message as well as the address of"
-	    " its log_ctl_t.\n");
+	    "\t-v\tInclude the date/time of the message as well as the address "
+	    "of its log_ctl_t.\n");
 }
