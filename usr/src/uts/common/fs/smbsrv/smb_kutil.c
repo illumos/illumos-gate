@@ -23,6 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -202,14 +203,7 @@ smb_sattr_check(uint16_t dosattr, uint16_t sattr)
 time_t
 smb_get_boottime(void)
 {
-	extern time_t	boot_time;
-	zone_t *z = curzone;
-
-	/* Unfortunately, the GZ doesn't set zone_boot_time. */
-	if (z->zone_id == GLOBAL_ZONEID)
-		return (boot_time);
-
-	return (z->zone_boot_time);
+	return (curzone->zone_boot_time);
 }
 
 /*
