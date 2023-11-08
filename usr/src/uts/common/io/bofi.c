@@ -47,8 +47,11 @@
 #include <sys/sunndi.h>
 #include <sys/debug.h>
 #include <sys/bofi.h>
-#include <sys/dvma.h>
 #include <sys/bofi_impl.h>
+
+#ifdef __sparc
+#include <sys/dvma.h>
+#endif
 
 /*
  * Testing the resilience of a hardened device driver requires a suitably wide

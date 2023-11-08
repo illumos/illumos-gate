@@ -60,7 +60,9 @@ struct bofi_link {
 
 struct bofi_shadow {
 	union {
+#ifdef __sparc
 		struct dvma_ops dvma_ops;
+#endif
 		ddi_acc_impl_t acc;
 		struct {
 			uint_t (*int_handler)(caddr_t, caddr_t);
