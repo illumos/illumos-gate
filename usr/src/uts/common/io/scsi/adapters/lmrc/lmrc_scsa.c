@@ -37,11 +37,13 @@
  * In tran_setup_pkt(9e), a MPT command is allocated for the scsi_pkt, and its
  * members are initialized as follows:
  * - pkt_cdbp will point to the CDB structure embedded in the MPT I/O frame
- * - pkt_scbp will point to the sense DMA memory allocated for the MPT command
- * - pkt_scblen will be set to the size of the sense DMA memory
+ * - pkt_scbp will point to the struct scsi_arq_status in the sense DMA memory
+ *   allocated for the MPT command
+ * - pkt_scblen will be set to the size of the sense DMA memory, minus alignment
  * - SenseBufferLowAddress and SenseBufferLength in the MPT I/O frame will be
  *   set to the sense DMA address and length, respectively, adjusted to account
- *   for the space needed for the ARQ pkt. (There is no SenseBufferHighAddress.)
+ *   for the space needed for the ARQ pkt and alignment.
+ * - There is no SenseBufferHighAddress.
  * - rc_timeout is set to pkt_time, but it is unknown if that has any effect
  */
 
@@ -599,11 +601,13 @@ lmrc_tran_reset(struct scsi_address *sa, int level)
  * Set up a MPT command for a scsi_pkt, and initialize scsi_pkt members as
  * needed:
  * - pkt_cdbp will point to the CDB structure embedded in the MPT I/O frame
- * - pkt_scbp will point to the sense DMA memory allocated for the command
- * - pkt_scblen will be set to the size of the sense DMA memory
+ * - pkt_scbp will point to the struct scsi_arq_status in the sense DMA memory
+ *   allocated for the MPT command
+ * - pkt_scblen will be set to the size of the sense DMA memory, minus alignment
  * - SenseBufferLowAddress and SenseBufferLength in the MPT I/O frame will be
- *   set to the sense DMA address and length, adjusted to account for the space
- *   needed for the ARQ pkt. Note there is no SenseBufferHighAddress.
+ *   set to the sense DMA address and length, respectively, adjusted to account
+ *   for the space needed for the ARQ pkt and alignment.
+ * - There is no SenseBufferHighAddress.
  * - rc_timeout is set to pkt_time, but it is unknown if that has any effect
  *
  * The procedure is the same irrespective of whether the command is sent to a
@@ -653,17 +657,19 @@ lmrc_tran_setup_pkt(struct scsi_pkt *pkt, int (*callback)(caddr_t),
 	io_req->IoFlags = pkt->pkt_cdblen;
 
 	/*
-	 * Set up sense buffer. The DMA memory holds the whole ARQ structure,
-	 * so point SenseBufferLowAddress to sts_sensedata and reduce the length
+	 * Set up sense buffer. The DMA memory was setup to holds the whole ARQ
+	 * structure aligned so that its sts_sensedata is aligned to 64 bytes.
+	 * Point SenseBufferLowAddress to sts_sensedata and reduce the length
 	 * accordingly.
 	 */
 	pkt->pkt_scbp = mpt->mpt_sense;
-	pkt->pkt_scblen = lmrc_dma_get_size(&mpt->mpt_sense_dma);
+	pkt->pkt_scblen = lmrc_dma_get_size(&mpt->mpt_sense_dma) - 64 +
+	    offsetof(struct scsi_arq_status, sts_sensedata);
 
 	lmrc_dma_set_addr32(&mpt->mpt_sense_dma,
 	    &io_req->SenseBufferLowAddress);
 	io_req->SenseBufferLowAddress +=
-	    offsetof(struct scsi_arq_status, sts_sensedata);
+	    P2ROUNDUP(offsetof(struct scsi_arq_status, sts_sensedata), 64);
 	io_req->SenseBufferLength = pkt->pkt_scblen -
 	    offsetof(struct scsi_arq_status, sts_sensedata);
 

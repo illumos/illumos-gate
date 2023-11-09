@@ -957,16 +957,27 @@ lmrc_alloc_mpt_cmds(lmrc_t *lmrc, const size_t ncmd)
 
 		/*
 		 * We request a few bytes more for sense so that we can fit our
-		 * arq struct before the actual sense data.
+		 * arq struct before the actual sense data. We must make sure to
+		 * put sts_sensedata at a 64 byte aligned address.
 		 */
 		ret = lmrc_dma_alloc(lmrc, lmrc->l_dma_attr_32,
-		    &cmd->mpt_sense_dma, LMRC_SENSE_LEN +
-		    offsetof(struct scsi_arq_status, sts_sensedata), 64,
+		    &cmd->mpt_sense_dma, LMRC_SENSE_LEN + P2ROUNDUP(
+		    offsetof(struct scsi_arq_status, sts_sensedata), 64), 64,
 		    DDI_DMA_CONSISTENT);
 		if (ret != DDI_SUCCESS)
 			goto fail;
 
-		cmd->mpt_sense = cmd->mpt_sense_dma.ld_buf;
+		/*
+		 * Now that we have a sufficiently sized and 64 byte aligned DMA
+		 * buffer for sense, calculate mpt_sense so that it points at a
+		 * struct scsi_arq_status somewhere within the first 64 bytes in
+		 * the DMA buffer, making sure its sts_sensedata is aligned at
+		 * 64 bytes as well.
+		 */
+		cmd->mpt_sense = cmd->mpt_sense_dma.ld_buf + 64 -
+		    offsetof(struct scsi_arq_status, sts_sensedata);
+		VERIFY(IS_P2ALIGNED(&(((struct scsi_arq_status *)cmd->mpt_sense)
+		    ->sts_sensedata), 64));
 
 		cmd->mpt_smid = i + 1;
 
