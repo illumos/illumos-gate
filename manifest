@@ -2595,7 +2595,7 @@ f usr/bin/amd64/pwait 0555 root bin
 f usr/bin/amd64/pwdx 0555 root bin
 h usr/bin/amd64/rksh93=usr/bin/amd64/ksh93
 h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
-f usr/bin/amd64/savecore 0555 root bin
+s usr/bin/amd64/savecore=../savecore
 s usr/bin/amd64/size=../size
 s usr/bin/amd64/sort=../sort
 s usr/bin/amd64/strings=../strings
@@ -2935,7 +2935,7 @@ f usr/bin/runat 0555 root bin
 f usr/bin/rup 0555 root bin
 f usr/bin/ruptime 0555 root bin
 f usr/bin/rusers 0555 root bin
-h usr/bin/savecore=usr/lib/isaexec
+f usr/bin/savecore 0555 root bin
 f usr/bin/scp 0555 root bin
 f usr/bin/script 0555 root bin
 f usr/bin/sdiff 0555 root bin
@@ -5841,6 +5841,7 @@ f usr/lib/expreserve 0555 root bin
 f usr/lib/exrecover 0555 root bin
 f usr/lib/extendedFILE.so.1 0755 root bin
 d usr/lib/fm 0755 root bin
+s usr/lib/fm/64=amd64
 d usr/lib/fm/amd64 0755 root bin
 f usr/lib/fm/amd64/libdiagcode.so.1 0755 root bin
 s usr/lib/fm/amd64/libdiagcode.so=libdiagcode.so.1

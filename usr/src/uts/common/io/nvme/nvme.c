@@ -551,7 +551,7 @@ static kmem_cache_t *nvme_cmd_cache;
  * Queue DMA memory must be page aligned. The maximum length of a queue is
  * 65536 entries, and an entry can be 64 bytes long.
  */
-static ddi_dma_attr_t nvme_queue_dma_attr = {
+static const ddi_dma_attr_t nvme_queue_dma_attr = {
 	.dma_attr_version	= DMA_ATTR_V0,
 	.dma_attr_addr_lo	= 0,
 	.dma_attr_addr_hi	= 0xffffffffffffffffULL,
@@ -572,9 +572,11 @@ static ddi_dma_attr_t nvme_queue_dma_attr = {
  * A PRP entry describes one page of DMA memory using the page size specified
  * in the controller configuration's memory page size register (CC.MPS). It uses
  * a 64bit base address aligned to this page size. There is no limitation on
- * chaining PRPs together for arbitrarily large DMA transfers.
+ * chaining PRPs together for arbitrarily large DMA transfers. These DMA
+ * attributes will be copied into the nvme_t during nvme_attach() and the
+ * dma_attr_maxxfer will be updated.
  */
-static ddi_dma_attr_t nvme_prp_dma_attr = {
+static const ddi_dma_attr_t nvme_prp_dma_attr = {
 	.dma_attr_version	= DMA_ATTR_V0,
 	.dma_attr_addr_lo	= 0,
 	.dma_attr_addr_hi	= 0xffffffffffffffffULL,
@@ -594,9 +596,10 @@ static ddi_dma_attr_t nvme_prp_dma_attr = {
  *
  * A SGL entry describes a chunk of DMA memory using a 64bit base address and a
  * 32bit length field. SGL Segment and SGL Last Segment entries require the
- * length to be a multiple of 16 bytes.
+ * length to be a multiple of 16 bytes. While the SGL DMA attributes are copied
+ * into the nvme_t, they are not currently used for any I/O.
  */
-static ddi_dma_attr_t nvme_sgl_dma_attr = {
+static const ddi_dma_attr_t nvme_sgl_dma_attr = {
 	.dma_attr_version	= DMA_ATTR_V0,
 	.dma_attr_addr_lo	= 0,
 	.dma_attr_addr_hi	= 0xffffffffffffffffULL,
@@ -5501,6 +5504,13 @@ nvme_ufm_update(nvme_t *nvme)
 	mutex_exit(&nvme->n_fwslot_mutex);
 }
 
+/*
+ * Download new firmware to the device's internal staging area. We do not call
+ * nvme_ufm_update() here because after a firmware download, there has been no
+ * change to any of the actual persistent firmware data. That requires a
+ * subsequent ioctl (NVME_IOC_FIRMWARE_COMMIT) to commit the firmware to a slot
+ * or to activate a slot.
+ */
 static int
 nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
     int mode, cred_t *cred_p)
@@ -5575,12 +5585,6 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 		len -= copylen;
 	}
 
-	/*
-	 * Let the DDI UFM subsystem know that the firmware information for
-	 * this device has changed.
-	 */
-	nvme_ufm_update(nvme);
-
 	return (rv);
 }
 
@@ -5614,17 +5618,22 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	switch (action) {
 	case NVME_FWC_SAVE:
 	case NVME_FWC_SAVE_ACTIVATE:
-		timeout = nvme_commit_save_cmd_timeout;
 		if (slot == 1 && nvme->n_idctl->id_frmw.fw_readonly)
 			return (EROFS);
 		break;
 	case NVME_FWC_ACTIVATE:
 	case NVME_FWC_ACTIVATE_IMMED:
-		timeout = nvme_admin_cmd_timeout;
 		break;
 	default:
 		return (EINVAL);
 	}
+
+	/*
+	 * Use the extended timeout for all firmware operations here as we've
+	 * seen examples in the field where an activate may take longer than the
+	 * 1s period that we've asked for.
+	 */
+	timeout = nvme_commit_save_cmd_timeout;
 
 	fc_dw10.b.fc_slot = slot;
 	fc_dw10.b.fc_action = action;
@@ -5650,7 +5659,8 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 
 	/*
 	 * Let the DDI UFM subsystem know that the firmware information for
-	 * this device has changed.
+	 * this device has changed. We perform this unconditionally as an
+	 * invalidation doesn't particularly hurt us.
 	 */
 	nvme_ufm_update(nvme);
 
