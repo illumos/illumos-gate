@@ -26,6 +26,7 @@
  * Copyright 2015 RackTop Systems.
  * Copyright (c) 2016, Intel Corporation.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1228,18 +1229,34 @@ zpool_find_import_impl(libpc_handle_t *hdl, importargs_t *iarg)
 		 * This is not MT-safe, but we have no MT consumers of libzutil
 		 */
 		while ((dp = readdir64(dirp)) != NULL) {
-			const char *name = dp->d_name;
+			char *name = dp->d_name;
+			avl_index_t where;
+
 			if (name[0] == '.' &&
 			    (name[1] == 0 || (name[1] == '.' && name[2] == 0)))
 				continue;
 
 			slice = zutil_alloc(hdl, sizeof (rdsk_node_t));
-			slice->rn_name = zutil_strdup(hdl, name);
+			slice->rn_name = name;
 			slice->rn_avl = &slice_cache;
 			slice->rn_dfd = dfd;
 			slice->rn_hdl = hdl;
 			slice->rn_nozpool = B_FALSE;
-			avl_add(&slice_cache, slice);
+			/*
+			 * readdir(3C) buffers several directory entries per
+			 * actual read operation. It is possible that if
+			 * directory entries appear between reading one chunk
+			 * and the next, that the same entry name can end up
+			 * being returned more than once. We need to check that
+			 * this entry doesn't already exist before adding it to
+			 * the tree.
+			 */
+			if (avl_find(&slice_cache, slice, &where) == NULL) {
+				slice->rn_name = zutil_strdup(hdl, name);
+				avl_insert(&slice_cache, slice, where);
+			} else {
+				free(slice);
+			}
 		}
 		/*
 		 * create a thread pool to do all of this in parallel;
