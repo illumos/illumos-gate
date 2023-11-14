@@ -45,7 +45,7 @@ LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 
 all:    $(PROG)
 
-install: $(ROOTPROG) $(ROOTLINK) $(ROOTLINK64) $(ROOTDECLINK)
+install: all $(ROOTPROG) $(ROOTLINK) $(ROOTLINK64) $(ROOTDECLINK)
 
 $(ROOTDECLINK):
 	$(RM) $@; $(SYMLINK) ../../bin/$(@F) $@
