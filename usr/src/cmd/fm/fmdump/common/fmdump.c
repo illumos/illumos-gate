@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Co.
  */
 
 #include <alloca.h>
@@ -179,8 +180,9 @@ fmdump_year(char *buf, size_t len, const fmd_log_record_t *rp)
 
 /* BEGIN CSTYLED */
 static const char *synopsis =
-"Usage: %s [[-e | -i | -I] | -A ] [-f] [-mvVp] [-c class] [-R root]\n"
-	"\t      [-t time ][-T time] [-u uuid] [-n name[.name]*[=value]] "
+"Usage: %s [[-e | -i | -I | -u] | -A ] [-f] [-aHmvVp] [-c class] [-R root]\n"
+	"\t      [-t time] [-T time] [-u uuid] [-n name[.name]*[=value]]\n"
+	"\t      [-N name[.name]*[=value][;name[.name]*[=value]]*] "
 							"[file]...\n    "
     "Log selection: [-e | -i | -I] or one [file]; default is the fault log\n"
 	"\t-e  display error log content\n"
@@ -189,19 +191,22 @@ static const char *synopsis =
 	"\t-R  set root directory for pathname expansions\n    "
     "Command behaviour:\n"
 	"\t-A  Aggregate specified [file]s or, if no [file], all known logs\n"
+	"\t-H  display the log's header attributes instead of contents\n"
 	"\t-f  follow growth of log file by waiting for additional data\n    "
     "Output options:\n"
+	"\t-j  Used with -V: emit JSON-formatted output\n"
 	"\t-m  display human-readable messages (only for fault logs)\n"
-	"\t-v  set verbose mode: display additional event detail\n"
-	"\t-V  set very verbose mode: display complete event contents\n"
 	"\t-p  Used with -V: apply some output prettification\n"
-	"\t-j  Used with -V: emit JSON-formatted output\n    "
+	"\t-v  set verbose mode: display additional event detail\n"
+	"\t-V  set very verbose mode: display complete event contents\n    "
     "Selection filters:\n"
+	"\t-a  select all events, including normally silent events\n"
 	"\t-c  select events that match the specified class\n"
+	"\t-n  select events containing named nvpair (with matching value)\n"
+	"\t-N  select events matching multiple property names (or nvpairs)\n"
 	"\t-t  select events that occurred after the specified time\n"
 	"\t-T  select events that occurred before the specified time\n"
-	"\t-u  select events that match the specified diagnosis uuid\n"
-	"\t-n  select events containing named nvpair (with matching value)\n";
+	"\t-u  select events that match the specified diagnosis uuid\n";
 /* END CSTYLED */
 
 static int
@@ -442,13 +447,117 @@ setupnamevalue(char *namevalue)
 		}
 	}
 
-	if ((argt = malloc(sizeof (fmd_log_filter_nvarg_t))) == NULL)
+	if ((argt = calloc(1, sizeof (fmd_log_filter_nvarg_t))) == NULL)
 		fmdump_fatal("failed to allocate memory");
 
 	argt->nvarg_name = namevalue;		/* now just name */
 	argt->nvarg_value = value;
 	argt->nvarg_value_regex = value_regex;
 	return (argt);
+}
+
+/*
+ * As for setupnamevalue() above, create our chain of filter arguments for -N
+ * [name[=value][;name[=value]]*.  This would be simple except for the problems
+ * of escaping something in a string.  To accommodate the use of the ; within
+ * the chain, we allow it to be escaped.  One might imagine that the backslash
+ * character should be used to escape it, but that opens Pandora's box because
+ * the value portion of each entry (if present) is allowed to be a regex.  The
+ * treatment of backslashes within regexes is not something we want to replicate
+ * here, which would be necessary if we wanted to allow escaping the ; with a
+ * backslash.  Specifically, consider how we treat the sequence of characters
+ * '\\;x' (two backslash characters followed by a semicolon and then some other
+ * character x).  In the name portion of the entry, this would be a backslash
+ * followed by an escaped semicolon, so that we would treat this as '\;' and
+ * include x and subsequent characters in this entry.  In the value portion (if
+ * present), we would have to treat it as a pair of backslashes followed by the
+ * terminating ; and the next entry would begin with 'x'...  except that we
+ * might be inside [] where the backslash is not special, and so on.
+ *
+ * Let's not do that.  Instead, we allow the user to 'escape' the ; by repeating
+ * it, and we interpret that before any regex interpretation is done.  Therefore
+ * *every* pair of consecutive semicolons, regardless of where it appears, is
+ * replaced by a literal semicolon.  This allows the semicolon to appear any
+ * number of times in either the name or, if present, the value, including as
+ * part of a regex (see regexp(7)), simply by doubling it.  A non-doubled
+ * semicolon always terminates the entry.  This now creates one more problem:
+ * whether to treat ';;;' as a literal semicolon followed by the entry
+ * terminator, or the entry terminator followed by a literal semicolon to start
+ * the next entry.  Here we have to cheat a little: it's clear from the FMD PRM
+ * (especially chapter 10 as well as the schema for module properties, buffers,
+ * statistics, and other entities) that the event member namespace is intended
+ * to exclude both the semicolon and whitespace.  A value, or a regex intended
+ * to match values, might well include anything.  Therefore, a semicolon at the
+ * beginning of an entry is unlikely to be useful, while one at the end of an
+ * entry may well be intentional.  We'll allow either or both when unambiguous,
+ * but a sequence containing an odd number of consecutive ';' characters will be
+ * interpreted as half that number of literal semicolons (rounded down) followed
+ * by the terminator.  If the user wishes to begin an event property name with a
+ * semicolon, it needs to be the first property in the chain.  Chains with
+ * multiple properties whose names begin with a literal semicolon are not
+ * supported.  Again, this almost certainly can never matter as no event should
+ * ever have a property whose name contains a semicolon.
+ *
+ * We choose the semicolon because the comma is very likely to be present in
+ * some property values on which the user may want to filter, especially the
+ * name of device paths.  The semicolon may itself appear in values, especially
+ * if the property is a URI, though it is likely much less common.  We have to
+ * pick something.  If this proves unwieldy or insufficiently expressive, it
+ * will need to be replaced by a full-on logical expression parser with
+ * first-class support for internal quoting, escaping, and regexes.  One might
+ * be better off dumping JSON and importing it into a SQL database if that level
+ * of complexity is required.
+ */
+
+static fmd_log_filter_nvarg_t *
+setupnamevalue_multi(char *chainstr)
+{
+	fmd_log_filter_nvarg_t *argchain = NULL;
+	size_t rem = strlen(chainstr) + 1;
+	fmd_log_filter_nvarg_t *argt;
+
+	/*
+	 * Here, rem holds the number of characters remaining that we are
+	 * permitted to examine, including the terminating NUL.  If the first
+	 * entry begins with a single semicolon, it is considered empty and
+	 * ignored.  Similarly, a trailing semicolon is optional and ignored if
+	 * present.  We won't create empty filter entries for any input.
+	 */
+	for (char *nv = chainstr; rem > 0; ++chainstr, --rem) {
+		switch (*chainstr) {
+		case ';':
+			ASSERT(rem > 1);
+
+			/*
+			 * Check for double-semicolon.  If found,
+			 * de-duplicate it and advance past, then continue the
+			 * loop: we can't be done yet.
+			 */
+			if (chainstr[1] == ';') {
+				ASSERT(rem > 2);
+				--rem;
+				(void) memmove(chainstr, chainstr + 1, rem);
+				break;
+			}
+
+			*chainstr = '\0';
+
+			/*FALLTHROUGH*/
+		case '\0':
+			if (chainstr != nv) {
+				argt = setupnamevalue(nv);
+				argt->nvarg_next = argchain;
+				argchain = argt;
+			}
+			nv = chainstr + 1;
+
+			/*FALLTHROUGH*/
+		default:
+			ASSERT(rem > 0);
+		}
+	}
+
+	return (argchain);
 }
 
 /*
@@ -1189,8 +1298,8 @@ main(int argc, char *argv[])
 	allfv = alloca(sizeof (fmd_log_filter_t) * argc);
 
 	while (optind < argc) {
-		while ((c =
-		    getopt(argc, argv, "Aac:efHiIjmn:O:pR:t:T:u:vV")) != EOF) {
+		while ((c = getopt(argc, argv,
+		    "Aac:efHiIjmN:n:O:pR:t:T:u:vV")) != EOF) {
 			switch (c) {
 			case 'A':
 				opt_A++;
@@ -1232,10 +1341,32 @@ main(int argc, char *argv[])
 			case 'm':
 				opt_m++;
 				break;
-			case 'O':
-				off = strtoull(optarg, NULL, 16);
+			case 'N':
+				fltfv[fltfc].filt_func =
+				    fmd_log_filter_nv_multi;
+				fltfv[fltfc].filt_arg =
+				    setupnamevalue_multi(optarg);
+				allfv[allfc++] = fltfv[fltfc++];
+				break;
+			case 'n':
+				fltfv[fltfc].filt_func = fmd_log_filter_nv;
+				fltfv[fltfc].filt_arg = setupnamevalue(optarg);
+				allfv[allfc++] = fltfv[fltfc++];
+				break;
+			case 'O': {
+				char *p;
+
+				errno = 0;
+				off = strtoull(optarg, &p, 16);
+
+				if (errno != 0 || p == optarg || *p != '\0') {
+					fmdump_usage(
+					    "illegal offset format -- %s\n",
+					    optarg);
+				}
 				iflags |= FMD_LOG_XITER_OFFS;
 				break;
+			}
 			case 'p':
 				if (opt_j)
 					return (usage(stderr));
@@ -1261,12 +1392,6 @@ main(int argc, char *argv[])
 				opt_u++;
 				opt_a++; /* -u implies -a */
 				break;
-			case 'n': {
-				fltfv[fltfc].filt_func = fmd_log_filter_nv;
-				fltfv[fltfc].filt_arg = setupnamevalue(optarg);
-				allfv[allfc++] = fltfv[fltfc++];
-				break;
-			}
 			case 'v':
 				opt_v++;
 				break;
@@ -1300,6 +1425,8 @@ main(int argc, char *argv[])
 				fmdump_usage("illegal argument -- %s\n",
 				    argv[optind]);
 
+			ASSERT(ifileidx < n_ifiles);
+
 			if ((dest = malloc(PATH_MAX)) == NULL)
 				fmdump_fatal("failed to allocate memory");
 
@@ -1307,6 +1434,14 @@ main(int argc, char *argv[])
 			ifiles[ifileidx++] = dest;
 		}
 	}
+
+	/*
+	 * It's possible that file arguments were interleaved with options and
+	 * option arguments, in which case we allocated space for more file
+	 * arguments that we actually got.  Adjust as required so that we don't
+	 * reference invalid entries.
+	 */
+	n_ifiles = ifileidx;
 
 	if (opt_A) {
 		int rc;

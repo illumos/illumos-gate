@@ -1,16 +1,18 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+.\" Copyright 2024 Oxide Computer Co.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FMDUMP 8 "Jan 14, 2020"
+.TH FMDUMP 8 "April 1, 2024"
 .SH NAME
 fmdump \- fault management log viewer
 .SH SYNOPSIS
 .nf
-\fBfmdump\fR [\fB-efmvV\fR] [\fB-c\fR \fIclass\fR] [\fB-R\fR \fIdir\fR] [\fB-t\fR \fItime\fR] [\fB-T\fR \fItime\fR]
-     [\fB-u\fR \fIuuid\fR] [\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]] [\fIfile\fR]
+\fBfmdump\fR [\fB-aAefHiIjmpvV\fR] [\fB-c\fR \fIclass\fR] [\fB-R\fR \fIdir\fR] [\fB-t\fR \fItime\fR] [\fB-T\fR \fItime\fR]
+     [\fB-u\fR \fIuuid\fR] [\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]]
+     [\fB-N\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR][;\fIname\fR[.\fIname\fR]*[=\fIvalue\fR]]*] [\fIfile\fR]
 .fi
 
 .SH DESCRIPTION
@@ -42,6 +44,19 @@ system.
 .RS 13n
 A log which records fault diagnosis information, the problems believed to
 explain these symptoms.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinformational logs\fR
+.ad
+.RS 13n
+A pair of logs that record informational events that may not lead directly to
+a fault diagnosis but can assist in interpreting system state should one
+occur.  These events are separated into a log containing informational events
+("ireports") with high priority and sysevents ("high-value" informational
+events), and another containing other ireports.
 .RE
 
 .sp
@@ -122,6 +137,38 @@ selects events whose attributes are \fB(uuid1 OR uuid2\fR) \fBAND\fR (time on
 or after 02Dec03).
 .SH OPTIONS
 The following options are supported:
+
+.sp
+.ne 2
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include all events from the requested file(s), including events that are
+ordinarily silent.
+.sp
+Silent events may contain Private telemetry information, and their existence
+may be Private also.  The presence of silent events and the data they contain
+should not be parsed or relied upon in the development of scripts or other
+tools, and their presence or absence should not be relied upon to indicate
+whether an error or fault condition exists.
+.RE
+
+.sp
+.ne 2
+\fB\fB-A\fR\fR
+.ad
+.sp .6
+.RS 4n
+Aggregate the data from the file(s) specified or, if no file(s) are specified,
+all known logs.  Output may include events from fault, error, and
+informational logs, including older logs that have previously been rotated
+out.  The order in which events are displayed is unspecified.  As this option
+displays data from log files that would be selected by the \fB-e\fR, \fB-i\fR,
+and \fB-I\fR options, the same caveats listed with respect to those options
+also apply to \fB-A\fR.
+.RE
+
 .sp
 .ne 2
 .na
@@ -166,6 +213,61 @@ terminated at any time by sending an interrupt (\fBControl-C\fR).
 .sp
 .ne 2
 .na
+\fB\fB-H\fR\fR
+.ad
+.sp 6
+.RS 4n
+Instead of displaying the events contained in the selected log file, display
+its header attributes.  The names and values of these attributes are Private
+and should not be parsed or relied upon for the development of scripts or
+other tools.  This option is provided primarily for debugging the fault
+management system, but it may also be used to determine the type and origin of
+a log file that has been renamed or moved from the system on which it was
+originally produced.
+.RE
+
+.sp
+.ne 2
+\fB\fB-i\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display events from the ordinary information log instead of the fault log.
+This option is shorthand for specifying the pathname of the ordinary
+information log file.
+.sp
+The ordinary information log file, like the error log file, contains Private
+telemetry information and the same caveats apply with respect to
+interpretation or parsing of this data.
+.RE
+
+.sp
+.ne 2
+\fB\fB-I\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display events from the high-value information log instead of the fault log.
+This option is shorthand for specifying the pathname of the high-value
+information log file.
+.sp
+The high-value information log file, like the error and ordinary information
+log files, contains Private telemetry information and the same caveats apply
+with respect to interpretation or parsing of this data.
+.RE
+
+.sp
+.ne 2
+\fB\fB-j\fR\fR
+.ad
+.sp .6
+.RS 4n
+Output events in JSON format, when used with the \fB-V\fR option.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-m\fR\fR
 .ad
 .sp .6
@@ -181,11 +283,11 @@ log.
 .ad
 .sp .6
 .RS 4n
-Select fault log or error log events, depending on the \fB-e\fR option, that
-have properties with a matching name (and optionally a matching value). For
-string properties the value can be a regular expression match. Regular
-expression syntax is described in the EXTENDED REGULAR EXPRESSIONS section of
-the \fBregex\fR(7) manual page. Be careful when using the characters:
+Select log events that have properties with a matching name (and optionally a
+matching value). For string properties the value can be a regular expression
+match. Regular expression syntax is described in the EXTENDED REGULAR
+EXPRESSIONS section of the \fBregex\fR(7) manual page. Be careful when using
+the characters:
 .sp
 .in +2
 .nf
@@ -197,6 +299,36 @@ $  *  {  ^  |  (  )  \e
 \&...or a regular expression, because these are meaningful to the shell. It is
 safest to enclose any of these in single quotes. For numeric properties, the
 value can be octal, hex, or decimal.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-N\fR
+\fIname\fR[.\fIname\fR]*[=\fIvalue\fR][;\fIname\fR[.\fIname\fR]*[=\fIvalue\fR]]*\fR
+.ad
+.sp .6
+.RS 4n
+Select log events that have multiple properties with a matching name (and
+optionally a matching value), all of which must match the event.  Multiple
+properties are separated by the \fB;\fR character and any number may be
+specified; each is interpreted as if supplied with the \fB-n\fR option.  If
+the \fB;\fR character must appear in a value to be matched, it must be
+doubled as \fB;;\fR.  If the \fB-N\fR option appears on the command line
+multiple times, each supplied list of properties is treated as a separate
+selector like any other selector option, so that every event matching all
+properties of any one of several property lists will be selected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp 6
+.RS 4n
+Prettifies output when used with \fB-V\fR, including displaying FMRIs as
+strings instead of embedded name-value lists.
 .RE
 
 .sp
@@ -605,6 +737,24 @@ Fault management error log
 .ad
 .RS 22n
 Fault management fault log
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/fm/fmd/infolog\fR\fR
+.ad
+.RS 22n
+Fault management informational report log
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/fm/fmd/infolog_hival\fR\fR
+.ad
+.RS 22n
+Fault management high-value informational report log
 .RE
 
 .SH ATTRIBUTES

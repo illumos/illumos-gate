@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 Oxide Computer Co.
 #
 
 #
@@ -48,6 +49,7 @@ SYMBOL_VERSION SUNWprivate {
 	fmd_log_filter_before;
 	fmd_log_filter_class;
 	fmd_log_filter_nv;
+	fmd_log_filter_nv_multi;
 	fmd_log_filter_uuid;
 	fmd_log_header;
 	fmd_log_iter;
