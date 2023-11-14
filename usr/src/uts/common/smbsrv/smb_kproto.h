@@ -23,7 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011-2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2015-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -880,7 +880,7 @@ int	smb_rwx_cvwait(smb_rwx_t *rwx, clock_t timeout);
 void    smb_rwx_cvbcast(smb_rwx_t *rwx);
 
 void	smb_thread_init(smb_thread_t *, char *, smb_thread_ep_t,
-		void *, pri_t);
+		void *, pri_t, smb_server_t *);
 void	smb_thread_destroy(smb_thread_t *);
 int	smb_thread_start(smb_thread_t *);
 void	smb_thread_stop(smb_thread_t *);

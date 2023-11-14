@@ -13,7 +13,7 @@
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Unix Software Ltd.
- * Copyright 2021 Oxide Computer Company.
+ * Copyright 2023 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -35,14 +35,26 @@
 extern "C" {
 #endif
 
-#define	NVME_FMA_INIT			0x1
-#define	NVME_REGS_MAPPED		0x2
-#define	NVME_ADMIN_QUEUE		0x4
-#define	NVME_CTRL_LIMITS		0x8
-#define	NVME_INTERRUPTS			0x10
-#define	NVME_UFM_INIT			0x20
-#define	NVME_MUTEX_INIT			0x40
-#define	NVME_MGMT_INIT			0x80
+typedef enum {
+	NVME_PCI_CONFIG			= 1 << 0,
+	NVME_FMA_INIT			= 1 << 1,
+	NVME_REGS_MAPPED		= 1 << 2,
+	NVME_ADMIN_QUEUE		= 1 << 3,
+	NVME_CTRL_LIMITS		= 1 << 4,
+	NVME_INTERRUPTS			= 1 << 5,
+	NVME_UFM_INIT			= 1 << 6,
+	NVME_MUTEX_INIT			= 1 << 7,
+	NVME_MGMT_INIT			= 1 << 8,
+} nvme_progress_t;
+
+typedef enum {
+	/*
+	 * The controller fails to properly process commands on the admin queue
+	 * if the first one has CID 0. Subsequent use of CID 0 doesn't present
+	 * a problem.
+	 */
+	NVME_QUIRK_START_CID		= 1 << 0,
+} nvme_quirk_t;
 
 #define	NVME_MIN_ADMIN_QUEUE_LEN	16
 #define	NVME_MIN_IO_QUEUE_LEN		16
@@ -139,7 +151,8 @@ struct nvme_qpair {
 
 struct nvme {
 	dev_info_t *n_dip;
-	int n_progress;
+	nvme_progress_t n_progress;
+	nvme_quirk_t n_quirks;
 
 	caddr_t n_regs;
 	ddi_acc_handle_t n_regh;
@@ -154,6 +167,13 @@ struct nvme {
 	int n_intr_cap;
 	int n_intr_type;
 	int n_intr_types;
+
+	ddi_acc_handle_t n_pcicfg_handle;
+	uint16_t n_vendor_id;
+	uint16_t n_device_id;
+	uint16_t n_subsystem_vendor_id;
+	uint16_t n_subsystem_device_id;
+	uint8_t n_revision_id;
 
 	char *n_product;
 	char *n_vendor;
@@ -232,6 +252,7 @@ struct nvme {
 	uint32_t n_wrong_logpage;
 	uint32_t n_unknown_logpage;
 	uint32_t n_too_many_cookies;
+	uint32_t n_unknown_cid;
 
 	/* errors detected by hardware */
 	uint32_t n_data_xfr_err;

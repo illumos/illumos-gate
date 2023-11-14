@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -257,6 +257,18 @@ out:
 }
 
 #ifndef FKSMBD
+/*
+ * Decide whether we should trust the (in-band) user information
+ * that the client sends us over the named pipe.  The (in-kernel)
+ * SMB service calls this with the credential of the logged-on
+ * SMB user.  The privileges are normally:
+ *	  effective: basic,file_dac_search
+ *	inheritable: basic
+ *	  permitted: basic,file_dac_search,sys_smb
+ *	      limit: all
+ * This tests the permitted set for the presence of PRIV_SYS_SMB,
+ * which should only be granted to the SMB server.
+ */
 static boolean_t
 pipe_has_priv(ndr_pipe_t *np)
 {
@@ -270,20 +282,14 @@ pipe_has_priv(ndr_pipe_t *np)
 		return (B_FALSE);
 	}
 	clpid = ucred_getpid(uc);
-	if (clpid == 0) {
-		/* in-kernel caller: OK */
-		ret = B_TRUE;
-		goto out;
-	}
-
-	ps = ucred_getprivset(uc, PRIV_EFFECTIVE);
+	ps = ucred_getprivset(uc, PRIV_PERMITTED);
 	if (ps == NULL) {
 		smbd_report("pipesvc: ucred_getprivset failed");
 		goto out;
 	}
 
 	/*
-	 * Otherwise require sys_smb priv.
+	 * Require sys_smb priv.
 	 */
 	if (priv_ismember(ps, PRIV_SYS_SMB)) {
 		ret = B_TRUE;

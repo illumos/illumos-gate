@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -226,6 +226,12 @@ smbd_authsock_destroy(void)
 }
 
 #ifndef FKSMBD
+/*
+ * Decide whether to communicate with the client on this AF_UNIX socket.
+ * Normally the caller should be the (in-kernel) SMB service which has
+ * (typically) all privileges.  We test for PRIV_SYS_SMB here, which
+ * only the SMB service should have.
+ */
 static boolean_t
 authsock_has_priv(int sock)
 {
@@ -239,12 +245,6 @@ authsock_has_priv(int sock)
 		return (B_FALSE);
 	}
 	clpid = ucred_getpid(uc);
-	if (clpid == 0) {
-		/* in-kernel caller: OK */
-		ret = B_TRUE;
-		goto out;
-	}
-
 	ps = ucred_getprivset(uc, PRIV_EFFECTIVE);
 	if (ps == NULL) {
 		smbd_report("authsvc: ucred_getprivset failed");
@@ -252,7 +252,7 @@ authsock_has_priv(int sock)
 	}
 
 	/*
-	 * Otherwise require sys_smb priv.
+	 * Require sys_smb priv.
 	 */
 	if (priv_ismember(ps, PRIV_SYS_SMB)) {
 		ret = B_TRUE;
