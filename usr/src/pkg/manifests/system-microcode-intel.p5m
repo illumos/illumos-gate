@@ -36,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20230808,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20231114,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
