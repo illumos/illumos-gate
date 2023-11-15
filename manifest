@@ -1088,6 +1088,7 @@ f kernel/kmdb/amd64/stmf_sbd 0555 root sys
 f kernel/kmdb/amd64/ufs 0555 root sys
 f kernel/kmdb/amd64/uhci 0555 root sys
 f kernel/kmdb/amd64/usba 0555 root sys
+f kernel/kmdb/amd64/vmm 0555 root sys
 f kernel/kmdb/amd64/xhci 0555 root sys
 f kernel/kmdb/amd64/zfs 0555 root sys
 d kernel/mac 0755 root sys
@@ -10185,6 +10186,7 @@ f usr/lib/mdb/kvm/amd64/stmf_sbd.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/vmm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/zfs.so 0555 root sys
 d usr/lib/mdb/proc 0755 root sys

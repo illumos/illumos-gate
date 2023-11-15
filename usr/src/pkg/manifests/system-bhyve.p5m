@@ -15,7 +15,7 @@
 
 #
 # Copyright 2018 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Oxide Computer Company
 #
 
@@ -32,6 +32,9 @@ set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
 dir  path=kernel group=sys
+dir  path=kernel/kmdb group=sys
+dir  path=kernel/kmdb/$(ARCH64) group=sys
+file path=kernel/kmdb/$(ARCH64)/vmm group=sys mode=0555
 dir  path=usr group=sys
 dir  path=usr/kernel/drv group=sys
 dir  path=usr/kernel/drv/$(ARCH64) group=sys
@@ -44,6 +47,10 @@ file path=usr/kernel/drv/vmm.conf
 dir  path=usr/kernel/misc group=sys
 dir  path=usr/kernel/misc/$(ARCH64) group=sys
 file path=usr/kernel/misc/$(ARCH64)/vmm_vtd mode=0755
+dir  path=usr/lib/mdb group=sys
+dir  path=usr/lib/mdb/kvm group=sys
+dir  path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+file path=usr/lib/mdb/kvm/$(ARCH64)/vmm.so group=sys mode=0555
 file path=usr/lib/rsrvrctl mode=0555
 dir  path=usr/sbin
 file path=usr/sbin/bhyve mode=0555

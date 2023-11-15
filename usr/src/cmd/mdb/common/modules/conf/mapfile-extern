@@ -2,6 +2,7 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 # Copyright 2023 RackTop Systems, Inc.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 #
 # CDDL HEADER START
 #
@@ -91,6 +92,7 @@ SYMBOL_SCOPE {
 		mdb_fdio_fileno			{ FLAGS = EXTERN };
 		mdb_ffs				{ FLAGS = EXTERN };
 		mdb_flush			{ FLAGS = EXTERN };
+		mdb_fpwalk_dcmd			{ FLAGS = EXTERN };
 		mdb_fread			{ FLAGS = EXTERN };
 		mdb_free			{ FLAGS = EXTERN };
 		mdb_fwrite			{ FLAGS = EXTERN };

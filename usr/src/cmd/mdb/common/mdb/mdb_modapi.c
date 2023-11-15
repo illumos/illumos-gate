@@ -26,6 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -728,9 +729,9 @@ walk_dcmd(uintptr_t addr, const void *ignored, dcmd_walk_arg_t *dwp)
 	return (WALK_NEXT);
 }
 
-int
-mdb_pwalk_dcmd(const char *wname, const char *dcname,
-    int argc, const mdb_arg_t *argv, uintptr_t addr)
+static int
+i_mdb_pwalk_dcmd(const char *wname, const char *dcname,
+    int argc, const mdb_arg_t *argv, uintptr_t addr, uint_t flags)
 {
 	mdb_argvec_t args;
 	dcmd_walk_arg_t dw;
@@ -752,7 +753,7 @@ mdb_pwalk_dcmd(const char *wname, const char *dcname,
 
 	mdb_argvec_create(&dw.dw_argv);
 	mdb_argvec_copy(&dw.dw_argv, &args);
-	dw.dw_flags = DCMD_LOOP | DCMD_LOOPFIRST | DCMD_ADDRSPEC;
+	dw.dw_flags = flags | DCMD_LOOP | DCMD_LOOPFIRST | DCMD_ADDRSPEC;
 
 	wcb = mdb_wcb_create(iwp, (mdb_walk_cb_t)walk_dcmd, &dw, addr);
 	status = walk_common(wcb);
@@ -764,10 +765,25 @@ mdb_pwalk_dcmd(const char *wname, const char *dcname,
 }
 
 int
+mdb_pwalk_dcmd(const char *wname, const char *dcname,
+    int argc, const mdb_arg_t *argv, uintptr_t addr)
+{
+	return (i_mdb_pwalk_dcmd(wname, dcname, argc, argv, addr, 0));
+}
+
+int
+mdb_fpwalk_dcmd(const char *wname, const char *dcname,
+    int argc, const mdb_arg_t *argv, uintptr_t addr, uint_t flags)
+{
+	return (i_mdb_pwalk_dcmd(wname, dcname, argc, argv, addr, flags));
+}
+
+
+int
 mdb_walk_dcmd(const char *wname, const char *dcname,
     int argc, const mdb_arg_t *argv)
 {
-	return (mdb_pwalk_dcmd(wname, dcname, argc, argv, 0));
+	return (i_mdb_pwalk_dcmd(wname, dcname, argc, argv, 0, 0));
 }
 
 /*ARGSUSED*/
