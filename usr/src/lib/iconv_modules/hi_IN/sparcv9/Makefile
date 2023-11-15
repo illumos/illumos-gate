@@ -22,4 +22,4 @@ ICONV_LIBS      = $(PROGS:%=$(ICONV_DIR_64)/%)
 
 $(ICONV_LIBS) := FILEMODE= 755
 
-install: all $(ICONV_DIR) .WAIT $(ICONV_LIBS)
+install: all $(ICONV_DIR_64) .WAIT $(ICONV_LIBS)
