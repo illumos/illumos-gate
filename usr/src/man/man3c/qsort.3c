@@ -19,7 +19,7 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd October 11, 2020
+.Dd November 15, 2023
 .Dt QSORT 3C
 .Os
 .Sh NAME
@@ -52,7 +52,7 @@ The contents of the table are sorted in ascending order according to the
 user-supplied comparison function.
 .Pp
 The
-.Fa Ibase
+.Fa base
 argument points to the element at the base of the table.
 The
 .Fa nel
@@ -62,6 +62,7 @@ The
 argument specifies the size of each element in bytes.
 The
 .Fa compar
+argument is the name of the comparison function, which is called with two
 arguments that point to the elements being compared.
 The comparison function need not compare every byte, so arbitrary data may be
 contained in the elements in addition to the values being compared.
@@ -94,7 +95,7 @@ The
 .Fn qsort
 and
 .Fn qsort_r
-function safely allows concurrent access by multiple threads
+functions safely allow concurrent access by multiple threads
 to disjoint data, such as overlapping subtrees or tables.
 .Sh EXAMPLES
 .Sy Example 1
