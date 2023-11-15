@@ -1259,6 +1259,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	 */
 	uint64_t avail = get_per_bridge_avail(bus);
 
+	mem.size = 0;
 	if (avail > 0) {
 		/* Try 32MiB first, then adjust down until it fits */
 		for (uint_t i = 32; i > 0; i >>= 1) {
