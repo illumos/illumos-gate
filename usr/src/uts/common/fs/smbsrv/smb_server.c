@@ -1178,12 +1178,22 @@ smb_server_disconnect_share(smb_server_t *sv, const char *sharename)
 #ifdef	_KERNEL
 
 /*
- * Create a process to own SMB server threads.
+ * Create a process to own SMB server threads (like zfs spa.c)
+ * so we can see the CPU usage etc. with "prstat -L".
+ * The new process MUST be in the same zone as the caller.
  */
 static int
 smb_server_newproc(smb_server_t *sv)
 {
 	int rc;
+
+	/*
+	 * Todo: Fix newproc() for zones.
+	 * At present, it always creates in p0.
+	 * For now, only do this for the global zone.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID)
+		return (0);
 
 	mutex_enter(&sv->sv_proc_lock);
 	if (sv->sv_proc_p != NULL) {
