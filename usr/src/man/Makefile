@@ -47,6 +47,7 @@ SUBDIRS=	man1		\
 		man3iscsit	\
 		man3kstat	\
 		man3kvm		\
+		man3jedec	\
 		man3ldap	\
 		man3lgrp	\
 		man3lib		\

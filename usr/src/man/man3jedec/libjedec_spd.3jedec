@@ -1,0 +1,440 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd September 22, 2023
+.Dt LIBJEDEC_SPD 3JEDEC
+.Os
+.Sh NAME
+.Nm libjedec_spd
+.Nd parse DIMM SPD data
+.Sh LIBRARY
+.Lb libjedec
+.Sh SYNOPSIS
+.In libjedec.h
+.Ft "nvlist_t *"
+.Fo libjedec_spd
+.Fa "const uint8_t *buf"
+.Fa "size_t buflen"
+.Fa "spd_error_t *errp
+.Fc
+.Sh DESCRIPTION
+The
+.Fn libjedec_spd
+function parses a binary payload of SPD
+.Pq serial presence detect
+data and transforms it into a
+.Vt nvlist_t
+that can be used by callers to inspect the data.
+.Pp
+SPD data is defined by JEDEC and used in various DDR DRAM standards.
+This information describes everything from the size and organization of
+the DIMM and its dies,
+timing information, electrical properties, manufacturing data, and more.
+A DRAM module
+.Pq the thing we plug into a computer
+is made up of a number of different components.
+For example, a DDR5 module
+.Pq which is plugged into a slot
+contains not only a number of different DRAM dies, but also power
+controllers, registers, clock drivers, and more.
+The SPD data describes all of this information.
+.Pp
+There are two major properties of SPD information that determine which
+keys are present in it:
+.Bl -enum -width Ds
+.It
+The DDR version that the device implements.
+Examples of the version information include DDR4, LPDDR5, DDR3, and many
+others.
+.It
+The module's type.
+Examples of this include whether it is an RDIMM
+.Pq registered DIMM ,
+UDIMM
+.Pq unregistered DIMM ,
+soldered down, etc.
+.El
+.Pp
+While each DDR version has different SPD information and the module's
+type may further modify parts of it, the
+.Vt nvlist_t
+that is returned attempts to normalize this information as much as
+possible.
+Each key that is returned is defined in
+.In libjedec.h
+as a macro.
+The key space is dot
+.Pq Sq \&.
+delineated.
+The following key spaces are currently used:
+.Bl -tag -width Ds
+.It Dq meta
+This contains information about the SPD ROM itself, the encoding
+revision, the DRAM standard in use, the type of module, etc.
+This section also contains all of the CRC values and information that
+affects how the rest of data is parsed
+.Pq such as whether or not the package is monolithic .
+.It Dq dram
+This section contains information that is specific to the SDRAM dies
+that are present.
+This includes addressing information such as the number of rows,
+columns, banks, and bank groups that are on each die.
+It also includes information such as the supported voltages of the dies
+themselves and then describes a lot of the different timing properties
+such as the minimum times that a controller must wait between certain
+actions.
+.It Dq ddr4 , Dq ddr5
+This section contains information that is specific to a given DDR
+standard and cannot otherwise share a common definition.
+This section has a few additional subdivisions of information to cover
+items related to the module's type or are otherwise logically grouped
+together such as refresh management.
+For example, the library uses namespaces such as
+.Dq ddr4.rdimm
+and
+.Dq ddr5.lrdimm
+for properties that would be specific to DDR4 RDIMMs and DDR5 LRDIMMs
+respectively.
+.It Dq module
+This section relates to information about the physical module which
+includes information such as its physical dimensions, the types of
+components that are present on it, signal mapping, and related.
+.It Dq mfg
+This section contains information about the module manufacturing.
+This is where things like the module's serial number, the manufacturer,
+the part number, and related can be found.
+Generally this information is found in a different part of the SPD ROM
+and therefore may not always be present.
+.It Dq errors
+This section is an embedded
+.Vt nvlist_t
+that contains keys for each value that couldn't be parsed.
+For more information, see the
+.Sx Parsing Errors
+section for more information.
+.El
+.Ss Data Types
+The library attempts to use a fixed number of data types when performing
+conversions and follows the following guidelines:
+.Bl -bullet
+.It
+By default, integer values use a
+.Vt uint32_t
+to try and make things more uniform where possible and to allow for
+future changes.
+A
+.Vt uint64_t
+is used when the types contain data that could naturally overflow a
+.Vt uint32_t
+such as when counting the number of bits, bytes, or measuring time
+.Pq which is normalized to picoseconds .
+.Pp
+All integers are denoted as such explicitly with their size: either
+.Sq uint32_t
+or
+.Sq uint64_t .
+Some banks of keys all have the same type and are denoted as such in the
+introductory block comment.
+Use
+.Xr nvlist_lookup_uint32 3NVPAIR
+or
+.Xr nvlist_lookup_uint64 3NVPAIR
+to retrieve these keys.
+.It
+Strings, which are stored as traditional
+.Vt char *
+values should only contain printable characters.
+.Pp
+All strings are denoted as such by using the comment
+.Sq string .
+Use
+.Xr nvlist_lookup_string 3NVPAIR
+to retrieve these keys.
+.It
+There are many values which represent enumerations.
+The raw type is stored as a
+.Vt uint32_t .
+In general, these enumerations, unless otherwise indicated should not be
+assumed to have the identical values of a given specification.
+This is done because the values are not always uniform from
+specification to specification, except in rare cases.
+Not all DDR specifications can result in the same set of enumeration
+values.
+.Pp
+For example, consider the
+.Vt spd_temp_type_t
+which is an enumeration that describes the kind of temperature
+monitoring device present.
+The enumeration contains values from DDR3, DDR4, and DDR5; however, each
+standard has its own defined type of SPD temperature sensor.
+.Pp
+All enumerations are denoted as such by using the comment
+.Sq uint32_t Pq enum .
+Use
+.Xr nvlist_lookup_uint32 3NVPAIR
+to retrieve these keys.
+.It
+Several items are used to indicate a fact, but do not have any actual
+data associated with them.
+Their mere presence is sufficient to indicate a unique property of the
+DIMM.
+Examples of this include if the package is non-monolithic, the DIMM has
+asymmetrical ranks, etc.
+.Pp
+All such items are denoted as such by using the comment
+.Sq key .
+Use
+.Xr nvlist_lookup_boolean 3NVPAIR
+to retrieve these keys.
+.It
+A few types use arrays of
+.Vt uint32_t
+values to denote information.
+Some of the keys have a fixed number of entries that are expected, while
+others are variable and will depend on the parsed data.
+For example, a JEDEC ID is always encoded as two
+.Vt uint32_t
+values, the continuation and the underlying ID itself.
+Other values, such as the number of supported voltages or CAS latencies
+will vary.
+.Pp
+All fixed size arrays denote their size by using the comment
+.Sq uint32_t [4] ,
+where the number four is replaced with the actual size.
+All variable sized arrays elide the number and are denoted by the
+comment
+.Sq uint32_t [] .
+Use
+.Xr nvlist_lookup_uint32_array 3NVPAIR
+to retrieve these keys.
+.El
+.Ss Parsing Errors
+There are a number of different issues that can arise when trying to
+parse the SPD data that a device returns.
+The library attempts to parse as much as it can and breaks errors into
+two large categories:
+.Bl -enum -width Ds
+.It
+Errors which prevent us from doing anything at all, which are noted in
+the
+.Sx ERRORS
+section.
+The main items that relate to data
+.Pq as opposed to issues like running out of memory
+include when we encounter a DDR specification that we don't support or
+that the data has an encoding version we don't understand.
+This can also occur if there's not enough data for us to figure out what
+kind of SPD information is encoded.
+.It
+Errors that mean we cannot parse a specific piece of SPD data.
+This is by far the most common form of error that we encounter and these
+are the entries that make up the
+.Dq errors
+section of the returned
+.Vt nvlist_t
+that was mentioned earlier.
+.El
+.Pp
+The
+.Dq errors
+section is a nested
+.Vt nvlist_t
+that can be retrieved by using the
+.Dv SPD_KEY_ERRS
+key.
+This keys in this nvlist use the same name as the normal data keys.
+For example, if we were unable to properly parse the manufacturer's
+JEDEC ID, then the key
+.Dv SPD_KEY_MFG_MOD_MFG_ID
+.Pq Dq mfg.module-mfg-id
+would not be present in the top-level
+.Vt nvlist_t
+and would instead be in the error
+.Vt nvlist_t .
+.Pp
+Each item present in the error
+.Vt nvlist_t
+is itself a
+.Vt nvlist_t
+which contains the following keys:
+.Bl -tag -width Ds
+.It Dv SPD_KEY_ERRS_CODE
+The error code, a
+.Vt uint32_t,
+indicates a class of issue that occurred and its values are defined by
+the
+.Vt spd_error_kind_t
+enumeration.
+The following errors are defined:
+.Bl -tag -width Ds
+.It SPD_ERROR_NO_XLATE
+This indicates that the library did not know how to interpret a specific
+binary value.
+For example, if a given particular field was using what we believed to
+be a reserved value then we would set this error.
+.It SPD_ERROR_UNPRINT
+This indicates that we encountered a non-ASCII or otherwise unprintable
+character that was not allowed in the SPD string character set.
+.It SPD_ERROR_NO_DATA
+This indicates that there was no data for a given key.
+For example, this would be a string that consisted solely of space
+characters which are used to represent padding.
+.It SPD_ERROR_INTERNAL
+This indicates that something went wrong inside the library that was
+unexpected.
+.It SPD_ERROR_BAD_DATA
+This indicates that we've encountered something strange about the data
+in question.
+For example, this would be used for an invalid CRC or if the combination
+of values would cause an underflow in a calculation.
+.El
+.It Dv SPD_KEY_ERRS_MSG
+This is an error message that is intended for a person to understand and
+contains more specific information than the code above.
+.El
+.Pp
+Finally, there is one last top-level key that we will set if we find
+that the set of data that we had was incomplete.
+Rather than tag every single item in the
+.Dq errors
+.Vt nvlist_t ,
+we instead insert the key
+.Dv SPD_KEY_INCOMPLETE
+on the top-level nvlist.
+The key is a
+.Vt uint32_t
+that contains the starting offset of the
+.Sy key
+that we were unable to parse, which may be less than the total amount of
+data that was provided.
+For example, if we had 100 bytes of data, but there was a 20 byte key
+starting at byte 90, the this key would have a value of 90 as that's
+what we were unable to parse.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn libjedec_spd
+function returns an allocated
+.Vt nvlist_t
+that contains the parsed SPD data.
+There may be individual SPD fields that were unparsable which will be
+found in the
+.Dv SPD_KEY_ERRS
+field of the nvlist still.
+Otherwise
+.Dv NULL
+is returned
+and
+.Fa errp
+is set with a value that indicates why the function was unable to parse
+any data.
+.Sh EXAMPLES
+.Sy Example 1
+Printing SPD DRAM and Module Type
+.Pp
+The following example shows how to parse the SPD information and print
+out the type of DRAM and module's type.
+This example assumes that one has already obtained the raw SPD file from
+somewhere and just prints the raw values.
+.Bd -literal -offset 2
+#include <stdio.h>
+#include <stdint.h>
+#include <libjedec.h>
+
+void
+dump_dram_module_type(const uint8_t *buf, size_t len)
+{
+	nvlist_t *nvl;
+	spd_error_t err;
+	uint32_t ddr, mod;
+
+	nvl = libjedec_spd(buf, len, &err);
+	if (nvl == NULL) {
+		(void) fprintf(stderr, "failed to parse SPD data: 0x%x\en",
+		    err);
+		return;
+	}
+
+	if (nvlist_lookup_pairs(nvl, 0,
+	    SPD_KEY_DRAM_TYPE, DATA_TYPE_UINT32, &ddr,
+	    SPD_KEY_MOD_TYPE, DATA_TYPE_UINT32, &mod,
+	    NULL) != 0) {
+		nvlist_free(nvl);
+		(void) fprintf(stderr, "failed to look up keys\en");
+		return;
+	}
+
+	nvlist_free(nvl);
+	(void) printf("Found DDR type 0x%x, module type 0x%x\en", ddr,
+	    mod);
+}
+.Ed
+.Sh ERRORS
+Upon returning from the
+.Fn libjedec_spd
+function, the
+.Fa errp
+pointer will be set to one of the following values:
+.Bl  -tag -width Dv
+.It Er LIBJEDEC_SPD_OK
+This indicates that the system was able to parse SPD data into a valid
+.Vt nvlist_t
+and return it to the caller.
+This code should never appear when the function fails and returns
+.Dv NULL .
+Callers must still cehck the contents of the
+.Dv SPD_KEY_ERRS
+nvlist.
+.It Dv LIBJEDEC_SPD_NOMEM
+This indicates that the system ran out of memory while trying to
+construct the
+.Vt nvlist_t
+to return.
+.It Dv LIBJEDEC_SPD_TOOSHORT
+This indicates that not enough SPD data was present as indicated by
+.Fa buf
+and
+.Fa buflen
+for the given type of SPD information and therefore we were unable to
+successfully parse basic information.
+.It Dv LIBJEDEC_SPD_UNSUP_TYPE
+This indicates that the type of SPD data present, e.g. DDR4 SDRAM,
+LPDDR3, etc., that was found is not currently supported by the library.
+.It Dv LIBJEDEC_SPD_UNSUP_REV
+This indicates that while the library is familiar with the specific type
+of SPD data present, the encoding level of the data
+.Pq similar to a major version
+is unsupported by the library.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libjedec 3LIB ,
+.Xr nvlist_lookup_boolean 3NVPAIR ,
+.Xr nvlist_lookup_string 3NVPAIR ,
+.Xr nvlist_lookup_uint32 3NVPAIR ,
+.Xr nvlist_lookup_uint32_array 3NVPAIR ,
+.Xr nvlist_lookup_uint64 3NVPAIR
+.Pp
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Serial Presence Detect (SPD), General Standard
+.%N 21-C
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T DDR5 Serial Presence Detect (SPD) Contents
+.%N JESD400-5A.01
+.%D January 2023
+.Re

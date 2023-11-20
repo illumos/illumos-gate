@@ -67,7 +67,7 @@ static const libjedec_test_t libjedec_expects[] = {
 	{ 0x0d, 0x8A, "Aerospace Science Memory Shenzhen" },
 	/* Various Failure cases */
 	{ 0x00, 0x05, NULL },
-	{ 0x0d, 0xFE, NULL },
+	{ 0x0d, 0xFF, NULL },
 	{ 0x20, 0x01, NULL }
 };
 

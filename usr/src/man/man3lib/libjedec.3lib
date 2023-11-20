@@ -1,0 +1,128 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd September 18, 2023
+.Dt LIBJEDEC 3JEDEC
+.Os
+.Sh NAME
+.Nm libjedec
+.Nd JEDEC support library
+.Sh LIBRARY
+.Lb libjedec
+.In libjedec.h
+.Sh DESCRIPTION
+The
+.Nm
+library provides consumers access to several different classes of
+functions that are related to various JEDEC standards including:
+.Bl -bullet -width Ds
+.It
+Parsing Serial Presence Data (SPD) commonly found in DIMM modules
+.It
+Translating JEDEC vendor IDs to a well-known vendor name
+.It
+Translating JEDEC temperature range names to their numeric range
+.El
+.Pp
+This library is an uncommitted interface and API or ABI stability is not
+guaranteed.
+.Ss SPD Parsing
+Most DDR DIMM modules embed information about them which describes the
+timing, size and orientation, and manufacturing information of the
+device.
+The encoding of this information changes with each generation of the DDR
+devices and has its own format.
+The library attempts to normalize information across generations where
+possible.
+.Pp
+The function
+.Xr libjedec_spd 3JEDEC
+provides an interface to parse a full data payload into a
+.Vt nvlist_t ,
+a name-value pair list usable with
+.Xr libnvpair 3LIB .
+.Ss Vendor ID Translation
+JEDEC Vendor IDs come as a pair of a continuation number and an index
+into a block.
+These are then translated into well-known names by the JEDEC standard
+JEP106
+.Po
+.%T Standard Manufacturer's Identification Code
+.Pc .
+This vendor information can be found in different contexts such as SPD
+data, various SPI NOR and SPI NAND devices, SMBIOS, and more.
+.Pp
+The function
+.Xr libjedec_vendor_string 3JEDEC
+provides the ability to translate the IDs to a well known name.
+.Pp
+Currently the library implements JEP106BH from September 2023.
+.Ss Temperature Ranges
+Many JEDEC standards embed information about temperature ranges that
+components support for the case operating temperature, the ambient air
+temperature, and related.
+These ranges are in turn defined in JESD402-1A
+.Po
+.%T Temperature Range and Measurement Standards for Components and Modules
+.Pc .
+.Pp
+The function
+.Xr libejdec_temp_range 3JEDEC
+provides a way to translate these named ranges into the corresponding
+lower and upper bounds of the range.
+When other parts of the library parse data, they will emit the
+temperature range using the library's
+.Vt libjedec_temp_range_t
+type, which is defined in the aforementioned manual page.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Pp
+The interfaces in this library are currently designed for use for
+software that is a part of illumos and are subject to change at any
+time.
+They are documented as an aid to developers and no API or ABI stability
+is currently intended, though it is not expected to change dramatically.
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Pp
+While all functions in this library are currently
+.Sy MT-Safe ,
+there is no guarantee that this will apply to future functions.
+.Sh SEE ALSO
+.Xr libjedec_spd 3JEDEC ,
+.Xr libjedec_temp_range 3JEDEC ,
+.Xr libjedev_vendor_string 3JEDEC
+.Pp
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Standard Manufacturer's Identification Code
+.%N JEP106BH
+.%D September 2023
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Temperature Range and Measurement Standards for Components and Modules
+.%N JESD402-1A
+.%D March 2022
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Serial Presence Detect (SPD), General Standard
+.%N 21-C
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T DDR5 Serial Presence Detect (SPD) Contents
+.%N JESD400-5A.01
+.%D January 2023
+.Re

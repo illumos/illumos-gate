@@ -1,0 +1,79 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd September 21, 2023
+.Dt LIBJEDEC_VENDOR_STRING 3JEDEC
+.Os
+.Sh NAME
+.Nm libjedec_vendor_string
+.Nd translate JEDEC vendor IDs to strings
+.Sh LIBRARY
+.Lb libjedec
+.Sh SYNOPSIS
+.In libjedec.h
+.Ft "const char *"
+.Fo libjedec_vendor_string
+.Fa "uint_t cont"
+.Fa "uint_t vendor"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn libjedec_vendor_string
+function translates a JEDEC vendor ID into a corresponding name.
+JEDEC vendor IDs are defined in the JEP106 standard.
+Vendor IDs come in banks and each bank contains up to 126 unique vendor
+names.
+To accommodate more than 126 vendors, a series of continuation bytes --
+repeated values of 0x7f -- are used to indicate the bank.
+Most implementations, like SPD data, don't actually encode multiple
+continuations in the data, but rather just how many continuations are
+present.
+Note, the JEP106 standard describes the first bank as bank 1; however,
+the library is phrased in terms of the number of continuations due to
+how hardware encodes this data.
+.Pp
+The value in
+.Fa cont
+should indicate the number of continuations present.
+The value in
+.Fa vendor
+indicates the vendor to look for and should include its parity bit.
+When the name is successfully found, a pointer to a constant string with
+the vendor's current name is returned.
+Note that a given vendor's name may be changed over time due to
+acquisitions.
+When the value doesn't correspond to a known name then
+.Dv NULL
+is returned.
+.Pp
+Currently the data reflects the JEP106BH data from September 2023.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn libjedec_vendor_string
+function returns a pointer to a vendor's name.
+Otherwise
+.Dv NULL
+is returned to indicate that there is no mapping for the specified IDs.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libjedec 3LIB
+.Pp
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Standard Manufacturer's Identification Code
+.%N JEP106BH
+.%D September 2023
+.Re

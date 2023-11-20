@@ -1,0 +1,79 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd September 21, 2023
+.Dt LIBJEDEC_TEMP_RANGE 3JEDEC
+.Os
+.Sh NAME
+.Nm libjedec_temp_range
+.Nd look up JEDEC temperature ranges
+.Sh LIBRARY
+.Lb libjedec
+.Sh SYNOPSIS
+.In libjedec.h
+.Ft boolean_t
+.Fo libjedec_temp_range
+.Fa "libjedec_temp_range_t range"
+.Fa "int32_t *min"
+.Fa "int32_t *max"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn libjedec_temp_range
+function is used to translate a known JEDEC temperature range defined in
+JESD402-1A to the corresponding minimum and maximum temperature for the
+range.
+The temperature range to look for is defined in
+.Fa range
+and if found, both
+.Fa min
+and
+.Fa max
+are updated with the corresponding minimum and maximum temperature
+values in degrees Celsius.
+Both
+.Fa min
+and
+.Fa max
+must be valid pointers and may not be
+.Dv NULL .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn libjedec_temp_range
+function returns
+.Dv B_TRUE
+and
+.Fa min
+and
+.Fa max
+are updated with the corresponding ranges.
+Otherwise
+.Dv B_FALSE
+is returned and
+.Fa min
+and
+.Fa max
+are not updated.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libjedec 3LIB
+.Pp
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Temperature Range and Measurement Standards for Components and Modules
+.%N JESD402-1A
+.%D March 2022
+.Re
