@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2020 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 #
 
 UTSBASE = ../..
@@ -24,7 +24,7 @@ include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
+CPPFLAGS	+= -I$(CONF_SRCDIR)
 
 .KEEP_STATE:
 

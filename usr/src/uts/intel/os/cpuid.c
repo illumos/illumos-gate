@@ -1495,6 +1495,7 @@
 #include <sys/tsc.h>
 #include <sys/kobj.h>
 #include <sys/asm_misc.h>
+#include <sys/bitmap.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -1781,6 +1782,7 @@ struct xsave_info {
 
 #define	NMAX_CPI_STD	8		/* eax = 0 .. 7 */
 #define	NMAX_CPI_EXTD	0x22		/* eax = 0x80000000 .. 0x80000021 */
+#define	NMAX_CPI_TOPO	0x10		/* Sanity check on leaf 8X26, 1F */
 
 /*
  * See the big theory statement for a more detailed explanation of what some of
@@ -1809,7 +1811,7 @@ struct cpuid_info {
 	id_t cpi_last_lvl_cacheid;	/* fn 4: %eax: derived cache id */
 	uint_t cpi_cache_leaf_size;	/* Number of cache elements */
 					/* Intel fn: 4, AMD fn: 8000001d */
-	struct cpuid_regs **cpi_cache_leaves;	/* Acual leaves from above */
+	struct cpuid_regs **cpi_cache_leaves;	/* Actual leaves from above */
 	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 7 */
 	struct cpuid_regs cpi_sub7[1];	/* Leaf 7, sub-leaf 1 */
 	/*
@@ -1860,6 +1862,13 @@ struct cpuid_info {
 	uint_t cpi_cores_per_compunit;	/* AMD: # of cores in the ComputeUnit */
 
 	struct xsave_info cpi_xsave;	/* fn D: xsave/xrestor info */
+
+	/*
+	 * AMD and Intel extended topology information. Leaf 8X26 (AMD) and
+	 * eventually leaf 0x1F (Intel).
+	 */
+	uint_t cpi_topo_nleaves;
+	struct cpuid_regs cpi_topo[NMAX_CPI_TOPO];
 };
 
 
@@ -1905,6 +1914,10 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_SELF_INIT_CACHE(regs)	BITX((regs)->cp_eax, 8, 8)
 #define	CPI_CACHE_LVL(regs)		BITX((regs)->cp_eax, 7, 5)
 #define	CPI_CACHE_TYPE(regs)		BITX((regs)->cp_eax, 4, 0)
+#define	CPI_CACHE_TYPE_DONE	0
+#define	CPI_CACHE_TYPE_DATA	1
+#define	CPI_CACHE_TYPE_INSTR	2
+#define	CPI_CACHE_TYPE_UNIFIED	3
 #define	CPI_CPU_LEVEL_TYPE(regs)	BITX((regs)->cp_ecx, 15, 8)
 
 #define	CPI_CACHE_WAYS(regs)		BITX((regs)->cp_ebx, 31, 22)
@@ -1978,9 +1991,10 @@ static struct cpuid_info cpuid_info0;
 #define	CPUID_LEAF_EXT_1d		0x8000001d
 #define	CPUID_LEAF_EXT_1e		0x8000001e
 #define	CPUID_LEAF_EXT_21		0x80000021
+#define	CPUID_LEAF_EXT_26		0x80000026
 
 /*
- * Functions we consune from cpuid_subr.c;  don't publish these in a header
+ * Functions we consume from cpuid_subr.c;  don't publish these in a header
  * file to try and keep people using the expected cpuid_* interfaces.
  */
 extern uint32_t _cpuid_skt(uint_t, uint_t, uint_t, uint_t);
@@ -2249,6 +2263,32 @@ is_controldom(void)
 #endif	/* __xpv */
 
 /*
+ * Gather the extended topology information. This should be the same for both
+ * AMD leaf 8X26 and Intel leaf 0x1F (though the data interpretation varies).
+ */
+static void
+cpuid_gather_ext_topo_leaf(struct cpuid_info *cpi, uint32_t leaf)
+{
+	uint_t i;
+
+	for (i = 0; i < ARRAY_SIZE(cpi->cpi_topo); i++) {
+		struct cpuid_regs *regs = &cpi->cpi_topo[i];
+
+		bzero(regs, sizeof (struct cpuid_regs));
+		regs->cp_eax = leaf;
+		regs->cp_ecx = i;
+
+		(void) __cpuid_insn(regs);
+		if (CPUID_AMD_8X26_ECX_TYPE(regs->cp_ecx) ==
+		    CPUID_AMD_8X26_TYPE_DONE) {
+			break;
+		}
+	}
+
+	cpi->cpi_topo_nleaves = i;
+}
+
+/*
  * Make sure that we have gathered all of the CPUID leaves that we might need to
  * determine topology. We assume that the standard leaf 1 has already been done
  * and that xmaxeax has already been calculated.
@@ -2275,6 +2315,10 @@ cpuid_gather_amd_topology_leaves(cpu_t *cpu)
 		cp->cp_eax = CPUID_LEAF_EXT_1e;
 		(void) __cpuid_insn(cp);
 	}
+
+	if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_26) {
+		cpuid_gather_ext_topo_leaf(cpi, CPUID_LEAF_EXT_26);
+	}
 }
 
 /*
@@ -2287,7 +2331,7 @@ static uint32_t
 cpuid_gather_apicid(struct cpuid_info *cpi)
 {
 	/*
-	 * Leaf B changes based on the arguments to it. Beacuse we don't cache
+	 * Leaf B changes based on the arguments to it. Because we don't cache
 	 * it, we need to gather it again.
 	 */
 	if (cpi->cpi_maxeax >= 0xB) {
@@ -8058,4 +8102,132 @@ uarchrev_at_least(const x86_uarchrev_t ur, const x86_uarchrev_t min)
 	return (_X86_UARCHREV_VENDOR(ur) == _X86_UARCHREV_VENDOR(min) &&
 	    _X86_UARCHREV_UARCH(ur) == _X86_UARCHREV_UARCH(min) &&
 	    _X86_UARCHREV_REV(ur) >= _X86_UARCHREV_REV(min));
+}
+
+/*
+ * Topology cache related information. This is yet another cache interface that
+ * we're exposing out intended to be used when we have either Intel Leaf 4 or
+ * AMD Leaf 8x1D (introduced with Zen 1).
+ */
+static boolean_t
+cpuid_cache_topo_sup(const struct cpuid_info *cpi)
+{
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		if (cpi->cpi_maxeax >= 4) {
+			return (B_TRUE);
+		}
+		break;
+	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
+		if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1d &&
+		    is_x86_feature(x86_featureset, X86FSET_TOPOEXT)) {
+			return (B_TRUE);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return (B_FALSE);
+}
+
+int
+cpuid_getncaches(struct cpu *cpu, uint32_t *ncache)
+{
+	const struct cpuid_info *cpi;
+
+	ASSERT(cpuid_checkpass(cpu, CPUID_PASS_DYNAMIC));
+	cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (!cpuid_cache_topo_sup(cpi)) {
+		return (ENOTSUP);
+	}
+
+	*ncache = cpi->cpi_cache_leaf_size;
+	return (0);
+}
+
+int
+cpuid_getcache(struct cpu *cpu, uint32_t cno, x86_cache_t *cache)
+{
+	const struct cpuid_info *cpi;
+	const struct cpuid_regs *cp;
+
+	ASSERT(cpuid_checkpass(cpu, CPUID_PASS_DYNAMIC));
+	cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (!cpuid_cache_topo_sup(cpi)) {
+		return (ENOTSUP);
+	}
+
+	if (cno >= cpi->cpi_cache_leaf_size) {
+		return (EINVAL);
+	}
+
+	bzero(cache, sizeof (cache));
+	cp = cpi->cpi_cache_leaves[cno];
+	switch (CPI_CACHE_TYPE(cp)) {
+	case CPI_CACHE_TYPE_DATA:
+		cache->xc_type = X86_CACHE_TYPE_DATA;
+		break;
+	case CPI_CACHE_TYPE_INSTR:
+		cache->xc_type = X86_CACHE_TYPE_INST;
+		break;
+	case CPI_CACHE_TYPE_UNIFIED:
+		cache->xc_type = X86_CACHE_TYPE_UNIFIED;
+		break;
+	case CPI_CACHE_TYPE_DONE:
+	default:
+		return (EINVAL);
+	}
+	cache->xc_level = CPI_CACHE_LVL(cp);
+	if (CPI_FULL_ASSOC_CACHE(cp) != 0) {
+		cache->xc_flags |= X86_CACHE_F_FULL_ASSOC;
+	}
+	cache->xc_nparts = CPI_CACHE_PARTS(cp) + 1;
+	/*
+	 * The number of sets is reserved on AMD if the CPU is tagged as fully
+	 * associative, where as it is considered valid on Intel.
+	 */
+	if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+	    CPI_FULL_ASSOC_CACHE(cp) != 0) {
+		cache->xc_nsets = 1;
+	} else {
+		cache->xc_nsets = CPI_CACHE_SETS(cp) + 1;
+	}
+	cache->xc_nways = CPI_CACHE_WAYS(cp) + 1;
+	cache->xc_line_size = CPI_CACHE_COH_LN_SZ(cp) + 1;
+	cache->xc_size = cache->xc_nparts * cache->xc_nsets * cache->xc_nways *
+	    cache->xc_line_size;
+	/*
+	 * We're looking for the number of bits to cover the number of CPUs that
+	 * are being shared. Normally this would be the value - 1, but the CPUID
+	 * value is encoded as the actual value minus one, so we don't modify
+	 * this at all.
+	 */
+	cache->xc_apic_shift = highbit(CPI_NTHR_SHR_CACHE(cp));
+
+	/*
+	 * To construct a unique ID we construct a uint64_t that looks as
+	 * follows:
+	 *
+	 * [47:40] cache level
+	 * [39:32] CPUID cache type
+	 * [31:00] shifted APIC ID
+	 *
+	 * The shifted APIC ID gives us a guarantee that a given cache entry is
+	 * unique within its peers. The other two numbers give us something that
+	 * ensures that something is unique within the CPU. If we just had the
+	 * APIC ID shifted over by the indicated number of bits we'd end up with
+	 * an ID of zero for the L1I, L1D, L2, and L3.
+	 *
+	 * The format of this ID is private to the system and can change across
+	 * a reboot for the time being.
+	 */
+	cache->xc_id = (uint64_t)cache->xc_level << 40;
+	cache->xc_id |= (uint64_t)cache->xc_type << 32;
+	cache->xc_id |= (uint64_t)cpi->cpi_apicid >> cache->xc_apic_shift;
+
+	return (0);
 }

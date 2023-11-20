@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -18,7 +19,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
-PROGS = libjedec_test
+PROGS = libjedec_test libjedec_temp libjedec_spd
 
 LINTS = $(PROGS:%=%.ln)
 
@@ -28,11 +29,9 @@ include $(SRC)/test/Makefile.com
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
-#
-# Different tests require different sets of libraries. If we try and use
-# the same set, we'll get guidance errors from ld.
-#
 LDLIBS += -ljedec
+libjedec_spd	:= LDLIBS += -lnvpair
+CSTD = $(GNU_C99)
 
 all: $(PROGS)
 

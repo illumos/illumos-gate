@@ -98,6 +98,13 @@
 
 #define	ALL_MODE_EXECS (S_IXUSR | S_IXGRP | S_IXOTH)
 
+typedef struct zfs_acl_iter {
+	zfs_acl_t	*zai_aclp;	/* The ACL we're iterating */
+	zfs_acl_node_t	*zai_curr_node;	/* current node iterator is in */
+	void		*zai_next_ace;	/* pointer to next ACE */
+	int		zai_ace_idx;	/* ace iterator positioned on */
+} zfs_acl_iter_t;
+
 static uint16_t
 zfs_ace_v0_get_type(void *acep)
 {
@@ -376,7 +383,7 @@ zfs_acl_znode_info(znode_t *zp, int *aclsize, int *aclcount,
 	int size;
 	int error;
 
-	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
+	ASSERT(RW_ISWRITER(&zp->z_acl_lock));
 	if (zp->z_is_sa) {
 		if ((error = sa_size(zp->z_sa_hdl, SA_ZPL_DACL_ACES(zfsvfs),
 		    &size)) != 0)
@@ -571,10 +578,15 @@ zfs_ace_valid(vtype_t obj_type, zfs_acl_t *aclp, uint16_t type, uint16_t iflags)
 	return (B_TRUE);
 }
 
+/*
+ * We want this iterator to be usable by multiple threads in parallel.
+ * Caller now passes iterator state as 1st arg.
+ */
 static void *
-zfs_acl_next_ace(zfs_acl_t *aclp, void *start, uint64_t *who,
+zfs_acl_next_ace(zfs_acl_iter_t *zaip, void *start, uint64_t *who,
     uint32_t *access_mask, uint16_t *iflags, uint16_t *type)
 {
+	zfs_acl_t *aclp = zaip->zai_aclp;
 	zfs_acl_node_t *aclnode;
 
 	ASSERT(aclp);
@@ -584,29 +596,28 @@ zfs_acl_next_ace(zfs_acl_t *aclp, void *start, uint64_t *who,
 		if (aclnode == NULL)
 			return (NULL);
 
-		aclp->z_next_ace = aclnode->z_acldata;
-		aclp->z_curr_node = aclnode;
-		aclnode->z_ace_idx = 0;
+		zaip->zai_curr_node = aclnode;
+		zaip->zai_next_ace = aclnode->z_acldata;
+		zaip->zai_ace_idx = 0;
 	}
 
-	aclnode = aclp->z_curr_node;
+	aclnode = zaip->zai_curr_node;
 
 	if (aclnode == NULL)
 		return (NULL);
 
-	if (aclnode->z_ace_idx >= aclnode->z_ace_count) {
+	if (zaip->zai_ace_idx >= aclnode->z_ace_count) {
+	next_node:
 		aclnode = list_next(&aclp->z_acl, aclnode);
 		if (aclnode == NULL)
 			return (NULL);
-		else {
-			aclp->z_curr_node = aclnode;
-			aclnode->z_ace_idx = 0;
-			aclp->z_next_ace = aclnode->z_acldata;
-		}
+		zaip->zai_curr_node = aclnode;
+		zaip->zai_ace_idx = 0;
+		zaip->zai_next_ace = aclnode->z_acldata;
 	}
 
-	if (aclnode->z_ace_idx < aclnode->z_ace_count) {
-		void *acep = aclp->z_next_ace;
+	if (zaip->zai_ace_idx < aclnode->z_ace_count) {
+		void *acep = zaip->zai_next_ace;
 		size_t ace_size;
 
 		/*
@@ -616,15 +627,18 @@ zfs_acl_next_ace(zfs_acl_t *aclp, void *start, uint64_t *who,
 
 		if (((caddr_t)acep + ace_size) >
 		    ((caddr_t)aclnode->z_acldata + aclnode->z_size)) {
-			return (NULL);
+			DTRACE_PROBE3(acl__size__error, zfs_acl_t *, aclp,
+			    zfs_acl_node_t *, aclnode, zfs_ace_hdr_t *, acep);
+			goto next_node;
 		}
 
 		*iflags = aclp->z_ops.ace_flags_get(acep);
 		*type = aclp->z_ops.ace_type_get(acep);
 		*access_mask = aclp->z_ops.ace_mask_get(acep);
 		*who = aclp->z_ops.ace_who_get(acep);
-		aclp->z_next_ace = (caddr_t)aclp->z_next_ace + ace_size;
-		aclnode->z_ace_idx++;
+
+		zaip->zai_next_ace = (caddr_t)acep + ace_size;
+		zaip->zai_ace_idx++;
 
 		return ((void *)acep);
 	}
@@ -636,20 +650,13 @@ static uint64_t
 zfs_ace_walk(void *datap, uint64_t cookie, int aclcnt,
     uint16_t *flags, uint16_t *type, uint32_t *mask)
 {
-	zfs_acl_t *aclp = datap;
+	zfs_acl_iter_t *zaip = datap;
 	zfs_ace_hdr_t *acep = (zfs_ace_hdr_t *)(uintptr_t)cookie;
 	uint64_t who;
 
-	acep = zfs_acl_next_ace(aclp, acep, &who, mask,
+	acep = zfs_acl_next_ace(zaip, acep, &who, mask,
 	    flags, type);
 	return ((uint64_t)(uintptr_t)acep);
-}
-
-static zfs_acl_node_t *
-zfs_acl_curr_node(zfs_acl_t *aclp)
-{
-	ASSERT(aclp->z_curr_node);
-	return (aclp->z_curr_node);
 }
 
 /*
@@ -732,8 +739,10 @@ zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, cred_t *cr,
 	zfs_object_ace_t *zobjacep;
 	size_t ace_size;
 	uint16_t entry_type;
+	zfs_acl_iter_t	zai = {0};
 
-	while (zacep = zfs_acl_next_ace(aclp, zacep,
+	zai.zai_aclp = aclp;
+	while (zacep = zfs_acl_next_ace(&zai, zacep,
 	    &who, &access_mask, &iflags, &type)) {
 
 		switch (type) {
@@ -812,6 +821,7 @@ zfs_acl_xform(znode_t *zp, zfs_acl_t *aclp, cred_t *cr)
 	uint64_t who;
 	void *cookie = NULL;
 	zfs_acl_node_t *newaclnode;
+	zfs_acl_iter_t	zai = {0};
 
 	ASSERT(aclp->z_version == ZFS_ACL_VERSION_INITIAL);
 	/*
@@ -824,7 +834,9 @@ zfs_acl_xform(znode_t *zp, zfs_acl_t *aclp, cred_t *cr)
 	oldaclp = kmem_alloc(sizeof (zfs_oldace_t) * aclp->z_acl_count,
 	    KM_SLEEP);
 	i = 0;
-	while (cookie = zfs_acl_next_ace(aclp, cookie, &who,
+
+	zai.zai_aclp = aclp;
+	while (cookie = zfs_acl_next_ace(&zai, cookie, &who,
 	    &access_mask, &iflags, &type)) {
 		oldaclp[i].z_flags = iflags;
 		oldaclp[i].z_type = type;
@@ -901,10 +913,12 @@ zfs_mode_compute(uint64_t fmode, zfs_acl_t *aclp,
 	uint16_t	iflags, type;
 	uint32_t	access_mask;
 	boolean_t	an_exec_denied = B_FALSE;
+	zfs_acl_iter_t	zai = {0};
 
 	mode = (fmode & (S_IFMT | S_ISUID | S_ISGID | S_ISVTX));
 
-	while (acep = zfs_acl_next_ace(aclp, acep, &who,
+	zai.zai_aclp = aclp;
+	while (acep = zfs_acl_next_ace(&zai, acep, &who,
 	    &access_mask, &iflags, &type)) {
 
 		if (!zfs_acl_valid_ace_type(type, iflags))
@@ -1071,7 +1085,7 @@ zfs_acl_node_read(struct znode *zp, boolean_t have_lock, zfs_acl_t **aclpp,
 	int		error;
 	boolean_t	drop_lock = B_FALSE;
 
-	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
+	ASSERT(RW_ISWRITER(&zp->z_acl_lock));
 
 	if (zp->z_acl_cached && !will_modify) {
 		*aclpp = zp->z_acl_cached;
@@ -1163,7 +1177,7 @@ zfs_acl_chown_setattr(znode_t *zp)
 	zfs_acl_t *aclp;
 
 	ASSERT(MUTEX_HELD(&zp->z_lock));
-	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
+	ASSERT(RW_ISWRITER(&zp->z_acl_lock));
 
 	if ((error = zfs_acl_node_read(zp, B_TRUE, &aclp, B_FALSE)) == 0)
 		zp->z_mode = zfs_mode_compute(zp->z_mode, aclp,
@@ -1190,6 +1204,15 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, cred_t *cr, dmu_tx_t *tx)
 	uint64_t		ctime[2];
 	int			count = 0;
 	zfs_acl_phys_t		acl_phys;
+	zfs_acl_iter_t		zai = {0};
+
+	/*
+	 * One might be tempted to add here:
+	 * ASSERT(RW_ISWRITER(&zp->z_acl_lock));
+	 * and most callers have that lock, but zfs_mknode
+	 * calls without the lock when making a new node,
+	 * which is OK because it's not visible yet.
+	 */
 
 	mode = zp->z_mode;
 
@@ -1323,7 +1346,8 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, cred_t *cr, dmu_tx_t *tx)
 
 	zp->z_pflags |= aclp->z_hints;
 
-	if (ace_trivial_common(aclp, 0, zfs_ace_walk) == 0)
+	zai.zai_aclp = aclp;
+	if (ace_trivial_common(&zai, 0, zfs_ace_walk) == 0)
 		zp->z_pflags |= ZFS_ACL_TRIVIAL;
 
 	zfs_tstamp_update_setup(zp, STATE_CHANGED, NULL, ctime, B_TRUE);
@@ -1346,6 +1370,7 @@ zfs_acl_chmod(vtype_t vtype, uint64_t mode, boolean_t split, boolean_t trim,
 	void		*zacep;
 	boolean_t	isdir;
 	trivial_acl_t	masks;
+	zfs_acl_iter_t	zai = {0};
 
 	new_count = new_bytes = 0;
 
@@ -1375,7 +1400,8 @@ zfs_acl_chmod(vtype_t vtype, uint64_t mode, boolean_t split, boolean_t trim,
 		new_bytes += abstract_size;
 	}
 
-	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
+	zai.zai_aclp = aclp;
+	while (acep = zfs_acl_next_ace(&zai, acep, &who, &access_mask,
 	    &iflags, &type)) {
 		entry_type = (iflags & ACE_TYPE_FLAGS);
 		/*
@@ -1456,7 +1482,7 @@ zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 {
 	int error = 0;
 
-	mutex_enter(&zp->z_acl_lock);
+	rw_enter(&zp->z_acl_lock, RW_WRITER);
 	mutex_enter(&zp->z_lock);
 	if (zp->z_zfsvfs->z_acl_mode == ZFS_ACL_DISCARD)
 		*aclp = zfs_acl_alloc(zfs_acl_version_zp(zp));
@@ -1469,7 +1495,7 @@ zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 		    (zp->z_zfsvfs->z_acl_mode == ZFS_ACL_GROUPMASK), *aclp);
 	}
 	mutex_exit(&zp->z_lock);
-	mutex_exit(&zp->z_acl_lock);
+	rw_exit(&zp->z_acl_lock);
 
 	return (error);
 }
@@ -1510,6 +1536,7 @@ zfs_acl_inherit(zfsvfs_t *zfsvfs, vtype_t vtype, zfs_acl_t *paclp,
 	uint_t		aclinherit;
 	boolean_t	isdir = (vtype == VDIR);
 	boolean_t	isreg = (vtype == VREG);
+	zfs_acl_iter_t	zai = {0};
 
 	*need_chmod = B_TRUE;
 
@@ -1518,7 +1545,8 @@ zfs_acl_inherit(zfsvfs_t *zfsvfs, vtype_t vtype, zfs_acl_t *paclp,
 	if (aclinherit == ZFS_ACL_DISCARD || vtype == VLNK)
 		return (aclp);
 
-	while (pacep = zfs_acl_next_ace(paclp, pacep, &who,
+	zai.zai_aclp = paclp;
+	while (pacep = zfs_acl_next_ace(&zai, pacep, &who,
 	    &access_mask, &iflags, &type)) {
 
 		/*
@@ -1714,7 +1742,7 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 	}
 
 	if (acl_ids->z_aclp == NULL) {
-		mutex_enter(&dzp->z_acl_lock);
+		rw_enter(&dzp->z_acl_lock, RW_WRITER);
 		mutex_enter(&dzp->z_lock);
 		if (!(flag & IS_ROOT_NODE) &&
 		    (dzp->z_pflags & ZFS_INHERIT_ACE) &&
@@ -1730,7 +1758,7 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 			acl_ids->z_aclp->z_hints |= ZFS_ACL_TRIVIAL;
 		}
 		mutex_exit(&dzp->z_lock);
-		mutex_exit(&dzp->z_acl_lock);
+		rw_exit(&dzp->z_acl_lock);
 
 		if (need_chmod) {
 			if (vap->va_type == VDIR)
@@ -1747,10 +1775,14 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 	}
 
 	if (inherited || vsecp) {
+		zfs_acl_iter_t	zai = {0};
+
 		acl_ids->z_mode = zfs_mode_compute(acl_ids->z_mode,
 		    acl_ids->z_aclp, &acl_ids->z_aclp->z_hints,
 		    acl_ids->z_fuid, acl_ids->z_fgid);
-		if (ace_trivial_common(acl_ids->z_aclp, 0, zfs_ace_walk) == 0)
+
+		zai.zai_aclp = acl_ids->z_aclp;
+		if (ace_trivial_common(&zai, 0, zfs_ace_walk) == 0)
 			acl_ids->z_aclp->z_hints |= ZFS_ACL_TRIVIAL;
 	}
 
@@ -1801,12 +1833,28 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 	if (error = zfs_zaccess(zp, ACE_READ_ACL, 0, skipaclchk, cr))
 		return (error);
 
-	mutex_enter(&zp->z_acl_lock);
+	/*
+	 * This may be frequently called, so when possible
+	 * try to avoid entering z_acl_lock as writer.
+	 */
+	rw_enter(&zp->z_acl_lock, RW_READER);
+	aclp = zp->z_acl_cached;
+	if (aclp == NULL) {
+		/*
+		 * OK, need WRITER to load the ACL.  Note:
+		 * zfs_acl_node_read() re-checks zp->z_acl_cached
+		 * and just returns if it's set.
+		 */
+		rw_exit(&zp->z_acl_lock);
+		rw_enter(&zp->z_acl_lock, RW_WRITER);
 
-	error = zfs_acl_node_read(zp, B_FALSE, &aclp, B_FALSE);
-	if (error != 0) {
-		mutex_exit(&zp->z_acl_lock);
-		return (error);
+		error = zfs_acl_node_read(zp, B_FALSE, &aclp, B_FALSE);
+		if (error != 0) {
+			rw_exit(&zp->z_acl_lock);
+			return (error);
+		}
+		rw_downgrade(&zp->z_acl_lock);	/* now RW_READER */
+		ASSERT(zp->z_acl_cached);
 	}
 
 	/*
@@ -1817,8 +1865,10 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 		uint64_t who;
 		uint32_t access_mask;
 		uint16_t type, iflags;
+		zfs_acl_iter_t	zai = {0};
 
-		while (zacep = zfs_acl_next_ace(aclp, zacep,
+		zai.zai_aclp = aclp;
+		while (zacep = zfs_acl_next_ace(&zai, zacep,
 		    &who, &access_mask, &iflags, &type)) {
 			switch (type) {
 			case ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE:
@@ -1875,7 +1925,7 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 			vsecp->vsa_aclflags |= ACL_AUTO_INHERIT;
 	}
 
-	mutex_exit(&zp->z_acl_lock);
+	rw_exit(&zp->z_acl_lock);
 
 	return (0);
 }
@@ -1974,7 +2024,7 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 		    (zp->z_pflags & V4_ACL_WIDE_FLAGS);
 	}
 top:
-	mutex_enter(&zp->z_acl_lock);
+	rw_enter(&zp->z_acl_lock, RW_WRITER);
 	mutex_enter(&zp->z_lock);
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -2007,7 +2057,7 @@ top:
 	zfs_sa_upgrade_txholds(tx, zp);
 	error = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (error) {
-		mutex_exit(&zp->z_acl_lock);
+		rw_exit(&zp->z_acl_lock);
 		mutex_exit(&zp->z_lock);
 
 		if (error == ERESTART) {
@@ -2035,7 +2085,7 @@ top:
 	dmu_tx_commit(tx);
 done:
 	mutex_exit(&zp->z_lock);
-	mutex_exit(&zp->z_acl_lock);
+	rw_exit(&zp->z_acl_lock);
 
 	return (error);
 }
@@ -2116,18 +2166,34 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 	uint32_t	deny_mask = 0;
 	zfs_ace_hdr_t	*acep = NULL;
 	boolean_t	checkit;	/* ACE ID matches */
+	zfs_acl_iter_t	zai = {0};
 
-	mutex_enter(&zp->z_acl_lock);
+	/*
+	 * This can be a HOT code path, so when possible
+	 * try to avoid entering z_acl_lock as writer.
+	 */
+	rw_enter(&zp->z_acl_lock, RW_READER);
+	aclp = zp->z_acl_cached;
+	if (aclp == NULL) {
+		/*
+		 * OK, need WRITER to load the ACL.  Note:
+		 * zfs_acl_node_read() re-checks zp->z_acl_cached
+		 * and just returns if it's set.
+		 */
+		rw_exit(&zp->z_acl_lock);
+		rw_enter(&zp->z_acl_lock, RW_WRITER);
 
-	error = zfs_acl_node_read(zp, B_FALSE, &aclp, B_FALSE);
-	if (error != 0) {
-		mutex_exit(&zp->z_acl_lock);
-		return (error);
+		error = zfs_acl_node_read(zp, B_FALSE, &aclp, B_FALSE);
+		if (error != 0) {
+			rw_exit(&zp->z_acl_lock);
+			return (error);
+		}
+		rw_downgrade(&zp->z_acl_lock);	/* now RW_READER */
+		ASSERT(zp->z_acl_cached);
 	}
 
-	ASSERT(zp->z_acl_cached);
-
-	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
+	zai.zai_aclp = aclp;
+	while (acep = zfs_acl_next_ace(&zai, acep, &who, &access_mask,
 	    &iflags, &type)) {
 		uint32_t mask_matched;
 
@@ -2168,7 +2234,7 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 			 * The zfs_acl_valid_ace_type check above
 			 * should make this case impossible.
 			 */
-			mutex_exit(&zp->z_acl_lock);
+			rw_exit(&zp->z_acl_lock);
 			return (SET_ERROR(EIO));
 		}
 
@@ -2185,7 +2251,7 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 				    zfs_ace_hdr_t *, acep,
 				    uint32_t, mask_matched);
 				if (anyaccess) {
-					mutex_exit(&zp->z_acl_lock);
+					rw_exit(&zp->z_acl_lock);
 					return (0);
 				}
 			}
@@ -2197,7 +2263,7 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 			break;
 	}
 
-	mutex_exit(&zp->z_acl_lock);
+	rw_exit(&zp->z_acl_lock);
 
 	/* Put the found 'denies' back on the working mode */
 	if (deny_mask) {
@@ -2311,46 +2377,46 @@ zfs_fastaccesschk_execute(znode_t *zdp, cred_t *cr, boolean_t skipaclchk)
 		goto slow;
 
 
-	mutex_enter(&zdp->z_acl_lock);
+	rw_enter(&zdp->z_acl_lock, RW_READER);
 
 	if (zdp->z_pflags & ZFS_NO_EXECS_DENIED) {
-		mutex_exit(&zdp->z_acl_lock);
+		rw_exit(&zdp->z_acl_lock);
 		return (0);
 	}
 
 	if (FUID_INDEX(zdp->z_uid) != 0 || FUID_INDEX(zdp->z_gid) != 0) {
-		mutex_exit(&zdp->z_acl_lock);
+		rw_exit(&zdp->z_acl_lock);
 		goto slow;
 	}
 
 	if (uid == zdp->z_uid) {
 		owner = B_TRUE;
 		if (zdp->z_mode & S_IXUSR) {
-			mutex_exit(&zdp->z_acl_lock);
+			rw_exit(&zdp->z_acl_lock);
 			return (0);
 		} else {
-			mutex_exit(&zdp->z_acl_lock);
+			rw_exit(&zdp->z_acl_lock);
 			goto slow;
 		}
 	}
 	if (groupmember(zdp->z_gid, cr)) {
 		groupmbr = B_TRUE;
 		if (zdp->z_mode & S_IXGRP) {
-			mutex_exit(&zdp->z_acl_lock);
+			rw_exit(&zdp->z_acl_lock);
 			return (0);
 		} else {
-			mutex_exit(&zdp->z_acl_lock);
+			rw_exit(&zdp->z_acl_lock);
 			goto slow;
 		}
 	}
 	if (!owner && !groupmbr) {
 		if (zdp->z_mode & S_IXOTH) {
-			mutex_exit(&zdp->z_acl_lock);
+			rw_exit(&zdp->z_acl_lock);
 			return (0);
 		}
 	}
 
-	mutex_exit(&zdp->z_acl_lock);
+	rw_exit(&zdp->z_acl_lock);
 
 slow:
 	DTRACE_PROBE(zfs__fastpath__execute__access__miss);

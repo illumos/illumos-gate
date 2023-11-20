@@ -103,6 +103,11 @@ ENTRY(rdtsc)
 	ret
 SET_SIZE(rdtsc)
 
+/* void ud2a(void) */
+ENTRY(ud2a)
+	ud2a
+SET_SIZE(ud2a)
+
 /* void test_result_pass(void) */
 ENTRY(test_result_pass)
 	movl    $IOP_TEST_RESULT, %edi

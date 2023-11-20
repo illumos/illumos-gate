@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _TOPO_HC_H
@@ -38,6 +39,9 @@ extern "C" {
 #define	BAY		"bay"
 #define	BLADE		"blade"
 #define	BRANCH		"branch"
+#define	CACHE		"cache"
+#define	CCD		"ccd"
+#define	CCX		"ccx"
 #define	CMP		"CMP"
 #define	CENTERPLANE	"centerplane"
 #define	CHASSIS		"chassis"
@@ -267,16 +271,61 @@ extern "C" {
 #define	TOPO_DIMM_SLOT_FORM_FBDIMM	"FBDIMM"
 
 #define	TOPO_PGROUP_DIMM_PROPS		"dimm-properties"
-#define	TOPO_PROP_DIMM_TYPE
+#define	TOPO_PROP_DIMM_TYPE		"dram-type"
 #define	TOPO_DIMM_TYPE_UNKNOWN		"UNKNOWN"
 #define	TOPO_DIMM_TYPE_DDR		"DDR"
 #define	TOPO_DIMM_TYPE_DDR2		"DDR2"
 #define	TOPO_DIMM_TYPE_DDR3		"DDR3"
 #define	TOPO_DIMM_TYPE_DDR4		"DDR4"
+#define	TOPO_DIMM_TYPE_DDR5		"DDR5"
 #define	TOPO_DIMM_TYPE_LPDDR		"LPDDR"
 #define	TOPO_DIMM_TYPE_LPDDR2		"LPDDR2"
 #define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
 #define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
+#define	TOPO_DIMM_TYPE_LPDDR5		"LPDDR5"
+#define	TOPO_PROP_DIMM_MODULE_TYPE	"module-type"
+#define	TOPO_PROP_DIMM_SIZE		"size"
+#define	TOPO_PROP_DIMM_RANKS		"ranks"
+#define	TOPO_PROP_DIMM_BANKS		"banks"
+#define	TOPO_PROP_DIMM_BANK_GROUPS	"bank-groups"
+#define	TOPO_PROP_DIMM_BANKS_PER_GROUP	"banks-per-bank-group"
+#define	TOPO_PROP_DIMM_SUBCHANNELS	"subchannels"
+#define	TOPO_PROP_DIMM_DATA_WIDTH	"data-width"
+#define	TOPO_PROP_DIMM_ECC_WIDTH	"ecc-width"
+#define	TOPO_PROP_DIMM_VDD		"Vdd-mV"
+
+/*
+ * DIMM Component property group. Because it is hard to determine the number of
+ * each type of component that is present on a DIMM across the various SPD
+ * revisions without embedding part-specific knowledge and in some cases
+ * multiple logically different components are in the same physical part (such
+ * as the SPD and temperature sensor), we instead create a property group which
+ * contains this information about the components. For each class of component,
+ * there is information about manufacturer, revision, and device class type.
+ * There may be multiple instances of a given item. For example, DDR5 allows for
+ * 3 different PMIC manufacturers, etc. As such, for each item class, there will
+ * be an array where each entry corresponds to one another, as well as a
+ * top-level string array that describes what components one can look for. For
+ * each component there will potentially be the following properties:
+ *
+ * <component>-revision:	string[]
+ * <component>-mfg-name:	string[]
+ * <component>-type:		string[]
+ * <component>-count:		uint32 (Uncommon)
+ */
+#define	TOPO_PGROUP_DIMM_COMPONENTS	"dimm-components"
+#define	TOPO_PROP_DIMM_COMP		"components"
+#define	TOPO_PROP_DIMM_COMP_DIE		"dram-die"
+#define	TOPO_PROP_DIMM_COMP_SPD		"spd"
+#define	TOPO_PROP_DIMM_COMP_TS		"ts"
+#define	TOPO_PROP_DIMM_COMP_HS		"hs"
+#define	TOPO_PROP_DIMM_COMP_PMIC	"pmic"
+#define	TOPO_PROP_DIMM_COMP_CD		"cd"
+#define	TOPO_PROP_DIMM_COMP_RCD		"rcd"
+#define	TOPO_PROP_DIMM_COMP_DB		"db"
+#define	TOPO_PROP_DIMM_COMP_MRCD	"mrcd"
+#define	TOPO_PROP_DIMM_COMP_MDB		"mdb"
+#define	TOPO_PROP_DIMM_COMP_DMB		"dmb"
 
 #define	TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
 #define	TOPO_PROP_MB_MANUFACTURER	"manufacturer"
@@ -309,6 +358,23 @@ extern "C" {
 
 #define	TOPO_PGROUP_NVME		"nvme-properties"
 #define	TOPO_PROP_NVME_VER		"nvme-version"
+
+/*
+ * Hardware cache properties.
+ */
+#define	TOPO_PGROUP_CACHE	"cache"
+#define	TOPO_PGROUP_CACHE_LEVEL		"level"
+#define	TOPO_PGROUP_CACHE_WAYS		"ways"
+#define	TOPO_PGROUP_CACHE_SETS		"sets"
+#define	TOPO_PGROUP_CACHE_LINE_SIZE	"line-size"
+#define	TOPO_PGROUP_CACHE_SIZE		"size"
+#define	TOPO_PGROUP_CACHE_SYSTEM_ID	"system-id"
+#define	TOPO_PGROUP_CACHE_TYPES		"cache-types"
+#define	TOPO_PGROUP_CACHE_TYPES_DATA	"data"
+#define	TOPO_PGROUP_CACHE_TYPES_INSTR	"instruction"
+#define	TOPO_PGROUP_CACHE_FLAGS		"cache-flags"
+#define	TOPO_PGROUP_CACHE_FLAGS_UNIFIED	"unified"
+#define	TOPO_PGROUP_CACHE_FLAGS_FA	"fully-assosciative"
 
 #ifdef	__cplusplus
 }

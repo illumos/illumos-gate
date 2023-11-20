@@ -10,14 +10,14 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
  * A collection of utility functions for interacting with fabric IDs.
  */
 
-#include "zen_umc.h"
+#include <amdzen_client.h>
 
 /*
  * Validate whether a fabric ID actually represents a valid ID for a given data
@@ -94,4 +94,67 @@ zen_fabric_id_compose(const df_fabric_decomp_t *decomp, const uint32_t sock,
 	node |= sock << decomp->dfd_sock_shift;
 	*fabidp = (node << decomp->dfd_node_shift) |
 	    (comp << decomp->dfd_comp_shift);
+}
+
+#ifdef	DEBUG
+static boolean_t
+zen_apic_id_valid_parts(const amdzen_apic_decomp_t *decomp, const uint32_t sock,
+    const uint32_t die, const uint32_t ccd, const uint32_t ccx,
+    const uint32_t core, const uint32_t thread)
+{
+	ASSERT3U(decomp->aad_sock_shift, <, 32);
+	ASSERT3U(decomp->aad_die_shift, <, 32);
+	ASSERT3U(decomp->aad_ccd_shift, <, 32);
+	ASSERT3U(decomp->aad_ccx_shift, <, 32);
+	ASSERT3U(decomp->aad_core_shift, <, 32);
+	ASSERT3U(decomp->aad_thread_shift, <, 32);
+
+	if (((sock << decomp->aad_sock_shift) & ~decomp->aad_sock_mask) != 0) {
+		return (B_FALSE);
+	}
+
+	if (((die << decomp->aad_die_shift) & ~decomp->aad_die_mask) != 0) {
+		return (B_FALSE);
+	}
+
+	if (((ccd << decomp->aad_ccd_shift) & ~decomp->aad_ccd_mask) != 0) {
+		return (B_FALSE);
+	}
+
+	if (((ccx << decomp->aad_ccx_shift) & ~decomp->aad_ccx_mask) != 0) {
+		return (B_FALSE);
+	}
+
+	if (((core << decomp->aad_core_shift) & ~decomp->aad_core_mask) != 0) {
+		return (B_FALSE);
+	}
+
+	if (((thread << decomp->aad_thread_shift) &
+	    ~decomp->aad_thread_mask) != 0) {
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+#endif	/* DEBUG */
+
+/*
+ * Compose an APIC ID from its constituent parts.
+ */
+void
+zen_apic_id_compose(const amdzen_apic_decomp_t *decomp, const uint32_t sock,
+    const uint32_t die, const uint32_t ccd, const uint32_t ccx,
+    const uint32_t core, const uint32_t thread, uint32_t *apicid)
+{
+	uint32_t id;
+
+	ASSERT(zen_apic_id_valid_parts(decomp, sock, die, ccd, ccx, core,
+	    thread));
+	id = thread << decomp->aad_thread_shift;
+	id |= core << decomp->aad_core_shift;
+	id |= ccx << decomp->aad_ccx_shift;
+	id |= ccd << decomp->aad_ccd_shift;
+	id |= die << decomp->aad_die_shift;
+	id |= sock << decomp->aad_sock_shift;
+
+	*apicid = id;
 }

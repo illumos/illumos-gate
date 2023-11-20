@@ -98,13 +98,13 @@ function test_common
 		#
 		# Change device paths and re-import pool to update labels
 		#
-		sudo zpool export $TESTPOOL1
+		zpool export $TESTPOOL1
 		for dev in $pathstochange; do
 			log_must mv $dev "${dev}_new"
 			poolcheck=$(echo "$poolcheck" | \
 			    sed "s:$dev:${dev}_new:g")
 		done
-		sudo zpool import -d $DEVICE_DIR $TESTPOOL1
+		zpool import -d $DEVICE_DIR $TESTPOOL1
 	fi
 
 	#

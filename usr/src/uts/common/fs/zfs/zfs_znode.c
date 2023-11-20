@@ -167,7 +167,7 @@ zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 	mutex_init(&zp->z_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&zp->z_parent_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&zp->z_name_lock, NULL, RW_DEFAULT, NULL);
-	mutex_init(&zp->z_acl_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&zp->z_acl_lock, NULL, RW_DEFAULT, NULL);
 
 	rangelock_init(&zp->z_rangelock, zfs_rangelock_cb, zp);
 
@@ -190,7 +190,7 @@ zfs_znode_cache_destructor(void *buf, void *arg)
 	mutex_destroy(&zp->z_lock);
 	rw_destroy(&zp->z_parent_lock);
 	rw_destroy(&zp->z_name_lock);
-	mutex_destroy(&zp->z_acl_lock);
+	rw_destroy(&zp->z_acl_lock);
 	rangelock_fini(&zp->z_rangelock);
 
 	ASSERT(zp->z_dirlocks == NULL);
@@ -1270,13 +1270,13 @@ zfs_rezget(znode_t *zp)
 
 	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj_num);
 
-	mutex_enter(&zp->z_acl_lock);
+	rw_enter(&zp->z_acl_lock, RW_WRITER);
 	if (zp->z_acl_cached) {
 		zfs_acl_free(zp->z_acl_cached);
 		zp->z_acl_cached = NULL;
 	}
+	rw_exit(&zp->z_acl_lock);
 
-	mutex_exit(&zp->z_acl_lock);
 	ASSERT(zp->z_sa_hdl == NULL);
 	err = sa_buf_hold(zfsvfs->z_os, obj_num, NULL, &db);
 	if (err) {

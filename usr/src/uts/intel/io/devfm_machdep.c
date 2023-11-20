@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/stat.h>
@@ -48,10 +49,10 @@ typedef struct fm_cmi_walk_t
 	uint_t	chipid;		/* chipid to match during walk */
 	uint_t	coreid;		/* coreid to match */
 	uint_t	strandid;	/* strandid to match */
-	int	(*cbfunc)(cmi_hdl_t, void *, void *);  	/* callback function */
+	int	(*cbfunc)(cmi_hdl_t, void *, void *);	/* callback function */
 	cmi_hdl_t *hdls;	/* allocated array to save the handles */
-	int	nhdl_max;	/* allocated array size */
-	int	nhdl;		/* handles saved */
+	uint_t	nhdl_max;	/* allocated array size */
+	uint_t	nhdl;		/* handles saved */
 } fm_cmi_walk_t;
 
 extern int x86gentopo_legacy;
@@ -330,4 +331,152 @@ fm_ioctl_gentopo_legacy(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 	*onvlp = nvl;
 
 	return (0);
+}
+
+/*
+ * This is an internal bound on the maximum number of caches that we expect to
+ * encounter to reduce dynamic allocation.
+ */
+#define	FM_MAX_CACHES	0x10
+
+static int
+fm_cmi_cache_err_to_errno(cmi_errno_t cmi)
+{
+	switch (cmi) {
+	case CMIERR_C_NODATA:
+		return (ENOTSUP);
+	/*
+	 * Right now, CMIERR_C_BADCACHENO is explicitly not mapped to EINVAL
+	 * (which is what it maps to in cmi_hw.c.). This discrepancy exists
+	 * because there's nothing in a user request here that'd end up
+	 * resulting in an invalid value, it can only occur because we asked
+	 * for a cache that we were told exists, but doesn't actually. If we
+	 * returned EINVAL, the user would be wondering what was invalid about
+	 * their request.
+	 */
+	case CMIERR_C_BADCACHENO:
+	default:
+		return (EIO);
+	}
+}
+
+static int
+fm_populate_cache(cmi_hdl_t hdl, nvlist_t *nvl, uint_t cpuno)
+{
+	int ret;
+	cmi_errno_t err;
+	uint32_t ncache;
+	nvlist_t *caches[FM_MAX_CACHES];
+	char buf[32];
+
+	err = cmi_cache_ncaches(hdl, &ncache);
+	if (err != CMI_SUCCESS) {
+		return (fm_cmi_cache_err_to_errno(err));
+	}
+
+	/*
+	 * Our promise to userland is that if we skip a value here then there
+	 * are no caches.
+	 */
+	if (ncache == 0) {
+		return (0);
+	} else if (ncache > FM_MAX_CACHES) {
+		return (EOVERFLOW);
+	}
+
+	bzero(caches, sizeof (caches));
+	for (uint32_t i = 0; i < ncache; i++) {
+		x86_cache_t c;
+		fm_cache_info_type_t type = 0;
+
+		(void) nvlist_alloc(&caches[i], NV_UNIQUE_NAME, KM_SLEEP);
+		err = cmi_cache_info(hdl, i, &c);
+		if (err != CMI_SUCCESS) {
+			ret = fm_cmi_cache_err_to_errno(err);
+			goto cleanup;
+		}
+
+		fnvlist_add_uint32(caches[i], FM_CACHE_INFO_LEVEL, c.xc_level);
+		switch (c.xc_type) {
+		case X86_CACHE_TYPE_DATA:
+			type = FM_CACHE_INFO_T_DATA;
+			break;
+		case X86_CACHE_TYPE_INST:
+			type = FM_CACHE_INFO_T_INSTR;
+			break;
+		case X86_CACHE_TYPE_UNIFIED:
+			type = FM_CACHE_INFO_T_DATA | FM_CACHE_INFO_T_INSTR |
+			    FM_CACHE_INFO_T_UNIFIED;
+			break;
+		default:
+			break;
+		}
+		fnvlist_add_uint32(caches[i], FM_CACHE_INFO_TYPE,
+		    (uint32_t)type);
+		fnvlist_add_uint64(caches[i], FM_CACHE_INFO_NSETS, c.xc_nsets);
+		fnvlist_add_uint32(caches[i], FM_CACHE_INFO_NWAYS, c.xc_nways);
+		fnvlist_add_uint32(caches[i], FM_CACHE_INFO_LINE_SIZE,
+		    c.xc_line_size);
+		fnvlist_add_uint64(caches[i], FM_CACHE_INFO_TOTAL_SIZE,
+		    c.xc_size);
+		if ((c.xc_flags & X86_CACHE_F_FULL_ASSOC) != 0) {
+			fnvlist_add_boolean(caches[i],
+			    FM_CACHE_INFO_FULLY_ASSOC);
+		}
+		fnvlist_add_uint64(caches[i], FM_CACHE_INFO_ID, c.xc_id);
+		fnvlist_add_uint32(caches[i], FM_CACHE_INFO_X86_APIC_SHIFT,
+		    c.xc_apic_shift);
+	}
+
+	(void) snprintf(buf, sizeof (buf), "%u", cpuno);
+	fnvlist_add_nvlist_array(nvl, buf, caches, (uint_t)ncache);
+	ret = 0;
+
+cleanup:
+	for (uint32_t i = 0; i < ncache; i++) {
+		nvlist_free(caches[i]);
+	}
+	return (ret);
+}
+
+/*
+ * Gather all of the different per-CPU leaves and return them as a series of
+ * nvlists.
+ */
+int
+fm_ioctl_cache_info(int cmd, nvlist_t *invl, nvlist_t **onvlp)
+{
+	int ret = 0;
+	fm_cmi_walk_t walk;
+	nvlist_t *nvl;
+
+	if (cmd != FM_IOC_CACHE_INFO) {
+		return (ENOTTY);
+	}
+
+	walk_init(&walk, ANY_ID, ANY_ID, ANY_ID, NULL);
+	cmi_hdl_walk(select_cmi_hdl, &walk, NULL, NULL);
+	if (walk.nhdl == 0) {
+		walk_fini(&walk);
+		return (ENOENT);
+	}
+
+	(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	fnvlist_add_uint32(nvl, FM_CACHE_INFO_NCPUS, walk.nhdl);
+
+	for (uint_t i = 0; i < walk.nhdl; i++) {
+		if ((ret = fm_populate_cache(walk.hdls[i], nvl, i)) != 0) {
+			break;
+		}
+		cmi_hdl_rele(walk.hdls[i]);
+	}
+	walk_fini(&walk);
+
+	if (ret == 0) {
+		*onvlp = nvl;
+	} else {
+		nvlist_free(nvl);
+	}
+
+	return (ret);
 }

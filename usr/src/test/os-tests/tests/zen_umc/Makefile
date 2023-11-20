@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 #
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
@@ -86,5 +86,9 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 %.o: $(SRC)/common/mc/zen_umc/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/amdzen/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)

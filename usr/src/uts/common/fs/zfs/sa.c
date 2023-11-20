@@ -26,6 +26,7 @@
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -1520,9 +1521,9 @@ sa_add_projid(sa_handle_t *hdl, dmu_tx_t *tx, uint64_t projid)
 	if (zp->z_acl_cached == NULL) {
 		zfs_acl_t *aclp;
 
-		mutex_enter(&zp->z_acl_lock);
+		rw_enter(&zp->z_acl_lock, RW_WRITER);
 		err = zfs_acl_node_read(zp, B_FALSE, &aclp, B_FALSE);
-		mutex_exit(&zp->z_acl_lock);
+		rw_exit(&zp->z_acl_lock);
 		if (err != 0 && err != ENOENT)
 			return (err);
 	}

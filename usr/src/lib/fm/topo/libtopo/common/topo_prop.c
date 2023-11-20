@@ -23,7 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <strings.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <fm/libtopo.h>
 #include <topo_prop.h>
@@ -1538,4 +1543,135 @@ topo_prop_getprops(tnode_t *node, int *err)
 	topo_node_unlock(node);
 
 	return (nvl);
+}
+
+/*
+ * This is a convenience function for modules in the spirit of
+ * nvlist_get_pairs(). Most modules want to create a property group (which may
+ * already exist) and then set a number of properties. If setting any one
+ * property fails then the operation will fail and they are responsible for
+ * tearing down the node or failing the operation.
+ */
+int
+topo_create_props(topo_mod_t *mod, tnode_t *tn, int prop_flags,
+    const topo_pgroup_info_t *grp, ...)
+{
+	va_list ap;
+	const char *prop;
+	int ret = 0, err;
+
+	if (topo_pgroup_create(tn, grp, &err) != 0 && err != ETOPO_PROP_DEFD) {
+		topo_mod_dprintf(mod, "failed to create property group %s: %s",
+		    grp->tpi_name, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	va_start(ap, grp);
+	while ((prop = va_arg(ap, const char *)) != NULL) {
+		topo_type_t type = va_arg(ap, topo_type_t);
+
+		switch (type) {
+		case TOPO_TYPE_INT32: {
+			int32_t val = va_arg(ap, int32_t);
+			ret = topo_prop_set_int32(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_UINT32: {
+			uint32_t val = va_arg(ap, uint32_t);
+			ret = topo_prop_set_uint32(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_INT64: {
+			int64_t val = va_arg(ap, int64_t);
+			ret = topo_prop_set_int64(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_UINT64: {
+			uint64_t val = va_arg(ap, uint64_t);
+			ret = topo_prop_set_uint64(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_STRING: {
+			const char *val = va_arg(ap, const char *);
+			ret = topo_prop_set_string(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_FMRI: {
+			const nvlist_t *val = va_arg(ap, const nvlist_t *);
+			ret = topo_prop_set_fmri(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		case TOPO_TYPE_INT32_ARRAY: {
+			int32_t *vals = va_arg(ap, int32_t *);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_int32_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_UINT32_ARRAY: {
+			uint32_t *vals = va_arg(ap, uint32_t *);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_uint32_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_INT64_ARRAY: {
+			int64_t *vals = va_arg(ap, int64_t *);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_int64_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_UINT64_ARRAY: {
+			uint64_t *vals = va_arg(ap, uint64_t *);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_uint64_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_STRING_ARRAY: {
+			const char **vals = va_arg(ap, const char **);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_string_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_FMRI_ARRAY: {
+			const nvlist_t **vals = va_arg(ap, const nvlist_t **);
+			uint_t count = va_arg(ap, uint_t);
+			ret = topo_prop_set_fmri_array(tn, grp->tpi_name,
+			    prop, prop_flags, vals, count, &err);
+			break;
+		}
+		case TOPO_TYPE_DOUBLE: {
+			double val = va_arg(ap, double);
+			ret = topo_prop_set_double(tn, grp->tpi_name, prop,
+			    prop_flags, val, &err);
+			break;
+		}
+		default:
+			topo_mod_dprintf(mod, "cannot set property %s with "
+			    "unsupported and unknown type 0x%x\n", prop,
+			    type);
+			va_end(ap);
+			return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+		}
+
+		if (ret != 0) {
+			topo_mod_dprintf(mod, "failed to create %s property "
+			    "%s: %s\n", grp->tpi_name, prop,
+			    topo_strerror(err));
+			va_end(ap);
+			return (topo_mod_seterrno(mod, err));
+		}
+	}
+
+	va_end(ap);
+	return (0);
 }

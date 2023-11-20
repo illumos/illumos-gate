@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,6 +50,7 @@ extern int fm_ioctl_physcpu_info(int, nvlist_t *, nvlist_t **);
 extern int fm_ioctl_cpu_retire(int, nvlist_t *, nvlist_t **);
 extern int fm_ioctl_gentopo_legacy(int, nvlist_t *, nvlist_t **);
 #endif /* __x86 */
+extern int fm_ioctl_cache_info(int, nvlist_t *, nvlist_t **);
 
 static int fm_ioctl_versions(int, nvlist_t *, nvlist_t **);
 static int fm_ioctl_page_retire(int, nvlist_t *, nvlist_t **);
@@ -75,6 +80,7 @@ static const fm_vers_t fm_versions[] = {
 	{ FM_CPU_OP_VERSION, 1 },
 	{ FM_CPU_INFO_VERSION, 1 },
 	{ FM_TOPO_LEGACY_VERSION, 1 },
+	{ FM_CACHE_INFO_VERSION, 1 },
 	{ NULL, 0 }
 };
 
@@ -98,6 +104,8 @@ static const fm_subr_t fm_subrs[] = {
 	{ FM_IOC_GENTOPO_LEGACY, B_FALSE, FM_TOPO_LEGACY_VERSION,
 	    fm_ioctl_gentopo_legacy },
 #endif	/* __x86 */
+	{ FM_IOC_CACHE_INFO, B_FALSE, FM_CACHE_INFO_VERSION,
+	    fm_ioctl_cache_info },
 	{ -1, B_FALSE, NULL, NULL },
 };
 

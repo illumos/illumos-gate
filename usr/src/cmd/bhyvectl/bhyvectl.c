@@ -199,7 +199,6 @@ usage(bool cpu_intel)
 	"       [--set-rtc-nvram=<val>]\n"
 	"       [--rtc-nvram-offset=<offset>]\n"
 	"       [--get-active-cpus]\n"
-	"       [--get-suspended-cpus]\n"
 	"       [--get-intinfo]\n"
 	"       [--get-eptp]\n"
 	"       [--set-exception-bitmap]\n"
@@ -274,7 +273,7 @@ static int force_reset, force_poweroff;
 static const char *capname;
 static int create, destroy, get_memmap, get_memseg;
 static int get_intinfo;
-static int get_active_cpus, get_suspended_cpus;
+static int get_active_cpus;
 static uint64_t memsize;
 static int set_cr0, get_cr0, set_cr2, get_cr2, set_cr3, get_cr3;
 static int set_cr4, get_cr4;
@@ -1337,7 +1336,6 @@ setup_options(bool cpu_intel)
 		{ "force-reset",	NO_ARG,	&force_reset,		1 },
 		{ "force-poweroff", 	NO_ARG,	&force_poweroff, 	1 },
 		{ "get-active-cpus", 	NO_ARG,	&get_active_cpus, 	1 },
-		{ "get-suspended-cpus", NO_ARG,	&get_suspended_cpus, 	1 },
 		{ "get-intinfo", 	NO_ARG,	&get_intinfo,		1 },
 		{ "get-cpu-topology",	NO_ARG, &get_cpu_topology,	1 },
 		{ "pmtmr-port",		REQ_ARG,	0,	PMTMR_PORT },
@@ -2296,12 +2294,6 @@ main(int argc, char *argv[])
 		error = vm_active_cpus(ctx, &cpus);
 		if (!error)
 			print_cpus("active cpus", &cpus);
-	}
-
-	if (!error && (get_suspended_cpus || get_all)) {
-		error = vm_suspended_cpus(ctx, &cpus);
-		if (!error)
-			print_cpus("suspended cpus", &cpus);
 	}
 
 	if (!error && (get_intinfo || get_all)) {

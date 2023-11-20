@@ -170,12 +170,23 @@
 #include <sys/sunndi.h>
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
+#include <sys/policy.h>
+#include <sys/stat.h>
+#include <sys/sunddi.h>
+#include <sys/bitmap.h>
 
 #include <sys/amdzen/df.h>
-#include "amdzen_client.h"
+#include <sys/amdzen/ccd.h>
 #include "amdzen.h"
+#include "amdzen_client.h"
+#include "amdzen_topo.h"
 
 amdzen_t *amdzen_data;
+
+/*
+ * Internal minor nodes for devices that the nexus provides itself.
+ */
+#define	AMDZEN_MINOR_TOPO	0
 
 /*
  * Array of northbridge IDs that we care about.
@@ -403,6 +414,24 @@ amdzen_df_find(amdzen_t *azn, uint_t dfno)
 	return (NULL);
 }
 
+static amdzen_df_ent_t *
+amdzen_df_ent_find_by_instid(amdzen_df_t *df, uint8_t instid)
+{
+	for (uint_t i = 0; i < df->adf_nents; i++) {
+		amdzen_df_ent_t *ent = &df->adf_ents[i];
+
+		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0) {
+			continue;
+		}
+
+		if (ent->adfe_inst_id == instid) {
+			return (ent);
+		}
+	}
+
+	return (NULL);
+}
+
 /*
  * Client functions that are used by nexus children.
  */
@@ -584,12 +613,11 @@ amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
 		break;
 	case ZEN_DF_TYPE_CCM_CPU:
 		/*
-		 * While the wording of the PPR is a little weird, the CCM still
-		 * has subtype 0 in DFv4 systems; however, what's said to be for
-		 * the CPU appears to apply to the ACM.
+		 * Because the CCM CPU subtype has always remained zero, we can
+		 * use that regardless of the generation.
 		 */
 		df_type = DF_TYPE_CCM;
-		df_subtype = 0;
+		df_subtype = DF_CCM_SUBTYPE_CPU;
 		break;
 	default:
 		return (EINVAL);
@@ -886,6 +914,14 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		decomp->dfd_die_shift = DF_DIEMASK_V2_GET_DIE_SHIFT(mask) -
 		    decomp->dfd_node_shift;
 		ASSERT3U(decomp->dfd_die_shift, ==, 0);
+
+		/*
+		 * There is no register in the actual data fabric with the node
+		 * ID in DFv2 that we have found. Instead we take the first
+		 * entity's fabric ID and transform it into the node id.
+		 */
+		df->adf_nodeid = (df->adf_ents[0].adfe_fabric_id &
+		    decomp->dfd_node_mask) >> decomp->dfd_node_shift;
 		break;
 	case DF_REV_3:
 		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V3);
@@ -908,6 +944,8 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		decomp->dfd_comp_mask =
 		    DF_FIDMASK0_V3_GET_COMP_MASK(df->adf_mask0);
 		decomp->dfd_comp_shift = 0;
+
+		df->adf_nodeid = DF_SYSCFG_V3_GET_NODE_ID(df->adf_syscfg);
 		break;
 	case DF_REV_3P5:
 		df->adf_syscfg = amdzen_df_read32_bcast(azn, df,
@@ -933,6 +971,8 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		decomp->dfd_comp_mask =
 		    DF_FIDMASK0_V3P5_GET_COMP_MASK(df->adf_mask0);
 		decomp->dfd_comp_shift = 0;
+
+		df->adf_nodeid = DF_SYSCFG_V3P5_GET_NODE_ID(df->adf_syscfg);
 		break;
 	case DF_REV_4:
 		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V4);
@@ -962,10 +1002,88 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		decomp->dfd_comp_mask =
 		    DF_FIDMASK0_V3P5_GET_COMP_MASK(df->adf_mask0);
 		decomp->dfd_comp_shift = 0;
+
+		df->adf_nodeid = DF_SYSCFG_V4_GET_NODE_ID(df->adf_syscfg);
 		break;
 	default:
 		panic("encountered suspicious, previously rejected DF "
 		    "rev: 0x%x", df->adf_rev);
+	}
+}
+
+/*
+ * The purpose of this function is to map CCMs to the corresponding CCDs that
+ * exist. This is not an obvious thing as there is no direct mapping in the data
+ * fabric between these IDs.
+ *
+ * Prior to DFv4, a given CCM was only ever connected to at most one CCD.
+ * Starting in DFv4 a given CCM may have one or two SDP (scalable data ports)
+ * that connect to CCDs. These may be connected to the same CCD or a different
+ * one. When both ports are enabled we must check whether or not the port is
+ * considered to be in wide mode. When wide mode is enabled then the two ports
+ * are connected to a single CCD. If wide mode is disabled then the two ports
+ * are connected to separate CCDs.
+ *
+ * The physical number of a CCD, which is how we determine the SMN aperture to
+ * use, is based on the CCM ID. In most sockets we have seen up to a maximum of
+ * 8 CCMs. When a CCM is connected to more than one CCD we have determined based
+ * on some hints from AMD's ACPI information that the numbering is assumed to be
+ * that CCM's number plus the total number of CCMs.
+ *
+ * More concretely, the SP5 Genoa/Bergamo Zen 4 platform has 8 CCMs. When there
+ * are more than 8 CCDs installed then CCM 0 maps to CCDs 0 and 8. CCM 1 to CCDs
+ * 1 and 9, etc. CCMs 4-7 map 1:1 to CCDs 4-7. However, the placement of CCDs
+ * within the package has changed across generations.
+ *
+ * Notably in Rome and Milan (Zen 2/3) it appears that each quadrant had an
+ * increasing number of CCDs. So CCDs 0/1 were together, 2/3, 4/5, and 6/7. This
+ * meant that in cases where only a subset of CCDs were populated it'd forcibly
+ * disable the higher CCD in a group (but with DFv3 the CCM would still be
+ * enabled). So a 4 CCD config would generally enable CCDs 0, 2, 4, and 6 say.
+ * This was almost certainly done to balance the NUMA config.
+ *
+ * Instead, starting in Genoa (Zen 4) the CCMs are round-robined around the
+ * quadrants so CCMs (CCDs) 0 (0/8) and 4 (4) are together, 1 (1/9) and 5 (5),
+ * etc. This is also why we more often see disabled CCMs in Genoa, but not in
+ * Rome/Milan.
+ *
+ * When we're operating in wide mode and therefore both SDPs are connected to a
+ * single CCD, we've always found that the lower CCD index will be used by the
+ * system and the higher one is not considered present. Therefore, when
+ * operating in wide mode, we need to make sure that whenever we have a non-zero
+ * value for SDPs being connected that we rewrite this to only appear as a
+ * single CCD is present. It's conceivable (though hard to imagine) that we
+ * could get a value of 0b10 indicating that only the upper SDP link is active
+ * for some reason.
+ */
+
+static void
+amdzen_setup_df_ccm(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *dfe,
+    uint32_t ccmno)
+{
+	amdzen_ccm_data_t *ccm = &dfe->adfe_data.aded_ccm;
+	uint32_t ccd_en;
+
+	if (df->adf_rev >= DF_REV_4) {
+		uint32_t val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
+		    DF_CCD_EN_V4);
+		ccd_en = DF_CCD_EN_V4_GET_CCD_EN(val);
+
+		val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
+		    DF_CCMCFG4_V4);
+		if (DF_CCMCFG4_V4_GET_WIDE_EN(val) != 0 && ccd_en != 0) {
+			ccd_en = 0x1;
+		}
+	} else {
+		ccd_en = 0x1;
+	}
+
+	for (uint32_t i = 0; i < DF_MAX_CCDS_PER_CCM; i++) {
+		ccm->acd_ccd_en[i] = (ccd_en & (1 << i)) != 0;
+		if (ccm->acd_ccd_en[i] == 0)
+			continue;
+		ccm->acd_ccd_id[i] = ccmno + i * df->adf_nccm;
+		ccm->acd_nccds++;
 	}
 }
 
@@ -976,7 +1094,7 @@ static void
 amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 {
 	uint_t i;
-	uint32_t val;
+	uint32_t val, ccmno;
 
 	amdzen_determine_df_vers(azn, df);
 
@@ -1067,6 +1185,43 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 			panic("encountered suspicious, previously rejected DF "
 			    "rev: 0x%x", df->adf_rev);
 		}
+
+		/*
+		 * Record information about a subset of DF entities that we've
+		 * found. Currently we're tracking this only for CCMs.
+		 */
+		if ((dfe->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
+			continue;
+
+		if (dfe->adfe_type == DF_TYPE_CCM &&
+		    dfe->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+			df->adf_nccm++;
+		}
+	}
+
+	/*
+	 * Now that we have filled in all of our info, attempt to fill in
+	 * specific information about different types of instances.
+	 */
+	ccmno = 0;
+	for (uint_t i = 0; i < df->adf_nents; i++) {
+		amdzen_df_ent_t *dfe = &df->adf_ents[i];
+
+		if ((dfe->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
+			continue;
+
+		/*
+		 * Perform type and sub-type specific initialization. Currently
+		 * limited to CCMs.
+		 */
+		switch (dfe->adfe_type) {
+		case DF_TYPE_CCM:
+			amdzen_setup_df_ccm(azn, df, dfe, ccmno);
+			ccmno++;
+			break;
+		default:
+			break;
+		}
 	}
 
 	amdzen_determine_fabric_decomp(azn, df);
@@ -1084,6 +1239,629 @@ amdzen_find_nb(amdzen_t *azn, amdzen_df_t *df)
 			df->adf_nb = stub;
 			return;
 		}
+	}
+}
+
+static void
+amdzen_initpkg_to_apic(amdzen_t *azn, const uint32_t pkg0, const uint32_t pkg7)
+{
+	uint32_t nsock, nccd, nccx, ncore, nthr, extccx;
+	uint32_t nsock_bits, nccd_bits, nccx_bits, ncore_bits, nthr_bits;
+	amdzen_apic_decomp_t *apic = &azn->azn_apic_decomp;
+
+	/*
+	 * These are all 0 based values, meaning that we need to add one to each
+	 * of them. However, we skip this because to calculate the number of
+	 * bits to cover an entity we would subtract one.
+	 */
+	nthr = SCFCTP_PMREG_INITPKG0_GET_SMTEN(pkg0);
+	ncore = SCFCTP_PMREG_INITPKG7_GET_N_CORES(pkg7);
+	nccx = SCFCTP_PMREG_INITPKG7_GET_N_CCXS(pkg7);
+	nccd = SCFCTP_PMREG_INITPKG7_GET_N_DIES(pkg7);
+	nsock = SCFCTP_PMREG_INITPKG7_GET_N_SOCKETS(pkg7);
+
+	if (uarchrev_uarch(cpuid_getuarchrev(CPU)) >= X86_UARCH_AMD_ZEN4) {
+		extccx = SCFCTP_PMREG_INITPKG7_ZEN4_GET_16TAPIC(pkg7);
+	} else {
+		extccx = 0;
+	}
+
+	nthr_bits = highbit(nthr);
+	ncore_bits = highbit(ncore);
+	nccx_bits = highbit(nccx);
+	nccd_bits = highbit(nccd);
+	nsock_bits = highbit(nsock);
+
+	apic->aad_thread_shift = 0;
+	apic->aad_thread_mask = (1 << nthr_bits) - 1;
+
+	apic->aad_core_shift = nthr_bits;
+	if (ncore_bits > 0) {
+		apic->aad_core_mask = (1 << ncore_bits) - 1;
+		apic->aad_core_mask <<= apic->aad_core_shift;
+	} else {
+		apic->aad_core_mask = 0;
+	}
+
+	/*
+	 * The APIC_16T_MODE bit indicates that the total shift to start the CCX
+	 * should be at 4 bits if it's not. It doesn't mean that the CCX portion
+	 * of the value should take up four bits. In the common Genoa case,
+	 * nccx_bits will be zero.
+	 */
+	apic->aad_ccx_shift = apic->aad_core_shift + ncore_bits;
+	if (extccx != 0 && apic->aad_ccx_shift < 4) {
+		apic->aad_ccx_shift = 4;
+	}
+	if (nccx_bits > 0) {
+		apic->aad_ccx_mask = (1 << nccx_bits) - 1;
+		apic->aad_ccx_mask <<= apic->aad_ccx_shift;
+	} else {
+		apic->aad_ccx_mask = 0;
+	}
+
+	apic->aad_ccd_shift = apic->aad_ccx_shift + nccx_bits;
+	if (nccd_bits > 0) {
+		apic->aad_ccd_mask = (1 << nccd_bits) - 1;
+		apic->aad_ccd_mask <<= apic->aad_ccd_shift;
+	} else {
+		apic->aad_ccd_mask = 0;
+	}
+
+	apic->aad_sock_shift = apic->aad_ccd_shift + nccd_bits;
+	if (nsock_bits > 0) {
+		apic->aad_sock_mask = (1 << nsock_bits) - 1;
+		apic->aad_sock_mask <<= apic->aad_sock_shift;
+	} else {
+		apic->aad_sock_mask = 0;
+	}
+
+	/*
+	 * Currently all supported Zen 2+ platforms only have a single die per
+	 * socket as compared to Zen 1. So this is always kept at zero.
+	 */
+	apic->aad_die_mask = 0;
+	apic->aad_die_shift = 0;
+}
+
+/*
+ * We would like to determine what the logical APIC decomposition is on Zen 3
+ * and newer family parts. While there is information added to CPUID in the form
+ * of leaf 8X26, that isn't present in Zen 3, so instead we go to what we
+ * believe is the underlying source of the CPUID data.
+ *
+ * Fundamentally there are a series of registers in SMN space that relate to the
+ * SCFCTP. Coincidentally, there is one of these for each core and there are a
+ * pair of related SMN registers. L3::SCFCTP::PMREG_INITPKG0 contains
+ * information about a given's core logical and physical IDs. More interestingly
+ * for this particular case, L3::SCFCTP::PMREG_INITPKG7, contains the overall
+ * total number of logical entities. We've been promised that this has to be
+ * the same across the fabric. That's all well and good, but this begs the
+ * question of how do we actually get there. The above is a core-specific
+ * register and requires that we understand information about which CCDs and
+ * CCXs are actually present.
+ *
+ * So we are starting with a data fabric that has some CCM present. The CCM
+ * entries in the data fabric may be tagged with our ENABLED flag.
+ * Unfortunately, that can be true regardless of whether or not it's actually
+ * present or not. As a result, we go to another chunk of SMN space registers,
+ * SMU::PWR. These contain information about the CCDs, the physical cores that
+ * are enabled, and related. So we will first walk the DF entities and see if we
+ * can read its SMN::PWR::CCD_DIE_ID. If we get back a value of all 1s then
+ * there is nothing present. Otherwise, we should get back something that
+ * matches information in the data fabric.
+ *
+ * With that in hand, we can read the SMU::PWR::CORE_ENABLE register to
+ * determine which physical cores are enabled in the CCD/CCX. That will finally
+ * give us an index to get to our friend INITPKG7.
+ */
+static boolean_t
+amdzen_determine_apic_decomp_initpkg(amdzen_t *azn)
+{
+	amdzen_df_t *df = &azn->azn_dfs[0];
+	uint32_t ccdno = 0;
+
+	for (uint_t i = 0; i < df->adf_nents; i++) {
+		const amdzen_df_ent_t *ent = &df->adf_ents[i];
+		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
+			continue;
+
+		if (ent->adfe_type == DF_TYPE_CCM &&
+		    ent->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+			uint32_t val, nccx, pkg7, pkg0;
+			smn_reg_t die_reg, thrcfg_reg, core_reg;
+			smn_reg_t pkg7_reg, pkg0_reg;
+			int core_bit;
+			uint8_t pccxno, pcoreno;
+
+			die_reg = SMUPWR_CCD_DIE_ID(ccdno);
+			val = amdzen_smn_read(azn, df, die_reg);
+			if (val == SMN_EINVAL32) {
+				ccdno++;
+				continue;
+			}
+
+			ASSERT3U(SMUPWR_CCD_DIE_ID_GET(val), ==, ccdno);
+
+			/*
+			 * This die actually exists. Switch over to the core
+			 * enable register to find one to ask about physically.
+			 */
+			thrcfg_reg = SMUPWR_THREAD_CFG(ccdno);
+			val = amdzen_smn_read(azn, df, thrcfg_reg);
+			nccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
+			core_reg = SMUPWR_CORE_EN(ccdno);
+			val = amdzen_smn_read(azn, df, core_reg);
+			if (val == 0) {
+				ccdno++;
+				continue;
+			}
+
+			/*
+			 * There exists an enabled physical core. Find the first
+			 * index of it and map it to the corresponding CCD and
+			 * CCX. ddi_ffs is the bit index, but we want the
+			 * physical core number, hence the -1.
+			 */
+			core_bit = ddi_ffs(val);
+			ASSERT3S(core_bit, !=, 0);
+			pcoreno = core_bit - 1;
+
+			/*
+			 * Unfortunately SMU::PWR::THREAD_CONFIGURATION gives us
+			 * the Number of logical cores that are present in the
+			 * complex, not the total number of physical cores. So
+			 * here we need to encode that in Zen 3+ the number of
+			 * cores per CCX is a maximum of 8. Right now we do
+			 * assume that the physical and logical ccx numbering is
+			 * equivalent (we have no other way of knowing if it is
+			 * or isn't right now) and that we'd always have CCX0
+			 * before CCX1. AMD seems to suggest we can assume this,
+			 * though it is a worrisome assumption.
+			 */
+			pccxno = pcoreno / 8;
+			ASSERT3U(pccxno, <, nccx);
+			pkg7_reg = SCFCTP_PMREG_INITPKG7(ccdno, pccxno,
+			    pcoreno);
+			pkg7 = amdzen_smn_read(azn, df, pkg7_reg);
+			pkg0_reg = SCFCTP_PMREG_INITPKG0(ccdno, pccxno,
+			    pcoreno);
+			pkg0 = amdzen_smn_read(azn, df, pkg0_reg);
+			amdzen_initpkg_to_apic(azn, pkg0, pkg7);
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * We have the fun job of trying to figure out what the correct form of the APIC
+ * decomposition should be and how to break that into its logical components.
+ * The way that we get at this is generation-specific unfortunately. Here's how
+ * it works out:
+ *
+ * Zen 1-2	This era of CPUs are deceptively simple. The PPR for a given
+ *		family defines exactly how the APIC ID is broken into logical
+ *		components and it's fixed. That is, depending on whether or
+ *		not SMT is enabled. Zen 1 and Zen 2 use different schemes for
+ *		constructing this. The way that we're supposed to check if SMT
+ *		is enabled is to use AMD leaf 8X1E and ask how many threads per
+ *		core there are. We use the x86 feature set to determine that
+ *		instead.
+ *
+ *		More specifically the Zen 1 scheme is 7 bits long. The bits have
+ *		the following meanings.
+ *
+ *		[6]   Socket ID
+ *		[5:4] Node ID
+ *		[3]   Logical CCX ID
+ *		With SMT		Without SMT
+ *		[2:1] Logical Core ID	[2]   hardcoded to zero
+ *		[0] Thread ID		[1:0] Logical Core ID
+ *
+ *		The following is the Zen 2 scheme assuming SMT. The Zen 2 scheme
+ *		without SMT shifts everything to the right by one bit.
+ *
+ *		[7]   Socket ID
+ *		[6:4] Logical CCD ID
+ *		[3]   Logical CCX ID
+ *		[2:1] Logical Core ID
+ *		[0]   Thread ID
+ *
+ * Zen 3	Zen 3 CPUs moved past the fixed APIC ID format that Zen 1 and
+ *		Zen 2 had, but also don't give us the nice way of discovering
+ *		this via CPUID that Zen 4 did. The APIC ID id uses a given
+ *		number of bits for each logical component that exists, but the
+ *		exact number varies based on what's actually present. To get at
+ *		this we use a piece of data that is embedded in the SCFCTP
+ *		(Scalable Control Fabric, Clocks, Test, Power Gating). This can
+ *		be used to determine how many logical entities of each kind the
+ *		system thinks exist. While we could use the various CPUID
+ *		topology items to try to speed this up, they don't tell us the
+ *		die information that we need to do this.
+ *
+ * Zen 4+	Zen 4 introduced CPUID leaf 8000_0026h which gives us a means
+ *		for determining how to extract the CCD, CCX, and related pieces
+ *		out of the device. One thing we have to be aware of is that when
+ *		the CCD and CCX shift are the same, that means that there is
+ *		only a single CCX and therefore have to take that into account
+ *		appropriately. This is the case generally on Zen 4 platforms,
+ *		but not on Bergamo. Until we can confirm the actual CPUID leaf
+ *		values that we receive in the cases of Bergamo and others, we
+ *		opt instead to use the same SCFCTP scheme as Zen 3.
+ */
+static boolean_t
+amdzen_determine_apic_decomp(amdzen_t *azn)
+{
+	x86_uarchrev_t uarchrev = cpuid_getuarchrev(CPU);
+	amdzen_apic_decomp_t *apic = &azn->azn_apic_decomp;
+	boolean_t smt = is_x86_feature(x86_featureset, X86FSET_HTT);
+
+	switch (uarchrev_uarch(uarchrev)) {
+	case X86_UARCH_AMD_ZEN1:
+	case X86_UARCH_AMD_ZENPLUS:
+		apic->aad_sock_mask = 0x40;
+		apic->aad_sock_shift = 6;
+		apic->aad_die_mask = 0x30;
+		apic->aad_die_shift = 4;
+		apic->aad_ccd_mask = 0;
+		apic->aad_ccd_shift = 0;
+		apic->aad_ccx_mask = 0x08;
+		apic->aad_ccx_shift = 3;
+
+		if (smt) {
+			apic->aad_core_mask = 0x06;
+			apic->aad_core_shift = 1;
+			apic->aad_thread_mask = 0x1;
+			apic->aad_thread_shift = 0;
+		} else {
+			apic->aad_core_mask = 0x03;
+			apic->aad_core_shift = 0;
+			apic->aad_thread_mask = 0;
+			apic->aad_thread_shift = 0;
+		}
+		break;
+	case X86_UARCH_AMD_ZEN2:
+		if (smt) {
+			apic->aad_sock_mask = 0x80;
+			apic->aad_sock_shift = 7;
+			apic->aad_die_mask = 0;
+			apic->aad_die_shift = 0;
+			apic->aad_ccd_mask = 0x70;
+			apic->aad_ccd_shift = 4;
+			apic->aad_ccx_mask = 0x08;
+			apic->aad_ccx_shift = 3;
+			apic->aad_core_mask = 0x06;
+			apic->aad_core_shift = 1;
+			apic->aad_thread_mask = 0x01;
+			apic->aad_thread_shift = 0;
+		} else {
+			apic->aad_sock_mask = 0x40;
+			apic->aad_sock_shift = 6;
+			apic->aad_die_mask = 0;
+			apic->aad_die_shift = 0;
+			apic->aad_ccd_mask = 0x38;
+			apic->aad_ccd_shift = 3;
+			apic->aad_ccx_mask = 0x04;
+			apic->aad_ccx_shift = 2;
+			apic->aad_core_mask = 0x3;
+			apic->aad_core_shift = 0;
+			apic->aad_thread_mask = 0;
+			apic->aad_thread_shift = 0;
+		}
+		break;
+	case X86_UARCH_AMD_ZEN3:
+	case X86_UARCH_AMD_ZEN4:
+		return (amdzen_determine_apic_decomp_initpkg(azn));
+	default:
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Snapshot the number of cores that can exist in a CCX based on the Zen
+ * microarchitecture revision. In Zen 1-4 this has been a constant number
+ * regardless of the actual CPU Family.
+ */
+static void
+amdzen_determine_ncore_per_ccx(amdzen_t *azn)
+{
+	x86_uarchrev_t uarchrev = cpuid_getuarchrev(CPU);
+
+	switch (uarchrev_uarch(uarchrev)) {
+	case X86_UARCH_AMD_ZEN1:
+	case X86_UARCH_AMD_ZENPLUS:
+	case X86_UARCH_AMD_ZEN2:
+		azn->azn_ncore_per_ccx = 4;
+		break;
+	case X86_UARCH_AMD_ZEN3:
+	case X86_UARCH_AMD_ZEN4:
+		azn->azn_ncore_per_ccx = 8;
+		break;
+	default:
+		panic("asked about non-Zen uarch");
+	}
+}
+
+/*
+ * We need to be careful using this function as different AMD generations have
+ * acted in different ways when there is a missing CCD. We've found that in
+ * hardware where the CCM is enabled but there is no CCD attached, it generally
+ * is safe (i.e. DFv3 on Rome), but on DFv4 if we ask for a CCD that would
+ * correspond to a disabled CCM then the firmware may inject a fatal error
+ * (which is hopefully something missing in our RAS/MCA-X enablement).
+ *
+ * Put differently if this doesn't correspond to an Enabled CCM and you know the
+ * number of valid CCDs on this, don't use it.
+ */
+static boolean_t
+amdzen_ccd_present(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno)
+{
+	smn_reg_t die_reg = SMUPWR_CCD_DIE_ID(ccdno);
+	uint32_t val = amdzen_smn_read(azn, df, die_reg);
+	if (val == SMN_EINVAL32) {
+		return (B_FALSE);
+	}
+
+	ASSERT3U(ccdno, ==, SMUPWR_CCD_DIE_ID_GET(val));
+	return (B_TRUE);
+}
+
+/*
+ * Attempt to determine a logical CCD number of a given CCD where we don't have
+ * hardware support for L3::SCFCTP::PMREG_INITPKG* (e.g. pre-Zen 3 systems).
+ * The CCD numbers that we have are the in the physical space. Likely beacuse of
+ * how the orientation of CCM numbers map to physical locations and the layout
+ * of them within the pacakge, we haven't found a good way using the core DFv3
+ * registers to determine if a given CCD is actually present or not as generally
+ * all the CCMs are left enabled. Instead we use SMU::PWR::DIE_ID as a proxy to
+ * determine CCD presence.
+ */
+static uint32_t
+amdzen_ccd_log_id_zen2(amdzen_t *azn, amdzen_df_t *df,
+    const amdzen_df_ent_t *targ)
+{
+	uint32_t smnid = 0;
+	uint32_t logid = 0;
+
+	for (uint_t i = 0; i < df->adf_nents; i++) {
+		const amdzen_df_ent_t *ent = &df->adf_ents[i];
+
+		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0) {
+			continue;
+		}
+
+		if (ent->adfe_inst_id == targ->adfe_inst_id) {
+			return (logid);
+		}
+
+		if (ent->adfe_type == targ->adfe_type &&
+		    ent->adfe_subtype == targ->adfe_subtype) {
+			boolean_t present = amdzen_ccd_present(azn, df, smnid);
+			smnid++;
+			if (present) {
+				logid++;
+			}
+		}
+	}
+
+	panic("asked to match against invalid DF entity %p in df %p", targ, df);
+}
+
+static void
+amdzen_ccd_fill_core_initpkg0(amdzen_t *azn, amdzen_df_t *df,
+    amdzen_topo_ccd_t *ccd, amdzen_topo_ccx_t *ccx, amdzen_topo_core_t *core,
+    boolean_t *ccd_set, boolean_t *ccx_set)
+{
+	smn_reg_t pkg0_reg;
+	uint32_t pkg0;
+
+	pkg0_reg = SCFCTP_PMREG_INITPKG0(ccd->atccd_phys_no, ccx->atccx_phys_no,
+	    core->atcore_phys_no);
+	pkg0 = amdzen_smn_read(azn, df, pkg0_reg);
+	core->atcore_log_no = SCFCTP_PMREG_INITPKG0_GET_LOG_CORE(pkg0);
+
+	if (!*ccx_set) {
+		ccx->atccx_log_no = SCFCTP_PMREG_INITPKG0_GET_LOG_CCX(pkg0);
+		*ccx_set = B_TRUE;
+	}
+
+	if (!*ccd_set) {
+		ccd->atccd_log_no = SCFCTP_PMREG_INITPKG0_GET_LOG_DIE(pkg0);
+		*ccd_set = B_TRUE;
+	}
+}
+
+/*
+ * Attempt to fill in the physical topology information for this given CCD.
+ * There are a few steps to this that we undertake to perform this as follows:
+ *
+ * 1) First we determine whether the CCD is actually present or not by reading
+ * SMU::PWR::DIE_ID. CCDs that are not installed will still have an enabled DF
+ * entry it appears, but the request for the die ID will returns an invalid
+ * read (all 1s). This die ID should match what we think of as the SMN number
+ * below. If not, we're in trouble and the rest of this is in question.
+ *
+ * 2) We use the SMU::PWR registers to determine how many logical and physical
+ * cores are present in this CCD and how they are split amongst the CCX. Here we
+ * need to encode the CPU to CCX core size rankings. Through this process we
+ * determine and fill out which threads and cores are enabled.
+ *
+ * 3) In Zen 3+ we then will read each core's INITPK0 values to ensure that we
+ * have a proper physical to logical mapping, at which point we can fill in the
+ * APIC IDs. For Zen 2, we will set the AMDZEN_TOPO_CCD_F_CORE_PHYS_UNKNOWN to
+ * indicate that we just mapped the first logical processor to the first enabled
+ * core.
+ *
+ * 4) Once we have the logical IDs determined we will construct the APIC ID that
+ * we expect this to have.
+ *
+ * Steps (2) - (4) are intertwined and done together.
+ */
+static void
+amdzen_ccd_fill_topo(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *ent,
+    amdzen_topo_ccd_t *ccd)
+{
+	uint32_t val, nccx, core_en, thread_en;
+	uint32_t nlcore_per_ccx, nthreads_per_core;
+	uint32_t sockid, dieid, compid;
+	const uint32_t ccdno = ccd->atccd_phys_no;
+	const x86_uarch_t uarch = uarchrev_uarch(cpuid_getuarchrev(CPU));
+	boolean_t smt, pkg0_ids, logccd_set = B_FALSE;
+	smn_reg_t reg;
+
+	ASSERT(MUTEX_HELD(&azn->azn_mutex));
+	if (!amdzen_ccd_present(azn, df, ccdno)) {
+		ccd->atccd_err = AMDZEN_TOPO_CCD_E_CCD_MISSING;
+		return;
+	}
+
+	reg = SMUPWR_THREAD_CFG(ccdno);
+	val = amdzen_smn_read(azn, df, reg);
+	nccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
+	nlcore_per_ccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
+	smt = SMUPWR_THREAD_CFG_GET_SMT_MODE(val);
+	ASSERT3U(nccx, <=, AMDZEN_TOPO_CCD_MAX_CCX);
+	if (smt == SMUPWR_THREAD_CFG_SMT_MODE_SMT) {
+		nthreads_per_core = 2;
+	} else {
+		nthreads_per_core = 1;
+	}
+
+	reg = SMUPWR_CORE_EN(ccdno);
+	core_en = amdzen_smn_read(azn, df, reg);
+	reg = SMUPWR_THREAD_EN(ccdno);
+	thread_en = amdzen_smn_read(azn, df, reg);
+
+	/*
+	 * The BSP is never enabled in a conventional sense and therefore the
+	 * bit is reserved and left as 0. As the BSP should be in the first CCD,
+	 * we go through and OR back in the bit lest we think the thread isn't
+	 * enabled.
+	 */
+	if (ccdno == 0) {
+		thread_en |= 1;
+	}
+
+	ccd->atccd_phys_no = ccdno;
+	if (uarch >= X86_UARCH_AMD_ZEN3) {
+		pkg0_ids = B_TRUE;
+	} else {
+		ccd->atccd_flags |= AMDZEN_TOPO_CCD_F_CORE_PHYS_UNKNOWN;
+		pkg0_ids = B_FALSE;
+
+		/*
+		 * Determine the CCD logical ID for Zen 2 now since this doesn't
+		 * rely upon needing a valid physical core.
+		 */
+		ccd->atccd_log_no = amdzen_ccd_log_id_zen2(azn, df, ent);
+		logccd_set = B_TRUE;
+	}
+
+	/*
+	 * To construct the APIC ID we need to know the socket and die (not CCD)
+	 * this is on. We deconstruct the CCD's fabric ID to determine that.
+	 */
+	zen_fabric_id_decompose(&df->adf_decomp, ent->adfe_fabric_id, &sockid,
+	    &dieid, &compid);
+
+	/*
+	 * At this point we have all the information about the CCD, the number
+	 * of CCX instances, and which physical cores and threads are enabled.
+	 * Currently we assume that if we have one CCX enabled, then it is
+	 * always CCX0. We cannot find evidence of a two CCX supporting part
+	 * that doesn't always ship with both CCXs present and enabled.
+	 */
+	ccd->atccd_nlog_ccx = ccd->atccd_nphys_ccx = nccx;
+	for (uint32_t ccxno = 0; ccxno < nccx; ccxno++) {
+		amdzen_topo_ccx_t *ccx = &ccd->atccd_ccx[ccxno];
+		const uint32_t core_mask = (1 << azn->azn_ncore_per_ccx) - 1;
+		const uint32_t core_shift = ccxno * azn->azn_ncore_per_ccx;
+		const uint32_t ccx_core_en = (core_en >> core_shift) &
+		    core_mask;
+		boolean_t logccx_set = B_FALSE;
+
+		ccd->atccd_ccx_en[ccxno] = 1;
+		ccx->atccx_phys_no = ccxno;
+		ccx->atccx_nphys_cores = azn->azn_ncore_per_ccx;
+		ccx->atccx_nlog_cores = nlcore_per_ccx;
+
+		if (!pkg0_ids) {
+			ccx->atccx_log_no = ccx->atccx_phys_no;
+			logccx_set = B_TRUE;
+		}
+
+		for (uint32_t coreno = 0, logcorezen2 = 0;
+		    coreno < azn->azn_ncore_per_ccx; coreno++) {
+			amdzen_topo_core_t *core = &ccx->atccx_cores[coreno];
+
+			if ((ccx_core_en & (1 << coreno)) == 0) {
+				continue;
+			}
+
+			ccx->atccx_core_en[coreno] = 1;
+			core->atcore_phys_no = coreno;
+
+			/*
+			 * Now that we have the physical core number present, we
+			 * must determine the logical core number and fill out
+			 * the logical CCX/CCD if it has not been set. We must
+			 * do this before we attempt to look at which threads
+			 * are enabled, because that operates based upon logical
+			 * core number.
+			 *
+			 * For Zen 2 we do not have INITPKG0 at our disposal. We
+			 * currently assume (and tag for userland with the
+			 * AMDZEN_TOPO_CCD_F_CORE_PHYS_UNKNOWN flag) that we are
+			 * mapping logical cores to physicals in the order of
+			 * appearance.
+			 */
+			if (pkg0_ids) {
+				amdzen_ccd_fill_core_initpkg0(azn, df, ccd, ccx,
+				    core, &logccd_set, &logccx_set);
+			} else {
+				core->atcore_log_no = logcorezen2;
+				logcorezen2++;
+			}
+
+			/*
+			 * Determining which bits to use for the thread is a bit
+			 * weird here. Thread IDs within a CCX are logical, but
+			 * there are always physically spaced CCX sizes. See the
+			 * comment at the definition for SMU::PWR::THREAD_ENABLE
+			 * for more information.
+			 */
+			const uint32_t thread_shift = (ccx->atccx_nphys_cores *
+			    ccx->atccx_log_no + core->atcore_log_no) *
+			    nthreads_per_core;
+			const uint32_t thread_mask = (nthreads_per_core << 1) -
+			    1;
+			const uint32_t core_thread_en = (thread_en >>
+			    thread_shift) & thread_mask;
+			core->atcore_nthreads = nthreads_per_core;
+			core->atcore_thr_en[0] = core_thread_en & 0x01;
+			core->atcore_thr_en[1] = core_thread_en & 0x02;
+#ifdef	DEBUG
+			if (nthreads_per_core == 1) {
+				VERIFY0(core->atcore_thr_en[1]);
+			}
+#endif
+			for (uint32_t thrno = 0; thrno < core->atcore_nthreads;
+			    thrno++) {
+				ASSERT3U(core->atcore_thr_en[thrno], !=, 0);
+
+				zen_apic_id_compose(&azn->azn_apic_decomp,
+				    sockid, dieid, ccd->atccd_log_no,
+				    ccx->atccx_log_no, core->atcore_log_no,
+				    thrno, &core->atcore_apicids[thrno]);
+
+			}
+		}
+
+		ASSERT3U(logccx_set, ==, B_TRUE);
+		ASSERT3U(logccd_set, ==, B_TRUE);
 	}
 }
 
@@ -1110,6 +1888,12 @@ amdzen_nexus_init(void *arg)
 		amdzen_setup_df(azn, df);
 		amdzen_find_nb(azn, df);
 	}
+
+	if (amdzen_determine_apic_decomp(azn)) {
+		azn->azn_flags |= AMDZEN_F_APIC_DECOMP_VALID;
+	}
+
+	amdzen_determine_ncore_per_ccx(azn);
 
 	/*
 	 * Not all children may be installed. As such, we do not treat the
@@ -1404,6 +2188,379 @@ amdzen_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 }
 
 static int
+amdzen_topo_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+	minor_t m;
+	amdzen_t *azn = amdzen_data;
+
+	if (crgetzoneid(credp) != GLOBAL_ZONEID ||
+	    secpolicy_sys_config(credp, B_FALSE) != 0) {
+		return (EPERM);
+	}
+
+	if ((flag & (FEXCL | FNDELAY | FNONBLOCK)) != 0) {
+		return (EINVAL);
+	}
+
+	if (otyp != OTYP_CHR) {
+		return (EINVAL);
+	}
+
+	m = getminor(*devp);
+	if (m != AMDZEN_MINOR_TOPO) {
+		return (ENXIO);
+	}
+
+	mutex_enter(&azn->azn_mutex);
+	if ((azn->azn_flags & AMDZEN_F_IOCTL_MASK) !=
+	    AMDZEN_F_ATTACH_COMPLETE) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
+	}
+	mutex_exit(&azn->azn_mutex);
+
+	return (0);
+}
+
+static int
+amdzen_topo_ioctl_base(amdzen_t *azn, intptr_t arg, int mode)
+{
+	amdzen_topo_base_t base;
+
+	bzero(&base, sizeof (base));
+	mutex_enter(&azn->azn_mutex);
+	base.atb_ndf = azn->azn_ndfs;
+
+	if ((azn->azn_flags & AMDZEN_F_APIC_DECOMP_VALID) == 0) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
+	}
+
+	base.atb_apic_decomp = azn->azn_apic_decomp;
+	for (uint_t i = 0; i < azn->azn_ndfs; i++) {
+		const amdzen_df_t *df = &azn->azn_dfs[i];
+
+		base.atb_maxdfent = MAX(base.atb_maxdfent, df->adf_nents);
+		if (i == 0) {
+			base.atb_rev = df->adf_rev;
+			base.atb_df_decomp = df->adf_decomp;
+		}
+	}
+	mutex_exit(&azn->azn_mutex);
+
+	if (ddi_copyout(&base, (void *)(uintptr_t)arg, sizeof (base),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+/*
+ * Fill in the peers. The way we do is this is to just fill in all the entries
+ * and then zero out the ones that aren't valid.
+ */
+static void
+amdzen_topo_ioctl_df_fill_peers(const amdzen_df_ent_t *ent,
+    amdzen_topo_df_ent_t *topo_ent)
+{
+	topo_ent->atde_npeers = DF_FBIINFO0_GET_FTI_PCNT(ent->adfe_info0);
+	topo_ent->atde_peers[0] = DF_FBINFO1_GET_FTI0_NINSTID(ent->adfe_info1);
+	topo_ent->atde_peers[1] = DF_FBINFO1_GET_FTI1_NINSTID(ent->adfe_info1);
+	topo_ent->atde_peers[2] = DF_FBINFO1_GET_FTI2_NINSTID(ent->adfe_info1);
+	topo_ent->atde_peers[3] = DF_FBINFO1_GET_FTI3_NINSTID(ent->adfe_info1);
+	topo_ent->atde_peers[4] = DF_FBINFO2_GET_FTI4_NINSTID(ent->adfe_info2);
+	topo_ent->atde_peers[5] = DF_FBINFO2_GET_FTI5_NINSTID(ent->adfe_info2);
+
+	for (uint32_t i = topo_ent->atde_npeers; i < AMDZEN_TOPO_DF_MAX_PEERS;
+	    i++) {
+		topo_ent->atde_peers[i] = 0;
+	}
+}
+
+static void
+amdzen_topo_ioctl_df_fill_ccm(const amdzen_df_ent_t *ent,
+    amdzen_topo_df_ent_t *topo_ent)
+{
+	const amdzen_ccm_data_t *ccm = &ent->adfe_data.aded_ccm;
+	amdzen_topo_ccm_data_t *topo_ccm = &topo_ent->atde_data.atded_ccm;
+
+	topo_ccm->atcd_nccds = ccm->acd_nccds;
+	for (uint32_t i = 0; i < DF_MAX_CCDS_PER_CCM; i++) {
+		topo_ccm->atcd_ccd_en[i] = ccm->acd_ccd_en[i];
+		topo_ccm->atcd_ccd_ids[i] = ccm->acd_ccd_id[i];
+	}
+}
+
+static int
+amdzen_topo_ioctl_df(amdzen_t *azn, intptr_t arg, int mode)
+{
+	uint_t model;
+	uint32_t max_ents, nwritten;
+	const amdzen_df_t *df;
+	amdzen_topo_df_t topo_df;
+#ifdef	_MULTI_DATAMODEL
+	amdzen_topo_df32_t topo_df32;
+#endif
+
+	model = ddi_model_convert_from(mode);
+	switch (model) {
+#ifdef	_MULTI_DATAMODEL
+	case DDI_MODEL_ILP32:
+		if (ddi_copyin((void *)(uintptr_t)arg, &topo_df32,
+		    sizeof (topo_df32), mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		bzero(&topo_df, sizeof (topo_df));
+		topo_df.atd_dfno = topo_df32.atd_dfno;
+		topo_df.atd_df_buf_nents = topo_df32.atd_df_buf_nents;
+		topo_df.atd_df_ents = (void *)(uintptr_t)topo_df32.atd_df_ents;
+		break;
+#endif
+	case DDI_MODEL_NONE:
+		if (ddi_copyin((void *)(uintptr_t)arg, &topo_df,
+		    sizeof (topo_df), mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	mutex_enter(&azn->azn_mutex);
+	if (topo_df.atd_dfno >= azn->azn_ndfs) {
+		mutex_exit(&azn->azn_mutex);
+		return (EINVAL);
+	}
+
+	df = &azn->azn_dfs[topo_df.atd_dfno];
+	topo_df.atd_nodeid = df->adf_nodeid;
+	topo_df.atd_sockid = (df->adf_nodeid & df->adf_decomp.dfd_sock_mask) >>
+	    df->adf_decomp.dfd_sock_shift;
+	topo_df.atd_dieid = (df->adf_nodeid & df->adf_decomp.dfd_die_mask) >>
+	    df->adf_decomp.dfd_die_shift;
+	topo_df.atd_rev = df->adf_rev;
+	topo_df.atd_df_act_nents = df->adf_nents;
+	max_ents = MIN(topo_df.atd_df_buf_nents, df->adf_nents);
+
+	if (topo_df.atd_df_ents == NULL) {
+		topo_df.atd_df_buf_nvalid = 0;
+		mutex_exit(&azn->azn_mutex);
+		goto copyout;
+	}
+
+	nwritten = 0;
+	for (uint32_t i = 0; i < max_ents; i++) {
+		amdzen_topo_df_ent_t topo_ent;
+		const amdzen_df_ent_t *ent = &df->adf_ents[i];
+
+		/*
+		 * We opt not to include disabled elements right now. They
+		 * generally don't have a valid type and there isn't much useful
+		 * information we can get from them. This can be changed if we
+		 * find a use case for them for userland topo.
+		 */
+		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
+			continue;
+
+		bzero(&topo_ent, sizeof (topo_ent));
+		topo_ent.atde_type = ent->adfe_type;
+		topo_ent.atde_subtype = ent->adfe_subtype;
+		topo_ent.atde_fabric_id = ent->adfe_fabric_id;
+		topo_ent.atde_inst_id = ent->adfe_inst_id;
+		amdzen_topo_ioctl_df_fill_peers(ent, &topo_ent);
+
+		if (ent->adfe_type == DF_TYPE_CCM &&
+		    ent->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+			amdzen_topo_ioctl_df_fill_ccm(ent, &topo_ent);
+		}
+
+		if (ddi_copyout(&topo_ent, &topo_df.atd_df_ents[nwritten],
+		    sizeof (topo_ent), mode & FKIOCTL) != 0) {
+			mutex_exit(&azn->azn_mutex);
+			return (EFAULT);
+		}
+		nwritten++;
+	}
+	mutex_exit(&azn->azn_mutex);
+
+	topo_df.atd_df_buf_nvalid = nwritten;
+copyout:
+	switch (model) {
+#ifdef	_MULTI_DATAMODEL
+	case DDI_MODEL_ILP32:
+		topo_df32.atd_nodeid = topo_df.atd_nodeid;
+		topo_df32.atd_sockid = topo_df.atd_sockid;
+		topo_df32.atd_dieid = topo_df.atd_dieid;
+		topo_df32.atd_rev = topo_df.atd_rev;
+		topo_df32.atd_df_buf_nvalid = topo_df.atd_df_buf_nvalid;
+		topo_df32.atd_df_act_nents = topo_df.atd_df_act_nents;
+
+		if (ddi_copyout(&topo_df32, (void *)(uintptr_t)arg,
+		    sizeof (topo_df32), mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+#endif
+	case DDI_MODEL_NONE:
+		if (ddi_copyout(&topo_df, (void *)(uintptr_t)arg,
+		    sizeof (topo_df), mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+	default:
+		break;
+	}
+
+
+	return (0);
+}
+
+static int
+amdzen_topo_ioctl_ccd(amdzen_t *azn, intptr_t arg, int mode)
+{
+	amdzen_topo_ccd_t ccd, *ccdp;
+	amdzen_df_t *df;
+	amdzen_df_ent_t *ent;
+	amdzen_ccm_data_t *ccm;
+	uint32_t ccdno;
+	size_t copyin_size = offsetof(amdzen_topo_ccd_t, atccd_err);
+
+	/*
+	 * Only copy in the identifying information so that way we can ensure
+	 * the rest of the structure we return to the user doesn't contain
+	 * anything unexpected in it.
+	 */
+	bzero(&ccd, sizeof (ccd));
+	if (ddi_copyin((void *)(uintptr_t)arg, &ccd, copyin_size,
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	mutex_enter(&azn->azn_mutex);
+	if ((azn->azn_flags & AMDZEN_F_APIC_DECOMP_VALID) == 0) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_NO_APIC_DECOMP;
+		goto copyout;
+	}
+
+	df = amdzen_df_find(azn, ccd.atccd_dfno);
+	if (df == NULL) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_BAD_DFNO;
+		goto copyout;
+	}
+
+	/*
+	 * We don't have enough information to know how to construct this
+	 * information in Zen 1 at this time, so refuse.
+	 */
+	if (df->adf_rev <= DF_REV_2) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_SOC_UNSUPPORTED;
+		goto copyout;
+	}
+
+	ent = amdzen_df_ent_find_by_instid(df, ccd.atccd_instid);
+	if (ent == NULL) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_BAD_INSTID;
+		goto copyout;
+	}
+
+	if (ent->adfe_type != DF_TYPE_CCM ||
+	    ent->adfe_subtype != DF_CCM_SUBTYPE_CPU) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_NOT_A_CCD;
+		goto copyout;
+	}
+
+	ccm = &ent->adfe_data.aded_ccm;
+	for (ccdno = 0; ccdno < DF_MAX_CCDS_PER_CCM; ccdno++) {
+		if (ccm->acd_ccd_en[ccdno] != 0 &&
+		    ccm->acd_ccd_id[ccdno] == ccd.atccd_phys_no) {
+			break;
+		}
+	}
+
+	if (ccdno == DF_MAX_CCDS_PER_CCM) {
+		ccd.atccd_err = AMDZEN_TOPO_CCD_E_NOT_A_CCD;
+		goto copyout;
+	}
+
+	if (ccm->acd_ccd_data[ccdno] == NULL) {
+		/*
+		 * We don't actually have this data. Go fill it out and save it
+		 * for future use.
+		 */
+		ccdp = kmem_zalloc(sizeof (amdzen_topo_ccd_t), KM_NOSLEEP_LAZY);
+		if (ccdp == NULL) {
+			mutex_exit(&azn->azn_mutex);
+			return (ENOMEM);
+		}
+
+		ccdp->atccd_dfno = ccd.atccd_dfno;
+		ccdp->atccd_instid = ccd.atccd_instid;
+		ccdp->atccd_phys_no = ccd.atccd_phys_no;
+		amdzen_ccd_fill_topo(azn, df, ent, ccdp);
+		ccm->acd_ccd_data[ccdno] = ccdp;
+	}
+	ASSERT3P(ccm->acd_ccd_data[ccdno], !=, NULL);
+	bcopy(ccm->acd_ccd_data[ccdno], &ccd, sizeof (ccd));
+
+copyout:
+	mutex_exit(&azn->azn_mutex);
+	if (ddi_copyout(&ccd, (void *)(uintptr_t)arg, sizeof (ccd),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
+amdzen_topo_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	int ret;
+	amdzen_t *azn = amdzen_data;
+
+	if (getminor(dev) != AMDZEN_MINOR_TOPO) {
+		return (ENXIO);
+	}
+
+	if ((mode & FREAD) == 0) {
+		return (EBADF);
+	}
+
+	switch (cmd) {
+	case AMDZEN_TOPO_IOCTL_BASE:
+		ret = amdzen_topo_ioctl_base(azn, arg, mode);
+		break;
+	case AMDZEN_TOPO_IOCTL_DF:
+		ret = amdzen_topo_ioctl_df(azn, arg, mode);
+		break;
+	case AMDZEN_TOPO_IOCTL_CCD:
+		ret = amdzen_topo_ioctl_ccd(azn, arg, mode);
+		break;
+	default:
+		ret = ENOTTY;
+		break;
+	}
+
+	return (ret);
+}
+
+static int
+amdzen_topo_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+	if (otyp != OTYP_CHR) {
+		return (EINVAL);
+	}
+
+	if (getminor(dev) != AMDZEN_MINOR_TOPO) {
+		return (ENXIO);
+	}
+
+	return (0);
+}
+
+static int
 amdzen_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	amdzen_t *azn = amdzen_data;
@@ -1417,6 +2574,13 @@ amdzen_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&azn->azn_mutex);
 	if (azn->azn_dip != NULL) {
 		dev_err(dip, CE_WARN, "driver is already attached!");
+		mutex_exit(&azn->azn_mutex);
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_create_minor_node(dip, "topo", S_IFCHR, AMDZEN_MINOR_TOPO,
+	    DDI_PSEUDO, 0) != 0) {
+		dev_err(dip, CE_WARN, "failed to create topo minor node!");
 		mutex_exit(&azn->azn_mutex);
 		return (DDI_FAILURE);
 	}
@@ -1456,6 +2620,7 @@ amdzen_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	ddi_remove_minor_node(azn->azn_dip, NULL);
 	azn->azn_dip = NULL;
 	mutex_exit(&azn->azn_mutex);
 
@@ -1491,6 +2656,26 @@ amdzen_alloc(void)
 	cv_init(&amdzen_data->azn_cv, NULL, CV_DRIVER, NULL);
 }
 
+static struct cb_ops amdzen_topo_cb_ops = {
+	.cb_open = amdzen_topo_open,
+	.cb_close = amdzen_topo_close,
+	.cb_strategy = nodev,
+	.cb_print = nodev,
+	.cb_dump = nodev,
+	.cb_read = nodev,
+	.cb_write = nodev,
+	.cb_ioctl = amdzen_topo_ioctl,
+	.cb_devmap = nodev,
+	.cb_mmap = nodev,
+	.cb_segmap = nodev,
+	.cb_chpoll = nochpoll,
+	.cb_prop_op = ddi_prop_op,
+	.cb_flag = D_MP,
+	.cb_rev = CB_REV,
+	.cb_aread = nodev,
+	.cb_awrite = nodev
+};
+
 struct bus_ops amdzen_bus_ops = {
 	.busops_rev = BUSO_REV,
 	.bus_map = nullbusmap,
@@ -1516,7 +2701,8 @@ static struct dev_ops amdzen_dev_ops = {
 	.devo_detach = amdzen_detach,
 	.devo_reset = nodev,
 	.devo_quiesce = ddi_quiesce_not_needed,
-	.devo_bus_ops = &amdzen_bus_ops
+	.devo_bus_ops = &amdzen_bus_ops,
+	.devo_cb_ops = &amdzen_topo_cb_ops
 };
 
 static struct modldrv amdzen_modldrv = {

@@ -161,7 +161,7 @@ vmm_zsd_shutdown(zoneid_t zid, void *data)
 	for (sc = list_head(&zsd->vz_vmms); sc != NULL;
 	    sc = list_next(&zsd->vz_vmms, sc)) {
 		/* Send a poweroff to the VM, whether running or not. */
-		(void) vm_suspend(sc->vmm_vm, VM_SUSPEND_POWEROFF);
+		(void) vm_suspend(sc->vmm_vm, VM_SUSPEND_POWEROFF, -1);
 	}
 	mutex_exit(&zsd->vz_lock);
 }

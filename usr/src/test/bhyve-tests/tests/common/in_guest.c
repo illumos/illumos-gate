@@ -416,6 +416,26 @@ test_initialize_flags(const char *tname, uint64_t create_flags)
 	return (ctx);
 }
 
+void
+test_reinitialize(struct vmctx *ctx, uint64_t flags)
+{
+	int err;
+
+	if ((err = vm_reinit(ctx, flags)) != 0) {
+		test_fail_errno(err, "Could not reinit VM");
+	}
+
+	/* Reload tables and payload in case they were altered */
+
+	populate_identity_table(ctx);
+	populate_desc_tables(ctx);
+
+	err = load_payload(ctx);
+	if (err != 0) {
+		test_fail_errno(err, "Could not load payload");
+	}
+}
+
 int
 test_setup_vcpu(struct vmctx *ctx, int vcpu, uint64_t rip, uint64_t rsp)
 {
@@ -534,7 +554,6 @@ which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 
 	switch (vexit->exitcode) {
 	case VM_EXITCODE_BOGUS:
-	case VM_EXITCODE_REQIDLE:
 		bzero(ventry, sizeof (ventry));
 		return (VEK_REENTR);
 	case VM_EXITCODE_INOUT:

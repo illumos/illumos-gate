@@ -37,7 +37,9 @@ file path=opt/bhyve-tests/tests/inst_emul/exit_paging mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/imul mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/page_dirty mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/rdmsr mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/suspend_info mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/triple_fault mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/vcpu_barrier mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/wrmsr mode=0555
 dir  path=opt/bhyve-tests/tests/kdev
 file path=opt/bhyve-tests/tests/kdev/guest_tsc_adjust mode=0555

@@ -1202,6 +1202,8 @@ dir  path=usr/lib/secure/$(ARCH64)
 link path=usr/lib/secure/32 target=.
 link path=usr/lib/secure/64 target=$(ARCH64)
 dir  path=usr/lib/security
+dir  path=usr/lib/spd
+file path=usr/lib/spd/spd mode=0555
 dir  path=usr/lib/sysevent
 dir  path=usr/lib/sysevent/modules
 file path=usr/lib/sysevent/modules/datalink_mod.so

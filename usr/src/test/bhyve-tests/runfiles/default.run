@@ -71,7 +71,9 @@ tests = [
 	'triple_fault',
 	'exit_paging',
 	'page_dirty',
-	'exit_consistent'
+	'exit_consistent',
+	'suspend_info',
+	'vcpu_barrier'
 	]
 
 [/opt/bhyve-tests/tests/viona]

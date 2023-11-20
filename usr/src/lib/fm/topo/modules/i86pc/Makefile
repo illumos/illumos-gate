@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = chip chipset hostbridge pcibus x86pi
+SUBDIRS = chip chipset hostbridge pcibus x86pi zen
 
 .PARALLEL: $(SUBDIRS)
 

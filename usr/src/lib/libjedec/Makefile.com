@@ -11,16 +11,20 @@
 
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 
 LIBRARY =	libjedec.a
 VERS =		.1
-OBJECTS =	libjedec.o
+OBJECTS =	libjedec.o libjedec_spd.o libjedec_spd_ddr4.o bitext.o \
+		libjedec_spd_ddr5.o libjedec_temp.o
 
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB)
 CPPFLAGS +=	-I../common
+LDLIBS +=	-lc -lnvpair
+CSTD =		$(CSTD_GNU99)
 
 SRCDIR =	../common
 
@@ -28,4 +32,9 @@ SRCDIR =	../common
 
 all:	$(LIBS)
 
+pics/%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 include ../../Makefile.targ
+

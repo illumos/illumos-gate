@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 # CDDL HEADER START
 #
@@ -25,6 +26,8 @@
 $mapfile_version 2
 
 SYMBOL_SCOPE {
+	topo_create_props		{ TYPE = FUNCTION; FLAGS = extern };
+
 	topo_digraph_destroy		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_digraph_new		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_edge_new			{ TYPE = FUNCTION; FLAGS = extern };
@@ -42,6 +45,8 @@ SYMBOL_SCOPE {
 	topo_mod_free			{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_nvalloc		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_nvdup			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_asprintf		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_vasprintf		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_strfree		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_strfreev		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_strdup			{ TYPE = FUNCTION; FLAGS = extern };
@@ -70,6 +75,7 @@ SYMBOL_SCOPE {
 	topo_mod_str2nvl		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_auth			{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_clean_str		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_clean_strn		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_hc_occupied		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_product		{ TYPE = FUNCTION; FLAGS = extern };
 

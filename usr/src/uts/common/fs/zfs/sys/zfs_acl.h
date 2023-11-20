@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_FS_ZFS_ACL_H
@@ -155,16 +156,13 @@ typedef struct zfs_acl_node {
 	size_t		z_allocsize;	/* Size of blob in bytes */
 	size_t		z_size;		/* length of ACL data */
 	uint64_t	z_ace_count;	/* number of ACEs in this acl node */
-	int		z_ace_idx;	/* ace iterator positioned on */
 } zfs_acl_node_t;
 
 typedef struct zfs_acl {
 	uint64_t	z_acl_count;	/* Number of ACEs */
 	size_t		z_acl_bytes;	/* Number of bytes in ACL */
 	uint_t		z_version;	/* version of ACL */
-	void		*z_next_ace;	/* pointer to next ACE */
 	uint64_t	z_hints;	/* ACL hints (ZFS_INHERIT_ACE ...) */
-	zfs_acl_node_t	*z_curr_node;	/* current node iterator is handling */
 	list_t		z_acl;		/* chunks of ACE data */
 	acl_ops_t	z_ops;		/* ACL operations */
 } zfs_acl_t;

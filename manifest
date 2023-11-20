@@ -5992,6 +5992,7 @@ d usr/lib/fm/topo 0755 root bin
 d usr/lib/fm/topo/maps 0755 root bin
 f usr/lib/fm/topo/maps/xfp-hc-topology.xml 0444 root bin
 d usr/lib/fm/topo/plugins 0755 root bin
+f usr/lib/fm/topo/plugins/dimm.so 0555 root bin
 f usr/lib/fm/topo/plugins/disk.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ahci.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ipmi.so 0555 root bin
@@ -10604,6 +10605,8 @@ f usr/lib/smtp/sendmail/mailq 4555 root bin
 s usr/lib/smtp/sendmail/newaliases=sendmail
 f usr/lib/smtp/sendmail/sendmail 2555 root smmsp
 d usr/lib/snmp 0755 root bin
+d usr/lib/spd 0755 root bin
+f usr/lib/spd/spd 0555 root bin
 d usr/lib/spell 0755 root bin
 f usr/lib/spell/compress 0555 root bin
 f usr/lib/spell/hashcheck 0555 root bin
@@ -10773,6 +10776,7 @@ f usr/platform/i86pc/lib/fm/topo/plugins/chipset.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/x86pi.so 0555 root sys
+f usr/platform/i86pc/lib/fm/topo/plugins/zen.so 0555 root sys
 d usr/platform/i86pc/lib/mdb 0755 root sys
 d usr/platform/i86pc/lib/mdb/kvm 0755 root sys
 d usr/platform/i86pc/lib/mdb/kvm/amd64 0755 root sys

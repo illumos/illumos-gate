@@ -211,7 +211,6 @@ static struct vm_entry *vmentry;
 
 static struct bhyvestats {
 	uint64_t	vmexit_bogus;
-	uint64_t	vmexit_reqidle;
 	uint64_t	vmexit_hlt;
 	uint64_t	vmexit_pause;
 	uint64_t	vmexit_mtrap;
@@ -893,18 +892,6 @@ vmexit_bogus(struct vmctx *ctx __unused, struct vm_exit *vme,
 }
 
 static int
-vmexit_reqidle(struct vmctx *ctx __unused, struct vm_exit *vme,
-    int *pvcpu __unused)
-{
-
-	assert(vme->inst_length == 0);
-
-	stats.vmexit_reqidle++;
-
-	return (VMEXIT_CONTINUE);
-}
-
-static int
 vmexit_hlt(struct vmctx *ctx __unused, struct vm_exit *vme __unused,
     int *pvcpu __unused)
 {
@@ -1108,7 +1095,6 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_VMX]    = vmexit_vmx,
 	[VM_EXITCODE_SVM]    = vmexit_svm,
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
-	[VM_EXITCODE_REQIDLE] = vmexit_reqidle,
 	[VM_EXITCODE_RDMSR]  = vmexit_rdmsr,
 	[VM_EXITCODE_WRMSR]  = vmexit_wrmsr,
 	[VM_EXITCODE_MTRAP]  = vmexit_mtrap,

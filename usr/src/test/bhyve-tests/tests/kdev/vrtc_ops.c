@@ -19,6 +19,8 @@
 #include <strings.h>
 #include <libgen.h>
 #include <assert.h>
+#include <signal.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -30,6 +32,27 @@
 #include "in_guest.h"
 #include "test_defs.h"
 
+static bool timed_out = false;
+
+static void
+sigalrm_handler(int sig)
+{
+	timed_out = true;
+}
+
+static void
+configure_timeout(uint_t seconds)
+{
+	struct sigaction sa = {
+		.sa_handler = sigalrm_handler,
+	};
+	struct sigaction old_sa;
+	if (sigaction(SIGALRM, &sa, &old_sa) != 0) {
+		test_fail_errno(errno,
+		    "could not prep signal handling for bad access");
+	}
+	(void) alarm(seconds);
+}
 
 int
 main(int argc, char *argv[])
@@ -51,12 +74,20 @@ main(int argc, char *argv[])
 		test_fail_errno(err, "Could zero out RTC time");
 	}
 
+	/* A successful payload should be wrapped up well before 8 seconds */
+	configure_timeout(8);
+
 	struct vm_entry ventry = { 0 };
 	struct vm_exit vexit = { 0 };
 
 	do {
 		const enum vm_exit_kind kind =
 		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+
+		if (timed_out) {
+			test_fail_msg("test timed out\n");
+		}
+
 		switch (kind) {
 		case VEK_REENTR:
 			break;

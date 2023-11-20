@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <alloca.h>
@@ -301,26 +302,26 @@ topo_search_path(topo_mod_t *mod, const char *rootdir, const char *file)
 }
 
 /*
- * SMBIOS serial numbers can contain characters (particularly ':' and ' ')
- * that are invalid for the authority and can break FMRI parsing.  We translate
- * any invalid characters to a safe '-', as well as trimming any leading or
- * trailing whitespace.  Similarly, '/' can be found in some product names
- * so we translate that to '-'.
+ * SMBIOS serial numbers (and many other strings from devices) can contain
+ * characters (particularly ':' and ' ') that are invalid for the authority and
+ * can break FMRI parsing.  We translate any invalid characters to a safe '-',
+ * as well as trimming any leading or trailing whitespace.  Similarly, '/' can
+ * be found in some product names so we translate that to '-'.
  */
 char *
-topo_cleanup_auth_str(topo_hdl_t *thp, const char *begin)
+topo_cleanup_strn(topo_hdl_t *thp, const char *begin, size_t max)
 {
 	char buf[MAXNAMELEN];
 	const char *end, *cp;
 	char *pp;
 	char c;
-	int i;
+	size_t i;
 
-	end = begin + strlen(begin);
+	end = begin + max;
 
 	while (begin < end && isspace(*begin))
 		begin++;
-	while (begin < end && isspace(*(end - 1)))
+	while (begin < end && (isspace(*(end - 1)) || *(end - 1) == '\0'))
 		end--;
 
 	if (begin >= end)
@@ -342,6 +343,12 @@ topo_cleanup_auth_str(topo_hdl_t *thp, const char *begin)
 
 	pp = topo_hdl_strdup(thp, buf);
 	return (pp);
+}
+
+char *
+topo_cleanup_auth_str(topo_hdl_t *thp, const char *begin)
+{
+	return (topo_cleanup_strn(thp, begin, strlen(begin)));
 }
 
 void

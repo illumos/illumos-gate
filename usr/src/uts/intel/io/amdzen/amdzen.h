@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_H
@@ -86,10 +86,25 @@ typedef struct {
 	ddi_acc_handle_t	azns_cfgspace;
 } amdzen_stub_t;
 
-typedef enum  {
+typedef enum {
 	AMDZEN_DFE_F_MCA	= 1 << 0,
-	AMDZEN_DFE_F_ENABLED	= 1 << 1
+	AMDZEN_DFE_F_ENABLED	= 1 << 1,
+	AMDZEN_DFE_F_DATA_VALID	= 1 << 2
 } amdzen_df_ent_flags_t;
+
+/*
+ * Data specific to a CCM.
+ */
+typedef struct {
+	uint32_t acd_nccds;
+	uint8_t acd_ccd_en[DF_MAX_CCDS_PER_CCM];
+	uint32_t acd_ccd_id[DF_MAX_CCDS_PER_CCM];
+	void *acd_ccd_data[DF_MAX_CCDS_PER_CCM];
+} amdzen_ccm_data_t;
+
+typedef union {
+	amdzen_ccm_data_t aded_ccm;
+} amdzen_df_ent_data_t;
 
 typedef struct {
 	uint8_t adfe_drvid;
@@ -102,6 +117,7 @@ typedef struct {
 	uint32_t adfe_info1;
 	uint32_t adfe_info2;
 	uint32_t adfe_info3;
+	amdzen_df_ent_data_t adfe_data;
 } amdzen_df_ent_t;
 
 typedef enum {
@@ -124,6 +140,7 @@ typedef struct {
 	uint32_t	adf_mask0;
 	uint32_t	adf_mask1;
 	uint32_t	adf_mask2;
+	uint32_t	adf_nccm;
 	df_fabric_decomp_t	adf_decomp;
 } amdzen_df_t;
 
@@ -134,12 +151,20 @@ typedef enum {
 	AMDZEN_F_SCAN_DISPATCHED	= 1 << 3,
 	AMDZEN_F_SCAN_COMPLETE		= 1 << 4,
 	AMDZEN_F_ATTACH_DISPATCHED	= 1 << 5,
-	AMDZEN_F_ATTACH_COMPLETE	= 1 << 6
+	AMDZEN_F_ATTACH_COMPLETE	= 1 << 6,
+	AMDZEN_F_APIC_DECOMP_VALID	= 1 << 7
 } amdzen_flags_t;
 
 #define	AMDZEN_F_TASKQ_MASK	(AMDZEN_F_SCAN_DISPATCHED | \
     AMDZEN_F_SCAN_COMPLETE | AMDZEN_F_ATTACH_DISPATCHED | \
     AMDZEN_F_ATTACH_COMPLETE)
+
+/*
+ * These are the set of flags we want to consider when determining whether or
+ * not we're OK for receiving topo ioctls.
+ */
+#define	AMDZEN_F_IOCTL_MASK	(AMDZEN_F_UNSUPPORTED | \
+    AMDZEN_F_DEVICE_ERROR | AMDZEN_F_MAP_ERROR | AMDZEN_F_ATTACH_COMPLETE)
 
 typedef struct amdzen {
 	kmutex_t	azn_mutex;
@@ -153,6 +178,8 @@ typedef struct amdzen {
 	list_t		azn_nb_stubs;
 	uint_t		azn_ndfs;
 	amdzen_df_t	azn_dfs[AMDZEN_MAX_DFS];
+	uint32_t	azn_ncore_per_ccx;
+	amdzen_apic_decomp_t azn_apic_decomp;
 } amdzen_t;
 
 typedef enum {

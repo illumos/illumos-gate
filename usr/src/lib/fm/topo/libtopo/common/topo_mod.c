@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -918,7 +919,16 @@ topo_mod_clean_str(topo_mod_t *mod, const char *str)
 	if (str == NULL)
 		return (NULL);
 
-	return (topo_cleanup_auth_str(mod->tm_hdl, str));
+	return (topo_cleanup_strn(mod->tm_hdl, str, strlen(str)));
+}
+
+char *
+topo_mod_clean_strn(topo_mod_t *mod, const char *str, size_t len)
+{
+	if (str == NULL)
+		return (NULL);
+
+	return (topo_cleanup_strn(mod->tm_hdl, str, len));
 }
 
 int

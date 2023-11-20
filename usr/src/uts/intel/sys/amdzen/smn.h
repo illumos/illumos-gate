@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Co.
+ * Copyright 2023 Oxide Computer Co.
  */
 
 #ifndef _SYS_AMDZEN_SMN_H
@@ -523,6 +523,11 @@ _fn(const uint8_t unitno, const smn_reg_def_t def, const uint16_t reginst) \
 									\
 	return (SMN_MAKE_REG_SIZED(aperture + reg, size32));		\
 }
+
+/*
+ * An invalid SMN read will return all 1s similar to PCI.
+ */
+#define	SMN_EINVAL32	0xffffffff
 
 #ifdef __cplusplus
 }

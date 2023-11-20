@@ -212,9 +212,17 @@ struct vm_hpet_cap {
 
 struct vm_suspend {
 	enum vm_suspend_how how;
+	int source;
 };
 
-#define	VM_REINIT_F_FORCE_SUSPEND	(1 << 0)
+/*
+ * Deprecated flags for vm_reinit`flags:
+ *
+ * Suspend (by force) VM as part of reinit.  Effectively a no-op since
+ * suspension requirements during reinit have been lifted.
+ *
+ * #define VM_REINIT_F_FORCE_SUSPEND	(1 << 0)
+ */
 
 struct vm_reinit {
 	uint64_t	flags;
@@ -243,7 +251,10 @@ struct vm_cpuset {
 #endif
 };
 #define	VM_ACTIVE_CPUS		0
-#define	VM_SUSPENDED_CPUS	1
+/*
+ * Deprecated:
+ * #define VM_SUSPENDED_CPUS	1
+ */
 #define	VM_DEBUG_CPUS		2
 
 struct vm_intinfo {
@@ -415,7 +426,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	15
+#define	VMM_CURRENT_INTERFACE_VERSION	16
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -531,6 +542,8 @@ struct vm_legacy_cpuid {
 #define	VM_SET_AUTODESTRUCT		(VMM_IOC_BASE | 0x24)
 #define	VM_DESTROY_SELF			(VMM_IOC_BASE | 0x25)
 #define	VM_DESTROY_PENDING		(VMM_IOC_BASE | 0x26)
+
+#define	VM_VCPU_BARRIER			(VMM_IOC_BASE | 0x27)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

@@ -19,6 +19,12 @@
 #define	IOP_PMTMR	0x408
 #define	IOP_ATPIT_C0	0x40
 #define	IOP_ATPIT_CMD	0x43
+#define	IOP_ATPIC_MCMD	0x20
+#define	IOP_ATPIC_MDATA	0x21
+#define	IOP_ATPIC_SCMD	0xa0
+#define	IOP_ATPIC_SDATA	0xa1
+#define	IOP_RTC_ADDR	0x70
+#define	IOP_RTC_DATA	0x71
 
 #define	MMIO_HPET_BASE	0xfed00000UL
 #define	MMIO_LAPIC_BASE	0xfee00000UL

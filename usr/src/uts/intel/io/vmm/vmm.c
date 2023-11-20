@@ -138,8 +138,9 @@ struct vcpu {
 	kcondvar_t	state_cv;	/* (o) IDLE-transition cv */
 	int		hostcpu;	/* (o) vcpu's current host cpu */
 	int		lastloccpu;	/* (o) last host cpu localized to */
-	int		reqidle;	/* (i) request vcpu to idle */
+	bool		reqidle;	/* (i) request vcpu to idle */
 	bool		reqconsist;	/* (i) req. vcpu exit when consistent */
+	bool		reqbarrier;	/* (i) request vcpu exit barrier */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
 	uint64_t	exit_intinfo;	/* (i) events pending at VM exit */
@@ -204,9 +205,10 @@ struct vm {
 	struct vrtc	*vrtc;			/* (o) virtual RTC */
 	volatile cpuset_t active_cpus;		/* (i) active vcpus */
 	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for dbg */
-	int		suspend;		/* (i) stop VM execution */
-	volatile cpuset_t suspended_cpus;	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
+	int		suspend_how;		/* (i) stop VM execution */
+	int		suspend_source;		/* (i) src vcpuid of suspend */
+	hrtime_t	suspend_when;		/* (i) time suspend asserted */
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
 	struct vmspace	*vmspace;		/* (o) guest's address space */
@@ -311,6 +313,7 @@ static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 static void vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t);
 static bool vcpu_sleep_bailout_checks(struct vm *vm, int vcpuid);
 static int vcpu_vector_sipi(struct vm *vm, int vcpuid, uint8_t vector);
+static bool vm_is_suspended(struct vm *, struct vm_exit *);
 
 static void vmm_savectx(void *);
 static void vmm_restorectx(void *);
@@ -405,16 +408,16 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	} else {
 		vie_reset(vcpu->vie_ctx);
 		bzero(&vcpu->exitinfo, sizeof (vcpu->exitinfo));
-		if (vcpu->ustate != VU_INIT) {
-			vcpu_ustate_change(vm, vcpu_id, VU_INIT);
-		}
+		vcpu_ustate_change(vm, vcpu_id, VU_INIT);
 		bzero(&vcpu->mtrr, sizeof (vcpu->mtrr));
 	}
 
 	vcpu->run_state = VRS_HALT;
 	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
 	(void) vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
-	vcpu->reqidle = 0;
+	vcpu->reqidle = false;
+	vcpu->reqconsist = false;
+	vcpu->reqbarrier = false;
 	vcpu->exit_intinfo = 0;
 	vcpu->nmi_pending = false;
 	vcpu->extint_pending = false;
@@ -545,8 +548,9 @@ vm_init(struct vm *vm, bool create)
 	CPU_ZERO(&vm->active_cpus);
 	CPU_ZERO(&vm->debug_cpus);
 
-	vm->suspend = 0;
-	CPU_ZERO(&vm->suspended_cpus);
+	vm->suspend_how = 0;
+	vm->suspend_source = 0;
+	vm->suspend_when = 0;
 
 	for (i = 0; i < vm->maxcpus; i++)
 		vcpu_init(vm, i, create);
@@ -736,37 +740,6 @@ vm_destroy(struct vm *vm)
 int
 vm_reinit(struct vm *vm, uint64_t flags)
 {
-	/* A virtual machine can be reset only if all vcpus are suspended. */
-	if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) != 0) {
-		if ((flags & VM_REINIT_F_FORCE_SUSPEND) == 0) {
-			return (EBUSY);
-		}
-
-		/*
-		 * Force the VM (and all its vCPUs) into a suspended state.
-		 * This should be quick and easy, since the vm_reinit() call is
-		 * made while holding the VM write lock, which requires holding
-		 * all of the vCPUs in the VCPU_FROZEN state.
-		 */
-		(void) atomic_cmpset_int((uint_t *)&vm->suspend, 0,
-		    VM_SUSPEND_RESET);
-		for (uint_t i = 0; i < vm->maxcpus; i++) {
-			struct vcpu *vcpu = &vm->vcpu[i];
-
-			if (CPU_ISSET(i, &vm->suspended_cpus) ||
-			    !CPU_ISSET(i, &vm->active_cpus)) {
-				continue;
-			}
-
-			vcpu_lock(vcpu);
-			VERIFY3U(vcpu->state, ==, VCPU_FROZEN);
-			CPU_SET_ATOMIC(i, &vm->suspended_cpus);
-			vcpu_unlock(vcpu);
-		}
-
-		VERIFY0(CPU_CMP(&vm->suspended_cpus, &vm->active_cpus));
-	}
-
 	vm_cleanup(vm, false);
 	vm_init(vm, false);
 	return (0);
@@ -1461,9 +1434,10 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	 */
 	if (from_idle) {
 		while (vcpu->state != VCPU_IDLE) {
-			vcpu->reqidle = 1;
+			vcpu->reqidle = true;
 			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
 			cv_wait(&vcpu->state_cv, &vcpu->lock);
+			vcpu->reqidle = false;
 		}
 	} else {
 		KASSERT(vcpu->state != VCPU_IDLE, ("invalid transition from "
@@ -1605,7 +1579,7 @@ vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled)
 	vcpu_unlock(vcpu);
 
 	if (vm_halted) {
-		(void) vm_suspend(vm, VM_SUSPEND_HALT);
+		(void) vm_suspend(vm, VM_SUSPEND_HALT, -1);
 	}
 
 	return (userspace_exit ? -1 : 0);
@@ -1853,75 +1827,6 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid)
 		vie_advance_pc(vie, &vcpu->nextrip);
 	}
 	return (error);
-}
-
-static int
-vm_handle_suspend(struct vm *vm, int vcpuid)
-{
-	int i;
-	struct vcpu *vcpu;
-
-	vcpu = &vm->vcpu[vcpuid];
-
-	CPU_SET_ATOMIC(vcpuid, &vm->suspended_cpus);
-
-	/*
-	 * Wait until all 'active_cpus' have suspended themselves.
-	 */
-	vcpu_lock(vcpu);
-	vcpu_ustate_change(vm, vcpuid, VU_INIT);
-	while (1) {
-		int rc;
-
-		if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) == 0) {
-			break;
-		}
-
-		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
-		rc = cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->lock, hz,
-		    TR_CLOCK_TICK);
-		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
-
-		/*
-		 * If the userspace process driving the instance is killed, any
-		 * vCPUs yet to be marked suspended (because they are not
-		 * VM_RUN-ing in the kernel presently) will never reach that
-		 * state.
-		 *
-		 * To avoid vm_handle_suspend() getting stuck in the kernel
-		 * waiting for those vCPUs, offer a bail-out even though it
-		 * means returning without all vCPUs in a suspended state.
-		 */
-		if (rc <= 0) {
-			if ((curproc->p_flag & SEXITING) != 0) {
-				break;
-			}
-		}
-	}
-	vcpu_unlock(vcpu);
-
-	/*
-	 * Wakeup the other sleeping vcpus and return to userspace.
-	 */
-	for (i = 0; i < vm->maxcpus; i++) {
-		if (CPU_ISSET(i, &vm->suspended_cpus)) {
-			vcpu_notify_event(vm, i);
-		}
-	}
-
-	return (-1);
-}
-
-static int
-vm_handle_reqidle(struct vm *vm, int vcpuid)
-{
-	struct vcpu *vcpu = &vm->vcpu[vcpuid];
-
-	vcpu_lock(vcpu);
-	KASSERT(vcpu->reqidle, ("invalid vcpu reqidle %d", vcpu->reqidle));
-	vcpu->reqidle = 0;
-	vcpu_unlock(vcpu);
-	return (-1);
 }
 
 static int
@@ -2190,37 +2095,104 @@ vm_handle_wrmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 	return (0);
 }
 
-int
-vm_suspend(struct vm *vm, enum vm_suspend_how how)
+/*
+ * Has a suspend event been asserted on the VM?
+ *
+ * The reason and (in the case of a triple-fault) source vcpuid are optionally
+ * returned if such a state is present.
+ */
+static bool
+vm_is_suspended(struct vm *vm, struct vm_exit *vme)
 {
-	if (how <= VM_SUSPEND_NONE || how >= VM_SUSPEND_LAST)
-		return (EINVAL);
+	const int val = vm->suspend_how;
+	if (val == 0) {
+		return (false);
+	} else {
+		if (vme != NULL) {
+			vme->exitcode = VM_EXITCODE_SUSPENDED;
+			vme->u.suspended.how = val;
+			vme->u.suspended.source = vm->suspend_source;
+			/*
+			 * Normalize suspend event time and, on the off chance
+			 * that it was recorded as occuring prior to VM boot,
+			 * clamp it to a minimum of 0.
+			 */
+			vme->u.suspended.when = (uint64_t)
+			    MAX(vm_normalize_hrtime(vm, vm->suspend_when), 0);
+		}
+		return (true);
+	}
+}
 
-	if (atomic_cmpset_int((uint_t *)&vm->suspend, 0, how) == 0) {
-		return (EALREADY);
+int
+vm_suspend(struct vm *vm, enum vm_suspend_how how, int source)
+{
+	if (how <= VM_SUSPEND_NONE || how >= VM_SUSPEND_LAST) {
+		return (EINVAL);
 	}
 
 	/*
-	 * Notify all active vcpus that they are now suspended.
+	 * Although the common case of calling vm_suspend() is via
+	 * ioctl(VM_SUSPEND), where all the vCPUs will be held in the frozen
+	 * state, it can also be called by a running vCPU to indicate a
+	 * triple-fault.  In the latter case, there is no exclusion from a
+	 * racing vm_suspend() from a different vCPU, so assertion of the
+	 * suspended state must be performed carefully.
+	 *
+	 * The `suspend_when` is set first via atomic cmpset to pick a "winner"
+	 * of the suspension race, followed by population of 'suspend_source'.
+	 * Only after those are done, and a membar is emitted will 'suspend_how'
+	 * be set, which makes the suspended state visible to any vCPU checking
+	 * for it.  That order will prevent an incomplete suspend state (between
+	 * 'how', 'source', and 'when') from being observed.
 	 */
+	const hrtime_t now = gethrtime();
+	if (atomic_cmpset_long((ulong_t *)&vm->suspend_when, 0, now) == 0) {
+		return (EALREADY);
+	}
+	vm->suspend_source = source;
+	membar_producer();
+	vm->suspend_how = how;
+
+	/* Notify all active vcpus that they are now suspended. */
 	for (uint_t i = 0; i < vm->maxcpus; i++) {
 		struct vcpu *vcpu = &vm->vcpu[i];
 
 		vcpu_lock(vcpu);
-		if (vcpu->state == VCPU_IDLE || vcpu->state == VCPU_FROZEN) {
+
+		if (!CPU_ISSET(i, &vm->active_cpus)) {
 			/*
-			 * Any vCPUs not actively running or in HLT can be
-			 * marked as suspended immediately.
+			 * vCPUs not already marked as active can be ignored,
+			 * since they cannot become marked as active unless the
+			 * VM is reinitialized, clearing the suspended state.
 			 */
-			if (CPU_ISSET(i, &vm->active_cpus)) {
-				CPU_SET_ATOMIC(i, &vm->suspended_cpus);
-			}
-		} else {
+			vcpu_unlock(vcpu);
+			continue;
+		}
+
+		switch (vcpu->state) {
+		case VCPU_IDLE:
+		case VCPU_FROZEN:
 			/*
-			 * Those which are running or in HLT will pick up the
-			 * suspended state after notification.
+			 * vCPUs not locked by in-kernel activity can be
+			 * immediately marked as suspended: The ustate is moved
+			 * back to VU_INIT, since no further guest work will
+			 * occur while the VM is in this state.
+			 *
+			 * A FROZEN vCPU may still change its ustate on the way
+			 * out of the kernel, but a subsequent check at the end
+			 * of vm_run() should be adequate to fix it up.
+			 */
+			vcpu_ustate_change(vm, i, VU_INIT);
+			break;
+		default:
+			/*
+			 * Any vCPUs which are running or waiting in-kernel
+			 * (such as in HLT) are notified to pick up the newly
+			 * suspended state.
 			 */
 			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
+			break;
 		}
 		vcpu_unlock(vcpu);
 	}
@@ -2515,14 +2487,8 @@ restart:
 
 	vcpu->nextrip = vme->rip + vme->inst_length;
 	switch (vme->exitcode) {
-	case VM_EXITCODE_REQIDLE:
-		error = vm_handle_reqidle(vm, vcpuid);
-		break;
 	case VM_EXITCODE_RUN_STATE:
 		error = vm_handle_run_state(vm, vcpuid);
-		break;
-	case VM_EXITCODE_SUSPENDED:
-		error = vm_handle_suspend(vm, vcpuid);
 		break;
 	case VM_EXITCODE_IOAPIC_EOI:
 		vioapic_process_eoi(vm, vcpuid,
@@ -2580,7 +2546,13 @@ exit:
 	vmm_savectx(&vcpu->vtc);
 	kpreempt_enable();
 
-	vcpu_ustate_change(vm, vcpuid, VU_EMU_USER);
+	/*
+	 * Bill time in userspace against VU_EMU_USER, unless the VM is
+	 * suspended, in which case VU_INIT is the choice.
+	 */
+	vcpu_ustate_change(vm, vcpuid,
+	    vm_is_suspended(vm, NULL) ? VU_INIT : VU_EMU_USER);
+
 	return (error);
 }
 
@@ -2722,7 +2694,7 @@ vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *retinfo)
 		 */
 		if (VM_INTINFO_TYPE(info1) == VM_INTINFO_HWEXCP &&
 		    VM_INTINFO_VECTOR(info1) == IDT_DF) {
-			(void) vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
+			(void) vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT, vcpuid);
 			*retinfo = 0;
 			return (false);
 		}
@@ -3297,7 +3269,7 @@ vm_activate_cpu(struct vm *vm, int vcpuid)
 	if (CPU_ISSET(vcpuid, &vm->active_cpus))
 		return (EBUSY);
 
-	if (vm->suspend != 0) {
+	if (vm_is_suspended(vm, NULL)) {
 		return (EBUSY);
 	}
 
@@ -3305,11 +3277,10 @@ vm_activate_cpu(struct vm *vm, int vcpuid)
 
 	/*
 	 * It is possible that this vCPU was undergoing activation at the same
-	 * time that the VM was being suspended.  If that happens to be the
-	 * case, it should reflect the suspended state immediately.
+	 * time that the VM was being suspended.
 	 */
-	if (atomic_load_acq_int((uint_t *)&vm->suspend) != 0) {
-		CPU_SET_ATOMIC(vcpuid, &vm->suspended_cpus);
+	if (vm_is_suspended(vm, NULL)) {
+		return (EBUSY);
 	}
 
 	return (0);
@@ -3358,48 +3329,44 @@ vm_resume_cpu(struct vm *vm, int vcpuid)
 }
 
 static bool
-vcpu_bailout_checks(struct vm *vm, int vcpuid, bool on_entry,
-    uint64_t entry_rip)
+vcpu_bailout_checks(struct vm *vm, int vcpuid)
 {
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 	struct vm_exit *vme = &vcpu->exitinfo;
-	bool bail = false;
 
 	ASSERT(vcpuid >= 0 && vcpuid < vm->maxcpus);
 
-	if (vm->suspend) {
-		if (on_entry) {
-			VERIFY(vm->suspend > VM_SUSPEND_NONE &&
-			    vm->suspend < VM_SUSPEND_LAST);
+	/*
+	 * Check if VM is suspended, only passing the 'vm_exit *' to be
+	 * populated if this check is being performed as part of entry.
+	 */
+	if (vm_is_suspended(vm, vme)) {
+		/* Confirm exit details are as expected */
+		VERIFY3S(vme->exitcode, ==, VM_EXITCODE_SUSPENDED);
+		VERIFY(vme->u.suspended.how > VM_SUSPEND_NONE &&
+		    vme->u.suspended.how < VM_SUSPEND_LAST);
 
-			vme->exitcode = VM_EXITCODE_SUSPENDED;
-			vme->u.suspended.how = vm->suspend;
-		} else {
-			/*
-			 * Handling VM suspend is complicated, so if that
-			 * condition is detected outside of VM-entry itself,
-			 * just emit a BOGUS exitcode so we take a lap to pick
-			 * up the event during an entry and are directed into
-			 * the vm_handle_suspend() logic.
-			 */
-			vme->exitcode = VM_EXITCODE_BOGUS;
-		}
-		bail = true;
+		return (true);
 	}
 	if (vcpu->reqidle) {
-		vme->exitcode = VM_EXITCODE_REQIDLE;
+		/*
+		 * Another thread is trying to lock this vCPU and is waiting for
+		 * it to enter the VCPU_IDLE state.  Take a lap with a BOGUS
+		 * exit to allow other thread(s) access to this vCPU.
+		 */
+		vme->exitcode = VM_EXITCODE_BOGUS;
 		vmm_stat_incr(vm, vcpuid, VMEXIT_REQIDLE, 1);
-
-		if (!on_entry) {
-			/*
-			 * A reqidle request detected outside of VM-entry can be
-			 * handled directly by clearing the request (and taking
-			 * a lap to userspace).
-			 */
-			vcpu_assert_locked(vcpu);
-			vcpu->reqidle = 0;
-		}
-		bail = true;
+		return (true);
+	}
+	if (vcpu->reqbarrier) {
+		/*
+		 * Similar to 'reqidle', userspace has requested that this vCPU
+		 * be pushed to a barrier by exiting to userspace.  Take that
+		 * lap with BOGUS and clear the flag.
+		 */
+		vme->exitcode = VM_EXITCODE_BOGUS;
+		vcpu->reqbarrier = false;
+		return (true);
 	}
 	if (vcpu->reqconsist) {
 		/*
@@ -3410,72 +3377,104 @@ vcpu_bailout_checks(struct vm *vm, int vcpuid, bool on_entry,
 		 */
 		vme->exitcode = VM_EXITCODE_BOGUS;
 		vcpu->reqconsist = false;
-		bail = true;
+		return (true);
 	}
 	if (vcpu_should_yield(vm, vcpuid)) {
 		vme->exitcode = VM_EXITCODE_BOGUS;
 		vmm_stat_incr(vm, vcpuid, VMEXIT_ASTPENDING, 1);
-		bail = true;
+		return (true);
 	}
 	if (CPU_ISSET(vcpuid, &vm->debug_cpus)) {
 		vme->exitcode = VM_EXITCODE_DEBUG;
-		bail = true;
+		return (true);
 	}
 
-	if (bail) {
-		if (on_entry) {
-			/*
-			 * If bailing out during VM-entry, the current %rip must
-			 * be recorded in the exitinfo.
-			 */
-			vme->rip = entry_rip;
-		}
-		vme->inst_length = 0;
-	}
-	return (bail);
+	return (false);
 }
 
 static bool
 vcpu_sleep_bailout_checks(struct vm *vm, int vcpuid)
 {
-	/*
-	 * Bail-out check done prior to sleeping (in vCPU contexts like HLT or
-	 * wait-for-SIPI) expect that %rip is already populated in the vm_exit
-	 * structure, and we would only modify the exitcode.
-	 */
-	return (vcpu_bailout_checks(vm, vcpuid, false, 0));
+	if (vcpu_bailout_checks(vm, vcpuid)) {
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+		struct vm_exit *vme = &vcpu->exitinfo;
+
+		/*
+		 * Bail-out check done prior to sleeping (in vCPU contexts like
+		 * HLT or wait-for-SIPI) expect that %rip is already populated
+		 * in the vm_exit structure, and we would only modify the
+		 * exitcode and clear the inst_length.
+		 */
+		vme->inst_length = 0;
+		return (true);
+	}
+	return (false);
 }
 
 bool
 vcpu_entry_bailout_checks(struct vm *vm, int vcpuid, uint64_t rip)
 {
-	/*
-	 * Bail-out checks done as part of VM entry require an updated %rip to
-	 * populate the vm_exit struct if any of the conditions of interest are
-	 * matched in the check.
-	 */
-	return (vcpu_bailout_checks(vm, vcpuid, true, rip));
+	if (vcpu_bailout_checks(vm, vcpuid)) {
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+		struct vm_exit *vme = &vcpu->exitinfo;
+
+		/*
+		 * Bail-out checks done as part of VM entry require an updated
+		 * %rip to populate the vm_exit struct if any of the conditions
+		 * of interest are matched in the check.
+		 */
+		vme->rip = rip;
+		vme->inst_length = 0;
+		return (true);
+	}
+	return (false);
+}
+
+int
+vm_vcpu_barrier(struct vm *vm, int vcpuid)
+{
+	if (vcpuid >= 0 && vcpuid < vm->maxcpus) {
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+		/* Push specified vCPU to barrier */
+		vcpu_lock(vcpu);
+		if (CPU_ISSET(vcpuid, &vm->active_cpus)) {
+			vcpu->reqbarrier = true;
+			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
+		}
+		vcpu_unlock(vcpu);
+
+		return (0);
+	} else if (vcpuid == -1) {
+		/* Push all (active) vCPUs to barrier */
+		for (int i = 0; i < vm->maxcpus; i++) {
+			struct vcpu *vcpu = &vm->vcpu[i];
+
+			vcpu_lock(vcpu);
+			if (CPU_ISSET(vcpuid, &vm->active_cpus)) {
+				vcpu->reqbarrier = true;
+				vcpu_notify_event_locked(vcpu,
+				    VCPU_NOTIFY_EXIT);
+			}
+			vcpu_unlock(vcpu);
+		}
+
+		return (0);
+	} else {
+		return (EINVAL);
+	}
 }
 
 cpuset_t
 vm_active_cpus(struct vm *vm)
 {
-
 	return (vm->active_cpus);
 }
 
 cpuset_t
 vm_debug_cpus(struct vm *vm)
 {
-
 	return (vm->debug_cpus);
-}
-
-cpuset_t
-vm_suspended_cpus(struct vm *vm)
-{
-
-	return (vm->suspended_cpus);
 }
 
 void *
@@ -3580,13 +3579,16 @@ void
 vcpu_ustate_change(struct vm *vm, int vcpuid, enum vcpu_ustate ustate)
 {
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
-	hrtime_t now = gethrtime();
+	const hrtime_t now = gethrtime();
 
-	ASSERT3U(ustate, !=, vcpu->ustate);
 	ASSERT3S(ustate, <, VU_MAX);
 	ASSERT3S(ustate, >=, VU_INIT);
 
-	hrtime_t delta = now - vcpu->ustate_when;
+	if (ustate == vcpu->ustate) {
+		return;
+	}
+
+	const hrtime_t delta = now - vcpu->ustate_when;
 	vcpu->ustate_total[vcpu->ustate] += delta;
 
 	membar_producer();

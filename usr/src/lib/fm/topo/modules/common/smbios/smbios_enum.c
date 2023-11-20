@@ -81,6 +81,8 @@ smbios2topotype(topo_mod_t *mod, uint8_t type)
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_DDR3));
 	case (SMB_MDT_DDR4):
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_DDR4));
+	case (SMB_MDT_DDR5):
+		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_DDR5));
 	case (SMB_MDT_LPDDR):
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_LPDDR));
 	case (SMB_MDT_LPDDR2):
@@ -89,6 +91,8 @@ smbios2topotype(topo_mod_t *mod, uint8_t type)
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_LPDDR3));
 	case (SMB_MDT_LPDDR4):
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_LPDDR4));
+	case (SMB_MDT_LPDDR5):
+		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_LPDDR5));
 	default:
 		return (topo_mod_strdup(mod, TOPO_DIMM_TYPE_UNKNOWN));
 	}

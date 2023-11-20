@@ -541,6 +541,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SET_AUTODESTRUCT:
 	case VM_DESTROY_SELF:
 	case VM_DESTROY_PENDING:
+	case VM_VCPU_BARRIER:
 	default:
 		break;
 	}
@@ -587,7 +588,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_suspend(sc->vmm_vm, vmsuspend.how);
+		error = vm_suspend(sc->vmm_vm, vmsuspend.how, vmsuspend.source);
 		break;
 	}
 	case VM_REINIT: {
@@ -1519,6 +1520,11 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 
+	case VM_VCPU_BARRIER:
+		vcpu = arg;
+		error = vm_vcpu_barrier(sc->vmm_vm, vcpu);
+		break;
+
 	case VM_GET_CPUS: {
 		struct vm_cpuset vm_cpuset;
 		cpuset_t tempset;
@@ -1545,8 +1551,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 		if (vm_cpuset.which == VM_ACTIVE_CPUS) {
 			tempset = vm_active_cpus(sc->vmm_vm);
-		} else if (vm_cpuset.which == VM_SUSPENDED_CPUS) {
-			tempset = vm_suspended_cpus(sc->vmm_vm);
 		} else if (vm_cpuset.which == VM_DEBUG_CPUS) {
 			tempset = vm_debug_cpus(sc->vmm_vm);
 		} else {

@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _VMMAPI_H_
@@ -312,7 +312,9 @@ int	vm_rtc_gettime(struct vmctx *ctx, timespec_t *);
 int	vcpu_reset(struct vmctx *ctx, int vcpu);
 
 int	vm_active_cpus(struct vmctx *ctx, cpuset_t *cpus);
+#ifdef	__FreeBSD__
 int	vm_suspended_cpus(struct vmctx *ctx, cpuset_t *cpus);
+#endif	/* __FreeBSD__ */
 int	vm_debug_cpus(struct vmctx *ctx, cpuset_t *cpus);
 int	vm_activate_cpu(struct vmctx *ctx, int vcpu);
 int	vm_suspend_cpu(struct vmctx *ctx, int vcpu);
@@ -332,6 +334,7 @@ int vm_get_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state *state,
     uint8_t *sipi_vector);
 int vm_set_run_state(struct vmctx *ctx, int vcpu, enum vcpu_run_state state,
     uint8_t sipi_vector);
+int vm_vcpu_barrier(struct vmctx *, int);
 #endif	/* __FreeBSD__ */
 
 #ifdef	__FreeBSD__
