@@ -39,6 +39,9 @@ usage(int exitcode)
 	exit(exitcode);
 }
 
+/*
+ * Parse an input size of MiB to bytes.
+ */
 static bool
 parse_size(const char *arg, size_t *resp)
 {
@@ -156,14 +159,14 @@ do_query(int fd)
 		return;
 	}
 
-	printf("Free KiB:\t%zu\n"
-	    "Allocated KiB:\t%zu\n"
-	    "Transient Allocated KiB:\t%zu\n"
-	    "Size limit KiB:\t%zu\n",
-	    data.vrq_free_sz / 1024,
-	    data.vrq_alloc_sz / 1024,
-	    data.vrq_alloc_transient_sz / 1024,
-	    data.vrq_limit / 1024);
+	printf("Free MiB:\t%zu\n"
+	    "Allocated MiB:\t%zu\n"
+	    "Transient Allocated MiB:\t%zu\n"
+	    "Size limit MiB:\t%zu\n",
+	    data.vrq_free_sz / (1024 * 1024),
+	    data.vrq_alloc_sz / (1024 * 1024),
+	    data.vrq_alloc_transient_sz / (1024 * 1024),
+	    data.vrq_limit / (1024 * 1024));
 }
 
 int
