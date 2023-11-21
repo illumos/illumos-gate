@@ -20,8 +20,11 @@ ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
 PROGS = libjedec_test libjedec_temp libjedec_spd
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
 
-LINTS = $(PROGS:%=%.ln)
+ROOTOPTPROGS = $(PROGS32:%=$(TESTDIR)/%) \
+	$(PROGS64:%=$(TESTDIR)/%)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
@@ -30,17 +33,19 @@ CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 LDLIBS += -ljedec
-libjedec_spd	:= LDLIBS += -lnvpair
+LDLIBS64 += -ljedec
+libjedec_spd.32	:= LDLIBS += -lnvpair
+libjedec_spd.64	:= LDLIBS64 += -lnvpair
 CSTD = $(GNU_C99)
 
-all: $(PROGS)
+all: $(PROGS32) $(PROGS64)
 
-install: all $(CMDS) $(OUTFILES)
+$(ROOTOPTPROGS): all
 
-lint:
+install: all $(ROOTOPTPROGS)
 
 clobber: clean
-	-$(RM) $(PROGS) $(LINTS)
+	-$(RM) $(PROGS32) $(PGROGS64)
 
 clean:
 
@@ -52,6 +57,10 @@ $(TESTDIR):
 $(TESTDIR)/%: %
 	$(INS.file)
 
-%: %.c
+%.64: %.c
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
 	$(LINK.c) -o $@ $< $(LDLIBS)
 	$(POST_PROCESS)
