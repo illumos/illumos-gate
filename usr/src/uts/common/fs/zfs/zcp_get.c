@@ -572,7 +572,7 @@ prop_valid_for_ds(dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 	error = get_objset_type(ds, &zfs_type);
 	if (error != 0)
 		return (B_FALSE);
-	return (zfs_prop_valid_for_type(zfs_prop, zfs_type));
+	return (zfs_prop_valid_for_type(zfs_prop, zfs_type, B_FALSE));
 }
 
 /*
