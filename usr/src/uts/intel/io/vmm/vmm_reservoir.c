@@ -55,12 +55,13 @@
  *
  * Operators may attempt to alter the amount of memory allocated to the
  * reservoir via an ioctl against the vmmctl device.  The total amount of memory
- * in the reservoir (free, or allocated to VMs) is arbitrarily limited at this
- * time by `vmmr_total_limit`, which defaults to 80% of physmem.  This is done
- * to prevent the reservoir from inadvertently growing to a size where the
- * system has inadequate memory to make forward progress.  Shrinking the
- * reservoir is only possible when it contains free (not allocated by any guest
- * VMs) memory.
+ * in the reservoir (free, or allocated to VMs) is limited by
+ * `vmm_total_limit` (see its definition for how this limit is calculated).
+ *
+ * The limit is in place to prevent the reservoir from inadvertently growing
+ * to a size where the system has inadequate memory to make forward progress.
+ * Shrinking the reservoir is only possible when it contains free (not
+ * allocated by any guest VMs) memory.
  *
  *
  * Page Tracking

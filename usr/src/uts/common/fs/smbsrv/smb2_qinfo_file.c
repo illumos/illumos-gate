@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -25,7 +25,6 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/ntifs.h>
 
-static uint32_t smb2_qif_all(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_basic(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_standard(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_internal(smb_request_t *, smb_queryinfo_t *);
@@ -48,6 +47,12 @@ static uint32_t smb2_qif_opens(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_tags(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_id_info(smb_request_t *, smb_queryinfo_t *);
 
+/*
+ * MS-SMB2 3.3.5.20.1 says (in a windows behavior note) that
+ * 2012R2 and older fill in the FileNameInformation.
+ * Default to the new behavior.
+ */
+boolean_t smb2_qif_all_get_name = B_FALSE;
 
 uint32_t
 smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
@@ -75,10 +80,8 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileAllInformation:
 		mask = SMB_AT_ALL;
 		getstd = B_TRUE;
-		if (sr->session->dialect < SMB_VERS_3_11) {
-			/* See smb2_qif_all() */
+		if (smb2_qif_all_get_name)
 			getname = B_TRUE;
-		}
 		break;
 
 	case FileNameInformation:
@@ -244,18 +247,12 @@ smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
 	if (status)
 		return (status);
 
-	/*
-	 * MS-SMB2 3.3.5.20.1 says (in a windows behavior note) that
-	 * 2012R2 and older fill in the FileNameInformation.
-	 * We could let this depend on sr->sr_cfg->skc_version
-	 * but doing it based on dialect is a lot easier and
-	 * has nearly the same effect.
-	 */
-	if (sr->session->dialect < SMB_VERS_3_11) {
-		/* Win2012r2 and earlier fill it in. (SMB 3.0) */
+	/* See smb2_qif_all_get_name */
+	if (qi->qi_namelen != 0) {
+		/* Win2012r2 and earlier fill it in. */
 		status = smb2_qif_name(sr, qi);
 	} else {
-		/* Win2016 and later just put zeros (SMB 3.11) */
+		/* Win2016 and later just put zeros. */
 		int rc = smb_mbc_encodef(&sr->raw_data, "10.");
 		status = (rc == 0) ? 0 : NT_STATUS_BUFFER_OVERFLOW;
 	}
