@@ -76,6 +76,7 @@ _info(struct modinfo *modinfop)
 
 
 static void virtio_set_status(virtio_t *, uint8_t);
+static void virtio_set_status_locked(virtio_t *, uint8_t);
 static int virtio_chain_append_impl(virtio_chain_t *, uint64_t, size_t,
     uint16_t);
 static int virtio_interrupts_setup(virtio_t *, int);
@@ -194,7 +195,7 @@ virtio_fini(virtio_t *vio, boolean_t failed)
 		/*
 		 * Signal to the host that device setup failed.
 		 */
-		virtio_set_status(vio, VIRTIO_STATUS_FAILED);
+		virtio_set_status_locked(vio, VIRTIO_STATUS_FAILED);
 	} else {
 		virtio_device_reset_locked(vio);
 	}
@@ -402,21 +403,27 @@ virtio_intr_pri(virtio_t *vio)
  * constants for "status".  To zero the status field use virtio_device_reset().
  */
 static void
-virtio_set_status(virtio_t *vio, uint8_t status)
+virtio_set_status_locked(virtio_t *vio, uint8_t status)
 {
 	VERIFY3U(status, !=, 0);
-
-	mutex_enter(&vio->vio_mutex);
+	VERIFY(MUTEX_HELD(&vio->vio_mutex));
 
 	uint8_t old = virtio_get8(vio, VIRTIO_LEGACY_DEVICE_STATUS);
 	virtio_put8(vio, VIRTIO_LEGACY_DEVICE_STATUS, status | old);
+}
 
+static void
+virtio_set_status(virtio_t *vio, uint8_t status)
+{
+	mutex_enter(&vio->vio_mutex);
+	virtio_set_status_locked(vio, status);
 	mutex_exit(&vio->vio_mutex);
 }
 
 static void
 virtio_device_reset_locked(virtio_t *vio)
 {
+	VERIFY(MUTEX_HELD(&vio->vio_mutex));
 	virtio_put8(vio, VIRTIO_LEGACY_DEVICE_STATUS, VIRTIO_STATUS_RESET);
 }
 
