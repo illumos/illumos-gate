@@ -99,7 +99,7 @@ for type in " " mirror raidz raidz2; do
 	log_note "$TESTPOOL1 $type has previous size: $prev_size and " \
 	    "expanded size: $expand_size"
 	# compare available pool size from zfs
-	if [[ $zfs_expand_size > $zfs_prev_size ]]; then
+	if (( zfs_expand_size > zfs_prev_size )); then
 	# check for zpool history for the pool size expansion
 		if [[ $type == " " ]]; then
 			typeset	size_addition=$(zpool history -il $TESTPOOL1 |\
@@ -107,7 +107,7 @@ for type in " " mirror raidz raidz2; do
 			    grep "vdev online" | \
 			    grep "(+${EX_1GB}" | wc -l)
 
-			if [[ $size_addition -ne $i ]]; then
+			if (( size_addition != i )); then
 				log_fail "pool $TESTPOOL1 is not autoexpand " \
 				    "after LUN expansion"
 			fi
@@ -117,7 +117,7 @@ for type in " " mirror raidz raidz2; do
 			    grep "vdev online" | \
 			    grep "(+${EX_1GB})" >/dev/null 2>&1
 
-			if [[ $? -ne 0 ]] ; then
+			if (( $? != 0 )) ; then
 				log_fail "pool $TESTPOOL1 is not autoexpand " \
 				    "after LUN expansion"
 			fi
@@ -127,7 +127,7 @@ for type in " " mirror raidz raidz2; do
 			    grep "vdev online" | \
 			    grep "(+${EX_3GB})" >/dev/null 2>&1
 
-			if [[ $? -ne 0 ]]; then
+			if (( $? != 0 )); then
 				log_fail "pool $TESTPOOL is not autoexpand " \
 				    "after LUN expansion"
 			fi
