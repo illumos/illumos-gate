@@ -33,6 +33,7 @@ SRCS =		libnwam_audit.c libnwam_backend.c libnwam_enm.c \
 		libnwam_wlan.c
 HDRDIR =	common
 SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 POFILE =	libnwam.po
 MSGFILES =	common/*.c
 
