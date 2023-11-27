@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd December  2, 2019
+.Dd November 27, 2023
 .Dt PROC_WALK 3PROC
 .Os
 .Sh NAME
 .Nm proc_walk
 .Nd walk all processes or threads in /proc
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo proc_walk

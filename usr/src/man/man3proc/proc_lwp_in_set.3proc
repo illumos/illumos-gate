@@ -11,15 +11,17 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_LWP_IN_SET 3PROC
 .Os
 .Sh NAME
 .Nm proc_lwp_in_set ,
 .Nm proc_lwp_range_valid
 .Nd test and validate thread ranges
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
+.In libproc.h
 .Ft int
 .Fo proc_lwp_in_set
 .Fa "const char *set"

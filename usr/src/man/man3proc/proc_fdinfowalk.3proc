@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd January 6, 2020
+.Dd November 27, 2023
 .Dt PROC_FDINFOWALK 3PROC
 .Os
 .Sh NAME
 .Nm proc_fdinfowalk
 .Nd walk the additional miscellaneous information in a prfdinfo_t structure
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo proc_fdinfowalk

@@ -11,15 +11,16 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_GET_PRIV 3PROC
 .Os
 .Sh NAME
 .Nm proc_get_priv ,
 .Nm proc_free_priv
 .Nd get process privileges
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "prpriv_t *"
 .Fo proc_get_priv

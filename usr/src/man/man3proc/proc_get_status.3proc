@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd November 8, 2020
+.Dd November 27, 2023
 .Dt PROC_GET_STATUS 3PROC
 .Os
 .Sh NAME
 .Nm proc_get_status
 .Nd get process status information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo proc_get_status

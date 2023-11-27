@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd January 6, 2020
+.Dd November 27, 2023
 .Dt PROC_FDINFO_MISC 3PROC
 .Os
 .Sh NAME
 .Nm proc_fdinfo_misc
 .Nd retrieve a miscellaneous information item from a prfdinfo_t structure
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft const void *
 .Fo proc_fdinfo_misc

@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd January 6, 2020
+.Dd November 27, 2023
 .Dt PROC_FDWALK 3PROC
 .Os
 .Sh NAME
 .Nm proc_fdwalk
 .Nd walk the open file descriptors for a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo proc_fdwalk

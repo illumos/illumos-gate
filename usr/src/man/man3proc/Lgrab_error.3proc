@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt LGRAB_ERROR 3PROC
 .Os
 .Sh NAME
 .Nm Lgrab_error
 .Nd get Lgrab error message string
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const char *"
 .Fo Lgrab_error

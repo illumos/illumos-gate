@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PR_STAT 3PROC
 .Os
 .Sh NAME
@@ -22,8 +22,9 @@
 .Nm pr_stat ,
 .Nm pr_stat64
 .Nd inject stat system call into victim process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo pr_fstat

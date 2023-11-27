@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt LGRAB 3PROC
 .Os
 .Sh NAME
 .Nm Lgrab
 .Nd obtain a handle to control a thread
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_lwphandle *"
 .Fo Lgrab

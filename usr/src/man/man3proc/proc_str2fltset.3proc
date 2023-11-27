@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_STR2FLTSET 3PROC
 .Os
 .Sh NAME
@@ -19,8 +19,9 @@
 .Nm proc_str2sigset ,
 .Nm proc_str2sysset
 .Nd convert a string to a fault, signal, or system call set
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft char *
 .Fo proc_str2fltset

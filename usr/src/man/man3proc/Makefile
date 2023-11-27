@@ -241,6 +241,7 @@ MANLINKS=					\
 		proc_flushstdio.3proc		\
 		proc_free_priv.3proc		\
 		proc_get_ldt.3proc		\
+		proc_get_lwpstatus.3proc	\
 		proc_lwp_range_valid.3proc	\
 		proc_signame.3proc		\
 		proc_sigset2str.3proc		\
@@ -431,6 +432,8 @@ proc_sigset2str.3proc		:= LINKSRC = proc_fltset2str.3proc
 proc_sysset2str.3proc		:= LINKSRC = proc_fltset2str.3proc
 
 proc_free_priv.3proc		:= LINKSRC = proc_get_priv.3proc
+
+proc_get_lwpstatus.3proc	:= LINKSRC = proc_get_lwpsinfo.3proc
 
 proc_lwp_range_valid.3proc	:= LINKSRC = proc_lwp_in_set.3proc
 

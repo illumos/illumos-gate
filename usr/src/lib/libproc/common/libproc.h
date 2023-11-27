@@ -732,6 +732,7 @@ extern prfdinfo_t *proc_get_fdinfo(pid_t, int);
 extern const void *proc_fdinfo_misc(const prfdinfo_t *, uint_t, size_t *);
 extern void proc_fdinfo_free(prfdinfo_t *);
 extern int proc_get_lwpsinfo(pid_t, uint_t, lwpsinfo_t *);
+extern int proc_get_lwpstatus(pid_t, uint_t, lwpstatus_t *);
 
 /*
  * Utility functions for debugging tools to convert numeric fault,

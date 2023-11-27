@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2015, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -234,5 +234,21 @@ proc_get_lwpsinfo(pid_t pid, uint_t thr, lwpsinfo_t *lwpip)
 		(void) close(fd);
 	}
 	return (rv);
+}
 
+int
+proc_get_lwpstatus(pid_t pid, uint_t thr, lwpstatus_t *lwp)
+{
+	char fname[PATH_MAX];
+	int fd;
+	int rv = -1;
+
+	(void) snprintf(fname, sizeof (fname), "%s/%d/lwp/%u/lwpstatus",
+	    procfs_path, (int)pid, thr);
+	if ((fd = open(fname, O_RDONLY)) >= 0) {
+		if (read(fd, lwp, sizeof (*lwp)) == sizeof (*lwp))
+			rv = 0;
+		(void) close(fd);
+	}
+	return (rv);
 }
