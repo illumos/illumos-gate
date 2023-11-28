@@ -242,16 +242,16 @@ static const char *lxml_prop_types[] = {
 	""				/* SC_XI_INCLUDE */
 };
 
+static int xml_read_options = 0;
+
 int
 lxml_init()
 {
 	if (getenv("SVCCFG_NOVALIDATE") == NULL) {
 		/*
-		 * DTD validation, with line numbers.
+		 * DTD validation.
 		 */
-		(void) xmlLineNumbersDefault(1);
-		xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
-		xmlLoadExtDtdDefaultValue |= XML_COMPLETE_ATTRS;
+		xml_read_options |= XML_PARSE_DTDLOAD | XML_PARSE_DTDATTR;
 	}
 
 	return (0);
@@ -3720,10 +3720,8 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, svccfg_op_t op)
 	if (do_validate)
 		dtdpath = getenv("SVCCFG_DTD");
 
-	if (dtdpath != NULL)
-		xmlLoadExtDtdDefaultValue = 0;
-
-	if ((document = xmlReadFile(filename, NULL, 0)) == NULL) {
+	document = xmlReadFile(filename, NULL, xml_read_options);
+	if (document == NULL) {
 		semerr(gettext("couldn't parse document\n"));
 		return (-1);
 	}

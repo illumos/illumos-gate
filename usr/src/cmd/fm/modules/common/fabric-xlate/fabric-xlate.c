@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <libxml/tree.h>
+#include <libxml/parser.h>
 #include <libxml/xpathInternals.h>
 
 #include "fabric-xlate.h"

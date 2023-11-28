@@ -2010,8 +2010,6 @@ txml_file_parse(topo_mod_t *tmp,
 	 */
 	if (getenv("TOPOXML_VALIDATE") != NULL) {
 		dtdpath = getenv("TOPO_DTD");
-		if (dtdpath != NULL)
-			xmlLoadExtDtdDefaultValue = 0;
 		validate = 1;
 	}
 

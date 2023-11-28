@@ -139,21 +139,6 @@ libbrand_initialize()
 		return (B_FALSE);
 	}
 
-	/*
-	 * Note that here we're initializing per-process libxml2
-	 * state.  By doing so we're implicitly assuming that
-	 * no other code in this process is also trying to
-	 * use libxml2.  But in most case we know this not to
-	 * be true since we're almost always used in conjunction
-	 * with libzonecfg, which also uses libxml2.  Lucky for
-	 * us, libzonecfg initializes libxml2 to essentially
-	 * the same defaults as we're using below.
-	 */
-	(void) xmlLineNumbersDefault(1);
-	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
-	xmlDoValidityCheckingDefaultValue = 1;
-	(void) xmlKeepBlanksDefault(0);
-	xmlGetWarningsDefaultValue = 0;
 	xmlSetGenericErrorFunc(NULL, brand_error_func);
 
 	libbrand_initialized = B_TRUE;
@@ -198,7 +183,9 @@ open_xml_file(const char *file)
 	/*
 	 * Parse the file
 	 */
-	if ((doc = xmlParseFile(file)) == NULL)
+	doc = xmlReadFile(file, NULL, XML_PARSE_DTDLOAD |
+	    XML_PARSE_DTDVALID | XML_PARSE_NOBLANKS | XML_PARSE_NOWARNING);
+	if (doc == NULL)
 		return (NULL);
 
 	/*

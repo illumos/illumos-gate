@@ -262,14 +262,6 @@ xml_init()
 	}
 	xmlInitParser();
 
-	/*
-	 * DTD validation, with line numbers.
-	 */
-	(void) xmlLineNumbersDefault(1);
-	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
-	xmlDoValidityCheckingDefaultValue = 1;
-	/* Try to improve indentation and readability */
-	(void) xmlKeepBlanksDefault(0);
 	/* Send all XML errors to our debug handler */
 	xmlSetGenericErrorFunc(NULL, pool_error_func);
 	/* Load up DTD element a-dtype data to improve performance */
@@ -2703,6 +2695,10 @@ pool_xml_parse_document(pool_conf_t *conf)
 			pool_seterror(POE_INVALID_CONF);
 			return (PO_FAIL);
 		}
+
+		xmlCtxtUseOptions(ctxt,
+		    XML_PARSE_DTDLOAD | XML_PARSE_DTDVALID |
+		    XML_PARSE_NOBLANKS);
 
 		while ((res = fread(chars, 1, size, prov->pxc_file)) > 0) {
 			if (xmlParseChunk(ctxt, chars, res, 0) != 0) {

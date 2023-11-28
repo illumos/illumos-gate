@@ -44,6 +44,7 @@
 #include    <alloca.h>
 #include    <pthread.h>
 #include    <ucred.h>
+#include    <stdlib.h>
 #include    "isns_server.h"
 #include    "admintf.h"
 #include    "isns_mgmt.h"
