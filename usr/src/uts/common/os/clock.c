@@ -25,6 +25,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -1904,6 +1905,7 @@ clkset(time_t approx)
 
 	if (!boot_time) {
 		boot_time = ts.tv_sec;
+		global_zone->zone_boot_time = ts.tv_sec;
 		set_clock = 1;
 	}
 

@@ -816,7 +816,7 @@ typedef enum vnevent	{
 	VE_RMDIR	= 4,	/* Remove of directory vnode's name */
 	VE_CREATE	= 5,	/* Create with vnode's name which exists */
 	VE_LINK		= 6,	/* Link with vnode's name as source */
-	VE_RENAME_DEST_DIR = 7,	/* Rename with vnode as target dir */
+	VE_RENAME_DEST_DIR	= 7,	/* Rename with vnode as target dir */
 	VE_MOUNTEDOVER	= 8,	/* File or Filesystem got mounted over vnode */
 	VE_TRUNCATE = 9,	/* Truncate */
 	VE_PRE_RENAME_SRC = 10,	/* Pre-rename, with vnode as source */
@@ -1266,6 +1266,8 @@ extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 #define	LOOKUP_XATTR		0x02	/* lookup up extended attr dir */
 #define	CREATE_XATTR_DIR	0x04	/* Create extended attr dir */
 #define	LOOKUP_HAVE_SYSATTR_DIR	0x08	/* Already created virtual GFS dir */
+/* LOOKUP_CHECKREAD		0x10	- private lookuppnvp flag */
+#define	LOOKUP_NOACLCHECK	0x20	/* Dont check ACL when checking perms */
 
 /*
  * Flags for VOP_READDIR

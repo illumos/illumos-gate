@@ -23,6 +23,7 @@
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -243,6 +244,10 @@ lookuppnvp(
 		lookup_flags |= FIGNORECASE;
 		pn_alloc(&presrvd);
 		pp = &presrvd;
+	}
+	if ((flags & LOOKUP_NOACLCHECK) != 0) {
+		lookup_flags |= LOOKUP_NOACLCHECK;
+		flags &= ~LOOKUP_NOACLCHECK;
 	}
 
 	if (flags & __FLXNOAUTO)

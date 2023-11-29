@@ -1410,15 +1410,15 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	znode_t *zdp = VTOZ(dvp);
 	zfsvfs_t *zfsvfs = zdp->z_zfsvfs;
 	int	error = 0;
-	boolean_t skipaclchk = ((flags & ATTR_NOACLCHECK) != 0);
+	boolean_t skipaclchk = ((flags & LOOKUP_NOACLCHECK) != 0);
 
 	/*
-	 * ATTR_NOACLCHECK is specified to skip EXECUTE checks for
+	 * LOOKUP_NOACLCHECK is specified to skip EXECUTE checks for
 	 * consumers (like SMB) that bypass traverse checking.
 	 * Turn it off here so it can't accidentally be used
 	 * for other checks.
 	 */
-	flags &= ~ATTR_NOACLCHECK;
+	flags &= ~LOOKUP_NOACLCHECK;
 
 	/*
 	 * Fast path lookup, however we must skip DNLC lookup

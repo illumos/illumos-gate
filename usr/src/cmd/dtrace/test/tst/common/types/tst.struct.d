@@ -31,7 +31,7 @@
  *
  * SECTION: Structs and Unions/Structs;
  *	Actions and Subroutines/copyin();
- * 	Actions and Subroutines/copyinstr();
+ *	Actions and Subroutines/copyinstr();
  *	Variables/External Variables
  *
  * NOTES:
@@ -49,10 +49,22 @@ struct env_vars_32 {
 	uint32_t e3;
 };
 
+struct env_vars_flex_32 {
+	uint32_t e1;
+	uint32_t e2;
+	uint32_t e3[];
+};
+
 struct env_vars_64 {
 	uint64_t e1;
 	uint64_t e2;
 	uint64_t e3;
+};
+
+struct env_vars_flex_64 {
+	uint64_t e1;
+	uint64_t e2;
+	uint64_t e3[];
 };
 
 BEGIN
@@ -60,10 +72,18 @@ BEGIN
 {
 	e32 = (struct D`env_vars_32 *)
 	    copyin(curpsinfo->pr_envp, sizeof (struct D`env_vars_32));
+	e32f = (struct D`env_vars_flex_32 *)
+	    copyin(curpsinfo->pr_envp, sizeof (struct D`env_vars_flex_32) +
+	    sizeof (uint32_t) * 2);
 
 	printf("e1 = \"%s\"\n", stringof(copyinstr(e32->e1)));
 	printf("e2 = \"%s\"\n", stringof(copyinstr(e32->e2)));
 	printf("e3 = \"%s\"\n", stringof(copyinstr(e32->e3)));
+	printf("\n");
+	printf("e1 = \"%s\"\n", stringof(copyinstr(e32f->e1)));
+	printf("e2 = \"%s\"\n", stringof(copyinstr(e32f->e2)));
+	printf("e3[0] = \"%s\"\n", stringof(copyinstr(e32f->e3[0])));
+	printf("e3[1] = \"%s\"\n", stringof(copyinstr(e32f->e3[1])));
 
 	exit(0);
 }
@@ -73,10 +93,18 @@ BEGIN
 {
 	e64 = (struct D`env_vars_64 *)
 	    copyin(curpsinfo->pr_envp, sizeof (struct D`env_vars_64));
+	e64f = (struct D`env_vars_flex_64 *)
+	    copyin(curpsinfo->pr_envp, sizeof (struct D`env_vars_flex_64) +
+	    sizeof (uint64_t) * 2);
 
 	printf("e1 = \"%s\"\n", stringof(copyinstr(e64->e1)));
 	printf("e2 = \"%s\"\n", stringof(copyinstr(e64->e2)));
 	printf("e3 = \"%s\"\n", stringof(copyinstr(e64->e3)));
+	printf("\n");
+	printf("e1 = \"%s\"\n", stringof(copyinstr(e64f->e1)));
+	printf("e2 = \"%s\"\n", stringof(copyinstr(e64f->e2)));
+	printf("e3[0] = \"%s\"\n", stringof(copyinstr(e64f->e3[0])));
+	printf("e3[1] = \"%s\"\n", stringof(copyinstr(e64f->e3[1])));
 
 	exit(0);
 }
