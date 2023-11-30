@@ -2232,19 +2232,17 @@ uint_t
 asyintr(caddr_t argasy)
 {
 	struct asycom		*asy = (struct asycom *)argasy;
-	struct asyncline	*async;
+	struct asyncline	*async = asy->asy_priv;
 	int			ret_status = DDI_INTR_UNCLAIMED;
-	uchar_t			interrupt_id, lsr;
-
-	interrupt_id = ddi_get8(asy->asy_iohandle,
-	    asy->asy_ioaddr + ISR) & 0x0F;
-	async = asy->asy_priv;
 
 	if ((async == NULL) ||
 	    !(async->async_flags & (ASYNC_ISOPEN|ASYNC_WOPEN))) {
-		if (interrupt_id & NOINTERRUPT)
+		const uint8_t intr_id = ddi_get8(asy->asy_iohandle,
+		    asy->asy_ioaddr + ISR) & 0x0F;
+
+		if (intr_id & NOINTERRUPT) {
 			return (DDI_INTR_UNCLAIMED);
-		else {
+		} else {
 			/*
 			 * reset the device by:
 			 *	reading line status
@@ -2272,33 +2270,47 @@ asyintr(caddr_t argasy)
 	 * We will loop until the interrupt line is pulled low. asy
 	 * interrupt is edge triggered.
 	 */
-	/* CSTYLED */
-	for (;; interrupt_id =
-	    (ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + ISR) & 0x0F)) {
+	for (;;) {
+		const uint8_t intr_id = ddi_get8(asy->asy_iohandle,
+		    asy->asy_ioaddr + ISR) & 0x0F;
 
-		if (interrupt_id & NOINTERRUPT)
+		if (intr_id & NOINTERRUPT)
 			break;
 		ret_status = DDI_INTR_CLAIMED;
 
 		DEBUGCONT1(ASY_DEBUG_INTR, "asyintr: interrupt_id = 0x%d\n",
-		    interrupt_id);
-		lsr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
-		switch (interrupt_id) {
+		    intr_id);
+		const uint8_t lsr = ddi_get8(asy->asy_iohandle,
+		    asy->asy_ioaddr + LSR);
+
+		switch (intr_id) {
+		case TxRDY:
+			/*
+			 * The transmit-ready interrupt implies an empty
+			 * transmit-hold register (or FIFO).  Confirm that
+			 * before attempting to transmit more data.
+			 */
+			VERIFY((lsr & XHRE) != 0);
+			async_txint(asy);
+			/*
+			 * Unlike the other interrupts which fall through to
+			 * attempting to fill the output register/FIFO, TxRDY
+			 * has no need having just done so.
+			 */
+			continue;
+
 		case RxRDY:
 		case RSTATUS:
 		case FFTMOUT:
 			/* receiver interrupt or receiver errors */
 			async_rxint(asy, lsr);
 			break;
-		case TxRDY:
-			/* transmit interrupt */
-			async_txint(asy);
-			continue;
 		case MSTATUS:
 			/* modem status interrupt */
 			async_msint(asy);
 			break;
 		}
+		/* Refill the output FIFO if it has gone empty */
 		if ((lsr & XHRE) && (async->async_flags & ASYNC_BUSY) &&
 		    (async->async_ocnt > 0))
 			async_txint(asy);
