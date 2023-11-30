@@ -25,15 +25,6 @@
 
 export PATH=/usr/bin:/usr/sbin:/opt/tools/sbin:/opt/tools/bin:$PATH
 
-# The pkgsrc packages we will install.
-export SMARTOS_TEST_PKGS="
-    python39
-    sudo
-    coreutils
-    gcc10
-    gmake
-"
-
 #
 # Set $KEEP as a precaution in case we ever end up running the zfs-test suite
 # by accident or design. This ensures it never attempts to destroy the 'zones'
@@ -239,9 +230,13 @@ function setup_pkgsrc {
     log_must tar -zxpf ${BOOTSTRAP_TAR} -C /
 }
 
+# The pkgsrc packages we will install are now a single metapackage.
+# If updates in that metapackage (e.g. python change) cause tests to fail,
+# consult with pkgsrc and/or maintainers of usr/src/test tests to update.
+
 function install_required_pkgs {
 
-    log_must pkgin -y in ${SMARTOS_TEST_PKGS}
+    log_must pkgin -y in smartos-test-tools
 }
 
 function add_test_accounts {
