@@ -979,6 +979,8 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 	 * (e.g. RSCN)
 	 */
 	if (linkdown) {
+		hba->flag &= ~FC_GPIO_LINK_UP;
+
 		mutex_enter(&EMLXS_PORT_LOCK);
 
 		port->flag &= EMLXS_PORT_LINKDOWN_MASK;
@@ -1626,6 +1628,8 @@ emlxs_port_online(emlxs_port_t *vport)
 		/* Flush any pending ub buffers */
 		emlxs_ub_flush(vport);
 	}
+
+	hba->flag |= FC_GPIO_LINK_UP;
 
 	return;
 

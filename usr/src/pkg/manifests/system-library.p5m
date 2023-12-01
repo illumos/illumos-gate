@@ -48,6 +48,7 @@
 <include system-library.man3gen.inc>
 <include system-library.man3kstat.inc>
 <include system-library.man3kvm.inc>
+<include system-library.man3jedec.inc>
 <include system-library.man3ldap.inc>
 <include system-library.man3lgrp.inc>
 <include system-library.man3lib.inc>
@@ -1193,6 +1194,7 @@ dir  path=usr/share/man/man3exacct
 dir  path=usr/share/man/man3ext
 dir  path=usr/share/man/man3fstyp
 dir  path=usr/share/man/man3gen
+dir  path=usr/share/man/man3jedec
 dir  path=usr/share/man/man3kstat
 dir  path=usr/share/man/man3kvm
 dir  path=usr/share/man/man3ldap

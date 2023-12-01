@@ -32,9 +32,12 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/vnic-mtu]
 [/opt/util-tests/tests/bunyan/bunyan]
 [/opt/util-tests/tests/libsff/libsff]
-[/opt/util-tests/tests/libjedec_test]
-[/opt/util-tests/tests/libjedec_temp]
-[/opt/util-tests/tests/libjedec_spd]
+[/opt/util-tests/tests/libjedec_test.32]
+[/opt/util-tests/tests/libjedec_temp.32]
+[/opt/util-tests/tests/libjedec_spd.32]
+[/opt/util-tests/tests/libjedec_test.64]
+[/opt/util-tests/tests/libjedec_temp.64]
+[/opt/util-tests/tests/libjedec_spd.64]
 [/opt/util-tests/tests/smbios]
 
 user = root

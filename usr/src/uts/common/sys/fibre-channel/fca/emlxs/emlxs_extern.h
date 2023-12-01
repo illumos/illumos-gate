@@ -486,6 +486,9 @@ extern void			emlxs_mb_deferred_cmpl(emlxs_port_t *port,
 extern void			emlxs_mb_flush(emlxs_hba_t *hba);
 extern void			emlxs_mb_heartbeat(emlxs_hba_t *hba,
 					MAILBOXQ *mbq);
+extern void			emlxs_mb_gpio_write(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint8_t pin,
+					uint8_t val);
 extern void			emlxs_mb_request_features(emlxs_hba_t *hba,
 					MAILBOXQ *mbq, uint32_t mask);
 extern int			emlxs_mb_resume_rpi(emlxs_hba_t *hba,

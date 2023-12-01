@@ -15833,6 +15833,10 @@ s usr/share/man/man3head/wordexp.3head=wordexp.h.3head
 f usr/share/man/man3head/wordexp.h.3head 0444 root bin
 s usr/share/man/man3head/xlocale.3head=xlocale.h.3head
 f usr/share/man/man3head/xlocale.h.3head 0444 root bin
+d usr/share/man/man3jedec 0755 root bin
+f usr/share/man/man3jedec/libjedec_spd.3jedec 0444 root bin
+f usr/share/man/man3jedec/libjedec_temp_range.3jedec 0444 root bin
+f usr/share/man/man3jedec/libjedec_vendor_string.3jedec 0444 root bin
 d usr/share/man/man3kstat 0755 root bin
 f usr/share/man/man3kstat/kstat.3kstat 0444 root bin
 f usr/share/man/man3kstat/kstat_chain_update.3kstat 0444 root bin
@@ -16140,6 +16144,7 @@ f usr/share/man/man3lib/libgen.3lib 0444 root bin
 f usr/share/man/man3lib/libgss.3lib 0444 root bin
 f usr/share/man/man3lib/libintl.3lib 0444 root bin
 f usr/share/man/man3lib/libiscsit.3lib 0444 root bin
+f usr/share/man/man3lib/libjedec.3lib 0444 root bin
 f usr/share/man/man3lib/libkmf.3lib 0444 root bin
 f usr/share/man/man3lib/libkrb5.3lib 0444 root bin
 f usr/share/man/man3lib/libkstat.3lib 0444 root bin

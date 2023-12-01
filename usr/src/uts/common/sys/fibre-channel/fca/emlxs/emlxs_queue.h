@@ -476,6 +476,8 @@ typedef struct CQE_ASYNC
 #define	ASYNC_EVENT_QOS_SPEED		1
 
 /* PORT - evt_type defines */
+#define	ASYNC_EVENT_PORT_OTEMP		2
+#define	ASYNC_EVENT_PORT_NTEMP		3
 #define	ASYNC_EVENT_MISCONFIG_PORT	9
 
 typedef struct CQE_MBOX

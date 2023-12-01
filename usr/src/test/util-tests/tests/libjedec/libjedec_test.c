@@ -67,7 +67,7 @@ static const libjedec_test_t libjedec_expects[] = {
 	{ 0x0d, 0x8A, "Aerospace Science Memory Shenzhen" },
 	/* Various Failure cases */
 	{ 0x00, 0x05, NULL },
-	{ 0x0d, 0xFE, NULL },
+	{ 0x0d, 0xFF, NULL },
 	{ 0x20, 0x01, NULL }
 };
 
@@ -81,22 +81,26 @@ main(void)
 
 		out = libjedec_vendor_string(libjedec_expects[i].ljtt_cont,
 		    libjedec_expects[i].ljtt_vendor);
-		if (out == NULL && libjedec_expects[i].ljtt_exp != NULL) {
-			errs++;
-			(void) fprintf(stderr, "test %u failed, expected %s, "
-			    "but lookup failed\n", i,
-			    libjedec_expects[i].ljtt_exp);
-		} else if (out != NULL && libjedec_expects[i].ljtt_exp ==
-		    NULL) {
-			errs++;
-			(void) fprintf(stderr, "test %u failed, expected "
-			    "lookup failure, but it succeeded with %s\n", i,
-			    out);
-		} else if (strcmp(out, libjedec_expects[i].ljtt_exp) != 0) {
-			errs++;
-			(void) fprintf(stderr, "test %u failed, expected %s, "
-			    "found %s\n", i, libjedec_expects[i].ljtt_exp,
-			    out);
+		if (out == NULL) {
+			if (libjedec_expects[i].ljtt_exp != NULL) {
+				errs++;
+				(void) fprintf(stderr, "test %u failed, "
+				    "expected %s, but lookup failed\n", i,
+				    libjedec_expects[i].ljtt_exp);
+			}
+		} else {
+			if (libjedec_expects[i].ljtt_exp == NULL) {
+				errs++;
+				(void) fprintf(stderr, "test %u failed, "
+				    "expected lookup failure, but it succeeded "
+				    "with %s\n", i, out);
+			} else if (strcmp(out, libjedec_expects[i].ljtt_exp) !=
+			    0) {
+				errs++;
+				(void) fprintf(stderr, "test %u failed, "
+				    "expected %s, found %s\n", i,
+				    libjedec_expects[i].ljtt_exp, out);
+			}
 		}
 	}
 

@@ -53,6 +53,7 @@ MANFILES=	libMPAPI.3lib		\
 		libgss.3lib		\
 		libintl.3lib		\
 		libiscsit.3lib		\
+		libjedec.3lib		\
 		libkmf.3lib		\
 		libkrb5.3lib		\
 		libkstat.3lib		\

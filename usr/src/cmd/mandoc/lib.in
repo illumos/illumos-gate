@@ -41,6 +41,7 @@ LINE("libfstyp",	"File System Type Identification Library (libfstyp, \\-lfstyp \
 LINE("libgen",		"String Pattern Matching Library (libgen, \\-lgen)")
 LINE("libgss",		"Generic Security Services Library (libgss, \\-lgss)")
 LINE("libiscsit",	"iSCSI Management Library (libiscsit, \\-liscsit)")
+LINE("libjedec",	"JEDEC Support Library Functions (libjedec, \\-ljedec)")
 LINE("libkstat",	"Kernel Statistics Library (libkstat, \\-lkstat)")
 LINE("libkvm",		"Kernel VM Library (libkvm, \\-lkvm)")
 LINE("libldap",		"LDAP Library (libldap, \\-lldap)")
