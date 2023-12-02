@@ -227,7 +227,7 @@ pcieadm_find_dip_cb(di_node_t node, void *arg)
 	path = di_devfs_path(node);
 	if (path == NULL) {
 		err(EXIT_FAILURE, "failed to construct devfs path for node: "
-		    "%s (%s)", di_node_name(node));
+		    "%s", di_node_name(node));
 	}
 
 	driver = di_driver_name(node);

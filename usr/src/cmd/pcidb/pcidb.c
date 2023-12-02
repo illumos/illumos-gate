@@ -516,7 +516,8 @@ pcidb_parse_device_filter(pcidb_filter_t *filter, char *arg, const char *orig)
 	}
 
 	if (val > UINT16_MAX) {
-		errx(EXIT_FAILURE, "invalid id: %x is larger than 0xffff", val);
+		errx(EXIT_FAILURE, "invalid id: %lx is larger than 0xffff",
+		    val);
 	}
 
 	primary = (uint32_t)val;
@@ -539,7 +540,8 @@ pcidb_parse_device_filter(pcidb_filter_t *filter, char *arg, const char *orig)
 	}
 
 	if (val > UINT16_MAX) {
-		errx(EXIT_FAILURE, "invalid id: %x is larger than 0xffff", val);
+		errx(EXIT_FAILURE, "invalid id: %lx is larger than 0xffff",
+		    val);
 	}
 
 	secondary = (uint32_t)val;
@@ -580,7 +582,8 @@ pcidb_parse_device_filter(pcidb_filter_t *filter, char *arg, const char *orig)
 	}
 
 	if (val > UINT16_MAX) {
-		errx(EXIT_FAILURE, "invalid id: %x is larger than 0xffff", val);
+		errx(EXIT_FAILURE, "invalid id: %lx is larger than 0xffff",
+		    val);
 	}
 
 	filter->pft_subven = (uint32_t)val;
@@ -600,7 +603,8 @@ pcidb_parse_device_filter(pcidb_filter_t *filter, char *arg, const char *orig)
 	}
 
 	if (val > UINT16_MAX) {
-		errx(EXIT_FAILURE, "invalid id: %x is larger than 0xffff", val);
+		errx(EXIT_FAILURE, "invalid id: %lx is larger than 0xffff",
+		    val);
 	}
 
 	filter->pft_subdev = (uint32_t)val;

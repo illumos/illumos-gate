@@ -351,7 +351,7 @@ main(int argc, char *argv[])
 		if (snprintf(devpath, sizeof (devpath), "/devices/%s",
 		    xp_devpath) >= sizeof (devpath))
 			errx(EXIT_FAILURE, "xhci path found at %s overflows "
-			    "internal device path");
+			    "internal device path", xp_devpath);
 		di_devfs_path_free(xp_devpath);
 		xp_devpath = NULL;
 		xp_path = devpath;

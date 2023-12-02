@@ -70,7 +70,7 @@ mcb_imc_init(nvlist_t *nvl, const char *file)
 
 	imc = calloc(1, sizeof (*imc));
 	if (imc == NULL) {
-		errx(EXIT_FAILURE, "failed to allocate memory for imc_t");
+		err(EXIT_FAILURE, "failed to allocate memory for imc_t");
 	}
 
 	if (!imc_restore_decoder(nvl, imc)) {
@@ -111,7 +111,7 @@ mcb_umc_init(nvlist_t *nvl, const char *file)
 
 	umc = calloc(1, sizeof (*umc));
 	if (umc == NULL) {
-		errx(EXIT_FAILURE, "failed to allocate memory for zen_umc_t");
+		err(EXIT_FAILURE, "failed to allocate memory for zen_umc_t");
 	}
 
 	if (!zen_umc_restore_decoder(nvl, umc)) {
@@ -187,14 +187,16 @@ mcdecode_from_file(const char *file)
 	if (addr == MAP_FAILED) {
 		err(EXIT_FAILURE, "failed to map %s", file);
 	}
+
 	ret = nvlist_unpack(addr, st.st_size, &nvl, 0);
 	if (ret != 0) {
-		errx(EXIT_FAILURE, "failed to unpack %s: %s",
-		    strerror(ret));
+		errc(EXIT_FAILURE, ret, "failed to unpack %s", file);
 	}
+
 	if (munmap(addr, st.st_size) != 0) {
 		err(EXIT_FAILURE, "failed to unmap %s", file);
 	}
+
 	if (close(fd) != 0) {
 		err(EXIT_FAILURE, "failed to close fd for %s", file);
 	}
@@ -359,7 +361,7 @@ main(int argc, char *argv[])
 			tmp = strtoull(optarg, &eptr, 0);
 			if (errno != 0 || *eptr != '\0') {
 				errx(EXIT_FAILURE, "failed to parse address "
-				    "'%s'", eptr);
+				    "'%s'", optarg);
 			}
 			pa = (uint64_t)tmp;
 			break;
