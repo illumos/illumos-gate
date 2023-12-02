@@ -74,11 +74,12 @@ main(int argc, char *argv[])
 
 		if (vm_activate_cpu(ctx, vcpu) == 0) {
 			errx(EXIT_FAILURE,
-			    "unexpected activation for invalid vcpu %d");
+			    "unexpected activation for invalid vcpu %d", vcpu);
 		}
 		if (vm_get_register(ctx, vcpu, VM_REG_GUEST_RAX, &val) == 0) {
 			errx(EXIT_FAILURE,
-			    "unexpected get_register for invalid vcpu %d");
+			    "unexpected get_register for invalid vcpu %d",
+			    vcpu);
 		}
 	}
 

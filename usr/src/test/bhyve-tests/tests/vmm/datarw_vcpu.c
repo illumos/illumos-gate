@@ -36,7 +36,7 @@ static void
 should_eq_u64(const char *field_name, uint64_t a, uint64_t b)
 {
 	if (a != b) {
-		errx(EXIT_FAILURE, "unexpected %s %u != %u",
+		errx(EXIT_FAILURE, "unexpected %s %" PRIu64 " != %" PRIu64,
 		    field_name, a, b);
 	}
 }
