@@ -86,7 +86,7 @@ main(int argc, char *argv[])
 
 	for (int i = 0; i < IOV_MAX; i++) {
 		if (strcmp(data + i * DATA_LEN, "data") != 0)
-			errx(EXIT_FAILURE, "bad read at 0x%lx", i * DATA_LEN);
+			errx(EXIT_FAILURE, "bad read at 0x%zx", i * DATA_LEN);
 	}
 
 	/*
@@ -95,14 +95,14 @@ main(int argc, char *argv[])
 
 	for (off_t off = 0; off < ONE_GIG * 8; off += ONE_GIG) {
 		if ((written = pwritev(fd, iov, 1, off)) != DATA_LEN)
-			err(EXIT_FAILURE, "pwritev(0x%lx) failed", off);
+			err(EXIT_FAILURE, "pwritev(0x%" PRIx64 ") failed", off);
 	}
 
 	for (off_t off = 0; off < ONE_GIG * 8; off += ONE_GIG) {
 		if ((read = preadv(fd, iov, 1, off)) != DATA_LEN)
-			err(EXIT_FAILURE, "preadv(0x%lx) failed", off);
+			err(EXIT_FAILURE, "preadv(0x%" PRIx64 ") failed", off);
 		if (strcmp(data, "data") != 0)
-			errx(EXIT_FAILURE, "bad read at 0x%lx", off);
+			errx(EXIT_FAILURE, "bad read at 0x%" PRIx64, off);
 	}
 
 	return (EXIT_SUCCESS);

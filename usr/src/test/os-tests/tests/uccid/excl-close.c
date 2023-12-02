@@ -60,7 +60,7 @@ main(int argc, char *argv[])
 
 	estat = -1;
 	if (waitpid(pid, &estat, 0) == -1) {
-		err(EXIT_FAILURE, "failed to wait for pid %d", pid);
+		err(EXIT_FAILURE, "failed to wait for pid %" _PRIdID, pid);
 	}
 
 	if (estat != 0) {

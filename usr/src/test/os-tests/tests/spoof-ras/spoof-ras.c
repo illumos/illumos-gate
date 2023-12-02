@@ -578,7 +578,8 @@ spoof_run_tests(int s, struct lif_nd_req *nce)
 		(void) printf("Tests completed successfully!\n");
 	} else {
 		if (kill(dtrace, SIGKILL) != 0)  {
-			warn("Failed to kill dtrace child (pid %d)", dtrace);
+			warn("Failed to kill dtrace child (pid %" _PRIdID ")",
+			    dtrace);
 		}
 		(void) printf("Test of normal behaviour didn't succeed!\n");
 		return (EXIT_FAILURE);
