@@ -33,12 +33,12 @@ onetest(const char *name, const char *in, size_t insz,
 
 	sz = mbrtowc(&wc, in, insz, &mbs);
 	if (errno != outerr)
-		err(1, "%zu %s(%zd)", MB_CUR_MAX, name, insz);
+		err(1, "%u %s(%zd)", MB_CUR_MAX, name, insz);
 	if (sz != outsz || (out != WEOF && wc != out))
-		errx(1, "%zu %s(%zd) = (%zd, %d) != (%zd, %d)",
-		    MB_CUR_MAX, name, insz, sz, wc, outsz, out);
+		errx(1, "%u %s(%zu) = (%zu, %" _PRIdWC ") != (%zu, %" _PRIdWC
+		    ")", MB_CUR_MAX, name, insz, sz, wc, outsz, out);
 	if (mbsinit(&mbs) == (insz && outsz == (size_t)-2))
-		errx(1, "%zu %s(%zd) mbsinit", MB_CUR_MAX, name, insz);
+		errx(1, "%u %s(%zd) mbsinit", MB_CUR_MAX, name, insz);
 	if (errno == 0 && outerr == 0)
 		return;
 	errno = 0;

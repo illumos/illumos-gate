@@ -44,8 +44,8 @@ check_pos(FILE *f, long pos)
 	}
 
 	if (off64 != pos) {
-		errx(EXIT_FAILURE, "ftello64 position mismatched: found %ld, "
-		    "expected %ld", off64, pos);
+		errx(EXIT_FAILURE, "ftello64 position mismatched: found %"
+		    PRId64 " expected %ld", off64, pos);
 	}
 }
 

@@ -132,7 +132,7 @@ main(int argc, char **argv)
 				variant = VARIANT_VX;
 				break;
 			default:
-				errx(EXIT_FAILURE, "Unknown variant %ld", num);
+				errx(EXIT_FAILURE, "Unknown variant %lld", num);
 			}
 			break;
 		case 'x':

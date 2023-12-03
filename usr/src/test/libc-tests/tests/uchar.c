@@ -163,7 +163,7 @@ mbrtoc32_roundtrip(void)
 
 	clen = c32rtomb(buf, out, &mbs);
 	if (clen != len) {
-		warnx("c32rtomb returned %d bytes, but we originally used %d",
+		warnx("c32rtomb returned %zu bytes, but we originally used %zu",
 		    clen, len);
 		ret = B_FALSE;
 	}
@@ -423,7 +423,7 @@ mbrtoc16_roundtrip(void)
 
 	clen = c16rtomb(buf, out, &mbs);
 	if (clen != len) {
-		warnx("c16rtomb returned %d bytes, but we originally used %d",
+		warnx("c16rtomb returned %zu bytes, but we originally used %zu",
 		    clen, len);
 		ret = B_FALSE;
 	}
@@ -483,7 +483,7 @@ mbrtoc16_surrogate(void)
 	bzero(&mbs, sizeof (mbs));
 	len = mbrtoc16(&out0, surrogate, slen, &mbs);
 	if (len != slen) {
-		warnx("mbrtoc16 returned %zu, expected %u", len, slen);
+		warnx("mbrtoc16 returned %zu, expected %zu", len, slen);
 		ret = B_FALSE;
 	}
 
@@ -519,7 +519,7 @@ mbrtoc16_surrogate(void)
 
 	clen = c16rtomb(buf, out0, &mbs);
 	if (clen != 0) {
-		warnx("c16rtomb returned %d bytes, but expected zero for the "
+		warnx("c16rtomb returned %zu bytes, but expected zero for the "
 		    "first surrogate", clen);
 		ret = B_FALSE;
 	}
@@ -532,7 +532,7 @@ mbrtoc16_surrogate(void)
 
 	clen = c16rtomb(buf, out1, &mbs);
 	if (clen != slen) {
-		warnx("c16rtomb returned %zd, expected %u", len, slen);
+		warnx("c16rtomb returned %zu, expected %zu", len, slen);
 		ret = B_FALSE;
 	}
 
@@ -690,7 +690,7 @@ c32rtomb_null(void)
 	bzero(&mbs, sizeof (mbs));
 	len = c32rtomb(NULL, uchar_value, &mbs);
 	if (len != 1) {
-		warnx("c32rtomb returned %zd, expected %zd", len, 1);
+		warnx("c32rtomb returned %zu, expected %d", len, 1);
 		ret = B_FALSE;
 	}
 
@@ -707,7 +707,7 @@ c16rtomb_null(void)
 	bzero(&mbs, sizeof (mbs));
 	len = c16rtomb(NULL, uchar_value, &mbs);
 	if (len != 1) {
-		warnx("c16rtomb returned %zd, expected %zd", len, 1);
+		warnx("c16rtomb returned %zu, expected %d", len, 1);
 		ret = B_FALSE;
 	}
 
