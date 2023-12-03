@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014 Joyent, Inc.
 .\"
-.Dd Sep 26, 2014
+.Dd December 2, 2023
 .Dt CTF 5
 .Os
 .Sh NAME
@@ -215,7 +215,7 @@ following sections will cover this in more detail.
       |     |    |                |
       |     v    v                v
       |   +----+---+---+---+----+---+---+---+---+---+----+
-      +---| \\0 | i | n | t | \\0 | f | o | o | _ | t | \\0 |
+      +---| \e0 | i | n | t | \e0 | f | o | o | _ | t | \e0 |
           +----+---+---+---+----+---+---+---+---+---+----+
           0    1   2   3   4    5   6   7   8   9   10   11
 .Ed
@@ -517,7 +517,7 @@ type information:
 #define	CTF_INFO_ISROOT(info)	(((info) & 0x0400) >> 10)
 #define	CTF_INFO_VLEN(info)	(((info) & CTF_MAX_VLEN))
 
-#define	CTF_TYPE_INFO(kind, isroot, vlen) \\
+#define	CTF_TYPE_INFO(kind, isroot, vlen) \e
 	(((kind) << 11) | (((isroot) ? 1 : 0) << 10) | ((vlen) & CTF_MAX_VLEN))
 .Ed
 .Ss The Label Section
@@ -835,7 +835,7 @@ This encoding can be expressed through the following macros:
 #define	CTF_INT_OFFSET(data)	(((data) & 0x00ff0000) >> 16)
 #define	CTF_INT_BITS(data)	(((data) & 0x0000ffff))
 
-#define	CTF_INT_DATA(encoding, offset, bits) \\
+#define	CTF_INT_DATA(encoding, offset, bits) \e
 	(((encoding) << 24) | ((offset) << 16) | (bits))
 .Ed
 .Pp
@@ -900,7 +900,7 @@ This encoding can be expressed through the following macros:
 #define	CTF_FP_OFFSET(data)	(((data) & 0x00ff0000) >> 16)
 #define	CTF_FP_BITS(data)	(((data) & 0x0000ffff))
 
-#define	CTF_FP_DATA(encoding, offset, bits) \\
+#define	CTF_FP_DATA(encoding, offset, bits) \e
 	(((encoding) << 24) | ((offset) << 16) | (bits))
 .Ed
 .Lp

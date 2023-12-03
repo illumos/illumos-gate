@@ -4,17 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPSERV 5 "Feb 25, 2017"
+.TH YPSERV 5 "Dec 2, 2023"
 .SH NAME
 ypserv \- configuration file for NIS to LDAP transition daemons
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/default/ypserv\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBypserv\fR file specifies configuration information for the
 \fBypserv\fR(8) daemon. Configuration information can come from LDAP or be
 specified in the \fBypserv\fR file.
@@ -28,13 +26,11 @@ A related \fBNISLDAPmapping\fR file contains mapping information that converts
 NIS entries into LDAP entries. See the \fBNISLDAPmapping\fR(5) man page for an
 overview of the setup that is needed to map NIS data to or from LDAP.
 .SH EXTENDED DESCRIPTION
-.LP
 The \fBypserv\fR(8) server recognizes the attributes that follow. Values
 specified for these attributes in the \fBypserv\fR file, including any empty
 values, override values that are obtained from LDAP. However, the
 \fBnisLDAPconfig*\fR values are read from the \fBypserv\fR file only
 .SS "Attributes"
-.LP
 The following are attributes that are used for initial configuration.
 .sp
 .ne 2
@@ -505,7 +501,6 @@ default value for \fBnisLDAPstoreErrortimeout\fR is 15 seconds. The
 .RE
 
 .SS "Storing Configuration Attributes in LDAP"
-.LP
 Most attributes described on this man page, as well as those described on
 \fBNISLDAPmapping\fR(5), can be stored in LDAP. In order to do so, you will
 need to add the following definitions to your LDAP server, which are described
@@ -591,7 +586,7 @@ dn: cn=schema
                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.17 ) \e
                NAME 'nisLDAPnameFields' \e
-               DESC 'Rules for breaking NIS entries into fields' \\e
+               DESC 'Rules for breaking NIS entries into fields' \e
                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
      attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.43.1.18 ) \e
                NAME 'nisLDAPsplitFields' \e
@@ -673,7 +668,6 @@ Use this file as input to the \fBldapadd\fR(1) command in order to create the
 NIS to LDAP configuration entry. Initially, the entry is empty. You can use the
 \fBldapmodify\fR(1) command to add configuration attributes.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating a NIS to LDAP Configuration Entry
 .sp
 .LP
@@ -689,7 +683,6 @@ preferredServerList: 127.0.0.1:389
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -704,7 +697,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.LP
 .BR ldapadd (1),
 .BR ldapmodify (1),
 .BR NISLDAPmapping (5),

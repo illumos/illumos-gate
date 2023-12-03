@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2015, Joyent, Inc.
 .\"
-.Dd Oct 4, 2014
+.Dd December 2, 2023
 .Dt CTFDIFF 1
 .Os
 .Sh NAME
@@ -283,9 +283,9 @@ and
 that have been uniquified against the same container
 .Sy /ws/rm/zlan/proto/kernel/amd64/genunix .
 .Bd -literal -offset 6n
-$ ctfdiff -t -p /ws/rm/zlan/proto/kernel/amd64/genunix \\
-    -P /ws/rm/zlan/proto/kernel/amd64/genunix \\
-    /ws/rm/zlan/proto/kernel/drv/amd64/vnd  \\
+$ ctfdiff -t -p /ws/rm/zlan/proto/kernel/amd64/genunix \e
+    -P /ws/rm/zlan/proto/kernel/amd64/genunix \e
+    /ws/rm/zlan/proto/kernel/drv/amd64/vnd  \e
     /ws/rm/zlan/proto/kernel/drv/amd64/overlay
 ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32769 is different
 ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32770 is different
@@ -310,7 +310,7 @@ This example shows us looking for differences in the function
 in two different version of the library
 .Sy libzfs_core.so.1 .
 .Bd -literal -offset 6n
-$ ctfdiff -f -F libzfs_core_init /usr/lib/libzfs_core.so.1 \\
+$ ctfdiff -f -F libzfs_core_init /usr/lib/libzfs_core.so.1 \e
     /ws/rm/ctf/proto/usr/lib/libzfs_core.so.1
 $ echo $?
 .Ed
@@ -331,8 +331,8 @@ and the types
 and
 .Sy vnd_ioc_info_t .
 .Bd -literal -offset 6n
-$ ctfdiff -t -I -T vnd_ioc_attach_t  -T vnd_ioc_link_t  \\
-    -T vnd_ioc_unlink_t -T vnd_ioc_buf_t  -T vnd_ioc_info_t \\
+$ ctfdiff -t -I -T vnd_ioc_attach_t  -T vnd_ioc_link_t  \e
+    -T vnd_ioc_unlink_t -T vnd_ioc_buf_t  -T vnd_ioc_info_t \e
     i386/libvnd.so.1 amd64/libvnd.so.1
 $ echo $?
 0

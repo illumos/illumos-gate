@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 .\"
-.Dd Sep 02, 2015
+.Dd December 2, 2023
 .Dt NDP 4P
 .Os
 .Sh NAME
@@ -220,7 +220,7 @@ int get(char *host) {
 	hints.ai_protocol = IPPROTO_IPV6;
 
 	if ((err = getaddrinfo(host, NULL, &hints, &serverinfo)) != 0) {
-		(void) fprintf(stderr, "Unable to lookup %s: %s\\n", host,
+		(void) fprintf(stderr, "Unable to lookup %s: %s\en", host,
 		    gai_strerror(err));
 		return (1);
 	}
@@ -296,7 +296,7 @@ int set(char *host) {
 	hints.ai_protocol = IPPROTO_IPV6;
 
 	if ((err = getaddrinfo(host, NULL, &hints, &serverinfo)) != 0) {
-		(void) fprintf(stderr, "Unable to lookup %s: %s\\n", host,
+		(void) fprintf(stderr, "Unable to lookup %s: %s\en", host,
 		    gai_strerror(err));
 		return (1);
 	}
