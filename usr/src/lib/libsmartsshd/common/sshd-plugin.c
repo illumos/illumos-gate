@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #include <alloca.h>
@@ -165,27 +166,6 @@ sshd_user_key_allowed(struct passwd *pw, const char *type,
 	if (tohexstr(md5buf, sizeof (md5buf), hex, sizeof (hex)) != 0)
 		return (0);
 	return (sshd_allowed_in_capi(pw, hex));
-}
-
-/* ARGSUSED */
-int
-sshd_user_rsa_key_allowed(struct passwd *pw, RSA *key, const char *fp)
-{
-	return (sshd_allowed_in_capi(pw, fp));
-}
-
-/* ARGSUSED */
-int
-sshd_user_dsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
-{
-	return (sshd_allowed_in_capi(pw, fp));
-}
-
-/* ARGSUSED */
-int
-sshd_user_ecdsa_key_allowed(struct passwd *pw, DSA *key, const char *fp)
-{
-	return (sshd_allowed_in_capi(pw, fp));
 }
 
 #ifdef __cplusplus
