@@ -11,13 +11,16 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PERROR_PRINTF 3PROC
 .Os
 .Sh NAME
 .Nm Perror_printf
 .Nd interposable function for additional diagnostics
+.Sh LIBRARY
+.Lb libproc
 .Sh SYNOPSIS
+.In libproc.h
 .Ft void
 .Fo Perror_printf
 .Fa "struct ps_prochandle *P"

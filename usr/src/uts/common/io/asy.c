@@ -2287,10 +2287,18 @@ asyintr(caddr_t argasy)
 		case TxRDY:
 			/*
 			 * The transmit-ready interrupt implies an empty
-			 * transmit-hold register (or FIFO).  Confirm that
-			 * before attempting to transmit more data.
+			 * transmit-hold register (or FIFO).  Check that it is
+			 * present before attempting to transmit more data.
 			 */
-			VERIFY((lsr & XHRE) != 0);
+			if ((lsr & XHRE) == 0) {
+				/*
+				 * Taking a TxRDY interrupt only to find XHRE
+				 * absent would be a surprise, except for a
+				 * racing asyputchar(), which ignores the
+				 * excl_hi mutex when writing to the device.
+				 */
+				continue;
+			}
 			async_txint(asy);
 			/*
 			 * Unlike the other interrupts which fall through to

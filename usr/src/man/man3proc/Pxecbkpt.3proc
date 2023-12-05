@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PXECBKPT 3PROC
 .Os
 .Sh NAME
@@ -20,7 +20,10 @@
 .Nm Lxecbkpt ,
 .Nm Lxecwapt
 .Nd step over a breakpoint or watchpoint
+.Sh LIBRARY
+.Lb libproc
 .Sh SYNOPSIS
+.In libproc.h
 .Ft int
 .Fo Pxecbkpt
 .Fa "struct ps_prochandle *P"

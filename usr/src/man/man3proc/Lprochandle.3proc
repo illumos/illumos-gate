@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd Nov 26, 2017
+.Dd November 27, 2023
 .Dt LPROCHANDLE 3PROC
 .Os
 .Sh NAME
 .Nm Lprochandle
 .Nd get process control handle from thread control handle
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_prochandle *"
 .Fo Lprochandle

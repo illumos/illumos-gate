@@ -11,13 +11,16 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PLWP_GETGWINDOWS 3PROC
 .Os
 .Sh NAME
 .Nm Plwp_getgwindows
 .Nd get thread unspilled register windows
+.Sh LIBRARY
+.Lb libproc
 .Sh SYNOPSIS
+.In libproc.h
 .Ft int
 .Fo Plwp_getgwindows
 .Fa "struct ps_prochandle *P"

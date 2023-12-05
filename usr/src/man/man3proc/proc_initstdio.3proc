@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_INITSTDIO 3PROC
 .Os
 .Sh NAME
@@ -19,8 +19,9 @@
 .Nm proc_flushstdio ,
 .Nm proc_finistdio
 .Nd stdio buffering functions
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo proc_initstdio

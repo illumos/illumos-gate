@@ -232,6 +232,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_get_priv;
 	proc_get_psinfo;
 	proc_get_lwpsinfo;
+	proc_get_lwpstatus;
 	proc_get_secflags;
 	proc_get_status;
 	proc_initstdio;

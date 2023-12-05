@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt LPSINFO 3PROC
 .Os
 .Sh NAME
 .Nm Lpsinfo
 .Nd get process ps information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const lwpsinfo_t *"
 .Fo Lpsinfo

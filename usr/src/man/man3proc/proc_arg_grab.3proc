@@ -11,15 +11,16 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 22, 2020
+.Dd November 27, 2023
 .Dt PROC_ARG_GRAB 3PROC
 .Os
 .Sh NAME
 .Nm proc_arg_grab ,
 .Nm proc_arg_xgrab
 .Nd process grabbing utility function
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_prochandle"
 .Fo proc_arg_grab

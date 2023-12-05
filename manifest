@@ -17419,6 +17419,7 @@ f usr/share/man/man3proc/proc_get_auxv.3proc 0444 root bin
 f usr/share/man/man3proc/proc_get_cred.3proc 0444 root bin
 s usr/share/man/man3proc/proc_get_ldt.3proc=Pldt.3proc
 f usr/share/man/man3proc/proc_get_lwpsinfo.3proc 0444 root bin
+s usr/share/man/man3proc/proc_get_lwpstatus.3proc=proc_get_lwpsinfo.3proc
 f usr/share/man/man3proc/proc_get_priv.3proc 0444 root bin
 f usr/share/man/man3proc/proc_get_psinfo.3proc 0444 root bin
 f usr/share/man/man3proc/proc_get_status.3proc 0444 root bin

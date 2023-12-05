@@ -9,22 +9,30 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd October 3, 2021
+.Dd November 27, 2023
 .Dt PROC_GET_LWPSINFO 3PROC
 .Os
 .Sh NAME
-.Nm proc_get_lwpsinfo
-.Nd get thread ps information
-.Sh SYNOPSIS
+.Nm proc_get_lwpsinfo ,
+.Nm proc_get_lwpstatus
+.Nd get thread ps and status information
+.Sh LIBRARY
 .Lb libproc
-.In libproc
+.Sh SYNOPSIS
+.In libproc.h
 .Ft int
 .Fo proc_get_lwpsinfo
 .Fa "pid_t pid"
 .Fa "uint_t thr"
-.Fa "lwpsinfo_t *lwp"
+.Fa "lwpsinfo_t *lwpps"
+.Fc
+.Ft int
+.Fo proc_get_lwpstatus
+.Fa "pid_t pid"
+.Fa "uint_t thr"
+.Fa "lwpstatus_t *lwpst"
 .Fc
 .Sh DESCRIPTION
 The
@@ -37,9 +45,25 @@ found in the process
 The information from the
 .Pa lwpsinfo
 file will be placed in
-.Fa lwp .
+.Fa lwpps .
 The definition of the
 .Vt lwpsinfo_t
+structure may be found in
+.Xr proc 5 .
+.Pp
+The
+.Fn proc_get_lwpstatus
+function is a convenient way to read the /proc lwpstatus for the specific
+thread,
+.Fa thr ,
+found in the process
+.Fa pid .
+The information from the
+.Pa lwpstatus
+file will be placed in
+.Fa lwpst .
+The definition of the
+.Vt lwpstatus_t
 structure may be found in
 .Xr proc 5 .
 .Pp
@@ -50,8 +74,10 @@ It is safe to pass one of those identifiers in as
 or to use a specific number.
 .Sh RETURN VALUES
 Upon successful completion, the
-.Fn proc_get_psinfo
-function returns
+.Fn proc_get_lwpsinfo
+and
+.Fn proc_get_lwpstatus
+functions return
 .Sy 0 .
 Otherwise,
 .Sy -1

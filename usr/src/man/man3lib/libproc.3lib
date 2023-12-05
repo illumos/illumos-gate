@@ -14,7 +14,7 @@
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd March 20, 2023
+.Dd December 2, 2023
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -322,15 +322,16 @@ library.
 .It Sy proc_flushstdio Ta Sy proc_get_auxv
 .It Sy proc_fdinfo_misc Ta Sy proc_get_cred
 .It Sy proc_get_fdinfo Ta Sy proc_get_lwpsinfo
-.It Sy proc_get_priv Ta Sy proc_get_psinfo
-.It Sy proc_get_status Ta Sy proc_get_initstdio
-.It Sy proc_lwp_in_set Ta Sy proc_lwp_range_valid
-.It Sy proc_signame Ta Sy proc_sigset2str
-.It Sy proc_str2content Ta Sy proc_str2flt
-.It Sy proc_str2fltset Ta Sy proc_str2sig
-.It Sy proc_str2sigset Ta Sy proc_str2sys
-.It Sy proc_str2sysset Ta Sy proc_sysname
-.It Sy proc_sysset2str Ta Sy proc_unctrl_psinfo
+.It Sy proc_get_lwpstatus Ta Sy proc_get_priv
+.It Sy proc_get_psinfo Ta Sy proc_get_status
+.It Sy proc_get_initstdio Ta Sy proc_lwp_in_set
+.It Sy proc_lwp_range_valid Ta Sy proc_signame
+.It Sy proc_sigset2str Ta Sy proc_str2content
+.It Sy proc_str2flt Ta Sy proc_str2fltset
+.It Sy proc_str2sig Ta Sy proc_str2sigset
+.It Sy proc_str2sys Ta Sy proc_str2sysset
+.It Sy proc_sysname Ta Sy proc_sysset2str
+.It Sy proc_unctrl_psinfo Ta Sy ""
 .El
 .Ss x86 Specific Routines
 The following routines are specific to the x86, 32-bit and 64-bit,
@@ -1326,6 +1327,8 @@ changes may occur which break both source and binary compatibility.
 .Xr proc_get_auxv 3PROC ,
 .Xr proc_get_cred 3PROC ,
 .Xr proc_get_fdinfo 3PROC ,
+.Xr proc_get_lwpsinfo 3PROC ,
+.Xr proc_get_lwpstatus 3PROC ,
 .Xr proc_get_priv 3PROC ,
 .Xr proc_get_psinfo 3PROC ,
 .Xr proc_get_status 3PROC ,

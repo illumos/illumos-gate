@@ -13,7 +13,7 @@
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_FLTNAME 3PROC
 .Os
 .Sh NAME
@@ -22,8 +22,9 @@
 .Nm proc_sysname ,
 .Nm proc_dmodelname
 .Nd convert a fault, signal, system call and data model to a name
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "char *"
 .Fo proc_fltname

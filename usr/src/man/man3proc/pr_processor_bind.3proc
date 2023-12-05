@@ -11,14 +11,15 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PR_PROCESSOR_BIND 3PROC
 .Os
 .Sh NAME
 .Nm pr_processor_bind
 .Nd inject processor_bind system call into victim process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo pr_processor_bind

@@ -11,15 +11,16 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 27, 2023
 .Dt PROC_ARG_PSINFO 3PROC
 .Os
 .Sh NAME
 .Nm proc_arg_psinfo ,
 .Nm proc_arg_xpsinfo
 .Nd process ps information utility function
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft pid_t
 .Fo proc_arg_psinfo
