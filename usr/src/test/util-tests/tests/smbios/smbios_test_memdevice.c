@@ -188,7 +188,7 @@ smbios_test_memdevice_verify_common(smbios_memdevice_t *mem)
 	}
 
 	if (mem->smbmd_size != 0x123456ULL * 1024 * 1024) {
-		warnx("found wrong size: %u", mem->smbmd_size);
+		warnx("found wrong size: %" PRIu64, mem->smbmd_size);
 		ret = B_FALSE;
 	}
 
@@ -285,12 +285,13 @@ smbios_test_memdevice_verify_32_33(smbios_hdl_t *hdl)
 	}
 
 	if (mem.smbmd_extspeed != smbios_memdevice_speed) {
-		warnx("found wrong device speed: %u", mem.smbmd_extspeed);
+		warnx("found wrong device speed: %" PRIu64, mem.smbmd_extspeed);
 		ret = B_FALSE;
 	}
 
 	if (mem.smbmd_extclkspeed != smbios_memdevice_clkspeed) {
-		warnx("found wrong device clkspeed: %u", mem.smbmd_extclkspeed);
+		warnx("found wrong device clkspeed: %" PRIu64,
+		    mem.smbmd_extclkspeed);
 		ret = B_FALSE;
 	}
 
@@ -381,12 +382,13 @@ smbios_test_memdevice_verify_33(smbios_hdl_t *hdl)
 	}
 
 	if (mem.smbmd_extspeed != smbios_memdevice_speed) {
-		warnx("found wrong device speed: %u", mem.smbmd_extspeed);
+		warnx("found wrong device speed: %" PRIu64, mem.smbmd_extspeed);
 		ret = B_FALSE;
 	}
 
 	if (mem.smbmd_extclkspeed != smbios_memdevice_clkspeed) {
-		warnx("found wrong device clkspeed: %u", mem.smbmd_extclkspeed);
+		warnx("found wrong device clkspeed: %" PRIu64,
+		    mem.smbmd_extclkspeed);
 		ret = B_FALSE;
 	}
 
@@ -427,12 +429,13 @@ smbios_test_memdevice_verify_33ext(smbios_hdl_t *hdl)
 	}
 
 	if (mem.smbmd_extspeed != smbios_memdevice_extspeed) {
-		warnx("found wrong device speed: %u", mem.smbmd_extspeed);
+		warnx("found wrong device speed: %" PRIu64, mem.smbmd_extspeed);
 		ret = B_FALSE;
 	}
 
 	if (mem.smbmd_extclkspeed != smbios_memdevice_extclkspeed) {
-		warnx("found wrong device clkspeed: %u", mem.smbmd_extclkspeed);
+		warnx("found wrong device clkspeed: %" PRIu64,
+		    mem.smbmd_extclkspeed);
 		ret = B_FALSE;
 	}
 

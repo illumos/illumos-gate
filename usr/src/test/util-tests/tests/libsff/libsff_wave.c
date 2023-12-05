@@ -49,15 +49,14 @@ main(void)
 	buf[SFF_8472_WAVELENGTH_LOW] = 0x34;
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
-		errx(1, "TEST FAILED: failed to parse SFP wavelength "
-		    "values: %s\n", strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to parse SFP wavelength "
+		    "values");
 	}
 
 	if ((ret = nvlist_lookup_string(nvl, LIBSFF_KEY_WAVELENGTH, &val)) !=
 	    0) {
-		errx(1, "TEST FAILED: failed to find %s: %s when "
-		    "parsing key %d: %s\n", LIBSFF_KEY_WAVELENGTH,
-		    strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to find %s",
+		    LIBSFF_KEY_WAVELENGTH);
 	}
 	(void) printf("%s: %s\n", LIBSFF_KEY_WAVELENGTH, val);
 	nvlist_free(nvl);
@@ -71,14 +70,14 @@ main(void)
 	buf[SFF_8472_WAVELENGTH_LOW] = 0x34;
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
-		errx(1, "TEST FAILED: failed to parse SFP wavelength "
-		    "values: %s\n", strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to parse SFP wavelength "
+		    "values");
 	}
 
 	if ((ret = nvlist_lookup_string(nvl, LIBSFF_KEY_WAVELENGTH, &val)) !=
 	    ENOENT) {
 		errx(1, "TEST FALIED: found unexpected return value for key "
-		    "%s: %d\n", LIBSFF_KEY_WAVELENGTH, ret);
+		    "%s: %d", LIBSFF_KEY_WAVELENGTH, ret);
 	}
 
 	nvlist_free(nvl);
@@ -89,14 +88,14 @@ main(void)
 	buf[SFF_8472_WAVELENGTH_LOW] = 0x34;
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
-		errx(1, "TEST FAILED: failed to parse SFP wavelength "
-		    "values: %s\n", strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to parse SFP wavelength "
+		    "values");
 	}
 
 	if ((ret = nvlist_lookup_string(nvl, LIBSFF_KEY_WAVELENGTH, &val)) !=
 	    ENOENT) {
 		errx(1, "TEST FALIED: found unexpected return value for key "
-		    "%s: %d\n", LIBSFF_KEY_WAVELENGTH, ret);
+		    "%s: %d", LIBSFF_KEY_WAVELENGTH, ret);
 	}
 
 	nvlist_free(nvl);
@@ -117,16 +116,15 @@ main(void)
 	buf[SFF_8636_ATTENUATE_12G] = 0x45;
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
-		errx(1, "TEST FAILED: failed to parse QSFP BR "
-		    "values: %s\n", strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to parse QSFP BR "
+		    "values");
 	}
 
 	for (i = 0; attenuate[i] != NULL; i++) {
 		if ((ret = nvlist_lookup_string(nvl, attenuate[i], &val)) !=
 		    0) {
-			errx(1, "TEST FAILED: failed to find %s: %s when "
-			    "parsing key %d: %s\n", attenuate[i],
-			    strerror(ret));
+			errc(1, ret, "TEST FAILED: failed to find %s",
+			    attenuate[i]);
 		}
 		(void) printf("%s: %s\n", attenuate[i], val);
 	}
@@ -134,8 +132,8 @@ main(void)
 	for (i = 0; wave[i] != NULL; i++) {
 		if ((ret = nvlist_lookup_string(nvl, wave[i], &val)) !=
 		    ENOENT) {
-			errx(1, "TEST FALIED: found unexpected return value "
-			    "for key %s: %d\n", attenuate[i], ret);
+			errx(1, "TEST FAILED: found unexpected return value "
+			    "for key %s: %d", attenuate[i], ret);
 		}
 
 	}
@@ -151,14 +149,13 @@ main(void)
 	buf[SFF_8636_WAVELENGTH_TOLERANCE_LOW] = 0x78;
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
-		errx(1, "TEST FAILED: failed to parse QSFP Wavelength "
-		    "values: %s\n", strerror(ret));
+		errc(1, ret, "TEST FAILED: failed to parse QSFP Wavelength "
+		    "values");
 	}
 
 	for (i = 0; wave[i] != NULL; i++) {
 		if ((ret = nvlist_lookup_string(nvl, wave[i], &val)) != 0) {
-			errx(1, "TEST FAILED: failed to find %s: %s when "
-			    "parsing key %d: %s\n", wave[i], strerror(ret));
+			errc(1, ret, "TEST FAILED: failed to find %s", wave[i]);
 		}
 		(void) printf("%s: %s\n", wave[i], val);
 	}
@@ -167,7 +164,7 @@ main(void)
 		if ((ret = nvlist_lookup_string(nvl, attenuate[i], &val)) !=
 		    ENOENT) {
 			errx(1, "TEST FALIED: found unexpected return value "
-			    "for key %s: %d\n", attenuate[i], ret);
+			    "for key %s: %d", attenuate[i], ret);
 		}
 
 	}

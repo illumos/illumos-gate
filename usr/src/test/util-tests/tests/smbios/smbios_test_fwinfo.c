@@ -416,8 +416,8 @@ smbios_test_fwinfo_verify_comps(smbios_hdl_t *hdl)
 	} else {
 		for (uint_t i = 0; i < smbios_fwinfo_ncomps; i++) {
 			if (comps[i].smbfwe_id != 0x2300 + i) {
-				warnx("component id %u is wrong: 0x%x", i,
-				    comps[i]);
+				warnx("component id %u is wrong: 0x%" _PRIxID,
+				    i, comps[i].smbfwe_id);
 				ret = B_FALSE;
 			}
 		}

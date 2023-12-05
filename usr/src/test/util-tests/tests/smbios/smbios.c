@@ -88,7 +88,7 @@ smbios_test_table_append_common(smbios_test_table_t *table, const void *buf,
 
 		newbuf = umem_zalloc(newlen, UMEM_DEFAULT);
 		if (newbuf == NULL) {
-			err(EXIT_FAILURE, "failed to umem_zalloc for %lu bytes",
+			err(EXIT_FAILURE, "failed to umem_zalloc for %zu bytes",
 			    newlen);
 		}
 

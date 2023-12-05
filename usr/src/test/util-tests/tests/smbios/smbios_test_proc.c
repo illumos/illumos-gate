@@ -149,8 +149,8 @@ smbios_test_proc_verify_common(smbios_hdl_t *hdl, smbios_struct_t *sp,
 	smbios_info_t info;
 
 	if (proc->smbp_cpuid != smbios_proc_cpuid) {
-		warnx("processor state mismatch, found unexpected cpuid: 0x%x",
-		    proc->smbp_cpuid);
+		warnx("processor state mismatch, found unexpected cpuid: 0x%"
+		    PRIx64, proc->smbp_cpuid);
 		ret = B_FALSE;
 	}
 
@@ -199,20 +199,20 @@ smbios_test_proc_verify_common(smbios_hdl_t *hdl, smbios_struct_t *sp,
 
 	if (proc->smbp_l1cache != 0x11ca) {
 		warnx("processor state mismatch, found unexpected l1 cache id: "
-		    "0x%x", proc->smbp_l1cache);
+		    "0x%" _PRIxID, proc->smbp_l1cache);
 		ret = B_FALSE;
 	}
 
 
 	if (proc->smbp_l2cache != 0x12ca) {
 		warnx("processor state mismatch, found unexpected l2 cache id: "
-		    "0x%x", proc->smbp_l2cache);
+		    "0x%" _PRIxID, proc->smbp_l2cache);
 		ret = B_FALSE;
 	}
 
 	if (proc->smbp_l3cache != 0x13ca) {
 		warnx("processor state mismatch, found unexpected l3 cache id: "
-		    "0x%x", proc->smbp_l3cache);
+		    "0x%" _PRIxID, proc->smbp_l3cache);
 		ret = B_FALSE;
 	}
 
