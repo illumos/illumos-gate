@@ -1501,6 +1501,11 @@ smb_shr_cache_iterate(smb_shriter_t *shi)
  * Add the specified share to the cache.  Memory needs to be allocated
  * for the cache entry and the passed information is copied to the
  * allocated space.
+ *
+ * Note: This modifies *si (an intentional side-effect), adding bits
+ * to shr_type and shr_flags, which the caller expects, eg. so that
+ * smb_shr_add() and smb_shr_rename() use the updated smb_share_t
+ * when they call smb_kmod_share().
  */
 static uint32_t
 smb_shr_cache_addent(smb_share_t *si)
@@ -1511,9 +1516,9 @@ smb_shr_cache_addent(smb_share_t *si)
 	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
+	si->shr_type |= smb_shr_is_special(si->shr_name);
 
-	if (smb_shr_is_admin(cache_ent->shr_name))
+	if (smb_shr_is_admin(si->shr_name))
 		si->shr_flags |= SMB_SHRF_ADMIN;
 
 	bcopy(si, cache_ent, sizeof (smb_share_t));
