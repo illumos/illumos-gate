@@ -319,6 +319,7 @@ void lmrc_put_dcmd(lmrc_t *, lmrc_mfi_cmd_t *);
 lmrc_mfi_cmd_t *lmrc_get_mfi(lmrc_t *);
 void lmrc_put_mfi(lmrc_mfi_cmd_t *);
 int lmrc_abort_outstanding_mfi(lmrc_t *, const size_t);
+int lmrc_build_mptmfi_passthru(lmrc_t *, lmrc_mfi_cmd_t *);
 
 int lmrc_start_aen(lmrc_t *);
 

@@ -408,12 +408,19 @@ lmrc_task_mgmt(lmrc_t *lmrc, lmrc_tgt_t *tgt, uint8_t type, uint16_t smid)
 
 	if (atomic_inc_uint_nv(&lmrc->l_fw_outstanding_cmds) >
 	    lmrc->l_max_scsi_cmds) {
+		rw_exit(&tgt->tgt_lock);
 		atomic_dec_uint(&lmrc->l_fw_outstanding_cmds);
 		return (0);
 	}
 
 	mpt = lmrc_get_mpt(lmrc);
+	if (mpt == NULL) {
+		rw_exit(&tgt->tgt_lock);
+		atomic_dec_uint(&lmrc->l_fw_outstanding_cmds);
+		return (0);
+	}
 	ASSERT(mutex_owned(&mpt->mpt_lock));
+
 
 	bzero(mpt->mpt_io_frame, LMRC_MPI2_RAID_DEFAULT_IO_FRAME_SIZE);
 	tm_req = mpt->mpt_io_frame;
@@ -647,7 +654,12 @@ lmrc_tran_setup_pkt(struct scsi_pkt *pkt, int (*callback)(caddr_t),
 	ASSERT(cmd != NULL);
 
 	mpt = lmrc_get_mpt(lmrc);
+	if (mpt == NULL) {
+		rw_exit(&tgt->tgt_lock);
+		return (-1);
+	}
 	ASSERT(mutex_owned(&mpt->mpt_lock));
+
 
 	io_req = mpt->mpt_io_frame;
 
