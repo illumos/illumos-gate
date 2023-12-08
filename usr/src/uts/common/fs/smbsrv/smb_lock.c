@@ -851,8 +851,10 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *lock, smb_lock_t *conflict)
 	conflict = NULL;
 
 	/*
-	 * Before we actually start waiting, setup the hooks
-	 * smb_request_cancel uses to unblock this wait.
+	 * Prepare for cancellable lock wait.
+	 *
+	 * If cancelled, smb_lock_cancel_sr sets
+	 * l_flags |= SMB_LOCK_FLAG_CANCELLED
 	 */
 	mutex_enter(&sr->sr_mutex);
 	if (sr->sr_state == SMB_REQ_STATE_ACTIVE) {
@@ -890,31 +892,29 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *lock, smb_lock_t *conflict)
 	mutex_exit(&lock->l_mutex);
 
 	/*
-	 * Done waiting.  Cleanup cancel hooks and
-	 * finish SR state transitions.
+	 * Did we get the lock or were we cancelled?
 	 */
 	mutex_enter(&sr->sr_mutex);
-	sr->cancel_method = NULL;
-	sr->cancel_arg2 = NULL;
-
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_LOCK:
 		/* Normal wakeup.  Keep status from above. */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
 		break;
-
 	case SMB_REQ_STATE_CANCEL_PENDING:
-		/* Cancelled via smb_lock_cancel_sr */
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
-		/* FALLTHROUGH */
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
 	case SMB_REQ_STATE_CANCELLED:
+		/* Call should return an error. */
 		if (status == NT_STATUS_SUCCESS)
 			status = NT_STATUS_CANCELLED;
 		break;
-
 	default:
 		break;
 	}
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 	mutex_exit(&sr->sr_mutex);
 
 	/* Return to the caller with n_lock_list held. */

@@ -213,6 +213,9 @@ smb_opipe_send_userinfo(smb_request_t *sr, smb_opipe_t *opipe,
 	if (!smb_netuserinfo_xdr(&xdrs, &nui))
 		goto out;
 
+	/*
+	 * Prepare for cancellable send/recv.
+	 */
 	mutex_enter(&sr->sr_mutex);
 	if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
 		mutex_exit(&sr->sr_mutex);
@@ -234,23 +237,30 @@ smb_opipe_send_userinfo(smb_request_t *sr, smb_opipe_t *opipe,
 	if (rc == 0 && iocnt != sizeof (status))
 		rc = EIO;
 
+	/*
+	 * Did the send/recv. complete or was it cancelled?
+	 */
 	mutex_enter(&sr->sr_mutex);
-	sr->cancel_method = NULL;
-	sr->cancel_arg2 = NULL;
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_PIPE:
+		/* Normal wakeup.  Keep rc from above. */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
 		break;
 	case SMB_REQ_STATE_CANCEL_PENDING:
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
+	case SMB_REQ_STATE_CANCELLED:
 		rc = EINTR;
 		break;
 	default:
 		/* keep rc from above */
 		break;
 	}
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 	mutex_exit(&sr->sr_mutex);
-
 
 	/*
 	 * Return the status we read from the pipe service,
@@ -463,6 +473,9 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 	if (sock == NULL)
 		return (EBADF);
 
+	/*
+	 * Prepare for cancellable recvmsg.
+	 */
 	mutex_enter(&sr->sr_mutex);
 	if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
 		mutex_exit(&sr->sr_mutex);
@@ -485,21 +498,29 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 	rc = ksocket_recvmsg(sock, &msghdr, 0,
 	    &recvcnt, ofile->f_cr);
 
+	/*
+	 * Did the recvmsg complete or was it cancelled?
+	 */
 	mutex_enter(&sr->sr_mutex);
-	sr->cancel_method = NULL;
-	sr->cancel_arg2 = NULL;
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_PIPE:
+		/* Normal wakeup.  Keep rc from above. */
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
 		break;
 	case SMB_REQ_STATE_CANCEL_PENDING:
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
+	case SMB_REQ_STATE_CANCELLED:
 		rc = EINTR;
 		break;
 	default:
 		/* keep rc from above */
 		break;
 	}
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 	mutex_exit(&sr->sr_mutex);
 
 	if (rc != 0)

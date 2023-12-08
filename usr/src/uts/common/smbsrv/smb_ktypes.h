@@ -1823,6 +1823,7 @@ typedef struct smb_request {
 	uint32_t		sr_magic;
 	kmutex_t		sr_mutex;
 	smb_req_state_t		sr_state;
+	kcondvar_t		sr_st_cv;
 	struct smb_server	*sr_server;
 	pid_t			*sr_pid;
 	int32_t			sr_gmtoff;

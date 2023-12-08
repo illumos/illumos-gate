@@ -280,14 +280,9 @@ smb_notify_act2(smb_request_t *sr)
 		return (NT_STATUS_INVALID_HANDLE);
 	nc = &of->f_notify;
 
-	mutex_enter(&of->f_mutex);
-
 	/*
 	 * Prepare for a potentially long wait for events.
 	 * Normally transition from ACTIVE to WAITING_FCN1.
-	 *
-	 * Note we hold both of->f_mutex, sr->sr_mutex here,
-	 * taken in that order.
 	 */
 	mutex_enter(&sr->sr_mutex);
 	switch (sr->sr_state) {
@@ -299,7 +294,6 @@ smb_notify_act2(smb_request_t *sr)
 		sr->sr_state = SMB_REQ_STATE_WAITING_FCN1;
 		sr->cancel_method = smb_notify_cancel;
 		sr->sr_worker = NULL;
-		list_insert_tail(&nc->nc_waiters, sr);
 		status = NT_STATUS_PENDING;
 		break;
 
@@ -313,14 +307,24 @@ smb_notify_act2(smb_request_t *sr)
 	mutex_exit(&sr->sr_mutex);
 
 	/*
-	 * In case we missed any events before setting
-	 * state FCN1, schedule our own wakeup.
+	 * Arrange to get smb_notify_wakeup() calls,
+	 * and check for any notify change events that
+	 * may have arrived before we entered f_mutex
+	 *
+	 * Note that smb_notify_cancel may run after we drop
+	 * the sr_mutex, so sr_state may change to cancelled.
+	 * In that case, the smb_notify_wakeup does nothing.
+	 * Note that smb_notify_wakeup is exempt from the
+	 * "MUST NOT touch" (the SR) rule described above.
 	 */
-	if (status == NT_STATUS_PENDING && nc->nc_events != 0) {
-		smb_notify_wakeup(sr);
+	if (status == NT_STATUS_PENDING) {
+		mutex_enter(&of->f_mutex);
+		list_insert_tail(&nc->nc_waiters, sr);
+		if (nc->nc_events != 0) {
+			smb_notify_wakeup(sr);
+		}
+		mutex_exit(&of->f_mutex);
 	}
-
-	mutex_exit(&of->f_mutex);
 
 	/* Note: Never NT_STATUS_NOTIFY_ENUM_DIR here. */
 	ASSERT(status != NT_STATUS_NOTIFY_ENUM_DIR);
@@ -349,15 +353,11 @@ smb_notify_act3(smb_request_t *sr)
 	ASSERT(of != NULL);
 	nc = &of->f_notify;
 
-	mutex_enter(&of->f_mutex);
-
 	mutex_enter(&sr->sr_mutex);
 	ASSERT3P(sr->sr_worker, ==, NULL);
 	sr->sr_worker = curthread;
-	sr->cancel_method = NULL;
 
-	list_remove(&nc->nc_waiters, sr);
-
+switch_state:
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_WAITING_FCN2:
 		/*
@@ -366,23 +366,30 @@ smb_notify_act3(smb_request_t *sr)
 		sr->sr_state = SMB_REQ_STATE_ACTIVE;
 		status = 0;
 		break;
-
 	case SMB_REQ_STATE_CANCEL_PENDING:
+		/* cancel_method running. wait. */
+		cv_wait(&sr->sr_st_cv, &sr->sr_mutex);
+		goto switch_state;
+	case SMB_REQ_STATE_CANCELLED:
 		/*
 		 * Got smb_notify_cancel
 		 */
-		sr->sr_state = SMB_REQ_STATE_CANCELLED;
 		status = NT_STATUS_CANCELLED;
 		break;
 	default:
 		status = NT_STATUS_INTERNAL_ERROR;
 		break;
 	}
+	sr->cancel_method = NULL;
 	mutex_exit(&sr->sr_mutex);
 
+	/*
+	 * The actual SMB notify work.
+	 */
+	mutex_enter(&of->f_mutex);
+	list_remove(&nc->nc_waiters, sr);
 	if (status == 0)
 		status = smb_notify_get_events(sr);
-
 	mutex_exit(&of->f_mutex);
 
 	/*
