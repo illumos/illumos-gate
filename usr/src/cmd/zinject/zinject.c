@@ -1211,11 +1211,11 @@ main(int argc, char **argv)
 				(void) fprintf(stderr, "the '-C' option may "
 				    "not be used with logical data errors "
 				    "'decrypt' and 'decompress'\n");
-				record.zi_dvas = dvas;
+				libzfs_fini(g_zfs);
+				return (1);
 			}
+			record.zi_dvas = dvas;
 		}
-
-		record.zi_cmd = ZINJECT_DATA_FAULT;
 
 		if (error == EACCES) {
 			if (type != TYPE_DATA) {
@@ -1232,6 +1232,8 @@ main(int argc, char **argv)
 			 * not found.
 			 */
 			error = ECKSUM;
+		} else {
+			record.zi_cmd = ZINJECT_DATA_FAULT;
 		}
 
 		if (translate_record(type, argv[0], range, level, &record, pool,

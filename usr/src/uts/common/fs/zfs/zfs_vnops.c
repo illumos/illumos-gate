@@ -5608,6 +5608,13 @@ zfs_reqzcbuf(vnode_t *vp, enum uio_rw ioflag, xuio_t *xuio, cred_t *cr,
 		return (SET_ERROR(EINVAL));
 	}
 
+	/*
+	 * Note: Setting UIO_XUIO in uio_extflg tells the caller to
+	 * return any loaned buffers by calling VOP_RETZCBUF, so
+	 * after we do this we MUST expect a zfs_retzcbuf call.
+	 * Note that for UIO_READ, XUIO_XUZC_PRIV is not set
+	 * until zfs_read calls dmu_xuio_init.
+	 */
 	uio->uio_extflg = UIO_XUIO;
 	XUIO_XUZC_RW(xuio) = ioflag;
 	ZFS_EXIT(zfsvfs);
@@ -5623,6 +5630,10 @@ zfs_retzcbuf(vnode_t *vp, xuio_t *xuio, cred_t *cr, caller_context_t *ct)
 	int ioflag = XUIO_XUZC_RW(xuio);
 
 	ASSERT(xuio->xu_type == UIOTYPE_ZEROCOPY);
+
+	/* In case zfs_read never calls dmu_xuio_init */
+	if (XUIO_XUZC_PRIV(xuio) == NULL)
+		return (0);
 
 	i = dmu_xuio_cnt(xuio);
 	while (i-- > 0) {
