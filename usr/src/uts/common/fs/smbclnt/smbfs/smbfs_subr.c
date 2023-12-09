@@ -339,6 +339,7 @@ errout:
  *	FileStandardInformation
  *	FileInternalInformation
  *	FileEaInformation
+ *	FileAccessInformation
  *	FilePositionInformation
  *	FileModeInformation
  *	FileAlignmentInformation
@@ -399,6 +400,7 @@ smbfs_decode_file_all_info(struct smb_share *ssp,
 	 * Then:
 	 *	FileInternalInformation
 	 *	FileEaInformation
+	 *	FileAccessInformation
 	 *	FilePositionInformation
 	 *	FileModeInformation
 	 *	FileAlignmentInformation
