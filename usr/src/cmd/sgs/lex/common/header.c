@@ -114,8 +114,7 @@ chd1(void)
 	(void) fprintf(fout, "#endif\n");
 	(void) fprintf(fout,
 	"\n#if defined(__cplusplus) || defined(__STDC__)\n");
-	(void) fprintf(fout,
-	"\n#if defined(__cplusplus) && defined(__EXTERN_C__)\n");
+	(void) fprintf(fout, "\n#if defined(__cplusplus)\n");
 	(void) fprintf(fout, "extern \"C\" {\n");
 	(void) fprintf(fout, "#endif\n");
 	(void) fprintf(fout, "\tint yyback(int *, int);\n"); /* ? */
@@ -143,8 +142,7 @@ chd1(void)
 	(void) fprintf(fout, "\tvoid allprint(char);\n");
 	(void) fprintf(fout, "\tvoid sprint(char *);\n");
 	(void) fprintf(fout, "#endif\n");
-	(void) fprintf(fout,
-	"#if defined(__cplusplus) && defined(__EXTERN_C__)\n");
+	(void) fprintf(fout, "#if defined(__cplusplus)\n");
 	(void) fprintf(fout, "}\n");
 	(void) fprintf(fout, "#endif\n\n");
 	(void) fprintf(fout, "#ifdef __cplusplus\n");
