@@ -411,7 +411,6 @@ show_ustat(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_ustat32(private_t *pri, long offset)
 {
@@ -428,7 +427,6 @@ show_ustat32(private_t *pri, long offset)
 		    ubuf.f_fpack);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_fusers(private_t *pri, long offset, long nproc)
@@ -477,7 +475,6 @@ show_utssys(private_t *pri, long r0)
 	}
 }
 
-#ifdef _LP64
 void
 show_utssys32(private_t *pri, long r0)
 {
@@ -495,7 +492,6 @@ show_utssys32(private_t *pri, long r0)
 		}
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_cladm(private_t *pri, int code, int function, long offset)
@@ -825,7 +821,6 @@ show_strioctl(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_strioctl32(private_t *pri, long offset)
 {
@@ -847,7 +842,6 @@ show_strioctl32(private_t *pri, long offset)
 		--pri->recur;
 	}
 }
-#endif	/* _LP64 */
 
 void
 print_strbuf(private_t *pri, struct strbuf *sp, const char *name, int dump)
@@ -884,7 +878,6 @@ print_strbuf(private_t *pri, struct strbuf *sp, const char *name, int dump)
 	}
 }
 
-#ifdef _LP64
 void
 print_strbuf32(private_t *pri, struct strbuf32 *sp, const char *name, int dump)
 {
@@ -919,7 +912,6 @@ print_strbuf32(private_t *pri, struct strbuf32 *sp, const char *name, int dump)
 			showbuffer(pri, (long)sp->buf, (long)sp->len);
 	}
 }
-#endif	/* _LP64 */
 
 /* strpeek and strfdinsert flags word */
 const char *
@@ -959,7 +951,6 @@ show_strpeek(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_strpeek32(private_t *pri, long offset)
 {
@@ -976,7 +967,6 @@ show_strpeek32(private_t *pri, long offset)
 		    strflags(pri, strpeek.flags));
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_strfdinsert(private_t *pri, long offset)
@@ -997,7 +987,6 @@ show_strfdinsert(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_strfdinsert32(private_t *pri, long offset)
 {
@@ -1016,7 +1005,6 @@ show_strfdinsert32(private_t *pri, long offset)
 		    strfdinsert.offset);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_strrecvfd(private_t *pri, long offset)
@@ -1063,7 +1051,6 @@ show_strlist(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_strlist32(private_t *pri, long offset)
 {
@@ -1092,7 +1079,6 @@ show_strlist32(private_t *pri, long offset)
 		}
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_jwinsize(private_t *pri, long offset)
@@ -1315,10 +1301,6 @@ show_ioctl(private_t *pri, int code, long offset)
 	int lp64 = (data_model == PR_MODEL_LP64);
 	int err = pri->Errno;	/* don't display output parameters */
 				/* for a failed system call */
-#ifndef _LP64
-	if (lp64)
-		return;
-#endif
 	if (offset == 0)
 		return;
 
@@ -1423,34 +1405,22 @@ show_ioctl(private_t *pri, int code, long offset)
 		break;
 		/* these all point to structures */
 	case I_STR:
-#ifdef _LP64
 		if (lp64)
 			show_strioctl(pri, offset);
 		else
 			show_strioctl32(pri, offset);
-#else
-		show_strioctl(pri, offset);
-#endif
 		break;
 	case I_PEEK:
-#ifdef _LP64
 		if (lp64)
 			show_strpeek(pri, offset);
 		else
 			show_strpeek32(pri, offset);
-#else
-		show_strpeek(pri, offset);
-#endif
 		break;
 	case I_FDINSERT:
-#ifdef _LP64
 		if (lp64)
 			show_strfdinsert(pri, offset);
 		else
 			show_strfdinsert32(pri, offset);
-#else
-		show_strfdinsert(pri, offset);
-#endif
 		break;
 	case I_RECVFD:
 		if (err)
@@ -1460,14 +1430,10 @@ show_ioctl(private_t *pri, int code, long offset)
 	case I_LIST:
 		if (err)
 			break;
-#ifdef _LP64
 		if (lp64)
 			show_strlist(pri, offset);
 		else
 			show_strlist32(pri, offset);
-#else
-		show_strlist(pri, offset);
-#endif
 		break;
 	case JWINSIZE:
 		if (err)
@@ -1553,7 +1519,6 @@ show_statvfs(private_t *pri)
 	}
 }
 
-#ifdef _LP64
 void
 show_statvfs32(private_t *pri)
 {
@@ -1598,7 +1563,6 @@ show_statvfs32(private_t *pri)
 		    statvfs.f_fstr);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_statvfs64(private_t *pri)
@@ -1670,7 +1634,6 @@ show_statfs(private_t *pri)
 	}
 }
 
-#ifdef _LP64
 void
 show_statfs32(private_t *pri)
 {
@@ -1695,7 +1658,6 @@ show_statfs32(private_t *pri)
 		    statfs.f_fpack);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_flock32(private_t *pri, long offset)
@@ -1866,7 +1828,6 @@ show_fcntl(private_t *pri)
 		return;
 
 	switch (pri->sys_args[1]) {
-#ifdef _LP64
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
@@ -1896,29 +1857,6 @@ show_fcntl(private_t *pri)
 	case 56:	/* F_FLOCKW64 */
 		show_flock64(pri, offset);
 		break;
-#else	/* _LP64 */
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-	case F_FREESP:
-	case F_ALLOCSP:
-	case F_SETLK_NBMAND:
-		show_flock32(pri, offset);
-		break;
-	case F_GETLK64:
-	case F_SETLK64:
-	case F_SETLKW64:
-	case F_FREESP64:
-	case F_ALLOCSP64:
-	case F_SETLK64_NBMAND:
-	case F_OFD_GETLK64:
-	case F_OFD_SETLK64:
-	case F_OFD_SETLKW64:
-	case F_FLOCK64:
-	case F_FLOCKW64:
-		show_flock64(pri, offset);
-		break;
-#endif	/* _LP64 */
 	case F_SHARE:
 	case F_UNSHARE:
 		show_share(pri, offset);
@@ -1935,7 +1873,6 @@ show_strbuf(private_t *pri, long offset, const char *name, int dump)
 		print_strbuf(pri, &strbuf, name, dump);
 }
 
-#ifdef _LP64
 void
 show_strbuf32(private_t *pri, long offset, const char *name, int dump)
 {
@@ -1944,7 +1881,6 @@ show_strbuf32(private_t *pri, long offset, const char *name, int dump)
 	if (Pread(Proc, &strbuf, sizeof (strbuf), offset) == sizeof (strbuf))
 		print_strbuf32(pri, &strbuf, name, dump);
 }
-#endif	/* _LP64 */
 
 void
 show_gp_msg(private_t *pri, int what)
@@ -1970,7 +1906,6 @@ show_gp_msg(private_t *pri, int what)
 	if (dump)
 		Eserialize();
 
-#ifdef _LP64
 	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0) {
 		if (data_model == PR_MODEL_LP64)
 			show_strbuf(pri, offset, "ctl", dump);
@@ -1983,12 +1918,6 @@ show_gp_msg(private_t *pri, int what)
 		else
 			show_strbuf32(pri, offset, "dat", dump);
 	}
-#else	/* _LP64 */
-	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0)
-		show_strbuf(pri, offset, "ctl", dump);
-	if (pri->sys_nargs >= 3 && (offset = pri->sys_args[2]) != 0)
-		show_strbuf(pri, offset, "dat", dump);
-#endif	/* _LP64 */
 
 	/* exit region of lengthy output */
 	if (dump)
@@ -2168,7 +2097,6 @@ show_perm(private_t *pri, struct ipc_perm *ip)
 	    ip->key);
 }
 
-#ifdef _LP64
 void
 show_perm32(private_t *pri, struct ipc_perm32 *ip)
 {
@@ -2183,7 +2111,6 @@ show_perm32(private_t *pri, struct ipc_perm32 *ip)
 	    ip->seq,
 	    ip->key);
 }
-#endif	/* _LP64 */
 
 static void
 show_msgctl64(private_t *pri, long offset)
@@ -2232,7 +2159,6 @@ show_msgctl(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_msgctl32(private_t *pri, long offset)
 {
@@ -2256,7 +2182,6 @@ show_msgctl32(private_t *pri, long offset)
 		prtime(pri, "    ct = ", msgq.msg_ctime);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_msgbuf(private_t *pri, long offset, long msgsz)
@@ -2282,7 +2207,6 @@ show_msgbuf(private_t *pri, long offset, long msgsz)
 	}
 }
 
-#ifdef _LP64
 void
 show_msgbuf32(private_t *pri, long offset, long msgsz)
 {
@@ -2306,9 +2230,7 @@ show_msgbuf32(private_t *pri, long offset, long msgsz)
 			Xserialize();
 	}
 }
-#endif	/* _LP64 */
 
-#ifdef _LP64
 void
 show_msgsys(private_t *pri, long msgsz)
 {
@@ -2364,49 +2286,6 @@ show_msgsys(private_t *pri, long msgsz)
 		break;
 	}
 }
-#else	/* _LP64 */
-void
-show_msgsys(private_t *pri, long msgsz)
-{
-	switch (pri->sys_args[0]) {
-	case 0:			/* msgget() */
-		break;
-	case 1:			/* msgctl() */
-		if (pri->sys_nargs > 3) {
-			switch (pri->sys_args[2]) {
-			case IPC_STAT:
-				if (pri->Errno)
-					break;
-				/*FALLTHROUGH*/
-			case IPC_SET:
-				show_msgctl(pri, (long)pri->sys_args[3]);
-				break;
-			case IPC_STAT64:
-				if (pri->Errno)
-					break;
-				/*FALLTHROUGH*/
-			case IPC_SET64:
-				show_msgctl64(pri, (long)pri->sys_args[3]);
-				break;
-			}
-		}
-		break;
-	case 2:			/* msgrcv() */
-		if (!pri->Errno && pri->sys_nargs > 2)
-			show_msgbuf(pri, pri->sys_args[2], msgsz);
-		break;
-	case 3:			/* msgsnd() */
-		if (pri->sys_nargs > 3)
-			show_msgbuf(pri, pri->sys_args[2],
-			    pri->sys_args[3]);
-		break;
-	case 4:			/* msgids() */
-	case 5:			/* msgsnap() */
-	default:		/* unexpected subcode */
-		break;
-	}
-}
-#endif	/* _LP64 */
 
 static void
 show_semctl64(private_t *pri, long offset)
@@ -2442,7 +2321,6 @@ show_semctl(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_semctl32(private_t *pri, long offset)
 {
@@ -2460,7 +2338,6 @@ show_semctl32(private_t *pri, long offset)
 		prtime(pri, "    ct = ", semds.sem_ctime);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_semop(private_t *pri, long offset, long nsops, long timeout)
@@ -2507,16 +2384,12 @@ show_semsys(private_t *pri)
 					break;
 				/*FALLTHROUGH*/
 			case IPC_SET:
-#ifdef _LP64
 				if (data_model == PR_MODEL_LP64)
 					show_semctl(pri,
 					    (long)pri->sys_args[4]);
 				else
 					show_semctl32(pri,
 					    (long)pri->sys_args[4]);
-#else
-				show_semctl(pri, (long)pri->sys_args[4]);
-#endif
 				break;
 			case IPC_STAT64:
 				if (pri->Errno)
@@ -2595,7 +2468,6 @@ show_shmctl(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_shmctl32(private_t *pri, long offset)
 {
@@ -2619,7 +2491,6 @@ show_shmctl32(private_t *pri, long offset)
 		prtime(pri, "    ct = ", shmds.shm_ctime);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_shmsys(private_t *pri)
@@ -2635,16 +2506,12 @@ show_shmsys(private_t *pri)
 					break;
 				/*FALLTHROUGH*/
 			case IPC_SET:
-#ifdef _LP64
 				if (data_model == PR_MODEL_LP64)
 					show_shmctl(pri,
 					    (long)pri->sys_args[3]);
 				else
 					show_shmctl32(pri,
 					    (long)pri->sys_args[3]);
-#else
-				show_shmctl(pri, (long)pri->sys_args[3]);
-#endif
 				break;
 			case IPC_STAT64:
 				if (pri->Errno)
@@ -2721,7 +2588,6 @@ show_sigset(private_t *pri, long offset, const char *name)
 	}
 }
 
-#ifdef _LP64
 void
 show_sigaltstack32(private_t *pri, long offset, const char *name)
 {
@@ -2738,19 +2604,16 @@ show_sigaltstack32(private_t *pri, long offset, const char *name)
 		    altstack.ss_flags);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_sigaltstack(private_t *pri, long offset, const char *name)
 {
 	struct sigaltstack altstack;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_sigaltstack32(pri, offset, name);
 		return;
 	}
-#endif
 	if (offset != 0 &&
 	    Pread(Proc, &altstack, sizeof (altstack), offset) ==
 	    sizeof (altstack)) {
@@ -2763,7 +2626,6 @@ show_sigaltstack(private_t *pri, long offset, const char *name)
 	}
 }
 
-#ifdef _LP64
 void
 show_sigaction32(private_t *pri, long offset, const char *name, long odisp)
 {
@@ -2784,19 +2646,16 @@ show_sigaction32(private_t *pri, long offset, const char *name, long odisp)
 		    sigaction.sa_flags);
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_sigaction(private_t *pri, long offset, const char *name, long odisp)
 {
 	struct sigaction sigaction;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_sigaction32(pri, offset, name, odisp);
 		return;
 	}
-#endif
 	if (offset != 0 &&
 	    Pread(Proc, &sigaction, sizeof (sigaction), offset) ==
 	    sizeof (sigaction)) {
@@ -2813,7 +2672,6 @@ show_sigaction(private_t *pri, long offset, const char *name, long odisp)
 	}
 }
 
-#ifdef _LP64
 void
 print_siginfo32(private_t *pri, const siginfo32_t *sip)
 {
@@ -2968,7 +2826,6 @@ print_siginfo32(private_t *pri, const siginfo32_t *sip)
 
 	(void) fputc('\n', stdout);
 }
-#endif	/* _LP64 */
 
 void
 print_siginfo(private_t *pri, const siginfo_t *sip)
@@ -3127,7 +2984,6 @@ print_siginfo(private_t *pri, const siginfo_t *sip)
 	(void) fputc('\n', stdout);
 }
 
-#ifdef _LP64
 void
 show_siginfo32(private_t *pri, long offset)
 {
@@ -3137,19 +2993,16 @@ show_siginfo32(private_t *pri, long offset)
 	    Pread(Proc, &siginfo, sizeof (siginfo), offset) == sizeof (siginfo))
 		print_siginfo32(pri, &siginfo);
 }
-#endif	/* _LP64 */
 
 void
 show_siginfo(private_t *pri, long offset)
 {
 	struct siginfo siginfo;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_siginfo32(pri, offset);
 		return;
 	}
-#endif
 	if (offset != 0 &&
 	    Pread(Proc, &siginfo, sizeof (siginfo), offset) == sizeof (siginfo))
 		print_siginfo(pri, &siginfo);
@@ -3186,7 +3039,6 @@ show_bool(private_t *pri, long offset, int count)
 		Xserialize();
 }
 
-#ifdef _LP64
 void
 show_iovec32(private_t *pri, long offset, int niov, int showbuf, long count)
 {
@@ -3225,7 +3077,6 @@ show_iovec32(private_t *pri, long offset, int niov, int showbuf, long count)
 			Xserialize();
 	}
 }
-#endif	/* _LP64 */
 
 void
 show_iovec(private_t *pri, long offset, long niov, int showbuf, long count)
@@ -3235,12 +3086,10 @@ show_iovec(private_t *pri, long offset, long niov, int showbuf, long count)
 	long nb;
 	int serial = (count > MYBUFSIZ / 4 && showbuf);
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_iovec32(pri, offset, niov, showbuf, count);
 		return;
 	}
-#endif
 	if (niov > 16)		/* is this the real limit? */
 		niov = 16;
 
@@ -3586,7 +3435,6 @@ show_msghdr(private_t *pri, long offset)
 
 }
 
-#ifdef _LP64
 void
 show_msghdr32(private_t *pri, long offset)
 {
@@ -3622,7 +3470,6 @@ show_msghdr32(private_t *pri, long offset)
 	show_iovec32(pri, (long)msg.msg_iov, msg.msg_iovlen, showbuf, nb);
 
 }
-#endif	/* _LP64 */
 
 static void
 show_doorargs(private_t *pri, long offset)
@@ -3752,7 +3599,6 @@ show_doorparam(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 
 static void
 show_doorargs32(private_t *pri, long offset)
@@ -3787,21 +3633,16 @@ show_doorparam32(private_t *pri, long offset)
 	}
 }
 
-#endif	/* _LP64 */
 
 static void
 show_doors(private_t *pri)
 {
 	switch (pri->sys_args[5]) {
 	case DOOR_CALL:
-#ifdef _LP64
 		if (data_model == PR_MODEL_LP64)
 			show_doorargs(pri, (long)pri->sys_args[1]);
 		else
 			show_doorargs32(pri, (long)pri->sys_args[1]);
-#else
-		show_doorargs(pri, (long)pri->sys_args[1]);
-#endif
 		break;
 	case DOOR_UCRED:
 		if (!pri->Errno)
@@ -3813,14 +3654,10 @@ show_doors(private_t *pri)
 		break;
 	case DOOR_GETPARAM:
 		if (!pri->Errno) {
-#ifdef _LP64
 			if (data_model == PR_MODEL_LP64)
 				show_doorparam(pri, (long)pri->sys_args[2]);
 			else
 				show_doorparam32(pri, (long)pri->sys_args[2]);
-#else
-			show_doorparam(pri, (long)pri->sys_args[2]);
-#endif
 		}
 		break;
 	}
@@ -3844,7 +3681,6 @@ show_portargs(private_t *pri, long offset)
 }
 
 
-#ifdef _LP64
 
 static void
 show_portargs32(private_t *pri, long offset)
@@ -3863,28 +3699,22 @@ show_portargs32(private_t *pri, long offset)
 	}
 }
 
-#endif	/* _LP64 */
 
 static void
 show_ports(private_t *pri)
 {
 	switch (pri->sys_args[0]) {
 	case PORT_GET:
-#ifdef _LP64
 		if (data_model == PR_MODEL_LP64)
 			show_portargs(pri, (long)pri->sys_args[2]);
 		else
 			show_portargs32(pri, (long)pri->sys_args[2]);
-#else
-		show_portargs(pri, (long)pri->sys_args[2]);
-#endif
 		break;
 	}
 }
 
 #define	MAX_SNDFL_PRD 16
 
-#ifdef _LP64
 
 static void
 show_ksendfilevec32(private_t *pri, int fd,
@@ -3972,7 +3802,6 @@ show_ksendfilevec64(private_t *pri, int fd,
 	Xserialize();
 }
 
-#endif /* _LP64 */
 
 /*ARGSUSED*/
 static void
@@ -3981,13 +3810,11 @@ show_sendfilevec(private_t *pri, int fd, sendfilevec_t *sndvec, int sfvcnt)
 	sendfilevec_t *snd_ptr, snd[MAX_SNDFL_PRD];
 	size_t cpy_rqst;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_ksendfilevec32(pri, fd,
 		    (ksendfilevec32_t *)sndvec, sfvcnt);
 		return;
 	}
-#endif
 	Eserialize();
 	while (sfvcnt > 0) {
 		cpy_rqst = MIN(sfvcnt, MAX_SNDFL_PRD);
@@ -4030,13 +3857,11 @@ show_sendfilevec64(private_t *pri, int fd, sendfilevec64_t *sndvec, int sfvcnt)
 	sendfilevec64_t *snd_ptr, snd[MAX_SNDFL_PRD];
 	size_t cpy_rqst;
 
-#ifdef _LP64
 	if (data_model != PR_MODEL_LP64) {
 		show_ksendfilevec64(pri, fd,
 		    (ksendfilevec64_t *)sndvec, sfvcnt);
 		return;
 	}
-#endif
 
 	Eserialize();
 	while (sfvcnt > 0) {
@@ -4051,13 +3876,8 @@ show_sendfilevec64(private_t *pri, int fd, sendfilevec64_t *sndvec, int sfvcnt)
 
 		while (cpy_rqst) {
 			(void) printf(
-#ifdef _LP64
 			    "sfv_fd=%d\tsfv_flag=0x%x\t"
 			    "sfv_off=%ld\tsfv_len=%lu\n",
-#else
-			    "sfv_fd=%d\tsfv_flag=0x%x\t"
-			    "sfv_off=%lld\tsfv_len=%lu\n",
-#endif
 			    snd_ptr->sfv_fd,
 			    snd_ptr->sfv_flag,
 			    snd_ptr->sfv_off,
@@ -4103,7 +3923,6 @@ show_memcntl_mha(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 
 static void
 show_memcntl_mha32(private_t *pri, long offset)
@@ -4130,7 +3949,6 @@ show_memcntl_mha32(private_t *pri, long offset)
 	}
 }
 
-#endif	/* _LP64 */
 
 static void
 show_memcntl(private_t *pri)
@@ -4138,14 +3956,10 @@ show_memcntl(private_t *pri)
 
 	if ((int)pri->sys_args[2] != MC_HAT_ADVISE)
 		return;
-#ifdef _LP64
 	if (data_model == PR_MODEL_LP64)
 		show_memcntl_mha(pri, (long)pri->sys_args[3]);
 	else
 		show_memcntl_mha32(pri, (long)pri->sys_args[3]);
-#else
-	show_memcntl_mha(pri, (long)pri->sys_args[3]);
-#endif
 }
 
 void
@@ -4362,7 +4176,6 @@ show_getrusage(long offset)
 	    r.ru_nivcsw);
 }
 
-#ifdef _LP64
 void
 show_getrusage32(long offset)
 {
@@ -4404,7 +4217,6 @@ show_getrusage32(long offset)
 	(void) printf("\tinv cntxt swtchs: %d\n",
 	    r.ru_nivcsw);
 }
-#endif
 
 /*
  * Utility function to print a packed nvlist by unpacking
@@ -4524,7 +4336,6 @@ show_zone_create_args(private_t *pri, long offset)
 }
 
 
-#ifdef _LP64
 
 static void
 show_zone_create_args32(private_t *pri, long offset)
@@ -4607,21 +4418,16 @@ show_zone_create_args32(private_t *pri, long offset)
 	}
 }
 
-#endif
 
 static void
 show_zones(private_t *pri)
 {
 	switch (pri->sys_args[0]) {
 	case ZONE_CREATE:
-#ifdef _LP64
 		if (data_model == PR_MODEL_LP64)
 			show_zone_create_args(pri, (long)pri->sys_args[1]);
 		else
 			show_zone_create_args32(pri, (long)pri->sys_args[1]);
-#else
-		show_zone_create_args(pri, (long)pri->sys_args[1]);
-#endif
 		break;
 	}
 }
@@ -4678,15 +4484,9 @@ show_rctlblk(private_t *pri, long _rctlblk)
 			    pri->pname, s);
 		}
 
-#ifdef _LP64
 		(void) printf("%s\t\t Recipient PID: %d\n",
 		    pri->pname,
 		    rctlblk_get_recipient_pid(blk));
-#else
-		(void) printf("%s\t\t Recipient PID: %ld\n",
-		    pri->pname,
-		    rctlblk_get_recipient_pid(blk));
-#endif
 		(void) printf("%s\t\t   Firing Time: %lld\n",
 		    pri->pname,
 		    rctlblk_get_firing_time(blk));
@@ -4747,7 +4547,6 @@ show_utimesys(private_t *pri)
 	}
 }
 
-#ifdef _LP64
 static void
 show_sockconfig_filter_prop32(private_t *pri, long addr)
 {
@@ -4799,7 +4598,6 @@ show_sockconfig_filter_prop32(private_t *pri, long addr)
 			}
 	}
 }
-#endif	/* _LP64 */
 static void
 show_sockconfig_filter_prop(private_t *pri, long addr)
 {
@@ -4857,16 +4655,12 @@ show_sockconfig(private_t *pri)
 {
 	switch (pri->sys_args[0]) {
 	case SOCKCONFIG_ADD_FILTER:
-#ifdef _LP64
 		if (data_model == PR_MODEL_LP64)
 			show_sockconfig_filter_prop(pri,
 			    (long)pri->sys_args[2]);
 		else
 			show_sockconfig_filter_prop32(pri,
 			    (long)pri->sys_args[2]);
-#else
-		show_sockconfig_filter_prop(pri, (long)pri->sys_args[2]);
-#endif
 		break;
 	default:
 		break;
@@ -5146,11 +4940,6 @@ expound(private_t *pri, long r0, int raw)
 	int what = Lsp->pr_what;
 	int err = pri->Errno;		/* don't display output parameters */
 					/* for a failed system call */
-#ifndef _LP64
-	/* We are a 32-bit truss; we can't grok a 64-bit process */
-	if (lp64)
-		return;
-#endif
 	/* for reporting sleeping system calls */
 	if (what == 0 && (Lsp->pr_flags & (PR_ASLEEP|PR_VFORKP)))
 		what = Lsp->pr_syscall;
@@ -5183,14 +4972,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_utssys:
 		if (err)
 			break;
-#ifdef _LP64
 		if (lp64)
 			show_utssys(pri, r0);
 		else
 			show_utssys32(pri, r0);
-#else
-		show_utssys(pri, r0);
-#endif
 		break;
 	case SYS_ioctl:
 		if (pri->sys_nargs >= 3) /* each case must decide for itself */
@@ -5221,12 +5006,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_fstatvfs:
 		if (err)
 			break;
-#ifdef _LP64
 		if (!lp64) {
 			show_statvfs32(pri);
 			break;
 		}
-#endif
 		show_statvfs(pri);
 		break;
 	case SYS_statvfs64:
@@ -5239,14 +5022,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_fstatfs:
 		if (err)
 			break;
-#ifdef _LP64
 		if (lp64)
 			show_statfs(pri);
 		else
 			show_statfs32(pri);
-#else
-		show_statfs(pri);
-#endif
 		break;
 	case SYS_fcntl:
 		show_fcntl(pri);
@@ -5263,15 +5042,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_getdents:
 		if (err || pri->sys_nargs <= 1 || r0 <= 0)
 			break;
-#ifdef _LP64
 		if (!lp64) {
 			show_dents32(pri, (long)pri->sys_args[1], r0);
 			break;
 		}
-#else
-		show_dents32(pri, (long)pri->sys_args[1], r0);
-		break;
-#endif
 		/* FALLTHROUGH */
 	case SYS_getdents64:
 		if (err || pri->sys_nargs <= 1 || r0 <= 0)
@@ -5390,14 +5164,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_setrlimit:
 		if (pri->sys_nargs <= 1)
 			break;
-#ifdef _LP64
 		if (lp64)
 			show_rlimit64(pri, (long)pri->sys_args[1]);
 		else
 			show_rlimit32(pri, (long)pri->sys_args[1]);
-#else
-		show_rlimit32(pri, (long)pri->sys_args[1]);
-#endif
 		break;
 	case SYS_getrlimit64:
 		if (err)
@@ -5541,14 +5311,10 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_sendmsg:
 		if (pri->sys_nargs <= 2)
 			break;
-#ifdef _LP64
 		if (lp64)
 			show_msghdr(pri, pri->sys_args[1]);
 		else
 			show_msghdr32(pri, pri->sys_args[1]);
-#else
-		show_msghdr(pri, pri->sys_args[1]);
-#endif
 		break;
 	case SYS_door:
 		show_doors(pri);
@@ -5594,11 +5360,9 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_rusagesys:
 		if (!err)
 			if (pri->sys_args[0] == _RUSAGESYS_GETRUSAGE) {
-#ifdef _LP64
 				if (!lp64)
 					show_getrusage32(pri->sys_args[1]);
 				else
-#endif
 					show_getrusage(pri->sys_args[1]);
 			}
 		break;

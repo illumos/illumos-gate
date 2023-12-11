@@ -2600,7 +2600,7 @@ s usr/bin/amd64/savecore=../savecore
 s usr/bin/amd64/size=../size
 s usr/bin/amd64/sort=../sort
 s usr/bin/amd64/strings=../strings
-f usr/bin/amd64/truss 0555 root bin
+s usr/bin/amd64/truss=../truss
 f usr/bin/amt 0555 root bin
 h usr/bin/apropos=usr/bin/man
 f usr/bin/ar 0555 root bin
@@ -2996,7 +2996,7 @@ f usr/bin/tput 0555 root bin
 f usr/bin/tr 0555 root bin
 f usr/bin/troff 0555 root bin
 f usr/bin/true 0555 root bin
-h usr/bin/truss=usr/lib/isaexec
+f usr/bin/truss 0555 root bin
 f usr/bin/tsort 0555 root bin
 f usr/bin/tty 0555 root bin
 h usr/bin/type=usr/bin/alias

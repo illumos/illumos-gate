@@ -42,21 +42,15 @@
 #include "proto.h"
 
 void	show_stat32(private_t *, long);
-#ifdef _LP64
 void	show_stat64(private_t *, long);
-#endif
 
 void
 show_stat(private_t *pri, long offset)
 {
-#ifdef _LP64
 	if (data_model == PR_MODEL_LP64)
 		show_stat64(pri, offset);
 	else
 		show_stat32(pri, offset);
-#else
-	show_stat32(pri, offset);
-#endif
 }
 
 void
@@ -148,7 +142,6 @@ show_stat64_32(private_t *pri, long offset)
 	}
 }
 
-#ifdef _LP64
 void
 show_stat64(private_t *pri, long offset)
 {
@@ -189,4 +182,3 @@ show_stat64(private_t *pri, long offset)
 		    statb.st_fstype);
 	}
 }
-#endif	/* _LP64 */
