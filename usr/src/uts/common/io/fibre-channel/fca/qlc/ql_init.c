@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -31,7 +31,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -57,18 +57,18 @@
  */
 static uint16_t ql_nvram_request(ql_adapter_state_t *, uint32_t);
 static int ql_nvram_24xx_config(ql_adapter_state_t *);
-static void ql_23_properties(ql_adapter_state_t *, nvram_t *);
-static void ql_24xx_properties(ql_adapter_state_t *, nvram_24xx_t *);
+static void ql_23_properties(ql_adapter_state_t *, ql_init_cb_t *);
+static void ql_24xx_properties(ql_adapter_state_t *, ql_init_24xx_cb_t *);
 static int ql_check_isp_firmware(ql_adapter_state_t *);
-static int ql_chip_diag(ql_adapter_state_t *);
 static int ql_load_flash_fw(ql_adapter_state_t *);
 static int ql_configure_loop(ql_adapter_state_t *);
 static int ql_configure_hba(ql_adapter_state_t *);
 static int ql_configure_fabric(ql_adapter_state_t *);
 static int ql_configure_device_d_id(ql_adapter_state_t *);
+static void ql_update_dev(ql_adapter_state_t *, uint32_t);
 static void ql_set_max_read_req(ql_adapter_state_t *);
 static void ql_configure_n_port_info(ql_adapter_state_t *);
-static void ql_clear_mcp(ql_adapter_state_t *);
+static void ql_reset_24xx_chip(ql_adapter_state_t *);
 static void ql_mps_reset(ql_adapter_state_t *);
 
 /*
@@ -93,7 +93,7 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 	la_els_logi_t		*els = &ha->loginparams;
 	int			retries = 5;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started cfg=0x%llx\n", ha->cfg_flags);
 
 	do {
 		/* Clear adapter flags. */
@@ -134,30 +134,17 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 			(void) ql_nvram_config(ha);
 		}
 
-		/* Set login parameters. */
-		if (CFG_IST(ha, CFG_CTRL_24258081)) {
-			els->common_service.rx_bufsize = CHAR_TO_SHORT(
-			    ha->init_ctrl_blk.cb24.max_frame_length[0],
-			    ha->init_ctrl_blk.cb24.max_frame_length[1]);
-			bcopy((void *)&ha->init_ctrl_blk.cb24.port_name[0],
-			    (void *)&els->nport_ww_name.raw_wwn[0], 8);
-			bcopy((void *)&ha->init_ctrl_blk.cb24.node_name[0],
-			    (void *)&els->node_ww_name.raw_wwn[0], 8);
-		} else {
-			els->common_service.rx_bufsize = CHAR_TO_SHORT(
-			    ha->init_ctrl_blk.cb.max_frame_length[0],
-			    ha->init_ctrl_blk.cb.max_frame_length[1]);
-			bcopy((void *)&ha->init_ctrl_blk.cb.port_name[0],
-			    (void *)&els->nport_ww_name.raw_wwn[0], 8);
-			bcopy((void *)&ha->init_ctrl_blk.cb.node_name[0],
-			    (void *)&els->node_ww_name.raw_wwn[0], 8);
-		}
-		bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv,
-		    strlen(QL_VERSION));
-
 		/* Determine which RISC code to use. */
 		if ((rval = ql_check_isp_firmware(ha)) != QL_SUCCESS) {
-			if ((rval = ql_chip_diag(ha)) == QL_SUCCESS) {
+			if (ha->dev_state != NX_DEV_READY) {
+				EL(ha, "dev_state not ready, isp_abort_needed_2"
+				    "\n");
+				TASK_DAEMON_LOCK(ha);
+				ha->task_daemon_flags |= ISP_ABORT_NEEDED;
+				TASK_DAEMON_UNLOCK(ha);
+				break;
+			}
+			if ((rval = ql_mbx_wrap_test(ha, NULL)) == QL_SUCCESS) {
 				rval = ql_load_isp_firmware(ha);
 			}
 		}
@@ -165,19 +152,24 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 		if (rval == QL_SUCCESS && (rval = ql_set_cache_line(ha)) ==
 		    QL_SUCCESS && (rval = ql_init_rings(ha)) == QL_SUCCESS) {
 
+			ql_enable_intr(ha);
 			(void) ql_fw_ready(ha, ha->fwwait);
 
-			if (!(ha->task_daemon_flags & QL_SUSPENDED) &&
+			if (!DRIVER_SUSPENDED(ha) &&
 			    ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
 				if (ha->topology & QL_LOOP_CONNECTION) {
 					ha->state = ha->state | FC_STATE_LOOP;
 					msg = "Loop ONLINE";
+					TASK_DAEMON_LOCK(ha);
 					ha->task_daemon_flags |= STATE_ONLINE;
+					TASK_DAEMON_UNLOCK(ha);
 				} else if (ha->topology & QL_P2P_CONNECTION) {
 					ha->state = ha->state |
 					    FC_STATE_ONLINE;
 					msg = "Link ONLINE";
+					TASK_DAEMON_LOCK(ha);
 					ha->task_daemon_flags |= STATE_ONLINE;
+					TASK_DAEMON_UNLOCK(ha);
 				} else {
 					msg = "Unknown Link state";
 				}
@@ -196,28 +188,37 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 
 	cmn_err(CE_NOTE, "!Qlogic %s(%d): %s", QL_NAME, ha->instance, msg);
 
-	/* Enable ISP interrupts and login parameters. */
-	if (CFG_IST(ha, CFG_CTRL_8021)) {
-		ql_8021_enable_intrs(ha);
-	} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-		WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
-	} else {
-		WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+	/* Enable ISP interrupts if not already enabled. */
+	if (!(ha->flags & INTERRUPTS_ENABLED)) {
+		ql_enable_intr(ha);
 	}
 
 	ADAPTER_STATE_LOCK(ha);
-	ha->flags |= (INTERRUPTS_ENABLED | ONLINE);
+	ha->flags |= ONLINE;
 	ADAPTER_STATE_UNLOCK(ha);
 
-	ha->task_daemon_flags &= ~(FC_STATE_CHANGE | RESET_MARKER_NEEDED |
+	/*
+	 * Set flash write-protection.
+	 */
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2) &&
+	    ha->dev_state == NX_DEV_READY) {
+		ql_24xx_protect_flash(ha);
+	}
+
+	TASK_DAEMON_LOCK(ha);
+	ha->task_daemon_flags &= ~(FC_STATE_CHANGE | MARKER_NEEDED |
 	    COMMAND_WAIT_NEEDED);
+	TASK_DAEMON_UNLOCK(ha);
 
 	/*
 	 * Setup login parameters.
 	 */
+	bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv, strlen(QL_VERSION));
+
 	els->common_service.fcph_version = 0x2006;
 	els->common_service.btob_credit = 3;
-	els->common_service.cmn_features = 0x8800;
+	els->common_service.cmn_features =
+	    ha->topology & QL_N_PORT ? 0x8000 : 0x8800;
 	els->common_service.conc_sequences = 0xff;
 	els->common_service.relative_offset = 3;
 	els->common_service.e_d_tov = 0x07d0;
@@ -226,12 +227,13 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 	class3_param->class_valid_svc_opt = 0x8800;
 	class3_param->rcv_data_size = els->common_service.rx_bufsize;
 	class3_param->conc_sequences = 0xff;
+	class3_param->open_sequences_per_exch = 1;
 
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -255,7 +257,7 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 	uint32_t	timer;
 	uint16_t	cmd, w16;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	if (CFG_IST(ha, CFG_SBUS_CARD)) {
 		w16 = (uint16_t)ddi_get16(ha->sbus_fpga_dev_handle,
@@ -271,8 +273,11 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 		 */
 		cmd = (uint16_t)ql_pci_config_get16(ha, PCI_CONF_COMM);
 		cmd = (uint16_t)(cmd | PCI_COMM_IO | PCI_COMM_MAE |
-		    PCI_COMM_ME | PCI_COMM_MEMWR_INVAL |
-		    PCI_COMM_PARITY_DETECT | PCI_COMM_SERR_ENABLE);
+		    PCI_COMM_ME | PCI_COMM_PARITY_DETECT |
+		    PCI_COMM_SERR_ENABLE);
+		if (ql_get_cap_ofst(ha, PCI_CAP_ID_PCIX)) {
+			cmd = (uint16_t)(cmd | PCI_COMM_MEMWR_INVAL);
+		}
 
 		/*
 		 * If this is a 2300 card and not 2312, reset the
@@ -326,7 +331,7 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 			}
 		}
 
-		if (!(CFG_IST(ha, CFG_CTRL_8021)) &&
+		if (!(CFG_IST(ha, CFG_CTRL_82XX)) &&
 		    ha->pci_max_read_req != 0) {
 			ql_set_max_read_req(ha);
 		}
@@ -340,12 +345,14 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 		ql_pci_config_put8(ha, PCI_CONF_LATENCY_TIMER, 0x40);
 
 		/* Reset expansion ROM address decode enable. */
-		w16 = (uint16_t)ql_pci_config_get16(ha, PCI_CONF_ROM);
-		w16 = (uint16_t)(w16 & ~BIT_0);
-		ql_pci_config_put16(ha, PCI_CONF_ROM, w16);
+		if (!CFG_IST(ha, CFG_CTRL_278083)) {
+			w16 = (uint16_t)ql_pci_config_get16(ha, PCI_CONF_ROM);
+			w16 = (uint16_t)(w16 & ~BIT_0);
+			ql_pci_config_put16(ha, PCI_CONF_ROM, w16);
+		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_10(ha, "done\n");
 
 	return (QL_SUCCESS);
 }
@@ -368,11 +375,15 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 static void
 ql_set_max_read_req(ql_adapter_state_t *ha)
 {
+	int		ofst;
 	uint16_t	read_req, w16;
 	uint16_t	tmp = ha->pci_max_read_req;
 
-	if ((ha->device_id == 0x2422) ||
-	    ((ha->device_id & 0xff00) == 0x2300)) {
+	QL_PRINT_3(ha, "started\n");
+
+	if ((ofst = ql_get_cap_ofst(ha, PCI_CAP_ID_PCIX))) {
+		ofst += PCI_PCIX_COMMAND;
+		QL_PRINT_10(ha, "PCI-X Command Reg = %xh\n", ofst);
 		/* check for vaild override value */
 		if (tmp == 512 || tmp == 1024 || tmp == 2048 ||
 		    tmp == 4096) {
@@ -382,18 +393,18 @@ ql_set_max_read_req(ql_adapter_state_t *ha)
 			for (read_req = 0; tmp != 0; read_req++) {
 				tmp = (uint16_t)(tmp >> 1);
 			}
-			w16 = (uint16_t)ql_pci_config_get16(ha, 0x4e);
+			w16 = (uint16_t)ql_pci_config_get16(ha, ofst);
 			w16 = (uint16_t)(w16 & ~(BIT_3 & BIT_2));
 			w16 = (uint16_t)(w16 | (read_req << 2));
-			ql_pci_config_put16(ha, 0x4e, w16);
+			ql_pci_config_put16(ha, ofst, w16);
 		} else {
 			EL(ha, "invalid parameter value for "
 			    "'pci-max-read-request': %d; using system "
 			    "default\n", tmp);
 		}
-	} else if ((ha->device_id == 0x2432) || ((ha->device_id & 0xff00) ==
-	    0x2500) || (ha->device_id == 0x8432)) {
-		/* check for vaild override value */
+	} else if ((ofst = ql_get_cap_ofst(ha, PCI_CAP_ID_PCI_E))) {
+		ofst += PCI_PCIE_DEVICE_CONTROL;
+		QL_PRINT_10(ha, "PCI-E Device Control Reg = %xh\n", ofst);
 		if (tmp == 128 || tmp == 256 || tmp == 512 ||
 		    tmp == 1024 || tmp == 2048 || tmp == 4096) {
 			/* shift away the don't cares */
@@ -402,17 +413,18 @@ ql_set_max_read_req(ql_adapter_state_t *ha)
 			for (read_req = 0; tmp != 0; read_req++) {
 				tmp = (uint16_t)(tmp >> 1);
 			}
-			w16 = (uint16_t)ql_pci_config_get16(ha, 0x54);
+			w16 = (uint16_t)ql_pci_config_get16(ha, ofst);
 			w16 = (uint16_t)(w16 & ~(BIT_14 | BIT_13 |
 			    BIT_12));
 			w16 = (uint16_t)(w16 | (read_req << 12));
-			ql_pci_config_put16(ha, 0x54, w16);
+			ql_pci_config_put16(ha, ofst, w16);
 		} else {
 			EL(ha, "invalid parameter value for "
 			    "'pci-max-read-request': %d; using system "
 			    "default\n", tmp);
 		}
 	}
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -420,7 +432,7 @@ ql_set_max_read_req(ql_adapter_state_t *ha)
  *
  * Input:
  *	ha:		adapter state pointer.
- *	ha->hba_buf = request and response rings
+ *	ha->req_q[0]:	request ring
  *
  * Output:
  *	ha->init_ctrl_blk = initialization control block
@@ -439,17 +451,18 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	caddr_t		dptr1, dptr2;
 	ql_init_cb_t	*icb = &ha->init_ctrl_blk.cb;
 	ql_ip_init_cb_t	*ip_icb = &ha->ip_init_ctrl_blk.cb;
-	nvram_t		*nv = (nvram_t *)ha->request_ring_bp;
-	uint16_t	*wptr = (uint16_t *)ha->request_ring_bp;
+	nvram_t		*nv = (nvram_t *)ha->req_q[0]->req_ring.bp;
+	uint16_t	*wptr = (uint16_t *)ha->req_q[0]->req_ring.bp;
 	uint8_t		chksum = 0;
 	int		rval;
 	int		idpromlen;
 	char		idprombuf[32];
 	uint32_t	start_addr;
+	la_els_logi_t	*els = &ha->loginparams;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 		return (ql_nvram_24xx_config(ha));
 	}
 
@@ -457,7 +470,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	if ((rval = ql_lock_nvram(ha, &start_addr, LNF_NVRAM_DATA)) ==
 	    QL_SUCCESS) {
 		/* Verify valid NVRAM checksum. */
-		for (cnt = 0; cnt < sizeof (nvram_t)/2; cnt++) {
+		for (cnt = 0; cnt < sizeof (nvram_t) / 2; cnt++) {
 			*wptr = (uint16_t)ql_get_nvram_word(ha,
 			    (uint32_t)(cnt + start_addr));
 			chksum = (uint8_t)(chksum + (uint8_t)*wptr);
@@ -479,7 +492,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		    ha->subven_id, nv->nvram_version);
 
 		/* Don't print nvram message if it's an on-board 2200 */
-		if (!((CFG_IST(ha, CFG_CTRL_2200)) &&
+		if (!((CFG_IST(ha, CFG_CTRL_22XX)) &&
 		    (ha->xioctl->fdesc.flash_size == 0))) {
 			cmn_err(CE_WARN, "%s(%d): NVRAM configuration failed,"
 			    " using driver defaults.", QL_NAME, ha->instance);
@@ -500,7 +513,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		/*
 		 * Allow 2048 byte frames for 2300
 		 */
-		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
+		if (CFG_IST(ha, CFG_CTRL_2363)) {
 			nv->max_frame_length[1] = 8;
 		}
 		nv->max_iocb_allocation[1] = 1;
@@ -514,8 +527,8 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		    DDI_PROP_CANSLEEP, "idprom", (caddr_t)idprombuf,
 		    &idpromlen) != DDI_PROP_SUCCESS) {
 
-			QL_PRINT_3(CE_CONT, "(%d): Unable to read idprom "
-			    "property\n", ha->instance);
+			QL_PRINT_10(ha, "Unable to read idprom "
+			    "property\n");
 			cmn_err(CE_WARN, "%s(%d) : Unable to read idprom "
 			    "property", QL_NAME, ha->instance);
 
@@ -537,7 +550,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		}
 
 		/* Don't print nvram message if it's an on-board 2200 */
-		if (!(CFG_IST(ha, CFG_CTRL_2200)) &&
+		if (!(CFG_IST(ha, CFG_CTRL_22XX)) &&
 		    (ha->xioctl->fdesc.flash_size == 0)) {
 			cmn_err(CE_WARN, "%s(%d): Unreliable HBA NVRAM, using"
 			    " default HBA parameters and temporary WWPN:"
@@ -551,7 +564,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		nv->login_timeout = 4;
 
 		/* Set default connection options for the 23xx to 2 */
-		if (!(CFG_IST(ha, CFG_CTRL_2200))) {
+		if (!(CFG_IST(ha, CFG_CTRL_22XX))) {
 			nv->add_fw_opt[0] = (uint8_t)(nv->add_fw_opt[0] |
 			    BIT_5);
 		}
@@ -568,34 +581,9 @@ ql_nvram_config(ql_adapter_state_t *ha)
 		rval = QL_FUNCTION_FAILED;
 	}
 
-	/* Check for adapter node name (big endian). */
-	for (cnt = 0; cnt < 8; cnt++) {
-		if (nv->node_name[cnt] != 0) {
-			break;
-		}
-	}
-
-	/* Copy port name if no node name (big endian). */
-	if (cnt == 8) {
-		bcopy((void *)&nv->port_name[0], (void *)&nv->node_name[0], 8);
-		nv->node_name[0] = (uint8_t)(nv->node_name[0] & ~BIT_0);
-		nv->port_name[0] = (uint8_t)(nv->node_name[0] | BIT_0);
-	}
-
 	/* Reset initialization control blocks. */
 	bzero((void *)icb, sizeof (ql_init_cb_t));
-
-	/* Get driver properties. */
-	ql_23_properties(ha, nv);
-
-	cmn_err(CE_CONT, "!Qlogic %s(%d) WWPN=%02x%02x%02x%02x"
-	    "%02x%02x%02x%02x : WWNN=%02x%02x%02x%02x%02x%02x%02x%02x\n",
-	    QL_NAME, ha->instance, nv->port_name[0], nv->port_name[1],
-	    nv->port_name[2], nv->port_name[3], nv->port_name[4],
-	    nv->port_name[5], nv->port_name[6], nv->port_name[7],
-	    nv->node_name[0], nv->node_name[1], nv->node_name[2],
-	    nv->node_name[3], nv->node_name[4], nv->node_name[5],
-	    nv->node_name[6], nv->node_name[7]);
+	bzero((void *)ip_icb, sizeof (ql_ip_init_cb_t));
 
 	/*
 	 * Copy over NVRAM RISC parameter block
@@ -613,10 +601,62 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	dptr1 = (caddr_t)&icb->add_fw_opt[0];
 	cnt = (uint32_t)((uintptr_t)&icb->reserved_3[0] -
 	    (uintptr_t)&icb->add_fw_opt[0]);
-
 	while (cnt-- != 0) {
 		*dptr1++ = *dptr2++;
 	}
+
+	ha->execution_throttle = CHAR_TO_SHORT(nv->execution_throttle[0],
+	    nv->execution_throttle[1]);
+	ha->loop_reset_delay = nv->reset_delay;
+	ha->port_down_retry_count = nv->port_down_retry_count;
+	ha->maximum_luns_per_target = CHAR_TO_SHORT(
+	    nv->maximum_luns_per_target[0], nv->maximum_luns_per_target[1]);
+	if (ha->maximum_luns_per_target == 0) {
+		ha->maximum_luns_per_target++;
+	}
+	ha->adapter_features = CHAR_TO_SHORT(nv->adapter_features[0],
+	    nv->adapter_features[1]);
+
+	/* Check for adapter node name (big endian). */
+	for (cnt = 0; cnt < 8; cnt++) {
+		if (icb->node_name[cnt] != 0) {
+			break;
+		}
+	}
+
+	/* Copy port name if no node name (big endian). */
+	if (cnt == 8) {
+		for (cnt = 0; cnt < 8; cnt++) {
+			icb->node_name[cnt] = icb->port_name[cnt];
+		}
+		icb->node_name[0] = (uint8_t)(icb->node_name[0] & ~BIT_0);
+		icb->port_name[0] = (uint8_t)(icb->node_name[0] | BIT_0);
+	}
+
+	ADAPTER_STATE_LOCK(ha);
+	ha->cfg_flags &= ~(CFG_ENABLE_FULL_LIP_LOGIN | CFG_ENABLE_TARGET_RESET |
+	    CFG_ENABLE_LIP_RESET | CFG_LOAD_FLASH_FW | CFG_FAST_TIMEOUT |
+	    CFG_DISABLE_RISC_CODE_LOAD | CFG_ENABLE_FWEXTTRACE |
+	    CFG_ENABLE_FWFCETRACE | CFG_SET_CACHE_LINE_SIZE_1 | CFG_LR_SUPPORT);
+	if (nv->host_p[0] & BIT_4) {
+		ha->cfg_flags |= CFG_DISABLE_RISC_CODE_LOAD;
+	}
+	if (nv->host_p[0] & BIT_5) {
+		ha->cfg_flags |= CFG_SET_CACHE_LINE_SIZE_1;
+	}
+	if (nv->host_p[1] & BIT_2) {
+		ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN;
+	}
+	if (nv->host_p[1] & BIT_3) {
+		ha->cfg_flags |= CFG_ENABLE_TARGET_RESET;
+	}
+	nv->adapter_features[0] & BIT_3 ?
+	    (ha->flags |= MULTI_CHIP_ADAPTER) :
+	    (ha->flags &= ~MULTI_CHIP_ADAPTER);
+	ADAPTER_STATE_UNLOCK(ha);
+
+	/* Get driver properties. */
+	ql_23_properties(ha, icb);
 
 	/*
 	 * Setup driver firmware options.
@@ -629,7 +669,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	 * Always enable 64bit addressing, except SBUS cards.
 	 */
 	ha->cfg_flags |= CFG_ENABLE_64BIT_ADDRESSING;
-	if (CFG_IST(ha, (CFG_SBUS_CARD | CFG_CTRL_2300 | CFG_CTRL_6322))) {
+	if (CFG_IST(ha, CFG_SBUS_CARD | CFG_CTRL_2363)) {
 		icb->firmware_options[0] = (uint8_t)
 		    (icb->firmware_options[0] & ~BIT_3);
 		if (CFG_IST(ha, CFG_SBUS_CARD)) {
@@ -651,90 +691,82 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	    (icb->firmware_options[0] & ~(BIT_5 | BIT_4));
 	icb->firmware_options[1] = (uint8_t)
 	    (icb->firmware_options[1] & ~BIT_4);
-
-	icb->add_fw_opt[1] = (uint8_t)(icb->add_fw_opt[1] & ~(BIT_5 | BIT_4));
-	icb->special_options[0] = (uint8_t)(icb->special_options[0] | BIT_1);
-
-	if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
-		if ((icb->special_options[1] & 0x20) == 0) {
-			EL(ha, "50 ohm is not set\n");
-		}
-	}
-	icb->execution_throttle[0] = 0xff;
-	icb->execution_throttle[1] = 0xff;
-
 	if (CFG_IST(ha, CFG_ENABLE_FCP_2_SUPPORT)) {
 		icb->firmware_options[1] = (uint8_t)
 		    (icb->firmware_options[1] | BIT_7 | BIT_6);
 		icb->add_fw_opt[1] = (uint8_t)
 		    (icb->add_fw_opt[1] | BIT_5 | BIT_4);
 	}
+	icb->add_fw_opt[1] = (uint8_t)(icb->add_fw_opt[1] & ~(BIT_5 | BIT_4));
+	icb->special_options[0] = (uint8_t)(icb->special_options[0] | BIT_1);
+
+	if (CFG_IST(ha, CFG_CTRL_2363)) {
+		if ((icb->special_options[1] & 0x20) == 0) {
+			EL(ha, "50 ohm is not set\n");
+		}
+	}
 
 	/*
 	 * Set host adapter parameters
 	 */
-	ADAPTER_STATE_LOCK(ha);
-	ha->nvram_version = nv->nvram_version;
-	ha->adapter_features = CHAR_TO_SHORT(nv->adapter_features[0],
-	    nv->adapter_features[1]);
-
-	nv->host_p[0] & BIT_4 ? (ha->cfg_flags |= CFG_DISABLE_RISC_CODE_LOAD) :
-	    (ha->cfg_flags &= ~CFG_DISABLE_RISC_CODE_LOAD);
-	nv->host_p[0] & BIT_5 ? (ha->cfg_flags |= CFG_SET_CACHE_LINE_SIZE_1) :
-	    (ha->cfg_flags &= ~CFG_SET_CACHE_LINE_SIZE_1);
-
-	nv->host_p[1] & BIT_1 ? (ha->cfg_flags |= CFG_ENABLE_LIP_RESET) :
-	    (ha->cfg_flags &= ~CFG_ENABLE_LIP_RESET);
-	nv->host_p[1] & BIT_2 ? (ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN) :
-	    (ha->cfg_flags &= ~CFG_ENABLE_FULL_LIP_LOGIN);
-	nv->host_p[1] & BIT_3 ? (ha->cfg_flags |= CFG_ENABLE_TARGET_RESET) :
-	    (ha->cfg_flags &= ~CFG_ENABLE_TARGET_RESET);
-
-	nv->adapter_features[0] & BIT_3 ?
-	    (ha->cfg_flags |= CFG_MULTI_CHIP_ADAPTER) :
-	    (ha->cfg_flags &= ~CFG_MULTI_CHIP_ADAPTER);
-
-	ADAPTER_STATE_UNLOCK(ha);
-
-	ha->execution_throttle = CHAR_TO_SHORT(nv->execution_throttle[0],
-	    nv->execution_throttle[1]);
-	ha->loop_reset_delay = nv->reset_delay;
-	ha->port_down_retry_count = nv->port_down_retry_count;
-	ha->r_a_tov = (uint16_t)(icb->login_timeout < R_A_TOV_DEFAULT ?
-	    R_A_TOV_DEFAULT : icb->login_timeout);
-	ha->maximum_luns_per_target = CHAR_TO_SHORT(
-	    nv->maximum_luns_per_target[0], nv->maximum_luns_per_target[1]);
-	if (ha->maximum_luns_per_target == 0) {
-		ha->maximum_luns_per_target++;
+	/* Get adapter id string for Sun branded 23xx only */
+	if (CFG_IST(ha, CFG_CTRL_23XX) && nv->adapInfo[0] != 0) {
+		(void) snprintf((int8_t *)ha->adapInfo, 16, "%s",
+		    nv->adapInfo);
 	}
 
+	ha->r_a_tov = (uint16_t)(icb->login_timeout < R_A_TOV_DEFAULT ?
+	    R_A_TOV_DEFAULT : icb->login_timeout);
+
+	els->common_service.rx_bufsize = CHAR_TO_SHORT(
+	    icb->max_frame_length[0], icb->max_frame_length[1]);
+	bcopy((void *)icb->port_name, (void *)els->nport_ww_name.raw_wwn, 8);
+	bcopy((void *)icb->node_name, (void *)els->node_ww_name.raw_wwn, 8);
+
+	cmn_err(CE_CONT, "!Qlogic %s(%d) WWPN=%02x%02x%02x%02x"
+	    "%02x%02x%02x%02x : WWNN=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+	    QL_NAME, ha->instance,
+	    els->nport_ww_name.raw_wwn[0], els->nport_ww_name.raw_wwn[1],
+	    els->nport_ww_name.raw_wwn[2], els->nport_ww_name.raw_wwn[3],
+	    els->nport_ww_name.raw_wwn[4], els->nport_ww_name.raw_wwn[5],
+	    els->nport_ww_name.raw_wwn[6], els->nport_ww_name.raw_wwn[7],
+	    els->node_ww_name.raw_wwn[0], els->node_ww_name.raw_wwn[1],
+	    els->node_ww_name.raw_wwn[2], els->node_ww_name.raw_wwn[3],
+	    els->node_ww_name.raw_wwn[4], els->node_ww_name.raw_wwn[5],
+	    els->node_ww_name.raw_wwn[6], els->node_ww_name.raw_wwn[7]);
 	/*
 	 * Setup ring parameters in initialization control block
 	 */
-	cnt = REQUEST_ENTRY_CNT;
+	cnt = ha->req_q[0]->req_entry_cnt;
 	icb->request_q_length[0] = LSB(cnt);
 	icb->request_q_length[1] = MSB(cnt);
-	cnt = RESPONSE_ENTRY_CNT;
+	cnt = ha->rsp_queues[0]->rsp_entry_cnt;
 	icb->response_q_length[0] = LSB(cnt);
 	icb->response_q_length[1] = MSB(cnt);
 
-	icb->request_q_address[0] = LSB(LSW(LSD(ha->request_dvma)));
-	icb->request_q_address[1] = MSB(LSW(LSD(ha->request_dvma)));
-	icb->request_q_address[2] = LSB(MSW(LSD(ha->request_dvma)));
-	icb->request_q_address[3] = MSB(MSW(LSD(ha->request_dvma)));
-	icb->request_q_address[4] = LSB(LSW(MSD(ha->request_dvma)));
-	icb->request_q_address[5] = MSB(LSW(MSD(ha->request_dvma)));
-	icb->request_q_address[6] = LSB(MSW(MSD(ha->request_dvma)));
-	icb->request_q_address[7] = MSB(MSW(MSD(ha->request_dvma)));
+	start_addr = ha->req_q[0]->req_ring.cookie.dmac_address;
+	icb->request_q_address[0] = LSB(LSW(start_addr));
+	icb->request_q_address[1] = MSB(LSW(start_addr));
+	icb->request_q_address[2] = LSB(MSW(start_addr));
+	icb->request_q_address[3] = MSB(MSW(start_addr));
 
-	icb->response_q_address[0] = LSB(LSW(LSD(ha->response_dvma)));
-	icb->response_q_address[1] = MSB(LSW(LSD(ha->response_dvma)));
-	icb->response_q_address[2] = LSB(MSW(LSD(ha->response_dvma)));
-	icb->response_q_address[3] = MSB(MSW(LSD(ha->response_dvma)));
-	icb->response_q_address[4] = LSB(LSW(MSD(ha->response_dvma)));
-	icb->response_q_address[5] = MSB(LSW(MSD(ha->response_dvma)));
-	icb->response_q_address[6] = LSB(MSW(MSD(ha->response_dvma)));
-	icb->response_q_address[7] = MSB(MSW(MSD(ha->response_dvma)));
+	start_addr = ha->req_q[0]->req_ring.cookie.dmac_notused;
+	icb->request_q_address[4] = LSB(LSW(start_addr));
+	icb->request_q_address[5] = MSB(LSW(start_addr));
+	icb->request_q_address[6] = LSB(MSW(start_addr));
+	icb->request_q_address[7] = MSB(MSW(start_addr));
+
+	start_addr = ha->rsp_queues[0]->rsp_ring.cookie.dmac_address;
+	icb->response_q_address[0] = LSB(LSW(start_addr));
+	icb->response_q_address[1] = MSB(LSW(start_addr));
+	icb->response_q_address[2] = LSB(MSW(start_addr));
+	icb->response_q_address[3] = MSB(MSW(start_addr));
+
+	start_addr = ha->rsp_queues[0]->rsp_ring.cookie.dmac_notused;
+	icb->response_q_address[4] = LSB(LSW(start_addr));
+	icb->response_q_address[5] = MSB(LSW(start_addr));
+	icb->response_q_address[6] = LSB(MSW(start_addr));
+	icb->response_q_address[7] = MSB(MSW(start_addr));
 
 	/*
 	 * Setup IP initialization control block
@@ -753,20 +785,23 @@ ql_nvram_config(ql_adapter_state_t *ha)
 	ip_icb->queue_size[0] = LSB(cnt);
 	ip_icb->queue_size[1] = MSB(cnt);
 
-	ip_icb->queue_address[0] = LSB(LSW(LSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[1] = MSB(LSW(LSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[2] = LSB(MSW(LSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[3] = MSB(MSW(LSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[4] = LSB(LSW(MSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[5] = MSB(LSW(MSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[6] = LSB(MSW(MSD(ha->rcvbuf_dvma)));
-	ip_icb->queue_address[7] = MSB(MSW(MSD(ha->rcvbuf_dvma)));
+	start_addr = ha->rcv_ring.cookie.dmac_address;
+	ip_icb->queue_address[0] = LSB(LSW(start_addr));
+	ip_icb->queue_address[1] = MSB(LSW(start_addr));
+	ip_icb->queue_address[2] = LSB(MSW(start_addr));
+	ip_icb->queue_address[3] = MSB(MSW(start_addr));
+
+	start_addr = ha->rcv_ring.cookie.dmac_notused;
+	ip_icb->queue_address[4] = LSB(LSW(start_addr));
+	ip_icb->queue_address[5] = MSB(LSW(start_addr));
+	ip_icb->queue_address[6] = LSB(MSW(start_addr));
+	ip_icb->queue_address[7] = MSB(MSW(start_addr));
 
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -792,14 +827,14 @@ ql_get_nvram_word(ql_adapter_state_t *ha, uint32_t address)
 	uint32_t	nv_cmd;
 	uint16_t	rval;
 
-	QL_PRINT_4(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_4(ha, "started\n");
 
 	nv_cmd = address << 16;
 	nv_cmd = nv_cmd | NV_READ_OP;
 
 	rval = (uint16_t)ql_nvram_request(ha, nv_cmd);
 
-	QL_PRINT_4(CE_CONT, "(%d): NVRAM data = %xh\n", ha->instance, rval);
+	QL_PRINT_4(ha, "NVRAM data = %xh\n", rval);
 
 	return (rval);
 }
@@ -843,7 +878,7 @@ ql_nvram_request(ql_adapter_state_t *ha, uint32_t nv_cmd)
 	/* Read data from NVRAM. */
 
 	for (cnt = 0; cnt < 16; cnt++) {
-		WRT16_IO_REG(ha, nvram, NV_SELECT+NV_CLOCK);
+		WRT16_IO_REG(ha, nvram, NV_SELECT + NV_CLOCK);
 		ql_nv_delay();
 		data <<= 1;
 		reg_data = RD16_IO_REG(ha, nvram);
@@ -885,7 +920,7 @@ ql_nv_delay(void)
  *
  * Input:
  *	ha:		adapter state pointer.
- *	ha->hba_buf = request and response rings
+ *	ha->req_q[0]:	request ring
  *
  * Output:
  *	ha->init_ctrl_blk = initialization control block
@@ -900,7 +935,8 @@ ql_nv_delay(void)
 int
 ql_nvram_24xx_config(ql_adapter_state_t *ha)
 {
-	uint32_t		index, addr, chksum, saved_chksum;
+	uint32_t		index, addr;
+	uint32_t		chksum = 0, saved_chksum = 0;
 	uint32_t		*longptr;
 	nvram_24xx_t		nvram;
 	int			idpromlen;
@@ -912,8 +948,9 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 	ql_init_24xx_cb_t	*icb =
 	    (ql_init_24xx_cb_t *)&ha->init_ctrl_blk.cb24;
 	ql_ip_init_24xx_cb_t	*ip_icb = &ha->ip_init_ctrl_blk.cb24;
+	la_els_logi_t		*els = &ha->loginparams;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	if ((rval = ql_lock_nvram(ha, &addr, LNF_NVRAM_DATA)) == QL_SUCCESS) {
 
@@ -942,7 +979,6 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 
 		cmn_err(CE_WARN, "%s(%d): NVRAM configuration failed, using "
 		    "driver defaults.", QL_NAME, ha->instance);
-
 		EL(ha, "failed, rval=%xh, checksum=%xh, id=%c%c%c%c, "
 		    "nvram_version=%x\n", rval, chksum, nv->id[0], nv->id[1],
 		    nv->id[2], nv->id[3], CHAR_TO_SHORT(nv->nvram_version[0],
@@ -1019,7 +1055,7 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		nv->port_down_retry_count[0] = 30;
 		nv->link_down_timeout[0] = 30;
 
-		if (CFG_IST(ha, CFG_CTRL_8081)) {
+		if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
 			nv->firmware_options_3[2] = BIT_4;
 			nv->feature_mask_l[0] = 9;
 			nv->ext_blk.version[0] = 1;
@@ -1036,34 +1072,8 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		rval = QL_FUNCTION_FAILED;
 	}
 
-	/* Check for adapter node name (big endian). */
-	for (index = 0; index < 8; index++) {
-		if (nv->node_name[index] != 0) {
-			break;
-		}
-	}
-
-	/* Copy port name if no node name (big endian). */
-	if (index == 8) {
-		bcopy((void *)&nv->port_name[0], (void *)&nv->node_name[0], 8);
-		nv->node_name[0] = (uint8_t)(nv->node_name[0] & ~BIT_0);
-		nv->port_name[0] = (uint8_t)(nv->node_name[0] | BIT_0);
-	}
-
 	/* Reset initialization control blocks. */
 	bzero((void *)icb, sizeof (ql_init_24xx_cb_t));
-
-	/* Get driver properties. */
-	ql_24xx_properties(ha, nv);
-
-	cmn_err(CE_CONT, "!Qlogic %s(%d) WWPN=%02x%02x%02x%02x"
-	    "%02x%02x%02x%02x : WWNN=%02x%02x%02x%02x%02x%02x%02x%02x\n",
-	    QL_NAME, ha->instance, nv->port_name[0], nv->port_name[1],
-	    nv->port_name[2], nv->port_name[3], nv->port_name[4],
-	    nv->port_name[5], nv->port_name[6], nv->port_name[7],
-	    nv->node_name[0], nv->node_name[1], nv->node_name[2],
-	    nv->node_name[3], nv->node_name[4], nv->node_name[5],
-	    nv->node_name[6], nv->node_name[7]);
 
 	/*
 	 * Copy over NVRAM Firmware Initialization Control Block.
@@ -1080,6 +1090,7 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 	icb->link_down_on_nos[0] = nv->link_down_on_nos[0];
 	icb->link_down_on_nos[1] = nv->link_down_on_nos[1];
 
+	/* Copy 2nd half. */
 	dst = (caddr_t)&icb->interrupt_delay_timer;
 	src = (caddr_t)&nv->interrupt_delay_timer;
 	index = (uint32_t)((uintptr_t)&icb->qos -
@@ -1088,10 +1099,16 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		*dst++ = *src++;
 	}
 
-	/*
-	 * Setup driver firmware options.
-	 */
-	if (CFG_IST(ha, CFG_CTRL_8081)) {
+	ha->execution_throttle = 16;
+	ha->loop_reset_delay = nv->reset_delay;
+	ha->port_down_retry_count = CHAR_TO_SHORT(nv->port_down_retry_count[0],
+	    nv->port_down_retry_count[1]);
+	ha->maximum_luns_per_target = CHAR_TO_SHORT(
+	    nv->max_luns_per_target[0], nv->max_luns_per_target[1]);
+	if (ha->maximum_luns_per_target == 0) {
+		ha->maximum_luns_per_target++;
+	}
+	if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
 		dst = (caddr_t)icb->enode_mac_addr;
 		src = (caddr_t)nv->fw.isp8001.e_node_mac_addr;
 		index = sizeof (nv->fw.isp8001.e_node_mac_addr);
@@ -1108,7 +1125,45 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		    icb->enode_mac_addr[0], icb->enode_mac_addr[1],
 		    icb->enode_mac_addr[2], icb->enode_mac_addr[3],
 		    icb->enode_mac_addr[4], icb->enode_mac_addr[5]);
-	} else {
+	}
+
+	/* Check for adapter node name (big endian). */
+	for (index = 0; index < 8; index++) {
+		if (icb->node_name[index] != 0) {
+			break;
+		}
+	}
+
+	/* Copy port name if no node name (big endian). */
+	if (index == 8) {
+		for (index = 0; index < 8; index++) {
+			icb->node_name[index] = icb->port_name[index];
+		}
+		icb->node_name[0] = (uint8_t)(icb->node_name[0] & ~BIT_0);
+		icb->port_name[0] = (uint8_t)(icb->node_name[0] | BIT_0);
+	}
+
+	ADAPTER_STATE_LOCK(ha);
+	ha->cfg_flags &= ~(CFG_ENABLE_FULL_LIP_LOGIN | CFG_ENABLE_TARGET_RESET |
+	    CFG_ENABLE_LIP_RESET | CFG_LOAD_FLASH_FW | CFG_FAST_TIMEOUT |
+	    CFG_DISABLE_RISC_CODE_LOAD | CFG_ENABLE_FWEXTTRACE |
+	    CFG_ENABLE_FWFCETRACE | CFG_SET_CACHE_LINE_SIZE_1 | CFG_LR_SUPPORT);
+	if (nv->host_p[1] & BIT_2) {
+		ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN;
+	}
+	if (nv->host_p[1] & BIT_3) {
+		ha->cfg_flags |= CFG_ENABLE_TARGET_RESET;
+	}
+	ha->flags &= ~MULTI_CHIP_ADAPTER;
+	ADAPTER_STATE_UNLOCK(ha);
+
+	/* Get driver properties. */
+	ql_24xx_properties(ha, icb);
+
+	/*
+	 * Setup driver firmware options.
+	 */
+	if (!CFG_IST(ha, CFG_FCOE_SUPPORT)) {
 		icb->firmware_options_1[0] = (uint8_t)
 		    (icb->firmware_options_1[0] | BIT_1);
 		icb->firmware_options_1[1] = (uint8_t)
@@ -1129,52 +1184,33 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		icb->firmware_options_2[1] = (uint8_t)
 		    (icb->firmware_options_2[1] & ~BIT_4);
 	}
-
 	icb->firmware_options_3[0] = (uint8_t)(icb->firmware_options_3[0] &
 	    ~BIT_7);
-
-	/* enable special N port 2 N port login behaviour */
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
-		icb->firmware_options_3[1] =
-		    (uint8_t)(icb->firmware_options_3[1] | BIT_0);
-	}
-
-	icb->execution_throttle[0] = 0xff;
-	icb->execution_throttle[1] = 0xff;
 
 	/*
 	 * Set host adapter parameters
 	 */
+	w1 = CHAR_TO_SHORT(icb->login_timeout[0], icb->login_timeout[1]);
+	ha->r_a_tov = (uint16_t)(w1 < R_A_TOV_DEFAULT ? R_A_TOV_DEFAULT : w1);
+
 	ADAPTER_STATE_LOCK(ha);
-	ha->nvram_version = CHAR_TO_SHORT(nv->nvram_version[0],
-	    nv->nvram_version[1]);
-	nv->host_p[1] & BIT_2 ? (ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN) :
-	    (ha->cfg_flags &= ~CFG_ENABLE_FULL_LIP_LOGIN);
-	nv->host_p[1] & BIT_3 ? (ha->cfg_flags |= CFG_ENABLE_TARGET_RESET) :
-	    (ha->cfg_flags &= ~CFG_ENABLE_TARGET_RESET);
-	ha->cfg_flags &= ~(CFG_DISABLE_RISC_CODE_LOAD | CFG_LR_SUPPORT |
-	    CFG_SET_CACHE_LINE_SIZE_1 | CFG_MULTI_CHIP_ADAPTER);
 	ha->cfg_flags |= CFG_ENABLE_64BIT_ADDRESSING;
 	if (CFG_IST(ha, CFG_CTRL_81XX) && nv->enhanced_features[0] & BIT_0) {
 		ha->cfg_flags |= CFG_LR_SUPPORT;
 	}
 	ADAPTER_STATE_UNLOCK(ha);
 
-	ha->execution_throttle = CHAR_TO_SHORT(nv->execution_throttle[0],
-	    nv->execution_throttle[1]);
-	ha->loop_reset_delay = nv->reset_delay;
-	ha->port_down_retry_count = CHAR_TO_SHORT(nv->port_down_retry_count[0],
-	    nv->port_down_retry_count[1]);
-	w1 = CHAR_TO_SHORT(icb->login_timeout[0], icb->login_timeout[1]);
-	ha->r_a_tov = (uint16_t)(w1 < R_A_TOV_DEFAULT ? R_A_TOV_DEFAULT : w1);
-	ha->maximum_luns_per_target = CHAR_TO_SHORT(
-	    nv->max_luns_per_target[0], nv->max_luns_per_target[1]);
-	if (ha->maximum_luns_per_target == 0) {
-		ha->maximum_luns_per_target++;
+	/* Queue shadowing */
+	if (ha->flags & QUEUE_SHADOW_PTRS) {
+		icb->firmware_options_2[3] = (uint8_t)
+		    (icb->firmware_options_2[3] | BIT_6 | BIT_5);
+	} else {
+		icb->firmware_options_2[3] = (uint8_t)
+		    (icb->firmware_options_2[3] | ~(BIT_6 | BIT_5));
 	}
 
 	/* ISP2422 Serial Link Control */
-	if (CFG_IST(ha, CFG_CTRL_2422)) {
+	if (CFG_IST(ha, CFG_CTRL_24XX)) {
 		ha->serdes_param[0] = CHAR_TO_SHORT(nv->fw.isp2400.swing_opt[0],
 		    nv->fw.isp2400.swing_opt[1]);
 		ha->serdes_param[1] = CHAR_TO_SHORT(nv->fw.isp2400.swing_1g[0],
@@ -1185,33 +1221,55 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		    nv->fw.isp2400.swing_4g[1]);
 	}
 
+	els->common_service.rx_bufsize = CHAR_TO_SHORT(
+	    icb->max_frame_length[0], icb->max_frame_length[1]);
+	bcopy((void *)icb->port_name, (void *)els->nport_ww_name.raw_wwn, 8);
+	bcopy((void *)icb->node_name, (void *)els->node_ww_name.raw_wwn, 8);
+
+	cmn_err(CE_CONT, "!Qlogic %s(%d) WWPN=%02x%02x%02x%02x"
+	    "%02x%02x%02x%02x : WWNN=%02x%02x%02x%02x%02x%02x%02x%02x\n",
+	    QL_NAME, ha->instance,
+	    els->nport_ww_name.raw_wwn[0], els->nport_ww_name.raw_wwn[1],
+	    els->nport_ww_name.raw_wwn[2], els->nport_ww_name.raw_wwn[3],
+	    els->nport_ww_name.raw_wwn[4], els->nport_ww_name.raw_wwn[5],
+	    els->nport_ww_name.raw_wwn[6], els->nport_ww_name.raw_wwn[7],
+	    els->node_ww_name.raw_wwn[0], els->node_ww_name.raw_wwn[1],
+	    els->node_ww_name.raw_wwn[2], els->node_ww_name.raw_wwn[3],
+	    els->node_ww_name.raw_wwn[4], els->node_ww_name.raw_wwn[5],
+	    els->node_ww_name.raw_wwn[6], els->node_ww_name.raw_wwn[7]);
 	/*
 	 * Setup ring parameters in initialization control block
 	 */
-	w1 = REQUEST_ENTRY_CNT;
+	w1 = ha->req_q[0]->req_entry_cnt;
 	icb->request_q_length[0] = LSB(w1);
 	icb->request_q_length[1] = MSB(w1);
-	w1 = RESPONSE_ENTRY_CNT;
+	w1 = ha->rsp_queues[0]->rsp_entry_cnt;
 	icb->response_q_length[0] = LSB(w1);
 	icb->response_q_length[1] = MSB(w1);
 
-	icb->request_q_address[0] = LSB(LSW(LSD(ha->request_dvma)));
-	icb->request_q_address[1] = MSB(LSW(LSD(ha->request_dvma)));
-	icb->request_q_address[2] = LSB(MSW(LSD(ha->request_dvma)));
-	icb->request_q_address[3] = MSB(MSW(LSD(ha->request_dvma)));
-	icb->request_q_address[4] = LSB(LSW(MSD(ha->request_dvma)));
-	icb->request_q_address[5] = MSB(LSW(MSD(ha->request_dvma)));
-	icb->request_q_address[6] = LSB(MSW(MSD(ha->request_dvma)));
-	icb->request_q_address[7] = MSB(MSW(MSD(ha->request_dvma)));
+	addr = ha->req_q[0]->req_ring.cookie.dmac_address;
+	icb->request_q_address[0] = LSB(LSW(addr));
+	icb->request_q_address[1] = MSB(LSW(addr));
+	icb->request_q_address[2] = LSB(MSW(addr));
+	icb->request_q_address[3] = MSB(MSW(addr));
 
-	icb->response_q_address[0] = LSB(LSW(LSD(ha->response_dvma)));
-	icb->response_q_address[1] = MSB(LSW(LSD(ha->response_dvma)));
-	icb->response_q_address[2] = LSB(MSW(LSD(ha->response_dvma)));
-	icb->response_q_address[3] = MSB(MSW(LSD(ha->response_dvma)));
-	icb->response_q_address[4] = LSB(LSW(MSD(ha->response_dvma)));
-	icb->response_q_address[5] = MSB(LSW(MSD(ha->response_dvma)));
-	icb->response_q_address[6] = LSB(MSW(MSD(ha->response_dvma)));
-	icb->response_q_address[7] = MSB(MSW(MSD(ha->response_dvma)));
+	addr = ha->req_q[0]->req_ring.cookie.dmac_notused;
+	icb->request_q_address[4] = LSB(LSW(addr));
+	icb->request_q_address[5] = MSB(LSW(addr));
+	icb->request_q_address[6] = LSB(MSW(addr));
+	icb->request_q_address[7] = MSB(MSW(addr));
+
+	addr = ha->rsp_queues[0]->rsp_ring.cookie.dmac_address;
+	icb->response_q_address[0] = LSB(LSW(addr));
+	icb->response_q_address[1] = MSB(LSW(addr));
+	icb->response_q_address[2] = LSB(MSW(addr));
+	icb->response_q_address[3] = MSB(MSW(addr));
+
+	addr = ha->rsp_queues[0]->rsp_ring.cookie.dmac_notused;
+	icb->response_q_address[4] = LSB(LSW(addr));
+	icb->response_q_address[5] = MSB(LSW(addr));
+	icb->response_q_address[6] = LSB(MSW(addr));
+	icb->response_q_address[7] = MSB(MSW(addr));
 
 	/*
 	 * Setup IP initialization control block
@@ -1225,7 +1283,7 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -1251,6 +1309,8 @@ int
 ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 {
 	int	i;
+
+	QL_PRINT_3(ha, "started\n");
 
 	if ((flags & LNF_NVRAM_DATA) && (flags & LNF_VPD_DATA)) {
 		EL(ha, "invalid options for function");
@@ -1283,7 +1343,7 @@ ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 			    QL_NAME, ha->instance);
 			return (QL_FUNCTION_FAILED);
 		}
-	} else if (CFG_IST(ha, CFG_CTRL_2422)) {
+	} else if (CFG_IST(ha, CFG_CTRL_24XX)) {
 		if (flags & LNF_VPD_DATA) {
 			*addr = NVRAM_DATA_ADDR | ha->flash_vpd_addr;
 		} else if (flags & LNF_NVRAM_DATA) {
@@ -1294,7 +1354,7 @@ ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 		}
 
 		GLOBAL_HW_LOCK();
-	} else if (CFG_IST(ha, CFG_CTRL_258081)) {
+	} else if (CFG_IST(ha, CFG_CTRL_252780818283)) {
 		if (flags & LNF_VPD_DATA) {
 			*addr = ha->flash_data_addr | ha->flash_vpd_addr;
 		} else if (flags & LNF_NVRAM_DATA) {
@@ -1314,6 +1374,8 @@ ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 		GLOBAL_HW_LOCK();
 	}
 
+	QL_PRINT_3(ha, "done\n");
+
 	return (QL_SUCCESS);
 }
 
@@ -1330,12 +1392,16 @@ ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 void
 ql_release_nvram(ql_adapter_state_t *ha)
 {
+	QL_PRINT_3(ha, "started\n");
+
 	if (ha->device_id == 0x2312 || ha->device_id == 0x2322) {
 		/* Release resource lock */
 		WRT16_IO_REG(ha, host_to_host_sema, 0);
 	} else {
 		GLOBAL_HW_UNLOCK();
 	}
+
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1348,46 +1414,46 @@ ql_release_nvram(ql_adapter_state_t *ha)
  *
  * Input:
  *	ha:	adapter state pointer.
- *	nv:	NVRAM structure pointer.
+ *	icb:	Init control block structure pointer.
  *
  * Context:
  *	Kernel context.
  */
 static void
-ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
+ql_23_properties(ql_adapter_state_t *ha, ql_init_cb_t *icb)
 {
 	uint32_t	data, cnt;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Get frame payload size. */
 	if ((data = ql_get_prop(ha, "max-frame-length")) == 0xffffffff) {
 		data = 2048;
 	}
 	if (data == 512 || data == 1024 || data == 2048) {
-		nv->max_frame_length[0] = LSB(data);
-		nv->max_frame_length[1] = MSB(data);
+		icb->max_frame_length[0] = LSB(data);
+		icb->max_frame_length[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'max-frame-length': "
 		    "%d; using nvram default of %d\n", data, CHAR_TO_SHORT(
-		    nv->max_frame_length[0], nv->max_frame_length[1]));
+		    icb->max_frame_length[0], icb->max_frame_length[1]));
 	}
 
 	/* Get max IOCB allocation. */
-	nv->max_iocb_allocation[0] = 0;
-	nv->max_iocb_allocation[1] = 1;
+	icb->max_iocb_allocation[0] = 0;
+	icb->max_iocb_allocation[1] = 1;
 
 	/* Get execution throttle. */
 	if ((data = ql_get_prop(ha, "execution-throttle")) == 0xffffffff) {
 		data = 32;
 	}
 	if (data != 0 && data < 65536) {
-		nv->execution_throttle[0] = LSB(data);
-		nv->execution_throttle[1] = MSB(data);
+		icb->execution_throttle[0] = LSB(data);
+		icb->execution_throttle[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'execution-throttle': "
 		    "%d; using nvram default of %d\n", data, CHAR_TO_SHORT(
-		    nv->execution_throttle[0], nv->execution_throttle[1]));
+		    icb->execution_throttle[0], icb->execution_throttle[1]));
 	}
 
 	/* Get Login timeout. */
@@ -1395,10 +1461,10 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 3;
 	}
 	if (data < 256) {
-		nv->login_timeout = (uint8_t)data;
+		icb->login_timeout = (uint8_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'login-timeout': "
-		    "%d; using nvram value of %d\n", data, nv->login_timeout);
+		    "%d; using nvram value of %d\n", data, icb->login_timeout);
 	}
 
 	/* Get retry count. */
@@ -1406,35 +1472,35 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 4;
 	}
 	if (data < 256) {
-		nv->login_retry_count = (uint8_t)data;
+		icb->login_retry_count = (uint8_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'login-retry-count': "
 		    "%d; using nvram value of %d\n", data,
-		    nv->login_retry_count);
+		    icb->login_retry_count);
 	}
 
 	/* Get adapter hard loop ID enable. */
-	data =  ql_get_prop(ha, "enable-adapter-hard-loop-ID");
+	data = ql_get_prop(ha, "enable-adapter-hard-loop-ID");
 	if (data == 0) {
-		nv->firmware_options[0] =
-		    (uint8_t)(nv->firmware_options[0] & ~BIT_0);
+		icb->firmware_options[0] =
+		    (uint8_t)(icb->firmware_options[0] & ~BIT_0);
 	} else if (data == 1) {
-		nv->firmware_options[0] =
-		    (uint8_t)(nv->firmware_options[0] | BIT_0);
+		icb->firmware_options[0] =
+		    (uint8_t)(icb->firmware_options[0] | BIT_0);
 	} else if (data != 0xffffffff) {
 		EL(ha, "invalid parameter value for "
 		    "'enable-adapter-hard-loop-ID': %d; using nvram value "
-		    "of %d\n", data, nv->firmware_options[0] & BIT_0 ? 1 : 0);
+		    "of %d\n", data, icb->firmware_options[0] & BIT_0 ? 1 : 0);
 	}
 
 	/* Get adapter hard loop ID. */
-	data =  ql_get_prop(ha, "adapter-hard-loop-ID");
+	data = ql_get_prop(ha, "adapter-hard-loop-ID");
 	if (data < 126) {
-		nv->hard_address[0] = (uint8_t)data;
+		icb->hard_address[0] = (uint8_t)data;
 	} else if (data != 0xffffffff) {
 		EL(ha, "invalid parameter value for 'adapter-hard-loop-ID': "
 		    "%d; using nvram value of %d\n",
-		    data, nv->hard_address[0]);
+		    data, icb->hard_address[0]);
 	}
 
 	/* Get LIP reset. */
@@ -1443,13 +1509,14 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 0;
 	}
 	if (data == 0) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] & ~BIT_1);
+		ha->cfg_flags &= ~CFG_ENABLE_LIP_RESET;
 	} else if (data == 1) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] | BIT_1);
+		ha->cfg_flags |= CFG_ENABLE_LIP_RESET;
 	} else {
 		EL(ha, "invalid parameter value for "
 		    "'enable-LIP-reset-on-bus-reset': %d; using nvram value "
-		    "of %d\n", data, nv->host_p[1] & BIT_1 ? 1 : 0);
+		    "of %d\n", data,
+		    CFG_IST(ha, CFG_ENABLE_LIP_RESET) ? 1 : 0);
 	}
 
 	/* Get LIP full login. */
@@ -1458,13 +1525,14 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 1;
 	}
 	if (data == 0) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] & ~BIT_2);
+		ha->cfg_flags &= ~CFG_ENABLE_FULL_LIP_LOGIN;
 	} else if (data == 1) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] | BIT_2);
+		ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN;
 	} else {
 		EL(ha, "invalid parameter value for "
 		    "'enable-LIP-full-login-on-bus-reset': %d; using nvram "
-		    "value of %d\n", data, nv->host_p[1] & BIT_2 ? 1 : 0);
+		    "value of %d\n", data,
+		    CFG_IST(ha, CFG_ENABLE_FULL_LIP_LOGIN) ? 1 : 0);
 	}
 
 	/* Get target reset. */
@@ -1473,13 +1541,14 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 0;
 	}
 	if (data == 0) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] & ~BIT_3);
+		ha->cfg_flags &= ~CFG_ENABLE_TARGET_RESET;
 	} else if (data == 1) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] | BIT_3);
+		ha->cfg_flags |= CFG_ENABLE_TARGET_RESET;
 	} else {
 		EL(ha, "invalid parameter value for "
 		    "'enable-target-reset-on-bus-reset': %d; using nvram "
-		    "value of %d", data, nv->host_p[1] & BIT_3 ? 1 : 0);
+		    "value of %d", data,
+		    CFG_IST(ha, CFG_ENABLE_TARGET_RESET) ? 1 : 0);
 	}
 
 	/* Get reset delay. */
@@ -1487,10 +1556,10 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 5;
 	}
 	if (data != 0 && data < 256) {
-		nv->reset_delay = (uint8_t)data;
+		ha->loop_reset_delay = (uint8_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'reset-delay': %d; "
-		    "using nvram value of %d", data, nv->reset_delay);
+		    "using nvram value of %d", data, ha->loop_reset_delay);
 	}
 
 	/* Get port down retry count. */
@@ -1498,50 +1567,44 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		data = 8;
 	}
 	if (data < 256) {
-		nv->port_down_retry_count = (uint8_t)data;
+		ha->port_down_retry_count = (uint8_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'port-down-retry-count':"
 		    " %d; using nvram value of %d\n", data,
-		    nv->port_down_retry_count);
+		    ha->port_down_retry_count);
 	}
 
 	/* Get connection mode setting. */
 	if ((data = ql_get_prop(ha, "connection-options")) == 0xffffffff) {
 		data = 2;
 	}
-	cnt = CFG_IST(ha, CFG_CTRL_2200) ? 3 : 2;
+	cnt = CFG_IST(ha, CFG_CTRL_22XX) ? 3 : 2;
 	if (data <= cnt) {
-		nv->add_fw_opt[0] = (uint8_t)(nv->add_fw_opt[0] &
+		icb->add_fw_opt[0] = (uint8_t)(icb->add_fw_opt[0] &
 		    ~(BIT_6 | BIT_5 | BIT_4));
-		nv->add_fw_opt[0] = (uint8_t)(nv->add_fw_opt[0] |
+		icb->add_fw_opt[0] = (uint8_t)(icb->add_fw_opt[0] |
 		    (uint8_t)(data << 4));
 	} else {
 		EL(ha, "invalid parameter value for 'connection-options': "
 		    "%d; using nvram value of %d\n", data,
-		    (nv->add_fw_opt[0] >> 4) & 0x3);
+		    (icb->add_fw_opt[0] >> 4) & 0x3);
 	}
 
 	/* Get data rate setting. */
-	if ((CFG_IST(ha, CFG_CTRL_2200)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_22XX)) == 0) {
 		if ((data = ql_get_prop(ha, "fc-data-rate")) == 0xffffffff) {
 			data = 2;
 		}
 		if (data < 3) {
-			nv->special_options[1] = (uint8_t)
-			    (nv->special_options[1] & 0x3f);
-			nv->special_options[1] = (uint8_t)
-			    (nv->special_options[1] | (uint8_t)(data << 6));
+			icb->special_options[1] = (uint8_t)
+			    (icb->special_options[1] & 0x3f);
+			icb->special_options[1] = (uint8_t)
+			    (icb->special_options[1] | (uint8_t)(data << 6));
 		} else {
 			EL(ha, "invalid parameter value for 'fc-data-rate': "
 			    "%d; using nvram value of %d\n", data,
-			    (nv->special_options[1] >> 6) & 0x3);
+			    (icb->special_options[1] >> 6) & 0x3);
 		}
-	}
-
-	/* Get adapter id string for Sun branded 23xx only */
-	if ((CFG_IST(ha, CFG_CTRL_2300)) && nv->adapInfo[0] != 0) {
-		(void) snprintf((int8_t *)ha->adapInfo, 16, "%s",
-		    nv->adapInfo);
 	}
 
 	/* Get IP FW container count. */
@@ -1562,7 +1625,7 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 
 	ADAPTER_STATE_UNLOCK(ha);
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1584,33 +1647,7 @@ ql_common_properties(ql_adapter_state_t *ha)
 {
 	uint32_t	data;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	/* Get extended logging trace buffer size. */
-	if ((data = ql_get_prop(ha, "set-ext-log-buffer-size")) !=
-	    0xffffffff && data != 0) {
-		char		*new_trace;
-		uint32_t	new_size;
-
-		if (ha->el_trace_desc->trace_buffer != NULL) {
-			new_size = 1024 * data;
-			new_trace = (char *)kmem_zalloc(new_size, KM_SLEEP);
-
-			if (new_trace == NULL) {
-				cmn_err(CE_WARN, "%s(%d): can't get new"
-				    " trace buffer",
-				    QL_NAME, ha->instance);
-			} else {
-				/* free the previous */
-				kmem_free(ha->el_trace_desc->trace_buffer,
-				    ha->el_trace_desc->trace_buffer_size);
-				/* Use the new one */
-				ha->el_trace_desc->trace_buffer = new_trace;
-				ha->el_trace_desc->trace_buffer_size = new_size;
-			}
-		}
-
-	}
+	QL_PRINT_10(ha, "started\n");
 
 	/* Get extended logging enable. */
 	if ((data = ql_get_prop(ha, "extended-logging")) == 0xffffffff ||
@@ -1622,19 +1659,6 @@ ql_common_properties(ql_adapter_state_t *ha)
 		EL(ha, "invalid parameter value for 'extended-logging': %d;"
 		    " using default value of 0\n", data);
 		ha->cfg_flags &= ~CFG_ENABLE_EXTENDED_LOGGING;
-	}
-
-	/* Get extended logging trace disable. */
-	if ((data = ql_get_prop(ha, "disable-extended-logging-trace")) ==
-	    0xffffffff || data == 0) {
-		ha->cfg_flags &= ~CFG_DISABLE_EXTENDED_LOGGING_TRACE;
-	} else if (data == 1) {
-		ha->cfg_flags |= CFG_DISABLE_EXTENDED_LOGGING_TRACE;
-	} else {
-		EL(ha, "invalid parameter value for "
-		    "'disable-extended-logging-trace': %d;"
-		    " using default value of 0\n", data);
-		ha->cfg_flags &= ~CFG_DISABLE_EXTENDED_LOGGING_TRACE;
 	}
 
 	/* Get FCP 2 Error Recovery. */
@@ -1745,11 +1769,21 @@ ql_common_properties(ql_adapter_state_t *ha)
 		ha->pci_max_read_req = (uint16_t)(data);
 	}
 
+	/* Get the plogi retry params overrides. */
+	if ((data = ql_get_prop(ha, "plogi_params_retry_count")) !=
+	    0xffffffff && data != 0) {
+		ha->plogi_params->retry_cnt = (uint32_t)(data);
+	}
+	if ((data = ql_get_prop(ha, "plogi_params_retry_delay")) !=
+	    0xffffffff && data != 0) {
+		ha->plogi_params->retry_dly_usec = (uint32_t)(data);
+	}
+
 	/*
 	 * Set default fw wait, adjusted for slow FCF's.
 	 * Revisit when FCF's as fast as FC switches.
 	 */
-	ha->fwwait = (uint8_t)(CFG_IST(ha, CFG_CTRL_8081) ? 45 : 10);
+	ha->fwwait = (uint8_t)(CFG_IST(ha, CFG_FCOE_SUPPORT) ? 45 : 10);
 	/* Get the attach fw_ready override value. */
 	if ((data = ql_get_prop(ha, "init-loop-sync-wait")) != 0xffffffff) {
 		if (data > 0 && data <= 240) {
@@ -1761,7 +1795,44 @@ ql_common_properties(ql_adapter_state_t *ha)
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	/* Get fm-capable property */
+	ha->fm_capabilities = DDI_FM_NOT_CAPABLE;
+	if ((data = ql_get_prop(ha, "fm-capable")) != 0xffffffff) {
+		if (data == 0) {
+			ha->fm_capabilities = DDI_FM_NOT_CAPABLE;
+		} else if (data > 0xf) {
+			ha->fm_capabilities = 0xf;
+
+		} else {
+			ha->fm_capabilities = (int)(data);
+		}
+	} else {
+		ha->fm_capabilities = (int)(DDI_FM_EREPORT_CAPABLE
+		    | DDI_FM_ERRCB_CAPABLE);
+	}
+
+	if ((data = ql_get_prop(ha, "msix-vectors")) == 0xffffffff) {
+		ha->mq_msix_vectors = 0;
+	} else if (data < 256) {
+		ha->mq_msix_vectors = (uint8_t)data;
+	} else {
+		EL(ha, "invalid parameter value for 'msix-vectors': "
+		    "%d; using value of %d\n", data, 0);
+		ha->mq_msix_vectors = 0;
+	}
+
+	/* Get number of completion threads. */
+	if ((data = ql_get_prop(ha, "completion-threads")) == 0xffffffff) {
+		ha->completion_thds = 4;
+	} else if (data < 256 && data >= 1) {
+		ha->completion_thds = (uint8_t)data;
+	} else {
+		EL(ha, "invalid parameter value for 'completion-threads':"
+		    " %d; using default value of %d", data, 4);
+		ha->completion_thds = 4;
+	}
+
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -1774,29 +1845,29 @@ ql_common_properties(ql_adapter_state_t *ha)
  *
  * Input:
  *	ha:	adapter state pointer.
- *	nv:	NVRAM structure pointer.
+ *	icb:	Init control block structure pointer.
  *
  * Context:
  *	Kernel context.
  */
 static void
-ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
+ql_24xx_properties(ql_adapter_state_t *ha, ql_init_24xx_cb_t *icb)
 {
 	uint32_t	data;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	/* Get frame size */
 	if ((data = ql_get_prop(ha, "max-frame-length")) == 0xffffffff) {
 		data = 2048;
 	}
 	if (data == 512 || data == 1024 || data == 2048 || data == 2112) {
-		nv->max_frame_length[0] = LSB(data);
-		nv->max_frame_length[1] = MSB(data);
+		icb->max_frame_length[0] = LSB(data);
+		icb->max_frame_length[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'max-frame-length': %d;"
 		    " using nvram default of %d\n", data, CHAR_TO_SHORT(
-		    nv->max_frame_length[0], nv->max_frame_length[1]));
+		    icb->max_frame_length[0], icb->max_frame_length[1]));
 	}
 
 	/* Get execution throttle. */
@@ -1804,12 +1875,12 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 32;
 	}
 	if (data != 0 && data < 65536) {
-		nv->execution_throttle[0] = LSB(data);
-		nv->execution_throttle[1] = MSB(data);
+		icb->execution_throttle[0] = LSB(data);
+		icb->execution_throttle[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'execution-throttle':"
 		    " %d; using nvram default of %d\n", data, CHAR_TO_SHORT(
-		    nv->execution_throttle[0], nv->execution_throttle[1]));
+		    icb->execution_throttle[0], icb->execution_throttle[1]));
 	}
 
 	/* Get Login timeout. */
@@ -1817,12 +1888,12 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 3;
 	}
 	if (data < 65536) {
-		nv->login_timeout[0] = LSB(data);
-		nv->login_timeout[1] = MSB(data);
+		icb->login_timeout[0] = LSB(data);
+		icb->login_timeout[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'login-timeout': %d; "
 		    "using nvram value of %d\n", data, CHAR_TO_SHORT(
-		    nv->login_timeout[0], nv->login_timeout[1]));
+		    icb->login_timeout[0], icb->login_timeout[1]));
 	}
 
 	/* Get retry count. */
@@ -1830,38 +1901,38 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 4;
 	}
 	if (data < 65536) {
-		nv->login_retry_count[0] = LSB(data);
-		nv->login_retry_count[1] = MSB(data);
+		icb->login_retry_count[0] = LSB(data);
+		icb->login_retry_count[1] = MSB(data);
 	} else {
 		EL(ha, "invalid parameter value for 'login-retry-count': "
 		    "%d; using nvram value of %d\n", data, CHAR_TO_SHORT(
-		    nv->login_retry_count[0], nv->login_retry_count[1]));
+		    icb->login_retry_count[0], icb->login_retry_count[1]));
 	}
 
 	/* Get adapter hard loop ID enable. */
-	data =  ql_get_prop(ha, "enable-adapter-hard-loop-ID");
+	data = ql_get_prop(ha, "enable-adapter-hard-loop-ID");
 	if (data == 0) {
-		nv->firmware_options_1[0] =
-		    (uint8_t)(nv->firmware_options_1[0] & ~BIT_0);
+		icb->firmware_options_1[0] =
+		    (uint8_t)(icb->firmware_options_1[0] & ~BIT_0);
 	} else if (data == 1) {
-		nv->firmware_options_1[0] =
-		    (uint8_t)(nv->firmware_options_1[0] | BIT_0);
+		icb->firmware_options_1[0] =
+		    (uint8_t)(icb->firmware_options_1[0] | BIT_0);
 	} else if (data != 0xffffffff) {
 		EL(ha, "invalid parameter value for "
 		    "'enable-adapter-hard-loop-ID': %d; using nvram value "
 		    "of %d\n", data,
-		    nv->firmware_options_1[0] & BIT_0 ? 1 : 0);
+		    icb->firmware_options_1[0] & BIT_0 ? 1 : 0);
 	}
 
 	/* Get adapter hard loop ID. */
-	data =  ql_get_prop(ha, "adapter-hard-loop-ID");
+	data = ql_get_prop(ha, "adapter-hard-loop-ID");
 	if (data < 126) {
-		nv->hard_address[0] = LSB(data);
-		nv->hard_address[1] = MSB(data);
+		icb->hard_address[0] = LSB(data);
+		icb->hard_address[1] = MSB(data);
 	} else if (data != 0xffffffff) {
 		EL(ha, "invalid parameter value for 'adapter-hard-loop-ID':"
 		    " %d; using nvram value of %d\n", data, CHAR_TO_SHORT(
-		    nv->hard_address[0], nv->hard_address[1]));
+		    icb->hard_address[0], icb->hard_address[1]));
 	}
 
 	/* Get LIP reset. */
@@ -1885,13 +1956,14 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 1;
 	}
 	if (data == 0) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] & ~BIT_2);
+		ha->cfg_flags &= ~CFG_ENABLE_FULL_LIP_LOGIN;
 	} else if (data == 1) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] | BIT_2);
+		ha->cfg_flags |= CFG_ENABLE_FULL_LIP_LOGIN;
 	} else {
 		EL(ha, "invalid parameter value for "
 		    "'enable-LIP-full-login-on-bus-reset': %d; using nvram "
-		    "value of %d\n", data, nv->host_p[1] & BIT_2 ? 1 : 0);
+		    "value of %d\n", data,
+		    ha->cfg_flags & CFG_ENABLE_FULL_LIP_LOGIN ? 1 : 0);
 	}
 
 	/* Get target reset. */
@@ -1900,13 +1972,14 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 0;
 	}
 	if (data == 0) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] & ~BIT_3);
+		ha->cfg_flags &= ~CFG_ENABLE_TARGET_RESET;
 	} else if (data == 1) {
-		nv->host_p[1] = (uint8_t)(nv->host_p[1] | BIT_3);
+		ha->cfg_flags |= CFG_ENABLE_TARGET_RESET;
 	} else {
 		EL(ha, "invalid parameter value for "
 		    "'enable-target-reset-on-bus-reset': %d; using nvram "
-		    "value of %d", data, nv->host_p[1] & BIT_3 ? 1 : 0);
+		    "value of %d", data,
+		    ha->cfg_flags & CFG_ENABLE_TARGET_RESET ? 1 : 0);
 	}
 
 	/* Get reset delay. */
@@ -1914,10 +1987,10 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 5;
 	}
 	if (data != 0 && data < 256) {
-		nv->reset_delay = (uint8_t)data;
+		ha->loop_reset_delay = (uint8_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'reset-delay': %d; "
-		    "using nvram value of %d", data, nv->reset_delay);
+		    "using nvram value of %d", data, ha->loop_reset_delay);
 	}
 
 	/* Get port down retry count. */
@@ -1925,47 +1998,59 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		data = 8;
 	}
 	if (data < 256) {
-		nv->port_down_retry_count[0] = LSB(data);
-		nv->port_down_retry_count[1] = MSB(data);
+		ha->port_down_retry_count = (uint16_t)data;
 	} else {
 		EL(ha, "invalid parameter value for 'port-down-retry-count':"
-		    " %d; using nvram value of %d\n", data, CHAR_TO_SHORT(
-		    nv->port_down_retry_count[0],
-		    nv->port_down_retry_count[1]));
+		    " %d; using nvram value of %d\n", data,
+		    ha->port_down_retry_count);
 	}
 
-	if (!(CFG_IST(ha, CFG_CTRL_8081))) {
+	if (!(CFG_IST(ha, CFG_FCOE_SUPPORT))) {
+		uint32_t	conn;
+
 		/* Get connection mode setting. */
-		if ((data = ql_get_prop(ha, "connection-options")) ==
+		if ((conn = ql_get_prop(ha, "connection-options")) ==
 		    0xffffffff) {
-			data = 2;
+			conn = 2;
 		}
-		if (data <= 2) {
-			nv->firmware_options_2[0] = (uint8_t)
-			    (nv->firmware_options_2[0] &
+		if (conn <= 2) {
+			icb->firmware_options_2[0] = (uint8_t)
+			    (icb->firmware_options_2[0] &
 			    ~(BIT_6 | BIT_5 | BIT_4));
-			nv->firmware_options_2[0] = (uint8_t)
-			    (nv->firmware_options_2[0] | (uint8_t)(data << 4));
+			icb->firmware_options_2[0] = (uint8_t)
+			    (icb->firmware_options_2[0] | (uint8_t)(conn << 4));
 		} else {
 			EL(ha, "invalid parameter value for 'connection-"
-			    "options': %d; using nvram value of %d\n", data,
-			    (nv->firmware_options_2[0] >> 4) & 0x3);
+			    "options': %d; using nvram value of %d\n", conn,
+			    (icb->firmware_options_2[0] >> 4) & 0x3);
+		}
+		conn = icb->firmware_options_2[0] >> 4 & 0x3;
+		if (conn == 0 && ha->max_vports > 125) {
+			ha->max_vports = 125;
 		}
 
 		/* Get data rate setting. */
 		if ((data = ql_get_prop(ha, "fc-data-rate")) == 0xffffffff) {
 			data = 2;
 		}
-		if ((CFG_IST(ha, CFG_CTRL_2422) && data < 4) ||
-		    (CFG_IST(ha, CFG_CTRL_258081) && data < 5)) {
-			nv->firmware_options_3[1] = (uint8_t)
-			    (nv->firmware_options_3[1] & 0x1f);
-			nv->firmware_options_3[1] = (uint8_t)
-			    (nv->firmware_options_3[1] | (uint8_t)(data << 5));
+		if ((CFG_IST(ha, CFG_CTRL_24XX) && data < 4) ||
+		    (CFG_IST(ha, CFG_CTRL_25XX) && data < 5) ||
+		    (CFG_IST(ha, CFG_CTRL_2783) && data < 6)) {
+			if (CFG_IST(ha, CFG_CTRL_2783) && data == 5 &&
+			    conn == 0) {
+				EL(ha, "invalid parameter value for 'fc-data-"
+				    "rate': %d; using nvram value of %d\n",
+				    data, 2);
+				data = 2;
+			}
+			icb->firmware_options_3[1] = (uint8_t)
+			    (icb->firmware_options_3[1] & 0x1f);
+			icb->firmware_options_3[1] = (uint8_t)
+			    (icb->firmware_options_3[1] | (uint8_t)(data << 5));
 		} else {
 			EL(ha, "invalid parameter value for 'fc-data-rate': "
 			    "%d; using nvram value of %d\n", data,
-			    (nv->firmware_options_3[1] >> 5) & 0x7);
+			    (icb->firmware_options_3[1] >> 5) & 0x7);
 		}
 	}
 
@@ -2014,7 +2099,7 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 
 	ADAPTER_STATE_UNLOCK(ha);
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -2040,7 +2125,7 @@ ql_get_prop(ql_adapter_state_t *ha, char *string)
 	/*
 	 * Look for a adapter instance NPIV (virtual port) specific parameter
 	 */
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 		(void) sprintf(buf, "hba%d-vp%d-%s", ha->instance,
 		    ha->vp_index, string);
 		/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
@@ -2093,16 +2178,27 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 	caddr_t		bufp;
 	uint16_t	risc_address = (uint16_t)ha->risc_fw[0].addr;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	/* Test for firmware running. */
-	if (CFG_IST(ha, CFG_CTRL_8021)) {
-		if (ql_8021_idc_handler(ha) != NX_DEV_READY) {
-			rval = QL_FUNCTION_FAILED;
-		} else {
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
+		if ((rval = ql_8021_fw_chk(ha)) == QL_SUCCESS) {
 			rval = ql_start_firmware(ha);
 		}
+	} else if (CFG_IST(ha, CFG_CTRL_278083)) {
+		ha->dev_state = NX_DEV_READY;
+		if (ha->rom_status == MBS_ROM_FW_RUNNING) {
+			EL(ha, "ISP ROM Status = MBS_ROM_FW_RUNNING\n");
+			rval = QL_SUCCESS;
+		} else if (ha->rom_status == MBS_ROM_IDLE) {
+			EL(ha, "ISP ROM Status = MBS_ROM_IDLE\n");
+			rval = QL_FUNCTION_FAILED;
+		} else {
+			EL(ha, "ISP ROM Status, mbx0=%xh\n", ha->rom_status);
+			rval = QL_FUNCTION_FAILED;
+		}
 	} else if (CFG_IST(ha, CFG_DISABLE_RISC_CODE_LOAD)) {
+		ha->dev_state = NX_DEV_READY;
 		if (ha->risc_code != NULL) {
 			kmem_free(ha->risc_code, ha->risc_code_size);
 			ha->risc_code = NULL;
@@ -2110,10 +2206,10 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 		}
 
 		/* Get RISC code length. */
-		rval = ql_rd_risc_ram(ha, risc_address + 3, ha->request_dvma,
-		    1);
+		rval = ql_rd_risc_ram(ha, risc_address + 3,
+		    ha->req_q[0]->req_ring.cookie.dmac_laddress, 1);
 		if (rval == QL_SUCCESS) {
-			lptr = (uint32_t *)ha->request_ring_bp;
+			lptr = (uint32_t *)ha->req_q[0]->req_ring.bp;
 			fw_size = *lptr << 1;
 
 			if ((bufp = kmem_alloc(fw_size, KM_SLEEP)) != NULL) {
@@ -2134,7 +2230,8 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 					    (uint16_t)(byte_count >> 1);
 
 					rval = ql_rd_risc_ram(ha, risc_address,
-					    ha->request_dvma, word_count);
+					    ha->req_q[0]->req_ring.cookie.
+					    dmac_laddress, word_count);
 					if (rval != QL_SUCCESS) {
 						kmem_free(ha->risc_code,
 						    ha->risc_code_size);
@@ -2144,13 +2241,13 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 					}
 
 					(void) ddi_dma_sync(
-					    ha->hba_buf.dma_handle,
-					    REQUEST_Q_BUFFER_OFFSET,
-					    byte_count,
+					    ha->req_q[0]->req_ring.dma_handle,
+					    0, byte_count,
 					    DDI_DMA_SYNC_FORKERNEL);
-					ddi_rep_get16(ha->hba_buf.acc_handle,
-					    (uint16_t *)bufp,
-					    (uint16_t *)ha->request_ring_bp,
+					ddi_rep_get16(
+					    ha->req_q[0]->req_ring.acc_handle,
+					    (uint16_t *)bufp, (uint16_t *)
+					    ha->req_q[0]->req_ring.bp,
 					    word_count, DDI_DEV_AUTOINCR);
 
 					risc_address += word_count;
@@ -2161,6 +2258,7 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 			rval = QL_FUNCTION_FAILED;
 		}
 	} else {
+		ha->dev_state = NX_DEV_READY;
 		rval = QL_FUNCTION_FAILED;
 	}
 
@@ -2168,124 +2266,7 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 		EL(ha, "Load RISC code\n");
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-	}
-	return (rval);
-}
-
-/*
- * Chip diagnostics
- *	Test chip for proper operation.
- *
- * Input:
- *	ha = adapter state pointer.
- *
- * Returns:
- *	ql local function return status code.
- *
- * Context:
- *	Kernel context.
- */
-static int
-ql_chip_diag(ql_adapter_state_t *ha)
-{
-	ql_mbx_data_t	mr;
-	int		rval;
-	int32_t		retries = 4;
-	uint16_t	id;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	do {
-		/* Reset ISP chip. */
-		TASK_DAEMON_LOCK(ha);
-		ha->task_daemon_flags &= ~ISP_ABORT_NEEDED;
-		TASK_DAEMON_UNLOCK(ha);
-
-		/* For ISP2200A reduce firmware load size. */
-		if (CFG_IST(ha, CFG_CTRL_2200) &&
-		    RD16_IO_REG(ha, mailbox_out[7]) == 4) {
-			ha->fw_transfer_size = 128;
-		} else {
-			ha->fw_transfer_size = REQUEST_QUEUE_SIZE;
-		}
-
-		rval = QL_SUCCESS;
-		if (!(CFG_IST(ha, CFG_CTRL_8021))) {
-			ql_reset_chip(ha);
-
-			/* Check product ID of chip */
-			mr.mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
-			mr.mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
-			mr.mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
-
-			if (ha->device_id == 0x5432 ||
-			    ha->device_id == 0x8432) {
-				id = 0x2432;
-			} else if (ha->device_id == 0x5422 ||
-			    ha->device_id == 0x8422) {
-				id = 0x2422;
-			} else {
-				id = ha->device_id;
-			}
-
-			if (mr.mb[1] == PROD_ID_1 &&
-			    (mr.mb[2] == PROD_ID_2 || mr.mb[2] == PROD_ID_2a) &&
-			    (mr.mb[3] == PROD_ID_3 || mr.mb[3] == id)) {
-				ha->adapter_stats->revlvl.isp2200 =
-				    RD16_IO_REG(ha, mailbox_out[4]);
-				ha->adapter_stats->revlvl.risc =
-				    RD16_IO_REG(ha, mailbox_out[5]);
-				ha->adapter_stats->revlvl.frmbfr =
-				    RD16_IO_REG(ha, mailbox_out[6]);
-				ha->adapter_stats->revlvl.riscrom =
-				    RD16_IO_REG(ha, mailbox_out[7]);
-			} else {
-				cmn_err(CE_WARN, "%s(%d) - prod id failed!, "
-				    "mb1=%xh, mb2=%xh, mb3=%xh", QL_NAME,
-				    ha->instance, mr.mb[1], mr.mb[2], mr.mb[3]);
-				rval = QL_FUNCTION_FAILED;
-			}
-		} else if (!(ha->task_daemon_flags & FIRMWARE_LOADED)) {
-			break;
-		}
-
-		if (rval == QL_SUCCESS) {
-			/* Wrap Incoming Mailboxes Test. */
-			mr.mb[1] = 0xAAAA;
-			mr.mb[2] = 0x5555;
-			mr.mb[3] = 0xAA55;
-			mr.mb[4] = 0x55AA;
-			mr.mb[5] = 0xA5A5;
-			mr.mb[6] = 0x5A5A;
-			mr.mb[7] = 0x2525;
-			rval = ql_mbx_wrap_test(ha, &mr);
-			if (rval == QL_SUCCESS) {
-				if (mr.mb[1] != 0xAAAA ||
-				    mr.mb[2] != 0x5555 ||
-				    mr.mb[3] != 0xAA55 ||
-				    mr.mb[4] != 0x55AA ||
-				    mr.mb[5] != 0xA5A5 ||
-				    mr.mb[6] != 0x5A5A ||
-				    mr.mb[7] != 0x2525) {
-					rval = QL_FUNCTION_FAILED;
-					(void) ql_flash_errlog(ha,
-					    FLASH_ERRLOG_ISP_ERR, 0,
-					    RD16_IO_REG(ha, hccr),
-					    RD16_IO_REG(ha, istatus));
-				}
-			} else {
-				cmn_err(CE_WARN, "%s(%d) - reg test failed="
-				    "%xh!", QL_NAME, ha->instance, rval);
-			}
-		}
-	} while ((retries-- != 0) && (rval != QL_SUCCESS));
-
-	if (rval != QL_SUCCESS) {
-		EL(ha, "failed, rval = %xh\n", rval);
-	} else {
-		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2309,23 +2290,29 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 {
 	caddr_t			risc_code_address;
 	uint32_t		risc_address, risc_code_size;
-	int			rval;
+	int			rval = QL_FUNCTION_FAILED;
 	uint32_t		word_count, cnt;
 	size_t			byte_count;
 	ql_adapter_state_t	*ha = vha->pha;
 
-	if (CFG_IST(ha, CFG_CTRL_8021)) {
-		rval = ql_8021_load_risc(ha);
+	QL_PRINT_10(ha, "started\n");
+
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
+		rval = ql_8021_reset_fw(ha) == NX_DEV_READY ?
+		    QL_SUCCESS : QL_FUNCTION_FAILED;
 	} else {
 		if (CFG_IST(ha, CFG_CTRL_81XX)) {
 			ql_mps_reset(ha);
 		}
 
 		if (CFG_IST(ha, CFG_LOAD_FLASH_FW)) {
+			QL_PRINT_10(ha, "CFG_LOAD_FLASH_FW exit\n");
 			return (ql_load_flash_fw(ha));
 		}
 
-		QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+		if (CFG_IST(ha, CFG_CTRL_27XX)) {
+			(void) ql_2700_get_module_dmp_template(ha);
+		}
 
 		/* Load firmware segments */
 		for (cnt = 0; cnt < MAX_RISC_CODE_SEGMENTS &&
@@ -2333,19 +2320,24 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 
 			risc_code_address = ha->risc_fw[cnt].code;
 			risc_address = ha->risc_fw[cnt].addr;
+			if ((risc_address = ha->risc_fw[cnt].addr) == 0) {
+				continue;
+			}
 			risc_code_size = ha->risc_fw[cnt].length;
 
 			while (risc_code_size) {
-				if (CFG_IST(ha, CFG_CTRL_242581)) {
+				if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 					word_count = ha->fw_transfer_size >> 2;
 					if (word_count > risc_code_size) {
 						word_count = risc_code_size;
 					}
 					byte_count = word_count << 2;
 
-					ddi_rep_put32(ha->hba_buf.acc_handle,
+					ddi_rep_put32(
+					    ha->req_q[0]->req_ring.acc_handle,
 					    (uint32_t *)risc_code_address,
-					    (uint32_t *)ha->request_ring_bp,
+					    (uint32_t *)
+					    ha->req_q[0]->req_ring.bp,
 					    word_count, DDI_DEV_AUTOINCR);
 				} else {
 					word_count = ha->fw_transfer_size >> 1;
@@ -2354,18 +2346,21 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 					}
 					byte_count = word_count << 1;
 
-					ddi_rep_put16(ha->hba_buf.acc_handle,
+					ddi_rep_put16(
+					    ha->req_q[0]->req_ring.acc_handle,
 					    (uint16_t *)risc_code_address,
-					    (uint16_t *)ha->request_ring_bp,
+					    (uint16_t *)
+					    ha->req_q[0]->req_ring.bp,
 					    word_count, DDI_DEV_AUTOINCR);
 				}
 
-				(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-				    REQUEST_Q_BUFFER_OFFSET, byte_count,
-				    DDI_DMA_SYNC_FORDEV);
+				(void) ddi_dma_sync(
+				    ha->req_q[0]->req_ring.dma_handle,
+				    0, byte_count, DDI_DMA_SYNC_FORDEV);
 
 				rval = ql_wrt_risc_ram(ha, risc_address,
-				    ha->request_dvma, word_count);
+				    ha->req_q[0]->req_ring.cookie.dmac_laddress,
+				    word_count);
 				if (rval != QL_SUCCESS) {
 					EL(ha, "failed, load=%xh\n", rval);
 					cnt = MAX_RISC_CODE_SEGMENTS;
@@ -2378,6 +2373,7 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 			}
 		}
 	}
+	bzero(ha->req_q[0]->req_ring.bp, ha->fw_transfer_size);
 
 	/* Start firmware. */
 	if (rval == QL_SUCCESS) {
@@ -2388,7 +2384,7 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 
 	return (rval);
@@ -2412,61 +2408,77 @@ ql_load_flash_fw(ql_adapter_state_t *ha)
 	uint32_t	risc_address, xfer_size, count,	*bp, faddr;
 	uint32_t	risc_code_size = 0;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
-	faddr = ha->flash_data_addr | ha->flash_fw_addr;
+	if (CFG_IST(ha, CFG_CTRL_278083)) {
+		if ((rval = ql_load_flash_image(ha)) != QL_SUCCESS) {
+			EL(ha, "load_flash_image status=%xh\n", rval);
+		} else if (CFG_IST(ha, CFG_CTRL_27XX) &&
+		    (rval = ql_2700_get_flash_dmp_template(ha)) !=
+		    QL_SUCCESS) {
+			EL(ha, "get_flash_dmp_template status=%xh\n", rval);
+		}
+	} else {
+		faddr = ha->flash_data_addr | ha->flash_fw_addr;
 
-	for (seg_cnt = 0; seg_cnt < 2; seg_cnt++) {
-		xfer_size = ha->fw_transfer_size >> 2;
-		do {
-			GLOBAL_HW_LOCK();
+		for (seg_cnt = 0; seg_cnt < 2; seg_cnt++) {
+			xfer_size = ha->fw_transfer_size >> 2;
+			do {
+				GLOBAL_HW_LOCK();
 
-			/* Read data from flash. */
-			bp = (uint32_t *)ha->request_ring_bp;
-			for (count = 0; count < xfer_size; count++) {
-				rval = ql_24xx_read_flash(ha, faddr++, bp);
+				/* Read data from flash. */
+				bp = (uint32_t *)ha->req_q[0]->req_ring.bp;
+				for (count = 0; count < xfer_size; count++) {
+					rval = ql_24xx_read_flash(ha, faddr++,
+					    bp);
+					if (rval != QL_SUCCESS) {
+						break;
+					}
+					ql_chg_endian((uint8_t *)bp++, 4);
+				}
+
+				GLOBAL_HW_UNLOCK();
+
 				if (rval != QL_SUCCESS) {
+					EL(ha, "24xx_read_flash failed=%xh\n",
+					    rval);
 					break;
 				}
-				ql_chg_endian((uint8_t *)bp++, 4);
-			}
 
-			GLOBAL_HW_UNLOCK();
+				if (risc_code_size == 0) {
+					bp = (uint32_t *)
+					    ha->req_q[0]->req_ring.bp;
+					risc_address = bp[2];
+					risc_code_size = bp[3];
+					ha->risc_fw[seg_cnt].addr =
+					    risc_address;
+				}
+
+				if (risc_code_size < xfer_size) {
+					faddr -= xfer_size - risc_code_size;
+					xfer_size = risc_code_size;
+				}
+
+				(void) ddi_dma_sync(
+				    ha->req_q[0]->req_ring.dma_handle,
+				    0, xfer_size << 2, DDI_DMA_SYNC_FORDEV);
+
+				rval = ql_wrt_risc_ram(ha, risc_address,
+				    ha->req_q[0]->req_ring.cookie.dmac_laddress,
+				    xfer_size);
+				if (rval != QL_SUCCESS) {
+					EL(ha, "ql_wrt_risc_ram failed=%xh\n",
+					    rval);
+					break;
+				}
+
+				risc_address += xfer_size;
+				risc_code_size -= xfer_size;
+			} while (risc_code_size);
 
 			if (rval != QL_SUCCESS) {
-				EL(ha, "24xx_read_flash failed=%xh\n", rval);
 				break;
 			}
-
-			if (risc_code_size == 0) {
-				bp = (uint32_t *)ha->request_ring_bp;
-				risc_address = bp[2];
-				risc_code_size = bp[3];
-				ha->risc_fw[seg_cnt].addr = risc_address;
-			}
-
-			if (risc_code_size < xfer_size) {
-				faddr -= xfer_size - risc_code_size;
-				xfer_size = risc_code_size;
-			}
-
-			(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-			    REQUEST_Q_BUFFER_OFFSET, xfer_size << 2,
-			    DDI_DMA_SYNC_FORDEV);
-
-			rval = ql_wrt_risc_ram(ha, risc_address,
-			    ha->request_dvma, xfer_size);
-			if (rval != QL_SUCCESS) {
-				EL(ha, "ql_wrt_risc_ram failed=%xh\n", rval);
-				break;
-			}
-
-			risc_address += xfer_size;
-			risc_code_size -= xfer_size;
-		} while (risc_code_size);
-
-		if (rval != QL_SUCCESS) {
-			break;
 		}
 	}
 
@@ -2479,7 +2491,7 @@ ql_load_flash_fw(ql_adapter_state_t *ha)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2502,12 +2514,14 @@ ql_start_firmware(ql_adapter_state_t *vha)
 {
 	int			rval, rval2;
 	uint32_t		data;
-	ql_mbx_data_t		mr;
+	ql_mbx_data_t		mr = {0};
 	ql_adapter_state_t	*ha = vha->pha;
+	ql_init_24xx_cb_t	*icb =
+	    (ql_init_24xx_cb_t *)&ha->init_ctrl_blk.cb24;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
-	if (CFG_IST(ha, CFG_CTRL_8021)) {
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
 		/* Save firmware version. */
 		rval = ql_get_fw_version(ha, &mr, MAILBOX_TOV);
 		ha->fw_major_version = mr.mb[1];
@@ -2524,24 +2538,43 @@ ql_start_firmware(ql_adapter_state_t *vha)
 		ha->fw_major_version = mr.mb[1];
 		ha->fw_minor_version = mr.mb[2];
 		ha->fw_subminor_version = mr.mb[3];
-		ha->fw_ext_memory_size = ((SHORT_TO_LONG(mr.mb[4], mr.mb[5]) -
+		ha->fw_ext_memory_end = SHORT_TO_LONG(mr.mb[4], mr.mb[5]);
+		ha->fw_ext_memory_size = ((ha->fw_ext_memory_end -
 		    0x100000) + 1) * 4;
-		ha->fw_attributes = mr.mb[6];
-
-		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		if (CFG_IST(ha, CFG_CTRL_278083)) {
+			ha->fw_attributes = SHORT_TO_LONG(mr.mb[6], mr.mb[15]);
+			ha->phy_fw_major_version = LSB(mr.mb[13]);
+			ha->phy_fw_minor_version = MSB(mr.mb[14]);
+			ha->phy_fw_subminor_version = LSB(mr.mb[14]);
+			ha->fw_ext_attributes = SHORT_TO_LONG(mr.mb[16],
+			    mr.mb[17]);
+		} else {
+			ha->fw_attributes = mr.mb[6];
 			ha->phy_fw_major_version = LSB(mr.mb[8]);
 			ha->phy_fw_minor_version = MSB(mr.mb[9]);
 			ha->phy_fw_subminor_version = LSB(mr.mb[9]);
-			ha->mpi_fw_major_version = LSB(mr.mb[10]);
-			ha->mpi_fw_minor_version = MSB(mr.mb[11]);
-			ha->mpi_fw_subminor_version = LSB(mr.mb[11]);
-			ha->mpi_capability_list = SHORT_TO_LONG(mr.mb[13],
-			    mr.mb[12]);
+			ha->mpi_capability_list =
+			    SHORT_TO_LONG(mr.mb[13], mr.mb[12]);
+		}
+		ha->mpi_fw_major_version = LSB(mr.mb[10]);
+		ha->mpi_fw_minor_version = MSB(mr.mb[11]);
+		ha->mpi_fw_subminor_version = LSB(mr.mb[11]);
+		if (CFG_IST(ha, CFG_CTRL_27XX)) {
+			ha->fw_shared_ram_start =
+			    SHORT_TO_LONG(mr.mb[18], mr.mb[19]);
+			ha->fw_shared_ram_end =
+			    SHORT_TO_LONG(mr.mb[20], mr.mb[21]);
+			ha->fw_ddr_ram_start =
+			    SHORT_TO_LONG(mr.mb[22], mr.mb[23]);
+			ha->fw_ddr_ram_end =
+			    SHORT_TO_LONG(mr.mb[24], mr.mb[25]);
+		}
+		if (CFG_IST(ha, CFG_FLASH_ACC_SUPPORT)) {
 			if ((rval2 = ql_flash_access(ha, FAC_GET_SECTOR_SIZE,
 			    0, 0, &data)) == QL_SUCCESS) {
 				ha->xioctl->fdesc.block_size = data << 2;
-				QL_PRINT_10(CE_CONT, "(%d): fdesc.block_size="
-				    "%xh\n", ha->instance,
+				QL_PRINT_10(ha, "fdesc.block_size="
+				    "%xh\n",
 				    ha->xioctl->fdesc.block_size);
 			} else {
 				EL(ha, "flash_access status=%xh\n", rval2);
@@ -2549,7 +2582,7 @@ ql_start_firmware(ql_adapter_state_t *vha)
 		}
 
 		/* Set Serdes Transmit Parameters. */
-		if (CFG_IST(ha, CFG_CTRL_2422) && ha->serdes_param[0] & BIT_0) {
+		if (CFG_IST(ha, CFG_CTRL_24XX) && ha->serdes_param[0] & BIT_0) {
 			mr.mb[1] = ha->serdes_param[0];
 			mr.mb[2] = ha->serdes_param[1];
 			mr.mb[3] = ha->serdes_param[2];
@@ -2565,12 +2598,55 @@ ql_start_firmware(ql_adapter_state_t *vha)
 			(void) ql_set_firmware_option(ha, &mr);
 		}
 	}
+
+	if (ha->flags & MULTI_QUEUE) {
+		QL_PRINT_10(ha, "MULTI_QUEUE\n");
+		icb->msi_x_vector[0] = LSB(ha->rsp_queues[0]->msi_x_vector);
+		icb->msi_x_vector[1] = MSB(ha->rsp_queues[0]->msi_x_vector);
+		if (ha->iflags & IFLG_INTR_MSIX &&
+		    CFG_IST(ha, CFG_NO_INTR_HSHAKE_SUP)) {
+			QL_PRINT_10(ha, "NO_INTR_HANDSHAKE\n");
+			ADAPTER_STATE_LOCK(ha);
+			ha->flags |= NO_INTR_HANDSHAKE;
+			ADAPTER_STATE_UNLOCK(ha);
+			icb->firmware_options_2[2] = (uint8_t)
+			    (icb->firmware_options_2[2] & ~(BIT_6 | BIT_5));
+			icb->firmware_options_2[2] = (uint8_t)
+			    (icb->firmware_options_2[2] | BIT_7);
+		} else {
+			icb->firmware_options_2[2] = (uint8_t)
+			    (icb->firmware_options_2[2] & ~BIT_5);
+			icb->firmware_options_2[2] = (uint8_t)
+			    (icb->firmware_options_2[2] | BIT_7 | BIT_6);
+		}
+	} else {
+		icb->firmware_options_2[2] = (uint8_t)
+		    (icb->firmware_options_2[2] & ~(BIT_7 | BIT_5));
+		icb->firmware_options_2[2] = (uint8_t)
+		    (icb->firmware_options_2[2] | BIT_6);
+	}
+	icb->firmware_options_2[3] = (uint8_t)
+	    (icb->firmware_options_2[3] & ~(BIT_1 | BIT_0));
+
+	/* Set fw execution throttle. */
+	if (CFG_IST(ha, CFG_CTRL_22XX) ||
+	    ql_get_resource_cnts(ha, &mr) != QL_SUCCESS) {
+		icb->execution_throttle[0] = 0xff;
+		icb->execution_throttle[1] = 0xff;
+	} else {
+		icb->execution_throttle[0] = LSB(mr.mb[6]);
+		icb->execution_throttle[1] = MSB(mr.mb[6]);
+	}
+	EL(ha, "icb->execution_throttle %d\n",
+	    CHAR_TO_SHORT(icb->execution_throttle[0],
+	    icb->execution_throttle[1]));
+
 	if (rval != QL_SUCCESS) {
 		ha->task_daemon_flags &= ~FIRMWARE_LOADED;
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		ha->task_daemon_flags |= FIRMWARE_LOADED;
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2591,7 +2667,7 @@ ql_start_firmware(ql_adapter_state_t *vha)
 int
 ql_set_cache_line(ql_adapter_state_t *ha)
 {
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Set the cache line. */
 	if (CFG_IST(ha->pha, CFG_SET_CACHE_LINE_SIZE_1)) {
@@ -2599,7 +2675,7 @@ ql_set_cache_line(ql_adapter_state_t *ha)
 		ql_pci_config_put8(ha->pha, PCI_CONF_CACHE_LINESZ, 1);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (QL_SUCCESS);
 }
@@ -2612,9 +2688,10 @@ ql_set_cache_line(ql_adapter_state_t *ha)
  *	already built by nvram config routine.
  *
  * Input:
- *	ha = adapter state pointer.
- *	ha->hba_buf = request and response rings
- *	ha->init_ctrl_blk = initialization control block
+ *	ha =			adapter state pointer.
+ *	ha->req_q =		request rings
+ *	ha->rsp_queues =	response rings
+ *	ha->init_ctrl_blk =	initialization control block
  *
  * Returns:
  *	ql local function return status code.
@@ -2630,10 +2707,10 @@ ql_init_rings(ql_adapter_state_t *vha2)
 	ql_mbx_data_t		mr;
 	ql_adapter_state_t	*ha = vha2->pha;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/* Clear outstanding commands array. */
-	for (index = 0; index < MAX_OUTSTANDING_COMMANDS; index++) {
+	for (index = 0; index < ha->osc_max_cnt; index++) {
 		ha->outstanding_cmds[index] = NULL;
 	}
 	ha->osc_index = 1;
@@ -2642,30 +2719,35 @@ ql_init_rings(ql_adapter_state_t *vha2)
 	ha->pending_cmds.last = NULL;
 
 	/* Initialize firmware. */
-	ha->request_ring_ptr = ha->request_ring_bp;
-	ha->req_ring_index = 0;
-	ha->req_q_cnt = REQUEST_ENTRY_CNT - 1;
-	ha->response_ring_ptr = ha->response_ring_bp;
-	ha->rsp_ring_index = 0;
+	ha->req_q[0]->req_ring_ptr = ha->req_q[0]->req_ring.bp;
+	ha->req_q[0]->req_ring_index = 0;
+	ha->req_q[0]->req_q_cnt = REQUEST_ENTRY_CNT - 1;
+	ha->rsp_queues[0]->rsp_ring_ptr = ha->rsp_queues[0]->rsp_ring.bp;
+	ha->rsp_queues[0]->rsp_ring_index = 0;
 
 	if (ha->flags & VP_ENABLED) {
 		ql_adapter_state_t	*vha;
-		uint16_t		cnt;
-		uint32_t		max_vports;
 		ql_init_24xx_cb_t	*icb = &ha->init_ctrl_blk.cb24;
 
-		max_vports = (CFG_IST(ha, CFG_CTRL_2422) ?
-		    MAX_24_VIRTUAL_PORTS : MAX_25_VIRTUAL_PORTS);
 		bzero(icb->vp_count,
 		    ((uintptr_t)icb + sizeof (ql_init_24xx_cb_t)) -
 		    (uintptr_t)icb->vp_count);
-		icb->vp_count[0] = (uint8_t)max_vports;
+		icb->vp_count[0] = ha->max_vports - 1;
 
 		/* Allow connection option 2. */
 		icb->global_vp_option[0] = BIT_1;
 
-		for (cnt = 0, vha = ha->vp_next; cnt < max_vports &&
-		    vha != NULL; vha = vha->vp_next, cnt++) {
+		/* Setup default options for all ports. */
+		for (index = 0; index < ha->max_vports; index++) {
+			icb->vpc[index].options = VPO_TARGET_MODE_DISABLED |
+			    VPO_INITIATOR_MODE_ENABLED;
+		}
+		/* Setup enabled ports. */
+		for (vha = ha->vp_next; vha != NULL; vha = vha->vp_next) {
+			if (vha->vp_index == 0 ||
+			    vha->vp_index >= ha->max_vports) {
+				continue;
+			}
 
 			index = (uint8_t)(vha->vp_index - 1);
 			bcopy(vha->loginparams.node_ww_name.raw_wwn,
@@ -2673,8 +2755,6 @@ ql_init_rings(ql_adapter_state_t *vha2)
 			bcopy(vha->loginparams.nport_ww_name.raw_wwn,
 			    icb->vpc[index].port_name, 8);
 
-			icb->vpc[index].options = VPO_TARGET_MODE_DISABLED |
-			    VPO_INITIATOR_MODE_ENABLED;
 			if (vha->flags & VP_ENABLED) {
 				icb->vpc[index].options = (uint8_t)
 				    (icb->vpc[index].options | VPO_ENABLED);
@@ -2692,7 +2772,7 @@ ql_init_rings(ql_adapter_state_t *vha2)
 		}
 	}
 
-	if (rval == QL_SUCCESS && (CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
+	if (rval == QL_SUCCESS && CFG_IST(ha, CFG_ISP_FW_TYPE_1)) {
 		/* Tell firmware to enable MBA_PORT_BYPASS_CHANGED event */
 		rval = ql_get_firmware_option(ha, &mr);
 		if (rval == QL_SUCCESS) {
@@ -2710,7 +2790,7 @@ ql_init_rings(ql_adapter_state_t *vha2)
 			EL(ha, "fcetrace buffer alloc failed: %xh\n", rval2);
 		} else {
 			if ((rval2 = ql_fw_etrace(ha, &ha->fwfcetracebuf,
-			    FTO_FCE_TRACE_ENABLE)) != QL_SUCCESS) {
+			    FTO_FCE_TRACE_ENABLE, NULL)) != QL_SUCCESS) {
 				EL(ha, "fcetrace enable failed: %xh\n", rval2);
 				ql_free_phys(ha, &ha->fwfcetracebuf);
 			}
@@ -2724,7 +2804,7 @@ ql_init_rings(ql_adapter_state_t *vha2)
 			EL(ha, "exttrace buffer alloc failed: %xh\n", rval2);
 		} else {
 			if ((rval2 = ql_fw_etrace(ha, &ha->fwexttracebuf,
-			    FTO_EXT_TRACE_ENABLE)) != QL_SUCCESS) {
+			    FTO_EXT_TRACE_ENABLE, NULL)) != QL_SUCCESS) {
 				EL(ha, "exttrace enable failed: %xh\n", rval2);
 				ql_free_phys(ha, &ha->fwexttracebuf);
 			}
@@ -2800,7 +2880,7 @@ ql_init_rings(ql_adapter_state_t *vha2)
 		TASK_DAEMON_LOCK(ha);
 		ha->task_daemon_flags |= FIRMWARE_UP;
 		TASK_DAEMON_UNLOCK(ha);
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_3(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2824,30 +2904,46 @@ int
 ql_fw_ready(ql_adapter_state_t *ha, uint8_t secs)
 {
 	ql_mbx_data_t	mr;
-	clock_t		timer;
+	clock_t		timer, login_wait, wait;
 	clock_t		dly = 250000;
 	clock_t		sec_delay = MICROSEC / dly;
-	clock_t		wait = secs * sec_delay;
 	int		rval = QL_FUNCTION_FAILED;
-	uint16_t	state = 0xffff;
+	uint16_t	state[6] = {0};
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
-	timer = ha->r_a_tov < secs ? secs : ha->r_a_tov;
-	timer = (timer + 2) * sec_delay;
+	login_wait = ha->r_a_tov * 2 * sec_delay;
+	timer = wait = secs * sec_delay;
+	state[0] = 0xffff;
 
 	/* Wait for ISP to finish LIP */
-	while (timer != 0 && wait != 0 &&
-	    !(ha->task_daemon_flags & ISP_ABORT_NEEDED)) {
+	while (login_wait != 0 && wait != 0 &&
+	    !(ha->task_daemon_flags & ISP_ABORT_NEEDED) &&
+	    !(ha->flags & MPI_RESET_NEEDED)) {
 
 		rval = ql_get_firmware_state(ha, &mr);
 		if (rval == QL_SUCCESS) {
-			if (ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-			    LOOP_DOWN)) {
-				wait--;
-			} else if (mr.mb[1] != FSTATE_READY) {
+			if (mr.mb[1] != FSTATE_READY) {
+				if (mr.mb[1] == FSTATE_LOSS_SYNC &&
+				    mr.mb[4] == FSTATE_MPI_NIC_ERROR &&
+				    CFG_IST(ha, CFG_FCOE_SUPPORT)) {
+					EL(ha, "mpi_nic_error, "
+					    "isp_abort_needed\n");
+					ADAPTER_STATE_LOCK(ha);
+					ha->flags |= MPI_RESET_NEEDED;
+					ADAPTER_STATE_UNLOCK(ha);
+					if (!(ha->task_daemon_flags &
+					    ABORT_ISP_ACTIVE)) {
+						TASK_DAEMON_LOCK(ha);
+						ha->task_daemon_flags |=
+						    ISP_ABORT_NEEDED;
+						TASK_DAEMON_UNLOCK(ha);
+					}
+				}
 				if (mr.mb[1] != FSTATE_WAIT_LOGIN) {
-					wait--;
+					timer = --wait;
+				} else {
+					timer = --login_wait;
 				}
 				rval = QL_FUNCTION_FAILED;
 			} else {
@@ -2873,16 +2969,25 @@ ql_fw_ready(ql_adapter_state_t *ha, uint8_t secs)
 				}
 			}
 		} else {
-			wait--;
+			break;
 		}
 
-		if (state != mr.mb[1]) {
-			EL(ha, "mailbox_reg[1] = %xh\n", mr.mb[1]);
-			state = mr.mb[1];
+		if (state[0] != mr.mb[1] || state[1] != mr.mb[2] ||
+		    state[2] != mr.mb[3] || state[3] != mr.mb[4] ||
+		    state[4] != mr.mb[5] || state[5] != mr.mb[6]) {
+			EL(ha, "mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, "
+			    "mbx5=%xh, mbx6=%xh\n", mr.mb[1], mr.mb[2],
+			    mr.mb[3], mr.mb[4], mr.mb[5], mr.mb[6]);
+			state[0] = mr.mb[1];
+			state[1] = mr.mb[2];
+			state[2] = mr.mb[3];
+			state[3] = mr.mb[4];
+			state[4] = mr.mb[5];
+			state[5] = mr.mb[6];
 		}
 
 		/* Delay for a tick if waiting. */
-		if (timer-- != 0 && wait != 0) {
+		if (timer != 0) {
 			if (timer % 4 == 0) {
 				delay(drv_usectohz(dly));
 			} else {
@@ -2894,10 +2999,17 @@ ql_fw_ready(ql_adapter_state_t *ha, uint8_t secs)
 	}
 
 	if (rval != QL_SUCCESS) {
+		if ((ha->task_daemon_flags & ISP_ABORT_NEEDED ||
+		    ha->flags & MPI_RESET_NEEDED) &&
+		    ha->task_daemon_flags & LOOP_RESYNC_NEEDED) {
+			TASK_DAEMON_LOCK(ha);
+			ha->task_daemon_flags &= ~LOOP_RESYNC_NEEDED;
+			TASK_DAEMON_UNLOCK(ha);
+		}
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_3(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2918,15 +3030,17 @@ ql_fw_ready(ql_adapter_state_t *ha, uint8_t secs)
 static int
 ql_configure_loop(ql_adapter_state_t *ha)
 {
-	int			rval;
+	int			rval = QL_SUCCESS;
 	ql_adapter_state_t	*vha;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	for (vha = ha; vha != NULL; vha = vha->vp_next) {
 		TASK_DAEMON_LOCK(ha);
 		if (!(vha->task_daemon_flags & LOOP_RESYNC_NEEDED) &&
-		    vha->vp_index != 0 && !(vha->flags & VP_ENABLED)) {
+		    vha->vp_index != 0 &&
+		    (!(vha->flags & VP_ENABLED) ||
+		    vha->flags & VP_ID_NOT_ACQUIRED)) {
 			TASK_DAEMON_UNLOCK(ha);
 			continue;
 		}
@@ -2948,7 +3062,7 @@ ql_configure_loop(ql_adapter_state_t *ha)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -2965,17 +3079,24 @@ ql_configure_loop(ql_adapter_state_t *ha)
  *
  * Context:
  *	Kernel context.
+ *	ADAPTER_STATE_LOCK must be already obtained
  */
 static void
 ql_configure_n_port_info(ql_adapter_state_t *ha)
 {
-	ql_tgt_t	tmp_tq;
-	ql_tgt_t	*tq;
-	uint8_t		*cb_port_name;
-	ql_link_t	*link;
-	int		index, rval;
+	ql_tgt_t		tmp_tq;
+	ql_tgt_t		*tq;
+	uint8_t			*cb_port_name;
+	ql_link_t		*link;
+	int			index, rval;
+	uint16_t		loop_id = 0;
+	uint32_t		found = 0;
+	ql_dev_id_list_t	*list;
+	uint32_t		list_size;
+	ql_mbx_data_t		mr;
+	port_id_t		d_id = {0, 0, 0, 0};
 
-	tq = &tmp_tq;
+	QL_PRINT_10(ha, "started\n");
 
 	/* Free existing target queues. */
 	for (index = 0; index < DEVICE_HEAD_LIST_SIZE; index++) {
@@ -2983,10 +3104,49 @@ ql_configure_n_port_info(ql_adapter_state_t *ha)
 		while (link != NULL) {
 			tq = link->base_address;
 			link = link->next;
-			ql_remove_link(&ha->dev[index], &tq->device);
-			ql_dev_free(ha, tq);
+
+			/* workaround FW issue, do implicit logout */
+			/* Never logo to the reused loopid!! */
+			if ((tq->loop_id != 0x7ff) &&
+			    (tq->loop_id != 0x7fe)) {
+				if (found == 0) {
+					rval = ql_get_port_database(ha,
+					    tq, PDF_NONE);
+					if ((rval == QL_SUCCESS) &&
+					    (tq->master_state ==
+					    PD_STATE_PORT_LOGGED_IN)) {
+						EL(ha, "nport id (%xh) "
+						    "loop_id=%xh "
+						    "reappeared\n",
+						    tq->d_id.b24,
+						    tq->loop_id);
+						bcopy((void *)&tq->port_name[0],
+						    (void *)&ha->n_port->
+						    port_name[0],
+						    8);
+						bcopy((void *)&tq->node_name[0],
+						    (void *)&ha->n_port->
+						    node_name[0],
+						    8);
+						ha->n_port->d_id.b24 =
+						    tq->d_id.b24;
+						found = 1;
+						continue;
+					}
+				}
+				(void) ql_logout_fabric_port(ha, tq);
+			}
+
+			tq->loop_id = PORT_NO_LOOP_ID;
 		}
 	}
+
+	if (found == 1) {
+		QL_PRINT_10(ha, "done found\n");
+		return;
+	}
+
+	tq = &tmp_tq;
 
 	/*
 	 * If the N_Port's WWPN is larger than our's then it has the
@@ -3015,16 +3175,14 @@ ql_configure_n_port_info(ql_adapter_state_t *ha)
 	tq->loop_id = 0x7fe;
 
 	rval = ql_get_port_database(ha, tq, PDF_NONE);
-	if (rval == QL_SUCCESS || rval == QL_NOT_LOGGED_IN) {
-		ql_dev_id_list_t	*list;
-		uint32_t		list_size;
-		ql_mbx_data_t		mr;
-		port_id_t		d_id = {0, 0, 0, 0};
-		uint16_t		loop_id = 0;
 
-		cb_port_name = (uint8_t *)(CFG_IST(ha, CFG_CTRL_24258081) ?
-		    &ha->init_ctrl_blk.cb24.port_name[0] :
-		    &ha->init_ctrl_blk.cb.port_name[0]);
+	/*
+	 * Only collect the P2P remote port information in the case of
+	 * QL_SUCCESS. FW should have always logged in (flogi) to remote
+	 * port at this point.
+	 */
+	if (rval == QL_SUCCESS) {
+		cb_port_name = &ha->loginparams.nport_ww_name.raw_wwn[0];
 
 		if ((ql_wwn_cmp(ha, (la_wwn_t *)&tq->port_name[0],
 		    (la_wwn_t *)cb_port_name) == 1)) {
@@ -3043,19 +3201,23 @@ ql_configure_n_port_info(ql_adapter_state_t *ha)
 		/* Resolve an n_port_handle */
 		ha->n_port->n_port_handle = 0x7fe;
 
-		list_size = sizeof (ql_dev_id_list_t) * DEVICE_LIST_ENTRIES;
-		list = (ql_dev_id_list_t *)kmem_zalloc(list_size, KM_SLEEP);
+	}
 
-		if (list != NULL &&
-		    ql_get_id_list(ha, (caddr_t)list, list_size, &mr) ==
-		    QL_SUCCESS) {
-			if (mr.mb[1]) {
-				EL(ha, "id list entries = %d\n", mr.mb[1]);
-				for (index = 0; index < mr.mb[1]; index++) {
-					ql_dev_list(ha, list, index,
-					    &d_id, &loop_id);
-					ha->n_port->n_port_handle = loop_id;
-				}
+	list_size = sizeof (ql_dev_id_list_t) * DEVICE_LIST_ENTRIES;
+	list = (ql_dev_id_list_t *)kmem_zalloc(list_size, KM_SLEEP);
+
+	if (ql_get_id_list(ha, (caddr_t)list, list_size, &mr) ==
+	    QL_SUCCESS) {
+			/* For the p2p mr.mb[1] must be 1 */
+			if (mr.mb[1] == 1) {
+				index = 0;
+				ql_dev_list(ha, list, index,
+				    &d_id, &loop_id);
+				ha->n_port->n_port_handle = loop_id;
+
+				tq->loop_id = loop_id;
+				tq->d_id.b24 = d_id.b24;
+				ha->n_port->d_id.b24 = d_id.b24;
 			} else {
 				for (index = 0; index <= LAST_LOCAL_LOOP_ID;
 				    index++) {
@@ -3069,23 +3231,64 @@ ql_configure_n_port_info(ql_adapter_state_t *ha)
 							ha->n_port->
 							    n_port_handle =
 							    tq->loop_id;
+							ha->n_port->d_id.b24 =
+							    tq->hard_addr.b24;
 							break;
 						}
-					} else {
+					} else if (rval == QL_SUCCESS) {
 						ha->n_port->n_port_handle =
 						    tq->loop_id;
+						ha->n_port->d_id.b24 =
+						    tq->hard_addr.b24;
+
 						break;
 					}
 				}
+				if (index > LAST_LOCAL_LOOP_ID) {
+					EL(ha, "P2P:exceeded last id, "
+					    "n_port_handle = %xh\n",
+					    ha->n_port->n_port_handle);
+
+					ha->n_port->n_port_handle = 0;
+					tq->loop_id = 0;
+				}
 			}
 		} else {
-			cmn_err(CE_WARN, "!%s(%d) didn't get list for %xh",
-			    QL_NAME, ha->instance, d_id.b24);
-		}
-		if (list != NULL) {
 			kmem_free(list, list_size);
+			EL(ha, "ql_get_dev_list unsuccessful\n");
+			return;
 		}
-	}
+
+		/* with the tq->loop_id to get the port database */
+
+		rval = ql_get_port_database(ha, tq, PDF_NONE);
+
+		if (rval == QL_NOT_LOGGED_IN) {
+			if (tq->master_state == PD_STATE_PLOGI_PENDING) {
+				bcopy((void *)&tq->port_name[0],
+				    (void *)&ha->n_port->port_name[0], 8);
+				bcopy((void *)&tq->node_name[0],
+				    (void *)&ha->n_port->node_name[0], 8);
+				bcopy((void *)&tq->hard_addr,
+				    (void *)&ha->n_port->d_id,
+				    sizeof (port_id_t));
+				ha->n_port->d_id.b24 = d_id.b24;
+			}
+		} else if (rval == QL_SUCCESS) {
+			bcopy((void *)&tq->port_name[0],
+			    (void *)&ha->n_port->port_name[0], 8);
+			bcopy((void *)&tq->node_name[0],
+			    (void *)&ha->n_port->node_name[0], 8);
+			bcopy((void *)&tq->hard_addr,
+			    (void *)&ha->n_port->d_id, sizeof (port_id_t));
+			ha->n_port->d_id.b24 = d_id.b24;
+
+		}
+
+		kmem_free(list, list_size);
+
+		EL(ha, "d_id = %xh, nport_handle = %xh, tq->loop_id = %xh",
+		    tq->d_id.b24, ha->n_port->n_port_handle, tq->loop_id);
 }
 
 
@@ -3110,7 +3313,7 @@ ql_configure_hba(ql_adapter_state_t *ha)
 	uint32_t	state;
 	ql_mbx_data_t	mr;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	/* Get host addresses. */
 	rval = ql_get_adapter_id(ha, &mr);
@@ -3123,59 +3326,66 @@ ql_configure_hba(ql_adapter_state_t *ha)
 		ha->d_id.b.al_pa = LSB(mr.mb[2]);
 		ha->d_id.b.area = MSB(mr.mb[2]);
 		ha->d_id.b.domain = LSB(mr.mb[3]);
+		ha->bbcr_initial = LSB(mr.mb[15]);
+		ha->bbcr_runtime = MSB(mr.mb[15]);
 
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags &= ~FDISC_ENABLED;
+		ADAPTER_STATE_UNLOCK(ha);
 
 		/* Get loop topology. */
 		switch (mr.mb[6]) {
-		case CNX_LOOP_NO_FABRIC:
+		case GID_TOP_NL_PORT:
 			ha->topology = (uint8_t)(ha->topology | QL_NL_PORT);
+			ha->loop_id = mr.mb[1];
 			break;
-		case CNX_FLPORT_IN_LOOP:
+		case GID_TOP_FL_PORT:
 			ha->topology = (uint8_t)(ha->topology | QL_FL_PORT);
+			ha->loop_id = mr.mb[1];
 			break;
-		case CNX_NPORT_2_NPORT_P2P:
-		case CNX_NPORT_2_NPORT_NO_TGT_RSP:
+		case GID_TOP_N_PORT:
+		case GID_TOP_N_PORT_NO_TGT:
 			ha->flags |= POINT_TO_POINT;
 			ha->topology = (uint8_t)(ha->topology | QL_N_PORT);
-			if (CFG_IST(ha, CFG_CTRL_2425)) {
+			ha->loop_id = 0xffff;
+			if (CFG_IST(ha, CFG_N2N_SUPPORT)) {
 				ql_configure_n_port_info(ha);
 			}
 			break;
-		case CNX_FLPORT_P2P:
+		case GID_TOP_F_PORT:
 			ha->flags |= POINT_TO_POINT;
 			ha->topology = (uint8_t)(ha->topology | QL_F_PORT);
+			ha->loop_id = 0xffff;
 
 			/* Get supported option. */
-			if (CFG_IST(ha, CFG_CTRL_24258081) &&
+			if (CFG_IST(ha, CFG_ISP_FW_TYPE_2) &&
 			    mr.mb[7] & GID_FP_NPIV_SUPPORT) {
+				ADAPTER_STATE_LOCK(ha);
 				ha->flags |= FDISC_ENABLED;
+				ADAPTER_STATE_UNLOCK(ha);
 			}
 			/* Get VLAN ID, mac address */
-			if (CFG_IST(ha, CFG_CTRL_8081)) {
+			if (CFG_IST(ha, CFG_FCOE_SUPPORT)) {
+				ha->flags |= FDISC_ENABLED;
 				ha->fabric_params = mr.mb[7];
 				ha->fcoe_vlan_id = (uint16_t)(mr.mb[9] & 0xfff);
 				ha->fcoe_fcf_idx = mr.mb[10];
-				ha->fcoe_vnport_mac[0] = MSB(mr.mb[11]);
-				ha->fcoe_vnport_mac[1] = LSB(mr.mb[11]);
-				ha->fcoe_vnport_mac[2] = MSB(mr.mb[12]);
-				ha->fcoe_vnport_mac[3] = LSB(mr.mb[12]);
-				ha->fcoe_vnport_mac[4] = MSB(mr.mb[13]);
-				ha->fcoe_vnport_mac[5] = LSB(mr.mb[13]);
+				ha->fcoe_vnport_mac[5] = MSB(mr.mb[11]);
+				ha->fcoe_vnport_mac[4] = LSB(mr.mb[11]);
+				ha->fcoe_vnport_mac[3] = MSB(mr.mb[12]);
+				ha->fcoe_vnport_mac[2] = LSB(mr.mb[12]);
+				ha->fcoe_vnport_mac[1] = MSB(mr.mb[13]);
+				ha->fcoe_vnport_mac[0] = LSB(mr.mb[13]);
 			}
 			break;
 		default:
-			QL_PRINT_2(CE_CONT, "(%d,%d): UNKNOWN topology=%xh, "
-			    "d_id=%xh\n", ha->instance, ha->vp_index, mr.mb[6],
-			    ha->d_id.b24);
+			QL_PRINT_2(ha, "UNKNOWN topology=%xh, d_id=%xh\n",
+			    mr.mb[6], ha->d_id.b24);
 			rval = QL_FUNCTION_FAILED;
 			break;
 		}
-		ADAPTER_STATE_UNLOCK(ha);
 
-		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
-		    CFG_CTRL_24258081))) {
+		if (CFG_IST(ha, CFG_CTRL_2363 | CFG_ISP_FW_TYPE_2)) {
 			mr.mb[1] = 0;
 			mr.mb[2] = 0;
 			rval = ql_data_rate(ha, &mr);
@@ -3194,6 +3404,10 @@ ql_configure_hba(ql_adapter_state_t *ha)
 					state = FC_STATE_8GBIT_SPEED;
 				} else if (mr.mb[1] == IIDMA_RATE_10GB) {
 					state = FC_STATE_10GBIT_SPEED;
+				} else if (mr.mb[1] == IIDMA_RATE_16GB) {
+					state = FC_STATE_16GBIT_SPEED;
+				} else if (mr.mb[1] == IIDMA_RATE_32GB) {
+					state = FC_STATE_32GBIT_SPEED;
 				} else {
 					state = 0;
 				}
@@ -3212,7 +3426,7 @@ ql_configure_hba(ql_adapter_state_t *ha)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		bp = ha->loginparams.nport_ww_name.raw_wwn;
-		EL(ha, "topology=%xh, d_id=%xh, "
+		EL(ha, "topology=%xh, hba port id=%xh, "
 		    "wwpn=%02x%02x%02x%02x%02x%02x%02x%02xh\n",
 		    ha->topology, ha->d_id.b24, bp[0], bp[1],
 		    bp[2], bp[3], bp[4], bp[5], bp[6], bp[7]);
@@ -3248,7 +3462,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 	ql_mbx_data_t		mr;
 	uint8_t			retries = MAX_DEVICE_LOST_RETRY;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	list_size = sizeof (ql_dev_id_list_t) * DEVICE_LIST_ENTRIES;
 	list = kmem_zalloc(list_size, KM_SLEEP);
@@ -3269,21 +3483,37 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 			return (rval);
 		}
 
-		/* Acquire adapter state lock. */
-		ADAPTER_STATE_LOCK(ha);
-
-		/* Mark all queues as unusable. */
+		/*
+		 * Mark queues as unusable selectively.
+		 * If the current topology is AL, only fabric tgt queues
+		 * are marked as unusable and eventually removed.
+		 * If the current topology is P2P, all fabric tgt queues
+		 * are processed in ql_configure_n_port_info().
+		 * If the current topology is Fabric, all previous created
+		 * non-fabric device should be marked as lost and eventually
+		 * should be removed.
+		 */
 		for (index = 0; index < DEVICE_HEAD_LIST_SIZE; index++) {
 			for (link = ha->dev[index].first; link != NULL;
 			    link = link->next) {
 				tq = link->base_address;
-				DEVICE_QUEUE_LOCK(tq);
-				if (!(tq->flags & TQF_PLOGI_PROGRS) &&
-				    !(ha->topology & QL_N_PORT)) {
-					tq->loop_id = (uint16_t)
-					    (tq->loop_id | PORT_LOST_ID);
+
+				if (VALID_DEVICE_ID(ha, tq->loop_id)) {
+					DEVICE_QUEUE_LOCK(tq);
+					if (!(tq->flags & TQF_PLOGI_PROGRS) &&
+					    !(ha->topology & QL_N_PORT)) {
+						tq->loop_id = (uint16_t)
+						    (tq->loop_id |
+						    PORT_LOST_ID);
+					}
+					if ((ha->topology & QL_NL_PORT) &&
+					    (tq->flags & TQF_FABRIC_DEVICE)) {
+						tq->loop_id = (uint16_t)
+						    (tq->loop_id |
+						    PORT_LOST_ID);
+					}
+					DEVICE_QUEUE_UNLOCK(tq);
 				}
-				DEVICE_QUEUE_UNLOCK(tq);
 			}
 		}
 
@@ -3292,94 +3522,78 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 			ql_dev_list(ha, list, index, &d_id, &loop_id);
 
 			if (VALID_DEVICE_ID(ha, loop_id)) {
+				ADAPTER_STATE_LOCK(ha);
 				tq = ql_dev_init(ha, d_id, loop_id);
+				ADAPTER_STATE_UNLOCK(ha);
 				if (tq != NULL) {
 					tq->loop_id = loop_id;
 
 					/* Test for fabric device. */
-					if (d_id.b.domain !=
+					if (ha->topology & QL_F_PORT ||
+					    d_id.b.domain !=
 					    ha->d_id.b.domain ||
 					    d_id.b.area != ha->d_id.b.area) {
 						tq->flags |= TQF_FABRIC_DEVICE;
 					}
 
-					ADAPTER_STATE_UNLOCK(ha);
 					if (ql_get_port_database(ha, tq,
 					    PDF_NONE) == QL_SUCCESS) {
-						ADAPTER_STATE_LOCK(ha);
 						tq->loop_id = (uint16_t)
 						    (tq->loop_id &
 						    ~PORT_LOST_ID);
-					} else {
-						ADAPTER_STATE_LOCK(ha);
 					}
 				}
 			}
 		}
 
 		/* 24xx does not report switch devices in ID list. */
-		if ((CFG_IST(ha, CFG_CTRL_24258081)) &&
-		    ha->topology & (QL_F_PORT | QL_FL_PORT)) {
-			d_id.b24 = 0xfffffe;
+		if (CFG_IST(ha, CFG_ISP_FW_TYPE_2) &&
+		    ha->topology & QL_FABRIC_CONNECTION) {
+			d_id.b24 = FS_FABRIC_F_PORT;
+			ADAPTER_STATE_LOCK(ha);
 			tq = ql_dev_init(ha, d_id, FL_PORT_24XX_HDL);
+			ADAPTER_STATE_UNLOCK(ha);
 			if (tq != NULL) {
 				tq->flags |= TQF_FABRIC_DEVICE;
-				ADAPTER_STATE_UNLOCK(ha);
 				(void) ql_get_port_database(ha, tq, PDF_NONE);
-				ADAPTER_STATE_LOCK(ha);
 			}
-			d_id.b24 = 0xfffffc;
+
+			d_id.b24 = FS_NAME_SERVER;
+			ADAPTER_STATE_LOCK(ha);
 			tq = ql_dev_init(ha, d_id, SNS_24XX_HDL);
+			ADAPTER_STATE_UNLOCK(ha);
 			if (tq != NULL) {
 				tq->flags |= TQF_FABRIC_DEVICE;
-				ADAPTER_STATE_UNLOCK(ha);
 				if (ha->vp_index != 0) {
 					(void) ql_login_fport(ha, tq,
 					    SNS_24XX_HDL, LFF_NONE, NULL);
 				}
 				(void) ql_get_port_database(ha, tq, PDF_NONE);
-				ADAPTER_STATE_LOCK(ha);
-			}
-		}
-
-		/* If F_port exists, allocate queue for FL_Port. */
-		index = ql_alpa_to_index[0xfe];
-		d_id.b24 = 0;
-		if (ha->dev[index].first != NULL) {
-			tq = ql_dev_init(ha, d_id, (uint16_t)
-			    (CFG_IST(ha, CFG_CTRL_24258081) ?
-			    FL_PORT_24XX_HDL : FL_PORT_LOOP_ID));
-			if (tq != NULL) {
-				tq->flags |= TQF_FABRIC_DEVICE;
-				ADAPTER_STATE_UNLOCK(ha);
-				(void) ql_get_port_database(ha, tq, PDF_NONE);
-				ADAPTER_STATE_LOCK(ha);
 			}
 		}
 
 		/* Allocate queue for broadcast. */
-		d_id.b24 = 0xffffff;
+		d_id.b24 = FS_BROADCAST;
+		ADAPTER_STATE_LOCK(ha);
 		(void) ql_dev_init(ha, d_id, (uint16_t)
-		    (CFG_IST(ha, CFG_CTRL_24258081) ? BROADCAST_24XX_HDL :
+		    (CFG_IST(ha, CFG_ISP_FW_TYPE_2) ? BROADCAST_24XX_HDL :
 		    IP_BROADCAST_LOOP_ID));
+		ADAPTER_STATE_UNLOCK(ha);
 
-		/* Check for any devices lost. */
+		/*
+		 * Topology change (fabric<->p2p),(fabric<->al)
+		 * (al<->p2p) have to be taken care of.
+		 */
 		loop = FALSE;
 		for (index = 0; index < DEVICE_HEAD_LIST_SIZE; index++) {
-			for (link = ha->dev[index].first; link != NULL;
-			    link = link->next) {
-				tq = link->base_address;
-
-				if ((tq->loop_id & PORT_LOST_ID) &&
-				    !(tq->flags & (TQF_INITIATOR_DEVICE |
-				    TQF_FABRIC_DEVICE))) {
-					loop = TRUE;
-				}
-			}
+			ql_update_dev(ha, index);
 		}
 
-		/* Release adapter state lock. */
-		ADAPTER_STATE_UNLOCK(ha);
+		if ((ha->topology & QL_NL_PORT) && (mr.mb[1] != 0)) {
+			loop = FALSE;
+		} else if (mr.mb[1] == 0 && !(ha->topology & QL_F_PORT)) {
+			loop = TRUE;
+		}
 
 		/* Give devices time to recover. */
 		if (loop == TRUE) {
@@ -3394,7 +3608,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 		EL(ha, "failed=%xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 
 	return (rval);
@@ -3418,7 +3632,7 @@ void
 ql_dev_list(ql_adapter_state_t *ha, union ql_dev_id_list *list,
     uint32_t index, port_id_t *d_id, uint16_t *id)
 {
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 		struct ql_24_dev_id	*list24 = (struct ql_24_dev_id *)list;
 
 		d_id->b.al_pa = list24[index].al_pa;
@@ -3466,24 +3680,22 @@ ql_configure_fabric(ql_adapter_state_t *ha)
 	ql_tgt_t	*tq;
 	int		rval = QL_FUNCTION_FAILED;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
-	ha->topology = (uint8_t)(ha->topology & ~QL_SNS_CONNECTION);
-
-	/* Test switch fabric controller present. */
-	d_id.b24 = FS_FABRIC_F_PORT;
-	tq = ql_d_id_to_queue(ha, d_id);
-	if (tq != NULL) {
-		/* Get port/node names of F_Port. */
-		(void) ql_get_port_database(ha, tq, PDF_NONE);
-
-		d_id.b24 = FS_NAME_SERVER;
+	if (ha->topology & QL_FABRIC_CONNECTION) {
+		/* Test switch fabric controller present. */
+		d_id.b24 = FS_FABRIC_F_PORT;
 		tq = ql_d_id_to_queue(ha, d_id);
 		if (tq != NULL) {
+			/* Get port/node names of F_Port. */
 			(void) ql_get_port_database(ha, tq, PDF_NONE);
-			ha->topology = (uint8_t)
-			    (ha->topology | QL_SNS_CONNECTION);
-			rval = QL_SUCCESS;
+
+			d_id.b24 = FS_NAME_SERVER;
+			tq = ql_d_id_to_queue(ha, d_id);
+			if (tq != NULL) {
+				(void) ql_get_port_database(ha, tq, PDF_NONE);
+				rval = QL_SUCCESS;
+			}
 		}
 	}
 
@@ -3491,7 +3703,7 @@ ql_configure_fabric(ql_adapter_state_t *ha)
 		EL(ha, "failed=%xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -3515,41 +3727,38 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	uint16_t		cmd;
 	ql_adapter_state_t	*ha = vha->pha;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_10(ha, "started\n");
 
 	/*
 	 * accessing pci space while not powered can cause panic's
 	 * on some platforms (i.e. Sunblade 1000's)
 	 */
 	if (ha->power_level == PM_LEVEL_D3) {
-		QL_PRINT_2(CE_CONT, "(%d): Low Power exit\n", ha->instance);
+		QL_PRINT_2(ha, "Low Power exit\n");
 		return;
 	}
+
+	/* Disable ISP interrupts. */
+	ql_disable_intr(ha);
 
 	/* Reset all outbound mailbox registers */
 	for (cnt = 0; cnt < ha->reg_off->mbox_cnt; cnt++) {
 		WRT16_IO_REG(ha, mailbox_in[cnt], (uint16_t)0);
 	}
 
-	if (CFG_IST(ha, CFG_CTRL_8021)) {
+	if (CFG_IST(ha, CFG_CTRL_82XX)) {
 		ha->timeout_cnt = 0;
 		ql_8021_reset_chip(ha);
-		QL_PRINT_3(CE_CONT, "(%d): 8021 exit\n", ha->instance);
+		QL_PRINT_10(ha, "8021 exit\n");
 		return;
 	}
 
-	/* Disable ISP interrupts. */
-	WRT16_IO_REG(ha, ictrl, 0);
-	ADAPTER_STATE_LOCK(ha);
-	ha->flags &= ~INTERRUPTS_ENABLED;
-	ADAPTER_STATE_UNLOCK(ha);
-
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
-		RD32_IO_REG(ha, ictrl);
+	if (CFG_IST(ha, CFG_ISP_FW_TYPE_2)) {
 		ql_reset_24xx_chip(ha);
-		QL_PRINT_3(CE_CONT, "(%d): 24xx exit\n", ha->instance);
+		QL_PRINT_10(ha, "24xx exit\n");
 		return;
 	}
+	QL_PRINT_10(ha, "CFG_ISP_FW_TYPE_1 reset\n");
 
 	/*
 	 * We are going to reset the chip in case of 2300. That might cause
@@ -3586,7 +3795,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	WRT16_IO_REG(ha, fpm_diag_config, 0x100);
 
 	/* Toggle FPM reset for 2300 */
-	if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
+	if (CFG_IST(ha, CFG_CTRL_2363)) {
 		WRT16_IO_REG(ha, fpm_diag_config, 0);
 	}
 
@@ -3594,7 +3803,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	WRT16_IO_REG(ha, ctrl_status, 0x10);
 
 	/* Reset frame buffer FIFOs. */
-	if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
+	if (CFG_IST(ha, CFG_CTRL_2363)) {
 		WRT16_IO_REG(ha, fb_cmd, 0x00fc);
 		/* read back fb_cmd until zero or 3 seconds max */
 		for (cnt = 0; cnt < 300000; cnt++) {
@@ -3603,7 +3812,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 			}
 			drv_usecwait(10);
 		}
-	} else  {
+	} else {
 		WRT16_IO_REG(ha, fb_cmd, 0xa000);
 	}
 
@@ -3624,13 +3833,17 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	WRT16_IO_REG(ha, hccr, HC_CLR_HOST_INT);
 
 	/* clear the mailbox command pointer. */
-	ql_clear_mcp(ha);
+	INTR_LOCK(ha);
+	ha->mcp = NULL;
+	INTR_UNLOCK(ha);
 
+	MBX_REGISTER_LOCK(ha);
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags &
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
+	MBX_REGISTER_UNLOCK(ha);
 
 	/* Bus Master is disabled so chip reset is safe. */
-	if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
+	if (CFG_IST(ha, CFG_CTRL_2363)) {
 		WRT16_IO_REG(ha, ctrl_status, ISP_RESET);
 		drv_usecwait(MILLISEC);
 
@@ -3645,7 +3858,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 
 	/* Wait for RISC to recover from reset. */
 	for (cnt = 0; cnt < 30000; cnt++) {
-		if (RD16_IO_REG(ha, mailbox_out[0]) != MBS_BUSY) {
+		if (RD16_IO_REG(ha, mailbox_out[0]) != MBS_ROM_BUSY) {
 			break;
 		}
 		drv_usecwait(MILLISEC);
@@ -3658,6 +3871,11 @@ ql_reset_chip(ql_adapter_state_t *vha)
 
 	/* Disable RISC pause on FPM parity error. */
 	WRT16_IO_REG(ha, hccr, HC_DISABLE_PARITY_PAUSE);
+
+	if (CFG_IST(ha, CFG_CTRL_22XX) &&
+	    RD16_IO_REG(ha, mailbox_out[7]) == 4) {
+		ha->fw_transfer_size = 128;
+	}
 
 	/* Initialize probe registers */
 	if (CFG_IST(ha, CFG_SBUS_CARD)) {
@@ -3684,7 +3902,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 		WRT16_IO_REG(ha, hccr, HC_RELEASE_RISC);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_10(ha, "done\n");
 }
 
 /*
@@ -3698,13 +3916,19 @@ ql_reset_chip(ql_adapter_state_t *vha)
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
-void
+static void
 ql_reset_24xx_chip(ql_adapter_state_t *ha)
 {
 	uint32_t	timer, stat;
 
+	QL_PRINT_10(ha, "started\n");
+
 	/* Shutdown DMA. */
-	WRT32_IO_REG(ha, ctrl_status, DMA_SHUTDOWN | MWB_4096_BYTES);
+	if (CFG_IST(ha, CFG_MWB_4096_SUPPORT)) {
+		WRT32_IO_REG(ha, ctrl_status, DMA_SHUTDOWN | MWB_4096_BYTES);
+	} else {
+		WRT32_IO_REG(ha, ctrl_status, DMA_SHUTDOWN);
+	}
 
 	/* Wait for DMA to stop. */
 	for (timer = 0; timer < 30000; timer++) {
@@ -3717,6 +3941,14 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 	/* Stop the firmware. */
 	WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
 	WRT16_IO_REG(ha, mailbox_in[0], MBC_STOP_FIRMWARE);
+	WRT16_IO_REG(ha, mailbox_in[1], 0);
+	WRT16_IO_REG(ha, mailbox_in[2], 0);
+	WRT16_IO_REG(ha, mailbox_in[3], 0);
+	WRT16_IO_REG(ha, mailbox_in[4], 0);
+	WRT16_IO_REG(ha, mailbox_in[5], 0);
+	WRT16_IO_REG(ha, mailbox_in[6], 0);
+	WRT16_IO_REG(ha, mailbox_in[7], 0);
+	WRT16_IO_REG(ha, mailbox_in[8], 0);
 	WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
 	for (timer = 0; timer < 30000; timer++) {
 		stat = RD32_IO_REG(ha, risc2host);
@@ -3731,14 +3963,23 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 	}
 
 	/* Reset the chip. */
-	WRT32_IO_REG(ha, ctrl_status, ISP_RESET | DMA_SHUTDOWN |
-	    MWB_4096_BYTES);
+	WRT32_IO_REG(ha, ctrl_status, ISP_RESET);
 	drv_usecwait(100);
 
-	/* Wait for idle status from ROM firmware. */
-	for (timer = 0; timer < 30000; timer++) {
-		if (RD16_IO_REG(ha, mailbox_out[0]) == 0) {
-			break;
+	/* Wait for RISC to recover from reset. */
+	for (timer = 30000; timer; timer--) {
+		ha->rom_status = RD16_IO_REG(ha, mailbox_out[0]);
+		if (CFG_IST(ha, CFG_CTRL_278083)) {
+			/* Wait for RISC to recover from reset. */
+			if ((ha->rom_status & MBS_ROM_STATUS_MASK) !=
+			    MBS_ROM_BUSY) {
+				break;
+			}
+		} else {
+			/* Wait for idle status from ROM firmware. */
+			if (ha->rom_status == MBS_ROM_IDLE) {
+				break;
+			}
 		}
 		drv_usecwait(100);
 	}
@@ -3751,12 +3992,25 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 		drv_usecwait(100);
 	}
 
-	/* clear the mailbox command pointer. */
-	ql_clear_mcp(ha);
+	ha->adapter_stats->revlvl.isp2200 = RD16_IO_REG(ha, mailbox_out[4]);
+	ha->adapter_stats->revlvl.risc = RD16_IO_REG(ha, mailbox_out[5]);
+	ha->adapter_stats->revlvl.frmbfr = RD16_IO_REG(ha, mailbox_out[6]);
+	ha->adapter_stats->revlvl.riscrom = RD16_IO_REG(ha, mailbox_out[8]);
 
 	/* Insure mailbox registers are free. */
+	WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+	WRT32_IO_REG(ha, hccr, HC24_CLR_HOST_INT);
+
+	/* clear the mailbox command pointer. */
+	INTR_LOCK(ha);
+	ha->mcp = NULL;
+	INTR_UNLOCK(ha);
+
+	/* Insure mailbox registers are free. */
+	MBX_REGISTER_LOCK(ha);
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags &
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
+	MBX_REGISTER_UNLOCK(ha);
 
 	if (ha->flags & MPI_RESET_NEEDED) {
 		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
@@ -3779,46 +4033,8 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 		ADAPTER_STATE_UNLOCK(ha);
 	}
 
-	/*
-	 * Set flash write-protection.
-	 */
-	if ((ha->flags & ONLINE) == 0) {
-		ql_24xx_protect_flash(ha);
-	}
+	QL_PRINT_10(ha, "done\n");
 }
-
-/*
- * ql_clear_mcp
- *	Carefully clear the mailbox command pointer in the ha struct.
- *
- * Input:
- *	ha = adapter block pointer.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-
-static void
-ql_clear_mcp(ql_adapter_state_t *ha)
-{
-	uint32_t cnt;
-
-	/* Don't null ha->mcp without the lock, but don't hang either. */
-	if (MBX_REGISTER_LOCK_OWNER(ha) == curthread) {
-		ha->mcp = NULL;
-	} else {
-		for (cnt = 0; cnt < 300000; cnt++) {
-			if (TRY_MBX_REGISTER_LOCK(ha) != 0) {
-				ha->mcp = NULL;
-				MBX_REGISTER_UNLOCK(ha);
-				break;
-			} else {
-				drv_usecwait(10);
-			}
-		}
-	}
-}
-
 
 /*
  * ql_abort_isp
@@ -3838,34 +4054,41 @@ int
 ql_abort_isp(ql_adapter_state_t *vha)
 {
 	ql_link_t		*link, *link2;
-	ddi_devstate_t		state;
 	uint16_t		index;
 	ql_tgt_t		*tq;
 	ql_lun_t		*lq;
-	ql_srb_t		*sp;
 	int			rval = QL_SUCCESS;
 	ql_adapter_state_t	*ha = vha->pha;
+	boolean_t		abort_loop_down = B_FALSE;
 
-	QL_PRINT_2(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_2(ha, "started\n");
 
 	TASK_DAEMON_LOCK(ha);
 	ha->task_daemon_flags &= ~ISP_ABORT_NEEDED;
 	if (ha->task_daemon_flags & ABORT_ISP_ACTIVE ||
 	    (ha->flags & ONLINE) == 0 || ha->flags & ADAPTER_SUSPENDED) {
 		TASK_DAEMON_UNLOCK(ha);
+		QL_PRINT_2(ha, "already active or suspended tdf=0x%llx, "
+		    "flgs=0x%llx\n", ha->task_daemon_flags, ha->flags);
 		return (rval);
 	}
 
 	ha->task_daemon_flags |= ABORT_ISP_ACTIVE;
-	ha->task_daemon_flags &= ~(RESET_MARKER_NEEDED | FIRMWARE_UP |
+	ha->task_daemon_flags &= ~(MARKER_NEEDED | FIRMWARE_UP |
 	    FIRMWARE_LOADED);
 	for (vha = ha; vha != NULL; vha = vha->vp_next) {
-		vha->task_daemon_flags |= LOOP_DOWN;
 		vha->task_daemon_flags &= ~(COMMAND_WAIT_NEEDED |
 		    LOOP_RESYNC_NEEDED);
+		vha->task_daemon_flags |= LOOP_DOWN;
+		if (vha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
+			abort_loop_down = B_TRUE;
+			vha->loop_down_timer = LOOP_DOWN_TIMER_START;
+		}
 	}
 
 	TASK_DAEMON_UNLOCK(ha);
+
+	ql_port_state(ha, FC_STATE_OFFLINE, FC_STATE_CHANGE);
 
 	if (ha->mailbox_flags & MBX_BUSY_FLG) {
 		/* Acquire mailbox register lock. */
@@ -3881,7 +4104,7 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		/* Wait for mailbox. */
 		for (index = 100; index &&
 		    ha->mailbox_flags & MBX_ABORT; index--) {
-			drv_usecwait(50000);
+			delay(1);
 		}
 	}
 
@@ -3894,13 +4117,27 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		ql_cmd_wait(ha);
 	}
 
+	rval = QL_ABORTED;
+	if (ha->flags & FW_DUMP_NEEDED) {
+		rval = ql_binary_fw_dump(ha, TRUE);
+	}
+
 	/* Shutdown IP. */
 	if (ha->flags & IP_INITIALIZED) {
 		(void) ql_shutdown_ip(ha);
 	}
 
+	if (ha->task_daemon_flags & ISP_ABORT_NEEDED) {
+		TASK_DAEMON_LOCK(ha);
+		ha->task_daemon_flags &= ~ISP_ABORT_NEEDED;
+		TASK_DAEMON_UNLOCK(ha);
+	}
+
 	/* Reset the chip. */
-	ql_reset_chip(ha);
+	if (rval != QL_SUCCESS) {
+		rval = QL_SUCCESS;
+		ql_reset_chip(ha);
+	}
 
 	/*
 	 * Even though we have waited for outstanding commands to complete,
@@ -3911,64 +4148,7 @@ ql_abort_isp(ql_adapter_state_t *vha)
 	 */
 
 	/* Place all commands in outstanding cmd list on device queue. */
-	for (index = 1; index < MAX_OUTSTANDING_COMMANDS; index++) {
-		REQUEST_RING_LOCK(ha);
-		INTR_LOCK(ha);
-		if ((link = ha->pending_cmds.first) != NULL) {
-			sp = link->base_address;
-			ql_remove_link(&ha->pending_cmds, &sp->cmd);
-
-			REQUEST_RING_UNLOCK(ha);
-			index = 0;
-		} else {
-			REQUEST_RING_UNLOCK(ha);
-			if ((sp = ha->outstanding_cmds[index]) == NULL) {
-				INTR_UNLOCK(ha);
-				continue;
-			}
-		}
-
-		/*
-		 * It's not obvious but the index for commands pulled from
-		 * pending will be zero and that entry in the outstanding array
-		 * is not used so nulling it is "no harm, no foul".
-		 */
-
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
-
-		INTR_UNLOCK(ha);
-
-		/* If command timeout. */
-		if (sp->flags & SRB_COMMAND_TIMEOUT) {
-			sp->pkt->pkt_reason = CS_TIMEOUT;
-			sp->flags &= ~SRB_RETRY;
-			sp->flags |= SRB_ISP_COMPLETED;
-
-			/* Call done routine to handle completion. */
-			ql_done(&sp->cmd);
-			continue;
-		}
-
-		/* Acquire target queue lock. */
-		lq = sp->lun_queue;
-		tq = lq->target_queue;
-		DEVICE_QUEUE_LOCK(tq);
-
-		/* Reset watchdog time. */
-		sp->wdg_q_time = sp->init_wdg_q_time;
-
-		/* Place request back on top of device queue. */
-		sp->flags &= ~(SRB_ISP_STARTED | SRB_ISP_COMPLETED |
-		    SRB_RETRY);
-
-		ql_add_link_t(&lq->cmd, &sp->cmd);
-		sp->flags |= SRB_IN_DEVICE_QUEUE;
-
-		/* Release target queue lock. */
-		DEVICE_QUEUE_UNLOCK(tq);
-	}
+	ql_requeue_all_cmds(ha);
 
 	/*
 	 * Clear per LUN active count, because there should not be
@@ -3995,7 +4175,9 @@ ql_abort_isp(ql_adapter_state_t *vha)
 	}
 
 	if ((rval = ql_check_isp_firmware(ha)) != QL_SUCCESS) {
-		if ((rval = ql_chip_diag(ha)) == QL_SUCCESS) {
+		if (ha->dev_state != NX_DEV_READY) {
+			EL(ha, "dev_state not ready\n");
+		} else if ((rval = ql_mbx_wrap_test(ha, NULL)) == QL_SUCCESS) {
 			rval = ql_load_isp_firmware(ha);
 		}
 	}
@@ -4004,63 +4186,153 @@ ql_abort_isp(ql_adapter_state_t *vha)
 	    QL_SUCCESS && (rval = ql_init_rings(ha)) == QL_SUCCESS &&
 	    (rval = ql_fw_ready(ha, 10)) == QL_SUCCESS) {
 
+		/* Enable ISP interrupts. */
+		if (!(ha->flags & INTERRUPTS_ENABLED)) {
+			ql_enable_intr(ha);
+		}
+
 		/* If reset abort needed that may have been set. */
 		TASK_DAEMON_LOCK(ha);
 		ha->task_daemon_flags &= ~(ISP_ABORT_NEEDED |
 		    ABORT_ISP_ACTIVE);
 		TASK_DAEMON_UNLOCK(ha);
 
-		/* Enable ISP interrupts. */
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_enable_intrs(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
-		} else {
-			WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
-		}
-
-		ADAPTER_STATE_LOCK(ha);
-		ha->flags |= INTERRUPTS_ENABLED;
-		ADAPTER_STATE_UNLOCK(ha);
-
 		/* Set loop online, if it really is. */
 		ql_loop_online(ha);
-
-		state = ddi_get_devstate(ha->dip);
-		if (state != DDI_DEVSTATE_UP) {
-			/*EMPTY*/
-			ddi_dev_report_fault(ha->dip, DDI_SERVICE_RESTORED,
-			    DDI_DEVICE_FAULT, "Device reset succeeded");
-		}
 	} else {
 		/* Enable ISP interrupts. */
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			ql_8021_enable_intrs(ha);
-		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
-			WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
-		} else {
-			WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+		if (!(ha->flags & INTERRUPTS_ENABLED)) {
+			ql_enable_intr(ha);
 		}
 
-		ADAPTER_STATE_LOCK(ha);
-		ha->flags |= INTERRUPTS_ENABLED;
-		ADAPTER_STATE_UNLOCK(ha);
-
 		TASK_DAEMON_LOCK(ha);
-		ha->task_daemon_flags &= ~(ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE);
-		ha->task_daemon_flags |= LOOP_DOWN;
+		for (vha = ha; vha != NULL; vha = vha->vp_next) {
+			vha->task_daemon_flags |= LOOP_DOWN;
+		}
+		ha->task_daemon_flags &= ~ISP_ABORT_NEEDED;
 		TASK_DAEMON_UNLOCK(ha);
 
 		ql_port_state(ha, FC_STATE_OFFLINE, FC_STATE_CHANGE);
+
+		ql_abort_queues(ha);
+
+		TASK_DAEMON_LOCK(ha);
+		ha->task_daemon_flags &= ~ABORT_ISP_ACTIVE;
+		TASK_DAEMON_UNLOCK(ha);
+	}
+
+	for (vha = ha; vha != NULL; vha = vha->vp_next) {
+		if (!(vha->task_daemon_flags & LOOP_DOWN) &&
+		    abort_loop_down == B_TRUE) {
+			vha->loop_down_timer = LOOP_DOWN_TIMER_OFF;
+		}
 	}
 
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_2(CE_CONT, "(%d): done\n", ha->instance);
+		QL_PRINT_2(ha, "done\n");
 	}
 	return (rval);
+}
+
+/*
+ * ql_requeue_all_cmds
+ *	Requeue all commands.
+ *
+ * Input:
+ *	ha = virtual adapter state pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+void
+ql_requeue_all_cmds(ql_adapter_state_t *ha)
+{
+	ql_link_t	*link;
+	ql_tgt_t	*tq;
+	ql_lun_t	*lq;
+	ql_srb_t	*sp;
+	uint16_t	index;
+
+	/* Place all commands in outstanding cmd list on device queue. */
+	for (index = 1; index < ha->osc_max_cnt; index++) {
+		INTR_LOCK(ha);
+		REQUEST_RING_LOCK(ha);
+		if ((link = ha->pending_cmds.first) != NULL) {
+			sp = link->base_address;
+			ql_remove_link(&ha->pending_cmds, &sp->cmd);
+
+			REQUEST_RING_UNLOCK(ha);
+			index = 0;
+		} else {
+			REQUEST_RING_UNLOCK(ha);
+			if ((sp = ha->outstanding_cmds[index]) == NULL ||
+			    sp == QL_ABORTED_SRB(ha)) {
+				INTR_UNLOCK(ha);
+				continue;
+			}
+		}
+
+		/*
+		 * It's not obvious but the index for commands pulled from
+		 * pending will be zero and that entry in the outstanding array
+		 * is not used so nulling it is "no harm, no foul".
+		 */
+
+		ha->outstanding_cmds[index] = NULL;
+		sp->handle = 0;
+		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+
+		INTR_UNLOCK(ha);
+
+		/* If command timeout. */
+		if (sp->flags & SRB_COMMAND_TIMEOUT) {
+			sp->pkt->pkt_reason = CS_TIMEOUT;
+			sp->flags &= ~SRB_RETRY;
+			sp->flags |= SRB_ISP_COMPLETED;
+
+			/* Call done routine to handle completion. */
+			ql_done(&sp->cmd, B_FALSE);
+			continue;
+		}
+
+		/* Acquire target queue lock. */
+		lq = sp->lun_queue;
+		tq = lq->target_queue;
+
+		/* return any tape IO as exchange dropped due to chip reset */
+		if (tq->flags & TQF_TAPE_DEVICE) {
+			sp->pkt->pkt_reason = CS_TRANSPORT;
+			sp->flags &= ~SRB_RETRY;
+			sp->flags |= SRB_ISP_COMPLETED;
+
+			EL(ha, "rtn seq IO, sp=%ph", sp);
+
+			/* Call done routine to handle completion. */
+			ql_done(&sp->cmd, B_FALSE);
+			continue;
+		}
+
+		DEVICE_QUEUE_LOCK(tq);
+
+		/* Reset watchdog time. */
+		sp->wdg_q_time = sp->init_wdg_q_time;
+
+		/* Place request back on top of device queue. */
+		sp->flags &= ~(SRB_ISP_STARTED | SRB_ISP_COMPLETED |
+		    SRB_RETRY);
+
+		ql_add_link_t(&lq->cmd, &sp->cmd);
+		sp->flags |= SRB_IN_DEVICE_QUEUE;
+
+		/* Release target queue lock. */
+		DEVICE_QUEUE_UNLOCK(tq);
+	}
 }
 
 /*
@@ -4085,7 +4357,7 @@ ql_vport_control(ql_adapter_state_t *ha, uint8_t cmd)
 	int		rval;
 	uint32_t	pkt_size;
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "started\n");
 
 	if (ha->vp_index != 0) {
 		pkt_size = sizeof (ql_mbx_iocb_t);
@@ -4099,6 +4371,7 @@ ql_vport_control(ql_adapter_state_t *ha, uint8_t cmd)
 		pkt->vpc.entry_count = 1;
 		pkt->vpc.command = cmd;
 		pkt->vpc.vp_count = 1;
+		pkt->vpc.fcf_index = ha->fcoe_fcf_idx;
 		bit = (uint8_t)(ha->vp_index - 1);
 		pkt->vpc.vp_index[bit / 8] = (uint8_t)
 		    (pkt->vpc.vp_index[bit / 8] | BIT_0 << bit % 8);
@@ -4117,8 +4390,7 @@ ql_vport_control(ql_adapter_state_t *ha, uint8_t cmd)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance,
-		    ha->vp_index);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -4142,7 +4414,12 @@ ql_vport_modify(ql_adapter_state_t *ha, uint8_t cmd, uint8_t opt)
 	int		rval;
 	uint32_t	pkt_size;
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "started\n");
+
+	if (ha->pha->task_daemon_flags & LOOP_DOWN) {
+		QL_PRINT_10(ha, "loop_down\n");
+		return (QL_FUNCTION_FAILED);
+	}
 
 	pkt_size = sizeof (ql_mbx_iocb_t);
 	pkt = kmem_zalloc(pkt_size, KM_SLEEP);
@@ -4157,6 +4434,7 @@ ql_vport_modify(ql_adapter_state_t *ha, uint8_t cmd, uint8_t opt)
 	pkt->vpm.vp_count = 1;
 	pkt->vpm.first_vp_index = ha->vp_index;
 	pkt->vpm.first_options = opt;
+	pkt->vpm.fcf_index = ha->fcoe_fcf_idx;
 	bcopy(ha->loginparams.nport_ww_name.raw_wwn, pkt->vpm.first_port_name,
 	    8);
 	bcopy(ha->loginparams.node_ww_name.raw_wwn, pkt->vpm.first_node_name,
@@ -4175,8 +4453,7 @@ ql_vport_modify(ql_adapter_state_t *ha, uint8_t cmd, uint8_t opt)
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance,
-		    ha->vp_index);
+		QL_PRINT_10(ha, "done\n");
 	}
 	return (rval);
 }
@@ -4196,7 +4473,7 @@ ql_vport_enable(ql_adapter_state_t *ha)
 {
 	int	timer;
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "started\n");
 
 	ha->state = FC_PORT_SPEED_MASK(ha->state) | FC_STATE_OFFLINE;
 	TASK_DAEMON_LOCK(ha);
@@ -4206,12 +4483,13 @@ ql_vport_enable(ql_adapter_state_t *ha)
 
 	ADAPTER_STATE_LOCK(ha);
 	ha->flags |= VP_ENABLED;
+	ha->flags &= ~VP_ID_NOT_ACQUIRED;
 	ADAPTER_STATE_UNLOCK(ha);
+	ha->fcoe_fcf_idx = 0;
 
 	if (ql_vport_modify(ha, VPM_MODIFY_ENABLE, VPO_TARGET_MODE_DISABLED |
 	    VPO_INITIATOR_MODE_ENABLED | VPO_ENABLED) != QL_SUCCESS) {
-		QL_PRINT_2(CE_CONT, "(%d): failed to enable virtual port=%d\n",
-		    ha->instance, ha->vp_index);
+		QL_PRINT_2(ha, "failed to enable virtual port\n");
 		return (QL_FUNCTION_FAILED);
 	}
 	if (!(ha->pha->task_daemon_flags & LOOP_DOWN)) {
@@ -4219,11 +4497,14 @@ ql_vport_enable(ql_adapter_state_t *ha)
 		for (timer = 0; timer < 3000 &&
 		    !(ha->task_daemon_flags & STATE_ONLINE);
 		    timer++) {
+			if (ha->flags & VP_ID_NOT_ACQUIRED) {
+				break;
+			}
 			delay(1);
 		}
 	}
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "done\n");
 
 	return (QL_SUCCESS);
 }
@@ -4244,7 +4525,7 @@ ql_vport_create(ql_adapter_state_t *ha, uint8_t index)
 {
 	ql_adapter_state_t	*vha;
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "started\n");
 
 	/* Inherit the parents data. */
 	vha = kmem_alloc(sizeof (ql_adapter_state_t), KM_SLEEP);
@@ -4270,7 +4551,7 @@ ql_vport_create(ql_adapter_state_t *ha, uint8_t index)
 	vha->ub_array = kmem_zalloc(sizeof (*vha->ub_array) * QL_UB_LIMIT,
 	    KM_SLEEP);
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "done\n");
 
 	return (vha);
 }
@@ -4290,7 +4571,7 @@ ql_vport_destroy(ql_adapter_state_t *ha)
 {
 	ql_adapter_state_t	*vha;
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "started\n");
 
 	/* Remove port from list. */
 	ADAPTER_STATE_LOCK(ha);
@@ -4310,7 +4591,7 @@ ql_vport_destroy(ql_adapter_state_t *ha)
 	}
 	kmem_free(ha, sizeof (ql_adapter_state_t));
 
-	QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance, ha->vp_index);
+	QL_PRINT_10(ha, "done\n");
 }
 
 /*
@@ -4341,11 +4622,94 @@ ql_mps_reset(ql_adapter_state_t *ha)
 
 	if (ql_rd_risc_ram_word(ha, 0x7A15, &data) == QL_SUCCESS) {
 		dctl = (uint16_t)ql_pci_config_get16(ha, 0x54);
-		if ((data & 0xe0) != (dctl & 0xe0)) {
+		if ((data & 0xe0) < (dctl & 0xe0)) {
+			data &= 0xff1f;
+			data |= dctl & 0xe0;
+			(void) ql_wrt_risc_ram_word(ha, 0x7A15, data);
+		} else if ((data & 0xe0) != (dctl & 0xe0)) {
 			data &= 0xff1f;
 			data |= dctl & 0xe0;
 			(void) ql_wrt_risc_ram_word(ha, 0x7A15, data);
 		}
 	}
 	(void) ql_wrt_risc_ram_word(ha, 0x7c00, 0);
+}
+
+/*
+ * ql_update_dev
+ *	Updates device status on loop reconfigure.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	index:	list index of device data.
+ *
+ * Context:
+ *	Kernel context.
+ */
+static void
+ql_update_dev(ql_adapter_state_t *ha, uint32_t index)
+{
+	ql_link_t	*link;
+	ql_tgt_t	*tq;
+	int		rval;
+
+	QL_PRINT_3(ha, "started\n");
+
+	link = ha->dev[index].first;
+	while (link != NULL) {
+		tq = link->base_address;
+		link = link->next;
+
+		if (tq->loop_id & PORT_LOST_ID &&
+		    !(tq->flags & (TQF_INITIATOR_DEVICE | TQF_FABRIC_DEVICE))) {
+
+			tq->loop_id &= ~PORT_LOST_ID;
+
+			if (VALID_DEVICE_ID(ha, tq->loop_id)) {
+				/* implicit logo due to fw issue */
+				rval = ql_get_port_database(ha, tq, PDF_NONE);
+
+				if (rval == QL_NOT_LOGGED_IN) {
+					if (tq->master_state ==
+					    PD_STATE_PORT_UNAVAILABLE) {
+						(void) ql_logout_fabric_port(
+						    ha, tq);
+						tq->loop_id = PORT_NO_LOOP_ID;
+					}
+				} else if (rval == QL_SUCCESS) {
+					tq->loop_id = PORT_NO_LOOP_ID;
+				}
+			}
+		} else if (ha->topology & QL_NL_PORT &&
+		    tq->flags & TQF_FABRIC_DEVICE) {
+
+			tq->loop_id &= ~PORT_LOST_ID;
+
+			if (VALID_DEVICE_ID(ha, tq->loop_id)) {
+				/* implicit logo due to fw issue */
+				rval = ql_get_port_database(ha, tq, PDF_NONE);
+
+				if (rval == QL_NOT_LOGGED_IN) {
+					if (tq->master_state ==
+					    PD_STATE_PORT_UNAVAILABLE) {
+						(void) ql_logout_fabric_port(
+						    ha, tq);
+						/*
+						 * fabric to AL topo change
+						 */
+						tq->loop_id = PORT_NO_LOOP_ID;
+					}
+				} else if (rval == QL_SUCCESS) {
+					/*
+					 * Normally this is 7fe,
+					 * Don't issue logo, it causes
+					 * logo in single tgt AL.
+					 */
+					tq->loop_id = PORT_NO_LOOP_ID;
+				}
+			}
+		}
+	}
+
+	QL_PRINT_3(ha, "done\n");
 }

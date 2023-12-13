@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_API_H
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -52,6 +52,11 @@ extern "C" {
 #include <sys/utsname.h>
 #include <sys/file.h>
 #include <sys/param.h>
+#include <sys/time.h>
+#include <sys/ddifm.h>
+#include <sys/sunddi.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/io/ddi.h>
 #include <ql_open.h>
 
 #include <sys/fibre-channel/fc.h>
@@ -76,6 +81,21 @@ extern "C" {
 #define	DDI_INTR_ALLOC_STRICT	1
 #endif
 
+#define	PCI_PCIE_DEVICE_CONTROL		0x8	/* Device control reg offset */
+#define	PCI_MSI_CONTROL			0x2	/* MSI Control reg offset */
+#define	PCI_MSI_MSG_ADDR		0x4	/* MSI Msg Addr reg offset */
+#define	PCI_MSI_MSG_UPPER_ADDR		0x8	/* MSI MSI Msg Upper Addr reg */
+/* offset */
+#define	PCI_MSI_MSG_DATA		0xc	/* MSI Msg Data reg offset */
+#define	PCI_MSI_X_CONTROL		0x2	/* MSI-X Control reg offset */
+#define	MSI_X_TABLE_SIZE_MASK		0x7ff	/* MSI-X Table Size mask */
+
+#define	PCIE_EXT_CAP_PTR		0x100
+#define	PCIE_EXT_CAP_NEXT_SHIFT		20
+#define	PCIE_EXT_CAP_ID_SRIOV		0x0010	/* SRIOV capabilities offset */
+#define	PCIE_EXT_CAP_SRIOV_TOTAL_VFS	0xe
+#define	PCIE_SRIOV_PAGE_SIZE_MULTIPLIER	4096
+
 /*
  * NPIV defines
  */
@@ -93,6 +113,9 @@ extern "C" {
 #endif
 #ifndef	FC_NPIV_NPIV_BOUND
 #define	FC_NPIV_NPIV_BOUND	0x49
+#endif
+#ifndef	FC_HBA_PORTSPEED_32GBIT
+#define	FC_HBA_PORTSPEED_32GBIT	64
 #endif
 
 #pragma weak ddi_intr_get_supported_types
@@ -124,19 +147,9 @@ extern int ddi_intr_enable();
 extern int ddi_intr_get_cap();
 extern int ddi_intr_remove_handler();
 
-#ifndef QL_DRV_HARDENING
-#define	ddi_devstate_t			int
-#define	DDI_DEVSTATE_UP			0
-#define	ddi_get_devstate(a)		DDI_DEVSTATE_UP
-#define	ddi_dev_report_fault(a, b, c, d)
-#define	ddi_check_dma_handle(a)		DDI_SUCCESS
-#define	ddi_check_acc_handle(a)		DDI_SUCCESS
-#define	QL_CLEAR_DMA_HANDLE(x)
-#else
 #define	QL_CLEAR_DMA_HANDLE(x)	((ddi_dma_impl_t *)x)->dmai_fault_notify = 0; \
-				((ddi_dma_impl_t *)x)->dmai_fault_check  = 0; \
-				((ddi_dma_impl_t *)x)->dmai_fault	 = 0
-#endif
+				((ddi_dma_impl_t *)x)->dmai_fault_check = 0; \
+				((ddi_dma_impl_t *)x)->dmai_fault	= 0
 
 #ifndef	FC_STATE_1GBIT_SPEED
 #define	FC_STATE_1GBIT_SPEED	0x0100	/* 1 Gbit/sec */
@@ -153,42 +166,80 @@ extern int ddi_intr_remove_handler();
 #ifndef FC_STATE_10GBIT_SPEED
 #define	FC_STATE_10GBIT_SPEED	0x0600	/* 10 Gbit/sec */
 #endif
+#ifndef FC_STATE_16GBIT_SPEED
+#define	FC_STATE_16GBIT_SPEED	0x0800	/* 16 Gbit/sec */
+#endif
+#ifndef FC_STATE_32GBIT_SPEED
+#define	FC_STATE_32GBIT_SPEED	0x1000	/* 32 Gbit/sec */
+#endif
 
 /*
  * Data bit definitions.
  */
-#define	BIT_0   0x1
-#define	BIT_1   0x2
-#define	BIT_2   0x4
-#define	BIT_3   0x8
-#define	BIT_4   0x10
-#define	BIT_5   0x20
-#define	BIT_6   0x40
-#define	BIT_7   0x80
-#define	BIT_8   0x100
-#define	BIT_9   0x200
-#define	BIT_10  0x400
-#define	BIT_11  0x800
-#define	BIT_12  0x1000
-#define	BIT_13  0x2000
-#define	BIT_14  0x4000
-#define	BIT_15  0x8000
-#define	BIT_16  0x10000
-#define	BIT_17  0x20000
-#define	BIT_18  0x40000
-#define	BIT_19  0x80000
-#define	BIT_20  0x100000
-#define	BIT_21  0x200000
-#define	BIT_22  0x400000
-#define	BIT_23  0x800000
-#define	BIT_24  0x1000000
-#define	BIT_25  0x2000000
-#define	BIT_26  0x4000000
-#define	BIT_27  0x8000000
-#define	BIT_28  0x10000000
-#define	BIT_29  0x20000000
-#define	BIT_30  0x40000000
-#define	BIT_31  0x80000000
+#define	BIT_0	0x1
+#define	BIT_1	0x2
+#define	BIT_2	0x4
+#define	BIT_3	0x8
+#define	BIT_4	0x10
+#define	BIT_5	0x20
+#define	BIT_6	0x40
+#define	BIT_7	0x80
+#define	BIT_8	0x100
+#define	BIT_9	0x200
+#define	BIT_10	0x400
+#define	BIT_11	0x800
+#define	BIT_12	0x1000
+#define	BIT_13	0x2000
+#define	BIT_14	0x4000
+#define	BIT_15	0x8000
+#define	BIT_16	0x10000
+#define	BIT_17	0x20000
+#define	BIT_18	0x40000
+#define	BIT_19	0x80000
+#define	BIT_20	0x100000
+#define	BIT_21	0x200000
+#define	BIT_22	0x400000
+#define	BIT_23	0x800000
+#define	BIT_24	0x1000000
+#define	BIT_25	0x2000000
+#define	BIT_26	0x4000000
+#define	BIT_27	0x8000000
+#define	BIT_28	0x10000000
+#define	BIT_29	0x20000000
+#define	BIT_30	0x40000000
+#define	BIT_31	0x80000000
+#define	BIT_32	0x100000000
+#define	BIT_33	0x200000000
+#define	BIT_34	0x400000000
+#define	BIT_35	0x800000000
+#define	BIT_36	0x1000000000
+#define	BIT_37	0x2000000000
+#define	BIT_38	0x4000000000
+#define	BIT_39	0x8000000000
+#define	BIT_40	0x10000000000
+#define	BIT_41	0x20000000000
+#define	BIT_42	0x40000000000
+#define	BIT_43	0x80000000000
+#define	BIT_44	0x100000000000
+#define	BIT_45	0x200000000000
+#define	BIT_46	0x400000000000
+#define	BIT_47	0x800000000000
+#define	BIT_48	0x1000000000000
+#define	BIT_49	0x2000000000000
+#define	BIT_50	0x4000000000000
+#define	BIT_51	0x8000000000000
+#define	BIT_52	0x10000000000000
+#define	BIT_53	0x20000000000000
+#define	BIT_54	0x40000000000000
+#define	BIT_55	0x80000000000000
+#define	BIT_56	0x100000000000000
+#define	BIT_57	0x200000000000000
+#define	BIT_58	0x400000000000000
+#define	BIT_59	0x800000000000000
+#define	BIT_60	0x1000000000000000
+#define	BIT_61	0x2000000000000000
+#define	BIT_62	0x4000000000000000
+#define	BIT_63	0x8000000000000000
 
 /*
  *  Local Macro Definitions.
@@ -264,6 +315,36 @@ extern int ddi_intr_remove_handler();
 #define	WRT32_IOMAP_REG(ha, regname, data) \
 	WRT_IOREG_DWORD(ha, (ha->iomap_iobase + ha->reg_off->regname), (data))
 
+#define	RD8_MBAR_REG(ha, ofst) \
+	(uint8_t)ddi_get8(ha->mbar_dev_handle, \
+	(uint8_t *)(ha->mbar + (ofst)))
+#define	RD16_MBAR_REG(ha, ofst) \
+	(uint16_t)ddi_get16(ha->mbar_dev_handle, \
+	(uint16_t *)(ha->mbar + (ofst)))
+#define	RD32_MBAR_REG(ha, ofst) \
+	(uint32_t)ddi_get32(ha->mbar_dev_handle, \
+	(uint32_t *)(ha->mbar + (ofst)))
+#define	RD64_MBAR_REG(ha, ofst) \
+	(uint64_t)ddi_get64(ha->mbar_dev_handle, \
+	(uint64_t *)(ha->mbar + (ofst)))
+
+#define	WR8_MBAR_REG(ha, ofst, data) \
+	ddi_put8(ha->mbar_dev_handle, \
+	(uint8_t *)(ha->mbar + (ofst)), \
+	(uint8_t)(data))
+#define	WR16_MBAR_REG(ha, ofst, data) \
+	ddi_put16(ha->mbar_dev_handle, \
+	(uint16_t *)(ha->mbar + (ofst)), \
+	(uint16_t)(data))
+#define	WR32_MBAR_REG(ha, ofst, data) \
+	ddi_put32(ha->mbar_dev_handle, \
+	(uint32_t *)(ha->mbar + (ofst)), \
+	(uint32_t)(data))
+#define	WR64_MBAR_REG(ha, ofst, data) \
+	ddi_put64(ha->mbar_dev_handle, \
+	(uint64_t *)(ha->mbar + (ofst)), \
+	(uint64_t)(data))
+
 /*
  * FCA definitions
  */
@@ -320,6 +401,10 @@ typedef struct {
 #define	MAX_24_FIBRE_DEVICES	2048
 #define	MAX_24_VIRTUAL_PORTS	127
 #define	MAX_25_VIRTUAL_PORTS	254
+#define	MAX_27_VIRTUAL_PORTS	252
+#define	MAX_8021_VIRTUAL_PORTS	63
+#define	MAX_81XX_VIRTUAL_PORTS	254
+#define	MAX_83_VIRTUAL_PORTS	254
 
 #define	LAST_LOCAL_LOOP_ID		 0x7d
 #define	FL_PORT_LOOP_ID			 0x7e /* FFFFFE Fabric F_Port */
@@ -348,9 +433,9 @@ typedef struct {
 #define	QL_NL_PORT		BIT_1
 #define	QL_F_PORT		BIT_2
 #define	QL_FL_PORT		BIT_3
-#define	QL_SNS_CONNECTION	BIT_4
 #define	QL_LOOP_CONNECTION	(QL_NL_PORT | QL_FL_PORT)
 #define	QL_P2P_CONNECTION	(QL_F_PORT | QL_N_PORT)
+#define	QL_FABRIC_CONNECTION	(QL_F_PORT | QL_FL_PORT)
 
 /* Timeout timer counts in seconds (must greater than 1 second). */
 #define	WATCHDOG_TIME		5			/* 0 - 255 */
@@ -365,9 +450,8 @@ typedef struct {
 #define	TIMEOUT_THRESHOLD	16			/* 0 - 255 */
 
 /* Maximum outstanding commands in ISP queues (1-4095) */
-#define	MAX_OUTSTANDING_COMMANDS	0x400
-#define	OSC_INDEX_MASK			0xfff
-#define	OSC_INDEX_SHIFT			12
+#define	OSC_INDEX_MASK		0xfff
+#define	OSC_INDEX_SHIFT		12
 
 /* Maximum unsolicited buffers (1-65535) */
 #define	QL_UB_LIMIT	256
@@ -380,23 +464,15 @@ typedef struct {
 /*
  * ISP request, response, mailbox and receive buffer queue sizes
  */
+#define	SHADOW_ENTRY_SIZE	4
 #define	REQUEST_ENTRY_SIZE	64
 #define	REQUEST_QUEUE_SIZE	(REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT)
 
 #define	RESPONSE_ENTRY_SIZE	64
 #define	RESPONSE_QUEUE_SIZE	(RESPONSE_ENTRY_SIZE * RESPONSE_ENTRY_CNT)
 
-#define	MAILBOX_BUFFER_SIZE	0x4000
-
 #define	RCVBUF_CONTAINER_SIZE	12
 #define	RCVBUF_QUEUE_SIZE	(RCVBUF_CONTAINER_SIZE * RCVBUF_CONTAINER_CNT)
-
-/*
- * ISP DMA buffer definitions
- */
-#define	REQUEST_Q_BUFFER_OFFSET  0
-#define	RESPONSE_Q_BUFFER_OFFSET (REQUEST_Q_BUFFER_OFFSET + REQUEST_QUEUE_SIZE)
-#define	RCVBUF_Q_BUFFER_OFFSET  (RESPONSE_Q_BUFFER_OFFSET + RESPONSE_QUEUE_SIZE)
 
 /*
  * DMA attributes definitions.
@@ -446,7 +522,7 @@ typedef struct {
 #define	QL_DMA_GRANULARITY	1
 #define	QL_DMA_XFER_FLAGS	0
 
-typedef union  {
+typedef union {
 	uint64_t size64;	/* 1 X 64 bit number */
 	uint32_t size32[2];	/* 2 x 32 bit number */
 	uint16_t size16[4];	/* 4 x 16 bit number */
@@ -489,6 +565,16 @@ typedef struct {
 	uint16_t nx_host_int;	/* NetXen */
 	uint16_t nx_risc_int;	/* NetXen */
 } reg_off_t;
+
+/*
+ * Multi-Queue, Mem BAR 2 definition.
+ */
+#define	MBAR2_REQ_IN		0x0
+#define	MBAR2_REQ_OUT		0x4
+#define	MBAR2_RESP_IN		0x8
+#define	MBAR2_RESP_OUT		0xc
+#define	MBAR2_MULTI_Q_MAX	256
+#define	MBAR2_REG_OFFSET	4096
 
 /*
  * Mbox-8 read maximum debounce count.
@@ -555,6 +641,8 @@ typedef struct {
 #define	FLASH_CONF_ADDR		0x7FFD0000
 #define	FLASH_24_25_DATA_ADDR	0x7FF00000
 #define	FLASH_8100_DATA_ADDR	0x7F800000
+#define	FLASH_8300_DATA_ADDR	0x7F800000
+#define	FLASH_2700_DATA_ADDR	0x7F800000
 #define	FLASH_ADDR_MASK		0x7FFF0000
 
 #define	NVRAM_CONF_ADDR		0x7FFF0000
@@ -571,6 +659,14 @@ typedef struct {
 #define	NVRAM_8100_FUNC1_ADDR		0xD0180
 #define	NVRAM_8021_FUNC0_ADDR		0xF0080
 #define	NVRAM_8021_FUNC1_ADDR		0xF0180
+#define	NVRAM_8300_FC_FUNC0_ADDR	0x270080
+#define	NVRAM_8300_FC_FUNC1_ADDR	0x270180
+#define	NVRAM_8300_FCOE_FUNC0_ADDR	0x274080
+#define	NVRAM_8300_FCOE_FUNC1_ADDR	0x274180
+#define	NVRAM_2700_FUNC0_ADDR		0x270080
+#define	NVRAM_2700_FUNC1_ADDR		0x270180
+#define	NVRAM_2700_FUNC2_ADDR		0x270280
+#define	NVRAM_2700_FUNC3_ADDR		0x270380
 
 #define	VPD_2400_FUNC0_ADDR		0
 #define	VPD_2400_FUNC1_ADDR		0x100
@@ -580,6 +676,14 @@ typedef struct {
 #define	VPD_8100_FUNC1_ADDR		0xD0400
 #define	VPD_8021_FUNC0_ADDR		0xFA300
 #define	VPD_8021_FUNC1_ADDR		0xFA300
+#define	VPD_8300_FC_FUNC0_ADDR		0x270000
+#define	VPD_8300_FC_FUNC1_ADDR		0x270100
+#define	VPD_8300_FCOE_FUNC0_ADDR	0xFA300
+#define	VPD_8300_FCOE_FUNC1_ADDR	0xFA300
+#define	VPD_2700_FUNC0_ADDR		0x270000
+#define	VPD_2700_FUNC1_ADDR		0x270100
+#define	VPD_2700_FUNC2_ADDR		0x270200
+#define	VPD_2700_FUNC3_ADDR		0x270300
 #define	VPD_SIZE			0x80
 
 #define	FLASH_2200_FIRMWARE_ADDR	0x20000
@@ -589,8 +693,34 @@ typedef struct {
 #define	FLASH_8100_FIRMWARE_ADDR	0xA0000
 #define	FLASH_8021_FIRMWARE_ADDR	0x40000
 #define	FLASH_8021_FIRMWARE_SIZE	0x80000
+#define	FLASH_8300_FC_FIRMWARE_ADDR	0x240000
+#define	FLASH_8300_FCOE_FIRMWARE_ADDR	0x220000
+#define	FLASH_8300_FIRMWARE_SIZE	0x20000
+#define	FLASH_2700_FIRMWARE_ADDR	0x240000
+#define	FLASH_2700_FIRMWARE_SIZE	0x20000
+
 #define	FLASH_8021_BOOTLOADER_ADDR	0x4000
 #define	FLASH_8021_BOOTLOADER_SIZE	0x8000
+#define	FLASH_8300_BOOTLOADER_ADDR	0x4000
+#define	FLASH_8300_BOOTLOADER_SIZE	0x8000
+
+#define	FLASH_2200_BOOT_CODE_ADDR	0
+#define	FLASH_2300_BOOT_CODE_ADDR	0
+#define	FLASH_2400_BOOT_CODE_ADDR	0
+#define	FLASH_2500_BOOT_CODE_ADDR	0
+#define	FLASH_2700_BOOT_CODE_ADDR	0x200000
+#define	FLASH_8100_BOOT_CODE_ADDR	0x80000
+#define	FLASH_8021_BOOT_CODE_ADDR	0x20000
+#define	FLASH_8300_BOOT_CODE_ADDR	0x200000
+
+#define	BEACON_8300_FC_FUNC0_ADDR	0x00201320
+#define	BEACON_8300_FC_FUNC1_ADDR	0x00201328
+#define	BEACON_8300_FCOE_FUNC0_ADDR	0x00201324
+#define	BEACON_8300_FCOE_FUNC1_ADDR	0x0020132c
+#define	BEACON_2700_FUNC0_ADDR		0x00201320
+#define	BEACON_2700_FUNC1_ADDR		0x00201328
+#define	BEACON_2700_FUNC2_ADDR		0x00201330
+#define	BEACON_2700_FUNC3_ADDR		0x00201338
 
 #define	FLASH_2400_ERRLOG_START_ADDR_0	0
 #define	FLASH_2400_ERRLOG_START_ADDR_1	0
@@ -598,6 +728,8 @@ typedef struct {
 #define	FLASH_2500_ERRLOG_START_ADDR_1	0x54400
 #define	FLASH_8100_ERRLOG_START_ADDR_0	0xDC000
 #define	FLASH_8100_ERRLOG_START_ADDR_1	0xDC400
+#define	FLASH_8300_ERRLOG_START_ADDR_0	0x280000
+#define	FLASH_8300_ERRLOG_START_ADDR_1	0x280400
 #define	FLASH_ERRLOG_SIZE		0x200
 #define	FLASH_ERRLOG_ENTRY_SIZE		4
 
@@ -605,11 +737,15 @@ typedef struct {
 #define	FLASH_2500_DESCRIPTOR_TABLE	0x50000
 #define	FLASH_8100_DESCRIPTOR_TABLE	0xD8000
 #define	FLASH_8021_DESCRIPTOR_TABLE	0
+#define	FLASH_8300_DESCRIPTOR_TABLE	0xFC000
+#define	FLASH_2700_DESCRIPTOR_TABLE	0xFC000
 
 #define	FLASH_2400_LAYOUT_TABLE		0x11400
 #define	FLASH_2500_LAYOUT_TABLE		0x50400
 #define	FLASH_8100_LAYOUT_TABLE		0xD8400
 #define	FLASH_8021_LAYOUT_TABLE		0xFC400
+#define	FLASH_8300_LAYOUT_TABLE		0xFC400
+#define	FLASH_2700_LAYOUT_TABLE		0xFC400
 
 /*
  * Flash Error Log Event Codes.
@@ -646,7 +782,7 @@ typedef struct {
 #define	MBX_ERR			0x11
 #define	ASYNC_EVENT		0x12
 #define	RESP_UPDATE		0x13
-#define	REQ_UPDATE		0x14
+#define	MULTI_Q_RSP_UPDATE	0x14
 #define	SCSI_FAST_POST_16	0x15
 #define	SCSI_FAST_POST_32	0x16
 #define	CTIO_FAST_POST		0x17
@@ -690,8 +826,8 @@ typedef struct {
  */
 #define	ICB_VERSION		1
 typedef struct ql_init_cb {
-	uint8_t  version;
-	uint8_t  reserved;
+	uint8_t version;
+	uint8_t reserved;
 
 	/*
 	 * LSB BIT 0  = enable_hard_loop_id
@@ -755,10 +891,10 @@ typedef struct ql_init_cb {
 	 * MSB BIT 6 = Enable CRN
 	 * MSB BIT 7 =
 	 */
-	uint8_t  add_fw_opt[2];
+	uint8_t	add_fw_opt[2];
 
-	uint8_t  response_accumulation_timer;
-	uint8_t  interrupt_delay_timer;
+	uint8_t	response_accumulation_timer;
+	uint8_t	interrupt_delay_timer;
 
 	/*
 	 * LSB BIT 0 = Enable Read xfr_rdy
@@ -779,20 +915,20 @@ typedef struct ql_init_cb {
 	 * MSB BIT 6 = Data Rate (2300 only)
 	 * MSB BIT 7 = Data Rate (2300 only)
 	 */
-	uint8_t  special_options[2];
+	uint8_t	special_options[2];
 
-	uint8_t  reserved_3[26];
+	uint8_t	reserved_3[26];
 } ql_init_cb_t;
 
 /*
  * Virtual port definition.
  */
 typedef struct ql_vp_cfg {
-	uint8_t  reserved[2];
-	uint8_t  options;
-	uint8_t  hard_prev_addr;
-	uint8_t  port_name[8];
-	uint8_t  node_name[8];
+	uint8_t	reserved[2];
+	uint8_t	options;
+	uint8_t	hard_prev_addr;
+	uint8_t	port_name[8];
+	uint8_t	node_name[8];
 } ql_vp_cfg_t;
 
 /*
@@ -860,7 +996,7 @@ typedef struct ql_init_24xx_cb {
 	 * BIT 14 = Node Name Option
 	 * BIT 15-31 = Reserved
 	 */
-	uint8_t  firmware_options_1[4];
+	uint8_t	firmware_options_1[4];
 
 	/*
 	 * BIT 0  = Operation Mode bit 0
@@ -936,19 +1072,19 @@ typedef struct ql_init_24xx_cb {
 	 */
 	uint8_t firmware_options_3[4];
 
-	uint8_t  qos[2];
-	uint8_t  rid[2];
+	uint8_t	qos[2];
+	uint8_t	rid[2];
 
-	uint8_t  reserved_3[4];
+	uint8_t	reserved_3[4];
 
-	uint8_t  enode_mac_addr[6];
+	uint8_t	enode_mac_addr[6];
 
-	uint8_t  reserved_4[10];
+	uint8_t	reserved_4[10];
 
 	/*
 	 * Multi-ID firmware.
 	 */
-	uint8_t		vp_count[2];
+	uint8_t	vp_count[2];
 
 	/*
 	 * BIT 1  = Allows mode 2 connection option
@@ -974,8 +1110,8 @@ typedef union ql_comb_init_cb {
  */
 #define	IP_ICB_VERSION	1
 typedef struct ql_ip_init_cb {
-	uint8_t  version;
-	uint8_t  reserved;
+	uint8_t	version;
+	uint8_t	reserved;
 
 	/*
 	 * LSB BIT 0  = receive_buffer_address_length
@@ -998,8 +1134,8 @@ typedef struct ql_ip_init_cb {
 
 #define	IP_ICB_24XX_VERSION	1
 typedef struct ql_ip_init_24xx_cb {
-	uint8_t  version;
-	uint8_t  reserved;
+	uint8_t	version;
+	uint8_t	reserved;
 	/*
 	 * LSB BIT 2  = allow out of receive buffers AE
 	 */
@@ -1023,20 +1159,9 @@ typedef union ql_comb_ip_init_cb {
  * f/w module table
  */
 struct fw_table {
-	uint16_t	fw_class;
+	uint32_t	fw_class;
 	int8_t		*fw_version;
 };
-
-/*
- * aif function table
- */
-typedef struct ql_ifunc {
-	uint_t		(*ifunc)();
-} ql_ifunc_t;
-
-#define	QL_MSIX_AIF		0x0
-#define	QL_MSIX_RSPQ		0x1
-#define	QL_MSIX_MAXAIF		QL_MSIX_RSPQ + 1
 
 /*
  * DMA memory type.
@@ -1047,8 +1172,7 @@ typedef enum mem_alloc_type {
 	LITTLE_ENDIAN_DMA,
 	BIG_ENDIAN_DMA,
 	KERNEL_MEM,
-	NO_SWAP_DMA,
-	STRUCT_BUF_MEMORY
+	NO_SWAP_DMA
 } mem_alloc_type_t;
 
 /*
@@ -1069,17 +1193,13 @@ typedef struct dma_mem {
 	ddi_acc_handle_t	acc_handle;
 	ddi_dma_handle_t	dma_handle;
 	ddi_dma_cookie_t	cookie;
+	uint32_t		max_cookie_count;
 	uint32_t		cookie_count;
 	uint32_t		size;
 	uint32_t		memflags;
 	mem_alloc_type_t	type;
 	uint32_t		flags;		/* Solaris DMA flags. */
 } dma_mem_t;
-
-/*
- * dma_mem_t memflags defines
- */
-#define	MFLG_32BIT_ONLY		BIT_0
 
 /*
  * 24 bit port ID type definition.
@@ -1107,7 +1227,7 @@ typedef union {
 		uint8_t rsvd_1;
 	}b;
 #else
-#error  One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
 #endif
 } port_id_t;
 
@@ -1115,16 +1235,51 @@ typedef union {
  * Link list definitions.
  */
 typedef struct ql_link {
-	struct ql_link *prev;
-	struct ql_link *next;
-	void   *base_address;
-	struct ql_head *head;	/* the queue this link is on */
+	struct ql_link	*prev;
+	struct ql_link	*next;
+	void		*base_address;
+	struct ql_head	*head;	/* the queue this link is on */
 } ql_link_t;
 
 typedef struct ql_head {
-	ql_link_t  *first;
-	ql_link_t  *last;
+	ql_link_t	*first;
+	ql_link_t	*last;
 } ql_head_t;
+
+/*
+ * ISP request queue context
+ */
+typedef struct ql_request_q {
+	struct cmd_entry	*req_ring_ptr;
+	dma_mem_t		req_ring;
+	uint32_t		*req_out_shadow_ptr;
+	uint32_t		req_out_shadow_ofst;
+	uint32_t		mbar_req_in;
+	uint32_t		mbar_req_out;
+	uint16_t		req_ring_index;
+	uint16_t		req_entry_cnt;
+	uint16_t		req_q_cnt;	/* # of available entries. */
+	uint16_t		req_q_number;
+} ql_request_q_t;
+
+/*
+ * ISP response queue context
+ */
+typedef struct ql_response_q {
+	struct ql_srb		*status_srb;
+	struct sts_entry	*rsp_ring_ptr;
+	dma_mem_t		rsp_ring;
+	kmutex_t		intr_mutex;
+	uint32_t		*rsp_in_shadow_ptr;
+	uint32_t		rsp_in_shadow_ofst;
+	uint32_t		mbar_rsp_in;
+	uint32_t		mbar_rsp_out;
+	uint16_t		rsp_ring_index;
+	uint16_t		rsp_entry_cnt;
+	uint16_t		isp_rsp_index;
+	uint16_t		rsp_q_number;
+	uint16_t		msi_x_vector;
+} ql_response_q_t;
 
 /*
  * This is the per-command structure
@@ -1164,38 +1319,44 @@ typedef struct ql_srb {
 
 	/* Command IOCB context. */
 	void			(*iocb)(struct ql_adapter_state *,
-	    struct ql_srb *, void *);
+	    ql_request_q_t *, struct ql_srb *, void *);
 	struct cmd_entry	*request_ring_ptr;
 	uint32_t		handle;
+	uint16_t		req_q_number;
 	uint16_t		req_cnt;
 	uint8_t			retry_count;
+	uint8_t			rsp_q_number;
 	dma_mem_t		sg_dma;
 } ql_srb_t;
 
-#define	SRB_ISP_STARTED		  BIT_0   /* Command sent to ISP. */
-#define	SRB_ISP_COMPLETED	  BIT_1   /* ISP finished with command. */
-#define	SRB_RETRY		  BIT_2   /* Driver retrying command. */
-#define	SRB_POLL		  BIT_3   /* Poll for completion. */
-#define	SRB_WATCHDOG_ENABLED	  BIT_4   /* Command on watchdog list. */
-#define	SRB_ABORT		  BIT_5   /* SRB to be aborted. */
-#define	SRB_UB_IN_FCA		  BIT_6   /* FCA holds unsolicited buffer */
-#define	SRB_UB_IN_ISP		  BIT_7   /* ISP holds unsolicited buffer */
-#define	SRB_UB_CALLBACK		  BIT_8   /* Unsolicited callback needed. */
-#define	SRB_UB_RSCN		  BIT_9   /* Unsolicited RSCN callback. */
-#define	SRB_UB_FCP		  BIT_10  /* Unsolicited RSCN callback. */
-#define	SRB_FCP_CMD_PKT		  BIT_11  /* FCP command type packet. */
-#define	SRB_FCP_DATA_PKT	  BIT_12  /* FCP data type packet. */
-#define	SRB_FCP_RSP_PKT		  BIT_13  /* FCP response type packet. */
-#define	SRB_IP_PKT		  BIT_14  /* IP type packet. */
-#define	SRB_GENERIC_SERVICES_PKT  BIT_15  /* Generic services type packet */
-#define	SRB_COMMAND_TIMEOUT	  BIT_16  /* Command timed out. */
-#define	SRB_ABORTING		  BIT_17  /* SRB aborting. */
-#define	SRB_IN_DEVICE_QUEUE	  BIT_18  /* In Device Queue */
-#define	SRB_IN_TOKEN_ARRAY	  BIT_19  /* In Token Array */
-#define	SRB_UB_FREE_REQUESTED	  BIT_20  /* UB Free requested */
-#define	SRB_UB_ACQUIRED		  BIT_21  /* UB selected for upcall */
-#define	SRB_MS_PKT		  BIT_22  /* Management Service pkt */
-#define	SRB_ELS_PKT		  BIT_23  /* Extended Link Services pkt */
+#define	SRB_ISP_STARTED		BIT_0 /* Command sent to ISP. */
+#define	SRB_ISP_COMPLETED	BIT_1 /* ISP finished with command. */
+#define	SRB_RETRY		BIT_2 /* Driver retrying command. */
+#define	SRB_POLL		BIT_3 /* Poll for completion. */
+
+#define	SRB_WATCHDOG_ENABLED	BIT_4 /* Command on watchdog list. */
+#define	SRB_ELS_PKT		BIT_5 /* Extended Link Services pkt */
+#define	SRB_UB_IN_FCA		BIT_6 /* FCA holds unsolicited buffer */
+#define	SRB_UB_IN_ISP		BIT_7 /* ISP holds unsolicited buffer */
+
+#define	SRB_UB_CALLBACK		BIT_8 /* Unsolicited callback needed. */
+#define	SRB_UB_RSCN		BIT_9 /* Unsolicited RSCN callback. */
+#define	SRB_UB_FCP		BIT_10 /* Unsolicited RSCN callback. */
+#define	SRB_FCP_CMD_PKT		BIT_11 /* FCP command type packet. */
+
+#define	SRB_FCP_DATA_PKT	BIT_12 /* FCP data type packet. */
+#define	SRB_FCP_RSP_PKT		BIT_13 /* FCP response type packet. */
+#define	SRB_IP_PKT		BIT_14 /* IP type packet. */
+#define	SRB_GENERIC_SERVICES_PKT BIT_15 /* Generic services type packet */
+
+#define	SRB_COMMAND_TIMEOUT	BIT_16 /* Command timed out. */
+#define	SRB_ABORTING		BIT_17 /* SRB aborting. */
+#define	SRB_IN_DEVICE_QUEUE	BIT_18 /* In Device Queue */
+#define	SRB_IN_TOKEN_ARRAY	BIT_19 /* In Token Array */
+
+#define	SRB_UB_FREE_REQUESTED	BIT_20 /* UB Free requested */
+#define	SRB_UB_ACQUIRED		BIT_21 /* UB selected for upcall */
+#define	SRB_MS_PKT		BIT_22 /* Management Service pkt */
 
 /*
  * This byte will be used to define flags for the LUN on the target.
@@ -1229,7 +1390,14 @@ typedef struct ql_lun {
 	/* LUN execution throttle. */
 	uint16_t		lun_outcnt;
 
+	/* LUN number as reported by REPORT LUNS */
 	uint16_t		lun_no;
+
+	/*
+	 * Logical unit number in SCSI3 format, also
+	 * referred to as FCP lun or FCP entity address.
+	 */
+	uint64_t		lun_addr;
 
 	ql_link_t		link;
 } ql_lun_t;
@@ -1240,14 +1408,21 @@ typedef struct ql_lun {
 #define	LQF_UNTAGGED_PENDING	BIT_0
 
 /*
+ * SCSI standard defined lun addressing methods.
+ */
+#define	QL_LUN_AM_MASK		0xC0	/* Address Method Mask */
+#define	QL_LUN_AM_PDEV		0x00	/* Peripheral device AM */
+#define	QL_LUN_AM_FLAT		0x40	/* Flat space AM */
+#define	QL_LUN_AM_LUN		0x80	/* Logical unit AM */
+#define	QL_LUN_AM_EFLAT		0xC0	/* Extended flat space AM */
+#define	QL_LUN_AM_ELUN		0xC0	/* Extended logical unit AM */
+
+/*
  * Fibre Channel Device Queue structure
  */
 typedef struct ql_target {
 	/* Device queue lock. */
 	kmutex_t		mutex;
-
-	/* Head target command link. */
-	ql_head_t		tgt_cmd;
 
 	volatile uint32_t	flags;
 	port_id_t		d_id;
@@ -1309,6 +1484,8 @@ typedef struct ql_target {
 #define	TQF_NEED_AUTHENTICATION	BIT_5
 #define	TQF_PLOGI_PROGRS	BIT_6
 #define	TQF_IIDMA_NEEDED	BIT_7
+#define	TQF_LOGIN_NEEDED	BIT_8
+
 /*
  * Tempoary N_Port information
  */
@@ -1316,6 +1493,7 @@ typedef struct ql_n_port_info {
 	uint16_t	n_port_handle;
 	uint8_t		port_name[8];	/* Big endian. */
 	uint8_t		node_name[8];	/* Big endian. */
+	port_id_t	d_id;
 } ql_n_port_info_t;
 
 /*
@@ -1325,8 +1503,11 @@ typedef struct ql_n_port_info {
 #define	IIDMA_RATE_NDEF		0xfffffffe	/* not defined in conf file */
 #define	IIDMA_RATE_1GB		0x0
 #define	IIDMA_RATE_2GB		0x1
+#define	IIDMA_RATE_AUTO		0x2
 #define	IIDMA_RATE_4GB		0x3
 #define	IIDMA_RATE_8GB		0x4
+#define	IIDMA_RATE_16GB		0x5
+#define	IIDMA_RATE_32GB		0x6
 #define	IIDMA_RATE_10GB		0x13
 #define	IIDMA_RATE_MAX		IIDMA_RATE_10GB
 
@@ -1367,22 +1548,43 @@ typedef struct fw_code {
 #define	QL_DUMP_VALID		BIT_1
 #define	QL_DUMP_UPLOADED	BIT_2
 
+#define	QL_LOG_ENTRIES	256		/* max # of EL entries */
+#define	QL_LOG_LENGTH	128		/* max # of bytes in each EL entry */
+
+typedef struct ql_trace_entry {
+	timespec_t	hs_time;	/* high resolution timestamp */
+	char		buf[QL_LOG_LENGTH];
+} ql_trace_entry_t;
+
+/* per instance based extended logging trace descriptor */
 typedef struct el_trace_desc {
 	kmutex_t	mutex;
-	uint16_t	next;
-	uint32_t	trace_buffer_size;
-	char		*trace_buffer;
-} el_trace_desc_t;
+	uint32_t	nentries; /* max number of entries */
+	uint16_t	nindex;	/* next index to fill */
+	uint32_t	start;	/* starting point */
+	uint32_t	end;	/* ending point */
+	uint32_t	csize;	/* current filled queue size */
+	uint32_t	count;	/* sequence number */
+	size_t		trace_buffer_size;
+	ql_trace_entry_t *trace_buffer;
+} ql_trace_desc_t;
 
 /*
  * NVRAM cache descriptor.
  */
 typedef struct nvram_cache_desc {
-	kmutex_t	mutex;
 	uint32_t	valid;
 	uint32_t	size;
 	void		*cache;
 } nvram_cache_desc_t;
+
+/*
+ * Plogi retry parameters
+ */
+typedef struct plogi_params_desc {
+	uint32_t	retry_cnt;
+	uint32_t	retry_dly_usec;
+} plogi_params_desc_t;
 
 /*
  * ql attach progress indication
@@ -1401,6 +1603,10 @@ typedef struct nvram_cache_desc {
 #define	QL_IOMAP_IOBASE_MAPPED		BIT_11
 #define	QL_N_PORT_INFO_CREATED		BIT_12
 #define	QL_DB_IOBASE_MAPPED		BIT_13
+#define	QL_FCA_INIT_FM			BIT_14
+#define	QL_NVRAM_CACHE_CREATED		BIT_15
+#define	QL_PLOGI_PARAMS_CREATED		BIT_16
+
 /* Device queue head list size (based on AL_PA address). */
 #define	DEVICE_HEAD_LIST_SIZE	0x81
 
@@ -1411,6 +1617,20 @@ struct legacy_intr_set {
 	uint32_t	pci_int_reg;
 };
 
+/* Returned Mailbox registers. */
+typedef struct ql_mbx_data {
+	uint16_t	mb[MAX_MBOX_COUNT];
+} ql_mbx_data_t;
+
+typedef struct ql_ledstate {
+	uint32_t	BeaconState;
+	uint32_t	LEDflags;
+	uint32_t	flags;
+	uint32_t	led_blink_on;
+	uint32_t	select;
+	ql_mbx_data_t	cfg;
+} ql_ledstate_t;
+
 /*
  * Adapter state structure.
  */
@@ -1418,78 +1638,83 @@ typedef struct ql_adapter_state {
 	ql_link_t		hba;
 
 	kmutex_t		mutex;
-	volatile uint32_t	flags;			/* State flags. */
+	volatile uint64_t	flags;			/* State flags. */
 	uint32_t		state;
 	port_id_t		d_id;
 	uint16_t		loop_id;
-	uint8_t			topology;
 	uint16_t		sfp_stat;
-
 	uint16_t		idle_timer;
+	uint16_t		r_a_tov;	    /* 2 * R_A_TOV + 5 */
+	uint8_t			topology;
+	uint8_t			bbcr_runtime;
+	uint8_t			bbcr_initial;
 	uint8_t			loop_down_abort_time;
 	uint8_t			port_retry_timer;
 	uint8_t			loop_down_timer;
 	uint8_t			watchdog_timer;
-	uint16_t		r_a_tov;	    /* 2 * R_A_TOV + 5 */
 
 	/* Task Daemon context. */
-	callb_cpr_t		cprinfo;
+	ql_head_t		unsol_callback_queue;
+	ddi_taskq_t		*driver_thread_taskq;
 	kmutex_t		task_daemon_mutex;
-	kcondvar_t		cv_dr_suspended;
 	kcondvar_t		cv_task_daemon;
-	volatile uint32_t	task_daemon_flags;
-	ql_head_t		callback_queue;
+	kcondvar_t		cv_dr_suspended;
+	volatile uint64_t	task_daemon_flags;
+	uint32_t		driver_thread_awake;
+	uint64_t		df;
+	uint64_t		sf;
+	uint64_t		cf;
+
+	/* Completion thread context */
+	ddi_taskq_t		*completion_taskq;
+	ql_head_t		comp_q;
+	kmutex_t		comp_q_mutex;
+	kcondvar_t		cv_comp_thread;
+	uint8_t			comp_thds_active;
+	uint8_t			comp_thds_awake;
+	uint8_t			completion_thds;
 
 	/* Interrupt context. */
-	kmutex_t		intr_mutex;
-	caddr_t			iobase;
-	uint8_t			rev_id;
-	uint16_t		device_id;
-	uint16_t		subsys_id;
-	uint16_t		subven_id;
-	uint16_t		ven_id;
-	uint16_t		fw_class;
-	ql_srb_t		*status_srb;
+	ddi_iblock_cookie_t	iblock_cookie;
+	ddi_intr_handle_t	*htable;
+	uint32_t		hsize;
+	int32_t			intr_cnt;
+	void			*intr_pri;
+	int32_t			intr_cap;
+	uint32_t		iflags;
 	volatile uint8_t	intr_claimed;
+	uint8_t			mq_msix_vectors;
+	uint8_t			interrupt_count;
 
-	/*
-	 * ISP request queue, response queue, mailbox buffer and
-	 * IP receive queue buffer.
-	 */
-	dma_mem_t		hba_buf;
-
-	/* ISP request queue context. */
-	kmutex_t		req_ring_mutex;
-	struct cmd_entry	*request_ring_bp;
-	struct cmd_entry	*request_ring_ptr;
-	uint64_t		request_dvma;
-	uint16_t		req_ring_index;
-	uint16_t		req_q_cnt;	/* # of available entries. */
+	/* Outstanding ISP commands. */
 	ql_head_t		pending_cmds;
 	ql_srb_t		**outstanding_cmds;
 	uint16_t		osc_index;
+	uint16_t		osc_max_cnt;
+
+	/* ISP request queue context. */
+	kmutex_t		req_ring_mutex;
+	ql_request_q_t		*req_q[2];
 
 	/* ISP response queue context. */
-	struct sts_entry	*response_ring_bp;
-	struct sts_entry	*response_ring_ptr;
-	uint64_t		response_dvma;
-	uint16_t		rsp_ring_index;
-	uint16_t		isp_rsp_index;
+	ql_response_q_t		**rsp_queues;
+	uint32_t		rsp_queues_size;
+	uint8_t			rsp_queues_cnt;
+	uint8_t			rsp_q_number;
+	uint8_t			io_min_rsp_q_number;
+
+	/* IP receive buffer queue context. */
+	ql_tgt_t		*rcv_dev_q;
+	dma_mem_t		rcv_ring;
+	struct rcvbuf		*rcvbuf_ring_ptr;
+	uint16_t		rcvbuf_ring_index;
 
 	/* Mailbox context. */
 	kmutex_t		mbx_mutex;
-	caddr_t			mbx_bp;
 	struct mbx_cmd		*mcp;
 	kcondvar_t		cv_mbx_wait;
 	kcondvar_t		cv_mbx_intr;
 	volatile uint8_t	mailbox_flags;
-
-	/* ISP receive buffer queue context. */
-	ql_tgt_t		*rcv_dev_q;
-	struct rcvbuf		*rcvbuf_ring_bp;
-	struct rcvbuf		*rcvbuf_ring_ptr;
-	uint64_t		rcvbuf_dvma;
-	uint16_t		rcvbuf_ring_index;
 
 	/* Unsolicited buffer data. */
 	uint16_t		ub_outcnt;
@@ -1508,13 +1733,26 @@ typedef struct ql_adapter_state {
 	kstat_t			*k_stats;
 	ql_adapter_stat_t	*adapter_stats;
 
-	/* Solaris adapter configuration data */
-	ddi_acc_handle_t	dev_handle;
+	/* PCI context */
 	ddi_acc_handle_t	pci_handle;	/* config space */
+	ddi_acc_handle_t	dev_handle;
+	caddr_t			iobase;
 	ddi_acc_handle_t	iomap_dev_handle;
 	caddr_t			iomap_iobase;
+	ddi_acc_handle_t	mbar_dev_handle;
+	caddr_t			mbar;
+	uint32_t		mbar_size;
+	uint32_t		mbar_queue_offset;
+	uint16_t		device_id;
+	uint16_t		subsys_id;
+	uint16_t		subven_id;
+	uint16_t		ven_id;
+	uint16_t		pci_max_read_req;
+	uint8_t			rev_id;
+	uint8_t			pci_function_number;
+
+	/* Solaris adapter configuration data */
 	dev_info_t		*dip;
-	ddi_iblock_cookie_t	iblock_cookie;
 	fc_fca_tran_t		*tran;
 	uint32_t		instance;
 	int8_t			*devpath;
@@ -1529,10 +1767,20 @@ typedef struct ql_adapter_state {
 	uint32_t		fw_major_version;
 	uint32_t		fw_minor_version;
 	uint32_t		fw_subminor_version;
-	uint16_t		fw_attributes;
+	uint32_t		fw_attributes;
+	uint32_t		fw_ext_attributes;
+	uint32_t		fw_ext_memory_end;
 	uint32_t		fw_ext_memory_size;
+	uint32_t		fw_shared_ram_start;
+	uint32_t		fw_shared_ram_end;
+	uint32_t		fw_ddr_ram_start;
+	uint32_t		fw_ddr_ram_end;
 	uint32_t		parity_pause_errors;
 	boolean_t		log_parity_pause;
+	uint32_t		fw_class;
+	uint16_t		fw_state[7];
+	uint16_t		rom_status;
+	ql_ledstate_t		ledstate;
 	uint16_t		parity_hccr_err;
 	uint32_t		parity_stat_err;
 	reg_off_t		*reg_off;
@@ -1541,37 +1789,38 @@ typedef struct ql_adapter_state {
 	ql_fw_code_t		risc_fw[MAX_RISC_CODE_SEGMENTS];
 	uint32_t		risc_dump_size;
 	void			(*fcp_cmd)(struct ql_adapter_state *,
-				    ql_srb_t *, void *);
+				ql_request_q_t *, ql_srb_t *, void *);
 	void			(*ip_cmd)(struct ql_adapter_state *,
-				    ql_srb_t *, void *);
+				ql_request_q_t *, ql_srb_t *, void *);
 	void			(*ms_cmd)(struct ql_adapter_state *,
-				    ql_srb_t *, void *);
+				ql_request_q_t *, ql_srb_t *, void *);
+	void			(*els_cmd)(struct ql_adapter_state *,
+				ql_request_q_t *, ql_srb_t *, void *);
 	uint8_t			cmd_segs;
 	uint8_t			cmd_cont_segs;
 
 	/* NVRAM configuration data */
-	uint32_t		cfg_flags;
+	uint64_t		cfg_flags;
 	ql_comb_init_cb_t	init_ctrl_blk;
 	ql_comb_ip_init_cb_t	ip_init_ctrl_blk;
-	uint16_t		nvram_version;
-	uint16_t		adapter_features;
 	uint32_t		fw_transfer_size;
+	uint16_t		adapter_features;
 	uint16_t		execution_throttle;
 	uint16_t		port_down_retry_count;
+	uint16_t		serdes_param[4];
+	uint16_t		maximum_luns_per_target;
 	uint8_t			port_down_retry_delay;
 	uint8_t			qfull_retry_count;
 	uint8_t			qfull_retry_delay;
-	uint16_t		serdes_param[4];
 	uint8_t			loop_reset_delay;
 
 	/* Power management context. */
 	kmutex_t		pm_mutex;
-	uint32_t		busy;
+	uint32_t		pm_busy;
 	uint8_t			power_level;
 	uint8_t			pm_capable;
 	uint8_t			config_saved;
 	uint8_t			lip_on_panic;
-	port_id_t		port_hard_address;
 
 	/* sbus card data */
 	caddr_t			sbus_fpga_iobase;
@@ -1582,24 +1831,9 @@ typedef struct ql_adapter_state {
 	/* XIOCTL context pointer. */
 	struct ql_xioctl	*xioctl;
 
-	kmutex_t		cache_mutex;
 	struct ql_fcache	*fcache;
 	int8_t			*vcache;
-
-	/* AIF (Advanced Interrupt Framework) support */
-	ddi_intr_handle_t	*htable;
-	uint32_t		hsize;
-	int32_t			intr_cnt;
-	uint32_t		intr_pri;
-	int32_t			intr_cap;
-	uint32_t		iflags;
-
-	/* PCI maximum read request override */
-	uint16_t		pci_max_read_req;
-
-	/* port manage mutex */
-	kmutex_t		portmutex;
-	uint16_t		maximum_luns_per_target;
+	nvram_cache_desc_t	*nvram_cache;
 
 	/* f/w dump mutex */
 	uint32_t		ql_dump_size;
@@ -1611,29 +1845,33 @@ typedef struct ql_adapter_state {
 
 	dma_mem_t		fwexttracebuf;		/* extended trace  */
 	dma_mem_t		fwfcetracebuf;		/* event trace */
+	ql_mbx_data_t		fw_fce_trace_enable;
 	uint32_t		fwfcetraceopt;
 	uint32_t		flash_errlog_start;	/* 32bit word addr */
 	uint32_t		flash_errlog_ptr;	/* 32bit word addr */
 	uint8_t			send_plogi_timer;
+
+	/* Plogi retry parameters */
+	plogi_params_desc_t	*plogi_params;
 
 	/* Virtual port context. */
 	fca_port_attrs_t	*pi_attrs;
 	struct ql_adapter_state	*pha;
 	struct ql_adapter_state *vp_next;
 	uint8_t			vp_index;
+	uint8_t			max_vports;
 
 	uint16_t		free_loop_id;
 
 	/* Tempoary N_Port information */
 	struct ql_n_port_info	*n_port;
 
-	void			(*els_cmd)(struct ql_adapter_state *,
-				    ql_srb_t *, void *);
-	el_trace_desc_t		*el_trace_desc;
+	ql_trace_desc_t		*ql_trace_desc;
 
 	uint32_t		flash_data_addr;
 	uint32_t		flash_fw_addr;
 	uint32_t		flash_golden_fw_addr;
+	uint32_t		boot_code_addr;
 	uint32_t		flash_vpd_addr;
 	uint32_t		flash_nvram_addr;
 	uint32_t		flash_desc_addr;
@@ -1645,28 +1883,19 @@ typedef struct ql_adapter_state {
 	uint8_t			mpi_fw_minor_version;
 	uint8_t			mpi_fw_subminor_version;
 
-	uint8_t			idc_flash_acc;
-	uint8_t			idc_restart_cnt;
 	uint16_t		idc_mb[8];
 	uint8_t			idc_restart_timer;
-	uint8_t			idc_flash_acc_timer;
 
 	/* VLAN ID and MAC address */
 	uint8_t			fcoe_vnport_mac[6];
 	uint16_t		fabric_params;
 	uint16_t		fcoe_vlan_id;
 	uint16_t		fcoe_fcf_idx;
-	nvram_cache_desc_t	*nvram_cache;
 
 	/* NetXen context */
 	ddi_acc_handle_t	db_dev_handle;
 	caddr_t			db_iobase;
-	uint64_t		first_page_group_start;
-	uint64_t		first_page_group_end;
-	uint64_t		mn_win_crb;
 	caddr_t			nx_pcibase;	/* BAR0 base I/O address */
-	uint32_t		crb_win;
-	uint32_t		ddr_mn_window;
 	uint32_t		qdr_sn_window;
 	uint32_t		*nx_req_in;
 	caddr_t			db_read;
@@ -1675,67 +1904,115 @@ typedef struct ql_adapter_state {
 	uint32_t		bootloader_size;
 	uint32_t		bootloader_addr;
 	uint32_t		flash_fw_size;
+	uint32_t		dev_state;
+	uint32_t		fw_heartbeat_counter;
+	dma_mem_t		dmp_template;
+	uint32_t		md_capture_mask;
+	uint32_t		md_capture_size;
 	uint16_t		iidma_rate;
 	uint8_t			function_number;
 	uint8_t			timeout_cnt;
+	uint8_t			seconds_since_last_heartbeat;
+
+	/* default dma attributes */
+	ddi_dma_attr_t		bit32_io_dma_attr;
+	ddi_dma_attr_t		bit64_io_dma_attr;
+
+	ddi_dma_attr_t		io_dma_attr;
+	ddi_dma_attr_t		fcsm_cmd_dma_attr;
+	ddi_dma_attr_t		fcsm_rsp_dma_attr;
+	ddi_dma_attr_t		fcip_cmd_dma_attr;
+	ddi_dma_attr_t		fcip_rsp_dma_attr;
+	ddi_dma_attr_t		fcp_cmd_dma_attr;
+	ddi_dma_attr_t		fcp_rsp_dma_attr;
+	ddi_dma_attr_t		fcp_data_dma_attr;
+
+	int			fm_capabilities;
+	uint16_t		errlog[4];
 } ql_adapter_state_t;
 
 /*
  * adapter state flags
  */
-#define	FCA_BOUND			BIT_0
-#define	QL_OPENED			BIT_1
-#define	ONLINE				BIT_2
-#define	INTERRUPTS_ENABLED		BIT_3
-#define	ABORT_CMDS_LOOP_DOWN_TMO	BIT_4
-#define	POINT_TO_POINT			BIT_5
-#define	IP_ENABLED			BIT_6
-#define	IP_INITIALIZED			BIT_7
-#define	MENLO_LOGIN_OPERATIONAL		BIT_8
-#define	ADAPTER_SUSPENDED		BIT_9
-#define	ADAPTER_TIMER_BUSY		BIT_10
-#define	PARITY_ERROR			BIT_11
-#define	FLASH_ERRLOG_MARKER		BIT_12
-#define	VP_ENABLED			BIT_13
-#define	FDISC_ENABLED			BIT_14
-#define	FUNCTION_1			BIT_15
-#define	MPI_RESET_NEEDED		BIT_16
+#define	FCA_BOUND			(uint64_t)BIT_0
+#define	QL_OPENED			(uint64_t)BIT_1
+#define	ONLINE				(uint64_t)BIT_2
+#define	INTERRUPTS_ENABLED		(uint64_t)BIT_3
+
+#define	ABORT_CMDS_LOOP_DOWN_TMO	(uint64_t)BIT_4
+#define	POINT_TO_POINT			(uint64_t)BIT_5
+#define	IP_ENABLED			(uint64_t)BIT_6
+#define	IP_INITIALIZED			(uint64_t)BIT_7
+
+#define	MENLO_LOGIN_OPERATIONAL		(uint64_t)BIT_8
+#define	ADAPTER_SUSPENDED		(uint64_t)BIT_9
+#define	FW_DUMP_NEEDED			(uint64_t)BIT_10
+#define	PARITY_ERROR			(uint64_t)BIT_11
+
+#define	FLASH_ERRLOG_MARKER		(uint64_t)BIT_12
+#define	VP_ENABLED			(uint64_t)BIT_13
+#define	FDISC_ENABLED			(uint64_t)BIT_14
+#define	MULTI_QUEUE			(uint64_t)BIT_15
+
+#define	MPI_RESET_NEEDED		(uint64_t)BIT_16
+#define	VP_ID_NOT_ACQUIRED		(uint64_t)BIT_17
+#define	IDC_STALL_NEEDED		(uint64_t)BIT_18
+#define	POLL_INTR			(uint64_t)BIT_19
+
+#define	IDC_RESTART_NEEDED		(uint64_t)BIT_20
+#define	IDC_ACK_NEEDED			(uint64_t)BIT_21
+#define	LOOPBACK_ACTIVE			(uint64_t)BIT_22
+#define	QUEUE_SHADOW_PTRS		(uint64_t)BIT_23
+
+#define	NO_INTR_HANDSHAKE		(uint64_t)BIT_24
+#define	COMP_THD_TERMINATE		(uint64_t)BIT_25
+#define	DISABLE_NIC_FW_DMP		(uint64_t)BIT_26
+#define	MULTI_CHIP_ADAPTER		(uint64_t)BIT_27
 
 /*
  * task daemon flags
  */
-#define	TASK_DAEMON_STOP_FLG		BIT_0
-#define	TASK_DAEMON_SLEEPING_FLG	BIT_1
-#define	TASK_DAEMON_ALIVE_FLG		BIT_2
-#define	TASK_DAEMON_IDLE_CHK_FLG	BIT_3
-#define	SUSPENDED_WAKEUP_FLG		BIT_4
-#define	FC_STATE_CHANGE			BIT_5
-#define	NEED_UNSOLICITED_BUFFERS	BIT_6
-#define	RESET_MARKER_NEEDED		BIT_7
-#define	RESET_ACTIVE			BIT_8
-#define	ISP_ABORT_NEEDED		BIT_9
-#define	ABORT_ISP_ACTIVE		BIT_10
-#define	LOOP_RESYNC_NEEDED		BIT_11
-#define	LOOP_RESYNC_ACTIVE		BIT_12
-#define	LOOP_DOWN			BIT_13
-#define	DRIVER_STALL			BIT_14
-#define	COMMAND_WAIT_NEEDED		BIT_15
-#define	COMMAND_WAIT_ACTIVE		BIT_16
-#define	STATE_ONLINE			BIT_17
-#define	ABORT_QUEUES_NEEDED		BIT_18
-#define	TASK_DAEMON_STALLED_FLG		BIT_19
-#define	TASK_THREAD_CALLED		BIT_20
-#define	FIRMWARE_UP			BIT_21
-#define	LIP_RESET_PENDING		BIT_22
-#define	FIRMWARE_LOADED			BIT_23
-#define	RSCN_UPDATE_NEEDED		BIT_24
-#define	HANDLE_PORT_BYPASS_CHANGE	BIT_25
-#define	PORT_RETRY_NEEDED		BIT_26
-#define	TASK_DAEMON_POWERING_DOWN	BIT_27
-#define	TD_IIDMA_NEEDED			BIT_28
-#define	SEND_PLOGI			BIT_29
-#define	IDC_EVENT			BIT_30
+#define	TASK_DAEMON_STOP_FLG		(uint64_t)BIT_0
+#define	TASK_DAEMON_SLEEPING_FLG	(uint64_t)BIT_1
+#define	TASK_DAEMON_ALIVE_FLG		(uint64_t)BIT_2
+#define	TASK_DAEMON_IDLE_CHK_FLG	(uint64_t)BIT_3
 
+#define	SUSPENDED_WAKEUP_FLG		(uint64_t)BIT_4
+#define	FC_STATE_CHANGE			(uint64_t)BIT_5
+#define	NEED_UNSOLICITED_BUFFERS	(uint64_t)BIT_6
+#define	MARKER_NEEDED			(uint64_t)BIT_7
+
+#define	MARKER_ACTIVE			(uint64_t)BIT_8
+#define	ISP_ABORT_NEEDED		(uint64_t)BIT_9
+#define	ABORT_ISP_ACTIVE		(uint64_t)BIT_10
+#define	LOOP_RESYNC_NEEDED		(uint64_t)BIT_11
+
+#define	LOOP_RESYNC_ACTIVE		(uint64_t)BIT_12
+#define	LOOP_DOWN			(uint64_t)BIT_13
+#define	DRIVER_STALL			(uint64_t)BIT_14
+#define	COMMAND_WAIT_NEEDED		(uint64_t)BIT_15
+
+#define	COMMAND_WAIT_ACTIVE		(uint64_t)BIT_16
+#define	STATE_ONLINE			(uint64_t)BIT_17
+#define	ABORT_QUEUES_NEEDED		(uint64_t)BIT_18
+#define	TASK_DAEMON_STALLED_FLG		(uint64_t)BIT_19
+
+#define	SEND_PLOGI			(uint64_t)BIT_20
+#define	FIRMWARE_UP			(uint64_t)BIT_21
+#define	IDC_POLL_NEEDED			(uint64_t)BIT_22
+#define	FIRMWARE_LOADED			(uint64_t)BIT_23
+
+#define	RSCN_UPDATE_NEEDED		(uint64_t)BIT_24
+#define	HANDLE_PORT_BYPASS_CHANGE	(uint64_t)BIT_25
+#define	PORT_RETRY_NEEDED		(uint64_t)BIT_26
+#define	TASK_DAEMON_POWERING_DOWN	(uint64_t)BIT_27
+
+#define	TD_IIDMA_NEEDED			(uint64_t)BIT_28
+#define	WATCHDOG_NEEDED			(uint64_t)BIT_29
+#define	LED_BLINK			(uint64_t)BIT_30
+
+#define	DTF_EL_MSG_SKIP_FLGS	(IDC_POLL_NEEDED | WATCHDOG_NEEDED | \
+    TASK_DAEMON_IDLE_CHK_FLG | LED_BLINK)
 /*
  * Mailbox flags
  */
@@ -1747,48 +2024,77 @@ typedef struct ql_adapter_state {
 /*
  * Configuration flags
  */
-#define	CFG_ENABLE_HARD_ADDRESS			BIT_0
-#define	CFG_ENABLE_64BIT_ADDRESSING		BIT_1
-#define	CFG_ENABLE_LIP_RESET			BIT_2
-#define	CFG_ENABLE_FULL_LIP_LOGIN		BIT_3
-#define	CFG_ENABLE_TARGET_RESET			BIT_4
-#define	CFG_ENABLE_LINK_DOWN_REPORTING		BIT_5
-#define	CFG_DISABLE_EXTENDED_LOGGING_TRACE	BIT_6
-#define	CFG_ENABLE_FCP_2_SUPPORT		BIT_7
-#define	CFG_MULTI_CHIP_ADAPTER			BIT_8
-#define	CFG_SBUS_CARD				BIT_9
-#define	CFG_CTRL_2300				BIT_10
-#define	CFG_CTRL_6322				BIT_11
-#define	CFG_CTRL_2200				BIT_12
-#define	CFG_CTRL_2422				BIT_13
-#define	CFG_CTRL_25XX				BIT_14
-#define	CFG_ENABLE_EXTENDED_LOGGING		BIT_15
-#define	CFG_DISABLE_RISC_CODE_LOAD		BIT_16
-#define	CFG_SET_CACHE_LINE_SIZE_1		BIT_17
-#define	CFG_CTRL_MENLO				BIT_18
-#define	CFG_EXT_FW_INTERFACE			BIT_19
-#define	CFG_LOAD_FLASH_FW			BIT_20
-#define	CFG_DUMP_MAILBOX_TIMEOUT		BIT_21
-#define	CFG_DUMP_ISP_SYSTEM_ERROR		BIT_22
-#define	CFG_DUMP_DRIVER_COMMAND_TIMEOUT		BIT_23
-#define	CFG_DUMP_LOOP_OFFLINE_TIMEOUT		BIT_24
-#define	CFG_ENABLE_FWEXTTRACE			BIT_25
-#define	CFG_ENABLE_FWFCETRACE			BIT_26
-#define	CFG_FW_MISMATCH				BIT_27
-#define	CFG_CTRL_81XX				BIT_28
-#define	CFG_CTRL_8021				BIT_29
-#define	CFG_FAST_TIMEOUT			BIT_30
-#define	CFG_LR_SUPPORT				BIT_31
+#define	CFG_CTRL_27XX				(uint64_t)BIT_0
+#define	CFG_ENABLE_64BIT_ADDRESSING		(uint64_t)BIT_1
+#define	CFG_ENABLE_LIP_RESET			(uint64_t)BIT_2
+#define	CFG_ENABLE_FULL_LIP_LOGIN		(uint64_t)BIT_3
 
-#define	CFG_CTRL_2425		(CFG_CTRL_2422 | CFG_CTRL_25XX)
-#define	CFG_CTRL_8081		(CFG_CTRL_8021 | CFG_CTRL_81XX)
-#define	CFG_CTRL_2581		(CFG_CTRL_25XX | CFG_CTRL_81XX)
-#define	CFG_CTRL_242581		(CFG_CTRL_2422 | CFG_CTRL_25XX | CFG_CTRL_81XX)
-#define	CFG_CTRL_24258081	(CFG_CTRL_2425 | CFG_CTRL_8081)
-#define	CFG_CTRL_258081		(CFG_CTRL_25XX | CFG_CTRL_8081)
-#define	CFG_CTRL_2480		(CFG_CTRL_2422 | CFG_CTRL_8021)
+#define	CFG_ENABLE_TARGET_RESET			(uint64_t)BIT_4
+#define	CFG_ENABLE_LINK_DOWN_REPORTING		(uint64_t)BIT_5
+#define	CFG_LR_SUPPORT				(uint64_t)BIT_6
+#define	CFG_ENABLE_FCP_2_SUPPORT		(uint64_t)BIT_7
 
-#define	CFG_IST(ha, cfgflags)	(ha->cfg_flags & cfgflags)
+#define	CFG_CTRL_83XX				(uint64_t)BIT_8
+#define	CFG_SBUS_CARD				(uint64_t)BIT_9
+#define	CFG_CTRL_23XX				(uint64_t)BIT_10
+#define	CFG_CTRL_63XX				(uint64_t)BIT_11
+
+#define	CFG_CTRL_22XX				(uint64_t)BIT_12
+#define	CFG_CTRL_24XX				(uint64_t)BIT_13
+#define	CFG_CTRL_25XX				(uint64_t)BIT_14
+#define	CFG_ENABLE_EXTENDED_LOGGING		(uint64_t)BIT_15
+
+#define	CFG_DISABLE_RISC_CODE_LOAD		(uint64_t)BIT_16
+#define	CFG_SET_CACHE_LINE_SIZE_1		(uint64_t)BIT_17
+#define	CFG_CTRL_MENLO				(uint64_t)BIT_18
+#define	CFG_EXT_FW_INTERFACE			(uint64_t)BIT_19
+
+#define	CFG_LOAD_FLASH_FW			(uint64_t)BIT_20
+#define	CFG_DUMP_MAILBOX_TIMEOUT		(uint64_t)BIT_21
+#define	CFG_DUMP_ISP_SYSTEM_ERROR		(uint64_t)BIT_22
+#define	CFG_DUMP_DRIVER_COMMAND_TIMEOUT		(uint64_t)BIT_23
+
+#define	CFG_DUMP_LOOP_OFFLINE_TIMEOUT		(uint64_t)BIT_24
+#define	CFG_ENABLE_FWEXTTRACE			(uint64_t)BIT_25
+#define	CFG_ENABLE_FWFCETRACE			(uint64_t)BIT_26
+#define	CFG_CTRL_80XX				(uint64_t)BIT_27
+
+#define	CFG_CTRL_81XX				(uint64_t)BIT_28
+#define	CFG_CTRL_82XX				(uint64_t)BIT_29
+#define	CFG_FAST_TIMEOUT			(uint64_t)BIT_30
+
+#define	CFG_CTRL_2363		(CFG_CTRL_23XX | CFG_CTRL_63XX)
+#define	CFG_CTRL_2425		(CFG_CTRL_24XX | CFG_CTRL_25XX)
+#define	CFG_CTRL_2783		(CFG_CTRL_27XX | CFG_CTRL_83XX)
+#define	CFG_CTRL_8081		(CFG_CTRL_80XX | CFG_CTRL_81XX)
+#define	CFG_CTRL_278083		(CFG_CTRL_80XX | CFG_CTRL_2783)
+#define	CFG_CTRL_27808183	(CFG_CTRL_8081 | CFG_CTRL_2783)
+#define	CFG_CTRL_2527808183	(CFG_CTRL_25XX | CFG_CTRL_27808183)
+#define	CFG_CTRL_252780818283	(CFG_CTRL_82XX | CFG_CTRL_2527808183)
+
+#define	CFG_ISP_FW_TYPE_1	(CFG_CTRL_22XX | CFG_CTRL_2363)
+#define	CFG_ISP_FW_TYPE_2	(CFG_CTRL_24XX | CFG_CTRL_252780818283)
+#define	CFG_FCIP_TYPE_1		(CFG_CTRL_22XX | CFG_CTRL_23XX)
+#define	CFG_FCIP_SUPPORT	(CFG_FCIP_TYPE_1 | CFG_CTRL_24XX)
+#define	CFG_FCOE_SUPPORT	(CFG_CTRL_82XX | CFG_CTRL_8081)
+#define	CFG_N2N_SUPPORT		(CFG_CTRL_2425 | CFG_CTRL_2783)
+#define	CFG_FC_TYPE_1		(CFG_CTRL_22XX | CFG_CTRL_2363)
+#define	CFG_FC_TYPE_2		(CFG_CTRL_2425 | CFG_CTRL_2783)
+#define	CFG_FC_TYPE		(CFG_FC_TYPE_1 | CFG_FC_TYPE_2)
+#define	CFG_NO_INTR_HSHAKE_SUP	(CFG_CTRL_27808183)
+#define	CFG_MWB_4096_SUPPORT	(CFG_CTRL_2425 | CFG_CTRL_81XX)
+#define	CFG_IIDMA_SUPPORT	(CFG_CTRL_8081 | CFG_FC_TYPE_2)
+#define	CFG_FLASH_ACC_SUPPORT	(CFG_CTRL_27808183)
+#define	CFG_FLASH_DMA_SUPPORT	(CFG_CTRL_2527808183)
+#define	CFG_LOOP_POINT_SUPPORT	(CFG_CTRL_8081)
+#define	CFG_LB_ECHO_SUPPORT	(CFG_CTRL_2363 | CFG_ISP_FW_TYPE_2)
+#define	CFG_SET_LEDS_SUPPORT	(CFG_CTRL_2363 | CFG_ISP_FW_TYPE_2)
+#define	CFG_SERDES_SUPPORT	(CFG_CTRL_2783)
+#define	CFG_BBCR_SUPPORT	(CFG_CTRL_2783)
+#define	CFG_MSI_SUPPORT		(CFG_CTRL_2425 | CFG_CTRL_81XX | CFG_CTRL_82XX)
+
+
+#define	CFG_IST(ha, cfgflags)	(ha->cfg_flags & (cfgflags))
 
 /*
  * Interrupt configuration flags
@@ -1810,8 +2116,10 @@ typedef struct ql_adapter_state {
 #define	LSD(x)		(uint32_t)(x)
 #define	MSD(x)		(uint32_t)((uint64_t)(x) >> 32)
 
-#define	SHORT_TO_LONG(lsw, msw) (uint32_t)((uint16_t)msw << 16 | (uint16_t)lsw)
-#define	CHAR_TO_SHORT(lsb, msb) (uint16_t)((uint8_t)msb << 8 | (uint8_t)lsb)
+#define	LONG_TO_LLONG(lsl, msl) (uint64_t)((uint64_t)(msl) << 32 | \
+	(uint32_t)(lsl))
+#define	SHORT_TO_LONG(lsw, msw) (uint32_t)((uint32_t)msw << 16 | (uint16_t)lsw)
+#define	CHAR_TO_SHORT(lsb, msb) (uint16_t)((uint16_t)msb << 8 | (uint8_t)lsb)
 #define	CHAR_TO_LONG(lsb, b1, b2, msb) \
 	(uint32_t)(SHORT_TO_LONG(CHAR_TO_SHORT(lsb, b1), \
 	CHAR_TO_SHORT(b2, msb)))
@@ -1860,27 +2168,26 @@ typedef struct ql_adapter_state {
 #define	VALID_N_PORT_HDL(x)	(x <= LAST_N_PORT_HDL || \
 	(x >= SNS_24XX_HDL && x <= BROADCAST_24XX_HDL))
 
-#define	VALID_DEVICE_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_24258081) ? \
+#define	VALID_DEVICE_ID(ha, x)	(CFG_IST(ha, CFG_ISP_FW_TYPE_2) ? \
 	VALID_N_PORT_HDL(x) : VALID_LOOP_ID(x))
 
-#define	VALID_TARGET_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_24258081) ? \
+#define	VALID_TARGET_ID(ha, x)	(CFG_IST(ha, CFG_ISP_FW_TYPE_2) ? \
 	(x <= LAST_N_PORT_HDL) : (LOCAL_LOOP_ID(x) || SNS_LOOP_ID(x)))
 
-#define	RESERVED_LOOP_ID(ha, x) (CFG_IST(ha, CFG_CTRL_24258081) ? \
+#define	RESERVED_LOOP_ID(ha, x) (CFG_IST(ha, CFG_ISP_FW_TYPE_2) ? \
 	(x > LAST_N_PORT_HDL && x <= FL_PORT_24XX_HDL) : \
 	(x >= FL_PORT_LOOP_ID && x <= SIMPLE_NAME_SERVER_LOOP_ID))
 
-#define	QL_LOOP_TRANSITION	(RESET_MARKER_NEEDED | RESET_ACTIVE | \
+#define	QL_LOOP_TRANSITION	(MARKER_NEEDED | MARKER_ACTIVE | \
 				ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE | \
 				LOOP_RESYNC_NEEDED | LOOP_RESYNC_ACTIVE | \
 				COMMAND_WAIT_NEEDED | COMMAND_WAIT_ACTIVE)
 
-#define	QL_SUSPENDED		(QL_LOOP_TRANSITION | LOOP_DOWN | DRIVER_STALL)
-
 #define	LOOP_RECONFIGURE(ha)	(ha->task_daemon_flags & (QL_LOOP_TRANSITION | \
 				DRIVER_STALL))
 
-#define	DRIVER_SUSPENDED(ha)	(ha->task_daemon_flags & QL_SUSPENDED)
+#define	DRIVER_SUSPENDED(ha)	(ha->task_daemon_flags & (LOOP_DOWN | \
+				QL_LOOP_TRANSITION | DRIVER_STALL))
 
 #define	LOOP_NOT_READY(ha)	(ha->task_daemon_flags & (QL_LOOP_TRANSITION | \
 				LOOP_DOWN))
@@ -1889,33 +2196,26 @@ typedef struct ql_adapter_state {
 
 #define	QL_TASK_PENDING(ha)	( \
     ha->task_daemon_flags & (QL_LOOP_TRANSITION | ABORT_QUEUES_NEEDED | \
-    PORT_RETRY_NEEDED) || ha->callback_queue.first != NULL)
+    PORT_RETRY_NEEDED) || ha->unsol_callback_queue.first != NULL)
 
 #define	QL_DAEMON_NOT_ACTIVE(ha)	( \
 	!(ha->task_daemon_flags & TASK_DAEMON_ALIVE_FLG) || \
 	ha->task_daemon_flags & (TASK_DAEMON_SLEEPING_FLG | \
 	TASK_DAEMON_STOP_FLG))
 
-#define	QL_DAEMON_SUSPENDED(ha)	(\
-	(((ha)->cprinfo.cc_events & CALLB_CPR_START) ||\
-	((ha)->flags & ADAPTER_SUSPENDED)))
+#define	QL_ABORTED_SRB(ha)	((ql_srb_t *)ha)
 
-#define	INTERRUPT_PENDING(ha)	(CFG_IST(ha, CFG_CTRL_8021) ? \
+#define	INTERRUPT_PENDING(ha)	(CFG_IST(ha, CFG_CTRL_82XX) ? \
 				RD32_IO_REG(ha, nx_risc_int) & NX_RISC_INT : \
 				RD16_IO_REG(ha, istatus) & RISC_INT)
-
-#define	QL_MAX_FRAME_SIZE(ha) \
-	    (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ? CHAR_TO_SHORT( \
-	    ha->init_ctrl_blk.cb24.max_frame_length[0], \
-	    ha->init_ctrl_blk.cb24.max_frame_length[1]) : CHAR_TO_SHORT( \
-	    ha->init_ctrl_blk.cb.max_frame_length[0], \
-	    ha->init_ctrl_blk.cb.max_frame_length[1]))
-
 /*
  * Locking Macro Definitions
  */
 #define	GLOBAL_STATE_LOCK()		mutex_enter(&ql_global_mutex)
 #define	GLOBAL_STATE_UNLOCK()		mutex_exit(&ql_global_mutex)
+
+#define	GLOBAL_TIMER_LOCK()		mutex_enter(&ql_global_timer_mutex)
+#define	GLOBAL_TIMER_UNLOCK()		mutex_exit(&ql_global_timer_mutex)
 
 #define	TRY_DEVICE_QUEUE_LOCK(q)	mutex_tryenter(&q->mutex)
 #define	DEVICE_QUEUE_LOCK(q)		mutex_enter(&q->mutex)
@@ -1926,8 +2226,11 @@ typedef struct ql_adapter_state {
 #define	MBX_REGISTER_LOCK(ha)		mutex_enter(&ha->pha->mbx_mutex)
 #define	MBX_REGISTER_UNLOCK(ha)		mutex_exit(&ha->pha->mbx_mutex)
 
-#define	INTR_LOCK(ha)			mutex_enter(&ha->pha->intr_mutex)
-#define	INTR_UNLOCK(ha)			mutex_exit(&ha->pha->intr_mutex)
+#define	INTR_LOCK(ha)			ql_intr_lock(ha->pha)
+#define	INTR_UNLOCK(ha)			ql_intr_unlock(ha->pha)
+
+#define	INDX_INTR_LOCK(ha, i)	mutex_enter(&ha->pha->rsp_queues[i]->intr_mutex)
+#define	INDX_INTR_UNLOCK(ha, i)	mutex_exit(&ha->pha->rsp_queues[i]->intr_mutex)
 
 #define	TASK_DAEMON_LOCK(ha)		mutex_enter(&ha->pha->task_daemon_mutex)
 #define	TASK_DAEMON_UNLOCK(ha)		mutex_exit(&ha->pha->task_daemon_mutex)
@@ -1935,11 +2238,8 @@ typedef struct ql_adapter_state {
 #define	REQUEST_RING_LOCK(ha)		mutex_enter(&ha->pha->req_ring_mutex)
 #define	REQUEST_RING_UNLOCK(ha)		mutex_exit(&ha->pha->req_ring_mutex)
 
-#define	CACHE_LOCK(ha)			mutex_enter(&ha->pha->cache_mutex);
-#define	CACHE_UNLOCK(ha)		mutex_exit(&ha->pha->cache_mutex);
-
-#define	PORTMANAGE_LOCK(ha)		mutex_enter(&ha->pha->portmutex);
-#define	PORTMANAGE_UNLOCK(ha)		mutex_exit(&ha->pha->portmutex);
+#define	COMP_Q_LOCK(ha)			mutex_enter(&ha->pha->comp_q_mutex)
+#define	COMP_Q_UNLOCK(ha)		mutex_exit(&ha->pha->comp_q_mutex)
 
 #define	ADAPTER_STATE_LOCK(ha)		mutex_enter(&ha->pha->mutex)
 #define	ADAPTER_STATE_UNLOCK(ha)	mutex_exit(&ha->pha->mutex)
@@ -1955,9 +2255,6 @@ typedef struct ql_adapter_state {
 
 #define	GLOBAL_HW_LOCK()		mutex_enter(&ql_global_hw_mutex)
 #define	GLOBAL_HW_UNLOCK()		mutex_exit(&ql_global_hw_mutex)
-
-#define	NVRAM_CACHE_LOCK(ha)		mutex_enter(&ha->nvram_cache->mutex);
-#define	NVRAM_CACHE_UNLOCK(ha)		mutex_exit(&ha->nvram_cache->mutex);
 
 /*
  * PCI power management control/status register location
@@ -1995,8 +2292,6 @@ typedef struct ql_config_space {
 #define	QL_RESTORE_CONFIG_REGS(dip)		ql_restore_config_regs(dip)
 
 #endif /* USE_DDI_INTERFACES */
-
-#define	QL_IS_SET(x, y)	(((x) & (y)) == (y))
 
 /*
  * QL local function return status codes
@@ -2151,7 +2446,12 @@ typedef struct prli_acc_resp {
 	struct prli_svc_pram_resp_page	svc_params;
 } prli_acc_resp_t;
 
-#define	EL_TRACE_BUF_SIZE	8192
+#define	EL_TRACE_BUF_SIZE		8192
+
+#define	QL_PORT_ID_MASK			0xffffff
+
+#define	QL_PLOGI_RETRY_CNT		(5)
+#define	QL_PLOGI_RETRY_DLY_USEC		(10 * MILLISEC)
 
 /*
  * Global Data in ql_api.c source file.
@@ -2181,11 +2481,11 @@ uint32_t ql_pci_config_get32(ql_adapter_state_t *, off_t);
 void ql_pci_config_put8(ql_adapter_state_t *, off_t, uint8_t);
 void ql_pci_config_put16(ql_adapter_state_t *, off_t, uint16_t);
 void ql_delay(ql_adapter_state_t *, clock_t);
-void ql_awaken_task_daemon(ql_adapter_state_t *, ql_srb_t *, uint32_t,
-    uint32_t);
+void ql_awaken_task_daemon(ql_adapter_state_t *, ql_srb_t *, uint64_t,
+    uint64_t);
 int ql_abort_device(ql_adapter_state_t *, ql_tgt_t *, int);
 int ql_binary_fw_dump(ql_adapter_state_t *, int);
-void ql_done(ql_link_t *);
+void ql_done(ql_link_t *, boolean_t);
 int ql_24xx_flash_id(ql_adapter_state_t *);
 int ql_24xx_load_flash(ql_adapter_state_t *, uint8_t *, uint32_t, uint32_t);
 int ql_poll_flash(ql_adapter_state_t *, uint32_t, uint8_t);
@@ -2197,6 +2497,7 @@ uint8_t ql_read_flash_byte(ql_adapter_state_t *, uint32_t);
 int ql_24xx_read_flash(ql_adapter_state_t *, uint32_t, uint32_t *);
 int ql_24xx_write_flash(ql_adapter_state_t *, uint32_t, uint32_t);
 fc_unsol_buf_t *ql_get_unsolicited_buffer(ql_adapter_state_t *, uint32_t);
+int ql_dump_firmware(ql_adapter_state_t *);
 size_t ql_ascii_fw_dump(ql_adapter_state_t *, caddr_t);
 void ql_add_link_b(ql_head_t *, ql_link_t *);
 void ql_add_link_t(ql_head_t *, ql_link_t *);
@@ -2216,10 +2517,10 @@ void ql_restart_driver(ql_adapter_state_t *);
 int ql_load_flash(ql_adapter_state_t *, uint8_t *, uint32_t);
 int ql_get_dma_mem(ql_adapter_state_t *, dma_mem_t *, uint32_t,
     mem_alloc_type_t, mem_alignment_t);
+void ql_free_dma_resource(ql_adapter_state_t *, dma_mem_t *);
 int ql_alloc_phys(ql_adapter_state_t *, dma_mem_t *, int);
 void ql_free_phys(ql_adapter_state_t *, dma_mem_t *);
 void ql_24xx_protect_flash(ql_adapter_state_t *);
-void ql_free_dma_resource(ql_adapter_state_t *, dma_mem_t *);
 uint8_t ql_pci_config_get8(ql_adapter_state_t *, off_t);
 void ql_pci_config_put32(ql_adapter_state_t *, off_t, uint32_t);
 int ql_24xx_unprotect_flash(ql_adapter_state_t *);
@@ -2232,12 +2533,27 @@ void ql_isp_els_handle_cmd_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
 void ql_isp_els_handle_rsp_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
 void ql_isp_els_handle_endian(ql_adapter_state_t *ha, uint8_t *ptr,
     uint8_t ls_code);
-int ql_el_trace_desc_ctor(ql_adapter_state_t *);
-int ql_el_trace_desc_dtor(ql_adapter_state_t *);
+void ql_el_trace_alloc(ql_adapter_state_t *);
+void ql_el_trace_dealloc(ql_adapter_state_t *);
 int ql_nvram_cache_desc_ctor(ql_adapter_state_t *);
 int ql_nvram_cache_desc_dtor(ql_adapter_state_t *);
+int ql_plogi_params_desc_ctor(ql_adapter_state_t *);
+int ql_plogi_params_desc_dtor(ql_adapter_state_t *);
 int ql_wwn_cmp(ql_adapter_state_t *, la_wwn_t *, la_wwn_t *);
 void ql_dev_free(ql_adapter_state_t *, ql_tgt_t *);
+void ql_restart_queues(ql_adapter_state_t *);
+void ql_abort_queues(ql_adapter_state_t *);
+void ql_requeue_pending_cmds(ql_adapter_state_t *, ql_tgt_t *);
+void ql_toggle_loop_state(ql_adapter_state_t *);
+void ql_els_24xx_iocb(ql_adapter_state_t *, ql_request_q_t *, ql_srb_t *,
+    void *);
+int ql_get_cap_ofst(ql_adapter_state_t *, uint8_t);
+void ql_intr_lock(ql_adapter_state_t *);
+void ql_intr_unlock(ql_adapter_state_t *);
+void ql_io_comp(ql_srb_t *sp);
+uint64_t ql_get_lun_addr(ql_tgt_t *, uint16_t);
+int ql_2700_get_flash_dmp_template(ql_adapter_state_t *);
+int ql_2700_get_module_dmp_template(ql_adapter_state_t *);
 
 #ifdef	__cplusplus
 }

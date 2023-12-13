@@ -1179,8 +1179,10 @@ f kernel/misc/qlc/amd64/qlc_fw_2200 0755 root sys
 f kernel/misc/qlc/amd64/qlc_fw_2300 0755 root sys
 f kernel/misc/qlc/amd64/qlc_fw_2400 0755 root sys
 f kernel/misc/qlc/amd64/qlc_fw_2500 0755 root sys
+f kernel/misc/qlc/amd64/qlc_fw_2700 0755 root sys
 f kernel/misc/qlc/amd64/qlc_fw_6322 0755 root sys
 f kernel/misc/qlc/amd64/qlc_fw_8100 0755 root sys
+f kernel/misc/qlc/amd64/qlc_fw_8301fc 0755 root sys
 d kernel/misc/scsi_vhci 0755 root sys
 d kernel/misc/scsi_vhci/amd64 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc 0755 root sys

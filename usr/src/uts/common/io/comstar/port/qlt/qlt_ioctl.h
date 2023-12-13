@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2009-2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QLT_IOCTL_H
@@ -107,6 +106,8 @@ typedef struct qlt_ioctl_mbox {
 #define	QLT_IOCTL_STAY_OFFLINE		0x9006
 #define	QLT_IOCTL_MBOX			0x9007
 #define	QLT_IOCTL_ELOG			0x9008
+#define	QLT_IOCTL_CHIP_RESET		0x9009
+#define	QLT_IOCTL_CRASH_SYS		0x900a
 
 #ifdef	__cplusplus
 }

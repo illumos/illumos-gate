@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * File Name: exioctso.h
@@ -29,7 +29,7 @@
  * ***********************************************************************
  * *                                                                    **
  * *                            NOTICE                                  **
- * *            COPYRIGHT (C) 2009 QLOGIC CORPORATION                   **
+ * *            COPYRIGHT (C) 2015 QLOGIC CORPORATION                   **
  * *                    ALL RIGHTS RESERVED                             **
  * *                                                                    **
  * ***********************************************************************
@@ -38,6 +38,10 @@
 
 #ifndef _EXIOCTSO_H_
 #define	_EXIOCTSO_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <sys/int_types.h>
 
@@ -59,7 +63,7 @@
 
 #define	EXT_DEF_MAX_HBA_OS		256	/* 0 - 0xFF */
 #define	EXT_DEF_MAX_BUS_OS		1
-#define	EXT_DEF_MAX_TARGET_OS  		256	/* 0 - 0xFF */
+#define	EXT_DEF_MAX_TARGET_OS		256	/* 0 - 0xFF */
 #define	EXT_DEF_MAX_LUN_OS		16384
 #define	EXT_DEF_NON_SCSI3_MAX_LUN_OS	256
 
@@ -106,7 +110,18 @@
 #define	EXT_CC_VPORT_CMD_OS			136
 #define	EXT_CC_ACCESS_FLASH_OS			137
 #define	EXT_CC_RESET_FW_OS			138
+#define	EXT_CC_I2C_DATA_OS			139
+#define	EXT_CC_DUMP_OS				140
+#define	EXT_CC_SERDES_REG_OP_OS			141
+#define	EXT_CC_VF_STATE_OS			142
+#define	EXT_CC_SERDES_REG_OP_EX_OS		143
+#define	EXT_CC_ELS_PASSTHRU_OS			144
+#define	EXT_CC_FLASH_UPDATE_CAPS_OS		145
+#define	EXT_CC_GET_BBCR_DATA_OS			146
 
 #define	EXT_CC_HBA_NODE_SBUS			0x01
 
+#ifdef	__cplusplus
+}
+#endif
 #endif /* _EXIOCTSO_H_ */

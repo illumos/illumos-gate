@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2009-2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -214,8 +214,8 @@ alloc_bctl_failed:;
 		goto dmem_failure_loop;
 	}
 	kmem_free(qlt->dmem_buckets, sizeof (dmem_buckets) +
-	    ((sizeof (dmem_buckets)/sizeof (void *))
-	    *sizeof (qlt_dmem_bucket_t)));
+	    (((sizeof (dmem_buckets)/sizeof (void *))-1)*
+	    sizeof (qlt_dmem_bucket_t)));
 	qlt->dmem_buckets = NULL;
 
 	return (QLT_FAILURE);
@@ -563,8 +563,10 @@ qlt_dma_free_handles(qlt_state_t *qlt, qlt_dma_handle_t *first_handle)
 		if (tmp_handle->num_cookies != 0) {
 			rv = ddi_dma_unbind_handle(tmp_handle->dma_handle);
 			ASSERT(rv == DDI_SUCCESS);
-			tmp_handle->num_cookies = 0;
-			tmp_handle->num_cookies_fetched = 0;
+			if (rv == DDI_SUCCESS) {
+				tmp_handle->num_cookies = 0;
+				tmp_handle->num_cookies_fetched = 0;
+			}
 		}
 		tmp_handle = tmp_handle->next;
 		handle_count++;
@@ -646,7 +648,7 @@ qlt_ddi_dma_nextcookie(stmf_data_buf_t *dbuf, ddi_dma_cookie_t *cookiep)
  * faster access to the cookies in qlt_xfer_scsi_data() at the expense of
  * an extra copy. If the qlt->req_lock is hot, this may help.
  */
-int qlt_sgl_prefetch = 0;
+uint16_t qlt_sgl_prefetch = 0;
 
 /*ARGSUSED*/
 stmf_status_t
@@ -659,8 +661,9 @@ qlt_dma_setup_dbuf(fct_local_port_t *port, stmf_data_buf_t *dbuf,
 	qlt_dma_handle_t	*handle_list, *th;
 	int			i, rv;
 	ddi_dma_cookie_t	*cookie_p;
-	int			cookie_count, numbufs;
-	int			prefetch;
+	int			numbufs;
+	uint16_t		cookie_count;
+	uint16_t		prefetch;
 	size_t			qsize;
 
 	/*

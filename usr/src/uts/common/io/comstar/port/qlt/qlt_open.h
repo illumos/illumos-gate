@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2009-2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@ extern "C" {
 #endif
 
 #ifndef QLT_VERSION
-#define	QLT_VERSION	"20100505-1.05"
+#define	QLT_VERSION	"20160222-1.06"
 #endif
 
 #ifndef	QLT_NAME

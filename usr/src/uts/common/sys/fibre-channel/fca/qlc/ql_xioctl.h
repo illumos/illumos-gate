@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -181,6 +181,7 @@ typedef struct flash_desc {
 #define	ATMEL_FLASH		0x1f	/* Atmel (AT26DF081A) */
 #define	WINBOND_FLASH		0xef	/* Winbond (W25X16) */
 #define	INTEL_FLASH		0x89	/* Intel (QB25F016S33B8) */
+#define	EON_FLASH		0x1c	/* EON Silicon Solutions */
 
 /* flash id defines */
 #define	AMD_FLASHID_128K	0x6e	/* 128k AMD flash chip */
@@ -191,6 +192,7 @@ typedef struct flash_desc {
 #define	ST_FLASHID_128K		0x23	/* 128k ST flash chip */
 #define	ST_FLASHID_512K		0xe3	/* 512k ST flash chip */
 #define	ST_FLASHID_M25PXX	0x20	/* M25Pxx ST flash chip */
+#define	ST_FLASHID_N25QXXX	0xBA	/* M25Qxx ST flash chip */
 #define	SST_FLASHID_128K	0xd5	/* 128k SST flash chip */
 #define	SST_FLASHID_1024K	0xd8	/* 1 MB SST flash chip */
 #define	SST_FLASHID_1024K_A	0x80	/* 1 MB SST 25LF080A flash chip */
@@ -201,8 +203,11 @@ typedef struct flash_desc {
 #define	MXIC_FLASHID_25LXX	0x20	/* 25Lxx MXIC flash chip */
 #define	ATMEL_FLASHID_1024K	0x45	/* 1 MB ATMEL flash chip */
 #define	SPAN_FLASHID_2048K	0x02	/* 2 MB Spansion flash chip */
+#define	SPAN_FLASHID_16384K	0x20	/* 16 MB Spansion flash chip */
 #define	WINBOND_FLASHID		0x30	/* Winbond W25Xxx flash chip */
+#define	WINBOND_FLASHID_Q	0x40	/* Winbond W25Qxxx flash chip */
 #define	INTEL_FLASHID		0x89	/* Intel QB25F016S33B8 flash chip */
+#define	EON_FLASHID_EN25QXXX	0x30	/* EON EN25Qxxx flash chip */
 
 /* flash type defines */
 #define	FLASH128	BIT_0
@@ -214,12 +219,6 @@ typedef struct flash_desc {
 #define	FLASH8192	BIT_6
 #define	FLASH_PAGE	BIT_31
 #define	FLASH_LEGACY	(FLASH128 | FLASH512S)
-
-typedef struct ql_ledstate {
-	uint32_t		BeaconState;
-	uint32_t		LEDflags;
-	uint32_t		flags;
-} ql_ledstate_t;
 
 /*
  * ledstate flags definitions
@@ -362,6 +361,7 @@ typedef struct ql_fp_cfg_map {
 } ql_fp_cfg_map_t;
 
 #define	FLASH_FW_REGION			0x01
+#define	FLASH_BOOT_CODE_REGION		0x07
 #define	FLASH_VPD_0_REGION		0x14
 #define	FLASH_NVRAM_0_REGION		0x15
 #define	FLASH_VPD_1_REGION		0x16
@@ -370,6 +370,7 @@ typedef struct ql_fp_cfg_map {
 #define	FLASH_ERROR_LOG_0_REGION	0x1D
 #define	FLASH_ERROR_LOG_1_REGION	0x1F
 #define	FLASH_GOLDEN_FW_REGION		0x2F
+#define	FLASH_BOOTLOADER_REGION		0x72
 
 #define	FLASH_8021_FW_REGION		0x74
 #define	FLASH_8021_GOLDEN_FW_REGION	0x75
@@ -405,9 +406,6 @@ typedef struct ql_xioctl {
 	int64_t			IOOutputByteCnt;
 	int64_t			IOInputByteCnt;
 
-	/* Adapter LED state */
-	ql_ledstate_t		ledstate;
-
 	/* Async event context */
 	void			*aen_tracking_queue;
 	uint8_t			aen_q_head;
@@ -440,6 +438,7 @@ ql_fcache_t *ql_get_fbuf(ql_fcache_t *, uint32_t);
 int ql_dump_fcode(ql_adapter_state_t *, uint8_t *, uint32_t, uint32_t);
 int ql_pci_dump(ql_adapter_state_t *, uint32_t *, uint32_t, int);
 int ql_load_fcode(ql_adapter_state_t *, uint8_t *, uint32_t, uint32_t);
+int ql_set_loop_point(ql_adapter_state_t *, uint16_t);
 
 #ifdef __cplusplus
 }

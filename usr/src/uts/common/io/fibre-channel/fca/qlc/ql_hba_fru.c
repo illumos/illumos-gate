@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2010 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -31,7 +31,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -237,7 +237,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	size_t			vlen;
 	int32_t			i;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	attrs = &port_info->pi_attrs;
 
@@ -259,8 +259,6 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	(void) snprintf(attrs->firmware_version, FCHBA_FIRMWARE_VERSION_LEN,
 	    "%02d.%02d.%02d", ha->fw_major_version, ha->fw_minor_version,
 	    ha->fw_subminor_version);
-
-	CACHE_LOCK(ha);
 
 	/* Report FCode / BIOS / EFI version(s). */
 	if (ha->fcache != NULL) {
@@ -298,14 +296,12 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 		}
 	}
 
-	CACHE_UNLOCK(ha);
-
 	if (strlen(attrs->option_rom_version) == 0) {
 		int		rval = -1;
 		uint32_t	i = 0;
 		caddr_t		fcode_ver_buf = NULL;
 
-		if (CFG_IST(ha, CFG_CTRL_2200)) {
+		if (CFG_IST(ha, CFG_CTRL_22XX)) {
 			/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
 			rval = ddi_getlongprop(DDI_DEV_T_ANY, ha->dip,
 			    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "version",
@@ -324,16 +320,17 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	}
 
 	attrs->vendor_specific_id = ha->adapter_features;
-	attrs->max_frame_size = CFG_IST(ha, CFG_CTRL_24258081) ?
-	    (ha->init_ctrl_blk.cb24.max_frame_length[1] << 8 |
-	    ha->init_ctrl_blk.cb24.max_frame_length[0]) :
-	    (ha->init_ctrl_blk.cb.max_frame_length[1] << 8 |
-	    ha->init_ctrl_blk.cb.max_frame_length[0]);
+	attrs->max_frame_size = ha->loginparams.common_service.rx_bufsize;
 	attrs->supported_cos = 0x10000000; /* Class 3 only */
 
 	switch (chip & 0xFF00) {
+	case 0x2000:
+		attrs->supported_speed = chip == 0x2071 ?
+		    FC_HBA_PORTSPEED_32GBIT : FC_HBA_PORTSPEED_16GBIT;
+		break;
 	case 0x2200:
-		attrs->supported_speed = FC_HBA_PORTSPEED_1GBIT;
+		attrs->supported_speed = chip == 0x2261 ?
+		    FC_HBA_PORTSPEED_16GBIT : FC_HBA_PORTSPEED_1GBIT;
 		break;
 	case 0x2300:
 		attrs->supported_speed = FC_HBA_PORTSPEED_2GBIT |
@@ -486,7 +483,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	(void) snprintf((int8_t *)attrs->sym_port_name, vlen,
 	    "%s(%d,%d)", QL_NAME, ha->instance, ha->vp_index);
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -505,10 +502,10 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 void
 ql_setup_fruinfo(ql_adapter_state_t *ha)
 {
-	uint32_t 		mybasedev_len;
+	uint32_t		mybasedev_len;
 	ql_adapter_state_t	*base_ha = NULL;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	/*
 	 * To generate common id for instances residing on the
@@ -523,8 +520,6 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 	 */
 	if (ql_get_basedev_len(ha, &mybasedev_len, &ha->fru_port_index) == 0) {
 
-		GLOBAL_STATE_LOCK();
-
 		/*
 		 * Search for this basedev against all of the
 		 * ha in the ql_hba global list. If found one
@@ -535,27 +530,17 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 		base_ha = ql_search_basedev(ha, mybasedev_len);
 		if (base_ha != NULL && base_ha->fru_hba_index != 0) {
 			ha->fru_hba_index = base_ha->fru_hba_index;
+			ha->fru_port_index = base_ha->fru_port_index + 1;
 		} else {
 			ha->fru_hba_index = ql_gfru_hba_index++;
+			ha->fru_port_index = 0;
 		}
-
-		if (CFG_IST(ha, CFG_CTRL_8081)) {
-			/*
-			 * The FC functions on 81xx hbas are functions 2 and 3
-			 * while the Nic functions occupy 0 and 1.  Adjust
-			 * fru port index to be like previous FCAs.
-			 */
-			ha->fru_port_index = ha->flags & FUNCTION_1 ? 1 : 0;
-		}
-
-		GLOBAL_STATE_UNLOCK();
-
 	} else {
 		ha->fru_hba_index = 0;
 		ha->fru_port_index = 0;
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 }
 
 /*
@@ -585,7 +570,7 @@ ql_get_basedev_len(ql_adapter_state_t *ha, uint32_t *basedev_len,
 	int32_t		port_off;
 	int8_t		*devstr;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(ha, "started\n");
 
 	if (ha->devpath == NULL) {
 		return ((uint32_t)-1);
@@ -626,7 +611,7 @@ ql_get_basedev_len(ql_adapter_state_t *ha, uint32_t *basedev_len,
 		*basedev_len = (uint32_t)(port_off - 1);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	QL_PRINT_3(ha, "done\n");
 
 	return (0);
 }
@@ -655,7 +640,7 @@ ql_search_basedev(ql_adapter_state_t *myha, uint32_t mybasedev_len)
 	ql_adapter_state_t	*ha;
 	uint32_t		basedev_len, port_index;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", myha->instance);
+	QL_PRINT_3(myha, "started\n", myha->instance);
 
 	for (link = ql_hba.first; link != NULL; link = link->next) {
 
@@ -691,13 +676,13 @@ ql_search_basedev(ql_adapter_state_t *myha, uint32_t mybasedev_len)
 		    ha->devpath, basedev_len) == 0)) {
 
 			/* We found the ha with same basedev */
-			QL_PRINT_3(CE_CONT, "(%d): found, done\n",
+			QL_PRINT_3(myha, "found, done\n",
 			    myha->instance);
 			return (ha);
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): not found, done\n", myha->instance);
+	QL_PRINT_3(myha, "not found, done\n", myha->instance);
 
 	return (NULL);
 }

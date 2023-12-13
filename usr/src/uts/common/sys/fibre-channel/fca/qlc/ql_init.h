@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2015 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_INIT_H
@@ -35,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2015 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -45,6 +44,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+extern	uint32_t ql_task_cb_dly;
 
 /*
  * ISP2200 NVRAM structure definition.
@@ -164,15 +165,15 @@ typedef struct nvram {
 	 * MSB BIT 6 = unused
 	 * MSB BIT 7 = unused
 	 */
-	uint8_t	 host_p[2];
+	uint8_t	host_p[2];
 
-	uint8_t	 boot_node_name[8];
-	uint8_t	 boot_lun_number;
-	uint8_t	 reset_delay;
-	uint8_t	 port_down_retry_count;
-	uint8_t	 reserved_5;
+	uint8_t	boot_node_name[8];
+	uint8_t	boot_lun_number;
+	uint8_t	reset_delay;
+	uint8_t	port_down_retry_count;
+	uint8_t	reserved_5;
 
-	uint8_t  maximum_luns_per_target[2];
+	uint8_t	maximum_luns_per_target[2];
 
 	uint8_t reserved_6[14];
 
@@ -517,8 +518,14 @@ typedef struct nvram_24xx {
 	uint8_t oem_specific;
 	uint8_t reserved_4[15];
 
-	/* Offset 112 (70h). */
-	uint8_t reserved_5[16];
+	/*
+	 * Offset 112 (70h).
+	 * BIT 0   = additional receive credits
+	 * BIT 1   = additional receive credits
+	 * BIT 2-15 = Reserved
+	 */
+	uint8_t execute_fw_options[2];
+	uint8_t reserved_5[14];
 
 	/*
 	 * Offset 128 (80h).
@@ -691,8 +698,8 @@ typedef struct nvram_24xx {
 	uint8_t fw_table_sig[2];
 
 	/* Offset 480 (1E0h). */
-	int8_t  model_name[4];
-	int8_t  model_name1[12]; /* 24xx power_table[8]. */
+	int8_t	model_name[4];
+	int8_t	model_name1[12]; /* 24xx power_table[8]. */
 
 	/* Offset 496 (1F0h). */
 	uint8_t feature_mask_l[2];
@@ -709,11 +716,14 @@ typedef struct nvram_24xx {
 /*
  * Firmware Dump structure definition
  */
-#define	QL_2200_FW_DUMP_SIZE	0x68000		/* bytes */
-#define	QL_2300_FW_DUMP_SIZE	0xE2000		/* bytes */
-#define	QL_6322_FW_DUMP_SIZE	0xE2000		/* bytes */
-#define	QL_24XX_FW_DUMP_SIZE	0x0330000	/* bytes */
-#define	QL_25XX_FW_DUMP_SIZE	0x0330000	/* bytes */
+#define	QL_2200_FW_DUMP_SIZE	0x100000	/* 86e15 bytes */
+#define	QL_2300_FW_DUMP_SIZE	0x100000	/* fc6d3 bytes */
+#define	QL_6322_FW_DUMP_SIZE	0x100000	/* fc6d8 bytes */
+#define	QL_24XX_FW_DUMP_SIZE	0x300000	/* 2cef71 bytes */
+#define	QL_25XX_FW_DUMP_SIZE	0x400000	/* 356c97 bytes */
+#define	QL_81XX_FW_DUMP_SIZE	0x400000	/* 356c97 bytes */
+#define	QL_27XX_FW_DUMP_SIZE	0x600000	/* 5c3e69 bytes */
+#define	QL_83XX_FW_DUMP_SIZE	0x400000	/* 372792 bytes */
 
 #define	QL_24XX_VPD_SIZE	0x200		/* bytes */
 #define	QL_24XX_SFP_SIZE	0x200		/* bytes */
@@ -785,7 +795,9 @@ typedef struct ql_24xx_fw_dump {
 } ql_24xx_fw_dump_t;
 
 typedef struct ql_25xx_fw_dump {
+	uint32_t hccr;
 	uint32_t r2h_status;
+	uint32_t aer_ues;
 	uint32_t hostrisc_reg[32];
 	uint32_t pcie_reg[4];
 	uint32_t host_reg[32];
@@ -820,15 +832,17 @@ typedef struct ql_25xx_fw_dump {
 	uint32_t fpm_hdw_reg[192];
 	uint32_t fb_hdw_reg[192];
 	uint32_t code_ram[0x2000];
-	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
-	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
 	uint32_t ext_trace_buf[FWEXTSIZE / 4];
 	uint32_t fce_trace_buf[FWFCESIZE / 4];
-	uint32_t ext_mem[1];
+	uint32_t req_q_size[2];
+	uint32_t rsp_q_size;
+	uint32_t req_rsp_ext_mem[1];
 } ql_25xx_fw_dump_t;
 
 typedef struct ql_81xx_fw_dump {
+	uint32_t hccr;
 	uint32_t r2h_status;
+	uint32_t aer_ues;
 	uint32_t hostrisc_reg[32];
 	uint32_t pcie_reg[4];
 	uint32_t host_reg[32];
@@ -863,14 +877,333 @@ typedef struct ql_81xx_fw_dump {
 	uint32_t fpm_hdw_reg[224];
 	uint32_t fb_hdw_reg[208];
 	uint32_t code_ram[0x2000];
-	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
-	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
 	uint32_t ext_trace_buf[FWEXTSIZE / 4];
 	uint32_t fce_trace_buf[FWFCESIZE / 4];
-	uint32_t ext_mem[1];
+	uint32_t req_q_size[2];
+	uint32_t rsp_q_size;
+	uint32_t req_rsp_ext_mem[1];
 } ql_81xx_fw_dump_t;
 
+typedef struct ql_83xx_fw_dump {
+	uint32_t	hccr;
+	uint32_t	r2h_status;
+	uint32_t	aer_ues;
+	uint32_t	hostrisc_reg[48];
+	uint32_t	pcie_reg[4];
+	uint32_t	host_reg[32];
+	uint16_t	mailbox_reg[32];
+	uint32_t	xseq_gp_reg[256];
+	uint32_t	xseq_0_reg[48];
+	uint32_t	xseq_1_reg[16];
+	uint32_t	xseq_2_reg[16];
+	uint32_t	rseq_gp_reg[256];
+	uint32_t	rseq_0_reg[32];
+	uint32_t	rseq_1_reg[16];
+	uint32_t	rseq_2_reg[16];
+	uint32_t	rseq_3_reg[16];
+	uint32_t	aseq_gp_reg[256];
+	uint32_t	aseq_0_reg[32];
+	uint32_t	aseq_1_reg[16];
+	uint32_t	aseq_2_reg[16];
+	uint32_t	aseq_3_reg[16];
+	uint32_t	cmd_dma_reg[64];
+	uint32_t	req0_dma_reg[15];
+	uint32_t	resp0_dma_reg[15];
+	uint32_t	req1_dma_reg[15];
+	uint32_t	xmt0_dma_reg[32];
+	uint32_t	xmt1_dma_reg[32];
+	uint32_t	xmt2_dma_reg[32];
+	uint32_t	xmt3_dma_reg[32];
+	uint32_t	xmt4_dma_reg[32];
+	uint32_t	xmt_data_dma_reg[16];
+	uint32_t	rcvt0_data_dma_reg[32];
+	uint32_t	rcvt1_data_dma_reg[32];
+	uint32_t	risc_gp_reg[128];
+	uint32_t	shadow_reg[11];
+	uint32_t	risc_io;
+	uint32_t	lmc_reg[128];
+	uint32_t	fpm_hdw_reg[256];
+	uint32_t	rq0_array_reg[256];
+	uint32_t	rq1_array_reg[256];
+	uint32_t	rp0_array_reg[256];
+	uint32_t	rp1_array_reg[256];
+	uint32_t	ato_array_reg[128];
+	uint32_t	queue_control_reg[16];
+	uint32_t	fb_hdw_reg[432];
+	uint32_t	code_ram[0x2400];
+	uint32_t	ext_trace_buf[FWEXTSIZE / 4];
+	uint32_t	fce_trace_buf[FWFCESIZE / 4];
+	uint32_t	req_q_size[2];
+	uint32_t	rsp_q_size;
+	uint32_t	req_rsp_ext_mem[1];
+} ql_83xx_fw_dump_t;
+
 #ifdef _KERNEL
+
+/*
+ * firmware dump Entry Types
+ */
+#define	DT_NOP		 0
+#define	DT_THDR		99
+#define	DT_TEND		255
+#define	DT_RIOB1	256
+#define	DT_WIOB1	257
+#define	DT_RIOB2	258
+#define	DT_WIOB2	259
+#define	DT_RPCI		260
+#define	DT_WPCI		261
+#define	DT_RRAM		262
+#define	DT_GQUE		263
+#define	DT_GFCE		264
+#define	DT_PRISC	265
+#define	DT_RRISC	266
+#define	DT_DINT		267
+#define	DT_GHBD		268
+#define	DT_SCRA		269
+#define	DT_RRREG	270
+#define	DT_WRREG	271
+#define	DT_RRRAM	272
+#define	DT_RPCIC	273
+#define	DT_GQUES	274
+#define	DT_WDMP		275
+
+/*
+ * firmware dump Template Header (Entry Type 99)
+ */
+typedef struct ql_dt_hdr {
+	uint32_t	type;
+	uint32_t	first_entry_offset;
+	uint32_t	size_of_template;
+	uint32_t	rsv;
+	uint32_t	num_of_entries;
+	uint32_t	version;
+	uint32_t	driver_timestamp;
+	uint32_t	checksum;
+	uint32_t	rsv_1;
+	uint32_t	driver_info[3];
+	uint32_t	saved_state_area[16];
+	uint32_t	rsv_2[8];
+	uint32_t	ver_attr[5];
+} ql_dt_hdr_t;
+
+/*
+ * firmware dump Common Entry Header
+ */
+typedef struct ql_dt_entry_hdr {
+	uint32_t	type;
+	uint32_t	size;
+	uint32_t	rsv;
+#ifdef _BIG_ENDIAN
+	uint8_t		driver_flags;
+	uint8_t		rsv_2;
+	uint8_t		rsv_1;
+	uint8_t		capture_flags;
+#else
+	uint8_t		capture_flags;
+	uint8_t		rsv_1;
+	uint8_t		rsv_2;
+	uint8_t		driver_flags;
+#endif
+} ql_dt_entry_hdr_t;
+
+/*
+ * Capture Flags
+ */
+#define	PF_ONLY_FLAG	BIT_0	/* Physical Function Only */
+#define	PF_VF_FLAG	BIT_1	/* Physical and Virtual Functions */
+
+/*
+ * Driver Flags
+ */
+#define	SKIPPED_FLAG	BIT_7	/* driver skipped this entry  */
+
+/*
+ * firmware dump Entry Including Header
+ */
+typedef struct ql_dt_entry {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		data[1];
+} ql_dt_entry_t;
+
+/*
+ * firmware dump Template image
+ */
+typedef struct ql_dmp_template {
+	uint32_t	rsv[2];
+	uint32_t	len;
+	uint32_t	major_ver;
+	uint32_t	minor_ver;
+	uint32_t	subminor_ver;
+	uint32_t	attribute;
+	ql_dt_hdr_t	hdr;
+	ql_dt_entry_t	entries[1];
+} ql_dmp_template_t;
+
+typedef struct ql_dt_riob1 {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+#ifdef _BIG_ENDIAN
+	uint8_t			pci_offset;
+	uint8_t			reg_count_h;
+	uint8_t			reg_count_l;
+	uint8_t			reg_size;
+#else
+	uint8_t			reg_size;
+	uint8_t			reg_count_l;
+	uint8_t			reg_count_h;
+	uint8_t			pci_offset;
+#endif
+} ql_dt_riob1_t;
+
+typedef struct ql_dt_wiob1 {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+	uint32_t		data;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[3];
+	uint8_t			pci_offset;
+#else
+	uint8_t			pci_offset;
+	uint8_t			rsv[3];
+#endif
+} ql_dt_wiob1_t;
+
+typedef struct ql_dt_riob2 {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+#ifdef _BIG_ENDIAN
+	uint8_t			pci_offset;
+	uint8_t			reg_count_h;
+	uint8_t			reg_count_l;
+	uint8_t			reg_size;
+	uint8_t			rsv[3];
+	uint8_t			bank_sel_offset;
+#else
+	uint8_t			reg_size;
+	uint8_t			reg_count_l;
+	uint8_t			reg_count_h;
+	uint8_t			pci_offset;
+	uint8_t			bank_sel_offset;
+	uint8_t			rsv[3];
+#endif
+	uint32_t		reg_bank;
+} ql_dt_riob2_t;
+
+typedef struct ql_dt_wiob2 {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[2];
+	uint8_t			data_h;
+	uint8_t			data_l;
+	uint8_t			bank_sel_offset;
+	uint8_t			pci_offset;
+	uint8_t			rsv1[2];
+#else
+	uint8_t			data_l;
+	uint8_t			data_h;
+	uint8_t			rsv[2];
+	uint8_t			rsv1[2];
+	uint8_t			pci_offset;
+	uint8_t			bank_sel_offset;
+#endif
+	uint32_t		reg_bank;
+} ql_dt_wiob2_t;
+
+typedef struct ql_dt_rpci {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+} ql_dt_rpci_t;
+
+typedef struct ql_dt_wpci {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+	uint32_t		data;
+} ql_dt_wpci_t, ql_dt_wrreg_t;
+
+typedef struct ql_dt_rram {
+	ql_dt_entry_hdr_t	h;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[3];
+	uint8_t			ram_area;
+#else
+	uint8_t			ram_area;
+	uint8_t			rsv[3];
+#endif
+	uint32_t		start_addr;
+	uint32_t		end_addr;
+} ql_dt_rram_t;
+
+typedef struct ql_dt_gque {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		num_queues;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[3];
+	uint8_t			queue_type;
+#else
+	uint8_t			queue_type;
+	uint8_t			rsv[3];
+#endif
+} ql_dt_gque_t, ql_dt_gques_t;
+
+typedef struct ql_dt_gfce {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		fce_trace_size;
+	uint32_t		write_pointer[2];
+	uint32_t		base_pointer[2];
+	uint32_t		fce_enable_mb0;
+	uint32_t		fce_enable_mb2;
+	uint32_t		fce_enable_mb3;
+	uint32_t		fce_enable_mb4;
+	uint32_t		fce_enable_mb5;
+	uint32_t		fce_enable_mb6;
+} ql_dt_gfce_t;
+
+typedef struct ql_dt_prisc {
+	ql_dt_entry_hdr_t	h;
+} ql_dt_prisc_t, ql_dt_rrisc_t;
+
+typedef struct ql_dt_dint {
+	ql_dt_entry_hdr_t	h;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[3];
+	uint8_t			pci_offset;
+#else
+	uint8_t			pci_offset;
+	uint8_t			rsv[3];
+#endif
+	uint32_t		data;
+} ql_dt_dint_t;
+
+typedef struct ql_dt_ghbd {
+	ql_dt_entry_hdr_t	h;
+#ifdef _BIG_ENDIAN
+	uint8_t			rsv[3];
+	uint8_t			host_buf_type;
+#else
+	uint8_t			host_buf_type;
+	uint8_t			rsv[3];
+#endif
+	uint32_t		buf_size;
+	uint32_t		start_addr;
+} ql_dt_ghbd_t;
+
+typedef struct ql_dt_scra {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		scratch_size;
+} ql_dt_scra_t;
+
+typedef struct ql_dt_rrreg {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		addr;
+	uint32_t		count;
+} ql_dt_rrreg_t, ql_dt_rrram_t, ql_dt_rpcic_t;
+
+typedef struct ql_dt_wdmp {
+	ql_dt_entry_hdr_t	h;
+	uint32_t		length;
+	uint32_t		data[1];
+} ql_dt_wdmp_t;
 
 /*
  * ql_lock_nvram() flags
@@ -890,10 +1223,10 @@ typedef struct ql_81xx_fw_dump {
  * NVRAM Command values.
  */
 #define	NV_START_BIT	BIT_2
-#define	NV_WRITE_OP	(BIT_26+BIT_24)
-#define	NV_READ_OP	(BIT_26+BIT_25)
-#define	NV_ERASE_OP	(BIT_26+BIT_25+BIT_24)
-#define	NV_MASK_OP	(BIT_26+BIT_25+BIT_24)
+#define	NV_WRITE_OP	(BIT_26 + BIT_24)
+#define	NV_READ_OP	(BIT_26 + BIT_25)
+#define	NV_ERASE_OP	(BIT_26 + BIT_25 + BIT_24)
+#define	NV_MASK_OP	(BIT_26 + BIT_25 + BIT_24)
 #define	NV_DELAY_COUNT	10
 
 /*
@@ -959,8 +1292,8 @@ int ql_fw_ready(ql_adapter_state_t *, uint8_t);
 void ql_dev_list(ql_adapter_state_t *, ql_dev_id_list_t *, uint32_t,
     port_id_t *, uint16_t *);
 void ql_reset_chip(ql_adapter_state_t *);
-void ql_reset_24xx_chip(ql_adapter_state_t *);
 int ql_abort_isp(ql_adapter_state_t *);
+void ql_requeue_all_cmds(ql_adapter_state_t *);
 int ql_vport_control(ql_adapter_state_t *, uint8_t);
 int ql_vport_modify(ql_adapter_state_t *, uint8_t, uint8_t);
 int ql_vport_enable(ql_adapter_state_t *);

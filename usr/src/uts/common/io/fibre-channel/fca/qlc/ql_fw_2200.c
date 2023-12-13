@@ -10,7 +10,7 @@
  *									*
  *				NOTICE					*
  *									*
- *		COPYRIGHT 2008 QLOGIC CORPORATION			*
+ *		COPYRIGHT 1994-2015 QLOGIC CORPORATION			*
  *			ALL RIGHTS RESERVED				*
  *									*
  * This file contains the QLogic hardware specific firmware binary.	*

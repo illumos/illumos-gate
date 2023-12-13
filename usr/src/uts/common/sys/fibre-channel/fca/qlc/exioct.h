@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 QLogic Corporation.  All rights reserved.
+ * Copyright 2015 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@
  * ***********************************************************************
  * *                                                                    **
  * *                            NOTICE                                  **
- * *            COPYRIGHT (C) 2000-2010 QLOGIC CORPORATION              **
+ * *            COPYRIGHT (C) 2000-2015 QLOGIC CORPORATION              **
  * *                    ALL RIGHTS RESERVED                             **
  * *                                                                    **
  * ***********************************************************************
@@ -69,7 +69,7 @@ extern "C" {
 #define	EXT_DEF_PORTID_SIZE			4
 #define	EXT_DEF_PORTID_SIZE_ACTUAL		3
 #define	EXT_DEF_MAX_STR_SIZE			128
-#define	EXT_DEF_SCSI_PASSTHRU_CDB_LENGTH	12
+#define	EXT_DEF_SCSI_PASSTHRU_CDB_LENGTH	16
 #define	EXT_DEF_MAC_ADDRESS_SIZE		6
 
 #define	EXT_DEF_ADDR_MODE_32			1
@@ -218,7 +218,14 @@ typedef union _ext_signature {
 #define	EXT_CC_VPORT_CMD		EXT_CC_VPORT_CMD_OS
 #define	EXT_CC_ACCESS_FLASH		EXT_CC_ACCESS_FLASH_OS
 #define	EXT_CC_RESET_FW			EXT_CC_RESET_FW_OS
-
+#define	EXT_CC_I2C_DATA			EXT_CC_I2C_DATA_OS
+#define	EXT_CC_DUMP			EXT_CC_DUMP_OS
+#define	EXT_CC_SERDES_REG_OP		EXT_CC_SERDES_REG_OP_OS
+#define	EXT_CC_VF_STATE			EXT_CC_VF_STATE_OS
+#define	EXT_CC_SERDES_REG_OP_EX		EXT_CC_SERDES_REG_OP_EX_OS
+#define	EXT_CC_SEND_ELS_PASSTHRU	EXT_CC_ELS_PASSTHRU_OS
+#define	EXT_CC_FLASH_UPDATE_CAPS	EXT_CC_FLASH_UPDATE_CAPS_OS
+#define	EXT_CC_GET_BBCR_DATA		EXT_CC_GET_BBCR_DATA_OS
 /*
  * HBA port operations
  */
@@ -271,6 +278,7 @@ typedef union _ext_signature {
 #define	EXT_SC_GET_DCBX_PARAM		9
 #define	EXT_SC_GET_FCF_LIST		10
 #define	EXT_SC_GET_RESOURCE_CNTS	11
+#define	EXT_SC_GET_PRIV_STATS		12
 
 /* 100 - 199 FC_INTF_TYPE */
 #define	EXT_SC_GET_LINK_STATUS		101	/* Currently Not Supported */
@@ -353,6 +361,32 @@ typedef union _ext_signature {
 #define	EXT_SC_RESET_FC_FW	1
 #define	EXT_SC_RESET_MPI_FW	2
 
+/*
+ * Thermal temp adapter subcodes
+ * Used with EXT_CC_I2C_DATA as the ioctl code.
+ */
+#define	EXT_SC_GET_BOARD_TEMP	1
+
+/*
+ * Dump sub codes
+ * Used with EXT_CC_DUMP_OP as the ioctl code.
+ */
+#define	EXT_SC_DUMP_SIZE	1
+#define	EXT_SC_DUMP_READ	2
+#define	EXT_SC_DUMP_TRIGGER	3
+
+/*
+ * SerDes Register subcodes
+ * Used with EXT_CC_SERDES_REG_OP and EXT_CC_SERDES_REG_OP_EX
+ * as the ioctl code.
+ */
+#define	EXT_SC_READ_SERDES_REG	1
+#define	EXT_SC_WRITE_SERDES_REG	2
+
+/* Flash update capabilities subcommands */
+#define	EXT_SC_GET_FLASH_UPDATE_CAPS	1
+#define	EXT_SC_SET_FLASH_UPDATE_CAPS	2
+
 /* Read */
 
 /* Write */
@@ -377,7 +411,9 @@ typedef struct _EXT_HBA_NODE {
 	UINT8	DriverVersion[EXT_DEF_MAX_STR_SIZE];	/* 128; "7.4.3" */
 	UINT8	FWVersion[EXT_DEF_MAX_STR_SIZE];	/* 128; "2.1.6" */
 	UINT8	OptRomVersion[EXT_DEF_MAX_STR_SIZE];	/* 128; "1.44" */
-	UINT8	Reserved[32];				/* 32 */
+	UINT8	MpiVersion[4];				/* 4 */
+	UINT8	PepFwVersion[4];			/* 4 */
+	UINT8	Reserved[24];				/* 24 */
 } EXT_HBA_NODE, *PEXT_HBA_NODE;				/* 696 */
 
 /* HBA node query interface type */
@@ -405,7 +441,9 @@ typedef struct _EXT_HBA_PORT {
 	UINT8	FabricName[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
 	UINT16	LinkState2;			/* 2; sfp status */
 	UINT16	LinkState3;			/* 2; reserved field */
-	UINT8	Reserved[6];			/* 6 */
+	UINT16	LinkState1;			/* 2; sfp status */
+	UINT16	LinkState6;			/* 2; sfp status */
+	UINT8	Reserved[2];			/* 2 */
 } EXT_HBA_PORT, *PEXT_HBA_PORT;			/* 64 */
 
 /* FC-4 Instrumentation */
@@ -484,6 +522,8 @@ typedef struct _EXT_LOOPBACK_RSP {
 #define	IIDMA_RATE_4GB		0x3
 #define	IIDMA_RATE_8GB		0x4
 #define	IIDMA_RATE_10GB		0x13
+#define	IIDMA_RATE_16GB		0x5
+#define	IIDMA_RATE_32GB		0x6
 #define	IIDMA_RATE_UNKNOWN	0xffff
 
 /* IIDMA Mode values */
@@ -493,12 +533,14 @@ typedef struct _EXT_LOOPBACK_RSP {
 #define	IIDMA_MODE_3		3
 
 /* Port Speed values */
-#define	EXT_DEF_PORTSPEED_UNKNOWN 	0x0
+#define	EXT_DEF_PORTSPEED_UNKNOWN	0x0
 #define	EXT_DEF_PORTSPEED_1GBIT		0x1
 #define	EXT_DEF_PORTSPEED_2GBIT		0x2
 #define	EXT_DEF_PORTSPEED_4GBIT		0x4
 #define	EXT_DEF_PORTSPEED_8GBIT		0x8
 #define	EXT_DEF_PORTSPEED_10GBIT	0x10
+#define	EXT_DEF_PORTSPEED_16GBIT	0x20
+#define	EXT_DEF_PORTSPEED_32GBIT	0x40
 #define	EXT_PORTSPEED_NOT_NEGOTIATED	(1<<15)	/* Speed not established */
 
 typedef struct _EXT_DISC_PORT {
@@ -702,7 +744,7 @@ typedef struct _EXT_SET_RNID_REQ {
 } EXT_SET_RNID_REQ, *PEXT_SET_RNID_REQ; /* 84 */
 
 /* RNID definition and data struct */
-#define	SEND_RNID_RSP_SIZE  72
+#define	SEND_RNID_RSP_SIZE	72
 
 typedef struct _RNID_DATA
 {
@@ -724,7 +766,7 @@ typedef struct _EXT_SCSI_PASSTHRU {
 	UINT8		Direction;
 	UINT8		CdbLength;
 	UINT8		Cdb[EXT_DEF_SCSI_PASSTHRU_CDB_LENGTH];
-	UINT8		Reserved[66];
+	UINT8		Reserved[62];
 	UINT8		SenseData[256];
 } EXT_SCSI_PASSTHRU, *PEXT_SCSI_PASSTHRU;
 
@@ -734,7 +776,7 @@ typedef struct _EXT_FC_SCSI_PASSTHRU {
 	UINT8		Direction;
 	UINT8		CdbLength;
 	UINT8		Cdb[EXT_DEF_SCSI_PASSTHRU_CDB_LENGTH];
-	UINT8		Reserved[64];
+	UINT8		Reserved[60];
 	UINT8		SenseData[256];
 } EXT_FC_SCSI_PASSTHRU, *PEXT_FC_SCSI_PASSTHRU;
 
@@ -771,6 +813,7 @@ typedef struct _EXT_ASYNC_EVENT {
 #define	EXT_DEF_LIP_RESET	0x8013
 #define	EXT_DEF_RSCN		0x8015
 #define	EXT_DEF_DEVICE_UPDATE	0x8014
+#define	EXT_DEF_DPORT_DIAGS	0x8080
 
 /* LED state information */
 #define	EXT_DEF_GRN_BLINK_OFF	0x00
@@ -853,7 +896,7 @@ typedef struct _EXT_DEVICEDATA
 	UINT32	ReturnListEntryCount;	/* Set to number of device entries */
 					/* returned in list. */
 
-	EXT_DEVICEDATAENTRY  EntryList[1]; /* Variable length */
+	EXT_DEVICEDATAENTRY	EntryList[1];	/* Variable length */
 } EXT_DEVICEDATA, *PEXT_DEVICEDATA;
 
 
@@ -874,11 +917,11 @@ typedef struct _EXT_SWAPTARGETDEVICE
     offsetof(LUN_BITMASK_LIST_BUFFER, asBitmaskEntry)
 #endif
 
-#define	EXT_DEF_LUN_BITMASK_LIST_MIN_SIZE   \
+#define	EXT_DEF_LUN_BITMASK_LIST_MIN_SIZE \
 	(EXT_DEF_LUN_BITMASK_LIST_HEADER_SIZE + \
 	(sizeof (EXT_EXTERNAL_LUN_BITMASK_ENTRY) * \
 	EXT_DEF_LUN_BITMASK_LIST_MIN_ENTRIES))
-#define	EXT_DEF_LUN_BITMASK_LIST_MAX_SIZE   \
+#define	EXT_DEF_LUN_BITMASK_LIST_MAX_SIZE \
 	(EXT_DEF_LUN_BITMASK_LIST_HEADER_SIZE + \
 	(sizeof (EXT_EXTERNAL_LUN_BITMASK_ENTRY) * \
 	EXT_DEF_LUN_BITMASK_LIST_MAX_ENTRIES))
@@ -1029,7 +1072,7 @@ typedef struct _EXT_MENLO_ACCESS_PARAMETERS {
 	} ap;
 } EXT_MENLO_ACCESS_PARAMETERS, *PEXT_MENLO_ACCESS_PARAMETERS;
 
-#define	INFO_DATA_TYPE_LOG_CONFIG_TBC		((10*7)+1)*4
+#define	INFO_DATA_TYPE_LOG_CONFIG_TBC		((10 * 7) + 1) * 4
 #define	INFO_DATA_TYPE_PORT_STAT_ETH_TBC	0x194
 #define	INFO_DATA_TYPE_PORT_STAT_FC_TBC		0xC0
 #define	INFO_DATA_TYPE_LIF_STAT_TBC		0x40
@@ -1107,6 +1150,33 @@ typedef struct _EXT_VPORT_INFO {
 	UINT8		reserved[220];
 } EXT_VPORT_INFO, *PEXT_VPORT_INFO;
 
+typedef struct _EXT_BOARD_TEMP {
+	UINT16	IntTemp;
+	UINT16	FracTemp;
+	UINT8	Reserved[60];
+} EXT_BOARD_TEMP, *PEXT_BOARD_TEMP;
+
+/* ASIC TEMPERATURE defines */
+#define	EXT_DEF_ASIC_TEMP_COMMAND_COMPLETE	0x4000
+#define	EXT_DEF_ASIC_TEMP_HOST_INT_ERR		0x4002
+#define	EXT_DEF_ASIC_TEMP_COMMAND_ERR		0x4005
+#define	EXT_DEF_ASIC_TEMP_COMMAND_PARAM_ERR	0x4006
+
+typedef struct _EXT_SERDES_REG {
+	UINT16	addr;
+	UINT16	val;
+} EXT_SERDES_REG, *PEXT_SERDES_REG;
+
+typedef struct _EXT_VF_STATE {
+	UINT32	NoOfVFConfigured;
+	UINT32	NoOfVFActive;
+} EXT_VF_STATE, *PEXT_VF_STATE;
+
+typedef struct _EXT_SERDES_REG_EX {
+	UINT32	addr;
+	UINT32	val;
+} EXT_SERDES_REG_EX, *PEXT_SERDES_REG_EX;
+
 #define	EXT_DEF_FCF_LIST_SIZE	4096	/* Bytes */
 #define	FCF_INFO_RETURN_ALL	0
 #define	FCF_INFO_RETURN_ONE	1
@@ -1149,6 +1219,57 @@ typedef	struct	_EXT_RESOURCE_CNTS {
 	UINT32	NoOfSupVPs;		/* 4 */
 	UINT32	NoOfSupFCFs;		/* 4 */
 } EXT_RESOURCE_CNTS, *PEXT_RESOURCE_CNTS;
+
+#define	FW_FCE_SIZE	(0x4000 * 4)	/* bytes - 16kb multiples */
+
+typedef struct _EXT_FW_FCE_TRACE {
+	UINT16	Registers[32];
+	UINT8	TraceData[FW_FCE_SIZE];		/* Variable length */
+} EXT_FW_FCE_TRACE, *PEXT_FW_FCE_TRACE;
+
+/* Request Buffer for ELS PT */
+#define	EXT_DEF_WWPN_VALID	1
+#define	EXT_DEF_WWNN_VALID	2
+#define	EXT_DEF_PID_VALID	4
+
+typedef struct _EXT_ELS_PT_REQ {
+	UINT16		ValidMask;
+	UINT8		WWNN[EXT_DEF_WWN_NAME_SIZE];
+	UINT8		WWPN[EXT_DEF_WWN_NAME_SIZE];
+	UINT8		Id[EXT_DEF_PORTID_SIZE];
+	UINT8		Reserved[10];
+} EXT_ELS_PT_REQ, *PEXT_ELS_PT_REQ;
+
+typedef struct _EXT_FLASH_UPDATE_CAPS {
+	UINT64		Capabilities;
+	UINT32		OutageDuration;
+	UINT8		Reserved[20];
+} EXT_FLASH_UPDATE_CAPS, *PEXT_FLASH_UPDATE_CAPS;
+
+/* BB_CR Status */
+#define	EXT_DEF_BBCR_STATUS_DISABLED	0
+#define	EXT_DEF_BBCR_STATUS_ENABLED	1
+#define	EXT_DEF_BBCR_STATUS_UNKNOWN	2
+
+/* BB_CR State */
+#define	EXT_DEF_BBCR_STATE_OFFLINE	0
+#define	EXT_DEF_BBCR_STATE_ONLINE	1
+
+/* BB_CR Offline Reason Code */
+#define	EXT_DEF_BBCR_REASON_PORT_SPEED		1
+#define	EXT_DEF_BBCR_REASON_PEER_PORT		2
+#define	EXT_DEF_BBCR_REASON_SWITCH		3
+#define	EXT_DEF_BBCR_REASON_LOGIN_REJECT	4
+
+typedef struct _EXT_BBCR_DATA {
+	UINT8	Status;			/* 1 - enabled, 0 - Disabled */
+	UINT8	State;			/* 1 - online, 0 - offline */
+	UINT8	ConfiguredBBSCN;	/* 0-15 */
+	UINT8	NegotiatedBBSCN;	/* 0-15 */
+	UINT8	OfflineReasonCode;
+	UINT16	mbx1;			/* Port State */
+	UINT8	Reserved[9];
+} EXT_BBCR_DATA, *PEXT_BBCR_DATA;
 
 #ifdef	__cplusplus
 }
