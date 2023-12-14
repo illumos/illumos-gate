@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd November 10, 2020
+.Dd December 2, 2023
 .Dt PTHREAD_ATTR_GET_NP 3C
 .Os
 .Sh NAME
@@ -126,13 +126,13 @@ print_stackinfo(void *arg)
 	size_t stksize;
 
 	if (pthread_attr_init(&attr) != 0) {
-		fprintf(stderr, "failed to init attr: %s\\n",
+		fprintf(stderr, "failed to init attr: %s\en",
 		    strerror(errno));
 		exit(1);
 	}
 
 	if (pthread_attr_get_np(*thrp, &attr) != 0) {
-		fprintf(stderr, "failed to get thread attributes: %s\\n",
+		fprintf(stderr, "failed to get thread attributes: %s\en",
 		    strerror(errno));
 		exit(1);
 	}
@@ -141,7 +141,7 @@ print_stackinfo(void *arg)
 	assert(ret == 0);
 	ret = pthread_attr_getstacksize(&attr, &stksize);
 	assert(ret == 0);
-	(void) printf("stack base is at %p, it is %d bytes large\\n",
+	(void) printf("stack base is at %p, it is %d bytes large\en",
 	    stk, stksize);
 	return (NULL);
 }
@@ -153,7 +153,7 @@ main(void)
 
 	if ((ret = pthread_create(&g_thr, NULL, print_stackinfo,
 	    &g_thr) != 0)) {
-		fprintf(stderr, "failed to create a thread: %s\\n",
+		fprintf(stderr, "failed to create a thread: %s\en",
 		    strerror(errno));
 		exit(1);
 	}

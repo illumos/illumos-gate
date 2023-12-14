@@ -843,9 +843,6 @@ xml_init_data(
 	free(cwd);
 	free(p);
 
-	/* do not keep blank spaces */
-	(void) xmlKeepBlanksDefault(0);
-
 	/* remove the tmp file if it exists */
 	if (access(xml_tmp_file, F_OK) == 0) {
 		(void) remove(xml_tmp_file);

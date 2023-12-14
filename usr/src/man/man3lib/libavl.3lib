@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd Dec 04, 2015
+.Dd December 2, 2023
 .Dt LIBAVL 3LIB
 .Os
 .Sh NAME
@@ -273,9 +273,9 @@ find_avl(void)
 		lookup.in_val = i;
 		inp = avl_find(&inttree, &lookup, NULL);
 		if (inp == NULL) {
-			printf("Entry %d is not in the tree\\n", i);
+			printf("Entry %d is not in the tree\en", i);
 		} else {
-			printf("Entry %d is in the tree\\n",
+			printf("Entry %d is in the tree\en",
 			    inp->in_val);
 		}
 	}
@@ -290,7 +290,7 @@ walk_forwards(void)
 	intnode_t *inp;
 	for (inp = avl_first(&inttree); inp != NULL;
 	    inp = AVL_NEXT(&inttree, inp)) {
-		printf("Found entry %d\\n", inp->in_val);
+		printf("Found entry %d\en", inp->in_val);
 	}
 }
 
@@ -303,7 +303,7 @@ walk_backwards(void)
 	intnode_t *inp;
 	for (inp = avl_last(&inttree); inp != NULL;
 	    inp = AVL_PREV(&inttree, inp)) {
-		printf("Found entry %d\\n", inp->in_val);
+		printf("Found entry %d\en", inp->in_val);
 	}
 }
 
@@ -314,7 +314,7 @@ walk_backwards(void)
 static void
 inttree_inspect(void)
 {
-	printf("The tree is %s, there are %ld nodes in it\\n",
+	printf("The tree is %s, there are %ld nodes in it\en",
 	    avl_is_empty(&inttree) == B_TRUE ? "empty" : "not empty",
 	    avl_numnodes(&inttree));
 }
@@ -350,10 +350,10 @@ nearest_nodes(void)
 		abort();
 	inp = avl_nearest(&inttree, where, AVL_BEFORE);
 	assert(inp != NULL);
-	printf("closest node before 12 is: %d\\n", inp->in_val);
+	printf("closest node before 12 is: %d\en", inp->in_val);
 	inp = avl_nearest(&inttree, where, AVL_AFTER);
 	assert(inp != NULL);
-	printf("closest node after 12 is: %d\\n", inp->in_val);
+	printf("closest node after 12 is: %d\en", inp->in_val);
 }
 
 static void

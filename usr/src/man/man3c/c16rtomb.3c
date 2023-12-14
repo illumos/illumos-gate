@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Robert Mustacchi
 .\"
-.Dd February 17, 2023
+.Dd December 2, 2023
 .Dt C16RTOMB 3C
 .Os
 .Sh NAME
@@ -156,10 +156,10 @@ will be used to write out the results of the
 conversion.
 In other words, the functions would be called as:
 .Bd -literal -offset indent
-c16rtomb(buf, L'\\0', ps)
-c32rtomb(buf, L'\\0', ps)
-wcrtomb(buf, L'\\0', ps)
-wcrtomb_l(buf, L'\\0', ps, loc)
+c16rtomb(buf, L'\e0', ps)
+c32rtomb(buf, L'\e0', ps)
+wcrtomb(buf, L'\e0', ps)
+wcrtomb_l(buf, L'\e0', ps, loc)
 .Ed
 .Ss Locale Details
 Not all locales in the system are Unicode based locales.

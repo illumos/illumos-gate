@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd January 17, 2022
+.Dd December 2, 2023
 .Dt GETGROUPLIST 3C
 .Os
 .Sh NAME
@@ -157,7 +157,7 @@ printgroups(const char *user)
 
         (void) printf("%s ", gr->gr_name);
     }
-    (void) fputc('\\n', stdout);
+    (void) fputc('\en', stdout);
 
     free(groups);
 }

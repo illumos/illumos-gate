@@ -171,6 +171,9 @@
 #define	RCAP_SERVICE	"system/rcap:default"
 #define	POOLD_SERVICE	"system/pools/dynamic:default"
 
+#define	XML_PARSER_OPTIONS	(XML_PARSE_DTDLOAD | XML_PARSE_DTDVALID | \
+				XML_PARSE_NOBLANKS | XML_PARSE_NOWARNING)
+
 /*
  * rctl alias definitions
  *
@@ -341,12 +344,6 @@ zonecfg_init_handle(void)
 		return (NULL);
 	}
 
-	/* generic libxml initialization */
-	(void) xmlLineNumbersDefault(1);
-	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
-	xmlDoValidityCheckingDefaultValue = 1;
-	(void) xmlKeepBlanksDefault(0);
-	xmlGetWarningsDefaultValue = 0;
 	xmlSetGenericErrorFunc(NULL, zonecfg_error_func);
 
 	return (handle);
@@ -622,7 +619,8 @@ zonecfg_get_handle_impl(const char *zonename, const char *filename,
 	if (zonename == NULL)
 		return (Z_NO_ZONE);
 
-	if ((handle->zone_dh_doc = xmlParseFile(filename)) == NULL) {
+	handle->zone_dh_doc = xmlReadFile(filename, NULL, XML_PARSER_OPTIONS);
+	if (handle->zone_dh_doc == NULL) {
 		/* distinguish file not found vs. found but not parsed */
 		if (stat(filename, &statbuf) == 0)
 			return (Z_INVALID_DOCUMENT);
@@ -740,7 +738,8 @@ zonecfg_attach_manifest(int fd, zone_dochandle_t local_handle,
 	boolean_t valid;
 
 	/* load the manifest into the handle for the remote system */
-	if ((rem_handle->zone_dh_doc = xmlReadFd(fd, NULL, NULL, 0)) == NULL) {
+	rem_handle->zone_dh_doc = xmlReadFd(fd, NULL, NULL, XML_PARSER_OPTIONS);
+	if (rem_handle->zone_dh_doc == NULL) {
 		return (Z_INVALID_DOCUMENT);
 	}
 

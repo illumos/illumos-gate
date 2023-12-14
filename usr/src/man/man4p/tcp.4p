@@ -15,7 +15,7 @@
 .\" Copyright 2022 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
-.Dd "Jan 07, 2019"
+.Dd December 2, 2023
 .Dt TCP 4P
 .Os
 .Sh NAME
@@ -584,7 +584,7 @@ main(int argc, char *argv[])
 	int y = 1;
 
 	if (argc != 3) {
-		fprintf(stderr, "%s <host> <port>\\n", argv[0]);
+		fprintf(stderr, "%s <host> <port>\en", argv[0]);
 		return (1);
 	}
 
@@ -593,7 +593,7 @@ main(int argc, char *argv[])
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((rv = getaddrinfo(argv[1], argv[2], &hints, &gair)) != 0) {
-		fprintf(stderr, "getaddrinfo() failed: %s\\n",
+		fprintf(stderr, "getaddrinfo() failed: %s\en",
 		    gai_strerror(rv));
 		return (1);
 	}
@@ -617,7 +617,7 @@ main(int argc, char *argv[])
 	}
 
 	if (p == NULL) {
-		fprintf(stderr, "failed to connect to server\\n");
+		fprintf(stderr, "failed to connect to server\en");
 		return (1);
 	}
 
@@ -672,19 +672,19 @@ logmsg(struct sockaddr *s, int bytes)
 	case AF_INET: {
 		struct sockaddr_in *s4 = (struct sockaddr_in *)s;
 		inet_ntop(AF_INET, &s4->sin_addr, dq, sizeof (dq));
-		fprintf(stdout, "sent %d bytes to %s:%d\\n",
+		fprintf(stdout, "sent %d bytes to %s:%d\en",
 		    bytes, dq, ntohs(s4->sin_port));
 		break;
 	}
 	case AF_INET6: {
 		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)s;
 		inet_ntop(AF_INET6, &s6->sin6_addr, dq, sizeof (dq));
-		fprintf(stdout, "sent %d bytes to [%s]:%d\\n",
+		fprintf(stdout, "sent %d bytes to [%s]:%d\en",
 		    bytes, dq, ntohs(s6->sin6_port));
 		break;
 	}
 	default:
-		fprintf(stdout, "sent %d bytes to unknown client\\n",
+		fprintf(stdout, "sent %d bytes to unknown client\en",
 		    bytes);
 		break;
 	}
@@ -698,7 +698,7 @@ main(int argc, char *argv[])
 	int slen, wlen, rv;
 
 	if (argc != 3) {
-		fprintf(stderr, "%s <port> <message>\\n", argv[0]);
+		fprintf(stderr, "%s <port> <message>\en", argv[0]);
 		return (1);
 	}
 
@@ -710,7 +710,7 @@ main(int argc, char *argv[])
 	hints.ai_flags = AI_PASSIVE;
 
 	if ((rv = getaddrinfo(NULL, argv[1], &hints, &gair)) != 0) {
-		fprintf(stderr, "getaddrinfo() failed: %s\\n",
+		fprintf(stderr, "getaddrinfo() failed: %s\en",
 		    gai_strerror(rv));
 		return (1);
 	}
@@ -734,7 +734,7 @@ main(int argc, char *argv[])
 	}
 
 	if (p == NULL) {
-		fprintf(stderr, "server failed to bind()\\n");
+		fprintf(stderr, "server failed to bind()\en");
 		return (1);
 	}
 
@@ -745,7 +745,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	fprintf(stdout, "waiting for clients...\\n");
+	fprintf(stdout, "waiting for clients...\en");
 
 	for (int times = 0; times < 5; times++) {
 		struct sockaddr_storage stor;
@@ -774,11 +774,11 @@ main(int argc, char *argv[])
 		perror("close(sfd) failed");
 	}
 
-	fprintf(stdout, "finished.\\n");
+	fprintf(stdout, "finished.\en");
 
 	return (0);
 }
-$ ./server 8080 $'hello\\n'
+$ ./server 8080 $'hello\en'
 waiting for clients...
 sent 6 bytes to [::ffff:127.0.0.1]:59059
 sent 6 bytes to [::ffff:127.0.0.1]:47448

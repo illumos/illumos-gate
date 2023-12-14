@@ -43,6 +43,7 @@
 #include <unistd.h>
 
 #include <libxml/tree.h>
+#include <libxml/valid.h>
 
 #include <sys/mman.h>
 #include <sys/pool.h>
