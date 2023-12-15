@@ -940,6 +940,11 @@ try_again:
 			mutex_exit(&so->so_lock);
 			return (error);
 		}
+
+		/* See if new data has arrived in the meantime */
+		if (so->so_rcv_head != NULL)
+			goto again1;
+
 		/*
 		 * No pending data. Return right away for nonblocking
 		 * socket, otherwise sleep waiting for data.
@@ -956,9 +961,6 @@ try_again:
 					goto done;
 				}
 
-				if (so->so_rcv_head != NULL) {
-					goto again1;
-				}
 				so->so_rcv_wakeup = B_TRUE;
 				so->so_rcv_wanted = uiop->uio_resid;
 				if (so->so_rcvtimeo == 0) {
