@@ -11,6 +11,7 @@
 
 #
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -24,6 +25,7 @@ PROG=		testregex
 SHPROG=		regex_test
 
 DATA=		basic.dat basic.out \
+		bug16127.dat bug16127.out \
 		categorize.dat categorize.out \
 		forcedassoc.dat forcedassoc.out \
 		leftassoc.dat leftassoc.out \

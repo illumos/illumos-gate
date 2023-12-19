@@ -1,0 +1,30 @@
+NOTE test cases for illumos bug 16127
+#
+# This involved an erroneously implemented optimization which reduces
+# single-element sets to an exact match with a single codepoint.
+# Match sets record small-codepoint characters in a bitmap and large-codepoint
+# characters in an array; the optimization would falsely trigger if either
+# the bitmap or the array was a singleton, ignoring the members of the other
+# side of the set.
+#
+# To exercise this, we construct sets which have one member of one side and
+# one or more of the other, and verify that all members can be found.
+
+{C	C.UTF-8
+B	[aà]	a	(0,1)
+B	[aà]	à	(0,2)
+B	[aàá]	a	(0,1)
+B	[aàá]	à	(0,2)
+B	[aàá]	á	(0,2)
+B	[abà]	à	(0,2)
+B	[abà]	a	(0,1)
+B	[abà]	b	(0,1)
+E	[aà]	a	(0,1)
+E	[aà]	à	(0,2)
+E	[aàá]	a	(0,1)
+E	[aàá]	à	(0,2)
+E	[aàá]	á	(0,2)
+E	[abà]	à	(0,2)
+E	[abà]	a	(0,1)
+E	[abà]	b	(0,1)
+}
