@@ -74,7 +74,7 @@
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\"
-.Dd June 14, 2017
+.Dd December 26, 2023
 .Dt REGCOMP 3C
 .Os
 .Sh NAME
@@ -119,6 +119,14 @@ and
 .Fn regfree
 frees any dynamically-allocated storage used by the internal form
 of an RE.
+.Pp
+The translation of an RE into the internal form contained in a
+.Ft regex_t
+is inherently locale-specific; changes to the locale in effect between
+.Fn regcomp
+and subsequent calls to
+.Fn regexec
+may result in unexpected or undefined behavior.
 .Pp
 The header
 .In regex.h
@@ -244,6 +252,10 @@ The RE must have been compiled by a previous invocation of
 The compiled form is not altered during execution of
 .Fn regexec ,
 so a single compiled RE can be used simultaneously by multiple threads.
+The locale in effect at the time of
+.Fn regexec
+must be the same as the one in effect when the RE was compiled by
+.Fn regcomp .
 .Pp
 By default, the NUL-terminated string pointed to by
 .Fa string
@@ -748,9 +760,12 @@ The
 .Fn regcomp
 function can be used safely in a multithreaded application as long as
 .Xr setlocale 3C
-is not being called to change the locale.
+or
+.Xr uselocale 3C
+are not being called to change the locale.
 .Sh SEE ALSO
 .Xr attributes 7 ,
+.Xr locale 7 ,
 .Xr regex 7 ,
 .Xr standards 7
 .Pp

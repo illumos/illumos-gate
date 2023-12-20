@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
@@ -109,6 +110,7 @@ xmbrtowc_dummy(wint_t *wi, const char *s, size_t n __unused,
 /* no multibyte support */
 #define	XMBRTOWC	xmbrtowc_dummy
 #define	ZAPSTATE(mbs)	((void)(mbs))
+#define	NC_ENGINE NC_MAX
 /* function names */
 #define	SNAMES			/* engine.c looks after details */
 
@@ -136,6 +138,7 @@ xmbrtowc_dummy(wint_t *wi, const char *s, size_t n __unused,
 #undef	SNAMES
 #undef	XMBRTOWC
 #undef	ZAPSTATE
+#undef	NC_ENGINE
 
 /* macros for manipulating states, large version */
 #define	states	char *
@@ -164,6 +167,7 @@ xmbrtowc_dummy(wint_t *wi, const char *s, size_t n __unused,
 /* no multibyte support */
 #define	XMBRTOWC	xmbrtowc_dummy
 #define	ZAPSTATE(mbs)	((void)(mbs))
+#define	NC_ENGINE NC_MAX
 /* function names */
 #define	LNAMES			/* flag */
 
@@ -173,7 +177,9 @@ xmbrtowc_dummy(wint_t *wi, const char *s, size_t n __unused,
 #undef	LNAMES
 #undef	XMBRTOWC
 #undef	ZAPSTATE
+#undef	NC_ENGINE
 #define	XMBRTOWC	xmbrtowc
+#define	NC_ENGINE NC_WIDE
 #define	ZAPSTATE(mbs)	(void) memset((mbs), 0, sizeof (*(mbs)))
 #define	MNAMES
 
@@ -208,7 +214,7 @@ regexec(const regex_t *_RESTRICT_KYWD preg, const char *_RESTRICT_KYWD string,
 		return (REG_BADPAT);
 	eflags = GOODFLAGS(eflags);
 
-	if (MB_CUR_MAX > 1)
+	if (g->mb_cur_max > 1)
 		return (mmatcher(g, string, nmatch, pmatch, eflags));
 	else if (g->nstates <= CHAR_BIT*sizeof (states1) && !(eflags&REG_LARGE))
 		return (smatcher(g, string, nmatch, pmatch, eflags));

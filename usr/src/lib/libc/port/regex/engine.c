@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
@@ -149,19 +150,19 @@ static const char *pchar(int ch);
  * from current position pointed to by cur.
  */
 static const char *
-stepback(const char *start, const char *cur, int nchar)
+stepback(const char *start, const char *cur, int nchar, unsigned int max)
 {
 	const char *ret;
 	int wc, mbc;
 	mbstate_t mbs;
 	size_t clen;
 
-	if (MB_CUR_MAX == 1)
+	if (max == 1)
 		return ((cur - nchar) > start ? cur - nchar : NULL);
 
 	ret = cur;
 	for (wc = nchar; wc > 0; wc--) {
-		for (mbc = 1; mbc <= MB_CUR_MAX; mbc++) {
+		for (mbc = 1; mbc <= max; mbc++) {
 			if ((ret - mbc) < start)
 				return (NULL);
 			memset(&mbs, 0, sizeof (mbs));
@@ -169,7 +170,7 @@ stepback(const char *start, const char *cur, int nchar)
 			if (clen != (size_t)-1 && clen != (size_t)-2)
 				break;
 		}
-		if (mbc > MB_CUR_MAX)
+		if (mbc > max)
 			return (NULL);
 		ret -= mbc;
 	}
@@ -282,7 +283,7 @@ matcher(struct re_guts *g, const char *string, size_t nmatch,
 	if (dp != NULL && g->moffset > -1) {
 		const char *nstart;
 
-		nstart = stepback(start, dp, g->moffset);
+		nstart = stepback(start, dp, g->moffset, g->mb_cur_max);
 		if (nstart != NULL)
 			start = nstart;
 	}
@@ -632,7 +633,7 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 				return (NULL);
 			cs = &m->g->sets[OPND(s)];
 			sp += XMBRTOWC(&wc, sp, stop - sp, &m->mbs, BADCHAR);
-			if (wc == BADCHAR || !CHIN(cs, wc))
+			if (wc == BADCHAR || !CHIN(NC_ENGINE, cs, wc))
 				return (NULL);
 			break;
 		case OBOL:
@@ -950,7 +951,7 @@ step(struct re_guts *g,
 			break;
 		case OANYOF:
 			cs = &g->sets[OPND(s)];
-			if (!NONCHAR(ch) && CHIN(cs, ch))
+			if (!NONCHAR(ch) && CHIN(NC_ENGINE, cs, ch))
 				FWD(aft, bef, 1);
 			break;
 		case OBACK_:		/* ignored here */
