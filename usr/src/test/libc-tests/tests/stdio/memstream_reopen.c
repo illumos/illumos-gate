@@ -50,7 +50,7 @@ check_reopen(FILE *f, const char *variant)
 
 	if (errno != EBADF) {
 		errx(EXIT_FAILURE, "TEST FAILED: found wrong errno for %s: "
-		    "expected %d, found %d", EBADF, errno);
+		    "expected %d, found %d", variant, EBADF, errno);
 	}
 
 	(void) printf("TEST PASSED: %s\n", variant);

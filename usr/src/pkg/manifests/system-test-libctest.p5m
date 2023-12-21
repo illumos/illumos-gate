@@ -166,6 +166,8 @@ dir  path=opt/libc-tests/tests/regex
 dir  path=opt/libc-tests/tests/regex/data
 file path=opt/libc-tests/tests/regex/data/basic.dat mode=0444
 file path=opt/libc-tests/tests/regex/data/basic.out mode=0444
+file path=opt/libc-tests/tests/regex/data/bug16127.dat mode=0444
+file path=opt/libc-tests/tests/regex/data/bug16127.out mode=0444
 file path=opt/libc-tests/tests/regex/data/categorize.dat mode=0444
 file path=opt/libc-tests/tests/regex/data/categorize.out mode=0444
 file path=opt/libc-tests/tests/regex/data/forcedassoc.dat mode=0444

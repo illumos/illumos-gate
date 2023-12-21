@@ -623,7 +623,8 @@ cpcgen_determine_vendor(const char *datadir)
 		cpcgen_mode = CPCGEN_MODE_INTEL;
 	} else {
 		if (errno != ENOENT) {
-			err(EXIT_FAILURE, "stat(2) of %s failed unexpectedly");
+			err(EXIT_FAILURE, "stat(2) of %s failed unexpectedly",
+			    mappath);
 		}
 
 		cpcgen_mode = CPCGEN_MODE_AMD;
@@ -1735,7 +1736,7 @@ cpcgen_cfile_amd_event(FILE *f, nvlist_t *nvl, const char *path, uint_t ent)
 
 	if (nvlist_lookup_string(nvl, "code", &code) != 0) {
 		warnx("event %s (index %u) from %s missing required properties "
-		    "for C translation", name, path, ent);
+		    "for C translation", name, ent, path);
 		return (B_FALSE);
 	}
 

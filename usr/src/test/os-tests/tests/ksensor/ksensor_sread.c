@@ -80,7 +80,7 @@ main(int argc, const char *argv[])
 
 		if (scalar.sis_unit != SENSOR_UNIT_CELSIUS) {
 			warnx("data from sensor %s looks off, expected sensor "
-			    "to indicate Celsius, but instead %u",
+			    "to indicate Celsius, but instead %u", buf,
 			    scalar.sis_unit);
 		}
 

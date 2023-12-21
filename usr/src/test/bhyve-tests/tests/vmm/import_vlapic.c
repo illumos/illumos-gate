@@ -108,7 +108,7 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "could not emulate MMIO of LAPIC CCR");
 	}
 	if (ccr_value != TIMER_TEST_VAL) {
-		errx(EXIT_FAILURE, "CCR not clamped: %lx != %lx",
+		errx(EXIT_FAILURE, "CCR not clamped: %lx != %x",
 		    ccr_value, TIMER_TEST_VAL);
 	}
 

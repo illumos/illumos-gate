@@ -5036,7 +5036,7 @@ pcieadm_cfgspace(pcieadm_t *pcip, pcieadm_cfgspace_op_t op,
 		headshort = "headerX";
 		header = pcieadm_cfgspace_unknown;
 		warnx("unsupported PCI header type: 0x%x, output limited to "
-		    "data configuration space");
+		    "data configuration space", type);
 	}
 
 	walk.pcw_dtype = type;

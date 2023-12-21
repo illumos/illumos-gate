@@ -14,7 +14,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 [DEFAULT]
@@ -103,3 +103,4 @@ user = root
 user = root
 
 [/opt/util-tests/tests/ar/artest]
+[/opt/util-tests/tests/cpio/cpio_test]

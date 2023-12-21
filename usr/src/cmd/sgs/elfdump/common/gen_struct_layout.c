@@ -910,7 +910,7 @@ get_field_info(char *tname, char *fname, char *dotname,
 	}
 
 	if (rc < 0)
-		errx(1, "Error getting info for %s.%s", stype, fname);
+		errx(1, "Error getting info for %s.%s", tname, fname);
 	if (rc == 0)
 		errx(1, "Did not find %s.%s", tname, fname);
 

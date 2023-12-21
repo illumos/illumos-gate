@@ -411,7 +411,7 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 	path = di_devfs_path(node);
 	if (path == NULL) {
 		err(EXIT_FAILURE, "failed to construct devfs path for node: "
-		    "%s (%s)", di_node_name(node));
+		    "%s", di_node_name(node));
 	}
 
 	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "reg", &regs);

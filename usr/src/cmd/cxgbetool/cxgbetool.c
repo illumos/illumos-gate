@@ -252,7 +252,7 @@ load_fw(int argc, char *argv[], int start_arg, const char *iff_name)
 
 	fw = malloc(sizeof (struct t4_ldfw) + len);
 	if (!fw) {
-		warn("%s: %s allocate %ld bytes failed",
+		warn("%s: %s allocate %zu bytes failed",
 		    __func__, fname, sizeof (struct t4_ldfw) + len);
 		close(fd);
 		exit(1);
@@ -333,7 +333,7 @@ do_collect(char *dbg_entity_list, const char *iff_name, const char *fname)
 
 	cudbg = malloc(sizeof(struct t4_cudbg_dump) + CUDBG_SIZE);
 	if (!cudbg) {
-		err(1, "%s:allocate %ld bytes failed", __func__, CUDBG_SIZE);
+		err(1, "%s:allocate %d bytes failed", __func__, CUDBG_SIZE);
 	}
 
 	memset(cudbg, 0, sizeof(struct t4_cudbg_dump) + CUDBG_SIZE);
@@ -745,7 +745,7 @@ cxgbetool_parse_path(char *arg)
 		    "/devices%s", bpath) >= sizeof (cxgbetool_nexus)) {
 			errx(EXIT_FAILURE, "failed to construct full /devices "
 			    "path for %s: internal path buffer would have "
-			    "overflowed");
+			    "overflowed", bpath);
 		}
 		di_devfs_path_free(bpath);
 

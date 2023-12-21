@@ -1776,7 +1776,7 @@ do_format(int fd, const nvme_process_arg_t *npa)
 		lbaf = strtoul(npa->npa_argv[0], NULL, 10);
 
 		if (errno != 0 || lbaf > NVME_FRMT_MAX_LBAF)
-			errx(-1, "invalid LBA format %d", lbaf + 1);
+			errx(-1, "invalid LBA format %lu", lbaf + 1);
 
 		if (npa->npa_idns->id_lbaf[lbaf].lbaf_ms != 0)
 			errx(-1, "LBA formats with metadata not supported");

@@ -47,7 +47,7 @@ xsu_hwsupport(void)
 	uint_t nisa = getisax(isa, ARRAY_SIZE(isa));
 
 	if (nisa != ARRAY_SIZE(isa)) {
-		errx(EXIT_FAILURE, "did not get all %u hwcap values, found %u",
+		errx(EXIT_FAILURE, "did not get all %zu hwcap values, found %u",
 		    ARRAY_SIZE(isa), nisa);
 	}
 
@@ -569,8 +569,8 @@ xsu_proc_finish(xsu_proc_t *xp)
 	}
 
 	if (waitpid(pid, &xp->xp_wait, 0) != pid) {
-		err(EXIT_FAILURE, "failed to get our child processes's wait "
-		    "info", pid);
+		err(EXIT_FAILURE, "failed to get our child processes's (%"
+		    _PRIdID "), wait info", pid);
 	}
 
 	if (WIFEXITED(xp->xp_wait) == 0) {

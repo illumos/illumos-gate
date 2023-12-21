@@ -409,6 +409,25 @@ extern "C" {
 #define	_SCNuID			_PRIuID
 #define	_SCNXID			_PRIXID
 
+/*
+ * The following are set up for the wint_t and wchar_t which have the same
+ * general problem. They have the same types as above, but we use unique macros
+ * to help readers.
+ */
+#define	_PRIdWC			_PRIdID
+#define	_PRIiWC			_PRIiID
+#define	_PRIoWC			_PRIoID
+#define	_PRIxWC			_PRIxID
+#define	_PRIuWC			_PRIuID
+#define	_PRIXWC			_PRIXID
+#define	_SCNdWC			_PRIdID
+#define	_SCNiWC			_PRIiID
+#define	_SCNoWC			_PRIoID
+#define	_SCNxWC			_PRIxID
+#define	_SCNuWC			_PRIuID
+#define	_SCNXWC			_PRIXID
+
+
 #endif	/* _STRICT_SYMBOLS */
 
 #ifdef __cplusplus

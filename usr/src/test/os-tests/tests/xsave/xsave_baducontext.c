@@ -38,7 +38,7 @@
 #include "xsave_util.h"
 
 static void *xsave_buf;
-static const char *curtest;
+static volatile const char *curtest;
 
 static void
 bad_success(void)
@@ -245,6 +245,7 @@ main(int argc, char *argv[])
 
 	ucontext_t *ctx = setup_context();
 	VERIFY3U(ctx->uc_xsave, !=, 0);
+	curtest = tests[l].bct_test;
 	tests[l].bct_func(ctx);
 	(void) setcontext(ctx);
 	errx(EXIT_FAILURE, "TEST FAILED: setcontext returned despite us "

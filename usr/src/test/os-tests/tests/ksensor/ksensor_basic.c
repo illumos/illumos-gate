@@ -72,7 +72,7 @@ ksensor_basic(sensor_test_t *st)
 
 	if (kind.sik_kind != st->st_kind) {
 		warnx("TEST FAILED: %s: expected kind %" PRIu64 ", found kind %"
-		    PRIu64, st->st_path, st->st_kind, kind);
+		    PRIu64, st->st_path, st->st_kind, kind.sik_kind);
 		goto err;
 	}
 

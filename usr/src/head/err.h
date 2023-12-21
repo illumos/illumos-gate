@@ -39,18 +39,18 @@ extern "C" {
 #include <sys/ccompile.h>
 
 /* Program exit and warning calls */
-void err(int, const char *, ...) __NORETURN;
-void verr(int, const char *, va_list) __NORETURN;
-void errc(int, int, const char *, ...) __NORETURN;
-void verrc(int, int, const char *, va_list) __NORETURN;
-void errx(int, const char *, ...) __NORETURN;
-void verrx(int, const char *, va_list) __NORETURN;
-void warn(const char *, ...);
-void vwarn(const char *, va_list);
-void warnc(int, const char *, ...);
-void vwarnc(int, const char *, va_list);
-void warnx(const char *, ...);
-void vwarnx(const char *, va_list);
+void err(int, const char *, ...) __PRINTFLIKE(2) __NORETURN;
+void verr(int, const char *, va_list) __VPRINTFLIKE(2) __NORETURN;
+void errc(int, int, const char *, ...) __PRINTFLIKE(3) __NORETURN;
+void verrc(int, int, const char *, va_list) __VPRINTFLIKE(3) __NORETURN;
+void errx(int, const char *, ...) __PRINTFLIKE(2) __NORETURN;
+void verrx(int, const char *, va_list) __VPRINTFLIKE(2) __NORETURN;
+void warn(const char *, ...) __PRINTFLIKE(1);
+void vwarn(const char *, va_list) __VPRINTFLIKE(1);
+void warnc(int, const char *, ...) __PRINTFLIKE(2);
+void vwarnc(int, const char *, va_list) __VPRINTFLIKE(2);
+void warnx(const char *, ...) __PRINTFLIKE(1);
+void vwarnx(const char *, va_list) __VPRINTFLIKE(1);
 
 #ifdef __cplusplus
 }

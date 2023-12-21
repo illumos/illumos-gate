@@ -13,12 +13,13 @@
 
 #
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
 TESTDIR=$(dirname $0)
 TREGEX=${TESTDIR}/testregex
 
-for t in basic categorize forcedassoc leftassoc \
+for t in basic bug16127 categorize forcedassoc leftassoc \
     nullsubexpr repetition rightassoc; do
 	${TREGEX} -F ${TESTDIR}/data/${t}.dat | \
 	    diff -u - ${TESTDIR}/data/${t}.out || \

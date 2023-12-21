@@ -53,7 +53,7 @@ main(int argc, char *argv[])
 	ret = read(fd, buf, sizeof (buf));
 	if (ret != -1) {
 		errx(EXIT_FAILURE, "read succeeded when it should have failed "
-		    "(EACCES case), returned %ld", ret);
+		    "(EACCES case), returned %zd", ret);
 	}
 
 	if (errno != EACCES) {
@@ -68,7 +68,7 @@ main(int argc, char *argv[])
 	ret = read(fd, buf, sizeof (buf));
 	if (ret != -1) {
 		errx(EXIT_FAILURE, "read succeeded when it should have failed "
-		    "(ENODATA case), returned %ld", ret);
+		    "(ENODATA case), returned %zd", ret);
 	}
 
 	if (errno != ENODATA) {

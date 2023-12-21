@@ -28,6 +28,10 @@
 /*	All Rights Reserved					*/
 
 /*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
@@ -76,11 +80,7 @@
 /*
  * Special kludge for off_t being a signed quantity.
  */
-#if _FILE_OFFSET_BITS == 64
-typedef	u_longlong_t	u_off_t;
-#else
 typedef	ulong_t		u_off_t;
-#endif
 
 #define	SECMODE	0xe080
 
@@ -117,17 +117,26 @@ typedef	ulong_t		u_off_t;
     path : Gen.g_attrnam_p), statbuf, 0)
 
 /*
+ * Convert from and to old dev_t formats.
+ */
+#define	SVR3_MAJOR(x)	((major_t)((dev_t)(x) >> ONBITSMINOR) & OMAXMAJ)
+#define	SVR3_MINOR(x)	((minor_t)((dev_t)(x) & OMAXMIN))
+#define	TO_SVR3(maj, min) \
+	((((ushort_t)(maj) & OMAXMAJ) << ONBITSMINOR) | \
+	((ushort_t)(min) & OMAXMIN))
+
+/*
  *	These limits reflect the maximum size regular file that
  *	can be archived, depending on the archive type. For archives
  *	with character-format headers (odc, tar, ustar) we use
  *	CHAR_OFFSET_MAX.  For archives with SVR4 ASCII headers (-c, -H crc)
  *	we store filesize in an 8-char hexadecimal string and use
  *	ASC_OFFSET_MAX.  Otherwise, we are limited to the size that will
- *	fit in a signed long value.
+ *	fit in a signed int value.
  */
 #define	CHAR_OFFSET_MAX	077777777777ULL	/* 11 octal digits */
 #define	ASC_OFFSET_MAX	0XFFFFFFFF	/* 8 hexadecimal digits */
-#define	BIN_OFFSET_MAX	LONG_MAX	/* signed long max value */
+#define	BIN_OFFSET_MAX	INT_MAX		/* signed int max value */
 
 #define	POSIXMODES	07777
 
@@ -139,7 +148,7 @@ static void bflush(void);
 static int chgreel(int dir);
 static int ckname(int);
 static void ckopts(long mask);
-static long cksum(char hdr, int byt_cnt, int *err);
+static uint_t cksum(char hdr, int byt_cnt, int *err);
 static int creat_hdr(void);
 static int creat_lnk(int dirfd, char *name1_p, char *name2_p);
 static int creat_spec(int dirfd);
@@ -228,7 +237,7 @@ struct buf_info {
 		*b_out_p,	/* Position to take bytes from buffer at */
 		*b_in_p,	/* Position to put bytes into buffer at */
 		*b_end_p;	/* Pointer to end of buffer */
-	long	b_cnt,		/* Count of unprocessed bytes */
+	int	b_cnt,		/* Count of unprocessed bytes */
 		b_size;		/* Size of buffer in bytes */
 } Buffr;
 
@@ -236,7 +245,7 @@ struct buf_info {
 
 static
 struct gen_hdr {
-	ulong_t	g_magic,	/* Magic number field */
+	uint_t	g_magic,	/* Magic number field */
 		g_ino,		/* Inode number of file */
 		g_mode,		/* Mode of file */
 		g_uid,		/* Uid of file */
@@ -244,9 +253,9 @@ struct gen_hdr {
 		g_nlink,	/* Number of links */
 		g_mtime;	/* Modification time */
 	off_t	g_filesz;	/* Length of file */
-	ulong_t	g_dev,		/* File system of file */
-		g_rdev,		/* Major/minor numbers of special files */
-		g_namesz,	/* Length of filename */
+	dev_t	g_dev,		/* File system of file */
+		g_rdev;		/* Major/minor numbers of special files */
+	uint_t	g_namesz,	/* Length of filename */
 		g_cksum;	/* Checksum of file */
 	char	g_gname[32],
 		g_uname[32],
@@ -311,7 +320,7 @@ typedef struct sl_info
 	struct sl_info *llink;	/* Left subtree ptr (tree depth in *sl_head) */
 	struct sl_info *rlink;	/* Right subtree ptr */
 	int bal;		/* Subtree balance factor */
-	ulong_t	sl_count;	/* Number of symlinks */
+	uint_t	sl_count;	/* Number of symlinks */
 	int	sl_ftype;	/* file type of inode */
 	ino_t	sl_ino;		/* Inode of file */
 	ino_t	sl_ino2;	/* alternate inode for -Hodc */
@@ -359,7 +368,7 @@ typedef struct sl_remap
 
 static sl_info_t	*sl_info_alloc(void);
 static sl_info_t	*sl_insert(dev_t, ino_t, int);
-static ulong_t		sl_numlinks(dev_t, ino_t, int);
+static uint_t		sl_numlinks(dev_t, ino_t, int);
 static void		sl_preview_synonyms(void);
 static void		sl_remember_tgt(const struct stat *, int, int);
 static sl_info_t	*sl_search(dev_t, ino_t, int);
@@ -413,7 +422,7 @@ static
 union swpbuf {
 	unsigned char	s_byte[4];
 	ushort_t	s_half[2];
-	ulong_t	s_word;
+	uint_t	s_word;
 } *Swp_p;
 
 static
@@ -490,14 +499,14 @@ static
 int	Bufsize = BUFSZ;	/* Default block size */
 
 
-static u_longlong_t    Blocks;	/* full blocks transferred */
-static u_longlong_t    SBlocks;	/* cumulative char count from short reads */
+static ulong_t    Blocks;	/* full blocks transferred */
+static ulong_t    SBlocks;	/* cumulative char count from short reads */
 
 
 static off_t	Max_offset = BIN_OFFSET_MAX;	/* largest file size */
 static off_t	Max_filesz;			/* from getrlimit */
 
-static ulong_t	Savedev;
+static uint_t	Savedev;
 
 static
 FILE	*Ef_p,			/* File pointer of pattern input file */
@@ -747,7 +756,7 @@ main(int argc, char **argv)
 		}
 		/* Do not count "extra" "read-ahead" buffered data */
 		if (Buffr.b_cnt > Bufsize)
-			Blocks -=  (u_longlong_t)(Buffr.b_cnt / Bufsize);
+			Blocks -=  (Buffr.b_cnt / Bufsize);
 		break;
 	case OCo: /* COPY OUT */
 		if (Args & OCA) {
@@ -827,9 +836,9 @@ main(int argc, char **argv)
 			msg(EXTN, "close error");
 	}
 	if ((Args & OCq) == 0) {
-		Blocks = (u_longlong_t)(Blocks * Bufsize + SBlocks +
+		Blocks = (ulong_t)(Blocks * Bufsize + SBlocks +
 		    0x1FF) >> 9;
-		msg(EPOST, "%lld blocks", Blocks);
+		msg(EPOST, "%ld blocks", Blocks);
 	}
 	if (Error_cnt)
 		msg(EPOST, "%d error(s)", Error_cnt);
@@ -941,7 +950,7 @@ bfill(void)
 		} /* (rv = g_read(Device, Archive ... */
 		if (Hdr_type != BAR || rv == Bufsize) {
 			Buffr.b_in_p += rv;
-			Buffr.b_cnt += (long)rv;
+			Buffr.b_cnt += rv;
 		}
 		if (rv == Bufsize) {
 			eof = 0;
@@ -966,7 +975,7 @@ bfill(void)
 			continue;
 		} else {
 			eof = 0;
-			SBlocks += (u_longlong_t)rv;
+			SBlocks += (ulong_t)rv;
 		}
 	} /* (Buffr.b_end_p - Buffr.b_in_p) <= Bufsize */
 
@@ -976,7 +985,7 @@ bfill(void)
 			return (-1);
 		} /* (rv = g_read(Device, Archive ... */
 		Buffr.b_in_p += rv;
-		Buffr.b_cnt += (long)rv;
+		Buffr.b_cnt += rv;
 		if (rv == Bufsize) {
 			eof = 0;
 			Blocks++;
@@ -988,7 +997,7 @@ bfill(void)
 			return (-1);
 		} else {
 			eof = 0;
-			SBlocks += (u_longlong_t)rv;
+			SBlocks += (ulong_t)rv;
 		}
 	}
 	return (rv);
@@ -1014,11 +1023,11 @@ bflush(void)
 				ioerror(OUTPUT);
 		}
 		Buffr.b_out_p += rv;
-		Buffr.b_cnt -= (long)rv;
+		Buffr.b_cnt -= rv;
 		if (rv == Bufsize)
 			Blocks++;
 		else if (rv > 0)
-			SBlocks += (u_longlong_t)rv;
+			SBlocks += (ulong_t)rv;
 	}
 	rstbuf();
 }
@@ -1445,12 +1454,12 @@ ckopts(long mask)
  * header initialized to all spaces (\040).
  */
 
-static long
+static uint_t
 cksum(char hdr, int byt_cnt, int *err)
 {
 	char *crc_p, *end_p;
 	int cnt;
-	long checksum = 0L, have;
+	uint_t checksum = 0, have;
 	off_t lcnt;
 
 	if (err != NULL)
@@ -1460,7 +1469,7 @@ cksum(char hdr, int byt_cnt, int *err)
 		if (Args & OCi) { /* do running checksum */
 			end_p = Buffr.b_out_p + byt_cnt;
 			for (crc_p = Buffr.b_out_p; crc_p < end_p; crc_p++)
-				checksum += (long)*crc_p;
+				checksum += (uint_t)*crc_p;
 			break;
 		}
 		/* OCo - do checksum of file */
@@ -1606,7 +1615,7 @@ creat_hdr(void)
 				Gen.g_tname = Gen.g_nam_p;
 			}
 			(void) strcpy(Gen.g_tmagic, "ustar");
-			(void) strcpy(Gen.g_version, "00");
+			(void) memcpy(Gen.g_version, "00", 2);
 
 			dpasswd = getpwuid(SrcSt.st_uid);
 			if (dpasswd == NULL) {
@@ -1686,7 +1695,7 @@ creat_hdr(void)
 		sl_info_t *p = sl_search(dev, ino, ftype);
 		Gen.g_ino = p ? p->sl_ino2 : -1;
 
-		if (Gen.g_ino == (ulong_t)-1) {
+		if (Gen.g_ino == UINT_MAX) {
 			msg(ERR, "%s%s%s: cannot be archived - inode too big "
 			    "for -Hodc format",
 			    (Gen.g_attrnam_p == NULL) ?
@@ -1978,7 +1987,6 @@ creat_spec(int dirfd)
 			 * Note that, for a socket, the third
 			 * parameter to mknod() is ignored.
 			 */
-
 			result = mknod(nam_p, (int)G_p->g_mode,
 			    (int)G_p->g_rdev);
 		}
@@ -2115,8 +2123,8 @@ creat_tmp(char *nam_p)
 	 */
 
 	if (G_p->g_typeflag == 0 &&
-	    (DesSt.st_mode & (ulong_t)Ftype) == S_IFREG &&
-	    (G_p->g_mode & (ulong_t)Ftype) == S_IFREG) {
+	    (DesSt.st_mode & (uint_t)Ftype) == S_IFREG &&
+	    (G_p->g_mode & (uint_t)Ftype) == S_IFREG) {
 		/*
 		 * The archive file and the filesystem file are both regular
 		 * files.  We write to the temporary file in this case.
@@ -2334,7 +2342,7 @@ write_bytes(int ofd, char *buf, size_t maxwrite, data_in_t *data_in_info)
 			data_in_info->data_in_wr_part = 1;
 		return (1);
 	} else if (Args & OCp) {
-		Blocks += (u_longlong_t)((cnt + (Bufsize - 1)) / Bufsize);
+		Blocks += (ulong_t)((cnt + (Bufsize - 1)) / Bufsize);
 	}
 	return (0);
 }
@@ -2687,7 +2695,7 @@ data_in(int proc_mode)
 		proc_mode = P_SKIP;
 		VERBOSE((Args & (OCv | OCV)), nam_p);
 	}
-	if (Args & (OCb | OCs | OCS)) { /* verfify that swapping is possible */
+	if (Args & (OCb | OCs | OCS)) { /* verify that swapping is possible */
 		swapfile = 1;
 		if (Args & (OCs | OCb) && G_p->g_filesz % 2) {
 			msg(ERR,
@@ -2865,7 +2873,7 @@ read_file(char *nam_p, off_t file_size, off_t *real_filesz,
 		}
 
 		Buffr.b_in_p += amount_read;
-		Buffr.b_cnt += (long)amount_read;
+		Buffr.b_cnt += amount_read;
 
 		amt_to_read -= (off_t)amount_read;
 		if (!read_exact &&
@@ -3118,9 +3126,9 @@ data_out(void)
 	}
 
 	if (Hdr_type == CRC) {
-		long csum = cksum(CRC, 0, &errret);
+		uint_t csum = cksum(CRC, 0, &errret);
 		if (errret != 0) {
-			G_p->g_cksum = (ulong_t)-1;
+			G_p->g_cksum = UINT_MAX;
 			msg(POST, "\"%s%s%s\" skipped",
 			    (Gen.g_attrnam_p == NULL) ?
 			    nam_p : Gen.g_attrfnam_p,
@@ -3834,7 +3842,7 @@ verify_attr_support(char *filename, int attrflg, arc_action_t actflag,
 		return (ATTR_SKIP);
 	}
 
-return (ATTR_OK);
+	return (ATTR_OK);
 }
 #endif
 
@@ -4593,7 +4601,7 @@ gethdr(void)
 					}
 				}
 			} else if (hit != BAR) { /* binary, -c, ASC and CRC */
-				if (Gen.g_nlink <= (ulong_t)0)
+				if (Gen.g_nlink <= 0)
 					goodhdr = 0;
 				if (*(Buffr.b_out_p + hsize - 1) != '\0')
 					goodhdr = 0;
@@ -4912,8 +4920,8 @@ gethdr(void)
 				switch (attr->attr_type) {
 				case UFSD_ACL:
 				case ACE_ACL:
-					(void) sscanf(attr->attr_len, "%7lo",
-					    (ulong_t *)&aclcnt);
+					(void) sscanf(attr->attr_len, "%7o",
+					    (uint_t *)&aclcnt);
 					/* header is 8 */
 					attrsize = 8 +
 					    strlen(&attr->attr_info[0])
@@ -4944,9 +4952,9 @@ gethdr(void)
 				default:
 					msg(EXT, "unrecognized attr type");
 					break;
-			}
-			/* next attributes */
-			tp += attrsize;
+				}
+				/* next attributes */
+				tp += attrsize;
 			} while (bytes > 0);
 			free(secp);
 		} else {
@@ -5418,7 +5426,6 @@ mkshort(short sval[], long v)
 {
 	union swpbuf *swp_p, swp_b;
 
-	/* LINTED alignment */
 	swp_p = (union swpbuf *)sval;
 	swp_b.s_word = 1;
 	if (swp_b.s_byte[0]) {
@@ -5845,6 +5852,12 @@ read_hdr(int hdr)
 		Gen.g_ino = Hdr.h_ino;
 		Gen.g_dev = Hdr.h_dev;
 		Gen.g_rdev = Hdr.h_rdev;
+		maj = SVR3_MAJOR(Gen.g_dev);
+		rmaj = SVR3_MAJOR(Gen.g_rdev);
+		min = SVR3_MINOR(Gen.g_dev);
+		rmin = SVR3_MINOR(Gen.g_rdev);
+		Gen.g_dev = makedev(maj, min);
+		Gen.g_rdev = makedev(rmaj, rmin);
 		Gen.g_cksum = 0L;
 		Gen.g_filesz = (off_t)mklong(Hdr.h_filesize);
 		Gen.g_namesz = Hdr.h_namesize;
@@ -5852,34 +5865,32 @@ read_hdr(int hdr)
 		break;
 	case CHR:
 		if (sscanf(Buffr.b_out_p,
-		    "%6lo%6lo%6lo%6lo%6lo%6lo%6lo%6lo%11lo%6o%11llo",
+		    "%6o%6o%6o%6o"
+		    "%6" _SCNoID "%6" _SCNoID
+		    "%6o%6o%11o%6o%11lo",
 		    &Gen.g_magic, &Gen.g_dev, &Gen.g_ino, &Gen.g_mode,
-		    &Gen.g_uid, &Gen.g_gid, &Gen.g_nlink, &Gen.g_rdev,
-		    (ulong_t *)&Gen.g_mtime, (uint_t *)&Gen.g_namesz,
+		    &Gen.g_uid, &Gen.g_gid,
+		    &Gen.g_nlink, &Gen.g_rdev,
+		    (uint_t *)&Gen.g_mtime, (uint_t *)&Gen.g_namesz,
 		    (u_off_t *)&Gen.g_filesz) == CHR_CNT) {
 			rv = CHR;
-#define	cpioMAJOR(x)	(int)(((unsigned)x >> 8) & 0x7F)
-#define	cpioMINOR(x)	(int)(x & 0xFF)
-			maj = cpioMAJOR(Gen.g_dev);
-			rmaj = cpioMAJOR(Gen.g_rdev);
-			min = cpioMINOR(Gen.g_dev);
-			rmin = cpioMINOR(Gen.g_rdev);
-			if (Use_old_stat) {
-				/* needs error checking */
-				Gen.g_dev = (maj << 8) | min;
-				Gen.g_rdev = (rmaj << 8) | rmin;
-			} else {
-				Gen.g_dev = makedev(maj, min);
-				Gen.g_rdev = makedev(rmaj, rmin);
-			}
+			maj = SVR3_MAJOR(Gen.g_dev);
+			rmaj = SVR3_MAJOR(Gen.g_rdev);
+			min = SVR3_MINOR(Gen.g_dev);
+			rmin = SVR3_MINOR(Gen.g_rdev);
+			Gen.g_dev = makedev(maj, min);
+			Gen.g_rdev = makedev(rmaj, rmin);
 		}
 		break;
 	case ASC:
 	case CRC:
 		if (sscanf(Buffr.b_out_p,
-		    "%6lx%8lx%8lx%8lx%8lx%8lx%8lx%8llx%8x%8x%8x%8x%8x%8lx",
-		    &Gen.g_magic, &Gen.g_ino, &Gen.g_mode, &Gen.g_uid,
-		    &Gen.g_gid, &Gen.g_nlink, &Gen.g_mtime,
+		    "%6x%8x%8x"
+		    "%8" _SCNxID "%8" _SCNxID
+		    "%8x%8x%8lx%8x%8x%8x%8x%8x%8x",
+		    &Gen.g_magic, &Gen.g_ino, &Gen.g_mode,
+		    &Gen.g_uid, &Gen.g_gid,
+		    &Gen.g_nlink, &Gen.g_mtime,
 		    (u_off_t *)&Gen.g_filesz, (uint_t *)&maj, (uint_t *)&min,
 		    (uint_t *)&rmaj, (uint_t *)&rmin, (uint_t *)&Gen.g_namesz,
 		    &Gen.g_cksum) == ASC_CNT) {
@@ -5897,16 +5908,18 @@ read_hdr(int hdr)
 			Gen.g_nam_p[0] = '\0';
 			(void) strncpy((char *)&nambuf,
 			    Thdr_p->tbuf.t_name, NAMSIZ);
-			(void) sscanf(Thdr_p->tbuf.t_mode, "%8lo",
+			(void) sscanf(Thdr_p->tbuf.t_mode, "%8o",
 			    &Gen.g_mode);
-			(void) sscanf(Thdr_p->tbuf.t_uid, "%8lo", &Gen.g_uid);
-			(void) sscanf(Thdr_p->tbuf.t_gid, "%8lo", &Gen.g_gid);
-			(void) sscanf(Thdr_p->tbuf.t_size, "%11llo",
+			(void) sscanf(Thdr_p->tbuf.t_uid, "%8" _SCNoID,
+			    &Gen.g_uid);
+			(void) sscanf(Thdr_p->tbuf.t_gid, "%8" _SCNoID,
+			    &Gen.g_gid);
+			(void) sscanf(Thdr_p->tbuf.t_size, "%12lo",
 			    (u_off_t *)&Gen.g_filesz);
-			(void) sscanf(Thdr_p->tbuf.t_mtime, "%12lo",
-			    (ulong_t *)&Gen.g_mtime);
-			(void) sscanf(Thdr_p->tbuf.t_cksum, "%8lo",
-			    (ulong_t *)&Gen.g_cksum);
+			(void) sscanf(Thdr_p->tbuf.t_mtime, "%12o",
+			    (uint_t *)&Gen.g_mtime);
+			(void) sscanf(Thdr_p->tbuf.t_cksum, "%8o",
+			    (uint_t *)&Gen.g_cksum);
 			if (Thdr_p->tbuf.t_linkname[0] != '\0')
 				Gen.g_nlink = 1;
 			else
@@ -5931,24 +5944,20 @@ read_hdr(int hdr)
 				break;
 			}
 
-			(void) sscanf(Thdr_p->tbuf.t_magic, "%8lo",
-			    /* LINTED alignment */
-			    (ulong_t *)&Gen.g_tmagic);
-			(void) sscanf(Thdr_p->tbuf.t_version, "%8lo",
-			    /* LINTED alignment */
-			    (ulong_t *)&Gen.g_version);
+			(void) sscanf(Thdr_p->tbuf.t_magic, "%6o",
+			    (uint_t *)&Gen.g_tmagic);
+			(void) sscanf(Thdr_p->tbuf.t_version, "%2o",
+			    (uint_t *)&Gen.g_version);
 			(void) sscanf(Thdr_p->tbuf.t_uname, "%32s",
 			    (char *)&Gen.g_uname);
 			(void) sscanf(Thdr_p->tbuf.t_gname, "%32s",
 			    (char *)&Gen.g_gname);
-			(void) sscanf(Thdr_p->tbuf.t_devmajor, "%8lo",
-			    &Gen.g_dev);
-			(void) sscanf(Thdr_p->tbuf.t_devminor, "%8lo",
-			    &Gen.g_rdev);
+			(void) sscanf(Thdr_p->tbuf.t_devmajor, "%8o", &maj);
+			(void) sscanf(Thdr_p->tbuf.t_devminor, "%8o", &min);
 			(void) strncpy((char *)&prebuf,
 			    Thdr_p->tbuf.t_prefix, PRESIZ);
 			Gen.g_namesz = strlen(Gen.g_nam_p) + 1;
-			Gen.g_dev = makedev(maj, min);
+			Gen.g_rdev = makedev(maj, min);
 		}
 		rv = USTAR;
 		break;
@@ -5959,14 +5968,16 @@ read_hdr(int hdr)
 		} else {
 			Thdr_p = (union tblock *)Buffr.b_out_p;
 			Gen.g_nam_p[0] = '\0';
-			(void) sscanf(Thdr_p->tbuf.t_mode, "%lo", &Gen.g_mode);
-			(void) sscanf(Thdr_p->tbuf.t_uid, "%lo", &Gen.g_uid);
-			(void) sscanf(Thdr_p->tbuf.t_gid, "%lo", &Gen.g_gid);
-			(void) sscanf(Thdr_p->tbuf.t_size, "%llo",
+			(void) sscanf(Thdr_p->tbuf.t_mode, "%8o", &Gen.g_mode);
+			(void) sscanf(Thdr_p->tbuf.t_uid, "%8" _SCNoID,
+			    &Gen.g_uid);
+			(void) sscanf(Thdr_p->tbuf.t_gid, "%8" _SCNoID,
+			    &Gen.g_gid);
+			(void) sscanf(Thdr_p->tbuf.t_size, "%12" SCNo64,
 			    (u_off_t *)&Gen.g_filesz);
-			(void) sscanf(Thdr_p->tbuf.t_mtime, "%lo",
+			(void) sscanf(Thdr_p->tbuf.t_mtime, "%12o",
 			    &Gen.g_mtime);
-			(void) sscanf(Thdr_p->tbuf.t_cksum, "%lo",
+			(void) sscanf(Thdr_p->tbuf.t_cksum, "%8o",
 			    &Gen.g_cksum);
 			if (Thdr_p->tbuf.t_typeflag == '1')	/* hardlink */
 				Gen.g_nlink = 1;
@@ -5983,9 +5994,9 @@ read_hdr(int hdr)
 		if (Bar_vol_num == 0 && bar_read_cnt == 0) {
 			read_bar_vol_hdr();
 			bar_read_cnt++;
-		}
-		else
+		} else {
 			read_bar_file_hdr();
+		}
 		rv = BAR;
 		break;
 	default:
@@ -6104,7 +6115,7 @@ rstfiles(int over, int dirfd)
 			nam_p = G_p->g_attrnam_p;
 		}
 	} else {
-		if (Gen.g_nlink > (ulong_t)0) {
+		if (Gen.g_nlink > 0) {
 			nam_p = G_p->g_nam_p;
 		} else {
 			nam_p = Gen.g_nam_p;
@@ -6328,7 +6339,7 @@ rstfiles(int over, int dirfd)
 		 * and not just created file
 		 */
 		set_tym(G_p->g_dirfd, get_component(inam_p),
-		    (ulong_t)SrcSt.st_atime, (ulong_t)SrcSt.st_mtime);
+		    (uint_t)SrcSt.st_atime, (uint_t)SrcSt.st_mtime);
 	}
 }
 
@@ -6831,7 +6842,6 @@ swap(char *buf_p, int cnt)
 	cnt /= 4;
 	if (Args & (OCb | OCs | BSM)) {
 		tcnt = cnt;
-		/* LINTED alignment */
 		Swp_p = (union swpbuf *)buf_p;
 		while (tcnt-- > 0) {
 			tbyte = Swp_p->s_byte[0];
@@ -6851,7 +6861,6 @@ swap(char *buf_p, int cnt)
 	}
 	if (Args & (OCb | OCS)) {
 		tcnt = cnt;
-		/* LINTED alignment */
 		Swp_p = (union swpbuf *)buf_p;
 		while (tcnt-- > 0) {
 			thalf = Swp_p->s_half[0];
@@ -7029,7 +7038,7 @@ verbose(char *nam_p)
 			else
 				(void) printf("%-9s", Curpw_p->pw_name);
 		} else {
-			if (Curpw_p = getpwuid((int)Gen.g_uid)) {
+			if ((Curpw_p = getpwuid((int)Gen.g_uid)) != NULL) {
 				(void) printf("%-9s", Curpw_p->pw_name);
 				Lastuid = (uid_t)Gen.g_uid;
 			} else {
@@ -7043,7 +7052,7 @@ verbose(char *nam_p)
 			else
 				(void) printf("%-9s", Curgr_p->gr_name);
 		} else {
-			if (Curgr_p = getgrgid((int)Gen.g_gid)) {
+			if ((Curgr_p = getgrgid((int)Gen.g_gid)) != NULL) {
 				(void) printf("%-9s", Curgr_p->gr_name);
 				Lastgid = (gid_t)Gen.g_gid;
 			} else {
@@ -7061,23 +7070,22 @@ verbose(char *nam_p)
 			if (S_ISSPARSE(Gen.g_mode) && Gen.g_holes != NULL)
 				filesz = Gen.g_holes->orig_size;
 
-			if (filesz < (1LL << 31))
-				(void) printf("%7lld ", (offset_t)filesz);
-			else
-				(void) printf("%11lld ", (offset_t)filesz);
-		} else
-			(void) printf("%3d,%3d ", (int)major(Gen.g_rdev),
-			    (int)minor(Gen.g_rdev));
+			(void) printf("%*" PRId64 " ",
+			    filesz < (1L << 31) ? 7 : 11, filesz);
+		} else {
+			(void) printf("%3" PRId32 ",%3" PRId32 " ",
+			    major(Gen.g_rdev), minor(Gen.g_rdev));
+		}
 		ttime = Gen.g_mtime;
 		(void) strftime(Time, sizeof (Time),
 		    dcgettext(NULL, FORMAT, LC_TIME), localtime(&ttime));
 		(void) printf("%s, ", Time);
 		str_fprintf(stdout, name_fmt, name, attribute);
 		if ((Gen.g_mode & Ftype) == S_IFLNK) {
-			if (Hdr_type == USTAR || Hdr_type == TAR)
+			if (Hdr_type == USTAR || Hdr_type == TAR) {
 				(void) strcpy(Symlnk_p,
 				    Thdr_p->tbuf.t_linkname);
-			else {
+			} else {
 				FILL(Gen.g_filesz);
 				(void) strncpy(Symlnk_p, Buffr.b_out_p,
 				    Gen.g_filesz);
@@ -7117,8 +7125,6 @@ verbose(char *nam_p)
 	(void) fflush(Out_p);
 }
 
-#define	MK_USHORT(a)	(a & 00000177777)
-
 /*
  * write_hdr: Transfer header information for the generic structure
  * into the format for the selected header and bwrite() the header.
@@ -7129,6 +7135,8 @@ write_hdr(int arcflag, off_t len)
 {
 	int cnt = 0, pad;
 	mode_t mode = 0;
+	major_t maj;
+	minor_t min;
 	uid_t uid;
 	gid_t gid;
 	const char warnfmt[] = "%s%s%s : %s";
@@ -7175,25 +7183,25 @@ write_hdr(int arcflag, off_t len)
 	 */
 	switch (Hdr_type) {
 	case BIN:			/* 16-bits of u_short */
-		if ((ulong_t)uid > (ulong_t)USHRT_MAX)
+		if ((uint_t)uid > (uint_t)USHRT_MAX)
 			uid = UID_NOBODY;
-		if ((ulong_t)gid > (ulong_t)USHRT_MAX)
+		if ((uint_t)gid > (uint_t)USHRT_MAX)
 			gid = GID_NOBODY;
 		break;
-	case CHR:			/* %.6lo => 262143 base 10 */
-		if ((ulong_t)uid > (ulong_t)0777777)
+	case CHR:			/* %.6o => 262143 base 10 */
+		if ((uint_t)uid > (uint_t)0777777)
 			uid = UID_NOBODY;
-		if ((ulong_t)gid > (ulong_t)0777777)
+		if ((uint_t)gid > (uint_t)0777777)
 			gid = GID_NOBODY;
 		break;
-	case ASC:			/* %.8lx => full 32 bits */
+	case ASC:			/* %.8x => full 32 bits */
 	case CRC:
 		break;
 	case USTAR:
-	case TAR:			/* %.7lo => 2097151 base 10 */
-		if ((ulong_t)uid > (ulong_t)07777777)
+	case TAR:			/* %.7o => 2097151 base 10 */
+		if ((uint_t)uid > (uint_t)07777777)
 			uid = UID_NOBODY;
-		if ((ulong_t)gid > (ulong_t)07777777)
+		if ((uint_t)gid > (uint_t)07777777)
 			gid = GID_NOBODY;
 		break;
 	default:
@@ -7257,7 +7265,13 @@ write_hdr(int arcflag, off_t len)
 		Hdr.h_gid = gid;
 		Hdr.h_mode = mode;
 		Hdr.h_nlink = G_p->g_nlink;
-		Hdr.h_rdev = G_p->g_rdev;
+		maj = major(G_p->g_rdev);
+		min = minor(G_p->g_rdev);
+		if (maj > (uint_t)OMAXMAJ)
+			maj = 0;
+		if (min > (uint_t)OMAXMIN)
+			min = 0;
+		Hdr.h_rdev = TO_SVR3(maj, min);
 		mkshort(Hdr.h_mtime, (long)G_p->g_mtime);
 		Hdr.h_namesize = (short)G_p->g_namesz;
 		mkshort(Hdr.h_filesize, (long)len);
@@ -7265,22 +7279,29 @@ write_hdr(int arcflag, off_t len)
 		(void) memcpy(Buffr.b_in_p, &Hdr, cnt);
 		break;
 	case CHR:
-		/*LINTED*/
 		(void) sprintf(Buffr.b_in_p,
-		    "%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.11lo%.6lo%."
-		    "11llo%s", G_p->g_magic, G_p->g_dev, G_p->g_ino, mode,
-		    (long)uid, (long)gid, G_p->g_nlink, MK_USHORT(G_p->g_rdev),
-		    G_p->g_mtime, (long)G_p->g_namesz, (offset_t)len,
+		    "%.6o%.6o%.6o%.6o"
+		    "%.6" _PRIoID "%.6" _PRIoID "%.6o"
+		    "%.6" PRIo16
+		    "%.11o%.6o%.11" PRIo64
+		    "%s",
+		    G_p->g_magic, G_p->g_dev, G_p->g_ino, mode,
+		    uid, gid, G_p->g_nlink,
+		    (unsigned short)(G_p->g_rdev & 0xffff),
+		    G_p->g_mtime, G_p->g_namesz, len,
 		    G_p->g_nam_p);
 		break;
 	case ASC:
 	case CRC:
-		/*LINTED*/
 		(void) sprintf(Buffr.b_in_p,
-		    "%.6lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%."
-		    "8lx%.8lx%.8lx%.8lx%s",
-		    G_p->g_magic, G_p->g_ino, mode, G_p->g_uid,
-		    G_p->g_gid, G_p->g_nlink, G_p->g_mtime, (ulong_t)len,
+		    "%.6x%.8x%.8x"
+		    "%.8" _PRIxID "%.8" _PRIxID
+		    "%.8x%.8x%.8x"
+		    "%.8" PRIx32 "%.8" PRIx32 "%.8" PRIx32 "%.8" PRIx32
+		    "%.8x%.8x%s",
+		    G_p->g_magic, G_p->g_ino, mode,
+		    G_p->g_uid, G_p->g_gid,
+		    G_p->g_nlink, G_p->g_mtime, (uint_t)len,
 		    major(G_p->g_dev), minor(G_p->g_dev),
 		    major(G_p->g_rdev), minor(G_p->g_rdev),
 		    G_p->g_namesz, G_p->g_cksum, G_p->g_nam_p);
@@ -7289,13 +7310,12 @@ write_hdr(int arcflag, off_t len)
 		Thdr_p = (union tblock *)Buffr.b_in_p;
 		(void) memset(Thdr_p, 0, TARSZ);
 		(void) strncpy(Thdr_p->tbuf.t_name, G_p->g_tname,
-		    (int)strlen(G_p->g_tname));
-		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o", (int)mode);
-		(void) sprintf(Thdr_p->tbuf.t_uid, "%07o", (int)uid);
-		(void) sprintf(Thdr_p->tbuf.t_gid, "%07o", (int)gid);
-		(void) sprintf(Thdr_p->tbuf.t_size, "%011llo",
-		    (offset_t)len);
-		(void) sprintf(Thdr_p->tbuf.t_mtime, "%011lo", G_p->g_mtime);
+		    strlen(G_p->g_tname));
+		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o", mode);
+		(void) sprintf(Thdr_p->tbuf.t_uid, "%07" _PRIoID, uid);
+		(void) sprintf(Thdr_p->tbuf.t_gid, "%07" _PRIoID, gid);
+		(void) sprintf(Thdr_p->tbuf.t_size, "%011" PRIo64, len);
+		(void) sprintf(Thdr_p->tbuf.t_mtime, "%011o", G_p->g_mtime);
 		if (arcflag == ARCHIVE_ACL) {
 			Thdr_p->tbuf.t_typeflag = 'A';	/* ACL file type */
 		} else if (arcflag == ARCHIVE_XATTR ||
@@ -7318,13 +7338,13 @@ write_hdr(int arcflag, off_t len)
 			    strlen(T_lname));
 		}
 		(void) strcpy(Thdr_p->tbuf.t_magic, TMAGIC);
-		(void) strcpy(Thdr_p->tbuf.t_version, TVERSION);
+		(void) memcpy(Thdr_p->tbuf.t_version, TVERSION, 2);
 		(void) strcpy(Thdr_p->tbuf.t_uname, G_p->g_uname);
 		(void) strcpy(Thdr_p->tbuf.t_gname, G_p->g_gname);
-		(void) sprintf(Thdr_p->tbuf.t_devmajor, "%07o",
-		    (int)major(G_p->g_rdev));
-		(void) sprintf(Thdr_p->tbuf.t_devminor, "%07o",
-		    (int)minor(G_p->g_rdev));
+		(void) sprintf(Thdr_p->tbuf.t_devmajor, "%07" PRIo32,
+		    major(G_p->g_rdev));
+		(void) sprintf(Thdr_p->tbuf.t_devminor, "%07" PRIo32,
+		    minor(G_p->g_rdev));
 		if (Gen.g_prefix) {
 			(void) strcpy(Thdr_p->tbuf.t_prefix, Gen.g_prefix);
 			free(Gen.g_prefix);
@@ -7333,20 +7353,18 @@ write_hdr(int arcflag, off_t len)
 			Thdr_p->tbuf.t_prefix[0] = '\0';
 		}
 		(void) sprintf(Thdr_p->tbuf.t_cksum, "%07o",
-		    (int)cksum(TARTYP, 0, NULL));
+		    cksum(TARTYP, 0, NULL));
 		break;
 	case TAR:
 		Thdr_p = (union tblock *)Buffr.b_in_p;
 		(void) memset(Thdr_p, 0, TARSZ);
 		(void) strncpy(Thdr_p->tbuf.t_name, G_p->g_nam_p,
 		    G_p->g_namesz);
-		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o ", (int)mode);
-		(void) sprintf(Thdr_p->tbuf.t_uid, "%07o ", (int)uid);
-		(void) sprintf(Thdr_p->tbuf.t_gid, "%07o ", (int)gid);
-		(void) sprintf(Thdr_p->tbuf.t_size, "%011llo ",
-		    (offset_t)len);
-		(void) sprintf(Thdr_p->tbuf.t_mtime, "%011o ",
-		    (int)G_p->g_mtime);
+		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o ", mode);
+		(void) sprintf(Thdr_p->tbuf.t_uid, "%07" _PRIoID " ", uid);
+		(void) sprintf(Thdr_p->tbuf.t_gid, "%07" _PRIoID " ", gid);
+		(void) sprintf(Thdr_p->tbuf.t_size, "%011" PRIo64 " ", len);
+		(void) sprintf(Thdr_p->tbuf.t_mtime, "%011o ", G_p->g_mtime);
 		if (T_lname[0] != '\0') {
 			Thdr_p->tbuf.t_typeflag = '1';
 		} else {
@@ -7547,7 +7565,7 @@ convert_to_old_stat(struct stat *FromStat, char *namep, char *attrp)
 	ToSt.st_gid = TmpSt.st_gid;
 	ToSt.st_ino = (ino_t)TmpSt.st_ino;
 	ToSt.st_mode = (mode_t)TmpSt.st_mode;
-	ToSt.st_mtime = (ulong_t)TmpSt.st_modtime;
+	ToSt.st_mtime = (uint_t)TmpSt.st_modtime;
 	ToSt.st_nlink = (nlink_t)TmpSt.st_nlink;
 	ToSt.st_size = (off_t)TmpSt.st_size;
 	ToSt.st_rdev = (dev_t)TmpSt.st_rdev;
@@ -7602,13 +7620,13 @@ read_bar_vol_hdr(void)
 		exit(1);
 	}
 
-	(void) sscanf(bar_Vhdr->dbuf.mode, "%8lo", &Gen_bar_vol.g_mode);
-	(void) sscanf(bar_Vhdr->dbuf.uid, "%8d", (int *)&Gen_bar_vol.g_uid);
-	(void) sscanf(bar_Vhdr->dbuf.gid, "%8d", (int *)&Gen_bar_vol.g_gid);
-	(void) sscanf(bar_Vhdr->dbuf.size, "%12llo",
+	(void) sscanf(bar_Vhdr->dbuf.mode, "%8l", &Gen_bar_vol.g_mode);
+	(void) sscanf(bar_Vhdr->dbuf.uid, "%8" _SCNdID, &Gen_bar_vol.g_uid);
+	(void) sscanf(bar_Vhdr->dbuf.gid, "%8" _SCNdID, &Gen_bar_vol.g_gid);
+	(void) sscanf(bar_Vhdr->dbuf.size, "%12" SCNo64,
 	    (u_off_t *)&Gen_bar_vol.g_filesz);
-	(void) sscanf(bar_Vhdr->dbuf.mtime, "%12lo", &Gen_bar_vol.g_mtime);
-	(void) sscanf(bar_Vhdr->dbuf.chksum, "%8lo", &Gen_bar_vol.g_cksum);
+	(void) sscanf(bar_Vhdr->dbuf.mtime, "%12o", &Gen_bar_vol.g_mtime);
+	(void) sscanf(bar_Vhdr->dbuf.chksum, "%8o", &Gen_bar_vol.g_cksum);
 
 	/* set the compress flag */
 	if (bar_Vhdr->dbuf.compressed == '1')
@@ -7643,6 +7661,8 @@ read_bar_file_hdr(void)
 	union b_block *tmp_hdr;
 	char *start_of_name, *name_p;
 	char *tmp;
+	major_t maj;
+	minor_t min;
 
 	if (*Buffr.b_out_p == '\0') {
 		*Gen.g_nam_p = '\0';
@@ -7652,24 +7672,24 @@ read_bar_file_hdr(void)
 	tmp_hdr = (union b_block *)Buffr.b_out_p;
 
 	tmp = &tmp_hdr->dbuf.mode[1];
-	(void) sscanf(tmp, "%8lo", &Gen.g_mode);
-	(void) sscanf(tmp_hdr->dbuf.uid, "%8lo", &Gen.g_uid);
-	(void) sscanf(tmp_hdr->dbuf.gid, "%8lo", &Gen.g_gid);
-	(void) sscanf(tmp_hdr->dbuf.size, "%12llo",
+	(void) sscanf(tmp, "%8o", &Gen.g_mode);
+	(void) sscanf(tmp_hdr->dbuf.uid, "%8" _SCNoID, &Gen.g_uid);
+	(void) sscanf(tmp_hdr->dbuf.gid, "%8" _SCNoID, &Gen.g_gid);
+	(void) sscanf(tmp_hdr->dbuf.size, "%12" SCNo64,
 	    (u_off_t *)&Gen.g_filesz);
-	(void) sscanf(tmp_hdr->dbuf.mtime, "%12lo", &Gen.g_mtime);
-	(void) sscanf(tmp_hdr->dbuf.chksum, "%8lo", &Gen.g_cksum);
-	(void) sscanf(tmp_hdr->dbuf.rdev, "%8lo", &Gen.g_rdev);
+	(void) sscanf(tmp_hdr->dbuf.mtime, "%12o", &Gen.g_mtime);
+	(void) sscanf(tmp_hdr->dbuf.chksum, "%8o", &Gen.g_cksum);
+	(void) sscanf(tmp_hdr->dbuf.rdev, "%8o", &Gen.g_rdev);
 
-#define	to_new_major(x)	(int)((unsigned)((x) & OMAXMAJ) << NBITSMINOR)
-#define	to_new_minor(x)	(int)((x) & OMAXMIN)
-	Gen.g_rdev = to_new_major(Gen.g_rdev) | to_new_minor(Gen.g_rdev);
+	maj = SVR3_MAJOR(Gen.g_rdev);
+	min = SVR3_MINOR(Gen.g_rdev);
+	Gen.g_rdev = makedev(maj, min);
 	bar_linkflag = tmp_hdr->dbuf.linkflag;
 	start_of_name = &tmp_hdr->dbuf.start_of_name;
 
 
 	name_p = Gen.g_nam_p;
-	while (*name_p++ = *start_of_name++)
+	while ((*name_p++ = *start_of_name++) != '\0')
 		;
 	*name_p = '\0';
 	if (bar_linkflag == LNKTYPE || bar_linkflag == SYMTYPE)
@@ -7695,7 +7715,7 @@ setup_uncompress(FILE **pipef)
 		cmdlen = snprintf(cmd_buf, MAXPATHLEN * 2,
 		    "chmod +w '%s'; uncompress -c > '%s'; "
 		    "chmod 0%o '%s'",
-		    Gen.g_nam_p, Gen.g_nam_p, (int)G_p->g_mode, Gen.g_nam_p);
+		    Gen.g_nam_p, Gen.g_nam_p, G_p->g_mode, Gen.g_nam_p);
 	} else {
 		cmdlen = snprintf(cmd_buf, MAXPATHLEN * 2,
 		    "uncompress -c > '%s'", Gen.g_nam_p);
@@ -7746,17 +7766,17 @@ skip_bar_volhdr(void)
 			exit(1);
 		}
 
-		(void) sscanf(bar_Vhdr->dbuf.mode, "%8lo",
+		(void) sscanf(bar_Vhdr->dbuf.mode, "%8o",
 		    &Gen_bar_vol.g_mode);
-		(void) sscanf(bar_Vhdr->dbuf.uid, "%8lo",
+		(void) sscanf(bar_Vhdr->dbuf.uid, "%8" _SCNoID,
 		    &Gen_bar_vol.g_uid);
-		(void) sscanf(bar_Vhdr->dbuf.gid, "%8lo",
+		(void) sscanf(bar_Vhdr->dbuf.gid, "%8" _SCNoID,
 		    &Gen_bar_vol.g_gid);
-		(void) sscanf(bar_Vhdr->dbuf.size, "%12llo",
+		(void) sscanf(bar_Vhdr->dbuf.size, "%12" SCNo64,
 		    (u_off_t *)&Gen_bar_vol.g_filesz);
-		(void) sscanf(bar_Vhdr->dbuf.mtime, "%12lo",
+		(void) sscanf(bar_Vhdr->dbuf.mtime, "%12o",
 		    &Gen_bar_vol.g_mtime);
-		(void) sscanf(bar_Vhdr->dbuf.chksum, "%8lo",
+		(void) sscanf(bar_Vhdr->dbuf.chksum, "%8o",
 		    &Gen_bar_vol.g_cksum);
 		if (bar_Vhdr->dbuf.compressed == '1')
 			Compressed = 1;
@@ -8793,7 +8813,8 @@ read_xattr_hdr()
 	    sizeof (struct xattr_hdr));
 	(void) sscanf(xattrp->h_namesz, "%7d", &namelen);
 	if (link_len > 0) {
-		xattr_linkp = (struct xattr_buf *)((int)xattrp + (int)comp_len);
+		xattr_linkp = (struct xattr_buf *)((intptr_t)xattrp +
+		    (int)comp_len);
 	} else {
 		xattr_linkp = NULL;
 	}
@@ -9019,7 +9040,6 @@ write_xattr_hdr()
 		    linkinfo, &attrlen);
 		Gen.g_filesz = attrlen;
 		write_hdr(ARCHIVE_XATTR, (off_t)attrlen);
-		/*LINTED*/
 		(void) sprintf(namep, "%s/%s", DEVNULL, Gen.g_attrnam_p);
 		write_ancillary(attrbuf, attrlen, B_TRUE);
 	}
@@ -9193,7 +9213,7 @@ sl_insert(dev_t device, ino_t inode, int ftype)
 
 	if (s->bal == 0) {
 		s->bal = a;
-		head->llink = (sl_info_t *)((int)head->llink + 1);
+		head->llink = (sl_info_t *)((intptr_t)head->llink + 1);
 		return (q);
 	} else if (s->bal == -a) {
 		s->bal = 0;
@@ -9265,7 +9285,7 @@ sl_insert(dev_t device, ino_t inode, int ftype)
  * sl_numlinks: return the number of links that we saw during our preview.
  */
 
-static ulong_t
+static uint_t
 sl_numlinks(dev_t device, ino_t inode, int ftype)
 {
 	sl_info_t *p = sl_search(device, inode, ftype);
@@ -9357,7 +9377,7 @@ preview_attrs(char *s, char *attrparent)
 		return (1);
 	}
 
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.') {
 			if (dp->d_name[1] == '\0') {
 				Hiddendir = 1;

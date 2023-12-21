@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
@@ -1287,17 +1288,32 @@ singleton(cset *cs)
 {
 	wint_t i, s, n;
 
+	/* Exclude the complicated cases we don't want to deal with */
+	if (cs->nranges != 0 || cs->ntypes != 0 || cs->icase != 0)
+		return (OUT);
+
+	if (cs->nwides > 1)
+		return (OUT);
+
+	/* Count the number of characters present in the bitmap */
 	for (i = n = 0; i < NC; i++)
 		if (CHIN(cs, i)) {
 			n++;
 			s = i;
 		}
-	if (n == 1)
-		return (s);
-	if (cs->nwides == 1 && cs->nranges == 0 && cs->ntypes == 0 &&
-	    cs->icase == 0)
+
+	if (n > 1)
+		return (OUT);
+
+	if (n == 1) {
+		if (cs->nwides == 0)
+			return (s);
+		else
+			return (OUT);
+	}
+	if (cs->nwides == 1)
 		return (cs->wides[0]);
-	/* Don't bother handling the other cases. */
+
 	return (OUT);
 }
 

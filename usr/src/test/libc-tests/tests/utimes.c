@@ -290,7 +290,7 @@ runtest(enum ttype fn, char *dir, timespec_t *atim, timespec_t *mtim)
 
 		/* relative to a directory */
 		if (futimesat(dfd, "file", tv) == -1)
-			err(EXIT_FAILURE, "futimesat(dir, file)", path);
+			err(EXIT_FAILURE, "futimesat(dir, file)");
 		if (!compare_filetime(path, true, atim, mtim, false)) {
 			warnx("failed relative to a directory");
 			ret = false;
@@ -314,7 +314,7 @@ runtest(enum ttype fn, char *dir, timespec_t *atim, timespec_t *mtim)
 		if (fchdir(dfd) == -1)
 			err(EXIT_FAILURE, "fchdir(%s)", dir);
 		if (futimesat(AT_FDCWD, "file", tv) == -1)
-			err(EXIT_FAILURE, "futimesat(AT_FDCWD, file)", path);
+			err(EXIT_FAILURE, "futimesat(AT_FDCWD, file)");
 		if (!compare_filetime(path, true, atim, mtim, false)) {
 			warnx("failed with AT_FDCWD relative");
 			ret = false;
@@ -386,7 +386,7 @@ runtest(enum ttype fn, char *dir, timespec_t *atim, timespec_t *mtim)
 
 		/* relative to a directory */
 		if (utimensat(dfd, "file", ts, 0) == -1)
-			err(EXIT_FAILURE, "utimensat(dir, file)", path);
+			err(EXIT_FAILURE, "utimensat(dir, file)");
 		if (!compare_filetime(path, false, atim, mtim, false)) {
 			warnx("failed relative to a directory");
 			ret = false;
@@ -397,7 +397,7 @@ runtest(enum ttype fn, char *dir, timespec_t *atim, timespec_t *mtim)
 
 		/* repeat against symbolic link path */
 		if (utimensat(dfd, "link", ts, 0) == -1)
-			err(EXIT_FAILURE, "utimensat(dir, link)", path);
+			err(EXIT_FAILURE, "utimensat(dir, link)");
 		if (!compare_filetime(path, false, atim, mtim, false)) {
 			warnx("failed through link relative to a directory");
 			ret = false;

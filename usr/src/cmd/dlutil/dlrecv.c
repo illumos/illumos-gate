@@ -67,7 +67,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	for (i = 0; i < sizeof (msg->dm_host); i++) {
 		if (!isprint(msg->dm_host[i]) &&
 		    msg->dm_host[i] != '\0') {
-			warnx("Encountered bad byte in dm_host[%d]\n",
+			warnx("Encountered bad byte in dm_host[%d]",
 			    i);
 			return (B_FALSE);
 		}
@@ -77,7 +77,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	}
 
 	if (!nul) {
-		warnx("Missing NUL in dm_host\n");
+		warnx("Missing NUL in dm_host");
 		return (B_FALSE);
 	}
 
@@ -85,7 +85,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	for (i = 0; i < sizeof (msg->dm_mesg); i++) {
 		if (!isprint(msg->dm_mesg[i]) &&
 		    msg->dm_mesg[i] != '\0') {
-			warnx("Encountered bad byte in dm_mesg[%d]\n",
+			warnx("Encountered bad byte in dm_mesg[%d]",
 			    i);
 			return (B_FALSE);
 		}
@@ -95,12 +95,12 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	}
 
 	if (!nul) {
-		warnx("Missing NUL in dm_mesg\n");
+		warnx("Missing NUL in dm_mesg");
 		return (B_FALSE);
 	}
 
 	if (strcmp(msg->dm_mesg, DLSEND_MSG) != 0) {
-		warnx("Missing expected message (%s)\n", DLSEND_MSG);
+		warnx("Missing expected message (%s)", DLSEND_MSG);
 		return (B_FALSE);
 	}
 
@@ -172,20 +172,20 @@ main(int argc, char *argv[])
 	}
 
 	if ((ret = dlpi_open(argv[0], &dh, 0)) != DLPI_SUCCESS) {
-		warnx("failed to open %s: %s\n", argv[0],
+		warnx("failed to open %s: %s", argv[0],
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if ((ret = dlpi_bind(dh, dlrecv_sap, &bind_sap)) != DLPI_SUCCESS) {
-		warnx("failed to bind to sap 0x%x: %s\n", dlrecv_sap,
+		warnx("failed to bind to sap 0x%x: %s", dlrecv_sap,
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if (bind_sap != dlrecv_sap) {
 		warnx("failed to bind to requested sap 0x%x, bound to "
-		    "0x%x\n", dlrecv_sap, bind_sap);
+		    "0x%x", dlrecv_sap, bind_sap);
 		exit(1);
 	}
 
@@ -198,22 +198,20 @@ main(int argc, char *argv[])
 		msglen = sizeof (msg);
 		ret = dlpi_recv(dh, NULL, NULL, &msg, &msglen, -1, &rinfo);
 		if (ret != DLPI_SUCCESS) {
-			warnx("failed to receive data: %s\n",
-			    dlpi_strerror(ret));
+			warnx("failed to receive data: %s", dlpi_strerror(ret));
 			continue;
 		}
 
 		if (msglen != rinfo.dri_totmsglen) {
-			warnx("message truncated: expected %ld bytes, "
-			    "got %ld\n", sizeof (dlsend_msg_t),
+			warnx("message truncated: expected %zu bytes, "
+			    "got %zu", sizeof (dlsend_msg_t),
 			    rinfo.dri_totmsglen);
 			invalid = B_TRUE;
 		}
 
 		if (msglen != sizeof (msg)) {
-			warnx("message too short: expected %ld bytes, "
-			    "got %ld\n", sizeof (dlsend_msg_t),
-			    msglen);
+			warnx("message too short: expected %zu bytes, "
+			    "got %zu", sizeof (dlsend_msg_t), msglen);
 			invalid = B_TRUE;
 		}
 

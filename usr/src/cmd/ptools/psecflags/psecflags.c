@@ -65,7 +65,7 @@ static struct idtypes {
 	{ P_UID,	"user"		},
 	{ P_ZONEID,	"zone"		},
 	{ P_ZONEID,	"zoneid"	},
-	{ 0, 		NULL		}
+	{ 0,		NULL		}
 };
 
 static int
@@ -165,7 +165,7 @@ main(int argc, char **argv)
 					break;
 				case 'E':
 					errx(1, "the effective flags cannot "
-					    "be changed", optarg[0]);
+					    "be changed");
 				default:
 					errx(1, "unknown security flag "
 					    "set: '%c'", optarg[0]);

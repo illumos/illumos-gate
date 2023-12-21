@@ -69,7 +69,7 @@ smbios_test_pinfo_verify_amd64(smbios_hdl_t *hdl)
 	}
 
 	if (pinfo.smbpi_processor != smbios_pinfo_phandle) {
-		warnx("processor handle incorrect, found 0x%x",
+		warnx("processor handle incorrect, found 0x%" _PRIxID,
 		    pinfo.smbpi_processor);
 		ret = B_FALSE;
 	}
@@ -187,7 +187,7 @@ smbios_test_pinfo_verify_riscv(smbios_hdl_t *hdl)
 	}
 
 	if (pinfo.smbpi_processor != smbios_pinfo_phandle) {
-		warnx("processor handle incorrect, found 0x%x",
+		warnx("processor handle incorrect, found 0x%" _PRIxID,
 		    pinfo.smbpi_processor);
 		ret = B_FALSE;
 	}
