@@ -701,7 +701,7 @@ typedef enum {
 #define	DF_COMPCNT_V2_GET_PIE(r)	bitx32(r, 7, 0)
 
 /*CSTYLED*/
-#define	DF_COMPCNT_V4		(df_reg_def_t){ .drd_gens = DF_REV_4 \
+#define	DF_COMPCNT_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x184 }
 #define	DF_COMPCNT_V4_GET_IOS(r)	bitx32(r, 31, 26)
