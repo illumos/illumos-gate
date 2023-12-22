@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Adam Fenn <adam@fenn.io>
  *
@@ -30,7 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -74,7 +73,7 @@ static uint32_t	pctestdev_ioport_data;
 
 static int	pctestdev_debugexit_io(struct vmctx *ctx, int in,
 		    int port, int bytes, uint32_t *eax, void *arg);
-static int	pctestdev_iomem_io(struct vmctx *ctx, int vcpu, int dir,
+static int	pctestdev_iomem_io(struct vcpu *vcpu, int dir,
 		    uint64_t addr, int size, uint64_t *val, void *arg1,
 		    long arg2);
 static int	pctestdev_ioport_io(struct vmctx *ctx, int in,
@@ -190,7 +189,7 @@ pctestdev_debugexit_io(struct vmctx *ctx __unused, int in,
 }
 
 static int
-pctestdev_iomem_io(struct vmctx *ctx __unused, int vcpu __unused, int dir,
+pctestdev_iomem_io(struct vcpu *vcpu __unused, int dir,
     uint64_t addr, int size, uint64_t *val, void *arg1 __unused,
     long arg2 __unused)
 {

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Neel Natu <neel@freebsd.org>
  * All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -84,9 +83,8 @@ static struct bootrom_var_state {
  * that the Firmware Volume area is writable and persistent.
  */
 static int
-bootrom_var_mem_handler(struct vmctx *ctx __unused, int vcpu __unused, int dir,
-    uint64_t addr, int size, uint64_t *val, void *arg1 __unused,
-    long arg2 __unused)
+bootrom_var_mem_handler(struct vcpu *vcpu __unused, int dir, uint64_t addr,
+    int size, uint64_t *val, void *arg1 __unused, long arg2 __unused)
 {
 	off_t offset;
 

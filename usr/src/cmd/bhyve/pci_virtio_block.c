@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -42,7 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/linker_set.h>
@@ -431,8 +428,7 @@ pci_vtblk_resized(struct blockif_ctxt *bctxt __unused, void *arg,
 }
 
 static int
-pci_vtblk_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    nvlist_t *nvl)
+pci_vtblk_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	char bident[sizeof("XXX:XXX")];
 	struct blockif_ctxt *bctxt;
@@ -450,6 +446,11 @@ pci_vtblk_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
 	bctxt = blockif_open(nvl, bident);
 	if (bctxt == NULL) {
 		perror("Could not open backing file");
+		return (1);
+	}
+
+	if (blockif_add_boot_device(pi, bctxt)) {
+		perror("Invalid boot device");
 		return (1);
 	}
 

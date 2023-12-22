@@ -41,13 +41,18 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
 		errx(EXIT_FAILURE, "could not open test VM");
 	}
 
-	if (vm_activate_cpu(ctx, 0) != 0) {
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
+
+	if (vm_activate_cpu(vcpu) != 0) {
 		err(EXIT_FAILURE, "could not activate vcpu0");
 	}
 
@@ -102,7 +107,7 @@ main(int argc, char *argv[])
 
 	/* Now simulate a read of CCR from that LAPIC */
 	uint64_t ccr_value = 0;
-	error = vm_readwrite_kernemu_device(ctx, 0, APIC_ADDR_CCR,
+	error = vm_readwrite_kernemu_device(vcpu, APIC_ADDR_CCR,
 	    false, 4, &ccr_value);
 	if (error != 0) {
 		err(EXIT_FAILURE, "could not emulate MMIO of LAPIC CCR");

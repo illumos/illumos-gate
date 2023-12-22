@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2013 Intel Corporation
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  * Copyright 2019 Joyent, Inc.
  */
@@ -832,7 +830,7 @@ enum nvme_path_related_status_code {
 	NVME_SC_ASYMMETRIC_ACCESS_TRANSITION	= 0x03,
 	NVME_SC_CONTROLLER_PATHING_ERROR	= 0x60,
 	NVME_SC_HOST_PATHING_ERROR		= 0x70,
-	NVME_SC_COMMAND_ABOTHED_BY_HOST		= 0x71,
+	NVME_SC_COMMAND_ABORTED_BY_HOST		= 0x71,
 };
 
 /* admin opcodes */
@@ -865,8 +863,14 @@ enum nvme_admin_opcode {
 	NVME_OPC_VIRTUALIZATION_MANAGEMENT	= 0x1c,
 	NVME_OPC_NVME_MI_SEND			= 0x1d,
 	NVME_OPC_NVME_MI_RECEIVE		= 0x1e,
-	/* 0x1f-0x7b - reserved */
+	/* 0x1f - reserved */
+	NVME_OPC_CAPACITY_MANAGEMENT		= 0x20,
+	/* 0x21-0x23 - reserved */
+	NVME_OPC_LOCKDOWN			= 0x24,
+	/* 0x25-0x7b - reserved */
 	NVME_OPC_DOORBELL_BUFFER_CONFIG		= 0x7c,
+	/* 0x7d-0x7e - reserved */
+	NVME_OPC_FABRICS_COMMANDS		= 0x7f,
 
 	NVME_OPC_FORMAT_NVM			= 0x80,
 	NVME_OPC_SECURITY_SEND			= 0x81,
@@ -896,6 +900,8 @@ enum nvme_nvm_opcode {
 	NVME_OPC_RESERVATION_ACQUIRE		= 0x11,
 	/* 0x12-0x14 - reserved */
 	NVME_OPC_RESERVATION_RELEASE		= 0x15,
+	/* 0x16-0x18 - reserved */
+	NVME_OPC_COPY				= 0x19,
 };
 
 enum nvme_feature {

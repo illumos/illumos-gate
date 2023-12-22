@@ -30,7 +30,7 @@ void test_pass(void);
 const char *test_msg_get(struct vmctx *);
 void test_msg_print(struct vmctx *);
 
-int test_setup_vcpu(struct vmctx *, int, uint64_t, uint64_t);
+int test_setup_vcpu(struct vcpu *, uint64_t, uint64_t);
 
 enum vm_exit_kind {
 	/* Otherwise empty vmexit which should result in immediate re-entry */
@@ -45,7 +45,7 @@ enum vm_exit_kind {
 	VEK_UNHANDLED,
 };
 
-enum vm_exit_kind test_run_vcpu(struct vmctx *, int, struct vm_entry *,
+enum vm_exit_kind test_run_vcpu(struct vcpu *, struct vm_entry *,
     struct vm_exit *);
 
 void ventry_fulfill_inout(const struct vm_exit *, struct vm_entry *, uint32_t);

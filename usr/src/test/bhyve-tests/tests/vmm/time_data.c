@@ -523,12 +523,16 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
 		errx(EXIT_FAILURE, "could not open test VM");
 	}
-	if (vm_activate_cpu(ctx, 0) != 0) {
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
+	if (vm_activate_cpu(vcpu) != 0) {
 		err(EXIT_FAILURE, "could not activate vcpu0");
 	}
 
@@ -594,6 +598,7 @@ main(int argc, char *argv[])
 	/* observe that host times and guest data are updated after a write */
 	test_adjust(vmfd, &time_info);
 
+	vm_vcpu_close(vcpu);
 	vm_destroy(ctx);
 	(void) printf("%s\tPASS\n", suite_name);
 	return (EXIT_SUCCESS);

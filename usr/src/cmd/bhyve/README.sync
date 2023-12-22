@@ -5,11 +5,11 @@ The bhyve userland code in this directory, and its associated libraries and
 parts of the kernel module have been updated to the latest upstream FreeBSD
 sources as of:
 
-    commit e53fcff1848bb5acafc3dc38cfeb34724d9b0b96
-    Author: John Baldwin <jhb@FreeBSD.org>
-    Date:   Wed Dec 21 10:33:34 2022 -0800
+    commit 6f7e9779fcb196e2d66720e1b97de89b69677208
+    Author: Corvin Köhne <corvink@FreeBSD.org>
+    Date:   Wed Jul 27 14:47:54 2022 +0200
 
-        bhyve: Simplify spinup_ap_realmode slightly.
+        bhyve: add config option to load ACPI tables into memory
 
 Divergence Notes:
 

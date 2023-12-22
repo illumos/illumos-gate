@@ -34,6 +34,8 @@ $mapfile_version 2
 
 SYMBOL_VERSION ILLUMOSprivate {
 	global:
+		vcpu_ctx;
+		vcpu_id;
 		vcpu_reset;
 		vm_activate_cpu;
 		vm_active_cpus;
@@ -99,6 +101,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_readwrite_kernemu_device;
 		vm_reinit;
 		vm_restart_instruction;
+		vm_resume_all_cpus;
 		vm_resume_cpu;
 		vm_rtc_gettime;
 		vm_rtc_read;
@@ -118,10 +121,13 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_setup_pptdev_msi;
 		vm_setup_pptdev_msix;
 		vm_suspend;
+		vm_suspend_all_cpus;
 		vm_suspend_cpu;
 		vm_unassign_pptdev;
 		vm_unmap_pptdev_mmio;
 		vm_vcpu_barrier;
+		vm_vcpu_close;
+		vm_vcpu_open;
 		vm_wrlock_cycle;
 
 	local:

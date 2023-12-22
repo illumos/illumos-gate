@@ -30,19 +30,23 @@ clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 
 SRCS =	acpi.c			\
+	acpi_device.c		\
 	atkbdc.c		\
 	basl.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
 	bootrom.c		\
-	console.c		\
 	config.c		\
+	console.c		\
+	crc16.c			\
+	e820.c			\
 	fwctl.c			\
 	gdb.c			\
 	hexdump.c		\
 	inout.c			\
 	ioapic.c		\
+	iov.c			\
 	mem.c			\
 	mevent.c		\
 	mptbl.c			\
@@ -71,11 +75,18 @@ SRCS =	acpi.c			\
 	privileges.c		\
 	ps2kbd.c		\
 	ps2mouse.c		\
+	qemu_fwcfg.c		\
+	qemu_loader.c		\
 	rfb.c			\
 	rtc.c			\
 	smbiostbl.c		\
 	sockstream.c		\
+	spinup_ap.c		\
 	task_switch.c		\
+	tpm_device.c		\
+	tpm_emul_passthru.c	\
+	tpm_intf_crb.c		\
+	tpm_ppi_qemu.c		\
 	uart_emul.c		\
 	usb_emul.c		\
 	usb_mouse.c		\
@@ -83,8 +94,6 @@ SRCS =	acpi.c			\
 	virtio.c		\
 	vmgenc.c		\
 	xmsr.c			\
-	spinup_ap.c		\
-	iov.c			\
 	bhyve_sol_glue.c
 
 # We are not yet performing instruction emulation in userspace, so going to the
@@ -126,7 +135,8 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/uts/intel/io/vmm \
 		-I$(SRC)/uts/common \
 		-I$(SRC)/uts/intel \
-		-DWITHOUT_CAPSICUM
+		-DWITHOUT_CAPSICUM \
+		-DOPENSSL_API_COMPAT=0x10100000L
 
 SMOFF += all_func_returns
 rfb.o := SMOFF=

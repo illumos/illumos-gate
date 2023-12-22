@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\"
 .Dd July 29, 2023
 .Dt BHYVE_CONFIG 5
@@ -123,9 +123,15 @@ If no suffix is given, the value is assumed to be in mebibytes.
 .It Va memory.wired Ta bool Ta false Ta
 Wire guest memory.
 .It Va acpi_tables Ta bool Ta false Ta
-Generate ACPI tables; these tables are
-.Em not
-used on illumos.
+Generate ACPI tables.
+.It Va acpi_tables_in_memory Ta bool Ta true Ta
+.Xr bhyve 8
+always exposes ACPI tables by FwCfg.
+For backward compatibility bhyve copies them into the guest memory as well.
+This can cause problems if the guest uses the in-memory version, since certain
+advanced features, such as TPM emulation, are exposed only via FwCfg.
+Therefore, it is recommended to set this flag to false when running Windows
+guests.
 .It Va destroy_on_poweroff Ta bool Ta false Ta
 Destroy the VM on guest-initiated power-off.
 .It Va gdb.address Ta string Ta localhost Ta
@@ -142,6 +148,15 @@ Specify the keyboard layout name with the file name in
 .Pa /usr/share/bhyve/kbdlayout .
 This value only works when loaded with UEFI mode for VNC, and when a VNC client
 that doesn't support the QEMU Extended Key Event Message us used.
+.It Va tpm.path Ta string Ta Ta
+Path to the host TPM device.
+This is typically /dev/tpm0.
+.It Va tpm.type Ta string Ta Ta
+Type of the TPM device passed to the guest.
+Currently, only "passthru" is supported.
+.It Va tpm.version Ta string Ta 2.0 Ta
+Version of the TPM device according to the TCG specification.
+Currently, only version 2.0 is supported.
 .It Va rtc.use_localtime Ta bool Ta true Ta
 The real time clock uses the local time of the host.
 If this is set to false, the real time clock uses UTC.
@@ -323,6 +338,7 @@ VGA framebuffer device attached to VNC server.
 .It Li lpc
 LPC PCI-ISA bridge with COM1-COM4 16550 serial ports,
 a boot ROM,
+an optional fwcfg type,
 and an optional debug/test device.
 This device must be configured on bus 0.
 .It Li nvme
@@ -447,7 +463,16 @@ by itself, or both of
 and
 .Va devid
 must be specified.
-.Bl -column "vendor" "integer" "Default"
+The vendor and device IDs can be specified using the legacy
+.Va vendor
+and
+.Va devid ,
+or via the new
+.Va pcireg.vendor
+and
+.Va pcireg.device
+properties.
+.Bl -column "pcireg.*" "integer" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
 .It Va model Ta string Ta netapp Ta
 Specify a hostbridge model to emulate.
@@ -461,6 +486,13 @@ and
 PCI vendor ID.
 .It Va devid Ta integer Ta 0x1275 Ta
 PCI device ID.
+.It Va pcireg.* Ta integer Ta Ta
+Values of PCI register.
+.Bl -column "device" "Default"
+.It Sy Name Ta Sy Type Ta Sy Default
+.It Va vendor Ta integer Ta 0x1275
+.It Va device Ta integer Ta 0x1275
+.El
 .El
 .Ss AHCI Controller Settings
 AHCI controller devices contain zero or more ports each of which
@@ -553,8 +585,26 @@ Settings for the COM2 serial port device.
 Settings for the COM3 serial port device.
 .It Va com4 Ta node Ta Ta
 Settings for the COM4 serial port device.
+.It Va fwcfg Ta string Ta bhyve Ta
+The fwcfg type to be used.
+Supported values are
+.Dq bhyve
+for fwctl and
+.Dq qemu
+for fwcfg.
 .It Va pc-testdev Ta bool Ta false Ta
 Enable the PC debug/test device.
+.It Va pcireg.* Ta integer Ta Ta
+Values of PCI register.
+This value is required for the Intel GOP driver to work properly.
+.Bl -column "subvendor" "Default"
+.It Sy Name Ta Sy Default
+.It Va vendor Ta 0x8086
+.It Va device Ta 0x7000
+.It Va revid Ta 0
+.It Va subvendor Ta 0
+.It Va subdevice Ta 0
+.El
 .El
 .Ss NVMe Controller Settings
 Each NVMe controller supports a single storage device.

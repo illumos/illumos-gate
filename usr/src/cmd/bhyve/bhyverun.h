@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -49,15 +47,19 @@
 extern int guest_ncpus;
 extern uint16_t cpu_cores, cpu_sockets, cpu_threads;
 
+struct vcpu;
 struct vmctx;
 struct vm_exit;
 
 void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
 
-void fbsdrun_addcpu(struct vmctx *ctx, int newcpu, bool suspend);
-
 int  fbsdrun_virtio_msix(void);
 
-int vmexit_task_switch(struct vmctx *, struct vm_exit *, int *vcpu);
+int vmexit_task_switch(struct vmctx *, struct vcpu *, struct vm_exit *);
+
+#ifndef	__FreeBSD__
+struct vcpu_info;
+void fbsdrun_addcpu(struct vcpu_info *, bool);
+#endif
 
 #endif

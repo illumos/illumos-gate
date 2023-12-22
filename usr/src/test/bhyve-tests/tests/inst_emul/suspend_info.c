@@ -40,7 +40,7 @@
 #define	VCPU1_STACK	(MEM_LOC_STACK - 0x1000)
 
 struct vcpu_thread_ctx {
-	struct vmctx *ctx;
+	struct vcpu *vcpu;
 	enum vm_suspend_how *howp;
 	int *sourcep;
 };
@@ -49,14 +49,15 @@ static void *
 vcpu0_thread(void *arg)
 {
 	struct vcpu_thread_ctx *vtc = arg;
-	struct vmctx *ctx = vtc->ctx;
+	struct vcpu *vcpu = vtc->vcpu;
 
 	struct vm_entry ventry = { 0 };
 	struct vm_exit vexit = { 0 };
 
+
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+		    test_run_vcpu(vcpu, &ventry, &vexit);
 		switch (kind) {
 		case VEK_REENTR:
 			break;
@@ -74,15 +75,15 @@ vcpu0_thread(void *arg)
 }
 
 static void
-vcpu0_setup(struct vmctx *ctx)
+vcpu0_setup(struct vcpu *vcpu)
 {
 	int err;
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, VCPU0_STACK);
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, VCPU0_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
-	err = vm_set_register(ctx, 0, VM_REG_GUEST_RDI, 0);
+	err = vm_set_register(vcpu, VM_REG_GUEST_RDI, 0);
 	if (err != 0) {
 		test_fail_errno(err, "failed to set %rdi");
 	}
@@ -110,19 +111,20 @@ vcpu0_join(pthread_t tid)
 }
 
 static void
-test_plain_suspend(struct vmctx *ctx, enum vm_suspend_how test_how)
+test_plain_suspend(struct vmctx *ctx, struct vcpu *vcpu,
+    enum vm_suspend_how test_how)
 {
 	enum vm_suspend_how how;
 	int source;
 	struct vcpu_thread_ctx vcpu0 = {
-		.ctx = ctx,
+		.vcpu = vcpu,
 		.howp = &how,
 		.sourcep = &source,
 	};
 	pthread_t tid;
 	int err;
 
-	vcpu0_setup(ctx);
+	vcpu0_setup(vcpu);
 	tid = vcpu0_spawn(&vcpu0);
 	err = vm_suspend(ctx, test_how);
 	if (err != 0) {
@@ -144,26 +146,31 @@ test_plain_suspend(struct vmctx *ctx, enum vm_suspend_how test_how)
 }
 
 static void
-test_emitted_triplefault(struct vmctx *ctx)
+test_emitted_triplefault(struct vmctx *ctx, struct vcpu *vcpu)
 {
 	enum vm_suspend_how vcpu0_how;
 	int vcpu0_source;
 	struct vcpu_thread_ctx vcpu0 = {
-		.ctx = ctx,
+		.vcpu = vcpu,
 		.howp = &vcpu0_how,
 		.sourcep = &vcpu0_source,
 	};
+	struct vcpu *vcpu1;
 	int err;
 	pthread_t tid;
 
-	vcpu0_setup(ctx);
+	vcpu0_setup(vcpu);
+
+	if ((vcpu1 = vm_vcpu_open(ctx, 1)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu1");
+	}
 
 	/* Setup vCPU1 like vCPU0, but with ID of 1 in %rdi */
-	err = test_setup_vcpu(ctx, 1, MEM_LOC_PAYLOAD, VCPU1_STACK);
+	err = test_setup_vcpu(vcpu1, MEM_LOC_PAYLOAD, VCPU1_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu1");
 	}
-	err = vm_set_register(ctx, 1, VM_REG_GUEST_RDI, 1);
+	err = vm_set_register(vcpu1, VM_REG_GUEST_RDI, 1);
 	if (err != 0) {
 		test_fail_errno(err, "failed to set %rdi");
 	}
@@ -178,7 +185,7 @@ test_emitted_triplefault(struct vmctx *ctx)
 	struct vm_exit vexit = { 0 };
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 1, &ventry, &vexit);
+		    test_run_vcpu(vcpu1, &ventry, &vexit);
 		switch (kind) {
 		case VEK_REENTR:
 			break;
@@ -222,22 +229,27 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 
 	ctx = test_initialize(test_suite_name);
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
 
 	/*
 	 * Try injecting the various suspend types, and confirm that vcpu0 exits
 	 * with the expected details.
 	 */
-	test_plain_suspend(ctx, VM_SUSPEND_RESET);
-	test_plain_suspend(ctx, VM_SUSPEND_POWEROFF);
-	test_plain_suspend(ctx, VM_SUSPEND_HALT);
+	test_plain_suspend(ctx, vcpu, VM_SUSPEND_RESET);
+	test_plain_suspend(ctx, vcpu, VM_SUSPEND_POWEROFF);
+	test_plain_suspend(ctx, vcpu, VM_SUSPEND_HALT);
 
 	/*
 	 * Let vCPU1 generate a triple-fault, and confirm that it is emitted by
 	 * both exiting vCPU threads, with the proper details.
 	 */
-	test_emitted_triplefault(ctx);
+	test_emitted_triplefault(ctx, vcpu);
 
 	test_pass();
 }

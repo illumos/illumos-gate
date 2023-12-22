@@ -38,8 +38,6 @@
 #define __GNUC_PREREQ__(ma, mi) 0
 #endif
 
-#define	__FBSDID(s)
-
 #ifdef	__GNUC__
 #define	asm		__asm
 #define	inline		__inline
@@ -99,6 +97,10 @@
                  (&reinterpret_cast <const volatile char &>	\
                   (static_cast<type *> (0)->field))))
 #endif
+#endif
+
+#ifndef __DECONST
+#define	__DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
 #endif
 
 #endif	/* _COMPAT_FREEBSD_SYS_CDEFS_H_ */

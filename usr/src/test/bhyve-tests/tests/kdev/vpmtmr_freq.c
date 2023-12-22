@@ -19,6 +19,7 @@
 #include <strings.h>
 #include <libgen.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -84,16 +85,21 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(test_suite_name);
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
 
 	err =  vm_pmtmr_set_location(ctx, IOP_PMTMR);
 	if (err != 0) {
 		test_fail_errno(err, "Could not place pmtmr");
 	}
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -109,7 +115,7 @@ main(int argc, char *argv[])
 
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+		    test_run_vcpu(vcpu, &ventry, &vexit);
 		if (kind == VEK_REENTR) {
 			continue;
 		} else if (kind != VEK_UNHANDLED) {

@@ -60,13 +60,18 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
 		errx(EXIT_FAILURE, "could not open test VM");
 	}
 
-	if (vm_activate_cpu(ctx, 0) != 0) {
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
+
+	if (vm_activate_cpu(vcpu) != 0) {
 		err(EXIT_FAILURE, "could not activate vcpu0");
 	}
 
@@ -100,7 +105,7 @@ main(int argc, char *argv[])
 	/* A VM_RUN attempted now should fail with EBUSY */
 	struct vm_entry ventry = { .cmd = 0, };
 	struct vm_exit vexit = { 0 };
-	if (vm_run(ctx, 0, &ventry, &vexit) == 0) {
+	if (vm_run(vcpu, &ventry, &vexit) == 0) {
 		errx(EXIT_FAILURE, "VM_RUN should have failed");
 	}
 	error = errno;
@@ -128,6 +133,7 @@ main(int argc, char *argv[])
 		    EALREADY, error);
 	}
 
+	vm_vcpu_close(vcpu);
 	vm_destroy(ctx);
 	(void) printf("%s\tPASS\n", suite_name);
 	return (EXIT_SUCCESS);

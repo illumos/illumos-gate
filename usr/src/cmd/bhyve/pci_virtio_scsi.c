@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Jakub Klama <jceel@FreeBSD.org>.
  * Copyright (c) 2018 Marcelo Araujo <araujo@FreeBSD.org>.
@@ -29,7 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/linker_set.h>
@@ -245,7 +244,7 @@ static void pci_vtscsi_eventq_notify(void *, struct vqueue_info *);
 static void pci_vtscsi_requestq_notify(void *, struct vqueue_info *);
 static int  pci_vtscsi_init_queue(struct pci_vtscsi_softc *,
     struct pci_vtscsi_queue *, int);
-static int pci_vtscsi_init(struct vmctx *, struct pci_devinst *, nvlist_t *);
+static int pci_vtscsi_init(struct pci_devinst *, nvlist_t *);
 
 static struct virtio_consts vtscsi_vi_consts = {
 	.vc_name =	"vtscsi",
@@ -698,8 +697,7 @@ pci_vtscsi_legacy_config(nvlist_t *nvl, const char *opts)
 }
 
 static int
-pci_vtscsi_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    nvlist_t *nvl)
+pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_vtscsi_softc *sc;
 	const char *devname, *value;
@@ -709,6 +707,15 @@ pci_vtscsi_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
 	value = get_config_value_node(nvl, "iid");
 	if (value != NULL)
 		sc->vss_iid = strtoul(value, NULL, 10);
+
+	value = get_config_value_node(nvl, "bootindex");
+	if (value != NULL) {
+		if (pci_emul_add_boot_device(pi, atoi(value))) {
+			EPRINTLN("Invalid bootindex %d", atoi(value));
+			free(sc);
+			return (-1);
+		}
+	}
 
 	devname = get_config_value_node(nvl, "dev");
 	if (devname == NULL)

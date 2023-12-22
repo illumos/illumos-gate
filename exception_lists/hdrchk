@@ -384,6 +384,7 @@ usr/src/uts/intel/sys/acpi/platform/acwin64.h
 # bhyve sources
 syntax: glob
 usr/src/cmd/bhyve/acpi.h
+usr/src/cmd/bhyve/acpi_device.h
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.h
 usr/src/cmd/bhyve/audio.h
@@ -393,8 +394,10 @@ usr/src/cmd/bhyve/bhyverun.h
 usr/src/cmd/bhyve/block_if.h
 usr/src/cmd/bhyve/bootrom.h
 usr/src/cmd/bhyve/console.h
+usr/src/cmd/bhyve/crc16.h
 usr/src/cmd/bhyve/dbgport.h
 usr/src/cmd/bhyve/debug.h
+usr/src/cmd/bhyve/e820.h
 usr/src/cmd/bhyve/inout.h
 usr/src/cmd/bhyve/ioapic.h
 usr/src/cmd/bhyve/kernemu_dev.h
@@ -407,10 +410,12 @@ usr/src/cmd/bhyve/pci_lpc.h
 usr/src/cmd/bhyve/pctestdev.h
 usr/src/cmd/bhyve/ps2kbd.h
 usr/src/cmd/bhyve/ps2mouse.h
+usr/src/cmd/bhyve/qemu_loader.h
 usr/src/cmd/bhyve/rtc.h
 usr/src/cmd/bhyve/smbiostbl.h
 usr/src/cmd/bhyve/sockstream.h
 usr/src/cmd/bhyve/spinup_ap.h
+usr/src/cmd/bhyve/tpm_*.h
 usr/src/cmd/bhyve/uart_emul.h
 usr/src/cmd/bhyve/vga.h
 usr/src/cmd/bhyve/vmgenc.h

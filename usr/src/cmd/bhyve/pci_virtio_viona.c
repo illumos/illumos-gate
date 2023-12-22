@@ -689,7 +689,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 }
 
 static int
-pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	dladm_handle_t		handle;
 	dladm_status_t		status;
@@ -746,7 +746,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 	dladm_close(handle);
 
-	error = pci_viona_viona_init(ctx, sc);
+	error = pci_viona_viona_init(pi->pi_vmctx, sc);
 	if (error != 0) {
 		free(sc);
 		return (1);
@@ -939,8 +939,8 @@ pci_viona_qnotify(struct pci_viona_softc *sc, int ring)
 }
 
 static void
-pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
-    int enabled, uint64_t address)
+pci_viona_baraddr(struct pci_devinst *pi, int baridx, int enabled,
+    uint64_t address)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
 	uint64_t ioport;
@@ -970,8 +970,8 @@ pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 }
 
 static void
-pci_viona_write(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    int baridx, uint64_t offset, int size, uint64_t value)
+pci_viona_write(struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
 	void *ptr;
@@ -1074,8 +1074,7 @@ pci_viona_write(struct vmctx *ctx __unused, struct pci_devinst *pi,
 }
 
 static uint64_t
-pci_viona_read(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    int baridx, uint64_t offset, int size)
+pci_viona_read(struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
 	void *ptr;

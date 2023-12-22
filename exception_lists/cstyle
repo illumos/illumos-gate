@@ -1177,6 +1177,7 @@ usr/src/uts/intel/sys/acpi/platform/acwin64.h
 # bhyve sources
 syntax: glob
 usr/src/cmd/bhyve/acpi.[ch]
+usr/src/cmd/bhyve/acpi_device.[ch]
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.[ch]
 usr/src/cmd/bhyve/audio.[ch]
@@ -1185,12 +1186,14 @@ usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]
 usr/src/cmd/bhyve/bootrom.[ch]
+usr/src/cmd/bhyve/crc16.[ch]
 usr/src/cmd/bhyve/config.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
 usr/src/cmd/bhyve/debug.h
+usr/src/cmd/bhyve/e820.[ch]
 usr/src/cmd/bhyve/fwctl.[ch]
 usr/src/cmd/bhyve/gdb.[ch]
 usr/src/cmd/bhyve/hda_codec.c
@@ -1230,11 +1233,14 @@ usr/src/cmd/bhyve/pm.c
 usr/src/cmd/bhyve/post.c
 usr/src/cmd/bhyve/ps2kbd.[ch]
 usr/src/cmd/bhyve/ps2mouse.[ch]
+usr/src/cmd/bhyve/qemu_fwcfg.[ch]
+usr/src/cmd/bhyve/qemu_loader.[ch]
 usr/src/cmd/bhyve/rtc.[ch]
 usr/src/cmd/bhyve/smbiostbl.[ch]
 usr/src/cmd/bhyve/sockstream.[ch]
 usr/src/cmd/bhyve/spinup_ap.[ch]
 usr/src/cmd/bhyve/task_switch.c
+usr/src/cmd/bhyve/tpm*
 usr/src/cmd/bhyve/uart_emul.[ch]
 usr/src/cmd/bhyve/usb_emul.[ch]
 usr/src/cmd/bhyve/usb_mouse.c

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MEM_H_
@@ -33,9 +31,9 @@
 
 #include <sys/linker_set.h>
 
-struct vmctx;
+struct vcpu;
 
-typedef int (*mem_func_t)(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
+typedef int (*mem_func_t)(struct vcpu *vcpu, int dir, uint64_t addr,
 			  int size, uint64_t *val, void *arg1, long arg2);
 
 struct mem_range {
@@ -54,14 +52,12 @@ struct mem_range {
 
 void	init_mem(int ncpu);
 
-int	emulate_mem(struct vmctx *ctx, int vcpu, struct vm_mmio *mmio);
+int	emulate_mem(struct vcpu *vcpu, struct vm_mmio *mmio);
 
-int	read_mem(struct vmctx *ctx, int vcpu, uint64_t gpa, uint64_t *rval,
-		 int size);
+int	read_mem(struct vcpu *vpu, uint64_t gpa, uint64_t *rval, int size);
 int	register_mem(struct mem_range *memp);
 int	register_mem_fallback(struct mem_range *memp);
 int	unregister_mem(struct mem_range *memp);
-int	write_mem(struct vmctx *ctx, int vcpu, uint64_t gpa, uint64_t wval,
-		  int size);
+int	write_mem(struct vcpu *vcpu, uint64_t gpa, uint64_t wval, int size);
 
 #endif	/* _MEM_H_ */

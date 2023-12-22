@@ -19,6 +19,7 @@
 #include <strings.h>
 #include <libgen.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -51,11 +52,16 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(test_suite_name);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -64,7 +70,7 @@ main(int argc, char *argv[])
 	 * Although x2APIC should be off by default, make doubly sure by
 	 * explicitly setting it so.
 	 */
-	err = vm_set_x2apic_state(ctx, 0, X2APIC_DISABLED);
+	err = vm_set_x2apic_state(vcpu, X2APIC_DISABLED);
 	if (err != 0) {
 		test_fail_errno(err, "Could not disable x2apic on vcpu0");
 	}
@@ -74,7 +80,7 @@ main(int argc, char *argv[])
 
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+		    test_run_vcpu(vcpu, &ventry, &vexit);
 		switch (kind) {
 		case VEK_REENTR:
 			break;

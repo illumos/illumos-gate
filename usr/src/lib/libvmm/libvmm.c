@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -61,6 +62,7 @@ struct vmm {
 	char *vmm_mem;
 	size_t vmm_memsize;
 	size_t vmm_ncpu;
+	struct vcpu **vmm_vcpu;
 };
 
 
@@ -87,6 +89,8 @@ vmm_t *
 vmm_open_vm(const char *name)
 {
 	vmm_t *vmm = NULL;
+	int _errno;
+	int i;
 
 	vmm = malloc(sizeof (vmm_t));
 	if (vmm == NULL)
@@ -100,6 +104,7 @@ vmm_open_vm(const char *name)
 
 	vmm->vmm_ctx = vm_open(name);
 	if (vmm->vmm_ctx == NULL) {
+		list_destroy(&vmm->vmm_memlist);
 		free(vmm);
 		return (NULL);
 	}
@@ -118,13 +123,41 @@ vmm_open_vm(const char *name)
 		} while (vmm->vmm_ncpu == 0);
 	}
 
+	vmm->vmm_vcpu = calloc(vmm->vmm_ncpu, sizeof (struct vcpu *));
+	if (vmm->vmm_vcpu == NULL)
+		goto fail;
+	for (i = 0; i < vmm->vmm_ncpu; i++) {
+		vmm->vmm_vcpu[i] = vm_vcpu_open(vmm->vmm_ctx, i);
+		if (vmm->vmm_vcpu[i] == NULL) {
+			_errno = errno;
+			while (i-- >= 0)
+				vm_vcpu_close(vmm->vmm_vcpu[i]);
+			free(vmm->vmm_vcpu);
+			errno = _errno;
+			goto fail;
+		}
+	}
+
 	return (vmm);
+
+fail:
+	_errno = errno;
+	vmm_close_vm(vmm);
+	errno = _errno;
+
+	return (NULL);
 }
 
 void
 vmm_close_vm(vmm_t *vmm)
 {
+	uint_t i;
+
 	vmm_unmap(vmm);
+
+	for (i = 0; i < vmm->vmm_ncpu; i++)
+		vm_vcpu_close(vmm->vmm_vcpu[i]);
+	free(vmm->vmm_vcpu);
 
 	list_destroy(&vmm->vmm_memlist);
 
@@ -343,31 +376,31 @@ vmm_memsize(vmm_t *vmm)
 int
 vmm_cont(vmm_t *vmm)
 {
-	return (vm_resume_cpu(vmm->vmm_ctx, -1));
+	return (vm_resume_all_cpus(vmm->vmm_ctx));
 }
 
 int
-vmm_step(vmm_t *vmm, int vcpu)
+vmm_step(vmm_t *vmm, int vcpuid)
 {
 	cpuset_t cpuset;
 	int ret;
 
-	if (vcpu >= vmm->vmm_ncpu) {
+	if (vcpuid >= vmm->vmm_ncpu) {
 		errno = EINVAL;
 		return (-1);
 	}
 
-	ret = vm_set_capability(vmm->vmm_ctx, vcpu, VM_CAP_MTRAP_EXIT, 1);
+	ret = vm_set_capability(vmm->vmm_vcpu[vcpuid], VM_CAP_MTRAP_EXIT, 1);
 	if (ret != 0)
 		return (-1);
 
-	assert(vm_resume_cpu(vmm->vmm_ctx, vcpu) == 0);
+	assert(vm_resume_cpu(vmm->vmm_vcpu[vcpuid]) == 0);
 
 	do {
 		(void) vm_debug_cpus(vmm->vmm_ctx, &cpuset);
-	} while (!CPU_ISSET(vcpu, &cpuset));
+	} while (!CPU_ISSET(vcpuid, &cpuset));
 
-	(void) vm_set_capability(vmm->vmm_ctx, vcpu, VM_CAP_MTRAP_EXIT, 0);
+	(void) vm_set_capability(vmm->vmm_vcpu[vcpuid], VM_CAP_MTRAP_EXIT, 0);
 
 	return (ret);
 }
@@ -375,7 +408,7 @@ vmm_step(vmm_t *vmm, int vcpu)
 int
 vmm_stop(vmm_t *vmm)
 {
-	int ret = vm_suspend_cpu(vmm->vmm_ctx, -1);
+	int ret = vm_suspend_all_cpus(vmm->vmm_ctx);
 
 	if (ret == 0)
 		vmm_update_ncpu(vmm);
@@ -503,29 +536,29 @@ vmm_mapdesc(int desc)
 }
 
 int
-vmm_getreg(vmm_t *vmm, int vcpu, int reg, uint64_t *val)
+vmm_getreg(vmm_t *vmm, int vcpuid, int reg, uint64_t *val)
 {
 	reg = vmm_mapreg(reg);
 
 	if (reg == VM_REG_LAST)
 		return (-1);
 
-	return (vm_get_register(vmm->vmm_ctx, vcpu, reg, val));
+	return (vm_get_register(vmm->vmm_vcpu[vcpuid], reg, val));
 }
 
 int
-vmm_setreg(vmm_t *vmm, int vcpu, int reg, uint64_t val)
+vmm_setreg(vmm_t *vmm, int vcpuid, int reg, uint64_t val)
 {
 	reg = vmm_mapreg(reg);
 
 	if (reg == VM_REG_LAST)
 		return (-1);
 
-	return (vm_set_register(vmm->vmm_ctx, vcpu, reg, val));
+	return (vm_set_register(vmm->vmm_vcpu[vcpuid], reg, val));
 }
 
 int
-vmm_get_regset(vmm_t *vmm, int vcpu, size_t nregs, const int *regnums,
+vmm_get_regset(vmm_t *vmm, int vcpuid, size_t nregs, const int *regnums,
     uint64_t *regvals)
 {
 	int *vm_regnums;
@@ -542,7 +575,7 @@ vmm_get_regset(vmm_t *vmm, int vcpu, size_t nregs, const int *regnums,
 			goto fail;
 	}
 
-	ret = vm_get_register_set(vmm->vmm_ctx, vcpu, nregs, vm_regnums,
+	ret = vm_get_register_set(vmm->vmm_vcpu[vcpuid], nregs, vm_regnums,
 	    regvals);
 
 fail:
@@ -551,7 +584,7 @@ fail:
 }
 
 int
-vmm_set_regset(vmm_t *vmm, int vcpu, size_t nregs, const int *regnums,
+vmm_set_regset(vmm_t *vmm, int vcpuid, size_t nregs, const int *regnums,
     uint64_t *regvals)
 {
 	int *vm_regnums;
@@ -568,7 +601,7 @@ vmm_set_regset(vmm_t *vmm, int vcpu, size_t nregs, const int *regnums,
 			goto fail;
 	}
 
-	ret = vm_set_register_set(vmm->vmm_ctx, vcpu, nregs, vm_regnums,
+	ret = vm_set_register_set(vmm->vmm_vcpu[vcpuid], nregs, vm_regnums,
 	    regvals);
 
 fail:
@@ -577,25 +610,26 @@ fail:
 }
 
 int
-vmm_get_desc(vmm_t *vmm, int vcpu, int desc, vmm_desc_t *vd)
+vmm_get_desc(vmm_t *vmm, int vcpuid, int desc, vmm_desc_t *vd)
 {
 	desc = vmm_mapdesc(desc);
 	if (desc == VM_REG_LAST)
 		return (-1);
 
-	return (vm_get_desc(vmm->vmm_ctx, vcpu, desc, &vd->vd_base, &vd->vd_lim,
+	return (vm_get_desc(vmm->vmm_vcpu[vcpuid], desc, &vd->vd_base,
+	    &vd->vd_lim,
 	    &vd->vd_acc));
 }
 
 int
-vmm_set_desc(vmm_t *vmm, int vcpu, int desc, vmm_desc_t *vd)
+vmm_set_desc(vmm_t *vmm, int vcpuid, int desc, vmm_desc_t *vd)
 {
 	desc = vmm_mapdesc(desc);
 	if (desc == VM_REG_LAST)
 		return (-1);
 
-	return (vm_set_desc(vmm->vmm_ctx, vcpu, desc, vd->vd_base, vd->vd_lim,
-	    vd->vd_acc));
+	return (vm_set_desc(vmm->vmm_vcpu[vcpuid], desc, vd->vd_base,
+	    vd->vd_lim, vd->vd_acc));
 }
 
 /*
@@ -681,7 +715,7 @@ vmm_pte2paddr(vmm_t *vmm, uint64_t pte, boolean_t ia32, int level,
 }
 
 static vmm_mode_t
-vmm_vcpu_mmu_mode(vmm_t *vmm, int vcpu, vmm_mmu_t *mmu)
+vmm_vcpu_mmu_mode(vmm_t *vmm, int vcpuid __unused, vmm_mmu_t *mmu)
 {
 	if ((mmu->vm_cr0 & CR0_PE) == 0)
 		return (VMM_MODE_REAL);
@@ -694,23 +728,23 @@ vmm_vcpu_mmu_mode(vmm_t *vmm, int vcpu, vmm_mmu_t *mmu)
 }
 
 vmm_mode_t
-vmm_vcpu_mode(vmm_t *vmm, int vcpu)
+vmm_vcpu_mode(vmm_t *vmm, int vcpuid)
 {
 	vmm_mmu_t mmu = { 0 };
 
-	if (vmm_get_regset(vmm, vcpu, ARRAY_SIZE(vmm_mmu_regnum),
+	if (vmm_get_regset(vmm, vcpuid, ARRAY_SIZE(vmm_mmu_regnum),
 	    vmm_mmu_regnum, (uint64_t *)&mmu) != 0)
 		return (VMM_MODE_UNKNOWN);
 
-	return (vmm_vcpu_mmu_mode(vmm, vcpu, &mmu));
+	return (vmm_vcpu_mmu_mode(vmm, vcpuid, &mmu));
 }
 
 vmm_isa_t
-vmm_vcpu_isa(vmm_t *vmm, int vcpu)
+vmm_vcpu_isa(vmm_t *vmm, int vcpuid)
 {
 	vmm_desc_t cs;
 
-	if (vmm_get_desc(vmm, vcpu, VMM_DESC_CS, &cs) != 0)
+	if (vmm_get_desc(vmm, vcpuid, VMM_DESC_CS, &cs) != 0)
 		return (VMM_ISA_UNKNOWN);
 
 	switch (cs.vd_acc & (X86_SEG_BIG | X86_SEG_LONG)) {
@@ -733,15 +767,15 @@ vmm_vcpu_isa(vmm_t *vmm, int vcpu)
  *
  */
 int
-vmm_vtol(vmm_t *vmm, int vcpu, int seg, uint64_t vaddr, uint64_t *laddr)
+vmm_vtol(vmm_t *vmm, int vcpuid, int seg, uint64_t vaddr, uint64_t *laddr)
 {
 	vmm_desc_t desc;
 	uint64_t limit;
 
-	if (vmm_get_desc(vmm, vcpu, seg, &desc) != 0)
+	if (vmm_get_desc(vmm, vcpuid, seg, &desc) != 0)
 		return (-1);
 
-	switch (vmm_vcpu_mode(vmm, vcpu)) {
+	switch (vmm_vcpu_mode(vmm, vcpuid)) {
 	case VMM_MODE_REAL:
 		if (seg == VMM_DESC_FS || seg == VMM_DESC_GS)
 			goto fault;
@@ -778,15 +812,15 @@ vmm_vtol(vmm_t *vmm, int vcpu, int seg, uint64_t vaddr, uint64_t *laddr)
  * according to the mode the vCPU is in.
  */
 int
-vmm_vtop(vmm_t *vmm, int vcpu, int seg, uint64_t vaddr, uint64_t *paddr)
+vmm_vtop(vmm_t *vmm, int vcpuid, int seg, uint64_t vaddr, uint64_t *paddr)
 {
 	vmm_mmu_t mmu = { 0 };
 	int ret = 0;
 
-	if (vmm_vtol(vmm, vcpu, seg, vaddr, &vaddr) != 0)
+	if (vmm_vtol(vmm, vcpuid, seg, vaddr, &vaddr) != 0)
 		return (-1);
 
-	if (vmm_get_regset(vmm, vcpu, ARRAY_SIZE(vmm_mmu_regnum),
+	if (vmm_get_regset(vmm, vcpuid, ARRAY_SIZE(vmm_mmu_regnum),
 	    vmm_mmu_regnum, (uint64_t *)&mmu) != 0)
 		return (-1);
 
@@ -796,7 +830,7 @@ vmm_vtop(vmm_t *vmm, int vcpu, int seg, uint64_t vaddr, uint64_t *paddr)
 		return (0);
 	}
 
-	switch (vmm_vcpu_mmu_mode(vmm, vcpu, &mmu)) {
+	switch (vmm_vcpu_mmu_mode(vmm, vcpuid, &mmu)) {
 	case VMM_MODE_PROT:
 		/* protected mode, no PAE: 2-level paging, 32bit PTEs */
 		ret = vmm_pte2paddr(vmm, mmu.vm_cr3, B_TRUE, 2, vaddr, paddr);
@@ -817,7 +851,8 @@ vmm_vtop(vmm_t *vmm, int vcpu, int seg, uint64_t vaddr, uint64_t *paddr)
 }
 
 ssize_t
-vmm_vread(vmm_t *vmm, int vcpu, int seg, void *buf, size_t len, uintptr_t addr)
+vmm_vread(vmm_t *vmm, int vcpuid, int seg, void *buf, size_t len, uintptr_t
+    addr)
 {
 	ssize_t res = 0;
 	uint64_t paddr;
@@ -825,7 +860,7 @@ vmm_vread(vmm_t *vmm, int vcpu, int seg, void *buf, size_t len, uintptr_t addr)
 	uint64_t boundary;
 
 	while (len != 0) {
-		if (vmm_vtop(vmm, vcpu, seg, addr, &paddr) != 0) {
+		if (vmm_vtop(vmm, vcpuid, seg, addr, &paddr) != 0) {
 			errno = EFAULT;
 			return (0);
 		}
@@ -848,7 +883,7 @@ vmm_vread(vmm_t *vmm, int vcpu, int seg, void *buf, size_t len, uintptr_t addr)
 }
 
 ssize_t
-vmm_vwrite(vmm_t *vmm, int vcpu, int seg, const void *buf, size_t len,
+vmm_vwrite(vmm_t *vmm, int vcpuid, int seg, const void *buf, size_t len,
     uintptr_t addr)
 {
 	ssize_t res = 0;
@@ -857,7 +892,7 @@ vmm_vwrite(vmm_t *vmm, int vcpu, int seg, const void *buf, size_t len,
 	uint64_t boundary;
 
 	while (len != 0) {
-		if (vmm_vtop(vmm, vcpu, seg, addr, &paddr) != 0) {
+		if (vmm_vtop(vmm, vcpuid, seg, addr, &paddr) != 0) {
 			errno = EFAULT;
 			return (0);
 		}
