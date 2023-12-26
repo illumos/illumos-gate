@@ -227,8 +227,8 @@ ctftest_check_symbol_cb(const char *obj, ctf_id_t type, ulong_t idx, void *arg)
 		}
 
 		if (id != type) {
-			warnx("type mismatch for symbol %s, has type id %"
-			    _PRIuID ", but specified type %s has id %" _PRIuID,
+			warnx("type mismatch for symbol %s, has type id %ld"
+			    ", but specified type %s has id %ld",
 			    tests[i].cs_symbol, type, tests[i].cs_type, id);
 			cb->csc_ret = B_FALSE;
 			return (0);
@@ -294,9 +294,9 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 
 		if (tid != base) {
 			if (!quiet) {
-				warnx("type mismatch at layer %u: found id %"
-				    _PRIuID ", but expecting type id %" _PRIuID
-				    " for type %s, symbol %s", layer, base, tid,
+				warnx("type mismatch at layer %u: found "
+				    "id %ld, but expecting type id %ld for "
+				    "type %s, symbol %s", layer, base, tid,
 				    tests->cd_tname, symbol);
 			}
 			return (B_FALSE);
@@ -318,7 +318,7 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 			if (ctf_array_info(fp, base, &ari) == CTF_ERR) {
 				if (!quiet) {
 					warnx("failed to lookup array info at "
-					    "layer %" _PRIuID " for type %s, "
+					    "layer %ld for type %s, "
 					    "symbol %s: %s", base,
 					    tests->cd_tname, symbol,
 					    ctf_errmsg(ctf_errno(fp)));
@@ -350,8 +350,8 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 				if (!quiet) {
 					warnx("array contents mismatch at "
 					    "layer %u for type %s, symbol %s: "
-					    "found %" _PRIuID ", expected %s/%"
-					    _PRIuID, layer, tests->cd_tname,
+					    "found %ld, expected %s/%ld",
+					    layer, tests->cd_tname,
 					    symbol, ari.ctr_contents,
 					    tests->cd_contents, tid);
 				}
@@ -370,7 +370,7 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 
 	if (base != CTF_ERR) {
 		if (!quiet) {
-			warnx("found additional type %" _PRIuID " in chain, "
+			warnx("found additional type %ld in chain, "
 			    "but expected no more", base);
 		}
 		return (B_FALSE);
