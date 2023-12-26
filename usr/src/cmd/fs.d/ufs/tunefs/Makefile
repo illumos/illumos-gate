@@ -43,8 +43,6 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
-lint:		lint_PROG
-
 $(ROOTUSRSBIN)/$(LIBPROG):	FRC
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@
 

@@ -68,7 +68,5 @@ daemon.o:	../lib/daemon.c
 smfcfg.o:	../lib/smfcfg.c
 		$(COMPILE.c) ../lib/smfcfg.c
 
-lint:		lint_SRCS
-
 clean:
 		$(RM) $(OBJS) $(TYPEPROG)

@@ -46,8 +46,6 @@ CERRWARN +=	-_gcc=-Wno-type-limits
 # not linted
 SMATCH=off
 
-lint:		lint_PROG
-
 $(FSOBJS): $(FSSRCS)
 	$(COMPILE.c) -o $@ $(FSSRCS)
 

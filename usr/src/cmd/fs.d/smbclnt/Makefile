@@ -45,14 +45,13 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 catalog:=       TARGET= catalog
 
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 catalog: $(SUBDIRS_CATALOG)
 	$(RM) $(POFILE)

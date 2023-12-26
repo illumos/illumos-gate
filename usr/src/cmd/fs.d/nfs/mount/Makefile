@@ -115,7 +115,5 @@ install: all $(FSTYPEPROG)
 	$(RM) $(ROOTETCPROG)
 	$(SYMLINK) ../../../usr/lib/fs/$(FSTYPE)/$(LIBPROG) $(ROOTETCPROG)
 
-lint:	webnfs.h webnfs_xdr.c webnfs_client.c lint_SRCS
-
 clean:
 	$(RM) $(OBJS) webnfs.x webnfs.h webnfs_xdr.c webnfs_client.c

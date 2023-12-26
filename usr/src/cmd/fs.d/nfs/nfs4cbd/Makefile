@@ -60,7 +60,5 @@ thrpool.o:	../lib/thrpool.c
 
 install:	$(TYPEPROG)
 
-lint:	lint_SRCS
-
 clean:
 	$(RM) $(OBJS)

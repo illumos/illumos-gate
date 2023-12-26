@@ -48,6 +48,8 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lshare -lscf -luuid -ldlpi -lnsl -lnvpair -lxml2 -lumem -lc
 NATIVE_LIBS +=	libxml2.so
 
+CSTD =		$(CSTD_GNU99)
+
 CFLAGS +=	$(CCVERBOSE)
 
 CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \

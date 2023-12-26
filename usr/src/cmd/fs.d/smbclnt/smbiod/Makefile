@@ -38,7 +38,6 @@ SRCS=	$(TYPEPROG).c
 POFILE=	$(TYPEPROG).po
 
 CFLAGS += $(CCVERBOSE)
-CSTD= $(CSTD_GNU99)
 
 LDLIBS += -lsmbfs -lumem
 
@@ -54,8 +53,6 @@ ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 all:	$(TYPEPROG)
 
 catalog:	$(POFILE)
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(OBJS) $(POFILE)

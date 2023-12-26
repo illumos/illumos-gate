@@ -35,7 +35,7 @@ include $(SRC)/cmd/Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKNFS)
 
-all lint:
+all:
 
 install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 

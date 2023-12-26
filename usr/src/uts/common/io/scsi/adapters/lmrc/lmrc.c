@@ -42,7 +42,6 @@ static uint32_t lmrc_read_reg(lmrc_t *, uint32_t);
 static void lmrc_write_reg(lmrc_t *, uint32_t, uint32_t);
 static int lmrc_transition_to_ready(lmrc_t *);
 static void lmrc_process_mptmfi_passthru(lmrc_t *, lmrc_mpt_cmd_t *);
-static void lmrc_build_mptmfi_passthru(lmrc_t *, lmrc_mfi_cmd_t *);
 static int lmrc_poll_mfi(lmrc_t *, lmrc_mfi_cmd_t *, uint8_t);
 static boolean_t lmrc_check_fw_fault(lmrc_t *);
 static int lmrc_get_event_log_info(lmrc_t *, lmrc_evt_log_info_t *);
@@ -487,7 +486,6 @@ lmrc_process_replies(lmrc_t *lmrc, uint8_t queue)
 			dev_err(lmrc->l_dip, CE_PANIC,
 			    "!reply received for unknown Function %x",
 			    io_req->Function);
-			break;
 		}
 
 		mutex_exit(&mpt->mpt_lock);
@@ -522,11 +520,15 @@ lmrc_process_replies(lmrc_t *lmrc, uint8_t queue)
 /*
  * lmrc_build_mptmfi_passthru
  *
- * MFI commands are send as MPT MFI passthrough I/O requests. To send a a MFI
- * frame to the RAID controller, we need to get a MPT command, set up the MPT
- * I/O request and build a one-entry SGL pointing to the MFI command.
+ * MFI commands are send as MPT MFI passthrough I/O requests. To be able to send
+ * a MFI frame to the RAID controller, we need to have a MPT command set up as
+ * MPT I/O request and a one-entry SGL pointing to the MFI command.
+ *
+ * As there's only a small number of MFI commands compared to the amound of MPT
+ * commands, the MPT command for each MFI is pre-allocated at attach time and
+ * initialized here.
  */
-static void
+int
 lmrc_build_mptmfi_passthru(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 {
 	Mpi25SCSIIORequest_t *io_req;
@@ -534,6 +536,10 @@ lmrc_build_mptmfi_passthru(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 	lmrc_mpt_cmd_t *mpt;
 
 	mpt = lmrc_get_mpt(lmrc);
+	if (mpt == NULL)
+		return (DDI_FAILURE);
+
+	/* lmrc_get_mpt() should return the mpt locked */
 	ASSERT(mutex_owned(&mpt->mpt_lock));
 
 	mfi->mfi_mpt = mpt;
@@ -550,6 +556,14 @@ lmrc_build_mptmfi_passthru(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 	    (void *)io_req - lmrc->l_ioreq_dma.ld_buf,
 	    LMRC_MPI2_RAID_DEFAULT_IO_FRAME_SIZE, DDI_DMA_SYNC_FORDEV),
 	    ==, DDI_SUCCESS);
+
+	/*
+	 * As we're not sending this command to the hardware any time soon,
+	 * drop the mutex before we return.
+	 */
+	mutex_exit(&mpt->mpt_lock);
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -599,14 +613,11 @@ lmrc_process_mptmfi_passthru(lmrc_t *lmrc, lmrc_mpt_cmd_t *mpt)
  *
  * Post a MFI command to the firmware. Reset the cmd_status to invalid. Build
  * a MPT MFI passthru command if necessary and a MPT atomic request descriptor
- * before posting the request. The MFI command's mutex must be held. If the MPT
- * MFI passthru command already exists for the MFI command, the MPT command's
- * mutex must be held, too, and we don't drop it on return.
+ * before posting the request. The MFI command's mutex must be held.
  */
 void
 lmrc_issue_mfi(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi, lmrc_mfi_cmd_cb_t *cb)
 {
-	boolean_t exit_mutex = B_FALSE;
 	lmrc_mfi_header_t *hdr = &mfi->mfi_frame->mf_hdr;
 	lmrc_atomic_req_desc_t req_desc;
 
@@ -620,12 +631,6 @@ lmrc_issue_mfi(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi, lmrc_mfi_cmd_cb_t *cb)
 	}
 
 	hdr->mh_cmd_status = MFI_STAT_INVALID_STATUS;
-	if (mfi->mfi_mpt == NULL) {
-		exit_mutex = B_TRUE;
-		lmrc_build_mptmfi_passthru(lmrc, mfi);
-	}
-
-	ASSERT(mutex_owned(&mfi->mfi_mpt->mpt_lock));
 
 	req_desc = lmrc_build_atomic_request(lmrc, mfi->mfi_mpt,
 	    MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO);
@@ -638,8 +643,6 @@ lmrc_issue_mfi(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi, lmrc_mfi_cmd_cb_t *cb)
 		    mfi->mfi_data_dma.ld_len, DDI_DMA_SYNC_FORDEV);
 
 	lmrc_send_atomic_request(lmrc, req_desc);
-	if (exit_mutex)
-		mutex_exit(&mfi->mfi_mpt->mpt_lock);
 }
 
 /*
@@ -1865,6 +1868,7 @@ lmrc_tgt_find(lmrc_t *lmrc, struct scsi_device *sd)
  * lmrc_get_mpt
  *
  * Get a MPT command from the list and initialize it. Return the command locked.
+ * Return NULL if the MPT command list is empty.
  */
 lmrc_mpt_cmd_t *
 lmrc_get_mpt(lmrc_t *lmrc)
@@ -1875,7 +1879,8 @@ lmrc_get_mpt(lmrc_t *lmrc)
 	mutex_enter(&lmrc->l_mpt_cmd_lock);
 	mpt = list_remove_head(&lmrc->l_mpt_cmd_list);
 	mutex_exit(&lmrc->l_mpt_cmd_lock);
-	VERIFY(mpt != NULL);
+	if (mpt == NULL)
+		return (NULL);
 
 	mutex_enter(&mpt->mpt_lock);
 	bzero(mpt->mpt_io_frame, LMRC_MPI2_RAID_DEFAULT_IO_FRAME_SIZE);
@@ -1898,8 +1903,10 @@ lmrc_get_mpt(lmrc_t *lmrc)
 /*
  * lmrc_put_mpt
  *
- * Put a MPT command back on the list. Destroy the CV, thereby
- * asserting that no one is waiting on it.
+ * Put a MPT command back on the list. The command lock must be held when this
+ * function is called, being unlocked only after the command has been put on
+ * the free list. The command CV is destroyed, thereby asserting that no one is
+ * still waiting on it.
  */
 void
 lmrc_put_mpt(lmrc_mpt_cmd_t *mpt)
@@ -1937,7 +1944,6 @@ lmrc_get_mfi(lmrc_t *lmrc)
 	bzero(mfi->mfi_frame, sizeof (lmrc_mfi_frame_t));
 	mfi->mfi_frame->mf_hdr.mh_context = mfi->mfi_idx;
 	mfi->mfi_callback = NULL;
-	mfi->mfi_mpt = NULL;
 
 	cv_init(&mfi->mfi_cv, NULL, CV_DRIVER, NULL);
 	mutex_exit(&mfi->mfi_lock);
@@ -1961,10 +1967,6 @@ lmrc_put_mfi(lmrc_mfi_cmd_t *mfi)
 	ASSERT0(list_link_active(&mfi->mfi_node));
 
 	mutex_enter(&mfi->mfi_lock);
-	if (mfi->mfi_mpt != NULL) {
-		mutex_enter(&mfi->mfi_mpt->mpt_lock);
-		lmrc_put_mpt(mfi->mfi_mpt);
-	}
 
 	cv_destroy(&mfi->mfi_cv);
 
@@ -2175,9 +2177,7 @@ lmrc_aen_handler(void *arg)
 	 */
 	dcmd->md_mbox_32[0] = evt->evt_seqnum + 1;
 	mutex_enter(&mfi->mfi_lock);
-	mutex_enter(&mfi->mfi_mpt->mpt_lock);
 	lmrc_issue_mfi(lmrc, mfi, lmrc_complete_aen);
-	mutex_exit(&mfi->mfi_mpt->mpt_lock);
 	mutex_exit(&mfi->mfi_lock);
 }
 

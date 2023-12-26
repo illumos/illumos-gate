@@ -75,8 +75,5 @@ nfslog_config.o:	../lib/nfslog_config.c
 nfslogtab.o:	../lib/nfslogtab.c
 		$(COMPILE.c) ../lib/nfslogtab.c
 
-lint:
-	$(LINT.c) $(SRCS) $(LDLIBS)
-
 clean:
 	$(RM) $(OBJS)

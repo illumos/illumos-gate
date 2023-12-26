@@ -41,9 +41,5 @@ LDLIBS	+=	-ladm
 # not linted
 SMATCH=off
 
-lint		:=	PROG= $(LIBPROG)
-
-lint:		lint_PROG
-
 $(ROOTUSRSBIN)/$(LIBPROG):
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

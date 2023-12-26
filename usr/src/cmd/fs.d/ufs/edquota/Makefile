@@ -36,7 +36,6 @@ include		../../Makefile.fstype
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 CERRWARN +=	-_gcc=-Wno-parentheses
-lint:		lint_PROG
 
 # not linted
 SMATCH=off

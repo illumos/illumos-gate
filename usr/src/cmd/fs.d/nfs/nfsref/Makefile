@@ -34,6 +34,8 @@ CFLAGS +=	$(CCVERBOSE) -I../lib
 OBJS=	nfsref.o ref_subr.o
 SRCS=	nfsref.c
 
+CSTD= $(CSTD_GNU99)
+
 CERRWARN += -_gcc=-Wno-unused-variable
 
 # not linted
@@ -64,9 +66,6 @@ $(POFILE): $(SRCS)
 	$(XGETTEXT)     $(XGETFLAGS) $(POFILE).i
 	sed "/^domain/d"        messages.po     > $@
 	$(RM) $(POFILE).i messages.po
-
-lint:
-	$(LINT.c) $(SRCS) $(LDLIBS)
 
 clean:
 	$(RM) $(OBJS)

@@ -60,4 +60,4 @@ $(V4SSDIR):
 
 .KEEP_STATE:
 
-clean clobber lint:
+clean clobber:

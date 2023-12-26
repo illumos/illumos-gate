@@ -45,7 +45,6 @@ $(ROOTLIBFSTYPE)/mount := FILEMODE= 0555
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
-CSTD= $(CSTD_GNU99)
 
 LDLIBS += -lsmbfs
 
@@ -60,8 +59,6 @@ POFILE=		mount.po
 catalog:	$(POFILE)
 
 install:	$(ROOTLIBFSTYPEPROG)
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(OBJS) $(POFILE)

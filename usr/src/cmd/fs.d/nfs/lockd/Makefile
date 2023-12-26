@@ -39,7 +39,6 @@ SRCS	  =	$(LOCAL:%.o=%.c) ../lib/daemon.c ../lib/nfs_tbind.c \
 		../lib/smfcfg.c ../lib/thrpool.c
 LDLIBS	 +=	-lnsl -lscf
 CPPFLAGS +=	-I../lib
-CSTD	  =	$(CSTD_GNU99)
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch
@@ -48,7 +47,6 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
-
 
 $(TYPEPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
@@ -80,9 +78,6 @@ $(POFILE): $(SRCS)
 	$(XGETTEXT)     $(XGETFLAGS) $(POFILE).i
 	sed "/^domain/d"        messages.po     > $@
 	$(RM) $(POFILE).i messages.po
-
-lint:
-	$(LINT.c) $(SRCS) $(LDLIBS)
 
 clean:
 	$(RM) $(OBJS) $(DOBJ)

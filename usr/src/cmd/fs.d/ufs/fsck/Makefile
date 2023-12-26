@@ -68,4 +68,3 @@ clean:
 include ../../../../Makefile.xref
 
 XREFFLAGS=	-f -x
-

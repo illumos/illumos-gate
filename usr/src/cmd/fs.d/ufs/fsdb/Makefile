@@ -42,5 +42,3 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 SMATCH=off
 
 SRCS=	$(LIBPROG).c
-
-lint:	lint_SRCS
