@@ -134,7 +134,7 @@ cons_probe(void)
 	}
 
 	/* We want a callback to install the new value when this var changes. */
-	env_setenv("twiddle_divisor", EV_VOLATILE, "1", twiddle_set,
+	(void) env_setenv("twiddle_divisor", EV_VOLATILE, "16", twiddle_set,
 	    env_nounset);
 
 	/* Do all console probes */
@@ -180,7 +180,7 @@ cons_probe(void)
 	else
 		console = prefconsole;
 
-	env_setenv("console", EV_VOLATILE, console, cons_set,
+	(void) env_setenv("console", EV_VOLATILE, console, cons_set,
 	    env_nounset);
 
 	free(prefconsole);
@@ -456,7 +456,7 @@ twiddle_set(struct env_var *ev, int flags, const void *value)
 		return (CMD_ERROR);
 	}
 	twiddle_divisor((uint_t)tdiv);
-	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+	(void) env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
 	return (CMD_OK);
 }

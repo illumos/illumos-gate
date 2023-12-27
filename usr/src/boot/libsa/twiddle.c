@@ -35,19 +35,18 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include "stand.h"
 
 /* Extra functions from NetBSD standalone printf.c */
 
-static u_int globaldiv;
+static uint_t globaldiv = 16;
 
 void
-twiddle(u_int callerdiv)
+twiddle(uint_t callerdiv)
 {
-	static u_int callercnt, globalcnt, pos;
+	static uint_t callercnt, globalcnt, pos;
 
 	callercnt++;
 	if (callerdiv > 1 && (callercnt % callerdiv) != 0)
@@ -62,7 +61,7 @@ twiddle(u_int callerdiv)
 }
 
 void
-twiddle_divisor(u_int gdiv)
+twiddle_divisor(uint_t gdiv)
 {
 
 	globaldiv = gdiv;
