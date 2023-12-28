@@ -2190,8 +2190,14 @@ determine_platform(void)
 			platform_type = HW_BHYVE;
 			return;
 		}
-		if (strcmp(hvstr, HVSIG_MICROSOFT) == 0)
+		if (strcmp(hvstr, HVSIG_MICROSOFT) == 0) {
 			platform_type = HW_MICROSOFT;
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_QEMU_TCG) == 0) {
+			platform_type = HW_QEMU_TCG;
+			return;
+		}
 	} else {
 		/*
 		 * Check older VMware hardware versions. VMware hypervisor is
