@@ -42,6 +42,9 @@ CCERRWARN +=	-_gcc=-Wno-switch
 CCERRWARN +=	-_gcc=-Wno-reorder
 CCERRWARN +=	-_gcc=-Wno-type-limits
 
+pics/nameSyntaxYacc.o := CPPFLAGS += -D__EXTERN_C__
+pics/nameSyntaxLex.o := CPPFLAGS += -D__EXTERN_C__
+
 CLEANFILES +=	pics/lex.fru.cc pics/y.tab.cc pics/y.tab.h
 CLOBBERFILES +=	$(DYNLIBCCC) libfru.so
 
