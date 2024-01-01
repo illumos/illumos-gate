@@ -11620,7 +11620,7 @@ f usr/share/lib/zoneinfo/Antarctica/Rothera 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/South_Pole 0644 root bin
 h usr/share/lib/zoneinfo/Antarctica/Syowa=usr/share/lib/zoneinfo/Asia/Riyadh
 f usr/share/lib/zoneinfo/Antarctica/Troll 0644 root bin
-h usr/share/lib/zoneinfo/Antarctica/Vostok=usr/share/lib/zoneinfo/Asia/Urumqi
+f usr/share/lib/zoneinfo/Antarctica/Vostok 0644 root bin
 d usr/share/lib/zoneinfo/Arctic 0755 root bin
 h usr/share/lib/zoneinfo/Arctic/Longyearbyen=usr/share/lib/zoneinfo/Europe/Berlin
 d usr/share/lib/zoneinfo/Asia 0755 root bin

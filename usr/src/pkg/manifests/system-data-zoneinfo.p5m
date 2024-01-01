@@ -18,7 +18,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2023.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2023.4,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Timezone Information"
 set name=pkg.description value="timezone information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -278,7 +278,7 @@ hardlink path=usr/share/lib/zoneinfo/Antarctica/South_Pole \
     target=../Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/Antarctica/Syowa target=../Asia/Riyadh
 file path=usr/share/lib/zoneinfo/Antarctica/Troll
-hardlink path=usr/share/lib/zoneinfo/Antarctica/Vostok target=../Asia/Urumqi
+file path=usr/share/lib/zoneinfo/Antarctica/Vostok
 dir  path=usr/share/lib/zoneinfo/Arctic
 hardlink path=usr/share/lib/zoneinfo/Arctic/Longyearbyen target=../Europe/Berlin
 dir  path=usr/share/lib/zoneinfo/Asia
