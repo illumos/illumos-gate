@@ -22,7 +22,7 @@
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Bill Sommerfeld
+# Copyright 2024 Bill Sommerfeld
 #
 
 from __future__ import print_function
@@ -97,10 +97,10 @@ def git(command):
 def git_root():
     """Return the root of the current git workspace"""
 
-    p = git('rev-parse --git-dir')
-    dir = p[0]
+    p = git('rev-parse --show-toplevel')
+    dir = p[0].strip()
 
-    return os.path.abspath(os.path.join(dir, os.path.pardir))
+    return os.path.abspath(dir)
 
 def git_branch():
     """Return the current git branch"""
@@ -185,20 +185,12 @@ def gen_files(root, parent, paths, exclude, filter=None):
     if filter is None:
         filter = lambda x: os.path.isfile(x)
 
-    # Taken entirely from Python 2.6's os.path.relpath which we would use if we
-    # could.
-    def relpath(path, here):
-        c = os.path.abspath(os.path.join(root, path)).split(os.path.sep)
-        s = os.path.abspath(here).split(os.path.sep)
-        l = len(os.path.commonprefix((s, c)))
-        return os.path.join(*[os.path.pardir] * (len(s)-l) + c[l:])
-
     def ret(select=None):
         if not select:
             select = lambda x: True
 
         for abspath in git_file_list(parent, paths):
-            path = relpath(abspath, '.')
+            path = os.path.relpath(os.path.join(root, abspath), '.')
             try:
                 res = git("diff %s HEAD %s" % (parent, path))
             except GitError as e:

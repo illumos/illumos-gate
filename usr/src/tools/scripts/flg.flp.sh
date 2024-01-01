@@ -183,7 +183,7 @@ if [[ $SCM_MODE == "unknown" ]]; then
 elif [[ $SCM_MODE == "mercurial" ]]; then
 	FILELIST=$(hg manifest)
 elif [[ $SCM_MODE == "git" ]]; then
-	FILELIST=$(cd $(dirname $(git rev-parse --git-dir)) && git ls-files)
+	FILELIST=$(cd $(git rev-parse --show-toplevel) && git ls-files)
 elif [[ $SCM_MODE != "teamware" ]]; then
 	fail "Unsupported SCM in use: $SCM_MODE"
 fi
