@@ -163,10 +163,11 @@ def git_file_list(parent, paths=None):
 
     ret = set()
     for fname in p:
-        if fname and not fname.isspace() and fname not in ret:
-            ret.add(fname.strip())
+        fname = fname.strip()
+        if fname and not fname.isspace():
+            ret.add(fname)
 
-    return ret
+    return sorted(ret)
 
 def not_check(root, cmd):
     """Return a function which returns True if a file given as an argument
