@@ -25,6 +25,7 @@
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -3808,6 +3809,7 @@ vhci_update_pathstates(void *arg)
 	struct scsi_pkt			*pkt;
 	struct buf			*bp;
 	struct scsi_vhci_priv		*svp_conflict = NULL;
+	size_t				blksize;
 
 	ASSERT(VHCI_LUN_IS_HELD(vlun));
 	dip  = vlun->svl_dip;
@@ -3821,6 +3823,8 @@ vhci_update_pathstates(void *arg)
 	if ((npip == NULL) || (sps != MDI_SUCCESS)) {
 		goto done;
 	}
+
+	blksize = vhci_get_blocksize(dip);
 
 	fo = vlun->svl_fops;
 	do {
@@ -3944,7 +3948,7 @@ vhci_update_pathstates(void *arg)
 			/* Check for Reservation Conflict */
 			bp = scsi_alloc_consistent_buf(
 			    &svp->svp_psd->sd_address, (struct buf *)NULL,
-			    DEV_BSIZE, B_READ, NULL, NULL);
+			    blksize, B_READ, NULL, NULL);
 			if (!bp) {
 				VHCI_DEBUG(1, (CE_NOTE, NULL,
 				    "!vhci_update_pathstates: No resources "
@@ -3957,8 +3961,8 @@ vhci_update_pathstates(void *arg)
 			    PKT_CONSISTENT, NULL, NULL);
 			if (pkt) {
 				(void) scsi_setup_cdb((union scsi_cdb *)
-				    (uintptr_t)pkt->pkt_cdbp, SCMD_READ, 1, 1,
-				    0);
+				    (uintptr_t)pkt->pkt_cdbp, SCMD_READ_G1, 1,
+				    1, 0);
 				pkt->pkt_time = 3 * 30;
 				pkt->pkt_flags = FLAG_NOINTR;
 				pkt->pkt_path_instance =
@@ -6849,6 +6853,7 @@ vhci_failover(dev_info_t *vdip, dev_info_t *cdip, int flags)
 	int			reserve_pending, check_condition, UA_condition;
 	struct scsi_pkt		*pkt;
 	struct buf		*bp;
+	size_t			blksize;
 
 	vhci = ddi_get_soft_state(vhci_softstate, ddi_get_instance(vdip));
 	sd = ddi_get_driver_private(cdip);
@@ -6859,6 +6864,8 @@ vhci_failover(dev_info_t *vdip, dev_info_t *cdip, int flags)
 	VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_failover(1): guid %s\n", guid));
 	vhci_log(CE_NOTE, vdip, "!Initiating failover for device %s "
 	    "(GUID %s)", ddi_node_name(cdip), guid);
+
+	blksize = vhci_get_blocksize(cdip);
 
 	/*
 	 * Lets maintain a local copy of the vlun->svl_active_pclass
@@ -6962,7 +6969,7 @@ next_pathclass:
 		UA_condition = 0;
 
 		bp = scsi_alloc_consistent_buf(&svp->svp_psd->sd_address,
-		    (struct buf *)NULL, DEV_BSIZE, B_READ, NULL, NULL);
+		    (struct buf *)NULL, blksize, B_READ, NULL, NULL);
 		if (!bp) {
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
 			    "vhci_failover !No resources (buf)\n"));
@@ -6974,7 +6981,7 @@ next_pathclass:
 		    PKT_CONSISTENT, NULL, NULL);
 		if (pkt) {
 			(void) scsi_setup_cdb((union scsi_cdb *)(uintptr_t)
-			    pkt->pkt_cdbp, SCMD_READ, 1, 1, 0);
+			    pkt->pkt_cdbp, SCMD_READ_G1, 1, 1, 0);
 			pkt->pkt_flags = FLAG_NOINTR;
 check_path_again:
 			pkt->pkt_path_instance = mdi_pi_get_path_instance(npip);
@@ -8816,4 +8823,53 @@ vhci_invalidate_mpapi_lu(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun)
 	}
 	VHCI_DEBUG(6, (CE_WARN, NULL, "vhci_invalidate_mpapi_lu: "
 	    "Could not find LU(%s) to invalidate.", svl_wwn));
+}
+
+/*
+ * Return the device's block size (as given by the 'device-blksize'
+ * property). If the property does not exist, the default DEV_BSIZE
+ * is returned.
+ */
+size_t
+vhci_get_blocksize(dev_info_t *dip)
+{
+	/*
+	 * Unfortunately, 'device-blksize' is typically implemented in
+	 * a device as a dynamic property managed by cmlb. As a result,
+	 * we cannot merely use ddi_prop_get_int() to get the value.
+	 * Instead, we must call the cb_prop_op on the device.
+	 * If that fails, we will attempt ddi_prop_get_int() in case
+	 * there is a device that defines it as a static property.
+	 * If all else fails, we return DEV_BSIZE.
+	 */
+	struct dev_ops *ops = DEVI(dip)->devi_ops;
+
+	/*
+	 * The DDI property interfaces don't recognize unsigned
+	 * values, so we have to cast it outself when we return the value.
+	 */
+	int blocksize = DEV_BSIZE;
+
+	/*
+	 * According to i_ldi_prop_op(), some nexus drivers apparently do not
+	 * always correctly set cb_prop_op, so we must check for
+	 * nodev, nulldev, and NULL.
+	 */
+	if (ops->devo_cb_ops->cb_prop_op != nodev &&
+	    ops->devo_cb_ops->cb_prop_op != nulldev &&
+	    ops->devo_cb_ops->cb_prop_op != NULL) {
+		int proplen = sizeof (blocksize);
+		int ret;
+
+		ret = cdev_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN_AND_VAL_BUF,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM | DDI_PROP_DYNAMIC,
+		    "device-blksize", (caddr_t)&blocksize, &proplen);
+		if (ret == DDI_PROP_SUCCESS && proplen == sizeof (blocksize) &&
+		    blocksize > 0)
+			return (blocksize);
+	}
+
+	blocksize = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0, "device-blksize",
+	    DEV_BSIZE);
+	return ((blocksize > 0) ? blocksize : DEV_BSIZE);
 }
