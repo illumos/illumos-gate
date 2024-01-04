@@ -56,6 +56,9 @@ function cleanup
 	FSTAB=/tmp/fstab_$$
 	rm -f $FSTAB
 	for sdisk in $swap_disks; do
+		if [[ -n $(swap -l 2>&1 | grep $sdisk) ]]; then
+			continue
+		fi
 		echo "$sdisk	-	-	swap	-	no	-" >> $FSTAB
 	done
 	if [ -e $FSTAB ]
@@ -84,7 +87,7 @@ log_onexit cleanup
 for sdisk in $swap_disks; do
 	log_note "Executing: swap -d $sdisk"
 	swap -d $sdisk >/dev/null 2>&1;
-	if [[ $? != 0 ]]; then
+	if (( $? != 0 )); then
 		log_untested "Unable to delete swap device $sdisk because of" \
 				"insufficient RAM"
 	fi
