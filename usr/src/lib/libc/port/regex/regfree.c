@@ -54,11 +54,6 @@ regfree(regex_t *preg)
 	struct re_guts *g;
 	int i;
 
-#ifdef	__lint
-	/* shut up lint! */
-	CHIN(NULL, 0);
-#endif
-
 	if (preg->re_magic != MAGIC1)	/* oops */
 		return;			/* nice to complain, but hard */
 

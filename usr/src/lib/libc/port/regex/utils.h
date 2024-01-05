@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
@@ -37,7 +38,7 @@
 #define	INFINITY	(DUPMAX + 1)
 
 #define	NC_MAX		(CHAR_MAX - CHAR_MIN + 1)
-#define	NC		((MB_CUR_MAX) == 1 ? (NC_MAX) : (128))
+#define	NC_WIDE		(128)
 typedef unsigned char uch;
 
 /* switch off assertions (if not already off) if no REDEBUG */

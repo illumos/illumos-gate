@@ -1,4 +1,5 @@
 /*
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@hamachi.org>
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -119,13 +120,13 @@ typedef struct {
 	int		icase;
 } cset;
 
-static int
-CHIN1(cset *cs, wint_t ch)
+static inline int
+CHIN1(int nc, cset *cs, wint_t ch)
 {
 	unsigned int i;
 
 	assert(ch >= 0);
-	if (ch < NC)
+	if (ch < nc)
 		return (((cs->bmp[ch >> 3] & (1 << (ch & 7))) != 0) ^
 		    cs->invert);
 	for (i = 0; i < cs->nwides; i++) {
@@ -145,19 +146,19 @@ CHIN1(cset *cs, wint_t ch)
 	return (cs->invert);
 }
 
-static int
-CHIN(cset *cs, wint_t ch)
+static inline int
+CHIN(int nc, cset *cs, wint_t ch)
 {
 
 	assert(ch >= 0);
-	if (ch < NC)
+	if (ch < nc)
 		return (((cs->bmp[ch >> 3] & (1 << (ch & 7))) != 0) ^
 		    cs->invert);
 	else if (cs->icase)
-		return (CHIN1(cs, ch) || CHIN1(cs, towlower(ch)) ||
-		    CHIN1(cs, towupper(ch)));
+		return (CHIN1(nc, cs, ch) || CHIN1(nc, cs, towlower(ch)) ||
+		    CHIN1(nc, cs, towupper(ch)));
 	else
-		return (CHIN1(cs, ch));
+		return (CHIN1(nc, cs, ch));
 }
 
 /*
@@ -187,6 +188,7 @@ struct re_guts {
 	size_t nsub;		/* copy of re_nsub */
 	int backrefs;		/* does it use back references? */
 	sopno nplus;		/* how deep does it nest +s? */
+	unsigned int mb_cur_max;
 };
 
 /* misc utilities */

@@ -31,8 +31,14 @@
 #include "Parser.h"
 
 // yacc symbols
+#ifdef	__cplusplus
+extern "C" {
+#endif
 int fruparse(void);
 extern int frudebug;
+#ifdef	__cplusplus
+}
+#endif
 
 // global data to/from the lexer
 pthread_mutex_t gParserLock;

@@ -28,6 +28,7 @@
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 RackTop Systems.
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
 #
@@ -551,7 +552,7 @@ function rsync_upload
 	fi
 	$RSYNC -r -q ${src_dir} $dst 2>$err_msg
 	if (( $? != 0 )); then
-		if (( ${print_err_msg} > 0 )); then
+		if (( print_err_msg > 0 )); then
 			print "Failed.\nERROR: rsync failed"
 			print "src dir: '${src_dir}'\ndst dir: '$dst'"
 			print "error messages:"
@@ -734,7 +735,7 @@ function delete_webrev
 		dir_rm=${dir_spec}
 	fi
 
-	if (( ${delete_only} > 0 )); then
+	if (( delete_only > 0 )); then
 		print "       Removing: \c"
 	else
 		print "rmdir \c"
@@ -766,7 +767,7 @@ function delete_webrev
 	$SFTP -b $batch_file_rm $host_spec 2>${sftp_err_msg} 1>&2
 	integer -r ret=$?
 	rm -f $batch_file_rm
-	if (( $ret != 0 && $check > 0 )); then
+	if (( ret != 0 && check > 0 )); then
 		print "Failed.\nERROR: failed to remove remote directories"
 		print "error messages:"
 		$SED 's/^/> /' ${sftp_err_msg}
@@ -774,7 +775,7 @@ function delete_webrev
 		return $ret
 	fi
 	rm -f ${sftp_err_msg}
-	if (( ${delete_only} > 0 )); then
+	if (( delete_only > 0 )); then
 		print "Done."
 	fi
 
@@ -828,7 +829,7 @@ function upload_webrev
 		#
 		rsync_upload ${remote_target} 0
 		ret=$?
-		if (( $ret != 0 )); then
+		if (( ret != 0 )); then
 			print "Failed. (falling back to SSH)"
 			ssh_upload ${remote_target}
 			ret=$?
@@ -1354,7 +1355,7 @@ function relative_dir
 	# If the first path was specified absolutely, and it does
 	# not start with the second path, it's an error.
 	#
-	if [[ "$cur" = "/${1#/}" ]]; then
+	if [[ "$cur" == "/${1#/}" ]]; then
 		# Should never happen.
 		print -u2 "\nWARNING: relative_dir: \"$1\" not relative "
 		print -u2 "to \"$2\".  Check input paths.  Framed webrev "
@@ -1749,13 +1750,12 @@ comments_from_wx()
 	typeset fmt=$1
 	typeset p=$2
 
-	comm=`$AWK '
-	$1 == "'$p'" {
+	comm=$($AWK '$1 == "'$p'" {
 		do getline ; while (NF > 0)
 		getline
 		while (NF > 0) { print ; getline }
 		exit
-	}' < $wxfile`
+	}' < $wxfile)
 
 	if [[ -z $comm ]]; then
 		comm="*** NO COMMENTS ***"
@@ -1923,7 +1923,7 @@ function difflines
 	(( TDEL += del ))
 	(( TINS += ins ))
 	# Calculate unchanged lines
-	unc=`wc -l < $1`
+	unc=$(wc -l < $1)
 	if (( unc > 0 )); then
 		(( unc -= del + mod ))
 		(( TUNC += unc ))
@@ -2068,7 +2068,7 @@ function env_from_flist
 	# list.  Then copy those into our local versions of those
 	# variables if they have not been set already.
 	#
-	eval `$SED -e "s/#.*$//" $FLIST | $GREP = `
+	eval $($SED -e "s/#.*$//" $FLIST | $GREP = )
 
 	if [[ -z $codemgr_ws && -n $CODEMGR_WS ]]; then
 		codemgr_ws=$CODEMGR_WS
@@ -2093,9 +2093,9 @@ function look_for_prog
 	ppath=$PATH
 	ppath=$ppath:/usr/sfw/bin:/usr/bin:/usr/sbin
 	ppath=$ppath:/opt/onbld/bin
-	ppath=$ppath:/opt/onbld/bin/`uname -p`
+	ppath=$ppath:/opt/onbld/bin/$(uname -p)
 
-	PATH=$ppath prog=`whence $progname`
+	PATH=$ppath prog=$(whence $progname)
 	if [[ -n $prog ]]; then
 		print $prog
 	fi
@@ -2292,25 +2292,25 @@ set +o noclobber
 
 PATH=$(/bin/dirname "$(whence $0)"):$PATH
 
-[[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
-[[ -z $WX ]] && WX=`look_for_prog wx`
-[[ -z $GIT ]] && GIT=`look_for_prog git`
-[[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
-[[ -z $PERL ]] && PERL=`look_for_prog perl`
-[[ -z $RSYNC ]] && RSYNC=`look_for_prog rsync`
-[[ -z $SCCS ]] && SCCS=`look_for_prog sccs`
-[[ -z $AWK ]] && AWK=`look_for_prog nawk`
-[[ -z $AWK ]] && AWK=`look_for_prog gawk`
-[[ -z $AWK ]] && AWK=`look_for_prog awk`
-[[ -z $SCP ]] && SCP=`look_for_prog scp`
-[[ -z $SED ]] && SED=`look_for_prog sed`
-[[ -z $SFTP ]] && SFTP=`look_for_prog sftp`
-[[ -z $SORT ]] && SORT=`look_for_prog sort`
-[[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
-[[ -z $GREP ]] && GREP=`look_for_prog grep`
-[[ -z $FIND ]] && FIND=`look_for_prog find`
-[[ -z $MANDOC ]] && MANDOC=`look_for_prog mandoc`
-[[ -z $COL ]] && COL=`look_for_prog col`
+[[ -z $WDIFF ]] && WDIFF=$(look_for_prog wdiff)
+[[ -z $WX ]] && WX=$(look_for_prog wx)
+[[ -z $GIT ]] && GIT=$(look_for_prog git)
+[[ -z $WHICH_SCM ]] && WHICH_SCM=$(look_for_prog which_scm)
+[[ -z $PERL ]] && PERL=$(look_for_prog perl)
+[[ -z $RSYNC ]] && RSYNC=$(look_for_prog rsync)
+[[ -z $SCCS ]] && SCCS=$(look_for_prog sccs)
+[[ -z $AWK ]] && AWK=$(look_for_prog nawk)
+[[ -z $AWK ]] && AWK=$(look_for_prog gawk)
+[[ -z $AWK ]] && AWK=$(look_for_prog awk)
+[[ -z $SCP ]] && SCP=$(look_for_prog scp)
+[[ -z $SED ]] && SED=$(look_for_prog sed)
+[[ -z $SFTP ]] && SFTP=$(look_for_prog sftp)
+[[ -z $SORT ]] && SORT=$(look_for_prog sort)
+[[ -z $MKTEMP ]] && MKTEMP=$(look_for_prog mktemp)
+[[ -z $GREP ]] && GREP=$(look_for_prog grep)
+[[ -z $FIND ]] && FIND=$(look_for_prog find)
+[[ -z $MANDOC ]] && MANDOC=$(look_for_prog mandoc)
+[[ -z $COL ]] && COL=$(look_for_prog col)
 
 # set name of trash directory for remote webrev deletion
 TRASH_DIR=".trash"
@@ -2444,7 +2444,7 @@ if [[ $SCM_MODE == "git" ]]; then
 		codemgr_ws="${PWD}/${codemgr_ws}"
 	fi
 
-	if [[ "$codemgr_ws" = *"/.git" ]]; then
+	if [[ "$codemgr_ws" == *"/.git" ]]; then
 		codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
 	fi
 	CWS="$codemgr_ws"
@@ -2585,7 +2585,7 @@ elif [[ $flist_mode == "file" ]]; then
 	print -u2 " File list from: $flist_file"
 fi
 
-if [[ $# -gt 0 ]]; then
+if (( $# > 0 )); then
 	print -u2 "WARNING: unused arguments: $*"
 fi
 
@@ -2779,7 +2779,7 @@ if [[ -z $nflag ]]; then
 		print "   its.reg from: $REGFILE"
 	fi
 
-	$SED -e '/^#/d' -e '/^[ 	]*$/d' $REGFILE | while read LINE; do
+	$SED -e '/^#/d' -e $'/^[ \t]*$/d' $REGFILE | while read LINE; do
 
 		name=${LINE%%=*}
 		value="${LINE#*=}"
@@ -2810,7 +2810,7 @@ if [[ -z $nflag ]]; then
 		elif [[ $cf != $DEFCONFFILE ]]; then
 			print "       its.conf: reading $cf"
 		fi
-		$SED -e '/^#/d' -e '/^[ 	]*$/d' $cf | while read LINE; do
+		$SED -e '/^#/d' -e $'/^[ \t]*$/d' $cf | while read LINE; do
 		    eval "${LINE}"
 		done
 	done
@@ -2858,7 +2858,7 @@ if [[ -z $nflag ]]; then
 		itsinfo["${p}_URL"]="<a href=\\\"${itsinfo[${p}_URL]}\\\">&</a>"
 
 		# The character class below contains a literal tab
-		print "/^${p}[: 	]/ {
+		print "/^${p}[: \t]/ {
 				s;${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
 				s;^${p};${itsinfo[${p}_INFO]};
 			}" >> ${its_sed_script}
@@ -2869,7 +2869,7 @@ if [[ -z $nflag ]]; then
 	# the configured priorities to attempt implicit translations.
 	#
 	for p in ${its_priority}; do
-		print "/^${itsinfo[${p}_REGEX]}[ 	]/ {
+		print "/^${itsinfo[${p}_REGEX]}[ \t]/ {
 				s;^${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
 			}" >> ${its_sed_script}
 	done
@@ -3014,8 +3014,8 @@ FLIST=/tmp/$$.flist.clean
 #
 cat $FLIST | while read LINE
 do
-	set - $LINE
-	P=$1
+	set -A FIELDS $LINE
+	P=${FIELDS[0]}
 
 	#
 	# Normally, each line in the file list is just a pathname of a
@@ -3026,8 +3026,8 @@ do
 	oldname=""
 	oldpath=""
 	rename=
-	if [[ $# -eq 2 ]]; then
-		PP=$2			# old filename
+	if (( ${#FIELDS[*]} == 2 )); then
+		PP=${FIELDS[1]}			# old filename
 		if [[ -f $PP ]]; then
 			oldname=" (copied from $PP)"
 		else
@@ -3062,7 +3062,7 @@ do
 		PF=$F
 	fi
 
-	COMM=`getcomments html $P $PP`
+	COMM=$(getcomments html $P $PP)
 
 	print "\t$P$oldname\n\t\t\c"
 
@@ -3165,7 +3165,7 @@ do
 			$WDIFF -c "$COMM" \
 			    -t "$WNAME Wdiff $DIR/$F" $ofile $nfile > \
 			    $WDIR/$DIR/$F.wdiff.html 2>/dev/null
-			if [[ $? -eq 0 ]]; then
+			if (( $? == 0 )); then
 				print " wdiffs\c"
 			else
 				print " wdiffs[fail]\c"
@@ -3194,7 +3194,7 @@ do
 	# Check if it's man page, and create plain text, html and raw (ascii)
 	# output for the new version, as well as diffs against old version.
 	#
-	if [[ -f "$nfile" && "$nfile" = *.+([0-9])*([a-zA-Z]) && \
+	if [[ -f "$nfile" && "$nfile" == *.+([0-9])*([a-zA-Z]) && \
 	    -x $MANDOC && -x $COL ]]; then
 		$MANDOC -Tascii $nfile | $COL -b > $nfile.man.txt
 		source_to_html txt < $nfile.man.txt > $nfile.man.txt.html
@@ -3222,7 +3222,7 @@ do
 				$WDIFF -c "$COMM" -t "$WNAME Wdiff $DIR/$F" \
 				    $ofile.man.txt $nfile.man.txt > \
 				    $WDIR/$DIR/$F.man.wdiff.html 2>/dev/null
-				if [[ $? -eq 0 ]]; then
+				if (( $? == 0 )); then
 					print " man-wdiffs\c"
 				else
 					print " man-wdiffs[fail]\c"
@@ -3349,11 +3349,11 @@ print "</div>"
 #
 cat $FLIST | while read LINE
 do
-	set - $LINE
-	P=$1
+	set -A FIELDS $LINE
+	P=${FIELDS[0]}
 
-	if [[ $# == 2 ]]; then
-		PP=$2
+	if (( ${#FIELDS[*]} == 2 )); then
+		PP=${FIELDS[1]}
 		oldname="$PP"
 	else
 		PP=$P
@@ -3362,7 +3362,7 @@ do
 
 	mv_but_nodiff=
 	cmp $WDIR/raw_files/old/$PP $WDIR/raw_files/new/$P > /dev/null 2>&1
-	if [[ $? == 0 && -n "$oldname" ]]; then
+	if (( $? == 0 )) && [[ -n "$oldname" ]]; then
 		mv_but_nodiff=1
 	fi
 
@@ -3527,15 +3527,15 @@ do
 		# 3) Existing executable files
 		old_mode=
 		if [[ -f $WDIR/raw_files/old/$PP ]]; then
-			old_mode=`get_file_mode $WDIR/raw_files/old/$PP`
+			old_mode=$(get_file_mode $WDIR/raw_files/old/$PP)
 		fi
 
 		new_mode=
 		if [[ -f $WDIR/raw_files/new/$P ]]; then
-			new_mode=`get_file_mode $WDIR/raw_files/new/$P`
+			new_mode=$(get_file_mode $WDIR/raw_files/new/$P)
 		fi
 
-		if [[ -z "$old_mode" && "$new_mode" = *[1357]* ]]; then
+		if [[ -z "$old_mode" && "$new_mode" == *[1357]* ]]; then
 			print "<span class=\"chmod\">"
 			print "<p>new executable file: mode $new_mode</p>"
 			print "</span>"
@@ -3544,7 +3544,7 @@ do
 			print "<span class=\"chmod\">"
 			print "<p>mode change: $old_mode to $new_mode</p>"
 			print "</span>"
-		elif [[ "$new_mode" = *[1357]* ]]; then
+		elif [[ "$new_mode" == *[1357]* ]]; then
 			print "<span class=\"chmod\">"
 			print "<p>executable file: mode $new_mode</p>"
 			print "</span>"

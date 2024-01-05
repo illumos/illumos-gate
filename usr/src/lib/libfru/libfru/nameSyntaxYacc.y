@@ -39,8 +39,15 @@ extern Ancestor *gParserAnts;
 extern PathDef *gParserHead;
 extern int *gParserAbs;
 
-extern void yyerror (const char *msg);
-extern int  yylex   (void);
+#ifdef	__cplusplus
+extern "C" {
+#endif
+extern void yyerror(const char *msg);
+extern int yylex(void);
+extern int yywrap (void);
+#ifdef	__cplusplus
+}
+#endif
 
 %}
 

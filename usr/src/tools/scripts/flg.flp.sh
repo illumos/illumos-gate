@@ -23,11 +23,13 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+#
 #
 # Generates the list of source files that would get brought over with the
 # specified subtree as a result of inc.flg and req.flg files.  If no subtree
 # is named, then the current directory is assumed.
-# 
+#
 # Based loosely on ON's version of Teamware's def.dir.flp.
 #
 
@@ -35,13 +37,13 @@ ONBLDDIR=$(dirname $(whence $0))
 
 PATH=/usr/bin:${BUILD_TOOLS:-/opt}/teamware/bin:$ONBLDDIR
 export PATH
-PROG=`basename $0`
+PROG=$(basename $0)
 
 #
 # The CDPATH variable causes ksh's `cd' builtin to emit messages to stdout
 # under certain circumstances, which will screw up consumers of incflg()
 # (and perhaps other things as well); unset it.
-# 
+#
 unset CDPATH
 
 #
@@ -69,10 +71,10 @@ fail()
 #
 find_files()
 {
-   	pat=$1
-   	shift
+	pat=$1
+	shift
 
-	if [[ "$SCM_MODE" = "teamware" ]]; then
+	if [[ "$SCM_MODE" == "teamware" ]]; then
 		for dir; do
 			if [[ -d $CODEMGR_WS/$dir ]]; then
 				cd $CODEMGR_WS
@@ -81,7 +83,7 @@ find_files()
 				cd - > /dev/null
 			fi
 		done
-	elif [[ "$SCM_MODE" = "mercurial" || "$SCM_MODE" == "git" ]]; then
+	elif [[ "$SCM_MODE" == "mercurial" || "$SCM_MODE" == "git" ]]; then
 		dirs=""
 		for dir; do
 			if [[ -d $CODEMGR_WS/$dir ]]; then
@@ -111,7 +113,7 @@ echo_file()
 #
 exec_file()
 {
-	if [[ "${1##/}" = "$1" ]]; then
+	if [[ "${1##/}" == "$1" ]]; then
 		. $CODEMGR_WS/$1
 	else
 		. $1
@@ -125,8 +127,8 @@ exec_file()
 incflg()
 {
 	cd $1
-	for i in * .*; 	do
-    		case $i in
+	for i in * .*; do
+		case $i in
 		'*'|.|..)
 			;;
 		inc.flg)
@@ -165,9 +167,9 @@ prpath()
 
 		dots=
 		tree=$reltree
-		while [[ "${srcfile##$tree}" = "$srcfile" ]]; do
+		while [[ "${srcfile##$tree}" == "$srcfile" ]]; do
 			dots=../$dots
-			tree=`dirname $tree`
+			tree=$(dirname $tree)
 			[ "$tree" = "." ] && break
 		done
 		echo ${dots}${srcfile##$tree/}
@@ -199,19 +201,19 @@ done
 
 shift $((OPTIND - 1))
 
-[ $# -gt 1 ] && usage
+(( $# > 1 )) && usage
 
-CURTREE=`/bin/pwd`
+CURTREE=$(/bin/pwd)
 
 #
 # Determine the subtree being examined.
 #
-if [[ $# -eq 0 ]]; then
+if (( $# == 0 )); then
 	SUBTREE=$CURTREE
 elif [[ -d $1 ]]; then
 	SUBTREE=$1
-elif [[ -d $CODEMGR_WS/$1 ]]; then
-	SUBTREE=$CODEMGR_WS/$1
+elif [[ -d "$CODEMGR_WS/$1" ]]; then
+	SUBTREE="$CODEMGR_WS/$1"
 else
 	fail "neither \$CODEMGR_WS/$1 nor $1 exists as a directory"
 fi
@@ -220,25 +222,25 @@ fi
 # Get the canonical path to the subtree.
 #
 cd $SUBTREE
-SUBTREE=`/bin/pwd`
+SUBTREE=$(/bin/pwd)
 
 #
 # Get the canonical path to the current directory.
 #
 cd $CURTREE
-CURTREE=`/bin/pwd`
+CURTREE=$(/bin/pwd)
 
 #
 # Get the canonical path to the workspace.
 #
 cd $CODEMGR_WS
-CODEMGR_WS=`/bin/pwd`
+CODEMGR_WS=$(/bin/pwd)
 
-if [[ "${SUBTREE##$CODEMGR_WS}" = "$SUBTREE" ]]; then
+if [[ "${SUBTREE##$CODEMGR_WS}" == "$SUBTREE" ]]; then
 	fail "$SUBTREE is not a subtree of \$CODEMGR_WS"
 fi
 
-if [[ "${CURTREE##$CODEMGR_WS}" = "$CURTREE" ]]; then
+if [[ "${CURTREE##$CODEMGR_WS}" == "$CURTREE" ]]; then
 	fail "$CURTREE is not a subtree of \$CODEMGR_WS"
 fi
 
@@ -253,7 +255,7 @@ incflg $SUBTREE
 TREE=$SUBTREE
 while [[ $TREE != $CODEMGR_WS ]]; do
 	[[ -f $TREE/req.flg ]] && exec_file $TREE/req.flg
-	TREE=`dirname $TREE`
+	TREE=$(dirname $TREE)
 done
 
 exit 0

@@ -699,6 +699,7 @@ get_tie(SV *self, char *module, int instance, char *name, int *is_new)
 
 		/* Add TIEHASH magic */
 		hv_magic(hash, (GV *)tieref, 'P');
+		SvREFCNT_dec(tieref);
 		SvREADONLY_on(hash);
 
 	/* Otherwise, just find the existing tied hash */
