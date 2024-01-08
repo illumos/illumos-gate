@@ -12,7 +12,7 @@
 /*
  * Copyright 2021, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2023 MNX Cloud, Inc.
  */
 
@@ -442,7 +442,7 @@
 #include <sys/devops.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
-
+#include <sys/pci.h>
 #include <sys/mac_provider.h>
 
 #include <mlxcx.h>
@@ -1197,6 +1197,44 @@ mlxcx_teardown(mlxcx_t *mlxp)
 	VERIFY3S(mlxp->mlx_attach, ==, 0);
 	ddi_soft_state_free(mlxcx_softstate, mlxp->mlx_inst);
 	ddi_set_driver_private(dip, NULL);
+}
+
+static void
+mlxcx_get_model(mlxcx_t *mlxp)
+{
+	uint16_t venid;
+	uint16_t devid;
+
+	venid = pci_config_get16(mlxp->mlx_cfg_handle, PCI_CONF_VENID);
+	if (venid != MLXCX_VENDOR_ID) {
+		/* Currently, all supported cards have a Mellanox vendor id. */
+		mlxp->mlx_type = MLXCX_DEV_UNKNOWN;
+		return;
+	}
+
+	devid = pci_config_get16(mlxp->mlx_cfg_handle, PCI_CONF_DEVID);
+	switch (devid) {
+	case MLXCX_CX4_DEVID:
+	case MLXCX_CX4_VF_DEVID:
+	case MLXCX_CX4_LX_VF_DEVID:
+		mlxp->mlx_type = MLXCX_DEV_CX4;
+		break;
+	case MLXCX_CX5_DEVID:
+	case MLXCX_CX5_VF_DEVID:
+	case MLXCX_CX5_EX_DEVID:
+	case MLXCX_CX5_EX_VF_DEVID:
+	case MLXCX_CX5_GEN_VF_DEVID:
+		mlxp->mlx_type = MLXCX_DEV_CX5;
+		break;
+	case MLXCX_CX6_DEVID:
+	case MLXCX_CX6_VF_DEVID:
+	case MLXCX_CX6_DF_DEVID:
+	case MLXCX_CX6_LX_DEVID:
+		mlxp->mlx_type = MLXCX_DEV_CX6;
+		break;
+	default:
+		mlxp->mlx_type = MLXCX_DEV_UNKNOWN;
+	}
 }
 
 static boolean_t
@@ -2576,10 +2614,10 @@ mlxcx_init_caps(mlxcx_t *mlxp)
 	mlxp->mlx_nports = gen->mlcap_general_num_ports;
 	mlxp->mlx_max_sdu = (1 << (gen->mlcap_general_log_max_msg & 0x1F));
 
-	if (get_bit16(gen->mlcap_general_flags_c,
+	if (mlxp->mlx_type >= MLXCX_DEV_CX5 &&
+	    get_bit16(gen->mlcap_general_flags_c,
 	    MLXCX_CAP_GENERAL_FLAGS_C_PCAM_REG)) {
 		c->mlc_pcam = B_TRUE;
-		mlxcx_explore_pcam(mlxp, c);
 	}
 
 	c->mlc_max_tir = (1 << gen->mlcap_general_log_max_tir);
@@ -2735,6 +2773,7 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mlxcx_warn(mlxp, "failed to initial PCI config space");
 		goto err;
 	}
+	mlxcx_get_model(mlxp);
 	mlxp->mlx_attach |= MLXCX_ATTACH_PCI_CONFIG;
 
 	if (!mlxcx_regs_map(mlxp)) {
@@ -2809,6 +2848,10 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (!mlxcx_cmd_set_driver_version(mlxp, MLXCX_DRIVER_VERSION)) {
 		goto err;
+	}
+
+	if (mlxp->mlx_caps->mlc_pcam) {
+		mlxcx_explore_pcam(mlxp, mlxp->mlx_caps);
 	}
 
 	/*
