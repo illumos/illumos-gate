@@ -58,6 +58,24 @@ extern "C" {
 #endif
 
 /*
+ * The PCI device id for the cards we support. Taken from
+ * /usr/share/hwdata/pci.ids
+ */
+#define	MLXCX_CX4_DEVID			0x1013
+#define	MLXCX_CX4_VF_DEVID		0x1014
+#define	MLXCX_CX4_LX_DEVID		0x1015
+#define	MLXCX_CX4_LX_VF_DEVID		0x1016
+#define	MLXCX_CX5_DEVID			0x1017
+#define	MLXCX_CX5_VF_DEVID		0x1018
+#define	MLXCX_CX5_EX_DEVID		0x1019
+#define	MLXCX_CX5_EX_VF_DEVID		0x101a
+#define	MLXCX_CX6_DEVID			0x101b
+#define	MLXCX_CX6_VF_DEVID		0x101c
+#define	MLXCX_CX6_DF_DEVID		0x101d
+#define	MLXCX_CX5_GEN_VF_DEVID		0x101e
+#define	MLXCX_CX6_LX_DEVID		0x101f
+
+/*
  * Get access to the first PCI BAR.
  */
 #define	MLXCX_REG_NUMBER		1
@@ -1025,6 +1043,19 @@ typedef struct {
 	uint8_t	mlts_name[MLXCX_MTMP_NAMELEN];
 } mlxcx_temp_sensor_t;
 
+/*
+ * The oldest card supported by this driver is ConnectX-4. So far (at least),
+ * newer models tend to just add features vs. replacing them, so it seems
+ * reasonable to assume an unknown model likely supports everything the
+ * ConnectX-6 cards do.
+ */
+typedef enum {
+	MLXCX_DEV_CX4		= 0,
+	MLXCX_DEV_CX5		= 1,
+	MLXCX_DEV_CX6		= 2,
+	MLXCX_DEV_UNKNOWN	= 3,
+} mlxcx_dev_type_t;
+
 typedef enum {
 	MLXCX_ATTACH_FM		= 1 << 0,
 	MLXCX_ATTACH_PCI_CONFIG	= 1 << 1,
@@ -1055,6 +1086,7 @@ struct mlxcx {
 	int			mlx_inst;
 	mlxcx_attach_progress_t	mlx_attach;
 
+	mlxcx_dev_type_t	mlx_type;
 	mlxcx_drv_props_t	mlx_props;
 
 	/*
