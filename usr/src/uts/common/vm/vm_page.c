@@ -84,7 +84,7 @@
 
 static pgcnt_t max_page_get;	/* max page_get request size in pages */
 pgcnt_t total_pages = 0;	/* total number of pages (used by /proc) */
-uint64_t n_throttle = 0;	/* num times page create throttled */
+volatile uint64_t n_throttle = 0;	/* num times page create throttled */
 
 /*
  * freemem_lock protects all freemem variables:
