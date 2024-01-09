@@ -245,6 +245,9 @@ pgcnt_t		deficit;
 pgcnt_t		nscan;
 pgcnt_t		desscan;
 
+/* kstats */
+uint64_t	low_mem_scan;
+
 /* The maximum supported number of page_scanner() threads */
 #define	MAX_PSCAN_THREADS	16
 
@@ -285,12 +288,6 @@ static bool	reset_hands[MAX_PSCAN_THREADS];
  * currently available memory.
  */
 #define	SCHEDPAGING_HZ	4
-
-#define	WAKE_PAGEOUT_SCANNER(tag)			\
-	do {						\
-		DTRACE_PROBE(schedpage__wake__ ## tag);	\
-		cv_broadcast(&proc_pageout->p_cv);	\
-	} while (0)
 
 /*
  * despagescanners:
@@ -915,6 +912,7 @@ schedpaging(void *arg)
 			/*
 			 * We need more memory.
 			 */
+			low_mem_scan++;
 			WAKE_PAGEOUT_SCANNER(lowmem);
 		} else {
 			/*

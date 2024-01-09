@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1638,7 +1639,7 @@ delthr_get_freemem(struct mem_handle *mhp)
 		 * Put pressure on pageout.
 		 */
 		page_needfree(free_get);
-		cv_signal(&proc_pageout->p_cv);
+		WAKE_PAGEOUT_SCANNER(delthr);
 
 		mutex_enter(&mhp->mh_mutex);
 		(void) cv_reltimedwait(&mhp->mh_cv, &mhp->mh_mutex,

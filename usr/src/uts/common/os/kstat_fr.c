@@ -198,6 +198,8 @@ struct {
 	kstat_named_t pagesfree;
 	kstat_named_t pageslocked;
 	kstat_named_t pagestotal;
+	kstat_named_t lowmemscan;
+	kstat_named_t nthrottle;
 } system_pages_kstat = {
 	{ "physmem",		KSTAT_DATA_ULONG },
 	{ "nalloc",		KSTAT_DATA_ULONG },
@@ -205,20 +207,22 @@ struct {
 	{ "nalloc_calls",	KSTAT_DATA_ULONG },
 	{ "nfree_calls",	KSTAT_DATA_ULONG },
 	{ "kernelbase",		KSTAT_DATA_ULONG },
-	{ "econtig", 		KSTAT_DATA_ULONG },
-	{ "freemem", 		KSTAT_DATA_ULONG },
-	{ "availrmem", 		KSTAT_DATA_ULONG },
-	{ "lotsfree", 		KSTAT_DATA_ULONG },
-	{ "desfree", 		KSTAT_DATA_ULONG },
-	{ "minfree", 		KSTAT_DATA_ULONG },
-	{ "fastscan", 		KSTAT_DATA_ULONG },
-	{ "slowscan", 		KSTAT_DATA_ULONG },
-	{ "nscan", 		KSTAT_DATA_ULONG },
-	{ "desscan", 		KSTAT_DATA_ULONG },
-	{ "pp_kernel", 		KSTAT_DATA_ULONG },
-	{ "pagesfree", 		KSTAT_DATA_ULONG },
-	{ "pageslocked", 	KSTAT_DATA_ULONG },
+	{ "econtig",		KSTAT_DATA_ULONG },
+	{ "freemem",		KSTAT_DATA_ULONG },
+	{ "availrmem",		KSTAT_DATA_ULONG },
+	{ "lotsfree",		KSTAT_DATA_ULONG },
+	{ "desfree",		KSTAT_DATA_ULONG },
+	{ "minfree",		KSTAT_DATA_ULONG },
+	{ "fastscan",		KSTAT_DATA_ULONG },
+	{ "slowscan",		KSTAT_DATA_ULONG },
+	{ "nscan",		KSTAT_DATA_ULONG },
+	{ "desscan",		KSTAT_DATA_ULONG },
+	{ "pp_kernel",		KSTAT_DATA_ULONG },
+	{ "pagesfree",		KSTAT_DATA_ULONG },
+	{ "pageslocked",	KSTAT_DATA_ULONG },
 	{ "pagestotal",		KSTAT_DATA_ULONG },
+	{ "low_mem_scan",	KSTAT_DATA_ULONG },
+	{ "n_throttle",		KSTAT_DATA_ULONG },
 };
 
 static int header_kstat_update(kstat_t *, int);
@@ -912,6 +916,8 @@ system_pages_kstat_update(kstat_t *ksp, int rw)
 	system_pages_kstat.pageslocked.value.ul	= (ulong_t)(availrmem_initial -
 	    availrmem);
 	system_pages_kstat.pagestotal.value.ul	= (ulong_t)total_pages;
+	system_pages_kstat.lowmemscan.value.ul	= (ulong_t)low_mem_scan;
+	system_pages_kstat.nthrottle.value.ul	= (ulong_t)n_throttle;
 	/*
 	 * pp_kernel represents total pages used by the kernel since the
 	 * startup. This formula takes into account the boottime kernel
