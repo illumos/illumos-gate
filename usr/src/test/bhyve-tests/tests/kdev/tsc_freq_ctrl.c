@@ -77,7 +77,7 @@ check_reading(tsc_reading_t r1, tsc_reading_t r2, uint64_t guest_freq,
 
 void
 do_freq_test(uint64_t guest_freq, uint8_t per_sec, uint8_t seconds,
-    const int vmfd, struct vmctx *ctx, struct vdi_time_info_v1 *src)
+    const int vmfd, struct vcpu *vcpu, struct vdi_time_info_v1 *src)
 {
 	/* configure the guest to have the desired frequency */
 	struct vdi_time_info_v1 time_info = {
@@ -142,7 +142,7 @@ do_freq_test(uint64_t guest_freq, uint8_t per_sec, uint8_t seconds,
 		}
 
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+		    test_run_vcpu(vcpu, &ventry, &vexit);
 
 		if (kind == VEK_REENTR) {
 			continue;
@@ -191,11 +191,16 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(test_suite_name);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -229,12 +234,16 @@ main(int argc, char *argv[])
 	guest_freq = host_freq * 2;
 	(void) printf("testing 2x host_freq: guest_freq=%lu, host_freq=%lu\n",
 	    guest_freq, host_freq);
-	do_freq_test(guest_freq, per_sec, seconds, vmfd, ctx, &time_info);
+	do_freq_test(guest_freq, per_sec, seconds, vmfd, vcpu, &time_info);
 
 	/* reset guest */
+	vm_vcpu_close(vcpu);
 	test_cleanup(false);
 	ctx = test_initialize(test_suite_name);
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -244,12 +253,16 @@ main(int argc, char *argv[])
 	guest_freq = host_freq / 2;
 	(void) printf("testing 0.5x host_freq: guest_freq=%lu, host_freq=%lu\n",
 	    guest_freq, host_freq);
-	do_freq_test(guest_freq, per_sec, seconds, vmfd, ctx, &time_info);
+	do_freq_test(guest_freq, per_sec, seconds, vmfd, vcpu, &time_info);
 
 	/* reset guest */
+	vm_vcpu_close(vcpu);
 	test_cleanup(false);
 	ctx = test_initialize(test_suite_name);
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -259,12 +272,16 @@ main(int argc, char *argv[])
 	guest_freq = host_freq / 3;
 	(void) printf("testing 1/3 host_freq: guest_freq=%lu, host_freq=%lu\n",
 	    guest_freq, host_freq);
-	do_freq_test(guest_freq, per_sec, seconds, vmfd, ctx, &time_info);
+	do_freq_test(guest_freq, per_sec, seconds, vmfd, vcpu, &time_info);
 
 	/* reset guest */
+	vm_vcpu_close(vcpu);
 	test_cleanup(false);
 	ctx = test_initialize(test_suite_name);
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -274,7 +291,7 @@ main(int argc, char *argv[])
 	guest_freq = host_freq;
 	(void) printf("testing 1x host_freq: guest_freq=%lu, host_freq=%lu\n",
 	    guest_freq, host_freq);
-	do_freq_test(guest_freq, per_sec, seconds, vmfd, ctx, &time_info);
+	do_freq_test(guest_freq, per_sec, seconds, vmfd, vcpu, &time_info);
 
 	test_pass();
 }

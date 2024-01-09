@@ -19,6 +19,7 @@
 #include <strings.h>
 #include <libgen.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -93,7 +94,7 @@ check_reading(reading_t before, reading_t after, uint_t divisor, uint_t loops,
 
 
 static void
-run_test(struct vmctx *ctx, uint_t divisor, uint_t loops,
+run_test(struct vcpu *vcpu, uint_t divisor, uint_t loops,
     struct vm_entry *ventry, struct vm_exit *vexit)
 {
 	reading_t readings[2];
@@ -105,7 +106,7 @@ run_test(struct vmctx *ctx, uint_t divisor, uint_t loops,
 
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, ventry, vexit);
+		    test_run_vcpu(vcpu, ventry, vexit);
 		if (kind == VEK_REENTR) {
 			continue;
 		} else if (kind != VEK_UNHANDLED) {
@@ -159,11 +160,16 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(test_suite_name);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -171,8 +177,8 @@ main(int argc, char *argv[])
 	struct vm_entry ventry = { 0 };
 	struct vm_exit vexit = { 0 };
 
-	run_test(ctx, 4, 3, &ventry, &vexit);
-	run_test(ctx, 2, 4, &ventry, &vexit);
+	run_test(vcpu, 4, 3, &ventry, &vexit);
+	run_test(vcpu, 2, 4, &ventry, &vexit);
 	test_pass();
 	return (0);
 }

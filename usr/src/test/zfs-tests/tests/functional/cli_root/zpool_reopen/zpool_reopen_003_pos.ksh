@@ -66,6 +66,7 @@ log_must check_state $TESTPOOL "$REMOVED_DISK_ID" "unavail"
 TESTFILE=/$TESTPOOL/data
 TESTFILE_MD5=$(mktemp --tmpdir=/var/tmp)
 log_must generate_random_file /$TESTPOOL/data $LARGE_FILE_SIZE
+sync_pool $TESTPOOL
 log_must md5sum $TESTFILE > $TESTFILE_MD5
 
 # 4. Execute scrub.

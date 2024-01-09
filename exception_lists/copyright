@@ -517,6 +517,7 @@ usr/src/cmd/bhyve/config.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
+usr/src/cmd/bhyve/e820.[ch]
 usr/src/cmd/bhyve/fwctl.[ch]
 usr/src/cmd/bhyve/gdb.[ch]
 usr/src/cmd/bhyve/hda_codec.c

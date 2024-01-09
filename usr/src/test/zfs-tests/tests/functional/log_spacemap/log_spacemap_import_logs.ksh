@@ -64,9 +64,9 @@ log_must zpool create -o cachefile=none -f $LOGSM_POOL $TESTDISK
 log_must zfs create $LOGSM_POOL/fs
 
 log_must dd if=/dev/urandom of=/$LOGSM_POOL/fs/00 bs=128k count=10
-log_must sync
+sync_all_pools
 log_must dd if=/dev/urandom of=/$LOGSM_POOL/fs/00 bs=128k count=10
-log_must sync
+sync_all_pools
 
 log_must set_tunable32 zfs_keep_log_spacemaps_at_export 1
 log_must zpool export $LOGSM_POOL

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2020 Conrad Meyer <cem@FreeBSD.org>.  All rights reserved.
  *
@@ -25,13 +25,12 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/tree.h>
 
-#include <amd64/include/vmm.h>
+#include <machine/vmm.h>
 #include <x86/include/apicreg.h>
 struct vm;
 struct vm_hpet_cap;
@@ -46,10 +45,10 @@ struct vm_hpet_cap;
 #include "mem.h"
 
 static int
-apic_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr, int size,
+apic_handler(struct vcpu *vcpu, int dir, uint64_t addr, int size,
     uint64_t *val, void *arg1 __unused, long arg2 __unused)
 {
-	if (vm_readwrite_kernemu_device(ctx, vcpu, addr, (dir == MEM_F_WRITE),
+	if (vm_readwrite_kernemu_device(vcpu, addr, (dir == MEM_F_WRITE),
 	    size, val) != 0)
 		return (errno);
 	return (0);

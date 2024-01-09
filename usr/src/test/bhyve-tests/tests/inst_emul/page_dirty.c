@@ -109,6 +109,7 @@ void
 test_dirty_tracking_disabled(const char *test_suite_name)
 {
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	uint8_t dirty_bitmap[DIRTY_BITMAP_SZ] = { 0 };
@@ -121,7 +122,11 @@ test_dirty_tracking_disabled(const char *test_suite_name)
 	/* Create VM without VCF_TRACK_DIRTY flag */
 	ctx = test_initialize_flags(test_suite_name, 0);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -143,17 +148,22 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	/* Skip test if CPU doesn't support HW A/D tracking */
 	check_supported(test_suite_name);
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
 
 	/* Test for expected error with dirty tracking disabled */
 	test_dirty_tracking_disabled(test_suite_name);
 
 	ctx = test_initialize_flags(test_suite_name, VCF_TRACK_DIRTY);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -199,7 +209,7 @@ main(int argc, char *argv[])
 	struct vm_exit vexit = { 0 };
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, &ventry, &vexit);
+		    test_run_vcpu(vcpu, &ventry, &vexit);
 		switch (kind) {
 		case VEK_REENTR:
 			break;

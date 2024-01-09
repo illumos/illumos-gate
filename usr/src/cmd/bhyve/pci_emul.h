@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * Copyright 2018 Joyent, Inc.
@@ -38,6 +36,7 @@
 #include <sys/queue.h>
 #include <sys/kernel.h>
 #include <sys/nv.h>
+#include <sys/pciio.h>
 #include <sys/_pthreadtypes.h>
 
 #include <dev/pci/pcireg.h>
@@ -56,8 +55,7 @@ struct pci_devemu {
 	const char      *pe_emu;	/* Name of device emulation */
 
 	/* instance creation */
-	int       (*pe_init)(struct vmctx *, struct pci_devinst *,
-			     nvlist_t *);
+	int       (*pe_init)(struct pci_devinst *, nvlist_t *);
 	int	(*pe_legacy_config)(nvlist_t *, const char *);
 	const char *pe_alias;
 
@@ -65,29 +63,24 @@ struct pci_devemu {
 	void	(*pe_write_dsdt)(struct pci_devinst *);
 
 	/* config space read/write callbacks */
-	int	(*pe_cfgwrite)(struct vmctx *ctx,
-			       struct pci_devinst *pi, int offset,
+	int	(*pe_cfgwrite)(struct pci_devinst *pi, int offset,
 			       int bytes, uint32_t val);
-	int	(*pe_cfgread)(struct vmctx *ctx,
-			      struct pci_devinst *pi, int offset,
+	int	(*pe_cfgread)(struct pci_devinst *pi, int offset,
 			      int bytes, uint32_t *retval);
 
 	/* BAR read/write callbacks */
-	void      (*pe_barwrite)(struct vmctx *ctx,
-				 struct pci_devinst *pi, int baridx,
+	void      (*pe_barwrite)(struct pci_devinst *pi, int baridx,
 				 uint64_t offset, int size, uint64_t value);
-	uint64_t  (*pe_barread)(struct vmctx *ctx,
-				struct pci_devinst *pi, int baridx,
+	uint64_t  (*pe_barread)(struct pci_devinst *pi, int baridx,
 				uint64_t offset, int size);
 
-	void	(*pe_baraddr)(struct vmctx *ctx, struct pci_devinst *pi,
+	void	(*pe_baraddr)(struct pci_devinst *pi,
 			      int baridx, int enabled, uint64_t address);
 #ifndef __FreeBSD__
 	void	(*pe_lintrupdate)(struct pci_devinst *pi);
 #endif /* __FreeBSD__ */
 };
-
-#define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x);
+#define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x)
 
 enum pcibar_type {
 	PCIBAR_NONE,
@@ -234,10 +227,14 @@ typedef void (*pci_lintr_cb)(int b, int s, int pin, int pirq_pin,
 
 int	init_pci(struct vmctx *ctx);
 void	pci_callback(void);
+uint32_t pci_config_read_reg(const struct pcisel *host_sel, nvlist_t *nvl,
+	    uint32_t reg, uint8_t size, uint32_t def);
 int	pci_emul_alloc_bar(struct pci_devinst *pdi, int idx,
 	    enum pcibar_type type, uint64_t size);
 int 	pci_emul_alloc_rom(struct pci_devinst *const pdi, const uint64_t size,
     	    void **const addr);
+int 	pci_emul_add_boot_device(struct pci_devinst *const pi,
+	    const int bootindex);
 int	pci_emul_add_msicap(struct pci_devinst *pi, int msgnum);
 int	pci_emul_add_pciecap(struct pci_devinst *pi, int pcie_device_type);
 void	pci_emul_capwrite(struct pci_devinst *pi, int offset, int bytes,

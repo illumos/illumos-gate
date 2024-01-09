@@ -31,12 +31,12 @@
 #include "in_guest.h"
 
 static void
-run_until_unhandled(struct vmctx *ctx, struct vm_entry *ventry,
+run_until_unhandled(struct vcpu *vcpu, struct vm_entry *ventry,
     struct vm_exit *vexit)
 {
 	do {
 		const enum vm_exit_kind kind =
-		    test_run_vcpu(ctx, 0, ventry, vexit);
+		    test_run_vcpu(vcpu, ventry, vexit);
 		switch (kind) {
 		case VEK_REENTR:
 			break;
@@ -54,11 +54,11 @@ run_until_unhandled(struct vmctx *ctx, struct vm_entry *ventry,
 }
 
 static void
-repeat_consistent_exit(struct vmctx *ctx, struct vm_entry *ventry,
+repeat_consistent_exit(struct vcpu *vcpu, struct vm_entry *ventry,
     struct vm_exit *vexit, uint64_t expected_rip)
 {
 	ventry->cmd = VEC_DEFAULT | VEC_FLAG_EXIT_CONSISTENT;
-	if (vm_run(ctx, 0, ventry, vexit) != 0) {
+	if (vm_run(vcpu, ventry, vexit) != 0) {
 		test_fail_errno(errno, "Failure during vcpu entry");
 	}
 	if (vexit->rip != expected_rip) {
@@ -72,11 +72,15 @@ main(int argc, char *argv[])
 {
 	const char *test_suite_name = basename(argv[0]);
 	struct vmctx *ctx = NULL;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(test_suite_name);
 
-	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
@@ -88,15 +92,15 @@ main(int argc, char *argv[])
 	 * Let the payload run until it reaches the first userspace exit which
 	 * requires actual handling
 	 */
-	run_until_unhandled(ctx, &ventry, &vexit);
+	run_until_unhandled(vcpu, &ventry, &vexit);
 	if (vexit.exitcode != VM_EXITCODE_RDMSR) {
 		test_fail_vmexit(&vexit);
 	}
 	uint64_t rcx = 0, rip = 0;
-	if (vm_get_register(ctx, 0, VM_REG_GUEST_RCX, &rcx) != 0) {
+	if (vm_get_register(vcpu, VM_REG_GUEST_RCX, &rcx) != 0) {
 		test_fail_errno(errno, "Could not read guest %rcx");
 	}
-	if (vm_get_register(ctx, 0, VM_REG_GUEST_RIP, &rip) != 0) {
+	if (vm_get_register(vcpu, VM_REG_GUEST_RIP, &rip) != 0) {
 		test_fail_errno(errno, "Could not read guest %rip");
 	}
 	/* Paranoia: confirm that in-register %rip matches vm_exit data */
@@ -108,7 +112,7 @@ main(int argc, char *argv[])
 
 	/* Request a consistent exit */
 	ventry.cmd = VEC_DEFAULT | VEC_FLAG_EXIT_CONSISTENT;
-	if (vm_run(ctx, 0, &ventry, &vexit) != 0) {
+	if (vm_run(vcpu, &ventry, &vexit) != 0) {
 		test_fail_errno(errno, "Failure during vcpu entry");
 	}
 
@@ -135,11 +139,11 @@ main(int argc, char *argv[])
 	 * Repeat entry with consistency request.  This should not make any
 	 * forward progress since the vCPU is already in a consistent state.
 	 */
-	repeat_consistent_exit(ctx, &ventry, &vexit, vexit.rip);
+	repeat_consistent_exit(vcpu, &ventry, &vexit, vexit.rip);
 
 	/* Let the vCPU continue on to the next exit condition */
 	ventry.cmd = VEC_DEFAULT;
-	run_until_unhandled(ctx, &ventry, &vexit);
+	run_until_unhandled(vcpu, &ventry, &vexit);
 
 	const uint64_t read_addr = 0xc0000000;
 	const uint_t read_len = 4;
@@ -153,7 +157,7 @@ main(int argc, char *argv[])
 	 * fulfilling the MMIO should just result in the same MMIO exit.
 	 */
 	ventry.cmd = VEC_DEFAULT | VEC_FLAG_EXIT_CONSISTENT;
-	if (vm_run(ctx, 0, &ventry, &vexit) != 0) {
+	if (vm_run(vcpu, &ventry, &vexit) != 0) {
 		test_fail_errno(errno, "Failure during vcpu entry");
 	}
 	if (vexit.rip != rip ||
@@ -165,7 +169,7 @@ main(int argc, char *argv[])
 	/* Fulfill the MMIO and attempt another consistent exit */
 	ventry_fulfill_mmio(&vexit, &ventry, 0);
 	ventry.cmd |= VEC_FLAG_EXIT_CONSISTENT;
-	if (vm_run(ctx, 0, &ventry, &vexit) != 0) {
+	if (vm_run(vcpu, &ventry, &vexit) != 0) {
 		test_fail_errno(errno, "Failure during vcpu entry");
 	}
 
@@ -179,7 +183,7 @@ main(int argc, char *argv[])
 	 * And again, check that vCPU remains at that %rip once its state has
 	 * been made consistent.
 	 */
-	repeat_consistent_exit(ctx, &ventry, &vexit, vexit.rip);
+	repeat_consistent_exit(vcpu, &ventry, &vexit, vexit.rip);
 
 	test_pass();
 }

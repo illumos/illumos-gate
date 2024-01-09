@@ -1,12 +1,9 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Shunsuke Mie
  * Copyright (c) 2018 Leon Dang
  * Copyright (c) 2020 Chuck Tuffli
- *
- * Function crc16 Copyright (c) 2017, Fedor Uporov
- *     Obtained from function ext2_crc16() in sys/fs/ext2fs/ext2_csum.c
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -57,10 +54,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/errno.h>
 #include <sys/types.h>
+#ifdef __FreeBSD__
+#include <sys/crc16.h>
+#else
+#include "crc16.h"
+#endif
 #include <net/ieee_oui.h>
 #ifndef __FreeBSD__
 #include <endian.h>
@@ -132,7 +133,7 @@ static int nvme_debug = 0;
 /* Encode number of SQ's and CQ's for Set/Get Features */
 #define NVME_FEATURE_NUM_QUEUES(sc) \
 	(ZERO_BASED((sc)->num_squeues) & 0xffff) | \
-	(ZERO_BASED((sc)->num_cqueues) & 0xffff) << 16;
+	(ZERO_BASED((sc)->num_cqueues) & 0xffff) << 16
 
 #define	NVME_DOORBELL_OFFSET	offsetof(struct nvme_registers, doorbell)
 
@@ -521,6 +522,7 @@ static void
 pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 {
 	struct nvme_controller_data *cd = &sc->ctrldata;
+	int ret;
 
 	cd->vid = 0xFB5D;
 	cd->ssvid = 0x0000;
@@ -532,9 +534,9 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 	cd->rab   = 4;
 
 	/* FreeBSD OUI */
-	cd->ieee[0] = 0x58;
+	cd->ieee[0] = 0xfc;
 	cd->ieee[1] = 0x9c;
-	cd->ieee[2] = 0xfc;
+	cd->ieee[2] = 0x58;
 
 	cd->mic = 0;
 
@@ -590,56 +592,20 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 	    NVME_CTRLR_DATA_FNA_FORMAT_ALL_SHIFT;
 
 	cd->vwc = NVME_CTRLR_DATA_VWC_ALL_NO << NVME_CTRLR_DATA_VWC_ALL_SHIFT;
-}
 
-/*
- * Calculate the CRC-16 of the given buffer
- * See copyright attribution at top of file
- */
-static uint16_t
-crc16(uint16_t crc, const void *buffer, unsigned int len)
-{
-	const unsigned char *cp = buffer;
-	/* CRC table for the CRC-16. The poly is 0x8005 (x16 + x15 + x2 + 1). */
-	static uint16_t const crc16_table[256] = {
-		0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
-		0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
-		0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40,
-		0x0A00, 0xCAC1, 0xCB81, 0x0B40, 0xC901, 0x09C0, 0x0880, 0xC841,
-		0xD801, 0x18C0, 0x1980, 0xD941, 0x1B00, 0xDBC1, 0xDA81, 0x1A40,
-		0x1E00, 0xDEC1, 0xDF81, 0x1F40, 0xDD01, 0x1DC0, 0x1C80, 0xDC41,
-		0x1400, 0xD4C1, 0xD581, 0x1540, 0xD701, 0x17C0, 0x1680, 0xD641,
-		0xD201, 0x12C0, 0x1380, 0xD341, 0x1100, 0xD1C1, 0xD081, 0x1040,
-		0xF001, 0x30C0, 0x3180, 0xF141, 0x3300, 0xF3C1, 0xF281, 0x3240,
-		0x3600, 0xF6C1, 0xF781, 0x3740, 0xF501, 0x35C0, 0x3480, 0xF441,
-		0x3C00, 0xFCC1, 0xFD81, 0x3D40, 0xFF01, 0x3FC0, 0x3E80, 0xFE41,
-		0xFA01, 0x3AC0, 0x3B80, 0xFB41, 0x3900, 0xF9C1, 0xF881, 0x3840,
-		0x2800, 0xE8C1, 0xE981, 0x2940, 0xEB01, 0x2BC0, 0x2A80, 0xEA41,
-		0xEE01, 0x2EC0, 0x2F80, 0xEF41, 0x2D00, 0xEDC1, 0xEC81, 0x2C40,
-		0xE401, 0x24C0, 0x2580, 0xE541, 0x2700, 0xE7C1, 0xE681, 0x2640,
-		0x2200, 0xE2C1, 0xE381, 0x2340, 0xE101, 0x21C0, 0x2080, 0xE041,
-		0xA001, 0x60C0, 0x6180, 0xA141, 0x6300, 0xA3C1, 0xA281, 0x6240,
-		0x6600, 0xA6C1, 0xA781, 0x6740, 0xA501, 0x65C0, 0x6480, 0xA441,
-		0x6C00, 0xACC1, 0xAD81, 0x6D40, 0xAF01, 0x6FC0, 0x6E80, 0xAE41,
-		0xAA01, 0x6AC0, 0x6B80, 0xAB41, 0x6900, 0xA9C1, 0xA881, 0x6840,
-		0x7800, 0xB8C1, 0xB981, 0x7940, 0xBB01, 0x7BC0, 0x7A80, 0xBA41,
-		0xBE01, 0x7EC0, 0x7F80, 0xBF41, 0x7D00, 0xBDC1, 0xBC81, 0x7C40,
-		0xB401, 0x74C0, 0x7580, 0xB541, 0x7700, 0xB7C1, 0xB681, 0x7640,
-		0x7200, 0xB2C1, 0xB381, 0x7340, 0xB101, 0x71C0, 0x7080, 0xB041,
-		0x5000, 0x90C1, 0x9181, 0x5140, 0x9301, 0x53C0, 0x5280, 0x9241,
-		0x9601, 0x56C0, 0x5780, 0x9741, 0x5500, 0x95C1, 0x9481, 0x5440,
-		0x9C01, 0x5CC0, 0x5D80, 0x9D41, 0x5F00, 0x9FC1, 0x9E81, 0x5E40,
-		0x5A00, 0x9AC1, 0x9B81, 0x5B40, 0x9901, 0x59C0, 0x5880, 0x9841,
-		0x8801, 0x48C0, 0x4980, 0x8941, 0x4B00, 0x8BC1, 0x8A81, 0x4A40,
-		0x4E00, 0x8EC1, 0x8F81, 0x4F40, 0x8D01, 0x4DC0, 0x4C80, 0x8C41,
-		0x4400, 0x84C1, 0x8581, 0x4540, 0x8701, 0x47C0, 0x4680, 0x8641,
-		0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
-	};
-
-	while (len--)
-		crc = (((crc >> 8) & 0xffU) ^
-		    crc16_table[(crc ^ *cp++) & 0xffU]) & 0x0000ffffU;
-	return crc;
+#ifdef	__FreeBSD__
+	ret = snprintf(cd->subnqn, sizeof(cd->subnqn),
+	    "nqn.2013-12.org.freebsd:bhyve-%s-%u-%u-%u",
+	    get_config_value("name"), sc->nsc_pi->pi_bus,
+	    sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+#else
+	ret = snprintf((char *)cd->subnqn, sizeof (cd->subnqn),
+	    "nqn.2013-12.org.illumos:bhyve-%s-%u-%u-%u",
+	    get_config_value("name"), sc->nsc_pi->pi_bus,
+	    sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+#endif
+	if ((ret < 0) || ((unsigned)ret > sizeof(cd->subnqn)))
+		EPRINTLN("%s: error setting subnqn (%d)", __func__, ret);
 }
 
 static void
@@ -1109,7 +1075,7 @@ pci_nvme_reset(struct pci_nvme_softc *sc)
 }
 
 static int
-pci_nvme_init_controller(struct vmctx *ctx, struct pci_nvme_softc *sc)
+pci_nvme_init_controller(struct pci_nvme_softc *sc)
 {
 	uint16_t acqs, asqs;
 
@@ -1128,8 +1094,8 @@ pci_nvme_init_controller(struct vmctx *ctx, struct pci_nvme_softc *sc)
 		return (-1);
 	}
 	sc->submit_queues[0].size = asqs;
-	sc->submit_queues[0].qbase = vm_map_gpa(ctx, sc->regs.asq,
-	            sizeof(struct nvme_command) * asqs);
+	sc->submit_queues[0].qbase = vm_map_gpa(sc->nsc_pi->pi_vmctx,
+	    sc->regs.asq, sizeof(struct nvme_command) * asqs);
 	if (sc->submit_queues[0].qbase == NULL) {
 		EPRINTLN("%s: ASQ vm_map_gpa(%lx) failed", __func__,
 		    sc->regs.asq);
@@ -1149,8 +1115,8 @@ pci_nvme_init_controller(struct vmctx *ctx, struct pci_nvme_softc *sc)
 		return (-1);
 	}
 	sc->compl_queues[0].size = acqs;
-	sc->compl_queues[0].qbase = vm_map_gpa(ctx, sc->regs.acq,
-	         sizeof(struct nvme_completion) * acqs);
+	sc->compl_queues[0].qbase = vm_map_gpa(sc->nsc_pi->pi_vmctx,
+	    sc->regs.acq, sizeof(struct nvme_completion) * acqs);
 	if (sc->compl_queues[0].qbase == NULL) {
 		EPRINTLN("%s: ACQ vm_map_gpa(%lx) failed", __func__,
 		    sc->regs.acq);
@@ -1975,7 +1941,7 @@ nvme_opc_format_nvm(struct pci_nvme_softc* sc, struct nvme_command* command,
 		return (1);
 	}
 
-	/* Doesn't support Protection Infomation */
+	/* Doesn't support Protection Information */
 	pi = (command->cdw10 >> 5) & 0x7;
 	if (pi != 0) {
 		pci_nvme_status_genc(&compl->status, NVME_SC_INVALID_FIELD);
@@ -2185,7 +2151,7 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
  *
  * NVMe defines "data unit" as thousand's of 512 byte blocks and is rounded up.
  * E.g. 1 data unit is 1 - 1,000 512 byte blocks. 3 data units are 2,001 - 3,000
- * 512 byte blocks. Rounding up is acheived by initializing the remainder to 999.
+ * 512 byte blocks. Rounding up is achieved by initializing the remainder to 999.
  */
 static void
 pci_nvme_stats_write_read_update(struct pci_nvme_softc *sc, uint8_t opc,
@@ -2945,8 +2911,8 @@ pci_nvme_bar0_reg_dumps(const char *func, uint64_t offset, int iswrite)
 }
 
 static void
-pci_nvme_write_bar_0(struct vmctx *ctx, struct pci_nvme_softc* sc,
-	uint64_t offset, int size, uint64_t value)
+pci_nvme_write_bar_0(struct pci_nvme_softc *sc, uint64_t offset, int size,
+    uint64_t value)
 {
 	uint32_t ccreg;
 
@@ -3029,7 +2995,7 @@ pci_nvme_write_bar_0(struct vmctx *ctx, struct pci_nvme_softc* sc,
 				/* transition 1-> causes controller reset */
 				pci_nvme_reset_locked(sc);
 			else
-				pci_nvme_init_controller(ctx, sc);
+				pci_nvme_init_controller(sc);
 		}
 
 		/* Insert the iocqes, iosqes and en bits from the write */
@@ -3077,8 +3043,8 @@ pci_nvme_write_bar_0(struct vmctx *ctx, struct pci_nvme_softc* sc,
 }
 
 static void
-pci_nvme_write(struct vmctx *ctx, struct pci_devinst *pi,
-    int baridx, uint64_t offset, int size, uint64_t value)
+pci_nvme_write(struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	struct pci_nvme_softc* sc = pi->pi_arg;
 
@@ -3093,7 +3059,7 @@ pci_nvme_write(struct vmctx *ctx, struct pci_devinst *pi,
 
 	switch (baridx) {
 	case 0:
-		pci_nvme_write_bar_0(ctx, sc, offset, size, value);
+		pci_nvme_write_bar_0(sc, offset, size, value);
 		break;
 
 	default:
@@ -3140,8 +3106,7 @@ static uint64_t pci_nvme_read_bar_0(struct pci_nvme_softc* sc,
 
 
 static uint64_t
-pci_nvme_read(struct vmctx *ctx __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
+pci_nvme_read(struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct pci_nvme_softc* sc = pi->pi_arg;
 
@@ -3232,6 +3197,14 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 			sc->dataset_management = NVME_DATASET_MANAGEMENT_DISABLE;
 	}
 
+	value = get_config_value_node(nvl, "bootindex");
+	if (value != NULL) {
+		if (pci_emul_add_boot_device(sc->nsc_pi, atoi(value))) {
+			EPRINTLN("Invalid bootindex %d", atoi(value));
+			return (-1);
+		}
+	}
+
 	value = get_config_value_node(nvl, "ram");
 	if (value != NULL) {
 		uint64_t sz = strtoull(value, NULL, 10);
@@ -3296,7 +3269,7 @@ pci_nvme_resized(struct blockif_ctxt *bctxt __unused, void *arg,
 }
 
 static int
-pci_nvme_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
+pci_nvme_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_nvme_softc *sc;
 	uint32_t pci_membar_sz;
@@ -3376,9 +3349,6 @@ pci_nvme_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
 	pci_nvme_aen_init(sc);
 
 	pci_nvme_reset(sc);
-
-	pci_lintr_request(pi);
-
 done:
 	return (error);
 }

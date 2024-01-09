@@ -33,7 +33,7 @@
 
 
 static void
-check_caps(struct vmctx *ctx)
+check_caps(struct vcpu *vcpu)
 {
 	struct capcheck {
 		enum vm_cap_type cap;
@@ -47,7 +47,7 @@ check_caps(struct vmctx *ctx)
 		const char *capname = vm_capability_type2name(checks[i].cap);
 
 		int val;
-		if (vm_get_capability(ctx, 0, checks[i].cap, &val) != 0) {
+		if (vm_get_capability(vcpu, checks[i].cap, &val) != 0) {
 			err(EXIT_FAILURE, "could not query %s", capname);
 		}
 		const bool actual = (val != 0);
@@ -63,21 +63,27 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
 		errx(EXIT_FAILURE, "could not open test VM");
 	}
 
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
+
 	/* Check the capabs on a freshly created instance */
-	check_caps(ctx);
+	check_caps(vcpu);
 
 	/* Force the instance through a reinit before checking them again */
 	if (vm_reinit(ctx, 0) != 0) {
 		err(EXIT_FAILURE, "vm_reinit failed");
 	}
-	check_caps(ctx);
+	check_caps(vcpu);
 
+	vm_vcpu_close(vcpu);
 	vm_destroy(ctx);
 	(void) printf("%s\tPASS\n", suite_name);
 	return (EXIT_SUCCESS);

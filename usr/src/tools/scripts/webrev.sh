@@ -2431,22 +2431,15 @@ $WHICH_SCM | read SCM_MODE junk || exit 1
 if [[ $SCM_MODE == "git" ]]; then
 	#
 	# Git priorities:
-	# 1. git rev-parse --git-dir from CODEMGR_WS environment variable
-	# 2. git rev-parse --git-dir from directory of invocation
+	# 1. git rev-parse --show-toplevel from CODEMGR_WS environment variable
+	# 2. git rev-parse --show-toplevel from directory of invocation
 	#
 	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
-	    codemgr_ws=$($GIT --git-dir=$CODEMGR_WS/.git rev-parse --git-dir \
+	    codemgr_ws=$($GIT -C $CODEMGR_WS rev-parse --show-toplevel \
 		2>/dev/null)
 	[[ -z $codemgr_ws ]] && \
-	    codemgr_ws=$($GIT rev-parse --git-dir 2>/dev/null)
+	    codemgr_ws=$($GIT rev-parse --show-toplevel 2>/dev/null)
 
-	if [[ "$codemgr_ws" == ".git" ]]; then
-		codemgr_ws="${PWD}/${codemgr_ws}"
-	fi
-
-	if [[ "$codemgr_ws" == *"/.git" ]]; then
-		codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
-	fi
 	CWS="$codemgr_ws"
 elif [[ $SCM_MODE == "subversion" ]]; then
 	#

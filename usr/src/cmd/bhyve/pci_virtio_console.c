@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 iXsystems Inc.
  * All rights reserved.
@@ -35,7 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #ifndef WITHOUT_CAPSICUM
@@ -708,8 +707,7 @@ pci_vtcon_legacy_config(nvlist_t *nvl, const char *opts)
 }
 
 static int
-pci_vtcon_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    nvlist_t *nvl)
+pci_vtcon_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_vtcon_softc *sc;
 	nvlist_t *ports_nvl;

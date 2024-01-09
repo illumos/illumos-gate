@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 John H. Baldwin <jhb@FreeBSD.org>
  *
@@ -23,17 +23,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __GDB_H__
 #define	__GDB_H__
 
-void	gdb_cpu_add(int vcpu);
-void	gdb_cpu_breakpoint(int vcpu, struct vm_exit *vmexit);
-void	gdb_cpu_mtrap(int vcpu);
-void	gdb_cpu_suspend(int vcpu);
+void	gdb_cpu_add(struct vcpu *vcpu);
+void	gdb_cpu_breakpoint(struct vcpu *vcpu, struct vm_exit *vmexit);
+void	gdb_cpu_mtrap(struct vcpu *vcpu);
+void	gdb_cpu_suspend(struct vcpu *vcpu);
 void	init_gdb(struct vmctx *ctx);
 #ifndef __FreeBSD__
 void	init_mdb(struct vmctx *ctx);

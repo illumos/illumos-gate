@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014 Leon Dang <ldang@nahannisys.com>
  * Copyright 2018 Joyent, Inc.
@@ -34,7 +34,6 @@
      tablet             USB tablet mouse
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/uio.h>
@@ -287,10 +286,10 @@ struct pci_xhci_softc {
 };
 
 
-/* portregs and devices arrays are set up to start from idx=1 */
-#define	XHCI_PORTREG_PTR(x,n)	&(x)->portregs[(n)]
-#define	XHCI_DEVINST_PTR(x,n)	(x)->devices[(n)]
-#define	XHCI_SLOTDEV_PTR(x,n)	(x)->slots[(n)]
+/* port and slot numbering start from 1 */
+#define	XHCI_PORTREG_PTR(x,n)	&((x)->portregs[(n) - 1])
+#define	XHCI_DEVINST_PTR(x,n)	((x)->devices[(n) - 1])
+#define	XHCI_SLOTDEV_PTR(x,n)	((x)->slots[(n) - 1])
 
 #define	XHCI_HALTED(sc)		((sc)->opregs.usbsts & XHCI_STS_HCH)
 
@@ -2284,9 +2283,8 @@ pci_xhci_hostop_write(struct pci_xhci_softc *sc, uint64_t offset,
 
 
 static void
-pci_xhci_write(struct vmctx *ctx __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size __unused,
-    uint64_t value)
+pci_xhci_write(struct pci_devinst *pi, int baridx, uint64_t offset,
+    int size __unused, uint64_t value)
 {
 	struct pci_xhci_softc *sc;
 
@@ -2507,8 +2505,7 @@ pci_xhci_xecp_read(struct pci_xhci_softc *sc, uint64_t offset)
 
 
 static uint64_t
-pci_xhci_read(struct vmctx *ctx __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
+pci_xhci_read(struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct pci_xhci_softc *sc;
 	uint32_t	value;
@@ -2756,10 +2753,6 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 	sc->devices = calloc(XHCI_MAX_DEVS, sizeof(struct pci_xhci_dev_emu *));
 	sc->slots = calloc(XHCI_MAX_SLOTS, sizeof(struct pci_xhci_dev_emu *));
 
-	/* port and slot numbering start from 1 */
-	sc->devices--;
-	sc->slots--;
-
 	ndevices = 0;
 
 	slots_nvl = find_relative_config_node(nvl, "slot");
@@ -2853,7 +2846,6 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 
 portsfinal:
 	sc->portregs = calloc(XHCI_MAX_DEVS, sizeof(struct pci_xhci_portregs));
-	sc->portregs--;
 
 	if (ndevices > 0) {
 		for (i = 1; i <= XHCI_MAX_DEVS; i++) {
@@ -2869,14 +2861,14 @@ bad:
 		free(XHCI_DEVINST_PTR(sc, i));
 	}
 
-	free(sc->devices + 1);
-	free(sc->slots + 1);
+	free(sc->devices);
+	free(sc->slots);
 
 	return (-1);
 }
 
 static int
-pci_xhci_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
+pci_xhci_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_xhci_softc *sc;
 	int	error;

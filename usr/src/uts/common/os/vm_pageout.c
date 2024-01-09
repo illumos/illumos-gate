@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2018 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -241,7 +241,6 @@ pgcnt_t		lotsfree = 0;
 pgcnt_t		needfree = 0;
 pgcnt_t		throttlefree = 0;
 pgcnt_t		pageout_reserve = 0;
-pri_t		pageout_pri;
 
 pgcnt_t		deficit;
 pgcnt_t		nscan;
@@ -251,6 +250,7 @@ pgcnt_t		desscan;
 uint64_t low_mem_scan;
 uint64_t zone_cap_scan;
 
+/* The maximum supported number of page_scanner() threads */
 #define	MAX_PSCAN_THREADS	16
 
 /*
@@ -280,17 +280,30 @@ static hrtime_t	max_pageout_nsec;
 static hrtime_t	pageout_nsec;
 static hrtime_t	zone_pageout_nsec;
 
-static boolean_t	reset_hands[MAX_PSCAN_THREADS];
+static bool	reset_hands[MAX_PSCAN_THREADS];
 
 #define	PAGES_POLL_MASK	1023
+
+/*
+ * Pageout scheduling.
+ *
+ * Schedpaging controls the rate at which the page out daemon runs by
+ * setting the global variables nscan and desscan SCHEDPAGING_HZ
+ * times a second.  Nscan records the number of pages pageout has examined
+ * in its current pass; schedpaging() resets this value to zero each time
+ * it runs.  Desscan records the number of pages pageout should examine
+ * in its next pass; schedpaging() sets this value based on the amount of
+ * currently available memory.
+ */
 #define	SCHEDPAGING_HZ	4
 
 /*
  * despagescanners:
- *	The desired number of page scanner threads. The value can be set in
- *	/etc/system or tuned directly with 'mdb -kw'.  The system will bring
- *	the actual number of threads into line with the desired number. If set
- *	to an invalid value, the system will correct the setting.
+ *	The desired number of page scanner threads. For testing purposes, this
+ *	value can be set in /etc/system or tuned directly with mdb(1). The
+ *	system will bring the actual number of threads into line with the
+ *	desired number. If set to an invalid value, the system will correct the
+ *	setting.
  */
 uint_t despagescanners = 0;
 
@@ -310,6 +323,9 @@ uint_t despagescanners = 0;
  * pageout_sample_etime:
  *     The accumulated nanoseconds for the sample.
  *
+ * pageout_sampling:
+ *     True while sampling is still in progress.
+ *
  * pageout_rate:
  *     Rate in pages/nanosecond, computed at the end of sampling.
  *
@@ -325,11 +341,9 @@ static uint64_t	pageout_sample_lim = 4;
 static uint64_t	pageout_sample_cnt = 0;
 static pgcnt_t	pageout_sample_pages = 0;
 static hrtime_t	pageout_sample_etime = 0;
+static bool	pageout_sampling = true;
 static hrrate_t	pageout_rate = 0;
 static pgcnt_t	pageout_new_spread = 0;
-
-/* True if the page scanner is first starting up */
-#define	PAGE_SCAN_STARTUP	(pageout_sample_cnt < pageout_sample_lim)
 
 /* The current number of page scanner threads */
 static uint_t n_page_scanners = 1;
@@ -390,50 +404,36 @@ static struct clockinit {
 static inline pgcnt_t
 clamp(pgcnt_t value, pgcnt_t minimum, pgcnt_t maximum)
 {
-	if (value < minimum) {
+	if (value < minimum)
 		return (minimum);
-	} else if (value > maximum) {
+	else if (value > maximum)
 		return (maximum);
-	} else {
+	else
 		return (value);
-	}
 }
 
 static pgcnt_t
 tune(pgcnt_t initval, pgcnt_t initval_ceiling, pgcnt_t defval)
 {
-	if (initval == 0 || initval >= initval_ceiling) {
+	if (initval == 0 || initval >= initval_ceiling)
 		return (defval);
-	} else {
+	else
 		return (initval);
-	}
 }
-
-/*
- * Local boolean to control scanning when zones are over their cap. Avoids
- * accessing the zone_num_over_cap variable except within schedpaging(), which
- * only runs periodically. This is here only to reduce our access to
- * zone_num_over_cap, since it is already accessed a lot during paging, and
- * the page scanner accesses the zones_over variable on each page during a
- * scan. There is no lock needed for zone_num_over_cap since schedpaging()
- * doesn't modify the variable, it only cares if the variable is 0 or non-0.
- */
-static boolean_t zones_over = B_FALSE;
 
 /*
  * On large memory systems, multiple instances of the page scanner are run,
  * each responsible for a separate region of memory. This speeds up page
  * invalidation under low memory conditions.
  *
- * despagescanners can be set in /etc/system or via mdb and it will
- * be used as a guide for how many page scanners to create; the value
- * will be adjusted if it is not sensible. Otherwise, the number of
+ * For testing purposes, despagescanners can be set in /etc/system or via
+ * mdb(1) and it will be used as a guide for how many page scanners to create;
+ * the value will be adjusted if it is not sensible. Otherwise, the number of
  * page scanners is determined dynamically based on handspreadpages.
  */
 static void
 recalc_pagescanners(void)
 {
-	pgcnt_t sz;
 	uint_t des;
 
 	/* If the initial calibration has not been done, take no action. */
@@ -441,17 +441,19 @@ recalc_pagescanners(void)
 		return;
 
 	/*
-	 * If the desired number of scanners is set in /etc/system
-	 * then try to use it.
+	 * If `clockinit.ci_despagescanners` is non-zero, then a value for
+	 * `despagescanners` was set during initial boot. In this case, if
+	 * `despagescanners` has been reset to 0 then we want to revert to
+	 * that initial boot value.
 	 */
-	if (despagescanners == 0 && clockinit.ci_despagescanners != 0)
+	if (despagescanners == 0)
 		despagescanners = clockinit.ci_despagescanners;
 
 	if (despagescanners != 0) {
 		/*
 		 * We have a desired number of page scanners, either from
 		 * /etc/system or set via mdb. Try and use it (it will be
-		 * clamped below).
+		 * adjusted below if necessary).
 		 */
 		des = despagescanners;
 	} else {
@@ -464,27 +466,30 @@ recalc_pagescanners(void)
 		 * to 64GiB of RAM, a single thread is used; for very large
 		 * memory systems the threads are limited to MAX_PSCAN_THREADS.
 		 */
-		sz = btop(64ULL << 30);
-
-		if (sz > looppages) {
-			des = 1;
-		} else {
-			pgcnt_t tmp = sz;
-
-			for (des = 1; tmp < looppages; des++)
-				tmp += sz;
-		}
+		des = (looppages - 1) / btop(64ULL << 30) + 1;
 	}
 
 	/*
-	 * clamp the number of scanners so that we are under MAX_PSCAN_THREADS
-	 * and so that each scanner covers at least 10% more than
-	 * handspreadpages.
+	 * Clamp the number of scanners so that we have no more than
+	 * MAX_PSCAN_THREADS and so that each scanner covers at least 10% more
+	 * than handspreadpages.
 	 */
-	des = clamp(des, 1,
-	    looppages / (handspreadpages + handspreadpages / 10));
-	despagescanners = clamp(des, 1, MAX_PSCAN_THREADS);
+	pgcnt_t min_scanner_pages = handspreadpages + handspreadpages / 10;
+	pgcnt_t max_scanners = looppages / min_scanner_pages;
+	despagescanners = clamp(des, 1,
+	    clamp(max_scanners, 1, MAX_PSCAN_THREADS));
 }
+
+/*
+ * Local boolean to control scanning when zones are over their cap. Avoids
+ * accessing the zone_num_over_cap variable except within schedpaging(), which
+ * only runs periodically. This is here only to reduce our access to
+ * zone_num_over_cap, since it is already accessed a lot during paging, and
+ * the page scanner accesses the zones_over variable on each page during a
+ * scan. There is no lock needed for zone_num_over_cap since schedpaging()
+ * doesn't modify the variable, it only cares if the variable is 0 or non-0.
+ */
+static boolean_t zones_over = B_FALSE;
 
 /*
  * Set up the paging constants for the clock algorithm used by
@@ -747,7 +752,7 @@ setupclock(void)
 
 	/*
 	 * Establish the minimum and maximum length of time to be spent
-	 * scanning pages per wakeup, limiting the scanner duty cycle.  The
+	 * scanning pages per wakeup, limiting the scanner duty cycle. The
 	 * input percentage values (0-100) must be converted to a fraction of
 	 * the number of nanoseconds in a second of wall time, then further
 	 * scaled down by the number of scanner wakeups in a second.
@@ -768,22 +773,10 @@ setupclock(void)
 	 * Set a flag to re-evaluate the clock hand positions.
 	 */
 	for (uint_t i = 0; i < MAX_PSCAN_THREADS; i++)
-		reset_hands[i] = B_TRUE;
+		reset_hands[i] = true;
 
 	recalc_pagescanners();
 }
-
-/*
- * Pageout scheduling.
- *
- * Schedpaging controls the rate at which the page out daemon runs by
- * setting the global variables nscan and desscan SCHEDPAGING_HZ
- * times a second.  Nscan records the number of pages pageout has examined
- * in its current pass; schedpaging() resets this value to zero each time
- * it runs.  Desscan records the number of pages pageout should examine
- * in its next pass; schedpaging() sets this value based on the amount of
- * currently available memory.
- */
 
 static kmutex_t	pageout_mutex;
 
@@ -813,7 +806,7 @@ static bool pageout_pushing = false;
 static uint64_t pageout_pushcount = 0;
 static uint64_t pageout_pushcount_seen = 0;
 
-static int async_list_size = 8192;	/* number of async request structs */
+int async_list_size = 8192;
 
 static void pageout_scanner(void *);
 
@@ -845,7 +838,6 @@ schedpaging(void *arg)
 		kcage_cageout_wakeup();
 
 	if (mutex_tryenter(&pageout_mutex)) {
-
 		if (pageouts_running != 0)
 			goto out;
 
@@ -854,7 +846,11 @@ schedpaging(void *arg)
 		vavail = freemem - deficit;
 		if (pageout_new_spread != 0)
 			vavail -= needfree;
-		vavail = clamp(vavail, 0, lotsfree);
+		/* Note that vavail is signed so don't use clamp() here */
+		if (vavail < 0)
+			vavail = 0;
+		if (vavail > lotsfree)
+			vavail = lotsfree;
 
 		if (needfree > 0 && pageout_new_spread == 0) {
 			/*
@@ -887,13 +883,14 @@ schedpaging(void *arg)
 		if (pageout_new_spread != 0 && despagescanners != 0 &&
 		    despagescanners != n_page_scanners) {
 			/*
-			* We have finished the pagescan initialisation and the
-			* desired number of page scanners has changed, either
-			* because initialisation just finished, because of a
-			* memory DR, or because despagescanners has been
-			* modified on the fly (i.e. by mdb).
-			*/
-			uint_t i, curr_nscan = n_page_scanners;
+			 * We have finished the pagescan initialisation and the
+			 * desired number of page scanners has changed, either
+			 * because sampling just finished, because of a memory
+			 * DR, or because despagescanners has been modified on
+			 * the fly (e.g. via mdb(1)).
+			 */
+			uint_t curr_nscan = n_page_scanners;
+			uint_t i;
 
 			/* Re-validate despagescanners */
 			recalc_pagescanners();
@@ -901,16 +898,13 @@ schedpaging(void *arg)
 			n_page_scanners = despagescanners;
 
 			for (i = 0; i < MAX_PSCAN_THREADS; i++)
-				reset_hands[i] = B_TRUE;
+				reset_hands[i] = true;
 
 			/* If we need more scanners, start them now. */
-			if (n_page_scanners > curr_nscan) {
-				for (i = curr_nscan; i < n_page_scanners; i++) {
-					(void) lwp_kernel_create(proc_pageout,
-					    pageout_scanner,
-					    (void *)(uintptr_t)i, TS_RUN,
-					    pageout_pri);
-				}
+			for (i = curr_nscan; i < n_page_scanners; i++) {
+				(void) lwp_kernel_create(proc_pageout,
+				    pageout_scanner, (void *)(uintptr_t)i,
+				    TS_RUN, curthread->t_pri);
 			}
 
 			/*
@@ -918,13 +912,13 @@ schedpaging(void *arg)
 			 * wakeup so that the excess threads will terminate.
 			 */
 			if (n_page_scanners < curr_nscan) {
-				WAKE_PAGEOUT_SCANNER();
+				WAKE_PAGEOUT_SCANNER(reducing);
 			}
 		}
 
 		zones_over = B_FALSE;
 
-		if (PAGE_SCAN_STARTUP) {
+		if (pageout_sampling) {
 			/*
 			 * We still need to measure the rate at which the
 			 * system is able to scan pages of memory. Each of
@@ -935,49 +929,44 @@ schedpaging(void *arg)
 			desscan = total_pages;
 			pageout_nsec = max_pageout_nsec;
 
-			DTRACE_PROBE(schedpage__wake__sample);
-			WAKE_PAGEOUT_SCANNER();
+			WAKE_PAGEOUT_SCANNER(sampling);
 		} else if (freemem < lotsfree + needfree) {
 			/*
 			 * We need more memory.
 			 */
 			low_mem_scan++;
-
-			DTRACE_PROBE(schedpage__wake__low);
-			WAKE_PAGEOUT_SCANNER();
+			WAKE_PAGEOUT_SCANNER(lowmem);
 		} else if (zone_num_over_cap > 0) {
 			/*
-			 * One of more zones are over their cap.
+			 * One or more zones are over their cap.
 			 */
 
 			/* No page limit */
 			desscan = total_pages;
 
 			/*
-			* Increase the scanning CPU% to the max. This implies
-			* 80% of one CPU/sec if the scanner can run each
-			* opportunity. Can also be tuned via setting
-			* zone_pageout_nsec in /etc/system or with mdb.
-			*/
+			 * Increase the scanning CPU% to the max. This implies
+			 * 80% of one CPU/sec if the scanner can run each
+			 * opportunity. Can also be tuned via setting
+			 * zone_pageout_nsec in /etc/system or with mdb.
+			 */
 			pageout_nsec = (zone_pageout_nsec != 0) ?
-			   zone_pageout_nsec : max_pageout_nsec;
+			    zone_pageout_nsec : max_pageout_nsec;
 
 			zones_over = B_TRUE;
 			zone_cap_scan++;
 
-			DTRACE_PROBE(schedpage__wake__zone);
-			WAKE_PAGEOUT_SCANNER();
+			WAKE_PAGEOUT_SCANNER(zone);
 		} else {
 			/*
 			 * There are enough free pages, no need to
-			 * kick the scanner thread.  And next time
+			 * kick the scanner threads.  And next time
 			 * around, keep more of the `highly shared'
 			 * pages.
 			 */
 			cv_signal_pageout();
-			if (po_share > MIN_PO_SHARE) {
+			if (po_share > MIN_PO_SHARE)
 				po_share >>= 1;
-			}
 		}
 out:
 		mutex_exit(&pageout_mutex);
@@ -986,7 +975,7 @@ out:
 	/*
 	 * Signal threads waiting for available memory.
 	 * NOTE: usually we need to grab memavail_lock before cv_broadcast, but
-	 * in this case it is not needed - the waiters will be waken up during
+	 * in this case it is not needed - the waiters will be woken up during
 	 * the next invocation of this function.
 	 */
 	if (kmem_avail() > 0)
@@ -1019,13 +1008,8 @@ uint_t dopageout = 1;
  * In order to make page invalidation more responsive on machines with
  * larger memory, multiple pageout_scanner threads may be created. In this
  * case, each thread is given a segment of the memory "clock face" so that
- * memory can be reclaimed more quickly.
- *
- * As long as there are at least lotsfree pages, or no zones over their
- * cap, then pageout_scanner threads are not run. When pageout_scanner
- * threads are running for case (a), all pages are considered for pageout.
- * For case (b), only pages belonging to a zone over its cap will be
- * considered for pageout.
+ * memory can be reclaimed more quickly. As long as there are at least lotsfree
+ * pages, then pageout_scanner threads are not run.
  *
  * There are multiple threads that act on behalf of the pageout process. A
  * set of threads scan pages (pageout_scanner) and frees them up if they
@@ -1041,6 +1025,7 @@ void
 pageout()
 {
 	struct async_reqs *arg;
+	pri_t pageout_pri;
 	int i;
 	pgcnt_t max_pushes;
 	callb_cpr_t cprinfo;
@@ -1053,15 +1038,11 @@ pageout()
 	bcopy("pageout", PTOU(curproc)->u_psargs, 8);
 	bcopy("pageout", PTOU(curproc)->u_comm, 7);
 
-	/*
-	 * Create pageout scanner thread
-	 */
 	mutex_init(&pageout_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&push_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
-	 * Allocate and initialize the async request structures
-	 * for pageout.
+	 * Allocate and initialize the async request structures for pageout.
 	 */
 	push_req = (struct async_reqs *)
 	    kmem_zalloc(async_list_size * sizeof (struct async_reqs), KM_SLEEP);
@@ -1071,15 +1052,15 @@ pageout()
 		push_req[i].a_next = &push_req[i + 1];
 	}
 
-	pageout_pri = curthread->t_pri - 1;
+	pageout_pri = curthread->t_pri;
 
 	/* Create the first pageout scanner thread. */
 	(void) lwp_kernel_create(proc_pageout, pageout_scanner,
 	    (void *)0,	/* this is instance 0, not NULL */
-	    TS_RUN, pageout_pri);
+	    TS_RUN, pageout_pri - 1);
 
 	/*
-	 * kick off pageout scheduler.
+	 * kick off the pageout scheduler.
 	 */
 	schedpaging(NULL);
 
@@ -1131,19 +1112,50 @@ pageout()
 	}
 }
 
+static void
+pageout_sample_add(pgcnt_t count, hrtime_t elapsed)
+{
+	VERIFY(pageout_sampling);
+
+	/*
+	 * The global variables used below are only modified during initial
+	 * scanning when there is a single page scanner thread running.
+	 */
+	pageout_sample_pages += count;
+	pageout_sample_etime += elapsed;
+	pageout_sample_cnt++;
+
+	if (pageout_sample_cnt >= pageout_sample_lim) {
+		/*
+		 * We have enough samples, set the spread.
+		 */
+		pageout_sampling = false;
+		pageout_rate = (hrrate_t)pageout_sample_pages *
+		    (hrrate_t)(NANOSEC) / pageout_sample_etime;
+		pageout_new_spread = pageout_rate / 10;
+	}
+}
+
+static inline page_t *
+wrapping_page_next(page_t *cur, page_t *start, page_t *end)
+{
+	if (cur == end)
+		return (start);
+	return (page_nextn(cur, 1));
+}
+
 /*
  * Kernel thread that scans pages looking for ones to free
  */
 static void
 pageout_scanner(void *a)
 {
-	struct page *fronthand, *backhand, *fronthandstart;
-	struct page *regionstart, *regionend;
+	page_t *fhand, *bhand, *fhandstart;
+	page_t *regionstart, *regionend;
 	uint_t laps;
 	callb_cpr_t cprinfo;
-	pgcnt_t	nscan_cnt, tick;
+	pgcnt_t	nscan_cnt;
 	pgcnt_t	pcount;
-	bool bhwrapping, fhwrapping;
 	hrtime_t sample_start, sample_end;
 	uint_t inst = (uint_t)(uintptr_t)a;
 
@@ -1157,7 +1169,7 @@ pageout_scanner(void *a)
 	 * the right point on the assumption that after one circuit things
 	 * will have settled down, and restarts shouldn't be that often.
 	 */
-	reset_hands[inst] = B_TRUE;
+	reset_hands[inst] = true;
 
 	pageouts_running++;
 	mutex_exit(&pageout_mutex);
@@ -1176,9 +1188,8 @@ loop:
 	/*
 	 * Check if pageout has been disabled for debugging purposes.
 	 */
-	if (!dopageout) {
+	if (dopageout == 0)
 		goto loop;
-	}
 
 	/*
 	 * One may reset the clock hands and scanned region for debugging
@@ -1187,16 +1198,16 @@ loop:
 	 * memory is added to, or removed from, the system.
 	 */
 	if (reset_hands[inst]) {
-		struct page *first;
+		page_t *first;
 
-		reset_hands[inst] = B_FALSE;
+		reset_hands[inst] = false;
 
 		if (inst >= n_page_scanners) {
 			/*
-			* The desired number of page scanners has been
-			* reduced and this instance is no longer wanted.
-			* Exit the lwp.
-			*/
+			 * The desired number of page scanners has been
+			 * reduced and this instance is no longer wanted.
+			 * Exit the lwp.
+			 */
 			VERIFY3U(inst, !=, 0);
 			DTRACE_PROBE1(pageout__exit, uint_t, inst);
 			mutex_enter(&pageout_mutex);
@@ -1227,20 +1238,17 @@ loop:
 			regionend = page_nextn(regionstart, span - 1);
 		}
 
-		backhand = regionstart;
-		fronthand = page_nextn(backhand, handspreadpages);
-		tick = 1;
-
-		bhwrapping = fhwrapping = B_FALSE;
+		bhand = regionstart;
+		fhand = page_nextn(bhand, handspreadpages);
 
 		DTRACE_PROBE4(pageout__reset, uint_t, inst,
 		    pgcnt_t, regionstart, pgcnt_t, regionend,
-		    pgcnt_t, fronthand);
+		    pgcnt_t, fhand);
 	}
 
 	/*
-	 * This CPU kstat is only incremented here and we're obviously
-	 * on this CPU, so no lock.
+	 * This CPU kstat is only incremented here and we're on this CPU, so no
+	 * lock.
 	 */
 	CPU_STATS_ADDQ(CPU, vm, pgrrun, 1);
 
@@ -1258,13 +1266,13 @@ loop:
 	pcount = 0;
 
 	DTRACE_PROBE5(pageout__start, uint_t, inst, pgcnt_t, desscan,
-	    hrtime_t, pageout_nsec, page_t *, backhand, page_t *, fronthand);
+	    hrtime_t, pageout_nsec, page_t *, bhand, page_t *, fhand);
 
 	/*
 	 * Record the initial position of the front hand for this cycle so
 	 * that we can detect when the hand wraps around.
 	 */
-	fronthandstart = fronthand;
+	fhandstart = fhand;
 
 	sample_start = gethrtime();
 
@@ -1280,7 +1288,7 @@ loop:
 		 *  2) there is not enough free memory
 		 *  3) during page scan startup when determining sample data
 		 */
-		if (!PAGE_SCAN_STARTUP && freemem >= lotsfree + needfree &&
+		if (!pageout_sampling && freemem >= lotsfree + needfree &&
 		    !zones_over) {
 			/*
 			 * We are not sampling and enough memory has become
@@ -1312,57 +1320,44 @@ loop:
 		 * If checkpage manages to add a page to the free list,
 		 * we give ourselves another couple of trips around the loop.
 		 */
-		if ((rvfront = checkpage(fronthand, POH_FRONT)) == CKP_FREED) {
+		if ((rvfront = checkpage(fhand, POH_FRONT)) == CKP_FREED) {
 			laps = 0;
 		}
-		if ((rvback = checkpage(backhand, POH_BACK)) == CKP_FREED) {
+		if ((rvback = checkpage(bhand, POH_BACK)) == CKP_FREED) {
 			laps = 0;
 		}
 
 		++pcount;
 
 		/*
-		 * This CPU kstat is only incremented here and we're obviously
-		 * on this CPU, so no lock.
+		 * This CPU kstat is only incremented here and we're on this
+		 * CPU, so no lock.
 		 */
 		CPU_STATS_ADDQ(CPU, vm, scan, 1);
 
 		/*
 		 * Don't include ineligible pages in the number scanned.
 		 */
-		if (rvfront != CKP_INELIGIBLE || rvback != CKP_INELIGIBLE) {
+		if (rvfront != CKP_INELIGIBLE || rvback != CKP_INELIGIBLE)
 			nscan_cnt++;
-		}
 
-		if (bhwrapping) {
-			backhand = regionstart;
-			bhwrapping = B_FALSE;
-		} else {
-			backhand = page_nextn(backhand, tick);
-			if (backhand == regionend)
-				bhwrapping = B_TRUE;
-		}
-
-		if (fhwrapping) {
-			fronthand = regionstart;
-			fhwrapping = B_FALSE;
-		} else {
-			fronthand = page_nextn(fronthand, tick);
-			if (fronthand == regionend)
-				fhwrapping = B_TRUE;
-		}
+		/*
+		 * Tick
+		 */
+		bhand = wrapping_page_next(bhand, regionstart, regionend);
+		fhand = wrapping_page_next(fhand, regionstart, regionend);
 
 		/*
 		 * The front hand has wrapped around during this wakeup.
 		 */
-		if (fronthand == fronthandstart) {
+		if (fhand == fhandstart) {
 			laps++;
 			DTRACE_PROBE2(pageout__hand__wrap, uint_t, inst,
 			    uint_t, laps);
 
 			/*
 			 * This CPU kstat is only incremented here and we're
-			 * obviously on this CPU, so no lock.
+			 * on this CPU, so no lock.
 			 */
 			CPU_STATS_ADDQ(CPU, vm, rev, 1);
 
@@ -1371,7 +1366,7 @@ loop:
 			 * reclaim more pages.
 			 * If scanning only because zones are over their cap,
 			 * then wrapping is common and we simply keep going.
-			*/
+			 */
 			if (laps > 1 && freemem < lotsfree + needfree) {
 				/*
 				 * Extremely unlikely, but it happens.
@@ -1397,32 +1392,18 @@ loop:
 	    pgcnt_t, nscan_cnt, pgcnt_t, pcount)
 
 	/*
-	 * The global variables used below are only modified by this thread and
-	 * only during initial scanning when there is a single page scanner
-	 * thread running.
+	 * Continue accumulating samples until we have enough to get a
+	 * reasonable value for average scan rate.
 	 */
-	if (pageout_new_spread == 0) {
+	if (pageout_sampling) {
 		VERIFY3U(inst, ==, 0);
-
-		if (PAGE_SCAN_STARTUP) {
-			/*
-			 * Continue accumulating samples until we have enough
-			 * to get a reasonable value for average scan rate.
-			 */
-			pageout_sample_pages += pcount;
-			pageout_sample_etime += sample_end - sample_start;
-			++pageout_sample_cnt;
-		}
-
-		if (!PAGE_SCAN_STARTUP) {
-			/*
-			 * We have enough samples, set the spread.
-			 */
-			pageout_rate = (hrrate_t)pageout_sample_pages *
-			    (hrrate_t)(NANOSEC) / pageout_sample_etime;
-			pageout_new_spread = pageout_rate / 10;
+		pageout_sample_add(pcount, sample_end - sample_start);
+		/*
+		 * If, after the sample just added, we have finished sampling,
+		 * set up the paging constants.
+		 */
+		if (!pageout_sampling)
 			setupclock();
-		}
 	}
 
 	goto loop;
@@ -1494,7 +1475,7 @@ reset:
  *	CKP_FREED      if we freed it.
  */
 static checkpage_result_t
-checkpage(struct page *pp, pageout_hand_t whichhand)
+checkpage(page_t *pp, pageout_hand_t whichhand)
 {
 	int ppattr;
 	int isfs = 0;
@@ -1549,9 +1530,9 @@ checkpage(struct page *pp, pageout_hand_t whichhand)
 		if (pp->p_zoneid == ALL_ZONES ||
 		    zone_pdata[pp->p_zoneid].zpers_over == 0) {
 			/*
-			* Cross-zone shared page, or zone not over it's cap.
-			* Leave the page alone.
-			*/
+			 * Cross-zone shared page, or zone not over it's cap.
+			 * Leave the page alone.
+			 */
 			page_unlock(pp);
 			return (CKP_INELIGIBLE);
 		}
@@ -1752,7 +1733,7 @@ queue_io_request(vnode_t *vp, u_offset_t off)
 }
 
 /*
- * Wakeup pageout to initiate i/o if push_list is not empty.
+ * Wake up pageout to initiate i/o if push_list is not empty.
  */
 void
 cv_signal_pageout()

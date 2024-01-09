@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Beckhoff Automation GmbH & Co. KG
  * All rights reserved.
@@ -32,7 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #ifndef WITHOUT_CAPSICUM
@@ -567,8 +566,6 @@ done:
 	/* clear queue and send interrupt to guest */
 	vtinput_eventqueue_clear(queue);
 	vq_endchains(vq, 1);
-
-	return;
 }
 
 static int
@@ -638,8 +635,7 @@ pci_vtinput_legacy_config(nvlist_t *nvl, const char *opts)
 }
 
 static int
-pci_vtinput_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    nvlist_t *nvl)
+pci_vtinput_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_vtinput_softc *sc;
 

@@ -34,6 +34,7 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
@@ -45,6 +46,10 @@ main(int argc, char *argv[])
 	 * not appear to exist.
 	 */
 	assert(check_instance_usable(suite_name));
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
 
 	/* Ensure sure that auto-destruct is off */
 	if (ioctl(vm_get_device_fd(ctx), VM_SET_AUTODESTRUCT, 0) != 0) {
@@ -66,7 +71,7 @@ main(int argc, char *argv[])
 
 	/* Attempt an operation on our still-open handle */
 	uint64_t reg = 0;
-	if (vm_get_register(ctx, 0, VM_REG_GUEST_RAX, &reg) == 0) {
+	if (vm_get_register(vcpu, VM_REG_GUEST_RAX, &reg) == 0) {
 		err(EXIT_FAILURE,
 		    "VM_GET_REGISTER succeeded despite instance destruction");
 	}
@@ -77,6 +82,7 @@ main(int argc, char *argv[])
 	}
 
 
+	vm_vcpu_close(vcpu);
 	vm_close(ctx);
 	ctx = NULL;
 

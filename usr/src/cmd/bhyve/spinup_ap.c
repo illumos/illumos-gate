@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -41,7 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -58,7 +55,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef __FreeBSD__
 static void
-spinup_ap_realmode(struct vmctx *ctx, int newcpu, uint64_t rip)
+spinup_ap_realmode(struct vcpu *newcpu, uint64_t rip)
 {
 	int vector, error;
 	uint16_t cs;
@@ -71,38 +68,35 @@ spinup_ap_realmode(struct vmctx *ctx, int newcpu, uint64_t rip)
 	 * Update the %cs and %rip of the guest so that it starts
 	 * executing real mode code at at 'vector << 12'.
 	 */
-	error = vm_set_register(ctx, newcpu, VM_REG_GUEST_RIP, 0);
+	error = vm_set_register(newcpu, VM_REG_GUEST_RIP, 0);
 	assert(error == 0);
 
-	error = vm_get_desc(ctx, newcpu, VM_REG_GUEST_CS, &desc_base,
+	error = vm_get_desc(newcpu, VM_REG_GUEST_CS, &desc_base,
 			    &desc_limit, &desc_access);
 	assert(error == 0);
 
 	desc_base = vector << PAGE_SHIFT;
-	error = vm_set_desc(ctx, newcpu, VM_REG_GUEST_CS,
+	error = vm_set_desc(newcpu, VM_REG_GUEST_CS,
 			    desc_base, desc_limit, desc_access);
 	assert(error == 0);
 
 	cs = (vector << PAGE_SHIFT) >> 4;
-	error = vm_set_register(ctx, newcpu, VM_REG_GUEST_CS, cs);
+	error = vm_set_register(newcpu, VM_REG_GUEST_CS, cs);
 	assert(error == 0);
 }
 #endif /* __FreeBSD__ */
 
 void
-spinup_ap(struct vmctx *ctx, int newcpu, uint64_t rip)
+spinup_ap(struct vcpu *newcpu, uint64_t rip)
 {
 	int error;
 
-	assert(newcpu != 0);
-	assert(newcpu < guest_ncpus);
-
-	error = vcpu_reset(ctx, newcpu);
+	error = vcpu_reset(newcpu);
 	assert(error == 0);
 
 #ifdef	__FreeBSD__
-	spinup_ap_realmode(ctx, newcpu, rip);
+	spinup_ap_realmode(newcpu, rip);
 
-	vm_resume_cpu(ctx, newcpu);
+	vm_resume_cpu(newcpu);
 #endif
 }

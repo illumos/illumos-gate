@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013  Zhixiang Yu <zcore@freebsd.org>
  * Copyright (c) 2015-2016 Alexander Motin <mav@FreeBSD.org>
@@ -25,12 +25,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/linker_set.h>
@@ -2192,8 +2189,7 @@ pci_ahci_host_write(struct pci_ahci_softc *sc, uint64_t offset, uint64_t value)
 }
 
 static void
-pci_ahci_write(struct vmctx *ctx __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+pci_ahci_write(struct pci_devinst *pi, int baridx, uint64_t offset, int size,
     uint64_t value)
 {
 	struct pci_ahci_softc *sc = pi->pi_arg;
@@ -2287,8 +2283,7 @@ pci_ahci_port_read(struct pci_ahci_softc *sc, uint64_t offset)
 }
 
 static uint64_t
-pci_ahci_read(struct vmctx *ctx __unused,
-    struct pci_devinst *pi, int baridx, uint64_t regoff, int size)
+pci_ahci_read(struct pci_devinst *pi, int baridx, uint64_t regoff, int size)
 {
 	struct pci_ahci_softc *sc = pi->pi_arg;
 	uint64_t offset;
@@ -2415,7 +2410,7 @@ pci_ahci_hd_legacy_config(nvlist_t *nvl, const char *opts)
 }
 
 static int
-pci_ahci_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
+pci_ahci_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	char bident[sizeof("XXX:XXX:XXX")];
 	char node_name[sizeof("XX")];
@@ -2473,6 +2468,13 @@ pci_ahci_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
 			ret = 1;
 			goto open_fail;
 		}
+
+		ret = blockif_add_boot_device(pi, bctxt);
+		if (ret) {
+			sc->ports = p;
+			goto open_fail;
+		}
+
 		sc->port[p].bctx = bctxt;
 		sc->port[p].pr_sc = sc;
 		sc->port[p].port = p;

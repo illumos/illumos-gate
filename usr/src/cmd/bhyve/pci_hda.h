@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Alex Teaca <iateaca@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _HDA_EMUL_H_
@@ -46,12 +44,14 @@
 /*
  * HDA Debug Log
  */
-#define DEBUG_HDA			1
 #if DEBUG_HDA == 1
 extern FILE *dbg;
 #define DPRINTF(fmt, arg...)						\
 do {fprintf(dbg, "%s-%d: " fmt "\n", __func__, __LINE__, ##arg);		\
 fflush(dbg); } while (0)
+#ifndef DEBUG_HDA_FILE
+#define DEBUG_HDA_FILE "/tmp/bhyve_hda.log"
+#endif
 #else
 #define DPRINTF(fmt, arg...)
 #endif
@@ -87,6 +87,6 @@ struct hda_ops {
 		uint8_t dir, uint8_t *buf, size_t count);
 };
 
-#define HDA_EMUL_SET(x)		DATA_SET(hda_codec_class_set, x);
+#define HDA_EMUL_SET(x)		DATA_SET(hda_codec_class_set, x)
 
 #endif	/* _HDA_EMUL_H_ */

@@ -1639,7 +1639,7 @@ delthr_get_freemem(struct mem_handle *mhp)
 		 * Put pressure on pageout.
 		 */
 		page_needfree(free_get);
-		WAKE_PAGEOUT_SCANNER();
+		WAKE_PAGEOUT_SCANNER(delthr);
 
 		mutex_enter(&mhp->mh_mutex);
 		(void) cv_reltimedwait(&mhp->mh_cv, &mhp->mh_mutex,

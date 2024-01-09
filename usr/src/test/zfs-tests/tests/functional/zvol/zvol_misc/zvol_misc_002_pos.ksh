@@ -86,6 +86,7 @@ while (( 1 )); do
 	(( fn = fn + 1 ))
 done
 
+sync_all_pools
 log_must lockfs -f $TESTDIR
 log_must zfs snapshot $TESTPOOL/$TESTVOL@snap
 

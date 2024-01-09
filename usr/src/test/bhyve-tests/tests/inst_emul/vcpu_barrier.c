@@ -41,13 +41,13 @@ static bool timed_out = false;
 static void *
 vcpu0_thread(void *arg)
 {
-	struct vmctx *ctx = arg;
+	struct vcpu *vcpu = arg;
 
 	struct vm_entry ventry = { 0 };
 	struct vm_exit vexit = { 0 };
 
 	do {
-		int err = vm_run(ctx, 0, &ventry, &vexit);
+		int err = vm_run(vcpu, &ventry, &vexit);
 		if (err != 0) {
 			test_fail_errno(err, "error during vm_run()");
 		}
@@ -89,13 +89,18 @@ main(int argc, char *argv[])
 {
 	const char *suite_name = basename(argv[0]);
 	struct vmctx *ctx;
+	struct vcpu *vcpu;
 	int err;
 
 	ctx = test_initialize(suite_name);
 	assert(ctx != NULL);
 
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
+
 	/* Activate vcpu0 as if it were running */
-	err = vm_activate_cpu(ctx, 0);
+	err = vm_activate_cpu(vcpu);
 	if (err != 0) {
 		test_fail_errno(err, "could not activate vcpu0");
 	}
@@ -106,13 +111,13 @@ main(int argc, char *argv[])
 	 * being no code to execute.  Normally the emulated APIC would not allow
 	 * a CPU to SIPI itself, making this state impossible to reach.
 	 */
-	err = vm_set_run_state(ctx, 0, VRS_INIT, 0);
+	err = vm_set_run_state(vcpu, VRS_INIT, 0);
 	if (err != 0) {
 		test_fail_errno(err, "could not set vcpu0 run_state");
 	}
 
 	/* Get the vCPU thread running (and stuck in the kernel)... */
-	if (pthread_create(&vcpu0_tid, NULL, vcpu0_thread, (void *)ctx) != 0) {
+	if (pthread_create(&vcpu0_tid, NULL, vcpu0_thread, (void *)vcpu) != 0) {
 		test_fail_errno(errno, "could not create thread for vcpu0");
 	}
 
@@ -120,7 +125,7 @@ main(int argc, char *argv[])
 	configure_timeout();
 
 	/* ... then issue our barrier: */
-	err = vm_vcpu_barrier(ctx, 0);
+	err = vm_vcpu_barrier(vcpu);
 	if (err != 0) {
 		test_fail_errno(err, "failed to issue vcpu barrier");
 	}

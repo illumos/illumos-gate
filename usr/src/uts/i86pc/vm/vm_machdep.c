@@ -3544,7 +3544,7 @@ page_create_io(
 	if (nscan < desscan && freemem < minfree) {
 		TRACE_1(TR_FAC_VM, TR_PAGEOUT_CV_SIGNAL,
 		    "pageout_cv_signal:freemem %ld", freemem);
-		WAKE_PAGEOUT_SCANNER();
+		WAKE_PAGEOUT_SCANNER(page__create__io);
 	}
 
 	if (flags & PG_PHYSCONTIG) {

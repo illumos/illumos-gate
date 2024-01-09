@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,15 +24,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_XMSR_H_
 #define	_XMSR_H_
 
 int init_msr(void);
-int emulate_wrmsr(struct vmctx *ctx, int vcpu, uint32_t code, uint64_t val);
-int emulate_rdmsr(struct vmctx *ctx, int vcpu, uint32_t code, uint64_t *val);
+int emulate_wrmsr(struct vcpu *vcpu, uint32_t code, uint64_t val);
+int emulate_rdmsr(struct vcpu *vcpu, uint32_t code, uint64_t *val);
 
 #endif

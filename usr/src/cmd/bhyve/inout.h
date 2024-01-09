@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -45,6 +43,7 @@
 
 #include <sys/linker_set.h>
 
+struct vcpu;
 struct vmctx;
 struct vm_exit;
 #ifndef __FreeBSD__
@@ -88,9 +87,9 @@ struct inout_port {
 
 void	init_inout(void);
 #ifdef __FreeBSD__
-int	emulate_inout(struct vmctx *, int vcpu, struct vm_exit *vmexit);
+int	emulate_inout(struct vmctx *, struct vcpu *vcpu, struct vm_exit *vmexit);
 #else
-int	emulate_inout(struct vmctx *, int vcpu, struct vm_inout *inout);
+int	emulate_inout(struct vmctx *, struct vcpu *vcpu, struct vm_inout *inout);
 #endif
 int	register_inout(struct inout_port *iop);
 int	unregister_inout(struct inout_port *iop);
