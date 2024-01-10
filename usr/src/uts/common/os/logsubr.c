@@ -24,7 +24,7 @@
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Joyent, Inc.
- * Copyright 2023 MNX Cloud, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -263,7 +263,7 @@ log_init(void)
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
 	/* NOTE: We might switch to BOOTBANNER after this. */
-	printf("Copyright 2022-2023 MNX Cloud, Inc.\n");
+	printf("Copyright 2022-2024 MNX Cloud, Inc.\n");
 #else
 	bootbanner_print(log_bootbanner_print);
 #endif
