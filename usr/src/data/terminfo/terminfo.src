@@ -321,7 +321,7 @@ vanilla|dumb tty,
 # DEL and ^C are hardcoded to act as kill characters.
 # ^D acts as a line break (just like newline).
 # It also interprets
-#      \033];xxx\007 
+#      \033];xxx\007
 # for compatibility with xterm -TD
 9term|Plan9 terminal emulator for X,
 	am,
@@ -3551,11 +3551,11 @@ xterm-1003|testing xterm-mouse,
 # Ms modifies the selection/clipboard.  Its parameters are
 #	p1 = the storage unit (clipboard, selection or cut buffer)
 #	p2 = the base64-encoded clipboard content.
-# 
+#
 # Ss is used to set the cursor style as described by the DECSCUSR
 #	function to a block or underline.
 # Se resets the cursor style to the terminal power-on default.
-#  
+#
 # Cs and Ce set and reset the cursor colour.
 xterm+tmux|advanced xterm features used in tmux,
 	Cr=\E]112\007, Cs=\E]12;%p1%s\007,
@@ -5299,7 +5299,7 @@ sun-type4|Sun Workstation console with type 4 keyboard,
 # It supports bold -TD (2009-09-19)
 # Color support is up from 8 to 16 to 256.
 sun-color|Sun Microsystems Workstation console with color support (IA systems),
-	colors#256, ncv#3, pairs#32767,
+	xenl, colors#256, ncv#3, pairs#32767,
 	cub=\E[%p1%dD, cud=\E[%p1%dB, cuf=\E[%p1%dC,
 	cuu=\E[%p1%dA, home=\E[H, op=\E[0m, bold=\E[1m,
 	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
@@ -15957,7 +15957,7 @@ ncr7901|ncr 7901 model,
 # Manufactured in the early/mid eighties, behaves almost the same as a
 # Televideo 950.  Take a 950, change its cabinet for a more 80s-ish one (but
 # keep the same keyboard layout), add an optional 25-line mode, replace the DIP
-# switches with a menu and remove the "lock line" feature (ESC !  1 and ESC ! 
+# switches with a menu and remove the "lock line" feature (ESC !  1 and ESC !
 # 2), here is the NDR 9500.  Even the line-lock, albeit disabled, is
 # recognized:  if you type in "ESC !", the next (third) character is not
 # echoed, showing that the terminal was actually waiting for a parameter!

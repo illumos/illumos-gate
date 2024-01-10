@@ -222,6 +222,8 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 		    kmem_alloc(ptem->tvs_pix_data_size, KM_SLEEP);
 	}
 
+	ptem->tvs_stateflags = TVS_AUTOWRAP;
+
 	ptem->tvs_outbuf_size = tems.ts_c_dimension.width *
 	    sizeof (*ptem->tvs_outbuf);
 	ptem->tvs_outbuf = kmem_alloc(ptem->tvs_outbuf_size, KM_SLEEP);

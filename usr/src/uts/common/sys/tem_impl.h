@@ -188,6 +188,12 @@ typedef struct term_char {
 } term_char_t;
 
 /*
+ * Values for tvs_stateflags.
+ */
+#define	TVS_AUTOWRAP	0x00000001
+#define	TVS_WRAPPED	0x00000002
+
+/*
  * State structure for each virtual terminal emulator
  */
 struct tem_vt_state {
@@ -197,6 +203,7 @@ struct tem_vt_state {
 	uchar_t		tvs_alpha;	/* rgb alpha channel */
 	text_attr_t	tvs_flags;	/* flags for this x3.64 terminal */
 	int		tvs_state;	/* state in output esc seq processing */
+	uint_t		tvs_stateflags;
 	boolean_t	tvs_gotparam;	/* does output esc seq have a param */
 
 	int	tvs_curparam;	/* current param # of output esc seq */
