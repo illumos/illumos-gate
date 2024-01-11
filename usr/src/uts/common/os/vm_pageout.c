@@ -247,8 +247,8 @@ pgcnt_t		nscan;
 pgcnt_t		desscan;
 
 /* kstats */
-uint64_t low_mem_scan;
-uint64_t zone_cap_scan;
+uint64_t	low_mem_scan;
+uint64_t	zone_cap_scan;
 
 /* The maximum supported number of page_scanner() threads */
 #define	MAX_PSCAN_THREADS	16
