@@ -137,8 +137,20 @@ def git_parent_branch(branch):
                 return remote
     return 'origin/master'
 
+def slices(strlist, sep):
+    """Yield start & end of each commit within the list of comments"""
+    low = 0
+    for i, v in enumerate(strlist):
+        if v == sep:
+            yield(low, i)
+            low = i+1
+
+    if low != len(strlist):
+        yield(low, len(strlist))
+
 def git_comments(parent):
-    """Return a list of any checkin comments on this git branch"""
+    """Return the checkin comments for each commit on this git branch,
+    structured as a list of lists of lines."""
 
     p = git('log --pretty=tformat:%%B:SEP: %s..' % parent)
 
@@ -146,7 +158,8 @@ def git_comments(parent):
         sys.stderr.write("No outgoing changesets found - missing -p option?\n");
         sys.exit(1)
 
-    return [x.strip() for x in p if x != ':SEP:\n']
+    return [ [line.strip() for line in p[a:b]]
+             for (a, b) in slices(p, ':SEP:\n')]
 
 def git_file_list(parent, paths=None):
     """Return the set of files which have ever changed on this branch.
@@ -218,15 +231,24 @@ def comchk(root, parent, flist, output):
     output.write("Comments:\n")
 
     comments = git_comments(parent)
-    if len(comments) > 2:
-        if re.match('^Change-Id: I[0-9a-f]+', comments[-1]):
-            if comments[-2] == '':
-                print('Note: Gerrit Change Id present in comments')
-                comments = comments[:-2]
+    multi = len(comments) > 1
+    state = {}
 
-    return Comments.comchk(comments, check_db=True,
-                           output=output)
+    ret = 0
+    for commit in comments:
 
+        s = StringIO()
+
+        result = Comments.comchk(commit, check_db=True,
+                                 output=s, bugs=state)
+        ret |= result
+
+        if result != 0:
+            if multi:
+                output.write('\n%s\n' % commit[0])
+            output.write(s.getvalue())
+
+    return ret
 
 def mapfilechk(root, parent, flist, output):
     ret = 0
