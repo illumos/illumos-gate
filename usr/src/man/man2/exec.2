@@ -44,740 +44,780 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2015, Joyent, Inc.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH EXEC 2 "March 10, 2023"
-.SH NAME
-exec, execl, execle, execlp, execv, execve, execvp \- execute a file
-.SH SYNOPSIS
-.nf
-#include <unistd.h>
-
-\fBint\fR \fBexecl\fR(\fBconst char *\fR\fIpath\fR, \fBconst char *\fR\fIarg0\fR, \fB\&...
-     /* const char *\fR\fIargn\fR, \fB(char *)0 */);\fR
-.fi
-
-.LP
-.nf
-\fBint\fR \fBexecv\fR(\fBconst char *\fR\fIpath\fR, \fBchar *const\fR \fIargv[]\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBexecle\fR(\fBconst char *\fR\fIpath\fR, \fBconst char *\fR\fIarg0\fR, \fB\&...
-     /* const char *\fR\fIargn\fR, \fB(char *)0\fR,\fBchar *const\fR \fIenvp\fR[]*/);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBexecve\fR(\fBconst char *\fR\fIpath\fR, \fBchar *const\fR \fIargv[]\fR,
-     \fBchar *const\fR \fIenvp[]\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBexeclp\fR(\fBconst char *\fR\fIfile\fR, \fBconst char *\fR\fIarg0\fR, \fB\&...
-     /* const char *\fR\fIargn\fR, \fB(char *)0 */);\fR
-.fi
-
-.LP
-.nf
-\fBint\fR \fBexecvp\fR(\fBconst char *\fR\fIfile\fR, \fBchar *const\fR \fIargv[]\fR);
-.fi
-
-.SH DESCRIPTION
-Each of the functions in the \fBexec\fR family replaces the current process
-image with a new process image. The new image is constructed from a regular,
-executable file called the \fBnew process image file\fR. This file is either an
-executable object file or a file of data for an interpreter. There is no return
-from a successful call to one of these functions because the calling process
-image is overlaid by the new process image.
-.sp
-.LP
+.Dd January 12, 2024
+.Dt EXEC 2
+.Os
+.Sh NAME
+.Nm exec ,
+.Nm execl ,
+.Nm execle ,
+.Nm execlp ,
+.Nm execv ,
+.Nm execve ,
+.Nm execvp
+.Nd execute a file
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fo execl
+.Fa "const char *path"
+.Fa "const char *arg0"
+.Fa "..."
+.Fa NULL
+.Fc
+.Ft int
+.Fo execv
+.Fa "const char *path"
+.Fa "char *const argv[]"
+.Fc
+.Ft int
+.Fo execle
+.Fa "const char *path"
+.Fa "const char *arg0"
+.Fa "..."
+.Fa NULL
+.Fa "char *const envp[]"
+.Fc
+.Ft int
+.Fo execve
+.Fa "const char *path"
+.Fa "char *const argv[]"
+.Fa "char *const envp[]"
+.Fc
+.Ft int
+.Fo execlp
+.Fa "const char *file"
+.Fa "const char *arg0"
+.Fa "..."
+.Fa NULL
+.Fc
+.Ft int
+.Fo execvp
+.Fa "const char *file"
+.Fa "char *const argv[]"
+.Fc
+.Sh DESCRIPTION
+Each of the functions in the
+.Nm
+family replaces the current process image with a new process image.
+The new image is constructed from a regular, executable file called the new
+process image file.
+This file is either an executable object file or a file of data for an
+interpreter.
+There is no return from a successful call to one of these functions because the
+calling process image is overlaid by the new process image.
+.Pp
 An interpreter file begins with a line of the form
-.sp
-.in +2
-.nf
-#! pathname [\fIarg\fR]
-.fi
-.in -2
-
-.sp
-.LP
-where \fIpathname\fR is the path of the interpreter, and \fIarg\fR is an
-optional argument. When an interpreter file is executed, the system invokes the
-specified interpreter. The pathname specified in the interpreter file is passed
-as \fIarg0\fR to the interpreter. If \fIarg\fR was specified in the interpreter
-file, it is passed as \fIarg1\fR to the interpreter. The remaining arguments to
-the interpreter are \fIarg0\fR through \fIargn\fR of the originally exec'd
-file. The interpreter named by \fIpathname\fR may also be an interpreter file.
+.Pp
+.Dl #! Pa pathname Op Ar arg
+.Pp
+where
+.Pa pathname
+is the path of the interpreter, and
+.Ar arg
+is an optional argument.
+When an interpreter file is executed, the system invokes the specified
+interpreter.
+The pathname specified in the interpreter file is passed as
+.Fa arg0
+to the interpreter.
+If
+.Ar arg
+was specified in the interpreter file, it is passed as
+.Fa arg1
+to the interpreter.
+The remaining arguments to the interpreter are
+.Fa arg0
+through
+.Fa argn
+of the originally exec'd file.
+The interpreter named by
+.Pa pathname
+may also be an interpreter file.
 There can be up to four nested interpreter files before the final interpreter.
 The setid bits on nested interpreters are silently ignored.
-.sp
-.LP
+.Pp
 When a C-language program is executed as a result of this call, it is entered
 as a C-language function call as follows:
-.sp
-.in +2
-.nf
-int main (int argc, char *argv[]);
-.fi
-.in -2
-
-.sp
-.LP
-where \fIargc\fR is the argument count and \fIargv\fR is an array of character
-pointers to the arguments themselves. In addition, the following variable:
-.sp
-.in +2
-.nf
-extern char **environ;
-.fi
-.in -2
-
-.sp
-.LP
+.Pp
+.Dl int main Ns (int Fa argc Ns No , char * Ns Fa argv[])\&;
+.Pp
+where
+.Fa argc
+is the argument count and
+.Fa argv
+is an array of character pointers to the arguments themselves.
+In addition, the following variable:
+.Pp
+.Dl Va "extern char **environ\&;"
+.Pp
 is initialized as a pointer to an array of character pointers to the
-environment strings. The \fIargv\fR and \fIenviron\fR arrays are each
-terminated by a null pointer. The null pointer terminating the \fIargv\fR array
-is not counted in \fIargc\fR.
-.sp
-.LP
-The value of \fIargc\fR is non-negative, and if greater than 0, \fIargv\fR[0]
-points to a string containing the name of the file. If \fIargc\fR is 0,
-\fIargv\fR[0] is a null pointer, in which case there are no arguments.
-Applications should verify that \fIargc\fR is greater than 0 or that
-\fIargv\fR[0] is not a null pointer before dereferencing \fIargv\fR[0].
-.sp
-.LP
-The arguments specified by a program with one of the \fBexec\fR functions are
-passed on to the new process image in the \fBmain()\fR arguments.
-.sp
-.LP
-The \fIpath\fR argument points to a path name that identifies the new process
-image file.
-.sp
-.LP
-The \fIfile\fR argument is used to construct a pathname that identifies the new
-process image file. If the \fIfile\fR argument contains a slash character, it
-is used as the pathname for this file. Otherwise, the path prefix for this file
-is obtained by a search of the directories passed in the \fBPATH\fR environment
-variable (see \fBenviron\fR(7)). The environment is supplied typically by the
-shell. If the process image file is not a valid executable object file,
-\fBexeclp()\fR and \fBexecvp()\fR use the contents of that file as standard
-input to the shell. In this case, the shell becomes the new process image. The
-standard to which the caller conforms determines which shell is used. See
-\fBstandards\fR(7).
-.sp
-.LP
-The arguments represented by \fIarg0\fR\&.\|.\|. are pointers to
-null-terminated character strings. These strings constitute the argument list
-available to the new process image. The list is terminated by a null pointer.
-The \fIarg0\fR argument should point to a filename that is associated with the
-process being started by one of the \fBexec\fR functions.
-.sp
-.LP
-The \fIargv\fR argument is an array of character pointers to null-terminated
-strings. The last member of this array must be a null pointer. These strings
-constitute the argument list available to the new process image. The value in
-\fIargv\fR[0] should point to a filename that is associated with the process
-being started by one of the \fBexec\fR functions.
-.sp
-.LP
-The \fIenvp\fR argument is an array of character pointers to null-terminated
-strings. These strings constitute the environment for the new process image.
-The \fIenvp\fR array is terminated by a null pointer. For \fBexecl()\fR,
-\fBexecv()\fR, \fBexecvp()\fR, and \fBexeclp()\fR, the C-language run-time
-start-off routine places a pointer to the environment of the calling process in
-the global object \fBextern char **environ\fR, and it is used to pass the
-environment of the calling process to the new process image.
-.sp
-.LP
+environment strings.
+The
+.Fa argv
+and
+.Va environ
+arrays are each terminated by a null pointer.
+The null pointer terminating the
+.Fa argv
+array is not counted in
+.Fa argc .
+.Pp
+The value of
+.Fa argc
+is non-negative, and if greater than 0,
+.Fa argv[0]
+points to a string containing the name of the file.
+If
+.Fa argc
+is 0,
+.Fa argv[0]
+is a null pointer, in which case there are no arguments.
+Applications should verify that
+.Fa argc
+is greater than 0 or that
+.Fa argv[0]
+is not a null pointer before dereferencing
+.Fa argv[0] .
+.Pp
+The arguments specified by a program with one of the
+.Nm
+functions are passed on to the new process image in the
+.Fn main
+arguments.
+.Pp
+The
+.Fa path
+argument points to a path name that identifies the new process image file.
+.Pp
+The
+.Fa file
+argument is used to construct a pathname that identifies the new process image
+file.
+If the
+.Fa file
+argument contains a slash character, it is used as the pathname for this file.
+Otherwise, the path prefix for this file is obtained by a search of the
+directories passed in the
+.Ev PATH
+environment variable
+.Po
+see
+.Xr environ 7
+.Pc .
+The environment is supplied typically by the shell.
+If the process image file is not a valid executable object file,
+.Fn execlp
+and
+.Fn execvp
+use the contents of that file as standard input to the shell.
+In this case, the shell becomes the new process image.
+The standard to which the caller conforms determines which shell is used.
+See
+.Xr standards 7 .
+.Pp
+The arguments represented by
+.Fa arg0 Ns No \&...
+are pointers to null-terminated character strings.
+These strings constitute the argument list available to the new process image.
+The list is terminated by a null pointer.
+The
+.Fa arg0
+argument should point to a filename that is associated with the process being
+started by one of the
+.Nm
+functions.
+.Pp
+The
+.Fa argv
+argument is an array of character pointers to null-terminated strings.
+The last member of this array must be a null pointer.
+These strings constitute the argument list available to the new process image.
+The value in
+.Fa argv[0]
+should point to a filename that is associated with the process being started by
+one of the
+.Nm
+functions.
+.Pp
+The
+.Fa envp
+argument is an array of character pointers to null-terminated strings.
+These strings constitute the environment for the new process image.
+The
+.Fa envp
+array is terminated by a null pointer.
+For
+.Fn execl ,
+.Fn execv ,
+.Fn execvp ,
+and
+.Fn execlp ,
+the C-language run-time start-off routine places a pointer to the environment
+of the calling process in the global object
+.Va extern char **environ ,
+and it is used to pass the environment of the calling process to the new
+process image.
+.Pp
 The number of bytes available for the new process's combined argument and
-environment lists is \fBARG_MAX\fR. It is implementation-dependent whether null
-terminators, pointers, and/or any alignment bytes are included in this total.
-.sp
-.LP
+environment lists is
+.Dv ARG_MAX .
+It is implementation-dependent whether null terminators, pointers, and/or any
+alignment bytes are included in this total.
+.Pp
 File descriptors open in the calling process image remain open in the new
-process image, except for those whose close-on-exec flag \fBFD_CLOEXEC\fR is
-set; see \fBfcntl\fR(2). For those file descriptors that remain open, all
-attributes of the open file description, including file locks, remain
-unchanged.
-.sp
-.LP
-The preferred hardware address translation size (see \fBmemcntl\fR(2)) for the
-stack and heap of the new process image are set to the default system page
-size.
-.sp
-.LP
+process image, except for those whose close-on-exec flag
+.Dv FD_CLOEXEC
+is set; see
+.Xr fcntl 2 .
+For those file descriptors that remain open, all attributes of the open file
+description, including file locks, remain unchanged.
+.Pp
+The preferred hardware address translation size
+.Po
+see
+.Xr memcntl 2
+.Pc
+for the stack and heap of the new process image are set to the default system
+page size.
+.Pp
 Directory streams open in the calling process image are closed in the new
 process image.
-.sp
-.LP
+.Pp
 The state of conversion descriptors and message catalogue descriptors in the
-new process image is undefined. For the new process, the equivalent of:
-.sp
-.in +2
-.nf
-setlocale(LC_ALL, "C")
-.fi
-.in -2
-
-.sp
-.LP
+new process image is undefined.
+For the new process, the equivalent of:
+.Pp
+.Dl setlocale(LC_ALL, \&"C");
+.Pp
 is executed at startup.
-.sp
-.LP
-Signals set to the default action (\fBSIG_DFL\fR) in the calling process image
-are set to the default action in the new process image (see \fBsignal\fR(3C)).
-Signals set to be ignored (\fBSIG_IGN\fR) by the calling process image are set
-to be ignored by the new process image. Signals set to be caught by the calling
-process image are set to the default action in the new process image (see
-\fBsignal.h\fR(3HEAD)). After a successful call to any of the \fBexec\fR
-functions, alternate signal stacks are not preserved and the \fBSA_ONSTACK\fR
+.Pp
+Signals set to the default action
+.Po
+.Dv SIG_DFL
+.Pc
+in the calling process image are set to the default action in the new process
+image
+.Po
+see
+.Xr signal 3C
+.Pc .
+Signals set to be ignored
+.Po
+.Dv SIG_IGN
+.Pc
+by the calling process image are set to be ignored by the new process image.
+Signals set to be caught by the calling process image are set to the default
+action in the new process image
+.Po
+see
+.Xr signal.h 3HEAD
+.Pc .
+After a successful call to any of the
+.Nm
+functions, alternate signal stacks are not preserved and the
+.Dv SA_ONSTACK
 flag is cleared for all signals.
-.sp
-.LP
-After a successful call to any of the \fBexec\fR functions, any functions
-previously registered by \fBatexit\fR(3C) are no longer registered.
-.sp
-.LP
+.Pp
+After a successful call to any of the
+.Nm
+functions, any functions previously registered by
+.Xr atexit 3C
+are no longer registered.
+.Pp
 The saved resource limits in the new process image are set to be a copy of the
 process's corresponding hard and soft resource limits.
-.sp
-.LP
-If the \fBST_NOSUID\fR bit is set for the file system containing the new
-process image file, then the effective user \fBID\fR and effective group
-\fBID\fR are unchanged in the new process image. If the set-user-\fBID\fR mode
-bit of the new process image file is set (see \fBchmod\fR(2)), the effective
-user \fBID\fR of the new process image is set to the owner \fBID\fR of the new
-process image file. Similarly, if the set-group-\fBID\fR mode bit of the new
-process image file is set, the effective group \fBID\fR of the new process
-image is set to the group \fBID\fR of the new process image file. The real user
-\fBID\fR and real group \fBID\fR of the new process image remain the same as
-those of the calling process image. The effective user ID and effective group
-ID of the new process image are saved (as the saved set-user-ID and the saved
-set-group-ID for use by \fBsetuid\fR(2).
-.sp
-.LP
+.Pp
+If the
+.Dv ST_NOSUID
+bit is set for the file system containing the new process image file, then the
+effective user ID and effective group ID are unchanged in the new process
+image.
+If the set-user-ID mode bit of the new process image file is set
+.Po
+see
+.Xr chmod 2
+.Pc ,
+the effective user ID of the new process image is set to the owner ID of the
+new process image file.
+Similarly, if the set-group-ID mode bit of the new process image file is set,
+the effective group ID of the new process image is set to the group ID of the
+new process image file.
+The real user ID and real group ID of the new process image remain the same as
+those of the calling process image.
+The effective user ID and effective group ID of the new process image are saved
+.Pq as the saved set-user-ID and the saved set-group-ID
+for use by
+.Xr setuid 2 .
+.Pp
 The privilege sets are changed according to the following rules:
-.RS +4
-.TP
-1.
-The inheritable set, I, is intersected with the limit set, L.  This
-mechanism enforces the limit set for processes.
-.RE
-.RS +4
-.TP
-2.
+.Bl -enum -offset indent
+.It
+The inheritable set, I, is intersected with the limit set, L.
+This mechanism enforces the limit set for processes.
+.It
 The effective set, E, and the permitted set, P, are made equal to the new
 inheritable set.
-.RE
-.sp
-.LP
+.El
+.Pp
 The system attempts to set the privilege-aware state to non-PA both before
 performing any modifications to the process IDs and privilege sets as well as
 after completing the transition to new UIDs and privilege sets, following the
-rules outlined in \fBprivileges\fR(7).
-.sp
-.LP
-If the {\fBPRIV_PROC_OWNER\fR} privilege is asserted in the effective set, the
-set-user-ID and set-group-ID bits will be honored when the process is being
-controlled by \fBptrace\fR(3C). Additional restriction can apply when the
-traced process has an effective UID of 0. See \fBprivileges\fR(7).
-.sp
-.LP
+rules outlined in
+.Xr privileges 7 .
+.Pp
+If the
+.Brq Dv PRIV_PROC_OWNER
+privilege is asserted in the effective set, the set-user-ID and set-group-ID
+bits will be honored when the process is being controlled by
+.Xr ptrace 3C .
+Additional restrictions can apply when the traced process has an effective UID
+of 0.
+See
+.Xr privileges 7 .
+.Pp
 Any shared memory segments attached to the calling process image will not be
-attached to the new process image (see \fBshmop\fR(2)). Any mappings
-established through \fBmmap()\fR are not preserved across an \fBexec\fR. Memory
-mappings created in the process are unmapped before the address space is
-rebuilt for the new process image. See \fBmmap\fR(2).
-.sp
-.LP
-Memory locks established by the calling process via calls to \fBmlockall\fR(3C)
-or \fBmlock\fR(3C) are removed. If locked pages in the address space of the
-calling process are also mapped into the address spaces the locks established
-by the other processes will be unaffected by the call by this process to the
-\fBexec\fR function. If the \fBexec\fR function fails, the effect on memory
-locks is unspecified.
-.sp
-.LP
-If \fB_XOPEN_REALTIME\fR is defined and has a value other than \(mi1, any named
-semaphores open in the calling process are closed as if by appropriate calls to
-.BR sem_close (3C)
-.sp
-.LP
-Profiling is disabled for the new process; see \fBprofil\fR(2).
-.sp
-.LP
-Timers created by the calling process with \fBtimer_create\fR(3C) are deleted
-before replacing the current process image with the new process image.
-.sp
-.LP
-For the \fBSCHED_FIFO\fR and \fBSCHED_RR\fR scheduling policies, the policy and
-priority settings are not changed by a call to an \fBexec\fR function.
-.sp
-.LP
+attached to the new process image
+.Po
+see
+.Xr shmop 2
+.Pc .
+Any mappings established through
+.Fn mmap
+are not preserved across an
+.Nm .
+Memory mappings created in the process are unmapped before the address space is
+rebuilt for the new process image.
+See
+.Xr mmap 2 .
+.Pp
+Memory locks established by the calling process via calls to
+.Xr mlockall 3C
+or
+.Xr mlock 3C
+are removed.
+If locked pages in the address space of the calling process are also mapped
+into the address spaces the locks established by the other processes will be
+unaffected by the call by this process to the
+.Nm
+function.
+If the
+.Nm
+function fails, the effect on memory locks is unspecified.
+.Pp
+If
+.Dv _XOPEN_REALTIME
+is defined and has a value other than \-1, any named semaphores open in the
+calling process are closed as if by appropriate calls to
+.Xr sem_close 3C .
+.Pp
+Profiling is disabled for the new process; see
+.Xr profil 2 .
+.Pp
+Timers created by the calling process with
+.Xr timer_create 3C
+are deleted before replacing the current process image with the new process
+image.
+.Pp
+For the
+.Dv SCHED_FIFO
+and
+.Dv SCHED_RR
+scheduling policies, the policy and priority settings are not changed by a call
+to an
+.Nm
+function.
+.Pp
 All open message queue descriptors in the calling process are closed, as
-described in \fBmq_close\fR(3C).
-.sp
-.LP
-Any outstanding asynchronous I/O operations may be cancelled. Those
-asynchronous I/O operations that are not canceled will complete as if the
-\fBexec\fR function had not yet occurred, but any associated signal
-notifications are suppressed. It is unspecified whether the \fBexec\fR function
-itself blocks awaiting such I/O completion. In no event, however, will the new
-process image created by the \fBexec\fR function be affected by the presence of
-outstanding asynchronous I/O operations at the time the \fBexec\fR function is
-called.
-.sp
-.LP
-All active contract templates are cleared (see \fBcontract\fR(5)).
-.sp
-.LP
-The new process also inherits the following attributes from the calling
-process:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+described in
+.Xr mq_close 3C .
+.Pp
+Any outstanding asynchronous I/O operations may be cancelled.
+Those asynchronous I/O operations that are not canceled will complete as if the
+.Nm
+function had not yet occurred, but any associated signal notifications are
+suppressed.
+It is unspecified whether the
+.Nm
+function itself blocks awaiting such I/O completion.
+In no event, however, will the new process image created by the
+.Nm
+function be affected by the presence of outstanding asynchronous I/O operations
+at the time the
+.Nm
+function is called.
+.Pp
+All active contract templates are cleared
+.Po
+see
+.Xr contract 5
+.Pc .
+.Pp
+The new process also inherits the following attributes from the calling process:
+.Bl -bullet -offset Ds
+.It
 controlling terminal
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 current working directory
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-file-locks (see \fBfcntl\fR(2) and \fBlockf\fR(3C))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-file mode creation mask (see \fBumask\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-file size limit (see \fBulimit\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
+file-locks
+.Po
+see
+.Xr fcntl 2
+and
+.Xr lockf 3C
+.Pc
+.It
+file mode creation mask
+.Po
+see
+.Xr umask 2
+.Pc
+.It
+file size limit
+.Po
+see
+.Xr ulimit 2
+.Pc
+.It
 limit privilege set
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-nice value (see \fBnice\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-parent process \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-pending signals (see \fBsigpending\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-privilege debugging flag (see \fBprivileges\fR(7) and \fBgetpflags\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-process \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-process contract (see \fBcontract\fR(5) and \fBprocess\fR(5))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-process group \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-process signal mask (see \fBsigprocmask\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-processor bindings (see \fBprocessor_bind\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-processor set bindings (see \fBpset_bind\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-project \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-real group \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-real user \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-resource limits (see \fBgetrlimit\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
+nice value
+.Po
+see
+.Xr nice 2
+.Pc
+.It
+parent process ID
+.It
+pending signals
+.Po
+see
+.Xr sigpending 2
+.Pc
+.It
+privilege debugging flag
+.Po
+see
+.Xr privileges 7
+and
+.Xr getpflags 2
+.Pc
+.It
+process ID
+.It
+process contract
+.Po
+see
+.Xr contract 5
+and
+.Xr process 5
+.Pc
+.It
+process group ID
+.It
+process signal mask
+.Po
+see
+.Xr sigprocmask 2
+.Pc
+.It
+processor bindings
+.Po
+see
+.Xr processor_bind 2
+.Pc
+.It
+processor set bindings
+.Po
+see
+.Xr pset_bind 2
+.Pc
+.It
+project ID
+.It
+real group ID
+.It
+real user ID
+.It
+resource limits
+.Po
+see
+.Xr getrlimit 2
+.Pc
+.It
 root directory
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-scheduler class and priority (see \fBpriocntl\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBsemadj\fR values (see \fBsemop\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-session membership (see \fBexit\fR(2) and \fBsignal\fR(3C))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-supplementary group \fBIDs\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-task \fBID\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-time left until an alarm clock signal (see \fBalarm\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBtms_utime\fR, \fBtms_stime\fR, \fBtms_cutime\fR, and \fBtms_cstime\fR (see
-\fBtimes\fR(2))
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-trace flag (see \fBptrace\fR(3C) request 0)
-.RE
-.sp
-.LP
-A call to any \fBexec\fR function from a process with more than one thread
-results in all threads being terminated and the new executable image being
-loaded and executed. No destructor functions will be called.
-.sp
-.LP
-Upon successful completion, each of the functions in the \fBexec\fR family
-marks for update the \fBst_atime\fR field of the file.  If an \fBexec\fR
-function failed but was able to locate the \fBprocess image file\fR, whether
-the \fBst_atime\fR field is marked for update is unspecified. Should the
-function succeed, the process image file is considered to have been opened with
-\fBopen\fR(2). The corresponding \fBclose\fR(2) is considered to occur at a
-time after this open, but before process termination or successful completion
-of a subsequent call to one of the \fBexec\fR functions. The \fIargv\fR[\|] and
-\fIenvp\fR[\|] arrays of pointers and the strings to which those arrays point
-will not be modified by a call to one of the \fBexec\fR functions, except as a
-consequence of replacing the process image.
-.sp
-.LP
+.It
+scheduler class and priority
+.Po
+see
+.Xr priocntl 2
+.Pc
+.It
+semadj values
+.Po
+see
+.Xr semop 2
+.Pc
+.It
+session membership
+.Po
+see
+.Xr exit 2
+and
+.Xr signal 3C
+.Pc
+.It
+supplementary group IDs
+.It
+task ID
+.It
+time left until an alarm clock signal
+.Po
+see
+.Xr alarm 2
+.Pc
+.It
+.Fa tms_utime ,
+.Fa tms_stime ,
+.Fa tms_cutime ,
+and
+.Fa tms_cstime
+.Po
+see
+.Xr times 2
+.Pc
+.It
+trace flag
+.Po
+see
+.Xr ptrace 3C
+request 0
+.Pc
+.El
+.Pp
+A call to any
+.Nm
+function from a process with more than one thread results in all threads being
+terminated and the new executable image being loaded and executed.
+No destructor functions will be called.
+.Pp
+Upon successful completion, each of the functions in the
+.Nm
+family marks for update the
+.Fa st_atime
+field of the file.
+If an
+.Nm
+function failed but was able to locate the process image file, whether the
+.Fa st_atime
+field is marked for update is unspecified.
+Should the function succeed, the process image file is considered to have been
+opened with
+.Xr open 2 .
+The corresponding
+.Xr close 2
+is considered to occur at a time after this open, but before process
+termination or successful completion of a subsequent call to one of the
+.Nm
+functions.
+The
+.Fa argv[]
+and
+.Fa envp[]
+arrays of pointers and the strings to which those arrays point will not be
+modified by a call to one of the
+.Nm
+functions, except as a consequence of replacing the process image.
+.Pp
 The saved resource limits in the new process image are set to be a copy of the
 process's corresponding hard and soft limits.
-.SH RETURN VALUES
-If a function in the \fBexec\fR family returns to the calling process image, an
-error has occurred; the return value is \fB\(mi1\fR and \fBerrno\fR is set to
-indicate the error.
-.SH ERRORS
-The \fBexec\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBE2BIG\fR\fR
-.ad
-.RS 16n
+.Sh RETURN VALUES
+If a function in the
+.Nm
+family returns to the calling process image, an error has occurred; the return
+value is \-1 and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Nm
+functions will fail if:
+.Bl -tag -width Er
+.It Er E2BIG
 The number of bytes in the new process's argument list is greater than the
-system-imposed limit of {\fBARG_MAX\fR} bytes. The argument list limit is sum
-of the size of the argument list plus the size of the environment's exported
-shell variables.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 16n
+system-imposed limit of
+.Dv ARG_MAX
+bytes.
+The argument list limit is sum of the size of the argument list plus the size
+of the environment's exported shell variables.
+.It Er EACCES
 Search permission is denied for a directory listed in the new process file's
 path prefix.
-.sp
+.Pp
 The new process file is not an ordinary file.
-.sp
+.Pp
 The new process file mode denies execute permission.
-.sp
-The {\fBFILE_DAC_SEARCH\fR} privilege overrides the restriction on directory
-searches.
-.sp
-The {\fBFILE_DAC_EXECUTE\fR} privilege overrides the lack of execute
-permission.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 16n
+.Pp
+The
+.Brq Dv FILE_DAC_SEARCH
+privilege overrides the restriction on directory searches.
+.Pp
+The
+.Brq Dv FILE_DAC_EXECUTE
+privilege overrides the lack of execute permission.
+.It Er EAGAIN
 Total amount of system memory available when reading using raw I/O is
 temporarily insufficient.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 16n
+.It Er EFAULT
 An argument points to an illegal address.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 16n
+.It Er EINVAL
 The new process image file has the appropriate permission and has a recognized
 executable binary format, but the system does not support execution of a file
 with this format.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 16n
+.It Er EINTR
 A signal was caught during the execution of one of the functions in the
-\fIexec\fR family.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBELOOP\fR\fR
-.ad
-.RS 16n
-Too many symbolic links were encountered in translating \fIpath\fR or
-\fIfile\fR, or too many nested interpreter files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENAMETOOLONG\fR\fR
-.ad
-.RS 16n
-The length of the \fIfile\fR or \fIpath\fR argument exceeds {\fBPATH_MAX\fR},
-or the length of a \fIfile\fR or \fIpath\fR component exceeds {\fBNAME_MAX\fR}
-while {\fB_POSIX_NO_TRUNC\fR} is in effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOENT\fR\fR
-.ad
-.RS 16n
+.Nm
+family.
+.It Er ELOOP
+Too many symbolic links were encountered in translating
+.Fa path
+or
+.Fa file ,
+or too many nested interpreter files.
+.It Er ENAMETOOLONG
+The length of the
+.Fa file
+or
+.Fa path
+argument exceeds
+.Dv PATH_MAX ,
+or the length of a
+.Fa file
+or
+.Fa path
+component exceeds
+.Dv NAME_MAX
+while
+.Dv _POSIX_NO_TRUNC
+is in effect.
+.It Er ENOENT
 One or more components of the new process path name of the file do not exist or
 is a null pathname.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOLINK\fR\fR
-.ad
-.RS 16n
-The \fIpath\fR argument points to a remote machine and the link to that machine
-is no longer active.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTDIR\fR\fR
-.ad
-.RS 16n
+.It Er ENOLINK
+The
+.Fa path
+argument points to a remote machine and the link to that machine is no longer
+active.
+.It Er ENOTDIR
 A component of the new process path of the file prefix is not a directory.
-.RE
-
-.sp
-.LP
-The \fBexec\fR functions, except for \fBexeclp()\fR and \fBexecvp()\fR, will
-fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOEXEC\fR\fR
-.ad
-.RS 11n
+.El
+.Pp
+The
+.Nm
+functions, except for
+.Fn execlp
+and
+.Fn execvp ,
+will fail if:
+.Bl -tag -width Ds
+.It Er ENOEXEC
 The new process image file has the appropriate access permission but is not in
 the proper format.
-.RE
-
-.sp
-.LP
-The \fBexec\fR functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBENAMETOOLONG\fR\fR
-.ad
-.RS 16n
+.El
+.Pp
+The
+.Nm
+functions may fail if:
+.Bl -tag -width Ds
+.It Er ENAMETOOLONG
 Pathname resolution of a symbolic link produced an intermediate result whose
-length exceeds {\fBPATH_MAX\fR}.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 16n
+length exceeds
+.Dv PATH_MAX .
+.It Er ENOMEM
 The new process image requires more memory than is allowed by the hardware or
-system-imposed by memory management constraints. See \fBbrk\fR(2).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETXTBSY\fR\fR
-.ad
-.RS 16n
-The new process image file is a pure procedure (shared text) file that is
-currently open for writing by some process.
-.RE
-
-.SH USAGE
+system-imposed by memory management constraints.
+See
+.Xr brk 2 .
+.It Er ETXTBSY
+The new process image file is a pure procedure
+.Pq shared text
+file that is currently open for writing by some process.
+.El
+.Sh USAGE
 As the state of conversion descriptors and message catalogue descriptors in the
 new process image is undefined, portable applications should not rely on their
-use and should close them prior to calling one of the \fBexec\fR functions.
-.sp
-.LP
+use and should close them prior to calling one of the
+.Nm
+functions.
+.Pp
 Applications that require other than the default POSIX locale should call
-\fBsetlocale\fR(3C) with the appropriate parameters to establish the locale of
-the new process.
-.sp
-.LP
-The \fIenviron\fR array should not be accessed directly by the application.
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	See below.
-_
-Standard	See \fBstandards\fR(7).
-.TE
-
-.sp
-.LP
-The \fBexecle()\fR and \fBexecve()\fR functions are Async-Signal-Safe.
-.SH SEE ALSO
-.BR ksh (1),
-.BR ps (1),
-.BR sh (1),
-.BR alarm (2),
-.BR brk (2),
-.BR chmod (2),
-.BR exit (2),
-.BR fcntl (2),
-.BR fork (2),
-.BR getpflags (2),
-.BR getrlimit (2),
-.BR memcntl (2),
-.BR mmap (2),
-.BR nice (2),
-.BR priocntl (2),
-.BR profil (2),
-.BR semop (2),
-.BR shmop (2),
-.BR sigpending (2),
-.BR sigprocmask (2),
-.BR times (2),
-.BR umask (2),
-.BR lockf (3C),
-.BR ptrace (3C),
-.BR setlocale (3C),
-.BR signal (3C),
-.BR system (3C),
-.BR timer_create (3C),
-.BR a.out (5),
-.BR contract (5),
-.BR process (5),
-.BR attributes (7),
-.BR environ (7),
-.BR privileges (7),
-.BR standards (7)
-.SH WARNINGS
-If a program is \fBsetuid\fR to a user \fBID\fR other than the superuser, and
-the program is executed when the real user \fBID\fR is super-user, then the
-program has some of the powers of a super-user as well.
+.Xr setlocale 3C
+with the appropriate parameters to establish the locale of the new process.
+.Pp
+The
+.Fa environ
+array should not be accessed directly by the application.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+The
+.Fn execle
+and
+.Fn execve
+functions are
+.Sy Aysnc-Signal-Safe
+.Sh SEE ALSO
+.Xr ksh 1 ,
+.Xr ps 1 ,
+.Xr sh 1 ,
+.Xr alarm 2 ,
+.Xr brk 2 ,
+.Xr chmod 2 ,
+.Xr close 2 ,
+.Xr exit 2 ,
+.Xr fcntl 2 ,
+.Xr fork 2 ,
+.Xr getpflags 2 ,
+.Xr getrlimit 2 ,
+.Xr memcntl 2 ,
+.Xr mmap 2 ,
+.Xr nice 2 ,
+.Xr open 2 ,
+.Xr priocntl 2 ,
+.Xr processor_bind 2 ,
+.Xr profil 2 ,
+.Xr pset_bind 2 ,
+.Xr semop 2 ,
+.Xr setuid 2 ,
+.Xr shmop 2 ,
+.Xr sigpending 2 ,
+.Xr sigprocmask 2 ,
+.Xr times 2 ,
+.Xr ulimit 2 ,
+.Xr umask 2 ,
+.Xr atexit 3C ,
+.Xr lockf 3C ,
+.Xr mlock 3C ,
+.Xr mlockall 3C ,
+.Xr mq_close 3C ,
+.Xr ptrace 3C ,
+.Xr sem_close 3C ,
+.Xr setlocale 3C ,
+.Xr signal 3C ,
+.Xr system 3C ,
+.Xr timer_create 3C ,
+.Xr signal.h 3HEAD ,
+.Xr a.out 5 ,
+.Xr contract 5 ,
+.Xr process 5 ,
+.Xr attributes 7 ,
+.Xr environ 7 ,
+.Xr privileges 7 ,
+.Xr standards 7
+.Sh WARNINGS
+If a program is setuid to a user ID other than the superuser, and the program
+is executed when the real user ID is super-user, then the program has some of
+the powers of a super-user as well.
