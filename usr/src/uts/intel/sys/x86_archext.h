@@ -32,7 +32,7 @@
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -1211,6 +1211,7 @@ typedef enum x86_chiprev {
 	_DECL_CHIPREV(AMD, GENOA, A1, 0x0004),
 	_DECL_CHIPREV(AMD, GENOA, B0, 0x0008),
 	_DECL_CHIPREV(AMD, GENOA, B1, 0x0010),
+	_DECL_CHIPREV(AMD, GENOA, B2, 0x0020),
 	_DECL_CHIPREV(AMD, GENOA, ANY, _X86_CHIPREV_REV_MATCH_ALL),
 
 	_DECL_CHIPREV(AMD, VERMEER, UNKNOWN, 0x0001),
@@ -1313,7 +1314,13 @@ typedef enum x86_uarchrev {
 	_DECL_UARCHREV(AMD, ZEN3, B2, 0x0010),
 	_DECL_UARCHREV(AMD, ZEN3, ANY, _X86_UARCHREV_REV_MATCH_ALL),
 
-	_DECL_UARCHREV_NOREV(AMD, ZEN4, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN4, UNKNOWN, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN4, A0, 0x0002),
+	_DECL_UARCHREV(AMD, ZEN4, A1, 0x0004),
+	_DECL_UARCHREV(AMD, ZEN4, A2, 0x0008),
+	_DECL_UARCHREV(AMD, ZEN4, B0, 0x0010),
+	_DECL_UARCHREV(AMD, ZEN4, B1, 0x0020),
+	_DECL_UARCHREV(AMD, ZEN4, B2, 0x0040),
 	_DECL_UARCHREV(AMD, ZEN4, ANY, _X86_UARCHREV_REV_MATCH_ALL),
 
 	/* Keep at the end */
