@@ -38,7 +38,7 @@
  *
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -219,16 +219,6 @@ vlapic_timer_divisor(uint32_t dcr)
 		panic("vlapic_timer_divisor: invalid dcr 0x%08x", dcr);
 	}
 }
-
-#if 0
-static inline void
-vlapic_dump_lvt(uint32_t offset, uint32_t *lvt)
-{
-	printf("Offset %x: lvt %08x (V:%02x DS:%x M:%x)\n", offset,
-	    *lvt, *lvt & APIC_LVTT_VECTOR, *lvt & APIC_LVTT_DS,
-	    *lvt & APIC_LVTT_M);
-}
-#endif
 
 static uint32_t
 vlapic_get_ccr(struct vlapic *vlapic)
@@ -758,7 +748,11 @@ vlapic_callout_handler(void *arg)
 
 	vlapic_fire_timer(vlapic);
 
-	if (vlapic_periodic_timer(vlapic)) {
+	/*
+	 * We should not end up here with timer_period == 0, but to prevent a
+	 * runaway periodic timer, it is checked anyways.
+	 */
+	if (vlapic_periodic_timer(vlapic) && vlapic->timer_period != 0) {
 		/*
 		 * Compute the delta between when the timer was supposed to
 		 * fire and the present time.  We can depend on the fact that
@@ -1421,6 +1415,7 @@ vlapic_reset(struct vlapic *vlapic)
 	/* Reset any timer-related state first */
 	VLAPIC_TIMER_LOCK(vlapic);
 	callout_stop(&vlapic->callout);
+	vlapic->timer_fire_when = 0;
 	lapic->icr_timer = 0;
 	lapic->ccr_timer = 0;
 	lapic->dcr_timer = 0;
@@ -1914,6 +1909,7 @@ enum vlapic_validation_error {
 	VVE_BAD_TPR,
 	VVE_LOW_VECTOR,
 	VVE_ISR_PRIORITY,
+	VVE_TIMER_MISMATCH,
 };
 
 static enum vlapic_validation_error
@@ -1968,6 +1964,11 @@ vlapic_data_validate(const struct vlapic *vlapic, const vmm_data_req_t *req)
 		    popc8((uint8_t)(page->vlp_isr[i] >> 24)) > 1) {
 			return (VVE_ISR_PRIORITY);
 		}
+	}
+
+	/* If icr_timer is zero, then a scheduled timer does not make sense */
+	if (page->vlp_icr_timer == 0 && src->vl_timer_target != 0) {
+		return (VVE_TIMER_MISMATCH);
 	}
 
 	return (VVE_OK);
