@@ -230,6 +230,12 @@ extern int do_wdc_resize(const nvme_process_arg_t *);
 extern void optparse_wdc_resize(nvme_process_arg_t *);
 extern void usage_wdc_resize(const char *);
 
+extern int do_wdc_clear_assert(const nvme_process_arg_t *);
+extern void usage_wdc_clear_assert(const char *);
+
+extern int do_wdc_inject_assert(const nvme_process_arg_t *);
+extern void usage_wdc_inject_assert(const char *);
+
 #ifdef __cplusplus
 }
 #endif

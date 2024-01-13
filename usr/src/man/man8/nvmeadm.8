@@ -123,6 +123,14 @@
 .Cm wdc/resize
 .Fl s Ar size | Fl g
 .Ar ctl
+.Nm
+.Op Fl dv
+.Cm wdc/clear-assert
+.Ar ctl
+.Nm
+.Op Fl dv
+.Cm wdc/inject-assert
+.Ar ctl
 .Sh DESCRIPTION
 The
 .Nm
@@ -1041,6 +1049,29 @@ When performing a resize
 .Em all data and namespace will be erased !
 All namespaces must be detached prior to issuing this.
 .El
+.It Xo
+.Nm
+.Op Fl dv
+.Cm wdc/clear-assert
+.Ar ctl
+.Xc
+This clears an internal assertion record from a WDC device.
+Prior to running this any such internal assertion should be saved by using the
+.Cm wdc/e6dump
+command.
+This command should only be used if instructed to do so as part of a
+troubleshooting process.
+.It Xo
+.Nm
+.Op Fl dv
+.Cm wdc/inject-assert
+.Ar ctl
+.Xc
+This injects a device assertion into a WDC NVMe device.
+The behavior of doing so is device specific; however, all I/O will be
+interrupted and the device may be retired.
+Unless explicitly instructed as part of debugging a device or as part of
+internal development, this command should not be used.
 .El
 .Sh EXIT STATUS
 .Ex -std

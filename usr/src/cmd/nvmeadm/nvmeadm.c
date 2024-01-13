@@ -373,6 +373,20 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		0
 	},
 	{
+		"wdc/clear-assert",
+		"clear internal device assertion",
+		NULL,
+		NULL,
+		do_wdc_clear_assert, usage_wdc_clear_assert, NULL
+	},
+	{
+		"wdc/inject-assert",
+		"inject internal device assertion",
+		NULL,
+		NULL,
+		do_wdc_inject_assert, usage_wdc_inject_assert, NULL
+	},
+	{
 		NULL, NULL, NULL,
 		NULL, NULL, NULL, 0
 	}

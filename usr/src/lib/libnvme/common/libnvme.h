@@ -1196,6 +1196,12 @@ extern bool nvme_wdc_e6_req_set_output(nvme_wdc_e6_req_t *, void *,
     size_t);
 extern bool nvme_wdc_e6_req_exec(nvme_wdc_e6_req_t *);
 
+/*
+ * WDC assert injection and removal.
+ */
+extern bool nvme_wdc_assert_clear(nvme_ctrl_t *);
+extern bool nvme_wdc_assert_inject(nvme_ctrl_t *);
+
 #ifdef __cplusplus
 }
 #endif

@@ -307,3 +307,61 @@ do_wdc_resize(const nvme_process_arg_t *npa)
 
 	return (0);
 }
+
+int
+do_wdc_inject_assert(const nvme_process_arg_t *npa)
+{
+	nvme_vuc_disc_t *vuc;
+
+	if (npa->npa_argc > 0) {
+		errx(-1, "%s passed extraneous arguments starting with %s",
+		    npa->npa_cmd->c_name, npa->npa_argv[0]);
+	}
+
+	vuc = nvmeadm_vuc_init(npa, npa->npa_cmd->c_name);
+
+	if (!nvme_wdc_assert_inject(npa->npa_ctrl)) {
+		nvmeadm_fatal(npa, "failed to inject assertion");
+	}
+
+	nvmeadm_vuc_fini(npa, vuc);
+	return (0);
+}
+
+int
+do_wdc_clear_assert(const nvme_process_arg_t *npa)
+{
+	nvme_vuc_disc_t *vuc;
+
+	if (npa->npa_argc > 0) {
+		errx(-1, "%s passed extraneous arguments starting with %s",
+		    npa->npa_cmd->c_name, npa->npa_argv[0]);
+	}
+
+	vuc = nvmeadm_vuc_init(npa, npa->npa_cmd->c_name);
+
+	if (!nvme_wdc_assert_clear(npa->npa_ctrl)) {
+		nvmeadm_fatal(npa, "failed to clear assertion");
+	}
+
+	nvmeadm_vuc_fini(npa, vuc);
+	return (0);
+}
+
+void
+usage_wdc_clear_assert(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl>\n\n"
+	    "  Clear an internal device assertion.\n", c_name);
+}
+
+void
+usage_wdc_inject_assert(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl>\n\n"
+	    "  Inject a device assertion. This will cause the device to "
+	    "pause\n  execution of commands and create an internal fault. This "
+	    "should\n  not be used unless directed as part of a "
+	    "troubleshooting exercise.\n  If in doubt, do not use this!\n",
+	    c_name);
+}
