@@ -4428,6 +4428,24 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive,
 		return (zfs_error(hdl, EZFS_ZONED, errbuf));
 	}
 
+	/*
+	 * Do not rename dataset currently mounted as "/".
+	 * Such rename is blocked by kernel (umount2()) anyhow,
+	 * but blocking rename here will also prevent us unmounting
+	 * /usr, /var datasets while preparing for rename, and
+	 * therefore disturbing our live boot environment.
+	 */
+	char *mountpnt;
+	if (zfs_is_mounted(zhp, &mountpnt)) {
+		if (strcmp(mountpnt, "/") == 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "dataset is mounted as \"/\""));
+			free(mountpnt);
+			return (zfs_error(hdl, EZFS_BUSY, errbuf));
+		}
+		free(mountpnt);
+	}
+
 	if (recursive) {
 		parentname = zfs_strdup(zhp->zfs_hdl, zhp->zfs_name);
 		if (parentname == NULL) {
