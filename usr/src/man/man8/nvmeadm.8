@@ -59,6 +59,7 @@
 .Nm
 .Op Fl dv
 .Cm get-logpage
+.Op Fl O Ar output-file
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Nm
@@ -207,6 +208,8 @@ using the
 command.
 .It Ar offset
 Specifies the byte offset at which to load
+.It Ar output-file
+Specifies a file system location to write raw binary data out to.
 .Ar firmware-file
 within the controller's upload buffer.
 Vendors may require multiple images to be loaded at different offsets
@@ -589,10 +592,16 @@ then the command will generate an error.
 .It Xo
 .Nm
 .Cm get-logpage
+.Op Fl O Ar output-file
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Xc
 Print the specified log page of the specified controllers and/or namespaces.
+If
+.Fl O
+is specified, rather than print the contents of the log, the raw binary payload
+of the log will be written to
+.Ar output-file .
 Most log pages are only available on a per-controller basis.
 Known log pages are:
 .Bl -tag -width "firmware"

@@ -104,6 +104,10 @@ typedef struct {
 	boolean_t *nf_used;
 } nvmeadm_features_t;
 
+typedef struct {
+	const char *ngl_output;
+} nvmeadm_get_logpage_t;
+
 /* Version checking */
 extern boolean_t nvme_version_check(const nvme_process_arg_t *,
     const nvme_version_t *);
