@@ -1649,6 +1649,7 @@ typedef union {
 #define	NVME_CQE_SCT_GENERIC	0	/* Generic Command Status */
 #define	NVME_CQE_SCT_SPECIFIC	1	/* Command Specific Status */
 #define	NVME_CQE_SCT_INTEGRITY	2	/* Media and Data Integrity Errors */
+#define	NVME_CQE_SCT_PATH	3	/* Path Related Status (1.4) */
 #define	NVME_CQE_SCT_VENDOR	7	/* Vendor Specific */
 
 /*
@@ -1680,9 +1681,29 @@ typedef union {
 #define	NVME_CQE_SC_GEN_INV_DSGL_LEN	0xf	/* Data SGL Length Invalid */
 #define	NVME_CQE_SC_GEN_INV_MSGL_LEN	0x10	/* Metadata SGL Length Inval */
 #define	NVME_CQE_SC_GEN_INV_SGL_DESC	0x11	/* SGL Descriptor Type Inval */
+/* Added in NVMe 1.2 */
 #define	NVME_CQE_SC_GEN_INV_USE_CMB	0x12	/* Inval use of Ctrl Mem Buf */
 #define	NVME_CQE_SC_GEN_INV_PRP_OFF	0x13	/* PRP Offset Invalid */
 #define	NVME_CQE_SC_GEN_AWU_EXCEEDED	0x14	/* Atomic Write Unit Exceeded */
+#define	NVME_CQE_SC_GEN_OP_DENIED	0x15	/* Operation Denied */
+#define	NVME_CQE_SC_GEN_INV_SGL_OFF	0x16	/* SGL Offset Invalid */
+#define	NVME_CQE_SC_GEN_INV_SGL_ST	0x17	/* SGL Sub type Invalid */
+#define	NVME_CQE_SC_GEN_INCON_HOSTID	0x18	/* Host ID Inconsistent fmt */
+#define	NVME_CQE_SC_GEN_KA_EXP		0x19	/* Keep Alive Timer Expired */
+#define	NVME_CQE_SC_GEN_INV_KA_TO	0x1a	/* Keep Alive Timeout Invalid */
+/* Added in NVMe 1.3 */
+#define	NVME_CQE_SC_GEN_ABORT_PREEMPT	0x1b	/* Cmd aborted due to preempt */
+#define	NVME_CQE_SC_GEN_SANITIZE_FAIL	0x1c	/* Sanitize Failed */
+#define	NVME_CQE_SC_GEN_SANITIZING	0x1d	/* Sanitize in Progress */
+#define	NVME_CQE_SC_GEN_INV_SGL_GRAN	0x1e	/* SGL Data Block Gran. Inval */
+#define	NVME_CQE_SC_GEN_NO_CMD_Q_CMD	0x1f	/* Command not sup for CMB Q */
+/* Added in NVMe 1.4 */
+#define	NVME_CQE_SC_GEN_NS_RDONLY	0x20	/* Namespace is write prot. */
+#define	NVME_CQE_SC_GEN_CMD_INTR	0x21	/* Command Interrupted */
+#define	NVME_CQE_SC_GEN_TRANSIENT	0x22	/* Transient Transport Error */
+/* Added in NVMe 2.0 */
+#define	NVME_CQE_SC_GEN_CMD_LOCK	0x23	/* Command/Feature Lockdown */
+#define	NVME_CQE_SC_ADM_MEDIA_NR	0x24	/* Admin Cmd Media Not Ready */
 
 /* NVMe completion status code (generic NVM commands) */
 #define	NVME_CQE_SC_GEN_NVM_LBA_RANGE	0x80	/* LBA Out Of Range */
@@ -1690,6 +1711,12 @@ typedef union {
 #define	NVME_CQE_SC_GEN_NVM_NS_NOTRDY	0x82	/* Namespace Not Ready */
 #define	NVME_CQE_SC_GEN_NVM_RSV_CNFLCT	0x83	/* Reservation Conflict */
 #define	NVME_CQE_SC_GEN_NVM_FORMATTING	0x84	/* Format in progress (1.2) */
+/* Added in NVMe 2.0 */
+#define	NVME_CQE_SC_GEN_KEY_INV_VAL	0x85	/* Invalid value size */
+#define	NVME_CQE_SC_GEN_KEY_INV_KEY	0x86	/* Invalid key size */
+#define	NVME_CQE_SC_GEN_KEY_ENOENT	0x87	/* KV Key Does Not Exist */
+#define	NVME_CQE_SC_GEN_KEY_UNRECOV	0x88	/* Unrecovered Error */
+#define	NVME_CQE_SC_GEN_KEY_EXISTS	0x89	/* Key already exists */
 
 /* NVMe completion status code (command specific) */
 #define	NVME_CQE_SC_SPC_INV_CQ		0x0	/* Completion Queue Invalid */
@@ -1707,16 +1734,57 @@ typedef union {
 #define	NVME_CQE_SC_SPC_FEAT_SAVE	0xd	/* Feature Id Not Saveable */
 #define	NVME_CQE_SC_SPC_FEAT_CHG	0xe	/* Feature Not Changeable */
 #define	NVME_CQE_SC_SPC_FEAT_NS_SPEC	0xf	/* Feature Not Namespace Spec */
+/* Added in NVMe 1.2 */
 #define	NVME_CQE_SC_SPC_FW_NSSR		0x10	/* FW Application NSSR Reqd */
 #define	NVME_CQE_SC_SPC_FW_NEXT_RESET	0x11	/* FW Application Next Reqd */
 #define	NVME_CQE_SC_SPC_FW_MTFA		0x12	/* FW Application Exceed MTFA */
 #define	NVME_CQE_SC_SPC_FW_PROHIBITED	0x13	/* FW Application Prohibited */
 #define	NVME_CQE_SC_SPC_FW_OVERLAP	0x14	/* Overlapping FW ranges */
+#define	NVME_CQE_SC_SPC_NS_INSUF_CAP	0x15	/* NS Insufficient Capacity */
+#define	NVME_CQE_SC_SPC_NS_NO_ID	0x16	/* NS ID Unavailable */
+/* 0x17 is reserved */
+#define	NVME_CQE_SC_SPC_NS_ATTACHED	0x18	/* NS Already Attached */
+#define	NVME_CQE_SC_SPC_NS_PRIV		0x19	/* NS is private */
+#define	NVME_CQE_SC_SPC_NS_NOT_ATTACH	0x1a	/* NS Not Attached */
+#define	NVME_CQE_SC_SPC_THIN_ENOTSUP	0x1b	/* Thin Provisioning ENOTSUP */
+#define	NVME_CQE_SC_SPC_INV_CTRL_LIST	0x1c	/* Controller list invalid */
+/* Added in NVMe 1.3 */
+#define	NVME_CQE_SC_SPC_SELF_TESTING	0x1d	/* Self-test in progress */
+#define	NVME_CQE_SC_SPC_NO_BP_WRITE	0x1e	/* No Boot Partition Write */
+#define	NVME_CQE_SC_SPC_INV_CTRL_ID	0x1f	/* Invalid Controller Id */
+#define	NVME_CQE_SC_SPC_INV_SEC_CTRL	0x20	/* Invalid Sec. Ctrl state */
+#define	NVME_CQE_SC_SPC_INV_CTRL_NRSRC	0x21	/* Inv. # Ctrl Resources */
+#define	NVME_CQE_SC_SPC_INV_RSRC_ID	0x22	/* Inv. Resource ID */
+/* Added in NVMe 1.4 */
+#define	NVME_CQE_SC_SPC_NO_SAN_PMR	0x23	/* Sanitize prohib. w/ pmem */
+#define	NVME_CQE_SC_SPC_INV_ANA_GID	0x24	/* Invalid ANA group ID */
+#define	NVME_CQE_SC_SPC_ANA_ATTACH	0x25	/* ANA Attach Failed */
+/* Added in NVMe 2.0 */
+#define	NVME_CQE_SC_SPC_INSUF_CAP	0x26	/* Insufficient Capacity */
+#define	NVME_CQE_SC_SPC_NS_ATTACH_LIM	0x27	/* NS Attach Limit Exceeded */
+#define	NVME_CQE_SC_SPC_LOCKDOWN_UNSUP	0x28	/* Prohib Cmd Exec Not Sup */
+#define	NVME_CQE_SC_SPC_UNSUP_IO_CMD	0x29	/* I/O Command set not sup */
+#define	NVME_CQE_SC_SPC_DIS_IO_CMD	0x2a	/* I/O Command set not enab */
+#define	NVME_CQE_SC_SPC_INV_CMD_COMBO	0x2b	/* I/O command set combo rej */
+#define	NVME_CQE_SC_SPC_INV_IO_CMD	0x2c	/* Invalid I/O command set */
+#define	NVME_CQE_SC_SPC_UNAVAIL_ID	0x2d	/* Unavailable ID */
 
-/* NVMe completion status code (NVM command specific */
+
+/* NVMe completion status code (I/O command specific) */
 #define	NVME_CQE_SC_SPC_NVM_CNFL_ATTR	0x80	/* Conflicting Attributes */
 #define	NVME_CQE_SC_SPC_NVM_INV_PROT	0x81	/* Invalid Protection */
 #define	NVME_CQE_SC_SPC_NVM_READONLY	0x82	/* Write to Read Only Range */
+/* Added in 2.0 */
+#define	NVME_CQE_SC_SPC_IO_LIMIT	0x83	/* Cmd Size Limit Exceeded */
+/* 0x84 to 0xb7 are reserved */
+#define	NVME_CQE_SC_SPC_ZONE_BDRY_ERR	0xb8	/* Zoned Boundary Error */
+#define	NVME_CQE_SC_SPC_ZONE_FULL	0xb9	/* Zone is Full */
+#define	NVME_CQE_SC_SPC_ZONE_RDONLY	0xba	/* Zone is Read Only */
+#define	NVME_CQE_SC_SPC_ZONE_OFFLINE	0xbb	/* Zone is Offline */
+#define	NVME_CQE_SC_SPC_ZONE_INV_WRITE	0xbc	/* Zone Invalid Write */
+#define	NVME_CQE_SC_SPC_ZONE_ACT	0xbd	/* Too May Active Zones */
+#define	NVME_CQE_SC_SPC_ZONE_OPEN	0xbe	/* Too May Open Zones */
+#define	NVME_CQE_SC_SPC_INV_ZONE_TRANS	0xbf	/* Invalid Zone State Trans */
 
 /* NVMe completion status code (data / metadata integrity) */
 #define	NVME_CQE_SC_INT_NVM_WRITE	0x80	/* Write Fault */
@@ -1726,6 +1794,20 @@ typedef union {
 #define	NVME_CQE_SC_INT_NVM_REF_TAG	0x84	/* Reference Tag Check Err */
 #define	NVME_CQE_SC_INT_NVM_COMPARE	0x85	/* Compare Failure */
 #define	NVME_CQE_SC_INT_NVM_ACCESS	0x86	/* Access Denied */
+/* Added in 1.2 */
+#define	NVME_CQE_SC_INT_NVM_DEALLOC	0x87	/* Dealloc Log Block */
+/* Added in 2.0 */
+#define	NVME_CQE_SC_INT_NVM_TAG		0x88	/* End-to-End Storage Tag Err */
+
+/* NVMe completion status code (path related) */
+/* Added in NVMe 1.4 */
+#define	NVME_CQE_SC_PATH_INT_ERR	0x00	/* Internal Path Error */
+#define	NVME_CQE_SC_PATH_AA_PLOSS	0x01	/* Asym Access Pers Loss */
+#define	NVME_CQE_SC_PATH_AA_INACC	0x02	/* Asym Access Inaccessible */
+#define	NVME_CQE_SC_PATH_AA_TRANS	0x03	/* Asym Access Transition */
+#define	NVME_CQE_SC_PATH_CTRL_ERR	0x60	/* Controller Path Error */
+#define	NVME_CQE_SC_PATH_HOST_ERR	0x70	/* Host Path Error */
+#define	NVME_CQE_SC_PATH_HOST_ABRT	0x71	/* Cmd aborted by host */
 
 /*
  * Controller information (NVME_IOC_CTRL_INFO). This is a consolidation of misc.

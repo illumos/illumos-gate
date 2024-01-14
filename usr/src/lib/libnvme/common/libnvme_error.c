@@ -97,6 +97,38 @@ nvme_sctostr_gen_gen(uint32_t sct)
 		return ("prp offset invalid");
 	case NVME_CQE_SC_GEN_AWU_EXCEEDED:
 		return ("atomic write unit exceeded");
+	case NVME_CQE_SC_GEN_OP_DENIED:
+		return ("operation denied");
+	case NVME_CQE_SC_GEN_INV_SGL_OFF:
+		return ("sgl offset invalid");
+	case NVME_CQE_SC_GEN_INV_SGL_ST:
+		return ("sgl sub type invalid");
+	case NVME_CQE_SC_GEN_INCON_HOSTID:
+		return ("host identifier inconsistent format");
+	case NVME_CQE_SC_GEN_KA_EXP:
+		return ("keep alive timer expired");
+	case NVME_CQE_SC_GEN_INV_KA_TO:
+		return ("keep alive timeout invalid");
+	case NVME_CQE_SC_GEN_ABORT_PREEMPT:
+		return ("command aborted due to preempt and abort");
+	case NVME_CQE_SC_GEN_SANITIZE_FAIL:
+		return ("sanitize failed");
+	case NVME_CQE_SC_GEN_SANITIZING:
+		return ("sanitize in progress");
+	case NVME_CQE_SC_GEN_INV_SGL_GRAN:
+		return ("sgl data block granularity invalid");
+	case NVME_CQE_SC_GEN_NO_CMD_Q_CMD:
+		return ("command not supported for queue in cmb");
+	case NVME_CQE_SC_GEN_NS_RDONLY:
+		return ("namespace is write protected");
+	case NVME_CQE_SC_GEN_CMD_INTR:
+		return ("command interrupted");
+	case NVME_CQE_SC_GEN_TRANSIENT:
+		return ("transient transport error");
+	case NVME_CQE_SC_GEN_CMD_LOCK:
+		return ("command prohibited by command and feature lockdown");
+	case NVME_CQE_SC_ADM_MEDIA_NR:
+		return ("admin command media not ready");
 	default:
 		return ("unknown status code");
 	}
@@ -105,24 +137,53 @@ nvme_sctostr_gen_gen(uint32_t sct)
 static const char *
 nvme_sctostr_gen_csi(nvme_csi_t csi, uint32_t sct)
 {
-	if (csi != NVME_CSI_NVM) {
-		return ("unknown command set specific general status code");
-	}
-
+	/*
+	 * These errors are allowed for all command sets.
+	 */
 	switch (sct) {
-	case NVME_CQE_SC_GEN_NVM_LBA_RANGE:
-		return ("lba out of range");
 	case NVME_CQE_SC_GEN_NVM_CAP_EXC:
 		return ("capacity exceeded");
 	case NVME_CQE_SC_GEN_NVM_NS_NOTRDY:
 		return ("namespace not ready");
 	case NVME_CQE_SC_GEN_NVM_RSV_CNFLCT:
 		return ("reservation conflict");
-	case NVME_CQE_SC_GEN_NVM_FORMATTING:
-		return ("format in progress");
 	default:
-		return ("unknown command set specific general status code");
+		break;
 	}
+
+	switch (csi) {
+	case NVME_CSI_NVM:
+	case NVME_CSI_ZNS:
+		switch (sct) {
+		case NVME_CQE_SC_GEN_NVM_LBA_RANGE:
+			return ("lba out of range");
+		case NVME_CQE_SC_GEN_NVM_FORMATTING:
+			return ("format in progress");
+		default:
+			break;
+		}
+		break;
+	case NVME_CSI_KV:
+		switch (sct) {
+		case NVME_CQE_SC_GEN_KEY_INV_VAL:
+			return ("invalid value size");
+		case NVME_CQE_SC_GEN_KEY_INV_KEY:
+			return ("invalid key size");
+		case NVME_CQE_SC_GEN_KEY_ENOENT:
+			return ("kv key does not exist");
+		case NVME_CQE_SC_GEN_KEY_UNRECOV:
+			return ("unrecovered error");
+		case NVME_CQE_SC_GEN_KEY_EXISTS:
+			return ("key exists");
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return ("unknown command set specific general status code");
 }
 
 static const char *
@@ -169,19 +230,69 @@ nvme_sctostr_cmd_gen(uint32_t sct)
 		return ("firmware activation prohibited");
 	case NVME_CQE_SC_SPC_FW_OVERLAP:
 		return ("overlapping range");
+	case NVME_CQE_SC_SPC_NS_INSUF_CAP:
+		return ("namespace insufficient capacity");
+	case NVME_CQE_SC_SPC_NS_NO_ID:
+		return ("namespace identifier unavailable");
+	case NVME_CQE_SC_SPC_NS_ATTACHED:
+		return ("namespace already attached");
+	case NVME_CQE_SC_SPC_NS_PRIV:
+		return ("namespace is private");
+	case NVME_CQE_SC_SPC_NS_NOT_ATTACH:
+		return ("namespace is not attached");
+	case NVME_CQE_SC_SPC_THIN_ENOTSUP:
+		return ("thin provisioning not supported");
+	case NVME_CQE_SC_SPC_INV_CTRL_LIST:
+		return ("controller list invalid");
+	case NVME_CQE_SC_SPC_SELF_TESTING:
+		return ("device self-test in progress");
+	case NVME_CQE_SC_SPC_NO_BP_WRITE:
+		return ("boot partition write protected");
+	case NVME_CQE_SC_SPC_INV_CTRL_ID:
+		return ("invalid controller identifier");
+	case NVME_CQE_SC_SPC_INV_SEC_CTRL:
+		return ("invalid secondary controller state");
+	case NVME_CQE_SC_SPC_INV_CTRL_NRSRC:
+		return ("invalid number of controller resources");
+	case NVME_CQE_SC_SPC_INV_RSRC_ID:
+		return ("Invalid resource identifier");
+	case NVME_CQE_SC_SPC_NO_SAN_PMR:
+		return ("sanitize prohibited while persistent memory region "
+		    "is enabled");
+	case NVME_CQE_SC_SPC_INV_ANA_GID:
+		return ("ana group identifier invalid");
+	case NVME_CQE_SC_SPC_ANA_ATTACH:
+		return ("ana attach failed");
+	case NVME_CQE_SC_SPC_INSUF_CAP:
+		return ("insufficient capacity");
+	case NVME_CQE_SC_SPC_NS_ATTACH_LIM:
+		return ("namespace attachment limit exceeded");
+	case NVME_CQE_SC_SPC_LOCKDOWN_UNSUP:
+		return ("prohibition of command execution not supported");
+	case NVME_CQE_SC_SPC_UNSUP_IO_CMD:
+		return ("I/O command set not supported");
+	case NVME_CQE_SC_SPC_DIS_IO_CMD:
+		return ("I/O command set not enabled");
+	case NVME_CQE_SC_SPC_INV_CMD_COMBO:
+		return ("I/O command set combination rejected");
+	case NVME_CQE_SC_SPC_INV_IO_CMD:
+		return ("Invalid I/O command set");
+	case NVME_CQE_SC_SPC_UNAVAIL_ID:
+		return ("identifier unavailable");
 	default:
 		return ("unknown generic command status code");
 	}
 }
 
+/*
+ * The NVMe 2.0c spec that introduces many of the zoned related errors has
+ * footnotes to suggest some of these are command set specific, but does not
+ * mark any of them. For the moment we basically assume that they're valid
+ * everywhere due to the fact that they don't overlap.
+ */
 static const char *
 nvme_sctostr_cmd_csi(nvme_csi_t csi, uint32_t sct)
 {
-	if (csi != NVME_CSI_NVM) {
-		return ("unknown command specific, I/O command set specific "
-		    "status code");
-	}
-
 	switch (sct) {
 	case NVME_CQE_SC_SPC_NVM_CNFL_ATTR:
 		return ("conflicting attributes");
@@ -189,6 +300,22 @@ nvme_sctostr_cmd_csi(nvme_csi_t csi, uint32_t sct)
 		return ("invalid protection");
 	case NVME_CQE_SC_SPC_NVM_READONLY:
 		return ("write to read only range");
+	case NVME_CQE_SC_SPC_ZONE_BDRY_ERR:
+		return ("zoned boundary error");
+	case NVME_CQE_SC_SPC_ZONE_FULL:
+		return ("zone is full");
+	case NVME_CQE_SC_SPC_ZONE_RDONLY:
+		return ("zone is read only");
+	case NVME_CQE_SC_SPC_ZONE_OFFLINE:
+		return ("zone is offline");
+	case NVME_CQE_SC_SPC_ZONE_INV_WRITE:
+		return ("zone invalid write");
+	case NVME_CQE_SC_SPC_ZONE_ACT:
+		return ("too many active zones");
+	case NVME_CQE_SC_SPC_ZONE_OPEN:
+		return ("too many open zones");
+	case NVME_CQE_SC_SPC_INV_ZONE_TRANS:
+		return ("invalid zone state transition");
 	default:
 		return ("unknown command specific, I/O command set specific "
 		    "status code");
@@ -219,6 +346,10 @@ nvme_sctostr_media(nvme_csi_t csi, uint32_t sct)
 		return ("reference tag check err");
 	case NVME_CQE_SC_INT_NVM_ACCESS:
 		return ("access denied");
+	case NVME_CQE_SC_INT_NVM_TAG:
+		return ("end-to-end storage tag check error");
+	default:
+		break;
 	}
 
 	/*
@@ -232,8 +363,33 @@ nvme_sctostr_media(nvme_csi_t csi, uint32_t sct)
 	switch (sct) {
 	case NVME_CQE_SC_INT_NVM_COMPARE:
 		return ("compare failure");
+	case NVME_CQE_SC_INT_NVM_DEALLOC:
+		return ("deallocated or unwritten logical block");
 	default:
 		return ("unknown media and data integrity status code");
+	}
+}
+
+static const char *
+nvme_sctostr_path(uint32_t sct)
+{
+	switch (sct) {
+	case NVME_CQE_SC_PATH_INT_ERR:
+		return ("internal path error");
+	case NVME_CQE_SC_PATH_AA_PLOSS:
+		return ("asymmetric access persistent loss");
+	case NVME_CQE_SC_PATH_AA_INACC:
+		return ("asymmetric access inaccessible");
+	case NVME_CQE_SC_PATH_AA_TRANS:
+		return ("asymmetric access transition");
+	case NVME_CQE_SC_PATH_CTRL_ERR:
+		return ("controller pathing error");
+	case NVME_CQE_SC_PATH_HOST_ERR:
+		return ("host pathing error");
+	case NVME_CQE_SC_PATH_HOST_ABRT:
+		return ("command aborted by host");
+	default:
+		return ("unknown path related status code");
 	}
 }
 
@@ -260,6 +416,8 @@ nvme_sctostr(nvme_ctrl_t *ctrl __unused, nvme_csi_t csi, uint32_t sct,
 		}
 	case NVME_CQE_SCT_INTEGRITY:
 		return (nvme_sctostr_media(csi, sc));
+	case NVME_CQE_SCT_PATH:
+		return (nvme_sctostr_path(sc));
 	case NVME_CQE_SCT_VENDOR:
 		return ("vendor specific");
 	default:
