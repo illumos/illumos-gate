@@ -381,7 +381,7 @@ function verify_send
 	typeset dtst=$3
 
 	typeset oldval
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset snap=$dtst@snap.$stamp
 
 	typeset -i ret=1
@@ -410,7 +410,7 @@ function verify_fs_receive
 	typeset fs=$3
 
 	typeset dtst
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset newfs=$fs/newfs.$stamp
 	typeset newvol=$fs/newvol.$stamp
 	typeset bak_user=/tmp/bak.$user.$stamp
@@ -481,8 +481,7 @@ function verify_userprop
 	typeset perm=$2
 	typeset dtst=$3
 
-	typeset guid=$(get_prop guid $dtst)
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S').${guid}
+	typeset stamp=${perm}.${user}.$RANDOM
 
 	user_run $user zfs set "$user:ts=$stamp" $dtst
 	sync_pool ${dtst%%/*}
@@ -568,7 +567,7 @@ function verify_fs_create
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset newfs=$fs/nfs.$stamp
 	typeset newvol=$fs/nvol.$stamp
 
@@ -685,7 +684,7 @@ function verify_fs_snapshot
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset snap=$fs@snap.$stamp
 	typeset mntpt=$(get_prop mountpoint $fs)
 
@@ -726,7 +725,7 @@ function verify_fs_rollback
 	typeset fs=$3
 
 	typeset oldval
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset snap=$fs@snap.$stamp
 	typeset mntpt=$(get_prop mountpoint $fs)
 
@@ -759,8 +758,8 @@ function verify_fs_clone
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basefs=${fs%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basefs=${fs%/*}
 	typeset snap=$fs@snap.$stamp
 	typeset clone=$basefs/cfs.$stamp
 
@@ -804,8 +803,8 @@ function verify_fs_rename
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basefs=${fs%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basefs=${fs%/*}
 	typeset snap=$fs@snap.$stamp
 	typeset renamefs=$basefs/nfs.$stamp
 
@@ -887,7 +886,7 @@ function verify_fs_mount
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset mntpt=$(get_prop mountpoint $fs)
 	typeset newmntpt=/tmp/mnt.$stamp
 
@@ -955,7 +954,7 @@ function verify_fs_mountpoint
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 	typeset mntpt=$(get_prop mountpoint $fs)
 	typeset newmntpt=/tmp/mnt.$stamp
 
@@ -994,8 +993,8 @@ function verify_fs_promote
 	typeset perm=$2
 	typeset fs=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basefs=${fs%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basefs=${fs%/*}
 	typeset snap=$fs@snap.$stamp
 	typeset clone=$basefs/cfs.$stamp
 
@@ -1050,7 +1049,7 @@ function verify_fs_canmount
 	typeset fs=$3
 
 	typeset oldval
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset stamp=${perm}.${user}.$RANDOM
 
 	if ! ismounted $fs ; then
 		set -A modes "on" "off"
@@ -1361,8 +1360,8 @@ function verify_vol_snapshot
 	typeset perm=$2
 	typeset vol=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basevol=${vol%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basevol=${vol%/*}
 	typeset snap=$vol@snap.$stamp
 
 	user_run $user zfs snapshot $snap
@@ -1386,8 +1385,8 @@ function verify_vol_rollback
 	typeset perm=$2
 	typeset vol=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basevol=${vol%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basevol=${vol%/*}
 	typeset snap=$vol@snap.$stamp
 
 	typeset oldval
@@ -1421,8 +1420,8 @@ function verify_vol_clone
 	typeset perm=$2
 	typeset vol=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basevol=${vol%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basevol=${vol%/*}
 	typeset snap=$vol@snap.$stamp
 	typeset clone=$basevol/cvol.$stamp
 
@@ -1467,8 +1466,8 @@ function verify_vol_rename
 	typeset perm=$2
 	typeset vol=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basevol=${vol%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basevol=${vol%/*}
 	typeset snap=$vol@snap.$stamp
 	typeset clone=$basevol/cvol.$stamp
 	typeset renamevol=$basevol/nvol.$stamp
@@ -1514,8 +1513,8 @@ function verify_vol_promote
 	typeset perm=$2
 	typeset vol=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
-        typeset basevol=${vol%/*}
+	typeset stamp=${perm}.${user}.$RANDOM
+	typeset basevol=${vol%/*}
 	typeset snap=$vol@snap.$stamp
 	typeset clone=$basevol/cvol.$stamp
 
