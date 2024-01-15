@@ -1,1977 +1,1899 @@
-'\" te
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2023 Oxide Computer Company
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD 1 "Jan 28, 2022"
-.SH NAME
-ld \- link-editor for object files
-.SH SYNOPSIS
-.nf
-\fBld\fR [\fB-32\fR | \fB-64\fR] [\fB-a\fR | \fB-r\fR] [\fB-b\fR] [\fB-B\fRdirect | nodirect]
-[\fB-B\fR dynamic | static] [\fB-B\fR eliminate] [\fB-B\fR group] [\fB-B\fR local]
-[\fB-B\fR reduce] [\fB-B\fR symbolic] [\fB-c\fR \fIname\fR] [\fB-C\fR] [\fB-d\fR y | n]
-[\fB-D\fR \fItoken\fR,...] [\fB-e\fR \fIepsym\fR] [\fB-f\fR \fIname\fR | \fB-F\fR \fIname\fR] [\fB-G\fR] [\fB-h\fR \fIname\fR]
-[\fB-i\fR] [\fB-I\fR \fIname\fR] [\fB-l\fR \fIx\fR] [\fB-L\fR \fIpath\fR] [\fB-m\fR] [\fB-M\fR \fImapfile\fR]
-[\fB-N\fR \fIstring\fR] [\fB-o\fR \fIoutfile\fR] [\fB-p\fR \fIauditlib\fR] [\fB-P\fR \fIauditlib\fR]
-[\fB-Q\fR y | n] [\fB-R\fR \fIpath\fR] [\fB-s\fR] [\fB-S\fR \fIsupportlib\fR] [\fB-t\fR]
-[\fB-u\fR \fIsymname\fR] [\fB-V\fR] [\fB-Y P\fR\fI,dirlist\fR] [\fB-z\fR absexec]
-[\fB-z\fR allextract | defaultextract | weakextract ] [\fB-z\fR altexec64]
-[\fB-z\fR aslr[=\fIstate\fR]] [\fB-z\fR assert-deflib] [ \fB-z\fR assert-deflib=\fIlibname\fR]
-[\fB-z\fR combreloc | nocombreloc ] [\fB-z\fR defs | nodefs]
-[\fB-z\fR direct | nodirect] [\fB-z\fR endfiltee]
-[\fB-z\fR fatal-warnings | nofatal-warnings ] [\fB-z\fR finiarray=\fIfunction\fR]
-[\fB-z\fR globalaudit] [\fB-z\fR groupperm | nogroupperm]
-[\fB-z\fR guidance[=\fIid1\fR,\fIid2\fR...] [\fB-z\fR help ]
-[\fB-z\fR ignore | record] [\fB-z\fR initarray=\fIfunction\fR] [\fB-z\fR initfirst]
-[\fB-z\fR interpose] [\fB-z\fR lazyload | nolazyload]
-[\fB-z\fR ld32=\fIarg1\fR,\fIarg2\fR,...] [\fB-z\fR ld64=\fIarg1\fR,\fIarg2\fR,...]
-[\fB-z\fR loadfltr] [\fB-z\fR muldefs] [\fB-z\fR nocompstrtab] [\fB-z\fR nodefaultlib]
-[\fB-z\fR nodelete] [\fB-z\fR nodlopen] [\fB-z\fR nodump] [\fB-z\fR noldynsym]
-[\fB-z\fR nopartial] [\fB-z\fR noversion] [\fB-z\fR now] [\fB-z\fR origin]
-[\fB-z\fR preinitarray=\fIfunction\fR] [\fB-z\fR redlocsym] [\fB-z\fR relaxreloc]
-[\fB-z\fR rescan-now] [\fB-z\fR recan] [\fB-z\fR rescan-start \fI\&...\fR \fB-z\fR rescan-end]]
-[\fB-z\fR symbolcap] [\fB-z\fR target=sparc|x86] [\fB-z\fR text | textwarn | textoff]
-[\fB-z\fR type=\fIexec\fR|\fIkmod\fR|\fIreloc\fR|\fIshared\fR]
-[\fB-z\fR verbose] [\fB-z\fR wrap=\fIsymbol\fR] \fIfilename\fR...
-.fi
-
-.SH DESCRIPTION
-The link-editor, \fBld\fR, combines relocatable object files by resolving
-symbol references to symbol definitions, together with performing relocations.
-\fBld\fR operates in two modes, static or dynamic, as governed by the \fB-d\fR
-option. In all cases, the output of \fBld\fR is left in the file \fBa.out\fR by
-default. See NOTES.
-.sp
-.LP
-In dynamic mode, \fB-dy\fR, the default, relocatable object files that are
-provided as arguments are combined to produce an executable object file. This
-file is linked at execution with any shared object files that are provided as
-arguments. If the \fB-G\fR option is specified, relocatable object files are
-combined to produce a shared object. Without the \fB-G\fR option, a dynamic
-executable is created.
-.sp
-.LP
-In static mode, \fB-dn\fR, relocatable object files that are provided as
-arguments are combined to produce a static executable file. If the \fB-r\fR
+.\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd January 15, 2024
+.Dt LD 1
+.Os
+.Sh NAME
+.Nm ld
+.Nd link-editor for object files
+.Sh SYNOPSIS
+.Nm
+.Op Fl 32 | 64
+.Op Fl a | r
+.Op Fl b
+.Op Fl B Cm direct | Fl B Cm nodirect
+.Op Fl B Cm dynamic | Fl B Cm static
+.Op Fl B Cm eliminate
+.Op Fl B Cm group
+.Op Fl B Cm local
+.Op Fl B Cm reduce
+.Op Fl B Cm symbolic
+.Op Fl c Ar name
+.Op Fl C
+.Op Fl d Cm y | Fl d Cm n
+.Op Fl D Ar token Ns No ,...
+.Op Fl e Ar epsym
+.Op Fl f Ar name | Fl F Ar name
+.Op Fl G
+.Op Fl h Ar name
+.Op Fl i
+.Op Fl I Ar name
+.Op Fl l Ar x
+.Op Fl L Ar path
+.Op Fl m
+.Op Fl M Ar mapfile
+.Op Fl N Ar string
+.Op Fl o Ar outfile
+.Op Fl p Ar auditlib
+.Op Fl P Ar auditlib
+.Op Fl Q Cm y | Fl Q Cm n
+.Op Fl R Ar path
+.Op Fl s
+.Op Fl S Ar supportlib
+.Op Fl t
+.Op Fl u Ar symname
+.Op Fl V
+.Op Fl Y Cm P Ns \&, Ns Ar dirlist
+.Op Fl z Cm absexec
+.Op Fl z Cm allextract | Fl z Cm defaultextract | Fl z Cm weakextract
+.Op Fl z Cm altexec64
+.Op Fl z Cm aslr Ns Op Cm \&= Ns Ar state
+.Op Fl z Cm assert-deflib
+.Op Fl z Cm assert-deflib= Ns Ar libname
+.Op Fl z Cm combreloc | Fl z Cm nocombreloc
+.Op Fl z Cm defs | Fl z Cm nodefs
+.Op Fl z Cm direct | Fl z Cm nodirect
+.Op Fl z Cm endfiltee
+.Op Fl z Cm fatal-warnings | Fl z Cm nofatal-warnings
+.Op Fl z Cm finiarray= Ns Ar function
+.Op Fl z Cm globalaudit
+.Op Fl z Cm groupperm | nogroupperm
+.Op Fl z Cm guidance Ns Op Cm \&= Ns Ar id Ns No \&,...
+.Op Fl z Cm help
+.Op Fl z Cm ignore | Fl z Cm record
+.Op Fl z Cm initarray= Ns Ar function
+.Op Fl z Cm initfirst
+.Op Fl z Cm interpose
+.Op Fl z Cm lazyload | Fl z Cm nolazyload
+.Op Fl z Cm ld32= Ns Ar arg Ns No \&,...
+.Op Fl z Cm ld64= Ns Ar arg Ns No \&,...
+.Op Fl z Cm loadfltr
+.Op Fl z Cm muldefs
+.Op Fl z Cm nocompstrtab
+.Op Fl z Cm nodefaultlib
+.Op Fl z Cm nodelete
+.Op Fl z Cm nodlopen
+.Op Fl z Cm nodump
+.Op Fl z Cm noldynsym
+.Op Fl z Cm nopartial
+.Op Fl z Cm noversion
+.Op Fl z Cm now
+.Op Fl z Cm origin
+.Op Fl z Cm preinitarray= Ns Ar function
+.Op Fl z Cm redlocsym
+.Op Fl z Cm relaxreloc
+.Op Fl z Cm rescan
+.Op Fl z Cm rescan-now
+.Op Fl z Cm rescan-start \&... Fl z Cm rescan-end
+.Op Fl z Cm symbolcap
+.Op Fl z Cm target= Ns Cm sparc Ns | Ns Cm x86
+.Op Fl z Cm text | Fl z Cm textwarn | Fl z Cm textoff
+.Sm off
+.Op Fl z\~ Cm type= Cm exec | kmod | reloc | shared
+.Sm on
+.Op Fl z Cm verbose
+.Op Fl z Cm wrap= Ns Ar symbol
+.Ar filename Ns No \&...
+.Sh DESCRIPTION
+The link-editor,
+.Nm ,
+combines relocatable object files by resolving symbol references to symbol
+definitions, together with performing relocations.
+.Nm
+operates in two modes, static or dynamic, as governed by the
+.Fl d
+option.
+In all cases, the output of
+.Nm
+is left in the file
+.Pa a.out
+by default.
+See
+.Sx NOTES .
+.Pp
+In dynamic mode,
+.Fl d Cm y ,
+the default, relocatable object files that are provided as arguments are
+combined to produce an executable object file.
+This file is linked at execution with any shared object files that are provided
+as arguments.
+If the
+.Fl G
+option is specified, relocatable object files are combined to produce a shared
+object.
+Without the
+.Fl G
+option, a dynamic executable is created.
+.Pp
+In static mode,
+.Fl d Cm n ,
+relocatable object files that are provided as arguments are combined to produce
+a static executable file.
+If the
+.Fl r
 option is specified, relocatable object files are combined to produce one
-relocatable object file. See \fBStatic Executables\fR.
-.sp
-.LP
+relocatable object file.
+See
+.Sx Static Executables .
+.Pp
 Dynamic linking is the most common model for combining relocatable objects, and
-the eventual creation of processes within Solaris. This environment tightly
-couples the work of the link-editor and the runtime linker, \fBld.so.1\fR(1).
+the eventual creation of processes within illumos.
+This environment tightly couples the work of the link-editor and the runtime
+linker,
+.Xr ld.so.1 1 .
 Both of these utilities, together with their related technologies and
-utilities, are extensively documented in the \fILinker and Libraries Guide\fR.
-.sp
-.LP
-If any argument is a library, \fBld\fR by default searches the library exactly
-once at the point the library is encountered on the argument list. The library
-can be either a shared object or relocatable archive. See \fBar.h\fR(3HEAD)).
-.sp
-.LP
+utilities, are extensively documented in the
+.%T Linker and Libraries Guide .
+.Pp
+If any argument is a library,
+.Nm
+by default searches the library exactly once at the point the library is
+encountered on the argument list.
+The library can be either a shared object or relocatable archive.
+See
+.Xr ar.h 3HEAD .
+.Pp
 A shared object consists of an indivisible, whole unit that has been generated
-by a previous link-edit of one or more input files. When the link-editor
-processes a shared object, the entire contents of the shared object become a
-logical part of the resulting output file image. The shared object is not
-physically copied during the link-edit as its actual inclusion is deferred
-until process execution. This logical inclusion means that all symbol entries
-defined in the shared object are made available to the link-editing process.
-See Chapter 4, \fIShared Objects,\fR in \fILinker and Libraries Guide\fR
-.sp
-.LP
-For an archive library, \fBld\fR loads only those routines that define an
-unresolved external reference. \fBld\fR searches the symbol table of the
-archive library sequentially to resolve external references that can be
-satisfied by library members. This search is repeated until no external
-references can be resolved by the archive. Thus, the order of members in the
-library is functionally unimportant, unless multiple library members exist that
-define the same external symbol. Archive libraries that have interdependencies
-can require multiple command line definitions, or the use of one of the
-\fB-z\fR \fBrescan\fR options. See \fIArchive Processing\fR in \fILinker and
-Libraries Guide\fR.
-.sp
-.LP
-\fBld\fR is a cross link-editor, able to link 32-bit objects or 64-bit objects,
-for Sparc or x86 targets. \fBld\fR uses the \fBELF\fR class and machine type of
-the first relocatable object on the command line to govern the mode in which to
-operate. The mixing of 32-bit objects and 64-bit objects is not permitted.
-Similarly, only objects of a single machine type are allowed. See the
-\fB-32\fR, \fB-64\fR and \fB-z target\fR options, and the \fBLD_NOEXEC_64\fR
+by a previous link-edit of one or more input files.
+When the link-editor processes a shared object, the entire contents of the
+shared object become a logical part of the resulting output file image.
+The shared object is not physically copied during the link-edit as its actual
+inclusion is deferred until process execution.
+This logical inclusion means that all symbol entries defined in the shared
+object are made available to the link-editing process.
+See Chapter 4,
+.Em Shared Objects ,
+in
+.%T Linker and Libraries Guide .
+.Pp
+For an archive library,
+.Nm
+loads only those routines that define an unresolved external reference.
+.Nm
+searches the symbol table of the archive library sequentially to resolve
+external references that can be satisfied by library members.
+This search is repeated until no external references can be resolved by the
+archive.
+Thus, the order of members in the library is functionally unimportant, unless
+multiple library members exist that define the same external symbol.
+Archive libraries that have interdependencies can require multiple command line
+definitions, or the use of one of the
+.Fl z Cm rescan
+options.
+See
+.Em Archive Processing
+in
+.%T Linker and Libraries Guide .
+.Pp
+.Nm
+is a cross link-editor, able to link 32-bit objects or 64-bit objects, for
+Sparc or x86 targets.
+.Nm
+uses the
+.Sy ELF
+class and machine type of the first relocatable object on the command line to
+govern the mode in which to operate.
+The mixing of 32-bit objects and 64-bit objects is not permitted.
+Similarly, only objects of a single machine type are allowed.
+See the
+.Fl 32 ,
+.Fl 64
+and
+.Fl z Cm target
+options, and the
+.Ev LD_NOEXEC_64
 environment variable.
-.SS "Static Executables"
-The creation of static executables has been discouraged for many releases. In
-fact, 64-bit system archive libraries have never been provided. Because a
-static executable is built against system archive libraries, the executable
-contains system implementation details. This self-containment has a number of
-drawbacks.
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Ss Static Executables
+The creation of static executables is discouraged.
+Since a static executable is built against system archive libraries, the
+executable contains system implementation details.
+This self-containment has a number of drawbacks.
+.Bl -bullet -offset 4n
+.It
 The executable is immune to the benefits of system updates delivered as shared
-objects. The executable therefore, must be rebuilt to take advantage of many
-system improvements.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+objects.
+The executable therefore, must be rebuilt to take advantage of many system
+improvements.
+.It
 The ability of the executable to run on future releases can be compromised.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 The duplication of system implementation details negatively affects system
 performance.
-.RE
-.sp
-.LP
-With Solaris 10, 32-bit system archive libraries are no longer provided.
-Without these libraries, specifically \fBlibc.a\fR, the creation of static
-executables is no longer achievable without specialized system knowledge.
-However, the capability of \fBld\fR to process static linking options, and the
-processing of archive libraries, remains unchanged.
-.SH OPTIONS
+.El
+.Pp
+On illumos, system archive libraries
+.Po
+such as
+.Pa libc.a
+.Pc
+have never been provided.
+Without these libraries, the creation of static executables is not achievable
+without specialized system knowledge.
+However, the capability of
+.Nm
+to process static linking options, and the processing of archive libraries,
+remains.
+.Sh OPTIONS
 The following options are supported.
-.sp
-.ne 2
-.na
-\fB\fB-32\fR | \fB-64\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.Bl -tag -width 4n -compact
+.It Fl 32 | 64
 Creates a 32-bit, or 64-bit object.
-.sp
+.Pp
 By default, the class of the object being generated is determined from the
-first \fBELF\fR object processed from the command line. If no objects are
-specified, the class is determined by the first object encountered within the
-first archive processed from the command line. If there are no objects or
-archives, the link-editor creates a 32-bit object.
-.sp
-The \fB-64\fR option is required to create a 64-bit object solely from a
-mapfile.
-.sp
-This \fB-32\fR or \fB-64\fR options can also be used in the rare case of
-linking entirely from an archive that contains a mixture of 32 and 64-bit
-objects. If the first object in the archive is not the class of the object that
-is required to be created, then the \fB-32\fR or \fB-64\fR option can be used
-to direct the link-editor. See \fIThe 32-bit link-editor and 64-bit
-link-editor\fR in \fILinker and Libraries Guide\fR.
-.sp
-Note that for compability with existing Makefiles and scripts, these options
+first
+.Sy ELF
+object processed from the command line.
+If no objects are specified, the class is determined by the first object
+encountered within the first archive processed from the command line.
+If there are no objects or archives, the link-editor creates a 32-bit object.
+.Pp
+The
+.Fl 64
+option is required to create a 64-bit object solely from a mapfile.
+.Pp
+The
+.Fl 32
+or
+.Fl 64
+options can also be used in the rare case of linking entirely from an archive
+that contains a mixture of 32 and 64-bit objects.
+If the first object in the archive is not the class of the object that is
+required to be created, then the
+.Fl 32
+or
+.Fl 64
+option can be used to direct the link-editor.
+See
+.Em The 32-bit link-editor and 64-bit link-editor
+in
+.%T Linker and Libraries Guide .
+.Pp
+Note that for compatibility with existing Makefiles and scripts, these options
 may be given multiple times and may be mixed in the same invocation: the last
-instance wins, so that, for example, \fBld -64 -32 -64 ...\fR gives 64-bit
-output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.sp .6
-.RS 4n
-In static mode only, produces an executable object file. Undefined references
-are not permitted. This option is the default behavior for static mode. The
-\fB-a\fR option can not be used with the \fB-r\fR option. See \fBStatic
-Executables\fR under DESCRIPTION.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-b\fR\fR
-.ad
-.sp .6
-.RS 4n
-In dynamic mode only, provides no special processing for dynamic executable
-relocations that reference symbols in shared objects. Without the \fB-b\fR
-option, the link-editor applies techniques within a dynamic executable so that
-the text segment can remain read-only. One technique is the creation of special
-position-independent relocations for references to functions that are defined
-in shared objects. Another technique arranges for data objects that are defined
-in shared objects to be copied into the memory image of an executable at
-runtime.
-.sp
-The \fB-b\fR option is intended for specialized dynamic objects and is not
-recommended for general use. Its use suppresses all specialized processing
-required to ensure an object's shareability, and can even prevent the
-relocation of 64-bit executables.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBdirect\fR | \fBnodirect\fR\fR
-.ad
-.sp .6
-.RS 4n
-These options govern direct binding. \fB-B\fR \fBdirect\fR establishes direct
-binding information by recording the relationship between each symbol reference
-together with the dependency that provides the definition. In addition, direct
-binding information is established between each symbol reference and an
-associated definition within the object being created. The runtime linker uses
-this information to search directly for a symbol in the associated object
-rather than to carry out a default symbol search.
-.sp
-Direct binding information can only be established to dependencies specified
-with the link-edit. Thus, you should use the \fB-z\fR \fBdefs\fR option.
-Objects that wish to interpose on symbols in a direct binding environment
-should identify themselves as interposers with the \fB-z\fR \fBinterpose\fR
-option. The use of \fB-B\fR \fBdirect\fR enables \fB-z\fR \fBlazyload\fR for
-all dependencies.
-.sp
-The \fB-B\fR \fBnodirect\fR option prevents any direct binding to the
-interfaces offered by the object being created. The object being created can
-continue to directly bind to external interfaces by specifying the \fB-z\fR
-\fBdirect\fR option. See Appendix D, \fIDirect Bindings,\fR in \fILinker and
-Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBdynamic\fR | \fBstatic\fR\fR
-.ad
-.sp .6
-.RS 4n
-Options governing library inclusion. \fB-B\fR \fBdynamic\fR is valid in dynamic
-mode only. These options can be specified any number of times on the command
-line as toggles: if the \fB-B\fR \fBstatic\fR option is given, no shared
-objects are accepted until \fB-B\fR \fBdynamic\fR is seen. See the \fB-l\fR
+instance wins, so that, for example,
+.Ql ld -64 -32 -64 \&...
+gives 64-bit output.
+.Pp
+.It Fl a
+In static mode only, produces an executable object file.
+Undefined references are not permitted.
+This option is the default behavior for static mode.
+The
+.Fl a
+option can not be used with the
+.Fl r
 option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBeliminate\fR\fR
-.ad
-.sp .6
-.RS 4n
+See
+.Sx Static Executables
+.Pp
+.It Fl b
+In dynamic mode only, provides no special processing for dynamic executable
+relocations that reference symbols in shared objects.
+Without the
+.Fl b
+option, the link-editor applies techniques within a dynamic executable so that
+the text segment can remain read-only.
+One technique is the creation of special position-independent relocations for
+references to functions that are defined in shared objects.
+Another technique arranges for data objects that are defined in shared objects
+to be copied into the memory image of an executable at runtime.
+.Pp
+The
+.Fl b
+option is intended for specialized dynamic objects and is not recommended for
+general use.
+Its use suppresses all specialized processing required to ensure an object's
+shareability, and can even prevent the relocation of 64-bit executables.
+.Pp
+.It Fl B Cm direct | Fl B Cm nodirect
+These options govern direct binding.
+.Fl B Cm direct
+establishes direct binding information by recording the relationship between
+each symbol reference together with the dependency that provides the
+definition.
+In addition, direct binding information is established between each symbol
+reference and an associated definition within the object being created.
+The runtime linker uses this information to search directly for a symbol in the
+associated object rather than to carry out a default symbol search.
+.Pp
+Direct binding information can only be established to dependencies specified
+with the link-edit.
+Thus, you should use the
+.Fl z Cm defs
+option.
+Objects that wish to interpose on symbols in a direct binding environment
+should identify themselves as interposers with the
+.Fl z Cm interpose
+option.
+The use of
+.Fl B Cm direct
+enables
+.Fl z Cm lazyload
+for all dependencies.
+.Pp
+The
+.Fl B Cm nodirect
+option prevents any direct binding to the interfaces offered by the object
+being created.
+The object being created can continue to directly bind to external interfaces
+by specifying the
+.Fl z Cm direct
+option.
+See Appendix D,
+.Em Direct Bindings ,
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl B Cm dynamic | Fl B Cm static
+Options governing library inclusion.
+.Fl B Cm dynamic
+is valid in dynamic mode only.
+These options can be specified any number of times on the command line as
+toggles: if the
+.Fl B Cm static
+option is given, no shared objects are accepted until
+.Fl B Cm dynamic
+is seen.
+See the
+.Fl l
+option.
+.Pp
+.It Fl B Cm eliminate
 Causes any global symbols, not assigned to a version definition, to be
-eliminated from the symbol table. Version definitions can be supplied by means
-of a \fBmapfile\fR to indicate the global symbols that should remain visible in
-the generated object. This option achieves the same symbol elimination as the
-\fIauto-elimination\fR directive that is available as part of a \fBmapfile\fR
-version definition. This option can be useful when combining versioned and
-non-versioned relocatable objects. See also the \fB-B\fR \fBlocal\fR option and
-the \fB-B\fR \fBreduce\fR option. See \fIDefining Additional Symbols with a
-mapfile\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Establishes a shared object and its dependencies as a group. Objects within the
-group are bound to other members of the group at runtime. This mode is similar
-to adding the object to the process by using \fBdlopen\fR(3C) with the
-\fBRTLD_GROUP\fR mode. An object that has an explicit dependency on a object
-identified as a group, becomes a member of the group.
-.sp
-As the group must be self contained, use of the \fB-B\fR \fBgroup\fR option
-also asserts the \fB-z\fR \fBdefs\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBlocal\fR\fR
-.ad
-.sp .6
-.RS 4n
+eliminated from the symbol table.
+Version definitions can be supplied by means of a
+.Sy mapfile
+to indicate the global symbols that should remain visible in the generated
+object.
+This option achieves the same symbol elimination as the
+.Em auto-elimination
+directive that is available as part of a mapfile version definition.
+This option can be useful when combining versioned and non-versioned
+relocatable objects.
+See also the
+.Fl B Cm local
+and
+.Fl B Cm reduce
+options.
+See
+.Em Defining Additional Symbols with a mapfile
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl B Cm group
+Establishes a shared object and its dependencies as a group.
+Objects within the group are bound to other members of the group at runtime.
+This mode is similar to adding the object to the process by using
+.Xr dlopen 3C
+with the
+.Dv RTLD_GROUP
+mode.
+An object that has an explicit dependency on a object identified as a group,
+becomes a member of the group.
+.Pp
+As the group must be self contained, use of the
+.Fl B Cm group
+option also asserts the
+.Fl z Cm defs
+option.
+.Pp
+.It Fl B Cm local
 Causes any global symbols, not assigned to a version definition, to be reduced
-to local. Version definitions can be supplied by means of a \fBmapfile\fR to
-indicate the global symbols that should remain visible in the generated object.
-This option achieves the same symbol reduction as the \fIauto-reduction\fR
-directive that is available as part of a \fBmapfile\fR version definition. This
-option can be useful when combining versioned and non-versioned relocatable
-objects. See also the \fB-B\fR \fBeliminate\fR option and the \fB-B\fR
-\fBreduce\fR option. See \fIDefining Additional Symbols with a mapfile\fR in
-\fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBreduce\fR\fR
-.ad
-.sp .6
-.RS 4n
+to local.
+Version definitions can be supplied by means of a
+.Sy mapfile
+to indicate the global symbols that should remain visible in the generated
+object.
+This option achieves the same symbol reduction as the
+.Ar auto-reduction
+directive that is available as part of a mapfile version definition.
+This option can be useful when combining versioned and non-versioned
+relocatable objects.
+See also the
+.Fl B Cm eliminate
+and
+.Fl B Cm reduce
+options.
+See
+.Em Defining Additional Symbols with a mapfile
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl B Cm reduce
 When generating a relocatable object, causes the reduction of symbolic
-information defined by any version definitions. Version definitions can be
-supplied by means of a \fBmapfile\fR to indicate the global symbols that should
-remain visible in the generated object. By default, when a relocatable object
-is generated, version definitions are only recorded in the output image. The
-actual reduction of symbolic information is carried out when the object is used
-in the construction of a dynamic executable or shared object. The \fB-B\fR
-\fBreduce\fR option is applied automatically when a dynamic executable or
-shared object is created.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fBsymbolic\fR\fR
-.ad
-.sp .6
-.RS 4n
-In dynamic mode only. When building a shared object, binds references to global
-symbols to their definitions, if available, within the object. Normally,
-references to global symbols within shared objects are not bound until runtime,
-even if definitions are available. This model allows definitions of the same
-symbol in an executable or other shared object to override the object's own
-definition. \fBld\fR issues warnings for undefined symbols unless \fB-z\fR
-\fBdefs\fR overrides.
-.sp
-The \fB-B\fR \fBsymbolic\fR option is intended for specialized dynamic objects
-and is not recommended for general use. To reduce the runtime relocation
-processing that is required an object, the creation of a version definition is
-recommended.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-c\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Records the configuration file \fIname\fR for use at runtime. Configuration
-files can be employed to alter default search paths, provide a directory cache,
-together with providing alternative object dependencies. See \fBcrle\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-C\fR\fR
-.ad
-.sp .6
-.RS 4n
+information defined by any version definitions.
+Version definitions can be supplied by means of a
+.Sy mapfile
+to indicate the global symbols that should remain visible in the generated
+object.
+By default, when a relocatable object is generated, version definitions are
+only recorded in the output image.
+The actual reduction of symbolic information is carried out when the object is
+used in the construction of a dynamic executable or shared object.
+The
+.Fl B Cm reduce
+option is applied automatically when a dynamic executable or shared object is
+created.
+.Pp
+.It Fl B Cm symbolic
+In dynamic mode only.
+When building a shared object, binds references to global symbols to their
+definitions, if available, within the object.
+Normally, references to global symbols within shared objects are not bound
+until runtime, even if definitions are available.
+This model allows definitions of the same symbol in an executable or other
+shared object to override the object's own definition.
+.Nm
+issues warnings for undefined symbols unless
+.Fl z Cm defs
+overrides.
+.Pp
+The
+.Fl B Cm symbolic
+option is intended for specialized dynamic objects and is not recommended for
+general use.
+To reduce the runtime relocation processing that is required an object, the
+creation of a version definition is recommended.
+.Fl c Ar name
+records the configuration file
+.Ar name
+for use at runtime.
+Configuration files can be employed to alter default search paths, provide a
+directory cache, together with providing alternative object dependencies.
+See
+.Xr crle 1 .
+.Pp
+.It Fl C
 Demangles C++ symbol names displayed in diagnostic messages.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR \fBy\fR | \fBn\fR\fR
-.ad
-.sp .6
-.RS 4n
-When \fB-d\fR \fBy\fR, the default, is specified, \fBld\fR uses dynamic
-linking. When \fB-d\fR \fBn\fR is specified, \fBld\fR uses static linking. See
-\fBStatic Executables\fR under DESCRIPTION, and \fB-B\fR
-\fBdynamic\fR|\fBstatic\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-D\fR \fItoken\fR,...\fR
-.ad
-.sp .6
-.RS 4n
-Prints debugging information as specified by each \fItoken\fR, to the standard
-error. The special token \fBhelp\fR indicates the full list of tokens
-available. See \fIDebugging Aids\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR \fIepsym\fR\fR
-.ad
-.br
-.na
-\fB\fB--entry\fR \fIepsym\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sets the entry point address for the output file to be the symbol \fIepsym\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIname\fR\fR
-.ad
-.br
-.na
-\fB\fB--auxiliary\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Useful only when building a shared object. Specifies that the symbol table of
-the shared object is used as an auxiliary filter on the symbol table of the
-shared object specified by \fIname\fR. Multiple instances of this option are
-allowed. This option can not be combined with the \fB-F\fR option. See
-\fIGenerating Auxiliary Filters\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-F\fR \fIname\fR\fR
-.ad
-.br
-.na
-\fB\fB--filter\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Useful only when building a shared object. Specifies that the symbol table of
-the shared object is used as a filter on the symbol table of the shared object
-specified by \fIname\fR. Multiple instances of this option are allowed. This
-option can not be combined with the \fB-f\fR option. See \fIGenerating Standard
-Filters\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-G\fR\fR
-.ad
-.br
-.na
-\fB\fB-shared\fR\fR
-.ad
-.sp .6
-.RS 4n
-In dynamic mode only, produces a shared object. Undefined symbols are allowed.
-See Chapter 4, \fIShared Objects,\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-h\fR \fIname\fR\fR
-.ad
-.br
-.na
-\fB\fB-soname\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-In dynamic mode only, when building a shared object, records \fIname\fR in the
-object's dynamic section. \fIname\fR is recorded in any dynamic objects that
-are linked with this object rather than the object's file system name.
-Accordingly, \fIname\fR is used by the runtime linker as the name of the shared
-object to search for at runtime. See \fIRecording a Shared Object Name\fR in
-\fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.sp .6
-.RS 4n
-Ignores \fBLD_LIBRARY_PATH\fR. This option is useful when an
-\fBLD_LIBRARY_PATH\fR setting is in effect to influence the runtime library
-search, which would interfere with the link-editing being performed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-I\fR \fIname\fR\fR
-.ad
-.br
-.na
-\fB\fB--dynamic-linker\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-When building an executable, uses \fIname\fR as the path name of the
-interpreter to be written into the program header. The default in static mode
-is no interpreter. In dynamic mode, the default is the name of the runtime
-linker, \fBld.so.1\fR(1). Either case can be overridden by \fB-I\fR \fIname\fR.
-\fBexec\fR(2) loads this interpreter when the \fBa.out\fR is loaded, and passes
-control to the interpreter rather than to the \fBa.out\fR directly.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR \fIx\fR\fR
-.ad
-.br
-.na
-\fB\fB--library\fR \fIx\fR\fR
-.ad
-.sp .6
-.RS 4n
-Searches a library \fBlib\fR\fIx\fR\fB\&.so\fR or \fBlib\fR\fIx\fR\fB\&.a\fR,
+.Pp
+.It Fl d Cm y | Fl d Cm n
+When
+.Fl d Cm y ,
+the default, is specified,
+.Nm
+uses dynamic linking.
+When
+.Fl d Cm n
+is specified,
+.Nm
+uses static linking.
+See
+.Sx Static Executables
+and
+.Fl B Cm dynamic | Fl B Cm static .
+.Pp
+.It Fl D Ar token Ns \&,...
+Prints debugging information as specified by each
+.Ar token
+to the standard error.
+The special token
+.Cm help
+indicates the full list of tokens available.
+See
+.Em Debugging Aids
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl e Ar epsym
+.It Fl \&-entry Ar epsym
+Sets the entry point address for the output file to be the symbol
+.Ar epsym .
+.Pp
+.It Fl f Ar name
+.It Fl \&-auxiliary Ar name
+Useful only when building a shared object.
+Specifies that the symbol table of the shared object is used as an auxiliary
+filter on the symbol table of the shared object specified by
+.Ar name .
+Multiple instances of this option are allowed.
+This option can not be combined with the
+.Fl F
+option.
+See
+.Em Generating Auxiliary Filters
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl F Ar name
+.It Fl \&-filter Ar name
+Useful only when building a shared object.
+Specifies that the symbol table of the shared object is used as a filter on the
+symbol table of the shared object specified by
+.Ar name .
+Multiple instances of this option are allowed.
+This option cannot be combined with the
+.Fl f
+option.
+See
+.Em Generating Standard Filters
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl G
+.It Fl shared
+In dynamic mode only, produces a shared object.
+Undefined symbols are allowed.
+See Chapter 4,
+.Em Shared Objects ,
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl h Ar name
+.It Fl soname Ar name
+In dynamic mode only, when building a shared object, records
+.Ar name
+in the object's dynamic section.
+.Ar name
+is recorded in any dynamic objects that are linked with this object rather than
+the object's file system name.
+Accordingly,
+.Ar name
+is used by the runtime linker as the name of the shared object to search for at
+runtime.
+See
+.Em Recording a Shared Object Name
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl i
+Ignores
+.Ev LD_LIBRARY_PATH .
+This option is useful when an
+.Ev LD_LIBRARY_PATH
+setting is in effect to influence the runtime library search, which would
+interfere with the link-editing being performed.
+.Pp
+.It Fl I Ar name
+.It Fl \&-dynamic-linker Ar name
+When building an executable, uses
+.Ar name
+as the path name of the interpreter to be written into the program header.
+The default in static mode is no interpreter.
+In dynamic mode, the default is the name of the runtime linker,
+.Xr ld.so.1 1 .
+Either case can be overridden by
+.Fl I Ar name .
+.Xr exec 2
+loads this interpreter when the
+.Pa a.out
+is loaded, and passes control to the interpreter rather than to the
+.Pa a.out
+directly.
+.Pp
+.It Fl l Ar x
+.It Fl \&-library Ar x
+Searches a library
+.Sy lib Ns Ar x Ns Sy .so
+or
+.Sy lib Ns Ar x Ns Sy .a ,
 the conventional names for shared object and archive libraries, respectively.
-In dynamic mode, unless the \fB-B\fR \fBstatic\fR option is in effect, \fBld\fR
+In dynamic mode, unless the
+.Fl B Cm static
+option is in effect,
+.Nm
 searches each directory specified in the library search path for a
-\fBlib\fR\fIx\fR\fB\&.so\fR or \fBlib\fR\fIx\fR\fB\&.a\fR file. The directory
-search stops at the first directory containing either. \fBld\fR chooses the
-file ending in \fB\&.so\fR if \fB-l\fR\fIx\fR expands to two files with names
-of the form \fBlib\fR\fIx\fR\fB\&.so\fR and \fBlib\fR\fIx\fR\fB\&.a\fR. If no
-\fBlib\fR\fIx\fR\fB\&.so\fR is found, then \fBld\fR accepts
-\fBlib\fR\fIx\fR\fB\&.a\fR. In static mode, or when the \fB-B\fR \fBstatic\fR
-option is in effect, \fBld\fR selects only the file ending in \fB\&.a\fR.
-\fBld\fR searches a library when the library is encountered, so the placement
-of \fB-l\fR is significant. See \fILinking With Additional Libraries\fR in
-\fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-L\fR \fIpath\fR\fR
-.ad
-.br
-.na
-\fB\fB--library-path\fR \fIpath\fR\fR
-.ad
-.sp .6
-.RS 4n
-Adds \fIpath\fR to the library search directories. \fBld\fR searches for
-libraries first in any directories specified by the \fB-L\fR options and then
-in the standard directories. This option is useful only if the option precedes
-the \fB-l\fR options to which the \fB-L\fR option applies. See \fIDirectories
-Searched by the Link-Editor\fR in \fILinker and Libraries Guide\fR.
-.sp
-The environment variable \fBLD_LIBRARY_PATH\fR can be used to supplement the
-library search path, however the \fB-L\fR option is recommended, as the
-environment variable is also interpreted by the runtime environment. See
-\fBLD_LIBRARY_PATH\fR under ENVIRONMENT VARIABLES.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-m\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Sy lib Ns Ar x Ns Sy .so
+or
+.Sy lib Ns Ar x Ns Sy \&.a .
+The directory search stops at the first directory containing either.
+.Nm
+chooses the file ending in
+.Sy .so
+if
+.Fl l Ar x
+expands to two files with names of the form
+.Sy lib Ns Ar x Ns Sy .so
+and
+.Sy lib Ns Ar x Ns Sy .a .
+If no
+.Sy lib Ns Ar x Ns Sy .so
+is found, then
+.Nm
+accepts
+.Sy lib Ns Ar x Ns Sy .a .
+In static mode, or when the
+.Fl B Cm static
+option is in effect,
+.Nm
+selects only the file ending in
+.Sy .a .
+.Nm
+searches a library when the library is encountered, so the placement of
+.Fl l
+is significant.
+See
+.Em Linking With Additional Libraries
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl L Ar path
+.It Fl \&-library-path Ar path
+Adds
+.Ar path
+to the library search directories.
+.Nm
+searches for libraries first in any directories specified by the
+.Fl L
+options and then in the standard directories.
+This option is useful only if the option precedes the
+.Fl l
+options to which the
+.Fl L
+option applies.
+See
+.Em Directories Searched by the Link-Editor
+in
+.%T Linker and Libraries Guide .
+.Pp
+The environment variable
+.Ev LD_LIBRARY_PATH
+can be used to supplement the library search path, however the
+.Fl L
+option is recommended, as the environment variable is also interpreted by the
+runtime environment.
+See
+.Ev LD_LIBRARY_PATH
+under
+.Sx ENVIRONMENT .
+.Pp
+.It Fl m
 Produces a memory map or listing of the input/output sections, together with
 any non-fatal multiply-defined symbols, on the standard output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-M\fR \fImapfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Reads \fImapfile\fR as a text file of directives to \fBld\fR. This option can
-be specified multiple times. If \fImapfile\fR is a directory, then all regular
-files, as defined by \fBstat\fR(2), within the directory are processed. See
-Chapter 9, \fIMapfile Option,\fR in \fILinker and Libraries Guide\fR. Example
-mapfiles are provided in \fB/usr/lib/ld\fR. See FILES.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-N\fR \fIstring\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option causes a \fBDT_NEEDED\fR entry to be added to the \fB\&.dynamic\fR
-section of the object being built. The value of the \fBDT_NEEDED\fR string is
-the \fIstring\fR that is specified on the command line. This option is position
-dependent, and the \fBDT_NEEDED\fR \fB\&.dynamic\fR entry is relative to the
-other dynamic dependencies discovered on the link-edit line. This option is
-useful for specifying dependencies within device driver relocatable objects
-when combined with the \fB-dy\fR and \fB-r\fR options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-o\fR \fIoutfile\fR\fR
-.ad
-.br
-.na
-\fB\fB--output\fR \fIoutfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Produces an output object file that is named \fIoutfile\fR. The name of the
-default object file is \fBa.out\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIauditlib\fR\fR
-.ad
-.sp .6
-.RS 4n
-Identifies an audit library, \fIauditlib\fR. This audit library is used to
-audit the object being created at runtime. A shared object identified as
-requiring auditing with the \fB-p\fR option, has this requirement inherited by
-any object that specifies the shared object as a dependency. See the \fB-P\fR
-option. See \fIRuntime Linker Auditing Interface\fR in \fILinker and Libraries
-Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-P\fR \fIauditlib\fR\fR
-.ad
-.sp .6
-.RS 4n
-Identifies an audit library, \fIauditlib\fR. This audit library is used to
-audit the dependencies of the object being created at runtime. Dependency
-auditing can also be inherited from dependencies that are identified as
-requiring auditing. See the \fB-p\fR option, and the \fB-z\fR \fBglobalaudit\fR
-option. See \fIRuntime Linker Auditing Interface\fR in \fILinker and Libraries
-Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-Q\fR \fBy\fR | \fBn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Under \fB-Q\fR \fBy\fR, an \fBident\fR string is added to the \fB\&.comment\fR
-section of the output file. This string identifies the version of the \fBld\fR
-used to create the file. This results in multiple \fBld\fR \fBidents\fR when
-there have been multiple linking steps, such as when using \fBld\fR \fB-r\fR.
-This identification is identical with the default action of the \fBcc\fR
-command. \fB-Q\fR \fBn\fR suppresses version identification. \fB\&.comment\fR
-sections can be manipulated by the \fBmcs\fR(1) utility.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.br
-.na
-\fB\fB--relocatable\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.It Fl M Ar mapfile
+Reads
+.Ar mapfile
+as a text file of directives to
+.Nm .
+This option can be specified multiple times.
+If
+.Ar mapfile
+is a directory, then all regular files, as defined by
+.Xr stat 2 ,
+within the directory are processed.
+See Chapter 9,
+.Em Mapfile Option ,
+in
+.%T Linker and Libraries Guide .
+Example mapfiles are provided in
+.Pa /usr/lib/ld .
+See
+.Sx FILES .
+.Pp
+.It Fl N Ar string
+This option causes a
+.Dv DT_NEEDED
+entry to be added to the
+.Sy .dynamic
+section of the object being built.
+The value of the
+.Dv DT_NEEDED
+string is the
+.Ar string
+that is specified on the command line.
+This option is position dependent, and the
+.Dv DT_NEEDED
+.Sy .dynamic
+entry is relative to the other dynamic dependencies discovered on the link-edit
+line.
+This option is useful for specifying dependencies within device driver
+relocatable objects when combined with the
+.Fl d Cm y
+and
+.Fl r
+options.
+.Pp
+.It Fl o Ar outfile
+.It Fl \&-output Ar outfile
+Produces an output object file that is named
+.Ar outfile .
+The name of the default object file is
+.Pa a.out .
+.Pp
+.It Fl p Ar auditlib
+Identifies an audit library,
+.Ar auditlib .
+This audit library is used to audit the object being created at runtime.
+A shared object identified as requiring auditing with the
+.Fl p
+option, has this requirement inherited by any object that specifies the shared
+object as a dependency.
+See the
+.Fl P
+option.
+See
+.Em Runtime Linker Auditing Interface
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl P Ar auditlib
+Identifies an audit library,
+.Ar auditlib .
+This audit library is used to audit the dependencies of the object being
+created at runtime.
+Dependency auditing can also be inherited from dependencies that are identified
+as requiring auditing.
+See the
+.Fl p
+and
+.Fl z Cm globalaudit
+options.
+See
+.Em Runtime Linker Auditing Interface
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl Q Cm y | Fl Q Cm n
+Under
+.Fl Q Cm y ,
+an
+.Sy ident
+string is added to the
+.Sy .comment
+section of the output file.
+This string identifies the version of the
+.Nm
+used to create the file.
+This results in multiple
+.Nm
+idents when there have been multiple linking steps, such as when using
+.Nm Fl r .
+This identification is identical with the default action of the
+.Xr cc 1
+command.
+.Fl Q Cm n
+suppresses version identification.
+.Sy .comment
+sections can be manipulated by the
+.Xr mcs 1
+utility.
+.Pp
+.It Fl r
+.It Fl \&-relocatable
 Combines relocatable object files to produce one relocatable object file.
-\fBld\fR does not complain about unresolved references. This option cannot be
-used with the \fB-a\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-R\fR \fIpath\fR\fR
-.ad
-.br
-.na
-\fB\fB-rpath\fR \fIpath\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Nm
+does not complain about unresolved references.
+This option cannot be used with the
+.Fl a
+option.
+.Pp
+.It Fl R Ar path
+.It Fl rpath Ar path
 A colon-separated list of directories used to specify library search
-directories to the runtime linker. If present and not NULL, the path is
-recorded in the output object file and passed to the runtime linker. Multiple
-instances of this option are concatenated together with each \fIpath\fR
-separated by a colon. See \fIDirectories Searched by the Runtime Linker\fR in
-\fILinker and Libraries Guide\fR.
-.sp
+directories to the runtime linker.
+If present and not NULL, the path is recorded in the output object file and
+passed to the runtime linker.
+Multiple instances of this option are concatenated together with each
+.Ar path
+separated by a colon.
+See
+.Em Directories Searched by the Runtime Linker
+in
+.%T Linker and Libraries Guide .
+.Pp
 The use of a runpath within an associated object is preferable to setting
-global search paths such as through the \fBLD_LIBRARY_PATH\fR environment
-variable. Only the runpaths that are necessary to find the objects dependencies
-should be recorded. \fBldd\fR(1) can also be used to discover unused runpaths
-in dynamic objects, when used with the \fB-U\fR option.
-.sp
+global search paths such as through the
+.Ev LD_LIBRARY_PATH
+environment variable.
+Only the runpaths that are necessary to find the objects dependencies should be
+recorded.
+.Xr ldd 1
+can also be used to discover unused runpaths in dynamic objects, when used with
+the
+.Fl U
+option.
+.Pp
 Various tokens can also be supplied with a runpath that provide a flexible
-means of identifying system capabilities or an objects location. See Appendix
-C, \fIEstablishing Dependencies with Dynamic String Tokens,\fR in \fILinker and
-Libraries Guide\fR. The \fB$ORIGIN\fR token is especially useful in allowing
-dynamic objects to be relocated to different locations in the file system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR\fR
-.ad
-.br
-.na
-\fB\fB--strip-all\fR\fR
-.ad
-.sp .6
-.RS 4n
-Strips symbolic information from the output file. Any debugging information,
-that is, \fB\&.line\fR, \fB\&.debug*\fR, and \fB\&.stab*\fR sections, and their
-associated relocation entries are removed. Except for relocatable files, a
-symbol table \fBSHT_SYMTAB\fR and its associated string table section are not
-created in the output object file. The elimination of a \fBSHT_SYMTAB\fR symbol
-table can reduce the \fB\&.stab*\fR debugging information that is generated
-using the compiler drivers \fB-g\fR option. See the \fB-z\fR \fBredlocsym\fR
-and \fB-z\fR \fBnoldynsym\fR options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-S\fR \fIsupportlib\fR\fR
-.ad
-.sp .6
-.RS 4n
-The shared object \fIsupportlib\fR is loaded with \fBld\fR and given
-information regarding the linking process. Shared objects that are defined by
-using the \fB-S\fR option can also be supplied using the \fBSGS_SUPPORT\fR
-environment variable. See \fILink-Editor Support Interface\fR in \fILinker and
-Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.sp .6
-.RS 4n
+means of identifying system capabilities or an objects location.
+See Appendix C,
+.Em Establishing Dependencies with Dynamic String Tokens ,
+in
+.%T Linker and Libraries Guide .
+The
+.Sy $ORIGIN
+token is especially useful in allowing dynamic objects to be relocated to
+different locations in the file system.
+.Pp
+.It Fl s
+.It Fl \&-strip-all
+Strips symbolic information from the output file.
+Any debugging information,
+that is,
+.Sy .line ,
+.Sy .debug* ,
+and
+.Sy .stab*
+sections, and their associated relocation entries are removed.
+Except for relocatable files, a symbol table
+.Dv SHT_SYMTAB
+and its associated string table section are not created in the output object
+file.
+The elimination of a
+.Dv SHT_SYMTAB
+symbol table can reduce the .stab* debugging information that is generated
+using the compiler driver's
+.Fl g
+option.
+See the
+.Fl z Cm redlocsym
+and
+.Fl z Cm noldynsym
+options.
+.Pp
+.It Fl S Ar supportlib
+The shared object
+.Ar supportlib
+is loaded with
+.Nm
+and given information regarding the linking process.
+Shared objects that are defined by using the
+.Fl S
+option can also be supplied using the
+.Ev SGS_SUPPORT
+environment variable.
+See
+.Em Link-Editor Support Interface
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl t
 Turns off the warning for multiply-defined symbols that have different sizes or
 different alignments.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-u\fR \fIsymname\fR\fR
-.ad
-.br
-.na
-\fB\fB--undefined\fR \fIsymname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enters \fIsymname\fR as an undefined symbol in the symbol table. This option is
-useful for loading entirely from an archive library. In this instance, an
-unresolved reference is needed to force the loading of the first routine. The
-placement of this option on the command line is significant. This option must
-be placed before the library that defines the symbol. See \fIDefining
-Additional Symbols with the u option\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-V\fR\fR
-.ad
-.br
-.na
-\fB\fB--version\fR\fR
-.ad
-.sp .6
-.RS 4n
-Outputs a message giving information about the version of \fBld\fR being used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-Y\fR \fBP,\fR\fIdirlist\fR\fR
-.ad
-.sp .6
-.RS 4n
-Changes the default directories used for finding libraries. \fIdirlist\fR is a
-colon-separated path list.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBabsexec\fR\fR
-.ad
-.sp .6
-.RS 4n
-Useful only when building a dynamic executable. Specifies that references to
-external absolute symbols should be resolved immediately instead of being left
-for resolution at runtime. In very specialized circumstances, this option
-removes text relocations that can result in excessive swap space demands by an
-executable.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBallextract\fR | \fBdefaultextract\fR | \fBweakextract\fR\fR
-.ad
-.br
-.na
-\fB\fB--whole-archive\fR | \fB--no-whole-archive\fR\fR
-.ad
-.sp .6
-.RS 4n
-Alters the extraction criteria of objects from any archives that follow. By
-default, archive members are extracted to satisfy undefined references and to
-promote tentative definitions with data definitions. Weak symbol references do
-not trigger extraction. Under the \fB-z\fR \fBallextract\fR or
-\fB--whole-archive\fR options, all archive members are extracted from the
-archive. Under \fB-z\fR \fBweakextract\fR, weak references trigger archive
-extraction. The \fB-z\fR \fBdefaultextract\fR or \fB--no-whole-archive\fR
+.Pp
+.It Fl u Ar symname
+.It Fl \&-undefined Ar symname
+Enters
+.Ar symname
+as an undefined symbol in the symbol table.
+This option is useful for loading entirely from an archive library.
+In this instance, an unresolved reference is needed to force the loading of the
+first routine.
+The placement of this option on the command line is significant.
+This option must be placed before the library that defines the symbol.
+See
+.Em Defining Additional Symbols with the u option
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl V
+.It Fl \&-version
+Outputs a message giving information about the version of
+.Nm
+being used.
+.Pp
+.It Fl Y Cm P\&, Ns Ar dirlist
+Changes the default directories used for finding libraries.
+.Ar dirlist
+is a colon-separated path list.
+.Pp
+.It Fl z Cm absexec
+Useful only when building a dynamic executable.
+Specifies that references to external absolute symbols should be resolved
+immediately instead of being left for resolution at runtime.
+In very specialized circumstances, this option removes text relocations that
+can result in excessive swap space demands by an executable.
+.Pp
+.It Fl z Cm allextract | Fl z Cm defaultextract | Fl z Cm weakextract
+.It Fl \&-whole-archive | \&-no-whole-archive
+Alters the extraction criteria of objects from any archives that follow.
+By default, archive members are extracted to satisfy undefined references and
+to promote tentative definitions with data definitions.
+Weak symbol references do not trigger extraction.
+Under the
+.Fl z Cm allextract
+or
+.Fl \&-whole-archive
+options, all archive members are extracted from the archive.
+Under
+.Fl z Cm weakextract ,
+weak references trigger archive extraction.
+The
+.Fl z Cm defaultextract
+or
+.Fl \&-no-whole-archive
 options provide a means of returning to the default following use of the former
-extract options. See \fIArchive Processing\fR in \fILinker and Libraries
-Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBaltexec64\fR\fR
-.ad
-.sp .6
-.RS 4n
-Execute the 64-bit \fBld\fR. The creation of very large 32-bit objects can
-exhaust the virtual memory that is available to the 32-bit \fBld\fR. The
-\fB-z\fR \fBaltexec64\fR option can be used to force the use of the associated
-64-bit \fBld\fR. The 64-bit \fBld\fR provides a larger virtual address space
-for building 32-bit objects. See \fIThe 32-bit link-editor and 64-bit
-link-editor\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB-z\fR \fBaslr[=\fIstate\fR]\fR
-.ad
-.sp .6
-.RS 4n
+extract options.
+See
+.Em Archive Processing
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm altexec64
+Execute the 64-bit
+.Nm .
+The creation of very large 32-bit objects can exhaust the virtual memory that
+is available to the 32-bit
+.Nm .
+The
+.Fl z Cm altexec64
+option can be used to force the use of the associated 64-bit
+.Nm .
+The 64-bit
+.Nm
+provides a larger virtual address space for building 32-bit objects.
+See
+.Em The 32-bit link-editor and 64-bit link-editor
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm aslr Ns Op Cm \&= Ns Ar state
 Specify whether the executable's address space should be randomized on
-execution.  If \fIstate\fR is "enabled" randomization will always occur when
-this executable is run (regardless of inherited settings).  If \fIstate\fR is
-"disabled" randomization will never occur when this executable is run.  If
-\fIstate\fR is omitted, ASLR is enabled.
-
+execution.
+If
+.Ar state
+is
+.Cm enabled ,
+randomization will always occur when this executable is run
+.Pq regardless of inherited settings .
+If
+.Ar state
+is
+.Cm disabled ,
+randomization will never occur when this executable is run.
+If
+.Ar state
+is omitted, ASLR is enabled.
 An executable that should simply use the settings inherited from its
 environment should not use this flag at all.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBcombreloc\fR | \fBnocombreloc\fR\fR
-.ad
-.sp .6
-.RS 4n
-By default, \fBld\fR combines multiple relocation sections when building
-executables or shared objects. This section combination differs from
-relocatable objects, in which relocation sections are maintained in a
-one-to-one relationship with the sections to which the relocations must be
-applied. The \fB-z\fR \fBnocombreloc\fR option disables this merging of
-relocation sections, and preserves the one-to-one relationship found in the
-original relocatable objects.
-.sp
-\fBld\fR sorts the entries of data relocation sections by their symbol
-reference. This sorting reduces runtime symbol lookup. When multiple relocation
-sections are combined, this sorting produces the least possible relocation
-overhead when objects are loaded into memory, and speeds the runtime loading of
-dynamic objects.
-.sp
+.Pp
+.It Fl z Cm combreloc | Fl z Cm nocombreloc
+By default,
+.Nm
+combines multiple relocation sections when building executables or shared
+objects.
+This section combination differs from relocatable objects, in which relocation
+sections are maintained in a one-to-one relationship with the sections to which
+the relocations must be applied.
+The
+.Fl z Cm nocombreloc
+option disables this merging of relocation sections, and preserves the
+one-to-one relationship found in the original relocatable objects.
+.Pp
+.Nm
+sorts the entries of data relocation sections by their symbol reference.
+This sorting reduces runtime symbol lookup.
+When multiple relocation sections are combined, this sorting produces the least
+possible relocation overhead when objects are loaded into memory, and speeds
+the runtime loading of dynamic objects.
+.Pp
 Historically, the individual relocation sections were carried over to any
-executable or shared object, and the \fB-z\fR \fBcombreloc\fR option was
-required to enable the relocation section merging previously described.
-Relocation section merging is now the default. The \fB-z\fR \fBcombreloc\fR
+executable or shared object, and the
+.Fl z Cm combreloc
+option was required to enable the relocation section merging previously
+described.
+Relocation section merging is now the default.
+The
+.Fl z Cm combreloc
 option is still accepted for the benefit of old build environments, but the
 option is unnecessary, and has no effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBassert-deflib\fR\fR
-.ad
-.br
-.na
-\fB\fB-z\fR \fBassert-deflib=\fR\fIlibname\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.It Fl z Cm assert-deflib
+.It Fl z Cm assert-deflib= Ns Ar libname
 Enables warnings that check the location of where libraries passed in with
-\fB-l\fR are found. If the link-editor finds a library on its default search
-path it will emit a warning. This warning can be made fatal in conjunction with
-the option \fB-z fatal-warnings\fR. Passing \fIlibname\fR white lists a library
-from this check. The library must be the full name of the library, e.g.
-\fIlibc.so\fR. To white list multiple libraries, the \fB-z
-assert-deflib=\fR\fIlibname\fR option can be repeated multiple times. This
-option is useful when trying to build self-contained objects where a referenced
-library might exist in the default system library path and in alternate paths
-specified by \fB-L\fR, but you only want the alternate paths to be used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBdefs\fR | \fBnodefs\fR\fR
-.ad
-.br
-.na
-\fB\fB--no-undefined\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fB-z\fR \fBdefs\fR option and the \fB--no-undefined\fR option force a
-fatal error if any undefined symbols remain at the end of the link. This mode
-is the default when an executable is built. For historic reasons, this mode is
-\fBnot\fR the default when building a shared object. Use of the \fB-z\fR
-\fBdefs\fR option is recommended, as this mode assures the object being built
-is self-contained. A self-contained object has all symbolic references resolved
-internally, or to the object's immediate dependencies.
-.sp
-The \fB-z\fR \fBnodefs\fR option allows undefined symbols. For historic
-reasons, this mode is the default when a shared object is built. When used with
-executables, the behavior of references to such undefined symbols is
-unspecified. Use of the \fB-z\fR \fBnodefs\fR option is not recommended.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBdirect\fR | \fBnodirect\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Fl l
+are found.
+If the link-editor finds a library on its default search path it will emit a
+warning.
+This warning can be made fatal in conjunction with the option
+.Fl z Cm fatal-warnings .
+Passing
+.Ar libname
+white lists a library from this check.
+The library must be the full name of the library, e.g.
+.Pa libc.so .
+To white list multiple libraries, the
+.Fl z Cm assert-deflib= Ns Ar libname
+option can be repeated multiple times.
+This option is useful when trying to build self-contained objects where a
+referenced library might exist in the default system library path and in
+alternate paths specified by
+.Fl L ,
+but you only want the alternate paths to be used.
+.Pp
+.It Fl z Cm defs | Fl z Cm nodefs
+.It Fl \&-no-undefined
+The
+.Fl z Cm defs
+option and the
+.Fl \&-no-undefined
+option force a fatal error if any undefined symbols remain at the end of the
+link.
+This mode is the default when an executable is built.
+For historic reasons, this mode is
+.Em not
+the default when building a shared object.
+Use of the
+.Fl z Cm defs
+option is recommended, as this mode assures the object being built is
+self-contained.
+A self-contained object has all symbolic references resolved internally, or to
+the object's immediate dependencies.
+.Pp
+The
+.Fl z Cm nodefs
+option allows undefined symbols.
+For historic reasons, this mode is the default when a shared object is built.
+When used with executables, the behavior of references to such undefined
+symbols is unspecified.
+Use of the
+.Fl z Cm nodefs
+option is not recommended.
+.Pp
+.It Fl z Cm direct | Fl z Cm nodirect
 Enables or disables direct binding to any dependencies that follow on the
-command line. These options allow finer control over direct binding than the
-global counterpart \fB-B\fR \fBdirect\fR. The \fB-z\fR \fBdirect\fR option also
-differs from the \fB-B\fR \fBdirect\fR option in the following areas. Direct
-binding information is not established between a symbol reference and an
-associated definition within the object being created. Lazy loading is not
-enabled.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBendfiltee\fR\fR
-.ad
-.sp .6
-.RS 4n
+command line.
+These options allow finer control over direct binding than the global
+counterpart
+.Fl B Cm direct .
+The
+.Fl z Cm direct
+option also differs from the
+.Fl B Cm direct
+option in the following areas.
+Direct binding information is not established between a symbol reference and an
+associated definition within the object being created.
+Lazy loading is not enabled.
+.Pp
+.It Fl z Cm endfiltee
 Marks a filtee so that when processed by a filter, the filtee terminates any
-further filtee searches by the filter. See \fIReducing Filtee Searches\fR in
-\fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBfatal-warnings\fR | \fBnofatal-warnings\fR\fR
-.ad
-.br
-.na
-\fB\fB--fatal-warnings\fR | \fB--no-fatal-warnings\fR
-.ad
-.sp .6
-.RS 4n
-Controls the behavior of warnings emitted from the link-editor. Setting \fB-z
-fatal-warnings\fR promotes warnings emitted by the link-editor to fatal errors
-that will cause the link-editor to fail before linking. \fB-z
-nofatal-warnings\fR instead demotes these warnings such that they will not cause
-the link-editor to exit prematurely.
-.RE
-
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBfiniarray=\fR\fIfunction\fR\fR
-.ad
-.sp .6
-.RS 4n
-Appends an entry to the \fB\&.fini_array\fR section of the object being built.
-If no \fB\&.fini_array\fR section is present, a section is created. The new
-entry is initialized to point to \fIfunction\fR. See \fIInitialization and
-Termination Sections\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBglobalaudit\fR\fR
-.ad
-.sp .6
-.RS 4n
+further filtee searches by the filter.
+See
+.Em Reducing Filtee Searches
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm fatal-warnings | Fl z Cm nofatal-warnings
+.It Fl \&-fatal-warnings | \&-no-fatal-warnings
+Controls the behavior of warnings emitted from the link-editor.
+Setting
+.Fl z Cm fatal-warnings
+promotes warnings emitted by the link-editor to fatal errors that will cause
+the link-editor to fail before linking.
+.Fl z Cm nofatal-warnings
+instead demotes these warnings such that they will not cause the link-editor to
+exit prematurely.
+.Pp
+.It Fl z Cm finiarray= Ns Ar function
+Appends an entry to the
+.Sy .fini_array
+section of the object being built.
+If no
+.Sy .fini_array
+section is present, a section is created.
+The new entry is initialized to point to
+.Ar function .
+See
+.Em Initialization and Termination Sections
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm globalaudit
 This option supplements an audit library definition that has been recorded with
-the \fB-P\fR option. This option is only meaningful when building a dynamic
-executable. Audit libraries that are defined within an object with the \fB-P\fR
+the
+.Fl P
+option.
+This option is only meaningful when building a dynamic executable.
+Audit libraries that are defined within an object with the
+.Fl P
 option typically allow for the auditing of the immediate dependencies of the
-object. The \fB-z\fR \fBglobalaudit\fR promotes the auditor to a global
-auditor, thus allowing the auditing of all dependencies. See \fIInvoking the
-Auditing Interface\fR in \fILinker and Libraries Guide\fR.
-.sp
-An auditor established with the \fB-P\fR option and the \fB-z\fR
-\fBglobalaudit\fR option, is equivalent to the auditor being established with
-the \fBLD_AUDIT\fR environment variable. See \fBld.so.1\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBgroupperm\fR | \fBnogroupperm\fR\fR
-.ad
-.sp .6
-.RS 4n
-Assigns, or deassigns each dependency that follows to a unique group. The
-assignment of a dependency to a group has the same effect as if the dependency
-had been built using the \fB-B\fR \fBgroup\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB-z\fR \fBguidance\fR[=\fIid1\fR,\fIid2\fR...]
-.ad
-.sp .6
-.RS 4n
+object.
+The
+.Fl z Cm globalaudit
+promotes the auditor to a global auditor, thus allowing the auditing of all
+dependencies.
+See
+.Em Invoking the Auditing Interface
+in
+.%T Linker and Libraries Guide .
+.Pp
+An auditor established with the
+.Fl P
+option and the
+.Fl z Cm globalaudit
+option, is equivalent to the auditor being established with the
+.Ev LD_AUDIT
+environment variable.
+See
+.Xr ld.so.1 1 .
+.Pp
+.It Fl z Cm groupperm | Fl z Cm nogroupperm
+Assigns, or deassigns each dependency that follows to a unique group.
+The assignment of a dependency to a group has the same effect as if the
+dependency had been built using the
+.Fl B Cm group
+option.
+.Pp
+.It Fl z Cm guidance Ns Op Cm \&= Ns Ar id Ns No ,...
 Give messages suggesting link-editor features that could improve the resulting
 dynamic object.
-.LP
 Specific classes of suggestion can be silenced by specifying an optional comma
 separated list of guidance identifiers.
-.LP
 The current classes of suggestion provided are:
-
-.sp
-.ne 2
-.na
-Enable use of direct binding
-.ad
-.sp .6
-.RS 4n
-Suggests that \fB-z direct\fR or \fB-B direct\fR be present prior to any
-specified dependency.  This allows predictable symbol binding at runtime.
-
-Can be disabled with \fB-z guidance=nodirect\fR
-.RE
-
-.sp
-.ne 2
-.na
-Enable lazy dependency loading
-.ad
-.sp .6
-.RS 4n
-Suggests that \fB-z lazyload\fR be present prior to any specified dependency.
+.Bl -tag -width 4n
+.It Enable use of direct binding
+Suggests that
+.Fl z Cm direct
+or
+.Fl B Cm direct
+be present prior to any specified dependency.
+This allows predictable symbol binding at runtime.
+Can be disabled with
+.Fl z Cm guidance=nodirect
+.It Enable lazy dependency loading
+Suggests that
+.Fl z Cm lazyload
+be present prior to any specified dependency.
 This allows the dynamic object to be loaded more quickly.
-
-Can be disabled with \fB-z guidance=nolazyload\fR.
-.RE
-
-.sp
-.ne 2
-.na
-Shared objects should define all their dependencies.
-.ad
-.sp .6
-.RS 4n
-Suggests that \fB-z defs\fR be specified on the link-editor command line.
+Can be disabled with
+.Fl z Cm guidance=nolazyload
+.It Shared objects should define all their dependencies.
+Suggests that
+.Fl z Cm defs
+be specified on the link-editor command line.
 Shared objects that explicitly state all their dependencies behave more
 predictably when used.
-
-Can be be disabled with \fB-z guidance=nodefs\fR
-.RE
-
-.sp
-.ne 2
-.na
-Version 2 mapfile syntax
-.ad
-.sp .6
-.RS 4n
+Can be be disabled with
+.Fl z Cm guidance=nodefs
+.It Version 2 mapfile syntax
 Suggests that any specified mapfiles use the more readable version 2 syntax.
-
-Can be disabled with \fB-z guidance=nomapfile\fR.
-.RE
-
-.sp
-.ne 2
-.na
-Read-only text segment
-.ad
-.sp .6
-.RS 4n
+Can be disabled with
+.Fl z Cm guidance=nomapfile
+.It Read-only text segment
 Should any runtime relocations within the text segment exist, suggests that
-the object be compiled with position independent code (PIC).  Keeping large
-allocatable sections read-only allows them to be shared between processes
-using a given shared object.
-
-Can be disabled with \fB-z guidance=notext\fR
-.RE
-
-.sp
-.ne 2
-.na
-No unused dependencies
-.ad
-.sp .6
-.RS 4n
+the object be compiled with position independent code
+.Pq PIC .
+Keeping large allocatable sections read-only allows them to be shared between
+processes using a given shared object.
+Can be disabled with
+.Fl z Cm guidance=notext
+.It No unused dependencies
 Suggests that any dependency not referenced by the resulting dynamic object be
 removed from the link-editor command line.
-
-Can be disabled with \fB-z guidance=nounused\fR.
-.RE
-
-.sp
-.ne 2
-.na
-Global data in shared libraries built with mapfiles have size assertions
-.ad
-.sp .6
-.RS 4n
+Can be disabled with
+.Fl z Cm guidance=nounused
+.It Global data in shared libraries built with mapfiles have size assertions
 Suggests that any global data in a library built with a mapfile asserts the
 size of that global data for ABI stability purposes.
-
-Can be disabled with \fB-z guidance=noasserts\fR.
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBhelp\fR\fR
-.ad
-.br
-.na
-\fB\fB--help\fR\fR
-.ad
-.sp .6
-.RS 4n
+Can be disabled with
+.Fl z Cm guidance=noasserts
+.El
+.Pp
+.It Fl z Cm help
+.It Fl \&-help
 Print a summary of the command line options on the standard output and exit.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBignore\fR | \fBrecord\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.It Fl z Cm ignore | Fl z Cm record
 Ignores, or records, dynamic dependencies that are not referenced as part of
-the link-edit. Ignores, or records, unreferenced \fBELF\fR sections from the
-relocatable objects that are read as part of the link-edit. By default,
-\fB-z\fR \fBrecord\fR is in effect.
-.sp
-If an \fBELF\fR section is ignored, the section is eliminated from the output
-file being generated. A section is ignored when three conditions are true. The
-eliminated section must contribute to an allocatable segment. The eliminated
-section must provide no global symbols. No other section from any object that
-contributes to the link-edit, must reference an eliminated section.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBinitarray=\fR\fIfunction\fR\fR
-.ad
-.sp .6
-.RS 4n
-Appends an entry to the \fB\&.init_array\fR section of the object being built.
-If no \fB\&.init_array\fR section is present, a section is created. The new
-entry is initialized to point to \fIfunction\fR. See \fIInitialization and
-Termination Sections\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBinitfirst\fR\fR
-.ad
-.sp .6
-.RS 4n
+the link-edit.
+Ignores, or records, unreferenced
+.Sy ELF
+sections from the relocatable objects
+that are read as part of the link-edit.
+By default,
+.Fl z Cm record
+is in effect.
+.Pp
+If an
+.Sy ELF
+section is ignored, the section is eliminated from the output file being
+generated.
+A section is ignored when three conditions are true.
+The eliminated section must contribute to an allocatable segment.
+The eliminated section must provide no global symbols.
+No other section from any object that contributes to the link-edit, must
+reference an eliminated section.
+.Pp
+.It Fl z Cm initarray= Ns Ar function
+Appends an entry to the
+.Sy .init_array
+section of the object being built.
+If no
+.Sy .init_array
+section is present, a section is created.
+The new entry is initialized to point to
+.Ar function .
+See
+.Em Initialization and Termination Sections
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm initfirst
 Marks the object so that its runtime initialization occurs before the runtime
 initialization of any other objects brought into the process at the same time.
 In addition, the object runtime finalization occurs after the runtime
 finalization of any other objects removed from the process at the same time.
 This option is only meaningful when building a shared object.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBinterpose\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as an interposer. At runtime, an object is identified as an
-explicit interposer if the object has been tagged using the \fB-z interpose\fR
-option. An explicit interposer is also established when an object is loaded
-using the \fBLD_PRELOAD\fR environment variable. Implicit interposition can
-occur because of the load order of objects, however, this implicit
-interposition is unknown to the runtime linker. Explicit interposition can
-ensure that interposition takes place regardless of the order in which objects
-are loaded. Explicit interposition also ensures that the runtime linker
-searches for symbols in any explicit interposers when direct bindings are in
-effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBlazyload\fR | \fBnolazyload\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.It Fl z Cm interpose
+Marks the object as an interposer.
+At runtime, an object is identified as an explicit interposer if the object has
+been tagged using the
+.Fl z Cm interpose
+option.
+An explicit interposer is also established when an object is loaded using the
+.Ev LD_PRELOAD
+environment variable.
+Implicit interposition can occur because of the load order of objects, however,
+this implicit interposition is unknown to the runtime linker.
+Explicit interposition can ensure that interposition takes place regardless of
+the order in which objects are loaded.
+Explicit interposition also ensures that the runtime linker searches for
+symbols in any explicit interposers when direct bindings are in effect.
+.Pp
+.It Fl z Cm lazyload | Fl z Cm nolazyload
 Enables or disables the marking of dynamic dependencies to be lazily loaded.
-Dynamic dependencies which are marked \fBlazyload\fR are not loaded at initial
-process start-up. These dependencies are delayed until the first binding to the
-object is made. \fBNote:\fR Lazy loading requires the correct declaration of
-dependencies, together with associated runpaths for each dynamic object used
-within a process. See \fILazy Loading of Dynamic Dependencies\fR in \fILinker
-and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBld32\fR=\fIarg1\fR,\fIarg2\fR,...\fR
-.ad
-.br
-.na
-\fB\fB-z\fR \fBld64\fR=\fIarg1\fR,\fIarg2\fR,...\fR
-.ad
-.sp .6
-.RS 4n
+Dynamic dependencies which are marked
+Cm lazyload
+are not loaded at initial process start-up.
+These dependencies are delayed until the first binding to the object is made.
+Note: Lazy loading requires the correct declaration of dependencies, together
+with associated runpaths for each dynamic object used within a process.
+See
+.Em Lazy Loading of Dynamic Dependencies
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm ld32= Ns Ar arg Ns No ,...
+.It Fl z Cm ld64= Ns Ar arg Ns No ,...
 The class of the link-editor is affected by the class of the output file being
-created and by the capabilities of the underlying operating system. The
-\fB-z\fR \fBld\fR[\fB32\fR|\fB64\fR] options provide a means of defining any
-link-editor argument. The defined argument is only interpreted, respectively,
-by the 32-bit class or 64-bit class of the link-editor.
-.sp
+created and by the capabilities of the underlying operating system.
+The
+.Fl z Cm ld32 | Fl z Cm ld64
+options provide a means of defining any link-editor argument.
+The defined argument is only interpreted, respectively, by the 32-bit class or
+64-bit class of the link-editor.
+.Pp
 For example, support libraries are class specific, so the correct class of
 support library can be ensured using:
-.sp
-.in +2
-.nf
-\fBld ... -z ld32=-Saudit32.so.1 -z ld64=-Saudit64.so.1 ...\fR
-.fi
-.in -2
-.sp
-
-The class of link-editor that is invoked is determined from the \fBELF\fR class
-of the first relocatable file that is seen on the command line. This
-determination is carried out \fBprior\fR to any \fB-z\fR
-\fBld\fR[\fB32\fR|\fB64\fR] processing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBloadfltr\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+.Dl ld ... -z ld32=-Saudit32.so.1 -z ld64=-Saudit64.so.1 ...
+.Pp
+The class of link-editor that is invoked is determined from the
+.Sy ELF
+class of the first relocatable file that is seen on the command line.
+This determination is carried out
+.Em prior
+to any
+.Fl z Cm ld32 | Fl z Cm ld64
+processing.
+.Pp
+.It Fl z Cm loadfltr
 Marks a filter to indicate that filtees must be processed immediately at
-runtime. Normally, filter processing is delayed until a symbol reference is
-bound to the filter. The runtime processing of an object that contains this
-flag mimics that which occurs if the \fBLD_LOADFLTR\fR environment variable is
-in effect. See the \fBld.so.1\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBmuldefs\fR\fR
-.ad
-.br
-.na
-\fB\fB--allow-multiple-definition\fR\fR
-.ad
-.sp .6
-.RS 4n
-Allows multiple symbol definitions. By default, multiple symbol definitions
-that occur between relocatable objects result in a fatal error condition. This
-option, suppresses the error condition, allowing the first symbol definition to
-be taken.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnocompstrtab\fR\fR
-.ad
-.sp .6
-.RS 4n
-Disables the compression of \fBELF\fR string tables. By default, string
-compression is applied to \fBSHT_STRTAB\fR sections, and to \fBSHT_PROGBITS\fR
-sections that have their \fBSHF_MERGE\fR and \fBSHF_STRINGS\fR section flags
-set.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnodefaultlib\fR\fR
-.ad
-.sp .6
-.RS 4n
+runtime.
+Normally, filter processing is delayed until a symbol reference is bound to the
+filter.
+The runtime processing of an object that contains this flag mimics that which
+occurs if the
+.Ev LD_LOADFLTR
+environment variable is in effect.
+See the
+.Xr ld.so.1 1 .
+.Pp
+.It Fl z Cm muldefs
+.It Fl \&-allow-multiple-definition
+Allows multiple symbol definitions.
+By default, multiple symbol definitions that occur between relocatable objects
+result in a fatal error condition.
+This option, suppresses the error condition, allowing the first symbol
+definition to be taken.
+.Pp
+.It Fl z Cm nocompstrtab
+Disables the compression of
+.Sy ELF
+string tables.
+By default, string compression is applied to
+.Dv SHT_STRTAB
+sections, and to
+.Dv SHT_PROGBITS
+sections that have their
+.Dv SHF_MERGE
+and
+.Dv SHF_STRINGS
+section flags set.
+.Pp
+.It Fl z Cm nodefaultlib
 Marks the object so that the runtime default library search path, used after
-any \fBLD_LIBRARY_PATH\fR or runpaths, is ignored. This option implies that all
-dependencies of the object can be satisfied from its runpath.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnodelete\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as non-deletable at runtime. This mode is similar to adding
-the object to the process by using \fBdlopen\fR(3C) with the
-\fBRTLD_NODELETE\fR mode.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnodlopen\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as not available to \fBdlopen\fR(3C), either as the object
-specified by the \fBdlopen()\fR, or as any form of dependency required by the
-object specified by the \fBdlopen()\fR. This option is only meaningful when
-building a shared object.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnodump\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as not available to \fBdldump\fR(3C).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnoldynsym\fR\fR
-.ad
-.sp .6
-.RS 4n
-Prevents the inclusion of a \fB\&.SUNW_ldynsym\fR section in dynamic
-executables or sharable libraries. The \fB\&.SUNW_ldynsym\fR section augments
-the \fB\&.dynsym\fR section by providing symbols for local functions. Local
-function symbols allow debuggers to display local function names in stack
-traces from stripped programs. Similarly, \fBdladdr\fR(3C) is able to supply
-more accurate results.
-.sp
-The \fB-z\fR \fBnoldynsym\fR option also prevents the inclusion of the two
-symbol sort sections that are related to the \fB\&.SUNW_ldynsym\fR section. The
-\fB\&.SUNW_dynsymsort\fR section provides sorted access to regular function and
-variable symbols. The \fB\&.SUNW_dyntlssort\fR section provides sorted access
-to thread local storage (\fBTLS\fR) variable symbols.
-.sp
-The \fB\&.SUNW_ldynsym\fR, \fB\&.SUNW_dynsymsort\fR, and
-\fB\&.SUNW_dyntlssort\fR sections, which becomes part of the allocable text
-segment of the resulting file, cannot be removed by \fBstrip\fR(1). Therefore,
-the \fB-z\fR \fBnoldynsym\fR option is the only way to prevent their inclusion.
-See the \fB-s\fR and \fB-z\fR \fBredlocsym\fR options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnopartial\fR\fR
-.ad
-.sp .6
-.RS 4n
+any
+.Ev LD_LIBRARY_PATH
+or runpaths, is ignored.
+This option implies that all dependencies of the object can be satisfied from
+its runpath.
+.Pp
+.It Fl z Cm nodelete
+Marks the object as non-deletable at runtime.
+This mode is similar to adding the object to the process by using
+.Xr dlopen 3C
+with the
+.Dv RTLD_NODELETE
+mode.
+.Pp
+.It Fl z Cm nodlopen
+Marks the object as not available to
+.Xr dlopen 3C ,
+either as the object specified by the
+.Xr dlopen 3C ,
+or as any form of dependency required by the object specified by the
+.Xr dlopen 3C .
+This option is only meaningful when building a shared object.
+.Pp
+.It Fl z Cm nodump
+Marks the object as not available to
+.Xr dldump 3C .
+.Pp
+.It Fl z Cm noldynsym
+Prevents the inclusion of a
+.Sy .SUNW_ldynsym
+section in dynamic executables or sharable libraries.
+The
+.Sy .SUNW_ldynsym
+section augments the
+.Sy .dynsym
+section by providing symbols for local functions.
+Local function symbols allow debuggers to display local function names in stack
+traces from stripped programs.
+Similarly,
+.Xr dladdr 3C
+is able to supply more accurate results.
+.Pp
+The
+.Fl z Cm noldynsym
+option also prevents the inclusion of the two symbol sort sections that are
+related to the
+.Sy .SUNW_ldynsym
+section.
+The
+.Sy .SUNW_dynsymsort
+section provides sorted access to regular function and variable symbols.
+The
+.Sy .SUNW_dyntlssort
+section provides sorted access to thread local storage
+.Pq TLS
+variable symbols.
+.Pp
+The
+.Sy .SUNW_ldynsym ,
+.Sy .SUNW_dynsymsort ,
+and
+.Sy .SUNW_dyntlssort
+sections, which becomes part of the allocable text segment of the resulting
+file, cannot be removed by
+.Xr strip 1 .
+Therefore, the
+.Fl z Cm noldynsym
+option is the only way to prevent their inclusion.
+See the
+.Fl s
+and
+.Fl z Cm redlocsym
+options.
+.Pp
+.It Fl z Cm nopartial
 Partially initialized symbols, that are defined within relocatable object
 files, are expanded in the output file being generated.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnoversion\fR\fR
-.ad
-.sp .6
-.RS 4n
-Does not record any versioning sections. Any version sections or associated
-\fB\&.dynamic\fR section entries are not generated in the output image.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBnow\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as requiring non-lazy runtime binding. This mode is similar to
-adding the object to the process by using \fBdlopen\fR(3C) with the
-\fBRTLD_NOW\fR mode. This mode is also similar to having the \fBLD_BIND_NOW\fR
-environment variable in effect. See \fBld.so.1\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBorigin\fR\fR
-.ad
-.sp .6
-.RS 4n
-Marks the object as requiring immediate \fB$ORIGIN\fR processing at runtime.
+.Pp
+.It Fl z Cm noversion
+Does not record any versioning sections.
+Any version sections or associated
+.Sy .dynamic
+section entries are not generated in the output image.
+.Pp
+.It Fl z Cm now
+Marks the object as requiring non-lazy runtime binding.
+This mode is similar to adding the object to the process by using
+.Xr dlopen 3C
+with the
+.Dv RTLD_NOW
+mode.
+This mode is also similar to having the
+.Ev LD_BIND_NOW
+environment variable in effect.
+See
+.Xr ld.so.1 1 .
+.Pp
+.It Fl z Cm origin
+Marks the object as requiring immediate
+.Sy $ORIGIN
+processing at runtime.
 This option is only maintained for historic compatibility, as the runtime
-analysis of objects to provide for \fB$ORIGIN\fR processing is now default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBpreinitarray=\fR\fIfunction\fR\fR
-.ad
-.sp .6
-.RS 4n
-Appends an entry to the \fB\&.preinitarray\fR section of the object being
-built. If no \fB\&.preinitarray\fR section is present, a section is created.
-The new entry is initialized to point to \fIfunction\fR. See \fIInitialization
-and Termination Sections\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBredlocsym\fR\fR
-.ad
-.sp .6
-.RS 4n
-Eliminates all local symbols except for the \fISECT\fR symbols from the symbol
-table \fBSHT_SYMTAB\fR. All relocations that refer to local symbols are updated
-to refer to the corresponding \fISECT\fR symbol. This option allows specialized
-objects to greatly reduce their symbol table sizes. Eliminated local symbols
-can reduce the \fB\&.stab*\fR debugging information that is generated using the
-compiler drivers \fB-g\fR option. See the \fB-s\fR and \fB-z\fR \fBnoldynsym\fR
+analysis of objects to provide for
+.Sy $ORIGIN
+processing is now default.
+.Pp
+.It Fl z Cm preinitarray= Ns Ar function
+Appends an entry to the
+.Sy .preinitarray
+section of the object being built.
+If no
+.Sy .preinitarray
+section is present, a section is created.
+The new entry is initialized to point to
+.Ar function .
+See
+.Em Initialization and Termination Sections
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm redlocsym
+Eliminates all local symbols except for the
+.Sy SECT
+symbols from the symbol
+table
+.Dv SHT_SYMTAB .
+All relocations that refer to local symbols are updated to refer to the
+corresponding
+.Sy SECT
+symbol.
+This option allows specialized objects to greatly reduce their symbol table
+sizes.
+Eliminated local symbols can reduce the
+.Sy .stab
+debugging information that is generated using the compiler driver's
+.Fl g
+option.
+See the
+.Fl s
+and
+.Fl z Cm noldynsym
 options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBrelaxreloc\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBld\fR normally issues a fatal error upon encountering a relocation using a
-symbol that references an eliminated COMDAT section. If \fB-z\fR
-\fBrelaxreloc\fR is enabled, \fBld\fR instead redirects such relocations to the
-equivalent symbol in the COMDAT section that was kept. \fB-z\fR
-\fBrelaxreloc\fR is a specialized option, mainly of interest to compiler
-authors, and is not intended for general use.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBrescan-now\fR\fR
-.ad
-.br
-.na
-\fB\fB-z\fR \fBrescan\fR\fR
-.ad
-.sp .6
-.RS 4n
-These options rescan the archive files that are provided to the link-edit. By
-default, archives are processed once as the archives appear on the command
-line. Archives are traditionally specified at the end of the command line so
-that their symbol definitions resolve any preceding references. However,
-specifying archives multiple times to satisfy their own interdependencies can
-be necessary.
-.sp
-\fB-z\fR \fBrescan-now\fR is a positional option, and is processed by the
-link-editor immediately when encountered on the command line. All archives seen
-on the command line up to that point are immediately reprocessed in an attempt
-to locate additional archive members that resolve symbol references. This
-archive rescanning is repeated until a pass over the archives occurs in which
-no new members are extracted.
-.sp
-\fB-z\fR \fBrescan\fR is a position independent option. The link-editor defers
-the rescan operation until after it has processed the entire command line, and
-then initiates a final rescan operation over all archives seen on the command
-line. The \fB-z\fR \fBrescan\fR operation can interact incorrectly
-with objects that contain initialization (.init) or finalization (.fini)
-sections, preventing the code in those sections from running. For this reason,
-\fB-z\fR \fBrescan\fR is deprecated, and use of \fB-z\fR \fBrescan-now\fR is
+.Pp
+.It Fl z Cm relaxreloc
+.Nm
+normally issues a fatal error upon encountering a relocation using a
+symbol that references an eliminated COMDAT section.
+If
+.Fl z Cm relaxreloc
+is enabled,
+.Nm
+instead redirects such relocations to the equivalent symbol in the COMDAT
+section that was kept.
+.Fl z Cm relaxreloc
+is a specialized option, mainly of interest to compiler authors, and is not
+intended for general use.
+.Pp
+.It Fl z Cm rescan-now
+.It Fl z Cm rescan
+These options rescan the archive files that are provided to the link-edit.
+By default, archives are processed once as the archives appear on the command
+line.
+Archives are traditionally specified at the end of the command line so that
+their symbol definitions resolve any preceding references.
+However, specifying archives multiple times to satisfy their own
+interdependencies can be necessary.
+.Pp
+.Fl z Cm rescan-now
+is a positional option, and is processed by the link-editor immediately when
+encountered on the command line.
+All archives seen on the command line up to that point are immediately
+reprocessed in an attempt to locate additional archive members that resolve
+symbol references.
+This archive rescanning is repeated until a pass over the archives occurs in
+which no new members are extracted.
+.Pp
+.Fl z Cm rescan
+is a position independent option.
+The link-editor defers the rescan operation until after it has processed the
+entire command line, and then initiates a final rescan operation over all
+archives seen on the command line.
+The
+.Fl z Cm rescan
+operation can interact incorrectly with objects that contain initialization
+.Pq .init
+or finalization
+.Pq .fini
+sections, preventing the code in those sections from running.
+For this reason,
+.Fl z Cm rescan
+is deprecated, and use of
+.Fl z Cm rescan-now
+is
 advised.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBrescan-start\fR ... \fB-z\fR \fBrescan-end\fR\fR
-.ad
-.br
-.na
-\fB\fB--start-group\fR ... \fB--end-group\fR\fR
-.ad
-.br
-.na
-\fB\fB-(\fR ... \fB-)\fR\fR
-.ad
-.sp .6
-.RS 4n
-Defines an archive rescan group. This is a positional construct, and is
-processed by the link-editor immediately upon encountering the closing
-delimiter option.  Archives found within the group delimiter options are
-reprocessed as a group in an attempt to locate additional archive members that
-resolve symbol references. This archive rescanning is repeated until a pass
-over the archives occurs in which no new members are extracted.
+.Pp
+.It Fl z Cm rescan-start No \&... Fl z Cm rescan-end
+.It Fl \&-start-group No \&... Fl \&-end-group
+.It Fl \&( No \&... Fl \&)
+Defines an archive rescan group.
+This is a positional construct, and is processed by the link-editor immediately
+upon encountering the closing delimiter option.
+Archives found within the group delimiter options are reprocessed as a group in
+an attempt to locate additional archive members that resolve symbol references.
+This archive rescanning is repeated until a pass over the archives occurs in
+which no new members are extracted.
 Archive rescan groups cannot be nested.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBsymbolcap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies that a relocatable object that defines object capabilities
-should have those converted to symbol capabilities. A relocatable object
-that does not have any object capabilities will ignore this option.
-.sp
-Symbol capabilities provide a means for multiple implementations of a
-function to co-exist and have one picked at runtime based upon the
-hardware capabilities of the system. When \fB-z symbolcap\fR is invoked,
-all global functions are converted into local functions that have the
-corresponding capability name appended to them and an undefined symbol
-with the original name left in the resulting relocatable object. At
-runtime, the global symbol will be bound to the corresponding
-implementation that is appropriate based on the capabilities of the
-system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBtarget=sparc|x86\fR \fI\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the machine type for the output object. Supported targets are Sparc
-and x86. The 32-bit machine type for the specified target is used unless the
-\fB-64\fR option is also present, in which case the corresponding 64-bit
-machine type is used. By default, the machine type of the object being
-generated is determined from the first \fBELF\fR object processed from the
-command line. If no objects are specified, the machine type is determined by
-the first object encountered within the first archive processed from the
-command line. If there are no objects or archives, the link-editor assumes the
-native machine. This option is useful when creating an object directly with
-\fBld\fR whose input is solely from a \fBmapfile\fR. See the \fB-M\fR option.
+.Pp
+.It Fl z Cm symbolcap
+Specifies that a relocatable object that defines object capabilities should
+have those converted to symbol capabilities.
+A relocatable object that does not have any object capabilities will ignore
+this option.
+.Pp
+Symbol capabilities provide a means for multiple implementations of a function
+to co-exist and have one picked at runtime based upon the hardware capabilities
+of the system.
+When
+.Fl z Cm symbolcap
+is invoked, all global functions are converted into local functions that have
+the corresponding capability name appended to them and an undefined symbol with
+the original name left in the resulting relocatable object.
+At runtime, the global symbol will be bound to the corresponding implementation
+that is appropriate based on the capabilities of the system.
+.Pp
+.It Fl z Cm target= Ns Cm sparc Ns | Ns Cm x86
+Specifies the machine type for the output object.
+Supported targets are
+.Cm sparc
+and
+.Cm x86 .
+The 32-bit machine type for the specified target is used unless the
+.Fl 64
+option is also present, in which case the corresponding 64-bit machine type is
+used.
+By default, the machine type of the object being generated is determined from
+the first
+.Sy ELF
+object processed from the command line.
+If no objects are specified, the machine type is determined by the first object
+encountered within the first archive processed from the command line.
+If there are no objects or archives, the link-editor assumes the native
+machine.
+This option is useful when creating an object directly with
+.Nm
+whose input is solely from a
+.Sy mapfile .
+See the
+.Fl M
+option.
 It can also be useful in the rare case of linking entirely from an archive that
 contains objects of different machine types for which the first object is not
-of the desired machine type. See \fIThe 32-bit link-editor and 64-bit
-link-editor\fR in \fILinker and Libraries Guide\fR.
-.sp
-Note that for compability with existing Makefiles and scripts, these options
+of the desired machine type.
+See
+.Em The 32-bit link-editor and 64-bit link-editor
+in
+.%T Linker and Libraries Guide .
+.Pp
+Note that for compatibility with existing Makefiles and scripts, these options
 may be given multiple times and may be mixed in the same invocation: the last
-instance wins, so that, for example, \fBld -z target=sparc -z target=x86 ...\fR
-gives a machine type of \fBx86\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBtext\fR\fR
-.ad
-.sp .6
-.RS 4n
+instance wins, so that, for example,
+.Ql ld -z target=sparc -z target=x86 \&...
+gives a machine type of
+.Sq x86 .
+.Pp
+.It Fl z Cm text
 In dynamic mode only, forces a fatal error if any relocations against
-non-writable, allocatable sections remain. For historic reasons, this mode is
-not the default when building an executable or shared object. However, its use
-is recommended to ensure that the text segment of the dynamic object being
-built is shareable between multiple running processes. A shared text segment
-incurs the least relocation overhead when loaded into memory. See
-\fIPosition-Independent Code\fR in \fILinker and Libraries Guide\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBtextoff\fR\fR
-.ad
-.sp .6
-.RS 4n
+non-writable, allocatable sections remain.
+For historic reasons, this mode is not the default when building an executable
+or shared object.
+However, its use is recommended to ensure that the text segment of the dynamic
+object being built is shareable between multiple running processes.
+A shared text segment incurs the least relocation overhead when loaded into
+memory.
+See
+.Em Position-Independent Code
+in
+.%T Linker and Libraries Guide .
+.Pp
+.It Fl z Cm textoff
 In dynamic mode only, allows relocations against all allocatable sections,
-including non-writable ones. This mode is the default when building a shared
-object.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBtextwarn\fR\fR
-.ad
-.sp .6
-.RS 4n
+including non-writable ones.
+This mode is the default when building a shared object.
+.Pp
+.It Fl z Cm textwarn
 In dynamic mode only, lists a warning if any relocations against non-writable,
-allocatable sections remain. This mode is the default when building an
-executable.
-.RE
-
-.sp
-.ne 2
-.na
-\fB-z\fR \fBtype=exec|kmod|reloc|shared\fR
-.ad
-.sp .6
-.RS 4n
+allocatable sections remain.
+This mode is the default when building an executable.
+.Pp
+.It Xo
+.Sm off
+.Fl z\~ Cm type= Cm exec | kmod | reloc | shared
+.Sm on
+.Xc
 Specifies the type of object to create.
-
-.sp
-.ne 2
-.na
-exec
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width shared
+.It exec
 Dynamic executable
-.RE
-
-.sp
-.ne 2
-.na
-reloc
-.ad
-.sp .6
-.RS 4n
+.It reloc
 Relocatable object
-.RE
-
-.sp
-.ne 2
-.na
-shared
-.ad
-.sp .6
-.RS 4n
+.It shared
 Dynamic shared object
-.RE
-
-.sp
-.ne 2
-.na
-kmod
-.ad
-.sp .6
-.RS 4n
+.It kmod
 illumos kernel module
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fBverbose\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Pp
+.It Fl z Cm verbose
 This option provides additional warning diagnostics during a link-edit.
-Presently, this option conveys suspicious use of displacement relocations. This
-option also conveys the restricted use of static \fBTLS\fR relocations when
-building shared objects. In future, this option might be enhanced to provide
-additional diagnostics that are deemed too noisy to be generated by default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR\fBwrap=\fR\fIsymbol\fR\fR
-.ad
-.br
-.na
-\fB\fB-wrap=\fR \fIsymbol\fR\fR
-.ad
-.br
-.na
-\fB\fB--wrap=\fR \fIsymbol\fR\fR
-.ad
-.sp .6
-.RS 4n
-Rename undefined references to \fIsymbol\fR in order to allow wrapper code to
-be linked into the output object without having to modify source code. When
-\fB-z wrap\fR is specified, all undefined references to \fIsymbol\fR are
-modified to reference \fB__wrap_\fR\fIsymbol\fR, and all references to
-\fB__real_\fR\fIsymbol\fR are modified to reference \fIsymbol\fR. The user is
-expected to provide an object containing the \fB__wrap_\fR\fIsymbol\fR
-function. This wrapper function can call \fB__real_\fR\fIsymbol\fR in order to
-reference the actual function being wrapped.
-.sp
-The following is an example of a wrapper for the \fBmalloc\fR(3C) function:
-.sp
-.in +2
-.nf
+Presently, this option conveys suspicious use of displacement relocations.
+This option also conveys the restricted use of static TLS relocations when
+building shared objects.
+In future, this option might be enhanced to provide additional diagnostics that
+are deemed too noisy to be generated by default.
+.Pp
+.It Fl z Cm wrap= Ns Ar symbol
+.It Fl wrap Ns Cm \&= Ns Ar symbol
+.It Fl \&-wrap Ns Cm \&= Ns Ar symbol
+Rename undefined references to
+.Ar symbol
+in order to allow wrapper code to be linked into the output object without
+having to modify source code.
+When
+.Fl z Cm wrap
+is specified, all undefined references to
+.Ar symbol
+are modified to reference
+.Sy __wrap_ Ns Ar symbol ,
+and all references to
+.Sy __real_ Ns Ar symbol
+are modified to reference
+.Ar symbol .
+The user is expected to provide an object containing the
+.Sy __wrap_ Ns Ar symbol
+function.
+This wrapper function can call
+.Sy __real_ Ns Ar symbol
+in order to reference the actual function being wrapped.
+.Pp
+The following is an example of a wrapper for the
+.Xr malloc 3C
+function:
+.Bd -literal -offset 4n
 void *
 __wrap_malloc(size_t c)
 {
-        (void) printf("malloc called with %zu\en", c);
-        return (__real_malloc(c));
+    (void) printf("malloc called with %zu\en", c);
+    return (__real_malloc(c));
 }
-.fi
-.in -2
-
-If you link other code with this file using \fB-z\fR \fBwrap=malloc\fR to
-compile all the objects, then all calls to \fBmalloc\fR will call the function
-\fB__wrap_malloc\fR instead. The call to \fB__real_malloc\fR will call the real
-\fBmalloc\fR function.
-.sp
+.Ed
+.Pp
+If you link other code with this file using
+.Fl z Cm wrap= Ns Ar malloc
+to compile all the objects, then all calls to
+.Sy malloc
+will call the function
+.Sy __wrap_malloc
+instead.
+The call to
+.Sy __real_malloc
+will call the real
+.Sy malloc
+function.
+.Pp
 The real and wrapped functions should be maintained in separate source files.
 Otherwise, the compiler or assembler may resolve the call instead of leaving
 that operation for the link-editor to carry out, and prevent the wrap from
 occurring.
-.RE
-
-.SH ENVIRONMENT VARIABLES
-.ne 2
-.na
-\fB\fBLD_ALTEXEC\fR\fR
-.ad
-.sp .6
-.RS 4n
-An alternative link-editor path name. \fBld\fR executes, and passes control to
-this alternative link-editor. This environment variable provides a generic
-means of overriding the default link-editor that is called from the various
-compiler drivers. See the \fB-z altexec64\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLD_LIBRARY_PATH\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width 4n
+.It Ev LD_ALTEXEC
+An alternative link-editor path name.
+.Nm
+executes, and passes control to this alternative link-editor.
+This environment variable provides a generic means of overriding the default
+link-editor that is called from the various compiler drivers.
+See the
+.Fl z Cm altexec64
+option.
+.It Ev LD_LIBRARY_PATH
 A list of directories in which to search for the libraries specified using the
-\fB-l\fR option. Multiple directories are separated by a colon. In the most
-general case, this environment variable contains two directory lists separated
-by a semicolon:
-.sp
-.in +2
-.nf
-\fIdirlist1\fR\fB;\fR\fIdirlist2\fR
-.fi
-.in -2
-.sp
-
-If \fBld\fR is called with any number of occurrences of \fB-L\fR, as in:
-.sp
-.in +2
-.nf
-\fBld ... -L\fIpath1\fR ... -L\fIpathn\fR ...\fR
-.fi
-.in -2
-.sp
-
+.Fl l
+option.
+Multiple directories are separated by a colon.
+In the most general case, this environment variable contains two directory
+lists separated by a semicolon:
+.Pp
+.D1 Ar dirlist1 Ns Cm \&; Ns Ar dirlist2
+.Pp
+If
+.Nm
+is called with any number of occurrences of
+.Fl L ,
+as in:
+.Pp
+.D1 Nm No ... Fl L Ns Ar path1 No ... Fl L Ns Ar pathn No ...
+.Pp
 then the search path ordering is:
-.sp
-.in +2
-.nf
-\fB\fIdirlist1 path1\fR ... \fIpathn dirlist2\fR LIBPATH\fR
-.fi
-.in -2
-.sp
-
+.Pp
+.D1 Ar dirlist1 Ar path1 No ... Ar pathn Ar dirlist2 Ev LIBPATH
+.Pp
 When the list of directories does not contain a semicolon, the list is
-interpreted as \fIdirlist2\fR.
-.sp
-The \fBLD_LIBRARY_PATH\fR environment variable also affects the runtime linkers
-search for dynamic dependencies.
-.sp
-This environment variable can be specified with a _32 or _64 suffix. This makes
-the environment variable specific, respectively, to 32-bit or 64-bit processes
+interpreted as
+.Ar dirlist2 .
+.Pp
+The
+.Ev LD_LIBRARY_PATH
+environment variable also affects the runtime linkers search for dynamic
+dependencies.
+.Pp
+This environment variable can be specified with a _32 or _64 suffix.
+This makes the environment variable specific, respectively, to 32-bit or 64-bit
+processes and overrides any non-suffixed version of the environment variable
+that is in effect.
+.It Ev LD_NOEXEC_64
+Suppresses the automatic execution of the 64-bit link-editor.
+By default, the link-editor executes the 64-bit version when the
+.Sy ELF
+class of the first relocatable file identifies a 64-bit object.
+The 64-bit image that a 32-bit link-editor can create, has some limitations.
+However, some link-edits might find the use of the 32-bit link-editor faster.
+.It Ev LD_OPTIONS
+A default set of options to
+.Nm .
+.Ev LD_OPTIONS
+is interpreted by
+.Nm
+just as though its value had been placed on the command line, immediately
+following the name used to invoke
+.Nm ,
+as in:
+.Pp
+.D1 Nm Ev $LD_OPTIONS No ... Ar other-arguments No ...
+.It Ev LD_RUN_PATH
+An alternative mechanism for specifying a runpath to the link-editor.
+See the
+.Fl R
+option.
+If both
+.Ev LD_RUN_PATH
+and the
+.Fl R
+option are specified,
+.Fl R
+supersedes.
+.It Ev SGS_SUPPORT
+Provides a colon-separated list of shared objects that are loaded with the
+link-editor and given information regarding the linking process.
+This environment variable can be specified with a _32 or _64 suffix.
+This makes the environment variable specific, respectively, to the 32-bit or
+64-bit class of
+.Nm
 and overrides any non-suffixed version of the environment variable that is in
 effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLD_NOEXEC_64\fR\fR
-.ad
-.sp .6
-.RS 4n
-Suppresses the automatic execution of the 64-bit link-editor. By default, the
-link-editor executes the 64-bit version when the \fBELF\fR class of the first
-relocatable file identifies a 64-bit object. The 64-bit image that a 32-bit
-link-editor can create, has some limitations. However, some link-edits might
-find the use of the 32-bit link-editor faster.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLD_OPTIONS\fR\fR
-.ad
-.sp .6
-.RS 4n
-A default set of options to \fBld\fR. \fBLD_OPTIONS\fR is interpreted by
-\fBld\fR just as though its value had been placed on the command line,
-immediately following the name used to invoke \fBld\fR, as in:
-.sp
-.in +2
-.nf
-\fBld $LD_OPTIONS ... \fIother-arguments\fR ...\fR
-.fi
-.in -2
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLD_RUN_PATH\fR\fR
-.ad
-.sp .6
-.RS 4n
-An alternative mechanism for specifying a runpath to the link-editor. See the
-\fB-R\fR option. If both \fBLD_RUN_PATH\fR and the \fB-R\fR option are
-specified, \fB-R\fR supersedes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSGS_SUPPORT\fR\fR
-.ad
-.sp .6
-.RS 4n
-Provides a colon-separated list of shared objects that are loaded with the
-link-editor and given information regarding the linking process. This
-environment variable can be specified with a _32 or _64 suffix. This makes the
-environment variable specific, respectively, to the 32-bit or 64-bit class of
-\fBld\fR and overrides any non-suffixed version of the environment variable
-that is in effect. See the \fB-S\fR option.
-.RE
-
-.sp
-.LP
-Notice that environment variable-names that begin with the
-characters '\fBLD_\fR' are reserved for possible future enhancements to
-\fBld\fR and \fBld.so.1\fR(1).
-.SH FILES
-.ne 2
-.na
-\fB\fBlib\fIx\fR.so\fR\fR
-.ad
-.RS 15n
+See the
+.Fl S
+option.
+.El
+.Pp
+Notice that environment variable-names that begin with the characters
+.Sq LD_
+are reserved for possible future enhancements to
+.Nm
+and
+.Xr ld.so.1 1 .
+.Sh FILES
+.Bl -tag -width 4n
+.It lib Ns Ar x Ns No .so
 shared object libraries.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlib\fIx\fR.a\fR\fR
-.ad
-.RS 15n
+.It lib Ns Ar x Ns No .a
 archive libraries.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBa.out\fR\fR
-.ad
-.RS 15n
+.It Pa a.out
 default output file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fILIBPATH\fR\fR
-.ad
-.RS 15n
-For 32-bit libraries, the default search path is \fB/usr/ccs/lib\fR, followed
-by \fB/lib\fR, and finally \fB/usr/lib\fR. For 64-bit libraries, the default
-search path is \fB/lib/64\fR, followed by \fB/usr/lib/64\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/ld\fR\fR
-.ad
-.RS 15n
-A directory containing several \fBmapfiles\fR that can be used during
-link-editing. These \fBmapfiles\fR provide various capabilities, such as
-defining memory layouts, aligning bss, and defining non-executable stacks.
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.BR as (1),
-.BR crle (1),
-.BR gprof (1),
-.BR ld.so.1 (1),
-.BR ldd (1),
-.BR mcs (1),
-.BR pvs (1),
-.BR exec (2),
-.BR stat (2),
-.BR dldump (3C),
-.BR dlopen (3C),
-.BR elf (3ELF),
-.BR ar.h (3HEAD),
-.BR a.out (5),
-.BR attributes (7)
-.sp
-.LP
-\fILinker and Libraries Guide\fR
-.SH NOTES
-Default options applied by \fBld\fR are maintained for historic reasons. In
-today's programming environment, where dynamic objects dominate, alternative
-defaults would often make more sense. However, historic defaults must be
-maintained to ensure compatibility with existing program development
-environments. Historic defaults are called out wherever possible in this
-manual. For a description of the current recommended options, see Appendix A,
-\fILink-Editor Quick Reference,\fR in \fILinker and Libraries Guide\fR.
-.sp
-.LP
-If the file being created by \fBld\fR already exists, the file is unlinked
-after all input files have been processed. A new file with the specified name
-is then created. This allows \fBld\fR to create a new version of the file,
-while simultaneously allowing existing processes that are accessing the old
-file contents to continue running. If the old file has no other links, the disk
-space of the removed file is freed when the last process referencing the file
-terminates.
-.sp
-.LP
-The behavior of \fBld\fR when the file being created already exists was changed
-with \fBSXCE\fR build \fB43\fR. In older versions, the existing file was
-rewritten in place, an approach with the potential to corrupt any running
-processes that is using the file. This change has an implication for output
-files that have multiple hard links in the file system. Previously, all links
-would remain intact, with all links accessing the new file contents. The new
-\fBld\fR behavior \fBbreaks\fR such links, with the result that only the
-specified output file name references the new file. All the other links
-continue to reference the old file. To ensure consistent behavior, applications
-that rely on multiple hard links to linker output files should explicitly
-remove and relink the other file names.
+.It Ev LIBPATH
+For 32-bit libraries, the default search path is
+.Pa /usr/ccs/lib ,
+followed by
+.Pa /lib ,
+and finally
+.Pa /usr/lib .
+For 64-bit libraries, the default search path is
+.Pa /lib/64 ,
+followed by
+.Pa /usr/lib/64 .
+.It Pa /usr/lib/ld
+A directory containing several mapfiles that can be used during link-editing.
+These mapfiles provide various capabilities, such as defining memory layouts,
+aligning bss, and defining non-executable stacks.
+.El
+.Sh ATTRIBUTES
+The command line interface of
+.Nm
+is
+.Sy Committed .
+The output of
+.Nm
+is
+.Sy Committed .
+.Sh SEE ALSO
+.Xr as 1 ,
+.Xr crle 1 ,
+.Xr gprof 1 ,
+.Xr ld.so.1 1 ,
+.Xr ldd 1 ,
+.Xr mcs 1 ,
+.Xr pvs 1 ,
+.Xr strip 1 ,
+.Xr exec 2 ,
+.Xr stat 2 ,
+.Xr dladdr 3C ,
+.Xr dldump 3C ,
+.Xr dlopen 3C ,
+.Xr malloc 3C ,
+.Xr elf 3ELF ,
+.Xr ar.h 3HEAD ,
+.Xr a.out 5 ,
+.Xr attributes 7
+.Rs
+.%B Linker and Libraries Guide
+.Re
+.Sh NOTES
+Default options applied by
+.Nm
+are maintained for historic reasons.
+In today's programming environment, where dynamic objects dominate, alternative
+defaults would often make more sense.
+However, historic defaults must be maintained to ensure compatibility with
+existing program development environments.
+Historic defaults are called out wherever possible in this manual.
+For a description of the current recommended options, see Appendix A,
+.Em Link-Editor Quick Reference ,
+in
+.%T Linker and Libraries Guide .
+.Pp
+If the file being created by
+.Nm
+already exists, the file is unlinked after all input files have been processed.
+A new file with the specified name is then created.
+This allows
+.Nm
+to create a new version of the file, while simultaneously allowing existing
+processes that are accessing the old file contents to continue running.
+If the old file has no other links, the disk space of the removed file is freed
+when the last process referencing the file terminates.
+.Pp
+The behavior of
+.Nm
+when the file being created already exists was changed
+with SXCE build 43.
+In older versions, the existing file was rewritten in place, an approach with
+the potential to corrupt any running processes that is using the file.
+This change has an implication for output files that have multiple hard links
+in the file system.
+Previously, all links would remain intact, with all links accessing the new
+file contents.
+The new
+.Nm
+behavior
+.Em breaks
+such links, with the result that only the specified output file name references
+the new file.
+All the other links continue to reference the old file.
+To ensure consistent behavior, applications that rely on multiple hard links to
+linker output files should explicitly remove and relink the other file names.
