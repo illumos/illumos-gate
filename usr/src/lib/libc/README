@@ -180,7 +180,7 @@ These are the rules to follow for memory allocation:
 	  implementation of the function will be necessary.
 
 In a DEBUG build of libc:
-	make THREAD_DEBUG=-DTHREAD_DEBUG install
+	make THREAD_DEBUG=-DDEBUG install
 many of these rules are enforced by ASSERT() statements scattered about
 in the libc sources.  This is the default mode for building libc when
 a DEBUG nightly build is performed.
@@ -240,7 +240,7 @@ otherwise conflicting symbols could interpose on the version in libc without
 compromising libc itself, that is if libc defines fopen() which needs open() it
 would call _open() and an application defined open() would not cause fopen()
 to break.  This was made transparent to code within libc via a header,
-synonyms.h, which would #define open _open, for all such symbols. 
+synonyms.h, which would #define open _open, for all such symbols.
 
 Since ON now uses direct bindings extensively all symbols not explicitly
 marked "NODIRECT" are directly bound within libc anyway, and none of this is

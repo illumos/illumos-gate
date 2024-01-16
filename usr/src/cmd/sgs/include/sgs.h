@@ -246,7 +246,6 @@ typedef struct lm_list32	Lm_list32;
 /*
  * For the various utilities that include sgs.h
  */
-extern int	assfail(const char *, const char *, int);
 extern void	eprintf(Lm_list *, Error, const char *, ...);
 extern void	veprintf(Lm_list *, Error, const char *, va_list);
 extern uint_t	sgs_str_hash(const char *);

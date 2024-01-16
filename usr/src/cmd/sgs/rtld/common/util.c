@@ -51,6 +51,7 @@
 #include	<limits.h>
 #include	<debug.h>
 #include	<conv.h>
+#include	<upanic.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
@@ -3076,16 +3077,18 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	va_end(args);
 }
 
+static const char rtld_panicstr[] = "rtld assertion failure";
+
 /*
  * Provide assfail() for ASSERT() statements.  See <sys/debug.h> for further
  * details.
  */
-int
+void
 assfail(const char *a, const char *f, int l)
 {
 	(void) printf("assertion failed: %s, file: %s, line: %d\n", a, f, l);
 	(void) _lwp_kill(_lwp_self(), SIGABRT);
-	return (0);
+	upanic(rtld_panicstr, sizeof (rtld_panicstr));
 }
 
 void
@@ -3096,6 +3099,7 @@ assfail3(const char *msg, uintmax_t a, const char *op, uintmax_t b,
 	    "file: %s, line: %d\n", msg, (unsigned long long)a, op,
 	    (unsigned long long)b, f, l);
 	(void) _lwp_kill(_lwp_self(), SIGABRT);
+	upanic(rtld_panicstr, sizeof (rtld_panicstr));
 }
 
 /*

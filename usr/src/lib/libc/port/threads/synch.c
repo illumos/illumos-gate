@@ -32,7 +32,7 @@
 #include <sys/sdt.h>
 #include <atomic.h>
 
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 #define	INCR32(x)	(((x) != UINT32_MAX)? (x)++ : 0)
 #define	INCR(x)		((x)++)
 #define	DECR(x)		((x)--)
@@ -488,14 +488,14 @@ queue_alloc(void)
 		qp->qh_lock.mutex_flag = LOCK_INITED;
 		qp->qh_lock.mutex_magic = MUTEX_MAGIC;
 		qp->qh_hlist = &qp->qh_def_root;
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 		qp->qh_hlen = 1;
 		qp->qh_hmax = 1;
 #endif
 	}
 }
 
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 
 /*
  * Debugging: verify correctness of a sleep queue.
@@ -545,11 +545,11 @@ QVERIFY(queue_head_t *qp)
 	ASSERT(qp->qh_qlen == cnt);
 }
 
-#else	/* THREAD_DEBUG */
+#else	/* DEBUG */
 
 #define	QVERIFY(qp)
 
-#endif	/* THREAD_DEBUG */
+#endif	/* DEBUG */
 
 /*
  * Acquire a queue head.
@@ -3934,7 +3934,7 @@ cond_destroy(cond_t *cvp)
 	return (0);
 }
 
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 void
 assert_no_libc_locks_held(void)
 {

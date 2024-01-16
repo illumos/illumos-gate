@@ -55,7 +55,7 @@ extern	int	_thrp_cancelled(void);
 extern	void	*lmalloc(size_t);
 extern	void	lfree(void *, size_t);
 
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 extern	void	assert_no_libc_locks_held(void);
 #else
 #define	assert_no_libc_locks_held()
