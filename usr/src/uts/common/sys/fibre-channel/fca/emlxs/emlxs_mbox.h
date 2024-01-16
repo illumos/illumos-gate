@@ -620,30 +620,37 @@ typedef struct
 	uint32_t	MaxBBC:8;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	MaxBBC:8;
+	uint32_t	MaxBBC:8;	/* Word 0 */
 	uint32_t	rsvd1:8;
 	uint32_t	cr_count:8;
 	uint32_t	cr_delay:6;
 	uint32_t	ci:1;
 	uint32_t	cr:1;
 #endif
-	uint32_t	myId;
+	uint32_t	myId;		/* Word 1: alpa,n_port_id */
 	uint32_t	rsvd2;
-	uint32_t	edtov;
-	uint32_t	arbtov;
-	uint32_t	ratov;
+	uint32_t	edtov;		/* Word 3 */
+	uint32_t	arbtov;		/* Word 4, lp_tov */
+	uint32_t	ratov;		/* Word 5 */
 	uint32_t	rttov;
-	uint32_t	altov;
-	uint32_t	crtov;
-	uint32_t	citov;
+	uint32_t	altov;		/* Word 7 */
+	uint32_t	crtov;		/* Word 8, rsvd9 */
 #ifdef EMLXS_BIG_ENDIAN
 	uint32_t	rrq_enable:1;
 	uint32_t	rrq_immed:1;
 	uint32_t	rsvd4:29;
 	uint32_t	ack0_enable:1;
+	uint32_t	rsvd5:19;
+	uint32_t	cscn:1;
+	uint32_t	bbscn:4;
+	uint32_t	rsvd3:8;	/* Word 9 */
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ack0_enable:1;
+	uint32_t	rsvd3:8;	/* Word 9 */
+	uint32_t	bbscn:4;
+	uint32_t	cscn:1;
+	uint32_t	rsvd5:19;
+	uint32_t	ack0_enable:1;	/* Word 10, BSD dont have, but Linux */
 	uint32_t	rsvd4:29;
 	uint32_t	rrq_immed:1;
 	uint32_t	rrq_enable:1;
@@ -795,7 +802,12 @@ typedef struct
 	uint32_t	rsvd1:31;
 
 	uint32_t	topology:8;	/* Word 2 */
-	uint32_t	rsvd2:15;
+	uint32_t	ptv:1;
+	uint32_t	tf:1;
+	uint32_t	pt:2;
+	uint32_t	:4;
+	uint32_t	trunk:4;
+	uint32_t	:3;
 	uint32_t	ldv:1;
 	uint32_t	link_type:2;
 	uint32_t	link_number:6;
@@ -807,13 +819,18 @@ typedef struct
 	uint32_t	link_number:6;	/* Word 2 */
 	uint32_t	link_type:2;
 	uint32_t	ldv:1;
-	uint32_t	rsvd2:15;
+	uint32_t	:3;
+	uint32_t	trunk:4;
+	uint32_t	:4;
+	uint32_t	pt:2;
+	uint32_t	tf:1;
+	uint32_t	ptv:1;
 	uint32_t	topology:8;
 #endif
 	uint32_t	rsvd3;		/* Word 3 */
-	uint32_t	edtov;		/* Word 4 */
+	uint32_t	edtov;		/* Word 4 E_D_TOV timer value */
 	uint32_t	rsvd4;		/* Word 5 */
-	uint32_t	ratov;		/* Word 6 */
+	uint32_t	ratov;		/* Word 6 R_A_TOV timer value */
 	uint32_t	rsvd5;		/* Word 7 */
 	uint32_t	rsvd6;		/* Word 8 */
 	uint32_t	lmt;		/* Word 9 */
@@ -1212,7 +1229,61 @@ typedef struct
 
 typedef struct
 {
-	uint32_t	rsvd1;
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	clof:1;		/* clear_overflow_flags */
+	uint32_t	clrc:1;		/* clear_all_counters */
+	uint32_t	resv0:8;
+	uint32_t	w21of:1;
+	uint32_t	w20of:1;
+	uint32_t	w19of:1;
+	uint32_t	w18of:1;
+	uint32_t	w17of:1;
+	uint32_t	w16of:1;
+	uint32_t	w15of:1;
+	uint32_t	w14of:1;
+	uint32_t	w13of:1;
+	uint32_t	w12of:1;
+	uint32_t	w11of:1;
+	uint32_t	w10of:1;
+	uint32_t	w09of:1;
+	uint32_t	w08of:1;
+	uint32_t	w07of:1;
+	uint32_t	w06of:1;
+	uint32_t	w05of:1;
+	uint32_t	w04of:1;
+	uint32_t	w03of:1;
+	uint32_t	w02of:1;	/* counter overflow flags */
+	uint32_t	gec:1;
+	uint32_t	rec:1;		/* req_ext_counters */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	rec:1;		/* req_ext_counters */
+	uint32_t	gec:1;
+	uint32_t	w02of:1;	/* counter overflow flags */
+	uint32_t	w03of:1;
+	uint32_t	w04of:1;
+	uint32_t	w05of:1;
+	uint32_t	w06of:1;
+	uint32_t	w07of:1;
+	uint32_t	w08of:1;
+	uint32_t	w09of:1;
+	uint32_t	w10of:1;
+	uint32_t	w11of:1;
+	uint32_t	w12of:1;
+	uint32_t	w13of:1;
+	uint32_t	w14of:1;
+	uint32_t	w15of:1;
+	uint32_t	w16of:1;
+	uint32_t	w17of:1;
+	uint32_t	w18of:1;
+	uint32_t	w19of:1;
+	uint32_t	w20of:1;
+	uint32_t	w21of:1;
+	uint32_t	resv0:8;
+	uint32_t	clrc:1;		/* clear_all_counters */
+	uint32_t	clof:1;		/* clear_overflow_flags */
+#endif
+
 	uint32_t	linkFailureCnt;
 	uint32_t	lossSyncCnt;
 
@@ -1236,6 +1307,7 @@ typedef struct
 	uint32_t	SOFfCnt;
 	uint32_t	DropAERCnt;
 	uint32_t	DropRcv;
+	uint32_t	DropRcvXri;
 } READ_LNK_VAR;
 
 
@@ -2032,13 +2104,12 @@ typedef struct
 typedef struct
 {
 #ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd1:2;
+	uint16_t	rsvd1:2;	/* Word 1 */
 	uint16_t	upd:1;
 	uint16_t	vp:1;
 	uint16_t	rsvd2:12;
 	uint16_t	vfi;
-
-	uint16_t	vpi;
+	uint16_t	vpi;		/* Word 2 */
 	uint16_t	fcfi;
 
 	uint32_t	portname[2];    /* N_PORT name */
@@ -2049,7 +2120,9 @@ typedef struct
 	uint32_t	edtov;
 	uint32_t	ratov;
 
-	uint32_t	rsvd5:8;
+	uint32_t	vfi_bbscn:4;
+	uint32_t	vfi_bbcr:1;
+	uint32_t	rsvd5:3;	/* Word 10 */
 	uint32_t	sid:24;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
@@ -2058,7 +2131,6 @@ typedef struct
 	uint16_t	vp:1;
 	uint16_t	upd:1;
 	uint16_t	rsvd1:2;
-
 	uint16_t	fcfi;
 	uint16_t	vpi;
 
@@ -2070,8 +2142,10 @@ typedef struct
 	uint32_t	edtov;
 	uint32_t	ratov;
 
-	uint32_t	sid:24;
-	uint32_t	rsvd5:8;
+	uint32_t	sid:24;		/* nport_id */
+	uint32_t	rsvd5:3;
+	uint32_t	vfi_bbcr:1;
+	uint32_t	vfi_bbscn:4;
 #endif
 } REG_VFI_VAR;
 
@@ -2782,6 +2856,9 @@ typedef struct be_req_hdr
 #define	COMMON_OPCODE_READ_OBJ_LIST		0xAD
 #define	COMMON_OPCODE_DELETE_OBJ		0xAE
 #define	COMMON_OPCODE_GET_SLI4_PARAMS		0xB5
+#define	COMMON_OPCODE_SET_FEATURES		0xBF
+#define	COMMON_OPCODE_GET_RECONFIG_LINK_INFO	0xC9
+#define	COMMON_OPCODE_SET_RECONFIG_LINK_ID	0xCA
 
 #define	LOWLEVEL_OPCODE_GPIO_RDWR		0x30
 
@@ -3401,7 +3478,8 @@ typedef	struct _EQ_CONTEXT
 	uint32_t	Size:1;
 	uint32_t	Rsvd2:1;
 	uint32_t	Valid:1;
-	uint32_t	Rsvd1:29;
+	uint32_t	AutoValid:1;
+	uint32_t	Rsvd1:28;
 
 	uint32_t	Armed:1;
 	uint32_t	Rsvd4:2;
@@ -3413,7 +3491,8 @@ typedef	struct _EQ_CONTEXT
 	uint32_t	Rsvd5:13;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	Rsvd1:29;
+	uint32_t	Rsvd1:28;
+	uint32_t	AutoValid:1;
 	uint32_t	Valid:1;
 	uint32_t	Rsvd2:1;
 	uint32_t	Size:1;
@@ -3440,6 +3519,7 @@ typedef	struct _EQ_CONTEXT
 
 /* define for Size field */
 #define	EQ_ELEMENT_SIZE_4	0
+#define	EQ_ELEMENT_SIZE_16	1
 
 /* define for DelayMullt - used for interrupt coalescing */
 #define	EQ_DELAY_MULT		64
@@ -3731,7 +3811,8 @@ typedef	struct
 		uint32_t	Rsvd2:3;
 		uint32_t	FT:1;
 
-		uint32_t	EqRsvd3:4;		/* Word 2 */
+		uint32_t	EqAV:1;			/* Word 2 */
+		uint32_t	EqRsvd3:3;
 		uint32_t	EqeCntMethod:4;
 		uint32_t	EqPageSize:8;
 		uint32_t	EqRsvd2:4;
@@ -3742,7 +3823,8 @@ typedef	struct
 		uint32_t	EqRsvd4:16;		/* Word 3 */
 		uint32_t	EqeCntMask:16;
 
-		uint32_t	CqRsvd3:4;		/* Word 4 */
+		uint32_t	CqAV:1;			/* Word 4 */
+		uint32_t	CqRsvd3:3;
 		uint32_t	CqeCntMethod:4;
 		uint32_t	CqPageSize:8;
 		uint32_t	CQV:2;
@@ -3790,7 +3872,18 @@ typedef	struct
 		uint32_t	RqeCntMask:16;
 
 		uint32_t	Loopback:4;		/* Word 12 */
-		uint32_t	Rsvd4:12;
+		uint32_t	agxf :1;
+		uint32_t	lc :1;
+		uint32_t	oas :1;
+		uint32_t	:1;
+		uint32_t	tsmm :1;
+		uint32_t	timm :1;
+		uint32_t	sglc :1;
+		uint32_t	rxri :1;
+		uint32_t	ipr :1;
+		uint32_t	hlm :1;
+		uint32_t	rxc :1;
+		uint32_t	boundary_4ga:1;
 		uint32_t	PHWQ:1;
 		uint32_t	PHON:1;
 		uint32_t	PHOFF:1;
@@ -3826,6 +3919,29 @@ typedef	struct
 
 		uint32_t	VFIMax:16;
 		uint32_t	VPIMax:16;		/* Word 18 */
+
+		uint32_t	:11;
+		uint32_t	pbde :1;		/* Word 19 */
+		uint32_t	:6;
+		uint32_t	pvl:1;
+		uint32_t	nsler :1;
+		uint32_t	:1;
+		uint32_t	bv1s :1;
+		uint32_t	nosr :1;
+		uint32_t	eqdr :1;
+		uint32_t	:1;
+		uint32_t	xpsgl :1;
+		uint32_t	:1;
+		uint32_t	xibi :1;
+		uint32_t	nvme :1;
+		uint32_t	:1;
+		uint32_t	mds_diags :1;
+		uint32_t	ext_embed_cb :1;
+
+		uint32_t	frag_num_field_size:16;
+		uint32_t	frag_num_field_offset:16;
+		uint32_t	sgl_index_field_size:16;
+		uint32_t	sgl_index_field_offset:16;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
 		uint32_t	ProtocolType:8;		/* Word 0 */
@@ -3846,7 +3962,8 @@ typedef	struct
 		uint32_t	EqRsvd2:4;
 		uint32_t	EqPageSize:8;
 		uint32_t	EqeCntMethod:4;
-		uint32_t	EqRsvd3:4;
+		uint32_t	EqRsvd3:3;
+		uint32_t	EqAV:1;			/* auto valid */
 
 		uint32_t	EqeCntMask:16;		/* Word 3 */
 		uint32_t	EqRsvd4:16;
@@ -3855,17 +3972,18 @@ typedef	struct
 		uint32_t	CqRsvd1:4;
 		uint32_t	CqeSize:4;
 		uint32_t	CqRsvd2:2;
-		uint32_t	CQV:2;
+		uint32_t	CQV:2;			/* queue version */
 		uint32_t	CqPageSize:8;
 		uint32_t	CqeCntMethod:4;
-		uint32_t	CqRsvd3:4;
+		uint32_t	CqRsvd3:3;
+		uint32_t	CqAV:1;			/* auto valid */
 
 		uint32_t	CqeCntMask:16;		/* Word 5 */
 		uint32_t	CqRsvd4:16;
 
 		uint32_t	MqPageCnt:4;		/* Word 6 */
 		uint32_t	MqRsvd1:10;
-		uint32_t	MQV:2;
+		uint32_t	MQV:2;			/* queue version */
 		uint32_t	MqPageSize:8;
 		uint32_t	MqeCntMethod:4;
 		uint32_t	MqRsvd2:4;
@@ -3889,7 +4007,7 @@ typedef	struct
 		uint32_t	RqRsvd1:4;
 		uint32_t	RqeSize:4;
 		uint32_t	RqeRsvd2:2;
-		uint32_t	RQV:2;
+		uint32_t	RQV:2;			/* queue version */
 		uint32_t	RqPageSize:8;
 		uint32_t	RqeCntMethod:4;
 		uint32_t	RqRsvd3:4;
@@ -3900,10 +4018,10 @@ typedef	struct
 
 		uint32_t	FCOE:1;			/* Word 12 */
 		uint32_t	EXT:1;
-		uint32_t	HDRR:1;
-		uint32_t	SGLR:1;
+		uint32_t	HDRR:1;			/* hdr_template_req */
+		uint32_t	SGLR:1;			/* sgl_pre_reg_requi */
 		uint32_t	FBRR:1;
-		uint32_t	AREG:1;
+		uint32_t	AREG:1;			/* auto_reg */
 		uint32_t	TGT:1;
 		uint32_t	TERP:1;
 		uint32_t	ASSI:1;
@@ -3912,9 +4030,22 @@ typedef	struct
 		uint32_t	TRTY:1;
 		uint32_t	TRIR:1;
 		uint32_t	PHOFF:1;
-		uint32_t	PHON:1;
-		uint32_t	PHWQ:1;
-		uint32_t	Rsvd4:12;
+		uint32_t	PHON:1;			/* perf_hint */
+		uint32_t	PHWQ:1; 		/* perf_wq_id_assoc */
+
+		uint32_t	boundary_4ga:1;
+		uint32_t	rxc:1;
+		uint32_t	hlm:1;
+		uint32_t	ipr:1;
+		uint32_t	rxri:1;
+		uint32_t	sglc:1;  /* skyhawk SGL chaining_capable */
+		uint32_t	timm:1;  /* t10_dif_inline_capable */
+		uint32_t	tsmm:1;  /* t10_dif_separate_capable */
+		uint32_t	:1;
+		uint32_t	oas:1;   /* OAS is supported */
+		uint32_t	lc:1;
+		uint32_t	agxf:1;			/* auto_xfer_rdy */
+
 		uint32_t	Loopback:4;
 
 		uint32_t	SgeLength;		/* Word 13 */
@@ -3935,10 +4066,40 @@ typedef	struct
 
 		uint32_t	VPIMax:16;		/* Word 18 */
 		uint32_t	VFIMax:16;
+
+		uint32_t	ext_embed_cb:1;		/* Word 19 */
+		uint32_t	mds_diags:1;
+		uint32_t	:1;
+		uint32_t	nvme:1;
+		uint32_t	xibi:1;
+		uint32_t	:1;
+		uint32_t	xpsgl:1;
+		uint32_t	:1;
+		uint32_t	eqdr:1;
+		uint32_t	nosr:1;
+		uint32_t	bv1s:1;
+		uint32_t	:1;
+		uint32_t	nsler:1;
+		uint32_t	pvl:1;
+		uint32_t	:6;
+		uint32_t	pbde:1;
+		uint32_t	:11;
+
+		uint32_t	frag_num_field_offset:16, /* Word 20 */
+				frag_num_field_size:16;
+		uint32_t	sgl_index_field_offset:16, /* Word 21 */
+				sgl_index_field_size:16;
 #endif
+		uint32_t	chain_sge_initial_value_lo;  /* Word 22 */
+		uint32_t	chain_sge_initial_value_hi;  /* Word 23 */
 
-		uint32_t	Rsvd6;			/* Word 19 */
+		/* frag_field_offset, frag_field_size */
+		uint32_t	word24;
 
+		/* sgl_field_offset, sgl_field_size */
+		uint32_t	word25;
+		uint32_t	word26; /* Chain SGE initial value LOW  */
+		uint32_t	word27; /* Chain SGE initial value HIGH */
 } sli_params_t;
 
 /* SliFamily values */

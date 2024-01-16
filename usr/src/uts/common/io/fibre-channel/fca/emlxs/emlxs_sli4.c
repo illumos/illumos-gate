@@ -354,15 +354,6 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	}
 	hba->channel_fcp = 0; /* First channel */
 
-	/* Gen6 chips only support P2P topologies */
-	if ((hba->model_info.chip == EMLXS_LANCERG6_CHIP) &&
-	    cfg[CFG_TOPOLOGY].current != 2) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_msg,
-		    "Loop topologies are not supported by this HBA. "
-		    "Forcing topology to P2P.");
-		cfg[CFG_TOPOLOGY].current = 2;
-	}
-
 	/* Default channel for everything else is the last channel */
 	hba->channel_ip = hba->chan_count - 1;
 	hba->channel_els = hba->chan_count - 1;
@@ -423,9 +414,23 @@ reset:
 #ifdef FMA_SUPPORT
 	/* Access handle validation */
 	switch (hba->sli_intf & SLI_INTF_IF_TYPE_MASK) {
+	case SLI_INTF_IF_TYPE_6:
+		if ((emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+		    != DDI_FM_OK) ||
+		    (emlxs_fm_check_acc_handle(hba,
+		    hba->sli.sli4.bar0_acc_handle) != DDI_FM_OK) ||
+		    (emlxs_fm_check_acc_handle(hba,
+		    hba->sli.sli4.bar1_acc_handle) != DDI_FM_OK)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+
+			rval = EIO;
+			goto failed1;
+		}
+		break;
 	case SLI_INTF_IF_TYPE_2:
-		if ((emlxs_fm_check_acc_handle(hba,
-		    hba->pci_acc_handle) != DDI_FM_OK) ||
+		if ((emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+		    != DDI_FM_OK) ||
 		    (emlxs_fm_check_acc_handle(hba,
 		    hba->sli.sli4.bar0_acc_handle) != DDI_FM_OK)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
@@ -435,7 +440,6 @@ reset:
 			goto failed1;
 		}
 		break;
-
 	default :
 		if ((emlxs_fm_check_acc_handle(hba,
 		    hba->pci_acc_handle) != DDI_FM_OK) ||
@@ -604,6 +608,9 @@ reset:
 		    sizeof (vpd->sli4FwLabel));
 	} else if (hba->model_info.chip == EMLXS_LANCERG6_CHIP) {
 		(void) strlcpy(vpd->sli4FwLabel, "xe501.grp",
+		    sizeof (vpd->sli4FwLabel));
+	} else if (hba->model_info.chip == EMLXS_PRISMG7_CHIP) {
+		(void) strlcpy(vpd->sli4FwLabel, "xe601.grp",
 		    sizeof (vpd->sli4FwLabel));
 	} else {
 		(void) strlcpy(vpd->sli4FwLabel, "sli4.fw",
@@ -1441,8 +1448,7 @@ reset:
 		if (hba->state == FC_ERROR) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_init_failed_msg,
-			    "Adapter error.", mb->mbxCommand,
-			    mb->mbxStatus);
+			    "Adapter error.");
 
 			rval = EIO;
 			goto failed4;
@@ -1450,6 +1456,11 @@ reset:
 
 		BUSYWAIT_MS(1000);
 		i--;
+	}
+	if (i == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_init_msg,
+		    "Link up timeout");
 	}
 
 done:
@@ -1497,7 +1508,9 @@ failed1:
 	}
 
 	if (hba->sli.sli4.dump_region.virt) {
+		mutex_enter(&EMLXS_PORT_LOCK);
 		(void) emlxs_mem_free(hba, &hba->sli.sli4.dump_region);
+		mutex_exit(&EMLXS_PORT_LOCK);
 	}
 
 	if (rval == 0) {
@@ -1540,10 +1553,85 @@ killed:
 	(void) emlxs_mem_free_buffer(hba);
 
 	/* Free the host dump region buffer */
+	mutex_enter(&EMLXS_PORT_LOCK);
 	(void) emlxs_mem_free(hba, &hba->sli.sli4.dump_region);
+	mutex_exit(&EMLXS_PORT_LOCK);
 
 } /* emlxs_sli4_offline() */
 
+static int
+emlxs_map_g7_bars(emlxs_hba_t *hba)
+{
+	emlxs_port_t		*port = &PPORT;
+	dev_info_t		*dip;
+	ddi_device_acc_attr_t	dev_attr = emlxs_dev_acc_attr;
+	uint_t			num_prop;
+	pci_regspec_t		*prop;
+	int 			rnum, type, size, rcount, r;
+
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, hba->dip, 0,
+	    "reg", (int **)&prop, &num_prop) != DDI_PROP_SUCCESS) {
+		return (0);
+	}
+
+	dip = (dev_info_t *)hba->dip;
+	rcount = num_prop * sizeof (int) / sizeof (pci_regspec_t);
+	for (r = 0; r < rcount; r++) {
+		rnum = PCI_REG_REG_G(prop[r].pci_phys_hi);
+		type = PCI_ADDR_MASK &prop[r].pci_phys_hi;
+		size = prop[r].pci_size_low;
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_init_debug_msg,
+		    "PCI_BAR%x regaddr=%x type=%x size=%x",
+		    r, rnum, PCI_REG_ADDR_G(type), size);
+		if (type < PCI_ADDR_MEM32) {
+			/* config or IO reg address */
+			continue;
+		}
+		/* MEM reg address */
+		caddr_t addr;
+		ddi_acc_handle_t handle;
+		int status;
+
+		status = ddi_regs_map_setup(dip, r,
+		    (caddr_t *)&addr, 0, 0, &dev_attr,
+		    &handle);
+		if (status != DDI_SUCCESS) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_attach_failed_msg,
+			    "ddi_regs_map_setup BAR%d failed."
+			    "  status=%x",
+			    r, status);
+			ddi_prop_free((void *)prop);
+			return (0);
+		}
+		switch (r-1) {
+		case 0:
+			if (hba->sli.sli4.bar0_acc_handle == 0) {
+				hba->sli.sli4.bar0_addr = addr;
+				hba->sli.sli4.bar0_acc_handle =
+				    handle;
+			}
+			break;
+		case 1:
+			if (hba->sli.sli4.bar1_acc_handle == 0) {
+				hba->sli.sli4.bar1_addr = addr;
+				hba->sli.sli4.bar1_acc_handle =
+				    handle;
+			}
+			break;
+		case 2:
+			if (hba->sli.sli4.bar2_acc_handle == 0) {
+				hba->sli.sli4.bar2_addr = addr;
+				hba->sli.sli4.bar2_acc_handle =
+				    handle;
+			}
+			break;
+		}
+	}
+	ddi_prop_free((void *)prop);
+	return (num_prop > 0);
+}
 
 /*ARGSUSED*/
 static int
@@ -1616,7 +1704,7 @@ emlxs_sli4_map_hdw(emlxs_hba_t *hba)
 		hba->sli.sli4.PHYSDEV_reg_addr = 0;
 		break;
 
-	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_2: /* Lancer FC */
 
 		/* Map in Hardware BAR pages that will be used for */
 		/* communication with HBA. */
@@ -1667,7 +1755,45 @@ emlxs_sli4_map_hdw(emlxs_hba_t *hba)
 		    PHYSDEV_CONTROL_OFFSET);
 
 		break;
+	case SLI_INTF_IF_TYPE_6:
+		/* Map in Hardware BAR pages that will be used for */
+		/* communication with HBA. */
+		if (!emlxs_map_g7_bars(hba))
+			goto failed;
+		/* offset from beginning of register space */
+		hba->sli.sli4.MPUEPSemaphore_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    SLIPORT_SEMAPHORE_OFFSET);
+		hba->sli.sli4.MBDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr + PD_MB_DB_OFFSET);
+		hba->sli.sli4.EQDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar1_addr + PD_IF6_EQ_DB_OFFSET);
+		hba->sli.sli4.CQDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar1_addr + PD_IF6_CQ_DB_OFFSET);
+		hba->sli.sli4.MQDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar1_addr + PD_IF6_MQ_DB_OFFSET);
+		hba->sli.sli4.WQDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar1_addr + PD_IF6_WQ_DB_OFFSET);
+		hba->sli.sli4.RQDB_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar1_addr + PD_IF6_RQ_DB_OFFSET);
 
+		hba->sli.sli4.STATUS_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    SLIPORT_STATUS_OFFSET);
+		hba->sli.sli4.CNTL_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    SLIPORT_CONTROL_OFFSET);
+		hba->sli.sli4.ERR1_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    SLIPORT_ERROR1_OFFSET);
+		hba->sli.sli4.ERR2_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    SLIPORT_ERROR2_OFFSET);
+		hba->sli.sli4.PHYSDEV_reg_addr =
+		    (uint32_t *)(hba->sli.sli4.bar0_addr +
+		    PHYSDEV_CONTROL_OFFSET);
+
+		break;
 	case SLI_INTF_IF_TYPE_1:
 	case SLI_INTF_IF_TYPE_3:
 	default:
@@ -1815,6 +1941,7 @@ emlxs_check_hdw_ready(emlxs_hba_t *hba)
 			break;
 
 		case SLI_INTF_IF_TYPE_2:
+		case SLI_INTF_IF_TYPE_6:
 			status = emlxs_sli4_read_status(hba);
 
 			if (status & SLI_STATUS_READY) {
@@ -1910,6 +2037,7 @@ emlxs_sli4_read_status(emlxs_hba_t *hba)
 
 	switch (hba->sli_intf & SLI_INTF_IF_TYPE_MASK) {
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		status = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.STATUS_reg_addr);
 #ifdef FMA_SUPPORT
@@ -1946,6 +2074,7 @@ emlxs_sli4_read_sema(emlxs_hba_t *hba)
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		status = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.MPUEPSemaphore_reg_addr);
 #ifdef FMA_SUPPORT
@@ -1983,6 +2112,7 @@ emlxs_sli4_read_mbdb(emlxs_hba_t *hba)
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		status = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.MBDB_reg_addr);
 #ifdef FMA_SUPPORT
@@ -2025,6 +2155,7 @@ emlxs_sli4_write_mbdb(emlxs_hba_t *hba, uint64_t phys, boolean_t high)
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.MBDB_reg_addr, db);
 		break;
@@ -2037,33 +2168,39 @@ static void
 emlxs_sli4_write_eqdb(emlxs_hba_t *hba, uint16_t qid, uint32_t count,
     boolean_t arm)
 {
-	uint32_t	db;
+	emlxs_eqdb_u	db;
+	db.word = 0;
 
 	/*
 	 * Add the qid to the doorbell. It is split into a low and
 	 * high component.
 	 */
 
-	/* Initialize with the low bits */
-	db = qid & EQ_DB_ID_LO_MASK;
+	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) == SLI_INTF_IF_TYPE_6) {
+		db.db6.Qid = qid;
+		db.db6.NumPopped = count;
+		db.db6.Rearm = arm;
+	} else {
+		/* Initialize with the low bits */
+		db.db2.Qid = qid & EQ_DB_ID_LO_MASK;
 
-	/* drop the low bits */
-	qid >>= EQ_ID_LO_BITS;
+		/* Add the high bits */
+		db.db2.Qid_hi = (qid >> EQ_ID_LO_BITS) & 0x1f;
 
-	/* Add the high bits */
-	db |= (qid << EQ_DB_ID_HI_SHIFT) & EQ_DB_ID_HI_MASK;
+		/*
+		 * Include the number of entries to be popped.
+		 */
+		db.db2.NumPopped = count;
 
-	/*
-	 * Include the number of entries to be popped.
-	 */
-	db |= (count << EQ_DB_POP_SHIFT) & EQ_DB_POP_MASK;
+		/* The doorbell is for an event queue */
+		db.db2.Event = B_TRUE;
 
-	/* The doorbell is for an event queue */
-	db |= EQ_DB_EVENT;
-
-	/* Arm if asked to do so */
-	if (arm)
-		db |= EQ_DB_CLEAR | EQ_DB_REARM;
+		/* Arm if asked to do so */
+		if (arm)
+			/* Clear only on not AutoValid EqAV */
+			db.db2.Clear = B_TRUE;
+		db.db2.Rearm = arm;
+	}
 
 #ifdef DEBUG_FASTPATH
 	EMLXS_MSGF(&hba->port[0], _FILENO_, __LINE__, &emlxs_sli_detail_msg,
@@ -2074,14 +2211,20 @@ emlxs_sli4_write_eqdb(emlxs_hba_t *hba, uint16_t qid, uint32_t count,
 	case SLI_INTF_IF_TYPE_0:
 		/* The CQDB_reg_addr is also use for EQs */
 		ddi_put32(hba->sli.sli4.bar2_acc_handle,
-		    hba->sli.sli4.CQDB_reg_addr, db);
+		    hba->sli.sli4.CQDB_reg_addr, db.word);
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
 		/* The CQDB_reg_addr is also use for EQs */
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
-		    hba->sli.sli4.CQDB_reg_addr, db);
+		    hba->sli.sli4.CQDB_reg_addr, db.word);
 		break;
+
+	case SLI_INTF_IF_TYPE_6:
+		ddi_put32(hba->sli.sli4.bar1_acc_handle,
+		    hba->sli.sli4.EQDB_reg_addr, db.word);
+		break;
+
 	}
 } /* emlxs_sli4_write_eqdb() */
 
@@ -2089,45 +2232,52 @@ static void
 emlxs_sli4_write_cqdb(emlxs_hba_t *hba, uint16_t qid, uint32_t count,
     boolean_t arm)
 {
-	uint32_t	db;
+	emlxs_cqdb_u	db;
+	db.word = 0;
 
 	/*
 	 * Add the qid to the doorbell. It is split into a low and
 	 * high component.
 	 */
 
-	/* Initialize with the low bits */
-	db = qid & CQ_DB_ID_LO_MASK;
+	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) == SLI_INTF_IF_TYPE_6) {
+		db.db6.Qid = qid;
+		db.db6.NumPopped = count;
+		db.db6.Rearm = arm;
+	} else {
+		/* Initialize with the low bits */
+		db.db2.Qid = qid & CQ_DB_ID_LO_MASK;
 
-	/* drop the low bits */
-	qid >>= CQ_ID_LO_BITS;
+		/* Add the high bits */
+		db.db2.Qid_hi = (qid >> CQ_ID_LO_BITS) & 0x1f;
 
-	/* Add the high bits */
-	db |= (qid << CQ_DB_ID_HI_SHIFT) & CQ_DB_ID_HI_MASK;
+		/*
+		 * Include the number of entries to be popped.
+		 */
+		db.db2.NumPopped = count;
 
-	/*
-	 * Include the number of entries to be popped.
-	 */
-	db |= (count << CQ_DB_POP_SHIFT) & CQ_DB_POP_MASK;
-
-	/* Arm if asked to do so */
-	if (arm)
-		db |= CQ_DB_REARM;
-
+		/* Arm if asked to do so */
+		db.db2.Rearm = arm;
+	}
 #ifdef DEBUG_FASTPATH
 	EMLXS_MSGF(&hba->port[0], _FILENO_, __LINE__, &emlxs_sli_detail_msg,
-	    "CQE: CLEAR db=%08x: pops=%d", db, count);
+	    "CQE: db=%08x: pops=%d", db, count);
 #endif /* DEBUG_FASTPATH */
 
 	switch (hba->sli_intf & SLI_INTF_IF_TYPE_MASK) {
 	case SLI_INTF_IF_TYPE_0:
 		ddi_put32(hba->sli.sli4.bar2_acc_handle,
-		    hba->sli.sli4.CQDB_reg_addr, db);
+		    hba->sli.sli4.CQDB_reg_addr, db.word);
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
-		    hba->sli.sli4.CQDB_reg_addr, db);
+		    hba->sli.sli4.CQDB_reg_addr, db.word);
+		break;
+
+	case SLI_INTF_IF_TYPE_6:
+		ddi_put32(hba->sli.sli4.bar1_acc_handle,
+		    hba->sli.sli4.CQDB_reg_addr, db.word);
 		break;
 	}
 } /* emlxs_sli4_write_cqdb() */
@@ -2152,6 +2302,12 @@ emlxs_sli4_write_rqdb(emlxs_hba_t *hba, uint16_t qid, uint_t count)
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.RQDB_reg_addr, rqdb.word);
 		break;
+
+	case SLI_INTF_IF_TYPE_6:
+		ddi_put32(hba->sli.sli4.bar1_acc_handle,
+		    hba->sli.sli4.RQDB_reg_addr, rqdb.word);
+		break;
+
 	}
 
 } /* emlxs_sli4_write_rqdb() */
@@ -2175,6 +2331,10 @@ emlxs_sli4_write_mqdb(emlxs_hba_t *hba, uint16_t qid, uint_t count)
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.MQDB_reg_addr, db);
 		break;
+	case SLI_INTF_IF_TYPE_6:
+		ddi_put32(hba->sli.sli4.bar1_acc_handle,
+		    hba->sli.sli4.MQDB_reg_addr, db);
+		break;
 	}
 
 } /* emlxs_sli4_write_mqdb() */
@@ -2188,18 +2348,25 @@ emlxs_sli4_write_wqdb(emlxs_hba_t *hba, uint16_t qid, uint_t posted,
 
 	db = qid;
 	db |= (posted << WQ_DB_POST_SHIFT) & WQ_DB_POST_MASK;
-	db |= (index << WQ_DB_IDX_SHIFT) & WQ_DB_IDX_MASK;
 
 	switch (hba->sli_intf & SLI_INTF_IF_TYPE_MASK) {
 	case SLI_INTF_IF_TYPE_0:
+		db |= (index << WQ_DB_IDX_SHIFT) & WQ_DB_IDX_MASK;
 		ddi_put32(hba->sli.sli4.bar2_acc_handle,
 		    hba->sli.sli4.WQDB_reg_addr, db);
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+		db |= (index << WQ_DB_IDX_SHIFT) & WQ_DB_IDX_MASK;
 		ddi_put32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.WQDB_reg_addr, db);
 		break;
+
+	case SLI_INTF_IF_TYPE_6:
+		ddi_put32(hba->sli.sli4.bar1_acc_handle,
+		    hba->sli.sli4.WQDB_reg_addr, db);
+		break;
+
 	}
 
 #ifdef DEBUG_FASTPATH
@@ -2241,7 +2408,7 @@ emlxs_check_bootstrap_ready(emlxs_hba_t *hba, uint32_t tmo)
 		    hba->sli.sli4.ERR2_reg_addr);
 		break;
 
-	default:
+	default: /* IF_TYPE_2 and IF_TYPE_6 */
 		err1 = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.ERR1_reg_addr);
 		err2 = ddi_get32(hba->sli.sli4.bar0_acc_handle,
@@ -2490,6 +2657,7 @@ emlxs_sli4_hba_reset(emlxs_hba_t *hba, uint32_t restart, uint32_t skip_post,
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		if (quiesce == 0) {
 			emlxs_sli4_hba_kill(hba);
 		}
@@ -3815,9 +3983,10 @@ emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba, MAILBOXQ *mbq, int32_t flag,
 			    /* && mb->mbxCommand != MBX_DUMP_MEMORY */) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_mbox_detail_msg,
-				    "Completed.   %s: mb=%p status=%x Poll. "
-				    "embedded %d",
-				    emlxs_mb_cmd_xlate(mb->mbxCommand), mb, rc,
+				    "Completed.   %s: mb=%p status=%x rc=%x"
+				    " Poll. embedded %d",
+				    emlxs_mb_cmd_xlate(mb->mbxCommand), mb,
+				    rc, mb->mbxStatus,
 				    ((mb->mbxCommand != MBX_SLI_CONFIG) ? 1 :
 				    (mb4->un.varSLIConfig.be.embedded)));
 			}
@@ -4421,7 +4590,7 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	    "FCP: SGLaddr virt %p phys %p size %d", xrip->SGList->virt,
 	    xrip->SGList->phys, pkt->pkt_datalen);
 	emlxs_data_dump(port, "FCP: SGL",
-	    (uint32_t *)xrip->SGList->virt, 20, 0);
+	    (uint32_t *)xrip->SGList->virt, 32, 0);
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
 	    "FCP: CMD virt %p len %d:%d:%d",
 	    pkt->pkt_cmd, pkt->pkt_cmdlen, pkt->pkt_rsplen, pkt->pkt_datalen);
@@ -5078,7 +5247,7 @@ emlxs_sli4_read_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 	eqe.word = *ptr;
 	eqe.word = BE_SWAP32(eqe.word);
 
-	if (eqe.word & EQE_VALID) {
+	if ((eqe.word & EQE_VALID) == eq->qe_valid) {
 		rc = 1;
 	}
 
@@ -5297,6 +5466,9 @@ emlxs_sli4_process_async_event(emlxs_hba_t *hba, CQE_ASYNC_t *cqe)
 
 			switch (status) {
 				case 0 :
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+				    "SLI Port Async Event: link%d misconfig "
+				    "functional", hba->sli.sli4.link_number);
 				break;
 
 				case 1 :
@@ -5604,7 +5776,7 @@ emlxs_CQE_to_IOCB(emlxs_hba_t *hba, CQE_CmplWQ_t *cqe, emlxs_buf_t *sbp)
 
 #ifdef DEBUG_FASTPATH
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	    "CQE to IOCB: cmd:%x tag:%x xri:%d", wqe->Command,
+	    "CQE to IOCB: cmd:%x iotag:%x xri:%d", wqe->Command,
 	    wqe->RequestTag, wqe->XRITag);
 #endif /* DEBUG_FASTPATH */
 
@@ -6969,7 +7141,19 @@ emlxs_sli4_process_cq(emlxs_hba_t *hba, CQ_DESC_t *cq)
 
 	for (;;) {
 		cq_entry.word[3] = BE_SWAP32(cqe->word[3]);
-		if (!(cq_entry.word[3] & CQE_VALID)) {
+		if (((cq_entry.word[3]>>31) & 0x01) != cq->qe_valid) {
+#ifdef	DEBUG_CQE
+			if (num_entries == 0) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sli_detail_msg, "CQE: Invalid CQE:"
+				    " eqid=%x cqid=%x cqe=%p %08x %08x %08x"
+				    " %08x. host_index=%x valid=%d Break...",
+				    cq->eqid, cq->qid, cqe,
+				    cqe->word[0], cqe->word[1],
+				    cqe->word[2], cqe->word[3],
+				    cq->host_index, cq->qe_valid);
+			}
+#endif /* DEBUG_CQE */
 			break;
 		}
 
@@ -6981,12 +7165,18 @@ emlxs_sli4_process_cq(emlxs_hba_t *hba, CQ_DESC_t *cq)
 		emlxs_data_dump(port, "CQE", (uint32_t *)cqe, 6, 0);
 #endif /* DEBUG_CQE */
 		num_entries++;
-		cqe->word[3] = 0;
+		if (hba->sli.sli4.param.CqAV)
+			/* do not attach the valid bit */
+			cqe->word[3] &=	BE_SWAP32(CQE_VALID);
+		else
+			cqe->word[3] = 0;
 
 		cq->host_index++;
 		if (cq->host_index >= cq->max_index) {
 			cq->host_index = 0;
 			cqe = (CQE_u *)cq->addr.virt;
+			if (hba->sli.sli4.param.CqAV)
+				cq->qe_valid ^= 1;
 		} else {
 			cqe++;
 		}
@@ -7028,10 +7218,14 @@ emlxs_sli4_process_cq(emlxs_hba_t *hba, CQ_DESC_t *cq)
 				break;
 			default:
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-				    "Invalid CQ entry %d: %08x %08x %08x %08x",
+				    "Invalid CQ entry eqid=%x qid=%x code=%d: "
+				    "%08x %08x %08x %08x, host_index=%x "
+				    "valid=%d",
+				    cq->eqid, cq->qid,
 				    cq_entry.cqCmplEntry.Code, cq_entry.word[0],
 				    cq_entry.word[1], cq_entry.word[2],
-				    cq_entry.word[3]);
+				    cq_entry.word[3], cq->host_index,
+				    cq->qe_valid);
 				break;
 			}
 		}
@@ -7086,7 +7280,15 @@ emlxs_sli4_process_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 		eqe.word = *ptr;
 		eqe.word = BE_SWAP32(eqe.word);
 
-		if (!(eqe.word & EQE_VALID)) {
+		if ((eqe.word & EQE_VALID) != eq->qe_valid) {
+#ifdef DEBUG_FASTPATH
+			if (num_entries == 0) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+				    "EQE: Invalid EQE: %x. host_index=%x "
+				    "valid=%d Break...",
+				    eqe.word, eq->qe_valid);
+			}
+#endif /* DEBUG_FASTPATH */
 			break;
 		}
 
@@ -7095,12 +7297,17 @@ emlxs_sli4_process_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 		    "EQE00: %08x", eqe.word);
 #endif /* DEBUG_FASTPATH */
 
-		*ptr = 0;
+		if (hba->sli.sli4.param.EqAV)
+			*ptr &= BE_SWAP32(EQE_VALID);
+		else
+			*ptr = 0;
 		num_entries++;
 		eq->host_index++;
 		if (eq->host_index >= eq->max_index) {
 			eq->host_index = 0;
 			ptr = eq->addr.virt;
+			if (hba->sli.sli4.param.EqAV)
+				eq->qe_valid ^= 1;
 		} else {
 			ptr++;
 		}
@@ -7110,14 +7317,17 @@ emlxs_sli4_process_eq(emlxs_hba_t *hba, EQ_DESC_t *eq)
 		/* Verify CQ index */
 		if (cqi == 0xffff) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
-			    "EQE: Invalid CQid: %d. Dropping...",
-			    eqe.entry.CQId);
+			    "EQE: Invalid CQid: %d. valid=%d Dropping...",
+			    eqe.entry.CQId, eq->qe_valid);
 			continue;
 		}
 
 #ifdef DEBUG_FASTPATH
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "EQE: CQIndex:%x cqid:%x", cqi, eqe.entry.CQId);
+		    "EQE: qid=%x host_index=%x valid=%d iptr=%p CQIndex:%x "
+		    "cqid:%x",
+		    eq->qid, eq->host_index, eq->qe_valid, ptr, cqi,
+		    eqe.entry.CQId);
 #endif /* DEBUG_FASTPATH */
 
 		emlxs_sli4_process_cq(hba, &hba->sli.sli4.cq[cqi]);
@@ -7279,7 +7489,8 @@ emlxs_sli4_hba_reset_all(emlxs_hba_t *hba, uint32_t flag)
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
-	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) != SLI_INTF_IF_TYPE_2) {
+	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) != SLI_INTF_IF_TYPE_2 &&
+	    (hba->sli_intf & SLI_INTF_IF_TYPE_MASK) != SLI_INTF_IF_TYPE_6) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
 		    "Reset All failed. Invalid Operation.");
 		mutex_exit(&EMLXS_PORT_LOCK);
@@ -7351,6 +7562,8 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 
 	emlxs_fcf_fini(hba);
 
+	mutex_enter(&EMLXS_PORT_LOCK);
+
 	buf_info = &hba->sli.sli4.HeaderTmplate;
 	if (buf_info->virt) {
 		bzero(buf_info, sizeof (MBUF_INFO));
@@ -7363,11 +7576,16 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) ||
 		    (hba->sli.sli4.XRIinuse_b !=
 		    (XRIobj_t *)&hba->sli.sli4.XRIinuse_f)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
-			    "XRIs in use during free!: %p %p != %p\n",
-			    hba->sli.sli4.XRIinuse_f,
-			    hba->sli.sli4.XRIinuse_b,
-			    &hba->sli.sli4.XRIinuse_f);
+			xrip = (XRIobj_t *)hba->sli.sli4.XRIinuse_f;
+			while (xrip != (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
+				    "XRIs in use during free!: %p %p != %p "
+				    "XRI:%d iotag:%d\n",
+				    hba->sli.sli4.XRIinuse_f,
+				    hba->sli.sli4.XRIinuse_b, xrip, xrip->XRI,
+				    xrip->iotag);
+				xrip = xrip->_f;
+			}
 		}
 
 		xrip = hba->sli.sli4.XRIp;
@@ -7417,6 +7635,7 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 	/* Free the MQ */
 	bzero(&hba->sli.sli4.mq, sizeof (MQ_DESC_t));
 
+
 	buf_info = &hba->sli.sli4.slim2;
 	if (buf_info->virt) {
 		buf_info->flags = FC_MBUF_DMA;
@@ -7424,9 +7643,12 @@ emlxs_sli4_resource_free(emlxs_hba_t *hba)
 		bzero(buf_info, sizeof (MBUF_INFO));
 	}
 
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	/* GPIO lock */
 	if (hba->model_info.flags & EMLXS_GPIO_LEDS)
 		mutex_destroy(&hba->gpio_lock);
+
 
 } /* emlxs_sli4_resource_free() */
 
@@ -7574,6 +7796,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 
 		mutex_init(&hba->sli.sli4.eq[i].lastwq_lock, NULL,
 		    MUTEX_DRIVER, NULL);
+		hba->sli.sli4.eq[i].qe_valid = 1;
 	}
 
 
@@ -7595,6 +7818,7 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 
 		hba->sli.sli4.cq[i].max_index = cq_depth;
 		hba->sli.sli4.cq[i].qid = 0xffff;
+		hba->sli.sli4.cq[i].qe_valid = 1;
 	}
 
 
@@ -7705,8 +7929,8 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 				virt += size;
 #ifdef DEBUG_RQE
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-				    "RQ_ALLOC: rq[%d] rqb[%d,%d]=%p iotag=%d",
-				    i, j, k, mp, mp->tag);
+				    "RQ_ALLOC: rq[%d] rqb[%d,%d]=%p flags=%d",
+				    i, j, k, rqb, rqb->flags);
 #endif /* DEBUG_RQE */
 
 				rqe++;
@@ -8588,8 +8812,9 @@ emlxs_sli4_create_queues(emlxs_hba_t *hba, MAILBOXQ *mbq)
 			    MBX_SUCCESS) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_init_failed_msg, "Unable to Create "
-				    "CQ %d: Mailbox cmd=%x status=%x ",
-				    total_cq, mb->mbxCommand, mb->mbxStatus);
+				    "CQ %d: hba=%p Mailbox cmd=%x status=%x ",
+				    total_cq, hba, mb->mbxCommand,
+				    mb->mbxStatus);
 				return (EIO);
 			}
 			cq = (IOCTL_COMMON_CQ_CREATE *)
@@ -8618,6 +8843,7 @@ emlxs_sli4_create_queues(emlxs_hba_t *hba, MAILBOXQ *mbq)
 				    &hba->chan[total_cq - EMLXS_CQ_OFFSET_WQ];
 				break;
 			}
+			hba->sli.sli4.cq[total_cq].qe_valid = 1;
 			emlxs_data_dump(port, "CQX_CREATE", (uint32_t *)mb,
 			    18, 0);
 			total_cq++;
@@ -9114,6 +9340,7 @@ emlxs_ue_dump(emlxs_hba_t *hba, char *str)
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		status = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.STATUS_reg_addr);
 
@@ -9171,6 +9398,7 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 		break;
 
 	case SLI_INTF_IF_TYPE_2:
+	case SLI_INTF_IF_TYPE_6:
 		status = ddi_get32(hba->sli.sli4.bar0_acc_handle,
 		    hba->sli.sli4.STATUS_reg_addr);
 
@@ -9186,13 +9414,13 @@ emlxs_sli4_poll_erratt(emlxs_hba_t *hba)
 			if (error == 1) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
 				    "Host Error: status:%08x err1:%08x "
-				    "err2:%08x flag:%08x",
+				    "err2:%08x flag:%08x reset",
 				    status, ue_l, ue_h, hba->sli.sli4.flag);
 			} else {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_hardware_error_msg,
 				    "Host Error: status:%08x err1:%08x "
-				    "err2:%08x flag:%08x",
+				    "err2:%08x flag:%08x shutdown",
 				    status, ue_l, ue_h, hba->sli.sli4.flag);
 			}
 		}

@@ -495,9 +495,9 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 #define	MEM_IPBUF	5	/* memory segment to hold IP buffer data */
 #define	MEM_CTBUF	6	/* memory segment to hold CT buffer data */
 #define	MEM_FCTBUF	7	/* memory segment to hold FCT buffer data */
-#define MEM_SGL1K	8	/* memory segment to hold 1K SGL entries */
-#define MEM_SGL2K	9	/* memory segment to hold 2K SGL entries */
-#define MEM_SGL4K	10	/* memory segment to hold 4K SGL entries */
+#define	MEM_SGL1K	8	/* memory segment to hold 1K SGL entries */
+#define	MEM_SGL2K	9	/* memory segment to hold 2K SGL entries */
+#define	MEM_SGL4K	10	/* memory segment to hold 4K SGL entries */
 
 #ifdef SFCT_SUPPORT
 #define	FC_MAX_SEG	11
@@ -1397,6 +1397,7 @@ typedef struct EQ_DESC
 	uint16_t	lastwq;
 	MBUF_INFO	addr;
 
+	uint16_t	qe_valid;
 	/* Statistics */
 	uint32_t	max_proc;
 	uint32_t	isr_count;
@@ -1413,7 +1414,13 @@ typedef struct CQ_DESC
 	uint16_t	type;
 #define	EMLXS_CQ_TYPE_GROUP1	1  /* associated with a MQ and async events */
 #define	EMLXS_CQ_TYPE_GROUP2	2  /* associated with a WQ and RQ */
-	uint16_t	rsvd;
+
+	/*
+	 * queue entry autovalid logic on if_type == 6
+	 * this value toggles for each iteration of the queue (host_index==0)
+	 * a queue entry is valid when cqe valid bit matches this value
+	 */
+	uint16_t	qe_valid;
 
 	MBUF_INFO	addr;
 	CHANNEL		*channelp; /* ptr to CHANNEL associated with CQ */
@@ -1591,6 +1598,7 @@ typedef struct emlxs_sli4
 	uint32_t	*MBDB_reg_addr;
 
 	uint32_t	*CQDB_reg_addr;
+	uint32_t	*EQDB_reg_addr;
 	uint32_t	*MQDB_reg_addr;
 	uint32_t	*WQDB_reg_addr;
 	uint32_t	*RQDB_reg_addr;
@@ -1767,6 +1775,7 @@ typedef struct emlxs_hba
 #define	SLI_INTF_IF_TYPE_1		0x00001000
 #define	SLI_INTF_IF_TYPE_2		0x00002000
 #define	SLI_INTF_IF_TYPE_3		0x00003000
+#define	SLI_INTF_IF_TYPE_6		0x00006000
 
 #define	SLI_INTF_FAMILY_MASK		0x00000f00
 #define	SLI_INTF_FAMILY_BE2		0x00000000

@@ -30,6 +30,7 @@
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_MBOX_C);
 
+#define	SLI_PAGE_SIZE 4096
 
 emlxs_table_t emlxs_mb_status_table[] = {
 	{MBX_SUCCESS, "SUCCESS"},
@@ -345,6 +346,7 @@ emlxs_mb_eq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
 	IOCTL_COMMON_EQ_CREATE *qp;
 	uint64_t	addr;
+	emlxs_port_t	*port = &PPORT;
 
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 	mbq->nonembed = NULL;
@@ -366,19 +368,43 @@ emlxs_mb_eq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 	mb4->un.varSLIConfig.be.un_hdr.hdr_req.timeout = 0;
 	mb4->un.varSLIConfig.be.un_hdr.hdr_req.req_length =
 	    sizeof (IOCTL_COMMON_EQ_CREATE);
-	mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
 
 	qp = (IOCTL_COMMON_EQ_CREATE *)&mb4->un.varSLIConfig.payload;
 
-	/* 1024 * 4 bytes = 4K */
-	qp->params.request.EQContext.Count = EQ_ELEMENT_COUNT_1024;
 	qp->params.request.EQContext.Valid = 1;
 	qp->params.request.EQContext.DelayMult = EQ_DELAY_MULT;
 
+	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) != SLI_INTF_IF_TYPE_6) {
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 0;
+	} else {
+		mb4->un.varSLIConfig.be.un_hdr.hdr_req.version = 2;
+		qp->params.request.EQContext.AutoValid = 1;
+	}
+	qp->params.request.NumPages =
+	    hba->sli.sli4.eq[num].addr.size / SLI_PAGE_SIZE;
+	/* qp->params.request.EQContext.Size = EQ_ELEMENT_SIZE_4; */
+	switch (qp->params.request.NumPages) {
+	case 1:
+		qp->params.request.EQContext.Count = EQ_ELEMENT_COUNT_1024;
+		break;
+	case 2:
+		qp->params.request.EQContext.Count = EQ_ELEMENT_COUNT_2048;
+		break;
+	case 4:
+		qp->params.request.EQContext.Count = EQ_ELEMENT_COUNT_4096;
+		break;
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
+		    "num_pages %d not valid\n", qp->params.request.NumPages);
+		qp->params.request.NumPages = 1;
+	}
+
 	addr = hba->sli.sli4.eq[num].addr.phys;
-	qp->params.request.NumPages = 1;
-	qp->params.request.Pages[0].addrLow = PADDR_LO(addr);
-	qp->params.request.Pages[0].addrHigh = PADDR_HI(addr);
+	for (int i = 0; i < qp->params.request.NumPages; i++) {
+		qp->params.request.Pages[i].addrLow = PADDR_LO(addr);
+		qp->params.request.Pages[i].addrHigh = PADDR_HI(addr);
+		addr += SLI_PAGE_SIZE;
+	}
 
 	return;
 
@@ -461,7 +487,12 @@ emlxs_mb_cq_create(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t num)
 		qp2->params.request.CQContext.CqeSize = CQE_SIZE_16_BYTES;
 		qp2->params.request.CQContext.EQId = hba->sli.sli4.cq[num].eqid;
 		qp2->params.request.CQContext.Valid = 1;
-		qp2->params.request.CQContext.AutoValid = 0;
+		if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) ==
+		    SLI_INTF_IF_TYPE_6) {
+			qp2->params.request.CQContext.AutoValid = 1;
+		} else {
+			qp2->params.request.CQContext.AutoValid = 0;
+		}
 		qp2->params.request.CQContext.Eventable = 1;
 		qp2->params.request.CQContext.NoDelay = 0;
 		qp2->params.request.CQContext.Count1 = 0;
@@ -1979,6 +2010,9 @@ emlxs_mb_read_lnk_stat(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	mb->mbxCommand = MBX_READ_LNK_STAT;
 	mb->mbxOwner = OWN_HOST;
+	mb->un.varRdLnk.rec = 0; /* req_ext_counters */
+	mb->un.varRdLnk.clrc = 0; /* clear_all_counters */
+	mb->un.varRdLnk.clof = 0; /* clear_overflow_flags */
 	mbq->mbox_cmpl = NULL; /* no cmpl needed */
 	mbq->port = (void *)&PPORT;
 
@@ -2070,7 +2104,7 @@ emlxs_mb_config_link(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	mb->un.varCfgLnk.rttov = hba->fc_rttov;
 	mb->un.varCfgLnk.altov = hba->fc_altov;
 	mb->un.varCfgLnk.crtov = hba->fc_crtov;
-	mb->un.varCfgLnk.citov = hba->fc_citov;
+
 	mb->mbxCommand = MBX_CONFIG_LINK;
 	mb->mbxOwner = OWN_HOST;
 	mbq->mbox_cmpl = NULL;
@@ -2222,7 +2256,9 @@ emlxs_mb_init_link(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t topology,
 		mb->un.varInitLnk.link_speed = linkspeed;
 	}
 
-	mb->un.varInitLnk.link_flags |= FLAGS_PREABORT_RETURN;
+	if (hba->sli_mode == 3) {
+		mb->un.varInitLnk.link_flags |= FLAGS_PREABORT_RETURN;
+	}
 
 	mb->un.varInitLnk.fabric_AL_PA =
 	    (uint8_t)cfg[CFG_ASSIGN_ALPA].current;

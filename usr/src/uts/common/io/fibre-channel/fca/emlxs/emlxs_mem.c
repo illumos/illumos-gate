@@ -441,12 +441,11 @@ emlxs_mem_pool_alloc(emlxs_hba_t *hba, MEMSEG *seg, uint32_t count)
 	/* Check for initial allocation */
 	if (!(seg->fc_memflag & FC_MEMSEG_PUT_ENABLED)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_detail_msg,
-		    "%s alloc:%d n=%d s=%d f=%x l=%d,%d,%d "
-		    "f=%d:%d",
+		    "%s alloc:%d n=%d s=%d f=%x l=%d,%d,%d f=%d:%d",
 		    seg->fc_label, count, seg->fc_numblks,
-		    seg->fc_memsize, seg->fc_memflag, seg->fc_lo_water,
-		    seg->fc_hi_water, seg->fc_step, seg->fc_memget_cnt,
-		    seg->fc_low);
+		    seg->fc_memsize, seg->fc_memflag,
+		    seg->fc_lo_water, seg->fc_hi_water, seg->fc_step,
+		    seg->fc_memget_cnt, seg->fc_low);
 	}
 
 	if (!(seg->fc_memflag & FC_MBUF_DMA)) {

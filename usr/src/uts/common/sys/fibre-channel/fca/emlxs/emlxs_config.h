@@ -252,7 +252,7 @@ emlxs_config_t  emlxs_cfg[] = {
 		0, 16, 0, 0,
 		PARM_DYNAMIC_LINK,
 	"Select link speed. "
-		"[0=Auto, 1=1Gb, 2=2Gb, 4=4Gb, 8=8Gb, 16Gb]"},
+		"[0=Auto, 1=1Gb, 2=2Gb, 4=4Gb, 8=8Gb, 16=16Gb]"},
 
 	/* CFG_NUM_NODES */
 	{"num-nodes",

@@ -1030,7 +1030,7 @@ typedef struct emlxs_cqdb
 	uint32_t	NumPosted:2;	/* Number of entries posted */
 	uint32_t	Rearm:1;	/* Rearm CQ */
 	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
-	uint32_t	Rsvd1:5;
+	uint32_t	Qid_hi:5;
 	uint32_t	Event:1;	/* 1 if processed entry is EQE */
 				/* 0 if processed entry is CQE */
 	uint32_t	Qid:10;		/* CQ id for posted CQE */
@@ -1040,7 +1040,7 @@ typedef struct emlxs_cqdb
 	uint32_t	Qid:10;		/* CQ id for posted CQE */
 	uint32_t	Event:1;	/* 1 if processed entry is EQE */
 				/* 0 if processed entry is CQE */
-	uint32_t	Rsvd1:5;
+	uint32_t	Qid_hi:5;
 	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
 	uint32_t	Rearm:1;	/* Rearm CQ */
 	uint32_t	NumPosted:2;	/* Number of entries posted */
@@ -1048,13 +1048,30 @@ typedef struct emlxs_cqdb
 
 } emlxs_cqdb_t;
 
+typedef struct emlxs_cqdb6
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	NumPosted:2;	/* Number of entries posted */
+	uint32_t	Rearm:1;	/* Rearm CQ */
+	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
+	uint32_t	Qid:16;		/* CQ id for posted CQE */
+#endif /* EMLXS_BIG_ENDIAN */
 
-typedef union emlxs_cqdbu
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	Qid:16;		/* CQ id for posted CQE */
+	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
+	uint32_t	Rearm:1;	/* Rearm CQ */
+	uint32_t	NumPosted:2;	/* Number of entries posted */
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+} emlxs_cqdb6_t;
+
+typedef union
 {
 	uint32_t	word;
-	emlxs_cqdb_t	db;
-
-} emlxs_cqdbu_t;
+	emlxs_cqdb_t	db2;		/* if_type 0,2 */
+	emlxs_cqdb6_t	db6;		/* if_type 6 */
+} emlxs_cqdb_u;
 
 typedef struct emlxs_eqdb
 {
@@ -1062,7 +1079,7 @@ typedef struct emlxs_eqdb
 	uint32_t	Rsvd2:2;
 	uint32_t	Rearm:1;	/* Rearm EQ */
 	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
-	uint32_t	Rsvd1:5;
+	uint32_t	Qid_hi:5;
 	uint32_t	Event:1;	/* True iff processed entry is EQE */
 	uint32_t	Clear:1;	/* clears EQ interrupt when set */
 	uint32_t	Qid:9;		/* EQ id for posted EQE */
@@ -1071,22 +1088,42 @@ typedef struct emlxs_eqdb
 #ifdef EMLXS_LITTLE_ENDIAN
 	uint32_t	Qid:9;		/* EQ id for posted EQE */
 	uint32_t	Clear:1;	/* clears EQ interrupt when set */
-	uint32_t	Event:1;	/* True iff processed entry is EQE */
-	uint32_t	Rsvd1:5;
-	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
+	uint32_t	Event:1;	/* True if processed entry is EQE */
+	uint32_t	Qid_hi:5;
+	uint32_t	NumPopped:13;	/* Number of EQ entries processed */
 	uint32_t	Rearm:1;	/* Rearm EQ */
 	uint32_t	Rsvd2:2;
 #endif /* EMLXS_LITTLE_ENDIAN */
 
 } emlxs_eqdb_t;
 
+typedef struct emlxs_eqdb6
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	NumPosted:2;	/* Number of entries posted */
+	uint32_t	Rearm:1;	/* Rearm CQ */
+	uint32_t	NumPopped:13;	/* Number of CQ entries processed */
+	uint32_t	Rsvd1:4;
+	uint32_t	Qid:12;		/* EQ id for posted EQE */
+#endif /* EMLXS_BIG_ENDIAN */
 
-typedef union emlxs_eqdbu
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	Qid:12;		/* EQ id for posted EQE */
+	uint32_t	Rsvd1:4;
+	uint32_t	NumPopped:13;	/* Number of EQ entries processed */
+	uint32_t	Rearm:1;	/* Rearm EQ */
+	uint32_t	NumPosted:2;	/* Number of entries posted */
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+} emlxs_eqdb6_t;
+
+
+typedef union
 {
 	uint32_t	word;
-	emlxs_eqdb_t	db;
-
-} emlxs_eqdbu_t;
+	emlxs_eqdb_t	db2;		/* if_type 0,2 */
+	emlxs_eqdb6_t	db6;		/* if_type 6 */
+} emlxs_eqdb_u;
 
 
 typedef struct emlxs_mqdb

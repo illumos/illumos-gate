@@ -520,6 +520,13 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		if (!sbp || sbp == STALE_PACKET) {
 			continue;
 		}
+		/* if channel not set we can not send a abort iocbq */
+		if (sbp->channel == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+			    "timer_check_pkts: Invalid IO found. iotag=%d, "
+			    "no channel set", iotag);
+			continue;
+		}
 
 		/* Check if IO is valid */
 		if (!(sbp->pkt_flags & PACKET_VALID) ||

@@ -1950,7 +1950,7 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 	uint16_t ssdid;
 	uint32_t i;
 	uint32_t found = 0;
-	int32_t *prop;
+	pci_regspec_t *prop;
 	uint32_t num_prop;
 
 	if (hba->bus_type == SBUS_FC) {
@@ -2161,13 +2161,14 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, hba->dip, 0,
-	    "reg", &prop, &num_prop) == DDI_PROP_SUCCESS) {
+	    "reg", (int **)&prop, &num_prop) == DDI_PROP_SUCCESS) {
 		/* Parse the property for PCI function, device and bus no. */
 		hba->pci_function_number =
-		    (uint8_t)((prop[0] & 0x00000700) >> 8);
+		    (uint8_t)PCI_REG_FUNC_G(prop[0].pci_phys_hi);
 		hba->pci_device_number =
-		    (uint8_t)((prop[0] & 0x0000f800) >> 11);
-		hba->pci_bus_number = (uint8_t)((prop[0] & 0x00ff0000) >> 16);
+		    (uint8_t)PCI_REG_DEV_G(prop[0].pci_phys_hi);
+		hba->pci_bus_number =
+		    (uint8_t)PCI_REG_BUS_G(prop[0].pci_phys_hi);
 		ddi_prop_free((void *)prop);
 	}
 
