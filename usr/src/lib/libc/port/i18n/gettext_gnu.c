@@ -45,10 +45,6 @@
 #include "nlspath_checks.h"
 #include "gettext.h"
 
-#ifdef DEBUG
-#include <assert.h>
-#endif
-
 /* The following symbols are just for GNU binary compatibility */
 int	_nl_msg_cat_cntr;
 int	*_nl_domain_bindings;

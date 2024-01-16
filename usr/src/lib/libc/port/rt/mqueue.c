@@ -58,7 +58,7 @@
  * Message header which is part of messages in link list
  */
 typedef struct {
-	uint64_t 	msg_next;	/* offset of next message in the link */
+	uint64_t	msg_next;	/* offset of next message in the link */
 	uint64_t	msg_len;	/* length of the message */
 } msghdr_t;
 
@@ -127,7 +127,7 @@ typedef struct mq_header {
 #define	MQ_ASSERT(x)	assert(x);
 
 #define	MQ_ASSERT_PTR(_m, _p) \
-	assert((_p) != NULL && !((uintptr_t)(_p) & (MQ_ALIGNSIZE -1)) && \
+	assert((_p) != 0 && !((uintptr_t)(_p) & (MQ_ALIGNSIZE -1)) && \
 	    !((uintptr_t)_m + (uintptr_t)(_p) >= (uintptr_t)_m + \
 	    _m->mq_totsize));
 
@@ -658,7 +658,7 @@ mq_unlink(const char *path)
 
 static int
 __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
-	uint_t msg_prio, const timespec_t *timeout, int abs_rel)
+    uint_t msg_prio, const timespec_t *timeout, int abs_rel)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
@@ -767,7 +767,7 @@ mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, uint_t msg_prio)
 
 int
 mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
-	uint_t msg_prio, const timespec_t *abs_timeout)
+    uint_t msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
 	    abs_timeout, ABS_TIME));
@@ -775,7 +775,7 @@ mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 
 int
 mq_reltimedsend_np(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
-	uint_t msg_prio, const timespec_t *rel_timeout)
+    uint_t msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
 	    rel_timeout, REL_TIME));
@@ -794,7 +794,7 @@ decrement_rblocked(mqhdr_t *mqhp)
 
 static ssize_t
 __mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
-	uint_t *msg_prio, const timespec_t *timeout, int abs_rel)
+    uint_t *msg_prio, const timespec_t *timeout, int abs_rel)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
@@ -882,7 +882,7 @@ mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint_t *msg_prio)
 
 ssize_t
 mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
-	uint_t *msg_prio, const timespec_t *abs_timeout)
+    uint_t *msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
 	    abs_timeout, ABS_TIME));
@@ -890,7 +890,7 @@ mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 
 ssize_t
 mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
-	uint_t *msg_prio, const timespec_t *rel_timeout)
+    uint_t *msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
 	    rel_timeout, REL_TIME));
@@ -903,7 +903,7 @@ mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
  */
 static int
 cancel_if_necessary(thread_communication_data_t *tcdp,
-	const struct sigevent *sigevp)
+    const struct sigevent *sigevp)
 {
 	int do_cancel = !pthread_attr_equal(tcdp->tcd_attrp,
 	    sigevp->sigev_notify_attributes);

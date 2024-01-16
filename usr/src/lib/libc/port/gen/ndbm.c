@@ -78,6 +78,9 @@ static int setbit(DBM *);
 static int getbit(DBM *);
 static int dbm_flushdir(DBM *);
 static int dbm_flushpag(DBM *db);
+#ifdef NDBM_DEBUG
+static int chkblk(char buf[PBLKSIZ]);
+#endif
 
 /* the following three are required by mapfile-vers */
 datum dbm_do_nextkey(DBM *, datum);
@@ -510,7 +513,7 @@ dbm_slow_nextkey(DBM *db)
 			    (read(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) !=
 			    PBLKSIZ))
 				(void) memset(db->dbm_pagbuf, 0, PBLKSIZ);
-#ifdef DEBUG
+#ifdef NDBM_DEBUG
 			else if (chkblk(db->dbm_pagbuf) < 0)
 				db->dbm_flags |= _DBM_IOERR;
 #endif
@@ -583,7 +586,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 			    (read(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) !=
 			    PBLKSIZ))
 				(void) memset(db->dbm_pagbuf, 0, PBLKSIZ);
-#ifdef DEBUG
+#ifdef NDBM_DEBUG
 			else if (chkblk(db->dbm_pagbuf) < 0)
 			db->dbm_flags |= _DBM_IOERR;
 #endif
@@ -770,7 +773,7 @@ dbm_access(DBM *db, unsigned long hash)
 		if ((lseek64(db->dbm_pagf, where, L_SET) != where) ||
 		    (read(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) != PBLKSIZ))
 			(void) memset(db->dbm_pagbuf, 0, PBLKSIZ);
-#ifdef DEBUG
+#ifdef NDBM_DEBUG
 		else if (chkblk(db->dbm_pagbuf) < 0)
 			db->dbm_flags |= _DBM_IOERR;
 #endif
@@ -1012,7 +1015,7 @@ additem(char *buf, datum item, datum item1)
 	return (1);
 }
 
-#ifdef DEBUG
+#ifdef NDBM_DEBUG
 static int
 chkblk(char buf[PBLKSIZ])
 {

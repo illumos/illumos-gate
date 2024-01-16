@@ -1125,7 +1125,7 @@ CERRWARN += -_gcc=-Wno-address
 # enables ASSERT() checking in the threads portion of the library.
 # This is automatically enabled for DEBUG builds, not for non-debug builds.
 THREAD_DEBUG =
-$(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG
+$(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG -DDEBUG
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
