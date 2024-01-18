@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -31,6 +34,7 @@
 #include <pthread.h>
 #include <strings.h>
 #include <unistd.h>
+#include <zone.h>
 
 #include <libzfs.h>
 
@@ -194,6 +198,9 @@ libzfs_init_fru(void)
 {
 	char path[MAXPATHLEN];
 	char isa[257];
+
+	if (getzoneid() != GLOBAL_ZONEID)
+		return;
 
 #if defined(_LP64)
 	if (sysinfo(SI_ARCHITECTURE_64, isa, sizeof (isa)) < 0)
