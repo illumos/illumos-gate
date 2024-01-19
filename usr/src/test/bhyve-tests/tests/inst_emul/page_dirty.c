@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -154,15 +154,14 @@ main(int argc, char *argv[])
 	/* Skip test if CPU doesn't support HW A/D tracking */
 	check_supported(test_suite_name);
 
-	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
-		test_fail_errno(errno, "Could not open vcpu0");
-	}
-
 	/* Test for expected error with dirty tracking disabled */
 	test_dirty_tracking_disabled(test_suite_name);
 
 	ctx = test_initialize_flags(test_suite_name, VCF_TRACK_DIRTY);
 
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		test_fail_errno(errno, "Could not open vcpu0");
+	}
 	err = test_setup_vcpu(vcpu, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {
 		test_fail_errno(err, "Could not initialize vcpu0");

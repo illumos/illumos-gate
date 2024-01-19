@@ -1202,7 +1202,15 @@ mlxcx_teardown(mlxcx_t *mlxp)
 static void
 mlxcx_get_model(mlxcx_t *mlxp)
 {
+	uint16_t venid;
 	uint16_t devid;
+
+	venid = pci_config_get16(mlxp->mlx_cfg_handle, PCI_CONF_VENID);
+	if (venid != MLXCX_VENDOR_ID) {
+		/* Currently, all supported cards have a Mellanox vendor id. */
+		mlxp->mlx_type = MLXCX_DEV_UNKNOWN;
+		return;
+	}
 
 	devid = pci_config_get16(mlxp->mlx_cfg_handle, PCI_CONF_DEVID);
 	switch (devid) {

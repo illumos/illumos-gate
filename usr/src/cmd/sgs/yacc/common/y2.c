@@ -603,8 +603,7 @@ setup(int argc, char *argv[])
 
 	(void) fprintf(ftable,
 	    "\n#if defined(__cplusplus) || defined(__STDC__)\n");
-	(void) fprintf(ftable,
-	    "\n#if defined(__cplusplus) && defined(__EXTERN_C__)\n");
+	(void) fprintf(ftable, "\n#if defined(__cplusplus)\n");
 	(void) fprintf(ftable, "extern \"C\" {\n");
 	(void) fprintf(ftable, "#endif\n");
 	(void) fprintf(ftable, "#ifndef yyerror\n");
@@ -616,8 +615,7 @@ setup(int argc, char *argv[])
 	(void) fprintf(ftable, "	int yylex(void);\n");
 	(void) fprintf(ftable, "#endif\n");
 	(void) fprintf(ftable, "	int yyparse(void);\n");
-	(void) fprintf(ftable,
-	    "#if defined(__cplusplus) && defined(__EXTERN_C__)\n");
+	(void) fprintf(ftable, "#if defined(__cplusplus)\n");
 	(void) fprintf(ftable, "}\n");
 	(void) fprintf(ftable, "#endif\n");
 	(void) fprintf(ftable, "\n#endif\n\n");

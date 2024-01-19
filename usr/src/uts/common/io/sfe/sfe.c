@@ -31,10 +31,6 @@
  * DAMAGE.
  */
 
-/* Avoid undefined symbol for non IA architectures */
-#pragma weak	inb
-#pragma weak	outb
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -178,7 +174,7 @@ static uint16_t  sfe_mii_read_dp83815(struct gem_dev *, uint_t);
 static uint16_t  sfe_mii_read_sis900(struct gem_dev *, uint_t);
 static void sfe_mii_write_dp83815(struct gem_dev *, uint_t, uint16_t);
 static void sfe_mii_write_sis900(struct gem_dev *, uint_t, uint16_t);
-static void sfe_set_eq_sis630(struct gem_dev *dp);
+static void sfe_set_eq_sis630(struct gem_dev *);
 /* nic operations */
 static int sfe_reset_chip_sis900(struct gem_dev *);
 static int sfe_reset_chip_dp83815(struct gem_dev *);
@@ -416,79 +412,6 @@ static dev_info_t *
 sfe_search_pci_dev(int vendor_id, int device_id)
 {
 	return (sfe_search_pci_dev_subr(ddi_root_node(), vendor_id, device_id));
-}
-
-static boolean_t
-sfe_get_mac_addr_sis630e(struct gem_dev *dp)
-{
-	int		i;
-	dev_info_t	*isa_bridge;
-	ddi_acc_handle_t isa_handle;
-	int		reg;
-
-	if (inb == NULL || outb == NULL) {
-		/* this is not IA architecture */
-		return (B_FALSE);
-	}
-
-	if ((isa_bridge = sfe_search_pci_dev(0x1039, 0x8)) == NULL) {
-		cmn_err(CE_WARN, "%s: failed to find isa-bridge pci1039,8",
-		    dp->name);
-		return (B_FALSE);
-	}
-
-	if (pci_config_setup(isa_bridge, &isa_handle) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s: ddi_regs_map_setup failed",
-		    dp->name);
-		return (B_FALSE);
-	}
-
-	/* enable to access CMOS RAM */
-	reg = pci_config_get8(isa_handle, 0x48);
-	pci_config_put8(isa_handle, 0x48, reg | 0x40);
-
-	for (i = 0; i < ETHERADDRL; i++) {
-		outb(0x70, 0x09 + i);
-		dp->dev_addr.ether_addr_octet[i] = inb(0x71);
-	}
-
-	/* disable to access CMOS RAM */
-	pci_config_put8(isa_handle, 0x48, reg);
-	pci_config_teardown(&isa_handle);
-
-	return (B_TRUE);
-}
-
-static boolean_t
-sfe_get_mac_addr_sis635(struct gem_dev *dp)
-{
-	int		i;
-	uint32_t	rfcr;
-	uint16_t	v;
-	struct sfe_dev	*lp = dp->private;
-
-	DPRINTF(2, (CE_CONT, CONS "%s: %s: called", dp->name, __func__));
-	rfcr = INL(dp, RFCR);
-
-	OUTL(dp, CR, lp->cr | CR_RELOAD);
-	OUTL(dp, CR, lp->cr);
-
-	/* disable packet filtering before reading filter */
-	OUTL(dp, RFCR, rfcr & ~RFCR_RFEN);
-
-	/* load MAC addr from filter data register */
-	for (i = 0; i < ETHERADDRL; i += 2) {
-		OUTL(dp, RFCR,
-		    (RFADDR_MAC_SIS900 + (i/2)) << RFCR_RFADDR_SHIFT_SIS900);
-		v = INL(dp, RFDR);
-		dp->dev_addr.ether_addr_octet[i] = (uint8_t)v;
-		dp->dev_addr.ether_addr_octet[i+1] = (uint8_t)(v >> 8);
-	}
-
-	/* re-enable packet filtering */
-	OUTL(dp, RFCR, rfcr | RFCR_RFEN);
-
-	return (B_TRUE);
 }
 
 static boolean_t
@@ -1178,7 +1101,7 @@ sfe_get_stats(struct gem_dev *dp)
  */
 static int
 sfe_tx_desc_write(struct gem_dev *dp, int slot,
-		ddi_dma_cookie_t *dmacookie, int frags, uint64_t flags)
+    ddi_dma_cookie_t *dmacookie, int frags, uint64_t flags)
 {
 	uint32_t		mark;
 	struct sfe_desc		*tdp;
@@ -1249,7 +1172,7 @@ sfe_tx_start(struct gem_dev *dp, int start_slot, int nslot)
 
 static void
 sfe_rx_desc_write(struct gem_dev *dp, int slot,
-	    ddi_dma_cookie_t *dmacookie, int frags)
+    ddi_dma_cookie_t *dmacookie, int frags)
 {
 	struct sfe_desc		*rdp;
 	uint32_t		tmp0;
@@ -1996,13 +1919,7 @@ sfe_chipinfo_init_sis900(struct gem_dev *dp)
 
 	rev = lp->revid;
 
-	if (rev == SIS630E_900_REV /* 0x81 */) {
-		/* sis630E */
-		lp->get_mac_addr = &sfe_get_mac_addr_sis630e;
-	} else if (rev > 0x81 && rev <= 0x90) {
-		/* 630S, 630EA1, 630ET, 635A */
-		lp->get_mac_addr = &sfe_get_mac_addr_sis635;
-	} else if (rev == SIS962_900_REV /* 0x91 */) {
+	if (rev == SIS962_900_REV /* 0x91 */) {
 		/* sis962 or later */
 		lp->get_mac_addr = &sfe_get_mac_addr_sis962;
 	} else {
@@ -2365,7 +2282,7 @@ sfe_quiesce(dev_info_t *dip)
  */
 /* ======================================================== */
 DDI_DEFINE_STREAM_OPS(sfe_ops, nulldev, nulldev, sfeattach, sfedetach,
-	nodev, NULL, D_MP, NULL, sfe_quiesce);
+    nodev, NULL, D_MP, NULL, sfe_quiesce);
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */
@@ -2385,7 +2302,7 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int 	status;
+	int	status;
 
 	DPRINTF(2, (CE_CONT, CONS "sfe: _init: called"));
 	gem_mod_init(&sfe_ops, "sfe");

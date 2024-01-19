@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -453,6 +453,7 @@ typedef struct pcie_bus {
 	pcie_lbw_state_t	bus_lbw_state;
 	taskq_ent_t		bus_lbw_ent;
 	uint64_t		bus_lbw_nevents;
+	hrtime_t		bus_lbw_last_ts;
 	char			*bus_lbw_pbuf;
 	char			*bus_lbw_cbuf;
 

@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright (c) 2014 Gary Mills
 .\"
-.TH LEX 1 "Feb 17, 2023"
+.TH LEX 1 "Dec 25, 2023"
 .SH NAME
 lex \- generate programs for lexical tasks
 .SH SYNOPSIS
@@ -984,15 +984,3 @@ Interface Stability	Standard
 .BR environ (7),
 .BR regex (7),
 .BR standards (7)
-.SH NOTES
-If routines such as \fByyback()\fR, \fByywrap()\fR, and \fByylock()\fR
-in \fB\|.l\fR (ell) files are to be external C functions, the command line to
-compile a C++ program must define the \fB__EXTERN_C__\fR macro. For example:
-.sp
-.in +2
-.nf
-example%  \fBCC -D__EXTERN_C__ ... file\fR
-.fi
-.in -2
-.sp
-

@@ -12,7 +12,7 @@
 /*
  * Copyright 2021, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2023 MNX Cloud, Inc.
  */
 
@@ -56,6 +56,27 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define	MLXCX_VENDOR_ID			0x15b3
+
+/*
+ * The PCI device ids for the cards we support. The device IDs correspond to
+ * the device ids in the driver manifest, and the names were obtained from
+ * the PCI id database in /usr/share/hwdata/pci.ids
+ */
+#define	MLXCX_CX4_DEVID			0x1013
+#define	MLXCX_CX4_VF_DEVID		0x1014
+#define	MLXCX_CX4_LX_DEVID		0x1015
+#define	MLXCX_CX4_LX_VF_DEVID		0x1016
+#define	MLXCX_CX5_DEVID			0x1017
+#define	MLXCX_CX5_VF_DEVID		0x1018
+#define	MLXCX_CX5_EX_DEVID		0x1019
+#define	MLXCX_CX5_EX_VF_DEVID		0x101a
+#define	MLXCX_CX6_DEVID			0x101b
+#define	MLXCX_CX6_VF_DEVID		0x101c
+#define	MLXCX_CX6_DF_DEVID		0x101d
+#define	MLXCX_CX5_GEN_VF_DEVID		0x101e
+#define	MLXCX_CX6_LX_DEVID		0x101f
 
 /*
  * The PCI device id for the cards we support. Taken from

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -74,12 +74,25 @@ main(int argc, char *argv[])
 	/* Check some bogus inputs as well */
 	const int bad_inputs[] = {-1, maxcpus, maxcpus + 1};
 	for (uint_t i = 0; i < ARRAY_SIZE(bad_inputs); i++) {
-		const int vcpu = bad_inputs[i];
+		const int vcpuid = bad_inputs[i];
 
-		if (vm_vcpu_open(ctx, vcpu) != NULL) {
+		/*
+		 * There is no logic (currently) in vm_vcpu_open() checking
+		 * vcpuid for validity, so we must use a further operation to
+		 * perform a useful test.
+		 */
+		struct vcpu *vcpu = vm_vcpu_open(ctx, vcpuid);
+		if (vcpu == NULL) {
 			errx(EXIT_FAILURE,
-			    "unexpected open for invalid vcpu %d", i);
+			    "unexpected failure from vm_vcpu_open()");
 		}
+
+		if (vm_activate_cpu(vcpu) == 0) {
+			err(EXIT_FAILURE,
+			    "unexpected VM_ACTIVATE success for bad vcpuid %d",
+			    vcpuid);
+		}
+		vm_vcpu_close(vcpu);
 	}
 
 	vm_destroy(ctx);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -32,33 +32,14 @@
 
 #include "common.h"
 
-#define	APIC_ADDR_CCR	0xfee00390
+#define	APIC_ADDR_TIMER_ICR	0xfee00380
+#define	APIC_ADDR_TIMER_CCR	0xfee00390
 
 #define	TIMER_TEST_VAL	0x10000
 
-int
-main(int argc, char *argv[])
+static void
+test_ccr_clamp(int vmfd, struct vcpu *vcpu)
 {
-	const char *suite_name = basename(argv[0]);
-	struct vmctx *ctx;
-	struct vcpu *vcpu;
-
-	ctx = create_test_vm(suite_name);
-	if (ctx == NULL) {
-		errx(EXIT_FAILURE, "could not open test VM");
-	}
-
-	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
-		err(EXIT_FAILURE, "Could not open vcpu0");
-	}
-
-	if (vm_activate_cpu(vcpu) != 0) {
-		err(EXIT_FAILURE, "could not activate vcpu0");
-	}
-
-	const int vmfd = vm_get_device_fd(ctx);
-	int error;
-
 	/* Pause the instance before attempting to manipulate vlapic data */
 	if (ioctl(vmfd, VM_PAUSE, 0) != 0) {
 		err(EXIT_FAILURE, "VM_PAUSE failed");
@@ -107,7 +88,7 @@ main(int argc, char *argv[])
 
 	/* Now simulate a read of CCR from that LAPIC */
 	uint64_t ccr_value = 0;
-	error = vm_readwrite_kernemu_device(vcpu, APIC_ADDR_CCR,
+	int error = vm_readwrite_kernemu_device(vcpu, APIC_ADDR_TIMER_CCR,
 	    false, 4, &ccr_value);
 	if (error != 0) {
 		err(EXIT_FAILURE, "could not emulate MMIO of LAPIC CCR");
@@ -116,6 +97,98 @@ main(int argc, char *argv[])
 		errx(EXIT_FAILURE, "CCR not clamped: %lx != %x",
 		    ccr_value, TIMER_TEST_VAL);
 	}
+}
+
+static void
+test_timer_icr_constraints(int vmfd, struct vcpu *vcpu)
+{
+	/* Pause instance before our shenanigans */
+	if (ioctl(vmfd, VM_PAUSE, 0) != 0) {
+		err(EXIT_FAILURE, "VM_PAUSE failed");
+	}
+
+	/* Load a TIMER_ICR value */
+	uint64_t icr_value = 1 << 30;
+	int error = vm_readwrite_kernemu_device(vcpu, APIC_ADDR_TIMER_CCR,
+	    true, 4, &icr_value);
+	if (error != 0) {
+		err(EXIT_FAILURE, "failed to load timer ICR value");
+	}
+
+	struct vdi_lapic_v1 lapic_data;
+	struct vm_data_xfer xfer = {
+		.vdx_vcpuid = 0,
+		.vdx_class = VDC_LAPIC,
+		.vdx_version = 1,
+		.vdx_len = sizeof (lapic_data),
+		.vdx_data = &lapic_data,
+	};
+
+	if (ioctl(vmfd, VM_DATA_READ, &xfer) != 0) {
+		err(EXIT_FAILURE, "VM_DATA_READ of lapic failed");
+	}
+
+	/* Confirm that ICR value is set, and timer is scheduled */
+	if (lapic_data.vl_lapic.vlp_icr_timer == 0) {
+		errx(EXIT_FAILURE, "ICR_TIMER is 0");
+	}
+	if (lapic_data.vl_timer_target == 0) {
+		errx(EXIT_FAILURE, "vlapic timer not scheduled");
+	}
+
+	/* Reset vCPU to clear timer state from LAPIC */
+	if (vcpu_reset(vcpu) != 0) {
+		err(EXIT_FAILURE, "vcpu_reset() failed");
+	}
+
+	/* Re-read vlapic, and confirm zeroed bits */
+	if (ioctl(vmfd, VM_DATA_READ, &xfer) != 0) {
+		err(EXIT_FAILURE, "VM_DATA_READ of lapic failed");
+	}
+	if (lapic_data.vl_lapic.vlp_icr_timer != 0) {
+		errx(EXIT_FAILURE, "ICR_TIMER is not 0");
+	}
+	if (lapic_data.vl_timer_target != 0) {
+		errx(EXIT_FAILURE, "vlapic timer should not be scheduled");
+	}
+
+	/*
+	 * Try to load a vlapic payload with timer scheduled but icr_timer still
+	 * zeroed out.
+	 */
+	lapic_data.vl_timer_target = 1 << 20;
+	lapic_data.vl_lapic.vlp_icr_timer = 0;
+
+	if (ioctl(vmfd, VM_DATA_WRITE, &xfer) == 0) {
+		errx(EXIT_FAILURE,
+		    "VM_DATA_WRITE of invalid lapic data should fail");
+	}
+}
+
+int
+main(int argc, char *argv[])
+{
+	const char *suite_name = basename(argv[0]);
+	struct vmctx *ctx;
+	struct vcpu *vcpu;
+
+	ctx = create_test_vm(suite_name);
+	if (ctx == NULL) {
+		errx(EXIT_FAILURE, "could not open test VM");
+	}
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
+		err(EXIT_FAILURE, "Could not open vcpu0");
+	}
+
+	if (vm_activate_cpu(vcpu) != 0) {
+		err(EXIT_FAILURE, "could not activate vcpu0");
+	}
+
+	const int vmfd = vm_get_device_fd(ctx);
+
+	test_ccr_clamp(vmfd, vcpu);
+	test_timer_icr_constraints(vmfd, vcpu);
 
 	vm_destroy(ctx);
 	(void) printf("%s\tPASS\n", suite_name);

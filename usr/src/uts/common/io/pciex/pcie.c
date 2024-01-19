@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -3252,6 +3252,7 @@ pcie_link_bw_intr(dev_info_t *dip)
 	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
 	uint16_t linksts;
 	uint16_t flags = PCIE_LINKSTS_LINK_BW_MGMT | PCIE_LINKSTS_AUTO_BW;
+	hrtime_t now;
 
 	if ((bus_p->bus_lbw_state & PCIE_LBW_S_ENABLED) == 0) {
 		return (DDI_INTR_UNCLAIMED);
@@ -3262,6 +3263,8 @@ pcie_link_bw_intr(dev_info_t *dip)
 		return (DDI_INTR_UNCLAIMED);
 	}
 
+	now = gethrtime();
+
 	/*
 	 * Check if we've already dispatched this event. If we have already
 	 * dispatched it, then there's nothing else to do, we coalesce multiple
@@ -3269,6 +3272,7 @@ pcie_link_bw_intr(dev_info_t *dip)
 	 */
 	mutex_enter(&bus_p->bus_lbw_mutex);
 	bus_p->bus_lbw_nevents++;
+	bus_p->bus_lbw_last_ts = now;
 	if ((bus_p->bus_lbw_state & PCIE_LBW_S_DISPATCHED) == 0) {
 		if ((bus_p->bus_lbw_state & PCIE_LBW_S_RUNNING) == 0) {
 			taskq_dispatch_ent(pcie_link_tq, pcie_link_bw_taskq,
