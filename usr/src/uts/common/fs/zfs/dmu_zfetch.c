@@ -422,7 +422,7 @@ dmu_zfetch(zfetch_t *zf, uint64_t blkid, uint64_t nblks, boolean_t fetch_data,
 	if (zfs_refcount_count(&zs->zs_blocks) == 0)
 		zs->zs_start_time = zs->zs_atime;
 	zs->zs_blkid = end_of_access_blkid;
-	zfs_refcount_add_many(&zs->zs_blocks, pf_nblks + ipf_iend - ipf_istart,
+	zfs_refcount_add_few(&zs->zs_blocks, pf_nblks + ipf_iend - ipf_istart,
 	    NULL);
 	mutex_exit(&zs->zs_lock);
 	rw_exit(&zf->zf_rwlock);

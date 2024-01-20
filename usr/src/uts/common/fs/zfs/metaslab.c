@@ -5525,11 +5525,8 @@ metaslab_class_throttle_reserve(metaslab_class_t *mc, int slots, int allocator,
 		 * We reserve the slots individually so that we can unreserve
 		 * them individually when an I/O completes.
 		 */
-		for (int d = 0; d < slots; d++) {
-			reserved_slots =
-			    zfs_refcount_add(&mc->mc_alloc_slots[allocator],
-			    zio);
-		}
+		zfs_refcount_add_few(&mc->mc_alloc_slots[allocator], slots,
+		    zio);
 		zio->io_flags |= ZIO_FLAG_IO_ALLOCATING;
 		slot_reserved = B_TRUE;
 	}
@@ -5544,10 +5541,7 @@ metaslab_class_throttle_unreserve(metaslab_class_t *mc, int slots,
 {
 	ASSERT(mc->mc_alloc_throttle_enabled);
 	mutex_enter(&mc->mc_lock);
-	for (int d = 0; d < slots; d++) {
-		(void) zfs_refcount_remove(&mc->mc_alloc_slots[allocator],
-		    zio);
-	}
+	zfs_refcount_remove_few(&mc->mc_alloc_slots[allocator], slots, zio);
 	mutex_exit(&mc->mc_lock);
 }
 
