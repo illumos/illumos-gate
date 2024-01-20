@@ -70,7 +70,7 @@ A Reason why ERRNO2 could occur.
 .\" .Sy Safe
 .\" .Sy Unsafe
 .\" .Sy MT-Safe
-.\" .Sy Aysnc-Signal-Safe
+.\" .Sy Async-Signal-Safe
 .Sh SEE ALSO
 .\" A list of mentioned manuals or others that are relevant to this
 .\" function. If there is a user command that exercises this, for

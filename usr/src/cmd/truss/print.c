@@ -63,6 +63,7 @@
 #include <sys/aiocb.h>
 #include <sys/corectl.h>
 #include <sys/cpc_impl.h>
+#include <sys/execx.h>
 #include <sys/priocntl.h>
 #include <sys/tspriocntl.h>
 #include <sys/iapriocntl.h>
@@ -2996,6 +2997,38 @@ prt_grf(private_t *pri, int raw, long val)
 	}
 }
 
+void
+prt_exc(private_t *pri, int raw, long val)
+{
+#define	CBSIZE	sizeof (pri->code_buf)
+	char *str = pri->code_buf;
+	size_t used = 0;
+
+	if (raw) {
+		prt_hex(pri, 0, val);
+		return;
+	}
+	if (val == 0) {
+		outstring(pri, "0");
+		return;
+	}
+
+	*str = '\0';
+	if (val & EXEC_DESCRIPTOR) {
+		used = strlcat(str, "|EXEC_DESCRIPTOR", CBSIZE);
+		val &= ~EXEC_DESCRIPTOR;
+	}
+
+	if (val != 0 && used <= CBSIZE)
+		used += snprintf(str + used, CBSIZE - used, "|0x%lx", val);
+
+	if (used >= CBSIZE)
+		(void) snprintf(str + 1, CBSIZE - 1, "0x%lx", val);
+
+	outstring(pri, str + 1);
+#undef CBSIZE
+}
+
 /*
  * Array of pointers to print functions, one for each format.
  */
@@ -3104,5 +3137,6 @@ void (* const Print[])() = {
 	prt_grf,	/* GRF -- print getrandom flags */
 	prt_psdelta,	/* PSDLT -- print psecflags(2) delta */
 	prt_psfw,	/* PSFW -- print psecflags(2) set */
+	prt_exc,	/* EXC -- print execvex() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

@@ -1297,6 +1297,7 @@ gcore_prgetlwpstatus(mdb_proc_t *p, uintptr_t t_addr, mdb_kthread_t *t,
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (uintptr_t)up->u_argv;
 			sp->pr_sysarg[2] = (uintptr_t)up->u_envp;
+			sp->pr_sysarg[3] = 0;
 			for (i = 0, auxp = up->u_auxv;
 			    i < sizeof (up->u_auxv) / sizeof (up->u_auxv[0]);
 			    i++, auxp++) {

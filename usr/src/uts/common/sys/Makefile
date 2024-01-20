@@ -238,6 +238,7 @@ CHKHDRS=			\
 	exacct_catalog.h	\
 	exacct_impl.h		\
 	exec.h			\
+	execx.h			\
 	exechdr.h		\
 	extdirent.h		\
 	fault.h			\

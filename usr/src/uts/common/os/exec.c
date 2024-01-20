@@ -26,8 +26,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -53,6 +54,7 @@
 #include <sys/lgrp.h>
 #include <sys/vtrace.h>
 #include <sys/exec.h>
+#include <sys/execx.h>
 #include <sys/exechdr.h>
 #include <sys/kmem.h>
 #include <sys/prsystm.h>
@@ -130,19 +132,72 @@ size_t stack_guard_min_sz = 64 * 1024 * 1024;
  * exece() - system call wrapper around exec_common()
  */
 int
-exece(const char *fname, const char **argp, const char **envp)
+exece(uintptr_t file, const char **argp, const char **envp, int flags)
 {
 	int error;
 
-	error = exec_common(fname, argp, envp, EBA_NONE);
+	if ((flags & ~EXEC_DESCRIPTOR) != 0)
+		return (set_errno(EINVAL));
+
+	if ((flags & EXEC_DESCRIPTOR) != 0) {
+		/*
+		 * If EXEC_DESCRIPTOR is specified, then the `file`
+		 * parameter is the number of a file descriptor in the current
+		 * process.
+		 */
+		char *path = NULL;
+		size_t allocsize;
+		int fd = (int)file;
+		vnode_t *vp = NULL;
+
+		if ((error = fgetstartvp(fd, NULL, &vp)) != 0)
+			return (set_errno(error));
+
+		mutex_enter(&vp->v_lock);
+		if (vp->v_path != NULL && vp->v_path != vn_vpath_empty) {
+			allocsize = strlen(vp->v_path) + 1;
+			path = kmem_alloc(allocsize, KM_NOSLEEP);
+			if (path == NULL) {
+				mutex_exit(&vp->v_lock);
+				VN_RELE(vp);
+				return (set_errno(ENOMEM));
+			}
+			bcopy(vp->v_path, path, allocsize);
+		}
+		mutex_exit(&vp->v_lock);
+
+		/*
+		 * In the unlikely event that the descriptor's path is not
+		 * cached, we fall back to using a constructed one.
+		 */
+		if (path == NULL) {
+			/* 8 for "/dev/fd/", 10 for %d, + \0 == 19 */
+			allocsize = 20;
+			path = kmem_alloc(allocsize, KM_NOSLEEP);
+			if (path == NULL) {
+				VN_RELE(vp);
+				return (set_errno(ENOMEM));
+			}
+			(void) snprintf(path, allocsize, "/dev/fd/%d", fd);
+		}
+
+		error = exec_common(path, argp, envp, vp, EBA_NONE);
+		VN_RELE(vp);
+		kmem_free(path, allocsize);
+	} else {
+		const char *fname = (const char *)file;
+
+		error = exec_common(fname, argp, envp, NULL, EBA_NONE);
+	}
+
 	return (error ? (set_errno(error)) : 0);
 }
 
 int
 exec_common(const char *fname, const char **argp, const char **envp,
-    int brand_action)
+    vnode_t *vp, int brand_action)
 {
-	vnode_t *vp = NULL, *dir = NULL, *tmpvp = NULL;
+	vnode_t *dir = NULL, *tmpvp = NULL;
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
 	struct user *up = PTOU(p);
@@ -213,36 +268,53 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	sigorset(&curthread->t_hold, &ignoredefault);
 	mutex_exit(&p->p_lock);
 
-	/*
-	 * Look up path name and remember last component for later.
-	 * To help coreadm expand its %d token, we attempt to save
-	 * the directory containing the executable in p_execdir. The
-	 * first call to lookuppn() may fail and return EINVAL because
-	 * dirvpp is non-NULL. In that case, we make a second call to
-	 * lookuppn() with dirvpp set to NULL; p_execdir will be NULL,
-	 * but coreadm is allowed to expand %d to the empty string and
-	 * there are other cases in which that failure may occur.
-	 */
-	if ((error = pn_get((char *)fname, UIO_USERSPACE, &pn)) != 0)
-		goto out;
-	pn_alloc(&resolvepn);
-	if ((error = lookuppn(&pn, &resolvepn, FOLLOW, &dir, &vp)) != 0) {
-		pn_free(&resolvepn);
-		pn_free(&pn);
-		if (error != EINVAL)
-			goto out;
-
-		dir = NULL;
+	if (vp != NULL) {
+		/*
+		 * When a vnode is passed in we take an extra hold here and
+		 * release it before returning. This means that callers don't
+		 * need to account for the reference changing over the call.
+		 */
+		VN_HOLD(vp);
+		pn_alloc(&pn);
+		pn_alloc(&resolvepn);
+		VERIFY0(pn_set(&pn, fname));
+		VERIFY0(pn_set(&resolvepn, fname));
+	} else {
+		/*
+		 * Look up path name and remember last component for later.
+		 * To help coreadm expand its %d token, we attempt to save
+		 * the directory containing the executable in p_execdir. The
+		 * first call to lookuppn() may fail and return EINVAL because
+		 * dirvpp is non-NULL. In that case, we make a second call to
+		 * lookuppn() with dirvpp set to NULL; p_execdir will be NULL,
+		 * but coreadm is allowed to expand %d to the empty string and
+		 * there are other cases in which that failure may occur.
+		 */
 		if ((error = pn_get((char *)fname, UIO_USERSPACE, &pn)) != 0)
 			goto out;
 		pn_alloc(&resolvepn);
-		if ((error = lookuppn(&pn, &resolvepn, FOLLOW, NULLVPP,
-		    &vp)) != 0) {
+		error = lookuppn(&pn, &resolvepn, FOLLOW, &dir, &vp);
+		if (error != 0) {
 			pn_free(&resolvepn);
 			pn_free(&pn);
-			goto out;
+			if (error != EINVAL)
+				goto out;
+
+			dir = NULL;
+			if ((error = pn_get((char *)fname, UIO_USERSPACE,
+			    &pn)) != 0) {
+				goto out;
+			}
+			pn_alloc(&resolvepn);
+			if ((error = lookuppn(&pn, &resolvepn, FOLLOW, NULLVPP,
+			    &vp)) != 0) {
+				pn_free(&resolvepn);
+				pn_free(&pn);
+				goto out;
+			}
 		}
 	}
+
 	if (vp == NULL) {
 		if (dir != NULL)
 			VN_RELE(dir);

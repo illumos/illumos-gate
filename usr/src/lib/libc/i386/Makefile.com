@@ -23,7 +23,7 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
@@ -220,7 +220,7 @@ COMSYSOBJS=			\
 	chroot.o		\
 	cladm.o			\
 	close.o			\
-	execve.o		\
+	execvex.o		\
 	exit.o			\
 	facl.o			\
 	fchdir.o		\
@@ -946,7 +946,9 @@ PORTSYS=			\
 	execl.o			\
 	execle.o		\
 	execv.o			\
+	execve.o		\
 	fcntl.o			\
+	fexecve.o		\
 	getpagesizes.o		\
 	getpeerucred.o		\
 	inst_sync.o		\

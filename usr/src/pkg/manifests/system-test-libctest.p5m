@@ -97,6 +97,9 @@ file path=opt/libc-tests/tests/err/data/W.4.11.12 mode=0444
 file path=opt/libc-tests/tests/err/data/W.5.13.14 mode=0444
 file path=opt/libc-tests/tests/err/err mode=0555
 file path=opt/libc-tests/tests/err/err.ksh mode=0555
+file path=opt/libc-tests/tests/fexecve_test mode=0555
+file path=opt/libc-tests/tests/fexecve_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/fexecve_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/fnmatch.32 mode=0555
 file path=opt/libc-tests/tests/fnmatch.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555
