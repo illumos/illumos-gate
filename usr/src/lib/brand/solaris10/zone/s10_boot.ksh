@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 # s10 boot script.
 #
@@ -203,24 +204,13 @@ replace_with_native /usr/sbin/if_mpadm 0555 root:bin
 #
 # Replace IPFilter commands with native wrappers
 #
-if [ -n "$ARCH32" ]; then
-	replace_with_native /usr/lib/ipf/$ARCH32/ipftest 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ipf 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ipfs 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ipfstat 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ipmon 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ipnat 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH32/ippool 0555 root:bin
-fi
-if [ -n "$ARCH64" ]; then
-	replace_with_native /usr/lib/ipf/$ARCH64/ipftest 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ipf 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ipfs 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ipfstat 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ipmon 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ipnat 0555 root:bin
-	replace_with_native /usr/sbin/$ARCH64/ippool 0555 root:bin
-fi
+replace_with_native /usr/lib/ipf/ipftest 0555 root:bin
+replace_with_native /usr/sbin/ipf 0555 root:bin
+replace_with_native /usr/sbin/ipfs 0555 root:bin
+replace_with_native /usr/sbin/ipfstat 0555 root:bin
+replace_with_native /usr/sbin/ipmon 0555 root:bin
+replace_with_native /usr/sbin/ipnat 0555 root:bin
+replace_with_native /usr/sbin/ippool 0555 root:bin
 
 #
 # Replace in.mpathd daemon at /usr/lib/inet by native wrapper

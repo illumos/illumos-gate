@@ -12,10 +12,10 @@
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013, 2017 by Delphix. All rights reserved.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
-.\" Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd July 22, 2023
+.Dd January 14, 2024
 .Dt IPADM 8
 .Os
 .Sh NAME
@@ -23,75 +23,75 @@
 .Nd configure IP and IPMP interfaces, addresses and protocols
 .Sh SYNOPSIS
 .Nm
-.Ic help
+.Cm help
 .Nm
-.Ic create-if
+.Cm create-if
 .Op Fl t
 .Ar interface
 .Nm
-.Ic create-ip
+.Cm create-ip
 .Op Fl t
 .Ar interface
 .Nm
-.Ic delete-if
+.Cm delete-if
 .Ar interface
 .Nm
-.Ic delete-ip
+.Cm delete-ip
 .Ar interface
 .Pp
 .Nm
-.Ic create-ipmp
+.Cm create-ipmp
 .Op Fl t
 .Op Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
 .Nm
-.Ic delete-ipmp
+.Cm delete-ipmp
 .Ar ipmp-interface
 .Nm
-.Ic add-ipmp
+.Cm add-ipmp
 .Op Fl t
 .Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
 .Nm
-.Ic remove-ipmp
+.Cm remove-ipmp
 .Op Fl t
 .Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
 .Pp
 .Nm
-.Ic disable-if
+.Cm disable-if
 .Fl t
 .Ar interface
 .Nm
-.Ic enable-if
+.Cm enable-if
 .Fl t
 .Ar interface
 .Nm
-.Ic show-if
+.Cm show-if
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Ar interface
 .Pp
 .Nm
-.Ic set-ifprop
+.Cm set-ifprop
 .Op Fl t
 .Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Fl m Ar protocol
 .Ar interface
 .Nm
-.Ic reset-ifprop
+.Cm reset-ifprop
 .Op Fl t
 .Fl p Ar prop
 .Fl m Ar protocol
 .Ar interface
 .Nm
-.Ic show-ifprop
+.Cm show-ifprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar value Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Fl m Ar protocol
 .Op Ar interface
 .Pp
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm static
 .Op Fl d
@@ -99,7 +99,7 @@
 .Ar addr Ns Oo / Ns Ar prefixlen Oc Ns ...
 .Ar addrobj
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm dhcp
 .Op Fl 1
@@ -107,7 +107,7 @@
 .Op Fl w Bro Ar seconds Ns | Ns Cm forever Brc
 .Ar addrobj
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm addrconf
 .Op Fl i Ar interface-id
@@ -115,63 +115,63 @@
 .Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
 .Ar addrobj
 .Nm
-.Ic delete-addr
+.Cm delete-addr
 .Op Fl r
 .Ar addrobj
 .Nm
-.Ic show-addr
+.Cm show-addr
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Ar addrobj | interface Ns No /
 .Nm
-.Ic refresh-addr
+.Cm refresh-addr
 .Op Fl i
 .Ar addrobj
 .Nm
-.Ic down-addr
+.Cm down-addr
 .Op Fl t
 .Ar addrobj
 .Nm
-.Ic up-addr
+.Cm up-addr
 .Op Fl t
 .Ar addrobj
 .Nm
-.Ic disable-addr
+.Cm disable-addr
 .Op Fl t
 .Ar addrobj
 .Nm
-.Ic enable-addr
+.Cm enable-addr
 .Op Fl t
 .Ar addrobj
 .Pp
 .Nm
-.Ic set-addrprop
+.Cm set-addrprop
 .Op Fl t
 .Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Ar addrobj
 .Nm
-.Ic reset-addrprop
+.Cm reset-addrprop
 .Op Fl t
 .Fl p Ar prop
 .Ar addrobj
 .Nm
-.Ic show-addrprop
+.Cm show-addrprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Ar addrobj | interface Ns No /
 .Pp
 .Nm
-.Ic set-prop
+.Cm set-prop
 .Op Fl t
 .Fl p Ar prop Ns Oo Cm + Ns | Ns Cm - Oc Ns = Ns
 .Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Ar protocol
 .Nm
-.Ic reset-prop
+.Cm reset-prop
 .Op Fl t
 .Fl p Ar prop
 .Ar protocol
 .Nm
-.Ic show-prop
+.Cm show-prop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Ar protocol
@@ -223,26 +223,26 @@ When invoked with no arguments,
 .Nm
 shows the current address properties, in the same way as
 .Nm
-.Ic show-addr .
+.Cm show-addr .
 .Pp
 The following subcommands are supported:
 .Pp
 .Bl -tag -compact -width Ds
 .It Xo
 .Nm
-.Ic help
+.Cm help
 .Xc
 Display brief command usage.
 .Pp
 .It Xo
 .Nm
-.Ic create-if
+.Cm create-if
 .Op Fl t
 .Ar interface
 .Xc
 .It Xo
 .Nm
-.Ic create-ip
+.Cm create-ip
 .Op Fl t
 .Ar interface
 .Xc
@@ -251,9 +251,9 @@ The interface will be enabled as part of the creation process.
 The IPv4 interface will have the address 0.0.0.0.
 The IPv6 interface will have the address ::.
 The subcommands
-.Ic create-if
+.Cm create-if
 and
-.Ic create-ip
+.Cm create-ip
 are functionally equivalent aliases of each other.
 .Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
@@ -262,24 +262,24 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic delete-if
+.Cm delete-if
 .Ar interface
 .Xc
 .It Xo
 .Nm
-.Ic delete-ip
+.Cm delete-ip
 .Ar interface
 .Xc
 Permanently delete the specified IP interface.
 The subcommands
-.Ic delete-if
+.Cm delete-if
 and
-.Ic delete-ip
+.Cm delete-ip
 are functionally equivalent aliases of each other.
 .Pp
 .It Xo
 .Nm
-.Ic create-ipmp
+.Cm create-ipmp
 .Op Fl t
 .Op Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
@@ -297,14 +297,14 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic delete-ipmp
+.Cm delete-ipmp
 .Ar ipmp-interface
 .Xc
 Permanently delete the IPMP interface.
 .Pp
 .It Xo
 .Nm
-.Ic add-ipmp
+.Cm add-ipmp
 .Op Fl t
 .Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
@@ -319,7 +319,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic remove-ipmp
+.Cm remove-ipmp
 .Op Fl t
 .Fl i Ar interface Ns Oo , Ns Ar interface Oc Ns ...
 .Ar ipmp-interface
@@ -334,7 +334,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic disable-if
+.Cm disable-if
 .Fl t
 .Ar interface
 .Xc
@@ -346,7 +346,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic enable-if
+.Cm enable-if
 .Fl t
 .Ar interface
 .Xc
@@ -358,7 +358,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic show-if
+.Cm show-if
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Ar interface
 .Xc
@@ -432,7 +432,7 @@ Print the output in a parsable format.
 .Pp
 .It Xo
 .Nm
-.Ic set-ifprop
+.Cm set-ifprop
 .Op Fl t
 .Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Fl m Ar protocol
@@ -475,7 +475,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic reset-ifprop
+.Cm reset-ifprop
 .Op Fl t
 .Fl p Ar prop
 .Fl m Ar protocol
@@ -488,7 +488,7 @@ Specify which protocol the setting applies to.
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
-.Nm ipadm Ic set-ifprop
+.Nm ipadm Cm set-ifprop
 subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -496,7 +496,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic show-ifprop
+.Cm show-ifprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar value Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Fl m Ar protocol
@@ -537,13 +537,13 @@ The possible values for the property.
 .It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
-.Nm ipadm Ic set-ifprop
+.Nm ipadm Cm set-ifprop
 subcommand for the list of property names.
 .El
 .Pp
 .It Xo
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm static
 .Op Fl d
@@ -553,7 +553,7 @@ subcommand for the list of property names.
 .Xc
 Create an address on the specified IP interface using static configuration.
 The address will be enabled but can disabled using the
-.Nm ipadm Ic disable-addr
+.Nm ipadm Cm disable-addr
 subcommand.
 Note that
 .Cm addrconf
@@ -582,7 +582,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm dhcp
 .Op Fl 1
@@ -612,7 +612,7 @@ the DNS domain name value configured in
 .Pa /etc/default/dhcpagent
 for
 .Xr dhcpagent 8 .
-N.b. that the DHCP server implementation ultimately determines whether and
+Note that the DHCP server implementation ultimately determines whether and
 how the client-sent FQDN is used.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -626,7 +626,7 @@ The default value is 120.
 .Pp
 .It Xo
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Op Fl t
 .Fl T Cm addrconf
 .Op Fl i Ar interface-id
@@ -647,7 +647,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic delete-addr
+.Cm delete-addr
 .Op Fl r
 .Ar addrobj
 .Xc
@@ -659,7 +659,7 @@ Indicate that the DHCP-assigned address should be released.
 .Pp
 .It Xo
 .Nm
-.Ic show-addr
+.Cm show-addr
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Ar addrobj | interface Ns No /
 .Xc
@@ -686,11 +686,11 @@ It can be one of the following values:
 .Bl -tag -compact -width "inaccessible"
 .It Sy disabled
 see the
-.Nm ipadm Ic disable-addr
+.Nm ipadm Cm disable-addr
 subcommand
 .It Sy down
 see the
-.Nm ipadm Ic down-addr
+.Nm ipadm Cm down-addr
 subcommand
 .It Sy duplicate
 the address is duplicate
@@ -738,7 +738,7 @@ Print the output in a parsable format.
 .Pp
 .It Xo
 .Nm
-.Ic refresh-addr
+.Cm refresh-addr
 .Op Fl i
 .Ar addrobj
 .Xc
@@ -755,7 +755,7 @@ Obtain network configuration from DHCP without taking a lease on the address.
 .Pp
 .It Xo
 .Nm
-.Ic down-addr
+.Cm down-addr
 .Op Fl t
 .Ar addrobj
 .Xc
@@ -768,7 +768,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic up-addr
+.Cm up-addr
 .Op Fl t
 .Ar addrobj
 .Xc
@@ -781,7 +781,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic disable-addr
+.Cm disable-addr
 .Op Fl t
 .Ar addrobj
 .Xc
@@ -793,7 +793,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic enable-addr
+.Cm enable-addr
 .Op Fl t
 .Ar addrobj
 .Xc
@@ -805,7 +805,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic set-addrprop
+.Cm set-addrprop
 .Op Fl t
 .Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Ar addrobj
@@ -837,7 +837,7 @@ For a primary DHCP interface,
 is sent if this property is not defined.
 See the
 .Nm
-.Ic create-addr
+.Cm create-addr
 .Fl T Cm dhcp
 subcommand for the explanation of how an FQDN is determined.
 .It Cm transmit
@@ -845,7 +845,7 @@ Packets can be transmitted
 .Pq Cm on Ns / Ns Cm off .
 .It Cm zone
 The zone the addrobj is in
-.Po temporary-only -- use
+.Po temporary-only \(em use
 .Xr zonecfg 8
 to make persistent
 .Pc .
@@ -856,7 +856,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic reset-addrprop
+.Cm reset-addrprop
 .Op Fl t
 .Fl p Ar prop
 .Ar addrobj
@@ -868,7 +868,7 @@ property value to the default.
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
-.Nm ipadm Ic set-addrprop
+.Nm ipadm Cm set-addrprop
 subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -876,7 +876,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic show-addrprop
+.Cm show-addrprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Ar addrobj | interface Ns No /
@@ -915,13 +915,13 @@ The possible values for the property.
 .It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
-.Nm ipadm Ic set-addrprop
+.Nm ipadm Cm set-addrprop
 subcommand for the list of property names.
 .El
 .Pp
 .It Xo
 .Nm
-.Ic set-prop
+.Cm set-prop
 .Op Fl t
 .Fl p Ar prop Ns Oo Cm + Ns | Ns Cm - Oc Ns = Ns
 .Ar value Ns Oo , Ns Ar value Oc Ns ...
@@ -1005,7 +1005,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic reset-prop
+.Cm reset-prop
 .Op Fl t
 .Fl p Ar prop
 .Ar protocol
@@ -1015,7 +1015,7 @@ Reset a protocol's property value to the default.
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
-.Nm ipadm Ic set-prop
+.Nm ipadm Cm set-prop
 subcommand for the list of property names.
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -1023,7 +1023,7 @@ Temporary, not persistent across reboots.
 .Pp
 .It Xo
 .Nm
-.Ic show-prop
+.Cm show-prop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
 .Op Ar protocol
@@ -1059,7 +1059,7 @@ The possible values for the property.
 .It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
-.Nm ipadm Ic set-prop
+.Nm ipadm Cm set-prop
 subcommand for the list of property names.
 .El
 .El
