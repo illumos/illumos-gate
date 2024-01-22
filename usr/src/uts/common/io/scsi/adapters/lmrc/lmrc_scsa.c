@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -280,10 +280,6 @@ lmrc_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 
 	rc = &io_req->VendorRegion;
 	rc->rc_ld_tgtid = tgt->tgt_dev_id;
-
-	rw_enter(&lmrc->l_raidmap_lock, RW_READER);
-	rc->rc_timeout = lmrc->l_raidmap->rm_fp_pd_io_timeout;
-	rw_exit(&lmrc->l_raidmap_lock);
 
 	if (tgt->tgt_pd_info == NULL) {
 		/* This is LD I/O */
