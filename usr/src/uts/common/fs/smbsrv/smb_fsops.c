@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012-2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2024 RackTop Systems, Inc.
  */
 
 #include <sys/sid.h>
@@ -1546,6 +1546,7 @@ smb_fsop_write(
 	vnode_t *u_vp = NULL;
 	vnode_t *vp;
 	uint32_t amask;
+	int flags = 0;
 	int svmand;
 	int rc;
 
@@ -1571,6 +1572,16 @@ smb_fsop_write(
 		 */
 		if (cr != kcr && (ofile->f_granted_access & amask) == 0)
 			return (EACCES);
+
+		/*
+		 * We have an open file so access checks are done.
+		 * If we have to call setattr below, try to avoid
+		 * the expensive access check there.
+		 */
+		if (smb_tree_has_feature(ofile->f_tree,
+		    SMB_TREE_ACEMASKONACCESS)) {
+			flags |= ATTR_NOACLCHECK;
+		}
 	}
 
 	/*
@@ -1629,7 +1640,7 @@ smb_fsop_write(
 	    (ofile->f_pending_attr.sa_mask & SMB_AT_MTIME) != 0) {
 		bcopy(&ofile->f_pending_attr, &attr, sizeof (attr));
 		attr.sa_mask = SMB_AT_MTIME;
-		(void) smb_vop_setattr(vp, u_vp, &attr, 0, kcr);
+		(void) smb_vop_setattr(vp, u_vp, &attr, flags, kcr);
 	}
 
 	smb_node_end_crit(snode);

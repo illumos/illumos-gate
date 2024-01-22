@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2019-2023 RackTop Systems, Inc.
+ * Copyright 2019-2024 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -2431,6 +2431,10 @@ slow:
  *
  * The least priv subsystem is always consulted as a basic privilege
  * can define any form of access.
+ *
+ * Note that this function is called VERY frequently, and therefore
+ * has some careful optimizations of what it does.  In particular,
+ * a few places avoid calling zfs_fuid_map_id() when possible.
  */
 int
 zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
@@ -2479,7 +2483,6 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 		}
 	}
 
-	owner = zfs_fuid_map_id(zp->z_zfsvfs, zp->z_uid, cr, ZFS_OWNER);
 	/*
 	 * Map the bits required to the standard vnode flags VREAD|VWRITE|VEXEC
 	 * in needed_bits.  Map the bits mapped by working_mode (currently
@@ -2491,9 +2494,23 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 
 	working_mode = mode;
 
+	/*
+	 * If we were not concerned with performance here, we could
+	 * just always get the file owner immediately as follows:
+	 *   owner = zfs_fuid_map_id(zp->z_zfsvfs, zp->z_uid, cr, ZFS_OWNER);
+	 * However, that can cause a kidmap call (idmap up-call) in this
+	 * very hot code path so this tries to avoid that when possible.
+	 * For example, instead of (owner == crgetuid(cr))
+	 * this uses zfs_fuid_is_cruser() just below.
+	 *
+	 * Also note: With skipaclchk = TRUE, we're working with an
+	 * open handle so we know we're allowed to read ACL or attrs.
+	 * This can affect needed_bits below.
+	 */
 	if ((working_mode & (ACE_READ_ACL|ACE_READ_ATTRIBUTES)) &&
-	    owner == crgetuid(cr))
+	    (skipaclchk || zfs_fuid_is_cruser(zp->z_zfsvfs, zp->z_uid, cr))) {
 		working_mode &= ~(ACE_READ_ACL|ACE_READ_ATTRIBUTES);
+	}
 
 	if (working_mode & (ACE_READ_DATA|ACE_READ_NAMED_ATTRS|
 	    ACE_READ_ACL|ACE_READ_ATTRIBUTES|ACE_SYNCHRONIZE))
@@ -2506,9 +2523,33 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 
 	if ((error = zfs_zaccess_common(check_zp, mode, &working_mode,
 	    &check_privs, skipaclchk, cr)) == 0) {
+		uid_t root_owned;
+
 		if (is_attr)
 			VN_RELE(ZTOV(xzp));
-		return (secpolicy_vnode_access2(cr, ZTOV(zp), owner,
+
+		/*
+		 * The call to secpolicy_vnode_access2() below normally
+		 * wants the file owner UID in its third argument.
+		 * Getting that UID here requires a kidmap call that
+		 * we'd rather avoid due to its potential expense.
+		 * The file owner UID is unused in that function when
+		 * the last two arguments (curmode,wantmode) are equal,
+		 * and otherwise is used only to test if the file is
+		 * owned by root (UID == zero).  It does not actually
+		 * use the UID value other than that, so we can pass
+		 * anything other than zero when not owned by root.
+		 * The local "root_owned" is the UID value we pass.
+		 *
+		 * If secpolicy_vnode_access2() changes to need the
+		 * real owner UID here, this will need work.
+		 */
+		if (zp->z_uid == FUID_ENCODE(0, 0))
+			root_owned = 0; /* yes, owned by root */
+		else
+			root_owned = (uid_t)-1;
+
+		return (secpolicy_vnode_access2(cr, ZTOV(zp), root_owned,
 		    needed_bits, needed_bits));
 	}
 
@@ -2521,6 +2562,12 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 	if (error && (flags & V_APPEND)) {
 		error = zfs_zaccess_append(zp, &working_mode, &check_privs, cr);
 	}
+
+	/*
+	 * The remaining code in this function is reached less frequently,
+	 * so it's OK to go ahead and get the real owner etc.
+	 */
+	owner = zfs_fuid_map_id(zp->z_zfsvfs, zp->z_uid, cr, ZFS_OWNER);
 
 	if (error && check_privs) {
 		mode_t		checkmode = 0;

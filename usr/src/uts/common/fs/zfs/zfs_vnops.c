@@ -25,7 +25,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2015-2023 RackTop Systems, Inc.
+ * Copyright 2015-2024 RackTop Systems, Inc.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -2739,13 +2739,21 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * Also, if we are the owner don't bother, since owner should
 	 * always be allowed to read basic attributes of file.
 	 *
-	 * Check "is owner" using zfs_fuid_is_cruser to avoid an idmap
-	 * up-call in zfs_fuid_map_ids (that can be expensive).
+	 * Also skip when flags & ATTR_NOACLCHECK, which is safe when
+	 * we only need ACE_READ_ATTRIBUTES or ACE_READ_ACL because
+	 * none of the other checks (dataset checks etc) done in
+	 * zfs_access_common apply to those permissions.
+	 *
+	 * Check "is owner" using zfs_fuid_is_cruser which optimizes
+	 * the case where both the object and owner have known SIDs.
+	 *
+	 * These optimizations are to avoid a potentially expensive
+	 * idmap up-call for these very frequent access checks.
 	 */
-	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) &&
+	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) && !skipaclchk &&
 	    !zfs_fuid_is_cruser(zfsvfs, zp->z_uid, cr)) {
-		if (error = zfs_zaccess(zp, ACE_READ_ATTRIBUTES, 0,
-		    skipaclchk, cr)) {
+		if ((error = zfs_zaccess(zp, ACE_READ_ATTRIBUTES, 0,
+		    B_FALSE, cr)) != 0) {
 			ZFS_EXIT(zfsvfs);
 			return (error);
 		}
@@ -3215,8 +3223,10 @@ top:
 	    XVA_ISSET_REQ(xvap, XAT_SPARSE) ||
 	    XVA_ISSET_REQ(xvap, XAT_CREATETIME) ||
 	    XVA_ISSET_REQ(xvap, XAT_SYSTEM)))) {
-		need_policy = zfs_zaccess(zp, ACE_WRITE_ATTRIBUTES, 0,
+		err = zfs_zaccess(zp, ACE_WRITE_ATTRIBUTES, 0,
 		    skipaclchk, cr);
+		if (err != 0)
+			need_policy = TRUE;
 	}
 
 	if (mask & (AT_UID|AT_GID)) {
@@ -3268,8 +3278,6 @@ top:
 	}
 
 	mutex_enter(&zp->z_lock);
-	oldva.va_mode = zp->z_mode;
-	zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	if (mask & AT_XVATTR) {
 		/*
 		 * Update xvattr mask to include only those attributes
@@ -3361,6 +3369,11 @@ top:
 		    XVA_ISSET_REQ(xvap, XAT_OPAQUE))) {
 			need_policy = TRUE;
 		}
+	}
+
+	if (need_policy || (mask & AT_MODE) != 0) {
+		oldva.va_mode = zp->z_mode;
+		zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	}
 
 	mutex_exit(&zp->z_lock);

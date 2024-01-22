@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -129,6 +131,12 @@ nbl_conflict(vnode_t *vp,
  * If there was an error, the errno value is returned.  Otherwise, zero is
  * returned and *svp is set appropriately (non-zero for mandatory locks,
  * zero for no mandatory locks).
+ *
+ * This is called only in read/write code paths where we know that the
+ * user has previously opened a handle on this file so we have already
+ * checked that they have access to the file attributes.  Avoid the
+ * redundant access checking here which otherwise can cause frequent
+ * and potentially expensive kidmap up-calls from ZFS.
  */
 
 int
@@ -136,9 +144,13 @@ nbl_svmand(vnode_t *vp, cred_t *cr, int *svp)
 {
 	struct vattr va;
 	int error;
+	int flags = 0;
+
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS))
+		flags |= ATTR_NOACLCHECK;
 
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, flags, cr, NULL);
 	if (error != 0)
 		return (error);
 
