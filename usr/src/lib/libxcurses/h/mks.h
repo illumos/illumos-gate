@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -334,9 +336,6 @@ LEXTERN	void	crc16 (ushort *, ushort);
 LEXTERN	void	crcccitt (ushort *, ushort);
 LEXTERN	int	eprintf (const char *, ...);
 LEXTERN	void	eputs (const char *);
-LEXTERN	pid_t	fexecve (const char *, char *const *, char *const *);
-LEXTERN	pid_t	fexecvp (const char *, char *const *);
-LEXTERN	pid_t	fexecvep (const char *, char *const *, char *const *);
 LEXTERN int	execvep (const char *, char *const *, char *const *);
 LEXTERN	int	isabsname (const char *);
 LEXTERN	const char *m_cescape (wint_t);
@@ -557,7 +556,7 @@ LEXTERN	time_t	_oftout (ushort, ushort);
 #ifdef M_NON_STATIC_GETENV
 #define __m_getenv getenv
 #else
-LEXTERN	char 	*__m_getenv(char const *);  /* Library safe getenv() */
+LEXTERN	char	*__m_getenv(char const *);  /* Library safe getenv() */
 #endif
 
 #ifndef M_CRON_MAILER

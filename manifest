@@ -4203,6 +4203,7 @@ f usr/include/sys/exacct.h 0644 root bin
 f usr/include/sys/exacct_catalog.h 0644 root bin
 f usr/include/sys/exacct_impl.h 0644 root bin
 f usr/include/sys/exec.h 0644 root bin
+f usr/include/sys/execx.h 0644 root bin
 f usr/include/sys/exechdr.h 0644 root bin
 f usr/include/sys/extdirent.h 0644 root bin
 f usr/include/sys/fasttrap.h 0644 root bin
@@ -12483,6 +12484,7 @@ s usr/share/man/man2/execle.2=exec.2
 s usr/share/man/man2/execlp.2=exec.2
 s usr/share/man/man2/execv.2=exec.2
 s usr/share/man/man2/execve.2=exec.2
+f usr/share/man/man2/execvex.2 0444 root bin
 s usr/share/man/man2/execvp.2=exec.2
 f usr/share/man/man2/exit.2 0444 root bin
 s usr/share/man/man2/faccessat.2=access.2
@@ -12494,6 +12496,7 @@ s usr/share/man/man2/fchown.2=chown.2
 s usr/share/man/man2/fchownat.2=chown.2
 s usr/share/man/man2/fchroot.2=chroot.2
 f usr/share/man/man2/fcntl.2 0444 root bin
+s usr/share/man/man2/fexecve.2=exec.2
 f usr/share/man/man2/fork.2 0444 root bin
 s usr/share/man/man2/fork1.2=fork.2
 s usr/share/man/man2/forkall.2=fork.2

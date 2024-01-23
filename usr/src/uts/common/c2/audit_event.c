@@ -23,6 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -79,6 +80,7 @@
 #include <sys/ddi.h>
 #include <sys/port_impl.h>
 #include <sys/secflags.h>
+#include <sys/execx.h>
 
 static au_event_t	aui_fchownat(au_event_t);
 static au_event_t	aui_fchmodat(au_event_t);
@@ -119,6 +121,7 @@ static void	aus_facl(struct t_audit_data *);
 static void	aus_fchmod(struct t_audit_data *);
 static void	aus_fchmodat(struct t_audit_data *);
 static void	aus_fcntl(struct t_audit_data *);
+static void	aus_execve(struct t_audit_data *);
 static void	aus_mkdir(struct t_audit_data *);
 static void	aus_mkdirat(struct t_audit_data *);
 static void	aus_mknod(struct t_audit_data *);
@@ -326,7 +329,7 @@ aui_utssys,	AUE_FUSERS,	aus_null,	/* 57 utssys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 58 fsync */
 		auf_null,	0,
-aui_execve,	AUE_EXECVE,	aus_null,	/* 59 exece */
+aui_execve,	AUE_EXECVE,	aus_execve,	/* 59 exece */
 		auf_null,	S2E_MLD,
 aui_null,	AUE_NULL,	aus_null,	/* 60 umask */
 		auf_null,	0,
@@ -1453,6 +1456,45 @@ static au_event_t
 aui_execve(au_event_t e)
 {
 	return (e);
+}
+
+static void
+aus_execve(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t flags, fd;
+	struct file *fp;
+	struct f_audit_data *fad;
+
+	struct a {
+		long	file;
+		long	argv;
+		long	envp;
+		long	flags;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	fd = (uint32_t)uap->file;
+	flags = (uint32_t)uap->flags;
+
+	if ((flags & EXEC_DESCRIPTOR) == 0)
+		return;
+
+	if ((fp = getf(fd)) == NULL)
+		return;
+
+	fad = F2A(fp);
+
+	if (fad->fad_aupath != NULL)
+		au_uwrite(au_to_path(fad->fad_aupath));
+	else
+		au_uwrite(au_to_arg32(1, "no path: fd", fd));
+
+	audit_attributes(fp->f_vnode);
+
+	/* Flag that the path is already included in this audit record */
+	tad->tad_ctrl |= TAD_PATHFND;
+
+	releasef(fd);
 }
 
 /*ARGSUSED*/

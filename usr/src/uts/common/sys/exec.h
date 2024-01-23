@@ -208,9 +208,9 @@ extern char javamagicstr[];
 extern char nomagicstr[];
 
 extern int exec_args(execa_t *, uarg_t *, intpdata_t *, void **);
-extern int exece(const char *fname, const char **argp, const char **envp);
-extern int exec_common(const char *fname, const char **argp,
-    const char **envp, int brand_action);
+extern int exece(uintptr_t, const char **, const char **, int);
+extern int exec_common(const char *, const char **, const char **, vnode_t *,
+    int);
 extern int gexec(vnode_t **vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, size_t *execsz, caddr_t exec_file,
     struct cred *cred, int *brand_action);

@@ -27,20 +27,19 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-	.file	"execve.s"
+	.file	"execvex.s"
 
-/* C library -- execve						*/
-/* int execve(const char *path, const char *argv[], const char *envp[])
- *
- * where argv is a vector argv[0] ... argv[x], 0
- * last vector element must be 0
+/*
+ * extern int execvex(uintptr_t, char *const *, char *const *, int);
  */
 
 #include <sys/asm_linkage.h>
 
-	ANSI_PRAGMA_WEAK(execve,function)
+	ANSI_PRAGMA_WEAK(execvex,function)
 
 #include "SYS.h"
 
-	SYSCALL_RVAL1(execve)
-	SET_SIZE(execve)
+	ENTRY(execvex)
+	SYSTRAP_RVAL1(execve)
+	SYSCERROR
+	SET_SIZE(execvex)

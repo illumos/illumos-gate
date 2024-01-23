@@ -1444,6 +1444,7 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (caddr32_t)up->u_argv;
 			sp->pr_sysarg[2] = (caddr32_t)up->u_envp;
+			sp->pr_sysarg[3] = 0;
 			for (i = 0, auxp = up->u_auxv;
 			    i < sizeof (up->u_auxv) / sizeof (up->u_auxv[0]);
 			    i++, auxp++) {
@@ -3252,6 +3253,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 			sp->pr_sysarg[0] = 0;
 			sp->pr_sysarg[1] = (uintptr_t)up->u_argv;
 			sp->pr_sysarg[2] = (uintptr_t)up->u_envp;
+			sp->pr_sysarg[3] = 0;
 			for (i = 0, auxp = up->u_auxv;
 			    i < sizeof (up->u_auxv) / sizeof (up->u_auxv[0]);
 			    i++, auxp++) {

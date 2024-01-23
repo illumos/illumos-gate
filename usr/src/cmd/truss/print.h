@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All right reserved. */
 
@@ -143,7 +143,8 @@ extern "C" {
 #define	GRF	101		/* getrandom flags */
 #define	PSDLT	102		/* secflagsdelta_t */
 #define	PSFW	103		/* psecflagswhich_t */
-#define	HID	104		/* hidden argument, don't print */
+#define	EXC	104		/* execx flags */
+#define	HID	105		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

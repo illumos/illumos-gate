@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
@@ -26,6 +26,7 @@ timeout = 120
 post =
 outputdir = /var/tmp/test_results
 
+[/opt/libc-tests/tests/fexecve_test]
 [/opt/libc-tests/tests/fpround_test]
 [/opt/libc-tests/tests/newlocale_test]
 [/opt/libc-tests/tests/nl_langinfo_test]

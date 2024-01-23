@@ -565,7 +565,7 @@ brand_solaris_cmd(int cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 	switch ((cmd)) {
 	case B_EXEC_NATIVE:
 		err = exec_common((char *)arg1, (const char **)arg2,
-		    (const char **)arg3, EBA_NATIVE);
+		    (const char **)arg3, NULL, EBA_NATIVE);
 		return (err);
 
 	/*

@@ -300,7 +300,7 @@ exec_init(const char *initpath, const char *args)
 	}
 again:
 	error = exec_common((const char *)exec_fnamep,
-	    (const char **)uap, NULL, brand_action);
+	    (const char **)uap, NULL, NULL, brand_action);
 
 	/*
 	 * Normally we would just set lwp_argsaved and t_post_sys and

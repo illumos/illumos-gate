@@ -282,7 +282,7 @@ const struct systable systable[] = {
 {"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, SNF},		/*  56 */
 {"utssys",	4, DEC, NOV, HEX, DEC, UTS, HEX},		/*  57 */
 {"fdsync",	2, DEC, NOV, DEC, FFG},				/*  58 */
-{"execve",	3, DEC, NOV, STG, HEX, HEX},			/*  59 */
+{"execvex",	4, DEC, NOV, STG, HEX, HEX, EXC},		/*  59 */
 {"umask",	1, OCT, NOV, OCT},				/*  60 */
 {"chroot",	1, DEC, NOV, STG},				/*  61 */
 {"fcntl",	3, DEC, NOV, DEC, FCN, HEX},			/*  62 */
@@ -973,7 +973,9 @@ const	struct sysalias sysalias[] = {
 	{ "execv",	SYS_execve	},
 	{ "execle",	SYS_execve	},
 	{ "execlp",	SYS_execve	},
+	{ "execve",	SYS_execve	},
 	{ "execvp",	SYS_execve	},
+	{ "fexecve",	SYS_execve	},
 	{ "sigfillset",	SYS_sigpending	},
 	{ "getcontext",	SYS_context	},
 	{ "setcontext",	SYS_context	},

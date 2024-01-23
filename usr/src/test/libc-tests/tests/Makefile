@@ -21,6 +21,7 @@
 SUBDIRS = \
 	catopen \
 	err \
+	fexecve \
 	fpround \
 	i18n \
 	newlocale \

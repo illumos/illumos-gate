@@ -1,0 +1,101 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd January 12, 2024
+.Dt EXECVEX 2
+.Os
+.Sh NAME
+.Nm execvex
+.Nd execute a file with flags
+.Sh SYNOPSIS
+.In execx.h
+.Ft int
+.Fo execvex
+.Fa "uintptr_t path"
+.Fa "char *const argv[]"
+.Fa "char *const envp[]"
+.Fa "int flags"
+.Fc
+.Sh DESCRIPTION
+.Nm
+is an extended version of
+.Xr execve 2 .
+Like other functions in the
+.Xr exec 2
+family,
+.Nm
+replaces the current process image with a new one indicated by the
+.Ar path
+argument.
+.Pp
+The following values may be bitwise-ORed together in the
+.Fa flags
+argument to modify the behavior of the function:
+.Bl -tag -width Dv
+.It Dv EXEC_DESCRIPTOR
+The
+.Ar path
+argument is the number of an open file descriptor in the current process.
+.El
+.Pp
+If
+.Dv EXEC_DESCRIPTOR
+is not set in
+.Ar flags ,
+the
+.Ar path
+argument must be set to a pointer to a pathname of a file which is executable
+by the current process.
+.Pp
+The
+.Xr exec 2
+family of functions are implemented in terms of
+.Nm .
+A call to
+.Pp
+.Dl execve(path, argv, envp) ;
+.Pp
+is equivalent to
+.Pp
+.Dl execvex((uintptr_t)path, argv, envp, 0) ;
+.Pp
+and a call to
+.Pp
+.Dl fexecve(filedes, argv, envp) ;
+.Pp
+is equivalent to
+.Pp
+.Dl execvex((uintptr_t)filedes, argv, envp, EXEC_DESCRIPTOR) ;
+.Sh RETURN VALUES
+If
+.Nm
+returns to the calling process image, an error has occurred; the return
+value is \-1 and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+.Nm
+will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The flags argument is invalid.
+.El
+.Pp
+.Nm may also fail for any of the reasons listed in
+.Xr exec 2 .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr exec 2
