@@ -79,24 +79,6 @@ extern "C" {
 #define	MLXCX_CX6_LX_DEVID		0x101f
 
 /*
- * The PCI device id for the cards we support. Taken from
- * /usr/share/hwdata/pci.ids
- */
-#define	MLXCX_CX4_DEVID			0x1013
-#define	MLXCX_CX4_VF_DEVID		0x1014
-#define	MLXCX_CX4_LX_DEVID		0x1015
-#define	MLXCX_CX4_LX_VF_DEVID		0x1016
-#define	MLXCX_CX5_DEVID			0x1017
-#define	MLXCX_CX5_VF_DEVID		0x1018
-#define	MLXCX_CX5_EX_DEVID		0x1019
-#define	MLXCX_CX5_EX_VF_DEVID		0x101a
-#define	MLXCX_CX6_DEVID			0x101b
-#define	MLXCX_CX6_VF_DEVID		0x101c
-#define	MLXCX_CX6_DF_DEVID		0x101d
-#define	MLXCX_CX5_GEN_VF_DEVID		0x101e
-#define	MLXCX_CX6_LX_DEVID		0x101f
-
-/*
  * Get access to the first PCI BAR.
  */
 #define	MLXCX_REG_NUMBER		1
