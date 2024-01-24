@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Carlos Neira <cneirabustos@gmail.com>
  */
 
 #ifndef _SYS_LX_SOCKET_H
@@ -394,6 +395,27 @@ extern "C" {
 #define	LX_MSG_FASTOPEN		0x20000000
 #define	LX_MSG_CMSG_CLOEXEC	0x40000000
 
+/*
+ * Linux TCP states
+ */
+
+#define	LX_TCP_ESTABLISHED  1
+#define	LX_TCP_SYN_SENT  2
+#define	LX_TCP_SYN_RECV  3
+#define	LX_TCP_FIN_WAIT1  4
+#define	LX_TCP_FIN_WAIT2  5
+#define	LX_TCP_TIME_WAIT  6
+#define	LX_TCP_CLOSE  7
+#define	LX_TCP_CLOSE_WAIT  8
+#define	LX_TCP_LAST_ACK  9
+#define	LX_TCP_LISTEN  10
+#define	LX_TCP_CLOSING  11
+#define	LX_TCP_NEW_SYN_RECV  12
+/* max/min illumos tcp states */
+#define	LX_OS_MAX_TCP_STATE 6
+#define	LX_OS_MIN_TCP_STATE -6
+
+
 typedef struct lx_msghdr {
 	void		*msg_name;	/* optional address */
 	socklen_t	msg_namelen;	/* size of address */
@@ -436,6 +458,93 @@ typedef struct lx_sockaddr_in6 {
 	uint32_t	sin6_scope_id;  /* Depends on scope of sin6_addr */
 	/* one 32-bit field shorter than illumos */
 } lx_sockaddr_in6_t;
+
+/*
+ * Other platforms like OpenBSD and FreeBSD only setup some of the values,
+ * zeroing the rest. Also they add their  own extensions to the tcp_info struct.
+ * We will not add custom extensions and use the current Linux version, as our
+ * intent is just to lie to Linux applications requiring this syscall and this
+ * lie should be "just good enough".
+ */
+typedef struct lx_tcp_info {
+	/* Current state in TCP state machine */
+	uint8_t		tcpi_state;
+	/* Congestion avoidance state */
+	uint8_t		tcpi_ca_state;
+	/* Number of unrecovered RTO timeouts */
+	uint8_t		tcpi_retransmits;
+	/* Unanswered 0 window probes */
+	uint8_t		tcpi_probes;
+	/* Current exponential backoff for RTO */
+	uint8_t		tcpi_backoff;
+	/* Enabled TCP options */
+	uint8_t		tcpi_options;
+#define	LX_TCPI_OPT_TIMESTAMPS	0x01	/* Negotiated TCP Timestamps */
+#define	LX_TCPI_OPT_SACK	0x02	/* Negotiated SACK */
+#define	LX_TCPI_OPT_WSCALE	0x04	/* Negotiated Window Scaling */
+#define	LX_TCPI_OPT_ECN		0x08	/* Negotiated ECN */
+#define	LX_TCPI_OPT_ECN_SEEN	0x10	/* Received at least 1 packet w/ ECT */
+#define	LX_TCPI_OPT_SYN_DATA	0x20	/* Sent or received SYN-ACK for SYN */
+
+	uint8_t
+		tcpi_snd_wscale : 4,	/* Send window scale shift */
+		tcpi_rcv_wscale : 4;	/* Receive window scale shift */
+
+	/* Retransmission timeout (usecs) */
+	uint32_t	tcpi_rto;
+	/* Predicted soft clock tick for delivering delayed ACK */
+	uint32_t	tcpi_ato;
+	/* Maximum Segment Size, sent (RFC 4898 tcpEStatsStackMSSSent) */
+	uint32_t	tcpi_snd_mss;
+	/* Maximum Segment Size, received (RFC 4898 tcpEStatsStackMSSRcvd) */
+	uint32_t	tcpi_rcv_mss;
+
+	/* Sent but unacknowledged bytes */
+	uint32_t	tcpi_unacked;
+	/* # of SACKed packets; without SACK, # of recvd dup packets */
+	uint32_t	tcpi_sacked;
+	/* Estimated # of packets lost */
+	uint32_t	tcpi_lost;
+	/* Total # of rexmitted segments */
+	uint32_t	tcpi_retrans;
+	/* # of packets to highest SACKed sequence (deprecated on Linux) */
+	uint32_t	tcpi_fackets;
+
+	/* Time (msecs) since last sent data */
+	uint32_t	tcpi_last_data_sent;
+	/* Time (msecs) since last sent ACK (not filled in on Linux) */
+	uint32_t	tcpi_last_ack_sent;
+	/* Time (msecs) since last recv data */
+	uint32_t	tcpi_last_data_recv;
+	/* Time (msecs) since last recv ACK */
+	uint32_t	tcpi_last_ack_recv;
+
+	/* Last PMTU seen by socket */
+	uint32_t	tcpi_pmtu;
+	/* Slow start threshold (recv) */
+	uint32_t	tcpi_rcv_ssthresh;
+	/* Smoothed RTT (usecs) */
+	uint32_t	tcpi_rtt;
+	/* RTT variance (usecs) */
+	uint32_t	tcpi_rttvar;
+	/* Slow start threshold (send) */
+	uint32_t	tcpi_snd_ssthresh;
+	/* Send congestion window */
+	uint32_t	tcpi_snd_cwnd;
+	/* Advertised MSS */
+	uint32_t	tcpi_advmss;
+	/* ? */
+	uint32_t	tcpi_reordering;
+
+	/* ? */
+	uint32_t	tcpi_rcv_rtt;
+	/* Advertised recv window */
+	uint32_t	tcpi_rcv_space;
+
+	/* Total # of rexmitted segments for connection */
+	uint32_t	tcpi_total_retrans;
+
+} lx_tcp_info_t;
 
 #ifdef	__cplusplus
 }
