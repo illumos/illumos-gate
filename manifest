@@ -1352,6 +1352,8 @@ f lib/amd64/libnsl.so.1 0755 root bin
 s lib/amd64/libnsl.so=libnsl.so.1
 f lib/amd64/libnvpair.so.1 0755 root bin
 s lib/amd64/libnvpair.so=libnvpair.so.1
+f lib/amd64/libnwam.so.1 0755 root bin
+s lib/amd64/libnwam.so=libnvpair.so.1
 f lib/amd64/libofmt.so.1 0755 root bin
 s lib/amd64/libofmt.so=libofmt.so.1
 f lib/amd64/libpam.so.1 0755 root bin

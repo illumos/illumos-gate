@@ -33,10 +33,31 @@ SRCS =		libnwam_audit.c libnwam_backend.c libnwam_enm.c \
 		libnwam_wlan.c
 HDRDIR =	common
 SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 POFILE =	libnwam.po
 MSGFILES =	common/*.c
 
 XGETFLAGS =     -a -x libnwam.xcl
+
+TYPECHECK_LIB = libnwam.so.1
+TYPELIST = \
+	nwam_event_object_action \
+	nwam_event_object_state \
+	nwam_event_priority_group_info \
+	nwam_event_info \
+	nwam_event_wlan_info \
+	nwam_event_if_action \
+	nwam_event_if_state \
+	nwam_event_link_state \
+	nwam_event_link_action \
+	nwdad_register_info \
+	nwdad_object_action \
+	nwdad_object_state \
+	nwdad_priority_group_info \
+	nwdad_wlan_info \
+	nwamd_door_arg_data_t \
+	nwamd_door_arg_t \
+	nwam_backend_door_arg_t
 
 all :=		TARGET = all
 clean :=	TARGET = clean
@@ -49,7 +70,7 @@ all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(POFILE):      pofile_MSGFILES
 

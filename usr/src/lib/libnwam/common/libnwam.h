@@ -967,10 +967,15 @@ typedef enum {
 } nwam_object_type_t;
 
 typedef struct nwam_event *nwam_event_t;
+/*
+ * Be aware the first element have to be of type long! See msgsnd(2).
+ * Different size of long in 32-bit and 64-bit will be handled by kernel system
+ * call. Data followed the long have to be the same in 32-bit and 64-bit.
+ */
 struct nwam_event {
-	int nwe_type;
+	long nwe_type;
 	uint32_t nwe_size;
-
+	uint32_t nwe_pad1;
 	union {
 		struct nwam_event_object_action {
 			nwam_object_type_t nwe_object_type;

@@ -75,12 +75,12 @@ typedef enum {
 
 typedef union {
 	/* Used for EVENT_[UN]REGISTER requests */
-	struct {
+	struct nwdad_register_info {
 		char nwdad_name[MAXPATHLEN];
 	} nwdad_register_info;
 
 	/* Used for ACTION requests */
-	struct {
+	struct nwdad_object_action {
 		nwam_object_type_t nwdad_object_type;
 		char nwdad_name[NWAM_MAX_NAME_LEN];
 		char nwdad_parent[NWAM_MAX_NAME_LEN];
@@ -88,7 +88,7 @@ typedef union {
 	} nwdad_object_action;
 
 	/* Used for STATE requests */
-	struct {
+	struct nwdad_object_state {
 		nwam_object_type_t nwdad_object_type;
 		char nwdad_name[NWAM_MAX_NAME_LEN];
 		char nwdad_parent[NWAM_MAX_NAME_LEN];
@@ -97,12 +97,12 @@ typedef union {
 	} nwdad_object_state;
 
 	/* Used for PRIORITY_GROUP requests */
-	struct {
+	struct nwdad_priority_group_info {
 		int64_t nwdad_priority;
 	} nwdad_priority_group_info;
 
 	/* Used for WLAN request/responses */
-	struct {
+	struct nwdad_wlan_info {
 		char nwdad_name[NWAM_MAX_NAME_LEN];
 		char nwdad_essid[NWAM_MAX_NAME_LEN];
 		char nwdad_bssid[NWAM_MAX_NAME_LEN];
@@ -120,6 +120,7 @@ typedef struct {
 	nwam_request_type_t nwda_type;
 	nwam_request_status_t nwda_status;
 	nwam_error_t nwda_error;
+	uint32_t nwda_align;				/* for next member */
 	nwamd_door_arg_data_t nwda_data;
 } nwamd_door_arg_t;
 
@@ -133,8 +134,9 @@ typedef struct nwam_backend_door_arg {
 	nwam_backend_door_cmd_t nwbda_cmd;
 	char nwbda_dbname[MAXPATHLEN];			/* config filename */
 	char nwbda_object[NWAM_MAX_NAME_LEN];		/* config object */
-	size_t nwbda_datalen;				/* data follows arg */
+	uint32_t nwbda_datalen;				/* data follows arg */
 	nwam_error_t nwbda_result;			/* return code */
+	uint32_t nwbda_align;				/* for next member */
 	uint64_t nwbda_flags;
 } nwam_backend_door_arg_t;
 
