@@ -94,7 +94,7 @@ smb_autohome_add(const smb_token_t *token)
 		assert(username);
 	} else {
 		if (getpwuid_r(uid, &pw, buf, sizeof (buf)) == NULL) {
-			syslog(LOG_ERR, "unable to determine name for " \
+			syslog(LOG_DEBUG, "unable to determine name for " \
 			    "UID: %u\n", uid);
 			return;
 		}
@@ -141,7 +141,7 @@ smb_autohome_add_private(const char *username, uid_t uid, gid_t gid)
 	static mutex_t	autohome_mutex;
 	smb_share_t	si;
 	smb_autohome_t	*ai;
-	char 		shr_name[MAXNAMELEN];
+	char		shr_name[MAXNAMELEN];
 
 	(void) strlcpy(shr_name, username, sizeof (shr_name));
 
