@@ -60,10 +60,10 @@ forkit(char *msg, const char *expect, void (*postfn)(void))
 	/* don't leave it in the filesystem */
 	(void) unlink(fname);
 
-	pid = vfork();
+	pid = fork();
 	switch (pid) {
 	case -1:
-		test_failed(t, "vfork failed: %s", strerror(errno));
+		test_failed(t, "fork failed: %s", strerror(errno));
 		return;
 	case 0:
 		if (dup2(fd, 1) < 0) {
