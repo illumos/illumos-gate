@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,18 +107,10 @@ swapfs_recalc(pgcnt_t pgs)
 
 	if (new_swapfs_minfree == 0) {
 		/*
-		 * We set this lower than we'd like here, 2Mb, because we
-		 * always boot on swapfs. It's up to a safer value,
-		 * swapfs_desfree, when/if we add physical swap devices
-		 * in swapadd(). Users who want to change the amount of
-		 * memory that can be used as swap space should do so by
-		 * setting swapfs_desfree at boot time, not swapfs_minfree.
-		 * However, swapfs_minfree is tunable by install as a
-		 * workaround for bugid 1147463. Note swapfs_minfree is set
-		 * to 1/8th of memory, but clamped at the limit of 256 MB.
+		 * Set swapfs_minfree to be an eighth of physical, but
+		 * capped at 512 MiB.
 		 */
-		new_swapfs_minfree = MIN(MAX(btopr(2 * 1024 * 1024), pgs >> 3),
-		    btopr(256 * 1024 * 1024));
+		new_swapfs_minfree = MIN(btopr(512 * 1024 * 1024), pgs >> 3);
 	}
 
 	/*
@@ -162,7 +158,8 @@ swapfs_recalc(pgcnt_t pgs)
 /*ARGSUSED1*/
 int
 swapinit(int fstype, char *name)
-{							/* reserve for mp */
+{
+	/* reserve for mp */
 	ssize_t sw_freelist_size = klustsize / PAGESIZE * 2;
 	int i, error;
 
