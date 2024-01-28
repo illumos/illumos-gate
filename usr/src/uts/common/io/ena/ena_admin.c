@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -42,13 +42,19 @@ ena_release_cmd_ctx(ena_t *ena, ena_cmd_ctx_t *ctx)
 	ctx->ectx_cmd_opcode = ENAHW_CMD_NONE;
 
 	mutex_enter(&ena->ena_aq.ea_sq_lock);
-	list_insert_head(&ena->ena_aq.ea_cmd_ctxs_free, ctx);
+	/*
+	 * We return the free descriptor to the end of the list so that we
+	 * cycle through them with each admin command, and don't end up almost
+	 * always re-using the same entry with the same command ID. While the
+	 * controller does not appear to mind, it's a little counterintuitive.
+	 */
+	list_insert_tail(&ena->ena_aq.ea_cmd_ctxs_free, ctx);
 	ena->ena_aq.ea_pending_cmds--;
 	mutex_exit(&ena->ena_aq.ea_sq_lock);
 }
 
 /*
- * Acquire the next avaiable command context.
+ * Acquire the next available command context.
  */
 static ena_cmd_ctx_t *
 ena_acquire_cmd_ctx(ena_adminq_t *aq)
@@ -104,7 +110,7 @@ ena_admin_submit_cmd(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
 	    lctx, uint16_t, tail_mod, uint8_t, sq->eas_phase);
 
 	if ((sq->eas_tail & modulo_mask) == 0) {
-		sq->eas_phase = !sq->eas_phase;
+		sq->eas_phase ^= 1;
 	}
 
 	ena_hw_abs_write32(ena, sq->eas_dbaddr, sq->eas_tail);
@@ -169,7 +175,7 @@ ena_admin_process_responses(ena_t *ena)
 		head_mod = cq->eac_head & modulo_mask;
 
 		if (head_mod == 0) {
-			phase = !phase;
+			phase ^= 1;
 		}
 
 		hwresp = &cq->eac_entries[head_mod];
@@ -217,7 +223,8 @@ ena_admin_poll_for_resp(ena_t *ena, ena_cmd_ctx_t *ctx)
 			 * thing to do is to spin or panic; we choose
 			 * to panic.
 			 */
-			panic("timed out waiting for admin response");
+			dev_err(ena->ena_dip, CE_PANIC,
+			    "timed out waiting for admin response");
 		}
 	}
 
@@ -519,6 +526,8 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
 {
 	enahw_cmd_desc_t cmd;
 	enahw_cmd_destroy_sq_t *cmd_sq = &cmd.ecd_cmd.ecd_destroy_sq;
+	enahw_sq_direction_t dir =
+	    is_tx ? ENAHW_SQ_DIRECTION_TX : ENAHW_SQ_DIRECTION_RX;
 	enahw_resp_desc_t resp;
 	ena_cmd_ctx_t *ctx = NULL;
 	int ret;
@@ -527,7 +536,7 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
 	bzero(&resp, sizeof (resp));
 	cmd.ecd_opcode = ENAHW_CMD_DESTROY_SQ;
 	cmd_sq->edsq_idx = hw_idx;
-	ENAHW_CMD_DESTROY_SQ_DIR(cmd_sq, is_tx);
+	ENAHW_CMD_DESTROY_SQ_DIR(cmd_sq, dir);
 
 	if ((ret = ena_admin_submit_cmd(ena, &cmd, &resp, &ctx)) != 0) {
 		ena_err(ena, "failed to submit Destroy SQ command: %d", ret);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -113,10 +113,8 @@
  * BAR0 register offsets.
  *
  * Any register not defined in the common code was marked as a gap,
- * using the hex address of the register as suffix. The idea is to
- * make it clear where the gaps are and allow the
- * ena_hw_update_reg_cache() function to display any bits stored in
- * these gaps in case they turn out to be interesting later.
+ * using the hex address of the register as suffix to make it clear
+ * where the gaps are.
  */
 #define	ENAHW_REG_VERSION		0x0
 #define	ENAHW_REG_CONTROLLER_VERSION	0x4
@@ -625,8 +623,8 @@ typedef struct enahw_cmd_create_sq {
 	/*
 	 * 7-1	reserved
 	 *
-	 * 0	physically contiguous: When set indicates the descriptor
-	 *			       ring memory is physically contiguous.
+	 * 0	physically contiguous:	When set indicates the descriptor
+	 *				ring memory is physically contiguous.
 	 */
 	uint8_t		ecsq_caps_3;
 
@@ -839,6 +837,19 @@ typedef enum enahw_feature_id {
 } enahw_feature_id_t;
 
 /*
+ * Device capabilities.
+ *
+ * common: ena_admin_aq_caps_id
+ */
+typedef enum enahw_capability_id {
+	ENAHW_CAP_ENI_STATS			= 0,
+	ENAHW_CAP_ENA_SRD_INFO			= 1,
+	ENAHW_CAP_CUSTOMER_METRICS		= 2,
+	ENAHW_CAP_EXTENDED_RESET		= 3,
+	ENAHW_CAP_CDESC_MBZ			= 4,
+} enahw_capability_id_t;
+
+/*
  * The following macros define the maximum version we support for each
  * feature. These are the feature versions we use to communicate with
  * the feature command. Linux has these values spread throughout the
@@ -920,7 +931,7 @@ typedef struct enahw_device_hints {
 	 * This value is used by the networking stack to determine
 	 * when a pending transmission has stalled. This is similar to
 	 * the keep alive timeout, except its viewing progress from
-	 * the perspective of the network stack itself. This differnce
+	 * the perspective of the network stack itself. This difference
 	 * is subtle but important: the device could be in a state
 	 * where it has a functioning keep alive heartbeat, but has a
 	 * stuck Tx queue impeding forward progress of the networking
@@ -957,9 +968,14 @@ typedef struct enahw_feat_dev_attr {
 	 * (enahw_feature_id).
 	 */
 	uint32_t efda_supported_features;
-	uint32_t efda_rsvd1;
 
-	/* Number of bits used for physical/vritual address. */
+	/*
+	 * Bitmap representing device capabilities.
+	 * (enahw_capability_id)
+	 */
+	uint32_t efda_capabilities;
+
+	/* Number of bits used for physical/virtual address. */
 	uint32_t efda_phys_addr_width;
 	uint32_t efda_virt_addr_with;
 
@@ -1298,7 +1314,7 @@ typedef enum enahw_resp_status {
 	ENAHW_RESP_MALFORMED_REQUEST		= 4,
 	/*
 	 * At this place in the common code it mentions that there is
-	 * "additional status" in the reponse descriptor's
+	 * "additional status" in the response descriptor's
 	 * erd_ext_status field. As the common code never actually
 	 * uses this field it's hard to know the exact meaning of the
 	 * comment. My best guess is the illegal parameter error
@@ -1311,16 +1327,7 @@ typedef enum enahw_resp_status {
 } enahw_resp_status_t;
 
 /*
- * Not really a device structure, more of a helper to debug register values.
- */
-typedef struct enahw_reg_nv {
-	char		*ern_name;
-	uint32_t	ern_offset;
-	uint32_t	ern_value;
-} enahw_reg_nv_t;
-
-/*
- * I/O macros and strcutures.
+ * I/O macros and structures.
  * -------------------------
  */
 
@@ -1768,6 +1775,7 @@ typedef struct enahw_rx_desc {
 #define	ENAHW_RX_DESC_COMP_REQ_SHIFT	4
 #define	ENAHW_RX_DESC_COMP_REQ_MASK	BIT(4)
 
+#define	ENAHW_RX_DESC_CLEAR_CTRL(desc)	((desc)->erd_ctrl = 0)
 #define	ENAHW_RX_DESC_SET_PHASE(desc, val)				\
 	((desc)->erd_ctrl |= ((val) & ENAHW_RX_DESC_PHASE_MASK))
 

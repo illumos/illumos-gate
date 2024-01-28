@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_ENA_H
@@ -438,8 +438,9 @@ typedef enum ena_rxq_state {
 	ENA_RXQ_STATE_HOST_ALLOC	= 1 << 0,
 	ENA_RXQ_STATE_CQ_CREATED	= 1 << 1,
 	ENA_RXQ_STATE_SQ_CREATED	= 1 << 2,
-	ENA_RXQ_STATE_READY		= 1 << 3, /* RxQ ready and waiting */
-	ENA_RXQ_STATE_RUNNING		= 1 << 4, /* intrs enabled */
+	ENA_RXQ_STATE_SQ_FILLED		= 1 << 3,
+	ENA_RXQ_STATE_READY		= 1 << 4, /* RxQ ready and waiting */
+	ENA_RXQ_STATE_RUNNING		= 1 << 5, /* intrs enabled */
 } ena_rxq_state_t;
 
 typedef struct ena_rx_ctrl_block {
@@ -696,6 +697,7 @@ typedef struct ena {
 	 * Hardware info
 	 */
 	uint32_t		ena_supported_features;
+	uint32_t		ena_capabilities;
 	uint8_t			ena_dma_width;
 	boolean_t		ena_link_up;
 	boolean_t		ena_link_autoneg;

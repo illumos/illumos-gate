@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 #include "ena.h"
 
@@ -54,6 +54,7 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 	cq_descs_sz = txq->et_cq_num_descs * sizeof (*txq->et_cq_descs);
 	sq_descs_sz = txq->et_sq_num_descs * sizeof (*txq->et_sq_descs);
 
+	/* BEGIN CSTYLED */
 	conf = (ena_dma_conf_t) {
 		.edc_size = sq_descs_sz,
 		.edc_align = ENAHW_IO_SQ_DESC_BUF_ALIGNMENT,
@@ -61,6 +62,7 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 		.edc_endian = DDI_NEVERSWAP_ACC,
 		.edc_stream = B_FALSE,
 	};
+	/* END CSTYLED */
 
 	if (!ena_dma_alloc(ena, &txq->et_sq_dma, &conf, sq_descs_sz)) {
 		return (ENOMEM);
@@ -88,6 +90,7 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 		}
 	}
 
+	/* BEGIN CSTYLED */
 	conf = (ena_dma_conf_t) {
 		.edc_size = cq_descs_sz,
 		.edc_align = ENAHW_IO_CQ_DESC_BUF_ALIGNMENT,
@@ -95,6 +98,7 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 		.edc_endian = DDI_NEVERSWAP_ACC,
 		.edc_stream = B_FALSE,
 	};
+	/* END CSTYLED */
 
 	if (!ena_dma_alloc(ena, &txq->et_cq_dma, &conf, cq_descs_sz)) {
 		err = ENOMEM;
@@ -381,7 +385,6 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	    txq->et_sq_tail_idx & (txq->et_sq_num_descs - 1);
 
 	VERIFY3P(mp->b_next, ==, NULL);
-	VERIFY(txq->et_blocked == B_FALSE);
 
 	/*
 	 * The ena_state value is written by atomic operations. The
@@ -410,7 +413,7 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	 * buffer is guaranteed to be as large as MTU + frame header,
 	 * see ena_update_buf_sizes().
 	 */
-	if (txq->et_sq_avail_descs == 0) {
+	if (txq->et_blocked || txq->et_sq_avail_descs == 0) {
 		txq->et_blocked = B_TRUE;
 		mutex_enter(&txq->et_stat_lock);
 		txq->et_stat.ets_blocked.value.ui64++;
@@ -446,7 +449,7 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	mutex_exit(&txq->et_stat_lock);
 
 	if ((txq->et_sq_tail_idx & (txq->et_sq_num_descs - 1)) == 0) {
-		txq->et_sq_phase = !txq->et_sq_phase;
+		txq->et_sq_phase ^= 1;
 	}
 
 	mutex_exit(&txq->et_lock);
@@ -499,7 +502,7 @@ ena_tx_intr_work(ena_txq_t *txq)
 		head_mod = txq->et_cq_head_idx & (txq->et_cq_num_descs - 1);
 
 		if (head_mod == 0) {
-			txq->et_cq_phase = !txq->et_cq_phase;
+			txq->et_cq_phase ^= 1;
 		}
 
 		if (txq->et_blocked) {
@@ -512,14 +515,23 @@ ena_tx_intr_work(ena_txq_t *txq)
 		cdesc = &txq->et_cq_descs[head_mod];
 	}
 
+	if (recycled == 0) {
+		mutex_exit(&txq->et_lock);
+		return;
+	}
+
 	/*
 	 * If the device provided a head doorbell register, then we
 	 * need to update it to let the device know we are done
 	 * reading these CQ entries.
 	 */
 	if (txq->et_cq_head_db_addr != NULL) {
+		/*
+		 * We submit the raw value to the device, the hardware performs
+		 * its own modulo.
+		 */
 		ena_hw_abs_write32(txq->et_ena, txq->et_cq_head_db_addr,
-		    head_mod);
+		    txq->et_cq_head_idx);
 	}
 
 	mutex_exit(&txq->et_lock);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include "ena_hw.h"
@@ -44,7 +44,7 @@
  *    o TSO
  *    o RSS
  *    o Low Latency Queues (LLQ)
- *    o Support for different Tx complection policies
+ *    o Support for different Tx completion policies
  *    o More controlled Tx recycling and Rx refill
  *
  * Even without these features the ena driver should perform
@@ -265,7 +265,7 @@
  * The ena driver takes the sequence idea a bit further, creating a
  * descriptor table of the attach sequence (ena_attach_tbl). This
  * table is used by attach/detach to generically, declaratively, and
- * programmaticaly enforce the precise sequence order and verify that
+ * programmatically enforce the precise sequence order and verify that
  * anything that is done is undone. This provides several benefits:
  *
  *    o Correct order is enforced implicitly by the descriptor table.
@@ -420,7 +420,7 @@ ena_aenq_work(ena_t *ena)
 		head_mod = aenq->eaenq_head & (aenq->eaenq_num_descs - 1);
 
 		if (head_mod == 0) {
-			aenq->eaenq_phase = !aenq->eaenq_phase;
+			aenq->eaenq_phase ^= 1;
 		}
 
 		desc = &aenq->eaenq_descs[head_mod];
@@ -627,7 +627,7 @@ ena_aenq_link_change_hdlr(void *data, enahw_aenq_desc_t *desc)
 	    ENAHW_AENQ_LINK_CHANGE_LINK_STATUS_MASK) != 0;
 
 	/*
-	 * The interupts are not enabled until after we register mac,
+	 * The interrupts are not enabled until after we register mac,
 	 * so the mac handle should be valid.
 	 */
 	ASSERT3U(ena->ena_attach_seq, >=, ENA_ATTACH_MAC_REGISTER);
@@ -686,6 +686,7 @@ ena_aenq_init(ena_t *ena)
 	aenq->eaenq_num_descs = ENA_AENQ_NUM_DESCS;
 	size = aenq->eaenq_num_descs * sizeof (*aenq->eaenq_descs);
 
+	/* BEGIN CSTYLED */
 	conf = (ena_dma_conf_t) {
 		.edc_size = size,
 		.edc_align = ENAHW_AENQ_DESC_BUF_ALIGNMENT,
@@ -693,6 +694,7 @@ ena_aenq_init(ena_t *ena)
 		.edc_endian = DDI_NEVERSWAP_ACC,
 		.edc_stream = B_FALSE,
 	};
+	/* END CSTYLED */
 
 	if (!ena_dma_alloc(ena, &aenq->eaenq_dma, &conf, size)) {
 		ena_err(ena, "failed to allocate DMA for AENQ");
@@ -749,7 +751,7 @@ ena_set_max_io_queues(ena_t *ena)
 	max = MIN(ncpus_online, max);
 	/*
 	 * Supposedly a device could present a different number of SQs
-	 * and CQs. This driver is desinged in a way that requires
+	 * and CQs. This driver is designed in a way that requires
 	 * each SQ to have a corresponding and dedicated CQ (how would
 	 * it work otherwise). Therefore, we must check both values
 	 * and find the minimum between them.
@@ -1002,6 +1004,12 @@ ena_check_versions(ena_t *ena)
 	ena->ena_ctrl_subminor_vsn = ENAHW_CTRL_SUBMINOR_VSN(ctrl_vsn);
 	ena->ena_ctrl_impl_id = ENAHW_CTRL_IMPL_ID(ctrl_vsn);
 
+	ena_dbg(ena, "device version: %u.%u",
+	    ena->ena_dev_major_vsn, ena->ena_dev_minor_vsn);
+	ena_dbg(ena, "controller version: %u.%u.%u implementation %u",
+	    ena->ena_ctrl_major_vsn, ena->ena_ctrl_minor_vsn,
+	    ena->ena_ctrl_subminor_vsn, ena->ena_ctrl_impl_id);
+
 	if (ena->ena_ctrl_subminor_vsn < ENA_CTRL_SUBMINOR_VSN_MIN) {
 		ena_err(ena, "unsupported controller version: %u.%u.%u",
 		    ena->ena_ctrl_major_vsn, ena->ena_ctrl_minor_vsn,
@@ -1232,11 +1240,10 @@ ena_attach_device_init(ena_t *ena)
 	}
 
 	/*
-	 * While the Linux driver prefers to use interrupts to deliver
-	 * admin queue completions, we just poll -- it seems to work
-	 * just fine.
+	 * Start in polling mode until we've determined the number of queues
+	 * and are ready to configure and enable interrupts.
 	 */
-	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_MASK);
 	aq->ea_poll_mode = B_TRUE;
 
 	bzero(&resp, sizeof (resp));
@@ -1252,6 +1259,7 @@ ena_attach_device_init(ena_t *ena)
 	ena_dbg(ena, "device version: %u", feat->efda_device_version);
 	ena_dbg(ena, "supported features: 0x%x",
 	    feat->efda_supported_features);
+	ena_dbg(ena, "device capabilities: 0x%x", feat->efda_capabilities);
 	ena_dbg(ena, "phys addr width: %u", feat->efda_phys_addr_width);
 	ena_dbg(ena, "virt addr width: %u", feat->efda_virt_addr_with);
 	maddr = feat->efda_mac_addr;
@@ -1261,6 +1269,7 @@ ena_attach_device_init(ena_t *ena)
 
 	bcopy(maddr, ena->ena_mac_addr, ETHERADDRL);
 	ena->ena_max_mtu = feat->efda_max_mtu;
+	ena->ena_capabilities = feat->efda_capabilities;
 	supported_features = feat->efda_supported_features;
 	ena->ena_supported_features = supported_features;
 	feat = NULL;
@@ -1472,7 +1481,7 @@ ena_attach_intr_alloc(ena_t *ena)
 	/*
 	 * The ena_lock should not be held in the datapath, but it is
 	 * held as part of the AENQ handler, which runs in interrupt
-	 * context. Therefore, we delayed the initilization of this
+	 * context. Therefore, we delayed the initialization of this
 	 * mutex until after the interrupts are allocated.
 	 */
 	mutex_init(&ena->ena_lock, NULL, MUTEX_DRIVER,
@@ -1814,8 +1823,15 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/*
 	 * Now that interrupts are enabled make sure to tell the
-	 * device that all AENQ descriptors are ready for writing.
+	 * device that all AENQ descriptors are ready for writing, and
+	 * unmask the admin interrupt.
+	 *
+	 * Note that this interrupt is generated for both the admin queue and
+	 * the AENQ, but this driver always polls the admin queue. The surplus
+	 * interrupt for admin command completion triggers a harmless check of
+	 * the AENQ.
 	 */
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_UNMASK);
 	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_HEAD_DB,
 	    ena->ena_aenq.eaenq_num_descs);
 
