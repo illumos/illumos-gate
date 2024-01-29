@@ -813,13 +813,16 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 		ctx->count.c32[0] += (input_len >> 29);
 
 	} else {
+		uint64_t il = input_len;
+
+		il = il << 3;
 		buf_limit = 128;
 
 		/* compute number of bytes mod 128 */
 		buf_index = (ctx->count.c64[1] >> 3) & 0x7F;
 
 		/* update number of bits */
-		if ((ctx->count.c64[1] += (input_len << 3)) < (input_len << 3))
+		if ((ctx->count.c64[1] += il) < il)
 			ctx->count.c64[0]++;
 
 		ctx->count.c64[0] += (input_len >> 29);
