@@ -34,7 +34,12 @@ include ../../../Makefile.cmd.64
 
 include ../Makefile.com
 
-install: all $(ROOTPROG64)
+ROOTLINK=$(PROG:%=$(ROOTBIN64)/%)
+
+install: all $(ROOTPROG) $(ROOTLINK)
 	$(INSTALL.ksh.64bit)
+
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../bin/ksh $@
 
 include ../../../Makefile.targ

@@ -110,7 +110,7 @@ INSTALL.ksh.64bit=@ \
 	for i in $(USRKSH_ALIAS_LIST) ; do \
 		[[ "$$i" == "$(PROG)" ]] && continue ; \
 		$(RM) "$(ROOTBIN64)/$$i" ; \
-		$(LN) "$(ROOTBIN64)/$(PROG)" "$(ROOTBIN64)/$$i" ; \
+		$(SYMLINK) "../../bin/$$i" "$(ROOTBIN64)/$$i" ; \
 	done \
 	)
 

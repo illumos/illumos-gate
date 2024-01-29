@@ -2561,8 +2561,8 @@ f usr/bin/amd64/elfedit 0555 root bin
 f usr/bin/amd64/elfwrap 0555 root bin
 s usr/bin/amd64/encrypt=../encrypt
 f usr/bin/amd64/gcore 0555 root bin
-f usr/bin/amd64/ksh93 0555 root bin
-h usr/bin/amd64/ksh=usr/bin/amd64/ksh93
+s usr/bin/amd64/ksh93=../ksh93
+s usr/bin/amd64/ksh=../ksh
 s usr/bin/amd64/ld=../ld
 s usr/bin/amd64/ldd=../ldd
 f usr/bin/amd64/ls 0555 root bin
@@ -2598,8 +2598,8 @@ f usr/bin/amd64/ptree 0555 root bin
 s usr/bin/amd64/pvs=../pvs
 f usr/bin/amd64/pwait 0555 root bin
 f usr/bin/amd64/pwdx 0555 root bin
-h usr/bin/amd64/rksh93=usr/bin/amd64/ksh93
-h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
+s usr/bin/amd64/rksh=../rksh
+s usr/bin/amd64/rksh93=../rksh93
 s usr/bin/amd64/savecore=../savecore
 s usr/bin/amd64/size=../size
 s usr/bin/amd64/sort=../sort
@@ -2780,8 +2780,8 @@ f usr/bin/klist 0555 root bin
 f usr/bin/kmfcfg 0555 root bin
 f usr/bin/kpasswd 0555 root bin
 f usr/bin/krb5-config 0555 root bin
-h usr/bin/ksh93=usr/lib/isaexec
-h usr/bin/ksh=usr/lib/isaexec
+h usr/bin/ksh=usr/bin/ksh93
+f usr/bin/ksh93 0555 root bin
 f usr/bin/kstat 0555 root bin
 f usr/bin/ktutil 0555 root bin
 f usr/bin/kvmstat 0555 root bin
@@ -2926,8 +2926,8 @@ f usr/bin/regcmp 0555 root bin
 s usr/bin/remsh=rsh
 f usr/bin/renice 0555 root bin
 h usr/bin/rev=usr/bin/alias
-h usr/bin/rksh93=usr/lib/isaexec
-h usr/bin/rksh=usr/lib/isaexec
+h usr/bin/rksh=usr/bin/ksh93
+h usr/bin/rksh93=usr/bin/ksh93
 f usr/bin/rlogin 4555 root bin
 f usr/bin/rm 0555 root bin
 s usr/bin/rmail=mail

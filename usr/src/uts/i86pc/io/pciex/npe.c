@@ -27,6 +27,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -602,6 +603,7 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				return (DDI_SUCCESS);
 			}
 
+			pci_rp->pci_size_hi = 0;
 			pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
 
 			/* FALLTHROUGH */
@@ -691,7 +693,23 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				return (npe_setup_std_pcicfg_acc(rdip, mp, hp,
 				    offset, len));
 			} else {
-				pci_rp->pci_phys_low = ecfginfo[0];
+				uint64_t addr = (uint64_t)ecfginfo[0];
+
+				/*
+				 * The address for memory mapped configuration
+				 * space may theoretically be anywhere in the
+				 * processor's physical address space.
+				 *
+				 * We need to set both phys_mid and phys_low to
+				 * account for this. Because we are mapping a
+				 * single device, which has 1 KiB region and
+				 * alignment requirements, along with the fact
+				 * that we only allow for segment 0, means that
+				 * the offset will always fit in the lower
+				 * 32-bit word.
+				 */
+				pci_rp->pci_phys_mid = (uint32_t)(addr >> 32);
+				pci_rp->pci_phys_low = (uint32_t)addr;
 
 				ddi_prop_free(ecfginfo);
 
@@ -699,6 +717,7 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				    (cfp->c_devnum) << 15 |
 				    (cfp->c_funcnum << 12));
 
+				pci_rp->pci_size_hi = 0;
 				pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
 			}
 		} else {

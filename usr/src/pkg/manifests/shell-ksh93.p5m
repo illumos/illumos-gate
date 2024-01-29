@@ -36,10 +36,10 @@ file path=usr/bin/$(ARCH32)/ksh93 mode=0555
 hardlink path=usr/bin/$(ARCH32)/rksh target=ksh93
 hardlink path=usr/bin/$(ARCH32)/rksh93 target=ksh93
 dir  path=usr/bin/$(ARCH64)
-hardlink path=usr/bin/$(ARCH64)/ksh target=ksh93
-file path=usr/bin/$(ARCH64)/ksh93 mode=0555
-hardlink path=usr/bin/$(ARCH64)/rksh target=ksh93
-hardlink path=usr/bin/$(ARCH64)/rksh93 target=ksh93
+link path=usr/bin/$(ARCH64)/ksh target=../../bin/ksh
+link path=usr/bin/$(ARCH64)/ksh93 target=../../bin/ksh93
+link path=usr/bin/$(ARCH64)/rksh target=../../bin/rksh
+link path=usr/bin/$(ARCH64)/rksh93 target=../../bin/rksh93
 file path=usr/bin/alias mode=0555
 hardlink path=usr/bin/bg target=alias
 hardlink path=usr/bin/cd target=alias
@@ -56,8 +56,8 @@ hardlink path=usr/bin/jobs target=alias
 hardlink path=usr/bin/join target=alias
 link path=usr/bin/jsh target=ksh93
 hardlink path=usr/bin/kill target=alias
-hardlink path=usr/bin/ksh target=../lib/isaexec
-hardlink path=usr/bin/ksh93 target=../lib/isaexec
+hardlink path=usr/bin/ksh target=ksh93
+file path=usr/bin/ksh93 mode=0555
 hardlink path=usr/bin/paste target=alias
 hardlink path=usr/bin/pfksh target=pfexec
 hardlink path=usr/bin/pfksh93 target=pfexec
@@ -67,8 +67,8 @@ hardlink path=usr/bin/pfsh target=pfexec
 hardlink path=usr/bin/print target=alias
 hardlink path=usr/bin/read target=alias
 hardlink path=usr/bin/rev target=alias
-hardlink path=usr/bin/rksh target=../lib/isaexec
-hardlink path=usr/bin/rksh93 target=../lib/isaexec
+hardlink path=usr/bin/rksh target=ksh93
+hardlink path=usr/bin/rksh93 target=ksh93
 link path=usr/bin/sh target=$(ARCH32)/ksh93
 file path=usr/bin/shcomp mode=0555
 hardlink path=usr/bin/sum target=alias
