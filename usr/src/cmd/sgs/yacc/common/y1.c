@@ -592,8 +592,7 @@ prlook(LOOKSETS *p)
 		(void) fprintf(foutput, " { ");
 		TLOOP(j) {
 			if (BIT(pp, j))
-				(void) fprintf(foutput,  WSFMT("%ws "),
-				    symnam(j));
+				(void) fprintf(foutput, "%ws ", symnam(j));
 		}
 		(void) fprintf(foutput,  "}");
 	}
@@ -726,8 +725,7 @@ cpfir(void)
 		return;
 	if ((foutput != NULL)) {
 		NTLOOP(i) {
-			(void) fprintf(foutput, WSFMT("\n%ws: "),
-			    nontrst[i].name);
+			(void) fprintf(foutput, "\n%ws: ", nontrst[i].name);
 			prlook(pfirst[i]);
 			(void) fprintf(foutput, " %d\n", pempty[i]);
 		}
@@ -827,7 +825,7 @@ putitem(int *ptr, LOOKSETS *lptr)
 
 	if (pidebug && (foutput != NULL))
 		(void) fprintf(foutput,
-		    WSFMT("putitem(%ws), state %d\n"), writem(ptr), nstate);
+		    "putitem(%ws), state %d\n", writem(ptr), nstate);
 	j = pstate[nstate+1];
 	j->pitem = ptr;
 	if (!nolook)
@@ -993,7 +991,7 @@ stagen(void)
 			NTLOOP(j) {
 				if (temp1[j])
 					(void) fprintf(foutput,
-					    WSFMT("%ws %d, "), nontrst[j].name,
+					    "%ws %d, ", nontrst[j].name,
 					    temp1[j]);
 			}
 			(void) fprintf(foutput, "\n");
@@ -1127,8 +1125,7 @@ closure(int i)
 			if (u->flag)
 				(void) fprintf(foutput, "flag set!\n");
 			u->flag = 0;
-			(void) fprintf(foutput, WSFMT("\t%ws"),
-			    writem(u->pitem));
+			(void) fprintf(foutput, "\t%ws", writem(u->pitem));
 			prlook(&u->ws);
 			(void) fprintf(foutput,  "\n");
 		}
