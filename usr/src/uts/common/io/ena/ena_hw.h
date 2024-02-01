@@ -1192,7 +1192,8 @@ typedef struct enahw_resp_create_cq {
 	 */
 	uint16_t ercq_actual_num_descs;
 	uint32_t ercq_numa_node_reg_offset;
-	uint32_t ercq_head_db_reg_offset; /* doorbell */
+	/* CQ doorbell register - no longer supported by any ENA adapter */
+	uint32_t ercq_head_db_reg_offset;
 	uint32_t ercq_interrupt_mask_reg_offset; /* stop intr */
 } enahw_resp_create_cq_t;
 
