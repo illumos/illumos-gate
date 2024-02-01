@@ -122,7 +122,7 @@ zfs_refcount_count(zfs_refcount_t *rc)
 }
 
 int64_t
-zfs_refcount_add_many(zfs_refcount_t *rc, uint64_t number, void *holder)
+zfs_refcount_add_many(zfs_refcount_t *rc, uint64_t number, const void *holder)
 {
 	reference_t *ref = NULL;
 	int64_t count;
@@ -144,13 +144,25 @@ zfs_refcount_add_many(zfs_refcount_t *rc, uint64_t number, void *holder)
 }
 
 int64_t
-zfs_refcount_add(zfs_refcount_t *rc, void *holder)
+zfs_refcount_add(zfs_refcount_t *rc, const void *holder)
 {
 	return (zfs_refcount_add_many(rc, 1, holder));
 }
 
+void
+zfs_refcount_add_few(zfs_refcount_t *rc, uint64_t number, const void *holder)
+{
+	if (!rc->rc_tracked) {
+		(void) zfs_refcount_add_many(rc, number, holder);
+	} else {
+		for (; number > 0; number--)
+			(void) zfs_refcount_add(rc, holder);
+	}
+}
+
 int64_t
-zfs_refcount_remove_many(zfs_refcount_t *rc, uint64_t number, void *holder)
+zfs_refcount_remove_many(zfs_refcount_t *rc, uint64_t number,
+    const void *holder)
 {
 	reference_t *ref;
 	int64_t count;
@@ -192,15 +204,26 @@ zfs_refcount_remove_many(zfs_refcount_t *rc, uint64_t number, void *holder)
 			return (count);
 		}
 	}
-	panic("No such hold %p on refcount %llx", holder,
-	    (u_longlong_t)(uintptr_t)rc);
+	panic("No such hold %p with count %" PRIu64 " on refcount %llx",
+	    holder, number, (u_longlong_t)(uintptr_t)rc);
 	return (-1);
 }
 
 int64_t
-zfs_refcount_remove(zfs_refcount_t *rc, void *holder)
+zfs_refcount_remove(zfs_refcount_t *rc, const void *holder)
 {
 	return (zfs_refcount_remove_many(rc, 1, holder));
+}
+
+void
+zfs_refcount_remove_few(zfs_refcount_t *rc, uint64_t number, const void *holder)
+{
+	if (!rc->rc_tracked) {
+		(void) zfs_refcount_remove_many(rc, number, holder);
+	} else {
+		for (; number > 0; number--)
+			(void) zfs_refcount_remove(rc, holder);
+	}
 }
 
 void

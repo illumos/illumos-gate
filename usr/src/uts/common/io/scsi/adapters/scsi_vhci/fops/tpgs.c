@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -235,10 +236,13 @@ std_path_activate(struct scsi_device *sd, char *pathclass,
 	struct scsi_address		*ap;
 	int				err, retry_cnt, retry_cmd_cnt;
 	int				mode, state, retval, xlf, preferred;
+	size_t				blksize;
 
 	ap = &sd->sd_address;
 
 	mode = state = 0;
+
+	blksize = vhci_get_blocksize(sd->sd_dev);
 
 	if (vhci_tpgs_get_target_fo_mode(sd, &mode, &state, &xlf, &preferred)) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!std_path_activate:"
@@ -268,8 +272,8 @@ std_path_activate(struct scsi_device *sd, char *pathclass,
 		    (void *)sd));
 	}
 
-	bp = scsi_alloc_consistent_buf(ap, (struct buf *)NULL, DEV_BSIZE,
-	    B_READ, NULL, NULL);
+	bp = scsi_alloc_consistent_buf(ap, (struct buf *)NULL, blksize, B_READ,
+	    NULL, NULL);
 	if (!bp) {
 		VHCI_DEBUG(4, (CE_WARN, NULL,
 		    "!(sd:%p)std_path_activate failed to alloc buffer",
@@ -288,7 +292,7 @@ std_path_activate(struct scsi_device *sd, char *pathclass,
 	}
 
 	(void) scsi_setup_cdb((union scsi_cdb *)(uintptr_t)pkt->pkt_cdbp,
-	    SCMD_READ, 1, 1, 0);
+	    SCMD_READ_G1, 1, 1, 0);
 	pkt->pkt_time = 3*30;
 	pkt->pkt_flags |= FLAG_NOINTR;
 

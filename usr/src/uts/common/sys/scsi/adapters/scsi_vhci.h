@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
@@ -75,6 +76,8 @@ extern "C" {
 int vhci_do_scsi_cmd(struct scsi_pkt *);
 /*PRINTFLIKE3*/
 void vhci_log(int, dev_info_t *, const char *, ...);
+
+size_t vhci_get_blocksize(dev_info_t *);
 
 /*
  * debugging stuff
