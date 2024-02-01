@@ -1661,6 +1661,8 @@ RSAPROV_OBJS += rsa.o rsa_impl.o pkcs1.o
 
 SWRANDPROV_OBJS += swrand.o
 
+VIORANDPROV_OBJS += viorand.o
+
 #
 #			misc. modules
 #

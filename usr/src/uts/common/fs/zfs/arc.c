@@ -27,6 +27,7 @@
  * Copyright (c) 2011, 2019, Delphix. All rights reserved.
  * Copyright (c) 2020, George Amanakis. All rights reserved.
  * Copyright (c) 2020, The FreeBSD Foundation [1]
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  *
  * [1] Portions of this software were developed by Allan Jude
  *     under sponsorship from the FreeBSD Foundation.
@@ -6772,6 +6773,20 @@ arc_memory_throttle(spa_t *spa, uint64_t reserve, uint64_t txg)
 	spa->spa_lowmem_page_load = 0;
 #endif /* _KERNEL */
 	return (0);
+}
+
+/*
+ * In more extreme cases, return B_TRUE if system memory is tight enough
+ * that ZFS should defer work requiring new allocations.
+ */
+boolean_t
+arc_memory_is_low(void)
+{
+#ifdef _KERNEL
+	if (freemem < minfree + needfree)
+		return (B_TRUE);
+#endif /* _KERNEL */
+	return (B_FALSE);
 }
 
 void
