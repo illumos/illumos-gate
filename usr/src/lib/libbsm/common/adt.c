@@ -752,24 +752,14 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 {
 	struct addrinfo	*ai = NULL;
 	int	tries = 3;
-	char	msg[512];
 	int	eai_err;
 
 	while ((tries-- > 0) &&
 	    ((eai_err = getaddrinfo(hostname, NULL, NULL, &ai)) != 0)) {
-		/*
-		 * getaddrinfo returns its own set of errors.
-		 * Log them here, so any subsequent syslogs will
-		 * have a context.  adt_get_hostIP callers can only
-		 * return errno, so subsequent syslogs may be lacking
-		 * that getaddrinfo failed.
-		 */
-		(void) snprintf(msg, sizeof (msg), "getaddrinfo(%s) "
-		    "failed[%s]", hostname, gai_strerror(eai_err));
-		adt_write_syslog(msg, 0);
+		DPRINTF(("getaddrinfo(%s) failed[%s]", hostname,
+		    gai_strerror(eai_err)));
 
 		if (eai_err != EAI_AGAIN) {
-
 			break;
 		}
 		/* see if resolution becomes available */
@@ -804,7 +794,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 			    errno);
 			goto try_interface;
 		}
-		adt_write_syslog("setting Audit IP address to kernel", 0);
+		DPRINTF(("setting Audit IP address to kernel"));
 		*p_term = audit_info.ai_termid;
 		return (0);
 	}
@@ -812,7 +802,9 @@ try_interface:
 	{
 		struct ifaddrlist al;
 		int	family;
+#ifdef C2_DEBUG
 		char	ntop[INET6_ADDRSTRLEN];
+#endif
 
 		/*
 		 * getaddrinfo has failed to map the hostname
@@ -845,10 +837,8 @@ try_interface:
 			(void) memcpy(p_term->at_addr, &al.addr.addr6, AU_IPv6);
 		}
 
-		(void) snprintf(msg, sizeof (msg), "mapping %s to %s",
-		    hostname, inet_ntop(family, &(al.addr), ntop,
-		    sizeof (ntop)));
-		adt_write_syslog(msg, 0);
+		DPRINTF(("mapping %s to %s", hostname,
+		    inet_ntop(family, &(al.addr), ntop, sizeof (ntop))));
 		return (0);
 	}
 }
