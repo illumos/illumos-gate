@@ -540,7 +540,7 @@ typedef enum {
 /*CSTYLED*/
 #define	DF_DRAM_OFFSET_V4(r)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 7, \
-				.drd_reg = 0x404 + ((r) * 4) }
+				.drd_reg = 0x140 + ((r) * 4) }
 #define	DF_DRAM_OFFSET_V2_GET_OFFSET(r)		bitx32(r, 31, 20)
 #define	DF_DRAM_OFFSET_V3_GET_OFFSET(r)		bitx32(r, 31, 12)
 #define	DF_DRAM_OFFSET_V4_GET_OFFSET(r)		bitx32(r, 24, 1)
