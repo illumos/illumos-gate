@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 #include "ena.h"
 
@@ -40,6 +40,8 @@ ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 		ena_set_dma_addr_values(rxq->er_ena,
 		    rcb->ercb_dma.edb_cookie->dmac_laddress,
 		    &desc->erd_buff_addr_lo, &desc->erd_buff_addr_hi);
+
+		ENAHW_RX_DESC_CLEAR_CTRL(desc);
 		ENAHW_RX_DESC_SET_PHASE(desc, phase);
 		ENAHW_RX_DESC_SET_FIRST(desc);
 		ENAHW_RX_DESC_SET_LAST(desc);
@@ -49,7 +51,7 @@ ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 		tail_mod = rxq->er_sq_tail_idx & (rxq->er_sq_num_descs - 1);
 
 		if (tail_mod == 0) {
-			rxq->er_sq_phase = !rxq->er_sq_phase;
+			rxq->er_sq_phase ^= 1;
 		}
 
 		num--;
@@ -97,6 +99,7 @@ ena_alloc_rx_dma(ena_rxq_t *rxq)
 
 	cq_descs_sz = rxq->er_cq_num_descs * sizeof (*rxq->er_cq_descs);
 	sq_descs_sz = rxq->er_sq_num_descs * sizeof (*rxq->er_sq_descs);
+	/* BEGIN CSTYLED */
 	conf = (ena_dma_conf_t) {
 		.edc_size = sq_descs_sz,
 		.edc_align = ENAHW_IO_SQ_DESC_BUF_ALIGNMENT,
@@ -104,6 +107,7 @@ ena_alloc_rx_dma(ena_rxq_t *rxq)
 		.edc_endian = DDI_NEVERSWAP_ACC,
 		.edc_stream = B_FALSE,
 	};
+	/* END CSTYLED */
 
 	if (!ena_dma_alloc(ena, &rxq->er_sq_dma, &conf, sq_descs_sz)) {
 		return (ENOMEM);
@@ -130,6 +134,7 @@ ena_alloc_rx_dma(ena_rxq_t *rxq)
 		}
 	}
 
+	/* BEGIN CSTYLED */
 	conf = (ena_dma_conf_t) {
 		.edc_size = cq_descs_sz,
 		.edc_align = ENAHW_IO_CQ_DESC_BUF_ALIGNMENT,
@@ -137,6 +142,7 @@ ena_alloc_rx_dma(ena_rxq_t *rxq)
 		.edc_endian = DDI_NEVERSWAP_ACC,
 		.edc_stream = B_FALSE,
 	};
+	/* END CSTYLED */
 
 	if (!ena_dma_alloc(ena, &rxq->er_cq_dma, &conf, cq_descs_sz)) {
 		err = ENOMEM;
@@ -246,6 +252,7 @@ ena_cleanup_rxq(ena_rxq_t *rxq)
 		rxq->er_sq_tail_idx = 0;
 		rxq->er_sq_phase = 0;
 		rxq->er_state &= ~ENA_RXQ_STATE_SQ_CREATED;
+		rxq->er_state &= ~ENA_RXQ_STATE_SQ_FILLED;
 	}
 
 	if ((rxq->er_state & ENA_RXQ_STATE_CQ_CREATED) != 0) {
@@ -290,8 +297,28 @@ ena_ring_rx_start(mac_ring_driver_t rh, uint64_t gen_num)
 	ena_t *ena = rxq->er_ena;
 	uint32_t intr_ctrl;
 
+	ena_dbg(ena, "ring_rx_start %p: state %x", rxq, rxq->er_state);
+
 	mutex_enter(&rxq->er_lock);
-	ena_refill_rx(rxq, rxq->er_sq_num_descs);
+	if ((rxq->er_state & ENA_RXQ_STATE_SQ_FILLED) == 0) {
+		/*
+		 * The ENA controller gets upset and sets the fatal error bit
+		 * in its status register if we write a value to an RX SQ's
+		 * doorbell that is past its current head. This makes sense as
+		 * it would represent there being more descriptors available
+		 * than can fit in the ring. For this reason, we make sure that
+		 * we only fill the ring once, even if it is started multiple
+		 * times.
+		 * The `- 1` below is harder to explain. If we completely fill
+		 * the SQ ring, then at some time later that seems to be
+		 * independent of how many times we've been around the ring,
+		 * the ENA controller will set the fatal error bit and stop
+		 * responding. Leaving a gap prevents this somehow and it is
+		 * what the other open source drivers do.
+		 */
+		ena_refill_rx(rxq, rxq->er_sq_num_descs - 1);
+		rxq->er_state |= ENA_RXQ_STATE_SQ_FILLED;
+	}
 	rxq->er_m_gen_num = gen_num;
 	rxq->er_intr_limit = ena->ena_rxq_intr_limit;
 	mutex_exit(&rxq->er_lock);
@@ -470,7 +497,7 @@ next_desc:
 		head_mod = rxq->er_cq_head_idx & (rxq->er_cq_num_descs - 1);
 
 		if (head_mod == 0) {
-			rxq->er_cq_phase = !rxq->er_cq_phase;
+			rxq->er_cq_phase ^= 1;
 		}
 
 		if (polling && (total_bytes > poll_bytes)) {
@@ -488,14 +515,17 @@ next_desc:
 		    (rxq->er_cq_descs + rxq->er_cq_num_descs - 1));
 	}
 
-	mutex_enter(&rxq->er_stat_lock);
-	rxq->er_stat.ers_packets.value.ui64 += num_frames;
-	rxq->er_stat.ers_bytes.value.ui64 += total_bytes;
-	mutex_exit(&rxq->er_stat_lock);
+	if (num_frames > 0) {
+		mutex_enter(&rxq->er_stat_lock);
+		rxq->er_stat.ers_packets.value.ui64 += num_frames;
+		rxq->er_stat.ers_bytes.value.ui64 += total_bytes;
+		mutex_exit(&rxq->er_stat_lock);
 
-	DTRACE_PROBE4(rx__frames, mblk_t *, head, boolean_t, polling, uint64_t,
-	    num_frames, uint64_t, total_bytes);
-	ena_refill_rx(rxq, num_frames);
+		DTRACE_PROBE4(rx__frames, mblk_t *, head, boolean_t, polling,
+		    uint64_t, num_frames, uint64_t, total_bytes);
+		ena_refill_rx(rxq, num_frames);
+	}
+
 	return (head);
 }
 

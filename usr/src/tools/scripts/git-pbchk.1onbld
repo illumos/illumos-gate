@@ -1,4 +1,3 @@
-'\" t
 .\"
 .\" This file and its contents are supplied under the terms of the
 .\" Common Development and Distribution License ("CDDL"), version 1.0.
@@ -13,71 +12,108 @@
 .\" Copyright 2011 Richard Lowe.
 .\" Copyright 2015 Elysium Digital, L.L.C.
 .\" Copyright 2018 Joyent, Inc.
+.\" Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 .\"
-
-.TH "GIT\-PBCHK" "1ONBLD" "February 10, 2022" "" ""
-
-.SH "NAME"
-\fBgit\-pbchk\fR \- nits and pre\-putback checks for git
-
-.SH "SYNOPSIS"
-git\-pbchk [\-c \fIcheck\fR] [\-p \fIbranch\fR] [file...]
-
-.P
-git\-nits [\-c \fIcheck\fR] [\-p \fIbranch\fR] [file...]
-
-.SH "OPTIONS"
-
-.TP
-\fB\-c check\fR:
-.IP
-Run the specific \fIcheck\fR, as named below.
+.Dd February 1, 2024
+.Dt GIT-PBCHK 1ONBLD
+.Os
+.Sh NAME
+.Nm git-pbchk ,
+.Nm git-nits
+.Nd nits and pre-putback checks for git
+.Sh SYNOPSIS
+.Nm git-pbchk
+.Op Fl c Ar check
+.Op Fl p Ar branch
+.Nm git-nits
+.Op Fl c Ar check
+.Op Fl p Ar branch
+.Op Ar file Ns ...
+.Sh DESCRIPTION
+Check your workspace for common nits and putback-ending mistakes.
+A simple set of checks are run over various parts of your workspace
+and errors encountered are reported, all of which should, generally,
+be fixed.
+.Pp
+As these command names start with
+.Sq git-
+they can also be run by
+.Xr git 1
+as subcommands:
+.Pp
+.Dl $ git pbchk
+.Sh OPTIONS
+.Bl -tag -width 6n
+.It Fl c Ar check
+Run the specific
+.Ar check ,
+as named below.
 In this mode, individual files can be provided to check.
-.TP
-\fB\-p branch\fR:
-.IP
-Compare the current workspace to the parent \fIbranch\fR for the purposes of generating file and comment lists\.
-.IP
-If this option is not specified an attempt is made to determine this automatically, if the git branch configuration contains this information\.
-.IP
-If no branch is specified and none can be determined automatically \fBorigin/master\fR is used\.
-.SH "DESCRIPTION"
-Check your workspace for common nits and putback\-ending mistakes, a simple set of checks are run over various parts of your workspace and errors encountered are reported, all of which should, generally, be fixed\.
-.TP
-Comment format [comchk]
-Check that putback comments follow the prescribed format (only run for pbchk)
-.TP
-Copyrights [copyright]
+.It Fl p Ar branch
+Compare the current workspace to the parent
+.Ar branch
+for the purposes of generating file and comment lists.
+.Pp
+If this option is not specified an attempt is made to determine this
+automatically, if the git branch configuration contains this information.
+.Pp
+If no branch is specified and none can be determined automatically
+.Pa origin/master
+is used.
+.El
+.Sh CHECKS
+.Bl -tag -width 6n
+.It Comment format: Cm comchk
+Check that putback comments follow the prescribed format
+.Pq only run for pbchk .
+.It Copyrights: Cm copyright
 Check that each source file contains a copyright notice for the current
-year\. You don't need to fix this if you, the potential new copyright holder, chooses not to
-.TP
-C style [cstyle]
+year\. You don't need to fix this if you, the potential new copyright holder,
+chooses not to
+.It C style: Cm cstyle
 Check that C source files conform to the illumos C style rules
-.TP
-Header check [hdrchk]
-Check that C header files conform to the illumos header style rules (in addition to the general C rules)
-.TP
-Java style [jstyle]
-Check that Java source files conform to the illumos Java style rules (which differ from the traditionally recommended Java style)
-.TP
-SCCS Keywords [keywords]
-Check that no source files contain unexpanded SCCS keywords\. It is possible that this check may false positive on certain inputs\. It is generally obvious when this is the case\.
-.IP
-This check does not check for expanded SCCS keywords, though the common \'ident\'\-style lines should be removed regardless of whether they are expanded\.
-.TP
-Man page check [manlint]
+.It Header check: Cm hdrchk
+Check that C header files conform to the illumos header style rules
+.Pq in addition to the general C rules .
+.It Java style: Cm jstyle
+Check that Java source files conform to the illumos Java style rules
+.Pq which differ from the traditionally recommended Java style .
+.It SCCS Keywords: Cm keywords
+Check that no source files contain unexpanded SCCS keywords.
+It is possible that this check may false positive on certain inputs.
+It is generally obvious when this is the case.
+.Pp
+This check does not check for expanded SCCS keywords, though the common
+.Sq ident Ns
+-style lines should be removed regardless of whether they are
+expanded.
+.It Man page check: Cm manlint
 Check for problems with man pages.
-.TP
-Mapfile check [mapfilechk]
-Check that linker mapfiles contain a comment directing anyone editing to read the directions in \fBusr/lib/README\.mapfiles\fR\.
-.TP
-Whitespace check [wscheck]
+.It Mapfile check: Cm mapfilechk
+Check that linker mapfiles contain a comment directing anyone editing to
+read the directions in
+.Pa usr/lib/README.mapfiles .
+.It Shell script check: Cm shelllint
+Check for problems with shell scripts.
+.It Package manifest formatting: Cm pkgfmt
+Check package manifests for common errors.
+.It Windows special filename check Cm winnames
+Check for filenames which would prevent you from checking out
+illumos-gate on a Windows system.
+.It Whitespace check: Cm wscheck
 Check for whitespace issues such as mixed tabs/spaces in source files.
-.SH "FILES"
-Exception lists can be used to exclude certain files from checking, named after
+.It Committed symlinks check: Cm symlinks
+Report if there are any symlinks checked into your change; they are
+not allowed by illumos policy.
+.El
+.Sh FILES
+Exception lists can be used to exclude certain files from checks, named after
 the specific check.
-They can be found in \fB$CODEMGR_WS/exception_lists/\fR, or optionally under
-\fB$CODEMGR_WS/\.git/info/\fR, where they must be suffixed \fB.NOT\fR.
-
-.IP "" 0
-
+They can be found in
+.Pa $CODEMGR_WS/exception_lists ,
+or optionally under
+.Pa $CODEMGR_WS/.git/info/ ,
+where they must be suffixed
+.Pa .NOT .
+.Sh SEE ALSO
+.Xr git 1

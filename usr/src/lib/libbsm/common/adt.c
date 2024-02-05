@@ -753,7 +753,6 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 {
 	struct addrinfo	*ai = NULL;
 	int	tries = 3;
-	char	msg[512];
 	int	eai_err;
 	struct ifaddrlist al;
 	int	family;
@@ -788,19 +787,10 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 	/* Now try getaddrinfo */
 	while ((tries-- > 0) &&
 	    ((eai_err = getaddrinfo(hostname, NULL, NULL, &ai)) != 0)) {
-		/*
-		 * getaddrinfo returns its own set of errors.
-		 * Log them here, so any subsequent syslogs will
-		 * have a context.  adt_get_hostIP callers can only
-		 * return errno, so subsequent syslogs may be lacking
-		 * that getaddrinfo failed.
-		 */
-		(void) snprintf(msg, sizeof (msg), "getaddrinfo(%s) "
-		    "failed[%s]", hostname, gai_strerror(eai_err));
-		adt_write_syslog(msg, 0);
+		DPRINTF(("getaddrinfo(%s) failed[%s]", hostname,
+		    gai_strerror(eai_err)));
 
 		if (eai_err != EAI_AGAIN) {
-
 			break;
 		}
 		/* see if resolution becomes available */
@@ -833,8 +823,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		 */
 		if (auditon(A_GETKAUDIT, (caddr_t)&audit_info,
 		    sizeof (audit_info)) >= 0) {
-			adt_write_syslog("setting Audit IP address to kernel",
-			    0);
+			DPRINTF(("setting Audit IP address to kernel"));
 			*p_term = audit_info.ai_termid;
 			return (0);
 		}

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 #include "ena.h"
 
@@ -428,8 +428,24 @@ int
 ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	ena_t *ena = arg;
-	ena_basic_stat_t *ebs = ena->ena_device_basic_kstat->ks_data;
+	ena_basic_stat_t *ebs;
 	int ret = 0;
+
+	/*
+	 * The ENA device does not provide a lot of the stats that a
+	 * traditional NIC device would. Return ENOTSUP early for any we don't
+	 * support, and avoid a round trip to the controller.
+	 */
+	switch (stat) {
+	case MAC_STAT_NORCVBUF:
+	case MAC_STAT_RBYTES:
+	case MAC_STAT_IPACKETS:
+	case MAC_STAT_OBYTES:
+	case MAC_STAT_OPACKETS:
+		break;
+	default:
+		return (ENOTSUP);
+	}
 
 	ret = ena_stat_device_basic_update(ena->ena_device_basic_kstat,
 	    KSTAT_READ);
@@ -439,11 +455,8 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 	}
 
 	mutex_enter(&ena->ena_lock);
+	ebs = ena->ena_device_basic_kstat->ks_data;
 
-	/*
-	 * The ENA device does not provide a lot of the stats that a
-	 * traditional NIC device would.
-	 */
 	switch (stat) {
 	case MAC_STAT_NORCVBUF:
 		*val = ebs->ebs_rx_drops.value.ui64;
@@ -466,8 +479,7 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	default:
-		ret = ENOTSUP;
-		break;
+		dev_err(ena->ena_dip, CE_PANIC, "unhandled stat, 0x%x", stat);
 	}
 
 	mutex_exit(&ena->ena_lock);

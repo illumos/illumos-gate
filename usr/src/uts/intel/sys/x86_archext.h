@@ -1785,6 +1785,7 @@ extern int enable_platform_detection;
 #define	HVSIG_KVM	"KVMKVMKVM"
 #define	HVSIG_MICROSOFT	"Microsoft Hv"
 #define	HVSIG_BHYVE	"bhyve bhyve "
+#define	HVSIG_QEMU_TCG	"TCGTCGTCGTCG"
 
 /*
  * Defined hardware environments
@@ -1797,9 +1798,10 @@ extern int enable_platform_detection;
 #define	HW_KVM		(1 << 4)	/* Running on KVM hypervisor */
 #define	HW_MICROSOFT	(1 << 5)	/* Running on Microsoft hypervisor */
 #define	HW_BHYVE	(1 << 6)	/* Running on bhyve hypervisor */
+#define	HW_QEMU_TCG	(1 << 7)	/* Running on QEMU TCG hypervisor */
 
 #define	HW_VIRTUAL	(HW_XEN_HVM | HW_VMWARE | HW_KVM | HW_MICROSOFT | \
-	    HW_BHYVE)
+	    HW_BHYVE | HW_QEMU_TCG)
 
 #endif	/* _KERNEL */
 
