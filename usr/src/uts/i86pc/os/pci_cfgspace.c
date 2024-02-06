@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -168,8 +169,13 @@ pci_check(void)
 
 	pci_bios_cfg_type = pci_check_bios();
 
-	if (pci_bios_cfg_type == PCI_MECHANISM_NONE)
-		pci_bios_cfg_type = PCI_MECHANISM_1;	/* default to mech 1 */
+	if (pci_bios_cfg_type == PCI_MECHANISM_NONE) {
+		/*
+		 * Default to mechanism 1, and scan all PCI buses
+		 */
+		pci_bios_cfg_type = PCI_MECHANISM_1;
+		pci_bios_maxbus = pci_max_nbus;
+	}
 
 	switch (pci_get_cfg_type()) {
 	case PCI_MECHANISM_1:
