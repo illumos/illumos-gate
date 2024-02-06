@@ -2136,7 +2136,7 @@ _start(struct xboot_info *xbp)
 	if (find_boot_prop("kbm_debug") != NULL)
 		kbm_debug = 1;
 
-	DBG_MSG("\n\n*** Entered Solaris in _start() cmdline is: ");
+	DBG_MSG("\n\n*** Entered illumos in _start() cmdline is: ");
 	DBG_MSG((char *)xbp->bi_cmdline);
 	DBG_MSG("\n\n\n");
 
