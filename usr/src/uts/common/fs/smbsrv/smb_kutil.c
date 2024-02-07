@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
  */
 
@@ -1115,16 +1115,31 @@ smb_time_unix_to_nt(timestruc_t *unix_time)
 	return (nt_time + NT_TIME_BIAS);
 }
 
+const timestruc_t smb_nttime_m1 = { -1, -1 }; /* minus 1 */
+const timestruc_t smb_nttime_m2 = { -1, -2 }; /* minus 2 */
+
 void
 smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time)
 {
+	static const timestruc_t tzero = { 0, 0 };
 	uint32_t seconds;
 
 	ASSERT(unix_time);
 
-	if ((nt_time == 0) || (nt_time == -1)) {
-		unix_time->tv_sec = 0;
-		unix_time->tv_nsec = 0;
+	/*
+	 * NT time values (0, -1, -2) get special treatment in SMB.
+	 * See notes above smb_node_setattr() for details.
+	 */
+	if (nt_time == 0) {
+		*unix_time = tzero;
+		return;
+	}
+	if ((int64_t)nt_time == -1) {
+		*unix_time = smb_nttime_m1;
+		return;
+	}
+	if ((int64_t)nt_time == -2) {
+		*unix_time = smb_nttime_m2;
 		return;
 	}
 

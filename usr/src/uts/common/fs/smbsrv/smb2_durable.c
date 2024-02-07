@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017-2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2021-2023 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -1244,7 +1244,7 @@ smb2_dh_update_locks(smb_request_t *sr, smb_ofile_t *of)
 }
 
 /*
- * Save "sticky" times
+ * Save "sticky" times.
  */
 void
 smb2_dh_update_times(smb_request_t *sr, smb_ofile_t *of, smb_attr_t *attr)
@@ -1260,15 +1260,24 @@ smb2_dh_update_times(smb_request_t *sr, smb_ofile_t *of, smb_attr_t *attr)
 	if (attr->sa_mask & SMB_AT_ATIME) {
 		t = ts2hrt(&attr->sa_vattr.va_atime);
 		(void) nvlist_add_hrtime(of->dh_nvlist, "atime", t);
+	} else {
+		(void) nvlist_remove_all(of->dh_nvlist, "atime");
 	}
+
 	if (attr->sa_mask & SMB_AT_MTIME) {
 		t = ts2hrt(&attr->sa_vattr.va_mtime);
 		(void) nvlist_add_hrtime(of->dh_nvlist, "mtime", t);
+	} else {
+		(void) nvlist_remove_all(of->dh_nvlist, "mtime");
 	}
+
 	if (attr->sa_mask & SMB_AT_CTIME) {
 		t = ts2hrt(&attr->sa_vattr.va_ctime);
 		(void) nvlist_add_hrtime(of->dh_nvlist, "ctime", t);
+	} else {
+		(void) nvlist_remove_all(of->dh_nvlist, "ctime");
 	}
+
 	mutex_exit(&of->dh_nvlock);
 
 	sr->dh_nvl_dirty = B_TRUE;

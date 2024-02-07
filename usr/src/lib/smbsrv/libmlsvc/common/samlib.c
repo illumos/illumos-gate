@@ -297,6 +297,11 @@ netr_change_password(
 
 	/*
 	 * Create an RPC handle to this server, bound to SAMR.
+	 * Note: the group policy option to disable anonymous access to named
+	 * pipes on DCs doesn't work with this.
+	 * To work with that option, we'll have to find an interface that lets
+	 * us authenticate with an expired password, instead of the anonymous
+	 * bind we currently perform.
 	 */
 	status = ndr_rpc_bind(&handle, server, "", "", "SAMR");
 	if (status != NT_STATUS_SUCCESS)

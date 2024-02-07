@@ -484,6 +484,8 @@ smb_server_create(void)
 	    smb_tcon_threshold, smb_tcon_timeout);
 	smb_threshold_init(&sv->sv_opipe_ct, SMB_OPIPE_CMD,
 	    smb_opipe_threshold, smb_opipe_timeout);
+	smb_threshold_init(&sv->sv_logoff_ct, SMB_LOGOFF_CMD,
+	    smb_logoff_threshold, smb_logoff_timeout);
 
 	smb_llist_insert_tail(&smb_servers, sv);
 	smb_llist_exit(&smb_servers);
@@ -542,6 +544,7 @@ smb_server_delete(smb_server_t	*sv)
 	smb_threshold_fini(&sv->sv_ssetup_ct);
 	smb_threshold_fini(&sv->sv_tcon_ct);
 	smb_threshold_fini(&sv->sv_opipe_ct);
+	smb_threshold_fini(&sv->sv_logoff_ct);
 
 	smb_server_listener_destroy(&sv->sv_nbt_daemon);
 	smb_server_listener_destroy(&sv->sv_tcp_daemon);
@@ -1673,6 +1676,7 @@ smb_server_shutdown(smb_server_t *sv)
 	smb_threshold_wake_all(&sv->sv_ssetup_ct);
 	smb_threshold_wake_all(&sv->sv_tcon_ct);
 	smb_threshold_wake_all(&sv->sv_opipe_ct);
+	smb_threshold_wake_all(&sv->sv_logoff_ct);
 
 	/*
 	 * Wait for the session list to empty.

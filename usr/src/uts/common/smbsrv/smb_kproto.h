@@ -70,9 +70,11 @@ extern	uint_t smb_audit_flags;
 extern	int smb_ssetup_threshold;
 extern	int smb_tcon_threshold;
 extern	int smb_opipe_threshold;
+extern	int smb_logoff_threshold;
 extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
+extern	int smb_logoff_timeout;
 extern	int smb_allow_advisory_locks;
 extern	int smb_session_auth_tmo;
 
@@ -803,6 +805,9 @@ int32_t	smb_time_dos_to_unix(int16_t, int16_t);
 void smb_time_unix_to_dos(int32_t, int16_t *, int16_t *);
 void smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time);
 uint64_t smb_time_unix_to_nt(timestruc_t *);
+
+extern const timestruc_t smb_nttime_m1; /* minus 1 */
+extern const timestruc_t smb_nttime_m2; /* minus 2 */
 
 int netbios_name_isvalid(char *in, char *out);
 

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 /*
  * SMB Node State Machine
@@ -98,6 +98,14 @@
 #include <sys/sdt.h>
 #include <sys/nbmlock.h>
 #include <fs/fs_reparse.h>
+
+/* Todo: move this to sys/time.h */
+#ifndef	timespeccmp
+#define	timespeccmp(tvp, uvp, cmp)				\
+	(((tvp)->tv_sec == (uvp)->tv_sec) ?			\
+	((tvp)->tv_nsec cmp (uvp)->tv_nsec) :			\
+	((tvp)->tv_sec cmp (uvp)->tv_sec))
+#endif
 
 uint32_t smb_is_executable(char *);
 static void smb_node_create_audit_buf(smb_node_t *, int);
@@ -1498,6 +1506,16 @@ smb_node_file_is_readonly(smb_node_t *node)
  * attributes are returned in any query on the handle where
  * they are stored.
  *
+ * The client can also turn on or off these "sticky" times using
+ * the special NT time values -1 or -2, as described in:
+ *	[MS-FSCC] Section 2.4.7, the paragraphs describing:
+ *	CreationTime, LastAccessTime, LastWriteTime, ChangeTime
+ * and the Windows behavior notes in those descriptions.
+ * To summarize all the "special" NT time values:
+ *	 0: no change (caller handles this case)
+ *	-1: pause time updates (current value becomes "sticky")
+ *	-2: resume time updates (discontiue "sticky" behavior)
+ *
  * Other than the above, the file system layer takes care of the
  * normal time stamp updates, such as updating the mtime after a
  * write, and ctime after an attribute change.
@@ -1511,9 +1529,10 @@ int
 smb_node_setattr(smb_request_t *sr, smb_node_t *node,
     cred_t *cr, smb_ofile_t *of, smb_attr_t *attr)
 {
+	smb_attr_t cur_attr;
+	uint_t times_set = 0;
+	uint_t times_clr = 0;
 	int rc;
-	uint_t times_mask;
-	smb_attr_t tmp_attr;
 
 	SMB_NODE_VALID(node);
 
@@ -1533,18 +1552,18 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	case SMB_AT_ALLOCSZ:
 		/*
 		 * Setting the allocation size but not EOF position.
-		 * Get the current EOF in tmp_attr and (if necessary)
+		 * Get the current EOF in cur_attr and (if necessary)
 		 * truncate to the (rounded up) allocation size.
 		 * Using kcred here because if we don't have access,
 		 * we want to fail at setattr below and not here.
 		 */
-		bzero(&tmp_attr, sizeof (smb_attr_t));
-		tmp_attr.sa_mask = SMB_AT_SIZE;
-		rc = smb_fsop_getattr(NULL, zone_kcred(), node, &tmp_attr);
+		bzero(&cur_attr, sizeof (smb_attr_t));
+		cur_attr.sa_mask = SMB_AT_SIZE;
+		rc = smb_fsop_getattr(NULL, zone_kcred(), node, &cur_attr);
 		if (rc != 0)
 			return (rc);
 		attr->sa_allocsz = SMB_ALLOCSZ(attr->sa_allocsz);
-		if (tmp_attr.sa_vattr.va_size > attr->sa_allocsz) {
+		if (cur_attr.sa_vattr.va_size > attr->sa_allocsz) {
 			/* truncate the file to allocsz */
 			attr->sa_vattr.va_size = attr->sa_allocsz;
 			attr->sa_mask |= SMB_AT_SIZE;
@@ -1578,32 +1597,74 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	}
 
 	/*
-	 * When operating on an open file, some settable attributes
-	 * become "sticky" in the open file object until close.
-	 * (see above re. timestamps)
+	 * When setting times, -1 and -2 are "special" (see above).
+	 * Keep track of -2 values and just clear mask.
+	 * Replace -1 values with current time.
+	 *
+	 * Note that NT times -1, -2 have been converted to
+	 * smb_nttime_m1, smb_nttime_m2, respectively.
 	 */
-	times_mask = attr->sa_mask & SMB_AT_TIMES;
-	if (of != NULL && times_mask != 0) {
+	times_set = attr->sa_mask & SMB_AT_TIMES;
+	if (times_set != 0) {
+		bzero(&cur_attr, sizeof (smb_attr_t));
+		cur_attr.sa_mask = SMB_AT_TIMES;
+		rc = smb_fsop_getattr(NULL, zone_kcred(), node, &cur_attr);
+		if (rc != 0)
+			return (rc);
+
+		/* Easiest to get these right with a macro. */
+#define	FIX_TIME(FIELD, MASK)				\
+		if (timespeccmp(&attr->FIELD, &smb_nttime_m2, ==)) { \
+			times_clr |= MASK;		\
+			times_set &= ~MASK;		\
+		}					\
+		if (timespeccmp(&attr->FIELD, &smb_nttime_m1, ==)) \
+			attr->FIELD = cur_attr.FIELD	/* no ; */
+
+		if (times_set & SMB_AT_ATIME) {
+			FIX_TIME(sa_vattr.va_atime, SMB_AT_ATIME);
+		}
+		if (times_set & SMB_AT_MTIME) {
+			FIX_TIME(sa_vattr.va_mtime, SMB_AT_MTIME);
+		}
+		if (times_set & SMB_AT_CTIME) {
+			FIX_TIME(sa_vattr.va_ctime, SMB_AT_CTIME);
+		}
+		if (times_set & SMB_AT_CRTIME) {
+			FIX_TIME(sa_crtime, SMB_AT_CRTIME);
+		}
+#undef	FIX_TIME
+
+		/* Clear mask for -2 fields. */
+		attr->sa_mask &= ~times_clr;
+	}
+
+	/*
+	 * When operating on an open file, some settable attributes
+	 * become "sticky" in the open file object until close, or until
+	 * a set-time with value -2 (see above re. timestamps)
+	 *
+	 * Save the pending attributes.  We've handled -2 and -1 above,
+	 * and cleared the -2 cases from the times_set mask.
+	 */
+	if (of != NULL && (times_set != 0 || times_clr != 0)) {
 		smb_attr_t *pa;
 
 		SMB_OFILE_VALID(of);
 		mutex_enter(&of->f_mutex);
 		pa = &of->f_pending_attr;
 
-		pa->sa_mask |= times_mask;
+		pa->sa_mask |= times_set;
+		pa->sa_mask &= ~times_clr;
 
-		if (times_mask & SMB_AT_ATIME)
-			pa->sa_vattr.va_atime =
-			    attr->sa_vattr.va_atime;
-		if (times_mask & SMB_AT_MTIME)
-			pa->sa_vattr.va_mtime =
-			    attr->sa_vattr.va_mtime;
-		if (times_mask & SMB_AT_CTIME)
-			pa->sa_vattr.va_ctime =
-			    attr->sa_vattr.va_ctime;
-		if (times_mask & SMB_AT_CRTIME)
-			pa->sa_crtime =
-			    attr->sa_crtime;
+		if (times_set & SMB_AT_ATIME)
+			pa->sa_vattr.va_atime = attr->sa_vattr.va_atime;
+		if (times_set & SMB_AT_MTIME)
+			pa->sa_vattr.va_mtime = attr->sa_vattr.va_mtime;
+		if (times_set & SMB_AT_CTIME)
+			pa->sa_vattr.va_ctime = attr->sa_vattr.va_ctime;
+		if (times_set & SMB_AT_CRTIME)
+			pa->sa_crtime = attr->sa_crtime;
 
 		mutex_exit(&of->f_mutex);
 

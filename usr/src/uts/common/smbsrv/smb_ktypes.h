@@ -2074,6 +2074,7 @@ typedef struct {
 #define	SMB_SSETUP_CMD			"authentication"
 #define	SMB_TCON_CMD			"share mapping"
 #define	SMB_OPIPE_CMD			"pipe open"
+#define	SMB_LOGOFF_CMD			"logoff"
 #define	SMB_THRESHOLD_REPORT_THROTTLE	50
 typedef struct smb_cmd_threshold {
 	char			*ct_cmd;
@@ -2180,6 +2181,7 @@ typedef struct smb_server {
 	smb_cmd_threshold_t	sv_ssetup_ct;
 	smb_cmd_threshold_t	sv_tcon_ct;
 	smb_cmd_threshold_t	sv_opipe_ct;
+	smb_cmd_threshold_t	sv_logoff_ct;
 	kstat_t			*sv_legacy_ksp;
 	kmutex_t		sv_legacy_ksmtx;
 	smb_disp_stats_t	*sv_disp_stats1;
