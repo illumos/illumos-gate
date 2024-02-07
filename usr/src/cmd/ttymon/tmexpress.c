@@ -224,7 +224,8 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 		/*
 		 * The following code is only reached if -g was specified.
 		 * It attempts to determine a suitable terminal type for
-		 * the console login process.
+		 * the console login process, and in case we are using
+		 * serial console, tty mode line.
 		 *
 		 * If -d /dev/console also specified, we send an ioctl
 		 * to the console device to query the TERM type.
@@ -234,12 +235,13 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 		 * of "".  otherwise it is set to a term type value
 		 * that was returned.
 		 */
-		if ((strlen(pmtab->p_termtype) == 0) &&
-		    (strcmp(pmtab->p_device, "/dev/console") == 0) &&
-		    ((cn_fd = open("/dev/console", O_RDONLY)) != -1)) {
+		if (strcmp(pmtab->p_device, "/dev/console") == 0 &&
+		    (cn_fd = open("/dev/console", O_RDONLY)) != -1) {
 
-			if (ioctl(cn_fd, CONS_GETTERM, &cnterm) != -1)
+			if (strlen(pmtab->p_termtype) == 0 &&
+			    ioctl(cn_fd, CONS_GETTERM, &cnterm) != -1) {
 				pmtab->p_termtype = cnterm.cn_term_type;
+			}
 
 			if (ioctl(cn_fd, CONS_GETDEV, &cnd) != -1)
 				pmtab->p_ttymode =
