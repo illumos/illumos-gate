@@ -3702,7 +3702,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		/* make sure nicenum has enough space */
 		CTASSERT(sizeof (buf) >= NN_NUMBUF_SZ);
 
-		zfs_nicenum(bytes, buf, sizeof (buf));
+		zfs_nicebytes(bytes, buf, sizeof (buf));
 		(void) fprintf(stderr,
 		    "\r%5s completed (%4dMB/s) "
 		    "estimated time remaining: %uhr %02umin %02usec        ",
