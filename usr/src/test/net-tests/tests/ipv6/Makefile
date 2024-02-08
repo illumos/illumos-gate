@@ -10,17 +10,18 @@
 #
 
 #
-# Copyright 2019 Joyent, Inc.
 # Copyright 2024 Oxide Computer Company
+#
 #
 include $(SRC)/Makefile.master
 include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS = forwarding ipv6
-SCRIPTS = net_common
 ROOTOPTPKG = $(ROOT)/opt/net-tests
-TESTDIR = $(ROOTOPTPKG)/tests
-CMDS = $(SCRIPTS:%=$(TESTDIR)/%)
+TESTDIR = $(ROOTOPTPKG)/tests/ipv6
+
+PROG = link-local
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
 FILEMODE=0444
 $(CMDS) := FILEMODE = 0555
 
