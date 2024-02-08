@@ -419,7 +419,6 @@ typedef struct ena_txq {
 	 * This address is used to control the CQ interrupts.
 	 */
 	uint32_t		*et_cq_unmask_addr; /* WO */
-	uint32_t		*et_cq_head_db_addr; /* WO (currently unused) */
 	uint32_t		*et_cq_numa_addr;    /* WO (currently unused) */
 
 	/*
@@ -538,7 +537,6 @@ typedef struct ena_rxq {
 	uint16_t		er_cq_phase;	 /* RM */
 	uint16_t		er_cq_hw_idx;	 /* WO */
 	uint32_t		*er_cq_unmask_addr; /* WO */
-	uint32_t		*er_cq_head_db_addr; /* WO (currently unused) */
 	uint32_t		*er_cq_numa_addr;    /* WO (currently unused) */
 
 	ena_rx_ctrl_block_t	*er_rcbs; /* RM */
@@ -820,7 +818,7 @@ extern int ena_admin_poll_for_resp(ena_t *, ena_cmd_ctx_t *);
 extern void ena_free_host_info(ena_t *);
 extern boolean_t ena_init_host_info(ena_t *);
 extern int ena_create_cq(ena_t *, uint16_t, uint64_t, boolean_t, uint32_t,
-    uint16_t *, uint32_t **, uint32_t **, uint32_t **);
+    uint16_t *, uint32_t **, uint32_t **);
 extern int ena_destroy_cq(ena_t *, uint16_t);
 extern int ena_create_sq(ena_t *, uint16_t, uint64_t, boolean_t, uint16_t,
     uint16_t *, uint32_t **);

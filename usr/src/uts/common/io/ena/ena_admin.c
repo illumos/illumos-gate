@@ -384,7 +384,7 @@ ena_init_host_info(ena_t *ena)
 int
 ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
     boolean_t is_tx, uint32_t vector, uint16_t *hw_index,
-    uint32_t **unmask_addr, uint32_t **headdb, uint32_t **numanode)
+    uint32_t **unmask_addr, uint32_t **numanode)
 {
 	int ret;
 	enahw_cmd_desc_t cmd;
@@ -420,19 +420,18 @@ ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	*unmask_addr = (uint32_t *)(ena->ena_reg_base +
 	    resp_cq->ercq_interrupt_mask_reg_offset);
 
-	if (resp_cq->ercq_head_db_reg_offset != 0) {
-		*headdb = (uint32_t *)(ena->ena_reg_base +
-		    resp_cq->ercq_head_db_reg_offset);
-	} else {
-		*headdb = NULL;
-	}
-
 	if (resp_cq->ercq_numa_node_reg_offset != 0) {
 		*numanode = (uint32_t *)(ena->ena_reg_base +
 		    resp_cq->ercq_numa_node_reg_offset);
 	} else {
 		*numanode = NULL;
 	}
+
+	/*
+	 * The CQ head doorbell register is no longer supported by any
+	 * existing adapter hardware.
+	 */
+	VERIFY0(resp_cq->ercq_head_db_reg_offset);
 
 	return (0);
 }

@@ -22,14 +22,16 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  *	execlp(name, arg,...,0)	(like execl, but does path search)
  *	execvp(name, argv)	(like execv, but does path search)
+ *	execvpe(name, argv, envp) (like execve, but does path search)
  */
 
 #pragma weak _execlp = execlp
@@ -103,8 +105,9 @@ execlp(const char *name, const char *arg0, ...)
 	return (err);
 }
 
-int
-execvp(const char *name, char *const *argv)
+static int
+execvpe_int(const char *name, char *const *argv, char *const *envp,
+    boolean_t use_env)
 {
 	const char	*pathstr;
 	char	fname[PATH_MAX+2];
@@ -164,7 +167,11 @@ execvp(const char *name, char *const *argv)
 			fname[0] = '.';
 			fname[1] = '/';
 		}
-		(void) execv(fname, argv);
+		if (use_env) {
+			(void) execve(fname, argv, envp);
+		} else {
+			(void) execv(fname, argv);
+		}
 		switch (errno) {
 		case ENOEXEC:
 			newargs[0] = "sh";
@@ -175,7 +182,11 @@ execvp(const char *name, char *const *argv)
 					return (-1);
 				}
 			}
-			(void) execv(_PATH_BSHELL, newargs);
+			if (use_env) {
+				(void) execve(_PATH_BSHELL, newargs, envp);
+			} else {
+				(void) execv(_PATH_BSHELL, newargs);
+			}
 			return (-1);
 		case ETXTBSY:
 			if (++etxtbsy > 5)
@@ -194,6 +205,18 @@ execvp(const char *name, char *const *argv)
 	if (eacces)
 		errno = EACCES;
 	return (-1);
+}
+
+int
+execvp(const char *file, char *const *argv)
+{
+	return (execvpe_int(file, argv, NULL, B_FALSE));
+}
+
+int
+execvpe(const char *file, char *const *argv, char *const *envp)
+{
+	return (execvpe_int(file, argv, envp, B_TRUE));
 }
 
 static const char *

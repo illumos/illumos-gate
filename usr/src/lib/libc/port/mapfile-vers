@@ -28,7 +28,7 @@
 # Copyright (c) 2013 Gary Mills
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 #
@@ -78,6 +78,11 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.44 {
+    protected:
+	execvpe;
+} ILLUMOS_0.43;
 
 SYMBOL_VERSION ILLUMOS_0.43 {
     protected:

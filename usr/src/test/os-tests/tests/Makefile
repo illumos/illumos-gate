@@ -14,7 +14,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 SUBDIRS_i386 = i386 imc zen_umc xsave
@@ -23,6 +23,7 @@ SUBDIRS =       \
 		cores \
 		ddi_ufm \
 		definit \
+		execvpe \
 		file-locking \
 		ilstr \
 		ksensor \

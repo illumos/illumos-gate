@@ -3681,6 +3681,7 @@ f usr/include/nfs/mapid.h 0644 root bin
 f usr/include/nfs/mount.h 0644 root bin
 f usr/include/nfs/nfs.h 0644 root bin
 f usr/include/nfs/nfs4.h 0644 root bin
+f usr/include/nfs/nfs4x.h 0644 root bin
 f usr/include/nfs/nfs4_attr.h 0644 root bin
 f usr/include/nfs/nfs4_clnt.h 0644 root bin
 f usr/include/nfs/nfs4_db_impl.h 0644 root bin
@@ -12489,6 +12490,7 @@ s usr/share/man/man2/execv.2=exec.2
 s usr/share/man/man2/execve.2=exec.2
 f usr/share/man/man2/execvex.2 0444 root bin
 s usr/share/man/man2/execvp.2=exec.2
+s usr/share/man/man2/execvpe.2=exec.2
 f usr/share/man/man2/exit.2 0444 root bin
 s usr/share/man/man2/faccessat.2=access.2
 s usr/share/man/man2/facl.2=acl.2

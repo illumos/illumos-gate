@@ -164,7 +164,7 @@ ena_alloc_rxq(ena_rxq_t *rxq)
 	int ret = 0;
 	ena_t *ena = rxq->er_ena;
 	uint16_t cq_hw_idx, sq_hw_idx;
-	uint32_t *cq_unmask_addr, *cq_headdb, *cq_numanode;
+	uint32_t *cq_unmask_addr, *cq_numanode;
 	uint32_t *sq_db_addr;
 
 	/*
@@ -183,8 +183,7 @@ ena_alloc_rxq(ena_rxq_t *rxq)
 	 */
 	ret = ena_create_cq(ena,  rxq->er_cq_num_descs,
 	    rxq->er_cq_dma.edb_cookie->dmac_laddress, B_FALSE,
-	    rxq->er_intr_vector, &cq_hw_idx, &cq_unmask_addr, &cq_headdb,
-	    &cq_numanode);
+	    rxq->er_intr_vector, &cq_hw_idx, &cq_unmask_addr, &cq_numanode);
 
 	if (ret != 0) {
 		ena_err(ena, "failed to create Rx CQ %u: %d", rxq->er_rxqs_idx,
@@ -197,7 +196,6 @@ ena_alloc_rxq(ena_rxq_t *rxq)
 	rxq->er_cq_head_idx = 0;
 	rxq->er_cq_hw_idx = cq_hw_idx;
 	rxq->er_cq_unmask_addr = cq_unmask_addr;
-	rxq->er_cq_head_db_addr = cq_headdb;
 	rxq->er_cq_numa_addr = cq_numanode;
 	rxq->er_state |= ENA_RXQ_STATE_CQ_CREATED;
 
@@ -266,7 +264,6 @@ ena_cleanup_rxq(ena_rxq_t *rxq)
 		rxq->er_cq_hw_idx = 0;
 		rxq->er_cq_head_idx = 0;
 		rxq->er_cq_phase = 0;
-		rxq->er_cq_head_db_addr = NULL;
 		rxq->er_cq_unmask_addr = NULL;
 		rxq->er_cq_numa_addr = NULL;
 		rxq->er_state &= ~ENA_RXQ_STATE_CQ_CREATED;

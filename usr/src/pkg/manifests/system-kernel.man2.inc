@@ -64,6 +64,7 @@ link path=usr/share/man/man2/execv.2 target=exec.2
 link path=usr/share/man/man2/execve.2 target=exec.2
 file path=usr/share/man/man2/execvex.2
 link path=usr/share/man/man2/execvp.2 target=exec.2
+link path=usr/share/man/man2/execvpe.2 target=exec.2
 file path=usr/share/man/man2/exit.2
 link path=usr/share/man/man2/faccessat.2 target=access.2
 link path=usr/share/man/man2/facl.2 target=acl.2

@@ -67,11 +67,28 @@ extern "C" {
 #define	NFS_VERSION	((rpcvers_t)2)
 #define	NFS_PORT	2049
 
+/* Protocol versions with internal representation */
+typedef enum nfs_prot_vers {
+	NFS_VERS_2 =	0x200,	/* 2 */
+	NFS_VERS_3 =	0x300,	/* 3 */
+	NFS_VERS_4 =	0x400,	/* 4 */
+	NFS_VERS_4_1 =	0x401,  /* 4.1 */
+	NFS_VERS_4_2 =	0x402,	/* 4.2 */
+} nfs_prot_vers_t;
+
+#define	NFS_PROT_VERSION(x)		((x) >> 8)
+#define	NFS_PROT_V4_MINORVERSION(x)	((x) & 0xFF)
+
+#define	NFS_SRV_VERS_MIN	NFS_VERS_2
+#define	NFS_SRV_VERS_MAX	NFS_VERS_4_2
+
 /*
  * Used to determine registration and service handling of versions
  */
 #define	NFS_VERSMIN_DEFAULT	((rpcvers_t)2)
 #define	NFS_VERSMAX_DEFAULT	((rpcvers_t)4)
+#define	NFS_SRV_VERSMIN_DEFAULT	(NFS_VERS_2)
+#define	NFS_SRV_VERSMAX_DEFAULT	(NFS_VERS_4)
 
 /*
  * Used to track the state of the server so that initialization
@@ -98,8 +115,8 @@ struct nfsauth_globals;
 typedef struct nfs_globals {
 	list_node_t		nfs_g_link;	/* all globals list */
 
-	rpcvers_t		nfs_versmin;
-	rpcvers_t		nfs_versmax;
+	nfs_prot_vers_t		nfs_versmin;	/* NFS_VERS_... */
+	nfs_prot_vers_t		nfs_versmax;	/* NFS_VERS_... */
 
 	/* NFS server locks and state */
 	nfs_server_running_t	nfs_server_upordown;
@@ -2399,6 +2416,8 @@ extern mblk_t	*uio_to_mblk(uio_t *);
 extern mblk_t	*rfs_read_alloc(uint_t, struct iovec **, int *);
 extern void	rfs_rndup_mblks(mblk_t *, uint_t, int);
 extern void	rfs_free_xuio(void *);
+
+extern time_t nfs_sys_uptime(void);
 
 #endif	/* _KERNEL */
 

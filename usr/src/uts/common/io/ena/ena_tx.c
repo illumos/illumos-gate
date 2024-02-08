@@ -121,7 +121,7 @@ ena_alloc_txq(ena_txq_t *txq)
 	int ret = 0;
 	ena_t *ena = txq->et_ena;
 	uint16_t cq_hw_idx, sq_hw_idx;
-	uint32_t *cq_unmask_addr, *cq_headdb, *cq_numanode;
+	uint32_t *cq_unmask_addr, *cq_numanode;
 	uint32_t *sq_db_addr;
 
 	ASSERT3U(txq->et_cq_num_descs, >, 0);
@@ -142,8 +142,7 @@ ena_alloc_txq(ena_txq_t *txq)
 	 */
 	ret = ena_create_cq(ena, txq->et_cq_num_descs,
 	    txq->et_cq_dma.edb_cookie->dmac_laddress, B_TRUE,
-	    txq->et_intr_vector, &cq_hw_idx, &cq_unmask_addr, &cq_headdb,
-	    &cq_numanode);
+	    txq->et_intr_vector, &cq_hw_idx, &cq_unmask_addr, &cq_numanode);
 
 	if (ret != 0) {
 		ena_err(ena, "failed to create Tx CQ %u: %d", txq->et_txqs_idx,
@@ -154,7 +153,6 @@ ena_alloc_txq(ena_txq_t *txq)
 	txq->et_cq_hw_idx = cq_hw_idx;
 	txq->et_cq_phase = 1;
 	txq->et_cq_unmask_addr = cq_unmask_addr;
-	txq->et_cq_head_db_addr = cq_headdb;
 	txq->et_cq_numa_addr = cq_numanode;
 	txq->et_state |= ENA_TXQ_STATE_CQ_CREATED;
 
@@ -221,7 +219,6 @@ ena_cleanup_txq(ena_txq_t *txq)
 		txq->et_cq_hw_idx = 0;
 		txq->et_cq_head_idx = 0;
 		txq->et_cq_phase = 0;
-		txq->et_cq_head_db_addr = NULL;
 		txq->et_cq_unmask_addr = NULL;
 		txq->et_cq_numa_addr = NULL;
 		txq->et_state &= ~ENA_TXQ_STATE_CQ_CREATED;
@@ -518,20 +515,6 @@ ena_tx_intr_work(ena_txq_t *txq)
 	if (recycled == 0) {
 		mutex_exit(&txq->et_lock);
 		return;
-	}
-
-	/*
-	 * If the device provided a head doorbell register, then we
-	 * need to update it to let the device know we are done
-	 * reading these CQ entries.
-	 */
-	if (txq->et_cq_head_db_addr != NULL) {
-		/*
-		 * We submit the raw value to the device, the hardware performs
-		 * its own modulo.
-		 */
-		ena_hw_abs_write32(txq->et_ena, txq->et_cq_head_db_addr,
-		    txq->et_cq_head_idx);
 	}
 
 	mutex_exit(&txq->et_lock);

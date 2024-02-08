@@ -51,13 +51,11 @@
 
 #define	MAX_READ_DELEGATIONS 5
 
-static int rfs4_deleg_wlp = 5;
 static int rfs4_deleg_disabled;
 static int rfs4_max_setup_cb_tries = 5;
 
 #ifdef DEBUG
 
-static int rfs4_test_cbgetattr_fail = 0;
 int rfs4_cb_null;
 int rfs4_cb_debug;
 int rfs4_deleg_debug;

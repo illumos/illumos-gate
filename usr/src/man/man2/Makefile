@@ -184,6 +184,7 @@ MANLINKS=	_Exit.2				\
 		execv.2				\
 		execve.2			\
 		execvp.2			\
+		execvpe.2			\
 		faccessat.2			\
 		facl.2				\
 		fchdir.2			\
@@ -303,6 +304,7 @@ execlp.2			:= LINKSRC = exec.2
 execv.2				:= LINKSRC = exec.2
 execve.2			:= LINKSRC = exec.2
 execvp.2			:= LINKSRC = exec.2
+execvpe.2			:= LINKSRC = exec.2
 fexecve.2			:= LINKSRC = exec.2
 
 _Exit.2				:= LINKSRC = exit.2

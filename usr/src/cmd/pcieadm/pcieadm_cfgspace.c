@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -61,6 +61,12 @@
 
 #include "pcieadm.h"
 
+/*
+ * A few required forwards
+ */
+struct pcieadm_cfgspace_walk;
+struct pcieadm_regdef;
+
 typedef enum pcieadm_cfgspace_op {
 	PCIEADM_CFGSPACE_OP_PRINT,
 	PCIEADM_CFGSPACE_OP_WRITE
@@ -88,7 +94,8 @@ typedef struct pcieadm_cfgspace_ofmt {
 typedef enum pcieadm_regdef_val {
 	PRDV_STRVAL,
 	PRDV_BITFIELD,
-	PRDV_HEX
+	PRDV_HEX,
+	PRDV_CUSTOM
 } pcieadm_regdef_val_t;
 
 typedef struct pcieadm_regdef_addend {
@@ -109,6 +116,8 @@ typedef struct pcieadm_regdef {
 		 */
 		const char *prdv_strval[128];
 		pcieadm_regdef_addend_t prdv_hex;
+		void (*prdv_func)(struct pcieadm_cfgspace_walk *,
+		    const struct pcieadm_regdef *, uint64_t);
 	} prd_val;
 } pcieadm_regdef_t;
 
@@ -532,6 +541,9 @@ pcieadm_cfgspace_print_regdef(pcieadm_cfgspace_walk_t *walkp,
 				}
 				pcieadm_deindent();
 			}
+			break;
+		case PRDV_CUSTOM:
+			regdef->prd_val.prdv_func(walkp, regdef, regval);
 			break;
 		}
 	}
@@ -4694,6 +4706,57 @@ static const pcieadm_cfgspace_print_t pcieadm_cap_rcecea_v2[] = {
 	{ -1, -1, NULL }
 };
 
+/*
+ * Readiness Time Reporting
+ */
+
+/*
+ * A single readiness time constitutes a 9 bit value and 3 bit scale. The actual
+ * register contains a value in nanosconds which is calculated as value *
+ * 32^scale. We take advantage of the fact that this is a power of 2 and
+ * therefore we can calculate 32^scale by taking advantage that 32 is 2^5 and
+ * that this is really 2^(scale * 5) which becomes a simple bit shift.
+ */
+static void
+pcieadm_regdef_print_rtr(pcieadm_cfgspace_walk_t *walkp,
+    const pcieadm_regdef_t *regdef, uint64_t reg)
+{
+	uint64_t scale = bitx64(reg, 11, 9);
+	uint64_t time = bitx64(reg, 8, 0);
+
+	time *= 1ULL << (scale * 5);
+	pcieadm_field_printf(walkp, regdef->prd_short, regdef->prd_human,
+	    reg, "%" PRIu64 " ns\n", time);
+}
+
+static const pcieadm_regdef_t pcieadm_regdef_rtr1[] = {
+	{ 0, 11, "reset", "Reset Time", PRDV_CUSTOM,
+	    .prd_val = { .prdv_func = pcieadm_regdef_print_rtr } },
+	{ 12, 23, "dlup", "DL_Up Time", PRDV_CUSTOM,
+	    .prd_val = { .prdv_func = pcieadm_regdef_print_rtr } },
+	{ 31, 31, "valid", "Valid", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "invalid", "valid" } } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_rtr2[] = {
+	{ 0, 11, "flr", "FLR Time", PRDV_CUSTOM,
+	    .prd_val = { .prdv_func = pcieadm_regdef_print_rtr } },
+	{ 12, 23, "d3d0", "D3_HOT to D0 Time", PRDV_CUSTOM,
+	    .prd_val = { .prdv_func = pcieadm_regdef_print_rtr } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_cfgspace_print_t pcieadm_cap_rtr[] = {
+	{ 0x0, 4, "caphdr", "Capability Header", pcieadm_cfgspace_print_regdef,
+	    pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "rtr1", "Readiness Time Reporting Register 1",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_rtr1 },
+	{ 0x8, 4, "rtr2", "Readiness Time Reporting Register 2",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_rtr2 },
+	{ -1, -1, NULL }
+};
+
 static const pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
@@ -4795,7 +4858,8 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_PTM, "ptm", "Precision Time Management",
 	    pcieadm_cap_info_vers, { { 1, 0xc, pcieadm_cap_info_ptm } } },
 	{ PCIE_EXT_CAP_ID_FRS, "frs", "FRS Queueing" },
-	{ PCIE_EXT_CAP_ID_RTR, "trt", "Readiness Time Reporting" },
+	{ PCIE_EXT_CAP_ID_RTR, "rtr", "Readiness Time Reporting",
+	    pcieadm_cap_info_vers, { { 1, 0xc, pcieadm_cap_rtr } } },
 	/*
 	 * When we encounter a designated vendor specification, in particular,
 	 * for CXL, we'll want to set ppc_subcap so we can use reasonable

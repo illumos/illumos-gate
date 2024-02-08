@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <pwd.h>
 #include <zone.h>
@@ -152,110 +152,6 @@ arg_string(enum trust type, char *fmt, ...)
 		clean_string(buf);
 
 	return (strdup(buf));
-}
-
-/* stolen from libc/gen/port/gen/execvp.c */
-static const char *
-execat(const char *s1, const char *s2, char *si)
-{
-        char    *s;
-        int cnt = PATH_MAX + 1; /* number of characters in s2 */
-
-        s = si;
-        while (*s1 && *s1 != ':') {
-                if (cnt > 0) {
-                        *s++ = *s1++;
-                        cnt--;
-                } else
-                        s1++;
-        }
-        if (si != s && cnt > 0) {
-                *s++ = '/';
-                cnt--;
-        }
-        while (*s2 && cnt > 0) {
-                *s++ = *s2++;
-                cnt--;
-        }
-        *s = '\0';
-        return (*s1 ? ++s1: 0);
-}
-
-/*
- * Similiar to execvp(), execpt you can supply an environment and we always
- * use /bin/sh for shell scripts.  The PATH searched is the PATH in the
- * current environment, not the environment in the argument list.
- * This was pretty much stolen from libc/gen/port/execvp.c
- */
-static int
-execvpe(char *name, char *const argv[], char *const envp[])
-{
-	char *path;
-	char fname[PATH_MAX+2];
-	char *newargs[256];
-	int i;
-	const char *cp;
-	unsigned etxtbsy = 1;
-        int eacces = 0;
-
-	if (*name == '\0') {
-		errno = ENOENT;
-		return (-1);
-	}
-
-	if ((path = getenv("PATH")) == NULL)
-		path = "/usr/bin:/bin";
-
-        cp = strchr(name, '/')? (const char *)"": path;
-
-        do {
-                cp = execat(cp, name, fname);
-        retry:
-                /*
-                 * 4025035 and 4038378
-                 * if a filename begins with a "-" prepend "./" so that
-                 * the shell can't interpret it as an option
-                 */
-                if (*fname == '-') {
-                        size_t size = strlen(fname) + 1;
-                        if ((size + 2) > sizeof (fname)) {
-                                errno = E2BIG;
-                                return (-1);
-                        }
-                        (void) memmove(fname + 2, fname, size);
-                        fname[0] = '.';
-                        fname[1] = '/';
-                }
-                (void) execve(fname, argv, envp);
-                switch (errno) {
-                case ENOEXEC:
-                        newargs[0] = "sh";
-                        newargs[1] = fname;
-                        for (i = 1; (newargs[i + 1] = argv[i]) != NULL; ++i) {
-                                if (i >= 254) {
-                                        errno = E2BIG;
-                                        return (-1);
-                                }
-                        }
-                        (void) execve("/bin/sh", newargs, envp);
-                        return (-1);
-                case ETXTBSY:
-                        if (++etxtbsy > 5)
-                                return (-1);
-                        (void) sleep(etxtbsy);
-                        goto retry;
-                case EACCES:
-                        ++eacces;
-                        break;
-                case ENOMEM:
-                case E2BIG:
-                case EFAULT:
-                        return (-1);
-                }
-        } while (cp);
-        if (eacces)
-                errno = EACCES;
-        return (-1);
 }
 
 static char time_buf[50];
