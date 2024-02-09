@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -617,18 +617,25 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	case SMB_ODIR_STATE_CLOSED:
 	default:
 		mutex_exit(&od->d_mutex);
-		return (EBADF);
+		return (SET_ERROR(EBADF));
 	}
 
 	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
 		if (od->d_eof)
-			rc = ENOENT;
+			rc = SET_ERROR(ENOENT);
 		else
 			rc = smb_odir_single_fileinfo(sr, od, fileinfo);
 		od->d_eof = B_TRUE;
 	} else {
 		odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
 		for (;;) {
+			mutex_enter(&sr->sr_mutex);
+			if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
+				mutex_exit(&sr->sr_mutex);
+				rc = SET_ERROR(EINTR);
+				break;
+			}
+			mutex_exit(&sr->sr_mutex);
 			bzero(fileinfo, sizeof (smb_fileinfo_t));
 			if ((rc = smb_odir_next_odirent(od, odirent)) != 0)
 				break;
@@ -1044,6 +1051,8 @@ smb_odir_delete(void *arg)
 	kmem_cache_free(smb_cache_odir, od);
 }
 
+boolean_t smb_use_fs_abe = B_FALSE;
+
 /*
  * smb_odir_next_odirent
  *
@@ -1081,7 +1090,15 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 
 	bzero(odirent, sizeof (smb_odirent_t));
 
-	if (od->d_flags & SMB_ODIR_FLAG_ABE)
+	/*
+	 * VOP_READDIR() won't return until either the buffer has filled or the
+	 * end of the directory is reached. As a result, when we pass this flag,
+	 * calls on very large directories can take an unacceptably long time to
+	 * complete when the user doesn't have access to most entries. Until we
+	 * can cap the amount of time spent in this call, callers will manually
+	 * apply ABE to returned entries, instead of passing this flag.
+	 */
+	if (smb_use_fs_abe && (od->d_flags & SMB_ODIR_FLAG_ABE) != 0)
 		rddir_flags |= SMB_ABE;
 	if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
 		rddir_flags |= SMB_EDIRENT;

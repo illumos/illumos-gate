@@ -1061,7 +1061,7 @@ defout(void)
 		cp = tokset[i].name;
 		if (*cp == L' ')	/* literals */
 		{
-			(void) fprintf(fdebug, WSFMT("\t\"%ws\",\t%d,\n"),
+			(void) fprintf(fdebug, "\t\"%ws\",\t%d,\n",
 			    tokset[i].name + 1, tokset[i].value);
 			continue;	/* was cp++ */
 		}
@@ -1075,14 +1075,14 @@ defout(void)
 		}
 
 		(void) fprintf(fdebug,
-		    WSFMT("\t\"%ws\",\t%d,\n"), tokset[i].name,
+		    "\t\"%ws\",\t%d,\n", tokset[i].name,
 		    tokset[i].value);
 		(void) fprintf(ftable,
-		    WSFMT("# define %ws %d\n"), tokset[i].name,
+		    "# define %ws %d\n", tokset[i].name,
 		    tokset[i].value);
 		if (fdefine != NULL)
 			(void) fprintf(fdefine,
-			    WSFMT("# define %ws %d\n"),
+			    "# define %ws %d\n",
 			    tokset[i].name,
 			    tokset[i].value);
 
@@ -1485,7 +1485,7 @@ swt:
 				if (tok < 0)
 					tok = fdtype(*prdptr[nprod]);
 				(void) fprintf(faction,
-				    WSFMT(".%ws"), typeset[tok]);
+				    ".%ws", typeset[tok]);
 			}
 			goto loop;
 		}
@@ -1550,7 +1550,7 @@ swt:
 								/* CSTYLED */
 								fdtype(prdptr[nprod][i]);
 							(void) fprintf(faction,
-							    WSFMT(".%ws"),
+							    ".%ws",
 							    typeset[tok]);
 						}
 						goto swt;
@@ -1561,7 +1561,7 @@ swt:
 			 * (Likely id with $ in.)
 			 * If non-terminal is added, remove it from the list.
 			 */
-			(void) fprintf(faction, WSFMT("$%ws"), tokname);
+			(void) fprintf(faction, "$%ws", tokname);
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
  *	This message is passed to warning() function.
@@ -1610,7 +1610,7 @@ swt:
 				if (tok < 0)
 					tok = fdtype(prdptr[nprod][j+offset]);
 				(void) fprintf(faction,
-				    WSFMT(".%ws"), typeset[tok]);
+				    ".%ws", typeset[tok]);
 			}
 			goto swt;
 		}
@@ -1853,7 +1853,7 @@ lrprnt(void)	/* print out the left and right hand sides */
 		else
 			rhs = m_rhs;
 	}
-	(void) fprintf(fdebug, WSFMT("\t\"%ws :%ws\",\n"), lhstext, rhs);
+	(void) fprintf(fdebug, "\t\"%ws :%ws\",\n", lhstext, rhs);
 	if (m_rhs)
 		free(m_rhs);
 }

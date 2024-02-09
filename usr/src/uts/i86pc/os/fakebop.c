@@ -27,6 +27,7 @@
  * All rights reserved.
  *
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -967,12 +968,16 @@ do_bsys_doint(bootops_t *bop, int intnum, struct bop_regs *rp)
 	br.ds = rp->ds;
 	br.es = rp->es;
 
-	DBG_MSG("Doing BIOS call...");
+	DBG_MSG("Doing BIOS call...\n");
 	DBG(br.ax);
 	DBG(br.bx);
 	DBG(br.dx);
 	rp->eflags = bios_func(intnum, &br);
 	DBG_MSG("done\n");
+	DBG(rp->eflags);
+	DBG(br.ax);
+	DBG(br.bx);
+	DBG(br.dx);
 
 	rp->eax.word.ax = br.ax;
 	rp->ebx.word.bx = br.bx;

@@ -418,7 +418,7 @@ function default_raidz_setup
 	fi
 
 	[[ -d /$TESTPOOL ]] && rm -rf /$TESTPOOL
-	log_must zpool create -f $TESTPOOL raidz $1 $2 $3
+	log_must zpool create -f $TESTPOOL raidz $disklist
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 

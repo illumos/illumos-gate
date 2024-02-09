@@ -340,24 +340,6 @@ extern char pbuf[PBUFSIZE];
 #define	PARSERPREFIX "/usr"
 #endif
 
-/*
- * Lint is unable to properly handle formats with wide strings
- * (e.g. %ws) and misdiagnoses them as being malformed.
- * This macro is used to work around that, by substituting
- * a pointer to a null string when compiled by lint. This
- * trick works because lint is not able to evaluate the
- * variable.
- *
- * When lint is able to handle %ws, it would be appropriate
- * to come back through and remove the use of this macro.
- */
-#if defined(__lint)
-static const char *lint_ws_fmt = "";
-#define	WSFMT(_fmt) lint_ws_fmt
-#else
-#define	WSFMT(_fmt) _fmt
-#endif
-
 #ifdef	__cplusplus
 }
 #endif
