@@ -1544,7 +1544,7 @@ zfs_do_destroy(int argc, char **argv)
 
 		if (cb.cb_verbose) {
 			char buf[16];
-			zfs_nicenum(cb.cb_snapused, buf, sizeof (buf));
+			zfs_nicebytes(cb.cb_snapused, buf, sizeof (buf));
 			if (cb.cb_parsable) {
 				(void) printf("reclaim\t%llu\n",
 				    cb.cb_snapused);
@@ -2795,7 +2795,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		    prop == ZFS_PROP_USERQUOTA || prop == ZFS_PROP_GROUPQUOTA ||
 		    prop == ZFS_PROP_PROJECTUSED ||
 		    prop == ZFS_PROP_PROJECTQUOTA) {
-			zfs_nicenum(space, sizebuf, sizeof (sizebuf));
+			zfs_nicebytes(space, sizebuf, sizeof (sizebuf));
 		} else {
 			zfs_nicenum(space, sizebuf, sizeof (sizebuf));
 		}
@@ -2896,21 +2896,34 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 			break;
 		case USFIELD_USED:
 		case USFIELD_QUOTA:
+			if (type == DATA_TYPE_UINT64) {
+				if (parsable) {
+					(void) sprintf(valstr, "%llu", val64);
+					strval = valstr;
+				} else if (field == USFIELD_QUOTA &&
+				    val64 == 0) {
+					strval = "none";
+				} else {
+					zfs_nicebytes(val64, valstr,
+					    sizeof (valstr));
+					strval = valstr;
+				}
+			}
+			break;
 		case USFIELD_OBJUSED:
 		case USFIELD_OBJQUOTA:
 			if (type == DATA_TYPE_UINT64) {
 				if (parsable) {
 					(void) sprintf(valstr, "%llu", val64);
+					strval = valstr;
+				} else if (field == USFIELD_OBJQUOTA &&
+				    val64 == 0) {
+					strval = "none";
 				} else {
 					zfs_nicenum(val64, valstr,
 					    sizeof (valstr));
-				}
-				if ((field == USFIELD_QUOTA ||
-				    field == USFIELD_OBJQUOTA) &&
-				    strcmp(valstr, "0") == 0)
-					strval = "none";
-				else
 					strval = valstr;
+				}
 			}
 			break;
 		}

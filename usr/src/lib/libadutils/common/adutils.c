@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <alloca.h>
@@ -249,7 +250,7 @@ sid2binsid(adutils_sid_t *sid, uchar_t *binsid, int binsidlen)
  */
 int
 adutils_txtsid2hexbinsid(const char *txt, const uint32_t *rid,
-	char *hexbinsid, int hexbinsidlen)
+    char *hexbinsid, int hexbinsidlen)
 {
 	adutils_sid_t	sid = { 0 };
 	int		i, j;
@@ -495,7 +496,7 @@ adutils_reap_idle_connections()
 
 adutils_rc
 adutils_ad_alloc(adutils_ad_t **new_ad, const char *domain_name,
-	adutils_ad_partition_t part)
+    adutils_ad_partition_t part)
 {
 	adutils_ad_t *ad;
 
@@ -630,11 +631,12 @@ open_conn(adutils_host_t *adh, int timeoutsecs)
 	    NULL);
 
 	if (rc != LDAP_SUCCESS) {
-		(void) ldap_unbind(adh->ld);
-		adh->ld = NULL;
 		logger(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
 		    "%s port %d failed. (%s)", adh->host, adh->port,
 		    ldap_err2string(rc));
+		ldap_perror(adh->ld, adh->host);
+		(void) ldap_unbind(adh->ld);
+		adh->ld = NULL;
 		goto out;
 	}
 
@@ -951,9 +953,9 @@ adutils_lookup_check_sid_prefix(adutils_query_state_t *qs, const char *sid)
 
 adutils_rc
 adutils_lookup_batch_start(adutils_ad_t *ad, int nqueries,
-	adutils_ldap_res_search_cb ldap_res_search_cb,
-	void *ldap_res_search_argp,
-	adutils_query_state_t **state)
+    adutils_ldap_res_search_cb ldap_res_search_cb,
+    void *ldap_res_search_argp,
+    adutils_query_state_t **state)
 {
 	adutils_query_state_t	*new_state;
 	adutils_host_t		*adh = NULL;
@@ -998,7 +1000,7 @@ adutils_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 static
 int
 msgid2query(adutils_host_t *adh, int msgid,
-	adutils_query_state_t **state, int *qid)
+    adutils_query_state_t **state, int *qid)
 {
 	adutils_query_state_t	*p;
 	int			i;
@@ -1135,7 +1137,7 @@ adutils_getattr(const adutils_entry_t *entry, const char *attrname)
 static
 int
 make_entry(adutils_q_t *q, adutils_host_t *adh, LDAPMessage *search_res,
-	adutils_entry_t **entry)
+    adutils_entry_t **entry)
 {
 	BerElement	*ber = NULL;
 	BerValue	**bvalues = NULL;
@@ -1578,8 +1580,8 @@ adutils_lookup_batch_end(adutils_query_state_t **state)
  */
 adutils_rc
 adutils_lookup_batch_add(adutils_query_state_t *state,
-	const char *filter, const char * const *attrs, const char *edomain,
-	adutils_result_t **result, adutils_rc *rc)
+    const char *filter, const char * const *attrs, const char *edomain,
+    adutils_result_t **result, adutils_rc *rc)
 {
 	adutils_rc	retcode = ADUTILS_SUCCESS;
 	int		lrc, qid;
@@ -1675,7 +1677,7 @@ adutils_lookup_batch_add(adutils_query_state_t *state,
  */
 adutils_rc
 adutils_lookup(adutils_ad_t *ad, const char *filter, const char **attrs,
-		const char *domain, adutils_result_t **result)
+    const char *domain, adutils_result_t **result)
 {
 	adutils_rc		rc, brc;
 	adutils_query_state_t	*qs;

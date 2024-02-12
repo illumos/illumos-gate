@@ -45,7 +45,7 @@ static boolean_t smb_kshare_rele(const void *);
 static void smb_kshare_destroy(void *);
 static char *smb_kshare_oemname(const char *);
 static int smb_kshare_is_special(const char *);
-static boolean_t smb_kshare_is_admin(const char *);
+static int smb_kshare_is_admin(const char *);
 static smb_kshare_t *smb_kshare_decode(nvlist_t *);
 static uint32_t smb_kshare_decode_bool(nvlist_t *, const char *, uint32_t);
 static void smb_kshare_unexport_thread(smb_thread_t *, void *);
@@ -878,13 +878,13 @@ smb_kshare_export_trans(smb_server_t *sv, char *name, char *path, char *cmnt)
 
 	shr->shr_magic = SMB_SHARE_MAGIC;
 	shr->shr_refcnt = 1;
-	shr->shr_flags = SMB_SHRF_TRANS | smb_kshare_is_admin(shr->shr_name);
+	shr->shr_flags = SMB_SHRF_TRANS | smb_kshare_is_admin(name);
 	if (strcasecmp(name, "IPC$") == 0)
 		shr->shr_type = STYPE_IPC;
 	else
 		shr->shr_type = STYPE_DISKTREE;
 
-	shr->shr_type |= smb_kshare_is_special(shr->shr_name);
+	shr->shr_type |= smb_kshare_is_special(name);
 
 	shr->shr_name = smb_mem_strdup(name);
 	if (path)
@@ -1176,18 +1176,18 @@ smb_kshare_is_special(const char *sharename)
 /*
  * Check whether or not this is a default admin share: C$, D$ etc.
  */
-static boolean_t
+static int
 smb_kshare_is_admin(const char *sharename)
 {
 	if (sharename == NULL)
-		return (B_FALSE);
+		return (0);
 
 	if (strlen(sharename) == 2 &&
 	    smb_isalpha(sharename[0]) && sharename[1] == '$') {
-		return (B_TRUE);
+		return (SMB_SHRF_ADMIN);
 	}
 
-	return (B_FALSE);
+	return (0);
 }
 
 /*

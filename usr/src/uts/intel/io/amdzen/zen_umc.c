@@ -1285,13 +1285,6 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = X86_PF_AMD_PHOENIX,
-		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
-		.zufd_dram_nrules = 2,
-		.zufd_cs_nrules = 2,
-		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
-	}, {
 		.zufd_family = X86_PF_AMD_BERGAMO,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
 		    ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |

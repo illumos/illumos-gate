@@ -1161,6 +1161,8 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 		case ZFS_PROP_RECORDSIZE:
 		{
 			int maxbs = SPA_MAXBLOCKSIZE;
+			char buf[64];
+
 			if (zpool_hdl != NULL) {
 				maxbs = zpool_get_prop_int(zpool_hdl,
 				    ZPOOL_PROP_MAXBLOCKSIZE, NULL);
@@ -1179,9 +1181,10 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			 */
 			if (intval < SPA_MINBLOCKSIZE ||
 			    intval > maxbs || !ISP2(intval)) {
+				zfs_nicebytes(maxbs, buf, sizeof (buf));
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "'%s' must be power of 2 from 512B "
-				    "to %uKB"), propname, maxbs >> 10);
+				    "to %s"), propname, buf);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
@@ -1501,7 +1504,7 @@ badlabel:
 
 			case ZFS_PROP_VOLSIZE:
 				if (intval % blocksize != 0) {
-					zfs_nicenum(blocksize, buf,
+					zfs_nicebytes(blocksize, buf,
 					    sizeof (buf));
 					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 					    "'%s' must be a multiple of "
@@ -2769,7 +2772,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 				(void) snprintf(propbuf, proplen, "%llu",
 				    (u_longlong_t)val);
 			else
-				zfs_nicenum(val, propbuf, proplen);
+				zfs_nicebytes(val, propbuf, proplen);
 		}
 		zcp_check(zhp, prop, val, NULL);
 		break;
@@ -2896,15 +2899,38 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	case ZFS_PROP_GUID:
+	case ZFS_PROP_KEY_GUID:
+	case ZFS_PROP_IVSET_GUID:
 	case ZFS_PROP_CREATETXG:
+	case ZFS_PROP_OBJSETID:
+	case ZFS_PROP_PBKDF2_ITERS:
 		/*
-		 * GUIDs are stored as numbers, but they are identifiers.
+		 * These properties are stored as numbers, but they are
+		 * identifiers or counters.
 		 * We don't want them to be pretty printed, because pretty
-		 * printing mangles the ID into a truncated and useless value.
+		 * printing truncates their values making them useless.
 		 */
 		if (get_numeric_property(zhp, prop, src, &source, &val) != 0)
 			return (-1);
 		(void) snprintf(propbuf, proplen, "%llu", (u_longlong_t)val);
+		zcp_check(zhp, prop, val, NULL);
+		break;
+
+	case ZFS_PROP_REFERENCED:
+	case ZFS_PROP_AVAILABLE:
+	case ZFS_PROP_USED:
+	case ZFS_PROP_USEDSNAP:
+	case ZFS_PROP_USEDDS:
+	case ZFS_PROP_USEDREFRESERV:
+	case ZFS_PROP_USEDCHILD:
+		if (get_numeric_property(zhp, prop, src, &source, &val) != 0)
+			return (-1);
+		if (literal) {
+			(void) snprintf(propbuf, proplen, "%llu",
+			    (u_longlong_t)val);
+		} else {
+			zfs_nicebytes(val, propbuf, proplen);
+		}
 		zcp_check(zhp, prop, val, NULL);
 		break;
 
@@ -3205,12 +3231,13 @@ zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
 	} else if (propvalue == 0 &&
 	    (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA ||
 	    type == ZFS_PROP_USEROBJQUOTA || type == ZFS_PROP_GROUPOBJQUOTA ||
-	    type == ZFS_PROP_PROJECTQUOTA || ZFS_PROP_PROJECTOBJQUOTA)) {
+	    type == ZFS_PROP_PROJECTQUOTA ||
+	    type == ZFS_PROP_PROJECTOBJQUOTA)) {
 		(void) strlcpy(propbuf, "none", proplen);
 	} else if (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA ||
 	    type == ZFS_PROP_USERUSED || type == ZFS_PROP_GROUPUSED ||
 	    type == ZFS_PROP_PROJECTUSED || type == ZFS_PROP_PROJECTQUOTA) {
-		zfs_nicenum(propvalue, propbuf, proplen);
+		zfs_nicebytes(propvalue, propbuf, proplen);
 	} else {
 		zfs_nicenum(propvalue, propbuf, proplen);
 	}
@@ -3266,7 +3293,7 @@ zfs_prop_get_written(zfs_handle_t *zhp, const char *propname,
 	if (literal) {
 		(void) snprintf(propbuf, proplen, "%llu", propvalue);
 	} else {
-		zfs_nicenum(propvalue, propbuf, proplen);
+		zfs_nicebytes(propvalue, propbuf, proplen);
 	}
 	return (0);
 }
