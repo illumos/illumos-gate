@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -349,7 +349,7 @@ lmrc_process_mpt_pkt(lmrc_t *lmrc, struct scsi_pkt *pkt, uint8_t status,
 		break;
 
 	default:
-		dev_err(lmrc->l_dip, CE_PANIC, "!command failed, status = %x, "
+		dev_err(lmrc->l_dip, CE_WARN, "!command failed, status = %x, "
 		    "ex_status = %x, cdb[0] = %x", status, ex_status,
 		    pkt->pkt_cdbp[0]);
 		pkt->pkt_reason = CMD_TRAN_ERR;
@@ -484,7 +484,7 @@ lmrc_process_replies(lmrc_t *lmrc, uint8_t queue)
 		default:
 			mutex_exit(&mpt->mpt_lock);
 			dev_err(lmrc->l_dip, CE_PANIC,
-			    "!reply received for unknown Function %x",
+			    "reply received for unknown Function %x",
 			    io_req->Function);
 		}
 
@@ -602,7 +602,7 @@ lmrc_process_mptmfi_passthru(lmrc_t *lmrc, lmrc_mpt_cmd_t *mpt)
 	case MFI_CMD_INVALID:
 	default:
 		dev_err(lmrc->l_dip, CE_PANIC,
-		    "!invalid MFI cmd completion received, cmd = %x",
+		    "invalid MFI cmd completion received, cmd = %x",
 		    hdr->mh_cmd);
 		break;
 	}

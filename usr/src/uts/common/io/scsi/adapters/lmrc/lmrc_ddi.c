@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -1224,7 +1224,7 @@ lmrc_dma_alloc(lmrc_t *lmrc, ddi_dma_attr_t attr, lmrc_dma_t *dmap, size_t len,
 		 * indicates a driver bug which should cause a panic.
 		 */
 		dev_err(lmrc->l_dip, CE_PANIC,
-		    "!failed to get DMA handle, check DMA attributes");
+		    "failed to allocate DMA handle, check DMA attributes");
 		return (ret);
 	}
 
@@ -1238,7 +1238,7 @@ lmrc_dma_alloc(lmrc_t *lmrc, ddi_dma_attr_t attr, lmrc_dma_t *dmap, size_t len,
 		 * driver bug and should cause a panic.
 		 */
 		dev_err(lmrc->l_dip, CE_PANIC,
-		    "!failed to allocated DMA memory, check DMA flags (%x)",
+		    "failed to allocate DMA memory, check DMA flags (%x)",
 		    flags);
 		return (ret);
 	}

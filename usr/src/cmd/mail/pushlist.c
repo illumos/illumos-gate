@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "mail.h"
 /*
@@ -28,10 +28,8 @@
  * If contflg == TRUE, link this line to the end of the continuation lines
  * for the headerline specified (head or tail of type hdrtype).
  */
-void pushlist(hdrtype, where, s, contflg)
-register	int	hdrtype;
-register	int	where;
-register		char *s;
+void
+pushlist(int hdrtype, int where, char *s, int contflg)
 {
 	static char pn[] = "pushlist";
 	char		*p;

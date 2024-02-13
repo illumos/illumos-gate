@@ -306,7 +306,7 @@ statjob(struct job *jp, int stat, int fg, int rc)
  */
 
 static void
-collectjobs(wnohang)
+collectjobs(int wnohang)
 {
 	pid_t pid;
 	struct job *jp;

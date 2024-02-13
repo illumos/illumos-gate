@@ -9,7 +9,7 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 the University of Queensland
+.\" Copyright 2023 the University of Queensland
 .\"
 .Dd August 27, 2020
 .Dt MLXCX 4D
@@ -349,6 +349,25 @@ The
 property determines the maximum number of packets that
 will be processed on a given completion ring during a single interrupt.
 This is done to try and guarantee some amount of liveness in the system.
+The default value is
+.Sy 256 .
+.Ed
+.It Sy rx_p50_loan_min_size
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy MTU
+.Ed
+.Bd -filled
+The
+.Sy rx_p50_loan_min_size
+property determines the minimum size of packet buffers allowed to be loaned
+to MAC when the ring has reached >=50% of its buffers already on loan.
+Packet buffers larger than this value will be copied.
+At <50% of ring buffers on loan, all buffers will be loaned.
+At >=75% of buffers on loan, all packets will be copied instead to ensure
+ring availability.
 The default value is
 .Sy 256 .
 .Ed

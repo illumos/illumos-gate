@@ -171,7 +171,7 @@ int	i;
 }
 
 void
-done(sig)
+done(int sig)
 {
 	unsigned char	*t;
 	int	savxit;

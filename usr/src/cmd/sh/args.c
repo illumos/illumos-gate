@@ -276,8 +276,7 @@ freeargs(blk)
 }
 
 static struct dolnod *
-copyargs(from, n)
-	unsigned char	*from[];
+copyargs(unsigned char *from[], int n)
 {
 	struct dolnod *np = (struct dolnod *)alloc(sizeof (struct dolnod));
 	unsigned char **fp = from;
@@ -296,8 +295,7 @@ copyargs(from, n)
 
 
 struct dolnod *
-clean_args(blk)
-	struct dolnod *blk;
+clean_args(struct dolnod *blk)
 {
 	unsigned char **argp;
 	struct dolnod *argr = 0;
@@ -384,8 +382,7 @@ int funcnt;
  * use count.
  */
 
-void restorargs(olddolh, funcnt)
-struct dolnod *olddolh;
+void restorargs(struct dolnod *olddolh, int funcnt)
 {
 	if(argfor != olddolh)
 		while ((argfor = clean_args(argfor)) != olddolh && argfor);
@@ -404,7 +401,7 @@ struct dolnod *olddolh;
 }
 
 struct dolnod *
-useargs()
+useargs(void)
 {
 	if (dolh)
 	{

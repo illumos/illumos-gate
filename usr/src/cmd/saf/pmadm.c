@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -934,10 +934,7 @@ tell_sac(char *tag)
  */
 
 void
-list_svcs(pmtag, type, svctag, oflag)
-char *pmtag;
-char *type;
-char *svctag;
+list_svcs(char *pmtag, char *type, char *svctag, int oflag)
 {
 	FILE *fp;				/* scratch file pointer */
 	register struct taglist *tp;		/* pointer to PM list */

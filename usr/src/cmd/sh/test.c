@@ -59,7 +59,7 @@ test(int argn, unsigned char *com[])
 }
 
 unsigned char *
-nxtarg(mt)
+nxtarg(int mt)
 {
 	if (ap >= ac)
 	{
