@@ -70,6 +70,8 @@ driver name=emlxs perms="* 0666 root sys" class=fibre-channel \
     alias=pciex10df,f100 \
     alias=pciex10df,f111 \
     alias=pciex10df,f112 \
+    alias=pciex10df,f400 \
+    alias=pciex10df,f410 \
     alias=pciex10df,fc20 \
     alias=pciex10df,fc40 \
     alias=pciex10df,fe00 \

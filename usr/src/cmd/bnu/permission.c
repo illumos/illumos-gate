@@ -898,8 +898,7 @@ char *fullname;
  *	FAIL		-> failure - not a valid path for access
  */
 int
-chkpth(path, flag)
-char *path;
+chkpth(char *path, int flag)
 {
 	char *s;
 

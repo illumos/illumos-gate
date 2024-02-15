@@ -161,8 +161,7 @@ char	*label;
  *	usetup - vanilla unix setup routine
  */
 static int
-usetup(role, fdreadp, fdwritep)
-int	*fdreadp, *fdwritep;
+usetup(int role, int *fdreadp, int *fdwritep)
 {
 	if (role == SLAVE)
 	{
@@ -177,7 +176,7 @@ int	*fdreadp, *fdwritep;
  *	uteardown - vanilla unix teardown routine
  */
 static int
-uteardown(role, fdread, fdwrite)
+uteardown(int role, int fdread, int fdwrite)
 {
 	int ret;
 	char *ttyn;
@@ -325,14 +324,8 @@ unsigned	nbytes;
 /*
  *	tioctl - stub for tli ioctl routine
  */
-/*ARGSUSED*/
 static int
-#ifdef __STDC__
-tioctl(int fd, int request, ...)
-#else
-tioctl(fd, request, arg)
-int	fd, request;
-#endif
+tioctl(int fd __unused, int request __unused, ...)
 {
 	return (SUCCESS);
 }
@@ -342,8 +335,7 @@ int	fd, request;
  *	note blatant assumption that *fdreadp == *fdwritep == 0
  */
 static int
-tsetup(role, fdreadp, fdwritep)
-int	*fdreadp, *fdwritep;
+tsetup(int role, int *fdreadp, int *fdwritep)
 {
 
 	if (role == SLAVE) {
@@ -362,9 +354,8 @@ int	*fdreadp, *fdwritep;
 /*
  *	tteardown - tli shutdown routine
  */
-/*ARGSUSED*/
 static int
-tteardown(role, fdread, fdwrite)
+tteardown(int role __unused, int fdread, int fdwrite __unused)
 {
 	(void) t_unbind(fdread);
 	(void) t_close(fdread);

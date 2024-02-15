@@ -221,10 +221,7 @@ char *flds[], *dev[];
  */
 
 GLOBAL int
-rddev(type, dev, buf, devcount)
-char *type;
-char *dev[];
-char *buf;
+rddev(char *type, char *dev[], char *buf, int devcount)
 {
 	char *commap, d_type[BUFSIZ];
 	int na;
@@ -295,8 +292,7 @@ char *buf;
  */
 
 static int
-finds(sysnam, flds, fldcount)
-char *sysnam, *flds[];
+finds(char *sysnam, char *flds[], int fldcount)
 {
 	static char info[BUFSIZ];
 	int na;
@@ -956,8 +952,7 @@ int type;
 #undef FLUSH
 
 GLOBAL int
-wrstr(fn, buf, len, echocheck)
-char *buf;
+wrstr(int fn, char *buf, int len, int echocheck)
 {
 	int 	i;
 	char dbuf[BUFSIZ], *dbptr = dbuf;
@@ -989,9 +984,7 @@ char *buf;
 }
 
 GLOBAL int
-wrchr(fn, buf, len)
-int fn;
-char *buf;
+wrchr(int fn, char *buf, int len)
 {
 	int 	i, saccess;
 	char	cin, cout;

@@ -91,10 +91,7 @@ eturnoff()
  *	SUCCESS	-> write succeeded
  */
 int
-ewrmsg(type, str, fn)
-char *str;
-int fn;
-char type;
+ewrmsg(char type, char *str, int fn)
 {
 	return(etwrmsg(type, str, fn, 0));
 }
@@ -108,8 +105,7 @@ char type;
  *	SUCCESS	-> ok message in str
  */
 int
-erdmsg(str, fn)
-char *str;
+erdmsg(char *str, int fn)
 {
 	return(etrdmsg(str, fn, 0));
 }
@@ -196,8 +192,7 @@ int	fn;
  *	FAIL	-> failure on link
  */
 int
-erddata(fn, fp2)
-FILE *fp2;
+erddata(int fn, FILE *fp2)
 {
 	int ret;
 	int	fd2;
@@ -288,8 +283,7 @@ FILE *fp2;
  *	i	-> # of bytes read (must not be 0)
  */
 int
-erdblk(blk, len,  fn)
-char *blk;
+erdblk(char *blk, int len, int fn)
 {
 	int i, ret;
 
@@ -329,8 +323,7 @@ struct tbuf {
  *	SUCCESS	-> ok message in str
  */
 int
-trdmsg(str, fn)
-char *str;
+trdmsg(char *str, int fn)
 {
 	return(etrdmsg(str, fn, TPACKSIZE));
 }
@@ -345,9 +338,7 @@ char *str;
  *	SUCCESS	-> write succeeded
  */
 int
-twrmsg(type, str, fn)
-char type;
-char *str;
+twrmsg(char type, char *str, int fn)
 {
 	return(etwrmsg(type, str, fn, TPACKSIZE));
 }
@@ -410,8 +401,7 @@ int	fn;
  *	FAIL	-> failure on link
  */
 int
-trddata(fn, fp2)
-FILE *fp2;
+trddata(int fn, FILE *fp2)
 {
 	int len, nread;
 	long Nbytes;
@@ -454,9 +444,7 @@ FILE *fp2;
  */
 
 int
-etrdmsg(str, fn, i)
-char *str;
-int i;
+etrdmsg(char *str, int fn, int i)
 {
 	int len;
 	int nullterm = 0;

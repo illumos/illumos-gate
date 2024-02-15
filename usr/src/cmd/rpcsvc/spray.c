@@ -136,14 +136,14 @@ main(int argc, char *argv[])
 	cumul = *co;
 	if (cumul.counter < cnt)
 		printf("\n\t%d packets (%.3f%%) dropped by %s\n",
-			cnt - cumul.counter,
-			100.0 * (cnt - cumul.counter)/cnt, host);
+		    cnt - cumul.counter,
+		    100.0 * (cnt - cumul.counter)/cnt, host);
 	else
 		printf("\n\tno packets dropped by %s\n", host);
-	psec = (1000000.0 * cumul.counter)
-		/ (1000000.0 * cumul.clock.sec + cumul.clock.usec);
-	bsec = (lnth * 1000000.0 * cumul.counter)/
-		(1000000.0 * cumul.clock.sec + cumul.clock.usec);
+	psec = (1000000.0 * cumul.counter) /
+	    (1000000.0 * cumul.clock.sec + cumul.clock.usec);
+	bsec = (lnth * 1000000.0 * cumul.counter) /
+	    (1000000.0 * cumul.clock.sec + cumul.clock.usec);
 	printf("\t%u packets/sec, %u bytes/sec\n", psec, bsec);
 	exit(0);
 	/* NOTREACHED */
@@ -155,17 +155,15 @@ main(int argc, char *argv[])
 static struct timeval TIMEOUT = { 0, 0 };
 
 enum clnt_stat
-sprayproc_spray_1nd(argp, clnt)
-	sprayarr *argp;
-	CLIENT *clnt;
+sprayproc_spray_1nd(sprayarr *argp, CLIENT *clnt)
 {
 	return (clnt_call(clnt, SPRAYPROC_SPRAY, xdr_sprayarr, (caddr_t)argp,
-			xdr_void, NULL, TIMEOUT));
+	    xdr_void, NULL, TIMEOUT));
 }
 
 /* A cheap milliseconds sleep call */
 static void
-slp(usecs)
+slp(int usecs)
 {
 	static struct pollfd pfds[1] = {
 		0, POLLIN, 0

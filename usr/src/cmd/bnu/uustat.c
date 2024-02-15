@@ -121,9 +121,7 @@ short Jobcount;		/* == 1 if -j parameter set with -s option */
 char f[NAMESIZE];
 
 int
-main(argc, argv, envp)
-char *argv[];
-char **envp;
+main(int argc, char *argv[], char **envp)
 {
 	struct m *m, *machine();
 	DIR *spooldir, *subdir, *machdir, *gradedir;

@@ -460,8 +460,7 @@ dialreset()
  * return TRUE if successful, FALSE if not
  */
 GLOBAL int
-getsysline(buf, len)
-char *buf;
+getsysline(char *buf, int len)
 {
 	char	*prev = _uu_setlocale(LC_ALL, "C");
 
@@ -518,8 +517,7 @@ nextsystems()
  * return TRUE if successful, FALSE if not
  */
 GLOBAL int
-getdevline(buf, len)
-char *buf;
+getdevline(char *buf, int len)
 {
 	char	*prev = _uu_setlocale(LC_ALL, "C");
 
@@ -569,8 +567,7 @@ nextdevices()
  */
 
 GLOBAL int
-getdialline(buf, len)
-char *buf;
+getdialline(char *buf, int len)
 {
 	char	*prev = _uu_setlocale(LC_ALL, "C");
 

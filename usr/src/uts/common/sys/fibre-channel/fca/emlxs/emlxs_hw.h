@@ -121,7 +121,7 @@ extern "C" {
 
 #define	FF_DEF_EDTOV		2000	/* Default E_D_TOV (2000ms) */
 #define	FF_DEF_ALTOV		15	/* Default AL_TIME (15ms) */
-#define	FF_DEF_RATOV		2	/* Default RA_TOV (2s) */
+#define	FF_DEF_RATOV		10	/* Default RA_TOV (10s) */
 #define	FF_DEF_ARBTOV		1900	/* Default ARB_TOV (1900ms) */
 #define	MAX_MSG_DATA		28	/* max msg data in CMD_ADAPTER_MSG */
 					/* iocb */
@@ -722,14 +722,16 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	CSR_MPU_EP_SEMAPHORE_OFFSET	0x00AC
 
 /* SLI Status register */
-#define	SLI_STATUS_ERROR		0x80000000
-#define	SLI_STATUS_BE			0x40000000
-#define	SLI_STATUS_OTI			0x20000000
+#define	SLI_STATUS_ERROR		0x80000000  /* b31 */
+#define	SLI_STATUS_BE			0x40000000  /* b30 big endian */
+#define	SLI_STATUS_OTI			0x20000000  /* b29 over temp */
+
 #define	SLI_STATUS_DUMP_LOCATION	0x04000000
-#define	SLI_STATUS_DUMP_IMAGE_PRESENT	0x02000000
-#define	SLI_STATUS_RESET_NEEDED		0x01000000
-#define	SLI_STATUS_READY		0x00800000
+#define	SLI_STATUS_DUMP_IMAGE_PRESENT	0x02000000  /* b25 */
+#define	SLI_STATUS_RESET_NEEDED		0x01000000  /* b24 */
+#define	SLI_STATUS_READY		0x00800000  /* b23 */
 #define	SLI_STATUS_INTERRUPT_DISABLE	0x00400000
+#define	SLI_STATUS_FDP			0x00200000  /* b21 func dump present */
 
 /* SLI Control register */
 #define	SLI_CNTL_BE		0x40000000
@@ -769,13 +771,24 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	MPU_EP_BFW	0x40000000	/* BackupFWinusemask */
 #define	MPU_EP_ERR	0x80000000	/* POSTfatalerrormask */
 
-/* BAR2 offsets for principal doorbell registers */
+/* physical devices BAR2 offsets for principal doorbell registers */
 
 #define	PD_RQ_DB_OFFSET	0x00A0	/* Doorbell notify of posted RQEs */
 #define	PD_WQ_DB_OFFSET	0x0040	/* Doorbell notify of posted WQEs */
 #define	PD_CQ_DB_OFFSET	0x0120	/* Doorbell notify of processed CQEs or EQEs */
 #define	PD_MQ_DB_OFFSET	0x0140	/* Doorbell notify of posted MQEs */
+
 #define	PD_MB_DB_OFFSET	0x0160	/* Doorbell Bootstrap Mailbox */
+
+/* physical devices BAR1 offsets for principal doorbell registers */
+
+#define	PD_IF6_RQ_DB_OFFSET	0x0080	/* Doorbell notify of posted RQEs */
+#define	PD_IF6_WQ_DB_OFFSET	0x0040	/* Doorbell notify of posted WQEs */
+#define	PD_IF6_CQ_DB_OFFSET	0x00C0	/* Doorbell notify of processed CQEs */
+#define	PD_IF6_EQ_DB_OFFSET	0x0120	/* Doorbell notify of processed EQEs */
+#define	PD_IF6_MQ_DB_OFFSET	0x0160	/* Doorbell notify of posted MQEs */
+
+/* physical devices BAR0 offsets for principal doorbell registers */
 
 #define	SLIPORT_SEMAPHORE_OFFSET	0x0400
 #define	SLIPORT_STATUS_OFFSET		0x0404
@@ -783,7 +796,7 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	SLIPORT_ERROR1_OFFSET		0x040C
 #define	SLIPORT_ERROR2_OFFSET		0x0410
 #define	PHYSDEV_CONTROL_OFFSET		0x0414
-
+#define	SLIPORT_EQDELAY_OFFSET		0x0418
 
 /* Doorbell definitions */
 
@@ -2448,7 +2461,7 @@ typedef enum emlxs_be_flashtypes
 /* Driver level constructs */
 typedef struct emlxs_be_fw_file
 {
-	uint32_t 	be_version;
+	uint32_t	be_version;
 	uint32_t	ufi_plus;
 
 	uint32_t	type;
@@ -2462,7 +2475,7 @@ typedef struct emlxs_be_fw_file
 
 typedef struct emlxs_be_fw_image
 {
-	uint32_t 	be_version;
+	uint32_t	be_version;
 	uint32_t	ufi_plus;
 
 	uint32_t fcoe_version;
@@ -2477,28 +2490,31 @@ typedef struct emlxs_be_fw_image
 
 typedef struct emlxs_obj_header
 {
-	uint32_t 	FileSize;
+	uint32_t	FileSize;
 
 #ifdef EMLXS_BIG_ENDIAN
-	uint16_t 	MagicNumHi;
-	uint16_t 	MagicNumLo;
+	uint16_t	MagicNumHi;
+	uint16_t	MagicNumLo;
 
-	uint32_t 	FileType:8;
-	uint32_t 	Id:8;
-	uint32_t 	rsvd0:16;
+	uint32_t	FileType:8;
+	uint32_t	Id:8;
+	uint32_t	rsvd0:16;
 #endif
 
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t 	MagicNumLo;
-	uint16_t 	MagicNumHi;
+	uint16_t	MagicNumLo;
+	uint16_t	MagicNumHi;
 
-	uint32_t 	rsvd0:16;
-	uint32_t 	Id:8;
-	uint32_t 	FileType:8;
+	uint32_t	rsvd0:16;
+	uint32_t	Id:8;
+	uint32_t	FileType:8;
 #endif
 
 #define	OBJ_MAGIC_NUM_HI		0xFEAA
 #define	OBJ_MAGIC_NUM_LO		0x0001
+#define	OBJ_MAGIC_NUM_LO_G6		0x0003
+#define	OBJ_MAGIC_NUM_LO_G7		0x0005
+#define	OBJ_MAGIC_NUM_LO_G7P		0x0020
 
 #define	OBJ_GRP_FILE_TYPE		0xF7
 

@@ -103,8 +103,7 @@ char type;
  *	0	-> ok message in str
  */
 int
-xrdmsg(str, fn)
-char *str;
+xrdmsg(char *str, int fn)
 {
 	int len;
 
@@ -137,8 +136,7 @@ char *str;
  *	0	-> ok
  */
 int
-xwrdata(fp1, fn)
-FILE *fp1;
+xwrdata(FILE *fp1, int fn)
 {
 	int fd1;
 	int len, ret;
@@ -171,8 +169,7 @@ FILE *fp1;
  *	FAIL	-> failure on x.25 link
  */
 int
-xrddata(fn, fp2)
-FILE *fp2;
+xrddata(int fn, FILE *fp2)
 {
 	int fd2;
 	int len;
@@ -208,8 +205,7 @@ FILE *fp2;
  *	i	-> # of bytes read
  */
 int
-xrdblk(blk, len,  fn)
-char *blk;
+xrdblk(char *blk, int len, int fn)
 {
 	int i, ret;
 

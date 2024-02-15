@@ -268,6 +268,7 @@ emlxs_fct_io_trace(emlxs_port_t *port, fct_cmd_t *fct_cmd, uint32_t data)
 			iop->trc[0]++;
 		} else {
 			iop->trc[0] = 0;
+		}
 	} else {
 		iop->trc[0]++;
 	}

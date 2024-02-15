@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2014-2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2020-2024 RackTop Systems, Inc.
  */
 
 #ifndef _SMB2_KPROTO_H_
@@ -151,6 +151,7 @@ extern void smb2_dh_shutdown(smb_server_t *);
 int smb2_dh_new_ca_share(smb_server_t *, smb_kshare_t *);
 void smb2_dh_close_persistent(smb_ofile_t *);
 void smb2_dh_close_my_orphans(smb_request_t *, smb_ofile_t *);
+boolean_t smb_dh_create_allowed(smb_request_t *, smb_ofile_t *);
 int smb2_dh_make_persistent(smb_request_t *, smb_ofile_t *);
 void smb2_dh_setdoc_persistent(smb_ofile_t *);
 void smb2_dh_update_nvfile(smb_request_t *);

@@ -247,7 +247,7 @@ ddi_device_acc_attr_t emlxs_data_acc_attr = {
  * as defined in the Fibre Channel Transport Programmming Guide.
  */
 #if (EMLXS_MODREV == EMLXS_MODREV5)
-	static fc_fca_tran_t emlxs_fca_tran = {
+static fc_fca_tran_t emlxs_fca_tran = {
 	FCTL_FCA_MODREV_5,		/* fca_version, with SUN NPIV support */
 	MAX_VPORTS,			/* fca numerb of ports */
 	sizeof (emlxs_buf_t),		/* fca pkt size */
@@ -1576,8 +1576,8 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		(void) emlxs_vpi_port_bind_notify(port);
 		mutex_enter(&EMLXS_PORT_LOCK);
 
-		linkstate = (port->vpip->state == VPI_STATE_PORT_ONLINE)?
-		    FC_LINK_UP:FC_LINK_DOWN;
+		linkstate = (port->vpip->state == VPI_STATE_PORT_ONLINE) ?
+		    FC_LINK_UP : FC_LINK_DOWN;
 	} else {
 		linkstate = hba->state;
 	}
@@ -7124,6 +7124,13 @@ emlxs_hba_attach(dev_info_t *dip)
 	cfg = &CFG;
 
 	bcopy((uint8_t *)&emlxs_cfg, (uint8_t *)cfg, sizeof (emlxs_cfg));
+	/*
+	 * Gen7 chips respond with unknown command so we disable heartbeat
+	 * it can be re enabled in emlxs.conf
+	 */
+	if ((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) == SLI_INTF_IF_TYPE_6)
+		cfg[CFG_HEARTBEAT_ENABLE].current = 0;
+
 #ifdef MSI_SUPPORT
 	if ((void *)&ddi_intr_get_supported_types != NULL) {
 		hba->intr_flags |= EMLXS_MSI_ENABLED;
@@ -8453,8 +8460,10 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);
-			(void) ddi_dma_mem_free(
-			    (ddi_acc_handle_t *)&buf_info->data_handle);
+			if (buf_info->data_handle) {
+				(void) ddi_dma_mem_free(
+				    (ddi_acc_handle_t *)&buf_info->data_handle);
+			}
 			(void) ddi_dma_free_handle(
 			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 			buf_info->dma_handle = NULL;

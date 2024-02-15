@@ -94,8 +94,7 @@ static char err_bad_domainname[] = "domainname";
  * This is the main line for the ypmatch process.
  */
 int
-main(argc, argv)
-	char **argv;
+main(int argc, char **argv)
 {
 	get_command_line_args(argc, argv);
 

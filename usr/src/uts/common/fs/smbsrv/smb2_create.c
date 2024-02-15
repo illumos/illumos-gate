@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -470,6 +470,17 @@ smb2_create(smb_request_t *sr)
 	}
 
 	/*
+	 * Ignore lease or oplock requests for anything other than
+	 * plain files. The share type was checked above, but the
+	 * node pointer of->f_node is only valid for "disk" files.
+	 */
+	if (of->f_ftype != SMB_FTYPE_DISK ||
+	    !smb_node_is_file(of->f_node)) {
+		op->op_oplock_level = SMB2_OPLOCK_LEVEL_NONE;
+		cctx.cc_in_flags &= ~CCTX_REQUEST_LEASE;
+	}
+
+	/*
 	 * [MS-SMB2] 3.3.5.9.8
 	 * Handling the SMB2_CREATE_REQUEST_LEASE Create Context
 	 */
@@ -489,25 +500,15 @@ smb2_create(smb_request_t *sr)
 	}
 
 	/*
-	 * Make this a durable open, but only if:
-	 * (durable handle requested and...)
-	 *
-	 * 1. op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH
-	 * 2. A lease is requested with handle caching
-	 *    - for v1, the lease must not be on a directory
-	 * 3. For v2, flags has "persistent" (tree is CA)
-	 *    (when tree not CA, turned off persist above)
+	 * If requested and allowed, make this a durable open;
+	 * see comment above smb_dh_create_allowed() for more detail.
 	 *
 	 * Otherwise, DH requests are ignored, so we set
 	 * dh_vers = not durable
 	 */
 	if ((cctx.cc_in_flags &
 	    (CCTX_DH_REQUEST|CCTX_DH_REQUEST_V2)) != 0 &&
-	    smb_node_is_file(of->f_node) &&
-	    ((op->dh_v2_flags & DH_PERSISTENT) != 0 ||
-	    (op->op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH) ||
-	    (op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE &&
-	    (op->lease_state & OPLOCK_LEVEL_CACHE_HANDLE) != 0))) {
+	    smb_dh_create_allowed(sr, of)) {
 		/*
 		 * OK, make this handle "durable"
 		 */

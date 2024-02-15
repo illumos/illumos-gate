@@ -3509,7 +3509,7 @@ emlxs_fc_fcftab_cfglink_action(emlxs_port_t *port, uint32_t evt,
 	mb4->un.varCfgLnk.rttov = hba->fc_rttov;
 	mb4->un.varCfgLnk.altov = hba->fc_altov;
 	mb4->un.varCfgLnk.crtov = hba->fc_crtov;
-	mb4->un.varCfgLnk.citov = hba->fc_citov;
+
 
 	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
 	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
@@ -11972,8 +11972,7 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 /* ARGSUSED */
 static void
-emlxs_deferred_cmpl_thread(emlxs_hba_t *hba,
-	void *arg1, void *arg2)
+emlxs_deferred_cmpl_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 {
 	emlxs_deferred_cmpl_t *cmpl = (emlxs_deferred_cmpl_t *)arg1;
 	uint32_t status = (uint32_t)((unsigned long)arg2);
@@ -12003,8 +12002,7 @@ emlxs_deferred_cmpl_thread(emlxs_hba_t *hba,
 
 /* ARGSUSED */
 static void
-emlxs_port_offline_thread(emlxs_hba_t *hba,
-	void *arg1, void *arg2)
+emlxs_port_offline_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 {
 	emlxs_port_t *port = (emlxs_port_t *)arg1;
 	uint32_t scope = (uint32_t)((unsigned long)arg2);
@@ -12017,8 +12015,7 @@ emlxs_port_offline_thread(emlxs_hba_t *hba,
 
 /* ARGSUSED */
 static void
-emlxs_port_online_thread(emlxs_hba_t *hba,
-	void *arg1, void *arg2)
+emlxs_port_online_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 {
 	emlxs_port_t *port = (emlxs_port_t *)arg1;
 
@@ -12035,7 +12032,12 @@ emlxs_vpi_logo_handler(emlxs_port_t *port, VPIobj_t *vpip)
 	vpip->flag &= ~EMLXS_VPI_LOGI;
 	if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
 		vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
-
+		if (vpip->vfip == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "emlxs_vpi_logo_handler: invalid state "
+			    "(vpip->vfip == NULL), vpip=%p", vpip);
+			return;
+		}
 		if (vpip->vfip->logi_count) {
 			vpip->vfip->logi_count--;
 		}
@@ -12043,7 +12045,6 @@ emlxs_vpi_logo_handler(emlxs_port_t *port, VPIobj_t *vpip)
 			vpip->vfip->flogi_vpip = NULL;
 		}
 	}
-
 } /* emlxs_vpi_logo_handler() */
 
 
@@ -15203,7 +15204,7 @@ emlxs_rpi_unreg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 			if ((xrip->rpip == rpip) &&
 			    (xrip->flag & EMLXS_XRI_RESERVED)) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-				    "rpi_unreg_action:%d xri_count=%d. "
+				    "rpi_unreg_handler:%d xri_count=%d. "
 				    "Unreserving XRI:%d iotag:%d.",
 				    rpip->RPI,
 				    rpip->xri_count,

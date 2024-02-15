@@ -493,7 +493,7 @@ char   *argv[];
 }
 
 static void
-disconnect (code)
+disconnect(int code)
 {
     struct termio   termio;
 
