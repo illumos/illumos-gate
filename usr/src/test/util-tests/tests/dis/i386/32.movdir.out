@@ -1,0 +1,4 @@
+    libdis_test:      0f 38 f9 03        movdiri %eax,(%ebx)
+    libdis_test+0x4:  0f 38 f9 4a 10     movdiri %ecx,0x10(%edx)
+    libdis_test+0x9:  66 0f 38 f8 58 10  movdir64b 0x10(%eax),%ebx
+    libdis_test+0xf:  67 66 0f 38 f8 1d  movdir64b (%di),%bx

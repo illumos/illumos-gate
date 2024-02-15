@@ -1,0 +1,7 @@
+    libdis_test:      0f 0d 00           prefetch (%eax)
+    libdis_test+0x3:  0f 18 0e           prefetcht0 (%esi)
+    libdis_test+0x6:  0f 18 13           prefetcht1 (%ebx)
+    libdis_test+0x9:  0f 18 59 04        prefetcht2 0x4(%ecx)
+    libdis_test+0xd:  0f 0d 49 08        prefetchw 0x8(%ecx)
+    libdis_test+0x11: 0f 18 82 67 01 00  prefetchnta 0x167(%edx)
+                      00 

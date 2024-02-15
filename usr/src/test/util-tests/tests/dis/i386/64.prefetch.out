@@ -1,0 +1,10 @@
+    libdis_test:      0f 0d 00           prefetch (%rax)
+    libdis_test+0x3:  41 0f 18 0a        prefetcht0 (%r10)
+    libdis_test+0x7:  0f 18 13           prefetcht1 (%rbx)
+    libdis_test+0xa:  0f 18 59 04        prefetcht2 0x4(%rcx)
+    libdis_test+0xe:  0f 0d 49 08        prefetchw 0x8(%rcx)
+    libdis_test+0x12: 0f 18 42 23        prefetchnta 0x23(%rdx)
+    libdis_test+0x16: 0f 18 3d 00 00 00  prefetchit0 +0x0(%rip)	<libdis_test+0x1d>
+                      00 
+    libdis_test+0x1d: 0f 18 35 18 00 00  prefetchit1 +0x18(%rip)	<0x3c>
+                      00 

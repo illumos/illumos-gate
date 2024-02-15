@@ -16,7 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -1182,14 +1182,20 @@ file path=opt/util-tests/tests/dis/i386/32.gfni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.gfni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.misc.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.misc.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.movbe.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.movbe.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.movdir.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.movdir.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.opmask.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.opmask.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.pclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.pclmulqdq.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.popcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.popcnt.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.prefetch.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.prefetch.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.sha.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.sha.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.sse-3.out mode=0444
@@ -1244,14 +1250,20 @@ file path=opt/util-tests/tests/dis/i386/64.gfni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.gfni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.misc.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.misc.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.movbe.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.movbe.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.movdir.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.movdir.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.opmask.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.opmask.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.pclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.pclmulqdq.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.popcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.popcnt.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.prefetch.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.prefetch.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.random.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.random.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.sha.out mode=0444

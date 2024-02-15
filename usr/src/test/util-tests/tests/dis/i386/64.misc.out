@@ -1,0 +1,2 @@
+    libdis_test:     f3 0f c7 f8        rdpid  %rax
+    libdis_test+0x4: f3 41 0f c7 fa     rdpid  %r10

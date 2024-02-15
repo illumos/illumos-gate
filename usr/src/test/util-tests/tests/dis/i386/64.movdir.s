@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
- * Test random related instructions
+ * Test movdir related instructions
  */
 
 .text
@@ -22,8 +22,10 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	rdrand	%bx
-	rdrand	%ebx
-	rdseed	%bx
-	rdseed	%ebx
+	movdiri		%rax, (%rbx)
+	movdiri		%rcx, 0x10(%rdx)
+	movdir64b	(%rsi), %rdi
+	movdir64b	(%r10), %r9
+	movdir64b	0x10(%rax), %rbx
+	movdir64b	0x10(%eax), %ebx
 .size libdis_test, [.-libdis_test]

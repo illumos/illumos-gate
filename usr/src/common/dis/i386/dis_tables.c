@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Robert Mustacchi
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -162,6 +162,8 @@ enum {
 	XADDB,		/* for xaddb */
 	MOVSXZ,		/* AMD64 mov sign extend 32 to 64 bit instruction */
 	MOVBE,		/* movbe instruction */
+	MOVDIR,		/* movdir64b register semantics m512 -> r16/32/64 */
+	RMATCH,		/* register, but type matches CPU, not prefixes */
 
 /*
  * MMX/SIMD addressing modes.
@@ -591,7 +593,7 @@ const instable_t dis_op0F01[8] = {
 const instable_t dis_op0F18[8] = {
 
 /*  [0]  */	TNS("prefetchnta",PREF),TNS("prefetcht0",PREF),	TNS("prefetcht1",PREF),	TNS("prefetcht2",PREF),
-/*  [4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4]  */	INVALID,		INVALID,		TNSu("prefetchit1",PREF),TNSu("prefetchit0",PREF),
 };
 
 /*
@@ -651,13 +653,23 @@ const instable_t dis_op660FC7[8] = {
 };
 
 /*
- *	Decode table for 0x0FC7 opcode with 0xF3 prefix
+ *	Decode table for 0x0FC7 opcode with 0xF3 prefix -- memory instructions
  */
 
 const instable_t dis_opF30FC7[8] = {
 
 /*  [0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [4]  */	INVALID,		INVALID,		TNS("vmxon",M),		INVALID,
+};
+
+/*
+ *	Decode table for 0x0FC7 opcode with 0xF3 prefix -- register instructions
+ */
+
+const instable_t dis_opF30FC7m3[8] = {
+
+/*  [0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4]  */	INVALID,		INVALID,		INVALID,		TNS("rdpid",RMATCH)
 };
 
 /*
@@ -2058,7 +2070,7 @@ const instable_t dis_op0F38[256] = {
 /*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [F0]  */	IND(dis_op0F38F0),	IND(dis_op0F38F1),	INVALID,		INVALID,
 /*  [F4]  */	INVALID,		INVALID,		IND(dis_op0F38F6),	INVALID,
-/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	TNS("movdir64b",MOVDIR),TNS("movdiri",RM),	INVALID,		INVALID,
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
 
@@ -2312,7 +2324,7 @@ const instable_t dis_opAVX660F3A[256] = {
  *	indicate a sub-code.
  */
 const instable_t dis_op0F0D[8] = {
-/*  [00]  */	INVALID,		TNS("prefetchw",PREF),	TNS("prefetchwt1",PREF),INVALID,
+/*  [00]  */	TNS("prefetch",PREF),	TNS("prefetchw",PREF),	TNS("prefetchwt1",PREF),INVALID,
 /*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
 
@@ -4279,6 +4291,45 @@ not_avx512:
 						goto error;
 					}
 					break;
+				case RM:
+					/*
+					 * Currently the MOVDIRI instruction is
+					 * the only known case here. It is not
+					 * allowed to have a prefix.
+					 */
+					if (rep_prefix != 0x0) {
+						goto error;
+					}
+					break;
+				case MOVDIR:
+					/*
+					 * MOVDIR64B requires a opnd size prefix
+					 * of 0x66, but ignores it. This means
+					 * that we need to undo what we did
+					 * earlier and readjust the operator and
+					 * address size prefixes.
+					 */
+					if (opnd_size_prefix != 0x66) {
+						goto error;
+					}
+					if (cpu_mode == SIZE64 ||
+					    cpu_mode == SIZE16) {
+						if (addr_size_prefix == 0x67) {
+							opnd_size = SIZE32;
+						} else {
+							opnd_size = cpu_mode;
+						}
+					} else {
+						if (addr_size_prefix == 0x67) {
+							opnd_size = SIZE16;
+						} else {
+							opnd_size = SIZE32;
+						}
+					}
+					addr_size = opnd_size;
+					addr_size_prefix = 0;
+					opnd_size_prefix = 0;
+					break;
 				default:
 					goto error;
 			}
@@ -4418,9 +4469,7 @@ not_avx512:
 		 * where they overloaded these instructions based on the ModR/M
 		 * bytes. The VMX instructions have a mode of 0 since they are
 		 * memory instructions but rdrand instructions have a mode of
-		 * 0b11 (REG_ONLY) because they only operate on registers. While
-		 * there are different prefix formats, for now it is sufficient
-		 * to use a single different table.
+		 * 0b11 (REG_ONLY) because they only operate on registers.
 		 */
 
 		/*
@@ -4433,34 +4482,38 @@ not_avx512:
 		    sizeof (instable_t);
 
 		/*
-		 * If we have a mode of 0b11 then we have to rewrite this.
+		 * If we have a mode of 0b11 then we have to rewrite this. We
+		 * must check prefixes first.
 		 */
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
-		if (mode == REG_ONLY) {
-			dp = (instable_t *)&dis_op0FC7m3[off];
-			break;
-		}
 
 		/*
 		 * Rewrite if this instruction used one of the magic prefixes.
 		 */
 		if (rep_prefix) {
-			if (rep_prefix == 0xf3)
+			if (rep_prefix == 0xf3 && mode == REG_ONLY)
+				dp = (instable_t *)&dis_opF30FC7m3[off];
+			else if (rep_prefix == 0xf3)
 				dp = (instable_t *)&dis_opF30FC7[off];
 			else
 				goto error;
 			rep_prefix = 0;
 		} else if (opnd_size_prefix) {
-			dp = (instable_t *)&dis_op660FC7[off];
-			opnd_size_prefix = 0;
-			if (opnd_size == SIZE16)
-				opnd_size = SIZE32;
+			if (mode == REG_ONLY) {
+				dp = (instable_t *)&dis_op0FC7m3[reg];
+			} else {
+				dp = (instable_t *)&dis_op660FC7[off];
+				opnd_size_prefix = 0;
+				if (opnd_size == SIZE16)
+					opnd_size = SIZE32;
+			}
+		} else if (mode == REG_ONLY) {
+			dp = (instable_t *)&dis_op0FC7m3[off];
 		} else if (reg == 4 || reg == 5) {
 			/*
 			 * We have xsavec (4) or xsaves (5), so rewrite.
 			 */
 			dp = (instable_t *)&dis_op0FC7[reg];
-			break;
 		}
 		break;
 
@@ -5142,6 +5195,13 @@ just_mem:
 		dtrace_rex_adjust(rex_prefix, mode, &reg, NULL);
 		dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 0);
 		dtrace_get_operand(x, REG_ONLY, EAX_REGNO, LONG_OPND, 1);
+		break;
+
+	case RMATCH:
+		x->d86_opnd_size = x->d86_mode;
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		dtrace_rex_adjust(rex_prefix, mode, NULL, &r_m);
+		dtrace_get_operand(x, mode, r_m, LONG_OPND, 0);
 		break;
 
 	/*
@@ -6390,6 +6450,22 @@ L_VEX_RM:
 		dtrace_evex_adjust_z_opmask(x, 3, evex_byte3);
 
 		dtrace_imm_opnd(x, wbit, 1, 0);
+		break;
+	case MOVDIR:
+		/*
+		 * The semantics of the movdir64b instruction is a little bit
+		 * weird and we need to trick the rest of the engine. In this
+		 * case we change d86_mode to match the operand/address size
+		 * that we overrode to earlier. Basically the standard CPU mode
+		 * doesn't actually influence which register set is used, but
+		 * the 0x67 prefix does.
+		 */
+		x->d86_numopnds = 2;
+		x->d86_mode = x->d86_opnd_size;
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
+		dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 1);
+		dtrace_get_operand(x, mode, r_m, LONG_OPND, 0);
 		break;
 	/* an invalid op code */
 	case AM:
