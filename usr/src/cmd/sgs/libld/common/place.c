@@ -25,6 +25,7 @@
  *
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -713,6 +714,81 @@ eh_frame_muldef(Ofl_desc *ofl, Is_desc *isp)
 }
 
 /*
+ * Hash the specified Os_desc on the specified segment descriptor, allocating
+ * and resizing the hash table as necessary.  (We only hash when the number of
+ * output secctions exceeds a minimum, below which we deem it not worth it to
+ * have the auxiliary structure.)
+ */
+static void
+os_desc_hash(Sg_desc *sgp, Os_desc *osp)
+{
+	const size_t min_size = 31;
+	Aliste nitems, idx, idx1;
+	os_desc_hash_t *hash;
+	size_t new_size;
+
+	if ((nitems = aplist_nitems(sgp->sg_osdescs)) < min_size) {
+		return;
+	}
+
+	if ((hash = sgp->sg_hashtab) != NULL && hash->osh_hashtab != NULL) {
+		if (nitems < hash->osh_size) {
+			/*
+			 * We have a hash table, and it's not undersized -- just
+			 * add our newest element.
+			 */
+			idx = osp->os_namehash % hash->osh_size;
+			osp->os_hashnext = hash->osh_hashtab[idx];
+			hash->osh_hashtab[idx] = osp;
+			return;
+		}
+
+		/*
+		 * We have a hash table, but it's full:  we are going to want
+		 * to double our size and rehash all of the output section
+		 * descriptions.  First, free our old hash table...
+		 */
+		libld_free(hash->osh_hashtab);
+		new_size = (hash->osh_size << 1) - 1;
+	} else {
+		/*
+		 * We either don't have a hash structure or we don't have a
+		 * hash table (the partial construction of which may be due to
+		 * a previous allocation failure).  Determine what we want
+		 * our new size to be, and allocate our hash structure as
+		 * needed.
+		 */
+		new_size = min_size;
+
+		while (new_size <= nitems)
+			new_size = (new_size << 1) - 1;
+
+		if (hash == NULL) {
+			hash = libld_calloc(1, sizeof (os_desc_hash_t));
+
+			if ((sgp->sg_hashtab = hash) == NULL)
+				return;
+		}
+	}
+
+	if ((hash->osh_hashtab =
+	    libld_calloc(new_size, sizeof (void *))) == NULL) {
+		return;
+	}
+
+	/*
+	 * Set our new size, and scan everything and hash it in.
+	 */
+	hash->osh_size = new_size;
+
+	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
+		idx = osp->os_namehash % hash->osh_size;
+		osp->os_hashnext = hash->osh_hashtab[idx];
+		hash->osh_hashtab[idx] = osp;
+	}
+}
+
+/*
  * Place a section into the appropriate segment and output section.
  *
  * entry:
@@ -743,6 +819,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	char		*oname, *sname;
 	uint_t		onamehash;
 	Boolean		is_ehframe = (isp->is_flags & FLG_IS_EHFRAME) != 0;
+	Boolean		linear_scan = TRUE;
+	os_desc_hash_t	*hash;
 
 	/*
 	 * Define any sections that must be thought of as referenced.  These
@@ -1072,7 +1150,47 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * assigned. If we find a matching section simply add this new section.
 	 */
 	iidx = 0;
-	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
+
+	/*
+	 * To not become quadratic with respect to the number of output
+	 * sections, we want to avoid a scan of the existing output sections
+	 * on every section placement.  To effect this, we use a hash table
+	 * for sections when the number of sections gets sufficiently large;
+	 * if this hash table is present, we check the absence of the other
+	 * (uncommon) conditions that necessitate a linear scan, using the
+	 * hash chain if we can.
+	 */
+	if (os_ndx == 0 && (hash = sgp->sg_hashtab) != NULL) {
+		APlist *list = sgp->sg_osdescs;
+
+		osp = list->apl_data[list->apl_nitems - 1];
+
+		if (ident >= osp->os_identndx) {
+			linear_scan = FALSE;
+			osp = hash->osh_hashtab[onamehash % hash->osh_size];
+		}
+	}
+
+	/*
+	 * We now want to iterate over output sections, looking for a match
+	 * or an insertion point.  Note that this loop condition is a bit
+	 * convoluted because it's encoding two different ways of iterating
+	 * over output section descriptors:  if it's a linear scan, we will
+	 * iterate over the list elements, and if it's not a linear scan we
+	 * will iterate over the hash chain that we discovered above.  (The
+	 * only condition that will actually change over the loop is osp; the
+	 * mechanics of iterating to the next section depend on linear_scan
+	 * and are contained in the body of the loop.)
+	 */
+	while ((linear_scan && sgp->sg_osdescs != NULL) ||
+	    (!linear_scan && osp != NULL)) {
+		if (linear_scan) {
+			if ((idx1 = iidx) >= sgp->sg_osdescs->apl_nitems)
+				break;
+
+			osp = sgp->sg_osdescs->apl_data[idx1];
+		}
+
 		Shdr	*os_shdr = osp->os_shdr;
 
 		/*
@@ -1166,6 +1284,11 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 			return (osp);
 		}
 
+		if (!linear_scan) {
+			osp = osp->os_hashnext;
+			continue;
+		}
+
 		/*
 		 * Do we need to worry about section ordering?
 		 */
@@ -1196,6 +1319,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 			break;
 
 		iidx = idx1 + 1;
+	}
+
+	if (!linear_scan) {
+		iidx = sgp->sg_osdescs->apl_nitems;
 	}
 
 	/*
@@ -1364,5 +1491,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	if (aplist_insert(&sgp->sg_osdescs, osp, AL_CNT_SG_OSDESC,
 	    iidx) == NULL)
 		return ((Os_desc *)S_ERROR);
+
+	os_desc_hash(sgp, osp);
+
 	return (osp);
 }

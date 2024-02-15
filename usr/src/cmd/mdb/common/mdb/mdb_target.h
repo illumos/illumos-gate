@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_MDB_TARGET_H
@@ -494,6 +495,15 @@ extern int mdb_tgt_getareg(mdb_tgt_t *, mdb_tgt_tid_t,
 
 extern int mdb_tgt_putareg(mdb_tgt_t *, mdb_tgt_tid_t,
 	const char *, mdb_tgt_reg_t);
+
+/*
+ * Thread name interface
+ *
+ * If the underlying target supports it, copy the thread name (if any) for the
+ * specified thread into the specified buffer.
+ */
+
+extern int mdb_tgt_thread_name(mdb_tgt_t *, mdb_tgt_tid_t, char *, size_t);
 
 /*
  * Stack Interface

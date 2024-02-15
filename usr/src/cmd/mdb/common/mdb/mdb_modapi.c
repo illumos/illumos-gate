@@ -24,7 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -320,6 +320,12 @@ int
 mdb_getareg(mdb_tid_t tid, const char *rname, mdb_reg_t *rp)
 {
 	return (mdb_tgt_getareg(mdb.m_target, tid, rname, rp));
+}
+
+int
+mdb_thread_name(mdb_tid_t tid, char *buf, size_t bufsize)
+{
+	return (mdb_tgt_thread_name(mdb.m_target, tid, buf, bufsize));
 }
 
 static u_longlong_t

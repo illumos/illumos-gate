@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -107,57 +108,58 @@ value_write(mdb_tgt_t *t, const void *buf, size_t nbytes, uintptr_t addr)
 }
 
 static const mdb_tgt_ops_t value_ops = {
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_setflags */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_setcontext */
-	(void (*)())(uintptr_t) mdb_tgt_nop,	/* t_activate */
-	(void (*)())(uintptr_t) mdb_tgt_nop,	/* t_deactivate */
-	(void (*)())(uintptr_t) mdb_tgt_nop,	/* t_periodic */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setflags */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setcontext */
+	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_activate */
+	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_deactivate */
+	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_periodic */
 	mdb_value_tgt_destroy,			/* t_destroy */
-	(const char *(*)()) mdb_tgt_null,	/* t_name */
-	(const char *(*)()) mdb_conf_isa,	/* t_isa */
-	(const char *(*)()) mdb_conf_platform,	/* t_platform */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_uname */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_dmodel */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_awrite */
+	(const char *(*)())mdb_tgt_null,	/* t_name */
+	(const char *(*)())mdb_conf_isa,	/* t_isa */
+	(const char *(*)())mdb_conf_platform,	/* t_platform */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_uname */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_dmodel */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
 	value_read,				/* t_vread */
 	value_write,				/* t_vwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pwrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pwrite */
 	value_read,				/* t_fread */
 	value_write,				/* t_fwrite */
 	value_read,				/* t_ioread */
 	value_write,				/* t_iowrite */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_vtop */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_lookup_by_name */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_lookup_by_addr */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_symbol_iter */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_mapping_iter */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_object_iter */
-	(const mdb_map_t *(*)()) mdb_tgt_null,	/* t_addr_to_map */
-	(const mdb_map_t *(*)()) mdb_tgt_null,	/* t_name_to_map */
-	(struct ctf_file *(*)()) mdb_tgt_null,	/* t_addr_to_ctf */
-	(struct ctf_file *(*)()) mdb_tgt_null,	/* t_name_to_ctf */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_status */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_run */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step_out */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_next */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_cont */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_signal */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vbrkpt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sbrkpt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_pwapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vwapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_iowapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysenter */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysexit */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_signal */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_fault */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_getareg */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_putareg */
-	(int (*)())(uintptr_t) mdb_tgt_nop,	/* t_stack_iter */
-	(int (*)())(uintptr_t) mdb_tgt_notsup	/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_vtop */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_lookup_by_name */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_lookup_by_addr */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_symbol_iter */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_mapping_iter */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_object_iter */
+	(const mdb_map_t *(*)())mdb_tgt_null,	/* t_addr_to_map */
+	(const mdb_map_t *(*)())mdb_tgt_null,	/* t_name_to_map */
+	(struct ctf_file *(*)())mdb_tgt_null,	/* t_addr_to_ctf */
+	(struct ctf_file *(*)())mdb_tgt_null,	/* t_name_to_ctf */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_status */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_run */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step_out */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_next */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_cont */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_signal */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vbrkpt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sbrkpt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vwapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysenter */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysexit */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_signal */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_fault */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_getareg */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_putareg */
+	(int (*)())(uintptr_t)mdb_tgt_nop,	/* t_stack_iter */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_thread_name */
 };
 
 int

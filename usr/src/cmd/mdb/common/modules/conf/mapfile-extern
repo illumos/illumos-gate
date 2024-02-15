@@ -3,6 +3,7 @@
 # Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 # Copyright 2023 RackTop Systems, Inc.
 # Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Oxide Computer Company
 #
 # CDDL HEADER START
 #
@@ -161,6 +162,7 @@ SYMBOL_SCOPE {
 		mdb_strtoull			{ FLAGS = EXTERN };
 		mdb_symbol_iter			{ FLAGS = EXTERN };
 		mdb_tgt_notsup			{ FLAGS = EXTERN };
+		mdb_thread_name			{ FLAGS = EXTERN };
 		mdb_vnode2path			{ FLAGS = EXTERN };
 		mdb_vread			{ FLAGS = EXTERN };
 		mdb_vtype2chr			{ FLAGS = EXTERN };

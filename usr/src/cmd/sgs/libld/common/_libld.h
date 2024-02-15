@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -663,6 +664,7 @@ extern void		lds_atexit(Ofl_desc *, int);
 #define	libld_calloc(n, s)	calloc(n, s)
 
 extern int		isdavl_compare(const void *, const void *);
+extern int		osdesc_compare(const Os_desc *, const Os_desc *);
 
 extern Sdf_desc		*sdf_add(const char *, APlist **);
 extern Sdf_desc		*sdf_find(const char *, APlist *);

@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <mdb/mdb_debug.h>
@@ -65,7 +66,7 @@ nv_hashstring(const char *key)
 
 static mdb_var_t *
 nv_var_alloc(const char *name, const mdb_nv_disc_t *disc,
-	uintmax_t value, uint_t flags, uint_t um_flags, mdb_var_t *next)
+    uintmax_t value, uint_t flags, uint_t um_flags, mdb_var_t *next)
 {
 	size_t nbytes;
 	mdb_var_t *v;
@@ -154,7 +155,7 @@ mdb_nv_destroy(mdb_nv_t *nv)
 		}
 	}
 
-	mdb_free(nv->nv_hash, sizeof (mdb_var_t *) * NV_HASHSZ);
+	mdb_free(nv->nv_hash, sizeof (mdb_var_t *) * nv->nv_hashsz);
 }
 
 mdb_var_t *
@@ -208,6 +209,49 @@ nv_var_overload(mdb_var_t *v, mdb_var_t *w)
 	return (w);
 }
 
+static void
+nv_resize(mdb_nv_t *nv)
+{
+	size_t i, bucket, new_hashsz = (nv->nv_hashsz << 1) - 1;
+	mdb_var_t *v, *w, **new_hash =
+	    mdb_zalloc(sizeof (mdb_var_t *) * new_hashsz, nv->nv_um_flags);
+
+	if (new_hash == NULL) {
+		/*
+		 * If this fails (possible only if UM_NOSLEEP was set in our
+		 * flags), we will simply return -- and will presumably attempt
+		 * to rehash again on a subsequent insert.
+		 */
+		ASSERT(nv->nv_um_flags & UM_NOSLEEP);
+		return;
+	}
+
+	/*
+	 * This is a point of no return:  we are going to iterate over our
+	 * hash table, rehashing everything.  Note that the ordering within
+	 * hash chains is not preserved:  if every element of a bucket were
+	 * to rehash to the same bucket in the larger table, the ordering
+	 * will be flipped.
+	 */
+	for (i = 0; i < nv->nv_hashsz; i++) {
+		for (v = nv->nv_hash[i]; v != NULL; v = w) {
+			w = v->v_next;
+
+			bucket = nv_hashstring(NV_NAME(v)) % new_hashsz;
+			v->v_next = new_hash[bucket];
+			new_hash[bucket] = v;
+		}
+	}
+
+	/*
+	 * Everything has been rehashed; free our old hash table and point
+	 * ourselves to the new one.
+	 */
+	mdb_free(nv->nv_hash, sizeof (mdb_var_t *) * nv->nv_hashsz);
+	nv->nv_hash = new_hash;
+	nv->nv_hashsz = new_hashsz;
+}
+
 /*
  * Can return NULL only if the nv's memory allocation flags include UM_NOSLEEP
  */
@@ -220,6 +264,10 @@ mdb_nv_insert(mdb_nv_t *nv, const char *name, const mdb_nv_disc_t *disc,
 
 	ASSERT(!(flags & MDB_NV_EXTNAME) || !(flags & MDB_NV_OVERLOAD));
 	ASSERT(!(flags & MDB_NV_RDONLY) || !(flags & MDB_NV_OVERLOAD));
+
+	if (nv->nv_nelems > nv->nv_hashsz && nv->nv_iter_elt == NULL) {
+		nv_resize(nv);
+	}
 
 	/*
 	 * If the specified name is already hashed,
