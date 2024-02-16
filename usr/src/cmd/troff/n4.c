@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -205,9 +205,7 @@ tchar i;
 
 /* insert into input number i, in format form, with size-font bits bits */
 int
-setn1(i, form, bits)
-int	i;
-tchar bits;
+setn1(int i, int form, tchar bits)
 {
 	extern int	wrc();
 

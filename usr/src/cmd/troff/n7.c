@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -423,8 +423,7 @@ ckul()
 
 
 int
-storeline(c, w)
-tchar c;
+storeline(tchar c, int w)
 {
 	if (linep >= line + lnsize - 1) {
 		if (!over) {

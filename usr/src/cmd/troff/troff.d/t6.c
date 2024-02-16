@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -115,7 +115,7 @@ tchar j;
  * clear width cache-- s means just space
  */
 int
-zapwcache(s)
+zapwcache(int s)
 {
 	int	i;
 
@@ -208,8 +208,9 @@ int	i;
 }
 
 int
-abscw(n)	/* return index of abs char n in fontab[], etc. */
-{	int i, ncf;
+abscw(int n)	/* return index of abs char n in fontab[], etc. */
+{
+	int i, ncf;
 
 	ncf = fontbase[xfont]->nwfont & BYTEMASK;
 	for (i = 0; i < ncf; i++)
@@ -219,8 +220,7 @@ abscw(n)	/* return index of abs char n in fontab[], etc. */
 }
 
 int
-xbits(i, bitf)
-tchar i;
+xbits(tchar i, int bitf)
 {
 	int	k;
 

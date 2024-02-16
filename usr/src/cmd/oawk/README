@@ -19,7 +19,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 CHANGES as of July 12:
 
 1. \ddd allowed in regular expressions.
