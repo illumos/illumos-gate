@@ -696,6 +696,9 @@ pkglint: makesilent
 	    | sed 's/.*/    & \\/' >> $(PDIR)/pkglintrc
 	$(PKGDEBUG)echo "    pkg:/runtime/python$(PYTHON3_PKGVERS) \\" \
 	     >> $(PDIR)/pkglintrc
+	$(PKGDEBUG)$(BUILDPY3b) \
+	    echo "    pkg:/runtime/python$(PYTHON3b_PKGVERS) \\" \
+	     >> $(PDIR)/pkglintrc
 	$(PKGDEBUG) echo "    pkg:/runtime/perl$(PERL_PKGVERS) \\" \
 	     >> $(PDIR)/pkglintrc
 	$(PKGDEBUG)echo >> $(PDIR)/pkglintrc
