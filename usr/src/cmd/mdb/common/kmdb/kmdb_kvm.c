@@ -23,6 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  *
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -2447,7 +2448,8 @@ static const mdb_tgt_ops_t kmt_ops = {
 	kmt_getareg,				/* t_getareg */
 	kmt_putareg,				/* t_putareg */
 	(int (*)())(uintptr_t)mdb_tgt_nop,	/* XXX t_stack_iter */
-	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_thread_name */
 };
 
 /*

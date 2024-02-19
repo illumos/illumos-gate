@@ -25,6 +25,7 @@
  * Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/mdb_modapi.h>
@@ -975,6 +976,46 @@ ulwp_walk_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(addr, &ulwp, wsp->walk_cbdata));
 }
 
+typedef struct lwp_wchan {
+	uint8_t		wchan_flag[4];
+	uint16_t	wchan_type;
+	uint16_t	wchan_magic;
+} lwp_wchan_t;
+
+static int
+wchan_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr != 0) {
+		mdb_warn("wchan walk only supports global walks");
+		return (WALK_ERR);
+	}
+
+	if (mdb_layered_walk("ulwp", wsp) == -1) {
+		mdb_warn("couldn't walk ulwp");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+wchan_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = (uintptr_t)(((ulwp_t *)wsp->walk_layer)->ul_wchan);
+	lwp_wchan_t wchan;
+
+	if (addr == (uintptr_t)NULL) {
+		return (WALK_NEXT);
+	}
+
+	if (mdb_vread(&wchan, sizeof (wchan), addr) != sizeof (wchan)) {
+		mdb_warn("failed to read wchan at 0x%p", addr);
+		return (WALK_ERR);
+	}
+
+	return (wsp->walk_callback(addr, &wchan, wsp->walk_cbdata));
+}
+
 /* Avoid classifying NULL pointers as part of the main stack on x86 */
 #define	MIN_STACK_ADDR		(0x10000ul)
 
@@ -1385,6 +1426,302 @@ d_psinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct d_mutex_output {
+	char *mo_output;
+	struct d_mutex_output *mo_next;
+} d_mutex_output_t;
+
+static void
+d_mutex_output_push(d_mutex_output_t **head, const char *out)
+{
+	d_mutex_output_t *new;
+	size_t len = strlen(out) + 1;
+
+	new = mdb_alloc(sizeof (d_mutex_output_t), UM_SLEEP | UM_GC);
+	new->mo_next = *head;
+	new->mo_output = mdb_alloc(len, UM_SLEEP | UM_GC);
+	bcopy(out, new->mo_output, len);
+
+	*head = new;
+}
+
+void
+d_mutex_output_reverse(d_mutex_output_t **head)
+{
+	d_mutex_output_t *current, *next, *last = NULL;
+
+	for (current = *head; current != NULL; current = next) {
+		next = current->mo_next;
+		current->mo_next = last;
+		last = current;
+
+		if (next == NULL) {
+			break;
+		}
+	}
+
+	*head = current;
+}
+
+typedef struct d_mutex_walkdata {
+	uintptr_t mow_target;
+	d_mutex_output_t *mow_output;
+} d_mutex_walkdata_t;
+
+int
+d_mutex_walk(uintptr_t addr, const ulwp_t *ulwp, d_mutex_walkdata_t *wd)
+{
+	char buf[256];
+
+	if ((uintptr_t)ulwp->ul_wchan != wd->mow_target)
+		return (WALK_NEXT);
+
+	if (mdb_thread_name(ulwp->ul_lwpid, buf, sizeof (buf)) != 0) {
+		mdb_snprintf(buf, sizeof (buf), "0x%p", addr);
+	}
+
+	d_mutex_output_push(&wd->mow_output, buf);
+	return (WALK_NEXT);
+}
+
+static void
+d_mutex_help(void)
+{
+	mdb_printf("%s\n",
+"Dump a mutex, optionally decoding flags and displaying waiters.\n");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf("%s",
+"  -v    Dump verbosely, decoding type and flags and showing waiters\n"
+"  -f    force printing as a mutex, even if it doesn't appear to be one\n");
+}
+
+static int
+d_mutex(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	lwp_mutex_t mutex;
+	uintptr_t owner;
+	char buf[256];
+	uint_t opt_v = FALSE, opt_f = FALSE, warn;
+	d_mutex_walkdata_t wd;
+	d_mutex_output_t *toutput = NULL, *foutput = NULL;
+	size_t i;
+
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &opt_v,
+	    'f', MDB_OPT_SETBITS, TRUE, &opt_f,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%-16s %4s %4s %4s %s\n",
+		    "ADDR", "TYPE", "FLAG", "WTRS", "OWNER");
+	}
+
+	/*
+	 * If we aren't in a loop or a pipe, we will warn explicitly when
+	 * we can't make sense of a mutex.
+	 */
+	warn = (flags & (DCMD_LOOP | DCMD_PIPE)) ? FALSE : TRUE;
+
+	if (mdb_vread(&mutex, sizeof (mutex), addr) != sizeof (mutex)) {
+		if (warn)
+			mdb_warn("failed to read mutex at 0x%p", addr);
+
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * It's legal to have a zero'd mutex_t in BSS -- so we can only
+	 * rely on the magic to disambiguate a mutex if it is non-zero.
+	 */
+	if (!opt_f && mutex.flags.magic != 0 &&
+	    mutex.flags.magic != MUTEX_MAGIC) {
+		if (!warn)
+			return (DCMD_ERR);
+
+		if (mutex.flags.magic == COND_MAGIC) {
+			mdb_warn("0x%p is not a mutex (appears to be a "
+			    "condition variable)\n", addr);
+		} else if (mutex.flags.magic == SEMA_MAGIC) {
+			mdb_warn("0x%p is not a mutex (appears to be a "
+			    "semaphore)\n", addr);
+		} else if (mutex.flags.magic == RWL_MAGIC) {
+			mdb_warn("0x%p is not a mutex (appears to be a "
+			    "readers/writer lock)\n", addr);
+		} else {
+			mdb_warn("0x%p does not appear to be a mutex (expected "
+			    "0x%x, found 0x%x)\n", addr, MUTEX_MAGIC,
+			    mutex.flags.magic);
+		}
+
+		return (DCMD_ERR);
+	}
+
+	if (!opt_f) {
+		/*
+		 * Sanity check that if we have an owner, it at least isn't
+		 * obviously not a ulwp_t.
+		 */
+		uintptr_t owner = mutex.mutex_owner;
+		ulwp_t u;
+
+		if (owner == (uintptr_t)NULL) {
+			if (mutex.mutex_waiters) {
+				if (!warn)
+					return (DCMD_ERR);
+
+				mdb_warn("0x%p does not appear to be a mutex "
+				    "(waiters, but no owner?)\n", addr);
+
+				return (DCMD_ERR);
+			}
+		} else if (mdb_vread(&u, sizeof (u), owner) != sizeof (u) ||
+		    (uintptr_t)u.ul_self != owner) {
+			if (!warn)
+				return (DCMD_ERR);
+
+			mdb_warn("0x%p does not appear to be mutex "
+			    "(owner 0x%p does not appear to be a ulwp_t)\n",
+			    addr, owner);
+
+			return (DCMD_ERR);
+		}
+	}
+
+	mdb_printf("%-16p %4x %4x %4s ", addr, mutex.mutex_type,
+	    mutex.mutex_flag,
+	    mutex.mutex_waiters ? "yes" : "no");
+
+	if ((owner = mutex.mutex_owner) == (uintptr_t)NULL) {
+		mdb_printf("-\n");
+	} else {
+		ulwp_t u;
+
+		if (mdb_vread(&u, sizeof (u), owner) != sizeof (u) ||
+		    mdb_thread_name(u.ul_lwpid, buf, sizeof (buf)) != 0) {
+			mdb_snprintf(buf, sizeof (buf), "%d", u.ul_lwpid);
+		}
+
+		mdb_printf("%p %s\n", owner, buf);
+	}
+
+	if (!opt_v)
+		return (DCMD_OK);
+
+	static struct {
+		int val;
+		char *str;
+	} tvals[] = {
+		{ 0x01, "LOCK_SHARED" },
+		{ 0x02, "LOCK_ERRORCHECK" },
+		{ 0x04, "LOCK_RECURSIVE" },
+		{ 0x10, "LOCK_PRIO_INHERIT" },
+		{ 0x20, "LOCK_PRIO_PROTECT" },
+		{ 0x40, "LOCK_ROBUST" },
+		/*
+		 * This is a defunct type, but an ancient (or corrupt) mutex
+		 * might have it set; indicate it if we see it.
+		 */
+		{ 0x08, "PROCESS_ROBUST" },
+		{ 0, "" }
+	};
+
+	if (!(mutex.mutex_type & LOCK_SHARED)) {
+		d_mutex_output_push(&toutput, "LOCK_NORMAL");
+	}
+
+	for (i = 0; tvals[i].val != 0; i++) {
+		if ((mutex.mutex_type & tvals[i].val) != 0) {
+			d_mutex_output_push(&toutput, tvals[i].str);
+		}
+	}
+
+	static struct {
+		int val;
+		char *str;
+	} fvals[] = {
+		{ 0x1, "LOCK_OWNERDEAD" },
+		{ 0x2, "LOCK_NOTRECOVERABLE" },
+		{ 0x4, "LOCK_INITED" },
+		{ 0x8, "LOCK_UNMAPPED" },
+		{ 0, "" },
+	};
+
+	for (i = 0; fvals[i].val != 0; i++) {
+		if ((mutex.mutex_flag & fvals[i].val) != 0) {
+			d_mutex_output_push(&foutput, fvals[i].str);
+		}
+	}
+
+	wd.mow_target = addr;
+	wd.mow_output = NULL;
+
+	if (mdb_walk("ulwp", (mdb_walk_cb_t)d_mutex_walk, &wd) != 0) {
+		mdb_warn("can't walk \"ulwp\"");
+		return (DCMD_ERR);
+	}
+
+	d_mutex_output_t *ooutput = wd.mow_output;
+	d_mutex_output_reverse(&toutput);
+	d_mutex_output_reverse(&foutput);
+	d_mutex_output_reverse(&ooutput);
+
+	d_mutex_output_t *thead = toutput;
+	d_mutex_output_t *fhead = foutput;
+	d_mutex_output_t *ohead = ooutput;
+
+	mdb_printf("%21s", toutput != NULL ? "|" : "");
+	mdb_printf("%5s", foutput != NULL ? "|" : "");
+	mdb_printf("%3s\n", ooutput != NULL ? "|" : "");
+
+	boolean_t needblank = ooutput != NULL;
+
+	while (toutput != NULL || foutput != NULL || ooutput != NULL) {
+		if (toutput != NULL) {
+			mdb_printf("%17s %s", toutput->mo_output,
+			    toutput == thead ? "<-+" : "   ");
+			toutput = toutput->mo_next;
+		} else {
+			mdb_printf("%21s", "");
+		}
+
+		if (foutput != NULL) {
+			if (ooutput != NULL) {
+				mdb_printf("%5s", "|");
+			} else {
+				if (needblank) {
+					mdb_printf("%5s", "|");
+					needblank = B_FALSE;
+				} else {
+					mdb_printf("%7s %s",
+					    foutput == fhead ? "+->" : "",
+					    foutput->mo_output);
+					foutput = foutput->mo_next;
+				}
+			}
+		} else {
+			mdb_printf("%5s", "");
+		}
+
+		if (ooutput != NULL) {
+			mdb_printf("%5s %s",
+			    ooutput == ohead ? "+->" : "", ooutput->mo_output);
+			ooutput = ooutput->mo_next;
+		}
+
+		mdb_printf("\n");
+	}
+
+	return (DCMD_OK);
+}
+
 static int
 d_errno(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -1425,17 +1762,18 @@ d_errno(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static const mdb_dcmd_t dcmds[] = {
 	{ "errno", "?", "print errno of a given TID", d_errno, NULL },
 	{ "jmp_buf", ":", "print jmp_buf contents", d_jmp_buf, NULL },
-	{ "sigjmp_buf", ":", "print sigjmp_buf contents", d_sigjmp_buf, NULL },
+	{ "mutex", ":[-f|v]", "dump out a mutex", d_mutex, d_mutex_help },
+	{ "psinfo", "[-v]", "prints relevant psinfo_t data", d_psinfo,
+	    d_psinfo_dcmd_help },
 	{ "siginfo", ":", "print siginfo_t structure", d_siginfo, NULL },
+	{ "sigjmp_buf", ":", "print sigjmp_buf contents", d_sigjmp_buf, NULL },
 	{ "stacks", "?[-afiv] [-c func] [-C func] [-m module] [-M module] ",
 		"print unique thread stacks", stacks_dcmd, stacks_help },
 	{ "tid2ulwp", "?", "convert TID to ulwp_t address", tid2ulwp },
+	{ "tsd", ":-k key", "print tsd for this thread", d_tsd, NULL },
 	{ "ucontext", ":", "print ucontext_t structure", d_ucontext, NULL },
 	{ "ulwp", ":", "print ulwp_t structure", d_ulwp, NULL },
 	{ "uberdata", ":", "print uberdata_t structure", d_uberdata, NULL },
-	{ "tsd", ":-k key", "print tsd for this thread", d_tsd, NULL },
-	{ "psinfo", "[-v]", "prints relevant psinfo_t data", d_psinfo,
-	    d_psinfo_dcmd_help },
 	{ NULL }
 };
 
@@ -1448,6 +1786,8 @@ static const mdb_walker_t walkers[] = {
 		ulwp_walk_init, ulwp_walk_step, NULL, NULL },
 	{ "ulwp", "walk list of ulwp_t pointers",
 		ulwp_walk_init, ulwp_walk_step, NULL, NULL },
+	{ "wchan", "walk wait channels",
+		wchan_walk_init, wchan_walk_step, NULL, NULL },
 	{ NULL }
 };
 

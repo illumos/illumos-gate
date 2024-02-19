@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
- * Test random related instructions
+ * Test prefetch related instructions
  */
 
 .text
@@ -22,8 +22,12 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	rdrand	%bx
-	rdrand	%ebx
-	rdseed	%bx
-	rdseed	%ebx
+	prefetch	(%rax)
+	prefetcht0	(%r10)
+	prefetcht1	(%rbx)
+	prefetcht2	0x4(%rcx)
+	prefetchw	0x8(%rcx)
+	prefetchnta	0x23(%rdx)
+	prefetchit0	(%rip)
+	prefetchit1	0x18(%rip)
 .size libdis_test, [.-libdis_test]

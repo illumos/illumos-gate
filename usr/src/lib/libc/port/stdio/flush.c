@@ -985,6 +985,18 @@ set_stdops(FILE *iop, stdio_ops_t *ops)
 
 }
 
+static void
+clr_stdops(FILE *iop)
+{
+#ifdef	_LP64
+	iop->_ops = NULL;
+#else
+	struct xFILEdata *dat = getxfdat(iop);
+	dat->_ops = NULL;
+#endif
+
+}
+
 ssize_t
 _xread(FILE *iop, void *buf, size_t nbytes)
 {
@@ -1090,7 +1102,7 @@ _xunassoc(FILE *iop)
 	if (ops == NULL) {
 		return;
 	}
-	set_stdops(iop, NULL);
+	clr_stdops(iop);
 	free(ops);
 }
 

@@ -1,0 +1,7 @@
+    libdis_test:      48 0f 38 f9 03     movdiri %rax,(%rbx)
+    libdis_test+0x5:  48 0f 38 f9 4a 10  movdiri %rcx,0x10(%rdx)
+    libdis_test+0xb:  66 0f 38 f8 3e     movdir64b (%rsi),%rdi
+    libdis_test+0x10: 66 45 0f 38 f8 0a  movdir64b (%r10),%r9
+    libdis_test+0x16: 66 0f 38 f8 58 10  movdir64b 0x10(%rax),%rbx
+    libdis_test+0x1c: 67 66 0f 38 f8 58  movdir64b 0x10(%eax),%ebx
+                      10 

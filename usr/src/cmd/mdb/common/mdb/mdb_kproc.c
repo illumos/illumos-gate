@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -885,27 +886,27 @@ kp_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 }
 
 static const mdb_tgt_ops_t kproc_ops = {
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_setflags */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setflags */
 	kp_setcontext,				/* t_setcontext */
 	kp_activate,				/* t_activate */
 	kp_deactivate,				/* t_deactivate */
-	(void (*)())(uintptr_t) mdb_tgt_nop,	/* t_periodic */
+	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_periodic */
 	kp_destroy,				/* t_destroy */
 	kp_name,				/* t_name */
 	kp_isa,					/* t_isa */
 	kp_platform,				/* t_platform */
 	kp_uname,				/* t_uname */
 	kp_dmodel,				/* t_dmodel */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_awrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
 	kp_vread,				/* t_vread */
 	kp_vwrite,				/* t_vwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_fread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_fwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_ioread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_iowrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pwrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_fread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_fwrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_ioread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_iowrite */
 	kp_vtop,				/* t_vtop */
 	kp_lookup_by_name,			/* t_lookup_by_name */
 	kp_lookup_by_addr,			/* t_lookup_by_addr */
@@ -914,28 +915,29 @@ static const mdb_tgt_ops_t kproc_ops = {
 	kp_object_iter,				/* t_object_iter */
 	kp_addr_to_map,				/* t_addr_to_map */
 	kp_name_to_map,				/* t_name_to_map */
-	(struct ctf_file *(*)()) mdb_tgt_null,	/* t_addr_to_ctf */
-	(struct ctf_file *(*)()) mdb_tgt_null,	/* t_name_to_ctf */
+	(struct ctf_file *(*)())mdb_tgt_null,	/* t_addr_to_ctf */
+	(struct ctf_file *(*)())mdb_tgt_null,	/* t_name_to_ctf */
 	kp_status,				/* t_status */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_run */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step_out */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_next */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_cont */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_signal */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sbrkpt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vbrkpt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_pwapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vwapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_iowapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysenter */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysexit */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_signal */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_fault */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_getareg XXX */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_putareg XXX */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_stack_iter XXX */
-	kp_auxv					/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_run */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step_out */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_next */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_cont */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_signal */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sbrkpt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vbrkpt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vwapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysenter */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysexit */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_signal */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_fault */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_getareg XXX */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_putareg XXX */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_stack_iter XXX */
+	kp_auxv,				/* t_auxv */
+	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_thread_name */
 };
 
 int

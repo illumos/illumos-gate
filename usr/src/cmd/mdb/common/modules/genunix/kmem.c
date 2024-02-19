@@ -26,6 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <mdb/mdb_param.h>
@@ -3808,7 +3809,7 @@ vmem_seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (verbose) {
-		mdb_printf("%<b>%16p%</b> %4s %16p %16p %16d\n",
+		mdb_printf("%<b>%16p%</b> %4s %16p %16p %16ld\n",
 		    addr, type, vs.vs_start, vs.vs_end, sz);
 
 		if (no_debug)

@@ -268,7 +268,7 @@ extract_format(const char *fmt, char *norm, size_t sz, int strict)
 
 	(void) memset(norm, '\0', sz);
 
-#ifdef DEBUG
+#ifdef NLS_DEBUG
 	printf("Format \"%s\" canonical form: ", fmt);
 #endif
 
@@ -460,7 +460,7 @@ done:
 			norm[arg*FORMAT_SIZE + 1] = flag;
 		}
 	}
-#ifdef DEBUG
+#ifdef NLS_DEBUG
 	for (t = 0; t < maxarg * FORMAT_SIZE; t += FORMAT_SIZE) {
 		printf("%c(%d)", norm[t], norm[t+1]);
 	}

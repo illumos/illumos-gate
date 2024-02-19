@@ -23,10 +23,12 @@
 .Nd nits and pre-putback checks for git
 .Sh SYNOPSIS
 .Nm git-pbchk
-.Op Fl c Ar check
+.Fl l
+.Nm git-pbchk
+.Op Fl c Ar check Ns ...
 .Op Fl p Ar branch
 .Nm git-nits
-.Op Fl c Ar check
+.Op Fl c Ar check Ns ...
 .Op Fl p Ar branch
 .Op Ar file Ns ...
 .Sh DESCRIPTION
@@ -49,6 +51,10 @@ Run the specific
 .Ar check ,
 as named below.
 In this mode, individual files can be provided to check.
+Multiple
+.Fl c
+options can be supplied, and will run the named checks in the order given on
+the command line.
 .It Fl p Ar branch
 Compare the current workspace to the parent
 .Ar branch
@@ -60,6 +66,10 @@ automatically, if the git branch configuration contains this information.
 If no branch is specified and none can be determined automatically
 .Pa origin/master
 is used.
+.It Fl l
+Print a list of the checks that can be used with
+.Fl c ,
+with a short description of each one.
 .El
 .Sh CHECKS
 .Bl -tag -width 6n

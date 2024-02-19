@@ -39,7 +39,7 @@
  *  SORTDOWN - CHAINED list is sorted in decreasing order.
  *  START - CHAINED list with entries appended at front.
  *  DRIVER - compile in a main program to drive the tests.
- *  DEBUG - compile some debugging printout statements.
+ *  HSEARCH_DEBUG - compile some debugging printout statements.
  *  USCR - user supplied comparison routine.
  */
 
@@ -162,7 +162,7 @@ start:
 	hdump();
 	printf("Enter a probe: ");
 	until(EOF == scanf("%s", line) || strcmp(line, "quit") == 0);
-#ifdef DEBUG
+#ifdef HSEARCH_DEBUG
 	printf("%s, ", line);
 	printf("division: %d, ", hashd(line));
 	printf("multiplication: %d\n", hashm(line));
@@ -291,7 +291,7 @@ ENTRY
 
 /* D1: */
 	i = HASH(item.key);	/* Primary hash on key */
-#ifdef DEBUG
+#ifdef HSEARCH_DEBUG
 	if (action == ENTER)
 		printf("hash = %o\n", i);
 #endif
@@ -304,7 +304,7 @@ ENTRY
 
 /* D3: */
 	c = HASH2(item.key);	/* No match => compute secondary hash */
-#ifdef DEBUG
+#ifdef HSEARCH_DEBUG
 	if (action == ENTER)
 		printf("hash2 = %o\n", c);
 #endif
@@ -365,7 +365,7 @@ D6:	if (action == FIND)		/* Insert if requested */
 		}
 		if (r != prcnt - 1) {	/* If an improvement occurred */
 			table[curpos] = table[curj]; /* Old key to new site */
-#ifdef DEBUG
+#ifdef HSEARCH_DEBUG
 			printf("Switch curpos = %o, curj = %o, oldi = %o\n",
 				curj, curpos, i);
 #endif

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -1457,7 +1457,8 @@ static const mdb_tgt_ops_t bhyve_ops = {
 	.t_getareg =		bhyve_getareg,
 	.t_putareg =		bhyve_putareg,
 	.t_stack_iter =		(int (*)())(uintptr_t)mdb_tgt_notsup,
-	.t_auxv =		(int (*)())(uintptr_t)mdb_tgt_notsup
+	.t_auxv =		(int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_thread_name =	(int (*)())(uintptr_t)mdb_tgt_notsup
 };
 
 int

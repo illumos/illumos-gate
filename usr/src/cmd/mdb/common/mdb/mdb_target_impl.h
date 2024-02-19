@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_MDB_TARGET_IMPL_H
@@ -134,6 +135,8 @@ typedef struct mdb_tgt_ops {
 	    mdb_tgt_stack_f *, void *);
 
 	int (*t_auxv)(mdb_tgt_t *, const auxv_t **auxvp);
+
+	int (*t_thread_name)(mdb_tgt_t *, mdb_tgt_tid_t, char *, size_t);
 } mdb_tgt_ops_t;
 
 /*

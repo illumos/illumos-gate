@@ -204,7 +204,7 @@ char *__nis_server;   /* if set, use only this server for binding */
 
 #define	OPT_INT 1
 #define	OPT_STRING 2
-#ifdef DEBUG
+#ifdef NSS_DEBUG_INSECURE
 #define	OPT_FILE 3
 #endif
 
@@ -215,7 +215,7 @@ struct option {
 };
 
 static struct option nss_options[] = {
-#ifdef DEBUG
+#ifdef NSS_DEBUG_INSECURE
 	/* allowing __nss_debug_file to be set could be a security hole. */
 	{ "debug_file", OPT_FILE, &__nss_debug_file },
 #endif
@@ -224,7 +224,7 @@ static struct option nss_options[] = {
 };
 
 static struct option nis_options[] = {
-#ifdef DEBUG
+#ifdef NSS_DEBUG_INSECURE
 	/* allowing __nis_debug_file to be set could be a security hole. */
 	{ "debug_file", OPT_FILE, &__nis_debug_file },
 #endif
@@ -642,7 +642,7 @@ set_option(struct option *opt, char *name, char *val)
 {
 	int n;
 	char *p;
-#ifdef DEBUG
+#ifdef NSS_DEBUG_INSECURE
 	FILE *fp;
 #endif
 
@@ -661,7 +661,7 @@ set_option(struct option *opt, char *name, char *val)
 					n = atoi(val);
 				*((int *)opt->address) = n;
 				break;
-#ifdef DEBUG
+#ifdef NSS_DEBUG_INSECURE
 			case OPT_FILE:
 				fp = fopen(val, "wF");
 				*((FILE **)opt->address) = fp;

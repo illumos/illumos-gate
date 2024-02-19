@@ -26,7 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -1305,7 +1305,7 @@ pt_regstatus(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (pt_regs(addr, flags, argc, argv));
 }
 
-static void
+static int
 pt_thread_name(mdb_tgt_t *t, mdb_tgt_tid_t tid, char *buf, size_t bufsize)
 {
 	char name[THREAD_NAME_MAX];
@@ -1315,11 +1315,18 @@ pt_thread_name(mdb_tgt_t *t, mdb_tgt_tid_t tid, char *buf, size_t bufsize)
 	if (t->t_pshandle == NULL ||
 	    Plwp_getname(t->t_pshandle, tid, name, sizeof (name)) != 0 ||
 	    name[0] == '\0') {
-		(void) mdb_snprintf(buf, bufsize, "%lu", tid);
-		return;
+		if (mdb_snprintf(buf, bufsize, "%lu", tid) > bufsize) {
+			return (set_errno(EMDB_NAME2BIG));
+		}
+
+		return (0);
 	}
 
-	(void) mdb_snprintf(buf, bufsize, "%lu [%s]", tid, name);
+	if (mdb_snprintf(buf, bufsize, "%lu [%s]", tid, name) > bufsize) {
+		return (set_errno(EMDB_NAME2BIG));
+	}
+
+	return (0);
 }
 
 static int
@@ -1355,7 +1362,7 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 	sp = gregs.gregs[R_SP];
 #endif
 
-	pt_thread_name(t, tid, name, sizeof (name));
+	(void) pt_thread_name(t, tid, name, sizeof (name));
 
 	mdb_printf("stack pointer for thread %s: %p\n", name, sp);
 	if (pc != 0)
@@ -4746,7 +4753,8 @@ static const mdb_tgt_ops_t proc_ops = {
 	pt_getareg,				/* t_getareg */
 	pt_putareg,				/* t_putareg */
 	pt_stack_iter,				/* t_stack_iter */
-	pt_auxv					/* t_auxv */
+	pt_auxv,				/* t_auxv */
+	pt_thread_name				/* t_thread_name */
 };
 
 /*
@@ -5379,14 +5387,16 @@ mdb_proc_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 
 	/*
 	 * If we don't have an executable path or the executable path is the
-	 * /proc/<pid>/object/a.out path, but we now have a libproc handle,
-	 * attempt to derive the executable path using Pexecname().  We need
-	 * to do this in the /proc case in order to open the executable for
-	 * writing because /proc/object/<file> permission are masked with 0555.
-	 * If Pexecname() fails us, fall back to /proc/<pid>/object/a.out.
+	 * /proc/<pid>/object/a.out path, but we now have a libproc handle (and
+	 * it didn't come from a core file), attempt to derive the executable
+	 * path using Pexecname().  We need to do this in the /proc case in
+	 * order to open the executable for writing because /proc/object/<file>
+	 * permission are masked with 0555.  If Pexecname() fails us, fall back
+	 * to /proc/<pid>/object/a.out.
 	 */
-	if (t->t_pshandle != NULL && (aout_path == NULL || (stat64(aout_path,
-	    &st) == 0 && strcmp(st.st_fstype, "proc") == 0))) {
+	if (t->t_pshandle != NULL && core_path == NULL &&
+	    (aout_path == NULL || (stat64(aout_path, &st) == 0 &&
+	    strcmp(st.st_fstype, "proc") == 0))) {
 		GElf_Sym s;
 		aout_path = Pexecname(t->t_pshandle, execname, MAXPATHLEN);
 		if (aout_path == NULL && state != PS_DEAD && state != PS_IDLE) {

@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_LIBLD_H
@@ -1005,7 +1005,16 @@ struct os_desc {			/* Output section descriptor */
 	APlist		*os_mstrsyms;	/* symbols affected by string merge */
 	APlist		*os_mstrrels;	/* section relocs affected by... */
 	Str_tbl		*os_mstrtab;	/* merged string table */
+	Os_desc		*os_hashnext;	/* next hashed */
 };
+
+/*
+ * Hash of output section descriptors, by namehash.
+ */
+typedef struct os_desc_hash {
+	Os_desc		**osh_hashtab;	/* hash table itself */
+	size_t		osh_size;	/* number of elements in hash table */
+} os_desc_hash_t;
 
 #define	FLG_OS_KEY		0x01	/* section requires sort keys */
 #define	FLG_OS_OUTREL		0x02	/* output rel against this section */
@@ -1068,6 +1077,7 @@ struct sg_desc {			/* output segment descriptor */
 	Xword		sg_align;	/* LCM of sh_addralign */
 	Elf_Scn		*sg_fscn;	/* the SCN of the first section. */
 	avl_node_t	sg_avlnode;	/* AVL book-keeping */
+	os_desc_hash_t	*sg_hashtab;	/* hash table of output descriptors */
 };
 
 #define	FLG_SG_P_VADDR		0x0001	/* p_vaddr segment attribute set */
