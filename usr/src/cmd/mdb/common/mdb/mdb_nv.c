@@ -259,7 +259,7 @@ mdb_var_t *
 mdb_nv_insert(mdb_nv_t *nv, const char *name, const mdb_nv_disc_t *disc,
     uintmax_t value, uint_t flags)
 {
-	size_t i = nv_hashstring(name) % nv->nv_hashsz;
+	size_t i;
 	mdb_var_t *v;
 
 	ASSERT(!(flags & MDB_NV_EXTNAME) || !(flags & MDB_NV_OVERLOAD));
@@ -268,6 +268,8 @@ mdb_nv_insert(mdb_nv_t *nv, const char *name, const mdb_nv_disc_t *disc,
 	if (nv->nv_nelems > nv->nv_hashsz && nv->nv_iter_elt == NULL) {
 		nv_resize(nv);
 	}
+
+	i = nv_hashstring(name) % nv->nv_hashsz;
 
 	/*
 	 * If the specified name is already hashed,
