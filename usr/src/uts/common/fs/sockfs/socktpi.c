@@ -522,7 +522,8 @@ sotpi_init(struct sonode *so, struct sonode *tso, struct cred *cr, int flags)
 			 */
 			return (error);
 		}
-		if (error = so_strinit(so, tso)) {
+		error = so_strinit(so, tso);
+		if (error != 0) {
 			(void) sotpi_close(so, flags, cr);
 			return (error);
 		}
@@ -2027,7 +2028,7 @@ again:
 	 */
 	mutex_enter(&nso->so_lock);
 	sinlen = (nso->so_family == AF_INET) ? sizeof (sin_t) : sizeof (sin6_t);
-	if ((nso->so_family == AF_INET) || (nso->so_family == AF_INET6) &&
+	if ((nso->so_family == AF_INET || nso->so_family == AF_INET6) &&
 	    MBLKL(ack_mp) == (sizeof (struct T_ok_ack) + sinlen)) {
 		ack_mp->b_rptr += sizeof (struct T_ok_ack);
 		bcopy(ack_mp->b_rptr, nsti->sti_laddr_sa, sinlen);
@@ -5767,8 +5768,8 @@ sotpi_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		 * (!value != !(so->so_state & SS_ASYNC))
 		 * but some engineers find that too hard to read.
 		 */
-		if (value == 0 && (so->so_state & SS_ASYNC) != 0 ||
-		    value != 0 && (so->so_state & SS_ASYNC) == 0)
+		if ((value == 0 && (so->so_state & SS_ASYNC) != 0) ||
+		    (value != 0 && (so->so_state & SS_ASYNC) == 0))
 			error = so_flip_async(so, vp, mode, cr);
 		mutex_exit(&so->so_lock);
 		return (error);
