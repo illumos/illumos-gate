@@ -665,7 +665,7 @@ so_dequeue_msg(struct sonode *so, mblk_t **mctlp, struct uio *uiop,
 	mblk_t	*savemp, *savemptail;
 	mblk_t	*new_msg_head;
 	mblk_t	*new_msg_last_head;
-	mblk_t	*last_tail;
+	mblk_t	*last_tail = NULL;
 	boolean_t partial_read;
 	boolean_t reset_atmark = B_FALSE;
 	int more = 0;

@@ -72,7 +72,6 @@ CFLAGS		+= -I.
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 #	Default build targets.

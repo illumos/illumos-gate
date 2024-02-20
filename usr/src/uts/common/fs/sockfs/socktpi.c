@@ -5044,6 +5044,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
 
+	len = (t_uscalar_t)sizeof (uint32_t);	/* Default */
+
 	/*
 	 * Check for SOL_SOCKET options.
 	 * Certain SOL_SOCKET options are returned directly whereas
@@ -5111,8 +5113,6 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			}
 			break;
 		}
-
-		len = (t_uscalar_t)sizeof (uint32_t);	/* Default */
 
 		switch (option_name) {
 		case SO_TYPE:

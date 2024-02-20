@@ -571,7 +571,7 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 int
 so_shutdown(struct sonode *so, int how, struct cred *cr)
 {
-	int error;
+	int error = 0;
 
 	SO_BLOCK_FALLBACK(so, SOP_SHUTDOWN(so, how, cr));
 
