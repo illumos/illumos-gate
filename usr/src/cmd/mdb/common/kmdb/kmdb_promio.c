@@ -169,17 +169,17 @@ pio_name(mdb_io_t *io)
 }
 
 static const mdb_io_ops_t promio_ops = {
-	pio_read,
-	pio_write,
-	pio_seek,
-	pio_ctl,
-	pio_close,
-	pio_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = pio_read,
+	.io_write = pio_write,
+	.io_seek = pio_seek,
+	.io_ctl = pio_ctl,
+	.io_close = pio_close,
+	.io_name = pio_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume,
 };
 
 mdb_io_t *

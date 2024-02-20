@@ -317,17 +317,17 @@ extern int tigetflag(const char *);
 extern int tigetnum(const char *);
 
 static const mdb_io_ops_t termio_ops = {
-	termio_read,
-	termio_write,
-	termio_seek,
-	termio_ctl,
-	termio_close,
-	termio_name,
-	termio_link,
-	termio_unlink,
-	termio_setattr,
-	termio_suspend,
-	termio_resume
+	.io_read = termio_read,
+	.io_write = termio_write,
+	.io_seek = termio_seek,
+	.io_ctl = termio_ctl,
+	.io_close = termio_close,
+	.io_name = termio_name,
+	.io_link = termio_link,
+	.io_unlink = termio_unlink,
+	.io_setattr = termio_setattr,
+	.io_suspend = termio_suspend,
+	.io_resume = termio_resume,
 };
 
 static termio_info_t termio_info;

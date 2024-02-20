@@ -678,10 +678,18 @@ static const mdb_walker_t walkers[] = {
 	{ NULL }
 };
 
-static const mdb_qops_t sppp_qops = { sppp_qinfo, sppp_rnext, sppp_wnext };
-static const mdb_qops_t sppptun_qops = {
-	sppptun_qinfo, sppptun_rnext, sppptun_wnext
+static const mdb_qops_t sppp_qops = {
+	.q_info = sppp_qinfo,
+	.q_rnext = sppp_rnext,
+	.q_wnext = sppp_wnext,
 };
+
+static const mdb_qops_t sppptun_qops = {
+	.q_info = sppptun_qinfo,
+	.q_rnext = sppptun_rnext,
+	.q_wnext = sppptun_wnext,
+};
+
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 
 const mdb_modinfo_t *

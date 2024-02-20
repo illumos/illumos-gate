@@ -559,7 +559,7 @@ kt_module_by_name(kt_data_t *kt, const char *name)
 void
 kt_activate(mdb_tgt_t *t)
 {
-	static const mdb_nv_disc_t reg_disc = { NULL, reg_disc_get };
+	static const mdb_nv_disc_t reg_disc = { .disc_get = reg_disc_get };
 	kt_data_t *kt = t->t_data;
 	void *sym;
 

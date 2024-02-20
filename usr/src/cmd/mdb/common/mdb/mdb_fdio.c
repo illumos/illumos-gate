@@ -151,17 +151,17 @@ mdb_fdio_create_path(const char *path[], const char *fname,
 }
 
 static const mdb_io_ops_t fdio_file_ops = {
-	fdio_read,
-	fdio_write,
-	fdio_seek,
-	fdio_ctl,
-	fdio_close,
-	fdio_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = fdio_read,
+	.io_write = fdio_write,
+	.io_seek = fdio_seek,
+	.io_ctl = fdio_ctl,
+	.io_close = fdio_close,
+	.io_name = fdio_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume
 };
 
 /*
@@ -271,17 +271,17 @@ fdio_bdev_write(mdb_io_t *io, const void *buf, size_t nbytes)
 }
 
 static const mdb_io_ops_t fdio_bdev_ops = {
-	fdio_bdev_read,
-	fdio_bdev_write,
-	fdio_seek,
-	fdio_ctl,
-	fdio_close,
-	fdio_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = fdio_bdev_read,
+	.io_write = fdio_bdev_write,
+	.io_seek = fdio_seek,
+	.io_ctl = fdio_ctl,
+	.io_close = fdio_close,
+	.io_name = fdio_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume,
 };
 
 mdb_io_t *

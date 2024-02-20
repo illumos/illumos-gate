@@ -83,17 +83,17 @@ memio_seek(mdb_io_t *io, off64_t offset, int whence)
 }
 
 static const mdb_io_ops_t memio_ops = {
-	memio_read,
-	no_io_write,
-	memio_seek,
-	no_io_ctl,
-	no_io_close,
-	no_io_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = memio_read,
+	.io_write = no_io_write,
+	.io_seek = memio_seek,
+	.io_ctl = no_io_ctl,
+	.io_close = no_io_close,
+	.io_name = no_io_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume,
 };
 
 mdb_io_t *

@@ -87,11 +87,15 @@ logdmux_uwnext(const queue_t *q)
 }
 
 static const mdb_qops_t logdmux_uqops = {
-	logdmux_uqinfo, mdb_qrnext_default, logdmux_uwnext
+	.q_info = logdmux_uqinfo,
+	.q_rnext = mdb_qrnext_default,
+	.q_wnext = logdmux_uwnext,
 };
 
 static const mdb_qops_t logdmux_lqops = {
-	logdmux_lqinfo, logdmux_lrnext, mdb_qwnext_default
+	.q_info = logdmux_lqinfo,
+	.q_rnext = logdmux_lrnext,
+	.q_wnext = mdb_qwnext_default
 };
 
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION };

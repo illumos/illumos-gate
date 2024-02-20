@@ -105,58 +105,58 @@ kt_stackv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 const mdb_tgt_ops_t kt_amd64_ops = {
-	kt_setflags,				/* t_setflags */
-	kt_setcontext,				/* t_setcontext */
-	kt_activate,				/* t_activate */
-	kt_deactivate,				/* t_deactivate */
-	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_periodic */
-	kt_destroy,				/* t_destroy */
-	kt_name,				/* t_name */
-	(const char *(*)())mdb_conf_isa,	/* t_isa */
-	kt_platform,				/* t_platform */
-	kt_uname,				/* t_uname */
-	kt_dmodel,				/* t_dmodel */
-	kt_aread,				/* t_aread */
-	kt_awrite,				/* t_awrite */
-	kt_vread,				/* t_vread */
-	kt_vwrite,				/* t_vwrite */
-	kt_pread,				/* t_pread */
-	kt_pwrite,				/* t_pwrite */
-	kt_fread,				/* t_fread */
-	kt_fwrite,				/* t_fwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_ioread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_iowrite */
-	kt_vtop,				/* t_vtop */
-	kt_lookup_by_name,			/* t_lookup_by_name */
-	kt_lookup_by_addr,			/* t_lookup_by_addr */
-	kt_symbol_iter,				/* t_symbol_iter */
-	kt_mapping_iter,			/* t_mapping_iter */
-	kt_object_iter,				/* t_object_iter */
-	kt_addr_to_map,				/* t_addr_to_map */
-	kt_name_to_map,				/* t_name_to_map */
-	kt_addr_to_ctf,				/* t_addr_to_ctf */
-	kt_name_to_ctf,				/* t_name_to_ctf */
-	kt_status,				/* t_status */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_run */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step_out */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_next */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_cont */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_signal */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vbrkpt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sbrkpt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vwapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysenter */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysexit */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_signal */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_fault */
-	kt_getareg,				/* t_getareg */
-	kt_putareg,				/* t_putareg */
-	mdb_amd64_kvm_stack_iter,		/* t_stack_iter */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_auxv */
-	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_thread_name */
+	.t_setflags = kt_setflags,
+	.t_setcontext = kt_setcontext,
+	.t_activate = kt_activate,
+	.t_deactivate = kt_deactivate,
+	.t_periodic = (void (*)())(uintptr_t)mdb_tgt_nop,
+	.t_destroy = kt_destroy,
+	.t_name = kt_name,
+	.t_isa = (const char *(*)())mdb_conf_isa,
+	.t_platform = kt_platform,
+	.t_uname = kt_uname,
+	.t_dmodel = kt_dmodel,
+	.t_aread = kt_aread,
+	.t_awrite = kt_awrite,
+	.t_vread = kt_vread,
+	.t_vwrite = kt_vwrite,
+	.t_pread = kt_pread,
+	.t_pwrite = kt_pwrite,
+	.t_fread = kt_fread,
+	.t_fwrite = kt_fwrite,
+	.t_ioread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_iowrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vtop = kt_vtop,
+	.t_lookup_by_name = kt_lookup_by_name,
+	.t_lookup_by_addr = kt_lookup_by_addr,
+	.t_symbol_iter = kt_symbol_iter,
+	.t_mapping_iter = kt_mapping_iter,
+	.t_object_iter = kt_object_iter,
+	.t_addr_to_map = kt_addr_to_map,
+	.t_name_to_map = kt_name_to_map,
+	.t_addr_to_ctf = kt_addr_to_ctf,
+	.t_name_to_ctf = kt_name_to_ctf,
+	.t_status = kt_status,
+	.t_run = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_step = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_step_out = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_next = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_cont = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_signal = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_add_vbrkpt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sbrkpt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_pwapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_vwapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_iowapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysenter = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysexit = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_signal = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_fault = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_getareg = kt_getareg,
+	.t_putareg = kt_putareg,
+	.t_stack_iter = mdb_amd64_kvm_stack_iter,
+	.t_auxv = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_thread_name = (int (*)())(uintptr_t)mdb_tgt_notsup,
 };
 
 void

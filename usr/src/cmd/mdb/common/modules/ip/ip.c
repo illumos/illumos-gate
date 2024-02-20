@@ -2005,7 +2005,12 @@ static const mdb_walker_t walkers[] = {
 	{ NULL }
 };
 
-static const mdb_qops_t ip_qops = { ip_qinfo, ip_rnext, ip_wnext };
+static const mdb_qops_t ip_qops = {
+	.q_info = ip_qinfo,
+	.q_rnext = ip_rnext,
+	.q_wnext = ip_wnext
+};
+
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 
 const mdb_modinfo_t *
