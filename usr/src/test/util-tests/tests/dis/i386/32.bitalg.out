@@ -1,0 +1,198 @@
+    libdis_test:       62 f2 7d 08 54 f8  vpopcntb %xmm0,%xmm7
+    libdis_test+0x6:   62 f2 7d 08 54 3f  vpopcntb (%edi),%xmm7
+    libdis_test+0xc:   62 f2 7d 08 54 b2  vpopcntb 0x64(%edx),%xmm6
+                       64 00 00 00 
+    libdis_test+0x16:  62 f2 7d 08 54 8c  vpopcntb 0x64(%edi,%ebx,4),%xmm1
+                       9f 64 00 00 00 
+    libdis_test+0x21:  62 f2 7d 0a 54 ec  vpopcntb %xmm4,%xmm5{%k2}
+    libdis_test+0x27:  62 f2 7d 8b 54 fe  vpopcntb %xmm6,%xmm7{%k3}{z}
+    libdis_test+0x2d:  62 f2 7d 0c 54 b8  vpopcntb 0x7777(%eax),%xmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x37:  62 f2 7d 8d 54 80  vpopcntb 0x6666(%eax),%xmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x41:  62 f2 7d 28 54 f8  vpopcntb %ymm0,%ymm7
+    libdis_test+0x47:  62 f2 7d 28 54 3f  vpopcntb (%edi),%ymm7
+    libdis_test+0x4d:  62 f2 7d 28 54 b2  vpopcntb 0x64(%edx),%ymm6
+                       64 00 00 00 
+    libdis_test+0x57:  62 f2 7d 28 54 8c  vpopcntb 0x64(%edi,%ebx,4),%ymm1
+                       9f 64 00 00 00 
+    libdis_test+0x62:  62 f2 7d 2a 54 ec  vpopcntb %ymm4,%ymm5{%k2}
+    libdis_test+0x68:  62 f2 7d ab 54 fe  vpopcntb %ymm6,%ymm7{%k3}{z}
+    libdis_test+0x6e:  62 f2 7d 2c 54 b8  vpopcntb 0x7777(%eax),%ymm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x78:  62 f2 7d ad 54 80  vpopcntb 0x6666(%eax),%ymm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x82:  62 f2 7d 48 54 f8  vpopcntb %zmm0,%zmm7
+    libdis_test+0x88:  62 f2 7d 48 54 3f  vpopcntb (%edi),%zmm7
+    libdis_test+0x8e:  62 f2 7d 48 54 b2  vpopcntb 0x64(%edx),%zmm6
+                       64 00 00 00 
+    libdis_test+0x98:  62 f2 7d 48 54 8c  vpopcntb 0x64(%edi,%ebx,4),%zmm1
+                       9f 64 00 00 00 
+    libdis_test+0xa3:  62 f2 7d 4a 54 ec  vpopcntb %zmm4,%zmm5{%k2}
+    libdis_test+0xa9:  62 f2 7d cb 54 fe  vpopcntb %zmm6,%zmm7{%k3}{z}
+    libdis_test+0xaf:  62 f2 7d 4c 54 b8  vpopcntb 0x7777(%eax),%zmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0xb9:  62 f2 7d cd 54 80  vpopcntb 0x6666(%eax),%zmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0xc3:  62 f2 fd 08 54 f8  vpopcntw %xmm0,%xmm7
+    libdis_test+0xc9:  62 f2 fd 08 54 3f  vpopcntw (%edi),%xmm7
+    libdis_test+0xcf:  62 f2 fd 08 54 b2  vpopcntw 0x64(%edx),%xmm6
+                       64 00 00 00 
+    libdis_test+0xd9:  62 f2 fd 08 54 8c  vpopcntw 0x64(%edi,%ebx,4),%xmm1
+                       9f 64 00 00 00 
+    libdis_test+0xe4:  62 f2 fd 0a 54 ec  vpopcntw %xmm4,%xmm5{%k2}
+    libdis_test+0xea:  62 f2 fd 8b 54 fe  vpopcntw %xmm6,%xmm7{%k3}{z}
+    libdis_test+0xf0:  62 f2 fd 0c 54 b8  vpopcntw 0x7777(%eax),%xmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0xfa:  62 f2 fd 8d 54 80  vpopcntw 0x6666(%eax),%xmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x104: 62 f2 fd 28 54 f8  vpopcntw %ymm0,%ymm7
+    libdis_test+0x10a: 62 f2 fd 28 54 3f  vpopcntw (%edi),%ymm7
+    libdis_test+0x110: 62 f2 fd 28 54 b2  vpopcntw 0x64(%edx),%ymm6
+                       64 00 00 00 
+    libdis_test+0x11a: 62 f2 fd 28 54 8c  vpopcntw 0x64(%edi,%ebx,4),%ymm1
+                       9f 64 00 00 00 
+    libdis_test+0x125: 62 f2 fd 2a 54 ec  vpopcntw %ymm4,%ymm5{%k2}
+    libdis_test+0x12b: 62 f2 fd ab 54 fe  vpopcntw %ymm6,%ymm7{%k3}{z}
+    libdis_test+0x131: 62 f2 fd 2c 54 b8  vpopcntw 0x7777(%eax),%ymm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x13b: 62 f2 fd ad 54 80  vpopcntw 0x6666(%eax),%ymm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x145: 62 f2 fd 48 54 f8  vpopcntw %zmm0,%zmm7
+    libdis_test+0x14b: 62 f2 fd 48 54 3f  vpopcntw (%edi),%zmm7
+    libdis_test+0x151: 62 f2 fd 48 54 b2  vpopcntw 0x64(%edx),%zmm6
+                       64 00 00 00 
+    libdis_test+0x15b: 62 f2 fd 48 54 8c  vpopcntw 0x64(%edi,%ebx,4),%zmm1
+                       9f 64 00 00 00 
+    libdis_test+0x166: 62 f2 fd 4a 54 ec  vpopcntw %zmm4,%zmm5{%k2}
+    libdis_test+0x16c: 62 f2 fd cb 54 fe  vpopcntw %zmm6,%zmm7{%k3}{z}
+    libdis_test+0x172: 62 f2 fd 4c 54 b8  vpopcntw 0x7777(%eax),%zmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x17c: 62 f2 fd cd 54 80  vpopcntw 0x6666(%eax),%zmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x186: 62 f2 7d 08 55 f8  vpopcntd %xmm0,%xmm7
+    libdis_test+0x18c: 62 f2 7d 08 55 3f  vpopcntd (%edi),%xmm7
+    libdis_test+0x192: 62 f2 7d 08 55 b2  vpopcntd 0x64(%edx),%xmm6
+                       64 00 00 00 
+    libdis_test+0x19c: 62 f2 7d 08 55 8c  vpopcntd 0x64(%edi,%ebx,4),%xmm1
+                       9f 64 00 00 00 
+    libdis_test+0x1a7: 62 f2 7d 0a 55 ec  vpopcntd %xmm4,%xmm5{%k2}
+    libdis_test+0x1ad: 62 f2 7d 8b 55 fe  vpopcntd %xmm6,%xmm7{%k3}{z}
+    libdis_test+0x1b3: 62 f2 7d 0c 55 b8  vpopcntd 0x7777(%eax),%xmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x1bd: 62 f2 7d 8d 55 80  vpopcntd 0x6666(%eax),%xmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x1c7: 62 f2 7d 18 55 39  vpopcntd (%ecx){1to4},%xmm7
+    libdis_test+0x1cd: 62 f2 7d 18 55 b9  vpopcntd 0x12345(%ecx){1to4},%xmm7
+                       45 23 01 00 
+    libdis_test+0x1d7: 62 f2 7d 28 55 f8  vpopcntd %ymm0,%ymm7
+    libdis_test+0x1dd: 62 f2 7d 28 55 3f  vpopcntd (%edi),%ymm7
+    libdis_test+0x1e3: 62 f2 7d 28 55 b2  vpopcntd 0x64(%edx),%ymm6
+                       64 00 00 00 
+    libdis_test+0x1ed: 62 f2 7d 28 55 8c  vpopcntd 0x64(%edi,%ebx,4),%ymm1
+                       9f 64 00 00 00 
+    libdis_test+0x1f8: 62 f2 7d 2a 55 ec  vpopcntd %ymm4,%ymm5{%k2}
+    libdis_test+0x1fe: 62 f2 7d ab 55 fe  vpopcntd %ymm6,%ymm7{%k3}{z}
+    libdis_test+0x204: 62 f2 7d 2c 55 b8  vpopcntd 0x7777(%eax),%ymm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x20e: 62 f2 7d ad 55 80  vpopcntd 0x6666(%eax),%ymm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x218: 62 f2 7d 38 55 39  vpopcntd (%ecx){1to8},%ymm7
+    libdis_test+0x21e: 62 f2 7d 38 55 b9  vpopcntd 0x54321(%ecx){1to8},%ymm7
+                       21 43 05 00 
+    libdis_test+0x228: 62 f2 7d 48 55 f8  vpopcntd %zmm0,%zmm7
+    libdis_test+0x22e: 62 f2 7d 48 55 3f  vpopcntd (%edi),%zmm7
+    libdis_test+0x234: 62 f2 7d 48 55 b2  vpopcntd 0x64(%edx),%zmm6
+                       64 00 00 00 
+    libdis_test+0x23e: 62 f2 7d 48 55 8c  vpopcntd 0x64(%edi,%ebx,4),%zmm1
+                       9f 64 00 00 00 
+    libdis_test+0x249: 62 f2 7d 4a 55 ec  vpopcntd %zmm4,%zmm5{%k2}
+    libdis_test+0x24f: 62 f2 7d cb 55 fe  vpopcntd %zmm6,%zmm7{%k3}{z}
+    libdis_test+0x255: 62 f2 7d 4c 55 b8  vpopcntd 0x7777(%eax),%zmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x25f: 62 f2 7d cd 55 80  vpopcntd 0x6666(%eax),%zmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x269: 62 f2 7d 58 55 39  vpopcntd (%ecx){1to16},%zmm7
+    libdis_test+0x26f: 62 f2 7d 58 55 b9  vpopcntd 0x34543(%ecx){1to16},%zmm7
+                       43 45 03 00 
+    libdis_test+0x279: 62 f2 fd 08 55 f8  vpopcntq %xmm0,%xmm7
+    libdis_test+0x27f: 62 f2 fd 08 55 3f  vpopcntq (%edi),%xmm7
+    libdis_test+0x285: 62 f2 fd 08 55 b2  vpopcntq 0x64(%edx),%xmm6
+                       64 00 00 00 
+    libdis_test+0x28f: 62 f2 fd 08 55 8c  vpopcntq 0x64(%edi,%ebx,4),%xmm1
+                       9f 64 00 00 00 
+    libdis_test+0x29a: 62 f2 fd 0a 55 ec  vpopcntq %xmm4,%xmm5{%k2}
+    libdis_test+0x2a0: 62 f2 fd 8b 55 fe  vpopcntq %xmm6,%xmm7{%k3}{z}
+    libdis_test+0x2a6: 62 f2 fd 0c 55 b8  vpopcntq 0x7777(%eax),%xmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x2b0: 62 f2 fd 8d 55 80  vpopcntq 0x6666(%eax),%xmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x2ba: 62 f2 fd 18 55 39  vpopcntq (%ecx){1to2},%xmm7
+    libdis_test+0x2c0: 62 f2 fd 18 55 b9  vpopcntq 0x12345(%ecx){1to2},%xmm7
+                       45 23 01 00 
+    libdis_test+0x2ca: 62 f2 fd 28 55 f8  vpopcntq %ymm0,%ymm7
+    libdis_test+0x2d0: 62 f2 fd 28 55 3f  vpopcntq (%edi),%ymm7
+    libdis_test+0x2d6: 62 f2 fd 28 55 b2  vpopcntq 0x64(%edx),%ymm6
+                       64 00 00 00 
+    libdis_test+0x2e0: 62 f2 fd 28 55 8c  vpopcntq 0x64(%edi,%ebx,4),%ymm1
+                       9f 64 00 00 00 
+    libdis_test+0x2eb: 62 f2 fd 2a 55 ec  vpopcntq %ymm4,%ymm5{%k2}
+    libdis_test+0x2f1: 62 f2 fd ab 55 fe  vpopcntq %ymm6,%ymm7{%k3}{z}
+    libdis_test+0x2f7: 62 f2 fd 2c 55 b8  vpopcntq 0x7777(%eax),%ymm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x301: 62 f2 fd ad 55 80  vpopcntq 0x6666(%eax),%ymm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x30b: 62 f2 fd 38 55 39  vpopcntq (%ecx){1to4},%ymm7
+    libdis_test+0x311: 62 f2 fd 38 55 b9  vpopcntq 0x54321(%ecx){1to4},%ymm7
+                       21 43 05 00 
+    libdis_test+0x31b: 62 f2 fd 48 55 f8  vpopcntq %zmm0,%zmm7
+    libdis_test+0x321: 62 f2 fd 48 55 3f  vpopcntq (%edi),%zmm7
+    libdis_test+0x327: 62 f2 fd 48 55 b2  vpopcntq 0x64(%edx),%zmm6
+                       64 00 00 00 
+    libdis_test+0x331: 62 f2 fd 48 55 8c  vpopcntq 0x64(%edi,%ebx,4),%zmm1
+                       9f 64 00 00 00 
+    libdis_test+0x33c: 62 f2 fd 4a 55 ec  vpopcntq %zmm4,%zmm5{%k2}
+    libdis_test+0x342: 62 f2 fd cb 55 fe  vpopcntq %zmm6,%zmm7{%k3}{z}
+    libdis_test+0x348: 62 f2 fd 4c 55 b8  vpopcntq 0x7777(%eax),%zmm7{%k4}
+                       77 77 00 00 
+    libdis_test+0x352: 62 f2 fd cd 55 80  vpopcntq 0x6666(%eax),%zmm0{%k5}{z}
+                       66 66 00 00 
+    libdis_test+0x35c: 62 f2 fd 58 55 39  vpopcntq (%ecx){1to8},%zmm7
+    libdis_test+0x362: 62 f2 fd 58 55 b9  vpopcntq 0x34543(%ecx){1to8},%zmm7
+                       43 45 03 00 
+    libdis_test+0x36c: 62 f2 6d 08 8f d9  vpshufbitqmb %xmm1,%xmm2,%k3
+    libdis_test+0x372: 62 f2 5d 0d 8f e3  vpshufbitqmb %xmm3,%xmm4,%k4{%k5}
+    libdis_test+0x378: 62 f2 45 08 8f 07  vpshufbitqmb (%edi),%xmm7,%k0
+    libdis_test+0x37e: 62 f2 45 09 8f 07  vpshufbitqmb (%edi),%xmm7,%k0{%k1}
+    libdis_test+0x384: 62 f2 45 08 8f 87  vpshufbitqmb 0x167(%edi),%xmm7,%k0
+                       67 01 00 00 
+    libdis_test+0x38e: 62 f2 45 09 8f 87  vpshufbitqmb 0x761(%edi),%xmm7,%k0{%k1}
+                       61 07 00 00 
+    libdis_test+0x398: 62 f2 45 08 8f 84  vpshufbitqmb 0x167(%edi,%esi,4),%xmm7,%k0
+                       b7 67 01 00 00 
+    libdis_test+0x3a3: 62 f2 45 09 8f 84  vpshufbitqmb 0x761(%edi,%edx,8),%xmm7,%k0{%k1}
+                       d7 61 07 00 00 
+    libdis_test+0x3ae: 62 f2 6d 28 8f d9  vpshufbitqmb %ymm1,%ymm2,%k3
+    libdis_test+0x3b4: 62 f2 5d 2d 8f e3  vpshufbitqmb %ymm3,%ymm4,%k4{%k5}
+    libdis_test+0x3ba: 62 f2 45 28 8f 07  vpshufbitqmb (%edi),%ymm7,%k0
+    libdis_test+0x3c0: 62 f2 45 29 8f 07  vpshufbitqmb (%edi),%ymm7,%k0{%k1}
+    libdis_test+0x3c6: 62 f2 45 28 8f 87  vpshufbitqmb 0x167(%edi),%ymm7,%k0
+                       67 01 00 00 
+    libdis_test+0x3d0: 62 f2 45 29 8f 87  vpshufbitqmb 0x761(%edi),%ymm7,%k0{%k1}
+                       61 07 00 00 
+    libdis_test+0x3da: 62 f2 45 28 8f 84  vpshufbitqmb 0x167(%edi,%esi,4),%ymm7,%k0
+                       b7 67 01 00 00 
+    libdis_test+0x3e5: 62 f2 45 29 8f 84  vpshufbitqmb 0x761(%edi,%edx,8),%ymm7,%k0{%k1}
+                       d7 61 07 00 00 
+    libdis_test+0x3f0: 62 f2 6d 48 8f d9  vpshufbitqmb %zmm1,%zmm2,%k3
+    libdis_test+0x3f6: 62 f2 5d 4d 8f e3  vpshufbitqmb %zmm3,%zmm4,%k4{%k5}
+    libdis_test+0x3fc: 62 f2 45 48 8f 07  vpshufbitqmb (%edi),%zmm7,%k0
+    libdis_test+0x402: 62 f2 45 49 8f 07  vpshufbitqmb (%edi),%zmm7,%k0{%k1}
+    libdis_test+0x408: 62 f2 45 48 8f 87  vpshufbitqmb 0x167(%edi),%zmm7,%k0
+                       67 01 00 00 
+    libdis_test+0x412: 62 f2 45 49 8f 87  vpshufbitqmb 0x761(%edi),%zmm7,%k0{%k1}
+                       61 07 00 00 
+    libdis_test+0x41c: 62 f2 45 48 8f 84  vpshufbitqmb 0x167(%edi,%esi,4),%zmm7,%k0
+                       b7 67 01 00 00 
+    libdis_test+0x427: 62 f2 45 49 8f 84  vpshufbitqmb 0x761(%edi,%edx,8),%zmm7,%k0{%k1}
+                       d7 61 07 00 00 

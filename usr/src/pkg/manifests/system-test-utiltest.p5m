@@ -1162,6 +1162,10 @@ file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.bf16.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.bf16.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.bitalg.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.bitalg.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi2.out mode=0444
@@ -1180,6 +1184,8 @@ file path=opt/util-tests/tests/dis/i386/32.fma-ss.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.fma-ss.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.gfni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.gfni.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.ifma.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.ifma.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.misc.out mode=0444
@@ -1226,6 +1232,10 @@ file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.bf16.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.bf16.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.bitalg.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.bitalg.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi2.out mode=0444
@@ -1248,6 +1258,8 @@ file path=opt/util-tests/tests/dis/i386/64.fsbase.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.fsbase.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.gfni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.gfni.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.ifma.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.ifma.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.misc.out mode=0444
