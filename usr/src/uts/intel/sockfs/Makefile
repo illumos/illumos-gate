@@ -69,10 +69,6 @@ TOKGEN		 = $(SRCDIR)/nl7ctokgen
 DERIVED_FILES	 = nl7ctokgen.h
 CFLAGS		+= -I.
 
-CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-unused-value
-CERRWARN	+= -_gcc=-Wno-unused-function
-
 #
 #	Default build targets.
 #

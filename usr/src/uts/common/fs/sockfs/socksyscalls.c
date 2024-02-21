@@ -586,7 +586,7 @@ bind(int sock, struct sockaddr *name, socklen_t namelen, int version)
 		error = socket_bind(so, name, namelen, _SOBIND_SOCKBSD, CRED());
 		break;
 	}
-done:
+
 	releasef(sock);
 	if (name != NULL)
 		kmem_free(name, (size_t)namelen);

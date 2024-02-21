@@ -1975,7 +1975,7 @@ soreadfile(file_t *fp, uchar_t *buf, u_offset_t fileoff, int *err, size_t size)
 
 	if (error == EINTR && cnt != 0)
 		error = 0;
-out:
+
 	if (error != 0) {
 		*err = error;
 		return (0);
