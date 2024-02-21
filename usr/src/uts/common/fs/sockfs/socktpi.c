@@ -278,7 +278,6 @@ sotpi_create(struct sockparams *sp, int family, int type, int protocol,
 {
 	struct sonode	*so;
 	kmem_cache_t	*cp;
-	int		sfamily = family;
 
 	ASSERT(sp->sp_sdev_info.sd_vnode != NULL);
 
