@@ -1069,7 +1069,7 @@ usage(void)		/* print usage message and quit */
 	static char usage3[] =
 	    "\t[ -p proclist ] [ -g pgrplist ] [ -s sidlist ]";
 	static char usage4[] =
-	    "\t[ -z zonelist ] [-h lgrplist]";
+	    "\t[ -z zonelist ] [ -h lgrplist ]";
 	static char usage5[] =
 	    "  'format' is one or more of:";
 
