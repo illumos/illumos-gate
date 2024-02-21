@@ -199,17 +199,23 @@ pthread_mutexattr_getrobust(const pthread_mutexattr_t *attr, int *robust)
 }
 
 /*
- * pthread_mutex_init: Initializes the mutex object.  It copies the
- * various attributes into one type argument and calls mutex_init().
+ * pthread_mutex_init: Initializes the mutex object.  It copies the various
+ * attributes into one type argument and calls mutex_init().  Unlike other
+ * values, the types that are used in the mutex attributes are not 1:1 mapped to
+ * our underlying lock types at this time so we can properly honor the semantics
+ * of someone asking for a PTHREAD_MUTEX_NORMAL lock that must deadlock. The
+ * underlying threads implementation does not do this by default for
+ * USYNC_THREAD and so we don't do this unless explicitly asked for it.
  */
 #pragma weak _pthread_mutex_init = pthread_mutex_init
 int
 pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
     const pthread_mutexattr_t *_RESTRICT_KYWD attr)
 {
-	mattr_t *ap;
-	int	type;
-	int	prioceiling = 0;
+	mattr_t		*ap;
+	int		type, ret;
+	int		prioceiling = 0;
+	uint16_t	flags = 0;
 
 	/*
 	 * All of the pshared, type, protocol, robust attributes
@@ -218,11 +224,31 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 	if (attr != NULL) {
 		if ((ap = attr->__pthread_mutexattrp) == NULL)
 			return (EINVAL);
-		type = ap->pshared | ap->type | ap->protocol | ap->robustness;
+		switch (ap->type) {
+		case PTHREAD_MUTEX_NORMAL:
+			type = LOCK_NORMAL;
+			flags = LOCK_DEADLOCK;
+			break;
+		case PTHREAD_MUTEX_ERRORCHECK:
+			type = LOCK_ERRORCHECK;
+			break;
+		case PTHREAD_MUTEX_RECURSIVE:
+			type = LOCK_RECURSIVE;
+			break;
+		default:
+			/*
+			 * This covers PTHREAD_MUTEX_DEFAULT, which should be
+			 * the only remaining valid value.
+			 */
+			type = LOCK_NORMAL;
+			break;
+		}
+
+		type |= ap->pshared | ap->protocol | ap->robustness;
 		if (ap->protocol == PTHREAD_PRIO_PROTECT)
 			prioceiling = ap->prioceiling;
 	} else {
-		type = PTHREAD_PROCESS_PRIVATE | PTHREAD_MUTEX_DEFAULT |
+		type = PTHREAD_PROCESS_PRIVATE | LOCK_NORMAL |
 		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALLED;
 	}
 
@@ -243,7 +269,18 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 		(void) memset(mutex, 0, sizeof (*mutex));
 	}
 
-	return (mutex_init((mutex_t *)mutex, type, &prioceiling));
+	ret = mutex_init((mutex_t *)mutex, type, &prioceiling);
+
+	/*
+	 * If we have a normal mutex, we need to set that deadlock behavior is
+	 * required.
+	 */
+	if (ret == 0 && flags != 0) {
+		mutex_t *mp = (mutex_t *)mutex;
+		mp->mutex_flag |= flags;
+	}
+
+	return (ret);
 }
 
 /*
@@ -288,6 +325,10 @@ pthread_mutex_getprioceiling(const pthread_mutex_t *mp, int *ceiling)
 /*
  * UNIX98
  * pthread_mutexattr_settype: sets the type attribute
+ *
+ * Type attributes are kept in terms of POSIX mutex types until the mutex is
+ * initialized, after which it is translated into the corresponding underlying
+ * lock type.
  */
 int
 pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
@@ -298,13 +339,9 @@ pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 		return (EINVAL);
 	switch (type) {
 	case PTHREAD_MUTEX_NORMAL:
-		type = LOCK_NORMAL;
-		break;
 	case PTHREAD_MUTEX_ERRORCHECK:
-		type = LOCK_ERRORCHECK;
-		break;
 	case PTHREAD_MUTEX_RECURSIVE:
-		type = LOCK_RECURSIVE | LOCK_ERRORCHECK;
+	case PTHREAD_MUTEX_DEFAULT:
 		break;
 	default:
 		return (EINVAL);
@@ -326,19 +363,6 @@ pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *typep)
 	if (attr == NULL || (ap = attr->__pthread_mutexattrp) == NULL ||
 	    typep == NULL)
 		return (EINVAL);
-	switch (ap->type) {
-	case LOCK_NORMAL:
-		type = PTHREAD_MUTEX_NORMAL;
-		break;
-	case LOCK_ERRORCHECK:
-		type = PTHREAD_MUTEX_ERRORCHECK;
-		break;
-	case LOCK_RECURSIVE | LOCK_ERRORCHECK:
-		type = PTHREAD_MUTEX_RECURSIVE;
-		break;
-	default:
-		return (EINVAL);
-	}
 	*typep = type;
 	return (0);
 }

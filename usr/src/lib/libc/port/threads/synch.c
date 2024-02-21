@@ -2270,9 +2270,16 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 		 * us that the signal handlers are safe by setting:
 		 *	export _THREAD_ASYNC_SAFE=1
 		 * we return EDEADLK rather than actually deadlocking.
+		 *
+		 * A lock may explicitly override this with the
+		 * LOCK_DEADLOCK flag which is currently set for POSIX
+		 * NORMAL mutexes as the specification requires deadlock
+		 * behavior and applications _do_ rely on that for their
+		 * correctness guarantees.
 		 */
 		if (tsp == NULL &&
-		    MUTEX_OWNER(mp) == self && !self->ul_async_safe) {
+		    MUTEX_OWNER(mp) == self && !self->ul_async_safe &&
+		    (mp->mutex_flag & LOCK_DEADLOCK) == 0) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
 			return (EDEADLK);
 		}

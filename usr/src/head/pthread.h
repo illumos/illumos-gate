@@ -72,12 +72,14 @@ extern "C" {
 
 /*
  * mutex types
- * keep these in synch which sys/synch.h lock flags
+ *
+ * _ERRORCHECK and _RERCURSIVE are kept in line with their corresponding values
+ * in sys/synch.h; however, in general these types have their own semantics.
  */
 #define	PTHREAD_MUTEX_NORMAL		0x0
 #define	PTHREAD_MUTEX_ERRORCHECK	0x2
 #define	PTHREAD_MUTEX_RECURSIVE		0x4
-#define	PTHREAD_MUTEX_DEFAULT		PTHREAD_MUTEX_NORMAL
+#define	PTHREAD_MUTEX_DEFAULT		0x8
 
 /*
  * Mutex protocol values. Keep these in synch with sys/synch.h lock types.
