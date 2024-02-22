@@ -49,7 +49,7 @@
 
 #define	YYDEBUG	1
 
-extern	void	yyerror __P((char *));
+extern	int	yyerror __P((const char *));
 extern	int	yyparse __P((void));
 extern	int	yylex __P((void));
 extern	int	yydebug;

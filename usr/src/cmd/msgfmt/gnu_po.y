@@ -219,7 +219,7 @@ plural_message	: MSGSTR '[' NUM ']' message_string
 	}
 	;
 %%
-void
+int
 yyerror(const char *err)
 {
 	(void) fprintf(stderr,

@@ -51,7 +51,7 @@ main(void)
 }
 
 int
-yyerror(char *msg)
+yyerror(const char *msg)
 {
 	compile_error("%s", msg);
 	return (0);

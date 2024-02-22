@@ -112,7 +112,7 @@ struct msgtbl {
 
 extern int	yyparse(void);
 extern int	yylex(void);
-extern void	yyerror(const char *);
+extern int	yyerror(const char *) __NORETURN;
 extern void	handle_domain(char *);
 extern void	handle_comment(char *);
 extern void	handle_message(struct entry *, struct entry *);

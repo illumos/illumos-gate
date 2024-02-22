@@ -246,7 +246,7 @@ unscanc(int c)
 		nextline--;
 	}
 	if (ungetc(c, input) < 0) {
-		yyerror(_("ungetc failed"));
+		(void) yyerror(_("ungetc failed"));
 	}
 }
 
@@ -258,13 +258,11 @@ scan_hex_byte(void)
 
 	c1 = scanc();
 	if (!isxdigit(c1)) {
-		yyerror(_("malformed hex digit"));
-		return (0);
+		(void) yyerror(_("malformed hex digit"));
 	}
 	c2 = scanc();
 	if (!isxdigit(c2)) {
-		yyerror(_("malformed hex digit"));
-		return (0);
+		(void) yyerror(_("malformed hex digit"));
 	}
 	v = ((hex(c1) << 4) | hex(c2));
 	return (v);
@@ -278,14 +276,12 @@ scan_dec_byte(void)
 
 	c1 = scanc();
 	if (!isdigit(c1)) {
-		yyerror(_("malformed decimal digit"));
-		return (0);
+		(void) yyerror(_("malformed decimal digit"));
 	}
 	b = c1 - '0';
 	c2 = scanc();
 	if (!isdigit(c2)) {
-		yyerror(_("malformed decimal digit"));
-		return (0);
+		(void) yyerror(_("malformed decimal digit"));
 	}
 	b *= 10;
 	b += (c2 - '0');
@@ -309,14 +305,12 @@ scan_oct_byte(void)
 
 	c1 = scanc();
 	if (!isodigit(c1)) {
-		yyerror(_("malformed octal digit"));
-		return (0);
+		(void) yyerror(_("malformed octal digit"));
 	}
 	b = c1 - '0';
 	c2 = scanc();
 	if (!isodigit(c2)) {
-		yyerror(_("malformed octal digit"));
-		return (0);
+		(void) yyerror(_("malformed octal digit"));
 	}
 	b *= 8;
 	b += (c2 - '0');
@@ -336,10 +330,7 @@ add_tok(int c)
 	if ((tokidx + 1) >= toksz) {
 		toksz += 64;
 		if ((token = realloc(token, toksz)) == NULL) {
-			yyerror(_("out of memory"));
-			tokidx = 0;
-			toksz = 0;
-			return;
+			(void) yyerror(_("out of memory"));
 		}
 	}
 
@@ -353,10 +344,7 @@ add_wcs(wchar_t c)
 		widesz += 64;
 		widestr = realloc(widestr, (widesz * sizeof (wchar_t)));
 		if (widestr == NULL) {
-			yyerror(_("out of memory"));
-			wideidx = 0;
-			widesz = 0;
-			return;
+			(void) yyerror(_("out of memory"));
 		}
 	}
 
@@ -373,7 +361,7 @@ get_wcs(void)
 	widesz = 0;
 	if (ws == NULL) {
 		if ((ws = wsdup(L"")) == NULL) {
-			yyerror(_("out of memory"));
+			(void) yyerror(_("out of memory"));
 		}
 	}
 	return (ws);
@@ -447,9 +435,7 @@ get_wide(void)
 	wchar_t	wc;
 
 	if (mb_cur_max >= sizeof (mbs)) {
-		yyerror(_("max multibyte character size too big"));
-		mbi = 0;
-		return (T_NULL);
+		(void) yyerror(_("max multibyte character size too big"));
 	}
 	for (;;) {
 		if ((mbi == mb_cur_max) || ((c = get_byte()) == EOF)) {
@@ -458,8 +444,7 @@ get_wide(void)
 			 * valid wide decoding.  fatal error.
 			 */
 			mbi = 0;
-			yyerror(_("not a valid character encoding"));
-			return (T_NULL);
+			(void) yyerror(_("not a valid character encoding"));
 		}
 		mbs[mbi++] = c;
 		mbs[mbi] = 0;
@@ -473,8 +458,7 @@ get_wide(void)
 	mbi = 0;
 	if ((category != T_CHARMAP) && (category != T_WIDTH)) {
 		if (check_charmap(wc) < 0) {
-			yyerror(_("no symbolic name for character"));
-			return (T_NULL);
+			(void) yyerror(_("no symbolic name for character"));
 		}
 	}
 
@@ -500,8 +484,7 @@ get_symbol(void)
 			continue;
 		}
 		if (c == '\n') {	/* well that's strange! */
-			yyerror(_("unterminated symbolic name"));
-			continue;
+			(void) yyerror(_("unterminated symbolic name"));
 		}
 		if (c == '>') {		/* end of symbol */
 
@@ -512,8 +495,7 @@ get_symbol(void)
 			 */
 
 			if (token == NULL) {
-				yyerror(_("missing symbolic name"));
-				return (T_NULL);
+				(void) yyerror(_("missing symbolic name"));
 			}
 			tokidx = 0;
 
@@ -557,7 +539,7 @@ get_symbol(void)
 		add_tok(c);
 	}
 
-	yyerror(_("unterminated symbolic name"));
+	(void) yyerror(_("unterminated symbolic name"));
 	return (EOF);
 }
 
@@ -614,7 +596,7 @@ consume_token(void)
 		char *eptr;
 		yylval.num = strtol(token, &eptr, 10);
 		if (*eptr != 0)
-			yyerror(_("malformed number"));
+			(void) yyerror(_("malformed number"));
 		return (T_NUMBER);
 	}
 
@@ -800,7 +782,7 @@ yylex(void)
 	return (EOF);
 }
 
-void
+int
 yyerror(const char *msg)
 {
 	(void) fprintf(stderr, _("%s: %d: error: %s\n"),

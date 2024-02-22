@@ -33,7 +33,7 @@
 #define OPTION_REPLYTO          0x20
 #define OPTION_FROUTE           0x40
 
-extern	void	yyerror __P((char *));
+extern	int	yyerror __P((const char *));
 extern	int	yyparse __P((void));
 extern	int	yylex __P((void));
 extern	int	yydebug;
@@ -270,8 +270,8 @@ ipfrule:
 	;
 
 bpfrule:
-	IPFY_BPFV4 '{' YY_STR '}' 	{ dobpf(4, $3); free($3); }
-	| IPFY_BPFV6 '{' YY_STR '}' 	{ dobpf(6, $3); free($3); }
+	IPFY_BPFV4 '{' YY_STR '}'	{ dobpf(4, $3); free($3); }
+	| IPFY_BPFV6 '{' YY_STR '}'	{ dobpf(6, $3); free($3); }
 	;
 
 ruletail:
@@ -347,43 +347,43 @@ inopt:
 		if ( ruleopts & OPTION_LOG )
 			yyerror("Duplicate log option");
 		ruleopts |= OPTION_LOG;
-	}	
+	}
 	| quick
 	{
 		if ( ruleopts & OPTION_QUICK )
 			yyerror("Duplicate quick option");
 		ruleopts |= OPTION_QUICK;
-	} 
+	}
 	| on
 	{
 		if ( ruleopts & OPTION_ON )
 			yyerror("Duplicate on option");
 		ruleopts |= OPTION_ON;
-	} 
+	}
 	| dup
 	{
 		if ( ruleopts & OPTION_DUP )
 			yyerror("Duplicate dup option");
 		ruleopts |= OPTION_DUP;
-	} 
+	}
 	| froute
 	{
 		if ( ruleopts & OPTION_FROUTE )
 			yyerror("Duplicate froute option");
 		ruleopts |= OPTION_FROUTE;
-	} 
+	}
 	| proute
 	{
 		if ( ruleopts & OPTION_PROUTE )
 			yyerror("Duplicate proute option");
 		ruleopts |= OPTION_PROUTE;
-	} 
+	}
 	| replyto
 	{
 		if ( ruleopts & OPTION_REPLYTO )
 			yyerror("Duplicate replyto option");
 		ruleopts |= OPTION_REPLYTO;
-	} 
+	}
 	;
 
 outopts:
@@ -396,19 +396,19 @@ outopt:
 		if ( ruleopts & OPTION_LOG )
 			yyerror("Duplicate log option");
 		ruleopts |= OPTION_LOG;
-	} 
+	}
 	| quick
 	{
 		if ( ruleopts & OPTION_QUICK )
 			yyerror("Duplicate quick option");
 		ruleopts |= OPTION_QUICK;
-	} 
+	}
 	| on
 	{
 		if ( ruleopts & OPTION_ON )
 			yyerror("Duplicate on option");
 		ruleopts |= OPTION_ON;
-	} 
+	}
 	| dup
 	{
 		if ( ruleopts & OPTION_DUP )
@@ -420,13 +420,13 @@ outopt:
 		if ( ruleopts & OPTION_PROUTE )
 			yyerror("Duplicate proute option");
 		ruleopts |= OPTION_PROUTE;
-	} 
+	}
 	| replyto
 	{
 		if ( ruleopts & OPTION_REPLYTO )
 			yyerror("Duplicate replyto option");
 		ruleopts |= OPTION_REPLYTO;
-	} 
+	}
 	;
 
 tos:	| settos YY_NUMBER	{ DOALL(fr->fr_tos = $2; fr->fr_mtos = 0xff;) }
@@ -442,7 +442,7 @@ toslist:
 	| YY_HEX	{ DOREM(fr->fr_tos = $1; fr->fr_mtos = 0xff;) }
 	| toslist lmore YY_NUMBER
 			{ DOREM(fr->fr_tos = $3; fr->fr_mtos = 0xff;) }
-	| toslist lmore YY_HEX	
+	| toslist lmore YY_HEX
 			{ DOREM(fr->fr_tos = $3; fr->fr_mtos = 0xff;) }
 	;
 
@@ -613,7 +613,7 @@ dup:	IPFY_DUPTO name
 	  if (use_inet6 == 0)
 		fr->fr_dif.fd_ip = $4.in4;
 	  else
-	  	bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
+		bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
 	  yyexpectaddr = 0;
 	  fr->fr_flags |= FR_DUP;
 	  free($2);
@@ -643,7 +643,7 @@ proute:	routeto name
 	  if (use_inet6 == 0)
 		fr->fr_tif.fd_ip = $4.in4;
 	  else
-	  	bcopy(&$4, &fr->fr_tif.fd_ip6, sizeof(fr->fr_tif.fd_ip6));
+		bcopy(&$4, &fr->fr_tif.fd_ip6, sizeof(fr->fr_tif.fd_ip6));
 	  yyexpectaddr = 0;
 	  free($2);
 	}
@@ -771,7 +771,7 @@ andwith:
 	| IPFY_AND			{ nowith = 0; setipftype(); }
 	;
 
-flags:	| startflags flagset	
+flags:	| startflags flagset
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = FR_TCPFMAX;) }
 	| startflags flagset '/' flagset
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = $4;) }
@@ -956,8 +956,8 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  yyresetdict();
 					  yyexpectaddr = 0; }
-	| hostname                      { if (use_inet6 == 0) { 
-						$$.a.in4 = $1.in4; 
+	| hostname                      { if (use_inet6 == 0) {
+						$$.a.in4 = $1.in4;
 						$$.m.in4_addr = 0xffffffff;
 					  } else {
 						set_ipv6_addr = 1;
@@ -966,19 +966,19 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  }
 					  yyexpectaddr = 0; }
 	| hostname                      { yyresetdict();
-					  if (use_inet6 == 0) 
-						$$.a.in4 = $1.in4; 
-					  else { 
-						set_ipv6_addr = 1; 
-						bcopy(&$1, &$$.a, sizeof($$.a)); 
-					  } 
-					} 
+					  if (use_inet6 == 0)
+						$$.a.in4 = $1.in4;
+					  else {
+						set_ipv6_addr = 1;
+						bcopy(&$1, &$$.a, sizeof($$.a));
+					  }
+					}
 		maskspace               { yysetdict(maskwords); }
-		mask                    { if (use_inet6 == 0) { 
-						$$.m.in4_addr = $5.in4.s_addr; 
-						$$.a.in4_addr &= $5.in4.s_addr; 
-					  } else 
-						bcopy(&$5, &$$.m, sizeof($$.m)); 
+		mask                    { if (use_inet6 == 0) {
+						$$.m.in4_addr = $5.in4.s_addr;
+						$$.a.in4_addr &= $5.in4.s_addr;
+					  } else
+						bcopy(&$5, &$$.m, sizeof($$.m));
 					  yyresetdict();
 					  yyexpectaddr = 0; }
 	| YY_IPV6			{ set_ipv6_addr = 1;
@@ -990,7 +990,7 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  yyresetdict();
 					  bcopy(&$1, &$$.a, sizeof($$.a)); }
 		maskspace               { yysetdict(maskwords); }
-		mask                    { bcopy(&$5, &$$.m, sizeof($$.m)); 
+		mask                    { bcopy(&$5, &$$.m, sizeof($$.m));
 					  yyresetdict();
 					  yyexpectaddr = 0; }
 	;
@@ -1003,13 +1003,13 @@ maskspace:
 mask:
 	ipv4				{ $$.in4 = $1; }
 	| YY_HEX			{ $$.in4.s_addr = htonl($1); }
-	| YY_NUMBER                     { if ((use_inet6 == 0) && ($1 <= 32)) 
-						ntomask(4, $1, (u_32_t *)&$$.in4); 
-					  else if ((use_inet6 != 0) && ($1 <= 128)) 
-						ntomask(6, $1, $$.i6); 
-					  else { 
-						yyerror("Bad value specified for netmask"); 
-						return 0; 
+	| YY_NUMBER                     { if ((use_inet6 == 0) && ($1 <= 32))
+						ntomask(4, $1, (u_32_t *)&$$.in4);
+					  else if ((use_inet6 != 0) && ($1 <= 128))
+						ntomask(6, $1, $$.i6);
+					  else {
+						yyerror("Bad value specified for netmask");
+						return 0;
 					  }
 					}
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
@@ -1042,11 +1042,11 @@ hostname:
 	ipv4				{ $$.in4 = $1; }
 	| YY_NUMBER			{ $$.in4.s_addr = $1; }
 	| YY_HEX			{ $$.in4.s_addr = $1; }
-	| YY_STR                        { if (lookuphost($1, &$$) == 1) 
+	| YY_STR                        { if (lookuphost($1, &$$) == 1)
 						free($1);
-					  else { 
-						free($1); 
-						if (ifpflag != FRI_DYNAMIC) 
+					  else {
+						free($1);
+						if (ifpflag != FRI_DYNAMIC)
 							yyerror("Unknown hostname");
 					  }
 					}
@@ -1938,7 +1938,7 @@ static frentry_t *addrule()
 	f = f2;
 	for (f1 = frc; count > 0; count--, f1 = f1->fr_next) {
 		f->fr_next = (frentry_t *)calloc(sizeof(*f), 1);
-		if (f->fr_next == NULL) 
+		if (f->fr_next == NULL)
 			yyerror("sorry, out of memory");
 		added++;
 		f = f->fr_next;
@@ -2116,7 +2116,7 @@ alist_t *list;
 	top = calloc(1, sizeof(*top));
 	if (top == NULL)
 		return 0;
-	
+
 	for (n = top, a = list; (n != NULL) && (a != NULL); a = a->al_next) {
 		n->ipn_addr.adf_family = a->al_family;
 		n->ipn_mask.adf_family = a->al_family;
@@ -2161,7 +2161,7 @@ alist_t *list;
 	top = calloc(1, sizeof(*top));
 	if (top == NULL)
 		return 0;
-	
+
 	for (n = top, a = list; (n != NULL) && (a != NULL); a = a->al_next) {
 		n->ipe_family = a->al_family;
 		(void *)bcopy((void *)&a->al_i6addr,

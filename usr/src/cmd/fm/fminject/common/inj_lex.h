@@ -39,6 +39,8 @@ extern int yylineno;
 /*PRINTFLIKE1*/
 extern void yyerror(const char *, ...);
 extern void yyreset(void);
+extern int yyparse(void);
+extern int yylex(void);
 
 #ifdef __cplusplus
 }

@@ -22,12 +22,9 @@
  */
 %}
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
-%{
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
-%}
 %{
 
 #include "stdio.h"
@@ -35,7 +32,7 @@
 #include "time.h"
 
 extern int yylex(void);
-extern void yyerror();
+extern int yyerror(const char *);
 extern void atabort(char *);
 int yyparse(void);
 extern	int	gmtflag;
@@ -79,7 +76,7 @@ args
 			atabort("bad year");
 	}
 	| time ampm timezone date incr UNKNOWN {
-		yyerror();
+		(void) yyerror("bad time specification");
 	}
 	;
 

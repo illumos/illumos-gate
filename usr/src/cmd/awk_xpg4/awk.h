@@ -34,6 +34,9 @@
  *
  */
 
+#ifndef AWK_H
+#define	AWK_H
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -272,9 +275,9 @@ int	yyparse(void);
 #pragma aux awkerr aborts;
 #pragma aux awkperr aborts;
 #endif
-void	yyerror(char *msg, ...);
-void	awkerr(char *fmt, ...) __NORETURN;
-void	awkperr(char *fmt, ...);
+int	yyerror(const char *msg, ...);
+void	awkerr(const char *fmt, ...) __NORETURN;
+void	awkperr(const char *fmt, ...);
 void	uexit(NODE *);
 int	yylex(void);
 NODE	*renode(wchar_t *restr);
@@ -443,9 +446,8 @@ extern	NODE    *inc_oper;
 extern	NODE	*asn_oper;
 
 extern char *mbunconvert(wchar_t *);
-extern	wchar_t 	*mbstowcsdup(char *);
+extern	wchar_t		*mbstowcsdup(char *);
 extern	char		*wcstombsdup(wchar_t *);
-extern	void		awkerr(char *, ...);
 /*
  * The following defines the expected max length in chars of a printed number.
  * This should be the longest expected size for any type of number
@@ -493,3 +495,5 @@ extern void int_regwfree(REGEXP);
 extern size_t int_regwerror(int, REGEXP, char *, size_t);
 extern int int_regwdosuba(REGEXP, const wchar_t *,
 			const wchar_t *, wchar_t **, int, int *);
+
+#endif /* AWK_H */

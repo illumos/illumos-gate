@@ -106,7 +106,7 @@ typedef struct	map_info {
 	struct map_info		*mi_next;
 	ulong_t			mi_flags;	/* misc flags */
 	rd_loadobj_t		mi_loadobj;	/* keep the old loadobj for */
-						/* 	good luck */
+						/*	good luck */
 } map_info_t;
 
 #define	FLG_MI_EXEC		0x0001		/* is object an EXEC */
@@ -126,7 +126,7 @@ typedef struct map_list {
  */
 typedef struct bpt_struct {
 	ulong_t			bl_addr;	/* address of breakpoint */
-	bptinstr_t 		bl_instr;	/* original instruction */
+	bptinstr_t		bl_instr;	/* original instruction */
 	unsigned		bl_flags;	/* break point flags */
 	struct bpt_struct	*bl_next;
 } bptlist_t;
@@ -242,7 +242,7 @@ extern map_info_t	*str_to_map(struct ps_prochandle *, const char *);
 extern retc_t		str_to_sym(struct ps_prochandle *, const char *,
 				GElf_Sym *);
 extern int		yyparse(void);
-extern int		yyerror(char *);
+extern int		yyerror(const char *);
 extern int		yylex(void);
 
 #ifdef	__cplusplus

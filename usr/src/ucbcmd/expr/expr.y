@@ -366,7 +366,7 @@ errxx(int err)
 }
 
 int
-yyerror(char *s)
+yyerror(const char *s)
 {
 	(void) write(2, "expr: ", 6);
 	(void) write(2, s, (unsigned) strlen(s));

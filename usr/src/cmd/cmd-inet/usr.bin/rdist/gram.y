@@ -25,7 +25,7 @@ struct	subcmd *last_sc;
 
 static void append(char *label, struct namelist *files, char *stamp,
     struct subcmd *subcmds);
-void yyerror(char *s);
+int yyerror(const char *s);
 
 %}
 
@@ -124,7 +124,8 @@ cmd:		  INSTALL options opt_namelist SM {
 			if ($3 != NULL) {
 				nl = expand($3, E_VARS);
 				if (nl && nl->n_next != NULL)
-					yyerror("only one name allowed\n");
+					(void) yyerror(
+					    "only one name allowed\n");
 				$1->sc_name = nl ? nl->n_name: NULL;
 				if (nl)
 					free(nl);
@@ -153,7 +154,7 @@ cmd:		  INSTALL options opt_namelist SM {
 			for (nl = expand(dupnl($2), E_VARS); nl != NULL;
 				nl = nl->n_next)
 				if ((cp = re_comp(nl->n_name)) != NULL)
-					yyerror(cp);
+					(void) yyerror(cp);
 			$1->sc_args = expand($2, E_VARS);
 			$$ = $1;
 		}
@@ -235,7 +236,7 @@ again:
 		cp2 = &yytext[INMAX - 1];
 		for (;;) {
 			if (cp1 >= cp2) {
-				yyerror("command string too long\n");
+				(void) yyerror("command string too long\n");
 				break;
 			}
 			c = getc(fin);
@@ -254,7 +255,7 @@ again:
 			*cp1++ = c;
 		}
 		if (c != '"')
-			yyerror("missing closing '\"'\n");
+			(void) yyerror("missing closing '\"'\n");
 		*cp1 = '\0';
 		yylval.string = makestr(yytext);
 		return(STRING);
@@ -269,7 +270,7 @@ again:
 	cp2 = &yytext[INMAX - 1];
 	for (;;) {
 		if (cp1 >= cp2) {
-			yyerror("input line too long\n");
+			(void) yyerror("input line too long\n");
 			break;
 		}
 		if (c == '\\') {
@@ -442,15 +443,15 @@ append(label, files, stamp, subcmds)
 /*
  * Error printing routine in parser.
  */
-void
-yyerror(s)
-	char *s;
+int
+yyerror(const char *s)
 {
 	extern int yychar;
 
 	nerrs++;
 	fflush(stdout);
 	fprintf(stderr, "rdist: line %d: %s\n", yylineno, s);
+	return (0);
 }
 
 /*

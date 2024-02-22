@@ -28,7 +28,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -103,8 +103,8 @@ static char *mkjobname(time_t);
 static time_t parse_time(char *);
 static time_t gtime(struct tm *);
 static void escapestr(const char *);
-void atabort(char *)__NORETURN;
-void yyerror(void);
+void atabort(const char *) __NORETURN;
+int yyerror(const char *);
 extern int yyparse(void);
 
 extern void	audit_at_delete(char *, char *, int);
@@ -115,8 +115,8 @@ extern int	audit_cron_delete_anc_file(char *, char *);
 /*
  * Error in getdate(3C)
  */
-static char 	*errlist[] = {
-/* 0 */ 	"",
+static char	*errlist[] = {
+/* 0 */	"",
 /* 1 */	"getdate: The DATEMSK environment variable is not set",
 /* 2 */	"getdate: Error on \"open\" of the template file",
 /* 3 */	"getdate: Error on \"stat\" of the template file",
@@ -449,7 +449,7 @@ catch(int x)
 
 
 void
-atabort(char *msg)
+atabort(const char *msg)
 {
 	fprintf(stderr, "at: %s\n", gettext(msg));
 
@@ -462,10 +462,11 @@ yywrap(void)
 	return (1);
 }
 
-void
-yyerror(void)
+int
+yyerror(const char *s)
 {
-	atabort(BADTIME);
+	atabort(s);
+	return (0);
 }
 
 /*

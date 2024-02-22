@@ -29,8 +29,9 @@
 
 #include <stdio.h>
 
-void
+int
 yyerror(const char *s)
 {
 	(void) fprintf(stderr, "%s\n", s);
+	return (0);
 }

@@ -23,6 +23,8 @@
 #include <limits.h>
 #include "charmap.h"
 
+extern int yylex(void);
+
 %}
 %union {
 	char		*token;

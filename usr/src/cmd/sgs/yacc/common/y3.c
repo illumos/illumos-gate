@@ -47,7 +47,7 @@ output(void)
 	int i, k, c;
 	WSET *u, *v;
 
-	(void) fprintf(ftable, "static YYCONST yytabelem yyexca[] ={\n");
+	(void) fprintf(ftable, "static const yytabelem yyexca[] ={\n");
 
 	SLOOP(i) { /* output the stuff for state i */
 		nolook = !(tystate[i] == MUSTLOOKAHEAD);
@@ -93,9 +93,9 @@ output(void)
 				" (red'ns %d and %d ) on %ws",
 							i, -temp1[k],
 							lastred, symnam(k));
-						    if (-temp1[k] > lastred)
-							temp1[k] = -lastred;
-						    ++zzrrconf;
+							if (-temp1[k] > lastred)
+								temp1[k] = -lastred;
+							++zzrrconf;
 							/* END CSTYLED */
 						} else
 							/*
@@ -488,7 +488,7 @@ void
 warray(wchar_t *s, int *v, int n)
 {
 	int i;
-	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
+	(void) fprintf(ftable, "static const yytabelem %ws[]={\n", s);
 	for (i = 0; i < n; ) {
 		if (i % 10 == 0)
 			(void) fprintf(ftable, "\n");

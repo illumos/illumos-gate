@@ -10,12 +10,12 @@
 #include <ctype.h>
 #include "ipf.h"
 #ifdef	IPFILTER_SCAN
-# include "netinet/ip_scan.h"
+#include "netinet/ip_scan.h"
 #endif
 #include <sys/ioctl.h>
 #include <syslog.h>
 #ifdef	TEST_LEXER
-# define	NO_YACC
+#define	NO_YACC
 union	{
 	int		num;
 	char		*str;
@@ -29,7 +29,7 @@ union	{
 FILE *yyin;
 
 #define	ishex(c)	(ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || \
-			 ((c) >= 'A' && (c) <= 'F'))
+			((c) >= 'A' && (c) <= 'F'))
 #define	TOOLONG		-3
 
 extern int	string_start;
@@ -61,8 +61,7 @@ static	char		*yytexttostr __P((int, int));
 static	void		yystrtotext __P((char *));
 static	char		*yytexttochar __P((void));
 
-static int yygetc(docont)
-int docont;
+static int yygetc(int docont)
 {
 	int c;
 
@@ -70,11 +69,11 @@ int docont;
 		c = yytext[yypos++];
 		if (c == '\n')
 			yylineNum++;
-		return c;
+		return (c);
 	}
 
 	if (yypos == YYBUFSIZ)
-		return TOOLONG;
+		return (TOOLONG);
 
 	if (pos >= string_start && pos <= string_end) {
 		c = string_val[pos - string_start];
@@ -95,12 +94,11 @@ int docont;
 	yylast = yypos;
 	yytext[yypos] = '\0';
 
-	return c;
+	return (c);
 }
 
 
-static void yyunputc(c)
-int c;
+static void yyunputc(int c)
 {
 	if (c == '\n')
 		yylineNum--;
@@ -108,8 +106,7 @@ int c;
 }
 
 
-static int yyswallow(last)
-int last;
+static int yyswallow(int last)
 {
 	int c;
 
@@ -119,24 +116,23 @@ int last;
 	if (c != EOF)
 		yyunputc(c);
 	if (c == last)
-		return 0;
-	return -1;
+		return (0);
+	return (-1);
 }
 
 
-static char *yytexttochar()
+static char *yytexttochar(void)
 {
 	int i;
 
 	for (i = 0; i < yypos; i++)
 		yychars[i] = (char)(yytext[i] & 0xff);
 	yychars[i] = '\0';
-	return yychars;
+	return (yychars);
 }
 
 
-static void yystrtotext(str)
-char *str;
+static void yystrtotext(char *str)
 {
 	int len;
 	char *s;
@@ -151,8 +147,7 @@ char *str;
 }
 
 
-static char *yytexttostr(offset, max)
-int offset, max;
+static char *yytexttostr(int offset, int max)
 {
 	char *str;
 	int i;
@@ -171,11 +166,12 @@ int offset, max;
 			str[i - offset] = (char)(yytext[i] & 0xff);
 		str[i - offset] = '\0';
 	}
-	return str;
+	return (str);
 }
 
 
-int yylex()
+int
+yylex(void)
 {
 	int c, n, isbuilding, rval, lnext, nokey = 0;
 	char *name;
@@ -193,10 +189,9 @@ nextchar:
 	c = yygetc(0);
 	if (yydebug > 1)
 		printf("yygetc = (%x) %c [%*.*s]\n", c, c, yypos, yypos,
-		       yytexttochar());
+		    yytexttochar());
 
-	switch (c)
-	{
+	switch (c) {
 	case '\n' :
 		lnext = 0;
 		nokey = 0;
@@ -210,7 +205,7 @@ nextchar:
 		}
 		if (yylast > yypos) {
 			bcopy(yytext + yypos, yytext,
-			      sizeof(yytext[0]) * (yylast - yypos + 1));
+			    sizeof (yytext[0]) * (yylast - yypos + 1));
 		}
 		yylast -= yypos;
 		yypos = 0;
@@ -236,13 +231,12 @@ nextchar:
 	if (lnext == 1) {
 		lnext = 0;
 		if ((isbuilding == 0) && !ISALNUM(c)) {
-			return c;
+			return (c);
 		}
 		goto nextchar;
 	}
 
-	switch (c)
-	{
+	switch (c) {
 	case '#' :
 		if (isbuilding == 1) {
 			yyunputc(c);
@@ -324,7 +318,7 @@ nextchar:
 		yybreakondot = 0;
 		yyvarnext = 0;
 		yytokentype = 0;
-		return 0;
+		return (0);
 	}
 
 	if (strchr("=,/;{}()@", c) != NULL) {
@@ -345,8 +339,7 @@ nextchar:
 		}
 	}
 
-	switch (c)
-	{
+	switch (c) {
 	case '-' :
 		if (yyexpectaddr)
 			break;
@@ -441,7 +434,7 @@ nextchar:
 			*s++ = c;
 			c = yygetc(1);
 		} while ((ishex(c) || c == ':' || c == '.') &&
-			 (s - ipv6buf < 46));
+		    (s - ipv6buf < 46));
 		yyunputc(c);
 		*s = '\0';
 
@@ -497,7 +490,7 @@ done:
 
 	if (yydebug)
 		printf("isbuilding %d yyvarnext %d nokey %d\n",
-		       isbuilding, yyvarnext, nokey);
+		    isbuilding, yyvarnext, nokey);
 	if (isbuilding == 1) {
 		wordtab_t *w;
 
@@ -525,16 +518,15 @@ done:
 
 	if (yydebug)
 		printf("lexed(%s) [%d,%d,%d] => %d @%d\n", yystr, string_start,
-			string_end, pos, rval, yysavedepth);
+		    string_end, pos, rval, yysavedepth);
 
-	switch (rval)
-	{
+	switch (rval) {
 	case YY_NUMBER :
 		sscanf(yystr, "%u", &yylval.num);
 		break;
 
 	case YY_HEX :
-		sscanf(yystr, "0x%x", (u_int *)&yylval.num);
+		sscanf(yystr, "0x%x", (uint_t *)&yylval.num);
 		break;
 
 	case YY_STR :
@@ -547,58 +539,57 @@ done:
 
 	if (yylast > 0) {
 		bcopy(yytext + yypos, yytext,
-		      sizeof(yytext[0]) * (yylast - yypos + 1));
+		    sizeof (yytext[0]) * (yylast - yypos + 1));
 		yylast -= yypos;
 		yypos = 0;
 	}
 
-	return rval;
+	return (rval);
 }
 
 
-static wordtab_t *yyfindkey(key)
-char *key;
+static wordtab_t *yyfindkey(char *key)
 {
 	wordtab_t *w;
 
 	if (yywordtab == NULL)
-		return NULL;
+		return (NULL);
 
 	for (w = yywordtab; w->w_word != 0; w++)
 		if (strcasecmp(key, w->w_word) == 0)
-			return w;
-	return NULL;
+			return (w);
+	return (NULL);
 }
 
 
-char *yykeytostr(num)
-int num;
+char *
+yykeytostr(int num)
 {
 	wordtab_t *w;
 
 	if (yywordtab == NULL)
-		return "<unknown>";
+		return ("<unknown>");
 
 	for (w = yywordtab; w->w_word; w++)
 		if (w->w_value == num)
-			return w->w_word;
-	return "<unknown>";
+			return (w->w_word);
+	return ("<unknown>");
 }
 
 
-wordtab_t *yysettab(words)
-wordtab_t *words;
+wordtab_t *
+yysettab(wordtab_t *words)
 {
 	wordtab_t *save;
 
 	save = yywordtab;
 	yywordtab = words;
-	return save;
+	return (save);
 }
 
 
-void yyerror(msg)
-char *msg;
+int
+yyerror(const char *msg)
 {
 	char *txt, letter[2];
 	int freetxt = 0;
@@ -608,12 +599,12 @@ char *msg;
 		letter[1] = '\0';
 		txt =  letter;
 	} else if (yytokentype == YY_STR || yytokentype == YY_HEX ||
-		   yytokentype == YY_NUMBER) {
+	    yytokentype == YY_NUMBER) {
 		if (yystr == NULL) {
 			txt = yytexttostr(yypos, YYBUFSIZ);
 			if (txt == NULL) {
 				fprintf(stderr, "sorry, out of memory,"
-					" bailing out\n");
+				    " bailing out\n");
 				exit(1);
 			}
 			freetxt = 1;
@@ -623,7 +614,7 @@ char *msg;
 		txt = yykeytostr(yytokentype);
 		if (txt == NULL) {
 			fprintf(stderr, "sorry, out of memory,"
-				" bailing out\n");
+			    " bailing out\n");
 			exit(1);
 		}
 	}
@@ -634,12 +625,12 @@ char *msg;
 }
 
 
-void yysetdict(newdict)
-wordtab_t *newdict;
+void
+yysetdict(wordtab_t *newdict)
 {
-	if (yysavedepth == sizeof(yysavewords)/sizeof(yysavewords[0])) {
+	if (yysavedepth == sizeof (yysavewords) / sizeof (yysavewords[0])) {
 		fprintf(stderr, "%d: at maximum dictionary depth\n",
-			yylineNum);
+		    yylineNum);
 		return;
 	}
 
@@ -648,7 +639,8 @@ wordtab_t *newdict;
 		printf("yysavedepth++ => %d\n", yysavedepth);
 }
 
-void yyresetdict()
+void
+yyresetdict(void)
 {
 	if (yydebug)
 		printf("yyresetdict(%d)\n", yysavedepth);
@@ -662,9 +654,8 @@ void yyresetdict()
 
 
 #ifdef	TEST_LEXER
-int main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int n;
 
@@ -672,6 +663,6 @@ char *argv[];
 
 	while ((n = yylex()) != 0)
 		printf("%d.n = %d [%s] %d %d\n",
-			yylineNum, n, yystr, yypos, yylast);
+		    yylineNum, n, yystr, yypos, yylast);
 }
 #endif

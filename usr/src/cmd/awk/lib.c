@@ -49,10 +49,10 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) Lucent Technologies 1997	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <string.h>
@@ -649,10 +649,11 @@ recbld(void)	/* create $0 from $1..$NF if necessary */
 
 int	errorflag	= 0;
 
-void
+int
 yyerror(const char *s)
 {
 	SYNTAX("%s", s);
+	return (0);
 }
 
 void

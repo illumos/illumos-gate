@@ -213,7 +213,7 @@ extern void	print_field_attr(ndr_node_t *);
 extern int	yyparse(void);
 
 /* ndr_main.c */
-extern int	yyerror(char *);
+extern int	yyerror(const char *);
 
 #ifdef __cplusplus
 }

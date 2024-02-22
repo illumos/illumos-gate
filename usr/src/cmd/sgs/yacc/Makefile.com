@@ -72,11 +72,6 @@ $(PROG):=	LDLIBS = $(LDLIBS.cmd)
 CSTD= $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
 
 $(ROOTPROG):= FILEMODE = 0555
 

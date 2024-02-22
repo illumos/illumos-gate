@@ -117,7 +117,7 @@ static int	yylex();
 extern int	yyparse(void);
 static int	readesc(FILE *stream, int delim, int single_char);
 static int	wordcmp(const void *w1, const void *w2);
-static int	yyerror(char *msg);
+static int	yyerror(const char *msg) __NORETURN;
 static void	usage(void);
 static void	set_layout(char *arg);
 static FILE	*open_mapping_file(char *pathbuf, char *name,
@@ -383,7 +383,7 @@ makeentry(tablemask, entry)
 	register int index;
 
 	if ((kep = (keyentry *) malloc((unsigned)sizeof (keyentry))) == NULL)
-		yyerror("out of memory for entries");
+		(void) yyerror("out of memory for entries");
 	kep->ke_next = NULL;
 	kep->ke_entry.kio_tablemask = tablemask;
 	kep->ke_entry.kio_station = 0;
@@ -407,7 +407,7 @@ duplicate_mapentry(station, otherstation)
 	register dupentry *dep;
 
 	if ((dep = (dupentry *) malloc((unsigned)sizeof (dupentry))) == NULL)
-		yyerror("out of memory for entries");
+		(void) yyerror("out of memory for entries");
 
 	if (lastduplicate == NULL)
 		firstduplicate = dep;
@@ -431,7 +431,7 @@ swap_mapentry(station, otherstation)
 	register dupentry *dep;
 
 	if ((dep = (dupentry *) malloc((unsigned)sizeof (dupentry))) == NULL)
-		yyerror("out of memory for entries");
+		(void) yyerror("out of memory for entries");
 
 	if (lastswap == NULL)
 		firstswap = dep;
@@ -627,7 +627,7 @@ term:
 |	FKEY '(' number ')'
 		{
 		if ($3 < 1 || $3 > 16)
-			yyerror("invalid function key number");
+			(void) yyerror("invalid function key number");
 		$$ = $1 + $3 - 1;
 		}
 ;
@@ -642,7 +642,7 @@ number:
 		if (isdigit($1))
 			$$ = $1 - '0';
 		else
-			yyerror("syntax error");
+			(void) yyerror("syntax error");
 		}
 ;
 
@@ -769,7 +769,7 @@ yylex()
 	case '\'':
 		tokentype = CHAR;
 		if ((c = getc(infile)) == EOF)
-			yyerror("unterminated character constant");
+			(void) yyerror("unterminated character constant");
 		if (c == '\n') {
 			(void) ungetc(c, infile);
 			yylval.number = '\'';
@@ -777,7 +777,7 @@ yylex()
 			switch (c) {
 
 			case '\'':
-				yyerror("null character constant");
+				(void) yyerror("null character constant");
 				break;
 
 			case '\\':
@@ -789,15 +789,17 @@ yylex()
 				break;
 			}
 			if ((c = getc(infile)) == EOF || c == '\n')
-				yyerror("unterminated character constant");
+				(void) yyerror(
+				    "unterminated character constant");
 			else if (c != '\'')
-				yyerror("only one character allowed in character constant");
+				(void) yyerror("only one character allowed "
+				    "in character constant");
 		}
 		break;
 
 	case '"':
 		if ((c = getc(infile)) == EOF)
-			yyerror("unterminated string constant");
+			(void) yyerror("unterminated string constant");
 		if (c == '\n') {
 			(void) ungetc(c, infile);
 			tokentype = CHAR;
@@ -807,19 +809,19 @@ yylex()
 			cp = &tokbuf[0];
 			do {
 				if (cp > &tokbuf[256])
-					yyerror("line too long");
+					(void) yyerror("line too long");
 				if (c == '\\')
 					c = readesc(infile, '"', 0);
 				*cp++ = (char)c;
 			} while ((c = getc(infile)) != EOF && c != '\n' &&
 				c != '"');
 			if (c != '"')
-				yyerror("unterminated string constant");
+				(void) yyerror("unterminated string constant");
 			*cp = '\0';
 			if (nstrings == 16)
-				yyerror("too many strings");
+				(void) yyerror("too many strings");
 			if ((int) strlen(tokbuf) > KTAB_STRLEN)
-				yyerror("string too long");
+				(void) yyerror("string too long");
 			strings[nstrings] = strdup(tokbuf);
 			yylval.number = STRING+nstrings;
 			nstrings++;
@@ -834,7 +836,7 @@ yylex()
 
 	case '^':
 		if ((c = getc(infile)) == EOF)
-			yyerror("missing newline at end of line");
+			(void) yyerror("missing newline at end of line");
 		tokentype = CHAR;
 		if (c == ' ' || c == '\t' || c == '\n') {
 			/*
@@ -844,9 +846,9 @@ yylex()
 		} else {
 			yylval.number = c & 037;
 			if ((c = getc(infile)) == EOF)
-				yyerror("missing newline at end of line");
+				(void) yyerror("missing newline at end of line");
 			if (c != ' ' && c != '\t' && c != '\n')
-				yyerror("invalid control character");
+				(void) yyerror("invalid control character");
 		}
 		(void) ungetc(c, infile);
 		break;
@@ -855,11 +857,11 @@ yylex()
 		cp = &tokbuf[0];
 		do {
 			if (cp > &tokbuf[256])
-				yyerror("line too long");
+				(void) yyerror("line too long");
 			*cp++ = (char)c;
 		} while ((c = getc(infile)) != EOF && (isalnum(c) || c == '_'));
 		if (c == EOF)
-			yyerror("newline missing");
+			(void) yyerror("newline missing");
 		(void) ungetc(c, infile);
 		*cp = '\0';
 		if (strlen(tokbuf) == 1) {
@@ -887,7 +889,7 @@ yylex()
 			} else {
 				yylval.number = strtol(tokbuf, &ptr, 0);
 				if (ptr == tokbuf)
-					yyerror("syntax error");
+					(void) yyerror("syntax error");
 				else
 					tokentype = INT;
 			}
@@ -909,7 +911,7 @@ readesc(stream, delim, single_char)
 	register int i;
 
 	if ((c = getc(stream)) == EOF || c == '\n')
-		yyerror("unterminated character constant");
+		(void) yyerror("unterminated character constant");
 
 	if (c >= '0' && c <= '7') {
 		val = 0;
@@ -917,19 +919,22 @@ readesc(stream, delim, single_char)
 		for (;;) {
 			val = val*8 + c - '0';
 			if ((c = getc(stream)) == EOF || c == '\n')
-				yyerror("unterminated character constant");
+				(void) yyerror(
+				    "unterminated character constant");
 			if (c == delim)
 				break;
 			i++;
 			if (i > 3) {
 				if (single_char)
-					yyerror("escape sequence too long");
+					(void) yyerror(
+					    "escape sequence too long");
 				else
 					break;
 			}
 			if (c < '0' || c > '7') {
 				if (single_char)
-					yyerror("illegal character in escape sequence");
+					(void) yyerror("illegal character "
+					    "in escape sequence");
 				else
 					break;
 			}
@@ -966,7 +971,8 @@ readesc(stream, delim, single_char)
 			if (c == delim)
 				val = delim;
 			else
-				yyerror("illegal character in escape sequence");
+				(void) yyerror("illegal character "
+				    "in escape sequence");
 		}
 	}
 	return (val);
@@ -981,8 +987,7 @@ wordcmp(const void *w1, const void *w2)
 }
 
 static int
-yyerror(msg)
-	char *msg;
+yyerror(const char *msg)
 {
 	(void) fprintf(stderr, "%s, line %d: %s\n", infilename, lineno, msg);
 	exit(1);

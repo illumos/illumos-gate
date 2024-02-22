@@ -24,6 +24,8 @@
 #include <limits.h>
 #include "localedef.h"
 
+extern int yylex(void);
+
 %}
 %union {
 	int		num;

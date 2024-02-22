@@ -144,7 +144,7 @@ unscanc(int c)
 		nextline--;
 	}
 	if (ungetc(c, input) < 0) {
-		yyerror(_("ungetc failed"));
+		(void) yyerror(_("ungetc failed"));
 	}
 }
 
@@ -156,12 +156,12 @@ scan_hex_byte(void)
 
 	c1 = scanc();
 	if (!isxdigit(c1)) {
-		yyerror(_("malformed hex digit"));
+		(void) yyerror(_("malformed hex digit"));
 		return (0);
 	}
 	c2 = scanc();
 	if (!isxdigit(c2)) {
-		yyerror(_("malformed hex digit"));
+		(void) yyerror(_("malformed hex digit"));
 		return (0);
 	}
 	v = ((hex(c1) << 4) | hex(c2));
@@ -176,13 +176,13 @@ scan_dec_byte(void)
 
 	c1 = scanc();
 	if (!isdigit(c1)) {
-		yyerror(_("malformed decimal digit"));
+		(void) yyerror(_("malformed decimal digit"));
 		return (0);
 	}
 	b = c1 - '0';
 	c2 = scanc();
 	if (!isdigit(c2)) {
-		yyerror(_("malformed decimal digit"));
+		(void) yyerror(_("malformed decimal digit"));
 		return (0);
 	}
 	b *= 10;
@@ -207,13 +207,13 @@ scan_oct_byte(void)
 
 	c1 = scanc();
 	if (!isodigit(c1)) {
-		yyerror(_("malformed octal digit"));
+		(void) yyerror(_("malformed octal digit"));
 		return (0);
 	}
 	b = c1 - '0';
 	c2 = scanc();
 	if (!isodigit(c2)) {
-		yyerror(_("malformed octal digit"));
+		(void) yyerror(_("malformed octal digit"));
 		return (0);
 	}
 	b *= 8;
@@ -234,7 +234,7 @@ add_tok(int c)
 	if ((tokidx + 1) >= toksz) {
 		toksz += 64;
 		if ((token = realloc(token, toksz)) == NULL) {
-			yyerror(_("out of memory"));
+			(void) yyerror(_("out of memory"));
 			tokidx = 0;
 			toksz = 0;
 			return;
@@ -314,7 +314,7 @@ get_wide(void)
 
 	mbs[mbi] = 0;
 	if (mb_cur_max > MB_LEN_MAX) {
-		yyerror(_("max multibyte character size too big"));
+		(void) yyerror(_("max multibyte character size too big"));
 		return (T_NULL);
 	}
 	for (;;) {
@@ -322,7 +322,7 @@ get_wide(void)
 			break;
 		if (mbi == mb_cur_max) {
 			unscanc(c);
-			yyerror(_("length > mb_cur_max"));
+			(void) yyerror(_("length > mb_cur_max"));
 			return (T_NULL);
 		}
 		mbs[mbi++] = c;
@@ -352,7 +352,7 @@ get_symbol(void)
 			continue;
 		}
 		if (c == '\n') {	/* well that's strange! */
-			yyerror(_("unterminated symbolic name"));
+			(void) yyerror(_("unterminated symbolic name"));
 			continue;
 		}
 		if (c == '>') {		/* end of symbol */
@@ -364,7 +364,7 @@ get_symbol(void)
 			 */
 
 			if (token == NULL) {
-				yyerror(_("missing symbolic name"));
+				(void) yyerror(_("missing symbolic name"));
 				return (T_NULL);
 			}
 			tokidx = 0;
@@ -397,7 +397,7 @@ get_symbol(void)
 		add_tok(c);
 	}
 
-	yyerror(_("unterminated symbolic name"));
+	(void) yyerror(_("unterminated symbolic name"));
 	return (EOF);
 }
 
@@ -449,7 +449,7 @@ consume_token(void)
 		char *eptr;
 		yylval.num = strtol(token, &eptr, 10);
 		if (*eptr != 0)
-			yyerror(_("malformed number"));
+			(void) yyerror(_("malformed number"));
 		return (T_NUMBER);
 	}
 
@@ -641,7 +641,7 @@ yylex(void)
 	return (EOF);
 }
 
-void
+int
 yyerror(const char *msg)
 {
 	(void) fprintf(stderr, _("%s: %d: error: %s\n"),

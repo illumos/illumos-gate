@@ -35,7 +35,7 @@ static cmd_t *cmd = NULL;		/* Command being processed */
 
 /* yacc externals */
 extern int yydebug;
-extern void yyerror(char *s);
+extern int yyerror(const char *s);
 
 extern boolean_t newline_terminated;
 
@@ -181,7 +181,7 @@ clear_command: CLEAR
 	{
 		properr($2);
 		YYERROR;
-	}		
+	}
 	|	CLEAR property_type
 	{
 		/* clear prop */
@@ -241,7 +241,7 @@ create_command: CREATE
 	}
 	|	CREATE resource2_type ncu_class_type TOKEN
 	{
-		/* create ncu ip/phys test */	  
+		/* create ncu ip/phys test */
 		if (($$ = alloc_cmd()) == NULL)
 			YYERROR;
 		cmd = $$;
@@ -271,7 +271,7 @@ create_command: CREATE
 	}
 	|	CREATE OPTION TOKEN resource2_type ncu_class_type TOKEN
 	{
-		/* create -t old ncu ip/phys test */	  
+		/* create -t old ncu ip/phys test */
 		if (($$ = alloc_cmd()) == NULL)
 			YYERROR;
 		cmd = $$;
@@ -396,7 +396,7 @@ export_command:	EXPORT
 		command_usage(CMD_EXPORT);
 		YYERROR;
 	}
- 	|	EXPORT OPTION
+	|	EXPORT OPTION
 	{
 		/* export -d */
 		if (($$ = alloc_cmd()) == NULL)
@@ -537,7 +537,7 @@ get_command: GET
 	{
 		properr($2);
 		YYERROR;
-	}		
+	}
 	|	GET property_type
 	{
 		/* get prop */

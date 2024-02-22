@@ -1,3 +1,5 @@
+#ifndef LEXER_H
+#define	LEXER_H
 
 typedef	struct	wordtab	{
 	char	*w_word;
@@ -23,7 +25,7 @@ typedef	struct	wordtab	{
 extern	wordtab_t	*yysettab __P((wordtab_t *));
 extern	void		yysetdict __P((wordtab_t *));
 extern	int		yylex __P((void));
-extern	void		yyerror __P((char *));
+extern	int		yyerror __P((const char *));
 extern	char		*yykeytostr __P((int));
 extern	void		yyresetdict __P((void));
 
@@ -33,3 +35,4 @@ extern	int	yyexpectaddr;
 extern	int	yybreakondot;
 extern	int	yyvarnext;
 
+#endif /* LEXER_H */

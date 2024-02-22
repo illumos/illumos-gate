@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1993-2005  by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
- */ 
+ */
 
 %{
 #include "ipf.h"
@@ -13,7 +13,7 @@
 
 #define	YYDEBUG	1
 
-extern	void	yyerror __P((char *));
+extern	int	yyerror __P((const char *));
 extern	int	yyparse __P((void));
 extern	int	yylex __P((void));
 extern	int	yydebug;
@@ -47,7 +47,7 @@ static	ipmon_action_t	*alist = NULL;
 %token	<num>	YY_NUMBER YY_HEX
 %token	<str>	YY_STR
 %token	<ip6>	YY_IPV6
-%token	YY_COMMENT 
+%token	YY_COMMENT
 %token	YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	YY_RANGE_OUT YY_RANGE_IN
 
@@ -80,7 +80,7 @@ assign:	YY_STR assigning YY_STR ';'		{ set_variable($1, $3);
 						  resetlexer();
 						  free($1);
 						  free($3);
-						} 
+						}
 	;
 
 assigning:
@@ -285,8 +285,8 @@ static int macflags[17][2] = {
 	{ IPM_DSTPORT,		IPMAC_DSTPORT	},
 	{ IPM_GROUP,		IPMAC_GROUP	},
 	{ IPM_INTERFACE,	IPMAC_INTERFACE	},
-	{ IPM_LOGTAG,		IPMAC_LOGTAG 	},
-	{ IPM_NATTAG,		IPMAC_NATTAG 	},
+	{ IPM_LOGTAG,		IPMAC_LOGTAG	},
+	{ IPM_NATTAG,		IPMAC_NATTAG	},
 	{ IPM_PACKET,		IPMAC_EVERY	},
 	{ IPM_PROTOCOL,		IPMAC_PROTOCOL	},
 	{ IPM_RESULT,		IPMAC_RESULT	},
@@ -294,8 +294,8 @@ static int macflags[17][2] = {
 	{ IPM_SECOND,		IPMAC_EVERY	},
 	{ IPM_SRCIP,		IPMAC_SRCIP	},
 	{ IPM_SRCPORT,		IPMAC_SRCPORT	},
-	{ IPM_TYPE,		IPMAC_TYPE 	},
-	{ IPM_WITH,		IPMAC_WITH 	},
+	{ IPM_TYPE,		IPMAC_TYPE	},
+	{ IPM_WITH,		IPMAC_WITH	},
 	{ 0, 0 }
 };
 
@@ -375,7 +375,7 @@ opt_t *olist;
 			a->ac_iface = o->o_str;
 			o->o_str = NULL;
 			break;
-		case IPM_GROUP : 
+		case IPM_GROUP :
 			if (o->o_str != NULL)
 				strncpy(a->ac_group, o->o_str, FR_GROUPLEN);
 			else
