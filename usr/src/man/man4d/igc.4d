@@ -1,0 +1,62 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd February 8, 2024
+.Dt IGC 4D
+.Os
+.Sh NAME
+.Nm igc
+.Nd Intel I225/I226 Ethernet Driver
+.Sh SYNOPSIS
+.Pa /dev/net/igc*
+.Sh DESCRIPTION
+The
+.Nm
+driver is a GLDv3 NIC driver for the Intel I225 and I226 controller
+families supporting speeds from 10 Mbit to 2.5 Gbit with a BASE-T
+interface.
+The device driver currently exposes a single transmit and receive queue.
+It supports checksumming, jumbo frames up to 9216 bytes, LED control,
+and full control around auto-negotiation and pause frames.
+.Pp
+For each device supported by the
+.Nm
+driver, a character special file is created under
+.Pa /dev/net .
+The first instance would have id 0 and would be named
+.Sy igc0
+and found at
+.Pa /dev/net/igc0 .
+The device supports the Data Link Provider Interface
+.Pq DLPI
+which is documented in
+.Xr dlpi 4P
+and more easily consumed via
+.Xr libdlpi 3LIB .
+.Pp
+Early revisions of the I225 device had issues where the minimum
+supported inter-packet gap was not sufficient.
+This caused some issues with 2500BASE-T operation, but did not impact
+1000BASE-T.
+In some cases, it may be necessary to disable support for 2500BASE-T
+via
+.Xr dladm 8 .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/igc
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr libdlpi 3LIB ,
+.Xr dlpi 4P ,
+.Xr dladm 8

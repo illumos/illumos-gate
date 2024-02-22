@@ -1,0 +1,15 @@
+This directory contains the 'core' or 'common' code for the igc driver
+that is generally speaking developed by Intel for use for different
+operating systems. We pick this up via FreeBSD, which places this code
+in sys/dev/igc. Most files that begin with 'igc_' are part of this with
+the exception of igc_osdep.h (an OS-specific file) and igc_txrx.c
+(FreeBSD's tie into iflib).
+
+These files were snapshotted in January 2024 from the FreeBSD main git
+branch (53df7e58cca7e6726b44f447f10ddc3451cfa851). The last change to
+them was 685dc743dc3b5645e34836464128e1c0558b404b. The only difference
+from the upstream files right now is the removal of the '<sys/cdefs.h>'
+includes.
+
+For more information on how this fits in, please see the 'Organization'
+section of the uts/common/io/igc/igc.c theory statement.

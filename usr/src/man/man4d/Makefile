@@ -16,7 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2023 Peter Tribble
-# Copyright 2022 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2023 RackTop Systems, Inc.
 #
 
@@ -75,6 +75,7 @@ _MANFILES=	aac.4d		\
 		ibtl.4d		\
 		ieee1394.4d	\
 		igb.4d		\
+		igc.4d		\
 		ipnet.4d	\
 		iscsi.4d	\
 		iser.4d		\

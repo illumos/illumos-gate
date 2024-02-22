@@ -26,7 +26,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017 by Delphix. All rights reserved.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2023 RackTop Systems, Inc.
 #
 
@@ -1406,6 +1406,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/e1000g/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/igb/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/igc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/igc/core/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
