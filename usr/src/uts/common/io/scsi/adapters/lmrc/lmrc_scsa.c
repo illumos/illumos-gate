@@ -51,6 +51,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/scsi/scsi.h>
+#include <sys/scsi/adapters/mfi/mfi_pd.h>
 
 #include "lmrc.h"
 #include "lmrc_reg.h"
@@ -297,7 +298,7 @@ lmrc_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 
 		if (tgt->tgt_type == DTYPE_DIRECT &&
 		    lmrc->l_use_seqnum_jbod_fp) {
-			lmrc_pd_cfg_t *pdcfg;
+			mfi_pd_cfg_t *pdcfg;
 
 			rw_enter(&lmrc->l_pdmap_lock, RW_READER);
 			pdcfg = &lmrc->l_pdmap->pm_pdcfg[tgt->tgt_dev_id];

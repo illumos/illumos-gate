@@ -37,6 +37,10 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
+#include <sys/scsi/adapters/mfi/mfi.h>
+#include <sys/scsi/adapters/mfi/mfi_evt.h>
+#include <sys/scsi/adapters/mfi/mfi_ld.h>
+
 #include "lmrc.h"
 #include "lmrc_reg.h"
 #include "lmrc_raid.h"
@@ -54,7 +58,7 @@ static boolean_t lmrc_raid_tgt_deactivate_cb(void *, char *,
 static struct buf *lmrc_raid_send_inquiry(lmrc_t *, lmrc_tgt_t *, uint8_t,
     uint8_t);
 static uint64_t lmrc_raid_get_wwn(lmrc_t *, uint8_t);
-static int lmrc_raid_update_tgtmap(lmrc_t *, lmrc_ld_tgtid_list_t *);
+static int lmrc_raid_update_tgtmap(lmrc_t *, mfi_ld_tgtid_list_t *);
 
 
 /*
@@ -69,7 +73,7 @@ lmrc_get_raidmap(lmrc_t *lmrc, lmrc_fw_raid_map_t **raidmap)
 	lmrc_fw_raid_map_t *rm;
 	int ret;
 
-	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_LD_MAP_GET_INFO,
+	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, MFI_DCMD_LD_MAP_GET_INFO,
 	    lmrc->l_max_map_sz, 4);
 
 	if (mfi == NULL)
@@ -118,12 +122,12 @@ lmrc_sync_raidmap(lmrc_t *lmrc)
 {
 	lmrc_fw_raid_map_t *rm;
 	lmrc_mfi_cmd_t *mfi;
-	lmrc_mfi_dcmd_payload_t *dcmd;
+	mfi_dcmd_payload_t *dcmd;
 
 	rw_enter(&lmrc->l_raidmap_lock, RW_READER);
 	rm = lmrc->l_raidmap;
-	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_WRITE,
-	    LMRC_DCMD_LD_MAP_GET_INFO, rm->rm_raidmap_sz, 4);
+	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_WRITE, MFI_DCMD_LD_MAP_GET_INFO,
+	    rm->rm_raidmap_sz, 4);
 
 	if (mfi == NULL) {
 		rw_exit(&lmrc->l_raidmap_lock);
@@ -132,7 +136,7 @@ lmrc_sync_raidmap(lmrc_t *lmrc)
 
 	dcmd = &mfi->mfi_frame->mf_dcmd;
 	dcmd->md_mbox_8[0] = rm->rm_ld_count;
-	dcmd->md_mbox_8[1] = LMRC_DCMD_MBOX_PEND_FLAG;
+	dcmd->md_mbox_8[1] = MFI_DCMD_MBOX_PEND_FLAG;
 	rw_exit(&lmrc->l_raidmap_lock);
 
 	mutex_enter(&mfi->mfi_lock);
@@ -157,8 +161,8 @@ lmrc_sync_raidmap_again(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 {
 	lmrc_fw_raid_map_t *rm;
 	lmrc_dma_t *dma = &mfi->mfi_data_dma;
-	lmrc_ld_tgt_t *ld_sync = dma->ld_buf;
-	lmrc_mfi_dcmd_payload_t *dcmd = &mfi->mfi_frame->mf_dcmd;
+	mfi_ld_ref_t *ld_sync = dma->ld_buf;
+	mfi_dcmd_payload_t *dcmd = &mfi->mfi_frame->mf_dcmd;
 	uint32_t ld;
 
 	bzero(dma->ld_buf, dma->ld_len);
@@ -170,8 +174,8 @@ lmrc_sync_raidmap_again(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 
 		ASSERT(lr != NULL);
 
-		ld_sync[ld].lt_tgtid = lr->lr_target_id;
-		ld_sync[ld].lt_seqnum = lr->lr_seq_num;
+		ld_sync[ld].lr_tgtid = lr->lr_target_id;
+		ld_sync[ld].lr_seqnum = lr->lr_seq_num;
 	}
 	dcmd->md_mbox_8[0] = rm->rm_ld_count;
 	rw_exit(&lmrc->l_raidmap_lock);
@@ -189,7 +193,7 @@ lmrc_sync_raidmap_again(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 static void
 lmrc_complete_sync_raidmap(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 {
-	lmrc_mfi_header_t *hdr = &mfi->mfi_frame->mf_hdr;
+	mfi_header_t *hdr = &mfi->mfi_frame->mf_hdr;
 	lmrc_dma_t *dma = &mfi->mfi_data_dma;
 	lmrc_fw_raid_map_t *rm = dma->ld_buf;
 
@@ -506,7 +510,7 @@ fail:
  * Feed the LD target ID list into the target map. Try to get a WWN for each LD.
  */
 static int
-lmrc_raid_update_tgtmap(lmrc_t *lmrc, lmrc_ld_tgtid_list_t *ld_list)
+lmrc_raid_update_tgtmap(lmrc_t *lmrc, mfi_ld_tgtid_list_t *ld_list)
 {
 	int ret;
 	int i;
@@ -558,7 +562,7 @@ fail:
 int
 lmrc_get_ld_list(lmrc_t *lmrc)
 {
-	lmrc_mfi_dcmd_payload_t *dcmd;
+	mfi_dcmd_payload_t *dcmd;
 	lmrc_mfi_cmd_t *mfi;
 	int ret;
 
@@ -566,14 +570,14 @@ lmrc_get_ld_list(lmrc_t *lmrc)
 	if (!INITLEVEL_ACTIVE(lmrc, LMRC_INITLEVEL_RAID))
 		return (DDI_SUCCESS);
 
-	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_LD_LIST_QUERY,
-	    sizeof (lmrc_ld_tgtid_list_t) + lmrc->l_fw_supported_vd_count, 1);
+	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, MFI_DCMD_LD_LIST_QUERY,
+	    sizeof (mfi_ld_tgtid_list_t) + lmrc->l_fw_supported_vd_count, 1);
 
 	if (mfi == NULL)
 		return (DDI_FAILURE);
 
 	dcmd = &mfi->mfi_frame->mf_dcmd;
-	dcmd->md_mbox_8[0] = LMRC_LD_QUERY_TYPE_EXPOSED_TO_HOST;
+	dcmd->md_mbox_8[0] = MFI_LD_QUERY_TYPE_EXPOSED_TO_HOST;
 
 	if (lmrc->l_max_256_vd_support)
 		dcmd->md_mbox_8[2] = 1;
@@ -593,49 +597,49 @@ out:
 /*
  * lmrc_raid_aen_handler
  *
- * Handle AENs with locale code LMRC_EVT_LOCALE_LD. If the LD configuration
+ * Handle AENs with locale code MFI_EVT_LOCALE_LD. If the LD configuration
  * changed, update the LD list and target map.
  */
 int
-lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
+lmrc_raid_aen_handler(lmrc_t *lmrc, mfi_evt_detail_t *evt)
 {
 	int ret = DDI_SUCCESS;
 
 	switch (evt->evt_code) {
-	case LMRC_EVT_LD_CC_STARTED:
-	case LMRC_EVT_LD_CC_PROGRESS:
-	case LMRC_EVT_LD_CC_COMPLETE:
+	case MFI_EVT_LD_CC_STARTED:
+	case MFI_EVT_LD_CC_PROGRESS:
+	case MFI_EVT_LD_CC_COMPLETE:
 		/*
 		 * Consistency Check. I/O is possible during consistency check,
 		 * so there's no need to do anything.
 		 */
 		break;
 
-	case LMRC_EVT_LD_FAST_INIT_STARTED:
-	case LMRC_EVT_LD_FULL_INIT_STARTED:
+	case MFI_EVT_LD_FAST_INIT_STARTED:
+	case MFI_EVT_LD_FULL_INIT_STARTED:
 		/*
 		 * A LD initialization process has been started.
 		 */
 		ret = lmrc_get_ld_list(lmrc);
 		break;
 
-	case LMRC_EVT_LD_BG_INIT_PROGRESS:
-	case LMRC_EVT_LD_INIT_PROGRESS:
+	case MFI_EVT_LD_BG_INIT_PROGRESS:
+	case MFI_EVT_LD_INIT_PROGRESS:
 		/*
 		 * FULL INIT reports these for every percent of completion.
 		 * Ignore.
 		 */
 		break;
 
-	case LMRC_EVT_LD_INIT_ABORTED:
-	case LMRC_EVT_LD_INIT_COMPLETE:
+	case MFI_EVT_LD_INIT_ABORTED:
+	case MFI_EVT_LD_INIT_COMPLETE:
 		/*
 		 * The LD initialization has ended, one way or another.
 		 */
 		ret = lmrc_get_ld_list(lmrc);
 		break;
 
-	case LMRC_EVT_LD_BBT_CLEARED:
+	case MFI_EVT_LD_BBT_CLEARED:
 		/*
 		 * The Bad Block Table for the LD has been cleared. This usually
 		 * follows a INIT_COMPLETE, but may occur in other situations.
@@ -643,7 +647,7 @@ lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
 		 */
 		break;
 
-	case LMRC_EVT_LD_PROP_CHANGED:
+	case MFI_EVT_LD_PROP_CHANGED:
 		/*
 		 * Happens when LD props are changed, such as setting the
 		 * "hidden" property. There's little we can do here as we
@@ -653,7 +657,7 @@ lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
 		 */
 		break;
 
-	case LMRC_EVT_LD_OFFLINE:
+	case MFI_EVT_LD_OFFLINE:
 		/*
 		 * Not sure when this happens, but since the LD is offline we
 		 * should just remove it from the target map.
@@ -661,14 +665,14 @@ lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
 		ret = lmrc_get_ld_list(lmrc);
 		break;
 
-	case LMRC_EVT_LD_DELETED:
+	case MFI_EVT_LD_DELETED:
 		/*
 		 * A LD was deleted, remove it from target map.
 		 */
 		ret = lmrc_get_ld_list(lmrc);
 		break;
 
-	case LMRC_EVT_LD_OPTIMAL:
+	case MFI_EVT_LD_OPTIMAL:
 		/*
 		 * There might be several cases when this event occurs,
 		 * in particular when a LD is created. In that case it's the
@@ -676,7 +680,7 @@ lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
 		 */
 		break;
 
-	case LMRC_EVT_LD_CREATED:
+	case MFI_EVT_LD_CREATED:
 		/*
 		 * This is the 2nd event generated when a LD is created, and
 		 * it's the one FreeBSD and Linux act on. Add the LD to the
@@ -685,14 +689,14 @@ lmrc_raid_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
 		ret = lmrc_get_ld_list(lmrc);
 		break;
 
-	case LMRC_EVT_LD_AVAILABLE:
+	case MFI_EVT_LD_AVAILABLE:
 		/*
 		 * This event happens last when a LD is created, but there may
 		 * be other scenarios where this occurs. Ignore it for now.
 		 */
 		break;
 
-	case LMRC_EVT_LD_STATE_CHANGE:
+	case MFI_EVT_LD_STATE_CHANGE:
 		/*
 		 * Not sure when this happens, but updating the LD list is
 		 * probably a good idea.
