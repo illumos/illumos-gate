@@ -13,6 +13,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -406,17 +407,49 @@ typedef union {
 } nvme_abort_cmd_t;
 
 /*
- * NVMe Get Log Page
+ * NVMe Get Log Page. dw12/13 are the lower and upper halves of the 64-bit
+ * offset field respectively in bytes. These must be dword aligned. The offset
+ * was added in NVMe v1.2, but requires controller support.
  */
 typedef union {
 	struct {
 		uint8_t lp_lid;		/* Log Page Identifier */
-		uint8_t lp_rsvd1;
-		uint16_t lp_numd:12;	/* Number of Dwords */
-		uint16_t lp_rsvd2:4;
+		/*
+		 * The log-specific field was introduced as a 4-bit field in
+		 * NVMe 1.3. It was extended to be a 7-bit field in NVMe 2.0 and
+		 * renamed log-specific parameter.
+		 */
+		uint8_t lp_lsp:7;
+		uint8_t lp_rae:1;	/* Retain Async Event  v1.3 */
+		/*
+		 * This is the lower number of dwords. This was changed in NVMe
+		 * v1.2 to be split between this field and dw11. In NVMe 1.0/1.1
+		 * this was only 12 bits long.
+		 */
+		uint16_t lp_lnumdl;	/* Number of Dwords */
 	} b;
 	uint32_t r;
-} nvme_getlogpage_t;
+} nvme_getlogpage_dw10_t;
+
+typedef union {
+	struct {
+		uint16_t lp_numdu;	/* Number of dwords v1.2 */
+		uint16_t lp_lsi;	/* Log Specific Field v1.3 */
+	} b;
+	uint32_t r;
+} nvme_getlogpage_dw11_t;
+
+typedef union {
+	struct {
+		uint8_t lp_uuid:7;	/* UUID Index v1.4 */
+		uint8_t lp_rsvd1:1;
+		uint8_t lp_rsvd2;
+		uint8_t lp_rsvd3:7;
+		uint8_t lp_ot:1;	/* Offset Type v2.0 */
+		uint8_t lp_csi;		/* Command Set Identifier v2.0 */
+	} b;
+	uint32_t r;
+} nvme_getlogpage_dw14_t;
 
 /*
  * dword11 values for the dataset management command. Note that the dword11
@@ -434,6 +467,23 @@ typedef struct {
 	uint32_t	nr_len;
 	uint64_t	nr_lba;
 } nvme_range_t;
+
+/*
+ * NVMe Identify Command
+ */
+typedef union {
+	struct {
+		/*
+		 * The controller or namespace structure (CNS). This field was
+		 * originally a single bit wide in NVMe 1.0. It was two bits
+		 * wide in NVMe 1.1 and was increased to 8 bits in NVMe 1.2.
+		 */
+		uint8_t id_cns;
+		uint8_t id_rsvd0;
+		uint16_t id_cntid;	/* Controller ID, NVMe 1.2 */
+	} b;
+	uint32_t r;
+} nvme_identify_dw10_t;
 
 #ifdef __cplusplus
 }

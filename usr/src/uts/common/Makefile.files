@@ -1941,7 +1941,12 @@ YGE_OBJS = yge.o
 
 SKD_OBJS = skd.o
 
-NVME_OBJS = nvme.o
+#
+# Objects in the driver followed by common objects.
+#
+NVME_OBJS += nvme.o nvme_validate.o nvme_lock.o
+NVME_OBJS += nvme_feature.o nvme_field.o nvme_firmware.o nvme_format.o \
+		nvme_identify.o nvme_log.o nvme_version.o nvme_vuc.o
 
 PVSCSI_OBJS = pvscsi.o
 

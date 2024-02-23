@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -30,6 +30,7 @@
 #include <err.h>
 #include <assert.h>
 #include <libcmdutils.h>
+#include <ctype.h>
 
 #include "nvmeadm.h"
 
@@ -580,28 +581,30 @@ nvme_print_version(int indent, const char *name, uint32_t value)
  * data structure
  */
 void
-nvme_print_ctrl_summary(nvme_identify_ctrl_t *idctl, nvme_version_t *version)
+nvme_print_ctrl_summary(nvme_ctrl_info_t *info)
 {
-	(void) printf("model: %.*s, serial: %.*s, FW rev: %.*s, NVMe v%u.%u",
-	    nvme_strlen(idctl->id_model, sizeof (idctl->id_model)),
-	    idctl->id_model,
-	    nvme_strlen(idctl->id_serial, sizeof (idctl->id_serial)),
-	    idctl->id_serial,
-	    nvme_strlen(idctl->id_fwrev, sizeof (idctl->id_fwrev)),
-	    idctl->id_fwrev,
-	    version->v_major, version->v_minor);
+	nvme_uint128_t u128;
+	char buf[64];
 
-	if (idctl->id_oacs.oa_nsmgmt != 0) {
-		char buf[64];
+	const nvme_version_t *version = nvme_ctrl_info_version(info);
 
-		(void) nvme_snprint_uint128(buf, sizeof (buf),
-		    idctl->ap_tnvmcap, 20, 0);
+	(void) printf("model: %s, serial: %s, FW rev: %s, NVMe v%u.%u",
+	    nvme_ctrl_info_model(info), nvme_ctrl_info_serial(info),
+	    nvme_ctrl_info_fwrev(info), version->v_major, version->v_minor);
+
+	/*
+	 * This can fail because a device isn't at NVMe version 1.2 or it
+	 * doesn't support namespace management.
+	 */
+	if (nvme_ctrl_info_cap(info, &u128)) {
+		(void) nvme_snprint_uint128(buf, sizeof (buf), u128, 20, 0);
 		(void) printf(", Capacity = %s MB", buf);
-		if (idctl->ap_unvmcap.lo != 0 || idctl->ap_unvmcap.hi != 0) {
-			(void) nvme_snprint_uint128(buf, sizeof (buf),
-			    idctl->ap_unvmcap, 20, 0);
-			(void) printf(", Unallocated = %s MB", buf);
-		}
+	}
+
+	if (nvme_ctrl_info_unalloc_cap(info, &u128) && (u128.lo != 0 ||
+	    u128.hi != 0)) {
+		(void) nvme_snprint_uint128(buf, sizeof (buf), u128, 20, 0);
+		(void) printf(", Unallocated = %s MB", buf);
 	}
 
 	(void) printf("\n");
@@ -612,22 +615,35 @@ nvme_print_ctrl_summary(nvme_identify_ctrl_t *idctl, nvme_version_t *version)
  * data structure
  */
 void
-nvme_print_nsid_summary(nvme_identify_nsid_t *idns)
+nvme_print_nsid_summary(nvme_ns_info_t *ns)
 {
-	int bsize = 1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
+	const nvme_nvm_lba_fmt_t *fmt = NULL;
+	const char *comma = "";
+	uint64_t val;
 	char numbuf[40];
 
-	nicenum_scale(idns->id_nsize, bsize, numbuf, sizeof (numbuf),
-	    NN_UNIT_SPACE);
-	(void) printf("Size = %sB, ", numbuf);
+	(void) nvme_ns_info_curformat(ns, &fmt);
 
-	nicenum_scale(idns->id_ncap, bsize, numbuf, sizeof (numbuf),
-	    NN_UNIT_SPACE);
-	(void) printf("Capacity = %sB, ", numbuf);
+	if (nvme_ns_info_size(ns, &val) && fmt != NULL) {
+		nicenum_scale(val, nvme_nvm_lba_fmt_data_size(fmt), numbuf,
+		    sizeof (numbuf), NN_UNIT_SPACE);
+		(void) printf("Size = %sB", numbuf);
+		comma = ", ";
+	}
 
-	nicenum_scale(idns->id_nuse, bsize, numbuf, sizeof (numbuf),
-	    NN_UNIT_SPACE);
-	(void) printf("Used = %sB\n", numbuf);
+	if (nvme_ns_info_cap(ns, &val) && fmt != NULL) {
+		nicenum_scale(val, nvme_nvm_lba_fmt_data_size(fmt), numbuf,
+		    sizeof (numbuf), NN_UNIT_SPACE);
+		(void) printf("%sCapacity = %sB", comma,  numbuf);
+		comma = ", ";
+	}
+
+	if (nvme_ns_info_use(ns, &val) && fmt != NULL) {
+		nicenum_scale(val, nvme_nvm_lba_fmt_data_size(fmt), numbuf,
+		    sizeof (numbuf), NN_UNIT_SPACE);
+		(void) printf("%sUsed = %sB", comma, numbuf);
+	}
+	(void) printf("\n");
 }
 
 /*
@@ -637,8 +653,8 @@ nvme_print_nsid_summary(nvme_identify_nsid_t *idns)
  * command.
  */
 void
-nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
-    nvme_capabilities_t *cap, nvme_version_t *version)
+nvme_print_identify_ctrl(const nvme_identify_ctrl_t *idctl, uint32_t mpsmin,
+    const nvme_version_t *version)
 {
 	int i;
 
@@ -662,31 +678,31 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	}
 	nvme_print(4, "Multi-Interface Capabilities", -1, NULL);
 	nvme_print_bit(6, "Multiple PCI Express ports",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_mic.m_multi_pci, NULL, NULL);
 	nvme_print_bit(6, "Multiple Controller Support",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_mic.m_multi_ctrl, NULL, NULL);
 	nvme_print_bit(6, "Controller is an SR-IOV Virtual Function",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_mic.m_sr_iov, NULL, NULL);
 	nvme_print_bit(6, "Asymmetric Namespace Access Reporting",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idctl->id_mic.m_anar_sup, NULL, NULL);
 
 	if (idctl->id_mdts > 0)
 		nvme_print_uint64(4, "Maximum Data Transfer Size",
-		    (1 << idctl->id_mdts) * cap->mpsmin / 1024, NULL, "kB");
+		    (1 << idctl->id_mdts) * mpsmin / 1024, NULL, "kB");
 	else
 		nvme_print_str(4, "Maximum Data Transfer Size", -1,
 		    "unlimited", 0);
 
-	if (nvme_version_check(version, 1, 1)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v1)) {
 		nvme_print_uint64(4, "Unique Controller Identifier",
 		    idctl->id_cntlid, NULL, NULL);
 	}
 
-	if (nvme_version_check(version, 1, 2)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v2)) {
 		nvme_print_version(4, "NVMe Version",
 		    idctl->id_ver);
 
@@ -705,112 +721,112 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print(4, "Optional Asynchronous Events Supported", -1,
 		    NULL);
 		nvme_print_bit(6, "Namespace Attribute Notices",
-		    nvme_version_check(version, 1, 2),
+		    nvme_vers_atleast(version, &nvme_vers_1v2),
 		    idctl->id_oaes.oaes_nsan, NULL, NULL);
 		nvme_print_bit(6, "Firmware Activation Notices",
-		    nvme_version_check(version, 1, 2),
+		    nvme_vers_atleast(version, &nvme_vers_1v2),
 		    idctl->id_oaes.oaes_fwact, NULL, NULL);
 		nvme_print_bit(6, "Asynchronous Namespace Access Change "
 		    "Notices",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_oaes.oaes_ansacn, NULL, NULL);
 		nvme_print_bit(6, "Predictable Latency Event Aggregation",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_oaes.oaes_plat, NULL, NULL);
 		nvme_print_bit(6, "LBA Status Information Notices",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_oaes.oaes_lbasi, NULL, NULL);
 		nvme_print_bit(6, "Endurance Group Event Aggregate Log Page "
 		    "Change Notices",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_oaes.oaes_egeal, NULL, NULL);
 
 		nvme_print(4, "Controller Attributes", -1,
 		    NULL);
 		nvme_print_bit(6, "128-bit Host Identifier",
-		    nvme_version_check(version, 1, 2),
+		    nvme_vers_atleast(version, &nvme_vers_1v2),
 		    idctl->id_ctratt.ctrat_hid, NULL, NULL);
 		nvme_print_bit(6, "Non-Operational Power State Permissive Mode",
-		    nvme_version_check(version, 1, 3),
+		    nvme_vers_atleast(version, &nvme_vers_1v3),
 		    idctl->id_ctratt.ctrat_nops, NULL, NULL);
 		nvme_print_bit(6, "NVM Sets",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_nvmset, NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Levels",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_rrl, NULL, NULL);
 		nvme_print_bit(6, "Endurance Groups",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_engrp, NULL, NULL);
 		nvme_print_bit(6, "Predictable Latency Mode",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_plm, NULL, NULL);
 		nvme_print_bit(6, "Traffic Based Keep Alive",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_tbkas, NULL, NULL);
 		nvme_print_bit(6, "Namespace Granularity",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_nsg, NULL, NULL);
 		nvme_print_bit(6, "SQ Associations",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_sqass, NULL, NULL);
 		nvme_print_bit(6, "UUID List",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_ctratt.ctrat_uuid, NULL, NULL);
 
 		nvme_print(4, "Read Recovery Levels", -1,
 		    NULL);
 		nvme_print_bit(6, "Read Recovery Level 0",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 0), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 1",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 1), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 2",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 2), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 3",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 3), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 4 - Default",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 4), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 5",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 5), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 6",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 6), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 7",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 7), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 8",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 8), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 9",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 9), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 10",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 10), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 11",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 11), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 12",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 12), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 13",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 13), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 14",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 14), NULL, NULL);
 		nvme_print_bit(6, "Read Recovery Level 15 - Fast Fail",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_rrls & (1 << 15), NULL, NULL);
 	}
 
-	if (nvme_version_check(version, 1, 4)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v4)) {
 		switch (idctl->id_cntrltype) {
 		case NVME_CNTRLTYPE_RSVD:
 			nvme_print_str(4, "Controller Type", -1,
@@ -836,7 +852,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print_str(4, "Controller Type", -1, "not reported", 0);
 	}
 
-	if (nvme_version_check(version, 1, 3)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v3)) {
 		uint8_t zguid[16] = { 0 };
 
 		if (memcmp(zguid, idctl->id_frguid, sizeof (zguid)) != 0) {
@@ -848,7 +864,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print_str(4, "FRU GUID", -1, "unsupported", 0);
 	}
 
-	if (nvme_version_check(version, 1, 4)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v4)) {
 		nvme_print_uint64(4, "Command Retry Delay Time 1",
 		    idctl->id_crdt1 * 100, NULL, "ms");
 		nvme_print_uint64(4, "Command Retry Delay Time 2",
@@ -879,10 +895,10 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print(2, "NVMe Management Interface", -1, NULL);
 		nvme_print(4, "Management Endpoint Capabilities", -1, NULL);
 		nvme_print_bit(6, "SMBus/I2C Port Management Endpoint",
-		    nvme_version_check(version, 1, 2),
+		    nvme_vers_atleast(version, &nvme_vers_1v2),
 		    idctl->id_mec.mec_smbusme, NULL, NULL);
 		nvme_print_bit(6, "PCIe Port Management Endpoint",
-		    nvme_version_check(version, 1, 2),
+		    nvme_vers_atleast(version, &nvme_vers_1v2),
 		    idctl->id_mec.mec_pcieme, NULL, NULL);
 
 		if (idctl->id_vpdwc.vwci_valid != 0) {
@@ -901,10 +917,10 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		} else {
 			nvme_print(4, "NVM Subsystem Report", -1, NULL);
 			nvme_print_bit(6, "NVMe Storage Device",
-			    nvme_version_check(version, 1, 2),
+			    nvme_vers_atleast(version, &nvme_vers_1v2),
 			    idctl->id_nvmsr.nvmsr_nvmesd, NULL, NULL);
 			nvme_print_bit(6, "NVMe Enclosure",
-			    nvme_version_check(version, 1, 2),
+			    nvme_vers_atleast(version, &nvme_vers_1v2),
 			    idctl->id_nvmsr.nvmsr_nvmee, NULL, NULL);
 		}
 	}
@@ -912,34 +928,34 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	nvme_print(2, "Admin Command Set Attributes", -1, NULL);
 	nvme_print(4, "Optional Admin Command Support", -1, NULL);
 	nvme_print_bit(6, "Security Send & Receive",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oacs.oa_security, NULL, NULL);
 	nvme_print_bit(6, "Format NVM",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oacs.oa_format, NULL, NULL);
 	nvme_print_bit(6, "Firmware Activate & Download",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oacs.oa_firmware, NULL, NULL);
 	nvme_print_bit(6, "Namespace Management",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_oacs.oa_nsmgmt, NULL, NULL);
 	nvme_print_bit(6, "Device Self-test",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oacs.oa_selftest, NULL, NULL);
 	nvme_print_bit(6, "Directives",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oacs.oa_direct, NULL, NULL);
 	nvme_print_bit(6, "NVME-MI Send and Receive",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oacs.oa_nvmemi, NULL, NULL);
 	nvme_print_bit(6, "Virtualization Management",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oacs.oa_virtmgmt, NULL, NULL);
 	nvme_print_bit(6, "Doorbell Buffer Config",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oacs.oa_doorbell, NULL, NULL);
 	nvme_print_bit(6, "Get LBA Status",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idctl->id_oacs.oa_lbastat, NULL, NULL);
 	if (verbose) {
 		nvme_print_uint64(4, "Abort Command Limit",
@@ -949,29 +965,29 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	}
 	nvme_print(4, "Firmware Updates", -1, NULL);
 	nvme_print_bit(6, "Firmware Slot 1",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_frmw.fw_readonly, "read-only", "writable");
 	nvme_print_uint64(6, "No. of Firmware Slots",
 	    idctl->id_frmw.fw_nslot, NULL, NULL);
 	nvme_print_bit(6, "Activate Without Reset",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_frmw.fw_norst, NULL, NULL);
 
 	nvme_print(2, "Log Page Attributes", -1, NULL);
 	nvme_print_bit(6, "Per Namespace SMART/Health info",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_lpa.lp_smart, NULL, NULL);
 	nvme_print_bit(6, "Commands Supported and Effects",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_lpa.lp_cmdeff, NULL, NULL);
 	nvme_print_bit(6, "Get Log Page Extended Data",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_lpa.lp_extsup, NULL, NULL);
 	nvme_print_bit(6, "Telemetry Log Pages",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_lpa.lp_telemetry, NULL, NULL);
 	nvme_print_bit(6, "Persistent Event Log",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idctl->id_lpa.lp_persist, NULL, NULL);
 
 	nvme_print_uint64(4, "Error Log Page Entries",
@@ -980,15 +996,15 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	    (uint16_t)idctl->id_npss + 1, NULL, NULL);
 	if (verbose) {
 		nvme_print_bit(4, "Admin Vendor-specific Command Format",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    idctl->id_avscc.av_spec, "standard", "vendor-specific");
 	}
 
 	nvme_print_bit(4, "Autonomous Power State Transitions",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idctl->id_apsta.ap_sup, NULL, NULL);
 
-	if (nvme_version_check(version, 1, 2)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v2)) {
 		nvme_print_temp(4, "Warning Composite Temperature Threshold",
 		    idctl->ap_wctemp);
 		nvme_print_temp(4, "Critical Composite Temperature Threshold",
@@ -1069,7 +1085,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 			    idctl->ap_edstt, NULL, "min");
 			nvme_print(4, "Device Self-test Options", -1, NULL);
 			nvme_print_bit(6, "Self-test operation granularity",
-			    nvme_version_check(version, 1, 3),
+			    nvme_vers_atleast(version, &nvme_vers_1v3),
 			    idctl->ap_dsto.dsto_sub, "subsystem", "controller");
 		} else {
 			nvme_print_str(4, "Extended Device Self-test Time", -1,
@@ -1106,9 +1122,10 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print(4, "Host Controlled Thermal Management Attributes",
 		    -1, NULL);
 		nvme_print_bit(6, "Host Controlled Thermal Management",
-		    nvme_version_check(version, 1, 3),
+		    nvme_vers_atleast(version, &nvme_vers_1v3),
 		    idctl->ap_hctma.hctma_hctm, NULL, NULL);
-		if (idctl->ap_mntmt != 0 && nvme_version_check(version, 1, 3)) {
+		if (idctl->ap_mntmt != 0 && nvme_vers_atleast(version,
+		    &nvme_vers_1v3)) {
 			nvme_print_temp(6, "Minimum Thermal Management "
 			    "Temperature", idctl->ap_mntmt);
 		} else {
@@ -1116,7 +1133,8 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 			    "Temperature", -1, "unsupported", -1);
 		}
 
-		if (idctl->ap_mxtmt != 0 && nvme_version_check(version, 1, 3)) {
+		if (idctl->ap_mxtmt != 0 && nvme_vers_atleast(version,
+		    &nvme_vers_1v3)) {
 			nvme_print_temp(6, "Maximum Thermal Management "
 			    "Temperature", idctl->ap_mxtmt);
 		} else {
@@ -1126,18 +1144,18 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 
 		nvme_print(4, "Sanitize Capabilities", -1, NULL);
 		nvme_print_bit(6, "Crypto Erase Support",
-		    nvme_version_check(version, 1, 3),
+		    nvme_vers_atleast(version, &nvme_vers_1v3),
 		    idctl->ap_sanitize.san_ces, NULL, NULL);
 		nvme_print_bit(6, "Block Erase Support",
-		    nvme_version_check(version, 1, 3),
+		    nvme_vers_atleast(version, &nvme_vers_1v3),
 		    idctl->ap_sanitize.san_bes, NULL, NULL);
 		nvme_print_bit(6, "Overwrite Support",
-		    nvme_version_check(version, 1, 3),
+		    nvme_vers_atleast(version, &nvme_vers_1v3),
 		    idctl->ap_sanitize.san_ows, NULL, NULL);
 		nvme_print_bit(6, "No-Deallocate Inhibited",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_sanitize.san_ndi, NULL, NULL);
-		if (nvme_version_check(version, 1, 4)) {
+		if (nvme_vers_atleast(version, &nvme_vers_1v4)) {
 			uint_t val = idctl->ap_sanitize.san_nodmmas;
 			switch (val) {
 			case NVME_NODMMAS_UNDEF:
@@ -1203,25 +1221,25 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print(4, "Asymmetric Namespace Access Capabilities",
 		    -1, NULL);
 		nvme_print_bit(6, "ANA Optimized state",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_opt, NULL, NULL);
 		nvme_print_bit(6, "ANA Non-Optimized state",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_unopt, NULL, NULL);
 		nvme_print_bit(6, "ANA Inaccessible state",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_inacc, NULL, NULL);
 		nvme_print_bit(6, "ANA Persistent Loss state",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_ploss, NULL, NULL);
 		nvme_print_bit(6, "ANA Persistent Change state",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_chg, NULL, NULL);
 		nvme_print_bit(6, "ANAGRPID doesn't change with attached NS",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_grpns, "yes", "no");
 		nvme_print_bit(6, "Non-zero ANAGRPID in Namespace Management",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->ap_anacap.anacap_grpid, NULL, NULL);
 
 		if (idctl->id_mic.m_anar_sup != 0) {
@@ -1255,7 +1273,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		    "min %d, max %d",
 		    1 << idctl->id_cqes.qes_min, 1 << idctl->id_cqes.qes_max);
 
-		if (nvme_version_check(version, 1, 2)) {
+		if (nvme_vers_atleast(version, &nvme_vers_1v2)) {
 			nvme_print_uint64(4, "Maximum Outstanding Commands",
 			    idctl->id_maxcmd, NULL, NULL);
 		} else {
@@ -1267,47 +1285,47 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	    idctl->id_nn, NULL, NULL);
 	nvme_print(4, "Optional NVM Command Support", -1, NULL);
 	nvme_print_bit(6, "Compare",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oncs.on_compare, NULL, NULL);
 	nvme_print_bit(6, "Write Uncorrectable",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oncs.on_wr_unc, NULL, NULL);
 	nvme_print_bit(6, "Dataset Management",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_oncs.on_dset_mgmt, NULL, NULL);
 	nvme_print_bit(6, "Write Zeros",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idctl->id_oncs.on_wr_zero, NULL, NULL);
 	nvme_print_bit(6, "Save/Select in Get/Set Features",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idctl->id_oncs.on_save, NULL, NULL);
 	nvme_print_bit(6, "Reservations",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idctl->id_oncs.on_reserve, NULL, NULL);
 	nvme_print_bit(6, "Timestamp Feature",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idctl->id_oncs.on_ts, NULL, NULL);
 	nvme_print_bit(6, "Verify",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idctl->id_oncs.on_verify, NULL, NULL);
 
 	nvme_print(4, "Fused Operation Support", -1, NULL);
 	nvme_print_bit(6, "Compare and Write",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_fuses.f_cmp_wr, NULL, NULL);
 	nvme_print(4, "Format NVM Attributes", -1, NULL);
 	nvme_print_bit(6, "Per Namespace Format",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_fna.fn_format == 0, NULL, NULL);
 	nvme_print_bit(6, "Per Namespace Secure Erase",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_fna.fn_sec_erase == 0, NULL, NULL);
 	nvme_print_bit(6, "Cryptographic Erase",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_fna.fn_crypt_erase, NULL, NULL);
 	nvme_print(4, "Volatile Write Cache", -1, NULL);
 	nvme_print_bit(6, "Present",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idctl->id_vwc.vwc_present, "yes", "no");
 	if (verbose) {
 		switch (idctl->id_vwc.vwc_nsflush) {
@@ -1339,23 +1357,24 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 
 	if (verbose != 0) {
 		nvme_print_bit(4, "NVM Vendor-specific Command Format",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    idctl->id_nvscc.nv_spec, "standard", "vendor-specific");
 
 		nvme_print(4, "Namespace Write Protection Capabilities",
 		    -1, NULL);
 		nvme_print_bit(6, "Core Support",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_nwpc.nwpc_base, NULL, NULL);
 		nvme_print_bit(6, "Write Protect Until Power Cycle",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_nwpc.nwpc_wpupc, NULL, NULL);
 		nvme_print_bit(6, "Permanent Write Protect",
-		    nvme_version_check(version, 1, 4),
+		    nvme_vers_atleast(version, &nvme_vers_1v4),
 		    idctl->id_nwpc.nwpc_permwp, NULL, NULL);
 	}
 
-	if (idctl->id_fuses.f_cmp_wr && nvme_version_check(version, 1, 1)) {
+	if (idctl->id_fuses.f_cmp_wr && nvme_vers_atleast(version,
+	    &nvme_vers_1v1)) {
 		nvme_print_uint64(4, "Atomic Compare & Write Size",
 		    (uint32_t)idctl->id_acwu + 1, NULL,
 		    idctl->id_acwu == 0 ? " block" : " blocks");
@@ -1383,25 +1402,25 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		break;
 	}
 	nvme_print_bit(6, "Keyed SGL Block Descriptor",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_sgls.sgl_keyed, NULL, NULL);
 	nvme_print_bit(6, "SGL Bit Bucket Descriptor",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idctl->id_sgls.sgl_bucket, NULL, NULL);
 	nvme_print_bit(6, "Byte Aligned Contiguous Metadata",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_sgls.sgl_balign, NULL, NULL);
 	nvme_print_bit(6, "SGL Longer than Data Transferred",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_sgls.sgl_sglgtd, NULL, NULL);
 	nvme_print_bit(6, "MPTR with SGL",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_sgls.sgl_mptr, NULL, NULL);
 	nvme_print_bit(6, "SGL Address as Offset",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idctl->id_sgls.sgl_offset, NULL, NULL);
 	nvme_print_bit(6, "Transport SGL Data Block",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idctl->id_sgls.sgl_tport, NULL, NULL);
 	if (verbose) {
 		if (idctl->id_mnan != 0) {
@@ -1413,7 +1432,8 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		}
 	}
 
-	if (nvme_version_check(version, 1, 2) && idctl->id_subnqn[0] != '\0') {
+	if (nvme_vers_atleast(version, &nvme_vers_1v2) &&
+	    idctl->id_subnqn[0] != '\0') {
 		nvme_print_str(4, "NVMe Subsystem Qualified Name", -1,
 		    (char *)idctl->id_subnqn, sizeof (idctl->id_subnqn));
 	} else {
@@ -1427,7 +1447,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		int places = 2;
 		char *unit = "W";
 
-		if (nvme_version_check(version, 1, 1) &&
+		if (nvme_vers_atleast(version, &nvme_vers_1v1) &&
 		    idctl->id_psd[i].psd_mps == 1) {
 			scale = 0.0001;
 			places = 4;
@@ -1442,7 +1462,7 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 		nvme_print(4, "Power State Descriptor", i, NULL);
 		nvme_print_double(6, "Maximum Power", power, places, unit);
 		nvme_print_bit(6, "Non-Operational State",
-		    nvme_version_check(version, 1, 1),
+		    nvme_vers_atleast(version, &nvme_vers_1v1),
 		    idctl->id_psd[i].psd_nops, "yes", "no");
 		nvme_print_uint64(6, "Entry Latency",
 		    idctl->id_psd[i].psd_enlat, NULL, "us");
@@ -1466,7 +1486,8 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
  * command.
  */
 void
-nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
+nvme_print_identify_nsid(const nvme_identify_nsid_t *idns,
+    const nvme_version_t *version)
 {
 	int bsize = 1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
 	int i;
@@ -1481,19 +1502,19 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 	    idns->id_nuse * bsize / 1024 / 1024, NULL, "MB");
 	nvme_print(4, "Namespace Features", -1, NULL);
 	nvme_print_bit(6, "Thin Provisioning",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_nsfeat.f_thin, NULL, NULL);
 	nvme_print_bit(6, "Namespace-specific Atomic Units",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idns->id_nsfeat.f_nsabp, NULL, NULL);
 	nvme_print_bit(6, "Deallocate errors",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idns->id_nsfeat.f_dae, NULL, NULL);
 	nvme_print_bit(6, "Namespace GUID Reuse",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    idns->id_nsfeat.f_uidreuse, "impossible", "possible");
 	nvme_print_bit(6, "Namespace-specific I/O Optimized Sizes",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idns->id_nsfeat.f_optperf, NULL, NULL);
 
 	nvme_print_uint64(4, "Number of LBA Formats",
@@ -1502,32 +1523,32 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 	nvme_print_uint64(6, "LBA Format",
 	    (uint16_t)idns->id_flbas.lba_format, NULL, NULL);
 	nvme_print_bit(6, "Extended Data LBA",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_flbas.lba_extlba, "yes", "no");
 
 	nvme_print(4, "Metadata Capabilities", -1, NULL);
 	nvme_print_bit(6, "Extended Data LBA",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_mc.mc_extlba, NULL, NULL);
 	nvme_print_bit(6, "Separate Metadata",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_mc.mc_separate, NULL, NULL);
 
 	nvme_print(4, "End-to-End Data Protection Capabilities", -1, NULL);
 	nvme_print_bit(6, "Protection Information Type 1",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dpc.dp_type1, NULL, NULL);
 	nvme_print_bit(6, "Protection Information Type 2",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dpc.dp_type2, NULL, NULL);
 	nvme_print_bit(6, "Protection Information Type 3",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dpc.dp_type3, NULL, NULL);
 	nvme_print_bit(6, "Protection Information first",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dpc.dp_first, NULL, NULL);
 	nvme_print_bit(6, "Protection Information last",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dpc.dp_last, NULL, NULL);
 	nvme_print(4, "End-to-End Data Protection Settings", -1, NULL);
 	if (idns->id_dps.dp_pinfo == 0) {
@@ -1538,39 +1559,39 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 		    idns->id_dps.dp_pinfo, NULL, NULL);
 	}
 	nvme_print_bit(6, "Protection Information in Metadata",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    idns->id_dps.dp_first, "first 8 bytes", "last 8 bytes");
 
 	nvme_print(4, "Namespace Multi-Path I/O and Namespace Sharing "
 	    "Capabilities", -1, NULL);
 
 	nvme_print_bit(6, "Namespace is shared",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_nmic.nm_shared, "yes", "no");
 	nvme_print(2, "Reservation Capabilities", -1, NULL);
 	nvme_print_bit(6, "Persist Through Power Loss",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_persist, NULL, NULL);
 	nvme_print_bit(6, "Write Exclusive",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_wr_excl, NULL, NULL);
 	nvme_print_bit(6, "Exclusive Access",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_excl, NULL, NULL);
 	nvme_print_bit(6, "Write Exclusive - Registrants Only",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_wr_excl_r, NULL, NULL);
 	nvme_print_bit(6, "Exclusive Access - Registrants Only",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_excl_r, NULL, NULL);
 	nvme_print_bit(6, "Write Exclusive - All Registrants",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_wr_excl_a, NULL, NULL);
 	nvme_print_bit(6, "Exclusive Access - All Registrants",
-	    nvme_version_check(version, 1, 1),
+	    nvme_vers_atleast(version, &nvme_vers_1v1),
 	    idns->id_rescap.rc_excl_a, NULL, NULL);
 	nvme_print_bit(6, "Ignore Existing Key Behavior",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    idns->id_rescap.rc_ign_ekey, "NVMe 1.3 behavior", "pre-NVMe 1.3");
 
 	if (idns->id_fpi.fpi_sup != 0) {
@@ -1699,7 +1720,7 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 
 	nvme_print(4, "Namespace Attributes", -1, NULL);
 	nvme_print_bit(6, "Write Protected",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    idns->id_nsattr.nsa_wprot, "yes", "no");
 
 	if (verbose) {
@@ -1720,7 +1741,7 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 		}
 	}
 
-	if (nvme_version_check(version, 1, 2)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v2)) {
 		uint8_t guid[16] = { 0 };
 		if (memcmp(guid, idns->id_nguid, sizeof (guid) != 0)) {
 			nvme_print_guid(4, "Namespace GUID", idns->id_nguid);
@@ -1733,7 +1754,7 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
 	}
 
 
-	if (nvme_version_check(version, 1, 1)) {
+	if (nvme_vers_atleast(version, &nvme_vers_1v1)) {
 		uint8_t oui[8] = { 0 };
 		if (memcmp(oui, idns->id_eui64, sizeof (oui)) != 0) {
 			nvme_print_eui64(4, "IEEE Extended Unique Identifier",
@@ -1768,7 +1789,7 @@ nvme_print_identify_nsid(nvme_identify_nsid_t *idns, nvme_version_t *version)
  */
 void
 nvme_print_identify_nsid_list(const char *header,
-    nvme_identify_nsid_list_t *nslist)
+    const nvme_identify_nsid_list_t *nslist)
 {
 	uint32_t i;
 
@@ -1793,7 +1814,7 @@ nvme_print_identify_nsid_list(const char *header,
 void
 nvme_print_identify_nsid_desc(void *nsdesc)
 {
-	nvme_identify_nsid_desc_t *desc = nsdesc;
+	const nvme_identify_nsid_desc_t *desc = nsdesc;
 	int i = 0;
 	uintptr_t ptr, end;
 
@@ -1843,7 +1864,7 @@ nvme_print_identify_nsid_desc(void *nsdesc)
  */
 void
 nvme_print_identify_ctrl_list(const char *header,
-    nvme_identify_ctrl_list_t *ctlist)
+    const nvme_identify_ctrl_list_t *ctlist)
 {
 	int i;
 
@@ -1861,8 +1882,8 @@ nvme_print_identify_ctrl_list(const char *header,
  * if verbose is set.
  */
 void
-nvme_print_error_log(int nlog, nvme_error_log_entry_t *elog,
-    nvme_version_t *version)
+nvme_print_error_log(int nlog, const nvme_error_log_entry_t *elog,
+    const nvme_version_t *version)
 {
 	int i;
 
@@ -1937,10 +1958,10 @@ nvme_print_error_log(int nlog, nvme_error_log_entry_t *elog,
 		    elog[i].el_sf.sf_sct,
 		    status_code_types[elog[i].el_sf.sf_sct]);
 		nvme_print_bit(6, "More",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    elog[i].el_sf.sf_m, "yes", "no");
 		nvme_print_bit(6, "Do Not Retry",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    elog[i].el_sf.sf_m, "yes", "no");
 		nvme_print_uint64(4, "Parameter Error Location byte",
 		    elog[i].el_byte, "0x%0.2"PRIx64, NULL);
@@ -1964,26 +1985,26 @@ nvme_print_error_log(int nlog, nvme_error_log_entry_t *elog,
  * of the log if verbose is set.
  */
 void
-nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl,
-    nvme_version_t *version)
+nvme_print_health_log(const nvme_health_log_t *hlog,
+    const nvme_identify_ctrl_t *idctl, const nvme_version_t *version)
 {
 	nvme_print(0, "SMART/Health Information", -1, NULL);
 	nvme_print(2, "Critical Warnings", -1, NULL);
 	nvme_print_bit(4, "Available Space",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    hlog->hl_crit_warn.cw_avail, "low", "OK");
 	nvme_print_bit(4, "Temperature",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    hlog->hl_crit_warn.cw_temp, "too high", "OK");
 	nvme_print_bit(4, "Device Reliability",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    hlog->hl_crit_warn.cw_reliab, "degraded", "OK");
 	nvme_print_bit(4, "Media",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    hlog->hl_crit_warn.cw_readonly, "read-only", "OK");
 	if (idctl->id_vwc.vwc_present != 0)
 		nvme_print_bit(4, "Volatile Memory Backup",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    hlog->hl_crit_warn.cw_volatile, "failed", "OK");
 
 	nvme_print_temp(2, "Temperature", hlog->hl_temp);
@@ -2026,7 +2047,7 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl,
 	nvme_print_uint128(2, "Errors Logged",
 	    hlog->hl_errors_logged, NULL, 0, 0);
 
-	if (!nvme_version_check(version, 1, 2)) {
+	if (!nvme_vers_atleast(version, &nvme_vers_1v2)) {
 		return;
 	}
 
@@ -2080,7 +2101,7 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl,
 		    hlog->hl_temp_sensor_8);
 	}
 
-	if (!nvme_version_check(version, 1, 3)) {
+	if (!nvme_vers_atleast(version, &nvme_vers_1v3)) {
 		return;
 	}
 
@@ -2103,7 +2124,8 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl,
  * This function pretty-prints the firmware slot information.
  */
 void
-nvme_print_fwslot_log(nvme_fwslot_log_t *fwlog, nvme_identify_ctrl_t *idctl)
+nvme_print_fwslot_log(const nvme_fwslot_log_t *fwlog,
+    const nvme_identify_ctrl_t *idctl)
 {
 	int i;
 
@@ -2134,15 +2156,28 @@ nvme_print_fwslot_log(nvme_fwslot_log_t *fwlog, nvme_identify_ctrl_t *idctl)
  * These functions pretty-print the data structures returned by GET FEATURES.
  */
 void
-nvme_print_feat_arbitration(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_unknown(nvme_feat_output_t output, uint32_t cdw0, void *b,
+    size_t s)
+{
+	if ((output & NVME_FEAT_OUTPUT_CDW0) != 0) {
+		nvme_print_uint64(4, "cdw0", cdw0, "0x%"PRIx64, NULL);
+	}
+
+	if ((output & NVME_FEAT_OUTPUT_DATA) != 0) {
+		nvme_print_hexbuf(4, "data", b, s);
+	}
+}
+
+void
+nvme_print_feat_arbitration(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_arbitration_t arb;
 
-	arb.r = (uint32_t)res;
+	arb.r = cdw0;
 	if (arb.b.arb_ab != 7)
 		nvme_print_uint64(4, "Arbitration Burst",
 		    1 << arb.b.arb_ab, NULL, NULL);
@@ -2158,22 +2193,22 @@ nvme_print_feat_arbitration(uint64_t res, void *b, size_t s,
 }
 
 void
-nvme_print_feat_power_mgmt(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_power_mgmt(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_power_mgmt_t pm;
 
-	pm.r = (uint32_t)res;
+	pm.r = cdw0;
 	nvme_print_uint64(4, "Power State", (uint8_t)pm.b.pm_ps,
 	    NULL, NULL);
 }
 
 void
-nvme_print_feat_lba_range(uint64_t res, void *buf, size_t bufsize,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_lba_range(uint32_t cdw0, void *buf, size_t bufsize,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(id));
 
@@ -2185,7 +2220,7 @@ nvme_print_feat_lba_range(uint64_t res, void *buf, size_t bufsize,
 	if (buf == NULL)
 		return;
 
-	lrt.r = res;
+	lrt.r = cdw0;
 	lr = buf;
 
 	n_lr = bufsize / sizeof (nvme_lba_range_t);
@@ -2208,10 +2243,10 @@ nvme_print_feat_lba_range(uint64_t res, void *buf, size_t bufsize,
 			    lr[i].lr_type, NULL, NULL);
 		nvme_print(6, "Attributes", -1, NULL);
 		nvme_print_bit(8, "Writable",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    lr[i].lr_attr.lr_write, "yes", "no");
 		nvme_print_bit(8, "Hidden",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    lr[i].lr_attr.lr_hidden, "yes", "no");
 		nvme_print_uint64(6, "Starting LBA",
 		    lr[i].lr_slba, NULL, NULL);
@@ -2232,28 +2267,28 @@ nvme_print_feat_lba_range(uint64_t res, void *buf, size_t bufsize,
 }
 
 void
-nvme_print_feat_temperature(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_temperature(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_temp_threshold_t tt;
 	char *label = b;
 
-	tt.r = (uint32_t)res;
+	tt.r = cdw0;
 	nvme_print_temp(4, label, tt.b.tt_tmpth);
 }
 
 void
-nvme_print_feat_error(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_error(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_error_recovery_t er;
 
-	er.r = (uint32_t)res;
+	er.r = cdw0;
 	if (er.b.er_tler > 0)
 		nvme_print_uint64(4, "Time Limited Error Recovery",
 		    (uint32_t)er.b.er_tler * 100, NULL, "ms");
@@ -2263,30 +2298,30 @@ nvme_print_feat_error(uint64_t res, void *b, size_t s,
 }
 
 void
-nvme_print_feat_write_cache(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_write_cache(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_write_cache_t wc;
 
-	wc.r = (uint32_t)res;
+	wc.r = cdw0;
 	nvme_print_bit(4, "Volatile Write Cache",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    wc.b.wc_wce, "enabled", "disabled");
 }
 
 void
-nvme_print_feat_nqueues(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_nqueues(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_nqueues_t nq;
 
-	nq.r = (uint32_t)res;
+	nq.r = cdw0;
 	nvme_print_uint64(4, "Number of Submission Queues",
 	    nq.b.nq_nsq + 1, NULL, NULL);
 	nvme_print_uint64(4, "Number of Completion Queues",
@@ -2294,23 +2329,23 @@ nvme_print_feat_nqueues(uint64_t res, void *b, size_t s,
 }
 
 void
-nvme_print_feat_intr_coal(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_intr_coal(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_intr_coal_t ic;
 
-	ic.r = (uint32_t)res;
+	ic.r = cdw0;
 	nvme_print_uint64(4, "Aggregation Threshold",
 	    ic.b.ic_thr + 1, NULL, NULL);
 	nvme_print_uint64(4, "Aggregation Time",
 	    (uint16_t)ic.b.ic_time * 100, NULL, "us");
 }
 void
-nvme_print_feat_intr_vect(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_intr_vect(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
@@ -2318,89 +2353,89 @@ nvme_print_feat_intr_vect(uint64_t res, void *b, size_t s,
 	nvme_intr_vect_t iv;
 	char *tmp;
 
-	iv.r = (uint32_t)res;
+	iv.r = cdw0;
 	if (asprintf(&tmp, "Vector %d Coalescing Disable", iv.b.iv_iv) < 0)
 		err(-1, "nvme_print_feat_common()");
 
 	nvme_print_bit(4, tmp, iv.b.iv_cd,
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    "yes", "no");
 }
 
 void
-nvme_print_feat_write_atom(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_write_atom(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_write_atomicity_t wa;
 
-	wa.r = (uint32_t)res;
+	wa.r = cdw0;
 	nvme_print_bit(4, "Disable Normal", wa.b.wa_dn,
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    "yes", "no");
 }
 
 void
-nvme_print_feat_async_event(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *idctl, nvme_version_t *version)
+nvme_print_feat_async_event(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *idctl, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	nvme_async_event_conf_t aec;
 
-	aec.r = (uint32_t)res;
+	aec.r = cdw0;
 	nvme_print_bit(4, "Available Space below threshold",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    aec.b.aec_avail, "enabled", "disabled");
 	nvme_print_bit(4, "Temperature above threshold",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    aec.b.aec_temp, "enabled", "disabled");
 	nvme_print_bit(4, "Device Reliability compromised",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    aec.b.aec_reliab, "enabled", "disabled");
 	nvme_print_bit(4, "Media read-only",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    aec.b.aec_readonly, "enabled", "disabled");
 	if (idctl->id_vwc.vwc_present != 0) {
 		nvme_print_bit(4, "Volatile Memory Backup failed",
-		    nvme_version_check(version, 1, 0),
+		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    aec.b.aec_volatile, "enabled", "disabled");
 	}
 
 	/* NVMe 1.2 */
 	nvme_print_bit(4, "Namespace attribute notices",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    aec.b.aec_nsan, "enabled", "disabled");
 	nvme_print_bit(4, "Firmware activation notices",
-	    nvme_version_check(version, 1, 2),
+	    nvme_vers_atleast(version, &nvme_vers_1v2),
 	    aec.b.aec_fwact, "enabled", "disabled");
 
 	/* NVMe 1.3 */
 	nvme_print_bit(4, "Telemetry log notices",
-	    nvme_version_check(version, 1, 3),
+	    nvme_vers_atleast(version, &nvme_vers_1v3),
 	    aec.b.aec_telln, "enabled", "disabled");
 
 	/* NVMe 1.4 */
 	nvme_print_bit(4, "ANA change notices",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    aec.b.aec_ansacn, "enabled", "disabled");
 	nvme_print_bit(4,
 	    "Predictable latency event aggr. LCNs",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    aec.b.aec_plat, "enabled", "disabled");
 	nvme_print_bit(4, "LBA status information notices",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    aec.b.aec_lbasi, "enabled", "disabled");
 	nvme_print_bit(4, "Endurance group event aggregate LCNs",
-	    nvme_version_check(version, 1, 4),
+	    nvme_vers_atleast(version, &nvme_vers_1v4),
 	    aec.b.aec_egeal, "enabled", "disabled");
 }
 
 void
-nvme_print_feat_auto_pst(uint64_t res, void *buf, size_t bufsize,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_auto_pst(uint32_t cdw0, void *buf, size_t bufsize,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(id));
 
@@ -2412,11 +2447,11 @@ nvme_print_feat_auto_pst(uint64_t res, void *buf, size_t bufsize,
 	if (buf == NULL)
 		return;
 
-	apst.r = res;
+	apst.r = cdw0;
 	aps = buf;
 
 	nvme_print_bit(4, "Autonomous Power State Transition",
-	    nvme_version_check(version, 1, 0),
+	    nvme_vers_atleast(version, &nvme_vers_1v0),
 	    apst.b.apst_apste, "enabled", "disabled");
 	for (i = 0; i != cnt; i++) {
 		if (aps[i].apst_itps == 0 && aps[i].apst_itpt == 0)
@@ -2431,45 +2466,68 @@ nvme_print_feat_auto_pst(uint64_t res, void *buf, size_t bufsize,
 }
 
 void
-nvme_print_feat_progress(uint64_t res, void *b, size_t s,
-    nvme_identify_ctrl_t *id, nvme_version_t *version)
+nvme_print_feat_progress(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
 {
 	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_software_progress_marker_t spm;
 
-	spm.r = (uint32_t)res;
+	spm.r = cdw0;
 	nvme_print_uint64(4, "Pre-Boot Software Load Count",
 	    spm.b.spm_pbslc, NULL, NULL);
 }
 
-const char *
-nvme_fw_error(int err, int sc)
+/*
+ * This is designed to print out a large buffer as decipherable hexadecimal.
+ * This is intended for log pages or command output where there is unknown
+ * printing. For an inline hex buffer, see nvme_print_hexbuf(). Our expectation
+ * here is that we have approximately 6 digits worth of address on the left then
+ * we'll spell out each byte, followed by the translated form on the right. Each
+ * of these groups is separated by pipes.
+ */
+void
+nvmeadm_dump_hex(const uint8_t *buf, size_t len)
 {
-	if (sc == 0)
-		return (strerror(err));
+	size_t off = 0;
 
-	switch (sc) {
-	case NVME_CQE_SC_SPC_INV_FW_SLOT:
-		return ("Invalid firmware slot");
-	case NVME_CQE_SC_SPC_INV_FW_IMG:
-		return ("Invalid firmware image");
-	case NVME_CQE_SC_SPC_FW_RESET:
-		return ("Conventional reset required - use "
-		    "'reboot -p' or similar");
-	case NVME_CQE_SC_SPC_FW_NSSR:
-		return ("NVM subsystem reset required - power cycle "
-		    "your system");
-	case NVME_CQE_SC_SPC_FW_NEXT_RESET:
-		return ("Image will be activated at next reset");
-	case NVME_CQE_SC_SPC_FW_MTFA:
-		return ("Activation requires maximum time violation");
-	case NVME_CQE_SC_SPC_FW_PROHIBITED:
-		return ("Activation prohibited");
-	default:
-		return ("See message log (usually /var/adm/messages) "
-		    "for details");
+	if (len == 0) {
+		return;
 	}
 
+	/*
+	 * First we print the header.
+	 */
+	(void) printf("          ");
+	(void) printf("   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f");
+	(void) printf("   0123456789abcdef\n");
+
+	while (len > 0) {
+		size_t nents = MIN(len, 16);
+		len -= nents;
+
+		(void) printf("0x%06x  |", off);
+		for (size_t i = 0; i < nents; i++) {
+			(void) printf(" %02x", buf[i]);
+		}
+
+		for (size_t i = nents; i < 16; i++) {
+			(void) printf("   ");
+		}
+
+		(void) printf(" | ");
+
+		for (size_t i = 0; i < nents; i++) {
+			if (isprint(buf[i])) {
+				(void) printf("%c", buf[i]);
+			} else {
+				(void) putc('.', stdout);
+			}
+		}
+
+		(void) putc('\n', stdout);
+		buf += nents;
+		off += nents;
+	}
 }

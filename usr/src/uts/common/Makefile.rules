@@ -117,6 +117,10 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/inet/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/nvme/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/ucode/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
