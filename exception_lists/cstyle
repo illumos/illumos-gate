@@ -904,6 +904,7 @@ usr/src/uts/common/io/i40e/core/i40e_register.h
 usr/src/uts/common/io/i40e/core/i40e_status.h
 usr/src/uts/common/io/i40e/core/i40e_type.h
 usr/src/uts/common/io/i40e/core/virtchnl.h
+usr/src/uts/common/io/igc/core/*
 usr/src/uts/common/io/iwn/if_iwn.c
 usr/src/uts/common/io/iwn/if_iwnreg.h
 usr/src/uts/common/io/iwn/if_iwnvar.h

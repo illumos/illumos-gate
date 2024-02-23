@@ -22,10 +22,7 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	/*
-	 * wbnoinvd instruction
-	 */
-	.byte 0xf3, 0x0f, 0x09
+	wbnoinvd
 	wbinvd
 	invd
 .size libdis_test, [.-libdis_test]

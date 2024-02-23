@@ -26,7 +26,7 @@
 # Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2023 Racktop Systems, Inc.
 #
 
@@ -402,6 +402,7 @@ DRV_KMODS	+= sfe
 DRV_KMODS	+= sfxge
 DRV_KMODS	+= amd8111s
 DRV_KMODS	+= igb
+DRV_KMODS	+= igc
 DRV_KMODS	+= ipmi
 DRV_KMODS	+= iprb
 DRV_KMODS	+= ixgbe

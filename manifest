@@ -88,6 +88,7 @@ s dev/full=../devices/pseudo/mm@0:full
 s dev/icmp6=../devices/pseudo/icmp6@0:icmp6
 s dev/icmp=../devices/pseudo/icmp@0:icmp
 s dev/igb=../devices/pseudo/clone@0:igb
+s dev/igc=../devices/pseudo/clone@0:igc
 s dev/ip6=../devices/pseudo/ip6@0:ip6
 s dev/ip=../devices/pseudo/ip@0:ip
 s dev/ipauth=../devices/pseudo/ipf@0:ipauth
@@ -686,6 +687,7 @@ f kernel/drv/amd64/i8042 0755 root sys
 f kernel/drv/amd64/icmp 0755 root sys
 f kernel/drv/amd64/icmp6 0755 root sys
 f kernel/drv/amd64/igb 0755 root sys
+f kernel/drv/amd64/igc 0755 root sys
 f kernel/drv/amd64/imc 0755 root sys
 f kernel/drv/amd64/imcstub 0755 root sys
 f kernel/drv/amd64/intel_nb5000 0755 root sys
@@ -18933,6 +18935,7 @@ f usr/share/man/man4d/hxge.4d 0444 root bin
 f usr/share/man/man4d/i40e.4d 0444 root bin
 f usr/share/man/man4d/ieee1394.4d 0444 root bin
 f usr/share/man/man4d/igb.4d 0444 root bin
+f usr/share/man/man4d/igc.4d 0444 root bin
 f usr/share/man/man4d/imc.4d 0444 root bin
 f usr/share/man/man4d/imcstub.4d 0444 root bin
 f usr/share/man/man4d/ipmi.4d 0444 root bin

@@ -1,0 +1,53 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/igc@$(PKGVERS)
+set name=pkg.summary value="Intel I225/226 Ethernet Driver"
+set name=pkg.description value="Intel I225/226 Ethernet Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/igc group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/igc.4d
+driver name=igc \
+    alias=pciex8086,d9f \
+    alias=pciex8086,125b \
+    alias=pciex8086,125c \
+    alias=pciex8086,125d \
+    alias=pciex8086,125e \
+    alias=pciex8086,125f \
+    alias=pciex8086,15f2 \
+    alias=pciex8086,15f3 \
+    alias=pciex8086,15f7 \
+    alias=pciex8086,15f8 \
+    alias=pciex8086,15fd \
+    alias=pciex8086,3100 \
+    alias=pciex8086,3101 \
+    alias=pciex8086,3102 \
+    alias=pciex8086,5502 \
+    alias=pciex8086,5503
+license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/igc/core/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/igc/core/THIRDPARTYLICENSE

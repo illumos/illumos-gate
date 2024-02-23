@@ -119,6 +119,7 @@ usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/e1000api/*
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
+usr/src/uts/common/io/igc/core/*
 usr/src/uts/common/io/ixgbe/core/*
 usr/src/uts/common/sys/scsi/adapters/mpi/*
 usr/src/contrib/*
