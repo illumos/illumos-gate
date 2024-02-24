@@ -293,11 +293,15 @@ static const mdb_walker_t walkers[] = {
 };
 
 static const mdb_qops_t ptm_qops = {
-	ptm_qinfo, mdb_qrnext_default, mdb_qwnext_default
+	.q_info = ptm_qinfo,
+	.q_rnext = mdb_qrnext_default,
+	.q_wnext = mdb_qwnext_default,
 };
 
 static const mdb_qops_t pts_qops = {
-	pts_qinfo, mdb_qrnext_default, mdb_qwnext_default
+	.q_info = pts_qinfo,
+	.q_rnext = mdb_qrnext_default,
+	.q_wnext = mdb_qwnext_default,
 };
 
 static const mdb_modinfo_t modinfo = {

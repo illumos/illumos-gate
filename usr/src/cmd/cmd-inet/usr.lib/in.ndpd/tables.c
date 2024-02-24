@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include "defs.h"
@@ -2341,6 +2343,7 @@ phyint_cleanup(struct phyint *pi)
 	pi->pi_stateless = pi->pi_StatelessAddrConf;
 	pi->pi_stateful = pi->pi_StatefulAddrConf;
 	pi->pi_ipadm_aobjname[0] = '\0';
+	pi->pi_ifaddr = in6addr_any;
 }
 
 /*

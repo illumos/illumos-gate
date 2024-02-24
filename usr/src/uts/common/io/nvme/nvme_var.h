@@ -13,7 +13,7 @@
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Unix Software Ltd.
- * Copyright 2023 Oxide Computer Company.
+ * Copyright 2024 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -26,6 +26,8 @@
 #include <sys/blkdev.h>
 #include <sys/taskq_impl.h>
 #include <sys/list.h>
+#include <sys/ddi_ufm.h>
+#include <nvme_common.h>
 
 /*
  * NVMe driver state
@@ -44,8 +46,12 @@ typedef enum {
 	NVME_INTERRUPTS			= 1 << 5,
 	NVME_UFM_INIT			= 1 << 6,
 	NVME_MUTEX_INIT			= 1 << 7,
-	NVME_MGMT_INIT			= 1 << 8,
+	NVME_MGMT_INIT			= 1 << 8
 } nvme_progress_t;
+
+typedef enum {
+	NVME_NS_LOCK	= 1 << 0
+} nvme_ns_progress_t;
 
 typedef enum {
 	/*
@@ -67,16 +73,97 @@ typedef enum {
 
 typedef struct nvme nvme_t;
 typedef struct nvme_namespace nvme_namespace_t;
-typedef struct nvme_minor_state nvme_minor_state_t;
+typedef struct nvme_minor nvme_minor_t;
+typedef struct nvme_lock nvme_lock_t;
+typedef struct nvme_minor_lock_info nvme_minor_lock_info_t;
 typedef struct nvme_dma nvme_dma_t;
 typedef struct nvme_cmd nvme_cmd_t;
 typedef struct nvme_cq nvme_cq_t;
 typedef struct nvme_qpair nvme_qpair_t;
 typedef struct nvme_task_arg nvme_task_arg_t;
 
-struct nvme_minor_state {
-	kthread_t	*nm_oexcl;
-	boolean_t	nm_open;
+/*
+ * These states represent the minor's perspective. That is, of a minor's
+ * namespace and controller lock, where is it?
+ */
+typedef enum {
+	NVME_LOCK_STATE_UNLOCKED	= 0,
+	NVME_LOCK_STATE_BLOCKED,
+	NVME_LOCK_STATE_ACQUIRED
+} nvme_minor_lock_state_t;
+
+struct nvme_minor_lock_info {
+	list_node_t nli_node;
+	nvme_lock_t *nli_lock;
+	nvme_minor_lock_state_t nli_state;
+	nvme_lock_level_t nli_curlevel;
+	/*
+	 * While the minor points back to itself and the nvme_t should always
+	 * point to the current controller, the namespace should only point to
+	 * one if this is a particular namespace lock. The former two are
+	 * initialized at minor initialization time.
+	 */
+	nvme_minor_t *nli_minor;
+	nvme_t *nli_nvme;
+	nvme_namespace_t *nli_ns;
+	/*
+	 * This is the common ioctl information that should be filled in when
+	 * we're being woken up for any reason other than an interrupted signal.
+	 * This should only be set while blocking.
+	 */
+	nvme_ioctl_common_t *nli_ioc;
+	/*
+	 * The following are provided for debugging purposes. In particular,
+	 * information like the kthread_t and related that performed this should
+	 * be considered suspect as it represents who took the operation, not
+	 * who performed the operation (unless we're actively blocking).
+	 */
+	hrtime_t nli_last_change;
+	uintptr_t nli_acq_kthread;
+	pid_t nli_acq_pid;
+};
+
+struct nvme_minor {
+	/*
+	 * The following three fields are set when this is created.
+	 */
+	id_t nm_minor;
+	nvme_t *nm_ctrl;
+	nvme_namespace_t *nm_ns;
+	/*
+	 * This link is used to index this minor on the global list of active
+	 * open-related minors. This is only manipulated under the
+	 * nvme_open_minors_mutex.
+	 */
+	avl_node_t nm_avl;
+	/*
+	 * Information related to locking. Note, there is no pointer to a locked
+	 * controller as the only one can be the one specified here. This data
+	 * is protected by the controller's n_minor_mutex.
+	 */
+	kcondvar_t nm_cv;
+	nvme_minor_lock_info_t nm_ctrl_lock;
+	nvme_minor_lock_info_t nm_ns_lock;
+};
+
+struct nvme_lock {
+	nvme_minor_lock_info_t *nl_writer;
+	list_t nl_readers;
+	list_t nl_pend_readers;
+	list_t nl_pend_writers;
+	/*
+	 * The following are stats to indicate how often certain locking
+	 * activities have occurred for debugging purposes.
+	 */
+	uint32_t nl_nwrite_locks;
+	uint32_t nl_nread_locks;
+	uint32_t nl_npend_writes;
+	uint32_t nl_npend_reads;
+	uint32_t nl_nnonblock;
+	uint32_t nl_nsignals;
+	uint32_t nl_nsig_unlock;
+	uint32_t nl_nsig_blocks;
+	uint32_t nl_nsig_acq;
 };
 
 struct nvme_dma {
@@ -180,6 +267,8 @@ struct nvme {
 
 	nvme_version_t n_version;
 	boolean_t n_dead;
+	nvme_ioctl_errno_t n_dead_status;
+	taskq_ent_t n_dead_tqent;
 	boolean_t n_strict_version;
 	boolean_t n_ignore_unknown_vendor_status;
 	uint32_t n_admin_queue_len;
@@ -192,10 +281,7 @@ struct nvme {
 	boolean_t n_write_cache_present;
 	boolean_t n_write_cache_enabled;
 	int n_error_log_len;
-	boolean_t n_lba_range_supported;
-	boolean_t n_auto_pst_supported;
 	boolean_t n_async_event_supported;
-	boolean_t n_progress_supported;
 	int n_submission_queues;
 	int n_completion_queues;
 
@@ -208,12 +294,23 @@ struct nvme {
 	int n_pageshift;
 	int n_pagesize;
 
-	int n_namespace_count;
+	uint32_t n_namespace_count;
 	uint_t n_namespaces_attachable;
 	uint_t n_ioq_count;
 	uint_t n_cq_count;
 
+	/*
+	 * This is cached identify controller and common namespace data that
+	 * exists in the system. This generally can be used in the kernel;
+	 * however, we have to be careful about what we use here because these
+	 * values are not refreshed after attach. Therefore these are good for
+	 * answering the question what does the controller support or what is in
+	 * the common namespace information, but not otherwise. That means you
+	 * shouldn't use this to try to answer how much capacity is still in the
+	 * controller because this information is just cached.
+	 */
 	nvme_identify_ctrl_t *n_idctl;
+	nvme_identify_nsid_t *n_idcomns;
 
 	/* Pointer to the admin queue, which is always queue 0 in n_ioq. */
 	nvme_qpair_t *n_adminq;
@@ -238,11 +335,12 @@ struct nvme {
 	/* protects namespace management operations */
 	kmutex_t n_mgmt_mutex;
 
-	/* protects minor node operations */
+	/*
+	 * This lock protects the minor node locking state across the controller
+	 * and all related namespaces.
+	 */
 	kmutex_t n_minor_mutex;
-
-	/* state for devctl minor node */
-	nvme_minor_state_t n_minor;
+	nvme_lock_t n_lock;
 
 	/* errors detected by driver */
 	uint32_t n_dma_bind_err;
@@ -299,6 +397,7 @@ struct nvme {
 
 struct nvme_namespace {
 	nvme_t *ns_nvme;
+	nvme_ns_progress_t ns_progress;
 	uint8_t ns_eui64[8];
 	uint8_t	ns_nguid[16];
 	char	ns_name[11];
@@ -317,8 +416,10 @@ struct nvme_namespace {
 
 	nvme_identify_nsid_t *ns_idns;
 
-	/* state for attachment point minor node */
-	nvme_minor_state_t ns_minor;
+	/*
+	 * Namespace lock, see the theory statement for more information.
+	 */
+	nvme_lock_t ns_lock;
 
 	/*
 	 * If a namespace has neither NGUID nor EUI64, we create a devid in
@@ -331,6 +432,112 @@ struct nvme_task_arg {
 	nvme_t *nt_nvme;
 	nvme_cmd_t *nt_cmd;
 };
+
+typedef enum {
+	/*
+	 * This indicates that there is no exclusive access required for this
+	 * operation. However, this operation will fail if someone attempts to
+	 * perform this operation and someone else holds a write lock.
+	 */
+	NVME_IOCTL_EXCL_NONE	= 0,
+	/*
+	 * This indicates that a write lock is required to perform the
+	 * operation.
+	 */
+	NVME_IOCTL_EXCL_WRITE,
+	/*
+	 * This indicates that the exclusive check should be skipped. The only
+	 * case this should be used in is the lock and unlock ioctls as they
+	 * should be able to proceed even when the controller is being used
+	 * exclusively.
+	 */
+	NVME_IOCTL_EXCL_SKIP
+} nvme_ioctl_excl_t;
+
+/*
+ * This structure represents the set of checks that we apply to ioctl's using
+ * the nvme_ioctl_common_t structure as part of validation.
+ */
+typedef struct nvme_ioctl_check {
+	/*
+	 * This indicates whether or not the command in question allows a
+	 * namespace to be specified at all. If this is false, a namespace minor
+	 * cannot be used and a controller minor must leave the nsid set to
+	 * zero.
+	 */
+	boolean_t nck_ns_ok;
+	/*
+	 * This indicates that a minor node corresponding to a namespace is
+	 * allowed to issue this.
+	 */
+	boolean_t nck_ns_minor_ok;
+	/*
+	 * This indicates that the controller should be skipped from all of the
+	 * following processing behavior. That is, it's allowed to specify
+	 * whatever it wants in the nsid field, regardless if it is valid or
+	 * not. This is required for some of the Identify Command options that
+	 * list endpoints. This should generally not be used and the driver
+	 * should still validate the nuance here.
+	 */
+	boolean_t nck_skip_ctrl;
+	/*
+	 * This indicates that if we're on the controller's minor and we don't
+	 * have an explicit namespace ID (i.e. 0), should the namespace be
+	 * rewritten to be the broadcast namespace.
+	 */
+	boolean_t nck_ctrl_rewrite;
+	/*
+	 * This indicates whether or not the broadcast NSID is acceptable for
+	 * the controller node.
+	 */
+	boolean_t nck_bcast_ok;
+
+	/*
+	 * This indicates to the lock checking code what kind of exclusive
+	 * access is required. This check occurs after any namespace rewriting
+	 * has occurred. When looking at exclusivity, a broadcast namespace or
+	 * namespace 0 indicate that the controller is the target, otherwise the
+	 * target namespace will be checked for a write lock.
+	 */
+	nvme_ioctl_excl_t nck_excl;
+} nvme_ioctl_check_t;
+
+/*
+ * Constants
+ */
+extern uint_t nvme_vendor_specific_admin_cmd_max_timeout;
+extern uint32_t nvme_vendor_specific_admin_cmd_size;
+
+/*
+ * Common functions.
+ */
+extern nvme_namespace_t *nvme_nsid2ns(nvme_t *, uint32_t);
+extern boolean_t nvme_ioctl_error(nvme_ioctl_common_t *, nvme_ioctl_errno_t,
+    uint32_t, uint32_t);
+extern boolean_t nvme_ctrl_atleast(nvme_t *, const nvme_version_t *);
+extern void nvme_ioctl_success(nvme_ioctl_common_t *);
+
+/*
+ * Validation related functions and kernel tunable limits.
+ */
+extern boolean_t nvme_validate_logpage(nvme_t *, nvme_ioctl_get_logpage_t *);
+extern boolean_t nvme_validate_identify(nvme_t *, nvme_ioctl_identify_t *,
+    boolean_t);
+extern boolean_t nvme_validate_get_feature(nvme_t *,
+    nvme_ioctl_get_feature_t *);
+extern boolean_t nvme_validate_vuc(nvme_t *, nvme_ioctl_passthru_t *);
+extern boolean_t nvme_validate_format(nvme_t *, nvme_ioctl_format_t *);
+extern boolean_t nvme_validate_fw_load(nvme_t *, nvme_ioctl_fw_load_t *);
+extern boolean_t nvme_validate_fw_commit(nvme_t *, nvme_ioctl_fw_commit_t *);
+
+/*
+ * Locking functions
+ */
+extern void nvme_rwlock(nvme_minor_t *, nvme_ioctl_lock_t *);
+extern void nvme_rwunlock(nvme_minor_lock_info_t *, nvme_lock_t *);
+extern void nvme_rwlock_ctrl_dead(void *);
+extern void nvme_lock_init(nvme_lock_t *);
+extern void nvme_lock_fini(nvme_lock_t *);
 
 #ifdef __cplusplus
 }

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/nettest@$(PKGVERS)
@@ -52,6 +52,8 @@ file path=opt/net-tests/tests/forwarding/ip_fwd_018 mode=0555
 file path=opt/net-tests/tests/forwarding/ip_fwd_019 mode=0555
 file path=opt/net-tests/tests/forwarding/ip_fwd_020 mode=0555
 file path=opt/net-tests/tests/forwarding/ip_fwd_suite mode=0555
+dir  path=opt/net-tests/tests/ipv6
+file path=opt/net-tests/tests/ipv6/link-local mode=0555
 file path=opt/net-tests/tests/net_common mode=0555
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=system/test/testrunner

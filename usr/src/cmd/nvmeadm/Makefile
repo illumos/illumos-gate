@@ -11,24 +11,29 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
 
 PROG= nvmeadm
 
-OBJS= nvmeadm.o nvmeadm_dev.o nvmeadm_ofmt.o nvmeadm_print.o
-SRCS= $(OBJS:%.o=%.c)
+OBJS=	nvme_version.o	\
+	nvmeadm.o	\
+	nvmeadm_ofmt.o	\
+	nvmeadm_print.o	\
+	nvmeadm_wdc.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 include ../Makefile.ctf
 
 .KEEP_STATE:
 
-CFLAGS +=	$(CCVERBOSE) -I$(SRC)/uts/common/io/nvme
-LDLIBS +=	-ldevinfo -lofmt -lcmdutils
+CPPFLAGS +=	-I$(SRC)/uts/common/io/nvme -I$(SRC)/common/nvme
+LDLIBS +=	-ldevinfo -lofmt -lcmdutils -lnvme
 CSTD=	$(CSTD_GNU99)
+CTF_MODE= link
 
 #
 # nvme_print_uint128() uses VLAs which understandably confuses smatch.
@@ -43,6 +48,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 %.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/nvme/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

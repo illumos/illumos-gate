@@ -34,5 +34,4 @@ include ../../Makefile.plugin
 
 CPPFLAGS += -I$(SRC)/uts/common -I../../common/ufm
 
-LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus -ldiskmgt
-
+LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus -ldiskmgt -lnvme

@@ -1,0 +1,91 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/test/nvmetest@$(PKGVERS)
+set name=pkg.summary value="NVMe Test Suite"
+set name=pkg.description value="NVMe Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/nvme-tests
+dir  path=opt/nvme-tests/bin
+file path=opt/nvme-tests/bin/non-destructive mode=0555
+file path=opt/nvme-tests/bin/unit mode=0555
+dir  path=opt/nvme-tests/runfiles
+file path=opt/nvme-tests/runfiles/non-destruct.run mode=0444
+file path=opt/nvme-tests/runfiles/unit.run mode=0444
+dir  path=opt/nvme-tests/tests
+dir  path=opt/nvme-tests/tests/ioctl
+file path=opt/nvme-tests/tests/ioctl/bad-lock.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/bad-lock.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-get-feature.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-get-feature.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-get-log.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-get-log.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-identify.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-identify.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-lock.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/basic-lock.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/ctrl-block-lock.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/ctrl-block-lock.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/lock-order.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/lock-order.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/lock-signal.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/lock-signal.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/multi-lock-err.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/multi-lock-err.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/multi-reader-lock.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/multi-reader-lock.64 mode=0555
+dir  path=opt/nvme-tests/tests/libnvme
+file path=opt/nvme-tests/tests/libnvme/bad-req.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/bad-req.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ctrl-disc.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ctrl-disc.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/info-roundtrip.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/info-roundtrip.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/missing-field.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/missing-field.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-disc.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-disc.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-info.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-info.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/sctostr.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/sctostr.64 mode=0555
+dir  path=opt/nvme-tests/tests/nvmeadm
+file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_test mode=0555
+dir  path=opt/nvme-tests/tests/unit
+file path=opt/nvme-tests/tests/unit/feature.32 mode=0555
+file path=opt/nvme-tests/tests/unit/feature.64 mode=0555
+file path=opt/nvme-tests/tests/unit/firmware.32 mode=0555
+file path=opt/nvme-tests/tests/unit/firmware.64 mode=0555
+file path=opt/nvme-tests/tests/unit/format.32 mode=0555
+file path=opt/nvme-tests/tests/unit/format.64 mode=0555
+file path=opt/nvme-tests/tests/unit/identify.32 mode=0555
+file path=opt/nvme-tests/tests/unit/identify.64 mode=0555
+file path=opt/nvme-tests/tests/unit/logs.32 mode=0555
+file path=opt/nvme-tests/tests/unit/logs.64 mode=0555
+file path=opt/nvme-tests/tests/unit/version.32 mode=0555
+file path=opt/nvme-tests/tests/unit/version.64 mode=0555
+file path=opt/nvme-tests/tests/unit/vuc.32 mode=0555
+file path=opt/nvme-tests/tests/unit/vuc.64 mode=0555
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=driver/storage/nvme
+depend type=require fmri=system/test/testrunner

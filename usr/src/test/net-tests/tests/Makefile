@@ -11,11 +11,12 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 include $(SRC)/Makefile.master
 include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS = forwarding
+SUBDIRS = forwarding ipv6
 SCRIPTS = net_common
 ROOTOPTPKG = $(ROOT)/opt/net-tests
 TESTDIR = $(ROOTOPTPKG)/tests

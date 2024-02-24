@@ -36,6 +36,20 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/nvme group=sys
 file path=kernel/drv/nvme.conf group=sys preserve=renamenew
 dir  path=usr group=sys
+dir  path=usr/include
+file path=usr/include/libnvme.h
+dir  path=usr/include/sys
+dir  path=usr/include/sys/nvme
+file path=usr/include/sys/nvme/discovery.h
+file path=usr/include/sys/nvme/wdc.h
+file path=usr/include/sys/nvme/wdc_sn65x.h
+file path=usr/include/sys/nvme/wdc_sn840.h
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libnvme.so target=libnvme.so.1
+file path=usr/lib/$(ARCH64)/libnvme.so.1
+link path=usr/lib/libnvme.so target=libnvme.so.1
+file path=usr/lib/libnvme.so.1
 dir  path=usr/sbin
 file path=usr/sbin/nvmeadm mode=0555
 dir  path=usr/share

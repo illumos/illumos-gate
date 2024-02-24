@@ -2312,7 +2312,10 @@ pt_activate_common(mdb_tgt_t *t)
 static void
 pt_activate(mdb_tgt_t *t)
 {
-	static const mdb_nv_disc_t reg_disc = { reg_disc_set, reg_disc_get };
+	static const mdb_nv_disc_t reg_disc = {
+		.disc_set = reg_disc_set,
+		.disc_get = reg_disc_get
+	};
 
 	pt_data_t *pt = t->t_data;
 	struct utsname u1, u2;
@@ -3782,15 +3785,15 @@ pt_sysenter_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_sysenter_ops = {
-	pt_sysenter_ctor,	/* se_ctor */
-	pt_sysenter_dtor,	/* se_dtor */
-	pt_sysenter_info,	/* se_info */
-	no_se_secmp,		/* se_secmp */
-	no_se_vecmp,		/* se_vecmp */
-	no_se_arm,		/* se_arm */
-	no_se_disarm,		/* se_disarm */
-	no_se_cont,		/* se_cont */
-	pt_sysenter_match	/* se_match */
+	.se_ctor = pt_sysenter_ctor,
+	.se_dtor = pt_sysenter_dtor,
+	.se_info = pt_sysenter_info,
+	.se_secmp = no_se_secmp,
+	.se_vecmp = no_se_vecmp,
+	.se_arm = no_se_arm,
+	.se_disarm = no_se_disarm,
+	.se_cont = no_se_cont,
+	.se_match = pt_sysenter_match,
 };
 
 static int
@@ -3842,15 +3845,15 @@ pt_sysexit_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_sysexit_ops = {
-	pt_sysexit_ctor,	/* se_ctor */
-	pt_sysexit_dtor,	/* se_dtor */
-	pt_sysexit_info,	/* se_info */
-	no_se_secmp,		/* se_secmp */
-	no_se_vecmp,		/* se_vecmp */
-	no_se_arm,		/* se_arm */
-	no_se_disarm,		/* se_disarm */
-	no_se_cont,		/* se_cont */
-	pt_sysexit_match	/* se_match */
+	.se_ctor = pt_sysexit_ctor,
+	.se_dtor = pt_sysexit_dtor,
+	.se_info = pt_sysexit_info,
+	.se_secmp = no_se_secmp,
+	.se_vecmp = no_se_vecmp,
+	.se_arm = no_se_arm,
+	.se_disarm = no_se_disarm,
+	.se_cont = no_se_cont,
+	.se_match = pt_sysexit_match,
 };
 
 static int
@@ -3902,15 +3905,15 @@ pt_signal_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_signal_ops = {
-	pt_signal_ctor,		/* se_ctor */
-	pt_signal_dtor,		/* se_dtor */
-	pt_signal_info,		/* se_info */
-	no_se_secmp,		/* se_secmp */
-	no_se_vecmp,		/* se_vecmp */
-	no_se_arm,		/* se_arm */
-	no_se_disarm,		/* se_disarm */
-	no_se_cont,		/* se_cont */
-	pt_signal_match		/* se_match */
+	.se_ctor = pt_signal_ctor,
+	.se_dtor = pt_signal_dtor,
+	.se_info = pt_signal_info,
+	.se_secmp = no_se_secmp,
+	.se_vecmp = no_se_vecmp,
+	.se_arm = no_se_arm,
+	.se_disarm = no_se_disarm,
+	.se_cont = no_se_cont,
+	.se_match = pt_signal_match,
 };
 
 static int
@@ -3965,15 +3968,15 @@ pt_fault_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_fault_ops = {
-	pt_fault_ctor,		/* se_ctor */
-	pt_fault_dtor,		/* se_dtor */
-	pt_fault_info,		/* se_info */
-	no_se_secmp,		/* se_secmp */
-	no_se_vecmp,		/* se_vecmp */
-	no_se_arm,		/* se_arm */
-	no_se_disarm,		/* se_disarm */
-	no_se_cont,		/* se_cont */
-	pt_fault_match		/* se_match */
+	.se_ctor = pt_fault_ctor,
+	.se_dtor = pt_fault_dtor,
+	.se_info = pt_fault_info,
+	.se_secmp = no_se_secmp,
+	.se_vecmp = no_se_vecmp,
+	.se_arm = no_se_arm,
+	.se_disarm = no_se_disarm,
+	.se_cont = no_se_cont,
+	.se_match = pt_fault_match,
 };
 
 /*
@@ -4207,15 +4210,15 @@ pt_brkpt_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_brkpt_ops = {
-	pt_brkpt_ctor,		/* se_ctor */
-	pt_brkpt_dtor,		/* se_dtor */
-	pt_brkpt_info,		/* se_info */
-	pt_brkpt_secmp,		/* se_secmp */
-	pt_brkpt_vecmp,		/* se_vecmp */
-	pt_brkpt_arm,		/* se_arm */
-	pt_brkpt_disarm,	/* se_disarm */
-	pt_brkpt_cont,		/* se_cont */
-	pt_brkpt_match		/* se_match */
+	.se_ctor = pt_brkpt_ctor,
+	.se_dtor = pt_brkpt_dtor,
+	.se_info = pt_brkpt_info,
+	.se_secmp = pt_brkpt_secmp,
+	.se_vecmp = pt_brkpt_vecmp,
+	.se_arm = pt_brkpt_arm,
+	.se_disarm = pt_brkpt_disarm,
+	.se_cont = pt_brkpt_cont,
+	.se_match = pt_brkpt_match,
 };
 
 static int
@@ -4380,15 +4383,15 @@ pt_wapt_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t proc_wapt_ops = {
-	pt_wapt_ctor,		/* se_ctor */
-	pt_wapt_dtor,		/* se_dtor */
-	pt_wapt_info,		/* se_info */
-	pt_wapt_secmp,		/* se_secmp */
-	pt_wapt_vecmp,		/* se_vecmp */
-	pt_wapt_arm,		/* se_arm */
-	pt_wapt_disarm,		/* se_disarm */
-	pt_wapt_cont,		/* se_cont */
-	pt_wapt_match		/* se_match */
+	.se_ctor = pt_wapt_ctor,
+	.se_dtor = pt_wapt_dtor,
+	.se_info = pt_wapt_info,
+	.se_secmp = pt_wapt_secmp,
+	.se_vecmp = pt_wapt_vecmp,
+	.se_arm = pt_wapt_arm,
+	.se_disarm = pt_wapt_disarm,
+	.se_cont = pt_wapt_cont,
+	.se_match = pt_wapt_match,
 };
 
 static void
@@ -4703,58 +4706,58 @@ pt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 
 
 static const mdb_tgt_ops_t proc_ops = {
-	pt_setflags,				/* t_setflags */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setcontext */
-	pt_activate,				/* t_activate */
-	pt_deactivate,				/* t_deactivate */
-	pt_periodic,				/* t_periodic */
-	pt_destroy,				/* t_destroy */
-	pt_name,				/* t_name */
-	(const char *(*)())mdb_conf_isa,	/* t_isa */
-	pt_platform,				/* t_platform */
-	pt_uname,				/* t_uname */
-	pt_dmodel,				/* t_dmodel */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
-	pt_vread,				/* t_vread */
-	pt_vwrite,				/* t_vwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_pread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_pwrite */
-	pt_fread,				/* t_fread */
-	pt_fwrite,				/* t_fwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_ioread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_iowrite */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_vtop */
-	pt_lookup_by_name,			/* t_lookup_by_name */
-	pt_lookup_by_addr,			/* t_lookup_by_addr */
-	pt_symbol_iter,				/* t_symbol_iter */
-	pt_mapping_iter,			/* t_mapping_iter */
-	pt_object_iter,				/* t_object_iter */
-	pt_addr_to_map,				/* t_addr_to_map */
-	pt_name_to_map,				/* t_name_to_map */
-	pt_addr_to_ctf,				/* t_addr_to_ctf */
-	pt_name_to_ctf,				/* t_name_to_ctf */
-	pt_status,				/* t_status */
-	pt_run,					/* t_run */
-	pt_step,				/* t_step */
-	pt_step_out,				/* t_step_out */
-	pt_next,				/* t_next */
-	pt_continue,				/* t_cont */
-	pt_signal,				/* t_signal */
-	pt_add_vbrkpt,				/* t_add_vbrkpt */
-	pt_add_sbrkpt,				/* t_add_sbrkpt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
-	pt_add_vwapt,				/* t_add_vwapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
-	pt_add_sysenter,			/* t_add_sysenter */
-	pt_add_sysexit,				/* t_add_sysexit */
-	pt_add_signal,				/* t_add_signal */
-	pt_add_fault,				/* t_add_fault */
-	pt_getareg,				/* t_getareg */
-	pt_putareg,				/* t_putareg */
-	pt_stack_iter,				/* t_stack_iter */
-	pt_auxv,				/* t_auxv */
-	pt_thread_name				/* t_thread_name */
+	.t_setflags = pt_setflags,
+	.t_setcontext = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_activate = pt_activate,
+	.t_deactivate = pt_deactivate,
+	.t_periodic = pt_periodic,
+	.t_destroy = pt_destroy,
+	.t_name = pt_name,
+	.t_isa = (const char *(*)())mdb_conf_isa,
+	.t_platform = pt_platform,
+	.t_uname = pt_uname,
+	.t_dmodel = pt_dmodel,
+	.t_aread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_awrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vread = pt_vread,
+	.t_vwrite = pt_vwrite,
+	.t_pread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_pwrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_fread = pt_fread,
+	.t_fwrite = pt_fwrite,
+	.t_ioread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_iowrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vtop = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_lookup_by_name = pt_lookup_by_name,
+	.t_lookup_by_addr = pt_lookup_by_addr,
+	.t_symbol_iter = pt_symbol_iter,
+	.t_mapping_iter = pt_mapping_iter,
+	.t_object_iter = pt_object_iter,
+	.t_addr_to_map = pt_addr_to_map,
+	.t_name_to_map = pt_name_to_map,
+	.t_addr_to_ctf = pt_addr_to_ctf,
+	.t_name_to_ctf = pt_name_to_ctf,
+	.t_status = pt_status,
+	.t_run = pt_run,
+	.t_step = pt_step,
+	.t_step_out = pt_step_out,
+	.t_next = pt_next,
+	.t_cont = pt_continue,
+	.t_signal = pt_signal,
+	.t_add_vbrkpt = pt_add_vbrkpt,
+	.t_add_sbrkpt = pt_add_sbrkpt,
+	.t_add_pwapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_vwapt = pt_add_vwapt,
+	.t_add_iowapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysenter = pt_add_sysenter,
+	.t_add_sysexit = pt_add_sysexit,
+	.t_add_signal = pt_add_signal,
+	.t_add_fault = pt_add_fault,
+	.t_getareg = pt_getareg,
+	.t_putareg = pt_putareg,
+	.t_stack_iter = pt_stack_iter,
+	.t_auxv = pt_auxv,
+	.t_thread_name = pt_thread_name,
 };
 
 /*

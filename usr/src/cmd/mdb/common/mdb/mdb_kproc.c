@@ -886,58 +886,58 @@ kp_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 }
 
 static const mdb_tgt_ops_t kproc_ops = {
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setflags */
-	kp_setcontext,				/* t_setcontext */
-	kp_activate,				/* t_activate */
-	kp_deactivate,				/* t_deactivate */
-	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_periodic */
-	kp_destroy,				/* t_destroy */
-	kp_name,				/* t_name */
-	kp_isa,					/* t_isa */
-	kp_platform,				/* t_platform */
-	kp_uname,				/* t_uname */
-	kp_dmodel,				/* t_dmodel */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
-	kp_vread,				/* t_vread */
-	kp_vwrite,				/* t_vwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_pread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_pwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_fread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_fwrite */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_ioread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_iowrite */
-	kp_vtop,				/* t_vtop */
-	kp_lookup_by_name,			/* t_lookup_by_name */
-	kp_lookup_by_addr,			/* t_lookup_by_addr */
-	kp_symbol_iter,				/* t_symbol_iter */
-	kp_mapping_iter,			/* t_mapping_iter */
-	kp_object_iter,				/* t_object_iter */
-	kp_addr_to_map,				/* t_addr_to_map */
-	kp_name_to_map,				/* t_name_to_map */
-	(struct ctf_file *(*)())mdb_tgt_null,	/* t_addr_to_ctf */
-	(struct ctf_file *(*)())mdb_tgt_null,	/* t_name_to_ctf */
-	kp_status,				/* t_status */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_run */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_step_out */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_next */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_cont */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_signal */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sbrkpt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vbrkpt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_vwapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysenter */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysexit */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_signal */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_fault */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_getareg XXX */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_putareg XXX */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_stack_iter XXX */
-	kp_auxv,				/* t_auxv */
-	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_thread_name */
+	.t_setflags = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_setcontext = kp_setcontext,
+	.t_activate = kp_activate,
+	.t_deactivate = kp_deactivate,
+	.t_periodic = (void (*)())(uintptr_t)mdb_tgt_nop,
+	.t_destroy = kp_destroy,
+	.t_name = kp_name,
+	.t_isa = kp_isa,
+	.t_platform = kp_platform,
+	.t_uname = kp_uname,
+	.t_dmodel = kp_dmodel,
+	.t_aread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_awrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vread = kp_vread,
+	.t_vwrite = kp_vwrite,
+	.t_pread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_pwrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_fread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_fwrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_ioread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_iowrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vtop = kp_vtop,
+	.t_lookup_by_name = kp_lookup_by_name,
+	.t_lookup_by_addr = kp_lookup_by_addr,
+	.t_symbol_iter = kp_symbol_iter,
+	.t_mapping_iter = kp_mapping_iter,
+	.t_object_iter = kp_object_iter,
+	.t_addr_to_map = kp_addr_to_map,
+	.t_name_to_map = kp_name_to_map,
+	.t_addr_to_ctf = (struct ctf_file *(*)())mdb_tgt_null,
+	.t_name_to_ctf = (struct ctf_file *(*)())mdb_tgt_null,
+	.t_status = kp_status,
+	.t_run = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_step = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_step_out = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_next = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_cont = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_signal = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_add_sbrkpt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_vbrkpt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_pwapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_vwapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_iowapt = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysenter = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysexit = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_signal = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_fault = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_getareg = (int (*)())(uintptr_t)mdb_tgt_notsup,	/* XXX */
+	.t_putareg = (int (*)())(uintptr_t)mdb_tgt_notsup,	/* XXX */
+	.t_stack_iter = (int (*)())(uintptr_t)mdb_tgt_notsup,	/* XXX */
+	.t_auxv = kp_auxv,
+	.t_thread_name = (int (*)())(uintptr_t)mdb_tgt_notsup,
 };
 
 int
@@ -1135,17 +1135,17 @@ kp_io_name(mdb_io_t *io)
 }
 
 static const mdb_io_ops_t kp_io_ops = {
-	kp_io_read,
-	no_io_write,
-	kp_io_seek,
-	no_io_ctl,
-	kp_io_close,
-	kp_io_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = kp_io_read,
+	.io_write = no_io_write,
+	.io_seek = kp_io_seek,
+	.io_ctl = no_io_ctl,
+	.io_close = kp_io_close,
+	.io_name = kp_io_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume,
 };
 
 static mdb_io_t *

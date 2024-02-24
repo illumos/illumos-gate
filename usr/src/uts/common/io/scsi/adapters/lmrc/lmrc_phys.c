@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -372,6 +372,10 @@ lmrc_get_pd_list(lmrc_t *lmrc)
 	lmrc_mfi_dcmd_payload_t *dcmd;
 	int ret;
 
+	/* If the phys iport isn't attached yet, just return success. */
+	if (!INITLEVEL_ACTIVE(lmrc, LMRC_INITLEVEL_PHYS))
+		return (DDI_SUCCESS);
+
 	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_PD_LIST_QUERY,
 	    sizeof (lmrc_pd_list_t) + sizeof (lmrc_pd_addr_t) * LMRC_MAX_PD, 1);
 
@@ -453,6 +457,8 @@ lmrc_phys_attach(dev_info_t *dip)
 		if (lmrc_setup_pdmap(lmrc) != DDI_SUCCESS)
 			lmrc->l_use_seqnum_jbod_fp = B_FALSE;
 
+	INITLEVEL_SET(lmrc, LMRC_INITLEVEL_PHYS);
+
 	ret = lmrc_get_pd_list(lmrc);
 	if (ret != DDI_SUCCESS) {
 		dev_err(lmrc->l_dip, CE_WARN, "!Failed to get PD list.");
@@ -469,6 +475,7 @@ lmrc_phys_detach(dev_info_t *dip)
 	lmrc_t *lmrc = ddi_get_soft_state(lmrc_state, ddi_get_instance(pdip));
 
 	VERIFY(lmrc != NULL);
+	INITLEVEL_CLEAR(lmrc, LMRC_INITLEVEL_PHYS);
 
 	if (lmrc->l_phys_tgtmap != NULL) {
 		scsi_hba_tgtmap_destroy(lmrc->l_phys_tgtmap);

@@ -29,7 +29,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Peter Tribble.
 # Copyright 2015, Joyent, Inc. All rights reserved.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -889,6 +889,12 @@ FSHDRS=				\
 	zfs.h			\
 	zut.h
 
+NVMEHDRS=		\
+	discovery.h	\
+	wdc.h		\
+	wdc_sn840.h	\
+	wdc_sn65x.h
+
 SCSIHDRS=		\
 	scsi.h		\
 	scsi_address.h	\
@@ -1178,6 +1184,7 @@ CHECKHDRS=						\
 	$(FMFSHDRS:%.h=fm/fs/%.check)			\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
+	$(NVMEHDRS:%.h=nvme/%.check)			\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
 	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
@@ -1237,6 +1244,7 @@ CHECKHDRS=						\
 	$(ROOTIBNEXHDRS)	\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
+	$(ROOTNVMEHDRS)		\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSATAGENHDRS)	\
@@ -1309,6 +1317,7 @@ install_h:			\
 	$(ROOTIBNEXHDRS)	\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
+	$(ROOTNVMEHDRS)		\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSATAGENHDRS)	\

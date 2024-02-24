@@ -144,17 +144,17 @@ shellio_close(mdb_io_t *io)
 }
 
 static const mdb_io_ops_t shellio_ops = {
-	no_io_read,
-	no_io_write,
-	no_io_seek,
-	no_io_ctl,
-	shellio_close,
-	no_io_name,
-	no_io_link,
-	shellio_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = no_io_read,
+	.io_write = no_io_write,
+	.io_seek = no_io_seek,
+	.io_ctl = no_io_ctl,
+	.io_close = shellio_close,
+	.io_name = no_io_name,
+	.io_link = no_io_link,
+	.io_unlink = shellio_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume
 };
 
 void

@@ -12,7 +12,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -68,19 +68,20 @@
 #include <sys/dkio.h>
 #include <sys/scsi/generic/inquiry.h>
 
-#include <sys/nvme.h>
+#include <libnvme.h>
 #include "disk.h"
 #include "disk_drivers.h"
 
 typedef struct nvme_enum_info {
 	topo_mod_t		*nei_mod;
 	di_node_t		nei_dinode;
-	nvme_identify_ctrl_t	*nei_idctl;
-	nvme_version_t		nei_vers;
+	nvme_t			*nei_libnvme;
+	nvme_ctrl_t		*nei_ctrl;
+	nvme_ctrl_info_t	*nei_ctrl_info;
+	const nvme_version_t	*nei_vers;
 	tnode_t			*nei_parent;
 	tnode_t			*nei_nvme;
 	nvlist_t		*nei_nvme_fmri;
-	const char		*nei_nvme_path;
 	int			nei_fd;
 } nvme_enum_info_t;
 
@@ -149,34 +150,32 @@ get_logical_disk(topo_mod_t *mod, const char *devpath, uint_t *bufsz)
 }
 
 static bool
-disk_nvme_make_ns_serial(topo_mod_t *mod, const nvme_identify_nsid_t *id,
-    uint32_t nsid, char *buf, size_t buflen)
+disk_nvme_make_ns_serial(topo_mod_t *mod, nvme_ns_info_t *ns_info, char *buf,
+    size_t buflen)
 {
-	uint8_t zero_guid[16] = { 0 };
+	uint8_t nguid[16], eui64[8];
 	int ret;
 
-	if (bcmp(zero_guid, id->id_nguid, sizeof (id->id_nguid)) != 0) {
+	if (nvme_ns_info_nguid(ns_info, nguid)) {
 		ret = snprintf(buf, buflen, "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X"
 		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
-		    id->id_nguid[0], id->id_nguid[1], id->id_nguid[2],
-		    id->id_nguid[3], id->id_nguid[4], id->id_nguid[5],
-		    id->id_nguid[6], id->id_nguid[7], id->id_nguid[8],
-		    id->id_nguid[9], id->id_nguid[10], id->id_nguid[11],
-		    id->id_nguid[12], id->id_nguid[13], id->id_nguid[14],
-		    id->id_nguid[15]);
-	} else if (bcmp(zero_guid, id->id_eui64, sizeof (id->id_eui64)) != 0) {
+		    nguid[0], nguid[1], nguid[2], nguid[3], nguid[4],
+		    nguid[5], nguid[6], nguid[7], nguid[8], nguid[9],
+		    nguid[10], nguid[11], nguid[12], nguid[13], nguid[14],
+		    nguid[15]);
+	} else if (nvme_ns_info_eui64(ns_info, eui64)) {
 		ret = snprintf(buf, buflen,
 		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
-		    id->id_eui64[0], id->id_eui64[1], id->id_eui64[2],
-		    id->id_eui64[3], id->id_eui64[4], id->id_eui64[5],
-		    id->id_eui64[6], id->id_eui64[7]);
+		    eui64[0], eui64[1], eui64[2], eui64[3], eui64[4],
+		    eui64[5], eui64[6], eui64[7]);
 	} else {
-		ret = snprintf(buf, buflen, "%u", nsid);
+		ret = snprintf(buf, buflen, "%u", nvme_ns_info_nsid(ns_info));
 	}
 
 	if ((size_t)ret >= buflen) {
 		topo_mod_dprintf(mod, "overflowed serial number for nsid %u: "
-		    "needed %zu bytes, got %d", nsid, buflen, ret);
+		    "needed %zu bytes, got %d", nvme_ns_info_nsid(ns_info),
+		    buflen, ret);
 		return (false);
 	}
 
@@ -336,41 +335,18 @@ disk_nvme_make_ns_di_props(topo_mod_t *mod, tnode_t *tn, di_node_t di)
 }
 
 static void
-disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
+disk_nvme_make_ns(nvme_enum_info_t *nei, nvme_ns_info_t *ns_info)
 {
 	topo_mod_t *mod = nei->nei_mod;
 	nvlist_t *auth = NULL, *fmri = NULL;
+	const uint32_t nsid = nvme_ns_info_nsid(ns_info);
 	const topo_instance_t inst = nsid - 1;
-	nvme_ns_info_t info;
-	nvme_ioctl_t ioc;
 	char serial[64], capstr[64];
-	uint64_t cap, blksz;
+	const nvme_nvm_lba_fmt_t *fmt;
+	const char *bd_addr;
+	uint64_t cap, blksz, capblks;
 	tnode_t *tn;
-	uint8_t lba;
 	int err;
-
-	bzero(&ioc, sizeof (ioc));
-	bzero(&info, sizeof (info));
-	ioc.n_len = sizeof (nvme_ns_info_t);
-	ioc.n_buf = (uintptr_t)&info;
-	ioc.n_arg = nsid;
-
-	if (ioctl(nei->nei_fd, NVME_IOC_NS_INFO, &ioc) != 0) {
-		topo_mod_dprintf(mod, "failed to get namespace info for ns %u: "
-		    "%s", nsid, strerror(errno));
-		return;
-	}
-
-	if ((info.nni_state & NVME_NS_STATE_IGNORED) != 0) {
-		return;
-	}
-
-	if ((info.nni_state &
-	    (NVME_NS_STATE_ACTIVE | NVME_NS_STATE_ATTACHED)) == 0) {
-		topo_mod_dprintf(mod, "skipping nsid %u because it is not "
-		    "active or attached (state: 0x%x)", nsid, info.nni_state);
-		return;
-	}
 
 	auth = topo_mod_auth(mod, nei->nei_nvme);
 	if (auth == NULL) {
@@ -392,8 +368,7 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
 	 * we're given of the NGUID, EUI64, and then fall back to the namespace
 	 * number.
 	 */
-	if (!disk_nvme_make_ns_serial(mod, &info.nni_id, nsid, serial,
-	    sizeof (serial))) {
+	if (!disk_nvme_make_ns_serial(mod, ns_info, serial, sizeof (serial))) {
 		goto done;
 	}
 	fmri = topo_mod_hcfmri(mod, nei->nei_nvme, FM_HC_SCHEME_VERSION,
@@ -433,9 +408,14 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
 		    topo_strerror(err));
 	}
 
-	lba = info.nni_id.id_flbas.lba_format;
-	blksz = 1ULL << info.nni_id.id_lbaf[lba].lbaf_lbads;
-	if (blksz != 0 && topo_prop_set_uint64(tn, TOPO_PGROUP_STORAGE,
+	if (!nvme_ns_info_curformat(ns_info, &fmt)) {
+		topo_mod_dprintf(mod, "failed to get current namespace "
+		    "format: %s", nvme_ns_info_errmsg(ns_info));
+		goto done;
+	}
+
+	blksz = nvme_nvm_lba_fmt_data_size(fmt);
+	if (topo_prop_set_uint64(tn, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_LOG_BLOCK_SIZE, TOPO_PROP_IMMUTABLE, blksz, &err) !=
 	    0) {
 		topo_mod_dprintf(mod, "failed to create property %s:%s on %s[%"
@@ -445,7 +425,13 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
 		goto done;
 	}
 
-	cap = blksz * info.nni_id.id_nsize;
+	if (!nvme_ns_info_cap(ns_info, &capblks)) {
+		topo_mod_dprintf(mod, "failed to get namespace capacity: %s",
+		    nvme_ns_info_errmsg(ns_info));
+		goto done;
+	}
+
+	cap = blksz * capblks;
 	if (snprintf(capstr, sizeof (capstr), "%" PRIu64, cap) >=
 	    sizeof (capstr)) {
 		topo_mod_dprintf(mod, "overflowed capacity calculation on "
@@ -456,12 +442,21 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
 	/*
 	 * Finally attempt to find a child node that has a matching name and go
 	 * from there. Sorry, this does result in node creation being O(n^2),
-	 * but at least n is usually small today.
+	 * but at least n is usually small today. Note, we may not have a blkdev
+	 * address because the disk may not be attached.
 	 */
+	if (!nvme_ns_info_bd_addr(ns_info, &bd_addr)) {
+		if (nvme_ns_info_err(ns_info) != NVME_INFO_ERR_NS_NO_BLKDEV) {
+			topo_mod_dprintf(mod, "failed to get namespace blkdev "
+			    "address: %s", nvme_ns_info_errmsg(ns_info));
+		}
+		goto done;
+	}
+
 	for (di_node_t di = di_child_node(nei->nei_dinode); di != DI_NODE_NIL;
 	    di = di_sibling_node(di)) {
 		const char *addr = di_bus_addr(di);
-		if (addr != NULL && strcmp(addr, info.nni_addr) == 0) {
+		if (addr != NULL && strcmp(addr, bd_addr) == 0) {
 			disk_nvme_make_ns_di_props(mod, tn, di);
 		}
 	}
@@ -508,29 +503,31 @@ static int
 make_nvme_node(nvme_enum_info_t *nvme_info)
 {
 	topo_mod_t *mod = nvme_info->nei_mod;
+	nvme_ctrl_info_t *info = nvme_info->nei_ctrl_info;
+	nvme_ns_iter_t *iter = NULL;
+	nvme_iter_t nret;
+	const nvme_ns_disc_t *disc;
 	nvlist_t *auth = NULL, *fmri = NULL, *fru;
 	tnode_t *nvme;
-	char *rev = NULL, *model = NULL, *serial = NULL, *vers = NULL;
+	char *model = NULL, *serial = NULL, *vers = NULL;
 	char *pname = topo_node_name(nvme_info->nei_parent);
 	char *label = NULL;
 	topo_instance_t pinst = topo_node_instance(nvme_info->nei_parent);
 	int err = 0, ret = -1;
 
 	/*
-	 * Next we pass the strings through a function that sanitizes them of
-	 * any characters that can't be used in an FMRI string. This also takes
-	 * care of making them properly terminated.
+	 * Pass the model and serial strings through a function that sanitizes
+	 * them of any characters that can't be used in an FMRI string. Note, we
+	 * do not use the firmware revision here because that's not really a
+	 * device property that should be part of the FMRI (it can be changed at
+	 * runtime).
 	 */
-	rev = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_fwrev,
-	    NVME_FWVER_SZ);
-	model = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_model,
-	    NVME_MODEL_SZ);
-	serial = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_serial,
-	    NVME_SERIAL_SZ);
+	model = topo_mod_clean_str(mod, nvme_ctrl_info_model(info));
+	serial = topo_mod_clean_str(mod, nvme_ctrl_info_serial(info));
 
 	auth = topo_mod_auth(mod, nvme_info->nei_parent);
 	fmri = topo_mod_hcfmri(mod, nvme_info->nei_parent, FM_HC_SCHEME_VERSION,
-	    NVME, 0, NULL, auth, model, rev, serial);
+	    NVME, 0, NULL, auth, model, NULL, serial);
 
 	if (fmri == NULL) {
 		/* errno set */
@@ -615,8 +612,8 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 		goto error;
 	}
 
-	if (asprintf(&vers, "%u.%u", nvme_info->nei_vers.v_major,
-	    nvme_info->nei_vers.v_minor) < 0) {
+	if (asprintf(&vers, "%u.%u", nvme_info->nei_vers->v_major,
+	    nvme_info->nei_vers->v_minor) < 0) {
 		topo_mod_dprintf(mod, "%s: failed to alloc string", __func__);
 		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		goto error;
@@ -644,7 +641,7 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	 * Create a child disk node for each namespace.
 	 */
 	if (topo_node_range_create(mod, nvme, DISK, 0,
-	    (nvme_info->nei_idctl->id_nn - 1)) < 0) {
+	    nvme_ctrl_info_nns(info) - 1) < 0) {
 		/* errno set */
 		topo_mod_dprintf(mod, "%s: error creating %s range", __func__,
 		    DISK);
@@ -657,26 +654,49 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	 * We map things such that a disk instance is always namespace - 1 to
 	 * fit into the above mapping.
 	 */
-	for (uint32_t i = 1; i <= nvme_info->nei_idctl->id_nn; i++) {
-		disk_nvme_make_ns(nvme_info, i);
+	if (!nvme_ns_discover_init(nvme_info->nei_ctrl,
+	    NVME_NS_DISC_F_NOT_IGNORED, &iter)) {
+		topo_mod_dprintf(mod, "failed to initialize namespace "
+		    "discovery: %s", nvme_errmsg(nvme_info->nei_libnvme));
+		ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
+		goto error;
+	}
+
+	for (nret = nvme_ns_discover_step(iter, &disc); nret == NVME_ITER_VALID;
+	    nret = nvme_ns_discover_step(iter, &disc)) {
+		nvme_ns_info_t *ns_info;
+		uint32_t nsid = nvme_ns_disc_nsid(disc);
+
+		if (!nvme_ctrl_ns_info_snap(nvme_info->nei_ctrl, nsid,
+		    &ns_info)) {
+			topo_mod_dprintf(mod, "failed to get namespace "
+			    "information for ns %u: %s", nsid,
+			    nvme_errmsg(nvme_info->nei_libnvme));
+			ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
+			goto error;
+		}
+
+		disk_nvme_make_ns(nvme_info, ns_info);
+		nvme_ns_info_free(ns_info);
+	}
+
+	if (nret == NVME_ITER_ERROR) {
+		topo_mod_dprintf(mod, "namespace discovery failed: %s",
+		    nvme_errmsg(nvme_info->nei_libnvme));
+		ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
 	}
 	ret = 0;
 
 error:
+	nvme_ns_discover_fini(iter);
 	free(vers);
 	nvlist_free(auth);
 	nvlist_free(fmri);
-	topo_mod_strfree(mod, rev);
 	topo_mod_strfree(mod, model);
 	topo_mod_strfree(mod, serial);
 	topo_mod_strfree(mod, label);
 	return (ret);
 }
-
-struct diwalk_arg {
-	topo_mod_t	*diwk_mod;
-	tnode_t		*diwk_parent;
-};
 
 /*
  * This function gathers identity information from the NVMe controller and
@@ -684,85 +704,42 @@ struct diwalk_arg {
  * does the actual topo node creation.
  */
 static int
-discover_nvme_ctl(di_node_t node, di_minor_t minor, void *arg)
+discover_nvme_ctl(topo_mod_t *mod, tnode_t *pnode, di_node_t dinode)
 {
-	struct diwalk_arg *wkarg = arg;
-	topo_mod_t *mod = wkarg->diwk_mod;
-	char *path = NULL, *devctl = NULL;
-	nvme_ioctl_t nioc = { 0 };
-	nvme_identify_ctrl_t *idctl = NULL;
+	topo_disk_t *disk = topo_mod_getspecific(mod);
 	nvme_enum_info_t nvme_info = { 0 };
-	int fd = -1, ret = DI_WALK_TERMINATE;
-
-	if ((path = di_devfs_minor_path(minor)) == NULL) {
-		topo_mod_dprintf(mod, "failed to get minor path");
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		return (ret);
-	}
-
-	topo_mod_dprintf(mod, "%s=%" PRIu64 ": found nvme controller: %s",
-	    topo_node_name(wkarg->diwk_parent),
-	    topo_node_instance(wkarg->diwk_parent), path);
-
-	if (asprintf(&devctl, "/devices%s", path) < 0) {
-		topo_mod_dprintf(mod, "failed to alloc string");
-		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
-		goto error;
-	}
-
-	if ((fd = open(devctl, O_RDWR)) < 0) {
-		topo_mod_dprintf(mod, "failed to open %s", devctl);
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
-	if ((idctl = topo_mod_zalloc(mod, NVME_IDENTIFY_BUFSIZE)) == NULL) {
-		topo_mod_dprintf(mod, "zalloc failed");
-		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
-		goto error;
-	}
-	nioc.n_len = NVME_IDENTIFY_BUFSIZE;
-	nioc.n_buf = (uintptr_t)idctl;
-	nioc.n_arg = NVME_IDENTIFY_CTRL;
-
-	if (ioctl(fd, NVME_IOC_IDENTIFY, &nioc) != 0) {
-		topo_mod_dprintf(mod, "NVME_IOC_IDENTIFY ioctl "
-		    "failed: %s", strerror(errno));
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
-
-	nioc.n_len = sizeof (nvme_version_t);
-	nioc.n_buf = (uintptr_t)&nvme_info.nei_vers;
-	nioc.n_arg = 0;
-
-	if (ioctl(fd, NVME_IOC_VERSION, &nioc) != 0) {
-		topo_mod_dprintf(mod, "NVME_IOC_VERSION ioctl failed: %s",
-		    strerror(errno));
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
+	int ret;
 
 	nvme_info.nei_mod = mod;
-	nvme_info.nei_nvme_path = path;
-	nvme_info.nei_dinode = node;
-	nvme_info.nei_idctl = idctl;
-	nvme_info.nei_parent = wkarg->diwk_parent;
-	nvme_info.nei_fd = fd;
+	nvme_info.nei_dinode = dinode;
+	nvme_info.nei_parent = pnode;
+	nvme_info.nei_libnvme = disk->td_nvme;
 
-	if (make_nvme_node(&nvme_info) != 0) {
-		/* errno set */
+	if (!nvme_ctrl_init(disk->td_nvme, dinode, &nvme_info.nei_ctrl)) {
+		topo_mod_dprintf(mod, "failed to initialize nvme_ctrl_t: %s",
+		    nvme_errmsg(disk->td_nvme));
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+
+	if (!nvme_ctrl_info_snap(nvme_info.nei_ctrl,
+	    &nvme_info.nei_ctrl_info)) {
+		topo_mod_dprintf(mod, "failed to initialize nvme_ctrl_t: %s",
+		    nvme_errmsg(disk->td_nvme));
+		ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
 		goto error;
 	}
 
-	ret = DI_WALK_CONTINUE;
+	nvme_info.nei_vers = nvme_ctrl_info_version(nvme_info.nei_ctrl_info);
+
+	if ((ret = make_nvme_node(&nvme_info)) != 0) {
+		goto error;
+	}
 
 error:
-	if (fd > 0)
-		(void) close(fd);
-	di_devfs_path_free(path);
-	free(devctl);
-	if (idctl != NULL)
-		topo_mod_free(mod, idctl, NVME_IDENTIFY_BUFSIZE);
+	if (nvme_info.nei_ctrl_info != NULL)
+		nvme_ctrl_info_free(nvme_info.nei_ctrl_info);
+	if (nvme_info.nei_ctrl != NULL)
+		nvme_ctrl_fini(nvme_info.nei_ctrl);
 	return (ret);
 }
 
@@ -773,7 +750,6 @@ disk_nvme_enum_disk(topo_mod_t *mod, tnode_t *pnode)
 	int err;
 	di_node_t devtree;
 	di_node_t dnode;
-	struct diwalk_arg wkarg = { 0 };
 	int ret = -1;
 
 	/*
@@ -802,8 +778,6 @@ disk_nvme_enum_disk(topo_mod_t *mod, tnode_t *pnode)
 	 * check if the devfs path of the parent matches the one specified in
 	 * TOPO_BINDING_PARENT_DEV.
 	 */
-	wkarg.diwk_mod = mod;
-	wkarg.diwk_parent = pnode;
 	dnode = di_drv_first_node(NVME_DRV, devtree);
 	while (dnode != DI_NODE_NIL) {
 		char *path;
@@ -814,11 +788,9 @@ disk_nvme_enum_disk(topo_mod_t *mod, tnode_t *pnode)
 			goto out;
 		}
 		if (strcmp(parent, path) == 0) {
-			if (di_walk_minor(dnode, DDI_NT_NVME_NEXUS, 0,
-			    &wkarg, discover_nvme_ctl) < 0) {
-				di_devfs_path_free(path);
-				goto out;
-			}
+			ret = discover_nvme_ctl(mod, pnode, dnode);
+			di_devfs_path_free(path);
+			goto out;
 		}
 		di_devfs_path_free(path);
 		dnode = di_drv_next_node(dnode);

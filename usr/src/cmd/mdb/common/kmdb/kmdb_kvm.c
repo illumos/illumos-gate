@@ -659,8 +659,8 @@ kmt_reg_disc_set(mdb_var_t *v, uintmax_t r)
 }
 
 static const mdb_nv_disc_t kmt_reg_disc = {
-	kmt_reg_disc_set,
-	kmt_reg_disc_get
+	.disc_get = kmt_reg_disc_get,
+	.disc_set = kmt_reg_disc_set
 };
 
 /*ARGSUSED*/
@@ -1856,15 +1856,15 @@ kmt_brkpt_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t kmt_brkpt_ops = {
-	kmt_brkpt_ctor,		/* se_ctor */
-	kmt_brkpt_dtor,		/* se_dtor */
-	kmt_brkpt_info,		/* se_info */
-	kmt_brkpt_secmp,	/* se_secmp */
-	kmt_brkpt_vecmp,	/* se_vecmp */
-	kmt_brkpt_arm,		/* se_arm */
-	kmt_brkpt_disarm,	/* se_disarm */
-	kmt_brkpt_cont,		/* se_cont */
-	kmt_brkpt_match		/* se_match */
+	.se_ctor = kmt_brkpt_ctor,
+	.se_dtor = kmt_brkpt_dtor,
+	.se_info = kmt_brkpt_info,
+	.se_secmp = kmt_brkpt_secmp,
+	.se_vecmp = kmt_brkpt_vecmp,
+	.se_arm = kmt_brkpt_arm,
+	.se_disarm = kmt_brkpt_disarm,
+	.se_cont = kmt_brkpt_cont,
+	.se_match = kmt_brkpt_match,
 };
 
 static int
@@ -2069,15 +2069,15 @@ kmt_wapt_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t kmt_wapt_ops = {
-	kmt_wapt_ctor,		/* se_ctor */
-	kmt_wapt_dtor,		/* se_dtor */
-	kmt_wapt_info,		/* se_info */
-	kmt_wapt_secmp,		/* se_secmp */
-	kmt_wapt_vecmp,		/* se_vecmp */
-	kmt_wapt_arm,		/* se_arm */
-	kmt_wapt_disarm,	/* se_disarm */
-	kmt_wapt_cont,		/* se_cont */
-	kmt_wapt_match		/* se_match */
+	.se_ctor = kmt_wapt_ctor,
+	.se_dtor = kmt_wapt_dtor,
+	.se_info = kmt_wapt_info,
+	.se_secmp = kmt_wapt_secmp,
+	.se_vecmp = kmt_wapt_vecmp,
+	.se_arm = kmt_wapt_arm,
+	.se_disarm = kmt_wapt_disarm,
+	.se_cont = kmt_wapt_cont,
+	.se_match = kmt_wapt_match,
 };
 
 /*ARGSUSED*/
@@ -2136,15 +2136,15 @@ kmt_trap_match(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_tgt_status_t *tsp)
 }
 
 static const mdb_se_ops_t kmt_trap_ops = {
-	kmt_trap_ctor,		/* se_ctor */
-	no_se_dtor,		/* se_dtor */
-	kmt_trap_info,		/* se_info */
-	no_se_secmp,		/* se_secmp */
-	no_se_vecmp,		/* se_vecmp */
-	no_se_arm,		/* se_arm */
-	no_se_disarm,		/* se_disarm */
-	no_se_cont,		/* se_cont */
-	kmt_trap_match		/* se_match */
+	.se_ctor = kmt_trap_ctor,
+	.se_dtor = no_se_dtor,
+	.se_info = kmt_trap_info,
+	.se_secmp = no_se_secmp,
+	.se_vecmp = no_se_vecmp,
+	.se_arm = no_se_arm,
+	.se_disarm = no_se_disarm,
+	.se_cont = no_se_cont,
+	.se_match = kmt_trap_match,
 };
 
 static void
@@ -2351,8 +2351,7 @@ kmt_cpuid_disc_get(const mdb_var_t *v)
 }
 
 static const mdb_nv_disc_t kmt_cpuid_disc = {
-	NULL,
-	kmt_cpuid_disc_get
+	.disc_get = kmt_cpuid_disc_get
 };
 
 /*
@@ -2398,58 +2397,58 @@ kmt_destroy(mdb_tgt_t *t)
 }
 
 static const mdb_tgt_ops_t kmt_ops = {
-	kmt_setflags,				/* t_setflags */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setcontext */
-	kmt_activate,				/* t_activate */
-	(void (*)())(uintptr_t)mdb_tgt_nop,	/* t_deactivate */
-	kmt_periodic,				/* t_periodic */
-	kmt_destroy,				/* t_destroy */
-	kmt_name,				/* t_name */
-	(const char *(*)())mdb_conf_isa,	/* t_isa */
-	kmt_platform,				/* t_platform */
-	kmt_uname,				/* t_uname */
-	kmt_dmodel,				/* t_dmodel */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
-	kmt_read,				/* t_vread */
-	kmt_write,				/* t_vwrite */
-	kmt_pread,				/* t_pread */
-	kmt_pwrite,				/* t_pwrite */
-	kmt_read,				/* t_fread */
-	kmt_write,				/* t_fwrite */
-	kmt_ioread,				/* t_ioread */
-	kmt_iowrite,				/* t_iowrite */
-	kmt_vtop,				/* t_vtop */
-	kmt_lookup_by_name,			/* t_lookup_by_name */
-	kmt_lookup_by_addr,			/* t_lookup_by_addr */
-	kmt_symbol_iter,			/* t_symbol_iter */
-	kmt_mapping_iter,			/* t_mapping_iter */
-	kmt_object_iter,			/* t_object_iter */
-	kmt_addr_to_map,			/* t_addr_to_map */
-	kmt_name_to_map,			/* t_name_to_map */
-	kmt_addr_to_ctf,			/* t_addr_to_ctf */
-	kmt_name_to_ctf,			/* t_name_to_ctf */
-	kmt_status,				/* t_status */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_run */
-	kmt_step,				/* t_step */
-	kmt_step_out,				/* t_step_out */
-	kmt_next,				/* t_next */
-	kmt_continue,				/* t_cont */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_signal */
-	kmt_add_vbrkpt,				/* t_add_vbrkpt */
-	kmt_add_sbrkpt,				/* t_add_sbrkpt */
-	kmt_add_pwapt,				/* t_add_pwapt */
-	kmt_add_vwapt,				/* t_add_vwapt */
-	kmt_add_iowapt,				/* t_add_iowapt */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysenter */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_sysexit */
-	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_signal */
-	kmt_add_trap,				/* t_add_fault */
-	kmt_getareg,				/* t_getareg */
-	kmt_putareg,				/* t_putareg */
-	(int (*)())(uintptr_t)mdb_tgt_nop,	/* XXX t_stack_iter */
-	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_auxv */
-	(int (*)())(uintptr_t)mdb_tgt_notsup	/* t_thread_name */
+	.t_setflags = kmt_setflags,
+	.t_setcontext = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_activate = kmt_activate,
+	.t_deactivate = (void (*)())(uintptr_t)mdb_tgt_nop,
+	.t_periodic = kmt_periodic,
+	.t_destroy = kmt_destroy,
+	.t_name = kmt_name,
+	.t_isa = (const char *(*)())mdb_conf_isa,
+	.t_platform = kmt_platform,
+	.t_uname = kmt_uname,
+	.t_dmodel = kmt_dmodel,
+	.t_aread = (ssize_t (*)())mdb_tgt_notsup,
+	.t_awrite = (ssize_t (*)())mdb_tgt_notsup,
+	.t_vread = kmt_read,
+	.t_vwrite = kmt_write,
+	.t_pread = kmt_pread,
+	.t_pwrite = kmt_pwrite,
+	.t_fread = kmt_read,
+	.t_fwrite = kmt_write,
+	.t_ioread = kmt_ioread,
+	.t_iowrite = kmt_iowrite,
+	.t_vtop = kmt_vtop,
+	.t_lookup_by_name = kmt_lookup_by_name,
+	.t_lookup_by_addr = kmt_lookup_by_addr,
+	.t_symbol_iter = kmt_symbol_iter,
+	.t_mapping_iter = kmt_mapping_iter,
+	.t_object_iter = kmt_object_iter,
+	.t_addr_to_map = kmt_addr_to_map,
+	.t_name_to_map = kmt_name_to_map,
+	.t_addr_to_ctf = kmt_addr_to_ctf,
+	.t_name_to_ctf = kmt_name_to_ctf,
+	.t_status = kmt_status,
+	.t_run = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_step = kmt_step,
+	.t_step_out = kmt_step_out,
+	.t_next = kmt_next,
+	.t_cont = kmt_continue,
+	.t_signal = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_add_vbrkpt = kmt_add_vbrkpt,
+	.t_add_sbrkpt = kmt_add_sbrkpt,
+	.t_add_pwapt = kmt_add_pwapt,
+	.t_add_vwapt = kmt_add_vwapt,
+	.t_add_iowapt = kmt_add_iowapt,
+	.t_add_sysenter = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_sysexit = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_signal = (int (*)())(uintptr_t)mdb_tgt_null,
+	.t_add_fault = kmt_add_trap,
+	.t_getareg = kmt_getareg,
+	.t_putareg = kmt_putareg,
+	.t_stack_iter = (int (*)())(uintptr_t)mdb_tgt_nop,	/* XXX */
+	.t_auxv = (int (*)())(uintptr_t)mdb_tgt_notsup,
+	.t_thread_name = (int (*)())(uintptr_t)mdb_tgt_notsup,
 };
 
 /*

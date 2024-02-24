@@ -1,0 +1,248 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+    global:
+	nvme_ctrl_deverr;
+	nvme_ctrl_devi;
+	nvme_ctrl_disc_devi;
+	nvme_ctrl_disc_minor;
+	nvme_ctrl_discover_fini;
+	nvme_ctrl_discover_init;
+	nvme_ctrl_discover_step;
+	nvme_ctrl_discover;
+	nvme_ctrl_err;
+	nvme_ctrl_errlen;
+	nvme_ctrl_errmsg;
+	nvme_ctrl_errtostr;
+	nvme_ctrl_fini;
+	nvme_ctrl_info_cap;
+	nvme_ctrl_info_common_ns;
+	nvme_ctrl_info_err;
+	nvme_ctrl_info_errlen;
+	nvme_ctrl_info_errmsg;
+	nvme_ctrl_info_errtostr;
+	nvme_ctrl_info_errtostr;
+	nvme_ctrl_info_format;
+	nvme_ctrl_info_free;
+	nvme_ctrl_info_fwrev;
+	nvme_ctrl_info_identify;
+	nvme_ctrl_info_model;
+	nvme_ctrl_info_nformats;
+	nvme_ctrl_info_nns;
+	nvme_ctrl_info_pci_did;
+	nvme_ctrl_info_pci_mps_max;
+	nvme_ctrl_info_pci_mps_min;
+	nvme_ctrl_info_pci_nintrs;
+	nvme_ctrl_info_pci_rev;
+	nvme_ctrl_info_pci_subsys;
+	nvme_ctrl_info_pci_subvid;
+	nvme_ctrl_info_pci_vid;
+	nvme_ctrl_info_persist;
+	nvme_ctrl_info_restore;
+	nvme_ctrl_info_serial;
+	nvme_ctrl_info_snap;
+	nvme_ctrl_info_syserr;
+	nvme_ctrl_info_transport;
+	nvme_ctrl_info_type;
+	nvme_ctrl_info_unalloc_cap;
+	nvme_ctrl_info_vendor;
+	nvme_ctrl_info_version;
+	nvme_ctrl_init_by_instance;
+	nvme_ctrl_init;
+	nvme_ctrl_lock;
+	nvme_ctrl_ns_info_snap;
+	nvme_ctrl_ns_init;
+	nvme_ctrl_syserr;
+	nvme_ctrl_unlock;
+	nvme_err;
+	nvme_errlen;
+	nvme_errmsg;
+	nvme_errtostr;
+	nvme_feat_disc_csi;
+	nvme_feat_disc_data_size;
+	nvme_feat_disc_dup;
+	nvme_feat_disc_fid;
+	nvme_feat_disc_fields_get;
+	nvme_feat_disc_fields_set;
+	nvme_feat_disc_flags;
+	nvme_feat_disc_free;
+	nvme_feat_disc_impl;
+	nvme_feat_disc_kind;
+	nvme_feat_disc_output_get;
+	nvme_feat_disc_output_set;
+	nvme_feat_disc_scope;
+	nvme_feat_disc_short;
+	nvme_feat_disc_spec;
+	nvme_feat_discover_fini;
+	nvme_feat_discover_init;
+	nvme_feat_discover_step;
+	nvme_feat_discover;
+	nvme_fini;
+	nvme_format_req_exec;
+	nvme_format_req_fini;
+	nvme_format_req_init;
+	nvme_format_req_set_lbaf;
+	nvme_format_req_set_nsid;
+	nvme_format_req_set_ses;
+	nvme_fw_commit_req_exec;
+	nvme_fw_commit_req_fini;
+	nvme_fw_commit_req_init;
+	nvme_fw_commit_req_set_action;
+	nvme_fw_commit_req_set_slot;
+	nvme_fw_load;
+	nvme_get_feat_req_exec;
+	nvme_get_feat_req_fini;
+	nvme_get_feat_req_get_cdw0;
+	nvme_get_feat_req_init_by_disc;
+	nvme_get_feat_req_init_by_name;
+	nvme_get_feat_req_init;
+	nvme_get_feat_req_set_cdw11;
+	nvme_get_feat_req_set_fid;
+	nvme_get_feat_req_set_nsid;
+	nvme_get_feat_req_set_output;
+	nvme_get_feat_req_set_sel;
+	nvme_id_req_exec;
+	nvme_id_req_fini;
+	nvme_id_req_init_by_cns;
+	nvme_id_req_set_ctrlid;
+	nvme_id_req_set_nsid;
+	nvme_id_req_set_output;
+	nvme_init;
+	nvme_log_disc_calc_size;
+	nvme_log_disc_csi;
+	nvme_log_disc_desc;
+	nvme_log_disc_dup;
+	nvme_log_disc_fields;
+	nvme_log_disc_free;
+	nvme_log_disc_impl;
+	nvme_log_disc_kind;
+	nvme_log_disc_lid;
+	nvme_log_disc_name;
+	nvme_log_disc_scopes;
+	nvme_log_disc_size;
+	nvme_log_disc_sources;
+	nvme_log_discover_fini;
+	nvme_log_discover_init;
+	nvme_log_discover_step;
+	nvme_log_discover;
+	nvme_log_req_exec;
+	nvme_log_req_fini;
+	nvme_log_req_init_by_disc;
+	nvme_log_req_init_by_name;
+	nvme_log_req_init;
+	nvme_log_req_set_csi;
+	nvme_log_req_set_lid;
+	nvme_log_req_set_lsi;
+	nvme_log_req_set_lsp;
+	nvme_log_req_set_nsid;
+	nvme_log_req_set_offset;
+	nvme_log_req_set_output;
+	nvme_log_req_set_rae;
+	nvme_ns_bd_attach;
+	nvme_ns_bd_detach;
+	nvme_ns_disc_eui64;
+	nvme_ns_disc_flags;
+	nvme_ns_disc_level;
+	nvme_ns_disc_nguid;
+	nvme_ns_disc_nsid;
+	nvme_ns_discover_fini;
+	nvme_ns_discover_init;
+	nvme_ns_discover_step;
+	nvme_ns_discover;
+	nvme_ns_fini;
+	nvme_ns_info_bd_addr;
+	nvme_ns_info_cap;
+	nvme_ns_info_curformat;
+	nvme_ns_info_err;
+	nvme_ns_info_errlen;
+	nvme_ns_info_errmsg;
+	nvme_ns_info_errtostr;
+	nvme_ns_info_eui64;
+	nvme_ns_info_format;
+	nvme_ns_info_free;
+	nvme_ns_info_identify;
+	nvme_ns_info_level;
+	nvme_ns_info_nformats;
+	nvme_ns_info_nguid;
+	nvme_ns_info_nsid;
+	nvme_ns_info_size;
+	nvme_ns_info_snap;
+	nvme_ns_info_syserr;
+	nvme_ns_info_use;
+	nvme_ns_init_by_name;
+	nvme_ns_init;
+	nvme_ns_lock;
+	nvme_ns_unlock;
+	nvme_nvm_lba_fmt_data_size;
+	nvme_nvm_lba_fmt_id;
+	nvme_nvm_lba_fmt_meta_size;
+	nvme_nvm_lba_fmt_rel_perf;
+	nvme_sctostr;
+	nvme_scttostr;
+	nvme_syserr;
+	nvme_vuc_disc_desc;
+	nvme_vuc_disc_dt;
+	nvme_vuc_disc_dup;
+	nvme_vuc_disc_free;
+	nvme_vuc_disc_impact;
+	nvme_vuc_disc_lock;
+	nvme_vuc_disc_name;
+	nvme_vuc_disc_opcode;
+	nvme_vuc_discover_by_name;
+	nvme_vuc_discover_fini;
+	nvme_vuc_discover_init;
+	nvme_vuc_discover_step;
+	nvme_vuc_discover;
+	nvme_vuc_req_exec;
+	nvme_vuc_req_fini;
+	nvme_vuc_req_get_cdw0;
+	nvme_vuc_req_init;
+	nvme_vuc_req_set_cdw12;
+	nvme_vuc_req_set_cdw13;
+	nvme_vuc_req_set_cdw14;
+	nvme_vuc_req_set_cdw15;
+	nvme_vuc_req_set_impact;
+	nvme_vuc_req_set_input;
+	nvme_vuc_req_set_nsid;
+	nvme_vuc_req_set_opcode;
+	nvme_vuc_req_set_output;
+	nvme_vuc_req_set_timeout;
+	nvme_wdc_e6_req_exec;
+	nvme_wdc_e6_req_fini;
+	nvme_wdc_e6_req_init;
+	nvme_wdc_e6_req_set_offset;
+	nvme_wdc_e6_req_set_output;
+	nvme_wdc_resize_get;
+	nvme_wdc_resize_set;
+    local:
+	*;
+};

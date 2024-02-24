@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 #ifndef _LMRC_H
 #define	_LMRC_H
@@ -73,6 +73,8 @@ enum lmrc_init_level {
 	LMRC_INITLEVEL_MFICMDS =	(1 << 10),
 	LMRC_INITLEVEL_MPTCMDS =	(1 << 11),
 	LMRC_INITLEVEL_FW =		(1 << 12),
+	LMRC_INITLEVEL_RAID =		(1 << 13),
+	LMRC_INITLEVEL_PHYS =		(1 << 14),
 };
 
 #define	INITLEVEL_SET(_lmrc, name)				\

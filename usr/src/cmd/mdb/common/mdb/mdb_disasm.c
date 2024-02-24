@@ -312,8 +312,7 @@ libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 
 	if ((p = mdb_tgt_name(t)) != NULL && strcmp(p, "proc") == 0) {
 		/* check for ELF ET_REL type; turn on NOIMMSYM if so */
-
-		GElf_Ehdr 	leh;
+		GElf_Ehdr	leh;
 
 		if (mdb_tgt_getxdata(t, "ehdr", &leh, sizeof (leh)) != -1 &&
 		    leh.e_type == ET_REL)  {
@@ -394,10 +393,10 @@ libdisasm_destroy(mdb_disasm_t *dp)
 }
 
 static const mdb_dis_ops_t libdisasm_ops = {
-	libdisasm_destroy,
-	libdisasm_ins2str,
-	libdisasm_previns,
-	libdisasm_nextins
+	.dis_destroy = libdisasm_destroy,
+	.dis_ins2str = libdisasm_ins2str,
+	.dis_previns = libdisasm_previns,
+	.dis_nextins = libdisasm_nextins
 };
 
 /*
@@ -406,7 +405,7 @@ static const mdb_dis_ops_t libdisasm_ops = {
  */
 static int
 libdisasm_create(mdb_disasm_t *dp, const char *name,
-		const char *desc, int flags)
+    const char *desc, int flags)
 {
 	if ((dp->dis_data = dis_handle_create(flags, NULL, libdisasm_lookup,
 	    libdisasm_read)) == NULL)
@@ -538,10 +537,10 @@ defdis_nextins(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 }
 
 static const mdb_dis_ops_t defdis_ops = {
-	defdis_destroy,
-	defdis_ins2str,
-	defdis_previns,
-	defdis_nextins
+	.dis_destroy = defdis_destroy,
+	.dis_ins2str = defdis_ins2str,
+	.dis_previns = defdis_previns,
+	.dis_nextins = defdis_nextins,
 };
 
 static int

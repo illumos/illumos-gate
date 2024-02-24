@@ -1,0 +1,76 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+#
+# This contains a number of non-destructive tests that require a
+# specific NVMe device to target. This must be invoked by the top-level
+# scripts which will validate that the selected device is usable.
+#
+
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 120
+post =
+outputdir = /var/tmp/test_results
+
+[/opt/nvme-tests/tests/ioctl]
+user = root
+tests = [
+	'bad-lock.32',
+	'bad-lock.64',
+	'basic-get-feature.32',
+	'basic-get-feature.64',
+	'basic-get-log.32',
+	'basic-get-log.64',
+	'basic-identify.32',
+	'basic-identify.64',
+	'basic-lock.32',
+	'basic-lock.64',
+	'ctrl-block-lock.32',
+	'ctrl-block-lock.64',
+	'lock-order.32',
+	'lock-order.64',
+	'lock-signal.32',
+	'lock-signal.64',
+	'multi-lock-err.32',
+	'multi-lock-err.64',
+	'multi-reader-lock.32',
+	'multi-reader-lock.64'
+	]
+
+[/opt/nvme-tests/tests/libnvme]
+user = root
+tests = [
+	'bad-req.32',
+	'bad-req.64',
+	'ctrl-disc.32',
+	'ctrl-disc.64',
+	'info-roundtrip.32',
+	'info-roundtrip.64',
+	'missing-field.32',
+	'missing-field.64',
+	'ns-disc.32',
+	'ns-disc.64',
+	'ns-info.32',
+	'ns-info.64'
+	]
+
+[/opt/nvme-tests/tests/nvmeadm]
+user = root
+tests = [
+	'nvmeadm_test'
+	]

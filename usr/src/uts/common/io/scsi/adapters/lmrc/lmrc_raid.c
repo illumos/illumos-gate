@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -562,6 +562,10 @@ lmrc_get_ld_list(lmrc_t *lmrc)
 	lmrc_mfi_cmd_t *mfi;
 	int ret;
 
+	/* If the raid iport isn't attached yet, just return success. */
+	if (!INITLEVEL_ACTIVE(lmrc, LMRC_INITLEVEL_RAID))
+		return (DDI_SUCCESS);
+
 	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_LD_LIST_QUERY,
 	    sizeof (lmrc_ld_tgtid_list_t) + lmrc->l_fw_supported_vd_count, 1);
 
@@ -732,6 +736,8 @@ lmrc_raid_attach(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	INITLEVEL_SET(lmrc, LMRC_INITLEVEL_RAID);
+
 	ret = lmrc_get_ld_list(lmrc);
 	if (ret != DDI_SUCCESS) {
 		dev_err(lmrc->l_dip, CE_WARN, "!Failed to get LD list.");
@@ -748,6 +754,7 @@ lmrc_raid_detach(dev_info_t *dip)
 	lmrc_t *lmrc = ddi_get_soft_state(lmrc_state, ddi_get_instance(pdip));
 
 	VERIFY(lmrc != NULL);
+	INITLEVEL_CLEAR(lmrc, LMRC_INITLEVEL_RAID);
 
 	if (lmrc->l_raid_tgtmap != NULL) {
 		scsi_hba_tgtmap_destroy(lmrc->l_raid_tgtmap);

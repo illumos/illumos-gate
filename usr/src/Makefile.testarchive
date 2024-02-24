@@ -9,6 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright 2021 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 #
@@ -26,6 +27,7 @@ TEST_IPS_MANIFEST_FILES = \
     system-test-elftest.p5m \
     system-test-libctest.p5m \
     system-test-nettest.p5m \
+    system-test-nvmetest.p5m \
     system-test-ostest.p5m \
     system-test-smbclient.p5m \
     system-test-testrunner.p5m \

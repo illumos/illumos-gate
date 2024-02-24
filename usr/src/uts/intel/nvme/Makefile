@@ -40,6 +40,11 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
+# Bits required for common source.
+#
+CPPFLAGS	+= -I$(SRC)/common/nvme
+
+#
 # Driver depends on blkdev
 #
 LDFLAGS		+= -N drv/blkdev -N misc/sata

@@ -17,10 +17,19 @@
 
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
+#include <libnvme.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * This is the disk module-specific data.
+ */
+typedef struct {
+	topo_list_t td_dlist;
+	nvme_t *td_nvme;
+} topo_disk_t;
 
 #define	MPTSAS_DRV	"mpt_sas"
 #define	NVME_DRV	"nvme"

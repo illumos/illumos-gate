@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <strings.h>
@@ -85,7 +86,8 @@ disk_enum(topo_mod_t *mod, tnode_t *baynode,
 {
 	char		*device, *driver, *pname;
 	int		err;
-	topo_list_t	*dlistp = topo_mod_getspecific(mod);
+	topo_disk_t	*disk = topo_mod_getspecific(mod);
+	topo_list_t	*dlistp = &disk->td_dlist;
 
 	if (strcmp(name, DISK) != 0 && strcmp(name, NVME) != 0) {
 		topo_mod_dprintf(mod, "disk_enum: can't enumerate %s nodes - "
@@ -163,7 +165,7 @@ disk_enum(topo_mod_t *mod, tnode_t *baynode,
 int
 _topo_init(topo_mod_t *mod, topo_version_t version)
 {
-	topo_list_t *dlistp;
+	topo_disk_t *disk;
 
 	/*
 	 * Turn on module debugging output
@@ -179,15 +181,24 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 		return (-1);		/* mod errno already set */
 	}
 
-	if ((dlistp = topo_mod_zalloc(mod, sizeof (topo_list_t))) == NULL) {
-		topo_mod_dprintf(mod, "_topo_inti: failed to allocate "
-		    "disk list");
+	if ((disk = topo_mod_zalloc(mod, sizeof (topo_disk_t))) == NULL) {
+		topo_mod_dprintf(mod, "_topo_init: failed to allocate "
+		    "module data");
 		return (-1);
 	}
 
-	if (dev_list_gather(mod, dlistp) != 0) {
+	if ((disk->td_nvme = nvme_init()) == NULL) {
+		topo_mod_dprintf(mod, "_topo_init: failed to create libnvme "
+		    "handle: %s", strerror(errno));
+		topo_mod_free(mod, disk, sizeof (topo_disk_t));
 		topo_mod_unregister(mod);
-		topo_mod_free(mod, dlistp, sizeof (topo_list_t));
+		return (-1);
+	}
+
+	if (dev_list_gather(mod, &disk->td_dlist) != 0) {
+		nvme_fini(disk->td_nvme);
+		topo_mod_free(mod, disk, sizeof (topo_disk_t));
+		topo_mod_unregister(mod);
 		topo_mod_dprintf(mod, "_topo_init: "
 		    "failed to locate disks");
 		return (-1);
@@ -196,7 +207,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 	topo_mod_dprintf(mod, "_topo_init: "
 	    "%s enumerator initialized\n", DISK);
 
-	topo_mod_setspecific(mod, dlistp);
+	topo_mod_setspecific(mod, disk);
 
 	return (0);
 }
@@ -204,9 +215,10 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 void
 _topo_fini(topo_mod_t *mod)
 {
-	topo_list_t *dlistp = topo_mod_getspecific(mod);
-	dev_list_free(mod, dlistp);
-	topo_mod_free(mod, dlistp, sizeof (topo_list_t));
+	topo_disk_t *disk = topo_mod_getspecific(mod);
+	dev_list_free(mod, &disk->td_dlist);
+	nvme_fini(disk->td_nvme);
+	topo_mod_free(mod, disk, sizeof (topo_disk_t));
 	topo_mod_unregister(mod);
 	topo_mod_dprintf(mod, "_topo_fini: "
 	    "%s enumerator uninitialized\n", DISK);

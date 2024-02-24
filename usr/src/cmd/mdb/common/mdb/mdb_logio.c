@@ -94,17 +94,17 @@ logio_name(mdb_io_t *io)
 }
 
 static const mdb_io_ops_t logio_ops = {
-	logio_read,
-	logio_write,
-	no_io_seek,
-	no_io_ctl,
-	logio_close,
-	logio_name,
-	no_io_link,
-	no_io_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = logio_read,
+	.io_write = logio_write,
+	.io_seek = no_io_seek,
+	.io_ctl = no_io_ctl,
+	.io_close = logio_close,
+	.io_name = logio_name,
+	.io_link = no_io_link,
+	.io_unlink = no_io_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume
 };
 
 mdb_io_t *

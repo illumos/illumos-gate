@@ -309,17 +309,17 @@ pio_unlink(mdb_io_t *io, mdb_iob_t *iob)
 }
 
 static const mdb_io_ops_t pipeio_ops = {
-	pio_read,
-	pio_write,
-	no_io_seek,
-	pio_ctl,
-	pio_close,
-	pio_name,
-	pio_link,
-	pio_unlink,
-	no_io_setattr,
-	no_io_suspend,
-	no_io_resume
+	.io_read = pio_read,
+	.io_write = pio_write,
+	.io_seek = no_io_seek,
+	.io_ctl = pio_ctl,
+	.io_close = pio_close,
+	.io_name = pio_name,
+	.io_link = pio_link,
+	.io_unlink = pio_unlink,
+	.io_setattr = no_io_setattr,
+	.io_suspend = no_io_suspend,
+	.io_resume = no_io_resume,
 };
 
 mdb_io_t *

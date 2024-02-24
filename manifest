@@ -3537,6 +3537,7 @@ f usr/include/libmilter/README 0644 root bin
 f usr/include/libmilter/mfapi.h 0644 root bin
 f usr/include/libmilter/mfdef.h 0644 root bin
 f usr/include/libndmp.h 0644 root bin
+f usr/include/libnvme.h 0644 root bin
 f usr/include/libnvpair.h 0644 root bin
 f usr/include/libnwam.h 0644 root bin
 f usr/include/libnwam_priv.h 0644 root bin
@@ -4590,6 +4591,11 @@ f usr/include/sys/netstack.h 0644 root bin
 f usr/include/sys/nexusdefs.h 0644 root bin
 f usr/include/sys/note.h 0644 root bin
 f usr/include/sys/null.h 0644 root bin
+d usr/include/sys/nvme 0755 root bin
+f usr/include/sys/nvme/discovery.h 0644 root bin
+f usr/include/sys/nvme/wdc.h 0644 root bin
+f usr/include/sys/nvme/wdc_sn65x.h 0644 root bin
+f usr/include/sys/nvme/wdc_sn840.h 0644 root bin
 f usr/include/sys/nvpair.h 0644 root bin
 f usr/include/sys/nvpair_impl.h 0644 root bin
 f usr/include/sys/objfs.h 0644 root bin
@@ -5434,6 +5440,8 @@ s usr/lib/amd64/libnsl.so.1=../../../lib/amd64/libnsl.so.1
 s usr/lib/amd64/libnsl.so=../../../lib/amd64/libnsl.so.1
 f usr/lib/amd64/libnvfru.so.1 0755 root bin
 s usr/lib/amd64/libnvfru.so=libnvfru.so.1
+f usr/lib/amd64/libnvme.so.1 0755 root bin
+s usr/lib/amd64/libnvme.so=libnvme.so.1
 s usr/lib/amd64/libnvpair.so.1=../../../lib/amd64/libnvpair.so.1
 s usr/lib/amd64/libnvpair.so=../../../lib/amd64/libnvpair.so.1
 s usr/lib/amd64/libpam.so.1=../../../lib/amd64/libpam.so.1
@@ -6942,6 +6950,8 @@ s usr/lib/libnsl.so.1=../../lib/libnsl.so.1
 s usr/lib/libnsl.so=../../lib/libnsl.so.1
 f usr/lib/libnvfru.so.1 0755 root bin
 s usr/lib/libnvfru.so=libnvfru.so.1
+f usr/lib/libnvme.so.1 0755 root bin
+s usr/lib/libnvme.so=libnvme.so.1
 s usr/lib/libnvpair.so.1=../../lib/libnvpair.so.1
 s usr/lib/libnvpair.so=../../lib/libnvpair.so.1
 s usr/lib/libnwam.so.1=../../lib/libnwam.so.1

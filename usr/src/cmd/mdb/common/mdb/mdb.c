@@ -455,9 +455,15 @@ static mdb_frame_t frame0;
 void
 mdb_create(const char *execname, const char *arg0)
 {
-	static const mdb_nv_disc_t psym_disc = { psym_disc_set, psym_disc_get };
-	static const mdb_nv_disc_t roff_disc = { roff_disc_set, roff_disc_get };
-	static const mdb_nv_disc_t thr_disc = { NULL, thr_disc_get };
+	static const mdb_nv_disc_t psym_disc = {
+		.disc_set = psym_disc_set,
+		.disc_get = psym_disc_get
+	};
+	static const mdb_nv_disc_t roff_disc = {
+		.disc_set = roff_disc_set,
+		.disc_get = roff_disc_get
+	};
+	static const mdb_nv_disc_t thr_disc = { .disc_get = thr_disc_get };
 
 	static char rootdir[MAXPATHLEN];
 
