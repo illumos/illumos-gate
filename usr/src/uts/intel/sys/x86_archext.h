@@ -33,6 +33,7 @@
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -618,23 +619,50 @@ extern "C" {
  * Intel IA32_ARCH_CAPABILITIES MSR.
  */
 #define	MSR_IA32_ARCH_CAPABILITIES		0x10a
-#define	IA32_ARCH_CAP_RDCL_NO			0x0001
-#define	IA32_ARCH_CAP_IBRS_ALL			0x0002
-#define	IA32_ARCH_CAP_RSBA			0x0004
-#define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	0x0008
-#define	IA32_ARCH_CAP_SSB_NO			0x0010
-#define	IA32_ARCH_CAP_MDS_NO			0x0020
-#define	IA32_ARCH_CAP_IF_PSCHANGE_MC_NO		0x0040
-#define	IA32_ARCH_CAP_TSX_CTRL			0x0080
-#define	IA32_ARCH_CAP_TAA_NO			0x0100
+#define	IA32_ARCH_CAP_RDCL_NO			(1UL << 0)
+#define	IA32_ARCH_CAP_IBRS_ALL			(1UL << 1)
+#define	IA32_ARCH_CAP_RSBA			(1UL << 2)
+#define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	(1UL << 3)
+#define	IA32_ARCH_CAP_SSB_NO			(1UL << 4)
+#define	IA32_ARCH_CAP_MDS_NO			(1UL << 5)
+#define	IA32_ARCH_CAP_IF_PSCHANGE_MC_NO		(1UL << 6)
+#define	IA32_ARCH_CAP_TSX_CTRL			(1UL << 7)
+#define	IA32_ARCH_CAP_TAA_NO			(1UL << 8)
+#define	IA32_ARCH_CAP_RESERVED_1		(1UL << 9)
+#define	IA32_ARCH_CAP_MCU_CONTROL		(1UL << 10)
+#define	IA32_ARCH_CAP_ENERGY_FILTERING_CTL	(1UL << 11)
+#define	IA32_ARCH_CAP_DOITM			(1UL << 12)
+#define	IA32_ARCH_CAP_SBDR_SSDP_NO		(1UL << 13)
+#define	IA32_ARCH_CAP_FBSDP_NO			(1UL << 14)
+#define	IA32_ARCH_CAP_PSDP_NO			(1UL << 15)
+#define	IA32_ARCH_CAP_RESERVED_2		(1UL << 16)
+#define	IA32_ARCH_CAP_FB_CLEAR			(1UL << 17)
+#define	IA32_ARCH_CAP_FB_CLEAR_CTRL		(1UL << 18)
+#define	IA32_ARCH_CAP_RRSBA			(1UL << 19)
+#define	IA32_ARCH_CAP_BHI_NO			(1UL << 20)
+#define	IA32_ARCH_CAP_XAPIC_DISABLE_STATUS	(1UL << 21)
+#define	IA32_ARCH_CAP_RESERVED_3		(1UL << 22)
+#define	IA32_ARCH_CAP_OVERCLOCKING_STATUS	(1UL << 23)
+#define	IA32_ARCH_CAP_PBRSB_NO			(1UL << 24)
+#define	IA32_ARCH_CAP_GDS_CTRL			(1UL << 25)
+#define	IA32_ARCH_CAP_GDS_NO			(1UL << 26)
+#define	IA32_ARCH_CAP_RFDS_NO			(1UL << 27)
+#define	IA32_ARCH_CAP_RFDS_CLEAR		(1UL << 28)
 
 /*
  * Intel Speculation related MSRs
  */
 #define	MSR_IA32_SPEC_CTRL	0x48
-#define	IA32_SPEC_CTRL_IBRS	0x01
-#define	IA32_SPEC_CTRL_STIBP	0x02
-#define	IA32_SPEC_CTRL_SSBD	0x04
+#define	IA32_SPEC_CTRL_IBRS		(1UL << 0)
+#define	IA32_SPEC_CTRL_STIBP		(1UL << 1)
+#define	IA32_SPEC_CTRL_SSBD		(1UL << 2)
+#define	IA32_SPEC_CTRL_IPRED_DIS_U	(1UL << 3)
+#define	IA32_SPEC_CTRL_IPRED_DIS_S	(1UL << 4)
+#define	IA32_SPEC_CTRL_RRSBA_DIS_U	(1UL << 5)
+#define	IA32_SPEC_CTRL_RRSBA_DIS_S	(1UL << 6)
+#define	IA32_SPEC_CTRL_PSFD		(1UL << 7)
+#define	IA32_SPEC_CTRL_DDPD_U		(1UL << 8)
+#define	IA32_SPEC_CTRL_BHI_DIS_S	(1UL << 10)
 
 #define	MSR_IA32_PRED_CMD	0x49
 #define	IA32_PRED_CMD_IBPB	0x01
@@ -904,6 +932,8 @@ extern "C" {
 #define	X86FSET_AVX512_VBMI2	106
 #define	X86FSET_AVX512_BF16	107
 #define	X86FSET_AUTO_IBRS	108
+#define	X86FSET_RFDS_NO		109
+#define	X86FSET_RFDS_CLEAR	110
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1441,7 +1471,7 @@ typedef enum x86_uarchrev {
 #define	INTC_MODEL_HASWELL_XEON		0x3f
 
 #define	INTC_MODEL_BROADWELL		0x3d
-#define	INTC_MODEL_BROADELL_2		0x47
+#define	INTC_MODEL_BROADWELL_2		0x47
 #define	INTC_MODEL_BROADWELL_XEON	0x4f
 #define	INTC_MODEL_BROADWELL_XEON_D	0x56
 
@@ -1452,6 +1482,8 @@ typedef enum x86_uarchrev {
 #define	INTC_MODEL_SKYLAKE_XEON		0x55
 #define	INTC_MODEL_SKYLAKE_DESKTOP	0x5e
 
+#define	INTC_MODEL_CANNON_LAKE		0x66
+
 /*
  * Note, both Kaby Lake models are shared with Coffee Lake, Whiskey Lake, Amber
  * Lake, and some Comet Lake parts.
@@ -1461,11 +1493,25 @@ typedef enum x86_uarchrev {
 
 #define	INTC_MODEL_ICELAKE_XEON		0x6a
 #define	INTC_MODEL_ICELAKE_MOBILE	0x7e
+#define	INTC_MODEL_ICELAKE_XEON_DE	0x6c
+
 #define	INTC_MODEL_TIGERLAKE_MOBILE	0x8c
+#define	INTC_MODEL_TIGERLAKE_MOBILE_2	0x8d
+#define	INTC_MODEL_SAPPHIRE_RAPIDS	0x8f
 
 #define	INTC_MODEL_COMETLAKE		0xa5
 #define	INTC_MODEL_COMETLAKE_MOBILE	0xa6
 #define	INTC_MODEL_ROCKETLAKE		0xa7
+
+#define	INTC_MODEL_ALDER_LAKE_DESKTOP	0x97
+#define	INTC_MODEL_ALDER_LAKE_MOBILE	0x9a	/* And some Atom parts too */
+#define	INTC_MODEL_RAPTOR_LAKE_MOBILE_1	0xb7
+#define	INTC_MODEL_RAPTOR_LAKE_MOBILE_2	0xba
+#define	INTC_MODEL_RAPTOR_LAKE_MOBILE_3	0xbf
+
+#define	INTC_MODEL_METEOR_LAKE		0xaa
+
+#define	INTC_MODEL_EMERALD_RAPIDS	0xcf
 
 /*
  * Atom Processors
@@ -1476,11 +1522,19 @@ typedef enum x86_uarchrev {
 #define	INTC_MODEL_CLOVERVIEW		0x35
 #define	INTC_MODEL_CEDARVIEW		0x36
 #define	INTC_MODEL_BAY_TRAIL		0x37
+#define	INTC_MODEL_MERRIFIELD		0x4a
 #define	INTC_MODEL_AVATON		0x4d
 #define	INTC_MODEL_AIRMONT		0x4c
-#define	INTC_MODEL_GOLDMONT		0x5c
+#define	INTC_MODEL_MOOREFIELD		0x5a
+#define	INTC_MODEL_APOLLO_LAKE		0x5c
+#define	INTC_MODEL_SOFIA_3G_R		0x5d
 #define	INTC_MODEL_DENVERTON		0x5f
 #define	INTC_MODEL_GEMINI_LAKE		0x7a
+#define	INTC_MODEL_TREMONT		0x86	/* Parker Ridge & Snow Ridge */
+#define	INTC_MODEL_LAKEFIELD		0x8a
+#define	INTC_MODEL_ELKHART_LAKE		0x96
+#define	INTC_MODEL_JASPER_LAKE		0x9c
+#define	INTC_MODEL_ALDER_LAKE_N		0xbe	/* And some {desk,lap}top too */
 
 /*
  * xgetbv/xsetbv support
@@ -1532,7 +1586,7 @@ typedef enum x86_uarchrev {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	109
+#define	NUM_X86_FEATURES	111
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

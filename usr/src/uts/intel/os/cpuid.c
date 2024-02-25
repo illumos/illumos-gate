@@ -25,7 +25,7 @@
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
  * Copyright 2023 Oxide Computer Company
- * Copyright 2022 MNX Cloud, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1113,6 +1113,7 @@
  *   - ret2spec, SpectreRSB
  *   - L1 Terminal Fault (L1TF)
  *   - Microarchitectural Data Sampling (MDS)
+ *   - Register File Data Sampling (RFDS)
  *
  * Each of these requires different sets of mitigations and has different attack
  * surfaces. For the most part, this discussion is about protecting the kernel
@@ -1422,6 +1423,16 @@
  * effective. Currently we basically are relying on microcode for processors
  * that enumerate MDS_NO.
  *
+ * Another MDS-variant in a few select Intel Atom CPUs is Register File Data
+ * Sampling: RFDS. This allows an attacker to sample values that were in any
+ * of integer, floating point, or vector registers. This was discovered by
+ * Intel during internal validation work.  The existence of the RFDS_NO
+ * capability, or the LACK of a RFDS_CLEAR capability, means we do not have to
+ * act. Intel has said some CPU models immune to RFDS MAY NOT enumerate
+ * RFDS_NO. If RFDS_NO is not set, but RFDS_CLEAR is, we must set x86_md_clear,
+ * and make sure it's using VERW. Unlike MDS, RFDS can't be helped by the
+ * MSR that L1D uses.
+ *
  * The microcode features are enumerated as part of the IA32_ARCH_CAPABILITIES.
  * When bit 7 (IA32_ARCH_CAP_TSX_CTRL) is present, then we are given two
  * different powers. The first allows us to cause all transactions to
@@ -1462,6 +1473,7 @@
  *  - L1TF: spec_uarch_flush, SMT exclusion, requires microcode
  *  - MDS: x86_md_clear, requires microcode, disabling SMT
  *  - TAA: x86_md_clear and disabling SMT OR microcode and disabling TSX
+ *  - RFDS: microcode with x86_md_clear if RFDS_CLEAR set and RFDS_NO not.
  *
  * The following table indicates the x86 feature set bits that indicate that a
  * given problem has been solved or a notable feature is present:
@@ -1469,6 +1481,7 @@
  *  - RDCL_NO: Meltdown, L1TF, MSBDS subset of MDS
  *  - MDS_NO: All forms of MDS
  *  - TAA_NO: TAA
+ *  - RFDS_NO: RFDS
  */
 
 #include <sys/types.h>
@@ -1660,7 +1673,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx512_bitalg",
 	"avx512_vbmi2",
 	"avx512_bf16",
-	"auto_ibrs"
+	"auto_ibrs",
+	"rfds_no",
+	"rfds_clear"
 };
 
 boolean_t
@@ -2829,8 +2844,8 @@ spec_uarch_flush_msr(void)
 /*
  * This function points to a function that will flush certain
  * micro-architectural state on the processor. This flush is used to mitigate
- * two different classes of Intel CPU vulnerabilities: L1TF and MDS. This
- * function can point to one of three functions:
+ * three different classes of Intel CPU vulnerabilities: L1TF, MDS, and RFDS.
+ * This function can point to one of three functions:
  *
  * - A noop which is done because we either are vulnerable, but do not have
  *   microcode available to help deal with a fix, or because we aren't
@@ -2843,7 +2858,8 @@ spec_uarch_flush_msr(void)
  *
  * - x86_md_clear which will flush the MDS related state. This is done when we
  *   have a processor that is vulnerable to MDS, but is not vulnerable to L1TF
- *   (RDCL_NO is set).
+ *   (RDCL_NO is set); or if the CPU is vulnerable to RFDS and indicates VERW
+ *   can clear it (RFDS_CLEAR is set).
  */
 void (*spec_uarch_flush)(void) = spec_uarch_flush_noop;
 
@@ -2852,18 +2868,24 @@ cpuid_update_md_clear(cpu_t *cpu, uchar_t *featureset)
 {
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 
+	/* Non-Intel doesn't concern us here. */
+	if (cpi->cpi_vendor != X86_VENDOR_Intel)
+		return;
+
 	/*
 	 * While RDCL_NO indicates that one of the MDS vulnerabilities (MSBDS)
 	 * has been fixed in hardware, it doesn't cover everything related to
 	 * MDS. Therefore we can only rely on MDS_NO to determine that we don't
 	 * need to mitigate this.
+	 *
+	 * We must ALSO check the case of RFDS_NO and if RFDS_CLEAR is set,
+	 * because of the small cases of RFDS.
 	 */
-	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
-	    is_x86_feature(featureset, X86FSET_MDS_NO)) {
-		return;
-	}
 
-	if (is_x86_feature(featureset, X86FSET_MD_CLEAR)) {
+	if ((!is_x86_feature(featureset, X86FSET_MDS_NO) &&
+	    is_x86_feature(featureset, X86FSET_MD_CLEAR)) ||
+	    (!is_x86_feature(featureset, X86FSET_RFDS_NO) &&
+	    is_x86_feature(featureset, X86FSET_RFDS_CLEAR))) {
 		const uint8_t nop = NOP_INSTR;
 		uint8_t *md = (uint8_t *)x86_md_clear;
 
@@ -2876,18 +2898,19 @@ cpuid_update_md_clear(cpu_t *cpu, uchar_t *featureset)
 static void
 cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 {
-	boolean_t need_l1d, need_mds;
+	boolean_t need_l1d, need_mds, need_rfds;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 
 	/*
-	 * If we're not on Intel or we've mitigated both RDCL and MDS in
-	 * hardware, then there's nothing left for us to do for enabling the
-	 * flush. We can also go ahead and say that SMT exclusion is
+	 * If we're not on Intel or we've mitigated all of RDCL, MDS, and RFDS
+	 * in hardware, then there's nothing left for us to do for enabling
+	 * the flush. We can also go ahead and say that SMT exclusion is
 	 * unnecessary.
 	 */
 	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
 	    (is_x86_feature(featureset, X86FSET_RDCL_NO) &&
-	    is_x86_feature(featureset, X86FSET_MDS_NO))) {
+	    is_x86_feature(featureset, X86FSET_MDS_NO) &&
+	    is_x86_feature(featureset, X86FSET_RFDS_NO))) {
 		extern int smt_exclusion;
 		smt_exclusion = 0;
 		spec_uarch_flush = spec_uarch_flush_noop;
@@ -2918,9 +2941,22 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 		need_mds = B_FALSE;
 	}
 
+	if (!is_x86_feature(featureset, X86FSET_RFDS_NO) &&
+	    is_x86_feature(featureset, X86FSET_RFDS_CLEAR)) {
+		need_rfds = B_TRUE;
+	} else {
+		need_rfds = B_FALSE;
+	}
+
 	if (need_l1d) {
+		/*
+		 * As of Feb, 2024, no CPU needs L1D *and* RFDS mitigation
+		 * together. If the following VERIFY trips, we need to add
+		 * further fixes here.
+		 */
+		VERIFY(!need_rfds);
 		spec_uarch_flush = spec_uarch_flush_msr;
-	} else if (need_mds) {
+	} else if (need_mds || need_rfds) {
 		spec_uarch_flush = x86_md_clear;
 	} else {
 		/*
@@ -3223,6 +3259,14 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_TAA_NO);
 				}
+				if (reg & IA32_ARCH_CAP_RFDS_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_RFDS_NO);
+				}
+				if (reg & IA32_ARCH_CAP_RFDS_CLEAR) {
+					add_x86_feature(featureset,
+					    X86FSET_RFDS_CLEAR);
+				}
 			}
 			no_trap();
 		}
@@ -3302,7 +3346,7 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 	/*
 	 * Update whether or not we need to be taking explicit action against
-	 * MDS.
+	 * MDS or RFDS.
 	 */
 	cpuid_update_md_clear(cpu, featureset);
 

@@ -22,6 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -617,16 +618,6 @@ _syscall_invoke:
 	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
-	 * Unlike other cases, because we need to restore the user stack pointer
-	 * before exiting the kernel we must clear the microarch state before
-	 * getting here. This should be safe because it means that the only
-	 * values on the bus after this are based on the user's registers and
-	 * potentially the addresses where we stored them. Given the constraints
-	 * of sysret, that's how it has to be.
-	 */
-	call	x86_md_clear
-
-	/*
 	 * To get back to userland, we need the return %rip in %rcx and
 	 * the return %rfl in %r11d.  The sysretq instruction also arranges
 	 * to fix up %cs and %ss; everything else is our responsibility.
@@ -652,6 +643,16 @@ _syscall_invoke:
 
 	movq	REGOFF_RIP(%rsp), %rcx
 	movl	REGOFF_RFL(%rsp), %r11d
+
+	/*
+	 * Unlike other cases, because we need to restore the user stack pointer
+	 * before exiting the kernel we must clear the microarch state before
+	 * getting here. This should be safe because it means that the only
+	 * values on the bus after this are based on the user's registers and
+	 * potentially the addresses where we stored them. Given the constraints
+	 * of sysret, that's how it has to be.
+	 */
+	call	x86_md_clear
 
 #if defined(__xpv)
 	addq	$REGOFF_RIP, %rsp
@@ -905,16 +906,6 @@ _syscall32_save:
 	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
-	 * Unlike other cases, because we need to restore the user stack pointer
-	 * before exiting the kernel we must clear the microarch state before
-	 * getting here. This should be safe because it means that the only
-	 * values on the bus after this are based on the user's registers and
-	 * potentially the addresses where we stored them. Given the constraints
-	 * of sysret, that's how it has to be.
-	 */
-	call	x86_md_clear
-
-	/*
 	 * To get back to userland, we need to put the return %rip in %rcx and
 	 * the return %rfl in %r11d.  The sysret instruction also arranges
 	 * to fix up %cs and %ss; everything else is our responsibility.
@@ -930,6 +921,16 @@ _syscall32_save:
 
 	movl	REGOFF_RFL(%rsp), %r11d		/* %r11 -> eflags */
 	movl	REGOFF_RIP(%rsp), %ecx		/* %ecx -> %eip */
+	/*
+	 * Unlike other cases, because we need to restore the user stack pointer
+	 * before exiting the kernel we must clear the microarch state before
+	 * getting here. This should be safe because it means that the only
+	 * values on the bus after this are based on the user's registers and
+	 * potentially the addresses where we stored them. Given the constraints
+	 * of sysret, that's how it has to be.
+	 */
+	call	x86_md_clear
+
 	movl	REGOFF_RSP(%rsp), %esp
 
 	ASSERT_UPCALL_MASK_IS_SET
