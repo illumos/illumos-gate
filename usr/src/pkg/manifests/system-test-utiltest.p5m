@@ -1162,6 +1162,8 @@ file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512cd.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512cd.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bf16.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bf16.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bitalg.out mode=0444
@@ -1214,6 +1216,10 @@ file path=opt/util-tests/tests/dis/i386/32.ssse3.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.ssse3.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.vaes.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.vaes.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vbmi.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vbmi.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vbmi2.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vbmi2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.xsave.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.xsave.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.adx.out mode=0444
@@ -1232,6 +1238,8 @@ file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512cd.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512cd.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bf16.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bf16.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bitalg.out mode=0444
@@ -1290,6 +1298,10 @@ file path=opt/util-tests/tests/dis/i386/64.ssse3.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.ssse3.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vaes.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vaes.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vbmi.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vbmi.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vbmi2.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vbmi2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vmx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vmx.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.xsave.out mode=0444
