@@ -65,14 +65,11 @@ CLEANFILES	+= $(LIBSTUBS) $(LIBGEN)
 BINARY		=
 
 #
-# Non-patch genunix builds merge a version of the ip module called ipctf.  This
-# is to ensure that the common network-related types are included in genunix and
-# can thus be uniquified out of other modules.  We don't want to do this for
-# patch builds, since we can't guarantee that ip and genunix will be in the same
-# patch.
+# genunix builds merge a version of the ip module called ipctf.  This is to
+# ensure that the common network-related types are included in genunix and can
+# thus be uniquified out of other modules.
 #
 IPCTF_TARGET	= $(IPCTF)
-$(PATCH_BUILD)IPCTF_TARGET =
 
 CPPFLAGS	+= -I$(SRC)/common
 CPPFLAGS	+= -I$(SRC)/uts/common/fs/zfs

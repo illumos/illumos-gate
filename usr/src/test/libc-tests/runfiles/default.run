@@ -124,6 +124,8 @@ timeout = 600
 [/opt/libc-tests/tests/memchr.64]
 [/opt/libc-tests/tests/memset_s.32]
 [/opt/libc-tests/tests/memset_s.64]
+[/opt/libc-tests/tests/mutex-16200.32]
+[/opt/libc-tests/tests/mutex-16200.64]
 [/opt/libc-tests/tests/posix_memalign.32]
 [/opt/libc-tests/tests/posix_memalign.64]
 [/opt/libc-tests/tests/printf-15294.32]

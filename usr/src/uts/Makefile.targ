@@ -70,7 +70,7 @@ $(MODSTUBS_O):	$(MODSTUBS)
 # with release, version and machine set as follows:
 #
 #	release: contents of $(RELEASE) (Spaces replaced by '_')
-#	version: contents of $(PATCHID) (Spaces replaced by '_')
+#	version: contents of $(VERSION) (Spaces replaced by '_')
 #	machine: contents of $(UNAME_M)
 #
 # Build environment information is only contained in the comment section.
@@ -78,7 +78,7 @@ $(MODSTUBS_O):	$(MODSTUBS)
 
 $(OBJS_DIR)/vers.o: $(OBJECTS)
 	$(COMPILE.c) -DUTS_RELEASE=\"`$(ECHO) $(RELEASE) | sed -e 's/ /_/g'`\" \
-	    -DUTS_VERSION=\"`$(ECHO) $(PATCHID) | sed -e 's/ /_/g'`\" \
+	    -DUTS_VERSION=\"`$(ECHO) $(VERSION) | sed -e 's/ /_/g'`\" \
 	    -DUTS_PLATFORM=\"$(UNAME_M)\" -o $@ $(SRC)/uts/common/os/vers.c
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)

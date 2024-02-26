@@ -52,6 +52,7 @@ PROGS = \
 	isatty \
 	memchr \
 	memset_s \
+	mutex-16200 \
 	posix_memalign \
 	printf-15294 \
 	printf-9511 \
@@ -94,6 +95,11 @@ set_constraint_handler_s.64 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 
 isatty.32 :=	CSTD=$(GNU_C99)
 isatty.64 :=	CSTD=$(GNU_C99)
+
+mutex-16200.32 :=	LDLIBS += -lproc
+mutex-16200.64 :=	LDLIBS64 += -lproc
+mutex-16200.32 :=	CSTD=$(GNU_C99)
+mutex-16200.64 :=	CSTD=$(GNU_C99)
 
 strtonum.32 :=		CSTD=$(GNU_C99)
 strtonum.64 :=		CSTD=$(GNU_C99)

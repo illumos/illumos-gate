@@ -1651,6 +1651,7 @@ d_mutex(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ 0x2, "LOCK_NOTRECOVERABLE" },
 		{ 0x4, "LOCK_INITED" },
 		{ 0x8, "LOCK_UNMAPPED" },
+		{ 0x10, "LOCK_DEADLOCK" },
 		{ 0, "" },
 	};
 

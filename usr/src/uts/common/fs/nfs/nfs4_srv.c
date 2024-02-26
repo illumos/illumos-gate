@@ -3224,6 +3224,11 @@ rfs4_op_lookupp(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
+	if (cs->vp->v_type == VLNK) {
+		*cs->statusp = resp->status = NFS4ERR_SYMLINK;
+		goto out;
+	}
+
 	if (cs->vp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
 		goto out;

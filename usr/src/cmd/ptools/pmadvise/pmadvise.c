@@ -558,7 +558,7 @@ parse_suboptions(char *value)
 static int
 create_maplist(void *arg, const prmap_t *pmp, const char *object_name)
 {
-	const 		pstatus_t *Psp = Pstatus(Pr);
+	const pstatus_t *Psp = Pstatus(Pr);
 	mapnode_t *newmap = malloc(sizeof (mapnode_t));
 	saddr_t	*newaddr;
 	saddr_t	*psaddr;
@@ -722,7 +722,8 @@ apply_advice(saddr_t **advicelist)
  * Set advice but keep mutual exclusive property of advice groupings
  */
 static void
-set_advice(int *combined_adv, int new_adv) {
+set_advice(int *combined_adv, int new_adv)
+{
 	/*
 	 * Since advice falls in 3 groups of mutually exclusive options,
 	 * clear previous value if new advice overwrites that group.
@@ -909,12 +910,14 @@ advtostr(int adv)
 				/*
 				 * check if it's the first advice entry
 				 */
-				if (*buf == '\0')
+				if (*buf == '\0') {
 					(void) snprintf(buf, sizeof (buf) - 1,
 					    "<= %s", advicestr[i]);
-				else
-					(void) snprintf(buf, sizeof (buf) - 1,
-					    "%s,%s", buf, advicestr[i]);
+				} else {
+					(void) strlcat(buf, ",", sizeof (buf));
+					(void) strlcat(buf, advicestr[i],
+					    sizeof (buf));
+				}
 			}
 		}
 	}
