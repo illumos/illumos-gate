@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2021-2024 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -2004,6 +2004,9 @@ adjoin_table[] = {
 	    "Failed to authenticate using the new computer account." },
 	{ SMB_ADJOIN_ERR_STORE_PROPS,
 	    "Failed to store computer account information locally." },
+	{ SMB_ADJOIN_ERR_ALREADY_JOINED,
+	    "Already joined to a domain. "
+	    "Run \"smbadm join -w workgroup\" first." },
 	{ 0, NULL }
 };
 

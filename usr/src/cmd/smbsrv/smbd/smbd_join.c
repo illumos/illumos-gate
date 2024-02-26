@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2023-2024 RackTop Systems, Inc.
  */
 
 #include <syslog.h>
@@ -306,6 +306,7 @@ smbd_join_workgroup(smb_joininfo_t *info, smb_joinres_t *res)
 	(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, nb_domain,
 	    sizeof (nb_domain));
 
+	(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_FALSE);
 	smbd_set_secmode(SMB_SECMODE_WORKGRP);
 	smb_config_setdomaininfo(info->domain_name, "", "", "", "");
 	(void) smb_config_set_idmap_domain("");

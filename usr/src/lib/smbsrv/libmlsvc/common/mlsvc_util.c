@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2021-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -106,6 +106,16 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	int rc;
 
 	bzero(&dxi, sizeof (dxi));
+
+	/*
+	 * Prevent attempts to join a domain when the system is already joined.
+	 */
+	if (smb_config_getbool(SMB_CI_DOMAIN_MEMB) == B_TRUE) {
+		syslog(LOG_INFO, "smbd: join when already joined");
+		res->join_err = SMB_ADJOIN_ERR_ALREADY_JOINED;
+		res->status = NT_STATUS_INVALID_SERVER_STATE;
+		return;
+	}
 
 	if (info->container_name[0] != '\0')
 		container = info->container_name;

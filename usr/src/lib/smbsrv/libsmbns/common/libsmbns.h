@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef	_LIBSMBNS_H
@@ -91,6 +92,7 @@ typedef enum smb_ads_status {
 	SMB_ADJOIN_ERR_COMMIT_KEYTAB,
 	SMB_ADJOIN_ERR_AUTH_NETLOGON,
 	SMB_ADJOIN_ERR_STORE_PROPS,
+	SMB_ADJOIN_ERR_ALREADY_JOINED,
 } smb_ads_status_t;
 
 /* ADS functions */
