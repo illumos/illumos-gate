@@ -182,6 +182,16 @@ struct e1000_hw;
 #define E1000_DEV_ID_PCH_RPL_I219_V22		0x0DC8
 #define E1000_DEV_ID_PCH_RPL_I219_LM23		0x0DC5
 #define E1000_DEV_ID_PCH_RPL_I219_V23		0x0DC6
+#define E1000_DEV_ID_PCH_ARL_I219_LM24		0x57A0
+#define E1000_DEV_ID_PCH_ARL_I219_V24		0x57A1
+#define E1000_DEV_ID_PCH_PTP_I219_LM25		0x57B3
+#define E1000_DEV_ID_PCH_PTP_I219_V25		0x57B4
+#define E1000_DEV_ID_PCH_PTP_I219_LM26		0x57B5
+#define E1000_DEV_ID_PCH_PTP_I219_V26		0x57B6
+#define E1000_DEV_ID_PCH_PTP_I219_LM27		0x57B7
+#define E1000_DEV_ID_PCH_PTP_I219_V27		0x57B8
+#define E1000_DEV_ID_PCH_NVL_I219_LM29		0x57B9
+#define E1000_DEV_ID_PCH_NVL_I219_V29		0x57BA
 #define E1000_DEV_ID_82576			0x10C9
 #define E1000_DEV_ID_82576_FIBER		0x10E6
 #define E1000_DEV_ID_82576_SERDES		0x10E7
@@ -272,9 +282,11 @@ enum e1000_mac_type {
 	 * The following MACs all share the ich8 style of hardware and are
 	 * implemented in ich8, though some are a little more different than
 	 * others. The pch_lpt, pch_spt, pch_cnp, pch_tgp, pch_adp, pch_mtp,
-	 * pch_lnp, and pch_rpl families are a bit more different than the
-	 * others and just have slight variants in behavior between them. They
-	 * are ordered based on release.
+	 * pch_lnp, pch_rpl, pch_arl, pch_ptp, and pch_nvl families are a bit
+	 * more different than the others and just have slight variants in
+	 * behavior between them. We call them out just in case we need to deal
+	 * with the quirks between different device generations. They are
+	 * ordered based on release.
 	 */
 	e1000_ich8lan,
 	e1000_ich9lan,
@@ -289,6 +301,9 @@ enum e1000_mac_type {
 	e1000_pch_mtp,
 	e1000_pch_lnp,
 	e1000_pch_rpl,
+	e1000_pch_arl,
+	e1000_pch_ptp,
+	e1000_pch_nvl,
 	/*
 	 * After this point all MACs are used by the igb(4D) driver as opposed
 	 * to e1000g(4D). If a new MAC is specific to e1000g series of devices,

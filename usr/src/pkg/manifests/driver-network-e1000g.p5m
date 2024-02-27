@@ -194,6 +194,16 @@ driver name=e1000g perms="* 0666 root sys" clone_perms="e1000g 0666 root sys" \
     alias=pci8086,550f,p \
     alias=pci8086,5510,p \
     alias=pci8086,5511,p \
+    alias=pci8086,57a0,p \
+    alias=pci8086,57a1,p \
+    alias=pci8086,57b3,p \
+    alias=pci8086,57b4,p \
+    alias=pci8086,57b5,p \
+    alias=pci8086,57b6,p \
+    alias=pci8086,57b7,p \
+    alias=pci8086,57b8,p \
+    alias=pci8086,57b9,p \
+    alias=pci8086,57ba,p \
     alias=pci8086,f0fe \
     alias=pciex8086,d4c \
     alias=pciex8086,d4d \
@@ -298,6 +308,16 @@ driver name=e1000g perms="* 0666 root sys" clone_perms="e1000g 0666 root sys" \
     alias=pciex8086,550f \
     alias=pciex8086,5510 \
     alias=pciex8086,5511 \
+    alias=pciex8086,57a0 \
+    alias=pciex8086,57a1 \
+    alias=pciex8086,57b3 \
+    alias=pciex8086,57b4 \
+    alias=pciex8086,57b5 \
+    alias=pciex8086,57b6 \
+    alias=pciex8086,57b7 \
+    alias=pciex8086,57b8 \
+    alias=pciex8086,57b9 \
+    alias=pciex8086,57ba \
     alias=pciex8086,f0fe
 legacy pkg=SUNWintgige desc="Intel(R) PRO/1000 Server Adapter Driver" \
     name="Intel(R) PRO/1000 Server Adapter Driver"

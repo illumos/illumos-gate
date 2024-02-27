@@ -26,7 +26,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -718,6 +718,9 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_pch_mtp:
 	case e1000_pch_lnp:
 	case e1000_pch_rpl:
+	case e1000_pch_arl:
+	case e1000_pch_ptp:
+	case e1000_pch_nvl:
 		/*
 		 * On the SPT, the device flash is actually in BAR0, not a
 		 * separate BAR. Therefore we end up setting the
@@ -922,6 +925,9 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_pch_mtp:
 	case e1000_pch_lnp:
 	case e1000_pch_rpl:
+	case e1000_pch_arl:
+	case e1000_pch_ptp:
+	case e1000_pch_nvl:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1510,6 +1516,12 @@ e1000g_init(struct e1000g *Adapter)
 	} else if (hw->mac.type == e1000_pch_lnp) {
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch_rpl) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_arl) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_ptp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_nvl) {
 		pba = E1000_PBA_26K;
 	} else {
 		/*
