@@ -129,7 +129,8 @@ so_socket(int family, int type_w_flags, int protocol, char *devpath,
 
 	/* Allocate a file descriptor for the socket */
 	vp = SOTOV(so);
-	if (error = falloc(vp, FWRITE|FREAD, &fp, &fd)) {
+	error = falloc(vp, FWRITE|FREAD, &fp, &fd);
+	if (error != 0) {
 		(void) socket_close(so, 0, CRED());
 		socket_destroy(so);
 		return (set_errno(error));
@@ -487,7 +488,8 @@ so_socketpair(int sv[2])
 		}
 
 		nvp = SOTOV(nso);
-		if (error = falloc(nvp, FWRITE|FREAD, &nfp, &nfd)) {
+		error = falloc(nvp, FWRITE|FREAD, &nfp, &nfd);
+		if (error != 0) {
 			(void) socket_close(nso, 0, CRED());
 			socket_destroy(nso);
 			eprintsoline(nso, error);
@@ -708,7 +710,8 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version,
 		releasef(sock);
 		return (set_errno(error));
 	}
-	if (error = falloc(NULL, FWRITE|FREAD, &nfp, NULL)) {
+	error = falloc(NULL, FWRITE|FREAD, &nfp, NULL);
+	if (error != 0) {
 		setf(nfd, NULL);
 		(void) socket_close(nso, 0, CRED());
 		socket_destroy(nso);
