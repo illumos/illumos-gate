@@ -66,3 +66,6 @@ pre = setup
 user = root
 tests = ['hmac_sha1_32', 'hmac_sha1_64']
 post = cleanup
+
+[/opt/crypto-tests/tests/longhash]
+tests = ['longhash_32', 'longhash_64']
