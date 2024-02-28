@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd February 26, 2023
+.Dd March 11, 2024
 .Dt AMDZEN 4D
 .Os
 .Sh NAME
@@ -45,6 +45,9 @@ AMD Zen 3+ Rembrandt
 .It
 AMD Zen 4 Genoa, Bergamo, Raphael, and Phoenix
 .Pq Family 19h
+.It
+Amd Zen 5
+.Pq Family 1ah
 .El
 .Pp
 This driver is a nexus driver and facilitates access to the northbridge,

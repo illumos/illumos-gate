@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_H
@@ -22,6 +22,7 @@
 #include <sys/pci.h>
 #include <sys/taskq.h>
 #include <sys/bitmap.h>
+#include <sys/x86_archext.h>
 #include <sys/amdzen/df.h>
 
 #include "amdzen_client.h"
@@ -178,6 +179,8 @@ typedef struct amdzen {
 	list_t		azn_nb_stubs;
 	uint_t		azn_ndfs;
 	amdzen_df_t	azn_dfs[AMDZEN_MAX_DFS];
+	x86_uarchrev_t	azn_uarchrev;
+	x86_chiprev_t	azn_chiprev;
 	uint32_t	azn_ncore_per_ccx;
 	amdzen_apic_decomp_t azn_apic_decomp;
 } amdzen_t;

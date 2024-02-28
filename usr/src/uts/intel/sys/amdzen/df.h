@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_AMDZEN_DF_H
@@ -31,7 +31,22 @@
  * supported here, which are v2 (Zen 1), v3 (Zen 2/3), v3.5 (Zen 2/3 with DDR5),
  * and v4 (Zen 4). In many cases, while the same logical thing exists in
  * different generations, they often have different shapes and sometimes things
- * with the same shape show up in different locations.
+ * with the same shape show up in different locations. As DFv4 has been extended
+ * across several different lines, things haven't been quite as smooth as we'd
+ * like in terms of DF representation. Certain things end up moving around much
+ * more liberally while revving the minor version of the DF, though at least we
+ * can still identify it as such.
+ *
+ * The major (relevant to us) distinction that we have found so far is that
+ * starting in DF 4v2 and greater, the way that DRAM was structured and the
+ * corresponding DRAM channel remap settings were moved. Because the DRAM base
+ * address registers were moved to 0x200, we call this DF_REV_4D2. If this
+ * gets much more nuanced, we should likely figure out if we want to encode
+ * minor versions in these constants and offer function pointers to get common
+ * things rather than forcing it onto clients. Note that this is very much a
+ * rough approximation and not really great. There are many places where the
+ * width of fields has changed slightly between minor revs, but are eating up
+ * more reserved bits, or not using quite as many.
  *
  * To make things a little easier for clients, each register definition encodes
  * enough information to also include which hardware generations it supports,
@@ -83,12 +98,18 @@ typedef enum df_rev {
 	DF_REV_2	= 1 << 0,
 	DF_REV_3	= 1 << 1,
 	DF_REV_3P5	= 1 << 2,
-	DF_REV_4	= 1 << 3
+	DF_REV_4	= 1 << 3,
+	/*
+	 * This is a synthetic revision we make up per the theory statement that
+	 * covers devices that have an updated DRAM layout.
+	 */
+	DF_REV_4D2	= 1 << 4
 } df_rev_t;
 
-#define	DF_REV_ALL_23	(DF_REV_2 | DF_REV_3 | DF_REV_3P5)
 #define	DF_REV_ALL_3	(DF_REV_3 | DF_REV_3P5)
-#define	DF_REV_ALL	(DF_REV_2 | DF_REV_3 | DF_REV_3P5 | DF_REV_4)
+#define	DF_REV_ALL_23	(DF_REV_2 | DF_REV_ALL_3)
+#define	DF_REV_ALL_4	(DF_REV_4 | DF_REV_4D2)
+#define	DF_REV_ALL	(DF_REV_ALL_23 | DF_REV_ALL_4)
 
 typedef struct df_reg_def {
 	df_rev_t	drd_gens;
@@ -144,13 +165,25 @@ typedef enum {
 } df_cs_subtype_t;
 
 /*
- * Note, this only exists in Genoa (maybe more generally Zen 4), otherwise it's
- * always zero.
+ * Starting in DFv4 they introduced a CCM subtype; however, kept the CPU
+ * compatible with prior DF revisions in v4.0. Starting with v4.1, they moved
+ * this to a value of one and the less asked about the ACM the better.
+ * Unfortunately this doesn't fit nicely with the major DF revisions which we
+ * use for register access.
  */
 typedef enum {
-	DF_CCM_SUBTYPE_CPU = 0,
-	DF_CCM_SUBTYPE_ACM = 1
+	DF_CCM_SUBTYPE_CPU_V2 = 0,
+	DF_CCM_SUBTYPE_ACM_V4 = 1,
+	DF_CCM_SUBTYPE_CPU_V4P1 = 1
 } df_ccm_subtype_v4_t;
+
+typedef enum {
+	DF_NCM_SUBTYPE_MMHUB = 1,
+	DF_NCM_SUBTYPE_DCE = 2,
+	DF_NCM_SUBTYPE_IOMMU = 4
+} df_ncm_subtype_t;
+
+
 #define	DF_FBIINFO0_GET_HAS_MCA(r)	bitx32(r, 23, 23)
 #define	DF_FBIINFO0_GET_FTI_DCNT(r)	bitx32(r, 21, 20)
 #define	DF_FBIINFO0_GET_FTI_PCNT(r)	bitx32(r, 18, 16)
@@ -184,16 +217,18 @@ typedef enum {
 	DF_TYPE_SPF,
 	DF_TYPE_LLC,
 	DF_TYPE_CAKE,
-	DF_TYPE_CNLI = 0xd,
+	DF_TYPE_ICNG,
+	DF_TYPE_PFX,
+	DF_TYPE_CNLI
 } df_type_t;
 
 /*
  * DF::FabricBlockInstanceInformation1 -- get basic information about a fabric
- * instance.
+ * instance. This appears to have been dropped starting in DF 4D2.
  */
 /*CSTYLED*/
-#define	DF_FBIINFO1		(df_reg_def_t){ .drd_gens = DF_REV_ALL, \
-				    .drd_func = 0, .drd_reg = 0x48 }
+#define	DF_FBIINFO1		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23 | \
+				    DF_REV_4, .drd_func = 0, .drd_reg = 0x48 }
 #define	DF_FBINFO1_GET_FTI3_NINSTID(r)		bitx32(r, 31, 24)
 #define	DF_FBINFO1_GET_FTI2_NINSTID(r)		bitx32(r, 23, 16)
 #define	DF_FBINFO1_GET_FTI1_NINSTID(r)		bitx32(r, 15, 8)
@@ -201,11 +236,11 @@ typedef enum {
 
 /*
  * DF::FabricBlockInstanceInformation2 -- get basic information about a fabric
- * instance.
+ * instance. This appears to have been dropped starting in DF 4D2.
  */
 /*CSTYLED*/
-#define	DF_FBIINFO2		(df_reg_def_t){ .drd_gens = DF_REV_ALL, \
-				    .drd_func = 0, .drd_reg = 0x4c }
+#define	DF_FBIINFO2		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23 | \
+				    DF_REV_4, .drd_func = 0, .drd_reg = 0x4c }
 #define	DF_FBINFO2_GET_FTI5_NINSTID(r)		bitx32(r, 15, 8)
 #define	DF_FBINFO2_GET_FTI4_NINSTID(r)		bitx32(r, 7, 0)
 
@@ -221,6 +256,16 @@ typedef enum {
 #define	DF_FBIINFO3_V3P5_GET_BLOCKID(r)	bitx32(r, 11, 8)
 #define	DF_FBIINFO3_V4_GET_BLOCKID(r)	bitx32(r, 19, 8)
 #define	DF_FBIINFO3_GET_INSTID(r)	bitx32(r, 7, 0)
+
+/*
+ * DF::DfCapability -- Describes the capabilities that the DF has.
+ */
+/*CSTYLED*/
+#define	DF_CAPAB		(df_reg_def_t){ .drd_gens = DF_REV_ALL, \
+				    .drd_func = 0, .drd_reg = 0x90 }
+#define	DF_CAPAB_GET_EXTCSREMAP(r)	bitx32(r, 2, 2);
+#define	DF_CAPAB_GET_SPF(r)		bitx32(r, 1, 1);
+#define	DF_CAPAB_GET_POISON(r)		bitx32(r, 0, 0);
 
 /*
  * DF::Skt0CsTargetRemap0, DF::Skt0CsTargetRemap1, DF::Skt1CsTargetRemap0,
@@ -247,7 +292,9 @@ typedef enum {
  * DF::CsTargetRemap0A, DF::CsTargetRemap0B, etc. -- These registers contain the
  * remap engines in DFv4. Note, that while v3 used 0/1 as REMAP[01], as
  * referring to the same logical set of things, here [0-3] is used for different
- * things and A/B distinguish the different actual CS values.
+ * things and A/B distinguish the different actual CS values. This was redone to
+ * allow for a wider channel selection in the 4D2 parts, see the subsequent
+ * section.
  */
 /*CSTYLED*/
 #define	DF_CS_REMAP0A_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
@@ -273,6 +320,53 @@ typedef enum {
 /*CSTYLED*/
 #define	DF_CS_REMAP3B_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				    .drd_func = 7, .drd_reg = 0x19c }
+
+/*
+ * DF::CsTargetRemap0A, DF::CsTargetRemap0B, etc. -- D42 edition. This has
+ * changed the actual size of the remap values so that they are now 5 bits wide,
+ * allowing for up to 32 channels. This is indicated by bit 2 (EXTCSREMAP) in
+ * DF::DfCapability. As a result, there are now only 6 remaps per register, so
+ * there are now 3 registers [ABC] per remap target [0123].
+ * changing around where the registers actually are.
+ */
+#define	DF_CS_REMAP_GET_CSX_V4B(r, x)	bitx32(r, (4 + (5 * (x))), (5 * ((x))))
+/*CSTYLED*/
+#define	DF_CS_REMAP0A_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x180 }
+/*CSTYLED*/
+#define	DF_CS_REMAP0B_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x184 }
+/*CSTYLED*/
+#define	DF_CS_REMAP0C_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x188 }
+/*CSTYLED*/
+#define	DF_CS_REMAP1A_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x198 }
+/*CSTYLED*/
+#define	DF_CS_REMAP1B_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x19c }
+/*CSTYLED*/
+#define	DF_CS_REMAP1C_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1a0 }
+/*CSTYLED*/
+#define	DF_CS_REMAP2A_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1b0 }
+/*CSTYLED*/
+#define	DF_CS_REMAP2B_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1b4 }
+/*CSTYLED*/
+#define	DF_CS_REMAP2C_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1b8 }
+/*CSTYLED*/
+#define	DF_CS_REMAP3A_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1c8 }
+/*CSTYLED*/
+#define	DF_CS_REMAP3B_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1cc }
+/*CSTYLED*/
+#define	DF_CS_REMAP3C_V4D2	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				    .drd_func = 7, .drd_reg = 0x1d0 }
+
 /*
  * DF::CfgAddressCntl -- This register contains the information about the
  * configuration of PCIe buses.  We care about finding which one has our BUS A,
@@ -283,7 +377,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0x84 }
 /*CSTYLED*/
-#define	DF_CFG_ADDR_CTL_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
+#define	DF_CFG_ADDR_CTL_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xc04 }
 #define	DF_CFG_ADDR_CTL_GET_BUS_NUM(r)	bitx32(r, 7, 0)
@@ -298,6 +392,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xa0 + ((x) * 4) }
 #define	DF_MAX_CFGMAP		8
+#define	DF_MAX_CFGMAP_TURIN	16
 #define	DF_CFGMAP_V2_GET_BUS_LIMIT(r)		bitx32(r, 31, 24)
 #define	DF_CFGMAP_V2_GET_BUS_BASE(r)		bitx32(r, 23, 16)
 #define	DF_CFGMAP_V2_GET_DEST_ID(r)		bitx32(r, 11, 4)
@@ -311,11 +406,11 @@ typedef enum {
  * two registers and more possible entries!
  */
 /*CSTYLED*/
-#define	DF_CFGMAP_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_CFGMAP_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xc80 + ((x) * 8) }
 /*CSTYLED*/
-#define	DF_CFGMAP_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_CFGMAP_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xc84 + ((x) * 8) }
 #define	DF_CFGMAP_BASE_V4_GET_BASE(r)	bitx32(r, 23, 16)
@@ -327,7 +422,9 @@ typedef enum {
 
 /*
  * DF::X86IOBaseAddress, DF::X86IOLimitAddress -- Base and limit registers for
- * routing I/O space. These are fairly similar prior to DFv4.
+ * routing I/O space. These are fairly similar prior to DFv4. The number of
+ * these was increased in Turin. We expect this'll hold true for future server
+ * parts.
  */
 /*CSTYLED*/
 #define	DF_IO_BASE_V2(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
@@ -338,6 +435,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xd00 + ((x) * 8) }
 #define	DF_MAX_IO_RULES		8
+#define	DF_MAX_IO_RULES_TURIN	16
 #define	DF_IO_BASE_SHIFT	12
 #define	DF_IO_BASE_V2_GET_BASE(r)	bitx32(r, 24, 12)
 #define	DF_IO_BASE_V2_GET_IE(r)		bitx32(r, 5, 5)
@@ -391,7 +489,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0x104 }
 /*CSTYLED*/
-#define	DF_DRAM_HOLE_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_DRAM_HOLE_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 7, \
 				.drd_reg = 0x104 }
 #define	DF_DRAM_HOLE_GET_BASE(r)	bitx32(r, 31, 24)
@@ -473,17 +571,29 @@ typedef enum {
  * DF::DramAddressIntlv  -- DFv4 edition. Here all the controls around the
  * target, interleaving, hashing, and more is split out from the base and limit
  * registers and put into dedicated control and interleave registers.
+ *
+ * In the 4D2 variant, the base and limit are the same, just at different
+ * addresses. The control register is subtly different with additional
+ * interleave options.
  */
 /*CSTYLED*/
 #define	DF_DRAM_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 7, \
 				.drd_reg = 0xe00 + ((x) * 0x10) }
+/*CSTYLED*/
+#define	DF_DRAM_BASE_V4D2(x)	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				.drd_func = 7, \
+				.drd_reg = 0x200 + ((x) * 0x10) }
 #define	DF_DRAM_BASE_V4_GET_ADDR(r)		bitx32(r, 27, 0)
 #define	DF_DRAM_BASE_V4_BASE_SHIFT		28
 /*CSTYLED*/
 #define	DF_DRAM_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 7, \
 				.drd_reg = 0xe04 + ((x) * 0x10) }
+/*CSTYLED*/
+#define	DF_DRAM_LIMIT_V4D2(x)	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				.drd_func = 7, \
+				.drd_reg = 0x204 + ((x) * 0x10) }
 #define	DF_DRAM_LIMIT_V4_GET_ADDR(r)		bitx32(r, 27, 0)
 #define	DF_DRAM_LIMIT_V4_LIMIT_SHIFT		28
 #define	DF_DRAM_LIMIT_V4_LIMIT_EXCL		(1 << 28)
@@ -492,11 +602,23 @@ typedef enum {
 #define	DF_DRAM_CTL_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 7, \
 				.drd_reg = 0xe08 + ((x) * 0x10) }
+/*CSTYLED*/
+#define	DF_DRAM_CTL_V4D2(x)	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				.drd_func = 7, \
+				.drd_reg = 0208 + ((x) * 0x10) }
 #define	DF_DRAM_CTL_V4_GET_DEST_ID(r)		bitx32(r, 27, 16)
+#define	DF_DRAM_CTL_V4D2_GET_HASH_1T(r)		bitx32(r, 15, 15)
+/*
+ * It seems that this was added in DF V4.1 (no relation to 4D2). It was reserved
+ * prior to this, so we leave it without a version suffix for now.
+ */
+#define	DF_DRAM_CTL_V4_GET_COL_SWIZ(r)		bitx32(r, 11, 11)
 #define	DF_DRAM_CTL_V4_GET_HASH_1G(r)		bitx32(r, 10, 10)
 #define	DF_DRAM_CTL_V4_GET_HASH_2M(r)		bitx32(r, 9, 9)
 #define	DF_DRAM_CTL_V4_GET_HASH_64K(r)		bitx32(r, 8, 8)
+#define	DF_DRAM_CTL_V4D2_GET_HASH_4K(r)		bitx32(r, 7, 7)
 #define	DF_DRAM_CTL_V4_GET_REMAP_SEL(r)		bitx32(r, 7, 5)
+#define	DF_DRAM_CTL_V4D2_GET_REMAP_SEL(r)	bitx32(r, 6, 5)
 #define	DF_DRAM_CTL_V4_GET_REMAP_EN(r)		bitx32(r, 4, 4)
 #define	DF_DRAM_CTL_V4_GET_SCM(r)		bitx32(r, 2, 2)
 #define	DF_DRAM_CTL_V4_GET_HOLE_EN(r)		bitx32(r, 1, 1)
@@ -506,8 +628,41 @@ typedef enum {
 #define	DF_DRAM_ILV_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 7, \
 				.drd_reg = 0xe0c + ((x) * 0x10) }
+/*CSTYLED*/
+#define	DF_DRAM_ILV_V4D2(x)	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
+				.drd_func = 7, \
+				.drd_reg = 0x20c + ((x) * 0x10) }
 #define	DF_DRAM_ILV_V4_GET_SOCK(r)		bitx32(r, 18, 18)
 #define	DF_DRAM_ILV_V4_GET_DIE(r)		bitx32(r, 13, 12)
+/*
+ * We're cheating a bit here. We combine the various different non-overlapping
+ * values in the 4D2 variants. In particular, most client parts stick to the
+ * first few values while the rest are sometimes used in the moniker "DF 4.5".
+ */
+#define	DF_DRAM_ILV_V4D2_GET_CHAN(r)		bitx32(r, 9, 4)
+#define	DF_DRAM_ILV_V4D2_CHAN_1			0x0
+#define	DF_DRAM_ILV_V4D2_CHAN_2			0x1
+#define	DF_DRAM_ILV_V4D2_CHAN_4			0x3
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_16S8CH_1K	0xc
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS0_24CH_1K	0xe
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_1K	0x10
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_4CH_1K	0x11
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_8S4CH_1K	0x12
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS4_3CH_1K	0x13
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_6CH_1K	0x14
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_12CH_1K	0x15
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_5CH_1K	0x16
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_10CH_1K	0x17
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_2K	0x20
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_4CH_2K	0x21
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_8S4CH_2K	0x22
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_16S8CH_2K	0x23
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS4_3CH_2K	0x24
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_6CH_2K	0x25
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS1_12CH_2K	0x26
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS0_24CH_2K	0x27
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_5CH_2K	0x28
+#define	DF_DRAM_ILV_V4D2_CHAN_NPS2_10CH_2K	0x29
 #define	DF_DRAM_ILV_V4_GET_CHAN(r)		bitx32(r, 8, 4)
 #define	DF_DRAM_ILV_V4_CHAN_1			0x0
 #define	DF_DRAM_ILV_V4_CHAN_2			0x1
@@ -538,7 +693,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0x1b4 }
 /*CSTYLED*/
-#define	DF_DRAM_OFFSET_V4(r)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_DRAM_OFFSET_V4(r)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 7, \
 				.drd_reg = 0x140 + ((r) * 4) }
 #define	DF_DRAM_OFFSET_V2_GET_OFFSET(r)		bitx32(r, 31, 20)
@@ -546,6 +701,54 @@ typedef enum {
 #define	DF_DRAM_OFFSET_V4_GET_OFFSET(r)		bitx32(r, 24, 1)
 #define	DF_DRAM_OFFSET_SHIFT			28
 #define	DF_DRAM_OFFSET_GET_EN(r)		bitx32(r, 0, 0)
+
+/*
+ * DF::VGAEn -- This controls whether or not the historical x86 VGA
+ * compatibility region is enabled or not.
+ */
+/*CSTYLED*/
+#define	DF_VGA_EN_V2		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
+				.drd_func = 0, \
+				.drd_reg = 0x80 }
+/*CSTYLED*/
+#define	DF_VGA_EN_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 0, \
+				.drd_reg = 0xc08 }
+
+#define	DF_VGA_EN_GET_FABID(r)		bitx32(r, 15, 4)
+#define	DF_VGA_EN_GET_CPUDIS(r)		bitx32(r, 2, 2)
+#define	DF_VGA_EN_GET_NP(r)		bitx32(r, 1, 1)
+#define	DF_VGA_EN_GET_EN(r)		bitx32(r, 0, 0)
+
+/*
+ * DF::MmioPciCfgBaseAddr, DF::MmioPciCfgBaseAddrExt, DF::MmioPciCfgLimitAddr,
+ * DF::MmioPciCfgLimitAddrExt -- These are DFv4 additions that control where PCI
+ * extended configuration space is and whether or not the DF honors this. This
+ * must match the values programmed into the CPU. Prior to DFv4, there was not a
+ * DF setting for this. The encoded values of the base and limit are the same.
+ */
+/*CSTYLED*/
+#define	DF_ECAM_BASE_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 0, \
+				.drd_reg = 0xc10 }
+/*CSTYLED*/
+#define	DF_ECAM_BASE_EXT_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 0, \
+				.drd_reg = 0xc14 }
+/*CSTYLED*/
+#define	DF_ECAM_LIMIT_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 0, \
+				.drd_reg = 0xc18 }
+/*CSTYLED*/
+#define	DF_ECAM_LIMIT_EXT_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 0, \
+				.drd_reg = 0xc1c }
+#define	DF_ECAM_V4_GET_ADDR(r)		bitx32(r, 31, 20)
+#define	DF_ECAM_V4_ADDR_SHIFT		20
+#define	DF_ECAM_LIMIT_EXCL		(1 << DF_ECAM_V4_ADDR_SHIFT)
+#define	DF_ECAM_BASE_V4_GET_EN(r)	bitx32(r, 0, 0)
+#define	DF_ECAM_EXT_V4_GET_ADDR(r)	bitx32(r, 23, 0)
+#define	DF_ECAM_EXT_V4_ADDR_SHIFT	32
 
 /*
  * DF::MmioBaseAddress, DF::MmioLimitAddress, DF::MmioAddressControl -- These
@@ -560,22 +763,23 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0x204 + ((x) * 0x10) }
 /*CSTYLED*/
-#define	DF_MMIO_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_MMIO_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd80 + ((x) * 0x10) }
 /*CSTYLED*/
-#define	DF_MMIO_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_MMIO_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd84 + ((x) * 0x10) }
 #define	DF_MMIO_SHIFT		16
 #define	DF_MMIO_LIMIT_EXCL	(1 << DF_MMIO_SHIFT)
 #define	DF_MAX_MMIO_RULES	16
+#define	DF_MAX_MMIO_RULES_TURIN	32
 /*CSTYLED*/
 #define	DF_MMIO_CTL_V2(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
 				.drd_func = 0, \
 				.drd_reg = 0x208 + ((x) * 0x10) }
 /*CSTYLED*/
-#define	DF_MMIO_CTL_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_MMIO_CTL_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd88 + ((x) * 0x10) }
 #define	DF_MMIO_CTL_V2_GET_NP(r)	bitx32(r, 12, 12)
@@ -607,7 +811,7 @@ typedef enum {
  * used for MMIO.
  */
 /*CSTYLED*/
-#define	DF_MMIO_EXT_V4(x)		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_MMIO_EXT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd8c + ((x) * 0x10) }
 #define	DF_MMIO_EXT_V4_GET_LIMIT(r)	bitx32(r, 23, 16)
@@ -678,7 +882,7 @@ typedef enum {
 #define	DF_SYSCFG_V3P5_GET_MY_TYPE(r)		bitx32(r, 1, 0)
 
 /*CSTYLED*/
-#define	DF_SYSCFG_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_SYSCFG_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x180 }
 #define	DF_SYSCFG_V4_GET_NODE_ID(r)	bitx32(r, 27, 16)
@@ -692,8 +896,7 @@ typedef enum {
  * this does not seem defined for DFv3.5
  */
 /*CSTYLED*/
-#define	DF_COMPCNT_V2		(df_reg_def_t){ .drd_gens = DF_REV_2 | \
-				    DF_REV_3, \
+#define	DF_COMPCNT_V2		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
 				.drd_func = 1, \
 				.drd_reg = 0x204 }
 #define	DF_COMPCNT_V2_GET_IOMS(r)	bitx32(r, 23, 16)
@@ -701,7 +904,7 @@ typedef enum {
 #define	DF_COMPCNT_V2_GET_PIE(r)	bitx32(r, 7, 0)
 
 /*CSTYLED*/
-#define	DF_COMPCNT_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_COMPCNT_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x184 }
 #define	DF_COMPCNT_V4_GET_IOS(r)	bitx32(r, 31, 26)
@@ -758,7 +961,7 @@ typedef enum {
 				.drd_func = 1, \
 				.drd_reg = 0x150 }
 /*CSTYLED*/
-#define	DF_FIDMASK0_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FIDMASK0_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x1b0 }
 #define	DF_FIDMASK0_V3P5_GET_NODE_MASK(r)	bitx32(r, 31, 16)
@@ -768,7 +971,7 @@ typedef enum {
 				.drd_func = 1, \
 				.drd_reg = 0x154 }
 /*CSTYLED*/
-#define	DF_FIDMASK1_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FIDMASK1_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x1b4 }
 #define	DF_FIDMASK1_V3P5_GET_SOCK_SHIFT(r)	bitx32(r, 11, 8)
@@ -778,7 +981,7 @@ typedef enum {
 				.drd_func = 1, \
 				.drd_reg = 0x158 }
 /*CSTYLED*/
-#define	DF_FIDMASK2_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FIDMASK2_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x1b8 }
 #define	DF_FIDMASK2_V3P5_GET_SOCK_MASK(r)	bitx32(r, 31, 16)
@@ -817,12 +1020,13 @@ typedef enum {
  * single CCD.
  *
  * The CCX related fields are only valid when the dense mode is enabled in the
- * global DF controls. We don't generally recommend this as a way of determining
- * if multiple CCX units are present on the CCD because it is tied to DFv4.
+ * global DF controls. If a CPU doesn't support that, then that field is
+ * reserved. We don't generally recommend this as a way of determining if
+ * multiple CCX units are present on the CCD because it is tied to DFv4.
  */
 #define	DF_MAX_CCDS_PER_CCM	2
 /*CSTYLED*/
-#define	DF_CCD_EN_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_CCD_EN_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x104 }
 #define	DF_CCD_EN_V4_GET_CCX_EN(r)	bitx32(r, 17, 16)
@@ -832,7 +1036,8 @@ typedef enum {
 /*
  * DF::PhysicalCoreEnable0, etc. -- These registers can be used to tell us which
  * cores are actually enabled. This appears to have been introduced in DFv3.
- * DFv4 expanded this from two registers to four.
+ * DFv4 expanded this from two registers to several more. The number that are
+ * valid vary based upon the CPU family.
  */
 /*CSTYLED*/
 #define	DF_PHYS_CORE_EN0_V3	(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
@@ -843,21 +1048,29 @@ typedef enum {
 				.drd_func = 1, \
 				.drd_reg = 0x304 }
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN0_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_PHYS_CORE_EN0_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x140 }
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN1_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_PHYS_CORE_EN1_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x144 }
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN2_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_PHYS_CORE_EN2_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x148 }
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN3_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_PHYS_CORE_EN3_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x14c }
+/*CSTYLED*/
+#define	DF_PHYS_CORE_EN4_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 1, \
+				.drd_reg = 0x150 }
+/*CSTYLED*/
+#define	DF_PHYS_CORE_EN5_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 1, \
+				.drd_reg = 0x154 }
 
 /*
  * DF::Np2ChannelConfig -- This is used in Milan to contain information about
@@ -879,7 +1092,7 @@ typedef enum {
  * meanings. A subset of the bits are defined below based upon our needs.
  */
 /*CSTYLED*/
-#define	DF_CCMCFG4_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_CCMCFG4_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 3, \
 				.drd_reg = 0x510 }
 #define	DF_CCMCFG4_V4_GET_WIDE_EN(r)		bitx32(r, 26, 26)
@@ -897,7 +1110,7 @@ typedef enum {
 				.drd_func = 4, \
 				.drd_reg = 0x5c }
 /*CSTYLED*/
-#define	DF_FICAA_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FICAA_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x8c }
 #define	DF_FICAA_V2_SET_INST(r, v)		bitset32(r, 23, 16, v)
@@ -917,11 +1130,11 @@ typedef enum {
 				.drd_func = 4, \
 				.drd_reg = 0x9c}
 /*CSTYLED*/
-#define	DF_FICAD_LO_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FICAD_LO_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0xb8}
 /*CSTYLED*/
-#define	DF_FICAD_HI_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_FICAD_HI_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0xbc}
 

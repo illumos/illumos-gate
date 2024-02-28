@@ -350,6 +350,13 @@ static uint32_t amd_skts[][16] = {
 	{
 		[4] = X86_SOCKET_SP5,
 		[8] = X86_SOCKET_SP6
+	},
+	/*
+	 * Family 0x1a models 00-1f	(Zen 5[c] - Turin)
+	 */
+#define	A_SKTS_TURIN			30
+	{
+		[4] = X86_SOCKET_SP5,
 	}
 };
 
@@ -776,7 +783,16 @@ static const struct amd_rev_mapent {
 	{ 0x19, 0xa0, 0xaf, 0x2, 0x2, X86_CHIPREV_AMD_BERGAMO_A2, "RSDN-A2",
 	    X86_UARCHREV_AMD_ZEN4_A2, A_SKTS_BERGAMO },
 	{ 0x19, 0xa0, 0xaf, 0x0, 0xf, X86_CHIPREV_AMD_BERGAMO_UNKNOWN, "???",
-	    X86_UARCHREV_AMD_ZEN4_UNKNOWN, A_SKTS_BERGAMO }
+	    X86_UARCHREV_AMD_ZEN4_UNKNOWN, A_SKTS_BERGAMO },
+
+	/* Turin */
+	{ 0x1a, 0x00, 0x0f, 0x0, 0x0, X86_CHIPREV_AMD_TURIN_UNKNOWN, "BRH-A0",
+	    X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_TURIN},
+	{ 0x1a, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_TURIN_UNKNOWN, "BRH-???",
+	    X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_TURIN},
+	{ 0x1a, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_DENSE_TURIN_UNKNOWN,
+	    "BRHD-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_TURIN}
+
 };
 
 /*

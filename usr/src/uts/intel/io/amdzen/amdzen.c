@@ -205,10 +205,14 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x14a4,
 	/* Family 17h Mendocino, Family 19h Rembrandt */
 	0x14b5,
-	/* Family 19h Raphael */
+	/* Family 19h Raphael, Family 1Ah 40-4fh */
 	0x14d8,
 	/* Family 19h Phoenix */
-	0x14e8
+	0x14e8,
+	/* Family 1Ah Turin */
+	0x153a,
+	/* Family 1Ah 20-2fh */
+	0x1507
 };
 
 typedef struct {
@@ -303,6 +307,7 @@ amdzen_df_read_regdef(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def,
 		val = DF_FICAA_V2_SET_REG(val, def.drd_reg >> 2);
 		break;
 	case DF_REV_4:
+	case DF_REV_4D2:
 		ficaa = DF_FICAA_V4;
 		ficad = DF_FICAD_LO_V4;
 		val = DF_FICAA_V4_SET_REG(val, def.drd_reg >> 2);
@@ -396,6 +401,16 @@ amdzen_smn_write(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg,
 		panic("unreachable invalid SMN register size %u",
 		    SMN_REG_SIZE(reg));
 	}
+}
+
+/*
+ * This is an unfortunate necessity due to the evolution of the CCM DF values.
+ */
+static inline boolean_t
+amdzen_df_at_least(const amdzen_df_t *df, uint8_t major, uint8_t minor)
+{
+	return (df->adf_major > major || (df->adf_major == major &&
+	    df->adf_minor >= minor));
 }
 
 static amdzen_df_t *
@@ -631,12 +646,13 @@ amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
 		}
 		break;
 	case ZEN_DF_TYPE_CCM_CPU:
-		/*
-		 * Because the CCM CPU subtype has always remained zero, we can
-		 * use that regardless of the generation.
-		 */
 		df_type = DF_TYPE_CCM;
-		df_subtype = DF_CCM_SUBTYPE_CPU;
+
+		if (df->adf_rev >= DF_REV_4 && amdzen_df_at_least(df, 4, 1)) {
+			df_subtype = DF_CCM_SUBTYPE_CPU_V4P1;
+		} else {
+			df_subtype = DF_CCM_SUBTYPE_CPU_V2;
+		}
 		break;
 	default:
 		return (EINVAL);
@@ -807,6 +823,24 @@ amdzen_is_rome_style(uint_t id)
 }
 
 /*
+ * Deal with the differences between between how a CCM subtype is indicated
+ * across CPU generations.
+ */
+static boolean_t
+amdzen_dfe_is_ccm(const amdzen_df_t *df, const amdzen_df_ent_t *ent)
+{
+	if (ent->adfe_type != DF_TYPE_CCM) {
+		return (B_FALSE);
+	}
+
+	if (df->adf_rev >= DF_REV_4 && amdzen_df_at_least(df, 4, 1)) {
+		return (ent->adfe_subtype == DF_CCM_SUBTYPE_CPU_V4P1);
+	} else {
+		return (ent->adfe_subtype == DF_CCM_SUBTYPE_CPU_V2);
+	}
+}
+
+/*
  * To be able to do most other things we want to do, we must first determine
  * what revision of the DF (data fabric) that we're using.
  *
@@ -864,7 +898,14 @@ amdzen_determine_df_vers(amdzen_t *azn, amdzen_df_t *df)
 				df->adf_rev = DF_REV_2;
 			}
 		}
-	} else if (df->adf_major == 4 && df->adf_minor == 0) {
+	} else if (df->adf_major == 4 && df->adf_minor >= 2) {
+		/*
+		 * These are devices that have the newer memory layout that
+		 * moves the DF::DramBaseAddress to 0x200. Please see the df.h
+		 * theory statement for more information.
+		 */
+		df->adf_rev = DF_REV_4D2;
+	} else if (df->adf_major == 4) {
 		df->adf_rev = DF_REV_4;
 	} else {
 		df->adf_rev = DF_REV_UNKNOWN;
@@ -996,6 +1037,7 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		df->adf_nodeid = DF_SYSCFG_V3P5_GET_NODE_ID(df->adf_syscfg);
 		break;
 	case DF_REV_4:
+	case DF_REV_4D2:
 		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V4);
 		df->adf_mask0 =  amdzen_df_read32_bcast(azn, df,
 		    DF_FIDMASK0_V4);
@@ -1077,7 +1119,6 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
  * could get a value of 0b10 indicating that only the upper SDP link is active
  * for some reason.
  */
-
 static void
 amdzen_setup_df_ccm(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *dfe,
     uint32_t ccmno)
@@ -1126,6 +1167,7 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		val = amdzen_df_read32_bcast(azn, df, DF_CFG_ADDR_CTL_V2);
 		break;
 	case DF_REV_4:
+	case DF_REV_4D2:
 		val = amdzen_df_read32_bcast(azn, df, DF_CFG_ADDR_CTL_V4);
 		break;
 	default:
@@ -1166,8 +1208,12 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 
 		dfe->adfe_drvid = inst;
 		dfe->adfe_info0 = amdzen_df_read32(azn, df, inst, DF_FBIINFO0);
-		dfe->adfe_info1 = amdzen_df_read32(azn, df, inst, DF_FBIINFO1);
-		dfe->adfe_info2 = amdzen_df_read32(azn, df, inst, DF_FBIINFO2);
+		if (df->adf_rev <= DF_REV_4) {
+			dfe->adfe_info1 = amdzen_df_read32(azn, df, inst,
+			    DF_FBIINFO1);
+			dfe->adfe_info2 = amdzen_df_read32(azn, df, inst,
+			    DF_FBIINFO2);
+		}
 		dfe->adfe_info3 = amdzen_df_read32(azn, df, inst, DF_FBIINFO3);
 
 		dfe->adfe_type = DF_FBIINFO0_GET_TYPE(dfe->adfe_info0);
@@ -1184,7 +1230,19 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		if (DF_FBIINFO0_GET_HAS_MCA(dfe->adfe_info0)) {
 			dfe->adfe_flags |= AMDZEN_DFE_F_MCA;
 		}
-		dfe->adfe_inst_id = DF_FBIINFO3_GET_INSTID(dfe->adfe_info3);
+
+		/*
+		 * Starting with DFv4 there is no instance ID in the fabric info
+		 * 3 register, so we instead grab it out of the driver ID which
+		 * is what it should be anyways.
+		 */
+		if (df->adf_rev >= DF_REV_4) {
+			dfe->adfe_inst_id = dfe->adfe_drvid;
+		} else {
+			dfe->adfe_inst_id =
+			    DF_FBIINFO3_GET_INSTID(dfe->adfe_info3);
+		}
+
 		switch (df->adf_rev) {
 		case DF_REV_2:
 			dfe->adfe_fabric_id =
@@ -1199,6 +1257,7 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 			    DF_FBIINFO3_V3P5_GET_BLOCKID(dfe->adfe_info3);
 			break;
 		case DF_REV_4:
+		case DF_REV_4D2:
 			dfe->adfe_fabric_id =
 			    DF_FBIINFO3_V4_GET_BLOCKID(dfe->adfe_info3);
 			break;
@@ -1214,8 +1273,7 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		if ((dfe->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
 			continue;
 
-		if (dfe->adfe_type == DF_TYPE_CCM &&
-		    dfe->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+		if (amdzen_dfe_is_ccm(df, dfe)) {
 			df->adf_nccm++;
 		}
 	}
@@ -1263,6 +1321,96 @@ amdzen_find_nb(amdzen_t *azn, amdzen_df_t *df)
 	}
 }
 
+/*
+ * We need to be careful using this function as different AMD generations have
+ * acted in different ways when there is a missing CCD. We've found that in
+ * hardware where the CCM is enabled but there is no CCD attached, it generally
+ * is safe (i.e. DFv3 on Rome), but on DFv4 if we ask for a CCD that would
+ * correspond to a disabled CCM then the firmware may inject a fatal error
+ * (which is hopefully something missing in our RAS/MCA-X enablement).
+ *
+ * Put differently if this doesn't correspond to an Enabled CCM and you know the
+ * number of valid CCDs on this, don't use it.
+ */
+static boolean_t
+amdzen_ccd_present(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno)
+{
+	smn_reg_t die_reg = SMUPWR_CCD_DIE_ID(ccdno);
+	uint32_t val = amdzen_smn_read(azn, df, die_reg);
+	if (val == SMN_EINVAL32) {
+		return (B_FALSE);
+	}
+
+	ASSERT3U(ccdno, ==, SMUPWR_CCD_DIE_ID_GET(val));
+	return (B_TRUE);
+}
+
+static uint32_t
+amdzen_ccd_thread_en(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno)
+{
+	smn_reg_t reg;
+
+	if (uarchrev_uarch(azn->azn_uarchrev) >= X86_UARCH_AMD_ZEN5) {
+		reg = L3SOC_THREAD_EN(ccdno);
+	} else {
+		reg = SMUPWR_THREAD_EN(ccdno);
+	}
+
+	return (amdzen_smn_read(azn, df, reg));
+}
+
+static uint32_t
+amdzen_ccd_core_en(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno)
+{
+	smn_reg_t reg;
+
+	if (uarchrev_uarch(azn->azn_uarchrev) >= X86_UARCH_AMD_ZEN5) {
+		reg = L3SOC_CORE_EN(ccdno);
+	} else {
+		reg = SMUPWR_CORE_EN(ccdno);
+	}
+
+	return (amdzen_smn_read(azn, df, reg));
+}
+
+static void
+amdzen_ccd_info(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno, uint32_t *nccxp,
+    uint32_t *nlcorep, uint32_t *nthrp)
+{
+	uint32_t nccx, nlcore, smt;
+
+	if (uarchrev_uarch(azn->azn_uarchrev) >= X86_UARCH_AMD_ZEN5) {
+		smn_reg_t reg = L3SOC_THREAD_CFG(ccdno);
+		uint32_t val = amdzen_smn_read(azn, df, reg);
+		nccx = L3SOC_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
+		nlcore = L3SOC_THREAD_CFG_GET_CORE_COUNT(val) + 1;
+		smt = L3SOC_THREAD_CFG_GET_SMT_MODE(val);
+	} else {
+		smn_reg_t reg = SMUPWR_THREAD_CFG(ccdno);
+		uint32_t val = amdzen_smn_read(azn, df, reg);
+		nccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
+		nlcore = SMUPWR_THREAD_CFG_GET_CORE_COUNT(val) + 1;
+		smt = SMUPWR_THREAD_CFG_GET_SMT_MODE(val);
+	}
+
+	if (nccxp != NULL) {
+		*nccxp = nccx;
+	}
+
+	if (nlcorep != NULL) {
+		*nlcorep = nlcore;
+	}
+
+	if (nthrp != NULL) {
+		/* The L3::L3SOC and SMU::PWR values are the same here */
+		if (smt == SMUPWR_THREAD_CFG_SMT_MODE_SMT) {
+			*nthrp = 2;
+		} else {
+			*nthrp = 1;
+		}
+	}
+}
+
 static void
 amdzen_initpkg_to_apic(amdzen_t *azn, const uint32_t pkg0, const uint32_t pkg7)
 {
@@ -1281,7 +1429,7 @@ amdzen_initpkg_to_apic(amdzen_t *azn, const uint32_t pkg0, const uint32_t pkg7)
 	nccd = SCFCTP_PMREG_INITPKG7_GET_N_DIES(pkg7);
 	nsock = SCFCTP_PMREG_INITPKG7_GET_N_SOCKETS(pkg7);
 
-	if (uarchrev_uarch(cpuid_getuarchrev(CPU)) >= X86_UARCH_AMD_ZEN4) {
+	if (uarchrev_uarch(azn->azn_uarchrev) >= X86_UARCH_AMD_ZEN4) {
 		extccx = SCFCTP_PMREG_INITPKG7_ZEN4_GET_16TAPIC(pkg7);
 	} else {
 		extccx = 0;
@@ -1387,32 +1535,23 @@ amdzen_determine_apic_decomp_initpkg(amdzen_t *azn)
 		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
 			continue;
 
-		if (ent->adfe_type == DF_TYPE_CCM &&
-		    ent->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+		if (amdzen_dfe_is_ccm(df, ent)) {
 			uint32_t val, nccx, pkg7, pkg0;
-			smn_reg_t die_reg, thrcfg_reg, core_reg;
 			smn_reg_t pkg7_reg, pkg0_reg;
 			int core_bit;
 			uint8_t pccxno, pcoreno;
 
-			die_reg = SMUPWR_CCD_DIE_ID(ccdno);
-			val = amdzen_smn_read(azn, df, die_reg);
-			if (val == SMN_EINVAL32) {
+			if (!amdzen_ccd_present(azn, df, ccdno)) {
 				ccdno++;
 				continue;
 			}
-
-			ASSERT3U(SMUPWR_CCD_DIE_ID_GET(val), ==, ccdno);
 
 			/*
 			 * This die actually exists. Switch over to the core
 			 * enable register to find one to ask about physically.
 			 */
-			thrcfg_reg = SMUPWR_THREAD_CFG(ccdno);
-			val = amdzen_smn_read(azn, df, thrcfg_reg);
-			nccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
-			core_reg = SMUPWR_CORE_EN(ccdno);
-			val = amdzen_smn_read(azn, df, core_reg);
+			amdzen_ccd_info(azn, df, ccdno, &nccx, NULL, NULL);
+			val = amdzen_ccd_core_en(azn, df, ccdno);
 			if (val == 0) {
 				ccdno++;
 				continue;
@@ -1431,16 +1570,14 @@ amdzen_determine_apic_decomp_initpkg(amdzen_t *azn)
 			/*
 			 * Unfortunately SMU::PWR::THREAD_CONFIGURATION gives us
 			 * the Number of logical cores that are present in the
-			 * complex, not the total number of physical cores. So
-			 * here we need to encode that in Zen 3+ the number of
-			 * cores per CCX is a maximum of 8. Right now we do
-			 * assume that the physical and logical ccx numbering is
-			 * equivalent (we have no other way of knowing if it is
-			 * or isn't right now) and that we'd always have CCX0
-			 * before CCX1. AMD seems to suggest we can assume this,
-			 * though it is a worrisome assumption.
+			 * complex, not the total number of physical cores.
+			 * Right now we do assume that the physical and logical
+			 * ccx numbering is equivalent (we have no other way of
+			 * knowing if it is or isn't right now) and that we'd
+			 * always have CCX0 before CCX1. AMD seems to suggest we
+			 * can assume this, though it is a worrisome assumption.
 			 */
-			pccxno = pcoreno / 8;
+			pccxno = pcoreno / azn->azn_ncore_per_ccx;
 			ASSERT3U(pccxno, <, nccx);
 			pkg7_reg = SCFCTP_PMREG_INITPKG7(ccdno, pccxno,
 			    pcoreno);
@@ -1515,11 +1652,10 @@ amdzen_determine_apic_decomp_initpkg(amdzen_t *azn)
 static boolean_t
 amdzen_determine_apic_decomp(amdzen_t *azn)
 {
-	x86_uarchrev_t uarchrev = cpuid_getuarchrev(CPU);
 	amdzen_apic_decomp_t *apic = &azn->azn_apic_decomp;
 	boolean_t smt = is_x86_feature(x86_featureset, X86FSET_HTT);
 
-	switch (uarchrev_uarch(uarchrev)) {
+	switch (uarchrev_uarch(azn->azn_uarchrev)) {
 	case X86_UARCH_AMD_ZEN1:
 	case X86_UARCH_AMD_ZENPLUS:
 		apic->aad_sock_mask = 0x40;
@@ -1574,6 +1710,7 @@ amdzen_determine_apic_decomp(amdzen_t *azn)
 		break;
 	case X86_UARCH_AMD_ZEN3:
 	case X86_UARCH_AMD_ZEN4:
+	case X86_UARCH_AMD_ZEN5:
 		return (amdzen_determine_apic_decomp_initpkg(azn));
 	default:
 		return (B_FALSE);
@@ -1584,14 +1721,13 @@ amdzen_determine_apic_decomp(amdzen_t *azn)
 /*
  * Snapshot the number of cores that can exist in a CCX based on the Zen
  * microarchitecture revision. In Zen 1-4 this has been a constant number
- * regardless of the actual CPU Family.
+ * regardless of the actual CPU Family. In Zen 5 this varies based upon whether
+ * or not dense dies are being used.
  */
 static void
 amdzen_determine_ncore_per_ccx(amdzen_t *azn)
 {
-	x86_uarchrev_t uarchrev = cpuid_getuarchrev(CPU);
-
-	switch (uarchrev_uarch(uarchrev)) {
+	switch (uarchrev_uarch(azn->azn_uarchrev)) {
 	case X86_UARCH_AMD_ZEN1:
 	case X86_UARCH_AMD_ZENPLUS:
 	case X86_UARCH_AMD_ZEN2:
@@ -1601,41 +1737,25 @@ amdzen_determine_ncore_per_ccx(amdzen_t *azn)
 	case X86_UARCH_AMD_ZEN4:
 		azn->azn_ncore_per_ccx = 8;
 		break;
+	case X86_UARCH_AMD_ZEN5:
+		if (chiprev_family(azn->azn_chiprev) ==
+		    X86_PF_AMD_DENSE_TURIN) {
+			azn->azn_ncore_per_ccx = 16;
+		} else {
+			azn->azn_ncore_per_ccx = 8;
+		}
+		break;
 	default:
-		panic("asked about non-Zen uarch");
+		panic("asked about non-Zen or unknown uarch");
 	}
-}
-
-/*
- * We need to be careful using this function as different AMD generations have
- * acted in different ways when there is a missing CCD. We've found that in
- * hardware where the CCM is enabled but there is no CCD attached, it generally
- * is safe (i.e. DFv3 on Rome), but on DFv4 if we ask for a CCD that would
- * correspond to a disabled CCM then the firmware may inject a fatal error
- * (which is hopefully something missing in our RAS/MCA-X enablement).
- *
- * Put differently if this doesn't correspond to an Enabled CCM and you know the
- * number of valid CCDs on this, don't use it.
- */
-static boolean_t
-amdzen_ccd_present(amdzen_t *azn, amdzen_df_t *df, uint32_t ccdno)
-{
-	smn_reg_t die_reg = SMUPWR_CCD_DIE_ID(ccdno);
-	uint32_t val = amdzen_smn_read(azn, df, die_reg);
-	if (val == SMN_EINVAL32) {
-		return (B_FALSE);
-	}
-
-	ASSERT3U(ccdno, ==, SMUPWR_CCD_DIE_ID_GET(val));
-	return (B_TRUE);
 }
 
 /*
  * Attempt to determine a logical CCD number of a given CCD where we don't have
  * hardware support for L3::SCFCTP::PMREG_INITPKG* (e.g. pre-Zen 3 systems).
- * The CCD numbers that we have are the in the physical space. Likely beacuse of
+ * The CCD numbers that we have are the in the physical space. Likely because of
  * how the orientation of CCM numbers map to physical locations and the layout
- * of them within the pacakge, we haven't found a good way using the core DFv3
+ * of them within the package, we haven't found a good way using the core DFv3
  * registers to determine if a given CCD is actually present or not as generally
  * all the CCMs are left enabled. Instead we use SMU::PWR::DIE_ID as a proxy to
  * determine CCD presence.
@@ -1725,13 +1845,12 @@ static void
 amdzen_ccd_fill_topo(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *ent,
     amdzen_topo_ccd_t *ccd)
 {
-	uint32_t val, nccx, core_en, thread_en;
+	uint32_t nccx, core_en, thread_en;
 	uint32_t nlcore_per_ccx, nthreads_per_core;
 	uint32_t sockid, dieid, compid;
 	const uint32_t ccdno = ccd->atccd_phys_no;
-	const x86_uarch_t uarch = uarchrev_uarch(cpuid_getuarchrev(CPU));
-	boolean_t smt, pkg0_ids, logccd_set = B_FALSE;
-	smn_reg_t reg;
+	const x86_uarch_t uarch = uarchrev_uarch(azn->azn_uarchrev);
+	boolean_t pkg0_ids, logccd_set = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&azn->azn_mutex));
 	if (!amdzen_ccd_present(azn, df, ccdno)) {
@@ -1739,22 +1858,12 @@ amdzen_ccd_fill_topo(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *ent,
 		return;
 	}
 
-	reg = SMUPWR_THREAD_CFG(ccdno);
-	val = amdzen_smn_read(azn, df, reg);
-	nccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
-	nlcore_per_ccx = SMUPWR_THREAD_CFG_GET_COMPLEX_COUNT(val) + 1;
-	smt = SMUPWR_THREAD_CFG_GET_SMT_MODE(val);
+	amdzen_ccd_info(azn, df, ccdno, &nccx, &nlcore_per_ccx,
+	    &nthreads_per_core);
 	ASSERT3U(nccx, <=, AMDZEN_TOPO_CCD_MAX_CCX);
-	if (smt == SMUPWR_THREAD_CFG_SMT_MODE_SMT) {
-		nthreads_per_core = 2;
-	} else {
-		nthreads_per_core = 1;
-	}
 
-	reg = SMUPWR_CORE_EN(ccdno);
-	core_en = amdzen_smn_read(azn, df, reg);
-	reg = SMUPWR_THREAD_EN(ccdno);
-	thread_en = amdzen_smn_read(azn, df, reg);
+	core_en = amdzen_ccd_core_en(azn, df, ccdno);
+	thread_en = amdzen_ccd_thread_en(azn, df, ccdno);
 
 	/*
 	 * The BSP is never enabled in a conventional sense and therefore the
@@ -1893,7 +2002,13 @@ amdzen_nexus_init(void *arg)
 	amdzen_t *azn = arg;
 
 	/*
-	 * First go through all of the stubs and assign the DF entries.
+	 * Assign the requisite identifying information for this CPU.
+	 */
+	azn->azn_uarchrev = cpuid_getuarchrev(CPU);
+	azn->azn_chiprev = cpuid_getchiprev(CPU);
+
+	/*
+	 * Go through all of the stubs and assign the DF entries.
 	 */
 	mutex_enter(&azn->azn_mutex);
 	if (!amdzen_map_dfs(azn) || !amdzen_check_dfs(azn)) {
@@ -1910,11 +2025,11 @@ amdzen_nexus_init(void *arg)
 		amdzen_find_nb(azn, df);
 	}
 
+	amdzen_determine_ncore_per_ccx(azn);
+
 	if (amdzen_determine_apic_decomp(azn)) {
 		azn->azn_flags |= AMDZEN_F_APIC_DECOMP_VALID;
 	}
-
-	amdzen_determine_ncore_per_ccx(azn);
 
 	/*
 	 * Not all children may be installed. As such, we do not treat the
@@ -2278,14 +2393,21 @@ amdzen_topo_ioctl_base(amdzen_t *azn, intptr_t arg, int mode)
 }
 
 /*
- * Fill in the peers. The way we do is this is to just fill in all the entries
- * and then zero out the ones that aren't valid.
+ * Fill in the peers. We only have this information prior to DF 4D2.  The way we
+ * do is this is to just fill in all the entries and then zero out the ones that
+ * aren't valid.
  */
 static void
-amdzen_topo_ioctl_df_fill_peers(const amdzen_df_ent_t *ent,
-    amdzen_topo_df_ent_t *topo_ent)
+amdzen_topo_ioctl_df_fill_peers(const amdzen_df_t *df,
+    const amdzen_df_ent_t *ent, amdzen_topo_df_ent_t *topo_ent)
 {
 	topo_ent->atde_npeers = DF_FBIINFO0_GET_FTI_PCNT(ent->adfe_info0);
+
+	if (df->adf_rev >= DF_REV_4D2) {
+		bzero(topo_ent->atde_peers, sizeof (topo_ent->atde_npeers));
+		return;
+	}
+
 	topo_ent->atde_peers[0] = DF_FBINFO1_GET_FTI0_NINSTID(ent->adfe_info1);
 	topo_ent->atde_peers[1] = DF_FBINFO1_GET_FTI1_NINSTID(ent->adfe_info1);
 	topo_ent->atde_peers[2] = DF_FBINFO1_GET_FTI2_NINSTID(ent->adfe_info1);
@@ -2361,6 +2483,8 @@ amdzen_topo_ioctl_df(amdzen_t *azn, intptr_t arg, int mode)
 	topo_df.atd_dieid = (df->adf_nodeid & df->adf_decomp.dfd_die_mask) >>
 	    df->adf_decomp.dfd_die_shift;
 	topo_df.atd_rev = df->adf_rev;
+	topo_df.atd_major = df->adf_major;
+	topo_df.atd_minor = df->adf_minor;
 	topo_df.atd_df_act_nents = df->adf_nents;
 	max_ents = MIN(topo_df.atd_df_buf_nents, df->adf_nents);
 
@@ -2389,10 +2513,9 @@ amdzen_topo_ioctl_df(amdzen_t *azn, intptr_t arg, int mode)
 		topo_ent.atde_subtype = ent->adfe_subtype;
 		topo_ent.atde_fabric_id = ent->adfe_fabric_id;
 		topo_ent.atde_inst_id = ent->adfe_inst_id;
-		amdzen_topo_ioctl_df_fill_peers(ent, &topo_ent);
+		amdzen_topo_ioctl_df_fill_peers(df, ent, &topo_ent);
 
-		if (ent->adfe_type == DF_TYPE_CCM &&
-		    ent->adfe_subtype == DF_CCM_SUBTYPE_CPU) {
+		if (amdzen_dfe_is_ccm(df, ent)) {
 			amdzen_topo_ioctl_df_fill_ccm(ent, &topo_ent);
 		}
 
@@ -2414,6 +2537,8 @@ copyout:
 		topo_df32.atd_sockid = topo_df.atd_sockid;
 		topo_df32.atd_dieid = topo_df.atd_dieid;
 		topo_df32.atd_rev = topo_df.atd_rev;
+		topo_df32.atd_major = topo_df.atd_major;
+		topo_df32.atd_minor = topo_df.atd_minor;
 		topo_df32.atd_df_buf_nvalid = topo_df.atd_df_buf_nvalid;
 		topo_df32.atd_df_act_nents = topo_df.atd_df_act_nents;
 
@@ -2485,8 +2610,7 @@ amdzen_topo_ioctl_ccd(amdzen_t *azn, intptr_t arg, int mode)
 		goto copyout;
 	}
 
-	if (ent->adfe_type != DF_TYPE_CCM ||
-	    ent->adfe_subtype != DF_CCM_SUBTYPE_CPU) {
+	if (!amdzen_dfe_is_ccm(df, ent)) {
 		ccd.atccd_err = AMDZEN_TOPO_CCD_E_NOT_A_CCD;
 		goto copyout;
 	}

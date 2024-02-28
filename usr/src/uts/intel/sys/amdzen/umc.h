@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_UMC_H
@@ -408,14 +408,14 @@ amdzen_umc_smn_reg(const uint8_t umcno, const smn_reg_def_t def,
 #define	UMC_DIMMCFG_GET_RDIMM(r)	bitx32(r, 4, 4)
 #define	UMC_DIMMCFG_GET_CISCS(r)	bitx32(r, 3, 3)
 #define	UMC_DIMMCFG_GET_3DS(r)		bitx32(r, 2, 2)
+#define	UMC_DIMMCFG_GET_OUTPUT_INV(r)	bitx32(r, 1, 1)
+#define	UMC_DIMMCFG_GET_MRS_MIRROR(r)	bitx32(r, 0, 0)
 
 #define	UMC_DIMMCFG_DDR4_GET_NVDIMMP(r)	bitx32(r, 12, 12)
 #define	UMC_DIMMCFG_DDR4_GET_DDR4e(r)	bitx32(r, 11, 11)
 #define	UMC_DIMMCFG_DDR5_GET_RALIGN(r)	bitx32(r, 13, 12)
 #define	UMC_DIMMCFG_DDR5_GET_ASYM(r)	bitx32(r, 11, 11)
 
-#define	UMC_DIMMCFG_DDR4_GET_OUTPUT_INV(r)	bitx32(r, 1, 1)
-#define	UMC_DIMMCFG_DDR4_GET_MRS_MIRROR(r)	bitx32(r, 0, 0)
 
 /*
  * UMC::CH::AddrHashBank -- These registers contain various instructions about
