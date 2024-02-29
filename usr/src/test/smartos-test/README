@@ -11,7 +11,7 @@
 
 #
 # Copyright 2019 Joyent. Inc.
-# Copyright 2023 MNX Cloud, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 Strictly speaking, this is not a set of tests. Rather, it is a wrapper that
@@ -78,6 +78,12 @@ or
     # /opt/os-tests/bin/ostest
 
 
+Notes on NVMe testing:
+
+NVMe is tested by unit tests and by non-destructive component tests.  The
+latter must specify NVME_TEST_DEVICE from nvme* names.  E.g. "nvme0".  If
+NVME_TEST_DEVICE is not set, the non-destructive component tests will not run.
+
 Notes on ZFS testing:
 
 At present, this wrapper will execute the ZFS tests IF the DISKS environment
@@ -130,8 +136,10 @@ inconsistencies in the BHYVE/VMM results) which has:
 	A 100GB disk for `zones` (a smaller disk can cause ENOSPC problems
 	sometimes)
 
-	Three 30GB disks for setting up in DISKS for ZFS testing.  (fewer
+	Six 30GB disks for setting up in DISKS for ZFS testing.  (fewer
 	can cause ZFS test failures)
+
+	(optional) a Virtual NVMe drive of 20GB (or greater size).
 
 	An NIC that can reach the public Internet.
 
@@ -155,8 +163,11 @@ we run:
 	touch /lib/sdc/.sdc-test-no-production-data
 		(let smartos-test know we're okay with this)
 
-	export DISKS="c1t2d0 c1t3d0 c1t4d0"
+	export DISKS="c1t2d0 c1t3d0 c1t4d0 ..."
 		(your disk names may vary)
+
+	(optional)
+	export NVME_TEST_DEVICE=nvme0
 
 	./opt/smartos-build/bin/smartos-build -c ./tests-release-20230323-20230323T000605Z.tgz
 		(Configure for testing)

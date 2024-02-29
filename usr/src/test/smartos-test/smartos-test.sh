@@ -13,7 +13,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2023 MNX Cloud, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 #
@@ -321,6 +321,18 @@ function zfs_test_check {
     log_test zfstest su - ztest -c /opt/zfs-tests/bin/zfstest
 }
 
+function nvme_test_check {
+    # Execute the unit tests regardless...
+    log_testrunner nvme-tests /opt/nvme-tests/runfiles/unit.run
+
+    # If we specify NVME_TEST_DEVICE, then run the non-destructive NVMe tests.
+    if [[ -n "$NVME_TEST_DEVICE" ]]; then
+	log_testrunner nvme-tests /opt/nvme-tests/runfiles/non-destruct.run
+    else
+	log "Skipping NVMe non-destructive tests"
+    fi
+}
+
 #
 # By using log_test or log_testrunner, we accumulate the exit codes from each
 # test run to $RESULT.
@@ -338,6 +350,7 @@ function execute_tests {
     log_test vndtest /opt/vndtest/bin/vndtest -a
     log_testrunner util-tests /opt/util-tests/runfiles/default.run
     log_testrunner os-tests /opt/os-tests/runfiles/default.run
+    nvme_test_check
     zfs_test_check
 
     if [[ -n "$FAILED_TESTS" ]]; then
