@@ -29,14 +29,27 @@
 # information about overriding the defaults.
 #
 <include global_zone_only_component>
-set name=pkg.fmri value=pkg:/driver/network/platform@$(PKGVERS)
-set name=pkg.renamed value=true
+set name=pkg.fmri value=pkg:/driver/network/dnet@$(PKGVERS)
+set name=pkg.summary value="DEC 21x4x Ethernet Driver"
+set name=pkg.description value="Ethernet driver for DEC 21040, 21041, 21140"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-# dnet moved out of this package, so create a dependency for upgraded systems
-depend type=require fmri=driver/network/dnet
-# elxl moved out of this package, so create a dependency for upgraded systems
-depend type=require fmri=driver/network/elxl
-# iprb moved out of this package, so create a dependency for upgraded systems
-depend type=require fmri=driver/network/iprb
-# pcn moved out of this package, so create a dependency for upgraded systems
-depend type=require fmri=driver/network/pcn
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/dnet group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dnet.4d
+driver name=dnet perms="* 0666 root sys" clone_perms="dnet 0666 root sys" \
+    alias=pci1011,2 \
+    alias=pci1011,9 \
+    alias=pci1011,14 \
+    alias=pci1011,19 \
+    alias=pci10b8,2001 \
+    alias=pci1109,1400 \
+    alias=pci1109,2400 \
+    alias=pci2646,1
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
