@@ -2901,7 +2901,15 @@ nvme_write_cache_set(nvme_t *nvme, boolean_t enable)
 	if (enable)
 		nwc.b.wc_wce = 1;
 
-	return (nvme_set_features(nvme, B_FALSE, 0, NVME_FEAT_WRITE_CACHE,
+	/*
+	 * We've seen some cases where this fails due to us being told we've
+	 * specified an invalid namespace when operating against the Xen xcp-ng
+	 * qemu NVMe virtual device. As such, we generally ensure that trying to
+	 * enable this doesn't lead us to panic. It's not completely clear why
+	 * specifying namespace zero here fails, but not when we're setting the
+	 * number of queues below.
+	 */
+	return (nvme_set_features(nvme, B_TRUE, 0, NVME_FEAT_WRITE_CACHE,
 	    nwc.r, &nwc.r));
 }
 
