@@ -31,12 +31,6 @@
 find_files "s.*"	\
 	usr/src/uts/common/io/scsi \
 	usr/src/uts/common/sys \
-	usr/src/uts/sparc/dada	\
-	usr/src/uts/sparc/fas	\
-	usr/src/uts/sparc/scsi	\
-	usr/src/uts/sparc/sd	\
-	usr/src/uts/sparc/ses	\
-	usr/src/uts/sparc/st	\
 	usr/src/uts/sun/io/dada \
 	usr/src/uts/sun/sys/dada \
 	usr/src/uts/sun/sys/scsi
@@ -67,14 +61,7 @@ echo_file  usr/src/uts/common/vm/page.h
 echo_file  usr/src/uts/common/vm/seg.h
 echo_file  usr/src/uts/common/vm/seg_enum.h
 echo_file  usr/src/uts/req.flg
-echo_file  usr/src/uts/sparc/Makefile
-echo_file  usr/src/uts/sparc/Makefile.files
-echo_file  usr/src/uts/sparc/Makefile.rules
-echo_file  usr/src/uts/sparc/Makefile.sparc
-echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/req.flg
-echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/src/uts/sun/Makefile.rules
 echo_file  usr/src/uts/sun/sys/obpdefs.h
 echo_file  usr/src/uts/sun/sys/promif.h
 echo_file  usr/src/uts/sun/sys/socalreg.h
