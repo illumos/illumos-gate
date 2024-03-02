@@ -214,6 +214,9 @@ struct vm_page {
 static vmspace_mapping_t *vm_mapping_find(vmspace_t *, uintptr_t, size_t);
 static void vmspace_hold_enter(vmspace_t *);
 static void vmspace_hold_exit(vmspace_t *, bool);
+static void vmspace_clients_invalidate(vmspace_t *, uintptr_t, size_t);
+static int vmspace_ensure_mapped(vmspace_t *, uintptr_t, int, pfn_t *,
+    uint64_t *);
 static void vmc_space_hold(vm_client_t *);
 static void vmc_space_release(vm_client_t *, bool);
 static void vmc_space_invalidate(vm_client_t *, uintptr_t, size_t, uint64_t);
@@ -296,45 +299,165 @@ vmspace_resident_count(vmspace_t *vms)
 	return (vms->vms_pages_mapped);
 }
 
-int
-vmspace_track_dirty(vmspace_t *vms, uint64_t gpa, size_t len, uint8_t *bitmap)
+/*
+ * Perform an operation on the status (accessed/dirty) bits held in the page
+ * tables of this vmspace.
+ *
+ * Such manipulations race against both hardware writes (from running vCPUs) and
+ * emulated accesses reflected from userspace.  Safe functionality depends on
+ * the VM instance being read-locked to prevent vmspace_map/vmspace_unmap
+ * operations from changing the page tables during the walk.
+ */
+void
+vmspace_bits_operate(vmspace_t *vms, uint64_t gpa, size_t len,
+    vmspace_bit_oper_t oper, uint8_t *bitmap)
 {
-	if (!vms->vms_track_dirty)
-		return (EPERM);
+	const bool bit_input = (oper & VBO_FLAG_BITMAP_IN) != 0;
+	const bool bit_output = (oper & VBO_FLAG_BITMAP_OUT) != 0;
+	const vmspace_bit_oper_t oper_only =
+	    oper & ~(VBO_FLAG_BITMAP_IN | VBO_FLAG_BITMAP_OUT);
+	vmm_gpt_t *gpt = vms->vms_gpt;
 
 	/*
-	 * Accumulate dirty bits into the given bit vector.  Note that this
-	 * races both against hardware writes from running vCPUs and
-	 * reflections from userspace.
-	 *
-	 * Called from a userspace-visible ioctl, this depends on the VM
-	 * instance being read-locked to prevent vmspace_map/vmspace_unmap
-	 * operations from changing the page tables during the walk.
+	 * The bitmap cannot be NULL if the requested operation involves reading
+	 * or writing from it.
 	 */
+	ASSERT(bitmap != NULL || (!bit_input && !bit_output));
+
 	for (size_t offset = 0; offset < len; offset += PAGESIZE) {
-		bool bit = false;
-		uint64_t *entry = vmm_gpt_lookup(vms->vms_gpt, gpa + offset);
-		if (entry != NULL)
-			bit = vmm_gpt_reset_dirty(vms->vms_gpt, entry, false);
-		uint64_t pfn_offset = offset >> PAGESHIFT;
-		size_t bit_offset = pfn_offset / 8;
-		size_t bit_index = pfn_offset % 8;
-		bitmap[bit_offset] |= (bit << bit_index);
+		const uint64_t pfn_offset = offset >> PAGESHIFT;
+		const size_t bit_offset = pfn_offset / 8;
+		const uint8_t bit_mask = 1 << (pfn_offset % 8);
+
+		if (bit_input && (bitmap[bit_offset] & bit_mask) == 0) {
+			continue;
+		}
+
+		bool value = false;
+		uint64_t *entry = vmm_gpt_lookup(gpt, gpa + offset);
+		if (entry == NULL) {
+			if (bit_output) {
+				bitmap[bit_offset] &= ~bit_mask;
+			}
+			continue;
+		}
+
+		switch (oper_only) {
+		case VBO_GET_DIRTY:
+			value = vmm_gpt_query(gpt, entry, VGQ_DIRTY);
+			break;
+		case VBO_SET_DIRTY: {
+			uint_t prot = 0;
+			bool present_writable = false;
+			pfn_t pfn;
+
+			/*
+			 * To avoid blindly setting the dirty bit on otherwise
+			 * empty PTEs, we must first check if the entry for the
+			 * address in question has been populated.
+			 *
+			 * Only if the page is marked both Present and Writable
+			 * will we permit the dirty bit to be set.
+			 */
+			if (!vmm_gpt_is_mapped(gpt, entry, &pfn, &prot)) {
+				int err = vmspace_ensure_mapped(vms, gpa,
+				    PROT_WRITE, &pfn, entry);
+				if (err == 0) {
+					present_writable = true;
+				}
+			} else if ((prot & PROT_WRITE) != 0) {
+				present_writable = true;
+			}
+
+			if (present_writable) {
+				value = !vmm_gpt_reset_dirty(gpt, entry, true);
+			}
+			break;
+		}
+		case VBO_RESET_DIRTY:
+			/*
+			 * Although at first glance, it may seem like the act of
+			 * resetting the dirty bit may require the same care as
+			 * setting it, the constraints make for a simpler task.
+			 *
+			 * Any PTEs with the dirty bit set will have already
+			 * been properly populated.
+			 */
+			value = vmm_gpt_reset_dirty(gpt, entry, false);
+			break;
+		default:
+			panic("unrecognized operator: %d", oper_only);
+			break;
+		}
+		if (bit_output) {
+			if (value) {
+				bitmap[bit_offset] |= bit_mask;
+			} else {
+				bitmap[bit_offset] &= ~bit_mask;
+			}
+		}
 	}
 
 	/*
-	 * Now invalidate those bits and shoot down address spaces that
-	 * may have them cached.
+	 * Invalidate the address range potentially effected by the changes to
+	 * page table bits, issuing shoot-downs for those who might have it in
+	 * cache.
 	 */
 	vmspace_hold_enter(vms);
 	vms->vms_pt_gen++;
+	vmspace_clients_invalidate(vms, gpa, len);
+	vmspace_hold_exit(vms, true);
+}
+
+/*
+ * Is dirty-page-tracking enabled for the vmspace?
+ */
+bool
+vmspace_get_tracking(vmspace_t *vms)
+{
+	mutex_enter(&vms->vms_lock);
+	const bool val = vms->vms_track_dirty;
+	mutex_exit(&vms->vms_lock);
+	return (val);
+}
+
+/*
+ * Set the state (enabled/disabled) of dirty-page-tracking for the vmspace.
+ */
+int
+vmspace_set_tracking(vmspace_t *vms, bool enable_dirty_tracking)
+{
+	if (enable_dirty_tracking && !vmm_gpt_can_track_dirty(vms->vms_gpt)) {
+		/* Do not allow this to be set if it is not supported */
+		return (ENOTSUP);
+	}
+
+	vmspace_hold_enter(vms);
+	if (vms->vms_track_dirty == enable_dirty_tracking) {
+		/* No further effort required if state already matches */
+		vmspace_hold_exit(vms, false);
+		return (0);
+	}
+
+	vms->vms_track_dirty = enable_dirty_tracking;
+
+	/* Configure all existing clients for new tracking behavior */
 	for (vm_client_t *vmc = list_head(&vms->vms_clients);
 	    vmc != NULL;
 	    vmc = list_next(&vms->vms_clients, vmc)) {
-		vmc_space_invalidate(vmc, gpa, len, vms->vms_pt_gen);
+		mutex_enter(&vmc->vmc_lock);
+		vmc->vmc_track_dirty = enable_dirty_tracking;
+		mutex_exit(&vmc->vmc_lock);
 	}
-	vmspace_hold_exit(vms, true);
 
+	/*
+	 * Notify all clients of what is considered an invalidation of the
+	 * entire vmspace.
+	 */
+	vms->vms_pt_gen++;
+	vmspace_clients_invalidate(vms, 0, vms->vms_size);
+
+	vmspace_hold_exit(vms, true);
 	return (0);
 }
 
@@ -616,6 +739,19 @@ vmspace_hold_exit(vmspace_t *vms, bool kick_on_cpu)
 	mutex_exit(&vms->vms_lock);
 }
 
+static void
+vmspace_clients_invalidate(vmspace_t *vms, uintptr_t gpa, size_t len)
+{
+	ASSERT(MUTEX_HELD(&vms->vms_lock));
+	VERIFY(vms->vms_held);
+
+	for (vm_client_t *vmc = list_head(&vms->vms_clients);
+	    vmc != NULL;
+	    vmc = list_next(&vms->vms_clients, vmc)) {
+		vmc_space_invalidate(vmc, gpa, len, vms->vms_pt_gen);
+	}
+}
+
 /*
  * Attempt to map a vm_object span into the vmspace.
  *
@@ -709,10 +845,7 @@ vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 	 * an invalidation notice.
 	 */
 	if (gen != 0) {
-		for (vmc = list_head(&vms->vms_clients); vmc != NULL;
-		    vmc = list_next(&vms->vms_clients, vmc)) {
-			vmc_space_invalidate(vmc, addr, len, vms->vms_pt_gen);
-		}
+		vmspace_clients_invalidate(vms, addr, len);
 	}
 
 	vm_mapping_remove(vms, vmsm);
@@ -720,6 +853,47 @@ vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 	return (0);
 }
 
+/*
+ * For a given GPA in the vmspace, ensure that the backing page (if any) is
+ * properly mapped as present in the provided PTE.
+ */
+static int
+vmspace_ensure_mapped(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
+    uint64_t *leaf_pte)
+{
+	vmspace_mapping_t *vmsm;
+	vm_object_t *vmo;
+	pfn_t pfn;
+
+	ASSERT(pfnp != NULL);
+	ASSERT(leaf_pte != NULL);
+
+	vmsm = vm_mapping_find(vms, gpa, PAGESIZE);
+	if (vmsm == NULL) {
+		return (FC_NOMAP);
+	}
+	if ((req_prot & vmsm->vmsm_prot) != req_prot) {
+		return (FC_PROT);
+	}
+
+	vmo = vmsm->vmsm_object;
+	pfn = vm_object_pfn(vmo, VMSM_OFFSET(vmsm, gpa));
+	VERIFY(pfn != PFN_INVALID);
+
+	if (vmm_gpt_map_at(vms->vms_gpt, leaf_pte, pfn, vmsm->vmsm_prot,
+	    vmo->vmo_attr)) {
+		atomic_inc_64(&vms->vms_pages_mapped);
+	}
+
+	*pfnp = pfn;
+	return (0);
+}
+
+/*
+ * Look up the PTE for a given GPA in the vmspace, populating it with
+ * appropriate contents (pfn, protection, etc) if it is empty, but backed by a
+ * valid mapping.
+ */
 static int
 vmspace_lookup_map(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
     uint64_t **ptepp)
@@ -748,24 +922,9 @@ vmspace_lookup_map(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
 			return (FC_PROT);
 		}
 	} else {
-		vmspace_mapping_t *vmsm;
-		vm_object_t *vmo;
-
-		vmsm = vm_mapping_find(vms, gpa, PAGESIZE);
-		if (vmsm == NULL) {
-			return (FC_NOMAP);
-		}
-
-		if ((req_prot & vmsm->vmsm_prot) != req_prot) {
-			return (FC_PROT);
-		}
-		vmo = vmsm->vmsm_object;
-		pfn = vm_object_pfn(vmo, VMSM_OFFSET(vmsm, gpa));
-		VERIFY(pfn != PFN_INVALID);
-
-		if (vmm_gpt_map_at(gpt, leaf, pfn, vmsm->vmsm_prot,
-		    vmo->vmo_attr)) {
-			atomic_inc_64(&vms->vms_pages_mapped);
+		int err = vmspace_ensure_mapped(vms, gpa, req_prot, &pfn, leaf);
+		if (err != 0) {
+			return (err);
 		}
 	}
 

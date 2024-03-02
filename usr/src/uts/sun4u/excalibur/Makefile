@@ -46,8 +46,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -55,7 +53,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(EXCALIBUR_KMODS)
+def all clean clobber: $(EXCALIBUR_KMODS)
 
 install:	$(ROOT_EXCALIBUR_DIR) \
 		$(USR_EXCALIBUR_DIR) \

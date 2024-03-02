@@ -49,8 +49,6 @@ install		:=	TARGET= install
 install.prereq	:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
 install_h.prereq	:=	TARGET= install_h
@@ -59,7 +57,7 @@ install_h.prereq	:=	TARGET= install_h
 
 .PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config
 
-def all install clean clobber modlist: genassym $(KMODS) $(XMODS) config
+def all install clean clobber: genassym $(KMODS) $(XMODS) config
 
 clobber: clobber.targ
 

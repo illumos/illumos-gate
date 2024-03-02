@@ -36,7 +36,8 @@ PROG =	mem_partial \
 	pause_resume \
 	import_vlapic \
 	time_data \
-	maxcpu
+	maxcpu \
+	npt_ops
 
 SCRIPT = vmm_drv_test_fini vmm_drv_test_init
 

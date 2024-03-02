@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _VMM_GPT_H
@@ -32,6 +32,11 @@ typedef enum vmm_gpt_node_level {
 	LEVEL1,
 	MAX_GPT_LEVEL,
 } vmm_gpt_node_level_t;
+
+typedef enum vmm_gpt_query {
+	VGQ_ACCESSED,
+	VGQ_DIRTY,
+} vmm_gpt_query_t;
 
 /*
  * The vmm_pte_ops structure contains function pointers for format-specific
@@ -65,6 +70,7 @@ struct vmm_pte_ops {
 	uint_t		(*vpeo_reset_accessed)(uint64_t *, bool);
 	uint64_t	(*vpeo_get_pmtp)(pfn_t, bool);
 	bool		(*vpeo_hw_ad_supported)(void);
+	bool		(*vpeo_query)(uint64_t *, vmm_gpt_query_t);
 };
 
 extern vmm_pte_ops_t ept_pte_ops;
@@ -89,5 +95,7 @@ uint64_t vmm_gpt_get_pmtp(vmm_gpt_t *, bool);
 bool vmm_gpt_is_mapped(vmm_gpt_t *, uint64_t *, pfn_t *, uint_t *);
 uint_t vmm_gpt_reset_accessed(vmm_gpt_t *, uint64_t *, bool);
 uint_t vmm_gpt_reset_dirty(vmm_gpt_t *, uint64_t *, bool);
+bool vmm_gpt_query(vmm_gpt_t *, uint64_t *, vmm_gpt_query_t);
+bool vmm_gpt_can_track_dirty(vmm_gpt_t *);
 
 #endif /* _VMM_GPT_H */

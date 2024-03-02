@@ -44,8 +44,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -55,8 +53,6 @@ check		:=	TARGET= check
 
 def all clean clobber: genassym unix .WAIT \
 		$(OPL_CPU_KMODS) $(OPL_KMODS)
-
-modlist:	unix $(OPL_CPU_KMODS) $(OPL_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise
 

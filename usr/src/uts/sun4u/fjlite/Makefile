@@ -48,8 +48,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 IMPLEMENTED_PLATFORM	= SUNW,UltraAX-i2
@@ -61,7 +59,7 @@ IMPLEMENTED_PLATFORM	= SUNW,UltraAX-i2
 
 .PARALLEL:	$(FJLITE_KMODS)
 
-def all clean clobber modlist:	$(FJLITE_KMODS)
+def all clean clobber:	$(FJLITE_KMODS)
 
 install:	$(ROOT_FJLITE_DIR) $(USR_FJLITE_DIR) \
 		.WAIT $(FJLITE_KMODS)

@@ -261,8 +261,6 @@ def $(DEF_DEPS)			:= TARGET = def
 all $(ALL_DEPS)			:= TARGET = all
 clean $(CLEAN_DEPS)		:= TARGET = clean
 clobber $(CLOBBER_DEPS)		:= TARGET = clobber
-modlist	$(MODLIST_DEPS)		:= TARGET = modlist
-modlist	$(MODLIST_DEPS)		:= NO_STATE= -K $$MODSTATE$$$$
 install $(INSTALL_DEPS)		:= TARGET = install
 symcheck $(SYM_DEPS)		:= TARGET = symcheck
 
@@ -322,106 +320,6 @@ def.targ:		$(OBJS_DIR) $(ALL_TARGET)
 all.targ:		$(OBJS_DIR) $(ALL_TARGET)
 
 install.targ:		$(OBJS_DIR) $(INSTALL_TARGET)
-
-#
-# Support for Install.sh.
-#
-
-modlist:	$(MODLIST_DEPS)
-
-# paths relative to $(ROOT).
-RELMODULE = $(ROOTMODULE:$(ROOT)/%=%)
-RELCONF = $(ROOT_CONFFILE:$(ROOT)/%=%)
-RELLINK = $(ROOTLINK:$(ROOT)/%=%)
-RELUNIX = $(UNIX32_LINK:$(ROOT)/%=%)
-RELSOFTLINKS = $(ROOTSOFTLINKS:$(ROOT)/%=%)
-
-MODSRC:sh=		pwd
-
-#
-# Generate module information for Install.sh, i.e., specify what files
-# Install.sh should include.  Each line looks like
-#   <tag> <srcdir> <arg1> <arg2> ...
-# where <tag> specifies the type of file, <srcdir> gives the source
-# path (useful if there is an error), and <argN> is one or more
-# additional bits of information that Install.sh needs (e.g., source
-# directory, install directory, filtering tags).  See Install.sh for
-# details on the arguments for each tag type, especially the functions
-# copymod, filtmod, and filtimpl.
-#
-# Changes to this target may require corresponding changes to
-# Install.sh.
-#
-# Don't issue a MOD entry if it's not in the install list.
-#
-
-$(MODLIST_DEPS): FRC
-	@case $@ in \
-	*32) \
-		class=32; \
-		[ -n "$(RELMODULE)" ] && relmodule=`dirname $(RELMODULE)`;; \
-	*64) \
-		class=64; \
-		[ -n "$(RELMODULE)" ] && \
-		    relmodule=`dirname $(RELMODULE)`/$(SUBDIR64);; \
-	esac; \
-	if [ -z "$(THISIMPL)" ]; then \
-		impl=all; \
-	else \
-		impl=$(THISIMPL); \
-	fi; \
-	if [ -n "$(ROOTMODULE)" -a -n "$(INSTALL_TARGET)" ]; then \
-		if [ -z "$(MODULE)" ]; then \
-			module=`basename $(ROOTMODULE)`; \
-		else \
-			module=$(MODULE); \
-		fi; \
-		tinstall="$(INSTALL_TARGET)"; \
-		for t in $$tinstall; do \
-			if [ "$(ROOTMODULE)" = $$t ]; then \
-				echo MOD $(MODSRC) $$module $$relmodule \
-				    $$class $$impl; \
-				break; \
-			fi \
-		done \
-	fi; \
-	if [ -n "$(CONF_SRCDIR)" ]; then \
-		tinstall="$(INSTALL_TARGET)"; \
-		for t in $$tinstall; do \
-			if [ $(ROOT_CONFFILE) = $$t ]; then \
-				echo CONF $(MODSRC) $(RELCONF) \
-				    $(MODSRC)/$(CONF_SRCDIR) $$impl $$module; \
-				break; \
-			fi \
-		done \
-	fi; \
-	if [ -n "$(ROOTLINK)" ]; then \
-		rellinks="$(RELLINK)"; \
-		for r in $$rellinks; do \
-			if [ $$class = 32 ]; then \
-				linkdir=`dirname $$r`; \
-			else \
-				linkdir=`dirname $$r`/$(SUBDIR64); \
-			fi; \
-			echo LINK $(MODSRC) $$relmodule $$module \
-				$$linkdir `basename $$r` $$impl; \
-		done \
-	fi; \
-	if [ -n "$(UNIX32_LINK)" ]; then \
-		echo SYMLINK $(MODSRC) $(SUBDIR64)/$(UNIX) \
-		    `dirname $(RELUNIX)` unix $$impl $$module; \
-	fi; \
-	trelsoftlinks="$(RELSOFTLINKS)"; \
-	for t in $$trelsoftlinks; do \
-		if [ $$class = 32 ]; then \
-			linkdir=`dirname $$t`; \
-		else \
-			linkdir=`dirname $$t`/$(SUBDIR64); \
-		fi; \
-		linkname=`basename $$t`; \
-		echo SYMLINK $(MODSRC) $(MODULE) $$linkdir $$linkname \
-		    $$impl $$module; \
-	done
 
 #
 #	Cleanliness is next to ...

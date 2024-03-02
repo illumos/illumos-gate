@@ -82,6 +82,7 @@ file path=opt/bhyve-tests/tests/vmm/maxcpu mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
+file path=opt/bhyve-tests/tests/vmm/npt_ops mode=0555
 file path=opt/bhyve-tests/tests/vmm/pause_resume mode=0555
 file path=opt/bhyve-tests/tests/vmm/self_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/time_data mode=0555

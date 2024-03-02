@@ -32,7 +32,7 @@
  * 0		mismatch
  * 1		match
  * -1		error occured, caller should check errno:
- * 		EINVAL	access list entry is invalid
+ *		EINVAL	access list entry is invalid
  *		ENOMEM	failed to allocate memory
  */
 
@@ -45,6 +45,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdint.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -160,8 +161,13 @@ inet_matchaddr(const void *sa, const char *name)
 				errno = EINVAL;
 				break;
 			}
-			mask4 = mb ? ~0 << ((sizeof (struct in_addr) * NBBY)
-			    - mb) : 0;
+			if (mb != 0) {
+				mask4 =
+				    UINT32_MAX <<
+				    ((sizeof (struct in_addr) * NBBY) - mb);
+			} else {
+				mask4 = 0;
+			}
 			hcaddr4 &= mask4;
 		} else {
 			/*

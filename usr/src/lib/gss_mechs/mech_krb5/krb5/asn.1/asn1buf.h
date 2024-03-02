@@ -141,13 +141,11 @@ asn1_error_code asn1buf_destroy
 	(asn1buf **buf);
 /* effects   Deallocates **buf, sets *buf to NULL. */
 
-asn1_error_code asn1buf_insert_octet
-	(asn1buf *buf, const int o);
 /* requires  *buf is allocated
    effects   Inserts o into the buffer *buf, expanding the buffer if
              necessary.  Returns ENOMEM memory is exhausted. */
 #if ((__GNUC__ >= 2) && !defined(ASN1BUF_OMIT_INLINE_FUNCS))
-extern __inline__ asn1_error_code asn1buf_insert_octet(asn1buf *buf, const int o)
+static __inline__ asn1_error_code asn1buf_insert_octet(asn1buf *buf, const int o)
 {
   asn1_error_code retval;
 
@@ -157,6 +155,9 @@ extern __inline__ asn1_error_code asn1buf_insert_octet(asn1buf *buf, const int o
   (buf->next)++;
   return 0;
 }
+#else
+asn1_error_code asn1buf_insert_octet
+	(asn1buf *buf, const int o);
 #endif
 
 asn1_error_code asn1buf_insert_octetstring

@@ -40,8 +40,6 @@ all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
 
@@ -49,7 +47,7 @@ install_h	:=	TARGET= install_h
 
 .PARALLEL:	$(PARALLEL_KMODS) $(XMODS) config
 
-def all install clean clobber modlist: $(KMODS) $(XMODS) config
+def all install clean clobber: $(KMODS) $(XMODS) config
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

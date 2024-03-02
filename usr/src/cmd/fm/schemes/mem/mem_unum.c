@@ -159,8 +159,12 @@ mem_unum_burst_sgsc(const char *pat, char ***dimmsp, size_t *ndimmsp)
 	for (i = 0; i < 4; i++) {
 		(void) snprintf(buf, sizeof (buf), "%s/D%d", base, i);
 
-		if ((c = strtok(NULL, " ")) != NULL)
-			(void) snprintf(buf, sizeof (buf), "%s %s", buf, c);
+		if ((c = strtok(NULL, " ")) != NULL) {
+			size_t len = strlen(buf);
+
+			(void) snprintf(buf + len, sizeof (buf) - len,
+			    " %s", c);
+		}
 
 		dimms[i] = fmd_fmri_strdup(buf);
 	}

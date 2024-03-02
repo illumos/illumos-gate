@@ -145,7 +145,7 @@ clean_buf(char *buf)
  */
 
 static int
-yylex()
+yylex(void)
 {
 	char *p;
 	int i;
@@ -165,8 +165,8 @@ yylex()
 	return (A_STRING);
 }
 
-static char
-*rel(oper, r1, r2) register char *r1, *r2;
+static char *
+rel(int oper, char *r1, char *r2)
 {
 	long long i, l1, l2;
 
@@ -237,11 +237,11 @@ static char
 	return (i ? "1": "0");
 }
 
-static char
-*arith(oper, r1, r2) char *r1, *r2;
+static char *
+arith(int oper, char *r1, char *r2)
 {
 	long long i1, i2;
-	register char *rv;
+	char *rv;
 
 	if (!(ematch(r1, "-\\{0,1\\}[0-9]*$") &&
 	    ematch(r2, "-\\{0,1\\}[0-9]*$")))
@@ -291,10 +291,9 @@ static char
 }
 
 static char
-*conj(oper, r1, r2)
-	char *r1, *r2;
+*conj(int oper, char *r1, char *r2)
 {
-	register char *rv;
+	char *rv;
 
 	switch (oper) {
 

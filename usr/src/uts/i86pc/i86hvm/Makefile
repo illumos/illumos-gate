@@ -46,8 +46,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -57,7 +55,7 @@ check		:=	TARGET= check
 
 .PARALLEL: $(HVM_KMODS)
 
-def all clean clobber modlist:	$(HVM_KMODS)
+def all clean clobber:	$(HVM_KMODS)
 
 install: install_implementations .WAIT \
 	$(HVM_KMODS)

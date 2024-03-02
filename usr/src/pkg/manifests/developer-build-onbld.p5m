@@ -72,7 +72,6 @@ file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
 file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
 file path=opt/onbld/bin/$(ARCH)/tic mode=0555
 file path=opt/onbld/bin/$(ARCH)/zic mode=0555
-file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/build_cscope mode=0555
 file path=opt/onbld/bin/cddlchk mode=0555 \
@@ -240,7 +239,6 @@ file \
     mode=0444
 dir  path=opt/onbld/man
 dir  path=opt/onbld/man/man1onbld
-file path=opt/onbld/man/man1onbld/Install.1onbld
 file path=opt/onbld/man/man1onbld/bldenv.1onbld
 $(i386_ONLY)file path=opt/onbld/man/man1onbld/btxld.1onbld
 file path=opt/onbld/man/man1onbld/cddlchk.1onbld

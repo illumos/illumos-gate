@@ -165,7 +165,7 @@ rel(int oper, char *r1, char *r2)
 	return i? "1": "0";
 }
 
-char *arith(oper, r1, r2) char *r1, *r2;
+char *arith(int oper, char *r1, char *r2)
 {
 	long i1, i2;
 	char *rv;
@@ -200,7 +200,7 @@ char *arith(oper, r1, r2) char *r1, *r2;
 	(void) strcpy(rv, ltoa(i1));
 	return rv;
 }
-char *conj(oper, r1, r2) char *r1, *r2;
+char *conj(int oper, char *r1, char *r2)
 {
 	char *rv;
 

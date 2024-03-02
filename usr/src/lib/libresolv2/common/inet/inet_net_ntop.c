@@ -30,6 +30,7 @@ static const char rcsid[] = "$Id: inet_net_ntop.c,v 1.5 2006/06/20 02:50:14 mark
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "port_after.h"
 
@@ -197,7 +198,7 @@ inet_net_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) {
 		memset(inbuf + p, 0, 16 - p);
 		b = bits % 8;
 		if (b != 0) {
-			m = ~0 << (8 - b);
+			m = UINT_MAX << (8 - b);
 			inbuf[p-1] &= m;
 		}
 

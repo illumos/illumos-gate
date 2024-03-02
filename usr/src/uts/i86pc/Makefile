@@ -41,13 +41,11 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist	modlist.intel :=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) modlist modlist.intel
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS)
 
 INITIAL_TARGETS = \
 	genassym \
@@ -59,15 +57,6 @@ def all clean clobber: setup genassym unix .WAIT \
 
 install: install_platforms setup genassym unix .WAIT \
 	$(KMODS) $(XMODS) $(IMPLEMENTATIONS)
-
-# list the modules under i86pc.
-modlist: unix $(KMODS) $(XMODS) $(IMPLEMENTATIONS)
-
-# list the modules for Install -k i86pc.
-modlist.karch: modlist modlist.intel
-
-modlist.intel:
-	@cd $(SRC)/uts/intel; pwd; $(MAKE) $(NO_STATE) modlist
 
 genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

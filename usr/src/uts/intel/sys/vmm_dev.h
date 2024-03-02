@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_VMM_DEV_H_
@@ -353,8 +353,9 @@ struct vmm_resv_target {
 };
 
 /*
- * struct vmm_dirty_tracker is used for tracking dirty guest pages during
- * e.g. live migration.
+ * The VM_TRACK_DIRTY_PAGES ioctl uses the vmm_dirty_page_tracker struct as
+ * input.  That ioctl is deprecated in favor of VM_NPT_OPERATION, which exposes
+ * equivalent functionality.
  *
  * - The `vdt_start_gpa` field specifies the offset from the beginning of
  *   guest physical memory to track;
@@ -373,6 +374,63 @@ struct vmm_dirty_tracker {
 	size_t		vdt_len;	/* length of region */
 	void		*vdt_pfns;	/* bit vector of dirty bits */
 };
+
+/*
+ * Perform an operation the nested page tables for the guest.
+ *
+ * The vno_operation field determines how (if at all) the other fields are used.
+ * If the VNO_FLAG_BITMAP_IN or VNO_FLAG_BITMAP_OUT flags are present in
+ * vno_operation, then vno_bitmap is expected to point to a region of memory
+ * sized adequately (1 bit per page) for the region specified by vno_gpa and
+ * vno_len.  Presently that region size is limited to 1GiB (256k 4k pages).
+ *
+ * Several operations act on the entire guest memory space as whole, and thus
+ * expect that no memory region (or bitmap) are provided.  These operations are:
+ *
+ * - VNO_OP_GET_TRACK_DIRTY: Get status of dirty-page-tracking for the VM.
+ *   Return value of the ioctl will indicate the status (0 = off, 1 = on).
+ * - VNO_OP_EN_TRACK_DIRTY: Enable dirty-page-tracking for the VM.  Will emit an
+ *   error if such tracking is not supported by hardware.
+ * - VNO_OP_DIS_TRACK_DIRTY: Disable dirty-page-tracking for the VM.
+ *
+ * The remaining operations act upon PTEs in the range specified by vno_gpa and
+ * vno_len.
+ *
+ * If the VNO_FLAG_BITMAP_IN flag is set, the operation will be executed only
+ * for pages with a corresponding bit set in the bitmap.  When the flag is not
+ * set, the operation is applied to all pages in the region specified by
+ * vno_gpa/vno_len.
+ *
+ * For operations which yield per-page results, that will be returned to the
+ * caller via the bitmap if the VNO_FLAG_BITMAP_OUT flag is set.  Those
+ * operations are as follows:
+ *
+ * - VNO_OP_GET_DIRTY: Gets the state of the dirty bit for the page(s)
+ * - VNO_OP_RESET_DIRTY: Clears any existing dirty bit for the page(s),
+ *   returning it via the bitmap
+ * - VNO_OP_SET_DIRTY: Asserts the state of the dirty bit for the page(s).  This
+ *   is only performed for pages which are mapped into the guest as writable.
+ *
+ * The above bitmap operations on dirty bits in the NPTs are possible
+ * independent of whether dirty-page-tracking is enabled for the vmspace.
+ * Querying dirty bits from a vmspace without such tracking enabled will return
+ * only bits which have been manually set via a preceding NPT operation.
+ */
+struct vm_npt_operation {
+	uint64_t	vno_gpa;
+	uint64_t	vno_len;
+	uint8_t		*vno_bitmap;
+	uint32_t	vno_operation;
+};
+
+#define	VNO_OP_RESET_DIRTY	0x1
+#define	VNO_OP_SET_DIRTY	0x2
+#define	VNO_OP_GET_DIRTY	0x3
+#define	VNO_OP_GET_TRACK_DIRTY	0x20
+#define	VNO_OP_EN_TRACK_DIRTY	0x21
+#define	VNO_OP_DIS_TRACK_DIRTY	0x22
+#define	VNO_FLAG_BITMAP_IN	(1 << 30)
+#define	VNO_FLAG_BITMAP_OUT	(1 << 31)
 
 /* Current (arbitrary) max length for vm_data_xfer */
 #define VM_DATA_XFER_LIMIT	8192
@@ -424,7 +482,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	16
+#define	VMM_CURRENT_INTERFACE_VERSION	17
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -542,6 +600,7 @@ struct vm_legacy_cpuid {
 #define	VM_DESTROY_PENDING		(VMM_IOC_BASE | 0x26)
 
 #define	VM_VCPU_BARRIER			(VMM_IOC_BASE | 0x27)
+#define	VM_NPT_OPERATION		(VMM_IOC_BASE | 0x28)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

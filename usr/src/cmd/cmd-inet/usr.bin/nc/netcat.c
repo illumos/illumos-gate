@@ -468,7 +468,8 @@ print_addr(char *ntop, size_t ntlen, struct sockaddr *addr, int len, int flags)
 		return ((char *)gai_strerror(e));
 	}
 
-	(void) snprintf(ntop, ntlen, "%s port %s", ntop, port);
+	(void) strlcat(ntop, " port ", ntlen);
+	(void) strlcat(ntop, port, ntlen);
 
 	return (ntop);
 }

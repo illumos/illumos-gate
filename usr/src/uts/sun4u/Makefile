@@ -41,15 +41,12 @@ install_h	:=	TARGET= install_h
 install_h.prere	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist	modlist.sparc :=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 .KEEP_STATE:
 
 .PARALLEL:	$(PARALLEL_KMODS) $(XMODS) \
-		$(IMPLEMENTATIONS) \
-		modlist modlist.sparc
+		$(IMPLEMENTATIONS)
 
 # Override for CPU_KMODS... they cannot be built
 # in parallel
@@ -59,15 +56,6 @@ def all clean clobber: genassym unix .WAIT \
 	$(KMODS) $(XMODS) $(IMPLEMENTATIONS)
 
 clobber: clobber.targ
-
-# list the modules under sun4u.
-modlist: unix $(KMODS) $(XMODS) $(IMPLEMENTATIONS:.WAIT=)
-
-# list the modules for Install -k sun4u.
-modlist.karch: modlist modlist.sparc
-
-modlist.sparc:
-	@cd $(SRC)/uts/sparc; pwd; $(MAKE) $(NO_STATE) modlist
 
 install: install_platforms genassym unix .WAIT $(KMODS) \
 	$(XMODS) $(IMPLEMENTATIONS)
