@@ -4,6 +4,7 @@
  */
 /*
  * Copyright 2013 Saso Kiselkov.  All rights reserved.
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 /*
@@ -788,11 +789,11 @@ SHA512Init(SHA512_CTX *ctx)
 void
 SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 {
-	uint32_t	i, buf_index, buf_len, buf_limit;
+	size_t		i, buf_index, buf_len, buf_limit;
 	const uint8_t	*input = inptr;
 	uint32_t	algotype = ctx->algotype;
 #if defined(__amd64)
-	uint32_t	block_count;
+	size_t		block_count;
 #endif	/* !__amd64 */
 
 
@@ -801,13 +802,22 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 		return;
 
 	if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+		/*
+		 * Extract low 32 bits of input_len; when we adjust
+		 * count.c32[0] we must fold in the carry from the
+		 * addition of the low bits along with the nonzero
+		 * upper bits (if any) from input_len.
+		 */
+		uint32_t il = input_len & UINT32_MAX;
+
+		il = il << 3;
 		buf_limit = 64;
 
 		/* compute number of bytes mod 64 */
 		buf_index = (ctx->count.c32[1] >> 3) & 0x3F;
 
 		/* update number of bits */
-		if ((ctx->count.c32[1] += (input_len << 3)) < (input_len << 3))
+		if ((ctx->count.c32[1] += il) < il)
 			ctx->count.c32[0]++;
 
 		ctx->count.c32[0] += (input_len >> 29);
@@ -825,7 +835,7 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 		if ((ctx->count.c64[1] += il) < il)
 			ctx->count.c64[0]++;
 
-		ctx->count.c64[0] += (input_len >> 29);
+		ctx->count.c64[0] += ((uintmax_t)input_len >> 61);
 	}
 
 	buf_len = buf_limit - buf_index;

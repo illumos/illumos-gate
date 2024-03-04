@@ -10,16 +10,21 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
-SUBDIRS = modes common digest hmac longhash
+ALGS	= longhash
 
-all: $(SUBDIRS)
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
 
-modes: common
-digest: common
-hmac: common
+.KEEP_STATE:
 
-include $(SRC)/test/Makefile.com
+all clean clobber install: $(ALGS)
+
+$(ALGS): FRC
+	$(MAKE) -e -f Makefile.longhash BASEPROG=$@ $(TARGET)
+
+FRC:

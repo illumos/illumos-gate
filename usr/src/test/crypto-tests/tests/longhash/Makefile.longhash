@@ -1,0 +1,78 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+#
+
+TESTDIR	= $(ROOT)/opt/crypto-tests/tests/longhash
+
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
+include $(SRC)/cmd/Makefile.ctf
+
+PROGS_32 = $(BASEPROG)_32
+PROGS_64 = $(BASEPROG)_64
+PROGS = $(PROGS_32) $(PROGS_64)
+
+COMMON_OBJS_32 = $(COMMON_OBJS:%.o=%.32.o)
+COMMON_OBJS_64 = $(COMMON_OBJS:%.o=%.64.o)
+
+COMMONDIR = $(SRC)/test/crypto-tests/tests/common
+
+$(PROGS_32) := OBJS += $(BASEPROG:%=%.32.o) $(COMMON_OBJS_32)
+$(PROGS_64) := OBJS += $(BASEPROG:%=%.64.o) $(COMMON_OBJS_64)
+$(PROGS_64) := LDLIBS += $(LDLIBS64)
+
+LDLIBS += -lmd
+
+CSTD = $(CSTD_GNU99)
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROGS)
+
+%_32: %.32.o $(COMMON_OBJS_32)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%_64: %.64.o $(COMMON_OBJS_64)
+	$(LINK64.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%.32.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+install: all $(CMDS)
+
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) *.o $(PROGS)
+
+$(CMDS): $(TESTDIR) $(PROGS)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%_32: %_32
+	$(INS.file)
+
+$(TESTDIR)/%_64: %_64
+	$(INS.file)
