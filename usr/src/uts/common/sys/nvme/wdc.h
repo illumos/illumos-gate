@@ -127,6 +127,16 @@ CTASSERT(sizeof (wdc_e6_header_t) == 8);
 #define	WDC_VUC_RESIZE_SUB_SET		0x1
 #define	WDC_VUC_RESIZE_SUB_PHASE	0x2
 
+/*
+ * Several WDC devices have a notion of an assert that is visible in the device
+ * manageability log. As part of recovering devices, that assert must be cleared
+ * through a vendor-specific command.
+ */
+#define	WDC_VUC_ASSERT_OPC	0xd8
+#define	WDC_VUC_ASSERT_CMD	0x3
+#define	WDC_VUC_ASSERT_SUB_CLEAR	0x5
+#define	WDC_VUC_ASSERT_SUB_INJECT	0x6
+
 #pragma	pack()	/* pack(1) */
 
 #ifdef __cplusplus

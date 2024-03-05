@@ -10,9 +10,9 @@
 .\"
 .\"
 .\" Copyright 2020 Robert Mustacchi
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd March 10, 2023
+.Dd February 27, 2024
 .Dt E1000G 4D
 .Os
 .Sh NAME
@@ -141,9 +141,9 @@ Ethernet Connection I218-LM v1-3
 .It
 Ethernet Connection I218-V v1-3
 .It
-Ethernet Connection I219-LM v1-23
+Ethernet Connection I219-LM v1-27, 29
 .It
-Ethernet Connection I219-V v1-23
+Ethernet Connection I219-V v1-27, 29
 .El
 .Pp
 The following specific devices are supported by this driver:

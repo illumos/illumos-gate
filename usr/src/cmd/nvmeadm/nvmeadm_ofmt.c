@@ -361,7 +361,7 @@ const char *nvmeadm_list_logs_fields_impl = "device,name,scope,impl,fields,"
 	"desc";
 const ofmt_field_t nvmeadm_list_logs_ofmt[] = {
 	{ "DEVICE", 8, NVME_LIST_LOGS_DEVICE, nvmeadm_list_logs_ofmt_cb },
-	{ "NAME", 14, NVME_LIST_LOGS_NAME, nvmeadm_list_logs_ofmt_cb },
+	{ "NAME", 18, NVME_LIST_LOGS_NAME, nvmeadm_list_logs_ofmt_cb },
 	{ "DESC", 30, NVME_LIST_LOGS_DESC, nvmeadm_list_logs_ofmt_cb },
 	{ "SCOPE", 14, NVME_LIST_LOGS_SCOPE, nvmeadm_list_logs_ofmt_cb },
 	{ "FIELDS", 10, NVME_LIST_LOGS_FIELDS, nvmeadm_list_logs_ofmt_cb },

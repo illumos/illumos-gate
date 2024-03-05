@@ -26,7 +26,13 @@
 const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&wdc_sn840,
 	&wdc_sn650,
-	&wdc_sn655
+	&wdc_sn655,
+	&micron_7300_pro,
+	&micron_7300_max,
+	&micron_7400_pro,
+	&micron_7400_max,
+	&micron_7450_pro,
+	&micron_7450_max
 };
 
 /*

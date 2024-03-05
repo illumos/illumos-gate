@@ -236,6 +236,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_vuc_req_set_opcode;
 	nvme_vuc_req_set_output;
 	nvme_vuc_req_set_timeout;
+	nvme_wdc_assert_clear;
+	nvme_wdc_assert_inject;
 	nvme_wdc_e6_req_exec;
 	nvme_wdc_e6_req_fini;
 	nvme_wdc_e6_req_init;

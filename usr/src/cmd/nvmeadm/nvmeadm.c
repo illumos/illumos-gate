@@ -112,6 +112,7 @@ static void optparse_identify(nvme_process_arg_t *);
 static void optparse_identify_ctrl(nvme_process_arg_t *);
 static void optparse_identify_ns(nvme_process_arg_t *);
 static void optparse_list_logs(nvme_process_arg_t *);
+static void optparse_get_logpage(nvme_process_arg_t *);
 static void optparse_list_features(nvme_process_arg_t *);
 static void optparse_secure_erase(nvme_process_arg_t *);
 
@@ -242,9 +243,9 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 	{
 		"get-logpage",
 		"get a log page from controllers and/or namespaces",
+		"  -O file\toutput log raw binary data to a file\n",
 		NULL,
-		NULL,
-		do_get_logpage, usage_get_logpage, NULL,
+		do_get_logpage, usage_get_logpage, optparse_get_logpage,
 		NVMEADM_C_MULTI
 	},
 	{
@@ -370,6 +371,20 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		 * information we get from vuc discovery.
 		 */
 		0
+	},
+	{
+		"wdc/clear-assert",
+		"clear internal device assertion",
+		NULL,
+		NULL,
+		do_wdc_clear_assert, usage_wdc_clear_assert, NULL
+	},
+	{
+		"wdc/inject-assert",
+		"inject internal device assertion",
+		NULL,
+		NULL,
+		do_wdc_inject_assert, usage_wdc_inject_assert, NULL
 	},
 	{
 		NULL, NULL, NULL,
@@ -1750,7 +1765,7 @@ do_list_logs(const nvme_process_arg_t *npa)
 static void
 usage_get_logpage(const char *c_name)
 {
-	(void) fprintf(stderr, "%s <ctl>[/<ns>][,...] <logpage>\n\n"
+	(void) fprintf(stderr, "%s [-O file] <ctl>[/<ns>][,...] <logpage>\n\n"
 	    "  Print the specified log page of the specified NVMe "
 	    "controllers and/or name-\n  spaces. Run nvmeadm list-logpages "
 	    "for supported log pages. All devices\n support error, health, "
@@ -1806,6 +1821,30 @@ do_get_logpage_size(const nvme_process_arg_t *npa, nvme_log_disc_t *disc,
 	return (ret);
 }
 
+static void
+do_get_logpage_dump(const void *buf, size_t len, const char *file)
+{
+	size_t off = 0;
+	int fd = open(file, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+
+	if (fd < 0) {
+		err(-1, "failed to create output file %s", file);
+	}
+
+	while (len > 0) {
+		ssize_t ret = write(fd, buf + off, len - off);
+		if (ret < 0) {
+			err(EXIT_FAILURE, "failed to write log data to file %s "
+			    "at offset %zu", file, off);
+		}
+
+		off += (size_t)ret;
+		len -= (size_t)ret;
+	}
+
+	(void) close(fd);
+}
+
 static int
 do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 {
@@ -1815,6 +1854,7 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 	nvme_log_disc_scope_t scope;
 	void *buf;
 	size_t toalloc;
+	nvmeadm_get_logpage_t *log = npa->npa_cmd_arg;
 
 	/*
 	 * If we have enough information to identify a log-page via libnvme (or
@@ -1873,6 +1913,11 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 		    npa->npa_argv[0]);
 	}
 
+	if (log != NULL && log->ngl_output != NULL) {
+		do_get_logpage_dump(buf, toalloc, log->ngl_output);
+		goto done;
+	}
+
 	(void) printf("%s: ", npa->npa_name);
 	if (strcmp(page, "error") == 0) {
 		size_t nlog = toalloc / sizeof (nvme_error_log_entry_t);
@@ -1886,6 +1931,7 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 		nvmeadm_dump_hex(buf, toalloc);
 	}
 
+done:
 	free(buf);
 	nvme_log_disc_free(disc);
 	nvme_log_req_fini(req);
@@ -1904,6 +1950,35 @@ do_get_logpage_fwslot(const nvme_process_arg_t *npa)
 	}
 
 	return (do_get_logpage_common(npa, "firmware"));
+}
+
+static void
+optparse_get_logpage(nvme_process_arg_t *npa)
+{
+	int c;
+	const char *output = NULL;
+	nvmeadm_get_logpage_t *log;
+
+	if ((log = calloc(1, sizeof (nvmeadm_get_logpage_t))) == NULL) {
+		err(-1, "failed to allocate memory to track log page "
+		    "information");
+	}
+
+	npa->npa_cmd_arg = log;
+
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":O:")) != -1) {
+		switch (c) {
+		case 'O':
+			output = optarg;
+			break;
+		case '?':
+			errx(-1, "unknown option: -%c", optopt);
+		case ':':
+			errx(-1, "option -%c requires an argument", optopt);
+		}
+	}
+
+	log->ngl_output = output;
 }
 
 static int

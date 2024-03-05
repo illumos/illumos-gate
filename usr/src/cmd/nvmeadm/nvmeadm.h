@@ -104,6 +104,10 @@ typedef struct {
 	boolean_t *nf_used;
 } nvmeadm_features_t;
 
+typedef struct {
+	const char *ngl_output;
+} nvmeadm_get_logpage_t;
+
 /* Version checking */
 extern boolean_t nvme_version_check(const nvme_process_arg_t *,
     const nvme_version_t *);
@@ -225,6 +229,12 @@ extern void usage_wdc_e6dump(const char *);
 extern int do_wdc_resize(const nvme_process_arg_t *);
 extern void optparse_wdc_resize(nvme_process_arg_t *);
 extern void usage_wdc_resize(const char *);
+
+extern int do_wdc_clear_assert(const nvme_process_arg_t *);
+extern void usage_wdc_clear_assert(const char *);
+
+extern int do_wdc_inject_assert(const nvme_process_arg_t *);
+extern void usage_wdc_inject_assert(const char *);
 
 #ifdef __cplusplus
 }

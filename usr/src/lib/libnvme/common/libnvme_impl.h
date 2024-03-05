@@ -467,6 +467,12 @@ typedef struct nvme_vsd {
 extern const nvme_vsd_t wdc_sn840;
 extern const nvme_vsd_t wdc_sn650;
 extern const nvme_vsd_t wdc_sn655;
+extern const nvme_vsd_t micron_7300_pro;
+extern const nvme_vsd_t micron_7300_max;
+extern const nvme_vsd_t micron_7400_pro;
+extern const nvme_vsd_t micron_7400_max;
+extern const nvme_vsd_t micron_7450_pro;
+extern const nvme_vsd_t micron_7450_max;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);

@@ -49,6 +49,12 @@ static const uint32_t nvme_wdc_resize_timeout = 30;
  */
 static const uint32_t nvme_wdc_e6_timeout = 30;
 
+/*
+ * Timeout for injecting and clearing asserts. We make this generous as assert
+ * injection may take some time.
+ */
+static const uint32_t nvme_wdc_assert_timeout = 45;
+
 typedef enum {
 	NVME_WDC_E6_REQ_FIELD_OFFSET	= 0,
 	NVME_WDC_E6_REQ_FIELD_LEN
@@ -251,6 +257,22 @@ static const nvme_vuc_disc_t wdc_sn840_sn65x_vuc[] = { {
 	.nvd_opc = WDC_VUC_E6_DUMP_OPC,
 	.nvd_dt = NVME_VUC_DISC_IO_OUTPUT,
 	.nvd_lock = NVME_VUC_DISC_LOCK_READ
+}, {
+	.nvd_short = "wdc/clear-assert",
+	.nvd_desc = "clear internal drive assertion",
+	.nvd_opc = WDC_VUC_ASSERT_OPC,
+	.nvd_dt = NVME_VUC_DISC_IO_NONE,
+	.nvd_lock = NVME_VUC_DISC_LOCK_NONE
+}, {
+	/*
+	 * It's hard to come up with a good impact statement from this. It will
+	 * cause I/O to fail but may or may not cause issues with data.
+	 */
+	.nvd_short = "wdc/inject-assert",
+	.nvd_desc = "inject internal drive assertion",
+	.nvd_opc = WDC_VUC_ASSERT_OPC,
+	.nvd_dt = NVME_VUC_DISC_IO_NONE,
+	.nvd_lock = NVME_VUC_DISC_LOCK_WRITE
 } };
 
 const nvme_vsd_t wdc_sn840 = {
@@ -488,4 +510,44 @@ nvme_wdc_e6_req_exec(nvme_wdc_e6_req_t *req)
 	}
 
 	return (nvme_ctrl_success(ctrl));
+}
+
+static bool
+nvme_wdc_assert_common(nvme_ctrl_t *ctrl, uint32_t subcmd)
+{
+	nvme_vuc_req_t *req = NULL;
+	const char *name = subcmd == WDC_VUC_ASSERT_SUB_CLEAR ?
+	    "wdc/clear-assert" : "wdc/inject-assert";
+	uint32_t cdw12 = WDC_VUC_ASSERT_CMD | (subcmd << 8);
+
+	if (!nvme_vendor_vuc_supported(ctrl, name)) {
+		return (false);
+	}
+
+	if (!nvme_vuc_req_init(ctrl, &req)) {
+		return (false);
+	}
+
+	if (!nvme_vuc_req_set_opcode(req, WDC_VUC_ASSERT_OPC) ||
+	    !nvme_vuc_req_set_cdw12(req, cdw12) ||
+	    !nvme_vuc_req_set_timeout(req, nvme_wdc_assert_timeout) ||
+	    !nvme_vuc_req_exec(req)) {
+		nvme_vuc_req_fini(req);
+		return (false);
+	}
+
+	nvme_vuc_req_fini(req);
+	return (nvme_ctrl_success(ctrl));
+}
+
+bool
+nvme_wdc_assert_clear(nvme_ctrl_t *ctrl)
+{
+	return (nvme_wdc_assert_common(ctrl, WDC_VUC_ASSERT_SUB_CLEAR));
+}
+
+bool
+nvme_wdc_assert_inject(nvme_ctrl_t *ctrl)
+{
+	return (nvme_wdc_assert_common(ctrl, WDC_VUC_ASSERT_SUB_INJECT));
 }

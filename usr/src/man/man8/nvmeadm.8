@@ -59,6 +59,7 @@
 .Nm
 .Op Fl dv
 .Cm get-logpage
+.Op Fl O Ar output-file
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Nm
@@ -121,6 +122,14 @@
 .Op Fl dv
 .Cm wdc/resize
 .Fl s Ar size | Fl g
+.Ar ctl
+.Nm
+.Op Fl dv
+.Cm wdc/clear-assert
+.Ar ctl
+.Nm
+.Op Fl dv
+.Cm wdc/inject-assert
 .Ar ctl
 .Sh DESCRIPTION
 The
@@ -207,6 +216,8 @@ using the
 command.
 .It Ar offset
 Specifies the byte offset at which to load
+.It Ar output-file
+Specifies a file system location to write raw binary data out to.
 .Ar firmware-file
 within the controller's upload buffer.
 Vendors may require multiple images to be loaded at different offsets
@@ -589,10 +600,16 @@ then the command will generate an error.
 .It Xo
 .Nm
 .Cm get-logpage
+.Op Fl O Ar output-file
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
 .Xc
 Print the specified log page of the specified controllers and/or namespaces.
+If
+.Fl O
+is specified, rather than print the contents of the log, the raw binary payload
+of the log will be written to
+.Ar output-file .
 Most log pages are only available on a per-controller basis.
 Known log pages are:
 .Bl -tag -width "firmware"
@@ -614,6 +631,10 @@ Use the
 command to determine which are supported for a given device and whether
 they operate on a controller or namespace.
 .Bl -tag -width "wdc/devmgm"
+.It micron/smart
+Micron Vendor Unique SMART.
+.It micron/extsmart
+Micron Extended SMART.
 .It wdc/eol
 Western Digital end-of-life.
 .It wdc/devmgmt
@@ -1028,6 +1049,29 @@ When performing a resize
 .Em all data and namespace will be erased !
 All namespaces must be detached prior to issuing this.
 .El
+.It Xo
+.Nm
+.Op Fl dv
+.Cm wdc/clear-assert
+.Ar ctl
+.Xc
+This clears an internal assertion record from a WDC device.
+Prior to running this any such internal assertion should be saved by using the
+.Cm wdc/e6dump
+command.
+This command should only be used if instructed to do so as part of a
+troubleshooting process.
+.It Xo
+.Nm
+.Op Fl dv
+.Cm wdc/inject-assert
+.Ar ctl
+.Xc
+This injects a device assertion into a WDC NVMe device.
+The behavior of doing so is device specific; however, all I/O will be
+interrupted and the device may be retired.
+Unless explicitly instructed as part of debugging a device or as part of
+internal development, this command should not be used.
 .El
 .Sh EXIT STATUS
 .Ex -std
