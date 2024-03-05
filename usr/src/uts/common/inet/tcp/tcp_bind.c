@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #include <sys/types.h>
@@ -737,6 +738,16 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 */
 			if (!IPCL_BIND_ZONE_MATCH(lconnp, connp))
 				continue;
+
+			/*
+			 * allow multiple interface-specific binds to coexist.
+			 */
+			if (connp->conn_incoming_ifindex !=
+			    lconnp->conn_incoming_ifindex) {
+				if ((connp->conn_incoming_ifindex != 0) &&
+				    (lconnp->conn_incoming_ifindex != 0))
+					continue;
+			}
 
 			/*
 			 * If TCP_EXCLBIND is set for either the bound or

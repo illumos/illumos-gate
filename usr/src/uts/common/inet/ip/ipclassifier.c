@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Joyent, Inc.
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 /*
@@ -1539,6 +1540,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 	conn_t	*connp;
 	uint16_t  *up;
 	zoneid_t	zoneid = ira->ira_zoneid;
+	int		ifindex = ira->ira_ruifindex;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	up = (uint16_t *)((uchar_t *)ipha + hdr_len + TCP_PORTS_OFFSET);
@@ -1554,6 +1556,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_CONN_MATCH(connp, protocol,
 			    ipha->ipha_src, ipha->ipha_dst, ports) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
@@ -1584,6 +1588,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
 			    lport) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
@@ -1629,6 +1635,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
@@ -1680,6 +1688,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 	conn_t		*connp;
 	uint16_t	*up;
 	zoneid_t	zoneid = ira->ira_zoneid;
+	int		ifindex = ira->ira_ruifindex;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 
@@ -1697,6 +1706,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_CONN_MATCH_V6(connp, protocol,
 			    ip6h->ip6_src, ip6h->ip6_dst, ports) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
@@ -1728,6 +1739,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
@@ -1765,6 +1778,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
+			    (connp->conn_incoming_ifindex == 0 ||
+			    connp->conn_incoming_ifindex == ifindex) &&
 			    (connp->conn_zoneid == zoneid ||
 			    connp->conn_allzones ||
 			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&

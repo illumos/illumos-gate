@@ -2149,15 +2149,6 @@ repeat:
 			tcp_xmit_listeners_reset(mp, ira, ipst, NULL);
 			return;
 		}
-		if (connp->conn_incoming_ifindex != 0 &&
-		    connp->conn_incoming_ifindex != ira->ira_ruifindex) {
-			CONN_DEC_REF(connp);
-
-			/* Send the TH_RST */
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-			tcp_xmit_listeners_reset(mp, ira, ipst, NULL);
-			return;
-		}
 		if (connp->conn_min_ttl != 0 &&
 		    connp->conn_min_ttl > ira->ira_ttl) {
 			CONN_DEC_REF(connp);
@@ -2303,7 +2294,6 @@ repeat:
 		connp = ipcl_classify_v6(mp, IPPROTO_UDP, ip_hdr_length,
 		    ira, ipst);
 		if (connp == NULL) {
-	no_udp_match:
 			if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_UDP].
 			    connf_head != NULL) {
 				ASSERT(ira->ira_protocol == IPPROTO_UDP);
@@ -2314,11 +2304,6 @@ repeat:
 			}
 			return;
 
-		}
-		if (connp->conn_incoming_ifindex != 0 &&
-		    connp->conn_incoming_ifindex != ira->ira_ruifindex) {
-			CONN_DEC_REF(connp);
-			goto no_udp_match;
 		}
 		if (connp->conn_min_ttl != 0 &&
 		    connp->conn_min_ttl > ira->ira_ttl) {

@@ -19,7 +19,11 @@ include $(SRC)/cmd/Makefile.cmd
 ROOTOPTPKG = $(ROOT)/opt/net-tests
 TESTDIR = $(ROOTOPTPKG)/tests/ipv6
 
-PROG = link-local
+PROG = link-local scope-test-v4 scope-test-v6 dup_bind
+
+PYSHEBANG = $(PYTHON3)
+PYVER = $(PYTHON3_VERSION)
+PYSUFFIX = $(PYTHON3_SUFFIX)
 
 CMDS = $(PROG:%=$(TESTDIR)/%)
 FILEMODE=0444
@@ -42,3 +46,7 @@ $(TESTDIR)/%: %
 
 $(TESTDIR)/%: %.ksh
 	$(INS.rename)
+
+$(TESTDIR)/%: %.py
+	$(INS.pyfile)
+

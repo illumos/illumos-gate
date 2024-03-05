@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
 [DEFAULT]
@@ -40,5 +41,13 @@ tests = [
       'ip_fwd_018',
       'ip_fwd_019',
       'ip_fwd_020'
+      ]
+user = root
+
+[/opt/net-tests/tests/ipv6]
+tests = [
+      'link-local',
+      'scope-test-v4',
+      'scope-test-v6',
       ]
 user = root
