@@ -197,7 +197,7 @@
 	(((v) & ENAHW_CAPS_ADMIN_CMD_TIMEOUT_MASK) >>	\
 	    ENAHW_CAPS_ADMIN_CMD_TIMEOUT_SHIFT)
 
-enum enahw_reset_reason_types {
+typedef enum enahw_reset_reason_types {
 	ENAHW_RESET_NORMAL			= 0,
 	ENAHW_RESET_KEEP_ALIVE_TO		= 1,
 	ENAHW_RESET_ADMIN_TO			= 2,
@@ -213,8 +213,22 @@ enum enahw_reset_reason_types {
 	ENAHW_RESET_USER_TRIGGER		= 12,
 	ENAHW_RESET_GENERIC			= 13,
 	ENAHW_RESET_MISS_INTERRUPT		= 14,
+	ENAHW_RESET_SUSPECTED_POLL_STARVATION	= 15,
+	ENAHW_RESET_RX_DESCRIPTOR_MALFORMED	= 16,
+	ENAHW_RESET_TX_DESCRIPTOR_MALFORMED	= 17,
+	ENAHW_RESET_MISSING_ADMIN_INTERRUPT	= 18,
+	ENAHW_RESET_DEVICE_REQUEST		= 19,
 	ENAHW_RESET_LAST,
-};
+} enahw_reset_reason_t;
+
+#define	ENAHW_RESET_REASON_LSB_SHIFT		0
+#define	ENAHW_RESET_REASON_LSB_MASK		0xf
+#define	ENAHW_RESET_REASON_MSB_SHIFT		4
+#define	ENAHW_RESET_REASON_MSB_MASK		0xf0
+#define	ENAHW_RESET_REASON_LSB(v)		\
+	(((v) & ENAHW_RESET_REASON_LSB_MASK) >> ENAHW_RESET_REASON_LSB_SHIFT)
+#define	ENAHW_RESET_REASON_MSB(v)		\
+	(((v) & ENAHW_RESET_REASON_MSB_MASK) >> ENAHW_RESET_REASON_MSB_SHIFT)
 
 /*
  * Admin Submission Queue Caps (Register 0x18)
@@ -271,6 +285,8 @@ enum enahw_reset_reason_types {
 #define	ENAHW_DEV_CTL_QUIESCENT_MASK		0x4
 #define	ENAHW_DEV_CTL_IO_RESUME_SHIFT		3
 #define	ENAHW_DEV_CTL_IO_RESUME_MASK		0x8
+#define	ENAHW_DEV_CTL_RESET_REASON_EXT_SHIFT	24
+#define	ENAHW_DEV_CTL_RESET_REASON_EXT_MASK	0xf000000
 #define	ENAHW_DEV_CTL_RESET_REASON_SHIFT	28
 #define	ENAHW_DEV_CTL_RESET_REASON_MASK		0xf0000000
 
@@ -314,6 +330,8 @@ typedef struct enahw_aenq_desc {
 			uint32_t rx_drops_high;
 			uint32_t tx_drops_low;
 			uint32_t tx_drops_high;
+			uint32_t rx_overruns_low;
+			uint32_t rx_overruns_high;
 		} keep_alive;
 	} ead_payload;
 } enahw_aenq_desc_t;
@@ -341,7 +359,9 @@ typedef enum enahw_aenq_groups {
 	ENAHW_AENQ_GROUP_NOTIFICATION		= 3,
 	ENAHW_AENQ_GROUP_KEEP_ALIVE		= 4,
 	ENAHW_AENQ_GROUP_REFRESH_CAPABILITIES	= 5,
-	ENAHW_AENQ_GROUPS_ARR_NUM		= 6,
+	ENAHW_AENQ_GROUP_CONF_NOTIFICATIONS	= 6,
+	ENAHW_AENQ_GROUP_DEVICE_REQUEST_RESET	= 7,
+	ENAHW_AENQ_GROUPS_ARR_NUM		= 8,
 } enahw_aenq_groups_t;
 
 /*
@@ -505,6 +525,12 @@ typedef struct enahw_host_info {
 #define	ENAHW_HOST_INFO_RX_BUF_MIRRORING_MASK			BIT(3)
 #define	ENAHW_HOST_INFO_RSS_CONFIGURABLE_FUNCTION_KEY_SHIFT	4
 #define	ENAHW_HOST_INFO_RSS_CONFIGURABLE_FUNCTION_KEY_MASK	BIT(4)
+#define	ENAHW_HOST_INFO_RX_PAGE_REUSE_SHIFT			6
+#define	ENAHW_HOST_INFO_RX_PAGE_REUSE_MASK			BIT(6)
+#define	ENAHW_HOST_INFO_TX_IPV6_CSUM_OFFLOAD_SHIFT		7
+#define	ENAHW_HOST_INFO_TX_IPV6_CSUM_OFFLOAD_MASK		BIT(7)
+#define	ENAHW_HOST_INFO_INFO_PHC_SHIFT				8
+#define	ENAHW_HOST_INFO_INFO_PHC_MASK				BIT(8)
 
 /* common: ena_admin_os_type */
 enum enahw_os_type {
@@ -753,7 +779,7 @@ typedef struct enahw_cmd_get_stats {
  * "string format" with additional statistics per queue and per device ID.
  *
  * ENI: According to the Linux documentation it returns "extra HW
- * stats for a specific network interfaces".
+ * stats for specific network interface".
  *
  * common: ena_admin_get_stats_type
  */
@@ -833,6 +859,7 @@ typedef enum enahw_feature_id {
 	ENAHW_FEAT_AENQ_CONFIG			= 26,
 	ENAHW_FEAT_LINK_CONFIG			= 27,
 	ENAHW_FEAT_HOST_ATTR_CONFIG		= 28,
+	ENAHW_FEAT_PHC_CONFIG			= 29,
 	ENAHW_FEAT_NUM				= 32,
 } enahw_feature_id_t;
 
@@ -845,8 +872,9 @@ typedef enum enahw_capability_id {
 	ENAHW_CAP_ENI_STATS			= 0,
 	ENAHW_CAP_ENA_SRD_INFO			= 1,
 	ENAHW_CAP_CUSTOMER_METRICS		= 2,
-	ENAHW_CAP_EXTENDED_RESET		= 3,
+	ENAHW_CAP_EXTENDED_RESET_REASONS	= 3,
 	ENAHW_CAP_CDESC_MBZ			= 4,
+	ENAHW_CAP_NUM
 } enahw_capability_id_t;
 
 /*
@@ -897,6 +925,9 @@ typedef enum enahw_link_speeds {
  *
  * common: ena_admin_ena_hw_hints
  */
+
+#define	ENAHW_HINTS_NO_TIMEOUT	0xffff
+
 typedef struct enahw_device_hints {
 	/*
 	 * The amount of time the driver should wait for an MMIO read
@@ -908,6 +939,7 @@ typedef struct enahw_device_hints {
 	 * If the driver has not seen an AENQ keep alive in this
 	 * timeframe, then consider the device hung and perform a
 	 * reset.
+	 * common: driver_watchdog_timeout
 	 */
 	uint16_t edh_keep_alive_timeout;
 
@@ -936,7 +968,7 @@ typedef struct enahw_device_hints {
 	 * where it has a functioning keep alive heartbeat, but has a
 	 * stuck Tx queue impeding forward progress of the networking
 	 * stack (which in many cases results in a scenario
-	 * indistinguishable form a complete host hang).
+	 * indistinguishable from a complete host hang).
 	 *
 	 * The mac layer does not currently provide such
 	 * functionality, though it could and should be extended to
@@ -1175,6 +1207,7 @@ typedef union enahw_resp_get_feat {
 	enahw_feat_aenq_t		ergf_aenq;
 	enahw_feat_link_conf_t		ergf_link_conf;
 	enahw_feat_offload_t		ergf_offload;
+	enahw_device_hints_t		ergf_hints;
 } enahw_resp_get_feat_u;
 
 /*
@@ -1220,6 +1253,8 @@ typedef struct enahw_resp_basic_stats {
 	uint32_t erbs_rx_drops_high;
 	uint32_t erbs_tx_drops_low;
 	uint32_t erbs_tx_drops_high;
+	uint32_t erbs_rx_overruns_low;
+	uint32_t erbs_rx_overruns_high;
 } enahw_resp_basic_stats_t;
 
 /* common: ena_admin_eni_stats */

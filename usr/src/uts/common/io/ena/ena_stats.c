@@ -12,6 +12,7 @@
 /*
  * Copyright 2024 Oxide Computer Company
  */
+
 #include "ena.h"
 
 /*
@@ -36,6 +37,7 @@
  *     - Rx drops
  *     - Tx packets/bytes
  *     - Tx drops
+ *     - Rx overruns
  *
  * EXTENDED (ENAHW_GET_STATS_TYPE_EXTENDED)
  *
@@ -50,8 +52,49 @@
  *     - Tx Bandwidth Allowance Exceeded
  *     - PPS Allowance Exceeded (presumably for combined Rx/Tx)
  *     - Connection Tracking PPS Allowance Exceeded
- *     - Link-local PPS Alloance Exceeded
+ *     - Link-local PPS Allowance Exceeded
  */
+
+void
+ena_stat_device_cleanup(ena_t *ena)
+{
+	if (ena->ena_device_kstat != NULL) {
+		kstat_delete(ena->ena_device_kstat);
+		ena->ena_device_kstat = NULL;
+	}
+}
+
+bool
+ena_stat_device_init(ena_t *ena)
+{
+	kstat_t *ksp = kstat_create(ENA_MODULE_NAME,
+	    ddi_get_instance(ena->ena_dip), "device", "net", KSTAT_TYPE_NAMED,
+	    sizeof (ena_device_stat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+	ena_device_stat_t *eds = &ena->ena_device_stat;
+
+	if (ksp == NULL) {
+		ena_err(ena, "!failed to create device kstats");
+		return (false);
+	}
+
+	ena->ena_device_kstat = ksp;
+	ksp->ks_data = eds;
+
+	kstat_named_init(&eds->eds_reset_forced, "reset_forced",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&eds->eds_reset_error, "reset_error",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&eds->eds_reset_fatal, "reset_fatal",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&eds->eds_reset_keepalive, "reset_keepalive",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&eds->eds_reset_txstall, "reset_txstall",
+	    KSTAT_DATA_UINT64);
+
+	kstat_install(ena->ena_device_kstat);
+	return (true);
+}
 
 static int
 ena_stat_device_basic_update(kstat_t *ksp, int rw)
@@ -60,17 +103,26 @@ ena_stat_device_basic_update(kstat_t *ksp, int rw)
 	ena_basic_stat_t *ebs = ksp->ks_data;
 	enahw_resp_desc_t resp;
 	enahw_resp_basic_stats_t *stats = &resp.erd_resp.erd_basic_stats;
+	bool fetch;
 	int ret = 0;
 
 	if (rw == KSTAT_WRITE) {
 		return (EACCES);
 	}
 
-	if ((ret = ena_admin_get_basic_stats(ena, &resp)) != 0) {
-		return (ret);
-	}
+	mutex_enter(&ena->ena_device_basic_stat_lock);
+	fetch = gethrtime() - ena->ena_device_basic_stat_last_update >
+	    ENA_BASIC_STATS_MINIMUM_INTERVAL_NS;
+	mutex_exit(&ena->ena_device_basic_stat_lock);
 
-	mutex_enter(&ena->ena_lock);
+	if (!fetch)
+		return (0);
+
+	if ((ret = ena_admin_get_basic_stats(ena, &resp)) != 0)
+		return (ret);
+
+	mutex_enter(&ena->ena_device_basic_stat_lock);
+	ena->ena_device_basic_stat_last_update = gethrtime();
 
 	ebs->ebs_tx_bytes.value.ui64 =
 	    ((uint64_t)stats->erbs_tx_bytes_high << 32) |
@@ -91,8 +143,11 @@ ena_stat_device_basic_update(kstat_t *ksp, int rw)
 	ebs->ebs_rx_drops.value.ui64 =
 	    ((uint64_t)stats->erbs_rx_drops_high << 32) |
 	    (uint64_t)stats->erbs_rx_drops_low;
+	ebs->ebs_rx_overruns.value.ui64 =
+	    ((uint64_t)stats->erbs_rx_overruns_high << 32) |
+	    (uint64_t)stats->erbs_rx_overruns_low;
 
-	mutex_exit(&ena->ena_lock);
+	mutex_exit(&ena->ena_device_basic_stat_lock);
 
 	return (0);
 }
@@ -101,12 +156,13 @@ void
 ena_stat_device_basic_cleanup(ena_t *ena)
 {
 	if (ena->ena_device_basic_kstat != NULL) {
+		mutex_destroy(&ena->ena_device_basic_stat_lock);
 		kstat_delete(ena->ena_device_basic_kstat);
 		ena->ena_device_basic_kstat = NULL;
 	}
 }
 
-boolean_t
+bool
 ena_stat_device_basic_init(ena_t *ena)
 {
 	kstat_t *ksp = kstat_create(ENA_MODULE_NAME,
@@ -117,8 +173,12 @@ ena_stat_device_basic_init(ena_t *ena)
 
 	if (ksp == NULL) {
 		ena_err(ena, "!failed to create device_basic kstats");
-		return (B_FALSE);
+		return (false);
 	}
+
+	mutex_init(&ena->ena_device_basic_stat_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(ena->ena_intr_pri));
+	ena->ena_device_basic_stat_last_update = 0;
 
 	ena->ena_device_basic_kstat = ksp;
 	ebs = ksp->ks_data;
@@ -138,12 +198,15 @@ ena_stat_device_basic_init(ena_t *ena)
 	ebs->ebs_rx_pkts.value.ui64 = 0;
 	kstat_named_init(&ebs->ebs_rx_drops, "rx_drops", KSTAT_DATA_UINT64);
 	ebs->ebs_rx_drops.value.ui64 = 0;
+	kstat_named_init(&ebs->ebs_rx_overruns, "rx_overruns",
+	    KSTAT_DATA_UINT64);
+	ebs->ebs_rx_overruns.value.ui64 = 0;
 
 	kstat_install(ena->ena_device_basic_kstat);
-	return (B_TRUE);
+	return (true);
 }
 
-int
+static int
 ena_stat_device_extended_update(kstat_t *ksp, int rw)
 {
 	ena_t *ena = ksp->ks_private;
@@ -182,7 +245,7 @@ ena_stat_device_extended_cleanup(ena_t *ena)
 	}
 }
 
-boolean_t
+bool
 ena_stat_device_extended_init(ena_t *ena)
 {
 	kstat_t *ksp = kstat_create(ENA_MODULE_NAME,
@@ -193,7 +256,7 @@ ena_stat_device_extended_init(ena_t *ena)
 
 	if (ksp == NULL) {
 		ena_err(ena, "!failed to create device_ext kstats");
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena->ena_device_extended_kstat = ksp;
@@ -222,7 +285,7 @@ ena_stat_device_extended_init(ena_t *ena)
 	ees->ees_linklocal_exceeded.value.ui64 = 0;
 
 	kstat_install(ena->ena_device_extended_kstat);
-	return (B_TRUE);
+	return (true);
 }
 
 void
@@ -234,7 +297,7 @@ ena_stat_aenq_cleanup(ena_t *ena)
 	}
 }
 
-boolean_t
+bool
 ena_stat_aenq_init(ena_t *ena)
 {
 	kstat_t *ksp = kstat_create(ENA_MODULE_NAME,
@@ -245,7 +308,7 @@ ena_stat_aenq_init(ena_t *ena)
 
 	if (ksp == NULL) {
 		ena_err(ena, "!failed to create aenq kstats");
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena->ena_aenq_kstat = ksp;
@@ -258,8 +321,27 @@ ena_stat_aenq_init(ena_t *ena)
 	    KSTAT_DATA_UINT64);
 	eas->eaes_link_change.value.ui64 = 0;
 
+	kstat_named_init(&eas->eaes_notification, "notification",
+	    KSTAT_DATA_UINT64);
+	eas->eaes_notification.value.ui64 = 0;
+
+	kstat_named_init(&eas->eaes_keep_alive, "keep_alive",
+	    KSTAT_DATA_UINT64);
+	eas->eaes_keep_alive.value.ui64 = 0;
+
+	kstat_named_init(&eas->eaes_request_reset, "request_reset",
+	    KSTAT_DATA_UINT64);
+	eas->eaes_request_reset.value.ui64 = 0;
+
+	kstat_named_init(&eas->eaes_fatal_error, "fatal_error",
+	    KSTAT_DATA_UINT64);
+	eas->eaes_fatal_error.value.ui64 = 0;
+
+	kstat_named_init(&eas->eaes_warning, "warning", KSTAT_DATA_UINT64);
+	eas->eaes_warning.value.ui64 = 0;
+
 	kstat_install(ena->ena_aenq_kstat);
-	return (B_TRUE);
+	return (true);
 }
 
 void
@@ -271,7 +353,7 @@ ena_stat_txq_cleanup(ena_txq_t *txq)
 	}
 }
 
-boolean_t
+bool
 ena_stat_txq_init(ena_txq_t *txq)
 {
 	ena_t *ena = txq->et_ena;
@@ -288,7 +370,7 @@ ena_stat_txq_init(ena_txq_t *txq)
 
 	if (ksp == NULL) {
 		ena_err(ena, "!failed to create %s kstats", buf);
-		return (B_FALSE);
+		return (false);
 	}
 
 	txq->et_kstat = ksp;
@@ -314,7 +396,7 @@ ena_stat_txq_init(ena_txq_t *txq)
 	ets->ets_packets.value.ui64 = 0;
 
 	kstat_install(txq->et_kstat);
-	return (B_TRUE);
+	return (true);
 }
 
 void
@@ -326,7 +408,7 @@ ena_stat_rxq_cleanup(ena_rxq_t *rxq)
 	}
 }
 
-boolean_t
+bool
 ena_stat_rxq_init(ena_rxq_t *rxq)
 {
 	ena_t *ena = rxq->er_ena;
@@ -343,7 +425,7 @@ ena_stat_rxq_init(ena_rxq_t *rxq)
 
 	if (ksp == NULL) {
 		ena_err(ena, "!failed to create %s kstats", buf);
-		return (B_FALSE);
+		return (false);
 	}
 
 	rxq->er_kstat = ksp;
@@ -373,7 +455,7 @@ ena_stat_rxq_init(ena_rxq_t *rxq)
 	ers->ers_hck_l4_err.value.ui64 = 0;
 
 	kstat_install(rxq->er_kstat);
-	return (B_TRUE);
+	return (true);
 }
 
 int
@@ -430,6 +512,7 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 	ena_t *ena = arg;
 	ena_basic_stat_t *ebs;
 	int ret = 0;
+	bool fetch = false;
 
 	/*
 	 * The ENA device does not provide a lot of the stats that a
@@ -437,29 +520,44 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 	 * support, and avoid a round trip to the controller.
 	 */
 	switch (stat) {
+	case ETHER_STAT_LINK_DUPLEX:
+	case MAC_STAT_IFSPEED:
+		break;
+	case MAC_STAT_IERRORS:
+	case MAC_STAT_OERRORS:
 	case MAC_STAT_NORCVBUF:
 	case MAC_STAT_RBYTES:
 	case MAC_STAT_IPACKETS:
 	case MAC_STAT_OBYTES:
 	case MAC_STAT_OPACKETS:
+		fetch = true;
 		break;
 	default:
 		return (ENOTSUP);
 	}
 
-	ret = ena_stat_device_basic_update(ena->ena_device_basic_kstat,
-	    KSTAT_READ);
+	if (fetch) {
+		ret = ena_stat_device_basic_update(ena->ena_device_basic_kstat,
+		    KSTAT_READ);
 
-	if (ret != 0) {
-		return (ret);
+		if (ret != 0)
+			return (ret);
 	}
 
-	mutex_enter(&ena->ena_lock);
+	mutex_enter(&ena->ena_device_basic_stat_lock);
 	ebs = ena->ena_device_basic_kstat->ks_data;
 
 	switch (stat) {
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = ena->ena_link_duplex;
+		break;
+
+	case MAC_STAT_IFSPEED:
+		*val = ena->ena_link_speed_mbits * 1000000ULL;
+		break;
+
 	case MAC_STAT_NORCVBUF:
-		*val = ebs->ebs_rx_drops.value.ui64;
+		*val = ebs->ebs_rx_overruns.value.ui64;
 		break;
 
 	case MAC_STAT_RBYTES:
@@ -470,6 +568,10 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = ebs->ebs_rx_pkts.value.ui64;
 		break;
 
+	case MAC_STAT_IERRORS:
+		*val = ebs->ebs_rx_drops.value.ui64;
+		break;
+
 	case MAC_STAT_OBYTES:
 		*val = ebs->ebs_tx_bytes.value.ui64;
 		break;
@@ -478,10 +580,14 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = ebs->ebs_tx_pkts.value.ui64;
 		break;
 
+	case MAC_STAT_OERRORS:
+		*val = ebs->ebs_tx_drops.value.ui64;
+		break;
+
 	default:
 		dev_err(ena->ena_dip, CE_PANIC, "unhandled stat, 0x%x", stat);
 	}
 
-	mutex_exit(&ena->ena_lock);
+	mutex_exit(&ena->ena_device_basic_stat_lock);
 	return (ret);
 }

@@ -16,6 +16,7 @@
 #ifndef	_ENA_H
 #define	_ENA_H
 
+#include <sys/stdbool.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/types.h>
@@ -87,10 +88,36 @@ extern "C" {
 #define	ENA_MS_TO_NS(ms)	((ms) * 1000000ul)
 
 /*
- * The default amount of time we will wait for an admin command to
- * complete, specified in microseconds. In this case, 500 milliseconds.
+ * The default amount of time we will wait for an admin command to complete,
+ * specified in nanoseconds. This can be overridden by hints received from the
+ * device. We default to half a second.
  */
-#define	ENA_ADMIN_CMD_DEF_TIMEOUT	MSEC2NSEC(500)
+#define	ENA_ADMIN_CMD_DEF_TIMEOUT_NS	MSEC2NSEC(500)
+
+/*
+ * The interval of the watchdog timer, in nanoseconds.
+ */
+#define	ENA_WATCHDOG_INTERVAL_NS	MSEC2NSEC(1000)
+
+/*
+ * The device sends a keepalive message every second. If we don't see any for
+ * a while we will trigger a device reset. Other open source drivers use
+ * 6 seconds for this value, so do we.
+ */
+#define	ENA_DEVICE_KEEPALIVE_TIMEOUT_NS	MSEC2NSEC(6000)
+
+/*
+ * The number of consecutive times a TX queue needs to be seen as blocked by
+ * the watchdog timer before a reset is invoked. Since the watchdog interval
+ * is one second, this is approximately in seconds.
+ */
+#define	ENA_TX_STALL_TIMEOUT		8
+
+/*
+ * In order to avoid rapidly sending basic stats requests to the controller, we
+ * impose a limit of one request every 10ms.
+ */
+#define	ENA_BASIC_STATS_MINIMUM_INTERVAL_NS	MSEC2NSEC(10);
 
 /*
  * Property macros.
@@ -116,7 +143,7 @@ typedef struct ena_dma_conf {
 	uint64_t	edc_align;
 	int		edc_sgl;
 	uchar_t		edc_endian;
-	boolean_t	edc_stream;
+	bool		edc_stream;
 } ena_dma_conf_t;
 
 typedef struct ena_dma_buf {
@@ -143,16 +170,6 @@ typedef struct ena_dma_buf {
 #define	ENA_DMA_SYNC(buf, flag)					\
 	((void)ddi_dma_sync((buf).edb_dma_hdl, 0, 0, (flag)))
 #endif
-
-typedef struct ena_aenq_grpstr {
-	enahw_aenq_groups_t	eag_type;
-	const char		*eag_str;
-} ena_aenq_grpstr_t;
-
-typedef struct ena_aenq_synstr {
-	enahw_aenq_syndrome_t	eas_type;
-	const char		*eas_str;
-} ena_aenq_synstr_t;
 
 typedef void (*ena_aenq_hdlr_t)(void *data, enahw_aenq_desc_t *desc);
 
@@ -195,7 +212,7 @@ typedef struct ena_cmd_ctx {
 	uint16_t		ectx_id;
 
 	/* Is the command pending? */
-	boolean_t		ectx_pending;
+	bool			ectx_pending;
 
 	/* The type of command associated with this context. */
 	enahw_cmd_opcode_t	ectx_cmd_opcode;
@@ -217,7 +234,7 @@ typedef struct ena_cmd_ctx {
  * In general, only a single lock needs to be held in order to access
  * the different parts of the admin queue:
  *
- *  sq_lock: Any data deailng with submitting admin commands, which
+ *  sq_lock: Any data dealing with submitting admin commands, which
  *  includes acquiring a command context.
  *
  *  cq_lock: Any data dealing with reading command responses.
@@ -236,10 +253,11 @@ typedef struct ena_adminq {
 	hrtime_t		ea_cmd_timeout_ns; /* WO */
 
 	uint16_t		ea_qlen;	/* WO */
-	boolean_t		ea_poll_mode;	/* WO */
+	bool			ea_poll_mode;	/* WO */
 
 	ena_cmd_ctx_t		*ea_cmd_ctxs;	  /* WO */
 	list_t			ea_cmd_ctxs_free; /* ea_sq_lock */
+	list_t			ea_cmd_ctxs_used; /* ea_sq_lock */
 	uint16_t		ea_pending_cmds; /* ea_sq_lock */
 	ena_admin_sq_t		ea_sq; /* eq_sq_lock */
 	ena_admin_cq_t		ea_cq; /* eq_cq_lock */
@@ -252,6 +270,21 @@ typedef struct ena_adminq {
 		uint64_t queue_full;
 	} ea_stats;
 } ena_adminq_t;
+
+/*
+ * Cache of the last set of value hints received from the device. See the
+ * definition of ehahw_device_hints_t in ena_hw.h for more detail on the
+ * purpose of each.
+ */
+typedef struct ena_hints {
+	uint16_t		eh_mmio_read_timeout;
+	uint16_t		eh_keep_alive_timeout;
+	uint16_t		eh_tx_comp_timeout;
+	uint16_t		eh_missed_tx_reset_threshold;
+	uint16_t		eh_admin_comp_timeout;
+	uint16_t		eh_max_tx_sgl;
+	uint16_t		eh_max_rx_sgl;
+} ena_hints_t;
 
 typedef enum ena_attach_seq {
 	ENA_ATTACH_PCI = 1,	 /* PCI config space */
@@ -272,14 +305,14 @@ typedef enum ena_attach_seq {
 #define	ENA_ATTACH_NUM_ENTRIES	(ENA_ATTACH_END - 1)
 
 struct ena;
-typedef boolean_t (*ena_attach_fn_t)(struct ena *);
-typedef void (*ena_cleanup_fn_t)(struct ena *);
+typedef bool (*ena_attach_fn_t)(struct ena *);
+typedef void (*ena_cleanup_fn_t)(struct ena *, bool);
 
 typedef struct ena_attach_desc {
 	ena_attach_seq_t ead_seq;
 	const char *ead_name;
 	ena_attach_fn_t ead_attach_fn;
-	boolean_t ead_attach_hard_fail;
+	bool ead_attach_hard_fail;
 	ena_cleanup_fn_t ead_cleanup_fn;
 } ena_attach_desc_t;
 
@@ -362,7 +395,7 @@ typedef struct ena_txq {
 	ena_dma_buf_t		et_sq_dma;    /* WO */
 
 	/* Is the Tx queue currently in a blocked state? */
-	boolean_t		et_blocked; /* TM */
+	bool			et_blocked; /* TM */
 
 	/*
 	 * The number of descriptors owned by this ring. This value
@@ -419,7 +452,15 @@ typedef struct ena_txq {
 	 * This address is used to control the CQ interrupts.
 	 */
 	uint32_t		*et_cq_unmask_addr; /* WO */
-	uint32_t		*et_cq_numa_addr;    /* WO (currently unused) */
+	uint32_t		*et_cq_numa_addr;   /* WO (currently unused) */
+
+	/*
+	 * This is used to detect transmit stalls and invoke a reset. The
+	 * watchdog increments this counter when it sees that the TX
+	 * ring is still blocked, and if it exceeds the threshold then the
+	 * device is assumed to have stalled and needs to be reset.
+	 */
+	uint32_t		et_stall_watchdog; /* TM */
 
 	/*
 	 * This mutex protects the Tx queue stats. This mutex may be
@@ -546,7 +587,18 @@ typedef struct ena_rxq {
 	kstat_t			*er_kstat;
 } ena_rxq_t;
 
-/* These are stats based off of enahw_resp_basic_stats_t. */
+typedef struct ena_device_stat {
+	kstat_named_t	eds_reset_forced;
+	kstat_named_t	eds_reset_error;
+	kstat_named_t	eds_reset_fatal;
+	kstat_named_t	eds_reset_keepalive;
+	kstat_named_t	eds_reset_txstall;
+} ena_device_stat_t;
+
+/*
+ * These are stats based on enahw_resp_basic_stats_t and data that accompanies
+ * the asynchronous keepalive event.
+ */
 typedef struct ena_basic_stat {
 	kstat_named_t	ebs_tx_bytes;
 	kstat_named_t	ebs_tx_pkts;
@@ -555,9 +607,10 @@ typedef struct ena_basic_stat {
 	kstat_named_t	ebs_rx_bytes;
 	kstat_named_t	ebs_rx_pkts;
 	kstat_named_t	ebs_rx_drops;
+	kstat_named_t	ebs_rx_overruns;
 } ena_basic_stat_t;
 
-/* These are stats based off of enahw_resp_eni_stats_t. */
+/* These are stats based on enahw_resp_eni_stats_t. */
 typedef struct ena_extended_stat {
 	kstat_named_t	ees_bw_in_exceeded;
 	kstat_named_t	ees_bw_out_exceeded;
@@ -570,10 +623,26 @@ typedef struct ena_extended_stat {
 typedef struct ena_aenq_stat {
 	kstat_named_t	eaes_default;
 	kstat_named_t	eaes_link_change;
+	kstat_named_t	eaes_notification;
+	kstat_named_t	eaes_keep_alive;
+	kstat_named_t	eaes_request_reset;
+	kstat_named_t	eaes_fatal_error;
+	kstat_named_t	eaes_warning;
 } ena_aenq_stat_t;
 
-#define	ENA_STATE_PRIMORDIAL	0x1u
-#define	ENA_STATE_RUNNING	0x2u
+#ifdef DEBUG
+typedef struct ena_reg {
+	const char	*er_name;
+	const uint16_t	er_offset;
+	uint32_t	er_value;
+} ena_reg_t;
+#endif
+
+#define	ENA_STATE_UNKNOWN	0x00u
+#define	ENA_STATE_INITIALIZED	0x01u
+#define	ENA_STATE_STARTED	0x02u
+#define	ENA_STATE_ERROR		0x04u
+#define	ENA_STATE_RESETTING	0x08u
 
 /*
  * This structure contains the per-instance (PF of VF) state of the
@@ -582,6 +651,14 @@ typedef struct ena_aenq_stat {
 typedef struct ena {
 	dev_info_t		*ena_dip;
 	int			ena_instance;
+
+#ifdef DEBUG
+	/*
+	 * In debug kernels, the registers are cached here at various points
+	 * for easy inspection via mdb(1).
+	 */
+	ena_reg_t		ena_reg[ENAHW_NUM_REGS];
+#endif
 
 	/*
 	 * Global lock, used to synchronize administration changes to
@@ -595,6 +672,18 @@ typedef struct ena {
 	 * do not need to enter ena_lock.
 	 */
 	uint32_t		ena_state;
+
+	/*
+	 * The reason for the last device reset.
+	 */
+	enahw_reset_reason_t	ena_reset_reason;
+
+	/*
+	 * Watchdog
+	 */
+	kmutex_t		ena_watchdog_lock;
+	ddi_periodic_t		ena_watchdog_periodic;
+	uint64_t		ena_watchdog_last_keepalive;
 
 	/*
 	 * PCI config space and BAR handle.
@@ -672,6 +761,10 @@ typedef struct ena {
 	uint16_t		ena_num_txqs;
 
 	/* These statistics are device-wide. */
+	kstat_t			*ena_device_kstat;
+	ena_device_stat_t	ena_device_stat;
+	hrtime_t		ena_device_basic_stat_last_update;
+	kmutex_t		ena_device_basic_stat_lock;
 	kstat_t			*ena_device_basic_kstat;
 	kstat_t			*ena_device_extended_kstat;
 
@@ -694,12 +787,11 @@ typedef struct ena {
 	/*
 	 * Hardware info
 	 */
+	ena_hints_t		ena_device_hints;
 	uint32_t		ena_supported_features;
 	uint32_t		ena_capabilities;
 	uint8_t			ena_dma_width;
-	boolean_t		ena_link_up;
-	boolean_t		ena_link_autoneg;
-	boolean_t		ena_link_full_duplex;
+	bool			ena_link_autoneg;
 	link_duplex_t		ena_link_duplex;
 	uint64_t		ena_link_speed_mbits;
 	enahw_link_speeds_t	ena_link_speeds;
@@ -724,61 +816,91 @@ typedef struct ena {
 	uint16_t		ena_max_io_queues;
 
 	/* Hardware Offloads */
-	boolean_t		ena_tx_l3_ipv4_csum;
+	bool			ena_tx_l3_ipv4_csum;
 
-	boolean_t		ena_tx_l4_ipv4_part_csum;
-	boolean_t		ena_tx_l4_ipv4_full_csum;
-	boolean_t		ena_tx_l4_ipv4_lso;
+	bool			ena_tx_l4_ipv4_part_csum;
+	bool			ena_tx_l4_ipv4_full_csum;
+	bool			ena_tx_l4_ipv4_lso;
 
-	boolean_t		ena_tx_l4_ipv6_part_csum;
-	boolean_t		ena_tx_l4_ipv6_full_csum;
-	boolean_t		ena_tx_l4_ipv6_lso;
+	bool			ena_tx_l4_ipv6_part_csum;
+	bool			ena_tx_l4_ipv6_full_csum;
+	bool			ena_tx_l4_ipv6_lso;
 
-	boolean_t		ena_rx_l3_ipv4_csum;
-	boolean_t		ena_rx_l4_ipv4_csum;
-	boolean_t		ena_rx_l4_ipv6_csum;
-	boolean_t		ena_rx_hash;
+	bool			ena_rx_l3_ipv4_csum;
+	bool			ena_rx_l4_ipv4_csum;
+	bool			ena_rx_l4_ipv6_csum;
+	bool			ena_rx_hash;
 
 	uint32_t		ena_max_mtu;
 	uint8_t			ena_mac_addr[ETHERADDRL];
 } ena_t;
 
 /*
+ * Misc
+ */
+extern bool ena_reset(ena_t *, const enahw_reset_reason_t);
+extern bool ena_is_feat_avail(ena_t *, const enahw_feature_id_t);
+extern bool ena_is_cap_avail(ena_t *, const enahw_capability_id_t);
+extern void ena_update_hints(ena_t *, enahw_device_hints_t *);
+
+/*
  * Logging functions.
  */
-/*PRINTFLIKE2*/
+extern bool ena_debug;
 extern void ena_err(const ena_t *, const char *, ...) __KPRINTFLIKE(2);
-/*PRINTFLIKE2*/
 extern void ena_dbg(const ena_t *, const char *, ...) __KPRINTFLIKE(2);
+extern void ena_panic(const ena_t *, const char *, ...) __KPRINTFLIKE(2);
+extern void ena_trigger_reset(ena_t *, enahw_reset_reason_t);
 
+/*
+ * Hardware access.
+ */
 extern uint32_t ena_hw_bar_read32(const ena_t *, const uint16_t);
 extern uint32_t ena_hw_abs_read32(const ena_t *, uint32_t *);
 extern void ena_hw_bar_write32(const ena_t *, const uint16_t, const uint32_t);
 extern void ena_hw_abs_write32(const ena_t *, uint32_t *, const uint32_t);
+extern const char *enahw_reset_reason(enahw_reset_reason_t);
+#ifdef DEBUG
+extern void ena_init_regcache(ena_t *);
+extern void ena_update_regcache(ena_t *);
+#else
+#define	ena_init_regcache(x)
+#define	ena_update_regcache(x)
+#endif
+
+/*
+ * Watchdog
+ */
+extern void ena_enable_watchdog(ena_t *);
+extern void ena_disable_watchdog(ena_t *);
 
 /*
  * Stats
  */
+extern void ena_stat_device_cleanup(ena_t *);
+extern bool ena_stat_device_init(ena_t *);
+
 extern void ena_stat_device_basic_cleanup(ena_t *);
-extern boolean_t ena_stat_device_basic_init(ena_t *);
+extern bool ena_stat_device_basic_init(ena_t *);
 
 extern void ena_stat_device_extended_cleanup(ena_t *);
-extern boolean_t ena_stat_device_extended_init(ena_t *);
+extern bool ena_stat_device_extended_init(ena_t *);
 
 extern void ena_stat_aenq_cleanup(ena_t *);
-extern boolean_t ena_stat_aenq_init(ena_t *);
+extern bool ena_stat_aenq_init(ena_t *);
 
 extern void ena_stat_rxq_cleanup(ena_rxq_t *);
-extern boolean_t ena_stat_rxq_init(ena_rxq_t *);
+extern bool ena_stat_rxq_init(ena_rxq_t *);
 extern void ena_stat_txq_cleanup(ena_txq_t *);
-extern boolean_t ena_stat_txq_init(ena_txq_t *);
+extern bool ena_stat_txq_init(ena_txq_t *);
 
 /*
  * DMA
  */
-extern boolean_t ena_dma_alloc(ena_t *, ena_dma_buf_t *, ena_dma_conf_t *,
+extern bool ena_dma_alloc(ena_t *, ena_dma_buf_t *, ena_dma_conf_t *,
     size_t);
 extern void ena_dma_free(ena_dma_buf_t *);
+extern void ena_dma_bzero(ena_dma_buf_t *);
 extern void ena_set_dma_addr(const ena_t *, const uint64_t, enahw_addr_t *);
 extern void ena_set_dma_addr_values(const ena_t *, const uint64_t, uint32_t *,
     uint16_t *);
@@ -786,18 +908,17 @@ extern void ena_set_dma_addr_values(const ena_t *, const uint64_t, uint32_t *,
 /*
  * Interrupts
  */
-extern boolean_t ena_intr_add_handlers(ena_t *);
-extern void ena_intr_remove_handlers(ena_t *);
+extern bool ena_intr_add_handlers(ena_t *);
+extern void ena_intr_remove_handlers(ena_t *, bool);
 extern void ena_tx_intr_work(ena_txq_t *);
 extern void ena_rx_intr_work(ena_rxq_t *);
-extern void ena_aenq_work(ena_t *);
-extern boolean_t ena_intrs_disable(ena_t *);
-extern boolean_t ena_intrs_enable(ena_t *);
+extern bool ena_intrs_disable(ena_t *);
+extern bool ena_intrs_enable(ena_t *);
 
 /*
  * MAC
  */
-extern boolean_t ena_mac_register(ena_t *);
+extern bool ena_mac_register(ena_t *);
 extern int ena_mac_unregister(ena_t *);
 extern void ena_ring_tx_stop(mac_ring_driver_t);
 extern int ena_ring_tx_start(mac_ring_driver_t, uint64_t);
@@ -816,13 +937,15 @@ extern int ena_admin_submit_cmd(ena_t *, enahw_cmd_desc_t *,
     enahw_resp_desc_t *, ena_cmd_ctx_t **);
 extern int ena_admin_poll_for_resp(ena_t *, ena_cmd_ctx_t *);
 extern void ena_free_host_info(ena_t *);
-extern boolean_t ena_init_host_info(ena_t *);
-extern int ena_create_cq(ena_t *, uint16_t, uint64_t, boolean_t, uint32_t,
+extern bool ena_init_host_info(ena_t *);
+extern void ena_create_cmd_ctx(ena_t *);
+extern void ena_release_all_cmd_ctx(ena_t *);
+extern int ena_create_cq(ena_t *, uint16_t, uint64_t, bool, uint32_t,
     uint16_t *, uint32_t **, uint32_t **);
 extern int ena_destroy_cq(ena_t *, uint16_t);
-extern int ena_create_sq(ena_t *, uint16_t, uint64_t, boolean_t, uint16_t,
+extern int ena_create_sq(ena_t *, uint16_t, uint64_t, bool, uint16_t,
     uint16_t *, uint32_t **);
-extern int ena_destroy_sq(ena_t *, uint16_t, boolean_t);
+extern int ena_destroy_sq(ena_t *, uint16_t, bool);
 extern int ena_set_feature(ena_t *, enahw_cmd_desc_t *,
     enahw_resp_desc_t *, const enahw_feature_id_t, const uint8_t);
 extern int ena_get_feature(ena_t *, enahw_resp_desc_t *,
@@ -832,14 +955,21 @@ extern int ena_admin_get_eni_stats(ena_t *, enahw_resp_desc_t *);
 extern int enahw_resp_status_to_errno(ena_t *, enahw_resp_status_t);
 
 /*
+ * Async event queue
+ */
+extern bool ena_aenq_init(ena_t *);
+extern bool ena_aenq_configure(ena_t *);
+extern void ena_aenq_enable(ena_t *);
+extern void ena_aenq_work(ena_t *);
+extern void ena_aenq_free(ena_t *);
+
+/*
  * Rx/Tx allocations
  */
-extern boolean_t ena_alloc_rxq(ena_rxq_t *);
-extern void ena_cleanup_rxq(ena_rxq_t *);
-extern boolean_t ena_alloc_txq(ena_txq_t *);
-extern void ena_cleanup_txq(ena_txq_t *);
-
-extern ena_aenq_grpstr_t ena_groups_str[];
+extern bool ena_alloc_rxq(ena_rxq_t *);
+extern void ena_cleanup_rxq(ena_rxq_t *, bool);
+extern bool ena_alloc_txq(ena_txq_t *);
+extern void ena_cleanup_txq(ena_txq_t *, bool);
 
 #ifdef __cplusplus
 }

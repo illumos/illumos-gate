@@ -25,17 +25,16 @@
  * on "Nitro"-based instances. It presents itself with the following
  * PCI Vendor/Device IDs
  *
- * o 1d0f:0ec2 -- ENA PF
- * o 1d0f:1ec2 -- ENA PF (Reserved)
- * o 1d0f:ec20 -- ENA VF
- * o 1d0f:ec21 -- ENA VF (Reserved)
+ *    o 1d0f:0ec2 -- ENA PF
+ *    o 1d0f:1ec2 -- ENA PF (Reserved)
+ *    o 1d0f:ec20 -- ENA VF
+ *    o 1d0f:ec21 -- ENA VF (Reserved)
  *
  * This driver provides support for only the essential features needed
  * to drive traffic on an ENA device. Support for the following
  * features IS NOT currently implemented.
  *
  *    o Admin Queue Interrupts: queue completion events are always polled
- *    o AENQ keep alive
  *    o FMA
  *    o Rx checksum offloads
  *    o Tx checksum offloads
@@ -98,10 +97,10 @@
  * This means that a Tx/Rx queue at index 0 will map to vector 1, and
  * so on.
  *
- * NOTE: The ENA driver currently doesn't make use of the Admin Queue
- * interrupt. This interrupt is used to notify a the driver that a
- * command response is read. The ENA driver always polls the Admin
- * Queue for responses.
+ * NOTE: The ENA driver currently doesn't make full use of the Admin
+ * Queue interrupt. This interrupt is used both to notify the driver
+ * when a command response is ready, and when an async event is posted.
+ * The ENA driver always polls the Admin Queue for responses.
  *
  * Tx Queue Workings
  * -----------------
@@ -207,9 +206,9 @@
  * is registered, the ena_aenq_default_hdlr() handler is used. A given
  * device may not support all the different event types
  * (enahw_aenq_groups_t); and the driver may choose to enable a subset
- * of the supported events. During attach we call ena_setup_aenq() to
- * negotiate the supported/enabled events. The enabled group is stored
- * at ena_aenq_enabled_groups.
+ * of the supported events. During attach we call ena_aenq_configure()
+ * to negotiate the supported/enabled events. The enabled group is
+ * stored at ena_aenq_enabled_groups.
  *
  * Queues and Unsigned Wraparound
  * ------------------------------
@@ -222,6 +221,33 @@
  * course, when accessing our own descriptor arrays we must make sure
  * to first perform a modulo of this value or risk running off into
  * space.
+ *
+ * Watchdog and Device Reset
+ * -------------------------
+ *
+ * While the device is running, the driver periodically invokes a
+ * watchdog function to check that all is well, and to reset the
+ * device if not. The device will be reset if any of the following is
+ * true:
+ *
+ *    o The device's status register fatal error bit is set. A device
+ *      in this state will no longer process any queues;
+ *    o No asynchronous event keepalives have been received for some
+ *      time -- see ENA_DEVICE_KEEPALIVE_TIMEOUT_NS;
+ *    o A Tx queue has remained blocked for some time -- see
+ *      ENA_TX_STALL_TIMEOUT;
+ *    o The device has requested, via an asynchronous event, that we
+ *      perform a reset;
+ *    o Driver code has detected an error and set the EN_STATE_ERROR
+ *      bit in ena_state.
+ *
+ * There is a "fatal error" asynchronous event, but common code does
+ * not use that as a reason to trigger a reset, and so neither do we.
+ *
+ * The global `ena_force_reset` variable can be used as a simple means
+ * to trigger a reset during driver development and testing. If there
+ * are multiple instances, it is likely that only one of them will
+ * reset when this variable is changed to `true`.
  *
  * Attach Sequencing
  * -----------------
@@ -293,18 +319,10 @@
  * These are some basic data layout invariants on which development
  * assumptions where made.
  */
-CTASSERT(sizeof (enahw_aenq_desc_t) == 64);
-/* TODO: Why doesn't this work? */
-/* CTASSERT(sizeof (enahw_tx_data_desc_t) == 64); */
+CTASSERT(sizeof (enahw_tx_data_desc_t) == 16);
 CTASSERT(sizeof (enahw_tx_data_desc_t) == sizeof (enahw_tx_meta_desc_t));
 CTASSERT(sizeof (enahw_tx_data_desc_t) == sizeof (enahw_tx_desc_t));
 CTASSERT(sizeof (enahw_tx_meta_desc_t) == sizeof (enahw_tx_desc_t));
-/*
- * We add this here as an extra safety check to make sure that any
- * addition to the AENQ group enum also updates the groups array num
- * value.
- */
-CTASSERT(ENAHW_AENQ_GROUPS_ARR_NUM == 6);
 
 /*
  * Amazon does not specify the endianess of the ENA device. We assume
@@ -327,7 +345,7 @@ CTASSERT(ENAHW_AENQ_GROUPS_ARR_NUM == 6);
 #define	ENA_DRV_VER_MINOR	0
 #define	ENA_DRV_VER_SUBMINOR	0
 
-uint64_t ena_admin_cmd_timeout_ns = ENA_ADMIN_CMD_DEF_TIMEOUT;
+uint64_t ena_admin_cmd_timeout_ns = ENA_ADMIN_CMD_DEF_TIMEOUT_NS;
 
 /*
  * Log an error message. We leave the destination (console or system
@@ -347,10 +365,24 @@ ena_err(const ena_t *ena, const char *fmt, ...)
 	va_end(ap);
 }
 
+void
+ena_panic(const ena_t *ena, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	if (ena != NULL && ena->ena_dip != NULL) {
+		vdev_err(ena->ena_dip, CE_PANIC, fmt, ap);
+	} else {
+		vcmn_err(CE_PANIC, fmt, ap);
+	}
+	va_end(ap);
+}
+
 /*
- * Set this to B_TRUE to enable debug messages.
+ * Set this to true to enable debug messages.
  */
-boolean_t ena_debug = B_FALSE;
+bool ena_debug = false;
 
 /*
  * Log a debug message. We force all debug messages to go to the
@@ -376,79 +408,148 @@ ena_dbg(const ena_t *ena, const char *fmt, ...)
 	}
 }
 
-ena_aenq_grpstr_t ena_groups_str[ENAHW_AENQ_GROUPS_ARR_NUM] = {
-	{ .eag_type = ENAHW_AENQ_GROUP_LINK_CHANGE, .eag_str = "LINK CHANGE" },
-	{ .eag_type = ENAHW_AENQ_GROUP_FATAL_ERROR, .eag_str = "FATAL ERROR" },
-	{ .eag_type = ENAHW_AENQ_GROUP_WARNING, .eag_str = "WARNING" },
-	{
-		.eag_type = ENAHW_AENQ_GROUP_NOTIFICATION,
-		.eag_str = "NOTIFICATION"
-	},
-	{ .eag_type = ENAHW_AENQ_GROUP_KEEP_ALIVE, .eag_str = "KEEP ALIVE" },
-	{
-		.eag_type = ENAHW_AENQ_GROUP_REFRESH_CAPABILITIES,
-		.eag_str = "REFRESH CAPABILITIES"
-	},
-};
-
 void
-ena_aenq_work(ena_t *ena)
+ena_trigger_reset(ena_t *ena, enahw_reset_reason_t reason)
 {
-	ena_aenq_t *aenq = &ena->ena_aenq;
-	uint16_t head_mod = aenq->eaenq_head & (aenq->eaenq_num_descs - 1);
-	boolean_t processed = B_FALSE;
-	enahw_aenq_desc_t *desc = &aenq->eaenq_descs[head_mod];
-	uint64_t ts;
-
-	ts = ((uint64_t)desc->ead_ts_high << 32) | (uint64_t)desc->ead_ts_low;
-	ENA_DMA_SYNC(aenq->eaenq_dma, DDI_DMA_SYNC_FORKERNEL);
-
-	while (ENAHW_AENQ_DESC_PHASE(desc) == aenq->eaenq_phase) {
-		ena_aenq_hdlr_t hdlr;
-
-		ASSERT3U(desc->ead_group, <, ENAHW_AENQ_GROUPS_ARR_NUM);
-		processed = B_TRUE;
-		ena_dbg(ena, "AENQ Group: (0x%x) %s Syndrome: 0x%x ts: %" PRIu64
-		    " us", desc->ead_group,
-		    ena_groups_str[desc->ead_group].eag_str, desc->ead_syndrome,
-		    ts);
-
-		hdlr = ena->ena_aenq.eaenq_hdlrs[desc->ead_group];
-		hdlr(ena, desc);
-
-		aenq->eaenq_head++;
-		head_mod = aenq->eaenq_head & (aenq->eaenq_num_descs - 1);
-
-		if (head_mod == 0) {
-			aenq->eaenq_phase ^= 1;
-		}
-
-		desc = &aenq->eaenq_descs[head_mod];
-	}
-
-	if (processed) {
-		ena_hw_bar_write32(ena, ENAHW_REG_AENQ_HEAD_DB,
-		    aenq->eaenq_head);
-	}
+	mutex_enter(&ena->ena_lock);
+	ena->ena_reset_reason = reason;
+	mutex_exit(&ena->ena_lock);
+	atomic_or_32(&ena->ena_state, ENA_STATE_ERROR);
 }
 
 /*
- * Use for attach sequences which perform no resource allocation (or
- * global state modification) and thus require no subsequent
- * deallocation.
+ * Determine if a given feature is available on this device.
  */
-static void
-ena_no_cleanup(ena_t *ena)
+bool
+ena_is_feat_avail(ena_t *ena, const enahw_feature_id_t feat_id)
 {
+	VERIFY3U(feat_id, <=, ENAHW_FEAT_NUM);
+	uint32_t mask = 1U << feat_id;
+
+	/*
+	 * The device attributes feature is always supported, as
+	 * indicated by the common code.
+	 */
+	if (feat_id == ENAHW_FEAT_DEVICE_ATTRIBUTES)
+		return (true);
+
+	return ((ena->ena_supported_features & mask) != 0);
 }
 
-static boolean_t
+/*
+ * Determine if a given capability is available on this device.
+ */
+bool
+ena_is_cap_avail(ena_t *ena, const enahw_capability_id_t cap_id)
+{
+	VERIFY3U(cap_id, <=, ENAHW_CAP_NUM);
+	uint32_t mask = 1U << cap_id;
+
+	return ((ena->ena_capabilities & mask) != 0);
+}
+
+static bool
+ena_device_reset(ena_t *ena, enum enahw_reset_reason_types reason)
+{
+	uint32_t rval, wval, reason_lsb, reason_msb;
+	hrtime_t timeout, expired;
+
+	rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
+	if ((rval & ENAHW_DEV_STS_READY_MASK) == 0) {
+		ena_err(ena, "reset: device is not ready");
+		return (false);
+	}
+
+	rval = ena_hw_bar_read32(ena, ENAHW_REG_CAPS);
+
+	/*
+	 * The device stores the reset timeout at 100ms resolution; we
+	 * normalize that to nanoseconds.
+	 */
+	timeout = MSEC2NSEC(ENAHW_CAPS_RESET_TIMEOUT(rval) * 100);
+
+	if (timeout == 0) {
+		ena_err(ena, "device gave invalid (0) reset timeout");
+		return (false);
+	}
+
+	expired = gethrtime() + timeout;
+
+	wval = ENAHW_DEV_CTL_DEV_RESET_MASK;
+
+	reason_lsb = ENAHW_RESET_REASON_LSB(reason);
+	reason_msb = ENAHW_RESET_REASON_MSB(reason);
+
+	wval |= (reason_lsb << ENAHW_DEV_CTL_RESET_REASON_SHIFT) &
+	    ENAHW_DEV_CTL_RESET_REASON_MASK;
+	if (ena_is_cap_avail(ena, ENAHW_CAP_EXTENDED_RESET_REASONS)) {
+		wval |= (reason_msb << ENAHW_DEV_CTL_RESET_REASON_EXT_SHIFT) &
+		    ENAHW_DEV_CTL_RESET_REASON_EXT_MASK;
+	} else if (reason_msb != 0) {
+		/* Fall back to "generic" which we know will fit */
+		wval = ENAHW_DEV_CTL_DEV_RESET_MASK;
+		wval |= (ENAHW_RESET_GENERIC <<
+		    ENAHW_DEV_CTL_RESET_REASON_SHIFT) &
+		    ENAHW_DEV_CTL_RESET_REASON_MASK;
+	}
+
+	ena_hw_bar_write32(ena, ENAHW_REG_DEV_CTL, wval);
+
+	/*
+	 * Make sure reset is in progress.
+	 */
+	for (;;) {
+		rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
+
+		if ((rval & ENAHW_DEV_STS_RESET_IN_PROGRESS_MASK) != 0)
+			break;
+
+		if (gethrtime() > expired) {
+			ena_err(ena, "device reset start timed out");
+			return (false);
+		}
+
+		/* Sleep for 100 milliseconds. */
+		delay(drv_usectohz(100 * 1000));
+	}
+
+	/*
+	 * Reset the timeout counter for the next device request.
+	 */
+	expired = gethrtime() + timeout;
+
+	/*
+	 * Wait for the device reset to finish.
+	 */
+	ena_hw_bar_write32(ena, ENAHW_REG_DEV_CTL, 0);
+	for (;;) {
+		rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
+
+		if ((rval & ENAHW_DEV_STS_RESET_IN_PROGRESS_MASK) == 0) {
+			break;
+		}
+
+		if (gethrtime() > expired) {
+			ena_err(ena, "device reset timed out");
+			return (false);
+		}
+
+		/* Sleep for 100 milliseconds. */
+		delay(drv_usectohz(100 * 1000));
+	}
+
+	ena_dbg(ena, "device reset succeeded");
+
+	return (true);
+}
+
+static bool
 ena_attach_pci(ena_t *ena)
 {
 	ddi_acc_handle_t hdl;
 
 	if (pci_config_setup(ena->ena_dip, &hdl) != 0) {
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena->ena_pci_hdl = hdl;
@@ -461,22 +562,24 @@ ena_attach_pci(ena_t *ena)
 	    ena->ena_pci_vid, ena->ena_pci_did, ena->ena_pci_rev,
 	    ena->ena_pci_svid, ena->ena_pci_sdid);
 
-	return (B_TRUE);
+	return (true);
 }
 
 static void
-ena_cleanup_pci(ena_t *ena)
+ena_cleanup_pci(ena_t *ena, bool resetting)
 {
+	VERIFY0(resetting);
 	pci_config_teardown(&ena->ena_pci_hdl);
 }
 
 static void
-ena_cleanup_regs_map(ena_t *ena)
+ena_cleanup_regs_map(ena_t *ena, bool resetting)
 {
+	VERIFY0(resetting);
 	ddi_regs_map_free(&ena->ena_reg_hdl);
 }
 
-static boolean_t
+static bool
 ena_attach_regs_map(ena_t *ena)
 {
 	int ret = 0;
@@ -485,7 +588,7 @@ ena_attach_regs_map(ena_t *ena)
 	    DDI_SUCCESS) {
 		ena_err(ena, "failed to get register set %d size",
 		    ENA_REG_NUMBER);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "register size: %ld", ena->ena_reg_size);
@@ -506,13 +609,13 @@ ena_attach_regs_map(ena_t *ena)
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to map register set %d: %d",
 		    ENA_REG_NUMBER, ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "registers mapped to base: 0x%p",
 	    (void *)ena->ena_reg_base);
 
-	return (B_TRUE);
+	return (true);
 }
 
 /*
@@ -527,32 +630,38 @@ ena_admin_sq_free(ena_t *ena)
 /*
  * Initialize the admin submission queue.
  */
-static boolean_t
+static bool
 ena_admin_sq_init(ena_t *ena)
 {
 	ena_adminq_t *aq = &ena->ena_aq;
 	ena_dma_buf_t *dma = &aq->ea_sq.eas_dma;
 	size_t size = aq->ea_qlen * sizeof (*aq->ea_sq.eas_entries);
 	uint32_t addr_low, addr_high, wval;
-	ena_dma_conf_t conf = {
-		.edc_size = size,
-		.edc_align = ENAHW_ADMIN_SQ_DESC_BUF_ALIGNMENT,
-		.edc_sgl = 1,
-		.edc_endian = DDI_NEVERSWAP_ACC,
-		.edc_stream = B_FALSE,
-	};
 
-	if (!ena_dma_alloc(ena, dma, &conf, size)) {
-		ena_err(ena, "failed to allocate DMA for Admin SQ");
-		return (B_FALSE);
+	if (aq->ea_sq.eas_entries == NULL) {
+		ena_dma_conf_t conf = {
+			.edc_size = size,
+			.edc_align = ENAHW_ADMIN_SQ_DESC_BUF_ALIGNMENT,
+			.edc_sgl = 1,
+			.edc_endian = DDI_NEVERSWAP_ACC,
+			.edc_stream = false,
+		};
+
+		if (!ena_dma_alloc(ena, dma, &conf, size)) {
+			ena_err(ena, "failed to allocate DMA for Admin SQ");
+			return (false);
+		}
+
+		ENA_DMA_VERIFY_ADDR(ena, dma->edb_cookie->dmac_laddress);
+		aq->ea_sq.eas_entries = (void *)dma->edb_va;
+	} else {
+		ena_dma_bzero(dma);
 	}
 
-	aq->ea_sq.eas_entries = (void *)dma->edb_va;
 	aq->ea_sq.eas_tail = 0;
 	aq->ea_sq.eas_phase = 1;
 	aq->ea_sq.eas_dbaddr =
 	    (uint32_t *)(ena->ena_reg_base + ENAHW_REG_ASQ_DB);
-	ENA_DMA_VERIFY_ADDR(ena, dma->edb_cookie->dmac_laddress);
 	addr_low = (uint32_t)(dma->edb_cookie->dmac_laddress);
 	addr_high = (uint32_t)(dma->edb_cookie->dmac_laddress >> 32);
 	ena_hw_bar_write32(ena, ENAHW_REG_ASQ_BASE_LO, addr_low);
@@ -560,7 +669,8 @@ ena_admin_sq_init(ena_t *ena)
 	wval = ENAHW_ASQ_CAPS_DEPTH(aq->ea_qlen) |
 	    ENAHW_ASQ_CAPS_ENTRY_SIZE(sizeof (*aq->ea_sq.eas_entries));
 	ena_hw_bar_write32(ena, ENAHW_REG_ASQ_CAPS, wval);
-	return (B_TRUE);
+
+	return (true);
 }
 
 /*
@@ -575,30 +685,36 @@ ena_admin_cq_free(ena_t *ena)
 /*
  * Initialize the admin completion queue.
  */
-static boolean_t
+static bool
 ena_admin_cq_init(ena_t *ena)
 {
 	ena_adminq_t *aq = &ena->ena_aq;
 	ena_dma_buf_t *dma = &aq->ea_cq.eac_dma;
-	size_t size = aq->ea_qlen * sizeof (*aq->ea_cq.eac_entries);
 	uint32_t addr_low, addr_high, wval;
-	ena_dma_conf_t conf = {
-		.edc_size = size,
-		.edc_align = ENAHW_ADMIN_CQ_DESC_BUF_ALIGNMENT,
-		.edc_sgl = 1,
-		.edc_endian = DDI_NEVERSWAP_ACC,
-		.edc_stream = B_FALSE,
-	};
 
-	if (!ena_dma_alloc(ena, dma, &conf, size)) {
-		ena_err(ena, "failed to allocate DMA for Admin CQ");
-		return (B_FALSE);
+	if (aq->ea_cq.eac_entries == NULL) {
+		size_t size = aq->ea_qlen * sizeof (*aq->ea_cq.eac_entries);
+		ena_dma_conf_t conf = {
+			.edc_size = size,
+			.edc_align = ENAHW_ADMIN_CQ_DESC_BUF_ALIGNMENT,
+			.edc_sgl = 1,
+			.edc_endian = DDI_NEVERSWAP_ACC,
+			.edc_stream = false,
+		};
+
+		if (!ena_dma_alloc(ena, dma, &conf, size)) {
+			ena_err(ena, "failed to allocate DMA for Admin CQ");
+			return (false);
+		}
+
+		ENA_DMA_VERIFY_ADDR(ena, dma->edb_cookie->dmac_laddress);
+		aq->ea_cq.eac_entries = (void *)dma->edb_va;
+	} else {
+		ena_dma_bzero(dma);
 	}
 
-	aq->ea_cq.eac_entries = (void *)dma->edb_va;
 	aq->ea_cq.eac_head = 0;
 	aq->ea_cq.eac_phase = 1;
-	ENA_DMA_VERIFY_ADDR(ena, dma->edb_cookie->dmac_laddress);
 	addr_low = (uint32_t)(dma->edb_cookie->dmac_laddress);
 	addr_high = (uint32_t)(dma->edb_cookie->dmac_laddress >> 32);
 	ena_hw_bar_write32(ena, ENAHW_REG_ACQ_BASE_LO, addr_low);
@@ -606,120 +722,24 @@ ena_admin_cq_init(ena_t *ena)
 	wval = ENAHW_ACQ_CAPS_DEPTH(aq->ea_qlen) |
 	    ENAHW_ACQ_CAPS_ENTRY_SIZE(sizeof (*aq->ea_cq.eac_entries));
 	ena_hw_bar_write32(ena, ENAHW_REG_ACQ_CAPS, wval);
-	return (B_TRUE);
+
+	return (true);
 }
 
-static void
-ena_aenq_default_hdlr(void *data, enahw_aenq_desc_t *desc)
+void
+ena_update_hints(ena_t *ena, enahw_device_hints_t *hints)
 {
-	ena_t *ena = data;
-
-	ena->ena_aenq_stat.eaes_default.value.ui64++;
-	ena_dbg(ena, "unimplemented handler for aenq group: %s",
-	    ena_groups_str[desc->ead_group].eag_str);
-}
-
-static void
-ena_aenq_link_change_hdlr(void *data, enahw_aenq_desc_t *desc)
-{
-	ena_t *ena = data;
-	boolean_t is_up = (desc->ead_payload.link_change.flags &
-	    ENAHW_AENQ_LINK_CHANGE_LINK_STATUS_MASK) != 0;
-
-	/*
-	 * The interrupts are not enabled until after we register mac,
-	 * so the mac handle should be valid.
-	 */
-	ASSERT3U(ena->ena_attach_seq, >=, ENA_ATTACH_MAC_REGISTER);
-	ena->ena_aenq_stat.eaes_link_change.value.ui64++;
-
-	mutex_enter(&ena->ena_lock);
-
-	/*
-	 * Notify mac only on an actual change in status.
-	 */
-	if (ena->ena_link_up != is_up) {
-		if (is_up) {
-			mac_link_update(ena->ena_mh, LINK_STATE_UP);
-		} else {
-			mac_link_update(ena->ena_mh, LINK_STATE_DOWN);
-		}
-	}
-
-	ena->ena_link_up = is_up;
-
-	mutex_exit(&ena->ena_lock);
-}
-
-/*
- * Free any resources related to the Async Event Notification Queue.
- */
-static void
-ena_aenq_free(ena_t *ena)
-{
-	ena_dma_free(&ena->ena_aenq.eaenq_dma);
-}
-
-static void
-ena_aenq_set_def_hdlrs(ena_aenq_t *aenq)
-{
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_LINK_CHANGE] = ena_aenq_default_hdlr;
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_FATAL_ERROR] = ena_aenq_default_hdlr;
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_WARNING] = ena_aenq_default_hdlr;
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_NOTIFICATION] =
-	    ena_aenq_default_hdlr;
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_KEEP_ALIVE] = ena_aenq_default_hdlr;
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_REFRESH_CAPABILITIES] =
-	    ena_aenq_default_hdlr;
-}
-/*
- * Initialize the Async Event Notification Queue.
- */
-static boolean_t
-ena_aenq_init(ena_t *ena)
-{
-	ena_aenq_t *aenq = &ena->ena_aenq;
-	size_t size;
-	uint32_t addr_low, addr_high, wval;
-	ena_dma_conf_t conf;
-
-	aenq->eaenq_num_descs = ENA_AENQ_NUM_DESCS;
-	size = aenq->eaenq_num_descs * sizeof (*aenq->eaenq_descs);
-
-	/* BEGIN CSTYLED */
-	conf = (ena_dma_conf_t) {
-		.edc_size = size,
-		.edc_align = ENAHW_AENQ_DESC_BUF_ALIGNMENT,
-		.edc_sgl = 1,
-		.edc_endian = DDI_NEVERSWAP_ACC,
-		.edc_stream = B_FALSE,
-	};
-	/* END CSTYLED */
-
-	if (!ena_dma_alloc(ena, &aenq->eaenq_dma, &conf, size)) {
-		ena_err(ena, "failed to allocate DMA for AENQ");
-		return (B_FALSE);
-	}
-
-	aenq->eaenq_descs = (void *)aenq->eaenq_dma.edb_va;
-	aenq->eaenq_head = 0;
-	aenq->eaenq_phase = 1;
-	bzero(aenq->eaenq_descs, size);
-	ena_aenq_set_def_hdlrs(aenq);
-
-	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_LINK_CHANGE] =
-	    ena_aenq_link_change_hdlr;
-
-	ENA_DMA_VERIFY_ADDR(ena, aenq->eaenq_dma.edb_cookie->dmac_laddress);
-	addr_low = (uint32_t)(aenq->eaenq_dma.edb_cookie->dmac_laddress);
-	addr_high = (uint32_t)(aenq->eaenq_dma.edb_cookie->dmac_laddress >> 32);
-	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_BASE_LO, addr_low);
-	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_BASE_HI, addr_high);
-	ENA_DMA_SYNC(aenq->eaenq_dma, DDI_DMA_SYNC_FORDEV);
-	wval = ENAHW_AENQ_CAPS_DEPTH(aenq->eaenq_num_descs) |
-	    ENAHW_AENQ_CAPS_ENTRY_SIZE(sizeof (*aenq->eaenq_descs));
-	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_CAPS, wval);
-	return (B_TRUE);
+	ena->ena_device_hints.eh_mmio_read_timeout =
+	    hints->edh_mmio_read_timeout;
+	ena->ena_device_hints.eh_keep_alive_timeout =
+	    hints->edh_keep_alive_timeout;
+	ena->ena_device_hints.eh_tx_comp_timeout = hints->edh_tx_comp_timeout;
+	ena->ena_device_hints.eh_missed_tx_reset_threshold =
+	    hints->edh_missed_tx_reset_threshold;
+	ena->ena_device_hints.eh_admin_comp_timeout =
+	    hints->edh_admin_comp_timeout;
+	ena->ena_device_hints.eh_max_tx_sgl = hints->edh_max_tx_sgl;
+	ena->ena_device_hints.eh_max_rx_sgl = hints->edh_max_rx_sgl;
 }
 
 /*
@@ -788,27 +808,54 @@ ena_update_buf_sizes(ena_t *ena)
 	    ENA_RX_BUF_IPHDR_ALIGNMENT, ena->ena_page_sz, uint32_t);
 }
 
-static boolean_t
+static bool
+ena_get_hints(ena_t *ena)
+{
+	int ret;
+	enahw_resp_desc_t resp;
+	enahw_device_hints_t *hints = &resp.erd_resp.erd_get_feat.ergf_hints;
+
+	ena_dbg(ena, "Requesting hints");
+
+	bzero(&resp, sizeof (resp));
+	ret = ena_get_feature(ena, &resp, ENAHW_FEAT_HW_HINTS,
+	    ENAHW_FEAT_HW_HINTS_VER);
+
+	if (ret == ENOTSUP) {
+		/* In this case the device does not support querying hints */
+		ena_dbg(ena, "Hints are unsupported");
+		return (true);
+	} else if (ret != 0) {
+		ena_err(ena, "Error getting hints: %d", ret);
+		return (false);
+	}
+
+	ena_update_hints(ena, hints);
+
+	return (true);
+}
+
+static bool
 ena_get_offloads(ena_t *ena)
 {
 	int ret = 0;
 	enahw_resp_desc_t resp;
 	enahw_feat_offload_t *feat = &resp.erd_resp.erd_get_feat.ergf_offload;
 
-	ena->ena_tx_l3_ipv4_csum = B_FALSE;
+	ena->ena_tx_l3_ipv4_csum = false;
 
-	ena->ena_tx_l4_ipv4_part_csum = B_FALSE;
-	ena->ena_tx_l4_ipv4_full_csum = B_FALSE;
-	ena->ena_tx_l4_ipv4_lso = B_FALSE;
+	ena->ena_tx_l4_ipv4_part_csum = false;
+	ena->ena_tx_l4_ipv4_full_csum = false;
+	ena->ena_tx_l4_ipv4_lso = false;
 
-	ena->ena_tx_l4_ipv6_part_csum = B_FALSE;
-	ena->ena_tx_l4_ipv6_full_csum = B_FALSE;
-	ena->ena_tx_l4_ipv6_lso = B_FALSE;
+	ena->ena_tx_l4_ipv6_part_csum = false;
+	ena->ena_tx_l4_ipv6_full_csum = false;
+	ena->ena_tx_l4_ipv6_lso = false;
 
-	ena->ena_rx_l3_ipv4_csum = B_FALSE;
-	ena->ena_rx_l4_ipv4_csum = B_FALSE;
-	ena->ena_rx_l4_ipv6_csum = B_FALSE;
-	ena->ena_rx_hash = B_FALSE;
+	ena->ena_rx_l3_ipv4_csum = false;
+	ena->ena_rx_l4_ipv4_csum = false;
+	ena->ena_rx_l4_ipv6_csum = false;
+	ena->ena_rx_hash = false;
 
 	bzero(&resp, sizeof (resp));
 	ret = ena_get_feature(ena, &resp, ENAHW_FEAT_STATELESS_OFFLOAD_CONFIG,
@@ -820,10 +867,10 @@ ena_get_offloads(ena_t *ena)
 		 * for hardware offloads. We take that as a sign that
 		 * the device provides no offloads.
 		 */
-		return (B_TRUE);
+		return (true);
 	} else if (ret != 0) {
 		ena_err(ena, "error getting stateless offload: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena->ena_tx_l3_ipv4_csum = ENAHW_FEAT_OFFLOAD_TX_L3_IPV4_CSUM(feat);
@@ -843,7 +890,7 @@ ena_get_offloads(ena_t *ena)
 	ena->ena_rx_l3_ipv4_csum = ENAHW_FEAT_OFFLOAD_RX_L3_IPV4_CSUM(feat);
 	ena->ena_rx_l4_ipv4_csum = ENAHW_FEAT_OFFLOAD_RX_L4_IPV4_CSUM(feat);
 	ena->ena_rx_l4_ipv6_csum = ENAHW_FEAT_OFFLOAD_RX_L4_IPV6_CSUM(feat);
-	return (B_TRUE);
+	return (true);
 }
 
 static int
@@ -868,7 +915,7 @@ ena_get_prop(ena_t *ena, char *propname, const int minval, const int maxval,
 	return (value);
 }
 
-static boolean_t
+static bool
 ena_set_mtu(ena_t *ena)
 {
 	int ret = 0;
@@ -884,10 +931,10 @@ ena_set_mtu(ena_t *ena)
 	    ENAHW_FEAT_MTU_VER)) != 0) {
 		ena_err(ena, "failed to set device MTU to %u: %d", ena->ena_mtu,
 		    ret);
-		return (B_FALSE);
+		return (false);
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
 static void
@@ -896,7 +943,7 @@ ena_get_link_config(ena_t *ena)
 	enahw_resp_desc_t resp;
 	enahw_feat_link_conf_t *feat =
 	    &resp.erd_resp.erd_get_feat.ergf_link_conf;
-	boolean_t full_duplex;
+	bool full_duplex;
 
 	bzero(&resp, sizeof (resp));
 
@@ -908,10 +955,10 @@ ena_get_link_config(ena_t *ena)
 		 * For the most accurate information on bandwidth
 		 * limits see the official AWS documentation.
 		 */
-		ena->ena_link_speed_mbits = 1 * 1000 * 1000;
+		ena->ena_link_speed_mbits = 1000;
 		ena->ena_link_speeds = ENAHW_LINK_SPEED_1G;
 		ena->ena_link_duplex = LINK_DUPLEX_FULL;
-		ena->ena_link_autoneg = B_TRUE;
+		ena->ena_link_autoneg = true;
 		return;
 	}
 
@@ -937,7 +984,7 @@ ena_get_link_config(ena_t *ena)
  * admin queue is established, and the hardware features/capabs have
  * been queried; it should be called before mac registration.
  */
-static boolean_t
+static bool
 ena_attach_read_conf(ena_t *ena)
 {
 	uint32_t gcv;	/* Greatest Common Value */
@@ -961,14 +1008,14 @@ ena_attach_read_conf(ena_t *ena)
 	ena->ena_txq_num_descs = ena_get_prop(ena, ENA_PROP_TXQ_NUM_DESCS,
 	    ENA_PROP_TXQ_NUM_DESCS_MIN, gcv, gcv);
 
-	return (B_TRUE);
+	return (true);
 }
 
 /*
  * Perform any necessary device configuration after the driver.conf
  * has been read.
  */
-static boolean_t
+static bool
 ena_attach_dev_cfg(ena_t *ena)
 {
 	ASSERT3U(ena->ena_attach_seq, >=, ENA_ATTACH_READ_CONF);
@@ -982,14 +1029,14 @@ ena_attach_dev_cfg(ena_t *ena)
 		ena_err(ena, "trying fallback MTU: %u", ena->ena_mtu);
 
 		if (!ena_set_mtu(ena)) {
-			return (B_FALSE);
+			return (false);
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
-static boolean_t
+static bool
 ena_check_versions(ena_t *ena)
 {
 	uint32_t dev_vsn = ena_hw_bar_read32(ena, ENAHW_REG_VERSION);
@@ -1014,179 +1061,16 @@ ena_check_versions(ena_t *ena)
 		ena_err(ena, "unsupported controller version: %u.%u.%u",
 		    ena->ena_ctrl_major_vsn, ena->ena_ctrl_minor_vsn,
 		    ena->ena_ctrl_subminor_vsn);
-		return (B_FALSE);
+		return (false);
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
-boolean_t
-ena_setup_aenq(ena_t *ena)
-{
-	enahw_cmd_desc_t cmd;
-	enahw_feat_aenq_t *cmd_feat =
-	    &cmd.ecd_cmd.ecd_set_feat.ecsf_feat.ecsf_aenq;
-	enahw_resp_desc_t resp;
-	enahw_feat_aenq_t *resp_feat = &resp.erd_resp.erd_get_feat.ergf_aenq;
-	enahw_aenq_groups_t to_enable;
-
-	bzero(&resp, sizeof (resp));
-	if (ena_get_feature(ena, &resp, ENAHW_FEAT_AENQ_CONFIG,
-	    ENAHW_FEAT_AENQ_CONFIG_VER) != 0) {
-		return (B_FALSE);
-	}
-
-	to_enable = BIT(ENAHW_AENQ_GROUP_LINK_CHANGE) |
-	    BIT(ENAHW_AENQ_GROUP_FATAL_ERROR) |
-	    BIT(ENAHW_AENQ_GROUP_WARNING) |
-	    BIT(ENAHW_AENQ_GROUP_NOTIFICATION);
-	to_enable &= resp_feat->efa_supported_groups;
-
-	bzero(&cmd, sizeof (cmd));
-	bzero(&resp, sizeof (cmd));
-	cmd_feat->efa_enabled_groups = to_enable;
-
-	if (ena_set_feature(ena, &cmd, &resp, ENAHW_FEAT_AENQ_CONFIG,
-	    ENAHW_FEAT_AENQ_CONFIG_VER) != 0) {
-		return (B_FALSE);
-	}
-
-	bzero(&resp, sizeof (resp));
-	if (ena_get_feature(ena, &resp, ENAHW_FEAT_AENQ_CONFIG,
-	    ENAHW_FEAT_AENQ_CONFIG_VER) != 0) {
-		return (B_FALSE);
-	}
-
-	ena->ena_aenq_supported_groups = resp_feat->efa_supported_groups;
-	ena->ena_aenq_enabled_groups = resp_feat->efa_enabled_groups;
-
-	for (uint_t i = 0; i < ENAHW_AENQ_GROUPS_ARR_NUM; i++) {
-		ena_aenq_grpstr_t *grpstr = &ena_groups_str[i];
-		boolean_t supported = BIT(grpstr->eag_type) &
-		    resp_feat->efa_supported_groups;
-		boolean_t enabled = BIT(grpstr->eag_type) &
-		    resp_feat->efa_enabled_groups;
-
-		ena_dbg(ena, "%s supported: %s enabled: %s", grpstr->eag_str,
-		    supported ? "Y" : "N", enabled ? "Y" : "N");
-	}
-
-	return (B_TRUE);
-}
-
-/*
- * Free all resources allocated as part of ena_device_init().
- */
-static void
-ena_cleanup_device_init(ena_t *ena)
+static bool
+ena_adminq_init(ena_t *ena)
 {
 	ena_adminq_t *aq = &ena->ena_aq;
-
-	ena_free_host_info(ena);
-	mutex_destroy(&aq->ea_sq_lock);
-	mutex_destroy(&aq->ea_cq_lock);
-	mutex_destroy(&aq->ea_stat_lock);
-	list_destroy(&aq->ea_cmd_ctxs_free);
-	kmem_free(aq->ea_cmd_ctxs, sizeof (ena_cmd_ctx_t) * aq->ea_qlen);
-	ena_admin_sq_free(ena);
-	ena_admin_cq_free(ena);
-	ena_aenq_free(ena);
-	ena_stat_device_basic_cleanup(ena);
-	ena_stat_device_extended_cleanup(ena);
-	ena_stat_aenq_cleanup(ena);
-}
-
-static boolean_t
-ena_attach_device_init(ena_t *ena)
-{
-	ena_adminq_t *aq = &ena->ena_aq;
-	uint32_t rval, wval;
-	uint8_t dma_width;
-	hrtime_t timeout, cmd_timeout;
-	hrtime_t expired;
-	enahw_resp_desc_t resp;
-	enahw_feat_dev_attr_t *feat = &resp.erd_resp.erd_get_feat.ergf_dev_attr;
-	uint8_t *maddr;
-	uint32_t supported_features;
-	int ret = 0;
-
-	rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
-	if ((rval & ENAHW_DEV_STS_READY_MASK) == 0) {
-		ena_err(ena, "device is not ready");
-		return (B_FALSE);
-	}
-
-	rval = ena_hw_bar_read32(ena, ENAHW_REG_CAPS);
-
-	/*
-	 * The device stores the reset timeout at 100ms resolution; we
-	 * normalize that to nanoseconds.
-	 */
-	timeout = MSEC2NSEC(ENAHW_CAPS_RESET_TIMEOUT(rval) * 100);
-
-	if (timeout == 0) {
-		ena_err(ena, "device gave invalid reset timeout");
-		return (B_FALSE);
-	}
-
-	expired = gethrtime() + timeout;
-
-	wval = ENAHW_DEV_CTL_DEV_RESET_MASK;
-	wval |= (ENAHW_RESET_NORMAL << ENAHW_DEV_CTL_RESET_REASON_SHIFT) &
-	    ENAHW_DEV_CTL_RESET_REASON_MASK;
-	ena_hw_bar_write32(ena, ENAHW_REG_DEV_CTL, wval);
-
-	/*
-	 * Make sure reset is in progress.
-	 */
-	while (1) {
-		rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
-
-		if ((rval & ENAHW_DEV_STS_RESET_IN_PROGRESS_MASK) != 0) {
-			break;
-		}
-
-		if (gethrtime() > expired) {
-			ena_err(ena, "device reset start timed out");
-			return (B_FALSE);
-		}
-
-		/* Sleep for 100 milliseconds. */
-		delay(drv_usectohz(100 * 1000));
-	}
-
-	/*
-	 * Reset the timeout counter for the next device request.
-	 */
-	expired = gethrtime() + timeout;
-
-	/*
-	 * Wait for the device reset to finish.
-	 */
-	ena_hw_bar_write32(ena, ENAHW_REG_DEV_CTL, 0);
-	while (1) {
-		rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
-
-		if ((rval & ENAHW_DEV_STS_RESET_IN_PROGRESS_MASK) == 0) {
-			break;
-		}
-
-		if (gethrtime() > expired) {
-			ena_err(ena, "device reset timed out");
-			return (B_FALSE);
-		}
-
-		/* Sleep for 100 milliseconds. */
-		delay(drv_usectohz(100 * 1000));
-	}
-
-	if (!ena_check_versions(ena)) {
-		return (B_FALSE);
-	}
-
-	rval = ena_hw_bar_read32(ena, ENAHW_REG_CAPS);
-	dma_width = ENAHW_CAPS_DMA_ADDR_WIDTH(rval);
-	ena->ena_dma_width = dma_width;
 
 	/*
 	 * As we are not using an interrupt for admin queue completion
@@ -1204,16 +1088,72 @@ ena_attach_device_init(ena_t *ena)
 	    KM_SLEEP);
 	list_create(&aq->ea_cmd_ctxs_free, sizeof (ena_cmd_ctx_t),
 	    offsetof(ena_cmd_ctx_t, ectx_node));
+	list_create(&aq->ea_cmd_ctxs_used, sizeof (ena_cmd_ctx_t),
+	    offsetof(ena_cmd_ctx_t, ectx_node));
 
-	for (uint_t i = 0; i < aq->ea_qlen; i++) {
-		ena_cmd_ctx_t *ctx = &aq->ea_cmd_ctxs[i];
+	ena_create_cmd_ctx(ena);
 
-		ctx->ectx_id = i;
-		ctx->ectx_pending = B_FALSE;
-		ctx->ectx_cmd_opcode = ENAHW_CMD_NONE;
-		ctx->ectx_resp = NULL;
-		list_insert_tail(&aq->ea_cmd_ctxs_free, ctx);
-	}
+	/*
+	 * Start in polling mode until we've determined the number of queues
+	 * and are ready to configure and enable interrupts.
+	 */
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_MASK);
+	aq->ea_poll_mode = true;
+
+	return (true);
+}
+
+/*
+ * Free all resources allocated as part of ena_device_init().
+ */
+static void
+ena_cleanup_device_init(ena_t *ena, bool resetting)
+{
+	ena_adminq_t *aq = &ena->ena_aq;
+
+	VERIFY0(resetting);
+
+	ena_free_host_info(ena);
+	mutex_destroy(&aq->ea_sq_lock);
+	mutex_destroy(&aq->ea_cq_lock);
+	mutex_destroy(&aq->ea_stat_lock);
+	list_destroy(&aq->ea_cmd_ctxs_free);
+	list_destroy(&aq->ea_cmd_ctxs_used);
+	kmem_free(aq->ea_cmd_ctxs, sizeof (ena_cmd_ctx_t) * aq->ea_qlen);
+	ena_admin_sq_free(ena);
+	ena_admin_cq_free(ena);
+	ena_aenq_free(ena);
+	ena_stat_device_cleanup(ena);
+	ena_stat_device_basic_cleanup(ena);
+	ena_stat_device_extended_cleanup(ena);
+	ena_stat_aenq_cleanup(ena);
+}
+
+static bool
+ena_attach_device_init(ena_t *ena)
+{
+	ena_adminq_t *aq = &ena->ena_aq;
+	uint32_t rval;
+	uint8_t dma_width;
+	hrtime_t cmd_timeout;
+	enahw_resp_desc_t resp;
+	enahw_feat_dev_attr_t *feat = &resp.erd_resp.erd_get_feat.ergf_dev_attr;
+	uint8_t *maddr;
+	uint32_t supported_features;
+	int ret = 0;
+
+	ena->ena_reset_reason = ENAHW_RESET_NORMAL;
+	if (!ena_device_reset(ena, ena->ena_reset_reason))
+		return (false);
+
+	if (!ena_check_versions(ena))
+		return (false);
+
+	ena_init_regcache(ena);
+
+	rval = ena_hw_bar_read32(ena, ENAHW_REG_CAPS);
+	dma_width = ENAHW_CAPS_DMA_ADDR_WIDTH(rval);
+	ena->ena_dma_width = dma_width;
 
 	/*
 	 * The value stored in the device register is in the
@@ -1223,28 +1163,20 @@ ena_attach_device_init(ena_t *ena)
 	cmd_timeout = MSEC2NSEC(ENAHW_CAPS_ADMIN_CMD_TIMEOUT(rval) * 100);
 	aq->ea_cmd_timeout_ns = max(cmd_timeout, ena_admin_cmd_timeout_ns);
 
-	if (aq->ea_cmd_timeout_ns == 0) {
-		aq->ea_cmd_timeout_ns = ENA_ADMIN_CMD_DEF_TIMEOUT;
-	}
+	if (aq->ea_cmd_timeout_ns == 0)
+		aq->ea_cmd_timeout_ns = ENA_ADMIN_CMD_DEF_TIMEOUT_NS;
 
-	if (!ena_admin_sq_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_adminq_init(ena))
+		return (false);
 
-	if (!ena_admin_cq_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_admin_sq_init(ena))
+		return (false);
 
-	if (!ena_aenq_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_admin_cq_init(ena))
+		return (false);
 
-	/*
-	 * Start in polling mode until we've determined the number of queues
-	 * and are ready to configure and enable interrupts.
-	 */
-	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_MASK);
-	aq->ea_poll_mode = B_TRUE;
+	if (!ena_aenq_init(ena))
+		return (false);
 
 	bzero(&resp, sizeof (resp));
 	ret = ena_get_feature(ena, &resp, ENAHW_FEAT_DEVICE_ATTRIBUTES,
@@ -1252,7 +1184,7 @@ ena_attach_device_init(ena_t *ena)
 
 	if (ret != 0) {
 		ena_err(ena, "failed to get device attributes: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "impl ID: %u", feat->efda_impl_id);
@@ -1275,7 +1207,7 @@ ena_attach_device_init(ena_t *ena)
 	feat = NULL;
 	bzero(&resp, sizeof (resp));
 
-	if (supported_features & BIT(ENAHW_FEAT_MAX_QUEUES_EXT)) {
+	if (ena_is_feat_avail(ena, ENAHW_FEAT_MAX_QUEUES_EXT)) {
 		enahw_feat_max_queue_ext_t *feat_mqe =
 		    &resp.erd_resp.erd_get_feat.ergf_max_queue_ext;
 
@@ -1284,7 +1216,7 @@ ena_attach_device_init(ena_t *ena)
 
 		if (ret != 0) {
 			ena_err(ena, "failed to query max queues ext: %d", ret);
-			return (B_FALSE);
+			return (false);
 		}
 
 		ena->ena_tx_max_sq_num = feat_mqe->efmqe_max_tx_sq_num;
@@ -1312,7 +1244,7 @@ ena_attach_device_init(ena_t *ena)
 
 		if (ret != 0) {
 			ena_err(ena, "failed to query max queues: %d", ret);
-			return (B_FALSE);
+			return (false);
 		}
 
 		ena->ena_tx_max_sq_num = feat_mq->efmq_max_sq_num;
@@ -1335,46 +1267,50 @@ ena_attach_device_init(ena_t *ena)
 
 	ena->ena_mtu = ena->ena_max_mtu;
 	ena_update_buf_sizes(ena);
-	/*
-	 * We could use ENAHW_FEAT_HW_HINTS to determine actual SGL
-	 * sizes, for now we just force everything to use one
-	 * segment.
-	 */
+
+	if (!ena_get_hints(ena))
+		return (false);
+
 	ena->ena_tx_sgl_max_sz = 1;
 	ena->ena_rx_sgl_max_sz = 1;
+	if (ena->ena_device_hints.eh_max_tx_sgl != 0)
+		ena->ena_tx_sgl_max_sz = ena->ena_device_hints.eh_max_tx_sgl;
+	if (ena->ena_device_hints.eh_max_rx_sgl != 0)
+		ena->ena_rx_sgl_max_sz = ena->ena_device_hints.eh_max_rx_sgl;
 
-	if (!ena_init_host_info(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_init_host_info(ena))
+		return (false);
 
-	if (!ena_setup_aenq(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_aenq_configure(ena))
+		return (false);
 
 	ena_get_link_config(ena);
 
-	if (!ena_get_offloads(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_get_offloads(ena))
+		return (false);
 
-	if (!ena_stat_device_basic_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_stat_device_init(ena))
+		return (false);
 
-	if (!ena_stat_device_extended_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_stat_device_basic_init(ena))
+		return (false);
 
-	if (!ena_stat_aenq_init(ena)) {
-		return (B_FALSE);
-	}
+	if (!ena_stat_device_extended_init(ena))
+		return (false);
 
-	return (B_TRUE);
+	if (!ena_stat_aenq_init(ena))
+		return (false);
+
+	ena_update_regcache(ena);
+
+	return (true);
 }
 
 static void
-ena_cleanup_intr_alloc(ena_t *ena)
+ena_cleanup_intr_alloc(ena_t *ena, bool resetting)
 {
+	VERIFY0(resetting);
+
 	for (int i = 0; i < ena->ena_num_intrs; i++) {
 		int ret = ddi_intr_free(ena->ena_intr_handles[i]);
 		if (ret != DDI_SUCCESS) {
@@ -1394,7 +1330,7 @@ ena_cleanup_intr_alloc(ena_t *ena)
  * with the assumption that it's the only type of interrupt the device
  * can present.
  */
-static boolean_t
+static bool
 ena_attach_intr_alloc(ena_t *ena)
 {
 	int ret;
@@ -1404,13 +1340,13 @@ ena_attach_intr_alloc(ena_t *ena)
 	ret = ddi_intr_get_supported_types(ena->ena_dip, &types);
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to get interrupt types: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "supported interrupt types: 0x%x", types);
 	if ((types & DDI_INTR_TYPE_MSIX) == 0) {
 		ena_err(ena, "the ena driver only supports MSI-X interrupts");
-		return (B_FALSE);
+		return (false);
 	}
 
 	/* One for I/O, one for adminq. */
@@ -1420,13 +1356,13 @@ ena_attach_intr_alloc(ena_t *ena)
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to get number of MSI-X interrupts: %d",
 		    ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	if (avail < min) {
 		ena_err(ena, "number of MSI-X interrupts is %d, but the driver "
 		    "requires a minimum of %d", avail, min);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "%d MSI-X interrupts available", avail);
@@ -1434,13 +1370,13 @@ ena_attach_intr_alloc(ena_t *ena)
 	ret = ddi_intr_get_navail(ena->ena_dip, DDI_INTR_TYPE_MSIX, &avail);
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to get available interrupts: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	if (avail < min) {
 		ena_err(ena, "number of available MSI-X interrupts is %d, "
 		    "but the driver requires a minimum of %d", avail, min);
-		return (B_FALSE);
+		return (false);
 	}
 
 	req = MIN(ideal, avail);
@@ -1452,13 +1388,13 @@ ena_attach_intr_alloc(ena_t *ena)
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to allocate %d MSI-X interrupts: %d",
 		    req, ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	if (actual < min) {
 		ena_err(ena, "number of allocated interrupts is %d, but the "
 		    "driver requires a minimum of %d", actual, min);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena->ena_num_intrs = actual;
@@ -1466,28 +1402,29 @@ ena_attach_intr_alloc(ena_t *ena)
 	ret = ddi_intr_get_cap(ena->ena_intr_handles[0], &ena->ena_intr_caps);
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to get interrupt capability: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ret = ddi_intr_get_pri(ena->ena_intr_handles[0], &ena->ena_intr_pri);
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "failed to get interrupt priority: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ena_dbg(ena, "MSI-X interrupts allocated: %d, cap: 0x%x, pri: %u",
 	    actual, ena->ena_intr_caps, ena->ena_intr_pri);
 
 	/*
-	 * The ena_lock should not be held in the datapath, but it is
+	 * The ena_lock should not be held in the data path, but it is
 	 * held as part of the AENQ handler, which runs in interrupt
 	 * context. Therefore, we delayed the initialization of this
 	 * mutex until after the interrupts are allocated.
 	 */
 	mutex_init(&ena->ena_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(ena->ena_intr_pri));
+	mutex_init(&ena->ena_watchdog_lock, NULL, MUTEX_DRIVER, NULL);
 
-	return (B_TRUE);
+	return (true);
 }
 
 /*
@@ -1495,15 +1432,24 @@ ena_attach_intr_alloc(ena_t *ena)
  * NOT allocating the queue descriptors or data buffers. Those are
  * allocated on demand as queues are started.
  */
-static boolean_t
+static bool
 ena_attach_alloc_rxqs(ena_t *ena)
 {
-	/* We rely on the interrupt priority for initializing the mutexes. */
-	VERIFY3U(ena->ena_attach_seq, >=, ENA_ATTACH_INTR_ALLOC);
-	ena->ena_num_rxqs = ena->ena_num_intrs - 1;
-	ASSERT3U(ena->ena_num_rxqs, >, 0);
-	ena->ena_rxqs = kmem_zalloc(ena->ena_num_rxqs * sizeof (*ena->ena_rxqs),
-	    KM_SLEEP);
+	bool resetting = false;
+
+	if (ena->ena_rxqs == NULL) {
+		/*
+		 * We rely on the interrupt priority for initializing the
+		 * mutexes.
+		 */
+		VERIFY3U(ena->ena_attach_seq, >=, ENA_ATTACH_INTR_ALLOC);
+		ena->ena_num_rxqs = ena->ena_num_intrs - 1;
+		ASSERT3U(ena->ena_num_rxqs, >, 0);
+		ena->ena_rxqs = kmem_zalloc(
+		    ena->ena_num_rxqs * sizeof (*ena->ena_rxqs), KM_SLEEP);
+	} else {
+		resetting = true;
+	}
 
 	for (uint_t i = 0; i < ena->ena_num_rxqs; i++) {
 		ena_rxq_t *rxq = &ena->ena_rxqs[i];
@@ -1513,40 +1459,49 @@ ena_attach_alloc_rxqs(ena_t *ena)
 		rxq->er_intr_vector = i + 1;
 		rxq->er_mrh = NULL;
 
-		mutex_init(&rxq->er_lock, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(ena->ena_intr_pri));
-		mutex_init(&rxq->er_stat_lock, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(ena->ena_intr_pri));
+		if (!resetting) {
+			mutex_init(&rxq->er_lock, NULL, MUTEX_DRIVER,
+			    DDI_INTR_PRI(ena->ena_intr_pri));
+			mutex_init(&rxq->er_stat_lock, NULL, MUTEX_DRIVER,
+			    DDI_INTR_PRI(ena->ena_intr_pri));
+		}
 
 		rxq->er_ena = ena;
 		rxq->er_sq_num_descs = ena->ena_rxq_num_descs;
 		rxq->er_cq_num_descs = ena->ena_rxq_num_descs;
 
 		if (!ena_stat_rxq_init(rxq)) {
-			return (B_FALSE);
+			return (false);
 		}
 
 		if (!ena_alloc_rxq(rxq)) {
-			return (B_FALSE);
+			ena_stat_rxq_cleanup(rxq);
+			return (false);
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
 static void
-ena_cleanup_rxqs(ena_t *ena)
+ena_cleanup_rxqs(ena_t *ena, bool resetting)
 {
 	for (uint_t i = 0; i < ena->ena_num_rxqs; i++) {
 		ena_rxq_t *rxq = &ena->ena_rxqs[i];
 
-		ena_cleanup_rxq(rxq);
-		mutex_destroy(&rxq->er_lock);
-		mutex_destroy(&rxq->er_stat_lock);
+		ena_cleanup_rxq(rxq, resetting);
+		if (!resetting) {
+			mutex_destroy(&rxq->er_lock);
+			mutex_destroy(&rxq->er_stat_lock);
+		}
 		ena_stat_rxq_cleanup(rxq);
 	}
 
-	kmem_free(ena->ena_rxqs, ena->ena_num_rxqs * sizeof (*ena->ena_rxqs));
+	if (!resetting) {
+		kmem_free(ena->ena_rxqs,
+		    ena->ena_num_rxqs * sizeof (*ena->ena_rxqs));
+		ena->ena_rxqs = NULL;
+	}
 }
 
 /*
@@ -1554,15 +1509,24 @@ ena_cleanup_rxqs(ena_t *ena)
  * NOT allocating the queue descriptors or data buffers. Those are
  * allocated on demand as a queue is started.
  */
-static boolean_t
+static bool
 ena_attach_alloc_txqs(ena_t *ena)
 {
-	/* We rely on the interrupt priority for initializing the mutexes. */
-	VERIFY3U(ena->ena_attach_seq, >=, ENA_ATTACH_INTR_ALLOC);
-	ena->ena_num_txqs = ena->ena_num_intrs - 1;
-	ASSERT3U(ena->ena_num_txqs, >, 0);
-	ena->ena_txqs = kmem_zalloc(ena->ena_num_txqs * sizeof (*ena->ena_txqs),
-	    KM_SLEEP);
+	bool resetting = false;
+
+	if (ena->ena_txqs == NULL) {
+		/*
+		 * We rely on the interrupt priority for initializing the
+		 * mutexes.
+		 */
+		VERIFY3U(ena->ena_attach_seq, >=, ENA_ATTACH_INTR_ALLOC);
+		ena->ena_num_txqs = ena->ena_num_intrs - 1;
+		ASSERT3U(ena->ena_num_txqs, >, 0);
+		ena->ena_txqs = kmem_zalloc(
+		    ena->ena_num_txqs * sizeof (*ena->ena_txqs), KM_SLEEP);
+	} else {
+		resetting = true;
+	}
 
 	for (uint_t i = 0; i < ena->ena_num_txqs; i++) {
 		ena_txq_t *txq = &ena->ena_txqs[i];
@@ -1572,40 +1536,186 @@ ena_attach_alloc_txqs(ena_t *ena)
 		txq->et_intr_vector = i + 1;
 		txq->et_mrh = NULL;
 
-		mutex_init(&txq->et_lock, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(ena->ena_intr_pri));
-		mutex_init(&txq->et_stat_lock, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(ena->ena_intr_pri));
+		if (!resetting) {
+			mutex_init(&txq->et_lock, NULL, MUTEX_DRIVER,
+			    DDI_INTR_PRI(ena->ena_intr_pri));
+			mutex_init(&txq->et_stat_lock, NULL, MUTEX_DRIVER,
+			    DDI_INTR_PRI(ena->ena_intr_pri));
+		}
 
 		txq->et_ena = ena;
 		txq->et_sq_num_descs = ena->ena_txq_num_descs;
 		txq->et_cq_num_descs = ena->ena_txq_num_descs;
 
 		if (!ena_stat_txq_init(txq)) {
-			return (B_FALSE);
+			return (false);
 		}
 
 		if (!ena_alloc_txq(txq)) {
-			return (B_FALSE);
+			ena_stat_txq_cleanup(txq);
+			return (false);
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
 static void
-ena_cleanup_txqs(ena_t *ena)
+ena_cleanup_txqs(ena_t *ena, bool resetting)
 {
-	for (uint_t i = 0; i < ena->ena_num_rxqs; i++) {
+	for (uint_t i = 0; i < ena->ena_num_txqs; i++) {
 		ena_txq_t *txq = &ena->ena_txqs[i];
 
-		ena_cleanup_txq(txq);
-		mutex_destroy(&txq->et_lock);
-		mutex_destroy(&txq->et_stat_lock);
+		ena_cleanup_txq(txq, resetting);
+		if (!resetting) {
+			mutex_destroy(&txq->et_lock);
+			mutex_destroy(&txq->et_stat_lock);
+		}
 		ena_stat_txq_cleanup(txq);
 	}
 
-	kmem_free(ena->ena_txqs, ena->ena_num_txqs * sizeof (*ena->ena_txqs));
+	if (!resetting) {
+		kmem_free(ena->ena_txqs,
+		    ena->ena_num_txqs * sizeof (*ena->ena_txqs));
+		ena->ena_txqs = NULL;
+	}
+}
+
+/*
+ * To reset the device we need to unwind some of the steps taken during attach
+ * but, since the device could well be in a failed state, we cannot rely on
+ * being able to talk via the admin queue to do things such as explicitly
+ * destroy rings. We call selected cleanup handlers with the second parameter
+ * set to "true" to indicate that we are resetting and should avoid such
+ * communication.
+ *
+ * The existing DMA memory regions for the admin queue, async event queue and
+ * host information are preserved but have their contents zeroed.
+ * Experimentation has shown that the device hangs onto old async event queue
+ * addresses, even through a reset, with surprising results if the addresses
+ * happen to change.
+ *
+ * We clean up all of the Tx and Rx ring descriptors and the TCBs but leave the
+ * allocated memory for the ring data and mutexes intact. Pointers to this
+ * memory have already been provided to MAC, and the mutexes keep the rings
+ * locked until we're ready to start them again.
+ *
+ * To ensure that other driver activity is excluded, we hold the mutexes on the
+ * Tx and Rx rings throughout, and unset the `ENA_STATE_STARTED` bit in the
+ * state, which causes the interrupt handlers to return without doing any work.
+ * The admin interrupt, used for notifications of admin completions or new
+ * asynchronous events, is masked after the device is reset until we're ready
+ * to process them again.
+ */
+bool
+ena_reset(ena_t *ena, const enahw_reset_reason_t reason)
+{
+	ena_txq_state_t tx_state[ena->ena_num_txqs];
+	ena_rxq_state_t rx_state[ena->ena_num_rxqs];
+	bool ret = false;
+
+	ena_err(ena, "resetting device with reason 0x%x [%s]",
+	    reason, enahw_reset_reason(reason));
+
+	VERIFY0(ena->ena_state & ENA_STATE_RESETTING);
+	atomic_or_32(&ena->ena_state, ENA_STATE_RESETTING);
+
+	VERIFY(ena->ena_state & ENA_STATE_STARTED);
+	atomic_and_32(&ena->ena_state, ~ENA_STATE_STARTED);
+
+	mutex_enter(&ena->ena_lock);
+
+	ena_update_regcache(ena);
+
+	for (uint_t i = 0; i < ena->ena_num_txqs; i++) {
+		ena_txq_t *txq = &ena->ena_txqs[i];
+
+		mutex_enter(&txq->et_lock);
+		tx_state[i] = txq->et_state;
+		if (txq->et_state & ENA_TXQ_STATE_RUNNING)
+			ena_ring_tx_stop((mac_ring_driver_t)txq);
+	}
+
+	for (uint_t i = 0; i < ena->ena_num_rxqs; i++) {
+		ena_rxq_t *rxq = &ena->ena_rxqs[i];
+
+		mutex_enter(&rxq->er_lock);
+		rx_state[i] = rxq->er_state;
+		if (rxq->er_state & ENA_RXQ_STATE_RUNNING)
+			ena_ring_rx_stop((mac_ring_driver_t)rxq);
+	}
+
+	if (!ena_device_reset(ena, reason)) {
+		ena_err(ena, "reset: failed to reset device");
+		goto out;
+	}
+
+	/* This masks the admin/aenq interrupt */
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_MASK);
+
+	ena_cleanup_txqs(ena, true);
+	ena_cleanup_rxqs(ena, true);
+
+	ena_release_all_cmd_ctx(ena);
+
+	if (!ena_admin_cq_init(ena) || !ena_admin_sq_init(ena)) {
+		ena_err(ena, "reset: failed to program admin queues");
+		goto out;
+	}
+
+	if (!ena_init_host_info(ena)) {
+		ena_err(ena, "reset: failed to set host info");
+		goto out;
+	}
+
+	if (!ena_aenq_init(ena) || !ena_aenq_configure(ena)) {
+		ena_err(ena, "reset: failed to configure aenq");
+		goto out;
+	}
+
+	if (!ena_set_mtu(ena)) {
+		ena_err(ena, "reset: failed to set MTU");
+		goto out;
+	}
+
+	if (!ena_attach_alloc_txqs(ena) || !ena_attach_alloc_rxqs(ena)) {
+		ena_err(ena, "reset: failed to program IO queues");
+		goto out;
+	}
+
+	ena_aenq_enable(ena);
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_UNMASK);
+
+	for (uint_t i = 0; i < ena->ena_num_rxqs; i++) {
+		ena_rxq_t *rxq = &ena->ena_rxqs[i];
+
+		mutex_exit(&rxq->er_lock);
+		if (rx_state[i] & ENA_RXQ_STATE_RUNNING) {
+			(void) ena_ring_rx_start((mac_ring_driver_t)rxq,
+			    rxq->er_m_gen_num);
+		}
+	}
+
+	for (uint_t i = 0; i < ena->ena_num_txqs; i++) {
+		ena_txq_t *txq = &ena->ena_txqs[i];
+
+		mutex_exit(&txq->et_lock);
+		if (tx_state[i] & ENA_TXQ_STATE_RUNNING) {
+			(void) ena_ring_tx_start((mac_ring_driver_t)txq,
+			    txq->et_m_gen_num);
+		}
+	}
+
+	atomic_or_32(&ena->ena_state, ENA_STATE_STARTED);
+	ret = true;
+
+out:
+	atomic_and_32(&ena->ena_state, ~ENA_STATE_RESETTING);
+	mutex_exit(&ena->ena_lock);
+
+	ena_update_regcache(ena);
+
+	return (ret);
 }
 
 ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
@@ -1613,7 +1723,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_PCI,
 		.ead_name = "PCI config",
 		.ead_attach_fn = ena_attach_pci,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_pci,
 	},
 
@@ -1621,7 +1731,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_REGS,
 		.ead_name = "BAR mapping",
 		.ead_attach_fn = ena_attach_regs_map,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_regs_map,
 	},
 
@@ -1629,7 +1739,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_DEV_INIT,
 		.ead_name = "device initialization",
 		.ead_attach_fn = ena_attach_device_init,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_device_init,
 	},
 
@@ -1637,23 +1747,23 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_READ_CONF,
 		.ead_name = "ena.conf",
 		.ead_attach_fn = ena_attach_read_conf,
-		.ead_attach_hard_fail = B_TRUE,
-		.ead_cleanup_fn = ena_no_cleanup,
+		.ead_attach_hard_fail = true,
+		.ead_cleanup_fn = NULL,
 	},
 
 	{
 		.ead_seq = ENA_ATTACH_DEV_CFG,
 		.ead_name = "device config",
 		.ead_attach_fn = ena_attach_dev_cfg,
-		.ead_attach_hard_fail = B_TRUE,
-		.ead_cleanup_fn = ena_no_cleanup,
+		.ead_attach_hard_fail = true,
+		.ead_cleanup_fn = NULL,
 	},
 
 	{
 		.ead_seq = ENA_ATTACH_INTR_ALLOC,
 		.ead_name = "interrupt allocation",
 		.ead_attach_fn = ena_attach_intr_alloc,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_intr_alloc,
 	},
 
@@ -1661,7 +1771,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_INTR_HDLRS,
 		.ead_name = "interrupt handlers",
 		.ead_attach_fn = ena_intr_add_handlers,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_intr_remove_handlers,
 	},
 
@@ -1669,7 +1779,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_TXQS_ALLOC,
 		.ead_name = "Tx queues",
 		.ead_attach_fn = ena_attach_alloc_txqs,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_txqs,
 	},
 
@@ -1677,7 +1787,7 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_RXQS_ALLOC,
 		.ead_name = "Rx queues",
 		.ead_attach_fn = ena_attach_alloc_rxqs,
-		.ead_attach_hard_fail = B_TRUE,
+		.ead_attach_hard_fail = true,
 		.ead_cleanup_fn = ena_cleanup_rxqs,
 	},
 
@@ -1690,16 +1800,16 @@ ena_attach_desc_t ena_attach_tbl[ENA_ATTACH_NUM_ENTRIES] = {
 		.ead_seq = ENA_ATTACH_MAC_REGISTER,
 		.ead_name = "mac registration",
 		.ead_attach_fn = ena_mac_register,
-		.ead_attach_hard_fail = B_TRUE,
-		.ead_cleanup_fn = ena_no_cleanup,
+		.ead_attach_hard_fail = true,
+		.ead_cleanup_fn = NULL,
 	},
 
 	{
 		.ead_seq = ENA_ATTACH_INTRS_ENABLE,
 		.ead_name = "enable interrupts",
 		.ead_attach_fn = ena_intrs_enable,
-		.ead_attach_hard_fail = B_TRUE,
-		.ead_cleanup_fn = ena_no_cleanup,
+		.ead_attach_hard_fail = true,
+		.ead_cleanup_fn = NULL,
 	}
 };
 
@@ -1729,12 +1839,14 @@ ena_cleanup(ena_t *ena)
 		ena_dbg(ena, "running cleanup sequence: %s (%d)",
 		    desc->ead_name, idx);
 
-		desc->ead_cleanup_fn(ena);
+		if (desc->ead_cleanup_fn != NULL)
+			desc->ead_cleanup_fn(ena, false);
 		ena->ena_attach_seq--;
 	}
 
 	ASSERT3U(ena->ena_attach_seq, ==, 0);
 	mutex_destroy(&ena->ena_lock);
+	mutex_destroy(&ena->ena_watchdog_lock);
 }
 
 static int
@@ -1753,7 +1865,7 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ena->ena_page_sz = ddi_ptob(dip, 1);
 
 	for (int i = 0; i < ENA_ATTACH_NUM_ENTRIES; i++) {
-		boolean_t success;
+		bool success;
 		ena_attach_desc_t *desc = &ena_attach_tbl[i];
 
 		ena_dbg(ena, "running attach sequence: %s (%d)", desc->ead_name,
@@ -1805,7 +1917,8 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				 * deal with partial success of the
 				 * corresponding ead_attach_fn.
 				 */
-				desc->ead_cleanup_fn(ena);
+				if (desc->ead_cleanup_fn != NULL)
+					desc->ead_cleanup_fn(ena, false);
 			}
 
 			ena_cleanup(ena);
@@ -1822,20 +1935,21 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Now that interrupts are enabled make sure to tell the
-	 * device that all AENQ descriptors are ready for writing, and
-	 * unmask the admin interrupt.
-	 *
+	 * Now that interrupts are enabled, unmask the admin interrupt.
 	 * Note that this interrupt is generated for both the admin queue and
 	 * the AENQ, but this driver always polls the admin queue. The surplus
 	 * interrupt for admin command completion triggers a harmless check of
 	 * the AENQ.
 	 */
 	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, ENAHW_INTR_UNMASK);
-	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_HEAD_DB,
-	    ena->ena_aenq.eaenq_num_descs);
+	ena_aenq_enable(ena);
 
 	ddi_set_driver_private(dip, ena);
+
+	ena_update_regcache(ena);
+
+	atomic_or_32(&ena->ena_state, ENA_STATE_INITIALIZED);
+
 	return (DDI_SUCCESS);
 }
 
