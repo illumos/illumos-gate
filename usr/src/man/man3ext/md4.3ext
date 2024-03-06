@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MD4 3EXT "Nov 13, 2007"
+.TH MD4 3EXT "Feb 28, 2024"
 .SH NAME
 md4, MD4Init, MD4Update, MD4Final \- MD4 digest functions
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ md4, MD4Init, MD4Update, MD4Final \- MD4 digest functions
 .LP
 .nf
 \fBvoid\fR \fBMD4Update\fR(\fBMD4_CTX *\fR\fIcontext\fR, \fBunsigned char *\fR\fIinput\fR,
-     \fBunsigned int\fR \fIinlen\fR);
+     \fBsize_t\fR \fIinlen\fR);
 .fi
 
 .LP
@@ -89,10 +89,10 @@ buffer that will contain the result of the \fBMD4\fR digest.
 
 int
 AuthenticateMsg(unsigned char *auth_buffer, struct iovec
-                *messageIov, unsigned int num_buffers)
+                *messageIov, size_t num_buffers)
 {
     MD4_CTX ctx;
-    unsigned int i;
+    size_t i;
 
     MD4Init(&ctx);
 
