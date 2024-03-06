@@ -55,8 +55,8 @@ static int logflag = 0;
 static char *prog;
 
 static void usage(void);
-static void catch_sighup(void);
-static void catch_sigusr1(void);
+static void catch_sighup(int);
+static void catch_sigusr1(int);
 static pid_t enter_daemon_lock(void);
 static void exit_daemon_lock(void);
 
@@ -67,7 +67,8 @@ extern void cleanup_poll_thread();
  * Print command line syntax for starting rcm_daemon
  */
 static void
-usage() {
+usage()
+{
 	(void) fprintf(stderr,
 	    gettext("usage: %s [-d debug_level] [-t idle_timeout]\n"), prog);
 	rcmd_exit(EINVAL);
@@ -104,7 +105,7 @@ rcmd_exit(int status)
  * there is no DR activity.
  */
 void
-catch_sighup(void)
+catch_sighup(int signal __unused)
 {
 	rcm_log_message(RCM_INFO,
 	    gettext("SIGHUP received, will exit when daemon is idle\n"));
@@ -115,7 +116,7 @@ catch_sighup(void)
  * When SIGUSR1 is received, exit the thread
  */
 void
-catch_sigusr1(void)
+catch_sigusr1(int signal __unused)
 {
 	rcm_log_message(RCM_DEBUG, "SIGUSR1 received in thread %d\n",
 	    thr_self());

@@ -108,7 +108,7 @@ main(int argc, char *argv[])
 	 * we test background by whether SIGINT is ignored
 	 */
 	(void) sigaction(SIGINT, NULL, &sigintact);
-	if (sigintact.sa_sigaction == SIG_IGN) {
+	if (sigintact.sa_handler == SIG_IGN) {
 		(void) signal(SIGHUP, SIG_IGN);
 		(void) setsid();
 	}
@@ -293,11 +293,11 @@ main(int argc, char *argv[])
 			}
 		}
 
-		ai.path 	= dir->dir_name;
+		ai.path		= dir->dir_name;
 		ai.opts		= dir->dir_opts;
 		ai.map		= dir->dir_map;
 		ai.subdir	= "";
-		ai.direct 	= dir->dir_direct;
+		ai.direct	= dir->dir_direct;
 		if (dir->dir_direct)
 			ai.key = dir->dir_name;
 		else

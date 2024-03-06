@@ -223,8 +223,9 @@ static const unsigned int siam[][2] = {
 *  saved handler
 */
 static void
-__fex_hdlr(int sig, siginfo_t *sip, ucontext_t *uap)
+__fex_hdlr(int sig, siginfo_t *sip, void *arg)
 {
+	ucontext_t		*uap = arg;
 	struct fex_handler_data	*thr_handlers;
 	struct sigaction	act;
 	void			(*handler)(), (*siamp)();
@@ -385,8 +386,9 @@ extern int _sse_hw;
 *  saved handler
 */
 static void
-__fex_hdlr(int sig, siginfo_t *sip, ucontext_t *uap)
+__fex_hdlr(int sig, siginfo_t *sip, void *arg)
 {
+	ucontext_t		*uap = arg;
 	struct fex_handler_data	*thr_handlers;
 	struct sigaction	act;
 	void			(*handler)() = NULL, (*simd_handler[4])();
@@ -734,7 +736,7 @@ not_ieee:
 		break;
 #endif
 	default:
-		act.sa_handler(sig, &osip, uap);
+		act.sa_sigaction(sig, &osip, uap);
 	}
 }
 
@@ -814,11 +816,11 @@ __fex_update_te()
 
 	/* install __fex_hdlr as necessary */
 	if (!hdlr_installed && te) {
-		act.sa_handler = __fex_hdlr;
+		act.sa_sigaction = __fex_hdlr;
 		sigemptyset(&act.sa_mask);
 		act.sa_flags = SA_SIGINFO;
 		sigaction(SIGFPE, &act, &tmpact);
-		if (tmpact.sa_handler != __fex_hdlr)
+		if (tmpact.sa_sigaction != __fex_hdlr)
 		{
 			mutex_lock(&hdlr_lock);
 			oact = tmpact;

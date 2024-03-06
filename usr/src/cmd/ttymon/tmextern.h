@@ -77,7 +77,7 @@ extern "C" {
 
 /* tmchild.c	*/
 	extern	void	write_prompt(int, struct pmtab *, int, int);
-	extern	void	timedout(void);
+	extern	void	timedout(int);
 	extern	void	tmchild(struct pmtab *);
 	extern	void	sigpoll(int);
 

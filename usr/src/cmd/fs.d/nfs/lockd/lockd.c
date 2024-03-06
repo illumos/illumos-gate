@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -105,7 +105,7 @@ static int nlmsvcpool(int max_servers);
 static	void	usage(void);
 
 extern	int	_nfssys(int, void *);
-static void sigterm_handler(void);
+static void sigterm_handler(int);
 static void shutdown_lockd(void);
 
 extern int	daemonize_init(void);
@@ -475,7 +475,7 @@ ncdev_to_rdev(const char *ncdev)
 }
 
 static void
-sigterm_handler(void)
+sigterm_handler(int signal __unused)
 {
 	/* to call atexit handler */
 	exit(0);

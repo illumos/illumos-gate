@@ -781,8 +781,9 @@ dprog_compile()
 }
 
 static void
-status_fire(void)
-{}
+status_fire(int signal __unused)
+{
+}
 
 static void
 status_init(void)
@@ -1614,7 +1615,7 @@ format_symbol(char *buf, uintptr_t addr, int show_size)
 
 static void
 report_stats(FILE *out, lsrec_t **sort_buf, size_t nrecs, uint64_t total_count,
-	uint64_t total_time)
+    uint64_t total_time)
 {
 	uint32_t event = sort_buf[0]->ls_event;
 	lsrec_t *lsp;

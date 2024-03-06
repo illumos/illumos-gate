@@ -360,7 +360,7 @@ write_prompt(int fd, struct pmtab *pmtab, int flush, int clear)
  *	timedout	- input period timed out
  */
 void
-timedout(void)
+timedout(int signal __unused)
 {
 	exit(1);
 }

@@ -142,7 +142,8 @@ static pid_t enter_daemon_lock(void);
 static void exit_daemon_lock(void);
 
 static void
-usage() {
+usage()
+{
 	(void) fprintf(stderr, "usage: syseventd [-d <debug_level>] "
 	    "[-r <root_dir>]\n");
 	(void) fprintf(stderr, "higher debug levels get progressively ");
@@ -209,7 +210,7 @@ flt_handler(int sig)
 		syseventd_err_print(UNKNOWN_SIGNAL_CAUGHT, sig);
 	}
 
-	(void) se_signal_sethandler(sig, SIG_DFL, NULL);
+	(void) se_signal_sethandler(sig, SE_SIG_DFL, NULL);
 
 	switch (sig) {
 		case SIGINT:
@@ -816,7 +817,7 @@ client_deliver_event_thr(void *arg)
  */
 static struct event_dispatch_pkg *
 client_deliver_event(struct sysevent_client *scp, sysevent_t *ev,
-	sema_t *completion_sema)
+    sema_t *completion_sema)
 {
 	size_t ev_sz = sysevent_get_size(ev);
 	struct event_dispatchq *newq, *tmp;

@@ -172,7 +172,7 @@ _nscd_release_clearance(sema_t *sema)
 }
 
 static void
-dozip(void)
+dozip(int signal __unused)
 {
 	/* not much here */
 }

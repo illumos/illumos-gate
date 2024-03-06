@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -316,7 +316,7 @@ struct	command {
 #define	ZBREAK		0
 #define	ZBRKSW		1
 #define	ZCASE		2
-#define	ZDEFAULT 	3
+#define	ZDEFAULT	3
 #define	ZELSE		4
 #define	ZEND		5
 #define	ZENDIF		6
@@ -467,7 +467,7 @@ extern tchar	*globone(tchar *);
 extern tchar	*index_(tchar *, tchar);
 extern struct biltins	*isbfunc(struct command *);
 extern void	pintr(void);
-extern void	pchild(void);
+extern void	pchild(int);
 extern tchar	*putn(int);
 extern tchar	*rindex_(tchar *, tchar);
 extern tchar	**saveblk(tchar **);

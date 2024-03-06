@@ -68,7 +68,7 @@ void cleanutx(struct sactab *);
 void account(struct sactab *, pid_t);
 void startit(struct sactab *);
 char **mkargv(struct sactab *);
-void pollpms(void);
+void pollpms(int);
 void reap(int);
 void pollfail(struct sactab *, int);
 void readpipe(void);
@@ -120,7 +120,7 @@ main(int argc, char *argv[])
  * minimize time spent in STARTING or UNKNOWN, pollpms() sets alarm
  */
 
-	pollpms();
+	pollpms(SIGALRM);
 	for (;;)
 		readpipe();
 }
@@ -762,7 +762,7 @@ mkargv(struct sactab *sp)
  */
 
 void
-pollpms()
+pollpms(int signal __unused)
 {
 	struct sactab *sp;	/* working pointer */
 	struct sacmsg sacmsg;		/* message to send to PM */

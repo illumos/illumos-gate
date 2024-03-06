@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -53,7 +53,7 @@ struct process	*pfind(tchar *);
  *	to mask interrupts when playing with the proclist data structures!
  */
 void
-pchild(void)
+pchild(int signal __unused)
 {
 	struct process *pp;
 	struct process	*fp;
@@ -272,7 +272,7 @@ pjwait(struct process *pp)
 		 * SIGCHLD signal handler (pchild()) directly.
 		 */
 		if (csh_wait_noreap() > 0)
-			pchild();	/* simulate receipt of SIGCHLD */
+			pchild(SIGCHLD);	/* simulate receipt of SIGCHLD */
 	}
 	(void) sigsetmask(omask);
 	if (tpgrp > 0)			/* get tty back */

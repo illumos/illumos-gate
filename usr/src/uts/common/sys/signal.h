@@ -72,14 +72,14 @@ typedef	struct {
 } k_sigset_t;
 
 /*
- * The signal handler routine can have either one or three arguments.
- * Existing C code has used either form so not specifing the arguments
- * neatly finesses the problem.  C++ doesn't accept this.  To C++
- * "(*sa_handler)()" indicates a routine with no arguments (ANSI C would
- * specify this as "(*sa_handler)(void)").  One or the other form must be
- * used for C++ and the only logical choice is "(*sa_handler)(int)" to allow
- * the SIG_* defines to work.  "(*sa_sigaction)(int, siginfo_t *, void *)"
- * can be used for the three argument form.
+ * The signal handler routine can have either one or three arguments.  With
+ * K&R C code could use either form so not specifing the arguments neatly
+ * finessed the problem.  Modern C and any C++ do not accept this.  To them
+ * "(*sa_handler)()" indicates a routine with no arguments (what used to be
+ * "(*sa_handler)(void)").  One or the other form must be used and the only
+ * logical choice is "(*sa_handler)(int)" to allow the SIG_* defines to work.
+ * "(*sa_sigaction)(int, siginfo_t *, void *)" can be used for the three
+ * argument form.
  */
 
 /*
@@ -88,11 +88,7 @@ typedef	struct {
 struct sigaction {
 	int sa_flags;
 	union {
-#ifdef	__cplusplus
 		void (*_handler)(int);
-#else
-		void (*_handler)();
-#endif
 #if defined(__EXTENSIONS__) || defined(_KERNEL) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	(_POSIX_C_SOURCE > 2) || defined(_XPG4_2)

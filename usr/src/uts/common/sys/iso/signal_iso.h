@@ -36,7 +36,7 @@
  * C Standard must be placed in this header.  If these new identifiers
  * are required to also be in the C++ Standard "std" namespace, then for
  * anything other than macro definitions, corresponding "using" directives
- * must also be added to <sys/signal.h.h>.
+ * must also be added to <sys/signal.h>.
  */
 
 #ifndef _SYS_SIGNAL_ISO_H
@@ -113,17 +113,17 @@ typedef	SIG_FUNC_TYP *SIG_TYP;
 
 #elif	defined(__lint)
 
-#define	SIG_DFL	(void(*)())0
-#define	SIG_ERR (void(*)())0
-#define	SIG_IGN	(void (*)())0
-#define	SIG_HOLD (void(*)())0
+#define	SIG_DFL	(void(*)(int))0
+#define	SIG_ERR (void(*)(int))0
+#define	SIG_IGN	(void(*)(int))0
+#define	SIG_HOLD (void(*)(int))0
 
 #else
 
-#define	SIG_DFL	(void(*)())0
-#define	SIG_ERR	(void(*)())-1
-#define	SIG_IGN	(void (*)())1
-#define	SIG_HOLD (void(*)())2
+#define	SIG_DFL	(void(*)(int))0
+#define	SIG_ERR	(void(*)(int))-1
+#define	SIG_IGN	(void(*)(int))1
+#define	SIG_HOLD (void(*)(int))2
 
 #endif
 

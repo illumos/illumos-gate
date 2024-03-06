@@ -3406,8 +3406,8 @@ Pcreate_callback(struct ps_prochandle *P)
 	if (pt->p_stdout != NULL)
 		pt_dupfd(pt->p_stdout, O_CREAT | O_WRONLY, 0666, STDOUT_FILENO);
 
-	(void) mdb_signal_sethandler(SIGPIPE, SIG_DFL, NULL);
-	(void) mdb_signal_sethandler(SIGQUIT, SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(SIGPIPE, MDB_SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(SIGQUIT, MDB_SIG_DFL, NULL);
 }
 
 static int
@@ -3628,11 +3628,11 @@ pt_setrun(mdb_tgt_t *t, mdb_tgt_status_t *tsp, int flags)
 	 * it.  Ignore SIGTTOU while doing this to avoid being suspended.
 	 */
 	if (mdb.m_flags & MDB_FL_JOBCTL) {
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_IGN, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_IGN, NULL);
 		(void) IOP_CTL(mdb.m_term, TIOCGPGRP, &old_pgid);
 		(void) IOP_CTL(mdb.m_term, TIOCSPGRP,
 		    (void *)&Pstatus(P)->pr_pgid);
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_DFL, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_DFL, NULL);
 	}
 
 	if (Pstate(P) != PS_RUN && Psetrun(P, sig, flags) == -1) {
@@ -3676,9 +3676,9 @@ pt_setrun(mdb_tgt_t *t, mdb_tgt_status_t *tsp, int flags)
 	 * while ignoring SIGTTOU so we are not accidentally suspended.
 	 */
 	if (old_pgid != -1) {
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_IGN, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_IGN, NULL);
 		(void) IOP_CTL(mdb.m_term, TIOCSPGRP, &pgid);
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_DFL, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_DFL, NULL);
 	}
 
 	/*
