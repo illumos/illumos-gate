@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer company
+ * Copyright 2024 Oxide Computer company
  */
 
 /*
@@ -457,6 +457,7 @@ pci_prop_data_fill(ddi_acc_handle_t acc, uint8_t bus, uint8_t dev, uint8_t func,
 	for (; max_cap > 0 && cap_off >= PCI_CAP_PTR_OFF; max_cap--) {
 		uint8_t cap_addr = cap_off & PCI_CAP_PTR_MASK;
 		uint8_t cap_id = pci_prop_get8(acc, prop, cap_addr);
+		uint16_t subvid, subsys;
 		pci_prop_failure_t ret;
 
 		/*
@@ -478,21 +479,31 @@ pci_prop_data_fill(ddi_acc_handle_t acc, uint8_t bus, uint8_t dev, uint8_t func,
 		case PCI_CAP_ID_P2P_SUBSYS:
 			/*
 			 * This is only legal in a type 1 header configuration
-			 * space. If we encounter it elsewhere, warn about it,
-			 * but don't fail.
+			 * space. In practice we've found some root complex
+			 * event collectors in the wild that have both. Because
+			 * this must come after the type 0 header, if this
+			 * differs then we'll say something.
 			 */
-			if (prop->ppd_header != PCI_HEADER_PPB) {
+			subvid = pci_prop_get16(acc, prop, cap_addr +
+			    PCI_SUBSYSCAP_SUBVID);
+			subsys = pci_prop_get16(acc, prop, cap_addr +
+			    PCI_SUBSYSCAP_SUBSYS);
+			if (prop->ppd_header == PCI_HEADER_PPB) {
+				prop->ppd_subvid = subvid;
+				prop->ppd_subsys = subsys;
+			} else if (subvid != prop->ppd_subvid ||
+			    subsys != prop->ppd_subsys) {
 				cmn_err(CE_WARN, "found device at b/d/f "
 				    "0x%x/0x%x/0x%x with PCI subsystem "
-				    "capability, but wrong header type: 0x%x",
-				    bus, dev, func, prop->ppd_header);
+				    "capability, but wrong header type 0x%x "
+				    "and mismatched subsystems: header "
+				    "0x%x/0x%x, cap: 0x%x/0x%x, using header "
+				    "values", bus, dev, func, prop->ppd_header,
+				    prop->ppd_subvid, prop->ppd_subsys, subvid,
+				    subsys);
 				break;
 			}
 
-			prop->ppd_subvid = pci_prop_get16(acc, prop, cap_addr +
-			    PCI_SUBSYSCAP_SUBVID);
-			prop->ppd_subsys = pci_prop_get16(acc, prop, cap_addr +
-			    PCI_SUBSYSCAP_SUBSYS);
 			break;
 		default:
 			break;
