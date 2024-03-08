@@ -243,7 +243,7 @@ abort(void)
 	 * assure it never returns so we will as well.
 	 */
 	(void) sigemptyset(&sa.sa_mask);
-	sa.sa_sigaction = SIG_DFL;
+	sa.sa_handler = SIG_DFL;
 	sa.sa_flags = 0;
 
 	for (;;) {

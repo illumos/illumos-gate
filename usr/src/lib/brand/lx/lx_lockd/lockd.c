@@ -302,7 +302,7 @@ lx_syslog(char *fmt, ...)
 
 /* When debugging, ensure cleanup */
 static void
-sigint_handler(void)
+sigint_handler(int signal __unused)
 {
 	NETSELPDECL(providerp);
 

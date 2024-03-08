@@ -1975,7 +1975,7 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 
 			if ((lxsa.lxsa_handler != SIG_DFL) &&
 			    (lxsa.lxsa_handler != SIG_IGN)) {
-				sa.sa_handler = lx_call_user_handler;
+				sa.sa_sigaction = lx_call_user_handler;
 
 				/*
 				 * The interposition signal handler needs the
