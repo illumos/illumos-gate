@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -174,6 +174,7 @@
 #include <sys/stat.h>
 #include <sys/sunddi.h>
 #include <sys/bitmap.h>
+#include <sys/stdbool.h>
 
 #include <sys/amdzen/df.h>
 #include <sys/amdzen/ccd.h>
@@ -213,13 +214,21 @@ static const uint16_t amdzen_nb_ids[] = {
 typedef struct {
 	char *acd_name;
 	amdzen_child_t acd_addr;
+	/*
+	 * This indicates whether or not we should issue warnings to users when
+	 * something happens specific to this instance. The main reason we don't
+	 * want to is for optional devices that may not be installed as they are
+	 * for development purposes (e.g. usmn, zen_udf); however, if there is
+	 * an issue with the others we still want to know.
+	 */
+	bool acd_warn;
 } amdzen_child_data_t;
 
 static const amdzen_child_data_t amdzen_children[] = {
-	{ "smntemp", AMDZEN_C_SMNTEMP },
-	{ "usmn", AMDZEN_C_USMN },
-	{ "zen_udf", AMDZEN_C_ZEN_UDF },
-	{ "zen_umc", AMDZEN_C_ZEN_UMC }
+	{ "smntemp", AMDZEN_C_SMNTEMP, true },
+	{ "usmn", AMDZEN_C_USMN, false },
+	{ "zen_udf", AMDZEN_C_ZEN_UDF, false },
+	{ "zen_umc", AMDZEN_C_ZEN_UMC, true }
 };
 
 static uint8_t
@@ -680,8 +689,10 @@ amdzen_create_child(amdzen_t *azn, const amdzen_child_data_t *acd)
 
 	ddi_set_parent_data(child, (void *)acd);
 	if ((ret = ndi_devi_online(child, 0)) != NDI_SUCCESS) {
-		dev_err(azn->azn_dip, CE_WARN, "!failed to online child "
-		    "dip %s: %d", acd->acd_name, ret);
+		if (acd->acd_warn) {
+			dev_err(azn->azn_dip, CE_WARN, "!failed to online "
+			    "child dip %s: %d", acd->acd_name, ret);
+		}
 		return (B_FALSE);
 	}
 
