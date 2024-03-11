@@ -87,12 +87,13 @@ main(int argc, char **argv)
 	int n, *p;
 	int Cflag, cflag, dflag, sflag, isstring2;
 	wint_t ch, cnt, lastch;
+	int c;
 
 	(void) setlocale(LC_ALL, "");
 
 	Cflag = cflag = dflag = sflag = 0;
-	while ((ch = getopt(argc, argv, "Ccdsu")) != -1)
-		switch ((char)ch) {
+	while ((c = getopt(argc, argv, "Ccdsu")) != -1)
+		switch (c) {
 		case 'C':
 			Cflag = 1;
 			cflag = 0;

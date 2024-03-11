@@ -364,7 +364,7 @@ main(int argc, char **argv)
 	sigset_t set;
 	timer_t tid;
 	char *end, *p;
-	char c;
+	int c;
 	hrtime_t last, now;
 	dtrace_optval_t statustime;
 

@@ -354,7 +354,7 @@ ilbadm_create_hc(int argc, char *argv[])
 	ilb_hc_info_t	hc_info;
 	ilbadm_status_t	ret = ILBADM_OK;
 	ilb_status_t	rclib;
-	char		c;
+	int		c;
 
 
 	hc_info.hci_def_ping = B_TRUE;

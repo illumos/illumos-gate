@@ -105,7 +105,7 @@ print_resource_binding(const char *type, pid_t pid)
 int
 main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	int i;
 	idtype_t idtype = P_PID;
 	char *idstr = "pid";

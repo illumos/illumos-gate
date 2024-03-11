@@ -163,7 +163,7 @@ void PRS(argc, argv)
 	extern char *optarg;
 
 	progname = argv[0];
-	while ((c= getopt(argc, argv, "r:f:dP:s:h:")) != EOF) {
+	while ((c = getopt(argc, argv, "r:f:dP:s:h:")) != EOF) {
 		switch (c) {
 				case 'r':
 			realm = optarg;

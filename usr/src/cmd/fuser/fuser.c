@@ -450,8 +450,8 @@ int
 main(int argc, char **argv)
 {
 	fu_data_t	*fu_data;
-	char		*mntname, c;
-	int		newfile = 0, errors = 0, opts = 0, flags = 0;
+	char		*mntname;
+	int		c, newfile = 0, errors = 0, opts = 0, flags = 0;
 	int		uts_flags, sig, okay, err;
 
 	(void) setlocale(LC_ALL, "");

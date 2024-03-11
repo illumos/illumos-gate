@@ -505,7 +505,7 @@ set_lock_root(void)
 static void
 parse_args(int argc, char *argv[])
 {
-	char opt;
+	int opt;
 	char get_linkcompat_opts = FALSE;
 	char *compat_class;
 	int num_aliases = 0;

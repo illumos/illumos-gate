@@ -66,7 +66,7 @@ main(int argc, char **argv)
 	int decompress = 0;
 	int doioc = 0;
 	size_t	blksize = 8192;
-	char c;
+	int c;
 
 	while ((c = getopt(argc, argv, "mcdb:")) != -1) {
 		switch (c) {

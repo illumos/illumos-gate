@@ -142,7 +142,7 @@ main(int argc, char **argv)
 	char *scmd = NULL;
 	char *opts;		/* The set of flags for cmd */
 	int errflag = 0;	/* We had an options parse error */
-	char c;			/* current getopts flag */
+	int c;			/* current getopts flag */
 	ret_t (*action)(char *);	/* Function pointer for the action */
 	ret_t ret;
 

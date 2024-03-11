@@ -355,7 +355,7 @@ usage()
 static void
 parse_args(int argc, char *argv[])
 {
-	char opt;
+	int opt;
 
 	if (argc == 1)
 		usage();

@@ -131,7 +131,7 @@ config_commit(pool_conf_t *conf, const char *static_conf_name)
 int
 main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	pool_conf_t *conf = NULL;
 	const char *static_conf_loc;
 

@@ -1017,7 +1017,7 @@ main(int argc, char **argv)
 	char *data_buf;
 	lsrec_t *lsp, **current, **first, **sort_buf, **merge_buf;
 	FILE *out = stdout;
-	char c;
+	int c;
 	pid_t child;
 	int status;
 	int i, j;

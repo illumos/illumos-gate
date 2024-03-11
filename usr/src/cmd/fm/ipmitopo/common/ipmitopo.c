@@ -133,8 +133,8 @@ main(int argc, char **argv)
 	ipmi_handle_t *ihp;
 	char *errmsg;
 	uint_t xport_type;
-	char c, *host = NULL, *user = NULL, *passwd = NULL;
-	int err;
+	char *host = NULL, *user = NULL, *passwd = NULL;
+	int c, err;
 	nvlist_t *params = NULL;
 
 	pname = argv[0];

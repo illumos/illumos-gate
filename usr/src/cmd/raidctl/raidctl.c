@@ -229,7 +229,7 @@ main(int argc, char **argv)
 	/* index and temporary variables */
 	int ret;
 	int status;
-	char c = '\0';
+	int c;
 
 	/* fd for the filelock */
 	int fd;

@@ -540,7 +540,7 @@ do_list(int argc, char **argv)
 	boolean_t		mflag = B_FALSE;
 	boolean_t		pflag = B_FALSE;
 	boolean_t		vflag = B_FALSE;
-	char			ch;
+	int			ch;
 	cryptoadm_provider_t	*prov = NULL;
 	int			rc = SUCCESS;
 

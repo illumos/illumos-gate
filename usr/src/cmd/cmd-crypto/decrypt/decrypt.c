@@ -196,7 +196,7 @@ main(int argc, char **argv)
 	extern char *optarg;
 	extern int optind;
 	char *optstr;
-	char c;			/* current getopts flag */
+	int c;			/* current getopts flag */
 	char *algo_str = NULL;	/* algorithm string */
 	struct CommandInfo *cmd;
 	char *cmdname;		/* name of command */

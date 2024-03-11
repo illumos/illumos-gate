@@ -172,7 +172,7 @@ do_query(int fd)
 int
 main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	const char *opt_a = NULL, *opt_r = NULL, *opt_s = NULL;
 	bool opt_q = false;
 	int fd;

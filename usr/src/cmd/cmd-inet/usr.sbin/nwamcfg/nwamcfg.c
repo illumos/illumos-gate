@@ -4318,7 +4318,7 @@ int
 main(int argc, char *argv[])
 {
 	int	err;
-	char	c;
+	int	c;
 
 	/* This must be before anything goes to stdout. */
 	setbuf(stdout, NULL);

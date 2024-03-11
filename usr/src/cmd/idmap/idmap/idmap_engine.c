@@ -74,7 +74,7 @@ extern int optind, optopt, opterr;
 static int
 options_parse(int argc, char *argv[], const char *options)
 {
-	char c;
+	int c;
 
 	optind = 1;
 

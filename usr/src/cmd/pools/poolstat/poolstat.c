@@ -193,7 +193,7 @@ Atoi(char *p, int *errp)
 int
 main(int argc, char *argv[])
 {
-	char		c;
+	int		c;
 	int 		error = 0;
 
 	(void) getpname(argv[0]);
