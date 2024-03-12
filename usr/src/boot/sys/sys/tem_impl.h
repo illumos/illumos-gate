@@ -172,7 +172,7 @@ typedef struct term_char {
 /*
  * Values for tvs_stateflags.
  */
-#define	TVS_AUTOWRAP	0x00000001	/* Always set */
+#define	TVS_AUTOWRAP	0x00000001	/* autowrap is on by default */
 #define	TVS_WRAPPED	0x00000002	/* line wrap in progress */
 
 /*
@@ -183,7 +183,7 @@ struct tem_vt_state {
 	uint8_t		tvs_alpha;	/* rgb alpha channel */
 	text_attr_t	tvs_flags;	/* flags for this x3.64 terminal */
 	int		tvs_state;	/* state in output esc seq processing */
-	uint_t		tvs_stateflags;
+	uint_t		tvs_stateflags; /* state of some features */
 	bool		tvs_gotparam;	/* does output esc seq have a param */
 
 	int	tvs_curparam;	/* current param # of output esc seq */

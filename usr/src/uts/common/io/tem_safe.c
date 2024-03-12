@@ -2288,8 +2288,12 @@ tem_safe_mv_cursor(struct tem_vt_state *tem, int row, int col,
 		row = tems.ts_c_dimension.height - 1;
 	if (col < 0)
 		col = 0;
-	if (col >= tems.ts_c_dimension.width)
+	if (col >= tems.ts_c_dimension.width) {
+		tem->tvs_stateflags |= TVS_WRAPPED;
 		col = tems.ts_c_dimension.width - 1;
+	} else {
+		tem->tvs_stateflags &= ~TVS_WRAPPED;
+	}
 
 	tem_safe_send_data(tem, credp, called_from);
 	tem->tvs_c_cursor.row = (screen_pos_t)row;
