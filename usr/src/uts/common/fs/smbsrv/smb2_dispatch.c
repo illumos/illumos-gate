@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015-2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2024 RackTop Systems, Inc.
  */
 
 
@@ -424,23 +424,26 @@ smb2_credit_increase(smb_request_t *sr)
  * Record some statistics:  latency, rx bytes, tx bytes
  * per:  server, session & kshare.
  */
-static inline void
-smb2_record_stats(smb_request_t *sr, smb_disp_stats_t *sds, boolean_t tx_only)
+inline void
+smb2_record_stats(smb_request_t *sr, smb_disp_stats_t *sds, boolean_t need_lat)
 {
-	hrtime_t	dt;
 	int64_t		rxb;
 	int64_t		txb;
 
-	dt = gethrtime() - sr->sr_time_start;
 	rxb = (int64_t)(sr->command.chain_offset - sr->smb2_cmd_hdr);
 	txb = (int64_t)(sr->reply.chain_offset - sr->smb2_reply_hdr);
+	txb += sr->smb2_async_txb;
+	sr->smb2_async_txb = 0;
 
-	if (!tx_only) {
-		smb_server_inc_req(sr->sr_server);
-		smb_latency_add_sample(&sds->sdt_lat, dt);
-		atomic_add_64(&sds->sdt_rxb, rxb);
-	}
+	smb_server_inc_req(sr->sr_server);
+	atomic_add_64(&sds->sdt_rxb, rxb);
 	atomic_add_64(&sds->sdt_txb, txb);
+
+	if (need_lat) {
+		hrtime_t dt;
+		dt = gethrtime() - sr->sr_time_start;
+		smb_latency_add_sample(&sds->sdt_lat, dt);
+	}
 }
 
 /*
@@ -481,7 +484,7 @@ smb2sr_work(struct smb_request *sr)
 
 	session = sr->session;
 
-	ASSERT(sr->smb2_async == B_FALSE);
+	ASSERT(sr->smb2_async_mode == B_FALSE);
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
 	ASSERT(sr->fid_ofile == 0);
@@ -514,6 +517,7 @@ cmd_start:
 	 * prevents continuing, we'll close the connection.
 	 * [MS-SMB2] 3.3.5.2.6 Handling Incorrectly Formatted...
 	 */
+	sr->smb2_async_mode = B_FALSE;
 	sr->smb2_cmd_hdr = sr->command.chain_offset;
 	if ((rc = smb2_decode_header(sr)) != 0) {
 		cmn_err(CE_WARN, "clnt %s bad SMB2 header",
@@ -537,10 +541,6 @@ cmd_start:
 	if (sr->smb2_hdr_flags & SMB2_FLAGS_ASYNC_COMMAND) {
 		/* Probably an async cancel. */
 		DTRACE_PROBE1(smb2__dispatch__async, smb_request_t *, sr);
-	} else if (sr->smb2_async) {
-		/* Previous command in compound went async. */
-		sr->smb2_hdr_flags |= SMB2_FLAGS_ASYNC_COMMAND;
-		sr->smb2_async_id = SMB2_ASYNCID(sr);
 	}
 
 	/*
@@ -876,15 +876,9 @@ cmd_start:
 
 	/*
 	 * Credit adjustments (decrease)
-	 *
-	 * If we've gone async, credit adjustments were done
-	 * when we sent the interim reply.
 	 */
-	if (!sr->smb2_async) {
-		if (sr->smb2_credit_request < sr->smb2_credit_charge) {
-			smb2_credit_decrease(sr);
-		}
-	}
+	if (sr->smb2_credit_request < sr->smb2_credit_charge)
+		smb2_credit_decrease(sr);
 
 	/*
 	 * The real work: call the SMB2 command handler
@@ -912,8 +906,11 @@ cmd_start:
 
 	/*
 	 * Credit adjustments (increase)
+	 *
+	 * If we've gone async, credit adjustments were done
+	 * when we sent the interim reply.
 	 */
-	if (!sr->smb2_async) {
+	if (!sr->smb2_async_mode) {
 		if (sr->smb2_credit_request > sr->smb2_credit_charge) {
 			smb2_credit_increase(sr);
 		}
@@ -959,9 +956,8 @@ cmd_done:
 
 	/*
 	 * Pad the reply to align(8) if there will be another.
-	 * (We don't compound async replies.)
 	 */
-	if (!sr->smb2_async && sr->smb2_next_command != 0)
+	if (sr->smb2_next_command != 0)
 		(void) smb_mbc_put_align(&sr->reply, 8);
 
 	/*
@@ -969,23 +965,17 @@ cmd_done:
 	 *   rxb = command.chain_offset - smb2_cmd_hdr;
 	 *   txb = reply.chain_offset - smb2_reply_hdr;
 	 * which at this point represent the current cmd/reply.
-	 *
-	 * Note: If async, this does txb only, and
-	 * skips the smb_latency_add_sample() calls.
 	 */
-	smb2_record_stats(sr, sds, sr->smb2_async);
+	smb2_record_stats(sr, sds, B_TRUE);
 
 	/*
 	 * If there's a next command, figure out where it starts,
 	 * and fill in the next header offset for the reply.
 	 * Note: We sanity checked smb2_next_command above.
-	 * Once we've gone async, replies are not compounded.
 	 */
 	if (sr->smb2_next_command != 0) {
 		sr->command.chain_offset =
 		    sr->smb2_cmd_hdr + sr->smb2_next_command;
-	}
-	if (sr->smb2_next_command != 0 && !sr->smb2_async) {
 		sr->smb2_next_reply =
 		    sr->reply.chain_offset - sr->smb2_reply_hdr;
 	} else {
@@ -1015,11 +1005,7 @@ cmd_done:
 	    (sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) != 0)
 		smb2_sign_reply(sr);
 
-	/*
-	 * Non-async runs the whole compound before send.
-	 * When we've gone async, send each individually.
-	 */
-	if (!sr->smb2_async && sr->smb2_next_command != 0)
+	if (sr->smb2_next_command != 0)
 		goto cmd_start;
 
 	/*
@@ -1032,11 +1018,6 @@ cmd_done:
 	}
 
 	smb2_send_reply(sr);
-	if (sr->smb2_async && sr->smb2_next_command != 0) {
-		MBC_FLUSH(&sr->reply);	/* New reply buffer. */
-		ASSERT(sr->reply.max_bytes == sr->session->reply_max_bytes);
-		goto cmd_start;
-	}
 
 cleanup:
 	if (disconnect)
@@ -1056,9 +1037,9 @@ cleanup:
 }
 
 /*
- * Build interim responses for the current and all following
- * requests in this compound, then send the compound response,
- * leaving the SR state so that smb2sr_work() can continue its
+ * Build an interim response for a command that needs to 'go async'.
+ * This is used by requests that block for a relatively long time.
+ * Leave the SR state so that smb2sr_work() can continue its
  * processing of this compound in "async mode".
  *
  * If we agree to "go async", this should return STATUS_SUCCESS.
@@ -1071,149 +1052,85 @@ cleanup:
  * this just uses a modified messageID, which is already unique.
  *
  * Credits:  All credit changes should happen via the interim
- * responses, so we have to manage credits here.  After this
- * returns to smb2sr_work, the final replies for all these
- * commands will have smb2_credit_response = smb2_credit_charge
+ * response, so we have to manage credits here.  After this
+ * returns to smb2sr_work, the final reply for this command
+ * will have smb2_credit_response = 0
  * (meaning no further changes to the clients' credits).
+ *
+ * Compound responses:
+ *
+ * [MS-SMB2] 3.3.5.2.7.2 "Handling Compounded Related Requests" states:
+ *
+ * "When an operation requires asynchronous processing, all the subsequent
+ * operations MUST also be processed asynchronously. The server MUST send an
+ * interim response for all such operations as specified in section 3.3.4.2."
+ *
+ * One might expect that means we should also send interim responses for every
+ * command following the current one. However, Windows does not do that, and at
+ * least one client (mount.cifs) rejects such 'extra' responses as errors.
+ * When asked for clarification, Microsoft Dochelp pointed to this part of
+ * [MS-SMB2] 3.3.4.2 "Sending an Interim Response for an Asynchronous Operation"
+ *
+ * "The server MAY choose to send an interim response for any request..."
+ *
+ * Further experimentation on Windows reveals two separate behaviors, seemingly
+ * distinguished by whether the request may block indefinitely:
+ *
+ * Bounded blocking (e.g. Oplock break):
+ * - An interim response is sent before any part of the compound response.
+ * - If multiple commands 'go async', they each send separate interim responses.
+ * - A single compound response is sent when the final command completes.
+ *
+ * Indefinite blocking (e.g. Change Notify, Byte-Range Lock):
+ * - If the command is not the last in the compound, it is rejected with
+ * "NT_STATUS_INTERNAL_ERROR".
+ * - All responses for commands prior to the one that 'goes async' are returned
+ * immediately as a single compound response.
+ * - An interim response is then sent separately from the compound response.
+ *
+ * We follow Windows behavior here for compatibility purposes, with one
+ * exception: in the indefinite case, we deliver the interim response at the end
+ * of the compound response, rather than separately, as we don't have the state
+ * needed to modify the previous response's header to terminate the compound.
+ * The command-specific handler chooses whether to allow this in the middle of
+ * the compound.
+ *
+ * Errors here mean we failed to encode the interim response.
+ * Rather than actually disconnect here, let's assume whatever problem we
+ * encountered will be seen by the caller as they continue processing the
+ * compound, and just restore everything and return an error.
  */
-uint32_t
-smb2sr_go_async(smb_request_t *sr)
+static uint32_t
+smb2sr_send_interim(smb_request_t *sr)
 {
-	smb_session_t *session;
-	smb_disp_stats_t *sds;
-	uint16_t cmd_idx;
-	int32_t saved_com_offset;
-	uint32_t saved_cmd_hdr;
-	uint16_t saved_cred_resp;
 	uint32_t saved_hdr_flags;
-	uint32_t saved_reply_hdr;
-	uint32_t msg_len;
 	boolean_t disconnect = B_FALSE;
 
-	if (sr->smb2_async) {
-		/* already went async in some previous cmd. */
-		return (NT_STATUS_SUCCESS);
-	}
-	sr->smb2_async = B_TRUE;
-
-	/* The "server" session always runs async. */
-	session = sr->session;
-	if (session->sock == NULL)
-		return (NT_STATUS_SUCCESS);
-
-	sds = NULL;
-	saved_com_offset = sr->command.chain_offset;
-	saved_cmd_hdr = sr->smb2_cmd_hdr;
-	saved_cred_resp = sr->smb2_credit_response;
-	saved_hdr_flags = sr->smb2_hdr_flags;
-	saved_reply_hdr = sr->smb2_reply_hdr;
-
-	/*
-	 * The command-specific handler should not yet have put any
-	 * data in the reply except for the (place holder) header.
-	 */
-	if (sr->reply.chain_offset != sr->smb2_reply_hdr + SMB2_HDR_SIZE) {
-		ASSERT3U(sr->reply.chain_offset, ==,
-		    sr->smb2_reply_hdr + SMB2_HDR_SIZE);
-		return (NT_STATUS_INTERNAL_ERROR);
-	}
-
-	/*
-	 * Rewind to the start of the current header in both the
-	 * command and reply bufers, so the loop below can just
-	 * decode/encode just in every pass.  This means the
-	 * current command header is decoded again, but that
-	 * avoids having to special-case the first loop pass.
-	 */
-	sr->command.chain_offset = sr->smb2_cmd_hdr;
-	sr->reply.chain_offset = sr->smb2_reply_hdr;
-
-	/*
-	 * This command processing loop is a simplified version of
-	 * smb2sr_work() that just puts an "interim response" for
-	 * every command in the compound (NT_STATUS_PENDING).
-	 */
-cmd_start:
-	sr->smb2_status = NT_STATUS_PENDING;
-
-	/*
-	 * Decode the request header
-	 */
-	sr->smb2_cmd_hdr = sr->command.chain_offset;
-	if ((smb2_decode_header(sr)) != 0) {
-		cmn_err(CE_WARN, "clnt %s bad SMB2 header",
-		    session->ip_addr_str);
-		disconnect = B_TRUE;
-		goto cleanup;
-	}
-	sr->smb2_hdr_flags |= (SMB2_FLAGS_SERVER_TO_REDIR |
-	    SMB2_FLAGS_ASYNC_COMMAND);
 	sr->smb2_async_id = SMB2_ASYNCID(sr);
-
-	/*
-	 * In case we bail out...
-	 */
-	if (sr->smb2_credit_charge == 0)
-		sr->smb2_credit_charge = 1;
-	sr->smb2_credit_response = sr->smb2_credit_charge;
-
-	/*
-	 * Write a tentative reply header.
-	 */
+	sr->smb2_status = NT_STATUS_PENDING;
+	sr->smb2_hdr_flags |= SMB2_FLAGS_ASYNC_COMMAND;
+	saved_hdr_flags = sr->smb2_hdr_flags;
 	sr->smb2_next_reply = 0;
-	ASSERT((sr->reply.chain_offset & 7) == 0);
-	sr->smb2_reply_hdr = sr->reply.chain_offset;
+
 	if ((smb2_encode_header(sr, B_FALSE)) != 0) {
 		cmn_err(CE_WARN, "clnt %s excessive reply",
-		    session->ip_addr_str);
+		    sr->session->ip_addr_str);
 		disconnect = B_TRUE;
 		goto cleanup;
 	}
-
-	/*
-	 * Figure out the length of data...
-	 */
-	if (sr->smb2_next_command != 0) {
-		/* [MS-SMB2] says this is 8-byte aligned */
-		msg_len = sr->smb2_next_command;
-		if ((msg_len & 7) != 0 || (msg_len < SMB2_HDR_SIZE) ||
-		    ((sr->smb2_cmd_hdr + msg_len) > sr->command.max_bytes)) {
-			cmn_err(CE_WARN, "clnt %s bad SMB2 next cmd",
-			    session->ip_addr_str);
-			disconnect = B_TRUE;
-			goto cleanup;
-		}
-	} else {
-		msg_len = sr->command.max_bytes - sr->smb2_cmd_hdr;
-	}
-
-	/*
-	 * We just skip any data, so no shadow chain etc.
-	 */
-	sr->command.chain_offset = sr->smb2_cmd_hdr + msg_len;
-	ASSERT(sr->command.chain_offset <= sr->command.max_bytes);
-
-	/*
-	 * Validate the commmand code...
-	 */
-	if (sr->smb2_cmd_code < SMB2_INVALID_CMD)
-		cmd_idx = sr->smb2_cmd_code;
-	else
-		cmd_idx = SMB2_INVALID_CMD;
-	sds = &session->s_server->sv_disp_stats2[cmd_idx];
 
 	/*
 	 * Don't change (user, tree, file) because we want them
-	 * exactly as they were when we entered.  That also means
-	 * we may not have the right user in sr->uid_user for
-	 * signature checks, so leave that until smb2sr_work
-	 * runs these commands "for real".  Therefore, here
-	 * we behave as if: (sr->uid_user == NULL)
+	 * exactly as they were when we entered.
+	 * Interim responses are NOT signed; we already checked the signature
+	 * for this message, and will restore this flag on completion.
 	 */
 	sr->smb2_hdr_flags &= ~SMB2_FLAGS_SIGNED;
 
+	smb2sr_put_error(sr, sr->smb2_status);
+
 	/*
-	 * Credit adjustments (decrease)
+	 * Credit adjustments (increase)
 	 *
 	 * NOTE: interim responses are not signed.
 	 * Any attacker can modify the credit grant
@@ -1224,115 +1141,112 @@ cmd_start:
 	 * If the credits WERE modified, we'll find out
 	 * when we verify the signature later,
 	 * which nullifies any changes caused here.
-	 *
-	 * Skip this on the first command, because the
-	 * credit decrease was done by the caller.
-	 */
-	if (sr->smb2_cmd_hdr != saved_cmd_hdr) {
-		if (sr->smb2_credit_request < sr->smb2_credit_charge) {
-			smb2_credit_decrease(sr);
-		}
-	}
-
-	/*
-	 * The real work: ... (would be here)
-	 */
-	smb2sr_put_error(sr, sr->smb2_status);
-
-	/*
-	 * Credit adjustments (increase)
 	 */
 	if (sr->smb2_credit_request > sr->smb2_credit_charge) {
 		smb2_credit_increase(sr);
 	}
 
-	/* cmd_done: label */
-
-	/*
-	 * Pad the reply to align(8) if there will be another.
-	 * This (interim) reply uses compounding.
-	 */
-	if (sr->smb2_next_command != 0)
-		(void) smb_mbc_put_align(&sr->reply, 8);
-
-	/*
-	 * Record some statistics.  Uses:
-	 *   rxb = command.chain_offset - smb2_cmd_hdr;
-	 *   txb = reply.chain_offset - smb2_reply_hdr;
-	 * which at this point represent the current cmd/reply.
-	 *
-	 * Note: We're doing smb_latency_add_sample() for all
-	 * remaining commands NOW, which means we won't include
-	 * the async part of their work in latency statistics.
-	 * That's intentional, as the async part of a command
-	 * would otherwise skew our latency statistics.
-	 */
-	smb2_record_stats(sr, sds, B_FALSE);
-
-	/*
-	 * If there's a next command, figure out where it starts,
-	 * and fill in the next header offset for the reply.
-	 * Note: We sanity checked smb2_next_command above.
-	 */
-	if (sr->smb2_next_command != 0) {
-		sr->command.chain_offset =
-		    sr->smb2_cmd_hdr + sr->smb2_next_command;
-		sr->smb2_next_reply =
-		    sr->reply.chain_offset - sr->smb2_reply_hdr;
-	} else {
-		ASSERT(sr->smb2_next_reply == 0);
-	}
+	DTRACE_PROBE1(go__async, smb_request_t *, sr);
 
 	/*
 	 * Overwrite the (now final) SMB2 header for this response.
 	 */
 	(void) smb2_encode_header(sr, B_TRUE);
+	sr->smb2_async_txb =
+	    (int64_t)(sr->reply.chain_offset - sr->smb2_reply_hdr);
 
-	/*
-	 * Process whole compound before sending.
-	 */
-	if (sr->smb2_next_command != 0)
-		goto cmd_start;
 	smb2_send_reply(sr);
 
-	ASSERT(!disconnect);
+	/*
+	 * Now that we've responded (with credits granted),
+	 * the final response shouldn't grant any.
+	 */
+	sr->smb2_credit_response = 0;
 
 cleanup:
-	/*
-	 * Restore caller's command processing state.
-	 */
-	sr->smb2_cmd_hdr = saved_cmd_hdr;
-	sr->command.chain_offset = saved_cmd_hdr;
-	(void) smb2_decode_header(sr);
-	sr->command.chain_offset = saved_com_offset;
-
-	sr->smb2_credit_response = saved_cred_resp;
-	sr->smb2_hdr_flags = saved_hdr_flags;
 	sr->smb2_status = NT_STATUS_SUCCESS;
+	sr->smb2_hdr_flags = saved_hdr_flags;
 
-	/*
-	 * In here, the "disconnect" flag just means we had an
-	 * error decoding or encoding something.  Rather than
-	 * actually disconnect here, let's assume whatever
-	 * problem we encountered will be seen by the caller
-	 * as they continue processing the compound, and just
-	 * restore everything and return an error.
-	 */
 	if (disconnect) {
-		sr->smb2_async = B_FALSE;
-		sr->smb2_reply_hdr = saved_reply_hdr;
-		sr->reply.chain_offset = sr->smb2_reply_hdr;
-		(void) smb2_encode_header(sr, B_FALSE);
+		sr->smb2_async_mode = B_FALSE;
+		sr->smb2_hdr_flags &= SMB2_FLAGS_ASYNC_COMMAND;
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
+	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * This variant of 'go async' sends the interim response on its own,
+ * saving/restoring the response compound currently under construction.
+ * See the longer comment above smb2sr_send_interim().
+ */
+uint32_t
+smb2sr_go_async(smb_request_t *sr)
+{
+	struct mbuf_chain saved_reply;
+	uint32_t saved_reply_hdr = sr->smb2_reply_hdr;
+	uint32_t saved_next_reply = sr->smb2_next_reply;
+	uint32_t status;
+
+	if (sr->smb2_async_mode) {
+		/* cmd is already being processed async */
+		return (NT_STATUS_SUCCESS);
+	}
+	sr->smb2_async_mode = B_TRUE;
+
+	/* The "server" session always runs async. */
+	if (sr->session->sock == NULL)
+		return (NT_STATUS_SUCCESS);
+
 	/*
-	 * The compound reply buffer we sent is now gone.
-	 * Setup a new reply buffer for the caller.
+	 * All the encoding functions use sr and sr->reply.
+	 * Keep a copy of the old reply MBC around so we can send out our
+	 * interim response on its own, then restore the original.
 	 */
-	sr->smb2_hdr_flags |= SMB2_FLAGS_ASYNC_COMMAND;
-	sr->smb2_async_id = SMB2_ASYNCID(sr);
-	sr->smb2_next_reply = 0;
+	saved_reply = sr->reply; /* struct copy */
+	MBC_INIT(&sr->reply, sr->reply.max_bytes);
+	sr->smb2_reply_hdr = 0;
+
+	status = smb2sr_send_interim(sr);
+
+	MBC_FLUSH(&sr->reply); /* clear our interim reply */
+	sr->reply = saved_reply; /* struct copy - restore original */
+	sr->smb2_next_reply = saved_next_reply;
+	sr->smb2_reply_hdr = saved_reply_hdr;
+
+	return (status);
+}
+
+/*
+ * This variant of 'go async' appends the interim response
+ * to the response compound currently under construction.
+ * See the longer comment above smb2sr_send_interim().
+ */
+uint32_t
+smb2sr_go_async_indefinite(smb_request_t *sr)
+{
+	uint32_t saved_reply_hdr = sr->smb2_reply_hdr;
+	uint32_t status;
+
+	if (sr->smb2_async_mode) {
+		/* cmd is already being processed async */
+		return (NT_STATUS_SUCCESS);
+	}
+	sr->smb2_async_mode = B_TRUE;
+
+	/* The "server" session always runs async. */
+	if (sr->session->sock == NULL)
+		return (NT_STATUS_SUCCESS);
+
+	/* Rewind reply to start of header */
+	sr->reply.chain_offset = saved_reply_hdr;
+
+	status = smb2sr_send_interim(sr);
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
+
+	/* We've now consumed the reply; re-initialize it. */
 	MBC_FLUSH(&sr->reply);
 	ASSERT(sr->reply.max_bytes == sr->session->reply_max_bytes);
 	ASSERT(sr->reply.chain_offset == 0);

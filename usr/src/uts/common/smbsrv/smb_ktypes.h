@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011-2022 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2017-2023 RackTop Systems, Inc.
+ * Copyright 2017-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -1903,8 +1903,9 @@ typedef struct smb_request {
 	boolean_t		encrypted;
 	boolean_t		dh_nvl_dirty;
 
-	boolean_t		smb2_async;
+	boolean_t		smb2_async_mode;
 	uint64_t		smb2_async_id;
+	int64_t			smb2_async_txb;
 	/* Parameters */
 	struct mbuf_chain	smb_vwv;	/* variable width value */
 

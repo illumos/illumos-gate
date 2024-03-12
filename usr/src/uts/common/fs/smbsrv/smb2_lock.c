@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -317,7 +318,7 @@ smb2_lock_blocking(smb_request_t *sr)
 	status = smb_lock_range(sr, lk->Offset, lk->Length, pid, ltype, 0);
 	if (status == NT_STATUS_LOCK_NOT_GRANTED ||
 	    status == NT_STATUS_FILE_LOCK_CONFLICT) {
-		status = smb2sr_go_async(sr);
+		status = smb2sr_go_async_indefinite(sr);
 		if (status != 0)
 			return (status);
 		status = smb_lock_range(sr, lk->Offset, lk->Length,

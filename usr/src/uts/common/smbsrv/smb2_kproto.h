@@ -43,10 +43,12 @@ void	smb2_dispatch_stats_init(smb_server_t *);
 void	smb2_dispatch_stats_fini(smb_server_t *);
 void	smb2_dispatch_stats_update(smb_server_t *,
 		smb_kstat_req_t *, int, int);
+void	smb2_record_stats(smb_request_t *, smb_disp_stats_t *, boolean_t);
 
 int	smb2sr_newrq(smb_request_t *);
 void	smb2sr_work(smb_request_t *);
 uint32_t smb2sr_go_async(smb_request_t *);
+uint32_t smb2sr_go_async_indefinite(smb_request_t *);
 void smb2sr_append_postwork(smb_request_t *, smb_request_t *);
 
 int smb2_decode_header(smb_request_t *);
