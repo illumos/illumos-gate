@@ -118,8 +118,10 @@ svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
 	wrmsr(MSR_STAR, host_msrs[IDX_MSR_STAR]);
 	wrmsr(MSR_SF_MASK, host_msrs[IDX_MSR_SF_MASK]);
 
-	/* Reset frequency multiplier MSR */
-	wrmsr(MSR_AMD_TSC_RATIO, AMD_TSCM_RESET_VAL);
+	/* Reset frequency multiplier MSR if any scaling is configured */
+	if (vm_get_freq_multiplier(sc->vm) != VM_TSCM_NOSCALE) {
+		wrmsr(MSR_AMD_TSC_RATIO, AMD_TSCM_RESET_VAL);
+	}
 
 	/* MSR_KGSBASE will be restored on the way back to userspace */
 }

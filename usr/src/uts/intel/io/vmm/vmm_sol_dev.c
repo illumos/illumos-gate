@@ -1848,8 +1848,9 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			.vdr_len = len,
 			.vdr_data = buf,
 			.vdr_result_len = &vdx.vdx_result_len,
+			.vdr_vcpuid = vdx.vdx_vcpuid,
 		};
-		error = vmm_data_read(sc->vmm_vm, vdx.vdx_vcpuid, &req);
+		error = vmm_data_read(sc->vmm_vm, &req);
 
 		if (error == 0 && buf != NULL) {
 			if (ddi_copyout(buf, vdx.vdx_data, len, md) != 0) {
@@ -1906,10 +1907,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			.vdr_len = len,
 			.vdr_data = buf,
 			.vdr_result_len = &vdx.vdx_result_len,
+			.vdr_vcpuid = vdx.vdx_vcpuid,
 		};
 		if (vmm_allow_state_writes != 0) {
-			error = vmm_data_write(sc->vmm_vm, vdx.vdx_vcpuid,
-			    &req);
+			error = vmm_data_write(sc->vmm_vm, &req);
 		} else {
 			/*
 			 * Reject the write if somone has thrown the switch back

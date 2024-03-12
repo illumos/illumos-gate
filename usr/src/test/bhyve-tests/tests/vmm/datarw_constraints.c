@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -145,6 +145,7 @@ test_vm_classes(int vmfd)
 			.vdx_version = cases[i].ctc_version,
 			.vdx_len = bufsz,
 			.vdx_data = buf,
+			.vdx_vcpuid = -1,
 		};
 
 		/* First do a read */
@@ -340,6 +341,49 @@ test_vcpuid_combos(int vmfd)
 	free(buf);
 }
 
+static void
+test_vcpuid_time(int vmfd)
+{
+	struct vdi_time_info_v1 data;
+	struct vm_data_xfer vdx = {
+		.vdx_class = VDC_VMM_TIME,
+		.vdx_version = 1,
+		.vdx_len = sizeof (data),
+		.vdx_data = &data,
+	};
+
+	/* This should work with the system-wide vcpuid */
+	vdx.vdx_vcpuid = -1;
+	if (ioctl(vmfd, VM_DATA_READ, &vdx) != 0) {
+		err(EXIT_FAILURE, "VM_DATA_READ failed for valid vcpuid");
+	}
+
+	/* But fail for other vcpuids */
+	vdx.vdx_vcpuid = 0;
+	if (ioctl(vmfd, VM_DATA_READ, &vdx) == 0) {
+		err(EXIT_FAILURE, "VM_DATA_READ should fail for vcpuid %d",
+		    vdx.vdx_vcpuid);
+	}
+
+	/*
+	 * Perform same check for writes
+	 *
+	 * Normally this would require care to handle hosts which lack frequency
+	 * scaling functionality, but since we are writing back the same data,
+	 * the guest frequency should match that of the host, requiring no real
+	 * scaling be done for the instance.
+	 */
+	vdx.vdx_vcpuid = -1;
+	if (ioctl(vmfd, VM_DATA_WRITE, &vdx) != 0) {
+		err(EXIT_FAILURE, "VM_DATA_WRITE failed for valid vcpuid");
+	}
+	vdx.vdx_vcpuid = 0;
+	if (ioctl(vmfd, VM_DATA_WRITE, &vdx) == 0) {
+		errx(EXIT_FAILURE, "VM_DATA_READ should fail for vcpuid %d",
+		    vdx.vdx_vcpuid);
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -371,6 +415,9 @@ main(int argc, char *argv[])
 
 	/* Try some weird vdx_vcpuid cases */
 	test_vcpuid_combos(vmfd);
+
+	/* VMM_TIME is picky about vcpuid */
+	test_vcpuid_time(vmfd);
 
 	vm_destroy(ctx);
 	(void) printf("%s\tPASS\n", suite_name);

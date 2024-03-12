@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -3934,8 +3934,7 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 SET_DECLARE(vmm_data_version_entries, const vmm_data_version_entry_t);
 
 static int
-vmm_data_find(const vmm_data_req_t *req, int vcpuid,
-    const vmm_data_version_entry_t **resp)
+vmm_data_find(const vmm_data_req_t *req, const vmm_data_version_entry_t **resp)
 {
 	const vmm_data_version_entry_t **vdpp, *vdp;
 
@@ -3977,7 +3976,8 @@ vmm_data_find(const vmm_data_req_t *req, int vcpuid,
 			 * others expect vcpuid [0, VM_MAXCPU).
 			 */
 			const int llimit = vdp->vdve_vcpu_wildcard ? -1 : 0;
-			if (vcpuid < llimit || vcpuid >= VM_MAXCPU) {
+			if (req->vdr_vcpuid < llimit ||
+			    req->vdr_vcpuid >= VM_MAXCPU) {
 				return (EINVAL);
 			}
 		} else {
@@ -4882,6 +4882,14 @@ vmm_data_read_vmm_time(void *arg, const vmm_data_req_t *req)
 	struct vm *vm = arg;
 	struct vdi_time_info_v1 *out = req->vdr_data;
 
+	/*
+	 * Since write operations on VMM_TIME data are strict about vcpuid
+	 * (see: vmm_data_write_vmm_time()), read operations should be as well.
+	 */
+	if (req->vdr_vcpuid != -1) {
+		return (EINVAL);
+	}
+
 	/* Take a snapshot of this point in time */
 	uint64_t tsc;
 	hrtime_t hrtime;
@@ -4936,6 +4944,17 @@ vmm_data_write_vmm_time(void *arg, const vmm_data_req_t *req)
 
 	struct vm *vm = arg;
 	const struct vdi_time_info_v1 *src = req->vdr_data;
+
+	/*
+	 * While vcpuid values != -1 are tolerated by the vmm_data machinery for
+	 * VM-wide endpoints, the time-related data is more strict: It relies on
+	 * write-locking the VM (implied by the vcpuid -1) to prevent vCPUs or
+	 * other bits from observing inconsistent values while the state is
+	 * being written.
+	 */
+	if (req->vdr_vcpuid != -1) {
+		return (EINVAL);
+	}
 
 	/*
 	 * Platform-specific checks will verify the requested frequency against
@@ -5064,12 +5083,12 @@ static const vmm_data_version_entry_t versions_v1 = {
 VMM_DATA_VERSION(versions_v1);
 
 int
-vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
+vmm_data_read(struct vm *vm, const vmm_data_req_t *req)
 {
 	int err = 0;
 
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, vcpuid, &entry);
+	err = vmm_data_find(req, &entry);
 	if (err != 0) {
 		return (err);
 	}
@@ -5080,7 +5099,7 @@ vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 
 		err = entry->vdve_readf(datap, req);
 	} else if (entry->vdve_vcpu_readf != NULL) {
-		err = entry->vdve_vcpu_readf(vm, vcpuid, req);
+		err = entry->vdve_vcpu_readf(vm, req->vdr_vcpuid, req);
 	} else {
 		err = EINVAL;
 	}
@@ -5097,12 +5116,12 @@ vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 }
 
 int
-vmm_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
+vmm_data_write(struct vm *vm, const vmm_data_req_t *req)
 {
 	int err = 0;
 
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, vcpuid, &entry);
+	err = vmm_data_find(req, &entry);
 	if (err != 0) {
 		return (err);
 	}
@@ -5113,7 +5132,7 @@ vmm_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 
 		err = entry->vdve_writef(datap, req);
 	} else if (entry->vdve_vcpu_writef != NULL) {
-		err = entry->vdve_vcpu_writef(vm, vcpuid, req);
+		err = entry->vdve_vcpu_writef(vm, req->vdr_vcpuid, req);
 	} else {
 		err = EINVAL;
 	}
