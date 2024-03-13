@@ -76,6 +76,7 @@
 #if defined(EFI)
 #include <efi.h>
 #include <efilib.h>
+#include <Protocol/GraphicsOutput.h>
 #else
 #include <btxv86.h>
 #include <vbe.h>
@@ -865,7 +866,7 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 #if defined(EFI)
 	EFI_STATUS status;
 	EFI_TPL tpl;
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 
 	/*
 	 * We assume Blt() does work, if not, we will need to build

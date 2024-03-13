@@ -31,6 +31,7 @@
 #include <stand.h>
 #include <stdbool.h>
 #include <sys/queue.h>
+#include <Protocol/BlockIo.h>
 
 extern EFI_HANDLE		IH;
 extern EFI_SYSTEM_TABLE		*ST;

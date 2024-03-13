@@ -86,7 +86,7 @@ efi_getsmap(void)
 	efi_mmap = malloc(size);
 	status = BS->GetMemoryMap(&size, efi_mmap, &key, &desc_size, NULL);
 	if (EFI_ERROR(status)) {
-		printf("GetMemoryMap: error %lu\n", EFI_ERROR_CODE(status));
+		printf("GetMemoryMap: error %lu\n", DECODE_ERROR(status));
 		free(efi_mmap);
 		return;
 	}
@@ -99,7 +99,7 @@ efi_getsmap(void)
 	ndesc = size / desc_size;
 	while (i < ndesc) {
 		if (next == NULL) {
-			next = malloc(sizeof(*next));
+			next = malloc(sizeof (*next));
 			if (next == NULL)
 				break;
 
@@ -136,7 +136,7 @@ efi_getsmap(void)
 	}
 	smaplen = n;
 	if (smaplen > 0) {
-		smapbase = malloc(smaplen * sizeof(*smapbase));
+		smapbase = malloc(smaplen * sizeof (*smapbase));
 		if (smapbase != NULL) {
 			n = 0;
 			STAILQ_FOREACH(cur, &head, sb_bufs)
@@ -159,7 +159,7 @@ efi_addsmapdata(struct preloaded_file *kfp)
 
 	if (smapbase == NULL || smaplen == 0)
 		return;
-	size = smaplen * sizeof(*smapbase);
+	size = smaplen * sizeof (*smapbase);
 	file_addmetadata(kfp, MODINFOMD_SMAP, size, smapbase);
 }
 
@@ -168,7 +168,7 @@ COMMAND_SET(smap, "smap", "show BIOS SMAP", command_smap);
 static int
 command_smap(int argc __unused, char *argv[] __unused)
 {
-	u_int i;
+	uint_t i;
 
 	if (smapbase == NULL || smaplen == 0)
 		return (CMD_ERROR);

@@ -24,11 +24,11 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include <efi.h>
 #include <efilib.h>
+#include <efidevp.h>
 #include <stand.h>
+#include <Protocol/LoadedImage.h>
 
 static EFI_PHYSICAL_ADDRESS heap;
 static UINTN heapsize;
@@ -73,8 +73,7 @@ arg_skipword(CHAR16 *argp)
 EFI_STATUS
 efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
-	static EFI_GUID image_protocol = LOADED_IMAGE_PROTOCOL;
-	EFI_LOADED_IMAGE *img;
+	EFI_LOADED_IMAGE_PROTOCOL *img;
 	CHAR16 *argp, *args, **argv;
 	EFI_STATUS status;
 	int argc, addprog;
@@ -96,7 +95,8 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 
 	/* Use efi_exit() from here on... */
 
-	status = OpenProtocolByHandle(IH, &image_protocol, (void **)&img);
+	status = OpenProtocolByHandle(IH, &gEfiLoadedImageProtocolGuid,
+	    (void **)&img);
 	if (status != EFI_SUCCESS)
 		efi_exit(status);
 
@@ -116,7 +116,7 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 		if (img->LoadOptionsSize == strlen(img->LoadOptions) + 1) {
 			args = malloc(img->LoadOptionsSize << 1);
 			for (argc = 0; argc < (int)img->LoadOptionsSize; argc++)
-				args[argc] = ((char*)img->LoadOptions)[argc];
+				args[argc] = ((char *)img->LoadOptions)[argc];
 		} else {
 			args = malloc(img->LoadOptionsSize);
 			memcpy(args, img->LoadOptions, img->LoadOptionsSize);
@@ -142,9 +142,9 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	if (!addprog) {
 		addprog =
 		    (DevicePathType(img->FilePath) != MEDIA_DEVICE_PATH ||
-		     DevicePathSubType(img->FilePath) != MEDIA_FILEPATH_DP ||
-		     DevicePathNodeLength(img->FilePath) <=
-			sizeof(FILEPATH_DEVICE_PATH)) ? 1 : 0;
+		    DevicePathSubType(img->FilePath) != MEDIA_FILEPATH_DP ||
+		    DevicePathNodeLength(img->FilePath) <=
+		    sizeof (FILEPATH_DEVICE_PATH)) ? 1 : 0;
 		if (!addprog) {
 			/* XXX todo. */
 		}
@@ -160,7 +160,7 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 		argp = arg_skipword(argp);
 	}
 	/* Part 3: build vector. */
-	argv = malloc((argc + 1) * sizeof(CHAR16*));
+	argv = malloc((argc + 1) * sizeof (CHAR16*));
 	argc = 0;
 	if (addprog)
 		argv[argc++] = (CHAR16 *)LOADER_EFI;

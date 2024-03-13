@@ -28,11 +28,17 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <efidevp.h>
+#include <Protocol/DevicePath.h>
+#include <Protocol/DevicePathFromText.h>
+#include <Protocol/DevicePathToText.h>
+#include <Protocol/LoadedImage.h>
 
-static EFI_GUID ImageDevicePathGUID =
+EFI_GUID gEfiLoadedImageDevicePathProtocolGuid =
     EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
-static EFI_GUID DevicePathGUID = DEVICE_PATH_PROTOCOL;
-static EFI_GUID DevicePathToTextGUID = EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID;
+EFI_GUID gEfiDevicePathProtocolGuid = DEVICE_PATH_PROTOCOL;
+EFI_GUID gEfiDevicePathToTextProtocolGuid =
+    EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID;
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *textProtocol;
 
 EFI_DEVICE_PATH *
@@ -41,7 +47,8 @@ efi_lookup_image_devpath(EFI_HANDLE handle)
 	EFI_DEVICE_PATH *devpath;
 	EFI_STATUS status;
 
-	status = OpenProtocolByHandle(handle, &ImageDevicePathGUID,
+	status = OpenProtocolByHandle(handle,
+	    &gEfiLoadedImageDevicePathProtocolGuid,
 	    (void **)&devpath);
 	if (EFI_ERROR(status))
 		devpath = NULL;
@@ -54,7 +61,7 @@ efi_lookup_devpath(EFI_HANDLE handle)
 	EFI_DEVICE_PATH *devpath;
 	EFI_STATUS status;
 
-	status = OpenProtocolByHandle(handle, &DevicePathGUID,
+	status = OpenProtocolByHandle(handle, &gEfiDevicePathProtocolGuid,
 	    (void **)&devpath);
 	if (EFI_ERROR(status))
 		devpath = NULL;
@@ -66,25 +73,26 @@ efi_close_devpath(EFI_HANDLE handle)
 {
 	EFI_STATUS status;
 
-	status = BS->CloseProtocol(handle, &DevicePathGUID, IH, NULL);
+	status = BS->CloseProtocol(handle, &gEfiDevicePathProtocolGuid, IH,
+	    NULL);
 	if (EFI_ERROR(status))
-		printf("CloseProtocol error: %lu\n", EFI_ERROR_CODE(status));
+		printf("CloseProtocol error: %lu\n", DECODE_ERROR(status));
 }
 
 CHAR16 *
 efi_devpath_name(EFI_DEVICE_PATH *devpath)
 {
-	static int once = 1;
+	static bool once = true;
 	EFI_STATUS status;
 
 	if (devpath == NULL)
 		return (NULL);
 	if (once) {
-		status = BS->LocateProtocol(&DevicePathToTextGUID, NULL,
-		    (VOID **)&textProtocol);
+		status = BS->LocateProtocol(&gEfiDevicePathToTextProtocolGuid,
+		    NULL, (void **)&textProtocol);
 		if (EFI_ERROR(status))
 			textProtocol = NULL;
-		once = 0;
+		once = false;
 	}
 	if (textProtocol == NULL)
 		return (NULL);
@@ -160,7 +168,8 @@ efi_devpath_handle(EFI_DEVICE_PATH *devpath)
 	 * for a given device path should give us a handle for the
 	 * closest node in the path to the end that is valid.
 	 */
-	status = BS->LocateDevicePath(&DevicePathGUID, &devpath, &h);
+	status = BS->LocateDevicePath(&gEfiDevicePathProtocolGuid,
+	    &devpath, &h);
 	if (EFI_ERROR(status))
 		return (NULL);
 	return (h);

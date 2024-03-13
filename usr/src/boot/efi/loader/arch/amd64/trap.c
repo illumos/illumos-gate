@@ -62,15 +62,15 @@
  */
 
 static struct region_descriptor fw_idt;	/* Descriptor for pristine fw IDT */
-static struct region_descriptor loader_idt;/* Descriptor for loader
-					   shadow IDT */
+static struct region_descriptor
+    loader_idt; /* Descriptor for loader shadow IDT */
 static EFI_PHYSICAL_ADDRESS lidt_pa;	/* Address of loader shadow IDT */
 static EFI_PHYSICAL_ADDRESS tss_pa;	/* Address of TSS */
-static EFI_PHYSICAL_ADDRESS exc_stack_pa;/* Address of IST stack for loader */
-EFI_PHYSICAL_ADDRESS exc_rsp;	/* %rsp value on our IST stack when
-				   exception happens */
-EFI_PHYSICAL_ADDRESS fw_intr_handlers[NUM_EXC]; /* fw handlers for < 32 IDT
-						   vectors */
+static EFI_PHYSICAL_ADDRESS exc_stack_pa; /* Address of IST stack for loader */
+EFI_PHYSICAL_ADDRESS
+    exc_rsp;	/* %rsp value on our IST stack when exception happens */
+EFI_PHYSICAL_ADDRESS
+    fw_intr_handlers[NUM_EXC]; /* fw handlers for < 32 IDT vectors */
 static int intercepted[NUM_EXC];
 static int ist;				/* IST for exception handlers */
 static uint32_t tss_fw_seg;		/* Fw TSS segment */
@@ -156,8 +156,8 @@ free_tables(void)
 		exc_stack_pa = 0;
 	}
 	if (tss_pa != 0 && tss_fw_seg == 0) {
-		BS->FreePages(tss_pa, EFI_SIZE_TO_PAGES(sizeof(struct
-		    amd64tss)));
+		BS->FreePages(tss_pa,
+		    EFI_SIZE_TO_PAGES(sizeof (struct amd64tss)));
 		tss_pa = 0;
 	}
 	if (loader_gdt_pa != 0) {
@@ -178,20 +178,20 @@ efi_setup_tss(struct region_descriptor *gdt, uint32_t loader_tss_idx,
 	tss_desc = (struct system_segment_descriptor *)(gdt->rd_base +
 	    (loader_tss_idx << 3));
 	status = BS->AllocatePages(AllocateAnyPages, EfiLoaderData,
-	    EFI_SIZE_TO_PAGES(sizeof(struct amd64tss)), &tss_pa);
+	    EFI_SIZE_TO_PAGES(sizeof (struct amd64tss)), &tss_pa);
 	if (EFI_ERROR(status)) {
 		printf("efi_setup_tss: AllocatePages tss error %lu\n",
-		    EFI_ERROR_CODE(status));
+		    DECODE_ERROR(status));
 		return (0);
 	}
 	*tss = (struct amd64tss *)tss_pa;
-	bzero(*tss, sizeof(**tss));
-	tss_desc->sd_lolimit = sizeof(struct amd64tss);
+	bzero(*tss, sizeof (**tss));
+	tss_desc->sd_lolimit = sizeof (struct amd64tss);
 	tss_desc->sd_lobase = tss_pa;
 	tss_desc->sd_type = SDT_SYSTSS;
 	tss_desc->sd_dpl = 0;
 	tss_desc->sd_p = 1;
-	tss_desc->sd_hilimit = sizeof(struct amd64tss) >> 16;
+	tss_desc->sd_hilimit = sizeof (struct amd64tss) >> 16;
 	tss_desc->sd_gran = 0;
 	tss_desc->sd_hibase = tss_pa >> 24;
 	tss_desc->sd_xx0 = 0;
@@ -218,7 +218,7 @@ efi_redirect_exceptions(void)
 	    EFI_SIZE_TO_PAGES(fw_idt.rd_limit), &lidt_pa);
 	if (EFI_ERROR(status)) {
 		printf("efi_redirect_exceptions: AllocatePages IDT error %lu\n",
-		    EFI_ERROR_CODE(status));
+		    DECODE_ERROR(status));
 		lidt_pa = 0;
 		return (0);
 	}
@@ -226,7 +226,7 @@ efi_redirect_exceptions(void)
 	    &exc_stack_pa);
 	if (EFI_ERROR(status)) {
 		printf("efi_redirect_exceptions: AllocatePages stk error %lu\n",
-		    EFI_ERROR_CODE(status));
+		    DECODE_ERROR(status));
 		exc_stack_pa = 0;
 		free_tables();
 		return (0);
@@ -234,15 +234,15 @@ efi_redirect_exceptions(void)
 	loader_idt.rd_limit = fw_idt.rd_limit;
 	bcopy((void *)fw_idt.rd_base, (void *)loader_idt.rd_base,
 	    loader_idt.rd_limit);
-	bzero(ist_use_table, sizeof(ist_use_table));
-	bzero(fw_intr_handlers, sizeof(fw_intr_handlers));
-	bzero(intercepted, sizeof(intercepted));
+	bzero(ist_use_table, sizeof (ist_use_table));
+	bzero(fw_intr_handlers, sizeof (fw_intr_handlers));
+	bzero(intercepted, sizeof (intercepted));
 
 	sgdt(&fw_gdt);
 	tss_fw_seg = read_tr();
 	gdt_rd = NULL;
 	if (tss_fw_seg == 0) {
-		for (i = 2; (i << 3) + sizeof(*gdt_desc) <= fw_gdt.rd_limit;
+		for (i = 2; (i << 3) + sizeof (*gdt_desc) <= fw_gdt.rd_limit;
 		    i += 2) {
 			gdt_desc = (struct system_segment_descriptor *)(
 			    fw_gdt.rd_base + (i << 3));
@@ -259,18 +259,18 @@ efi_redirect_exceptions(void)
 				return (0);
 			}
 			loader_gdt.rd_limit = roundup2(fw_gdt.rd_limit +
-			    sizeof(struct system_segment_descriptor),
-			    sizeof(struct system_segment_descriptor)) - 1;
+			    sizeof (struct system_segment_descriptor),
+			    sizeof (struct system_segment_descriptor)) - 1;
 			i = (loader_gdt.rd_limit + 1 -
-			    sizeof(struct system_segment_descriptor)) /
-			    sizeof(struct system_segment_descriptor) * 2;
+			    sizeof (struct system_segment_descriptor)) /
+			    sizeof (struct system_segment_descriptor) * 2;
 			status = BS->AllocatePages(AllocateAnyPages,
 			    EfiLoaderData,
 			    EFI_SIZE_TO_PAGES(loader_gdt.rd_limit),
 			    &loader_gdt_pa);
 			if (EFI_ERROR(status)) {
 				printf("efi_setup_tss: AllocatePages gdt error "
-				    "%lu\n",  EFI_ERROR_CODE(status));
+				    "%lu\n",  DECODE_ERROR(status));
 				loader_gdt_pa = 0;
 				free_tables();
 				return (0);

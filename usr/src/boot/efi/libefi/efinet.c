@@ -38,8 +38,16 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <efidevp.h>
+#include <Protocol/Arp.h>
+#include <Protocol/SimpleNetwork.h>
+#include <Protocol/VlanConfig.h>
 
-static EFI_GUID sn_guid = EFI_SIMPLE_NETWORK_PROTOCOL;
+EFI_GUID gEfiArpProtocolGuid = EFI_ARP_PROTOCOL_GUID;
+EFI_GUID gEfiArpServiceBindingProtocolGuid =
+    EFI_ARP_SERVICE_BINDING_PROTOCOL_GUID;
+EFI_GUID gEfiSimpleNetworkProtocolGuid = EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
+EFI_GUID gEfiVlanConfigProtocolGuid = EFI_VLAN_CONFIG_PROTOCOL_GUID;
 
 static void efinet_end(struct netif *);
 static ssize_t efinet_get(struct iodesc *, void **, time_t);
@@ -118,12 +126,12 @@ efinet_probe(struct netif *nif, void *machdep_hint __unused)
 	 * we will be racing with the UEFI network stack. It will
 	 * pull packets off the network leading to lost packets.
 	 */
-	status = BS->OpenProtocol(h, &sn_guid, (void **)&net,
-	    IH, NULL, EFI_OPEN_PROTOCOL_EXCLUSIVE);
+	status = BS->OpenProtocol(h, &gEfiSimpleNetworkProtocolGuid,
+	    (void **)&net, IH, NULL, EFI_OPEN_PROTOCOL_EXCLUSIVE);
 	if (status != EFI_SUCCESS) {
 		printf("Unable to open network interface %d for "
 		    "exclusive access: %lu\n", nif->nif_unit,
-		    EFI_ERROR_CODE(status));
+		    DECODE_ERROR(status));
 	}
 
 	return (0);
@@ -212,10 +220,11 @@ efinet_init(struct iodesc *desc, void *machdep_hint __unused)
 	}
 
 	h = nif->nif_driver->netif_ifs[nif->nif_unit].dif_private;
-	status = OpenProtocolByHandle(h, &sn_guid, (void **)&nif->nif_devdata);
+	status = OpenProtocolByHandle(h, &gEfiSimpleNetworkProtocolGuid,
+	    (void **)&nif->nif_devdata);
 	if (status != EFI_SUCCESS) {
 		printf("net%d: cannot fetch interface data (status=%lu)\n",
-		    nif->nif_unit, EFI_ERROR_CODE(status));
+		    nif->nif_unit, DECODE_ERROR(status));
 		return;
 	}
 
@@ -224,7 +233,7 @@ efinet_init(struct iodesc *desc, void *machdep_hint __unused)
 		status = net->Start(net);
 		if (status != EFI_SUCCESS) {
 			printf("net%d: cannot start interface (status=%lu)\n",
-			    nif->nif_unit, EFI_ERROR_CODE(status));
+			    nif->nif_unit, DECODE_ERROR(status));
 			return;
 		}
 	}
@@ -233,7 +242,7 @@ efinet_init(struct iodesc *desc, void *machdep_hint __unused)
 		status = net->Initialize(net, 0, 0);
 		if (status != EFI_SUCCESS) {
 			printf("net%d: cannot init. interface (status=%lu)\n",
-			    nif->nif_unit, EFI_ERROR_CODE(status));
+			    nif->nif_unit, DECODE_ERROR(status));
 			return;
 		}
 	}
@@ -244,7 +253,7 @@ efinet_init(struct iodesc *desc, void *machdep_hint __unused)
 	status = net->ReceiveFilters(net, mask, 0, FALSE, 0, NULL);
 	if (status != EFI_SUCCESS)
 		printf("net%d: cannot set rx. filters (status=%lu)\n",
-		    nif->nif_unit, EFI_ERROR_CODE(status));
+		    nif->nif_unit, DECODE_ERROR(status));
 
 #ifdef EFINET_DEBUG
 	dump_mode(net->Mode);
@@ -292,7 +301,8 @@ efinet_dev_init(void)
 	int err;
 	extern struct devsw netdev;
 
-	status = efi_get_protocol_handles(&sn_guid, &nhandles, &handles);
+	status = efi_get_protocol_handles(&gEfiSimpleNetworkProtocolGuid,
+	    &nhandles, &handles);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
 	handles2 = (EFI_HANDLE *)malloc(nhandles * sizeof (EFI_HANDLE));

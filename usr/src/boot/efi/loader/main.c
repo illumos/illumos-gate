@@ -41,8 +41,15 @@
 
 #include <efi.h>
 #include <efilib.h>
-#include <efigpt.h>
 #include <efichar.h>
+#include <eficonsctl.h>
+#include <efidevp.h>
+#include <Guid/SmBios.h>
+#include <Protocol/DevicePath.h>
+#include <Protocol/LoadedImage.h>
+#include <Protocol/SerialIo.h>
+#include <Protocol/SimpleTextIn.h>
+#include <Uefi/UefiGpt.h>
 
 #include <uuid.h>
 
@@ -57,17 +64,14 @@
 
 struct arch_switch archsw;	/* MI/MD interface boundary */
 
-EFI_GUID devid = DEVICE_PATH_PROTOCOL;
-EFI_GUID imgid = LOADED_IMAGE_PROTOCOL;
-EFI_GUID smbios = SMBIOS_TABLE_GUID;
-EFI_GUID smbios3 = SMBIOS3_TABLE_GUID;
-EFI_GUID inputid = SIMPLE_TEXT_INPUT_PROTOCOL;
-EFI_GUID serialio = SERIAL_IO_PROTOCOL;
+EFI_GUID gEfiLoadedImageProtocolGuid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+EFI_GUID gEfiSmbiosTableGuid = SMBIOS_TABLE_GUID;
+EFI_GUID gEfiSmbios3TableGuid = SMBIOS3_TABLE_GUID;
 
 extern void acpi_detect(void);
 extern void efi_getsmap(void);
 
-static EFI_LOADED_IMAGE *img;
+static EFI_LOADED_IMAGE_PROTOCOL *img;
 
 /*
  * Number of seconds to wait for a keystroke before exiting with failure
@@ -155,7 +159,8 @@ has_keyboard(void)
 	 * Find all the handles that support the SIMPLE_TEXT_INPUT_PROTOCOL and
 	 * do the typical dance to get the right sized buffer.
 	 */
-	status = efi_get_protocol_handles(&inputid, &nhandles, &hin);
+	status = efi_get_protocol_handles(&gEfiSimpleTextInProtocolGuid,
+	    &nhandles, &hin);
 	if (EFI_ERROR(status))
 		return (retval);
 
@@ -166,7 +171,8 @@ has_keyboard(void)
 	 * legacy device path for keyboards.
 	 */
 	for (i = 0; i < nhandles; i++) {
-		status = OpenProtocolByHandle(hin[i], &devid, (void **)&path);
+		status = OpenProtocolByHandle(hin[i],
+		    &gEfiDevicePathProtocolGuid, (void **)&path);
 		if (EFI_ERROR(status))
 			continue;
 
@@ -354,7 +360,7 @@ try_as_currdev(pdinfo_t *pp)
 }
 
 static bool
-find_currdev(EFI_LOADED_IMAGE *img)
+find_currdev(EFI_LOADED_IMAGE_PROTOCOL *img)
 {
 	pdinfo_t *dp, *pp;
 	EFI_DEVICE_PATH *devpath, *copy;
@@ -639,7 +645,8 @@ uefi_serial_console(void)
 	if (uid == 0)
 		return ("ttya");
 
-	status = efi_get_protocol_handles(&serialio, &nhandles, &handles);
+	status = efi_get_protocol_handles(&gEfiSerialIoProtocolGuid,
+	    &nhandles, &handles);
 	if (EFI_ERROR(status)) {
 		return (NULL);
 	}
@@ -699,7 +706,8 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_zfs_probe = efi_zfs_probe;
 
 	/* Get our loaded image protocol interface structure. */
-	(void) OpenProtocolByHandle(IH, &imgid, (void **)&img);
+	(void) OpenProtocolByHandle(IH, &gEfiLoadedImageProtocolGuid,
+	    (void **)&img);
 
 	/*
 	 * XXX Chicken-and-egg problem; we want to have console output
@@ -884,8 +892,8 @@ main(int argc, CHAR16 *argv[])
 		efi_free_devpath_name(text);
 	}
 
-	status = OpenProtocolByHandle(img->DeviceHandle, &devid,
-	    (void **)&imgpath);
+	status = OpenProtocolByHandle(img->DeviceHandle,
+	    &gEfiDevicePathProtocolGuid, (void **)&imgpath);
 	if (status == EFI_SUCCESS) {
 		text = efi_devpath_name(imgpath);
 		if (text != NULL) {
@@ -935,8 +943,8 @@ main(int argc, CHAR16 *argv[])
 	bi_isadir();			/* set ISADIR */
 	acpi_detect();
 
-	if ((ptr = efi_get_table(&smbios3)) == NULL)
-		ptr = efi_get_table(&smbios);
+	if ((ptr = efi_get_table(&gEfiSmbios3TableGuid)) == NULL)
+		ptr = efi_get_table(&gEfiSmbiosTableGuid);
 	smbios_detect(ptr);
 
 	interact(NULL);			/* doesn't return */
@@ -1297,9 +1305,8 @@ COMMAND_SET(fdt, "fdt", "flattened device tree handling", command_fdt);
 static int
 command_chain(int argc, char *argv[])
 {
-	EFI_GUID LoadedImageGUID = LOADED_IMAGE_PROTOCOL;
 	EFI_HANDLE loaderhandle;
-	EFI_LOADED_IMAGE *loaded_image;
+	EFI_LOADED_IMAGE_PROTOCOL *loaded_image;
 	EFI_STATUS status;
 	struct stat st;
 	struct devdesc *dev;
@@ -1344,8 +1351,8 @@ command_chain(int argc, char *argv[])
 		command_errmsg = "LoadImage failed";
 		return (CMD_ERROR);
 	}
-	status = OpenProtocolByHandle(loaderhandle, &LoadedImageGUID,
-	    (void **)&loaded_image);
+	status = OpenProtocolByHandle(loaderhandle,
+	    &gEfiLoadedImageProtocolGuid, (void **)&loaded_image);
 
 	if (argc > 2) {
 		int i, len = 0;

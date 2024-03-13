@@ -30,9 +30,10 @@
 #include <efi.h>
 #include <efichar.h>
 #include <efilib.h>
+#include <Guid/GlobalVariable.h>
 
-static EFI_GUID illumosBootVarGUID = ILLUMOS_BOOT_VAR_GUID;
-static EFI_GUID GlobalBootVarGUID = EFI_GLOBAL_VARIABLE;
+EFI_GUID gillumosBootVarGuid = ILLUMOS_BOOT_VAR_GUID;
+EFI_GUID gEfiGlobalVariableGuid = EFI_GLOBAL_VARIABLE;
 
 EFI_STATUS
 efi_getenv(EFI_GUID *g, const char *v, void *data, size_t *len)
@@ -73,13 +74,13 @@ EFI_STATUS
 efi_global_getenv(const char *v, void *data, size_t *len)
 {
 
-	return (efi_getenv(&GlobalBootVarGUID, v, data, len));
+	return (efi_getenv(&gEfiGlobalVariableGuid, v, data, len));
 }
 
 EFI_STATUS
 efi_global_setenv(const char *v, void *data, size_t len)
 {
-	return (efi_setenv(&GlobalBootVarGUID,
+	return (efi_setenv(&gEfiGlobalVariableGuid,
 	    EFI_VARIABLE_NON_VOLATILE |
 	    EFI_VARIABLE_BOOTSERVICE_ACCESS |
 	    EFI_VARIABLE_RUNTIME_ACCESS, v, data, len));
@@ -89,13 +90,13 @@ EFI_STATUS
 efi_illumos_getenv(const char *v, void *data, size_t *len)
 {
 
-	return (efi_getenv(&illumosBootVarGUID, v, data, len));
+	return (efi_getenv(&gillumosBootVarGuid, v, data, len));
 }
 
 EFI_STATUS
 efi_setenv_illumos_wcs(const char *var, CHAR16 *valstr)
 {
-	return (efi_setenv(&illumosBootVarGUID,
+	return (efi_setenv(&gillumosBootVarGuid,
 	    EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
 	    var, valstr, (ucs2len(valstr) + 1) * sizeof (CHAR16)));
 }

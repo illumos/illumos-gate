@@ -195,7 +195,7 @@ efi_loadaddr(uint_t type, void *data, vm_offset_t addr)
 
 	if (EFI_ERROR(status)) {
 		printf("failed to allocate %zu bytes for staging area: %lu\n",
-		    size, EFI_ERROR_CODE(status));
+		    size, DECODE_ERROR(status));
 		return (0);
 	}
 
