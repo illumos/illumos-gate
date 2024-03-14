@@ -52,13 +52,6 @@ find_files "s.*"	\
 
 # to compile the drivers/modules
 find_files "s.*"	\
-	usr/src/uts/sparc/ib		\
-	usr/src/uts/sparc/ibcm		\
-	usr/src/uts/sparc/ibdm		\
-	usr/src/uts/sparc/ibmf		\
-	usr/src/uts/sparc/ibtl		\
-	usr/src/uts/sparc/ibp		\
-	usr/src/uts/sparc/rpcib		\
 	usr/src/uts/intel/ib		\
 	usr/src/uts/intel/ibcm		\
 	usr/src/uts/intel/ibdm		\
@@ -86,34 +79,15 @@ echo_file  usr/src/Makefile.psm.targ
 echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
-echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/src/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile
-echo_file  usr/src/uts/sparc/Makefile
-echo_file  usr/src/uts/sparc/Makefile.files
-echo_file  usr/src/uts/sparc/Makefile.rules
-echo_file  usr/src/uts/sparc/Makefile.sparc
-echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/req.flg
 echo_file  usr/src/uts/intel/Makefile
 echo_file  usr/src/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
-echo_file  usr/src/uts/sun4/Makefile.files
-echo_file  usr/src/uts/sun4/Makefile.rules
-echo_file  usr/src/uts/sun4u/Makefile
-echo_file  usr/src/uts/sun4u/Makefile.files
-echo_file  usr/src/uts/sun4u/Makefile.rules
-echo_file  usr/src/uts/sun4u/Makefile.sun4u
-echo_file  usr/src/uts/sun4u/Makefile.targ
-echo_file  usr/src/uts/sun4u/Makefile.workarounds
-echo_file  usr/src/uts/sfmmu/Makefile.files
-echo_file  usr/src/uts/sfmmu/Makefile.rules
-echo_file  usr/src/uts/sparc/v9/Makefile.files
-echo_file  usr/src/uts/sparc/v9/Makefile.rules
 echo_file  usr/src/cmd/Makefile
 echo_file  usr/src/cmd/Makefile.cmd
 echo_file  usr/src/cmd/Makefile.targ

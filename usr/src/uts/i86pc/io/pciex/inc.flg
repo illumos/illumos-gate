@@ -26,7 +26,7 @@
 #
 
 # This file brings down all that is needed to build the
-# x86 PCI Express code. 
+# x86 PCI Express code.
 #
 
 # header files
@@ -85,8 +85,6 @@ echo_file  usr/src/Makefile.psm.targ
 echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
-echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/src/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile

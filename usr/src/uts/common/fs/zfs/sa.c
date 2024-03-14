@@ -371,7 +371,7 @@ sa_attr_op(sa_handle_t *hdl, sa_bulk_attr_t *bulk, int count,
 			if (bulk[i].sa_data) {
 				SA_COPY_DATA(bulk[i].sa_data_func,
 				    bulk[i].sa_addr, bulk[i].sa_data,
-				    bulk[i].sa_size);
+				    MIN(bulk[i].sa_size, bulk[i].sa_length));
 			}
 			continue;
 

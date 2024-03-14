@@ -49,13 +49,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Overrides.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DUDFS_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 # Define dependency on specfs
 #
 LDFLAGS += -N fs/specfs

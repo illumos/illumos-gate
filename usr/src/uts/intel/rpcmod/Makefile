@@ -58,13 +58,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
-#	Overrides.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DRPCMOD_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 #	depends_on
 #
 LDFLAGS		+= -Nmisc/tlimod

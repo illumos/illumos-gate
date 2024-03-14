@@ -268,23 +268,13 @@ Adding a New Kernel Module
 	editing the following lines (in addition to comments).
 
 		MODULE		= namefs
-			- replace with module name 
+			- replace with module name
 		OBJECTS		= $(NAMEFS_OBJS:%=$(OBJS_DIR)/%)
 		LINTS		= $(NAMEFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 			- replace with MODULE_OBJS
 		ROOTMODULE	= $(ROOT_FS_DIR)/$(MODULE).kmod
 			- replace directory part with the appropriate
 			  installation directory name (see Makefile.uts)
-
-	If a custom version of modstubs.o is needed to check the undefines
-	for this routine, the following lines need to appear in the
-	Makefile (after the inclusion of Makefile.mach (i.e.: Makefile.sun4c)).
-
-		MODSTUBS_DIR	 = $(OBJS_DIR)
-		$(MODSTUBS_O)	:= AS_CPPFLAGS += -DNAMEFS_MODULE
-			- replace "-DNAMEFS_MODULE" with the appropriate flag
-			  for the modstubs.o assembly.
-		CLEANFILES	+= $(MODSTUBS_O)
 
     4]  Edit the parent Makefile.mach (i.e.: Makefile.sun4c) to know about
 	the new module:
@@ -310,4 +300,3 @@ Moving a Module to the "Implementation Architecture" Independent Build
 	Makefile.sun4c) to *not* know about this module and edit the
 	"instruction set architecture" directory Makefile (i.e.:
 	Makefile.sparc) to know about it.
-

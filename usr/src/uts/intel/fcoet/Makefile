@@ -54,7 +54,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides and depends_on
 #
-MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -Ndrv/stmf -Ndrv/fct -Ndrv/fcoe
 
 #

@@ -53,10 +53,6 @@ find_files "s.*.h"	\
 find_files "s.*.h"	\
 	usr/src/uts/common/vm
 
-find_files "s.*"	\
-	usr/src/uts/sparc/hci1394	\
-	usr/src/uts/sparc/s1394
-
 echo_file  usr/src/Makefile.master
 echo_file  usr/src/Makefile.master.64
 echo_file  usr/src/req.flg
@@ -65,14 +61,7 @@ echo_file  usr/src/Makefile.psm.targ
 echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
-echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/src/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile
-echo_file  usr/src/uts/sparc/Makefile
-echo_file  usr/src/uts/sparc/Makefile.files
-echo_file  usr/src/uts/sparc/Makefile.rules
-echo_file  usr/src/uts/sparc/Makefile.sparc
-echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/req.flg

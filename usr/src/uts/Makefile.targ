@@ -42,28 +42,11 @@ $(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE) $(MAPFILE)
 	$(POST_PROCESS)
 
 #
-#	This target checks each kmod for undefined entry points. It does not
-#	modify the kmod in any way.
-#
-$(MODULE).check:	FRC
-	@BUILD_TYPE=DBG32 $(MAKE) $(MODULE).check.targ
-
-$(MODULE).check.targ:	$(BINARY) $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODSTUBS_O) $(GENLIB)
-	$(LD) -o /dev/null $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODSTUBS_O) $(GENLIB)
-
-#
 # Since assym.h is a derived file, the dependency must be explicit for all
 # files including this file.  The actual lists are defined in
 # */Makefile.files.
 #
 $(ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/assym.h
-
-#
-#	Everybody need to know how to create a modstubs.o built with the
-#	appropriate flags and located in the appropriate location.
-#
-$(MODSTUBS_O):	$(MODSTUBS)
-	$(COMPILE.s) -o $@ $(MODSTUBS)
 
 #
 # Build the source file which contains the kernel's utsname,

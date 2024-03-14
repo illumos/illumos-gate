@@ -104,7 +104,6 @@
 # itself.  This is a questionable practice, since they tend to rot.
 #
 ./usr/src/cmd/syslogd/sparcv9/Makefile
-./usr/src/uts/sparc/uhci/Makefile
 ./usr/src/lib/pam_modules/smb/amd64/Makefile
 ./usr/src/lib/pam_modules/smb/sparcv9/Makefile
 ./usr/src/cmd/isns/isnsd/xml_def/isnsmgmtSchema.xsd

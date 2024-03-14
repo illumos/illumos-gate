@@ -52,13 +52,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
-#	Overrides.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DNFS_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 # Define dependencies on specfs, rpcmod, and rpcsec
 #
 LDFLAGS += -N fs/specfs -N strmod/rpcmod -N misc/rpcsec

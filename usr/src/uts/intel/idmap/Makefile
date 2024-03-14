@@ -61,7 +61,7 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 #
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-CLEANFILES	+= $(MODSTUBS_O)
+
 #
 #	Default build targets.
 #

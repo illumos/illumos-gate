@@ -364,12 +364,6 @@ LX_BRAND_OBJS  =		\
 	lx_wait.o		\
 	lx_xattr.o
 
-#
-#	special files
-#
-MODSTUB_OBJ +=		\
-	modstubs.o
-
 BOOTDEV_OBJS +=		\
 	bootdev.o
 

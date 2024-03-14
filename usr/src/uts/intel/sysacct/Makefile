@@ -54,13 +54,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DSYSACCT_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:
