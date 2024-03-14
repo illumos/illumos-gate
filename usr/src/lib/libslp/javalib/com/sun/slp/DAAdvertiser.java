@@ -62,7 +62,7 @@ class DAAdvertiser extends Thread {
     static protected Hashtable daadv =
 	new Hashtable();	// Existing advertisers
 
-    private Boolean done = new Boolean(false);
+    private Boolean done = Boolean.valueOf(false);
 
     // Initialize the DAAdvertiser on the designated interface.
 
@@ -201,7 +201,7 @@ class DAAdvertiser extends Thread {
 
 		// Somebody interrupted us. If we are to exit, then do so.
 
-		synchronized (done) {
+		synchronized (this) {
 
 		    if (done.booleanValue()) {
 			return;
@@ -251,8 +251,8 @@ class DAAdvertiser extends Thread {
 
     void stopThread() {
 
-	synchronized (done) {
-	    done = new Boolean(true);
+	synchronized (this) {
+	    done = Boolean.valueOf(true);
 
 	}
 

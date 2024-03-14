@@ -287,7 +287,7 @@ public class ServiceURL extends Object implements Serializable   {
 		new IllegalArgumentException(
 				conf.formatMessage("url_char_error",
 						   new Object[] {
-				    new Character(c)}));
+				    Character.valueOf(c)}));
 	}
     }
 

@@ -253,7 +253,7 @@ final class DoubleStatistic extends AbstractStatistic
 
 	public Long getLongValue()
 	{
-		return (new Long(((Double) getValue()).longValue()));
+		return (Long.valueOf(((Double) getValue()).longValue()));
 	}
 
 	public UnsignedInt64 getUnsignedInt64Value()
@@ -267,7 +267,7 @@ final class DoubleStatistic extends AbstractStatistic
 		Double v1 = getDoubleValue();
 		Double v2 = o.getDoubleValue();
 
-		return (new DoubleStatistic(new Double(v1.doubleValue() +
+		return (new DoubleStatistic(Double.valueOf(v1.doubleValue() +
 					    v2.doubleValue()),
 			getStart(), getEnd()));
 	}
@@ -277,7 +277,7 @@ final class DoubleStatistic extends AbstractStatistic
 		Double v1 = getDoubleValue();
 		Double v2 = o.getDoubleValue();
 
-		return (new DoubleStatistic(new Double(v1.doubleValue() -
+		return (new DoubleStatistic(Double.valueOf(v1.doubleValue() -
 					    v2.doubleValue()),
 			getStart(), getEnd()));
 	}
@@ -308,8 +308,8 @@ final class DoubleStatistic extends AbstractStatistic
 		if (count == 0)
 			throw new IllegalArgumentException("Cannot derive a " +
 			    "snapshot from an empty iterator");
-		return (new DoubleStatistic(new Double(total / count), first,
-			last));
+		return (new DoubleStatistic(Double.valueOf(total / count),
+			first, last));
 	}
 }
 
@@ -336,7 +336,7 @@ final class LongStatistic extends AbstractStatistic
 
 	public Double getDoubleValue()
 	{
-		return (new Double(((Long) getValue()).longValue()));
+		return (Double.valueOf(((Long) getValue()).longValue()));
 	}
 
 	public Long getLongValue()
@@ -355,7 +355,7 @@ final class LongStatistic extends AbstractStatistic
 		Long v1 = getLongValue();
 		Long v2 = o.getLongValue();
 
-		return (new LongStatistic(new Long(v1.longValue() +
+		return (new LongStatistic(Long.valueOf(v1.longValue() +
 					    v2.longValue()),
 			getStart(), getEnd()));
 	}
@@ -365,7 +365,7 @@ final class LongStatistic extends AbstractStatistic
 		Long v1 = getLongValue();
 		Long v2 = o.getLongValue();
 
-		return (new LongStatistic(new Long(v1.longValue() -
+		return (new LongStatistic(Long.valueOf(v1.longValue() -
 					    v2.longValue()),
 			getStart(), getEnd()));
 	}
@@ -395,7 +395,7 @@ final class LongStatistic extends AbstractStatistic
 		if (count == 0)
 			throw new IllegalArgumentException("Cannot derive a " +
 			    "snapshot from an empty iterator");
-		return (new LongStatistic(new Long(total / count), first,
+		return (new LongStatistic(Long.valueOf(total / count), first,
 			last));
 	}
 }
@@ -424,12 +424,13 @@ final class UnsignedInt64Statistic extends AbstractStatistic
 
 	public Double getDoubleValue()
 	{
-		return (new Double(((UnsignedInt64) getValue()).longValue()));
+		return (Double.valueOf(
+		    ((UnsignedInt64) getValue()).longValue()));
 	}
 
 	public Long getLongValue()
 	{
-		return (new Long(((UnsignedInt64) getValue()).longValue()));
+		return (Long.valueOf(((UnsignedInt64) getValue()).longValue()));
 	}
 
 	public UnsignedInt64 getUnsignedInt64Value()

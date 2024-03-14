@@ -33,7 +33,6 @@ import java.text.*;
 import java.util.*;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
-import java.security.PrivilegedAction;
 
 import com.sun.solaris.service.exception.SuccinctStackTraceFormatter;
 
@@ -70,12 +69,8 @@ public class SysloglikeFormatter extends Formatter {
 	/**
 	 * Line separator string.
 	 */
-	private String lineSeparator = (String)java.security.AccessController
-	    .doPrivileged(new PrivilegedAction() {
-		public Object run() {
-			return System.getProperty("line.separator");
-		}
-	});
+	private String lineSeparator =
+		System.getProperty("line.separator");
 
 	/**
 	 * Flag to set whether log records should indicate the name of

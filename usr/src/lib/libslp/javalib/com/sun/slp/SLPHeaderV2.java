@@ -120,7 +120,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 
     static void registerOptionClass(int id, Class optClass) {
 
-	Integer key = new Integer(id);
+	Integer key = Integer.valueOf(id);
 
 	// We should probably check if it implements SLPOption.OptionParser,
 	//  but...
@@ -185,7 +185,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 				ServiceLocationException.PARSE_ERROR,
 				"option_error",
 				new Object[] {
-		    new Integer(optOff), new Integer(length)});
+		    Integer.valueOf(optOff), Integer.valueOf(length)});
 
 	}
 
@@ -262,7 +262,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 				ServiceLocationException.PARSE_ERROR,
 				"function_code_error",
 				new Object[] {
-		    new Integer(functionCode)});
+		    Integer.valueOf(functionCode)});
 
 	}
 
@@ -274,7 +274,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 				ServiceLocationException.PARSE_ERROR,
 				"length_overflow",
 				new Object[] {
-		    new Integer(nbytes), new Integer(length)});
+		    Integer.valueOf(nbytes), Integer.valueOf(length)});
 
 	}
 
@@ -293,7 +293,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 	Assert.slpassert(((functionCode <= SAAdvert) &&
 	    (functionCode >= SrvReq)),
 		      "function_code_error",
-		      new Object[] {new Integer(functionCode)});
+		      new Object[] {Integer.valueOf(functionCode)});
 
 	Assert.slpassert((locale != null),
 		      "null_locale_error",
@@ -320,8 +320,8 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 				ServiceLocationException.BUFFER_OVERFLOW,
 				"buffer_overflow",
 				new Object[] {
-		    new Integer(headerLen + SHORT_SIZE),
-			new Integer(packetLength)});
+		    Integer.valueOf(headerLen + SHORT_SIZE),
+			Integer.valueOf(packetLength)});
 	}
     }
 
@@ -514,7 +514,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 
 	    // Lookup an option parser.
 
-	    Integer key = new Integer(optId);
+	    Integer key = Integer.valueOf(optId);
 
 	    Class optClass = (Class)optClasses.get(key);
 

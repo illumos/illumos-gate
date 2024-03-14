@@ -1553,7 +1553,7 @@ class SLPConfig {
 
     boolean getHasSecurity() {
 	return securityEnabled &&
-	    (new Boolean(System.getProperty("net.slp.securityEnabled",
+	    (Boolean.valueOf(System.getProperty("net.slp.securityEnabled",
 					    "false")).booleanValue());
     }
 

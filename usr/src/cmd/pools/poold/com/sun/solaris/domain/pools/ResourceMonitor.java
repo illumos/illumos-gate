@@ -240,7 +240,7 @@ class ResourceMonitor extends HashMap
 			}
 			utilV = 100 * ((total.doubleValue() - idleV) /
 			    total.doubleValue());
-			return (new DoubleStatistic(new Double(utilV),
+			return (new DoubleStatistic(Double.valueOf(utilV),
 				((AggregateStatistic)first.get(first.size() -
 				2)).getStart(), ((AggregateStatistic)first.
 				getLast()).getEnd()));

@@ -102,7 +102,7 @@ abstract class ClientMsgManager extends Object {
 				ServiceLocationException.INTERNAL_ERROR,
 				"cmm_creation_error",
 				new Object[] { keyName,
-						   new Integer(version)});
+						   Integer.valueOf(version)});
 
 	    }
 
@@ -127,7 +127,7 @@ abstract class ClientMsgManager extends Object {
 				"cmm_creation_exception",
 				new Object[] { ex,
 						   keyName,
-						   new Integer(version),
+						   Integer.valueOf(version),
 						   ex.getMessage()});
 	}
     }

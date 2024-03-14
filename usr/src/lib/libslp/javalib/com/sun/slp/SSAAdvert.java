@@ -63,7 +63,7 @@ class SSAAdvert extends SrvLocMsgImpl {
 
 	Assert.slpassert(hdr != null,
 		      "version_number_error",
-		      new Object[] {new Integer(version)});
+		      new Object[] {Integer.valueOf(version)});
 
 	hdr.functionCode = SrvLocHeader.SAAdvert;
 	hdr.xid = xid;

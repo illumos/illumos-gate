@@ -49,13 +49,13 @@ abstract class AbstractAggregationValue
     public
     AbstractAggregationValue(long v)
     {
-	value = new Long(v);
+	value = Long.valueOf(v);
     }
 
     public
     AbstractAggregationValue(double v)
     {
-	value = new Double(v);
+	value = Double.valueOf(v);
     }
 
     public Number

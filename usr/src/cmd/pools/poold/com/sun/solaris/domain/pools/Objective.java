@@ -697,9 +697,10 @@ final class WeightedLoadObjective extends AbstractObjective
                 while (cpuIt.hasNext()) {
                     Component currentCPU = (Component) cpuIt.next();
                     int cpuid = (int) currentCPU.getLongProperty("cpu.sys_id");
-                    if (allCPUData.containsKey(new Integer(cpuid))) {
+                    if (allCPUData.containsKey(Integer.valueOf(cpuid))) {
                         LocalityGroup lg =
-                            (LocalityGroup) allCPUData.get(new Integer(cpuid));
+                            (LocalityGroup) allCPUData.get(
+                            Integer.valueOf(cpuid));
                         if (lgroupdata.containsKey(lg)) {
                             LGroupData cpulgp = (LGroupData) lgroupdata.get(lg);
                             cpulgp.incNumcpu();
@@ -892,7 +893,7 @@ final class LocalityObjective extends AbstractObjective
                 LocalityGroup lg = (LocalityGroup) LGroupIt.next();
                 int cpu_ids[] = lg.getCPUIDs();
                 for (int i = 0; i < cpu_ids.length; i++) {
-                    allCPUData.put(new Integer(cpu_ids[i]), lg);
+                    allCPUData.put(Integer.valueOf(cpu_ids[i]), lg);
                 }
             }
 
@@ -1014,7 +1015,7 @@ final class LocalityObjective extends AbstractObjective
                 Component cpu = (Component) cpulist.get(0);
 		int cpuid = (int) cpu.getLongProperty("cpu.sys_id");
                 LocalityGroup lgroup =
-                        (LocalityGroup) allCPUData.get(new Integer(cpuid));
+                        (LocalityGroup) allCPUData.get(Integer.valueOf(cpuid));
                 HashMap allresults = (HashMap) psetlg.getResults();
                 ResultTuple result = (ResultTuple) allresults.get(lgroup);
 
@@ -1126,7 +1127,7 @@ final class UtilizationObjective extends AbstractObjective
 		if (zoneList.size() == 9) {
 			zoneList.remove(0);
 		}
-		zoneList.add(new Integer(sl.getZoneMean(val)));
+		zoneList.add(Integer.valueOf(sl.getZoneMean(val)));
 
 		/*
 		 * Evaluate whether or not this objective is under

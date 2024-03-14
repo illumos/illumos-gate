@@ -238,7 +238,7 @@ abstract public class ServiceLocationManager extends Object {
 		new ServiceLocationException(errCode,
 					     "loopback_error",
 					     new Object[] {
-		    new Short(errCode)});
+		    Short.valueOf(errCode)});
 
 	}
 

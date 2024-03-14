@@ -76,7 +76,7 @@ class PermSARegTable extends Thread {
 
 	Object[] rec =
 	    new Object[] {
-	    new Long(System.currentTimeMillis() + INCREMENT),
+	    Long.valueOf(System.currentTimeMillis() + INCREMENT),
 		sr};
 
 	// Note that we do not account for multiple nonservice: URLs under
@@ -103,7 +103,7 @@ class PermSARegTable extends Thread {
 	} catch (ServiceLocationException ex) {
 
 	    config.writeLog("periodic_exception",
-			    new Object[] {new Short(ex.getErrorCode()),
+			    new Object[] {Short.valueOf(ex.getErrorCode()),
 					      ex.getMessage()});
 	} catch (IllegalArgumentException iae) {
 	    Assert.slpassert(false, "reregister_bug", new Object[0]);
@@ -133,7 +133,7 @@ class PermSARegTable extends Thread {
 
 	    if (xtime <= lnow) {
 		send((SrvLocMsg)rec[REG]);
-		rec[TIME] = new Long(lnow + INCREMENT);
+		rec[TIME] = Long.valueOf(lnow + INCREMENT);
 	    }
 	}
 

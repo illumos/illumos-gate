@@ -207,7 +207,7 @@ public final class LinearDistribution extends Distribution
 	    total += (double)bucket.getFrequency() *
 		    (double)(bucket.getMin() + 1);
 	}
-	return (new Double(total));
+	return (Double.valueOf(total));
     }
 
     private long

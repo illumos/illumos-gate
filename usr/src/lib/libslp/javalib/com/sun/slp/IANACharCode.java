@@ -198,7 +198,7 @@ abstract class IANACharCode extends Object {
 		    new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"v1_charcode_error",
-				new Object[] {new Character(c), encoding});
+				new Object[] {Character.valueOf(c), encoding});
 	    }
 
 	} else if (encoding.equals(ASCII) || encoding.equals(LATIN1)) {
@@ -210,7 +210,7 @@ abstract class IANACharCode extends Object {
 		    new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"v1_charcode_error",
-				new Object[] {new Character(c), encoding});
+				new Object[] {Character.valueOf(c), encoding});
 	    }
 	} else if (encoding.equals(UTF8)) {
 
@@ -219,7 +219,7 @@ abstract class IANACharCode extends Object {
 		    new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"v1_charcode_error",
-				new Object[] {new Character(c), encoding});
+				new Object[] {Character.valueOf(c), encoding});
 	    }
 
 

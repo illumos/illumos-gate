@@ -306,7 +306,7 @@ class ServiceStoreFactory extends Object {
 				ServiceLocationException.PARSE_ERROR,
 				"ssf_not_valid_lifetime",
 				new Object[] {
-			slifetime, new Integer(linecount)});
+			slifetime, Integer.valueOf(linecount)});
 
 	    } catch (IllegalArgumentException ex) {
 		throw
@@ -314,7 +314,7 @@ class ServiceStoreFactory extends Object {
 				ServiceLocationException.PARSE_ERROR,
 				"ssf_syntax_err",
 				new Object[] {
-			ex.getMessage(), new Integer(linecount)});
+			ex.getMessage(), Integer.valueOf(linecount)});
 
 	    }
 

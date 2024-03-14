@@ -59,9 +59,9 @@ abstract class SrvLocMsgImpl extends Object implements SrvLocMsg {
 	if (hdr.functionCode != functionCode) {
 	    throw
 		new ServiceLocationException(
-				ServiceLocationException.NETWORK_ERROR,
-				"wrong_reply_type",
-				new Object[] {new Integer(hdr.functionCode)});
+			ServiceLocationException.NETWORK_ERROR,
+			"wrong_reply_type",
+			new Object[] {Integer.valueOf(hdr.functionCode)});
 	}
 
 	this.hdr = hdr;

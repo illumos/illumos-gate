@@ -335,7 +335,7 @@ abstract class ServerDATable extends DATable {
 				  new Object[] {
 			advert.URL,
 			    hdr.scopes,
-			    new Long(timestamp)});
+			    Long.valueOf(timestamp)});
 		}
 
 		return;
@@ -347,7 +347,7 @@ abstract class ServerDATable extends DATable {
 			      new Object[] {
 		    advert.URL,
 			hdr.scopes,
-			new Long(advert.timestamp)});
+			Long.valueOf(advert.timestamp)});
 	    }
 
 	    // Forward existing registrations to the new advert.
@@ -595,7 +595,7 @@ abstract class ServerDATable extends DATable {
 			      new Object[] {
 		    Integer.toHexString(hdr.xid),
 			addr,
-			new Integer(ex.getErrorCode()),
+			Integer.valueOf(ex.getErrorCode()),
 			ex.getMessage()});
 
 	    }

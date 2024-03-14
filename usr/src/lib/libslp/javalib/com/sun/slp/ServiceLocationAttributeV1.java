@@ -603,7 +603,7 @@ class ServiceLocationAttributeV1 extends ServiceLocationAttribute {
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"v1_8bit_error",
-				new Object[] {new Character(c)});
+				new Object[] {Character.valueOf(c)});
 		}
 
 		buf.append(c);

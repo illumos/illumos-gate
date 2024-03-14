@@ -174,7 +174,7 @@ abstract class SrvLocHeader extends Object implements SrvLocMsg, Cloneable {
 
 	    Class headerClass = Class.forName(className);
 
-	    classTable.put(new Integer(version), headerClass);
+	    classTable.put(Integer.valueOf(version), headerClass);
 
 	} catch (ClassNotFoundException ex) {
 
@@ -195,7 +195,7 @@ abstract class SrvLocHeader extends Object implements SrvLocMsg, Cloneable {
 
 	    // Get header class.
 
-	    Class hdrClass = (Class)classTable.get(new Integer(version));
+	    Class hdrClass = (Class)classTable.get(Integer.valueOf(version));
 
 	    if (hdrClass == null) {
 		return null;
@@ -210,7 +210,7 @@ abstract class SrvLocHeader extends Object implements SrvLocMsg, Cloneable {
 
 	    SLPConfig.getSLPConfig().writeLog("slh_creation_exception",
 					      new Object[] {
-		new Integer(version),
+		Integer.valueOf(version),
 		    ex,
 		    ex.getMessage()});
 	    return null;

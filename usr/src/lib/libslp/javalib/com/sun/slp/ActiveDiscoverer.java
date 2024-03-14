@@ -115,7 +115,7 @@ class ActiveDiscoverer extends Thread {
 	    Assert.slpassert(false,
 			  "sdat_active_err",
 			  new Object[] {
-		new Integer(ex.getErrorCode()),
+		Integer.valueOf(ex.getErrorCode()),
 		    ex.getMessage()});
 
 	}
@@ -252,7 +252,7 @@ class ActiveDiscoverer extends Thread {
 	} catch (ServiceLocationException ex) {
 
 	    config.writeLog("ad_multi_error",
-			    new Object[] { new Integer(ex.getErrorCode()),
+			    new Object[] { Integer.valueOf(ex.getErrorCode()),
 					       ex.getMessage() });
 
 	}
@@ -284,7 +284,7 @@ class ActiveDiscoverer extends Thread {
 
 		if (config.traceDrop()) {
 		    config.writeLog("ad_trans_error", new Object[] {
-			new Integer(ex.getErrorCode()),
+			Integer.valueOf(ex.getErrorCode()),
 			    daAddr,
 			    ex.getMessage() });
 		}

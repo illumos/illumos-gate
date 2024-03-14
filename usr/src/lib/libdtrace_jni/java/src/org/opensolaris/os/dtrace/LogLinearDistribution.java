@@ -186,7 +186,7 @@ public final class LogLinearDistribution extends Distribution
         for (Distribution.Bucket bucket : buckets)
             total += ((double)bucket.getFrequency() * (double)bucket.getMin());
 
-        return (new Double(total));
+        return (Double.valueOf(total));
     }
 
     private long getZeroBucketValue() {
