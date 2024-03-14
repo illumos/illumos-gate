@@ -170,7 +170,7 @@ flt_handler(int sig, siginfo_t *sip, ucontext_t *ucp, void *data)
 		bcopy(ucp, &_mdb_abort_ctx, sizeof (_mdb_abort_ctx));
 
 	_mdb_abort_info.si_signo = sig;
-	(void) mdb_signal_sethandler(sig, SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(sig, MDB_SIG_DFL, NULL);
 
 	/*
 	 * If there is no current dcmd, or the current dcmd comes from a
@@ -495,8 +495,8 @@ main(int argc, char *argv[], char *envp[])
 	if (sigaltstack(&sigstack, NULL) != 0)
 		die("could not set signal stack");
 
-	(void) mdb_signal_sethandler(SIGPIPE, SIG_IGN, NULL);
-	(void) mdb_signal_sethandler(SIGQUIT, SIG_IGN, NULL);
+	(void) mdb_signal_sethandler(SIGPIPE, MDB_SIG_IGN, NULL);
+	(void) mdb_signal_sethandler(SIGQUIT, MDB_SIG_IGN, NULL);
 
 	(void) mdb_signal_sethandler(SIGILL, flt_handler, NULL);
 	(void) mdb_signal_sethandler(SIGTRAP, flt_handler, NULL);

@@ -477,7 +477,7 @@ daemonize_start(void)
 		 */
 		struct sigaction act;
 
-		act.sa_sigaction = SIG_DFL;
+		act.sa_handler = SIG_DFL;
 		(void) sigemptyset(&act.sa_mask);
 		act.sa_flags = 0;
 
@@ -675,7 +675,7 @@ main(int argc, char *argv[])
 	(void) sigfillset(&act.sa_mask);
 
 	/* signals to ignore */
-	act.sa_sigaction = SIG_IGN;
+	act.sa_handler = SIG_IGN;
 	act.sa_flags = 0;
 	(void) sigaction(SIGPIPE, &act, NULL);
 	(void) sigaction(SIGALRM, &act, NULL);

@@ -97,7 +97,7 @@ extern char *getcacheopt(char *s);
 extern void logit(char *format, ...);
 extern int load_admin_defaults(admin_t *ptr, int will_become_server);
 extern int getldap_init(void);
-extern void getldap_revalidate(void);
+extern void getldap_revalidate(int);
 extern int getldap_uidkeepalive(int keep, int interval);
 extern int getldap_invalidate(void);
 extern void getldap_lookup(LineBuf *config_info, ldap_call_t *in);

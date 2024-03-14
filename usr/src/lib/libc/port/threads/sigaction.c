@@ -129,7 +129,7 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		(void) memcpy(&uact, (void *)sap, sizeof (uact));
 		if ((sig == SIGCANCEL || sig == SIGAIOCANCEL) &&
 		    (sap->sa_flags & SA_RESETHAND))
-			sap->sa_sigaction = SIG_DFL;
+			sap->sa_handler = SIG_DFL;
 		lrw_unlock(rwlp);
 	}
 
@@ -178,8 +178,8 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 			goto out;
 		}
 		/* SIGCANCEL is ignored by default */
-		if (uact.sa_sigaction == SIG_DFL ||
-		    uact.sa_sigaction == SIG_IGN)
+		if (uact.sa_handler == SIG_DFL ||
+		    uact.sa_handler == SIG_IGN)
 			goto out;
 	}
 
@@ -193,8 +193,8 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		if (sip != NULL && sip->si_code == SI_LWP && aiowp != NULL)
 			siglongjmp(aiowp->work_jmp_buf, 1);
 		/* SIGLWP is ignored by default */
-		if (uact.sa_sigaction == SIG_DFL ||
-		    uact.sa_sigaction == SIG_IGN)
+		if (uact.sa_handler == SIG_DFL ||
+		    uact.sa_handler == SIG_IGN)
 			goto out;
 	}
 
@@ -430,8 +430,8 @@ sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 		 * handlers to anything other than SIG_DFL or SIG_IGN.
 		 */
 		if (self->ul_vfork) {
-			if (tact.sa_sigaction != SIG_IGN)
-				tact.sa_sigaction = SIG_DFL;
+			if (tact.sa_handler != SIG_IGN)
+				tact.sa_handler = SIG_DFL;
 		} else if (sig == SIGCANCEL || sig == SIGAIOCANCEL) {
 			/*
 			 * Always catch these signals.
@@ -439,8 +439,8 @@ sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 			 * We need SIGAIOCANCEL for aio_cancel() to work.
 			 */
 			udp->siguaction[sig].sig_uaction = tact;
-			if (tact.sa_sigaction == SIG_DFL ||
-			    tact.sa_sigaction == SIG_IGN)
+			if (tact.sa_handler == SIG_DFL ||
+			    tact.sa_handler == SIG_IGN)
 				tact.sa_flags = SA_SIGINFO;
 			else {
 				tact.sa_flags |= SA_SIGINFO;
@@ -449,8 +449,8 @@ sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 			}
 			tact.sa_sigaction = udp->sigacthandler;
 			tact.sa_mask = maskset;
-		} else if (tact.sa_sigaction != SIG_DFL &&
-		    tact.sa_sigaction != SIG_IGN) {
+		} else if (tact.sa_handler != SIG_DFL &&
+		    tact.sa_handler != SIG_IGN) {
 			udp->siguaction[sig].sig_uaction = tact;
 			tact.sa_flags &= ~SA_NODEFER;
 			tact.sa_sigaction = udp->sigacthandler;
@@ -461,8 +461,8 @@ sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 	if ((rv = __sigaction(sig, tactp, oact)) != 0)
 		udp->siguaction[sig].sig_uaction = oaction;
 	else if (oact != NULL &&
-	    oact->sa_sigaction != SIG_DFL &&
-	    oact->sa_sigaction != SIG_IGN)
+	    oact->sa_handler != SIG_DFL &&
+	    oact->sa_handler != SIG_IGN)
 		*oact = oaction;
 
 	/*
@@ -745,11 +745,11 @@ signal_init()
 		rwlp->mutex.mutex_flag = LOCK_INITED;
 		rwlp->mutex.mutex_magic = MUTEX_MAGIC;
 		sap = &udp->siguaction[sig].sig_uaction;
-		if (sap->sa_sigaction != SIG_DFL &&
-		    sap->sa_sigaction != SIG_IGN &&
+		if (sap->sa_handler != SIG_DFL &&
+		    sap->sa_handler != SIG_IGN &&
 		    __sigaction(sig, NULL, &act) == 0 &&
-		    act.sa_sigaction != SIG_DFL &&
-		    act.sa_sigaction != SIG_IGN) {
+		    act.sa_handler != SIG_DFL &&
+		    act.sa_handler != SIG_IGN) {
 			act = *sap;
 			act.sa_flags &= ~SA_NODEFER;
 			act.sa_sigaction = udp->sigacthandler;
@@ -801,8 +801,8 @@ setup_cancelsig(int sig)
 	lrw_rdlock(rwlp);
 	act = udp->siguaction[sig].sig_uaction;
 	lrw_unlock(rwlp);
-	if (act.sa_sigaction == SIG_DFL ||
-	    act.sa_sigaction == SIG_IGN)
+	if (act.sa_handler == SIG_DFL ||
+	    act.sa_handler == SIG_IGN)
 		act.sa_flags = SA_SIGINFO;
 	else {
 		act.sa_flags |= SA_SIGINFO;

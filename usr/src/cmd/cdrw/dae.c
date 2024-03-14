@@ -109,7 +109,7 @@ handle_jitter(uchar_t *buf, uchar_t *last_end)
 		}
 	}
 	for (i = BLOCK_SIZE*(READ_OVERLAP - BLOCKS_COMPARE);
-		i < 2*READ_OVERLAP*BLOCK_SIZE; i += 4) {
+	    i < 2*READ_OVERLAP*BLOCK_SIZE; i += 4) {
 		if (memcmp(last_end - BLOCK_SIZE * BLOCKS_COMPARE, buf + i,
 		    BLOCK_SIZE * BLOCKS_COMPARE) == 0) {
 			return (i + (BLOCK_SIZE * BLOCKS_COMPARE));
@@ -154,7 +154,7 @@ read_audio_track(cd_device *dev, struct track_info *ti, bstreamhandle h)
 	off = 0;
 
 	/* set up signal handler to write audio TOC if ^C is pressed */
-	sv.sa_handler = extract_signal_handler;
+	sv.sa_sigaction = extract_signal_handler;
 	(void) sigemptyset(&sv.sa_mask);
 	sv.sa_flags = 0;
 	(void) sigaction(SIGINT, &sv, &oldsv);

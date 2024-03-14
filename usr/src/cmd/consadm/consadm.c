@@ -98,10 +98,10 @@ static void fallbackdaemon(void);
 static void persistlist(void);
 static int verifyarg(char *, int);
 static int safeopen(char *);
-static void catch_term(void);
-static void catch_alarm(void);
-static void catch_hup(void);
-static void cleanup_on_exit(void);
+static void catch_term(int);
+static void catch_alarm(int);
+static void catch_hup(int);
+static void cleanup_on_exit(int);
 static void addtolist(char *);
 static void removefromlist(char *);
 static int pathcmp(char *, char *);
@@ -258,21 +258,21 @@ main(int argc, char *argv[])
 
 /* for daemon to handle termination from user command */
 static void
-catch_term()
+catch_term(int signal __unused)
 {
 	exit(E_SUCCESS);
 }
 
 /* handle lack of carrier on open */
 static void
-catch_alarm()
+catch_alarm(int signal __unused)
 {
 	siglongjmp(deadline, 1);
 }
 
 /* caught a sighup */
 static void
-catch_hup()
+catch_hup(int signal __unused)
 {
 	/*
 	 * ttymon sends sighup to consadmd because it has the serial
@@ -284,7 +284,7 @@ catch_hup()
 
 /* Remove persistent state on receiving signal. */
 static void
-cleanup_on_exit()
+cleanup_on_exit(int signal __unused)
 {
 	(void) unlink(CONSADMLOCK);
 	exit(E_ERROR);

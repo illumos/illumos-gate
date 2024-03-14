@@ -589,7 +589,7 @@ static void	remv();
 static void	write_ioctl_syscon();
 static void	spawn(struct PROC_TABLE *, struct CMD_LINE *);
 static void	setimer(int);
-static void	siglvl(int, siginfo_t *, ucontext_t *);
+static void	siglvl(int, siginfo_t *, void *);
 static void	sigpoll(int);
 static void	enter_maintenance(void);
 static void	timer(int);
@@ -2142,7 +2142,7 @@ init_signals(void)
 	 * Handle all level-changing signals using siglvl() and set sa_mask so
 	 * that all level-changing signals are blocked while in siglvl().
 	 */
-	act.sa_handler = siglvl;
+	act.sa_sigaction = siglvl;
 	act.sa_flags = SA_SIGINFO;
 	(void) sigemptyset(&act.sa_mask);
 
@@ -2230,8 +2230,9 @@ setup_pipe()
  * should change the current run level.  We set new_state accordingly.
  */
 void
-siglvl(int sig, siginfo_t *sip, ucontext_t *ucp)
+siglvl(int sig, siginfo_t *sip, void *arg)
 {
+	ucontext_t *ucp = arg;
 	struct PROC_TABLE *process;
 	struct sigaction act;
 

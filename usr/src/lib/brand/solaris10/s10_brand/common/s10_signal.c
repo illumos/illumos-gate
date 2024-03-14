@@ -472,7 +472,7 @@ s10_sigaction(sysret_t *rval,
 	if (sigactp != NULL) {
 		handler = sigactp->sa_handler;
 		if (handler != SIG_DFL && handler != SIG_IGN)
-			sigactp->sa_handler = s10_sigacthandler;
+			sigactp->sa_sigaction = s10_sigacthandler;
 	}
 
 	if ((err = __systemcall(rval, SYS_sigaction + 1024,
@@ -492,8 +492,8 @@ s10_sigaction(sysret_t *rval,
 		err = nativesigset_to_s10(&osigactp->sa_mask,
 		    &osigactp->sa_mask);
 
-		if (osigactp->sa_handler == s10_sigacthandler)
-			osigactp->sa_handler = s10_handlers[sig - 1];
+		if (osigactp->sa_sigaction == s10_sigacthandler)
+			osigactp->sa_sigaction = s10_handlers[sig - 1];
 
 		if (err == 0 && brand_uucopy(osigactp, oact,
 		    sizeof (struct sigaction)) != 0)

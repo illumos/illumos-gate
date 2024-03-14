@@ -2661,7 +2661,7 @@ getldap_refresh()
 }
 
 void
-getldap_revalidate()
+getldap_revalidate(int signal __unused)
 {
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_revalidate()...\n");

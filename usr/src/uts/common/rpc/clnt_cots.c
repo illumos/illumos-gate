@@ -2543,9 +2543,9 @@ connmgr_close(struct cm_xprt *cm_entry)
 
 	mutex_exit(&cm_entry->x_lock);
 	if (cm_entry->x_ksp != NULL) {
-		mutex_enter(&connmgr_lock);
+		mutex_enter(cm_entry->x_ksp->ks_lock);
 		cm_entry->x_ksp->ks_private = NULL;
-		mutex_exit(&connmgr_lock);
+		mutex_exit(cm_entry->x_ksp->ks_lock);
 
 		/*
 		 * Must free the buffer we allocated for the

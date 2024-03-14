@@ -591,8 +591,8 @@ termio_close(mdb_io_t *io)
 {
 	termio_data_t *td = io->io_data;
 
-	(void) mdb_signal_sethandler(SIGWINCH, SIG_DFL, NULL);
-	(void) mdb_signal_sethandler(SIGTSTP, SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(SIGWINCH, MDB_SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(SIGTSTP, MDB_SIG_DFL, NULL);
 
 	termio_suspend_tty(td, &td->tio_ptios);
 
@@ -725,9 +725,9 @@ termio_suspend_tty(termio_data_t *td, struct termios *iosp)
 
 	if (td->tio_opgid > 0 && td->tio_opgid != mdb.m_pgid) {
 		mdb_dprintf(MDB_DBG_CMDBUF, "fg pgid=%d\n", (int)td->tio_opgid);
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_IGN, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_IGN, NULL);
 		(void) termio_ctl(td->tio_io, TIOCSPGRP, &td->tio_opgid);
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_DFL, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_DFL, NULL);
 	}
 }
 
@@ -777,9 +777,9 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 	 * We temporarily ignore TTOU because TIOCSPGRP could trigger it.
 	 */
 	if (td->tio_opgid != mdb.m_pgid) {
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_IGN, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_IGN, NULL);
 		(void) termio_ctl(td->tio_io, TIOCSPGRP, &mdb.m_pgid);
-		(void) mdb_signal_sethandler(SIGTTOU, SIG_DFL, NULL);
+		(void) mdb_signal_sethandler(SIGTTOU, MDB_SIG_DFL, NULL);
 		mdb_dprintf(MDB_DBG_CMDBUF, "fg pgid=%d\n", (int)mdb.m_pgid);
 	}
 
@@ -2056,13 +2056,13 @@ termio_quit(termio_data_t *td, int c)
 static const char *
 termio_susp(termio_data_t *td, int c)
 {
-	(void) mdb_signal_sethandler(SIGWINCH, SIG_IGN, NULL);
-	(void) mdb_signal_sethandler(SIGTSTP, SIG_IGN, NULL);
+	(void) mdb_signal_sethandler(SIGWINCH, MDB_SIG_IGN, NULL);
+	(void) mdb_signal_sethandler(SIGTSTP, MDB_SIG_IGN, NULL);
 
 	termio_suspend_tty(td, &td->tio_ptios);
 	mdb_iob_nl(td->tio_out);
 
-	(void) mdb_signal_sethandler(SIGTSTP, SIG_DFL, NULL);
+	(void) mdb_signal_sethandler(SIGTSTP, MDB_SIG_DFL, NULL);
 	(void) mdb_signal_pgrp(SIGTSTP);
 
 	/*
@@ -2070,7 +2070,7 @@ termio_susp(termio_data_t *td, int c)
 	 * debugger process group to be stopped by the kernel.  Once we return
 	 * from that call, we assume we are resuming from a subsequent SIGCONT.
 	 */
-	(void) mdb_signal_sethandler(SIGTSTP, SIG_IGN, NULL);
+	(void) mdb_signal_sethandler(SIGTSTP, MDB_SIG_IGN, NULL);
 	termio_resume_tty(td, &td->tio_ptios);
 
 	(void) mdb_signal_sethandler(SIGWINCH, termio_winch, td);

@@ -19,7 +19,7 @@ time_t *tschedule;
 static unsigned int timeout;		/* current timeout */
 static char *attnmessage, *saveattn;	/* attention message */
 
-static void alarmcatch();
+static void alarmcatch(int);
 static int idatesort(const void *, const void *);
 
 #ifdef DEBUG
@@ -105,7 +105,7 @@ query_once(char	*question, int def)
 		back = def;
 		goto done;
 	}
-	alarmcatch();
+	alarmcatch(SIGALRM);
 	in_query_once = 1;
 	pollset.fd = -1;
 	pollset.events = 0;
@@ -150,7 +150,7 @@ query_once(char	*question, int def)
 		} else {
 			msg(gettext("\"yes\" or \"no\"?\n"));
 			in_query_once = 0;
-			alarmcatch();
+			alarmcatch(SIGALRM);
 			in_query_once = 1;
 		}
 	}
@@ -177,7 +177,7 @@ done:
  *	longjmp back there and return the default answer.
  */
 static void
-alarmcatch(void)
+alarmcatch(int signal __unused)
 {
 	struct sigvec sv;
 
@@ -216,7 +216,7 @@ interrupt(int sig)
 	if (saveattn) {
 		attnmessage = saveattn;
 		saveattn = NULL;
-		alarmcatch();
+		alarmcatch(SIGALRM);
 	}
 }
 

@@ -326,7 +326,7 @@ varpd_setup_lookup_threads(void)
 }
 
 static void
-varpd_cleanup(void)
+varpd_cleanup(int signal __unused)
 {
 	varpd_exit = B_TRUE;
 }
