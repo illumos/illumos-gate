@@ -208,6 +208,15 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 } };
 
 static const nvme_log_page_info_t wdc_sn65x_log_pages[] = { {
+	.nlpi_short = "ocp/smart",
+	.nlpi_human = "OCP SMART / Health",
+	.nlpi_lid = OCP_LOG_DSSD_SMART,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_smart_t),
+}, {
 	.nlpi_short = "wdc/power",
 	.nlpi_human = "Power Samples",
 	.nlpi_lid = WDC_SN65X_LOG_POWER,

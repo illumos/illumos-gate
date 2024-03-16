@@ -23,6 +23,8 @@
  * Vendor-specific definitions for the WDC SN650 and SN655 NVMe devices.
  */
 
+#include <sys/nvme/ocp.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,7 +33,10 @@ extern "C" {
 #define	WDC_SN655_DID	0x2722
 
 typedef enum {
-	WDC_SN65X_LOG_OCP_SMART		= 0xc0,
+	/*
+	 * This is the same as the OCP SMART log.
+	 */
+	WDC_SN65X_LOG_OCP_SMART		= OCP_LOG_DSSD_SMART,
 	/*
 	 * This uses the common wdc_vul_power_t structure.
 	 */

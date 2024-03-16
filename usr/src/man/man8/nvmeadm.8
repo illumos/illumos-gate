@@ -12,7 +12,7 @@
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd January 12, 2024
+.Dd March 26, 2024
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -635,6 +635,18 @@ they operate on a controller or namespace.
 Micron Vendor Unique SMART.
 .It micron/extsmart
 Micron Extended SMART.
+.It ocp/smart
+Open Compute Datacenter NVMe SSD specification SMART / Health information.
+.It ocp/errrec
+Open Compute Datacenter NVMe SSD specification error recovery log.
+.It ocp/fwact
+Open Compute Datacenter NVMe SSD specification firmware activation log.
+.It ocp/latency
+Open Compute Datacenter NVMe SSD specification latency monitor.
+.It ocp/devcap
+Open Compute Datacenter NVMe SSD specification device capabilities.
+.It ocp/unsup
+Open Compute Datacenter NVMe SSD specification unsupported requirements.
 .It wdc/eol
 Western Digital end-of-life.
 .It wdc/devmgmt
