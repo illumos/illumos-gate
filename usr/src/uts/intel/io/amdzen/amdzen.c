@@ -553,6 +553,11 @@ amdzen_c_df_read32(uint_t dfno, uint8_t inst, const df_reg_def_t def,
 		return (ENOENT);
 	}
 
+	if (df->adf_rev == DF_REV_UNKNOWN) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
+	}
+
 	*valp = amdzen_df_read_regdef(azn, df, def, inst, B_FALSE);
 	mutex_exit(&azn->azn_mutex);
 
@@ -571,6 +576,11 @@ amdzen_c_df_read64(uint_t dfno, uint8_t inst, const df_reg_def_t def,
 	if (df == NULL) {
 		mutex_exit(&azn->azn_mutex);
 		return (ENOENT);
+	}
+
+	if (df->adf_rev == DF_REV_UNKNOWN) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
 	}
 
 	*valp = amdzen_df_read_regdef(azn, df, def, inst, B_TRUE);
