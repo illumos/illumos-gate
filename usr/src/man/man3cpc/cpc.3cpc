@@ -3,8 +3,8 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
-.\" Copyright 2023 Oxide Computer Company
-.Dd March 23, 2023
+.\" Copyright 2024 Oxide Computer Company
+.Dd March 16, 2024
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -149,10 +149,12 @@ Includes Ryzen, ThreadRipper, and EPYC branded processors.
 AMD Family 19h Zen 3 processors, including models 00-0fh, 20-2fh, and
 40-5fh.
 Includes Ryzen, ThreadRipper, and EPYC branded processors.
-.It Xr amd_f17h_zen4_events 3CPC
+.It Xr amd_f19h_zen4_events 3CPC
 AMD Family 19h Zen 4 processors, including models 10-1fh, 60-7fh, and
 a0-afh.
 Includes Ryzen and EPYC branded processors.
+.It Xr amd_f1ah_zen5_events 3CPC
+AMD Family 19h Zen 5 processors including models 00-1fh.
 .El
 .Ss Using Attributes
 Some processors have advanced performance counter capabilities that are
