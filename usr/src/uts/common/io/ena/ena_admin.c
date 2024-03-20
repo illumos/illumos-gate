@@ -28,7 +28,15 @@ static void
 ena_complete_cmd_ctx(ena_cmd_ctx_t *ctx, enahw_resp_desc_t *hwresp)
 {
 	bcopy(hwresp, ctx->ectx_resp, sizeof (*hwresp));
-	ctx->ectx_pending = B_FALSE;
+	ctx->ectx_pending = false;
+}
+
+static inline void
+ena_reset_cmd_ctx(ena_cmd_ctx_t *ctx)
+{
+	ctx->ectx_pending = false;
+	ctx->ectx_resp = NULL;
+	ctx->ectx_cmd_opcode = ENAHW_CMD_NONE;
 }
 
 /*
@@ -37,20 +45,49 @@ ena_complete_cmd_ctx(ena_cmd_ctx_t *ctx, enahw_resp_desc_t *hwresp)
 static void
 ena_release_cmd_ctx(ena_t *ena, ena_cmd_ctx_t *ctx)
 {
-	ASSERT(ctx->ectx_pending == B_FALSE);
-	ctx->ectx_resp = NULL;
-	ctx->ectx_cmd_opcode = ENAHW_CMD_NONE;
+	ASSERT(ctx->ectx_pending == false);
+	ena_reset_cmd_ctx(ctx);
 
 	mutex_enter(&ena->ena_aq.ea_sq_lock);
 	/*
 	 * We return the free descriptor to the end of the list so that we
 	 * cycle through them with each admin command, and don't end up almost
 	 * always re-using the same entry with the same command ID. While the
-	 * controller does not appear to mind, it's a little counterintuitive.
+	 * controller does not appear to mind, it's a little counter-intuitive.
 	 */
+	list_remove(&ena->ena_aq.ea_cmd_ctxs_used, ctx);
 	list_insert_tail(&ena->ena_aq.ea_cmd_ctxs_free, ctx);
 	ena->ena_aq.ea_pending_cmds--;
 	mutex_exit(&ena->ena_aq.ea_sq_lock);
+}
+
+void
+ena_release_all_cmd_ctx(ena_t *ena)
+{
+	ena_adminq_t *aq = &ena->ena_aq;
+	ena_cmd_ctx_t *ctx;
+
+	mutex_enter(&aq->ea_sq_lock);
+	while ((ctx = list_remove_head(&aq->ea_cmd_ctxs_used)) != NULL) {
+		ena_reset_cmd_ctx(ctx);
+		list_insert_tail(&aq->ea_cmd_ctxs_free, ctx);
+	}
+	aq->ea_pending_cmds = 0;
+	mutex_exit(&aq->ea_sq_lock);
+}
+
+void
+ena_create_cmd_ctx(ena_t *ena)
+{
+	ena_adminq_t *aq = &ena->ena_aq;
+
+	for (uint_t i = 0; i < aq->ea_qlen; i++) {
+		ena_cmd_ctx_t *ctx = &aq->ea_cmd_ctxs[i];
+
+		ctx->ectx_id = i;
+		ena_reset_cmd_ctx(ctx);
+		list_insert_tail(&aq->ea_cmd_ctxs_free, ctx);
+	}
 }
 
 /*
@@ -62,8 +99,9 @@ ena_acquire_cmd_ctx(ena_adminq_t *aq)
 	VERIFY(MUTEX_HELD(&aq->ea_sq_lock));
 	ASSERT3U(aq->ea_pending_cmds, <, aq->ea_qlen);
 	ena_cmd_ctx_t *ctx = list_remove_head(&aq->ea_cmd_ctxs_free);
+	list_insert_head(&aq->ea_cmd_ctxs_used, ctx);
 
-	ctx->ectx_pending = B_TRUE;
+	ctx->ectx_pending = true;
 	return (ctx);
 }
 
@@ -77,7 +115,7 @@ ena_admin_submit_cmd(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
 	VERIFY3U(cmd->ecd_opcode, !=, 0);
 	ena_adminq_t *aq = &ena->ena_aq;
 	ena_admin_sq_t *sq = &aq->ea_sq;
-	uint16_t modulo_mask = aq->ea_qlen - 1;
+	const uint16_t modulo_mask = aq->ea_qlen - 1;
 	ena_cmd_ctx_t *lctx = NULL;
 
 	mutex_enter(&aq->ea_sq_lock);
@@ -99,6 +137,7 @@ ena_admin_submit_cmd(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
 	ENAHW_CMD_ID(cmd, lctx->ectx_id);
 	bcopy(cmd, &sq->eas_entries[tail_mod], sizeof (*cmd));
 	ENA_DMA_SYNC(sq->eas_dma, DDI_DMA_SYNC_FORDEV);
+
 	sq->eas_tail++;
 	aq->ea_pending_cmds++;
 
@@ -129,12 +168,15 @@ ena_admin_read_resp(ena_t *ena, enahw_resp_desc_t *hwresp)
 	ena_admin_cq_t *cq = &aq->ea_cq;
 	ena_cmd_ctx_t *ctx = NULL;
 	uint16_t modulo_mask = aq->ea_qlen - 1;
+
 	VERIFY(MUTEX_HELD(&aq->ea_cq_lock));
 
 	uint16_t head_mod = cq->eac_head & modulo_mask;
 	uint8_t phase = cq->eac_phase & ENAHW_RESP_PHASE_MASK;
 	uint16_t cmd_id = ENAHW_RESP_CMD_ID(hwresp);
+
 	ctx = &aq->ea_cmd_ctxs[cmd_id];
+
 	ASSERT3U(ctx->ectx_id, ==, cmd_id);
 	ena_complete_cmd_ctx(ctx, hwresp);
 
@@ -195,7 +237,7 @@ ena_admin_poll_for_resp(ena_t *ena, ena_cmd_ctx_t *ctx)
 	int ret = 0;
 	hrtime_t expire = gethrtime() + ena->ena_aq.ea_cmd_timeout_ns;
 
-	while (1) {
+	for (;;) {
 		ena_admin_process_responses(ena);
 
 		if (!ctx->ectx_pending) {
@@ -218,13 +260,12 @@ ena_admin_poll_for_resp(ena_t *ena, ena_cmd_ctx_t *ctx)
 			 * command failed but once again the reply was
 			 * not delivered. With this unknown state the
 			 * best thing to do is to reset the device and
-			 * start from scratch. But as we don't have
-			 * that capability at the moment the next best
-			 * thing to do is to spin or panic; we choose
-			 * to panic.
+			 * start from scratch. There is even a reset
+			 * reason code just for this.
 			 */
-			dev_err(ena->ena_dip, CE_PANIC,
-			    "timed out waiting for admin response");
+			ena_err(ena, "timed out waiting for admin response");
+			ena_trigger_reset(ena, ENAHW_RESET_ADMIN_TO);
+			return (EIO);
 		}
 	}
 
@@ -239,7 +280,7 @@ ena_free_host_info(ena_t *ena)
 	ena_dma_free(&ena->ena_host_info);
 }
 
-boolean_t
+bool
 ena_init_host_info(ena_t *ena)
 {
 	enahw_host_info_t *ehi;
@@ -251,19 +292,22 @@ ena_init_host_info(ena_t *ena)
 	enahw_feat_host_attr_t *ha_cmd =
 	    &cmd.ecd_cmd.ecd_set_feat.ecsf_feat.ecsf_host_attr;
 	enahw_resp_desc_t resp;
-	ena_dma_conf_t conf = {
-		.edc_size = ENAHW_HOST_INFO_ALLOC_SZ,
-		.edc_align = ENAHW_HOST_INFO_ALIGNMENT,
-		.edc_sgl = 1,
-		.edc_endian = DDI_NEVERSWAP_ACC,
-		.edc_stream = B_FALSE,
-	};
 
 	hi_dma = &ena->ena_host_info;
 
-	if (!ena_dma_alloc(ena, hi_dma, &conf, 4096)) {
-		ena_err(ena, "failed to allocate DMA for host info");
-		return (B_FALSE);
+	if (hi_dma->edb_va == NULL) {
+		ena_dma_conf_t conf = {
+			.edc_size = ENAHW_HOST_INFO_ALLOC_SZ,
+			.edc_align = ENAHW_HOST_INFO_ALIGNMENT,
+			.edc_sgl = 1,
+			.edc_endian = DDI_NEVERSWAP_ACC,
+			.edc_stream = false,
+		};
+
+		if (!ena_dma_alloc(ena, hi_dma, &conf, 4096)) {
+			ena_err(ena, "failed to allocate DMA for host info");
+			return (false);
+		}
 	}
 
 	ehi = (void *)hi_dma->edb_va;
@@ -338,6 +382,25 @@ ena_init_host_info(ena_t *ena)
 	 *    The device supports the retrieving and updating of the
 	 *    RSS function and hash key. As we don't yet implement RSS
 	 *    this is disabled.
+	 *
+	 * ENA_ADMIN_HOST_INFO_RX_PAGE_REUSE
+	 *
+	 *    Dynamic Rx Buffer feature. This feature allows the driver to
+	 *    avoid additional Rx buffer allocations by effectively using a
+	 *    buffer more than once if there is space remaining after receiving
+	 *    a packet. We currently use fixed TCBs and rings and don't
+	 *    implement this feature.
+	 *
+	 * ENA_ADMIN_HOST_INFO_TX_IPV6_CSUM_OFFLOAD
+	 *
+	 *    Indicate that the driver supports Tx IPv6 checksum offload.
+	 *
+	 * ENA_ADMIN_HOST_INFO_PHC
+	 *
+	 *    Instructs the device to enable its PHC (Precision Time Protocol
+	 *    Hardware Clock). In Linux, this would be exposed to userland NTP
+	 *    software as a PTP device. We don't support this so leave it
+	 *    disabled.
 	 */
 	ehi->ehi_driver_supported_features =
 	    ENAHW_HOST_INFO_RX_OFFSET_MASK |
@@ -375,15 +438,15 @@ ena_init_host_info(ena_t *ena)
 	if (ret != 0) {
 		ena_err(ena, "failed to set host attributes: %d", ret);
 		ena_dma_free(hi_dma);
-		return (B_FALSE);
+		return (false);
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
 int
 ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
-    boolean_t is_tx, uint32_t vector, uint16_t *hw_index,
+    bool is_tx, uint32_t vector, uint16_t *hw_index,
     uint32_t **unmask_addr, uint32_t **numanode)
 {
 	int ret;
@@ -464,7 +527,7 @@ ena_destroy_cq(ena_t *ena, uint16_t hw_idx)
 
 int
 ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
-    boolean_t is_tx, uint16_t cq_index, uint16_t *hw_index, uint32_t **db_addr)
+    bool is_tx, uint16_t cq_index, uint16_t *hw_index, uint32_t **db_addr)
 {
 	int ret;
 	enahw_cmd_desc_t cmd;
@@ -478,7 +541,7 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	if (!ISP2(num_descs)) {
 		ena_err(ena, "the number of descs must be a power of 2, but "
 		    " is %d", num_descs);
-		return (B_FALSE);
+		return (false);
 	}
 
 	bzero(&cmd, sizeof (cmd));
@@ -521,7 +584,7 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 }
 
 int
-ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
+ena_destroy_sq(ena_t *ena, uint16_t hw_idx, bool is_tx)
 {
 	enahw_cmd_desc_t cmd;
 	enahw_cmd_destroy_sq_t *cmd_sq = &cmd.ecd_cmd.ecd_destroy_sq;
@@ -550,26 +613,6 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
 	return (0);
 }
 
-/*
- * Determine if a given feature is available on this device.
- */
-static boolean_t
-ena_is_feature_avail(ena_t *ena, const enahw_feature_id_t feat_id)
-{
-	VERIFY3U(feat_id, <=, ENAHW_FEAT_NUM);
-	uint32_t mask = 1U << feat_id;
-
-	/*
-	 * The device attributes feature is always supported, as
-	 * indicated by the common code.
-	 */
-	if (feat_id == ENAHW_FEAT_DEVICE_ATTRIBUTES) {
-		return (B_TRUE);
-	}
-
-	return ((ena->ena_supported_features & mask) != 0);
-}
-
 int
 ena_set_feature(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
     const enahw_feature_id_t feat_id, const uint8_t feat_ver)
@@ -578,7 +621,7 @@ ena_set_feature(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
 	ena_cmd_ctx_t *ctx = NULL;
 	int ret = 0;
 
-	if (!ena_is_feature_avail(ena, feat_id)) {
+	if (!ena_is_feat_avail(ena, feat_id)) {
 		ena_err(ena, "attempted to set unsupported feature: 0x%x %d"
 		    " (0x%x)", feat_id, feat_ver, ena->ena_supported_features);
 		return (ENOTSUP);
@@ -606,7 +649,7 @@ ena_get_feature(ena_t *ena, enahw_resp_desc_t *resp,
 	ena_cmd_ctx_t *ctx = NULL;
 	int ret = 0;
 
-	if (!ena_is_feature_avail(ena, feat_id)) {
+	if (!ena_is_feat_avail(ena, feat_id)) {
 		return (ENOTSUP);
 	}
 

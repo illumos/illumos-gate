@@ -10,8 +10,9 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
+
 #include "ena.h"
 
 /*
@@ -111,7 +112,7 @@ ena_fill_tx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
 {
 	ena_t *ena = arg;
-	ena_txq_t *txq = &(ena->ena_txqs[ring_index]);
+	ena_txq_t *txq = &ena->ena_txqs[ring_index];
 
 	VERIFY3S(rtype, ==, MAC_RING_TYPE_TX);
 	VERIFY3S(ring_index, <, ena->ena_num_txqs);
@@ -129,7 +130,7 @@ ena_fill_rx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
 {
 	ena_t *ena = arg;
-	ena_rxq_t *rxq = &(ena->ena_rxqs[ring_index]);
+	ena_rxq_t *rxq = &ena->ena_rxqs[ring_index];
 
 	VERIFY3S(rtype, ==, MAC_RING_TYPE_RX);
 	VERIFY3S(ring_index, <, ena->ena_num_rxqs);
@@ -151,7 +152,9 @@ ena_m_start(void *arg)
 {
 	ena_t *ena = arg;
 
-	atomic_or_32(&ena->ena_state, ENA_STATE_RUNNING);
+	atomic_or_32(&ena->ena_state, ENA_STATE_STARTED);
+	ena_enable_watchdog(ena);
+
 	return (0);
 }
 
@@ -159,7 +162,9 @@ static void
 ena_m_stop(void *arg)
 {
 	ena_t *ena = arg;
-	atomic_and_32(&ena->ena_state, ~ENA_STATE_RUNNING);
+
+	ena_disable_watchdog(ena);
+	atomic_and_32(&ena->ena_state, ~ENA_STATE_STARTED);
 }
 
 /*
@@ -421,7 +426,7 @@ ena_mac_unregister(ena_t *ena)
 	return (mac_unregister(ena->ena_mh));
 }
 
-boolean_t
+bool
 ena_mac_register(ena_t *ena)
 {
 	int ret;
@@ -429,7 +434,7 @@ ena_mac_register(ena_t *ena)
 
 	if ((regp = mac_alloc(MAC_VERSION)) == NULL) {
 		ena_err(ena, "failed to allocate MAC handle");
-		return (B_FALSE);
+		return (false);
 	}
 
 	regp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;

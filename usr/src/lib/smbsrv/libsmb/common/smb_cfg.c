@@ -1208,11 +1208,14 @@ smb_config_get_protocol(smb_cfg_id_t id, char *name, uint32_t default_val)
 }
 
 /*
- * The service manifest has empty values by default for min_protocol and
- * max_protocol. The expectation is that when those values are empty, we don't
- * constrain the range of supported protocol versions (and allow use of the
- * whole range that we implement). For that reason, this should usually be the
- * highest protocol version we implement.
+ * If the service properties min_protocol and max_protocol are empty values,
+ * the built-in defaults allow clients to use any supported protocol version.
+ * Policy choices (such as "let's disable SMB1") should be implemented by
+ * setting values in the SMB service, either via the service manifest (if a
+ * distribution policy) or via svccfg/svcprop (if a local policy).
+ *
+ * max_protocol_default should be the highest implemented protocol version.
+ * See also $UTS/common/fs/smbsrv/smb2_negotiate.c
  */
 uint32_t max_protocol_default = SMB_VERS_3_11;
 
@@ -1228,7 +1231,7 @@ smb_config_get_max_protocol(void)
 }
 
 /*
- * This should eventually be SMB_VERS_2_BASE
+ * See comment above max_protocol_default
  */
 uint32_t min_protocol_default = SMB_VERS_1;
 

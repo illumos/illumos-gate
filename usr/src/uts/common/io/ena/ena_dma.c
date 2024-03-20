@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include "ena.h"
@@ -71,7 +71,7 @@ ena_dma_attr(const ena_t *ena, ddi_dma_attr_t *attrp,
 	/*
 	 * Minimum and maximum amount of data we can send. This isn't
 	 * strictly limited by PCI in hardware, as it'll just make the
-	 * appropriate number of requests. Simiarly, PCIe allows for
+	 * appropriate number of requests. Similarly, PCIe allows for
 	 * an arbitrary granularity. We set this to one, as it's
 	 * really a matter of what hardware is requesting from us.
 	 */
@@ -107,10 +107,11 @@ ena_dma_free(ena_dma_buf_t *edb)
 		edb->edb_dma_hdl = NULL;
 	}
 
+	edb->edb_va = NULL;
 	edb->edb_len = 0;
 }
 
-boolean_t
+bool
 ena_dma_alloc(ena_t *ena, ena_dma_buf_t *edb, ena_dma_conf_t *conf, size_t size)
 {
 	int ret;
@@ -130,7 +131,7 @@ ena_dma_alloc(ena_t *ena, ena_dma_buf_t *edb, ena_dma_conf_t *conf, size_t size)
 	    &edb->edb_dma_hdl);
 	if (ret != DDI_SUCCESS) {
 		ena_err(ena, "!failed to allocate DMA handle: %d", ret);
-		return (B_FALSE);
+		return (false);
 	}
 
 	ret = ddi_dma_mem_alloc(edb->edb_dma_hdl, size, &acc, flags,
@@ -140,7 +141,7 @@ ena_dma_alloc(ena_t *ena, ena_dma_buf_t *edb, ena_dma_conf_t *conf, size_t size)
 		ena_err(ena, "!failed to allocate %lu bytes of DMA "
 		    "memory: %d", size, ret);
 		ena_dma_free(edb);
-		return (B_FALSE);
+		return (false);
 	}
 
 	bzero(edb->edb_va, size_allocated);
@@ -152,13 +153,19 @@ ena_dma_alloc(ena_t *ena, ena_dma_buf_t *edb, ena_dma_conf_t *conf, size_t size)
 		ena_err(ena, "!failed to bind %lu bytes of DMA "
 		    "memory: %d", size_allocated, ret);
 		ena_dma_free(edb);
-		return (B_FALSE);
+		return (false);
 	}
 
 	edb->edb_len = size;
 	edb->edb_real_len = size_allocated;
 	edb->edb_cookie = ddi_dma_cookie_one(edb->edb_dma_hdl);
-	return (B_TRUE);
+	return (true);
+}
+
+void
+ena_dma_bzero(ena_dma_buf_t *edb)
+{
+	bzero(edb->edb_va, edb->edb_real_len);
 }
 
 /*
@@ -177,7 +184,7 @@ ena_set_dma_addr(const ena_t *ena, const uint64_t phys_addr,
 }
 
 /*
- * The same as the above function, but writes the phsyical address to
+ * The same as the above function, but writes the physical address to
  * the supplied value pointers instead. Mostly used as a sanity check
  * that the address fits in the reported DMA width.
  */

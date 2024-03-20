@@ -10,8 +10,9 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
+
 #include "ena.h"
 
 /*
@@ -28,6 +29,9 @@ ena_io_intr(caddr_t arg1, caddr_t arg2)
 	ena_txq_t *txq = &ena->ena_txqs[vector - 1];
 	ena_rxq_t *rxq = &ena->ena_rxqs[vector - 1];
 	uint32_t intr_ctrl;
+
+	if ((ena->ena_state & ENA_STATE_STARTED) == 0)
+		return (DDI_INTR_CLAIMED);
 
 	ASSERT3P(txq, !=, NULL);
 	ASSERT3P(rxq, !=, NULL);
@@ -49,13 +53,16 @@ ena_admin_intr(caddr_t arg1, caddr_t arg2)
 {
 	ena_t *ena = (ena_t *)arg1;
 
-	ena_aenq_work(ena);
+	if ((ena->ena_state & ENA_STATE_STARTED) != 0)
+		ena_aenq_work(ena);
 	return (DDI_INTR_CLAIMED);
 }
 
 void
-ena_intr_remove_handlers(ena_t *ena)
+ena_intr_remove_handlers(ena_t *ena, bool resetting)
 {
+	VERIFY0(resetting);
+
 	for (int i = 0; i < ena->ena_num_intrs; i++) {
 		int ret = ddi_intr_remove_handler(ena->ena_intr_handles[i]);
 
@@ -71,14 +78,14 @@ ena_intr_remove_handlers(ena_t *ena)
  * The ena driver uses separate interrupt handlers for the admin queue
  * and I/O queues.
  */
-boolean_t
+bool
 ena_intr_add_handlers(ena_t *ena)
 {
 	ASSERT3S(ena->ena_num_intrs, >=, 2);
 	if (ddi_intr_add_handler(ena->ena_intr_handles[0], ena_admin_intr, ena,
 	    (void *)(uintptr_t)0) != DDI_SUCCESS) {
 		ena_err(ena, "failed to add admin interrupt handler");
-		return (B_FALSE);
+		return (false);
 	}
 
 	for (int i = 1; i < ena->ena_num_intrs; i++) {
@@ -104,14 +111,14 @@ ena_intr_add_handlers(ena_t *ena)
 				    ena->ena_intr_handles[i]);
 			}
 
-			return (B_FALSE);
+			return (false);
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
-boolean_t
+bool
 ena_intrs_disable(ena_t *ena)
 {
 	int ret;
@@ -121,7 +128,7 @@ ena_intrs_disable(ena_t *ena)
 		    ena->ena_num_intrs)) != DDI_SUCCESS) {
 			ena_err(ena, "failed to block disable interrupts: %d",
 			    ret);
-			return (B_FALSE);
+			return (false);
 		}
 	} else {
 		for (int i = 0; i < ena->ena_num_intrs; i++) {
@@ -129,15 +136,15 @@ ena_intrs_disable(ena_t *ena)
 			if (ret != DDI_SUCCESS) {
 				ena_err(ena, "failed to disable interrupt "
 				    "%d: %d", i, ret);
-				return (B_FALSE);
+				return (false);
 			}
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }
 
-boolean_t
+bool
 ena_intrs_enable(ena_t *ena)
 {
 	int ret;
@@ -147,7 +154,7 @@ ena_intrs_enable(ena_t *ena)
 		    ena->ena_num_intrs)) != DDI_SUCCESS) {
 			ena_err(ena, "failed to block enable interrupts: %d",
 			    ret);
-			return (B_FALSE);
+			return (false);
 		}
 	} else {
 		for (int i = 0; i < ena->ena_num_intrs; i++) {
@@ -166,10 +173,10 @@ ena_intrs_enable(ena_t *ena)
 					    ena->ena_intr_handles[i]);
 				}
 
-				return (B_FALSE);
+				return (false);
 			}
 		}
 	}
 
-	return (B_TRUE);
+	return (true);
 }

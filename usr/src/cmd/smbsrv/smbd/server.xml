@@ -234,7 +234,7 @@ file.
 		<propval name='max_protocol' type='astring'
 			value='' override='true'/>
 		<propval name='min_protocol' type='astring'
-			value='' override='true'/>
+			value='2.1' override='true'/>
 		<propval name='encrypt' type='astring'
 			value='disabled' override='true'/>
 		<propval name='encrypt_ciphers' type='astring'
