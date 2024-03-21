@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 	.file	"retpoline.s"
@@ -119,18 +120,23 @@
 	RETPOLINE_MKJUMP(r15)
 
 	/*
-	 * The x86_rsb_stuff function is called from pretty arbitrary
-	 * contexts. It's much easier for us to save and restore all the
-	 * registers we touch rather than clobber them for callers. You must
-	 * preserve this property or the system will panic at best.
+	 * The x86_rsb_stuff{,_vmexit} functions can be called from pretty
+	 * arbitrary contexts. It's much easier for us to save and restore all
+	 * the registers we touch rather than clobber them for callers. You
+	 * must preserve this property or the system will panic at best.
+	 *
+	 * The reason for two entry points is because the need to RSB stuff
+	 * on Intel depends greatly on factors that are different in the
+	 * VMEXIT case, vs. the other context-switching cases
+	 *
+	 * See cpuid.c's cpuid_patch_rsb() for where the two entry points'
+	 * NOPs actually get patched with one-byte RETs as need be, and the
+	 * rules we use to determine which gets disabled with a RET, and which
+	 * maintain their NOP to proceed to executing the stuffing sequence.
 	 */
-	ENTRY(x86_rsb_stuff)
-	/*
-	 * These nops are present so we can patch a ret instruction if we need
-	 * to disable RSB stuffing because enhanced IBRS is present or we're
-	 * disabling mitigations.
-	 */
+	ENTRY_NP(x86_rsb_stuff_vmexit)
 	nop
+	ALTENTRY(x86_rsb_stuff)
 	nop
 	pushq	%rdi
 	pushq	%rax
@@ -154,6 +160,7 @@ rsb_loop:
 	popq	%rdi
 	ret
 	SET_SIZE(x86_rsb_stuff)
+	SET_SIZE(x86_rsb_stuff_vmexit)
 
 #elif defined(__i386)
 
