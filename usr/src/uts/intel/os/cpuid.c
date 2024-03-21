@@ -1203,10 +1203,14 @@
  * enhanced IBRS. When eIBRS is present and enabled, then there should be
  * nothing else that we need to do to protect the kernel at this time.
  *
- * Unfortunately, eIBRS or not, we need to manually overwrite the contents of
- * the return stack buffer. We do this through the x86_rsb_stuff() function.
- * Currently this is employed on context switch and vmx_exit. The
- * x86_rsb_stuff() function is disabled only when mitigations in general are.
+ * Unfortunately, not all eIBRS implementations are sufficient to guard
+ * against RSB manipulations, so we still need to manually overwrite the
+ * contents of the return stack buffer unless the hardware specifies we are
+ * covered. We do this through the x86_rsb_stuff() function.  Currently this
+ * is employed on context switch and vmx_exit. The x86_rsb_stuff() function is
+ * disabled only when mitigations in general are, or if we have hardware
+ * indicating no need for post-barrier RSB protections, either in one place
+ * (old hardware), or on both (newer hardware).
  *
  * If SMEP is not present, then we would have to stuff the RSB every time we
  * transitioned from user mode to the kernel, which isn't very practical right
@@ -1675,7 +1679,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx512_bf16",
 	"auto_ibrs",
 	"rfds_no",
-	"rfds_clear"
+	"rfds_clear",
+	"pbrsb_no"
 };
 
 boolean_t
@@ -2968,12 +2973,40 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 }
 
 /*
- * We default to enabling RSB mitigations.
+ * We default to enabling Return Stack Buffer (RSB) mitigations.
  *
- * NOTE: We used to skip RSB mitigations with eIBRS, but developments around
- * post-barrier RSB guessing suggests we should enable RSB mitigations always
- * unless specifically instructed not to.
+ * We used to skip RSB mitigations with Intel eIBRS, but developments around
+ * post-barrier RSB (PBRSB) guessing suggests we should enable Intel RSB
+ * mitigations always unless explicitly bypassed, or unless hardware indicates
+ * the bug has been fixed.
  *
+ * The current decisions for using, or ignoring, a RSB software stuffing
+ * sequence are expressed by the following table:
+ *
+ * +-------+------------+-----------------+--------+
+ * | eIBRS |  PBRSB_NO  |  context switch | vmexit |
+ * +-------+------------+-----------------+--------+
+ * |   Yes |     No     |  stuff          | stuff  |
+ * |   Yes |     Yes    |  ignore         | ignore |
+ * |   No  |     No     |  stuff          | ignore |
+ * +-------+------------+-----------------+--------+
+ *
+ * Note that if an Intel CPU has no eIBRS, it will never enumerate PBRSB_NO,
+ * because machines with no eIBRS do not have a problem with PBRSB overflow.
+ * See the Intel document cited below for details.
+ *
+ * Also note that AMD AUTO_IBRS has no PBRSB problem, so it is not included in
+ * the table above, and that there is no situation where vmexit stuffing is
+ * needed, but context-switch stuffing isn't.
+ */
+
+/* BEGIN CSTYLED */
+/*
+ * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/advisory-guidance/post-barrier-return-stack-buffer-predictions.html
+ */
+/* END CSTYLED */
+
+/*
  * AMD indicates that when Automatic IBRS is enabled we do not need to implement
  * return stack buffer clearing for VMEXIT as it takes care of it. The manual
  * also states that as long as SMEP and we maintain at least one page between
@@ -2982,17 +3015,41 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
  * present.
  */
 static void
-cpuid_patch_rsb(x86_spectrev2_mitigation_t mit)
+cpuid_patch_rsb(x86_spectrev2_mitigation_t mit, bool intel_pbrsb_no)
 {
 	const uint8_t ret = RET_INSTR;
 	uint8_t *stuff = (uint8_t *)x86_rsb_stuff;
+	uint8_t *vmx_stuff = (uint8_t *)x86_rsb_stuff_vmexit;
 
 	switch (mit) {
 	case X86_SPECTREV2_AUTO_IBRS:
 	case X86_SPECTREV2_DISABLED:
+		/* Don't bother with any RSB stuffing! */
 		*stuff = ret;
+		*vmx_stuff = ret;
+		break;
+	case X86_SPECTREV2_RETPOLINE:
+		/*
+		 * The Intel document on Post-Barrier RSB says that processors
+		 * without eIBRS do not have PBRSB problems upon VMEXIT.
+		 */
+		VERIFY(!intel_pbrsb_no);
+		VERIFY3U(*stuff, !=, ret);
+		*vmx_stuff = ret;
 		break;
 	default:
+		/*
+		 * eIBRS is all that's left.  If CPU claims PBRSB is fixed,
+		 * don't use the RSB mitigation in either case.  Otherwise
+		 * both vmexit and context-switching require the software
+		 * mitigation.
+		 */
+		if (intel_pbrsb_no) {
+			/* CPU claims PBRSB problems are fixed. */
+			*stuff = ret;
+			*vmx_stuff = ret;
+		}
+		VERIFY3U(*stuff, ==, *vmx_stuff);
 		break;
 	}
 }
@@ -3267,6 +3324,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_RFDS_CLEAR);
 				}
+				if (reg & IA32_ARCH_CAP_PBRSB_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_PBRSB_NO);
+				}
 			}
 			no_trap();
 		}
@@ -3327,7 +3388,7 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	}
 
 	cpuid_patch_retpolines(v2mit);
-	cpuid_patch_rsb(v2mit);
+	cpuid_patch_rsb(v2mit, is_x86_feature(featureset, X86FSET_PBRSB_NO));
 	x86_spectrev2_mitigation = v2mit;
 	membar_producer();
 

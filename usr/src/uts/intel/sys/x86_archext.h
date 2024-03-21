@@ -934,6 +934,7 @@ extern "C" {
 #define	X86FSET_AUTO_IBRS	108
 #define	X86FSET_RFDS_NO		109
 #define	X86FSET_RFDS_CLEAR	110
+#define	X86FSET_PBRSB_NO	111
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1586,7 +1587,7 @@ typedef enum x86_uarchrev {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	111
+#define	NUM_X86_FEATURES	112
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -1609,6 +1610,7 @@ extern uint_t pentiumpro_bug4046376;
  */
 extern void (*spec_uarch_flush)(void);
 extern void x86_rsb_stuff(void);
+extern void x86_rsb_stuff_vmexit(void);
 extern void x86_md_clear(void);
 
 #endif
