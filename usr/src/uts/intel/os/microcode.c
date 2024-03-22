@@ -459,10 +459,9 @@ ucode_get_rev(uint32_t *revp)
 {
 	int i;
 
-	ASSERT(ucode != NULL);
 	ASSERT(revp != NULL);
 
-	if (!ucode->us_capable(CPU))
+	if (ucode == NULL || !ucode->us_capable(CPU))
 		return (EM_NOTSUP);
 
 	mutex_enter(&cpu_lock);
