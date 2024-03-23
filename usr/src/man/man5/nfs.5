@@ -19,9 +19,9 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\" Copyright 2020 Joyent, Inc.
-.\" Copyright 2022 RackTop Systems.
+.\" Copyright 2022-2024 RackTop Systems.
 .\"
-.Dd September 15, 2022
+.Dd March 23, 2024
 .Dt NFS 5
 .Os
 .Sh NAME
@@ -79,7 +79,8 @@ option to
 .Xc
 The NFS server only uses NFS versions in the range specified by these
 properties.
-Valid values of versions are: 2, 3, and 4.
+Valid values of versions are: 2, 3, 4, 4.0, 4.1 and 4.2.
+Version 4 is an alias for 4.0.
 Default minimum version is
 .Li 2 ,
 while the default maximum version is
