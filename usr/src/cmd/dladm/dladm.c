@@ -4255,7 +4255,7 @@ do_modify_iptun(int argc, char *argv[], const char *use)
 static void
 do_show_iptun(int argc, char *argv[], const char *use)
 {
-	char		option;
+	int		option;
 	datalink_id_t	linkid;
 	uint32_t	flags = DLADM_OPT_ACTIVE;
 	char		*name = NULL;
@@ -8171,7 +8171,7 @@ do_add_bridge(int argc, char **argv, const char *use)
 static void
 do_delete_bridge(int argc, char **argv, const char *use)
 {
-	char			option;
+	int			option;
 	char			*altroot = NULL;
 	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	dladm_status_t		status;
@@ -8204,7 +8204,7 @@ do_delete_bridge(int argc, char **argv, const char *use)
 static void
 do_remove_bridge(int argc, char **argv, const char *use)
 {
-	char		option;
+	int		option;
 	uint_t		n, nlink;
 	char		*links[MAXPORT];
 	datalink_id_t	linkids[MAXPORT];

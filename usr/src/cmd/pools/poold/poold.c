@@ -391,7 +391,7 @@ pu_getpname(const char *arg0)
 int
 main(int argc, char *argv[])
 {
-	char c;
+	int c;
 	char log_severity[16] = "";
 	JavaVMInitArgs vm_args;
 	JavaVMOption vm_opts[5];

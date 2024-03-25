@@ -329,7 +329,7 @@ do_add_flow(int argc, char *argv[])
 	uint_t			index;
 	datalink_id_t		linkid;
 
-	char			option;
+	int			option;
 	boolean_t		l_arg = B_FALSE;
 	char			propstr[DLADM_STRSIZE];
 	char			attrstr[DLADM_STRSIZE];
@@ -415,7 +415,7 @@ do_add_flow(int argc, char *argv[])
 static void
 do_remove_flow(int argc, char *argv[])
 {
-	char			option;
+	int			option;
 	char			*flowname = NULL;
 	char			linkname[MAXLINKNAMELEN];
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;

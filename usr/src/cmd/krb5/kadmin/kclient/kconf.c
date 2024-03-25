@@ -117,7 +117,8 @@ main(int argc, char **argv)
 {
 	profile_t	profile;
 	errcode_t	code;
-	char		c, *realm, *kdcs, *master, *domain, *token, *lasts;
+	int		c;
+	char		*realm, *kdcs, *master, *domain, *token, *lasts;
 	char		*file, **ret_values = NULL;
 	boolean_t	set_change = FALSE;
 	struct profile_string_list values;

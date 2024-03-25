@@ -2013,7 +2013,7 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 
-	char	c;		/* for parsing getopts */
+	int	c;		/* for parsing getopts */
 	int	nopts = 0;	/* for backward compatibility */
 	int	err = 0;
 

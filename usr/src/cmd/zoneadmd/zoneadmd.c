@@ -334,12 +334,12 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
     char *init_file)
 {
 	int argc = 0, argc_save;
-	int i;
+	int i, c;
 	int err = Z_OK;
 	char *arg, *lasts, **argv = NULL, **argv_save;
 	char zonecfg_args[BOOTARGS_MAX];
 	char scratchargs[BOOTARGS_MAX], *sargs;
-	char c, argsw[5];
+	char argsw[5];
 
 	bzero(outargs, BOOTARGS_MAX);
 

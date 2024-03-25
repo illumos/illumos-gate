@@ -3430,7 +3430,7 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 int
 main(int argc, char **argv)
 {
-	char	ch;
+	int	ch;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)

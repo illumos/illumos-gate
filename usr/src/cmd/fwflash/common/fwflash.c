@@ -94,7 +94,7 @@ main(int argc, char **argv)
 {
 	int		rv = FWFLASH_SUCCESS;
 	int		i;
-	char		ch;
+	int		ch;
 	char		*read_file;
 	extern char	*optarg;
 	char		*devclass = NULL;

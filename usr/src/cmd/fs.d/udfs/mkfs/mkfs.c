@@ -183,7 +183,7 @@ main(int32_t argc, int8_t *argv[])
 	char *special, *raw_special;
 	struct stat statarea;
 	struct ustat ustatarea;
-	int32_t	c;
+	int	c;
 	uint32_t temp_secsz;
 	int isfs;
 

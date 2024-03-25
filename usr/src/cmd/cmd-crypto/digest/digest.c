@@ -134,7 +134,7 @@ main(int argc, char **argv)
 	extern char *optarg;
 	extern int optind;
 	int errflag = 0;	/* We had an optstr parse error */
-	char c;			/* current getopts flag */
+	int c;			/* current getopts flag */
 	char *algo_str;		/* mechanism/algorithm string */
 	int filecount;
 	boolean_t mac_cmd;	/* if TRUE, do mac, else do digest */

@@ -782,7 +782,7 @@ main(int argc, char *argv[])
 	struct rlimit rlim;
 	struct sigaction act;
 	sigset_t set;
-	char c;
+	int c;
 	boolean_t run_fg = B_FALSE;
 
 	if ((nhdl = malloc(sizeof (nd_hdl_t))) == NULL) {

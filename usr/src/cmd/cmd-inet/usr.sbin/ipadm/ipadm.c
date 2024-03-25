@@ -1073,7 +1073,7 @@ do_reset_ifprop(int argc, char **argv, const char *use)
 static void
 do_show_prop(int argc, char **argv, const char *use)
 {
-	char			option;
+	int			option;
 	nvlist_t		*proplist = NULL;
 	char			*fields_str = NULL;
 	char			*protostr;

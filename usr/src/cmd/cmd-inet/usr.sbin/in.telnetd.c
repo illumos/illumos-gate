@@ -2197,7 +2197,7 @@ main(int argc, char *argv[])
 	boolean_t standalone = 0;
 #endif /* defined(DEBUG) */
 	extern char *optarg;
-	char c;
+	int c;
 	int tos = -1;
 
 	while ((c = getopt(argc, argv, TELNETD_OPTS DEBUG_OPTS)) != -1) {

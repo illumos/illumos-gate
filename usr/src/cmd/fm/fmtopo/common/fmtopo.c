@@ -895,7 +895,8 @@ static void
 get_pargs(int argc, char *argv[])
 {
 	struct prop_args *pp;
-	char c, *s, *p;
+	char *s, *p;
+	int c;
 	int i = 0;
 
 	if ((pargs = malloc(sizeof (struct prop_args *) * pcnt)) == NULL) {

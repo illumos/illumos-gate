@@ -186,7 +186,7 @@ main(int argc, char *argv[])
 	int fd = -1;
 
 	extern char *optarg;
-	char c;
+	int c;
 	int tos = -1;
 	krb5_context krb_context;
 	krb5_keytab keytab = NULL;

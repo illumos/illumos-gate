@@ -228,7 +228,7 @@ admin_lock(int argc, char **argv)
 	char			*kFlag = "";	/* key */
 	char			*oFlag = "";	/* object */
 	char			*p;
-	char			c;
+	int			c;
 	int			aFlag = 0;	/* acquire lock */
 	int			eFlag = 0;	/* exclusive lock */
 	int			exclusive = 1;	/* exclusive vs shared lock */

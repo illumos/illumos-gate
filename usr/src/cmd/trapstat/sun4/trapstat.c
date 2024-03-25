@@ -1029,7 +1029,8 @@ int
 main(int argc, char **argv)
 {
 	processorid_t id;
-	char c, *end;
+	char *end;
+	int c;
 	ulong_t indefinite;
 	long count = 0, rate = 0;
 	int list = 0, parsable = 0;

@@ -3495,8 +3495,8 @@ errignore(const char *str, ...)
 int
 main(int argc, char **argv)
 {
-	char opt, opt_mode;
-	int i, n;
+	char opt_mode;
+	int opt, i, n;
 	char *columns_str = NULL;
 	char *cp;
 	const char *progname;

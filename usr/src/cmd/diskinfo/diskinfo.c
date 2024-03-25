@@ -468,7 +468,7 @@ enumerate_disks(di_opts_t *opts)
 int
 main(int argc, char *argv[])
 {
-	char c;
+	int c;
 
 	di_opts_t opts = {
 		.di_condensed = B_FALSE,

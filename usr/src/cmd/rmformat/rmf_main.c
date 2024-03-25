@@ -74,7 +74,7 @@ void process_options();
 int
 main(int32_t argc, char **argv)
 {
-	char i;
+	int i;
 	char *tmp_ptr;
 
 	/*
