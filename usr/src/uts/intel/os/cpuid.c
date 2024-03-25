@@ -1107,6 +1107,7 @@
  *   - Spectre v1
  *   - swapgs (Spectre v1 variant)
  *   - Spectre v2
+ *     - Branch History Injection (BHI).
  *   - Meltdown (Spectre v3)
  *   - Rogue Register Read (Spectre v3a)
  *   - Speculative Store Bypass (Spectre v4)
@@ -1250,6 +1251,33 @@
  * what the kernel does. The threat model of kmdb is more limited and therefore
  * it may make more sense to investigate using prediction barriers as the whole
  * system is only executing a single instruction at a time while in kmdb.
+ *
+ * Branch History Injection (BHI)
+ *
+ * BHI is a specific form of SPECTREv2 where an attacker may manipulate branch
+ * history before transitioning from user to supervisor mode (or from VMX
+ * non-root/guest to root mode). The attacker can then exploit certain
+ * compiler-generated code-sequences ("gadgets") to disclose information from
+ * other contexts or domains.  Recent (late-2023/early-2024) research in
+ * object code analysis discovered many more potential gadgets than what was
+ * initially reported (which previously was confined to Linux use of
+ * unprivileged eBPF).
+ *
+ * The BHI threat doesn't exist in processsors that predate eIBRS, or in AMD
+ * ones. Some eIBRS processors have the ability to disable branch history in
+ * certain (but not all) cases using an MSR write. eIBRS processors that don't
+ * have the ability to disable must use a software sequence to scrub the
+ * branch history buffer.
+ *
+ * BHI_DIS_S (the aforementioned MSR) prevents ring 0 from ring 3 (VMX guest
+ * or VMX root). It does not protect different user processes from each other,
+ * or ring 3 VMX guest from ring 3 VMX root or vice versa.
+ *
+ * The BHI clearing sequence prevents user exploiting kernel gadgets, and user
+ * A's use of user B's gadgets.
+ *
+ * SMEP and eIBRS are a continuing defense-in-depth measure protecting the
+ * kernel.
  *
  * SPECTRE v1, v4
  *
@@ -1478,6 +1506,7 @@
  *  - MDS: x86_md_clear, requires microcode, disabling SMT
  *  - TAA: x86_md_clear and disabling SMT OR microcode and disabling TSX
  *  - RFDS: microcode with x86_md_clear if RFDS_CLEAR set and RFDS_NO not.
+ *  - BHI: software sequence, and use of BHI_DIS_S if microcode has it.
  *
  * The following table indicates the x86 feature set bits that indicate that a
  * given problem has been solved or a notable feature is present:
@@ -1486,6 +1515,7 @@
  *  - MDS_NO: All forms of MDS
  *  - TAA_NO: TAA
  *  - RFDS_NO: RFDS
+ *  - BHI_NO: BHI
  */
 
 #include <sys/types.h>
@@ -1680,7 +1710,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"auto_ibrs",
 	"rfds_no",
 	"rfds_clear",
-	"pbrsb_no"
+	"pbrsb_no",
+	"bhi_no",
+	"bhi_clear"
 };
 
 boolean_t
@@ -1833,7 +1865,7 @@ struct cpuid_info {
 					/* Intel fn: 4, AMD fn: 8000001d */
 	struct cpuid_regs **cpi_cache_leaves;	/* Actual leaves from above */
 	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 7 */
-	struct cpuid_regs cpi_sub7[1];	/* Leaf 7, sub-leaf 1 */
+	struct cpuid_regs cpi_sub7[2];	/* Leaf 7, sub-leaves 1-2 */
 	/*
 	 * extended function information
 	 */
@@ -1913,6 +1945,7 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_FEATURES_7_0_ECX(cpi)	((cpi)->cpi_std[7].cp_ecx)
 #define	CPI_FEATURES_7_0_EDX(cpi)	((cpi)->cpi_std[7].cp_edx)
 #define	CPI_FEATURES_7_1_EAX(cpi)	((cpi)->cpi_sub7[0].cp_eax)
+#define	CPI_FEATURES_7_2_EDX(cpi)	((cpi)->cpi_sub7[1].cp_edx)
 
 #define	CPI_BRANDID(cpi)	BITX((cpi)->cpi_std[1].cp_ebx, 7, 0)
 #define	CPI_CHUNKS(cpi)		BITX((cpi)->cpi_std[1].cp_ebx, 15, 7)
@@ -2973,6 +3006,88 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 }
 
 /*
+ * Branch History Injection (BHI) mitigations.
+ *
+ * Intel has provided a software sequence that will scrub the BHB. Like RSB
+ * (below) we can scribble a return at the beginning to avoid if if the CPU
+ * is modern enough. We can also scribble a return if the CPU is old enough
+ * to not have an RSB (pre-eIBRS).
+ */
+typedef enum {
+	X86_BHI_TOO_OLD_OR_DISABLED,	/* Pre-eIBRS or disabled */
+	X86_BHI_NEW_ENOUGH,		/* AMD, or Intel with BHI_NO set */
+	X86_BHI_DIS_S,			/* BHI_NO == 0, but BHI_DIS_S avail. */
+	/* NOTE: BHI_DIS_S above will still need the software sequence. */
+	X86_BHI_SOFTWARE_SEQUENCE,	/* Use software sequence */
+} x86_native_bhi_mitigation_t;
+
+x86_native_bhi_mitigation_t x86_bhi_mitigation = X86_BHI_SOFTWARE_SEQUENCE;
+
+static void
+cpuid_enable_bhi_dis_s(void)
+{
+	uint64_t val;
+
+	val = rdmsr(MSR_IA32_SPEC_CTRL);
+	val |= IA32_SPEC_CTRL_BHI_DIS_S;
+	wrmsr(MSR_IA32_SPEC_CTRL, val);
+}
+
+/*
+ * This function scribbles RET into the first instruction of x86_bhb_clear()
+ * if SPECTREV2 mitigations are disabled, the CPU is too old, the CPU is new
+ * enough to fix (which includes non-Intel CPUs), or the CPU has an explicit
+ * disable-Branch-History control.
+ */
+static x86_native_bhi_mitigation_t
+cpuid_learn_and_patch_bhi(x86_spectrev2_mitigation_t v2mit, cpu_t *cpu,
+    uchar_t *featureset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+	const uint8_t ret = RET_INSTR;
+	uint8_t *bhb_clear = (uint8_t *)x86_bhb_clear;
+
+	ASSERT0(cpu->cpu_id);
+
+	/* First check for explicitly disabled... */
+	if (v2mit == X86_SPECTREV2_DISABLED) {
+		*bhb_clear = ret;
+		return (X86_BHI_TOO_OLD_OR_DISABLED);
+	}
+
+	/*
+	 * Then check for BHI_NO, which means the CPU doesn't have this bug,
+	 * or if it's non-Intel, in which case this mitigation mechanism
+	 * doesn't apply.
+	 */
+	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
+	    is_x86_feature(featureset, X86FSET_BHI_NO)) {
+		*bhb_clear = ret;
+		return (X86_BHI_NEW_ENOUGH);
+	}
+
+	/*
+	 * Now check for the BHI_CTRL MSR, and then set it if available.
+	 * We will still need to use the software sequence, however.
+	 */
+	if (is_x86_feature(featureset, X86FSET_BHI_CTRL)) {
+		cpuid_enable_bhi_dis_s();
+		return (X86_BHI_DIS_S);
+	}
+
+	/*
+	 * Finally, check if we are too old to bother with RSB:
+	 */
+	if (v2mit == X86_SPECTREV2_RETPOLINE) {
+		*bhb_clear = ret;
+		return (X86_BHI_TOO_OLD_OR_DISABLED);
+	}
+
+	ASSERT(*bhb_clear != ret);
+	return (X86_BHI_SOFTWARE_SEQUENCE);
+}
+
+/*
  * We default to enabling Return Stack Buffer (RSB) mitigations.
  *
  * We used to skip RSB mitigations with Intel eIBRS, but developments around
@@ -3270,6 +3385,14 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 		}
 
 		/*
+		 * Some prediction controls are enumerated by subleaf 2 of
+		 * leaf 7.
+		 */
+		if (CPI_FEATURES_7_2_EDX(cpi) & CPUID_INTC_EDX_7_2_BHI_CTRL) {
+			add_x86_feature(featureset, X86FSET_BHI_CTRL);
+		}
+
+		/*
 		 * Don't read the arch caps MSR on xpv where we lack the
 		 * on_trap().
 		 */
@@ -3328,6 +3451,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_PBRSB_NO);
 				}
+				if (reg & IA32_ARCH_CAP_BHI_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_BHI_NO);
+				}
 			}
 			no_trap();
 		}
@@ -3358,6 +3485,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 			break;
 		}
 
+		/* If we're committed to BHI_DIS_S, set it for this core. */
+		if (x86_bhi_mitigation == X86_BHI_DIS_S)
+			cpuid_enable_bhi_dis_s();
+
 		cpuid_apply_tsx(x86_taa_mitigation, featureset);
 		return;
 	}
@@ -3370,10 +3501,11 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 	/*
 	 * By default we've come in with retpolines enabled. Check whether we
-	 * should disable them or enable enhanced or automatic IBRS. RSB
-	 * stuffing is enabled by default. Note, we do not allow the use of AMD
-	 * optimized retpolines as it was disclosed by AMD in March 2022 that
-	 * they were still vulnerable. Prior to that point, we used them.
+	 * should disable them or enable enhanced or automatic IBRS.
+	 *
+	 * Note, we do not allow the use of AMD optimized retpolines as it was
+	 * disclosed by AMD in March 2022 that they were still
+	 * vulnerable. Prior to that point, we used them.
 	 */
 	if (x86_disable_spectrev2 != 0) {
 		v2mit = X86_SPECTREV2_DISABLED;
@@ -3389,6 +3521,7 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 	cpuid_patch_retpolines(v2mit);
 	cpuid_patch_rsb(v2mit, is_x86_feature(featureset, X86FSET_PBRSB_NO));
+	x86_bhi_mitigation = cpuid_learn_and_patch_bhi(v2mit, cpu, featureset);
 	x86_spectrev2_mitigation = v2mit;
 	membar_producer();
 
@@ -4174,8 +4307,8 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 		}
 
 		/*
-		 * If we have subleaf 1 available, grab and store that. This is
-		 * used for more AVX and related features.
+		 * If we have subleaf 1 or 2 available, grab and store
+		 * that. This is used for more AVX and related features.
 		 */
 		if (ecp->cp_eax >= 1) {
 			struct cpuid_regs *c71;
@@ -4183,6 +4316,15 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			c71->cp_eax = 7;
 			c71->cp_ecx = 1;
 			(void) __cpuid_insn(c71);
+		}
+
+		/* Subleaf 2 has certain security indicators in it. */
+		if (ecp->cp_eax >= 2) {
+			struct cpuid_regs *c72;
+			c72 = &cpi->cpi_sub7[1];
+			c72->cp_eax = 7;
+			c72->cp_ecx = 2;
+			(void) __cpuid_insn(c72);
 		}
 	}
 
