@@ -613,6 +613,10 @@ of the log will be written to
 Most log pages are only available on a per-controller basis.
 Known log pages are:
 .Bl -tag -width "firmware"
+.It suplog
+Supported Log Pages.
+Lists information about log pages that the device supports.
+Available starting in NVMe 2.0 devices.
 .It error
 Error Information
 .It health
@@ -622,6 +626,10 @@ A controller may support this log page on a per-namespace basis.
 Firmware Slot Information
 .It changens
 Changed Namespaces.
+.It cmdeff
+Commands Supported and Effects.
+An optional log page beginning in NVMe 1.2 that indicates what commands
+the controller itself actually supports.
 .El
 .Pp
 The following vendor-specific log pages are supported.

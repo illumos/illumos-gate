@@ -322,7 +322,7 @@ nvmeadm_list_logs_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 		ret = snprintf(buf, buflen, "%" PRIu64, alloc);
 		break;
 	case NVME_LIST_LOGS_IMPL:
-		ret = strlcpy(buf, nvme_log_disc_impl(disc)? "yes" : "no",
+		ret = strlcpy(buf, nvme_log_disc_impl(disc) ? "yes" : "no",
 		    buflen);
 		break;
 	case NVME_LIST_LOGS_SOURCES:

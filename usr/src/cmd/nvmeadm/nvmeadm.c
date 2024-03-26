@@ -1689,6 +1689,10 @@ usage_list_logs(const char *c_name)
 static boolean_t
 do_list_logs_match(const nvme_log_disc_t *disc, nvmeadm_list_logs_t *nll)
 {
+	if (!nll->nll_unimpl && !nvme_log_disc_impl(disc)) {
+		return (B_FALSE);
+	}
+
 	if (nll->nll_nfilts <= 0) {
 		return (B_TRUE);
 	}
