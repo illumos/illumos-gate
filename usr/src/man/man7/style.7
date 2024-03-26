@@ -1,0 +1,2093 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 1993 by Sun Microsystems, Inc.
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd March 17, 2024
+.Dt STYLE 7
+.Os
+.Sh NAME
+.Nm STYLE
+.Nd C Style and Coding Standards for illumos
+.Sh SYNOPSIS
+This document describes a set of coding standards for C programs written in
+illumos gate, the illumos source repository.
+.Pp
+This document is based on
+.%T C Style and Coding Standards for SunOS
+by Bill Shannon.
+.Sh INTRODUCTION
+The purpose of the document is to establish a consistent style for C program
+source files within the illumos gate.
+Collectively, this document describes the
+.Dq illumos C style ,
+and the scope is limited to the application of illumos coding style to the C
+language.
+.Pp
+Source code tends to be read many more times than it is written or modified.
+Using a consistent style makes it easier for multiple people to co-operate in
+the development and maintenance of programs.
+It reduces cognitive complexity by eliminating superficial differences, freeing
+the programmer to concentrate on the task at hand.
+This in turn aids review and analysis of code, since small stylistic
+distractions are eliminated.
+Further, eliding such distractions makes it easier for programmers to work on
+unfamiliar parts of the code base.
+Finally, it facilitates the construction of tools that incorporate the rules in
+this standard to help programmers prepare programs.
+For example, automated formatters, text editor integration, and so on, can refer
+to this document to understand the rules of illumos C.
+.Pp
+Of necessity, these standards cannot cover all situations.
+Experience and informed judgment count for much.
+Inexperienced programmers who encounter unusual situations should refer to code
+written by experienced C programmers following these rules, or consult with
+experienced illumos programmers for help with creating a stylistically
+acceptable solution.
+.Pp
+The illumos code base has a long history, dating back to the original Unix from
+AT&T and Bell Labs.
+Furthermore, for many years the C style was not formally defined, and there was
+much variation and many corner cases as it evolved.
+As such, it is possible to find examples of code that do not conform to this
+standard in the source tree.
+If possible, strongly consider converting to this style before beginning
+substantial work on such code.
+If that is not practical, then favor consistency with surrounding code over
+conformity.
+All new code should conform to these rules.
+.\"
+.Sh Character Set
+Source files predominantly use ASCII printing characters.
+However, UTF-8 may be used when required for accurate representation of names
+and proper nouns in comments and string literals.
+Exercise some care here, however: be aware that source files are consumed by
+many tools beyond just compilers, and some may not be able to cope with
+multi-byte extended characters.
+In particular,
+.St -isoC-99
+is used for most illumos source and technically limits its
+.Dq extended
+character set to characters that can fit into a single byte.
+C11 relaxes this, and most illumos tools are already fairly tolerant here,
+but use sound judgment with non-ASCII characters: people should not be forced
+to change their names, but do not add emoji or other extraneous content.
+UTF-8 may not be used in identifiers.
+.Pp
+Generally favor ASCII-only in header files.
+For new code, Avoid non-ASCII characters from non-UTF-8 character encodings
+such as ISO-8859-1 or similar.
+Pseudo-graphical line printing characters and similar glyphs are not permitted,
+though diagrams made with
+.Dq ASCII art
+using
+.Sq + ,
+.Sq - ,
+.Sq |
+and so on are permitted.
+Non-printing characters, such as control characters
+.Pq including form-feeds, backspace, and similar
+should not appear in source files.
+Terminal escape sequences to change text color or position are similarly
+prohibited.
+.Pp
+Inside of string constants, prefer C escape sequences instead of literal
+characters for tabs, form-feeds, carriage returns, newlines, and so on.
+Obviously, use a literal space character when a space is required in a string:
+do not use octal or hex escape sequences when a space literal will do.
+.Pp
+Generally prefer the use of C character constants to numeric code points.
+For example, use
+.Bd -literal -offset indent
+if (*p == '\en')
+	return (EOL);		/* end of line */
+.Ed
+.Pp
+instead of,
+.Bd -literal -offset indent
+#define NL 10
+if (*p == NL)
+	return (EOL);		/* end of line */
+.Ed
+.Pp
+An exception here may be if reading octet-oriented data where specific values
+are known in advance, such as when parsing data read from a socket.
+.\"
+.Sh Lines in Source Files
+Lines in source files are limited to 80 columns.
+If a logical line exceeds this, it must be broken and continued on a new line.
+.Ss Continuation Lines
+Continuation lines are used when a logical statement or expression will not fit
+in the available space, such as a procedure call with many arguments, or a
+complex boolean or arithmetic expression.
+When this happens, the line should be broken as follows:
+.Bl -bullet -offset indent
+.It
+After a comma in the case of a function call or function definition.
+Note, never break in the middle of a parameter expression, such as between the
+type and argument name.
+.It
+After the last operator that fits on the line for arithmetic, boolean and
+ternary expressions.
+.El
+.Pp
+A continuation line should never start with a logical or binary operator.
+The next line should be further indented by four literal space characters
+.Pq half a tab stop .
+If needed, subsequent continuation lines should be broken in the same manner,
+and aligned with each other.
+For example,
+.Bd -literal -offset indent
+if (long_logical_test_1 || long_logical_test_2 ||
+    long_logical_test_3) {
+	statements;
+}
+.Ed
+.Bd -literal -offset indent
+a = (long_identifier_term1 - long_identifier_term2) *
+    long_identifier_term3;
+.Ed
+.Bd -literal -offset indent
+function(long_complicated_expression1, long_complicated_expression2,
+    long_complicated_expression3, long_complicated_expression4,
+    long_complicated_expression5, long_complicated_expression6)
+.Ed
+.Pp
+It is acceptable to break a line earlier than necessary in order to keep
+constructs together to aid readability or understanding.
+For example,
+.Bd -literal -offset indent
+if ((flag & FLAG1) != 0 ||
+    (flag & FLAG2) != 0 ||
+    (flag & FLAG3) != 0) {
+	statements;
+}
+.Ed
+.Pp
+Continuation lines usually occur when blocks are deeply nested or very long
+identifiers are used, or functions have many parameters.
+Often, this is a sign that code should be rewritten or broken up, or that the
+variable name is not fit for purpose.
+A strategically introduced temporary variable may help clarify the code.
+Breaking a particularly large function with deeply nested blocks up into
+multiple, smaller functions can be an improvement.
+Using a structure to group arguments together instead of having many positional
+parameters can make function signatures shorter and easier to understand.
+.\"
+.Ss Indentation and White Space
+Initial indentation must use only tab characters, with tabs set to eight spaces.
+Continuation lines are indented with tabs to the continued line, and then
+further indented by another four spaces, as described above.
+If indentation causes the code to be too wide to fit in 80 columns, it may be
+too complex and would be clearer if it were rewritten, as described above.
+The rules for how to indent particular C constructs such as
+.Ic if , for
+and
+.Ic switch
+are described in
+.Sx Compound Statements .
+.Pp
+Tab characters may also be used for alignment beyond indentation within source
+files, such as to line up comments, but avoid using spaces for this.
+Note that
+.Dq ASCII art
+diagrams in block comments are explicitly exempt from this rule, and may use
+spaces for alignment as needed.
+A space followed by a tab outside of a string constant is forbidden.
+.Pp
+Trailing white space is not permitted, whether at the ends of lines or at the
+end of the file.
+That is, neither trailing blanks or tabs at the ends of lines nor additional
+newlines at the end of a file are allowed.
+The last character in each source file should be a newline character.
+.\"
+.Sh Comments
+Comments should be used to give overviews of code and provide additional
+information that is not readily apparent from the source itself.
+Comments should only be used to describe
+.Em what
+code does or
+.Em why
+it is implemented the way that it is, but should not describe
+.Em how
+code works.
+Very rare exceptions are allowed for cases where the implementation is
+particularly subtle.
+.Pp
+Source files should begin with a block comment that includes license information
+for that file, as well as a list of copyright holders.
+However, source files should not contain comments listing authors or the
+modification history for the file: this information belongs in the revision
+control system and issue tracker.
+Following the copyright material, an explanatory comment that describes the
+file's purpose, provides background, refences to relevant standards, or similar
+information, is helpful.
+A suitable template for new files can be found in
+.Pa usr/src/prototypes
+within the illumos-gate code repository.
+.Pp
+Front-matter aside, comments should only contain information that is germane to
+reading and understanding the program.
+External information, such about how the corresponding package is built or what
+directory it should reside in should not be in a comment in a source file.
+Discussions of non-trivial design decisions are appropriate if they aid in
+understanding the code, but again avoid duplicating information that is present
+in, and clear from, the code.
+In general, avoid including information that is likely to become out-of-date in
+comments; for example, specific section numbers of rapidly evolving documents
+may change over time.
+.Pp
+Comments should
+.Em not
+be enclosed in large boxes drawn with asterisks or other characters.
+Comments should never include special characters, such as form-feed or
+backspace, and no terminal drawing characters.
+.Pp
+There are three styles of comments:
+block, single-line, and trailing.
+.Ss Block Comments
+The opening
+.Sq /*
+of a block comment that appears at the top-level of a file
+.Pq that is, outside of a function, structure definition, or similar construct
+should be in column one.
+There should be a
+.Sq \&*
+in column 2 before each line of text in the block comment,
+and the closing
+.Sq */
+should be in columns 2-3, so that the
+.Sm off
+.Sq \&*
+s
+.Sm on
+line up.
+This enables
+.Ql grep ^.\e*
+to match all of the top-level block comments in a file.
+There is never any text on the first or last lines of a block comment.
+The initial text line is separated from the * by a single space, although
+later text lines may be further indented, as appropriate for clarity.
+.Bd -literal -offset indent
+/*
+ * Here is a block comment.
+ * The comment text should be spaced or tabbed over
+ * and the opening slash-star and closing star-slash
+ * should be alone on a line.
+ */
+.Ed
+.Pp
+Block comments are used to provide high-level, natural language descriptions of
+the content of files, the purpose of functions, and to describe data structures
+and algorithms.
+Block comments should be used at the beginning of each file and before
+functions as necessary.
+.Pp
+The very first comment in a file should be front-matter containing license and
+copyright information, as mentioned above.
+.Pp
+Following the front-matter, files should have block comments that describe
+their contents and any special considerations the reader should take note of
+while reading.
+.Pp
+A block comment preceding a function should document what it does, input
+parameters, algorithm, and returned value.
+For example,
+.Bd -literal -offset indent
+/*
+ * index(c, str) returns a pointer to the first occurrence of
+ * character c in string str, or NULL if c doesn't occur
+ * in the string.
+ */
+.Ed
+.Pp
+In many cases, block comments inside a function are appropriate, and they
+should be indented to the same indentation level as the code that they
+describe.
+.Pp
+Block comments should contain complete, correct sentences and should follow
+the English language rules for punctuation, grammar, and capitalization.
+Sentences should be separated by either a single space or two space characters,
+and such spacing should be consistent within a comment.
+That is, either always separate sentences with a single space or with two
+spaces, but do not mix styles within a comment
+.Pq and ideally do not mix styles within a source file .
+Paragraphs within a block comment should be separated by an empty line
+containing only a space,
+.Sq \&*
+and newline.
+For example,
+.Bd -literal -offset indent
+/*
+ * This is a block comment.  It consists of several sentences
+ * that are separated by two space characters.  It should say
+ * something significant about the code.
+ *
+ * This comment also contains two separate paragraphs, separated
+ * by an "empty" line.  Note that the "empty" line still has the
+ * leading ' *'.
+ */
+.Ed
+.Pp
+Do not indent paragraphs with spaces or tabs.
+.Ss Single-Line Comments
+A single-line comment is a short comment that may appear on a single line
+indented so that it matches the code that follows.
+Short phrases or sentence fragments are acceptable in single-line comments.
+.Bd -literal -offset indent
+if (argc > 1) {
+	/* get input file from command line */
+	if (freopen(argv[1], "r", stdin) == NULL)
+		err(EXIT_FAILURE, "can't open %s\en", argv[1]);
+}
+.Ed
+.Pp
+The comment text should be separated from the opening
+.Sq /*
+and closing
+.Sq */
+by a space.
+.Pp
+The closing
+.Sm off
+.Sq */
+s
+.Sm on
+of several adjacent single-line comments should
+.Em not
+be forced to be aligned vertically.
+In general, a block comment should be used when a single line is insufficient.
+.Ss Trailing Comments
+Very short comments may appear on the same line as the code they describe,
+but should be tabbed over far enough to separate them from the statements.
+If more than one short comment appears in a block of code, they should all
+be tabbed to the same indentation level.
+Trailing comments are most often sentence fragments or short phrases.
+.Bd -literal -offset indent
+if (a == 2)
+	return (TRUE);		/* special case */
+else
+	return (isprime(a));	/* works only for odd a */
+.Ed
+.Pp
+Trailing comments are most useful for documenting declarations and non-obvious
+cases.
+Avoid the assembly language style of commenting every line of executable code
+with a trailing comment.
+.Pp
+Trailing comments are often also used on preprocessor
+.Sy #else
+and
+.Sy #endif
+statements if they are far away from the corresponding test.
+See
+.Sx Preprocessor
+for more guidance on this.
+.Ss XXX and TODO comments
+Do not add
+.Dq XXX
+or
+.Dq TODO
+comments in new code.
+.\"
+.Sh Naming Conventions
+It has been said that naming things is the hardest problem in computer science,
+and the longevity of illumos means that there is wide variation across the
+source base when it comes to identifiers.
+Much of this was driven by the demands of early C dialects, that restricted
+externally visible identifiers to 6 significant characters.
+While this ancient restriction no longer applies in modern C, there is still an
+aesthetic preference for brevity and some argument about backwards compatibility
+with third-party compilers.
+Regardless, consistent application of conventions for identifiers can make
+programs more understandable and easier to read.
+Naming conventions can also give information about the function of the
+identifier, whether constants, named types, variables, or similar, that can be
+helpful in understanding code.
+Programmers should therefore be consistent in using naming conventions within a
+project.
+Individual projects will undoubtedly have their own naming conventions
+incorporating terminology specific to that project.
+.Pp
+In general, the following guidelines should be followed:
+.Bl -bullet -offset indent
+.It
+The length of a name should be proportional to its scope.
+An identifier declared at global scope would generally be longer than one
+declared in a small block; an index variable used in a one-line loop might be a
+single character.
+.It
+Names should be short but meaningful.
+Favor brevity.
+.It
+One character names should be avoided except for temporary variables of short
+scope.
+If one uses a single character name, then use variables
+.Va i , j , k , m , n
+for integers,
+.Va c , d , e
+for characters,
+.Va p , q
+for pointers, and
+.Va s , t
+for character pointers.
+Avoid variable
+.Va l
+.Pq lower-case L
+because it is hard to distinguish between
+.Sq 1
+.Pq the digit one
+and
+.Sq I
+.Pq capital i
+on some printers and displays.
+.It
+Pointers may have a
+.Sq p
+appended to their names for each level of indirection.
+For example, a pointer to the variable
+.Va dbaddr
+can be named
+.Va dbaddrp
+.Po or perhaps simply
+.Va dp
+.Pc ,
+if the scope is small enough.
+Similarly,
+.Va dbaddrpp
+would be a pointer to a pointer to
+.Va dbaddr .
+.It
+Separate
+.Dq words
+in a long identifier with underscores:
+.Pp
+.Dl create_panel_item
+.Pp
+Mixed case names like
+.Sq CreatePanelItem ,
+or
+.Sq javaStyleName ,
+are strongly discouraged and should not be used for new code.
+.It
+Leading underscores are reserved by the C standard and generally should not be
+used in identifiers for user-space programs.
+They may be used in user-space libraries or in the kernel with some caution,
+though be careful to avoid conflicts with constructs from standard C, such
+as
+.Sq _Bool ,
+.Sq _Alignof ,
+and so on.
+Trailing underscores should be similarly avoided in user-space programs.
+.It
+Two conventions are used for named types in the form of typedefs.
+Within the kernel and in many places in userland, named types are given
+a name ending in
+.Sq _t ,
+for example,
+.Bd -literal -offset indent
+typedef enum { FALSE, TRUE } bool_t;
+typedef struct node node_t;
+.Ed
+.Pp
+Technically such names are reserved by POSIX, but some liberties are taken
+here given both the age and provenance of the illumos code base.
+Note that typedefs for function pointer types may end in
+.Sq _f
+to signify that they refer to function types.
+.Pp
+In some user programs named types have their first letter capitalized, as in,
+.Bd -literal -offset indent
+typedef enum { FALSE, TRUE } Bool;
+typedef struct node Node;
+.Ed
+This practice is deprecated; all new code must use the
+.Sq _f
+and
+.Sq _t
+suffices for named types.
+.It
+.Ic #define
+names for constants should be in all CAPS.
+Separate words with underscores, as for variable names.
+.It
+Function-like macro names may be all CAPS or all lower case.
+Prefer all upper case macro names for new code.
+Some macros
+.Po such as
+.Xr getchar 3C
+and
+.Xr putchar 3C
+.Pc
+are in lower case since they may also exist as functions.
+Others, such as
+.Xr major 3C ,
+.Xr minor 3C ,
+and
+.Xr makedev 3C
+are macros for historical reasons.
+.It
+Variable names, structure tag names, and function names should be lower case.
+.Pp
+Note: in general, with the exception of named types, it is best to avoid names
+that differ only in case, like
+.Va foo
+and
+.Va FOO .
+The potential for confusion is considerable.
+However, it is acceptable to use a name which differs only in capitalization
+from its base type for a typedef, such as,
+.Pp
+.Dl typedef struct node Node;
+.Pp
+It is also acceptable to give a variable of this type a name that is the
+all lower case version of the type name.
+For example,
+.Bd -literal -offset indent
+Node node;
+.Ed
+.It
+Struct members should be prefixed with an identifier as described in
+.Sx Structures and Unions .
+.It
+The individual items of enums should be made unique names by prefixing them
+with a tag identifying the package to which they belong.
+For example,
+.Bd -literal -offset indent
+enum rainbow { RB_red, RB_orange, RB_green, RB_blue };
+.Ed
+.Pp
+The
+.Xr mdb 1
+debugger supports enums in that it can print out the value of an enum, and can
+also perform assignment statements using an item in the range of an enum.
+Thus, the use of enums over equivalent
+.Ic #define Ns No s
+may aid debugging programs.
+For example, rather than writing:
+.Bd -literal -offset indent
+#define	SUNDAY	0
+#define	MONDAY	1
+.Ed
+.Pp
+write:
+.Bd -literal -offset indent
+enum day_of_week { DW_SUNDAY, DW_MONDAY, ... };
+.Ed
+.Pp
+Enums of this sort can be particularly useful for bitfields, as the
+.Xr mdb 1
+debugger can decode them symbolically.
+For example, an instance of:
+.Bd -literal -offset indent
+enum vmx_caps {
+        VMX_CAP_NONE            = 0,
+        VMX_CAP_TPR_SHADOW      = (1UL << 0),
+        VMX_CAP_APICV           = (1UL << 1),
+        VMX_CAP_APICV_X2APIC    = (1UL << 2),
+        VMX_CAP_APICV_PIR       = (1UL << 3),
+};
+.Ed
+.Pp
+with all bits set is printed by
+.Xr mdb 1
+as
+.Bd -literal -offset indent
+0xf (VMX_CAP_{TPR_SHADOW|APICV|APICV_X2APIC|APICV_PIR})
+.Ed
+.It
+Implementors of libraries should take care to hide symbols that are private
+to the library.
+If a symbol is local to a single module, one may simply declare it as
+.Ic static .
+For symbols that are shared between several translation units in the same
+library, and therefore must be declared
+.Ic extern ,
+the programmer should use the linker and mapfiles to hide private symbols.
+For symbols that are logically private to group of libraries, one may use
+a naming convention, such as prefixing the name with an underscore and a tag
+that is unique to the package, such as,
+.Ql _panel_caret_mpr ,
+but it is not necessary to use stylistic conventions to hide symbols that
+will not be exported.
+Programmers may optionally use such a naming convention as an additional signal
+that symbols are internal to a library, but this is not required.
+.It
+One should always use care to avoid conflicts with identifiers reserved by C.
+.It
+Generally use nouns for type names and verbs or verb phrases for functions.
+.El
+.\"
+.Sh Declarations
+There is considerable variation in the format of declarations within the illumos
+gate.
+As an example, there are many places that use one declaration per line, and
+employ tab characters to line up the variable names:
+.Bd -literal -offset indent
+int	level;		/* indentation level */
+int	size;		/* size of symbol table */
+int	lines;		/* lines read from input */
+.Ed
+.Pp
+and it is also common to declarations combined into a single line, particularly
+when the variable names are self-explanatory or temporary:
+.Bd -literal -offset indent
+int level, size, lines;
+.Ed
+.Pp
+Indentation between type names or qualifiers and identifiers also varies.
+Some use no such indentation:
+.Bd -literal -offset indent
+int level,
+volatile uint8_t byte;
+char *ptr;
+.Ed
+.Pp
+while many programmers feel that aligning variable declarations makes code more
+readable:
+.Bd -literal -offset indent
+int		x;
+extern int	y;
+volatile int	count;
+char		**pointer_to_string;
+.Ed
+.Pp
+However note that declarations such as the following probably make code
+.Em harder
+to read:
+.Bd -literal -offset indent
+struct very_long_structure_name			*p;
+struct another_very_long_structure_name		*q;
+char						*s;
+int						i;
+short						r;
+.Ed
+.Pp
+While these styles vary, there are some rules which should be applied
+consistently:
+.Bl -bullet -offset indent
+.It
+Always use function prototypes in preference to old-style function
+declarations for new code.
+.It
+Variables and functions should not be declared on the same line.
+.It
+Variables which are initialized at the time of declaration should be declared
+on separate lines.
+That is one should write:
+.Bd -literal -offset indent
+int size, lines;
+int level = 0;
+.Ed
+.Pp
+instead of:
+.Bd -literal -offset indent
+int level = 0, size, lines;
+.Ed
+.It
+Variable declarations should be scoped to the smallest possible block in which
+they are used.
+.It
+Variable names within inner blocks should not shadow those at higher levels.
+.It
+For code compiled with flags that enable
+.St -isoC-99
+features, additionally:
+.Bl -bullet -offset indent
+.It
+A
+.Ic for
+loop may declare and initialize its counting variable.
+Note that the most appropriate type for counting variables is often
+.Vt size_t
+or
+.Vt uint_t
+rather than
+.Vt int .
+In particular, take care when indexing into arrays:
+.Vt size_t
+is guaranteed to be large enough to index any array, whereas
+.Vt uint_t
+is not.
+.It
+Variables do not have to be declared at the start of a block.
+However, care should be taken to use this feature only where it makes the code
+more readable.
+.El
+.El
+.Ss External Declarations
+External declarations should begin in column 1.
+Each declaration should be on a separate line.
+A comment describing the role of the object being declared should be included,
+with the exception that a list of defined constants does not need comments if
+the constant names themselves are sufficient documentation.
+Constant names and their defined values should be tabbed so that they line up
+underneath each other.
+For a block of related objects, a single block comment is sufficient.
+However, if trailing comments are used, these should also be tabbed to line up
+underneath each other.
+.Ss Structures and Unions
+For structure and union template declarations, each element should be on its
+own line with a comment describing it.
+The
+.Ic struct
+keyword and opening brace
+.Sq \&{
+should be on the same line as the structure tag, and the closing brace should
+be alone on a line in column 1.
+Each member is indented by one tab:
+.Bd -literal -offset indent
+struct boat {
+	int	b_wllength;	/* water line length in feet */
+	int	b_type;		/* see below */
+	long	b_sarea;	/* sail area in square feet */
+};
+.Ed
+.Pp
+Struct members should be prefixed with an abbreviation of the struct name
+followed by an underscore
+.Pq Sq _ .
+Typically the first character of each word in the struct's name is used for the
+prefix.
+While not required by the language, this convention disambiguates the members
+for tools such as
+.Xr cscope 1 .
+For example, consider a structure with a member named
+.Sq len ,
+this could lead to many ambiguous references.
+.Ss Use of Sq static
+In any file which is part of a larger whole rather than a self-contained
+program, maximum use should be made of the
+.Sy static
+keyword to make functions and variables local to single files.
+Variables in particular should be accessible from other files only when there
+is a clear need that cannot be filled in another way.
+Such usage, and in particular its rationale, should be made clear with comments,
+and possibly with a private header file.
+.Ss Qualifiers
+Qualifiers, like
+.Sq const ,
+.Sq volatile ,
+and
+.Sq restrict
+are used to communicate information to the compiler about how an object is used.
+This can be very useful for facilitating optimizations that can dramatically
+improve the runtime performance of code.
+Appropriate qualification can prevent bugs.
+For example, a
+.Sq const
+qualified pointer points to an object that cannot be modified; an attempt to do
+so will give a compile-time error, rather than runtime data corruption.
+Additionally, use of such qualifiers can communicate attributes of an interface
+to a programmer who uses that interface; a programmer who passes a pointer to a
+function that expects a
+.Sq const
+qualified parameter knows that the function will not modify the value the
+pointer refers to.
+Use qualifiers, but beware of some caveats.
+.Pp
+Pointer variables that are
+.Sq const
+qualified should not cast away the qualifier; the compiler may make
+optimizations based on the qualification that are invalid if applied in a
+non-const context.
+Similarly, it is undefined behavior to discard the qualifier for variables that
+are
+.Sq volatile .
+Note that this means that one cannot, for example, pass a volatile-qualified
+pointer to many functions, such as
+.Xr memcpy 3C
+or
+.Xr memset 3C .
+.\"
+.Sh Function Definitions
+A complex function should be preceded by a prologue in a block comment that
+gives the name and a short description of what the function does.
+.Pp
+The type of the value returned should be alone on a line in column 1, including
+any qualifiers, such as
+.Sq const
+or
+.Sq static .
+Functions that return
+.Vt int
+should have that return type explicitly specified: traditional C's default of
+.Vt int
+for the return type of unqualified functions is deprecated.
+If the function does not return a value then it should be given the return type
+.Vt void .
+If the return value requires explanation, it should be given in the block
+comment.
+Functions and variables that are not used outside of the file they are defined
+in should be declared as
+.Sy static .
+This lets the reader know explicitly that they are private, and also eliminates
+the possibility of name conflicts with variables and procedures in other files.
+.Pp
+Functions must be declared using
+.St -ansiC
+syntax rather than K&R.
+There are still places within the illumos gate that use K&R syntax and these
+should be converted as work is done in those areas.
+.Pp
+All local declarations and code within the function body should be tabbed over
+at least one tab, with the level of indentation reflecting the structure of the
+code.
+Labels should appear in column 1.
+If the function uses any external variables or functions that are not
+otherwise declared
+.Sy extern
+at the file level or in a header file,
+these should have their own declarations in the function body using the
+.Sy extern
+keyword.
+If the external variable is an array, the array bounds must be repeated
+in the
+.Sy extern
+declaration.
+.Pp
+If an external variable or value of a parameter passed by pointer is changed by
+the function, that should be noted in the block comment.
+.Pp
+All comments about parameters and local variables should be tabbed so that they
+line up vertically.
+The declarations should be separated from the function's statements by a blank
+line.
+.Pp
+Note that functions that take no parameters must always have a void parameter,
+as shown in the first example below.
+.Pp
+The following examples illustrate many of the rules for function definitions.
+.Bd -literal -offset indent
+/*
+ * sky_is_blue()
+ *
+ * Return true if the sky is blue, else false.
+ */
+bool
+sky_is_blue(void)
+{
+	extern int hour;
+
+	if (hour < MORNING || hour > EVENING)
+		return (false);	/* black */
+	else
+		return (true);	/* blue */
+}
+.Ed
+.Bd -literal -offset indent
+/*
+ * tail(nodep)
+ *
+ * Find the last element in the linked list
+ * pointed to by nodep and return a pointer to it.
+ */
+Node *
+tail(Node *nodep)
+{
+	Node *np;	/* current pointer advances to NULL */
+	Node *lp;	/* last pointer follows np */
+
+	np = lp = nodep;
+	while ((np = np->next) != NULL)
+		lp = np;
+	return (lp);
+}
+.Ed
+.Bd -literal -offset indent
+/*
+ * ANSI C Form 1.
+ * Use this form when the arguments easily fit on one line,
+ * and no per-argument comments are needed.
+ */
+int
+foo(int alpha, char *beta, struct bar gamma)
+{
+	\&...
+}
+.Ed
+.Bd -literal -offset indent
+/*
+ * ANSI C Form 2.
+ * This is a variation on form 1, using the standard continuation
+ * line technique (indent by 4 spaces). Use this form when no
+ * per-argument comments are needed, but all argument declarations
+ * won't fit on one line.
+ */
+int
+foo(int alpha, char *beta,
+    struct bar gamma)
+{
+	\&...
+}
+.Ed
+.Bd -literal -offset indent
+/*
+ * ANSI C Form 3.
+ * Use this form when per-argument comments are needed.
+ * Note that each line of arguments is indented by a full
+ * tab stop. Note carefully the placement of the left
+ * and right parentheses.
+ */
+int
+foo(
+	int alpha,		/* first arg */
+	char *beta,		/* arg with a long comment needed */
+				/*   to describe its purpose */
+	struct bar gamma)	/* big arg */
+{
+	\&...
+}
+.Ed
+.Pp
+A single blank line should separate function definitions.
+.\"
+.Sh Type Declarations
+Many programmers use named types, such as,
+.Sy typedef Ns No s ,
+liberally.
+They feel that the use of typedefs simplifies declaration lists and can
+make program modification easier when types must change.
+Other programmers feel that the use of a typedef hides the underlying type when
+they want to know what the type is.
+This is particularly true for programmers who need to be concerned with
+efficiency, like kernel programmers, and therefore need to be aware of the
+implementation details.
+The choice of whether or not to use typedef is left to the implementor.
+.Pp
+If one elects to use a typedef in conjunction with a pointer type, the
+underlying type should be typedef-ed, rather than typedef-ing a pointer to
+underlying type, because it is often necessary and usually helpful to be able
+to tell if a type is a pointer.
+.Pp
+The use of
+.St -isoC-99
+unsigned integer identifiers of the form
+.Vt uintXX_t
+is preferred over the older BSD-style
+.Vt u_intXX_t .
+New code should use the former, and old code should be converted to the new form
+if other work is being done in that area.
+.Sh Boolean Types
+.St -isoC-99
+introduced the
+.Sq _Bool
+keyword and preprocessor macros for the
+.Vt bool ,
+.Vt true ,
+and
+.Vt false
+symbols in the
+.In stdbool.h
+header
+.Po
+.In sys/stdbool.h
+in the kernel
+.Pc .
+Prior to this, C had no standard boolean type, but illumos provided an
+.Sq enum ,
+.Vt boolean_t ,
+with variants
+.Dv B_FALSE
+and
+.Dv B_TRUE
+that is widely used.
+.Pp
+Sadly, these two types differ significantly:
+.Bl -bullet -offset indent
+.It
+.Vt bool
+tends to be defined by ABIs as being a single byte wide, while
+enumerations, and thus
+.Vt boolean_t ,
+use the same representation as an
+.Vt int .
+.It
+.Vt bool
+is defined to be unsigned, while the enumerated type
+.Vt boolean_t
+is signed.
+.It
+The type
+.Dq rank
+of
+.Vt _Bool
+is defined to be lower than all other integer types.
+.It
+The only legal values of variables of type
+.Vt bool
+are 0 and 1 (false and true respectively), and while
+.Vt boolean_t
+is only defined with two variants, nothing structurally prevents an assignment
+from a different value.
+.It
+Type conversion to
+.Vt _Bool
+has different semantics than assignment to other integer types: conversion
+results in a 0 if and only if the original value compares equal to 0, otherwise
+the result is a 1.
+For an
+.Vt int ,
+truncating, rounding behavior, or sign extending behavior is used.
+.El
+Thus, programmers must exercise significant care when mixing code using the
+standard type and
+.Vt boolean_t .
+.Pp
+Broadly, new code should prefer the use of
+.Vt bool
+when available.
+However, code that makes extensive use of
+.Vt boolean_t
+should generally continue to do so.
+Do not mix
+.Vt bool
+and
+.Vt boolean_t
+in the same
+.Vt struct ,
+for example.
+Similarly, if a file makes extensive use of one, then do not use the other.
+Furthermore be aware that using
+.Vt bool
+requires at least
+.St -isoC-99 ,
+which is not mandated across the system, so exercise care in public interfaces.
+Be particularly aware that transitive includes of header files could mean
+that code using constructs such as
+.Vt bool
+might leak into code that targets an older version of the language; the
+programmer must not allow this to happen.
+For example, should a use of
+.Vt bool
+inadvertantly end up in
+.In stdlib.h ,
+.In sys/types.h ,
+or another standard-mandated or traditional Unix header file and be
+available outside of a
+.St -isoC-99
+compilation environment, older programs could fail to compile.
+.Pp
+Do not use
+.Vt int
+or another type to present boolean values in new code.
+.Ss Guidelines for mixing boolean types
+As mentioned above, care must taken when mixing
+.Vt bool
+and
+.Vt boolean_t
+types.
+In particular:
+.Bl -bullet -offset indent
+.It
+Assigning from a variable of type
+.Vt bool
+to one of
+.Vt boolean_t ,
+or vice versa, is generally safe.
+This includes assigning the value returned from a function of one type to the
+other.
+.It
+Passing arguments of one type to a function expecting the other is generally
+safe.
+.It
+Simple comparisons between the two types are generally safe.
+.El
+.Pp
+However, taking a pointer to a variable of one type and casting it to the
+other is not safe and should never be done.
+Similarly, changing the definition of one type to another in a
+.Vt struct
+or
+.Vt union
+is not safe unless one can guarantee that the element of such a compound type
+is never referred to by pointer and that the type is never used as part of a
+public interface, such as an
+.Xr ioctl 2 .
+.\"
+.Sh Statements
+Each line should contain at most one statement.
+In particular, do not use the comma operator to group multiple statements on
+one line, or to avoid using braces.
+For example,
+.Bd -literal -offset indent
+argv++; argc--;		/* WRONG */
+
+if (err)
+	fprintf(stderr, "error"), exit(1);	/* VERY WRONG */
+.Ed
+.Pp
+Nesting the ternary conditional operator
+.Pq ?:
+can lead to confusing, hard to follow code.
+For example:
+.Bd -literal -offset indent
+num = cnt < tcnt ? (cnt < fcnt ? fcnt : cnt) :
+    tcnt < bcnt ? tcnt : bcnt > fcnt ? fcnt : bcnt;	/* WRONG */
+.Ed
+.Pp
+Avoid expressions like these, and in general do not nest the ternary operator
+unless doing so is unavoidable.
+.Pp
+If the
+.Ic return
+statement is used to return a value, the expression should always be enclosed
+in parentheses.
+.Pp
+Functions that return no value should
+.Em not
+include a return statement as the last statement in the function, though early
+return via a bare
+.Ic return ;
+on a line by itself is permitted.
+.Ss Compound Statements
+Compound statements are statements that contain lists of statements
+enclosed in braces
+.Pq Sq {} .
+The enclosed list should be indented one more level than the compound statement
+itself.
+The opening left brace should be at the end of the line beginning the compound
+statement, and the closing right brace should be alone on a line, positioned
+under the beginning of the compound statement
+.Pq see examples below .
+Note that the left brace that begins a function body is the only occurrence
+of a left brace which should be alone on a line.
+.Pp
+Braces are also used around a single statement when it is part of a control
+structure, such as an
+.Ic if-else
+or
+.Ic for
+statement, as in:
+.Bd -literal -offset indent
+if (condition) {
+	if (other_condition)
+		statement;
+}
+.Ed
+.Pp
+Some programmers feel that braces should be used to surround
+.Em all
+statements that are part of control structures, even singletons, because this
+makes it easier to add or delete statements without thinking about whether
+braces should be added or removed.
+Some programmers reason that, since some apparent function calls might actually
+be macros that expand into multiple statements, always using braces allows such
+macros to always work safely.
+Thus, they would write:
+.Bd -literal -offset indent
+if (condition) {
+	return (0);
+}
+.Ed
+.Pp
+Here, the braces are optional and may be omitted to save vertical space.
+However:
+.Bl -bullet -offset indent
+.It
+if one arm of an
+.Ic if-else
+statement contains braces, all arms should contain braces;
+.It
+if the condition or singleton occupies more than one line, braces should always
+be used;
+.Bd -literal -offset indent
+if (condition) {
+	fprintf(stderr, "wrapped singleton: %d\en",
+	    errno);
+}
+.Ed
+.Bd -literal -offset indent
+if (strncmp(str, "long condition",
+    sizeof ("long condition") - 1) == 0) {
+	fprintf(stderr, "singleton: %d\en", errno);
+}
+.Ed
+.It
+if the body of a
+.Ic for
+or
+.Ic while
+loop is empty, no braces are needed:
+.Bd -literal -offset indent
+while (*p++ != c)
+	;
+.Ed
+.El
+.Ss Examples
+.Sy if, if-else, if-else if-else statements
+.Bd -literal -offset indent
+if (condition) {
+	statements;
+}
+.Ed
+.Bd -literal -offset indent
+if (condition) {
+	statements;
+} else {
+	statements;
+}
+.Ed
+.Bd -literal -offset indent
+if (condition) {
+	statements;
+} else if (condition) {
+	statements;
+}
+.Ed
+.Pp
+Note that the right brace before the
+.Ic else
+and the right brace before the
+.Ic while
+of a
+.Ic do-while
+statement
+.Pq see below
+are the only places where a right brace appears that is not alone on a line.
+.Pp
+.Sy for statements
+.Bd -literal -offset indent
+for (initialization; condition; update) {
+	statements;
+}
+.Ed
+.Pp
+When using the comma operator in the initialization or update clauses
+of a
+.Ic for
+statement, it is suggested that no more than three variables should be updated.
+More than this tends to make the expression too complex.
+In this case it is generally better to use separate statements outside
+the
+.Ic for
+loop
+.Pq for the initialization clause ,
+or at the end of the loop
+.Pq for the update clause .
+.Pp
+The initialization, condition, and update portions of a
+.Ic for
+loop may be omitted.
+.Pp
+The infinite loop is written using a
+.Ic for
+loop.
+.Bd -literal -offset indent
+for (;;) {
+	statements;
+}
+.Ed
+.Pp
+.Sy while statements
+.Bd -literal -offset indent
+while (condition) {
+	statements;
+}
+.Ed
+.Pp
+When writing
+.Ic while
+loops, prefer nested assignment inside of comparison.
+That is, prefer:
+.Bd -literal -offset indent
+while ((c = getc()) != EOF) {
+	statements;
+}
+.Ed
+.Pp
+over,
+.Bd -literal -offset indent
+c = get();
+while (c != EOF) {
+	statements;
+	c = getc();
+}
+.Ed
+.Pp
+.Sy do-while statements
+.Bd -literal -offset indent
+do {
+	statements;
+} while (condition);
+.Ed
+.Pp
+.Sy switch statements
+.Bd -literal -offset indent
+switch (condition) {
+case ABC:
+case DEF:
+	statements;
+	break;
+case GHI:
+	statements;
+	/* FALLTHROUGH */
+case JKL: {
+	int local;
+
+	statements;
+}
+case XYZ:
+	statements;
+	break;
+default:
+	statements;
+	break;
+}
+.Ed
+.Pp
+The last
+.Ic break
+is, strictly speaking, redundant, but it is recommended form nonetheless
+because it prevents a fall-through error if another
+.Ic case
+is added later after the last one.
+.Pp
+When using the fall-through feature of
+.Ic switch ,
+a comment of the style shown above should be used.
+In addition to being a useful note for future maintenance, it serves as a
+hint to the compiler that this is intentional and should not therefore
+generate a warning.
+.Pp
+All
+.Ic switch
+statements should include a default case with the possible exception of a
+switch on an
+.Vt enum
+variable for which all possible values of the
+.Vt enum
+are listed.
+.Pp
+Don't assume that the list of cases covers all possible cases.
+New, unanticipated, cases may be added later, or bugs elsewhere in the program
+may cause variables to take on unexpected values.
+.Pp
+Each
+.Ic case
+statement should be indented to the same level as the
+.Ic switch
+statement.
+Each
+.Ic case
+statement should be on a line separate from the statements within the case.
+.\"
+.Sh White Space
+.Ss Vertical White Space
+Judicious use of lines can improve readability by setting off sections of code
+that are logically related.
+Use vertical white space to make it clear that stanzas are logically separated.
+.Pp
+A blank line should always be used in the following circumstances:
+.Bl -bullet -offset indent
+.It
+After the
+.Ic #include
+section at the top of a source file.
+.It
+After blocks of
+.Ic #define Ns No s
+of constants, and before and after
+.Ic #define Ns No s
+of macros.
+.It
+Between structure declarations.
+.It
+Between functions.
+.It
+After local variable declarations.
+.El
+.Pp
+Form-feeds should never be used to separate functions.
+.\"
+.Sh Horizontal White Space
+Here are the guidelines for blank spaces:
+.Bl -bullet -offset indent
+.It
+A blank should follow a keyword whenever a parenthesis follows the keyword.
+Note that both
+.Ic sizeof
+and
+.Ic return
+are keywords, whereas things like
+.Xr strlen 3C
+and
+.Xr exit 3C
+are not.
+.Pp
+Blanks should not be used between procedure names
+.Pq or macro calls
+and their argument list.
+This helps to distinguish keywords from procedure calls.
+.Bd -literal -offset indent
+/*
+ * No space between strncmp and '(' but
+ * there is one between sizeof and '('
+ */
+if (strncmp(x, "done", sizeof ("done") - 1) == 0)
+	...
+.Ed
+.It
+Blanks should appear after commas in argument lists.
+.It
+Blanks should
+.Em not
+appear immediately after a left parenthesis or immediately before a right
+parenthesis.
+.It
+All binary operators except
+.Sq \&.
+and
+.Sq ->
+should be separated from their operands by blanks.
+In other words, blanks should appear around assignment, arithmetic, relational,
+and logical operators.
+.Pp
+Blanks should never separate unary operators such as unary minus,
+address
+.Pq Sq \&& ,
+indirection
+.Pq Sq \&* ,
+increment
+.Pq Sq ++ ,
+and decrement
+.Pq Sq --
+from their operands.
+Note that this includes the unary
+.Sq \&*
+that is a part of pointer declarations.
+.Pp
+Examples:
+.Bd -literal -offset indent
+char *d, *s;
+a += c + d;
+a = (a + b) / (c * d);
+strp->field = str.fl - ((x & MASK) >> DISP);
+while ((*d++ = *s++) != '\0')
+	n++;
+.Ed
+.It
+The expressions in a
+.Ic for
+statement should be separated by blanks:
+.Bd -literal -offset indent
+for (expr1; expr2; expr3)
+.Ed
+.Pp
+If an expression is omitted, no space should be left in its place:
+.Bd -literal -offset indent
+for (expr1; expr2;)
+.Ed
+.It
+Casts should not be followed by a blank, with the exception of function
+calls whose return values are ignored:
+.Bd -literal -offset indent
+(void) myfunc((uintptr_t)ptr, (char *)x);
+.Ed
+.El
+.Ss Hidden White Space
+There are many uses of blanks that will not be visible when viewed
+on a terminal, and it is often difficult to distinguish blanks from tabs.
+However, inconsistent use of blanks and tabs may produce unexpected results
+when the code is printed with a pretty-printer, and may make simple regular
+expression searches fail unexpectedly.
+The following guidelines are helpful:
+.Bl -bullet -offset indent
+.It
+Spaces and tabs at the end of a line are not permitted.
+.It
+Spaces between tabs, and tabs between spaces, are not permitted.
+.It
+Use tabs to line things up in columns
+.Po
+such as for indenting code, and to line up elements within a series of
+declarations
+.Pc
+and spaces to separate items within a line.
+.It
+Use tabs to separate single line comments from the corresponding code.
+.El
+.\"
+.Sh Parentheses
+Since C has complex precedence rules, parentheses can clarify the programmer's
+intent in complex expressions that mix operators.
+Programmers should feel free to use parentheses if they feel that they make
+the code clearer and easier to understand.
+However, bear in mind that this can be taken too far, so some judgment must
+be applied to prevent making things less readable.
+For example, compare:
+.Bd -literal -offset indent
+x = ((x * 2) * 3) + (((y / 2) * 3) + 1);
+.Ed
+.Pp
+to,
+.Bd -literal -offset indent
+x = x * 2 * 3 + y / 2 * 3 + 1;
+.Ed
+.Pp
+It is also important to remember that complex expressions can be used as
+parameters to macros, and operator-precedence problems can arise unless
+.Em all
+occurrences of parameters in the body of a macro definition have parentheses
+around them.
+.\"
+.Sh Constants
+Numeric constants should not generally be written directly.
+Instead, give the constant a meaningful name using a
+.Ic const
+variable, an
+.Ic enum
+or the
+.Ic #define
+feature of the C preprocessor.
+This makes it easier to maintain large programs since the constant value can be
+changed uniformly by changing only the constant's definition.
+.Pp
+The enum data type is the preferred way to handle situations where
+a variable takes on only a discrete set of values, since additional type
+checking is available through the compiler and, as mentioned above,
+tools such as the
+.Xr mdb 1
+debugger also support enums.
+.Pp
+There are some cases where the constants 0 and 1 may appear as themselves
+instead of as
+.Ic #define Ns No s .
+For example if a
+.Ic for
+loop indexes through an array, then
+.Bd -literal -offset indent
+for (i = 0; i < ARYBOUND; i++)
+.Ed
+.Pp
+is reasonable.
+.Pp
+In rare cases, other constants may appear as themselves.
+Some judgment is required to determine whether the semantic meaning of the
+constant is obvious from its value, or whether the code would be easier
+to understand if a symbolic name were used for the value.
+.\"
+.Sh Goto
+While not completely avoidable, use of
+.Ic goto
+is generally discouraged.
+In many cases, breaking a procedure into smaller pieces, or using a different
+language construct can eliminate the need for
+.Ic goto Ns No s .
+For example, instead of:
+.Bd -literal -offset indent
+again:
+	if (s = proc(args))
+		if (s == -1 && errno == EINTR)
+			goto again;
+.Ed
+.Pp
+write:
+.Bd -literal -offset indent
+	do {
+		s = proc(args);
+	} while (s == -1 && errno == EINTR);
+.Ed
+.Pp
+The main place where
+.Ic goto Ns No s
+can be usefully employed is to break out of several levels of
+.Ic switch
+or loop nesting, or to centralize error path cleanup code in a function.
+For example:
+.Bd -literal -offset indent
+	for (...)
+		for (...) {
+			...
+			if (disaster)
+				goto error;
+		}
+	...
+error:
+	clean up the mess;
+.Ed
+.Pp
+However the need to do such things may indicate that the inner constructs
+should be broken out into a separate function.
+Never use a
+.Ic goto
+outside of a given block to branch to a label within a block:
+.Bd -literal -offset indent
+goto label;	/* WRONG */
+\&...
+for (...) {
+	...
+label:
+	statement;
+	...
+}
+.Ed
+.Pp
+When a
+.Ic goto
+is necessary, the accompanying label should be alone on a line.
+.Sh Variable Initialization
+C permits initializing a variable where it is declared.
+Programmers are equally divided about whether or not this is a good idea:
+.Qo
+I like to think of declarations and executable code as separate units.
+Intermixing them only confuses the issue.
+If only a scattered few declarations are initialized, it is easy not to see
+them.
+.Qc
+.Qo
+The major purpose of code style is clarity.
+I think the less hunting around for the connections between different places in
+the code, the better.
+I don't think variables should be initialized for no reason, however.
+If the variable doesn't need to be initialized, don't waste the reader's time
+by making him/her think that it does.
+.Qc
+.Pp
+A convention used by some programmers is to only initialize automatic variables
+in declarations if the value of the variable is constant throughout the block;
+such variables should be declared
+.Ic const .
+Note that as a matter of correctness, all automatic variables must be
+initialized before use, either in the declaration or elsewhere.
+.Pp
+The decision about whether or not to initialize a variable in a declaration is
+therefore left to the implementor.
+Use good taste.
+For example, don't bury a variable initialization in the middle of a long
+declaration:
+.Bd -literal -offset indent
+int	a, b, c, d = 4, e, f;		/* This is NOT good style */
+.Ed
+.Sh Multiple Assignments
+C also permits assigning several variables to the same value in a single
+statement, as in,
+.Bd -literal -offset indent
+x = y = z = 0;
+.Ed
+Good taste is required here also.
+For example, assigning several variables that are used the same way in the
+program in a single statement clarifies the relationship between the variables
+by making it more explicit:
+.Bd -literal -offset indent
+x = y = z = 0;
+vx = vy = vz = 1;
+count = 0;
+scale = 1;
+.Ed
+.Pp
+is good, whereas:
+.Bd -literal -offset indent
+x = y = z = count = 0;
+vx = vy = vz = scale = 1;
+.Ed
+.Pp
+sacrifices clarity for brevity.
+In any case, the variables that are so assigned should all be of the same type
+.Po
+or all pointers being initialized to
+.Dv NULL
+.Pc .
+It is not a good idea to use multiple assignments for complex expressions,
+as this can be significantly harder to read.
+E.g.,
+.Bd -literal -offset indent
+foo_bar.fb_name.firstch = bar_foo.fb_name.lastch = 'c'; /* Yecch */
+.Ed
+.\"
+.Sh Preprocessor
+The C preprocessor provides support for textual inclusion of files
+.Pq most often header files ,
+conditional compilation, and macro definitions and substitutions.
+.Pp
+It should be noted that the preprocessor works at the lexicographical, not
+syntactic level of the language.
+It is possible to define macros that are not syntactically valid when expanded,
+and the programmer should take care when using the preprocessor.
+Some general advice follows.
+.Pp
+Do not rename members of a structure using
+.Ic #define
+within a subsystem; instead, use a
+.Ic union .
+The legacy practice of using
+.Ic #define
+to define shorthand notations for referencing members of a union should
+not be used in new code.
+.Pp
+Be
+.Em extremely
+careful when choosing names for
+.Ic #define Ns No s .
+For example, never use something like
+.Bd -literal -offset indent
+#define	size	10
+.Ed
+.Pp
+especially in a header file, since it is not unlikely that the user
+might want to declare a variable named
+.Va size .
+.Pp
+Remember that names used in
+.Ic #define
+statements come out of a global preprocessor name space and can conflict with
+names in any other namespace.
+For this reason, this use of
+.Ic #define
+is discouraged.
+.Pp
+Note that
+.Ic #define
+follows indentation rules similar to other declarations; see the section on
+.Sx Indentation
+for details.
+.Pp
+Care is needed when defining macros that replace functions since functions
+pass their parameters by value whereas macros pass their arguments by
+name substitution.
+.Pp
+At the end of an
+.Ic #ifdef
+construct used to select among a required set of options
+.Pq such as machine types ,
+include a final
+.Ic #else
+clause containing a useful but illegal statement so that the compiler will
+generate an error message if none of the options has been defined:
+.Bd -literal -offset indent
+#ifdef vax
+	...
+#elif sun
+	...
+#elif u3b2
+	...
+#else
+#error unknown machine type;
+#endif /* machine type */
+.Ed
+.Pp
+Header files should make use of
+.Dq include guards
+to prevent their contents from being evaluated multiple times.
+For example,
+.Bd -literal -offset indent
+#ifndef	_FOOBAR_H
+#define	_FOOBAR_H
+
+/* Header contents....
+
+#endif	/* !_FOOBAR_H */
+.Ed
+.Pp
+The symbol defined for the include guard should be uniquely derived from the
+header file's name.
+Note that this is one area where library authors often use a leading underscore
+in an identifier.
+While this is technically in violation of the ISO C standard, the practice is
+common.
+.Pp
+Don't change C syntax via macro substitution.
+For example,
+.Bd -literal -offset indent
+#define	BEGIN	{
+.Ed
+.Pp
+It makes the program unintelligible to all but the perpetrator.
+.Pp
+Be especially aware that function-like macros are textually substituted, and
+side-effects in their arguments may be multiply-evaluated if the arguments are
+referred to more than once in the body of the macro.
+Similarly, variables defined inside of a macro's body may conflict with
+variables in the outer scope.
+Finally, macros are not generally type safe.
+For most macros and most programs, these are non-issues, but programmers who
+run into problems here may consider judicious use of
+.Sq inline
+functions as an alternative.
+.Ss Whitespace and the Preprocessor
+Use the following conventions with respect to whitespace and the preprocessor:
+.Bl -bullet -offset indent
+.It
+.Sq #include
+should be followed by a single space character.
+.It
+.Sq #define
+should be followed by a single tab character.
+.It
+.Sq #if ,
+.Sq #ifdef ,
+and other preprocessor statements may be followed by either a tab or space, but
+be consistent with the surrounding code.
+.El
+.\"
+.Sh Miscellaneous Comments on Good Taste
+Avoid undefined behavior wherever possible.
+Note that the rules of C are very subtle, and many things that at first
+appear well-defined can actually conceal undefined behavior.
+When in doubt, consult the C standard.
+.Pp
+Traditional Unix style favors guard clauses, which check a precondition and fail
+.Pq possibly via an early return
+over deeply nested control structures.
+For example, prefer:
+.Bd -literal -offset indent
+void
+foo(void)
+{
+	struct foo *foo;
+	struct bar *bar;
+	struct baz *baz;
+
+	foo = some_foo();
+	if (!is_valid_foo(foo))
+		return;
+	bar = some_bar(foo);
+	if (!is_valid_bar(bar)
+		return;
+	baz = some_baz(bar);
+	if (!is_valid_baz(baz));
+		return;
+
+	/* All of the preconditions are met */
+	do_something(baz);
+}
+.Ed
+.Pp
+over,
+.Bd -literal -offset indent
+void
+foo(void)
+{
+	struct foo *f;
+
+	foo = some_foo();
+	if (is_valid_foo(foo)) {
+		bar = some_bar(foo);
+		if (is_valid_bar(bar)) {
+			baz = some_baz(bar);
+			if (is_valid_baz(baz)) {
+				/* Preconditions met */
+				do_something(baz);
+			}
+		}
+	}
+}
+.Ed
+.Pp
+Try to make the structure of your program match the intent.
+For example, replace:
+.Bd -literal -offset indent
+if (boolean_expression)
+	return (TRUE);
+else
+	return (FALSE);
+.Ed
+.Pp
+with:
+.Bd -literal -offset indent
+return (boolean_expression);
+.Ed
+.Pp
+Similarly,
+.Bd -literal -offset indent
+if (condition)
+	return (x);
+return (y);
+.Ed
+.Pp
+is usually clearer than:
+.Bd -literal -offset indent
+if (condition)
+	return (x);
+else
+	return (y);
+.Ed
+.Pp
+or even better, if the condition and return expressions are short;
+.Bd -literal -offset indent
+return (condition ? x : y);
+.Ed
+.Pp
+Do not default the boolean test for nonzero.
+Prefer
+.Bd -literal -offset indent
+if (f() != 0)
+.Ed
+.Pp
+rather than
+.Bd -literal -offset indent
+if (f())
+.Ed
+.Pp
+even though 0 is considered to
+.Dq false
+in boolean contexts in C.
+An exception is commonly made for predicate functions, which encapsulate
+.Pq possibly complex
+boolean expressions.
+Predicates must meet the following restrictions:
+.Bl -bullet -offset indent
+.It
+Has no other purpose than to return true or false.
+.It
+Returns 0 for false, non-zero for true.
+.It
+Is named so that the meaning of the return value is obvious.
+.El
+.Pp
+Call a predicate
+.Fn is_valid
+or
+.Fn valid ,
+not
+.Fn check_valid .
+Note that
+.Fn isvalid
+and similar names with the
+.Sq is
+prefix followed by a letter or number
+.Pq but not underscore
+are reserved by the ISO C standard.
+.Pp
+The set of POSIX ctype functions including
+.Xr isalpha 3C ,
+.Xr isalnum 3C ,
+and
+.Xr isdigit 3C
+are examples of predicates.
+.Pp
+A particularly notorious case of not obeying the rules around predicates is
+using
+.Xr strcmp 3C
+to test for string equality, where the result should never be defaulted
+.Pq and indeed, a return value of 0 denotes equality .
+.Pp
+Never use the boolean negation operator
+.Pq Sq \&!
+with non-boolean expressions.
+In particular, never use it to test for a NULL pointer or to test for
+success of comparison functions like
+.Xr strcmp 3C
+or
+.Xr memcmp 3C .
+E.g.,
+.Bd -literal -offset indent
+char *p;
+\&...
+if (!p)			/* WRONG */
+	return;
+
+if (!strcmp(*argv, "-a"))	/* WRONG */
+	aflag++;
+.Ed
+.Pp
+When testing whether a bit is set in a value, it is good style to explicitly
+test the result of a bitwise operation against 0, rather than defaulting the
+boolean condition.
+Prefer
+.Bd -literal -offset indent
+if ((flags & FLAG_VERBOSE) != 0)
+if ((flags & FLAG_VERBOSE) == 0)
+.Ed
+.Pp
+rather than the following:
+.Bd -literal -offset indent
+if (flags & FLAG_VERBOSE)
+if (!(flags & FLAG_VERBOSE))
+.Ed
+.Pp
+Do not use the assignment operator in a place where it could be easily
+confused with the equality operator.
+For instance, in the simple expression
+.Bd -literal -offset indent
+if (x = y)
+	statement;
+.Ed
+.Pp
+it is hard to tell whether the programmer really meant assignment or
+mistyped an equality test.
+Instead, use
+.Bd -literal -offset indent
+if ((x = y) != 0)
+	statement;
+.Ed
+.Pp
+or something similar, if the assignment is actually needed within the
+.Ic if
+statement.
+.Pp
+There is a time and a place for embedded assignments.
+The
+.Ic ++
+and
+.Ic --
+operators count as assignments; so, for many purposes, do functions with side
+effects.
+.Pp
+In some constructs there is no better way to accomplish the results without
+making the code bulkier and less readable.
+To repeat the earlier loop example:
+.Bd -literal -offset indent
+while ((c = getchar()) != EOF) {
+	process the character
+}
+.Ed
+.Pp
+Embedded assignments used to provide modest improvement in run-time
+performance, but this is no longer the case with modern optimizing compilers.
+Do note write, for example,
+.Bd -literal -offset indent
+d = (a = b + c) + 4;		/* WRONG */
+.Ed
+.Pp
+believing that it will somehow be
+.Dq faster
+than
+.Bd -literal -offset indent
+a = b + c;
+d = a + 4;
+.Ed
+.Pp
+In general, avoid such premature micro-optimization unless performance
+is clearly a bottleneck, and a profile shows that the optimization provides
+a significant performance boost.
+Be aware how in the long run hand-optimized code often turns into a
+pessimization, and maintenance difficulty will increase as the human
+memory of what's going on in a given piece of code fades.
+Note also that side effects within expressions can result in code
+whose semantics are compiler-dependent, since C's order of evaluation
+is explicitly undefined in most places.
+Compilers do differ.
+.Pp
+There is also a time and place for the ternary
+.Pq Sq \&? \&:
+operator and the binary comma operator.
+If an expression containing a binary operator appears before the
+.Sq \&? ,
+it should be parenthesized:
+.Bd -literal -offset indent
+(x >= 0) ? x : -x
+.Ed
+.Pp
+Nested ternary operators can be confusing and should be avoided if possible.
+.Pp
+The comma operator can be useful in
+.Ic for
+statements to provide multiple initializations or incrementations.
+.Sh SEE ALSO
+.Rs
+.%T C Style and Coding Standards for SunOS
+.%A Bill Shannon
+.%D 1996
+.Re
+.Pp
+.Xr mdb 1

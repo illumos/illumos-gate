@@ -19533,6 +19533,7 @@ s usr/share/man/man7/standard.7=attributes.7
 f usr/share/man/man7/standards.7 0444 root bin
 s usr/share/man/man7/step.7=regexp.7
 f usr/share/man/man7/sticky.7 0444 root bin
+f usr/share/man/man7/style.7 0444 root bin
 f usr/share/man/man7/tbl.7 0444 root bin
 f usr/share/man/man7/tecla.7 0444 root bin
 s usr/share/man/man7/teclarc.7=tecla.7

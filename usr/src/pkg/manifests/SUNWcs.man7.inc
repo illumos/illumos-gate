@@ -64,4 +64,5 @@ link path=usr/share/man/man7/stability.7 target=attributes.7
 link path=usr/share/man/man7/standard.7 target=attributes.7
 file path=usr/share/man/man7/standards.7
 file path=usr/share/man/man7/sticky.7
+file path=usr/share/man/man7/style.7
 file path=usr/share/man/man7/term.7
