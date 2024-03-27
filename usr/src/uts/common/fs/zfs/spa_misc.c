@@ -60,6 +60,7 @@
 #include <sys/arc.h>
 #include <sys/ddt.h>
 #include "zfs_prop.h"
+#include "zfs_fletcher.h"
 #include <sys/btree.h>
 #include <sys/zfeature.h>
 
@@ -2266,6 +2267,7 @@ spa_init(int mode)
 	vdev_cache_stat_init();
 	vdev_mirror_stat_init();
 	vdev_raidz_math_init();
+	fletcher_4_init();
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
@@ -2285,6 +2287,7 @@ spa_fini(void)
 	vdev_cache_stat_fini();
 	vdev_mirror_stat_fini();
 	vdev_raidz_math_fini();
+	fletcher_4_fini();
 	zil_fini();
 	dmu_fini();
 	zio_fini();

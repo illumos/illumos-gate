@@ -100,6 +100,18 @@ zfs_avx2_available(void)
 	return (is_x86_feature(x86_featureset, X86FSET_AVX2));
 }
 
+static inline boolean_t
+zfs_avx512f_available(void)
+{
+	return (is_x86_feature(x86_featureset, X86FSET_AVX512F));
+}
+
+static inline boolean_t
+zfs_avx512bw_available(void)
+{
+	return (is_x86_feature(x86_featureset, X86FSET_AVX512BW));
+}
+
 #else	/* ! _KERNEL */
 
 #include <sys/auxv.h>
@@ -165,6 +177,24 @@ zfs_avx2_available(void)
 
 	(void) getisax((uint32_t *)&u, 2);
 	return ((u[1] & AV_386_2_AVX2) != 0);
+}
+
+static inline boolean_t
+zfs_avx512f_available(void)
+{
+	uint32_t u[2] = { 0 };
+
+	(void) getisax((uint32_t *)&u, 2);
+	return ((u[1] & AV_386_2_AVX512F) != 0);
+}
+
+static inline boolean_t
+zfs_avx512bw_available(void)
+{
+	uint32_t u[2] = { 0 };
+
+	(void) getisax((uint32_t *)&u, 2);
+	return ((u[1] & AV_386_2_AVX512BW) != 0);
 }
 
 #endif	/* _KERNEL */

@@ -2003,7 +2003,7 @@ get_receive_resume_stats_impl(dsl_dataset_t *ds)
 		    packed_size, packed_size, 6);
 
 		zio_cksum_t cksum;
-		fletcher_4_native(compressed, compressed_size, NULL, &cksum);
+		fletcher_4_native_varsize(compressed, compressed_size, &cksum);
 
 		str = kmem_alloc(compressed_size * 2 + 1, KM_SLEEP);
 		for (int i = 0; i < compressed_size; i++) {

@@ -127,6 +127,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <sys/fs/zfs.h>
+#include <zfs_fletcher.h>
 #include <libnvpair.h>
 #include <libzutil.h>
 #include <libcmdutils.h>
@@ -366,6 +367,8 @@ ztest_func_t ztest_vdev_aux_add_remove;
 ztest_func_t ztest_split_pool;
 ztest_func_t ztest_reguid;
 ztest_func_t ztest_spa_upgrade;
+ztest_func_t ztest_fletcher;
+ztest_func_t ztest_fletcher_incr;
 ztest_func_t ztest_device_removal;
 ztest_func_t ztest_remap_blocks;
 ztest_func_t ztest_spa_checkpoint_create_discard;
@@ -407,6 +410,8 @@ ztest_info_t ztest_info[] = {
 	{ ztest_reguid,				1,	&zopt_rarely	},
 	{ ztest_scrub,				1,	&zopt_often	},
 	{ ztest_spa_upgrade,			1,	&zopt_rarely	},
+	{ ztest_fletcher,			1,	&zopt_rarely	},
+	{ ztest_fletcher_incr,			1,	&zopt_rarely	},
 	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_rarely	},
 	{ ztest_vdev_attach_detach,		1,	&zopt_incessant	},
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
@@ -5338,6 +5343,151 @@ ztest_spa_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	nvlist_free(props);
 
 	rw_exit(&ztest_name_lock);
+}
+
+void
+ztest_fletcher(ztest_ds_t *zd, uint64_t id)
+{
+	hrtime_t end = gethrtime() + NANOSEC;
+
+	while (gethrtime() <= end) {
+		int run_count = 100;
+		void *buf;
+		struct abd *abd_data, *abd_meta;
+		uint32_t size;
+		uint_t *ptr;
+		int i;
+		zio_cksum_t zc_ref;
+		zio_cksum_t zc_ref_byteswap;
+
+		size = ztest_random_blocksize();
+
+		buf = umem_alloc(size, UMEM_NOFAIL);
+		abd_data = abd_alloc(size, B_FALSE);
+		abd_meta = abd_alloc(size, B_TRUE);
+
+		for (i = 0, ptr = buf; i < size / sizeof (*ptr); i++, ptr++)
+			*ptr = ztest_random(UINT_MAX);
+
+		abd_copy_from_buf_off(abd_data, buf, 0, size);
+		abd_copy_from_buf_off(abd_meta, buf, 0, size);
+
+		VERIFY0(fletcher_4_impl_set("scalar"));
+		fletcher_4_native(buf, size, NULL, &zc_ref);
+		fletcher_4_byteswap(buf, size, NULL, &zc_ref_byteswap);
+
+		VERIFY0(fletcher_4_impl_set("cycle"));
+		while (run_count-- > 0) {
+			zio_cksum_t zc;
+			zio_cksum_t zc_byteswap;
+
+			fletcher_4_byteswap(buf, size, NULL, &zc_byteswap);
+			fletcher_4_native(buf, size, NULL, &zc);
+
+			VERIFY0(bcmp(&zc, &zc_ref, sizeof (zc)));
+			VERIFY0(bcmp(&zc_byteswap, &zc_ref_byteswap,
+			    sizeof (zc_byteswap)));
+
+			/* Test ABD - data */
+			abd_fletcher_4_byteswap(abd_data, size, NULL,
+			    &zc_byteswap);
+			abd_fletcher_4_native(abd_data, size, NULL, &zc);
+
+			VERIFY0(bcmp(&zc, &zc_ref, sizeof (zc)));
+			VERIFY0(bcmp(&zc_byteswap, &zc_ref_byteswap,
+			    sizeof (zc_byteswap)));
+
+			/* Test ABD - metadata */
+			abd_fletcher_4_byteswap(abd_meta, size, NULL,
+			    &zc_byteswap);
+			abd_fletcher_4_native(abd_meta, size, NULL, &zc);
+
+			VERIFY0(bcmp(&zc, &zc_ref, sizeof (zc)));
+			VERIFY0(bcmp(&zc_byteswap, &zc_ref_byteswap,
+			    sizeof (zc_byteswap)));
+
+		}
+
+		umem_free(buf, size);
+		abd_free(abd_data);
+		abd_free(abd_meta);
+	}
+}
+
+void
+ztest_fletcher_incr(ztest_ds_t *zd, uint64_t id)
+{
+	void *buf;
+	size_t size;
+	uint_t *ptr;
+	int i;
+	zio_cksum_t zc_ref;
+	zio_cksum_t zc_ref_bswap;
+
+	hrtime_t end = gethrtime() + NANOSEC;
+
+	while (gethrtime() <= end) {
+		int run_count = 100;
+
+		size = ztest_random_blocksize();
+		buf = umem_alloc(size, UMEM_NOFAIL);
+
+		for (i = 0, ptr = buf; i < size / sizeof (*ptr); i++, ptr++)
+			*ptr = ztest_random(UINT_MAX);
+
+		VERIFY0(fletcher_4_impl_set("scalar"));
+		fletcher_4_native(buf, size, NULL,  &zc_ref);
+		fletcher_4_byteswap(buf, size, NULL, &zc_ref_bswap);
+
+		VERIFY0(fletcher_4_impl_set("cycle"));
+
+		while (run_count-- > 0) {
+			zio_cksum_t zc;
+			zio_cksum_t zc_bswap;
+			size_t pos = 0;
+
+			ZIO_SET_CHECKSUM(&zc, 0, 0, 0, 0);
+			ZIO_SET_CHECKSUM(&zc_bswap, 0, 0, 0, 0);
+
+			while (pos < size) {
+				size_t inc = 64 * ztest_random(size / 67);
+				/* sometimes add few bytes to test non-simd */
+				if (ztest_random(100) < 10)
+					inc += P2ALIGN(ztest_random(64),
+					    sizeof (uint32_t));
+
+				if (inc > (size - pos))
+					inc = size - pos;
+
+				fletcher_4_incremental_native(buf + pos, inc,
+				    &zc);
+				fletcher_4_incremental_byteswap(buf + pos, inc,
+				    &zc_bswap);
+
+				pos += inc;
+			}
+
+			VERIFY3U(pos, ==, size);
+
+			VERIFY(ZIO_CHECKSUM_EQUAL(zc, zc_ref));
+			VERIFY(ZIO_CHECKSUM_EQUAL(zc_bswap, zc_ref_bswap));
+
+			/*
+			 * verify if incremental on the whole buffer is
+			 * equivalent to non-incremental version
+			 */
+			ZIO_SET_CHECKSUM(&zc, 0, 0, 0, 0);
+			ZIO_SET_CHECKSUM(&zc_bswap, 0, 0, 0, 0);
+
+			fletcher_4_incremental_native(buf, size, &zc);
+			fletcher_4_incremental_byteswap(buf, size, &zc_bswap);
+
+			VERIFY(ZIO_CHECKSUM_EQUAL(zc, zc_ref));
+			VERIFY(ZIO_CHECKSUM_EQUAL(zc_bswap, zc_ref_bswap));
+		}
+
+		umem_free(buf, size);
+	}
 }
 
 static int
