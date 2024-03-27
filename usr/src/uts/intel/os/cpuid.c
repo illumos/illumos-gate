@@ -2251,6 +2251,14 @@ determine_platform(void)
 			platform_type = HW_QEMU_TCG;
 			return;
 		}
+		if (strcmp(hvstr, HVSIG_VIRTUALBOX) == 0) {
+			platform_type = HW_VIRTUALBOX;
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_ACRN) == 0) {
+			platform_type = HW_ACRN;
+			return;
+		}
 	} else {
 		/*
 		 * Check older VMware hardware versions. VMware hypervisor is
