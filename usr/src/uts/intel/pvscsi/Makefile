@@ -13,7 +13,7 @@
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
-UTSBASE=	$(SRC)/uts
+UTSBASE=	../..
 
 MODULE=		pvscsi
 OBJECTS=	$(PVSCSI_OBJS:%=$(OBJS_DIR)/%)
