@@ -37,7 +37,8 @@ typedef enum {
 	MUTEX_TEST_F_USE_ATTR	= 1 << 0,
 	MUTEX_TEST_F_SET_TYPE	= 1 << 1,
 	MUTEX_TEST_F_DEADLOCK	= 1 << 2,
-	MUTEX_TEST_F_ILLUMOS	= 1 << 3
+	MUTEX_TEST_F_ILLUMOS	= 1 << 3,
+	MUTEX_TEST_F_UNLOCK	= 1 << 4
 } mutex_test_flags_t;
 
 typedef struct {
@@ -80,6 +81,18 @@ const mutex_test_t mutex_tests[] = {
 		.mt_type = PTHREAD_MUTEX_ERRORCHECK,
 		.mt_ret = EDEADLK
 	}, {
+		.mt_desc = "pthread attr recursive unlock",
+		.mt_flags = MUTEX_TEST_F_USE_ATTR | MUTEX_TEST_F_SET_TYPE |
+		    MUTEX_TEST_F_UNLOCK,
+		.mt_type = PTHREAD_MUTEX_RECURSIVE,
+		.mt_ret = EPERM
+	}, {
+		.mt_desc = "pthread attr errorcheck unlock",
+		.mt_flags = MUTEX_TEST_F_USE_ATTR | MUTEX_TEST_F_SET_TYPE |
+		    MUTEX_TEST_F_UNLOCK,
+		.mt_type = PTHREAD_MUTEX_ERRORCHECK,
+		.mt_ret = EPERM
+	}, {
 		.mt_desc = "illumos USYNC_THREAD",
 		.mt_flags = MUTEX_TEST_F_DEADLOCK | MUTEX_TEST_F_ILLUMOS,
 		.mt_type = USYNC_THREAD,
@@ -99,6 +112,16 @@ const mutex_test_t mutex_tests[] = {
 		.mt_flags = MUTEX_TEST_F_ILLUMOS,
 		.mt_type = USYNC_THREAD | LOCK_RECURSIVE | LOCK_ERRORCHECK,
 		.mt_ret = 0
+	}, {
+		.mt_desc = "illumos error check unlock",
+		.mt_flags = MUTEX_TEST_F_ILLUMOS | MUTEX_TEST_F_UNLOCK,
+		.mt_type = USYNC_THREAD | LOCK_ERRORCHECK,
+		.mt_ret = EPERM
+	}, {
+		.mt_desc = "illumos recursive error check unlock",
+		.mt_flags = MUTEX_TEST_F_ILLUMOS | MUTEX_TEST_F_UNLOCK,
+		.mt_type = USYNC_THREAD | LOCK_RECURSIVE | LOCK_ERRORCHECK,
+		.mt_ret = EPERM
 	}
 };
 
@@ -117,6 +140,22 @@ mutex_test_thr(void *arg)
 			VERIFY0(pthread_mutexattr_settype(&attr,
 			    test->mt_type));
 		}
+	}
+
+	if ((test->mt_flags & MUTEX_TEST_F_UNLOCK) != 0) {
+		if ((test->mt_flags & MUTEX_TEST_F_ILLUMOS) != 0) {
+			mutex_t m;
+
+			VERIFY0(mutex_init(&m, test->mt_type, NULL));
+			ret = mutex_unlock(&m);
+		} else {
+			pthread_mutex_t pm;
+
+			VERIFY0(pthread_mutex_init(&pm, attrp));
+			ret = pthread_mutex_unlock(&pm);
+		}
+
+		return ((void *)(uintptr_t)ret);
 	}
 
 	if ((test->mt_flags & MUTEX_TEST_F_ILLUMOS) != 0) {

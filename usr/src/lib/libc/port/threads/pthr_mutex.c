@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <pthread.h>
@@ -233,7 +237,7 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 			type = LOCK_ERRORCHECK;
 			break;
 		case PTHREAD_MUTEX_RECURSIVE:
-			type = LOCK_RECURSIVE;
+			type = LOCK_RECURSIVE | LOCK_ERRORCHECK;
 			break;
 		default:
 			/*
