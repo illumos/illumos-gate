@@ -293,6 +293,7 @@ extern vnode_t *rootdir;
 #endif
 
 #define	likely(x)	_zfs_expect((x) != 0, 1)
+#define	unlikely(x)	_zfs_expect((x) != 0, 0)
 
 #define	CPU_SEQID	(thr_self() & (max_ncpus - 1))
 
