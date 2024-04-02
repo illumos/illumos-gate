@@ -1,0 +1,83 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd Jan 27, 2024
+.Dt AVL_UPDATE 3AVL
+.Os
+.Sh NAME
+.Nm avl_update ,
+.Nm avl_update_gt ,
+.Nm avl_update_lt
+.Nd reinsert a node if its order has changed
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft boolean_t
+.Fo avl_update
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Ft boolean_t
+.Fo avl_update_gt
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Ft boolean_t
+.Fo avl_update_lt
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_update
+function re-inserts
+.Fa node
+into
+.Fa tree
+only if its order has changed relative to its nearest neighbors.
+To optimize performance,
+.Fn avl_update_lt
+checks only the previous node and
+.Fn avl_update_gt
+checks only the next node.
+Use
+.Fn avl_update_lt
+and
+.Fn avl_update_gt
+only if you know the direction in which the order of the node may change.
+.Sh RETURN VALUES
+The
+.Fn avl_update ,
+.Fn avl_update_lt
+and
+.Fn avl_update_gt
+functions return
+.Sy B_TRUE
+if it was necessary to relocate the node due its order having changed
+relative to its nearest neighbors and
+.Sy B_FALSE
+otherwise.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB

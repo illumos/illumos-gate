@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd Mar 13, 2016
+.Dd Feb 27, 2024
 .Dt AVL 9F
 .Os
 .Sh NAME
@@ -30,12 +31,15 @@
 .Nm avl_numnodes ,
 .Nm avl_remove ,
 .Nm avl_swap ,
+.Nm avl_update ,
+.Nm avl_update_gt ,
+.Nm avl_update_lt ,
 .Nm AVL_NEXT ,
 .Nm AVL_PREV
 .Nd AVL tree routines
 .Sh DESCRIPTION
 AVL trees are a general purpose, self-balancing binary tree that can be
-used instead of the standard linked list interfaces --
+used instead of the standard linked list interfaces \(em
 .Xr list_create 9F .
 AVL trees are particularly useful either when order is important or
 better lookup performance is required.
@@ -43,13 +47,13 @@ better lookup performance is required.
 The AVL tree interfaces are identical in both userland and the kernel.
 For more general information on AVL trees, see
 .Xr libavl 3LIB .
-For more information on any of the funtions defined here, please see the
+For more information on any of the functions defined here, please see the
 corresponding manual page in section 3AVL.
 Please note, that while the descriptions in those manual pages are accurate for
 writers of Device Drivers, the examples provided use scaffolding not available
 in the kernel, such as the use of
 .Fn malloc ,
-and need to be adapated.
+and need to be adapted.
 .Sh CONTEXT
 All of the AVL routines may be used in user, kernel, and interrupt
 context.
@@ -85,6 +89,9 @@ for more information on synchronization primitives.
 .Xr AVL_PREV 3AVL ,
 .Xr avl_remove 3AVL ,
 .Xr avl_swap 3AVL ,
+.Xr avl_update 3AVL ,
+.Xr avl_update_gt 3AVL ,
+.Xr avl_update_lt 3AVL ,
 .Xr libavl 3LIB
 .Rs
 .%T Writing Device Drivers
