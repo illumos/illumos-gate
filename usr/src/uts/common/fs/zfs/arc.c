@@ -3274,7 +3274,13 @@ arc_hdr_realloc_crypt(arc_buf_hdr_t *hdr, boolean_t need_crypt)
 	arc_buf_t *buf;
 	kmem_cache_t *ncache, *ocache;
 
+	/*
+	 * This function requires that hdr is in the arc_anon state.
+	 * Therefore it won't have any L2ARC data for us to worry about
+	 * copying.
+	 */
 	ASSERT(HDR_HAS_L1HDR(hdr));
+	ASSERT(!HDR_HAS_L2HDR(hdr));
 	ASSERT3U(!!HDR_PROTECTED(hdr), !=, need_crypt);
 	ASSERT3P(hdr->b_l1hdr.b_state, ==, arc_anon);
 	ASSERT(!multilist_link_active(&hdr->b_l1hdr.b_arc_node));
@@ -3334,6 +3340,18 @@ arc_hdr_realloc_crypt(arc_buf_hdr_t *hdr, boolean_t need_crypt)
 	zfs_refcount_transfer(&nhdr->b_l1hdr.b_refcnt, &hdr->b_l1hdr.b_refcnt);
 	(void) zfs_refcount_remove(&nhdr->b_l1hdr.b_refcnt, FTAG);
 	ASSERT0(zfs_refcount_count(&hdr->b_l1hdr.b_refcnt));
+
+	/*
+	 * We have already asserted that we are not on any ghost lists, and we
+	 * are never called to switch from a crypt to non-crypt header
+	 * with a non-NULL rabd (this is asserted below).
+	 * This leaves the hdr's b_pabd buffer to deal with.
+	 */
+	if (hdr->b_l1hdr.b_pabd != NULL) {
+		zfs_refcount_transfer_ownership_many(
+		    &hdr->b_l1hdr.b_state->arcs_size, arc_hdr_size(hdr),
+		    hdr, nhdr);
+	}
 
 	if (need_crypt) {
 		arc_hdr_set_flags(nhdr, ARC_FLAG_PROTECTED);
