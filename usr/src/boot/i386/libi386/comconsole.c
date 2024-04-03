@@ -202,12 +202,22 @@ comc_ini(void)
 			port->ioaddr = COM4_IOADDR;
 			break;
 		}
+		port->speed = comc_getspeed(port->ioaddr);
 		port->lcr = BITS8;	/* 8,n,1 */
 		port->ignore_cd = 1;	/* ignore cd */
 		port->rtsdtr_off = 0;	/* rts-dtr is on */
 
 		tty->c_private = port;
 		consoles[c++] = tty;
+
+		/* Reset terminal to initial normal settings with ESC [ 0 m */
+		comc_putchar(tty, 0x1b);
+		comc_putchar(tty, '[');
+		comc_putchar(tty, '0');
+		comc_putchar(tty, 'm');
+		/* drain input from random data */
+		while (comc_getchar(tty) != -1)
+			;
 	}
 	consoles[c] = NULL;
 }
