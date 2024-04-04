@@ -25,7 +25,7 @@
 #
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
-UTSBASE=	$(SRC)/uts
+UTSBASE=	../../..
 
 MODULE=		cmdk
 OBJECTS=	$(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)

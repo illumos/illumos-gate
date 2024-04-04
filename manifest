@@ -2570,7 +2570,7 @@ f usr/bin/addbadsec 0555 root bin
 f usr/bin/alias 0555 root bin
 d usr/bin/amd64 0755 root bin
 f usr/bin/amd64/amt 0555 root bin
-f usr/bin/amd64/cputrack 0555 root bin
+s usr/bin/amd64/cputrack=../cputrack
 f usr/bin/amd64/crle 0555 root bin
 s usr/bin/amd64/decrypt=../decrypt
 s usr/bin/amd64/digest=../digest
@@ -2677,7 +2677,7 @@ f usr/bin/connstat 0555 root bin
 f usr/bin/coreadm 0555 root bin
 f usr/bin/cp 0555 root bin
 f usr/bin/cpio 0555 root bin
-h usr/bin/cputrack=usr/lib/isaexec
+f usr/bin/cputrack 0555 root bin
 f usr/bin/crle 0555 root bin
 f usr/bin/crontab 4555 root bin
 f usr/bin/crypt 0555 root bin

@@ -14,7 +14,7 @@
 # Copyright 2022 RackTop Systems, Inc.
 #
 
-UTSBASE=	$(SRC)/uts
+UTSBASE=	../..
 
 MODULE=		vioscsi
 OBJECTS=	$(VIOSCSI_OBJS:%=$(OBJS_DIR)/%)

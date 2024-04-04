@@ -87,10 +87,6 @@ cputrack_pctx_errfn(const char *fn, const char *fmt, va_list ap)
 static int cputrack(int argc, char *argv[], int optind);
 static void intr(int);
 
-#if defined(__i386)
-static void p4_ht_error(void);
-#endif
-
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
@@ -366,17 +362,13 @@ pinit_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 	if (cpc_bind_pctx(cpc, pctx, lwpid, set, 0) != 0 ||
 	    cpc_set_sample(cpc, set, *data2) != 0) {
 		errstr = strerror(errno);
-		if (errno == EAGAIN)
+		if (errno == EAGAIN) {
 			(void) cpc_unbind(cpc, set);
-#if defined(__i386)
-		if (errno == EACCES)
-			p4_ht_error();
-		else
-#endif
-			(void) fprintf(stderr, gettext(
-			    "%6d: init_lwp: can't bind perf counters "
-			    "to lwp%d - %s\n"), (int)pid, (int)lwpid,
-			    errstr);
+		}
+
+		(void) fprintf(stderr, gettext(
+		    "%6d: init_lwp: can't bind perf counters "
+		    "to lwp%d - %s\n"), (int)pid, (int)lwpid, errstr);
 		return (-1);
 	}
 
@@ -749,132 +741,6 @@ cputrack(int argc, char *argv[], int optind)
 
 	return (err != 0 ? 1 : 0);
 }
-
-#if defined(__i386)
-
-#define	OFFLINE_CMD	"/usr/sbin/psradm -f "
-#define	BUFSIZE		5	/* enough for "n " where n is a cpuid */
-
-/*
- * cpc_bind_pctx() failed with EACCES, which means the user must first offline
- * all but one logical processor on each physical processor. Print to stderr the
- * psradm command string to do this.
- */
-static void
-p4_ht_error(void)
-{
-	kstat_ctl_t	*kc;
-	kstat_t		*ksp;
-	kstat_named_t	*k;
-	int		i;
-	int		max;
-	int		stat;
-	int		*designees;
-	int		*must_offline;
-	char		buf[BUFSIZE];
-	char		*cmd;
-	int		noffline = 0;
-	int		ndone = 0;
-
-	(void) fprintf(stderr, "%s\n",
-	    gettext("Pentium 4 processors with HyperThreading present.\nOffline"
-	    " all but one logical processor on each physical processor in"
-	    " order to use\ncputrack.\n"));
-
-
-	if ((kc = kstat_open()) == NULL)
-		return;
-
-	max = sysconf(_SC_CPUID_MAX);
-	if ((designees = malloc(max * sizeof (*designees))) == NULL) {
-		(void) fprintf(stderr, gettext("%s: no memory available\n"),
-		    opts->pgmname);
-		exit(0);
-	}
-
-	if ((must_offline = malloc(max * sizeof (*designees))) == NULL) {
-		(void) fprintf(stderr, gettext("%s: no memory available\n"),
-		    opts->pgmname);
-		exit(0);
-	}
-
-	for (i = 0; i < max; i++) {
-		designees[i] = -1;
-		must_offline[i] = 0;
-	}
-
-	for (i = 0; i < max; i++) {
-		stat = p_online(i, P_STATUS);
-		if (stat != P_ONLINE && stat != P_NOINTR)
-			continue;
-
-		if ((ksp = kstat_lookup(kc, "cpu_info", i, NULL)) == NULL) {
-			free(designees);
-			free(must_offline);
-			return;
-		}
-
-		if (kstat_read(kc, ksp, NULL) == -1) {
-			free(designees);
-			free(must_offline);
-			return;
-		}
-
-		if ((k = (kstat_named_t *)kstat_data_lookup(ksp, "chip_id"))
-		    == NULL) {
-			free(designees);
-			free(must_offline);
-			return;
-		}
-
-		if (designees[k->value.i32] == -1)
-			/*
-			 * This chip doesn't yet have a CPU designated to remain
-			 * online; let this one be it.
-			 */
-			designees[k->value.i32] = i;
-		else {
-			/*
-			 * This chip already has a designated CPU; this CPU must
-			 * go offline.
-			 */
-			must_offline[i] = 1;
-			noffline++;
-		}
-	}
-
-	/*
-	 * Now construct a string containing the command line used to offline
-	 * the appropriate processors.
-	 */
-
-	if ((cmd = malloc(strlen(OFFLINE_CMD) + (noffline * BUFSIZE) + 1))
-	    == NULL) {
-		(void) fprintf(stderr, gettext("%s: no memory available\n"),
-		    opts->pgmname);
-		exit(0);
-	}
-
-	(void) strcpy(cmd, OFFLINE_CMD);
-
-	for (i = 0; i < max; i++) {
-		if (must_offline[i] == 0)
-			continue;
-
-		ndone++;
-		(void) snprintf(buf, BUFSIZE, "%d", i);
-		if (ndone < noffline)
-			(void) strcat(buf, " ");
-		(void) strcat(cmd, buf);
-	}
-
-	(void) fprintf(stderr, "%s:\n%s\n", gettext("The following command "
-	    "will configure the system appropriately"), cmd);
-
-	exit(1);
-}
-
-#endif /* defined(__i386) */
 
 /*ARGSUSED*/
 static void

@@ -26,7 +26,7 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-UTSBASE=	$(SRC)/uts
+UTSBASE=	../../..
 
 MODULE=		rtls
 OBJECTS=	$(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)

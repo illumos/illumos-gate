@@ -24,7 +24,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2021 Jason King
 
-UTSBASE	= $(SRC)/uts
+UTSBASE	=	../..
 
 #
 #	Define the module and object file sets.

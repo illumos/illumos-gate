@@ -26,7 +26,7 @@
 #
 # Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE		= ../../
+UTSBASE		= ../..
 
 #
 #	Define the module and object file sets.
