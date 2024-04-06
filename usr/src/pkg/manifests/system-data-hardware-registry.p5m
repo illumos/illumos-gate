@@ -25,7 +25,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/hardware-registry@2023.8.24,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/hardware-registry@2024.3.31,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Hardware data files"
 set name=pkg.description \
     value="ASCII databases describing various PCI, USB and other hardware"
