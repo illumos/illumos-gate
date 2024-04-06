@@ -26,8 +26,13 @@ post =
 outputdir = /var/tmp/test_results
 
 [/opt/util-tests/tests/printf_test]
+
 [/opt/util-tests/tests/allowed-ips]
+user = root
+
 [/opt/util-tests/tests/set-linkprop]
+user = root
+
 [/opt/util-tests/tests/libsff/libsff]
 [/opt/util-tests/tests/libjedec_test.32]
 [/opt/util-tests/tests/libjedec_temp.32]
@@ -69,7 +74,10 @@ timeout = 300
 
 [/opt/util-tests/tests/grep_test]
 [/opt/util-tests/tests/date_test]
+
 [/opt/util-tests/tests/chown_test]
+user = root
+
 [/opt/util-tests/tests/make_test]
 [/opt/util-tests/tests/head/head_test]
 
