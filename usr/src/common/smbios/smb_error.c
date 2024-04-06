@@ -23,6 +23,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/smbios_impl.h>
@@ -45,10 +47,11 @@ static const char *const _smb_errlist[] = {
 	"SMBIOS header checksum mismatch",		/* ESMB_CKSUM */
 	"Invalid argument specified in library call",	/* ESMB_INVAL */
 	"Structure is not of the expected type",	/* ESMB_TYPE */
-	"Unknown SMBIOS error"				/* ESMB_UNKNOWN */
+	"Unknown SMBIOS error",				/* ESMB_UNKNOWN */
+	"Invalid requested value"			/* ESMB_REQVAL */
 };
 
-static const int _smb_nerr = sizeof (_smb_errlist) / sizeof (_smb_errlist[0]);
+static const size_t _smb_nerr = ARRAY_SIZE(_smb_errlist);
 
 const char *
 smbios_errmsg(int error)
@@ -60,7 +63,7 @@ smbios_errmsg(int error)
 	else
 		str = smb_strerror(error);
 
-	return (str ? str : "Unknown error");
+	return (str != NULL ? str : "Unknown error");
 }
 
 int

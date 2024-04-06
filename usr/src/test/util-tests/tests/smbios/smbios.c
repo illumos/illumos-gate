@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -584,7 +584,58 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_extmem_verify_invlen_cs,
 	    .st_desc = "SMBIOS Sun extended memory device invalid cs length"
+	},
+{
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_noent,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_noent,
+	    .st_desc = "additional information - no entries"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_ents,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_ents,
+	    .st_desc = "additional information - multiple entries"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_invlen_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_invlen_base,
+	    .st_desc = "additional information - invalid length: base"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_invlen_ent,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_invlen_ent,
+	    .st_desc = "additional information - invalid length: base entry"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_invlen_multient,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_invlen_multient,
+	    .st_desc = "additional information - invalid length: multiple "
+		"entries"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_addinfo_mktable_invlen_entdata,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_addinfo_verify_invlen_entdata,
+	    .st_desc = "additional information - invalid length: entry data"
 	}
+/* XXX Missing an addinfo ent call with the wrong type to verify */
 };
 
 static boolean_t

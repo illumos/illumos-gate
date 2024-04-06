@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -20,6 +20,7 @@ ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
 OBJS =	smbios.o \
+	smbios_test_addinfo.o \
 	smbios_test_chassis.o \
 	smbios_test_errors.o \
 	smbios_test_extmemdevice.o \

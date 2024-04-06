@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1771,6 +1771,21 @@ typedef struct smbios_powersup {
 #define	SMB_POWERSUP_T_REGL	0x08	/* regulator */
 
 /*
+ * SMBIOS Additional Information. The top level structure defines a number of
+ * additional information entries, each of which is variable length and intended
+ * to augment some existing field in the system. Therefore we have a single
+ * function to get the number of additional entries present and then a different
+ * one that retrieves each entity function.
+ */
+typedef struct smbios_addinfo_ent {
+	id_t smbai_ref;			/* referenced handle */
+	uint32_t smbai_ref_off;		/* offset into referenced handle */
+	const char *smbai_str;		/* optional string description */
+	uint32_t smbai_dlen;		/* optional data length */
+	void *smbai_data;		/* optional data */
+} smbios_addinfo_ent_t;
+
+/*
  * SMBIOS Onboard Devices Extended Information.  See DSP0134 Section 7.42
  * for more information.
  */
@@ -2120,6 +2135,11 @@ extern int smbios_info_iprobe(smbios_hdl_t *, id_t, smbios_iprobe_t *);
 extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
 extern int smbios_info_powersup(smbios_hdl_t *, id_t, smbios_powersup_t *);
+extern int smbios_info_addinfo_nents(smbios_hdl_t *, id_t, uint_t *);
+extern int smbios_info_addinfo_ent(smbios_hdl_t *, id_t, uint_t,
+    smbios_addinfo_ent_t **);
+extern void smbios_info_addinfo_ent_free(smbios_hdl_t *,
+    smbios_addinfo_ent_t *);
 extern int smbios_info_pciexrc(smbios_hdl_t *, id_t, smbios_pciexrc_t *);
 extern int smbios_info_processor_info(smbios_hdl_t *, id_t,
     smbios_processor_info_t *);
