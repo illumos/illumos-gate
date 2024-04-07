@@ -23,6 +23,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -131,6 +132,8 @@ extern char *strchrnul(const char *, int);
 extern char *strcasestr_l(const char *, const char *, locale_t);
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
+extern const char *strerrorname_np(int);
+extern const char *strerrordesc_np(int);
 #endif /* !defined(__STRICT_SYMBOLS) */
 
 #if defined(__EXTENSIONS__) || \

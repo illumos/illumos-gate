@@ -1221,6 +1221,8 @@ link path=usr/share/man/man3c/strdupa.3c target=string.3c
 file path=usr/share/man/man3c/strerror.3c
 link path=usr/share/man/man3c/strerror_l.3c target=strerror.3c
 link path=usr/share/man/man3c/strerror_r.3c target=strerror.3c
+link path=usr/share/man/man3c/strerrordesc_np.3c target=strerror.3c
+link path=usr/share/man/man3c/strerrorname_np.3c target=strerror.3c
 file path=usr/share/man/man3c/strfmon.3c
 link path=usr/share/man/man3c/strfmon_l.3c target=strfmon.3c
 file path=usr/share/man/man3c/strftime.3c

@@ -16,7 +16,7 @@
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -211,7 +211,8 @@ file path=opt/libc-tests/tests/stdio/test_mbrtowc.32 mode=0555
 file path=opt/libc-tests/tests/stdio/test_mbrtowc.64 mode=0555
 file path=opt/libc-tests/tests/strcoll-strxfrm-6907.32 mode=0555
 file path=opt/libc-tests/tests/strcoll-strxfrm-6907.64 mode=0555
-file path=opt/libc-tests/tests/strerror mode=0555
+file path=opt/libc-tests/tests/strerror.32 mode=0555
+file path=opt/libc-tests/tests/strerror.64 mode=0555
 file path=opt/libc-tests/tests/strtonum.32 mode=0555
 file path=opt/libc-tests/tests/strtonum.64 mode=0555
 dir  path=opt/libc-tests/tests/symbols

@@ -25,10 +25,11 @@
  */
 /*
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "_libc_gettext.h"
@@ -39,6 +40,7 @@
 extern const char _sys_errs[];
 extern const int _sys_index[];
 extern int _sys_num_err;
+extern const char *_sys_err_names[];
 
 char *
 strerror_l(int errnum, locale_t loc)
@@ -55,6 +57,32 @@ char *
 strerror(int errnum)
 {
 	return (strerror_l(errnum, uselocale(NULL)));
+}
+
+/*
+ * A version of sterror() that always operates in the C locale. It returns NULL
+ * rather than the "Unknown error" string.
+ */
+const char *
+strerrordesc_np(int errnum)
+{
+	if (errnum < _sys_num_err && errnum >= 0)
+		return (&_sys_errs[_sys_index[errnum]]);
+
+	errno = EINVAL;
+	return (NULL);
+}
+
+const char *
+strerrorname_np(int errnum)
+{
+	if (errnum >= 0 && errnum < _sys_num_err &&
+	    _sys_err_names[errnum] != NULL) {
+		return (_sys_err_names[errnum]);
+	}
+
+	errno = EINVAL;
+	return (NULL);
 }
 
 /*
