@@ -1043,7 +1043,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	}
 	if (bbuf == NULL) {
 		bio_size = V86_IO_BUFFER_SIZE;
-		if (bio_size / bd->bd_sectorsize == 0)
+		if (bio_size < bd->bd_sectorsize)
 			panic("BUG: Real mode buffer is too small");
 
 		/* Use alternate 4k buffer */
