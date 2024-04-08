@@ -53,6 +53,7 @@
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
 #include "zfeature_common.h"
+#include <zfs_fletcher.h>
 #include <libzutil.h>
 
 int
@@ -754,6 +755,7 @@ libzfs_init(void)
 	zpool_prop_init();
 	zpool_feature_init();
 	libzfs_mnttab_init(hdl);
+	fletcher_4_init();
 
 	hdl->libzfs_cachedprops = B_FALSE;
 	if (getenv("ZFS_PROP_DEBUG") != NULL) {
@@ -794,6 +796,7 @@ libzfs_fini(libzfs_handle_t *hdl)
 	libzfs_mnttab_fini(hdl);
 	libzfs_core_fini();
 	regfree(&hdl->libzfs_urire);
+	fletcher_4_fini();
 	free(hdl);
 }
 

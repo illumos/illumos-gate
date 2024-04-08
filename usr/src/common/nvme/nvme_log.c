@@ -228,12 +228,30 @@ nvme_lpd_changens_sup(const nvme_valid_ctrl_data_t *data,
 	    data->vcd_id->id_oaes.oaes_nsan != 0);
 }
 
+static bool
+nvme_lpd_cmdeff_sup(const nvme_valid_ctrl_data_t *data,
+    const nvme_log_page_info_t *lpi)
+{
+	return (nvme_field_atleast(data, &nvme_vers_1v2) &&
+	    data->vcd_id->id_lpa.lp_cmdeff != 0);
+}
+
 /*
  * The short names here correspond to the well defined names in nvmeadm(8) and
  * libnvme(3LIB) that users expect to be able to use. Please do not change them
  * without accounting for aliases and backwards compatibility.
  */
 const nvme_log_page_info_t nvme_std_log_pages[] = { {
+	.nlpi_short = "suplog",
+	.nlpi_human = "Supported Log Pages",
+	.nlpi_lid = NVME_LOGPAGE_SUP,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_2v0,
+	.nlpi_kind = NVME_LOG_ID_MANDATORY,
+	.nlpi_source = NVME_LOG_DISC_S_SPEC,
+	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
+	.nlpi_len = sizeof (nvme_suplog_log_t)
+}, {
 	.nlpi_short = "error",
 	.nlpi_human = "Error information",
 	.nlpi_lid = NVME_LOGPAGE_ERROR,
@@ -278,7 +296,18 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_disc = NVME_LOG_DISC_F_NEED_RAE,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (nvme_nschange_list_t)
-} };
+}, {
+	.nlpi_short = "cmdeff",
+	.nlpi_human = "commands supported and effects",
+	.nlpi_lid = NVME_LOGPAGE_CMDSUP,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_1v2,
+	.nlpi_sup_func = nvme_lpd_cmdeff_sup,
+	.nlpi_kind = NVME_LOG_ID_OPTIONAL,
+	.nlpi_source = NVME_LOG_DISC_S_ID_CTRL,
+	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
+	.nlpi_len = sizeof (nvme_cmdeff_log_t)
+}  };
 
 size_t nvme_std_log_npages = ARRAY_SIZE(nvme_std_log_pages);
 

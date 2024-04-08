@@ -23,19 +23,28 @@
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright (c) 2011, 2017 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 LIBRARY= libzfs.a
 VERS= .1
 
-OBJS_SHARED=			\
-	zfeature_common.o	\
-	zfs_comutil.o		\
-	zfs_deleg.o		\
-	zfs_fletcher.o		\
-	zfs_namecheck.o		\
-	zfs_prop.o		\
-	zpool_prop.o		\
+amd64_OBJS_SHARED=		\
+	zfs_fletcher_avx512.o	\
+	zfs_fletcher_intel.o	\
+	zfs_fletcher_sse.o
+
+OBJS_SHARED=				\
+	$($(MACH64)_OBJS_SHARED)	\
+	zfeature_common.o		\
+	zfs_comutil.o			\
+	zfs_deleg.o			\
+	zfs_fletcher.o			\
+	zfs_fletcher_superscalar.o	\
+	zfs_fletcher_superscalar4.o	\
+	zfs_namecheck.o			\
+	zfs_prop.o			\
+	zpool_prop.o			\
 	zprop_common.o
 
 OBJS_COMMON=			\

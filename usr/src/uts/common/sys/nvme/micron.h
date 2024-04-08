@@ -27,6 +27,7 @@
 
 #include <sys/nvme/micron_7300.h>
 #include <sys/nvme/micron_74x0.h>
+#include <sys/nvme/micron_x500.h>
 #include <sys/debug.h>
 #include <sys/stdint.h>
 
@@ -45,42 +46,43 @@ extern "C" {
 /*
  * Micron has a common extended SMART log that is used between multiple device
  * families. Some fields have been added in newer device generations and they
- * are reserved otherwise.
+ * are reserved otherwise. Starting in the 6500/7500+ generation, the structure
+ * was extended in size and is defined in its device-specific section.
  */
 typedef struct {
 	uint8_t mes_rsvd0[12];
 	uint32_t mes_gbb;
 	uint32_t mes_max_erase;
 	uint32_t mes_power_on;
-	uint8_t mes_rsvd1[24];
+	uint8_t mes_rsvd24[24];
 	uint32_t mes_wp_reason;
-	uint8_t mes_rsvd2[12];
+	uint8_t mes_rsvd52[12];
 	uint64_t mes_cap;
-	uint8_t mes_rsvd3[8];
+	uint8_t mes_rsvd72[8];
 	uint64_t mes_erase_count;
 	uint64_t mes_use_rate;
 	/*
 	 * Begin 7400+ specific fields.
 	 */
 	uint64_t mes_erase_fail;
-	uint8_t mes_rsvd4[8];
+	uint8_t mes_rsvd104[8];
 	uint64_t mes_uecc;
-	uint8_t mes_rsvd5[24];
+	uint8_t mes_rsvd120[24];
 	uint8_t mes_prog_fail[16];
 	uint8_t mes_read_bytes[16];
 	uint8_t mes_write_bytes[16];
-	uint8_t mes_rsvd6[16];
+	uint8_t mes_rsvd192[16];
 	/*
 	 * End 7400+ specific fields.
 	 */
 	uint32_t mes_trans_size;
 	uint32_t mes_bs_total;
 	uint32_t mes_bs_free;
-	uint64_t mes_bs_size;
-	uint8_t mes_rsvd7[16];
+	uint64_t mes_bs_cap;
+	uint8_t mes_rsvd228[16];
 	uint32_t mes_user_erase_min;
-	uint32_t mes_user_erase_max;
 	uint32_t mes_user_erase_avg;
+	uint32_t mes_user_erase_max;
 } micron_vul_ext_smart_t;
 
 typedef enum {
@@ -90,7 +92,7 @@ typedef enum {
 	MICRON_VUL_WP_R_NVRAM_CKSUM		= 1 << 3,
 	MICRON_VUL_WP_R_DRAM_RANGE		= 1 << 4,
 	MICRON_VUL_WP_R_OVERTEMP		= 1 << 5
-} MICRON_vul_wp_reason_t;
+} micron_vul_wp_reason_t;
 
 /*
  * Smatch can't handle packed structure sizeof calculations correctly,

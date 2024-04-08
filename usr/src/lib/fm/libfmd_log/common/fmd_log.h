@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Co.
  */
 
 #ifndef	_FMD_LOG_H
@@ -44,7 +46,7 @@ extern "C" {
  * purpose until they are publicly documented for use outside of Sun.
  */
 
-#define	FMD_LOG_VERSION	2		/* library ABI interface version */
+#define	FMD_LOG_VERSION	3		/* library ABI interface version */
 
 typedef struct fmd_log fmd_log_t;
 
@@ -100,6 +102,7 @@ extern fmd_log_rec_f fmd_log_filter_uuid;	/* char *uuid of list.suspect */
 extern fmd_log_rec_f fmd_log_filter_before;	/* struct timeval * latest */
 extern fmd_log_rec_f fmd_log_filter_after;	/* struct timeval * earliest */
 extern fmd_log_rec_f fmd_log_filter_nv;		/* char *namevalue in event */
+extern fmd_log_rec_f fmd_log_filter_nv_multi;	/* multiple name-value pairs */
 
 extern int fmd_log_filter(fmd_log_t *,
     uint_t, fmd_log_filter_t *, const fmd_log_record_t *);
@@ -108,6 +111,7 @@ typedef struct fmd_log_filter_nvarg {
 	char	*nvarg_name;
 	char	*nvarg_value;
 	regex_t	*nvarg_value_regex;
+	struct fmd_log_filter_nvarg *nvarg_next;
 } fmd_log_filter_nvarg_t;
 
 /*

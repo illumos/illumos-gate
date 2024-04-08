@@ -307,7 +307,7 @@ $AWK '#
 ' >/dev/null 2> $TEMP0
 grep 'line [45]' $TEMP0 >/dev/null || fail 'BAD: T.misc lineno'
 
-echo 'x\y' > $TEMP1
+echo 'x\r\y' > $TEMP1
 $AWK 'BEGIN { print "x\f\r\b\v\a\\y" }' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird chars'
 
@@ -485,7 +485,7 @@ awk '{ print NF, $0 }' $TEMP0| tail -1 > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc END must preserve $0'
 
 
-LC_ALL= LC_NUMERIC=ru_RU.ISO8859-5 $AWK 'BEGIN {
+LC_ALL= LC_NUMERIC=de_DE.UTF-8 $AWK 'BEGIN {
 	"echo 1,200" | getline;
 	if ($1 == 1.2) {
 		printf "good ";

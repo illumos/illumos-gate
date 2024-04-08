@@ -32,7 +32,10 @@ const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&micron_7400_pro,
 	&micron_7400_max,
 	&micron_7450_pro,
-	&micron_7450_max
+	&micron_7450_max,
+	&micron_6500_ion,
+	&micron_7500_pro,
+	&micron_7500_max
 };
 
 /*

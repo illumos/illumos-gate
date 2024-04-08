@@ -12,7 +12,7 @@
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd January 12, 2024
+.Dd March 26, 2024
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -613,6 +613,10 @@ of the log will be written to
 Most log pages are only available on a per-controller basis.
 Known log pages are:
 .Bl -tag -width "firmware"
+.It suplog
+Supported Log Pages.
+Lists information about log pages that the device supports.
+Available starting in NVMe 2.0 devices.
 .It error
 Error Information
 .It health
@@ -622,6 +626,10 @@ A controller may support this log page on a per-namespace basis.
 Firmware Slot Information
 .It changens
 Changed Namespaces.
+.It cmdeff
+Commands Supported and Effects.
+An optional log page beginning in NVMe 1.2 that indicates what commands
+the controller itself actually supports.
 .El
 .Pp
 The following vendor-specific log pages are supported.
@@ -635,6 +643,18 @@ they operate on a controller or namespace.
 Micron Vendor Unique SMART.
 .It micron/extsmart
 Micron Extended SMART.
+.It ocp/smart
+Open Compute Datacenter NVMe SSD specification SMART / Health information.
+.It ocp/errrec
+Open Compute Datacenter NVMe SSD specification error recovery log.
+.It ocp/fwact
+Open Compute Datacenter NVMe SSD specification firmware activation log.
+.It ocp/latency
+Open Compute Datacenter NVMe SSD specification latency monitor.
+.It ocp/devcap
+Open Compute Datacenter NVMe SSD specification device capabilities.
+.It ocp/unsup
+Open Compute Datacenter NVMe SSD specification unsupported requirements.
 .It wdc/eol
 Western Digital end-of-life.
 .It wdc/devmgmt

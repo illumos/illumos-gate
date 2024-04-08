@@ -20,6 +20,8 @@
 
 export LC_ALL=C
 
+TMPDIR=${TMPDIR:-/tmp}
+
 date_arg0="$(basename $0)"
 date_prog=/usr/bin/date
 date_curcmd=
@@ -42,7 +44,7 @@ compare()
 	date_curcmd="TZ=$3 $date_prog -r $1"
 	val=$(TZ=$3 $date_prog -r $1)
 	ret=$?
-	if [[ $ret -ne 0 ]]; then
+	if (( ret != 0 )); then
 		fatal "date not exit zero, exited $ret; command: $date_curcmd"
 	fi
 	if [[ -z "$val" ]]; then

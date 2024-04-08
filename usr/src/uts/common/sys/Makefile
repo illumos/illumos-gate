@@ -894,6 +894,8 @@ NVMEHDRS=		\
 	micron.h	\
 	micron_7300.h	\
 	micron_74x0.h	\
+	micron_x500.h	\
+	ocp.h		\
 	wdc.h		\
 	wdc_sn840.h	\
 	wdc_sn65x.h

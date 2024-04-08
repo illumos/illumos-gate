@@ -15,8 +15,8 @@
 
 /*
  * libnvme logic specific to Micron device families. Currently this has support
- * for the Micron 7300, 7400, and 7450 device generations. Right now we only
- * have support for some of the device-specific log pages.
+ * for the Micron 7300, 7400, 7450, 6500, and 7500 device generations. Right now
+ * we only have support for some of the device-specific log pages.
  */
 
 #include <sys/sysmacros.h>
@@ -53,6 +53,62 @@ static const nvme_log_page_info_t micron_74x0_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_DB,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (micron_vul_ext_smart_t)
+} };
+
+static const nvme_log_page_info_t micron_x500_log_pages[] = { {
+	.nlpi_short = "ocp/smart",
+	.nlpi_human = "OCP SMART / Health Information",
+	.nlpi_lid = OCP_LOG_DSSD_SMART,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_smart_t),
+}, {
+	.nlpi_short = "ocp/errrec",
+	.nlpi_human = "OCP Error Recovery",
+	.nlpi_lid = OCP_LOG_DSSD_ERROR_REC,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_errrec_t),
+}, {
+	.nlpi_short = "ocp/fwact",
+	.nlpi_human = "OCP Firmware Activation",
+	.nlpi_lid = OCP_LOG_DSSD_FWACT,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_fwact_t),
+}, {
+	.nlpi_short = "ocp/latency",
+	.nlpi_human = "OCP Latency Monitor",
+	.nlpi_lid = OCP_LOG_DSSD_LATENCY,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_lat_t),
+}, {
+	.nlpi_short = "ocp/devcap",
+	.nlpi_human = "OCP Device Capabilities",
+	.nlpi_lid = OCP_LOG_DSSD_DEV_CAP,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_devcap_t),
+}, {
+	.nlpi_short = "ocp/unsup",
+	.nlpi_human = "OCP Unsupported Requirements",
+	.nlpi_lid = OCP_LOG_DSSD_UNSUP_REQ,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
+	.nlpi_source = NVME_LOG_DISC_S_DB,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (ocp_vul_unsup_req_t),
 } };
 
 const nvme_vsd_t micron_7300_pro = {
@@ -101,4 +157,28 @@ const nvme_vsd_t micron_7450_max = {
 	.nvd_human = "Micron 7450 Max",
 	.nvd_logs = micron_74x0_log_pages,
 	.nvd_nlogs = ARRAY_SIZE(micron_74x0_log_pages)
+};
+
+const nvme_vsd_t micron_6500_ion = {
+	.nvd_vid = MICRON_PCI_VID,
+	.nvd_did = MICRON_6500_ION_DID,
+	.nvd_human = "Micron 6500 ION",
+	.nvd_logs = micron_x500_log_pages,
+	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages)
+};
+
+const nvme_vsd_t micron_7500_pro = {
+	.nvd_vid = MICRON_PCI_VID,
+	.nvd_did = MICRON_7500_PRO_DID,
+	.nvd_human = "Micron 7500 Pro",
+	.nvd_logs = micron_x500_log_pages,
+	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages)
+};
+
+const nvme_vsd_t micron_7500_max = {
+	.nvd_vid = MICRON_PCI_VID,
+	.nvd_did = MICRON_7500_MAX_DID,
+	.nvd_human = "Micron 7500 Max",
+	.nvd_logs = micron_x500_log_pages,
+	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages)
 };

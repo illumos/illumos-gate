@@ -473,6 +473,9 @@ extern const nvme_vsd_t micron_7400_pro;
 extern const nvme_vsd_t micron_7400_max;
 extern const nvme_vsd_t micron_7450_pro;
 extern const nvme_vsd_t micron_7450_max;
+extern const nvme_vsd_t micron_6500_ion;
+extern const nvme_vsd_t micron_7500_pro;
+extern const nvme_vsd_t micron_7500_max;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);

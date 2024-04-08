@@ -55,11 +55,7 @@ const raidz_impl_ops_t *raidz_all_maths[] = {
 	&vdev_raidz_scalar_impl,
 #if defined(__amd64)
 	&vdev_raidz_sse2_impl,
-#endif
-#if defined(__amd64)
 	&vdev_raidz_ssse3_impl,
-#endif
-#if defined(__amd64)
 	&vdev_raidz_avx2_impl,
 #endif
 };
@@ -289,7 +285,7 @@ const char *raidz_rec_name[] = {
 #define	BENCH_D_COLS	(8ULL)
 #define	BENCH_COLS	(BENCH_D_COLS + PARITY_PQR)
 #define	BENCH_ZIO_SIZE	(1ULL << SPA_OLD_MAXBLOCKSHIFT)	/* 128 kiB */
-#define	BENCH_NS	MSEC2NSEC(25)			/* 25ms */
+#define	BENCH_NS	MSEC2NSEC(1)			/* 1ms */
 
 typedef void (*benchmark_fn)(raidz_map_t *rm, const int fn);
 
@@ -339,7 +335,7 @@ benchmark_raidz_impl(raidz_map_t *bench_rm, const int fn, benchmark_fn bench_fn)
 		t_start = gethrtime();
 
 		do {
-			for (i = 0; i < 25; i++, run_cnt++)
+			for (i = 0; i < 5; i++, run_cnt++)
 				bench_fn(bench_rm, fn);
 
 			t_diff = gethrtime() - t_start;
@@ -489,7 +485,7 @@ static const struct {
 int
 vdev_raidz_impl_set(const char *val)
 {
-	int err = -EINVAL;
+	int err = EINVAL;
 	char req_name[RAIDZ_IMPL_NAME_MAX];
 	uint32_t impl = RAIDZ_IMPL_READ(user_sel_impl);
 	size_t i;

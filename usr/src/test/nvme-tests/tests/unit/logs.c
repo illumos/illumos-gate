@@ -599,8 +599,23 @@ static const log_scope_test_t log_scope_tests[] = { {
 	.lst_data = &nvme_ctrl_ns_2v0,
 	.lst_exp_scope = NVME_LOG_SCOPE_NVM
 }, {
-	.lst_desc = "changed namespaces log (2.0)",
+	.lst_desc = "changed namespace log (2.0)",
 	.lst_short = "changens",
+	.lst_data = &nvme_ctrl_ns_2v0,
+	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
+}, {
+	.lst_desc = "supported logs log (2.0)",
+	.lst_short = "suplog",
+	.lst_data = &nvme_ctrl_ns_2v0,
+	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
+}, {
+	.lst_desc = "commands supported and effects log (1.2)",
+	.lst_short = "cmdeff",
+	.lst_data = &nvme_ctrl_ns_1v2,
+	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
+}, {
+	.lst_desc = "commands supported and effects log (2.0)",
+	.lst_short = "cmdeff",
 	.lst_data = &nvme_ctrl_ns_2v0,
 	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
 } };
@@ -661,6 +676,24 @@ static const log_size_test_t log_size_tests[] = { {
 	.lt_data = &nvme_ctrl_ns_1v4,
 	.lt_size = sizeof (nvme_nschange_list_t),
 	.lt_var = false
+}, {
+	.lt_desc = "commands supported and effects log (1.2)",
+	.lt_short = "cmdeff",
+	.lt_data = &nvme_ctrl_ns_1v2,
+	.lt_size = sizeof (nvme_cmdeff_log_t),
+	.lt_var = false
+}, {
+	.lt_desc = "commands supported and effects log (1.4)",
+	.lt_short = "cmdeff",
+	.lt_data = &nvme_ctrl_ns_1v4,
+	.lt_size = sizeof (nvme_cmdeff_log_t),
+	.lt_var = false
+}, {
+	.lt_desc = "supported logs log (2.0)",
+	.lt_short = "suplog",
+	.lt_data = &nvme_ctrl_ns_2v0,
+	.lt_size = sizeof (nvme_suplog_log_t),
+	.lt_var = false
 } };
 
 typedef struct log_impl_test {
@@ -671,6 +704,16 @@ typedef struct log_impl_test {
 } log_impl_test_t;
 
 static const log_impl_test_t log_impl_tests[] = { {
+	.lit_desc = "supported logs (1.0)",
+	.lit_short = "suplog",
+	.lit_data = &nvme_ctrl_base_1v0,
+	.lit_impl = false
+}, {
+	.lit_desc = "supported logs (2.0)",
+	.lit_short = "suplog",
+	.lit_data = &nvme_ctrl_base_2v0,
+	.lit_impl = true
+}, {
 	.lit_desc = "error (1.0)",
 	.lit_short = "error",
 	.lit_data = &nvme_ctrl_base_1v0,
@@ -714,6 +757,21 @@ static const log_impl_test_t log_impl_tests[] = { {
 	.lit_desc = "changed namespace (1.2 No OAES)",
 	.lit_short = "changens",
 	.lit_data = &nvme_ctrl_base_1v2,
+	.lit_impl = false
+}, {
+	.lit_desc = "commands supported and effects (1.0)",
+	.lit_short = "cmdeff",
+	.lit_data = &nvme_ctrl_base_1v0,
+	.lit_impl = false
+}, {
+	.lit_desc = "commands supported and effects (1.4 LPA)",
+	.lit_short = "cmdeff",
+	.lit_data = &nvme_ctrl_ns_1v4,
+	.lit_impl = true
+}, {
+	.lit_desc = "commands supported and effects (2.0 No LPA)",
+	.lit_short = "cmdeff",
+	.lit_data = &nvme_ctrl_base_2v0,
 	.lit_impl = false
 } };
 

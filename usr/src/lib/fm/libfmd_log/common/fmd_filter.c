@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Co.
  */
 
 #include <sys/fm/protocol.h>
@@ -99,22 +101,65 @@ fmd_log_filter_after(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
 int
 fmd_log_filter_nv(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
 {
-	fmd_log_filter_nvarg_t *argt = (fmd_log_filter_nvarg_t *)arg;
-	char		*name = argt->nvarg_name;
-	char		*value = argt->nvarg_value;
-	regex_t		*value_regex = argt->nvarg_value_regex;
-	nvpair_t	*nvp;
-	int		ai;
+	/*
+	 * The nvarg_next member was added compatibly with the introduction of
+	 * ABI version 3.  Older consumers pass a smaller structure that does
+	 * not contain this member, so we treat it as if it were always NULL.
+	 */
+	for (fmd_log_filter_nvarg_t *argt = (fmd_log_filter_nvarg_t *)arg;
+	    argt != NULL; argt = (lp->log_abi < 3) ? NULL : argt->nvarg_next) {
+		char		*name = argt->nvarg_name;
+		char		*value = argt->nvarg_value;
+		regex_t		*value_regex = argt->nvarg_value_regex;
+		nvpair_t	*nvp;
+		int		ai;
 
-	/* see if nvlist has named member */
-	if (nvlist_lookup_nvpair_embedded_index(rp->rec_nvl, name,
-	    &nvp, &ai, NULL) != 0)
-		return (0);		/* name filter failure */
+		/* see if nvlist has named member */
+		if (nvlist_lookup_nvpair_embedded_index(rp->rec_nvl, name,
+		    &nvp, &ai, NULL) != 0) {
+			return (0);		/* name filter failure */
+		}
 
-	/* check value match for matching nvpair */
-	if ((value == NULL) ||
-	    (nvpair_value_match_regex(nvp, ai, value, value_regex, NULL) == 1))
-		return (1);		/* name/value filter pass */
+		/* check value match for matching nvpair */
+		if ((value != NULL) &&
+		    (nvpair_value_match_regex(nvp, ai,
+		    value, value_regex, NULL) != 1)) {
+			return (0);		/* value filter failure */
+		}
+	}
 
-	return (0);			/* value filter failure */
+	return (1);		/* name/value filter pass */
+}
+
+/*
+ * This exists because filters are sorted and grouped based on the pointer to
+ * the filtering function, and we need fmdump to be able to maintain backward
+ * compatibility.  fmdump distinguishes filter classes by the command-line
+ * option used to describe the filter.  As for all library consumers, filters
+ * with the same evaluation function are considered to have the same class, and
+ * groups of filters of the SAME class are ORed together (i.e., match-any) while
+ * distinct classes are ANDed together, so that at least one of every class of
+ * filter must match in order for the record to pass through.  The command-line
+ * syntax fmdump accepts for multiple name-value filter chains cannot be made
+ * compatible with the syntax it accepted for single name-value filters,
+ * requiring that a new command-line option be introduced for multi-name-value
+ * filter chains.  Using a separate function thus allows fmdump to treat
+ * single-name-value and multi-name-value filters as belonging to different
+ * classes, maintaining backward compatibility with its existing command-line
+ * option syntax AND consistency with its documented treatment of filters of
+ * distinct classes.  At the same time, because a single-name-value filter is
+ * merely a special case of a multi-name-value filter (each entry in the
+ * argument list is required to match the record in order for the record to pass
+ * the filter), the actual implementation of the two filter classes is
+ * identical.  A consumer that, unlike fmdump, wants to treat these types of
+ * filters as belonging to a single class can therefore do so simply by using
+ * fmd_log_filter_nv() regardless of the number of name-value parameters in the
+ * argument chain, while those that want the fmdump behaviour should use that
+ * function only for filters with a single such parameter and this function for
+ * those with multiple.  See fmdump(8).
+ */
+int
+fmd_log_filter_nv_multi(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
+{
+	return (fmd_log_filter_nv(lp, rp, arg));
 }

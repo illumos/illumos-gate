@@ -22,6 +22,7 @@
 
 #include <sys/types.h>
 #include <sys/debug.h>
+#include <sys/stddef.h>
 
 #ifdef _KERNEL
 #include <sys/types32.h>
@@ -1289,6 +1290,42 @@ typedef struct {
 #define	NVME_LOGPAGE_VEND_MIN	0xc0
 #define	NVME_LOGPAGE_VEND_MAX	0xff
 
+/*
+ * Supported Log Pages (2.0). There is one entry of an nvme_logsup_t that then
+ * exists on a per-log basis.
+ */
+
+/*
+ * The NVMe Log Identifier specific parameter field. Currently there is only one
+ * defined field for the persistent event log (pel).
+ */
+typedef union {
+	uint16_t nsl_lidsp;		/* Raw Value */
+	struct {			/* Persistent Event Log */
+		uint16_t nsl_ec512:1;
+		uint16_t nsl_pel_rsvd0p1:15;
+	} nsl_pel;
+} nvme_suplog_lidsp_t;
+
+typedef struct {
+	uint16_t ns_lsupp:1;
+	uint16_t ns_ios:1;
+	uint16_t ns_rsvd0p2:14;
+	nvme_suplog_lidsp_t ns_lidsp;
+} nvme_suplog_t;
+
+CTASSERT(sizeof (nvme_suplog_lidsp_t) == 2);
+CTASSERT(sizeof (nvme_suplog_t) == 4);
+
+typedef struct {
+	nvme_suplog_t	nl_logs[256];
+} nvme_suplog_log_t;
+
+CTASSERT(sizeof (nvme_suplog_log_t) == 1024);
+
+/*
+ * SMART / Health information
+ */
 typedef struct {
 	uint64_t el_count;		/* Error Count */
 	uint16_t el_sqid;		/* Submission Queue ID */
@@ -1373,6 +1410,49 @@ typedef struct {
 typedef struct {
 	uint32_t	nscl_ns[NVME_NSCHANGE_LIST_SIZE];
 } nvme_nschange_list_t;
+
+/*
+ * Commands Supported and Effects log page and information structure. This was
+ * an optional log page added in NVMe 1.2.
+ */
+typedef struct {
+	uint8_t cmd_csupp:1;	/* Command supported */
+	uint8_t cmd_lbcc:1;	/* Logical block content change */
+	uint8_t cmd_ncc:1;	/* Namespace capability change */
+	uint8_t cmd_nic:1;	/* Namespace inventory change */
+	uint8_t cmd_ccc:1;	/* Controller capability change */
+	uint8_t cmd_rsvd0p5:3;
+	uint8_t cmd_rsvd1;
+	uint16_t cmd_cse:3;	/* Command submission and execution */
+	uint16_t cmd_uuid:1;	/* UUID select supported, 1.4 */
+	uint16_t cmd_csp:12;	/* Command Scope, 2.0 */
+} nvme_cmdeff_t;
+
+CTASSERT(sizeof (nvme_cmdeff_t) == 4);
+
+typedef enum {
+	NVME_CMDEFF_CSP_NS		= 1 << 0,
+	NVME_CMDEFF_CSP_CTRL		= 1 << 1,
+	NVME_CMDEFF_CSP_SET		= 1 << 2,
+	NVME_CMDEFF_CSP_ENDURANCE	= 1 << 3,
+	NVME_CMDEFF_CSP_DOMAIN		= 1 << 4,
+	NVME_CMDEFF_CSP_NVM		= 1 << 5
+} nvme_cmdeff_csp_t;
+
+typedef enum {
+	NVME_CMDEFF_CSE_NONE	= 0,
+	NVME_CMDEFF_CSE_NS,
+	NVME_CMDEFF_CSE_CTRL
+} nvme_cmdeff_cse_t;
+
+typedef struct {
+	nvme_cmdeff_t	cme_admin[256];
+	nvme_cmdeff_t	cme_io[256];
+	uint8_t		cme_rsvd2048[2048];
+} nvme_cmdeff_log_t;
+
+CTASSERT(sizeof (nvme_cmdeff_log_t) == 4096);
+CTASSERT(offsetof(nvme_cmdeff_log_t, cme_rsvd2048) == 2048);
 
 /*
  * NVMe Format NVM

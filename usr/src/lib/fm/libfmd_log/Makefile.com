@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2024 Oxide Computer Co.
+#
 
 LIBRARY = libfmd_log.a
 VERS = .1
@@ -43,6 +45,7 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CERRWARN += $(CNOWARN_UNINIT)
 LDLIBS += -lexacct -lnvpair -lgen -lc
 
+CSTD =	$(CSTD_GNU99)
 
 .KEEP_STATE:
 
