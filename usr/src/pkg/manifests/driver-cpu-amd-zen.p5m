@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -32,6 +32,7 @@ file path=usr/share/man/man4d/amdzen.4d
 link path=usr/share/man/man4d/amdzen_stub.4d target=amdzen.4d
 driver name=amdzen
 #
+# 12c0-12c7: f1ah m00-1fh df
 # 1440-1447: f17h m70-7fh, f19h m20-2f df
 # 1448-144f: f17h m60-6fh df
 # 1450: f17h m00-0f nb
@@ -41,19 +42,30 @@ driver name=amdzen
 # 14a4: f19h m10-1f, m1a0-af nb
 # 14ad-14b4: f19h m10-1fh, a0-af df
 # 14b5: f17h ma0-af, f19h m40-4f nb
-# 14d8: f19h m60-6f nb
+# 14d8: f19h m60-6f, f1ah m40-4f nb
 # 14e8: f19h m70-7f nb
-# 14e0-14e7: f19h m60-6f df
+# 14e0-14e7: f19h m60-6f, f1ah m40-4f df
 # 14f0-14f7: f19h m70-7f df
+# 1507: f1ah m20-2f nb
+# 153a: f1ah m00-1f nb
 # 15d0: f17h m10-m2f nb
 # 15e8-15ef: f17h m10-m2f df
 # 1630: f17h m60-6f, f19h m50-5f nb
 # 1650-1657: f19h m00-0f df
 # 166a-1671: f19h m50-5f df
 # 1679-1680: f19h m40-4f df
+# 16f8-16ff: f1ah m20-2f df
 # 1724-172b: f17h ma0-af df
 #
 driver name=amdzen_stub \
+    alias=pci1022,12c0,p \
+    alias=pci1022,12c1,p \
+    alias=pci1022,12c2,p \
+    alias=pci1022,12c3,p \
+    alias=pci1022,12c4,p \
+    alias=pci1022,12c5,p \
+    alias=pci1022,12c6,p \
+    alias=pci1022,12c7,p \
     alias=pci1022,1440,p \
     alias=pci1022,1441,p \
     alias=pci1022,1442,p \
@@ -116,6 +128,8 @@ driver name=amdzen_stub \
     alias=pci1022,14f5,p \
     alias=pci1022,14f6,p \
     alias=pci1022,14f7,p \
+    alias=pci1022,1507,p \
+    alias=pci1022,153a,p \
     alias=pci1022,15d0,p \
     alias=pci1022,15e8,p \
     alias=pci1022,15e9,p \
@@ -150,6 +164,14 @@ driver name=amdzen_stub \
     alias=pci1022,167e,p \
     alias=pci1022,167f,p \
     alias=pci1022,1680,p \
+    alias=pci1022,16f8,p \
+    alias=pci1022,16f9,p \
+    alias=pci1022,16fa,p \
+    alias=pci1022,16fb,p \
+    alias=pci1022,16fc,p \
+    alias=pci1022,16fd,p \
+    alias=pci1022,16fe,p \
+    alias=pci1022,16ff,p \
     alias=pci1022,1724,p \
     alias=pci1022,1725,p \
     alias=pci1022,1726,p \

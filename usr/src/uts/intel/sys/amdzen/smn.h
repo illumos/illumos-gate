@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Co.
+ * Copyright 2024 Oxide Computer Co.
  */
 
 #ifndef _SYS_AMDZEN_SMN_H
@@ -444,6 +444,7 @@ typedef enum smn_unit {
 	SMN_UNIT_PCIE_PORT,
 	SMN_UNIT_PCIE_RSMU,
 	SMN_UNIT_SCFCTP,
+	SMN_UNIT_L3SOC,
 	SMN_UNIT_SMUPWR,
 	SMN_UNIT_IOMMUL1,
 	SMN_UNIT_IOMMUL2,

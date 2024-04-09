@@ -2960,15 +2960,23 @@ xdr_share_access(XDR *xdrs, uint32_t *share_access, uint32_t *deleg_want)
 {
 	uint32_t w;
 
-	if (xdrs->x_op == XDR_DECODE) {
+	switch (xdrs->x_op) {
+	case XDR_DECODE:
 		if (!xdr_u_int(xdrs, &w))
-			return (FALSE);
+			break;
 
 		*share_access = w & OPEN4_SHARE_ACCESS_MASK;
 		*deleg_want = w & OPEN4_SHARE_WANT_MASK;
+		return (TRUE);
+
+	case XDR_ENCODE:
+		return (xdr_u_int(xdrs, share_access));
+
+	case XDR_FREE:
+		return (TRUE);
 	}
 
-	return (TRUE);
+	return (FALSE);
 }
 
 static bool_t

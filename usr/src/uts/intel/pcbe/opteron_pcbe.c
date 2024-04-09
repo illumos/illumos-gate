@@ -66,11 +66,12 @@
 /*
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
- * Performance Counter Back-End for AMD Opteron and AMD Athlon 64 processors.
+ * Performance Counter Back-End for AMD Opteron, AMD Athlon 64, and Zen
+ * era processors.
  */
 
 #include <sys/cpuvar.h>
@@ -494,7 +495,18 @@ static const amd_generic_event_t family_19h_zen4_papi_events[] = {
 	GEN_EV_END
 };
 
-
+static const amd_generic_event_t family_1ah_zen5_papi_events[] = {
+	{ "PAPI_br_cn",		"Retired_Conditional_Branch_Instructions" },
+	{ "PAPI_br_ins",	"Retired_Branch_Instructions" },
+	{ "PAPI_br_msp",
+		"Retired_Conditional_Branch_Instructions_Mispredicted" },
+	{ "PAPI_br_ucn",	"Retired_Unconditional_Branch_Instructions" },
+	{ "PAPI_tot_cyc",	"Cycles_Not_in_Halt" },
+	{ "PAPI_tot_ins",	"Retired_Instructions" },
+	{ "PAPI_hw_int",	"Interrupts_Taken" },
+	{ "PAPI_tlb_sd",	"TLB_Flush_Events" },
+	GEN_EV_END
+};
 
 static char	*evlist;
 static size_t	evlist_sz;
@@ -530,7 +542,9 @@ static char amd_fam_19h_zen4_reg[] = "See \"Processor Programming Reference "
 "\"Processor Programming Reference (PPR) for AMD Family 19h Model 70h, "
 "Revision A0 Processors\" (AMD publication 57019), and "
 "amd_f19h_zen4_events(3CPC)";
-
+static char amd_fam_1ah_zen5_reg[] = "See \"Performance Monitor Counters "
+"for AMD Family 1Ah Model 00h-Fh Processors\" (AMD publication 58550) and "
+"amd_f1ah_zen5_events(3CPC)";
 
 static char amd_pcbe_impl_name[64];
 static char *amd_pcbe_cpuref;
@@ -669,6 +683,11 @@ opt_pcbe_init(void)
 		amd_pcbe_cpuref = amd_fam_19h_zen4_reg;
 		amd_events = opteron_pcbe_f19h_zen4_events;
 		amd_generic_events = family_19h_zen4_papi_events;
+		break;
+	case X86_UARCH_AMD_ZEN5:
+		amd_pcbe_cpuref = amd_fam_1ah_zen5_reg;
+		amd_events = opteron_pcbe_f1ah_zen5_events;
+		amd_generic_events = family_1ah_zen5_papi_events;
 		break;
 	default:
 		/*

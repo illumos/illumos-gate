@@ -1,0 +1,1561 @@
+[ {
+	"mnemonic": "Core::X86::Pmc::Core::Retired_x87_FP_Ops",
+	"name":"Retired_x87_FP_Ops",
+	"code": "0x002",
+	"summary": "FP retired x87 uops",
+	"description": "Number of retired x87 arithmetic operations. Can be used to calculate x87 FLOPs.",
+	"units": [ {
+		"name": "DivSqrROps",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "x87 Divide or square root uops."
+	}, {
+		"name": "MulOps",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "x87 Multiply uops."
+	}, {
+		"name": "AddSubOps",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "x87 Add/subtract uops."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_SSE_AVX_FLOPs",
+	"name":"Retired_SSE_AVX_FLOPs",
+	"code": "0x003",
+	"summary": "FP retired SSE and AVX FLOPs",
+	"description": "Number of SSE and AVX floating point arithmetic operations retired. Number of arithmetic operations retired is dependent on number of uops retired, data size (scalar/128/256/512), data type (BF16/FP16/FP32/FP64) and type of operation (add/sub/mul/mac/...). Use MergeEvent feature for accurate results.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "FlopTypeSel",
+		"bit-range": "7:5",
+		"rw": "Read-write",
+		"description": "Mask for specifying FLOP type.",
+		"values": [
+			{ "value": "0x0", "description": "All types." },
+			{ "value": "0x1", "description": "B Float 16." },
+			{ "value": "0x2", "description": "Scalar single." },
+			{ "value": "0x3", "description": "Packed single." },
+			{ "value": "0x4", "description": "Scalar double." },
+			{ "value": "0x5", "description": "Packed double." }
+		]
+	}, {
+		"name": "MacFLOPs",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Each MAC operation count as 2 FLOPs. bfloat MAC operations are not included in this event."
+	}, {
+		"name": "DivFLOPs",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Divide/square root FLOPs. Does not provide a useful count without use of the MergeEvent feature."
+	}, {
+		"name": "MultFLOPs",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Multiply FLOPs. Does not provide a useful count without use of the MergeEvent feature."
+	}, {
+		"name": "AddSubFLOPs",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Add/subtract FLOPs. Does not provide a useful count without use of the MergeEvent feature."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_FP_uOps",
+	"name":"Retired_FP_uOps",
+	"code": "0x008",
+	"summary": "FP uops retired by size",
+	"description": "Report number of FP uops retired by size. Can be used to determine how vectorized code is and how much MMX / x87 content is in the code.",
+	"units": [ {
+		"name": "Pack512uOpsRetired",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Packed 512-bit uops retired."
+	}, {
+		"name": "Pack256uOpsRetired",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Packed 256-bit uops retired."
+	}, {
+		"name": "Pack128uOpsRetired",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Packed 128-bit uops retired."
+	}, {
+		"name": "ScalaruOpsRetired",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Scalar uops retired."
+	}, {
+		"name": "MMXuOpsRetired",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "MMX uops retired."
+	}, {
+		"name": "x87uOpsRetired",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "x87 uops retired."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FP_Ops_Retired",
+	"name":"FP_Ops_Retired",
+	"code": "0x00A",
+	"summary": "FP uops retired sorted by vector or scalar",
+	"description": "Number of FP uops retired of selected type sorted by vector (AVX/SSE packed) or scalar (x87, AVX/SSE scalar). Can be used to profile FP codes.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "VectorFpOpType",
+		"bit-range": "7:4",
+		"rw": "Read-write",
+		"description": "select a vector FP uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "Divide." },
+			{ "value": "0x6", "description": "Square root." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert." },
+			{ "value": "0x9", "description": "Blend." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily thought to include shuffles. i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "BFloat." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all fp type uops." }
+		]
+	}, {
+		"name": "ScalarFpOpType",
+		"bit-range": "3:0",
+		"rw": "Read-write",
+		"description": "select scalar FP uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "Divide." },
+			{ "value": "0x6", "description": "Square root." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert." },
+			{ "value": "0x9", "description": "Blend." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily thought to include shuffles. i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "BFloat." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all fp type uops." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::INT_Ops_Retired",
+	"name":"INT_Ops_Retired",
+	"code": "0x00B",
+	"summary": "FP executed integer type uops sorted by vector or scalar",
+	"description": "Number of integer uops executed in the FP retired of selected type sorted by vector (SSE/AVX) or scalar (MMX). Can be used to profile vector INT / MMX codes.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "SseAvxOpType",
+		"bit-range": "7:4",
+		"rw": "Read-write",
+		"description": "select SSE/AVX vector INT uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "AES." },
+			{ "value": "0x6", "description": "SHA." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert or pack." },
+			{ "value": "0x9", "description": "Shift or rotate." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily though to include shuffles.  i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "VNNI." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all int type uops." }
+		]
+	}, {
+		"name": "MmxOpType",
+		"bit-range": "3:0",
+		"rw": "Read-write",
+		"description": "select MMX INT scalar uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "AES." },
+			{ "value": "0x6", "description": "SHA." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert or pack." },
+			{ "value": "0x9", "description": "Shift or rotate." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily though to include shuffles.  i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "VNNI." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all int type uops." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Packed_FP_Ops_Retired",
+	"name":"Packed_FP_Ops_Retired",
+	"code": "0x00C",
+	"summary": "FP uops retired sorted by packed 128 or packed 256",
+	"description": "Number of FP uops retired of selected type sorted by 128-bit packed dest (XMM) or 256-bit packed dest (YMM). Can be used to profile FP codes.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Fp256OpType",
+		"bit-range": "7:4",
+		"rw": "Read-write",
+		"description": "select a 256-bit packed FP uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "Divide." },
+			{ "value": "0x6", "description": "Square root." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert." },
+			{ "value": "0x9", "description": "Blend." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily thought to include shuffles. i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "BFloat." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all fp type uops." }
+		]
+	}, {
+		"name": "Fp128OpType",
+		"bit-range": "3:0",
+		"rw": "Read-write",
+		"description": "select 128-bit packed FP uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "Divide." },
+			{ "value": "0x6", "description": "Square root." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert." },
+			{ "value": "0x9", "description": "Blend." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily thought to include shuffles. i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "BFloat." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all fp type uops." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Packed_INT_Ops_Retired",
+	"name":"Packed_INT_Ops_Retired",
+	"code": "0x00D",
+	"summary": "FP executed packed integer uops sorted by packed 128 or packed 256",
+	"description": "Number of integer uops executed in FP retired of selected type sorted by 128-bit packed dest (XMM) or 256-bit packed dest (YMM). Can be used to profile FP codes.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Int256OpType",
+		"bit-range": "7:4",
+		"rw": "Read-write",
+		"description": "select a 256-bit packed INT uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "AES." },
+			{ "value": "0x6", "description": "SHA." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert or pack." },
+			{ "value": "0x9", "description": "Shift or rotate." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily though to include shuffles.  i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "VNNI." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all int type uops." }
+		]
+	}, {
+		"name": "Int128OpType",
+		"bit-range": "3:0",
+		"rw": "Read-write",
+		"description": "select 128-bit packed INT uop type to count or 0 for none.",
+		"values": [
+			{ "value": "0x0", "description": "None selected." },
+			{ "value": "0x1", "description": "Add." },
+			{ "value": "0x2", "description": "Subtract." },
+			{ "value": "0x3", "description": "Multiply." },
+			{ "value": "0x4", "description": "Multiply accumulate." },
+			{ "value": "0x5", "description": "AES." },
+			{ "value": "0x6", "description": "SHA." },
+			{ "value": "0x7", "description": "Compare." },
+			{ "value": "0x8", "description": "Convert or pack." },
+			{ "value": "0x9", "description": "Shift or rotate." },
+			{ "value": "0xA", "description": "Move. MOV* instructions will count as INT type, not FP type. In other words, PMCx00A, PMCx00C will not count MOV ops." },
+			{ "value": "0xB", "description": "Shuffle. Shuf uop counts may count for instructions that are not necessarily though to include shuffles.  i.e. horizontal add, dot-product, and some MOV instructions." },
+			{ "value": "0xC", "description": "VNNI." },
+			{ "value": "0xD", "description": "Logical." },
+			{ "value": "0xE", "description": "Other uops not included in previous groups." },
+			{ "value": "0xF", "description": "Select all int type uops." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FP_Dispatch_Faults",
+	"name":"FP_Dispatch_Faults",
+	"code": "0x00E",
+	"summary": "FP Dispatch Faults",
+	"description": "Number of FP dispatch faults triggered by type. Dispatch fill/spill faults occur when FP either does not have the data needed to operate on in its local registers (fill), or FP needs to empty out upper register data for proper SSE merging behavior when executing AVX code (spill).",
+	"units": [ {
+		"name": "YmmSpillFault",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "YMM spill fault"
+	}, {
+		"name": "YmmFillFault",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "YMM fill fault"
+	}, {
+		"name": "XmmFillFault",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "XMM Fill fault"
+	}, {
+		"name": "x87FillFault",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "x87 Fill fault"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Bad_Status_2_STLI",
+	"name":"Bad_Status_2_STLI",
+	"code": "0x024",
+	"summary": "Bad Status 2",
+	"description": "Store To Load Interlock (STLI) are loads that were unable to complete because of a possible match with an older store, and the older store could not do Store To Load Forwarding (STLF) for some reason.",
+	"units": [ {
+		"name": "StliOther",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Store-to-load conflicts: A load was unable to complete due to a non-forwardable conflict with an older store. Most commonly, a load's address range partially but not completely overlaps with an uncompleted older store. Software can avoid this problem by using same-size and same-alignment loads and stores when accessing the same data. Vector/SIMD code is particularly susceptible to this problem; software should construct wide vector stores by manipulating vector elements in registers using shuffle/blend/swap instructions prior to storing to memory, instead of using narrow element-by-element stores."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Lock_Instructions",
+	"name":"Retired_Lock_Instructions",
+	"code": "0x025",
+	"summary": "Retired Lock Instructions",
+	"description": "Counts retired atomic read-modify-write instructions with a LOCK prefix.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "LockInstructions",
+		"bit-range": "4:0",
+		"rw": "Read-write",
+		"description": "Specifies type of lock instructions counted",
+		"values": [
+			{ "value": "0x01", "description": "BusLock: Non-cacheable or cacheline-misaligned lock." },
+			{ "value": "0x1F", "description": "AnyLock: Counts all lock instructions." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::CLFLUSH",
+	"name":"CLFLUSH",
+	"code": "0x026",
+	"summary": "Retired CLFLUSH Instructions",
+	"description": "The number of retired CLFLUSH instructions. This is a non-speculative event."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::CPUID",
+	"name":"CPUID",
+	"code": "0x027",
+	"summary": "Retired CPUID Instructions",
+	"description": "The number of CPUID instructions retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LS_Dispatch",
+	"name":"LS_Dispatch",
+	"code": "0x029",
+	"summary": "LS Dispatch",
+	"description": "Counts the number of operations dispatched to the LS unit. Unit Masks events are ADDed.",
+	"units": [ {
+		"name": "LdOpSt",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Dispatch of a single op that performs a load from and store to the same memory address."
+	}, {
+		"name": "PureSt",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Dispatch of a single op that performs a memory store."
+	}, {
+		"name": "PureLd",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Dispatch of a single op that performs a memory load."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::SMI_or_SMM_cycles",
+	"name":"SMI_or_SMM_cycles",
+	"code": "0x02B",
+	"summary": "SMIs Received",
+	"description": "Counts the number of System Management Interrupts (SMIs) received."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Interrupts_Taken",
+	"name":"Interrupts_Taken",
+	"code": "0x02C",
+	"summary": "Interrupts Taken",
+	"description": "Counts the number of interrupts taken.",
+	"units": [ {
+		"name": "NumInterrupts",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Number of interrupts taken. This event is also counted when UnitMask[7:0]=0."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Store_to_Load_Forward",
+	"name":"Store_to_Load_Forward",
+	"code": "0x035",
+	"summary": "Store to Load Forward",
+	"description": "Number of STLF hits."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Store_Globally_Visible_Cancels_2",
+	"name":"Store_Globally_Visible_Cancels_2",
+	"code": "0x037",
+	"summary": "Store Globally Visible Cancels 2",
+	"description": "Counts reasons why a Store Coalescing Buffer (SCB) commit is canceled.",
+	"units": [ {
+		"name": "OlderStVisibleDepCancel",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Older SCB we are waiting on to become globally visible was unable to become globally visible."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LS_MAB_Allocates_by_Type",
+	"name":"LS_MAB_Allocates_by_Type",
+	"code": "0x041",
+	"summary": "LS MAB Allocates by Type",
+	"description": "Counts when an LS pipe allocates a Miss Address Buffer (MAB) entry to make a miss request.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "LsMabAllocation",
+		"bit-range": "6:0",
+		"rw": "Read-write",
+		"values": [
+			{ "value": "0x07", "description": "Load Store Allocations" },
+			{ "value": "0x08", "description": "Hardware Prefetcher Allocations" },
+			{ "value": "0x0F", "description": "All Allocations" }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Demand_DC_Fills_by_Data_Source",
+	"name":"Demand_DC_Fills_by_Data_Source",
+	"code": "0x043",
+	"summary": "Demand Data Cache Fills by Data Source",
+	"description": "Counts fills into the DC that were initiated by demand ops, per data source.",
+	"units": [ {
+		"name": "AlternateMemories_NearFar",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Requests that return from Extension Memory."
+	}, {
+		"name": "DramIO_Far",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Far",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from another CCX's cache."
+	}, {
+		"name": "DramIO_Near",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Near",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from another CCX's cache."
+	}, {
+		"name": "LocalCcx",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Data returned from L3 or different L2 in the same CCX."
+	}, {
+		"name": "LocalL2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Data returned from local L2."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Any_DC_Fills_by_Data_Source",
+	"name":"Any_DC_Fills_by_Data_Source",
+	"code": "0x044",
+	"summary": "Any Data Cache Fills by Data Source",
+	"description": "Counts all fills into the DC, per data source.",
+	"units": [ {
+		"name": "AlternateMemories_NearFar",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Requests that return from Extension Memory."
+	}, {
+		"name": "DramIO_Far",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Far",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from another CCX's cache."
+	}, {
+		"name": "DramIO_Near",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Near",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from another CCX's cache."
+	}, {
+		"name": "LocalCcx",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Data returned from L3 or different L2 in the same CCX."
+	}, {
+		"name": "LocalL2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Data returned from local L2."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L1_DTLB_Reloads",
+	"name":"L1_DTLB_Reloads",
+	"code": "0x045",
+	"summary": "L1 DTLB Reloads",
+	"description": "Counts L1DTLB reloads",
+	"units": [ {
+		"name": "TlbReload1GL2Miss",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 1G page that missed in the L2DTLB."
+	}, {
+		"name": "TlbReload2ML2Miss",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 2M page that missed in the L2DTLB."
+	}, {
+		"name": "TlbReloadCoalescedPageMiss",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "DTLB reload to a coalesced page that missed in the L2DTLB."
+	}, {
+		"name": "TlbReload4KL2Miss",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 4K page that missed in the L2DTLB."
+	}, {
+		"name": "TlbReload1GL2Hit",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 1G page that hit in the L2DTLB."
+	}, {
+		"name": "TlbReload2ML2Hit",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 2M page that hit in the L2DTLB."
+	}, {
+		"name": "TlbReloadCoalescedPageHit",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "DTLB reload to a coalesced page that hit in the L2DTLB."
+	}, {
+		"name": "TlbReload4KL2Hit",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "DTLB reload to a 4K page that hit in the L2DTLB."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Misaligned_Load_Flows",
+	"name":"Misaligned_Load_Flows",
+	"code": "0x047",
+	"summary": "Misaligned Load Flows",
+	"description": "The number of misaligned load flows.",
+	"units": [ {
+		"name": "MA4K",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "The number of 4KB misaligned (i.e., page crossing) loads or LdOpSt."
+	}, {
+		"name": "MA64",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "The number of 64B misaligned (i.e., cacheline crossing) loads or LdOpSt."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Software_Prefetch_Dispatched",
+	"name":"Software_Prefetch_Dispatched",
+	"code": "0x04B",
+	"summary": "Prefetch Instructions Dispatched",
+	"description": "Software Prefetch Instructions Dispatched (speculative)",
+	"units": [ {
+		"name": "PREFETCHNTA",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "PrefetchNTA instruction. See docAPM3 PREFETCHlevel."
+	}, {
+		"name": "PREFETCHW",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "PrefetchW instruction. See docAPM3 PREFETCHlevel."
+	}, {
+		"name": "PREFETCH",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "PrefetchT0, T1, and T2 instructions. See docAPM3 PREFETCHlevel."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::WCB_Close",
+	"name":"WCB_Close",
+	"code": "0x050",
+	"summary": "Write Combining Buffer Close",
+	"description": "Counts events that cause a Write Combining Buffer (WCB) entry to close.",
+	"units": [ {
+		"name": "FullLine64B",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "All 64 bytes of the WCB entry have been written."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Ineffective_Software_Prefetches",
+	"name":"Ineffective_Software_Prefetches",
+	"code": "0x052",
+	"summary": "Ineffective Software Prefetches",
+	"description": "The number of software prefetches that did not fetch data outside of the processor core.",
+	"units": [ {
+		"name": "MabHit",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Software PREFETCH instruction saw a match on an already-allocated miss request."
+	}, {
+		"name": "DcHit",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Software PREFETCH instruction saw a DC hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Software_Prefetch_Data_Cache_Fills",
+	"name":"Software_Prefetch_Data_Cache_Fills",
+	"code": "0x059",
+	"summary": "Software Prefetch Data Cache Fills by Data Source",
+	"description": "Counts fills into the DC that were initiated by software prefetch instructions, per data source.",
+	"units": [ {
+		"name": "AlternateMemories_NearFar",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Requests that return from Extension Memory."
+	}, {
+		"name": "DramIO_Far",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Far",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from another CCX's cache."
+	}, {
+		"name": "DramIO_Near",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Near",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from another CCX's cache."
+	}, {
+		"name": "LocalCcx",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Data returned from L3 or different L2 in the same CCX."
+	}, {
+		"name": "LocalL2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Data returned from local L2."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Hardware_Prefetch_Data_Cache_Fills",
+	"name":"Hardware_Prefetch_Data_Cache_Fills",
+	"code": "0x05A",
+	"summary": "Hardware Prefetch Data Cache Fills by Data Source",
+	"description": "Counts fills into the DC that were initiated by hardware prefetches, per data source.",
+	"units": [ {
+		"name": "AlternateMemories_NearFar",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Requests that return from Extension Memory."
+	}, {
+		"name": "DramIO_Far",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Far",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from another CCX's cache."
+	}, {
+		"name": "DramIO_Near",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from DRAM or MMIO."
+	}, {
+		"name": "NearFarCache_Near",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from another CCX's cache."
+	}, {
+		"name": "LocalCcx",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Data returned from L3 or different L2 in the same CCX."
+	}, {
+		"name": "LocalL2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Data returned from local L2."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Allocated_DC_misses",
+	"name":"Allocated_DC_misses",
+	"code": "0x05F",
+	"summary": "Allocated DC misses",
+	"description": "Counts the number of in-flight DC misses each cycle."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Cycles_Not_in_Halt",
+	"name":"Cycles_Not_in_Halt",
+	"code": "0x076",
+	"summary": "Cycles Not in Halt",
+	"description": "Counts cycles when the thread is not in a HALTed state"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::TLB_Flush_Events",
+	"name":"TLB_Flush_Events",
+	"code": "0x078",
+	"summary": "All TLB Flushes",
+	"description": "TLB flush events.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "events",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "All TLB Flushes",
+		"values": [
+			{ "value": "0xFF", "description": "Counts all TLB Flushes" }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::P0_frequency_Cycles_Not_in_Halt",
+	"name":"P0_frequency_Cycles_Not_in_Halt",
+	"code": "0x120",
+	"summary": "P0 Freq Cycles not in Halt",
+	"description": "Counts cycles not in Halt, at the P0 P-state frequency, regardless of the current Pstate.",
+	"units": [ {
+		"name": "P0_frequency_Cycles_Not_in_Halt",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Counts at the P0 frequency (same as Core::X86::Msr::MPERF) when not in Halt."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Instruction_Cache_Refills_from_L2",
+	"name":"Instruction_Cache_Refills_from_L2",
+	"code": "0x082",
+	"summary": "Instruction Cache Refills From L2",
+	"description": "The number of 64 byte instruction cache lines fulfilled from the L2 cache."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Instruction_Cache_Refills_from_System",
+	"name":"Instruction_Cache_Refills_from_System",
+	"code": "0x083",
+	"summary": "Instruction Cache Refills from System",
+	"description": "The number of 64 byte instruction cache line fulfilled from system memory or another cache."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L1_ITLB_Miss_L2_ITLB_Hit",
+	"name":"L1_ITLB_Miss_L2_ITLB_Hit",
+	"code": "0x084",
+	"summary": "L1 ITLB Miss, L2ITLB Hit",
+	"description": "The number of instruction fetches that miss in the L1 ITLB but hit in the L2 ITLB."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ITLB_Reload_from_Page_Table_walk",
+	"name":"ITLB_Reload_from_Page_Table_walk",
+	"code": "0x085",
+	"summary": "L1 ITLB Miss, L2 ITLB Miss",
+	"description": "The number of instruction fetches that miss in both the L1 ITLB and L2 ITLB.",
+	"units": [ {
+		"name": "Coalesced_4k",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Walk for >4k Coalesced page (implemented as 16k)"
+	}, {
+		"name": "walk_1G",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Walk for 1G page"
+	}, {
+		"name": "walk_2M",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Walk for 2M page"
+	}, {
+		"name": "walk_4K",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Walk to 4k page"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BP_Correct",
+	"name":"BP_Correct",
+	"code": "0x08B",
+	"summary": "BP Pipe Correction or Cancel",
+	"description": "The Branch Predictor flushed its own pipeline due to internal conditions such as a second level prediction structure. Does not count the number of bubbles caused by these internal flushes."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Variable_Target_Predictions",
+	"name":"Variable_Target_Predictions",
+	"code": "0x08E",
+	"summary": "Variable Target Predictions",
+	"description": "The number of times a branch used the indirect predictor to make a prediction."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Decoder_Overrides_Existing_Branch_Prediction_Speculative",
+	"name":"Decoder_Overrides_Existing_Branch_Prediction_Speculative",
+	"code": "0x091",
+	"summary": "Early Redirects",
+	"description": "Number of times that an Early Redirect is sent to Branch Predictor. This happens when either the decoder or dispatch logic is able to detect that the Branch Predictor needs to be redirected."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ITLB_Hits",
+	"name":"ITLB_Hits",
+	"code": "0x094",
+	"summary": "ITLB Instruction Fetch Hits",
+	"description": "The number of instruction fetches that hit in the L1ITLB.",
+	"units": [ {
+		"name": "IF1G",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "L1 Instruction TLB Hit (1G page size)"
+	}, {
+		"name": "IF2M",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "L1 Instruction TLB Hit (2M page size)"
+	}, {
+		"name": "IF4K",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "L1 Instruction TLB Hit (4k or 16k coalesced page size)"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BP_redirects",
+	"name":"BP_redirects",
+	"code": "0x09F",
+	"summary": "BP Redirects",
+	"description": "Counts redirects of the branch predictor. To support legacy software, counts both EX mispredict and resyncs when unit_mask[7:0] is set to 0.",
+	"units": [ {
+		"name": "ExRedir",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Mispredict redirect from EX (execution-time)"
+	}, {
+		"name": "Resync",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Resync redirect (Retire-time) from RT"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Fetch_IBS_events",
+	"name":"Fetch_IBS_events",
+	"code": "0x188",
+	"summary": "Fetch IBS events",
+	"description": "Counts significant Fetch IBS State transitions.",
+	"units": [ {
+		"name": "SampleVal",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Counts the number of valid Fetch Instruction Based Sampling (fetch IBS) samples that were collected. Each valid sample also created an IBS interrupt."
+	}, {
+		"name": "SampleFiltered",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Counts the number of Fetch IBS tagged fetches that were discarded due to IBS filtering. When a tagged fetch is discarded the Fetch IBS facility will automatically tag a new fetch."
+	}, {
+		"name": "SampleDiscarded",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Counts when the Fetch IBS facility discards an IBS tagged fetch for reasons other than IBS filtering. When a tagged fetch is discarded the Fetch IBS facility will automatically tag a new fetch."
+	}, {
+		"name": "FetchTagged",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Counts the number of fetches tagged for Fetch IBS. Not all tagged fetches create an IBS interrupt and valid fetch sample."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IC_Tag_Hit_Miss_events",
+	"name":"IC_Tag_Hit_Miss_events",
+	"code": "0x18E",
+	"summary": "IC Tag Hit and Miss Events",
+	"description": "Counts the number of microtag and full tag events as selected by unit mask.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "IcAccessTypes",
+		"bit-range": "4:0",
+		"rw": "Read-write",
+		"description": "Instruction Cache accesses.",
+		"values": [
+			{ "value": "0x07", "description": "Instruction Cache Hit." },
+			{ "value": "0x18", "description": "Instruction Cache Miss." },
+			{ "value": "0x1F", "description": "All Instruction Cache Accesses." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Op_Cache_hit_miss",
+	"name":"Op_Cache_hit_miss",
+	"code": "0x28F",
+	"summary": "Op Cache Hit or Miss",
+	"description": "Counts Op Cache micro-tag hit/miss events.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "OpCacheAccesses",
+		"bit-range": "2:0",
+		"rw": "Read-write",
+		"description": "OpCacheAccesses",
+		"values": [
+			{ "value": "0x3", "description": "Op Cache Hit." },
+			{ "value": "0x4", "description": "Op Cache Miss." },
+			{ "value": "0x7", "description": "All Op Cache accesses." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Dispatch_Empty",
+	"name":"Dispatch_Empty",
+	"code": "0x0A9",
+	"summary": "Op Queue Empty",
+	"description": "Cycles where the Op Queue is empty."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Source_of_Op_Dispatched_From_Decoder",
+	"name":"Source_of_Op_Dispatched_From_Decoder",
+	"code": "0x0AA",
+	"summary": "Source of Op Dispatched From Decoder",
+	"description": "Counts the number of ops dispatched from the decoder classified by op source.",
+	"units": [ {
+		"name": "Op_Cache",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Count of ops dispatched from OpCache"
+	}, {
+		"name": "x86_decoder",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Count of ops dispatched from x86 decoder"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Types_of_Ops_Dispatched_From_Decoder",
+	"name":"Types_of_Ops_Dispatched_From_Decoder",
+	"code": "0x0AB",
+	"summary": "Types of Ops Dispatched From Decoder",
+	"description": "Counts the number of ops dispatched from the decoder classified by op type. The UnitMask value encodes which types of ops are counted.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "DispOpType",
+		"bit-range": "4:0",
+		"rw": "Read-write",
+		"description": "DispOpType.",
+		"values": [
+			{ "value": "0x04", "description": "Any FP dispatch." },
+			{ "value": "0x08", "description": "Any Integer dispatch." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Dispatch_Stall_Cycles_Dynamic_Tokens_Part_1",
+	"name":"Dispatch_Stall_Cycles_Dynamic_Tokens_Part_1",
+	"code": "0x0AE",
+	"summary": "Dynamic Tokens Dispatch Stall Cycles 1",
+	"description": "Cycles where a dispatch group is valid but does not get dispatched due to a Token Stall. UnitMask bits select the stall types included in the count.",
+	"units": [ {
+		"name": "FPSchRsrcStall",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "FP NSQ token stall"
+	}, {
+		"name": "TakenBrnchBufferRsrc",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "taken branch buffer resource stall."
+	}, {
+		"name": "StoreQueueRsrcStall",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "STQ Tokens unavailable"
+	}, {
+		"name": "LoadQueueRsrcStall",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Load Queue Token Stall."
+	}, {
+		"name": "IntPhyRegFileRsrcStall",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Integer Physical Register File resource stall."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Dispatch_Stall_Cycles_Dynamic_Tokens_Part_2",
+	"name":"Dispatch_Stall_Cycles_Dynamic_Tokens_Part_2",
+	"code": "0x0AF",
+	"summary": "Dynamic Tokens Dispatch Stall Cycles 2",
+	"description": "Cycles where a dispatch group is valid but does not get dispatched due to a token stall. UnitMask bits select the stall types included in the count.",
+	"units": [ {
+		"name": "RetQ",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Retire queue tokens unavailable"
+	}, {
+		"name": "EX_Flush_recovery",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Integer Execution flush recovery pending"
+	}, {
+		"name": "AGTokens",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Agen tokens unavailable"
+	}, {
+		"name": "ALTokens",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "ALU tokens unavailable"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::No_Dispatch_per_Slot",
+	"name":"No_Dispatch_per_Slot",
+	"code": "0x1A0",
+	"summary": "No_Dispatch_per_Slot",
+	"description": "Counts the number of dispatch slots (each cycle) that remained unused for reasons selected by UnitMask.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "StallReason",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "Reasons",
+		"values": [
+			{ "value": "0x01", "description": "Counts dispatch slots left empty because the front-end did not supply ops." },
+			{ "value": "0x1E", "description": "Counts ops unable to dispatch due to back-end stalls." },
+			{ "value": "0x60", "description": "Counts ops unable to dispatch because the dispatch cycle was granted to the other SMT thread." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Additional_Resource_Stalls",
+	"name":"Additional_Resource_Stalls",
+	"code": "0x1A2",
+	"summary": "Dispatch Additional Resource Stalls",
+	"description": "This PMC event counts additional resource stalls that are not captured by Dispatch_Stall_Cycle_Dynamic_Tokens_Part_1 or Dispatch_Stall_Cycles_Dynamic_Tokens_Part_2.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Stall",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "Stalls.",
+		"values": [
+			{ "value": "0x30", "description": "Counts additional cycles dispatch is stalled due to the lack of dispatch resources." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Instructions",
+	"name":"Retired_Instructions",
+	"code": "0x0C0",
+	"summary": "Retired Instructions",
+	"description": "The number of instructions retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Macro_Ops",
+	"name":"Retired_Macro_Ops",
+	"code": "0x0C1",
+	"summary": "Retired Macro-Ops",
+	"description": "The number of macro-ops retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Branch_Instructions",
+	"name":"Retired_Branch_Instructions",
+	"code": "0x0C2",
+	"summary": "Retired Branch Instructions",
+	"description": "The number of branch instructions retired. This includes all types of architectural control flow changes, including exceptions and interrupts."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Branch_Instructions_Mispredicted",
+	"name":"Retired_Branch_Instructions_Mispredicted",
+	"code": "0x0C3",
+	"summary": "Retired Branch Instructions Mispredicted.",
+	"description": "The number of retired branch instructions, that were mispredicted. Note that only EX mispredicts are counted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Taken_Branch_Instructions",
+	"name":"Retired_Taken_Branch_Instructions",
+	"code": "0x0C4",
+	"summary": "Retired Taken Branch Instructions",
+	"description": "The number of taken branches that were retired. This includes all types of architectural control flow changes, including exceptions and interrupts."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Taken_Branch_Instructions_Mispredicted",
+	"name":"Retired_Taken_Branch_Instructions_Mispredicted",
+	"code": "0x0C5",
+	"summary": "Retired Taken Branch Instructions Mispredicted.",
+	"description": "The number of retired taken branch instructions that were mispredicted. Note that only EX mispredicts are counted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Far_Control_Transfers",
+	"name":"Retired_Far_Control_Transfers",
+	"code": "0x0C6",
+	"summary": "Retired Far Control Transfers",
+	"description": "The number of far control transfers retired including far call/jump/return, IRET, SYSCALL and SYSRET, plus exceptions and interrupts. Far control transfers are not subject to branch prediction."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Near_Return_Branch_Instructions",
+	"name":"Retired_Near_Return_Branch_Instructions",
+	"code": "0x0C8",
+	"summary": "Retired Near Return Branch Instructions",
+	"description": "The number of near return instructions (RET [C3] or RET Iw [C2]) retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Near_Return_Branch_Instructions_Mispredicted",
+	"name":"Retired_Near_Return_Branch_Instructions_Mispredicted",
+	"code": "0x0C9",
+	"summary": "Retired Near Return Branch Instructions Mispredicted",
+	"description": "The number of near returns retired that were not correctly predicted by the return address predictor. Each such mispredict incurs the same penalty as a mispredicted conditional branch instruction. Note that only EX mispredicts are counted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Indirect_Branch_Instructions_Mispredicted",
+	"name":"Retired_Indirect_Branch_Instructions_Mispredicted",
+	"code": "0x0CA",
+	"summary": "Retired Indirect Branch Instructions Mispredicted",
+	"description": "The number of indirect branches retired that were not correctly predicted. Each such mispredict incurs the same penalty as a mispredicted conditional branch instruction. Note that only EX mispredicts are counted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_MMX_FP_Instructions",
+	"name":"Retired_MMX_FP_Instructions",
+	"code": "0x0CB",
+	"summary": "Retired MMX FP Instructions",
+	"description": "The number of MMX, SSE or x87 instructions retired. The UnitMask allows the selection of the individual classes of instructions as given in the table. Each increment represents one complete instruction. Since this event includes non-numeric instructions it is not suitable for measuring MFLOPs",
+	"units": [ {
+		"name": "SSE",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "SSE instructions (SSE, SSE2, SSE3, SSSE3, SSE4A, SSE41, SSE42, AVX)."
+	}, {
+		"name": "MMX",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "MMX instructions"
+	}, {
+		"name": "X87",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "x87 instructions"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Indirect_Branch_Instructions",
+	"name":"Retired_Indirect_Branch_Instructions",
+	"code": "0x0CC",
+	"summary": "Retired Indirect Branch Instructions",
+	"description": "The number of indirect branches retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Conditional_Branch_Instructions",
+	"name":"Retired_Conditional_Branch_Instructions",
+	"code": "0x0D1",
+	"summary": "Retired Conditional Branch Instructions",
+	"description": "Count of conditional branch instructions that retired"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Div_Cycles_Busy_count",
+	"name":"Div_Cycles_Busy_count",
+	"code": "0x0D3",
+	"summary": "Div Cycles Busy count",
+	"description": "Counts cycles when the divider is busy"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Div_Op_Count",
+	"name":"Div_Op_Count",
+	"code": "0x0D4",
+	"summary": "Div Op Count",
+	"description": "Counts number of divide ops"
+
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Cycles_with_no_retire",
+	"name":"Cycles_with_no_retire",
+	"code": "0x0D6",
+	"summary": "Cycles with no retire",
+	"description": "This event counts cycles when the hardware thread does not retire any ops for reasons selected by UnitMask[4:0].  UnitMask events [4:0] are mutually exclusive. If multiple reasons apply for a given cycle, the lowest numbered UnitMask event is counted.",
+	"units": [ {
+		"name": "ThreadNotSelected",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "The number cycles where ops could have retired (i.e. did not fall into the sub-events [0]...[3]) but did not retire because the thread arbitration did not select the thread for retire."
+	}, {
+		"name": "Other",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "The number of cycles where ops could have retired (self and older ops are complete), but were stopped from retirement for other reasons: retire breaks, traps, faults, etc."
+	}, {
+		"name": "NotCompleteSelf",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "The number of cycles where the oldest retire slot did not have its completion bits set."
+	}, {
+		"name": "Empty",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "The number of cycles when there were no valid ops in the retire queue. This may be caused by front-end bottlenecks or pipeline redirects."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Microcoded_Instructions",
+	"name":"Retired_Microcoded_Instructions",
+	"code": "0x1C1",
+	"summary": "Retired Microcoded Instructions",
+	"description": "The number of retired microcoded instructions."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Microcode_Ops",
+	"name":"Retired_Microcode_Ops",
+	"code": "0x1C2",
+	"summary": "Retired Microcode Ops",
+	"description": "The number of microcode ops that have retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Conditional_Branch_Instructions_Mispredicted",
+	"name":"Retired_Conditional_Branch_Instructions_Mispredicted",
+	"code": "0x1C7",
+	"summary": "Retired Conditional Branch Instructions Mispredicted",
+	"description": "The number of retired conditional branch instructions that were not correctly predicted because of a branch direction mismatch."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Unconditional_Branch_Instructions_Mispredicted",
+	"name":"Retired_Unconditional_Branch_Instructions_Mispredicted",
+	"code": "0x1C8",
+	"summary": "Retired Unconditional Branch Instructions Mispredicted",
+	"description": "The number of retired unconditional indirect branch instructions that were mispredicted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_Unconditional_Branch_Instructions",
+	"name":"Retired_Unconditional_Branch_Instructions",
+	"code": "0x1C9",
+	"summary": "Retired Unconditional Branch Instructions",
+	"description": "Retired Unconditional Branch Instructions"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Tagged_IBS_Ops",
+	"name":"Tagged_IBS_Ops",
+	"code": "0x1CF",
+	"summary": "Tagged IBS Ops",
+	"description": "Counts Op IBS related events",
+	"units": [ {
+		"name": "IbsCountRollover",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Number of times an op could not be tagged by IBS because of a previous tagged op that has not yet signaled interrupt."
+	}, {
+		"name": "IbsTaggedOpsRet",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Number of Ops tagged by IBS that retired"
+	}, {
+		"name": "IbsTaggedOps",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Number of Ops tagged by IBS"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::Retired_fused_instructions",
+	"name":"Retired_fused_instructions",
+	"code": "0x1D0",
+	"summary": "Retired Fused Instructions",
+	"description": "Counts retired fused instructions."
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2RequestG1",
+	"name":"L2RequestG1",
+	"code": "0x060",
+	"summary": "Requests to L2 Group1",
+	"description": "All L2 Cache Requests (Breakdown 1 - Common)",
+	"units": [ {
+		"name": "RdBlkL",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Data Cache Reads (including hardware and software prefetch)."
+	}, {
+		"name": "RdBlkX",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Data Cache Stores"
+	}, {
+		"name": "LsRdBlkC_S",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Data Cache Shared Reads"
+	}, {
+		"name": "CacheableIcRead",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Instruction Cache Reads."
+	}, {
+		"name": "LsPrefetchL2Cmd",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "L2HwPf",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "All prefetches accepted by L2 pipeline, hit or miss. Types of PF and L2 hit/miss broken out in a separate perfmon event"
+	}, {
+		"name": "Group2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Various Noncacheable requests. Non-cached Data Reads, Non- cached Instruction Reads, Self-modifying code checks."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2RequestG2",
+	"name":"L2RequestG2",
+	"code": "0x061",
+	"summary": "Requests to L2 Group2",
+	"description": "All L2 Cache Requests (Breakdown 2 - Rare).",
+	"units": [ {
+		"name": "LsRdSized",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "LS sized read, coherent non-cacheable."
+	}, {
+		"name": "LsRdSizedNC",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "LS sized read, non-coherent, non-cacheable."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2WcbReq",
+	"name":"L2WcbReq",
+	"code": "0x063",
+	"summary": "Write Combining Buffer Requests",
+	"description": "Write Combining Buffer operations. For information on Write Combining see docAPM2 sections: Memory System, Memory Types, Buffering and Combining Memory Writes.",
+	"units": [ {
+		"name": "WcbClose",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Write Combining Buffer close"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2CacheReqStat",
+	"name":"L2CacheReqStat",
+	"code": "0x064",
+	"summary": "Core to L2 Cacheable Request Access Status",
+	"description": "L2 Cache Request Outcomes (not including L2 Prefetch).",
+	"units": [ {
+		"name": "LsRdBlkCS",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Data Cache Shared Read Hit in L2. "
+	}, {
+		"name": "LsRdBlkLHitX: Data Cache Read Hit in L2",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Modifiable"
+	}, {
+		"name": "LsRdBlkLHitS",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Data Cache Read Hit Non-Modifiable Line in L2."
+	}, {
+		"name": "LsRdBlkX",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Data Cache Store Hit in L2. "
+	}, {
+		"name": "LsRdBlkC",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Data Cache Req Miss in L2. "
+	}, {
+		"name": "IcFillHitX",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Instruction Cache Hit Modifiable Line in L2."
+	}, {
+		"name": "IcFillHitS",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Instruction Cache Hit Non-Modifiable Line in L2."
+	}, {
+		"name": "IcFillMiss",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Instruction Cache Req Miss in L2."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2PfHitL2",
+	"name":"L2PfHitL2",
+	"code": "0x070",
+	"summary": "L2 Prefetch Hit in L2",
+	"description": "Counts all L2 prefetches accepted by L2 pipeline which hit in the L2 cache.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Prefetches",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "Prefetches.",
+		"values": [
+			{ "value": "0x1F", "description": "Counts requests generated from L2 Hardware Prefetchers." },
+			{ "value": "0xE0", "description": "Counts requests generated from L1 DC Hardware Prefetchers." },
+			{ "value": "0xFF", "description": "Counts requests generated from L1 DC and L2 Hardware Prefetchers." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2PfMissL2HitL3",
+	"name":"L2PfMissL2HitL3",
+	"code": "0x071",
+	"summary": "L2 Prefetcher Hits in L3",
+	"description": "Counts all L2 prefetches accepted by the L2 pipeline which miss the L2 cache and hit the L3.",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Prefetches",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "L2Stream",
+		"values": [
+			{ "value": "0x1F", "description": "Counts requests generated from L2 Hardware Prefetchers." },
+			{ "value": "0xE0", "description": "Counts requests generated from L1 DC Hardware Prefetchers." },
+			{ "value": "0xFF", "description": "Counts requests generated from L1 DC and L2 Hardware Prefetchers." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2PfMissL2L3",
+	"name":"L2PfMissL2L3",
+	"code": "0x072",
+	"summary": "L2 Prefetcher Misses in L3",
+	"description": "Counts all L2 prefetches accepted by the L2 pipeline which miss the L2 and the L3 caches",
+	"unit_mode": "or-value",
+	"units": [ {
+		"name": "Prefetches",
+		"bit-range": "7:0",
+		"rw": "Read-write",
+		"description": "L2Stream",
+		"values": [
+			{ "value": "0x1F", "description": "Counts requests generated from L2 Hardware Prefetchers." },
+			{ "value": "0xE0", "description": "Counts requests generated from L1 DC Hardware Prefetchers." },
+			{ "value": "0xFF", "description": "Counts requests generated from L1 DC and L2 Hardware Prefetchers." }
+		]
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::L2::L2FillRspSrc",
+	"name":"L2FillRspSrc",
+	"code": "0x165",
+	"summary": "L2 Fill Response Source",
+	"description": "Counts fill responses based on their source. Selecting an event mask of 0xfe will count all L3 responses.  This will count all L3 responses to fill requests.  This event is similar to LS PMC 0x44",
+	"units": [ {
+		"name": "AlternateMemories_NearFar",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Requests that return from Extension Memory"
+	}, {
+		"name": "DramIO_Far",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from either DRAM or MMIO from another NUMA node, either from the same or different NUMA node."
+	}, {
+		"name": "NearFarCache_Far",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Requests that target another NUMA node and return from another CCX's cache."
+	}, {
+		"name": "DramIO_Near",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from either DRAM or MMIO from the same NUMA node."
+	}, {
+		"name": "NearFarCache_Near",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Requests that target the same NUMA node and return from another CCX's cache."
+	}, {
+		"name": "LocalCcx",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Data returned from L3 or different L2 in the same CCX."
+	} ]
+} ]

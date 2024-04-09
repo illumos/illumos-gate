@@ -32,7 +32,7 @@ set name=variant.arch value=$(ARCH)
 dir  path=kernel group=sys
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
-file path=kernel/drv/$(ARCH64)/bofi group=sys mode=0644
+file path=kernel/drv/$(ARCH64)/bofi group=sys
 file path=kernel/drv/bofi.conf group=sys
 dir  path=usr group=sys
 dir  path=usr/lib

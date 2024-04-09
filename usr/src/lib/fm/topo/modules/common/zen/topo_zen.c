@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -39,17 +39,30 @@
  */
 static const char *topo_zen_dev = "/devices/pseudo/amdzen@0:topo";
 
+static inline boolean_t
+topo_zen_df_at_least(const amdzen_topo_df_t *df, uint8_t major, uint8_t minor)
+{
+	return (df->atd_major > major || (df->atd_major == major &&
+	    df->atd_minor >= minor));
+}
+
 /*
- * Helper to indicate whether or not the given DF entry matches the type that we
- * expect and is fair to use, that is it is enabled. Note, this may correspond
- * to something in the DF that doesn't actually exist in the SoC, but we don't
- * know that yet.
+ * Helper to determine whether or not a given DF entity's type is that of a CCM
+ * or not as this has changed across the various DF versions.
  */
 static boolean_t
-topo_zen_fabric_match(const amdzen_topo_df_ent_t *ent, df_type_t type,
-    uint8_t subtype)
+topo_zen_fabric_is_ccm(const amdzen_topo_df_t *df,
+    const amdzen_topo_df_ent_t *ent)
 {
-	return (ent->atde_type == type && ent->atde_subtype == subtype);
+	if (ent->atde_type != DF_TYPE_CCM) {
+		return (B_FALSE);
+	}
+
+	if (df->atd_rev >= DF_REV_4 && topo_zen_df_at_least(df, 4, 1)) {
+		return (ent->atde_subtype == DF_CCM_SUBTYPE_CPU_V4P1);
+	} else {
+		return (ent->atde_subtype == DF_CCM_SUBTYPE_CPU_V2);
+	}
 }
 
 /*
@@ -65,7 +78,6 @@ topo_zen_enum_cleanup_sock(topo_mod_t *mod, zen_topo_enum_sock_t *sock)
 		(void) kstat_close(sock->ztes_kstat);
 		sock->ztes_kstat = NULL;
 	}
-
 
 	if (sock->ztes_cpus != NULL) {
 		for (uint_t i = 0; i < sock->ztes_ncpus; i++) {
@@ -163,8 +175,7 @@ topo_zen_enum_chip_gather(topo_mod_t *mod, const zen_topo_t *zen,
 	sock->ztes_df = df;
 	for (uint32_t i = 0; i < df->atd_df_buf_nvalid; i++) {
 		const amdzen_topo_df_ent_t *dfe = &df->atd_df_ents[i];
-		if (topo_zen_fabric_match(dfe, DF_TYPE_CCM,
-		    DF_CCM_SUBTYPE_CPU)) {
+		if (topo_zen_fabric_is_ccm(df, dfe)) {
 			nccd += dfe->atde_data.atded_ccm.atcd_nccds;
 		}
 	}
@@ -191,8 +202,7 @@ topo_zen_enum_chip_gather(topo_mod_t *mod, const zen_topo_t *zen,
 		const amdzen_topo_df_ent_t *dfe = &df->atd_df_ents[i];
 		const amdzen_topo_ccm_data_t *ccm;
 
-		if (!topo_zen_fabric_match(dfe, DF_TYPE_CCM,
-		    DF_CCM_SUBTYPE_CPU)) {
+		if (!topo_zen_fabric_is_ccm(df, dfe)) {
 			continue;
 		}
 
@@ -499,7 +509,6 @@ topo_zen_map_common_chip_info(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 
 	if (nvlist_lookup_pairs(cpu_nvl, 0,
 	    FM_PHYSCPU_INFO_CPU_ID, DATA_TYPE_INT32, &cpu_id,
-	    FM_PHYSCPU_INFO_CHIP_IDENTSTR, DATA_TYPE_STRING, &ident,
 	    FM_PHYSCPU_INFO_CHIP_REV, DATA_TYPE_STRING, &rev,
 	    FM_PHYSCPU_INFO_SOCKET_TYPE, DATA_TYPE_UINT32, &sockid,
 	    FM_PHYSCPU_INFO_FAMILY, DATA_TYPE_INT32, &sock->ztes_cpu_fam,
@@ -509,6 +518,15 @@ topo_zen_map_common_chip_info(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 		topo_mod_dprintf(mod, "missing required nvlist fields "
 		    "from FM physcpu info chip ident\n");
 		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+	}
+
+	/*
+	 * Some CPUs have PPIN disabled so we look for it separately here. The
+	 * rest of the aspects are required.
+	 */
+	if (nvlist_lookup_string(cpu_nvl, FM_PHYSCPU_INFO_CHIP_IDENTSTR,
+	    &ident) != 0) {
+		ident = NULL;
 	}
 
 	/*

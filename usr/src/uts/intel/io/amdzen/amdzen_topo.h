@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_TOPO_H
@@ -96,6 +96,8 @@ typedef struct amdzen_topo_df {
 	uint32_t atd_sockid;
 	uint32_t atd_dieid;
 	df_rev_t atd_rev;
+	uint32_t atd_major;
+	uint32_t atd_minor;
 	/*
 	 * atd_ndf_buf_nents should be set to the size of the number of DF
 	 * entries that are present in atd_df_ents. atd_ndf_buf_valid will
@@ -117,6 +119,8 @@ typedef struct {
 	uint32_t atd_sockid;
 	uint32_t atd_dieid;
 	df_rev_t atd_rev;
+	uint32_t atd_major;
+	uint32_t atd_minor;
 	uint32_t atd_df_buf_nents;
 	uint32_t atd_df_buf_nvalid;
 	uint32_t atd_df_act_nents;
@@ -138,7 +142,7 @@ typedef struct {
 #define	AMDZEN_TOPO_IOCTL_CCD		(AMDZEN_TOPO_IOCTL | 0x02)
 
 #define	AMDZEN_TOPO_CORE_MAX_THREADS	2
-#define	AMDZEN_TOPO_CCX_MAX_CORES	8
+#define	AMDZEN_TOPO_CCX_MAX_CORES	16
 #define	AMDZEN_TOPO_CCD_MAX_CCX		2
 
 typedef struct amdzen_topo_core {

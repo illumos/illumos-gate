@@ -14414,6 +14414,7 @@ f usr/share/man/man3cpc/amd_f17h_zen1_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/amd_f17h_zen2_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/amd_f19h_zen3_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/amd_f19h_zen4_events.3cpc 0444 root bin
+f usr/share/man/man3cpc/amd_f1ah_zen5_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdw_de_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdw_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdx_events.3cpc 0444 root bin

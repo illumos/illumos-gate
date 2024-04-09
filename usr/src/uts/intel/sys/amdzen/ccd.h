@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_AMDZEN_CCD_H
@@ -31,6 +31,9 @@
  * L3::SCFCTP	The Scalable Control Fabric, Clocks, Test, and Power Gating
  *		registers exist on a per-core basis within each CCD. The first
  *		point that we can find that this exists started in Zen 3.
+ *
+ * L3::SOC	This was added starting in Zen 5 and contains several of the
+ *		registers that used to exist in SMU::PWR.
  *
  * The register naming and fields generally follows the conventions that the DF
  * and UMC have laid out. The one divergence right now is that the functional
@@ -56,11 +59,14 @@ extern "C" {
  * "LOCAL" which implies that perhaps rather than aliasing CCD 0 it instead is
  * decoded by the unit on the originating CCD.  We don't use that in any case.
  *
- * Because Genoa supports up to 12 CCDs, they did add a second aperture that
- * starts at 4a08_1000h and uses the same shifts. This leads to some awkwardness
- * below. This does make it harder to get at this. We should investigate to
- * include the uarch to determine limits at some point in the future like we
- * have done with some of our DF registers.
+ * Once SoCs started supporting more than 8 CCDs with Zen 4, they added a second
+ * aperture that starts at 4a08_1000h and uses the same shifts. This leads to
+ * some awkwardness below. This does make it harder to get at this. We should
+ * investigate to include the uarch to determine limits at some point in the
+ * future like we have done with some of our DF registers.
+ *
+ * Starting in Zen 5, a chunk of the registers described here are all now in
+ * the L3::SOC block.
  */
 static inline smn_reg_t
 amdzen_smupwr_smn_reg(const uint8_t ccdno, const smn_reg_def_t def,
@@ -83,7 +89,7 @@ amdzen_smupwr_smn_reg(const uint8_t ccdno, const smn_reg_def_t def,
 
 	ASSERT(size32 == 1 || size32 == 2 || size32 == 4);
 	ASSERT3S(def.srd_unit, ==, SMN_UNIT_SMUPWR);
-	ASSERT3U(ccdno32, <, 12);
+	ASSERT3U(ccdno32, <, 16);
 	ASSERT3U(nents, >, reginst32);
 
 	uint32_t aperture_base, aperture_off;
@@ -205,14 +211,119 @@ amdzen_smupwr_smn_reg(const uint8_t ccdno, const smn_reg_def_t def,
 #define	SMUPWR_CORE_EN_SET_C(_r, _c)	bitset32(_r, _c, _c, 1)
 
 /*
+ * L3::SOC registers, per-CCD.  This functional unit is present starting in Zen
+ * 5 based platforms.  This covers a majority of the things that are described
+ * above in the SMU::PWR section, except for SMU::PWR::CCD_DIE_ID. CCDs are at a
+ * 23-bit stride.
+ */
+static inline smn_reg_t
+amdzen_l3soc_smn_reg(const uint8_t ccdno, const smn_reg_def_t def,
+    const uint16_t reginst)
+{
+	const uint32_t APERTURE_BASE = 0x203c0000;
+	const uint32_t APERTURE_MASK = 0xfffc0000;
+	CTASSERT((APERTURE_BASE & ~APERTURE_MASK) == 0);
+
+	const uint32_t ccdno32 = (const uint32_t)ccdno;
+	const uint32_t reginst32 = (const uint32_t)reginst;
+	const uint32_t size32 = (def.srd_size == 0) ? 4 :
+	    (const uint32_t)def.srd_size;
+
+	const uint32_t stride = (def.srd_stride == 0) ? size32 : def.srd_stride;
+	const uint32_t nents = (def.srd_nents == 0) ? 1 :
+	    (const uint32_t)def.srd_nents;
+
+	ASSERT(size32 == 1 || size32 == 2 || size32 == 4);
+	ASSERT3S(def.srd_unit, ==, SMN_UNIT_L3SOC);
+	ASSERT3U(ccdno32, <, 16);
+	ASSERT3U(nents, >, reginst32);
+
+	uint32_t aperture_base, aperture_off;
+	aperture_base = APERTURE_BASE;
+	aperture_off = ccdno32 << 23;
+	ASSERT3U(aperture_off, <=, UINT32_MAX - aperture_base);
+
+	const uint32_t aperture = aperture_base + aperture_off;
+	ASSERT0(aperture & ~APERTURE_MASK);
+
+	const uint32_t reg = def.srd_reg + reginst32 * stride;
+	ASSERT0(reg & APERTURE_MASK);
+
+	return (SMN_MAKE_REG_SIZED(aperture + reg, size32));
+
+}
+
+/*
+ * L3::L3SOC::CcxThreadEnable0 - the Zen 5+ variant of SMU::PWR::THREAD_ENABLE.
+ * See the description there.
+ */
+/*CSTYLED*/
+#define	D_L3SOC_THREAD_EN	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_L3SOC,			\
+	.srd_reg = 0x20					\
+}
+#define	L3SOC_THREAD_EN(c)	\
+    amdzen_l3soc_smn_reg(c, D_L3SOC_THREAD_EN, 0)
+#define	L3SOC_THREAD_EN_GET_T(_r, _t)	bitx32(_r, _t, _t)
+#define	L3SOC_THREAD_EN_SET_T(_r, _t)	bitset32(_r, _t, _t, 1)
+
+/*
+ * L3::L3SOC::CcxThreadConfiguration - the Zen 5+ variant of
+ * SMU::PWR::THREAD_CONFIGURATION. Indicates information about enabled cores,
+ * complexes, and SMT. The fields have similar semantics but are at different
+ * locations.
+ */
+/*CSTYLED*/
+#define	D_L3SOC_THREAD_CFG	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_L3SOC,			\
+	.srd_reg = 0x30					\
+}
+#define	L3SOC_THREAD_CFG(c)	\
+    amdzen_l3soc_smn_reg(c, D_L3SOC_THREAD_CFG, 0)
+#define	L3SOC_THREAD_CFG_GET_SMT_MODE(_r)	bitx32(_r, 10, 10)
+#define	L3SOC_THREAD_CFG_SMT_MODE_1T		1
+#define	L3SOC_THREAD_CFG_SMT_MODE_SMT		0
+#define	L3SOC_THREAD_CFG_GET_COMPLEX_COUNT(_r)	bitx32(_r, 9, 6)
+#define	L3SOC_THREAD_CFG_GET_CORE_COUNT(_r)	bitx32(_r, 3, 0)
+
+/*
+ * L3::L3SOC::CcxSoftDownCore0 - see SMU::PWR::SOFT_DOWNCORE.
+ */
+/*CSTYLED*/
+#define	D_L3SOC_SOFT_DOWNCORE	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_L3SOC,			\
+	.srd_reg = 0x34					\
+}
+#define	L3SOC_SOFT_DOWNCORE(c)	\
+    amdzen_l3soc_smn_reg(c, D_L3SOC_SOFT_DOWNCORE, 0)
+#define	L3SOC_SOFT_DOWNCORE_GET_DISCORE(_r)		bitx32(_r, 15, 0)
+#define	L3SOC_SOFT_DOWNCORE_GET_DISCORE_C(_r, _c)	bitx32(_r, _c, _c)
+#define	L3SOC_SOFT_DOWNCORE_SET_DISCORE(_r, _v)	bitset32(_r, 15, 0, _v)
+#define	L3SOC_SOFT_DOWNCORE_SET_DISCORE_C(_r, _c)	bitset32(_r, _c, _c, 1)
+
+/*
+ * L3::L3SOC::CcxCoreEnable0 -- see SMU::PWR::CORE_ENABLE.
+ */
+/*CSTYLED*/
+#define	D_L3SOC_CORE_EN	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_L3SOC,			\
+	.srd_reg = 0x3c					\
+}
+#define	L3SOC_CORE_EN(c)	\
+    amdzen_l3soc_smn_reg(c, D_L3SOC_CORE_EN, 0)
+#define	L3SOC_CORE_EN_GET(_r)		bitx32(_r, 15, 0)
+#define	L3SOC_CORE_EN_GET_C(_r, _c)	bitx32(_r, _c, _c)
+#define	L3SOC_CORE_EN_SET(_r, _v)	bitset32(_r, 15, 0, _v)
+#define	L3SOC_CORE_EN_SET_C(_r, _c)	bitset32(_r, _c, _c, 1)
+
+/*
  * SCFCTP registers. A copy of these exists for each core. One thing to be aware
- * of is that not all cores are enabled and this requires like at the SMU::PWR
- * registers above or the DF::CoreEnable. The aperture for these starts at
- * 2000_0000h. Each core is then spaced 2_0000h apart while each CCD has a
- * 23-bit stride and each CCX has a 22 bit stride. The number of cores per CCX
- * still caps at 8, which is what the various .srd_nents entries should be for
- * all registers in this space. The number of CCDs does vary per platform, but
- * we size this for the current largest number of 12 in Genoa and two CCXs.
+ * of is that not all cores are enabled and this requires looking at the
+ * SMU::PWR/L3::SOC registers above or the DF::CoreEnable. The aperture for
+ * these starts at 2000_0000h. Each core is then spaced 2_0000h apart while each
+ * CCD has a 23-bit stride and each CCX has a 22 bit stride. The number of cores
+ * and CCXes varies based upon the generation. We size this based on what we
+ * anticipate the maximums to be.
  *
  * In the future, it'd be good to have a way to constrain the values we accept
  * to something less than the maximum across all products, but this is often
@@ -220,12 +331,13 @@ amdzen_smupwr_smn_reg(const uint8_t ccdno, const smn_reg_def_t def,
  * challenging at the moment.
  */
 #define	SCFCTP_CORE_STRIDE	0x20000
+#define	SCFCTP_MAX_ENTS		16
 static inline smn_reg_t
 amdzen_scfctp_smn_reg(const uint8_t ccdno, const uint8_t ccxno,
     const smn_reg_def_t def, const uint16_t reginst)
 {
 	const uint32_t APERTURE_BASE = 0x20000000;
-	const uint32_t APERTURE_MASK = SMN_APERTURE_MASK;
+	const uint32_t APERTURE_MASK = 0xffc00000;
 	CTASSERT((APERTURE_BASE & ~APERTURE_MASK) == 0);
 
 	const uint32_t ccdno32 = (const uint32_t)ccdno;
@@ -241,8 +353,8 @@ amdzen_scfctp_smn_reg(const uint8_t ccdno, const uint8_t ccxno,
 	ASSERT(size32 == 1 || size32 == 2 || size32 == 4);
 	ASSERT3S(def.srd_unit, ==, SMN_UNIT_SCFCTP);
 	ASSERT3U(stride, ==, SCFCTP_CORE_STRIDE);
-	ASSERT3U(nents, ==, 8);
-	ASSERT3U(ccdno32, <, 12);
+	ASSERT3U(nents, ==, SCFCTP_MAX_ENTS);
+	ASSERT3U(ccdno32, <, 16);
 	ASSERT3U(ccxno32, <, 2);
 	ASSERT3U(nents, >, reginst32);
 
@@ -267,7 +379,7 @@ amdzen_scfctp_smn_reg(const uint8_t ccdno, const uint8_t ccxno,
 #define	D_SCFCTP_PMREG_INITPKG0	(const smn_reg_def_t){	\
 	.srd_unit = SMN_UNIT_SCFCTP,			\
 	.srd_reg = 0x2fd0,				\
-	.srd_nents = 8,					\
+	.srd_nents = SCFCTP_MAX_ENTS,			\
 	.srd_stride = SCFCTP_CORE_STRIDE		\
 }
 #define	SCFCTP_PMREG_INITPKG0(ccd, ccx, core)	\
@@ -293,7 +405,7 @@ amdzen_scfctp_smn_reg(const uint8_t ccdno, const uint8_t ccxno,
 #define	D_SCFCTP_PMREG_INITPKG7	(const smn_reg_def_t){	\
 	.srd_unit = SMN_UNIT_SCFCTP,			\
 	.srd_reg = 0x2fec,				\
-	.srd_nents = 8,					\
+	.srd_nents = SCFCTP_MAX_ENTS,			\
 	.srd_stride = SCFCTP_CORE_STRIDE		\
 }
 #define	SCFCTP_PMREG_INITPKG7(ccd, ccx, core)	\

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -228,8 +228,8 @@ topo_zen_build_strand_asru(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 	if (nvlist_add_uint8(fmri, FM_VERSION, FM_CPU_SCHEME_VERSION) != 0 ||
 	    nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_CPU) != 0 ||
 	    nvlist_add_uint32(fmri, FM_FMRI_CPU_ID, cpuid) != 0 ||
-	    nvlist_add_string(fmri, FM_FMRI_CPU_SERIAL_ID,
-	    sock->ztes_cpu_serial) != 0) {
+	    (sock->ztes_cpu_serial != NULL && nvlist_add_string(fmri,
+	    FM_FMRI_CPU_SERIAL_ID, sock->ztes_cpu_serial) != 0)) {
 		topo_mod_dprintf(mod, "failed to construct CPU FMRI\n");
 		nvlist_free(fmri);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
@@ -516,6 +516,13 @@ topo_zen_build_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
 	    TOPO_PGROUP_CHIP_MODEL, TOPO_TYPE_INT32, sock->ztes_cpu_model,
 	    TOPO_PGROUP_CHIP_STEPPING, TOPO_TYPE_INT32, sock->ztes_cpu_step,
 	    TOPO_PGROUP_CHIP_SOCKET, TOPO_TYPE_STRING, sock->ztes_cpu_sock,
+	    NULL) != 0) {
+		topo_node_unbind(chip);
+		return (-1);
+	}
+
+	if (sock->ztes_cpu_rev != NULL && topo_create_props(mod, chip,
+	    TOPO_PROP_IMMUTABLE, &topo_zen_chip_pgroup,
 	    TOPO_PGROUP_CHIP_REVISION, TOPO_TYPE_STRING, sock->ztes_cpu_rev,
 	    NULL) != 0) {
 		topo_node_unbind(chip);
