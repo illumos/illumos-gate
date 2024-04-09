@@ -129,6 +129,7 @@ static void
 dmu_zfetch_stream_fini(zstream_t *zs)
 {
 	mutex_destroy(&zs->zs_lock);
+	zfs_refcount_destroy(&zs->zs_blocks);
 	kmem_free(zs, sizeof (*zs));
 }
 
