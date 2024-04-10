@@ -13,7 +13,7 @@
 .\" Copyright 2020 Ryan Zezeski
 .\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd January 18, 2021
+.Dd March 10, 2024
 .Dt I40E 4D
 .Os
 .Sh NAME
@@ -45,21 +45,23 @@ Promiscuous access via
 .It
 IPv4 Checksum Offload
 .It
-TCP, UDP, and SCTP checksum offload
+TCP, UDP, and SCTP Checksum Offload
 .It
-IPv4 and IPv6 TCP Segmentation offload
+IPv4 and IPv6 TCP Segmentation Offload
 .El
 .Pp
 At this time, the
 .Nm
-driver does not enable the use of energy efficient Ethernet (EEE) or
-support the use of flow control through hardware pause frames.
+driver does not enable the use of energy efficient Ethernet
+.Pq EEE
+or support the use of flow control through hardware pause frames.
 .Sh APPLICATION PROGRAMMING INTERFACE
 For each device supported by the
 .Nm
 installed in the system, a character-special file will be created.
-This file supports the Data Link Provider Interface (DLPI) which is documented
-in
+This file supports the Data Link Provider Interface
+.Pq DLPI
+which is documented in
 .Xr dlpi 4P .
 For most consumers, the use of
 .Xr libdlpi 3LIB ,
@@ -98,7 +100,9 @@ is recommended.
 The
 .Nm
 driver may be joined into an aggregation based on the link aggregation
-control protocol (LACP) through
+control protocol
+.Pq LACP
+through
 .Xr dladm 8 .
 .Sh PROPERTIES
 The device supports the following properties which may be tuned through
@@ -307,7 +311,9 @@ Maximum:
 The
 .Sy tx_lso_enable
 property controls whether or not the device enables support for Large Segment
-Offloand (LSO) when transmitting packets.
+Offload
+.Pq LSO
+when transmitting packets.
 The default is to always enable support for this.
 Turning it off will decrease throughput when transmitting packets, but should
 be done if a hardware bug is suspected.
@@ -324,7 +330,8 @@ systems at this time.
 .It Pa /dev/net/i40e*
 Per-instance character device.
 .It Pa /kernel/drv/amd64/i40e
-Device driver (x86)
+Device driver
+.Pq x86
 .It Pa /kernel/drv/i40e.conf
 Driver configuration file
 .El
