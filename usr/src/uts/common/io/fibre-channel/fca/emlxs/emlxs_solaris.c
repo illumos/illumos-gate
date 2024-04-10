@@ -7198,14 +7198,6 @@ emlxs_hba_attach(dev_info_t *dip)
 		    hba->model_info.model);
 		goto failed;
 	}
-#define	FILTER_ORACLE_BRANDED
-#ifdef FILTER_ORACLE_BRANDED
-
-	/* Oracle branded adapters are not supported in this driver */
-	if (hba->model_info.flags & EMLXS_ORACLE_BRANDED) {
-		hba->model_info.flags |= EMLXS_NOT_SUPPORTED;
-	}
-#endif /* FILTER_ORACLE_BRANDED */
 
 	/* Check if adapter is not supported */
 	if (hba->model_info.flags & EMLXS_NOT_SUPPORTED) {
