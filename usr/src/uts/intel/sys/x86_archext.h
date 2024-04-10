@@ -507,6 +507,8 @@ extern "C" {
 #define	CPUID_INTC_EAX_7_1_LAM		0x02000000	/* Linear addr mask */
 /* bits 27-31 are reserved */
 
+#define	CPUID_INTC_EDX_7_2_BHI_CTRL	(1U << 4U)	/* BHI controls */
+
 /*
  * Intel also uses cpuid leaf 0xd to report additional instructions and features
  * when the sub-leaf in %ecx == 1. We label these using the same convention as
@@ -935,6 +937,8 @@ extern "C" {
 #define	X86FSET_RFDS_NO		109
 #define	X86FSET_RFDS_CLEAR	110
 #define	X86FSET_PBRSB_NO	111
+#define	X86FSET_BHI_NO		112
+#define	X86FSET_BHI_CTRL	113
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1598,7 +1602,7 @@ typedef enum x86_uarchrev {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	112
+#define	NUM_X86_FEATURES	114
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -1617,11 +1621,12 @@ extern uint_t pentiumpro_bug4046376;
 
 /*
  * These functions are all used to perform various side-channel mitigations.
- * Please see uts/i86pc/os/cpuid.c for more information.
+ * Please see uts/intel/os/cpuid.c for more information.
  */
 extern void (*spec_uarch_flush)(void);
 extern void x86_rsb_stuff(void);
 extern void x86_rsb_stuff_vmexit(void);
+extern void x86_bhb_clear(void);
 extern void x86_md_clear(void);
 
 #endif

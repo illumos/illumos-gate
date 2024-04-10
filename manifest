@@ -12745,6 +12745,9 @@ f usr/share/man/man3avl/avl_nearest.3avl 0444 root bin
 f usr/share/man/man3avl/avl_numnodes.3avl 0444 root bin
 s usr/share/man/man3avl/avl_remove.3avl=avl_add.3avl
 f usr/share/man/man3avl/avl_swap.3avl 0444 root bin
+f usr/share/man/man3avl/avl_update.3avl 0444 root bin
+s usr/share/man/man3avl/avl_update_gt.3avl=avl_update.3avl
+s usr/share/man/man3avl/avl_update_lt.3avl=avl_update.3avl
 d usr/share/man/man3bsm 0755 root bin
 s usr/share/man/man3bsm/au_close.3bsm=au_open.3bsm
 f usr/share/man/man3bsm/au_open.3bsm 0444 root bin

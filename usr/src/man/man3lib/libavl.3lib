@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd December 2, 2023
+.Dd January 27, 2024
 .Dt LIBAVL 3LIB
 .Os
 .Sh NAME
@@ -128,6 +129,8 @@ Individual functions are documented in their own manual pages.
 .It Sy avl_is_empty Ta Sy avl_last
 .It Sy avl_nearest Ta Sy avl_numnodes
 .It Sy avl_remove Ta Sy avl_swap
+.It Sy avl_update Ta Sy avl_update_gt
+.It Sy avl_update_lt Ta
 .El
 .Pp
 In addition, the library defines C pre-processor macros which are
@@ -205,6 +208,7 @@ $ gcc -Wall -o avl avl.c -lavl
  */
 
 #include <sys/avl.h>
+#include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -383,6 +387,19 @@ swap_avl(void)
 	inttree_inspect();
 }
 
+static void
+update_avl(void)
+{
+	intnode_t lookup, *inp;
+	avl_index_t where;
+
+	lookup.in_val = 9;
+	inp = avl_find(&inttree, &lookup, &where);
+	assert(inp != NULL);
+	inp->in_val = 25;
+	avl_update(&inttree, inp);
+}
+
 /*
  * Remove all remaining nodes in the tree. We first use
  * avl_destroy_nodes to empty the tree, then avl_destroy to finish.
@@ -415,6 +432,7 @@ main(void)
 	insert_avl();
 	inttree_inspect();
 	swap_avl();
+	update_avl();
 	cleanup();
 	return (0);
 }
@@ -442,6 +460,9 @@ See
 .Xr avl_numnodes 3AVL ,
 .Xr avl_remove 3AVL ,
 .Xr avl_swap 3AVL ,
+.Xr avl_update 3AVL ,
+.Xr avl_update_gt 3AVL ,
+.Xr avl_update_lt 3AVL
 .Rs
 .%A Adel'son-Vel'skiy, G. M.
 .%A Landis, Ye. M.

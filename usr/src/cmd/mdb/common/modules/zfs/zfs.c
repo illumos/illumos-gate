@@ -23,6 +23,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -3325,7 +3326,7 @@ typedef struct mdb_zfs_refcount {
 } mdb_zfs_refcount_t;
 
 typedef struct mdb_zfs_refcount_removed {
-	uint64_t rc_removed_count;
+	uint_t rc_removed_count;
 } mdb_zfs_refcount_removed_t;
 
 typedef struct mdb_zfs_refcount_tracked {
@@ -3373,10 +3374,10 @@ zfs_refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (rct.rc_tracked && rc.rc_count > 0)
 		mdb_printf("current holds:\n");
-	off = mdb_ctf_offsetof_by_name("zfs_refcount_t", "rc_list");
+	off = mdb_ctf_offsetof_by_name("zfs_refcount_t", "rc_tree");
 	if (off == -1)
 		return (DCMD_ERR);
-	mdb_pwalk("list", reference_cb, (void*)B_FALSE, addr + off);
+	mdb_pwalk("avl", reference_cb, (void *)B_FALSE, addr + off);
 
 	if (released && rcr.rc_removed_count > 0) {
 		mdb_printf("released holds:\n");
@@ -3384,7 +3385,7 @@ zfs_refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		off = mdb_ctf_offsetof_by_name("zfs_refcount_t", "rc_removed");
 		if (off == -1)
 			return (DCMD_ERR);
-		mdb_pwalk("list", reference_cb, (void*)B_TRUE, addr + off);
+		mdb_pwalk("list", reference_cb, (void *)B_TRUE, addr + off);
 	}
 
 	return (DCMD_OK);
