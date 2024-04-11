@@ -38,6 +38,7 @@
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
  * Copyright 2021 The University of Queensland
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -5110,8 +5111,9 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
 	    strchr(zc->zc_value, '@') == NULL ||
-	    strchr(zc->zc_value, '%'))
+	    strchr(zc->zc_value, '%') != NULL) {
 		return (SET_ERROR(EINVAL));
+	}
 
 	(void) strlcpy(tofs, zc->zc_value, sizeof (tofs));
 	tosnap = strchr(tofs, '@');
@@ -5119,18 +5121,21 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 
 	if (zc->zc_nvlist_src != 0 &&
 	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
-	    zc->zc_iflags, &recvdprops)) != 0)
-		return (error);
+	    zc->zc_iflags, &recvdprops)) != 0) {
+		goto out;
+	}
 
 	if (zc->zc_nvlist_conf != 0 &&
 	    (error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
-	    zc->zc_iflags, &localprops)) != 0)
-		return (error);
+	    zc->zc_iflags, &localprops)) != 0) {
+		goto out;
+	}
 
 	if (zc->zc_history_offset != 0 &&
 	    (error = get_nvlist(zc->zc_history_offset, zc->zc_history_len,
-	    zc->zc_iflags, &hidden_args)) != 0)
-		return (error);
+	    zc->zc_iflags, &hidden_args)) != 0) {
+		goto out;
+	}
 
 	if (zc->zc_string[0])
 		origin = zc->zc_string;
@@ -5143,8 +5148,6 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	    hidden_args, zc->zc_guid, zc->zc_resumable, zc->zc_cookie,
 	    &begin_record, zc->zc_cleanup_fd, &zc->zc_cookie, &zc->zc_obj,
 	    &zc->zc_action_handle, &errors);
-	nvlist_free(recvdprops);
-	nvlist_free(localprops);
 
 	/*
 	 * Now that all props, initial and delayed, are set, report the prop
@@ -5160,6 +5163,10 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		error = SET_ERROR(EINVAL);
 	}
 
+out:
+	nvlist_free(hidden_args);
+	nvlist_free(recvdprops);
+	nvlist_free(localprops);
 	nvlist_free(errors);
 
 	return (error);
