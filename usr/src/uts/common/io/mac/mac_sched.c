@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -3220,7 +3221,7 @@ mac_rx_srs_subflow_process(void *arg, mac_resource_handle_t srs,
 	while (mp != NULL) {
 
 		/*
-		 * We will increment the stats for the mactching subflow.
+		 * We will increment the stats for the matching subflow.
 		 * when we get the bytes/pkt count for the classified packets
 		 * later in mac_rx_srs_process.
 		 */
