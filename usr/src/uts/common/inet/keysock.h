@@ -21,18 +21,19 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_INET_KEYSOCK_H
 #define	_INET_KEYSOCK_H
 
+#include <inet/optcom.h>
+#include <net/pfkeyv2.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-extern int keysock_opt_get(queue_t *, int, int, uchar_t *);
-extern int keysock_opt_set(queue_t *, uint_t, int, int, uint_t,
-    uchar_t *, uint_t *, uchar_t *, void *, cred_t *cr);
 
 /*
  * Object to represent database of options to search passed to
@@ -121,7 +122,7 @@ typedef struct keysock_s {
 #define	KEYSOCK_NOLOOP	0x1	/* Don't loopback messages (no replies). */
 #define	KEYSOCK_PROMISC	0x2	/* Give me all outbound messages. */
 				/* DANGER:	Setting this requires EXTRA */
-				/* 		privilege on an MLS box. */
+				/*		privilege on an MLS box. */
 #define	KEYSOCK_EXTENDED 0x4	/* Extended REGISTER received. */
 
 /* My apologies for the ugliness of this macro.  And using constants. */
@@ -152,6 +153,12 @@ typedef struct keysock_consumer_s {
 #define	KC_FLUSHING 0x2		/* SADB_FLUSH pending on this consumer. */
 
 extern int keysock_plumb_ipsec(netstack_t *);
+extern int keysock_opt_get(queue_t *, int, int, uchar_t *);
+extern int keysock_opt_set(queue_t *, uint_t, int, int, uint_t,
+    uchar_t *, uint_t *, uchar_t *, void *, cred_t *cr);
+extern void keysock_error(keysock_t *, mblk_t *, int, int);
+extern void keysock_passup(mblk_t *, sadb_msg_t *, minor_t,
+    keysock_consumer_t *, boolean_t, keysock_stack_t *);
 
 #ifdef	__cplusplus
 }

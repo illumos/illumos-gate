@@ -24,6 +24,7 @@
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -789,6 +790,10 @@ tcp_kstat2_init(netstackid_t stackid)
 		{ "tcp_rst_unsent",		KSTAT_DATA_UINT64, 0 },
 		{ "tcp_reclaim_cnt",		KSTAT_DATA_UINT64, 0 },
 		{ "tcp_reass_timeout",		KSTAT_DATA_UINT64, 0 },
+		{ "tcp_sig_no_option",		KSTAT_DATA_UINT64, 0 },
+		{ "tcp_sig_no_space",		KSTAT_DATA_UINT64, 0 },
+		{ "tcp_sig_match_failed",	KSTAT_DATA_UINT64, 0 },
+		{ "tcp_sig_verify_failed",	KSTAT_DATA_UINT64, 0 },
 #ifdef TCP_DEBUG_COUNTER
 		{ "tcp_time_wait",		KSTAT_DATA_UINT64, 0 },
 		{ "tcp_rput_time_wait",		KSTAT_DATA_UINT64, 0 },
@@ -996,6 +1001,10 @@ tcp_clr_stats(tcp_stat_t *stats)
 	stats->tcp_rst_unsent.value.ui64 = 0;
 	stats->tcp_reclaim_cnt.value.ui64 = 0;
 	stats->tcp_reass_timeout.value.ui64 = 0;
+	stats->tcp_sig_no_option.value.ui64 = 0;
+	stats->tcp_sig_no_space.value.ui64 = 0;
+	stats->tcp_sig_match_failed.value.ui64 = 0;
+	stats->tcp_sig_verify_failed.value.ui64 = 0;
 
 #ifdef TCP_DEBUG_COUNTER
 	stats->tcp_time_wait.value.ui64 = 0;
@@ -1092,6 +1101,14 @@ tcp_add_stats(tcp_stat_counter_t *from, tcp_stat_t *to)
 	    from->tcp_reclaim_cnt;
 	to->tcp_reass_timeout.value.ui64 +=
 	    from->tcp_reass_timeout;
+	to->tcp_sig_no_option.value.ui64 +=
+	    from->tcp_sig_no_option;
+	to->tcp_sig_no_space.value.ui64 +=
+	    from->tcp_sig_no_space;
+	to->tcp_sig_match_failed.value.ui64 +=
+	    from->tcp_sig_match_failed;
+	to->tcp_sig_verify_failed.value.ui64 +=
+	    from->tcp_sig_verify_failed;
 
 #ifdef TCP_DEBUG_COUNTER
 	to->tcp_time_wait.value.ui64 +=

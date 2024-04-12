@@ -23,6 +23,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -91,6 +92,8 @@ extern sock_downcalls_t sock_tcp_downcalls;
 #define	TCPOPT_REAL_SACK_LEN	4
 #define	TCPOPT_MAX_SACK_LEN	36
 #define	TCPOPT_HEADER_LEN	2
+#define	TCPOPT_MD5_LEN		18
+#define	TCPOPT_REAL_MD5_LEN	(TCPOPT_MD5_LEN + 2)
 
 /* Round up the value to the nearest mss. */
 #define	MSS_ROUNDUP(value, mss)		((((value) - 1) / (mss) + 1) * (mss))
@@ -307,6 +310,7 @@ typedef struct tcp_opt_s {
 	uint32_t	tcp_opt_wscale;
 	uint32_t	tcp_opt_ts_val;
 	uint32_t	tcp_opt_ts_ecr;
+	uint8_t		tcp_opt_sig[MD5_DIGEST_LENGTH];
 	tcp_t		*tcp;
 } tcp_opt_t;
 
@@ -318,6 +322,7 @@ typedef struct tcp_opt_s {
 #define	TCP_OPT_TSTAMP_PRESENT	4
 #define	TCP_OPT_SACK_OK_PRESENT	8
 #define	TCP_OPT_SACK_PRESENT	16
+#define	TCP_OPT_SIG_PRESENT	32
 
 /*
  * Write-side flow-control is implemented via the per instance STREAMS

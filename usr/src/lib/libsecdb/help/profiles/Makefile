@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 Oxide Computer Company
 
 include ../../../../Makefile.master
 
@@ -64,6 +65,7 @@ HTMLENTS = \
 	RtNetMngmnt.html \
 	RtNetObservability.html \
 	RtNetSecure.html \
+	RtNetTCPMngmnt.html \
 	RtNetWifiMngmnt.html \
 	RtNetWifiSecure.html \
 	RtNetLinkSecure.html \

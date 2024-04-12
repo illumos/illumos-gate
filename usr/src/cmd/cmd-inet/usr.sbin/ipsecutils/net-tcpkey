@@ -1,0 +1,37 @@
+#!/sbin/sh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+. /lib/svc/share/smf_include.sh
+
+if [ -z "$SMF_FMRI" ]; then
+	echo "This script can only be invoked by smf"
+	exit $SMF_EXIT_ERR_NOSMF
+fi
+
+# This service does nothing in a shared IP zone
+smf_configure_ip || exit $SMF_EXIT_NODAEMON
+
+typeset -r CFG="$1"
+if [[ -z "$CFG" ]]; then
+	echo "Configuration file is not set."
+	exit $SMF_EXIT_ERR_FATAL
+fi
+if [[ ! -r "$CFG" ]]; then
+	echo "Configuration file '$CFG' cannot be read."
+	exit $SMF_EXIT_ERR_FATAL
+fi
+
+/usr/sbin/tcpkey -f "$CFG" || exit $SMF_EXIT_ERR_FATAL
+exit $SMF_EXIT_OK

@@ -562,7 +562,8 @@ IP_ICMP_OBJS =	icmp.o icmp_opt_data.o
 IP_RTS_OBJS =	rts.o rts_opt_data.o
 IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_opt_data.o tcp_sack.o tcp_stats.o \
 		tcp_misc.o tcp_timers.o tcp_time_wait.o tcp_tpi.o tcp_output.o \
-		tcp_input.o tcp_socket.o tcp_bind.o tcp_cluster.o tcp_tunables.o
+		tcp_input.o tcp_socket.o tcp_bind.o tcp_cluster.o \
+		tcp_tunables.o tcp_sig.o
 IP_UDP_OBJS =	udp.o udp_opt_data.o udp_tunables.o udp_stats.o
 IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_init.o sctp_input.o sctp_cookie.o \

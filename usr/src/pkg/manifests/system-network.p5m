@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/network@$(PKGVERS)
@@ -62,6 +63,7 @@ file path=etc/inet/secret/ike.preshared group=sys mode=0600 \
     original_name=SUNWcnetr:etc/inet/secret/ike.preshared preserve=true
 dir  path=etc/inet/secret/ike.privatekeys group=sys mode=0700
 file path=etc/inet/secret/ipseckeys.sample group=sys mode=0600
+file path=etc/inet/secret/tcpkeys.sample group=sys mode=0600
 dir  path=etc/ipadm owner=netadm group=netadm
 file path=etc/ipadm/ipadm.conf owner=netadm group=netadm preserve=true
 dir  path=etc/nwam owner=netadm group=netadm

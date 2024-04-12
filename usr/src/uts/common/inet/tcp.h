@@ -24,7 +24,7 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -252,8 +252,9 @@ typedef struct tcp_s {
 
 		tcp_lso :1,		/* Lower layer is capable of LSO */
 		tcp_is_wnd_shrnk : 1,	/* Window has shrunk */
+		tcp_md5sig : 1,		/* Add MD5 signature option */
 
-		tcp_pad_to_bit_31 : 17;
+		tcp_pad_to_bit_31 : 16;
 
 	uint32_t	tcp_initial_pmtu; /* Initial outgoing Path MTU. */
 
@@ -497,6 +498,13 @@ typedef struct tcp_s {
 	uint32_t		tcp_fin_wait_2_flush_interval;
 
 	tcp_conn_stats_t	tcp_cs;
+
+	/*
+	 * The cached inbound and outbound security associations (SAs) for the
+	 * TCP signature (TCP_MD5SIG).
+	 */
+	void		*tcp_sig_sa_in;
+	void		*tcp_sig_sa_out;
 
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];

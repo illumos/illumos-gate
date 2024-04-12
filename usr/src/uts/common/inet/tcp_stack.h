@@ -117,6 +117,10 @@ struct tcp_stack {
 
 	struct cc_algo	*tcps_default_cc_algo;
 
+	/* TCP signature database and lock. */
+	kmutex_t	tcps_sigdb_lock;
+	void		*tcps_sigdb;
+
 	/*
 	 * Per CPU stats
 	 *

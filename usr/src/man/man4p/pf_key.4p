@@ -1,10 +1,11 @@
-'\" te
+.\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2018, Joyent, Inc.
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PF_KEY 4P "December 28, 2020"
+.TH PF_KEY 4P "April 17, 2024"
 .SH NAME
 pf_key \- Security association database interface
 .SH SYNOPSIS
@@ -30,8 +31,8 @@ analogous to the method described in \fBroute\fR(4P). Only a superuser may
 access an \fBSADB\fR.
 .sp
 .LP
-SunOS applications that use PF_KEY include \fBipseckey\fR(8) and
-\fBin.iked\fR(8).
+Applications that use PF_KEY include \fBipseckey\fR(8), \fBin.iked\fR(8) and
+\fBtcpkey\fR(8).
 .sp
 .LP
 The operating system may spontaneously send pf_key messages to listening
@@ -151,6 +152,8 @@ Security Association Information Extension flags:
 #define SADB_X_SAFLAGS_PAIRED      0x10000   /* inbound/outbound pair*/
 #define SADB_X_SAFLAGS_OUTBOUND     0x8000   /* SA direction bit */
 #define SADB_X_SAFLAGS_INBOUND      0x4000   /* SA direction bit */
+#define SADB_X_SAFLAGS_TCPSIG       0x2000   /* SA is for a TCP signature */
+#define SADB_X_SAFLAGS_NATTED       0x1000   /* Local node is behind a NAT */
 .fi
 .in -2
 
@@ -917,6 +920,15 @@ Diagnostic Values:
 
 #define SADB_X_DIAGNOSTIC_SA_NOTFOUND           78
 #define SADB_X_DIAGNOSTIC_SA_EXPIRED            79
+#define SADB_X_DIAGNOSTIC_BAD_CTX               80
+#define SADB_X_DIAGNOSTIC_INVALID_REPLAY        81
+#define SADB_X_DIAGNOSTIC_MISSING_LIFETIME      82
+
+#define SADB_X_DIAGNOSTIC_BAD_LABEL             83
+
+#define SADB_X_DIAGNOSTIC_MISSING_ASTR          84
+#define SADB_X_DIAGNOSTIC_DUPLICATE_ASTR        85
+#define SADB_X_DIAGNOSTIC_MALFORMED_ASTR        86
 .fi
 .in -2
 
@@ -941,11 +953,12 @@ Interface Stability	Evolving
 .BR route (4P),
 .BR udp (4P),
 .BR in.iked (8),
-.BR ipseckey (8)
+.BR ipseckey (8),
+.BR tcpkey (8)
 .sp
 .LP
 McDonald, D.L., Metz, C.W., and Phan, B.G., \fIRFC 2367, PF_KEY Key Management
 API, Version 2\fR, The Internet Society, July 1998.
 .SH NOTES
 Time-based lifetimes may not expire with exact precision in seconds because
-kernel load may affect the aging of \fBSA\fR's.
+kernel load may affect the aging of \fBSA\fRs.

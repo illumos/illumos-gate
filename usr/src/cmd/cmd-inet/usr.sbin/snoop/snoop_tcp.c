@@ -22,6 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -45,6 +47,7 @@ extern char *dlc_header;
 #define	TCPOPT_HEADER_LEN	2
 #define	TCPOPT_TSTAMP_LEN	10
 #define	TCPOPT_SACK_LEN		8
+#define	TCPOPT_MD5_LEN		18
 
 /*
  * Convert a network byte order 32 bit integer to a host order integer.
@@ -62,9 +65,9 @@ static const struct {
 	unsigned int	tf_flag;
 	const char	*tf_name;
 } tcp_flags[] = {
-	{ TH_SYN, 	"Syn"	},
-	{ TH_FIN, 	"Fin"	},
-	{ TH_RST, 	"Rst"	},
+	{ TH_SYN,	"Syn"	},
+	{ TH_FIN,	"Fin"	},
+	{ TH_RST,	"Rst"	},
 	{ TH_PUSH,	"Push"	},
 	{ TH_ECE,	"ECE"	},
 	{ TH_CWR,	"CWR"	},
@@ -113,12 +116,12 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 		}
 		if (tcp->th_flags & TH_ACK) {
 			(void) snprintf(line, endline - line, " Ack=%u",
-				ntohl(tcp->th_ack));
+			    ntohl(tcp->th_ack));
 			line += strlen(line);
 		}
 		if (ntohl(tcp->th_seq)) {
 			(void) snprintf(line, endline - line, " Seq=%u Len=%d",
-				ntohl(tcp->th_seq), tcplen);
+			    ntohl(tcp->th_seq), tcplen);
 			line += strlen(line);
 		}
 		(void) snprintf(line, endline - line, " Win=%d",
@@ -128,15 +131,15 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 	}
 
 	sunrpc = !reservedport(IPPROTO_TCP, ntohs(tcp->th_dport)) &&
-		!reservedport(IPPROTO_TCP, ntohs(tcp->th_sport)) &&
-		valid_rpc(data + 4, fraglen - 4);
+	    !reservedport(IPPROTO_TCP, ntohs(tcp->th_sport)) &&
+	    valid_rpc(data + 4, fraglen - 4);
 
 	if (flags & F_DTAIL) {
 
 	show_header("TCP:  ", "TCP Header", tcplen);
 	show_space();
 	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_sport -
-		dlc_header, 2),	"Source port = %d", ntohs(tcp->th_sport));
+	    dlc_header, 2), "Source port = %d", ntohs(tcp->th_sport));
 
 	if (sunrpc) {
 		pname = "(Sun RPC)";
@@ -150,51 +153,51 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 		}
 	}
 	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_dport -
-		dlc_header, 2), "Destination port = %d %s",
-		ntohs(tcp->th_dport), pname);
+	    dlc_header, 2), "Destination port = %d %s",
+	    ntohs(tcp->th_dport), pname);
 	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_seq -
-		dlc_header, 4),	"Sequence number = %u",
-		ntohl(tcp->th_seq));
+	    dlc_header, 4),	"Sequence number = %u",
+	    ntohl(tcp->th_seq));
 	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_ack - dlc_header, 4),
-		"Acknowledgement number = %u",
-		ntohl(tcp->th_ack));
+	    "Acknowledgement number = %u",
+	    ntohl(tcp->th_ack));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_ack - dlc_header) +
-		4, 1), "Data offset = %d bytes", tcp->th_off * 4);
+	    4, 1), "Data offset = %d bytes", tcp->th_off * 4);
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "Flags = 0x%02x", tcp->th_flags);
+	    dlc_header) + 4, 1), "Flags = 0x%02x", tcp->th_flags);
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_CWR,
-		"ECN congestion window reduced",
-		"No ECN congestion window reduced"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_CWR,
+	    "ECN congestion window reduced",
+	    "No ECN congestion window reduced"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ECE,
-		"ECN echo", "No ECN echo"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ECE,
+	    "ECN echo", "No ECN echo"));
+	(void) sprintf(
+	    get_line(((char *)(uintptr_t)tcp->th_flags - dlc_header) + 4, 1),
+	    "      %s", getflag(tcp->th_flags, TH_URG,
+	    "Urgent pointer", "No urgent pointer"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s",
-		getflag(tcp->th_flags, TH_URG,
-		"Urgent pointer", "No urgent pointer"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ACK,
+	    "Acknowledgement", "No acknowledgement"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ACK,
-		"Acknowledgement", "No acknowledgement"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_PUSH,
+	    "Push", "No push"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_PUSH,
-		"Push", "No push"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_RST,
+	    "Reset", "No reset"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_RST,
-		"Reset", "No reset"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_SYN,
+	    "Syn", "No Syn"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_SYN,
-		"Syn", "No Syn"));
-	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
-		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_FIN,
-		"Fin", "No Fin"));
+	    dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_FIN,
+	    "Fin", "No Fin"));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_win - dlc_header) +
-		4, 1), "Window = %d", ntohs(tcp->th_win));
+	    4, 1), "Window = %d", ntohs(tcp->th_win));
 	/* XXX need to compute checksum and print whether correct */
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_sum - dlc_header) +
-		4, 1), "Checksum = 0x%04x", ntohs(tcp->th_sum));
+	    4, 1), "Checksum = 0x%04x", ntohs(tcp->th_sum));
 	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_urp - dlc_header) +
-		4, 1), "Urgent pointer = %d", ntohs(tcp->th_urp));
+	    4, 1), "Urgent pointer = %d", ntohs(tcp->th_urp));
 
 	/* Print TCP options - if any */
 
@@ -211,9 +214,7 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 	/* go to the next protocol layer */
 
 	if (!interpret_reserved(flags, IPPROTO_TCP,
-		ntohs(tcp->th_sport),
-		ntohs(tcp->th_dport),
-		data, fraglen)) {
+	    ntohs(tcp->th_sport), ntohs(tcp->th_dport), data, fraglen)) {
 		if (sunrpc && fraglen > 0)
 			interpret_rpc(flags, data, fraglen, IPPROTO_TCP);
 	}
@@ -222,15 +223,10 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 }
 
 static void
-print_tcpoptions(opt, optlen)
-	uchar_t *opt;
-	int optlen;
+print_tcpoptions(uchar_t *opt, int optlen)
 {
 	int	 len;
 	char	 *line;
-	uchar_t	*sack_opt;
-	uchar_t	*end_opt;
-	int	sack_len;
 
 	if (optlen <= 0) {
 		(void) sprintf(get_line((char *)&opt - dlc_header, 1),
@@ -254,8 +250,8 @@ print_tcpoptions(opt, optlen)
 			break;
 		case TCPOPT_MAXSEG:
 			(void) sprintf(line,
-			"  - Maximum segment size = %d bytes",
-				(opt[2] << 8) + opt[3]);
+			    "  - Maximum segment size = %d bytes",
+			    (opt[2] << 8) + opt[3]);
 			break;
 		case TCPOPT_WSCALE:
 			(void) sprintf(line, "  - Window scale = %d", opt[2]);
@@ -275,18 +271,21 @@ print_tcpoptions(opt, optlen)
 		case TCPOPT_SACK_PERMITTED:
 			(void) sprintf(line, "  - SACK permitted option");
 			break;
-		case TCPOPT_SACK:
+		case TCPOPT_SACK: {
+			uchar_t *sack_opt, *end_opt;
+			int sack_len;
+
 			/*
 			 * Sanity check.  Total length should be greater
 			 * than just the option header length.
 			 */
-			if (len <= TCPOPT_HEADER_LEN ||
-			    opt[1] <= TCPOPT_HEADER_LEN || len < opt[1]) {
+			if (optlen <= TCPOPT_HEADER_LEN ||
+			    len < TCPOPT_HEADER_LEN) {
 				(void) sprintf(line,
 				    "  - Incomplete SACK option");
 				break;
 			}
-			sack_len = opt[1] - TCPOPT_HEADER_LEN;
+			sack_len = len - TCPOPT_HEADER_LEN;
 			sack_opt = opt + TCPOPT_HEADER_LEN;
 			end_opt = opt + optlen;
 
@@ -314,17 +313,34 @@ print_tcpoptions(opt, optlen)
 				sack_len -= TCPOPT_SACK_LEN;
 			}
 			break;
+		}
+		case TCPOPT_MD5: {
+			uint_t i;
+
+			if (optlen < TCPOPT_MD5_LEN || len != TCPOPT_MD5_LEN) {
+				(void) sprintf(line,
+				    "  - Incomplete MD5 option");
+				break;
+			}
+
+			(void) sprintf(line, "  - TCP MD5 Signature = 0x");
+			for (i = 2; i < len; i++) {
+				char options[3];
+
+				(void) sprintf(options, "%02x", opt[i]);
+				(void) strcat(line, options);
+			}
+			break;
+		}
 		default:
 			(void) sprintf(line,
-			"  - Option %d (unknown - %d bytes) %s",
-				opt[0],
-				len - 2,
-				tohex((char *)&opt[2], len - 2));
+			    "  - Option %d (unknown - %d bytes) %s",
+			    opt[0], len - 2, tohex((char *)&opt[2], len - 2));
 			break;
 		}
 		if (len <= 0) {
 			(void) sprintf(line, "  - Incomplete option len %d",
-				len);
+			    len);
 			break;
 		}
 		opt += len;
@@ -340,9 +356,6 @@ static void
 print_tcpoptions_summary(uchar_t *opt, int optlen, char *line)
 {
 	int	 len;
-	uchar_t	*sack_opt;
-	uchar_t	*end_opt;
-	int	sack_len;
 	char	options[MAXLINE + 1];
 
 	if (optlen <= 0) {
@@ -383,17 +396,20 @@ print_tcpoptions_summary(uchar_t *opt, int optlen, char *line)
 		case TCPOPT_SACK_PERMITTED:
 			(void) strcat(line, "sackOK");
 			break;
-		case TCPOPT_SACK:
+		case TCPOPT_SACK: {
+			uchar_t *sack_opt, *end_opt;
+			int sack_len;
+
 			/*
 			 * Sanity check.  Total length should be greater
 			 * than just the option header length.
 			 */
-			if (len <= TCPOPT_HEADER_LEN ||
-			    opt[1] <= TCPOPT_HEADER_LEN || len < opt[1]) {
+			if (optlen <= TCPOPT_HEADER_LEN ||
+			    len < TCPOPT_HEADER_LEN) {
 				(void) strcat(line, "sack|");
 				break;
 			}
-			sack_len = opt[1] - TCPOPT_HEADER_LEN;
+			sack_len = len - TCPOPT_HEADER_LEN;
 			sack_opt = opt + TCPOPT_HEADER_LEN;
 			end_opt = opt + optlen;
 
@@ -416,6 +432,22 @@ print_tcpoptions_summary(uchar_t *opt, int optlen, char *line)
 				sack_len -= TCPOPT_SACK_LEN;
 			}
 			break;
+		}
+		case TCPOPT_MD5: {
+			uint_t i;
+
+			if (optlen < TCPOPT_MD5_LEN || len != TCPOPT_MD5_LEN) {
+				(void) strcat(line, "md5|");
+				break;
+			}
+
+			(void) strcat(line, "md5 0x");
+			for (i = 2; i < len; i++) {
+				(void) sprintf(options, "%02x", opt[i]);
+				(void) strcat(line, options);
+			}
+			break;
+		}
 		default:
 			(void) sprintf(options, "unknown %d", opt[0]);
 			(void) strcat(line, options);

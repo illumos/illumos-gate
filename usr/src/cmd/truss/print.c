@@ -2047,6 +2047,8 @@ tcp_optname(private_t *pri, long val)
 	case TCP_KEEPCNT:		return ("TCP_KEEPCNT");
 	case TCP_KEEPINTVL:		return ("TCP_KEEPINTVL");
 	case TCP_CONGESTION:		return ("TCP_CONGESTION");
+	case TCP_QUICKACK:		return ("TCP_QUICKACK");
+	case TCP_MD5SIG:		return ("TCP_MD5SIG");
 
 	default:			(void) snprintf(pri->code_buf,
 					    sizeof (pri->code_buf),

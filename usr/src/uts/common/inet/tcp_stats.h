@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_INET_TCP_STATS_H
@@ -122,6 +123,10 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_rst_unsent;
 	kstat_named_t	tcp_reclaim_cnt;
 	kstat_named_t	tcp_reass_timeout;
+	kstat_named_t	tcp_sig_no_option;
+	kstat_named_t	tcp_sig_no_space;
+	kstat_named_t	tcp_sig_match_failed;
+	kstat_named_t	tcp_sig_verify_failed;
 #ifdef TCP_DEBUG_COUNTER
 	kstat_named_t	tcp_time_wait;
 	kstat_named_t	tcp_rput_time_wait;
@@ -178,6 +183,10 @@ typedef struct tcp_stat_counter_s {
 	uint64_t	tcp_rst_unsent;
 	uint64_t	tcp_reclaim_cnt;
 	uint64_t	tcp_reass_timeout;
+	uint64_t	tcp_sig_no_option;
+	uint64_t	tcp_sig_no_space;
+	uint64_t	tcp_sig_match_failed;
+	uint64_t	tcp_sig_verify_failed;
 #ifdef TCP_DEBUG_COUNTER
 	uint64_t	tcp_time_wait;
 	uint64_t	tcp_rput_time_wait;

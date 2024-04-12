@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 Oxide Computer Company
 
 #
 # /etc/security/prof_attr
@@ -62,8 +63,9 @@ Network Autoconf User:::Network Auto-Magic User:auths=solaris.network.autoconf.r
 Network ILB:::Manage ILB configuration via ilbadm:auths=solaris.network.ilb.config,solaris.network.ilb.enable;help=RtNetILB.html
 Network VRRP:::Manage VRRP instances:auths=solaris.network.vrrp,solaris.smf.manage.vrrp;help=RtNetVRRP.html
 Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns,solaris.smf.manage.ilb,solaris.network.interface.config;profiles=Network Wifi Management,Inetd Management,Network VRRP,Network Observability;help=RtNetMngmnt.html
+Network TCP Key Management:::Manage the TCP security association database:auths=solaris.smf.manage.tcpkey,solaris.smf.value.tcpkey;help=RtNetTCPMngmnt.html
 Network Observability:::Allow access to observability devices:privs=net_observability;help=RtNetObservability.html
-Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd,solaris.network.*;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd,solaris.network.*;profiles=Network Wifi Security,Network Link Security,Network IPsec Management,Network TCP Key Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
 Network Link Security:::Manage network link security:auths=solaris.network.link.security;help=RtNetLinkSecure.html

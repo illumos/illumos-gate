@@ -165,6 +165,10 @@ file path=opt/os-tests/tests/syscall/fchmodat.32 mode=0555
 file path=opt/os-tests/tests/syscall/fchmodat.64 mode=0555
 file path=opt/os-tests/tests/syscall/open.32 mode=0555
 file path=opt/os-tests/tests/syscall/open.64 mode=0555
+dir  path=opt/os-tests/tests/tcpsig
+file path=opt/os-tests/tests/tcpsig/tcpsig mode=0555
+file path=opt/os-tests/tests/tcpsig/tcpsig_fini mode=0555
+file path=opt/os-tests/tests/tcpsig/tcpsig_init mode=0555
 dir  path=opt/os-tests/tests/timer
 file path=opt/os-tests/tests/timer/timer_limit mode=0555
 dir  path=opt/os-tests/tests/uccid

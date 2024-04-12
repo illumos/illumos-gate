@@ -51,6 +51,7 @@
 #include <inet/tcp_cluster.h>
 #include <inet/proto_set.h>
 #include <inet/ipsec_impl.h>
+#include <inet/tcp_sig.h>
 
 /*
  * RFC7323-recommended phrasing of TSTAMP option, for easier parsing
@@ -164,7 +165,8 @@ static void	tcp_icmp_error_ipv6(tcp_t *, mblk_t *, ip_recv_attr_t *);
 static mblk_t	*tcp_input_add_ancillary(tcp_t *, mblk_t *, ip_pkt_t *,
 		    ip_recv_attr_t *);
 static void	tcp_input_listener(void *, mblk_t *, void *, ip_recv_attr_t *);
-static void	tcp_process_options(tcp_t *, tcpha_t *);
+static boolean_t tcp_process_options(mblk_t *mp, tcp_t *, tcpha_t *,
+    ip_recv_attr_t *);
 static mblk_t	*tcp_reass(tcp_t *, mblk_t *, uint32_t);
 static void	tcp_reass_elim_overlap(tcp_t *, mblk_t *);
 static void	tcp_rsrv_input(void *, mblk_t *, void *, ip_recv_attr_t *);
@@ -507,6 +509,17 @@ tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
 			up += TCPOPT_TSTAMP_LEN;
 			continue;
 
+		case TCPOPT_MD5:
+			if (len < TCPOPT_MD5_LEN || up[1] != TCPOPT_MD5_LEN)
+				break;
+
+			bcopy(up + 2, tcpopt->tcp_opt_sig,
+			    sizeof (tcpopt->tcp_opt_sig));
+
+			found |= TCP_OPT_SIG_PRESENT;
+			up += TCPOPT_MD5_LEN;
+			continue;
+
 		default:
 			if (len <= 1 || len < (int)up[1] || up[1] == 0)
 				break;
@@ -529,8 +542,8 @@ tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
  * change receive window size after setting the tcp_mss value.  The caller
  * should do the appropriate change.
  */
-static void
-tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
+static boolean_t
+tcp_process_options(mblk_t *mp, tcp_t *tcp, tcpha_t *tcpha, ip_recv_attr_t *ira)
 {
 	int options;
 	tcp_opt_t tcpopt;
@@ -541,6 +554,17 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 
 	tcpopt.tcp = NULL;
 	options = tcp_parse_options(tcpha, &tcpopt);
+
+	if (tcp->tcp_md5sig) {
+		if ((options & TCP_OPT_SIG_PRESENT) == 0) {
+			TCP_STAT(tcp->tcp_tcps, tcp_sig_no_option);
+			return (B_FALSE);
+		}
+		if (!tcpsig_verify(mp->b_cont, tcp, tcpha, ira,
+		    tcpopt.tcp_opt_sig)) {
+			return (B_FALSE);
+		}
+	}
 
 	/*
 	 * Process MSS option.  Note that MSS option value does not account
@@ -680,6 +704,8 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 
 	if (tcp->tcp_cc_algo->conn_init != NULL)
 		tcp->tcp_cc_algo->conn_init(&tcp->tcp_ccv);
+
+	return (B_TRUE);
 }
 
 /*
@@ -1744,7 +1770,10 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	}
 
 	/* Process all TCP options. */
-	tcp_process_options(eager, tcpha);
+	if (!tcp_process_options(mp, eager, tcpha, ira)) {
+		tcp_bind_hash_remove(eager);
+		goto error3;
+	}
 
 	/* Is the other end ECN capable? */
 	if (tcps->tcps_ecn_permitted >= 1 &&
@@ -2190,10 +2219,11 @@ tcp_ack_mp(tcp_t *tcp)
 		    (tcp->tcp_suna + tcp->tcp_swnd) : tcp->tcp_snxt;
 	}
 
-	if (tcp->tcp_valid_bits) {
+	if (tcp->tcp_valid_bits || tcp->tcp_md5sig) {
 		/*
-		 * For the complex case where we have to send some
-		 * controls (FIN or SYN), let tcp_xmit_mp do it.
+		 * For the complex cases where we have to send some
+		 * controls (FIN or SYN), or add an MD5 signature
+		 * option, let tcp_xmit_mp do it.
 		 */
 		return (tcp_xmit_mp(tcp, NULL, 0, NULL, NULL, seq_no, B_FALSE,
 		    NULL, B_FALSE));
@@ -2646,7 +2676,10 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		}
 
 		/* Process all TCP options. */
-		tcp_process_options(tcp, tcpha);
+		if (!tcp_process_options(mp, tcp, tcpha, ira)) {
+			freemsg(mp);
+			return;
+		}
 		/*
 		 * The following changes our rwnd to be a multiple of the
 		 * MIN(peer MSS, our MSS) for performance reason.
@@ -2995,16 +3028,32 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	    ((tcpha->tha_flags & TH_SYN) ? 0 : tcp->tcp_snd_ws);
 
 	/*
-	 * We are interested in two TCP options: timestamps (if negotiated) and
-	 * SACK (if negotiated). Skip option parsing if neither is negotiated.
+	 * We are interested in three TCP options: timestamps (if negotiated),
+	 * SACK (if negotiated) and MD5. Skip option parsing if none of these
+	 * is enabled/negotiated.
 	 */
-	if (tcp->tcp_snd_ts_ok || tcp->tcp_snd_sack_ok) {
+	if (tcp->tcp_snd_ts_ok || tcp->tcp_snd_sack_ok || tcp->tcp_md5sig) {
 		int options;
+
 		if (tcp->tcp_snd_sack_ok)
 			tcpopt.tcp = tcp;
 		else
 			tcpopt.tcp = NULL;
+
 		options = tcp_parse_options(tcpha, &tcpopt);
+
+		if (tcp->tcp_md5sig) {
+			if ((options & TCP_OPT_SIG_PRESENT) == 0) {
+				TCP_STAT(tcp->tcp_tcps, tcp_sig_no_option);
+				freemsg(mp);
+				return;
+			}
+			if (!tcpsig_verify(mp, tcp, tcpha, ira,
+			    tcpopt.tcp_opt_sig)) {
+				freemsg(mp);
+				return;
+			}
+		}
 		/*
 		 * RST segments must not be subject to PAWS and are not
 		 * required to have timestamps.
@@ -3131,7 +3180,7 @@ try_again:;
 			 * packet that is unacceptable, it should not cause
 			 * "ACK wars".
 			 */
-			flags |=  TH_ACK_NEEDED;
+			flags |= TH_ACK_NEEDED;
 
 			/*
 			 * Continue processing this segment in order to use the

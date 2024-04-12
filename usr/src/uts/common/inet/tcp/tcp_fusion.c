@@ -152,6 +152,16 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 		CONN_DEC_REF(peer_connp);
 		return;
 	}
+
+	/*
+	 * If we need to add MD5 Signature options, don't allow fusion.
+	 */
+	if (tcp->tcp_md5sig || peer_tcp->tcp_md5sig) {
+		TCP_STAT(tcps, tcp_fusion_unqualified);
+		CONN_DEC_REF(peer_connp);
+		return;
+	}
+
 	/*
 	 * Fuse the endpoints; we perform further checks against both
 	 * tcp endpoints to ensure that a fusion is allowed to happen.

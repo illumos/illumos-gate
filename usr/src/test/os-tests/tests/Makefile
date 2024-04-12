@@ -43,6 +43,7 @@ SUBDIRS =       \
 		stackalign \
 		stress \
 		syscall \
+		tcpsig \
 		timer \
 		uccid \
 		$(SUBDIRS_$(MACH))

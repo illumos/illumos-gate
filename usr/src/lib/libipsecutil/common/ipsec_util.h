@@ -372,6 +372,7 @@ extern void print_lifetimes(FILE *, time_t, struct sadb_lifetime *,
 extern void print_address(FILE *, char *, struct sadb_address *, boolean_t);
 extern void print_asn1_name(FILE *, const unsigned char *, long);
 extern void print_key(FILE *, char *, struct sadb_key *);
+extern void print_keystr(FILE *, char *, struct sadb_key *);
 extern void print_ident(FILE *, char *, struct sadb_ident *);
 extern void print_sens(FILE *, char *, const struct sadb_sens *, boolean_t);
 extern void print_prop(FILE *, char *, struct sadb_prop *);
@@ -382,14 +383,18 @@ extern void print_kmc(FILE *, char *, struct sadb_x_kmc *);
 extern void print_samsg(FILE *, uint64_t *, boolean_t, boolean_t, boolean_t);
 extern char *rparsesatype(int);
 extern char *rparsealg(uint8_t, int);
+extern const char *rparsetcpsigalg(uint8_t);
 extern char *rparseidtype(uint16_t);
 extern boolean_t save_lifetime(struct sadb_lifetime *, FILE *);
 extern boolean_t save_address(struct sadb_address *, FILE *);
 extern boolean_t save_key(struct sadb_key *, FILE *);
+extern boolean_t save_keystr(struct sadb_key *, FILE *);
 extern boolean_t save_ident(struct sadb_ident *, FILE *);
 extern void save_assoc(uint64_t *, FILE *);
 extern FILE *opensavefile(char *);
 extern const char *do_inet_ntop(const void *, char *, size_t);
+extern uint8_t gettcpsigalgbyname(const char *);
+extern const char *gettcpsigalgbynum(uint8_t);
 
 /*
  * Label conversion convenience functions.

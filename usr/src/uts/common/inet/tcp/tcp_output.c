@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /* This file contains all TCP output processing functions. */
@@ -52,6 +53,7 @@
 #include <inet/proto_set.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ip_ndp.h>
+#include <inet/tcp_sig.h>
 
 static mblk_t	*tcp_get_seg_mp(tcp_t *, uint32_t, int32_t *);
 static void	tcp_wput_cmdblk(queue_t *, mblk_t *);
@@ -1158,14 +1160,16 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	 *   4. data in mblk
 	 *   5. len <= mss
 	 *   6. no tcp_valid bits
+	 *   7. no MD5 signature option
 	 */
-	if ((tcp->tcp_unsent != 0) ||
-	    (tcp->tcp_cork) ||
-	    (mp->b_cont != NULL) ||
-	    (tcp->tcp_state != TCPS_ESTABLISHED) ||
-	    (len == 0) ||
-	    (len > mss) ||
-	    (tcp->tcp_valid_bits != 0)) {
+	if (tcp->tcp_unsent != 0 ||
+	    tcp->tcp_cork ||
+	    tcp->tcp_md5sig ||
+	    mp->b_cont != NULL ||
+	    tcp->tcp_state != TCPS_ESTABLISHED ||
+	    len == 0 ||
+	    len > mss ||
+	    tcp->tcp_valid_bits != 0) {
 		tcp_wput_data(tcp, mp, B_FALSE);
 		return;
 	}
@@ -1928,16 +1932,17 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 
 		/*
 		 * Branch off to tcp_xmit_mp() if any of the VALID bits is
-		 * set.  For the case when TCP_FSS_VALID is the only valid
-		 * bit (normal active close), branch off only when we think
-		 * that the FIN flag needs to be set.  Note for this case,
-		 * that (snxt + len) may not reflect the actual seg_len,
-		 * as len may be further reduced in tcp_xmit_mp().  If len
-		 * gets modified, we will end up here again.
+		 * set or if we have to add an MD5 signature option.  For the
+		 * case when TCP_FSS_VALID is the only valid bit (normal active
+		 * close), branch off only when we think that the FIN flag
+		 * needs to be set.  Note for this case, that (snxt + len) may
+		 * not reflect the actual seg_len, as len may be further
+		 * reduced in tcp_xmit_mp().  If len gets modified, we will end
+		 * up here again.
 		 */
-		if (tcp->tcp_valid_bits != 0 &&
+		if (tcp->tcp_md5sig || (tcp->tcp_valid_bits != 0 &&
 		    (tcp->tcp_valid_bits != TCP_FSS_VALID ||
-		    ((*snxt + len) == tcp->tcp_fss))) {
+		    *snxt + len == tcp->tcp_fss))) {
 			uchar_t		*prev_rptr;
 			uint32_t	prev_snxt = tcp->tcp_snxt;
 
@@ -2451,9 +2456,43 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 		tcp->tcp_rack_cnt = 0;
 		TCPS_BUMP_MIB(tcps, tcpOutAck);
 	}
-	TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
+
 	tcpha->tha_seq = htonl(seq);
 	tcpha->tha_ack = htonl(ack);
+
+	if (tcp->tcp_md5sig) {
+		uint8_t digest[MD5_DIGEST_LENGTH];
+		int tcplen = (int)(mp->b_wptr - rptr) +
+		    TCPOPT_REAL_MD5_LEN - ip_hdr_len;
+
+		if (tcpsig_signature(mp->b_cont, tcp, tcpha, tcplen, digest,
+		    false)) {
+			uint8_t *wptr = mp->b_wptr;
+
+			wptr[0] = TCPOPT_NOP;
+			wptr[1] = TCPOPT_NOP;
+			wptr[2] = TCPOPT_MD5;
+			wptr[3] = TCPOPT_MD5_LEN;
+			bcopy(digest, &wptr[4], sizeof (digest));
+
+			tcpha->tha_offset_and_reserved += (5 << 4);
+			mp->b_wptr += TCPOPT_REAL_MD5_LEN;
+			ixa->ixa_pktlen += TCPOPT_REAL_MD5_LEN;
+			if (ixa->ixa_flags & IXAF_IS_IPV4) {
+				ipha->ipha_length = htons(ntohs(
+				    ipha->ipha_length) + TCPOPT_REAL_MD5_LEN);
+			} else {
+				ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) +
+				    TCPOPT_REAL_MD5_LEN);
+			}
+		} else {
+			/* Silently drop the packet */
+			freemsg(mp);
+			return;
+		}
+	}
+
+	TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 	/*
 	 * Include the adjustment for a source route if any.
 	 */
@@ -3061,7 +3100,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	uchar_t	*rptr;
 	tcpha_t	*tcpha;
 	int32_t	num_sack_blk = 0;
-	int32_t	sack_opt_len = 0;
+	int32_t	sack_opt_len = 0, opt_len = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
 	ip_xmit_attr_t	*ixa = connp->conn_ixa;
@@ -3076,7 +3115,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	/*
 	 * Note that tcp_mss has been adjusted to take into account the
 	 * timestamp option if applicable.  Because SACK options do not
-	 * appear in every TCP segments and they are of variable lengths,
+	 * appear in every TCP segment and they are of variable lengths,
 	 * they cannot be included in tcp_mss.  Thus we need to calculate
 	 * the actual segment length when we need to send a segment which
 	 * includes SACK options.
@@ -3086,9 +3125,13 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		    tcp->tcp_num_sack_blk);
 		sack_opt_len = num_sack_blk * sizeof (sack_blk_t) +
 		    TCPOPT_NOP_LEN * 2 + TCPOPT_HEADER_LEN;
-		if (max_to_send + sack_opt_len > tcp->tcp_mss)
-			max_to_send -= sack_opt_len;
+		opt_len += sack_opt_len;
 	}
+	if (tcp->tcp_md5sig)
+		opt_len += TCPOPT_REAL_MD5_LEN;
+
+	if (max_to_send + opt_len > tcp->tcp_mss)
+		max_to_send -= opt_len;
 
 	if (offset != NULL) {
 		off = *offset;
@@ -3216,9 +3259,9 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
 
 			U32_TO_BE32(llbolt,
-			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH + 4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
-			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH + 8);
 		}
 	}
 
@@ -3244,6 +3287,32 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		}
 		tcpha->tha_offset_and_reserved += ((num_sack_blk * 2 + 1) << 4);
 	}
+
+	/* Fill in the MD5 signature option */
+	if (tcp->tcp_md5sig) {
+		uint8_t digest[MD5_DIGEST_LENGTH];
+		int tcplen = data_length + (int)(mp1->b_wptr - rptr) +
+		    TCPOPT_REAL_MD5_LEN - ixa->ixa_ip_hdr_length;
+
+		if (tcpsig_signature(mp1->b_cont, tcp, tcpha, tcplen, digest,
+		    false)) {
+			uint8_t	*wptr = mp1->b_wptr;
+
+			wptr[0] = TCPOPT_NOP;
+			wptr[1] = TCPOPT_NOP;
+			wptr[2] = TCPOPT_MD5;
+			wptr[3] = TCPOPT_MD5_LEN;
+			bcopy(digest, &wptr[4], sizeof (digest));
+
+			tcpha->tha_offset_and_reserved += (5 << 4);
+			mp1->b_wptr += TCPOPT_REAL_MD5_LEN;
+		} else {
+			/* Silently drop the packet */
+			freemsg(mp1);
+			return (NULL);
+		}
+	}
+
 	ASSERT((uintptr_t)(mp1->b_wptr - rptr) <= (uintptr_t)INT_MAX);
 	data_length += (int)(mp1->b_wptr - rptr);
 
