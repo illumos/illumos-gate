@@ -27,7 +27,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2018, Joyent, Inc.
- * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2023-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -71,13 +71,11 @@
  * with the exception of a taskq creation flag TASKQ_DYNAMIC which tells that
  * dynamic task pool behavior is desired.
  *
- * Dynamic task queues may also place tasks in the normal queue (called "backing
- * queue") when task pool runs out of resources. Users of task queues may
- * disallow such queued scheduling by specifying TQ_NOQUEUE in the dispatch
- * flags.
+ * Dynamic task queues may also place tasks in a "backlog" when a taskq is
+ * resource constrained.  Users of task queues may prevent tasks from being
+ * enqueued in the backlog by passing TQ_NOQUEUE in the dispatch call.
  *
- * The backing task queue is also used for scheduling internal tasks needed for
- * dynamic task queue maintenance.
+ * See "Dynamic Task Queues" below for more details.
  *
  * INTERFACES ==================================================================
  *
@@ -261,7 +259,7 @@
  * | +---------------------+     +--> +------------+     +--> +------------+  |
  * | | ...		   |     |    | func, arg  |     |    | func, arg  |  |
  * +>+---------------------+ <---|-+  +------------+ <---|-+  +------------+  |
- *   | tq_taskq.tqent_next | ----+ |  | tqent_next | --->+ |  | tqent_next |--+
+ *   | tq_task.tqent_next  | ----+ |  | tqent_next | --->+ |  | tqent_next |--+
  *   +---------------------+	   |  +------------+     ^ |  +------------+
  * +-| tq_task.tqent_prev  |	   +--| tqent_prev |     | +--| tqent_prev |  ^
  * | +---------------------+	      +------------+     |    +------------+  |
@@ -277,21 +275,36 @@
  *   +-------------+  |
  *                    |   DYNAMIC TASK QUEUES:
  *                    |
+ *                    +-> taskq_idlebucket	    taskq_idlebucket_dispatch()
  *                    +-> taskq_bucket[nCPU]		taskq_bucket_dispatch()
  *                        +-------------------+                    ^
  *                   +--->| tqbucket_lock     |                    |
  *                   |    +-------------------+   +--------+      +--------+
- *                   |    | tqbucket_freelist |-->| tqent  |-->...| tqent  | ^
- *                   |    +-------------------+<--+--------+<--...+--------+ |
- *                   |    | ...               |   | thread |      | thread | |
- *                   |    +-------------------+   +--------+      +--------+ |
- *                   |    +-------------------+                              |
- * taskq_dispatch()--+--->| tqbucket_lock     |             TQ_APPEND()------+
+ *                   |    | tqbucket_freelist |-->| tqent  |-->...| tqent  |
+ *                   |    +-------------------+<--+--------+<--...+--------+
+ *                   |    |                   |   | thread |      | thread |
+ *                   |    | ...               |   +--------+      +--------+
+ *                   |    |                   |
+ *                   |    +-------------------+   +--------+      +--------+
+ *                   |    | tqbucket_backlog  |-->| tqent  |-->...| tqent  |
+ *                   |    +-------------------+<--+--------+<--...+--------+
+ *                   |    | ...               |   (no thread)
+ *                   |    +-------------------+
+ *		     |
+ *                   |    +-------------------+
+ * taskq_dispatch()--+--->| tqbucket_lock     |
  *      TQ_HASH()    |    +-------------------+   +--------+      +--------+
  *                   |    | tqbucket_freelist |-->| tqent  |-->...| tqent  |
  *                   |    +-------------------+<--+--------+<--...+--------+
- *                   |    | ...               |   | thread |      | thread |
+ *                   |    |                   |   | thread |      | thread |
+ *                   |    | ...               |   +--------+      +--------+
+ *                   |    |                   |
  *                   |    +-------------------+   +--------+      +--------+
+ *                   |    | tqbucket_backlog  |-->| tqent  |-->...| tqent  |
+ *                   |    +-------------------+<--+--------+<--...+--------+
+ *                   |    | ...               |   (no thread)
+ *                   |    +-------------------+
+ *		     |
  *		     +--->	...
  *
  *
@@ -352,37 +365,90 @@
  * target, and add them to the taskq_cpupct_list for later adjustment.
  *
  * We register taskq_cpu_setup() to be called whenever a CPU changes state.  It
- * walks the list of TASKQ_THREAD_CPU_PCT taskqs, adjusts their nthread_target
+ * walks the list of TASKQ_THREAD_CPU_PCT taskqs, adjusts their nthreads_target
  * if need be, and wakes up all of the threads to process the change.
  *
  * Dynamic Task Queues Implementation ------------------------------------------
  *
- * For a dynamic task queues there is a 1-to-1 mapping between a thread and
- * taskq_ent_structure. Each entry is serviced by its own thread and each thread
- * is controlled by a single entry.
+ * For a dynamic task queue, the set of worker threads expands and contracts
+ * based on the workload presented via taskq_dispatch calls. The work of a
+ * dynamic task queue is distributed across an array of "buckets" to reduce
+ * lock contention, with distribution determined via a hash (See TQ_HASH).
+ * The array of buckets is sized based on the number of CPUs in the system.
+ * The tunable 'taskq_maxbuckets' limits the maximum number of buckets.
+ * One additional bucket is used as the "idle bucket" (details below).
  *
- * Entries are distributed over a set of buckets. To avoid using modulo
- * arithmetics the number of buckets is 2^n and is determined as the nearest
- * power of two roundown of the number of CPUs in the system. Tunable
- * variable 'taskq_maxbuckets' limits the maximum number of buckets. Each entry
- * is attached to a bucket for its lifetime and can't migrate to other buckets.
+ * Each bucket also has a "backlog" list, used to store pending jobs,
+ * which are taskq_ent_t objects with no associated thread.  The total of
+ * backlogged work is distributed through the array of buckets, so that as
+ * threads become available in each bucket, they begin work on the backlog
+ * in parallel.  In order to ensure progress on the backlog, some care is
+ * taken to avoid buckets with a backlog with no threads.
  *
- * Entries that have scheduled tasks are not placed in any list. The dispatch
- * function sets their "func" and "arg" fields and signals the corresponding
- * thread to execute the task. Once the thread executes the task it clears the
- * "func" field and places an entry on the bucket cache of free entries pointed
- * by "tqbucket_freelist" field. ALL entries on the free list should have "func"
- * field equal to NULL. The free list is a circular doubly-linked list identical
- * in structure to the tq_task list above, but entries are taken from it in LIFO
- * order - the last freed entry is the first to be allocated. The
- * taskq_bucket_dispatch() function gets the most recently used entry from the
- * free list, sets its "func" and "arg" fields and signals a worker thread.
+ * Each bucket usually has some worker threads ready to accept new work,
+ * represented by a taskq_ent_t on the tqbucket_freelist. In addition to
+ * that array of buckets there is one more bucket called the "idle bucket",
+ * used as a place to put idle threads that might be moved to a regular
+ * bucket when that bucket needs another worker thread.  When a dispatch
+ * call (one willing to sleep) finds no free thread in either the hashed
+ * bucket free list nor in the idle bucket, it will attempt to create a
+ * new thread in the hashed bucket (see taskq_bucket_extend).
+ *
+ * Dispatch first tries a bucket chosen by hash, then the idle bucket.
+ * If the dispatch call allows sleeping, it then attempts to extend the
+ * bucket chosen by hash, and makes a dispatch attempt on that bucket.
+ * If that all fails, and if the dispatch call allows a queued task,
+ * an entry is placed on a per-bucket backlog queue.  The backlog is
+ * serviced as soon as other bucket threads become available.
+ *
+ * Worker threads wait a "short" time (taskq_thread_bucket_wait) on the
+ * free list for the bucket in which they were dispatched, and if no new
+ * work takes them off the free list before the expiration of the "short"
+ * wait, the thread takes itself off that bucket free list and moves to
+ * the "idle bucket", where waits longer (taskq_thread_timeout), before
+ * giving up waiting for work and exiting.
+ *
+ * New threads normally start life in one of the buckets (chosen by hash)
+ * and stay there while there's work for that bucket.  After a thread
+ * waits in a bucket for a short time (taskq_d_svc_tmo) without having
+ * any task assigned, it migrates to the idle bucket.  An exception
+ * is made for TASKQ_PREPOPULATE, in which case threads start out in
+ * the idle bucket.
+ *
+ * Running taskq_ent_t entries are not on any list. The dispatch function
+ * sets their "func" and "arg" fields and signals the corresponding thread to
+ * execute the task. Once the thread executes the task it clears the "func"
+ * field and places an entry on the per-bucket "tqbucket_freelist" which is
+ * used as a short-term cache of threads available for that bucket.  All
+ * entries on the free list should have the "func" field equal to NULL.
+ * The free list is a circular doubly-linked list identical in structure to
+ * the tq_task list above, but entries are taken from it in LIFO order so
+ * that threads seeing no work for a while can move to the idle bucket.
+ *
+ * The taskq_bucket_dispatch() function gets the most recently used entry
+ * from the free list, sets its "func" and "arg" fields and signals a worker
+ * thread.  Dispatch first tries a bucket selected via hash, then the idle
+ * bucket.  If both of those fail (and depending on options) an attempt to
+ * add threads to the bucket is made.
  *
  * After executing each task a per-entry thread taskq_d_thread() places its
- * entry on the bucket free list and goes to a timed sleep. If it wakes up
- * without getting new task it removes the entry from the free list and destroys
- * itself. The thread sleep time is controlled by a tunable variable
- * `taskq_thread_timeout'.
+ * entry on the bucket free list and goes to a (short) timed sleep. If it
+ * wakes up without getting a new task it, it removes the entry from the
+ * free list and "migrates" to the "idle bucket" for a longer wait.
+ * If that longer wait expires without work arriving, the thread exits.
+ * The thread sleep time is controlled by a tunable `taskq_thread_timeout'.
+ * A thread may be dispatched work from the idle bucket (eg. when dispatch
+ * fails to find a free entry in the hashed buckets).  When a thread is
+ * dispatched from the idle bucket, it moves to the bucket that the hash
+ * initially selected.
+ *
+ * Dynamic task queues make limited use of the "backing queue", which is
+ * the same taskq->tq_task list used by orginary (non-dynamic) task queues.
+ * The only taskq entries places on this list are for taskq_bucket_overflow
+ * calls, used to request thread creation for some bucket after a dispatch
+ * call fails to find a ready thread in some bucket.  There is only one
+ * thread servicing this backing queue, so these jobs should only sleep
+ * for memory allocation, and shoud not run jobs that block indefinitely.
  *
  * There are various statistics kept in the bucket which allows for later
  * analysis of taskq usage patterns. Also, a global copy of taskq creation and
@@ -427,22 +493,20 @@
  *	taskq_member() function works by comparing a thread t_taskq pointer with
  *	the passed thread pointer.
  *
- * LOCKS and LOCK Hierarchy ----------------------------------------------------
+ * LOCKS and LOCK Order -------------------------------------------------------
  *
- *   There are three locks used in task queues:
+ *   There are four locks used in task queues:
  *
- *   1) The taskq_t's tq_lock, protecting global task queue state.
+ *   1a) The idle bucket lock for bucket management.
+ *   1b) The hashed bucket locks for bucket management.
  *
- *   2) Each per-CPU bucket has a lock for bucket management.
- *
- *   3) The global taskq_cpupct_lock, which protects the list of
+ *   2) The global taskq_cpupct_lock, which protects the list of
  *      TASKQ_THREADS_CPU_PCT taskqs.
  *
- *   If both (1) and (2) are needed, tq_lock should be taken *after* the bucket
- *   lock.
+ *   3) The taskq_t's tq_lock, protecting global task queue state.
  *
- *   If both (1) and (3) are needed, tq_lock should be taken *after*
- *   taskq_cpupct_lock.
+ *   There are a few cases where two of these are entered, and when that
+ *   happens the lock entries are in the order they are listed here.
  *
  * DEBUG FACILITIES ------------------------------------------------------------
  *
@@ -470,9 +534,6 @@
  *
  *	taskq_maxbuckets	- Maximum number of buckets in any task queue
  *				  Default value: 128
- *
- *	taskq_search_depth	- Maximum # of buckets searched for a free entry
- *				  Default value: 4
  *
  *	taskq_dmtbf		- Mean time between induced dispatch failures
  *				  for dynamic task queues.
@@ -548,22 +609,48 @@ int taskq_cpupct_max_percent = TASKQ_CPUPCT_MAX_PERCENT;
 #define	TASKQ_THREAD_TIMEOUT (60 * 5)
 int taskq_thread_timeout = TASKQ_THREAD_TIMEOUT;
 
+/*
+ * Dynamic taskq queue threads stay in an empty bucket for only a
+ * relatively short time before moving to the "idle bucket".
+ */
+int taskq_thread_bucket_wait = 500;	/* mSec. */
+
+/*
+ * A counter for debug and testing.  See the increment site below.
+ */
+uint64_t taskq_disptcreates_lost = 0;
+
+/*
+ * Upper and lower limits on number of buckets for dyanmic taskq.
+ * Must be a power of two.  Dynamic should have more than one bucket.
+ * The floor of four is chosen somewhat arbitrarily, based on the
+ * smallest number of CPUs found in modern systems.
+ */
+#define	TASKQ_MINBUCKETS 4
+int taskq_minbuckets = TASKQ_MINBUCKETS;
 #define	TASKQ_MAXBUCKETS 128
 int taskq_maxbuckets = TASKQ_MAXBUCKETS;
 
 /*
- * When a bucket has no available entries another buckets are tried.
- * taskq_search_depth parameter limits the amount of buckets that we search
- * before failing. This is mostly useful in systems with many CPUs where we may
- * spend too much time scanning busy buckets.
+ * Hashing function: mix various bits of x and CPUHINT
+ *
+ * This hash is applied to the "arg" address supplied to taskq_dispatch.
+ * The distribution of objects in memory for that address are generally
+ * whatever the memory allocation system provides. We know only that they
+ * will be aligned to whatever minimum alignment is provided, and that the
+ * sizes of these objects will vary. Due to the known aligment, this hash
+ * function puts the CPU index in the lowest signigicant bits. Other bits
+ * are simply combined via XOR using a (low-cost) byte-access-compatible
+ * set of shifts. Emperical results show that this hash produces fairly
+ * even distribution for the consumers in this system.
  */
-#define	TASKQ_SEARCH_DEPTH 4
-int taskq_search_depth = TASKQ_SEARCH_DEPTH;
+#define	TQ_HASH(x, c)	((c) ^ (x) ^ ((x) >> 8) ^ ((x) >> 16) ^ ((x) >> 24))
 
 /*
- * Hashing function: mix various bits of x. May be pretty much anything.
+ * Get an index for the current CPU, used in the hash to spread
+ * work among buckets based on what CPU is running this.
  */
-#define	TQ_HASH(x) ((x) ^ ((x) >> 11) ^ ((x) >> 17) ^ ((x) ^ 27))
+#define	CPUHINT()		((uintptr_t)(CPU->cpu_seqid))
 
 /*
  * We do not create any new threads when the system is low on memory and start
@@ -579,7 +666,11 @@ static taskq_t	*taskq_create_common(const char *, int, int, pri_t, int,
     int, proc_t *, uint_t, uint_t);
 static void taskq_thread(void *);
 static void taskq_d_thread(taskq_ent_t *);
-static void taskq_bucket_extend(void *);
+static void taskq_d_migrate(void *);
+static void taskq_d_redirect(void *);
+static void taskq_bucket_overflow(void *);
+static taskq_ent_t *taskq_bucket_extend(taskq_bucket_t *);
+static void taskq_bucket_redist(taskq_bucket_t *);
 static int  taskq_constructor(void *, void *, int);
 static void taskq_destructor(void *, void *);
 static int  taskq_ent_constructor(void *, void *, int);
@@ -589,6 +680,8 @@ static void taskq_ent_free(taskq_t *, taskq_ent_t *);
 static int taskq_ent_exists(taskq_t *, task_func_t, void *);
 static taskq_ent_t *taskq_bucket_dispatch(taskq_bucket_t *, task_func_t,
     void *);
+static void taskq_backlog_enqueue(taskq_bucket_t *,
+    taskq_ent_t *tqe, int flags);
 
 /*
  * Task queues kstats.
@@ -619,14 +712,10 @@ struct taskq_kstat {
 
 struct taskq_d_kstat {
 	kstat_named_t	tqd_pri;
-	kstat_named_t	tqd_btasks;
-	kstat_named_t	tqd_bexecuted;
-	kstat_named_t	tqd_bmaxtasks;
-	kstat_named_t	tqd_bnalloc;
-	kstat_named_t	tqd_bnactive;
-	kstat_named_t	tqd_btotaltime;
 	kstat_named_t	tqd_hits;
 	kstat_named_t	tqd_misses;
+	kstat_named_t	tqd_ihits;	/* idle bucket hits */
+	kstat_named_t	tqd_imisses;	/* idle bucket misses */
 	kstat_named_t	tqd_overflows;
 	kstat_named_t	tqd_tcreates;
 	kstat_named_t	tqd_tdeaths;
@@ -636,16 +725,14 @@ struct taskq_d_kstat {
 	kstat_named_t	tqd_totaltime;
 	kstat_named_t	tqd_nalloc;
 	kstat_named_t	tqd_nfree;
+	kstat_named_t	tqd_nbacklog;
+	kstat_named_t	tqd_maxbacklog;
 } taskq_d_kstat = {
 	{ "priority",		KSTAT_DATA_UINT64 },
-	{ "btasks",		KSTAT_DATA_UINT64 },
-	{ "bexecuted",		KSTAT_DATA_UINT64 },
-	{ "bmaxtasks",		KSTAT_DATA_UINT64 },
-	{ "bnalloc",		KSTAT_DATA_UINT64 },
-	{ "bnactive",		KSTAT_DATA_UINT64 },
-	{ "btotaltime",		KSTAT_DATA_UINT64 },
 	{ "hits",		KSTAT_DATA_UINT64 },
 	{ "misses",		KSTAT_DATA_UINT64 },
+	{ "ihits",		KSTAT_DATA_UINT64 },
+	{ "imisses",		KSTAT_DATA_UINT64 },
 	{ "overflows",		KSTAT_DATA_UINT64 },
 	{ "tcreates",		KSTAT_DATA_UINT64 },
 	{ "tdeaths",		KSTAT_DATA_UINT64 },
@@ -655,6 +742,8 @@ struct taskq_d_kstat {
 	{ "totaltime",		KSTAT_DATA_UINT64 },
 	{ "nalloc",		KSTAT_DATA_UINT64 },
 	{ "nfree",		KSTAT_DATA_UINT64 },
+	{ "nbacklog",		KSTAT_DATA_UINT64 },
+	{ "maxbacklog",		KSTAT_DATA_UINT64 },
 };
 
 static kmutex_t taskq_kstat_lock;
@@ -722,6 +811,13 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	((l).tqent_prev == &(l)))
 
 /*
+ * Initialize 'tqe' list head
+ */
+#define	TQ_LIST_INIT(l) {					\
+	l.tqent_next = &l;					\
+	l.tqent_prev = &l;					\
+}
+/*
  * Append `tqe' in the end of the doubly-linked list denoted by l.
  */
 #define	TQ_APPEND(l, tqe) {					\
@@ -738,6 +834,15 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	tqe->tqent_prev = &l;					\
 	tqe->tqent_next->tqent_prev = tqe;			\
 	tqe->tqent_prev->tqent_next = tqe;			\
+}
+/*
+ * Remove 'tqe' from some list
+ */
+#define	TQ_REMOVE(tqe) {					\
+	tqe->tqent_prev->tqent_next = tqe->tqent_next;		\
+	tqe->tqent_next->tqent_prev = tqe->tqent_prev;		\
+	tqe->tqent_next = NULL;					\
+	tqe->tqent_prev = NULL;					\
 }
 
 /*
@@ -804,8 +909,7 @@ taskq_destructor(void *buf, void *cdrarg)
 
 	ASSERT(tq->tq_nthreads == 0);
 	ASSERT(tq->tq_buckets == NULL);
-	ASSERT(tq->tq_tcreates == 0);
-	ASSERT(tq->tq_tdeaths == 0);
+	ASSERT(tq->tq_dnthreads == 0);
 
 	mutex_destroy(&tq->tq_lock);
 	rw_destroy(&tq->tq_threadlock);
@@ -1094,9 +1198,12 @@ static taskq_ent_t *
 taskq_bucket_dispatch(taskq_bucket_t *b, task_func_t func, void *arg)
 {
 	taskq_ent_t *tqe;
+	taskq_t *tq = b->tqbucket_taskq;
+	taskq_bucket_t *idleb = &tq->tq_buckets[tq->tq_nbuckets];
 
 	ASSERT(MUTEX_NOT_HELD(&b->tqbucket_lock));
 	ASSERT(func != NULL);
+	VERIFY(b >= tq->tq_buckets && b < idleb);
 
 	mutex_enter(&b->tqbucket_lock);
 
@@ -1114,22 +1221,175 @@ taskq_bucket_dispatch(taskq_bucket_t *b, task_func_t func, void *arg)
 		ASSERT(tqe != &b->tqbucket_freelist);
 		ASSERT(tqe->tqent_thread != NULL);
 
-		tqe->tqent_prev->tqent_next = tqe->tqent_next;
-		tqe->tqent_next->tqent_prev = tqe->tqent_prev;
-		b->tqbucket_nalloc++;
+		TQ_REMOVE(tqe);
 		b->tqbucket_nfree--;
 		tqe->tqent_func = func;
 		tqe->tqent_arg = arg;
-		TQ_STAT(b, tqs_hits);
-		cv_signal(&tqe->tqent_cv);
+		b->tqbucket_nalloc++;
 		DTRACE_PROBE2(taskq__d__enqueue, taskq_bucket_t *, b,
 		    taskq_ent_t *, tqe);
+		cv_signal(&tqe->tqent_cv);
+		TQ_STAT(b, tqs_hits);
 	} else {
 		tqe = NULL;
 		TQ_STAT(b, tqs_misses);
 	}
 	mutex_exit(&b->tqbucket_lock);
 	return (tqe);
+}
+
+/*
+ * Dispatch a task "func(arg)" using a free entry from the "idle" bucket.
+ * If we succeed finding a free entry, migrate that thread from the "idle"
+ * bucket to the bucket passed (b).
+ *
+ * Assumes: no bucket locks is held.
+ *
+ * Returns: a pointer to an entry if dispatch was successful.
+ *	    NULL if there are no free entries or if the bucket is suspended.
+ */
+static taskq_ent_t *
+taskq_idlebucket_dispatch(taskq_bucket_t *b, task_func_t func, void *arg)
+{
+	taskq_ent_t	*tqe;
+	taskq_t		*tq = b->tqbucket_taskq;
+	taskq_bucket_t	*idleb = &tq->tq_buckets[tq->tq_nbuckets];
+
+	ASSERT(func != NULL);
+	ASSERT(b != idleb);
+	ASSERT(MUTEX_NOT_HELD(&b->tqbucket_lock));
+	ASSERT(MUTEX_NOT_HELD(&idleb->tqbucket_lock));
+
+	/*
+	 * Get out quickly (without locks) if unlikely to succeed.
+	 */
+	if (idleb->tqbucket_nfree == 0) {
+		TQ_STAT(idleb, tqs_misses);
+		return (NULL);
+	}
+
+	/*
+	 * Need the mutex on both the idle bucket (idleb) and bucket (b)
+	 * entered below. See Locks and Lock Order in the top comments.
+	 */
+	mutex_enter(&idleb->tqbucket_lock);
+
+	IMPLY(idleb->tqbucket_nfree == 0, IS_EMPTY(idleb->tqbucket_freelist));
+	IMPLY(idleb->tqbucket_nfree != 0, !IS_EMPTY(idleb->tqbucket_freelist));
+
+	/*
+	 * Get an entry from the idle bucket freelist if there is one.
+	 * Schedule task into the entry.
+	 */
+	if ((idleb->tqbucket_nfree != 0) &&
+	    !(idleb->tqbucket_flags & TQBUCKET_SUSPEND)) {
+		tqe = idleb->tqbucket_freelist.tqent_prev;
+
+		ASSERT(tqe != &idleb->tqbucket_freelist);
+		ASSERT(tqe->tqent_thread != NULL);
+
+		TQ_REMOVE(tqe);
+		idleb->tqbucket_nfree--;
+
+		tqe->tqent_func = func;
+		tqe->tqent_arg = arg;
+
+		/*
+		 * Note move TQE to new bucket here!
+		 * See reaction in taskq_d_thread
+		 */
+		tqe->tqent_un.tqent_bucket = b;
+
+		/*
+		 * Track the "alloc" on the bucket moved to,
+		 * as if this tqe were dispatched from there.
+		 */
+		mutex_enter(&b->tqbucket_lock);
+		b->tqbucket_nalloc++;
+		mutex_exit(&b->tqbucket_lock);
+
+		DTRACE_PROBE2(taskq__d__enqueue, taskq_bucket_t *, b,
+		    taskq_ent_t *, tqe);
+
+		/* Let the tqe thread run. */
+		cv_signal(&tqe->tqent_cv);
+
+		/* Count this as a "hit" on the idle bucket. */
+		TQ_STAT(idleb, tqs_hits);
+	} else {
+		tqe = NULL;
+		TQ_STAT(idleb, tqs_misses);
+	}
+
+	mutex_exit(&idleb->tqbucket_lock);
+
+	return (tqe);
+}
+
+/*
+ * Enqueue a taskq job on the per-bucket backlog.
+ */
+static taskq_ent_t *
+taskq_backlog_dispatch(taskq_bucket_t *bucket, task_func_t func, void *arg,
+    int flags)
+{
+	taskq_ent_t *tqe;
+	int kmflags = (flags & TQ_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
+
+	tqe = kmem_cache_alloc(taskq_ent_cache, kmflags);
+	if (tqe == NULL)
+		return (tqe);
+
+	tqe->tqent_func = func;
+	tqe->tqent_arg = arg;
+
+	mutex_enter(&bucket->tqbucket_lock);
+	taskq_backlog_enqueue(bucket, tqe, flags);
+	mutex_exit(&bucket->tqbucket_lock);
+
+	return (tqe);
+}
+
+static void
+taskq_backlog_enqueue(taskq_bucket_t *bucket, taskq_ent_t *tqe, int flags)
+{
+
+	ASSERT(MUTEX_HELD(&bucket->tqbucket_lock));
+
+	tqe->tqent_un.tqent_bucket = bucket;
+	if ((flags & TQ_FRONT) != 0) {
+		TQ_PREPEND(bucket->tqbucket_backlog, tqe);
+	} else {
+		TQ_APPEND(bucket->tqbucket_backlog, tqe);
+	}
+	bucket->tqbucket_nbacklog++;
+	/* See membar_consumer in taskq_d_thread(). */
+	membar_producer();
+	DTRACE_PROBE2(taskq__d__enqueue,
+	    taskq_bucket_t *, bucket,
+	    taskq_ent_t *, tqe);
+	TQ_STAT(bucket, tqs_overflow);
+#if TASKQ_STATISTIC
+	if (bucket->tqbucket_stat.tqs_maxbacklog <
+	    bucket->tqbucket_nbacklog) {
+		bucket->tqbucket_stat.tqs_maxbacklog =
+		    bucket->tqbucket_nbacklog;
+	}
+#endif
+	/*
+	 * Before this function is called, the caller has tried
+	 * taskq_bucket_dispatch, taskq_idlebucket_dispatch, and
+	 * not found any idle TQE. The bucket lock is dropped
+	 * between those calls and this, so it's possible that a
+	 * TQE worker became idle before we entered the mutex.
+	 * Check for that here and wake an idle thread so it
+	 * will re-check the backlog.
+	 */
+	if (bucket->tqbucket_nfree != 0) {
+		taskq_ent_t *itqe;
+		itqe = bucket->tqbucket_freelist.tqent_prev;
+		cv_signal(&itqe->tqent_cv);
+	}
 }
 
 /*
@@ -1147,13 +1407,12 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 {
 	taskq_bucket_t *bucket = NULL;	/* Which bucket needs extension */
 	taskq_ent_t *tqe = NULL;
-	taskq_ent_t *tqe1;
 	uint_t bsize;
 
 	ASSERT(tq != NULL);
 	ASSERT(func != NULL);
 
-	if (!(tq->tq_flags & TASKQ_DYNAMIC)) {
+	if ((tq->tq_flags & TASKQ_DYNAMIC) == 0) {
 		/*
 		 * TQ_NOQUEUE flag can't be used with non-dynamic task queues.
 		 */
@@ -1188,6 +1447,9 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 	ASSERT(!(flags & (TQ_NOALLOC | TQ_FRONT)));
 	TASKQ_D_RANDOM_DISPATCH_FAILURE(tq, flags);
 
+	ASSERT(func != taskq_d_migrate);
+	ASSERT(func != taskq_d_redirect);
+
 	bsize = tq->tq_nbuckets;
 
 	if (bsize == 1) {
@@ -1195,102 +1457,89 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		 * In a single-CPU case there is only one bucket, so get
 		 * entry directly from there.
 		 */
-		if ((tqe = taskq_bucket_dispatch(tq->tq_buckets, func, arg))
-		    != NULL)
+		tqe = taskq_bucket_dispatch(tq->tq_buckets, func, arg);
+		if (tqe != NULL)
 			return ((taskqid_t)tqe);	/* Fastpath */
 		bucket = tq->tq_buckets;
 	} else {
-		int loopcount;
-		taskq_bucket_t *b;
-		uintptr_t h = ((uintptr_t)CPU + (uintptr_t)arg) >> 3;
+		uintptr_t h = TQ_HASH((uintptr_t)arg, CPUHINT());
 
-		h = TQ_HASH(h);
-
-		/*
-		 * The 'bucket' points to the original bucket that we hit. If we
-		 * can't allocate from it, we search other buckets, but only
-		 * extend this one.
-		 */
-		b = &tq->tq_buckets[h & (bsize - 1)];
-		ASSERT(b->tqbucket_taskq == tq);	/* Sanity check */
+		bucket = &tq->tq_buckets[h & (bsize - 1)];
+		ASSERT(bucket->tqbucket_taskq == tq);	/* Sanity check */
 
 		/*
 		 * Do a quick check before grabbing the lock. If the bucket does
 		 * not have free entries now, chances are very small that it
 		 * will after we take the lock, so we just skip it.
 		 */
-		if (b->tqbucket_nfree != 0) {
-			if ((tqe = taskq_bucket_dispatch(b, func, arg)) != NULL)
+		if (bucket->tqbucket_nfree != 0) {
+			tqe = taskq_bucket_dispatch(bucket, func, arg);
+			if (tqe != NULL)
 				return ((taskqid_t)tqe);	/* Fastpath */
 		} else {
-			TQ_STAT(b, tqs_misses);
+			TQ_STAT(bucket, tqs_misses);
 		}
-
-		bucket = b;
-		loopcount = MIN(taskq_search_depth, bsize);
-		/*
-		 * If bucket dispatch failed, search loopcount number of buckets
-		 * before we give up and fail.
-		 */
-		do {
-			b = &tq->tq_buckets[++h & (bsize - 1)];
-			ASSERT(b->tqbucket_taskq == tq);  /* Sanity check */
-			loopcount--;
-
-			if (b->tqbucket_nfree != 0) {
-				tqe = taskq_bucket_dispatch(b, func, arg);
-			} else {
-				TQ_STAT(b, tqs_misses);
-			}
-		} while ((tqe == NULL) && (loopcount > 0));
 	}
 
 	/*
-	 * At this point we either scheduled a task and (tqe != NULL) or failed
-	 * (tqe == NULL). Try to recover from fails.
+	 * Try the "idle" bucket, which if successful, will
+	 * migrate an idle thread into this bucket.
 	 */
+	tqe = taskq_idlebucket_dispatch(bucket, func, arg);
+	if (tqe != NULL)
+		return ((taskqid_t)tqe);
+
+	/*
+	 * At this point we have failed to dispatch (tqe == NULL).
+	 * Try more expensive measures, if appropriate.
+	 */
+	ASSERT(tqe == NULL);
 
 	/*
 	 * For KM_SLEEP dispatches, try to extend the bucket and retry dispatch.
+	 *
+	 * taskq_bucket_extend() may fail to do anything, but this is
+	 * fine - we deal with it later. If the bucket was successfully
+	 * extended, there is a good chance that taskq_bucket_dispatch()
+	 * will get this new entry, unless another dispatch is racing with
+	 * this one and steals the new entry from under us.  In that (rare)
+	 * case, repeat the taskq_bucket_extend() call.  Keep a count of
+	 * the "lost the race" events just for debug and testing.
 	 */
-	if ((tqe == NULL) && !(flags & TQ_NOSLEEP)) {
-		/*
-		 * taskq_bucket_extend() may fail to do anything, but this is
-		 * fine - we deal with it later. If the bucket was successfully
-		 * extended, there is a good chance that taskq_bucket_dispatch()
-		 * will get this new entry, unless someone is racing with us and
-		 * stealing the new entry from under our nose.
-		 * taskq_bucket_extend() may sleep.
-		 */
-		taskq_bucket_extend(bucket);
-		TQ_STAT(bucket, tqs_disptcreates);
-		if ((tqe = taskq_bucket_dispatch(bucket, func, arg)) != NULL)
-			return ((taskqid_t)tqe);
-	}
-
-	ASSERT(bucket != NULL);
-
-	/*
-	 * Since there are not enough free entries in the bucket, add a
-	 * taskq entry to extend it in the background using backing queue
-	 * (unless we already have a taskq entry to perform that extension).
-	 */
-	mutex_enter(&tq->tq_lock);
-	if (!taskq_ent_exists(tq, taskq_bucket_extend, bucket)) {
-		if ((tqe1 = taskq_ent_alloc(tq, TQ_NOSLEEP)) != NULL) {
-			TQ_ENQUEUE_FRONT(tq, tqe1, taskq_bucket_extend, bucket);
-		} else {
-			tq->tq_nomem++;
+	if ((flags & TQ_NOSLEEP) == 0) {
+		while (taskq_bucket_extend(bucket) != NULL) {
+			TQ_STAT(bucket, tqs_disptcreates);
+			tqe = taskq_bucket_dispatch(bucket, func, arg);
+			if (tqe != NULL) {
+				return ((taskqid_t)tqe);
+			}
+			taskq_disptcreates_lost++;
 		}
 	}
 
 	/*
 	 * Dispatch failed and we can't find an entry to schedule a task.
-	 * Revert to the backing queue unless TQ_NOQUEUE was asked.
+	 * Use the per-bucket backlog queue unless TQ_NOQUEUE was asked.
+	 * Whether or not this succeeds, we'll schedule an asynchornous
+	 * task to try to extend (add a thread to) this bucket.
 	 */
-	if ((tqe == NULL) && !(flags & TQ_NOQUEUE)) {
-		if ((tqe = taskq_ent_alloc(tq, flags)) != NULL) {
-			TQ_ENQUEUE(tq, tqe, func, arg);
+	if ((flags & TQ_NOQUEUE) == 0) {
+		tqe = taskq_backlog_dispatch(bucket, func, arg, flags);
+	}
+
+	/*
+	 * Since there are not enough free entries in the bucket, add a
+	 * taskq entry to the backing queue to extend it in the background
+	 * (unless we already have a taskq entry to perform that work).
+	 *
+	 * Note that this is the ONLY case where dynamic taskq's use the
+	 * (single threaded) tq->tq_tasks dispatch mechanism.
+	 */
+	mutex_enter(&tq->tq_lock);
+	if (!taskq_ent_exists(tq, taskq_bucket_overflow, bucket)) {
+		taskq_ent_t *tqe1;
+		if ((tqe1 = taskq_ent_alloc(tq, flags)) != NULL) {
+			TQ_ENQUEUE(tq, tqe1, taskq_bucket_overflow, bucket);
 		} else {
 			tq->tq_nomem++;
 		}
@@ -1358,9 +1607,10 @@ taskq_wait(taskq_t *tq)
 	if (tq->tq_flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *b = tq->tq_buckets;
 		int bid = 0;
-		for (; (b != NULL) && (bid < tq->tq_nbuckets); b++, bid++) {
+		for (; (b != NULL) && (bid <= tq->tq_nbuckets); b++, bid++) {
 			mutex_enter(&b->tqbucket_lock);
-			while (b->tqbucket_nalloc > 0)
+			while (b->tqbucket_nalloc > 0 ||
+			    b->tqbucket_nbacklog > 0)
 				cv_wait(&b->tqbucket_cv, &b->tqbucket_lock);
 			mutex_exit(&b->tqbucket_lock);
 		}
@@ -1388,7 +1638,7 @@ taskq_suspend(taskq_t *tq)
 	if (tq->tq_flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *b = tq->tq_buckets;
 		int bid = 0;
-		for (; (b != NULL) && (bid < tq->tq_nbuckets); b++, bid++) {
+		for (; (b != NULL) && (bid <= tq->tq_nbuckets); b++, bid++) {
 			mutex_enter(&b->tqbucket_lock);
 			b->tqbucket_flags |= TQBUCKET_SUSPEND;
 			mutex_exit(&b->tqbucket_lock);
@@ -1423,7 +1673,7 @@ taskq_resume(taskq_t *tq)
 	if (tq->tq_flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *b = tq->tq_buckets;
 		int bid = 0;
-		for (; (b != NULL) && (bid < tq->tq_nbuckets); b++, bid++) {
+		for (; (b != NULL) && (bid <= tq->tq_nbuckets); b++, bid++) {
 			mutex_enter(&b->tqbucket_lock);
 			b->tqbucket_flags &= ~TQBUCKET_SUSPEND;
 			mutex_exit(&b->tqbucket_lock);
@@ -1515,6 +1765,7 @@ taskq_thread_wait(taskq_t *tq, kmutex_t *mx, kcondvar_t *cv,
 {
 	clock_t ret = 0;
 
+	ASSERT(MUTEX_HELD(mx));
 	if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
 		CALLB_CPR_SAFE_BEGIN(cprinfo);
 	}
@@ -1625,8 +1876,7 @@ taskq_thread(void *arg)
 			continue;
 		}
 
-		tqe->tqent_prev->tqent_next = tqe->tqent_next;
-		tqe->tqent_next->tqent_prev = tqe->tqent_prev;
+		TQ_REMOVE(tqe);
 		mutex_exit(&tq->tq_lock);
 
 		/*
@@ -1696,44 +1946,124 @@ taskq_thread(void *arg)
 }
 
 /*
- * Worker per-entry thread for dynamic dispatches.
+ * Sentinel function to help with thread migration.
+ * We never actualy run this function.
+ *
+ * When a thread becomes idle in one bucket and goes in search of another
+ * bucket to service, it's not on any free list. For consistency with the
+ * various assertions, we want the tqent_func to be non-NULL, so in such
+ * cases it points to this function.
  */
 static void
-taskq_d_thread(taskq_ent_t *tqe)
+taskq_d_migrate(void *arg __unused)
 {
-	taskq_bucket_t	*bucket = tqe->tqent_un.tqent_bucket;
-	taskq_t		*tq = bucket->tqbucket_taskq;
-	kmutex_t	*lock = &bucket->tqbucket_lock;
-	kcondvar_t	*cv = &tqe->tqent_cv;
-	callb_cpr_t	cprinfo;
-	clock_t		w = 0;
+	ASSERT(0);
+}
 
-	CALLB_CPR_INIT(&cprinfo, lock, callb_generic_cpr, tq->tq_name);
+/*
+ * Sentinel function to help with thread redistribution (forced migration).
+ * We never actualy run this function.
+ *
+ * When taskq_bucket_redist needs to direct a thread from one bucket
+ * to another, this function is dispatched into the bucket that will
+ * donate the thread, with the arg pointing to the bucket that will
+ * receive the thread.  See checks for this sentinel in the functions
+ * taskq_d_svc_bucket, taskq_d_thread.
+ */
+static void
+taskq_d_redirect(void *arg __unused)
+{
+	ASSERT(0);
+}
+
+/*
+ * Helper for taskq_d_thread() -- service a bucket
+ */
+static void
+taskq_d_svc_bucket(taskq_ent_t *tqe,
+    taskq_bucket_t *bucket, taskq_t *tq)
+{
+	kmutex_t	*lock = &bucket->tqbucket_lock;
+	clock_t		w = 0;
+	clock_t		tmo = MSEC_TO_TICK(taskq_thread_bucket_wait);
 
 	mutex_enter(lock);
 
+	/*
+	 * After this thread is started by taskq_bucket_extend(),
+	 * we may be on the free list (func == NULL) or we may have
+	 * been given a task to run.  If we have a task, start at
+	 * the top of the for loop, otherwise start in "the middle",
+	 * where we would be after finishing some task.
+	 */
+	if (tqe->tqent_func == NULL) {
+		/* We started on the bucket free list. */
+		ASSERT(tqe->tqent_prev != NULL);
+		ASSERT(bucket->tqbucket_nfree > 0);
+
+		/*
+		 * If we have a backlog, take off free list and
+		 * start working on the backlog.
+		 */
+		if (bucket->tqbucket_nbacklog > 0) {
+			TQ_REMOVE(tqe);
+			bucket->tqbucket_nfree--;
+			tqe->tqent_func = taskq_d_migrate;
+			bucket->tqbucket_nalloc++;
+			goto entry_backlog;
+		}
+		/*
+		 * We're already on the free list, so start where
+		 * we'd wait just after going onto the free list.
+		 */
+		goto entry_freelist;
+	}
+
+	/*
+	 * After a forced migration, clear the REDIRECT flag,
+	 * then continue as if voluntary migration.
+	 */
+	if (tqe->tqent_func == taskq_d_redirect) {
+		bucket->tqbucket_flags &= ~TQBUCKET_REDIRECT;
+		tqe->tqent_func = taskq_d_migrate;
+	}
+
+	/*
+	 * Migration to a new bucket (forced or voluntary).
+	 * We're not on any free list.  Enter middle of loop,
+	 * but first adjust nalloc as if we were dispatched.
+	 * Adjustment of nfree-- happened during return from
+	 * this function after servicing another bucket.
+	 */
+	if (tqe->tqent_func == taskq_d_migrate) {
+		bucket->tqbucket_nalloc++;
+		goto entry_backlog;
+	}
+
 	for (;;) {
 		/*
-		 * If a task is scheduled (func != NULL), execute it, otherwise
-		 * sleep, waiting for a job.
+		 * If a task is scheduled (func != NULL), execute it.
 		 */
 		if (tqe->tqent_func != NULL) {
 			hrtime_t	start;
 			hrtime_t	end;
 
+			/* Should not be on free list. */
+			ASSERT(tqe->tqent_prev == NULL);
 			ASSERT(bucket->tqbucket_nalloc > 0);
 
 			/*
-			 * It is possible to free the entry right away before
-			 * actually executing the task so that subsequent
-			 * dispatches may immediately reuse it. But this,
-			 * effectively, creates a two-length queue in the entry
-			 * and may lead to a deadlock if the execution of the
-			 * current task depends on the execution of the next
-			 * scheduled task. So, we keep the entry busy until the
-			 * task is processed.
+			 * Check for redirect (forced migration)
+			 * Skip going on free list. Just return.
 			 */
+			if (tqe->tqent_func == taskq_d_redirect) {
+				bucket->tqbucket_nalloc--;
+				goto unlock_out;
+			}
 
+			/*
+			 * Run the job.
+			 */
 			mutex_exit(lock);
 			start = gethrtime();
 			DTRACE_PROBE3(taskq__d__exec__start, taskq_t *, tq,
@@ -1744,69 +2074,384 @@ taskq_d_thread(taskq_ent_t *tqe)
 			end = gethrtime();
 			mutex_enter(lock);
 			bucket->tqbucket_totaltime += end - start;
-
-			/*
-			 * Return the entry to the bucket free list.
-			 */
-			tqe->tqent_func = NULL;
-			TQ_APPEND(bucket->tqbucket_freelist, tqe);
-			bucket->tqbucket_nalloc--;
-			bucket->tqbucket_nfree++;
-			ASSERT(!IS_EMPTY(bucket->tqbucket_freelist));
-			/*
-			 * taskq_wait() waits for nalloc to drop to zero on
-			 * tqbucket_cv.
-			 */
-			cv_signal(&bucket->tqbucket_cv);
 		}
 
+	entry_backlog:
 		/*
-		 * At this point the entry must be in the bucket free list -
-		 * either because it was there initially or because it just
-		 * finished executing a task and put itself on the free list.
+		 * If there's a backlog, consume the head of the
+		 * backlog like taskq_bucket_dispatch, then let the
+		 * normal execution code path run it.
 		 */
-		ASSERT(bucket->tqbucket_nfree > 0);
-		/*
-		 * Go to sleep unless we are closing.
-		 * If a thread is sleeping too long, it dies.
-		 */
-		if (! (bucket->tqbucket_flags & TQBUCKET_CLOSE)) {
-			w = taskq_thread_wait(tq, lock, cv,
-			    &cprinfo, taskq_thread_timeout * hz);
+		if (bucket->tqbucket_nbacklog > 0) {
+			taskq_ent_t	*bltqe;
+
+			/*
+			 * Should not be on free list.
+			 * May enter here from the top.
+			 */
+			ASSERT(tqe->tqent_prev == NULL);
+			ASSERT(bucket->tqbucket_nalloc > 0);
+
+			ASSERT(!IS_EMPTY(bucket->tqbucket_backlog));
+			bltqe = bucket->tqbucket_backlog.tqent_next;
+			TQ_REMOVE(bltqe);
+			bucket->tqbucket_nbacklog--;
+
+			DTRACE_PROBE2(taskq__x__backlog,
+			    taskq_bucket_t *, bucket,
+			    taskq_ent_t *, bltqe);
+
+			/*
+			 * Copy the backlog entry to the tqe
+			 * and free the backlog entry.
+			 */
+			tqe->tqent_func = bltqe->tqent_func;
+			tqe->tqent_arg  = bltqe->tqent_arg;
+			kmem_cache_free(taskq_ent_cache, bltqe);
+
+			/* Run as usual. */
+			continue;
 		}
+
+		DTRACE_PROBE2(taskq__d__wait1,
+		    taskq_t *, tq, taskq_ent_t *, tqe);
+
+		/*
+		 * We've run out of work in this bucket.
+		 * Put our TQE on the free list and wait.
+		 */
+		ASSERT(tqe->tqent_prev == NULL);
+		ASSERT(bucket->tqbucket_nalloc > 0);
+		bucket->tqbucket_nalloc--;
+		tqe->tqent_func = NULL;
+		TQ_APPEND(bucket->tqbucket_freelist, tqe);
+		bucket->tqbucket_nfree++;
+
+		/*
+		 * taskq_wait() waits for nalloc to drop to zero on
+		 * tqbucket_cv.
+		 */
+		cv_signal(&bucket->tqbucket_cv);
+
+	entry_freelist:
+		/*
+		 * Note: may enter here from the top.
+		 * We're on the free list.  Wait for work.
+		 */
+		ASSERT(tqe->tqent_func == NULL);
+		ASSERT(tqe->tqent_prev != NULL);
+		ASSERT(MUTEX_HELD(lock));
+
+		/*
+		 * If we're closing, finish.
+		 */
+		if ((bucket->tqbucket_flags & TQBUCKET_CLOSE) != 0)
+			break;
+
+		/*
+		 * Go to sleep waiting for work to arrive.
+		 * Sleep only briefly here on the bucket.
+		 * If no work lands in the bucket, return and
+		 * the caller will put this TQE on the common
+		 * list of idle threads and do the long wait.
+		 */
+		w = cv_reltimedwait(&tqe->tqent_cv, lock, tmo, TR_CLOCK_TICK);
 
 		/*
 		 * At this point we may be in two different states:
 		 *
 		 * (1) tqent_func is set which means that a new task is
 		 *	dispatched and we need to execute it.
+		 *	The dispatch took us off the free list.
 		 *
-		 * (2) Thread is sleeping for too long or we are closing. In
-		 *	both cases destroy the thread and the entry.
+		 * (2) Thread is sleeping for too long, or closing.
+		 *	We're done servicing this bucket.
+		 *
+		 * Some consistency checks:
+		 * func == NULL implies on free list
+		 * func != NULL implies not on free list
 		 */
+		if (tqe->tqent_func == NULL) {
+			/* Should be on the free list. */
+			ASSERT(tqe->tqent_prev != NULL);
+			ASSERT(bucket->tqbucket_nfree > 0);
+			if (w < 0) {
+				/* slept too long */
+				break;
+			}
 
-		/* If func is NULL we should be on the freelist. */
-		ASSERT((tqe->tqent_func != NULL) ||
-		    (bucket->tqbucket_nfree > 0));
-		/* If func is non-NULL we should be allocated */
-		ASSERT((tqe->tqent_func == NULL) ||
-		    (bucket->tqbucket_nalloc > 0));
-
-		/* Check freelist consistency */
-		ASSERT((bucket->tqbucket_nfree > 0) ||
-		    IS_EMPTY(bucket->tqbucket_freelist));
-		ASSERT((bucket->tqbucket_nfree == 0) ||
-		    !IS_EMPTY(bucket->tqbucket_freelist));
-
-		if ((tqe->tqent_func == NULL) &&
-		    ((w == -1) || (bucket->tqbucket_flags & TQBUCKET_CLOSE))) {
 			/*
-			 * This thread is sleeping for too long or we are
-			 * closing - time to die.
+			 * We may have been signaled if we finished a job
+			 * and got on the free list just before a call to
+			 * taskq_backlog_dispatch took the lock.  In that
+			 * case resume working on the backlog.
 			 */
-			break;
+			if (bucket->tqbucket_nbacklog > 0) {
+				TQ_REMOVE(tqe);
+				bucket->tqbucket_nfree--;
+				tqe->tqent_func = taskq_d_migrate;
+				bucket->tqbucket_nalloc++;
+				goto entry_backlog;
+			}
+
+			/*
+			 * Woken for some other reason.
+			 * Still on the free list, lock held.
+			 * Just wait again.
+			 */
+			goto entry_freelist;
 		}
+
+		/*
+		 * taskq_bucket_dispatch has set tqent_func
+		 * and taken us off the free list.
+		 */
+		ASSERT(tqe->tqent_func != NULL);
+		ASSERT(tqe->tqent_prev == NULL);
+		/* Back to the top (continue) */
 	}
+
+	/*
+	 * Remove the entry from the free list.
+	 * Will migrate to another bucket.
+	 * See taskq_d_migrate above.
+	 *
+	 * Note: nalloc++ happens after we return to taskq_d_thread
+	 * and enter the mutex for the next bucket we serve.
+	 */
+	TQ_REMOVE(tqe);
+	tqe->tqent_func = taskq_d_migrate;
+	ASSERT(bucket->tqbucket_nfree > 0);
+	bucket->tqbucket_nfree--;
+	cv_signal(&bucket->tqbucket_cv);
+
+unlock_out:
+	mutex_exit(lock);
+}
+
+/*
+ * Worker thread for dynamic taskq's
+ */
+static void
+taskq_d_thread(taskq_ent_t *tqe)
+{
+	callb_cpr_t	cprinfo;
+	taskq_bucket_t	*b;
+	taskq_bucket_t	*bucket = tqe->tqent_un.tqent_bucket;
+	taskq_t		*tq = bucket->tqbucket_taskq;
+	taskq_bucket_t	*idle_bucket = &tq->tq_buckets[tq->tq_nbuckets];
+	kmutex_t	*idle_lock = &idle_bucket->tqbucket_lock;
+	clock_t		tmo, w = 0;
+
+	CALLB_CPR_INIT(&cprinfo, idle_lock, callb_generic_cpr, tq->tq_name);
+
+	/*
+	 * Note that taskq_idlebucket_dispatch can change
+	 * tqent_bucket when we're on the free list.  Hold
+	 * idle_lock to synchronize with those changes.
+	 */
+	mutex_enter(idle_lock);
+	bucket = tqe->tqent_un.tqent_bucket;
+
+	/*
+	 * If we were started for TASKQ_PREPOPULATE,
+	 * we'll be on the idle bucket free list.
+	 * In that case start in the middle.
+	 */
+	if (bucket == idle_bucket) {
+		ASSERT(tqe->tqent_func == NULL);
+		ASSERT(tqe->tqent_prev != NULL);
+		goto entry_freelist;
+	}
+
+	/* Not on the idle_bucket free list. */
+	mutex_exit(idle_lock);
+
+	for (;;) {
+	continue_2:
+
+		/*
+		 * Service the bucket pointed to by the TQE.
+		 * We are NOT on the idle_bucket free list.
+		 * We may or may not be on the bucket free list.
+		 */
+		ASSERT(MUTEX_NOT_HELD(idle_lock));
+		bucket = tqe->tqent_un.tqent_bucket;
+		VERIFY3P(bucket, >=, tq->tq_buckets);
+		VERIFY3P(bucket, <, idle_bucket);
+
+		/* Enters/exits bucket->tqbucket_lock */
+		taskq_d_svc_bucket(tqe, bucket, tq);
+
+		/*
+		 * Finished servicing a bucket where we became idle.
+		 * Not on any free list.  Migrate to another bucket.
+		 * With "redirect" (forced migration) we move to the
+		 * bucket indicated by the arg.
+		 */
+		ASSERT(tqe->tqent_prev == NULL);
+		if (tqe->tqent_func == taskq_d_redirect) {
+			/*
+			 * Migrate to this bucket.
+			 * See: taskq_d_redirect()
+			 */
+			tqe->tqent_un.tqent_bucket = tqe->tqent_arg;
+			DTRACE_PROBE2(taskq__d__redirect,
+			    taskq_t *, tq, taskq_ent_t *, tqe);
+			continue;
+		}
+
+		/*
+		 * Look for buckets with backlog and if found, migrate
+		 * to that bucket.  Search starting at the next bucket
+		 * after the current one so the search starting points
+		 * will be distributed.
+		 *
+		 * Unlocked access is OK here.  A bucket may be missed
+		 * due to a stale (cached) nbacklog value, but another
+		 * idle thread will see the updated value soon.  If we
+		 * visit a bucket needlessly, the visit will be short.
+		 * There's a membar_producer after tqbucket_nbacklog is
+		 * updated, which should ensure visibility of updates
+		 * soon enough so buckets needing attention will get a
+		 * visit by threads passing through here.
+		 */
+	check_backlog:
+		ASSERT(tqe->tqent_func == taskq_d_migrate);
+		VERIFY3P(bucket, >=, tq->tq_buckets);
+		VERIFY3P(bucket, <, idle_bucket);
+		membar_consumer();
+		b = bucket;
+		do {
+			/* Next bucket */
+			if (++b == idle_bucket)
+				b = tq->tq_buckets;
+
+			if (b->tqbucket_nbacklog > 0) {
+				/*
+				 * Migrate to this bucket.
+				 * See: taskq_d_migrate()
+				 */
+				tqe->tqent_un.tqent_bucket = b;
+				DTRACE_PROBE2(taskq__d__migration,
+				    taskq_t *, tq, taskq_ent_t *, tqe);
+				goto continue_2;
+			}
+		} while (b != bucket);
+
+		DTRACE_PROBE2(taskq__d__wait2,
+		    taskq_t *, tq, taskq_ent_t *, tqe);
+
+		/*
+		 * Migrate to the idle bucket, put this TQE on
+		 * the free list for that bucket, then wait.
+		 */
+		ASSERT(tqe->tqent_prev == NULL);
+		tqe->tqent_un.tqent_bucket = idle_bucket;
+		mutex_enter(idle_lock);
+		tqe->tqent_func = NULL;
+		TQ_APPEND(idle_bucket->tqbucket_freelist, tqe);
+		idle_bucket->tqbucket_nfree++;
+
+	entry_freelist:
+		/*
+		 * Note: may enter here from the top.
+		 * We're on the free list.  Wait for work.
+		 */
+		ASSERT(tqe->tqent_func == NULL);
+		ASSERT(tqe->tqent_prev != NULL);
+		ASSERT(idle_bucket->tqbucket_nfree > 0);
+		ASSERT(MUTEX_HELD(idle_lock));
+		ASSERT3P(tqe->tqent_un.tqent_bucket, ==, idle_bucket);
+
+		/*
+		 * If we're closing, finish.
+		 */
+		if ((idle_bucket->tqbucket_flags & TQBUCKET_CLOSE) != 0)
+			break;
+
+		/*
+		 * Go to sleep waiting for work to arrive.
+		 * If a thread is sleeping too long, it dies.
+		 * If this is the last thread, no timeout.
+		 */
+		if (idle_bucket->tqbucket_nfree == 1) {
+			tmo = -1;
+		} else {
+			tmo = SEC_TO_TICK(taskq_thread_timeout);
+		}
+		w = taskq_thread_wait(tq, idle_lock,
+		    &tqe->tqent_cv, &cprinfo, tmo);
+
+		/*
+		 * At this point we may be in two different states:
+		 *
+		 * (1) tqent_func is set which means that a new task is
+		 *	dispatched and we need to execute it.
+		 *	The dispatch took us off the free list.
+		 *	Migrate to the new bucket.
+		 *
+		 * (2) Thread is sleeping for too long -- return
+		 *
+		 * Some consistency checks:
+		 * func == NULL implies on free list
+		 * func != NULL implies not on free list
+		 */
+		if (tqe->tqent_func == NULL) {
+			/* Should be on the free list. */
+			ASSERT(tqe->tqent_prev != NULL);
+			if (w < 0 && idle_bucket->tqbucket_nfree > 1) {
+				/*
+				 * taskq_thread_wait timed out.
+				 * If not last thread, exit.
+				 */
+				break;
+			}
+
+			/*
+			 * Woken for some other reason, one of:
+			 *	Last thread - stick around longer
+			 *	Destroying, out via CLOSE above
+			 *	taskq_bucket_redist signaled
+			 *
+			 * Still on the free list, lock held. Continue
+			 * back at the re-check for backlog work,
+			 * which means coming off the free list.
+			 *
+			 * Note that tqent_bucket is the idle bucket
+			 * at this point, which is not valid above,
+			 * so pretend we just finished servicing the
+			 * first bucket.  This happens rarely.
+			 */
+			bucket = tq->tq_buckets;
+			TQ_REMOVE(tqe);
+			idle_bucket->tqbucket_nfree--;
+			tqe->tqent_func = taskq_d_migrate;
+			tqe->tqent_un.tqent_bucket = bucket;
+			mutex_exit(idle_lock);
+			goto check_backlog;
+		}
+
+		/*
+		 * taskq_idlebucket_dispatch will have moved this
+		 * taskq_ent_t from the idle bucket (idleb) to a
+		 * new bucket (newb).  In detail, it has:
+		 *	Removed this TQE from idlb->tqbucket_freelist
+		 *	deccremented idleb->tqbucket_nfree
+		 *	Set tqent_bucket = new_bucket
+		 *	Set tqent_func, tqent_argarg
+		 *	incremented newb->tqbucket_nalloc
+		 */
+		ASSERT(tqe->tqent_func != NULL);
+		ASSERT(tqe->tqent_prev == NULL);
+		ASSERT(tqe->tqent_un.tqent_bucket != idle_bucket);
+		DTRACE_PROBE2(taskq__d__idledisp,
+		    taskq_t *, tq, taskq_ent_t *, tqe);
+		mutex_exit(idle_lock);
+		/* Back to the top (continue) */
+	}
+	ASSERT(MUTEX_HELD(idle_lock));
+	ASSERT(tqe->tqent_prev != NULL);
 
 	/*
 	 * Thread creation/destruction happens rarely,
@@ -1815,18 +2460,33 @@ taskq_d_thread(taskq_ent_t *tqe)
 	 */
 
 	/* Remove the entry from the free list. */
-	tqe->tqent_prev->tqent_next = tqe->tqent_next;
-	tqe->tqent_next->tqent_prev = tqe->tqent_prev;
-	ASSERT(bucket->tqbucket_nfree > 0);
-	bucket->tqbucket_nfree--;
+	TQ_REMOVE(tqe);
+	ASSERT(idle_bucket->tqbucket_nfree > 0);
+	idle_bucket->tqbucket_nfree--;
 
-	TQ_STAT(bucket, tqs_tdeaths);
-	cv_signal(&bucket->tqbucket_cv);
+	/* Note: Creates and deaths are on the idle bucket. */
+	TQ_STAT(idle_bucket, tqs_tdeaths);
+	cv_signal(&idle_bucket->tqbucket_cv);
+
+	/*
+	 * When destroying, wake the next thread, if any.
+	 * See thundering herd comment in taskq_destroy.
+	 */
+	if ((idle_bucket->tqbucket_flags & TQBUCKET_CLOSE) != 0 &&
+	    (idle_bucket->tqbucket_nfree > 0)) {
+		taskq_ent_t *ntqe;
+		ASSERT(!IS_EMPTY(idle_bucket->tqbucket_freelist));
+		ntqe = idle_bucket->tqbucket_freelist.tqent_next;
+		cv_signal(&ntqe->tqent_cv);
+	}
+
 	tqe->tqent_thread = NULL;
 	mutex_enter(&tq->tq_lock);
-	tq->tq_tdeaths++;
+	tq->tq_dnthreads--;
+	cv_broadcast(&tq->tq_exit_cv);
 	mutex_exit(&tq->tq_lock);
-	CALLB_CPR_EXIT(&cprinfo);	/* mutex_exit(lock) */
+
+	CALLB_CPR_EXIT(&cprinfo);	/* mutex_exit(idle_lock) */
 
 	kmem_cache_free(taskq_ent_cache, tqe);
 
@@ -1934,13 +2594,18 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 
 	bsize = 1 << (highbit(ncpus) - 1);
 	ASSERT(bsize >= 1);
+	bsize = MAX(bsize, taskq_minbuckets);
 	bsize = MIN(bsize, taskq_maxbuckets);
 
 	if (flags & TASKQ_DYNAMIC) {
 		ASSERT3S(nthreads, >=, 1);
-		tq->tq_maxsize = nthreads;
+		/* Need at least (bsize + 1) threads */
+		tq->tq_maxsize = MAX(nthreads, bsize + 1);
+		/* See taskq_bucket_redist(). */
+		tq->tq_atpb = tq->tq_maxsize / bsize;
+		ASSERT(tq->tq_atpb != 0);
 
-		/* For dynamic task queues use just one backup thread */
+		/* For dynamic task queues use just one backing thread */
 		nthreads = max_nthreads = 1;
 
 	} else if (flags & TASKQ_THREADS_CPU_PCT) {
@@ -2017,24 +2682,39 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 	taskq_thread_create(tq);
 	mutex_exit(&tq->tq_lock);
 
+	/*
+	 * For dynamic taskq, create the array of buckets, PLUS ONE
+	 * for the bucket used as the "idle bucket".
+	 */
 	if (flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *bucket = kmem_zalloc(sizeof (taskq_bucket_t) *
-		    bsize, KM_SLEEP);
+		    (bsize + 1), KM_SLEEP);
+		taskq_bucket_t *idle_bucket = &bucket[bsize];
 		int b_id;
 
 		tq->tq_buckets = bucket;
 
 		/* Initialize each bucket */
-		for (b_id = 0; b_id < bsize; b_id++, bucket++) {
+		for (b_id = 0; b_id < (bsize + 1); b_id++, bucket++) {
 			mutex_init(&bucket->tqbucket_lock, NULL, MUTEX_DEFAULT,
 			    NULL);
 			cv_init(&bucket->tqbucket_cv, NULL, CV_DEFAULT, NULL);
 			bucket->tqbucket_taskq = tq;
-			bucket->tqbucket_freelist.tqent_next =
-			    bucket->tqbucket_freelist.tqent_prev =
-			    &bucket->tqbucket_freelist;
-			if (flags & TASKQ_PREPOPULATE)
-				taskq_bucket_extend(bucket);
+			TQ_LIST_INIT(bucket->tqbucket_freelist);
+			TQ_LIST_INIT(bucket->tqbucket_backlog);
+		}
+		/*
+		 * Always create at least one idle bucket thread.
+		 * That can't fail because we're at nthreads=0.
+		 * If pre-populating, create more (nbuckets) threads.
+		 * That can fail, in which case we'll just try later.
+		 */
+		(void) taskq_bucket_extend(idle_bucket);
+		if (flags & TASKQ_PREPOPULATE) {
+			int i;
+			for (i = 1; i < bsize; i++) {
+				(void) taskq_bucket_extend(idle_bucket);
+			}
 		}
 	}
 
@@ -2087,8 +2767,6 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 void
 taskq_destroy(taskq_t *tq)
 {
-	taskq_bucket_t *b = tq->tq_buckets;
-	int bid = 0;
 
 	ASSERT(! (tq->tq_flags & TASKQ_CPR_SAFE));
 
@@ -2146,45 +2824,96 @@ taskq_destroy(taskq_t *tq)
 	mutex_exit(&tq->tq_lock);
 
 	/*
+	 * For dynamic taskq:
 	 * Mark each bucket as closing and wakeup all sleeping threads.
+	 * Two passes: 1st mark & wake all; 2nd wait for thread exits.
+	 * Include the idle bucket here.
 	 */
-	for (; (b != NULL) && (bid < tq->tq_nbuckets); b++, bid++) {
-		taskq_ent_t *tqe;
+	if (tq->tq_buckets != NULL) {
+		taskq_bucket_t *b;
+		uint_t bid = 0;
 
-		mutex_enter(&b->tqbucket_lock);
+		ASSERT((tq->tq_flags & TASKQ_DYNAMIC) != 0);
 
-		b->tqbucket_flags |= TQBUCKET_CLOSE;
-		/* Wakeup all sleeping threads */
+		for (bid = 0, b = tq->tq_buckets;
+		    bid <= tq->tq_nbuckets;
+		    b++, bid++) {
 
-		for (tqe = b->tqbucket_freelist.tqent_next;
-		    tqe != &b->tqbucket_freelist; tqe = tqe->tqent_next)
-			cv_signal(&tqe->tqent_cv);
+			taskq_ent_t *tqe;
 
-		ASSERT(b->tqbucket_nalloc == 0);
+			mutex_enter(&b->tqbucket_lock);
+
+			/* We called taskq_wait() above. */
+			ASSERT(b->tqbucket_nalloc == 0);
+
+			/*
+			 * Wakeup all sleeping threads.
+			 *
+			 * The idle bucket may have many threads.
+			 * Avoid a "thundering herd" of calls into
+			 * taskq_thread_wait() / cv_reltimedwait()
+			 * thrashing mutexes in callout teardown,
+			 * and just wake the first idle thread,
+			 * letting it wake the next.
+			 * See cv_signal near end of taskq_d_thread
+			 * In other buckets, wake all threads.
+			 */
+			b->tqbucket_flags |= TQBUCKET_CLOSE;
+			for (tqe = b->tqbucket_freelist.tqent_next;
+			    tqe != &b->tqbucket_freelist;
+			    tqe = tqe->tqent_next) {
+
+				cv_signal(&tqe->tqent_cv);
+
+				if (bid == tq->tq_nbuckets) {
+					/* idle bucket; just wake one. */
+					break;
+				}
+			}
+			mutex_exit(&b->tqbucket_lock);
+		}
+
+		for (bid = 0, b = tq->tq_buckets;
+		    bid <= tq->tq_nbuckets;
+		    b++, bid++) {
+			/*
+			 * Wait for tqbucket_freelist threads to exit.
+			 */
+			mutex_enter(&b->tqbucket_lock);
+			while (b->tqbucket_nfree > 0)
+				cv_wait(&b->tqbucket_cv, &b->tqbucket_lock);
+			mutex_exit(&b->tqbucket_lock);
+		}
 
 		/*
-		 * At this point we waited for all pending jobs to complete (in
-		 * both the task queue and the bucket and no new jobs should
-		 * arrive. Wait for all threads to die.
+		 * Threads that are migrating between buckets could be
+		 * missed by the waits on tqbucket_nfree, so also wait
+		 * for the total thread count to go to zero.
 		 */
-		while (b->tqbucket_nfree > 0)
-			cv_wait(&b->tqbucket_cv, &b->tqbucket_lock);
-		mutex_exit(&b->tqbucket_lock);
-		mutex_destroy(&b->tqbucket_lock);
-		cv_destroy(&b->tqbucket_cv);
-	}
+		mutex_enter(&tq->tq_lock);
+		while (tq->tq_dnthreads > 0) {
+			cv_wait(&tq->tq_exit_cv, &tq->tq_lock);
+		}
+		mutex_exit(&tq->tq_lock);
 
-	if (tq->tq_buckets != NULL) {
-		ASSERT(tq->tq_flags & TASKQ_DYNAMIC);
+		/*
+		 * Destroy all buckets
+		 */
+		for (bid = 0, b = tq->tq_buckets;
+		    bid <= tq->tq_nbuckets;
+		    b++, bid++) {
+			mutex_destroy(&b->tqbucket_lock);
+			cv_destroy(&b->tqbucket_cv);
+		}
+
 		kmem_free(tq->tq_buckets,
-		    sizeof (taskq_bucket_t) * tq->tq_nbuckets);
+		    sizeof (taskq_bucket_t) * (tq->tq_nbuckets + 1));
 
 		/* Cleanup fields before returning tq to the cache */
 		tq->tq_buckets = NULL;
-		tq->tq_tcreates = 0;
-		tq->tq_tdeaths = 0;
+		tq->tq_dnthreads = 0;
 	} else {
-		ASSERT(!(tq->tq_flags & TASKQ_DYNAMIC));
+		ASSERT((tq->tq_flags & TASKQ_DYNAMIC) == 0);
 	}
 
 	/*
@@ -2202,50 +2931,68 @@ taskq_destroy(taskq_t *tq)
 }
 
 /*
- * Extend a bucket with a new entry on the free list and attach a worker thread
- * to it.
- *
- * Argument: pointer to the bucket.
- *
- * This function may quietly fail. It is only used by taskq_dispatch() which
- * handles such failures properly.
+ * This is called asynchronously after taskq_dispatch has failed to
+ * find a free thread.  Try to create a thread (taskq_bucket_extend)
+ * and if that fails, make sure the bucket has at least one thread,
+ * redirecting a thread from another bucket if necessary.
  */
 static void
-taskq_bucket_extend(void *arg)
+taskq_bucket_overflow(void *arg)
+{
+	taskq_bucket_t *b = arg;
+
+	if (taskq_bucket_extend(b) == NULL) {
+		taskq_bucket_redist(b);
+	}
+}
+
+/*
+ * Extend a bucket with a new entry on the free list and attach a worker
+ * thread to it.  This is called from a context where sleep is allowed.
+ * This function may quietly fail. Callers deal with the possibility
+ * that this might not have created a thread for some reason, eg.
+ * lack of resources or limits on the number of threads.
+ *
+ * Argument: pointer to the bucket.
+ * Return: pointer to new taskq_ent_t if we created a thread, else NULL
+ */
+static taskq_ent_t *
+taskq_bucket_extend(taskq_bucket_t *b)
 {
 	taskq_ent_t *tqe;
-	taskq_bucket_t *b = (taskq_bucket_t *)arg;
 	taskq_t *tq = b->tqbucket_taskq;
+	taskq_bucket_t *idleb = &tq->tq_buckets[tq->tq_nbuckets];
 	kthread_t *t;
 	int nthreads;
 
+	/* How many threads currently in this bucket? */
+	mutex_enter(&b->tqbucket_lock);
+	nthreads = b->tqbucket_nalloc + b->tqbucket_nfree;
+	mutex_exit(&b->tqbucket_lock);
+
 	mutex_enter(&tq->tq_lock);
 
-	if (! ENOUGH_MEMORY()) {
+	/*
+	 * When there are no threads in this bucket, this call should
+	 * "try harder", so continue even if short on memory.
+	 */
+	if (! ENOUGH_MEMORY() && (nthreads > 0)) {
 		tq->tq_nomem++;
 		mutex_exit(&tq->tq_lock);
-		return;
+		return (NULL);
 	}
 
 	/*
 	 * Observe global taskq limits on the number of threads.
 	 */
-	if (tq->tq_tcreates++ - tq->tq_tdeaths > tq->tq_maxsize) {
-		tq->tq_tcreates--;
+	if ((tq->tq_dnthreads + 1) > tq->tq_maxsize) {
 		mutex_exit(&tq->tq_lock);
-		return;
+		return (NULL);
 	}
+	tq->tq_dnthreads++;
 	mutex_exit(&tq->tq_lock);
 
-	tqe = kmem_cache_alloc(taskq_ent_cache, KM_NOSLEEP);
-
-	if (tqe == NULL) {
-		mutex_enter(&tq->tq_lock);
-		tq->tq_nomem++;
-		tq->tq_tcreates--;
-		mutex_exit(&tq->tq_lock);
-		return;
-	}
+	tqe = kmem_cache_alloc(taskq_ent_cache, KM_SLEEP);
 
 	ASSERT(tqe->tqent_thread == NULL);
 
@@ -2274,16 +3021,21 @@ taskq_bucket_extend(void *arg)
 	tqe->tqent_func = NULL;
 	TQ_APPEND(b->tqbucket_freelist, tqe);
 	b->tqbucket_nfree++;
-	TQ_STAT(b, tqs_tcreates);
-
-#if TASKQ_STATISTIC
-	nthreads = b->tqbucket_stat.tqs_tcreates -
-	    b->tqbucket_stat.tqs_tdeaths;
-	b->tqbucket_stat.tqs_maxthreads = MAX(nthreads,
-	    b->tqbucket_stat.tqs_maxthreads);
-#endif
-
 	mutex_exit(&b->tqbucket_lock);
+
+	/*
+	 * Account for creates in the idle bucket, because
+	 * the deaths will be accounted there.
+	 */
+	mutex_enter(&idleb->tqbucket_lock);
+	TQ_STAT(idleb, tqs_tcreates);
+#if TASKQ_STATISTIC
+	nthreads = idleb->tqbucket_stat.tqs_tcreates -
+	    idleb->tqbucket_stat.tqs_tdeaths;
+	idleb->tqbucket_stat.tqs_maxthreads = MAX(nthreads,
+	    idleb->tqbucket_stat.tqs_maxthreads);
+#endif
+	mutex_exit(&idleb->tqbucket_lock);
 
 	/*
 	 * Start the stopped thread.
@@ -2300,6 +3052,116 @@ taskq_bucket_extend(void *arg)
 		setrun_locked(t);
 		thread_unlock(t);
 	}
+
+	return (tqe);
+}
+
+/*
+ * This is called after taskq_dispatch failed to find a free thread and
+ * also failed to create a new thread.  This usually means the taskq has
+ * as many threads are we're allowed to create, but can also happen when
+ * dispatch has TQ_NOQUEUE, or (rarely) we created a thread but lost the
+ * new thread to another racing dispatch call.  If this bucket has a
+ * backlog and no threads, then redistribute threads by moving one
+ * from another bucket (the donor bucket) into this one.  A thread in
+ * the donor bucket is redirected by dispatching the special function
+ * taskq_d_redirect in the donor bucket. As soon as some thread in the
+ * donor bucket completes, it will find taskq_d_redirect in the backlog
+ * and move to the recipient bucket (the bucket arg here).
+ */
+static void
+taskq_bucket_redist(taskq_bucket_t *bucket)
+{
+	taskq_t *tq = bucket->tqbucket_taskq;
+	taskq_bucket_t *idle_bucket = &tq->tq_buckets[tq->tq_nbuckets];
+	taskq_bucket_t *db;	/* donor bucket candidate */
+	taskq_ent_t *tqe = NULL;
+	uint_t nthreads;
+
+	VERIFY3P(bucket, >=, tq->tq_buckets);
+	VERIFY3P(bucket, <, idle_bucket);
+
+	/*
+	 * This makes no sense with a single bucket.
+	 * Someone patched taskq_minbuckets?
+	 */
+	if (tq->tq_nbuckets == 1)
+		goto out;
+
+	/*
+	 * Only redirect when there's a backlog and no threads,
+	 * and we have not already redirected a thread.
+	 */
+	mutex_enter(&bucket->tqbucket_lock);
+	nthreads = bucket->tqbucket_nalloc + bucket->tqbucket_nfree;
+	if (nthreads > 0 || bucket->tqbucket_nbacklog == 0 ||
+	    (bucket->tqbucket_flags & TQBUCKET_REDIRECT) != 0) {
+		mutex_exit(&bucket->tqbucket_lock);
+		goto out;
+	}
+	/* Clear this later if we fail to redirect a thread. */
+	bucket->tqbucket_flags |= TQBUCKET_REDIRECT;
+	mutex_exit(&bucket->tqbucket_lock);
+
+	/*
+	 * Need a tqe for taskq_backlog_enqueue
+	 */
+	tqe = kmem_cache_alloc(taskq_ent_cache, KM_SLEEP);
+	ASSERT(tqe->tqent_thread == NULL);
+	tqe->tqent_func = taskq_d_redirect;
+	tqe->tqent_arg = bucket; /* redirected to */
+
+	/*
+	 * Find a "donor bucket" (db) that can afford to lose a thread.
+	 * Search starting at the next bucket after the passed in one.
+	 * There should be some buckets with more threads than average
+	 * because the recipient bucket has no threads.
+	 */
+	db = bucket;
+	for (;;) {
+		/* Next bucket */
+		if (++db == idle_bucket)
+			db = tq->tq_buckets;
+		if (db == bucket)
+			break;
+
+		mutex_enter(&db->tqbucket_lock);
+		nthreads = db->tqbucket_nalloc + db->tqbucket_nfree;
+		if (nthreads > tq->tq_atpb) {
+			taskq_backlog_enqueue(db, tqe, TQ_FRONT);
+			mutex_exit(&db->tqbucket_lock);
+			goto out;
+		}
+		mutex_exit(&db->tqbucket_lock);
+	}
+	/*
+	 * No bucket with more than an average number of threads.
+	 * Free the tqe; undo the redirect flag.
+	 */
+	DTRACE_PROBE2(taskq__redist__fails, taskq_t *, tq,
+	    taskq_bucket_t *, bucket);
+	kmem_cache_free(taskq_ent_cache, tqe);
+	tqe = NULL;
+	mutex_enter(&bucket->tqbucket_lock);
+	bucket->tqbucket_flags &= ~TQBUCKET_REDIRECT;
+	mutex_exit(&bucket->tqbucket_lock);
+
+out:
+	/*
+	 * We're usually here because some backlog work exists.
+	 * In case a thread became idle just before a backlog
+	 * was added to some bucket, wake an idle thread.
+	 */
+	mutex_enter(&idle_bucket->tqbucket_lock);
+	if (idle_bucket->tqbucket_nfree != 0) {
+		taskq_ent_t *itqe;
+		itqe = bucket->tqbucket_freelist.tqent_prev;
+		cv_signal(&itqe->tqent_cv);
+	}
+	mutex_exit(&idle_bucket->tqbucket_lock);
+
+	DTRACE_PROBE3(taskq__bucket__redist__ret, taskq_t *, tq,
+	    taskq_bucket_t *, bucket, taskq_ent_t *, tqe);
 }
 
 static int
@@ -2329,48 +3191,76 @@ taskq_d_kstat_update(kstat_t *ksp, int rw)
 {
 	struct taskq_d_kstat *tqsp = &taskq_d_kstat;
 	taskq_t *tq = ksp->ks_private;
-	taskq_bucket_t *b = tq->tq_buckets;
-	int bid = 0;
+	taskq_bucket_t *b;
+	int bid;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
 	ASSERT(tq->tq_flags & TASKQ_DYNAMIC);
 
-	tqsp->tqd_btasks.value.ui64 = tq->tq_tasks;
-	tqsp->tqd_bexecuted.value.ui64 = tq->tq_executed;
-	tqsp->tqd_bmaxtasks.value.ui64 = tq->tq_maxtasks;
-	tqsp->tqd_bnalloc.value.ui64 = tq->tq_nalloc;
-	tqsp->tqd_bnactive.value.ui64 = tq->tq_active;
-	tqsp->tqd_btotaltime.value.ui64 = tq->tq_totaltime;
 	tqsp->tqd_pri.value.ui64 = tq->tq_pri;
 	tqsp->tqd_nomem.value.ui64 = tq->tq_nomem;
 
+	/*
+	 * Accumulate tqbucket_nalloc etc, tqbucket_stats
+	 */
+	tqsp->tqd_nalloc.value.ui64 = 0;
+	tqsp->tqd_nbacklog.value.ui64 = 0;
+	tqsp->tqd_nfree.value.ui64 = 0;
+	tqsp->tqd_totaltime.value.ui64 = 0;
+
 	tqsp->tqd_hits.value.ui64 = 0;
 	tqsp->tqd_misses.value.ui64 = 0;
+	tqsp->tqd_ihits.value.ui64 = 0;
+	tqsp->tqd_imisses.value.ui64 = 0;
 	tqsp->tqd_overflows.value.ui64 = 0;
+	tqsp->tqd_maxbacklog.value.ui64 = 0;
 	tqsp->tqd_tcreates.value.ui64 = 0;
 	tqsp->tqd_tdeaths.value.ui64 = 0;
 	tqsp->tqd_maxthreads.value.ui64 = 0;
-	tqsp->tqd_nomem.value.ui64 = 0;
 	tqsp->tqd_disptcreates.value.ui64 = 0;
-	tqsp->tqd_totaltime.value.ui64 = 0;
-	tqsp->tqd_nalloc.value.ui64 = 0;
-	tqsp->tqd_nfree.value.ui64 = 0;
 
-	for (; (b != NULL) && (bid < tq->tq_nbuckets); b++, bid++) {
-		tqsp->tqd_hits.value.ui64 += b->tqbucket_stat.tqs_hits;
-		tqsp->tqd_misses.value.ui64 += b->tqbucket_stat.tqs_misses;
-		tqsp->tqd_overflows.value.ui64 += b->tqbucket_stat.tqs_overflow;
-		tqsp->tqd_tcreates.value.ui64 += b->tqbucket_stat.tqs_tcreates;
-		tqsp->tqd_tdeaths.value.ui64 += b->tqbucket_stat.tqs_tdeaths;
+	/* Apparently this can be called when... */
+	if ((b = tq->tq_buckets) == NULL)
+		return (0);
+
+	for (bid = 0; bid <= tq->tq_nbuckets; b++, bid++) {
+
+		tqsp->tqd_nalloc.value.ui64 += b->tqbucket_nalloc;
+		tqsp->tqd_nbacklog.value.ui64 += b->tqbucket_nbacklog;
+		tqsp->tqd_nfree.value.ui64 += b->tqbucket_nfree;
+		tqsp->tqd_totaltime.value.ui64 += b->tqbucket_totaltime;
+
+		/*
+		 * For regular buckets, update hits, misses.
+		 * For the idle bucket, update ihits, imisses
+		 */
+		if (bid < tq->tq_nbuckets) {
+			tqsp->tqd_hits.value.ui64 +=
+			    b->tqbucket_stat.tqs_hits;
+			tqsp->tqd_misses.value.ui64 +=
+			    b->tqbucket_stat.tqs_misses;
+		} else {
+			tqsp->tqd_ihits.value.ui64 +=
+			    b->tqbucket_stat.tqs_hits;
+			tqsp->tqd_imisses.value.ui64 +=
+			    b->tqbucket_stat.tqs_misses;
+		}
+
+		tqsp->tqd_overflows.value.ui64 +=
+		    b->tqbucket_stat.tqs_overflow;
+		tqsp->tqd_maxbacklog.value.ui64 +=
+		    b->tqbucket_stat.tqs_maxbacklog;
+		tqsp->tqd_tcreates.value.ui64 +=
+		    b->tqbucket_stat.tqs_tcreates;
+		tqsp->tqd_tdeaths.value.ui64 +=
+		    b->tqbucket_stat.tqs_tdeaths;
 		tqsp->tqd_maxthreads.value.ui64 +=
 		    b->tqbucket_stat.tqs_maxthreads;
 		tqsp->tqd_disptcreates.value.ui64 +=
 		    b->tqbucket_stat.tqs_disptcreates;
-		tqsp->tqd_totaltime.value.ui64 += b->tqbucket_totaltime;
-		tqsp->tqd_nalloc.value.ui64 += b->tqbucket_nalloc;
-		tqsp->tqd_nfree.value.ui64 += b->tqbucket_nfree;
 	}
+
 	return (0);
 }

@@ -167,8 +167,7 @@ typedef struct smbstat_srv_snapshot {
 } smbstat_srv_snapshot_t;
 
 typedef struct smbstat_wrk_snapshot {
-	uint64_t	ws_maxthreads;
-	uint64_t	ws_bnalloc;
+	uint64_t	ws_nbacklog;
 } smbstat_wrk_snapshot_t;
 
 typedef struct smbstat_req_info {
@@ -757,17 +756,11 @@ smbstat_wrk_snapshot(void)
 		smbstat_fail(1, gettext("kstat_read('%s') failed"),
 		    smbstat_wrk_ksp->ks_name);
 
-	kn = kstat_data_lookup(smbstat_wrk_ksp, "maxthreads");
+	kn = kstat_data_lookup(smbstat_wrk_ksp, "nbacklog");
 	if ((kn == NULL) || (kn->data_type != KSTAT_DATA_UINT64))
 		smbstat_fail(1, gettext("kstat_read('%s') failed"),
-		    "maxthreads");
-	curr->ws_maxthreads = kn->value.ui64;
-
-	kn = kstat_data_lookup(smbstat_wrk_ksp, "bnalloc");
-	if ((kn == NULL) || (kn->data_type != KSTAT_DATA_UINT64))
-		smbstat_fail(1, gettext("kstat_read('%s') failed"),
-		    "bnalloc");
-	curr->ws_bnalloc = kn->value.ui64;
+		    "nbacklog");
+	curr->ws_nbacklog = kn->value.ui64;
 }
 
 /*
@@ -780,7 +773,7 @@ smbstat_wrk_process(void)
 
 	curr = smbstat_wrk_current_snapshot();
 
-	if (curr->ws_bnalloc >= curr->ws_maxthreads)
+	if (curr->ws_nbacklog != 0)
 		smbstat_srv_info.si_sat = B_TRUE;
 	else
 		smbstat_srv_info.si_sat = B_FALSE;
