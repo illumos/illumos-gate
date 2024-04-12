@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -165,6 +166,8 @@ opdes_t	udp_opt_arr[] = {
 
 { IP_DONTFRAG, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
+{ IP_MINTTL, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { MCAST_JOIN_GROUP, IPPROTO_IP, OA_X, OA_X, OP_NP,
 	OP_NODEFAULT, sizeof (struct group_req),
 	-1 /* not initialized */ },
@@ -285,6 +288,8 @@ opdes_t	udp_opt_arr[] = {
 { MCAST_LEAVE_SOURCE_GROUP, IPPROTO_IPV6, OA_X, OA_X, OP_NP,
 	OP_NODEFAULT, sizeof (struct group_source_req),
 	-1 /* not initialized */ },
+{ IPV6_MINHOPCOUNT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
 
 { UDP_ANONPRIVBIND, IPPROTO_UDP, OA_R, OA_RW, OP_PRIVPORT, 0,
 	sizeof (int), 0 },

@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -171,6 +171,8 @@ opdes_t	tcp_opt_arr[] = {
 { IP_UNSPEC_SRC, IPPROTO_IP, OA_R, OA_RW, OP_RAW, 0,
 	sizeof (int), 0 },
 
+{ IP_MINTTL,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { IPV6_UNICAST_HOPS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_DEF_FN,
 	sizeof (int), -1 /* not initialized */ },
 
@@ -238,6 +240,9 @@ opdes_t	tcp_opt_arr[] = {
 	sizeof (ipsec_req_t), -1 /* not initialized */ },
 { IPV6_SRC_PREFERENCES, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
 	sizeof (uint32_t), IPV6_PREFER_SRC_DEFAULT },
+
+{ IPV6_MINHOPCOUNT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
 };
 
 /*

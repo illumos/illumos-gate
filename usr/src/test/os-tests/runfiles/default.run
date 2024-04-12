@@ -14,7 +14,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
 #
 
@@ -183,3 +183,7 @@ tests = ['ilstr_basic.32', 'ilstr_basic.64']
 
 [/opt/os-tests/tests/execve]
 tests = ['execvpe-test.32', 'execvpe-test.64']
+
+[/opt/os-tests/tests/minttl]
+user = root
+tests = ['minttl', 'minttl_err']

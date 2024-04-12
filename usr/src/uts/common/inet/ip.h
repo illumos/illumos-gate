@@ -25,7 +25,7 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_INET_IP_H
@@ -2337,6 +2337,7 @@ struct ip_recv_attr_s {
 	uint_t		ira_pktlen;	/* Always set. For frag and stats */
 	uint16_t	ira_ip_hdr_length; /* Points to ULP header */
 	uint8_t		ira_protocol;	/* Protocol number for ULP cksum */
+	uint8_t		ira_ttl;	/* IP TTL / IPv6 Hop Count */
 	uint_t		ira_rifindex;	/* Received ifindex */
 	uint_t		ira_ruifindex;	/* Received upper ifindex */
 	ts_label_t	*ira_tsl;	/* Always set. NULL if not TX */

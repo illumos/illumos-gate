@@ -15,7 +15,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
 #
 
@@ -101,6 +101,9 @@ file path=opt/os-tests/tests/libtopo/digraph-test-in-badelement.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in-badnum.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in-badscheme.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in.xml mode=0444
+dir  path=opt/os-tests/tests/minttl
+file path=opt/os-tests/tests/minttl/minttl mode=0555
+file path=opt/os-tests/tests/minttl/minttl_err mode=0555
 file path=opt/os-tests/tests/odirectory.32 mode=0555
 file path=opt/os-tests/tests/odirectory.64 mode=0555
 dir  path=opt/os-tests/tests/pf_key

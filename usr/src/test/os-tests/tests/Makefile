@@ -29,6 +29,7 @@ SUBDIRS =       \
 		ksensor \
 		ksid \
 		libtopo \
+		minttl \
 		pf_key \
 		poll \
 		portfs \

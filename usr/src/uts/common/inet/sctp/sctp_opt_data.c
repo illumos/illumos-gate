@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -721,6 +722,8 @@ opdes_t	sctp_opt_arr[] = {
 { IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, 0,
 	sizeof (in_addr_t),	-1 /* not initialized  */ },
 
+{ IP_MINTTL, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { IPV6_UNSPEC_SRC, IPPROTO_IPV6, OA_R, OA_RW, OP_RAW, 0,
 	sizeof (int), 0 },
 
@@ -779,6 +782,9 @@ opdes_t	sctp_opt_arr[] = {
 	sizeof (ipsec_req_t), -1 /* not initialized */ },
 { IPV6_SRC_PREFERENCES, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
 	sizeof (uint32_t), IPV6_PREFER_SRC_DEFAULT },
+
+{ IPV6_MINHOPCOUNT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
 };
 
 uint_t sctp_opt_arr_size = A_CNT(sctp_opt_arr);
@@ -1268,7 +1274,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 
 	case IPPROTO_IP:
 		if (connp->conn_family != AF_INET) {
-			retval = ENOPROTOOPT;
+			retval = EINVAL;
 			goto done;
 		}
 		switch (name) {

@@ -5,6 +5,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -932,6 +933,7 @@ struct sockaddr_in6 {
 #define	IP_PKTINFO		0x1a	/* specify src address and/or index */
 #define	IP_RECVPKTINFO		0x1a	/* recv dest/matched addr and index */
 #define	IP_DONTFRAG		0x1b	/* don't fragment packets */
+#define	IP_MINTTL		0x1c	/* minimum acceptable TTL */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*
@@ -1300,6 +1302,8 @@ typedef struct {
 
 #define	IPV6_PREFER_SRC_DEFAULT	(IPV6_PREFER_SRC_MIPDEFAULT |\
 	IPV6_PREFER_SRC_TMPDEFAULT | IPV6_PREFER_SRC_CGADEFAULT)
+
+#define	IPV6_MINHOPCOUNT	0x2f	/* minimum acceptable hop limit */
 
 /*
  * SunOS private (potentially not portable) IPV6_ option names

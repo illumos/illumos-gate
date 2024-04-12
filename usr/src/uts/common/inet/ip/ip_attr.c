@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -198,6 +199,7 @@ typedef struct iramblk_s {
 	uint_t		irm_pktlen;
 	uint16_t	irm_ip_hdr_length; /* Points to ULP header */
 	uint8_t		irm_protocol;	/* Protocol number for ULP cksum */
+	uint8_t		irm_ttl;	/* IP TTL, IPv6 hop limit */
 	zoneid_t	irm_zoneid;	/* ALL_ZONES unless local delivery */
 
 	squeue_t	*irm_sqp;
@@ -536,6 +538,7 @@ ip_recv_attr_to_mblk(ip_recv_attr_t *ira)
 	irm->irm_pktlen = ira->ira_pktlen;
 	irm->irm_ip_hdr_length = ira->ira_ip_hdr_length;
 	irm->irm_protocol = ira->ira_protocol;
+	irm->irm_ttl = ira->ira_ttl;
 
 	irm->irm_sqp = ira->ira_sqp;
 	irm->irm_ring = ira->ira_ring;
@@ -647,6 +650,7 @@ ip_recv_attr_from_mblk(mblk_t *iramp, ip_recv_attr_t *ira)
 	ira->ira_pktlen = irm->irm_pktlen;
 	ira->ira_ip_hdr_length = irm->irm_ip_hdr_length;
 	ira->ira_protocol = irm->irm_protocol;
+	ira->ira_ttl = irm->irm_ttl;
 
 	ira->ira_sqp = irm->irm_sqp;
 	/* The rest of IP assumes that the rings never go away. */
