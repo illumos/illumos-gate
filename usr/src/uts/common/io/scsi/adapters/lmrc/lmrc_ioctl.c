@@ -329,6 +329,8 @@ lmrc_mfi_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
 		lmrc_dma_set_addr64(&mfi->mfi_data_dma,
 		    &mfi_sgl->ms64_phys_addr);
 		mfi_sgl->ms64_length = lmrc_dma_get_size(&mfi->mfi_data_dma);
+	} else {
+		mfi_hdr->mh_flags &= ~MFI_FRAME_DIR_BOTH;
 	}
 
 	if (mfi_hdr->mh_sense_len != 0) {
