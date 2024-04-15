@@ -10,8 +10,7 @@
  */
 
 /*
- * Copyright 2019 Robert Mustacchi
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -150,7 +149,6 @@ extern boolean_t smbios_test_chassis_verify_comps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku_nocomps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku(smbios_hdl_t *);
 
-
 extern boolean_t smbios_test_proc_mktable_25(smbios_test_table_t *);
 extern boolean_t smbios_test_proc_mktable_36(smbios_test_table_t *);
 extern boolean_t smbios_test_proc_verify_25(smbios_hdl_t *);
@@ -163,6 +161,21 @@ extern boolean_t smbios_test_extmem_mktable_cs(smbios_test_table_t *);
 extern boolean_t smbios_test_extmem_verify_invlen_cs(smbios_hdl_t *);
 extern boolean_t smbios_test_extmem_verify_nocs(smbios_hdl_t *);
 extern boolean_t smbios_test_extmem_verify_cs(smbios_hdl_t *);
+
+extern boolean_t smbios_test_addinfo_mktable_noent(smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_mktable_ents(smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_mktable_invlen_base(smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_mktable_invlen_ent(smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_mktable_invlen_multient(
+	smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_mktable_invlen_entdata(
+	smbios_test_table_t *);
+extern boolean_t smbios_test_addinfo_verify_noent(smbios_hdl_t *);
+extern boolean_t smbios_test_addinfo_verify_ents(smbios_hdl_t *);
+extern boolean_t smbios_test_addinfo_verify_invlen_base(smbios_hdl_t *);
+extern boolean_t smbios_test_addinfo_verify_invlen_ent(smbios_hdl_t *);
+extern boolean_t smbios_test_addinfo_verify_invlen_multient(smbios_hdl_t *);
+extern boolean_t smbios_test_addinfo_verify_invlen_entdata(smbios_hdl_t *);
 
 #ifdef __cplusplus
 }

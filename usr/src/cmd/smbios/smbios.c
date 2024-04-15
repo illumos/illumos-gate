@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1610,6 +1610,71 @@ print_powersup(smbios_hdl_t *shp, id_t id, FILE *fp)
 }
 
 static void
+print_addinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	uint_t nents, i;
+
+	if (smbios_info_addinfo_nents(shp, id, &nents) != 0) {
+		smbios_warn(shp, "failed to read additional information");
+		return;
+	}
+
+	oprintf(fp, "  Number of Additional Information Entries: %u\n", nents);
+	for (i = 0; i < nents; i++) {
+		smbios_addinfo_ent_t *ent;
+
+		oprintf(fp, "  Additional Information Entry %u\n", i);
+		if (smbios_info_addinfo_ent(shp, id, i, &ent) != 0) {
+			smbios_warn(shp, "failed to read additional "
+			    "information entry %u", i);
+			continue;
+		}
+
+		oprintf(fp, "    Referenced handle: %lu\n", ent->smbai_ref);
+		oprintf(fp, "    Handle offset: %u\n", ent->smbai_ref_off);
+		if (ent->smbai_str != NULL) {
+			str_print(fp, "    Information String", ent->smbai_str);
+		}
+
+		/*
+		 * As of SMBIOS 3.7, there are no extra data entries strictly
+		 * defined in the spec, but there may be something. If we find
+		 * something that's a standard integer size, then we'll
+		 * interpret it and print it as a hex value. In theory this is
+		 * supposed to refer back to some field, but hard to say how
+		 * this'll actually be used. The first time we encountered it
+		 * was just an additional string entry.
+		 */
+		if (ent->smbai_dlen > 0) {
+			oprintf(fp, "    Data Length: %u\n", ent->smbai_dlen);
+			switch (ent->smbai_dlen) {
+			case 1:
+				oprintf(fp, "    Data: 0x%x\n",
+				    *(uint8_t *)ent->smbai_data);
+				break;
+			case 2:
+				oprintf(fp, "    Data: 0x%x\n",
+				    *(uint16_t *)ent->smbai_data);
+				break;
+			case 4:
+				oprintf(fp, "    Data: 0x%x\n",
+				    *(uint32_t *)ent->smbai_data);
+				break;
+			case 8:
+				oprintf(fp, "    Data: 0x%x\n",
+				    *(uint64_t *)ent->smbai_data);
+				break;
+			default:
+				break;
+			}
+		}
+
+		smbios_info_addinfo_ent_free(shp, ent);
+	}
+}
+
+
+static void
 print_processor_info_riscv(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_processor_info_riscv_t rv;
@@ -2067,6 +2132,10 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_POWERSUP:
 		oprintf(fp, "\n");
 		print_powersup(shp, sp->smbstr_id, fp);
+		break;
+	case SMB_TYPE_ADDINFO:
+		oprintf(fp, "\n");
+		print_addinfo(shp, sp->smbstr_id, fp);
 		break;
 	case SMB_TYPE_OBDEVEXT:
 		oprintf(fp, "\n");

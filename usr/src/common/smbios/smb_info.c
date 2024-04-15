@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -2150,4 +2150,117 @@ smbios_info_fwinfo_comps_free(smbios_hdl_t *shp, uint_t ncomps,
 	}
 
 	smb_free(comps, sz);
+}
+
+int
+smbios_info_addinfo_nents(smbios_hdl_t *shp, id_t id, uint_t *nentsp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_addinfo_t add;
+
+	if (stp == NULL) {
+		return (-1); /* errno is set for us */
+	}
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_ADDINFO) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (add)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	smb_info_bcopy(stp->smbst_hdr, &add, sizeof (add));
+	*nentsp = add.smbai_nents;
+
+	return (0);
+}
+
+void
+smbios_info_addinfo_ent_free(smbios_hdl_t *hdl, smbios_addinfo_ent_t *ent)
+{
+	if (ent->smbai_dlen > 0) {
+		ASSERT3P(ent->smbai_data, !=, NULL);
+		smb_free(ent->smbai_data, ent->smbai_dlen);
+	}
+
+	smb_free(ent, sizeof (smbios_addinfo_ent_t));
+}
+
+int
+smbios_info_addinfo_ent(smbios_hdl_t *shp, id_t id, uint_t entno,
+    smbios_addinfo_ent_t **entp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	size_t off;
+	smb_addinfo_t add;
+	smb_addinfo_ent_t ent;
+	smbios_addinfo_ent_t *entry;
+	uint_t i;
+
+	if (stp == NULL) {
+		return (-1); /* errno is set for us */
+	}
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_ADDINFO) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (add)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	smb_info_bcopy(stp->smbst_hdr, &add, sizeof (add));
+	if (entno >= add.smbai_nents) {
+		return (smb_set_errno(shp, ESMB_REQVAL));
+	}
+
+	off = sizeof (add);
+	for (i = 0; i <= entno; i++) {
+		if (off + sizeof (ent) > stp->smbst_hdr->smbh_len) {
+			return (smb_set_errno(shp, ESMB_SHORT));
+		}
+
+		smb_info_bcopy_offset(stp->smbst_hdr, &ent, sizeof (ent), off);
+		if (ent.smbaie_len < sizeof (ent)) {
+			return (smb_set_errno(shp, ESMB_SHORT));
+		}
+
+		if (ent.smbaie_len + off > stp->smbst_hdr->smbh_len) {
+			return (smb_set_errno(shp, ESMB_CORRUPT));
+		}
+
+		if (i != entno) {
+			off += ent.smbaie_len;
+		}
+	}
+
+	entry = smb_alloc(sizeof (smbios_addinfo_ent_t));
+	if (entry == NULL) {
+		return (smb_set_errno(shp, ESMB_NOMEM));
+	}
+
+	entry->smbai_ref = ent.smbaie_rhdl;
+	entry->smbai_ref_off = ent.smbaie_off;
+	if (ent.smbaie_str != 0) {
+		entry->smbai_str = smb_strptr(stp, ent.smbaie_str);
+	} else {
+		entry->smbai_str = NULL;
+	}
+	entry->smbai_dlen = ent.smbaie_len - sizeof (ent);
+	if (entry->smbai_dlen > 0) {
+		entry->smbai_data = smb_alloc(entry->smbai_dlen);
+		if (entry->smbai_data == NULL) {
+			smb_free(entry, sizeof (smbios_addinfo_ent_t));
+			return (smb_set_errno(shp, ESMB_NOMEM));
+		}
+		smb_info_bcopy_offset(stp->smbst_hdr, entry->smbai_data,
+		    entry->smbai_dlen, off + offsetof(smb_addinfo_ent_t,
+		    smbaie_val));
+	} else {
+		entry->smbai_data = NULL;
+	}
+
+	*entp = entry;
+	return (0);
 }

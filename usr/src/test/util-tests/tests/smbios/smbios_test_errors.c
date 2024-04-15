@@ -10,8 +10,7 @@
  */
 
 /*
- * Copyright 2019 Robert Mustacchi
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -56,6 +55,7 @@ static smbios_info_func_t smbios_lookup_funcs[] = {
 	{ (smbios_lookup_f)smbios_info_tprobe, "tprobe" },
 	{ (smbios_lookup_f)smbios_info_iprobe, "iprobe" },
 	{ (smbios_lookup_f)smbios_info_powersup, "powersup" },
+	{ (smbios_lookup_f)smbios_info_addinfo_nents, "addinfo" },
 	{ (smbios_lookup_f)smbios_info_pciexrc, "pciexrc" },
 	{ (smbios_lookup_f)smbios_info_processor_info, "processor_info" },
 	{ (smbios_lookup_f)smbios_info_processor_riscv, "processor_riscv" },

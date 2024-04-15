@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -625,6 +625,28 @@ typedef struct smb_powersup {
 #define	SMB_PSU_CHARS_TYPE(x)		(((x) >> 10) & 0xf)
 
 /*
+ * SMBIOS implementation structure for SMB_TYPE_ADDINFO.
+ */
+typedef struct smb_addinfo {
+	smb_header_t smbai_hdr;
+	uint8_t smbai_nents;
+	uint8_t smbai_data[];
+} smb_addinfo_t;
+
+/*
+ * This contains the additional information entry. There are in theory n of
+ * these in the smbai_data[] member of the additional information structure
+ * above. The offset here is to the referenced handle.
+ */
+typedef struct smb_addinfo_ent {
+	uint8_t smbaie_len;
+	uint16_t smbaie_rhdl;
+	uint8_t smbaie_off;
+	uint8_t smbaie_str;
+	uint8_t smbaie_val[];
+} smb_addinfo_ent_t;
+
+/*
  * SMBIOS implementation structure for SMB_TYPE_OBDEVEXT.
  */
 typedef struct smb_obdev_ext {
@@ -812,7 +834,8 @@ enum {
 	ESMB_CKSUM,			/* SMBIOS header checksum mismatch */
 	ESMB_INVAL,			/* invalid function call argument */
 	ESMB_TYPE,			/* structure type mismatch */
-	ESMB_UNKNOWN			/* unknown error (maximum value tag) */
+	ESMB_UNKNOWN,			/* unknown error */
+	ESMB_REQVAL			/* invalid requested value */
 };
 
 extern const smb_struct_t *smb_lookup_type(smbios_hdl_t *, uint_t);
