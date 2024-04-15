@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 SUBDIRS = \
@@ -32,7 +32,6 @@ SUBDIRS = \
 	regex \
 	select \
 	stdio \
-	strerror \
 	symbols \
 	threads \
 	wcsrtombs \
@@ -61,6 +60,7 @@ PROGS = \
 	quick_exit_status \
 	set_constraint_handler_s \
 	strcoll-strxfrm-6907 \
+	strerror \
 	strtonum \
 	timespec_get \
 	wcsncasecmp \

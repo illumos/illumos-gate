@@ -19,7 +19,6 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
 
 /*
  * WARNING!
@@ -35,131 +34,137 @@
  *	  interfaces, and sys_errlist[] are created from this list.
  *	  It is the direct referencing of sys_errlist[] that is the problem.
  *	  Your code should only use perror() or strerror().
+ *
+ *	  The table is organized with the first column being the error number.
+ *	  The second column is the error's name. If the error should be skipped
+ *	  from the list, it has the magic name 'SKIP'. This generally is for
+ *	  the XENIX errors. The third column to the end of the file is the
+ *	  string that shows up when you run strerror().
  */
 
-1	Not owner
-2	No such file or directory
-3	No such process
-4	Interrupted system call
-5	I/O error
-6	No such device or address
-7	Arg list too long
-8	Exec format error
-9	Bad file number
-10	No child processes
-11	Resource temporarily unavailable
-12	Not enough space
-13	Permission denied
-14	Bad address
-15	Block device required
-16	Device busy
-17	File exists
-18	Cross-device link
-19	No such device
-20	Not a directory
-21	Is a directory
-22	Invalid argument
-23	File table overflow
-24	Too many open files
-25	Inappropriate ioctl for device
-26	Text file busy
-27	File too large
-28	No space left on device
-29	Illegal seek
-30	Read-only file system
-31	Too many links
-32	Broken pipe
-33	Argument out of domain
-34	Result too large
-35	No message of desired type
-36	Identifier removed
-37	Channel number out of range
-38	Level 2 not synchronized
-39	Level 3 halted
-40	Level 3 reset
-41	Link number out of range
-42	Protocol driver not attached
-43	No CSI structure available
-44	Level 2 halted
-45	Deadlock situation detected/avoided
-46	No record locks available
-47	Operation canceled
-48	Operation not supported
-49	Disc quota exceeded
-50	Bad exchange descriptor
-51	Bad request descriptor
-52	Message tables full
-53	Anode table overflow
-54	Bad request code
-55	Invalid slot
-56	File locking deadlock
-57	Bad font file format
-58	Owner of the lock died
-59	Lock is not recoverable
-60	Not a stream device
-61	No data available
-62	Timer expired
-63	Out of stream resources
-64	Machine is not on the network
-65	Package not installed
-66	Object is remote
-67	Link has been severed
-68	Advertise error
-69	Srmount error
-70	Communication error on send
-71	Protocol error
-72	Locked lock was unmapped 
-73	Facility is not active
-74	Multihop attempted
-77	Not a data message
-78	File name too long
-79	Value too large for defined data type
-80	Name not unique on network
-81	File descriptor in bad state
-82	Remote address changed
-83	Can not access a needed shared library
-84	Accessing a corrupted shared library
-85	.lib section in a.out corrupted
-86	Attempting to link in more shared libraries than system limit
-87	Can not exec a shared library directly
-88	Illegal byte sequence
-89	Operation not applicable
-90	Number of symbolic links encountered during path name traversal exceeds MAXSYMLINKS
-93	Directory not empty
-94	Too many users
-95	Socket operation on non-socket
-96	Destination address required
-97	Message too long
-98	Protocol wrong type for socket
-99	Option not supported by protocol
-120	Protocol not supported
-121	Socket type not supported
-122	Operation not supported on transport endpoint
-123	Protocol family not supported
-124	Address family not supported by protocol family
-125	Address already in use
-126	Cannot assign requested address
-127	Network is down
-128	Network is unreachable
-129	Network dropped connection because of reset
-130	Software caused connection abort
-131	Connection reset by peer
-132	No buffer space available
-133	Transport endpoint is already connected
-134	Transport endpoint is not connected
-135	Structure needs cleaning
-137	Not a name file
-138	Not available
-139	Is a name file
-140	Remote I/O error
-141	Reserved for future use
+1	EPERM	Not owner
+2	ENOENT	No such file or directory
+3	ESRCH	No such process
+4	EINTR	Interrupted system call
+5	EIO	I/O error
+6	ENXIO	No such device or address
+7	E2BIG	Arg list too long
+8	ENOEXEC	Exec format error
+9	EBADF	Bad file number
+10	ECHILD	No child processes
+11	EAGAIN	Resource temporarily unavailable
+12	ENOMEM	Not enough space
+13	EACCES	Permission denied
+14	EFAULT	Bad address
+15	ENOTBLK	Block device required
+16	EBUSY	Device busy
+17	EEXIST	File exists
+18	EXDEV	Cross-device link
+19	ENODEV	No such device
+20	ENOTDIR	Not a directory
+21	EISDIR	Is a directory
+22	EINVAL	Invalid argument
+23	ENFILE	File table overflow
+24	EMFILE	Too many open files
+25	ENOTTY	Inappropriate ioctl for device
+26	ETXTBSY	Text file busy
+27	EFBIG	File too large
+28	ENOSPC	No space left on device
+29	ESPIPE	Illegal seek
+30	EROFS	Read-only file system
+31	EMLINK	Too many links
+32	EPIPE	Broken pipe
+33	EDOM	Argument out of domain
+34	ERANGE	Result too large
+35	ENOMSG	No message of desired type
+36	EIDRM	Identifier removed
+37	ECHRNG	Channel number out of range
+38	EL2NSYNC	Level 2 not synchronized
+39	EL3HLT	Level 3 halted
+40	EL3RST	Level 3 reset
+41	ELNRNG	Link number out of range
+42	EUNATCH	Protocol driver not attached
+43	ENOCSI	No CSI structure available
+44	EL2HLT	Level 2 halted
+45	EDEADLK	Deadlock situation detected/avoided
+46	ENOLCK	No record locks available
+47	ECANCELED	Operation canceled
+48	ENOTSUP	Operation not supported
+49	EDQUOT	Disc quota exceeded
+50	EBADE	Bad exchange descriptor
+51	EBADR	Bad request descriptor
+52	EXFULL	Message tables full
+53	ENOANO	Anode table overflow
+54	EBADRQC	Bad request code
+55	EBADSLT	Invalid slot
+56	EDEADLOCK	File locking deadlock
+57	EBFONT	Bad font file format
+58	EOWNERDEAD	Owner of the lock died
+59	ENOTRECOVERABLE	Lock is not recoverable
+60	ENOSTR	Not a stream device
+61	ENODATA	No data available
+62	ETIME	Timer expired
+63	ENOSR	Out of stream resources
+64	ENONET	Machine is not on the network
+65	ENOPKG	Package not installed
+66	EREMOTE	Object is remote
+67	ENOLINK	Link has been severed
+68	EADV	Advertise error
+69	ESRMNT	Srmount error
+70	ECOMM	Communication error on send
+71	EPROTO	Protocol error
+72	ELOCKUNMAPPED	Locked lock was unmapped 
+73	ENOTACTIVE	Facility is not active
+74	EMULTIHOP	Multihop attempted
+77	EBADMSG	Not a data message
+78	ENAMETOOLONG	File name too long
+79	EOVERFLOW	Value too large for defined data type
+80	ENOTUNIQ	Name not unique on network
+81	EBADFD	File descriptor in bad state
+82	EREMCHG	Remote address changed
+83	ELIBACC	Can not access a needed shared library
+84	ELIBBAD	Accessing a corrupted shared library
+85	ELIBSCN	.lib section in a.out corrupted
+86	ELIBMAX	Attempting to link in more shared libraries than system limit
+87	ELIBEXEC	Can not exec a shared library directly
+88	EILSEQ	Illegal byte sequence
+89	ENOSYS	Operation not applicable
+90	ELOOP	Number of symbolic links encountered during path name traversal exceeds MAXSYMLINKS
+93	ENOTEMPTY	Directory not empty
+94	EUSERS	Too many users
+95	ENOTSOCK	Socket operation on non-socket
+96	EDESTADDRREQ	Destination address required
+97	EMSGSIZE	Message too long
+98	EPROTOTYPE	Protocol wrong type for socket
+99	ENOPROTOOPT	Option not supported by protocol
+120	EPROTONOSUPPORT	Protocol not supported
+121	ESOCKTNOSUPPORT	Socket type not supported
+122	EOPNOTSUPP	Operation not supported on transport endpoint
+123	EPFNOSUPPORT	Protocol family not supported
+124	EAFNOSUPPORT	Address family not supported by protocol family
+125	EADDRINUSE	Address already in use
+126	EADDRNOTAVAIL	Cannot assign requested address
+127	ENETDOWN	Network is down
+128	ENETUNREACH	Network is unreachable
+129	ENETRESET	Network dropped connection because of reset
+130	ECONNABORTED	Software caused connection abort
+131	ECONNRESET	Connection reset by peer
+132	ENOBUFS	No buffer space available
+133	EISCONN	Transport endpoint is already connected
+134	ENOTCONN	Transport endpoint is not connected
+135	SKIP	Structure needs cleaning
+137	SKIP	Not a name file
+138	SKIP	Not available
+139	SKIP	Is a name file
+140	SKIP	Remote I/O error
+141	SKIP	Reserved for future use
 142
-143	Cannot send after socket shutdown
-144	Too many references: cannot splice
-145	Connection timed out
-146	Connection refused
-147	Host is down
-148	No route to host
-149	Operation already in progress
-150	Operation now in progress
-151	Stale NFS file handle
+143	ESHUTDOWN	Cannot send after socket shutdown
+144	ETOOMANYREFS	Too many references: cannot splice
+145	ETIMEDOUT	Connection timed out
+146	ECONNREFUSED	Connection refused
+147	EHOSTDOWN	Host is down
+148	EHOSTUNREACH	No route to host
+149	EALREADY	Operation already in progress
+150	EINPROGRESS	Operation now in progress
+151	ESTALE	Stale NFS file handle

@@ -79,6 +79,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.45 {
+    protected:
+	strerrordesc_np;
+	strerrorname_np;
+} ILLUMOS_0.44;
+
 SYMBOL_VERSION ILLUMOS_0.44 {
     protected:
 	execvpe;

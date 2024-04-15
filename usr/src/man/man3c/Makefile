@@ -1277,6 +1277,8 @@ MANLINKS=	FD_CLR.3c				\
 		strdupa.3c				\
 		strerror_l.3c				\
 		strerror_r.3c				\
+		strerrordesc_np.3c			\
+		strerrorname_np.3c			\
 		strfmon_l.3c				\
 		strftime_l.3c				\
 		strlcat.3c				\
@@ -2386,6 +2388,8 @@ strcoll_l.3c				:= LINKSRC = strcoll.3c
 
 strerror_l.3c				:= LINKSRC = strerror.3c
 strerror_r.3c				:= LINKSRC = strerror.3c
+strerrordesc_np.3c			:= LINKSRC = strerror.3c
+strerrorname_np.3c			:= LINKSRC = strerror.3c
 
 strfmon_l.3c				:= LINKSRC = strfmon.3c
 

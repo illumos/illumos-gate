@@ -13932,6 +13932,8 @@ s usr/share/man/man3c/strdupa.3c=string.3c
 f usr/share/man/man3c/strerror.3c 0444 root bin
 s usr/share/man/man3c/strerror_l.3c=strerror.3c
 s usr/share/man/man3c/strerror_r.3c=strerror.3c
+s usr/share/man/man3c/strerrordesc_np.3c=strerror.3c
+s usr/share/man/man3c/strerrorname_np.3c=strerror.3c
 f usr/share/man/man3c/strfmon.3c 0444 root bin
 s usr/share/man/man3c/strfmon_l.3c=strfmon.3c
 f usr/share/man/man3c/strftime.3c 0444 root bin
