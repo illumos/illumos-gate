@@ -72,12 +72,12 @@ $(NATIVE_BUILD)MYCPPFLAGS =	-I ../common -I$(NATIVE_ADJUNCT)/include/libxml2
 CPPFLAGS +=	$(MYCPPFLAGS)
 LDFLAGS +=	$(MAPOPTS)
 
+# These are because of bugs in lex(1)/yacc(1) generated code
 CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-parentheses
 
 # not linted
 SMATCH=off

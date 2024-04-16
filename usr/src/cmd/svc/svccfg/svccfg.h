@@ -74,10 +74,8 @@ extern "C" {
 /* Flags for lscf_service_export() */
 #define	SCE_ALL_VALUES	0x01		/* Include all property values */
 
-#ifdef lint
 extern int yyerror(const char *);
 extern int yyparse(void);
-#endif /* lint */
 
 extern int lex_lineno;
 
@@ -392,125 +390,148 @@ extern const char * const false;
 #define	uu_list_append(list, elem)	uu_list_insert_before(list, NULL, elem)
 #define	uu_list_prepend(list, elem)	uu_list_insert_after(list, NULL, elem)
 
-void *safe_malloc(size_t);
-char *safe_strdup(const char *);
-void warn(const char *, ...);
-void synerr(int);
-void semerr(const char *, ...);
+extern void *safe_malloc(size_t);
+extern char *safe_strdup(const char *);
+extern void warn(const char *, ...);
+extern void synerr(int);
+extern void semerr(const char *, ...);
 
-void internal_init(void);
-void internal_dump(bundle_t *);
+extern void internal_init(void);
+extern void internal_dump(bundle_t *);
 
-int value_cmp(const void *, const void *, void *);
+extern int value_cmp(const void *, const void *, void *);
 
-bundle_t *internal_bundle_new(void);
-void internal_bundle_free(bundle_t *);
-entity_t *internal_service_new(const char *);
-void internal_service_free(entity_t *);
-entity_t *internal_instance_new(const char *);
-void internal_instance_free(entity_t *);
-entity_t *internal_template_new(void);
-pgroup_t *internal_pgroup_new(void);
-void internal_pgroup_free(pgroup_t *);
-pgroup_t *internal_pgroup_find(entity_t *, const char *, const char *);
-pgroup_t *internal_dependent_find(entity_t *, const char *);
-pgroup_t *internal_pgroup_find_or_create(entity_t *, const char *,
+extern bundle_t *internal_bundle_new(void);
+extern void internal_bundle_free(bundle_t *);
+extern entity_t *internal_service_new(const char *);
+extern void internal_service_free(entity_t *);
+extern entity_t *internal_instance_new(const char *);
+extern void internal_instance_free(entity_t *);
+extern entity_t *internal_template_new(void);
+extern pgroup_t *internal_pgroup_new(void);
+extern void internal_pgroup_free(pgroup_t *);
+extern pgroup_t *internal_pgroup_find(entity_t *, const char *, const char *);
+extern pgroup_t *internal_dependent_find(entity_t *, const char *);
+extern pgroup_t *internal_pgroup_find_or_create(entity_t *, const char *,
     const char *);
-pgroup_t *internal_pgroup_create_strict(entity_t *, const char *,
+extern pgroup_t *internal_pgroup_create_strict(entity_t *, const char *,
     const char *);
-property_t *internal_property_new(void);
-void internal_property_free(property_t *);
-property_t *internal_property_find(pgroup_t *, const char *);
-property_t *internal_property_create(const char *, scf_type_t, uint_t, ...);
-value_t *internal_value_new(void);
+extern property_t *internal_property_new(void);
+extern void internal_property_free(property_t *);
+extern property_t *internal_property_find(pgroup_t *, const char *);
+extern property_t *internal_property_create(const char *, scf_type_t,
+    uint_t, ...);
+extern value_t *internal_value_new(void);
 
-int internal_attach_service(bundle_t *, entity_t *);
-int internal_attach_entity(entity_t *, entity_t *);
-int internal_attach_pgroup(entity_t *, pgroup_t *);
-void internal_detach_pgroup(entity_t *, pgroup_t *);
-int internal_attach_dependent(entity_t *, pgroup_t *);
-int internal_attach_property(pgroup_t *, property_t *);
-void internal_detach_property(pgroup_t *, property_t *);
-void internal_attach_value(property_t *, value_t *);
+extern int internal_attach_service(bundle_t *, entity_t *);
+extern int internal_attach_entity(entity_t *, entity_t *);
+extern int internal_attach_pgroup(entity_t *, pgroup_t *);
+extern void internal_detach_pgroup(entity_t *, pgroup_t *);
+extern int internal_attach_dependent(entity_t *, pgroup_t *);
+extern int internal_attach_property(pgroup_t *, property_t *);
+extern void internal_detach_property(pgroup_t *, property_t *);
+extern void internal_attach_value(property_t *, value_t *);
 
-int load_init(void);
-void load_fini(void);
-int load_instance(const char *, const char *, entity_t **);
-int load_pg_attrs(const scf_propertygroup_t *, pgroup_t **);
-int load_pg(const scf_propertygroup_t *, pgroup_t **, const char *,
+extern int load_init(void);
+extern void load_fini(void);
+extern int load_instance(const char *, const char *, entity_t **);
+extern int load_pg_attrs(const scf_propertygroup_t *, pgroup_t **);
+extern int load_pg(const scf_propertygroup_t *, pgroup_t **, const char *,
     const char *);
-int prop_equal(property_t *, property_t *, const char *, const char *, int);
-int pg_attrs_equal(const pgroup_t *, const pgroup_t *, const char *, int);
-int pg_equal(pgroup_t *, pgroup_t *);
+extern int prop_equal(property_t *, property_t *, const char *, const char *,
+    int);
+extern int pg_attrs_equal(const pgroup_t *, const pgroup_t *, const char *,
+    int);
+extern int pg_equal(pgroup_t *, pgroup_t *);
 
-void lscf_cleanup(void);
-void lscf_prep_hndl(void);
-void lscf_init(void);
-int lscf_bundle_import(bundle_t *, const char *, uint_t);
-int lscf_bundle_apply(bundle_t *, const char *);
-void lscf_delete(const char *, int);
-void lscf_list(const char *);
-void lscf_select(const char *);
-void lscf_unselect();
-void lscf_get_selection_str(char *, size_t);
-void lscf_add(const char *);
-void lscf_listpg(const char *);
-void lscf_addpg(const char *, const char *, const char *);
-void lscf_delpg(char *);
-void lscf_delhash(char *, int);
-void lscf_listprop(const char *);
-void lscf_addprop(char *, const char *, const uu_list_t *);
-void lscf_delprop(char *);
-int lscf_describe(uu_list_t *, int);
-void lscf_listsnap();
-void lscf_selectsnap(const char *);
-void lscf_revert(const char *);
-void lscf_refresh();
-char *filename_to_propname(const char *);
-int lscf_retrieve_hash(const char *, unsigned char *);
-int lscf_store_hash(const char *, unsigned char *);
-int lscf_service_cleanup(void *, scf_walkinfo_t *);
-int lscf_hash_cleanup();
-void lscf_delnotify(const char *, int);
-void lscf_listnotify(const char *, int);
-int lscf_setnotify(uu_list_t *);
+extern void lscf_cleanup(void);
+extern void lscf_prep_hndl(void);
+extern void lscf_init(void);
+extern int lscf_bundle_import(bundle_t *, const char *, uint_t);
+extern int lscf_bundle_apply(bundle_t *, const char *);
+extern void lscf_delete(const char *, int);
+extern void lscf_list(const char *);
+extern void lscf_select(const char *);
+extern void lscf_unselect();
+extern void lscf_get_selection_str(char *, size_t);
+extern void lscf_add(const char *);
+extern void lscf_listpg(const char *);
+extern void lscf_addpg(const char *, const char *, const char *);
+extern void lscf_delpg(char *);
+extern void lscf_delhash(char *, int);
+extern void lscf_listprop(const char *);
+extern void lscf_addprop(char *, const char *, const uu_list_t *);
+extern void lscf_delprop(char *);
+extern int lscf_describe(uu_list_t *, int);
+extern void lscf_listsnap();
+extern void lscf_selectsnap(const char *);
+extern void lscf_revert(const char *);
+extern void lscf_refresh();
+extern char *filename_to_propname(const char *);
+extern int lscf_retrieve_hash(const char *, unsigned char *);
+extern int lscf_store_hash(const char *, unsigned char *);
+extern int lscf_service_cleanup(void *, scf_walkinfo_t *);
+extern int lscf_hash_cleanup();
+extern void lscf_delnotify(const char *, int);
+extern void lscf_listnotify(const char *, int);
+extern int lscf_setnotify(uu_list_t *);
 
 CPL_MATCH_FN(complete_select);
 CPL_MATCH_FN(complete_command);
 
-int lxml_init(void);
-int lxml_get_bundle_file(bundle_t *, const char *, svccfg_op_t);
-void lxml_store_value(value_t *, element_t, const xmlChar *);
+extern int lxml_init(void);
+extern int lxml_get_bundle_file(bundle_t *, const char *, svccfg_op_t);
+extern void lxml_store_value(value_t *, element_t, const xmlChar *);
+extern int lxml_inventory(const char *);
+extern int lscf_editprop(void);
+extern int lscf_addpropvalue(const char *, const char *, const char *);
+extern int lscf_delpropvalue(const char *, const char *, int);
+extern int lscf_setenv(uu_list_t *, int);
+extern void lscf_validate(const char *);
+extern void lscf_validate_fmri(const char *);
+extern int lscf_service_export(char *, const char *, int);
+extern int lscf_archive(const char *, int);
+extern int lscf_profile_extract(const char *);
+extern void lscf_set_repository(const char *, int);
+extern int lscf_setprop(const char *, const char *, const char *,
+    const uu_list_t *);
 
-void engine_init(void);
-int engine_exec_cmd(void);
-int engine_exec(char *);
-int add_cmd_matches(WordCompletion *, const char *, int, uint32_t);
-int engine_interp(void);
-int engine_source(const char *, boolean_t);
-int engine_import(uu_list_t *);
-int engine_cleanup(int);
-void help(int);
 
-int engine_cmd_getc(engine_state_t *);
-int engine_cmd_ungetc(engine_state_t *, char);
-void engine_cmd_nputs(engine_state_t *, char *, size_t);
+extern void engine_init(void);
+extern int engine_exec_cmd(void);
+extern int engine_exec(char *);
+extern int add_cmd_matches(WordCompletion *, const char *, int, uint32_t);
+extern int engine_interp(void);
+extern int engine_source(const char *, boolean_t);
+extern int engine_import(uu_list_t *);
+extern int engine_cleanup(int);
+extern int engine_set(uu_list_t *);
 
-void tmpl_errors_destroy(tmpl_errors_t *);
-void tmpl_errors_print(FILE *, tmpl_errors_t *, const char *);
-void tmpl_init(void);
-void tmpl_property_fini(property_t *);
-void tmpl_property_init(property_t *);
-tmpl_validate_status_t tmpl_validate_bundle(bundle_t *, tmpl_errors_t **);
+extern void help(int);
+
+extern int engine_cmd_getc(engine_state_t *);
+extern int engine_cmd_ungetc(engine_state_t *, char);
+extern void engine_cmd_nputs(engine_state_t *, char *, size_t);
+extern int engine_restore(const char *);
+extern int engine_restore(const char *);
+extern int engine_apply(const char *, int);
+
+extern void tmpl_errors_destroy(tmpl_errors_t *);
+extern void tmpl_errors_print(FILE *, tmpl_errors_t *, const char *);
+extern void tmpl_init(void);
+extern void tmpl_property_fini(property_t *);
+extern void tmpl_property_init(property_t *);
+extern tmpl_validate_status_t tmpl_validate_bundle(bundle_t *,
+    tmpl_errors_t **);
 
 #define	FMA_TOKENS	0
 #define	MIXED_TOKENS	-1
 #define	INVALID_TOKENS	-2
 
-char **tokenize(char *, const char *);
-int32_t check_tokens(char **);
-const char *de_tag(const char *);
-const char *tset_to_string(int32_t);
+extern char **tokenize(char *, const char *);
+extern int32_t check_tokens(char **);
+extern const char *de_tag(const char *);
+extern const char *tset_to_string(int32_t);
 
 #ifdef	__cplusplus
 }
