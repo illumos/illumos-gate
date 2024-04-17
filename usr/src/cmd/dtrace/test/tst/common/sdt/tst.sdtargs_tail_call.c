@@ -22,45 +22,22 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2024 Oxide Computer Company
  */
 
-/*
- * ASSERTION: Verify that argN (1..7) variables are properly remapped.
- */
+#include <unistd.h>
+#include <sys/uadmin.h>
 
-BEGIN
+int
+main(int argc, char **argv)
 {
-	/* Timeout after 5 seconds */
-	timeout = timestamp + 5000000000;
-	ignore = $1;
-}
+	while (1) {
+		if (uadmin(A_SDTTEST, 0, 0) < 0) {
+			perror("uadmin");
+			return (1);
+		}
 
-ERROR
-{
-	printf("sdt::sdt_test_args:test failed.\n");
-	exit(1);
-}
+		sleep(1);
+	}
 
-sdt::sdt_test_args:test
-/arg0 != 1 || arg1 != 2 || arg2 != 3 || arg3 != 4 || arg4 != 5 || arg5 != 6 ||
-    arg6 != 7/
-{
-	printf("sdt arg mismatch\n\n");
-	printf("args are  : %d, %d, %d, %d, %d, %d, %d\n", arg0, arg1, arg2,
-	    arg3, arg4, arg5, arg6);
-	printf("should be : 1, 2, 3, 4, 5, 6, 7\n");
-	exit(1);
-}
-
-sdt::sdt_test_args:test
-{
-	exit(0);
-}
-
-profile:::tick-1
-/timestamp > timeout/
-{
-	trace("test timed out");
-	exit(1);
+	return (0);
 }

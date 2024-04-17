@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -1537,6 +1538,8 @@ file path=opt/SUNWdtrt/tst/common/scripting/tst.uid.ksh mode=0444
 dir  path=opt/SUNWdtrt/tst/common/sdt
 file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs.d mode=0444
 file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs_tail_call.d mode=0444
+file path=opt/SUNWdtrt/tst/common/sdt/tst.sdtargs_tail_call.exe mode=0555
 dir  path=opt/SUNWdtrt/tst/common/sizeof
 file path=opt/SUNWdtrt/tst/common/sizeof/err.D_IDENT_BADREF.SizeofAssoc.d \
     mode=0444

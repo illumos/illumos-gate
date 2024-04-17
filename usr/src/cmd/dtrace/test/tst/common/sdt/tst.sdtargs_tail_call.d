@@ -26,7 +26,8 @@
  */
 
 /*
- * ASSERTION: Verify that argN (1..7) variables are properly remapped.
+ * ASSERTION: Verify that argN (1..7) variables are properly remapped if the
+ * probe is a tail call.
  */
 
 BEGIN
@@ -34,15 +35,16 @@ BEGIN
 	/* Timeout after 5 seconds */
 	timeout = timestamp + 5000000000;
 	ignore = $1;
+	pass = 0;
 }
 
 ERROR
 {
-	printf("sdt::sdt_test_args:test failed.\n");
+	printf("sdt::sdt_test_args_tail_call:test failed.\n");
 	exit(1);
 }
 
-sdt::sdt_test_args:test
+sdt::sdt_test_args_tail_call:test
 /arg0 != 1 || arg1 != 2 || arg2 != 3 || arg3 != 4 || arg4 != 5 || arg5 != 6 ||
     arg6 != 7/
 {
@@ -53,7 +55,17 @@ sdt::sdt_test_args:test
 	exit(1);
 }
 
-sdt::sdt_test_args:test
+sdt::sdt_test_args_tail_call:test
+{
+	pass = 1;
+}
+
+/*
+ * Since this is a tail call, on-disk there's no RET instruction.  We rely
+ * on krtld patching one in which should allow us to register a probe here.
+ */
+fbt::sdt_test_args_tail_call:return
+/pass/
 {
 	exit(0);
 }

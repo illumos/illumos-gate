@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_SDT_IMPL_H
@@ -38,6 +39,18 @@ extern "C" {
 #include <sys/dtrace.h>
 
 #if defined(__i386) || defined(__amd64)
+#define	SDT_CALL	0xe8
+#define	SDT_NOP		0x90
+#define	SDT_RET		0xc3
+
+/*
+ * The kernel runtime linker (krtld) will perform the patching described above
+ * and note the offset of the instruction that was patched for the SDT module
+ * in the sdpd_offset field of the sdt_probedesc_t structure.  In the case of
+ * a tail call, this index will be a RET otherwise it will be a NOP.
+ */
+#define	SDT_OFF_RET_IDX	3
+
 typedef uint8_t sdt_instr_t;
 #else
 typedef uint32_t sdt_instr_t;
@@ -64,6 +77,7 @@ typedef struct sdt_probe {
 	sdt_instr_t	*sdp_patchpoint;	/* patch point */
 	sdt_instr_t	sdp_patchval;		/* instruction to patch */
 	sdt_instr_t	sdp_savedval;		/* saved instruction value */
+	boolean_t	sdp_is_tailcall;	/* invoked as a tail call */
 	struct sdt_probe *sdp_next;		/* next probe */
 	struct sdt_probe *sdp_hashnext;		/* next on hash */
 } sdt_probe_t;

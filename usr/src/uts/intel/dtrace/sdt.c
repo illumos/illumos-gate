@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/modctl.h>
@@ -184,6 +185,8 @@ sdt_provide_module(void *arg, struct modctl *ctl)
 		sdp->sdp_patchval = SDT_PATCHVAL;
 		sdp->sdp_patchpoint = (uint8_t *)sdpd->sdpd_offset;
 		sdp->sdp_savedval = *sdp->sdp_patchpoint;
+		sdp->sdp_is_tailcall =
+		    sdp->sdp_patchpoint[SDT_OFF_RET_IDX] == SDT_RET;
 	}
 }
 
@@ -299,6 +302,7 @@ err:
 uint64_t
 sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 {
+	sdt_probe_t *sdp = parg;
 	uintptr_t val;
 	struct frame *fp = (struct frame *)dtrace_getfp();
 	uintptr_t *stack;
@@ -334,6 +338,17 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			} else {
 				stack = (uintptr_t *)(rp->r_rsp);
 				argno -= (inreg + 1);
+
+				/*
+				 * If the probe was invoked as a tail call, the
+				 * compiler leaves the stack as if we had just
+				 * entered the fictitious  __dtrace_probe_[name]
+				 * function, meaning we need to skip over the
+				 * saved return address to get to the stack
+				 * arguments.
+				 */
+				if (sdp->sdp_is_tailcall)
+					argno++;
 			}
 			goto load;
 		}
