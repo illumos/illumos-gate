@@ -498,20 +498,28 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_desc = "chassis - bad length (latest version)"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
-	    .st_tvers = SMB_VERSION,
-	    .st_libvers = SMB_VERSION,
-	    .st_mktable = smbios_test_chassis_mktable_base,
-	    .st_canopen = B_TRUE,
-	    .st_verify = smbios_test_chassis_verify_invlen,
-	    .st_desc = "chassis - bad length, expect sku"
-	}, {
-	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_24,
 	    .st_libvers = SMB_VERSION,
 	    .st_mktable = smbios_test_chassis_mktable_base,
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_chassis_verify_base,
 	    .st_desc = "chassis - basic 2.4 version"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_24,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_part,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_base,
+	    .st_desc = "chassis - hv 2.4 version"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_27,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_part,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_base,
+	    .st_desc = "chassis - hv 2.7 version"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION,

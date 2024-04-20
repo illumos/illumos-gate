@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -92,6 +92,26 @@ smbios_test_chassis_mktable_base(smbios_test_table_t *table)
 
 	smbios_test_chassis_mktable_fill_chassis(&ch);
 	(void) smbios_test_table_append(table, &ch, sizeof (ch));
+	smbios_test_chassis_mktable_append_strings(table);
+	smbios_test_table_str_fini(table);
+	smbios_test_table_append_eot(table);
+
+	return (B_TRUE);
+}
+
+/*
+ * A variant of the base that doesn't include the element length becaue there
+ * are no elements.
+ */
+boolean_t
+smbios_test_chassis_mktable_part(smbios_test_table_t *table)
+{
+	smb_chassis_t ch;
+	size_t len = offsetof(smb_chassis_t, smbch_cn);
+
+	smbios_test_chassis_mktable_fill_chassis(&ch);
+	ch.smbch_hdr.smbh_len = len;
+	(void) smbios_test_table_append(table, &ch, len);
 	smbios_test_chassis_mktable_append_strings(table);
 	smbios_test_table_str_fini(table);
 	smbios_test_table_append_eot(table);
@@ -245,12 +265,6 @@ smbios_test_chassis_verify_common(smbios_hdl_t *hdl, smbios_struct_t *sp,
 		ret = B_FALSE;
 	}
 
-	if (ch->smbc_elemlen != sizeof (smb_chassis_entry_t)) {
-		warnx("chassis state mismatch, found unexpected elemlen value: "
-		    "0x%x", ch->smbc_elemlen);
-		ret = B_FALSE;
-	}
-
 	if (smbios_info_common(hdl, sp->smbstr_id, &info) != 0) {
 		warnx("failed to get common chassis info: %s",
 		    smbios_errmsg(smbios_errno(hdl)));
@@ -370,6 +384,12 @@ smbios_test_chassis_verify_sku_nocomps(smbios_hdl_t *hdl)
 	if (ch.smbc_elems != 0) {
 		warnx("chassis state mismatch, found unexpected number of "
 		    "elements: 0x%x", ch.smbc_elems);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_elemlen != sizeof (smb_chassis_entry_t)) {
+		warnx("chassis state mismatch, found unexpected elemlen value: "
+		    "0x%x", ch.smbc_elemlen);
 		ret = B_FALSE;
 	}
 
@@ -499,6 +519,12 @@ smbios_test_chassis_verify_comps(smbios_hdl_t *hdl)
 		ret = B_FALSE;
 	}
 
+	if (ch.smbc_elemlen != sizeof (smb_chassis_entry_t)) {
+		warnx("chassis state mismatch, found unexpected elemlen value: "
+		    "0x%x", ch.smbc_elemlen);
+		ret = B_FALSE;
+	}
+
 	if (strcmp(ch.smbc_sku, "") != 0) {
 		warnx("chassis state mismatch, found unexpected sku: %s",
 		    ch.smbc_sku);
@@ -539,6 +565,12 @@ smbios_test_chassis_verify_sku(smbios_hdl_t *hdl)
 	if (ch.smbc_elems != 2) {
 		warnx("chassis state mismatch, found unexpected number of "
 		    "elements: 0x%x", ch.smbc_elems);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_elemlen != sizeof (smb_chassis_entry_t)) {
+		warnx("chassis state mismatch, found unexpected elemlen value: "
+		    "0x%x", ch.smbc_elemlen);
 		ret = B_FALSE;
 	}
 
