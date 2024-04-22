@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #ifndef _SYS_LX_FCNTL_H
@@ -73,6 +74,10 @@ extern "C" {
 #define	LX_F_GETLK64		12
 #define	LX_F_SETLK64		13
 #define	LX_F_SETLKW64		14
+
+#define	LX_F_OFD_GETLK		36
+#define	LX_F_OFD_SETLK		37
+#define	LX_F_OFD_SETLKW		38
 
 #define	LX_F_SETLEASE		1024
 #define	LX_F_GETLEASE		1025

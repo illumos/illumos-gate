@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/systm.h>
@@ -390,6 +391,12 @@ lx_fcntl_lock_cmd_to_s(int lx_cmd)
 		return (F_SETLK64);
 	case LX_F_SETLKW64:
 		return (F_SETLKW64);
+	case LX_F_OFD_GETLK:
+		return (F_OFD_GETLK);
+	case LX_F_OFD_SETLK:
+		return (F_OFD_SETLK);
+	case LX_F_OFD_SETLKW:
+		return (F_OFD_SETLKW);
 	default:
 		VERIFY(0);
 		/*NOTREACHED*/
@@ -437,6 +444,9 @@ lx_fcntl_lock(int fd, int lx_cmd, void *arg)
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
+	case F_OFD_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
 		if (datamodel == DATAMODEL_NATIVE) {
 			if (copyin(arg, &lxflk, sizeof (lx_flock_t)) != 0) {
 				error = EFAULT;
@@ -444,7 +454,7 @@ lx_fcntl_lock(int fd, int lx_cmd, void *arg)
 			}
 		}
 #if defined(_SYSCALL32_IMPL)
-		else {
+		else if (cmd == F_GETLK || cmd == F_SETLK || cmd == F_SETLKW) {
 			lx_flock32_t lxflk32;
 
 			if (copyin(arg, &lxflk32, sizeof (lxflk32)) != 0) {
@@ -457,6 +467,33 @@ lx_fcntl_lock(int fd, int lx_cmd, void *arg)
 			lxflk.l_start = (off64_t)lxflk32.l_start;
 			lxflk.l_len = (off64_t)lxflk32.l_len;
 			lxflk.l_pid = lxflk32.l_pid;
+		} else {
+			ASSERT(cmd == F_OFD_GETLK || cmd == F_OFD_SETLK ||
+			    cmd == F_OFD_SETLKW);
+			/*
+			 * Linux only allows the _OFD_ variants for 32-bit
+			 * apps on large-file ops, so there's no handling near
+			 * F_*64 below, and instead we do it here.  Oh and the
+			 * structure is SLIGHTLY different than the native
+			 * 64-bit one, so the copying mess needs to happen.
+			 */
+			/*
+			 * XXX KEBE ASKS DO WE NEED THIS CHECK OR CAN WE
+			 * VERIFY?
+			 */
+			if (datamodel != DATAMODEL_ILP32) {
+				error = EINVAL;
+				break;
+			}
+			if (copyin(arg, &lxflk64, sizeof (lxflk64)) != 0) {
+				error = EFAULT;
+				break;
+			}
+			lxflk.l_type = lxflk64.l_type;
+			lxflk.l_whence = lxflk64.l_whence;
+			lxflk.l_start = (off64_t)lxflk64.l_start;
+			lxflk.l_len = (off64_t)lxflk64.l_len;
+			lxflk.l_pid = lxflk64.l_pid;
 		}
 #endif /* _SYSCALL32_IMPL */
 
@@ -465,16 +502,49 @@ lx_fcntl_lock(int fd, int lx_cmd, void *arg)
 		if ((error = flock_check(vp, &bf, offset, maxoffset)) != 0)
 			break;
 
+		if (cmd == F_OFD_GETLK || cmd == F_OFD_SETLK ||
+		    cmd == F_OFD_SETLKW) {
+			/*
+			 * TBD OFD-style locking is currently limited to
+			 * covering the entire file.
+			 */
+			if (bf.l_whence != 0 || bf.l_start != 0 ||
+			    bf.l_len != 0) {
+				char buf[200];
+				/*
+				 * This may be worse for Linux apps that expect
+				 * this to work, so put a DTrace probe here.
+				 */
+				(void) snprintf(buf, sizeof (buf), "F_OFD_* "
+				    "fcntl being sent with one or more nonzero "
+				    "whence (%d), start (%ld), or len (%ld).",
+				    bf.l_whence, bf.l_start, bf.l_len);
+				lx_unsupported(buf);
+				DTRACE_PROBE3(lx__ofd__record__locking,
+				    uint16_t, bf.l_whence, long, bf.l_start,
+				    long, bf.l_len);
+				error = EINVAL;
+				break;
+			}
+		}
+
 		if ((error = VOP_FRLOCK(vp, cmd, &bf, flag, offset, NULL,
 		    fp->f_cred, NULL)) != 0) {
-			if (cmd == F_SETLKW && error == EINTR) {
+			if ((cmd == F_SETLKW || cmd == F_OFD_SETLKW) &&
+			    error == EINTR) {
 				ttolxlwp(curthread)->br_syscall_restart =
 				    B_TRUE;
 			}
 			break;
 		}
 
-		if (cmd != F_GETLK)
+		if (cmd == F_OFD_GETLK || cmd == F_OFD_SETLK ||
+		    cmd == F_OFD_SETLKW) {
+			if ((error = ofdlock(fp, cmd, &bf, flag, offset)) != 0)
+				break;
+		}
+
+		if (cmd != F_GETLK && cmd != F_OFD_GETLK)
 			break;
 
 		/*
@@ -611,6 +681,9 @@ lx_fcntl(int fd, int cmd, intptr_t arg)
 	case LX_F_GETLK:
 	case LX_F_SETLK:
 	case LX_F_SETLKW:
+	case LX_F_OFD_GETLK:
+	case LX_F_OFD_SETLK:
+	case LX_F_OFD_SETLKW:
 		return (lx_fcntl_lock(fd, cmd, (void *)arg));
 
 	default:
@@ -628,6 +701,9 @@ lx_fcntl64(int fd, int cmd, intptr_t arg)
 	case LX_F_GETLK64:
 	case LX_F_SETLKW64:
 	case LX_F_SETLK64:
+	case LX_F_OFD_GETLK:
+	case LX_F_OFD_SETLKW:
+	case LX_F_OFD_SETLK:
 		return (lx_fcntl_lock(fd, cmd, (void *)arg));
 
 	default:
