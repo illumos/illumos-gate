@@ -126,6 +126,7 @@ for lib in \
   libipsecutil \
   libkrb5 \
   libmlrpc \
+  libofmt \
   libpam \
   libsaveargs \
   libsec \
@@ -219,6 +220,7 @@ for lib in \
   libfakekernel \
   libads \
   libidmap \
+  libofmt \
   libsmbfs \
   libmlrpc
 do

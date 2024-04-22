@@ -101,8 +101,6 @@ extern	kmem_cache_t		*smb_cache_lock;
 extern	kmem_cache_t		*smb_kshare_cache_vfs;
 
 time_t smb_get_boottime(void);
-int smb_server_lookup(smb_server_t **);
-void smb_server_release(smb_server_t *);
 
 /*
  * SMB request handers called from the dispatcher.  Each SMB request
@@ -457,29 +455,38 @@ void fksmb_kdoor_open(smb_server_t *, void *);
 int smb_server_get_count(void);
 int smb_server_g_init(void);
 void smb_server_g_fini(void);
-int smb_server_create(void);
+int smb_server_create(dev_t);
 int smb_server_delete(smb_server_t *);
-int smb_server_configure(smb_ioc_cfg_t *);
-int smb_server_start(smb_ioc_start_t *);
-int smb_server_stop(void);
+int smb_server_lookup(smb_server_t **);
+void smb_server_release(smb_server_t *);
+
+/* smbsrv driver ioctl handlers */
+int smb_server_configure(smb_server_t *, smb_ioc_cfg_t *);
+int smb_server_start(smb_server_t *, smb_ioc_start_t *);
+int smb_server_stop(smb_server_t *);
+int smb_server_notify_event(smb_server_t *, smb_ioc_event_t *);
+int smb_server_set_gmtoff(smb_server_t *, smb_ioc_gmt_t *);
+int smb_kshare_export_list(smb_server_t *, smb_ioc_share_t *);
+int smb_kshare_unexport_list(smb_server_t *, smb_ioc_share_t *);
+int smb_kshare_info(smb_server_t *, smb_ioc_shareinfo_t *);
+int smb_kshare_access(smb_server_t *, smb_ioc_shareaccess_t *);
+int smb_server_numopen(smb_server_t *, smb_ioc_opennum_t *);
+int smb_server_enum(smb_server_t *, smb_ioc_svcenum_t *);
+int smb_server_session_close(smb_server_t *, smb_ioc_session_t *);
+int smb_server_file_close(smb_server_t *, smb_ioc_fileid_t *);
+int smb_server_spooldoc(smb_server_t *, smb_ioc_spooldoc_t *);
+
+/* other server stuff */
 boolean_t smb_server_is_stopping(smb_server_t *);
 void smb_server_cancel_event(smb_server_t *, uint32_t);
-int smb_server_notify_event(smb_ioc_event_t *);
 uint32_t smb_server_get_session_count(smb_server_t *);
-int smb_server_set_gmtoff(smb_ioc_gmt_t *);
-int smb_server_numopen(smb_ioc_opennum_t *);
-int smb_server_enum(smb_ioc_svcenum_t *);
-int smb_server_session_close(smb_ioc_session_t *);
-int smb_server_file_close(smb_ioc_fileid_t *);
 int smb_server_share_lookup(smb_server_t *, const char *, smb_node_t **);
 int smb_server_unshare(const char *);
-
 void smb_server_logoff_ssnid(smb_request_t *, uint64_t);
 smb_user_t *smb_server_lookup_user(smb_server_t *, uint64_t, uint64_t);
 
 void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
 
-int smb_server_spooldoc(smb_ioc_spooldoc_t *);
 int smb_spool_add_doc(smb_tree_t *, smb_kspooldoc_t *);
 void smb_spool_add_fid(smb_server_t *, uint16_t);
 
@@ -964,10 +971,6 @@ void smb_kshare_fini(smb_server_t *);
 int smb_kshare_start(smb_server_t *);
 void smb_kshare_stop(smb_server_t *);
 
-int smb_kshare_export_list(smb_ioc_share_t *);
-int smb_kshare_unexport_list(smb_ioc_share_t *);
-int smb_kshare_info(smb_ioc_shareinfo_t *);
-int smb_kshare_access(smb_ioc_shareaccess_t *);
 void smb_kshare_enum(smb_server_t *, smb_enumshare_info_t *);
 smb_kshare_t *smb_kshare_lookup(smb_server_t *, const char *);
 void smb_kshare_release(smb_server_t *, smb_kshare_t *);

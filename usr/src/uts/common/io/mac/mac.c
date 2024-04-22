@@ -24,6 +24,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -379,7 +380,8 @@ static int i_mac_constructor(void *, void *, int);
 static void i_mac_destructor(void *, void *);
 static int i_mac_ring_ctor(void *, void *, int);
 static void i_mac_ring_dtor(void *, void *);
-static mblk_t *mac_rx_classify(mac_impl_t *, mac_resource_handle_t, mblk_t *);
+static flow_entry_t *mac_rx_classify(mac_impl_t *, mac_resource_handle_t,
+    mblk_t *);
 void mac_tx_client_flush(mac_client_impl_t *);
 void mac_tx_client_block(mac_client_impl_t *);
 static void mac_rx_ring_quiesce(mac_ring_t *, uint_t);
@@ -2742,7 +2744,7 @@ mac_disable(mac_handle_t mh)
  * incoming packets to the right flow.
  */
 /* ARGSUSED */
-static mblk_t *
+static flow_entry_t *
 mac_rx_classify(mac_impl_t *mip, mac_resource_handle_t mrh, mblk_t *mp)
 {
 	flow_entry_t	*flent = NULL;
@@ -2750,10 +2752,7 @@ mac_rx_classify(mac_impl_t *mip, mac_resource_handle_t mrh, mblk_t *mp)
 	int		err;
 
 	err = mac_flow_lookup(mip->mi_flow_tab, mp, flags, &flent);
-	if (err != 0) {
-		/* no registered receive function */
-		return (mp);
-	} else {
+	if (err == 0) {
 		mac_client_impl_t	*mcip;
 
 		/*
@@ -2768,39 +2767,81 @@ mac_rx_classify(mac_impl_t *mip, mac_resource_handle_t mrh, mblk_t *mp)
 			flent = mcip->mci_flent;
 			FLOW_TRY_REFHOLD(flent, err);
 			if (err != 0)
-				return (mp);
+				return (NULL);
 		}
-		(flent->fe_cb_fn)(flent->fe_cb_arg1, flent->fe_cb_arg2, mp,
-		    B_FALSE);
-		FLOW_REFRELE(flent);
 	}
-	return (NULL);
+
+	/* flent will be NULL if mac_flow_lookup fails to find a match. */
+	return (flent);
 }
 
 mblk_t *
 mac_rx_flow(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mblk_t		*bp, *bp1, **bpp, *list = NULL;
+	mblk_t		*mp_next, *tail, **unclass_nextp;
+	mblk_t		*unclass_list = NULL;
+	flow_entry_t	*prev_flent = NULL;
 
 	/*
 	 * We walk the chain and attempt to classify each packet.
 	 * The packets that couldn't be classified will be returned
 	 * back to the caller.
+	 *
+	 * We want to batch together runs of matched packets bound
+	 * for the same flent into the same callback. Unmatched
+	 * packets should not break an ongoing chain.
 	 */
-	bp = mp_chain;
-	bpp = &list;
-	while (bp != NULL) {
-		bp1 = bp;
-		bp = bp->b_next;
-		bp1->b_next = NULL;
+	mp_next = tail = mp_chain;
+	unclass_nextp = &unclass_list;
+	while (mp_next != NULL) {
+		flow_entry_t	*flent;
+		mblk_t		*mp = mp_next;
+		mp_next = mp_next->b_next;
+		mp->b_next = NULL;
 
-		if (mac_rx_classify(mip, mrh, bp1) != NULL) {
-			*bpp = bp1;
-			bpp = &bp1->b_next;
+		flent = mac_rx_classify(mip, mrh, mp);
+		if (flent == NULL) {
+			/*
+			 * Add the current mblk_t to the end of the
+			 * unclassified packet chain at 'unclass_list'.
+			 * Move the current head forward if we have not
+			 * yet made any match.
+			 */
+			if (prev_flent == NULL) {
+				mp_chain = mp_next;
+				tail = mp_next;
+			}
+			*unclass_nextp = mp;
+			unclass_nextp = &mp->b_next;
+			continue;
 		}
+
+		if (prev_flent == NULL || flent == prev_flent) {
+			/* Either the first valid match, or in the same chain */
+			if (prev_flent != NULL)
+				FLOW_REFRELE(prev_flent);
+			if (mp != tail)
+				tail->b_next = mp;
+		} else {
+			ASSERT3P(prev_flent, !=, NULL);
+			(prev_flent->fe_cb_fn)(prev_flent->fe_cb_arg1,
+			    prev_flent->fe_cb_arg2, mp_chain, B_FALSE);
+			FLOW_REFRELE(prev_flent);
+			mp_chain = mp;
+		}
+
+		prev_flent = flent;
+		tail = mp;
 	}
-	return (list);
+	/* Last chain */
+	if (mp_chain != NULL) {
+		ASSERT3P(prev_flent, !=, NULL);
+		(prev_flent->fe_cb_fn)(prev_flent->fe_cb_arg1,
+		    prev_flent->fe_cb_arg2, mp_chain, B_FALSE);
+		FLOW_REFRELE(prev_flent);
+	}
+	return (unclass_list);
 }
 
 static int

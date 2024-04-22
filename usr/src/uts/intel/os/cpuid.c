@@ -8073,7 +8073,8 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 	 * Reread the CPUID portions that we need for various security
 	 * information.
 	 */
-	if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
 		/*
 		 * Check if we now have leaf 7 available to us.
 		 */
@@ -8082,7 +8083,7 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 			cp.cp_eax = 0;
 			cpi->cpi_maxeax = __cpuid_insn(&cp);
 			if (cpi->cpi_maxeax < 7)
-				return;
+				break;
 		}
 
 		bzero(&cp, sizeof (cp));
@@ -8090,20 +8091,21 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 		cp.cp_ecx = 0;
 		(void) __cpuid_insn(&cp);
 		cpi->cpi_std[7] = cp;
-	} else if (cpi->cpi_vendor == X86_VENDOR_AMD ||
-	    cpi->cpi_vendor == X86_VENDOR_HYGON) {
+		break;
+
+	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		/* No xcpuid support */
 		if (cpi->cpi_family < 5 ||
 		    (cpi->cpi_family == 5 && cpi->cpi_model < 1))
-			return;
+			break;
 
 		if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8) {
 			bzero(&cp, sizeof (cp));
 			cp.cp_eax = CPUID_LEAF_EXT_0;
 			cpi->cpi_xmaxeax = __cpuid_insn(&cp);
-			if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8) {
-				return;
-			}
+			if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8)
+				break;
 		}
 
 		/*
@@ -8116,22 +8118,24 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_8, &cp);
 		cpi->cpi_extd[8] = cp;
 
-		if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_21) {
-			return;
-		}
+		if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_21)
+			break;
 
 		bzero(&cp, sizeof (cp));
 		cp.cp_eax = CPUID_LEAF_EXT_21;
 		(void) __cpuid_insn(&cp);
 		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_21, &cp);
 		cpi->cpi_extd[0x21] = cp;
-	} else {
+		break;
+
+	default:
 		/*
 		 * Nothing to do here. Return an empty set which has already
 		 * been zeroed for us.
 		 */
 		return;
 	}
+
 	cpuid_scan_security(cpu, fset);
 }
 

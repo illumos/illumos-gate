@@ -415,7 +415,7 @@ smb_server_g_fini(void)
  * See smb_server_delete() for destruction.
  */
 int
-smb_server_create(void)
+smb_server_create(dev_t dev)
 {
 	zoneid_t	zid;
 	smb_server_t	*sv;
@@ -424,11 +424,11 @@ smb_server_create(void)
 
 	smb_llist_enter(&smb_servers, RW_WRITER);
 	sv = smb_llist_head(&smb_servers);
-	while (sv) {
+	while (sv != NULL) {
 		SMB_SERVER_VALID(sv);
 		if (sv->sv_zid == zid) {
 			smb_llist_exit(&smb_servers);
-			return (EPERM);
+			return (SET_ERROR(EBUSY));
 		}
 		sv = smb_llist_next(&smb_servers, sv);
 	}
@@ -439,6 +439,7 @@ smb_server_create(void)
 	sv->sv_state = SMB_SERVER_STATE_CREATED;
 	sv->sv_zid = zid;
 	sv->sv_pid = ddi_get_pid();
+	sv->sv_dev = dev;
 	sv->sv_proc_state = SMB_THREAD_STATE_EXITED;
 
 	mutex_init(&sv->sv_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -580,20 +581,15 @@ smb_server_delete(smb_server_t	*sv)
  * Called via SMB_IOC_CONFIG, for smbd startup or refresh.
  */
 int
-smb_server_configure(smb_ioc_cfg_t *ioc)
+smb_server_configure(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 {
 	int		rc = 0;
-	smb_server_t	*sv;
 
 	/*
 	 * Reality check negotiation token length vs. #define'd maximum.
 	 */
 	if (ioc->negtok_len > SMB_PI_MAX_NEGTOK)
 		return (EINVAL);
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
 
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
@@ -620,8 +616,6 @@ smb_server_configure(smb_ioc_cfg_t *ioc)
 	}
 	mutex_exit(&sv->sv_mutex);
 
-	smb_server_release(sv);
-
 	return (rc);
 }
 
@@ -632,17 +626,12 @@ smb_server_configure(smb_ioc_cfg_t *ioc)
  * Bring up the activities requried for SMB service.
  */
 int
-smb_server_start(smb_ioc_start_t *ioc)
+smb_server_start(smb_server_t *sv, smb_ioc_start_t *ioc)
 {
 	int		rc = 0;
 	int		family;
-	smb_server_t	*sv;
 	cred_t		*ucr;
 	struct proc	*tqproc;
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
 
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
@@ -754,19 +743,16 @@ smb_server_start(smb_ioc_start_t *ioc)
 		sv->sv_state = SMB_SERVER_STATE_RUNNING;
 		sv->sv_start_time = gethrtime();
 		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
 		smb_export_start(sv);
 		return (0);
 	default:
 		SMB_SERVER_STATE_VALID(sv->sv_state);
 		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
 		return (ENOTTY);
 	}
 
 	mutex_exit(&sv->sv_mutex);
 	smb_server_shutdown(sv);
-	smb_server_release(sv);
 	return (rc);
 }
 
@@ -774,13 +760,8 @@ smb_server_start(smb_ioc_start_t *ioc)
  * An smbd is shutting down.
  */
 int
-smb_server_stop(void)
+smb_server_stop(smb_server_t *sv)
 {
-	smb_server_t	*sv;
-	int		rc;
-
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
 
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
@@ -797,7 +778,6 @@ smb_server_stop(void)
 	}
 	mutex_exit(&sv->sv_mutex);
 
-	smb_server_release(sv);
 	return (0);
 }
 
@@ -831,17 +811,12 @@ smb_server_cancel_event(smb_server_t *sv, uint32_t txid)
 }
 
 int
-smb_server_notify_event(smb_ioc_event_t *ioc)
+smb_server_notify_event(smb_server_t *sv, smb_ioc_event_t *ioc)
 {
-	smb_server_t	*sv;
-	int		rc;
 
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		smb_event_notify(sv, ioc->txid);
-		smb_server_release(sv);
-	}
+	smb_event_notify(sv, ioc->txid);
 
-	return (rc);
+	return (0);
 }
 
 /*
@@ -854,17 +829,12 @@ smb_server_notify_event(smb_ioc_event_t *ioc)
  *
  * rc - 0 success
  */
-
 int
-smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
+smb_server_spooldoc(smb_server_t *sv, smb_ioc_spooldoc_t *ioc)
 {
-	smb_server_t	*sv;
-	int		rc;
+	int		rc = 0;
 	smb_kspooldoc_t *spdoc;
 	uint16_t	fid;
-
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
 
 	if (sv->sv_cfg.skc_print_enable == 0) {
 		rc = ENOTTY;
@@ -905,37 +875,27 @@ smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
 	kmem_free(spdoc, sizeof (*spdoc));
 
 out:
-	smb_server_release(sv);
 	return (rc);
 }
 
 int
-smb_server_set_gmtoff(smb_ioc_gmt_t *ioc)
+smb_server_set_gmtoff(smb_server_t *sv, smb_ioc_gmt_t *ioc)
 {
-	int		rc;
-	smb_server_t	*sv;
 
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		sv->si_gmtoff = ioc->offset;
-		smb_server_release(sv);
-	}
+	sv->si_gmtoff = ioc->offset;
 
-	return (rc);
+	return (0);
 }
 
 int
-smb_server_numopen(smb_ioc_opennum_t *ioc)
+smb_server_numopen(smb_server_t *sv, smb_ioc_opennum_t *ioc)
 {
-	smb_server_t	*sv;
-	int		rc;
 
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		ioc->open_users = sv->sv_users;
-		ioc->open_trees = sv->sv_trees;
-		ioc->open_files = sv->sv_files + sv->sv_pipes;
-		smb_server_release(sv);
-	}
-	return (rc);
+	ioc->open_users = sv->sv_users;
+	ioc->open_trees = sv->sv_trees;
+	ioc->open_files = sv->sv_files + sv->sv_pipes;
+
+	return (0);
 }
 
 /*
@@ -943,11 +903,10 @@ smb_server_numopen(smb_ioc_opennum_t *ioc)
  * enumeration context, i.e. what the caller want to get back.
  */
 int
-smb_server_enum(smb_ioc_svcenum_t *ioc)
+smb_server_enum(smb_server_t *sv, smb_ioc_svcenum_t *ioc)
 {
 	smb_svcenum_t	*svcenum = &ioc->svcenum;
-	smb_server_t	*sv;
-	int		rc;
+	int		rc = 0;
 	uint32_t	buflen_adjusted;
 
 	/*
@@ -972,9 +931,6 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 	if (svcenum->se_buflen + sizeof (*ioc) > ioc->hdr.len)
 		return (EINVAL);
 
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
-
 	svcenum->se_bavail = svcenum->se_buflen;
 	svcenum->se_bused = 0;
 	svcenum->se_nitems = 0;
@@ -991,7 +947,6 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 		rc = EINVAL;
 	}
 
-	smb_server_release(sv);
 	return (rc);
 }
 
@@ -999,18 +954,11 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
  * Look for sessions to disconnect by client and user name.
  */
 int
-smb_server_session_close(smb_ioc_session_t *ioc)
+smb_server_session_close(smb_server_t *sv, smb_ioc_session_t *ioc)
 {
-	smb_server_t	*sv;
 	int		cnt;
-	int		rc;
-
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
 
 	cnt = smb_server_session_disconnect(sv, ioc->client, ioc->username);
-
-	smb_server_release(sv);
 
 	if (cnt == 0)
 		return (ENOENT);
@@ -1021,18 +969,12 @@ smb_server_session_close(smb_ioc_session_t *ioc)
  * Close a file by uniqid.
  */
 int
-smb_server_file_close(smb_ioc_fileid_t *ioc)
+smb_server_file_close(smb_server_t *sv, smb_ioc_fileid_t *ioc)
 {
 	uint32_t	uniqid = ioc->uniqid;
-	smb_server_t	*sv;
 	int		rc;
 
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
-
 	rc = smb_server_fclose(sv, uniqid);
-
-	smb_server_release(sv);
 	return (rc);
 }
 
@@ -2043,7 +1985,7 @@ smb_server_lookup(smb_server_t **psv)
 		sv = smb_llist_next(&smb_servers, sv);
 	}
 	smb_llist_exit(&smb_servers);
-	return (EPERM);
+	return (ENXIO);
 }
 
 /*

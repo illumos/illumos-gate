@@ -359,18 +359,14 @@ smb_kshare_g_fini(void)
  * be exported.
  */
 int
-smb_kshare_export_list(smb_ioc_share_t *ioc)
+smb_kshare_export_list(smb_server_t *sv, smb_ioc_share_t *ioc)
 {
-	smb_server_t	*sv = NULL;
 	nvlist_t	*shrlist = NULL;
 	nvlist_t	 *share;
 	nvpair_t	 *nvp;
 	smb_kshare_t	 *shr;
 	char		*shrname;
 	int		rc;
-
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
 
 	if (!smb_export_isready(sv)) {
 		rc = ENOTACTIVE;
@@ -429,7 +425,6 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 
 out:
 	nvlist_free(shrlist);
-	smb_server_release(sv);
 	return (rc);
 }
 
@@ -450,18 +445,14 @@ out:
  * the path lookup due to a forced unmount finishing first.
  */
 int
-smb_kshare_unexport_list(smb_ioc_share_t *ioc)
+smb_kshare_unexport_list(smb_server_t *sv, smb_ioc_share_t *ioc)
 {
-	smb_server_t	*sv = NULL;
 	smb_unshare_t	*ux;
 	nvlist_t	*shrlist = NULL;
 	nvpair_t	*nvp;
 	boolean_t	unexport = B_FALSE;
 	char		*shrname;
 	int		rc;
-
-	if ((rc = smb_server_lookup(&sv)) != 0)
-		return (rc);
 
 	/*
 	 * Reality check that the nvlist's reported length doesn't exceed the
@@ -499,7 +490,6 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 
 out:
 	nvlist_free(shrlist);
-	smb_server_release(sv);
 	return (rc);
 }
 
@@ -508,16 +498,12 @@ out:
  * of specified share.
  */
 int
-smb_kshare_info(smb_ioc_shareinfo_t *ioc)
+smb_kshare_info(smb_server_t *sv, smb_ioc_shareinfo_t *ioc)
 {
-	smb_server_t	*sv;
-	int		rc;
 
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		ioc->shortnames = sv->sv_cfg.skc_short_names;
-		smb_server_release(sv);
-	}
-	return (rc);
+	ioc->shortnames = sv->sv_cfg.skc_short_names;
+
+	return (0);
 }
 
 /*
@@ -530,19 +516,13 @@ smb_kshare_info(smb_ioc_shareinfo_t *ioc)
  * so just check for READ or WRITE permissions.
  */
 int
-smb_kshare_access(smb_ioc_shareaccess_t *ioc)
+smb_kshare_access(smb_server_t *sv, smb_ioc_shareaccess_t *ioc)
 {
-	smb_server_t	*sv = NULL;
 	smb_user_t	*user = NULL;
 	smb_kshare_t	*shr = NULL;
 	smb_node_t	*shroot = NULL;
 	vnode_t		*vp = NULL;
 	int		rc = EACCES;
-
-	if ((rc = smb_server_lookup(&sv)) != 0) {
-		rc = ESRCH;
-		goto out;
-	}
 
 	shr = smb_kshare_lookup(sv, ioc->shrname);
 	if (shr == NULL) {
@@ -572,8 +552,6 @@ out:
 		smb_user_release(user);
 	if (shr != NULL)
 		smb_kshare_release(sv, shr);
-	if (sv != NULL)
-		smb_server_release(sv);
 
 	return (rc);
 }

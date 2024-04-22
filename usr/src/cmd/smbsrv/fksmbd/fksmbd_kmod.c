@@ -106,9 +106,12 @@ smb_kmod_isbound(void)
 }
 
 int
-smb_kmod_bind(void)
+smb_kmod_bind(boolean_t smbd)
 {
 	int rc;
+
+	if (!smbd)
+		return (ENXIO);
 
 	if (smbdrv_opened) {
 		smbdrv_opened = B_FALSE;

@@ -742,7 +742,7 @@ smbd_kernel_bind(void)
 	if (smb_kmod_isbound())
 		smbd_kernel_unbind();
 
-	if ((rc = smb_kmod_bind()) == 0) {
+	if ((rc = smb_kmod_bind(B_TRUE)) == 0) {
 		rc = smbd_kernel_start();
 		if (rc != 0)
 			smb_kmod_unbind();

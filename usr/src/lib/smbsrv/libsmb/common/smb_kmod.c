@@ -50,16 +50,28 @@ int smb_kmod_ioctl(int, smb_ioc_header_t *, uint32_t);
 
 int	smbdrv_fd = -1;
 
+/*
+ * Open the smbsrv driver.
+ * The smb daemon (smbd) opens the "control" device (/dev/smbsrv)
+ * and other consumers open the library device (/dev/smbsrv1)
+ */
 int
-smb_kmod_bind(void)
+smb_kmod_bind(boolean_t smbd)
 {
+	int fd;
+
 	if (smbdrv_fd != -1)
 		(void) close(smbdrv_fd);
 
-	if ((smbdrv_fd = open(SMBDRV_DEVICE_PATH, 0)) < 0) {
-		smbdrv_fd = -1;
-		return (errno);
+	if (smbd) {
+		fd = open(SMBDRV_DEVICE_PATH, 0);
+	} else {
+		fd = open(SMBDRV_DEVICE_PATH "1", 0);
 	}
+	if (fd < 0)
+		return (errno);
+
+	smbdrv_fd = fd;
 
 	return (0);
 }

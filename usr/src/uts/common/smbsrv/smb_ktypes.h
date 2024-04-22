@@ -2125,6 +2125,7 @@ typedef struct smb_server {
 	uint32_t		sv_refcnt;
 	pid_t			sv_pid;
 	zoneid_t		sv_zid;
+	dev_t			sv_dev;
 	smb_listener_daemon_t	sv_nbt_daemon;
 	smb_listener_daemon_t	sv_tcp_daemon;
 	krwlock_t		sv_cfg_lock;
