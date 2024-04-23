@@ -27,6 +27,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -2373,10 +2374,10 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			/*
 			 * This is a shared object executable, so we need to
 			 * pick a reasonable place to put the heap. Just don't
-			 * use the first page.
+			 * use the first few pages.
 			 */
-			env.ex_brkbase = (caddr_t)PAGESIZE;
-			env.ex_bssbase = (caddr_t)PAGESIZE;
+			env.ex_brkbase = (caddr_t)(8 * PAGESIZE);
+			env.ex_bssbase = (caddr_t)(8 * PAGESIZE);
 		}
 
 		/*
@@ -2482,13 +2483,16 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			 * misinterpret what we return from brk().
 			 *
 			 * It's probably not great, but we'll just set brkbase
-			 * to PAGESIZE. If there's something down there in the
-			 * way then libc/malloc should fall back to mmap() when
-			 * we fail to extend the brk for them.
+			 * to a small multiple of PAGESIZE, since some libraries
+			 * (e.g. procps 4.x) expect the first anonymous memory
+			 * region to begin at the 8th page or later. If there's
+			 * something down there in the way then libc/malloc
+			 * should fall back to mmap() when we fail to extend the
+			 * brk for them.
 			 */
 			if (ehdr.e_type == ET_DYN) {
-				env.ex_bssbase = (caddr_t)PAGESIZE;
-				env.ex_brkbase = (caddr_t)PAGESIZE;
+				env.ex_bssbase = (caddr_t)(8 * PAGESIZE);
+				env.ex_brkbase = (caddr_t)(8 * PAGESIZE);
 				env.ex_brksize = 0;
 			}
 		}
