@@ -46,6 +46,7 @@
 #include <limits.h>
 #include <libcontract.h>
 #include <locale.h>
+#include <langinfo.h>
 #include <sys/contract.h>
 #include <sys/ctfs.h>
 #include <libcontract_priv.h>
@@ -728,18 +729,17 @@ get_termwidth(void)
 static const char **
 get_boxchars(void)
 {
-	char *loc = setlocale(LC_ALL, "");
+	char *codeset;
 
-	if (loc == NULL)
-		return (box_ascii);
+	(void) setlocale(LC_CTYPE, "");
 
-	const char *p = strstr(loc, "UTF-8");
+	codeset = nl_langinfo(CODESET);
 
 	/*
-	 * Only use the UTF-8 box drawing characters if the locale ends
-	 * with "UTF-8".
+	 * Only use the UTF-8 box drawing characters if the locale uses
+	 * the UTF-8 codeset.
 	 */
-	if (p != NULL && p[5] == '\0')
+	if (codeset != NULL && strcmp(codeset, "UTF-8") == 0)
 		return (box_utf8);
 
 	return (box_ascii);
