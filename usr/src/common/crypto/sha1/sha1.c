@@ -34,6 +34,7 @@
 
 #if defined(_STANDALONE)
 #include <sys/cdefs.h>
+#include <stdint.h>
 #define	_RESTRICT_KYWD	restrict
 #else
 #if !defined(_KERNEL) && !defined(_BOOT)
@@ -46,6 +47,9 @@
 #endif	/* _STANDALONE */
 
 #include <sys/types.h>
+#if !defined(_STANDALONE)
+#include <sys/inttypes.h>
+#endif
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
@@ -178,9 +182,10 @@ extern void SHA1TransformVIS(uint64_t *, uint32_t *, uint32_t *, uint64_t *);
 void
 SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 {
-	uint32_t i, buf_index, buf_len;
+	size_t i, buf_index, buf_len;
 	uint64_t X0[40], input64[8];
 	const uint8_t *input = inptr;
+	uint32_t il;
 #ifdef _KERNEL
 	int usevis = 0;
 #else
@@ -194,8 +199,17 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 	/* compute number of bytes mod 64 */
 	buf_index = (ctx->count[1] >> 3) & 0x3F;
 
+	/*
+	 * Extract low 32 bits of input_len; when we adjust
+	 * count[0] we must fold in the carry from the
+	 * addition of the low bits along with the nonzero
+	 * upper bits (if any) from input_len.
+	 */
+	il = input_len & UINT32_MAX;
+	il = il << 3;
+
 	/* update number of bits */
-	if ((ctx->count[1] += (input_len << 3)) < (input_len << 3))
+	if ((ctx->count[1] += il) < il)
 		ctx->count[0]++;
 
 	ctx->count[0] += (input_len >> 29);
@@ -209,7 +223,7 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 		kfpu_t *fpu;
 		if (fpu_exists) {
 			uint8_t fpua[sizeof (kfpu_t) + GSR_SIZE + VIS_ALIGN];
-			uint32_t len = (input_len + buf_index) & ~0x3f;
+			size_t len = (input_len + buf_index) & ~0x3f;
 			int svfp_ok;
 
 			fpu = (kfpu_t *)P2ROUNDUP((uintptr_t)fpua, 64);
@@ -325,10 +339,11 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 void
 SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 {
-	uint32_t i, buf_index, buf_len;
+	size_t i, buf_index, buf_len;
 	const uint8_t *input = inptr;
+	uint32_t il;
 #if defined(__amd64)
-	uint32_t	block_count;
+	size_t	block_count;
 #endif	/* __amd64 */
 
 	/* check for noop */
@@ -338,8 +353,17 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 	/* compute number of bytes mod 64 */
 	buf_index = (ctx->count[1] >> 3) & 0x3F;
 
+	/*
+	 * Extract low 32 bits of input_len; when we adjust
+	 * count[0] we must fold in the carry from the
+	 * addition of the low bits along with the nonzero
+	 * upper bits (if any) from input_len.
+	 */
+	il = input_len & UINT32_MAX;
+	il = il << 3;
+
 	/* update number of bits */
-	if ((ctx->count[1] += (input_len << 3)) < (input_len << 3))
+	if ((ctx->count[1] += il) < il)
 		ctx->count[0]++;
 
 	ctx->count[0] += (input_len >> 29);

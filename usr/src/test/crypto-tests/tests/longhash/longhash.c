@@ -14,14 +14,14 @@
  */
 
 /*
- * Test that SHA2Update correctly adjusts the bit count
+ * Test that SHA1Update and SHA2Update correctly adjust the bit count
  * when fed large inputs.
  *
  * This is a very focussed white-box unit test that examines
- * handling of the running message bit count updated by SHA2Update.
+ * handling of the running message bit count updated by SHA*Update.
  *
  * Since we are only testing the bit count updates in this test,
- * we point SHA2Update at a buffer with an unmapped page, catch
+ * we point SHA*Update at a buffer with an unmapped page, catch
  * the SIGSEGV, and siglongjmp back out to the test assertions.
  */
 
@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <setjmp.h>
 
+#include <sha1.h>
 #include <sha2.h>
 #include <sys/debug.h>
 #include <sys/mman.h>
@@ -56,6 +57,52 @@ trap_handler(int signo, siginfo_t *info, void *ucp)
 	printf("signal: %d code: %d faulting address: %p\n",
 	    info->si_signo, info->si_code, info->si_addr);
 
+}
+
+static void
+test_update_sha1(void *buf, size_t len, uint32_t c0, uint32_t c1)
+{
+	SHA1_CTX ctx;
+	VERIFY3U(len, >, pagesize);
+
+	SHA1Init(&ctx);
+	VERIFY3U(0, ==, ctx.count[0]);
+	VERIFY3U(0, ==, ctx.count[1]);
+
+	if (sigsetjmp(from_trap, 1) == 0) {
+		(void) sigaction(SIGSEGV, &trap_sa, NULL);
+		SHA1Update(&ctx, buf, len);
+		errx(EXIT_FAILURE, "Should have faulted in SHA1Update "
+		    "(after %ld of %zu bytes)", pagesize, len);
+	} else {
+		(void) signal(SIGSEGV, SIG_DFL);
+		VERIFY3U(c0, ==, ctx.count[0]);
+		VERIFY3U(c1, ==, ctx.count[1]);
+	}
+
+	if (len <= pagesize * 2)
+		return;
+
+	/*
+	 * Try again with the same length split across two calls
+	 * to SHA1Update to exercise the other way that the high
+	 * order word of the bit count gets incremented.
+	 */
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, buf, pagesize);
+	VERIFY3U(0, ==, ctx.count[0]);
+	VERIFY3U(pagesize * 8, ==, ctx.count[1]);
+
+	if (sigsetjmp(from_trap, 1) == 0) {
+		(void) sigaction(SIGSEGV, &trap_sa, NULL);
+		SHA1Update(&ctx, buf, len - pagesize);
+		errx(EXIT_FAILURE, "Should have faulted in SHA1Update "
+		    "(after %ld of %zu bytes)", pagesize, len);
+	} else {
+		(void) signal(SIGSEGV, SIG_DFL);
+		VERIFY3U(c0, ==, ctx.count[0]);
+		VERIFY3U(c1, ==, ctx.count[1]);
+	}
 }
 
 static void
@@ -179,6 +226,11 @@ main(int argc, char **argv)
 	trap_sa.sa_sigaction = trap_handler;
 
 	max_len = SIZE_MAX;
+	for (len = pagesize * 2; len != 0 && len < max_len; len <<= 1) {
+		printf("test SHA1 length 0x%016lx\n", len);
+		test_update_sha1(buf, len, len >> 29, len << 3);
+	}
+
 	for (len = pagesize * 2; len != 0 && len < max_len; len <<= 1) {
 		printf("test SHA256 length 0x%016lx\n", len);
 		test_update_32(SHA256, buf, len, len >> 29, len << 3);
