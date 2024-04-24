@@ -39,6 +39,7 @@ SUBDIRS = \
 
 PROGS = \
 	aligned_alloc \
+	ascftime \
 	asprintf-14933 \
 	c11_threads \
 	c11_tss \

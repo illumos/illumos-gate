@@ -66,6 +66,8 @@ file path=opt/libc-tests/runfiles/default.run mode=0444
 dir  path=opt/libc-tests/tests
 file path=opt/libc-tests/tests/aligned_alloc.32 mode=0555
 file path=opt/libc-tests/tests/aligned_alloc.64 mode=0555
+file path=opt/libc-tests/tests/ascftime.32 mode=0555
+file path=opt/libc-tests/tests/ascftime.64 mode=0555
 file path=opt/libc-tests/tests/asprintf-14933.32 mode=0555
 file path=opt/libc-tests/tests/asprintf-14933.64 mode=0555
 file path=opt/libc-tests/tests/c11_threads.32 mode=0555
