@@ -654,6 +654,7 @@ PORTPRINT_W=			\
 PORTPRINT=			\
 	asprintf.o		\
 	doprnt.o		\
+	vdprintf.o		\
 	vfprintf.o		\
 	vsnprintf.o		\
 	vsprintf.o

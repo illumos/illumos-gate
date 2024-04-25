@@ -48,6 +48,7 @@ PROGS = \
 	c11_tss \
 	call_once \
 	closefrom \
+	dprintf \
 	endian \
 	env-7076 \
 	fnmatch \
@@ -99,6 +100,11 @@ posix_memalign.64 :=	LDLIBS64 += -lproc
 
 asprintf-14933.32 :=	CSTD=$(CSTD_GNU17)
 asprintf-14933.64 :=	CSTD=$(CSTD_GNU17)
+
+dprintf.32 :=	CSTD=$(CSTD_GNU17)
+dprintf.64 :=	CSTD=$(CSTD_GNU17)
+dprintf.32 :=	CPPFLAGS += -D_XOPEN_SOURCE=700 -D__EXTENSIONS__
+dprintf.64 :=	CPPFLAGS += -D_XOPEN_SOURCE=700 -D__EXTENSIONS__
 
 memset_s.32 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 memset_s.64 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1

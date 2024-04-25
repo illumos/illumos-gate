@@ -80,6 +80,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.55 {
+    protected:
+	dprintf;
+	vdprintf;
+} ILLUMOS_0.54;
+
 SYMBOL_VERSION ILLUMOS_0.54 {
     protected:
 	fdclose;

@@ -43,10 +43,11 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2025 Hans Rosenfeld
 .\"
-.TH VPRINTF 3C "February 21, 2023"
+.TH VPRINTF 3C "April 25, 2024"
 .SH NAME
-vprintf, vfprintf, vsprintf, vsnprintf, vasprintf \- print formatted output of
+vprintf, vdprintf, vfprintf, vsprintf, vsnprintf, vasprintf \- print formatted output of
 a variable argument list
 .SH SYNOPSIS
 .nf
@@ -54,6 +55,11 @@ a variable argument list
 #include <stdarg.h>
 
 \fBint\fR \fBvprintf\fR(\fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvdprintf\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
 .fi
 
 .LP
@@ -77,12 +83,12 @@ a variable argument list
 .fi
 
 .SH DESCRIPTION
-The \fBvprintf()\fR, \fBvfprintf()\fR, \fBvsprintf()\fR, \fBvsnprintf()\fR, and
-\fBvasprintf()\fR functions are the same as \fBprintf()\fR, \fBfprintf()\fR,
-\fBsprintf()\fR, \fBsnprintf()\fR, and \fBasprintf()\fR, respectively, except
-that instead of being called with a variable number of arguments, they are
-called with an argument list as defined in the \fB<stdarg.h>\fR header. See
-\fBprintf\fR(3C).
+The \fBvprintf()\fR, \fBvdprintf()\fR, \fBvfprintf()\fR, \fBvsprintf()\fR,
+\fBvsnprintf()\fR, and \fBvasprintf()\fR functions are the same as
+\fBprintf()\fR, \fBdprintf()\fR, \fBfprintf()\fR, \fBsprintf()\fR,
+\fBsnprintf()\fR, and \fBasprintf()\fR, respectively, except that instead of
+being called with a variable number of arguments, they are called with an
+argument list as defined in the \fB<stdarg.h>\fR header. See \fBprintf\fR(3C).
 .sp
 .LP
 The \fB<stdarg.h>\fR header defines the type \fBva_list\fR and a set of macros

@@ -44,15 +44,22 @@
 .\" Portions Copyright 1999, Forrest J. Cavalier III. All Rights Reserved.
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2025 Hans Rosenfeld
 .\"
-.TH PRINTF 3C "Aug 19, 2020"
+.TH PRINTF 3C "April 25, 2024"
 .SH NAME
-printf, fprintf, sprintf, snprintf, asprintf \- print formatted output
+printf, dprintf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 .SH SYNOPSIS
 .nf
 #include <stdio.h>
 
 \fBint\fR \fBprintf\fR(\fBconst char *restrict\fR \fIformat\fR,
+     \fB/*\fR \fIargs\fR*/ ...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdprintf\fR(\fBint\fR \fIfildes\fR, \fBconst char *restrict\fR \fIformat\fR,
      \fB/*\fR \fIargs\fR*/ ...);
 .fi
 
@@ -84,8 +91,10 @@ printf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 The \fBprintf()\fR function places output on the standard output stream
 \fBstdout\fR.
 .sp
+The \fBdprintf()\fR function places output on the given file descriptor
+\fIfildes\fR.
 .LP
-The \fBfprintf()\fR function places output on on the named output stream
+The \fBfprintf()\fR function places output on the named output stream
 \fIstream\fR.
 .sp
 .LP
@@ -812,6 +821,10 @@ For the conditions under which \fBprintf()\fR and \fBfprintf()\fR will fail and
 may fail, refer to \fBfputc\fR(3C) or \fBfputwc\fR(3C).
 .sp
 .LP
+For the conditions under which \fBdprintf()\fR will fail and may fail, refer to
+\fBfdopen\fR(3C) in addition to \fBfputc\fR(3C) or \fBfputw\fR(3C).
+.sp
+.LP
 The \fBsnprintf()\fR function will fail if:
 .sp
 .ne 2
@@ -1091,6 +1104,7 @@ libraries.
 .BR ecvt (3C),
 .BR exit (3C),
 .BR fclose (3C),
+.BR fdopen (3C),
 .BR fflush (3C),
 .BR fputwc (3C),
 .BR free (3C),

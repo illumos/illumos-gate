@@ -373,6 +373,18 @@ extern FILE	*fmemopen(void *_RESTRICT_KYWD, size_t,
 extern FILE	*open_memstream(char **, size_t *);
 #endif	/* !_STRICT_SYMBOLS || _XPG7 */
 
+/*
+ * Once we've cleaned up internal usage of dprintf across the system then we can
+ * come back and expose dprintf() using if !defined(_STRICT_SYMBOLS) as we do
+ * for other symbols.
+ */
+#if defined(_XPG7)
+extern int	dprintf(int, const char *_RESTRICT_KYWD, ...)
+	__PRINTFLIKE(2);
+extern int	vdprintf(int, const char *_RESTRICT_KYWD, __va_list)
+	__VPRINTFLIKE(2);
+#endif
+
 #if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
 #define	getchar_unlocked()	getc_unlocked(stdin)
