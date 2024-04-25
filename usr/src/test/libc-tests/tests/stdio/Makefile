@@ -14,6 +14,7 @@
 #
 
 PROGS = \
+	fdclose \
 	fileno \
 	fmemopentest \
 	ftell_ungetc \
