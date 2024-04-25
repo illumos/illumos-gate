@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -495,6 +496,7 @@ ire_send_local_v6(ire_t *ire, mblk_t *mp, void *iph_arg,
 	/* Map ixa to ira including IPsec policies */
 	ipsec_out_to_in(ixa, ill, &iras);
 	iras.ira_pktlen = pktlen;
+	iras.ira_ttl = ip6h->ip6_hlim;
 
 	ire->ire_ib_pkt_count++;
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
@@ -1072,6 +1074,7 @@ ire_send_wire_v6(ire_t *ire, mblk_t *mp, void *iph_arg,
 				bzero(&iras, sizeof (iras));
 				/* Map ixa to ira including IPsec policies */
 				ipsec_out_to_in(ixa, ill, &iras);
+				iras.ira_ttl = ip6h->ip6_hlim;
 
 				ip_drop_output("ICMP6_PKT_TOO_BIG", mp, ill);
 				icmp_pkt2big_v6(mp, ixa->ixa_fragsize, B_TRUE,

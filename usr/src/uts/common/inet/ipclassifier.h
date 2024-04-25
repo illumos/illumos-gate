@@ -406,6 +406,7 @@ struct conn_s {
 	uint_t		conn_rcvlowat;		/* Recv buffer low water mark */
 
 	uint8_t		conn_default_ttl;	/* Default TTL/hoplimit */
+	uint8_t		conn_min_ttl;		/* IP_MINTTL+IPV6_MINHOPLIMIT */
 
 	uint32_t	conn_flowinfo;	/* Connected flow id and tclass */
 

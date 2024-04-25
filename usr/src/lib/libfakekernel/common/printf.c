@@ -191,15 +191,13 @@ debug_enter(char *str)
 	/* Just a place for a break point. */
 }
 
-int
+void
 assfail(const char *a, const char *f, int l)
 {
 	if (!aok)
 		panic("assertion failed: %s, file: %s, line: %d", a, f, l);
 
 	fprintf(stderr, "ASSERTION CAUGHT: %s, file: %s, line: %d\n", a, f, l);
-
-	return (0);
 }
 
 void

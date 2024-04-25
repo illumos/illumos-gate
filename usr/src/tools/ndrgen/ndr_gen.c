@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <string.h>
@@ -559,7 +560,7 @@ generate_typeinfo_typeinfo(ndr_typeinfo_t *ti, int is_static, char *fname_type)
 	if (*flags == 0)
 		(void) strlcpy(flags, "NDR_F_NONE", NDLBUFSZ);
 	else
-		(void) strlcpy(flags, flags+1, NDLBUFSZ);
+		(void) memmove(flags, flags + 1, NDLBUFSZ - 1);
 
 	(void) printf("\n\n\n");
 	if (is_static)

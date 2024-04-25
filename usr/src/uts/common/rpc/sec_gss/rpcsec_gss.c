@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -447,12 +448,21 @@ rpc_gss_seccreate(CLIENT *clnt,
 	input_name.value = principal;
 	input_name.length = strlen(principal);
 
+	if (options_ret != NULL) {
+		options_ret->major_status = 0;
+		options_ret->minor_status = 0;
+	}
+
 	gssstat = gss_import_name(&minor_stat, &input_name,
 	    (gss_OID)GSS_C_NT_HOSTBASED_SERVICE, &target_name);
 
 	if (gssstat != GSS_S_COMPLETE) {
 		RPCGSS_LOG0(1,
 		    "rpc_gss_seccreate: unable to import gss name\n");
+		if (options_ret != NULL) {
+			options_ret->major_status = gssstat;
+			options_ret->minor_status = minor_stat;
+		}
 		return (ENOMEM);
 	}
 
@@ -497,6 +507,10 @@ rpc_gss_seccreate(CLIENT *clnt,
 	    mechanism, &ap->mech_type, &ret_flags, &time_rec, cr, 0)) {
 		if (ap->target_name) {
 			(void) gss_release_name(&minor_stat, &ap->target_name);
+		}
+		if (options_ret != NULL) {
+			options_ret->major_status = gssstat;
+			options_ret->minor_status = minor_stat;
 		}
 		kmem_free((char *)ap, sizeof (*ap));
 		kmem_free((char *)auth, sizeof (*auth));
@@ -563,7 +577,7 @@ rpc_gss_seccreate_pvt(gssstat, minor_stat, auth, ap, desired_mech_type,
 	rpc_gss_init_arg	call_arg;
 	rpc_gss_init_res	call_res;
 	gss_buffer_desc		*input_token_p, input_token, process_token;
-	int 			free_results = 0;
+	int			free_results = 0;
 	k_sigset_t		smask;
 	int			error = 0;
 

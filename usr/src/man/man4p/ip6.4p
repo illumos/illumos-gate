@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IP6 4P "December 28, 2020"
+.TH IP6 4P "April 17, 2024"
 .SH NAME
 ip6 \- Internet Protocol Version 6
 .SH SYNOPSIS
@@ -99,6 +100,20 @@ Default hop limit for unicast datagrams. This option takes an integer as an
 argument. Its value becomes the new default value for \fBip6_hops\fR that
 \fBIPv6\fR will use on outgoing unicast datagrams sent from that socket. The
 initial default is \fB60\fR.
+.RE
+
+.sp
+.ne 2
+.na
+.B IPV6_MINHOPCOUNT
+.ad
+.RS 22n
+Controls the minimum value of the IPv6 header's hop limit field that is required
+in an IPv6 packet before accepting it. If the value is set to 100, then only
+IPv6 packets with a TTL of 100 or higher are accepted. Packets with a TTL less
+than the minimum are dropped. This option takes an integer as an argument and
+must be in the range of 0 to 255. A value of 0 indicates that all packets should
+be accepted.
 .RE
 
 .sp

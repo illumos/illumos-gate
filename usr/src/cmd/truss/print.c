@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2144,6 +2144,7 @@ ip_optname(private_t *pri, long val)
 	/* IP_PKTINFO and IP_RECVPKTINFO share the same code */
 	case IP_PKTINFO:		return ("IP_PKTINFO/IP_RECVPKTINFO");
 	case IP_DONTFRAG:		return ("IP_DONTFRAG");
+	case IP_MINTTL:			return ("IP_MINTTL");
 	case IP_SEC_OPT:		return ("IP_SEC_OPT");
 	case MCAST_JOIN_GROUP:		return ("MCAST_JOIN_GROUP");
 	case MCAST_LEAVE_GROUP:		return ("MCAST_LEAVE_GROUP");
@@ -2214,6 +2215,7 @@ ipv6_optname(private_t *pri, long val)
 	case MCAST_UNBLOCK_SOURCE:	return ("MCAST_UNBLOCK_SOURCE");
 	case MCAST_JOIN_SOURCE_GROUP:	return ("MCAST_JOIN_SOURCE_GROUP");
 	case MCAST_LEAVE_SOURCE_GROUP:	return ("MCAST_LEAVE_SOURCE_GROUP");
+	case IPV6_MINHOPCOUNT:		return ("IPV6_MINHOPCOUNT");
 
 	default:			(void) snprintf(pri->code_buf,
 					    sizeof (pri->code_buf), "0x%lx",

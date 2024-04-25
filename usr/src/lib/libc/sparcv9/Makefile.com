@@ -1063,11 +1063,11 @@ CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-address
 
-# Setting THREAD_DEBUG = -DTHREAD_DEBUG (make THREAD_DEBUG=-DTHREAD_DEBUG ...)
-# enables ASSERT() checking in the threads portion of the library.
+# Setting THREAD_DEBUG = -DDEBUG (make THREAD_DEBUG=-DDEBUG ...)
+# enables ASSERT() checking in the library.
 # This is automatically enabled for DEBUG builds, not for non-debug builds.
 THREAD_DEBUG =
-$(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG -DDEBUG
+$(NOT_RELEASE_BUILD)THREAD_DEBUG = -DDEBUG
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 

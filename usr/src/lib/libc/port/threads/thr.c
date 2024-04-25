@@ -824,7 +824,7 @@ _thrp_exit()
 		self->ul_back->ul_forw = self->ul_forw;
 	}
 	self->ul_forw = self->ul_back = NULL;
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 	/* collect queue lock statistics before marking ourself dead */
 	record_spin_locks(self);
 #endif
@@ -898,7 +898,7 @@ _thrp_exit()
 	thr_panic("_thrp_exit(): _lwp_terminate() returned");
 }
 
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 void
 collect_queue_statistics()
 {
@@ -1173,7 +1173,7 @@ etest(const char *ev)
 		thread_max_spinners = value;
 	if ((value = envvar(ev, "QUEUE_FIFO", 8)) >= 0)
 		thread_queue_fifo = value;
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 	if ((value = envvar(ev, "QUEUE_VERIFY", 1)) >= 0)
 		thread_queue_verify = value;
 	if ((value = envvar(ev, "QUEUE_DUMP", 1)) >= 0)
@@ -1631,7 +1631,7 @@ finish_init()
 	 * (Functions are called in the reverse order of their registration.)
 	 */
 	(void) _atexit(grab_assert_lock);
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 	(void) _atexit(dump_queue_statistics);
 	(void) _atexit(collect_queue_statistics);
 #endif
@@ -1694,7 +1694,7 @@ postfork1_child()
 			qp->qh_lock.mutex_flag = LOCK_INITED;
 			qp->qh_lock.mutex_magic = MUTEX_MAGIC;
 			qp->qh_hlist = &qp->qh_def_root;
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 			qp->qh_hlen = 1;
 			qp->qh_hmax = 1;
 #endif
@@ -1812,7 +1812,7 @@ thr_stksegment(stack_t *stk)
 void
 force_continue(ulwp_t *ulwp)
 {
-#if defined(THREAD_DEBUG)
+#if defined(DEBUG)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 #endif

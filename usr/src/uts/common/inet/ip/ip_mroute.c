@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -141,15 +142,15 @@
  * causing the stats be be approximate, not exact.
  */
 
-#define	NO_VIF	MAXVIFS 	/* from mrouted, no route for src */
+#define	NO_VIF	MAXVIFS		/* from mrouted, no route for src */
 
 /*
  * Timeouts:
- * 	Upcall timeouts - BSD uses boolean_t mfc->expire and
+ *	Upcall timeouts - BSD uses boolean_t mfc->expire and
  *	nexpire[MFCTBLSIZE], the number of times expire has been called.
  *	SunOS 5.x uses mfc->timeout for each mfc.
  *	Some Unixes are limited in the number of simultaneous timeouts
- * 	that can be run, SunOS 5.x does not have this restriction.
+ *	that can be run, SunOS 5.x does not have this restriction.
  */
 
 /*
@@ -612,7 +613,7 @@ int
 ip_mrouter_done(ip_stack_t *ipst)
 {
 	conn_t		*mrouter;
-	vifi_t 		vifi;
+	vifi_t		vifi;
 	struct mfc	*mfc_rt;
 	int		i;
 
@@ -1439,7 +1440,7 @@ del_mfc(struct mfcctl *mfccp, ip_stack_t *ipst)
 {
 	struct in_addr	origin;
 	struct in_addr	mcastgrp;
-	struct mfc 	*rt;
+	struct mfc	*rt;
 	uint_t		hash;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
@@ -1533,7 +1534,7 @@ ip_mforward(mblk_t *mp, ip_recv_attr_t *ira)
 {
 	ipha_t		*ipha = (ipha_t *)mp->b_rptr;
 	ill_t		*ill = ira->ira_ill;
-	struct mfc 	*rt;
+	struct mfc	*rt;
 	ipaddr_t	src, dst, tunnel_src = 0;
 	static int	srctun = 0;
 	vifi_t		vifi;
@@ -2099,6 +2100,7 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 			iras.ira_ip_hdr_length =
 			    IPH_HDR_LENGTH(mp_copy->b_rptr);
 			iras.ira_pktlen = msgdsize(mp_copy);
+			iras.ira_ttl = ipha->ipha_ttl;
 			(mrouter->conn_recv)(mrouter, mp_copy, NULL, &iras);
 			ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 		}
@@ -2167,7 +2169,7 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 static void
 phyint_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 {
-	mblk_t 	*mp_copy;
+	mblk_t	*mp_copy;
 	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
@@ -2288,6 +2290,7 @@ register_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 		iras.ira_flags = IRAF_IS_IPV4;
 		iras.ira_ip_hdr_length = sizeof (ipha_t);
 		iras.ira_pktlen = msgdsize(mp_copy);
+		iras.ira_ttl = ipha->ipha_ttl;
 		(mrouter->conn_recv)(mrouter, mp_copy, NULL, &iras);
 		ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 	}
@@ -2539,8 +2542,8 @@ register_mforward(mblk_t *mp, ip_recv_attr_t *ira)
 static void
 encap_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 {
-	mblk_t 	*mp_copy;
-	ipha_t 	*ipha_copy;
+	mblk_t	*mp_copy;
+	ipha_t	*ipha_copy;
 	size_t	len;
 	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
@@ -2830,7 +2833,7 @@ reset_mrt_ill(ill_t *ill)
 static void
 tbf_control(struct vif *vifp, mblk_t *mp, ipha_t *ipha)
 {
-	size_t 	p_len =  msgdsize(mp);
+	size_t	p_len =  msgdsize(mp);
 	struct tbf	*t    = vifp->v_tbf;
 	timeout_id_t id = 0;
 	ill_t		*ill = vifp->v_ipif->ipif_ill;
@@ -3319,7 +3322,7 @@ ip_mroute_stats(mblk_t *mp, ip_stack_t *ipst)
 int
 ip_mroute_vif(mblk_t *mp, ip_stack_t *ipst)
 {
-	struct vifctl 	vi;
+	struct vifctl	vi;
 	vifi_t		vifi;
 
 	mutex_enter(&ipst->ips_numvifs_mutex);

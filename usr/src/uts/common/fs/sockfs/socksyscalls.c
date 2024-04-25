@@ -586,7 +586,7 @@ bind(int sock, struct sockaddr *name, socklen_t namelen, int version)
 		error = socket_bind(so, name, namelen, _SOBIND_SOCKBSD, CRED());
 		break;
 	}
-done:
+
 	releasef(sock);
 	if (name != NULL)
 		kmem_free(name, (size_t)namelen);
@@ -1213,6 +1213,8 @@ sendit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 	else
 		uiop->uio_extflg = UIO_COPY_DEFAULT;
 
+	len = uiop->uio_resid;
+
 	/* Allocate and copyin name and control */
 	name = msg->msg_name;
 	namelen = msg->msg_namelen;
@@ -1255,7 +1257,6 @@ sendit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 		msg->msg_controllen = controllen = 0;
 	}
 
-	len = uiop->uio_resid;
 	msg->msg_flags = flags;
 
 	error = socket_sendmsg(so, msg, uiop, CRED());
@@ -2175,7 +2176,7 @@ snf_async_read(snf_req_t *sr)
 	int extra = 0;
 	int maxblk = 0;
 	int wroff = 0;
-	struct sonode *so;
+	struct sonode *so = NULL;
 
 	fp = sr->sr_fp;
 	size = sr->sr_file_size;
@@ -2779,7 +2780,7 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	struct vattr va;
 	int maxblk = 0;
 	int wroff = 0;
-	struct sonode *so;
+	struct sonode *so = NULL;
 	struct nmsghdr msg;
 
 	vp = fp->f_vnode;

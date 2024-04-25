@@ -25,7 +25,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /* This file contains all TCP input processing functions. */
@@ -5521,7 +5521,13 @@ tcp_reinput(conn_t *connp, mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 		CONN_DEC_REF(connp);
 		return;
 	}
-
+	if (connp->conn_min_ttl != 0 && connp->conn_min_ttl > ira->ira_ttl) {
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+		freemsg(mp);
+		CONN_DEC_REF(connp);
+		return;
+	}
 	if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
 	    (ira->ira_flags & IRAF_IPSEC_SECURE)) {
 		ip6_t *ip6h;

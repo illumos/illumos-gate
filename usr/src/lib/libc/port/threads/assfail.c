@@ -30,6 +30,7 @@
  */
 
 #include "lint.h"
+#include "libc.h"
 #include "thr_uberdata.h"
 #include <upanic.h>
 
@@ -40,6 +41,8 @@ static mutex_t assert_lock = DEFAULTMUTEX;
 static ulwp_t *assert_thread = NULL;
 
 mutex_t *panic_mutex = NULL;
+
+static void Abort(const char *, size_t) __NORETURN;
 
 /*
  * Called from __assert() to set panicstr and panic_thread.
@@ -449,11 +452,18 @@ __assfail(const char *assertion, const char *filename, int line_num)
  * We don't use "#pragma weak assfail __assfail" in order to avoid
  * warnings from the check_fnames utility at build time for libraries
  * that define their own version of assfail().
+ *
+ * Additionally, ASSERT() and VERIFY() in <sys/debug.h> can invoke assfail().
+ *
+ * We would like this to be declared _NORETURN, but some caution is in order
+ * as alternate implementations of assfail() exist -- notably the one in
+ * libfakekernel -- which can return under some circumstances.
  */
 void
 assfail(const char *assertion, const char *filename, int line_num)
 {
 	__assfail(assertion, filename, line_num);
+	/* NOTREACHED */
 }
 
 void

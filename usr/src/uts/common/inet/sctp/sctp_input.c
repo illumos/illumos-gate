@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -3524,6 +3525,14 @@ sctp_input(conn_t *connp, ipha_t *ipha, ip6_t *ip6h, mblk_t *mp,
 	ill_t		*rill = ira->ira_rill;
 
 	secure = iraflags & IRAF_IPSEC_SECURE;
+
+	if (connp->conn_min_ttl != 0 && connp->conn_min_ttl > ira->ira_ttl) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		SCTP_REFRELE(sctp);
+		freemsg(mp);
+		return;
+	}
 
 	/*
 	 * We check some fields in conn_t without holding a lock.

@@ -26,7 +26,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -2129,6 +2129,11 @@ icmp_inbound_error_fanout_v4(mblk_t *mp, icmph_t *icmph, ip_recv_attr_t *ira)
 		if (connp == NULL)
 			goto discard_pkt;
 
+		if (connp->conn_min_ttl != 0 &&
+		    connp->conn_min_ttl > ira->ira_ttl) {
+			CONN_DEC_REF(connp);
+			goto discard_pkt;
+		}
 		if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) ||
 		    (ira->ira_flags & IRAF_IPSEC_SECURE)) {
 			mp = ipsec_check_inbound_policy(mp, connp,
@@ -4977,6 +4982,13 @@ ip_fanout_proto_conn(conn_t *connp, mblk_t *mp, ipha_t *ipha, ip6_t *ip6h,
 
 	ASSERT(!(IPCL_IS_IPTUN(connp)));
 
+	if (connp->conn_min_ttl != 0 && connp->conn_min_ttl > ira->ira_ttl) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
+		return;
+	}
+
 	if (((iraflags & IRAF_IS_IPV4) ?
 	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
 	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
@@ -5235,6 +5247,13 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *mp, ipha_t *ipha, ip6_t *ip6h,
 	iaflags_t	iraflags = ira->ira_flags;
 
 	secure = iraflags & IRAF_IPSEC_SECURE;
+
+	if (connp->conn_min_ttl != 0 && connp->conn_min_ttl > ira->ira_ttl) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
+		return;
+	}
 
 	if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld :
 	    !canputnext(connp->conn_rq)) {
@@ -14323,6 +14342,15 @@ ip_fanout_sctp_raw(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
 		ira->ira_rill = rill;
 		return;
 	}
+
+	if (connp->conn_min_ttl != 0 && connp->conn_min_ttl > ira->ira_ttl) {
+		CONN_DEC_REF(connp);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
+		return;
+	}
+
 	rq = connp->conn_rq;
 	if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld : !canputnext(rq)) {
 		CONN_DEC_REF(connp);

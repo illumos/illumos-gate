@@ -70,7 +70,7 @@ typedef struct aio_worker	aio_worker_t;
 typedef struct aio_hash		aio_hash_t;
 
 struct aio_args {
-	int 		fd;
+	int		fd;
 	caddr_t		buf;
 	size_t		bufsz;
 	offset_t	offset;
@@ -156,9 +156,9 @@ struct aio_req {
 #define	AIO_REQ_QUEUED		1
 #define	AIO_REQ_INPROGRESS	2
 #define	AIO_REQ_CANCELED	3
-#define	AIO_REQ_DONE 		4
+#define	AIO_REQ_DONE		4
 #define	AIO_REQ_FREE		5
-#define	AIO_REQ_DONEQ 		6
+#define	AIO_REQ_DONEQ		6
 
 /* use KAIO in _aio_rw() */
 #define	AIO_NO_KAIO		0x0
@@ -213,7 +213,7 @@ struct aio_req {
 #define	VALID_FD(fdes)		((fdes) >= 0 && (fdes) < MAX_KAIO_FDS)
 
 #define	KAIO_SUPPORTED(fdes)						\
-	(!VALID_FD(fdes) || 						\
+	(!VALID_FD(fdes) ||						\
 		((_kaio_supported[(fdes) / KAIO_FDARRAY_ELEM_SIZE] &	\
 		(uint32_t)(1 << ((fdes) % KAIO_FDARRAY_ELEM_SIZE))) == 0))
 
@@ -271,7 +271,7 @@ extern int _aio_rw64(aiocb64_t *, aio_lio_t *, aio_worker_t **, int, int);
 extern int _aio_create_worker(aio_req_t *, int);
 extern int _aio_cancel_req(aio_worker_t *, aio_req_t *, int *, int *);
 extern int aiocancel_all(int);
-extern void aio_panic(const char *);
+extern void aio_panic(const char *) __NORETURN;
 extern aio_req_t *_aio_hash_find(aio_result_t *);
 extern aio_req_t *_aio_hash_del(aio_result_t *);
 extern void _aio_req_mark_done(aio_req_t *);

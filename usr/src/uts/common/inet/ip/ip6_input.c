@@ -24,6 +24,7 @@
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -345,6 +346,7 @@ ip_input_common_v6(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		iras.ira_pktlen = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
 		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets,
 		    iras.ira_pktlen);
+		iras.ira_ttl = ip6h->ip6_hlim;
 
 		/*
 		 * Call one of:
@@ -1051,6 +1053,7 @@ ire_recv_forward_v6(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 		ip6h = (ip6_t *)mp->b_rptr;
 		ira->ira_pktlen = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
 		ira->ira_ip_hdr_length = IPV6_HDR_LEN;
+		ira->ira_ttl = ip6h->ip6_hlim;
 		if (ira->ira_pktlen > old_pkt_len)
 			added_tx_len = ira->ira_pktlen - old_pkt_len;
 	}
@@ -2155,6 +2158,11 @@ repeat:
 			tcp_xmit_listeners_reset(mp, ira, ipst, NULL);
 			return;
 		}
+		if (connp->conn_min_ttl != 0 &&
+		    connp->conn_min_ttl > ira->ira_ttl) {
+			CONN_DEC_REF(connp);
+			goto discard;
+		}
 		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
 		    (iraflags & IRAF_IPSEC_SECURE)) {
 			mp = ipsec_check_inbound_policy(mp, connp,
@@ -2311,6 +2319,11 @@ repeat:
 		    connp->conn_incoming_ifindex != ira->ira_ruifindex) {
 			CONN_DEC_REF(connp);
 			goto no_udp_match;
+		}
+		if (connp->conn_min_ttl != 0 &&
+		    connp->conn_min_ttl > ira->ira_ttl) {
+			CONN_DEC_REF(connp);
+			goto discard;
 		}
 		if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld :
 		    !canputnext(connp->conn_rq)) {

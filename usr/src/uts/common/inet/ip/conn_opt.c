@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -845,6 +846,9 @@ conn_opt_get(conn_opt_arg_t *coa, t_scalar_t level, t_scalar_t name,
 			else
 				*(uchar_t *)ptr = ipst->ips_ip_broadcast_ttl;
 			return (sizeof (uchar_t));
+		case IP_MINTTL:
+			*i1 = connp->conn_min_ttl;
+			return (sizeof (int));
 		default:
 			return (-1);
 		}
@@ -980,6 +984,9 @@ conn_opt_get(conn_opt_arg_t *coa, t_scalar_t level, t_scalar_t name,
 			break;
 		case IPV6_V6ONLY:
 			*i1 = connp->conn_ipv6_v6only;
+			return (sizeof (int));
+		case IPV6_MINHOPCOUNT:
+			*i1 = connp->conn_min_ttl;
 			return (sizeof (int));
 		default:
 			return (-1);
@@ -1241,7 +1248,7 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	switch (name) {
 	case IP_TTL:
 		/* Don't allow zero */
-		if (*i1 < 1 || *i1 > 255)
+		if (*i1 < 1 || *i1 > MAXTTL)
 			return (EINVAL);
 		break;
 	case IP_MULTICAST_IF:
@@ -1321,6 +1328,10 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		/* Just check it is ok. */
 		if (!ip_xmit_ifindex_valid(ifindex, zoneid, B_FALSE, ipst))
 			return (ENXIO);
+		break;
+	case IP_MINTTL:
+		if (*i1 < 0 || *i1 > MAXTTL)
+			return (EINVAL);
 		break;
 	}
 	if (checkonly)
@@ -1540,7 +1551,11 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 			return (error);
 		}
 		return (0);
-
+	case IP_MINTTL:
+		mutex_enter(&connp->conn_lock);
+		connp->conn_min_ttl = *i1;
+		mutex_exit(&connp->conn_lock);
+		break;
 	}
 	return (0);
 }
@@ -1665,7 +1680,7 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		if (inlen != 0 && inlen != sizeof (int))
 			return (EINVAL);
 		if (inlen == sizeof (int)) {
-			if (*i1 > 255 || *i1 < -1 || *i1 == 0)
+			if (*i1 > IPV6_MAX_HOPS || *i1 < -1 || *i1 == 0)
 				return (EINVAL);
 		}
 		break;
@@ -1732,6 +1747,10 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		if (*i1 < 0 || *i1 > 1) {
 			return (EINVAL);
 		}
+		break;
+	case IPV6_MINHOPCOUNT:
+		if (*i1 < 0 || *i1 > IPV6_MAX_HOPS)
+			return (EINVAL);
 		break;
 	}
 	if (checkonly)
@@ -2043,6 +2062,11 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	case IPV6_V6ONLY:
 		mutex_enter(&connp->conn_lock);
 		connp->conn_ipv6_v6only = onoff;
+		mutex_exit(&connp->conn_lock);
+		break;
+	case IPV6_MINHOPCOUNT:
+		mutex_enter(&connp->conn_lock);
+		connp->conn_min_ttl = *i1;
 		mutex_exit(&connp->conn_lock);
 		break;
 	}
@@ -2928,6 +2952,7 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	econnp->conn_flowinfo = lconnp->conn_flowinfo;
 
 	econnp->conn_default_ttl = lconnp->conn_default_ttl;
+	econnp->conn_min_ttl = lconnp->conn_min_ttl;
 
 	/*
 	 * TSOL: tsol_input_proc() needs the eager's cred before the

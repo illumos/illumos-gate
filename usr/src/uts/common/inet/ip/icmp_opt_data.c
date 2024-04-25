@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -155,6 +156,8 @@ opdes_t	icmp_opt_arr[] = {
 { IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, 0,
 	sizeof (in_addr_t), -1 /* not initialized */ },
 
+{ IP_MINTTL, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { MRT_INIT, IPPROTO_IP, 0, OA_X, OP_CONFIG,
 	OP_NODEFAULT, sizeof (int),
 	-1 /* not initialized */ },
@@ -165,19 +168,19 @@ opdes_t	icmp_opt_arr[] = {
 { MRT_ADD_VIF, IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
 	sizeof (struct vifctl), -1 /* not initialized */ },
 
-{ MRT_DEL_VIF, 	IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
+{ MRT_DEL_VIF, IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
 	sizeof (vifi_t), -1 /* not initialized */ },
 
-{ MRT_ADD_MFC, 	IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
+{ MRT_ADD_MFC, IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
 	sizeof (struct mfcctl), -1 /* not initialized */ },
 
-{ MRT_DEL_MFC, 	IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
+{ MRT_DEL_MFC, IPPROTO_IP, 0, OA_X, OP_CONFIG, OP_NODEFAULT,
 	sizeof (struct mfcctl), -1 /* not initialized */ },
 
-{ MRT_VERSION, 	IPPROTO_IP, OA_R, OA_R, OP_NP, OP_NODEFAULT,
+{ MRT_VERSION, IPPROTO_IP, OA_R, OA_R, OP_NP, OP_NODEFAULT,
 	sizeof (int), -1 /* not initialized */ },
 
-{ MRT_ASSERT, 	IPPROTO_IP, 0, OA_RW, OP_CONFIG,
+{ MRT_ASSERT, IPPROTO_IP, 0, OA_RW, OP_CONFIG,
 	OP_NODEFAULT,
 	sizeof (int), -1 /* not initialized */ },
 
@@ -304,6 +307,9 @@ opdes_t	icmp_opt_arr[] = {
 { MCAST_LEAVE_SOURCE_GROUP, IPPROTO_IPV6, OA_X, OA_X, OP_NP,
 	OP_NODEFAULT, sizeof (struct group_source_req),
 	-1 /* not initialized */ },
+
+{ IPV6_MINHOPCOUNT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
 };
 
 /*

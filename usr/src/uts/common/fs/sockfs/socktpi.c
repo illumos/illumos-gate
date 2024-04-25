@@ -1638,7 +1638,7 @@ sotpi_accept(struct sonode *so, int fflag, struct cred *cr,
 	/* Check that we are not already connected */
 	if ((so->so_state & SS_ACCEPTCONN) == 0)
 		goto conn_bad;
-again:
+
 	if ((error = sowaitconnind(so, fflag, &mp)) != 0)
 		goto e_bad;
 
@@ -2064,15 +2064,10 @@ again:
 
 	return (0);
 
-
-eproto_disc_unl:
-	error = EPROTO;
 e_disc_unl:
 	eprintsoline(so, error);
 	goto disconnect_unlocked;
 
-pr_disc_vp_unl:
-	eprintsoline(so, error);
 disconnect_vp_unlocked:
 	(void) VOP_CLOSE(nvp, 0, 1, 0, cr, NULL);
 	VN_RELE(nvp);
@@ -2080,8 +2075,6 @@ disconnect_unlocked:
 	(void) sodisconnect(so, SEQ_number, 0);
 	return (error);
 
-pr_disc_vp:
-	eprintsoline(so, error);
 disconnect_vp:
 	(void) sodisconnect(so, SEQ_number, _SODISCONNECT_LOCK_HELD);
 	so_unlock_single(so, SOLOCKED);
@@ -5044,6 +5037,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
 
+	len = (t_uscalar_t)sizeof (uint32_t);	/* Default */
+
 	/*
 	 * Check for SOL_SOCKET options.
 	 * Certain SOL_SOCKET options are returned directly whereas
@@ -5111,8 +5106,6 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			}
 			break;
 		}
-
-		len = (t_uscalar_t)sizeof (uint32_t);	/* Default */
 
 		switch (option_name) {
 		case SO_TYPE:
