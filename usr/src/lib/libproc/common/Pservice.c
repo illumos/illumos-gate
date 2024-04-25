@@ -388,7 +388,7 @@ ps_pglobal_lookup(struct ps_prochandle *P, const char *object_name,
 	GElf_Sym sym;
 
 	if (Plookup_by_name(P, object_name, sym_name, &sym) == 0) {
-		dprintf("pglobal_lookup <%s> -> %p\n",
+		Pdprintf("pglobal_lookup <%s> -> %p\n",
 		    sym_name, (void *)(uintptr_t)sym.st_value);
 		*sym_addr = (psaddr_t)sym.st_value;
 		return (PS_OK);
