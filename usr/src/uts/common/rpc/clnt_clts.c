@@ -1053,6 +1053,17 @@ clnt_clts_kcontrol(CLIENT *h, int cmd, char *arg)
 		*((uint32_t *)arg) = p->cku_xid;
 		return (TRUE);
 
+	case CLSET_NODELAYONERR:
+		/*
+		 * CLTS does not have this functionality, but
+		 * we return TRUE here to avoid error messages.
+		 */
+		return (TRUE);
+
+	case CLGET_NODELAYONERR:
+		/* CLTS does not support this functionality. */
+		return (FALSE);
+
 	case CLSET_BCAST:
 		p->cku_bcast = *((uint32_t *)arg);
 		return (TRUE);
