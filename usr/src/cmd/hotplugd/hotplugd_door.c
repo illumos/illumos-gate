@@ -166,8 +166,8 @@ door_server(void *cookie, char *argp, size_t sz, door_desc_t *dp, uint_t ndesc)
 	hp_cmd_t	cmd;
 	int		rv;
 
-	dprintf("Door call: cookie=%p, argp=%p, sz=%d\n", cookie, (void *)argp,
-	    sz);
+	hp_dprintf("Door call: cookie=%p, argp=%p, sz=%d\n", cookie,
+	    (void *)argp, sz);
 
 	/* Special case to free a results buffer */
 	if (sz == sizeof (uint64_t)) {
@@ -298,11 +298,11 @@ cmd_getinfo(nvlist_t *args, nvlist_t **resultsp)
 	uint_t		flags;
 	int		rv;
 
-	dprintf("cmd_getinfo:\n");
+	hp_dprintf("cmd_getinfo:\n");
 
 	/* Get arguments */
 	if (nvlist_lookup_string(args, HPD_PATH, &path) != 0) {
-		dprintf("cmd_getinfo: invalid arguments.\n");
+		hp_dprintf("cmd_getinfo: invalid arguments.\n");
 		return (EINVAL);
 	}
 	if (nvlist_lookup_string(args, HPD_CONNECTION, &connection) != 0)
@@ -315,7 +315,7 @@ cmd_getinfo(nvlist_t *args, nvlist_t **resultsp)
 		rv = hp_pack(root, &buf, &len);
 		hp_fini(root);
 	}
-	dprintf("cmd_getinfo: getinfo(): rv = %d, buf = %p.\n", rv,
+	hp_dprintf("cmd_getinfo: getinfo(): rv = %d, buf = %p.\n", rv,
 	    (void *)buf);
 
 	/*
@@ -329,7 +329,7 @@ cmd_getinfo(nvlist_t *args, nvlist_t **resultsp)
 
 	/* Allocate nvlist for results */
 	if (nvlist_alloc(&results, NV_UNIQUE_NAME_TYPE, 0) != 0) {
-		dprintf("cmd_getinfo: nvlist_alloc() failed.\n");
+		hp_dprintf("cmd_getinfo: nvlist_alloc() failed.\n");
 		free(buf);
 		return (ENOMEM);
 	}
@@ -338,7 +338,7 @@ cmd_getinfo(nvlist_t *args, nvlist_t **resultsp)
 	if ((nvlist_add_int32(results, HPD_STATUS, 0) != 0) ||
 	    (nvlist_add_byte_array(results, HPD_INFO,
 	    (uchar_t *)buf, len) != 0)) {
-		dprintf("cmd_getinfo: nvlist add failure.\n");
+		hp_dprintf("cmd_getinfo: nvlist add failure.\n");
 		nvlist_free(results);
 		free(buf);
 		return (ENOMEM);
@@ -369,13 +369,13 @@ cmd_changestate(nvlist_t *args, nvlist_t **resultsp)
 	uint_t		flags;
 	int		rv, state, old_state, status;
 
-	dprintf("cmd_changestate:\n");
+	hp_dprintf("cmd_changestate:\n");
 
 	/* Get arguments */
 	if ((nvlist_lookup_string(args, HPD_PATH, &path) != 0) ||
 	    (nvlist_lookup_string(args, HPD_CONNECTION, &connection) != 0) ||
 	    (nvlist_lookup_int32(args, HPD_STATE, &state) != 0)) {
-		dprintf("cmd_changestate: invalid arguments.\n");
+		hp_dprintf("cmd_changestate: invalid arguments.\n");
 		return (EINVAL);
 	}
 	if (nvlist_lookup_uint32(args, HPD_FLAGS, (uint32_t *)&flags) != 0)
@@ -389,7 +389,7 @@ cmd_changestate(nvlist_t *args, nvlist_t **resultsp)
 
 	/* Check authorization */
 	if (check_auth(uc, HP_MODIFY_AUTH) != 0) {
-		dprintf("cmd_changestate: access denied.\n");
+		hp_dprintf("cmd_changestate: access denied.\n");
 		audit_changestate(uc, HP_MODIFY_AUTH, path, connection,
 		    state, -1, ADT_FAIL_VALUE_AUTH);
 		ucred_free(uc);
@@ -398,7 +398,7 @@ cmd_changestate(nvlist_t *args, nvlist_t **resultsp)
 
 	/* Perform the state change operation */
 	status = changestate(path, connection, state, flags, &old_state, &root);
-	dprintf("cmd_changestate: changestate() == %d\n", status);
+	hp_dprintf("cmd_changestate: changestate() == %d\n", status);
 
 	/* Audit the operation */
 	audit_changestate(uc, HP_MODIFY_AUTH, path, connection, state,
@@ -417,20 +417,20 @@ cmd_changestate(nvlist_t *args, nvlist_t **resultsp)
 		char	*buf = NULL;
 		size_t	len = 0;
 
-		dprintf("cmd_changestate: results nvlist required.\n");
+		hp_dprintf("cmd_changestate: results nvlist required.\n");
 
 		/* Pack and discard the error snapshot */
 		rv = hp_pack(root, &buf, &len);
 		hp_fini(root);
 		if (rv != 0) {
-			dprintf("cmd_changestate: hp_pack() failed (%s).\n",
+			hp_dprintf("cmd_changestate: hp_pack() failed (%s).\n",
 			    strerror(rv));
 			return (status);
 		}
 
 		/* Allocate nvlist for results */
 		if (nvlist_alloc(&results, NV_UNIQUE_NAME_TYPE, 0) != 0) {
-			dprintf("cmd_changestate: nvlist_alloc() failed.\n");
+			hp_dprintf("cmd_changestate: nvlist_alloc() failed.\n");
 			free(buf);
 			return (status);
 		}
@@ -439,7 +439,7 @@ cmd_changestate(nvlist_t *args, nvlist_t **resultsp)
 		if ((nvlist_add_int32(results, HPD_STATUS, status) != 0) ||
 		    (nvlist_add_byte_array(results, HPD_INFO, (uchar_t *)buf,
 		    len) != 0)) {
-			dprintf("cmd_changestate: nvlist add failed.\n");
+			hp_dprintf("cmd_changestate: nvlist add failed.\n");
 			nvlist_free(results);
 			free(buf);
 			return (status);
@@ -467,7 +467,7 @@ cmd_private(hp_cmd_t cmd, nvlist_t *args, nvlist_t **resultsp)
 	char		*values = NULL;
 	int		status;
 
-	dprintf("cmd_private:\n");
+	hp_dprintf("cmd_private:\n");
 
 	/* Get caller's credentials */
 	if ((cmd == HP_CMD_SETPRIVATE) && (door_ucred(&uc) != 0)) {
@@ -479,14 +479,14 @@ cmd_private(hp_cmd_t cmd, nvlist_t *args, nvlist_t **resultsp)
 	if ((nvlist_lookup_string(args, HPD_PATH, &path) != 0) ||
 	    (nvlist_lookup_string(args, HPD_CONNECTION, &connection) != 0) ||
 	    (nvlist_lookup_string(args, HPD_OPTIONS, &options) != 0)) {
-		dprintf("cmd_private: invalid arguments.\n");
+		hp_dprintf("cmd_private: invalid arguments.\n");
 		return (EINVAL);
 	}
 
 	/* Check authorization */
 	if ((cmd == HP_CMD_SETPRIVATE) &&
 	    (check_auth(uc, HP_MODIFY_AUTH) != 0)) {
-		dprintf("cmd_private: access denied.\n");
+		hp_dprintf("cmd_private: access denied.\n");
 		audit_setprivate(uc, HP_MODIFY_AUTH, path, connection, options,
 		    ADT_FAIL_VALUE_AUTH);
 		ucred_free(uc);
@@ -495,7 +495,7 @@ cmd_private(hp_cmd_t cmd, nvlist_t *args, nvlist_t **resultsp)
 
 	/* Perform the operation */
 	status = private_options(path, connection, cmd, options, &values);
-	dprintf("cmd_private: private_options() == %d\n", status);
+	hp_dprintf("cmd_private: private_options() == %d\n", status);
 
 	/* Audit the operation */
 	if (cmd == HP_CMD_SETPRIVATE) {
@@ -509,7 +509,7 @@ cmd_private(hp_cmd_t cmd, nvlist_t *args, nvlist_t **resultsp)
 
 		/* Allocate nvlist for results */
 		if (nvlist_alloc(&results, NV_UNIQUE_NAME_TYPE, 0) != 0) {
-			dprintf("cmd_private: nvlist_alloc() failed.\n");
+			hp_dprintf("cmd_private: nvlist_alloc() failed.\n");
 			free(values);
 			return (ENOMEM);
 		}
@@ -517,7 +517,7 @@ cmd_private(hp_cmd_t cmd, nvlist_t *args, nvlist_t **resultsp)
 		/* Add values and status to the results */
 		if ((nvlist_add_int32(results, HPD_STATUS, status) != 0) ||
 		    (nvlist_add_string(results, HPD_OPTIONS, values) != 0)) {
-			dprintf("cmd_private: nvlist add failed.\n");
+			hp_dprintf("cmd_private: nvlist add failed.\n");
 			nvlist_free(results);
 			free(values);
 			return (ENOMEM);
@@ -596,7 +596,7 @@ free_buffer(uint64_t seqnum)
 
 	while (node) {
 		if (node->seqnum == seqnum) {
-			dprintf("Free buffer %lld\n", seqnum);
+			hp_dprintf("Free buffer %lld\n", seqnum);
 			if (prev) {
 				prev->next = node->next;
 			} else {

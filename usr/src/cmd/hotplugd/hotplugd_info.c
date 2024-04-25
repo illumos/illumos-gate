@@ -75,7 +75,7 @@ getinfo(const char *path, const char *connection, uint_t flags, hp_node_t *retp)
 	if ((path == NULL) || (retp == NULL))
 		return (EINVAL);
 
-	dprintf("getinfo: path=%s, connection=%s, flags=0x%x\n", path,
+	hp_dprintf("getinfo: path=%s, connection=%s, flags=0x%x\n", path,
 	    (connection == NULL) ? "NULL" : connection, flags);
 
 	/* Allocate the base path */
@@ -91,7 +91,7 @@ getinfo(const char *path, const char *connection, uint_t flags, hp_node_t *retp)
 
 	/* Check if there were no connections */
 	if (root == NULL) {
-		dprintf("getinfo: no hotplug connections.\n");
+		hp_dprintf("getinfo: no hotplug connections.\n");
 		free(basepath);
 		return (ENOENT);
 	}
@@ -130,7 +130,7 @@ getinfo(const char *path, const char *connection, uint_t flags, hp_node_t *retp)
  *
  *	When path is set to "/", the results need to be limited only to
  *	branches that contain hotplug information.  An initial search
- * 	is performed to mark which branches contain hotplug nodes.
+ *	is performed to mark which branches contain hotplug nodes.
  */
 static int
 copy_devinfo(const char *path, const char *connection, uint_t flags,

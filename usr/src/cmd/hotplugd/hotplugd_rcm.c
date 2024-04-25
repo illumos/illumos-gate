@@ -190,7 +190,7 @@ rcm_offline(char **rsrcs, uint_t flags, hp_node_t root)
 	uint_t		rcm_flags = 0;
 	int		rv = 0;
 
-	dprintf("rcm_offline()\n");
+	hp_dprintf("rcm_offline()\n");
 
 	/* Set flags */
 	if (flags & HPFORCE)
@@ -237,7 +237,7 @@ rcm_online(char **rsrcs)
 	rcm_handle_t	*handle;
 	rcm_info_t	*info = NULL;
 
-	dprintf("rcm_online()\n");
+	hp_dprintf("rcm_online()\n");
 
 	if (rcm_alloc_handle(NULL, 0, NULL, &handle) != RCM_SUCCESS) {
 		log_err("Cannot allocate RCM handle (%s)\n", strerror(errno));
@@ -263,7 +263,7 @@ rcm_remove(char **rsrcs)
 	rcm_handle_t	*handle;
 	rcm_info_t	*info = NULL;
 
-	dprintf("rcm_remove()\n");
+	hp_dprintf("rcm_remove()\n");
 
 	if (rcm_alloc_handle(NULL, 0, NULL, &handle) != RCM_SUCCESS) {
 		log_err("Cannot allocate RCM handle (%s)\n", strerror(errno));

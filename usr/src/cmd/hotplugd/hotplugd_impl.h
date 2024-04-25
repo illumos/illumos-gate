@@ -58,7 +58,7 @@ extern "C" {
  */
 void		log_err(char *fmt, ...);
 void		log_info(char *fmt, ...);
-void		dprintf(char *fmt, ...);
+void		hp_dprintf(char *fmt, ...);
 boolean_t	door_server_init(void);
 void		door_server_fini(void);
 int		getinfo(const char *path, const char *connection, uint_t flags,
