@@ -109,7 +109,7 @@ void		rmm_dbus_error_free(DBusError *);
 
 char		*rmm_vold_convert_volume_label(const char *name, size_t len);
 int		makepath(char *, mode_t);
-void		dprintf(const char *, ...);
+void		dbgprintf(const char *, ...);
 
 #ifdef	__cplusplus
 }

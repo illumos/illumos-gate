@@ -174,7 +174,7 @@ rmvolmgr(int argc, char **argv)
 	daemonize = (getenv("RMVOLMGR_NODAEMON") == NULL);
 
 	if (daemonize && daemon(0, 0) < 0) {
-		dprintf("daemonizing failed: %s", strerror(errno));
+		dbgprintf("daemonizing failed: %s", strerror(errno));
 		return (1);
 	}
 
@@ -186,12 +186,12 @@ rmvolmgr(int argc, char **argv)
 	 * signal mainloop integration using pipes
 	 */
 	if (pipe(sigexit_pipe) != 0) {
-		dprintf("pipe failed %s\n", strerror(errno));
+		dbgprintf("pipe failed %s\n", strerror(errno));
 		return (1);
 	}
 	sigexit_ioch = g_io_channel_unix_new(sigexit_pipe[0]);
 	if (sigexit_ioch == NULL) {
-		dprintf("g_io_channel_unix_new failed\n");
+		dbgprintf("g_io_channel_unix_new failed\n");
 		return (1);
 	}
 	g_io_add_watch(sigexit_ioch, G_IO_IN, sigexit_ioch_func, NULL);
@@ -220,7 +220,7 @@ rmvolmgr(int argc, char **argv)
 	rmm_mount_all();
 
 	if ((mainloop = g_main_loop_new(NULL, B_FALSE)) == NULL) {
-		dprintf("Cannot create main loop\n");
+		dbgprintf("Cannot create main loop\n");
 		return (1);
 	}
 
@@ -264,7 +264,7 @@ get_smf_properties()
 static void
 sigexit(int signo)
 {
-	dprintf("signal to exit %d\n", signo);
+	dbgprintf("signal to exit %d\n", signo);
 
 	write(sigexit_pipe[1], "s", 1);
 }
@@ -280,12 +280,12 @@ sigexit_ioch_func(GIOChannel *source, GIOCondition condition,
 
 	if (g_io_channel_read_chars(source, buf, 1, &bytes_read, &error) !=
 	    G_IO_STATUS_NORMAL) {
-		dprintf("g_io_channel_read_chars failed %s", error->message);
+		dbgprintf("g_io_channel_read_chars failed %s", error->message);
 		g_error_free(error);
 		return (TRUE);
 	}
 
-	dprintf("signal to exit\n");
+	dbgprintf("signal to exit\n");
 
 	rmm_unmount_all();
 
@@ -346,7 +346,7 @@ volume_should_mount(const char *udi)
 	/* get the backing storage device */
 	if (!(storage_device = libhal_device_get_property_string(hal_ctx, udi,
 	    "block.storage_device", NULL))) {
-		dprintf("cannot get block.storage_device\n");
+		dbgprintf("cannot get block.storage_device\n");
 		goto out;
 	}
 
@@ -377,17 +377,17 @@ volume_added(const char *udi)
 	GSList		*l;
 	managed_volume_t *v;
 
-	dprintf("volume added %s\n", udi);
+	dbgprintf("volume added %s\n", udi);
 
 	l = g_slist_find_custom(managed_volumes, udi, rmm_managed_compare_udi);
 	v = (l != NULL) ? l->data : NULL;
 
 	if (v != NULL) {
-		dprintf("already managed %s\n", udi);
+		dbgprintf("already managed %s\n", udi);
 		return;
 	}
 	if (!volume_should_mount(udi)) {
-		dprintf("should not mount %s\n", udi);
+		dbgprintf("should not mount %s\n", udi);
 		return;
 	}
 	if ((v = rmm_managed_alloc(hal_ctx, udi)) == NULL) {
@@ -397,7 +397,7 @@ volume_added(const char *udi)
 		v->my = B_TRUE;
 		managed_volumes = g_slist_prepend(managed_volumes, v);
 	} else {
-		dprintf("rmm_action failed %s\n", udi);
+		dbgprintf("rmm_action failed %s\n", udi);
 		rmm_managed_free(v);
 	}
 }
@@ -408,7 +408,7 @@ volume_removed(const char *udi)
 	GSList		*l;
 	managed_volume_t *v;
 
-	dprintf("volume removed %s\n", udi);
+	dbgprintf("volume removed %s\n", udi);
 
 	l = g_slist_find_custom(managed_volumes, udi, rmm_managed_compare_udi);
 	v = (l != NULL) ? l->data : NULL;
@@ -461,7 +461,7 @@ rmm_property_modified(LibHalContext *ctx, const char *udi, const char *key,
 	v = (l != NULL) ? l->data : NULL;
 
 	if (is_mounted) {
-		dprintf("Mounted: %s\n", udi);
+		dbgprintf("Mounted: %s\n", udi);
 
 		if (v != NULL) {
 			/* volume mounted by us is already taken care of */
@@ -479,7 +479,7 @@ rmm_property_modified(LibHalContext *ctx, const char *udi, const char *key,
 		(void) vold_postprocess(hal_ctx, udi, &v->aa);
 
 	} else {
-		dprintf("Unmounted: %s\n", udi);
+		dbgprintf("Unmounted: %s\n", udi);
 
 		if (v == NULL) {
 			return;
@@ -538,7 +538,7 @@ rmm_mount_all()
 	/* get all volumes */
 	if ((udis = libhal_find_device_by_capability(hal_ctx, "volume",
 	    &num_udis, &error)) == NULL) {
-		dprintf("mount_all: no volumes found\n");
+		dbgprintf("mount_all: no volumes found\n");
 		goto out;
 	}
 
@@ -546,7 +546,7 @@ rmm_mount_all()
 		/* skip if already mounted */
 		if (libhal_device_get_property_bool(hal_ctx, udis[i],
 		    "volume.is_mounted", NULL)) {
-			dprintf("mount_all: %s already mounted\n", udis[i]);
+			dbgprintf("mount_all: %s already mounted\n", udis[i]);
 			continue;
 		}
 		if (!volume_should_mount(udis[i])) {
