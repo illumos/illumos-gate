@@ -102,9 +102,9 @@ static void fatal(char *fmt, ...) __NORETURN;
 #define	DESFRAGSIZE	1024
 
 #ifdef DEBUG
-#define	dprintf(x)	printf x
+#define	dbgprintf(x)	printf x
 #else
-#define	dprintf(x)
+#define	dbgprintf(x)
 #endif
 
 static int	Nflag;		/* run mkfs without writing file system */
@@ -128,9 +128,9 @@ static int	nrpos_set = 0;	/* true if the user specified nrpos */
 static int	density = 0;	/* number of bytes per inode */
 static int	apc;		/* alternates per cylinder */
 static int	apc_set = 0;	/* true if the user specified apc */
-static int 	rot = -1;	/* rotational delay (msecs) */
+static int	rot = -1;	/* rotational delay (msecs) */
 static int	rot_set = 0;	/* true if the user specified rot */
-static int 	maxcontig = -1;	/* maximum number of contig blocks */
+static int	maxcontig = -1;	/* maximum number of contig blocks */
 static int	text_sb = 0;	/* no disk changes; just final sb text dump */
 static int	binary_sb = 0;	/* no disk changes; just final sb binary dump */
 static int	label_type;	/* see types below */
@@ -508,7 +508,7 @@ main(int argc, char *argv[])
 		if (density < MIN_MTB_DENSITY)
 			density = MIN_MTB_DENSITY;
 		fsize = bsize;
-		cpg = -1; 	/* says make cyl groups as big as possible */
+		cpg = -1;	/* says make cyl groups as big as possible */
 	} else {
 		if (fsize == 0)
 			fsize = DESFRAGSIZE;
@@ -615,7 +615,7 @@ main(int argc, char *argv[])
 			exit(0);
 	}
 
-	dprintf(("DeBuG newfs : nsect=%d ntrak=%d cpg=%d\n",
+	dbgprintf(("DeBuG newfs : nsect=%d ntrak=%d cpg=%d\n",
 	    nsectors, ntracks, cpg));
 	/*
 	 * If alternates-per-cylinder is ever implemented:
@@ -736,7 +736,7 @@ getdiskbydev(char *disk)
 		 * default parameters.
 		 */
 		if (ioctl(fd, DKIOCREMOVABLE, &isremovable)) {
-			dprintf(("DeBuG newfs : Unable to determine if %s is"
+			dbgprintf(("DeBuG newfs : Unable to determine if %s is"
 			    " Removable Media. Proceeding with system"
 			    " determined parameters.\n", disk));
 			isremovable = 0;
@@ -745,7 +745,7 @@ getdiskbydev(char *disk)
 		/* If removable check if a floppy disk */
 		if (isremovable) {
 			if (ioctl(fd, DKIOCGMEDIAINFO, &info)) {
-				dprintf(("DeBuG newfs : Unable to get media"
+				dbgprintf(("DeBuG newfs : Unable to get media"
 				    " info from %s.\n", disk));
 			} else {
 				if (info.dki_media_type == DK_FLOPPY) {
@@ -755,7 +755,7 @@ getdiskbydev(char *disk)
 		}
 
 		if (ioctl(fd, DKIOCHOTPLUGGABLE, &ishotpluggable)) {
-			dprintf(("DeBuG newfs : Unable to determine if %s is"
+			dbgprintf(("DeBuG newfs : Unable to determine if %s is"
 			    " Hotpluggable Media. Proceeding with system"
 			    " determined parameters.\n", disk));
 			ishotpluggable = 0;
@@ -771,7 +771,7 @@ getdiskbydev(char *disk)
 		    g.dkg_nsect) > CHSLIMIT) && !Tflag) {
 			use_efi_dflts = 1;
 		}
-		dprintf(("DeBuG newfs : geom=%llu, CHSLIMIT=%d "
+		dbgprintf(("DeBuG newfs : geom=%llu, CHSLIMIT=%d "
 		    "isremovable = %d ishotpluggable = %d use_efi_dflts = %d\n",
 		    (diskaddr_t)g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect,
 		    CHSLIMIT, isremovable, ishotpluggable, use_efi_dflts));
@@ -906,7 +906,7 @@ brute_force_get_device_size(int fd)
 	diskaddr_t	min_fail = 0;
 	diskaddr_t	max_succeed = 0;
 	diskaddr_t	cur_db_off;
-	char 		buf[DEV_BSIZE];
+	char		buf[DEV_BSIZE];
 
 	/*
 	 * First, see if we can read the device at all, just to
@@ -977,7 +977,7 @@ brute_force_get_device_size(int fd)
 static int
 validate_size(char *disk, diskaddr_t size)
 {
-	char 		buf[DEV_BSIZE];
+	char		buf[DEV_BSIZE];
 	int fd, rc;
 
 	if ((fd = open64(disk, O_RDONLY)) < 0) {
