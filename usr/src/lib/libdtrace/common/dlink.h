@@ -29,7 +29,7 @@ extern "C" {
 
 extern const char *devname;
 
-extern void dprintf(int, const char *, ...);
+extern void dl_dprintf(int, const char *, ...);
 extern void dtrace_link_init(void);
 extern void dtrace_link_dof(dof_hdr_t *, Lmid_t, const char *, uintptr_t);
 

@@ -76,7 +76,7 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 	 * message, but it's possible that might fail as well.
 	 */
 	if ((node = malloc(sizeof (obj_list_t))) == NULL) {
-		dprintf(0, "libdaudit: failed to allocate");
+		dl_dprintf(0, "libdaudit: failed to allocate");
 		return (0);
 	}
 	node->ol_next = list;
