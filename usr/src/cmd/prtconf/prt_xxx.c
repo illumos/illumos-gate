@@ -187,7 +187,7 @@ obio_print(uintptr_t data, int ilev)
 
 	dp = (struct ddi_parent_private_data *)data;
 #ifdef DEBUG
-	dprintf("obio parent private data: nreg = 0x%x offset = 0x%x"
+	dbgprintf("obio parent private data: nreg = 0x%x offset = 0x%x"
 	    " nintr = 0x%x offset = 0x%x nrng = 0x%x offset = %x\n",
 	    dp->par_nreg, *((di_off_t *)(&dp->par_reg)),
 	    dp->par_nintr, *((di_off_t *)(&dp->par_intr)),
@@ -253,7 +253,7 @@ pcmcia_print(uintptr_t data, int ilev)
 
 	dp = (struct pcmcia_parent_private *)data;
 #ifdef DEBUG
-	dprintf("pcmcia parent private data: nreg = 0x%x offset = 0x%x"
+	dbgprintf("pcmcia parent private data: nreg = 0x%x offset = 0x%x"
 	    " intr = 0x%x offset = %x\n",
 	    dp->ppd_nreg, *(di_off_t *)(&dp->ppd_reg),
 	    dp->ppd_intr, *(di_off_t *)(&dp->ppd_intrspec));
@@ -296,7 +296,7 @@ sbus_print(uintptr_t data, int ilev)
 
 	dp = (struct ddi_parent_private_data *)data;
 #ifdef DEBUG
-	dprintf("sbus parent private data: nreg = 0x%x offset = 0x%x"
+	dbgprintf("sbus parent private data: nreg = 0x%x offset = 0x%x"
 	    " nintr = 0x%x offset = 0x%x nrng = 0x%x offset = %x\n",
 	    dp->par_nreg, *((di_off_t *)(&dp->par_reg)),
 	    dp->par_nintr, *((di_off_t *)(&dp->par_intr)),
@@ -372,7 +372,7 @@ match_priv_data(di_node_t node)
 		while (tmp && (*tmp != '\0')) {
 			if (strncmp(tmp, drv_name, len) == 0) {
 #ifdef	DEBUG
-				dprintf("matched parent private data"
+				dbgprintf("matched parent private data"
 				    " at Node <%s> parent driver <%s>\n",
 				    di_node_name(node), drv_name);
 #endif	/* DEBUG */
@@ -400,7 +400,7 @@ dump_priv_data(int ilev, di_node_t node)
 
 	if ((pdp = match_priv_data(node)) == NULL) {
 #ifdef DEBUG
-		dprintf("Error: parent private data format unknown\n");
+		dbgprintf("Error: parent private data format unknown\n");
 #endif /* DEBUG */
 		return;
 	}
