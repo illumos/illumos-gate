@@ -295,7 +295,7 @@ extern int		pool_set_container(pool_elem_t *, pool_elem_t *);
  * variable LIBPOOL_DEBUG to 1, enables these functions.
  */
 extern void		do_dprintf(const char *, va_list);
-extern void		dprintf(const char *, ...);
+extern void		pool_dprintf(const char *, ...);
 
 /*
  * libpool maintains it's own error value, rather than further pollute

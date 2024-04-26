@@ -302,7 +302,7 @@ commit_update(pool_elem_t *e1, pool_elem_t *e2, int pass)
 				free(name);
 				assert(newres);
 #ifdef DEBUG
-				dprintf("transferring: res, comp\n");
+				pool_dprintf("transferring: res, comp\n");
 				pool_elem_dprintf(TO_ELEM(newres));
 				pool_elem_dprintf(e2);
 #endif	/* DEBUG */
@@ -841,11 +841,11 @@ resource_allocate_default(pool_resource_t **res, uint_t nelem)
 		if (resource_get_max(res[j],
 		    &res_info[j].ri_max) == PO_FAIL ||
 		    resource_get_min(res[j],
-			&res_info[j].ri_min) == PO_FAIL ||
+		    &res_info[j].ri_min) == PO_FAIL ||
 		    resource_get_size(res[j],
-			&res_info[j].ri_oldsize) == PO_FAIL ||
+		    &res_info[j].ri_oldsize) == PO_FAIL ||
 		    resource_get_pinned(res[j],
-			&res_info[j].ri_pinned) == PO_FAIL) {
+		    &res_info[j].ri_pinned) == PO_FAIL) {
 			free(res_info);
 			return (PO_FAIL);
 		}
@@ -870,7 +870,7 @@ resource_allocate_default(pool_resource_t **res, uint_t nelem)
 			num = res_info[j].ri_oldsize - real_min;
 			if (pool_resource_transfer(
 			    TO_CONF(TO_ELEM(default_res)),
-				res_info[j].ri_res, default_res, num) !=
+			    res_info[j].ri_res, default_res, num) !=
 			    PO_SUCCESS) {
 				free(res_info);
 				return (PO_FAIL);
@@ -909,12 +909,12 @@ resource_allocate_default(pool_resource_t **res, uint_t nelem)
  *
  * Step 2: Compute the newsize for each set:
  *
- * 	Give each set its min number of cpus.  This min may be greater than
+ *	Give each set its min number of cpus.  This min may be greater than
  *	its pset.min due to pinned cpus. If there are more cpus than the total
  *	of all mins, then the surplus cpus are dealt round-robin to all sets
  *	(up to their max) in order of decreasing importance.  A set may be
  *	skipped during dealing because it started with more than its min due to
- * 	pinned cpus.  The dealing stops when there are no more cpus or all
+ *	pinned cpus.  The dealing stops when there are no more cpus or all
  *	sets are at their max. If all sets are at their max, any remaining cpus
  *	are given to the default set.
  *
@@ -987,9 +987,9 @@ pset_allocate_imp(pool_resource_t **res, uint_t nelem)
 		tot_min += res_info[j].ri_newsize;
 
 #ifdef DEBUG
-		dprintf("res allocation details\n");
+		pool_dprintf("res allocation details\n");
 		pool_elem_dprintf(TO_ELEM(res[j]));
-		dprintf("size=%llu\n", res_info[j].ri_oldsize);
+		pool_dprintf("size=%llu\n", res_info[j].ri_oldsize);
 #endif	/* DEBUG */
 	}
 
@@ -1079,15 +1079,15 @@ pset_allocate_imp(pool_resource_t **res, uint_t nelem)
 
 		/* Transfer resources from the donor set to the receiver */
 		ntrans = MIN(res_info[donor].ri_transfer,
-			    -res_info[receiver].ri_transfer);
+		    -res_info[receiver].ri_transfer);
 
 		if (pool_resource_transfer(
-			TO_CONF(TO_ELEM(res_info[donor].ri_res)),
-			    res_info[donor].ri_res, res_info[receiver].ri_res,
-			    ntrans) != PO_SUCCESS) {
-				free(res_info);
-				return (PO_FAIL);
-			}
+		    TO_CONF(TO_ELEM(res_info[donor].ri_res)),
+		    res_info[donor].ri_res, res_info[receiver].ri_res,
+		    ntrans) != PO_SUCCESS) {
+			free(res_info);
+			return (PO_FAIL);
+		}
 		res_info[donor].ri_transfer -= ntrans;
 		res_info[receiver].ri_transfer += ntrans;
 	}
@@ -1294,11 +1294,11 @@ clone_element(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 	pool_elem_t *tgt = (pool_elem_t *)user;
 	const pool_prop_t *prop;
 #ifdef DEBUG
-	dprintf("Cloning %s from %s\n",
+	pool_dprintf("Cloning %s from %s\n",
 	    pool_conf_location(TO_CONF(TO_ELEM(tgt))),
 	    pool_conf_location(TO_CONF(pe)));
 	assert(TO_CONF(TO_ELEM(tgt)) != TO_CONF(pe));
-	dprintf("clone_element: Processing %s\n", name);
+	pool_dprintf("clone_element: Processing %s\n", name);
 	pool_value_dprintf(pv);
 #endif	/* DEBUG */
 	/*

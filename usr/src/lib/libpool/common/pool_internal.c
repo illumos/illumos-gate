@@ -604,14 +604,14 @@ res_set_max(pool_elem_t *elem, const pool_value_t *pval)
 			pool_seterror(POE_PUTPROP);
 			return (PO_FAIL);
 		}
+		/*
+		 * Ensure that the modified total max is >= size
+		 * of all resources of this type
+		 */
 		if (max < oldmax) {
-			/*
-			 * Ensure that the modified total max is >= size
-			 * of all resources of this type
-			 */
 			return (pool_validate_resource(TO_CONF(elem),
-				pool_elem_class_string(elem), c_max_prop,
-				max - oldmax));
+			    pool_elem_class_string(elem), c_max_prop,
+			    max - oldmax));
 		}
 	}
 	return (PO_SUCCESS);
@@ -672,14 +672,14 @@ res_set_min(pool_elem_t *elem, const pool_value_t *pval)
 			pool_seterror(POE_PUTPROP);
 			return (PO_FAIL);
 		}
+		/*
+		 * Ensure that the modified total min is <= size
+		 * of all resources of this type
+		 */
 		if (min > oldmin) {
-			/*
-			 * Ensure that the modified total min is <= size
-			 * of all resources of this type
-			 */
 			return (pool_validate_resource(TO_CONF(elem),
-				pool_elem_class_string(elem), c_min_prop,
-				min - oldmin));
+			    pool_elem_class_string(elem), c_min_prop,
+			    min - oldmin));
 		}
 	}
 	return (PO_SUCCESS);
@@ -951,7 +951,7 @@ resource_get_common(const pool_resource_t *res, const char *name,
 	if (pvc == POC_INVAL) {
 		*uval = 0;
 #ifdef DEBUG
-		dprintf("can't retrieve %s\n");
+		pool_dprintf("can't retrieve %s\n");
 		pool_elem_dprintf(TO_ELEM(res));
 #endif	/* DEBUG */
 	} else if (pvc == POC_UINT) {
@@ -1715,7 +1715,7 @@ pool_validate_resource(const pool_conf_t *conf, const char *type,
 		if ((dyn = pool_conf_alloc()) == NULL)
 			return (PO_FAIL);
 		if (pool_conf_open(dyn, pool_dynamic_location(), PO_RDONLY) !=
-		PO_SUCCESS) {
+		    PO_SUCCESS) {
 			pool_conf_free(dyn);
 			return (PO_FAIL);
 		}
@@ -1773,7 +1773,7 @@ do_dprintf(const char *format, va_list ap)
 
 /*PRINTFLIKE1*/
 void
-dprintf(const char *format, ...)
+pool_dprintf(const char *format, ...)
 {
 	if (_libpool_debug) {
 		va_list alist;
@@ -2011,19 +2011,19 @@ atom_free(const char *s)
 #ifdef DEBUG
 /*
  * log_item_dprintf() prints the contents of the supplied log item using the
- * pools dprintf() trace mechanism.
+ * pools pool_dprintf() trace mechanism.
  *
  * Returns PO_SUCCESS
  */
 void
 log_item_dprintf(log_item_t *li)
 {
-	dprintf("LOGDUMP: %d operation, %p\n", li->li_op, li->li_details);
+	pool_dprintf("LOGDUMP: %d operation, %p\n", li->li_op, li->li_details);
 }
 
 /*
  * log_item_dprintf() prints the contents of the supplied log item using the
- * pools dprintf() trace mechanism.
+ * pools pool_dprintf() trace mechanism.
  *
  * Returns PO_SUCCESS
  */
@@ -2032,12 +2032,12 @@ pool_elem_dprintf(const pool_elem_t *pe)
 {
 	if (pool_elem_class(pe) != PEC_COMP) {
 		const char *name = elem_get_name(pe);
-		dprintf("element type: %s name: %s\n",
+		pool_dprintf("element type: %s name: %s\n",
 		    pool_elem_class_string(pe), name);
 		free((void *)name);
 	} else {
 		id_t sys_id = elem_get_sysid(pe);
-		dprintf("element type: %s sys_id: %d\n",
+		pool_dprintf("element type: %s sys_id: %d\n",
 		    pool_elem_class_string(pe), sys_id);
 	}
 }

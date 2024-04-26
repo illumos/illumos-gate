@@ -363,7 +363,7 @@ pool_value_equal(pool_value_t *pv1, pool_value_t *pv2)
 
 	type = pool_value_get_type(pv1);
 	if (type != pool_value_get_type(pv2))
-	    return (PO_FALSE);
+		return (PO_FALSE);
 
 	switch (type) {
 		case POC_UINT:
@@ -402,7 +402,7 @@ pool_value_equal(pool_value_t *pv1, pool_value_t *pv2)
 
 #ifdef DEBUG
 /*
- * Trace pool_value_t details using dprintf
+ * Trace pool_value_t details using pool_dprintf
  */
 void
 pool_value_dprintf(const pool_value_t *pv)
@@ -415,29 +415,29 @@ pool_value_dprintf(const pool_value_t *pv)
 		"POC_STRING"
 	};
 
-	dprintf("name: %s\n", pv->pv_name ? pv->pv_name : "NULL");
+	pool_dprintf("name: %s\n", pv->pv_name ? pv->pv_name : "NULL");
 	if (pv->pv_class >= POC_UINT && pv->pv_class <= POC_STRING)
-		dprintf("type: %s\n", class_name[pv->pv_class]);
+		pool_dprintf("type: %s\n", class_name[pv->pv_class]);
 	else
-		dprintf("type: POC_INVAL\n");
+		pool_dprintf("type: POC_INVAL\n");
 	switch (pv->pv_class) {
 	case POC_UINT:
-		dprintf("value: %llu\n", pv->pv_u.u);
+		pool_dprintf("value: %llu\n", pv->pv_u.u);
 		break;
 	case POC_INT:
-		dprintf("value: %lld\n", pv->pv_u.i);
+		pool_dprintf("value: %lld\n", pv->pv_u.i);
 		break;
 	case POC_DOUBLE:
-		dprintf("value: %f\n", pv->pv_u.d);
+		pool_dprintf("value: %f\n", pv->pv_u.d);
 		break;
 	case POC_BOOL:
-		dprintf("value: %s\n", pv->pv_u.b ? "true" : "false");
+		pool_dprintf("value: %s\n", pv->pv_u.b ? "true" : "false");
 		break;
 	case POC_STRING:
-		dprintf("value: %s\n", pv->pv_u.s);
+		pool_dprintf("value: %s\n", pv->pv_u.s);
 		break;
 	default:
-		dprintf("value: invalid\n");
+		pool_dprintf("value: invalid\n");
 		break;
 	}
 }
