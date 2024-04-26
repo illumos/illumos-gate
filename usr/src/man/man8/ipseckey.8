@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPSECKEY 8 "November 22, 2021"
+.TH IPSECKEY 8 "April 17, 2024"
 .SH NAME
 ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
 .SH SYNOPSIS
@@ -72,7 +72,8 @@ types.
 .LP
 \fBipseckey\fR uses a \fBPF_KEY\fR socket and the message types \fBSADB_ADD\fR,
 \fBSADB_DELETE\fR, \fBSADB_GET\fR, \fBSADB_UPDATE\fR, \fBSADB_FLUSH\fR, and
-\fBSADB_X_PROMISC\fR. Thus, you must be a superuser to use this command.
+\fBSADB_X_PROMISC\fR. Thus, you must have the \fBPRIV_SYS_IP_CONFIG\fR
+privilege to use this command.
 .sp
 .LP
 \fBipseckey\fR handles sensitive cryptographic keying information. Please read
@@ -99,9 +100,8 @@ information.
 .sp .6
 .RS 4n
 Read commands from an input file, \fIfilename\fR. The lines of the input file
-are identical to the command line language. The \fBload\fR command provides
-similar functionality. The \fB-s\fR option or the \fBsave\fR command can
-generate files readable by the \fB-f\fR argument.
+are identical to the command line language. The \fB-s\fR option or the
+\fBsave\fR command can generate files readable by the \fB-f\fR argument.
 .RE
 
 .sp
@@ -226,7 +226,7 @@ delete that SA too. This command requires the \fBspi\fR extension and the
 .ad
 .sp .6
 .RS 4n
-Lookup and display a security association from a specific \fBSADB\fR. Like
+Look up and display a security association from a specific \fBSADB\fR. Like
 \fBdelete\fR, this command only requires \fBspi\fR and \fBdest\fR for IPsec.
 .RE
 
@@ -1503,7 +1503,8 @@ Interface Stability	Committed
 .BR ipsecconf (8),
 .BR route (8),
 .BR svcadm (8),
-.BR svccfg (8)
+.BR svccfg (8),
+.BR tcpkey (8)
 .sp
 .LP
 Schneier, B., \fIApplied Cryptography: Protocols, Algorithms, and Source Code

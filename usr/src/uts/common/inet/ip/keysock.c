@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -67,12 +68,13 @@
 #include <inet/optcom.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
+#include <inet/tcp_sig.h>
 #include <inet/keysock.h>
 
 #include <sys/isa_defs.h>
 
 /*
- * This is a transport provider for the PF_KEY key mangement socket.
+ * This is a transport provider for the PF_KEY key management socket.
  * (See RFC 2367 for details.)
  * Downstream messages are wrapped in a keysock consumer interface KEYSOCK_IN
  * messages (see ipsec_info.h), and passed to the appropriate consumer.
@@ -149,8 +151,6 @@ static int keysock_open(queue_t *, dev_t *, int, int, cred_t *);
 static int keysock_wput(queue_t *, mblk_t *);
 static int keysock_rput(queue_t *, mblk_t *);
 static int keysock_rsrv(queue_t *);
-static void keysock_passup(mblk_t *, sadb_msg_t *, minor_t,
-    keysock_consumer_t *, boolean_t, keysock_stack_t *);
 static void *keysock_stack_init(netstackid_t stackid, netstack_t *ns);
 static void keysock_stack_fini(netstackid_t stackid, void *arg);
 
@@ -1072,7 +1072,7 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
  * This function will free mp or recycle it for delivery, thereby causing
  * the stream head to free it.
  */
-static void
+void
 keysock_error(keysock_t *ks, mblk_t *mp, int error, int diagnostic)
 {
 	sadb_msg_t *samsg = (sadb_msg_t *)mp->b_rptr;
@@ -1113,14 +1113,21 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 	wrapper = allocb(sizeof (ipsec_info_t), BPRI_HI);
 	if (wrapper == NULL) {
 		ks3dbg(keystack, ("keysock_passdown: allocb failed.\n"));
-		if (extv[SADB_EXT_KEY_ENCRYPT] != NULL)
+		if (extv[SADB_EXT_KEY_ENCRYPT] != NULL) {
 			bzero(extv[SADB_EXT_KEY_ENCRYPT],
 			    SADB_64TO8(
 			    extv[SADB_EXT_KEY_ENCRYPT]->sadb_ext_len));
-		if (extv[SADB_EXT_KEY_AUTH] != NULL)
+		}
+		if (extv[SADB_EXT_KEY_AUTH] != NULL) {
 			bzero(extv[SADB_EXT_KEY_AUTH],
 			    SADB_64TO8(
 			    extv[SADB_EXT_KEY_AUTH]->sadb_ext_len));
+		}
+		if (extv[SADB_X_EXT_STR_AUTH] != NULL) {
+			bzero(extv[SADB_X_EXT_STR_AUTH],
+			    SADB_64TO8(
+			    extv[SADB_X_EXT_STR_AUTH]->sadb_ext_len));
+		}
 		if (flushmsg) {
 			ks0dbg((
 			    "keysock: Downwards flush/dump message failed!\n"));
@@ -1240,6 +1247,15 @@ ext_check(sadb_ext_t *ext, keysock_stack_t *keystack)
 		if (lp[i] == 0)
 			return (B_FALSE);
 		break;
+	case SADB_X_EXT_STR_AUTH: {
+		sadb_key_t *key = (sadb_key_t *)ext;
+
+		if (key->sadb_key_bits == 0)
+			return (B_FALSE);
+		if (key->sadb_key_bits > SADB_8TO1(TCPSIG_MD5_KEY_LEN))
+			return (B_FALSE);
+		break;
+	}
 	case SADB_EXT_IDENTITY_SRC:
 	case SADB_EXT_IDENTITY_DST:
 		/*
@@ -1504,6 +1520,9 @@ keysock_duplicate(int ext_type)
 	case SADB_EXT_KEY_ENCRYPT:
 		rc = SADB_X_DIAGNOSTIC_DUPLICATE_EKEY;
 		break;
+	case SADB_X_EXT_STR_AUTH:
+		rc = SADB_X_DIAGNOSTIC_DUPLICATE_ASTR;
+		break;
 	}
 	return (rc);
 }
@@ -1541,6 +1560,9 @@ keysock_malformed(int ext_type)
 		break;
 	case SADB_EXT_KEY_ENCRYPT:
 		rc = SADB_X_DIAGNOSTIC_MALFORMED_EKEY;
+		break;
+	case SADB_X_EXT_STR_AUTH:
+		rc = SADB_X_DIAGNOSTIC_MALFORMED_ASTR;
 		break;
 	}
 	return (rc);
@@ -1754,6 +1776,16 @@ keysock_parse(queue_t *q, mblk_t *mp)
 		break;
 	}
 
+	/*
+	 * If this is a TCPSIG SA message, pass it off to the handler in
+	 * tcp_sig.c and return. This is not implemented as a downstream
+	 * module.
+	 */
+	if (samsg->sadb_msg_satype == SADB_X_SATYPE_TCPSIG) {
+		tcpsig_sa_handler(ks, mp, samsg, extv);
+		return;
+	}
+
 	switch (samsg->sadb_msg_type) {
 	case SADB_REGISTER:
 		/*
@@ -1783,11 +1815,13 @@ keysock_parse(queue_t *q, mblk_t *mp)
 		/*
 		 * Pass down to appropriate consumer.
 		 */
-		if (samsg->sadb_msg_satype != SADB_SATYPE_UNSPEC)
+		if (samsg->sadb_msg_satype != SADB_SATYPE_UNSPEC) {
 			keysock_passdown(ks, mp, samsg->sadb_msg_satype, extv,
 			    B_FALSE);
-		else keysock_error(ks, mp, EINVAL,
-		    SADB_X_DIAGNOSTIC_SATYPE_NEEDED);
+		} else {
+			keysock_error(ks, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_SATYPE_NEEDED);
+		}
 		return;
 	case SADB_X_DELPAIR_STATE:
 		if (samsg->sadb_msg_satype == SADB_SATYPE_UNSPEC) {
@@ -2084,7 +2118,7 @@ keysock_out_err(keysock_consumer_t *kc, int ks_errno, mblk_t *mp)
  * The compiler _should_ be able to use tail-call optimizations to make the
  * large ## of parameters not a huge deal.
  */
-static void
+void
 keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
     keysock_consumer_t *kc, boolean_t persistent, keysock_stack_t *keystack)
 {

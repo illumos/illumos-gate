@@ -25,6 +25,7 @@
  * Copyright 2012 Milan Juri. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <unistd.h>
@@ -418,6 +419,62 @@ dump_key(uint8_t *keyp, uint_t bitlen, uint_t saltbits, FILE *where,
 	return (0);
 }
 
+int
+dump_keystr(uint8_t *keystr, uint_t bitlen, FILE *where)
+{
+	size_t keylen;
+	uint_t i;
+
+	/* There should be no leftover bits for a key string */
+	if ((bitlen & 0x7) != 0)
+		return (-1);
+
+	keylen = SADB_1TO8(bitlen);
+
+	for (i = 0; i < keylen; i++) {
+		if (pflag)
+			(void) fprintf(where, "XX");
+		else if (isprint(keystr[i]))
+			(void) fprintf(where, "%c", keystr[i]);
+		else
+			(void) fprintf(where, "\\x%x", keystr[i]);
+	}
+
+	return (0);
+}
+
+
+static struct tcpsigalg {
+	uint8_t ta_value;
+	const char *ta_name;
+} tcpalgs[] = {
+	{ .ta_name = "md5", .ta_value = SADB_AALG_MD5 }
+};
+
+uint8_t
+gettcpsigalgbyname(const char *name)
+{
+	uint_t i;
+
+	for (i = 0; i < ARRAY_SIZE(tcpalgs); i++) {
+		if (strcmp(name, tcpalgs[i].ta_name) == 0)
+			return (tcpalgs[i].ta_value);
+	}
+	return (0);
+}
+
+const char *
+gettcpsigalgbynum(uint8_t num)
+{
+	uint_t i;
+
+	for (i = 0; i < ARRAY_SIZE(tcpalgs); i++) {
+		if (num == tcpalgs[i].ta_value)
+			return (tcpalgs[i].ta_name);
+	}
+	return (NULL);
+}
+
 /*
  * Print an authentication or encryption algorithm
  */
@@ -461,6 +518,25 @@ int
 dump_ealg(uint8_t ealg, FILE *where)
 {
 	return (dump_generic_alg(ealg, IPSEC_PROTO_ESP, where));
+}
+
+int
+dump_tcpsigalg(uint8_t aalg, FILE *where)
+{
+	const char *name = gettcpsigalgbynum(aalg);
+
+	if (name == NULL) {
+		if (fprintf(where, dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), aalg) < 0) {
+			return (-1);
+		}
+		return (0);
+	}
+
+	if (fputs(name, where) == EOF)
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -1596,6 +1672,14 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_MISSING_LIFETIME:
 		return (dgettext(TEXT_DOMAIN,
 		    "Inappropriate lifetimes"));
+	case SADB_X_DIAGNOSTIC_MISSING_ASTR:
+		return (dgettext(TEXT_DOMAIN, "Missing authentication string"));
+	case SADB_X_DIAGNOSTIC_DUPLICATE_ASTR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate authentication string"));
+	case SADB_X_DIAGNOSTIC_MALFORMED_ASTR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Malformed authentication string"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown diagnostic code"));
 	}
@@ -1725,6 +1809,9 @@ print_sadb_msg(FILE *file, struct sadb_msg *samsg, time_t wallclock,
 	case SADB_SATYPE_ESP:
 		(void) fprintf(file, "ESP");
 		break;
+	case SADB_X_SATYPE_TCPSIG:
+		(void) fprintf(file, "TCPSIG");
+		break;
 	case SADB_SATYPE_RSVP:
 		(void) fprintf(file, "RSVP");
 		break;
@@ -1770,39 +1857,47 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 		    SADB_64TO8(assoc->sadb_sa_len));
 	}
 
-	(void) fprintf(file, dgettext(TEXT_DOMAIN,
-	    "%sSADB_ASSOC spi=0x%x, replay window size=%u, state="),
-	    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
-	switch (assoc->sadb_sa_state) {
-	case SADB_SASTATE_LARVAL:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "LARVAL"));
-		break;
-	case SADB_SASTATE_MATURE:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "MATURE"));
-		break;
-	case SADB_SASTATE_DYING:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DYING"));
-		break;
-	case SADB_SASTATE_DEAD:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
-		break;
-	case SADB_X_SASTATE_ACTIVE_ELSEWHERE:
+	if ((assoc->sadb_sa_flags & SADB_X_SAFLAGS_TCPSIG) == 0) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "ACTIVE_ELSEWHERE"));
-		break;
-	case SADB_X_SASTATE_IDLE:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "IDLE"));
-		break;
-	default:
-		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "<unknown %u>"), assoc->sadb_sa_state);
+		    "%sSADB_ASSOC spi=0x%x, replay window size=%u, state="),
+		    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
+		switch (assoc->sadb_sa_state) {
+		case SADB_SASTATE_LARVAL:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "LARVAL"));
+			break;
+		case SADB_SASTATE_MATURE:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "MATURE"));
+			break;
+		case SADB_SASTATE_DYING:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "DYING"));
+			break;
+		case SADB_SASTATE_DEAD:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
+			break;
+		case SADB_X_SASTATE_ACTIVE_ELSEWHERE:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "ACTIVE_ELSEWHERE"));
+			break;
+		case SADB_X_SASTATE_IDLE:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "IDLE"));
+			break;
+		default:
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "<unknown %u>"), assoc->sadb_sa_state);
+		}
+	} else {
+		(void) fprintf(file,
+		    dgettext(TEXT_DOMAIN, "%sSADB_ASSOC"), prefix);
 	}
 
 	if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "\n%sAuthentication algorithm = "),
 		    prefix);
-		(void) dump_aalg(assoc->sadb_sa_auth, file);
+		if ((assoc->sadb_sa_flags & SADB_X_SAFLAGS_TCPSIG) != 0)
+			(void) dump_tcpsigalg(assoc->sadb_sa_auth, file);
+		else
+			(void) dump_aalg(assoc->sadb_sa_auth, file);
 	}
 
 	if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
@@ -1845,6 +1940,8 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 		(void) fprintf(file, "X_TUNNEL ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATTED)
 		(void) fprintf(file, "X_NATTED ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_TCPSIG)
+		(void) fprintf(file, "X_TCPSIG ");
 	/* END Solaris-specific flags. */
 
 	(void) fprintf(file, ">\n");
@@ -2200,6 +2297,20 @@ print_key(FILE *file, char *prefix, struct sadb_key *key)
 }
 
 /*
+ * Print an SADB_X_EXT_STR_AUTH extension.
+ */
+void
+print_keystr(FILE *file, char *prefix, struct sadb_key *key)
+{
+	(void) fprintf(file, "%s", prefix);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "Authentication"));
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, " string.\n%s"), prefix);
+	(void) fprintf(file, "\"");
+	(void) dump_keystr((uint8_t *)(key + 1), key->sadb_key_bits, file);
+	(void) fprintf(file, "\"\n");
+}
+
+/*
  * Print an SADB_EXT_IDENTITY_* extension.
  */
 void
@@ -2494,6 +2605,10 @@ print_eprop(FILE *file, char *prefix, struct sadb_prop *eprop)
 				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for AH "));
 				break;
+			case SADB_X_SATYPE_TCPSIG:
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
+				    "for TCPSIG "));
+				break;
 			default:
 				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for satype=%d "),
@@ -2734,6 +2849,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 		case SADB_EXT_KEY_AUTH:
 			print_key(file, dgettext(TEXT_DOMAIN,
 			    "AKY: "), (struct sadb_key *)current);
+			break;
+		case SADB_X_EXT_STR_AUTH:
+			print_keystr(file, dgettext(TEXT_DOMAIN,
+			    "AST: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_KEY_ENCRYPT:
 			print_key(file, dgettext(TEXT_DOMAIN,
@@ -2979,6 +3098,28 @@ save_key(struct sadb_key *key, FILE *ofile)
 }
 
 /*
+ * Print save information for a key extension. Returns whether writing
+ * to the specified output file was successful or not.
+ */
+boolean_t
+save_keystr(struct sadb_key *key, FILE *ofile)
+{
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	if (fprintf(ofile, "authstring \"") < 0)
+		return (B_FALSE);
+
+	if (dump_keystr((uint8_t *)(key + 1), key->sadb_key_bits, ofile) == -1)
+		return (B_FALSE);
+
+	if (fprintf(ofile, "\"") < 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * Print save information for an identity extension.
  */
 boolean_t
@@ -3055,6 +3196,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 	struct sadb_x_replay_ctr *repl;
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
 	struct sadb_ext *ext;
+	boolean_t tcpsig = samsg->sadb_msg_satype == SADB_X_SATYPE_TCPSIG;
 
 #define	tidyup() \
 	terrno = errno; (void) fclose(ofile); errno = terrno; \
@@ -3066,8 +3208,19 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 	if (fputs("# begin assoc\n", ofile) == EOF)
 		bail(dgettext(TEXT_DOMAIN,
 		    "save_assoc: Opening comment of SA"));
-	if (fprintf(ofile, "add %s ", rparsesatype(samsg->sadb_msg_satype)) < 0)
-		bail(dgettext(TEXT_DOMAIN, "save_assoc: First line of SA"));
+	if (tcpsig) {
+		if (fprintf(ofile, "add ") < 0) {
+			bail(dgettext(TEXT_DOMAIN,
+			    "save_assoc: First line of SA"));
+		}
+		seen_proto = B_TRUE;
+	} else {
+		if (fprintf(ofile, "add %s ",
+		    rparsesatype(samsg->sadb_msg_satype)) < 0) {
+			bail(dgettext(TEXT_DOMAIN,
+			    "save_assoc: First line of SA"));
+		}
+	}
 	savenl();
 
 	current = (uint64_t *)(samsg + 1);
@@ -3087,11 +3240,13 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 					    "save_assoc: fprintf not mature"));
 				}
 			}
-			if (fprintf(ofile, "    spi 0x%x ",
-			    ntohl(assoc->sadb_sa_spi)) < 0) {
-				tidyup();
-				bail(dgettext(TEXT_DOMAIN,
-				    "save_assoc: fprintf spi"));
+			if (!tcpsig) {
+				if (fprintf(ofile, "    spi 0x%x ",
+				    ntohl(assoc->sadb_sa_spi)) < 0) {
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf spi"));
+				}
 			}
 			if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
 				if (fprintf(ofile, "encr_alg %s ",
@@ -3103,19 +3258,32 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 				}
 			}
 			if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
-				if (fprintf(ofile, "auth_alg %s ",
-				    rparsealg(assoc->sadb_sa_auth,
-				    IPSEC_PROTO_AH)) < 0) {
+				int ret;
+
+				if ((assoc->sadb_sa_flags &
+				    SADB_X_SAFLAGS_TCPSIG) != 0) {
+					ret = fprintf(ofile, "    authalg %s ",
+					    rparsetcpsigalg(
+					    assoc->sadb_sa_auth));
+				} else {
+					ret = fprintf(ofile, "auth_alg %s ",
+					    rparsealg(assoc->sadb_sa_auth,
+					    IPSEC_PROTO_AH));
+				}
+				if (ret < 0) {
 					tidyup();
 					bail(dgettext(TEXT_DOMAIN,
 					    "save_assoc: fprintf auth"));
 				}
 			}
-			if (fprintf(ofile, "replay %d ",
-			    assoc->sadb_sa_replay) < 0) {
-				tidyup();
-				bail(dgettext(TEXT_DOMAIN,
-				    "save_assoc: fprintf replay"));
+			if ((assoc->sadb_sa_flags &
+			    SADB_X_SAFLAGS_TCPSIG) == 0) {
+				if (fprintf(ofile, "replay %d ",
+				    assoc->sadb_sa_replay) < 0) {
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf replay"));
+				}
 			}
 			if (assoc->sadb_sa_flags & (SADB_X_SAFLAGS_NATT_LOC |
 			    SADB_X_SAFLAGS_NATT_REM)) {
@@ -3169,7 +3337,14 @@ skip_srcdst:
 		case SADB_EXT_KEY_ENCRYPT:
 			if (!save_key((struct sadb_key *)ext, ofile)) {
 				tidyup();
-				bail(dgettext(TEXT_DOMAIN, "save_address"));
+				bail(dgettext(TEXT_DOMAIN, "save_key"));
+			}
+			savenl();
+			break;
+		case SADB_X_EXT_STR_AUTH:
+			if (!save_keystr((struct sadb_key *)ext, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_keystr"));
 			}
 			savenl();
 			break;
@@ -3177,7 +3352,7 @@ skip_srcdst:
 		case SADB_EXT_IDENTITY_DST:
 			if (!save_ident((struct sadb_ident *)ext, ofile)) {
 				tidyup();
-				bail(dgettext(TEXT_DOMAIN, "save_address"));
+				bail(dgettext(TEXT_DOMAIN, "save_ident"));
 			}
 			savenl();
 			break;
@@ -3304,6 +3479,7 @@ static struct typetable {
 	{"all", SADB_SATYPE_UNSPEC},
 	{"ah",  SADB_SATYPE_AH},
 	{"esp", SADB_SATYPE_ESP},
+	{"tcpsig", SADB_X_SATYPE_TCPSIG},
 	/* PF_KEY NOTE:  More to come if net/pfkeyv2.h gets updated. */
 	{NULL, 0}	/* Token value is irrelevant for this entry. */
 };
@@ -3345,6 +3521,19 @@ rparsealg(uint8_t alg, int proto_num)
 	}
 
 	return (*(holder->a_names));
+}
+
+const char *
+rparsetcpsigalg(uint8_t alg)
+{
+	const char *name = gettcpsigalgbynum(alg);
+
+	if (name == NULL) {
+		(void) snprintf(numprint, NBUF_SIZE, "%d", alg);
+		return (numprint);
+	}
+
+	return (name);
 }
 
 /*

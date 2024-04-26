@@ -21,6 +21,7 @@
 # Copyright 2022 Garrett D'Amore
 # Copyright 2023 Peter Tribble
 # Copyright 2023 MNX Cloud, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 include		$(SRC)/Makefile.master
@@ -472,6 +473,7 @@ _MANFILES=	6to4relay.8		\
 		tcpd.8			\
 		tcpdchk.8		\
 		tcpdmatch.8		\
+		tcpkey.8		\
 		th_define.8		\
 		th_manage.8		\
 		tic.8			\

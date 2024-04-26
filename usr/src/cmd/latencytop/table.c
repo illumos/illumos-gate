@@ -165,7 +165,7 @@ read_line_from_mem(const char *mem, int mem_len, char *line, int line_len,
 /*
  * Parse special command from configuration file. Special command
  * has the following format :
-
+ *
  *	disable_cause <cause name>
  */
 static int

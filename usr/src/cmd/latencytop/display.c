@@ -241,7 +241,7 @@ print_sysglobal(void)
 /*
  * Prints current operation mode. Mode is combination of:
  *
- * 	"Process or Thread", and "1 or 2 or 3".
+ *	"Process or Thread", and "1 or 2 or 3".
  */
 static void
 print_current_mode()

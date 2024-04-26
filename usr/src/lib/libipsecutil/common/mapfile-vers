@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2024 Oxide Computer Company
 #
 
 #
@@ -53,7 +54,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	do_interactive;
 	dump_aalg;
 	dump_ealg;
+	dump_tcpsigalg;
 	dump_key;
+	dump_keystr;
 	dump_sadb_idtype;
 	dump_sockaddr;
 $if _x86 && _ELF64
@@ -71,6 +74,8 @@ $endif
 	_errxfp		{ TYPE = FUNCTION; FILTER = libc.so.1; };
 	getipsecalgs;
 	getipsecprotos;
+	gettcpsigalgbyname;
+	gettcpsigalgbynum;
 	in_masktoprefix;
 	interactive	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	ipsecalgs_diag;
@@ -112,6 +117,7 @@ $endif
 	print_eprop;
 	print_ident;
 	print_key;
+	print_keystr;
 	print_kmc;
 	print_lifetimes;
 	print_prop;
@@ -125,12 +131,14 @@ $endif
 	privstr2num;
 	readfile	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
 	rparsealg;
+	rparsetcpsigalg;
 	rparseidtype;
 	rparsesatype;
 	save_address;
 	save_assoc;
 	save_ident;
 	save_key;
+	save_keystr;
 	save_lifetime;
 	secs2out;
 	secs2str;

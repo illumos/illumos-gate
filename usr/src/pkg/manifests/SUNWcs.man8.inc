@@ -16,6 +16,7 @@
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright (c) 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 file path=usr/share/man/man8/6to4relay.8
@@ -259,6 +260,7 @@ file path=usr/share/man/man8/syseventconfd.8
 file path=usr/share/man/man8/syseventd.8
 file path=usr/share/man/man8/syslogd.8
 file path=usr/share/man/man8/tapes.8
+file path=usr/share/man/man8/tcpkey.8
 link path=usr/share/man/man8/telinit.8 target=init.8
 file path=usr/share/man/man8/tic.8
 file path=usr/share/man/man8/tpmadm.8

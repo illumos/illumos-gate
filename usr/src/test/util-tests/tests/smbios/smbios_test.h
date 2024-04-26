@@ -140,6 +140,7 @@ extern boolean_t smbios_test_verify_strings(smbios_hdl_t *);
 
 extern boolean_t smbios_test_chassis_mktable_invlen_base(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_base(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_part(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_comps(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_sku(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_sku_nocomps(smbios_test_table_t *);

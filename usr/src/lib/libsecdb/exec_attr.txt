@@ -21,6 +21,7 @@
 
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2022 Garrett D'Amore <garrett@damore.org>
+# Copyright 2024 Oxide Computer Company
 #
 # /etc/security/exec_attr
 #
@@ -202,6 +203,7 @@ Network Management:suser:cmd:::/usr/sbin/route:uid=0
 Network Management:suser:cmd:::/usr/sbin/snoop:uid=0
 Network Management:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Management:suser:cmd:::/usr/sbin/spray:euid=0
+Network TCP Key Management:suser:cmd:::/usr/sbin/tcpkey:privs=sys_ip_config
 Network Observability:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Link Security:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit

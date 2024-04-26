@@ -31,11 +31,7 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/bin
-$(i386_ONLY)dir path=usr/bin/$(ARCH32)
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/powertop mode=0555
-dir  path=usr/bin/$(ARCH64)
-file path=usr/bin/$(ARCH64)/powertop mode=0555
-hardlink path=usr/bin/powertop target=../../usr/lib/isaexec
+file path=usr/bin/powertop mode=0555
 dir  path=usr/share/man/man8
 file path=usr/share/man/man8/powertop.8
 legacy pkg=SUNWpowertop desc="PowerTOP tool" name="PowerTOP tool"

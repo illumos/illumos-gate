@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -124,6 +125,34 @@ killall(zoneid_t zoneid, boolean_t force)
 	}
 	mutex_exit(&pidlock);
 }
+
+/*
+ * Emits an SDT probe (sdt:::test) with 7 arguments.  This is used to test
+ * arguments are passed properly, whether via registers or on the stack.
+ */
+static void
+sdt_test_args(void)
+{
+	DTRACE_PROBE7(test, int, 1, int, 2, int, 3, int, 4, int, 5,
+	    int, 6, int, 7);
+}
+
+/*
+ * Same as above, but with the probe called as a tail call.
+ * Unfortunately, gcc doesn't yet have a [[musttail]] attribute that would
+ * either generate a tail call or error at compile time if it can't.  Instead
+ * we use a separate function along with a optimize pragma.  On x86, this does
+ * indeed generate a tail call as written.
+ */
+#pragma GCC push_options
+#pragma GCC optimize("optimize-sibling-calls")
+static void
+sdt_test_args_tail_call(int a, int b, int c, int d, int e, int f, int g)
+{
+	DTRACE_PROBE7(test, int, a, int, b, int, c, int, d,
+	    int, e, int, f, int, g);
+}
+#pragma GCC pop_options
 
 int
 kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
@@ -396,8 +425,8 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 
 	case A_SDTTEST:
 	{
-		DTRACE_PROBE7(test, int, 1, int, 2, int, 3, int, 4, int, 5,
-		    int, 6, int, 7);
+		sdt_test_args();
+		sdt_test_args_tail_call(1, 2, 3, 4, 5, 6, 7);
 		break;
 	}
 

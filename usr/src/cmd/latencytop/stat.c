@@ -269,8 +269,8 @@ clear_stat(gpointer key, lt_stat_collection_t *stat, void *user)
  */
 static void
 update_stat_entry(lt_stat_collection_t *stat, int cause_id,
-		lt_stat_type_t type, uint64_t value,
-		const char *string, int group_to_use)
+    lt_stat_type_t type, uint64_t value,
+    const char *string, int group_to_use)
 {
 	lt_stat_entry_t *entry = NULL;
 	lt_datagroup_t *group;

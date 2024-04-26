@@ -528,6 +528,7 @@ int
 smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	off_t skuoff;
 	smb_chassis_t ch;
 
 	if (stp == NULL) {
@@ -538,7 +539,12 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 		return (smb_set_errno(shp, ESMB_TYPE));
 	}
 
-	if (stp->smbst_hdr->smbh_len < sizeof (ch)) {
+	/*
+	 * The minimum table length for the chassis is 0xd, which is the
+	 * starting point of the OEM data. This was set in SMBIOS 2.1. We don't
+	 * consider SMBIOS 2.0 tables right now.
+	 */
+	if (stp->smbst_hdr->smbh_len < offsetof(smb_chassis_t, smbch_oemdata)) {
 		return (smb_set_errno(shp, ESMB_SHORT));
 	}
 
@@ -571,21 +577,23 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 
 	/*
 	 * If the table is older than version 2.7 which added support for the
-	 * chassis SKU, there's no reason to proceed.
+	 * chassis SKU, there's no reason to proceed. A 2.7 table is not
+	 * required to have support for a chassis SKU so we don't proceed either
+	 * if there isn't space for the SKU byte. This is very common of
+	 * hypervisors.
 	 */
-	if (!smb_gteq(shp, SMB_VERSION_27)) {
+	skuoff = sizeof (ch) + ch.smbch_cn * ch.smbch_cm;
+	if (!smb_gteq(shp, SMB_VERSION_27) ||
+	    stp->smbst_hdr->smbh_len < skuoff + 1) {
 		return (0);
 	}
 
 	if (smb_libgteq(shp, SMB_VERSION_27)) {
 		uint8_t strno;
 		const char *str;
-		off_t off = sizeof (ch) + ch.smbch_cn * ch.smbch_cm;
-		if (stp->smbst_hdr->smbh_len < off + 1) {
-			return (smb_set_errno(shp, ESMB_SHORT));
-		}
+
 		smb_info_bcopy_offset(stp->smbst_hdr, &strno, sizeof (strno),
-		    off);
+		    skuoff);
 		str = smb_strptr(stp, strno);
 		if (smb_libgteq(shp, SMB_VERSION_35)) {
 			chp->smbc_sku = str;
@@ -617,19 +625,20 @@ smbios_info_chassis_elts(smbios_hdl_t *shp, id_t id, uint_t *nentsp,
 		return (smb_set_errno(shp, ESMB_TYPE));
 	}
 
-	if (stp->smbst_hdr->smbh_len < sizeof (ch)) {
-		return (smb_set_errno(shp, ESMB_SHORT));
-	}
-
+	/*
+	 * We don't explicitly check the length of the table as it is legal for
+	 * the chassis table to be shorter than something that contains the
+	 * number of elements.
+	 */
 	smb_info_bcopy(stp->smbst_hdr, &ch, sizeof (ch));
-	if (ch.smbch_cm != sizeof (smb_chassis_entry_t)) {
-		return (smb_set_errno(shp, ESMB_CORRUPT));
-	}
-
 	if (ch.smbch_cn == 0) {
 		*nentsp = 0;
 		*entsp = NULL;
 		return (0);
+	}
+
+	if (ch.smbch_cm != sizeof (smb_chassis_entry_t)) {
+		return (smb_set_errno(shp, ESMB_CORRUPT));
 	}
 
 	entlen = ch.smbch_cm * ch.smbch_cn;

@@ -387,6 +387,7 @@ d etc/inet/secret 0700 root sys
 f etc/inet/secret/ike.preshared 0600 root sys
 d etc/inet/secret/ike.privatekeys 0700 root sys
 f etc/inet/secret/ipseckeys.sample 0600 root sys
+f etc/inet/secret/tcpkeys.sample 0600 root sys
 f etc/inet/services 0644 root sys
 s etc/inetd.conf=inet/inetd.conf
 d etc/init.d 0755 root sys
@@ -1685,6 +1686,7 @@ f lib/svc/manifest/network/ipsec/ike.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/ipsecalgs.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/manual-key.xml 0444 root sys
 f lib/svc/manifest/network/ipsec/policy.xml 0444 root sys
+f lib/svc/manifest/network/ipsec/tcpkey.xml 0444 root sys
 d lib/svc/manifest/network/iscsi 0755 root sys
 f lib/svc/manifest/network/iscsi/iscsi-initiator.xml 0444 root sys
 f lib/svc/manifest/network/iscsi/iscsi-target.xml 0444 root sys
@@ -1855,6 +1857,7 @@ f lib/svc/method/net-netmask 0555 root bin
 f lib/svc/method/net-physical 0555 root sys
 f lib/svc/method/net-routing-setup 0555 root bin
 f lib/svc/method/net-svc 0555 root bin
+f lib/svc/method/net-tcpkey 0555 root bin
 f lib/svc/method/nfs-client 0555 root bin
 f lib/svc/method/nfs-server 0555 root sys
 f lib/svc/method/nlockmgr 0555 root bin
@@ -6524,6 +6527,7 @@ f usr/lib/help/profiles/locale/C/RtNetLinkSecure.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetObservability.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetSecure.html 0444 root bin
+f usr/lib/help/profiles/locale/C/RtNetTCPMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetVRRP.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/C/RtNetWifiSecure.html 0444 root bin
@@ -6601,6 +6605,7 @@ f usr/lib/help/profiles/locale/RtNetLinkSecure.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetObservability.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetSecure.html 0444 root bin
+f usr/lib/help/profiles/locale/RtNetTCPMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetVRRP.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetWifiMngmnt.html 0444 root bin
 f usr/lib/help/profiles/locale/RtNetWifiSecure.html 0444 root bin
@@ -10901,10 +10906,10 @@ f usr/sbin/acpixtract 0555 root bin
 f usr/sbin/add_drv 0555 root bin
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
-f usr/sbin/amd64/dtrace 0555 root bin
-f usr/sbin/amd64/intrstat 0555 root bin
-f usr/sbin/amd64/lockstat 0555 root bin
-f usr/sbin/amd64/plockstat 0555 root bin
+s usr/sbin/amd64/dtrace=../dtrace
+s usr/sbin/amd64/intrstat=../intrstat
+s usr/sbin/amd64/lockstat=../lockstat
+s usr/sbin/amd64/plockstat=../plockstat
 f usr/sbin/arp 0555 root bin
 f usr/sbin/audit 0555 root bin
 f usr/sbin/auditconfig 0555 root bin
@@ -10948,7 +10953,7 @@ s usr/sbin/dlstat=../../sbin/dlstat
 f usr/sbin/dmesg 0555 root bin
 f usr/sbin/dminfo 0555 root bin
 h usr/sbin/drvconfig=usr/sbin/devfsadm
-h usr/sbin/dtrace=usr/lib/isaexec
+f usr/sbin/dtrace 0555 root bin
 f usr/sbin/dumpadm 0555 root bin
 f usr/sbin/editmap 0555 root bin
 s usr/sbin/edquota=../lib/fs/ufs/edquota
@@ -11011,7 +11016,7 @@ s usr/sbin/init=../../sbin/init
 f usr/sbin/install 0555 root bin
 f usr/sbin/installboot 0555 root sys
 s usr/sbin/installgrub=../../sbin/installgrub
-h usr/sbin/intrstat=usr/lib/isaexec
+f usr/sbin/intrstat 0555 root bin
 f usr/sbin/ipaddrsel 0555 root bin
 s usr/sbin/ipadm=../../sbin/ipadm
 f usr/sbin/ipdadm 0555 root bin
@@ -11036,7 +11041,7 @@ f usr/sbin/link 0555 root bin
 h usr/sbin/list_devices=usr/sbin/allocate
 f usr/sbin/locator 0555 root bin
 s usr/sbin/lockfs=../lib/fs/ufs/lockfs
-h usr/sbin/lockstat=usr/lib/isaexec
+f usr/sbin/lockstat 0555 root bin
 f usr/sbin/lofiadm 0555 root bin
 f usr/sbin/logadm 0555 root bin
 f usr/sbin/makedbm 0555 root bin
@@ -11070,7 +11075,7 @@ f usr/sbin/nwamcfg 0555 root bin
 f usr/sbin/pbind 0555 root sys
 f usr/sbin/pcitool 0555 root bin
 f usr/sbin/ping 4555 root bin
-h usr/sbin/plockstat=usr/lib/isaexec
+f usr/sbin/plockstat 0555 root bin
 f usr/sbin/pmadm 0555 root sys
 f usr/sbin/pmconfig 4555 root bin
 h usr/sbin/ports=usr/sbin/devfsadm
@@ -11150,6 +11155,7 @@ f usr/sbin/tar 0555 root bin
 f usr/sbin/tcpd 0555 root bin
 f usr/sbin/tcpdchk 0555 root bin
 f usr/sbin/tcpdmatch 0555 root bin
+h usr/sbin/tcpkey=usr/sbin/ipseckey
 f usr/sbin/traceroute 4555 root bin
 h usr/sbin/trapstat=usr/lib/platexec
 f usr/sbin/try-from 0555 root bin
@@ -19904,6 +19910,7 @@ f usr/share/man/man8/syslogd.8 0444 root bin
 f usr/share/man/man8/tapes.8 0444 root bin
 f usr/share/man/man8/tcpd.8 0444 root bin
 f usr/share/man/man8/tcpdchk.8 0444 root bin
+f usr/share/man/man8/tcpkey.8 0444 root bin
 f usr/share/man/man8/tcpdmatch.8 0444 root bin
 f usr/share/man/man8/tic.8 0444 root bin
 f usr/share/man/man8/traceroute.8 0444 root bin

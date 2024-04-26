@@ -23,31 +23,21 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= dtrace
 
 include ../Makefile.cmd
 
-SUBDIRS=	$(MACH) demo test
-$(BUILD64)SUBDIRS += $(MACH64)
+SUBDIRS=	$(MACH64) demo test
 
 all	:=	TARGET = all
 install	:=	TARGET = install
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
-
-clean clobber lint:	$(SUBDIRS)
-
-install:	$(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+all clean clobber install:	$(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

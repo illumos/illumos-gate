@@ -1,4 +1,4 @@
-'\"
+.\"
 .\" This file and its contents are supplied under the terms of the
 .\" Common Development and Distribution License ("CDDL"), version 1.0.
 .\" You may only use this file in accordance with the terms of version
@@ -12,10 +12,10 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 2019 Joyent, Inc.
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
-.Dd December 2, 2023
+.Dd April 17, 2024
 .Dt TCP 4P
 .Os
 .Sh NAME
@@ -36,18 +36,18 @@ t = t_open("/dev/tcp6", O_RDWR);
 TCP is the virtual circuit protocol of the Internet protocol family.
 It provides reliable, flow-controlled, in-order, two-way transmission of data.
 It is a byte-stream protocol layered above the Internet Protocol
-.Po Sy IP Pc ,
+.Pq Sy IP ,
 or the Internet Protocol Version 6
-.Po Sy IPv6 Pc ,
+.Pq Sy IPv6 ,
 the Internet protocol family's
 internetwork datagram delivery protocol.
 .Pp
 Programs can access TCP using the socket interface as a
 .Dv SOCK_STREAM
 socket type, or using the Transport Level Interface
-.Po Sy TLI Pc
+.Pq Sy TLI
 where it supports the connection-oriented
-.Po Dv BT_COTS_ORD Pc
+.Pq Dv BT_COTS_ORD
 service type.
 .Pp
 A checksum over all data helps TCP provide reliable communication.
@@ -80,7 +80,7 @@ The endpoints of a TCP connection are
 identified by the combination of an IPv4 or IPv6 address and a TCP
 port number.
 Although other protocols, such as the User Datagram Protocol
-.Po Sy UDP Pc ,
+.Pq Sy UDP ,
 may use the same host and port address format, the port space of these
 protocols is distinct.
 See
@@ -122,8 +122,9 @@ reverse source route will be used when responding.
 By using the special value
 .Dv INADDR_ANY
 with IPv4, or the unspecified
-address (all zeroes) with IPv6, the local IP address can be left
-unspecified in the
+address
+.Pq all zeroes
+with IPv6, the local IP address can be left unspecified in the
 .Fn bind
 call by either active or passive TCP
 sockets.
@@ -171,7 +172,7 @@ If an application does not want to allow another socket using the
 .Dv SO_REUSEADDR
 option to bind to a port its socket is bound to, the
 application can set the socket-level
-.Po Dv SOL_SOCKET Pc
+.Pq Dv SOL_SOCKET
 option
 .Dv SO_EXCLBIND
 on a socket.
@@ -186,8 +187,9 @@ and
 .Xr write 2
 system calls.
 If, after sending data, the local TCP receives no acknowledgements from its
-peer for a period of time (for example, if the remote machine crashes), the
-connection is closed and an error is returned.
+peer for a period of time
+.Pq for example, if the remote machine crashes ,
+the connection is closed and an error is returned.
 .Pp
 When a peer is sending data, it will only send up to the advertised
 .Dq receive window ,
@@ -204,11 +206,16 @@ application.
 When outstanding data has not yet been acknowledged, though, TCP will gather
 small amounts of output to be sent as a single packet once an acknowledgement
 has been received.
-Usually referred to as Nagle's Algorithm (RFC 896), this behavior helps prevent
-flooding the network with many small packets.
+Usually referred to as Nagle's Algorithm
+.Pq RFC 896 ,
+this behavior helps prevent flooding the network with many small packets.
 .Pp
-However, for some highly interactive clients (such as remote shells or
-windowing systems that send a stream of keypresses or mouse events), this
+However, for some highly interactive clients
+.Po
+such as remote shells or windowing systems that send a stream of keypresses or
+mouse events
+.Pc ,
+this
 batching may cause significant delays.
 To disable this behavior, TCP provides a boolean socket option,
 .Dv TCP_NODELAY .
@@ -221,14 +228,16 @@ When set to a non-zero value, TCP will only send out a full TCP segment.
 When
 .Dv TCP_CORK
 is set to zero after it has been enabled, all currently buffered data is sent
-out (as permitted by the peer's receive window and the current congestion
-window).
+out
+.Po
+as permitted by the peer's receive window and the current congestion window
+.Pc .
 .Pp
 Still other latency-sensitive applications rely on receiving a quick
 notification that their packets have been successfully received.
 To satisfy the requirements of those applications, setting the
 .Dv TCP_QUICKACK
-option to a non-zero value will instruct the TCP stack to send an acknowlegment
+option to a non-zero value will instruct the TCP stack to send an acknowledgment
 immediately upon receipt of a packet, rather than waiting to acknowledge
 multiple packets at once.
 .Pp
@@ -259,9 +268,47 @@ socket with the
 .Dv SIOCATMARK
 .Fn ioctl
 request, until it reaches the mark.
+.Pp
+The
+.Dv TCP_MD5SIG
+option controls the use of MD5 digests
+.Pq as defined by RFC 2385
+on the specified socket.
+The option value is specified as an
+.Vt int .
+When enabled
+.Pq non-zero ,
+outgoing packets have a digest added to the included TCP options and digests in
+incoming packets are verified.
+Incoming packets without a digest, or without a correct digest value, are
+silently dropped.
+In order to use this function, TCPSIG security associations
+.Pq one for each direction
+must also be configured in the system security association database
+.Pq SADB
+using
+.Xr tcpkey 8 .
+If no matching security association
+.Pq SA
+is found for traffic on a socket configured with the
+.Dv TCP_MD5SIG
+option, no outgoing segments are sent, and all inbound segments are dropped.
+In particular, the SA must be present prior to the socket being used in a
+call to
+.Xr connect 3SOCKET
+or
+.Xr accept 3SOCKET .
+Once the option is enabled and an SA is bound to a connection, it will be
+cached and used for all subsequent segments; it cannot be changed mid-stream.
+An SA which is in use can be deleted using
+.Xr tcpkey 8
+and will not be used for any new connections, but existing connections continue
+to use their cached copy.
 .Ss "Congestion Control"
 TCP follows the congestion control algorithm described in RFC 2581, and
-also supports the initial congestion window (cwnd) changes in RFC 3390.
+also supports the initial congestion window
+.Pq cwnd
+changes in RFC 3390.
 The initial cwnd calculation can be overridden by the socket option
 .Dv TCP_INIT_CWND .
 An application can use this option to set the initial cwnd to a
@@ -293,7 +340,8 @@ Since TCP determines whether a remote peer is no longer reachable by timing out
 waiting for acknowledgements, a host that never sends any new data may never
 notice a peer that has gone away.
 While consumers can avoid this problem by sending their own periodic heartbeat
-messages (Transport Layer Security does this, for example),
+messages
+.Pq Transport Layer Security does this, for example,
 TCP describes an optional keep-alive mechanism in RFC 1122.
 Applications can enable it using the socket-level option
 .Dv SO_KEEPALIVE .
@@ -339,19 +387,22 @@ This option specifies the interval in seconds between successive,
 unacknowledged keep-alive probes.
 .El
 .Ss "Additional Configuration"
-illumos supports TCP Extensions for High Performance (RFC 7323)
+illumos supports TCP Extensions for High Performance
+.Pq RFC 7323
 which includes the window scale and timestamp options, and Protection Against
 Wrap Around Sequence Numbers
-.Po Sy PAWS Pc .
+.Pq Sy PAWS .
 Note that if timestamps are negotiated on
 a connection, received segments without timestamps on that connection are
 silently dropped per the suggestion in the RFC. illumos also supports Selective
 Acknowledgment
-.Po Sy SACK Pc
-capabilities (RFC 2018) and Explicit Congestion
-Notification
-.Po Sy ECN Pc
-mechanism (RFC 3168).
+.Pq Sy SACK
+capabilities
+.Pq RFC 2018
+and Explicit Congestion Notification
+.Pq Sy ECN
+mechanism
+.Pq RFC 3168 .
 .Pp
 Turn on the window scale option in one of the following ways:
 .Bl -bullet -offset indent -width 4m
@@ -507,8 +558,9 @@ is
 Regardless of the value of
 .Cm tcp_tstamp_always ,
 the timestamp option will
-always be included in a connect acknowledgement (and all succeeding packets) if
-the connecting system has used the timestamp option.
+always be included in a connect acknowledgement
+.Pq and all succeeding packets
+if the connecting system has used the timestamp option.
 .El
 .Pp
 Use the following procedure to turn on the timestamp option only when the
@@ -539,7 +591,7 @@ is
 .El
 .Pp
 Protection Against Wrap Around Sequence Numbers
-.Po Sy PAWS Pc
+.Pq Sy PAWS
 is always used when the
 timestamp option is set.
 .Pp
@@ -819,7 +871,8 @@ A
 .Fn bind
 operation was attempted with a
 .Dq reserved
-port number and the effective user ID of the process was not the privileged user.
+port number and the effective user ID of the process was not the privileged
+user.
 .It Er ENOBUFS
 The system ran out of memory for internal data structures.
 .El
@@ -841,7 +894,8 @@ The system ran out of memory for internal data structures.
 .Xr ip6 4P ,
 .Xr smf 7 ,
 .Xr ndd 8 ,
-.Xr svcadm 8
+.Xr svcadm 8 ,
+.Xr tcpkey 8
 .Rs
 .%A "K. Ramakrishnan"
 .%A "S. Floyd"
@@ -880,6 +934,12 @@ The system ran out of memory for internal data structures.
 .%R "RFC 793"
 .%C "Network Information Center, SRI International, Menlo Park, CA."
 .%D "September 1981"
+.Re
+.Rs
+.%A "A. Heffernan"
+.%T "Protection of BGP Sessions via the TCP MD5 Signature Option"
+.%R "RFC 2385"
+.%D "August 1998"
 .Re
 .Sh NOTES
 The

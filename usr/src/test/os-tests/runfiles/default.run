@@ -194,3 +194,10 @@ tests = ['execvpe-test.32', 'execvpe-test.64']
 [/opt/os-tests/tests/minttl]
 user = root
 tests = ['minttl', 'minttl_err']
+
+[/opt/os-tests/tests/tcpsig]
+pre_user = root
+post_user = root
+pre = tcpsig_init
+tests = ['tcpsig']
+post = tcpsig_fini

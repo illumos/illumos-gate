@@ -41,4 +41,4 @@ $(PROG): $(MACH_OBJS) $(COMMON_OBJS)
 %.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 
-install: all $(ROOTPROG64)
+install: all $(ROOTPROG)

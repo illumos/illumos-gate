@@ -326,13 +326,26 @@ uint64_t
 nvme_log_page_info_size(const nvme_log_page_info_t *info,
     const nvme_valid_ctrl_data_t *data, bool *var)
 {
+	uint64_t len;
 	*var = info->nlpi_var_func != NULL;
 
 	if (info->nlpi_len_func != NULL) {
-		return (info->nlpi_len_func(data, info));
+		len = info->nlpi_len_func(data, info);
 	} else {
-		return (info->nlpi_len);
+		len = info->nlpi_len;
 	}
+
+	/*
+	 * Some vendor-specific log pages are not documented to have 4-byte
+	 * aligned lengths. This means that to get the full log page you must
+	 * round this up to ensure that you end up with a valid request. We opt
+	 * to do this here rather than have to check every single log page data
+	 * structure and fix it up manually. While it means consumers that are
+	 * using this to ignore information about the type itself may
+	 * erroneously display extra bytes (e.g. nvmeadm's default hex dumper),
+	 * that's better than getting an error or truncating the data.
+	 */
+	return (P2ROUNDUP(len, NVME_DWORD_SIZE));
 }
 
 bool

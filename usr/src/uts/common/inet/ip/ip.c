@@ -14461,7 +14461,7 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 
 	ASSERT(mp != NULL);
 	ASSERT(mp->b_datap->db_type == M_DATA);
-	ASSERT(pkt_len == msgdsize(mp));
+	ASSERT3U(pkt_len, ==, msgdsize(mp));
 
 	/*
 	 * If we have already been here and are coming back after ARP/ND.
@@ -14476,7 +14476,8 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 		ipha_t *ipha = (ipha_t *)mp->b_rptr;
 
 		ASSERT(!isv6);
-		ASSERT(pkt_len == ntohs(((ipha_t *)mp->b_rptr)->ipha_length));
+		ASSERT3U(pkt_len, ==,
+		    ntohs(((ipha_t *)mp->b_rptr)->ipha_length));
 		if (HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) &&
 		    !(ixaflags & IXAF_NO_PFHOOK)) {
 			int	error;

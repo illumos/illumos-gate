@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2023 MNX Cloud, Inc.
  */
 
@@ -368,6 +368,8 @@ fcnname##_info:							\
 	WSTUB(keysock,	keysock_plumb_ipsec,	nomod_zero);
 	WSTUB(keysock,	keysock_extended_reg,	nomod_zero);
 	WSTUB(keysock,	keysock_next_seq,	nomod_zero);
+	WSTUB(keysock,	keysock_error,		nomod_zero);
+	WSTUB(keysock,	keysock_passup,		nomod_zero);
 	END_MODULE(keysock);
 
 	MODULE(spdsock,drv);

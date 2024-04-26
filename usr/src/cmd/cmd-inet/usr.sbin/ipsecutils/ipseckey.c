@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -66,7 +67,9 @@ static uint32_t seq;
 static pid_t mypid;
 static boolean_t vflag = B_FALSE;	/* Verbose? */
 static boolean_t cflag = B_FALSE;	/* Check Only */
+static boolean_t tcpkey = B_FALSE;	/* Run as tcpkey */
 
+const char *progname;
 char *my_fmri = NULL;
 FILE *debugfile = stdout;
 static struct sockaddr_in cli_addr;
@@ -94,6 +97,8 @@ static boolean_t in_cluster_mode = B_FALSE;
 	handle_errors(x, y, B_TRUE, B_TRUE)
 #define	FATAL1(w, x, y, z) ERROR1(w, x, y, z);\
 	handle_errors(w, x, B_TRUE, B_TRUE)
+
+#define	QUOTE(x) #x
 
 /* Defined as a uint64_t array for alignment purposes. */
 static uint64_t get_buffer[MAX_GET_SIZE];
@@ -168,11 +173,12 @@ usage(void)
 {
 	if (!interactive) {
 		(void) fprintf(stderr, gettext("Usage:\t"
-		    "ipseckey [ -nvp ] | cmd [sa_type] [extfield value]*\n"));
+		    "%s [ -nvp ] | cmd [sa_type] [extfield value]*\n"),
+		    progname);
 		(void) fprintf(stderr,
-		    gettext("\tipseckey [ -nvp ] -f infile\n"));
+		    gettext("\t%s [ -nvp ] -f infile\n"), progname);
 		(void) fprintf(stderr,
-		    gettext("\tipseckey [ -nvp ] -s outfile\n"));
+		    gettext("\t%s [ -nvp ] -s outfile\n"), progname);
 		EXIT_FATAL(NULL);
 	} else {
 		(void) fprintf(stderr,
@@ -268,41 +274,61 @@ msg_init(struct sadb_msg *msg, uint8_t type, uint8_t satype)
 /*
  * Parse the command.
  */
+struct cmdtable {
+	char *cmd;
+	int token;
+};
+
+static struct cmdtable default_cmdtable[] = {
+	/*
+	 * Q: Do we want to do GETSPI?
+	 * A: No, it's for automated key mgmt. only.  Either that,
+	 *    or it isn't relevant until we support non IPsec SA types.
+	 */
+	{ "update",		CMD_UPDATE },
+	{ "update-pair",	CMD_UPDATE_PAIR },
+	{ "add",		CMD_ADD },
+	{ "delete",		CMD_DELETE },
+	{ "delete-pair",	CMD_DELETE_PAIR },
+	{ "get",		CMD_GET },
+	/*
+	 * Q: And ACQUIRE and REGISTER and EXPIRE?
+	 * A: not until we support non IPsec SA types.
+	 */
+	{ "flush",		CMD_FLUSH },
+	{ "dump",		CMD_DUMP },
+	{ "monitor",		CMD_MONITOR },
+	{ "passive_monitor",	CMD_PMONITOR },
+	{ "pmonitor",		CMD_PMONITOR },
+	{ "quit",		CMD_QUIT },
+	{ "exit",		CMD_QUIT },
+	{ "save",		CMD_SAVE },
+	{ "help",		CMD_HELP },
+	{ "?",			CMD_HELP },
+	{ NULL,			CMD_NONE }
+};
+
+static struct cmdtable tcpkey_cmdtable[] = {
+	{ "update",		CMD_UPDATE },
+	{ "add",		CMD_ADD },
+	{ "delete",		CMD_DELETE },
+	{ "get",		CMD_GET },
+	{ "flush",		CMD_FLUSH },
+	{ "dump",		CMD_DUMP },
+	{ "quit",		CMD_QUIT },
+	{ "exit",		CMD_QUIT },
+	{ "save",		CMD_SAVE },
+	{ "help",		CMD_HELP },
+	{ "?",			CMD_HELP },
+	{ NULL,			CMD_NONE }
+};
+
 static int
 parsecmd(char *cmdstr)
 {
-	static struct cmdtable {
-		char *cmd;
-		int token;
-	} table[] = {
-		/*
-		 * Q: Do we want to do GETSPI?
-		 * A: No, it's for automated key mgmt. only.  Either that,
-		 *    or it isn't relevant until we support non IPsec SA types.
-		 */
-		{"update",		CMD_UPDATE},
-		{"update-pair",		CMD_UPDATE_PAIR},
-		{"add",			CMD_ADD},
-		{"delete", 		CMD_DELETE},
-		{"delete-pair",		CMD_DELETE_PAIR},
-		{"get", 		CMD_GET},
-		/*
-		 * Q: And ACQUIRE and REGISTER and EXPIRE?
-		 * A: not until we support non IPsec SA types.
-		 */
-		{"flush",		CMD_FLUSH},
-		{"dump",		CMD_DUMP},
-		{"monitor",		CMD_MONITOR},
-		{"passive_monitor",	CMD_PMONITOR},
-		{"pmonitor",		CMD_PMONITOR},
-		{"quit",		CMD_QUIT},
-		{"exit",		CMD_QUIT},
-		{"save",		CMD_SAVE},
-		{"help",		CMD_HELP},
-		{"?",			CMD_HELP},
-		{NULL,			CMD_NONE}
-	};
-	struct cmdtable *ct = table;
+	struct cmdtable *ct;
+
+	ct = tcpkey ? tcpkey_cmdtable : default_cmdtable;
 
 	while (ct->cmd != NULL && strcmp(ct->cmd, cmdstr) != 0)
 		ct++;
@@ -356,10 +382,10 @@ static struct typetable {
 	{"all",	SADB_SATYPE_UNSPEC},
 	{"ah",	SADB_SATYPE_AH},
 	{"esp",	SADB_SATYPE_ESP},
+	{"tcpsig", SADB_X_SATYPE_TCPSIG},
 	/* PF_KEY NOTE:  More to come if net/pfkeyv2.h gets updated. */
 	{NULL,	0}	/* Token value is irrelevant for this entry. */
 };
-
 
 static int
 parsesatype(char *type, char *ebuf)
@@ -459,13 +485,15 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_LABEL		55
 #define	TOK_OLABEL		56
 #define	TOK_IMPLABEL		57
+#define	TOK_AUTHSTR		58
 
-
-static struct toktable {
+struct toktable {
 	char *string;
 	int token;
 	int next;
-} tokens[] = {
+};
+
+static struct toktable tokens[] = {
 	/* "String",		token value,		next arg is */
 	{"spi",			TOK_SPI,		NEXTNUM},
 	{"pair-spi",		TOK_PAIR_SPI,		NEXTNUM},
@@ -527,6 +555,7 @@ static struct toktable {
 	{"idst6",		TOK_IDSTADDR6,		NEXTADDR},
 
 	{"authkey",		TOK_AUTHKEY,		NEXTHEX},
+	{"authstring",		TOK_AUTHSTR,		NEXTNUMSTR},
 	{"encrkey",		TOK_ENCRKEY,		NEXTHEX},
 	{"srcidtype",		TOK_SRCIDTYPE,		NEXTIDENT},
 	{"dstidtype",		TOK_DSTIDTYPE,		NEXTIDENT},
@@ -556,6 +585,22 @@ static struct toktable {
 	{NULL,			TOK_UNKNOWN,		NEXTEOF}
 };
 
+static struct toktable tcpkey_tokens[] = {
+	/* "String",		token value,		next arg is */
+	{"src",			TOK_SRCADDR,		NEXTADDR},
+	{"src6",		TOK_SRCADDR6,		NEXTADDR},
+	{"dst",			TOK_DSTADDR,		NEXTADDR},
+	{"dst6",		TOK_DSTADDR6,		NEXTADDR},
+
+	{"sport",		TOK_SRCPORT,		NEXTNUM},
+	{"dport",		TOK_DSTPORT,		NEXTNUM},
+
+	{"authalg",		TOK_AUTHALG,		NEXTNUMSTR},
+	{"authstring",		TOK_AUTHSTR,		NEXTNUMSTR},
+
+	{NULL,			TOK_UNKNOWN,		NEXTEOF}
+};
+
 /*
  * Q:	Do I need stuff for proposals, combinations, supported algorithms,
  *	or SPI ranges?
@@ -572,7 +617,9 @@ parseextval(char *value, int *next)
 	if (value == NULL)
 		return (TOK_EOF);
 
-	for (tp = tokens; tp->string != NULL; tp++)
+	tp = tcpkey ? tcpkey_tokens : tokens;
+
+	for (; tp->string != NULL; tp++)
 		if (strcmp(value, tp->string) == 0)
 			break;
 
@@ -665,6 +712,28 @@ parsealg(char *alg, int proto_num, char *ebuf)
 		ERROR1(ep, ebuf, gettext(
 		    "Unknown authentication algorithm type \"%s\"\n"), alg);
 	}
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
+	return (0);
+}
+
+static uint8_t
+parsetcpalg(char *alg, char *ebuf)
+{
+	char *ep = NULL;
+	uint8_t algnum;
+
+	if (alg == NULL) {
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting an algorithm name.\n"));
+	}
+
+	algnum = gettcpsigalgbyname(alg);
+	if (algnum > 0)
+		return (algnum);
+
+	ERROR1(ep, ebuf,
+	    gettext("Unknown tcpsig authentication algorithm type \"%s\"\n"),
+	    alg);
 	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (0);
 }
@@ -919,6 +988,39 @@ parsekey(char *input, char *ebuf, uint_t reserved_bits)
 	return (retval);
 }
 
+static struct sadb_key *
+parseauthstr(char *input, char *ebuf)
+{
+	struct sadb_key *retval;
+	size_t alloclen, keylen;
+	char *ep = NULL;
+
+	if (input == NULL) {
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting an authentication string.\n"));
+	}
+
+	keylen = strlen(input);
+
+	if (keylen > TCPSIG_MD5_KEY_LEN) {
+		FATAL(ep, ebuf, gettext("Authentication string is too long, "
+		    "must be < " QUOTE(TCPSIG_MD5_KEY_LEN) " characters.\n"));
+	}
+
+	alloclen = sizeof (*retval) + roundup(keylen, sizeof (uint64_t));
+	retval = malloc(alloclen);
+
+	if (retval == NULL)
+		Bail("malloc(parseauthstr)");
+	retval->sadb_key_bits = SADB_8TO1(keylen);
+	retval->sadb_key_len = SADB_8TO64(alloclen);
+	retval->sadb_key_reserved = 0;
+	bcopy(input, (void *)(retval + 1), keylen);
+
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
+	return (retval);
+}
+
 #include <tsol/label.h>
 
 #define	PARSELABEL_BAD_TOKEN ((struct sadb_sens *)-1)
@@ -1093,7 +1195,8 @@ dodump(int satype, FILE *ofile)
 		(void) fprintf(ofile,
 		    gettext("# This key file was generated by the"));
 		(void) fprintf(ofile,
-		    gettext(" ipseckey(8) command's 'save' feature.\n\n"));
+		    gettext(" %s(8) command's 'save' feature.\n\n"),
+		    progname);
 	}
 	msg_init(msg, SADB_DUMP, (uint8_t)satype);
 	rc = key_write(keysock, msg, sizeof (*msg));
@@ -1173,7 +1276,7 @@ ipv6_addr_scope(struct in6_addr *addr)
 /*
  * doaddresses():
  *
- * Used by doaddup() and dodelget() to create new SA's based on the
+ * Used by doaddup() and dodelget() to create new SAs based on the
  * provided source and destination addresses hostent.
  *
  * sadb_msg_type: expected PF_KEY reply message type
@@ -1529,7 +1632,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 			    sizeof (cli_addr));
 		}
 		/* Blank the key for paranoia's sake. */
-		bzero(buffer, buffer_size);
+		explicit_bzero(buffer, buffer_size);
 		time_critical_enter();
 		do {
 			rc = read(keysock, buffer, buffer_size);
@@ -1823,13 +1926,26 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 					    "single auth algorithm.\n"));
 					break;
 				}
-				assoc->sadb_sa_auth = parsealg(*argv,
-				    IPSEC_PROTO_AH, ebuf);
+				if (satype == SADB_X_SATYPE_TCPSIG) {
+					assoc->sadb_sa_auth =
+					    parsetcpalg(*argv, ebuf);
+					assoc->sadb_sa_flags =
+					    SADB_X_SAFLAGS_TCPSIG;
+				} else {
+					assoc->sadb_sa_auth = parsealg(*argv,
+					    IPSEC_PROTO_AH, ebuf);
+				}
 				break;
 			case TOK_ENCRALG:
 				if (satype == SADB_SATYPE_AH) {
 					ERROR(ep, ebuf, gettext("Cannot specify"
 					    " encryption with SA type ah.\n"));
+					break;
+				}
+				if (satype == SADB_X_SATYPE_TCPSIG) {
+					ERROR(ep, ebuf, gettext("Cannot specify"
+					    " encryption with SA type"
+					    " tcpsig.\n"));
 					break;
 				}
 				if (assoc->sadb_sa_encrypt != 0) {
@@ -2315,8 +2431,8 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		case TOK_ENCRKEY:
 			if (encrypt != NULL) {
 				ERROR(ep, ebuf, gettext(
-				    "Can only specify "
-				    "single encryption key.\n"));
+				    "Can only specify a single"
+				    " encryption key.\n"));
 				break;
 			}
 			if (assoc != NULL &&
@@ -2339,7 +2455,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		case TOK_AUTHKEY:
 			if (auth != NULL) {
 				ERROR(ep, ebuf, gettext(
-				    "Can only specify single"
+				    "Can only specify a single"
 				    " authentication key.\n"));
 				break;
 			}
@@ -2352,6 +2468,29 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			}
 			totallen += SADB_64TO8(auth->sadb_key_len);
 			auth->sadb_key_exttype = SADB_EXT_KEY_AUTH;
+			break;
+		case TOK_AUTHSTR:
+			if (satype != SADB_X_SATYPE_TCPSIG) {
+				ERROR(ep, ebuf, gettext(
+				    "An authentication string can only be "
+				    "specified for SA type tcpsig.\n"));
+				break;
+			}
+			if (auth != NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify a single"
+				    " authentication key or string.\n"));
+				break;
+			}
+			auth = parseauthstr(*argv, ebuf);
+			argv++;
+			if (auth == NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Invalid authentication string.\n"));
+				break;
+			}
+			totallen += SADB_64TO8(auth->sadb_key_len);
+			auth->sadb_key_exttype = SADB_X_EXT_STR_AUTH;
 			break;
 		case TOK_SRCIDTYPE:
 			if (*argv == NULL || *(argv + 1) == NULL) {
@@ -2716,7 +2855,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	bcopy(&msg, nexthdr, sizeof (msg));
 	nexthdr += SADB_8TO64(sizeof (msg));
 	if (assoc != NULL) {
-		if (assoc->sadb_sa_spi == 0) {
+		if (satype != SADB_X_SATYPE_TCPSIG && assoc->sadb_sa_spi == 0) {
 			ERROR1(ep, ebuf, gettext(
 			    "The SPI value is missing for "
 			    "the association you wish to %s.\n"), thiscmd);
@@ -2772,7 +2911,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		spi = assoc->sadb_sa_spi;
 		free(assoc);
 	} else {
-		if (spi == 0)
+		if (satype != SADB_X_SATYPE_TCPSIG && spi == 0)
 			ERROR1(ep, ebuf, gettext(
 			    "Need to define SPI for %s.\n"), thiscmd);
 		ERROR1(ep, ebuf, gettext(
@@ -2817,14 +2956,14 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	if (encrypt != NULL) {
 		bcopy(encrypt, nexthdr, SADB_64TO8(encrypt->sadb_key_len));
 		nexthdr += encrypt->sadb_key_len;
-		bzero(encrypt, SADB_64TO8(encrypt->sadb_key_len));
+		explicit_bzero(encrypt, SADB_64TO8(encrypt->sadb_key_len));
 		free(encrypt);
 	}
 
 	if (auth != NULL) {
 		bcopy(auth, nexthdr, SADB_64TO8(auth->sadb_key_len));
 		nexthdr += auth->sadb_key_len;
-		bzero(auth, SADB_64TO8(auth->sadb_key_len));
+		explicit_bzero(auth, SADB_64TO8(auth->sadb_key_len));
 		free(auth);
 	}
 
@@ -2978,7 +3117,7 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 	struct sadb_address *src = NULL, *dst = NULL;
 	int next, token, sa_len;
 	char *thiscmd;
-	uint32_t spi;
+	uint32_t spi = 0;
 	uint8_t	sadb_msg_type;
 	struct hostent *srchp = NULL, *dsthp = NULL;
 	struct sockaddr_in6 *sin6;
@@ -3151,29 +3290,39 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 
 	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
 
-	if (assoc == NULL) {
+	if (assoc == NULL && satype != SADB_X_SATYPE_TCPSIG) {
 		FATAL1(ep, ebuf, gettext(
 		    "Need SA parameters for %s.\n"), thiscmd);
 	}
 
-	/* We can set the flags now with valid assoc in hand. */
-	assoc->sadb_sa_flags |= sa_flags;
+	if (assoc != NULL) {
+		/* We can set the flags now with valid assoc in hand. */
+		assoc->sadb_sa_flags |= sa_flags;
+	}
 
-	if ((srcport != 0) && (src == NULL)) {
-		ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
-		sin6 = (struct sockaddr_in6 *)(src + 1);
-		src->sadb_address_proto = proto;
-		bzero(sin6, sizeof (*sin6));
-		sin6->sin6_family = AF_INET6;
+	if (srcport != 0) {
+		if (src == NULL) {
+			ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
+			sin6 = (struct sockaddr_in6 *)(src + 1);
+			src->sadb_address_proto = proto;
+			bzero(sin6, sizeof (*sin6));
+			sin6->sin6_family = AF_INET6;
+		} else {
+			sin6 = (struct sockaddr_in6 *)(src + 1);
+		}
 		sin6->sin6_port = htons(srcport);
 	}
 
-	if ((dstport != 0) && (dst == NULL)) {
-		ALLOC_ADDR_EXT(dst, SADB_EXT_ADDRESS_DST);
-		sin6 = (struct sockaddr_in6 *)(dst + 1);
-		src->sadb_address_proto = proto;
-		bzero(sin6, sizeof (*sin6));
-		sin6->sin6_family = AF_INET6;
+	if (dstport != 0) {
+		if (dst == NULL) {
+			ALLOC_ADDR_EXT(dst, SADB_EXT_ADDRESS_DST);
+			sin6 = (struct sockaddr_in6 *)(dst + 1);
+			src->sadb_address_proto = proto;
+			bzero(sin6, sizeof (*sin6));
+			sin6->sin6_family = AF_INET6;
+		} else {
+			sin6 = (struct sockaddr_in6 *)(dst + 1);
+		}
 		sin6->sin6_port = htons(dstport);
 	}
 
@@ -3291,14 +3440,17 @@ mask_signals(boolean_t unmask)
 static void
 doattrhelp()
 {
+	struct toktable *tp;
 	int i;
 
 	puts_tr("\nSA attributes:");
 
-	for (i = 0; tokens[i].string != NULL; i++) {
-		if (i%3 == 0)
+	tp = tcpkey ? tcpkey_tokens : tokens;
+
+	for (i = 0; tp->string != NULL; tp++, i++) {
+		if (i % 3 == 0)
 			(void) printf("\n");
-		(void) printf("    %-15.15s", tokens[i].string);
+		(void) printf("    %-15.15s", tp->string);
 	}
 	(void) printf("\n");
 }
@@ -3319,7 +3471,7 @@ dohelpcmd(char *cmds)
 		puts_tr("update	 - Update an existing SA");
 		break;
 	case CMD_UPDATE_PAIR:
-		puts_tr("update-pair - Update an existing pair of SA's");
+		puts_tr("update-pair - Update an existing pair of SAs");
 		break;
 	case CMD_ADD:
 		puts_tr("add	 - Add a new security association (SA)");
@@ -3328,31 +3480,36 @@ dohelpcmd(char *cmds)
 		puts_tr("delete - Delete an SA");
 		break;
 	case CMD_DELETE_PAIR:
-		puts_tr("delete-pair - Delete a pair of SA's");
+		puts_tr("delete-pair - Delete a pair of SAs");
 		break;
 	case CMD_GET:
 		puts_tr("get - Display an SA");
 		break;
 	case CMD_FLUSH:
 		puts_tr("flush - Delete all SAs");
-		puts_tr("");
-		puts_tr("Optional arguments:");
-		puts_tr("all        delete all SAs");
-		puts_tr("esp        delete just ESP SAs");
-		puts_tr("ah         delete just AH SAs");
-		puts_tr("<number>   delete just SAs with type given by number");
-		puts_tr("");
+		if (!tcpkey) {
+			puts_tr("");
+			puts_tr("Optional arguments:");
+			puts_tr("all        delete all SAs");
+			puts_tr("esp        delete just ESP SAs");
+			puts_tr("ah         delete just AH SAs");
+			puts_tr("<number>   delete just SAs with type "
+			    "given by number");
+			puts_tr("");
+		}
 		break;
 	case CMD_DUMP:
 		puts_tr("dump - Display all SAs");
-		puts_tr("");
-		puts_tr("Optional arguments:");
-		puts_tr("all        display all SAs");
-		puts_tr("esp        display just ESP SAs");
-		puts_tr("ah         display just AH SAs");
-		puts_tr("<number>   display just SAs with type "
-		    "given by number");
-		puts_tr("");
+		if (!tcpkey) {
+			puts_tr("");
+			puts_tr("Optional arguments:");
+			puts_tr("all        display all SAs");
+			puts_tr("esp        display just ESP SAs");
+			puts_tr("ah         display just AH SAs");
+			puts_tr("<number>   display just SAs with type "
+			    "given by number");
+			puts_tr("");
+		}
 		break;
 	case CMD_MONITOR:
 		puts_tr("monitor - Monitor all PF_KEY reply messages.");
@@ -3381,6 +3538,20 @@ dohelpcmd(char *cmds)
 	}
 }
 
+static void
+dohelp_tcpkey(void)
+{
+	puts_tr("");
+	puts_tr("The following commands are of the form:");
+	puts_tr("    <command> {SA type} {attribute value}*");
+	puts_tr("");
+	puts_tr("add (interactive only) - Add a new security association (SA)");
+	puts_tr("delete - Delete an SA");
+	puts_tr("get - Display an SA");
+	puts_tr("flush - Delete all SAs");
+	puts_tr("dump - Display all SAs");
+	puts_tr("save - Saves all SAs to a file");
+}
 
 static void
 dohelp(char *cmds)
@@ -3395,6 +3566,12 @@ dohelp(char *cmds)
 	puts_tr("help <cmd> - Display help for command");
 	puts_tr("help attr  - Display possible SA attributes");
 	puts_tr("quit, exit - Exit the program");
+
+	if (tcpkey) {
+		dohelp_tcpkey();
+		return;
+	}
+
 	puts_tr("monitor - Monitor all PF_KEY reply messages.");
 	puts_tr("pmonitor, passive_monitor - Monitor PF_KEY messages that");
 	puts_tr("                            reply to all PF_KEY sockets.");
@@ -3420,10 +3597,12 @@ static void
 parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 {
 	int cmd, satype;
+	char *cmdstr;
 	char *ep = NULL;
 
 	if (argc == 0)
 		return;
+	cmdstr = argv[0];
 	cmd = parsecmd(*argv++);
 
 	/*
@@ -3475,23 +3654,27 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 
 	handle_errors(ep, ebuf, B_FALSE, B_FALSE);
 
-	satype = parsesatype(*argv, ebuf);
-
-	if (satype != SADB_SATYPE_UNSPEC) {
-		argv++;
+	if (tcpkey) {
+		satype = SADB_X_SATYPE_TCPSIG;
 	} else {
-		/*
-		 * You must specify either "all" or a specific SA type
-		 * for the "save" command.
-		 */
-		if (cmd == CMD_SAVE)
-			if (*argv == NULL) {
-				FATAL(ep, ebuf, gettext(
-				    "Must specify a specific "
-				    "SA type for save.\n"));
-			} else {
-				argv++;
+		satype = parsesatype(*argv, ebuf);
+		if (satype != SADB_SATYPE_UNSPEC) {
+			argv++;
+		} else {
+			/*
+			 * You must specify either "all" or a specific SA type
+			 * for the "save" command.
+			 */
+			if (cmd == CMD_SAVE) {
+				if (*argv == NULL) {
+					FATAL(ep, ebuf, gettext(
+					    "Must specify a specific "
+					    "SA type for save.\n"));
+				} else {
+					argv++;
+				}
 			}
+		}
 	}
 
 	switch (cmd) {
@@ -3566,8 +3749,7 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 		}
 		break;
 	default:
-		warnx(gettext("Unknown command (%s).\n"),
-		    *(argv - ((satype == SADB_SATYPE_UNSPEC) ? 1 : 2)));
+		warnx(gettext("Unknown command (%s).\n"), cmdstr);
 		usage();
 	}
 	handle_errors(ep, ebuf, B_FALSE, B_FALSE);
@@ -3582,6 +3764,8 @@ main(int argc, char *argv[])
 	char *configfile = NULL;
 	struct stat sbuf;
 	int bootflags;
+	int satype = SADB_SATYPE_UNSPEC;
+	char *prompt = "ipseckey> ";
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -3594,10 +3778,22 @@ main(int argc, char *argv[])
 	 */
 	my_fmri = getenv("SMF_FMRI");
 
-	openlog("ipseckey", LOG_CONS, LOG_AUTH);
-	if (getuid() != 0) {
-		errx(1, "Insufficient privileges to run ipseckey.");
+	/*
+	 * Check to see if the command is being run as tcpkey(8). If it is we
+	 * will expose a more limited interface and only manage the TCPSIG
+	 * SADB.
+	 */
+	progname = getprogname();
+	tcpkey = strcmp(progname, "tcpkey") == 0;
+
+	if (tcpkey) {
+		satype = SADB_X_SATYPE_TCPSIG;
+		prompt = "tcpkey> ";
 	}
+
+	openlog(progname, LOG_CONS, LOG_AUTH);
+	if (!priv_ineffect(PRIV_SYS_IP_CONFIG))
+		errx(1, "Insufficient privileges to run %s.", progname);
 
 	/* umask me to paranoid, I only want to create files read-only */
 	(void) umask((mode_t)00377);
@@ -3645,7 +3841,7 @@ main(int argc, char *argv[])
 			}
 			/*
 			 * The input file contains keying information, because
-			 * this is sensative, we should only accept data from
+			 * this is sensitive, we should only accept data from
 			 * this file if the file is root owned and only readable
 			 * by privileged users. If the command is being run by
 			 * the administrator, issue a warning, if this is run by
@@ -3665,7 +3861,7 @@ main(int argc, char *argv[])
 					EXIT_BADCONFIG2("Config file "
 					    "%s has insecure permissions.",
 					    optarg);
-				} else 	{
+				} else {
 					(void) fprintf(stderr, gettext(
 					    "Config file %s has insecure "
 					    "permissions, will be rejected in "
@@ -3713,24 +3909,24 @@ main(int argc, char *argv[])
 
 	if (dosave) {
 		mask_signals(B_FALSE);	/* Mask signals */
-		dodump(SADB_SATYPE_UNSPEC, savefile);
+		dodump(satype, savefile);
 		mask_signals(B_TRUE);	/* Unmask signals */
 		EXIT_OK(NULL);
 	}
 
 	/*
-	 * When run from smf(7) flush any existing SA's first
+	 * When run from smf(7) flush any existing SAs first
 	 * otherwise you will end up in maintenance mode.
 	 */
-	if ((my_fmri != NULL) && readfile) {
+	if (my_fmri != NULL && readfile) {
 		(void) fprintf(stdout, gettext(
-		    "Flushing existing SA's before adding new SA's\n"));
+		    "Flushing existing SAs before adding new SAs\n"));
 		(void) fflush(stdout);
-		doflush(SADB_SATYPE_UNSPEC);
+		doflush(satype);
 	}
 	if (infile != stdin || argc == 0) {
 		/* Go into interactive mode here. */
-		do_interactive(infile, configfile, "ipseckey> ", my_fmri,
+		do_interactive(infile, configfile, prompt, my_fmri,
 		    parseit, no_match);
 	}
 	parseit(argc, argv, NULL, B_FALSE);

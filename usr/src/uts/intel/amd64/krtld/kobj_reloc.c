@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /*
  * Copyright (c) 2017 Joyent, Inc.
@@ -43,17 +44,14 @@
 #include <sys/elf.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
+#include <sys/sdt_impl.h>
 
 #include "reloc.h"
-
-#define	SDT_NOP		0x90
-#define	SDT_NOPS	5
 
 static int
 sdt_reloc_resolve(struct module *mp, char *symname, uint8_t *instr)
 {
 	sdt_probedesc_t *sdp;
-	int i;
 
 	/*
 	 * The "statically defined tracing" (SDT) provider for DTrace.
@@ -75,8 +73,18 @@ sdt_reloc_resolve(struct module *mp, char *symname, uint8_t *instr)
 	sdp->sdpd_next = mp->sdt_probes;
 	mp->sdt_probes = sdp;
 
-	for (i = 0; i < SDT_NOPS; i++)
-		instr[i - 1] = SDT_NOP;
+	/*
+	 * The compiler may emit the probe call as a tail call (/sibling call).
+	 * On x86 that means instead of a CALL instruction, we get a JMP.  In
+	 * that case, we also need to patch in a RET instruction instead of just
+	 * NOPs.
+	 */
+	const boolean_t is_tailcall = instr[-1] != SDT_CALL;
+	instr[-1] = SDT_NOP;
+	instr[0] = SDT_NOP;
+	instr[1] = SDT_NOP;
+	instr[2] = SDT_NOP;
+	instr[SDT_OFF_RET_IDX] = is_tailcall ? SDT_RET : SDT_NOP;
 
 	return (0);
 }

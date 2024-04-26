@@ -29,7 +29,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright (c) 2011, 2015 by Delphix. All rights reserved.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 <include SUNWcs.man1.inc>
@@ -337,6 +337,7 @@ file path=lib/svc/manifest/network/ipsec/ike.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/ipsecalgs.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipsec/tcpkey.xml group=sys mode=0444
 dir  path=lib/svc/manifest/network/ldap group=sys
 file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
@@ -438,6 +439,7 @@ file path=lib/svc/method/net-nwam mode=0555
 file path=lib/svc/method/net-physical mode=0555
 file path=lib/svc/method/net-routing-setup mode=0555
 file path=lib/svc/method/net-svc mode=0555
+file path=lib/svc/method/net-tcpkey mode=0555
 file path=lib/svc/method/rmtmpfiles mode=0555
 file path=lib/svc/method/rpc-bind mode=0555
 file path=lib/svc/method/svc-allocate mode=0555
@@ -1104,6 +1106,7 @@ file path=usr/lib/help/profiles/locale/C/RtNetLinkSecure.html
 file path=usr/lib/help/profiles/locale/C/RtNetMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtNetObservability.html
 file path=usr/lib/help/profiles/locale/C/RtNetSecure.html
+file path=usr/lib/help/profiles/locale/C/RtNetTCPMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtNetVRRP.html
 file path=usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtNetWifiSecure.html
@@ -1453,6 +1456,7 @@ file path=usr/sbin/syseventadm group=sys mode=0555
 file path=usr/sbin/syslogd group=sys mode=0555
 hardlink path=usr/sbin/tapes target=./devfsadm
 file path=usr/sbin/tar mode=0555
+hardlink path=usr/sbin/tcpkey target=../../usr/sbin/ipseckey
 file path=usr/sbin/traceroute mode=4555
 file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/ttyadm group=sys mode=0755

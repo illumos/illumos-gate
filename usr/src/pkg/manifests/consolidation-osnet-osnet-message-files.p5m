@@ -21,6 +21,7 @@
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2022 Garrett D'Amore
+# Copyright 2024 Oxide Computer Company
 
 set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
 set name=pkg.summary value="Localizable ON message files"
@@ -232,6 +233,7 @@ file path=usr/lib/help/profiles/locale/RtNetLinkSecure.html
 file path=usr/lib/help/profiles/locale/RtNetMngmnt.html
 file path=usr/lib/help/profiles/locale/RtNetObservability.html
 file path=usr/lib/help/profiles/locale/RtNetSecure.html
+file path=usr/lib/help/profiles/locale/RtNetTCPMngmnt.html
 file path=usr/lib/help/profiles/locale/RtNetVRRP.html
 file path=usr/lib/help/profiles/locale/RtNetWifiMngmnt.html
 file path=usr/lib/help/profiles/locale/RtNetWifiSecure.html

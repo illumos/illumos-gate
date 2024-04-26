@@ -575,7 +575,7 @@ struct sockaddr_in6 {
 #endif /* _BIG_ENDIAN */
 
 /*
- * IN6_IS_ADDR_V4MAPPED - A IPv4 mapped INADDR_ANY
+ * IN6_IS_ADDR_V4MAPPED_ANY - A IPv4 mapped INADDR_ANY
  * Note: This macro is currently NOT defined in RFC2553 specification
  * and not a standard macro that portable applications should use.
  */

@@ -23,32 +23,33 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG = plockstat
+OBJS = plockstat.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-$(64ONLY)SUBDIRS = $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+LDLIBS += -ldtrace -lproc
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CLEANFILES += $(OBJS)
+
+ROOTLINK = $(PROG:%=$(ROOTUSRSBIN64)/%)
 
 .KEEP_STATE:
 
-all: $(SUBDIRS)
+all: $(PROG)
 
-clean clobber lint: $(SUBDIRS)
+install: all $(ROOTUSRSBINPROG) $(ROOTLINK)
 
-install: $(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+$(ROOTLINK):
+	$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
-FRC:
+clean:
+	-$(RM) $(CLEANFILES)
+
+include ../Makefile.targ

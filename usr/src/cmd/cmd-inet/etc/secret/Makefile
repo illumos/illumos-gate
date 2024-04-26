@@ -26,7 +26,7 @@
 
 SECRETDIR=	secret
 PRIVATEKEYDIR=	ike.privatekeys
-ETCPROG=	ike.preshared ipseckeys.sample
+ETCPROG=	ike.preshared ipseckeys.sample tcpkeys.sample
 
 include ../../../Makefile.cmd
 

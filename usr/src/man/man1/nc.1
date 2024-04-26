@@ -1,566 +1,494 @@
-'\" te
 .\" Copyright (c) 1996 David Sacerdote All rights reserved.
-.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-.\" 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. 3. The name of the author may not be used to endorse or promote products derived from this
-.\" software without specific prior written permission THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
-.\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-.\" STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are
+.\" met: 1. Redistributions of source code must retain the above copyright
+.\" notice, this list of conditions and the following disclaimer.
+.\"
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\" notice, this list of conditions and the following disclaimer in the
+.\" documentation and/or other materials provided with the distribution. 3.
+.\" The name of the author may not be used to endorse or promote products
+.\" derived from this
+.\"
+.\" software without specific prior written permission THIS SOFTWARE IS
+.\" PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+.\" INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
+.\" NO EVENT SHALL THE AUTHOR
+.\"
+.\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+.\" BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+.\" WHETHER IN CONTRACT,
+.\"
+.\" STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+.\" IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+.\" POSSIBILITY OF SUCH DAMAGE.
+.\"
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH NC 1 "Feb 17, 2023"
-.SH NAME
-nc \- arbitrary TCP and UDP connections and listens
-.SH SYNOPSIS
-.nf
-\fBnc\fR \fB-h\fR
-.fi
-
-.LP
-.nf
-\fBnc\fR [\fB-46dnrtuvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-P\fR \fIproxy_username\fR] [\fB-p\fR \fIport\fR]
-     [\fB-s\fR \fIsource_ip_address\fR] [\fB-T\fR \fIToS\fR] [\fB-w\fR \fItimeout\fR]
-     [\fB-X\fR \fIproxy_protocol\fR] [\fB-x\fR \fIproxy_address\fR[:\fIport\fR]]
-     \fIhostname\fR \fIport_list\fR
-.fi
-
-.LP
-.nf
-\fBnc\fR \fB-l\fR [\fB-46Ddnrtuvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-T\fR \fIToS\fR] [\fIhostname\fR] \fIport\fR
-.fi
-
-.LP
-.nf
-\fBnc\fR \fB-l\fR [\fB-46Ddnrtuvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-T\fR \fIToS\fR] \fB-p\fR \fIport\fR
-.fi
-
-.LP
-.nf
-\fBnc\fR \fB-U\fR [\fB-Ddtvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-w\fR \fItimeout\fR] \fIpath\fR
-.fi
-
-.LP
-.nf
-\fBnc\fR \fB-Ul\fR [\fB-46Ddktv\fR] [\fB-i\fR \fIinterval\fR] \fIpath\fR
-.fi
-
-.SH DESCRIPTION
-The \fBnc\fR (or \fBnetcat\fR) utility is used for a variety of tasks
-associated with TCP or UDP. \fBnc\fR can open TCP connections, send UDP
-packets, listen on arbitrary TCP and UDP ports, perform port scanning, and deal
-with both IPv4 and IPv6. Unlike \fBtelnet\fR(1), \fBnc\fR scripts nicely, and
-separates error messages onto standard error instead of sending them to
-standard output.
-.sp
-.LP
-The \fBnc\fR command is often used for the following tasks:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd April 15, 2024
+.Dt NC 1
+.Os
+.Sh NAME
+.Nm nc
+.Nd arbitrary TCP and UDP connections and listens
+.Sh SYNOPSIS
+.Nm
+.Fl h
+.Nm
+.Op Fl 46dnrStuvz
+.Op Fl i Ar interval
+.Op Fl P Ar proxy_username
+.Op Fl p Ar port
+.Op Fl s Ar source_ip_address
+.Op Fl T Ar ToS
+.Op Fl w Ar timeout
+.Op Fl X Ar proxy_protocol
+.Op Fl x Ar proxy_address Ns Op &: Ar port
+.Ar hostname
+.Ar port_list
+.Nm
+.Fl l
+.Op Fl 46DdnrStuvz
+.Op Fl i Ar interval
+.Op Fl T Ar ToS
+.Op Ar hostname
+.Ar port
+.Nm
+.Fl l
+.Op Fl 46DdnrStuvz
+.Op Fl i Ar interval
+.Op Fl T Ar ToS
+.Fl p Ar port
+.Nm
+.Fl U
+.Op Fl Ddtvz
+.Op Fl i Ar interval
+.Op Fl w Ar timeout
+.Fl p Ar path
+.Nm
+.Fl Ul
+.Op Fl 46Ddktv
+.Op Fl i Ar interval
+.Ar path
+.Sh DESCRIPTION
+The
+.Nm
+.Po
+or
+.Nm netcat
+.Pc
+utility is used for a variety of tasks associated with TCP or UDP.
+.Nm
+can open TCP connections, send UDP packets, listen on arbitrary TCP and UDP
+ports, perform port scanning, and deal with both IPv4 and IPv6.
+Unlike
+.Xr telnet 1 ,
+.Nm
+scripts nicely, and separates error messages onto standard error instead of
+sending them to standard output.
+.Pp
+The
+.Nm
+command is often used for the following tasks:
+.Bl -bullet -width Ds
+.It
 simple TCP proxies
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 shell-script based HTTP clients and servers
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 network daemon testing
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-a SOCKS or HTTP \fBProxyCommand\fR for \fBssh\fR(1)
-.RE
-.SH OPTIONS
+.It
+a SOCKS or HTTP ProxyCommand for
+.Xr ssh 1
+.El
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-4\fR\fR
-.ad
-.sp .6
-.RS 4n
-Force \fBnc\fR to use IPv4 addresses only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-6\fR\fR
-.ad
-.sp .6
-.RS 4n
-Force \fBnc\fR to use IPv6 addresses only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-D\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Ds
+.It Fl 4
+Force
+.Nm
+to use IPv4 addresses only.
+.It Fl 6
+Force
+.Nm
+to use IPv6 addresses only.
+.It Fl D
 Enable debugging on the socket.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR\fR
-.ad
-.sp .6
-.RS 4n
-Do not attempt to read from \fBstdin\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-h\fR\fR
-.ad
-.sp .6
-.RS 4n
-Print \fBnc\fR help.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR \fIinterval\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specify a delay time of \fIinterval\fR between lines of text sent and received.
+.It Fl d
+Do not attempt to read from
+.Dv stdin .
+.It Fl h
+Print
+.Nm
+help.
+.It Fl i Ar interval
+Specify a delay time of
+.Ar interval
+between lines of text sent and received.
 This option also causes a delay time between connections to multiple ports.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-k\fR\fR
-.ad
-.sp .6
-.RS 4n
-Force \fBnc\fR to listen for another connection after its current connection is
-closed.
-.sp
-It is an error to use this option without the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl k
+Force
+.Nm
+to listen for another connection after its current connection is closed.
+.Pp
+It is an error to use this option without the
+.Fl l
+option.
+.It Fl l
 Listen for an incoming connection rather than initiate a connection to a remote
 host.
-.sp
-It is an error to use this option in conjunction with the \fB-s\fR or \fB-z\fR
-options. Additionally, any \fItimeout\fR specified with the \fB-w\fR option is
-ignored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+It is an error to use this option in conjunction with the
+.Fl s
+or
+.Fl z
+options.
+Additionally, any
+.Ar timeout
+specified with the
+.Fl w
+option is ignored.
+.It Fl n
 Do not do any naming or service lookups on any addresses, hostnames, or ports.
-.sp
-Use of this option means that \fIhostname\fR and \fIport\fR arguments are
-restricted to numeric values.
-.sp
-If used with \fB-v\fR option all addresses and ports are printed in numeric
-form, in addition to the restriction imposed on the arguments. This option does
-not have any effect when used in conjunction with the \fB-U\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-P\fR \fIproxy_username\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specify a username (\fIproxy_username\fR) to present to a proxy server that
-requires authentication. If \fIproxy_username\fR is not specified,
-authentication is not attempted. Proxy authentication is only supported for
-\fBHTTP CONNECT\fR proxies at present.
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIport\fR\fR
-.ad
-.sp .6
-.RS 4n
-When used without \fB-l\fR option, specify the source port \fBnc\fR should use,
-subject to privilege restrictions and availability. When used with the \fB-l\fR
+.Pp
+Use of this option means that
+.Ar hostname
+and
+.Ar port
+arguments are restricted to numeric values.
+.Pp
+If used with
+.Fl v
+option all addresses and ports are printed in numeric form, in addition to the
+restriction imposed on the arguments.
+This option does not have any effect when used in conjunction with the
+.Fl U
+option.
+.It Fl P Ar proxy_username
+Specify a username
+.Po
+.Ar proxy_username
+.Pc
+to present to a proxy server that requires authentication.
+If
+.Ar proxy_username
+is not specified, authentication is not attempted.
+Proxy authentication is only supported for HTTP CONNECT proxies at present.
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.It Fl p Ar port
+When used without
+.Fl l
+option, specify the source port
+.Nm
+should use, subject to privilege restrictions and availability.
+When used with the
+.Fl l
 option, set the listen port.
-.sp
-This option can be used with \fB-l\fR option only provided global port argument
-is not specified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+This option can be used with
+.Fl l
+option only provided global port argument is not specified.
+.It Fl r
 Choose source or destination ports randomly instead of sequentially within a
 range or in the order that the system assigns them.
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fIsource_ip_address\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.It Fl S
+Enables the
+.%T RFC 2385
+TCP MD5 signature option.
+.Pp
+In order for packets to be sent or received in conjunction with this option, a
+security association that matches the traffic must also be created using
+.Xr tcpkey 8 .
+.It Fl s Ar source_ip_address
 Specify the IP of the interface which is used to send the packets.
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-T\fR \fIToS\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specify IP Type of Service (\fBToS\fR) for the connection. Valid values are the
-tokens: \fBlowdelay\fR, \fBthroughput\fR, \fBreliability\fR, or an 8-bit
-hexadecimal value preceded by \fB0x\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.sp .6
-.RS 4n
-Cause \fBnc\fR to send \fIRFC 854\fR \fBDON'T\fR and \fBWON'T\fR responses to
-\fIRFC 854\fR \fBDO\fR and \fBWILL\fR requests. This makes it possible to use
-\fBnc\fR to script \fBtelnet\fR sessions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-U\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specify the use of Unix Domain Sockets. If you specify this option without
-\fB-l\fR, \fBnc\fR, it becomes \fBAF_UNIX\fR client. If you specify this option
-with the \fB-l\fR option, a \fBAF_UNIX\fR server is created.
-.sp
-Use of this option requires that a single argument of a valid Unix domain path
-has to be provided to \fBnc\fR, not a host name or port.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-u\fR\fR
-.ad
-.sp .6
-.RS 4n
-Use UDP instead of the default option of TCP.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-v\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specify verbose output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-w\fR \fItimeout\fR\fR
-.ad
-.sp .6
-.RS 4n
-Silently close the connection if a connection and \fBstdin\fR are idle for more
-than \fItimeout\fR seconds.
-.sp
-This option has no effect on the \fB-l\fR option, that is, \fBnc\fR listens
-forever for a connection, with or without the \fB-w\fR flag. The default is no
-timeout.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-X\fR \fIproxy_protocol\fR\fR
-.ad
-.sp .6
-.RS 4n
-Use the specified protocol when talking to the proxy server. Supported
-protocols are \fB4\fR (\fBSOCKS v.4\fR), \fB5\fR (\fBSOCKS v.5\fR) and
-\fBconnect\fR (\fBHTTP\fR proxy). If the protocol is not specified,
-\fBSOCKS v.5\fR is used.
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-x\fR \fIproxy_address\fR[:\fIport\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Request connection to \fIhostname\fR using a proxy at \fIproxy_address\fR and
-\fIport\fR. If \fIport\fR is not specified, the well-known port for the proxy
-protocol is used (\fB1080\fR for \fBSOCKS\fR, \fB3128\fR for \fBHTTP\fR).
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR\fR
-.ad
-.sp .6
-.RS 4n
-Scan for listening daemons, without sending any data to them.
-.sp
-It is an error to use this option in conjunction with the \fB-l\fR option.
-.RE
-
-.SH OPERANDS
-The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIhostname\fR\fR
-.ad
-.RS 13n
-Specify host name.
-.sp
-\fIhostname\fR can be a numerical IP address or a symbolic hostname (unless the
-\fB-n\fR option is specified).
-.sp
-In general, \fIhostname\fR must be specified, unless the \fB-l\fR option is
-given or \fB-U\fR is used (in which case the argument is a path). If
-\fIhostname\fR argument is specified with \fB-l\fR option then \fIport\fR
-argument must be given as well and \fBnc\fR tries to bind to that address and
-port. If \fIhostname\fR argument is not specified with \fB-l\fR option then
-\fBnc\fR tries to listen on a wildcard socket for given \fIport\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIpath\fR\fR
-.ad
-.RS 13n
-Specify pathname.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIport\fR\fR
-.ad
-.br
-.na
-\fB\fIport_list\fR\fR
-.ad
-.RS 13n
-Specify port.
-.sp
-\fIport_list\fR can be specified as single integers, ranges or combinations of
-both. Specify ranges in the form of \fInn-mm\fR. The \fIport_list\fR must have
-at least one member, but can have multiple ports/ranges separated by commas.
-.sp
-In general, a destination port must be specified, unless the \fB-U\fR option is
-given, in which case a Unix Domain Socket path must be specified instead of
-\fIhostname\fR.
-.RE
-
-.SH USAGE
-.SS "Client/Server Model"
-It is quite simple to build a very basic client/server model using \fBnc\fR. On
-one console, start \fBnc\fR listening on a specific port for a connection. For
-example, the command:
-.sp
-.in +2
-.nf
-$ nc -l 1234
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-listens on port \fB1234\fR for a connection. On a second console (or a second
-machine), connect to the machine and port to which \fBnc\fR is listening:
-.sp
-.in +2
-.nf
-$ nc 127.0.0.1 1234
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-There should now be a connection between the ports. Anything typed at the
-second console is concatenated to the first, and vice-versa. After the
-connection has been set up, \fBnc\fR does not really care which side is being
-used as a \fBserver\fR and which side is being used as a \fBclient\fR. The
-connection can be terminated using an \fBEOF\fR (Ctrl/d).
-.SS "Data Transfer"
-The example in the previous section can be expanded to build a basic data
-transfer model. Any information input into one end of the connection is output
-to the other end, and input and output can be easily captured in order to
-emulate file transfer.
-.sp
-.LP
-Start by using \fBnc\fR to listen on a specific port, with output captured into
-a file:
-.sp
-.in +2
-.nf
-$ nc -l 1234 > filename.out
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Using a second machine, connect to the listening \fBnc\fR process, feeding it
-the file which is to be transferred:
-.sp
-.in +2
-.nf
-$ nc host.example.com 1234 < filename.in
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-After the file has been transferred, the connection closes automatically.
-.SS "Talking to Servers"
-It is sometimes useful to talk to servers \fBby hand\fR rather than through a
-user interface. It can aid in troubleshooting, when it might be necessary to
-verify what data a server is sending in response to commands issued by the
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.It Fl T Ar ToS
+Specify IP Type of Service
+.Pq ToS
+for the connection.
+Valid values are the tokens:
+.Cm lowdelay ,
+.Cm throughput ,
+.Cm reliability ,
+or an 8-bit hexadecimal value preceded by 0x.
+.It Fl t
+Cause
+.Nm
+to send
+.%T RFC 854
+.Dq DON'T
+and
+.Dq WON'T
+responses to
+.%T RFC 854
+.Dq DO
+and
+.Dq WILL
+requests.
+This makes it possible to use
+.Nm
+to script telnet sessions.
+.It Fl U
+Specify the use of Unix Domain Sockets.
+If you specify this option without
+.Fl l ,
+it becomes an
+.Dv AF_UNIX
 client.
-.sp
-.LP
+If you specify this option with the
+.Fl l
+option, a
+.Dv AF_UNIX
+server is created.
+.Pp
+Use of this option requires that a single argument of a valid Unix domain path
+has to be provided to
+.Nm ,
+not a host name or port.
+.It Fl u
+Use UDP instead of the default option of TCP.
+.It Fl v
+Specify verbose output.
+.It Fl w Ar timeout
+Silently close the connection if a connection and
+.Dv stdin
+are idle for more than
+.Ar timeout
+seconds.
+.Pp
+This option has no effect on the
+.Fl l
+option, that is,
+.Nm
+listens forever for a connection, with or without the
+.Fl w
+flag.
+The default is no timeout.
+.It Fl X Ar proxy_protocol
+Use the specified protocol when talking to the proxy server.
+Supported protocols are 4
+.Pq SOCKS v.4 ,
+5
+.Pq SOCKS v.5
+and connect
+.Pq HTTP proxy .
+If the protocol is not specified, SOCKS v.5 is used.
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.It Fl x Ar proxy_address Ns Op &: Ar port
+Request connection to
+.Ar hostname
+using a proxy at
+.Ar proxy_address
+and
+.Ar port .
+If
+.Ar port
+is not specified, the well-known port for the proxy protocol is used
+.Pq 1080 for SOCKS, 3128 for HTTP .
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.It Fl z
+Scan for listening daemons, without sending any data to them.
+.Pp
+It is an error to use this option in conjunction with the
+.Fl l
+option.
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -tag -width Ds
+.It Ar hostname
+Specify host name.
+.Pp
+.Ar hostname
+can be a numerical IP address or a symbolic hostname
+.Po
+unless the
+.Fl n
+option is specified
+.Pc .
+.Pp
+In general,
+.Ar hostname
+must be specified, unless the
+.Fl l
+option is given or
+.Fl U
+is used
+.Pq in which case the argument is a path .
+If
+.Ar hostname
+argument is specified with
+.Fl l
+option then
+.Ar port
+argument must be given as well and
+.Nm
+tries to bind to that address and port.
+If
+.Ar hostname
+argument is not specified with
+.Fl l
+option then
+.Nm
+tries to listen on a wildcard socket for given
+.Ar port .
+.It Ar path
+Specify pathname.
+.It Ar port | port_list
+Specify port.
+.Pp
+.Ar port_list
+can be specified as single integers, ranges or combinations of both.
+Specify ranges in the form of nn-mm.
+The
+.Ar port_list
+must have at least one member, but can have multiple ports/ranges separated by
+commas.
+.Pp
+In general, a destination port must be specified, unless the
+.Fl U
+option is given, in which case a Unix Domain Socket path must be specified
+instead of
+.Ar hostname .
+.El
+.Sh USAGE
+.Ss Client/Server Model
+It is quite simple to build a very basic client/server model using
+.Nm .
+On one console, start
+.Nm
+listening on a specific port for a connection.
+For example, the command:
+.Pp
+.Dl $ nc -l 1234
+.Pp
+listens on port 1234 for a connection.
+On a second console
+.Pq or a second machine ,
+connect to the machine and port to which
+.Nm
+is listening:
+.Pp
+.Dl $ nc 127.0.0.1 1234
+.Pp
+There should now be a connection between the ports.
+Anything typed at the second console is concatenated to the first, and
+vice-versa.
+After the connection has been set up,
+.Nm
+does not really care which side is being used as a server and which side is
+being used as a client.
+The connection can be terminated using an EOF
+.Pq Ctrl/d .
+.Ss Data Transfer
+The example in the previous section can be expanded to build a basic data
+transfer model.
+Any information input into one end of the connection is output to the other
+end, and input and output can be easily captured in order to emulate file
+transfer.
+.Pp
+Start by using
+.Nm
+to listen on a specific port, with output captured into a file:
+.Pp
+.Dl $ nc -l 1234 > filename.out
+.Pp
+Using a second machine, connect to the listening
+.Nm
+process, feeding it the file which is to be transferred:
+.Pp
+.Dl $ nc host.example.com 1234 < filename.in
+.Pp
+After the file has been transferred, the connection closes automatically.
+.Ss Talking to Servers
+It is sometimes useful to talk to servers by hand rather than through a user
+interface.
+It can aid in troubleshooting, when it might be necessary to verify what data a
+server is sending in response to commands issued by the client.
+.Pp
 For example, to retrieve the home page of a web site:
-.sp
-.in +2
-.nf
-$ echo -n "GET / HTTP/1.0\er\en\er\en" | nc host.example.com 80
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This also displays the headers sent by the web server. They can be filtered, if
-necessary, by using a tool such as \fBsed\fR(1).
-.sp
-.LP
+.Pp
+.Dl $ echo -n \&"GET / HTTP/1.0\er\en\er\en\&" | nc host.example.com 80
+.Pp
+This also displays the headers sent by the web server.
+They can be filtered, if necessary, by using a tool such as
+.Xr sed 1 .
+.Pp
 More complicated examples can be built up when the user knows the format of
-requests required by the server. As another example, an email can be submitted
-to an SMTP server using:
-.sp
-.in +2
-.nf
+requests required by the server.
+As another example, an email can be submitted to an SMTP server using:
+.Bd -literal -offset indent
 $ nc localhost 25 << EOF
 HELO host.example.com
-MAIL FROM: <user@host.example.com
-RCTP TO: <user2@host.example.com
+MAIL FROM: <user@host.example.com>
+RCPT TO: <user2@host.example.com>
 DATA
 Body of email.
 \&.
 QUIT
 EOF
-.fi
-.in -2
-.sp
-
-.SS "Port Scanning"
+.Ed
+.Ss Port Scanning
 It can be useful to know which ports are open and running services on a target
-machine. The \fB-z\fR flag can be used to tell \fBnc\fR to report open ports,
-rather than to initiate a connection.
-.sp
-.LP
+machine.
+The
+.Fl z
+flag can be used to tell
+.Nm
+to report open ports, rather than to initiate a connection.
+.Pp
 In this example:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 $ nc -z host.example.com 20-30
 Connection to host.example.com 22 port [tcp/ssh] succeeded!
 Connection to host.example.com 25 port [tcp/smtp] succeeded!
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 The port range was specified to limit the search to ports 20 - 30.
-.sp
-.LP
+.Pp
 Alternatively, it might be useful to know which server software is running, and
-which versions. This information is often contained within the greeting
-banners. In order to retrieve these, it is necessary to first make a
-connection, and then break the connection when the banner has been retrieved.
-This can be accomplished by specifying a small timeout with the \fB-w\fR flag,
-or perhaps by issuing a \fBQUIT\fR command to the server:
-.sp
-.in +2
-.nf
+which versions.
+This information is often contained within the greeting banners.
+In order to retrieve these, it is necessary to first make a connection, and
+then break the connection when the banner has been retrieved.
+This can be accomplished by specifying a small timeout with the
+.Fl w
+flag, or perhaps by issuing a QUIT command to the server:
+.Bd -literal -offset indent
 $ echo "QUIT" | nc host.example.com 20-30
 SSH-2.0-Sun_SSH_1.1
 Protocol mismatch.
 220 host.example.com IMS SMTP Receiver Version 0.84 Ready
-.fi
-.in -2
-.sp
-
-.SS "\fBinetd\fR Capabilities"
-One of the possible uses is to create simple services by using \fBinetd\fR(8).
-.sp
-.LP
+.Ed
+.Ss inetd Capabilities
+One of the possible uses is to create simple services by using
+.Xr inetd 8 .
+.Pp
 The following example creates a redirect from TCP port 8080 to port 80 on host
-\fBrealwww\fR:
-.sp
-.in +2
-.nf
+realwww:
+.Bd -literal -offset indent
 # cat << EOF >> /etc/services
-wwwredir    8080/tcp    # WWW redirect
-EOF
+wwwredir	  8080/tcp    # WWW redirect EOF
 # cat << EOF > /tmp/wwwredir.conf
 wwwredir stream tcp nowait nobody /usr/bin/nc /usr/bin/nc -w 3 realwww 80
 EOF
@@ -588,279 +516,211 @@ default  failrate_interval=60
 default  inherit_env=TRUE
 default  tcp_trace=TRUE
 default  tcp_wrappers=FALSE
-.fi
-.in -2
-.sp
-
-.SS "Privileges"
-To bind to a privileged port number \fBnc\fR needs to be granted the
-\fBnet_privaddr\fR privilege. If Solaris Trusted Extensions are configured and
-the port \fBnc\fR should listen on is configured as a multi-level port \fBnc\fR
-also needs the \fBnet_bindmlp\fR privilege.
-.sp
-.LP
+.Ed
+.Ss Privileges
+To bind to a privileged port number
+.Nm
+needs to be granted the
+.Sy net_privaddr
+privilege.
+If Trusted Extensions are configured and the port
+.Nm
+should listen on is configured as a multi-level port
+.Nm
+also needs the
+.Sy net_bindmlp
+privilege.
+.Pp
 Privileges can be assigned to the user or role directly, by specifying them in
-the account's default privilege set in \fBuser_attr\fR(5). However, this means
-that any application that this user or role starts have these additional
-privileges. To only grant the \fBprivileges\fR(7) when \fBnc\fR is invoked, the
-recommended approach is to create and assign an \fBrbac\fR(7) rights profile.
-See \fBEXAMPLES\fR for additional information.
-.SH EXAMPLES
-\fBExample 1 \fRUsing \fBnc\fR
-.sp
-.LP
-Open a TCP connection to port \fB42\fR of \fBhost.example.com\fR, using port
-\fB3141\fR as the source port, with a timeout of \fB5\fR seconds:
-
-.sp
-.in +2
-.nf
-$ nc -p 3141 -w 5 host.example.com 42
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Open a UDP connection to port \fB53\fR of \fBhost.example.com\fR:
-
-.sp
-.in +2
-.nf
-$ nc -u host.example.com 53
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Open a TCP connection to port 42 of \fBhost.example.com\fR using \fB10.1.2.3\fR
-as the IP for the local end of the connection:
-
-.sp
-.in +2
-.nf
-$ nc -s 10.1.2.3 host.example.com 42
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+the account's default privilege set in
+.Xr user_attr 5 .
+However, this means that any application that this user or role starts have
+these additional privileges.
+To only grant the
+.Xr privileges 7
+when
+.Nm
+is invoked, the recommended approach is to create and assign an
+.Xr rbac 7
+rights profile.
+See
+.Sx EXAMPLES
+for additional information.
+.Sh EXAMPLES
+Open a TCP connection to port 42 of host.example.com, using port 3141 as the
+source port, with a timeout of 5 seconds:
+.Pp
+.Dl $ nc -p 3141 -w 5 host.example.com 42
+.Pp
+Open a UDP connection to port 53 of host.example.com:
+.Pp
+.Dl $ nc -u host.example.com 53
+.Pp
+Open a TCP connection to port 42 of host.example.com using 10.1.2.3 as the IP
+for the local end of the connection:
+.Pp
+.Dl $ nc -s 10.1.2.3 host.example.com 42
+.Pp
 Use a list of ports and port ranges for a port scan on various ports:
-
-.sp
-.in +2
-.nf
-$ nc -z host.example.com 21-25,53,80,110-120,443
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+.Dl $ nc -z host.example.com 21-25,53,80,110-120,443
+.Pp
 Create and listen on a Unix Domain Socket:
-
-.sp
-.in +2
-.nf
-$ nc -lU /var/tmp/dsocket
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Create and listen on a UDP socket with associated port \fB8888\fR:
-
-.sp
-.in +2
-.nf
-$ nc -u -l -p 8888
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+.Dl $ nc -lU /var/tmp/dsocket
+.Pp
+Create and listen on a UDP socket with associated port 8888:
+.Pp
+.Dl $ nc -u -l -p 8888
+.Pp
 which is the same as:
-
-.sp
-.in +2
-.nf
-$ nc -u -l 8888
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Create and listen on a TCP socket with associated port \fB2222\fR and bind to
-address \fB127.0.0.1\fR only:
-
-.sp
-.in +2
-.nf
-$ nc -l 127.0.0.1 2222
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Connect to port \fB42\fR of \fBhost.example.com\fR using an HTTP proxy at
-\fB10.2.3.4\fR, port \fB8080\fR. This example could also be used by
-\fBssh\fR(1). See the \fBProxyCommand\fR directive in \fBssh_config\fR(5) for
-more information.
-
-.sp
-.in +2
-.nf
-$ nc -x10.2.3.4:8080 -Xconnect host.example.com 42
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+.Dl $ nc -u -l 8888
+.Pp
+Create and listen on a TCP socket with associated port 2222 and bind to address
+127.0.0.1 only:
+.Pp
+.Dl $ nc -l 127.0.0.1 2222
+.Pp
+Connect to port 42 of host.example.com using an HTTP proxy at 10.2.3.4, port
+8080.
+This example could also be used by
+.Xr ssh 1 .
+See the
+.Cm ProxyCommand
+directive in
+.Xr ssh_config 5
+for more information.
+.Pp
+.Dl $ nc -x10.2.3.4:8080 -Xconnect host.example.com 42
+.Pp
 The same example again, this time enabling proxy authentication with username
-\fBruser\fR if the proxy requires it:
-
-.sp
-.in +2
-.nf
-$ nc -x10.2.3.4:8080 -Xconnect -Pruser host.example.com 42
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To run \fBnc\fR with the smallest possible set of privileges as a user or role
-that has additional privileges (such as the default \fBroot\fR account) it can
-be invoked using \fBppriv\fR(1) as well. For example, limiting it to only run
-with the privilege to bind to a privileged port:
-
-.sp
-.in +2
-.nf
+ruser if the proxy requires it:
+.Pp
+.Dl $ nc -x10.2.3.4:8080 -Xconnect -Pruser host.example.com 42
+.Pp
+To run
+.Nm
+with the smallest possible set of privileges as a user or role that has
+additional privileges
+.Pq such as the default root account
+it can be invoked using
+.Xr ppriv 1
+as well.
+For example, limiting it to only run with the privilege to bind to a privileged
+port:
+.Bd -literal -offset indent
 $ ppriv -e -sA=basic,!file_link_any,!proc_exec,!proc_fork,\e
-!proc_info,!proc_session,net_privaddr nc -l 42
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To allow a user or role to use only \fBnc\fR with the \fBnet_privaddr\fR
+    !proc_info,!proc_session,net_privaddr nc -l 42
+.Ed
+.Pp
+To allow a user or role to use only
+.Nm
+with the
+.Sy net_privaddr
 privilege, a rights profile needs to be created:
-
-.sp
-.in +2
-.nf
-/etc/security/exec_attr
-Netcat privileged:solaris:cmd:::/usr/bin/nc:privs=net_privaddr
-
-/etc/security/prof_attr
-Netcat privileged:::Allow nc to bind to privileged ports:help=None.html
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Assigning this rights profile using \fBuser_attr\fR(5) permits the user or role
-to run \fBnc\fR allowing it to listen on any port. To permit a user or role to
-use \fBnc\fR only to listen on specific ports a wrapper script should be
-specified in the rights profiles:
-
-.sp
-.in +2
-.nf
-/etc/security/exec_attr
-Netcat restricted:solaris:cmd:::/usr/bin/nc-restricted:privs=net_privaddr
-
-/etc/security/prof_attr
-Netcat restricted:::Allow nc to bind to privileged ports:help=None.html
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+.Pa /etc/security/exec_attr:
+.Dl Netcat privileged:solaris:cmd:::/usr/bin/nc:privs=net_privaddr
+.Pa /etc/security/prof_attr
+.Dl Netcat privileged:::Allow nc to bind to privileged ports:help=None.html
+.Pp
+Assigning this rights profile using
+.Xr user_attr 5
+permits the user or role to run
+.Nm
+allowing it to listen on any port.
+To permit a user or role to use
+.Nm
+only to listen on specific ports a wrapper script should be specified in the
+rights profiles:
+.Pp
+.Pa /etc/security/exec_attr
+.Dl Netcat restricted:solaris:cmd:::/usr/bin/nc-restricted:privs=net_privaddr
+.Pa /etc/security/prof_attr
+.Dl Netcat restricted:::Allow nc to bind to privileged ports:help=None.html
+.Pp
 and write a shell script that restricts the permissible options, for example,
-one that permits one to bind only on ports between \fB42\fR and \fB64\fR
-(non-inclusive):
+one that permits one to bind only on ports between 42 and 64 non-inclusive:
+.Bd -literal -offset indent
+#!/bin/ksh
 
-.sp
-.in +2
-.nf
-/usr/bin/nc-restricted:
-
-#!/bin/sh
-[ $# -eq 1 ] && [ $1 -gt 42 -a $1 -lt 64 ] && /usr/bin/nc -l -p "$1"
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This grants the extra privileges when the user or role invokes \fBnc\fR using
-the wrapper script from a profile shell. See \fBpfsh\fR(1), \fBpfksh\fR(1),
-\fBpfcsh\fR(1), and \fBpfexec\fR(1).
-
-.sp
-.LP
-Invoking \fBnc\fR directly does not run it with the additional privileges, and
-neither does invoking the script without using \fBpfexec\fR or a profile shell.
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-.TE
-
-.sp
-.LP
-The package name is Committed. The command line syntax is Committed for the
-\fB-4\fR, \fB-6\fR, \fB-l\fR, \fB-n\fR, \fB-p\fR, \fB-u\fR, and \fB-w\fR
-options and their arguments (if any). The \fIname\fR and \fIport\fR list
-arguments are Committed. The port range syntax is Uncommitted. The interface
-stability level for all other command line options and their arguments is
-Uncommitted.
-.SH SEE ALSO
-.BR cat (1),
-.BR pfcsh (1),
-.BR pfexec (1),
-.BR pfksh (1),
-.BR pfsh (1),
-.BR ppriv (1),
-.BR sed (1),
-.BR ssh (1),
-.BR telnet (1),
-.BR ssh_config (5),
-.BR user_attr (5),
-.BR attributes (7),
-.BR privileges (7),
-.BR rbac (7),
-.BR inetadm (8),
-.BR inetconv (8),
-.BR inetd (8)
-.SH AUTHORS
-The original implementation of \fBnc\fR was written by Hobbit,
-\fBhobbit@avian.org\fR.
-.sp
-.LP
-\fBnc\fR was rewritten with IPv6 support by Eric Jackson,
-\fBericj@monkey.org\fR.
-.SH NOTES
-UDP port scans always succeeds, that is, reports the port as open, rendering
-the \fB-uz\fR combination of flags relatively useless.
+(( $# == 1 )) || exit 1
+(( $1 > 42 && $1 < 64 )) || exit 1
+exec /usr/bin/nc -l -p "$1"
+.Ed
+.Pp
+This grants the extra privileges when the user or role invokes
+.Nm
+using the wrapper script from a profile shell.
+See
+.Xr pfsh 1 ,
+.Xr pfksh 1 ,
+.Xr pfcsh 1 ,
+and
+.Xr pfexec 1 .
+.Pp
+Invoking
+.Nm
+directly does not run it with the additional privileges, and neither does
+invoking the script without using
+.Sy pfexec
+or a profile shell.
+.Sh INTERFACE STABILITY
+The command line syntax is
+.Sy Committed
+for the
+.Fl 4 ,
+.Fl 6 ,
+.Fl l ,
+.Fl n ,
+.Fl p ,
+.Fl u ,
+and
+.Fl w
+options and their arguments
+.Pq if any .
+The
+.Ar name
+and
+.Ar port
+list arguments are
+.Sy Committed .
+The port range syntax is
+.Sy Uncommitted .
+The interface stability level for all other command line options and their
+arguments is
+.Sy Uncommitted.
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr pfcsh 1 ,
+.Xr pfexec 1 ,
+.Xr pfksh 1 ,
+.Xr pfsh 1 ,
+.Xr ppriv 1 ,
+.Xr sed 1 ,
+.Xr ssh 1 ,
+.Xr telnet 1 ,
+.Xr ssh_config 5 ,
+.Xr user_attr 5 ,
+.Xr attributes 7 ,
+.Xr privileges 7 ,
+.Xr rbac 7 ,
+.Xr inetadm 8 ,
+.Xr inetconv 8 ,
+.Xr inetd 8 ,
+.Xr tcpkey 8
+.Sh AUTHORS
+The original implementation of
+.Nm
+was written by
+.An Hobbit Aq Mt hobbit@avian.org
+.Pp
+.Nm
+was rewritten with IPv6 support by
+.An -nosplit
+.An Eric Jackson Aq Mt ericj@monkey.org
+.Sh NOTES
+UDP port scans always succeed, that is, report the port as open, rendering the
+.Fl uz
+combination of flags relatively useless.

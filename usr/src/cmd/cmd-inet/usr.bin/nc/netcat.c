@@ -38,6 +38,7 @@
 
 /*
  * Portions Copyright 2008 Erik Trauschke
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -93,6 +94,7 @@ int	xflag;		/* Socks proxy */
 int	Xflag;		/* indicator of Socks version set */
 int	zflag;		/* Port Scan Flag */
 int	Dflag;		/* sodebug */
+int	Sflag;		/* TCP MD5 signature option */
 int	Tflag = -1;	/* IP Type of Service */
 
 int	timeout = -1;
@@ -146,7 +148,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46Ddhi:klnP:p:rs:T:tUuvw:X:x:z")) != -1) {
+	    "46Ddhi:klnP:p:rs:ST:tUuvw:X:x:z")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -225,6 +227,9 @@ main(int argc, char *argv[])
 			break;
 		case 'D':
 			Dflag = 1;
+			break;
+		case 'S':
+			Sflag = 1;
 			break;
 		case 'T':
 			Tflag = parse_iptos(optarg);
@@ -875,6 +880,13 @@ void
 set_common_sockopts(int s)
 {
 	int x = 1;
+
+	if (Sflag) {
+		if (setsockopt(s, IPPROTO_TCP, TCP_MD5SIG,
+		    &x, sizeof (x)) == -1) {
+			err(1, NULL);
+		}
+	}
 
 	if (Dflag) {
 		if (setsockopt(s, SOL_SOCKET, SO_DEBUG, &x, sizeof (x)) == -1)
