@@ -182,9 +182,9 @@
 #define	NRPOS		8	/* number distinct rotational positions */
 
 #ifdef DEBUG
-#define	dprintf(x)	printf x
+#define	dbgprintf(x)	printf x
 #else
-#define	dprintf(x)
+#define	dbgprintf(x)
 #endif
 
 /*
@@ -1022,7 +1022,7 @@ main(int argc, char *argv[])
 	} else {
 		maxcontig = tmpmaxcontig;
 	}
-	dprintf(("DeBuG maxcontig : %ld\n", maxcontig));
+	dbgprintf(("DeBuG maxcontig : %ld\n", maxcontig));
 
 	if (rotdelay == -1) {	/* default by newfs and mkfs */
 		rotdelay = ROTDELAY;
@@ -1031,7 +1031,7 @@ main(int argc, char *argv[])
 	if (cpg_flag == RC_DEFAULT) { /* If not explicity set, use default */
 		cpg = DESCPG;
 	}
-	dprintf(("DeBuG cpg : %ld\n", cpg));
+	dbgprintf(("DeBuG cpg : %ld\n", cpg));
 
 	/*
 	 * Now that we have the semi-sane args, either positional, via -o,
@@ -1087,7 +1087,7 @@ main(int argc, char *argv[])
 "       accessible until the system is rebooted with a 64-bit kernel.\n"));
 		}
 	}
-	dprintf(("DeBuG mtb : %c\n", mtb));
+	dbgprintf(("DeBuG mtb : %c\n", mtb));
 
 	/*
 	 * With newer and much larger disks, the newfs(8) and mkfs_ufs(8)
@@ -1131,7 +1131,7 @@ main(int argc, char *argv[])
 			use_efi_dflts = 1;
 			retry = 1;
 		} else if (ioctl(fsi, DKIOCGGEOM, &dkg)) {
-			dprintf(("%s: Unable to read Disk geometry", fsys));
+			dbgprintf(("%s: Unable to read Disk geometry", fsys));
 			perror(gettext("Unable to read Disk geometry"));
 			lockexit(32);
 		} else {
@@ -1143,13 +1143,13 @@ main(int argc, char *argv[])
 			}
 #endif
 			if (ioctl(fsi, DKIOCREMOVABLE, &isremovable)) {
-				dprintf(("DeBuG Unable to determine if %s is"
+				dbgprintf(("DeBuG Unable to determine if %s is"
 				    " Removable Media. Proceeding with system"
 				    " determined parameters.\n", fsys));
 				isremovable = 0;
 			}
 			if (ioctl(fsi, DKIOCHOTPLUGGABLE, &ishotpluggable)) {
-				dprintf(("DeBuG Unable to determine if %s is"
+				dbgprintf(("DeBuG Unable to determine if %s is"
 				    " Hotpluggable Media. Proceeding with "
 				    "system determined parameters.\n", fsys));
 				ishotpluggable = 0;
@@ -1162,9 +1162,9 @@ main(int argc, char *argv[])
 			}
 		}
 	}
-	dprintf(("DeBuG CHSLIMIT = %d geom = %llu\n", CHSLIMIT,
+	dbgprintf(("DeBuG CHSLIMIT = %d geom = %llu\n", CHSLIMIT,
 	    (diskaddr_t)dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
-	dprintf(("DeBuG label_type = %d isremovable = %d ishotpluggable = %d "
+	dbgprintf(("DeBuG label_type = %d isremovable = %d ishotpluggable = %d "
 	    "use_efi_dflts = %d\n", label_type, isremovable, ishotpluggable,
 	    use_efi_dflts));
 
@@ -1205,7 +1205,7 @@ main(int argc, char *argv[])
 			 * The primary superblock didn't help in determining
 			 * the fs_version. Try the first alternate superblock.
 			 */
-			dprintf(("DeBuG checksblock() failed - error : %d"
+			dbgprintf(("DeBuG checksblock() failed - error : %d"
 			    " for sb : %d\n", ret, SBOFF/sectorsize));
 			rdfs((diskaddr_t)ALTSB, (int)sbsize,
 			    (char *)&altsblock);
@@ -1219,7 +1219,7 @@ main(int argc, char *argv[])
 				use_efi_dflts = (altsblock.fs_version ==
 				    UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
 			}
-			dprintf(("DeBuG checksblock() returned : %d"
+			dbgprintf(("DeBuG checksblock() returned : %d"
 			    " for sb : %d\n", ret, ALTSB));
 		}
 	}
@@ -1227,7 +1227,7 @@ main(int argc, char *argv[])
 	geom_nsect = nsect;
 	geom_ntrack = ntrack;
 	geom_cpg = cpg;
-	dprintf(("DeBuG geom_nsect=%d, geom_ntrack=%d, geom_cpg=%d\n",
+	dbgprintf(("DeBuG geom_nsect=%d, geom_ntrack=%d, geom_cpg=%d\n",
 	    geom_nsect, geom_ntrack, geom_cpg));
 
 start_fs_creation:
@@ -1238,12 +1238,12 @@ retry_alternate_logic:
 		nsect = DEF_SECTORS_EFI;
 		ntrack = DEF_TRACKS_EFI;
 		cpg = DESCPG;
-		dprintf(("\nDeBuG Using EFI defaults\n"));
+		dbgprintf(("\nDeBuG Using EFI defaults\n"));
 	} else {
 		nsect = geom_nsect;
 		ntrack = geom_ntrack;
 		cpg = geom_cpg;
-		dprintf(("\nDeBuG Using Geometry\n"));
+		dbgprintf(("\nDeBuG Using Geometry\n"));
 		/*
 		 * 32K based on max block size of 64K, and rotational layout
 		 * test of nsect <= (256 * sectors/block).  Current block size
@@ -1355,7 +1355,7 @@ retry_alternate_logic:
 		    nsect * ntrack);
 	}
 
-	dprintf(("DeBuG cpg : %ld\n", cpg));
+	dbgprintf(("DeBuG cpg : %ld\n", cpg));
 	/*
 	 * Increase the cpg to maxcpg if either newfs was invoked
 	 * with -T option or if mkfs wants to create a mtb file system
@@ -1363,7 +1363,7 @@ retry_alternate_logic:
 	 */
 	if (cpg == -1 || (mtb == 'y' && cpg_flag == RC_DEFAULT))
 		cpg = maxcpg;
-	dprintf(("DeBuG cpg : %ld\n", cpg));
+	dbgprintf(("DeBuG cpg : %ld\n", cpg));
 
 	/*
 	 * mincpg is variable in complex ways, so we really can't
@@ -2123,8 +2123,8 @@ grow40:
 			if (ret) {
 				skip_this_sb = 1;
 				invalid_sb_cnt++;
-				dprintf(("DeBuG checksblock() failed - error :"
-				    " %d for sb : %llu invalid_sb_cnt : %d\n",
+				dbgprintf(("DeBuG checksblock() failed - error"
+				    " : %d for sb : %llu invalid_sb_cnt : %d\n",
 				    ret, num, invalid_sb_cnt));
 			} else {
 				/*
@@ -2227,8 +2227,8 @@ grow40:
 			if (ret) {
 				skip_this_sb = 1;
 				invalid_sb_cnt++;
-				dprintf(("DeBuG checksblock() failed - error :"
-				    " %d for sb : %llu invalid_sb_cnt : %d\n",
+				dbgprintf(("DeBuG checksblock() failed - error"
+				    " : %d for sb : %llu invalid_sb_cnt : %d\n",
 				    ret, num, invalid_sb_cnt));
 			} else {
 				/*
@@ -2457,8 +2457,8 @@ get_max_size(int fd)
 		slicesize = (uint32_t)vtoc.v_part[index].p_size;
 	}
 
-	dprintf(("DeBuG get_max_size index = %d, p_size = %lld, dolimit = %d\n",
-	    index, slicesize, (slicesize > FS_MAX)));
+	dbgprintf(("DeBuG get_max_size index = %d, p_size = %lld, "
+	    "dolimit = %d\n", index, slicesize, (slicesize > FS_MAX)));
 
 	/*
 	 * The next line limits a UFS file system to the maximum
@@ -3988,7 +3988,7 @@ checksblock(struct fs sb, int proceed)
 	}
 
 	if (proceed) {
-		if (err) dprintf(("%s", errmsg));
+		if (err) dbgprintf(("%s", errmsg));
 		return (err);
 	}
 
@@ -5381,7 +5381,7 @@ static void
 range_check(long *varp, char *name, long minimum, long maximum,
     long def_val, int user_supplied)
 {
-	dprintf(("DeBuG %s : %ld (%ld %ld %ld)\n",
+	dbgprintf(("DeBuG %s : %ld (%ld %ld %ld)\n",
 	    name, *varp, minimum, maximum, def_val));
 
 	if ((*varp < minimum) || (*varp > maximum)) {
@@ -5397,7 +5397,7 @@ range_check(long *varp, char *name, long minimum, long maximum,
 				    name, def_val);
 			}
 			*varp = def_val;
-			dprintf(("DeBuG %s : %ld\n", name, *varp));
+			dbgprintf(("DeBuG %s : %ld\n", name, *varp));
 			return;
 		}
 		lockexit(2);
