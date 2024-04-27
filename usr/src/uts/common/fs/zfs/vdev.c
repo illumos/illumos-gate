@@ -450,6 +450,18 @@ vdev_compact_children(vdev_t *pvd)
 		if (pvd->vdev_child[c])
 			newc++;
 
+	/*
+	 * If there are no remaining children (possible if this is an indirect
+	 * vdev) just free the old child array and return to avoid a pointless
+	 * zero-byte alloc.
+	 */
+	if (newc == 0) {
+		kmem_free(pvd->vdev_child, oldc * sizeof (vdev_t *));
+		pvd->vdev_child = NULL;
+		pvd->vdev_children = newc;
+		return;
+	}
+
 	newchild = kmem_alloc(newc * sizeof (vdev_t *), KM_SLEEP);
 
 	for (int c = newc = 0; c < oldc; c++) {
