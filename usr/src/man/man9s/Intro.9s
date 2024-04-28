@@ -1,130 +1,197 @@
-.\" Copyright 2018, Joyent Inc.
-.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
-.\" Copyright (c) 2001, Sun Microsystems, Inc.,  All Rights Reserved.
-.\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the
-.\" Common Development and Distribution License (the "License").
-.\" You may not use this file except in compliance with the License.
 .\"
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-.\" or http://www.opensolaris.org/os/licensing.
-.\" See the License for the specific language governing permissions
-.\" and limitations under the License.
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
 .\"
-.\" When distributing Covered Code, include this CDDL HEADER in each
-.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-.\" If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying
-.\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd July 9, 2018
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd April 28, 2024
 .Dt INTRO 9S
 .Os
 .Sh NAME
-.Nm Intro ,
-.Nm intro
-.Nd introduction to kernel data structures and properties
+.Nm Intro
+.Nd introduction to kernel data structures
 .Sh DESCRIPTION
-Section 9P describes kernel properties used by device drivers.
-Section 9S
-describes the data structures used by drivers to share information between the
-driver and the kernel.
+Section 9S describes the data structures that are used by the kernel and
+the various device driver frameworks.
+The structure manual pages should generally be considered documentation
+for the structure itself and the companions in sections 9, 9E, and 9F,
+provide more of the surrounding context.
+.Pp
+The structures listed here have varying ABI guarantees.
+While the majority of structures documented here are part of committed
+interfaces, that is not true of all of them.
+Uncommitted structures have no ABI guarantees and may change at any
+time.
+They are documented to aid folks working on the system.
+.Pp
+The rest of this manual groups documented structures into categories
+with additional information about what to read for more information.
+.Ss Module and Driver Initialization
+The structures here are all fundamental to initializing a device driver.
 See
 .Xr Intro 9E
-for an overview of device driver
-interfaces.
-.Pp
-In Section 9S, reference pages contain the following headings:
-.Bl -bullet -offset indent
-.It
-.Sy NAME
-summarizes the purpose of the structure or property.
-.It
-.Sy SYNOPSIS
-lists the include file that defines the structure or property.
-.It
-.Sy "INTERFACE LEVEL"
-describes any architecture dependencies.
-.It
-.Sy DESCRIPTION
-provides general information about the structure or property.
-.It
-.Sy "STRUCTURE MEMBERS"
-lists all accessible structure members (for Section 9S).
-.It
-.Sy "SEE ALSO"
-gives sources for further information.
+for more on their use and the examples in
+.Xr _init 9E
+for more information.
+These structures are generally required for every kernel module.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr cb_ops 9S Ta Xr dev_ops 9S
+.It Xr modldrv 9S Ta Xr modlinkage 9S
+.It Xr modlmisc 9S Ta Xr modlstrmod 9S
 .El
-.Pp
-Of the preceding headings, Section 9P reference pages contain the
-.Sy NAME ,
-.Sy DESCRIPTION ,
+.Ss Character and Block I/O
+These structures are used as part of the fundamental units of performing
+I/O for character and block devices and are related to how a driver will
+implement the corresponding
+.Xr read 9E ,
+.Xr write 9E ,
 and
-.Sy "SEE ALSO"
-fields.
-.Pp
-Every driver MUST include
-.In sys/ddi.h
-and
-.In sys/sunddi.h ,
-in that order, and as final entries.
-.Pp
-The following table summarizes the STREAMS structures described in Section 9S.
-.Bl -column "module_info" "illumos DDI" -offset indent
-.It Structure Ta Type
-.It Vt copyreq Ta DDI/DKI
-.It Vt copyresp Ta DDI/DKI
-.It Vt datab Ta DDI/DKI
-.It Vt fmodsw Ta illumos DDI
-.It Vt free_rtn Ta DDI/DKI
-.It Vt iocblk Ta DDI/DKI
-.It Vt linkblk Ta DDI/DKI
-.It Vt module_info Ta DDI/DKI
-.It Vt msgb Ta DDI/DKI
-.It Vt qband Ta DDI/DKI
-.It Vt qinit Ta DDI/DKI
-.It Vt queclass Ta illumos DDI
-.It Vt queue Ta DDI/DKI
-.It Vt streamtab Ta DDI/DKI
-.It Vt stroptions Ta DDI/DKI
+.Xr strategy 9E
+entry points.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr aio_req 9S Ta Xr buf 9S
+.It Xr iovec 9S Ta Xr uio 9S
 .El
-.Pp
-The following table summarizes structures that are not specific to STREAMS I/O.
-.Bl -column "ddi_device_acc_attr" "illumos x86 DDI" -offset indent
-.It Structure	Type
-.It Vt aio_req Ta illumos DDI
-.It Vt buf Ta DDI/DKI
-.It Vt cb_ops Ta illumos DDI
-.It Vt ddi_device_acc_attr Ta illumos DDI
-.It Vt ddi_dma_attr Ta illumos DDI
-.It Vt ddi_dma_cookie Ta illumos DDI
-.It Vt ddi_dmae_req Ta illumos x86 DDI
-.It Vt ddi_idevice_cookie Ta illumos DDI
-.It Vt ddi_mapdev_ctl Ta illumos DDI
-.It Vt devmap_callback_ctl Ta illumos DDI
-.It Vt dev_ops Ta illumos DDI
-.It Vt iovec Ta DDI/DKI
-.It Vt kstat Ta illumos DDI
-.It Vt kstat_intr Ta illumos DDI
-.It Vt kstat_io Ta illumos DDI
-.It Vt kstat_named Ta illumos DDI
-.It Vt map Ta DDI/DKI
-.It Vt modldrv Ta illumos DDI
-.It Vt modlinkage Ta illumos DDI
-.It Vt modlstrmod Ta illumos DDI
-.It Vt scsi_address Ta illumos DDI
-.It Vt scsi_arq_status Ta illumos DDI
-.It Vt scsi_device Ta illumos DDI
-.It Vt scsi_extended_sense Ta illumos DDI
-.It Vt scsi_hba_tran Ta illumos DDI
-.It Vt scsi_inquiry Ta illumos DDI
-.It Vt scsi_pkt Ta illumos DDI
-.It Vt scsi_status Ta illumos DDI
-.It Vt uio Ta DDI/DKI
+.Ss Message Block Structures
+Message blocks,
+.Vt mblk_t ,
+are the fundamental building block of networking, USB, and STREAMS
+device drivers.
+An overview to their design and structure can be found in the
+.Sy Message Block Functions
+of
+.Xr Intro 9F .
+The data for a message block is generally found in a corresponding data
+block structure.
+The following structures are relevant:
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr dblk 9S Ta Xr free_rtn 9S
+.It Xr mblk 9S Ta
 .El
+.Ss DMA Related Structures
+Direct Memory Access is one of the primary things that most device
+drivers facilitate.
+See
+.Xr Intro 9F
+for more on DMA itself and how these structures fit into those
+functions.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr ddi_device_acc_attr 9S Ta Xr ddi_dma_attr 9S
+.It Xr ddi_dma_cookie 9S Ta Xr ddi_dmae_req 9S
+.El
+.Ss MAC Related Structures
+The following structures are all part of the
+.Xr mac 9E
+device driver framework that is used for networking device drivers.
+See
+.Xr mac 9E
+for more information on how they fit in.
+Networking device drivers use the
+.Sx Message Blocks
+related data structures for I/O purposes.
+These structures describe specific parts of interfacing with the MAC
+framework.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr mac_callbacks 9S Ta Xr mac_group_info 9S
+.It Xr mac_intr 9S Ta Xr mac_register 9S
+.It Xr mac_ring_info 9S Ta
+.El
+.Ss SCSA Related Structures
+These structures are part of the SCSI/SAS device driver framework and
+are used in implementing device drivers for host bus adapters
+.Pq HBAs .
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr scsi_address 9S Ta Xr scsi_arq_status 9S
+.It Xr scsi_asc_key_strings 9S Ta Xr scsi_device 9S
+.It Xr scsi_extended_sense 9S Ta Xr scsi_hba_tran 9S
+.It Xr scsi_inquiry 9S Ta Xr scsi_pkt 9S
+.It Xr scsi_status 9S Ta
+.El
+.Ss Kernel Statistics
+Kernel statistics, or kstats, are a means for communicating data to
+userland through the
+.Xr kstat 4D
+driver,
+.Xr libkstat 3LIB
+library, and
+.Xr kstat 8
+command.
+Drivers can create their own kstats through the use of
+.Xr kstat_create 9F
+and some device driver frameworks create and manage kstats on behalf of
+drivers.
+The root kstat structure is discussed in
+.Xr kstat 9S .
+The other manuals listed discuss the different types of kstats that
+exist.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr kstat_intr 9S Ta Xr kstat_io 9S
+.It Xr kstat_named 9S Ta Xr kstat 9S
+.El
+.Ss Miscellaneous Device Driver Interfaces
+The following structures are all related to the broader device driver
+interface and serve different parts of it.
+They cover memory mapping, error handling, interrupts, etc.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr ddi_fm_error 9S Ta Xr ddi_idevice_cookie 9S
+.It Xr devmap_callback_ctl 9S Ta
+.El
+.Ss STREAMS Related Structures
+These structures include the fundamental structures required for
+registering a STREAMS based device driver with the kernel as well as the
+different structures, such as the
+.Xr copyreq 9S ,
+that are used as part of handling specific classes of operations.
+The
+.Xr queue 9S
+is the fundamental building block of STREAMS communication.
+Like with networking device drivers, STREAMS drivers also leverage the
+.Sx Message Blocks
+data structures for communication.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr copyreq 9S Ta Xr copyresp 9S
+.It Xr fmodsw 9S Ta Xr iocblk 9S
+.It Xr linkblk 9S Ta Xr module_info 9S
+.It Xr qband 9S Ta Xr qinit 9S
+.It Xr queclass 9S Ta Xr queue 9S
+.It Xr streamtab 9S Ta Xr stroptions 9S
+.El
+.Ss Network Hooks
+Network hooks provide a way for firewalls to participate and manipulate
+packets as they flow through the system.
+The following structures are related to the network hooks interfaces.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr hook_nic_event 9S Ta Xr hook_pkt_event 9S
+.It Xr hook_t 9S Ta Xr net_inject_t 9S
+.It Xr net_instance_t 9S Ta
+.El
+.Ss Historical Structures
+The following structures correspond to subsystems that generally are no
+longer used
+.Po
+.Xr mac 9E
+aka GLDv3 has replaced the GLDv2 functions mentioned below
+.Pc
+or refer to hardware that is no longer commonly found.
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr gld_mac_info 9S Ta Xr gld_stats 9S
+.It Xr tuple 9S Ta
+.El
+.Ss Manual Organization
+In addition to the standard manual sections that exist, entries in 9S
+contain an additional section titled
+.Dq STRUCTURE MEMBERS .
+This enumerates and describes the different members of the structures,
+their types, their purposes, and any constraints on when they should be
+used or how they should be interpreted.
 .Sh SEE ALSO
-.Xr Intro 9E
-.Sh NOTES
-Do not declare arrays of structures as the size of the structures can change
-between releases.
-Rely only on the structure members listed in this chapter and
-not on unlisted members or the position of a member in a structure.
+.Xr Intro 9 ,
+.Xr Intro 9E ,
+.Xr Intro 9F

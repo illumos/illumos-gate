@@ -1,461 +1,1053 @@
-'\" te
-.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 9E "May 15, 2001"
-.SH NAME
-Intro, intro \- overview of device driver interfaces and introduction to driver
-entry points
-.SH DESCRIPTION
-This page provides an overview of device driver interfaces and all of the
-Section 9 man pages (9E, 9F, 9P, and 9S). This overview is followed by an
-introduction to Section 9E, the driver entry-point routines.
-.SS "Overview of Device Driver Interfaces"
-Section 9 provides reference information needed to write device drivers for the
-illumos operating system. It describes the interfaces provided by the
-Device Driver Interface and the Driver-Kernel Interface (DDI/DKI).
-.SS "Porting"
-Software is usually considered portable if it can be adapted to run in a
-different environment more cheaply than it can be rewritten. The new
-environment may include a different processor, operating system, and even the
-language in which the program is written, if a language translator is
-available. Likewise the new environment might include multiple processors. More
-often, however, software is ported between environments that share an operating
-system, processor, and source language. The source code is modified to
-accommodate the differences in compilers or processors or releases of the
-operating system.
-.sp
-.LP
-In the past, device drivers did not port easily for one or more of the
-following reasons:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-To enhance functionality, members had been added to kernel data structures
-accessed by drivers, or the sizes of existing members had been redefined.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The calling or return syntax of kernel functions had changed.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Driver developers did not use existing kernel functions where available, or
-relied on undocumented side effects that were not maintained in the next
-release.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Architecture-specific code had been scattered throughout the driver when it
-could have been isolated.
-.RE
-.sp
-.LP
-Operating systems are periodically reissued to customers as a way to improve
-performance, fix bugs, and add new features. This is probably the most common
-threat to compatibility encountered by developers responsible for maintaining
-software. Another common problem is upgrading hardware. As new hardware is
-developed, customers occasionally decide to upgrade to faster, more capable
-computers of the same family. Although they may run the same operating system
-as those being replaced, architecture-specific code may prevent the software
-from porting.
-.SS "Scope of Interfaces"
-Although application programs have all of the porting problems mentioned,
-developers attempting to port device drivers have special challenges. Before
-describing the DDI/DKI, it is necessary to understand the position of device
-drivers in operating systems.
-.sp
-.LP
-Device drivers are kernel modules that control data transferred to and received
-from peripheral devices but are developed independently from the rest of the
-kernel. If the goal of achieving complete freedom in modifying the kernel is to
-be reconciled with the goal of binary compatibility with existing drivers, the
-interaction between drivers and the kernel must be rigorously regulated. This
-driver/kernel service interface is the most important of the three
-distinguishable interfaces for a driver, summarized as follows:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Driver-Kernel. I/O System calls result in calls to driver entry point routines.
-These make up the kernel-to-driver part of the service interface, described in
-Section 9E. Drivers may call any of the functions described in Section 9F.
-These are the driver-to-kernel part of the interface.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Driver-Hardware. All drivers (except software drivers) must include code for
-interrupt handling, and may also perform direct memory access (DMA). These and
-other hardware-specific interactions make up the driver/hardware interface.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Driver-Boot/Configuration Software. The interaction between the driver and the
-boot and configuration software is the third interface affecting drivers.
-.RE
-.SS "Scope of the DDI/DKI"
-The primary goal of the DDI/DKI is to facilitate both source and binary
-portability across successive releases of the operating systems on a particular
-machine. In addition, it promotes source portability across implementations of
-UNIX on different machines, and applies only to implementations based on System
-V Release 4. The DDI/DKI consists of several sections:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-DDI/DKI Architecture Independent - These interfaces are supported on all
-implementations of System V Release 4.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-DKI-only - These interfaces are part of System V Release 4, and may not be
-supported in future releases of System V. There are only two interfaces in this
-class, \fBsegmap\fR(9E) and \fBhat_getkpfnum\fR(9F)
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-illumos DDI - These interfaces specific to illumos.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-illumos SPARC specific DDI - These interfaces are specific to the SPARC
-processor, and may not be available on other processors supported by illumos.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-illumos x86 specific DDI - These interfaces are specific to the x86 processor,
-and may not be available on other processors supported by illumos.
-.RE
-.sp
-.LP
-To achieve the goal of source and binary compatibility, the functions,
-routines, and structures specified in the DDI/DKI must be used according to
-these rules.
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Drivers cannot access system state structures (for example, \fBu\fR and
-\fBsysinfo\fR) directly.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-For structures external to the driver that may be accessed directly, only the
-utility functions provided in Section 9F should be used. More generally, these
-functions should be used wherever possible.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The headers \fB<sys/ddi.h>\fR and \fB<sys/sunddi.h>\fR must be the last header
-files included by the driver.
-.RE
-.SS "Audience"
-Section 9 is for software engineers responsible for creating, modifying, or
-maintaining drivers that run on this operating system and beyond. It assumes
-that the reader is familiar with system internals and the C programming
-language.
-.SS "PCMCIA Standard"
-The \fIPC\fR \fICard\fR \fI95\fR \fIStandard\fR is listed under the \fBSEE\fR
-\fBALSO\fR heading in some Section 9 reference pages. This refers to
-documentation published by the Personal Computer Memory Card International
-Association (PCMCIA) and the Japan Electronic Industry Development Association
-(JEIDA).
-.SS "How to Use Section 9"
-Section 9 is divided into the following subsections:
-.sp
-.ne 2
-.na
-\fB\fB9E\fR \fR
-.ad
-.RS 7n
-Driver Entry Points - contains reference pages for all driver entry point
-routines.
-.RE
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd April 28, 2024
+.Dt INTRO 9E
+.Os
+.Sh NAME
+.Nm Intro
+.Nd introduction to device driver entry points
+.Sh DESCRIPTION
+Section 9E of the manual describes the entry points and building blocks that are
+used to build and implement all kinds of device drivers and kernel modules.
+Often times, modules and device drivers are talked about interchangeably.
+The operating system is built around the idea of loadable kernel modules.
+Device drivers are the primary type that we think about; however, there are
+loadable kernel modules for file systems, STREAMS devices, and even system
+calls!
+.Pp
+The vast majority of this section focuses on documenting device
+.Pq and STREAMS
+drivers.
+Device driver are further broken down into different categories depending on
+what they are targeting.
+For example, there are dedicated frameworks for SCSI/SAS HBA drivers, networking
+drivers, USB drivers, and then general character and block device drivers.
+While most of the time we think about device drivers as corresponding to a piece
+of physical hardware, there are also pseudo-device drivers which are device
+drivers that provide functionality, but aren't backed by any hardware.
+For example,
+.Xr dtrace 4D
+and
+.Xr lofi 4D
+are both pseudo-device drivers.
+.Pp
+To help understand the relationship between these different types of things,
+consider the following image:
+.Bd -literal
+  +--------------------+
+  |                    |
+  |  Loadable Modules  |
+  |                    |
+  +--------------------+
+    |                          +--------------+      +------------+
+    |                          |              |      |            |
+    +------------------------->| Cryptography | ...  | Scheduling |  ...
+    |                          |              |      |            |
+    |                          +--------------+      +------------+
+    |   +----------------+     +--------------+     +--------------+
+    |   |                |     |              |     |              |
+    +-->| Device Drivers | ... | File Systems | ... | System Calls | ...
+        |                |     |              |     |              |
+        +----------------+     +--------------+     +--------------+
+                v
+    +-----------+
+    |
+    |   +------------+  +---------+     +-----------+     +-----------+
+    +-->| Networking |->| igb(4D) | ... | mlxcx(4D) | ... | cxgbe(4D) | ...
+    |   +------------+  +---------+     +-----------+     +-----------+
+    |
+    |   +-------+       +----------+     +-------------+     +----------+
+    +-->|  HBA  |------>| smrt(4D) | ... | mpt_sas(4D) | ... | ahci(4D) | ...
+    |   +-------+       +----------+     +-------------+     +----------+
+    |
+    |   +-------+       +--------------+     +----------+     +---------+
+    +-->|  USB  |------>| scsa2usb(4D) | ... | ccid(4D) | ... | hid(4D) | ...
+    |   +-------+       +--------------+     +----------+     +---------+
+    |
+    |   +---------+     +------------+     +-------------+
+    +-->| Sensors |---->| smntemp(4) | ... | pchtemp(4D) | ...
+    |   +---------+     +------------+     +-------------+
+    |
+    +-------+-------------+-----------+----------+
+            |             v           V          |
+            v       +-----------+  +-----+       v
+        +-------+   | Character |  | USB |   +-------+
+        | Audio |   | and Block |  | HCD |   | Nexus |  ...
+        +-------+   |  Devices  |  +-----+   +-------+
+                    +-----------+
+.Ed
+.Pp
+The above diagram attempts to explain some of the relationships that were
+mentioned above at a high level.
+All device drivers are loadable modules that leverage the
+.Xr modldrv 9S
+structure and implement similar
+.Xr _init 9E
+and
+.Xr _fini 9E
+entry points.
+.Pp
+Some hardware implements more than one type of thing.
+The most common example here would be a NIC that implements a temperature sensor
+or a current sensor.
+Many devices also implement and leverage the kernel statistics framework called
+.Dq kstats .
+A device driver is not strictly limited to only a single class of thing.
+For example, many USB client devices are networking device drivers.
+In the subsequent sections we'll go into the functions and structures that are
+related to creating the different device drivers and their associated
+functions.
+.Ss Kernel Initialization
+To begin with, all loadable modules in the system are required to implement
+three entry points.
+If these entry points are not present, then the module cannot be installed in
+the system.
+These entry points are
+.Xr _init 9E ,
+.Xr _fini 9E ,
+and
+.Xr _info 9E .
+.Pp
+The
+.Xr _init 9E
+entry point will be the first thing called in the module and this is where
+any global initialization should be taken care of.
+Once all global state has been successfully created, the driver should call
+.Xr mod_install 9F
+to actually register with the system.
+Conversely,
+.Xr _fini 9E
+is used to tear down the module.
+The driver uses
+.Xr mod_remove 9F
+to first remove the driver from the system and then it can tear down any global
+state that was added there.
+.Pp
+While we mention global state here, this isn't widely used in most device
+drivers.
+A device driver can have multiple instances instantiated, one for each instance
+of a hardware device that is found and most state is tied to those instances.
+We'll discuss that more in the next section.
+.Pp
+The
+.Xr info 9E
+entry point these days just calls
+.Xr mod_info 9F
+directly and can return it.
+.Pp
+All of these entry points directly or indirectly require a
+.Vt "struct modlinkage" .
+This structure is used by all types of loadable kernel modules and is filled in
+with information that varies based on the type of module one is creating.
+Here, everything that we're creating is going to use a
+.Vt "struct modldrv" ,
+which describes a loadable driver.
+Every device driver will declare a static global variable for these and fill
+them out.
+They are documented in
+.Xr modlinkage 9S
+and
+.Xr modldrv 9S
+respectively.
+.Pp
+The following is an example of these structures borrowed from
+.Xr igc 4D :
+.Bd -literal
+static struct modldrv igc_modldrv = {
+        .drv_modops = &mod_driverops,
+        .drv_linkinfo = "Intel I226/226 Ethernet Controller",
+        .drv_dev_ops = &igc_dev_ops
+};
 
-.sp
-.ne 2
-.na
-\fB\fB9F\fR \fR
-.ad
-.RS 7n
-Kernel Functions - contains reference pages for all driver support routines.
-.RE
+static struct modlinkage igc_modlinkage = {
+        .ml_rev = MODREV_1,
+        .ml_linkage = { &igc_modldrv, NULL }
+};
+.Ed
+.Pp
+From this there are a few important things to take away.
+A single kernel module may implement more than one type of linkage, though this
+is the exception and not the norm.
+The second part to call out here is that while the
+.Fa drv_modops
+will be the same for all drivers that use the
+.Vt "struct modldrv" ,
+the
+.Fa drv_linkinfo
+and
+.Fa drv_dev_ops
+will be unique to each driver.
+The next section discusses the
+.Vt "struct dev_ops" .
+.Ss The Devices Tree and Instances
+Device drivers have a unique challenge that makes them different from other
+kinds of loadable modules: there may be very well more than a single instance of
+the hardware that they support.
+Consider a few examples: a user can plug in two distinct USB mass storage
+devices or keyboards.
+A system may have more than one NIC present or the hardware may expose multiple
+physical ports as distinct devices.
+Many systems have more than one disk device.
+Conversely, if a given piece of hardware isn't present then there's no reason
+for the driver for it to be loaded.
+There is nothing that the Intel 1 GbE Ethernet NIC driver,
+.Xr igb 4D ,
+can do if there are no supported devices plugged in.
+.Pp
+Devices are organized into a tree that is full of parent and child
+relationships.
+This tree is what you see when you run
+.Xr prtconf 8 .
+As an example, a USB device is plugged into a port on a hub, which may be
+plugged into another hub, and then is eventually plugged into a PCI device that
+is the USB host controller, which itself may be under a PCI-PCI bridge, and this
+chain continues all the way up to the root of the tree, which we call
+.Dq rootnex .
+Device drivers that can enumerate children and provide operations for them are
+called
+.Dq nexus
+drivers.
+.Pp
+The system automatically fills out the device tree through a combination of
+built-in mechanisms and through operations on other nexus drivers.
+When a new hardware unit is discovered, a
+.Vt dev_info_t
+structure, the device information, is created for it and it is linked into the
+tree.
+Generally, the system can then use automatic information embedded in the device
+to determine what driver is responsible for the piece of hardware through the
+use of the
+.Dq compatible
+property which the systems and nexus drivers set up on their children.
+For example, PCI and PCIe drivers automatically set up the compatible property
+based on information discovered in PCI configuration space like the device's
+vendor, device ID, and class IDs.
+The same is true of USB.
+.Pp
+When a device driver is packaged, it contains metadata that indicates which
+devices it supports.
+For example, the aforementioned igb driver will have a rule that it matches
+.Dq pciex8086,10a7 .
+When the kernel discovers a device with this alias present, it will know that it
+should assign it to the igb driver and then it will assign the
+.Vt dev_info_t
+structure a new instance number.
+.Pp
+To emphasize here, each time the device is discovered in the tree, it will have
+an independent instance number and an independent
+.Vt dev_info_t
+that accompanies it.
+Each instance has an independent life time too.
+The most obvious way to think about this is with something that can be
+physically removed while the system is on, like a USB device.
+Just because you pull one USB keyboard doesn't mean it impacts the other one
+there.
+They are inherently different devices
+.Po
+albeit if they were plugged into the same HUB and the HUB was removed, then they
+both would be removed; however, each would be acted on independently
+.Pc .
+.Pp
+Here is a slimmed down example from a system's
+.Xr prtconf 8
+output:
+.Bd -literal
+Oxide,Gimlet (driver name: rootnex)
+    scsi_vhci, instance #0 (driver name: scsi_vhci)
+    pci, instance #0 (driver name: npe)
+        pci1022,1480, instance #13 (driver name: amdzen_stub)
+        pci1022,164f
+        pci1022,1482
+        pci1de,fff9, instance #0 (driver name: pcieb)
+            pci1344,3100, instance #4 (driver name: nvme)
+                blkdev, instance #10 (driver name: blkdev)
+        pci1022,1482
+        pci1022,1482
+        pci1de,fff9, instance #1 (driver name: pcieb)
+            pci1b96,0, instance #7 (driver name: nvme)
+                blkdev, instance #0 (driver name: blkdev)
+        pci1de,fff9, instance #2 (driver name: pcieb)
+            pci1b96,0, instance #8 (driver name: nvme)
+                blkdev, instance #4 (driver name: blkdev)
+        pci1de,fff9, instance #3 (driver name: pcieb)
+            pci1b96,0, instance #10 (driver name: nvme)
+                blkdev, instance #1 (driver name: blkdev)
+.Ed
+.Pp
+From this we can see that there are multiple instances of the NVMe
+.Pq nvme ,
+PCIe bridge
+.Pq pcieb ,
+and
+generic block device
+.Pq blkdev
+driver present.
+Each of these has their own
+.Vt dev_info_t
+and has their various entry points called in parallel.
+With that, let's dig into the specifics of what the
+.Vt "struct dev_ops"
+actually is and the different operations to be aware.
+.Ss struct dev_ops
+The device operations structure,
+.Vt "struct dev_ops" ,
+controls all of the basic entry points that a loadable device contains.
+This is something that every driver has to implement, no matter the type.
+The most important things that will be present are the
+.Fa devo_attach
+and
+.Fa devo_detach
+members which are used to create and destroy instances of the driver and then a
+pointer to any subsequent operations that exist, such as the
+.Fa devo_cb_ops ,
+which is used for character and block device drivers and the
+.Fa devo_bus_ops ,
+which is used for nexus drivers.
+.Pp
+Attach and detach are the most important entry points in this structure.
+This could be practically thought of as the
+.Dq main
+function entry point for a device driver.
+This is where any initialization of the instance will occur.
+This would include many traditional things like setting up access to registers,
+allocating and assigning interrupts, and interfacing with the various other
+device driver frameworks such as
+.Xr mac 9E .
+.Pp
+The actions taken here are generally device-specific, while certain classes of
+devices
+.Pq e.g. PCI, USB, etc.
+will have overlapping concerns.
+In addition, this is where the driver will take care of creating anything like a
+minor node which will be used to access it by userland software if it's a
+character or block device driver.
+.Pp
+There is generally a per-instance data structure that a driver creates.
+It may do this by calling
+.Xr kmem_zalloc 9F
+and assigning the structure with the
+.Xr ddi_set_driver_private 9F
+entry point or it may use the DDI's soft state management functions rooted in
+.Xr ddi_soft_state_init 9F .
+A driver should try to tie as much state to the instance as possible, where
+possible.
+There should not be anything like a fixed size global array of possible
+instances.
+Someone usually finds a way to attach many more instances of some type of
+hardware than you might expect!
+.Pp
+The
+.Xr attach 9E
+and
+.Xr detach 9E
+entry points both have a unique command argument that is used to describe a
+specific action that is going on.
+This action may be a normal attach or it could be related to putting the system
+into the ACPI S3 sleep or similar state with the suspend and resume commands.
+.Pp
+The following table are the common functions that most drivers end up having to
+think a little bit about:
+.Vt "struct dev_ops" :
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr attach 9E Ta Xr detach 9E
+.It Xr getinfo 9E Ta Xr quiesce 9E
+.El
+.Pp
+Briefly, the
+.Xr getinfo 9E
+entry point is used to map between instances of a device driver and the minor
+nodes it creates.
+Drivers that participate in a framework like the SCSI HBA, Networking, or
+related don't usually end up implementing this.
+However, drivers that manually create minor nodes generally do.
+The
+.Xr quiesce 9E
+entry point is used as part of the fast reboot operation.
+It is basically intended to stop and/or reset the hardware and discard any
+ongoing I/O.
+For pseudo-device drivers or drivers which do not perform I/O, they can use the
+symbol
+.Ql ddi_quiesce_not_needed
+in lieu of a standard implementation.
+.Pp
+In addition, the following additional entry points exist, but are less commonly
+required either because the system generally takes care of it, such as
+.Xr probe 9E .
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr identify 9E Ta Xr power 9E
+.It Xr probe 9E Ta
+.El
+.Pp
+For more information on the structure, see also
+.Xr dev_ops 9S .
+The following are a few examples of the
+.Vt "struct dev_ops"
+structure from a few drivers.
+We recommend using the C99 style for all new instances.
+.Bd -literal
+static struct dev_ops ksensor_dev_ops = {
+        .devo_rev = DEVO_REV,
+        .devo_refcnt = 0,
+        .devo_getinfo = ksensor_getinfo,
+        .devo_identify = nulldev,
+        .devo_probe = nulldev,
+        .devo_attach = ksensor_attach,
+        .devo_detach = ksensor_detach,
+        .devo_reset = nodev,
+        .devo_power = ddi_power,
+        .devo_quiesce = ddi_quiesce_not_needed,
+        .devo_cb_ops = &ksensor_cb_ops
+};
 
-.sp
-.ne 2
-.na
-\fB\fB9P\fR \fR
-.ad
-.RS 7n
-Driver Properties - contains reference pages for driver properties.
-.RE
+static struct dev_ops igc_dev_ops = {
+        .devo_rev = DEVO_REV,
+        .devo_refcnt = 0,
+        .devo_getinfo = NULL,
+        .devo_identify = nulldev,
+        .devo_probe = nulldev,
+        .devo_attach = igc_attach,
+        .devo_detach = igc_detach,
+        .devo_reset = nodev,
+        .devo_quiesce = ddi_quiesce_not_supported,
+        .devo_cb_ops = &igc_cb_ops
+};
 
-.sp
-.ne 2
-.na
-\fB\fB9S\fR \fR
-.ad
-.RS 7n
-Data Structures - contains reference pages for driver-related structures.
-.RE
+static struct dev_ops pchtemp_dev_ops = {
+        .devo_rev = DEVO_REV,
+        .devo_refcnt = 0,
+        .devo_getinfo = nodev,
+        .devo_identify = nulldev,
+        .devo_probe = nulldev,
+        .devo_attach = pchtemp_attach,
+        .devo_detach = pchtemp_detach,
+        .devo_reset = nodev,
+        .devo_quiesce = ddi_quiesce_not_needed
+};
+.Ed
+.Ss Character and Block Operations
+In the history of UNIX, the most common device drivers that were created were
+for block and character devices.
+The interfaces in block and character devices are usually in service of common
+I/O patterns that the system exposes.
+For example, when you call
+.Xr open 2 ,
+.Xr ioctl 2 ,
+or
+.Xr read 2
+on a device, it goes through the device's corresponding entry point here.
+Both block and character devices operate on the shared
+.Vt "struct cb_ops"
+structure, with different members being expected for both of them.
+While they both require that someone implement the
+.Fa cb_open
+and
+.Fa cb_close
+members, block devices perform I/O through the
+.Xr strategy 9E
+entry point and support the
+.Xr dump 9E
+entry point for kernel crash dumps, while character devices implement the more
+historically familiar
+.Xr read 9E ,
+.Xr write 9E,
+and the
+.Xr devmap 9E
+entry point for supporting memory-mapping.
+.Pp
+While the device operations structures worked with the
+.Vt dev_info_t
+structure and there was one per-instance, character and block operations work
+with minor nodes: named entities that exist in the file system.
+UNIX has long had the idea of a major and minor number that is encoded in the
+.Vt dev_t
+which is embedded in the file system, which is what you see in the
+.Fa st_rdev
+member of stat structure when you call
+.Xr stat 2 .
+The major number is assigned to the driver
+.Em as a whole ,
+not an instance.
+The minor number space is shared between all instances of a driver.
+Minor node numbers are assigned by the driver when it calls
+.Xr ddi_create_minor_node 9F
+to create a minor node and when one of its character or block entry points are
+called, it will get this minor number back and it must translate it to the
+corresponding instance on its own.
+.Pp
+A special property of the
+.Xr open 9E
+entry point is that it can change the minor number a client gets during its call
+to open which it will use for all subsequent calls.
+This is called a
+.Dq cloning
+open.
+Whether this is used or not depends on the type of driver that you are creating.
+For example, many pseudo-device drivers like DTrace will use this so each client
+has its own state.
+Similarly, devices that have certain internal locking and transaction schemes
+will give each caller a unique minor.
+The
+.Xr ccid 4D
+and
+.Xr nvme 4D
+driver are examples of this.
+However, many drivers will have just a single minor node per instance and just
+say that the minor node's number is the instance number, making it very simple
+to figure out the mapping.
+When it's not so simple, often an AVL tree or some other structure is used to
+help map this together.
+.Pp
+The following entry points are generally used for character devices:
+.Bl -tag -width Ds
+.It Xr ioctl 9E
+The I/O control or ioctl entry point is used extensively throughout the system
+to perform different kinds of operations.
+These operations are often driver specific, though there are also some which are
+also common operations that are used across multiple devices like the disk
+operations described in
+.Xr dkio 4I
+or the ioctls that are used under the hood by
+.Xr cfgadm 8
+and friends.
+.Pp
+Whether a driver supports ioctls or not depends on it.
+If it does, it is up to the driver to always perform any requisite privilege and
+permission checking as well as take care in copying in and out any kind of
+memory from the user process through calls like
+.Xr ddi_copyin 9F
+and
+.Xr ddi_copyout 9F .
+.Pp
+The ioctl interface gives the driver writer great flexibility to create equally
+useful or hard to consume interfaces.
+When crafting a new committed interface over an ioctl, take care to ensure there
+is an ability to version the structure or use something that has more
+flexibility like a
+.Vt nvlist_t .
+See the
+.Sq Copying Data to and from Userland
+section of
+.Xr Intro 9F
+for more information.
+.It Xr read 9E , Xr write 9E , Xr aread 9E , and Xr awrite 9E
+These are the classic I/O routines of the system.
+A driver's read and write routines operate on a
+.Xr uio 9S
+structure which describes the I/O that is occurring, the offset into the
+device that the I/O should occur at, and has various flags that
+describe properties of the I/O request, such as whether or not it is a
+non-blocking request.
+.Pp
+The majority of device drivers that implement these entry points are using them
+to create some kind of file-like abstraction for a device.
+For example, the
+.Xr ccid 4D
+driver uses these interfaces for submitting commands and reading responses back
+from an underlying device.
+.Pp
+For most use cases
+.Xr read 9E
+and
+.Xr write 9E
+are sufficient; however, the
+.Xr aread 9E
+and
+.Xr awrite 9E
+are versions that tie into the kernel's asynchronous I/O engine.
+.It Xr chpoll 9E
+This entry point allows a device to be polled by user code for an event of
+interest and connects through the kernel to different polling mechanisms such as
+.Xr poll 2 ,
+.Xr port_get 3C ,
+and many others.
+Currently this interface only allows a driver to define the classic poll style
+events such as
+.Dv POLLIN ,
+.Dv POLLOUT, and
+.Dv POLLHUP .
+The exact semantics of these are up to the driver; however, it is expected that
+the read and write oriented semantics of the various events will be honored by
+the device driver.
+.It Xr devmap 9E and Xr segmap 9E
+These are entry points that are used to set up memory mappings for a device and
+replace the older
+.Xr mmap 9E
+entry point.
+When a function calls
+.Xr mmap 2
+on a device, it'll reach these, starting with the
+.Xr devmap 9E
+entry point.
+The driver is responsible for confirming that the mappings request and its
+semantics are sensible, after which it will set up memory for consumption.
+The
+.Xr devmap 9E
+manual page has more details on the specifics here and the related entry points
+that can be implemented as part of the
+.Xr devmap_callback_ctl 9S
+structures such as
+.Xr devmap_access 9E .
+The segment mapping is an optional part that provides some additional controls
+for a driver such as assigning certain mapping attributes or wanting to maintain
+separate contexts for different mappings.
+See
+.Xr segmap 9E
+for more information.
+It is common for drivers to just provide a
+.Xr devmap 9E
+entry point.
+.It Xr prop_op 9E
+This entry point is used for drive's to manage and deal with property creation.
+While this is its own entry point, most callers can just specify
+.Xr ddi_prop_op 9F
+for this and don't need any special handling.
+.El
+.Pp
+The following entry points are used uniquely used for block devices:
+.Bl -tag -width Ds
+.It Xr strategy 9E
+A driver's strategy entry point is used to actually perform I/O as described by
+the
+.Xr buf 9S
+structure.
+It is responsible for allocating all resources and then initiating the actual
+request.
+The actual request will finish potentially asynchronously through calls to
+.Xr biodone 9F
+or
+.Xr bioerror 9F .
+HBA or blkdev-based drivers do not usually end up implementing this interface.
+.It Xr dump 9E
+A driver's dump implementation is used when the operating system has had a fatal
+error and is trying to persist a crash dump to disk.
+This is a delicate operation as the system has already failed, which means many
+normal operations like interrupt handlers, timeouts, and blocking will no longer
+work.
+.El
+.Pp
+In general, the
+.Xr print 9E
+entry point for block devices is vestigial and users should fill in
+.Xr nodev 9F
+there instead.
+.Pp
+The following are some examples of different character device operations
+structures that drivers have employed.
+Note that using C99 structure definitions is preferred:
+.Bd -literal
+static struct cb_ops ksensor_cb_ops = {
+        .cb_open = ksensor_open,
+        .cb_close = ksensor_close,
+        .cb_strategy = nodev,
+        .cb_print = nodev,
+        .cb_dump = nodev,
+        .cb_read = nodev,
+        .cb_write = nodev,
+        .cb_ioctl = ksensor_ioctl,
+        .cb_devmap = nodev,
+        .cb_mmap = nodev,
+        .cb_segmap = nodev,
+        .cb_chpoll = nochpoll,
+        .cb_prop_op = ddi_prop_op,
+        .cb_flag = D_MP,
+        .cb_rev = CB_REV,
+        .cb_aread = nodev,
+        .cb_awrite = nodev
+};
 
-.SS "Compatibility Note"
-Sun Microsystem's implementation of the DDI/DKI was designed to provide binary
-compatibility for third-party device drivers across currently supported
-hardware platforms across minor releases of the operating system. However,
-unforeseen technical issues may force changes to the binary interface of the
-DDI/DKI. We cannot therefore promise or in any way assure that
-DDI/DKI-compliant device drivers will continue to operate correctly on future
-releases.
-.SS "Introduction to Section 9E"
-Section 9E describes the entry-point routines a developer can include in a
-device driver. These are called entry-point because they provide the calling
-and return syntax from the kernel into the driver. Entry-points are called, for
-instance, in response to system calls, when the driver is loaded, or in
-response to \fBSTREAMS\fR events.
-.sp
-.LP
-Kernel functions usable by the driver are described in section 9F.
-.sp
-.LP
-In this section, reference pages contain the following headings:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBNAME\fR describes the routine's purpose.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSYNOPSIS\fR summarizes the routine's calling and return syntax.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBINTERFACE LEVEL\fR describes any architecture dependencies. It also
-indicates whether the use of the entry point is required, optional, or
-discouraged.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBARGUMENTS\fR describes each of the routine's arguments.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBDESCRIPTION\fR provides general information about the routine.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBRETURN VALUES\fR describes each of the routine's return values.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSEE ALSO\fR gives sources for further information.
-.RE
-.SS "Overview of Driver Entry-Point Routines and Naming Conventions"
-By convention, a prefix string is added to the driver routine names. For a
-driver with the prefix \fIprefix\fR, the driver code may contain routines named
-\fIprefix\fRopen, \fIprefix\fRclose, \fIprefix\fRread, \fIprefix\fRwrite, and
-so forth. All global variables associated with the driver should also use the
-same prefix.
-.sp
-.LP
-All routines and data should be declared as \fBstatic\fR.
-.sp
-.LP
-Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
-order, and after all other include files.
-.sp
-.LP
-The following table summarizes the STREAMS driver entry points described in
-this section.
-.sp
+static struct cb_ops vio9p_cb_ops = {
+        .cb_rev =                       CB_REV,
+        .cb_flag =                      D_NEW | D_MP,
+        .cb_open =                      vio9p_open,
+        .cb_close =                     vio9p_close,
+        .cb_read =                      vio9p_read,
+        .cb_write =                     vio9p_write,
+        .cb_ioctl =                     vio9p_ioctl,
+        .cb_strategy =                  nodev,
+        .cb_print =                     nodev,
+        .cb_dump =                      nodev,
+        .cb_devmap =                    nodev,
+        .cb_mmap =                      nodev,
+        .cb_segmap =                    nodev,
+        .cb_chpoll =                    nochpoll,
+        .cb_prop_op =                   ddi_prop_op,
+        .cb_str =                       NULL,
+        .cb_aread =                     nodev,
+        .cb_awrite =                    nodev,
+};
 
-.sp
-.TS
-c c
-l l .
-\fBRoutine\fR	\fBType\fR
-_
-\fBput\fR	DDI/DKI
-\fBsrv\fR	DDI/DKI
-.TE
-
-.sp
-.LP
-The following table summarizes the driver entry points described in this
-section.
-.sp
-
-.sp
-.TS
-c c
-l l .
-\fBRoutine\fR	\fBType \fR
-_
-\fB_fini\fR	illumos DDI
-\fB_info\fR	illumos DDI
-\fB_init\fR	illumos DDI
-\fBaread\fR	illumos DDI
-\fBattach\fR	illumos DDI
-\fBawrite\fR	illumos DDI
-\fBchpoll\fR	DDI/DKI
-\fBclose\fR	DDI/DKI
-\fBdetach\fR	illumos DDI
-\fBdevmap\fR	illumos DDI
-\fBdevmap_access\fR	illumos DDI
-\fBdevmap_contextmgt\fR	illumos DDI
-\fBdevmap_dup\fR	illumos DDI
-\fBdevmap_map\fR	illumos DDI
-\fBdevmap_unmap\fR	illumos DDI
-\fBdump\fR	illumos DDI
-\fBgetinfo\fR	illumos DDI
-\fBidentify\fR	illumos DDI
-\fBioctl\fR	DDI/DKI
-\fBks_update\fR	illumos DDI
-\fBmapdev_access\fR	illumos DDI
-\fBmapdev_dup\fR	illumos DDI
-\fBmapdev_free\fR	illumos DDI
-\fBmmap\fR	DKI only
-\fBopen\fR	DDI/DKI
-\fBpower\fR	illumos DDI
-\fBprint\fR	DDI/DKI
-\fBprobe\fR	illumos DDI
-\fBprop_op\fR	illumos DDI
-\fBread\fR	DDI/DKI
-\fBsegmap\fR	DKI only
-\fBstrategy\fR	DDI/DKI
-\fBtran_abort\fR	illumos DDI
-\fBtran_destroy_pkt\fR	illumos DDI
-\fBtran_dmafree\fR	illumos DDI
-\fBtran_getcap\fR	illumos DDI
-\fBtran_init_pkt\fR	illumos DDI
-\fBtran_reset\fR	illumos DDI
-\fBtran_reset_notify\fR	illumos DDI
-\fBtran_setcap\fR	illumos DDI
-\fBtran_start\fR	illumos DDI
-\fBtran_sync_pkt\fR	illumos DDI
-\fBtran_tgt_free\fR	illumos DDI
-\fBtran_tgt_init\fR	illumos DDI
-\fBtran_tgt_probe\fR	illumos DDI
-\fBwrite\fR	DDI/DKI
-.TE
-
-.sp
-.LP
-The following table lists the error codes returned by a driver routine when it
-encounters an error. The error values are listed in alphabetic order and are
-defined in \fBsys/errno.h\fR. In the driver \fBopen\fR(9E), \fBclose\fR(9E),
-\fBioctl\fR(9E), \fBread\fR(9E), and \fBwrite\fR(9E) routines, errors are
-passed back to the user by calling \fBbioerror\fR(9F) to set \fBb_flags\fR to
-the proper error code. In the driver \fBstrategy\fR(9E) routine, errors are
-passed back to the user by setting the \fBb_error\fR member of the
-\fBbuf\fR(9S) structure to the error code. For \fBSTREAMS\fR \fBioctl\fR
-routines, errors should be sent upstream in an \fBM_IOCNAK\fR message. For
-\fBSTREAMS\fR \fBread()\fR and \fBwrite()\fR routines, errors should be sent
-upstream in an \fBM_ERROR\fR message. The driver \fBprint\fR routine should not
-return an error code because the function that it calls, \fBcmn_err\fR(9F), is
-declared as \fBvoid\fR (no error is returned).
-.sp
-
-.sp
-.TS
-c c
-l l .
-Error Value	Error Description
-_
-EAGAIN	T{
-Kernel resources, such as the buf structure or cache memory, are not available at this time (device may be busy, or the system resource is not available). This is used in open, ioctl, read, write, and strategy.
-T}
-_
-EFAULT	T{
-An invalid address has been passed as an argument; memory addressing error. This is used in open, close, ioctl, read, write, and strategy.
-T}
-_
-EINTR	T{
-Sleep interrupted by signal. This is used in open, close, ioctl, read, write, and strategy.
-T}
-_
-EINVAL	T{
-An invalid argument was passed to the routine. This is used in open, ioctl, read, write, and strategy.
-T}
-_
-EIO	T{
-A device error occurred; an error condition was detected in a device status register (the I/O request was valid, but an error occurred on the device). This is used in open, close, ioctl, read, write, and strategy.
-T}
-_
-ENXIO	T{
-An attempt was made to access a device or subdevice that does not exist (one that is not configured); an attempt was made to perform an invalid I/O operation; an incorrect minor number was specified. This is used in open, close, ioctl, read, write, and strategy.
-T}
-_
-EPERM	T{
-A process attempting an operation did not have required permission. This is used in open, ioctl, read, write, and strategy.
-T}
-_
-EROFS	T{
-An attempt was made to open for writing a read-only device. This is used in open.
-T}
-.TE
-
-.sp
-.LP
-The table below cross references error values to the driver routines from which
-the error values can be returned.
-.sp
-
-.sp
-.TS
-box;
-c | c | c | c
-l | l | l | l .
-open	close	ioctl	read, write and strategy
-_
-EAGAIN	EFAULT	EAGAIN	EAGAIN
-EFAULT	EINTR	EFAULT	EFAULT
-EINTR	EIO	EINTR	EINTR
-EINVAL	ENXIO	EINVAL	EINVAL
-EIO		EIO	EIO
-ENXIO		ENXIO	ENXIO
-EPERM		EPERM
-EROFS
-.TE
-
-.SH SEE ALSO
-.BR Intro (9F),
-.BR Intro (9S)
+static struct cb_ops bd_cb_ops = {
+        bd_open,                /* open */
+        bd_close,               /* close */
+        bd_strategy,            /* strategy */
+        nodev,                  /* print */
+        bd_dump,                /* dump */
+        bd_read,                /* read */
+        bd_write,               /* write */
+        bd_ioctl,               /* ioctl */
+        nodev,                  /* devmap */
+        nodev,                  /* mmap */
+        nodev,                  /* segmap */
+        nochpoll,               /* poll */
+        bd_prop_op,             /* cb_prop_op */
+        0,                      /* streamtab  */
+        D_64BIT | D_MP,         /* Driver compatibility flag */
+        CB_REV,                 /* cb_rev */
+        bd_aread,               /* async read */
+        bd_awrite               /* async write */
+};
+.Ed
+.Ss Networking Drivers
+Networking device drivers come in many forms and flavors.
+They may interface to the host via PCIe, USB, be a pseudo-device, or use
+something entirely different like SPI
+.Pq Serial Peripheral Interface .
+The system provides a dedicated networking interface driver framework that is
+documented in
+.Xr mac 9E  .
+This framework is sometimes also referred to as GLDv3
+.Pq Generic LAN Device version 3 .
+.Pp
+All networking drivers will still implement a basic
+.Vt "struct dev_ops"
+and a minimal
+.Vt "struct cb_ops" .
+The
+.Xr mac 9E
+framework takes care of implementing all of the standard character device entry
+points at the end of the day and instead provides a number of different
+networking-specific entry points that take care of things like getting and
+setting properties, installing and removing MAC addresses and filters, and
+actually transmitting and providing callbacks for receiving packets.
+.Pp
+Each instance of a device driver will generally have a separate registration
+with
+.Xr mac 9E .
+In other words, there is usually a one to one relationship between a driver
+having its
+.Xr attach 9E
+entry point called and it registering with the
+.Xr mac 9E
+framework.
+.Ss STREAMS Modules
+STREAMS modules are a historical way to provide certain services in the kernel.
+For networking device drivers, instead see the prior section and
+.Xr mac 9E .
+Conceptually STREAMS break things into queues, with one side being designed for
+a module to read data and another side for it write or produce data.
+These modules are arranged in a stack, with additional modules being pushed on
+for additional processing.
+For example, the TTY subsystem has a serial console as a base STREAMS module,
+but it then pushes on additional modules like the pseudo-terminal emulation
+.Po
+.Xr ptem 4M
+.Pc ,
+the standard line discipline
+.Po
+.Xr ldterm 4M
+.Pc ,
+etc.
+.Pp
+STREAMS drivers don't use the normal character device entry points
+.Pq though sometimes they do define them
+or even the
+.Vt "struct modldrv" .
+Instead they use the
+.Vt "struct modlstrmod"
+which is discussed in
+.Xr modlstrmod 9S ,
+which in turn requires one to fill out the
+.Xr fmodsw 9S ,
+.Xr streamtab 9S ,
+and
+.Xr qinit 9S
+structures.
+The latter of these has two of the more common entry points:
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr put 9E Ta Xr srv 9E
+.El
+.Pp
+These entry points are used when different kinds of messages are received by the
+device driver on a queue.
+In addition, those entry points define an alternative set of entry points for
+.Xr open 9E
+and
+.Xr close 9E
+as STREAMS modules open and close routines all operate in the context of a given
+.Vt queue_t .
+There are other differences here.
+An ioctl is not a dedicated entry point, but rather a specific message type
+.Po
+.Dv M_IOCTL
+.Pc
+that is
+received in a driver's
+.Xr put 9E
+routine.
+.Pp
+Finally, it's worth noting the
+.Xr mt-streams 9F
+manual page which discusses several concurrency related considerations for
+STREAMS related drivers.
+.Ss HBA Drivers
+Host bus adapters are used to interface with the various SCSI and SAS
+controllers.
+Like with networking, the kernel provides a framework under the name of SCSA.
+HBA drivers still often implement character device entry points; however, they
+generally end up calling into shared framework entry points for
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E .
+For several of the concepts related with the 3rd version for the framework, see
+.Xr iport 9 .
+.Pp
+The following entry points are associated with HBA drivers:
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr tran_abort 9E Ta Xr tran_bus_reset 9E
+.It Xr tran_dmafree 9E Ta Xr tran_getcap 9E
+.It Xr tran_init_pkt 9E Ta Xr tran_quiesce 9E
+.It Xr tran_reset 9E Ta Xr tran_reset_notify 9E
+.It Xr tran_setup_pkt 9E Ta Xr tran_start 9E
+.It Xr tran_sync_pkt 9E Ta Xr tran_tgt_free 9E
+.It Xr tran_tgt_init 9E Ta Xr tran_tgt_probe 9E
+.El
+.Pp
+In addition to these, when using SCSAv3 with iports, drivers will call
+.Xr scsi_hba_iport_register 9F
+to create various iports.
+This has the unique effect of causing the driver's top-level
+.Xr attach 9E
+entry point to be called again, but referring to the iport instead of the main
+hardware instance.
+.Ss USB Drivers
+The kernel provides a framework for USB client devices to access various USB
+services such as getting access to device and configuration descriptors, issuing
+control, bulk, interrupt, and isochronous requests, and being notified when they
+are removed from the system.
+Generally a USB device driver leverages a framework of some kind, like
+.Xr mac 9E
+in addition to the USB pieces.
+As such, there are no entry points specific to USB device drivers; however,
+there are plenty of provided functions.
+.Pp
+To get started with a USB device driver, one will generally perform some of the
+following steps:
+.Bl -enum
+.It
+Register with the USB framework by calling
+.Xr usb_client_attach 9F .
+.It
+Ask the kernel to fetch all of the device and class descriptors that are
+appropriate with the
+.Xr usb_get_dev_data 9F
+function.
+.It
+Parse the relevant descriptors to figure out which endpoints to attach.
+.It
+Open up pipes to the specific USB endpoints by using
+.Xr usb_lookup_ep_data 9F ,
+.Xr usb_ep_xdescr_fill 9F ,
+and
+.Xr usb_pipe_xopen 9F .
+.It
+Proceed with the rest of device initialization and service.
+.El
+.Ss Virtio Drivers
+The kernel provides an uncommitted interface for Virtio device drivers, which is
+discussed in some detail in
+.Pa uts/common/io/virtio/virtio.h .
+A client device driver will register with the framework through and then use
+that to begin feature and interrupt negotiation.
+As part of that, they are given the ability to set up virtqueues which can be
+used for communicating to and from the hypervisor.
+.Ss Kernel Statistics
+Drivers have the ability to export kstats
+.Pq kernel statistics
+that will appear in the
+.Xr kstat 8
+command.
+Any kind of module in the system can create and register a kstat, it is not
+strictly tied to anything like a
+.Vt dev_info_t .
+kstats have different types that they come in.
+The most common kstat type is the
+.Dv KSTAT_TYPE_NAMED
+which allows for multiple, typed name-value pairs to be part of the stat.
+This is what the kernel uses under the hood for many things such as the various
+.Xr mac 9E
+statistics that are managed on behalf of drivers.
+.Pp
+To create a kstat, a driver utilizes the
+.Xr kstat_create 9F
+function, after which it has a chance to set up the kstat and make choices about
+which entry points that it will implement.
+A kstat will not be made visible until the caller calls
+.Xr kstat_install 9F
+on it.
+The two entry points that a driver may implement are:
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr ks_snapshot 9E Ta Xr ks_update 9E
+.El
+.Pp
+First, let's discuss the
+.Xr ks_update 9E
+entry point.
+A kstat may be updated in one of two ways: either by having its
+.Xr ks_update 9E
+function called or by having the system update information as it goes in the
+kstat's data.
+One would use the former when it involves doing something like going out to
+hardware and reading registers, where as the latter approach might be used when
+operations can be tracked as part of a normal flow, such as the number of errors
+or particular requests a driver has encountered.
+The
+.Xr ks_snapshot 9E
+entry point is not as commonly used by comparison and allows a caller to
+interpose on the data marshalling process for copying out to userland.
+.Ss Upgradable Firmware Modules
+The UFM
+.Pq Upgradable Firmware Module
+system in the kernel allows a device driver to provide information about the
+firmware modules that are present on a device and is generally used as
+supplementary information about a device.
+The UFM framework allows a driver to declare a given number of modules that
+exist on a given
+.Vt dev_info_t .
+Each module has some number of slots with different versions.
+This information is automatically exported into various consumers such as
+.Xr fwflash 8 ,
+the Fault Management Architecture,
+and the
+.Xr ufm 4D
+driver's specific ioctls.
+.Pp
+A driver fills in the operations vector discussed in
+.Xr ddi_ufm 9E
+and registers it with the kernel by calling
+.Xr ddi_ufm_init 9F .
+These interfaces have entry points include:
+.Bl -column -offset -indent "ddi_ufm_op_fill_image(9E)" "ddi_ufp_op_fill_image(9E)"
+.It Xr ddi_ufm_op_getcaps 9E Ta Xr ddi_ufm_op_nimages 9E
+.It Xr ddi_ufm_op_fill_image 9E Ta Xr ddi_ufm_op_fill_slot 9E
+.It Xr ddi_ufm_op_readimg 9E Ta
+.El
+.Pp
+The
+.Xr ddi_ufm_op_getcaps 9E
+entry point describes the capabilities of the device and what other entry points
+the kernel and callers can expect to exist.
+The
+.Xr ddi_ufm_op_nimages 9E
+entry point tells the system how many images there are and if it is not
+implemented, then the system assumes there is a single slot.
+The
+.Xr ddi_ufm_op_fill_image 9E
+and
+.Xr ddi_ufm_op_fill_slot 9E
+entry points are used to fill in information about slots and images
+respectively, while the
+.Xr ddi_ufm_op_readimg 9E
+entry point is used to read an image from the device for the operating system.
+That entry point is often supported when dealing with EEPROMs as many devices do
+not have a way of retrieving the actual current firmware.
+.Ss USB Host Interface Drivers
+Opposite of USB device drivers are the device drivers that make the USB
+abstractions work: USB host interface controllers.
+The kernel provides a private framework for these, which is discussed in
+.Xr usba_hcdi 9E .
+A HCDI driver is a character device driver and ends up also instantiating a root
+hub as part of its operation and forwards many of its open, close, and ioctl
+routines to the corresponding usba hubdi functions.
+.Pp
+To get started with the framework, a driver will need to call
+.Xr usba_hcdi_register 9F
+with a filled out
+.Xr usba_hcdi_register_args_t 9S
+structure.
+That registration structure includes the operation vector of callbacks that the
+driver fills in, which involve opening and closing pipes
+.Po
+.Xr usba_hcdi_pipe_open 9E
+.Pc ,
+issuing the various ctrl, interrupt, bulk, and isochronous transfers
+.Po
+.Xr usba_hcdi_pipe_bulk_xfer 9E ,
+etc.
+.Pc ,
+and more.
+.Sh DTRACE PROBES
+By default, the DTrace
+.Xr fbt 4D ,
+function boundary tracing,
+provider will create DTrace probes based on the entry and return points
+of most functions in a module
+.Pq the primary exception being for some hand-written assembler .
+While this is very powerful, there are often times that driver writers
+want to define their own semantic probes.
+The
+.Xr sdt 4D ,
+statically defined tracing, provider can be used for this.
+.Pp
+To define an SDT probe, a driver should include
+.In sys/sdt.h ,
+which defines several macros for probes based on the number of arguments
+that are present.
+Each probe takes a name, which is constrained by the rules of a C
+identifier.
+If two underscore characters are present in a row
+.Pq Sq _
+they will be transformed into a hyphen
+.Pq Sq - .
+That is a probe declared with a name of
+.Sq hello__world
+will be named
+.Sq hello-world
+and accessible as the DTrace probe
+.Ql sdt:::hello-world .
+.Pp
+Each probe can present a varying number of arguments in DTrace, ranging
+from 0-8.
+For each DTrace probe argument, one passes both the type of the argument
+and the actual value.
+The following example from the
+.Xr igc 4D
+driver shows a DTrace probe that provides four arguments and would be
+accessible using the probe
+.Ql sdt:::igc-context-desc :
+.Bd -literal -offset indent
+DTRACE_PROBE4(igc__context__desc, igc_t *, igc, igc_tx_ring_t *,
+    ring, igc_tx_state_t *, tx, struct igc_adv_tx_context_desc *,
+    ctx);
+.Ed
+.Pp
+In the above example,
+.Fa igc ,
+.Fa ring ,
+.Fa tx ,
+and
+.Fa ctx
+are local variables and function parameters.
+.Pp
+By default SDT probes are considered
+.Sy Volatile ,
+in other words they can change at any time and disappear.
+This is used to encourage widespread use of SDT probes for what may be
+useful for a particular problem or issue that is being investigated.
+SDT probes that are stabilized are transformed into their own first
+class provider.
+.Sh SEE ALSO
+.Xr Intro 9 ,
+.Xr Intro 9F ,
+.Xr Intro 9S
