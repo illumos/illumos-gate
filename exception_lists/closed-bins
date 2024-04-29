@@ -42,6 +42,7 @@
 ./kernel/drv/usbser_edge
 ./kernel/kmdb/mpt
 ./kernel/kmdb/nfs
+./kernel/kmdb/amd64/nfs
 ./kernel/misc/klmmod
 ./kernel/misc/amd64/klmmod
 ./kernel/misc/klmops
@@ -133,6 +134,7 @@
 ./usr/lib/localedef/src/iso_8859_1/localedef.src
 ./usr/lib/mdb/kvm/mpt.so
 ./usr/lib/mdb/kvm/nfs.so
+./usr/lib/mdb/kvm/amd64/nfs.so
 ./usr/lib/nfs/lockd
 ./usr/lib/snmp
 ./usr/lib/snmp/mibiisa
