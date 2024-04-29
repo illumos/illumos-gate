@@ -307,7 +307,9 @@ $AWK '#
 ' >/dev/null 2> $TEMP0
 grep 'line [45]' $TEMP0 >/dev/null || fail 'BAD: T.misc lineno'
 
-echo 'x\r\y' > $TEMP1
+# XXX SmartOS - SmartOS-shipped bash (4.3.30) built-in echo fails here.
+# XXX SmartOS - Fix me when SmartOS-shipped bash gets updated.
+/bin/echo 'x\r\y' > $TEMP1
 $AWK 'BEGIN { print "x\f\r\b\v\a\\y" }' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird chars'
 
