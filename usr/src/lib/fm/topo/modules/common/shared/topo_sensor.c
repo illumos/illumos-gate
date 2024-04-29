@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -132,6 +132,8 @@ topo_sensor_units(const sensor_ioctl_scalar_t *scalar)
 		return (TOPO_SENSOR_UNITS_VOLTS);
 	case SENSOR_UNIT_AMPS:
 		return (TOPO_SENSOR_UNITS_AMPS);
+	case SENSOR_UNIT_NONE:
+		return (TOPO_SENSOR_UNITS_NONE);
 	default:
 		return (TOPO_SENSOR_UNITS_UNSPECIFIED);
 	}
@@ -186,6 +188,9 @@ topo_sensor_create_scalar_sensor(topo_mod_t *mod, tnode_t *pnode,
 		break;
 	case SENSOR_KIND_CURRENT:
 		topo_type = TOPO_SENSOR_TYPE_CURRENT;
+		break;
+	case SENSOR_KIND_SYNTHETIC:
+		topo_type = TOPO_SENSOR_TYPE_SYNTHETIC;
 		break;
 	default:
 		topo_mod_dprintf(mod, "unknown sensor kind for %s, found 0x%"

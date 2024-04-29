@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _LIBTOPO_H
@@ -461,11 +461,11 @@ extern topo_vertex_t *topo_node_vertex(tnode_t *);
  * Interfaces for converting sensor/indicator types, units, states, etc to
  * a string
  */
-void topo_sensor_type_name(uint32_t type, char *buf, size_t len);
-void topo_sensor_units_name(uint8_t type, char *buf, size_t len);
-void topo_led_type_name(uint8_t type, char *buf, size_t len);
-void topo_led_state_name(uint8_t type, char *buf, size_t len);
-void topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
+extern void topo_sensor_type_name(uint32_t, char *, size_t);
+extern void topo_sensor_units_name(uint32_t, char *, size_t);
+extern void topo_led_type_name(uint32_t, char *, size_t);
+extern void topo_led_state_name(uint32_t, char *, size_t);
+extern void topo_sensor_state_name(uint32_t, uint32_t, char *,
     size_t len);
 
 /*
@@ -617,7 +617,11 @@ typedef enum topo_sensor_unit {
 	TOPO_SENSOR_UNITS_FATAL_ERROR,
 	TOPO_SENSOR_UNITS_GRAMS,
 
-	TOPO_SENSOR_UNITS_PERCENT = 512
+	TOPO_SENSOR_UNITS_PERCENT = 512,
+	/*
+	 * This is used for a unitless control type sensor.
+	 */
+	TOPO_SENSOR_UNITS_NONE
 } topo_sensor_unit_t;
 
 /*
@@ -954,7 +958,7 @@ typedef enum topo_sensor_unit {
  * and sensor-specific codes into a single range.  Because there's overlap
  * between the two ranges we offset the generic type codes by 0x0100
  * which allows ample room in the hole for future expansion of the table to
- * accomodate either additions to the IPMI spec or to support new sensor types
+ * accommodate either additions to the IPMI spec or to support new sensor types
  * for alternate provider modules.
  */
 #define	TOPO_SENSOR_TYPE_THRESHOLD_STATE		0x0101
@@ -1055,6 +1059,13 @@ typedef enum topo_sensor_unit {
 
 #define	TOPO_SENSOR_STATE_GENERIC_OK_DEASSERTED		0x0001
 #define	TOPO_SENSOR_STATE_GENERIC_OK_ASSERTED		0x0002
+
+/*
+ * This represents a synthetic sensor that someone has created. That is, it has
+ * a value, but does not represent a true physical measurement of some kind. The
+ * most common example of this is a control-style measurement.
+ */
+#define	TOPO_SENSOR_TYPE_SYNTHETIC			0x10F
 
 /*
  * Indicator modes and types

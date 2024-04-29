@@ -40,6 +40,8 @@ MANFILES=	Intro.9e		\
 		gld.9e			\
 		identify.9e		\
 		ioctl.9e		\
+		ksensor.9e		\
+		ksensor_ops.9e		\
 		ks_snapshot.9e		\
 		ks_update.9e		\
 		mac.9e			\
@@ -123,6 +125,8 @@ MANLINKS=	ddi_ufm_op_fill_image.9e	\
 		gldm_set_promiscuous.9e	\
 		gldm_start.9e		\
 		gldm_stop.9e		\
+		kso_kind.9e		\
+		kso_scalar.9e		\
 		MAC.9e			\
 		mc_close.9e		\
 		mc_stop.9e		\
@@ -160,6 +164,9 @@ intro.9e			:= LINKSRC = Intro.9e
 
 _info.9e			:= LINKSRC = _fini.9e
 _init.9e			:= LINKSRC = _fini.9e
+
+kso_kind.9e			:= LINKSRC = ksensor_ops.9e
+kso_scalar.9e			:= LINKSRC = ksensor_ops.9e
 
 MAC.9e				:= LINKSRC = mac.9e
 gldv3.9e			:= LINKSRC = mac.9e

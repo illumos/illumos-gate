@@ -1,0 +1,280 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd May 10, 2024
+.Dt KSENSOR 9E
+.Os
+.Sh NAME
+.Nm ksensor
+.Nd kernel sensor framework
+.Sh SYNOPSIS
+.In sys/sensors.h
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The ksensor, kernel sensor, framework provides a means for drivers to provide
+various kinds of sensor information to userland such as temperature, voltage,
+current, and control sensors.
+Sensors are exposed in
+.Pa /dev/sensors
+and the framework takes care of managing minor nodes and ioctl interfaces.
+The driver does not need to expose a character device interface nor are its
+minor nodes used.
+.Ss Sensor Types, Kinds, Units and Naming
+Sensors are broken into different types.
+The types describe the shape of the value that can be read from the sensor
+itself.
+Currently, scalar sensors are the only supported sensor type.
+A scalar sensor has several properties:
+.Bl -tag -width Ds
+.It unit : Vt uint32_t
+The unit of the sensor, discussed below, indicates how to interpret the value
+itself.
+.It granularity : Vt int32_t
+The granularity indicates the number of increments per unit in the measurement.
+A value such as 10 indicates that the value is in 10ths of the unit.
+If this was a temperature sensor, one would need to divide by 10 to get the
+value into degrees.
+On the other hand a negative granularity indicates one would need to multiply
+the value to get the actual units.
+For example, a value of -2 would indicate that you'd need to multiply the value
+by two to get the actual number of degrees.
+.It precision : Vt uint32_t
+The precision represents the accuracy of the sensor itself and is measured in
+units of the granularity.
+For example, a temperature sensor that has a granularity of 1, meaning the value
+read from the sensor is in degrees, and is accurate to +/-5 degrees would set
+the precision to 5.
+Conversely, a temperature sensor that measured in 0.5 degree increments has a
+granularity of 2.
+If the sensor was accurate to +/-1 degree, then it'd have a precision of 2.
+If the precision is unknown, it should be left at zero.
+.It value : Vt int64_t
+The value is the actual reading from the sensor and it is interpreted according
+to the granularity.
+This is a signed value as the value may be negative or positive depending on the
+unit.
+.El
+.Pp
+In addition to the type, sensors also have a notion of a kind, which indicates
+what kind of physical property the sensor measures.
+The kernel defines the kinds currently:
+.Bl -tag -width Dv
+.It Dv SENSOR_KIND_TEMPERATURE
+This measures temperature, potentially in degrees Celsius, Fahrenheit, or
+Kelvin.
+This is one of the more common kinds of sensors in the system, as many ASICs
+embed temperature sensors for health and monitoring.
+.It Dv SENSOR_KIND_VOLTAGE
+Voltage sensors measure the amount of voltage at a particular point in a
+circuit.
+This is one part of determining how much power a device is consuming.
+While some ASICs and ICs operate at a fixed voltage range, many support
+operating at diverse ranges and can dynamically vary their voltage.
+.It Dv SENSOR_KIND_CURRENT
+Current sensors measure the total numbers of amps that are passing through
+a measurement point on a circuit
+.Pq which may be indirect .
+This is often a proxy for measuring how much power something is using as many
+computer related electronics operate at a fixed voltage.
+.It Dv SENSOR_KIND_SYNTHETIC
+A synthetic sensor is different from the others in that it does not actually
+measure an actual physical phenomenon.
+Synthetic sensors are generally a unitless measure on some fixed scale.
+That measure is often derived from some actual physical measurement, which is
+why synthetic sensors have the ability to indicate that their measurement is
+derived from another kind of sensor.
+To make this more concrete, let's look at an example.
+.Pp
+The
+.Xr smntemp 4D
+driver exposes the AMD Tctl sensor, which is a control temperature value.
+This is not a measurement in degrees C, but rather is a value from 0 to 100
+where 100 indicates that a thermal shutdown is imminent.
+This value is synthesized and transformed from several different temperature
+samples and goes through its own algorithm, but critically the resulting
+synthetic Tctl sensor does not represent a temperature, but is used to power
+cooling control loops.
+.It Dv SENSOR_KIND_UNKNOWN
+This value is used by the framework to indicate a kind was not reported.
+Drivers should not use this value.
+.El
+.Pp
+From here, a given measurement that occurs also has a unit that is associated
+with it.
+The following sensors are supported:
+.Bl -tag -width Dv
+.It Dv SENSOR_UNIT_CELSIUS
+Indicates that the sensor measure degrees in Celsius
+.Pq C .
+.It Dv SENSOR_UNIT_FAHRENHEIT
+Indicates that the sensor measure degrees in Fahrenheit
+.Pq F .
+.It Dv SENSOR_UNIT_KELVIN
+Indicates that the sensor measure degrees in Kelvin
+.Pq K .
+.It Dv SENSOR_UNIT_VOLTS
+Indicates that the sensor measures voltage in Volts
+.Pq V .
+.It Dv SENSOR_UNIT_AMPS
+Indicates that the sensor measures current in Amperes
+.Pq A .
+.It Dv SENSOR_UNIT_NONE
+This unit indicates that there is no unit because there is associated physical
+property.
+This should be used by
+.Dv SENSOR_KIND_SYNTHETIC
+sensors.
+.It Dv SENSOR_UNIT_UNKNOWN
+This value is used by the framework to indicate a unit was not reported.
+Drivers should not use this value.
+.El
+.Ss Sensor Names and Classes
+When a sensor is created with
+.Xr ksensor_create 9F
+it must specify both a name and a class, which influence how the sensor shows up
+under
+.Pa /dev/sensors.
+The class is a
+.Sq \&:
+delineated string
+.Po
+the same conceptually as a minor node's type, see
+.Xr ddi_create_minor_node 9F
+.Pc
+that describes the type of sensor.
+They begin with
+.Dq ddi_sensor
+and then are followed by the sensor's kind and then, after another colon,
+something that describes what type of hardware it corresponds to.
+The framework takes care of defining the class for PCI devices that create
+sensors with
+.Xr ksensor_create_scalar_pcidev 9F
+and provides the following classes otherwise:
+.Bl -tag -width Ds
+.It Dv DDI_NT_SENSOR_TEMP_CPU
+Indicates that this is a temperature sensor that relates to the CPU, whether the
+socket as a whole, a core, or some other unit.
+.It Dv DDI_NT_SENSOR_TEMP_PCH
+Indicates that this is a temperature sensor that relates to an external chipset
+to the CPU that is otherwise part of the platform.
+.El
+.Pp
+In general, drivers shouldn't create arbitrary classes that aren't defined by
+the framework as then they won't be tied into system services, like topology
+provided by the fault management architecture.
+.Pp
+Where the class effectively indicates the directory structure under
+.Pa /dev/sensors ,
+the name of the sensor corresponds to the name of the device that will be
+created.
+The semantics of the name determine a bit on the interface used.
+While the PCI sensor creation routines are tied into things such that the name
+is usually something descriptive, for other sensors that use
+.Xr ksensor_create 9F ,
+usually the name is part of a contract with something in userland that will
+consume it like FMA.
+.Ss Sensor Creation, Destruction, and Lifetimes
+Sensors are tied to an instance of a driver
+.Po
+i.e. a particular
+.Vt dev_info_t
+.Pc
+and are identified through an opaque
+.Vt id_t
+identifier that is unique in the system.
+.Pp
+To create a ksensor, a driver must call either
+.Xr ksensor_create 9F
+or
+.Xr ksensor_create_pcidev 9F
+in its
+.Xr attach 9E
+entry point.
+A ksensor cannot be created outside of a driver's
+.Xr attach 9E
+entry point.
+Once created, the sensor will persist until the driver removes the sensors with
+.Xr ksensor_remove 9F
+which can only be called during
+.Xr detach 9E
+or
+.Xr attach 9E .
+.Pp
+As part of creating a ksensor, a driver must supply an operations vector
+described in
+.Xr ksensor_ops 9E .
+This provides both metadata and data about the sensor itself.
+The framework provides the following guarantees and constraints around when the
+operation vectors will be called:
+.Bl -bullet
+.It
+No ksensor operations registered will ever be called during
+.Xr attach 9E
+and
+.Xr detach 9E .
+.It
+Like with other character devices, if the driver detaches for any reason
+.Pq e.g. modunload thread
+the character device will be maintained in
+.Pa /devices
+and its corresponding symlink in
+.Pa /dev/sensors .
+If the device is accessed again, the driver will automatically be reattached by
+the system like any other character device.
+This alleviates the sensor driver from having to worry about whether or not it
+is okay to detach.
+.It
+A single ksensor should assume that its operation vectors will be called in
+parallel.
+That is, not only can both
+.Xr kso_kind 9E
+and
+.Xr kso_scalar 9E
+be called from different threads at the same time, but multiple threads may
+call a single operation entry point as well.
+Put differently, the framework does not intend to serialize access to a single
+ksensor.
+.It
+If a driver provides multiple ksensors, it should assume that they can all be
+called in parallel.
+Put differently, different ksensors can be accessed at the same time.
+.El
+.Ss Kernel versus Userland Processing
+The ksensor framework is intended for cases where there are registers or schemes
+that can only be accessed by the kernel itself.
+A good case of this is where sensors are available through PCI configuration
+space or a memory-mapped BAR.
+Other devices like optical transceivers have an array of sensors, but are only
+accessible through an additional I/O interface like
+.Xr mac_capab_transceiver 9E .
+In cases where there are a lot of semantics and parsing required, or the kernel
+cannot wholly own the device, it can make more sense to instead leverage a
+different interface and allow another part of the system like FMA to amalgamate
+the different sensors using additional components in userland.
+.Pp
+The right call will vary based on the device and interface.
+The main point here is that while the ksensor framework exists, it doesn't have
+to be the only way that sensors are provided for consumption.
+But it is here to be used where it makes sense!
+.Sh SEE ALSO
+.Xr ksensor 4D ,
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr ksensor_ops 9E ,
+.Xr ddi_create_minor_node 9F ,
+.Xr ksensor_create 9F ,
+.Xr ksensor_create_scalar_pcidev 9F ,
+.Xr ksensor_kind 9F

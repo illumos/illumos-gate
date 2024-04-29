@@ -16,7 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 RackTop Systems, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2023 Peter Tribble
 #
 
@@ -715,6 +715,14 @@ link path=usr/share/man/man9f/kmem_cache_free.9f target=kmem_cache_create.9f
 link path=usr/share/man/man9f/kmem_cache_set_move.9f target=kmem_cache_create.9f
 link path=usr/share/man/man9f/kmem_free.9f target=kmem_alloc.9f
 link path=usr/share/man/man9f/kmem_zalloc.9f target=kmem_alloc.9f
+file path=usr/share/man/man9f/ksensor_create.9f
+link path=usr/share/man/man9f/ksensor_create_scalar_pcidev.9f \
+    target=ksensor_create.9f
+file path=usr/share/man/man9f/ksensor_kind.9f
+link path=usr/share/man/man9f/ksensor_kind_current.9f target=ksensor_kind.9f
+link path=usr/share/man/man9f/ksensor_kind_temperature.9f target=ksensor_kind.9f
+link path=usr/share/man/man9f/ksensor_kind_voltage.9f target=ksensor_kind.9f
+link path=usr/share/man/man9f/ksensor_remove.9f target=ksensor_create.9f
 file path=usr/share/man/man9f/kstat_create.9f
 file path=usr/share/man/man9f/kstat_delete.9f
 file path=usr/share/man/man9f/kstat_install.9f

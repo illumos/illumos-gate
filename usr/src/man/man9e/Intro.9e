@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd April 28, 2024
+.Dd May 23, 2024
 .Dt INTRO 9E
 .Os
 .Sh NAME
@@ -863,6 +863,31 @@ and
 .Xr usb_pipe_xopen 9F .
 .It
 Proceed with the rest of device initialization and service.
+.El
+.Ss Sensors
+Many devices embed sensors in them, such as a networking ASIC that tracks its
+junction temperature.
+The kernel provides the
+.Xr ksensor 9E
+.Pq kernel sensor
+framework to allow device drivers to implement sensors with a minimal set of
+callback functions.
+Any device driver, whether it's providing services through another framework or
+not, can implement the ksensor operations.
+Drivers do not need to implement any character device operations directly.
+They are instead provided via the
+.Xr ksensor 4D
+driver.
+.Pp
+A driver registers with the ksensor framework during its
+.Xr attach 9E
+entry point
+and must implement the functions described in
+.Xr ksensor_ops 9E
+for each sensor that it creates.
+These interfaces include:
+.Bl -column -offset -indent "mac_capab_transceiver" "mac_capab_transceiver"
+.It Xr kso_kind 9E Ta Xr kso_scalar 9E
 .El
 .Ss Virtio Drivers
 The kernel provides an uncommitted interface for Virtio device drivers, which is

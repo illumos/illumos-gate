@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -544,7 +544,7 @@ ksensor_create(dev_info_t *dip, const ksensor_ops_t *ops, void *arg,
 }
 
 int
-ksensor_create_scalar_pcidev(dev_info_t *dip, uint_t kind,
+ksensor_create_scalar_pcidev(dev_info_t *dip, uint64_t kind,
     const ksensor_ops_t *ops, void *arg, const char *name, id_t *idp)
 {
 	char *pci_name, *type;

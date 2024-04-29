@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <alloca.h>
@@ -367,7 +367,7 @@ topo_sensor_type_name(uint32_t type, char *buf, size_t len)
 }
 
 void
-topo_sensor_units_name(uint8_t type, char *buf, size_t len)
+topo_sensor_units_name(uint32_t type, char *buf, size_t len)
 {
 	topo_name_trans_t *ntp;
 
@@ -382,7 +382,7 @@ topo_sensor_units_name(uint8_t type, char *buf, size_t len)
 }
 
 void
-topo_led_type_name(uint8_t type, char *buf, size_t len)
+topo_led_type_name(uint32_t type, char *buf, size_t len)
 {
 	topo_name_trans_t *ntp;
 
@@ -397,7 +397,7 @@ topo_led_type_name(uint8_t type, char *buf, size_t len)
 }
 
 void
-topo_led_state_name(uint8_t type, char *buf, size_t len)
+topo_led_state_name(uint32_t type, char *buf, size_t len)
 {
 	topo_name_trans_t *ntp;
 
@@ -412,7 +412,7 @@ topo_led_state_name(uint8_t type, char *buf, size_t len)
 }
 
 void
-topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
+topo_sensor_state_name(uint32_t sensor_type, uint32_t state, char *buf,
     size_t len)
 {
 	topo_name_trans_t *ntp;

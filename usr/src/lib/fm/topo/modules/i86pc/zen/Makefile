@@ -10,21 +10,27 @@
 #
 
 #
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 MODULE = zen
 ARCH = i86pc
 CLASS = arch
 
-MODULESRCS = topo_zen.c topo_zen_tn.c
+MODULESRCS = topo_zen.c topo_zen_tn.c topo_zen_sensor.c topo_sensor.c
 ZENDIR = ../../common/zen/
+SHAREDDIR = ../../common/shared/
 
 include ../../Makefile.plugin
 
 CPPFLAGS += -I$(ZENDIR) -I$(SRC)/uts/intel/io/amdzen -I$(SRC)/uts/intel
+CPPFLAGS += -I$(SHAREDDIR)
 LDLIBS += -lfmd_agent -lumem -lkstat
 
 %.o: $(ZENDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: $(SHAREDDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

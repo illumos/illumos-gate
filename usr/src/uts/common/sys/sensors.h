@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_SENSORS_H
@@ -35,9 +35,13 @@ extern "C" {
 #define	SENSOR_KIND_TEMPERATURE		0x01
 #define	SENSOR_KIND_VOLTAGE		0x02
 #define	SENSOR_KIND_CURRENT		0x03
+#define	SENSOR_KIND_SYNTHETIC		0x04
 
 /*
- * Lists of units that senors may have.
+ * Lists of units that sensors may have. The none type is intended for unitless
+ * sensors such as general control sensors. These sensors are generally derived
+ * from a secondary unit. A prime example is AMD's CPU control temperature,
+ * which is a unitless measure that is derived from temperature.
  */
 #define	SENSOR_UNIT_UNKNOWN		0x00
 #define	SENSOR_UNIT_CELSIUS		0x01
@@ -45,6 +49,7 @@ extern "C" {
 #define	SENSOR_UNIT_KELVIN		0x03
 #define	SENSOR_UNIT_VOLTS		0x04
 #define	SENSOR_UNIT_AMPS		0x05
+#define	SENSOR_UNIT_NONE		0x06
 
 #define	SENSOR_IOCTL	(('s' << 24) | ('e' << 16) | ('n' << 8))
 
@@ -55,6 +60,7 @@ extern "C" {
 
 typedef struct sensor_ioctl_kind {
 	uint64_t	sik_kind;
+	uint64_t	sik_derive;
 } sensor_ioctl_kind_t;
 
 /*
@@ -108,7 +114,7 @@ extern int ksensor_create(dev_info_t *, const ksensor_ops_t *, void *,
  * Create a scalar sensor for a PCI device. If this is not a device-wide
  * (e.g. per-function) sensor, this should not be used.
  */
-extern int ksensor_create_scalar_pcidev(dev_info_t *, uint_t,
+extern int ksensor_create_scalar_pcidev(dev_info_t *, uint64_t,
     const ksensor_ops_t *, void *, const char *, id_t *);
 
 /*
