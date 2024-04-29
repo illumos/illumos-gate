@@ -1029,10 +1029,10 @@ vioif_reclaim_used_tx(vioif_t *vif)
 			do_update = B_TRUE;
 		}
 
+		mutex_exit(&vif->vif_mutex);
 		if (do_update) {
 			mac_tx_update(vif->vif_mac_handle);
 		}
-		mutex_exit(&vif->vif_mutex);
 	}
 
 	return (num_reclaimed);
