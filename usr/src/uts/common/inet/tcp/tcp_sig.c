@@ -613,7 +613,6 @@ static int
 tcpsig_sa_delget(keysock_t *ks, tcp_stack_t *tcps, sadb_msg_t *samsg,
     sadb_ext_t **extv, int *diagp)
 {
-	tcpsig_db_t *db;
 	sadb_address_t *srcext, *dstext;
 	struct sockaddr_storage *src, *dst;
 	tcpsig_sa_t *sa;
@@ -654,20 +653,18 @@ tcpsig_sa_delget(keysock_t *ks, tcp_stack_t *tcps, sadb_msg_t *samsg,
 		return (0);
 	}
 
-	/* Delete */
+	/*
+	 * Delete the entry.
+	 * At this point we still have a hold on the entry from the find call
+	 * above, so mark it as tombstoned and then release the hold. If
+	 * that causes the reference count to become 0, the entry will be
+	 * removed from the database.
+	 */
 
-	rw_enter(&db->td_lock, RW_WRITER);
 	mutex_enter(&sa->ts_lock);
-	if (sa->ts_refcnt > 0) {
-		sa->ts_tombstoned = true;
-		mutex_exit(&sa->ts_lock);
-		rw_exit(&db->td_lock);
-	} else {
-		list_remove(&db->td_salist, sa);
-		mutex_exit(&sa->ts_lock);
-		rw_exit(&db->td_lock);
-		tcpsig_sa_free(sa);
-	}
+	sa->ts_tombstoned = true;
+	mutex_exit(&sa->ts_lock);
+	tcpsig_sa_rele(sa);
 
 	return (0);
 }
