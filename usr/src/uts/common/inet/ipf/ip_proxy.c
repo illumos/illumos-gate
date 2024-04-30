@@ -875,6 +875,8 @@ ipf_stack_t *ifs;
 
 	/* Since the refcnt is used we make a copy of lcl_ap_proxies */
 	KMALLOCS(ifs->ifs_ap_proxies, aproxy_t *, sizeof (lcl_ap_proxies));
+	if (ifs->ifs_ap_proxies == NULL)
+		return (-1);
 	bcopy(lcl_ap_proxies, ifs->ifs_ap_proxies, sizeof (lcl_ap_proxies));
 
 	for (ap = ifs->ifs_ap_proxies; ap->apr_p; ap++) {

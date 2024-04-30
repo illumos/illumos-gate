@@ -296,6 +296,7 @@ typedef unsigned int	u_32_t;
 #  endif /* sparc */
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
 #  define	KMALLOCS(a,b,c)	(a) = (b)kmem_alloc((c), KM_NOSLEEP)
+#  define	SLEEPING_KMALLOCS(a,b,c) (a) = (b)kmem_alloc((c), KM_SLEEP)
 #  define	GET_MINOR(x)	getminor(x)
 /*extern	phy_if_t	get_unit __P((char *, int, ipf_stack_t *));*/
 #  define	GETIFP(n, v, ifs)	(void *)get_unit(n, v, ifs)
@@ -1478,6 +1479,7 @@ typedef	struct	mb_s	{
 # define	SPL_X(x)	;
 # define	KMALLOC(a,b)	(a) = (b)malloc(sizeof(*a))
 # define	KMALLOCS(a,b,c)	(a) = (b)malloc(c)
+# define	SLEEPING_KMALLOCS KMALLOCS
 # define	KFREE(x)	free(x)
 # define	KFREES(x,s)	free(x)
 # define	GETIFP(x, v, ifs)	get_unit(x,v, ifs)
