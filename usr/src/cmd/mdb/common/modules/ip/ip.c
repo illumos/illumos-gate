@@ -1443,8 +1443,9 @@ ip6hdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%<u>%-26s %-26s %4s %7s %5s %3s %3s%</u>\n",
 	    "SRC", "DST", "TCLS", "FLOW-ID", "PLEN", "NXT", "HOP");
 
-	class = (iph->ip6_vcf & IPV6_FLOWINFO_TCLASS) >> 20;
+	class = iph->ip6_vcf & IPV6_FLOWINFO_TCLASS;
 	mdb_nhconvert(&class, &class, sizeof (class));
+	class >>= 20;
 	flow = iph->ip6_vcf & IPV6_FLOWINFO_FLOWLABEL;
 	mdb_nhconvert(&flow, &flow, sizeof (flow));
 	mdb_nhconvert(&plen, &iph->ip6_plen, sizeof (plen));
