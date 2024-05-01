@@ -29,7 +29,7 @@
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd April 15, 2024
+.Dd April 27, 2024
 .Dt NC 1
 .Os
 .Sh NAME
@@ -41,6 +41,8 @@
 .Nm
 .Op Fl 46dnrStuvz
 .Op Fl i Ar interval
+.Op Fl M Ar ttl
+.Op Fl m Ar minttl
 .Op Fl P Ar proxy_username
 .Op Fl p Ar port
 .Op Fl s Ar source_ip_address
@@ -54,6 +56,8 @@
 .Fl l
 .Op Fl 46DdnrStuvz
 .Op Fl i Ar interval
+.Op Fl M Ar ttl
+.Op Fl m Ar minttl
 .Op Fl T Ar ToS
 .Op Ar hostname
 .Ar port
@@ -61,6 +65,8 @@
 .Fl l
 .Op Fl 46DdnrStuvz
 .Op Fl i Ar interval
+.Op Fl M Ar ttl
+.Op Fl m Ar minttl
 .Op Fl T Ar ToS
 .Fl p Ar port
 .Nm
@@ -152,6 +158,22 @@ Additionally, any
 specified with the
 .Fl w
 option is ignored.
+.It Fl M
+Set the default IPv4 TTL or IPv6 hop count that should be used in outgoing
+packets.
+This corresponds to the
+.Dv IP_TTL
+and
+.Dv IPV6_UNICAST_HOPS
+socket options.
+.It Fl m
+Set the minimum IPv4 TTL or IPv6 hop count that must be present on a packet for
+a packet to be received.
+This corresponds to the
+.Dv IP_MINTTL
+and
+.Dv IPV6_MINHOPCOUNT
+socket options.
 .It Fl n
 Do not do any naming or service lookups on any addresses, hostnames, or ports.
 .Pp
@@ -219,12 +241,12 @@ option.
 .It Fl T Ar ToS
 Specify IP Type of Service
 .Pq ToS
-for the connection.
+or IPv6 traffic class for the connection.
 Valid values are the tokens:
 .Cm lowdelay ,
 .Cm throughput ,
 .Cm reliability ,
-or an 8-bit hexadecimal value preceded by 0x.
+or any decimal or hexadecimal integer between 0 and 255.
 .It Fl t
 Cause
 .Nm

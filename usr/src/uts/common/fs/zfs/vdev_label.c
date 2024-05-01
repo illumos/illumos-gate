@@ -621,6 +621,16 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 
 		ASSERT(!vd->vdev_ishole);
 
+		/*
+		 * Indirect vdevs store the remnants of a removed vdev;
+		 * they have no direct children, but are not leaf devices.
+		 * The content of an indirect device is stored elsewhere
+		 * in the pool.  We can avoid a pointless zero-length alloc
+		 * and return early here.
+		 */
+		if (vd->vdev_children == 0)
+			return (nv);
+
 		child = kmem_alloc(vd->vdev_children * sizeof (nvlist_t *),
 		    KM_SLEEP);
 

@@ -40,6 +40,7 @@ SUBDIRS = \
 PROGS = \
 	env-OS-4089 \
 	aligned_alloc \
+	ascftime \
 	asprintf-14933 \
 	c11_threads \
 	c11_tss \

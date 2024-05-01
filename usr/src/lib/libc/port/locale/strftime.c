@@ -20,6 +20,7 @@
 #include "lint.h"
 #include "tzfile.h"
 #include <fcntl.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <stdio.h>
@@ -64,6 +65,26 @@ static const char *fmt_padding[][4] = {
 	{ "%04d",	"%d",	"%4d",	"%04d" }
 };
 
+/*
+ * If a caller (such as ascftime) passes in a very large maximum size,
+ * the pointer addition here may overflow, wrap around the end of
+ * memory, and, if used as-is, would cause subsequent range checks to fail
+ * spuriously, resulting in corrupted output even if there is sufficent
+ * room in the buffer for the requested format.
+ *
+ * To prevent this, we replace an overflowed result with the largest
+ * possible pointer value.
+ */
+static char *
+_ptlim(char *s, size_t maxsize)
+{
+	char *e = s + maxsize;
+
+	if (e < s)
+		e = (char *)(-sizeof (*e));
+
+	return (e);
+}
 
 size_t
 strftime_l(char *_RESTRICT_KYWD s, size_t maxsize,
@@ -71,10 +92,11 @@ strftime_l(char *_RESTRICT_KYWD s, size_t maxsize,
     locale_t loc)
 {
 	char *p;
+	char *e = _ptlim(s, maxsize);
 
 	tzset();
-	p = _fmt(loc, ((format == NULL) ? "%c" : format), t, s, s + maxsize);
-	if (p == s + maxsize)
+	p = _fmt(loc, ((format == NULL) ? "%c" : format), t, s, e);
+	if (p == e)
 		return (0);
 	*p = '\0';
 	return (p - s);

@@ -340,11 +340,12 @@ interpret_ipv6(int flags, const ip6_t *ip6h, int fraglen)
 	dst_name = addrtoname(AF_INET6, &ip6h->ip6_dst);
 
 	/*
-	 * Use endian-aware masks to extract traffic class and
-	 * flowinfo.  Also, flowinfo is now 20 bits and class 8
-	 * rather than 24 and 4.
+	 * The IPV6_FLOWINFO_* masks are endian-aware. However we still need to
+	 * convert this to the native endian values so we can print them
+	 * usefully. The shift for the class must occur after that as it is not
+	 * endian aware.
 	 */
-	class = ntohl((ip6h->ip6_vcf & IPV6_FLOWINFO_TCLASS) >> 20);
+	class = ntohl((ip6h->ip6_vcf & IPV6_FLOWINFO_TCLASS)) >> 20;
 	flow = ntohl(ip6h->ip6_vcf & IPV6_FLOWINFO_FLOWLABEL);
 
 	/*

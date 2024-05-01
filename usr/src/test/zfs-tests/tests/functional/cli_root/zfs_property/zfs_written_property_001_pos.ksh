@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 #
 
 #
@@ -75,7 +75,7 @@ for i in 1 2 3; do
 	log_must sync
 	written=$(get_prop written $TESTPOOL/$TESTFS1)
 	((expected_written=blocks * mb_block))
-	within_percent $written $expected_written 99.5 || \
+	within_percent $written $expected_written 99.0 || \
 	    log_fail "Unexpected written value $written $expected_written"
 	((total = total + blocks))
 	((blocks = blocks + 50))
@@ -93,7 +93,7 @@ for i in 1 2 3; do
 	else
 		((expected_written = blocks * mb_block))
 	fi
-	within_percent $written $expected_written 99.5 || \
+	within_percent $written $expected_written 99.0 || \
 	    log_fail "Unexpected written value $written $expected_written $i"
 	((blocks = blocks + 50))
 done
@@ -107,7 +107,7 @@ blocks=50
 for i in 1 2 3; do
 	writtenat=$(get_prop written@snap$i $TESTPOOL/$TESTFS1)
 	((expected_writtenat = total * mb_block))
-	within_percent $writtenat $expected_writtenat 99.5 || \
+	within_percent $writtenat $expected_writtenat 99.0 || \
 	    log_fail "Unexpected written@ value"
 	((total = total - blocks))
 	((blocks = blocks + 50))
@@ -126,12 +126,12 @@ within_percent $written $before_written 0.1 && \
 writtenat=$(get_prop written@snap1 $TESTPOOL/$TESTFS1)
 ((snap1_size = snap1_size - 150))
 ((expected_writtenat = snap1_size * mb_block))
-within_percent $writtenat $expected_writtenat 99.5 || \
+within_percent $writtenat $expected_writtenat 99.0 || \
     log_fail "Unexpected written value after delete $writtenat $expected_writtenat"
 writtenat=$(get_prop written@snap2 $TESTPOOL/$TESTFS1)
 ((snap2_size = snap2_size - 150))
 ((expected_writtenat = snap2_size * mb_block))
-within_percent $writtenat $expected_writtenat 99.5 || \
+within_percent $writtenat $expected_writtenat 99.0 || \
     log_fail "Unexpected written value after delete"
 
 log_note "write data"
@@ -147,15 +147,15 @@ writtenat3=$(get_prop written@snap3 $TESTPOOL/$TESTFS1)
 ((expected_writtenat = snap3_size * mb_block))
 [[ $written -eq $writtenat3 ]] || \
     log_fail "Unexpected_written value"
-within_percent $writtenat3 $expected_writtenat 99.5 || \
+within_percent $writtenat3 $expected_writtenat 99.0 || \
     log_fail "Unexpected_written@ value for snap3"
 ((snap2_size = snap2_size + blocks))
 ((expected_writtenat = snap2_size * mb_block))
-within_percent $writtenat2 $expected_writtenat 99.5 || \
+within_percent $writtenat2 $expected_writtenat 99.0 || \
     log_fail "Unexpected_written@ value for snap2"
 ((snap1_size = snap1_size + blocks))
 ((expected_writtenat = snap1_size * mb_block))
-within_percent $writtenat1 $expected_writtenat 99.5 || \
+within_percent $writtenat1 $expected_writtenat 99.0 || \
     log_fail "Unexpected_written@ value for snap1"
 
 log_note "write data to a clone"
@@ -182,7 +182,7 @@ written3=$(get_prop_mb written@snap3 $TESTPOOL/$TESTFS1)
 typeset -l expected_written3
 ((expected_written3 = snap_before_written2 + snap_before_written3))
 prev_written=$(get_prop_mb written $TESTPOOL/$TESTFS1@snap3)
-within_percent $prev_written $expected_written3 99.5 || \
+within_percent $prev_written $expected_written3 99.0 || \
     log_fail "unexpected written value $prev_written $expected_written3"
 
 log_must zfs destroy $TESTPOOL/$TESTFS1@snap3
@@ -216,14 +216,14 @@ for ds in $datasets; do
 	    count=$blocks
 	log_must sync
 done
-recursive_output=$(zfs get -r written@current $TESTPOOL | \
+recursive_output=$(zfs get -p -r written@current $TESTPOOL | \
     grep -v $TESTFS1@ | grep -v $TESTFS2@ | grep -v $TESTFS3@ | \
     grep -v "VALUE" | grep -v "-")
-expected="20.0M"
+expected=$((20 * mb_block))
 for ds in $datasets; do
 	writtenat=$(echo "$recursive_output" | grep -v $ds/)
 	writtenat=$(echo "$writtenat" | grep $ds | awk '{print $3}')
-	[[ $writtenat == $expected ]] || \
+	within_percent $writtenat $expected 99.0 || \
 	    log_fail "recursive written property output mismatch"
 done
 

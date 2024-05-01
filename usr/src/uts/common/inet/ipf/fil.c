@@ -6453,7 +6453,11 @@ ipftuneable_alloc(ipf_stack_t *ifs)
 {
     ipftuneable_t *item;
 
-    KMALLOCS(ifs->ifs_ipf_tuneables, ipftuneable_t *,
+    /*
+     * We are being called as part of netstack creation and may not return
+     * NULL; use a sleeping allocation.
+     */
+    SLEEPING_KMALLOCS(ifs->ifs_ipf_tuneables, ipftuneable_t *,
 	sizeof (lcl_ipf_tuneables));
     bcopy(lcl_ipf_tuneables, ifs->ifs_ipf_tuneables,
 	sizeof (lcl_ipf_tuneables));

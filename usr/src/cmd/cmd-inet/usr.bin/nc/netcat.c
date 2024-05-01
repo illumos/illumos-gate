@@ -83,10 +83,10 @@ unsigned int iflag;	/* Interval Flag */
 int	kflag;		/* More than one connect */
 int	lflag;		/* Bind to local port */
 int	nflag;		/* Don't do name lookup */
-char	*Pflag;		/* Proxy username */
+const char *Pflag;		/* Proxy username */
 char	*pflag;		/* Localport flag */
 int	rflag;		/* Random ports flag */
-char	*sflag;		/* Source Address */
+const char *sflag;		/* Source Address */
 int	tflag;		/* Telnet Emulation */
 int	uflag;		/* UDP - Default to TCP */
 int	vflag;		/* Verbosity */
@@ -99,6 +99,8 @@ int	Tflag = -1;	/* IP Type of Service */
 
 int	timeout = -1;
 int	family = AF_UNSPEC;
+int	ttl = -1;
+int	minttl = -1;
 
 /*
  * portlist structure
@@ -114,18 +116,18 @@ struct {
 void	atelnet(int, unsigned char *, unsigned int);
 void	build_ports(char *);
 void	help(void);
-int	local_listen(char *, char *, struct addrinfo);
+int	local_listen(const char *, const char *, struct addrinfo);
 void	readwrite(int);
 int	remote_connect(const char *, const char *, struct addrinfo);
 int	socks_connect(const char *, const char *,
 	    const char *, const char *, struct addrinfo, int, const char *);
 int	udptest(int);
-int	unix_connect(char *);
-int	unix_listen(char *);
-void	set_common_sockopts(int);
-int	parse_iptos(char *);
+int	unix_connect(const char *);
+int	unix_listen(const char *);
+void	set_common_sockopts(int, int);
+int	parse_iptos(const char *);
 void	usage(int);
-char	*print_addr(char *, size_t, struct sockaddr *, int, int);
+const char *print_addr(char *, size_t, struct sockaddr *, int, int);
 
 int
 main(int argc, char *argv[])
@@ -148,7 +150,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46Ddhi:klnP:p:rs:ST:tUuvw:X:x:z")) != -1) {
+	    "46Ddhi:klm:M:nP:p:rs:ST:tUuvw:X:x:z")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -183,6 +185,20 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			kflag = 1;
+			break;
+		case 'M':
+			ttl = strtonumx(optarg, 1, 255, &errstr, 0);
+			if (errstr != NULL) {
+				errx(1, "ttl is %s: %s, valid values are "
+				    "between 1 and 255", errstr, optarg);
+			}
+			break;
+		case 'm':
+			minttl = strtonumx(optarg, 0, 255, &errstr, 0);
+			if (errstr != NULL) {
+				errx(1, "minimum ttl is %s: %s, valid values "
+				    "are between 0 and 255", errstr, optarg);
+			}
 			break;
 		case 'l':
 			lflag = 1;
@@ -461,7 +477,7 @@ main(int argc, char *argv[])
 /*
  * print IP address and (optionally) a port
  */
-char *
+const char *
 print_addr(char *ntop, size_t ntlen, struct sockaddr *addr, int len, int flags)
 {
 	char port[NI_MAXSERV];
@@ -484,7 +500,7 @@ print_addr(char *ntop, size_t ntlen, struct sockaddr *addr, int len, int flags)
  * Returns a socket connected to a local unix socket. Returns -1 on failure.
  */
 int
-unix_connect(char *path)
+unix_connect(const char *path)
 {
 	struct sockaddr_un sunaddr;
 	int s;
@@ -513,7 +529,7 @@ unix_connect(char *path)
  * Create a unix domain socket, and listen on it.
  */
 int
-unix_listen(char *path)
+unix_listen(const char *path)
 {
 	struct sockaddr_un sunaddr;
 	int s;
@@ -594,7 +610,7 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 			}
 		}
 
-		set_common_sockopts(s);
+		set_common_sockopts(s, res0->ai_family);
 
 		if (connect(s, res0->ai_addr, res0->ai_addrlen) == 0)
 			break;
@@ -621,7 +637,7 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
  * address. Returns -1 on failure.
  */
 int
-local_listen(char *host, char *port, struct addrinfo hints)
+local_listen(const char *host, const char *port, struct addrinfo hints)
 {
 	struct addrinfo *res, *res0;
 	int s, ret, x = 1;
@@ -645,7 +661,7 @@ local_listen(char *host, char *port, struct addrinfo hints)
 		if (ret == -1)
 			err(1, NULL);
 
-		set_common_sockopts(s);
+		set_common_sockopts(s, res0->ai_family);
 
 		if (bind(s, (struct sockaddr *)res0->ai_addr,
 		    res0->ai_addrlen) == 0)
@@ -877,7 +893,7 @@ udptest(int s)
 }
 
 void
-set_common_sockopts(int s)
+set_common_sockopts(int s, int af)
 {
 	int x = 1;
 
@@ -893,16 +909,76 @@ set_common_sockopts(int s)
 			err(1, NULL);
 	}
 	if (Tflag != -1) {
-		if (setsockopt(s, IPPROTO_IP, IP_TOS, &Tflag,
-		    sizeof (Tflag)) == -1)
-			err(1, "set IP ToS");
+		switch (af) {
+		case AF_INET:
+			if (setsockopt(s, IPPROTO_IP, IP_TOS, &Tflag,
+			    sizeof (Tflag)) == -1) {
+				err(1, "failed to set IP ToS socket option");
+			}
+			break;
+		case AF_INET6:
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_TCLASS, &Tflag,
+			    sizeof (Tflag)) == -1) {
+				err(1, "failed to set IPv6 traffic class "
+				    "socket option");
+			}
+			break;
+		default:
+			err(1, "cannot set TTL/Hops on unsupported socket "
+			    "family 0x%x", af);
+		}
 	}
+
+	if (ttl != -1) {
+		switch (af) {
+		case AF_INET:
+			if (setsockopt(s, IPPROTO_IP, IP_TTL, &ttl,
+			    sizeof (ttl)) != 0) {
+				err(1, "failed to set IP TTL socket option");
+			}
+			break;
+		case AF_INET6:
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl,
+			    sizeof (ttl)) != 0) {
+				err(1, "failed to set IPv6 unicast hops socket "
+				    "option");
+			}
+			break;
+		default:
+			err(1, "cannot set TTL/Hops on unsupported socket "
+			    "family 0x%x", af);
+		}
+	}
+
+	if (minttl != -1) {
+		switch (af) {
+		case AF_INET:
+			if (setsockopt(s, IPPROTO_IP, IP_MINTTL, &minttl,
+			    sizeof (minttl)) != 0) {
+				err(1, "failed to set IP minimum TTL socket "
+				    "option");
+			}
+			break;
+		case AF_INET6:
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_MINHOPCOUNT,
+			    &minttl, sizeof (minttl)) != 0) {
+				err(1, "failed to set IPv6 minimum hop count "
+				    "socket option");
+			}
+			break;
+		default:
+			err(1, "cannot set minimum TTL/Hops on unsupported "
+			    "socket family 0x%x", af);
+		}
+	}
+
 }
 
 int
-parse_iptos(char *s)
+parse_iptos(const char *s)
 {
-	int tos = -1;
+	int tos;
+	const char *errstr;
 
 	if (strcmp(s, "lowdelay") == 0)
 		return (IPTOS_LOWDELAY);
@@ -911,9 +987,12 @@ parse_iptos(char *s)
 	if (strcmp(s, "reliability") == 0)
 		return (IPTOS_RELIABILITY);
 
-	if (sscanf(s, "0x%x", (unsigned int *) &tos) != 1 ||
-	    tos < 0 || tos > 0xff)
-		errx(1, "invalid IP Type of Service");
+	tos = strtonumx(s, 0, 255, &errstr, 0);
+	if (errstr != NULL) {
+		errx(1, "IP ToS/IPv6 TC is %s: %s, valid values are "
+		    "between 0 and 255", errstr, optarg);
+	}
+
 	return (tos);
 }
 
@@ -930,10 +1009,14 @@ help(void)
 	\t-i secs\t	Delay interval for lines sent, ports scanned\n\
 	\t-k		Keep inbound sockets open for multiple connects\n\
 	\t-l		Listen mode, for inbound connects\n\
+	\t-l		Listen mode, for inbound connects\n\
+	\t-M ttl\t	Set the outbound IPv4 TTL / IPv6 Hop Limit\n\
+	\t-m minttl	Set the inbound minimum IPv4 TTL / IPv6 Hop Limit\n\
 	\t-n		Suppress name/port resolutions\n\
 	\t-P proxyuser\tUsername for proxy authentication\n\
 	\t-p port\t	Specify local port or listen port\n\
 	\t-r		Randomize remote ports\n\
+	\t-S		Enable TCP MD5 signature socket option\n\
 	\t-s addr\t	Local source address\n\
 	\t-T ToS\t	Set IP Type of Service\n\
 	\t-t		Answer TELNET negotiation\n\
@@ -953,14 +1036,11 @@ void
 usage(int ret)
 {
 	(void) fprintf(stderr,
-	    "usage: nc [-46DdhklnrtUuvz] [-i interval] [-P proxy_username]"
-	    " [-p port]\n");
-	(void) fprintf(stderr,
-	    "\t  [-s source_ip_address] [-T ToS] [-w timeout]"
-	    " [-X proxy_protocol]\n");
-	(void) fprintf(stderr,
-	    "\t  [-x proxy_address[:port]] [hostname]"
-	    " [port[s]]\n");
+	    "usage: nc [-46DdhklnrStUuvz] [-i interval] [-M ttl] [-m minttl]\n"
+	    "\t  [-P proxy_username] [-p port] [-s source_ip_address] "
+	    "[-T ToS]\n"
+	    "\t  [-w timeout] [-X proxy_protocol] [-x proxy_address[:port]]\n"
+	    "\t  [hostname] [port[s]]\n");
 	if (ret)
 		exit(1);
 }
