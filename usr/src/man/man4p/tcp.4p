@@ -15,7 +15,7 @@
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
-.Dd April 17, 2024
+.Dd May 2, 2024
 .Dt TCP 4P
 .Os
 .Sh NAME
@@ -278,16 +278,20 @@ The option value is specified as an
 .Vt int .
 When enabled
 .Pq non-zero ,
-outgoing packets have a digest added to the included TCP options and digests in
-incoming packets are verified.
-Incoming packets without a digest, or without a correct digest value, are
-silently dropped.
+outgoing packets have a digest added to the TCP options in their header, and
+digests in incoming packets are verified.
 In order to use this function, TCPSIG security associations
 .Pq one for each direction
 must also be configured in the system security association database
 .Pq SADB
 using
 .Xr tcpkey 8 .
+A listening socket with the option enabled accepts connections with digests
+only from sources for which a security association exists.
+Connections without digests are only accepted from sources for which no
+security association is set up.
+The resulting connected socket only has TCP_MD5SIG set if the connection is
+protected with MD5 signatures.
 If no matching security association
 .Pq SA
 is found for traffic on a socket configured with the

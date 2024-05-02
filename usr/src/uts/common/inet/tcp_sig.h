@@ -52,6 +52,7 @@ extern void tcpsig_sa_handler(keysock_t *, mblk_t *, sadb_msg_t *,
     sadb_ext_t **);
 
 extern void tcpsig_sa_rele(tcpsig_sa_t *);
+extern bool tcpsig_sa_exists(tcp_t *, bool, tcpsig_sa_t **);
 extern bool tcpsig_signature(mblk_t *, tcp_t *, tcpha_t *, int, uint8_t *,
     bool);
 extern bool tcpsig_verify(mblk_t *, tcp_t *, tcpha_t *, ip_recv_attr_t *,

@@ -166,7 +166,7 @@ static mblk_t	*tcp_input_add_ancillary(tcp_t *, mblk_t *, ip_pkt_t *,
 		    ip_recv_attr_t *);
 static void	tcp_input_listener(void *, mblk_t *, void *, ip_recv_attr_t *);
 static boolean_t tcp_process_options(mblk_t *mp, tcp_t *, tcpha_t *,
-    ip_recv_attr_t *);
+    ip_recv_attr_t *, boolean_t);
 static mblk_t	*tcp_reass(tcp_t *, mblk_t *, uint32_t);
 static void	tcp_reass_elim_overlap(tcp_t *, mblk_t *);
 static void	tcp_rsrv_input(void *, mblk_t *, void *, ip_recv_attr_t *);
@@ -543,7 +543,8 @@ tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
  * should do the appropriate change.
  */
 static boolean_t
-tcp_process_options(mblk_t *mp, tcp_t *tcp, tcpha_t *tcpha, ip_recv_attr_t *ira)
+tcp_process_options(mblk_t *mp, tcp_t *tcp, tcpha_t *tcpha, ip_recv_attr_t *ira,
+    boolean_t incoming)
 {
 	int options;
 	tcp_opt_t tcpopt;
@@ -556,12 +557,29 @@ tcp_process_options(mblk_t *mp, tcp_t *tcp, tcpha_t *tcpha, ip_recv_attr_t *ira)
 	options = tcp_parse_options(tcpha, &tcpopt);
 
 	if (tcp->tcp_md5sig) {
-		if ((options & TCP_OPT_SIG_PRESENT) == 0) {
+		if ((options & TCP_OPT_SIG_PRESENT)) {
+			if (!tcpsig_verify(mp->b_cont, tcp, tcpha, ira,
+			    tcpopt.tcp_opt_sig)) {
+				return (B_FALSE);
+			}
+		} else if (incoming) {
+
+			/*
+			 * This is a SYN packet for a listener which has the
+			 * TCP_MD5SIG option enabled, but the incoming SYN did
+			 * not contain a signature. If there is a configured SA
+			 * for this connection we must silently drop the
+			 * incoming packet. Otherwise we will gracefully
+			 * degrade to a connection without the option enabled.
+			 */
+			if (tcpsig_sa_exists(tcp, true, NULL)) {
+				TCP_STAT(tcp->tcp_tcps, tcp_sig_no_option);
+				return (B_FALSE);
+			}
+			TCP_STAT(tcp->tcp_tcps, tcp_sig_degraded);
+			tcp->tcp_md5sig = 0;
+		} else {
 			TCP_STAT(tcp->tcp_tcps, tcp_sig_no_option);
-			return (B_FALSE);
-		}
-		if (!tcpsig_verify(mp->b_cont, tcp, tcpha, ira,
-		    tcpopt.tcp_opt_sig)) {
 			return (B_FALSE);
 		}
 	}
@@ -1770,7 +1788,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	}
 
 	/* Process all TCP options. */
-	if (!tcp_process_options(mp, eager, tcpha, ira)) {
+	if (!tcp_process_options(mp, eager, tcpha, ira, B_TRUE)) {
 		tcp_bind_hash_remove(eager);
 		goto error3;
 	}
@@ -2676,10 +2694,11 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		}
 
 		/* Process all TCP options. */
-		if (!tcp_process_options(mp, tcp, tcpha, ira)) {
+		if (!tcp_process_options(mp, tcp, tcpha, ira, B_FALSE)) {
 			freemsg(mp);
 			return;
 		}
+
 		/*
 		 * The following changes our rwnd to be a multiple of the
 		 * MIN(peer MSS, our MSS) for performance reason.
