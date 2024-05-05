@@ -901,7 +901,6 @@ audio_encode_aiff(Audio_hdr *hdrp, unsigned char *buf, unsigned int *blen)
 	uint32_t		tmp_uint;
 	uint32_t		tmp_uint2;
 	int			buf_size = 0;
-	int			encoding;
 	uint16_t		tmp_ushort;
 
 	/* the only encoding we support for .aiff is signed linear PCM */

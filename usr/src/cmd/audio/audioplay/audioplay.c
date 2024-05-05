@@ -136,7 +136,6 @@ static char		*Audio_path = NULL;
 			/* path to search for audio files */
 
 /* Global variables */
-extern int	getopt(int, char *const *, const char *);
 extern int	optind;
 extern char	*optarg;
 

@@ -51,7 +51,7 @@ AudioUnixfile::
 AudioUnixfile(
 	const char		*path,		// pathname
 	const FileAccess	acc):		// access mode
-	AudioStream(path), fd(-1), block(TRUE), mode(acc),
+	AudioStream(path), mode(acc), block(TRUE), fd(-1),
 	infostring(new char[1]), infolength(1)
 {
 	infostring[0] = '\0';
@@ -260,7 +260,7 @@ SetBlocking(
 // Return a pointer to the info string
 // XXX - returns a pointer to the string stored in the object
 // XXX - assumes ASCII data
-char *const AudioUnixfile::
+char *AudioUnixfile::
 GetInfostring(
 	int&		len) const		// returned length of string
 {

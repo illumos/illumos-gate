@@ -109,7 +109,6 @@ static unsigned		Oldsize = 0;
 			/* Size of input file, if append */
 
 /* Global variables */
-extern int getopt();
 extern int optind;
 extern char *optarg;
 

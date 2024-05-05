@@ -132,7 +132,7 @@ zfree(void* mbuf)
 	    return;
 
 	if (mbuf != NULL) {
-		if (size = delete_bm((caddr_t)mbuf)) {
+		if ((size = delete_bm((caddr_t)mbuf)) != 0) {
 			if (munmap((char *)mbuf, size) < 0)
 			    perror("zfree: munmap");
 		}
