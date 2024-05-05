@@ -117,7 +117,7 @@ typedef struct wav_filehdr wav_filehdr_t;
 
 
 /* byte swapping macros */
-#if defined(__sparc)				/* big endian */
+#if defined(_BIG_ENDIAN)				/* big endian */
 #define	AUDIO_WAV_FILE2HOST_INT(from, to)				\
 		(*to) = ((((*from) >> 24) & 0xff) | (((*from) & 0xff) << 24) | \
 		(((*from) >> 8) & 0xff00) | (((*from) & 0xff00) << 8))
@@ -128,7 +128,7 @@ typedef struct wav_filehdr wav_filehdr_t;
 #define	AUDIO_WAV_HOST2FILE_SHORT(from, to)				\
 		AUDIO_WAV_FILE2HOST_SHORT((from), (to))
 
-#elif defined(__i386) || defined(__amd64)	/* little endian */
+#elif defined(_LITTLE_ENDIAN)				/* little endian */
 #define	AUDIO_WAV_FILE2HOST_INT(from, to)				\
 		*((int *)(to)) = *((int *)(from))
 #define	AUDIO_WAV_FILE2HOST_SHORT(from, to)				\
