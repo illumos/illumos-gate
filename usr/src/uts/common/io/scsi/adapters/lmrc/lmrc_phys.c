@@ -32,21 +32,25 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
+#include <sys/scsi/adapters/mfi/mfi.h>
+#include <sys/scsi/adapters/mfi/mfi_evt.h>
+#include <sys/scsi/adapters/mfi/mfi_pd.h>
+
 #include "lmrc.h"
 #include "lmrc_reg.h"
 #include "lmrc_raid.h"
 #include "lmrc_phys.h"
 
-static int lmrc_get_pdmap(lmrc_t *, lmrc_pd_map_t **);
+static int lmrc_get_pdmap(lmrc_t *, mfi_pd_map_t **);
 static int lmrc_sync_pdmap(lmrc_t *, size_t);
 static void lmrc_complete_sync_pdmap(lmrc_t *, lmrc_mfi_cmd_t *);
 
-static lmrc_pd_info_t *lmrc_get_pd_info(lmrc_t *, uint16_t);
+static mfi_pd_info_t *lmrc_get_pd_info(lmrc_t *, uint16_t);
 static void lmrc_phys_tgt_activate_cb(void *, char *, scsi_tgtmap_tgt_type_t,
     void **);
 static boolean_t lmrc_phys_tgt_deactivate_cb(void *, char *,
     scsi_tgtmap_tgt_type_t, void *, scsi_tgtmap_deact_rsn_t);
-static int lmrc_phys_update_tgtmap(lmrc_t *, lmrc_pd_list_t *);
+static int lmrc_phys_update_tgtmap(lmrc_t *, mfi_pd_list_t *);
 
 /*
  * lmrc_get_pdmap
@@ -54,16 +58,16 @@ static int lmrc_phys_update_tgtmap(lmrc_t *, lmrc_pd_list_t *);
  * Get the physical device map from the firmware. Return a minimally sized copy.
  */
 static int
-lmrc_get_pdmap(lmrc_t *lmrc, lmrc_pd_map_t **pdmap)
+lmrc_get_pdmap(lmrc_t *lmrc, mfi_pd_map_t **pdmap)
 {
-	uint32_t pdmap_sz = sizeof (lmrc_pd_map_t) +
-	    sizeof (lmrc_pd_cfg_t) * LMRC_MAX_PHYS_DEV;
+	uint32_t pdmap_sz = sizeof (mfi_pd_map_t) +
+	    sizeof (mfi_pd_cfg_t) * MFI_MAX_PHYSICAL_DRIVES;
 	lmrc_mfi_cmd_t *mfi;
-	lmrc_pd_map_t *pm;
+	mfi_pd_map_t *pm;
 	int ret;
 
 	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ,
-	    LMRC_DCMD_SYSTEM_PD_MAP_GET_INFO, pdmap_sz, 4);
+	    MFI_DCMD_SYSTEM_PD_MAP_GET_INFO, pdmap_sz, 4);
 
 	if (mfi == NULL)
 		return (DDI_FAILURE);
@@ -75,15 +79,14 @@ lmrc_get_pdmap(lmrc_t *lmrc, lmrc_pd_map_t **pdmap)
 
 	pm = mfi->mfi_data_dma.ld_buf;
 
-	if (pm->pm_count > LMRC_MAX_PHYS_DEV) {
+	if (pm->pm_count > MFI_MAX_PHYSICAL_DRIVES) {
 		dev_err(lmrc->l_dip, CE_WARN,
 		    "!FW reports too many PDs: %d", pm->pm_count);
 		ret = DDI_FAILURE;
 		goto out;
 	}
 
-	pdmap_sz = sizeof (lmrc_pd_map_t) +
-	    pm->pm_count * sizeof (lmrc_pd_cfg_t);
+	pdmap_sz = sizeof (mfi_pd_map_t) + pm->pm_count * sizeof (mfi_pd_cfg_t);
 	*pdmap = kmem_zalloc(pdmap_sz, KM_SLEEP);
 	bcopy(pm, *pdmap, pdmap_sz);
 
@@ -104,19 +107,19 @@ out:
 static int
 lmrc_sync_pdmap(lmrc_t *lmrc, size_t pd_count)
 {
-	uint32_t pdmap_sz = sizeof (lmrc_pd_map_t) +
-	    pd_count * sizeof (lmrc_pd_cfg_t);
-	lmrc_mfi_dcmd_payload_t *dcmd;
+	uint32_t pdmap_sz = sizeof (mfi_pd_map_t) +
+	    pd_count * sizeof (mfi_pd_cfg_t);
+	mfi_dcmd_payload_t *dcmd;
 	lmrc_mfi_cmd_t *mfi;
 
 	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_WRITE,
-	    LMRC_DCMD_SYSTEM_PD_MAP_GET_INFO, pdmap_sz, 4);
+	    MFI_DCMD_SYSTEM_PD_MAP_GET_INFO, pdmap_sz, 4);
 
 	if (mfi == NULL)
 		return (DDI_FAILURE);
 
 	dcmd = &mfi->mfi_frame->mf_dcmd;
-	dcmd->md_mbox_8[0] = LMRC_DCMD_MBOX_PEND_FLAG;
+	dcmd->md_mbox_8[0] = MFI_DCMD_MBOX_PEND_FLAG;
 
 	mutex_enter(&mfi->mfi_lock);
 	lmrc_issue_mfi(lmrc, mfi, lmrc_complete_sync_pdmap);
@@ -134,11 +137,11 @@ lmrc_sync_pdmap(lmrc_t *lmrc, size_t pd_count)
 static void
 lmrc_complete_sync_pdmap(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 {
-	lmrc_mfi_header_t *hdr = &mfi->mfi_frame->mf_hdr;
+	mfi_header_t *hdr = &mfi->mfi_frame->mf_hdr;
 	lmrc_dma_t *dma = &mfi->mfi_data_dma;
-	lmrc_pd_map_t *pm = dma->ld_buf;
-	uint32_t pdmap_sz = sizeof (lmrc_pd_map_t) +
-	    lmrc->l_pdmap->pm_count * sizeof (lmrc_pd_cfg_t);
+	mfi_pd_map_t *pm = dma->ld_buf;
+	uint32_t pdmap_sz = sizeof (mfi_pd_map_t) +
+	    lmrc->l_pdmap->pm_count * sizeof (mfi_pd_cfg_t);
 
 	ASSERT(mutex_owned(&mfi->mfi_lock));
 
@@ -179,7 +182,7 @@ lmrc_complete_sync_pdmap(lmrc_t *lmrc, lmrc_mfi_cmd_t *mfi)
 int
 lmrc_setup_pdmap(lmrc_t *lmrc)
 {
-	lmrc_pd_map_t *pdmap = NULL;
+	mfi_pd_map_t *pdmap = NULL;
 	int ret;
 
 	ret = lmrc_get_pdmap(lmrc, &pdmap);
@@ -204,8 +207,8 @@ void
 lmrc_free_pdmap(lmrc_t *lmrc)
 {
 	if (lmrc->l_pdmap != NULL) {
-		uint32_t pdmap_sz = sizeof (lmrc_pd_map_t) +
-		    lmrc->l_pdmap->pm_count * sizeof (lmrc_pd_cfg_t);
+		uint32_t pdmap_sz = sizeof (mfi_pd_map_t) +
+		    lmrc->l_pdmap->pm_count * sizeof (mfi_pd_cfg_t);
 		kmem_free(lmrc->l_pdmap, pdmap_sz);
 		lmrc->l_pdmap = NULL;
 	}
@@ -237,16 +240,16 @@ lmrc_pd_tm_capable(lmrc_t *lmrc, uint16_t tgtid)
  *
  * Get physical drive info from FW.
  */
-static lmrc_pd_info_t *
+static mfi_pd_info_t *
 lmrc_get_pd_info(lmrc_t *lmrc, uint16_t dev_id)
 {
-	lmrc_pd_info_t *pdinfo = NULL;
+	mfi_pd_info_t *pdinfo = NULL;
 	lmrc_mfi_cmd_t *mfi;
-	lmrc_mfi_dcmd_payload_t *dcmd;
+	mfi_dcmd_payload_t *dcmd;
 	int ret;
 
-	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_PD_GET_INFO,
-	    sizeof (lmrc_pd_info_t), 1);
+	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, MFI_DCMD_PD_GET_INFO,
+	    sizeof (mfi_pd_info_t), 1);
 
 	if (mfi == NULL)
 		return (NULL);
@@ -259,8 +262,8 @@ lmrc_get_pd_info(lmrc_t *lmrc, uint16_t dev_id)
 	if (ret != DDI_SUCCESS)
 		goto out;
 
-	pdinfo = kmem_zalloc(sizeof (lmrc_pd_info_t), KM_SLEEP);
-	bcopy(mfi->mfi_data_dma.ld_buf, pdinfo, sizeof (lmrc_pd_info_t));
+	pdinfo = kmem_zalloc(sizeof (mfi_pd_info_t), KM_SLEEP);
+	bcopy(mfi->mfi_data_dma.ld_buf, pdinfo, sizeof (mfi_pd_info_t));
 
 out:
 	lmrc_put_dcmd(lmrc, mfi);
@@ -279,7 +282,7 @@ lmrc_phys_tgt_activate_cb(void *tgtmap_priv, char *tgt_addr,
 	lmrc_t *lmrc = tgtmap_priv;
 	lmrc_tgt_t *tgt = *tgt_privp;
 	uint16_t dev_id = tgt - lmrc->l_targets;
-	lmrc_pd_info_t *pd_info;
+	mfi_pd_info_t *pd_info;
 
 	VERIFY(lmrc == tgt->tgt_lmrc);
 
@@ -319,7 +322,7 @@ lmrc_phys_tgt_deactivate_cb(void *tgtmap_priv, char *tgt_addr,
  * Feed the PD list into the target map.
  */
 static int
-lmrc_phys_update_tgtmap(lmrc_t *lmrc, lmrc_pd_list_t *pd_list)
+lmrc_phys_update_tgtmap(lmrc_t *lmrc, mfi_pd_list_t *pd_list)
 {
 	int ret;
 	int i;
@@ -332,10 +335,10 @@ lmrc_phys_update_tgtmap(lmrc_t *lmrc, lmrc_pd_list_t *pd_list)
 		return (ret);
 
 	for (i = 0; i < pd_list->pl_count; i++) {
-		lmrc_pd_addr_t *pa = &pd_list->pl_addr[i];
+		mfi_pd_addr_t *pa = &pd_list->pl_addr[i];
 		char name[SCSI_WWN_BUFLEN];
 
-		if (pa->pa_dev_id > LMRC_MAX_PHYS_DEV) {
+		if (pa->pa_dev_id > MFI_MAX_PHYSICAL_DRIVES) {
 			dev_err(lmrc->l_dip, CE_WARN,
 			    "!%s: invalid PD dev id %d", __func__,
 			    pa->pa_dev_id);
@@ -369,21 +372,21 @@ int
 lmrc_get_pd_list(lmrc_t *lmrc)
 {
 	lmrc_mfi_cmd_t *mfi;
-	lmrc_mfi_dcmd_payload_t *dcmd;
+	mfi_dcmd_payload_t *dcmd;
 	int ret;
 
 	/* If the phys iport isn't attached yet, just return success. */
 	if (!INITLEVEL_ACTIVE(lmrc, LMRC_INITLEVEL_PHYS))
 		return (DDI_SUCCESS);
 
-	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, LMRC_DCMD_PD_LIST_QUERY,
-	    sizeof (lmrc_pd_list_t) + sizeof (lmrc_pd_addr_t) * LMRC_MAX_PD, 1);
+	mfi = lmrc_get_dcmd(lmrc, MFI_FRAME_DIR_READ, MFI_DCMD_PD_LIST_QUERY,
+	    sizeof (mfi_pd_list_t) + sizeof (mfi_pd_addr_t) * LMRC_MAX_PD, 1);
 
 	if (mfi == NULL)
 		return (DDI_FAILURE);
 
 	dcmd = &mfi->mfi_frame->mf_dcmd;
-	dcmd->md_mbox_8[0] = LMRC_PD_QUERY_TYPE_EXPOSED_TO_HOST;
+	dcmd->md_mbox_8[0] = MFI_PD_QUERY_TYPE_EXPOSED_TO_HOST;
 
 	ret = lmrc_issue_blocked_mfi(lmrc, mfi);
 
@@ -400,27 +403,27 @@ out:
 /*
  * lmrc_phys_aen_handler
  *
- * Handle AENs with locale code LMRC_EVT_LOCALE_PD. If the PD configuration
+ * Handle AENs with locale code MFI_EVT_LOCALE_PD. If the PD configuration
  * changed, update the PD list and target map.
  */
 
 int
-lmrc_phys_aen_handler(lmrc_t *lmrc, lmrc_evt_t *evt)
+lmrc_phys_aen_handler(lmrc_t *lmrc, mfi_evt_detail_t *evt)
 {
 	int ret = DDI_SUCCESS;
 
 	switch (evt->evt_code) {
-	case LMRC_EVT_PD_INSERTED:
-	case LMRC_EVT_PD_REMOVED:
-	case LMRC_EVT_PD_CHANGED:
+	case MFI_EVT_PD_INSERTED:
+	case MFI_EVT_PD_REMOVED:
+	case MFI_EVT_PD_CHANGED:
 		/*
 		 * For any change w.r.t. the PDs, refresh the PD list.
 		 */
 		ret = lmrc_get_pd_list(lmrc);
 		break;
 
-	case LMRC_EVT_PD_PATROL_READ_PROGRESS:
-	case LMRC_EVT_PD_RESET:
+	case MFI_EVT_PD_PATROL_READ_PROGRESS:
+	case MFI_EVT_PD_RESET:
 		break;
 
 	default:

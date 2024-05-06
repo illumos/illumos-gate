@@ -316,7 +316,7 @@ lmrc_ctrl_attach(dev_info_t *dip)
 	lmrc = ddi_get_soft_state(lmrc_state, instance);
 	lmrc->l_dip = dip;
 
-	lmrc->l_ctrl_info = kmem_zalloc(sizeof (lmrc_ctrl_info_t), KM_SLEEP);
+	lmrc->l_ctrl_info = kmem_zalloc(sizeof (mfi_ctrl_info_t), KM_SLEEP);
 	INITLEVEL_SET(lmrc, LMRC_INITLEVEL_BASIC);
 
 	lmrc->l_class = lmrc_get_class(lmrc);
@@ -576,7 +576,7 @@ lmrc_cleanup(lmrc_t *lmrc, boolean_t failed)
 	}
 
 	if (INITLEVEL_ACTIVE(lmrc, LMRC_INITLEVEL_BASIC)) {
-		kmem_free(lmrc->l_ctrl_info, sizeof (lmrc_ctrl_info_t));
+		kmem_free(lmrc->l_ctrl_info, sizeof (mfi_ctrl_info_t));
 		INITLEVEL_CLEAR(lmrc, LMRC_INITLEVEL_BASIC);
 	}
 
@@ -1052,7 +1052,7 @@ lmrc_alloc_mfi_cmds(lmrc_t *lmrc, const size_t ncmd)
 	for (i = 0; i < ncmd; i++) {
 		mfi = kmem_zalloc(sizeof (lmrc_mfi_cmd_t), KM_SLEEP);
 		ret = lmrc_dma_alloc(lmrc, lmrc->l_dma_attr,
-		    &mfi->mfi_frame_dma, sizeof (lmrc_mfi_frame_t), 256,
+		    &mfi->mfi_frame_dma, sizeof (mfi_frame_t), 256,
 		    DDI_DMA_CONSISTENT);
 		if (ret != DDI_SUCCESS)
 			goto fail;

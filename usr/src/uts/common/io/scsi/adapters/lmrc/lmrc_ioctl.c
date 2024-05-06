@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 /*
@@ -43,6 +43,9 @@
 #include <sys/ddifm.h>
 #include <sys/fm/io/ddi.h>
 
+#include <sys/scsi/adapters/mfi/mfi_evt.h>
+#include <sys/scsi/adapters/mfi/mfi_ioctl.h>
+
 #include "lmrc.h"
 #include "lmrc_reg.h"
 #include "lmrc_raid.h"
@@ -50,14 +53,14 @@
 
 static int lmrc_drv_ioctl_drv_version(lmrc_t *, void *, size_t, int);
 static int lmrc_drv_ioctl_pci_info(lmrc_t *, void *, size_t, int);
-static int lmrc_drv_ioctl(lmrc_t *, lmrc_ioctl_t *, int);
+static int lmrc_drv_ioctl(lmrc_t *, mfi_ioctl_t *, int);
 
-static void lmrc_mfi_ioctl_scsi_io(lmrc_t *, lmrc_ioctl_t *, lmrc_mfi_cmd_t *,
+static void lmrc_mfi_ioctl_scsi_io(lmrc_t *, mfi_ioctl_t *, lmrc_mfi_cmd_t *,
     uintptr_t *, uintptr_t *);
-static void lmrc_mfi_ioctl_dcmd(lmrc_t *, lmrc_ioctl_t *, lmrc_mfi_cmd_t *,
+static void lmrc_mfi_ioctl_dcmd(lmrc_t *, mfi_ioctl_t *, lmrc_mfi_cmd_t *,
     uintptr_t *);
-static int lmrc_mfi_ioctl(lmrc_t *, lmrc_ioctl_t *, int);
-static int lmrc_mfi_aen_ioctl(lmrc_t *, lmrc_aen_t *);
+static int lmrc_mfi_ioctl(lmrc_t *, mfi_ioctl_t *, int);
+static int lmrc_mfi_aen_ioctl(lmrc_t *, mfi_aen_t *);
 static int lmrc_fw_ioctl(lmrc_t *, intptr_t, int);
 static int lmrc_aen_ioctl(lmrc_t *, intptr_t, int);
 
@@ -69,7 +72,7 @@ static int lmrc_aen_ioctl(lmrc_t *, intptr_t, int);
 static int
 lmrc_drv_ioctl_drv_version(lmrc_t *lmrc, void *ubuf, size_t len, int mode)
 {
-	static lmrc_drv_ver_t dv = {
+	static mfi_drv_ver_t dv = {
 		.dv_signature = "$ILLUMOS$",
 		.dv_os_name = "illumos",
 		.dv_drv_name = "lmrc",
@@ -96,7 +99,7 @@ lmrc_drv_ioctl_pci_info(lmrc_t *lmrc, void *ubuf, size_t len, int mode)
 {
 	int *props = NULL;
 	ddi_acc_handle_t pcih;
-	lmrc_pci_info_t pi;
+	mfi_pci_info_t pi;
 	uint_t nprop;
 	int ret;
 	int i;
@@ -142,10 +145,10 @@ lmrc_drv_ioctl_pci_info(lmrc_t *lmrc, void *ubuf, size_t len, int mode)
  * MFI DCMD but are processed by the driver and not sent to the hardware.
  */
 static int
-lmrc_drv_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
+lmrc_drv_ioctl(lmrc_t *lmrc, mfi_ioctl_t *ioc, int mode)
 {
-	lmrc_mfi_header_t *hdr = &ioc->ioc_frame.mf_hdr;
-	lmrc_mfi_dcmd_payload_t *dcmd = &ioc->ioc_frame.mf_dcmd;
+	mfi_header_t *hdr = &ioc->ioc_frame.mf_hdr;
+	mfi_dcmd_payload_t *dcmd = &ioc->ioc_frame.mf_dcmd;
 	size_t xferlen = dcmd->md_sgl.ms64_length;
 	void *ubuf = (void *)dcmd->md_sgl.ms64_phys_addr;
 	int ret = EINVAL;
@@ -163,11 +166,11 @@ lmrc_drv_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
 #endif
 
 	switch (dcmd->md_opcode) {
-	case LMRC_DRIVER_IOCTL_DRIVER_VERSION:
+	case MFI_DRIVER_IOCTL_DRIVER_VERSION:
 		ret = lmrc_drv_ioctl_drv_version(lmrc, ubuf, xferlen, mode);
 		break;
 
-	case LMRC_DRIVER_IOCTL_PCI_INFORMATION:
+	case MFI_DRIVER_IOCTL_PCI_INFORMATION:
 		ret = lmrc_drv_ioctl_pci_info(lmrc, ubuf, xferlen, mode);
 		break;
 
@@ -194,16 +197,16 @@ lmrc_drv_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
  * Prepare MFI cmd for SCSI I/O passthru.
  */
 static void
-lmrc_mfi_ioctl_scsi_io(lmrc_t *lmrc, lmrc_ioctl_t *ioc,
-    lmrc_mfi_cmd_t *mfi, uintptr_t *sgloff, uintptr_t *senseoff)
+lmrc_mfi_ioctl_scsi_io(lmrc_t *lmrc, mfi_ioctl_t *ioc, lmrc_mfi_cmd_t *mfi,
+    uintptr_t *sgloff, uintptr_t *senseoff)
 {
-	lmrc_mfi_pthru_payload_t *ioc_pthru = &ioc->ioc_frame.mf_pthru;
-	lmrc_mfi_pthru_payload_t *mfi_pthru = &mfi->mfi_frame->mf_pthru;
+	mfi_pthru_payload_t *ioc_pthru = &ioc->ioc_frame.mf_pthru;
+	mfi_pthru_payload_t *mfi_pthru = &mfi->mfi_frame->mf_pthru;
 
 	bcopy(ioc_pthru->mp_cdb, mfi_pthru->mp_cdb, sizeof (mfi_pthru->mp_cdb));
 
-	*sgloff = offsetof(lmrc_mfi_pthru_payload_t, mp_sgl);
-	*senseoff = offsetof(lmrc_mfi_pthru_payload_t, mp_sense_buf_phys_addr);
+	*sgloff = offsetof(mfi_pthru_payload_t, mp_sgl);
+	*senseoff = offsetof(mfi_pthru_payload_t, mp_sense_buf_phys_addr);
 }
 
 /*
@@ -212,17 +215,17 @@ lmrc_mfi_ioctl_scsi_io(lmrc_t *lmrc, lmrc_ioctl_t *ioc,
  * Prepare MFI cmd for DMCD passthru.
  */
 static void
-lmrc_mfi_ioctl_dcmd(lmrc_t *lmrc, lmrc_ioctl_t *ioc,
-    lmrc_mfi_cmd_t *mfi, uintptr_t *sgloff)
+lmrc_mfi_ioctl_dcmd(lmrc_t *lmrc, mfi_ioctl_t *ioc, lmrc_mfi_cmd_t *mfi,
+    uintptr_t *sgloff)
 {
-	lmrc_mfi_dcmd_payload_t *ioc_dcmd = &ioc->ioc_frame.mf_dcmd;
-	lmrc_mfi_dcmd_payload_t *mfi_dcmd = &mfi->mfi_frame->mf_dcmd;
+	mfi_dcmd_payload_t *ioc_dcmd = &ioc->ioc_frame.mf_dcmd;
+	mfi_dcmd_payload_t *mfi_dcmd = &mfi->mfi_frame->mf_dcmd;
 
 	mfi_dcmd->md_opcode = ioc_dcmd->md_opcode;
 	bcopy(ioc_dcmd->md_mbox_8, mfi_dcmd->md_mbox_8,
 	    sizeof (mfi_dcmd->md_mbox_8));
 
-	*sgloff = offsetof(lmrc_mfi_dcmd_payload_t, md_sgl);
+	*sgloff = offsetof(mfi_dcmd_payload_t, md_sgl);
 }
 
 /*
@@ -232,21 +235,21 @@ lmrc_mfi_ioctl_dcmd(lmrc_t *lmrc, lmrc_ioctl_t *ioc,
  * in a uniform way for all supported MFI commands.
  */
 static int
-lmrc_mfi_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
+lmrc_mfi_ioctl(lmrc_t *lmrc, mfi_ioctl_t *ioc, int mode)
 {
 	uint64_t *mfi_senseaddr = NULL, *ioc_senseaddr = NULL;
 	lmrc_dma_t sense;
 	size_t xferlen = 0;
 
-	lmrc_mfi_header_t *mfi_hdr, *ioc_hdr;
-	lmrc_mfi_sgl_t *mfi_sgl, *ioc_sgl;
+	mfi_header_t *mfi_hdr, *ioc_hdr;
+	mfi_sgl_t *mfi_sgl, *ioc_sgl;
 	lmrc_mfi_cmd_t *mfi;
 	uintptr_t sgloff;
 	void *xferbuf;
 	int ret;
 
 	ioc_hdr = &ioc->ioc_frame.mf_hdr;
-	if (ioc_hdr->mh_sense_len > LMRC_IOC_SENSE_LEN)
+	if (ioc_hdr->mh_sense_len > MFI_IOC_SENSE_LEN)
 		return (EINVAL);
 
 	mfi = lmrc_get_mfi(lmrc);
@@ -290,8 +293,8 @@ lmrc_mfi_ioctl(lmrc_t *lmrc, lmrc_ioctl_t *ioc, int mode)
 	}
 
 	ASSERT3U(sgloff, !=, 0);
-	ioc_sgl = (lmrc_mfi_sgl_t *)&ioc->ioc_frame.mf_raw[sgloff];
-	mfi_sgl = (lmrc_mfi_sgl_t *)&mfi->mfi_frame->mf_raw[sgloff];
+	ioc_sgl = (mfi_sgl_t *)&ioc->ioc_frame.mf_raw[sgloff];
+	mfi_sgl = (mfi_sgl_t *)&mfi->mfi_frame->mf_raw[sgloff];
 
 #ifdef _MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
@@ -405,16 +408,16 @@ out:
 static int
 lmrc_fw_ioctl(lmrc_t *lmrc, intptr_t arg, int mode)
 {
-	lmrc_ioctl_t *ioc;
+	mfi_ioctl_t *ioc;
 	int ret = EINVAL;
 
-	ioc = kmem_zalloc(sizeof (lmrc_ioctl_t), KM_SLEEP);
+	ioc = kmem_zalloc(sizeof (mfi_ioctl_t), KM_SLEEP);
 	if (ddi_copyin((void *)arg, ioc, sizeof (*ioc), mode) != 0) {
 		ret = EFAULT;
 		goto out;
 	}
 
-	if (ioc->ioc_control_code == LMRC_DRIVER_IOCTL_COMMON) {
+	if (ioc->ioc_control_code == MFI_DRIVER_IOCTL_COMMON) {
 		ret = lmrc_drv_ioctl(lmrc, ioc, mode);
 	} else {
 		sema_p(&lmrc->l_ioctl_sema);
@@ -428,7 +431,7 @@ lmrc_fw_ioctl(lmrc_t *lmrc, intptr_t arg, int mode)
 	}
 
 out:
-	kmem_free(ioc, sizeof (lmrc_ioctl_t));
+	kmem_free(ioc, sizeof (mfi_ioctl_t));
 	return (ret);
 }
 
@@ -439,7 +442,7 @@ out:
  * user space.
  */
 static int
-lmrc_mfi_aen_ioctl(lmrc_t *lmrc, lmrc_aen_t *aen)
+lmrc_mfi_aen_ioctl(lmrc_t *lmrc, mfi_aen_t *aen)
 {
 	dev_err(lmrc->l_dip, CE_WARN, "!unimplemented ioctl: MFI AEN");
 	return (EINVAL);
@@ -454,7 +457,7 @@ static int
 lmrc_aen_ioctl(lmrc_t *lmrc, intptr_t arg, int mode)
 {
 	int ret = EINVAL;
-	lmrc_aen_t	aen;
+	mfi_aen_t aen;
 
 	if (ddi_copyin((void *)arg, &aen, sizeof (aen), mode) != 0)
 		return (EFAULT);
@@ -497,11 +500,11 @@ lmrc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (EIO);
 
 	switch ((uint_t)cmd) {
-	case LMRC_IOCTL_FIRMWARE:
+	case MFI_IOCTL_FIRMWARE:
 		ret = lmrc_fw_ioctl(lmrc, arg, mode);
 		break;
 
-	case LMRC_IOCTL_AEN:
+	case MFI_IOCTL_AEN:
 		ret = lmrc_aen_ioctl(lmrc, arg, mode);
 		break;
 

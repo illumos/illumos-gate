@@ -529,23 +529,36 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	/*
 	 * Search for ConOut protocol, if not found, use first handle.
 	 */
-	gop_handle = *hlist;
+	gop_handle = NULL;
 	for (i = 0; i < nhandles; i++) {
-		void *dummy = NULL;
+		EFI_GRAPHICS_OUTPUT_PROTOCOL *tgop;
+		void *dummy;
+
+		status = OpenProtocolByHandle(hlist[i],
+		    &gEfiGraphicsOutputProtocolGuid,
+		    (void **)&tgop);
+		if (status != EFI_SUCCESS)
+			continue;
+
+		if (tgop->Mode->Info->PixelFormat == PixelBltOnly ||
+		    tgop->Mode->Info->PixelFormat >= PixelFormatMax)
+			continue;
 
 		status = OpenProtocolByHandle(hlist[i],
 		    &gEfiConsoleOutDeviceGuid, &dummy);
 		if (status == EFI_SUCCESS) {
 			gop_handle = hlist[i];
+			gop = tgop;
 			break;
+		} else if (gop_handle == NULL) {
+			gop_handle = hlist[i];
+			gop = tgop;
 		}
 	}
 
-	status = OpenProtocolByHandle(gop_handle,
-	    &gEfiGraphicsOutputProtocolGuid, (void **)&gop);
 	free(hlist);
 
-	if (status == EFI_SUCCESS) {
+	if (gop != NULL) {
 		/* Save default mode. */
 		if (default_mode == UINT32_MAX) {
 			default_mode = gop->Mode->Mode;

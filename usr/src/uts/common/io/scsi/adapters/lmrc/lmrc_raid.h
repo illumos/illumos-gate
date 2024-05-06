@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  */
 
 #ifndef _LMRC_RAID_H
@@ -18,6 +18,9 @@
 
 #include <sys/types.h>
 #include <sys/debug.h>
+
+#include <sys/scsi/adapters/mfi/mfi_evt.h>
+#include <sys/scsi/adapters/mfi/mfi_ld.h>
 
 #include <sys/scsi/adapters/mpi/mpi2_type.h>
 #include <sys/scsi/adapters/mpi/mpi2.h>
@@ -37,11 +40,6 @@ typedef struct lmrc_ld_span_map		lmrc_ld_span_map_t;
 typedef struct lmrc_fw_raid_map		lmrc_fw_raid_map_t;
 typedef struct lmrc_raid_map_desc	lmrc_raid_map_desc_t;
 
-typedef struct lmrc_ld_tgt		lmrc_ld_tgt_t;
-typedef struct lmrc_ld_ref		lmrc_ld_ref_t;
-typedef	struct lmrc_ld_cfg		lmrc_ld_cfg_t;
-typedef struct lmrc_ld_list		lmrc_ld_list_t;
-typedef struct lmrc_ld_tgtid_list	lmrc_ld_tgtid_list_t;
 
 #include "lmrc.h"
 
@@ -115,14 +113,12 @@ CTASSERT(sizeof (lmrc_raidctx_g35_t) == 0x20);
 #define	LMRC_MAX_SPAN_DEPTH		8
 #define	LMRC_MAX_QUAD_DEPTH		LMRC_SPAN_DEPTH
 #define	LMRC_MAX_ROW_SIZE		32
-#define	LMRC_MAX_LOGICAL_DRIVES		64
 #define	LMRC_MAX_LOGICAL_DRIVES_EXT	256
 #define	LMRC_MAX_LOGICAL_DRIVES_DYN	512
 #define	LMRC_MAX_ARRAYS			128
 #define	LMRC_MAX_ARRAYS_EXT		256
 #define	LMRC_MAX_API_ARRAYS_EXT		(LMRC_MAX_ARRAYS_EXT)
 #define	LMRC_MAX_API_ARRAYS_DYN		512
-#define	LMRC_MAX_PHYS_DEV		256
 
 #define	LMRC_RAIDMAP_MAX_SPAN_DEPTH	(LMRC_MAX_SPAN_DEPTH)
 #define	LMRC_RAIDMAP_MAX_ROW_SIZE	(LMRC_MAX_ROW_SIZE)
@@ -297,22 +293,6 @@ struct lmrc_fw_raid_map {
 	uint32_t	rm_desc_data[0];
 };
 
-/*
- * LD target list
- */
-struct lmrc_ld_tgt {
-	uint8_t		lt_tgtid;
-	uint8_t		lt_rsvd;
-	uint16_t	lt_seqnum;
-};
-
-struct lmrc_ld_tgtid_list {
-	uint32_t	ltl_size;
-	uint32_t	ltl_count;
-	uint8_t		ltl_rsvd[3];
-	uint8_t		ltl_tgtid[0];
-};
-
 #pragma pack(0)
 
 /* RAID map accessor functions */
@@ -374,7 +354,7 @@ lmrc_cmd_is_rw(uint8_t cdb0)
 	}
 }
 
-typedef lmrc_raidctx_g35_t			MPI25_SCSI_IO_VENDOR_UNIQUE;
+typedef lmrc_raidctx_g35_t	MPI25_SCSI_IO_VENDOR_UNIQUE;
 #define	MPI25_SCSI_IO_VENDOR_UNIQUE_REGION
 #include <sys/scsi/adapters/mpi/mpi2_init.h>
 
@@ -388,6 +368,6 @@ int lmrc_get_ld_list(lmrc_t *);
 int lmrc_raid_attach(dev_info_t *);
 int lmrc_raid_detach(dev_info_t *);
 
-int lmrc_raid_aen_handler(lmrc_t *, lmrc_evt_t *);
+int lmrc_raid_aen_handler(lmrc_t *, mfi_evt_detail_t *);
 
 #endif /* _LMRC_RAID_H */
