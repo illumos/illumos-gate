@@ -111,8 +111,7 @@ qlc_fm_check_acc_handle(ql_adapter_state_t *ha, ddi_acc_handle_t handle)
 
 	ddi_fm_acc_err_get(handle, &err, DDI_FME_VERSION);
 
-	if ((void *)&ddi_fm_acc_err_clear != NULL)
-		(void) ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	(void) ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
 
 	return (err.fme_status);
 }
