@@ -933,15 +933,6 @@ ptioc(queue_t *q, mblk_t *mp, int qside)
 		return;
 
 	case TIOCGWINSZ:
-		/*
-		 * If all zeros NAK the message for dumb terminals.
-		 */
-		if ((tp->wsz.ws_row == 0) && (tp->wsz.ws_col == 0) &&
-		    (tp->wsz.ws_xpixel == 0) && (tp->wsz.ws_ypixel == 0)) {
-			miocnak(q, mp, 0, EINVAL);
-			return;
-		}
-
 		tmp = allocb(sizeof (struct winsize), BPRI_MED);
 		if (tmp == NULL) {
 			miocnak(q, mp, 0, EAGAIN);
