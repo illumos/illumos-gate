@@ -111,22 +111,22 @@ extern "C" {
  * Defines for supported drive options
  *
  * WARNING : THESE OPTIONS SHOULD NEVER BE CHANGED, AS OLDER CONFIGURATIONS
- * 		WILL DEPEND ON THE FLAG VALUES REMAINING THE SAME
+ *		WILL DEPEND ON THE FLAG VALUES REMAINING THE SAME
  */
 #define	ST_VARIABLE		0x001	/* Device supports variable	*/
 					/* length record sizes		*/
-#define	ST_QIC			0x002	/* QIC tape device 		*/
+#define	ST_QIC			0x002	/* QIC tape device		*/
 #define	ST_REEL			0x004	/* 1/2-inch reel tape device	*/
 #define	ST_BSF			0x008	/* Device supports backspace	*/
-					/* file as in mt(1) bsf : 	*/
+					/* file as in mt(1) bsf :	*/
 					/* backspace over EOF marks.	*/
-					/* Devices not supporting bsf 	*/
+					/* Devices not supporting bsf	*/
 					/* will fail with ENOTTY upon	*/
 					/* use of bsf			*/
 #define	ST_BSR			0x010	/* Device supports backspace	*/
 					/* record as in mt(1) bsr :	*/
 					/* backspace over records. If	*/
-					/* the device does not support 	*/
+					/* the device does not support	*/
 					/* bsr, the st driver emulates	*/
 					/* the action by rewinding the	*/
 					/* tape and using forward space	*/
@@ -140,7 +140,7 @@ extern "C" {
 					/* Device can figure out the	*/
 					/* tape density automatically,	*/
 					/* without issuing a		*/
-					/* mode-select/mode-sense 	*/
+					/* mode-select/mode-sense	*/
 #define	ST_NOBUF		0x080	/* Don't use buffered mode.	*/
 					/* This disables the device's	*/
 					/* ability for buffered	writes	*/
@@ -150,15 +150,15 @@ extern "C" {
 					/* device's buffer, but before	*/
 					/* all the data is actually	*/
 					/* written to tape		*/
-#define	ST_RESERVED_BIT1	0x100	/* resreved bit 		*/
-					/* parity while talking to it. 	*/
+#define	ST_RESERVED_BIT1	0x100	/* reserved bit			*/
+					/* parity while talking to it.	*/
 #define	ST_KNOWS_EOD		0x200	/* Device knows when EOD (End	*/
 					/* of Data) has been reached.	*/
 					/* If the device knows EOD, st	*/
 					/* uses fast file skipping.	*/
 					/* If it does not know EOD,	*/
 					/* file skipping happens one	*/
-					/* file at a time. 		*/
+					/* file at a time.		*/
 #define	ST_UNLOADABLE		0x400	/* Device will not complain if	*/
 					/* the st driver is unloaded &	*/
 					/* loaded again; e.g. will	*/
@@ -168,13 +168,13 @@ extern "C" {
 					/* close to report soft errors.	*/
 					/* Currently only Exabyte and	*/
 					/* DAT drives support this	*/
-					/* feature.  			*/
+					/* feature.			*/
 #define	ST_LONG_TIMEOUTS	0x1000	/* Device needs 5 times longer	*/
 					/* timeouts for normal		*/
 					/* operation			*/
 #define	ST_BUFFERED_WRITES	0x4000	/* The data is buffered in the	*/
 					/* driver and pre-acked to the	*/
-					/* application 			*/
+					/* application			*/
 #define	ST_NO_RECSIZE_LIMIT	0x8000	/* For variable record size	*/
 					/* devices only. If flag is	*/
 					/* set, then don't limit	*/
@@ -205,22 +205,22 @@ extern "C" {
 					/* not be used during open/	*/
 					/* close for High Availability	*/
 #define	ST_READ_IGNORE_ILI	0x40000 /* This flag is only applicable */
-					/* to variable block devices 	*/
+					/* to variable block devices	*/
 					/* which support the SILI bit	*/
-					/* option. It indicates that 	*/
+					/* option. It indicates that	*/
 					/* the SILI bit will be ignored */
-					/* during reads  		*/
-#define	ST_READ_IGNORE_EOFS 	0x80000 /* When this flag is set two 	*/
+					/* during reads			*/
+#define	ST_READ_IGNORE_EOFS	0x80000 /* When this flag is set two	*/
 					/* EOF marks do not indicate an */
 					/* EOM. This option is only	*/
 					/* supported on 1/2" reel tapes */
 #define	ST_SHORT_FILEMARKS	0x100000 /* This option applies only to */
-					/* EXABYTE 8mm tape drives 	*/
-					/* which support short 		*/
-					/* filemarks. When this flag 	*/
-					/* is set, short filemarks 	*/
+					/* EXABYTE 8mm tape drives	*/
+					/* which support short		*/
+					/* filemarks. When this flag	*/
+					/* is set, short filemarks	*/
 					/* will be used for writing	*/
-					/* filemarks. 			*/
+					/* filemarks.			*/
 #define	ST_EJECT_ON_CHANGER_FAILURE 0x200000 /* When this flag is set   */
 					/* and the tape is trapped in   */
 					/* the medium changer, the tape */
@@ -232,7 +232,7 @@ extern "C" {
 					/* will retry the last cmd if   */
 					/* the last error cause a check */
 					/* condition with error code    */
-					/* 0x71 and sense code  0x01 	*/
+					/* 0x71 and sense code 0x01	*/
 #define	ST_KNOWS_MEDIA		0x800000 /* Use configured media type	*/
 					/* detected to select correct   */
 					/* density code.		*/
@@ -1002,7 +1002,7 @@ struct scsi_tape {
 	uint_t	un_kbytes_xferred;	/* bytes (in K) counter */
 	uint_t	un_last_resid;		/* keep last resid, for PE */
 	uint_t	un_last_count;		/* keep last count, for PE */
-	struct 	kstat *un_stats;	/* for I/O statistics */
+	struct	kstat *un_stats;	/* for I/O statistics */
 	struct buf *un_rqs_bp;		/* bp used in rqpkt */
 	struct	buf *un_wf;		/* head of write queue */
 	struct	buf *un_wl;		/* tail of write queue */
@@ -1032,7 +1032,7 @@ struct scsi_tape {
 	kcondvar_t un_suspend_cv;	/* busy cv */
 					/* restore on close */
 	uchar_t	un_eject_tape_on_failure; /* 1 = eject tape, 0 = don't */
-	uchar_t	un_HeadClean; 		/* support and need head cleaning? */
+	uchar_t	un_HeadClean;		/* support and need head cleaning? */
 	uchar_t	un_rqs_state;		/* see define below */
 	struct scsi_extended_sense
 	    *un_uscsi_rqs_buf;		/* uscsi_rqs: buffer for RQS data */
@@ -1245,7 +1245,7 @@ typedef struct {
 #define	ST_RELEASE			0x002
 #define	ST_RESERVE			0x004
 #define	ST_PRESERVE_RESERVE		0x008
-#define	ST_RESERVATION_CONFLICT 	0x010
+#define	ST_RESERVATION_CONFLICT		0x010
 #define	ST_LOST_RESERVE			0x020
 #define	ST_APPLICATION_RESERVATIONS	0x040
 #define	ST_INITIATED_RESET		0x080
@@ -1457,11 +1457,20 @@ typedef struct {
 #define	DEBUGGING\
 	((scsi_options & SCSI_DEBUG_TGT) || (st_debug & 0x7))
 
-#define	DEBLOCK(d) int lev = CE_NOTE; mutex_enter(&st_debug_mutex); \
-    if (d == st_lastdev || d == 0) lev = CE_CONT; mutex_exit(&st_debug_mutex);
+#define	DEBLOCK(d) \
+	int lev = CE_NOTE; \
+	mutex_enter(&st_debug_mutex); \
+	if (d == st_lastdev || d == 0) { \
+		lev = CE_CONT; \
+	} \
+	mutex_exit(&st_debug_mutex);
 
-#define	DEBUNLOCK(d) mutex_enter(&st_debug_mutex); \
-    if (d != 0 && d != st_lastdev) st_lastdev = d; mutex_exit(&st_debug_mutex);
+#define	DEBUNLOCK(d) \
+	mutex_enter(&st_debug_mutex); \
+	if (d != 0 && d != st_lastdev) { \
+		st_lastdev = d; \
+	} \
+	mutex_exit(&st_debug_mutex);
 
 	/* initialization */
 #define	ST_DEBUG1	if ((st_debug & 0x7) >= 1) scsi_log
