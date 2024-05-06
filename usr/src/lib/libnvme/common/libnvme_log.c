@@ -677,7 +677,7 @@ static const nvme_field_check_t nvme_log_check_csi = {
 };
 
 bool
-nvme_log_req_set_csi(nvme_log_req_t *req, uint32_t csi)
+nvme_log_req_set_csi(nvme_log_req_t *req, nvme_csi_t csi)
 {
 	if (!nvme_field_check_one(req->nlr_ctrl, csi, "get log page",
 	    &nvme_log_check_csi, req->nlr_allow)) {
