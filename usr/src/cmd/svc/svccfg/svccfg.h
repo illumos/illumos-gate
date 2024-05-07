@@ -496,7 +496,6 @@ extern void lscf_set_repository(const char *, int);
 extern int lscf_setprop(const char *, const char *, const char *,
     const uu_list_t *);
 
-
 extern void engine_init(void);
 extern int engine_exec_cmd(void);
 extern int engine_exec(char *);
@@ -506,15 +505,13 @@ extern int engine_source(const char *, boolean_t);
 extern int engine_import(uu_list_t *);
 extern int engine_cleanup(int);
 extern int engine_set(uu_list_t *);
-
-extern void help(int);
-
 extern int engine_cmd_getc(engine_state_t *);
 extern int engine_cmd_ungetc(engine_state_t *, char);
 extern void engine_cmd_nputs(engine_state_t *, char *, size_t);
 extern int engine_restore(const char *);
-extern int engine_restore(const char *);
 extern int engine_apply(const char *, int);
+
+extern void help(int);
 
 extern void tmpl_errors_destroy(tmpl_errors_t *);
 extern void tmpl_errors_print(FILE *, tmpl_errors_t *, const char *);
