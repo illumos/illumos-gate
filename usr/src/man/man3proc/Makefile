@@ -41,6 +41,7 @@ MANFILES=					\
 		Pcreate.3proc			\
 		Pcred.3proc			\
 		Pctlfd.3proc			\
+		Pcwd.3proc			\
 		Pdelbkpt.3proc			\
 		Pdelwapt.3proc			\
 		Pdestroy_agent.3proc		\
@@ -197,6 +198,7 @@ MANLINKS=					\
 		Lxecwapt.3proc			\
 		Paddr_to_text_map.3proc		\
 		Pcreate_callback.3proc		\
+		Pcwd_free.3proc			\
 		Pdstop.3proc			\
 		Pfgcore.3proc			\
 		Pfgrab_core.3proc		\
@@ -312,6 +314,8 @@ ps_pcontinue.3proc		:= LINKSRC = ps_pstop.3proc
 
 Pxcreate.3proc			:= LINKSRC = Pcreate.3proc
 Pcreate_callback.3proc		:= LINKSRC = Pcreate.3proc
+
+Pcwd_free.3proc			:= LINKSRC = Pcwd.3proc
 
 Pfgrab_core.3proc		:= LINKSRC = Pgrab_core.3proc
 

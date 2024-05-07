@@ -28,7 +28,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #define	_STRUCTURED_PROC	1
@@ -1488,6 +1488,21 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		}
 
 		Psecflags_free(psf);
+	}
+
+	{
+		prcwd_t *cwd = NULL;
+
+		if (Pcwd(P, &cwd) != 0)
+			goto err;
+
+		if (write_note(fd, NT_CWD, cwd,
+		    sizeof (prcwd_t), &doff) != 0) {
+			Pcwd_free(cwd);
+			goto err;
+		}
+
+		Pcwd_free(cwd);
 	}
 
 #if defined(__i386) || defined(__amd64)

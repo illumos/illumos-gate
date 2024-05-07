@@ -12,9 +12,9 @@
 .\" Copyright 2018 Joyent, Inc.
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd December 2, 2023
+.Dd May 10, 2024
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -210,6 +210,7 @@ manipulation of the process itself.
 .It Sy Pasfd Ta Sy Pclearfault
 .It Sy Pclearsig Ta Sy Pcontent
 .It Sy Pcred Ta Sy Pctlfd
+.It Sy Pcwd Ta Sy Pcwd_free
 .It Sy Pdelbkpt Ta Sy Pdelwapt
 .It Sy Pdstop Ta Sy Pexecname
 .It Sy Pfault Ta Sy Pfgcore
@@ -1155,6 +1156,8 @@ changes may occur which break both source and binary compatibility.
 .Xr Pcontent 3PROC ,
 .Xr Pcred 3PROC ,
 .Xr Pctlfd 3PROC ,
+.Xr Pcwd 3PROC ,
+.Xr Pcwd_free 3PROC ,
 .Xr Pdelbkpt 3PROC ,
 .Xr Pdelwapt 3PROC ,
 .Xr Pdstop 3PROC ,

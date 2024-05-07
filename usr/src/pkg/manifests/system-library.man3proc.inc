@@ -58,6 +58,8 @@ link path=usr/share/man/man3proc/Pcreate_callback.3proc target=Pcreate.3proc
 file path=usr/share/man/man3proc/Pcreate_error.3proc
 file path=usr/share/man/man3proc/Pcred.3proc
 file path=usr/share/man/man3proc/Pctlfd.3proc
+file path=usr/share/man/man3proc/Pcwd.3proc
+link path=usr/share/man/man3proc/Pcwd_free.3proc target=Pcwd.3proc
 file path=usr/share/man/man3proc/Pdelbkpt.3proc
 file path=usr/share/man/man3proc/Pdelwapt.3proc
 file path=usr/share/man/man3proc/Pdestroy_agent.3proc

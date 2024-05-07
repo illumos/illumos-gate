@@ -1,0 +1,127 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd May 10, 2024
+.Dt Pcwd 3PROC
+.Os
+.Sh NAME
+.Nm Pcwd ,
+.Nm Pcwd_free
+.Nd get process current working directory information
+.Sh LIBRARY
+.Lb libproc
+.Sh SYNOPSIS
+.In libproc.h
+.Ft int
+.Fo Pcwd
+.Fa "struct ps_prochandle *P"
+.Fa "prcwd_t **cwdp"
+.Fc
+.Ft void
+.Fo Pcwd_free
+.Fa "prcwd_t *cwd"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pcwd
+function obtains the current working directory and related information
+about the file system it is contained upon of the process handle
+.Fa P .
+This information is synthesized for live processes and is obtained from
+the
+.Dv NT_CWD
+elf note for core files.
+It is not supported on handles that refer to idle
+.Pq Dv PS_IDLE
+processes.
+.Pp
+The library will allocate the memory needed for a
+.Ft prcwd_t
+structure.
+A pointer to this data will be stored in
+.Fa cwdp .
+It is the callers responsibility to release it by calling the
+.Fn Pcwd_free
+function and passing it back in the
+.Fa cwd
+argument.
+The allocated data stored in
+.Fa cwdp
+has a lifetime independent of the process handle,
+.Fa P .
+In other words, the data in
+.Fa cwdp
+may be used after someone has called
+.Xr Prelease 3PROC
+or
+.Xr Pfree 3PROC
+on
+.Fa P .
+.Pp
+The
+.Ft prcwd_t
+structure is defined in
+.In sys/procfs.h
+and discussed in more detail in
+.Xr core 5 .
+The various path related strings are NUL-terminated character strings that may
+not be valid in the calling process's locale.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pwcd
+function returns
+.Sy 0
+and stores the allocated
+.Vt prcwd_t
+structure in
+.Fa cwdp .
+Otherwise
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn Pcwd
+functions will fail if:
+.Bl  -tag -width Er
+.It Er EAGAIN, ENOMEM
+An underlying memory allocation failed.
+.It Er ENODATA
+The process handle,
+.Fa P ,
+refers to a core file which does not contain the
+.Dv NT_CWD
+ELF note.
+.It Er ENOTSUP
+The process handle
+.Fa P ,
+does not support obtaining the current working directory.
+This would happen because the process handle does not refer to a core
+file or live process.
+.El
+.Pp
+Additional errors may be generated based on the type of process handle
+that is present.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr pwdx 1 ,
+.Xr libproc 3LIB ,
+.Xr core 5 ,
+.Xr proc 5

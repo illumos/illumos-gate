@@ -113,6 +113,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Pcreate_error;
 	Pcred;
 	Pctlfd;
+	Pcwd;
+	Pcwd_free;
 	Pdelbkpt;
 	Pdelwapt;
 	Pdestroy_agent;

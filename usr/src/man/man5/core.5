@@ -3,7 +3,7 @@
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -21,7 +21,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd January 24, 2023
+.Dd May 10, 2024
 .Dt CORE 5
 .Os
 .Sh NAME
@@ -325,7 +325,7 @@ This information is the same as provided by
 .Xr sysinfo 2
 when invoked with the command
 .Dv SI_PLATFORM .
-.It auxv_t[]
+.It Vt auxv_t[]
 .Fa n_type :
 .Dv NT_AUXV .
 This entry contains the array of
@@ -345,7 +345,7 @@ The
 .Vt utsname
 structure is defined in
 .In sys/utsname.h .
-.It pcred_t
+.It Vt pcred_t
 .Fa n_type :
 .Dv NT_PRCRED .
 This structure contains the process credentials, including the real, saved,
@@ -465,6 +465,80 @@ flag is not set in
 While it is recommended that processes terminate with an ASCII string, consumers
 of this should not assume that the binary data is made of of printable
 characters.
+.It Vt prcwd_t
+.Fa n_type :
+.Dv NT_CWD .
+This entry describes information about the current working directory of the
+process at the time the core file is generated and information about the file
+system that the current working directory is found on.
+The
+.Vt prcwd_t
+is defined in
+.In sys/procfs.h .
+.Pp
+The members of the
+.Vt prcwd_t
+include:
+.Bl -tag -offset indent -width prcwd_mntspec
+.It Fa prcwd_fsid
+The file system ID.
+This is the same data that is found in the
+.Fa f_fsid
+member of the
+.Vt "struct statvfs"
+structure obtained through
+.Xr statvfs 2 .
+The file system ID is currently the device number
+.Po
+i.e. the
+.Vt dev_t
+.Pc
+and matches the
+.Fa mnt_major
+and
+.Fa mnt_minor
+of the
+.Vt "struct extmnttab"
+structure that is obtained through
+.Xr getextmntent 3C .
+.It Fa prcwd_fsname
+A NUL-terminated string containing the name of the file system itself, e.g.
+.Dq zfs ,
+.Dq tmpfs ,
+etc.
+This is the same as the
+.Fa f_bastype
+member of the
+.Vt "struct statvfs"
+and
+.Vt "mnt_fstype"
+of the
+.Vt "struct mnttab" .
+.It Fa prcwd_mntpt
+A NUL-terminated string that contains the path where the file system containing
+the current working directory is mounted.
+.It Fa prcwd_mntspec
+A NUL-terminated string that is the name of the mounted resource.
+This may be a ZFS dataset, a synthetic resource like
+.Dq swap ,
+.Dq procfs ,
+or
+.Dq bootfs ,
+or the path to a particular disk or file.
+This corresponds to the
+.Fa mnt_special
+member of the
+.Vt "struct mnttab" .
+.It Fa prcwd_cwd
+A NUL-terminated string containing the current path of the process at the time
+the core file was generated.
+.El
+.Pp
+From the operating system's perspective, a path is often just a NUL-terminated
+collection of bytes.
+This means it is possible that a path may contain bytes that are not printable
+or meaningful in the locale of a process that is processing this particular
+structure.
 .El
 .Pp
 For each active and zombie
@@ -578,9 +652,11 @@ see
 .Xr getrlimit 2 ,
 .Xr setrlimit 2 ,
 .Xr setuid 2 ,
+.Xr statvfs 2 ,
 .Xr sysinfo 2 ,
 .Xr uname 2 ,
 .Xr upanic 2 ,
+.Xr getextmntent 3C ,
 .Xr getzoneid 3C ,
 .Xr getzonenamebyid 3C ,
 .Xr elf 3ELF ,

@@ -404,6 +404,17 @@ static const sl_prupanic_layout_t prupanic_layout = {
 };
 
 
+static const sl_prcwd_layout_t prcwd_layout = {
+	{ 0,	3096,	0,	0 },		/* sizeof (prcwd_t) */
+	{ 0,	8,	0,	0 },		/* prcwd_fsid */
+	{ 8,	1,	16,	0 },		/* prcwd_fsname[] */
+	{ 24,	1,	1024,	0 },		/* prcwd_mntpt[] */
+	{ 1048,	1,	1024,	0 },		/* prcwd_mntspec[] */
+	{ 2072,	1,	1024,	0 },		/* prcwd_cwd[] */
+};
+
+
+
 
 
 static const sl_arch_layout_t layout_sparcv9 = {
@@ -430,6 +441,7 @@ static const sl_arch_layout_t layout_sparcv9 = {
 	&prsecflags_layout,
 	&prlwpname_layout,
 	&prupanic_layout,
+	&prcwd_layout,
 };
 
 
