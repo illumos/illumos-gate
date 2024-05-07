@@ -11,6 +11,7 @@
 
 #
 # Copyright 2023 Oxide Computer Company
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 UTSBASE = ../../..
@@ -20,8 +21,8 @@ UTSBASE = ../../..
 #
 #
 FW_VERSION_T4=	1.27.1.0
-FW_VERSION_T5=	1.27.4.0
-FW_VERSION_T6=	1.27.4.0
+FW_VERSION_T5=	1.27.5.0
+FW_VERSION_T6=	1.27.5.0
 
 FWDIR	= $(UTSBASE)/common/io/cxgbe/firmware
 FWFILES	= \
