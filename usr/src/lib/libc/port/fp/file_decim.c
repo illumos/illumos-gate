@@ -37,6 +37,7 @@
 #include <synch.h>
 #include "stdiom.h"
 #include "libc.h"
+#include "thr_uberdata.h"
 
 /* if the _IOWRT flag is set, this must be a call from sscanf */
 #define	mygetc(iop)	((iop->_flag & _IOWRT) ? \
@@ -56,7 +57,7 @@ file_to_decimal(char **ppc, int nmax, int fortran_conventions,
 	char	*good = cp;	/* last character accepted */
 	int	current;	/* *cp or EOF */
 	int	nread = 0;	/* number of characters read so far */
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 
 /* if the _IOWRT flag is set, this must be a call from sscanf */
 #define	NEXT \

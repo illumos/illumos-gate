@@ -47,7 +47,7 @@ size_t
 mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
     size_t n, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (mbrtowc_l(pwc, s, n, ps, uselocale(NULL)));
+	return (mbrtowc_l(pwc, s, n, ps, __curlocale()));
 }
 
 size_t
@@ -65,5 +65,5 @@ size_t
 mbrtowc_nz(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
     size_t n, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (mbrtowc_nz_l(pwc, s, n, ps, uselocale(NULL)));
+	return (mbrtowc_nz_l(pwc, s, n, ps, __curlocale()));
 }

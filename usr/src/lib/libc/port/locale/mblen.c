@@ -53,5 +53,5 @@ mblen_l(const char *s, size_t n, locale_t loc)
 int
 mblen(const char *s, size_t n)
 {
-	return (mblen_l(s, n, uselocale(NULL)));
+	return (mblen_l(s, n, __curlocale()));
 }

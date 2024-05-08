@@ -474,7 +474,7 @@ __mb_cur_max_l(locale_t loc)
 unsigned char
 __mb_cur_max(void)
 {
-	return (__mb_cur_max_l(uselocale(NULL)));
+	return (__mb_cur_max_l(__curlocale()));
 }
 
 /*
@@ -571,6 +571,31 @@ newlocale(int catmask, const char *locname, locale_t base)
 	freelocale(base);
 
 	return (mklocname(loc));
+}
+
+/*
+ * Transitional implementation of __curlocale() based on code from uselocale().
+ * This is a placeholder to introduce this interface into libc.
+ *
+ * A future change will move the locale pointer into the ulwp_t structure and
+ * make __curlocale() an inline function.
+ */
+locale_t
+__curlocale(void)
+{
+	locale_t *locptr;
+
+	locptr = tsdalloc(_T_SETLOCALE, sizeof (locale_t), freelocptr);
+	/* Should never occur */
+	if (locptr == NULL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	if (*locptr != NULL)
+		return (*locptr);
+
+	return (___global_locale);
 }
 
 locale_t

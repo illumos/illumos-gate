@@ -1322,6 +1322,7 @@ extern	void	_flush_windows(void);
 #endif
 extern	void	set_curthread(void *);
 extern	void	ssp_init(void);
+extern	locale_t __curlocale(void);
 
 extern	int	sema_relclockwait(sema_t *, clockid_t, const timespec_t *);
 extern	int	sema_clockwait(sema_t *, clockid_t, const timespec_t *);

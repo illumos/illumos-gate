@@ -106,5 +106,5 @@ found:
 wint_t
 __nextwctype(wint_t wc, wctype_t wct)
 {
-	return (nextwctype_l(wc, wct, uselocale(NULL)));
+	return (nextwctype_l(wc, wct, __curlocale()));
 }

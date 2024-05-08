@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdlib.h>
 #include <wchar.h>
 #include <locale.h>
@@ -51,5 +52,5 @@ wctomb_l(char *s, wchar_t wchar, locale_t loc)
 int
 wctomb(char *s, wchar_t wchar)
 {
-	return (wctomb_l(s, wchar, uselocale(NULL)));
+	return (wctomb_l(s, wchar, __curlocale()));
 }

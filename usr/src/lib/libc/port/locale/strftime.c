@@ -108,7 +108,7 @@ size_t
 strftime(char *_RESTRICT_KYWD s, size_t maxsize,
     const char *_RESTRICT_KYWD format, const struct tm *_RESTRICT_KYWD t)
 {
-	return (strftime_l(s, maxsize, format, t, uselocale(NULL)));
+	return (strftime_l(s, maxsize, format, t, __curlocale()));
 }
 
 static char *

@@ -38,12 +38,12 @@ toupper_l(int c, locale_t loc)
 int
 tolower(int c)
 {
-	return (isascii(c) ? __trans_lower[c] : tolower_l(c, uselocale(NULL)));
+	return (isascii(c) ? __trans_lower[c] : tolower_l(c, __curlocale()));
 }
 
 #undef toupper
 int
 toupper(int c)
 {
-	return (isascii(c) ? __trans_upper[c] : toupper_l(c, uselocale(NULL)));
+	return (isascii(c) ? __trans_upper[c] : toupper_l(c, __curlocale()));
 }

@@ -14,6 +14,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <locale.h>
 #include "localeimpl.h"
 #include "lctype.h"
@@ -45,5 +46,5 @@ mbsinit_l(const mbstate_t *s, locale_t loc)
 int
 mbsinit(const mbstate_t *s)
 {
-	return (mbsinit_l(s, uselocale(NULL)));
+	return (mbsinit_l(s, __curlocale()));
 }

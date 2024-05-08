@@ -216,5 +216,5 @@ end:
 int
 wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 {
-	return (wcscoll_l(ws1, ws2, uselocale(NULL)));
+	return (wcscoll_l(ws1, ws2, __curlocale()));
 }

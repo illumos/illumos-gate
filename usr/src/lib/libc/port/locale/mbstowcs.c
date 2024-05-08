@@ -49,5 +49,5 @@ mbstowcs_l(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s,
 size_t
 mbstowcs(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s, size_t n)
 {
-	return (mbstowcs_l(pwcs, s, n, uselocale(NULL)));
+	return (mbstowcs_l(pwcs, s, n, __curlocale()));
 }

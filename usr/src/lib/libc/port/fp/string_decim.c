@@ -31,6 +31,7 @@
 #include "base_conversion.h"
 #include <xlocale.h>
 #include <locale.h>
+#include "thr_uberdata.h"
 
 void
 string_to_decimal(char **ppc, int nmax, int fortran_conventions,
@@ -38,7 +39,7 @@ string_to_decimal(char **ppc, int nmax, int fortran_conventions,
     char **pechar)
 {
 	string_to_decimal_l(ppc, nmax, fortran_conventions, pd, pform, pechar,
-	    uselocale(NULL));
+	    __curlocale());
 }
 
 void

@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -60,5 +61,5 @@ mbtowc_l(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s, size_t n,
 int
 mbtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s, size_t n)
 {
-	return (mbtowc_l(pwc, s, n, uselocale(NULL)));
+	return (mbtowc_l(pwc, s, n, __curlocale()));
 }

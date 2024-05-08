@@ -34,6 +34,7 @@
 #include "lint.h"
 #include "_libc_gettext.h"
 #include "syserr.h"
+#include "thr_uberdata.h"
 #include <string.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -52,7 +53,7 @@ strerror_l(int errnum, locale_t loc)
 char *
 strerror(int errnum)
 {
-	return (strerror_l(errnum, uselocale(NULL)));
+	return (strerror_l(errnum, __curlocale()));
 }
 
 /*

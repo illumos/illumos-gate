@@ -32,6 +32,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdlib.h>
 #include <wchar.h>
 #include <locale.h>
@@ -59,7 +60,7 @@ wcscasecmp_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)
 int
 wcscasecmp(const wchar_t *s1, const wchar_t *s2)
 {
-	return (wcscasecmp_l(s1, s2, uselocale(NULL)));
+	return (wcscasecmp_l(s1, s2, __curlocale()));
 }
 
 int
@@ -80,5 +81,5 @@ wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)
 int
 wcsncasecmp(const wchar_t *s1, const wchar_t *s2, size_t n)
 {
-	return (wcsncasecmp_l(s1, s2, n, uselocale(NULL)));
+	return (wcsncasecmp_l(s1, s2, n, __curlocale()));
 }

@@ -21,6 +21,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <ctype.h>
 #include <locale.h>
 #include "localeimpl.h"
@@ -39,7 +40,7 @@
 	((unsigned)c > 255 || loc->ctype->lc_max_mblen > 1) ? 0 : \
 	(loc->ctype->lc_ctype_mask[c] & mask))
 
-#define	ISTYPE(c, mask)	ISTYPE_L(c, mask, uselocale(NULL))
+#define	ISTYPE(c, mask)	ISTYPE_L(c, mask, __curlocale())
 
 #define	DEFN_ISTYPE(type, mask)		\
 int					\
@@ -71,15 +72,15 @@ is##type(int c)				\
 #undef	ispunct
 #undef	isprint
 
-DEFN_ISTYPE(blank, _ISBLANK)
-DEFN_ISTYPE(upper, _ISUPPER)
-DEFN_ISTYPE(lower, _ISLOWER)
-DEFN_ISTYPE(digit, _ISDIGIT)
-DEFN_ISTYPE(xdigit, _ISXDIGIT)
-DEFN_ISTYPE(alpha, _ISALPHA)
-DEFN_ISTYPE(alnum, _ISALNUM)
-DEFN_ISTYPE(space, _ISSPACE)
-DEFN_ISTYPE(cntrl, _ISCNTRL)
-DEFN_ISTYPE(graph, _ISGRAPH)
-DEFN_ISTYPE(punct, _ISPUNCT)
-DEFN_ISTYPE(print, _ISPRINT)
+DEFN_ISTYPE(blank, _ISBLANK);
+DEFN_ISTYPE(upper, _ISUPPER);
+DEFN_ISTYPE(lower, _ISLOWER);
+DEFN_ISTYPE(digit, _ISDIGIT);
+DEFN_ISTYPE(xdigit, _ISXDIGIT);
+DEFN_ISTYPE(alpha, _ISALPHA);
+DEFN_ISTYPE(alnum, _ISALNUM);
+DEFN_ISTYPE(space, _ISSPACE);
+DEFN_ISTYPE(cntrl, _ISCNTRL);
+DEFN_ISTYPE(graph, _ISGRAPH);
+DEFN_ISTYPE(punct, _ISPUNCT);
+DEFN_ISTYPE(print, _ISPRINT);

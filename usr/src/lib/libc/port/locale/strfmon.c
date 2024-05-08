@@ -58,7 +58,7 @@
 
 /* internal macros */
 #define	PRINT(CH) {						\
-	if (dst >= s + maxsize) 				\
+	if (dst >= s + maxsize)					\
 		goto e2big_error;				\
 	*dst++ = CH;						\
 }
@@ -106,8 +106,8 @@ ssize_t
 strfmon_impl(char *_RESTRICT_KYWD s, size_t maxsize, locale_t loc,
     const char *_RESTRICT_KYWD format, va_list ap)
 {
-	char 		*dst;		/* output destination pointer */
-	const char 	*fmt;		/* current format poistion pointer */
+	char		*dst;		/* output destination pointer */
+	const char	*fmt;		/* current format poistion pointer */
 	char		*asciivalue;	/* formatted double pointer */
 
 	int		flags;		/* formatting options */
@@ -411,7 +411,7 @@ strfmon(char *_RESTRICT_KYWD s, size_t maxsize,
 	ssize_t ret;
 
 	va_start(ap, format);
-	ret = strfmon_impl(s, maxsize, uselocale(NULL), format, ap);
+	ret = strfmon_impl(s, maxsize, __curlocale(), format, ap);
 	va_end(ap);
 	return (ret);
 }

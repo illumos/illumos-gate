@@ -28,6 +28,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
@@ -78,5 +79,5 @@ size_t
 wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
     const wchar_t *_RESTRICT_KYWD src, size_t len)
 {
-	return (wcsxfrm_l(dest, src, len, uselocale(NULL)));
+	return (wcsxfrm_l(dest, src, len, __curlocale()));
 }

@@ -87,8 +87,8 @@ towlower(wint_t wc)
 {
 	return (iswascii(wc) ? __trans_lower[wc] :
 	    (wc < 0 || wc >= _CACHED_RUNES) ?
-	    change_case_ext(uselocale(NULL), wc, 1) :
-	    uselocale(NULL)->runelocale->__maplower[wc]);
+	    change_case_ext(__curlocale(), wc, 1) :
+	    __curlocale()->runelocale->__maplower[wc]);
 }
 
 wint_t
@@ -106,6 +106,6 @@ towupper(wint_t wc)
 {
 	return (iswascii(wc) ? __trans_upper[wc] :
 	    (wc < 0 || wc >= _CACHED_RUNES) ?
-	    change_case_ext(uselocale(NULL), wc, 0) :
-	    uselocale(NULL)->runelocale->__mapupper[wc]);
+	    change_case_ext(__curlocale(), wc, 0) :
+	    __curlocale()->runelocale->__mapupper[wc]);
 }

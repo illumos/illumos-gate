@@ -36,6 +36,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include "file64.h"
 #include <sys/types.h>
 #include <stdio.h>
@@ -900,7 +901,7 @@ p_b_term(struct parse *p, cset *cs)
 	char c;
 	wint_t start, finish;
 	wint_t i;
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 
 	/* classify what we've got */
 	switch ((MORE()) ? PEEK() : '\0') {
@@ -1561,7 +1562,7 @@ findmust(struct parse *p, struct re_guts *g)
 	char buf[MB_LEN_MAX];
 	size_t clen;
 	mbstate_t mbs;
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 
 	/* avoid making error situations worse */
 	if (p->error != 0)

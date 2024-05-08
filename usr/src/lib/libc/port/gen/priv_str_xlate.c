@@ -33,6 +33,7 @@
 #pragma weak _priv_gettext = priv_gettext
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -438,7 +439,7 @@ priv_gettext(const char *priv)
 	if (priv_getbyname(priv) < 0)
 		return (NULL);
 
-	curloc = uselocale(NULL);
+	curloc = __curlocale();
 	loc = current_locale(curloc, LC_MESSAGES);
 
 	if (snprintf(file, sizeof (file),

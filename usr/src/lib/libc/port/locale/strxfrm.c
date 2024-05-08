@@ -28,6 +28,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -92,5 +93,5 @@ error:
 size_t
 strxfrm(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src, size_t dlen)
 {
-	return (strxfrm_l(xf, src, dlen, uselocale(NULL)));
+	return (strxfrm_l(xf, src, dlen, __curlocale()));
 }

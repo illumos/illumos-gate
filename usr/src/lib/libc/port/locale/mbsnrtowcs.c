@@ -50,7 +50,7 @@ size_t
 mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
     size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (mbsnrtowcs_l(dst, src, nms, len, ps, uselocale(NULL)));
+	return (mbsnrtowcs_l(dst, src, nms, len, ps, __curlocale()));
 }
 
 size_t

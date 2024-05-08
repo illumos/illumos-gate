@@ -20,6 +20,7 @@
  * is as well. In this case, we can just pass this directly to mbrtowc_l().
  */
 
+#include "thr_uberdata.h"
 #include <locale.h>
 #include <wchar.h>
 #include <xlocale.h>
@@ -41,6 +42,5 @@ mbrtoc32(char32_t *restrict pc32, const char *restrict str, size_t len,
 		len = 1;
 	}
 
-	return (mbrtowc_l((wchar_t *)pc32, str, len, ps,
-	    uselocale((locale_t)0)));
+	return (mbrtowc_l((wchar_t *)pc32, str, len, ps, __curlocale()));
 }

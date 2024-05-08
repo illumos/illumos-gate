@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved   */
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -71,5 +71,5 @@ strncasecmp_l(const char *s1, const char *s2, size_t n, locale_t loc)
 int
 strncasecmp(const char *s1, const char *s2, size_t n)
 {
-	return (strncasecmp_l(s1, s2, n, uselocale(NULL)));
+	return (strncasecmp_l(s1, s2, n, __curlocale()));
 }

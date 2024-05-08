@@ -34,6 +34,7 @@
 
 #include "lint.h"
 #include "libc.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -102,7 +103,7 @@ process_nls_path(char *name, int oflag)
 	 * Chose XPG4. If oflag == NL_CAT_LOCALE, use LC_MESSAGES.
 	 */
 	if (oflag == NL_CAT_LOCALE) {
-		locale_t loc = uselocale(NULL);
+		locale_t loc = __curlocale();
 		locale = current_locale(loc, LC_MESSAGES);
 	} else {
 		locale = getenv("LANG");

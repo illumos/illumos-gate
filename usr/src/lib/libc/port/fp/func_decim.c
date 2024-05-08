@@ -25,6 +25,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -42,7 +43,7 @@ func_to_decimal(char **ppc, int nmax, int fortran_conventions,
 	char	*good = cp;	/* last character accepted */
 	int	current;	/* *cp or EOF */
 	int	nread = 0;	/* number of characters read so far */
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 
 #define	NEXT \
 	if (nread < nmax) { \

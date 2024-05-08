@@ -24,8 +24,8 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright (c) 1988 AT&T */
+/*	  All Rights Reserved   */
 
 #include "lint.h"
 #include <string.h>
@@ -75,5 +75,5 @@ strcasestr_l(const char *s1, const char *s2, locale_t loc)
 char *
 strcasestr(const char *s1, const char *s2)
 {
-	return (strcasestr_l(s1, s2, uselocale(NULL)));
+	return (strcasestr_l(s1, s2, __curlocale()));
 }

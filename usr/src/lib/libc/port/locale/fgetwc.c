@@ -98,7 +98,7 @@ _fgetwc_unlocked_l(FILE *fp, locale_t loc)
 wint_t
 _fgetwc_unlocked(FILE *fp)
 {
-	return (_fgetwc_unlocked_l(fp, uselocale(NULL)));
+	return (_fgetwc_unlocked_l(fp, __curlocale()));
 }
 
 
@@ -112,7 +112,7 @@ fgetwc(FILE *fp)
 {
 	wint_t		r;
 	rmutex_t	*l;
-	locale_t	loc = uselocale(NULL);
+	locale_t	loc = __curlocale();
 
 	FLOCKFILE(l, fp);
 	r = _fgetwc_unlocked_l(fp, loc);
@@ -131,7 +131,7 @@ __fgetwc_xpg5(FILE *fp)
 {
 	wint_t		r;
 	rmutex_t	*l;
-	locale_t	loc = uselocale(NULL);
+	locale_t	loc = __curlocale();
 
 	FLOCKFILE(l, fp);
 	if (GET_NO_MODE(fp))

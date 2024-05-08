@@ -277,3 +277,15 @@ In summary, any new function symbol in libc must be scoped protected unless it
 is one of a very small group of functions that must allow interposed versions
 to be bound to from the C library itself -- it is grossly unlikely that more
 of these will occur.
+
+# Current locale should be fetched via __curlocale()
+
+The integration of the fix for:
+	15725 Replace uselocale(NULL) with __curlocale() in libc
+
+introduces the private __curlocale() function as the preferred way for
+locale-dependent code in libc to fetch the current locale_t object for
+the current thread.  Code in libc should no longer call
+uselocale(NULL) for this purpose.  The POSIX.1-2008 standard only
+requires uselocale(NULL) to return a usable locale pointer if a
+per-thread locale was previously set.

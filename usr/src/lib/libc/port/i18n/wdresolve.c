@@ -26,6 +26,7 @@
 
 #include "lint.h"
 #include "mtlib.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <ctype.h>
 #include <string.h>
@@ -67,7 +68,7 @@ _wdinitialize(void)
 	if (modhandle)
 		(void) dlclose(modhandle);
 
-	curloc = uselocale(NULL);
+	curloc = __curlocale();
 	loc = current_locale(curloc, LC_CTYPE);
 
 	rv = snprintf(wdmodpath, sizeof (wdmodpath), "%s%s%s",

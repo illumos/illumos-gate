@@ -51,5 +51,5 @@ size_t
 mbsrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
     size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (mbsrtowcs_l(dst, src, len, ps, uselocale(NULL)));
+	return (mbsrtowcs_l(dst, src, len, ps, __curlocale()));
 }

@@ -50,5 +50,5 @@ wcstombs_l(char *_RESTRICT_KYWD s, const wchar_t *_RESTRICT_KYWD pwcs,
 size_t
 wcstombs(char *_RESTRICT_KYWD s, const wchar_t *_RESTRICT_KYWD pwcs, size_t n)
 {
-	return (wcstombs_l(s, pwcs, n, uselocale(NULL)));
+	return (wcstombs_l(s, pwcs, n, __curlocale()));
 }

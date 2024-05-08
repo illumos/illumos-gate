@@ -28,6 +28,7 @@
 #include <locale.h>
 #include <xlocale.h>
 #include "setlocale.h"
+#include "thr_uberdata.h"
 
 /* private locale structures */
 

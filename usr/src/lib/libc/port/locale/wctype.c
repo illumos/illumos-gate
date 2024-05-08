@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <ctype.h>
 #include <string.h>
 #include <wctype.h>
@@ -75,5 +76,5 @@ wctype_l(const char *property, locale_t loc __unused)
 wctype_t
 wctype(const char *property)
 {
-	return (wctype_l(property, uselocale(NULL)));
+	return (wctype_l(property, __curlocale()));
 }

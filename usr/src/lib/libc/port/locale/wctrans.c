@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <errno.h>
 #include <string.h>
 #include <wctype.h>
@@ -60,7 +61,7 @@ towctrans_l(wint_t wc, wctrans_t desc, locale_t loc)
 wint_t
 towctrans(wint_t wc, wctrans_t desc)
 {
-	return (towctrans_l(wc, desc, uselocale(NULL)));
+	return (towctrans_l(wc, desc, __curlocale()));
 }
 
 /*
@@ -92,5 +93,5 @@ wctrans_l(const char *charclass, locale_t loc __unused)
 wctrans_t
 wctrans(const char *charclass)
 {
-	return (wctrans_l(charclass, uselocale(NULL)));
+	return (wctrans_l(charclass, __curlocale()));
 }

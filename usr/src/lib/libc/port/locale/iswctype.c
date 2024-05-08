@@ -74,7 +74,7 @@ __istype_l(locale_t loc, wint_t c, unsigned int f)
 static int
 __istype(wint_t c, unsigned int f)
 {
-	return (__istype_l(uselocale(NULL), c, f));
+	return (__istype_l(__curlocale(), c, f));
 }
 
 int
@@ -92,7 +92,7 @@ iswctype(wint_t wc, wctype_t class)
 	/*
 	 * Note that we don't just call iswctype_l because we optimize for
 	 * the iswascii() case, so that most of the time we have no need to
-	 * call uselocale().
+	 * call __curlocale().
 	 */
 	if (iswascii(wc))
 		return (__ctype_mask[wc] & class);
@@ -133,22 +133,22 @@ isw##type(wint_t wc)				\
 #undef	iswalpha
 #undef	iswblank
 
-DEFN_ISWTYPE(alnum, _CTYPE_A|_CTYPE_D)
-DEFN_ISWTYPE(alpha, _CTYPE_A)
-DEFN_ISWTYPE(blank, _CTYPE_B)
-DEFN_ISWTYPE(cntrl, _CTYPE_C)
-DEFN_ISWTYPE(digit, _CTYPE_D)
-DEFN_ISWTYPE(graph, _CTYPE_G)
-DEFN_ISWTYPE(lower, _CTYPE_L)
-DEFN_ISWTYPE(upper, _CTYPE_U)
-DEFN_ISWTYPE(print, _CTYPE_R)
-DEFN_ISWTYPE(punct, _CTYPE_P)
-DEFN_ISWTYPE(space, _CTYPE_S)
-DEFN_ISWTYPE(xdigit, _CTYPE_X)
-DEFN_ISWTYPE(ideogram, _CTYPE_I)
-DEFN_ISWTYPE(phonogram, _CTYPE_Q)
-DEFN_ISWTYPE(special, _CTYPE_T)
-DEFN_ISWTYPE(number, _CTYPE_N)
+DEFN_ISWTYPE(alnum, _CTYPE_A|_CTYPE_D);
+DEFN_ISWTYPE(alpha, _CTYPE_A);
+DEFN_ISWTYPE(blank, _CTYPE_B);
+DEFN_ISWTYPE(cntrl, _CTYPE_C);
+DEFN_ISWTYPE(digit, _CTYPE_D);
+DEFN_ISWTYPE(graph, _CTYPE_G);
+DEFN_ISWTYPE(lower, _CTYPE_L);
+DEFN_ISWTYPE(upper, _CTYPE_U);
+DEFN_ISWTYPE(print, _CTYPE_R);
+DEFN_ISWTYPE(punct, _CTYPE_P);
+DEFN_ISWTYPE(space, _CTYPE_S);
+DEFN_ISWTYPE(xdigit, _CTYPE_X);
+DEFN_ISWTYPE(ideogram, _CTYPE_I);
+DEFN_ISWTYPE(phonogram, _CTYPE_Q);
+DEFN_ISWTYPE(special, _CTYPE_T);
+DEFN_ISWTYPE(number, _CTYPE_N);
 
 
 #undef iswhexnumber

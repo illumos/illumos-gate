@@ -526,7 +526,7 @@ strptime(const char *_RESTRICT_KYWD buf, const char *_RESTRICT_KYWD fmt,
 
 	(void) memset(tm, 0, sizeof (*tm));
 
-	return (__strptime(buf, fmt, tm, &flags, uselocale(NULL)));
+	return (__strptime(buf, fmt, tm, &flags, __curlocale()));
 }
 
 /*
@@ -539,7 +539,7 @@ __strptime_dontzero(const char *_RESTRICT_KYWD buf,
 {
 	int	flags = 0;
 
-	return (__strptime(buf, fmt, tm, &flags, uselocale(NULL)));
+	return (__strptime(buf, fmt, tm, &flags, __curlocale()));
 }
 
 /*

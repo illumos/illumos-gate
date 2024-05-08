@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <stdio.h>
 #include <wchar.h>
 #include <locale.h>
@@ -57,5 +58,5 @@ btowc_l(int c, locale_t loc)
 wint_t
 btowc(int c)
 {
-	return (btowc_l(c, uselocale(NULL)));
+	return (btowc_l(c, __curlocale()));
 }

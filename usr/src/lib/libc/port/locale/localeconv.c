@@ -59,7 +59,7 @@
 struct lconv *
 localeconv(void)
 {
-	return (localeconv_l(uselocale(NULL)));
+	return (localeconv_l(__curlocale()));
 }
 
 struct lconv *

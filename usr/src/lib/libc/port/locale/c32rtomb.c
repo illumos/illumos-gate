@@ -20,6 +20,7 @@
  * can represent with a wchar_t. This is basically a wrapper around wcrtomb().
  */
 
+#include "thr_uberdata.h"
 #include <locale.h>
 #include <wchar.h>
 #include <xlocale.h>
@@ -46,5 +47,5 @@ c32rtomb(char *restrict str, char32_t c32, mbstate_t *restrict ps)
 		c32 = L'\0';
 	}
 
-	return (wcrtomb_l(str, (wchar_t)c32, ps, uselocale((locale_t)0)));
+	return (wcrtomb_l(str, (wchar_t)c32, ps, __curlocale()));
 }

@@ -75,7 +75,7 @@ static int fnmatch1(const char *, const char *, const char *, int, mbstate_t,
 int
 fnmatch(const char *pattern, const char *string, int flags)
 {
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 	static const mbstate_t initial = { 0 };
 
 	return (fnmatch1(pattern, string, string, flags, initial, initial,

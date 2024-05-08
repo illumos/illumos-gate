@@ -69,7 +69,7 @@ wcwidth_l(wchar_t wc, locale_t loc)
 int
 wcwidth(wchar_t wc)
 {
-	return (wcwidth_l(wc, uselocale(NULL)));
+	return (wcwidth_l(wc, __curlocale()));
 }
 
 #pragma weak _scrwidth = scrwidth

@@ -24,13 +24,14 @@
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright (c) 1988 AT&T */
+/*	  All Rights Reserved   */
 
 #pragma weak _gettxt = gettxt
 
 #include "lint.h"
 #include "libc.h"
+#include "thr_uberdata.h"
 #include <mtlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -48,7 +49,7 @@
 #include "../i18n/_locale.h"
 #include "../i18n/_loc_path.h"
 
-#define	MESSAGES 	"/LC_MESSAGES/"
+#define	MESSAGES	"/LC_MESSAGES/"
 #define	DB_NAME_LEN	15
 
 #define	handle_return(s)	\
@@ -80,7 +81,7 @@ gettxt(const char *msg_id, const char *dflt_str)
 {
 	struct db_cache	*dbc;
 	struct db_list	*dbl;
-	char 	msgfile[DB_NAME_LEN];	/* name of static shared library */
+	char	msgfile[DB_NAME_LEN];	/* name of static shared library */
 	int	msgnum;			/* message number */
 	char	pathname[PATH_MAX];	/* full pathname to message file */
 	int	fd;
@@ -120,7 +121,7 @@ gettxt(const char *msg_id, const char *dflt_str)
 			return (handle_return(dflt_str));
 	}
 	msgnum = atoi(msg_id + name_len + 1);
-	loc = uselocale(NULL);
+	loc = __curlocale();
 	curloc = current_locale(loc, LC_MESSAGES);
 
 	lmutex_lock(&gettxt_lock);

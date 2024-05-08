@@ -48,5 +48,5 @@ wcrtomb_l(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps,
 size_t
 wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (wcrtomb_l(s, wc, ps, uselocale(NULL)));
+	return (wcrtomb_l(s, wc, ps, __curlocale()));
 }

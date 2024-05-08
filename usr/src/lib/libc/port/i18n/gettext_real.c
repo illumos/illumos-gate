@@ -29,6 +29,7 @@
 
 #include "lint.h"
 #include "mtlib.h"
+#include "thr_uberdata.h"
 #include <ctype.h>
 #include <locale.h>
 #include <stdio.h>
@@ -89,7 +90,7 @@ _real_gettext_u(const char *domain, const char *msgid1, const char *msgid2,
 	 * locale contains the value of 'category'
 	 */
 	if (loc == NULL)
-		loc = uselocale(NULL);
+		loc = __curlocale();
 	cur_locale = current_locale(loc, category);
 
 	language = getenv("LANGUAGE"); /* for GNU */

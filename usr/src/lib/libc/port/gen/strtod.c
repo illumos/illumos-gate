@@ -41,11 +41,12 @@
 #include <xlocale.h>
 #include "libc.h"
 #include "xpg6.h"
+#include "thr_uberdata.h"
 
 double
 strtod(const char *cp, char **ptr)
 {
-	return (strtod_l(cp, ptr, uselocale(NULL)));
+	return (strtod_l(cp, ptr, __curlocale()));
 }
 
 double
@@ -84,7 +85,7 @@ strtod_l(const char *cp, char **ptr, locale_t loc)
 float
 strtof(const char *cp, char **ptr)
 {
-	return (strtof_l(cp, ptr, uselocale(NULL)));
+	return (strtof_l(cp, ptr, __curlocale()));
 }
 
 float
@@ -121,7 +122,7 @@ strtof_l(const char *cp, char **ptr, locale_t loc)
 long double
 strtold(const char *cp, char **ptr)
 {
-	return (strtold_l(cp, ptr, uselocale(NULL)));
+	return (strtold_l(cp, ptr, __curlocale()));
 }
 
 long double

@@ -38,6 +38,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <locale.h>
 #include <wchar.h>
 #include <xlocale.h>
@@ -60,5 +61,5 @@ wcswidth_l(const wchar_t *pwcs, size_t n, locale_t loc)
 int
 wcswidth(const wchar_t *pwcs, size_t n)
 {
-	return (wcswidth_l(pwcs, n, uselocale(NULL)));
+	return (wcswidth_l(pwcs, n, __curlocale()));
 }

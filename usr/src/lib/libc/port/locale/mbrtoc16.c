@@ -20,6 +20,7 @@
  * with surrogate pairs.
  */
 
+#include "thr_uberdata.h"
 #include <locale.h>
 #include <wchar.h>
 #include <xlocale.h>
@@ -65,7 +66,7 @@ mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
 		return ((size_t)-3);
 	}
 
-	ret = mbrtowc_l(&wc, str, len, ps, uselocale(NULL));
+	ret = mbrtowc_l(&wc, str, len, ps, __curlocale());
 	if ((ssize_t)ret < 0) {
 		return (ret);
 	}

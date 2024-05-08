@@ -177,5 +177,5 @@ nl_langinfo_l(nl_item item, locale_t loc)
 char *
 nl_langinfo(nl_item item)
 {
-	return (nl_langinfo_l(item, uselocale(NULL)));
+	return (nl_langinfo_l(item, __curlocale()));
 }

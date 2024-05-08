@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <wchar.h>
 #include <locale.h>
 #include <xlocale.h>
@@ -46,5 +47,5 @@ mbrlen_l(const char *_RESTRICT_KYWD s, size_t n, mbstate_t *_RESTRICT_KYWD ps,
 size_t
 mbrlen(const char *_RESTRICT_KYWD s, size_t n, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (mbrlen_l(s, n, ps, uselocale(NULL)));
+	return (mbrlen_l(s, n, ps, __curlocale()));
 }

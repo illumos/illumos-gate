@@ -27,6 +27,7 @@
  */
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <limits.h>
 #include <stdio.h>
 #include <wchar.h>
@@ -49,5 +50,5 @@ wctob_l(wint_t c, locale_t loc)
 int
 wctob(wint_t c)
 {
-	return (wctob_l(c, uselocale(NULL)));
+	return (wctob_l(c, __curlocale()));
 }

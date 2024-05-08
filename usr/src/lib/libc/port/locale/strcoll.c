@@ -111,5 +111,5 @@ error:
 int
 strcoll(const char *s1, const char *s2)
 {
-	return (strcoll_l(s1, s2, uselocale(NULL)));
+	return (strcoll_l(s1, s2, __curlocale()));
 }

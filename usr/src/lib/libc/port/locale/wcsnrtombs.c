@@ -51,7 +51,7 @@ size_t
 wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
     size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
-	return (wcsnrtombs_l(dst, src, nwc, len, ps, uselocale(NULL)));
+	return (wcsnrtombs_l(dst, src, nwc, len, ps, __curlocale()));
 }
 
 size_t

@@ -39,6 +39,7 @@
 #include <time.h>
 #include <wchar.h>
 #include <alloca.h>
+#include "thr_uberdata.h"
 
 /*
  * Convert date and time to a wide-character string.
@@ -67,7 +68,7 @@ __wcsftime_xpg5(wchar_t *wcs, size_t maxsize, const wchar_t *format,
     const struct tm *timeptr)
 {
 	return (wcsftime_l(wcs, maxsize, format, timeptr,
-	    uselocale(NULL)));
+	    __curlocale()));
 }
 
 
@@ -139,7 +140,7 @@ wcsftime(wchar_t *wcs, size_t maxsize, const char *format,
 	int	len;
 	wchar_t	*wfmt;
 	size_t rv;
-	locale_t loc = uselocale(NULL);
+	locale_t loc = __curlocale();
 
 	/* Convert the format (mb string) to wide char array */
 	len = strlen(format) + 1;
