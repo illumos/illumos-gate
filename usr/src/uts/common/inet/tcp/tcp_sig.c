@@ -704,6 +704,76 @@ tcpsig_sa_handler(keysock_t *ks, mblk_t *mp, sadb_msg_t *samsg,
 	}
 }
 
+bool
+tcpsig_sa_exists(tcp_t *tcp, bool inbound, tcpsig_sa_t **sap)
+{
+	tcp_stack_t *tcps = tcp->tcp_tcps;
+	conn_t *connp = tcp->tcp_connp;
+	struct sockaddr_storage src, dst;
+	tcpsig_sa_t *sa;
+
+	bzero(&src, sizeof (src));
+	bzero(&dst, sizeof (dst));
+
+	if (connp->conn_ipversion == IPV6_VERSION) {
+		sin6_t *sin6;
+
+		sin6 = (sin6_t *)&src;
+		sin6->sin6_family = AF_INET6;
+		if (inbound) {
+			sin6->sin6_addr = connp->conn_faddr_v6;
+			sin6->sin6_port = connp->conn_fport;
+		} else {
+			sin6->sin6_addr = connp->conn_saddr_v6;
+			sin6->sin6_port = connp->conn_lport;
+		}
+
+		sin6 = (sin6_t *)&dst;
+		sin6->sin6_family = AF_INET6;
+		if (inbound) {
+			sin6->sin6_addr = connp->conn_saddr_v6;
+			sin6->sin6_port = connp->conn_lport;
+		} else {
+			sin6->sin6_addr = connp->conn_faddr_v6;
+			sin6->sin6_port = connp->conn_fport;
+		}
+	} else {
+		sin_t *sin;
+
+		sin = (sin_t *)&src;
+		sin->sin_family = AF_INET;
+		if (inbound) {
+			sin->sin_addr.s_addr = connp->conn_faddr_v4;
+			sin->sin_port = connp->conn_fport;
+		} else {
+			sin->sin_addr.s_addr = connp->conn_saddr_v4;
+			sin->sin_port = connp->conn_lport;
+		}
+
+		sin = (sin_t *)&dst;
+		sin->sin_family = AF_INET;
+		if (inbound) {
+			sin->sin_addr.s_addr = connp->conn_saddr_v4;
+			sin->sin_port = connp->conn_lport;
+		} else {
+			sin->sin_addr.s_addr = connp->conn_faddr_v4;
+			sin->sin_port = connp->conn_fport;
+		}
+	}
+
+	sa = tcpsig_sa_find(&src, &dst, tcps);
+
+	if (sa == NULL)
+		return (false);
+
+	if (sap != NULL)
+		*sap = sa;
+	else
+		tcpsig_sa_rele(sa);
+
+	return (true);
+}
+
 static void
 tcpsig_pseudo_compute4(tcp_t *tcp, int tcplen, MD5_CTX *ctx, bool inbound)
 {
@@ -779,67 +849,14 @@ tcpsig_signature(mblk_t *mp, tcp_t *tcp, tcpha_t *tcpha, int tcplen,
 
 	sa = inbound ? tcp->tcp_sig_sa_in : tcp->tcp_sig_sa_out;
 	if (sa == NULL) {
-		struct sockaddr_storage src, dst;
-
-		bzero(&src, sizeof (src));
-		bzero(&dst, sizeof (dst));
-
-		if (connp->conn_ipversion == IPV6_VERSION) {
-			sin6_t *sin6;
-
-			sin6 = (sin6_t *)&src;
-			sin6->sin6_family = AF_INET6;
-			if (inbound) {
-				sin6->sin6_addr = connp->conn_faddr_v6;
-				sin6->sin6_port = connp->conn_fport;
-			} else {
-				sin6->sin6_addr = connp->conn_saddr_v6;
-				sin6->sin6_port = connp->conn_lport;
-			}
-
-			sin6 = (sin6_t *)&dst;
-			sin6->sin6_family = AF_INET6;
-			if (inbound) {
-				sin6->sin6_addr = connp->conn_saddr_v6;
-				sin6->sin6_port = connp->conn_lport;
-			} else {
-				sin6->sin6_addr = connp->conn_faddr_v6;
-				sin6->sin6_port = connp->conn_fport;
-			}
-		} else {
-			sin_t *sin;
-
-			sin = (sin_t *)&src;
-			sin->sin_family = AF_INET;
-			if (inbound) {
-				sin->sin_addr.s_addr = connp->conn_faddr_v4;
-				sin->sin_port = connp->conn_fport;
-			} else {
-				sin->sin_addr.s_addr = connp->conn_saddr_v4;
-				sin->sin_port = connp->conn_lport;
-			}
-
-			sin = (sin_t *)&dst;
-			sin->sin_family = AF_INET;
-			if (inbound) {
-				sin->sin_addr.s_addr = connp->conn_saddr_v4;
-				sin->sin_port = connp->conn_lport;
-			} else {
-				sin->sin_addr.s_addr = connp->conn_faddr_v4;
-				sin->sin_port = connp->conn_fport;
-			}
-		}
-
-		sa = tcpsig_sa_find(&src, &dst, tcps);
-
-		if (sa == NULL) {
+		if (!tcpsig_sa_exists(tcp, inbound, &sa)) {
 			TCP_STAT(tcps, tcp_sig_match_failed);
 			return (false);
 		}
 
 		/*
-		 * tcpsig_sa_find() returns a held SA, so we don't need to take
-		 * another one before adding it to tcp.
+		 * tcpsig_sa_exists() returns a held SA, so we don't need to
+		 * take another hold before adding it to tcp.
 		 */
 		if (inbound)
 			tcp->tcp_sig_sa_in = sa;

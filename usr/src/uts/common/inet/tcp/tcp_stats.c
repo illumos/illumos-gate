@@ -799,6 +799,7 @@ tcp_kstat2_init(netstackid_t stackid)
 		{ "tcp_sig_no_space",		KSTAT_DATA_UINT64, 0 },
 		{ "tcp_sig_match_failed",	KSTAT_DATA_UINT64, 0 },
 		{ "tcp_sig_verify_failed",	KSTAT_DATA_UINT64, 0 },
+		{ "tcp_sig_degraded",		KSTAT_DATA_UINT64, 0 },
 #ifdef TCP_DEBUG_COUNTER
 		{ "tcp_time_wait",		KSTAT_DATA_UINT64, 0 },
 		{ "tcp_rput_time_wait",		KSTAT_DATA_UINT64, 0 },
@@ -1010,6 +1011,7 @@ tcp_clr_stats(tcp_stat_t *stats)
 	stats->tcp_sig_no_space.value.ui64 = 0;
 	stats->tcp_sig_match_failed.value.ui64 = 0;
 	stats->tcp_sig_verify_failed.value.ui64 = 0;
+	stats->tcp_sig_degraded.value.ui64 = 0;
 
 #ifdef TCP_DEBUG_COUNTER
 	stats->tcp_time_wait.value.ui64 = 0;
@@ -1114,6 +1116,8 @@ tcp_add_stats(tcp_stat_counter_t *from, tcp_stat_t *to)
 	    from->tcp_sig_match_failed;
 	to->tcp_sig_verify_failed.value.ui64 +=
 	    from->tcp_sig_verify_failed;
+	to->tcp_sig_degraded.value.ui64 +=
+	    from->tcp_sig_degraded;
 
 #ifdef TCP_DEBUG_COUNTER
 	to->tcp_time_wait.value.ui64 +=

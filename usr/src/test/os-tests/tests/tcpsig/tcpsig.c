@@ -97,7 +97,7 @@ static const tcpsig_test_t tcpsig_tests[] = {
 		.tt_port = PORT_NOSA,
 		.tt_enable_src = false,
 		.tt_enable_dst = true,
-		.tt_pass = TCPSIG_NOCONNECT
+		.tt_pass = TCPSIG_SENDRECV
 	},
 	{
 		.tt_desc = "IPv6 NOSA with MD5 enabled on both sides",
@@ -126,7 +126,7 @@ static const tcpsig_test_t tcpsig_tests[] = {
 		.tt_port = PORT_NOSA,
 		.tt_enable_src = false,
 		.tt_enable_dst = true,
-		.tt_pass = TCPSIG_NOCONNECT
+		.tt_pass = TCPSIG_SENDRECV
 	},
 	/* Tests using the port that has bi-directional SAs configured */
 	{
@@ -337,7 +337,7 @@ static const tcpsig_test_t tcpsig_tests[] = {
 		.tt_port = PORT_IBSA,
 		.tt_enable_src = false,
 		.tt_enable_dst = true,
-		.tt_pass = TCPSIG_NOCONNECT
+		.tt_pass = TCPSIG_SENDRECV
 	}, {
 		.tt_desc = "IPv6 IBSA with MD5 enabled on both sides",
 		.tt_domain = PF_INET6,
@@ -365,7 +365,7 @@ static const tcpsig_test_t tcpsig_tests[] = {
 		.tt_port = PORT_IBSA,
 		.tt_enable_src = false,
 		.tt_enable_dst = true,
-		.tt_pass = TCPSIG_NOCONNECT
+		.tt_pass = TCPSIG_SENDRECV
 	}
 };
 
@@ -427,7 +427,8 @@ tcpsig_connect(const tcpsig_test_t *test, int port, int src, int dst, int *cfd,
 	struct timespec to = { .tv_nsec = sock_to };
 	int namelen = test->tt_domain == PF_INET ? sizeof (struct sockaddr_in) :
 	    sizeof (struct sockaddr_in6);
-	int conn;
+	int conn, opt;
+	unsigned int optlen;
 	port_event_t pe;
 
 	if (listen(dst, 5) != 0) {
@@ -493,6 +494,36 @@ tcpsig_connect(const tcpsig_test_t *test, int port, int src, int dst, int *cfd,
 	conn = accept4(dst, NULL, NULL, SOCK_NONBLOCK);
 	if (conn < 0) {
 		warn("TEST FAILED: %s: failed to get client connection",
+		    test->tt_desc);
+		return (false);
+	}
+
+	optlen = sizeof (opt);
+	if (getsockopt(conn, IPPROTO_TCP, TCP_MD5SIG, &opt, &optlen) != 0) {
+		warn("TEST FAILED: %s: failed to retrieve accepted socket "
+		    "TCP_MD5SIG option", test->tt_desc);
+		return (false);
+	}
+
+	if (optlen != sizeof (opt)) {
+		warn("TEST FAILED: %s: TCP_MD5SIG option has wrong length %d "
+		    "(expected %ld).", test->tt_desc, optlen, sizeof (opt));
+		return (false);
+	}
+
+	/*
+	 * For tests where the TCP MD5 option is not enabled on the source, but
+	 * is on the destination, and where we expect the connection to
+	 * succeed, we also expect that the socket option has been disabled on
+	 * accept(). Check.
+	 */
+	if (test->tt_enable_dst && !test->tt_enable_src &&
+	    test->tt_pass == TCPSIG_SENDRECV && opt != 0) {
+		warnx("TEST FAILED: %s: TCP_MD5SIG is set and should not be",
+		    test->tt_desc);
+		return (false);
+	} else if (test->tt_enable_src && opt == 0) {
+		warnx("TEST FAILED: %s: TCP_MD5SIG is not set and should be",
 		    test->tt_desc);
 		return (false);
 	}

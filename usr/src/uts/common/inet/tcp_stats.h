@@ -127,6 +127,7 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_sig_no_space;
 	kstat_named_t	tcp_sig_match_failed;
 	kstat_named_t	tcp_sig_verify_failed;
+	kstat_named_t	tcp_sig_degraded;
 #ifdef TCP_DEBUG_COUNTER
 	kstat_named_t	tcp_time_wait;
 	kstat_named_t	tcp_rput_time_wait;
@@ -187,6 +188,7 @@ typedef struct tcp_stat_counter_s {
 	uint64_t	tcp_sig_no_space;
 	uint64_t	tcp_sig_match_failed;
 	uint64_t	tcp_sig_verify_failed;
+	uint64_t	tcp_sig_degraded;
 #ifdef TCP_DEBUG_COUNTER
 	uint64_t	tcp_time_wait;
 	uint64_t	tcp_rput_time_wait;

@@ -139,7 +139,7 @@ opdes_t	tcp_opt_arr[] = {
 
 { TCP_QUICKACK, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
-{ TCP_MD5SIG, IPPROTO_TCP, OA_W, OA_W, OP_NP, 0, sizeof (int), 0 },
+{ TCP_MD5SIG, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
 { TCP_RTO_INITIAL, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (uint32_t), 0 },
 
