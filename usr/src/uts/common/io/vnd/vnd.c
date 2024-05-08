@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -21,10 +22,10 @@
  * different datalinks. vnd provides many of the same capabilities as the
  * current TCP/IP stack does and some specific to layer two. Specifically:
  *
- * 	o Use of the DLD fastpath
- * 	o Packet capture hooks
- * 	o Ability to use hardware capabilities
- * 	o Useful interfaces for handling multiple frames
+ *	o Use of the DLD fastpath
+ *	o Packet capture hooks
+ *	o Ability to use hardware capabilities
+ *	o Useful interfaces for handling multiple frames
  *
  * The following image shows where vnd fits into today's networking stack:
  *
@@ -709,16 +710,16 @@
  * annotated with the protection that its members receives.  The following
  * annotations are used:
  *
- * 	A	Atomics; these values are only modified using atomics values.
+ *	A	Atomics; these values are only modified using atomics values.
  *		Currently this only applies to kstat values.
- * 	E	Existence; no lock is needed to access this member, it does not
+ *	E	Existence; no lock is needed to access this member, it does not
  *		change while the structure is valid.
- * 	GL	Global Lock; these members are protected by the global
+ *	GL	Global Lock; these members are protected by the global
  *		vnd_dev_lock.
- * 	L	Locked; access to the member is controlled by a lock that is in
- * 		the structure.
- * 	NSL	netstack lock; this member is protected by the containing
- * 		netstack. This only applies to the vnd_dev_t`vdd_nslink.
+ *	L	Locked; access to the member is controlled by a lock that is in
+ *		the structure.
+ *	NSL	netstack lock; this member is protected by the containing
+ *		netstack. This only applies to the vnd_dev_t`vdd_nslink.
  *	X	This member is special, and is discussed in this section.
  *
  * In addition to locking, we also have reference counts on the vnd_dev_t and
@@ -729,8 +730,8 @@
  * /devices or /dev. Reference counts are obtained on these structures as a part
  * of looking them up.
  *
- * 	# Global Lock Ordering
- * 	######################
+ *	# Global Lock Ordering
+ *	######################
  *
  * The following is the order that you must take locks in vnd:
  *
@@ -750,8 +751,8 @@
  *     it again.
  *   o You should not hold any locks when calling any of the rele functions.
  *
- * 	# Special Considerations
- * 	########################
+ *	# Special Considerations
+ *	########################
  *
  * While most of the locking is what's expected, it's worth going into the
  * special nature that a few members hold.  Today, only two structures have
@@ -1108,7 +1109,7 @@ typedef struct vnd_str_stat {
  * annotations.
  */
 typedef struct vnd_str {
-	kmutex_t 	vns_lock;
+	kmutex_t	vns_lock;
 	kcondvar_t	vns_cancelcv;		/* Uses vns_lock */
 	kcondvar_t	vns_barriercv;		/* Uses vns_lock */
 	kcondvar_t	vns_stcv;		/* Uses vns_lock */
@@ -1135,7 +1136,7 @@ typedef struct vnd_str {
 	mblk_t		vns_barrierblk;		/* E + X */
 	vnd_str_stat_t	vns_ksdata;		/* A */
 	size_t		vns_nflush;		/* L */
-	size_t 		vns_bsize;		/* L */
+	size_t		vns_bsize;		/* L */
 	struct vnd_dev	*vns_dev;		/* E + X */
 	struct vnd_pnsd	*vns_nsd;		/* E + X */
 } vnd_str_t;
@@ -2529,8 +2530,10 @@ vnd_st_promiscoff(vnd_str_t *vsp)
 		return;
 	}
 
+	/* We're successful, free the message we popped. */
+	freemsg(mp);
 	if (prim == DL_ERROR_ACK) {
-		cmn_err(CE_WARN, "!failed to disable promiscuos mode during "
+		cmn_err(CE_WARN, "!failed to disable promiscuous mode during "
 		    "vnd teardown");
 	}
 }
@@ -2590,6 +2593,8 @@ vnd_st_unbind(vnd_str_t *vsp)
 		cmn_err(CE_WARN, "!failed to unbind stream during vnd "
 		    "teardown");
 	}
+	/* We're successful, free the message we popped. */
+	freemsg(mp);
 
 next:
 	vsp->vns_state = VNS_S_ZOMBIE;
