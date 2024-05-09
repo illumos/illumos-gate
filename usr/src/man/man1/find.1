@@ -46,6 +46,7 @@
 .\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 .\" Copyright 2020 Joyent, Inc.
+.\" Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 .\"
 .TH FIND 1 "Aug 23, 2020"
 .SH NAME
@@ -229,7 +230,7 @@ True if the file's status was changed \fIn\fR days ago.
 \fB\fB-delete\fR\fR
 .ad
 .RS 17n
-Always true. Deletes the files and folders found recursing from the current
+Always true. Deletes the files and folders found recursively from the current
 directory. This option implicitly enables \fB-depth\fR and is incompatible
 with following symlinks, if specified. For security reasons, relative paths
 starting with '\fB\&/\fR' are not allowed.
@@ -306,6 +307,27 @@ and there's no such group name, it is taken as a group \fBID\fR.
 True if the file's ACL contains an entry for the group \fIgname\fR.
 If \fIgname\fR is numeric and there's no such group name, it is taken
 as a group \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-gsid\fR \fIsid\fR\fR
+.ad
+.RS 17n
+True if the file belongs to a group with the Windows Security Identifier (SID)
+specified by \fIsid\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-gsidacl\fR \fIsid\fR
+.ad
+.RS 17n
+True if the file's ACL contains an \fBgroup\fR entry containing the
+Windows Security Identifier (SID)
+specified by \fIsid\fR.
 .RE
 
 .sp
@@ -667,6 +689,16 @@ expressions.
 .sp
 .ne 2
 .na
+\fB\fB-sidacl\fR \fIsid\fR
+.ad
+.RS 17n
+True if the file's ACL contains an entry referencing the Windows
+Security Identifier (SID) specified by \fIsid\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-size\fR \fIn\fR[\fBc\fR]\fR
 .ad
 .RS 17n
@@ -705,6 +737,27 @@ there's no such user name, it is taken as a user \fBID\fR.
 True if the file's ACL contains an entry for the user \fIuname\fR.
 If \fIuname\fR is numeric and there's no such user name, it is
 taken as a user \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-usid\fR \fIsid\fR\fR
+.ad
+.RS 17n
+True if the file is owned by the Windows Security Identifier (SID)
+specified by \fIsid\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-usidacl\fR \fIsid\fR
+.ad
+.RS 17n
+True if the file's ACL contains an \fBuser\fR entry containing the
+Windows Security Identifier (SID)
+specified by \fIsid\fR.
 .RE
 
 .sp

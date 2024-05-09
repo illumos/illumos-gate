@@ -94,6 +94,9 @@ tests = ['custr_remove', 'custr_trunc']
 
 [/opt/util-tests/tests/find/findtest]
 
+[/opt/util-tests/tests/find/findroot]
+user=root
+
 [/opt/util-tests/tests/mdb/mdbtest]
 
 [/opt/util-tests/tests/sed]
