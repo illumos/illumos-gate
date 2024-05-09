@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 PROG= savecore
@@ -29,6 +30,7 @@ OBJS= savecore.o compress.o
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
+include ../Makefile.ctf
 
 CSTD = $(CSTD_GNU99)
 
@@ -38,8 +40,6 @@ CPPFLAGS += -DBZ_NO_STDIO -I$(SRC)/common -I$(SRC)/uts/common
 LDLIBS += -L$(ROOT)/usr/lib/fm/64 -lfmevent -lnvpair
 LDFLAGS += -R/usr/lib/fm/64
 
-# not linted
-SMATCH=off
 
 #
 # savecore is compiled with bits from $(SRC)/common/bzip2 and some function
@@ -56,6 +56,8 @@ BZIP2OBJS =	bz2blocksort.o	\
 		bz2bzlib.o	\
 		bz2crctable.o	\
 		bz2huffman.o
+
+$(BZIP2OBJS) := SMOFF=indenting
 
 .KEEP_STATE:
 

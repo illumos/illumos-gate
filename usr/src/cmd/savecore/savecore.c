@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -83,8 +84,6 @@ static int	livedump;		/* dump the current running system */
 static int	interactive;		/* user invoked; no syslog */
 static int	csave;			/* save dump compressed */
 static int	filemode;		/* processing file, not dump device */
-static int	percent_done;		/* progress indicator */
-static int	sec_done;		/* progress last report time */
 static hrtime_t	startts;		/* timestamp at start */
 static volatile uint64_t saved;		/* count of pages written */
 static volatile uint64_t zpages;	/* count of zero pages not written */
@@ -160,6 +159,8 @@ static const struct {
 };
 
 static void raise_event(enum sc_event_type, char *);
+static void report_progress(len_t, len_t);
+static void end_progress(len_t, len_t);
 
 static void
 usage(void)
@@ -505,18 +506,20 @@ build_dump_map(int corefd, const pfn_t *pfn_table)
  */
 static void
 Copy(offset_t dumpoff, len_t nb, offset_t *offp, int fd, char *buf,
-    size_t sz)
+    size_t sz, len_t *savedp, len_t total)
 {
 	size_t nr;
 	offset_t off = *offp;
 
 	while (nb > 0) {
+		report_progress(*savedp, total);
 		nr = sz < nb ? sz : (size_t)nb;
 		Pread(dumpfd, buf, nr, dumpoff);
 		Pwrite(fd, buf, nr, off);
 		off += nr;
 		dumpoff += nr;
 		nb -= nr;
+		*savedp += nr;
 	}
 	*offp = off;
 }
@@ -526,7 +529,8 @@ Copy(offset_t dumpoff, len_t nb, offset_t *offp, int fd, char *buf,
  * This supports older kernels with latest savecore.
  */
 static void
-CopyPages(offset_t *offp, int fd, char *buf, size_t sz)
+CopyPages(offset_t *offp, int fd, char *buf, size_t sz, len_t *savedp,
+    len_t total)
 {
 	uint32_t csize;
 	FILE *in = fdopen(dup(dumpfd), "rb");
@@ -541,6 +545,7 @@ CopyPages(offset_t *offp, int fd, char *buf, size_t sz)
 
 	Fseek(*offp, out);
 	while (np > 0) {
+		report_progress(*savedp, total);
 		Fread(&csize, sizeof (uint32_t), in);
 		Fwrite(&csize, sizeof (uint32_t), out);
 		*offp += sizeof (uint32_t);
@@ -555,6 +560,7 @@ CopyPages(offset_t *offp, int fd, char *buf, size_t sz)
 		Fwrite(cbuf, csize, out);
 		*offp += csize;
 		np--;
+		(*savedp)++;
 	}
 	(void) fclose(in);
 	(void) fclose(out);
@@ -572,6 +578,7 @@ copy_crashfile(const char *corefile)
 	int corefd = Open(corefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	size_t bufsz = FBUFSIZE;
 	char *inbuf = Zalloc(bufsz);
+	len_t completed, total;
 	offset_t coreoff;
 	size_t nb;
 
@@ -590,12 +597,22 @@ copy_crashfile(const char *corefile)
 	coreoff = sizeof (corehdr);
 
 	/*
+	 * Calculate the total number of bytes to be copied.
+	 */
+	total = dumphdr.dump_ksyms_csize +
+	    dumphdr.dump_npages * sizeof (pfn_t) +
+	    dumphdr.dump_nvtop * sizeof (mem_vtop_t);
+	total += datahdr.dump_data_csize != 0 ? datahdr.dump_data_csize :
+	    dumphdr.dump_npages;
+	completed = 0;
+
+	/*
 	 * Read in the compressed symbol table, copy it to corefile.
 	 */
 	coreoff = roundup(coreoff, pagesize);
 	corehdr.dump_ksyms = coreoff;
 	Copy(dumphdr.dump_ksyms, dumphdr.dump_ksyms_csize, &coreoff, corefd,
-	    inbuf, bufsz);
+	    inbuf, bufsz, &completed, total);
 
 	/*
 	 * Save the pfn table.
@@ -603,7 +620,7 @@ copy_crashfile(const char *corefile)
 	coreoff = roundup(coreoff, pagesize);
 	corehdr.dump_pfn = coreoff;
 	Copy(dumphdr.dump_pfn, dumphdr.dump_npages * sizeof (pfn_t), &coreoff,
-	    corefd, inbuf, bufsz);
+	    corefd, inbuf, bufsz, &completed, total);
 
 	/*
 	 * Save the dump map.
@@ -611,18 +628,19 @@ copy_crashfile(const char *corefile)
 	coreoff = roundup(coreoff, pagesize);
 	corehdr.dump_map = coreoff;
 	Copy(dumphdr.dump_map, dumphdr.dump_nvtop * sizeof (mem_vtop_t),
-	    &coreoff, corefd, inbuf, bufsz);
+	    &coreoff, corefd, inbuf, bufsz, &completed, total);
 
 	/*
 	 * Save the data pages.
 	 */
 	coreoff = roundup(coreoff, pagesize);
 	corehdr.dump_data = coreoff;
-	if (datahdr.dump_data_csize != 0)
+	if (datahdr.dump_data_csize != 0) {
 		Copy(dumphdr.dump_data, datahdr.dump_data_csize, &coreoff,
-		    corefd, inbuf, bufsz);
-	else
-		CopyPages(&coreoff, corefd, inbuf, bufsz);
+		    corefd, inbuf, bufsz, &completed, total);
+	} else {
+		CopyPages(&coreoff, corefd, inbuf, bufsz, &completed, total);
+	}
 
 	/*
 	 * Now write the modified dump header to front and end of the copy.
@@ -665,6 +683,8 @@ copy_crashfile(const char *corefile)
 		Pwrite(dumpfd, &dumphdr, sizeof (dumphdr), endoff);
 
 	(void) close(corefd);
+
+	end_progress(completed, total);
 }
 
 /*
@@ -1081,22 +1101,30 @@ bz2block(int corefd, stream_t *s, char *block, size_t blocksz)
 
 /* report progress */
 static void
-report_progress()
+report_progress(len_t done, len_t total)
 {
-	int sec, percent;
+	static uint_t sec_last, percent_last;
+	uint_t sec, percent;
 
 	if (!interactive)
 		return;
 
-	percent = saved * 100LL / corehdr.dump_npages;
+	percent = done * 100LL / total;
 	sec = (gethrtime() - startts) / NANOSEC;
-	if (percent > percent_done || sec > sec_done) {
-		(void) printf("\r%2d:%02d %3d%% done", sec / 60, sec % 60,
+	if (percent != percent_last || sec != sec_last) {
+		(void) printf("\r%2u:%02u %3u%% done", sec / 60, sec % 60,
 		    percent);
 		(void) fflush(stdout);
-		sec_done = sec;
-		percent_done = percent;
+		sec_last = sec;
+		percent_last = percent;
 	}
+}
+
+static void
+end_progress(len_t done, len_t total)
+{
+	report_progress(total, total);
+	(void) printf(": %lld of %lld pages saved\n", done, total);
 }
 
 /* thread body */
@@ -1132,7 +1160,7 @@ runstreams(void *arg)
 				enqt(&freeblocks, b);
 				(void) pthread_cond_signal(&cvfree);
 
-				report_progress();
+				report_progress(saved, corehdr.dump_npages);
 			}
 			s->bound = 0;
 			(void) pthread_cond_signal(&cvbarrier);
@@ -1304,7 +1332,7 @@ decompress_pages(int corefd)
 				nout = 0;
 			}
 
-			report_progress();
+			report_progress(saved, corehdr.dump_npages);
 
 			/*
 			 * Non-streams lzjb does not use blocks.  Stop
@@ -1408,8 +1436,7 @@ build_corefile(const char *namelist, const char *corefile)
 	 * Decompress the pages
 	 */
 	decompress_pages(corefd);
-	(void) printf(": %ld of %ld pages saved\n", (pgcnt_t)saved,
-	    dumphdr.dump_npages);
+	end_progress(saved, dumphdr.dump_npages);
 
 	if (verbose)
 		(void) printf("%ld (%ld%%) zero pages were not written\n",
@@ -1904,7 +1931,7 @@ main(int argc, char *argv[])
 				(void) fprintf(mfile, "Metrics:\n%s\n",
 				    metrics);
 				(void) fprintf(mfile, "Copy pages,%ld\n",
-				    dumphdr.  dump_npages);
+				    dumphdr.dump_npages);
 				(void) fprintf(mfile, "Copy time,%d\n", sec);
 				(void) fprintf(mfile, "Copy pages/sec,%ld\n",
 				    dumphdr.dump_npages / sec);
