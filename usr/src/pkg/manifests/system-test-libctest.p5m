@@ -64,6 +64,7 @@ file path=opt/libc-tests/cfg/symbols/wctype_h.cfg mode=0444
 dir  path=opt/libc-tests/runfiles
 file path=opt/libc-tests/runfiles/default.run mode=0444
 dir  path=opt/libc-tests/tests
+file path=opt/libc-tests/tests/aligned_alloc mode=0555
 file path=opt/libc-tests/tests/aligned_alloc.32 mode=0555
 file path=opt/libc-tests/tests/aligned_alloc.64 mode=0555
 file path=opt/libc-tests/tests/ascftime.32 mode=0555

@@ -3563,5 +3563,8 @@ fail:
 void
 umem_setmtbf(uint32_t mtbf)
 {
+	extern uint32_t vmem_mtbf;
+
 	umem_mtbf = mtbf;
+	vmem_mtbf = mtbf;
 }

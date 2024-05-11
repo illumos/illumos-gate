@@ -96,8 +96,7 @@ timeout = 600
 [/opt/libc-tests/tests/stdio/test_mbrtowc.32]
 [/opt/libc-tests/tests/stdio/test_mbrtowc.64]
 
-[/opt/libc-tests/tests/aligned_alloc.32]
-[/opt/libc-tests/tests/aligned_alloc.64]
+[/opt/libc-tests/tests/aligned_alloc]
 [/opt/libc-tests/tests/ascftime.32]
 [/opt/libc-tests/tests/ascftime.64]
 [/opt/libc-tests/tests/asprintf-14933.32]
