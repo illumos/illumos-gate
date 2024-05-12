@@ -90,9 +90,9 @@ struct fifonode {
 	ushort_t	fn_wsynccnt;	/* fifos waiting for open write sync */
 	ushort_t	fn_rsynccnt;	/* fifos waiting for open read sync */
 	ushort_t	fn_wwaitcnt;	/* threads waiting to write data */
-	time_t		fn_atime;	/* access times */
-	time_t		fn_mtime;	/* modification time */
-	time_t		fn_ctime;	/* change time */
+	timestruc_t	fn_atime;	/* access times */
+	timestruc_t	fn_mtime;	/* modification time */
+	timestruc_t	fn_ctime;	/* change time */
 	fifonode_t	*fn_nextp;	/* next link in the linked list */
 	fifonode_t	*fn_backp;	/* back link in linked list */
 	struct cred	*fn_pcredp;	/* credential associated with peer */

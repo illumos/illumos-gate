@@ -30,6 +30,7 @@
 /*
  * Copyright 2015, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -814,11 +815,10 @@ done:
 	 * vnode update access time
 	 */
 	if (error == 0) {
-		time_t now = gethrestime_sec();
+		gethrestime(&fnp->fn_atime);
 
 		if (fnp->fn_flag & ISPIPE)
-			fnp->fn_dest->fn_atime = now;
-		fnp->fn_atime = now;
+			fnp->fn_dest->fn_atime = fnp->fn_atime;
 	}
 	TRACE_2(TR_FAC_FIFO, TR_FIFOREAD_OUT,
 	    "fifo_read out:%p error %d", vp, error);
@@ -1089,7 +1089,8 @@ done:
 	 * make sure there were no errors and some data was transferred
 	 */
 	if (error == 0 && write_size != uiop->uio_resid) {
-		time_t now = gethrestime_sec();
+		timestruc_t now;
+		gethrestime(&now);
 
 		if (fnp->fn_flag & ISPIPE) {
 			fn_dest->fn_mtime = fn_dest->fn_ctime = now;
@@ -1468,24 +1469,18 @@ fifo_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
 			return (error);
 		mutex_enter(&fn_lock->flk_lock);
 		/* set current times from fnode, even if older than vnode */
-		vap->va_atime.tv_sec = fnp->fn_atime;
-		vap->va_atime.tv_nsec = 0;
-		vap->va_mtime.tv_sec = fnp->fn_mtime;
-		vap->va_mtime.tv_nsec = 0;
-		vap->va_ctime.tv_sec = fnp->fn_ctime;
-		vap->va_ctime.tv_nsec = 0;
+		vap->va_atime = fnp->fn_atime;
+		vap->va_mtime = fnp->fn_mtime;
+		vap->va_ctime = fnp->fn_ctime;
 	} else {
 		/*
 		 * for non-attached/ordinary pipes
 		 */
 		vap->va_mode = 0;
 		mutex_enter(&fn_lock->flk_lock);
-		vap->va_atime.tv_sec = fnp->fn_atime;
-		vap->va_atime.tv_nsec = 0;
-		vap->va_mtime.tv_sec = fnp->fn_mtime;
-		vap->va_mtime.tv_nsec = 0;
-		vap->va_ctime.tv_sec = fnp->fn_ctime;
-		vap->va_ctime.tv_nsec = 0;
+		vap->va_atime = fnp->fn_atime;
+		vap->va_mtime = fnp->fn_mtime;
+		vap->va_ctime = fnp->fn_ctime;
 		vap->va_uid = crgetuid(crp);
 		vap->va_gid = crgetgid(crp);
 		vap->va_nlink = 0;
@@ -1541,10 +1536,10 @@ fifo_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
 		fn_lock = fnp->fn_lock;
 		mutex_enter(&fn_lock->flk_lock);
 		if (vap->va_mask & AT_ATIME)
-			fnp->fn_atime = vap->va_atime.tv_sec;
+			fnp->fn_atime = vap->va_atime;
 		if (vap->va_mask & AT_MTIME)
-			fnp->fn_mtime = vap->va_mtime.tv_sec;
-		fnp->fn_ctime = gethrestime_sec();
+			fnp->fn_mtime = vap->va_mtime;
+		gethrestime(&fnp->fn_ctime);
 		mutex_exit(&fn_lock->flk_lock);
 	}
 	return (error);
@@ -1585,6 +1580,17 @@ fifo_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
 	return (EEXIST);
 }
 
+static boolean_t
+fifo_hres_gt(const timestruc_t *targ, const timestruc_t *base)
+{
+	if (targ->tv_sec > base->tv_sec) {
+		return (B_TRUE);
+	}
+
+	return (targ->tv_sec == base->tv_sec &&
+	    targ->tv_nsec > base->tv_nsec);
+}
+
 /*
  * If shadowing a vnode, apply the VOP_FSYNC to it.
  * Otherwise, return 0.
@@ -1602,12 +1608,12 @@ fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp, caller_context_t *ct)
 	va.va_mask = AT_MTIME | AT_ATIME;
 	if (VOP_GETATTR(fnp->fn_realvp, &va, 0, crp, ct) == 0) {
 		va.va_mask = 0;
-		if (fnp->fn_mtime > va.va_mtime.tv_sec) {
-			va.va_mtime.tv_sec = fnp->fn_mtime;
+		if (fifo_hres_gt(&fnp->fn_mtime, &va.va_mtime)) {
+			va.va_mtime = fnp->fn_mtime;
 			va.va_mask = AT_MTIME;
 		}
-		if (fnp->fn_atime > va.va_atime.tv_sec) {
-			va.va_atime.tv_sec = fnp->fn_atime;
+		if (fifo_hres_gt(&fnp->fn_atime, &va.va_atime)) {
+			va.va_atime = fnp->fn_atime;
 			va.va_mask |= AT_ATIME;
 		}
 		if (va.va_mask != 0)

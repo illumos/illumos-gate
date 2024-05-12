@@ -194,3 +194,6 @@ post_user = root
 pre = tcpsig_init
 tests = ['tcpsig']
 post = tcpsig_fini
+
+[/opt/os-tests/tests/fifo-tvnsec.32]
+[/opt/os-tests/tests/fifo-tvnsec.64]

@@ -65,6 +65,8 @@ file path=opt/os-tests/tests/execvpe/execvpe-noperm mode=0444
 file path=opt/os-tests/tests/execvpe/execvpe-script mode=0555
 file path=opt/os-tests/tests/execvpe/execvpe-test.32 mode=0555
 file path=opt/os-tests/tests/execvpe/execvpe-test.64 mode=0555
+file path=opt/os-tests/tests/fifo-tvnsec.32 mode=0555
+file path=opt/os-tests/tests/fifo-tvnsec.64 mode=0555
 dir  path=opt/os-tests/tests/file-locking
 file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555

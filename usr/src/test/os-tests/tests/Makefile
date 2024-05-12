@@ -51,6 +51,7 @@ SUBDIRS =       \
 PROGS = \
 	clock_gettime \
 	eventfd \
+	fifo-tvnsec \
 	odirectory \
 	ucontext \
 	getcontext_extd \
@@ -72,6 +73,9 @@ clock_gettime.32 :=	LDLIBS += -lproc
 clock_gettime.32 :=	CSTD = $(CSTD_GNU99)
 clock_gettime.64 :=	LDLIBS64 += -lproc
 clock_gettime.64 :=	CSTD = $(CSTD_GNU99)
+
+fifo-tvnsec.32 :=	CSTD = $(CSTD_GNU99)
+fifo-tvnsec.64 :=	CSTD = $(CSTD_GNU99)
 
 ucontext.32 :=		SMOFF += unreachable
 ucontext.64 :=		SMOFF += unreachable
