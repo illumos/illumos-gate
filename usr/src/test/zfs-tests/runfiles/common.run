@@ -546,7 +546,7 @@ tests = ['async_destroy_001_pos']
 tags = ['functional', 'async_destroy']
 
 [tests/functional/fault]
-tests = ['zpool_status_-s']
+tests = ['zpool_status_-s', 'auto_spare_sorted_001_pos']
 tags = ['functional', 'fault']
 
 [tests/functional/grow_pool]

@@ -16,6 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright (c) 2018 Datto Inc.
 # Copyright 2021 Jason King
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -2369,6 +2370,8 @@ file path=opt/zfs-tests/tests/functional/exec/exec_002_neg mode=0555
 file path=opt/zfs-tests/tests/functional/exec/mmap_exec mode=0555
 file path=opt/zfs-tests/tests/functional/exec/setup mode=0555
 dir  path=opt/zfs-tests/tests/functional/fault
+file path=opt/zfs-tests/tests/functional/fault/auto_spare_sorted_001_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/fault/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/fault/fault.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/fault/setup mode=0555

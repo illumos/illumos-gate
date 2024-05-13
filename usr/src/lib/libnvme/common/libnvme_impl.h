@@ -487,7 +487,7 @@ extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);
 #define	NVME_EUI64_NAMELEN	17
 
 extern int nvme_format_nguid(const uint8_t [16], char *, size_t);
-extern int nvme_format_eui64(const uint8_t [16], char *, size_t);
+extern int nvme_format_eui64(const uint8_t [8], char *, size_t);
 
 #ifdef __cplusplus
 }

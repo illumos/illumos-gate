@@ -26,8 +26,9 @@
 .\" Copyright (c) 2018 George Melikov. All Rights Reserved.
 .\" Copyright 2021 Joyent, Inc.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
+.\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd March 30, 2022
+.Dd May 8, 2024
 .Dt ZPOOL 8
 .Os
 .Sh NAME
@@ -419,6 +420,9 @@ ZFS allows devices to be associated with pools as
 .Qq hot spares .
 These devices are not actively used in the pool, but when an active device
 fails, it is automatically replaced by a hot spare.
+If there is more than one spare that could be used as a replacement then they
+are tried in order of increasing capacity so that the smallest available spare
+that can replace the failed device is used.
 To create a pool with hot spares, specify a
 .Sy spare
 vdev with any number of devices.
