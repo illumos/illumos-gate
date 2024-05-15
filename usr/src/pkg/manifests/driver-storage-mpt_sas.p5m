@@ -93,7 +93,9 @@ driver name=mpt_sas class=scsi-self-identifying \
     alias=pciex1000,c9 \
     alias=pciex1000,d0 \
     alias=pciex1000,d1 \
-    alias=pciex1000,d2
+    alias=pciex1000,d2 \
+    alias=pciex1000,e5 \
+    alias=pciex1000,e6
 legacy pkg=SUNWmptsas desc="LSI MPT SAS 2.0/2.5 Controller HBA Driver" \
     name="LSI MPT SAS 2.0/2.5 Controller HBA Driver"
 license cr_Sun license=cr_Sun

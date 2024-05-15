@@ -593,6 +593,9 @@ typedef struct _MPI2_CONFIG_REPLY
 #define MPI26_MFGPAGE_DEVID_SAS3616                 (0x00D1)
 #define MPI26_MFGPAGE_DEVID_SAS3708                 (0x00D2)
 
+#define MPI26_MFGPAGE_DEVID_SAS3816                 (0x00E5)
+#define MPI26_MFGPAGE_DEVID_SAS3816_1               (0x00E6)
+
 #define MPI26_MFGPAGE_DEVID_SAS4008                 (0x00A1)
 
 
