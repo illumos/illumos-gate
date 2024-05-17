@@ -79,6 +79,7 @@
 	<device match="sad/user" />
 	<device match="signalfd" />
 	<device match="smbsrv" />
+	<device match="smbsrv1" />
 	<device match="svvslo0" />
 	<device match="svvslo1" />
 	<device match="svvslo2" />

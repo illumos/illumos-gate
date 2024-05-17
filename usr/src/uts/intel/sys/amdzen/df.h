@@ -818,6 +818,7 @@ typedef enum {
 #define	DF_MMIO_EXT_V4_GET_BASE(r)	bitx32(r, 7, 0)
 #define	DF_MMIO_EXT_V4_SET_LIMIT(r)	bitset32(r, 23, 16)
 #define	DF_MMIO_EXT_V4_SET_BASE(r)	bitset32(r, 7, 0)
+#define	DF_MMIO_EXT_SHIFT		48
 
 /*
  * DF::DfGlobalCtrl -- This register we generally only care about in the

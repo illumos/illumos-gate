@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -1624,7 +1624,7 @@ zen_umc_read_dram_rule_df_4(zen_umc_t *umc, const uint_t dfno,
 		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS4_2CH;
 		break;
 	case DF_DRAM_ILV_V4_CHAN_NPS2_4CH:
-		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_COD2_4CH;
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_4CH;
 		break;
 	case DF_DRAM_ILV_V4_CHAN_NPS1_8CH:
 		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_8CH;
