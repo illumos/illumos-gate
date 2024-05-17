@@ -2263,11 +2263,17 @@ smb_server_logoff_ssnid(smb_request_t *sr, uint64_t ssnid)
 		/*
 		 * If we raced with disconnect, may find LOGGING_OFF,
 		 * in which case we want to just wait for it.
+		 *
+		 * If the session found went directly from LOGGING_ON
+		 * to LOGGING_OFF, the user->u_cred will be NULL.
+		 * In that case there's no server-side state that
+		 * needs to go away, so just ignore this user.
 		 */
 		user = smb_session_lookup_uid_st(sess, ssnid, 0,
 		    SMB_USER_STATE_LOGGING_OFF);
 		if (user != NULL) {
-			if (smb_is_same_user(user->u_cred, sr->user_cr))
+			if (user->u_cred != NULL &&
+			    smb_is_same_user(user->u_cred, sr->user_cr))
 				break;
 			smb_user_release(user);
 			user = NULL;
