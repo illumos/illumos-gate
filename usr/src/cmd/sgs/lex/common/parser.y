@@ -20,38 +20,36 @@
  * CDDL HEADER END
  */
 %}
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
+/*	  All Rights Reserved	*/
 
 %{
+#include "ldefs.h"
 
-/*
- * Lint is unable to properly handle formats with wide strings
- * (e.g. %ws) and misdiagnoses them as being malformed.
- * This macro is used to work around that, by substituting
- * a pointer to a null string when compiled by lint. This
- * trick works because lint is not able to evaluate the
- * variable.
- *
- * When lint is able to handle %ws, it would be appropriate
- * to come back through and remove the use of this macro.
- */
-#if defined(__lint)
-static const char *lint_ws_fmt = "";
-#define	WSFMT(_fmt) lint_ws_fmt
-#else
-#define	WSFMT(_fmt) _fmt
-#endif
+#define YYSTYPE union _yystype_
+union _yystype_
+{
+	int	i;
+	CHR	*cp;
+};
+int	peekon = 0; /* need this to check if "^" came in a definition section */
+int i;
+int j,k;
+int g;
+CHR *p;
+static wchar_t  L_PctUpT[]= {'%', 'T', 0};
+static wchar_t  L_PctLoT[]= {'%', 't', 0};
+static wchar_t  L_PctCbr[]= {'%', '}', 0};
 
 void yyerror(char *);
-
 %}
+
 /* parser.y */
 
 /* XCU4: add XSCON: %x exclusive start token */
@@ -72,31 +70,10 @@ void yyerror(char *);
 %left ITER
 %left CAT
 %left '*' '+' '?'
-
-%{
-#include "ldefs.h"
-
-#define YYSTYPE union _yystype_
-union _yystype_
-{
-	int	i;
-	CHR	*cp;
-};
-int	peekon = 0; /* need this to check if "^" came in a definition section */
-
-%}
 %%
-%{
-int i;
-int j,k;
-int g;
-CHR *p;
-static wchar_t  L_PctUpT[]= {'%', 'T', 0};
-static wchar_t  L_PctLoT[]= {'%', 't', 0};
-static wchar_t  L_PctCbr[]= {'%', '}', 0};
-%}
+
 acc	:	lexinput
-	={	
+	{
 # ifdef DEBUG
 		if(debug) sect2dump();
 # endif
@@ -104,12 +81,12 @@ acc	:	lexinput
 	;
 lexinput:	defns delim prods end
 	|	defns delim end
-	={
+	{
 		if(!funcflag)phead2();
 		funcflag = TRUE;
 	}
 	| error
-	={
+	{
 # ifdef DEBUG
 		if(debug) {
 			sect1dump();
@@ -124,7 +101,7 @@ lexinput:	defns delim prods end
 	;
 end:		delim | ;
 defns:	defns STR STR
-	={	scopy($2.cp,dp);
+	{	scopy($2.cp,dp);
 		def[dptr] = dp;
 		dp += slength($2.cp) + 1;
 		scopy($3.cp,dp);
@@ -139,7 +116,7 @@ defns:	defns STR STR
 	|
 	;
 delim:	DELIM
-	={
+	{
 # ifdef DEBUG
 		if(sect == DEFSECTION && debug) sect1dump();
 # endif
@@ -147,13 +124,13 @@ delim:	DELIM
 		}
 	;
 prods:	prods pr
-	={	$$.i = mn2(RNEWE,$1.i,$2.i);
+	{	$$.i = mn2(RNEWE,$1.i,$2.i);
 		}
 	|	pr
-	={	$$.i = $1.i;}
+	{	$$.i = $1.i;}
 	;
 pr:	r NEWE
-	={
+	{
 		if(divflg == TRUE)
 			i = mn1(S1FINAL,casecount);
 		else i = mn1(FINAL,casecount);
@@ -163,7 +140,7 @@ pr:	r NEWE
 			error("Too many (>%d) pattern-action rules.", NACTIONS);
 		}
 	| error NEWE
-	={
+	{
 # ifdef DEBUG
 		if(debug) sect2dump();
 # endif
@@ -175,9 +152,9 @@ pr:	r NEWE
 		yyline++;
 		}
 r:	CHAR
-	={	$$.i = mn0($1.i); }
+	{	$$.i = mn0($1.i); }
 	| STR
-	={
+	{
 		p = (CHR *)$1.cp;
 		i = mn0((unsigned)(*p++));
 		while(*p)
@@ -185,25 +162,25 @@ r:	CHAR
 		$$.i = i;
 		}
 	| '.'
-	={
+	{
 		$$.i = mn0(DOT);
 		}
 	| CCL
-	={	$$.i = mn1(RCCL,$1.i); }
+	{	$$.i = mn1(RCCL,$1.i); }
 	| NCCL
-	={	$$.i = mn1(RNCCL,$1.i); }
+	{	$$.i = mn1(RNCCL,$1.i); }
 	| r '*'
-	={	$$.i = mn1(STAR,$1.i); }
+	{	$$.i = mn1(STAR,$1.i); }
 	| r '+'
-	={	$$.i = mn1(PLUS,$1.i); }
+	{	$$.i = mn1(PLUS,$1.i); }
 	| r '?'
-	={	$$.i = mn1(QUEST,$1.i); }
+	{	$$.i = mn1(QUEST,$1.i); }
 	| r '|' r
-	={	$$.i = mn2(BAR,$1.i,$3.i); }
+	{	$$.i = mn2(BAR,$1.i,$3.i); }
 	| r r %prec CAT
-	={	$$.i = mn2(RCAT,$1.i,$2.i); }
+	{	$$.i = mn2(RCAT,$1.i,$2.i); }
 	| r '/' r
-	={	if(!divflg){
+	{	if(!divflg){
 			j = mn1(S2FINAL,-casecount);
 			i = mn2(RCAT,$1.i,j);
 			$$.i = mn2(DIV,i,$3.i);
@@ -215,7 +192,7 @@ r:	CHAR
 		divflg = TRUE;
 		}
 	| r ITER ',' ITER '}'
-	={	if($2.i > $4.i){
+	{	if($2.i > $4.i){
 			i = $2.i;
 			$2.i = $4.i;
 			$4.i = i;
@@ -236,7 +213,7 @@ r:	CHAR
 			}
 	}
 	| r ITER '}'
-	={
+	{
 		if($2.i < 0)error("can't have negative iteration");
 		else if($2.i == 0) $$.i = mn0(RNULLS);
 		else {
@@ -247,7 +224,7 @@ r:	CHAR
 			}
 		}
 	| r ITER ',' '}'
-	={
+	{
 				/* from n to infinity */
 		if($2.i < 0)error("can't have negative iteration");
 		else if($2.i == 0) $$.i = mn1(STAR,$1.i);
@@ -261,15 +238,15 @@ r:	CHAR
 			}
 		}
 	| SCON r
-	={	$$.i = mn2(RSCON,$2.i,(uintptr_t)$1.cp); }
+	{	$$.i = mn2(RSCON,$2.i,(uintptr_t)$1.cp); }
 
 	/* XCU4: add XSCON */
 	| XSCON r
-	={	$$.i = mn2(RXSCON,$2.i,(uintptr_t)$1.cp); }
+	{	$$.i = mn2(RXSCON,$2.i,(uintptr_t)$1.cp); }
 	| '^' r
-	={	$$.i = mn1(CARAT,$2.i); }
+	{	$$.i = mn1(CARAT,$2.i); }
 	| r '$'
-	={	i = mn0('\n');
+	{	i = mn0('\n');
 		if(!divflg){
 			j = mn1(S2FINAL,-casecount);
 			k = mn2(RCAT,$1.i,j);
@@ -279,15 +256,15 @@ r:	CHAR
 		divflg = TRUE;
 		}
 	| '(' r ')'
-	={	$$.i = $2.i; }
+	{	$$.i = $2.i; }
 	|	NULLS
-	={	$$.i = mn0(RNULLS); }
+	{	$$.i = mn0(RNULLS); }
 
 	/* XCU4: add ARRAY and POINTER */
-	| ARRAY 
-	={ isArray = 1; };
+	| ARRAY
+	{ isArray = 1; };
 	|     POINTER
-	={ isArray = 0; };
+	{ isArray = 0; };
 	;
 
 %%
@@ -429,7 +406,7 @@ yylex(void)
 						pchar=pcptr=(CHR *)myalloc(pchlen, sizeof(*pchar));
 						if (report==2) report=1;
 						continue;
-					case 't': case 'T': 	/* character set specifier */
+					case 't': case 'T':	/* character set specifier */
 						if(handleeuc)
 							error("\
 Character table (%t) is supported only in ASCII compatibility mode.\n");
@@ -493,7 +470,7 @@ Character table (%t) is supported only in ASCII compatibility mode.\n");
 							if(p[0]=='/' && p[1]=='*')
 								cpycom(p);
 							else
-								(void) fprintf(fout,WSFMT("%ws\n"),p);
+								(void) fprintf(fout, "%ws\n", p);
 						if(p[0] == '%') continue;
 						if (*p) error("EOF before %%%%");
 						else error("EOF before %%}");
@@ -523,7 +500,7 @@ start:
 							if (*t == 0) continue;
 							i = sptr*2;
 							if(!ratfor)(void) fprintf(fout,"# ");
-							(void) fprintf(fout,WSFMT("define %ws %d\n"),t,i);
+							(void) fprintf(fout, "define %ws %d\n", t, i);
 							scopy(t,sp);
 							sname[sptr] = sp;
 							/* XCU4: save exclusive flag with start name */
@@ -544,7 +521,7 @@ start:
 				case ' ': case '\t':		/* must be code */
 					lgate();
 					if( p[1]=='/' && p[2]=='*' ) cpycom(p);
-					else (void) fprintf(fout, WSFMT("%ws\n"),p);
+					else (void) fprintf(fout, "%ws\n", p);
 					continue;
 				case '/':	/* look for comments */
 					lgate();
@@ -642,7 +619,7 @@ start:
 						if(buf[0]=='/' && buf[1]=='*')
 							cpycom(buf);
 						else
-							(void) fprintf(fout,WSFMT("%ws\n"),buf);
+							(void) fprintf(fout, "%ws\n", buf);
 					continue;
 					}
 				if(peek == '%'){
@@ -732,7 +709,7 @@ start:
 						error("definition %ws not found",token);
 					else
 						munput('s',(CHR *)(subs[i]));
-            				if (peek == '^')
+					if (peek == '^')
                                                 peekon = 1;
 					continue;
 					}
@@ -843,7 +820,7 @@ start:
 					/* range specified */
 						if (light) {
 							c = gch();
-							if(c == '\\') 
+							if(c == '\\')
 								c=usescape(c=gch());
 							remch(c);
 							k = c;
@@ -858,8 +835,8 @@ Character range specified between different codesets.");
 								}
 							if(!handleeuc)
 							if(!(('A'<=j && k<='Z') ||
-						     	     ('a'<=j && k<='z') ||
-						     	     ('0'<=j && k<='9')))
+							    ('a'<=j && k<='z') ||
+							    ('0'<=j && k<='9')))
 								warning("Non-portable Character Class");
 							token[i++] = RANGE;
 							token[i++] = j;
@@ -950,14 +927,14 @@ Character range specified between different codesets.");
 # endif
 
 	if(getl(buf) && !eof) {
-  		if (sargv[optind] == NULL)
+		if (sargv[optind] == NULL)
 			(void) fprintf(fout, "\n# line %d\n", yyline-1);
-		else	
+		else
 			(void) fprintf(fout,
 				"\n# line %d \"%s\"\n", yyline-1, sargv[optind]);
-		(void) fprintf(fout,WSFMT("%ws\n"),buf);
+		(void) fprintf(fout, "%ws\n", buf);
 		while(getl(buf) && !eof)
-			(void) fprintf(fout,WSFMT("%ws\n"),buf);
+			(void) fprintf(fout, "%ws\n", buf);
         }
 
 	return(freturn(0));

@@ -52,10 +52,10 @@ void yyerror(char *s);
 	struct namelist *namel;
 }
 
-%type <intval> OPTION, options
-%type <string> NAME, STRING
-%type <subcmd> INSTALL, NOTIFY, EXCEPT, PATTERN, SPECIAL, cmdlist, cmd
-%type <namel> namelist, names, opt_namelist
+%type <intval> OPTION options
+%type <string> NAME STRING
+%type <subcmd> INSTALL NOTIFY EXCEPT PATTERN SPECIAL cmdlist cmd
+%type <namel> namelist names opt_namelist
 
 %%
 
@@ -63,28 +63,28 @@ file:		  /* VOID */
 		| file command
 		;
 
-command:	  NAME EQUAL namelist = {
+command:	  NAME EQUAL namelist {
 			(void) lookup($1, INSERT, $3);
 		}
-		| namelist ARROW namelist cmdlist = {
+		| namelist ARROW namelist cmdlist {
 			insert(NULL, $1, $3, $4);
 		}
-		| NAME COLON namelist ARROW namelist cmdlist = {
+		| NAME COLON namelist ARROW namelist cmdlist {
 			insert($1, $3, $5, $6);
 		}
-		| namelist DCOLON NAME cmdlist = {
+		| namelist DCOLON NAME cmdlist {
 			append(NULL, $1, $3, $4);
 		}
-		| NAME COLON namelist DCOLON NAME cmdlist = {
+		| NAME COLON namelist DCOLON NAME cmdlist {
 			append($1, $3, $5, $6);
 		}
 		| error
 		;
 
-namelist:	  NAME = {
+namelist:	  NAME {
 			$$ = makenl($1);
 		}
-		| LP names RP = {
+		| LP names RP {
 			$$ = $2;
 		}
 		;
@@ -92,7 +92,7 @@ namelist:	  NAME = {
 names:		  /* VOID */ {
 			$$ = last_n = NULL;
 		}
-		| names NAME = {
+		| names NAME {
 			if (last_n == NULL)
 				$$ = last_n = makenl($2);
 			else {
@@ -106,7 +106,7 @@ names:		  /* VOID */ {
 cmdlist:	  /* VOID */ {
 			$$ = last_sc = NULL;
 		}
-		| cmdlist cmd = {
+		| cmdlist cmd {
 			if (last_sc == NULL)
 				$$ = last_sc = $2;
 			else {
@@ -117,7 +117,7 @@ cmdlist:	  /* VOID */ {
 		}
 		;
 
-cmd:		  INSTALL options opt_namelist SM = {
+cmd:		  INSTALL options opt_namelist SM {
 			register struct namelist *nl;
 
 			$1->sc_options = $2 | options;
@@ -131,17 +131,17 @@ cmd:		  INSTALL options opt_namelist SM = {
 			}
 			$$ = $1;
 		}
-		| NOTIFY namelist SM = {
+		| NOTIFY namelist SM {
 			if ($2 != NULL)
 				$1->sc_args = expand($2, E_VARS);
 			$$ = $1;
 		}
-		| EXCEPT namelist SM = {
+		| EXCEPT namelist SM {
 			if ($2 != NULL)
 				$1->sc_args = expand($2, E_ALL);
 			$$ = $1;
 		}
-		| PATTERN namelist SM = {
+		| PATTERN namelist SM {
 			struct namelist *nl;
 			char *cp, *re_comp();
 
@@ -157,7 +157,7 @@ cmd:		  INSTALL options opt_namelist SM = {
 			$1->sc_args = expand($2, E_VARS);
 			$$ = $1;
 		}
-		| SPECIAL opt_namelist STRING SM = {
+		| SPECIAL opt_namelist STRING SM {
 			if ($2 != NULL)
 				$1->sc_args = expand($2, E_ALL);
 			$1->sc_name = $3;
@@ -165,18 +165,18 @@ cmd:		  INSTALL options opt_namelist SM = {
 		}
 		;
 
-options:	  /* VOID */ = {
+options:	  /* VOID */ {
 			$$ = 0;
 		}
-		| options OPTION = {
+		| options OPTION {
 			$$ |= $2;
 		}
 		;
 
-opt_namelist:	  /* VOID */ = {
+opt_namelist:	  /* VOID */ {
 			$$ = NULL;
 		}
-		| namelist = {
+		| namelist {
 			$$ = $1;
 		}
 		;
@@ -193,7 +193,7 @@ yylex()
 	register int c;
 	register char *cp1, *cp2;
 	static char quotechars[] = "[]{}*?$";
-	
+
 again:
 	switch (c = getc(fin)) {
 	case EOF:  /* end of file */

@@ -53,32 +53,32 @@ typedef	char *yystype;
 
 /* a single `expression' is evaluated and printed: */
 
-expression:	expr NOARG = {
+expression:	expr NOARG {
 			printf("%s\n", $1);
 			exit((!strcmp($1,"0")||!strcmp($1,"\0"))? 1: 0);
 			}
 	;
 
 
-expr:	'(' expr ')' = { $$ = $2; }
-	| expr OR expr   = { $$ = conj(OR, $1, $3); }
-	| expr AND expr   = { $$ = conj(AND, $1, $3); }
-	| expr EQ expr   = { $$ = rel(EQ, $1, $3); }
-	| expr GT expr   = { $$ = rel(GT, $1, $3); }
-	| expr GEQ expr   = { $$ = rel(GEQ, $1, $3); }
-	| expr LT expr   = { $$ = rel(LT, $1, $3); }
-	| expr LEQ expr   = { $$ = rel(LEQ, $1, $3); }
-	| expr NEQ expr   = { $$ = rel(NEQ, $1, $3); }
-	| expr ADD expr   = { $$ = arith(ADD, $1, $3); }
-	| expr SUBT expr   = { $$ = arith(SUBT, $1, $3); }
-	| expr MULT expr   = { $$ = arith(MULT, $1, $3); }
-	| expr DIV expr   = { $$ = arith(DIV, $1, $3); }
-	| expr REM expr   = { $$ = arith(REM, $1, $3); }
-	| expr MCH expr	 = { $$ = match($1, $3); }
-	| MATCH expr expr = { $$ = match($2, $3); }
-	| SUBSTR expr expr expr = { $$ = substr($2, $3, $4); }
-	| LENGTH expr       = { $$ = length($2); }
-	| INDEX expr expr = { $$ = index($2, $3); }
+expr:	'(' expr ')' { $$ = $2; }
+	| expr OR expr { $$ = conj(OR, $1, $3); }
+	| expr AND expr { $$ = conj(AND, $1, $3); }
+	| expr EQ expr { $$ = rel(EQ, $1, $3); }
+	| expr GT expr { $$ = rel(GT, $1, $3); }
+	| expr GEQ expr { $$ = rel(GEQ, $1, $3); }
+	| expr LT expr { $$ = rel(LT, $1, $3); }
+	| expr LEQ expr { $$ = rel(LEQ, $1, $3); }
+	| expr NEQ expr { $$ = rel(NEQ, $1, $3); }
+	| expr ADD expr { $$ = arith(ADD, $1, $3); }
+	| expr SUBT expr { $$ = arith(SUBT, $1, $3); }
+	| expr MULT expr { $$ = arith(MULT, $1, $3); }
+	| expr DIV expr { $$ = arith(DIV, $1, $3); }
+	| expr REM expr { $$ = arith(REM, $1, $3); }
+	| expr MCH expr	{ $$ = match($1, $3); }
+	| MATCH expr expr { $$ = match($2, $3); }
+	| SUBSTR expr expr expr { $$ = substr($2, $3, $4); }
+	| LENGTH expr { $$ = length($2); }
+	| INDEX expr expr { $$ = index($2, $3); }
 	| A_STRING
 	;
 %%
