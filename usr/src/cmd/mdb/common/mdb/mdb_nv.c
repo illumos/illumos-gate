@@ -247,7 +247,8 @@ nv_resize(mdb_nv_t *nv)
 	 * Everything has been rehashed; free our old hash table and point
 	 * ourselves to the new one.
 	 */
-	mdb_free(nv->nv_hash, sizeof (mdb_var_t *) * nv->nv_hashsz);
+	if (!(nv->nv_um_flags & UM_GC))
+		mdb_free(nv->nv_hash, sizeof (mdb_var_t *) * nv->nv_hashsz);
 	nv->nv_hash = new_hash;
 	nv->nv_hashsz = new_hashsz;
 }

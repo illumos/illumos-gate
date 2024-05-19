@@ -15,7 +15,7 @@
 .\"
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd December 28, 2020
+.Dd May 12, 2024
 .Dt DEMANGLE 1
 .Os
 .Sh NAME
@@ -87,7 +87,10 @@ While the mangling format was originally defined for the Itanium processor, g++
 and clang use this format for all their supported platforms (including x86 and
 SPARC).
 .It rust
-The legacy rust mangling format.
+The rust v0
+.Pq Rust RFC 2603
+and legacy mangling formats.
+The specific rust mangling format will be automatically detected.
 .It auto
 Attempt to detect the language automatically (default).
 .El

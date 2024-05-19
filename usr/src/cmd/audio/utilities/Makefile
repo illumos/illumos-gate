@@ -29,62 +29,48 @@ include ../../Makefile.cmd
 
 TARGETS		= library
 
-INCLUDES += -I../include
+CPPFLAGS += -I../include
 
-CPPFLAGS += $(INCLUDES)
-
-CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-unused-variable
-CERRWARN += -_gcc=-Wno-parentheses
-
-CCERRWARN += -_gcc=-Wno-reorder
-CCERRWARN += -_gcc=-Wno-ignored-qualifiers
-CCERRWARN += -_gcc=-Wno-return-type
 CCERRWARN += -_gcc=-Wno-switch
 
 # not linted
 SMATCH=off
 
-LINTFLAGS += -m -v -u
+COBJS =		\
+	device_ctl.o	\
+	filehdr.o	\
+	hdr_misc.o	\
+	g711.o		\
+	g721.o		\
+	g723.o		\
+	g72x_tables.o	\
+	zmalloc.o
 
-RANLIB= /usr/ccs/bin/ranlib
-
-LIBCSRCS        = device_ctl.c \
-		  filehdr.c \
-		  hdr_misc.c \
-		  g711.c \
-		  g721.c \
-		  g723.c \
-		  g72x_tables.c \
-		  zmalloc.c
-
-LIBCCSRCS	= Audio.cc \
-		  AudioBuffer.cc \
-		  AudioCopy.cc \
-		  AudioDebug.cc \
-		  AudioError.cc \
-		  AudioExtent.cc \
-		  AudioFile.cc \
-		  AudioGain.cc \
-		  AudioHdr.cc \
-		  AudioHdrParse.cc \
-		  AudioLib.cc \
-		  AudioList.cc \
-		  AudioPipe.cc \
-		  AudioRawPipe.cc \
-		  AudioStream.cc \
-		  AudioTypeChannel.cc \
-		  AudioTypeG72X.cc \
-		  AudioTypeMux.cc \
-		  AudioTypePcm.cc \
-		  AudioTypeSampleRate.cc \
-		  AudioUnixfile.cc \
-		  Fir.cc \
-		  Resample.cc
-
-COBJS= $(LIBCSRCS:%.c=%.o)
-CCOBJS= $(LIBCCSRCS:%.cc=%.o)
+CCOBJS =			\
+	Audio.o			\
+	AudioBuffer.o		\
+	AudioCopy.o		\
+	AudioDebug.o		\
+	AudioError.o		\
+	AudioExtent.o		\
+	AudioFile.o		\
+	AudioGain.o		\
+	AudioHdr.o		\
+	AudioHdrParse.o		\
+	AudioLib.o		\
+	AudioList.o		\
+	AudioPipe.o		\
+	AudioRawPipe.o		\
+	AudioStream.o		\
+	AudioTypeChannel.o	\
+	AudioTypeG72X.o		\
+	AudioTypeMux.o		\
+	AudioTypePcm.o		\
+	AudioTypeSampleRate.o	\
+	AudioUnixfile.o		\
+	Fir.o			\
+	Resample.o
 
 .PARALLEL:      $(COBJS) $(CCOBJS)
 
@@ -97,15 +83,11 @@ install all: $(libaudio)
 $(libaudio): $(COBJS) $(CCOBJS)
 	$(RM) $@
 	$(AR) cq $@ $(COBJS) $(CCOBJS)
-	test ! -f $(RANLIB) || $(RANLIB) $@
 
 clean:
 	$(RM) $(COBJS) $(CCOBJS)
 
 clobber: clean
 	$(RM) $(libaudio)
-
-lint:
-	$(LINT.c) $(LIBCSRCS) $(LDLIBS)
 
 _msg:

@@ -286,7 +286,7 @@ cmd_close_ofile(int argc, char **argv)
 	uint_t errs = 0;
 
 	if (argc < 2) {
-		fprintf(stderr, _("Missing file id\n"));
+		warnx(_("Missing file id"));
 		return (2);
 	}
 
@@ -297,12 +297,12 @@ cmd_close_ofile(int argc, char **argv)
 		errno = 0;
 		ul = strtoul(argv[i], NULL, 0);
 		if (errno != 0) {
-			fprintf(stderr, _("Invalid file id '%s'"), argv[i]);
+			warnx(_("Invalid file id '%s'"), argv[i]);
 			return (2);
 		}
 #ifdef _LP64
 		if (ul > UINT32_MAX) {
-			fprintf(stderr, _("File id %lu too large"), ul);
+			warnx(_("File id %lu too large"), ul);
 			return (2);
 		}
 #endif
@@ -318,8 +318,7 @@ cmd_close_ofile(int argc, char **argv)
 			 * or hex value, we use the string they gave us so
 			 * the value displayed matches what we were given.
 			 */
-			warnx(_("Closing fid %s failed: %s"), argv[i],
-			    strerror(rc));
+			warnc(rc, _("Closing fid %s failed"), argv[i]);
 			errs++;
 		}
 	}
@@ -337,7 +336,7 @@ cmd_close_sess(int argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		fprintf(stderr, _("clientname and username missing\n"));
+		warnx(_("clientname and username missing"));
 		return (2);
 	}
 	client = argv[1];
@@ -525,7 +524,7 @@ do_enum(smb_svcenum_t *req, ofmt_handle_t hdl)
 
 		ns = smb_kmod_enum_init(req);
 		if (ns == NULL) {
-			fprintf(stderr, _("SMB enum initialization failure"));
+			warnx(_("SMB enum initialization failure"));
 			return (1);
 		}
 
@@ -535,12 +534,10 @@ do_enum(smb_svcenum_t *req, ofmt_handle_t hdl)
 			 * When the SMB service is not running, expect ENXIO.
 			 */
 			if (rc == ENXIO) {
-				fprintf(stderr,
-				    _("Kernel SMB server not running"));
+				warnx(_("Kernel SMB server not running"));
 				return (1);
 			}
-			fprintf(stderr, _("SMB enumeration call failed: %s"),
-			    strerror(rc));
+			warnc(rc, _("SMB enumeration call failed"));
 			return (1);
 		}
 
@@ -680,7 +677,7 @@ ofmt_fatal(ofmt_handle_t hdl, ofmt_field_t *templ, ofmt_status_t status)
 	char buf[OFMT_BUFSIZE];
 	char *msg = ofmt_strerror(hdl, status, buf, sizeof (buf));
 
-	fprintf(stderr, _("ofmt error: %s\n"), msg);
+	warnx(_("ofmt error: %s"), msg);
 
 	if (status == OFMT_EBADFIELDS ||
 	    status == OFMT_ENOFIELDS) {

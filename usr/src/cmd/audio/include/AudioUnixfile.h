@@ -92,7 +92,7 @@ public:
 
 	// Methods specific to the audio file format
 	// Get info string
-	virtual char *const GetInfostring(
+	virtual char *GetInfostring(
 	    int& len) const;			// return length
 
 	// Set info string

@@ -268,11 +268,13 @@ _g723_update(
 
 		/* UPA1 */
 		state_ptr->a[0] -= state_ptr->a[0] >> 8;
-		if (sigpk == 0)
-			if (pks1 == 0)
+		if (sigpk == 0) {
+			if (pks1 == 0) {
 				state_ptr->a[0] += 192;
-			else
+			} else {
 				state_ptr->a[0] -= 192;
+			}
+		}
 
 		/* LIMD */
 		a1ul = 15360 - a2p;

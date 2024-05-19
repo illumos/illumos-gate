@@ -37,7 +37,7 @@ AudioBuffer::
 AudioBuffer(
 	double		len,			// buffer length, in seconds
 	const char	*local_name):			// name
-	AudioStream(local_name), buflen(len), bufaddr(0), zflag(0), bufsize(0)
+	AudioStream(local_name), buflen(len), zflag(0), bufsize(0), bufaddr(0)
 {
 }
 

@@ -716,7 +716,7 @@ chk_opt(struct options *optlistp, int security, char *proto)
 	struct options *optlist;
 	char *sep = "";
 	int notfirst = 0;
-	int ret;
+	int ret = OPT_ADD_OK;
 
 	for (optlist = optlistp; optlist != NULL; optlist = optlist->next) {
 		char *optname;
@@ -3017,7 +3017,6 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	char dir[MAXPATHLEN];
-	int auth;
 
 	while ((c = getopt(argc, argv, "?hfnr:s:v")) != EOF) {
 		switch (c) {
@@ -3243,15 +3242,18 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 				    " %s\n"), sa_errorstr(ret));
 		} else if (ret == SA_OK) {
 			char *pname;
+
 			pname = sa_get_group_attr(group, "name");
 			if (pname != NULL) {
+				int auth;
+
 				auth = check_authorizations(pname, flags);
+				if (!auth && verbose) {
+					(void) printf(gettext(
+					    "Command would fail: %s\n"),
+					    sa_errorstr(SA_NO_PERMISSION));
+				}
 				sa_free_attr_string(pname);
-			}
-			if (!auth && verbose) {
-				(void) printf(gettext(
-				    "Command would fail: %s\n"),
-				    sa_errorstr(SA_NO_PERMISSION));
 			}
 		}
 	}
@@ -3278,9 +3280,9 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *rsrcname = NULL;
 	char *rsrc = NULL;
 	char *newname = NULL;
-	char *newrsrc;
+	char *newrsrc = NULL;
 	char *groupname = NULL;
-	int auth;
+	int auth = 1;
 	int verbose = 0;
 
 	while ((c = getopt(argc, argv, "?hnd:r:s:")) != EOF) {

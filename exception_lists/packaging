@@ -448,7 +448,7 @@ usr/include/sys/iscsit/isns_protocol.h
 usr/include/sys/iscsit/radius_packet.h
 usr/include/sys/iscsit/radius_protocol.h
 #
-# libshare is private and the 64-bit sharemgr is not delivered.
+# libshare is private.
 #
 usr/lib/libshare.so
 usr/lib/amd64/libshare.so		i386

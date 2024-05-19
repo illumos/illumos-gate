@@ -44,14 +44,12 @@ extern "C" {
  * Note that these macros *do not* work for in-place transformations.
  */
 
-#if defined(mc68000) || defined(sparc)
+#if defined(_BIG_ENDIAN)
 #define	DECODE_SHORT(from, to)	*((short *)(to)) = *((short *)(from))
 #define	DECODE_LONG(from, to)	*((long *)(to)) = *((long *)(from))
 #define	DECODE_FLOAT(from, to)	*((float *)(to)) = *((float *)(from))
 #define	DECODE_DOUBLE(from, to)	*((double *)(to)) = *((double *)(from))
-#endif /* big-endian */
-
-#if defined(i386) || defined(__ppc)
+#elif defined(_LITTLE_ENDIAN)
 #define	DECODE_SHORT(from, to)						\
 			    ((char *)(to))[0] = ((char *)(from))[1];	\
 			    ((char *)(to))[1] = ((char *)(from))[0];
@@ -72,25 +70,14 @@ extern "C" {
 			    ((char *)(to))[5] = ((char *)(from))[2];	\
 			    ((char *)(to))[6] = ((char *)(from))[1];	\
 			    ((char *)(to))[7] = ((char *)(from))[0];
-#endif /* little-endian */
+#else /* little-endian */
+#error Unknown machine endianness
+#endif
 
-
-/* Most architectures are symmetrical with respect to conversions. */
-#if defined(mc68000) || defined(sparc) || defined(i386) || defined(__ppc)
 #define	ENCODE_SHORT(from, to)		DECODE_SHORT((from), (to))
 #define	ENCODE_LONG(from, to)		DECODE_LONG((from), (to))
 #define	ENCODE_FLOAT(from, to)		DECODE_FLOAT((from), (to))
 #define	ENCODE_DOUBLE(from, to)		DECODE_DOUBLE((from), (to))
-
-/* Define types of specific length */
-typedef char		i_8;
-typedef short		i_16;
-typedef int		i_32;
-typedef unsigned char	u_8;
-typedef unsigned short 	u_16;
-typedef unsigned	u_32;
-
-#endif /* Sun machines */
 
 #ifdef __cplusplus
 }

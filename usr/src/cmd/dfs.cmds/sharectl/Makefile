@@ -19,35 +19,49 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-DEFAULTFILES =
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
-#
-# One for each ISA.
-#
-SUBDIRS =	$(MACH)
+PROG=		sharectl
 
-all	:=	TARGET= all
-install	:=	TARGET= install
-clean	:=	TARGET= clean
-clobber	:=	TARGET= clobber
-_msg	:=	TARGET= _msg
-lint	:=	TARGET= lint
+CPPFLAGS += -I../sharemgr
+LDLIBS += -lshare -lumem
+
+OBJS = $(PROG:%=%.o) shareutil.o
+
+CLOBBERFILES = $(POFILE) $(POFILES)
+
+POFILES = $(OBJS:.o=.po)
+POFILE  = sharectl_cmd.po
 
 .KEEP_STATE:
 
-all clean lint _msg:	$(SUBDIRS)
+all: $(PROG)
 
-clobber: $(SUBDIRS)
-	$(RM) sharectl.po
+_msg: $(POFILE)
 
-install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+install: all $(ROOTUSRSBINPROG)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
+
+include ../../Makefile.targ
+
+$(POFILE):      $(POFILES)
+	$(RM) $@; cat $(POFILES) > $@
+
+%.o: ../sharemgr/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.po: ../sharemgr/%.c
+	$(COMPILE.cpp) $<  > $<.i
+	$(BUILD.po)

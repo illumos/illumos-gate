@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -447,13 +448,16 @@ fifovp(vnode_t *vp, cred_t *crp)
 	 */
 	va.va_mask = AT_TIMES;
 	if (VOP_GETATTR(vp, &va, 0, crp, NULL) == 0) {
-		fnp->fn_atime = va.va_atime.tv_sec;
-		fnp->fn_mtime = va.va_mtime.tv_sec;
-		fnp->fn_ctime = va.va_ctime.tv_sec;
+		fnp->fn_atime = va.va_atime;
+		fnp->fn_mtime = va.va_mtime;
+		fnp->fn_ctime = va.va_ctime;
 	} else {
-		fnp->fn_atime = 0;
-		fnp->fn_mtime = 0;
-		fnp->fn_ctime = 0;
+		fnp->fn_atime.tv_sec = 0;
+		fnp->fn_atime.tv_nsec = 0;
+		fnp->fn_mtime.tv_sec = 0;
+		fnp->fn_mtime.tv_nsec = 0;
+		fnp->fn_ctime.tv_sec = 0;
+		fnp->fn_ctime.tv_nsec = 0;
 	}
 
 	/*
@@ -513,7 +517,7 @@ makepipe(vnode_t **vpp1, vnode_t **vpp2)
 	vnode_t *nvp1;
 	vnode_t *nvp2;
 	fifodata_t *fdp;
-	time_t now;
+	timestruc_t now;
 
 	fdp = kmem_cache_alloc(pipe_cache, KM_SLEEP);
 	fdp->fifo_lock.flk_ref = 2;
@@ -531,7 +535,7 @@ makepipe(vnode_t **vpp1, vnode_t **vpp2)
 #else /* FIFODEBUG */
 	fnp1->fn_flag	= fnp2->fn_flag		= ISPIPE | FIFOFAST;
 #endif /* FIFODEBUG */
-	now = gethrestime_sec();
+	gethrestime(&now);
 	fnp1->fn_atime	= fnp2->fn_atime	= now;
 	fnp1->fn_mtime	= fnp2->fn_mtime	= now;
 	fnp1->fn_ctime	= fnp2->fn_ctime	= now;
@@ -541,8 +545,8 @@ makepipe(vnode_t **vpp1, vnode_t **vpp2)
 
 	fifo_reinit_vp(nvp1);		/* Reinitialize vnodes for reuse... */
 	fifo_reinit_vp(nvp2);
-	nvp1->v_vfsp = fifovfsp; 	/* Need to re-establish VFS & device */
-	nvp2->v_vfsp = fifovfsp; 	/* before we can reuse this vnode. */
+	nvp1->v_vfsp = fifovfsp;	/* Need to re-establish VFS & device */
+	nvp2->v_vfsp = fifovfsp;	/* before we can reuse this vnode. */
 	nvp1->v_rdev = fifodev;
 	nvp2->v_rdev = fifodev;
 }

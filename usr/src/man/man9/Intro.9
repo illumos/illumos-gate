@@ -1,21 +1,134 @@
-.Dd Jan 25, 2017
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd April 28, 2024
 .Dt INTRO 9
 .Os
 .Sh NAME
-.Nm Intro ,
-.Nm intro
-.Nd introduction to kernel concepts
+.Nm Intro
+.Nd introduction to kernel concepts, device drivers, functions, and structures
 .Sh DESCRIPTION
-This section outlines high-level concepts of the illumos kernel and its
-subsystems.
-Specific documentation can be found in this section's sub\-sections.
+Section 9 of the manual is documentation for concepts in the broader kernel,
+including writing device drivers.
+The manual is organized into different sections, each of which focuses on a
+particular area such as chapter 9E which covers device driver entry points.
+The following chapters of section 9 exist:
 .Bl -tag -width Ds
-.It Section 9E
-Driver Entry Points
-.It Section 9F
-Kernel Functions for Drivers
-.It Section 9P
-Kernel Properties for Drivers
-.It Section 9S
-Data Structures for Drivers
+.It Section 9
+The base section 9
+.Pq no chapter suffix
+contains various high-level concepts about the kernel.
+In addition to this page, there are manuals that cover:
+.Bl -tag -width Ds
+.It iports, phymaps, and tgtmaps
+.Xr iport 9
+discusses the design of abstractions that are used for host bus adapter
+.Pq HBA
+drivers to aid in the enumeration of devices.
+.It vmem
+.Xr vmem 9
+discusses the design of the virtual memory allocator that is used throughout the
+system.
 .El
+.It Section 9E
+Section 9E, driver entry points, describes the interfaces that a loadable kernel
+module and device driver need to implement to interface with the broader kernel.
+There are discussions of specific frameworks for different classes of drivers,
+such as
+.Xr mac 9E
+for networking device drivers, discussions of specific functions that a given
+device might implement like
+.Xr open 9E
+which correspond to performing a traditional operation on the device, and
+required entry points for all modules like
+.Xr _init 9E .
+.Pp
+.Xr Intro 9E
+provides an overview of loadable kernel modules, device drivers, and which
+function families are used for which types of devices.
+.It Section 9F
+Section 9F, kernel functions, describes the various kernel functions that are
+available.
+The majority of these functions are part of the device driver interface and have
+API and ABI guarantees associated with them.
+Entry points run the gamut from dealing with memory allocation, to common data
+structures, to device driver frameworks
+.Pq e.g. functions specific to Networking, USB, SCSI, etc. drivers ,
+to common C functions around strings, atomics, and memory copying.
+.Pp
+.Xr Intro 9F
+discusses the different groups of functions that are available and how they are
+often used.
+.It Section 9P
+Section 9P, properties, are used to document various properties that a device
+driver may set on themselves.
+These properties are generally used in tandem with a driver's
+.Xr driver.conf 5
+or set while the driver is executing.
+.It Section 9S
+Section 9S, structures, describes various structures that are filled out, their
+members, and their meanings that are used throughout the kernel.
+This includes various types like the
+.Vt mblk_t
+which is used to transfer data in the networking and USB stacks, the
+.Vt uio_t
+which is used to describe an I/O request, and the
+.Vt cb_ops
+which all character device drivers fill out to indicate which operations they
+support.
+.Pp
+.Xr Intro 9S
+describes the organization of the different structure types that exist.
+If exploring a subsystem, it is generally better to start with the corresponding
+9E and 9F discussions which often have more context for how these structures are
+used.
+.El
+.Pp
+Throughout the manuals you may see reference to the term
+.Dq DDI
+which is the Device Driver Interface, which represents the committed interfaces
+that the operating system exports for such purposes.
+Note, not everything documented is classified as a committed interface.
+Some uncommitted interfaces are documented to aid developers.
+In addition to these manuals, there is additional documentation in the form of
+various books available at
+.Lk https://illumos.org/books .
+In particular, the following books can be useful for writing software and
+debugging:
+.Bl -tag -width Ds
+.It Dynamic Tracing Guide
+This introduces and discusses how to use DTrace, the dynamic tracing facility
+built into the operating system.
+DTrace is used with the
+.Xr dtrace 8
+utility.
+.It Modular Debugger Guide
+This introduces and discusses how to use the modular debugger, which provides
+the ability to debug not only user processes, but both the kernel and crash
+dumps.
+To start debugging the kernel, use the
+.Fl k
+flag to
+.Xr mdb 1 .
+.It Writing Device Drivers
+This introduces how to write device drivers in the system and provides
+additional background and more guided tours of various types of devices and
+concepts such as DMA allocation.
+.El
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr vmem 9 ,
+.Xr Intro 9E ,
+.Xr Intro 9F ,
+.Xr Intro 9P ,
+.Xr Intro 9S

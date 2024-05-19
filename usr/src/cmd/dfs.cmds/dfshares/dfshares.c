@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	int retval;		/* exit status from exec'd commad */
 	int showall = (argc <= 1);	/* show all resources */
 	static char usage[] =
-		"usage: %s [-F fstype] [-h] [-o fs_options ] [arg ...]\n";
+	    "usage: %s [-F fstype] [-h] [-o fs_options ] [arg ...]\n";
 
 	cmd = strrchr(argv[0], '/');	/* find the basename */
 	if (cmd)
@@ -129,7 +129,8 @@ main(int argc, char **argv)
 		nargv[nargc++] = argv[optind];
 
 	if (showall) {		/* command with no args -- show all dfs's */
-		while (fsname = getfs(dfp)) {
+		pid = 0;
+		while ((fsname = getfs(dfp)) != NULL) {
 			(void) snprintf(subcmd, sizeof (subcmd),
 			    FSCMD, fsname, cmd);
 			switch (pid = fork()) {		/* do the subcommand */
@@ -147,38 +148,38 @@ main(int argc, char **argv)
 				break;
 			case -1:
 				(void) fprintf(stderr,
-					"%s: fork failed - try again later.\n",
-					cmd);
+				    "%s: fork failed - try again later.\n",
+				    cmd);
 				exit(1);
 			}
 		}
 		(void) fclose(dfp);
 		if (pid == 0) {		/* we never got into the loop! */
 			(void) fprintf(stderr,
-				    "%s: no file systems in %s\n",
-				    cmd, DFSTYPES);
+			    "%s: no file systems in %s\n",
+			    cmd, DFSTYPES);
 			(void) fprintf(stderr, usage, cmd);
 			exit(1);
-		}
-		else
+		} else {
 			exit(err);
+		}
 	}
 
 	if (fsname) {		/* generate fs specific command name */
 		if (invalid(fsname, dfp)) {	/* valid ? */
 			(void) fprintf(stderr,
-				    "%s: invalid file system name\n", cmd);
+			    "%s: invalid file system name\n", cmd);
 			(void) fprintf(stderr, usage, cmd);
 			exit(1);
 		}
 		else
 			(void) snprintf(subcmd, sizeof (subcmd),
 			    FSCMD, fsname, cmd);
-	} else if (fsname = getfs(dfp))		/* use 1st line in dfstypes */
+	} else if ((fsname = getfs(dfp)) != NULL) /* use 1st line in dfstypes */
 		(void) snprintf(subcmd, sizeof (subcmd), FSCMD, fsname, cmd);
 	else {
 		(void) fprintf(stderr,
-			    "%s: no file systems in %s\n", cmd, DFSTYPES);
+		    "%s: no file systems in %s\n", cmd, DFSTYPES);
 		(void) fprintf(stderr, usage, cmd);
 		exit(1);
 	}
@@ -196,11 +197,11 @@ main(int argc, char **argv)
 
 static int
 invalid(const char *name,	/* file system name */
-	FILE *f)		/* file of list of file system types */
+    FILE *f)		/* file of list of file system types */
 {
 	char *s;
 
-	while (s = getfs(f))	/* while there's still hope ... */
+	while ((s = getfs(f)) != NULL)	/* while there's still hope ... */
 		if (strcmp(s, name) == 0)
 			return (0);	/* we got it! */
 	return (1);
@@ -218,9 +219,9 @@ static char buf[BUFSIZ];
 static char *
 getfs(FILE *fp)
 {
-	register char *s;
+	char *s;
 
-	while (s = fgets(buf, BUFSIZ, fp)) {
+	while ((s = fgets(buf, BUFSIZ, fp)) != NULL) {
 		while (isspace(*s))	/* leading whitespace doesn't count */
 			++s;
 		if (*s != '#') {	/* not a comment */
