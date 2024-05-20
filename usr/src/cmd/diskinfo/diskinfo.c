@@ -14,6 +14,7 @@
  * Copyright 2021 RackTop Systems, Inc.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Sebastian Wiedenroth
  */
 
 #include <sys/types.h>
@@ -279,7 +280,7 @@ enumerate_disks(di_opts_t *opts)
 	for (i = 0; media != NULL && media[i] != 0; i++) {
 		dm_descriptor_t *disk, *controller;
 		nvlist_t *mattrs, *dattrs;
-		char *vid, *pid, *opath, *ctype, *pctype, *c;
+		char *vid, *pid, *serial, *opath, *ctype, *pctype, *c;
 		boolean_t removable, ssd;
 		char device[MAXPATHLEN];
 		di_phys_t phys;
@@ -318,6 +319,7 @@ enumerate_disks(di_opts_t *opts)
 			nvlist_query_string(dattrs, DM_VENDOR_ID, &vid);
 			nvlist_query_string(dattrs, DM_PRODUCT_ID, &pid);
 			nvlist_query_string(dattrs, DM_OPATH, &opath);
+			nvlist_query_string(dattrs, DM_SERIAL, &serial);
 
 			if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
 				removable = B_TRUE;
@@ -382,6 +384,9 @@ enumerate_disks(di_opts_t *opts)
 				slotname[0] = '-';
 				slotname[1] = '\0';
 			}
+		}
+		if (phys.dp_serial == NULL) {
+			phys.dp_serial = serial;
 		}
 
 		/*

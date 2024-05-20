@@ -28,6 +28,7 @@
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Sebastian Wiedenroth
  */
 
 #include <fcntl.h>
@@ -56,6 +57,7 @@
 
 #define	MAXPROPLEN		1024
 #define	DEVICE_ID_PROP		"devid"
+#define	INQUIRY_SERIAL_NO	"inquiry-serial-no"
 #define	PROD_ID_PROP		"inquiry-product-id"
 #define	PROD_ID_USB_PROP	"usb-product-name"
 #define	REMOVABLE_PROP		"removable-media"
@@ -937,6 +939,7 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	char	*type;
 	char	*prod_id;
 	char	*vendor_id;
+	char	*serial;
 
 	if (dm_debug) {
 		(void) fprintf(stderr, "INFO: create_disk %s\n", kernel_name);
@@ -1009,6 +1012,14 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 				cache_free_disk(diskp);
 				return (NULL);
 			}
+		}
+	}
+
+	serial = get_str_prop(INQUIRY_SERIAL_NO, args->node);
+	if (serial != NULL) {
+		if ((diskp->serial = strdup(serial)) == NULL) {
+			cache_free_disk(diskp);
+			return (NULL);
 		}
 	}
 
