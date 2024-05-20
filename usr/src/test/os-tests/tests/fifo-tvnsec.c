@@ -125,12 +125,12 @@ check_fifos(int wfd, int rfd)
 	struct timespec update[2];
 
 	VERIFY0(fstat(wfd, &st));
-	if (check_times(&st, CHK_ALL_GT, "write", "creation")) {
+	if (!check_times(&st, CHK_ALL_GT, "write", "creation")) {
 		ret = false;
 	}
 
 	VERIFY0(fstat(rfd, &st));
-	if (check_times(&st, CHK_ALL_GT, "read", "creation")) {
+	if (!check_times(&st, CHK_ALL_GT, "read", "creation")) {
 		ret = false;
 	}
 
@@ -146,13 +146,13 @@ check_fifos(int wfd, int rfd)
 	}
 
 	VERIFY0(fstat(wfd, &st));
-	if (check_times(&st, CHK_CTIME_GT | CHK_MTIME_GT | CHK_ATIME_LT,
+	if (!check_times(&st, CHK_CTIME_GT | CHK_MTIME_GT | CHK_ATIME_LT,
 	    "write", "post-write")) {
 		ret = false;
 	}
 
 	VERIFY0(fstat(rfd, &st));
-	if (check_times(&st, CHK_CTIME_GT | CHK_MTIME_GT | CHK_ATIME_LT,
+	if (!check_times(&st, CHK_CTIME_GT | CHK_MTIME_GT | CHK_ATIME_LT,
 	    "read", "post-write")) {
 		ret = false;
 	}
@@ -164,13 +164,13 @@ check_fifos(int wfd, int rfd)
 	}
 
 	VERIFY0(fstat(rfd, &st));
-	if (check_times(&st, CHK_CTIME_LT | CHK_MTIME_LT | CHK_ATIME_GT,
+	if (!check_times(&st, CHK_CTIME_LT | CHK_MTIME_LT | CHK_ATIME_GT,
 	    "read", "post-read")) {
 		ret = false;
 	}
 
 	VERIFY0(fstat(wfd, &st));
-	if (check_times(&st, CHK_CTIME_LT | CHK_MTIME_LT | CHK_ATIME_GT,
+	if (!check_times(&st, CHK_CTIME_LT | CHK_MTIME_LT | CHK_ATIME_GT,
 	    "write", "post-read")) {
 		ret = false;
 	}
@@ -182,12 +182,12 @@ check_fifos(int wfd, int rfd)
 
 	update_time();
 	VERIFY0(fstat(wfd, &st));
-	if (check_times(&st, CHK_ALL_LT, "write", "post-futimens")) {
+	if (!check_times(&st, CHK_ALL_LT, "write", "post-futimens")) {
 		ret = false;
 	}
 
 	VERIFY0(fstat(rfd, &st));
-	if (check_times(&st, CHK_ALL_LT, "read", "post-futimens")) {
+	if (!check_times(&st, CHK_ALL_LT, "read", "post-futimens")) {
 		ret = false;
 	}
 
@@ -240,6 +240,10 @@ main(void)
 		ret = EXIT_FAILURE;
 	}
 	(void) unlink(path);
+
+	if (ret == EXIT_SUCCESS) {
+		(void) printf("All tests completed successfully\n");
+	}
 
 	return (ret);
 }
