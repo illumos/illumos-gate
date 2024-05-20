@@ -242,7 +242,8 @@ lx_spl_consume(file_t *fp, uint_t count)
 	}
 
 	/* Update vnode update access time */
-	fnp->fn_atime = fnp->fn_dest->fn_atime = gethrestime_sec();
+	gethrestime(&fnp->fn_dest->fn_atime);
+	fnp->fn_atime = fnp->fn_dest->fn_atime;
 
 	mutex_exit(&fn_lock->flk_lock);
 }
