@@ -236,6 +236,12 @@ struct nvme_qpair {
 	ksema_t nq_sema; /* semaphore to ensure q always has >= 1 empty slot */
 };
 
+typedef struct nvme_mgmt_lock {
+	kmutex_t nml_lock;
+	kcondvar_t nml_cv;
+	uintptr_t nml_bd_own;
+} nvme_mgmt_lock_t;
+
 struct nvme {
 	dev_info_t *n_dip;
 	nvme_progress_t n_progress;
@@ -333,7 +339,7 @@ struct nvme {
 	ksema_t n_abort_sema;
 
 	/* protects namespace management operations */
-	kmutex_t n_mgmt_mutex;
+	nvme_mgmt_lock_t n_mgmt;
 
 	/*
 	 * This lock protects the minor node locking state across the controller
