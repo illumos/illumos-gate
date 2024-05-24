@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Oxide Computer Company
 #
 
@@ -56,6 +56,7 @@ file path=opt/bhyve-tests/tests/kdev/vrtc_ops mode=0555
 file path=opt/bhyve-tests/tests/kdev/wrmsr_tsc mode=0555
 dir  path=opt/bhyve-tests/tests/mevent
 file path=opt/bhyve-tests/tests/mevent/lists_delete mode=0555
+file path=opt/bhyve-tests/tests/mevent/mevent_test mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_disable mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_pause mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_requeue mode=0555

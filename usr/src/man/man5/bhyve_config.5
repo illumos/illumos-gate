@@ -25,7 +25,7 @@
 .\"
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd July 29, 2023
+.Dd August 13, 2024
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -122,6 +122,17 @@ or tebibytes.
 If no suffix is given, the value is assumed to be in mebibytes.
 .It Va memory.wired Ta bool Ta false Ta
 Wire guest memory.
+.It Va bootrom Ta path Ta Ta
+Path to a boot ROM.
+During initialization of the guest, the contents of this file are copied into
+the guest's memory.
+If a boot ROM is present, a firmware interface device is
+also enabled for use by the boot ROM.
+.It Va bootvars Ta path Ta Ta
+Path to boot VARS.
+The contents of this file are copied beneath the boot ROM.
+Firmware can write to it to save variables.
+Variables will be persistent across guest reboots.
 .It Va acpi_tables Ta bool Ta false Ta
 Generate ACPI tables.
 .It Va acpi_tables_in_memory Ta bool Ta true Ta
@@ -148,6 +159,11 @@ Specify the keyboard layout name with the file name in
 .Pa /usr/share/bhyve/kbdlayout .
 This value only works when loaded with UEFI mode for VNC, and when a VNC client
 that doesn't support the QEMU Extended Key Event Message us used.
+.It Va pci.enable_bars Ta bool Ta Ta
+Enable and map PCI BARs before executing any guest code.
+This setting is true by default but can be disabled to work around problems
+with guests that remap BARs themselves
+.Pq e.g. u-boot .
 .It Va tpm.path Ta string Ta Ta
 Path to the host TPM device.
 This is typically /dev/tpm0.
@@ -566,17 +582,6 @@ The following nodes are available under
 .Va lpc :
 .Bl -column "pc-testdev" "Format" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
-.It Va bootrom Ta path Ta Ta
-Path to a boot ROM.
-The contents of this file are copied into the guest's
-memory ending just before the 4GB physical address.
-If a boot ROM is present, a firmware interface device is
-also enabled for use by the boot ROM.
-.It Va bootvars Ta path Ta Ta
-Path to boot variables file.
-The contents of this file are copied beneath the boot ROM.
-Firmware can write to it to save variables.
-Variables will be persistent across guest reboots.
 .It Va com1 Ta node Ta Ta
 Settings for the COM1 serial port device.
 .It Va com2 Ta node Ta Ta

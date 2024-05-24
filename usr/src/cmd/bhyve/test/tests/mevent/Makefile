@@ -18,6 +18,7 @@
 TESTSUBDIR =	mevent
 PROG = \
 		lists_delete \
+		mevent_test \
 		read_disable \
 		read_pause \
 		read_requeue \
@@ -38,6 +39,7 @@ install: $(TESTDIR) $(CMDS)
 $(CMDS): $(PROG)
 
 vnode_zvol :=	LDLIBS += -lzfs -lnvpair
+mevent_test :=	LDLIBS += -lsocket
 
 include ../../Makefile.targ
 
@@ -45,4 +47,4 @@ include ../../Makefile.targ
 	$(LINK.c) -o $@ $< $(SUPOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-mevent.o: ../../../mevent.c
+mevent.o: ../../../common/mevent.c

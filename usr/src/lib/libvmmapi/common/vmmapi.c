@@ -70,6 +70,9 @@
 #define	MB	(1024 * 1024UL)
 #define	GB	(1024 * 1024 * 1024UL)
 
+#define	VM_LOWMEM_LIMIT	(3 * GB)
+#define	VM_HIGHMEM_BASE	(4 * GB)
+
 #ifndef __FreeBSD__
 /* shim to no-op for now */
 #define	MAP_NOCORE		0
@@ -676,6 +679,12 @@ vm_get_lowmem_size(struct vmctx *ctx)
 {
 
 	return (ctx->lowmem);
+}
+
+vm_paddr_t
+vm_get_highmem_base(struct vmctx *ctx __unused)
+{
+	return (VM_HIGHMEM_BASE);
 }
 
 size_t

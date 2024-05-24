@@ -180,6 +180,7 @@ void	vm_set_memflags(struct vmctx *ctx, int flags);
 int	vm_get_memflags(struct vmctx *ctx);
 const char *vm_get_name(struct vmctx *ctx);
 size_t	vm_get_lowmem_size(struct vmctx *ctx);
+vm_paddr_t vm_get_highmem_base(struct vmctx *ctx);
 size_t	vm_get_highmem_size(struct vmctx *ctx);
 int	vm_set_desc(struct vcpu *vcpu, int reg,
 		    uint64_t base, uint32_t limit, uint32_t access);

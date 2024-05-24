@@ -363,13 +363,12 @@ static int vmm_force_invariant_tsc = 0;
 
 
 /*
- * Round up to the next power of two, if necessary, and then take log2.
- * Returns -1 if argument is zero.
+ * Compute ceil(log2(x)).  Returns -1 if x is zero.
  */
 static __inline int
 log2(uint_t x)
 {
-	return (fls(x << (1 - powerof2(x))) - 1);
+	return (x == 0 ? -1 : fls(x - 1));
 }
 
 /*
