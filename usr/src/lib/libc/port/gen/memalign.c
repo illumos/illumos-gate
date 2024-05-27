@@ -23,14 +23,16 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "mallint.h"
 #include "mtlib.h"
+#include <stdalign.h>
 
 #define	_misaligned(p)		((unsigned)(p) & 3)
 		/* 4-byte "word" alignment is considered ok in LP64 */
@@ -185,12 +187,26 @@ memalign(size_t align, size_t nbytes)
 
 /*
  * This is the ISO/IEC C11 version of memalign. We have kept it as a separate
- * function, but it is basically the same thing. Note that this is implemented
- * this way to make life easier to libraries which already interpose on
- * memalign.
+ * function, but it is almost the same thing. aligned_alloc allows any alignment
+ * that is a fundamental alignment of one of the data types. However,
+ * aligned_alloc (like malloc) is required to ensure that the alignment is good
+ * for any of the base data objects. Our expectation is that memalign guarantees
+ * this. To work with memalign(), we round up any smaller alignments to the
+ * alignment of a pointer which is generally the requirement of memalign(3C).
+ *
+ * Note, aligned_alloc is implemented in terms of just calling memalign this way
+ * so that way interposing libraries can just interpose on that.
  */
 void *
 aligned_alloc(size_t align, size_t size)
 {
+	if (align == 0 || (align & (align - 1)) != 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	if (align < alignof (uintptr_t))
+		align = alignof (uintptr_t);
+
 	return (memalign(align, size));
 }

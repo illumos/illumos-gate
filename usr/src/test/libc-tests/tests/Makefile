@@ -71,6 +71,7 @@ PROGS = \
 	utimes
 
 SCRIPTS = \
+	aligned_alloc \
 	quick_exit \
 	psignal
 
@@ -81,6 +82,8 @@ PROGS64 = \
 	$(PROGS:%=%.64) \
 	printf-6961.64
 
+aligned_alloc.32 :=	CSTD=$(GNU_C99)
+aligned_alloc.64 :=	CSTD=$(GNU_C99)
 aligned_alloc.32 :=	LDLIBS += -lproc
 aligned_alloc.64 :=	LDLIBS64 += -lproc
 posix_memalign.32 :=	LDLIBS += -lproc

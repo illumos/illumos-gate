@@ -23,6 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -4540,6 +4541,16 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		error = EISCONN;
 		goto ud_error;
 	}
+
+	/*
+	 * Before we modify the ixa at all, invalidate our most recent address
+	 * to assure that any subsequent call to conn_same_as_last_v6() will
+	 * not indicate a match: any thread that picks up conn_lock after we
+	 * drop it (but before we pick it up again and properly set the most
+	 * recent address) must not associate the ixa with the (now old) last
+	 * address.
+	 */
+	connp->conn_v6lastdst = ipv6_all_zeros;
 
 	/* In case previous destination was multicast or multirt */
 	ip_attr_newdst(ixa);

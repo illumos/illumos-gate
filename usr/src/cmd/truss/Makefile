@@ -38,6 +38,7 @@ OBJS=			\
 	actions.o	\
 	expound.o	\
 	codes.o		\
+	codes_bhyve.o	\
 	print.o		\
 	ramdata.o	\
 	systable.o	\
@@ -68,6 +69,10 @@ LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket -ltsol -lnvpair
 CPPFLAGS += -D_REENTRANT
 CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
 CPPFLAGS += -I$(SRC)/uts/common
+
+codes_bhyve.o := CPPFLAGS += -I$(SRC)/compat/bhyve
+codes_bhyve.o := CPPFLAGS += -I$(SRC)/compat/bhyve/amd64
+codes_bhyve.o := CPPFLAGS += -I$(SRC)/uts/intel
 
 ROOTLINK = $(PROG:%=$(ROOTBIN64)/%)
 
