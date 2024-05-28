@@ -234,14 +234,19 @@ struct bd_errstats {
  */
 bd_handle_t	bd_alloc_handle(void *, bd_ops_t *, ddi_dma_attr_t *, int);
 void		bd_free_handle(bd_handle_t);
-int		bd_attach_handle(dev_info_t *, bd_handle_t);
-int		bd_detach_handle(bd_handle_t);
-void		bd_state_change(bd_handle_t);
 const char	*bd_address(bd_handle_t);
 void		bd_xfer_done(bd_xfer_t *, int);
 void		bd_error(bd_xfer_t *, int);
 void		bd_mod_init(struct dev_ops *);
 void		bd_mod_fini(struct dev_ops *);
+
+/*
+ * The following functions will cause the various bd_ops entries that were
+ * registered to be called. Locks should not be held across any calls to these.
+ */
+int		bd_attach_handle(dev_info_t *, bd_handle_t);
+int		bd_detach_handle(bd_handle_t);
+void		bd_state_change(bd_handle_t);
 
 #ifdef __cplusplus
 }

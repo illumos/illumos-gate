@@ -166,7 +166,6 @@ struct bd {
 	uint64_t	d_io_counter;
 
 	uint32_t	d_qcount;
-	uint32_t	d_qactive;
 	uint32_t	d_maxxfer;
 	uint32_t	d_blkshift;
 	uint32_t	d_pblkshift;

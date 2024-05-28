@@ -362,13 +362,26 @@
  * exclusive-open thread pointers nm_oexcl of each minor node associated with a
  * controller and its namespaces.
  *
- * In addition, there is one mutex n_mgmt_mutex which must be held whenever the
- * driver state for any namespace is changed, especially across calls to
- * nvme_init_ns(), nvme_attach_ns() and nvme_detach_ns(). Except when detaching
- * nvme, it should also be held across calls that modify the blkdev handle of a
- * namespace. Command and queue mutexes may be acquired and released while
- * n_mgmt_mutex is held, n_minor_mutex should not.
+ * In addition, there is a logical namespace management mutex which protects the
+ * data about namespaces. When interrogating the metadata of any namespace, this
+ * lock must be held. This gets tricky as we need to call into blkdev, which may
+ * issue callbacks into us which want this and it is illegal to hold locks
+ * across those blkdev calls as otherwise they might lead to deadlock (blkdev
+ * leverages ndi_devi_enter()).
  *
+ * The lock exposes two levels, one that we call 'NVME' and one 'BDRO' or blkdev
+ * read-only. The idea is that most callers will use the NVME level which says
+ * this is a full traditional mutex operation. The BDRO level is used by blkdev
+ * callback functions and is a promise to only only read the data. When a blkdev
+ * operation starts, the lock holder will use nvme_mgmt_bd_start(). This
+ * strictly speaking drops the mutex, but records that the lock is logically
+ * held by the thread that did the start() operation.
+ *
+ * During this time, other threads (or even the same one) may end up calling
+ * into nvme_mgmt_lock(). Only one person may still hold the lock at any time;
+ * however, the BRDO level will be allowed to proceed during this time. This
+ * allows us to make consistent progress and honor the blkdev lock ordering
+ * requirements, albeit it is not as straightforward as a simple mutex.
  *
  * Quiesce / Fast Reboot:
  *
@@ -568,6 +581,25 @@ kmutex_t nvme_open_minors_mutex;
  * Removal taskq used for n_dead callback processing.
  */
 taskq_t *nvme_dead_taskq;
+
+/*
+ * This enumeration is used in tandem with nvme_mgmt_lock() to describe which
+ * form of the lock is being taken. See the theory statement for more context.
+ */
+typedef enum {
+	/*
+	 * This is the primary form of taking the management lock and indicates
+	 * that the user intends to do a read/write of it. This should always be
+	 * used for any ioctl paths or truly anything other than a blkdev
+	 * information operation.
+	 */
+	NVME_MGMT_LOCK_NVME,
+	/*
+	 * This is a subordinate form of the lock whereby the user is in blkdev
+	 * callback context and will only intend to read the namespace data.
+	 */
+	NVME_MGMT_LOCK_BDRO
+} nvme_mgmt_lock_level_t;
 
 static int nvme_attach(dev_info_t *, ddi_attach_cmd_t);
 static int nvme_detach(dev_info_t *, ddi_detach_cmd_t);
@@ -1076,6 +1108,79 @@ nvme_get32(nvme_t *nvme, uintptr_t reg)
 	val = ddi_get32(nvme->n_regh, (uint32_t *)(nvme->n_regs + reg));
 
 	return (val);
+}
+
+static void
+nvme_mgmt_lock_fini(nvme_mgmt_lock_t *lock)
+{
+	ASSERT3U(lock->nml_bd_own, ==, 0);
+	mutex_destroy(&lock->nml_lock);
+	cv_destroy(&lock->nml_cv);
+}
+
+static void
+nvme_mgmt_lock_init(nvme_mgmt_lock_t *lock)
+{
+	mutex_init(&lock->nml_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&lock->nml_cv, NULL, CV_DRIVER, NULL);
+	lock->nml_bd_own = 0;
+}
+
+static void
+nvme_mgmt_unlock(nvme_t *nvme)
+{
+	nvme_mgmt_lock_t *lock = &nvme->n_mgmt;
+
+	cv_broadcast(&lock->nml_cv);
+	mutex_exit(&lock->nml_lock);
+}
+
+#ifdef	DEBUG
+static boolean_t
+nvme_mgmt_lock_held(nvme_t *nvme)
+{
+	return (MUTEX_HELD(&nvme->n_mgmt.nml_lock) != 0);
+}
+#endif	/* DEBUG */
+
+static void
+nvme_mgmt_lock(nvme_t *nvme, nvme_mgmt_lock_level_t level)
+{
+	nvme_mgmt_lock_t *lock = &nvme->n_mgmt;
+	mutex_enter(&lock->nml_lock);
+	while (lock->nml_bd_own != 0) {
+		if (level == NVME_MGMT_LOCK_BDRO)
+			break;
+		cv_wait(&lock->nml_cv, &lock->nml_lock);
+	}
+}
+
+/*
+ * This and nvme_mgmt_bd_end() are used to indicate that the driver is going to
+ * be calling into a re-entrant blkdev related function. We cannot hold the lock
+ * across such an operation and therefore must indicate that this is logically
+ * held, while allowing other operations to proceed. This nvme_mgmt_bd_end() may
+ * only be called by a thread that already holds the nmve_mgmt_lock().
+ */
+static void
+nvme_mgmt_bd_start(nvme_t *nvme)
+{
+	nvme_mgmt_lock_t *lock = &nvme->n_mgmt;
+
+	VERIFY(MUTEX_HELD(&lock->nml_lock));
+	VERIFY3U(lock->nml_bd_own, ==, 0);
+	lock->nml_bd_own = (uintptr_t)curthread;
+	mutex_exit(&lock->nml_lock);
+}
+
+static void
+nvme_mgmt_bd_end(nvme_t *nvme)
+{
+	nvme_mgmt_lock_t *lock = &nvme->n_mgmt;
+
+	mutex_enter(&lock->nml_lock);
+	VERIFY3U(lock->nml_bd_own, ==, (uintptr_t)curthread);
+	lock->nml_bd_own = 0;
 }
 
 /*
@@ -2421,7 +2526,7 @@ nvme_async_event_task(void *arg)
 				break;
 			}
 
-			mutex_enter(&nvme->n_mgmt_mutex);
+			nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 			for (uint_t i = 0; i < NVME_NSCHANGE_LIST_SIZE; i++) {
 				uint32_t nsid = nslist->nscl_ns[i];
 
@@ -2436,10 +2541,12 @@ nvme_async_event_task(void *arg)
 				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
 					continue;
 
+				nvme_mgmt_bd_start(nvme);
 				bd_state_change(nvme_nsid2ns(nvme,
 				    nsid)->ns_bd_hdl);
+				nvme_mgmt_bd_end(nvme);
 			}
-			mutex_exit(&nvme->n_mgmt_mutex);
+			nvme_mgmt_unlock(nvme);
 
 			break;
 
@@ -2551,7 +2658,7 @@ nvme_async_event(nvme_t *nvme)
 static boolean_t
 nvme_no_blkdev_attached(nvme_t *nvme, uint32_t nsid)
 {
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 	ASSERT3U(nsid, !=, 0);
 
 	if (nsid != NVME_NSID_BCAST) {
@@ -3347,7 +3454,7 @@ nvme_allocated_ns(nvme_namespace_t *ns)
 	nvme_t *nvme = ns->ns_nvme;
 	uint32_t i;
 
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 
 	/*
 	 * If supported, update the list of allocated namespace IDs.
@@ -3391,7 +3498,7 @@ nvme_active_ns(nvme_namespace_t *ns)
 	uint64_t *ptr;
 	uint32_t i;
 
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 
 	/*
 	 * If supported, update the list of active namespace IDs.
@@ -3445,7 +3552,7 @@ nvme_init_ns(nvme_t *nvme, uint32_t nsid)
 
 	ns->ns_nvme = nvme;
 
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 
 	/*
 	 * Because we might rescan a namespace and this will fail after boot
@@ -3564,8 +3671,9 @@ static boolean_t
 nvme_attach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 {
 	nvme_namespace_t *ns = nvme_nsid2ns(nvme, com->nioc_nsid);
+	int ret;
 
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 
 	if (ns->ns_ignore) {
 		return (nvme_ioctl_error(com, NVME_IOCTL_E_UNSUP_ATTACH_NS,
@@ -3589,7 +3697,10 @@ nvme_attach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 		}
 	}
 
-	if (bd_attach_handle(nvme->n_dip, ns->ns_bd_hdl) != DDI_SUCCESS) {
+	nvme_mgmt_bd_start(nvme);
+	ret = bd_attach_handle(nvme->n_dip, ns->ns_bd_hdl);
+	nvme_mgmt_bd_end(nvme);
+	if (ret != DDI_SUCCESS) {
 		return (nvme_ioctl_error(com, NVME_IOCTL_E_BLKDEV_ATTACH,
 		    0, 0));
 	}
@@ -3603,14 +3714,19 @@ static boolean_t
 nvme_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 {
 	nvme_namespace_t *ns = nvme_nsid2ns(nvme, com->nioc_nsid);
+	int ret;
 
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 
 	if (ns->ns_ignore || !ns->ns_attached)
 		return (B_TRUE);
 
+	nvme_mgmt_bd_start(nvme);
 	ASSERT3P(ns->ns_bd_hdl, !=, NULL);
-	if (bd_detach_handle(ns->ns_bd_hdl) != DDI_SUCCESS) {
+	ret = bd_detach_handle(ns->ns_bd_hdl);
+	nvme_mgmt_bd_end(nvme);
+
+	if (ret != DDI_SUCCESS) {
 		return (nvme_ioctl_error(com, NVME_IOCTL_E_BLKDEV_DETACH, 0,
 		    0));
 	}
@@ -3627,7 +3743,7 @@ nvme_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 static void
 nvme_rescan_ns(nvme_t *nvme, uint32_t nsid)
 {
-	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+	ASSERT(nvme_mgmt_lock_held(nvme));
 	ASSERT3U(nsid, !=, 0);
 
 	if (nsid != NVME_NSID_BCAST) {
@@ -4617,7 +4733,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_ufm_update(nvme->n_ufmh);
 	nvme->n_progress |= NVME_UFM_INIT;
 
-	mutex_init(&nvme->n_mgmt_mutex, NULL, MUTEX_DRIVER, NULL);
+	nvme_mgmt_lock_init(&nvme->n_mgmt);
 	nvme_lock_init(&nvme->n_lock);
 	nvme->n_progress |= NVME_MGMT_INIT;
 	nvme->n_dead_status = NVME_IOCTL_E_CTRL_DEAD;
@@ -4626,7 +4742,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Identify namespaces.
 	 */
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
@@ -4642,14 +4758,14 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		ns->ns_ignore = B_TRUE;
 		if (nvme_init_ns(nvme, i) != 0) {
-			mutex_exit(&nvme->n_mgmt_mutex);
+			nvme_mgmt_unlock(nvme);
 			goto fail;
 		}
 
 		if (ddi_create_minor_node(nvme->n_dip, ns->ns_name, S_IFCHR,
 		    NVME_MINOR(ddi_get_instance(nvme->n_dip), i),
 		    DDI_NT_NVME_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
-			mutex_exit(&nvme->n_mgmt_mutex);
+			nvme_mgmt_unlock(nvme);
 			dev_err(dip, CE_WARN,
 			    "!failed to create minor node for namespace %d", i);
 			goto fail;
@@ -4657,9 +4773,9 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
-	    NVME_MINOR(ddi_get_instance(dip), 0), DDI_NT_NVME_NEXUS, 0)
-	    != DDI_SUCCESS) {
-		mutex_exit(&nvme->n_mgmt_mutex);
+	    NVME_MINOR(ddi_get_instance(dip), 0), DDI_NT_NVME_NEXUS, 0) !=
+	    DDI_SUCCESS) {
+		nvme_mgmt_unlock(nvme);
 		dev_err(dip, CE_WARN, "nvme_attach: "
 		    "cannot create devctl minor node");
 		goto fail;
@@ -4681,13 +4797,13 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * our node is not yet in the attached state.
 			 */
 			if (!attached_ns) {
-				mutex_exit(&nvme->n_mgmt_mutex);
+				nvme_mgmt_unlock(nvme);
 				goto fail;
 			}
 		}
 	}
 
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 	return (DDI_SUCCESS);
 
@@ -4770,7 +4886,7 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (nvme->n_progress & NVME_MGMT_INIT) {
 		nvme_lock_fini(&nvme->n_lock);
-		mutex_destroy(&nvme->n_mgmt_mutex);
+		nvme_mgmt_lock_fini(&nvme->n_mgmt);
 	}
 
 	if (nvme->n_progress & NVME_UFM_INIT) {
@@ -5083,18 +5199,8 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	nvme_namespace_t *ns = arg;
 	nvme_t *nvme = ns->ns_nvme;
 	uint_t ns_count = MAX(1, nvme->n_namespaces_attachable);
-	boolean_t mutex_exit_needed = B_TRUE;
 
-	/*
-	 * nvme_bd_driveinfo is called by blkdev in two situations:
-	 * - during bd_attach_handle(), which we call with the mutex held
-	 * - during bd_attach(), which may be called with or without the
-	 *   mutex held
-	 */
-	if (mutex_owned(&nvme->n_mgmt_mutex))
-		mutex_exit_needed = B_FALSE;
-	else
-		mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_BDRO);
 
 	/*
 	 * Set the blkdev qcount to the number of submission queues.
@@ -5160,8 +5266,7 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	if (nvme->n_idctl->id_oncs.on_dset_mgmt)
 		drive->d_max_free_seg = NVME_DSET_MGMT_MAX_RANGES;
 
-	if (mutex_exit_needed)
-		mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 }
 
 static int
@@ -5169,22 +5274,12 @@ nvme_bd_mediainfo(void *arg, bd_media_t *media)
 {
 	nvme_namespace_t *ns = arg;
 	nvme_t *nvme = ns->ns_nvme;
-	boolean_t mutex_exit_needed = B_TRUE;
 
 	if (nvme->n_dead) {
 		return (EIO);
 	}
 
-	/*
-	 * nvme_bd_mediainfo is called by blkdev in various situations,
-	 * most of them out of our control. There's one exception though:
-	 * When we call bd_state_change() in response to "namespace change"
-	 * notification, where the mutex is already being held by us.
-	 */
-	if (mutex_owned(&nvme->n_mgmt_mutex))
-		mutex_exit_needed = B_FALSE;
-	else
-		mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_BDRO);
 
 	media->m_nblks = ns->ns_block_count;
 	media->m_blksize = ns->ns_block_size;
@@ -5193,8 +5288,7 @@ nvme_bd_mediainfo(void *arg, bd_media_t *media)
 
 	media->m_pblksize = ns->ns_best_block_size;
 
-	if (mutex_exit_needed)
-		mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 	return (0);
 }
@@ -5808,7 +5902,7 @@ nvme_ioctl_ns_info(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 	bcopy(idbuf, &ns_info->nni_id, sizeof (nvme_identify_nsid_t));
 	kmem_free(idbuf, NVME_IDENTIFY_BUFSIZE);
 
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 	if (ns->ns_allocated)
 		ns_info->nni_state |= NVME_NS_STATE_ALLOCATED;
 
@@ -5825,13 +5919,13 @@ nvme_ioctl_ns_info(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		addr = bd_address(ns->ns_bd_hdl);
 		if (strlcpy(ns_info->nni_addr, addr,
 		    sizeof (ns_info->nni_addr)) >= sizeof (ns_info->nni_addr)) {
-			mutex_exit(&nvme->n_mgmt_mutex);
+			nvme_mgmt_unlock(nvme);
 			(void) nvme_ioctl_error(&ns_info->nni_common,
 			    NVME_IOCTL_E_BD_ADDR_OVER, 0, 0);
 			goto copyout;
 		}
 	}
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 copyout:
 	if (ddi_copyout(ns_info, (void *)arg, sizeof (nvme_ioctl_ns_info_t),
@@ -6266,9 +6360,9 @@ nvme_ioctl_format(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		goto copyout;
 	}
 
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 	if (!nvme_no_blkdev_attached(nvme, ioc.nif_common.nioc_nsid)) {
-		mutex_exit(&nvme->n_mgmt_mutex);
+		nvme_mgmt_unlock(nvme);
 		(void) nvme_ioctl_error(&ioc.nif_common,
 		    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
 		goto copyout;
@@ -6278,7 +6372,7 @@ nvme_ioctl_format(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		nvme_ioctl_success(&ioc.nif_common);
 		nvme_rescan_ns(nvme, ioc.nif_common.nioc_nsid);
 	}
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 copyout:
 	if (ddi_copyout(&ioc, (void *)(uintptr_t)arg, sizeof (ioc),
@@ -6310,11 +6404,11 @@ nvme_ioctl_detach(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		goto copyout;
 	}
 
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 	if (nvme_detach_ns(nvme, &com)) {
 		nvme_ioctl_success(&com);
 	}
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 copyout:
 	if (ddi_copyout(&com, (void *)(uintptr_t)arg, sizeof (com),
@@ -6348,7 +6442,7 @@ nvme_ioctl_attach(nvme_minor_t *minor, intptr_t arg, int mode,
 		goto copyout;
 	}
 
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 	ns = nvme_nsid2ns(nvme, com.nioc_nsid);
 
 	/*
@@ -6366,7 +6460,7 @@ nvme_ioctl_attach(nvme_minor_t *minor, intptr_t arg, int mode,
 	} else {
 		nvme_ioctl_success(&com);
 	}
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 copyout:
 	if (ddi_copyout(&com, (void *)(uintptr_t)arg, sizeof (com),
@@ -6675,7 +6769,7 @@ nvme_ioctl_passthru(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		goto copyout;
 	}
 
-	mutex_enter(&nvme->n_mgmt_mutex);
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 	if ((pass.npc_impact & NVME_IMPACT_NS) != 0) {
 		/*
 		 * We've been told this has ns impact. Right now force that to
@@ -6683,7 +6777,7 @@ nvme_ioctl_passthru(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		 * the nsid field.
 		 */
 		if (!nvme_no_blkdev_attached(nvme, NVME_NSID_BCAST)) {
-			mutex_exit(&nvme->n_mgmt_mutex);
+			nvme_mgmt_unlock(nvme);
 			(void) nvme_ioctl_error(&pass.npc_common,
 			    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
 			goto copyout;
@@ -6717,7 +6811,7 @@ nvme_ioctl_passthru(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 			nvme_rescan_ns(nvme, NVME_NSID_BCAST);
 		}
 	}
-	mutex_exit(&nvme->n_mgmt_mutex);
+	nvme_mgmt_unlock(nvme);
 
 copyout:
 	rv = nvme_passthru_copyout_cmd(&pass, (void *)(uintptr_t)arg,
