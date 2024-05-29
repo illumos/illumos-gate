@@ -21660,6 +21660,7 @@ f usr/xpg4/bin/who 0555 root bin
 d usr/xpg4/include 0755 root bin
 f usr/xpg4/include/curses.h 0644 root bin
 f usr/xpg4/include/term.h 0644 root bin
+f usr/xpg4/include/termcap.h 0644 root bin
 f usr/xpg4/include/unctrl.h 0644 root bin
 d usr/xpg4/lib 0755 root bin
 s usr/xpg4/lib/64=amd64

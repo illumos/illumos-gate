@@ -11,8 +11,8 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
-
 
 include		../Makefile.lib
 
@@ -20,6 +20,12 @@ HDRS =		termcap.h
 HDRDIR=		common
 SUBDIRS=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
+
+# Install XPG4v2 header variants so that libtermcap can be used to
+# filter over libcurses(3xcurses).
+XHDRS =		termcap.h
+XROOTHDRDIR=	$(ROOT)/usr/xpg4/include
+XROOTHDRS=	$(XHDRS:%=$(XROOTHDRDIR)/%)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -30,13 +36,15 @@ install :=	TARGET= install
 
 all clean clobber install: $(SUBDIRS)
 
-
-install_h: $(ROOTHDRS)
+install_h: $(ROOTHDRS) $(XROOTHDRS)
 
 check: $(CHECKHDRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(XROOTHDRDIR)/%: $(HDRDIR)/x%
+	$(INS.rename)
 
 FRC:
 
