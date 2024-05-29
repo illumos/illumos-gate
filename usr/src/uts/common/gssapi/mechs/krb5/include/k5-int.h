@@ -2,7 +2,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001, 2003,2006 by the Massachusetts Institute of Technology,
+ * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001, 2003,2006,2009 by the Massachusetts Institute of Technology,
  * Cambridge, MA, USA.  All Rights Reserved.
  *
  * This software is being provided to you, the LICENSEE, by the
@@ -1369,6 +1369,8 @@ krb5int_gic_opt_to_opte(krb5_context context,
 
 krb5_error_code
 krb5int_copy_data_contents (krb5_context, const krb5_data *, krb5_data *);
+krb5_error_code
+krb5int_copy_data_contents_add0 (krb5_context, const krb5_data *, krb5_data *);
 
 #ifndef _KERNEL /* needed for lib/krb5/krb/ */
 typedef krb5_error_code (*krb5_gic_get_as_key_fct)

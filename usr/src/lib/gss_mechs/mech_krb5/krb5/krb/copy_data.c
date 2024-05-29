@@ -1,7 +1,7 @@
 /*
  * lib/krb5/krb/copy_data.c
  *
- * Copyright 1990,1991 by the Massachusetts Institute of Technology.
+ * Copyright 1990,1991,2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -75,6 +75,25 @@ krb5int_copy_data_contents(krb5_context context, const krb5_data *indata, krb5_d
 	memcpy((char *)outdata->data, (char *)indata->data, outdata->length);
     } else
 	outdata->data = 0;
+    outdata->magic = KV5M_DATA;
+
+    return 0;
+}
+
+/* As above, but add an (uncounted) extra byte at the end to
+   null-terminate the data so it can be used as a standard C
+   string.  */
+krb5_error_code
+krb5int_copy_data_contents_add0(krb5_context context, const krb5_data *indata, krb5_data *outdata)
+{
+    if (!indata)
+        return EINVAL;
+    outdata->length = indata->length;
+    if (!(outdata->data = malloc(outdata->length + 1)))
+        return ENOMEM;
+    if (outdata->length)
+        memcpy(outdata->data, indata->data, outdata->length);
+    outdata->data[outdata->length] = 0;
     outdata->magic = KV5M_DATA;
 
     return 0;

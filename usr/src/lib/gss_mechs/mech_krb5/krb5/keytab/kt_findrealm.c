@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -62,7 +64,7 @@ krb5_error_code krb5_kt_find_realm(krb5_context context, krb5_keytab keytab,
 			 * A suitable entry was found in the keytab.
 			 * Copy its realm
 			 */
-			ret = krb5int_copy_data_contents(context,
+			ret = krb5int_copy_data_contents_add0(context,
 			    &ent.principal->realm, realm);
 			if (ret) {
 				krb5_kt_free_entry(context, &ent);
