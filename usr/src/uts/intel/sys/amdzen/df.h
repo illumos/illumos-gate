@@ -419,6 +419,7 @@ typedef enum {
 #define	DF_CFGMAP_BASE_V4_GET_RE(r)	bitx32(r, 0, 0)
 #define	DF_CFGMAP_LIMIT_V4_GET_LIMIT(r)		bitx32(r, 23, 16)
 #define	DF_CFGMAP_LIMIT_V4_GET_DEST_ID(r)	bitx32(r, 11, 0)
+#define	DF_CFGMAP_LIMIT_V4D2_GET_DEST_ID(r)	bitx32(r, 7, 0)
 
 /*
  * DF::X86IOBaseAddress, DF::X86IOLimitAddress -- Base and limit registers for
@@ -431,7 +432,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xc0 + ((x) * 8) }
 /*CSTYLED*/
-#define	DF_IO_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_IO_BASE_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd00 + ((x) * 8) }
 #define	DF_MAX_IO_RULES		8
@@ -460,7 +461,7 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xc4 + ((x) * 8) }
 /*CSTYLED*/
-#define	DF_IO_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+#define	DF_IO_LIMIT_V4(x)	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 0, \
 				.drd_reg = 0xd04 + ((x) * 8) }
 #define	DF_MAX_IO_LIMIT		((1 << 24) - 1)
@@ -477,8 +478,10 @@ typedef enum {
 
 #define	DF_IO_LIMIT_V4_GET_LIMIT(r)	bitx32(r, 28, 16)
 #define	DF_IO_LIMIT_V4_GET_DEST_ID(r)	bitx32(r, 11, 0)
+#define	DF_IO_LIMIT_V4D2_GET_DEST_ID(r)	bitx32(r, 7, 0)
 #define	DF_IO_LIMIT_V4_SET_LIMIT(r, v)		bitset32(r, 28, 16, v)
 #define	DF_IO_LIMIT_V4_SET_DEST_ID(r, v)	bitset32(r, 11, 0, v)
+#define	DF_IO_LIMIT_V4D2_SET_DEST_ID(r, v)	bitset32(r, 7, 0, v)
 
 /*
  * DF::DramHoleControl -- This controls MMIO below 4 GiB. Note, both this and
@@ -605,8 +608,9 @@ typedef enum {
 /*CSTYLED*/
 #define	DF_DRAM_CTL_V4D2(x)	(df_reg_def_t){ .drd_gens = DF_REV_4D2, \
 				.drd_func = 7, \
-				.drd_reg = 0208 + ((x) * 0x10) }
+				.drd_reg = 0x208 + ((x) * 0x10) }
 #define	DF_DRAM_CTL_V4_GET_DEST_ID(r)		bitx32(r, 27, 16)
+#define	DF_DRAM_CTL_V4D2_GET_DEST_ID(r)		bitx32(r, 23, 16)
 #define	DF_DRAM_CTL_V4D2_GET_HASH_1T(r)		bitx32(r, 15, 15)
 /*
  * It seems that this was added in DF V4.1 (no relation to 4D2). It was reserved
@@ -795,8 +799,10 @@ typedef enum {
 #define	DF_MMIO_CTL_V3P5_SET_DEST_ID(r, v)	bitset32(r, 7, 4, v)
 
 #define	DF_MMIO_CTL_V4_GET_DEST_ID(r)	bitx32(r, 27, 16)
+#define	DF_MMIO_CTL_V4D2_GET_DEST_ID(r)	bitx32(r, 23, 16)
 #define	DF_MMIO_CTL_V4_GET_NP(r)	bitx32(r, 3, 3)
 #define	DF_MMIO_CTL_V4_SET_DEST_ID(r, v)	bitset32(r, 27, 16, v)
+#define	DF_MMIO_CTL_V4D2_SET_DEST_ID(r, v)	bitset32(r, 23, 16, v)
 #define	DF_MMIO_CTL_V4_SET_NP(r, v)		bitset32(r, 3, 3, v)
 
 #define	DF_MMIO_CTL_GET_CPU_DIS(r)	bitx32(r, 2, 2)
