@@ -115,6 +115,7 @@ static krb5_enctype pre_w2k8enctypes[] = {
 #define	SMB_ADS_ATTR_UPN	"userPrincipalName"
 #define	SMB_ADS_ATTR_SPN	"servicePrincipalName"
 #define	SMB_ADS_ATTR_CTL	"userAccountControl"
+#define	SMB_ADS_ATTR_UCPWD	"unicodePwd"
 #define	SMB_ADS_ATTR_DNSHOST	"dNSHostName"
 #define	SMB_ADS_ATTR_KVNO	"msDS-KeyVersionNumber"
 #define	SMB_ADS_ATTR_DN		"distinguishedName"
@@ -1688,6 +1689,71 @@ smb_ads_find_computer(smb_ads_handle_t *ah, char *dn)
 }
 
 /*
+ * Set a machine account password using LDAP
+ *
+ * Compose the funky unicode password string per
+ * [MS-ADTS] 3.1.1.3.1.5.1 unicodePwd
+ * which includes literal double quotes.
+ */
+static int
+smb_ads_update_acct_passwd(smb_ads_handle_t *ah, char *passwd, char *dn)
+{
+	LDAPMod *attrs[2];
+	struct berval *bvp[2];
+	struct berval bval;
+	char *qpass_buf = NULL;		/* quoted password */
+	int qpass_len = 0;
+	smb_wchar_t *ucpwd_buf = NULL;	/* unicode pw */
+	int ucpwd_len = 0;		/* length in bytes */
+	int ret = 0;
+
+	if (smb_ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0)
+		return (LDAP_NO_MEMORY);
+
+	qpass_len = asprintf(&qpass_buf, "\"%s\"", passwd);
+	if (qpass_len < 0) {
+		qpass_len = 0;
+		ret = LDAP_NO_MEMORY;
+		goto out;
+	}
+
+	/*
+	 * Allocate and fill Unicode passwd buffer.
+	 * Size to include a smb_wchar_t null termination.
+	 */
+	ucpwd_len = smb_wcequiv_strlen(qpass_buf);
+	ucpwd_buf = calloc(1, ucpwd_len + sizeof (smb_wchar_t));
+	if (ucpwd_buf == NULL) {
+		ret = LDAP_NO_MEMORY;
+		goto out;
+	}
+	ret = smb_mbstowcs(ucpwd_buf, qpass_buf, ucpwd_len / 2);
+	if (ret < 0) {
+		ret = LDAP_ENCODING_ERROR;
+		goto out;
+	}
+
+	bval.bv_val = (char *)ucpwd_buf;
+	bval.bv_len = ucpwd_len;
+	bvp[0] = &bval;
+	bvp[1] = NULL;
+
+	attrs[0]->mod_op = LDAP_MOD_REPLACE | LDAP_MOD_BVALUES;
+	attrs[0]->mod_type = SMB_ADS_ATTR_UCPWD;
+	attrs[0]->mod_bvalues = bvp;
+
+	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
+		syslog(LOG_NOTICE, "ldap_modify: %s", ldap_err2string(ret));
+	}
+
+out:
+	freezero(ucpwd_buf, ucpwd_len);
+	freezero(qpass_buf, qpass_len);
+	smb_ads_free_attr(attrs);
+	return (ret);
+}
+
+/*
  * smb_ads_update_computer_cntrl_attr
  *
  * Modify the user account control attribute of an existing computer
@@ -1743,6 +1809,9 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
 
 	return (kvno);
 }
+
+/* Available as a work-around if smb_ads_update_acct_passwd fails */
+boolean_t smbns_ads_try_kpasswd = 0;
 
 /*
  * smb_ads_join
@@ -1859,7 +1928,10 @@ smb_ads_join(char *domain, char *container,
 	smb_krb5_free_pn_set(&spns);
 
 	/* New machine_passwd was filled in by our caller. */
-	if (smb_krb5_setpwd(ctx, ah->domain, machine_passwd) != 0) {
+	x = smb_ads_update_acct_passwd(ah, machine_passwd, dn);
+	if (x != 0 && smbns_ads_try_kpasswd)
+		x = smb_krb5_setpwd(ctx, ah->domain, machine_passwd);
+	if (x != 0) {
 		rc = SMB_ADJOIN_ERR_KSETPWD;
 		goto adjoin_cleanup;
 	}
