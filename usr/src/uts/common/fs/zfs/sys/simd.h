@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SIMD_H
@@ -25,6 +26,7 @@
 #ifdef _KERNEL
 #include <sys/x86_archext.h>
 #include <sys/archsystm.h>
+#include <sys/systm.h>
 #include <sys/kfpu.h>
 #include <sys/proc.h>
 #include <sys/disp.h>
@@ -34,6 +36,14 @@ static inline int
 kfpu_allowed(void)
 {
 	extern int zfs_fpu_enabled;
+
+	/*
+	 * When panicking, play it safe and avoid kfpu use. This gives the best
+	 * chance of being able to dump successfully, particularly if the panic
+	 * occured around an FPU context switch.
+	 */
+	if (panicstr != NULL)
+		return (0);
 
 	return (zfs_fpu_enabled != 0 ? 1 : 0);
 }
