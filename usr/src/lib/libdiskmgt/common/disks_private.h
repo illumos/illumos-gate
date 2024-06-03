@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2024 Sebastian Wiedenroth
  */
 
 #ifndef _DISKS_PRIVATE_H
@@ -112,6 +113,7 @@ typedef struct disk {
 	int		wide;
 	int		cd_rom;
 	int		solid_state;
+	char		*serial;
 } disk_t;
 
 typedef struct descriptor {

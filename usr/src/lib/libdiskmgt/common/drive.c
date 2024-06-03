@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2024 Sebastian Wiedenroth
  */
 
 #include <fcntl.h>
@@ -368,13 +369,13 @@ drive_get_assoc_descriptors(descriptor_t *dp, dm_desc_type_t type,
 {
 	switch (type) {
 	case DM_CONTROLLER:
-	    return (get_assoc_controllers(dp, errp));
+		return (get_assoc_controllers(dp, errp));
 	case DM_PATH:
-	    return (get_assoc_paths(dp, errp));
+		return (get_assoc_paths(dp, errp));
 	case DM_ALIAS:
-	    return (get_assoc_alias(dp->p.disk, errp));
+		return (get_assoc_alias(dp->p.disk, errp));
 	case DM_MEDIA:
-	    return (media_get_assocs(dp, errp));
+		return (media_get_assocs(dp, errp));
 	}
 
 	*errp = EINVAL;
@@ -393,14 +394,14 @@ drive_get_assocs(descriptor_t *desc, int *errp)
 
 	drives = (descriptor_t **)calloc(2, sizeof (descriptor_t *));
 	if (drives == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	drives[0] = cache_get_desc(DM_DRIVE, desc->p.disk, NULL, NULL, errp);
 	if (*errp != 0) {
-	    cache_free_descriptors(drives);
-	    return (NULL);
+		cache_free_descriptors(drives);
+		return (NULL);
 	}
 
 	drives[1] = NULL;
@@ -416,20 +417,20 @@ drive_get_attributes(descriptor_t *dp, int *errp)
 	char		opath[MAXPATHLEN];
 
 	if (nvlist_alloc(&attrs, NVATTRS, 0) != 0) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	opath[0] = 0;
 	fd = drive_open_disk(dp->p.disk, opath, sizeof (opath));
 
 	if ((*errp = get_attrs(dp->p.disk, fd, opath, attrs)) != 0) {
-	    nvlist_free(attrs);
-	    attrs = NULL;
+		nvlist_free(attrs);
+		attrs = NULL;
 	}
 
 	if (fd >= 0) {
-	    (void) close(fd);
+		(void) close(fd);
 	}
 
 	return (attrs);
@@ -451,14 +452,14 @@ drive_get_descriptor_by_name(char *name, int *errp)
 	int		i;
 
 	if (name == NULL || devid_str_decode(name, &devid, NULL) != 0) {
-	    *errp = EINVAL;
-	    return (NULL);
+		*errp = EINVAL;
+		return (NULL);
 	}
 
 	drives = cache_get_descriptors(DM_DRIVE, errp);
 	if (*errp != 0) {
-	    devid_free(devid);
-	    return (NULL);
+		devid_free(devid);
+		return (NULL);
 	}
 
 	/*
@@ -466,20 +467,19 @@ drive_get_descriptor_by_name(char *name, int *errp)
 	 * want.  Once drive is set, we don't need to compare any more.
 	 */
 	for (i = 0; drives[i]; i++) {
-	    if (drive == NULL && drives[i]->p.disk->devid != NULL &&
-		devid_compare(devid, drives[i]->p.disk->devid) == 0) {
-		drive = drives[i];
-
-	    } else {
-		/* clean up the unused descriptor */
-		cache_free_descriptor(drives[i]);
-	    }
+		if (drive == NULL && drives[i]->p.disk->devid != NULL &&
+		    devid_compare(devid, drives[i]->p.disk->devid) == 0) {
+			drive = drives[i];
+		} else {
+			/* clean up the unused descriptor */
+			cache_free_descriptor(drives[i]);
+		}
 	}
 	free(drives);
 	devid_free(devid);
 
 	if (drive == NULL) {
-	    *errp = ENODEV;
+		*errp = ENODEV;
 	}
 
 	return (drive);
@@ -492,17 +492,17 @@ drive_get_descriptors(int filter[], int *errp)
 
 	drives = cache_get_descriptors(DM_DRIVE, errp);
 	if (*errp != 0) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	if (filter != NULL && filter[0] != DM_FILTER_END) {
-	    descriptor_t	**found;
-	    found = apply_filter(drives, filter, errp);
-	    if (*errp != 0) {
-		drives = NULL;
-	    } else {
-		drives = found;
-	    }
+		descriptor_t	**found;
+		found = apply_filter(drives, filter, errp);
+		if (*errp != 0) {
+			drives = NULL;
+		} else {
+			drives = found;
+		}
 	}
 
 	return (drives);
@@ -523,85 +523,87 @@ drive_get_stats(descriptor_t *dp, int stat_type, int *errp)
 	diskp = dp->p.disk;
 
 	if (nvlist_alloc(&stats, NVATTRS, 0) != 0) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	if (stat_type == DM_DRV_STAT_PERFORMANCE ||
 	    stat_type == DM_DRV_STAT_DIAGNOSTIC) {
 
-	    alias_t	*ap;
-	    kstat_ctl_t	*kc;
+		alias_t	*ap;
+		kstat_ctl_t	*kc;
 
-	    ap = diskp->aliases;
-	    if (ap == NULL || ap->kstat_name == NULL) {
-		nvlist_free(stats);
-		*errp = EACCES;
-		return (NULL);
-	    }
-
-	    if ((kc = kstat_open()) == NULL) {
-		nvlist_free(stats);
-		*errp = EACCES;
-		return (NULL);
-	    }
-
-	    while (ap != NULL) {
-		int	status;
-
-		if (ap->kstat_name == NULL) {
-		    continue;
+		ap = diskp->aliases;
+		if (ap == NULL || ap->kstat_name == NULL) {
+			nvlist_free(stats);
+			*errp = EACCES;
+			return (NULL);
 		}
 
-		if (stat_type == DM_DRV_STAT_PERFORMANCE) {
-		    status = get_io_kstats(kc, ap->kstat_name, stats);
-		} else {
-		    status = get_err_kstats(kc, ap->kstat_name, stats);
+		if ((kc = kstat_open()) == NULL) {
+			nvlist_free(stats);
+			*errp = EACCES;
+			return (NULL);
 		}
 
-		if (status != 0) {
-		    nvlist_free(stats);
-		    (void) kstat_close(kc);
-		    *errp = ENOMEM;
-		    return (NULL);
+		while (ap != NULL) {
+			int	status;
+
+			if (ap->kstat_name == NULL) {
+				continue;
+			}
+
+			if (stat_type == DM_DRV_STAT_PERFORMANCE) {
+				status = get_io_kstats(kc, ap->kstat_name,
+				    stats);
+			} else {
+				status = get_err_kstats(kc, ap->kstat_name,
+				    stats);
+			}
+
+			if (status != 0) {
+				nvlist_free(stats);
+				(void) kstat_close(kc);
+				*errp = ENOMEM;
+				return (NULL);
+			}
+
+			ap = ap->next;
 		}
 
-		ap = ap->next;
-	    }
+		(void) kstat_close(kc);
 
-	    (void) kstat_close(kc);
-
-	    *errp = 0;
-	    return (stats);
+		*errp = 0;
+		return (stats);
 	}
 
 	if (stat_type == DM_DRV_STAT_TEMPERATURE) {
-	    int		fd;
+		int		fd;
 
-	    if ((fd = drive_open_disk(diskp, NULL, 0)) >= 0) {
-		struct dk_temperature	temp;
+		if ((fd = drive_open_disk(diskp, NULL, 0)) >= 0) {
+			struct dk_temperature	temp;
 
-		if (ioctl(fd, DKIOCGTEMPERATURE, &temp) >= 0) {
-		    if (nvlist_add_uint32(stats, DM_TEMPERATURE,
-			temp.dkt_cur_temp) != 0) {
-			*errp = ENOMEM;
+			if (ioctl(fd, DKIOCGTEMPERATURE, &temp) >= 0) {
+				if (nvlist_add_uint32(stats, DM_TEMPERATURE,
+				    temp.dkt_cur_temp) != 0) {
+					*errp = ENOMEM;
+					nvlist_free(stats);
+					return (NULL);
+				}
+			} else {
+				*errp = errno;
+				nvlist_free(stats);
+				return (NULL);
+			}
+			(void) close(fd);
+		} else {
+			*errp = errno;
 			nvlist_free(stats);
 			return (NULL);
-		    }
-		} else {
-		    *errp = errno;
-		    nvlist_free(stats);
-		    return (NULL);
 		}
-		(void) close(fd);
-	    } else {
-		*errp = errno;
-		nvlist_free(stats);
-		return (NULL);
-	    }
 
-	    *errp = 0;
-	    return (stats);
+		*errp = 0;
+		return (stats);
 	}
 
 	nvlist_free(stats);
@@ -617,11 +619,11 @@ drive_make_descriptors()
 
 	dp = cache_get_disklist();
 	while (dp != NULL) {
-	    cache_load_desc(DM_DRIVE, dp, NULL, NULL, &error);
-	    if (error != 0) {
-		return (error);
-	    }
-	    dp = dp->next;
+		cache_load_desc(DM_DRIVE, dp, NULL, NULL, &error);
+		if (error != 0) {
+			return (error);
+		}
+		dp = dp->next;
 	}
 
 	return (0);
@@ -637,10 +639,11 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 	 * Just open the first devpath.
 	 */
 	if (diskp->aliases != NULL && diskp->aliases->devpaths != NULL) {
-	    if (opath != NULL) {
-		(void) strlcpy(opath, diskp->aliases->devpaths->devpath, len);
-	    }
-	    return (open(diskp->aliases->devpaths->devpath, O_RDONLY|O_NDELAY));
+		char *devpath = diskp->aliases->devpaths->devpath;
+		if (opath != NULL) {
+			(void) strlcpy(opath, devpath, len);
+		}
+		return (open(devpath, O_RDONLY | O_NDELAY));
 	}
 
 	return (-1);
@@ -655,35 +658,36 @@ apply_filter(descriptor_t **drives, int filter[], int *errp)
 	int		pos;
 
 	/* count the number of drives in the snapshot */
-	for (cnt = 0; drives[cnt]; cnt++);
+	for (cnt = 0; drives[cnt]; cnt++)
+		;
 
 	found = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t *));
 	if (found == NULL) {
-	    *errp = ENOMEM;
-	    cache_free_descriptors(drives);
-	    return (NULL);
+		*errp = ENOMEM;
+		cache_free_descriptors(drives);
+		return (NULL);
 	}
 
 	pos = 0;
 	for (i = 0; drives[i]; i++) {
-	    int j;
-	    int match;
+		int j;
+		int match;
 
-	    /* Make sure the drive type is set */
-	    get_drive_type(drives[i]->p.disk, -1);
+		/* Make sure the drive type is set */
+		get_drive_type(drives[i]->p.disk, -1);
 
-	    match = 0;
-	    for (j = 0; filter[j] != DM_FILTER_END; j++) {
-		if (drives[i]->p.disk->drv_type == filter[j]) {
-		    found[pos++] = drives[i];
-		    match = 1;
-		    break;
+		match = 0;
+		for (j = 0; filter[j] != DM_FILTER_END; j++) {
+			if (drives[i]->p.disk->drv_type == filter[j]) {
+				found[pos++] = drives[i];
+				match = 1;
+				break;
+			}
 		}
-	    }
 
-	    if (!match) {
-		cache_free_descriptor(drives[i]);
-	    }
+		if (!match) {
+			cache_free_descriptor(drives[i]);
+		}
 	}
 	found[pos] = NULL;
 	free(drives);
@@ -697,35 +701,35 @@ conv_drive_type(uint_t drive_type)
 {
 	switch (drive_type) {
 	case DK_UNKNOWN:
-	    return (DM_DT_UNKNOWN);
+		return (DM_DT_UNKNOWN);
 	case DK_MO_ERASABLE:
-	    return (DM_DT_MO_ERASABLE);
+		return (DM_DT_MO_ERASABLE);
 	case DK_MO_WRITEONCE:
-	    return (DM_DT_MO_WRITEONCE);
+		return (DM_DT_MO_WRITEONCE);
 	case DK_AS_MO:
-	    return (DM_DT_AS_MO);
+		return (DM_DT_AS_MO);
 	case DK_CDROM:
-	    return (DM_DT_CDROM);
+		return (DM_DT_CDROM);
 	case DK_CDR:
-	    return (DM_DT_CDR);
+		return (DM_DT_CDR);
 	case DK_CDRW:
-	    return (DM_DT_CDRW);
+		return (DM_DT_CDRW);
 	case DK_DVDROM:
-	    return (DM_DT_DVDROM);
+		return (DM_DT_DVDROM);
 	case DK_DVDR:
-	    return (DM_DT_DVDR);
+		return (DM_DT_DVDR);
 	case DK_DVDRAM:
-	    return (DM_DT_DVDRAM);
+		return (DM_DT_DVDRAM);
 	case DK_FIXED_DISK:
-	    return (DM_DT_FIXED);
+		return (DM_DT_FIXED);
 	case DK_FLOPPY:
-	    return (DM_DT_FLOPPY);
+		return (DM_DT_FLOPPY);
 	case DK_ZIP:
-	    return (DM_DT_ZIP);
+		return (DM_DT_ZIP);
 	case DK_JAZ:
-	    return (DM_DT_JAZ);
+		return (DM_DT_JAZ);
 	default:
-	    return (DM_DT_UNKNOWN);
+		return (DM_DT_UNKNOWN);
 	}
 }
 
@@ -743,32 +747,32 @@ get_assoc_alias(disk_t *diskp, int *errp)
 	cnt = 0;
 
 	while (aliasp != NULL) {
-	    if (aliasp->alias != NULL) {
-		cnt++;
-	    }
-	    aliasp = aliasp->next;
+		if (aliasp->alias != NULL) {
+			cnt++;
+		}
+		aliasp = aliasp->next;
 	}
 
 	/* set up the new array */
 	out_array = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t));
 	if (out_array == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	aliasp = diskp->aliases;
 	pos = 0;
 	while (aliasp != NULL) {
-	    if (aliasp->alias != NULL) {
-		out_array[pos++] = cache_get_desc(DM_ALIAS, diskp,
-		    aliasp->alias, NULL, errp);
-		if (*errp != 0) {
-		    cache_free_descriptors(out_array);
-		    return (NULL);
+		if (aliasp->alias != NULL) {
+			out_array[pos++] = cache_get_desc(DM_ALIAS, diskp,
+			    aliasp->alias, NULL, errp);
+			if (*errp != 0) {
+				cache_free_descriptors(out_array);
+				return (NULL);
+			}
 		}
-	    }
 
-	    aliasp = aliasp->next;
+		aliasp = aliasp->next;
 	}
 
 	out_array[pos] = NULL;
@@ -787,22 +791,23 @@ get_assoc_controllers(descriptor_t *dp, int *errp)
 	diskp = dp->p.disk;
 
 	/* Count how many we have. */
-	for (cnt = 0; diskp->controllers[cnt]; cnt++);
+	for (cnt = 0; diskp->controllers[cnt]; cnt++)
+		;
 
 	/* make the snapshot */
 	controllers = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t *));
 	if (controllers == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	for (i = 0; diskp->controllers[i]; i++) {
-	    controllers[i] = cache_get_desc(DM_CONTROLLER,
-		diskp->controllers[i], NULL, NULL, errp);
-	    if (*errp != 0) {
-		cache_free_descriptors(controllers);
-		return (NULL);
-	    }
+		controllers[i] = cache_get_desc(DM_CONTROLLER,
+		    diskp->controllers[i], NULL, NULL, errp);
+		if (*errp != 0) {
+			cache_free_descriptors(controllers);
+			return (NULL);
+		}
 	}
 
 	controllers[i] = NULL;
@@ -824,14 +829,15 @@ get_assoc_paths(descriptor_t *dp, int *errp)
 	/* Count how many we have. */
 	cnt = 0;
 	if (pp != NULL) {
-	    for (; pp[cnt]; cnt++);
+		for (; pp[cnt]; cnt++)
+			;
 	}
 
 	/* make the snapshot */
 	paths = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t *));
 	if (paths == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	/*
@@ -841,12 +847,12 @@ get_assoc_paths(descriptor_t *dp, int *errp)
 	 * lookup the path state for this drive.
 	 */
 	for (i = 0; i < cnt; i++) {
-	    paths[i] = cache_get_desc(DM_PATH, pp[i], dp->p.disk->device_id,
-		NULL, errp);
-	    if (*errp != 0) {
-		cache_free_descriptors(paths);
-		return (NULL);
-	    }
+		paths[i] = cache_get_desc(DM_PATH, pp[i], dp->p.disk->device_id,
+		    NULL, errp);
+		if (*errp != 0) {
+			cache_free_descriptors(paths);
+			return (NULL);
+		}
 	}
 
 	paths[i] = NULL;
@@ -859,86 +865,96 @@ static int
 get_attrs(disk_t *diskp, int fd, char *opath, nvlist_t *attrs)
 {
 	if (diskp->removable) {
-	    struct dk_minfo	minfo;
+		struct dk_minfo	minfo;
 
-	    if (nvlist_add_boolean(attrs, DM_REMOVABLE) != 0) {
-		return (ENOMEM);
-	    }
-
-	    /* Make sure media is inserted and spun up. */
-	    if (fd >= 0 && media_read_info(fd, &minfo)) {
-		if (nvlist_add_boolean(attrs, DM_LOADED) != 0) {
-		    return (ENOMEM);
+		if (nvlist_add_boolean(attrs, DM_REMOVABLE) != 0) {
+			return (ENOMEM);
 		}
-	    }
 
-	    /* can't tell diff between dead & no media on removable drives */
-	    if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_UP) != 0) {
-		return (ENOMEM);
-	    }
+		/* Make sure media is inserted and spun up. */
+		if (fd >= 0 && media_read_info(fd, &minfo)) {
+			if (nvlist_add_boolean(attrs, DM_LOADED) != 0) {
+				return (ENOMEM);
+			}
+		}
 
-	    get_drive_type(diskp, fd);
+		/*
+		 * can't tell diff between dead & no media on removable drives
+		 */
+		if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_UP) != 0) {
+			return (ENOMEM);
+		}
+
+		get_drive_type(diskp, fd);
 
 	} else {
-	    struct dk_minfo	minfo;
+		struct dk_minfo	minfo;
 
-	    /* check if the fixed drive is up or not */
-	    if (fd >= 0 && media_read_info(fd, &minfo)) {
-		if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_UP) != 0) {
-		    return (ENOMEM);
+		/* check if the fixed drive is up or not */
+		if (fd >= 0 && media_read_info(fd, &minfo)) {
+			if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_UP)
+			    != 0) {
+				return (ENOMEM);
 		}
-	    } else {
-		if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_DOWN) != 0) {
-		    return (ENOMEM);
+		} else {
+			if (nvlist_add_uint32(attrs, DM_STATUS, DM_DISK_DOWN)
+			    != 0) {
+				return (ENOMEM);
+			}
 		}
-	    }
 
-	    get_drive_type(diskp, fd);
+		get_drive_type(diskp, fd);
 	}
 
 	if (nvlist_add_uint32(attrs, DM_DRVTYPE, diskp->drv_type) != 0) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	if (diskp->product_id != NULL) {
-	    if (nvlist_add_string(attrs, DM_PRODUCT_ID, diskp->product_id)
-		!= 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_string(attrs, DM_PRODUCT_ID, diskp->product_id)
+		    != 0) {
+			return (ENOMEM);
+		}
 	}
 	if (diskp->vendor_id != NULL) {
-	    if (nvlist_add_string(attrs, DM_VENDOR_ID, diskp->vendor_id) != 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_string(attrs, DM_VENDOR_ID, diskp->vendor_id)
+		    != 0) {
+			return (ENOMEM);
+		}
+	}
+	if (diskp->serial != NULL) {
+		if (nvlist_add_string(attrs, DM_SERIAL, diskp->serial) != 0) {
+			return (ENOMEM);
+		}
 	}
 
 	if (diskp->sync_speed != -1) {
-	    if (nvlist_add_uint32(attrs, DM_SYNC_SPEED, diskp->sync_speed)
-		!= 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_uint32(attrs, DM_SYNC_SPEED, diskp->sync_speed)
+		    != 0) {
+			return (ENOMEM);
+		}
 	}
 
 	if (diskp->wide == 1) {
-	    if (nvlist_add_boolean(attrs, DM_WIDE) != 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_boolean(attrs, DM_WIDE) != 0) {
+			return (ENOMEM);
+		}
 	}
 
 	if (diskp->rpm == 0) {
-	    diskp->rpm = get_rpm(diskp, fd);
+		diskp->rpm = get_rpm(diskp, fd);
 	}
 
 	if (diskp->rpm > 0) {
-	    if (nvlist_add_uint32(attrs, DM_RPM, diskp->rpm) != 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_uint32(attrs, DM_RPM, diskp->rpm) != 0) {
+			return (ENOMEM);
+		}
 	}
 
 	if (strlen(opath) > 0) {
-	    if (nvlist_add_string(attrs, DM_OPATH, opath) != 0) {
-		return (ENOMEM);
-	    }
+		if (nvlist_add_string(attrs, DM_OPATH, opath) != 0) {
+			return (ENOMEM);
+		}
 	}
 
 	if (diskp->solid_state < 0) {
@@ -956,7 +972,7 @@ get_attrs(disk_t *diskp, int fd, char *opath, nvlist_t *attrs)
 
 static int
 get_disk_kstats(kstat_ctl_t *kc, char *diskname, char *classname,
-	nvlist_t *stats)
+    nvlist_t *stats)
 {
 	kstat_t		*ksp;
 	size_t		class_len;
@@ -964,23 +980,25 @@ get_disk_kstats(kstat_ctl_t *kc, char *diskname, char *classname,
 
 	class_len = strlen(classname);
 	for (ksp = kc->kc_chain; ksp; ksp = ksp->ks_next) {
-	    if (strncmp(ksp->ks_class, classname, class_len) == 0) {
-		char	kstat_name[KSTAT_STRLEN];
-		char	*dname = kstat_name;
-		char	*ename = ksp->ks_name;
+		if (strncmp(ksp->ks_class, classname, class_len) == 0) {
+			char	kstat_name[KSTAT_STRLEN];
+			char	*dname = kstat_name;
+			char	*ename = ksp->ks_name;
 
-		/* names are format: "sd0,err" - copy chars up to comma */
-		while (*ename && *ename != ',') {
-		    *dname++ = *ename++;
-		}
-		*dname = '\0';
+			/*
+			 * names are format: "sd0,err" - copy chars up to comma
+			 */
+			while (*ename && *ename != ',') {
+				*dname++ = *ename++;
+			}
+			*dname = '\0';
 
-		if (libdiskmgt_str_eq(diskname, kstat_name)) {
-		    (void) kstat_read(kc, ksp, NULL);
-		    err = get_kstat_vals(ksp, stats);
-		    break;
+			if (libdiskmgt_str_eq(diskname, kstat_name)) {
+				(void) kstat_read(kc, ksp, NULL);
+				err = get_kstat_vals(ksp, stats);
+				break;
+			}
 		}
-	    }
 	}
 
 	return (err);
@@ -996,42 +1014,43 @@ static void
 get_drive_type(disk_t *dp, int fd)
 {
 	if (dp->drv_type == DM_DT_UNKNOWN) {
-	    int	opened_here = 0;
+		int	opened_here = 0;
 
-	    /* We may have already opened the device. */
-	    if (fd < 0) {
-		fd = drive_open_disk(dp, NULL, 0);
-		opened_here = 1;
-	    }
+		/* We may have already opened the device. */
+		if (fd < 0) {
+			fd = drive_open_disk(dp, NULL, 0);
+			opened_here = 1;
+		}
 
-	    if (fd >= 0) {
-		if (dp->cd_rom) {
-		    /* use uscsi to determine drive type */
-		    dp->drv_type = get_cdrom_drvtype(fd);
+		if (fd >= 0) {
+			if (dp->cd_rom) {
+				/* use uscsi to determine drive type */
+				dp->drv_type = get_cdrom_drvtype(fd);
 
-		    /* if uscsi fails, just call it a cd-rom */
-		    if (dp->drv_type == DM_DT_UNKNOWN) {
-			dp->drv_type = DM_DT_CDROM;
-		    }
+				/* if uscsi fails, just call it a cd-rom */
+				if (dp->drv_type == DM_DT_UNKNOWN) {
+					dp->drv_type = DM_DT_CDROM;
+				}
+
+			} else {
+				struct dk_minfo	minfo;
+
+				if (media_read_info(fd, &minfo)) {
+					dp->drv_type = conv_drive_type(
+					    minfo.dki_media_type);
+				}
+			}
+
+			if (opened_here) {
+				(void) close(fd);
+			}
 
 		} else {
-		    struct dk_minfo	minfo;
-
-		    if (media_read_info(fd, &minfo)) {
-			dp->drv_type = conv_drive_type(minfo.dki_media_type);
-		    }
+			/* couldn't open */
+			if (dp->cd_rom) {
+				dp->drv_type = DM_DT_CDROM;
+			}
 		}
-
-		if (opened_here) {
-		    (void) close(fd);
-		}
-
-	    } else {
-		/* couldn't open */
-		if (dp->cd_rom) {
-		    dp->drv_type = DM_DT_CDROM;
-		}
-	    }
 	}
 }
 
@@ -1041,9 +1060,9 @@ get_err_attr_name(char *kstat_name)
 	int	i;
 
 	for (i = 0; kstat_err_names[i] != NULL; i++) {
-	    if (libdiskmgt_str_eq(kstat_name, kstat_err_names[i])) {
-		return (err_attr_names[i]);
-	    }
+		if (libdiskmgt_str_eq(kstat_name, kstat_err_names[i])) {
+			return (err_attr_names[i]);
+		}
 	}
 
 	return (NULL);
@@ -1065,54 +1084,57 @@ static int
 get_kstat_vals(kstat_t *ksp, nvlist_t *stats)
 {
 	if (ksp->ks_type == KSTAT_TYPE_IO) {
-	    kstat_io_t *kiop;
+		kstat_io_t *kiop;
 
-	    kiop = KSTAT_IO_PTR(ksp);
+		kiop = KSTAT_IO_PTR(ksp);
 
-	    /* see sys/kstat.h kstat_io_t struct for more fields */
+		/* see sys/kstat.h kstat_io_t struct for more fields */
 
-	    if (update_stat64(stats, DM_NBYTESREAD, kiop->nread) != 0) {
-		return (ENOMEM);
-	    }
-	    if (update_stat64(stats, DM_NBYTESWRITTEN, kiop->nwritten) != 0) {
-		return (ENOMEM);
-	    }
-	    if (update_stat64(stats, DM_NREADOPS, kiop->reads) != 0) {
-		return (ENOMEM);
-	    }
-	    if (update_stat64(stats, DM_NWRITEOPS, kiop->writes) != 0) {
-		return (ENOMEM);
-	    }
+		if (update_stat64(stats, DM_NBYTESREAD, kiop->nread) != 0) {
+			return (ENOMEM);
+		}
+		if (update_stat64(stats, DM_NBYTESWRITTEN, kiop->nwritten)
+		    != 0) {
+			return (ENOMEM);
+		}
+		if (update_stat64(stats, DM_NREADOPS, kiop->reads) != 0) {
+			return (ENOMEM);
+		}
+		if (update_stat64(stats, DM_NWRITEOPS, kiop->writes) != 0) {
+			return (ENOMEM);
+		}
 
 	} else if (ksp->ks_type == KSTAT_TYPE_NAMED) {
-	    kstat_named_t *knp;
-	    int		i;
+		kstat_named_t *knp;
+		int		i;
 
-	    knp = KSTAT_NAMED_PTR(ksp);
-	    for (i = 0; i < ksp->ks_ndata; i++) {
-		char	*attr_name;
+		knp = KSTAT_NAMED_PTR(ksp);
+		for (i = 0; i < ksp->ks_ndata; i++) {
+			char	*attr_name;
 
-		if (knp[i].name[0] == 0)
-		    continue;
+			if (knp[i].name[0] == 0)
+				continue;
 
-		if ((attr_name = get_err_attr_name(knp[i].name)) == NULL) {
-		    continue;
+			if ((attr_name = get_err_attr_name(knp[i].name))
+			    == NULL) {
+				continue;
+			}
 
+			switch (knp[i].data_type) {
+			case KSTAT_DATA_UINT32:
+				if (update_stat32(stats, attr_name,
+				    knp[i].value.ui32) != 0) {
+					return (ENOMEM);
+				}
+				break;
+
+			default:
+				/*
+				 * Right now all of the error types are uint32
+				 */
+				break;
+			}
 		}
-
-		switch (knp[i].data_type) {
-		case KSTAT_DATA_UINT32:
-		    if (update_stat32(stats, attr_name, knp[i].value.ui32)
-			!= 0) {
-			return (ENOMEM);
-		    }
-		    break;
-
-		default:
-		    /* Right now all of the error types are uint32 */
-		    break;
-		}
-	    }
 	}
 	return (0);
 }
@@ -1123,7 +1145,7 @@ update_stat32(nvlist_t *stats, char *attr, uint32_t value)
 	int32_t	currval;
 
 	if (nvlist_lookup_int32(stats, attr, &currval) == 0) {
-	    value += currval;
+		value += currval;
 	}
 
 	return (nvlist_add_uint32(stats, attr, value));
@@ -1141,7 +1163,7 @@ update_stat64(nvlist_t *stats, char *attr, uint64_t value)
 	int64_t	currval;
 
 	if (nvlist_lookup_int64(stats, attr, &currval) == 0) {
-	    value += currval;
+		value += currval;
 	}
 	return (nvlist_add_uint64(stats, attr, value));
 }
@@ -1157,49 +1179,49 @@ get_rpm(disk_t *dp, int fd)
 
 	/* We may have already opened the device. */
 	if (fd < 0) {
-	    fd = drive_open_disk(dp, NULL, 0);
-	    opened_here = 1;
+		fd = drive_open_disk(dp, NULL, 0);
+		opened_here = 1;
 	}
 
 	if (fd >= 0) {
-	    int				status;
-	    struct mode_geometry	*page4;
-	    struct scsi_ms_header	header;
-	    union {
-		struct mode_geometry	page4;
-		char			rawbuf[MAX_MODE_SENSE_SIZE];
-	    } u_page4;
+		int				status;
+		struct mode_geometry	*page4;
+		struct scsi_ms_header	header;
+		union {
+			struct mode_geometry	page4;
+			char			rawbuf[MAX_MODE_SENSE_SIZE];
+		} u_page4;
 
-	    page4 = &u_page4.page4;
-	    (void) memset(&u_page4, 0, sizeof (u_page4));
+		page4 = &u_page4.page4;
+		(void) memset(&u_page4, 0, sizeof (u_page4));
 
-	    status = uscsi_mode_sense(fd, DAD_MODE_GEOMETRY,
-		MODE_SENSE_PC_DEFAULT, (caddr_t)page4, MAX_MODE_SENSE_SIZE,
-		&header);
-
-	    if (status) {
 		status = uscsi_mode_sense(fd, DAD_MODE_GEOMETRY,
-		    MODE_SENSE_PC_SAVED, (caddr_t)page4, MAX_MODE_SENSE_SIZE,
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page4, MAX_MODE_SENSE_SIZE,
 		    &header);
-	    }
 
-	    if (status) {
-		status = uscsi_mode_sense(fd, DAD_MODE_GEOMETRY,
-		    MODE_SENSE_PC_CURRENT, (caddr_t)page4, MAX_MODE_SENSE_SIZE,
-		    &header);
-	    }
+		if (status) {
+			status = uscsi_mode_sense(fd, DAD_MODE_GEOMETRY,
+			    MODE_SENSE_PC_SAVED, (caddr_t)page4,
+			    MAX_MODE_SENSE_SIZE, &header);
+		}
 
-	    if (!status) {
+		if (status) {
+			status = uscsi_mode_sense(fd, DAD_MODE_GEOMETRY,
+			    MODE_SENSE_PC_CURRENT, (caddr_t)page4,
+			    MAX_MODE_SENSE_SIZE, &header);
+		}
+
+		if (!status) {
 #ifdef _LITTLE_ENDIAN
-		page4->rpm = ntohs(page4->rpm);
+			page4->rpm = ntohs(page4->rpm);
 #endif /* _LITTLE_ENDIAN */
 
-		rpm = page4->rpm;
-	    }
+			rpm = page4->rpm;
+		}
 
-	    if (opened_here) {
-		(void) close(fd);
-	    }
+		if (opened_here) {
+			(void) close(fd);
+		}
 	}
 
 	return (rpm);
@@ -1250,55 +1272,57 @@ get_cdrom_drvtype(int fd)
 	fill_command_g1(&cmd, &cdb, (caddr_t)buff, sizeof (buff));
 
 	if (ioctl(fd, USCSICMD, &cmd) >= 0) {
-	    struct get_configuration	*config;
-	    struct conf_feature		*feature;
-	    int				flen;
+		struct get_configuration	*config;
+		struct conf_feature		*feature;
+		int				flen;
 
-	    /* The first profile is the preferred one for the drive. */
-	    config = (struct get_configuration *)buff;
-	    feature = &config->feature;
-	    flen = feature->len / sizeof (struct profile_list);
-	    if (flen > 0) {
-		int prof_num;
+		/* The first profile is the preferred one for the drive. */
+		config = (struct get_configuration *)buff;
+		feature = &config->feature;
+		flen = feature->len / sizeof (struct profile_list);
+		if (flen > 0) {
+			int prof_num;
 
-		prof_num = (int)convnum(feature->features.plist[0].profile, 2);
+			prof_num = (int)convnum(
+			    feature->features.plist[0].profile, 2);
 
-		if (dm_debug > 1) {
-		    (void) fprintf(stderr, "INFO: uscsi get_configuration %d\n",
-			prof_num);
+			if (dm_debug > 1) {
+				(void) fprintf(stderr,
+				    "INFO: uscsi get_configuration %d\n",
+				    prof_num);
+			}
+
+			switch (prof_num) {
+			case PROF_MAGNETO_OPTICAL:
+				return (DM_DT_MO_ERASABLE);
+			case PROF_OPTICAL_WO:
+				return (DM_DT_MO_WRITEONCE);
+			case PROF_OPTICAL_ASMO:
+				return (DM_DT_AS_MO);
+			case PROF_CDROM:
+				return (DM_DT_CDROM);
+			case PROF_CDR:
+				return (DM_DT_CDR);
+			case PROF_CDRW:
+				return (DM_DT_CDRW);
+			case PROF_DVDROM:
+				return (DM_DT_DVDROM);
+			case PROF_DVDRAM:
+				return (DM_DT_DVDRAM);
+			case PROF_DVDRW_REST:
+				return (DM_DT_DVDRW);
+			case PROF_DVDRW_SEQ:
+				return (DM_DT_DVDRW);
+			case PROF_DVDRW:
+				return (DM_DT_DVDRW);
+			case PROF_DDCD_ROM:
+				return (DM_DT_DDCDROM);
+			case PROF_DDCD_R:
+				return (DM_DT_DDCDR);
+			case PROF_DDCD_RW:
+				return (DM_DT_DDCDRW);
+			}
 		}
-
-		switch (prof_num) {
-		case PROF_MAGNETO_OPTICAL:
-		    return (DM_DT_MO_ERASABLE);
-		case PROF_OPTICAL_WO:
-		    return (DM_DT_MO_WRITEONCE);
-		case PROF_OPTICAL_ASMO:
-		    return (DM_DT_AS_MO);
-		case PROF_CDROM:
-		    return (DM_DT_CDROM);
-		case PROF_CDR:
-		    return (DM_DT_CDR);
-		case PROF_CDRW:
-		    return (DM_DT_CDRW);
-		case PROF_DVDROM:
-		    return (DM_DT_DVDROM);
-		case PROF_DVDRAM:
-		    return (DM_DT_DVDRAM);
-		case PROF_DVDRW_REST:
-		    return (DM_DT_DVDRW);
-		case PROF_DVDRW_SEQ:
-		    return (DM_DT_DVDRW);
-		case PROF_DVDRW:
-		    return (DM_DT_DVDRW);
-		case PROF_DDCD_ROM:
-		    return (DM_DT_DDCDROM);
-		case PROF_DDCD_R:
-		    return (DM_DT_DDCDR);
-		case PROF_DDCD_RW:
-		    return (DM_DT_DDCDRW);
-		}
-	    }
 	}
 
 	/* see if the atapi capabilities give anything */
@@ -1316,44 +1340,45 @@ check_atapi(int fd)
 	fill_command_g1(&cmd, &cdb, (caddr_t)buff, sizeof (buff));
 
 	if (ioctl(fd, USCSICMD, &cmd) >= 0) {
-	    int			bdesclen;
-	    struct capabilities	*cap;
-	    struct mode_header_g2 *mode;
+		int			bdesclen;
+		struct capabilities	*cap;
+		struct mode_header_g2 *mode;
 
-	    mode = (struct mode_header_g2 *)buff;
+		mode = (struct mode_header_g2 *)buff;
 
-	    bdesclen = (int)convnum(mode->desclen, 2);
-	    cap = (struct capabilities *)
-		&buff[sizeof (struct mode_header_g2) + bdesclen];
+		bdesclen = (int)convnum(mode->desclen, 2);
+		cap = (struct capabilities *)
+		    &buff[sizeof (struct mode_header_g2) + bdesclen];
 
-	    if (dm_debug > 1) {
-		(void) fprintf(stderr, "INFO: uscsi atapi capabilities\n");
-	    }
+		if (dm_debug > 1) {
+			(void) fprintf(stderr,
+			    "INFO: uscsi atapi capabilities\n");
+		}
 
-	    /* These are in order of how we want to report the drv type. */
-	    if (cap->dvdram_write) {
-		return (DM_DT_DVDRAM);
-	    }
-	    if (cap->dvdr_write) {
-		return (DM_DT_DVDR);
-	    }
-	    if (cap->dvdrom_read) {
-		return (DM_DT_DVDROM);
-	    }
-	    if (cap->cdrw_write) {
-		return (DM_DT_CDRW);
-	    }
-	    if (cap->cdr_write) {
-		return (DM_DT_CDR);
-	    }
-	    if (cap->cdr_read) {
-		return (DM_DT_CDROM);
-	    }
+		/* These are in order of how we want to report the drv type. */
+		if (cap->dvdram_write) {
+			return (DM_DT_DVDRAM);
+		}
+		if (cap->dvdr_write) {
+			return (DM_DT_DVDR);
+		}
+		if (cap->dvdrom_read) {
+			return (DM_DT_DVDROM);
+		}
+		if (cap->cdrw_write) {
+			return (DM_DT_CDRW);
+		}
+		if (cap->cdr_write) {
+			return (DM_DT_CDR);
+		}
+		if (cap->cdr_read) {
+			return (DM_DT_CDROM);
+		}
 	}
 
 	/* everything failed, so this is an older CD-ROM */
 	if (dm_debug > 1) {
-	    (void) fprintf(stderr, "INFO: uscsi failed\n");
+		(void) fprintf(stderr, "INFO: uscsi failed\n");
 	}
 
 	return (DM_DT_CDROM);
@@ -1371,7 +1396,7 @@ convnum(uchar_t *nptr, int len)
 
 static void
 fill_command_g1(struct uscsi_cmd *cmd, union scsi_cdb *cdb,
-	caddr_t buff, int blen)
+    caddr_t buff, int blen)
 {
 	bzero((caddr_t)cmd, sizeof (struct uscsi_cmd));
 	bzero(buff, blen);
@@ -1387,7 +1412,7 @@ fill_command_g1(struct uscsi_cmd *cmd, union scsi_cdb *cdb,
 
 static void
 fill_general_page_cdb_g1(union scsi_cdb *cdb, int command, int lun,
-	uchar_t c0, uchar_t c1)
+    uchar_t c0, uchar_t c1)
 {
 	bzero((caddr_t)cdb, sizeof (union scsi_cdb));
 	cdb->scc_cmd = command;
@@ -1409,7 +1434,7 @@ fill_mode_page_cdb(union scsi_cdb *cdb, int page)
 
 static int
 uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
-	int page_size, struct  scsi_ms_header *header)
+    int page_size, struct  scsi_ms_header *header)
 {
 	caddr_t			mode_sense_buf;
 	struct mode_header	*hdr;
@@ -1426,10 +1451,10 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	 * and mode sense data itself.
 	 */
 	nbytes = sizeof (struct block_descriptor) +
-				sizeof (struct mode_header) + page_size;
+	    sizeof (struct mode_header) + page_size;
 	nbytes = page_size;
 	if ((mode_sense_buf = malloc((uint_t)nbytes)) == NULL) {
-	    return (-1);
+		return (-1);
 	}
 
 	/*
@@ -1451,18 +1476,18 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	ucmd.uscsi_flags |= USCSI_READ;
 	ucmd.uscsi_timeout = 30;
 	ucmd.uscsi_flags |= USCSI_RQENABLE;
-	if (ucmd.uscsi_rqbuf == NULL)  {
-	    ucmd.uscsi_rqbuf = rqbuf;
-	    ucmd.uscsi_rqlen = sizeof (rqbuf);
-	    ucmd.uscsi_rqresid = sizeof (rqbuf);
+	if (ucmd.uscsi_rqbuf == NULL) {
+		ucmd.uscsi_rqbuf = rqbuf;
+		ucmd.uscsi_rqlen = sizeof (rqbuf);
+		ucmd.uscsi_rqresid = sizeof (rqbuf);
 	}
 	ucmd.uscsi_rqstatus = IMPOSSIBLE_SCSI_STATUS;
 
 	status = ioctl(fd, USCSICMD, &ucmd);
 
 	if (status || ucmd.uscsi_status != 0) {
-	    free(mode_sense_buf);
-	    return (-1);
+		free(mode_sense_buf);
+		return (-1);
 	}
 
 	/*
@@ -1476,16 +1501,16 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	(void) memset((caddr_t)header, 0, sizeof (struct scsi_ms_header));
 	if (hdr->bdesc_length != sizeof (struct block_descriptor) &&
 	    hdr->bdesc_length != 0) {
-	    free(mode_sense_buf);
-	    return (-1);
+		free(mode_sense_buf);
+		return (-1);
 	}
 	(void) memcpy((caddr_t)header, mode_sense_buf,
 	    (int) (sizeof (struct mode_header) + hdr->bdesc_length));
 	pg = (struct mode_page *)((ulong_t)mode_sense_buf +
 	    sizeof (struct mode_header) + hdr->bdesc_length);
 	if (pg->code != page_code) {
-	    free(mode_sense_buf);
-	    return (-1);
+		free(mode_sense_buf);
+		return (-1);
 	}
 
 	/*
@@ -1496,8 +1521,8 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	 */
 	maximum = page_size - sizeof (struct mode_page) - hdr->bdesc_length;
 	if (((int)pg->length) > maximum) {
-	    free(mode_sense_buf);
-	    return (-1);
+		free(mode_sense_buf);
+		return (-1);
 	}
 
 	(void) memcpy(page_data, (caddr_t)pg, MODESENSE_PAGE_LEN(pg));

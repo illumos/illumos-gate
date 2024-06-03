@@ -27,6 +27,7 @@
 /*
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright 2024 Sebastian Wiedenroth
  */
 
 #ifndef _LIBDISKMGT_H
@@ -331,6 +332,7 @@ typedef enum {
 #define	DM_PRODUCT_ID		"product_id"
 #define	DM_REMOVABLE		"removable"	/* also in media */
 #define	DM_RPM			"rpm"
+#define	DM_SERIAL		"serial"
 #define	DM_SOLIDSTATE		"solid_state"
 #define	DM_STATUS		"status"
 #define	DM_SYNC_SPEED		"sync_speed"

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2024 Sebastian Wiedenroth
+ */
+
 #include <fcntl.h>
 #include <libdevinfo.h>
 #include <stdio.h>
@@ -262,6 +266,7 @@ cache_free_disk(disk_t *dp)
 	free(dp->product_id);
 	free(dp->vendor_id);
 	free(dp->controllers);
+	free(dp->serial);
 	/* the path objects are freed when we free the controller */
 	free(dp->paths);
 	ap = dp->aliases;
@@ -904,7 +909,7 @@ rewalk_tree()
  */
 static void
 update_desc(descriptor_t *descp, disk_t *newdisksp, controller_t *newctrlp,
-	bus_t *newbusp)
+    bus_t *newbusp)
 {
 	/* if the descriptor is already dead, we're done */
 	if (descp->p.generic == NULL) {
