@@ -499,6 +499,16 @@ nvme_ctrl_info_serial(nvme_ctrl_info_t *ci)
 	return (ci->nci_serial);
 }
 
+uint32_t
+nvme_ctrl_info_fwgran(nvme_ctrl_info_t *ci)
+{
+	nvme_valid_ctrl_data_t data;
+
+	data.vcd_vers = &ci->nci_vers;
+	data.vcd_id = &ci->nci_info;
+	return (nvme_fw_load_granularity(&data));
+}
+
 const char *
 nvme_ctrl_info_fwrev(nvme_ctrl_info_t *ci)
 {

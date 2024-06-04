@@ -614,6 +614,7 @@ extern const nvme_identify_ctrl_t *nvme_ctrl_info_identify(nvme_ctrl_info_t *);
 extern const nvme_version_t *nvme_ctrl_info_version(nvme_ctrl_info_t *);
 extern const char *nvme_ctrl_info_model(nvme_ctrl_info_t *);
 extern const char *nvme_ctrl_info_serial(nvme_ctrl_info_t *);
+extern uint32_t nvme_ctrl_info_fwgran(nvme_ctrl_info_t *);
 extern const char *nvme_ctrl_info_fwrev(nvme_ctrl_info_t *);
 extern uint32_t nvme_ctrl_info_nns(nvme_ctrl_info_t *);
 
@@ -1149,6 +1150,9 @@ extern bool nvme_vuc_req_get_cdw0(nvme_vuc_req_t *, uint32_t *);
  * The firmware download command has to date not really changed through the NVMe
  * 1.x and 2.0 standards, which is why it is not broken into a request and
  * execution format like others at this time.
+ *
+ * Firmware must be loaded with a particular granularity and if blocks do not
+ * conform to that, nvme_fw_load() will return an error.
  */
 extern bool nvme_fw_load(nvme_ctrl_t *, const void *, size_t, uint64_t);
 
