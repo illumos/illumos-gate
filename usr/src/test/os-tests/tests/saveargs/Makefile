@@ -1,4 +1,3 @@
-
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,30 +9,10 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright 2012, Richard Lowe.
-#
+# Copyright 2024 Richard Lowe.
 
-include $(SRC)/Makefile.master
-include $(SRC)/Makefile.master.64
+SUBDIRS =		\
+	functional	\
+	testmatch
 
-.KEEP_STATE:
-
-OBJECTS = testmatch.o data.o
-PROG = testmatch
-
-LDLIBS64 += -lsaveargs
-
-AS_CPPFLAGS += -D_ASM
-
-$(PROG): $(OBJECTS)
-	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS64)
-
-clean:
-	$(RM) $(OBJECTS) $(PROG)
-
-clobber: clean
-
-all: $(PROG)
-
-install: all
+include $(SRC)/test/Makefile.com

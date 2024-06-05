@@ -17,16 +17,21 @@
 #include <unistd.h>
 
 int
-test(long a, long b, long c, long d)
+test(long a, long b, long c, long d, long e)
 {
-	printf("%ld %ld %ld %ld\n", a, b, c, d);
+	printf("%ld %ld %ld %ld %ld\n", a, b, c, d, e);
+	fflush(stdout);
+
 	for (;;)
-		sleep(60);
+		(void) sleep(60);
+
+	/* not reached */
+	return (0);
 }
 
 int
 main(int argc, char **argv)
 {
-	test(1, 2, 3, 4);
+	(void) test(1, 2, 3, 4, 5);
 	return (0);
 }

@@ -32,13 +32,13 @@ x_size:
  * Named of the form <compiler>-<prologue style>-<nature of test>
  * basic			-- A regular function
  * align			-- odd number of arguments needing save-area
- * 				   alignment
+ *				   alignment
  * big-struct-ret		-- returns a > 16byte structure by value
  * big-struct-ret-and-spill	-- returns a > 16byte structure by value and
- * 				   spills args to the stack
+ *				   spills args to the stack
  * small-struct-ret		-- returns a < 16byte structure by value
  * small-struct-ret-and-spill	-- returns a < 16byte structure by value and
- * 				   spills args to the stack
+ *				   spills args to the stack
  * stack-spill			-- spills arguments to the stack
  */
 FUNC(gcc_mov_align)
@@ -427,15 +427,6 @@ movq    %rsp,%rbp
 movq    %rdi,-0x8(%rbp)
 subq    $0x40,%rsp
 SET_SIZE(big_struct_arg_by_value, big_struct_arg_by_value_end)
-
-FUNC(small_struct_arg_by_value)
-pushq   %rbp
-movq    %rsp,%rbp
-movq    %rdx,-0x18(%rbp)
-movq    %rsi,-0x10(%rbp)
-movq    %rdi,-0x8(%rbp)
-subq    $0x50,%rsp
-SET_SIZE(small_struct_arg_by_value, small_struct_arg_by_value_end)
 
 FUNC(interleaved_argument_saves)
 pushq	%rbp

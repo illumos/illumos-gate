@@ -16,22 +16,22 @@
 #include <stdio.h>
 #include <unistd.h>
 
-struct foo {
-	long a;
-	long b;
-};
-
-struct foo
-test(long a, long b, long c, long d, long e, long f, long g, long h)
+int
+test(long a, long b, long c, long d)
 {
-	printf("%ld %ld %ld %ld %ld %ld %ld %ld\n", a, b, c, d, e, f, g, h);
+	printf("%ld %ld %ld %ld\n", a, b, c, d);
+	fflush(stdout);
+
 	for (;;)
-		sleep(60);
+		(void) sleep(60);
+
+	/* not reached */
+	return (0);
 }
 
 int
 main(int argc, char **argv)
 {
-	test(1, 2, 3, 4, 5, 6, 7, 8);
+	(void) test(1, 2, 3, 4);
 	return (0);
 }
