@@ -3133,8 +3133,34 @@ nvmeadm_firmware_commit(const nvme_process_arg_t *npa, uint32_t slot,
 	}
 
 	if (!nvme_fw_commit_req_exec(req)) {
-		nvmeadm_fatal(npa, "failed to %s firmware on %s",
-		    npa->npa_cmd->c_name, npa->npa_name);
+		/*
+		 * A number of command specific status values are informational
+		 * and indicate that the operation was successful but that
+		 * something else, such as a device reset, is still required
+		 * before the new firmware is active.
+		 * We distinguish those here and report them as a note rather
+		 * than a fatal error.
+		 */
+		if (nvme_ctrl_err(npa->npa_ctrl) == NVME_ERR_CONTROLLER) {
+			uint32_t sct, sc;
+
+			nvme_ctrl_deverr(npa->npa_ctrl, &sct, &sc);
+			if (sct == NVME_CQE_SCT_SPECIFIC && (
+			    sc == NVME_CQE_SC_SPC_FW_RESET ||
+			    sc == NVME_CQE_SC_SPC_FW_NSSR ||
+			    sc == NVME_CQE_SC_SPC_FW_NEXT_RESET)) {
+				fprintf(stderr,
+				    "nvmeadm: commit successful but %s\n",
+				    nvme_sctostr(npa->npa_ctrl, NVME_CSI_NVM,
+				    sct, sc));
+			} else {
+				nvmeadm_fatal(npa, "failed to %s on %s",
+				    npa->npa_cmd->c_name, npa->npa_name);
+			}
+		} else {
+			nvmeadm_fatal(npa, "failed to %s on %s",
+			    npa->npa_cmd->c_name, npa->npa_name);
+		}
 	}
 
 	nvme_fw_commit_req_fini(req);
