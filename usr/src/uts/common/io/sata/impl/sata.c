@@ -26,7 +26,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Argo Technologies SA
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Racktop Systems, Inc.
+ * Copyright 2024 Racktop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
  * Copyright 2023 Jason King
  */
@@ -5270,7 +5270,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 			alc_len = scsipkt->pkt_cdbp[4];
 		} else {
 			alc_len = scsipkt->pkt_cdbp[7];
-			alc_len = (len << 8) | scsipkt->pkt_cdbp[8];
+			alc_len = (alc_len << 8) | scsipkt->pkt_cdbp[8];
 		}
 		/*
 		 * We do not check for possible parameters truncation
@@ -6097,7 +6097,7 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 no_header:
 		/* Check allocation length */
 		alc_len = scsipkt->pkt_cdbp[7];
-		alc_len = (len << 8) | scsipkt->pkt_cdbp[8];
+		alc_len = (alc_len << 8) | scsipkt->pkt_cdbp[8];
 
 		/*
 		 * We do not check for possible parameters truncation
