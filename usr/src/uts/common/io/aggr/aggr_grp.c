@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -2209,8 +2210,8 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 	ASSERT(MUTEX_HELD(&grp->lg_stat_lock));
 
 	/* We only aggregate counter statistics. */
-	if (IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat) ||
-	    IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat)) {
+	if ((IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat)) ||
+	    (IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat))) {
 		return (ENOTSUP);
 	}
 
@@ -2865,7 +2866,6 @@ update_ports:
 	if (avp != NULL)
 		list_insert_tail(&rx_group->arg_vlans, avp);
 
-done:
 	mac_perim_exit(mph);
 	return (err);
 }
@@ -3516,20 +3516,17 @@ aggr_m_propinfo(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 
 	_NOTE(ARGUNUSED(pr_name));
 
-	switch (pr_num) {
-	case MAC_PROP_MTU:
+	if (pr_num != MAC_PROP_MTU)
+		return;
 
-		err = aggr_grp_possible_mtu_range(grp, &rval, &rmaxcnt,
-		    &rcount);
-		if (err != 0) {
-			ASSERT(rval == NULL);
-			return;
-		}
-		for (i = 0; i < rcount; i++) {
-			mac_prop_info_set_range_uint32(prh,
-			    rval[i].mpur_min, rval[i].mpur_max);
-		}
-		kmem_free(rval, sizeof (mac_propval_uint32_range_t) * rmaxcnt);
-		break;
+	err = aggr_grp_possible_mtu_range(grp, &rval, &rmaxcnt, &rcount);
+	if (err != 0) {
+		ASSERT(rval == NULL);
+		return;
 	}
+	for (i = 0; i < rcount; i++) {
+		mac_prop_info_set_range_uint32(prh,
+		    rval[i].mpur_min, rval[i].mpur_max);
+	}
+	kmem_free(rval, sizeof (mac_propval_uint32_range_t) * rmaxcnt);
 }

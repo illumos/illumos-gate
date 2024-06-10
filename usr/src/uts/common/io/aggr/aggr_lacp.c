@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -554,8 +555,8 @@ lacp_periodic_sm(aggr_port_t *portp)
 
 	if (pl->sm.begin || !pl->sm.lacp_enabled ||
 	    !pl->sm.port_enabled ||
-	    !pl->ActorOperPortState.bit.activity &&
-	    !pl->PartnerOperPortState.bit.activity) {
+	    (!pl->ActorOperPortState.bit.activity &&
+	    !pl->PartnerOperPortState.bit.activity)) {
 
 		/* Stop timer whether it is running or not */
 		stop_periodic_timer(portp);
@@ -1658,7 +1659,6 @@ lacp_on(aggr_port_t *portp)
 		/* periodic_sm is started up from the receive machine */
 		lacp_selection_logic(portp);
 	}
-done:
 	mac_perim_exit(mph);
 } /* lacp_on */
 
