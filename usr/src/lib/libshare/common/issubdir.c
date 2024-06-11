@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -58,9 +58,7 @@
  *     (b) dir1's parent is dir2
  */
 int
-issubdir(dir1, dir2)
-	char *dir1;
-	char *dir2;
+issubdir(char *dir1, char *dir2)
 {
 	struct stat st;
 	struct stat parent_st;
@@ -97,11 +95,11 @@ issubdir(dir1, dir2)
 				child_dev = st.st_dev;
 				child_rdev = st.st_rdev;
 				(void) strncpy(child_fstype, st.st_fstype,
-						sizeof (child_fstype));
+				    sizeof (child_fstype));
 			}
 			if (index > 0 &&
 			    (child_dev != st.st_dev ||
-				inoeq(child_ino[index - 1], st.st_ino))) {
+			    inoeq(child_ino[index - 1], st.st_ino))) {
 				/*
 				 * Hit root: done
 				 */
@@ -116,7 +114,7 @@ issubdir(dir1, dir2)
 					p = strcpy(childdir, ".") + 1;
 				} else {
 					while (((p - 1) > childdir) &&
-						*(p - 1) == '/') {
+					    *(p - 1) == '/') {
 						p--;
 					}
 					*p = '\0';
@@ -124,7 +122,7 @@ issubdir(dir1, dir2)
 			}
 		}
 		valid = index;
-		(void) strcpy(childdir, dir1);
+		(void) strlcpy(childdir, dir1, MAXPATHLEN);
 	}
 
 	/*
@@ -138,7 +136,7 @@ issubdir(dir1, dir2)
 	 * Check rdev also in case of lofs
 	 */
 	if (((strcmp(parent_st.st_fstype, "lofs") == 0)) &&
-		(strcmp(child_fstype, "lofs") == 0)) {
+	    (strcmp(child_fstype, "lofs") == 0)) {
 		if (!deveq(parent_st.st_rdev, child_rdev)) {
 			return (0);
 		}
