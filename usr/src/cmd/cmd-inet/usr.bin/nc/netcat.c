@@ -39,6 +39,7 @@
 /*
  * Portions Copyright 2008 Erik Trauschke
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -93,6 +94,7 @@ int	vflag;		/* Verbosity */
 int	xflag;		/* Socks proxy */
 int	Xflag;		/* indicator of Socks version set */
 int	zflag;		/* Port Scan Flag */
+int	Bflag;		/* Use IP_SEC_OPT to bypass policy */
 int	Dflag;		/* sodebug */
 int	Sflag;		/* TCP MD5 signature option */
 int	Tflag = -1;	/* IP Type of Service */
@@ -150,7 +152,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46Ddhi:klm:M:nP:p:rs:ST:tUuvw:X:x:z")) != -1) {
+	    "46BDdhi:klm:M:nP:p:rs:ST:tUuvw:X:x:z")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -160,6 +162,9 @@ main(int argc, char *argv[])
 			break;
 		case 'U':
 			family = AF_UNIX;
+			break;
+		case 'B':
+			Bflag = 1;
 			break;
 		case 'X':
 			Xflag = 1;
@@ -285,6 +290,8 @@ main(int argc, char *argv[])
 		errx(1, "cannot use -s and -l");
 	if (lflag && rflag)
 		errx(1, "cannot use -r and -l");
+	if (lflag && Bflag)
+		errx(1, "cannot use -B and -l");
 	if (lflag && (timeout >= 0))
 		warnx("-w has no effect with -l");
 	if (lflag && pflag) {
@@ -904,6 +911,28 @@ set_common_sockopts(int s, int af)
 		}
 	}
 
+	if (Bflag) {
+		ipsec_req_t req = { IPSEC_PREF_NEVER, IPSEC_PREF_NEVER,
+			IPSEC_PREF_NEVER, 0, 0, 0 };
+		int level;
+
+		switch (af) {
+		case AF_INET:
+			level = IPPROTO_IP;
+			break;
+		case AF_INET6:
+			level = IPPROTO_IPV6;
+			break;
+		default:
+			err(1, "cannot set IPsec bypass on unsupported socket "
+			    "family 0x%x", af);
+		}
+		/* IP_SEC_OPT == IPV6_SEC_OPT, so we're good regardless... */
+		if (setsockopt(s, level, IP_SEC_OPT, &req, sizeof (req)) < 0) {
+			err(1, "IPsec bypass attempt");
+		}
+	}
+
 	if (Dflag) {
 		if (setsockopt(s, SOL_SOCKET, SO_DEBUG, &x, sizeof (x)) == -1)
 			err(1, NULL);
@@ -1003,6 +1032,7 @@ help(void)
 	(void) fprintf(stderr, "\tCommand Summary:\n\
 	\t-4		Use IPv4\n\
 	\t-6		Use IPv6\n\
+	\t-B		Bypass IPsec policy to force cleartext\n\
 	\t-D		Enable the debug socket option\n\
 	\t-d		Detach from stdin\n\
 	\t-h		This help text\n\
@@ -1036,7 +1066,7 @@ void
 usage(int ret)
 {
 	(void) fprintf(stderr,
-	    "usage: nc [-46DdhklnrStUuvz] [-i interval] [-M ttl] [-m minttl]\n"
+	    "usage: nc [-46BDdhklnrStUuvz] [-i interval] [-M ttl] [-m minttl]\n"
 	    "\t  [-P proxy_username] [-p port] [-s source_ip_address] "
 	    "[-T ToS]\n"
 	    "\t  [-w timeout] [-X proxy_protocol] [-x proxy_address[:port]]\n"
