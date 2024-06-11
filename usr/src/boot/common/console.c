@@ -88,6 +88,21 @@ cons_array_size(void)
 	return (n + 1);
 }
 
+struct console *
+cons_get_console(const char *name)
+{
+	char port[5];
+
+	(void) strlcpy(port, name, sizeof (port));
+	for (uint_t i = 0; consoles[i] != NULL; i++) {
+		if (strcmp(port, consoles[i]->c_name) == 0)
+			return (consoles[i]);
+	}
+
+	printf("No such port: %s\n", port);
+	return (NULL);
+}
+
 static void
 cons_add_dev(struct console *dev)
 {

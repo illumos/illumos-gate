@@ -26,7 +26,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Argo Technologies SA
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Racktop Systems, Inc.
+ * Copyright 2024 RackTop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
  * Copyright 2023 Jason King
  */
@@ -8711,33 +8711,22 @@ out:
 static	int
 sata_build_lsense_page_0(sata_drive_info_t *sdinfo, uint8_t *buf)
 {
-	struct log_parameter *lpp = (struct log_parameter *)buf;
-	uint8_t *page_ptr = (uint8_t *)lpp->param_values;
-	int num_pages_supported = 1; /* Always have GET_SUPPORTED_LOG_PAGES */
+	uint8_t *ptr = buf;
 	sata_id_t *sata_id = &sdinfo->satadrv_id;
 
-	lpp->param_code[0] = 0;
-	lpp->param_code[1] = 0;
-	lpp->param_ctrl_flags = LOG_CTRL_LP | LOG_CTRL_LBIN;
-	*page_ptr++ = PAGE_CODE_GET_SUPPORTED_LOG_PAGES;
+	/* The supported log pages should be in ascending order */
+	*ptr++ = PAGE_CODE_GET_SUPPORTED_LOG_PAGES;
 
 	if (sata_id->ai_cmdset82 & SATA_SMART_SUPPORTED) {
+		*ptr++ = PAGE_CODE_START_STOP_CYCLE_COUNTER;
 		if (sata_id->ai_cmdset84 & SATA_SMART_SELF_TEST_SUPPORTED) {
-			*page_ptr++ = PAGE_CODE_SELF_TEST_RESULTS;
-			++num_pages_supported;
+			*ptr++ = PAGE_CODE_SELF_TEST_RESULTS;
 		}
-		*page_ptr++ = PAGE_CODE_INFORMATION_EXCEPTIONS;
-		++num_pages_supported;
-		*page_ptr++ = PAGE_CODE_SMART_READ_DATA;
-		++num_pages_supported;
-		*page_ptr++ = PAGE_CODE_START_STOP_CYCLE_COUNTER;
-		++num_pages_supported;
+		*ptr++ = PAGE_CODE_INFORMATION_EXCEPTIONS;
+		*ptr++ = PAGE_CODE_SMART_READ_DATA;
 	}
 
-	lpp->param_len = num_pages_supported;
-
-	return ((&lpp->param_values[0] - (uint8_t *)lpp) +
-	    num_pages_supported);
+	return ((int)((uintptr_t)ptr - (uintptr_t)buf));
 }
 
 /*

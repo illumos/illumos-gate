@@ -163,6 +163,10 @@
 #include <Protocol/VariableWrite.h>
 #include <Protocol/VlanConfig.h>
 #include <Protocol/WatchdogTimer.h>
+#include <Protocol/IsaAcpi.h>
+#include <Protocol/IsaIo.h>
+#include <Protocol/SerialIo.h>
+#include <Protocol/SuperIo.h>
 #include <uuid.h>
 #include <stdbool.h>
 #include <sys/param.h>
@@ -260,7 +264,6 @@ EFI_GUID gEfiIpSecProtocolGuid = EFI_IPSEC_PROTOCOL_GUID;
 EFI_GUID gEfiIpSec2ProtocolGuid = EFI_IPSEC2_PROTOCOL_GUID;
 EFI_GUID gEfiIpSecConfigProtocolGuid = EFI_IPSEC_CONFIG_PROTOCOL_GUID;
 EFI_GUID gEfiIsaAcpiProtocolGuid = EFI_ISA_ACPI_PROTOCOL_GUID;
-EFI_GUID gEfiIsaIoProtocolGuid = EFI_ISA_IO_PROTOCOL_GUID;
 EFI_GUID gEfiKmsProtocolGuid = EFI_KMS_PROTOCOL_GUID;
 EFI_GUID gEfiLegacy8259ProtocolGuid = EFI_LEGACY_8259_PROTOCOL_GUID;
 EFI_GUID gEfiLoadFileProtocolGuid = EFI_LOAD_FILE_PROTOCOL_GUID;
@@ -349,9 +352,6 @@ EFI_GUID gFdtTableGuid = FDT_TABLE_GUID;
 EFI_GUID gLzmaCompress = LZMA_COMPRESS_GUID;
 EFI_GUID gMtcVendorGuid = MTC_VENDOR_GUID;
 EFI_GUID gPcdProtocolGuid = PCD_PROTOCOL_GUID;
-EFI_GUID gEfiSerialIoProtocolGuid = EFI_SERIAL_IO_PROTOCOL_GUID;
-EFI_GUID gEfiSerialTerminalDeviceTypeGuid =
-    EFI_SERIAL_TERMINAL_DEVICE_TYPE_GUID;
 
 static struct efi_uuid_mapping {
 	const char *efi_guid_name;
@@ -454,6 +454,7 @@ static struct efi_uuid_mapping {
 	    .efi_guid = &gEfiIsaAcpiProtocolGuid },
 	{ .efi_guid_name = "ISA io",
 	    .efi_guid = &gEfiIsaIoProtocolGuid },
+	{ .efi_guid_name = "Super io", .efi_guid = &gEfiSioProtocolGuid },
 	{ .efi_guid_name = "IDE controller init",
 	    .efi_guid = &gEfiIdeControllerInitProtocolGuid },
 	{ .efi_guid_name = "PCI",

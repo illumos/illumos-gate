@@ -496,20 +496,17 @@ efi_framebuffer_setup(void)
 static void
 efi_cons_probe(struct console *cp)
 {
-	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
-}
-
-static int
-efi_cons_init(struct console *cp, int arg __unused)
-{
 	struct efi_console_data *ecd;
 	void *coninex;
 	EFI_STATUS status;
-	UINTN i, max_dim, best_mode, cols, rows;
+
+	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
 
 	if (cp->c_private != NULL)
-		return (0);
+		return;
 
+	memset(keybuf, 0, KEYBUFSZ);
+	conout = ST->ConOut;
 	ecd = calloc(1, sizeof (*ecd));
 	/*
 	 * As console probing is called very early, the only reason for
@@ -520,21 +517,50 @@ efi_cons_init(struct console *cp, int arg __unused)
 	cp->c_private = ecd;
 
 	ecd->ecd_conin = ST->ConIn;
-	conout = ST->ConOut;
+	/*
+	 * Try to set up for SimpleTextInputEx protocol. If not available,
+	 * we will use SimpleTextInput protocol.
+	 */
+	coninex = NULL;
+	status = BS->OpenProtocol(ST->ConsoleInHandle,
+	    &gEfiSimpleTextInputExProtocolGuid,
+	    &coninex, IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (status == EFI_SUCCESS)
+		ecd->ecd_coninex = coninex;
+
+	if (efi_find_framebuffer(&efifb)) {
+		console_mode = EfiConsoleControlScreenText;
+		ecd->ecd_visual_ops = &text_ops;
+	} else {
+		efi_framebuffer_setup();
+		console_mode = EfiConsoleControlScreenGraphics;
+		ecd->ecd_visual_ops = &fb_ops;
+	}
+
+	/*
+	 * UEFI console is tricky, it may be video or serial device(s),
+	 * or both, SimpleTextOutput protocol will output on all listed
+	 * devices in "ConOut". If video console is present, we will not
+	 * use SimpleTextOutput and render the text on video screen only.
+	 */
+	if (console_mode == EfiConsoleControlScreenGraphics)
+		(void) setenv("console", cp->c_name, 1);
+}
+
+static int
+efi_cons_init(struct console *cp, int arg __unused)
+{
+	EFI_STATUS status;
+	UINTN i, max_dim, best_mode, cols, rows;
+
+	if (tem != NULL)
+		return (0);
 
 	conout->SetAttribute(conout, EFI_TEXT_ATTR(DEFAULT_FGCOLOR,
 	    DEFAULT_BGCOLOR));
-	memset(keybuf, 0, KEYBUFSZ);
 
 	status = BS->LocateProtocol(&gEfiConsoleControlProtocolGuid, NULL,
 	    (void **)&console_control);
-	if (status == EFI_SUCCESS) {
-		BOOLEAN GopUgaExists, StdInLocked;
-		status = console_control->GetMode(console_control,
-		    &console_mode, &GopUgaExists, &StdInLocked);
-	} else {
-		console_mode = EfiConsoleControlScreenText;
-	}
 
 	max_dim = best_mode = 0;
 	for (i = 0; i <= conout->Mode->MaxMode; i++) {
@@ -560,31 +586,12 @@ efi_cons_init(struct console *cp, int arg __unused)
 		setenv("screen-#cols", env, 1);
 	}
 
-	if (efi_find_framebuffer(&efifb)) {
-		console_mode = EfiConsoleControlScreenText;
-		ecd->ecd_visual_ops = &text_ops;
-	} else {
-		efi_framebuffer_setup();
-		console_mode = EfiConsoleControlScreenGraphics;
-		ecd->ecd_visual_ops = &fb_ops;
-	}
 
 	if (console_control != NULL)
 		(void) console_control->SetMode(console_control, console_mode);
 
 	/* some firmware enables the cursor when switching modes */
 	conout->EnableCursor(conout, FALSE);
-
-	coninex = NULL;
-	/*
-	 * Try to set up for SimpleTextInputEx protocol. If not available,
-	 * we will use SimpleTextInput protocol.
-	 */
-	status = BS->OpenProtocol(ST->ConsoleInHandle,
-	    &gEfiSimpleTextInputExProtocolGuid,
-	    &coninex, IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-	if (status == EFI_SUCCESS)
-		ecd->ecd_coninex = coninex;
 
 	gfx_framework_init();
 

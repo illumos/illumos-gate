@@ -136,6 +136,7 @@ uint_t	cons_array_size(void);
 int	cons_inputdev(void);
 void	cons_probe(void);
 void	cons_mode(int);
+struct console *cons_get_console(const char *);
 void	autoload_font(bool);
 
 /*

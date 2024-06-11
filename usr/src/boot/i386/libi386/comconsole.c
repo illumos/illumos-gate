@@ -443,21 +443,6 @@ comc_parse_mode(struct serial *sp, const char *value)
 	return (CMD_OK);
 }
 
-static struct console *
-get_console(const char *name)
-{
-	char port[5];
-
-	(void) strlcpy(port, name, sizeof (port));
-	for (uint_t i = 0; consoles[i] != NULL; i++) {
-		if (strcmp(port, consoles[i]->c_name) == 0)
-			return (consoles[i]);
-	}
-
-	printf("No such port: %s\n", port);
-	return (NULL);
-}
-
 /*
  * CMD_ERROR will cause set/setenv/setprop command to fail,
  * when used in loader scripts (forth), this will cause processing
@@ -474,7 +459,7 @@ comc_mode_set(struct env_var *ev, int flags, const void *value)
 	if (value == NULL)
 		return (CMD_ERROR);
 
-	if ((cp = get_console(ev->ev_name)) == NULL)
+	if ((cp = cons_get_console(ev->ev_name)) == NULL)
 		return (CMD_OK);
 
 	/* Do not override serial setup from SPCR */
@@ -506,9 +491,9 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 	struct serial *sp;
 
 	if (value == NULL)
-		return (CMD_ERROR);
+		return (CMD_OK);
 
-	if ((cp = get_console(ev->ev_name)) == NULL)
+	if ((cp = cons_get_console(ev->ev_name)) == NULL)
 		return (CMD_OK);
 
 	sp = cp->c_private;
@@ -519,7 +504,7 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 	} else {
 		printf("%s: invalid value: %s\n", ev->ev_name,
 		    (char *)value);
-		return (CMD_ERROR);
+		return (CMD_OK);
 	}
 
 	(void) comc_setup(cp);
@@ -543,9 +528,9 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 	struct serial *sp;
 
 	if (value == NULL)
-		return (CMD_ERROR);
+		return (CMD_OK);
 
-	if ((cp = get_console(ev->ev_name)) == NULL)
+	if ((cp = cons_get_console(ev->ev_name)) == NULL)
 		return (CMD_OK);
 
 	sp = cp->c_private;
@@ -556,7 +541,7 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 	} else {
 		printf("%s: invalid value: %s\n", ev->ev_name,
 		    (char *)value);
-		return (CMD_ERROR);
+		return (CMD_OK);
 	}
 
 	(void) comc_setup(cp);
@@ -652,7 +637,7 @@ comc_pcidev_set(struct env_var *ev, int flags, const void *value)
 	uint32_t locator;
 	int error;
 
-	if ((cp = get_console(ev->ev_name)) == NULL)
+	if ((cp = cons_get_console(ev->ev_name)) == NULL)
 		return (CMD_ERROR);
 	sp = cp->c_private;
 
