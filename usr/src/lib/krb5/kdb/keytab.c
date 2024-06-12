@@ -24,6 +24,10 @@
  * or implied warranty.
  *
  */
+/*
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+ * Copyright 2024 Toomas Soome <tsoome@me.com>
+ */
 #include <string.h>
 
 #include "k5-int.h"
@@ -49,7 +53,7 @@ krb5_ktkdb_get_name(krb5_context context, krb5_keytab keytab,
 
 krb5_kt_ops krb5_kt_kdb_ops = {
     0,
-    "KDB", 	/* Prefix -- this string should not appear anywhere else! */
+    "KDB",	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktkdb_resolve,		/* resolve */
     krb5_ktkdb_get_name,	/* get_name */
     krb5_ktkdb_close,		/* close */
@@ -59,43 +63,64 @@ krb5_kt_ops krb5_kt_kdb_ops = {
     NULL,			/* end_get */
     NULL,			/* add (extended) */
     NULL,			/* remove (extended) */
-    NULL, 		/* (void *) &krb5_ktfile_ser_entry */
+    NULL,			/* (void *) &krb5_ktfile_ser_entry */
 };
 
 typedef struct krb5_ktkdb_data {
-    char * name;
+	char *name;
 } krb5_ktkdb_data;
 
 krb5_error_code
-krb5_ktkdb_resolve(context, name, id)
-    krb5_context  	  context;
-    const char		* name;
-    krb5_keytab		* id;
+krb5_ktkdb_resolve(krb5_context context, const char *name, krb5_keytab *id)
 {
-    if ((*id = (krb5_keytab) malloc(sizeof(**id))) == NULL)
-        return(ENOMEM);
-    (*id)->ops = &krb5_kt_kdb_ops;
-    (*id)->magic = KV5M_KEYTAB;
-    return(0);
+	krb5_ktkdb_data *data;
+	krb5_keytab kt;
+
+	kt = malloc(sizeof (*kt));
+	if (kt == NULL)
+		return (ENOMEM);
+
+	kt->ops = &krb5_kt_kdb_ops;
+	kt->magic = KV5M_KEYTAB;
+
+	data = calloc(1, sizeof (*data));
+	if (data == NULL)
+		goto fail;
+
+	if (name != NULL) {
+		data->name = strdup(name);
+		if (data->name == NULL)
+			goto fail;
+	}
+	kt->data = data;
+	*id = kt;
+	return (0);
+fail:
+	krb5_xfree(data);
+	krb5_xfree(kt);
+	return (ENOMEM);
 }
 
 krb5_error_code
-krb5_ktkdb_close(context, kt)
-     krb5_context context;
-     krb5_keytab kt;
+krb5_ktkdb_close(krb5_context context, krb5_keytab kt)
 {
-  /*
-   * This routine is responsible for freeing all memory allocated
-   * for this keytab.  There are no system resources that need
-   * to be freed nor are there any open files.
-   *
-   * This routine should undo anything done by krb5_ktkdb_resolve().
-   */
+	krb5_ktkdb_data *data;
 
-  kt->ops = NULL;
-  krb5_xfree(kt);
+	/*
+	 * This routine is responsible for freeing all memory allocated
+	 * for this keytab.  There are no system resources that need
+	 * to be freed nor are there any open files.
+	 *
+	 * This routine should undo anything done by krb5_ktkdb_resolve().
+	 */
 
-  return 0;
+	kt->ops = NULL;
+	data = kt->data;
+	krb5_xfree(data->name);
+	krb5_xfree(data);
+	krb5_xfree(kt);
+
+	return (0);
 }
 
 static krb5_context ktkdb_ctx = NULL;
@@ -116,20 +141,20 @@ krb5_ktkdb_set_context(krb5_context ctx)
 
 krb5_error_code
 krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
-    krb5_context 	  in_context;
-    krb5_keytab 	  id;
-    krb5_const_principal  principal;
-    krb5_kvno 	 	  kvno;
-    krb5_enctype 	  enctype;
-    krb5_keytab_entry 	* entry;
+    krb5_context in_context;
+    krb5_keytab id;
+    krb5_const_principal principal;
+    krb5_kvno kvno;
+    krb5_enctype enctype;
+    krb5_keytab_entry *entry;
 {
-    krb5_context	  context;
-    krb5_keyblock       * master_key;
-    krb5_error_code 	  kerror = 0;
-    krb5_key_data 	* key_data;
-    krb5_db_entry 	  db_entry;
-    krb5_boolean 	  more = 0;
-    int 	 	  n = 0;
+    krb5_context context;
+    krb5_keyblock *master_key;
+    krb5_error_code kerror = 0;
+    krb5_key_data *key_data;
+    krb5_db_entry db_entry;
+    krb5_boolean more = 0;
+    int n = 0;
     int xrealm_tgt;
     krb5_boolean similar;
 
