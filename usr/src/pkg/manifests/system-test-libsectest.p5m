@@ -1,0 +1,50 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 RackTop Systems, Inc.
+#
+
+set name=pkg.fmri value=pkg:/system/test/libsectest@$(PKGVERS)
+set name=pkg.summary value="Libsec Unit Test Suite"
+set name=pkg.description value="Unit Tests for libsec"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/libsec-tests
+dir  path=opt/libsec-tests/bin
+file path=opt/libsec-tests/bin/acl_fromtext mode=0555
+file path=opt/libsec-tests/bin/acl_totext mode=0555
+file path=opt/libsec-tests/bin/libsectest mode=0555
+dir  path=opt/libsec-tests/runfiles
+file path=opt/libsec-tests/runfiles/default.run mode=0444
+dir  path=opt/libsec-tests/tests
+file path=opt/libsec-tests/tests/acltext_common mode=0555
+dir  path=opt/libsec-tests/tests/fromtext
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_0 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_1 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_2 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_3 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_4 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_5 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_6 mode=0555
+file path=opt/libsec-tests/tests/fromtext/acl_fromtext_7 mode=0555
+dir  path=opt/libsec-tests/tests/totext
+file path=opt/libsec-tests/tests/totext/acl_totext_0 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_1 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_2 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_3 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_4 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_5 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_6 mode=0555
+file path=opt/libsec-tests/tests/totext/acl_totext_7 mode=0555
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=system/test/testrunner

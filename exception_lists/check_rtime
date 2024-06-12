@@ -28,6 +28,7 @@
 # Copyright 2020 Oxide Computer Company
 # Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2024 RackTop Systems, Inc.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -70,6 +71,10 @@ SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 # malloc; however, they do not actually reference the object.
 #
 SKIP		^opt/libc-tests/tests/stdio/
+
+# The libsec tests interpose on all referenced libidmap functions,
+# causing false positives for the unref. checks for libsec.
+SKIP		^opt/libsec-tests/bin/
 
 # Objects that are allowed to have executable data segments
 EXEC_DATA	^MACH(lib)/ld\.so\.1$
