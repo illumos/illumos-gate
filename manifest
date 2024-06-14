@@ -986,11 +986,11 @@ d kernel/firmware/cxgbe 0755 root sys
 f kernel/firmware/cxgbe/t4fw-1.27.1.0.bin 0666 root bin
 s kernel/firmware/cxgbe/t4fw.bin=t4fw-1.27.1.0.bin
 f kernel/firmware/cxgbe/t4fw_cfg.txt 0666 root bin
-f kernel/firmware/cxgbe/t5fw-1.27.4.0.bin 0666 root bin
-s kernel/firmware/cxgbe/t5fw.bin=t5fw-1.27.4.0.bin
+f kernel/firmware/cxgbe/t5fw-1.27.5.0.bin 0666 root bin
+s kernel/firmware/cxgbe/t5fw.bin=t5fw-1.27.5.0.bin
 f kernel/firmware/cxgbe/t5fw_cfg.txt 0666 root bin
-f kernel/firmware/cxgbe/t6fw-1.27.4.0.bin 0666 root bin
-s kernel/firmware/cxgbe/t6fw.bin=t6fw-1.27.4.0.bin
+f kernel/firmware/cxgbe/t6fw-1.27.5.0.bin 0666 root bin
+s kernel/firmware/cxgbe/t6fw.bin=t6fw-1.27.5.0.bin
 f kernel/firmware/cxgbe/t6fw_cfg.txt 0666 root bin
 d kernel/firmware/iwn 0755 root sys
 f kernel/firmware/iwn/iwlwifi-100-5.ucode 0666 root sys

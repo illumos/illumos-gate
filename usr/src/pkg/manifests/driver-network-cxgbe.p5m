@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2019 by Chelsio Communications, Inc. All rights reserved.
 # Copyright 2023 Oxide Computer Company
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 <include global_zone_only_component>
@@ -33,11 +34,11 @@ dir  path=kernel/firmware/cxgbe group=sys
 file path=kernel/firmware/cxgbe/t4fw-1.27.1.0.bin
 link path=kernel/firmware/cxgbe/t4fw.bin target=t4fw-1.27.1.0.bin
 file path=kernel/firmware/cxgbe/t4fw_cfg.txt
-file path=kernel/firmware/cxgbe/t5fw-1.27.4.0.bin
-link path=kernel/firmware/cxgbe/t5fw.bin target=t5fw-1.27.4.0.bin
+file path=kernel/firmware/cxgbe/t5fw-1.27.5.0.bin
+link path=kernel/firmware/cxgbe/t5fw.bin target=t5fw-1.27.5.0.bin
 file path=kernel/firmware/cxgbe/t5fw_cfg.txt
-file path=kernel/firmware/cxgbe/t6fw-1.27.4.0.bin
-link path=kernel/firmware/cxgbe/t6fw.bin target=t6fw-1.27.4.0.bin
+file path=kernel/firmware/cxgbe/t6fw-1.27.5.0.bin
+link path=kernel/firmware/cxgbe/t6fw.bin target=t6fw-1.27.5.0.bin
 file path=kernel/firmware/cxgbe/t6fw_cfg.txt
 dir  path=usr group=sys
 dir  path=usr/sbin
