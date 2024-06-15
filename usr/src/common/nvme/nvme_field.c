@@ -36,20 +36,6 @@ nvme_field_atleast(const nvme_valid_ctrl_data_t *data,
 	return (nvme_vers_atleast(data->vcd_vers, targ));
 }
 
-bool
-nvme_field_supported_nsid(const nvme_field_info_t *field,
-    const nvme_valid_ctrl_data_t *data, char *msg, size_t msglen)
-{
-	if (data->vcd_id->id_oacs.oa_nsmgmt != 0) {
-		return (true);
-	}
-
-	(void) snprintf(msg, msglen, "controller does not support field %s "
-	    "(%s): missing namespace support in Optional Admin Command Support "
-	    "(OACS)", field->nlfi_human, field->nlfi_spec);
-	return (false);
-}
-
 /*
  * Note, we rely on external logic to determine if the broadcast nsid is valid.
  * We always accept it.

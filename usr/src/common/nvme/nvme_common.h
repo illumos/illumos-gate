@@ -109,8 +109,6 @@ extern nvme_field_error_t nvme_field_validate(const nvme_field_info_t *,
  */
 extern bool nvme_field_atleast(const nvme_valid_ctrl_data_t *,
     const nvme_version_t *);
-extern bool nvme_field_supported_nsid(const nvme_field_info_t *,
-    const nvme_valid_ctrl_data_t *, char *, size_t);
 extern bool nvme_field_valid_nsid(const nvme_field_info_t *,
     const nvme_valid_ctrl_data_t *, uint64_t, char *, size_t);
 extern bool nvme_field_range_check(const nvme_field_info_t *, uint64_t,
