@@ -776,12 +776,16 @@ SCardBeginTransaction(SCARDHANDLE arg)
 	}
 
 	/*
-	 * The semantics of pcsc are that this operation does not block, but
-	 * instead fails if we cannot grab it immediately.
+	 * According to the Windows documentation, this function "waits for the
+	 * completion of all other transactions before it begins".  Software in
+	 * the wild has been observed to be confused by the
+	 * SCARD_E_SHARING_VIOLATION condition we would previously return if
+	 * the card was already in use.  As a compatibility measure, we omit
+	 * the UCCID_TXN_DONT_BLOCK flag so that the kernel will sleep until
+	 * the card is no longer busy before returning.
 	 */
 	bzero(&txn, sizeof (uccid_cmd_txn_begin_t));
 	txn.uct_version = UCCID_CURRENT_VERSION;
-	txn.uct_flags = UCCID_TXN_DONT_BLOCK;
 
 	if (ioctl(card->pcc_fd, UCCID_CMD_TXN_BEGIN, &txn) != 0) {
 		VERIFY3S(errno, !=, EFAULT);
