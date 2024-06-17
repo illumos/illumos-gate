@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 PROG= ccidadm
@@ -20,7 +21,7 @@ include ../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lofmt -lcmdutils
-SRCS = ccidadm.c atr.c
+SRCS = ccidadm.c atr.c ilstr.o
 OBJS = $(SRCS:%.c=%.o)
 CPPFLAGS += -I$(SRC)/common/ccid
 
@@ -35,6 +36,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 %.o: $(SRC)/common/ccid/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/ilstr/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
