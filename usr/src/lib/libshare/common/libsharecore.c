@@ -1548,7 +1548,7 @@ parse_sharetab_impl(sa_handle_t handle, xfs_sharelist_t *tmplist,
 			xmlNodePtr node;
 			node = xmlNewChild((xmlNodePtr)share, NULL,
 			    (xmlChar *)"description", NULL);
-			xmlNodeSetContent(node,
+			(void) xmlNodeSetContent(node,
 			    (xmlChar *)tmplist->description);
 		}
 		legacy = 1;

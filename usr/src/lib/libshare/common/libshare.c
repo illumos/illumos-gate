@@ -2278,7 +2278,7 @@ _sa_set_share_description(void *share, char *content)
 	xmlNodePtr node;
 	node = xmlNewChild((xmlNodePtr)share, NULL, (xmlChar *)"description",
 	    NULL);
-	xmlNodeSetContent(node, (xmlChar *)content);
+	(void) xmlNodeSetContent(node, (xmlChar *)content);
 	return (node);
 }
 
@@ -2611,7 +2611,7 @@ sa_set_share_description(sa_share_t share, char *content)
 		node = _sa_set_share_description(share, content);
 	} else if (node != NULL && content != NULL) {
 		/* update a description */
-		xmlNodeSetContent(node, (xmlChar *)content);
+		(void) xmlNodeSetContent(node, (xmlChar *)content);
 	} else if (node != NULL && content == NULL) {
 		/* remove an existing description */
 		xmlUnlinkNode(node);
@@ -4446,7 +4446,7 @@ sa_set_resource_description(sa_resource_t resource, char *content)
 		node = _sa_set_share_description(resource, content);
 	} else if (node != NULL && content != NULL) {
 		/* update a description */
-		xmlNodeSetContent(node, (xmlChar *)content);
+		(void) xmlNodeSetContent(node, (xmlChar *)content);
 	} else if (node != NULL && content == NULL) {
 		/* remove an existing description */
 		xmlUnlinkNode(node);
