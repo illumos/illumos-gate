@@ -15,7 +15,7 @@
 .Dt USBA_HCDI_PIPE_RESET 9E
 .Os
 .Sh NAME
-.Nm usba_hcdi_pipe_rest
+.Nm usba_hcdi_pipe_reset
 .Nd reset an open USB pipe
 .Sh SYNOPSIS
 .In sys/usb/usba/hcdi.h

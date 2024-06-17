@@ -12,7 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_USB_XHCI_XHCI_H
@@ -341,6 +341,12 @@ typedef struct xhci_transfer {
 	usb_isoc_pkt_descr_t	*xt_isoc;
 	usb_opaque_t		xt_usba_req;
 } xhci_transfer_t;
+
+/*
+ * A transfer on a periodic endpoint does not generally have an associated USB
+ * request, except in the case of a oneshot Interrupt IN transfer.
+ */
+#define	XHCI_IS_ONESHOT_XFER(xt)	((xt)->xt_usba_req != NULL)
 
 /*
  * This represents a ring in xHCI, upon which event, transfer, and command TRBs
