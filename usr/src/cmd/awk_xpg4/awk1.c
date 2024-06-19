@@ -67,7 +67,7 @@ static void	awkvarinit(void);
 static wint_t	lexgetc(void);
 static void	lexungetc(wint_t c);
 static size_t	lexescape(wint_t endc, int regx, int cmd_line_operand);
-static void	awkierr(int perr, char *fmt, va_list ap) __NORETURN;
+static void	awkierr(int perr, const char *fmt, va_list ap) __NORETURN;
 static int	usage(void);
 void		strescape(wchar_t *str);
 static const char	*toprint(wint_t);
@@ -1146,8 +1146,8 @@ lexungetc(wint_t c)
 /*
  * Syntax errors during parsing.
  */
-void
-yyerror(char *s, ...)
+int
+yyerror(const char *s, ...)
 {
 	if (lexlast == FUNC || lexlast == GETLINE || lexlast == KEYWORD)
 		if (lexlast == KEYWORD)
@@ -1155,14 +1155,14 @@ yyerror(char *s, ...)
 		else
 			awkerr(gettext("attempt to redefine builtin function"));
 	awkerr(s);
+	return (0);
 }
 
 /*
  * Error routine for all awk errors.
  */
-/* ARGSUSED */
 void
-awkerr(char *fmt, ...)
+awkerr(const char *fmt, ...)
 {
 	va_list args;
 
@@ -1175,9 +1175,8 @@ awkerr(char *fmt, ...)
  * Error routine like "awkerr" except that it prints out
  * a message that includes an errno-specific indication.
  */
-/* ARGSUSED */
 void
-awkperr(char *fmt, ...)
+awkperr(const char *fmt, ...)
 {
 	va_list args;
 
@@ -1190,7 +1189,7 @@ awkperr(char *fmt, ...)
  * Common internal routine for awkerr, awkperr
  */
 static void
-awkierr(int perr, char *fmt, va_list ap)
+awkierr(int perr, const char *fmt, va_list ap)
 {
 	static char sep1[] = "\n>>>\t";
 	static char sep2[] = "\t<<<";

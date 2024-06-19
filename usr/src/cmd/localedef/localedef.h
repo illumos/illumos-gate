@@ -37,7 +37,7 @@ extern int undefok;	/* mostly ignore undefined symbols */
 extern int warnok;
 extern int warnings;
 
-void yyerror(const char *);
+int yyerror(const char *) __NORETURN;
 void errf(const char *, ...);
 void warn(const char *, ...);
 

@@ -105,12 +105,6 @@ clean:
 		$(XOBJS) $(LXOBJS) $(BOBJS) $(LOBJS) \
 		$(POFILE) $(POFILES) gnu_po.c y.tab.h xgettext.lx.c
 
-lint:	gnu_po.c y.tab.h
-	$(LINT.c) $(SOBJS:%.o=%.c) $(COBJS:%.o=%.c) $(LDLIBS)
-	$(LINT.c) $(GOBJS:%.o=%.c) $(BOBJS:%.o=%.c) $(COBJS:%.o=%.c) $(LDLIBS)
-	$(LINT.c) $(GOBJS:%.o=%.c) $(LOBJS:%.o=%.c) $(COBJS:%.o=%.c) $(LDLIBS)
-	$(LINT.c) $(XOBJS:%.o=%.c) $(LDLIBS)
-
 gnu_po.c + y.tab.h:	gnu_po.y
 	$(RM) gnu_po.c y.tab.h
 	$(YACC.y) gnu_po.y

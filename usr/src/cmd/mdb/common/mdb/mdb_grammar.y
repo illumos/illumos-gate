@@ -45,6 +45,8 @@
  * the * /.../ and % /.../ code below.
  */
 
+extern int yylex(void);
+
 static void
 vfetch(void *buf, size_t nbytes, uintptr_t addr)
 {
@@ -419,7 +421,7 @@ expression:	expression '+' expression { $$ = $1 + $3; }
 	|	MDB_TOK_SYMBOL {
 			if (strcmp($1, ".") == 0) {
 				$$ = mdb_nv_get_value(mdb.m_dot);
-				strfree($1);	
+				strfree($1);
 
 			} else {
 				const char *obj = MDB_TGT_OBJ_EVERY, *name = $1;
@@ -437,8 +439,8 @@ expression:	expression '+' expression { $$ = $1 + $3; }
 					yyperror("failed to dereference "
 					    "symbol");
 				}
-		
-				strfree($1);	
+
+				strfree($1);
 				$$ = (uintmax_t)sym.st_value;
 			}
 		}

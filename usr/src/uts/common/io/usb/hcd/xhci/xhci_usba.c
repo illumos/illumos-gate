@@ -12,7 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -316,7 +316,10 @@ xhci_hcdi_periodic_free(xhci_t *xhcip, xhci_pipe_t *xp)
  * the ring to basically 'consume' everything. For periodic IN endpoints, we
  * need to handle this somewhat differently and actually close the original
  * request and not deallocate the related pieces as those exist for the lifetime
- * of the endpoint and are constantly reused.
+ * of the endpoint and are constantly reused. While interrupt IN endpoints are
+ * mostly seen as periodic, oneshot transfers on those endpoints still bear a
+ * USB request that must be completed, and are a special case where we must
+ * still free the transfer.
  */
 static void
 xhci_hcdi_pipe_flush(xhci_t *xhcip, xhci_endpoint_t *xep, int intr_code)
@@ -326,7 +329,8 @@ xhci_hcdi_pipe_flush(xhci_t *xhcip, xhci_endpoint_t *xep, int intr_code)
 	ASSERT(MUTEX_HELD(&xhcip->xhci_lock));
 
 	while ((xt = list_remove_head(&xep->xep_transfers)) != NULL) {
-		if (xhci_endpoint_is_periodic_in(xep) == B_FALSE) {
+		if (xhci_endpoint_is_periodic_in(xep) == B_FALSE ||
+		    XHCI_IS_ONESHOT_XFER(xt)) {
 			usba_hcdi_cb(xep->xep_pipe, xt->xt_usba_req,
 			    USB_CR_FLUSHED);
 			xhci_transfer_free(xhcip, xt);
@@ -905,7 +909,7 @@ xhci_hcdi_pipe_bulk_xfer(usba_pipe_handle_data_t *ph, usb_bulk_req_t *ubrp,
 	epid = xhci_endpoint_pipe_to_epid(ph);
 	if (xd->xd_endpoints[epid] == NULL) {
 		mutex_exit(&xhcip->xhci_lock);
-		xhci_error(xhcip, "asked to do control transfer on slot %d, "
+		xhci_error(xhcip, "asked to do bulk transfer on slot %d, "
 		    "port %d, endpoint: %d, but no endpoint structure",
 		    xd->xd_slot, xd->xd_port, epid);
 		return (USB_FAILURE);

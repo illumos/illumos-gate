@@ -46,7 +46,7 @@ extern int cflag;
 extern int sflag;
 
 int yyparse(void);
-void yyerror(const char *);
+int yyerror(const char *) __NORETURN;
 void errf(const char *, ...);
 void warn(const char *, ...);
 

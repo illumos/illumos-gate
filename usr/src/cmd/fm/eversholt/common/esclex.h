@@ -70,8 +70,8 @@ extern int Pragma_trust_ereports;
 extern int Pragma_allow_cycles;
 
 /* exported by esclex.c but names are mandated by the way yacc works... */
-int yylex();
-void yyerror(const char *s);
+int yylex(void);
+int yyerror(const char *s);
 
 #ifdef	__cplusplus
 }

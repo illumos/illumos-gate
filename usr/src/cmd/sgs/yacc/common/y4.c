@@ -433,7 +433,7 @@ arout(wchar_t *s, int *v, int n)
 {
 	int i;
 
-	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
+	(void) fprintf(ftable, "static const yytabelem %ws[]={\n", s);
 	for (i = 0; i < n; ) {
 		if (i % 10 == 0)
 			(void) fprintf(ftable, "\n");

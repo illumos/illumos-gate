@@ -12,7 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -1273,13 +1273,13 @@ xhci_endpoint_dup_periodic(xhci_endpoint_t *xep, xhci_transfer_t *xt,
 	xhci_pipe_t *xp = (xhci_pipe_t *)xep->xep_pipe->p_hcd_private;
 	xhci_periodic_pipe_t *xpp = &xp->xp_periodic;
 
-	/*
-	 * In general, transfers shouldn't have a usb request. However, oneshot
-	 * Interrupt IN ones will, so we use this as a way to shortcut out of
-	 * here.
-	 */
-	if (xt->xt_usba_req != NULL)
+	if (XHCI_IS_ONESHOT_XFER(xt)) {
+		/*
+		 * Oneshot Interrupt IN transfers already have a USB request
+		 * which we can just return:
+		 */
 		return (xt->xt_usba_req);
+	}
 
 	if (xep->xep_type == USB_EP_ATTR_INTR) {
 		urp = (usb_opaque_t)usba_hcdi_dup_intr_req(xep->xep_pipe->p_dip,

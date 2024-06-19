@@ -47,7 +47,7 @@ static wchar_t  L_PctUpT[]= {'%', 'T', 0};
 static wchar_t  L_PctLoT[]= {'%', 't', 0};
 static wchar_t  L_PctCbr[]= {'%', '}', 0};
 
-void yyerror(char *);
+int yyerror(const char *);
 %}
 
 /* parser.y */

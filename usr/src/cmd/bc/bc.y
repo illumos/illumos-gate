@@ -42,7 +42,7 @@ static int *bundle(int, ...);
 static void usage(void);
 
 int	cpeek(char, int, char, int, char);
-void	yyerror(char *);
+int	yyerror(const char *);
 
 #define	STRING_SIZE	(BC_STRING_MAX + 3)	/* string plus quotes */
 						/* plus NULL */
@@ -569,7 +569,7 @@ CRS	:
 			if (crs == 'a')
 				crs = '{';
 			if (crs >= 0241) {
-				yyerror("program too big");
+				(void) yyerror("program too big");
 				getout(1);
 			}
 			bstack[bindx++] = lev++;
@@ -830,7 +830,7 @@ gotit:
 		while ((c = getch()) != '"') {
 			*str++ = c;
 			if (str >= &string[STRING_SIZE-1]) {
-				yyerror("string space exceeded");
+				(void) yyerror("string space exceeded");
 				getout(1);
 			}
 		}
@@ -889,7 +889,7 @@ loop:
 		sargv[ifile]);
 	ln = -1;
 	ss = "command line";
-	yyerror(mbuf);
+	(void) yyerror(mbuf);
 	getout(1);
 	/*NOTREACHED*/
 }
@@ -912,7 +912,7 @@ bundle(int i, ...)
 		printf("bundle %d elements at %o\n", i, q);
 	while (i-- > 0) {
 		if (b_sp_nxt >= & b_space[b_sp_max])
-			yyerror("bundling space exceeded");
+			(void) yyerror("bundling space exceeded");
 		*b_sp_nxt++ = va_arg(ap, int);
 	}
 	* b_sp_nxt++ = 0;
@@ -955,8 +955,8 @@ conout(int *p, char *s)
 	lev--;
 }
 
-void
-yyerror(char *s)
+int
+yyerror(const char *s)
 {
 	if (ifile >= sargc)
 		ss = "teletype";
@@ -973,6 +973,7 @@ yyerror(char *s)
 	bindx = 0;
 	lev = 0;
 	b_sp_nxt = &b_space[0];
+	return (0);
 }
 
 void
@@ -980,7 +981,7 @@ checkbuffer(void)
 {
 	/* Do not exceed the last char in input line buffer */
 	if (cp >= cpend) {
-		yyerror("line too long\n");
+		(void) yyerror("line too long\n");
 		getout(1);
 	}
 }
@@ -1021,7 +1022,7 @@ yyinit(int argc, char **argv)
 			sargv[0]);
 		ln = -1;
 		ss = "command line";
-		yyerror(mbuf);
+		(void) yyerror(mbuf);
 		getout(1);
 	}
 	ifile = 0;

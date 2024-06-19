@@ -533,8 +533,7 @@ term:
  * to right without recursion.
  */
 static NODE *
-fliplist(np)
-register NODE *np;
+fliplist(NODE *np)
 {
 	int type;
 

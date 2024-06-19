@@ -190,16 +190,16 @@ setup(int argc, char *argv[])
 	fdefine = NULL;
 	i = 1;
 
-	tokname = (wchar_t *)malloc(sizeof (wchar_t) * toksize);
-	tokset = (TOKSYMB *)malloc(sizeof (TOKSYMB) * ntoksz);
-	toklev = (int *)malloc(sizeof (int) * ntoksz);
-	nontrst = (NTSYMB *)malloc(sizeof (NTSYMB) * nnontersz);
-	mem0 = (int *)malloc(sizeof (int) * new_memsize);
-	prdptr = (int **)malloc(sizeof (int *) * (nprodsz+2));
-	levprd = (int *)malloc(sizeof (int) * (nprodsz+2));
-	had_act = (wchar_t *)calloc((nprodsz + 2), sizeof (wchar_t));
-	lhstext = (wchar_t *)calloc(1, sizeof (wchar_t) * LHS_TEXT_LEN);
-	rhstext = (wchar_t *)calloc(1, sizeof (wchar_t) * RHS_TEXT_LEN);
+	tokname = malloc(sizeof (wchar_t) * toksize);
+	tokset = malloc(sizeof (TOKSYMB) * ntoksz);
+	toklev = malloc(sizeof (int) * ntoksz);
+	nontrst = malloc(sizeof (NTSYMB) * nnontersz);
+	mem0 = malloc(sizeof (int) * new_memsize);
+	prdptr = malloc(sizeof (int *) * (nprodsz + 2));
+	levprd = malloc(sizeof (int) * (nprodsz + 2));
+	had_act = calloc(nprodsz + 2, sizeof (wchar_t));
+	lhstext = calloc(LHS_TEXT_LEN, sizeof (wchar_t));
+	rhstext = calloc(RHS_TEXT_LEN, sizeof (wchar_t));
 	aryfil(toklev, ntoksz, 0);
 	aryfil(levprd, nprodsz, 0);
 	for (ii = 0; ii < ntoksz; ++ii)
@@ -507,9 +507,10 @@ setup(int argc, char *argv[])
 						SETPLEV(toklev[j], i);
 					} else {
 						if (ASSOC(toklev[j]))
-						(void) warning(1, gettext(
+							(void) warning(1,
+							    gettext(
 				"redeclaration of precedence of %ws."),
-						    tokname);
+							    tokname);
 						SETASC(toklev[j], lev);
 						}
 					if (ty) {
@@ -587,38 +588,12 @@ setup(int argc, char *argv[])
 	end_toks();	/* all tokens dumped - get ready for reductions */
 
 	(void) fprintf(ftable, "\n#include <inttypes.h>\n");
-	(void) fprintf(ftable, "\n#ifdef __STDC__\n");
 	(void) fprintf(ftable, "#include <stdlib.h>\n");
 	(void) fprintf(ftable, "#include <string.h>\n");
-	(void) fprintf(ftable, "#define	YYCONST	const\n");
-	(void) fprintf(ftable, "#else\n");
-	(void) fprintf(ftable, "#include <malloc.h>\n");
-	(void) fprintf(ftable, "#include <memory.h>\n");
-	(void) fprintf(ftable, "#define	YYCONST\n");
-	(void) fprintf(ftable, "#endif\n");
 	(void) fprintf(ftable, "\n#include <values.h>\n");
 
 	if (sym_prefix[0] != '\0')
 		put_prefix_define(sym_prefix);
-
-	(void) fprintf(ftable,
-	    "\n#if defined(__cplusplus) || defined(__STDC__)\n");
-	(void) fprintf(ftable, "\n#if defined(__cplusplus)\n");
-	(void) fprintf(ftable, "extern \"C\" {\n");
-	(void) fprintf(ftable, "#endif\n");
-	(void) fprintf(ftable, "#ifndef yyerror\n");
-	(void) fprintf(ftable, "#if defined(__cplusplus)\n");
-	(void) fprintf(ftable, "	void yyerror(YYCONST char *);\n");
-	(void) fprintf(ftable, "#endif\n");
-	(void) fprintf(ftable, "#endif\n");
-	(void) fprintf(ftable, "#ifndef yylex\n");
-	(void) fprintf(ftable, "	int yylex(void);\n");
-	(void) fprintf(ftable, "#endif\n");
-	(void) fprintf(ftable, "	int yyparse(void);\n");
-	(void) fprintf(ftable, "#if defined(__cplusplus)\n");
-	(void) fprintf(ftable, "}\n");
-	(void) fprintf(ftable, "#endif\n");
-	(void) fprintf(ftable, "\n#endif\n\n");
 
 	(void) fprintf(ftable, "#define yyclearin yychar = -1\n");
 	(void) fprintf(ftable, "#define yyerrok yyerrflag = 0\n");
@@ -1883,9 +1858,7 @@ end_toks(void)	/* finish yytoks array, get ready for yyred's strings */
 {
 	(void) fprintf(fdebug, "\t\"-unknown-\",\t-1\t/* ends search */\n");
 	(void) fprintf(fdebug, "};\n\n");
-	(void) fprintf(fdebug,
-	    "#ifdef __cplusplus\nconst\n#endif\n");
-	(void) fprintf(fdebug, "char * yyreds[] =\n{\n");
+	(void) fprintf(fdebug, "const char * yyreds[] =\n{\n");
 	(void) fprintf(fdebug, "\t\"-no such reduction-\",\n");
 }
 

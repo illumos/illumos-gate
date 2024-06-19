@@ -598,7 +598,7 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 				desc = xmlNewChild(node, NULL,
 				    (xmlChar *)"description", NULL);
 				if (desc != NULL)
-					xmlNodeSetContent(desc,
+					(void) xmlNodeSetContent(desc,
 					    (xmlChar *)valuestr);
 			}
 		}

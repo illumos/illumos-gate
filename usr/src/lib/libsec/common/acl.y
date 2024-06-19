@@ -30,6 +30,8 @@
 
 extern int yyinteractive;
 extern acl_t *yyacl;
+extern int yylex(void);
+
 %}
 
 %union {

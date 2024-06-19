@@ -184,8 +184,7 @@ const nvme_field_info_t nvme_log_fields[] = {
 		.nlfi_def_allow = true
 	},
 	[NVME_LOG_REQ_FIELD_NSID] = {
-		.nlfi_vers = &nvme_vers_1v2,
-		.nlfi_sup = nvme_field_supported_nsid,
+		.nlfi_vers = &nvme_vers_1v0,
 		.nlfi_valid = nvme_field_valid_nsid,
 		.nlfi_spec = "nsid",
 		.nlfi_human = "namespace ID",

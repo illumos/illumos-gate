@@ -807,7 +807,7 @@ lmrc_intr_fini(lmrc_t *lmrc)
 {
 	uint_t i;
 
-	if (lmrc->l_intr_htable[0] == NULL)
+	if (lmrc->l_intr_htable == NULL || lmrc->l_intr_htable[0] == NULL)
 		return;
 
 	if ((lmrc->l_intr_cap & DDI_INTR_FLAG_BLOCK) != 0) {
@@ -948,7 +948,8 @@ lmrc_alloc_mpt_cmds(lmrc_t *lmrc, const size_t ncmd)
 	if (ret != DDI_SUCCESS)
 		return (ret);
 
-	cmds = kmem_zalloc(ncmd * sizeof (lmrc_mpt_cmd_t *), KM_SLEEP);
+	lmrc->l_mpt_cmds = cmds =
+	    kmem_zalloc(ncmd * sizeof (lmrc_mpt_cmd_t *), KM_SLEEP);
 	for (i = 0; i < ncmd; i++) {
 		cmd = kmem_zalloc(sizeof (lmrc_mpt_cmd_t), KM_SLEEP);
 
@@ -1004,7 +1005,6 @@ lmrc_alloc_mpt_cmds(lmrc_t *lmrc, const size_t ncmd)
 		list_insert_tail(&lmrc->l_mpt_cmd_list, cmd);
 	}
 
-	lmrc->l_mpt_cmds = cmds;
 	return (DDI_SUCCESS);
 
 fail:
@@ -1048,7 +1048,8 @@ lmrc_alloc_mfi_cmds(lmrc_t *lmrc, const size_t ncmd)
 	lmrc_mfi_cmd_t *mfi;
 	uint32_t i;
 
-	cmds = kmem_zalloc(ncmd * sizeof (lmrc_mfi_cmd_t *), KM_SLEEP);
+	lmrc->l_mfi_cmds = cmds =
+	    kmem_zalloc(ncmd * sizeof (lmrc_mfi_cmd_t *), KM_SLEEP);
 	for (i = 0; i < ncmd; i++) {
 		mfi = kmem_zalloc(sizeof (lmrc_mfi_cmd_t), KM_SLEEP);
 		ret = lmrc_dma_alloc(lmrc, lmrc->l_dma_attr,
@@ -1073,7 +1074,6 @@ lmrc_alloc_mfi_cmds(lmrc_t *lmrc, const size_t ncmd)
 		list_insert_tail(&lmrc->l_mfi_cmd_list, mfi);
 	}
 
-	lmrc->l_mfi_cmds = cmds;
 	return (DDI_SUCCESS);
 
 fail:

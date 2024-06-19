@@ -129,7 +129,7 @@ static int edited = PO_FALSE;		/* Has the configuration been changed */
 /* yacc externals */
 extern FILE *yyin;
 extern int yydebug;
-extern void yyerror(char *s);
+extern int yyerror(const char *s);
 
 /* Utility functions */
 static void arg_parse(const char *);

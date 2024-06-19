@@ -53,7 +53,7 @@ int lex_lineno = 1;	/* line number for error reporting */
 static int state = INITIAL;
 extern boolean_t cmd_file_mode;
 extern boolean_t saw_error;
-extern void yyerror(char *s);
+extern int yyerror(const char *s);
 
 static char *create_token(char *s);
 %}
@@ -514,7 +514,7 @@ create_token(char *s)
 	char *result;
 
 	if ((result = strdup(s)) == NULL) {
-		yyerror("Out of memory");
+		(void) yyerror("Out of memory");
 		exit(Z_ERR);
 	}
 
@@ -531,7 +531,7 @@ create_token(char *s)
 		new_unclaimed_tokens = (char **)realloc(unclaimed_tokens,
 		    unclaimed_tokens_size * sizeof (char *));
 		if (new_unclaimed_tokens == NULL) {
-			yyerror("Out of memory");
+			(void) yyerror("Out of memory");
 			free(result);
 			exit(Z_ERR);
 		}
@@ -542,8 +542,8 @@ create_token(char *s)
 	return (result);
 }
 
-void
-yyerror(char *s)
+int
+yyerror(const char *s)
 {
 	/*
 	 * Ensure that we won't leak unclaimed tokens.
@@ -557,7 +557,7 @@ yyerror(char *s)
 			(void) fprintf(stderr, gettext("%s, token expected\n"),
 			    s);
 		}
-		return;
+		return (0);
 	}
 
 	saw_error = B_TRUE;
@@ -568,4 +568,5 @@ yyerror(char *s)
 		(void) fprintf(stderr, gettext("%s at '%s'\n"), s,
 		    (yytext[0] == '\n') ? "\\n" : yytext);
 	usage(B_FALSE, HELP_SUBCMDS);
+	return (0);
 }

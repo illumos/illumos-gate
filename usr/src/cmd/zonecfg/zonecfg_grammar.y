@@ -49,7 +49,7 @@ extern int num_prop_vals;		/* # of property values */
 
 /* yacc externals */
 extern int yydebug;
-extern void yyerror(char *s);
+extern int yyerror(const char *s);
 
 /*
  * This function is used by the simple_prop_val reduction rules to set up
@@ -1084,7 +1084,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| SCHED		{ $$ = PT_SCHED; }
 	| HOSTID	{ $$ = PT_HOSTID; }
 	| USER		{ $$ = PT_USER; }
-	| AUTHS 	{ $$ = PT_AUTHS; }
+	| AUTHS		{ $$ = PT_AUTHS; }
 	| FS_ALLOWED	{ $$ = PT_FS_ALLOWED; }
 	| UUID		{ $$ = PT_UUID; }
 	| ZFSPRI	{ $$ = PT_ZFSPRI; }

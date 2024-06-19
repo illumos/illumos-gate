@@ -48,7 +48,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef AWK_H
 #define	AWK_H
@@ -348,7 +348,7 @@ extern	int	readrec(char **, size_t *, FILE *);
 extern	void	bracecheck(void);
 extern	void	recinit(unsigned int n);
 extern	void	syminit(void);
-extern	void	yyerror(const char *);
+extern	int	yyerror(const char *);
 extern	void	fldbld(void);
 extern	void	recbld(void);
 extern	int	getrec(char **, size_t *, int);

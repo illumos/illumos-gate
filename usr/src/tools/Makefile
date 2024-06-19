@@ -48,7 +48,8 @@ BOOT_SUBDIRS=		\
 	.WAIT		\
 	install.bin	\
 	.WAIT		\
-	ctf
+	ctf		\
+	yacc
 
 COMMON_SUBDIRS=		\
 	codesign	\

@@ -610,14 +610,15 @@ get_linemsgid(int line)
 	return (NOLINEMSG);
 }
 
-void
-yyerror(char *s)
+int
+yyerror(const char *s)
 {
 	if ((IsActiveMode(PreProcessMode) && pound_is_mine == FALSE) ||
 	    IsActiveMode(ReplaceMode)) {
-		return;
+		return (0);
 	}
 	src_err(srcfile, lineno, gettext("%s before or at: %s"), s, yytext);
+	return (0);
 }
 
 void

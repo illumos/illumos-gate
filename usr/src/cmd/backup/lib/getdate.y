@@ -470,11 +470,10 @@ static TABLE	MilitaryTable[] = {
 
 
 
-/* ARGSUSED */
-static void
-yyerror(s)
-    char	*s;
+static int
+yyerror(const char *s __unused)
 {
+	return (0);
 }
 
 

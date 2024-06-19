@@ -158,8 +158,8 @@ peek(int c, int r1, int r2)
 	return (r1);
 }
 
-/*ARGSUSED*/
-static void
-yyerror(YYCONST char *msg)
+static int
+yyerror(const char *msg __unused)
 {
+	return (0);
 }

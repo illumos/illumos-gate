@@ -29,6 +29,8 @@
 
 #include "svccfg.h"
 
+extern int yylex(void);
+
 uu_list_pool_t *string_pool;
 
 %}

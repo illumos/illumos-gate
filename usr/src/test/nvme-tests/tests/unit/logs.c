@@ -489,20 +489,6 @@ static const nvme_unit_field_test_t log_field_tests[] = { {
 	.nu_value = 0xfffffffffffffffc,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "unsupported nsid (1.0)",
-	.nu_fields = nvme_log_fields,
-	.nu_index = NVME_LOG_REQ_FIELD_NSID,
-	.nu_data = &nvme_ctrl_base_1v0,
-	.nu_value = 0x1,
-	.nu_ret = NVME_FIELD_ERR_UNSUP_VERSION
-}, {
-	.nu_desc = "unsupported nsid (2.0 No NS)",
-	.nu_fields = nvme_log_fields,
-	.nu_index = NVME_LOG_REQ_FIELD_NSID,
-	.nu_data = &nvme_ctrl_nons_2v0,
-	.nu_value = 0x1,
-	.nu_ret = NVME_FIELD_ERR_UNSUP_FIELD
-}, {
 	.nu_desc = "invalid nsid (1.4) (1)",
 	.nu_fields = nvme_log_fields,
 	.nu_index = NVME_LOG_REQ_FIELD_NSID,
@@ -524,6 +510,13 @@ static const nvme_unit_field_test_t log_field_tests[] = { {
 	.nu_value = 0x81,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
+	.nu_desc = "valid nsid (1.0)",
+	.nu_fields = nvme_log_fields,
+	.nu_index = NVME_LOG_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x1,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
 	.nu_desc = "valid nsid (1.4) (1)",
 	.nu_fields = nvme_log_fields,
 	.nu_index = NVME_LOG_REQ_FIELD_NSID,
@@ -543,6 +536,13 @@ static const nvme_unit_field_test_t log_field_tests[] = { {
 	.nu_index = NVME_LOG_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_ns_1v4,
 	.nu_value = 0x23,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "valid nsid (2.0 No NS)",
+	.nu_fields = nvme_log_fields,
+	.nu_index = NVME_LOG_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_nons_2v0,
+	.nu_value = 0x1,
 	.nu_ret = NVME_FIELD_ERR_OK
 } };
 

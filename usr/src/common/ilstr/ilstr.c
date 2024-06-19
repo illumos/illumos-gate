@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifdef _KERNEL
@@ -54,6 +54,16 @@ ilstr_init(ilstr_t *ils, int kmflag)
 	ils->ils_kmflag = kmflag;
 }
 
+/*
+ * Wrap an ilstr_t object around an existing buffer.  This is useful if you are
+ * using stack storage, or you have a pre-allocated error buffer for best
+ * effort error message construction in the face of memory exhaustion.
+ *
+ * This routine also allows ilstr to be used to assemble a string in a buffer
+ * provided by a caller.  In this case it is safe to return without calling
+ * ilstr_fini(), as ilstr does not allocate any resources that need to be
+ * cleaned up.
+ */
 void
 ilstr_init_prealloc(ilstr_t *ils, char *buf, size_t buflen)
 {
@@ -78,6 +88,12 @@ ilstr_reset(ilstr_t *ils)
 	ils->ils_errno = ILSTR_ERROR_OK;
 }
 
+/*
+ * This function frees any resources allocated by ilstr_init(), and must be
+ * called prior to the ilstr_t object going out of scope.  If
+ * ilstr_init_prealloc() is used, calling this function is optional but
+ * harmless.
+ */
 void
 ilstr_fini(ilstr_t *ils)
 {

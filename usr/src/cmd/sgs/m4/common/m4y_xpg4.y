@@ -179,8 +179,8 @@ peek3(char c1, int rc1, char c2, int rc2, int rc3)
 	return (rc3);
 }
 
-/*ARGSUSED*/
-static void
-yyerror(YYCONST char *msg)
+static int
+yyerror(const char *msg __unused)
 {
+	return (0);
 }

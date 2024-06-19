@@ -36,7 +36,7 @@ int lex_lineno = 1;	/* line number for error reporting */
 static int state = INITIAL;
 extern boolean_t cmd_file_mode;
 
-extern void yyerror(char *s);
+int yyerror(const char *s);
 char *safe_strdup(char *s);
 %}
 
@@ -220,7 +220,7 @@ char *safe_strdup(char *s);
 
 <TSTATE>\-[adftV] {	/* matches options */
 			yylval.strval = safe_strdup(yytext);
-			return OPTION; 
+			return OPTION;
 		}
 
 <TSTATE>[^ \t\n\";=\[\]\(\)]+	{	/* matches non-quoted values */
@@ -263,14 +263,14 @@ safe_strdup(char *s)
 	char *result;
 
 	if ((result = strdup(s)) == NULL) {
-		yyerror("Out of memory");
+		(void) yyerror("Out of memory");
 		exit(1);
 	}
 	return (result);
 }
 
-void
-yyerror(char *s)
+int
+yyerror(const char *s)
 {
 	/* feof(yyin) is not an error; anything else is, so we set saw_error */
 	if (yytext[0] == '\0') {
@@ -279,7 +279,7 @@ yyerror(char *s)
 			(void) fprintf(stderr, gettext("%s, token expected\n"),
 			    s);
 		}
-		return;
+		return (0);
 	}
 
 	saw_error = B_TRUE;
@@ -291,4 +291,5 @@ yyerror(char *s)
 		    (yytext[0] == '\n') ? "\\n" : yytext);
 	}
 	help_wrap();
+	return (0);
 }

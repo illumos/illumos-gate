@@ -41,7 +41,7 @@
 {\
 	if ( yychar >= 0 || ( yyr2[ yytmp ] >> 1 ) != 1 )\
 	{\
-		yyerror( "syntax error - cannot backup" );\
+		(void) yyerror( "syntax error - cannot backup" );\
 		goto yyerrlab;\
 	}\
 	yychar = newtoken;\
@@ -91,7 +91,8 @@ int yychar;			/* current input token number */
 **	If i<255, i itself is the token.  If i>255 but the neither
 **	of the 30th or 31st bit is on, i is already a token.
 */
-int yycvtok(int i)
+int
+yycvtok(int i)
 {
 	int first = 0;
 	int last = YYNMBCHARS - 1;
@@ -126,7 +127,8 @@ int yycvtok(int i)
 /*
 ** yyparse - return 0 if worked, 1 if syntax error not recovered from
 */
-int yyparse(void)
+int
+yyparse(void)
 {
 	YYSTYPE *yypvt = 0;	/* top of value stack for $vars */
 
@@ -159,7 +161,7 @@ int yyparse(void)
 	{
 		if ((yymaxdepth = YYEXPAND(0)) <= 0)
 		{
-			yyerror("yacc initialization error");
+			(void) yyerror("yacc initialization error");
 			YYABORT;
 		}
 	}
@@ -262,7 +264,7 @@ int yyparse(void)
 #endif
 			if (yynewmax <= yymaxdepth)	/* tables not expanded */
 			{
-				yyerror( "yacc stack overflow" );
+				(void) yyerror( "yacc stack overflow" );
 				YYABORT;
 			}
 			yymaxdepth = yynewmax;
@@ -360,7 +362,7 @@ int yyparse(void)
 			** look through exception table
 			*/
 			{
-				YYCONST int *yyxi = yyexca;
+				const int *yyxi = yyexca;
 
 				while ( ( *yyxi != -1 ) ||
 					( yyxi[1] != yy_state ) )
@@ -384,7 +386,7 @@ int yyparse(void)
 			switch ( yyerrflag )
 			{
 			case 0:		/* new error */
-				yyerror( "syntax error" );
+				(void) yyerror( "syntax error" );
 				goto skip_init;
 			yyerrlab:
 				/*

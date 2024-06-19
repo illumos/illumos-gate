@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -31,6 +32,7 @@
 #include <limits.h>
 #include <libcmdutils.h>
 #include <fts.h>
+#include <sys/ilstr.h>
 
 #include <sys/usb/clients/ccid/uccid.h>
 #include <atr.h>
@@ -157,70 +159,59 @@ ccidadm_iter(boolean_t readeronly, boolean_t newline,
 }
 
 static void
-ccidadm_list_slot_status_str(uccid_cmd_status_t *ucs, char *buf, uint_t buflen)
+ccidadm_list_slot_status_str(uccid_cmd_status_t *ucs, ilstr_t *s)
 {
 	if (!(ucs->ucs_status & UCCID_STATUS_F_CARD_PRESENT)) {
-		(void) snprintf(buf, buflen, "missing");
+		ilstr_append_str(s, "missing");
 		return;
 	}
 
-	if (ucs->ucs_status & UCCID_STATUS_F_CARD_ACTIVE) {
-		(void) snprintf(buf, buflen, "activated");
-		return;
+	if (!(ucs->ucs_status & UCCID_STATUS_F_CARD_ACTIVE)) {
+		ilstr_append_str(s, "un");
 	}
 
-	(void) snprintf(buf, buflen, "unactivated");
+	ilstr_append_str(s, "activated");
 }
 
-static boolean_t
-ccidadm_list_slot_transport_str(uccid_cmd_status_t *ucs, char *buf,
-    uint_t buflen)
+static void
+ccidadm_list_slot_transport_str(uccid_cmd_status_t *ucs, ilstr_t *s)
 {
-	const char *prot;
-	const char *tran;
 	uint_t bits = CCID_CLASS_F_TPDU_XCHG | CCID_CLASS_F_SHORT_APDU_XCHG |
 	    CCID_CLASS_F_EXT_APDU_XCHG;
 
 	switch (ucs->ucs_class.ccd_dwFeatures & bits) {
 	case 0:
-		tran = "character";
+		ilstr_append_str(s, "character");
 		break;
 	case CCID_CLASS_F_TPDU_XCHG:
-		tran = "TPDU";
+		ilstr_append_str(s, "TPDU");
 		break;
 	case CCID_CLASS_F_SHORT_APDU_XCHG:
 	case CCID_CLASS_F_EXT_APDU_XCHG:
-		tran = "APDU";
+		ilstr_append_str(s, "APDU");
 		break;
 	default:
-		tran = "unknown";
+		ilstr_append_str(s, "unknown");
 		break;
 	}
 
 	if ((ucs->ucs_status & UCCID_STATUS_F_PARAMS_VALID) != 0) {
 		switch (ucs->ucs_prot) {
 		case UCCID_PROT_T0:
-			prot = " (T=0)";
+			ilstr_append_str(s, " (T=0)");
 			break;
 		case UCCID_PROT_T1:
-			prot = " (T=1)";
+			ilstr_append_str(s, " (T=1)");
 			break;
 		default:
-			prot = "";
 			break;
 		}
-	} else {
-		prot = "";
 	}
-
-	return (snprintf(buf, buflen, "%s%s", tran, prot) < buflen);
 }
 
-static boolean_t
-ccidadm_list_slot_usable_str(uccid_cmd_status_t *ucs, char *buf,
-    uint_t buflen)
+static void
+ccidadm_list_slot_usable_str(uccid_cmd_status_t *ucs, ilstr_t *s)
 {
-	const char *un = "";
 	ccid_class_features_t feat;
 	uint_t prot = CCID_CLASS_F_SHORT_APDU_XCHG | CCID_CLASS_F_EXT_APDU_XCHG;
 	uint_t param = CCID_CLASS_F_AUTO_PARAM_NEG | CCID_CLASS_F_AUTO_PPS;
@@ -231,45 +222,41 @@ ccidadm_list_slot_usable_str(uccid_cmd_status_t *ucs, char *buf,
 	if ((feat & prot) == 0 ||
 	    (feat & param) != param ||
 	    (feat & clock) != clock) {
-		un = "un";
+		ilstr_append_str(s, "un");
 	}
 
-	return (snprintf(buf, buflen, "%ssupported", un) < buflen);
+	ilstr_append_str(s, "supported");
 }
 
 static boolean_t
 ccidadm_list_ofmt_cb(ofmt_arg_t *ofmt, char *buf, uint_t buflen)
 {
 	ccid_list_ofmt_arg_t *cloa = ofmt->ofmt_cbarg;
+	ilstr_t s;
+
+	ilstr_init_prealloc(&s, buf, buflen);
 
 	switch (ofmt->ofmt_id) {
 	case CCIDADM_LIST_DEVICE:
-		if (snprintf(buf, buflen, "%s", cloa->cloa_name) >= buflen) {
-			return (B_FALSE);
-		}
+		ilstr_append_str(&s, cloa->cloa_name);
 		break;
 	case CCIDADM_LIST_PRODUCT:
-		if (snprintf(buf, buflen, "%s",
-		    cloa->cloa_status->ucs_product) >= buflen) {
-			return (B_FALSE);
-		}
+		ilstr_append_str(&s, cloa->cloa_status->ucs_product);
 		break;
 	case CCIDADM_LIST_STATE:
-		ccidadm_list_slot_status_str(cloa->cloa_status, buf, buflen);
+		ccidadm_list_slot_status_str(cloa->cloa_status, &s);
 		break;
 	case CCIDADM_LIST_TRANSPORT:
-		return (ccidadm_list_slot_transport_str(cloa->cloa_status, buf,
-		    buflen));
+		ccidadm_list_slot_transport_str(cloa->cloa_status, &s);
 		break;
 	case CCIDADM_LIST_SUPPORTED:
-		return (ccidadm_list_slot_usable_str(cloa->cloa_status, buf,
-		    buflen));
+		ccidadm_list_slot_usable_str(cloa->cloa_status, &s);
 		break;
 	default:
 		return (B_FALSE);
 	}
 
-	return (B_TRUE);
+	return (ilstr_errno(&s) == ILSTR_ERROR_OK);
 }
 
 static void
