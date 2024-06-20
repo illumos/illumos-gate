@@ -47,7 +47,7 @@ extern "C" {
 
 
 /*
- * Solaris defines system structs that elfdump needs to display
+ * illumos defines system structs that elfdump needs to display
  * data from. We have a variety of hurdles to overcome in doing this:
  *
  *	- The size of system types can differ between ELFCLASS32 and
@@ -550,6 +550,15 @@ typedef struct {
 	sl_field_t		pru_data;
 } sl_prupanic_layout_t;
 
+typedef struct {
+	sl_field_t		sizeof_struct;
+	sl_field_t		prcwd_fsid;
+	sl_field_t		prcwd_fsname;
+	sl_field_t		prcwd_mntpt;
+	sl_field_t		prcwd_mntspec;
+	sl_field_t		prcwd_cwd;
+} sl_prcwd_layout_t;
+
 /*
  * This type collects all of the layout definitions for
  * a given architecture.
@@ -578,6 +587,7 @@ typedef struct {
 	const sl_prsecflags_layout_t	*prsecflags;	/* prsecflags_t */
 	const sl_prlwpname_layout_t	*prlwpname;	/* prlwpname_t */
 	const sl_prupanic_layout_t	*prupanic;	/* prupanic_t */
+	const sl_prcwd_layout_t		*prcwd;		/* prcwd_t */
 } sl_arch_layout_t;
 
 

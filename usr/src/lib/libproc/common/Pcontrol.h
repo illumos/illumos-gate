@@ -27,7 +27,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_PCONTROL_H
@@ -175,6 +175,7 @@ typedef struct core_info {	/* information specific to core files */
 	char *core_zonename;	/* zone name from core file */
 	prsecflags_t *core_secflags; /* secflags from core file */
 	prupanic_t *core_upanic; /* upanic from core file */
+	prcwd_t *core_cwd;	/* cwd from core file */
 #if defined(__i386) || defined(__amd64)
 	struct ssd *core_ldt;	/* LDT entries from core file */
 	uint_t core_nldt;	/* number of LDT entries in core file */
@@ -303,6 +304,7 @@ extern	struct ps_lwphandle *Lfind(struct ps_prochandle *, lwpid_t);
 extern	int	Lstopstatus(struct ps_lwphandle *, long, uint_t);
 
 extern char	procfs_path[PATH_MAX];
+extern ssize_t	proc_get_cwd(pid_t, char *, size_t);
 
 /*
  * Architecture-dependent definition of the breakpoint instruction.

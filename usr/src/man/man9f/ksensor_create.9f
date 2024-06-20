@@ -1,0 +1,270 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd May 10, 2024
+.Dt KSENSOR_CREATE 9F
+.Os
+.Sh NAME
+.Nm ksensor_create ,
+.Nm ksensor_create_scalar_pcidev ,
+.Nm ksensor_remove
+.Nd create and remove ksensors
+.Sh SYNOPSIS
+.In sys/sensors.h
+.Ft int
+.Fo ksensor_create
+.Fa "dev_info_t *dip"
+.Fa "const ksensor_ops_t *ops"
+.Fa "void *driver"
+.Fa "const char *name"
+.Fa "const char *class"
+.Fa "id_t *idp"
+.Fc
+.Ft int
+.Fo ksensor_create_scalar_pcidev
+.Fa "dev_info_t *dip"
+.Fa "uint64_t kind"
+.Fa "const ksensor_ops_t *ops"
+.Fa "void *driver"
+.Fa "const char *name"
+.Fa "id_t *idp"
+.Fc
+.Ft int
+.Fo ksensor_remove
+.Fa "dev_info_t *dip"
+.Fa "id_t id"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa class
+A string that indicates the class of sensor, see
+.Xr ksensor 9E
+for more information.
+.It Fa dip
+Pointer to the driver's
+.Vt dev_info_t
+structure for the specific instance.
+.It Fa driver
+An opaque pointer that will be provided back to the driver in
+.Xr ksensor_ops 9E
+entry points.
+.It Fa id
+A ksensor's ID which can be used to refer back to it in the framework.
+.It Fa idp
+A pointer which will be filled in with a created ksensor's ID.
+.It Fa kind
+A sensor kind, see
+.Xr ksensor 9E
+for a list of kinds.
+.It Fa name
+The name of the ksensor.
+.It Fa ops
+The ksensor operations vector, see
+.Xr ksensor_ops 9E .
+.El
+.Sh DESCRIPTION
+The
+.Fn ksensor_create
+and
+.Fn ksensor_create_scalar_pcidev
+functions are used to create ksensors and register them with the
+.Xr ksensor 9E
+framework during a driver's
+.Xr attach 9E
+entry point.
+A created ksensor is identified by the combination of the driver's
+.Fa dip
+and an ID which is returned in
+.Fa idp ,
+which should be kept so the ksensor can be removed via a subsequent call to
+.Fn ksensor_remove .
+.Pp
+The
+.Fn ksensor_create_scalar_pcidev
+function is used to create a ksensor for a PCI or PCIe device and will
+cause it to automatically be registered with the fault management
+architecture.
+.Fa kind
+is one of the sensor kinds listed in
+.Xr ksensor 9E .
+.Pp
+.Fa name
+should be something semantic about what the sensor is or its location in
+the device.
+For example, a voltage or current sensor should try to name the sensor
+based on the rail or supply it measures such as Vdd.
+Similarly, a temperature sensor should try to indicate where it measures
+the temperature.
+.Pp
+The
+.Fa ops
+argument provides the operations vector that the ksensor framework
+should use for making calls.
+The passed in structure must remain valid across the lifetime of the
+ksensor and often is a constant structure in the driver's program text.
+See
+.Xr ksensor_ops 9E
+for more information on the semantics of the callback operations vector.
+These operations vectors will not be called during a driver's
+.Xr attach 9E
+or
+.Xr detach 9E
+entry points, but can otherwise be called in parallel from multiple
+different threads.
+The framework does not provide any serialization.
+.Pp
+The opaque pointer
+.Fa driver ,
+will be returned as part of calling any of the
+.Xr ksensor_ops 9E
+entry points.
+As the framework does not provide the corresponding
+.Fa dip
+back in the entry points, this should generally not be a
+.Dv NULL
+pointer.
+.Pp
+The
+.Fn ksensor_create
+function is a more generic function and requires that the driver specify
+the
+.Fa class
+of the sensor directly, rather than having it inferred based upon
+.Fa kind .
+.Pp
+The
+.Fn ksensor_remove
+function allows a driver to remove a ksensor that was previously
+created identified by
+.Fa id .
+To simplify device teardown, a driver may pass the special ID
+.Dv KSENSOR_ALL_IDS
+to remove any registered ksensors.
+Because the framework guarantees that no entry points will be called
+during either
+.Xr attach 9E
+or
+.Xr detach 9E ,
+the driver does not need to take special care with when it calls
+.Fn ksensor_remove ,
+unlike
+.Xr untimeout 9F .
+.Sh CONTEXT
+The
+.Fn ksensor_create
+and
+.Fn ksensor_create_scalar_pcidev
+functions may only be called from a driver's
+.Xr attach 9E
+entry point.
+The
+.Fn ksensor_remove
+function may only be called from a driver's
+.Xr attach 9E
+or
+.Xr detach 9E
+entry points.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ksensor_create
+and
+.Fn ksensor_create_scalar_pcidev
+functions return
+.Sy 0
+and update
+.Fa idp
+with the newly created ksensor's ID.
+Otherwise, a non-zero error number is returned.
+.Pp
+Upon successful completion, the
+.Fn ksensor_remove
+function returns
+.Sy 0
+and deletes the ksensor.
+Otherwise, a non-zero error number is returned.
+.Sh ERRORS
+The
+.Fn ksensor_create
+and
+.Fn ksensor_create_scalar_pcidev
+functions will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
+The driver did not call these functions from its
+.Xr attach 9E
+entry point.
+.It Er EEXIST
+A ksensor with the same
+.Fa class
+and
+.Fa name
+already exists.
+.It Er EINVAL
+An invalid pointer was passed or
+.Fa ops ,
+.Fa name ,
+or
+.Fa class
+are malformed.
+.El
+.Pp
+Additionally, the
+.Fn ksensor_create_scalar_pcidev
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa dip
+does not refer to a valid PCI or PCIe device node with a
+.Dq regs
+property.
+.It Er EIO
+The
+.Dq regs
+property of
+.Fa dip
+is malformed.
+.It Er ENOTSUP
+The value of
+.Fa kind
+is not supported.
+.El
+.Pp
+The
+.Fn ksensor_remove
+function will fail if
+.Bl -tag -width Er
+.It Er EAGAIN
+The driver did not call this from either
+.Xr attach 9E
+or
+.Xr detach 9E .
+.It Er ENOENT
+The ksensor referenced in
+.Fa id
+does not exist for
+.Fa dip
+or, if
+.Fa id
+is
+.Dv KSENSOR_ALL_IDS ,
+the driver has no ksensors.
+.El
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr ksensor 9E ,
+.Xr ksensor_ops 9E

@@ -1,0 +1,112 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd May 10, 2024
+.Dt KSENSOR_KIND 9F
+.Os
+.Sh NAME
+.Nm ksensor_kind_current ,
+.Nm ksensor_kind_temperature ,
+.Nm ksensor_kind_voltage
+.Nd ksensor kind implementations
+.Sh SYNOPSIS
+.In sys/sensors.h
+.Ft int
+.Fo ksensor_kind_current
+.Fa "void *driver"
+.Fa "sensor_ioctl_kind_t *kind"
+.Fc
+.Ft int
+.Fo ksensor_kind_temperature
+.Fa "void *driver"
+.Fa "sensor_ioctl_kind_t *kind"
+.Fc
+.Ft int
+.Fo ksensor_kind_voltage
+.Fa "void *driver"
+.Fa "sensor_ioctl_kind_t *kind"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The
+.Fn ksensor_kind_current ,
+.Fn ksensor_kind_temperature ,
+and
+.Fn ksensor_kind_voltage
+functions are implementations of the ksensor
+.Xr kso_kind 9E
+entry point
+and indicate that a sensor is a current
+.Pq Dv SENSOR_KIND_CURRENT ,
+temperature
+.Pq Dv SENSOR_KIND_TEMPERATURE ,
+or voltage
+.Pq Dv SENSOR_KIND_VOLTAGE
+sensor respectively.
+.Pp
+While these functions can be called directly, it is expected that they
+will be used as part of a ksensor operations vector as described in
+.Xr ksensor_ops 9E ,
+allowing the driver to avoid having to implement the entry point
+directly.
+If a driver does use this function, it must ensure that the return value
+is passed back to the framework as part of its
+.Xr kso_kind 9E
+entry point.
+.Sh CONTEXT
+The
+.Fn ksensor_kind_current ,
+.Fn ksensor_kind_temperature ,
+and
+.Fn ksensor_kind_voltage
+functions can be called from
+.Sy user ,
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ksensor_kind_current ,
+.Fn ksensor_kind_temperature ,
+and
+.Fn ksensor_kind_voltage
+functions return
+.Sy 0
+and update
+.Fa kind
+with the corresponding information.
+Otherwise, a non-zero error value is returned.
+.Sh EXAMPLES
+.Sy Example 1
+Using
+.Fn ksensor_kind_temperature
+as part of the
+.Xr ksensor_ops 9E
+entry points.
+.Bd -literal
+#include <sys/sensors.h>
+
+static int coretemp_read(void *, sensor_ioctl_scalar_t *);
+
+static const ksensor_ops_t coretemp_temp_ops = {
+        .kso_kind = ksensor_kind_temperature,
+        .kso_scalar = coretemp_read
+};
+.Ed
+.Sh SEE ALSO
+.Xr ksensor 9E ,
+.Xr ksensor_ops 9E ,
+.Xr kso_kind 9E

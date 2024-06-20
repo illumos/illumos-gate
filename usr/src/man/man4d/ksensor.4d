@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd June 9, 2020
+.Dd May 23, 2024
 .Dt KSENSOR 4D
 .Os
 .Sh NAME
@@ -25,7 +25,8 @@
 The
 .Nm
 driver provides access to sensors that are built using the kernel sensor
-framework.
+framework described in
+.Xr ksensor 9E .
 Sensors register with the framework are automatically made available to
 the system and used with the fault management architecture
 .Pq FMA .
@@ -38,4 +39,5 @@ subject to change without notice, and should not be used directly.
 Sensor information can be dumped through the FMA developer utility
 .Sy fmtopo .
 .Sh SEE ALSO
-.Xr fmadm 8
+.Xr fmadm 8 ,
+.Xr ksensor 9E

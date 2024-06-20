@@ -28,7 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -57,6 +57,8 @@
 #include <sys/sysmacros.h>
 #include <sys/systeminfo.h>
 #include <sys/secflags.h>
+#include <sys/mnttab.h>
+#include <sys/mkdev.h>
 
 #include "libproc.h"
 #include "Pcontrol.h"
@@ -84,7 +86,6 @@ static  prheader_t *read_lfile(struct ps_prochandle *, const char *);
  * Ops vector functions for live processes.
  */
 
-/*ARGSUSED*/
 static ssize_t
 Pread_live(struct ps_prochandle *P, void *buf, size_t n, uintptr_t addr,
     void *data)
@@ -92,7 +93,6 @@ Pread_live(struct ps_prochandle *P, void *buf, size_t n, uintptr_t addr,
 	return (pread(P->asfd, buf, n, (off_t)addr));
 }
 
-/*ARGSUSED*/
 static ssize_t
 Pwrite_live(struct ps_prochandle *P, const void *buf, size_t n, uintptr_t addr,
     void *data)
@@ -100,7 +100,6 @@ Pwrite_live(struct ps_prochandle *P, const void *buf, size_t n, uintptr_t addr,
 	return (pwrite(P->asfd, buf, n, (off_t)addr));
 }
 
-/*ARGSUSED*/
 static int
 Pread_maps_live(struct ps_prochandle *P, prmap_t **Pmapp, ssize_t *nmapp,
     void *data)
@@ -134,7 +133,6 @@ Pread_maps_live(struct ps_prochandle *P, prmap_t **Pmapp, ssize_t *nmapp,
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
 Pread_aux_live(struct ps_prochandle *P, auxv_t **auxvp, int *nauxp, void *data)
 {
@@ -172,21 +170,18 @@ Pread_aux_live(struct ps_prochandle *P, auxv_t **auxvp, int *nauxp, void *data)
 	(void) close(fd);
 }
 
-/*ARGSUSED*/
 static int
 Pcred_live(struct ps_prochandle *P, prcred_t *pcrp, int ngroups, void *data)
 {
 	return (proc_get_cred(P->pid, pcrp, ngroups));
 }
 
-/* ARGSUSED */
 static int
 Psecflags_live(struct ps_prochandle *P, prsecflags_t **psf, void *data)
 {
 	return (proc_get_secflags(P->pid, psf));
 }
 
-/*ARGSUSED*/
 static int
 Ppriv_live(struct ps_prochandle *P, prpriv_t **pprv, void *data)
 {
@@ -201,7 +196,6 @@ Ppriv_live(struct ps_prochandle *P, prpriv_t **pprv, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 static const psinfo_t *
 Ppsinfo_live(struct ps_prochandle *P, psinfo_t *psinfo, void *data)
 {
@@ -211,21 +205,18 @@ Ppsinfo_live(struct ps_prochandle *P, psinfo_t *psinfo, void *data)
 	return (psinfo);
 }
 
-/*ARGSUSED*/
 static prheader_t *
 Plstatus_live(struct ps_prochandle *P, void *data)
 {
 	return (read_lfile(P, "lstatus"));
 }
 
-/*ARGSUSED*/
 static prheader_t *
 Plpsinfo_live(struct ps_prochandle *P, void *data)
 {
 	return (read_lfile(P, "lpsinfo"));
 }
 
-/*ARGSUSED*/
 static char *
 Pplatform_live(struct ps_prochandle *P, char *s, size_t n, void *data)
 {
@@ -234,14 +225,12 @@ Pplatform_live(struct ps_prochandle *P, char *s, size_t n, void *data)
 	return (s);
 }
 
-/*ARGSUSED*/
 static int
 Puname_live(struct ps_prochandle *P, struct utsname *u, void *data)
 {
 	return (uname(u));
 }
 
-/*ARGSUSED*/
 static char *
 Pzonename_live(struct ps_prochandle *P, char *s, size_t n, void *data)
 {
@@ -266,13 +255,11 @@ stat_exec(const char *path, void *arg)
 	    stp->st_dev == st.st_dev && stp->st_ino == st.st_ino);
 }
 
-/*ARGSUSED*/
 static char *
 Pexecname_live(struct ps_prochandle *P, char *buf, size_t buflen, void *data)
 {
 	char exec_name[PATH_MAX];
-	char cwd[PATH_MAX];
-	char proc_cwd[64];
+	char cwd[PATH_MAX], *cwdp = NULL;
 	struct stat64 st;
 	int ret;
 
@@ -302,19 +289,87 @@ Pexecname_live(struct ps_prochandle *P, char *buf, size_t buflen, void *data)
 	 * target process.  This only works if the target process has
 	 * not changed its current directory since it was exec'd.
 	 */
-	(void) snprintf(proc_cwd, sizeof (proc_cwd),
-	    "%s/%d/path/cwd", procfs_path, (int)P->pid);
+	if (proc_get_cwd(P->pid, cwd, sizeof (cwd)) > 0)
+		cwdp = cwd;
 
-	if ((ret = readlink(proc_cwd, cwd, PATH_MAX - 1)) > 0)
-		cwd[ret] = '\0';
-
-	(void) Pfindexec(P, ret > 0 ? cwd : NULL, stat_exec, &st);
+	(void) Pfindexec(P, cwdp, stat_exec, &st);
 
 	return (NULL);
 }
 
+/*
+ * Snapshot the cwd for a process. Note, we assume that we do not have the
+ * process held per se (pwdx does not grab the process). If our caller wants to
+ * guarantee this, they are responsible for getting a hold.
+ */
+static int
+Pcwd_live(struct ps_prochandle *P, prcwd_t **cwdp, void *data)
+{
+	prcwd_t *cwd = NULL;
+	struct statvfs st;
+	FILE *tab = NULL;
+	struct extmnttab ent;
+	int ret;
+
+	cwd = calloc(1, sizeof (prcwd_t));
+	if (cwd == NULL)
+		goto err;
+
+	if (proc_get_cwd(P->pid, cwd->prcwd_cwd, sizeof (cwd->prcwd_cwd)) < 0)
+		goto err;
+
+	if (statvfs(cwd->prcwd_cwd, &st) != 0)
+		goto err;
+
+	cwd->prcwd_fsid = st.f_fsid;
+	(void) memcpy(cwd->prcwd_fsname, st.f_basetype, FSTYPSZ);
+
+	/*
+	 * Find the corresponding mountpoint based on the fsid. If we don't find
+	 * a match, that's weird, but we'll try to get folks something. There's
+	 * always a possibility of a race going on as we can't stop file system
+	 * mount points from changing during this operation. Similarly, in lieu
+	 * of erorring on overflow we opt to truncate as tihs would again be a
+	 * surprising situation based on system limits.
+	 */
+	if ((tab = fopen(MNTTAB, "r")) == NULL)
+		goto err;
+	resetmnttab(tab);
+	dprintf("found fsid %llx\n", cwd->prcwd_fsid);
+	while ((ret = getextmntent(tab, &ent, sizeof (struct extmnttab))) ==
+	    0) {
+		/*
+		 * statvfs(2) always returns the compressed 32-bit compatible
+		 * dev, even in an LP64 environment. We must explicitly attempt
+		 * to convert things as a result to this format as the normal
+		 * makedev() doesn't quite do the right thing.
+		 */
+		if (__makedev(COMPATDEV, ent.mnt_major, ent.mnt_minor) ==
+		    st.f_fsid) {
+			(void) strlcpy(cwd->prcwd_mntpt, ent.mnt_mountp,
+			    sizeof (cwd->prcwd_mntpt));
+			(void) strlcpy(cwd->prcwd_mntspec, ent.mnt_special,
+			    sizeof (cwd->prcwd_mntspec));
+			break;
+		}
+	}
+
+	if (ret > 0) {
+		errno = EIO;
+		goto err;
+	}
+
+	(void) fclose(tab);
+	*cwdp = cwd;
+	return (0);
+
+err:
+	(void) fclose(tab);
+	free(cwd);
+	return (-1);
+}
+
 #if defined(__i386) || defined(__amd64)
-/*ARGSUSED*/
 static int
 Pldt_live(struct ps_prochandle *P, struct ssd *pldt, int nldt, void *data)
 {
@@ -337,6 +392,7 @@ static const ps_ops_t P_live_ops = {
 	.pop_zonename	= Pzonename_live,
 	.pop_execname	= Pexecname_live,
 	.pop_secflags	= Psecflags_live,
+	.pop_cwd	= Pcwd_live,
 #if defined(__i386) || defined(__amd64)
 	.pop_ldt	= Pldt_live
 #endif
@@ -751,7 +807,6 @@ Pcreate_error(int error)
  * may be useful for clients that need to modify signal dispositions, terminal
  * attributes, or process group and session properties for each new victim.
  */
-/*ARGSUSED*/
 void
 Pcreate_callback(struct ps_prochandle *P)
 {
@@ -1337,6 +1392,18 @@ Psecflags_free(prsecflags_t *psf)
 	free(psf);
 }
 
+int
+Pcwd(struct ps_prochandle *P, prcwd_t **cwd)
+{
+	return (P->ops.pop_cwd(P, cwd, P->data));
+}
+
+void
+Pcwd_free(prcwd_t *cwd)
+{
+	free(cwd);
+}
+
 static prheader_t *
 Plstatus(struct ps_prochandle *P)
 {
@@ -1365,7 +1432,6 @@ Pldt(struct ps_prochandle *P, struct ssd *pldt, int nldt)
 }
 #endif	/* __i386 */
 
-/* ARGSUSED */
 void
 Ppriv_free(struct ps_prochandle *P, prpriv_t *prv)
 {

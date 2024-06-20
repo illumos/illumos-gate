@@ -17296,6 +17296,8 @@ s usr/share/man/man3proc/Pcreate_callback.3proc=Pcreate.3proc
 f usr/share/man/man3proc/Pcreate_error.3proc 0444 root bin
 f usr/share/man/man3proc/Pcred.3proc 0444 root bin
 f usr/share/man/man3proc/Pctlfd.3proc 0444 root bin
+f usr/share/man/man3proc/Pcwd.3proc 0444 root bin
+s usr/share/man/man3proc/Pcwd_free.3proc=Pcwd.3proc
 f usr/share/man/man3proc/Pdelbkpt.3proc 0444 root bin
 f usr/share/man/man3proc/Pdelwapt.3proc 0444 root bin
 f usr/share/man/man3proc/Pdestroy_agent.3proc 0444 root bin
@@ -20013,6 +20015,10 @@ s usr/share/man/man9e/intro.9e=Intro.9e
 f usr/share/man/man9e/ioctl.9e 0444 root bin
 f usr/share/man/man9e/ks_snapshot.9e 0444 root bin
 f usr/share/man/man9e/ks_update.9e 0444 root bin
+f usr/share/man/man9e/ksensor.9e 0444 root bin
+f usr/share/man/man9e/ksensor_ops.9e 0444 root bin
+s usr/share/man/man9e/kso_kind.9e=ksensor_ops.9e
+s usr/share/man/man9e/kso_scalar.9e=ksensor_ops.9e
 f usr/share/man/man9e/mac.9e 0444 root bin
 f usr/share/man/man9e/mac_capab_led.9e 0444 root bin
 f usr/share/man/man9e/mac_capab_rings.9e 0444 root bin
@@ -20818,6 +20824,13 @@ s usr/share/man/man9f/kmem_cache_free.9f=kmem_cache_create.9f
 s usr/share/man/man9f/kmem_cache_set_move.9f=kmem_cache_create.9f
 s usr/share/man/man9f/kmem_free.9f=kmem_alloc.9f
 s usr/share/man/man9f/kmem_zalloc.9f=kmem_alloc.9f
+f usr/share/man/man9f/ksensor_create.9f 0444 root bin
+s usr/share/man/man9f/ksensor_create_scalar_pcidev.9f=ksensor_create.9f
+f usr/share/man/man9f/ksensor_kind.9f 0444 root bin
+s usr/share/man/man9f/ksensor_kind_current.9f=ksensor_kind.9f
+s usr/share/man/man9f/ksensor_kind_temperature.9f=ksensor_kind.9f
+s usr/share/man/man9f/ksensor_kind_voltage.9f=ksensor_kind.9f
+s usr/share/man/man9f/ksensor_remove.9f=ksensor_create.9f
 f usr/share/man/man9f/kstat_create.9f 0444 root bin
 f usr/share/man/man9f/kstat_delete.9f 0444 root bin
 f usr/share/man/man9f/kstat_install.9f 0444 root bin

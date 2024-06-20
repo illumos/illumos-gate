@@ -1,0 +1,275 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd May 10, 2024
+.Dt KSENSOR_OPS 9E
+.Os
+.Sh NAME
+.Nm ksensor_ops ,
+.Nm kso_kind ,
+.Nm kso_scalar
+.Nd ksensor entry points
+.Sh SYNOPSIS
+.In sys/sensors.h
+.Ft int
+.Fo kso_kind
+.Fa "void *driver"
+.Fa "sensor_ioctl_kind_t *kind"
+.Fc
+.Ft int
+.Fo kso_scalar
+.Fa "void *driver"
+.Fa "sensor_ioctl_scalar_t *scalar"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed as an argument to
+.Xr ksensor_create 9F .
+.It Fa kind
+A pointer to a structure the driver will fill out to answer what kind of
+sensor it is.
+.It Fa scalar
+A pointer to a structure that the driver will fill out to answer the
+current value of the sensor.
+.El
+.Sh DESCRIPTION
+The
+.Xr ksensor 9E
+framework requires that device drivers provide an operations vector when
+registering a sensor with
+.Xr ksensor_create 9F .
+The operations vector uses the
+.Vt ksensor_ops_t
+structure and is implemented in terms of two entry points
+.Fn kso_kind
+and
+.Fn kso_scalar ,
+both of which are required.
+.Pp
+In all entry points, the driver will be passed back
+.Fa driver ,
+which is the argument registered when the sensor was created.
+This provides the driver a direct means to determine which sensor the
+framework is asking about and allows the same operations vector to serve
+multiple instances of a sensor.
+.Pp
+The ksensor framework does not serialize calls to the operations
+vectors as part of its contract to sensor providers.
+Drivers must assume that the various entry points will be called in
+parallel from multiple threads and that if any locking is required, it
+is the driver's responsibility.
+.Ss ksensor kind
+The
+.Fn kso_kind
+entry point is used to answer the question of what kind of sensor
+something is.
+A ksensor's kind indicates to the user what type of physical phenomenon
+the sensor manages such as temperature, voltage, etc.
+Some sensors are synthesized from physical phenomena, but don't
+represent one themselves.
+These sensors use the
+.Fn kso_kind
+entry point to indicate that and what they're derived from.
+For many drivers, they can use one of the stock implementations that the
+kernel provides such as
+.Xr ksensor_kind_temperature 9F ,
+.Xr ksensor_kind_voltage 9F ,
+or
+.Xr ksensor_kind_current 9F
+if they're a stock temperature, voltage, or current sensor.
+.Pp
+For drivers that must implement this themselves, they should fill out
+the members of the
+.Ft sensor_ioctl_kind_t
+structure as follows:
+.Bl -tag -width Fa
+.It Fa sik_kind
+This member should be filled in with the kind of the sensor from the list in
+.Xr ksensor 9E .
+The driver should not use
+.Dv SENSOR_KIND_UNKNOWN .
+If the driver uses
+.Dv SENSOR_KIND_SYNTHETIC
+then it should fill in
+.Fa sik_derive .
+.It Fa sik_derive
+If the driver did not set
+.Fa sik_kind
+to
+.Dv SENSOR_KIND_SYNTHETIC ,
+then this member should not be set and left at its default value that
+the framework provides.
+Otherwise, if the type that it is derived from is known, then it should
+be set to one of the kind values other than
+.Dv SENSOR_KIND_UNKNOWN
+and
+.Dv SENSOR_KIND_SYNTHETIC .
+.El
+.Ss ksensor scalar
+The
+.Fn kso_scalar
+entry point is used to return information about a scalar value read from
+a sensor.
+This is the primary interface by which a value is read from a device.
+For more information on scalar sensors and the intended semantics, see
+the
+.Sy Sensor Types, Kinds, Units, and Naming
+section of
+.Xr ksensor 9E .
+.Pp
+When this entry point is called, the driver should fill out the members
+of the
+.Fa sensor_ioctl_scalar_t
+structure as follows:
+.Bl -tag -width Fa
+.It Fa sis_unit
+A
+.Vt uint32_t
+that indicates the unit that the sensor is in.
+This should be one of the units from the list in
+.Xr ksensor 9E
+and should not be
+.Dv SENSOR_UNIT_UNKNOWN .
+.Dv SENSOR_UNIT_NONE
+should only be used if the sensor's kind is
+.Dv SENSOR_KIND_SYNTHETIC .
+.It Fa sis_gran
+An
+.Vt int32_t
+that indicates the granularity or resolution of the sensor.
+The granularity indicates the number of increments per unit in the
+measurement.
+A value such as 10 indicates that the value is in 10ths of the unit.
+If this was a temperature sensor, one would need to divide
+.Fa sit_value
+by 10 to obtain degrees.
+On the other hand a negative granularity indicates one would need to multiply
+.Fa sit_value
+to get the actual base unit.
+For example, a value of -2 would indicate that actual number of degrees, you'd
+need to multiply the value by two.
+.It Fa sis_prec
+A
+.Vt uint32_t
+that represents the accuracy of the sensor itself and is measured in
+units of the granularity.
+For example, a temperature sensor that has a granularity of 1, meaning the value
+read from the sensor is in degrees, and is accurate to +/-5 degrees would set
+the precision to 5.
+Conversely, a temperature sensor that measured in 0.5 degree increments has a
+granularity of 2.
+If the sensor was accurate to +/-1 degree, then it'd have a precision of 2.
+If the precision is unknown, it should be left at zero.
+.It Fa sis_value
+A
+.Vt int64_t
+that represents the value read from the sensor.
+It is in units of the granularity and is a signed quantity.
+.El
+.Sh CONTEXT
+The
+.Fn kso_kind
+and
+.Fn kso_scalar
+functions are generally called from
+.Sy kernel
+context.
+While these functions may be called from
+.Sy user
+context, the driver must not assume that and should not be copying any
+data into or out of a user process.
+.Sh RETURN VALUES
+Upon successful completion, the device driver should have filled out the
+corresponding structure into
+.Fa kind
+or
+.Fa scalar
+and return
+.Sy 0 .
+Otherwise, a positive error number should be returned to indicate the
+failure.
+.Sh EXAMPLES
+.Sy Example 1
+Example PCI-based Implementation
+.Pp
+The following example shows what this might look like for PCI-based
+device driver that has a temperature sensor in configure space.
+This example assumes the sensor measures in 0.5 degree increments and
+is accurate to +/-1 degree .
+.Bd -literal
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/sensors.h>
+
+/*
+ * Our temperature sensor in configuration space. It returns an unsigned
+ * 32-bit value in 0.5 degree increments that indicates the current
+ * temperature in degrees C.
+ */
+#define	EX_SENSOR	0x200
+
+/*
+ * Our granularity is 0.5 degrees. Our precision is +/-1 degree, which
+ * is 2 units of our granularity, hence we define it as 2.
+ */
+#define	EX_SENSOR_GRAN	2
+#define	EX_SENSOR_PREC	2
+
+/*
+ * Driver structure that is registered with ksensor_create(9F). The
+ * ex_cfg member comes from a call to pci_config_setup() during
+ * attach(9E).
+ */
+typedef struct ex {
+	...
+	ddi_acc_handle_t ex_cfg;
+	...
+} ex_t;
+
+static int
+ex_sensor_temp_read(void *arg, sensor_ioctl_scalar_t *scalar)
+{
+	uint32_t reg;
+	ex_t *ex = arg;
+
+	reg = pci_config_get32(ex->ex_cfg, EX_SENSOR);
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = EX_SENSOR_GRAN;
+	scalar->sis_prec = EX_SENSOR_PREC;
+	scalar->sis_value = reg;
+	return (0);
+}
+
+static const ksensor_ops_t ex_sensor_temp_ops = {
+	.kso_kind = ksensor_kind_temperature,
+	.kso_scalar = ex_sensor_temp_read
+};
+.Ed
+.Sh ERRORS
+The device driver may return one of the following errors, but is not
+limited to this set if there is a more accurate error based on the
+situation.
+.Bl -tag -width Er
+.It Er EIO
+This error should be used when the driver fails to communicate with the
+device to read the current sensor value.
+.El
+.Sh SEE ALSO
+.Xr ksensor 9E ,
+.Xr ksensor_create 9F ,
+.Xr ksensor_kind 9F

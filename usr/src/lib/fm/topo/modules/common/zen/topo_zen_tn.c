@@ -465,6 +465,15 @@ topo_zen_build_ccds(topo_mod_t *mod, zen_topo_enum_sock_t *sock)
 			return (-1);
 		}
 
+		if (topo_zen_create_tdie(mod, zt_ccd->ztccd_tn, ccd) != 0) {
+			topo_mod_dprintf(mod, "failed to create Tdie sensor "
+			    "for DF/CCD %u/%u", ccd->atccd_dfno,
+			    ccd->atccd_phys_no);
+			topo_node_unbind(zt_ccd->ztccd_tn);
+			zt_ccd->ztccd_tn = NULL;
+			return (-1);
+		}
+
 		/*
 		 * At this point we should go create any additional sensors
 		 * (such as the per-CCD Tctl) and probably set some methods,
@@ -529,13 +538,19 @@ topo_zen_build_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
 		return (-1);
 	}
 
+	if (topo_zen_create_tctl(mod, chip, sock->ztes_df) != 0) {
+		topo_mod_dprintf(mod, "failed to create Tctl sensor");
+		topo_node_unbind(chip);
+		return (-1);
+	}
+
 	sock->ztes_tn = chip;
 	ret = topo_zen_build_ccds(mod, sock);
 
 	/*
 	 * At this point we should flesh out the I/O die and all the UMCs, IOMS
-	 * instances, and related. we would put the general thermal sensor that
-	 * smntemp exposes as procnode.%u under the I/O die when we have it.
+	 * instances, and related. When we have the I/O die we should move the
+	 * current Tctl sensor to it potentially.
 	 */
 
 	return (ret);

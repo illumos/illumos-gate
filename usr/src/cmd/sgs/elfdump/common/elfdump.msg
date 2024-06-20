@@ -482,6 +482,7 @@
 @ MSG_CNOTE_DESC_PRSECFLAGS_T		"desc: (prsecflags_t)"
 @ MSG_CNOTE_DESC_PRLWPNAME_T		"desc: (prlwpname_t)"
 @ MSG_CNOTE_DESC_PRUPANIC_T		"desc: (prupanic_t)"
+@ MSG_CNOTE_DESC_PRCWD_T		"desc: (prcwd_t)"
 
 @ MSG_CNOTE_FMT_LINE		"%*s%-*s%s"
 @ MSG_CNOTE_FMT_LINE_2UP	"%*s%-*s%-*s%-*s%s"
@@ -659,6 +660,11 @@
 @ MSG_CNOTE_T_PRU_VERSION		"pru_version:"
 @ MSG_CNOTE_T_PRU_FLAGS			"pru_flags:"
 @ MSG_CNOTE_T_PRU_DATA			"pru_data:"
+@ MSG_CNOTE_T_CWD_FSID			"prcwd_fsid:"
+@ MSG_CNOTE_T_CWD_FSNAME		"prcwd_fsname:"
+@ MSG_CNOTE_T_CWD_MNTPT			"prcwd_mntpt:"
+@ MSG_CNOTE_T_CWD_MNTSPEC		"prcwd_mntspec:"
+@ MSG_CNOTE_T_CWD_CWD			"prcwd_cwd:"
 
 
 # Names of fake sections generated from program header data

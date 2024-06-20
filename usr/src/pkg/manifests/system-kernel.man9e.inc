@@ -58,6 +58,10 @@ link path=usr/share/man/man9e/intro.9e target=Intro.9e
 file path=usr/share/man/man9e/ioctl.9e
 file path=usr/share/man/man9e/ks_snapshot.9e
 file path=usr/share/man/man9e/ks_update.9e
+file path=usr/share/man/man9e/ksensor.9e
+file path=usr/share/man/man9e/ksensor_ops.9e
+link path=usr/share/man/man9e/kso_kind.9e target=ksensor_ops.9e
+link path=usr/share/man/man9e/kso_scalar.9e target=ksensor_ops.9e
 file path=usr/share/man/man9e/mac.9e
 file path=usr/share/man/man9e/mac_capab_led.9e
 file path=usr/share/man/man9e/mac_capab_rings.9e

@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2015, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -34,6 +34,7 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/secflags.h>
+#include <errno.h>
 
 #include "Pcontrol.h"
 
@@ -251,4 +252,24 @@ proc_get_lwpstatus(pid_t pid, uint_t thr, lwpstatus_t *lwp)
 		(void) close(fd);
 	}
 	return (rv);
+}
+
+ssize_t
+proc_get_cwd(pid_t pid, char *cwd, size_t len)
+{
+	ssize_t ret;
+	char fname[PATH_MAX];
+
+	if (len == 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	(void) snprintf(fname, sizeof (fname), "%s/%d/path/cwd",
+	    procfs_path, (int)pid);
+
+	if ((ret = readlink(fname, cwd, len - 1)) > 0)
+		cwd[ret] = '\0';
+
+	return (ret);
 }

@@ -25,7 +25,11 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
 
 #include "lint.h"
 #include <sys/types.h>
@@ -67,7 +71,18 @@ __makedev(const int version, const major_t majdev, const minor_t mindev)
 			return (NODEV);
 		}
 		break;
+	case COMPATDEV:
+		if (majdev > MAXMAJ32 || mindev > MAXMIN32) {
+			errno = EINVAL;
+			return (NODEV);
+		}
 
+		if ((devnum = (((dev_t)majdev << NBITSMINOR32) |
+		    mindev)) == NODEV) {
+			errno = EINVAL;
+			return (NODEV);
+		}
+		break;
 	default:
 		errno = EINVAL;
 		return (NODEV);
@@ -107,6 +122,14 @@ __major(const int version, const dev_t devnum)
 #endif
 		break;
 
+	case COMPATDEV:
+		maj = devnum >> NBITSMAJOR32;
+		if (devnum == NODEV || maj > MAXMAJ32) {
+			errno = EINVAL;
+			return ((major_t)NODEV);
+		}
+		break;
+
 	default:
 		errno = EINVAL;
 		return ((major_t)NODEV);
@@ -122,21 +145,18 @@ __major(const int version, const dev_t devnum)
 minor_t
 __minor(const int version, const dev_t devnum)
 {
+	if (devnum == NODEV) {
+		errno = EINVAL;
+		return ((minor_t)NODEV);
+	}
+
 	switch (version) {
 	case OLDDEV:
-		if (devnum == NODEV) {
-			errno = EINVAL;
-			return ((minor_t)NODEV);
-		}
 		return (devnum & OMAXMIN);
-
 	case NEWDEV:
-		if (devnum == NODEV) {
-			errno = EINVAL;
-			return ((minor_t)NODEV);
-		}
 		return (devnum & MAXMIN);
-
+	case COMPATDEV:
+		return (devnum & MAXMIN32);
 	default:
 		errno = EINVAL;
 		return ((minor_t)NODEV);

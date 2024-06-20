@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer company
+ * Copyright 2024 Oxide Computer company
  */
 
 #ifndef _TOPO_ZEN_IMPL_H
@@ -92,6 +92,10 @@ typedef struct zen_topo_enum_sock {
 
 extern int topo_zen_build_chip(topo_mod_t *, tnode_t *, topo_instance_t,
     zen_topo_enum_sock_t *);
+extern int topo_zen_create_tctl(topo_mod_t *, tnode_t *,
+    const amdzen_topo_df_t *);
+extern int topo_zen_create_tdie(topo_mod_t *, tnode_t *,
+    const amdzen_topo_ccd_t *);
 
 #ifdef __cplusplus
 }

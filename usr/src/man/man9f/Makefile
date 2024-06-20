@@ -301,6 +301,8 @@ MANFILES=	ASSERT.9f				\
 		kiconvstr.9f				\
 		kmem_alloc.9f				\
 		kmem_cache_create.9f			\
+		ksensor_create.9f			\
+		ksensor_kind.9f				\
 		kstat_create.9f				\
 		kstat_delete.9f				\
 		kstat_install.9f			\
@@ -947,6 +949,11 @@ MANLINKS=	AVL_NEXT.9f					\
 		kmem_cache_set_move.9f				\
 		kmem_free.9f					\
 		kmem_zalloc.9f					\
+		ksensor_create_scalar_pcidev.9f			\
+		ksensor_kind_current.9f				\
+		ksensor_kind_temperature.9f			\
+		ksensor_kind_voltage.9f				\
+		ksensor_remove.9f				\
 		kstat_named_setstr.9f				\
 		kstat_runq_back_to_waitq.9f			\
 		kstat_runq_enter.9f				\
@@ -1760,6 +1767,13 @@ kmem_cache_alloc.9f			:= LINKSRC = kmem_cache_create.9f
 kmem_cache_destroy.9f			:= LINKSRC = kmem_cache_create.9f
 kmem_cache_free.9f			:= LINKSRC = kmem_cache_create.9f
 kmem_cache_set_move.9f			:= LINKSRC = kmem_cache_create.9f
+
+ksensor_create_scalar_pcidev.9f		:= LINKSRC = ksensor_create.9f
+ksensor_remove.9f			:= LINKSRC = ksensor_create.9f
+
+ksensor_kind_current.9f			:= LINKSRC = ksensor_kind.9f
+ksensor_kind_temperature.9f		:= LINKSRC = ksensor_kind.9f
+ksensor_kind_voltage.9f			:= LINKSRC = ksensor_kind.9f
 
 kstat_named_setstr.9f			:= LINKSRC = kstat_named_init.9f
 

@@ -28,7 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015 Gary Mills
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -119,7 +119,6 @@ core_rw(struct ps_prochandle *P, void *buf, size_t n, uintptr_t addr,
 	return (n - resid);
 }
 
-/*ARGSUSED*/
 static ssize_t
 Pread_core(struct ps_prochandle *P, void *buf, size_t n, uintptr_t addr,
     void *data)
@@ -127,7 +126,6 @@ Pread_core(struct ps_prochandle *P, void *buf, size_t n, uintptr_t addr,
 	return (core_rw(P, buf, n, addr, pread64));
 }
 
-/*ARGSUSED*/
 static ssize_t
 Pwrite_core(struct ps_prochandle *P, const void *buf, size_t n, uintptr_t addr,
     void *data)
@@ -136,7 +134,6 @@ Pwrite_core(struct ps_prochandle *P, const void *buf, size_t n, uintptr_t addr,
 	    (ssize_t (*)(int, void *, size_t, off64_t)) pwrite64));
 }
 
-/*ARGSUSED*/
 static int
 Pcred_core(struct ps_prochandle *P, prcred_t *pcrp, int ngroups, void *data)
 {
@@ -160,7 +157,6 @@ Pcred_core(struct ps_prochandle *P, prcred_t *pcrp, int ngroups, void *data)
 	return (-1);
 }
 
-/*ARGSUSED*/
 static int
 Psecflags_core(struct ps_prochandle *P, prsecflags_t **psf, void *data)
 {
@@ -179,7 +175,6 @@ Psecflags_core(struct ps_prochandle *P, prsecflags_t **psf, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 Ppriv_core(struct ps_prochandle *P, prpriv_t **pprv, void *data)
 {
@@ -199,14 +194,12 @@ Ppriv_core(struct ps_prochandle *P, prpriv_t **pprv, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 static const psinfo_t *
 Ppsinfo_core(struct ps_prochandle *P, psinfo_t *psinfo, void *data)
 {
 	return (&P->psinfo);
 }
 
-/*ARGSUSED*/
 static void
 Pfini_core(struct ps_prochandle *P, void *data)
 {
@@ -246,6 +239,8 @@ Pfini_core(struct ps_prochandle *P, void *data)
 			free(core->core_secflags);
 		if (core->core_upanic != NULL)
 			free(core->core_upanic);
+		if (core->core_cwd != NULL)
+			free(core->core_cwd);
 #ifdef __x86
 		if (core->core_ldt != NULL)
 			free(core->core_ldt);
@@ -255,7 +250,6 @@ Pfini_core(struct ps_prochandle *P, void *data)
 	}
 }
 
-/*ARGSUSED*/
 static char *
 Pplatform_core(struct ps_prochandle *P, char *s, size_t n, void *data)
 {
@@ -270,7 +264,6 @@ Pplatform_core(struct ps_prochandle *P, char *s, size_t n, void *data)
 	return (s);
 }
 
-/*ARGSUSED*/
 static int
 Puname_core(struct ps_prochandle *P, struct utsname *u, void *data)
 {
@@ -284,7 +277,6 @@ Puname_core(struct ps_prochandle *P, struct utsname *u, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 static char *
 Pzonename_core(struct ps_prochandle *P, char *s, size_t n, void *data)
 {
@@ -298,8 +290,31 @@ Pzonename_core(struct ps_prochandle *P, char *s, size_t n, void *data)
 	return (s);
 }
 
+static int
+Pcwd_core(struct ps_prochandle *P, prcwd_t **cwdp, void *data)
+{
+	prcwd_t *cwd;
+	core_info_t *core = data;
+
+	if (core->core_cwd == NULL) {
+		errno = ENODATA;
+		return (-1);
+	}
+
+	if ((cwd = calloc(1, sizeof (prcwd_t))) == NULL)
+		return (-1);
+
+	(void) memcpy(cwd, core->core_cwd, sizeof (prcwd_t));
+	cwd->prcwd_fsname[sizeof (cwd->prcwd_fsname) - 1] = '\0';
+	cwd->prcwd_mntpt[sizeof (cwd->prcwd_mntpt) - 1] = '\0';
+	cwd->prcwd_mntspec[sizeof (cwd->prcwd_mntpt) - 1] = '\0';
+	cwd->prcwd_cwd[sizeof (cwd->prcwd_mntpt) - 1] = '\0';
+	*cwdp = cwd;
+
+	return (0);
+}
+
 #ifdef __x86
-/*ARGSUSED*/
 static int
 Pldt_core(struct ps_prochandle *P, struct ssd *pldt, int nldt, void *data)
 {
@@ -333,6 +348,7 @@ static const ps_ops_t P_core_ops = {
 	.pop_uname	= Puname_core,
 	.pop_zonename	= Pzonename_core,
 	.pop_secflags	= Psecflags_core,
+	.pop_cwd	= Pcwd_core,
 #ifdef __x86
 	.pop_ldt	= Pldt_core
 #endif
@@ -1237,7 +1253,34 @@ note_upanic(struct ps_prochandle *P, size_t nbytes)
 	return (0);
 }
 
-/*ARGSUSED*/
+static int
+note_cwd(struct ps_prochandle *P, size_t nbytes)
+{
+	core_info_t *core = P->data;
+	prcwd_t *cwd;
+
+	if (core->core_cwd != NULL)
+		return (0);
+
+	if (sizeof (*cwd) != nbytes) {
+		dprintf("Pgrab_core: NT_CWD changed size."
+		    "  Need to handle a version change?\n");
+		return (-1);
+	}
+
+	if (nbytes != 0 && ((cwd = malloc(nbytes)) != NULL)) {
+		if (read(P->asfd, cwd, nbytes) != nbytes) {
+			dprintf("Pgrab_core: failed to read NT_CWD\n");
+			free(cwd);
+			return (-1);
+		}
+
+		core->core_cwd = cwd;
+	}
+
+	return (0);
+}
+
 static int
 note_notsup(struct ps_prochandle *P, size_t nbytes)
 {
@@ -1246,59 +1289,50 @@ note_notsup(struct ps_prochandle *P, size_t nbytes)
 	return (0);
 }
 
+#if NT_NUM != NT_CWD
+#error "NT_NUM has grown. Update nhdlrs array"
+#endif
+
 /*
  * Populate a table of function pointers indexed by Note type with our
  * functions to process each type of core file note:
  */
-static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
-	note_notsup,		/*  0	unassigned		*/
+static int (*nhdlrs[NT_NUM + 1])(struct ps_prochandle *, size_t) = {
 #ifdef __x86
-	note_linux_prstatus,		/*  1	NT_PRSTATUS (old)	*/
-#else
-	note_notsup,		/*  1	NT_PRSTATUS (old)	*/
+	[NT_PRSTATUS] = note_linux_prstatus,
 #endif
-	note_notsup,		/*  2	NT_PRFPREG (old)	*/
+	[NT_PRFPREG] = note_notsup,
 #ifdef __x86
-	note_linux_psinfo,		/*  3	NT_PRPSINFO (old)	*/
-#else
-	note_notsup,		/*  3	NT_PRPSINFO (old)	*/
+	[NT_PRPSINFO] = note_linux_psinfo,
 #endif
-	note_xreg,		/*  4	NT_PRXREG		*/
-	note_platform,		/*  5	NT_PLATFORM		*/
-	note_auxv,		/*  6	NT_AUXV			*/
+	[NT_PRXREG] = note_xreg,
+	[NT_PLATFORM] = note_platform,
+	[NT_AUXV] = note_auxv,
 #ifdef __sparc
-	note_gwindows,		/*  7	NT_GWINDOWS		*/
+	[NT_GWINDOWS] = note_gwindows,
 #ifdef __sparcv9
-	note_asrs,		/*  8	NT_ASRS			*/
-#else
-	note_notsup,		/*  8	NT_ASRS			*/
+	[NT_ASRS] = note_asrs,
 #endif
-#else
-	note_notsup,		/*  7	NT_GWINDOWS		*/
-	note_notsup,		/*  8	NT_ASRS			*/
 #endif
 #ifdef __x86
-	note_ldt,		/*  9	NT_LDT			*/
-#else
-	note_notsup,		/*  9	NT_LDT			*/
+	[NT_LDT] = note_ldt,
 #endif
-	note_pstatus,		/* 10	NT_PSTATUS		*/
-	note_notsup,		/* 11	unassigned		*/
-	note_notsup,		/* 12	unassigned		*/
-	note_psinfo,		/* 13	NT_PSINFO		*/
-	note_cred,		/* 14	NT_PRCRED		*/
-	note_utsname,		/* 15	NT_UTSNAME		*/
-	note_lwpstatus,		/* 16	NT_LWPSTATUS		*/
-	note_lwpsinfo,		/* 17	NT_LWPSINFO		*/
-	note_priv,		/* 18	NT_PRPRIV		*/
-	note_priv_info,		/* 19	NT_PRPRIVINFO		*/
-	note_content,		/* 20	NT_CONTENT		*/
-	note_zonename,		/* 21	NT_ZONENAME		*/
-	note_fdinfo,		/* 22	NT_FDINFO		*/
-	note_spymaster,		/* 23	NT_SPYMASTER		*/
-	note_secflags,		/* 24	NT_SECFLAGS		*/
-	note_lwpname,		/* 25	NT_LWPNAME		*/
-	note_upanic		/* 26	NT_UPANIC		*/
+	[NT_PSTATUS] = note_pstatus,
+	[NT_PSINFO] = note_psinfo,
+	[NT_PRCRED] = note_cred,
+	[NT_UTSNAME] = note_utsname,
+	[NT_LWPSTATUS] = note_lwpstatus,
+	[NT_LWPSINFO] = note_lwpsinfo,
+	[NT_PRPRIV] = note_priv,
+	[NT_PRPRIVINFO] = note_priv_info,
+	[NT_CONTENT] = note_content,
+	[NT_ZONENAME] = note_zonename,
+	[NT_FDINFO] = note_fdinfo,
+	[NT_SPYMASTER] = note_spymaster,
+	[NT_SECFLAGS] = note_secflags,
+	[NT_LWPNAME] = note_lwpname,
+	[NT_UPANIC] = note_upanic,
+	[NT_CWD] = note_cwd
 };
 
 static void
@@ -2576,7 +2610,8 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		/*
 		 * Invoke the note handler function from our table
 		 */
-		if (nhdr.n_type < sizeof (nhdlrs) / sizeof (nhdlrs[0])) {
+		if (nhdr.n_type < ARRAY_SIZE(nhdlrs) &&
+		    nhdlrs[nhdr.n_type] != NULL) {
 			if (nhdlrs[nhdr.n_type](P, nhdr.n_descsz) < 0) {
 				dprintf("handler for type %d returned < 0",
 				    nhdr.n_type);

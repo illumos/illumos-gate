@@ -28,7 +28,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -96,7 +96,7 @@ setup_note_header(Phdr *v, proc_t *p)
 
 	v[0].p_type = PT_NOTE;
 	v[0].p_flags = PF_R;
-	v[0].p_filesz = (sizeof (Note) * (10 + 3 * nlwp + nzomb + nfd))
+	v[0].p_filesz = (sizeof (Note) * (11 + 3 * nlwp + nzomb + nfd))
 	    + roundup(sizeof (psinfo_t), sizeof (Word))
 	    + roundup(sizeof (pstatus_t), sizeof (Word))
 	    + roundup(prgetprivsize(), sizeof (Word))
@@ -107,6 +107,7 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + roundup(sizeof (utsname), sizeof (Word))
 	    + roundup(sizeof (core_content_t), sizeof (Word))
 	    + roundup(sizeof (prsecflags_t), sizeof (Word))
+	    + roundup(sizeof (prcwd_t), sizeof (Word))
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (prlwpname_t), sizeof (Word))
@@ -174,6 +175,45 @@ setup_note_header(Phdr *v, proc_t *p)
 	mutex_exit(&p->p_lock);
 }
 
+static void
+fill_prcwd(proc_t *p, prcwd_t *cwd, vnode_t *vroot, cred_t *credp)
+{
+	vnode_t *vn;
+	vfs_t *vfsp;
+	dev32_t dev;
+
+	vn = p->p_user.u_cdir;
+	vfsp = vn->v_vfsp;
+
+	/*
+	 * Zero out the structure and ensure all the padding is zero as
+	 * otherwise it may have garbage left over from another note. This also
+	 * ensures that if we don't have a resource or mount point for some
+	 * unexpected reason that we end up with an empty string.
+	 */
+	bzero(cwd, sizeof (prcwd_t));
+
+	/*
+	 * We opt not to check the cached u_cwd as it may or may not exist.
+	 */
+	(void) vnodetopath(vroot, vn, cwd->prcwd_cwd,
+	    sizeof (cwd->prcwd_cwd), credp);
+	(void) cmpldev(&dev, vfsp->vfs_dev);
+	cwd->prcwd_fsid = dev;
+	(void) strlcpy(cwd->prcwd_fsname, vfssw[vfsp->vfs_fstype].vsw_name,
+	    sizeof (cwd->prcwd_fsname));
+	if (refstr_value(vfsp->vfs_mntpt) != NULL) {
+		(void) strlcpy(cwd->prcwd_mntpt, refstr_value(vfsp->vfs_mntpt),
+		    sizeof (cwd->prcwd_mntpt));
+	}
+
+	if (refstr_value(vfsp->vfs_resource) != NULL) {
+		(void) strlcpy(cwd->prcwd_mntspec,
+		    refstr_value(vfsp->vfs_resource),
+		    sizeof (cwd->prcwd_mntspec));
+	}
+}
+
 int
 write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
     rlim64_t rlimit, cred_t *credp, core_content_t content)
@@ -195,6 +235,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		struct utsname	uts;
 		prsecflags_t	psecflags;
 		prupanic_t	upanic;
+		prcwd_t		cwd;
 	} *bigwad;
 
 	size_t xregsize = prhasx(p) ? prgetprxregsize(p) : 0;
@@ -449,7 +490,16 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		}
 	}
 
+	/*
+	 * Take care of grabbing the cwd while we're here and still have vroot
+	 * held.
+	 */
+	fill_prcwd(p, &bigwad->cwd, vroot, credp);
+	error = elfnote(vp, &offset, NT_CWD, sizeof (bigwad->cwd),
+	    (caddr_t)&bigwad->cwd, rlimit, credp);
 	VN_RELE(vroot);
+	if (error)
+		goto done;
 
 #if defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);

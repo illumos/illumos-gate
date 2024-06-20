@@ -26,7 +26,7 @@
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2018 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -53,6 +53,7 @@
 @ MSG_NT_SECFLAGS		"[ NT_SECFLAGS ]"
 @ MSG_NT_LWPNAME		"[ NT_LWPNAME ]"
 @ MSG_NT_UPANIC			"[ NT_UPANIC ]"
+@ MSG_NT_CWD			"[ NT_CWD ]"
 
 
 @ MSG_AUXV_AF_SUN_SETUGID		"AF_SUN_SETUGID"
