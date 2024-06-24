@@ -25,6 +25,7 @@
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Joyent, Inc.
  * Copyright 2024 Carlos Neira <cneirabustos@gmail.com>
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/errno.h>
@@ -3996,8 +3997,12 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			*optlen = sizeof (lx_tcp_info_t);
 			bzero(optval, *optlen);
 
-			if (so->so_type != SOCK_STREAM)
+			if (so->so_type != SOCK_STREAM ||
+			    so->so_family == AF_UNIX) {
+				/* Let "out" case fix errno... */
+				error = ENOPROTOOPT;
 				goto out;
+			}
 
 			lx_tcp_info_t *ti = (lx_tcp_info_t *)optval;
 			conn_t *con = (struct conn_s *)so->so_proto_handle;
