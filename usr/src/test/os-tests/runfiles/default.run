@@ -204,3 +204,9 @@ post = tcpsig_fini
 
 [/opt/os-tests/tests/fifo-tvnsec.32]
 [/opt/os-tests/tests/fifo-tvnsec.64]
+
+[/opt/os-tests/tests/saveargs/functional/functional]
+arch = i86pc
+
+[/opt/os-tests/tests/saveargs/testmatch/testmatch]
+arch = i86pc

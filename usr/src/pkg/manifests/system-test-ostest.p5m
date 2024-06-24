@@ -125,6 +125,20 @@ file path=opt/os-tests/tests/portfs/file_assoc.64 mode=0555
 dir  path=opt/os-tests/tests/regression
 file path=opt/os-tests/tests/regression/illumos-15031 mode=0555
 file path=opt/os-tests/tests/regression/illumos-15036 mode=0555
+dir  path=opt/os-tests/tests/saveargs
+dir  path=opt/os-tests/tests/saveargs/functional
+file path=opt/os-tests/tests/saveargs/functional/align mode=0555
+file path=opt/os-tests/tests/saveargs/functional/basic mode=0555
+file path=opt/os-tests/tests/saveargs/functional/big-struct-ret mode=0555
+file path=opt/os-tests/tests/saveargs/functional/big-struct-ret-and-spill \
+    mode=0555
+file path=opt/os-tests/tests/saveargs/functional/functional mode=0555
+file path=opt/os-tests/tests/saveargs/functional/small-struct-ret mode=0555
+file path=opt/os-tests/tests/saveargs/functional/small-struct-ret-and-spill \
+    mode=0555
+file path=opt/os-tests/tests/saveargs/functional/stack-spill mode=0555
+dir  path=opt/os-tests/tests/saveargs/testmatch
+file path=opt/os-tests/tests/saveargs/testmatch/testmatch mode=0555
 dir  path=opt/os-tests/tests/sdevfs
 file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
 dir  path=opt/os-tests/tests/secflags

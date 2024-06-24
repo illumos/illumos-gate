@@ -13,33 +13,43 @@
 # Copyright 2012, Richard Lowe.
 #
 
-include $(SRC)/Makefile.master
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/Makefile.master.64
+include	$(SRC)/cmd/Makefile.ctf
+
+CTF_MODE = link
 
 .KEEP_STATE:
 
-PROGS = align \
+PROG = \
+	align \
 	basic \
 	big-struct-ret \
 	big-struct-ret-and-spill \
+	functional \
 	small-struct-ret \
 	small-struct-ret-and-spill \
 	stack-spill
 
-CFLAGS += $(CTF_FLAGS)
-CFLAGS64 += $(CTF_FLAGS)
+ROOTOPTPKG = $(ROOT)/opt/os-tests
+TESTDIR = $(ROOTOPTPKG)/tests/saveargs/functional
 
-%: %.c
-	$(LINK.c) -o $@ $< -lc
-	$(CTFCONVERT) -L VERSION $@
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
 
-all: $(PROGS)
+all: $(PROG)
 
-install: all
+install: $(CMDS)
 
 clean:
-	$(RM) $(PROGS)
+	$(RM) $(PROG)
 
 clobber: clean
 
-FRC:
+$(CMDS): $(TESTDIR) $(PROG)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

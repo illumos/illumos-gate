@@ -22,12 +22,18 @@ ena_free_tx_dma(ena_txq_t *txq)
 		for (uint_t i = 0; i < txq->et_sq_num_descs; i++) {
 			ena_tx_control_block_t *tcb = &txq->et_tcbs[i];
 			ena_dma_free(&tcb->etcb_dma);
+			if (tcb->etcb_mp != NULL)
+				freemsg(tcb->etcb_mp);
 		}
 
 		kmem_free(txq->et_tcbs,
 		    sizeof (*txq->et_tcbs) * txq->et_sq_num_descs);
+		kmem_free(txq->et_tcbs_freelist,
+		    sizeof (ena_tx_control_block_t *) * txq->et_sq_num_descs);
 
 		txq->et_tcbs = NULL;
+		txq->et_tcbs_freelist = NULL;
+		txq->et_tcbs_freelist_size = 0;
 	}
 
 	ena_dma_free(&txq->et_cq_dma);
@@ -68,6 +74,8 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 	txq->et_sq_descs = (void *)txq->et_sq_dma.edb_va;
 	txq->et_tcbs = kmem_zalloc(sizeof (*txq->et_tcbs) *
 	    txq->et_sq_num_descs, KM_SLEEP);
+	txq->et_tcbs_freelist = kmem_zalloc(sizeof (ena_tx_control_block_t *) *
+	    txq->et_sq_num_descs, KM_SLEEP);
 
 	for (uint_t i = 0; i < txq->et_sq_num_descs; i++) {
 		ena_tx_control_block_t *tcb = &txq->et_tcbs[i];
@@ -84,7 +92,11 @@ ena_alloc_tx_dma(ena_txq_t *txq)
 			err = ENOMEM;
 			goto error;
 		}
+
+		tcb->etcb_id = i;
+		txq->et_tcbs_freelist[i] = tcb;
 	}
+	txq->et_tcbs_freelist_size = txq->et_sq_num_descs;
 
 	ena_dma_conf_t cq_conf = {
 		.edc_size = cq_descs_sz,
@@ -263,6 +275,32 @@ ena_ring_tx_start(mac_ring_driver_t rh, uint64_t gen_num)
 	return (0);
 }
 
+static ena_tx_control_block_t *
+ena_tcb_alloc(ena_txq_t *txq)
+{
+	ena_tx_control_block_t *tcb;
+
+	ASSERT(MUTEX_HELD(&txq->et_lock));
+
+	if (txq->et_tcbs_freelist_size == 0)
+		return (NULL);
+	txq->et_tcbs_freelist_size--;
+	tcb = txq->et_tcbs_freelist[txq->et_tcbs_freelist_size];
+	txq->et_tcbs_freelist[txq->et_tcbs_freelist_size] = NULL;
+
+	return (tcb);
+}
+
+static void
+ena_tcb_free(ena_txq_t *txq, ena_tx_control_block_t *tcb)
+{
+	ASSERT3P(tcb, !=, NULL);
+	ASSERT(MUTEX_HELD(&txq->et_lock));
+	ASSERT3U(txq->et_tcbs_freelist_size, <, txq->et_sq_num_descs);
+	txq->et_tcbs_freelist[txq->et_tcbs_freelist_size++] = tcb;
+}
+
+
 static void
 ena_tx_copy_fragment(ena_tx_control_block_t *tcb, const mblk_t *mp,
     const size_t off, const size_t len)
@@ -283,17 +321,16 @@ ena_tx_copy_fragment(ena_tx_control_block_t *tcb, const mblk_t *mp,
 	tcb->etcb_dma.edb_used_len += len;
 }
 
-ena_tx_control_block_t *
-ena_pull_tcb(const ena_txq_t *txq, mblk_t *mp)
+static void
+ena_tcb_pull(const ena_txq_t *txq, ena_tx_control_block_t *tcb, mblk_t *mp)
 {
 	mblk_t *nmp = mp;
 	ena_t *ena = txq->et_ena;
-	ena_tx_control_block_t *tcb = NULL;
-	const uint16_t tail_mod =
-	    txq->et_sq_tail_idx & (txq->et_sq_num_descs - 1);
 
 	ASSERT(MUTEX_HELD(&txq->et_lock));
 	VERIFY3U(msgsize(mp), <, ena->ena_tx_buf_sz);
+	ASSERT3P(tcb, !=, NULL);
+	VERIFY0(tcb->etcb_dma.edb_used_len);
 
 	while (nmp != NULL) {
 		const size_t nmp_len = MBLKL(nmp);
@@ -303,24 +340,19 @@ ena_pull_tcb(const ena_txq_t *txq, mblk_t *mp)
 			continue;
 		}
 
-		/* For now TCB is bound to SQ desc. */
-		if (tcb == NULL) {
-			tcb = &txq->et_tcbs[tail_mod];
-		}
-
 		ena_tx_copy_fragment(tcb, nmp, 0, nmp_len);
 		nmp = nmp->b_cont;
 	}
 
 	ENA_DMA_SYNC(tcb->etcb_dma, DDI_DMA_SYNC_FORDEV);
-	VERIFY3P(nmp, ==, NULL);
-	VERIFY3P(tcb, !=, NULL);
-	return (tcb);
+
+	VERIFY3P(tcb->etcb_mp, ==, NULL);
+	tcb->etcb_mp = mp;
 }
 
 static void
 ena_fill_tx_data_desc(ena_txq_t *txq, ena_tx_control_block_t *tcb,
-    uint16_t tail, uint8_t phase, enahw_tx_data_desc_t *desc,
+    uint16_t req_id, uint8_t phase, enahw_tx_data_desc_t *desc,
     mac_ether_offload_info_t *meo, size_t mlen)
 {
 	VERIFY3U(mlen, <=, ENAHW_TX_DESC_LENGTH_MASK);
@@ -337,8 +369,8 @@ ena_fill_tx_data_desc(ena_txq_t *txq, ena_tx_control_block_t *tcb,
 	bzero(desc, sizeof (*desc));
 	ENAHW_TX_DESC_FIRST_ON(desc);
 	ENAHW_TX_DESC_LENGTH(desc, mlen);
-	ENAHW_TX_DESC_REQID_HI(desc, tail);
-	ENAHW_TX_DESC_REQID_LO(desc, tail);
+	ENAHW_TX_DESC_REQID_HI(desc, req_id);
+	ENAHW_TX_DESC_REQID_LO(desc, req_id);
 	ENAHW_TX_DESC_PHASE(desc, phase);
 	ENAHW_TX_DESC_DF_ON(desc);
 	ENAHW_TX_DESC_LAST_ON(desc);
@@ -406,10 +438,10 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	mutex_enter(&txq->et_lock);
 
 	/*
-	 * For the moment there is a 1:1 mapping between Tx descs and
-	 * Tx contexts. Currently Tx is copy only, and each context
-	 * buffer is guaranteed to be as large as MTU + frame header,
-	 * see ena_update_buf_sizes().
+	 * For the moment there are an equal number of Tx descs and Tx
+	 * contexts. Currently Tx is copy only, and each context buffer is
+	 * guaranteed to be as large as MTU + frame header, see
+	 * ena_update_buf_sizes().
 	 */
 	if (txq->et_blocked || txq->et_sq_avail_descs == 0) {
 		txq->et_blocked = true;
@@ -421,18 +453,24 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	}
 
 	ASSERT3U(meo.meoi_len, <=, ena->ena_max_frame_total);
-	tcb = ena_pull_tcb(txq, mp);
+
+	/*
+	 * There are as many pre-allocated TCBs as there are Tx descs so we
+	 * should never fail to get one.
+	 */
+	tcb = ena_tcb_alloc(txq);
 	ASSERT3P(tcb, !=, NULL);
-	tcb->etcb_mp = mp;
-	txq->et_sq_avail_descs--;
+	ena_tcb_pull(txq, tcb, mp);
 
 	/* Fill in the Tx descriptor. */
 	tail_mod = txq->et_sq_tail_idx & modulo_mask;
 	desc = &txq->et_sq_descs[tail_mod].etd_data;
-	ena_fill_tx_data_desc(txq, tcb, tail_mod, txq->et_sq_phase, desc, &meo,
-	    meo.meoi_len);
+	ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id, txq->et_sq_phase, desc,
+	    &meo, meo.meoi_len);
 	DTRACE_PROBE3(tx__submit, ena_tx_control_block_t *, tcb, uint16_t,
-	    tail_mod, enahw_tx_data_desc_t *, desc);
+	    tcb->etcb_id, enahw_tx_data_desc_t *, desc);
+
+	txq->et_sq_avail_descs--;
 
 	/*
 	 * Remember, we submit the raw tail value to the device, the
@@ -490,15 +528,16 @@ ena_tx_intr_work(ena_txq_t *txq)
 		/* Free the associated mblk. */
 		tcb->etcb_dma.edb_used_len = 0;
 		mp = tcb->etcb_mp;
+		tcb->etcb_mp = NULL;
 		VERIFY3P(mp, !=, NULL);
 		freemsg(mp);
-		tcb->etcb_mp = NULL;
 
 		/* Add this descriptor back to the free list. */
+		ena_tcb_free(txq, tcb);
 		txq->et_sq_avail_descs++;
-		txq->et_cq_head_idx++;
 
-		/* Check for phase rollover. */
+		/* Move on and check for phase rollover. */
+		txq->et_cq_head_idx++;
 		head_mod = txq->et_cq_head_idx & modulo_mask;
 		if (head_mod == 0)
 			txq->et_cq_phase ^= 1;

@@ -23,52 +23,6 @@
 
 #define	SIZE_OF(name) ((caddr_t)&name##_end - (caddr_t)&name)
 
-#define	TEST_GOOD(name, argc)					\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 0) ==	\
-	    SAVEARGS_TRAD_ARGS)					\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
-#define	TEST_GOOD_STRUCT(name, argc)				\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
-	    SAVEARGS_STRUCT_ARGS)				\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
-/*
- * GCC deals with structures differently, so TRAD args is actually correct for
- * this
- */
-#define	TEST_GOOD_GSTRUCT(name, argc)				\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
-	    SAVEARGS_TRAD_ARGS)					\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
-#define	TEST_BAD(name, argc)					\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 0) == 	\
-		SAVEARGS_NO_ARGS)				\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
-#define	TEST_BAD_STRUCT(name, argc)				\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 1) == 	\
-		SAVEARGS_NO_ARGS)				\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
-#define	TEST_BAD_GSTRUCT(name, argc)				\
-	if (saveargs_has_args(name, SIZE_OF(name), argc, 1) == 	\
-		SAVEARGS_NO_ARGS)				\
-		printf("Pass: %s\n", #name);			\
-	else							\
-		printf("FAIL: %s\n", #name);
-
 DEF_TEST(gcc_mov_align);
 DEF_TEST(gcc_mov_basic);
 DEF_TEST(gcc_mov_noorder);
@@ -122,6 +76,79 @@ DEF_TEST(small_struct_arg_by_value);
 int
 main(int argc, char **argv)
 {
+
+#define	TEST_GOOD(name, argc)						\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 0) ==	\
+		    SAVEARGS_TRAD_ARGS) {				\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+#define	TEST_GOOD_STRUCT(name, argc)					\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
+		    SAVEARGS_STRUCT_ARGS) {				\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+/*
+ * GCC deals with structures differently, so TRAD args is actually correct for
+ * this
+ */
+#define	TEST_GOOD_GSTRUCT(name, argc)					\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
+		    SAVEARGS_TRAD_ARGS) {				\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+#define	TEST_BAD(name, argc)						\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 0) ==	\
+		    SAVEARGS_NO_ARGS) {					\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+#define	TEST_BAD_STRUCT(name, argc)					\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
+		    SAVEARGS_NO_ARGS) {					\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+#define	TEST_BAD_GSTRUCT(name, argc)					\
+	do {								\
+		if (saveargs_has_args(name, SIZE_OF(name), argc, 1) ==	\
+		    SAVEARGS_NO_ARGS) {					\
+			printf("Pass: %s\n", #name);			\
+		} else {						\
+			res = 1;					\
+			printf("FAIL: %s\n", #name);			\
+		}							\
+	} while (0)
+
+	int res = 0;
+
 	TEST_GOOD(kmem_alloc, 2);
 	TEST_GOOD(uts_kill, 2);
 	TEST_GOOD(av1394_ic_bitreverse, 1);
@@ -164,12 +191,11 @@ main(int argc, char **argv)
 	TEST_GOOD(ss_mov_stack_spill, 8);
 
 	TEST_BAD(big_struct_arg_by_value, 2);
-	TEST_BAD(small_struct_arg_by_value, 2);
 
-	TEST_BAD(small_struct_ret_w_float, 1);
+	TEST_BAD_STRUCT(small_struct_ret_w_float, 1);
 
 	TEST_GOOD(interleaved_argument_saves, 4);
 	TEST_BAD(jmp_table, 1);
 
-	return (0);
+	return (res);
 }

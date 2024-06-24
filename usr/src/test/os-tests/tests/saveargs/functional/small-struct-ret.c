@@ -16,17 +16,28 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int
-test(long a, long b, long c, long d, long e)
+struct foo {
+	long a;
+	long b;
+};
+
+struct foo
+test(long a, long b, long c, long d)
 {
-	printf("%ld %ld %ld %ld %ld\n", a, b, c, d, e);
+	struct foo f = {0};
+
+	printf("%ld %ld %ld %ld\n", a, b, c, d);
+	fflush(stdout);
 	for (;;)
-		sleep(60);
+		(void) sleep(60);
+
+	return (f);
+
 }
 
 int
 main(int argc, char **argv)
 {
-	test(1, 2, 3, 4, 5);
+	(void) test(1, 2, 3, 4);
 	return (0);
 }

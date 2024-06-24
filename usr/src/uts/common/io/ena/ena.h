@@ -326,6 +326,12 @@ typedef enum {
  * packet. At the moment we support copy only.
  */
 typedef struct ena_tx_control_block {
+	/*
+	 * The index into et_tcbs where this tcb lives. Used as the request ID
+	 * value in the Tx descriptor. This allows us to match a response to
+	 * its associated TCB.
+	 */
+	uint16_t	etcb_id;
 	mblk_t		*etcb_mp;
 	ena_tcb_type_t	etcb_type;
 	ena_dma_buf_t	etcb_dma;
@@ -436,10 +442,12 @@ typedef struct ena_txq {
 
 	/*
 	 * The TCBs track host Tx information, like a pointer to the
-	 * mblk being submitted. Currently we maintain a 1:1 mapping
-	 * of SQ descriptors to TCBs as Tx is copy only.
+	 * mblk being submitted. The TCBs currently available for use are
+	 * maintained in a free list.
 	 */
 	ena_tx_control_block_t	*et_tcbs;    /* TM */
+	ena_tx_control_block_t	**et_tcbs_freelist; /* TM */
+	uint16_t		et_tcbs_freelist_size; /* TM */
 
 	enahw_tx_cdesc_t	*et_cq_descs; /* TM */
 	ena_dma_buf_t		et_cq_dma;    /* WO */
