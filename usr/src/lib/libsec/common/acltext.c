@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*LINTLIBRARY*/
@@ -39,7 +40,17 @@
 #include <idmap.h>
 #include <synch.h>
 
-#define	ID_STR_MAX	20	/* digits in LONG_MAX */
+/*
+ * Unix names returned for UID and GID values can actually be longer than
+ * the traditional 8 characters, or even 32 characters, etc.  When using
+ * "ad" in nsswitch.conf they can be quite long.  Let's use a reasonable
+ * compromise value here (80) which is large enough to hold SIDs in the
+ * numeric form (eg. "S-1-5-21-wwwwwwwww-xxxxxxxxx-yyyyyyyyy-zzzzzzzzz")
+ * but not necessarily every crazy long user name.  In addition, places
+ * below that might truncate a long name should detect truncation and
+ * fall-back to a more compact value (SID or UID/GID et).
+ */
+#define	ID_STR_MAX	80
 
 #define	APPENDED_ID_MAX	ID_STR_MAX + 1		/* id + colon */
 /*
@@ -85,6 +96,11 @@ aclent_perms(int perm, char *txt_perms)
 	txt_perms[3] = '\0';
 }
 
+/*
+ * Get the user name into the passed buffer.  If it can't be found,
+ * or if the noresolve flag is set, or if what we found will not fit
+ * in the buffer without truncation, just put a numeric ID.
+ */
 static char *
 pruname(uid_t uid, char *uidp, size_t buflen, int noresolve)
 {
@@ -92,15 +108,20 @@ pruname(uid_t uid, char *uidp, size_t buflen, int noresolve)
 
 	if (noresolve == 0)
 		passwdp = getpwuid(uid);
-	if (passwdp == (struct passwd *)NULL) {
-		/* could not get passwd information: display uid instead */
-		(void) snprintf(uidp, buflen, "%u", uid);
-	} else {
+	if (passwdp != NULL && strlen(passwdp->pw_name) < buflen) {
 		(void) strlcpy(uidp, passwdp->pw_name, buflen);
+	} else {
+		/* display uid instead */
+		(void) snprintf(uidp, buflen, "%u", uid);
 	}
 	return (uidp);
 }
 
+/*
+ * Get the group name into the passed buffer.  If it can't be found,
+ * or if the noresolve flag is set, or if what we found will not fit
+ * in the buffer without truncation, just put a numeric ID.
+ */
 static char *
 prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 {
@@ -108,11 +129,11 @@ prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 
 	if (noresolve == 0)
 		groupp = getgrgid(gid);
-	if (groupp == (struct group *)NULL) {
-		/* could not get group information: display gid instead */
-		(void) snprintf(gidp, buflen, "%u", gid);
-	} else {
+	if (groupp != NULL && strlen(groupp->gr_name) < buflen) {
 		(void) strlcpy(gidp, groupp->gr_name, buflen);
+	} else {
+		/* display gid instead */
+		(void) snprintf(gidp, buflen, "%u", gid);
 	}
 	return (gidp);
 }

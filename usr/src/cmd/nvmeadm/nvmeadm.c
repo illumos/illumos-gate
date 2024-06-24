@@ -3046,6 +3046,7 @@ do_firmware_load(const nvme_process_arg_t *npa)
 {
 	int fw_fd;
 	uint64_t offset = 0;
+	uint32_t fwug;
 	size_t size, len;
 	char buf[FIRMWARE_READ_BLKSIZE];
 
@@ -3069,14 +3070,31 @@ do_firmware_load(const nvme_process_arg_t *npa)
 		errx(-1, "Failed to open \"%s\": %s", npa->npa_argv[0],
 		    strerror(errno));
 
+	fwug = nvme_ctrl_info_fwgran(npa->npa_ctrl_info);
+
 	size = 0;
 	do {
-		len = read_block(npa, fw_fd, buf, sizeof (buf));
+		size_t slen;
+
+		slen = len = read_block(npa, fw_fd, buf, sizeof (buf));
 
 		if (len == 0)
 			break;
 
-		if (!nvme_fw_load(npa->npa_ctrl, buf, len, offset)) {
+		/*
+		 * If this is the last block and its length does not match the
+		 * firmware update load granularity reported by the controller
+		 * (or assumed prior to NVMe 1.3), pad the data out with zeros
+		 * to the required granularity.
+		 */
+		if (len < sizeof (buf) && (len % fwug) != 0) {
+			slen = roundup(slen, fwug);
+			if (slen > sizeof (buf))
+				slen = sizeof (buf);
+			bzero(buf + len, slen - len);
+		}
+
+		if (!nvme_fw_load(npa->npa_ctrl, buf, slen, offset)) {
 			nvmeadm_fatal(npa, "failed to load firmware image "
 			    "\"%s\" at offset %" PRIu64, npa->npa_argv[0],
 			    offset);
@@ -3115,8 +3133,34 @@ nvmeadm_firmware_commit(const nvme_process_arg_t *npa, uint32_t slot,
 	}
 
 	if (!nvme_fw_commit_req_exec(req)) {
-		nvmeadm_fatal(npa, "failed to %s firmware on %s",
-		    npa->npa_cmd->c_name, npa->npa_name);
+		/*
+		 * A number of command specific status values are informational
+		 * and indicate that the operation was successful but that
+		 * something else, such as a device reset, is still required
+		 * before the new firmware is active.
+		 * We distinguish those here and report them as a note rather
+		 * than a fatal error.
+		 */
+		if (nvme_ctrl_err(npa->npa_ctrl) == NVME_ERR_CONTROLLER) {
+			uint32_t sct, sc;
+
+			nvme_ctrl_deverr(npa->npa_ctrl, &sct, &sc);
+			if (sct == NVME_CQE_SCT_SPECIFIC && (
+			    sc == NVME_CQE_SC_SPC_FW_RESET ||
+			    sc == NVME_CQE_SC_SPC_FW_NSSR ||
+			    sc == NVME_CQE_SC_SPC_FW_NEXT_RESET)) {
+				fprintf(stderr,
+				    "nvmeadm: commit successful but %s\n",
+				    nvme_sctostr(npa->npa_ctrl, NVME_CSI_NVM,
+				    sct, sc));
+			} else {
+				nvmeadm_fatal(npa, "failed to %s on %s",
+				    npa->npa_cmd->c_name, npa->npa_name);
+			}
+		} else {
+			nvmeadm_fatal(npa, "failed to %s on %s",
+			    npa->npa_cmd->c_name, npa->npa_name);
+		}
 	}
 
 	nvme_fw_commit_req_fini(req);

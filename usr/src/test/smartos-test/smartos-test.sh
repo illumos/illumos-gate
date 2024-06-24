@@ -347,6 +347,7 @@ function execute_tests {
     log_testrunner crypto-tests /opt/crypto-tests/runfiles/default.run
     log_testrunner elf-tests /opt/elf-tests/runfiles/default.run
     log_testrunner libc-tests /opt/libc-tests/runfiles/default.run
+    log_testrunner libsec-tests /opt/libsec-tests/runfiles/default.run
     log_test vndtest /opt/vndtest/bin/vndtest -a
     log_testrunner util-tests /opt/util-tests/runfiles/default.run
     log_testrunner os-tests /opt/os-tests/runfiles/default.run

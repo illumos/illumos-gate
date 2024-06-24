@@ -53,6 +53,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_ctrl_info_errtostr;
 	nvme_ctrl_info_format;
 	nvme_ctrl_info_free;
+	nvme_ctrl_info_fwgran;
 	nvme_ctrl_info_fwrev;
 	nvme_ctrl_info_identify;
 	nvme_ctrl_info_model;

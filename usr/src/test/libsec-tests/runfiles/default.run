@@ -1,0 +1,42 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 RackTop Systems, Inc.
+#
+
+[DEFAULT]
+outputdir = /var/tmp/test_results
+quiet = False
+
+[/opt/libsec-tests/tests/fromtext]
+tests = [
+      'acl_fromtext_0',
+      'acl_fromtext_1',
+      'acl_fromtext_2',
+      'acl_fromtext_3',
+      'acl_fromtext_4',
+      'acl_fromtext_5',
+      'acl_fromtext_6',
+      'acl_fromtext_7'
+      ]
+
+[/opt/libsec-tests/tests/totext]
+tests = [
+      'acl_totext_0',
+      'acl_totext_1',
+      'acl_totext_2',
+      'acl_totext_3',
+      'acl_totext_4',
+      'acl_totext_5',
+      'acl_totext_6',
+      'acl_totext_7'
+      ]

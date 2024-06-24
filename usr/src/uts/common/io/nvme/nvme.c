@@ -2149,7 +2149,8 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 
 	case NVME_CQE_SC_SPC_FW_OVERLAP:
 		/* Overlapping Firmware Ranges */
-		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_IMAGE_LOAD);
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_IMAGE_LOAD ||
+		    cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
 
 	default:

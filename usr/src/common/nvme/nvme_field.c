@@ -84,6 +84,9 @@ nvme_field_validate(const nvme_field_info_t *field,
 {
 	ASSERT3P(field->nlfi_vers, !=, NULL);
 
+	if (msglen > 0)
+		*msg = '\0';
+
 	if (!nvme_field_atleast(data, field->nlfi_vers)) {
 		(void) snprintf(msg, msglen, "field %s (%s) requires "
 		    "version %u.%u, but device is at %u.%u", field->nlfi_human,
@@ -103,9 +106,13 @@ nvme_field_validate(const nvme_field_info_t *field,
 
 	if (field->nlfi_valid != NULL) {
 		if (!field->nlfi_valid(field, data, value, msg, msglen)) {
-			(void) snprintf(msg, msglen, "field %s (%s) "
-			    "value 0x%" PRIx64 " is invalid", field->nlfi_human,
-			    field->nlfi_spec, value);
+			if (msglen > 0 && *msg == '\0') {
+				(void) snprintf(msg, msglen,
+				    "field %s (%s) value 0x%" PRIx64
+				    " is invalid",
+				    field->nlfi_human,
+				    field->nlfi_spec, value);
+			}
 			return (NVME_FIELD_ERR_BAD_VALUE);
 		}
 	} else if (!nvme_field_range_check(field, 0, field->nlfi_max_size, msg,

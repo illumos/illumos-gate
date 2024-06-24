@@ -26,6 +26,7 @@ TEST_IPS_MANIFEST_FILES = \
     system-test-cryptotest.p5m \
     system-test-elftest.p5m \
     system-test-libctest.p5m \
+    system-test-libsectest.p5m \
     system-test-nettest.p5m \
     system-test-nvmetest.p5m \
     system-test-ostest.p5m \
