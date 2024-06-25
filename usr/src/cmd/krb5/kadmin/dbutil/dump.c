@@ -365,8 +365,8 @@ static krb5_error_code master_key_convert(context, db_entry)
     krb5_db_entry	* db_entry;
 {
     krb5_error_code	retval;
-    krb5_keyblock 	v5plainkey, *key_ptr;
-    krb5_keysalt 	keysalt;
+    krb5_keyblock	v5plainkey, *key_ptr;
+    krb5_keysalt	keysalt;
     int	      i, j;
     krb5_key_data	new_key_data, *key_data;
     krb5_boolean	is_mkey;
@@ -380,8 +380,6 @@ static krb5_error_code master_key_convert(context, db_entry)
 		    db_entry->n_key_data);
     for (i=0; i < db_entry->n_key_data; i++) {
 	key_data = &db_entry->key_data[i];
-	if (key_data->key_data_length == 0)
-	    continue;
 	retval = krb5_dbekd_decrypt_key_data(context, &master_key,
 					     key_data, &v5plainkey,
 					     &keysalt);
@@ -1243,7 +1241,7 @@ static void print_key_data(FILE *f, krb5_key_data *key_data)
  *	data		(input) pointer to a structure containing a FILE *
  *			        and a record counter.
  *	entry		(input) entry to get dumped.
- * 	<return value>	void
+ *	<return value>	void
  *
  * Requires:
  *	nuttin
@@ -1790,8 +1788,8 @@ process_k5beta_record(fname, kcontext, filep, verbose, linenop)
     krb5_timestamp	last_pwd_change, mod_date;
     krb5_principal	mod_princ;
     krb5_error_code	kret;
-    krb5_octet 		*shortcopy1 = NULL; /* SUNWresync121 memleak fix */
-    krb5_octet 		*shortcopy2 = NULL;
+    krb5_octet		*shortcopy1 = NULL; /* SUNWresync121 memleak fix */
+    krb5_octet		*shortcopy2 = NULL;
 
     try2read = (char *) NULL;
     (*linenop)++;
@@ -2116,7 +2114,7 @@ process_k5beta6_record(fname, kcontext, filep, verbose, linenop)
     char		*name;
     krb5_key_data	*kp, *kdatap;
     krb5_tl_data	**tlp, *tl;
-    krb5_octet 		*op;
+    krb5_octet		*op;
     krb5_error_code	kret;
     const char		*try2read;
 
@@ -2856,8 +2854,8 @@ load_db(argc, argv)
 		 *
 		 * We also don't want to add to the update log since we
 		 * are doing a whole sale replace of the db, because:
-		 * 	we could easily exceed # of update entries
-		 * 	we could implicity delete db entries during a replace
+		 *	we could easily exceed # of update entries
+		 *	we could implicity delete db entries during a replace
 		 *	no advantage in incr updates when entire db is replaced
 		 */
 		if (!update) {
