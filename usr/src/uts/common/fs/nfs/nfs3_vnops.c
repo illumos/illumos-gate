@@ -32,6 +32,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -4080,7 +4081,7 @@ nfs3readdir(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 
 	args.dir = *RTOFH3(rp);
 	args.cookie = (cookie3)rdc->nfs3_cookie;
-	args.cookieverf = rp->r_cookieverf;
+	args.cookieverf = (args.cookie == 0) ? 0 : rp->r_cookieverf;
 	args.count = rdc->buflen;
 
 	/*
@@ -4189,7 +4190,7 @@ nfs3readdirplus(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 
 	args.dir = *RTOFH3(rp);
 	args.cookie = (cookie3)rdc->nfs3_cookie;
-	args.cookieverf = rp->r_cookieverf;
+	args.cookieverf = (args.cookie == 0) ? 0 : rp->r_cookieverf;
 	args.dircount = rdc->buflen;
 	args.maxcount = mi->mi_tsize;
 
