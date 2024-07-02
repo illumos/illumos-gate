@@ -637,7 +637,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	int			unbind_on_err = 1;
 	boolean_t		clear_acceptconn_on_err = B_FALSE;
 	boolean_t		restore_backlog_on_err = B_FALSE;
-	int			save_so_backlog;
+	int			save_so_backlog = 0;
 	t_scalar_t		PRIM_type = O_T_BIND_REQ;
 	boolean_t		tcp_udp_xport;
 	sotpi_info_t		*sti = SOTOTPI(so);

@@ -137,7 +137,8 @@ Convert(
 	outbuf = new AudioBuffer(length + pad, "(G72x conversion buffer)");
 	if (outbuf == 0)
 		return (AUDIO_UNIXERROR);
-	if (err = outbuf->SetHeader(outhdr)) {
+	err = outbuf->SetHeader(outhdr);
+	if (err != AUDIO_SUCCESS) {
 		delete outbuf;
 		return (err);
 	}

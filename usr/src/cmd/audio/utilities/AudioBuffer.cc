@@ -449,7 +449,8 @@ AppendData(
 	// If the ending offset is beyond end of buffer, extend it
 	local_length = pos + GetHeader().Bytes_to_Time(len);
 	if (local_length > GetSize()) {
-		if (err = SetSize(local_length))
+		err = SetSize(local_length);
+		if (err != AUDIO_SUCCESS)
 			return (err);
 	}
 	return (WriteData(buf, len, pos));
