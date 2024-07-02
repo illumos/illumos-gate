@@ -6246,7 +6246,7 @@ cpuid_getsig(struct cpu *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_std[1].cp_eax);
 }
 
-uint32_t
+x86_chiprev_t
 cpuid_getchiprev(struct cpu *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, CPUID_PASS_IDENT));
