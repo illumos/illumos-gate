@@ -1709,10 +1709,12 @@ typedef union {
 #define	NVME_DWORD_MASK		(NVME_DWORD_SIZE - 1)
 
 /*
- * Maximum offset a firmware image can be load at is the number of
- * DWORDS in a 32 bit field. Expressed in bytes its is:
+ * The maximum offset a firmware image segment can be loaded at is the number
+ * of DWORDS in a 32 bit field. The maximum length of such a segment is the
+ * same. Expressed in bytes it is:
  */
 #define	NVME_FW_OFFSETB_MAX	((u_longlong_t)UINT32_MAX << NVME_DWORD_SHIFT)
+#define	NVME_FW_LENB_MAX	NVME_FW_OFFSETB_MAX
 
 typedef union {
 	struct {
