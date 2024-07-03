@@ -141,6 +141,7 @@ struct uart_softc {
 
 	struct fifo rxfifo;
 	struct mevent *mev;
+	struct mevent *mev_timer;
 
 	struct ttyfd tty;
 #ifndef	__FreeBSD__
@@ -420,8 +421,33 @@ uart_reset(struct uart_softc *sc)
 }
 
 /*
+ * Clear the IIR_RXTOUT timer, allowing uart_sock_drain() to continue
+ * processing.
+ */
+static void
+uart_intr_callback(int fd __unused, enum ev_type type __unused, void *param)
+{
+	struct uart_softc *sc = param;
+
+	pthread_mutex_lock(&sc->mtx);
+
+	mevent_delete(sc->mev_timer);
+	sc->mev_timer = NULL;
+
+	pthread_mutex_unlock(&sc->mtx);
+}
+
+/*
  * Toggle the COM port's intr pin depending on whether or not we have an
  * interrupt condition to report to the processor.
+ *
+ * For the IIR_RXTOUT path, interrupts are limited to no more than 1 per
+ * millisecond, otherwise it's possible to overflow a VM's TTY queue before it
+ * has a chance to process the incoming data, resulting in lost data.
+ *
+ * It would be nice to hook this properly into the baudrate, but until high
+ * resolution timers are supported we're effectively running at around 16000
+ * baud (one interrupt per full FIFO).
  */
 static void
 uart_toggle_intr(struct uart_softc *sc)
@@ -432,8 +458,12 @@ uart_toggle_intr(struct uart_softc *sc)
 
 	if (intr_reason == IIR_NOPEND)
 		(*sc->intr_deassert)(sc->arg);
-	else
+	else if (intr_reason != IIR_RXTOUT)
 		(*sc->intr_assert)(sc->arg);
+	else if (sc->mev_timer == NULL) {
+		(*sc->intr_assert)(sc->arg);
+		sc->mev_timer = mevent_add(1, EVF_TIMER, uart_intr_callback, sc);
+	}
 }
 
 static void
@@ -695,7 +725,7 @@ uart_sock_drain(int fd, enum ev_type ev, void *arg)
 	} else {
 		bool err_close = false;
 
-		while (rxfifo_available(sc)) {
+		while (rxfifo_available(sc) && sc->mev_timer == NULL) {
 			int res;
 
 			res = read(sc->usc_sock.clifd, &ch, 1);
