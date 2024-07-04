@@ -205,7 +205,6 @@ struct nvme_cq {
 	nvme_dma_t *ncq_dma;
 	nvme_cqe_t *ncq_cq;
 	uint_t ncq_head;
-	uint_t ncq_tail;
 	uintptr_t ncq_hdbl;
 	int ncq_phase;
 

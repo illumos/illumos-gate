@@ -23,10 +23,10 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# class action script for "rbac" class files
-# installed by pkgadd
+# Script to build RBAC *_attr files from fragments installed by pkg.
+# This script is run by service svc:/system/rbac:default.
 #
-# Files in "rbac" class:
+# Related RBAC *_attr files are:
 #
 # /etc/security/{prof_attr,exec_attr,auth_attr}
 # /etc/user_attr
@@ -37,6 +37,9 @@
 # 2 - warning or possible error condition. Installation continues. A warning
 #     message is displayed at the time of completion.
 #
+
+# i.rbac appears to depend on C locale
+export LC_ALL=C.UTF-8
 
 umask 022
 

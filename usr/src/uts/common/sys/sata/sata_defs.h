@@ -23,7 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _SATA_DEFS_H
@@ -325,6 +325,7 @@ typedef struct sata_id {
 #define	SATA_SMART_SELF_TEST_SUPPORTED	0x0002	/* SMART self-test supported */
 /* IDLE IMMEDIATE with UNLOAD FEATURE supported */
 #define	SATA_IDLE_UNLOAD_SUPPORTED	0x2000
+#define	SATA_GPL_SUPPORTED	0x0020	/* General Purpose Logging supported */
 
 /* Identify Device: physical sector size - word 106 */
 #define	SATA_L2PS_CHECK_BIT	0x4000	/* Set when this word valid */
@@ -519,10 +520,21 @@ typedef struct sata_id {
 
 #define	SCSI_INFO_EXCEPTIONS_PARAM_LEN	4
 
-#define	READ_LOG_EXT_LOG_DIRECTORY	0
+#define	READ_LOG_EXT_LOG_DIRECTORY	0x00
+#define	DEVICE_STATS_LOG		0x04
+#define	DEVSTAT_GENERAL_STATS			0x01
+#define	DEVSTAT_ROTATING_MEDIA_PAGE		0x03
+#define	DEVSTAT_GENERAL_ERRORS_PAGE		0x04
+#define	DEVSTAT_TEMP_PAGE			0x05
+#define	DEVSTAT_SSD_PAGE			0x07
+#define	SMART_SELFTEST_LOG_PAGE		0x06
+#define	EXT_SMART_SELFTEST_LOG_PAGE	0x07
 #define	READ_LOG_EXT_NCQ_ERROR_RECOVERY	0x10
-#define	SMART_SELFTEST_LOG_PAGE		6
-#define	EXT_SMART_SELFTEST_LOG_PAGE	7
+
+
+#define	SATA_STAT_SUPPORTED(x)		((x) & (1ULL << 63))
+#define	SATA_STAT_VALID(x)		((x) & (1ULL << 62))
+#define	SATA_STAT_VALUE(x)		((x) & ((1ULL << 59) - 1))
 
 /*
  * SATA NCQ error recovery page (0x10)
@@ -640,17 +652,21 @@ struct read_log_ext_directory {
  */
 #define	PC_CUMULATIVE_VALUES			0x01
 #define	PAGE_CODE_GET_SUPPORTED_LOG_PAGES	0x00
+#define	PAGE_CODE_READ_ERRORS			0x03
+#define	PAGE_CODE_TEMPERATURE			0x0d
+#define	PAGE_CODE_START_STOP_CYCLE_COUNTER	0x0e
 #define	PAGE_CODE_SELF_TEST_RESULTS		0x10
+#define	PAGE_CODE_SOLID_STATE_MEDIA		0x11
+#define	PAGE_CODE_GENERAL_STATS			0x19
 #define	PAGE_CODE_INFORMATION_EXCEPTIONS	0x2f
 #define	PAGE_CODE_SMART_READ_DATA		0x30
-#define	PAGE_CODE_START_STOP_CYCLE_COUNTER	0x0e
 
 
 struct log_parameter {
 	uint8_t param_code[2];		/* parameter dependant */
 	uint8_t param_ctrl_flags;	/* see defines below */
 	uint8_t param_len;		/* # of bytes following */
-	uint8_t param_values[1];	/* # of bytes defined by param_len */
+	uint8_t param_values[];		/* # of bytes defined by param_len */
 };
 
 /* param_ctrl_flag fields */
@@ -668,6 +684,8 @@ struct log_parameter {
 #define	SMART_MAGIC_VAL_4	0x2c
 
 #define	SCT_STATUS_LOG_PAGE	0xe0
+
+#define	SCSI_NO_TEMP		0xff
 
 /*
  * Acoustic management
