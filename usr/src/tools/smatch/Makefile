@@ -25,8 +25,7 @@ SPARSE_VERSION = 0.6.1-rc1-il-7
 include ../Makefile.tools
 
 # We have to build smatch before we can use cw
-i386_CC = $(GNUC_ROOT)/bin/gcc
-sparc_CC = $(GNUC_ROOT)/bin/gcc
+NATIVECC = $(GNUC_ROOT)/bin/gcc
 # sparc doesn't recognise -msave-args
 i386_SMATCHFLAGS = -msave-args
 sparc_SMATCHFLAGS =
@@ -35,7 +34,7 @@ sparc_SMATCHFLAGS =
 # unused on x86 because the compiler will replace ceil(3M) with its own copy.
 # However, on SPARC, it doesn't. So for now we disable builtins to make it
 # consistent.
-CFLAGS = -O -m64 -std=gnu99 -nodefaultlibs -D__sun $($(MACH)_SMATCHFLAGS)
+CFLAGS = -O -m64 -std=gnu99 -nodefaultlibs -D__sun $($(NATIVE_MACH)_SMATCHFLAGS)
 CFLAGS += -fno-builtin
 CFLAGS += -Wall -Wno-unknown-pragmas -Wno-psabi
 

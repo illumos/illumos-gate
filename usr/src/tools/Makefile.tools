@@ -25,6 +25,7 @@
 # Definitions common to tool source.
 #
 include $(SRC)/Makefile.master
+include $(SRC)/Makefile.native
 
 FILEMODE=	0555
 
@@ -48,9 +49,6 @@ ROOTONBLDETCABI=	$(ROOTONBLD)/etc/abi
 ROOTONBLDETCEXCEPT=	$(ROOTONBLD)/etc/exception_lists
 ROOTONBLDSHARE=		$(ROOTONBLD)/share
 
-CC =			$(NATIVECC)
-CCC =			$(NATIVECCC)
-CFLAGS =		$(NATIVE_CFLAGS)
 CPPFLAGS=		-D_TS_ERRNO
 ELFSIGN_O=		$(TRUE)
 LDLIBS=
@@ -71,10 +69,6 @@ GSHARED = -_gcc=-shared
 # protector work. Disable it right now for the tools.
 #
 STACKPROTECT = none
-
-# Unset CW_LINKER so we run the default.  We don't set LD here to avoid taking
-# the journey through LD_ALTEXEC unnecessarily.
-CW_LINKER=
 
 ROOTONBLDPROG=		$(PROG:%=$(ROOTONBLDBIN)/%)
 ROOTONBLDSCRIPTS=	$(SCRIPTS:%=$(ROOTONBLDBIN)/%)

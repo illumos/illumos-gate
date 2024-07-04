@@ -25,10 +25,9 @@
 #
 #
 
-include		../Makefile.com
 include		../../Makefile.tools
-include		$(SGSHOME)/libld/Makefile.com
-include		$(SRC)/Makefile.master.64
+include		$(SRC)/cmd/sgs/libld/Makefile.com
+include		../Makefile.com
 
 .KEEP_STATE:
 
@@ -38,17 +37,21 @@ include		$(SRC)/Makefile.master.64
 # that and just make sure to find everything relative to the tools proto
 # area.
 #
-LDLIBS =
-CW_LINKER =
-
-CPPFLAGS = $(NATIVE_CPPFLAGS) -DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
-		    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
-		    -I$(SRC)/uts/common
-LDLIBS +=	-L../libconv -lconv -L$(ROOTONBLDLIBMACH64) -llddbg -lelf -lc
+LDLIBS =	-L../libconv -lconv -L$(ROOTONBLDLIBMACH64) -llddbg -lelf -lc
 NATIVE_LIBS +=	libc.so
 
-DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
-CFLAGS = $(NATIVE_CFLAGS)
+CPPFLAGS += -DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
+	    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
+	    -I$(SRC)/uts/common
+
+DYNFLAGS +=	$(VERSREF) '-Wl,-R$$ORIGIN'
+
+# Necessary because we're a non-debug build in a debug environment, because
+# of being in src/tools
+CERRWARN += -_gcc=-Wno-unused-but-set-variable
+
+include		$(SRC)/Makefile.native
+include		$(SRC)/Makefile.master.64
 
 all:		$(DYNLIB) $(LIBLINKS)
 

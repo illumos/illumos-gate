@@ -23,19 +23,32 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 RackTop Systems.
-#
 # Copyright 2020 Joyent, Inc.
 #
 
-include Makefile.shared.com
+include $(SRC)/tools/Makefile.tools
+include $(SRC)/cmd/svc/configd/Makefile.shared.com
 
-CPPFLAGS += -I. -I../common -I$(SRC)/common/svc \
-	-I$(ROOT)/usr/include/sqlite-sys -D_REENTRANT
 
-LDLIBS += -lsecdb -lbsm -lumem -luutil -lsqlite-sys
+LIBUUTIL	= $(SRC)/lib/libuutil
+LIBSCF		= $(SRC)/lib/libscf
+LIBSQLITE	= $(SRC)/lib/libsqlite
 
-SCRIPTFILE	= restore_repository
-ROOTSCRIPTFILE	= $(ROOTLIBSVCBIN)/$(SCRIPTFILE)
+CPPFLAGS += -I$(SRC)/cmd/svc/configd \
+	-I$(SRC)/cmd/svc/common -I$(SRC)/common/svc \
+	-D_REENTRANT -I$(LIBUUTIL)/common -I$(LIBSCF)/inc -I$(LIBSQLITE) \
+	-I$(SRC)/tools/svc/libsqlite \
+
+CPPFLAGS += -DNATIVE_BUILD
+
+LDFLAGS += $(BDIRECT)
+LDLIBS	+= -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib \
+	-lumem -L$(ROOTONBLDLIBMACH) \
+	-R '$$ORIGIN/../../lib/$(MACH)' -lsqlite-sys -luutil
+
+NATIVE_LIBS += libumem.so libc.so
+
+include $(SRC)/Makefile.native
 
 .KEEP_STATE:
 .PARALLEL: $(OBJS)
@@ -46,16 +59,14 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-$(ROOTLIBSVCBIN)/%: %.sh
-	$(INS.rename)
+%.o: $(SRC)/cmd/svc/configd/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
-install: all $(ROOTLIBSVCBINPROG) $(ROOTVARSADMFILE) $(ROOTSCRIPTFILE)
+install: all $(ROOTONBLDMACHPROG)
 
 clean:
-	$(RM) $(OBJS)
 
 clobber: clean
 
 include $(SRC)/cmd/Makefile.targ
-
-FRC:

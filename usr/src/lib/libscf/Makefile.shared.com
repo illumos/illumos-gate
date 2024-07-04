@@ -9,11 +9,27 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2015, Richard Lowe.
-# Copyright 2020 Joyent, Inc.
+LIBRARY =	libscf.a
+VERS =		.1
 
-include $(SRC)/Makefile.native
+OBJECTS =		\
+	error.o		\
+	lowlevel.o	\
+	midlevel.o	\
+	notify_params.o	\
+	highlevel.o	\
+	scf_tmpl.o	\
+	scf_type.o
 
-MAKE_INCLUDE= $(SRC)/cmd/make/include
-CFLAGS += $(CCVERBOSE)
-CPPFLAGS = -I$(MAKE_INCLUDE) $(MAKE_DEFS)
+include $(SRC)/lib/Makefile.lib
+
+LIBS = $(DYNLIB)
+
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	$(CNOWARN_UNINIT)
+
+# not linted
+SMATCH=off

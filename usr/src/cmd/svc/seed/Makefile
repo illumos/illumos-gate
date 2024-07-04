@@ -134,18 +134,9 @@ FILEMODE = 0600
 # seeds are not intended for editing, but may be copied
 SEEDFILEMODE = 0444
 
-CONFIGD = ../configd/svc.configd-native
-SVCCFG = ../svccfg/svccfg-native
-
 .KEEP_STATE:
 
 all: global.db nonglobal.db miniroot.db
-
-$(CONFIGD): FRC
-	@cd ../configd; pwd; $(MAKE) native
-
-$(SVCCFG): FRC
-	@cd ../svccfg; pwd; $(MAKE) native
 
 ../milestone/console-login.xml:
 	@cd ../milestone; pwd; $(MAKE) console-login.xml
@@ -154,11 +145,11 @@ CONFIGD_ENV = \
 	SVCCFG_DTD=../dtd/service_bundle.dtd.1 \
 	PKG_INSTALL_ROOT=$(SRC)/cmd/svc/seed \
 	SVCCFG_REPOSITORY=$(SRC)/cmd/svc/seed/$@ \
-	SVCCFG_CONFIGD_PATH=$(CONFIGD)
+	SVCCFG_CONFIGD_PATH=$(SVCCONFIGD)
 
 IMPORT.mfst = $(CONFIGD_ENV) $(SVCCFG) import
 
-common.db: $(MFST_DIRS) $(COMMON_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
+common.db: $(MFST_DIRS) $(COMMON_DESCRIPTIONS)
 	$(RM) -f $@ $@-journal
 	$(IMPORT.mfst) $(COMMON_DESCRIPTIONS)
 

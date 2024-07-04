@@ -480,7 +480,6 @@ usr/include/sys/ilstr.h
 # SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #
 usr/include/sqlite-sys
-lib/libsqlite-native.o
 lib/libsqlite-sys.so
 #
 # Private/Internal kiconv header files. Do not ship.
@@ -666,8 +665,9 @@ usr/include/nvfru.h
 usr/include/libvrrpadm.h
 usr/lib/libvrrpadm.so
 usr/lib/amd64/libvrrpadm.so		i386
+
 #
-# This is only used during the -t tools build
+# These are only used during the -t tools build
 #
 opt/onbld/bin/i386/mandoc	i386
 opt/onbld/bin/i386/geniconvtbl	i386
@@ -676,11 +676,23 @@ opt/onbld/bin/i386/rpcgen	i386
 opt/onbld/bin/i386/vtfontcvt	i386
 opt/onbld/bin/i386/yacc		i386
 opt/onbld/lib/yaccpar
+opt/onbld/bin/i386/svc.configd	i386
+opt/onbld/bin/i386/svccfg	i386
 
 #
 # Private libdwarf
 #
 opt/onbld/lib/i386/libdwarf.so	i386
+
+#
+# Private SMF libraries
+#
+opt/onbld/lib/i386/libscf.so			i386
+opt/onbld/lib/i386/libscf.so.1			i386
+opt/onbld/lib/i386/libsqlite-sys.so		i386
+opt/onbld/lib/i386/libsqlite-sys.so.2.8.15	i386
+opt/onbld/lib/i386/libuutil.so			i386
+opt/onbld/lib/i386/libuutil.so.1		i386
 
 #
 # Private socket filter API

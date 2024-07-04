@@ -37,12 +37,10 @@
 # cmd/sgs/tools/Makefile.com
 
 include		$(SRC)/cmd/Makefile.cmd
-
 include		$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/Makefile.native
 
 OBJECTS=	piglatin.o
-NATIVECC_CFLAGS = -O
-NATIVE_LDFLAGS = $(LDASSERTS) $(BDIRECT)
 
 NATIVE=		$(OBJECTS:%.o=%)
 SRCS=		$(OBJECTS:%.o=../common/%.c)

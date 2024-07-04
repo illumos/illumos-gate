@@ -34,32 +34,35 @@
 # Note, these tools are not part of the product.
 #
 
-include		../Makefile.com
 include		../../Makefile.tools
+include		$(SRC)/cmd/sgs/Makefile.com
 include		$(SRC)/cmd/Makefile.cmd
-
+include		../Makefile.com
 
 PROG=	sgsmsg
+
+SRCDIR=	$(SRC)/tools/sgs/sgsmsg
 
 MAN1ONBLDFILES =	sgsmsg.1onbld
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=	644
 
-OBJS=	assfail.o \
-	avl.o \
-	findprime.o \
-	sgsmsg.o \
+OBJS=	assfail.o	\
+	avl.o		\
+	findprime.o	\
+	sgsmsg.o	\
 	string_table.o
 
 FILEMODE=	0755
 
-CPPFLAGS =	$(NATIVE_CPPFLAGS)
-CFLAGS =	$(NATIVE_CFLAGS)
 NATIVE_LIBS +=	libc.so
 CSTD = $(CSTD_GNU99)
-CW_LINKER =
 
 # not linted
 SMATCH=		off
+
+include		$(SRC)/Makefile.native
+
+.KEEP_STATE:
 
 all: $(PROG)
 
@@ -69,11 +72,10 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 
 %.o:	$(SGSCOMMON)/%.c
-	$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) $(CPPFLAGS) -c $<
+	$(COMPILE.c) -c $<
 
 avl.o:	$(SRC)/common/avl/avl.c
-	$(NATIVECC) $(DEBUG) $(NATIVE_CFLAGS) $(CPPFLAGS) -c \
-	    $(SRC)/common/avl/avl.c
+	$(COMPILE.c) -c $(SRC)/common/avl/avl.c -o $@
 
 clean:
 	$(RM) $(OBJS)

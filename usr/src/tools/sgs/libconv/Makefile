@@ -25,15 +25,16 @@
 #
 #
 
+include		../../Makefile.tools
+include		$(SRC)/cmd/sgs/libconv/Makefile.com
 include		../Makefile.com
-include		$(SGSHOME)/libconv/Makefile.com
-include		$(SRC)/Makefile.master.64
 
-CPPFLAGS =	 $(NATIVE_CPPFLAGS) -I$(SRC)/lib/libc/inc -I$(ELFCAP) \
+CPPFLAGS +=	-I$(SRC)/lib/libc/inc -I$(ELFCAP) \
 	-I$(SRC)/common/sgsrtcid \
 	-I$(SRC)/lib/libdemangle/common
-CFLAGS =	$(NATIVE_CFLAGS)
-CW_LINKER =
+
+include		$(SRC)/Makefile.native
+include		$(SRC)/Makefile.master.64
 
 .PARALLEL:	$(PICS)
 .KEEP_STATE:

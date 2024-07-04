@@ -24,31 +24,32 @@
 # Use is subject to license terms.
 #
 
-NOT_NATIVE = $(POUND_SIGN)		# tell Makefile.com we're native
+include $(SRC)/tools/Makefile.tools
+include $(SRC)/lib/libscf/Makefile.shared.com
 
-include ../Makefile.com
+SRCDIR =	$(SRC)/lib/libscf/common
+COMDIR =	$(SRC)/common/svc
+LIBUUTIL =	../libuutil
 
-CC =		$(NATIVECC)
-LD =		$(NATIVELD)
-CFLAGS =	$(NATIVE_CFLAGS)
-CPPFLAGS =	-I. $(MY_NATIVE_CPPFLAGS)
-LDFLAGS =
-LDLIBS =	$(MY_NATIVE_LDLIBS)
-NATIVE_LIBS +=	libc.so
+CPPFLAGS +=	-DNATIVE_BUILD $(DTEXTDOM) \
+		-I$(SRC)/lib/libscf/inc -I$(COMDIR) -I$(LIBUUTIL)/common
+LDLIBS =	-R '$$ORIGIN/../../lib/$(MACH)' -L$(ROOTONBLDLIBMACH) \
+		-luutil -lc -lgen -lnvpair -lsmbios
+NATIVE_LIBS +=	libsmbios.so libnvpair.so libgen.so libc.so
 
-#
-# We must use the build's avl headers, to match the common avl.c
-#
-AVLHEADERS = sys/avl.h sys/avl_impl.h
-CLOBBERFILES += $(AVLHEADERS) $(LIBS)
+include $(SRC)/Makefile.native
+
+.KEEP_STATE:
 
 all: $(LIBS)
 
-install: all
+install: all $(ROOTONBLDLIBMACH)/$(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
 
-$(PICS): $(AVLHEADERS)
+$(ROOTONBLDLIBMACH)/$(DYNLIB): $(DYNLIB)
+	$(INS.file) $(DYNLIB)
 
-sys/%: $(SRC)/uts/common/sys/%
-	@mkdir -p sys
-	cp -f $< $@
+$(ROOTONBLDLIBMACH)/$(LIBLINKS): $(ROOTONBLDLIBMACH)/$(DYNLIB)
+		@$(RM) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
+		$(SYMLINK) $(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
 
+include $(SRC)/lib/Makefile.targ

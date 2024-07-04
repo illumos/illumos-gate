@@ -10,10 +10,29 @@
 #
 
 # Copyright 2015, Richard Lowe.
-# Copyright 2020 Joyent, Inc.
 
-include $(SRC)/Makefile.native
+SUBDIRS=		\
+	configd		\
+	libscf		\
+	libsqlite	\
+	libuutil	\
+	svccfg
 
-MAKE_INCLUDE= $(SRC)/cmd/make/include
-CFLAGS += $(CCVERBOSE)
-CPPFLAGS = -I$(MAKE_INCLUDE) $(MAKE_DEFS)
+all	:=	TARGET = all
+install :=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
+
+.KEEP_STATE:
+
+svccfg: libscf libuutil
+configd: libsqlite libuutil
+libscf: libuutil
+
+
+all clean clobber install: $(SUBDIRS)
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

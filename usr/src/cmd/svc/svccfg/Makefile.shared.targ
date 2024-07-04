@@ -18,30 +18,27 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-# Copyright 2021 Oxide Computer Company
-#
 
 #
-# The default mode at the moment is to use ctfconvert on object files
-# and merge them together. If you set this to 'link' after including
-# Makefile.ctf, it will switch that so instead we just do a single
-# ctfconvert on the resulting linked binary.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
-CTF_MODE = objs
 
-POST_objs = ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
-POST_O_objs = ; $(CTFCONVERT_O)
+svccfg_lex.c: $(SRCDIR)/svccfg.l svccfg_grammar.h
+	$(LEX) $(LFLAGS) $(SRCDIR)/svccfg.l > $@
 
-POST_link = $(CTFCONVERT) -L VERSION $@
-POST_O_link =
+svccfg_help.o: svccfg_grammar.h
+svccfg_help-native.o: svccfg_grammar.h
 
-PROCESS_CTF = $(POST_$(CTF_MODE))
-POST_PROCESS_O += $(POST_O_$(CTF_MODE))
+svccfg_grammar.h svccfg_grammar.c: $(SRCDIR)/svccfg.y
+	$(YACC) $(YFLAGS) $(SRCDIR)/svccfg.y
+	@$(MV) y.tab.h svccfg_grammar.h
+	@$(MV) y.tab.c svccfg_grammar.c
 
-CFLAGS += $(CTF_FLAGS)
-CFLAGS64 += $(CTF_FLAGS_64)
-NATIVE_CFLAGS += $(CTF_FLAGS)
-NATIVE_CFLAGS64 += $(CTF_FLAGS_64)
+%.o: $(SRCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(COMDIR)/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)

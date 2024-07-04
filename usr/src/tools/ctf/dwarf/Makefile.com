@@ -128,4 +128,3 @@ $(DYNLIB) := CTFMERGE_POST= :
 CTFCONVERT_O= :
 
 include $(SRC)/lib/Makefile.targ
-

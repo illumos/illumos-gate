@@ -34,8 +34,7 @@ $(ROOTDIR)/lib/%:	%
 		$(INS.file)
 
 piglatin:	../common/piglatin.c
-		$(NATIVECC) $(NATIVE_CFLAGS) $(NATIVE_LDFLAGS) -o $@ \
-			../common/piglatin.c
+		$(COMPILE.c) ../common/piglatin.c -o $@
 
 %:		%.o
 		$(LINK.c) -o $@ $< $(LDLIBS)

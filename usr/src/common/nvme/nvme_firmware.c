@@ -50,15 +50,20 @@ nvme_fw_cmds_supported(const nvme_valid_ctrl_data_t *data)
 }
 
 /*
- * Validate a length for an NVMe firmware download request. The same constraints
- * hold for both the length and offset fields. These fields are in units of
- * uint32_t values. Starting in NVMe 1.3, additional constraints about the
- * granularity were added through the FWUG field in the identify controller data
- * structure. This indicates the required alignment in 4 KiB chunks. The
- * controller is allowed to indicate a value of 0 to indicate that this is
- * unknown (which is not particularly helpful) or that it may be 0xff which
- * indicates that there is no alignment constraint other than the natural
- * uint32_t alignment.
+ * Validate a length/offset for an NVMe firmware download request.
+ * These fields in the NVMe specification are in units of uint32_t values but,
+ * since the ioctl interfaces deal with byte counts, so do these validation
+ * functions. According to the specification the same constraints hold for
+ * both the length and offset fields; experience has shown, however, that we
+ * need to be more relaxed when validating the length -- see the comment in the
+ * validation function below.
+ *
+ * Starting in NVMe 1.3, additional constraints about the granularity were
+ * added through the FWUG field in the identify controller data structure. This
+ * indicates the required alignment in 4 KiB chunks. The controller is allowed
+ * to indicate a value of 0 to indicate that this is unknown (which is not
+ * particularly helpful) or that it may be 0xff which indicates that there is
+ * no alignment constraint other than the natural uint32_t alignment.
  *
  * For devices that exist prior to NVMe 1.3, we assume that we probably need at
  * least 4 KiB granularity for the time being. This may need to change in the
@@ -72,7 +77,7 @@ nvme_fw_load_granularity(const nvme_valid_ctrl_data_t *data)
 	if (nvme_vers_atleast(data->vcd_vers, &nvme_vers_1v3)) {
 		const uint8_t fwug = data->vcd_id->ap_fwug;
 		if (fwug == 0xff) {
-			gran = 4;
+			gran = NVME_DWORD_SIZE;
 		} else if (fwug != 0) {
 			gran = fwug * NVME_FWUG_MULT;
 		}
@@ -82,38 +87,44 @@ nvme_fw_load_granularity(const nvme_valid_ctrl_data_t *data)
 }
 
 static bool
-nvme_fw_load_field_valid_common(const nvme_field_info_t *field,
-    const nvme_valid_ctrl_data_t *data, uint64_t len, bool zero_ok, char *msg,
-    size_t msglen)
-{
-	uint32_t gran = nvme_fw_load_granularity(data);
-	uint64_t min = zero_ok ? 0 : 1;
-
-	if ((len % gran) != 0) {
-		(void) snprintf(msg, msglen, "%s (%s) value 0x%" PRIx64 " must "
-		    "be aligned to the firmware update granularity 0x%x",
-		    field->nlfi_human, field->nlfi_spec, len, gran);
-		return (false);
-	}
-
-	return (nvme_field_range_check(field, min, NVME_FW_OFFSETB_MAX, msg,
-	    msglen, len));
-}
-
-static bool
 nvme_fw_load_field_valid_len(const nvme_field_info_t *field,
     const nvme_valid_ctrl_data_t *data, uint64_t len, char *msg, size_t msglen)
 {
-	return (nvme_fw_load_field_valid_common(field, data, len, false, msg,
-	    msglen));
+	/*
+	 * While we would like to validate that the length is consistent with
+	 * the firmware upgrade granularity, we have encountered drives where
+	 * the vendor's firmware update file sizes are not a multiple of the
+	 * required granularity, and where the strategy of padding the last
+	 * block out to that required granularity does not always result in a
+	 * file that the drive will accept.
+	 *
+	 * The best we can do is ensure that it is a whole number of dwords.
+	 */
+	if ((len & NVME_DWORD_MASK) != 0) {
+		(void) snprintf(msg, msglen, "%s (%s) value 0x%" PRIx64 " must "
+		    "be aligned to the firmware update granularity 0x%x",
+		    field->nlfi_human, field->nlfi_spec, len, NVME_DWORD_SIZE);
+		return (false);
+	}
+	return (nvme_field_range_check(field, NVME_DWORD_SIZE,
+	    NVME_FW_LENB_MAX, msg, msglen, len));
 }
 
 static bool
 nvme_fw_load_field_valid_offset(const nvme_field_info_t *field,
     const nvme_valid_ctrl_data_t *data, uint64_t off, char *msg, size_t msglen)
 {
-	return (nvme_fw_load_field_valid_common(field, data, off, true, msg,
-	    msglen));
+	uint32_t gran = nvme_fw_load_granularity(data);
+
+	if ((off % gran) != 0) {
+		(void) snprintf(msg, msglen, "%s (%s) value 0x%" PRIx64 " must "
+		    "be aligned to the firmware update granularity 0x%x",
+		    field->nlfi_human, field->nlfi_spec, off, gran);
+		return (false);
+	}
+
+	return (nvme_field_range_check(field, 0, NVME_FW_OFFSETB_MAX, msg,
+	    msglen, off));
 }
 
 const nvme_field_info_t nvme_fw_load_fields[] = {

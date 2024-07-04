@@ -19,29 +19,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-# Copyright 2021 Oxide Computer Company
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
-#
-# The default mode at the moment is to use ctfconvert on object files
-# and merge them together. If you set this to 'link' after including
-# Makefile.ctf, it will switch that so instead we just do a single
-# ctfconvert on the resulting linked binary.
-#
-CTF_MODE = objs
+LIBRARY =	libuutil.a
+VERS =		.1
 
-POST_objs = ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
-POST_O_objs = ; $(CTFCONVERT_O)
+OBJECTS =		\
+	avl.o		\
+	uu_alloc.o	\
+	uu_avl.o	\
+	uu_dprintf.o	\
+	uu_ident.o	\
+	uu_list.o	\
+	uu_misc.o	\
+	uu_open.o	\
+	uu_pname.o	\
+	uu_string.o	\
+	uu_strtoint.o
 
-POST_link = $(CTFCONVERT) -L VERSION $@
-POST_O_link =
+include $(SRC)/lib/Makefile.lib
 
-PROCESS_CTF = $(POST_$(CTF_MODE))
-POST_PROCESS_O += $(POST_O_$(CTF_MODE))
+LIBS =		$(DYNLIB)
 
-CFLAGS += $(CTF_FLAGS)
-CFLAGS64 += $(CTF_FLAGS_64)
-NATIVE_CFLAGS += $(CTF_FLAGS)
-NATIVE_CFLAGS64 += $(CTF_FLAGS_64)
+LDLIBS +=	-lc
+
+CPPFLAGS +=	-I$(SRCDIR)
+
+SMOFF += signed
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG

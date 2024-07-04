@@ -1,0 +1,53 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2023 Richard Lowe
+#
+
+# Configure make to run the native tools with the native paths
+# Similar in spirit to Makefile.master.64.
+
+GNUC_ROOT=	$(NATIVE_GNUC_ROOT)
+GCCLIBDIR=	$(NATIVE_GCCLIBDIR)
+GCCLIBDIR64=	$(NATIVE_GCCLIBDIR64)
+
+CFLAGS=		$(NATIVE_CFLAGS)
+ASFLAGS=	$(NATIVE_ASFLAGS)
+CCFLAGS=	$(NATIVE_CCFLAGS)
+CFLAGS64=	$(NATIVE_CFLAGS64)
+ASFLAGS64=	$(NATIVE_ASFLAGS64)
+CCFLAGS64=	$(NATIVE_CCFLAGS64)
+
+CCNEEDED=	$(NATIVECCNEEDED)
+CCNEEDED64=	$(NATIVECCNEEDED64)
+
+BUILD_CC=	$(NATIVEBUILD_CC)
+BUILD_CCC=	$(NATIVEBUILD_CCC)
+BUILD_CPP=	$(NATIVEBUILD_CPP)
+BUILD_LD=	$(NATIVEBUILD_LD)
+BUILD_AS=	$(NATIVEBUILD_AS)
+
+CC=	$(NATIVECC)
+CCC=	$(NATIVECCC)
+CPP=	$(NATIVECPP)
+AS=	$(NATIVEAS)
+LD=	$(NATIVELD)
+
+CC64=	$(NATIVECC64)
+CCC64=	$(NATIVECCC64)
+CPP64=	$(NATIVECPP64)
+AS64=	$(NATIVEAS64)
+LD64=	$(NATIVELD64)
+
+# If we're building for the build machine, we should use the build-machine
+# link-editor just in case
+CW_LINKER=
