@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd March 11, 2024
+.Dd July 3, 2024
 .Dt AMDZEN 4D
 .Os
 .Sh NAME
@@ -46,7 +46,7 @@ AMD Zen 3+ Rembrandt
 AMD Zen 4 Genoa, Bergamo, Raphael, and Phoenix
 .Pq Family 19h
 .It
-Amd Zen 5
+Amd Zen 5 Turin, Strix, and Granite Ridge
 .Pq Family 1ah
 .El
 .Pp

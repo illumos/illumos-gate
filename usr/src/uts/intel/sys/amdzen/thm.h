@@ -109,6 +109,7 @@ THM_DIE_MAX_UNITS(x86_processor_family_t fam)
 	case X86_PF_AMD_REMBRANDT:
 	case X86_PF_AMD_RAPHAEL:
 	case X86_PF_AMD_PHOENIX:
+	case X86_PF_AMD_GRANITE_RIDGE:
 		return (8);
 	case X86_PF_AMD_GENOA:
 	case X86_PF_AMD_BERGAMO:
@@ -116,6 +117,7 @@ THM_DIE_MAX_UNITS(x86_processor_family_t fam)
 	case X86_PF_AMD_TURIN:
 	case X86_PF_AMD_DENSE_TURIN:
 		return (16);
+	case X86_PF_AMD_STRIX:
 	default:
 		return (0);
 	}
@@ -153,6 +155,7 @@ THM_DIE(uint8_t dieno, x86_processor_family_t fam)
 		break;
 	case X86_PF_AMD_RAPHAEL:
 	case X86_PF_AMD_PHOENIX:
+	case X86_PF_AMD_GRANITE_RIDGE:
 		regdef.srd_reg = 0x308;
 		break;
 	case X86_PF_AMD_TURIN:
