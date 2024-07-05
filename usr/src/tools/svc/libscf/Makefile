@@ -29,7 +29,7 @@ include $(SRC)/lib/libscf/Makefile.shared.com
 
 SRCDIR =	$(SRC)/lib/libscf/common
 COMDIR =	$(SRC)/common/svc
-LIBUUTIL =	../libuutil
+LIBUUTIL =	$(SRC)/lib/libuutil/
 
 CPPFLAGS +=	-DNATIVE_BUILD $(DTEXTDOM) \
 		-I$(SRC)/lib/libscf/inc -I$(COMDIR) -I$(LIBUUTIL)/common
