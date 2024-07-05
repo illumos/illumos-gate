@@ -4,6 +4,7 @@
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Hans Rosenfeld
 .\" Copyright 1989 AT&T
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -21,7 +22,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd May 10, 2024
+.Dd September 5, 2025
 .Dt CORE 5
 .Os
 .Sh NAME
@@ -44,7 +45,7 @@ Whatever the cause, the core file itself provides invaluable information to the
 programmer or support engineer to aid in diagnosing the problem.
 The core file can be inspected using a debugger such as
 .Xr mdb 1 ,
-gdb, dbx, or  or by applying one of the
+gdb, dbx, or by applying one of the
 .Xr proc 1
 tools.
 .Pp
@@ -177,9 +178,7 @@ field will have the
 .Dv PF_SUNW_KILLED
 flag set.
 .Pp
-The program headers of an
-.Sy ELF
-core file also contain entries for two
+The program headers of an ELF core file also contain entries for two
 .Sy NOTE
 segments, each containing several note entries as described below.
 The note entry header and core file note type
@@ -565,7 +564,7 @@ The
 structure is defined in
 .In sys/procfs.h .
 This is the only entry present for a zombie LWP.
-.It lwpstatus_t
+.It Vt lwpstatus_t
 .Fa n_type :
 .Dv NT_LWPSTATUS .
 This structure contains things of interest to a debugger from the operating
@@ -575,7 +574,15 @@ The
 .Vt lwpstatus_t
 structure is defined in
 .In sys/procfs.h .
-.Vt gwindows_t
+.It Vt prlwpname_t
+.Fa n_type :
+.Dv NT_LWPNAME .
+This structure contains the LWP-ID and the name of the LWP.
+The
+.Vt prlwpname_t
+structure is defined in
+.In sys/procfs.h .
+.It Vt gwindows_t
 .Fa n_type :
 .Dv NT_GWINDOWS .
 This entry is present only on a SPARC machine and only if the system was unable
@@ -605,14 +612,13 @@ is opaque and of variable size.
 discusses the structure of the extended register set for each supported
 architecture.
 .It Vt asrset_t
-\fB\fBasrset_t\fR\fR
 .Fa n_type :
 .Dv NT_ASRS .
 This entry is present only on a SPARC V9 machine and only if the process is a
 64-bit process.
 It contains the ancillary state registers for the LWP.
 The
-.Vt asrset_t asrset_t
+.Vt asrset_t
 structure is defined in
 .In sys/regset.h .
 .It Vt psinfo_t
