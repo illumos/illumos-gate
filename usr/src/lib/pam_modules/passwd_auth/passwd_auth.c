@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -65,26 +67,26 @@ int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 
-	char	*user;
-	char	*password;
-	char	*service;
-	int	i;
-	int	debug = 0;
-	int	nowarn = 0;
-	int	res;
-	char	prompt[PAM_MAX_MSG_SIZE];
-	char	*auth_user = NULL;
-	int	retval;
-	int	privileged;
-	char	*rep_passwd = NULL;
-	char	*repository_name = NULL;
+	const char *user;
+	char *password;
+	const char *service;
+	int i;
+	int debug = 0;
+	int nowarn = 0;
+	int res;
+	char prompt[PAM_MAX_MSG_SIZE];
+	char *auth_user = NULL;
+	int retval;
+	int privileged;
+	char *rep_passwd = NULL;
+	char *repository_name = NULL;
 	attrlist al[8];
-	int	min;
-	int	max;
-	int	lstchg;
-	int	server_policy = 0;
+	int min;
+	int max;
+	int lstchg;
+	int server_policy = 0;
 
-	pam_repository_t *auth_rep = NULL;
+	const pam_repository_t *auth_rep = NULL;
 	pwu_repository_t *pwu_rep = NULL;
 
 	for (i = 0; i < argc; i++) {
@@ -99,7 +101,8 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (flags & PAM_SILENT)
 		nowarn = 1;
 
-	if ((res = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS) {
+	if ((res = pam_get_user(pamh, (const char **)&user, NULL)) !=
+	    PAM_SUCCESS) {
 		if (debug)
 			syslog(LOG_DEBUG, "pam_passwd_auth: "
 			    "get user failed: %s", pam_strerror(pamh, res));
@@ -112,18 +115,18 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_SYSTEM_ERR);
 	}
 
-	res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
+	res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 	if (res != PAM_SUCCESS)
 		return (res);
 
 	if (password != NULL)
 		return (PAM_IGNORE);
 
-	res = pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+	res = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 	if (res != PAM_SUCCESS)
 		return (res);
 
-	res = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
+	res = pam_get_item(pamh, PAM_REPOSITORY, (const void **)&auth_rep);
 	if (res != PAM_SUCCESS) {
 		syslog(LOG_ERR, "pam_passwd_auth: pam_sm_authenticate: "
 		    "error getting repository");

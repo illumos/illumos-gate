@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_CHAUTHTOK 3PAM "Mar 1, 2005"
+.TH PAM_CHAUTHTOK 3PAM "Jul 6, 2024"
 .SH NAME
 pam_chauthtok \- perform password related functions within the PAM framework
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ pam_chauthtok \- perform password related functions within the PAM framework
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
 #include <security/pam_appl.h>
 
-\fBint\fR \fBpam_chauthtok\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBconst int\fR \fIflags\fR);
+\fBint\fR \fBpam_chauthtok\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION

@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <nsswitch.h>
@@ -46,7 +47,7 @@
  *
  */
 int
-__check_history(char *user, char *passwd, pwu_repository_t *rep)
+__check_history(const char *user, const char *passwd, pwu_repository_t *rep)
 {
 	int repositories;
 	int i;

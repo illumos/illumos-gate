@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -60,31 +62,30 @@ log_illegal_combination(const char *s1, const char *s2)
 	    " %s and %s", s1, s2);
 }
 
-/*ARGSUSED*/
 int
 pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	FILE	*fd;
-	const char	*allowdeny_filename = PF_PATH;
-	char	buf[BUFSIZ];
-	char	hostname[MAXHOSTNAMELEN];
-	char	*username = NULL;
-	char	*grbuf = NULL;
-	char	*bufp;
-	char	*rhost;
-	char	*limit;
-	int	userok = 0;
-	int	hostok = 0;
-	int	i;
-	int	allow_deny_test = 0;
-	long	grbuflen = 0;
-	boolean_t	debug = B_FALSE;
-	boolean_t	allow = B_FALSE;
-	boolean_t	matched = B_FALSE;
-	boolean_t	check_user = B_TRUE;
-	boolean_t	check_group = B_FALSE;
-	boolean_t	check_host = B_FALSE;
-	boolean_t	check_exact = B_FALSE;
+	FILE *fd;
+	const char *allowdeny_filename = PF_PATH;
+	char buf[BUFSIZ];
+	char hostname[MAXHOSTNAMELEN];
+	const char *username = NULL;
+	char *grbuf = NULL;
+	char *bufp;
+	const char *rhost;
+	char *limit;
+	int userok = 0;
+	int hostok = 0;
+	int i;
+	int allow_deny_test = 0;
+	long grbuflen = 0;
+	boolean_t debug = B_FALSE;
+	boolean_t allow = B_FALSE;
+	boolean_t matched = B_FALSE;
+	boolean_t check_user = B_TRUE;
+	boolean_t check_group = B_FALSE;
+	boolean_t check_host = B_FALSE;
+	boolean_t check_exact = B_FALSE;
 	pam_list_mode_t	op_mode = LIST_PLUS_CHECK;
 
 	// group reentrant interfaces limits
@@ -179,7 +180,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		    (allow ? "allow file" : "deny file"));
 	}
 
-	(void) pam_get_item(pamh, PAM_USER, (void**)&username);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&username);
 
 	if ((check_user || check_group || check_exact) && ((username == NULL) ||
 	    (*username == '\0'))) {
@@ -188,7 +189,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_USER_UNKNOWN);
 	}
 
-	(void) pam_get_item(pamh, PAM_RHOST, (void**)&rhost);
+	(void) pam_get_item(pamh, PAM_RHOST, (const void **)&rhost);
 
 	if ((check_host || check_exact) && ((rhost == NULL) ||
 	    (*rhost == '\0'))) {

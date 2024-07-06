@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "ldap_headers.h"
@@ -40,29 +42,26 @@
  * pam_sm_authenticate():
  * 	Authenticate user.
  */
-/*ARGSUSED*/
 int
-pam_sm_authenticate(
-	pam_handle_t		*pamh,
-	int 			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char			*service = NULL;
-	char			*user = NULL;
-	int			err;
-	int			result = PAM_AUTH_ERR;
-	int			debug = 0;
-	int			i;
-	char			*password = NULL;
-	ns_cred_t		*credp = NULL;
-	int			nowarn = 0;
+	const char *service = NULL;
+	const char *user = NULL;
+	int err;
+	int result = PAM_AUTH_ERR;
+	int debug = 0;
+	int i;
+	const char *password = NULL;
+	ns_cred_t *credp = NULL;
+	int nowarn = 0;
 
 	/* Get the service and user */
-	if ((err = pam_get_item(pamh, PAM_SERVICE, (void **)&service))
-							!= PAM_SUCCESS ||
-	    (err = pam_get_item(pamh, PAM_USER, (void **)&user)) != PAM_SUCCESS)
+	if ((err = pam_get_item(pamh, PAM_SERVICE, (const void **)&service)) !=
+	    PAM_SUCCESS ||
+	    (err = pam_get_item(pamh, PAM_USER, (const void **)&user)) !=
+	    PAM_SUCCESS) {
 		return (err);
+	}
 
 	/*
 	 * Check options passed to this module.
@@ -91,7 +90,7 @@ pam_sm_authenticate(
 		return (PAM_USER_UNKNOWN);
 
 	/* Get the password entered in the first scheme if any */
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **) &password);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 	if (password == NULL) {
 		if (debug)
 			syslog(LOG_AUTH | LOG_DEBUG,

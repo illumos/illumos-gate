@@ -1,139 +1,127 @@
-'\" te
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPAM 3LIB "Mar 24, 2004"
-.SH NAME
-libpam \- PAM (Pluggable Authentication Module) library
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpam\fR [ \fIlibrary\fR... ]
-#include <\fBsecurity/pam_appl.h\fR>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.\" Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd July 6, 2024
+.Dt LIBPAM 3LIB
+.Os
+.Sh NAME
+.Nm libpam
+.Nd PAM (Pluggable Authentication Module) library
+.Sh LIBRARY
+.Lb libpam
+.Sh SYNOPSIS
+.In security/pam_appl.h
+.Sh DESCRIPTION
 Functions in this library provide routines for the Pluggable Authentication
-Module (PAM).
-.SH INTERFACES
-.sp
-.LP
-The shared object \fBlibpam.so.1\fR provides the public interfaces defined
-below. See \fBIntro\fR(3) for additional information on shared object
-interfaces.
-.sp
-
-.sp
-.TS
-l l
-l l .
-\fBpam_acct_mgmt\fR	\fBpam_authenticate\fR
-\fBpam_chauthtok\fR	\fBpam_close_session\fR
-\fBpam_end\fR	\fBpam_get_data\fR
-\fBpam_get_item\fR	\fBpam_get_user\fR
-\fBpam_getenv\fR	\fBpam_getenvlist\fR
-\fBpam_open_session\fR	\fBpam_putenv\fR
-\fBpam_set_data\fR	\fBpam_set_item\fR
-\fBpam_setcred\fR	\fBpam_start\fR
-\fBpam_strerror\fR	
-.TE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/lib/libpam.so.1\fR\fR
-.ad
-.sp .6
-.RS 4n
-shared object
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/pam.conf\fR\fR
-.ad
-.sp .6
-.RS 4n
+Module
+.Pq PAM .
+.Pp
+Various PAM implementations have disagreed on whether certain parts of the
+function signatures for the
+.Fn pam_get_item
+and
+.Fn pam_get_user
+functions, as well as parts of the
+.Vt pam_conv
+structure, used the
+.Sy const
+qualifier.
+Historically illumos did not; however this was changed to align with other
+common implementations
+.Po
+e.g. the Linux PAM project and various *BSDs
+.Pc .
+If necessary the non-const definitions of these types can be selected by
+defining the macro
+.Dv _PAM_LEGACY_NONCONST
+prior to including
+.In security/pam_appl.h .
+.Sh INTERFACES
+The shared object
+.Sy libmap.so.1
+provides the public interfaces defined below.
+See
+.Xr Intro 3
+for additional information on shared object interfaces.
+.Bl -column -offset indent "pam_close_session" "pam_close_session"
+.It Sy pam_acct_mgmt Ta Sy pam_authenticate
+.It Sy pam_chauthtok Ta Sy pam_close_session
+.It Sy pam_end Ta Sy pam_get_data
+.It Sy pam_get_item Ta Sy pam_get_user
+.It Sy pam_getenv Ta Sy pam_getenvlist
+.It Sy pam_open_session Ta Sy pam_putenv
+.It Sy pam_set_data Ta Sy pam_set_item
+.It Sy pam_setcred Ta Sy pam_start
+.It Sy pam_strerror Ta
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /lib/libpam.so.1
+32-bit shared object
+.It Pa /lib/64/libpam.so.1
+64-bit shared object
+.It Pa /etc/pam.conf
 configuration file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/security/pam_dial_auth.so.1\fR\fR
-.ad
-.sp .6
-.RS 4n
-authentication management  \fBPAM\fR module for dialups
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/security/pam_rhosts_auth.so.1\fR\fR
-.ad
-.sp .6
-.RS 4n
-authentication management  \fBPAM\fR modules that use \fBruserok()\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/security/pam_sample.so.1\fR\fR
-.ad
-.sp .6
-.RS 4n
-sample \fBPAM\fR module
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT Level	MT-Safe with exceptions
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBpvs\fR(1),  \fBIntro\fR(3),  \fBpam\fR(3PAM),
-.BR pam.conf (5),
-.BR attributes (7),
-.BR pam_authtok_check (7),
-.BR pam_authtok_get (7),
-.BR pam_authtok_store (7),
-.BR pam_dhkeys (7),
-.BR pam_dial_auth (7),
-.BR pam_passwd_auth (7),
-.BR pam_rhosts_auth (7),
-.BR pam_sample (7),
-.BR pam_unix_account (7),
-.BR pam_unix_auth (7),
-.BR pam_unix_session (7)
-.SH NOTES
-.sp
-.LP
-The functions in \fBlibpam\fR are MT-Safe only if each thread within the
-multithreaded application uses its own \fBPAM\fR handle.
-.sp
-.LP
-The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
-provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
-\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
-\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
-\fBpam_unix_session\fR(7).
+.It Pa /usr/lib/security/pam_dial_auth.so.1
+authentication management PAM module for dialups
+.It Pa /usr/lib/security/pam_rhosts_auth.so.1
+authentication management PAM modules that use
+.Fn ruserok
+.It Pa /usr/lib/security/pam_sample.so.1
+sample PAM module
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe-with-exceptions
+.Sh SEE ALSO
+.Xr pvs 1 ,
+.Xr Intro 3 ,
+.Xr pam 3PAM ,
+.Xr pam.conf 5 ,
+.Xr attributes 7 ,
+.Xr pam_authtok_check 7 ,
+.Xr pam_authtok_get 7 ,
+.Xr pam_authtok_store 7 ,
+.Xr pam_dhkeys 7 ,
+.Xr pam_dial_auth 7 ,
+.Xr pam_passwd_auth 7 ,
+.Xr pam_rhosts_auth 7 ,
+.Xr pam_sample 7 ,
+.Xr pam_unix_account 7 ,
+.Xr pam_unix_auth 7 ,
+.Xr pam_unix_session 7
+.Sh NOTES
+The functions in
+.Nm
+are MT-Safe only if each thread within the multithreaded application uses its
+own PAM handle.
+.Pp
+The
+.Sy pam_unix
+module is no longer supported.
+Similar functionality is provided by
+.Xr pam_authtok_check 7 ,
+.Xr pam_authtok_get 7 ,
+.Xr pam_authtok_store 7 ,
+.Xr pam_dhkeys 7 ,
+.Xr pam_passwd_auth 7 ,
+.Xr pam_unix_account 7 ,
+.Xr pam_unix_auth 7 ,
+and
+.Xr pam_unix_session 7 .

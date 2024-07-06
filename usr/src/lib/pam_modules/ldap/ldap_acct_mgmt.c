@@ -22,6 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "ldap_headers.h"
@@ -178,7 +180,7 @@ display_passwd_reset_msg(pam_handle_t *pamh)
  *		 PAM_AUTH_ERR - Failure return code
  */
 static int
-get_account_mgmt(char *user, int *seconds, int *grace)
+get_account_mgmt(const char *user, int *seconds, int *grace)
 {
 	int rc	= PAM_AUTH_ERR;
 	AcctUsableResponse_t	acctResp;
@@ -239,22 +241,18 @@ get_account_mgmt(char *user, int *seconds, int *grace)
  */
 
 int
-pam_sm_acct_mgmt(
-	pam_handle_t *pamh,
-	int	flags,
-	int	argc,
-	const char **argv)
+pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 
-	char			*user = NULL;
-	int			result = PAM_AUTH_ERR;
-	int			debug = 0;
-	int			i;
-	char			*password = NULL;
-	ns_cred_t		*credp = NULL;
-	int			nowarn = 0;
-	int			seconds = 0, grace = 0;
-	ldap_authtok_data	*status;
+	const char *user = NULL;
+	int result = PAM_AUTH_ERR;
+	int debug = 0;
+	int i;
+	const char *password = NULL;
+	ns_cred_t *credp = NULL;
+	int nowarn = 0;
+	int seconds = 0, grace = 0;
+	ldap_authtok_data *status;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -270,9 +268,10 @@ pam_sm_acct_mgmt(
 				argv[i]);
 	}
 
-	if ((result = pam_get_item(pamh, PAM_USER, (void **)&user))
-							!= PAM_SUCCESS)
+	if ((result = pam_get_item(pamh, PAM_USER, (const void **)&user)) !=
+	    PAM_SUCCESS) {
 		goto out;
+	}
 
 	if (debug)
 		syslog(LOG_DEBUG,
@@ -286,7 +285,7 @@ pam_sm_acct_mgmt(
 	}
 
 	/* retrieve the password from the PAM handle */
-	result = pam_get_item(pamh, PAM_AUTHTOK, (void **) &password);
+	result = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 	if (password == NULL) {
 		if (debug)
 			syslog(LOG_DEBUG, "ldap pam_sm_acct_mgmt: "

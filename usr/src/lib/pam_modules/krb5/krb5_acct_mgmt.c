@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <kadm5/admin.h>
@@ -53,7 +55,7 @@
 static int
 fetch_princ_entry(
 	krb5_module_data_t *kmd,
-	char *princ_str,
+	const char *princ_str,
 	kadm5_principal_ent_rec *prent,	/* out */
 	int debug)
 
@@ -70,8 +72,8 @@ fetch_princ_entry(
 	password = kmd->password;
 	context = kmd->kcontext;
 
-	if ((code = get_kmd_kuser(context, (const char *)princ_str,
-	    kprinc, 2*MAXHOSTNAMELEN)) != 0) {
+	if ((code = get_kmd_kuser(context, princ_str,
+	    kprinc, 2 * MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
 
@@ -164,7 +166,7 @@ fetch_princ_entry(
 static int
 exp_warn(
 	pam_handle_t *pamh,
-	char *user,
+	const char *user,
 	krb5_module_data_t *kmd,
 	int debug)
 
@@ -299,22 +301,17 @@ exit:
  *      auth would have failed
  */
 int
-pam_sm_acct_mgmt(
-	pam_handle_t *pamh,
-	int	flags,
-	int	argc,
-	const char **argv)
-
+pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char *user = NULL;
+	const char *user = NULL;
 	char *userdata = NULL;
 	int err;
 	int i;
 	krb5_module_data_t *kmd = NULL;
-	char    messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	int debug = 0;  /* pam.conf entry option */
 	int nowarn = 0; /* pam.conf entry option, no expire warnings */
-	pam_repository_t	*rep_data = NULL;
+	const pam_repository_t *rep_data = NULL;
 
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
@@ -334,7 +331,7 @@ pam_sm_acct_mgmt(
 		    "PAM-KRB5 (acct): debug=%d, nowarn=%d",
 		    debug, nowarn);
 
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (const void **)&rep_data);
 
 	if (rep_data != NULL) {
 		/*
@@ -353,7 +350,7 @@ pam_sm_acct_mgmt(
 
 
 	/* get user name */
-	(void) pam_get_item(pamh, PAM_USER, (void **) &user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		err = PAM_USER_UNKNOWN;
@@ -375,8 +372,7 @@ pam_sm_acct_mgmt(
 		 * creds (assuming pam_sm_authenticate() succeeds).
 		 */
 		if (strcmp(user, userdata) == 0)
-			(void) pam_sm_authenticate(pamh, flags, argc,
-					(const char **)argv);
+			(void) pam_sm_authenticate(pamh, flags, argc, argv);
 		else
 			if (debug)
 				__pam_log(LOG_AUTH | LOG_DEBUG,

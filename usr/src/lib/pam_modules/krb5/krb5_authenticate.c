@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <security/pam_appl.h>
@@ -66,7 +68,7 @@ char *appdef[] = { "appdefaults", "kinit", NULL };
 
 #define	krb_realm (*(realmdef + 1))
 
-int	attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, char *,
+int	attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, const char *,
 	char **, boolean_t);
 void	krb5_cleanup(pam_handle_t *, void *, int);
 
@@ -85,27 +87,23 @@ extern krb5_error_code __krb5_get_init_creds_password(krb5_context,
  * pam_sm_authenticate		- Authenticate user
  */
 int
-pam_sm_authenticate(
-	pam_handle_t		*pamh,
-	int 			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char			*user = NULL;
-	int			err;
-	int			result = PAM_AUTH_ERR;
+	const char *user = NULL;
+	int err;
+	int result = PAM_AUTH_ERR;
 	/* pam.conf options */
-	int			debug = 0;
-	int			warn = 1;
+	int debug = 0;
+	int warn = 1;
 	/* return an error on password expire */
-	int			err_on_exp = 0;
-	int			i;
-	char			*password = NULL;
-	uid_t			pw_uid;
-	krb5_module_data_t	*kmd = NULL;
-	krb5_repository_data_t  *krb5_data = NULL;
-	pam_repository_t	*rep_data = NULL;
-	boolean_t		do_pkinit = FALSE;
+	int err_on_exp = 0;
+	int i;
+	char *password = NULL;
+	uid_t pw_uid;
+	krb5_module_data_t *kmd = NULL;
+	krb5_repository_data_t *krb5_data = NULL;
+	const pam_repository_t *rep_data = NULL;
+	boolean_t do_pkinit = FALSE;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0) {
@@ -132,7 +130,7 @@ pam_sm_authenticate(
 	 * pam_get_data could fail if we are being called for the first time
 	 * or if the module is not found, PAM_NO_MODULE_DATA is not an error
 	 */
-	err = pam_get_data(pamh, KRB5_DATA, (const void**)&kmd);
+	err = pam_get_data(pamh, KRB5_DATA, (const void **)&kmd);
 	if (!(err == PAM_SUCCESS || err == PAM_NO_MODULE_DATA))
 		return (PAM_SYSTEM_ERR);
 
@@ -179,7 +177,7 @@ pam_sm_authenticate(
 		}
 	}
 
-	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		if (do_pkinit) {
@@ -187,8 +185,8 @@ pam_sm_authenticate(
 			 * If doing PKINIT it is okay to prompt for the user
 			 * name.
 			 */
-			if ((err = pam_get_user(pamh, &user, NULL)) !=
-			    PAM_SUCCESS) {
+			if ((err = pam_get_user(pamh, &user,
+			    NULL)) != PAM_SUCCESS) {
 				if (debug) {
 					__pam_log(LOG_AUTH | LOG_DEBUG,
 					    "PAM-KRB5 (auth): get user failed: "
@@ -272,7 +270,7 @@ pam_sm_authenticate(
 	 * PAM functions, thats why we wait until this point to
 	 * return.
 	 */
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (const void **)&rep_data);
 
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
@@ -318,7 +316,7 @@ pam_sm_authenticate(
 		goto out;
 	}
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 
 	result = attempt_krb5_auth(pamh, kmd, user, &password, 1);
 
@@ -371,18 +369,12 @@ out:
 }
 
 static krb5_error_code
-pam_krb5_prompter(
-	krb5_context ctx,
-	void *data,
-	/* ARGSUSED1 */
-	const char *name,
-	const char *banner,
-	int num_prompts,
-	krb5_prompt prompts[])
+pam_krb5_prompter(krb5_context ctx, void *data, const char *name,
+    const char *banner, int num_prompts, krb5_prompt prompts[])
 {
 	krb5_error_code rc = KRB5_LIBOS_CANTREADPWD;
 	pam_handle_t *pamh = (pam_handle_t *)data;
-	struct pam_conv	*pam_convp;
+	const struct pam_conv	*pam_convp;
 	struct pam_message *msgs = NULL;
 	struct pam_response *ret_respp = NULL;
 	int i;
@@ -405,7 +397,8 @@ pam_krb5_prompter(
 		}
 	}
 
-	if (pam_get_item(pamh, PAM_CONV, (void **)&pam_convp) != PAM_SUCCESS) {
+	if (pam_get_item(pamh, PAM_CONV, (const void **)&pam_convp) !=
+	    PAM_SUCCESS) {
 		return (rc);
 	}
 	if (pam_convp == NULL) {
@@ -444,8 +437,8 @@ pam_krb5_prompter(
 	 * Call PAM conv function to display the prompt.
 	 */
 
-	if ((pam_convp->conv)(num_prompts, &msgs, &ret_respp,
-	    pam_convp->appdata_ptr) == PAM_SUCCESS) {
+	if ((pam_convp->conv)(num_prompts, (const struct pam_message **)&msgs,
+	    &ret_respp, pam_convp->appdata_ptr) == PAM_SUCCESS) {
 		for (i = 0; i < num_prompts; i++) {
 			/* convert PAM response to krb prompt reply format */
 			assert(prompts[i].reply->data != NULL);
@@ -500,7 +493,7 @@ int
 attempt_krb5_auth(
 	pam_handle_t *pamh,
 	krb5_module_data_t	*kmd,
-	char		*user,
+	const char	*user,
 	char		**krb5_pass,
 	boolean_t	verify_tik)
 {
@@ -544,8 +537,8 @@ attempt_krb5_auth(
 		return (PAM_SYSTEM_ERR);
 	}
 
-	if ((code = get_kmd_kuser(kmd->kcontext, (const char *)user, kuser,
-	    2*MAXHOSTNAMELEN)) != 0) {
+	if ((code = get_kmd_kuser(kmd->kcontext, user, kuser,
+	    2 * MAXHOSTNAMELEN)) != 0) {
 		/* get_kmd_kuser returns proper PAM error statuses */
 		return (code);
 	}

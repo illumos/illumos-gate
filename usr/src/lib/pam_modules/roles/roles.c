@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <syslog.h>
@@ -45,16 +47,15 @@ static int roleinlist();
  *	checks to allow roles for secondary logins.
  */
 
-/*ARGSUSED*/
 int
 pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 	uid_t uid;
 	userattr_t *user_entry;
-	char	*kva_value;
-	char	*username;
-	char	*auser;
-	char	*rhost;
+	char *kva_value;
+	const char *username;
+	const char *auser;
+	const char *rhost;
 	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	struct passwd *pw_entry, pwd;
 	char buf[NSS_BUFLEN_PASSWD];
@@ -63,9 +64,9 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int debug = 0;
 	int allow_remote = 0;
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&username);
-	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
-	(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&username);
+	(void) pam_get_item(pamh, PAM_AUSER, (const void **)&auser);
+	(void) pam_get_item(pamh, PAM_RHOST, (const void **)&rhost);
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "allow_remote") == 0) {
@@ -80,11 +81,11 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	if (debug) {
-		char	*ruser;
-		char	*service;
+		const char *ruser;
+		const char *service;
 
-		(void) pam_get_item(pamh, PAM_RUSER, (void **)&ruser);
-		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+		(void) pam_get_item(pamh, PAM_RUSER, (const void **)&ruser);
+		(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 		__pam_log(LOG_AUTH | LOG_DEBUG, "pam_roles:pam_sm_acct_mgmt: "
 		    "service = %s, allow_remote = %d, user = %s auser = %s "
 		    "ruser = %s rhost = %s\n", (service) ? service : "not set",

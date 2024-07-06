@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1983-1989 AT&T	*/
@@ -87,8 +89,8 @@ extern int audit_rexecd_fail(char *, char *, char *, char *);
 extern int audit_settid(int);	/* set termnal ID */
 
 /* PAM conversation function */
-static int rexec_conv(int, struct pam_message **,
-		struct pam_response **, void *);
+static int rexec_conv(int, const struct pam_message **,
+    struct pam_response **, void *);
 
 static pam_handle_t *pamh;	/* authentication handle */
 static struct pam_conv conv = {
@@ -531,14 +533,13 @@ legalenvvar(char *s)
  *	or garner information from the user.
  */
 
-/* ARGSUSED3 */
 static int
-rexec_conv(int num_msg, struct pam_message **msg,
+rexec_conv(int num_msg, const struct pam_message **msg,
     struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	int			i;
+	const struct pam_message *m;
+	struct pam_response *r;
+	int i;
 
 	if (num_msg <= 0)
 		return (PAM_CONV_ERR);

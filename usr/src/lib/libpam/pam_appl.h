@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _PAM_APPL_H
@@ -138,7 +140,11 @@ struct pam_response {
  * call back function pointers and application data pointers to the scheme
  */
 struct pam_conv {
+#ifdef _PAM_LEGACY_NONCONST
 	int (*conv)(int, struct pam_message **,
+#else
+	int (*conv)(int, const struct pam_message **,
+#endif
 	    struct pam_response **, void *);
 	void *appdata_ptr;		/* Application data ptr */
 };
@@ -186,7 +192,11 @@ extern int
 pam_get_item(
 	const pam_handle_t *pamh, 	/* PAM handle */
 	int item_type, 			/* Type of object - see below */
-	void **	item			/* Address of place to put pointer */
+#ifdef _PAM_LEGACY_NONCONST
+	void **item			/* Address of place to put pointer */
+#else
+	const void **item		/* Address of place to put pointer */
+#endif
 					/*   to object */
 );
 
@@ -223,9 +233,13 @@ typedef struct pam_repository pam_repository_t;
 
 extern int
 pam_get_user(
-	pam_handle_t *pamh,		/* PAM handle */
-	char **user, 			/* User Name */
-	const char *prompt		/* Prompt */
+	pam_handle_t *pamh,	/* PAM handle */
+#ifdef _PAM_LEGACY_NONCONST
+	char **user, 		/* User Name */
+#else
+	const char **user, 	/* User Name */
+#endif
+	const char *prompt	/* Prompt */
 );
 
 /*
@@ -324,7 +338,11 @@ pam_putenv(
 
 /* pam_getenv is called to retrieve an env variable from the PAM handle */
 
+#ifdef _PAM_LEGACY_NONCONST
 extern char *
+#else
+extern const char *
+#endif
 pam_getenv(
 	pam_handle_t	*pamh,
 	const char	*name

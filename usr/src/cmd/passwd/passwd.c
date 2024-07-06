@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -176,7 +178,7 @@ static int		pam_retval = PAM_SUCCESS;
 static uid_t		uid;
 static char		*prognamep;
 static long		maxdate;	/* password aging information */
-static int		passwd_conv(int, struct pam_message **,
+static int		passwd_conv(int, const struct pam_message **,
 			    struct pam_response **, void *);
 static struct pam_conv	pam_conv = {passwd_conv, NULL};
 static pam_handle_t	*pamh;		/* Authentication handle */
@@ -1576,15 +1578,14 @@ passwd_exit(int retcode)
  *
  */
 
-/*ARGSUSED*/
 static int
-passwd_conv(int num_msg, struct pam_message **msg,
-	    struct pam_response **response, void *appdata_ptr)
+passwd_conv(int num_msg, const struct pam_message **msg,
+    struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	char 			*temp;
-	int			k, i;
+	const struct pam_message *m;
+	struct pam_response *r;
+	char *temp;
+	int k, i;
 
 	if (num_msg <= 0)
 		return (PAM_CONV_ERR);

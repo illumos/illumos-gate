@@ -22,6 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <strings.h>
@@ -44,14 +46,14 @@
 static void
 debug(pam_handle_t *pamh, int flags, int argc, const char **argv, char *mod)
 {
-	char *user = NULL;
-	char *service = NULL;
+	const char *user = NULL;
+	const char *service = NULL;
 
 	if (argc < 1 || strcmp(argv[0], "debug") != 0)
 		return;
 
-	(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	syslog(LOG_AUTH | LOG_DEBUG, "%s pam_allow:%s(%x) for %s",
 	    service ? service : "No Service Specified", mod, flags,

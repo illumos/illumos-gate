@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -119,7 +120,7 @@ static	void	pm_do_auth(adt_session_data_t *);
 /*
  *  External Declarations.
  */
-extern	int	pam_tty_conv(int, struct pam_message **,
+extern	int	pam_tty_conv(int, const struct pam_message **,
     struct pam_response **, void *);
 extern	char	*optarg;
 

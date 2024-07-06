@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -71,12 +72,13 @@
 		i++; \
 	}
 
-int ldap_getattr(char *name, attrlist *item, pwu_repository_t *rep);
-int ldap_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
+int ldap_getattr(const char *name, attrlist *item, pwu_repository_t *rep);
+int ldap_getpwnam(const char *name, attrlist *items, pwu_repository_t *rep,
     void **buf);
 int ldap_update(attrlist *items, pwu_repository_t *rep, void *buf);
-int ldap_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf);
-int ldap_user_to_authenticate(char *name, pwu_repository_t *rep,
+int ldap_putpwnam(const char *name, const char *oldpw, pwu_repository_t *rep,
+    void *buf);
+int ldap_user_to_authenticate(const char *name, pwu_repository_t *rep,
 	char **auth_user, int *privileged);
 
 /*
@@ -190,7 +192,7 @@ free_ldapbuf(ldapbuf_t *p)
  * password attributes.
  */
 int
-ldap_user_to_authenticate(char *user, pwu_repository_t *rep,
+ldap_user_to_authenticate(const char *user, pwu_repository_t *rep,
 	char **auth_user, int *privileged)
 {
 	struct passwd *pw;
@@ -286,7 +288,7 @@ ldap_user_to_authenticate(char *user, pwu_repository_t *rep,
  */
 /*ARGSUSED*/
 int
-ldap_getattr(char *name, attrlist *items, pwu_repository_t *rep)
+ldap_getattr(const char *name, attrlist *items, pwu_repository_t *rep)
 {
 	attrlist *w;
 	int res;
@@ -403,7 +405,7 @@ out:
  */
 /*ARGSUSED*/
 int
-ldap_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
+ldap_getpwnam(const char *name, attrlist *items, pwu_repository_t *rep,
     void **buf)
 {
 	ldapbuf_t *ldapbuf;
@@ -1136,7 +1138,8 @@ out:
  */
 /*ARGSUSED*/
 int
-ldap_putpwnam(char *name, char *oldpw, pwu_repository_t *rep, void *buf)
+ldap_putpwnam(const char *name, const char *oldpw, pwu_repository_t *rep,
+    void *buf)
 {
 	int res;
 	char *dn;	/* dn of user whose attributes we are changing */

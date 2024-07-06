@@ -26,8 +26,8 @@
  *
  * Copyright (c) 2014 Gary Mills
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Sebastian Wiedenroth
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -369,8 +369,8 @@ extern int	audit_cron_delete_anc_file(char *, char *);
 extern int	audit_cron_is_anc_name(char *);
 extern int	audit_cron_mode();
 
-static int cron_conv(int, struct pam_message **,
-		struct pam_response **, void *);
+static int cron_conv(int, const struct pam_message **,
+    struct pam_response **, void *);
 
 static struct pam_conv pam_conv = {cron_conv, NULL};
 static pam_handle_t *pamh;	/* Authentication handle */
@@ -3440,10 +3440,10 @@ process_anc_files(int del)
 }
 
 static int
-cron_conv(int num_msg, struct pam_message **msgs,
+cron_conv(int num_msg, const struct pam_message **msgs,
     struct pam_response **response __unused, void *appdata_ptr __unused)
 {
-	struct pam_message	**m = msgs;
+	const struct pam_message **m = msgs;
 	int i;
 
 	for (i = 0; i < num_msg; i++) {

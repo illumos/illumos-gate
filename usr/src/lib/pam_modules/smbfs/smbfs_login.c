@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -49,15 +51,14 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	return (PAM_IGNORE);
 }
 
-/*ARGSUSED*/
 int
 pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 	boolean_t debug = B_FALSE;
 	char dom[20];
-	char *user;
-	char *pw;
-	char *service;
+	const char *user;
+	const char *pw;
+	const char *service;
 	struct passwd pwbuf;
 	char buf[NSS_BUFLEN_PASSWD];
 	char *home;
@@ -79,8 +80,8 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if ((flags & ~mask) != 0)
 		return (PAM_IGNORE);
 
-	(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		__pam_log(LOG_AUTH | LOG_ERR,
@@ -95,7 +96,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	uid = pwbuf.pw_uid;
 	home = pwbuf.pw_dir;
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&pw);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&pw);
 	if (pw == NULL) {
 		/*
 		 * A module on the stack has removed PAM_AUTHTOK.

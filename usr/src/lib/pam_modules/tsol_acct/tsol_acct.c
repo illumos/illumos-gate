@@ -21,6 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <libtsnet.h>
@@ -50,14 +52,13 @@ free_labels(m_range_t *r, m_label_t *l)
 	m_label_free(l);
 }
 
-/* ARGSUSED */
 int
 pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 	int i;
 	int debug = 0;
 	int allow_unlabeled = 0;
-	char *user;
+	const char *user;
 	char *rhost;
 	m_range_t *range;
 	m_label_t *plabel;
@@ -78,9 +79,9 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (!is_system_labeled())
 		return (PAM_IGNORE);
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
-	(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
+	(void) pam_get_item(pamh, PAM_RHOST, (const void **)&rhost);
 
 	if (debug) {
 		__pam_log(LOG_AUTH | LOG_DEBUG,

@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/param.h>
@@ -41,21 +43,16 @@ extern int ruserok(const char *, int, const char *, const char *);
 /*
  * pam_sm_authenticate	- Checks if the user is allowed remote access
  */
-/*ARGSUSED*/
 int
-pam_sm_authenticate(
-	pam_handle_t	*pamh,
-	int	flags,
-	int	argc,
-	const char	**argv)
+pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char *host = NULL, *lusername = NULL;
+	const char *host = NULL, *lusername = NULL;
 	struct passwd pwd;
 	char pwd_buffer[1024];
-	int	is_superuser;
-	char	*rusername;
-	int	i;
-	int	debug = 0;
+	int is_superuser;
+	const char *rusername;
+	int i;
+	int debug = 0;
 
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
@@ -64,12 +61,16 @@ pam_sm_authenticate(
 			syslog(LOG_DEBUG, "illegal option %s", argv[i]);
 	}
 
-	if (pam_get_item(pamh, PAM_USER, (void **) &lusername) != PAM_SUCCESS)
+	if (pam_get_item(pamh, PAM_USER, (const void **)&lusername) !=
+	    PAM_SUCCESS) {
 		return (PAM_SERVICE_ERR);
-	if (pam_get_item(pamh, PAM_RHOST, (void **) &host) != PAM_SUCCESS)
+	}
+	if (pam_get_item(pamh, PAM_RHOST, (const void **)&host) != PAM_SUCCESS)
 		return (PAM_SERVICE_ERR);
-	if (pam_get_item(pamh, PAM_RUSER, (void **)&rusername) != PAM_SUCCESS)
+	if (pam_get_item(pamh, PAM_RUSER, (const void **)&rusername) !=
+	    PAM_SUCCESS) {
 		return (PAM_SERVICE_ERR);
+	}
 
 	if (lusername == NULL || *lusername == '\0')
 		return (PAM_USER_UNKNOWN);

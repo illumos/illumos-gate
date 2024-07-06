@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -78,9 +80,10 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	boolean_t debug = B_FALSE;
 	boolean_t nowarn = B_FALSE;
 	pwu_repository_t files_rep;
-	char *user, *local_user;
-	char *newpw;
-	char *service;
+	const char *user;
+	char *local_user;
+	const char *newpw;
+	const char *service;
 	int privileged;
 	int res;
 	int i;
@@ -105,8 +108,8 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "pam_smb_passwd: storing authtok");
 
-	(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		__pam_log(LOG_AUTH | LOG_ERR,
@@ -114,7 +117,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_USER_UNKNOWN);
 	}
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&newpw);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&newpw);
 	if (newpw == NULL) {
 		/*
 		 * A module on the stack has removed PAM_AUTHTOK. We fail

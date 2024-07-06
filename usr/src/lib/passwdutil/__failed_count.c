@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <string.h>
@@ -28,7 +29,7 @@
 #include "passwdutil.h"
 
 int
-__incr_failed_count(char *username, char *repname, int max_failures)
+__incr_failed_count(const char *username, char *repname, int max_failures)
 {
 	int ret;
 	void *buf;
@@ -87,7 +88,7 @@ out:
  * returns the number of failed logins before the reset, or an error (< 0)
  */
 int
-__rst_failed_count(char *username, char *repname)
+__rst_failed_count(const char *username, char *repname)
 {
 	int ret;
 	void *buf;

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -129,12 +131,11 @@ free_resp(int num_msg, struct pam_response *pr)
 	free(pr);
 }
 
-/* ARGSUSED */
 int
-pam_tty_conv(int num_msg, struct pam_message **mess,
+pam_tty_conv(int num_msg, const struct pam_message **mess,
     struct pam_response **resp, void *my_data)
 {
-	struct pam_message *m = *mess;
+	const struct pam_message *m = *mess;
 	struct pam_response *r = calloc(num_msg, sizeof (struct pam_response));
 	int i;
 

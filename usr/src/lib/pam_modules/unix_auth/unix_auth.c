@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -65,7 +67,7 @@ error(pam_handle_t *pamh, char *fmt, ...)
 }
 
 static int
-get_max_failed(char *user)
+get_max_failed(const char *user)
 {
 	char *val = NULL;
 	userattr_t *uattr;
@@ -139,22 +141,22 @@ display_warning(pam_handle_t *pamh, int failures, char *homedir)
 int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	int	i;
-	int	debug = 0;
-	int	nowarn = (flags & PAM_SILENT) != 0;
-	char	*user;
-	char	*passwd;
-	char	*rep_passwd;
-	char	*crypt_passwd;
-	char	*repository_name;
-	struct pam_repository *auth_rep;
+	int i;
+	int debug = 0;
+	int nowarn = (flags & PAM_SILENT) != 0;
+	const char *user;
+	const char *passwd;
+	char *rep_passwd;
+	char *crypt_passwd;
+	char *repository_name;
+	const struct pam_repository *auth_rep;
 	pwu_repository_t *pwu_rep;
 	attrlist attr_pw[4];
-	int	result;
-	int	server_policy = 0;
-	int	old_failed_count;
-	char	*homedir = NULL;
-	int	dolock = 1;
+	int result;
+	int server_policy = 0;
+	int old_failed_count;
+	char *homedir = NULL;
+	int dolock = 1;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -171,7 +173,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "pam_unix_auth: entering pam_sm_authenticate()");
 
-	if (pam_get_item(pamh, PAM_USER, (void **)&user) != PAM_SUCCESS) {
+	if (pam_get_item(pamh, PAM_USER, (const void **)&user) != PAM_SUCCESS) {
 		__pam_log(LOG_AUTH | LOG_DEBUG, "pam_unix_auth: USER not set");
 		return (PAM_SYSTEM_ERR);
 	}
@@ -182,13 +184,14 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_USER_UNKNOWN);
 	}
 
-	if (pam_get_item(pamh, PAM_AUTHTOK, (void **)&passwd) != PAM_SUCCESS) {
+	if (pam_get_item(pamh, PAM_AUTHTOK, (const void **)&passwd) !=
+	    PAM_SUCCESS) {
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "pam_unix_auth: AUTHTOK not set!\n");
 		return (PAM_SYSTEM_ERR);
 	}
 
-	result = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
+	result = pam_get_item(pamh, PAM_REPOSITORY, (const void **)&auth_rep);
 	if (result == PAM_SUCCESS && auth_rep != NULL) {
 		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL)
 			return (PAM_BUF_ERR);

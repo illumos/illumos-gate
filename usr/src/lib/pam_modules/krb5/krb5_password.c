@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <kadm5/admin.h>
@@ -40,14 +42,14 @@
 #include "utils.h"
 #include "krb5_repository.h"
 
-extern int attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, char *,
-	char **, boolean_t);
-extern int krb5_verifypw(char *, char *, int);
+extern int attempt_krb5_auth(pam_handle_t *, krb5_module_data_t *, const char *,
+    char **, boolean_t);
+extern int krb5_verifypw(const char *, char *, int);
 
 static void display_msg(pam_handle_t *, int, char *);
 static void display_msgs(pam_handle_t *, int, int,
-		char msgs[][PAM_MAX_MSG_SIZE]);
-static int krb5_changepw(pam_handle_t *, char *, char *, char *, int);
+    char msgs[][PAM_MAX_MSG_SIZE]);
+static int krb5_changepw(pam_handle_t *, const char *, char *, char *, int);
 
 /*
  * set_ccname()
@@ -106,7 +108,7 @@ static void
 get_set_creds(
 	pam_handle_t *pamh,
 	krb5_module_data_t *kmd,
-	char *user,
+	const char *user,
 	char *newpass,
 	int debug)
 {
@@ -146,22 +148,18 @@ get_set_creds(
  */
 
 int
-pam_sm_chauthtok(
-	pam_handle_t		*pamh,
-	int			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
 
-	char			*user;
-	int			err, result = PAM_AUTHTOK_ERR;
-	char			*newpass = NULL;
-	char			*oldpass = NULL;
-	int			i;
-	int			debug = 0;
-	uid_t			pw_uid;
-	krb5_module_data_t	*kmd = NULL;
-	pam_repository_t	*rep_data = NULL;
+	const char *user;
+	int err, result = PAM_AUTHTOK_ERR;
+	char *newpass = NULL;
+	char *oldpass = NULL;
+	int i;
+	int debug = 0;
+	uid_t pw_uid;
+	krb5_module_data_t *kmd = NULL;
+	const pam_repository_t *rep_data = NULL;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -177,7 +175,7 @@ pam_sm_chauthtok(
 		    "PAM-KRB5 (password): start: flags = %x",
 		    flags);
 
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (const void **)&rep_data);
 
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
@@ -228,7 +226,7 @@ pam_sm_chauthtok(
 			return (PAM_IGNORE);
 	}
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		__pam_log(LOG_AUTH | LOG_ERR,
@@ -256,7 +254,7 @@ pam_sm_chauthtok(
 		goto out;
 	}
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&newpass);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&newpass);
 
 	/*
 	 * If the preauth type done didn't use a passwd just ignore the error.
@@ -267,7 +265,7 @@ pam_sm_chauthtok(
 		else
 			return (PAM_SYSTEM_ERR);
 
-	(void) pam_get_item(pamh, PAM_OLDAUTHTOK, (void **)&oldpass);
+	(void) pam_get_item(pamh, PAM_OLDAUTHTOK, (const void **)&oldpass);
 
 	if (oldpass == NULL)
 		if (kmd && kmd->preauth_type == KRB_PKINIT)
@@ -320,7 +318,7 @@ out:
 
 int
 krb5_verifypw(
-	char 	*princ_str,
+	const char 	*princ_str,
 	char	*old_password,
 	int debug)
 {
@@ -339,7 +337,7 @@ krb5_verifypw(
 		return (6);
 	}
 
-	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
+	if ((code = get_kmd_kuser(context, princ_str, kprinc,
 	    2*MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
@@ -419,7 +417,7 @@ krb5_verifypw(
 static int
 krb5_changepw(
 	pam_handle_t *pamh,
-	char *princ_str,
+	const char *princ_str,
 	char *old_password,
 	char *new_password,
 	int debug)
@@ -438,7 +436,7 @@ krb5_changepw(
 	if (krb5_init_secure_context(&context) != 0)
 		return (PAM_SYSTEM_ERR);
 
-	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
+	if ((code = get_kmd_kuser(context, princ_str, kprinc,
 	    2*MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}

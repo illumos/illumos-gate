@@ -35,6 +35,10 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 /* Pull in crypt() definition. */
 #define __EXTENSIONS__
 
@@ -1187,12 +1191,8 @@ static pam_handle_t *pamh = NULL;
  * echo off means password.
  */
 
-/*ARGSUSED*/
-static int PAM_conv (int num_msg,
-#ifndef SOL2
-    const
-#endif
-    struct pam_message **msg, struct pam_response **resp, void *appdata_ptr)
+static int PAM_conv (int num_msg, const struct pam_message **msg,
+    struct pam_response **resp, void *appdata_ptr)
 {
     int replies = 0;
     struct pam_response *reply = NULL;

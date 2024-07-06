@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdlib.h>
@@ -195,26 +197,26 @@ get_and_set_seckey(
 static int
 establish_key(pam_handle_t *pamh, int flags, int debug, char *netname)
 {
-	char	*user;
-	char	*passwd;
-	char	short_pass[sizeof (des_block)+1], *short_passp;
-	int	result;
-	uid_t	uid;
-	gid_t	gid;
-	int	err;
+	const char *user;
+	const char *passwd;
+	char short_pass[sizeof (des_block)+1], *short_passp;
+	int result;
+	uid_t uid;
+	gid_t gid;
+	int err;
 
 	struct passwd pw;	/* Needed to obtain uid */
-	char	*scratch;
-	int	scratchlen;
+	char *scratch;
+	int scratchlen;
 
-	mechanism_t	**mechs;
-	mechanism_t	**mpp;
-	int	get_seckey_cnt = 0;
-	int	set_seckey_cnt = 0;
-	int	good_pw_cnt = 0;
-	int	valid_mech_cnt = 0;
+	mechanism_t **mechs;
+	mechanism_t **mpp;
+	int get_seckey_cnt = 0;
+	int set_seckey_cnt = 0;
+	int good_pw_cnt = 0;
+	int valid_mech_cnt = 0;
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		if (debug)
@@ -222,7 +224,7 @@ establish_key(pam_handle_t *pamh, int flags, int debug, char *netname)
 		return (PAM_USER_UNKNOWN);
 	}
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&passwd);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&passwd);
 
 	scratchlen = sysconf(_SC_GETPW_R_SIZE_MAX);
 	if ((scratch = malloc(scratchlen)) == NULL)
@@ -399,16 +401,16 @@ static int
 remove_key(pam_handle_t *pamh, int flags, int debug)
 {
 	int result;
-	char *uname;
+	const char *uname;
 	attrlist attr_pw[2];
-	struct pam_repository *auth_rep = NULL;
+	const struct pam_repository *auth_rep = NULL;
 	pwu_repository_t *pwu_rep;
 	uid_t uid;
 	gid_t gid;
 	argres_t argres;
 	pthread_t tid;
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&uname);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&uname);
 	if (uname == NULL || *uname == '\0') {
 		if (debug)
 			syslog(LOG_DEBUG,
@@ -436,7 +438,7 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 		return (PAM_PERM_DENIED);
 	}
 
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (const void **)&auth_rep);
 	if (auth_rep != NULL) {
 		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL)
 			return (PAM_BUF_ERR);

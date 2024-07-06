@@ -22,7 +22,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	  All Rights Reserved	*/
@@ -128,8 +128,9 @@ static void audit_failure(int, struct passwd *, char *, int, boolean_t);
 #ifdef DYNAMIC_SU
 static void validate(char *, int *, boolean_t);
 static int legalenvvar(char *);
-static int su_conv(int, struct pam_message **, struct pam_response **, void *);
-static int emb_su_conv(int, struct pam_message **, struct pam_response **,
+static int su_conv(int, const struct pam_message **, struct pam_response **,
+    void *);
+static int emb_su_conv(int, const struct pam_message **, struct pam_response **,
     void *);
 static void freeresponse(int, struct pam_response **response);
 static struct pam_conv pam_conv = {su_conv, NULL};
@@ -1094,16 +1095,15 @@ audit_failure(int pw_change, struct passwd *pwd, char *user, int pamerr,
  *	a PAM authentication module to print error messages
  *	or garner information from the user.
  */
-/*ARGSUSED*/
 static int
-su_conv(int num_msg, struct pam_message **msg, struct pam_response **response,
-    void *appdata_ptr)
+su_conv(int num_msg, const struct pam_message **msg,
+    struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	char			*temp;
-	int			k;
-	char			respbuf[PAM_MAX_RESP_SIZE];
+	const struct pam_message *m;
+	struct pam_response *r;
+	char *temp;
+	int k;
+	char respbuf[PAM_MAX_RESP_SIZE];
 
 	if (num_msg <= 0)
 		return (PAM_CONV_ERR);
@@ -1181,16 +1181,15 @@ su_conv(int num_msg, struct pam_message **msg, struct pam_response **response,
  *	or garner information from the user.
  *	This version is used for embedded_su.
  */
-/*ARGSUSED*/
 static int
-emb_su_conv(int num_msg, struct pam_message **msg,
+emb_su_conv(int num_msg, const struct pam_message **msg,
     struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	char			*temp;
-	int			k;
-	char			respbuf[PAM_MAX_RESP_SIZE];
+	const struct pam_message *m;
+	struct pam_response *r;
+	char *temp;
+	int k;
+	char respbuf[PAM_MAX_RESP_SIZE];
 
 	if (num_msg <= 0)
 		return (PAM_CONV_ERR);
