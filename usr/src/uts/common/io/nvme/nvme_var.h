@@ -37,6 +37,8 @@
 extern "C" {
 #endif
 
+#define	NVME_MODULE_NAME		"nvme"
+
 typedef enum {
 	NVME_PCI_CONFIG			= 1 << 0,
 	NVME_FMA_INIT			= 1 << 1,
@@ -46,7 +48,8 @@ typedef enum {
 	NVME_INTERRUPTS			= 1 << 5,
 	NVME_UFM_INIT			= 1 << 6,
 	NVME_MUTEX_INIT			= 1 << 7,
-	NVME_MGMT_INIT			= 1 << 8
+	NVME_MGMT_INIT			= 1 << 8,
+	NVME_STAT_INIT			= 1 << 9
 } nvme_progress_t;
 
 typedef enum {
@@ -70,7 +73,6 @@ typedef enum {
 #define	NVME_MIN_ASYNC_EVENT_LIMIT	1
 #define	NVME_DEFAULT_MIN_BLOCK_SIZE	512
 
-
 typedef struct nvme nvme_t;
 typedef struct nvme_namespace nvme_namespace_t;
 typedef struct nvme_minor nvme_minor_t;
@@ -81,6 +83,8 @@ typedef struct nvme_cmd nvme_cmd_t;
 typedef struct nvme_cq nvme_cq_t;
 typedef struct nvme_qpair nvme_qpair_t;
 typedef struct nvme_task_arg nvme_task_arg_t;
+typedef struct nvme_device_stat nvme_device_stat_t;
+typedef struct nvme_admin_stat nvme_admin_stat_t;
 
 /*
  * These states represent the minor's perspective. That is, of a minor's
@@ -176,6 +180,26 @@ struct nvme_dma {
 	boolean_t nd_cached;
 };
 
+typedef enum {
+	NVME_CMD_ALLOCATED = 0,
+	NVME_CMD_SUBMITTED,
+	NVME_CMD_QUEUED,
+	NVME_CMD_COMPLETED,
+	NVME_CMD_LOST
+} nvme_cmd_state_t;
+
+typedef enum {
+	NVME_CMD_F_DONTPANIC	= 1 << 0,
+	NVME_CMD_F_USELOCK	= 1 << 1,
+} nvme_cmd_flag_t;
+
+/*
+ * This command structure is shared between admin and I/O commands. When used
+ * for an admin command, nc_mutex and nc_cv are used to synchronise access to
+ * various fields, and to signal command completion. NVME_CMD_F_USELOCK in
+ * nc_flags indicates whether the lock and CV are in use. For I/O commands,
+ * these are neither initialised nor used.
+ */
 struct nvme_cmd {
 	struct list_node nc_list;
 
@@ -184,9 +208,14 @@ struct nvme_cmd {
 
 	void (*nc_callback)(void *);
 	bd_xfer_t *nc_xfer;
-	boolean_t nc_completed;
-	boolean_t nc_dontpanic;
+
+	uint32_t nc_timeout;
+	nvme_cmd_flag_t nc_flags;
+	nvme_cmd_state_t nc_state; /* Protected by nc_mutex iff F_USELOCK */
 	uint16_t nc_sqid;
+
+	hrtime_t nc_submit_ts;
+	hrtime_t nc_queue_ts;
 
 	nvme_dma_t *nc_dma;
 	nvme_dma_t *nc_prp; /* DMA for PRP lists */
@@ -230,6 +259,7 @@ struct nvme_qpair {
 	nvme_cmd_t **nq_cmd;	/* active command array */
 	uint16_t nq_next_cmd;	/* next potential empty queue slot */
 	uint_t nq_active_cmds;	/* number of active cmds */
+	uint32_t nq_active_timeout; /* sum of the timeouts of active cmds */
 
 	kmutex_t nq_mutex;	/* protects shared state */
 	ksema_t nq_sema; /* semaphore to ensure q always has >= 1 empty slot */
@@ -240,6 +270,77 @@ typedef struct nvme_mgmt_lock {
 	kcondvar_t nml_cv;
 	uintptr_t nml_bd_own;
 } nvme_mgmt_lock_t;
+
+struct nvme_device_stat {
+	/* Errors detected by driver */
+	kstat_named_t nds_dma_bind_err;
+	kstat_named_t nds_abort_timeout;
+	kstat_named_t nds_abort_failed;
+	kstat_named_t nds_abort_successful;
+	kstat_named_t nds_abort_unsuccessful;
+	kstat_named_t nds_cmd_timeout;
+	kstat_named_t nds_wrong_logpage;
+	kstat_named_t nds_unknown_logpage;
+	kstat_named_t nds_too_many_cookies;
+	kstat_named_t nds_unknown_cid;
+
+	/* Errors detected by hardware */
+	kstat_named_t nds_inv_cmd_err;
+	kstat_named_t nds_inv_field_err;
+	kstat_named_t nds_inv_nsfmt_err;
+	kstat_named_t nds_data_xfr_err;
+	kstat_named_t nds_internal_err;
+	kstat_named_t nds_abort_rq_err;
+	kstat_named_t nds_abort_pwrloss_err;
+	kstat_named_t nds_abort_sq_del;
+	kstat_named_t nds_nvm_cap_exc;
+	kstat_named_t nds_nvm_ns_notrdy;
+	kstat_named_t nds_nvm_ns_formatting;
+	kstat_named_t nds_inv_cq_err;
+	kstat_named_t nds_inv_qid_err;
+	kstat_named_t nds_max_qsz_exc;
+	kstat_named_t nds_inv_int_vect;
+	kstat_named_t nds_inv_log_page;
+	kstat_named_t nds_inv_format;
+	kstat_named_t nds_inv_q_del;
+	kstat_named_t nds_cnfl_attr;
+	kstat_named_t nds_inv_prot;
+	kstat_named_t nds_readonly;
+	kstat_named_t nds_inv_fwslot;
+	kstat_named_t nds_inv_fwimg;
+	kstat_named_t nds_fwact_creset;
+	kstat_named_t nds_fwact_nssr;
+	kstat_named_t nds_fwact_reset;
+	kstat_named_t nds_fwact_mtfa;
+	kstat_named_t nds_fwact_prohibited;
+	kstat_named_t nds_fw_overlap;
+
+	/* Errors reported by asynchronous events */
+	kstat_named_t nds_diagfail_event;
+	kstat_named_t nds_persistent_event;
+	kstat_named_t nds_transient_event;
+	kstat_named_t nds_fw_load_event;
+	kstat_named_t nds_reliability_event;
+	kstat_named_t nds_temperature_event;
+	kstat_named_t nds_spare_event;
+	kstat_named_t nds_vendor_event;
+	kstat_named_t nds_notice_event;
+	kstat_named_t nds_unknown_event;
+};
+
+#define	NAS_CNT 0
+#define	NAS_AVG 1
+#define	NAS_MAX 2
+struct nvme_admin_stat {
+	kstat_named_t nas_getlogpage[3];
+	kstat_named_t nas_identify[3];
+	kstat_named_t nas_abort[3];
+	kstat_named_t nas_fwactivate[3];
+	kstat_named_t nas_fwimgload[3];
+	kstat_named_t nas_nsformat[3];
+	kstat_named_t nas_vendor[3];
+	kstat_named_t nas_other[3];
+};
 
 struct nvme {
 	dev_info_t *n_dip;
@@ -347,46 +448,12 @@ struct nvme {
 	kmutex_t n_minor_mutex;
 	nvme_lock_t n_lock;
 
-	/* errors detected by driver */
-	uint32_t n_dma_bind_err;
-	uint32_t n_abort_failed;
-	uint32_t n_cmd_timeout;
-	uint32_t n_cmd_aborted;
-	uint32_t n_wrong_logpage;
-	uint32_t n_unknown_logpage;
-	uint32_t n_too_many_cookies;
-	uint32_t n_unknown_cid;
+	kstat_t *n_device_kstat;
+	nvme_device_stat_t n_device_stat;
 
-	/* errors detected by hardware */
-	uint32_t n_data_xfr_err;
-	uint32_t n_internal_err;
-	uint32_t n_abort_rq_err;
-	uint32_t n_abort_sq_del;
-	uint32_t n_nvm_cap_exc;
-	uint32_t n_nvm_ns_notrdy;
-	uint32_t n_nvm_ns_formatting;
-	uint32_t n_inv_cq_err;
-	uint32_t n_inv_qid_err;
-	uint32_t n_max_qsz_exc;
-	uint32_t n_inv_int_vect;
-	uint32_t n_inv_log_page;
-	uint32_t n_inv_format;
-	uint32_t n_inv_q_del;
-	uint32_t n_cnfl_attr;
-	uint32_t n_inv_prot;
-	uint32_t n_readonly;
-
-	/* errors reported by asynchronous events */
-	uint32_t n_diagfail_event;
-	uint32_t n_persistent_event;
-	uint32_t n_transient_event;
-	uint32_t n_fw_load_event;
-	uint32_t n_reliability_event;
-	uint32_t n_temperature_event;
-	uint32_t n_spare_event;
-	uint32_t n_vendor_event;
-	uint32_t n_notice_event;
-	uint32_t n_unknown_event;
+	kstat_t *n_admin_kstat;
+	kmutex_t n_admin_stat_mutex;
+	nvme_admin_stat_t n_admin_stat;
 
 	/* hot removal NDI event handling */
 	ddi_eventcookie_t n_rm_cookie;
@@ -543,6 +610,13 @@ extern void nvme_rwunlock(nvme_minor_lock_info_t *, nvme_lock_t *);
 extern void nvme_rwlock_ctrl_dead(void *);
 extern void nvme_lock_init(nvme_lock_t *);
 extern void nvme_lock_fini(nvme_lock_t *);
+
+/*
+ * Statistics functions
+ */
+extern boolean_t nvme_stat_init(nvme_t *);
+extern void nvme_stat_cleanup(nvme_t *);
+extern void nvme_admin_stat_cmd(nvme_t *, nvme_cmd_t *);
 
 #ifdef __cplusplus
 }
