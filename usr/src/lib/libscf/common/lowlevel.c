@@ -54,7 +54,9 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/sysmacros.h>
+#ifndef	NATIVE_BUILD
 #include <libzonecfg.h>
+#endif	/* !NATIVE_BUILD */
 #include <unistd.h>
 #include <dlfcn.h>
 
@@ -900,6 +902,12 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		return (0);
 	}
 
+/*
+ * To simplify the tools bootstrap, because the tools svccfg is only operating
+ * on local files, we remove the ability for it to call into libzonecfg as there
+ * is no need to find a repository in another zone.
+ */
+#ifndef	NATIVE_BUILD
 	if (strcmp(name, "zone") == 0) {
 		char zone[MAXPATHLEN], root[MAXPATHLEN], door[MAXPATHLEN];
 		static int (*zone_get_rootpath)(char *, char *, size_t);
@@ -966,6 +974,7 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 
 		return (0);
 	}
+#endif	/* !NATIVE_BUILD */
 
 	return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 }
