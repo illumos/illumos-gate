@@ -4874,6 +4874,25 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 	return (TRAN_ACCEPT);
 }
 
+static boolean_t
+sata_txlt_unmap_supported(sata_pkt_txlate_t *spx, sata_drive_info_t *sdinfo)
+{
+	const sata_id_t *id = &sdinfo->satadrv_id;
+
+	ASSERT(MUTEX_HELD(&SATA_TXLT_CPORT_MUTEX(spx)));
+
+	/*
+	 * SAT-5 9.24.1 If the TRIM SUPPORTED bit is zero or the
+	 * DRAT SUPPORTED bit is zero, then UNMAP is not supported.
+	 */
+	if (!(id->ai_dsm & SATA_DSM_TRIM) ||
+	    !(id->ai_addsupported & SATA_DETERMINISTIC_READ)) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * Translate command: UNMAP
  *
@@ -4915,6 +4934,11 @@ sata_txlt_unmap(sata_pkt_txlate_t *spx)
 	if ((rval != TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(cport_mutex);
 		return (rval);
+	}
+
+	if (!sata_txlt_unmap_supported(spx, sdinfo)) {
+		mutex_exit(cport_mutex);
+		return (sata_txlt_invalid_command(spx));
 	}
 
 	/*
