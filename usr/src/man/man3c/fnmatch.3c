@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\"
-.Dd August 14, 2017
+.Dd July 12, 2024
 .Dt FNMATCH 3C
 .Os
 .Sh NAME
@@ -121,7 +121,7 @@ implementation of
 header
 .In fnmatch.h
 provides the
-.Dv FNM_FOLDCASE
+.Dv FNM_CASEFOLD
 flag having the same meaning.
 .It Dv FNM_NOESCAPE
 If not set, a backslash character
