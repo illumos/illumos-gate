@@ -91,6 +91,7 @@
 #include <sys/task.h>
 #include <sys/random.h>
 #include <sys/sysmacros.h>
+#include <sys/fdsync.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -3150,6 +3151,33 @@ prt_srf(private_t *pri, int raw, long val)
 }
 
 /*
+ * Print fdsync() internal argument.
+ */
+void
+prt_fds(private_t *pri, int raw, long val)
+{
+	if (raw) {
+		prt_hex(pri, 0, val);
+		return;
+	}
+
+	switch (val) {
+	case FDSYNC_FS:
+		outstring(pri, "FDSYNC_FS");
+		break;
+	case FDSYNC_FILE:
+		outstring(pri, "FDSYNC_FILE");
+		break;
+	case FDSYNC_DATA:
+		outstring(pri, "FDSYNC_DATA");
+		break;
+	default:
+		prt_hex(pri, 0, val);
+		break;
+	}
+}
+
+/*
  * Array of pointers to print functions, one for each format.
  */
 void (* const Print[])() = {
@@ -3260,5 +3288,6 @@ void (* const Print[])() = {
 	prt_exc,	/* EXC -- print execvex() flags */
 	prt_ffd,	/* FFD -- print fcntl() F_SETFD flags */
 	prt_srf,	/* SRF -- print send*()/recv*() flags */
+	prt_fds,	/* FDS -- print fdsync() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

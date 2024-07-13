@@ -260,7 +260,7 @@ struct fem_head {
 			struct shrlock *shr, int flag, cred_t *cr,	\
 			caller_context_t *ct);				\
 	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent,		\
-			vnode_t *dvp, char *cname, 			\
+			vnode_t *dvp, char *cname,			\
 			caller_context_t *ct);				\
 	int (*femop_reqzcbuf)(femarg_t *vf, enum uio_rw ioflag,		\
 			xuio_t *xuio, cred_t *cr,			\
@@ -291,7 +291,8 @@ struct fem {
 			enum whymountroot reason);			\
 	void (*fsemop_freevfs)(fsemarg_t *vf);				\
 	int (*fsemop_vnstate)(fsemarg_t *vf, vnode_t *vp,		\
-			vntrans_t nstate)		/* NB: No ";" */
+			vntrans_t nstate);				\
+	int (*fsemop_syncfs)(fsemarg_t *vf, uint64_t, cred_t *)	/* NB: No ";" */
 
 struct fsem {
 	const char *name;
@@ -413,6 +414,7 @@ extern int vfsnext_vget(fsemarg_t *vf, vnode_t **vpp, fid_t *fidp);
 extern int vfsnext_mountroot(fsemarg_t *vf, enum whymountroot reason);
 extern void vfsnext_freevfs(fsemarg_t *vf);
 extern int vfsnext_vnstate(fsemarg_t *vf, vnode_t *vp, vntrans_t nstate);
+extern int vfsnext_syncfs(fsemarg_t *vf, uint64_t flag, cred_t *cr);
 
 
 extern void fem_init(void); /* called once, by startup */

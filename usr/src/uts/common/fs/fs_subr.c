@@ -88,6 +88,16 @@ fs_nosys()
 }
 
 /*
+ * This is the version of syncfs that a file system gets by default if it
+ * doesn't support the entry point and has a valid sync routine.
+ */
+int
+fs_nosys_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	return (ENOSYS);
+}
+
+/*
  * The associated operation is invalid (on this vnode).
  */
 int
@@ -150,6 +160,16 @@ fs_nosys_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 /* ARGSUSED */
 int
 fs_sync(struct vfs *vfspp, short flag, cred_t *cr)
+{
+	return (0);
+}
+
+/*
+ * This should be used for file systems which do not need to support any kind of
+ * sync(2) style operation.
+ */
+int
+fs_syncfs_nop(vfs_t *vfspp, uint64_t flag, cred_t *cr)
 {
 	return (0);
 }

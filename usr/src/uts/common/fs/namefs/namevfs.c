@@ -22,6 +22,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -687,6 +688,19 @@ nm_sync(vfs_t *vfsp, short flag, cred_t *crp)
 	return (VOP_FSYNC(nodep->nm_filevp, FSYNC, crp, NULL));
 }
 
+static int
+nm_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *crp)
+{
+	struct namenode *nodep;
+
+	if (flags != 0) {
+		return (ENOTSUP);
+	}
+
+	nodep = (struct namenode *)vfsp->vfs_data;
+	return (VOP_FSYNC(nodep->nm_filevp, FSYNC, crp, NULL));
+}
+
 /*
  * File system initialization routine. Save the file system type,
  * establish a file system device number and initialize nm_filevp_hash[].
@@ -700,6 +714,7 @@ nameinit(int fstype, char *name)
 		VFSNAME_ROOT,		{ .vfs_root = nm_root },
 		VFSNAME_STATVFS,	{ .vfs_statvfs = nm_statvfs },
 		VFSNAME_SYNC,		{ .vfs_sync = nm_sync },
+		VFSNAME_SYNCFS,		{ .vfs_syncfs = nm_syncfs },
 		NULL,			NULL
 	};
 	static const fs_operation_def_t nm_dummy_vfsops_template[] = {

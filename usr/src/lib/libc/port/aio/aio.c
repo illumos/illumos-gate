@@ -26,6 +26,7 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include "libc.h"
 #include "asyncio.h"
 #include <atomic.h>
 #include <sys/param.h>
@@ -41,7 +42,6 @@ static void _aio_enq_doneq(aio_req_t *);
 
 extern void _aio_lio_free(aio_lio_t *);
 
-extern int __fdsync(int, int);
 extern int __fcntl(int, int, ...);
 extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
@@ -1176,11 +1176,15 @@ top:
 			if (reqp->req_state == AIO_REQ_CANCELED) {
 				/* EMPTY */;
 			} else if (arg->offset == O_SYNC) {
-				if ((retval = __fdsync(arg->fd, FSYNC)) == -1)
+				if ((retval = __fdsync(arg->fd, FDSYNC_FILE)) ==
+				    -1) {
 					error = errno;
+				}
 			} else {
-				if ((retval = __fdsync(arg->fd, FDSYNC)) == -1)
+				if ((retval = __fdsync(arg->fd, FDSYNC_DATA)) ==
+				    -1) {
 					error = errno;
+				}
 			}
 			if (_aio_hash_insert(reqp->req_resultp, reqp) != 0)
 				aio_panic("_aio_do_request(): AIOFSYNC: "

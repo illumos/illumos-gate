@@ -330,7 +330,8 @@ typedef enum vntrans vntrans_t;
 	int	(*vfs_vget)(vfs_t *, vnode_t **, fid_t *);		\
 	int	(*vfs_mountroot)(vfs_t *, enum whymountroot);		\
 	void	(*vfs_freevfs)(vfs_t *);				\
-	int	(*vfs_vnstate)(vfs_t *, vnode_t *, vntrans_t)	/* NB: No ";" */
+	int	(*vfs_vnstate)(vfs_t *, vnode_t *, vntrans_t);		\
+	int	(*vfs_syncfs)(vfs_t *, uint64_t, cred_t *)	/* NB: No ";" */
 
 /*
  * Operations supported on virtual file system.
@@ -349,6 +350,7 @@ extern int	fsop_mountroot(vfs_t *, enum whymountroot);
 extern void	fsop_freefs(vfs_t *);
 extern int	fsop_sync_by_kind(int, short, cred_t *);
 extern int	fsop_vnstate(vfs_t *, vnode_t *, vntrans_t);
+extern int	fsop_syncfs(vfs_t *, uint64_t, cred_t *);
 
 #define	VFS_MOUNT(vfsp, mvp, uap, cr) fsop_mount(vfsp, mvp, uap, cr)
 #define	VFS_UNMOUNT(vfsp, flag, cr) fsop_unmount(vfsp, flag, cr)
@@ -359,6 +361,7 @@ extern int	fsop_vnstate(vfs_t *, vnode_t *, vntrans_t);
 #define	VFS_MOUNTROOT(vfsp, init) fsop_mountroot(vfsp, init)
 #define	VFS_FREEVFS(vfsp) fsop_freefs(vfsp)
 #define	VFS_VNSTATE(vfsp, vn, ns)	fsop_vnstate(vfsp, vn, ns)
+#define	VFS_SYNCFS(vfsp, flag, cr) fsop_syncfs(vfsp, flag, cr)
 
 #define	VFSNAME_MOUNT		"mount"
 #define	VFSNAME_UNMOUNT		"unmount"
@@ -369,6 +372,8 @@ extern int	fsop_vnstate(vfs_t *, vnode_t *, vntrans_t);
 #define	VFSNAME_MOUNTROOT	"mountroot"
 #define	VFSNAME_FREEVFS		"freevfs"
 #define	VFSNAME_VNSTATE		"vnstate"
+#define	VFSNAME_SYNCFS		"syncfs"
+
 /*
  * Filesystem type switch table.
  */
@@ -443,7 +448,7 @@ typedef struct vfs_impl {
 	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
 	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
 
-	timespec_t	vi_hrctime; 		/* High-res creation time */
+	timespec_t	vi_hrctime;		/* High-res creation time */
 
 	zone_ref_t	vi_zone_ref;		/* reference to zone */
 } vfs_impl_t;

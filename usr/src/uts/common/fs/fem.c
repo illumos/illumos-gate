@@ -196,6 +196,7 @@ static fs_operation_trans_def_t fsem_opdef[] = {
 	_FSEMOPDEF(MOUNTROOT,	mountroot),
 	_FSEMOPDEF(FREEVFS,	freevfs),
 	_FSEMOPDEF(VNSTATE,	vnstate),
+	_FSEMOPDEF(SYNCFS,	syncfs),
 	{ NULL, 0, NULL, NULL }
 };
 
@@ -212,6 +213,7 @@ static struct fs_operation_def fsem_guard_ops[] = {
 	_FSEMGUARD(MOUNTROOT,	mountroot),
 	_FSEMGUARD(FREEVFS,	freevfs),
 	_FSEMGUARD(VNSTATE,	vnstate),
+	_FSEMGUARD(SYNCFS,	syncfs),
 	{ NULL, NULL}
 };
 
@@ -292,7 +294,7 @@ _op_find(femarg_t *ap, void **fp, int offs0, int offs1)
 #endif
 
 static fem_t *
-fem_alloc()
+fem_alloc(void)
 {
 	fem_t	*p;
 
@@ -307,7 +309,7 @@ fem_free(fem_t *p)
 }
 
 static fsem_t *
-fsem_alloc()
+fsem_alloc(void)
 {
 	fsem_t	*p;
 
@@ -1844,6 +1846,34 @@ fshead_sync(vfs_t *vfsp, short flag, cred_t *cr)
 }
 
 static int
+fshead_syncfs(vfs_t *vfsp, short flag, cred_t *cr)
+{
+	fsemarg_t	farg;
+	struct fem_list	*femsp;
+	int		(*func)(vfs_t *, uint64_t, cred_t *);
+	void		*arg0;
+	int		errc;
+
+	ASSERT(vfsp->vfs_implp);
+
+	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
+		func = vfsp->vfs_op->vfs_syncfs;
+		fem_unlock(vfsp->vfs_femhead);
+		errc = (*func)(vfsp, flag, cr);
+	} else {
+		fem_addref(femsp);
+		fem_unlock(vfsp->vfs_femhead);
+		farg.fa_vnode.vfsp = vfsp;
+		farg.fa_fnode = femsp->feml_nodes + femsp->feml_tos;
+		vfsop_find(&farg, &func, int, &arg0, vfs_syncfs, fsemop_syncfs);
+		errc = (*func)(arg0, flag, cr);
+		fem_release(femsp);
+	}
+	return (errc);
+}
+
+
+static int
 fshead_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 {
 	fsemarg_t	farg;
@@ -2024,6 +2054,7 @@ static struct fs_operation_def fshead_vfs_spec[]  = {
 	{ VFSNAME_MOUNTROOT, (femop_t *)fshead_mountroot },
 	{ VFSNAME_FREEVFS, (femop_t *)fshead_freevfs },
 	{ VFSNAME_VNSTATE, (femop_t *)fshead_vnstate },
+	{ VFSNAME_SYNCFS, (femop_t *)fshead_syncfs },
 	{	NULL,	NULL	}
 };
 
@@ -2860,6 +2891,19 @@ vfsnext_vnstate(fsemarg_t *vf, vnode_t *vp, vntrans_t nstate)
 	return ((*func)(arg0, vp, nstate));
 }
 
+int
+vfsnext_syncfs(fsemarg_t *vf, uint64_t flags, cred_t *cr)
+{
+	int (*func)(vfs_t *, uint64_t, cred_t *) = NULL;
+	void *arg0 = NULL;
+
+	ASSERT(vf != NULL);
+	vf->fa_fnode--;
+	vfsop_find(vf, &func, int, &arg0, vfs_syncfs, fsemop_syncfs);
+	ASSERT(func != NULL);
+	ASSERT(arg0 != NULL);
+	return ((*func)(arg0, flags, cr));
+}
 
 /*
  * Create a new fem_head and associate with the vnode.

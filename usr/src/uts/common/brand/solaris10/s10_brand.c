@@ -501,6 +501,7 @@ _init(void)
 	s10_emulation_table[S10_SYS_dup] = 1;			/*  41 */
 	s10_emulation_table[S10_SYS_pipe] = 1;			/*  42 */
 	s10_emulation_table[SYS_ioctl] = 1;			/*  54 */
+	s10_emulation_table[SYS_fdsync] = 1;			/*  58 */
 	s10_emulation_table[SYS_execve] = 1;			/*  59 */
 	s10_emulation_table[SYS_fcntl] = 1;			/*  62 */
 	s10_emulation_table[SYS_acctctl] = 1;			/*  71 */

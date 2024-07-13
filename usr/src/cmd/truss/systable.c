@@ -278,7 +278,7 @@ const struct systable systable[] = {
 {"uadmin",	3, DEC, NOV, DEC, DEC, DEC},			/*  55 */
 {"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, SNF},		/*  56 */
 {"utssys",	4, DEC, NOV, HEX, DEC, UTS, HEX},		/*  57 */
-{"fdsync",	2, DEC, NOV, DEC, FFG},				/*  58 */
+{"fdsync",	2, DEC, NOV, DEC, FDS},				/*  58 */
 {"execvex",	4, DEC, NOV, STG, HEX, HEX, EXC},		/*  59 */
 {"umask",	1, OCT, NOV, OCT},				/*  60 */
 {"chroot",	1, DEC, NOV, STG},				/*  61 */

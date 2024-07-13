@@ -54,6 +54,7 @@ extern "C" {
 extern int	fs_nosys();
 extern int	fs_inval();
 extern int	fs_notdir();
+extern int	fs_nosys_syncfs(vfs_t *, uint64_t, cred_t *);
 extern int	fs_nosys_map(struct vnode *, offset_t, struct as *, caddr_t *,
 			size_t, uchar_t, uchar_t, uint_t, struct cred *,
 			caller_context_t *);
@@ -67,6 +68,7 @@ extern int	fs_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
 			caller_context_t *);
 extern int	fs_fsync(vnode_t *, int, cred_t *, caller_context_t *);
 extern int	fs_sync(struct vfs *, short, cred_t *);
+extern int	fs_syncfs_nop(vfs_t *, uint64_t, cred_t *);
 extern int	fs_rwlock(vnode_t *, int, caller_context_t *);
 extern void	fs_rwunlock(vnode_t *, int, caller_context_t *);
 extern int	fs_cmp(vnode_t *, vnode_t *, caller_context_t *);

@@ -13,7 +13,8 @@
 # Copyright 2024 Oxide Computer Company
 #
 
-PROGS = statvfs
+PROGS = statvfs \
+	syncfs
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
@@ -34,6 +35,10 @@ CTF_MODE = link
 statvfs.32	:= CPPFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 statvfs.32	:= LDLIBS += -lsocket
 statvfs.64	:= LDLIBS64 += -lsocket
+
+syncfs.32	:= CPPFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+syncfs.32	:= LDLIBS += -lsocket
+syncfs.64	:= LDLIBS64 += -lsocket
 
 .KEEP_STATE:
 

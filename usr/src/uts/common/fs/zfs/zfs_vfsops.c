@@ -26,7 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -89,6 +89,7 @@ static int zfs_root(vfs_t *vfsp, vnode_t **vpp);
 static int zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp);
 static int zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp);
 static void zfs_freevfs(vfs_t *vfsp);
+static int zfs_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr);
 
 static const fs_operation_def_t zfs_vfsops_template[] = {
 	VFSNAME_MOUNT,		{ .vfs_mount = zfs_mount },
@@ -99,6 +100,7 @@ static const fs_operation_def_t zfs_vfsops_template[] = {
 	VFSNAME_SYNC,		{ .vfs_sync = zfs_sync },
 	VFSNAME_VGET,		{ .vfs_vget = zfs_vget },
 	VFSNAME_FREEVFS,	{ .vfs_freevfs = zfs_freevfs },
+	VFSNAME_SYNCFS,		{ .vfs_syncfs = zfs_syncfs },
 	NULL,			NULL
 };
 
@@ -183,6 +185,19 @@ zfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 	}
 
 	return (0);
+}
+
+/*
+ * This is a synchronous request to sync all file system data out.
+ */
+static int
+zfs_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	if (flags != 0) {
+		return (ENOTSUP);
+	}
+
+	return (zfs_sync(vfsp, 0, cr));
 }
 
 static int

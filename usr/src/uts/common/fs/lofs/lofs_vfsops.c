@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -150,10 +151,8 @@ vfsops_t *lo_vfsops;
  */
 /*ARGSUSED*/
 static int
-lo_mount(struct vfs *vfsp,
-	struct vnode *vp,
-	struct mounta *uap,
-	struct cred *cr)
+lo_mount(struct vfs *vfsp, struct vnode *vp, struct mounta *uap,
+    struct cred *cr)
 {
 	int error;
 	struct vnode *srootvp = NULL;	/* the server's root */
@@ -508,14 +507,34 @@ lo_statvfs(register struct vfs *vfsp, struct statvfs64 *sbp)
  */
 /* ARGSUSED */
 static int
-lo_sync(struct vfs *vfsp,
-	short flag,
-	struct cred *cr)
+lo_sync(struct vfs *vfsp, short flag, struct cred *cr)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_sync: %p\n", vfsp);
 #endif
 	return (0);
+}
+
+/*
+ * While the general sync(2) entry point above assumes that the underlying fs
+ * will be synced, we treat this as a directed blocking sync on the file system
+ * which means we should attempt the underlying file system.
+ */
+static int
+lo_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	vfs_t *realvfs;
+
+#ifdef LODEBUG
+	lo_dprint(4, "lo_syncfs: %p\n", vfsp);
+#endif
+	realvfs = lo_realvfs(vfsp, NULL);
+	if (realvfs != NULL) {
+		return (VFS_SYNCFS(realvfs, flags, cr));
+	} else {
+		return (EIO);
+	}
+
 }
 
 /*
@@ -559,6 +578,7 @@ lofsinit(int fstyp, char *name)
 		VFSNAME_SYNC,		{ .vfs_sync = lo_sync },
 		VFSNAME_VGET,		{ .vfs_vget = lo_vget },
 		VFSNAME_FREEVFS,	{ .vfs_freevfs = lo_freevfs },
+		VFSNAME_SYNCFS,		{ .vfs_syncfs = lo_syncfs },
 		NULL,			NULL
 	};
 	int error;
