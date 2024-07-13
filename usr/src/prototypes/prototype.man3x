@@ -50,9 +50,9 @@ and <if errno is set describe it below>.
 .Sh EXAMPLES
 .Sh ERRORS
 The
-.fn funcname
+.Fn funcname
 functions will fail if:
-.Bl  -tag -width Er
+.Bl -tag -width Er
 .It Er ERRNO1
 A Reason why ERRNO1 could occur.
 .It Er ERRNO2
