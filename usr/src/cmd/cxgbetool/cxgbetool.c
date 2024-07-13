@@ -41,10 +41,28 @@
 #include "t4fw_interface.h"
 #include "cudbg.h"
 #include "cudbg_lib_common.h"
+#include "cudbg_entity.h"
 
 #define CUDBG_SIZE (32 * 1024 * 1024)
 #define CUDBG_MAX_ENTITY_STR_LEN 4096
 #define MAX_PARAM_LEN 4096
+#ifndef MAX
+#define MAX(x, y)       ((x) > (y) ? (x) : (y))
+#endif
+
+struct reg_info {
+	const char *name;
+	uint32_t addr;
+	uint32_t len;
+};
+
+struct mod_regs {
+	const char *name;
+	const struct reg_info *ri;
+	unsigned int offset;
+};
+
+#include "reg_defs.h"
 
 static char cxgbetool_nexus[PATH_MAX];
 
@@ -121,7 +139,9 @@ static void usage(FILE *fp)
 	fprintf(fp,
 	    "\tdevlog                              show device log\n"
 	    "\tloadfw <FW image>                   Flash the FW image\n"
-	    "\tcudbg <option> [<args>]             Chelsio Unified Debugger\n");
+	    "\tcudbg <option> [<args>]             Chelsio Unified Debugger\n"
+	    "\tregdump [<module>]                  Dump registers\n"
+	    "\treg <address>[=<val>]               Read or write the registers\n");
 	exit(fp == stderr ? 1 : 0);
 }
 
@@ -226,6 +246,247 @@ get_devlog(int argc, char *argv[], int start_arg, const char *iff_name)
 	} while (i != first);
 
 	free(devlog);
+}
+
+static uint32_t xtract(uint32_t val, int shift, int len)
+{
+	return (val >> shift) & ((1 << len) - 1);
+}
+
+int dump_block_regs(const struct reg_info *reg_array, const u32 *regs)
+{
+	uint32_t reg_val = 0;
+
+	for ( ; reg_array->name; ++reg_array) {
+		if (!reg_array->len) {
+			reg_val = regs[reg_array->addr / 4];
+			printf("[%#7x] %-47s %#-10x %u\n", reg_array->addr,
+			       reg_array->name, reg_val, reg_val);
+		} else {
+			uint32_t v = xtract(reg_val, reg_array->addr,
+					    reg_array->len);
+			printf("    %*u:%u %-47s %#-10x %u\n",
+			       reg_array->addr < 10 ? 3 : 2,
+			       reg_array->addr + reg_array->len - 1,
+			       reg_array->addr, reg_array->name, v, v);
+		}
+	}
+	return 1;
+}
+
+int dump_regs_table(int argc, char *argv[], int start_arg,
+		    const u32 *regs, const struct mod_regs *modtab,
+		    int nmodules, const char *modnames)
+{
+	int match = 0;
+	const char *block_name = NULL;
+
+	if (argc == start_arg + 1)
+		block_name = argv[start_arg];
+	else if (argc != start_arg)
+		return -1;
+
+	for ( ; nmodules; nmodules--, modtab++) {
+		if (!block_name || !strcmp(block_name, modtab->name))
+			match += dump_block_regs(modtab->ri,
+						 regs + modtab->offset);
+	}
+	if (!match)
+		errx(1, "unknown block \"%s\"\navailable: %s", block_name,
+		     modnames);
+	return 0;
+}
+
+#define T5_MODREGS(name) { #name, t5_##name##_regs }
+static int
+dump_regs_t5(int argc, char *argv[], int start_arg, uint32_t *regs)
+{
+	static struct mod_regs t5_mod[] = {
+		T5_MODREGS(sge),
+		{ "pci", t5_pcie_regs },
+		T5_MODREGS(dbg),
+		{ "mc0", t5_mc_0_regs },
+		{ "mc1", t5_mc_1_regs },
+		T5_MODREGS(ma),
+		{ "edc0", t5_edc_t50_regs },
+		{ "edc1", t5_edc_t51_regs },
+		T5_MODREGS(cim),
+		T5_MODREGS(tp),
+		{ "ulprx", t5_ulp_rx_regs },
+		{ "ulptx", t5_ulp_tx_regs },
+		{ "pmrx", t5_pm_rx_regs },
+		{ "pmtx", t5_pm_tx_regs },
+		T5_MODREGS(mps),
+		{ "cplsw", t5_cpl_switch_regs },
+		T5_MODREGS(smb),
+		{ "i2c", t5_i2cm_regs },
+		T5_MODREGS(mi),
+		T5_MODREGS(uart),
+		T5_MODREGS(pmu),
+		T5_MODREGS(sf),
+		T5_MODREGS(pl),
+		T5_MODREGS(le),
+		T5_MODREGS(ncsi),
+		T5_MODREGS(mac),
+		{ "hma", t5_hma_t5_regs }
+	};
+
+	return dump_regs_table(argc, argv, start_arg, regs, t5_mod,
+			       ARRAY_SIZE(t5_mod),
+			       "sge, pci, dbg, mc0, mc1, ma, edc0, edc1, cim, "
+			       "tp, ulprx, ulptx, pmrx, pmtx, mps, cplsw, smb, "
+			       "i2c, mi, uart, pmu, sf, pl, le, ncsi, "
+			       "mac, hma");
+}
+
+#undef T5_MODREGS
+
+#define T6_MODREGS(name) { #name, t6_##name##_regs }
+static int dump_regs_t6(int argc, char *argv[], int start_arg, const u32 *regs)
+{
+	static struct mod_regs t6_mod[] = {
+		T6_MODREGS(sge),
+		{ "pci", t6_pcie_regs },
+		T6_MODREGS(dbg),
+		{ "mc0", t6_mc_0_regs },
+		T6_MODREGS(ma),
+		{ "edc0", t6_edc_t60_regs },
+		{ "edc1", t6_edc_t61_regs },
+		T6_MODREGS(cim),
+		T6_MODREGS(tp),
+		{ "ulprx", t6_ulp_rx_regs },
+		{ "ulptx", t6_ulp_tx_regs },
+		{ "pmrx", t6_pm_rx_regs },
+		{ "pmtx", t6_pm_tx_regs },
+		T6_MODREGS(mps),
+		{ "cplsw", t6_cpl_switch_regs },
+		T6_MODREGS(smb),
+		{ "i2c", t6_i2cm_regs },
+		T6_MODREGS(mi),
+		T6_MODREGS(uart),
+		T6_MODREGS(pmu),
+		T6_MODREGS(sf),
+		T6_MODREGS(pl),
+		T6_MODREGS(le),
+		T6_MODREGS(ncsi),
+		T6_MODREGS(mac),
+		{ "hma", t6_hma_t6_regs }
+	};
+
+	return dump_regs_table(argc, argv, start_arg, regs, t6_mod,
+			       ARRAY_SIZE(t6_mod),
+			       "sge, pci, dbg, mc0, ma, edc0, edc1, cim, "
+			       "tp, ulprx, ulptx, pmrx, pmtx, mps, cplsw, smb, "
+			       "i2c, mi, uart, pmu, sf, pl, le, ncsi, "
+			       "mac, hma");
+}
+#undef T6_MODREGS
+
+static int
+get_regdump(int argc, char *argv[], int start_arg, const char *iff_name)
+{
+	int rc, vers, revision, is_pcie;
+	uint32_t len, length;
+	struct t4_regdump *regs;
+
+	len = MAX(T5_REGDUMP_SIZE, T6_REGDUMP_SIZE);
+
+	regs = malloc(len + sizeof(struct t4_regdump));
+	if (!regs)
+		err(1, "%s: can't allocate reg dump buffer", __func__);
+
+	regs->len = len;
+
+	rc = doit(iff_name, T4_IOCTL_REGDUMP, regs);
+
+	if (rc == ENOBUFS) {
+		length = regs->len;
+		free(regs);
+
+		regs = malloc(length + sizeof(struct t4_regdump));
+		if (regs == NULL)
+			err(1, "%s: can't reallocate regs buffer", __func__);
+
+		rc = doit(iff_name, T4_IOCTL_REGDUMP, regs);
+	}
+
+	if (rc) {
+		free(regs);
+		errx(1, "%s: can't get register dumps", __func__);
+	}
+
+	vers = regs->version & 0x3ff;
+	revision = (regs->version >> 10) & 0x3f;
+	is_pcie = (regs->version & 0x80000000) != 0;
+
+	if (vers == 5) {
+		return dump_regs_t5(argc, argv, start_arg,
+				(uint32_t *)regs->data);
+	} else if (vers == 6) {
+		return dump_regs_t6(argc, argv, start_arg,
+				(uint32_t *)regs->data);
+	} else {
+		errx(1, "unknown card type %d.%d.%d", vers, revision, is_pcie);
+	}
+
+	return 0;
+}
+
+static void
+write_reg(const char *iff_name, uint32_t addr, uint32_t val)
+{
+	struct t4_reg32_cmd reg;
+
+	reg.reg = addr;
+	reg.value = val;
+
+	if (doit(iff_name, T4_IOCTL_PUT32, &reg) < 0)
+		err(1, "register write");
+}
+
+static uint32_t
+read_reg(const char *iff_name, uint32_t addr)
+{
+	struct t4_reg32_cmd reg;
+
+	reg.reg = addr;
+
+	if (doit(iff_name, T4_IOCTL_GET32, &reg) < 0)
+		err(1, "register read");
+	return reg.value;
+}
+
+static void register_io(int argc, char *argv[], int start_arg,
+		       const char *iff_name)
+{
+	char *p;
+	uint32_t addr = 0, val = 0, write = 0;
+
+	if (argc != start_arg + 1) {
+		errx(1, "incorrect number of arguments");
+	}
+	errno = 0;
+	addr = strtoul(argv[start_arg], &p, 0);
+	if (addr == 0 || errno != 0) {
+		errx(1, "invalid arguments");
+	}
+
+	if (p == argv[start_arg])
+		return;
+	if (*p == '=' && p[1]) {
+		val = strtoul(p + 1, &p, 0);
+		write = 1;
+	}
+	if (*p) {
+		errx(1, "bad parameter \"%s\"", argv[start_arg]);
+	}
+
+	if (write) {
+		write_reg(iff_name, addr, val);
+	} else {
+		val = read_reg(iff_name, addr);
+		printf("%#x [%u]\n", val, val);
+	}
 }
 
 static void
@@ -641,6 +902,10 @@ run_cmd(int argc, char *argv[], const char *iff_name)
 		load_fw(argc, argv, 3, iff_name);
 	else if (strcmp(argv[2], "cudbg") == 0)
 		get_cudbg(argc, argv, 3, iff_name);
+	else if (strcmp(argv[2], "regdump") == 0)
+		get_regdump(argc, argv, 3, iff_name);
+	else if (strcmp(argv[2], "reg") == 0)
+		register_io(argc, argv, 3, iff_name);
 	else
 		usage(stderr);
 }
