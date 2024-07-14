@@ -53,7 +53,7 @@ static const nvme_unit_field_test_t firmware_field_tests[] = { {
 	.nu_fields = nvme_fw_load_fields,
 	.nu_index = NVME_FW_LOAD_REQ_FIELD_NUMD,
 	.nu_data = &nvme_ctrl_base_1v0,
-	.nu_value = 0xfff,
+	.nu_value = 0xfff,	/* Invalid since not a whole number of dwords */
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
 	.nu_desc = "valid fw load numd 4K gran (1)",
@@ -256,14 +256,7 @@ static const nvme_unit_field_test_t firmware_field_tests[] = { {
 	.nu_fields = nvme_fw_load_fields,
 	.nu_index = NVME_FW_LOAD_REQ_FIELD_NUMD,
 	.nu_data = &nvme_ctrl_8kgran_1v3,
-	.nu_value = 0x1000,
-	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
-}, {
-	.nu_desc = "invalid fw load numd 8k gran (4)",
-	.nu_fields = nvme_fw_load_fields,
-	.nu_index = NVME_FW_LOAD_REQ_FIELD_NUMD,
-	.nu_data = &nvme_ctrl_8kgran_1v3,
-	.nu_value = 0x4004,
+	.nu_value = 0x1001,	/* Invalid since not a whole number of dwords */
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
 	.nu_desc = "valid fw load numd 8k gran (1)",
@@ -285,6 +278,19 @@ static const nvme_unit_field_test_t firmware_field_tests[] = { {
 	.nu_index = NVME_FW_LOAD_REQ_FIELD_NUMD,
 	.nu_data = &nvme_ctrl_8kgran_1v3,
 	.nu_value = 0x42000,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	/*
+	 * Although the spec states that the length should be consistent with
+	 * the advertised FWUG granularity, experience has shown that not all
+	 * drives/controllers are as picky, and so we allow lengths shorter
+	 * than the FWUG, as long as they are a whole number of dwords.
+	 */
+	.nu_desc = "valid fw load numd 8k gran (4)",
+	.nu_fields = nvme_fw_load_fields,
+	.nu_index = NVME_FW_LOAD_REQ_FIELD_NUMD,
+	.nu_data = &nvme_ctrl_8kgran_1v3,
+	.nu_value = 0x4004,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
 	.nu_desc = "invalid fw load offset 8k gran (1)",
