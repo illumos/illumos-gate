@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -41,6 +45,7 @@
 #include <sys/mkdev.h>
 #include <sys/mman.h>
 #include <sys/lgrp_user.h>
+#include <sys/debug.h>
 #include <libproc.h>
 
 #include "pmap_common.h"
@@ -168,10 +173,38 @@ static	uint_t	nstacks = 0;
 
 #define	MAX_TRIES	5
 
+static boolean_t
+reallocstacks(uint_t newcount)
+{
+	lwpstack_t *newstacks;
+
+	newstacks = recallocarray(stacks, nstacks, newcount,
+	    sizeof (lwpstack_t));
+	if (newstacks != NULL) {
+		stacks = newstacks;
+		nstacks = newcount;
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 static int
 getstack(void *data, const lwpstatus_t *lsp)
 {
-	int *np = (int *)data;
+	uint_t *np = (uint_t *)data;
+
+	/*
+	 * In the unlikely event that the number of LWPs has increased since we
+	 * allocated the stacks array to hold them, expand the space for these
+	 * next two entries.
+	 */
+	if (*np + 2 > nstacks && !reallocstacks(nstacks + 2)) {
+		(void) fprintf(stderr, "%s: warning: "
+		    "number of LWPs changed during execution, some details "
+		    "have been omitted.\n", command);
+		/* Terminate the walk */
+		return (1);
+	}
 
 	if (Plwp_alt_stack(Pr, lsp->pr_lwpid, &stacks[*np].lwps_stack) == 0) {
 		stacks[*np].lwps_stack.ss_flags |= SS_ONSTACK;
@@ -183,6 +216,8 @@ getstack(void *data, const lwpstatus_t *lsp)
 		stacks[*np].lwps_lwpid = lsp->pr_lwpid;
 		(*np)++;
 	}
+
+	VERIFY3U(*np, <=, nstacks);
 
 	return (0);
 }
@@ -422,10 +457,12 @@ again:
 				}
 			}
 
-			nstacks = psinfo.pr_nlwp * 2;
-			stacks = calloc(nstacks, sizeof (stacks[0]));
-			if (stacks != NULL) {
-				int n = 0;
+			/*
+			 * Multiplied by 2 to accomodate the main and alt
+			 * stack for each LWP.
+			 */
+			if (reallocstacks(psinfo.pr_nlwp * 2)) {
+				uint_t n = 0;
 				(void) Plwp_iter(Pr, getstack, &n);
 				qsort(stacks, nstacks, sizeof (stacks[0]),
 				    cmpstacks);
@@ -475,6 +512,7 @@ again:
 					if (stacks != NULL) {
 						free(stacks);
 						stacks = NULL;
+						nstacks = 0;
 					}
 					goto again;
 				}
@@ -566,6 +604,7 @@ again:
 			if (stacks != NULL) {
 				free(stacks);
 				stacks = NULL;
+				nstacks = 0;
 			}
 
 		}
@@ -677,7 +716,6 @@ again:
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 look_map(void *data, const prmap_t *pmp, const char *object_name)
 {
@@ -811,12 +849,9 @@ pagesize(const prxmap_t *pmp)
 	return (buf);
 }
 
-/*ARGSUSED*/
 static int
-look_smap(void *data,
-	const prxmap_t *pmp,
-	const char *object_name,
-	int last, int doswap)
+look_smap(void *data, const prxmap_t *pmp, const char *object_name, int last,
+    int doswap)
 {
 	struct totals *t = data;
 	const pstatus_t *Psp = Pstatus(Pr);
@@ -921,12 +956,9 @@ look_smap(void *data,
 #define	ANON(x)	((aflag || (((x)->pr_mflags & MA_SHARED) == 0)) ? \
 	    ((x)->pr_anon) : 0)
 
-/*ARGSUSED*/
 static int
-look_xmap(void *data,
-	const prxmap_t *pmp,
-	const char *object_name,
-	int last, int doswap)
+look_xmap(void *data, const prxmap_t *pmp, const char *object_name, int last,
+    int doswap)
 {
 	struct totals *t = data;
 	const pstatus_t *Psp = Pstatus(Pr);
@@ -970,12 +1002,9 @@ look_xmap(void *data,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-look_xmap_nopgsz(void *data,
-	const prxmap_t *pmp,
-	const char *object_name,
-	int last, int doswap)
+look_xmap_nopgsz(void *data, const prxmap_t *pmp, const char *object_name,
+    int last, int doswap)
 {
 	struct totals *t = data;
 	const pstatus_t *Psp = Pstatus(Pr);
@@ -1191,7 +1220,6 @@ nextmap(void)
 	return (&maps[map_count++]);
 }
 
-/*ARGSUSED*/
 static int
 gather_map(void *ignored, const prmap_t *map, const char *objname)
 {
@@ -1211,7 +1239,6 @@ gather_map(void *ignored, const prmap_t *map, const char *objname)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 gather_xmap(void *ignored, const prxmap_t *xmap, const char *objname,
     int last, int doswap)
@@ -1491,7 +1518,7 @@ mem_chunk_get(memory_chunk_t *chunk, uintptr_t vaddr)
 	uint64_t	*dataptr = inaddr;
 	uint64_t	*outptr = outdata;
 	uint_t		*valptr = validity;
-	int 		i, j, rc;
+	int		i, j, rc;
 
 	chunk->chunk_start = vaddr;
 	chunk->page_index = 0;	/* reset index for the new chunk */
@@ -1659,7 +1686,6 @@ addr_to_lgrp(memory_chunk_t *chunk, uintptr_t vaddr, size_t *psz)
 	return (lgrp);
 }
 
-/* ARGSUSED */
 static void
 intr(int sig)
 {
