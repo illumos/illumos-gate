@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEVMAP_DEVMEM_SETUP 9F "Jun 05, 2006"
+.TH DEVMAP_DEVMEM_SETUP 9F "July 13, 2024"
 .SH NAME
 devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 \fBint\fR \fBdevmap_devmem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBuint_t\fR \fIrnumber\fR,
      \fBoffset_t\fR \fIroff\fR,  \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR,
-     \fBuint_t\fR \fIflags\fR, \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR);
+     \fBuint_t\fR \fIflags\fR, \fBconst ddi_device_acc_attr_t *\fR\fIaccattrp\fR);
 .fi
 
 .LP
@@ -24,7 +24,7 @@ devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 \fBint\fR \fBdevmap_umem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBddi_umem_cookie_t\fR \fIcookie\fR,
      \fBoffset_t\fR \fIkoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR, \fBuint_t\fR \fIflags\fR,
-     \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR);
+     \fBconst ddi_device_acc_attr_t *\fR\fIaccattrp\fR);
 .fi
 
 .SH INTERFACE LEVEL

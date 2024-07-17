@@ -845,7 +845,7 @@ ddi_dma_burstsizes(ddi_dma_handle_t handle)
  *
  */
 void
-ddi_dma_attr_merge(ddi_dma_attr_t *attr, ddi_dma_attr_t *mod)
+ddi_dma_attr_merge(ddi_dma_attr_t *attr, const ddi_dma_attr_t *mod)
 {
 	attr->dma_attr_addr_lo =
 	    MAX(attr->dma_attr_addr_lo, mod->dma_attr_addr_lo);
@@ -914,7 +914,7 @@ ddi_map_fault(dev_info_t *dip, struct hat *hat, struct seg *seg,
  *	available for direct access to user process via the mmap(2) system call.
  */
 int
-ddi_device_mapping_check(dev_t dev, ddi_device_acc_attr_t *accattrp,
+ddi_device_mapping_check(dev_t dev, const ddi_device_acc_attr_t *accattrp,
     uint_t rnumber, uint_t *hat_flags)
 {
 	ddi_acc_handle_t handle;
@@ -6860,14 +6860,14 @@ ddi_set_console_bell(void (*bellfunc)(clock_t duration))
 }
 
 int
-ddi_dma_alloc_handle(dev_info_t *dip, ddi_dma_attr_t *attr,
+ddi_dma_alloc_handle(dev_info_t *dip, const ddi_dma_attr_t *attr,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
 	int (*funcp)() = ddi_dma_allochdl;
 	ddi_dma_attr_t dma_attr;
 	struct bus_ops *bop;
 
-	if (attr == (ddi_dma_attr_t *)0)
+	if (attr == NULL)
 		return (DDI_DMA_BADATTR);
 
 	dma_attr = *attr;
@@ -6891,7 +6891,7 @@ static uintptr_t dma_mem_list_id = 0;
 
 int
 ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
-    ddi_device_acc_attr_t *accattrp, uint_t flags,
+    const ddi_device_acc_attr_t *accattrp, uint_t flags,
     int (*waitfp)(caddr_t), caddr_t arg, caddr_t *kaddrp,
     size_t *real_length, ddi_acc_handle_t *handlep)
 {
@@ -7263,7 +7263,7 @@ i_ddi_dma_clr_fault(ddi_dma_handle_t handle)
  */
 int
 ddi_regs_map_setup(dev_info_t *dip, uint_t rnumber, caddr_t *addrp,
-    offset_t offset, offset_t len, ddi_device_acc_attr_t *accattrp,
+    offset_t offset, offset_t len, const ddi_device_acc_attr_t *accattrp,
     ddi_acc_handle_t *handle)
 {
 	ddi_map_req_t mr;

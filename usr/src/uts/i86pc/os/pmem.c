@@ -135,7 +135,7 @@ int
 devmap_pmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
     struct devmap_callback_ctl *callbackops, devmap_pmem_cookie_t cookie,
     offset_t off, size_t len, uint_t maxprot, uint_t flags,
-    ddi_device_acc_attr_t *accattrp)
+    const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct devmap_pmem_cookie *pcp = (struct devmap_pmem_cookie *)cookie;
@@ -210,7 +210,7 @@ devmap_pmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 int
 devmap_pmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
     devmap_pmem_cookie_t cookie, offset_t off, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp)
+    uint_t flags, const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct devmap_pmem_cookie *pcp = (struct devmap_pmem_cookie *)cookie;
@@ -420,7 +420,7 @@ devmap_pmem_free(devmap_pmem_cookie_t cookie)
 	pgcnt_t		i;
 	pgcnt_t		tpages = 0;
 	page_t		*pp;
-	pmem_lpg_t 	*pl1, *plp;
+	pmem_lpg_t	*pl1, *plp;
 	pmem_lpg_t	*pf_lpgs = NULL;
 	uint_t		npls = 0;
 	pmem_lpg_t *last_pl = NULL;

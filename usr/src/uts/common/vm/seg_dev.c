@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -484,7 +484,7 @@ segdev_dup(struct seg *seg, struct seg *newseg)
 	newseg->s_data = (void *)newsdp;
 
 	VN_HOLD(sdp->vp);
-	newsdp->vp 	= sdp->vp;
+	newsdp->vp	= sdp->vp;
 	newsdp->mapfunc = sdp->mapfunc;
 	newsdp->offset	= sdp->offset;
 	newsdp->pageprot = sdp->pageprot;
@@ -813,7 +813,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 	VN_HOLD(sdp->vp);
 	nsdp->mapfunc = sdp->mapfunc;
 	nsdp->offset = sdp->offset + (offset_t)(nseg->s_base - seg->s_base);
-	nsdp->vp 	= sdp->vp;
+	nsdp->vp	= sdp->vp;
 	nsdp->pageprot = sdp->pageprot;
 	nsdp->prot	= sdp->prot;
 	nsdp->maxprot = sdp->maxprot;
@@ -1672,7 +1672,7 @@ segdev_fault(
 	 *	memory/device regions that are being faulted on
 	 *	but that is hard to identify and with REMAP, harder
 	 * Second, a desire to serialize F_INVAL(and F_PROT) calls w.r.t.
-	 * 	to F_SOFTLOCK calls to the driver.
+	 *	to F_SOFTLOCK calls to the driver.
 	 * These serializations are to simplify the driver programmer model.
 	 * To support these two features, the code first goes through the
 	 *	devmap handles and counts the pages (slpage) that are covered
@@ -1762,7 +1762,7 @@ segdev_fault(
 		 * will hang waiting on the first to complete.
 		 * devmap_setup verifies that slocks in a dhp_chain are same.
 		 * RFE: this deadlock only hold true for F_SOFTLOCK. For
-		 * 	F_INVAL/F_PROT, since we now allow multiple in parallel,
+		 *	F_INVAL/F_PROT, since we now allow multiple in parallel,
 		 *	we could have done the softlock_enter inside the loop
 		 *	and supported multi-dhp mappings with dissimilar devices
 		 */
@@ -2399,7 +2399,7 @@ segdev_dump(struct seg *seg __unused)
 int
 ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
     off_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cred,
-    ddi_device_acc_attr_t *accattrp, uint_t rnumber)
+    const ddi_device_acc_attr_t *accattrp, uint_t rnumber)
 {
 	struct segdev_crargs dev_a;
 	int (*mapfunc)(dev_t dev, off_t off, int prot);
@@ -3378,7 +3378,8 @@ devmap_devmem_large_page_setup(devmap_handle_t *dhp)
 int
 devmap_devmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
     struct devmap_callback_ctl *callbackops, uint_t rnumber, offset_t roff,
-    size_t len, uint_t maxprot, uint_t flags, ddi_device_acc_attr_t *accattrp)
+    size_t len, uint_t maxprot, uint_t flags,
+    const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	ddi_acc_handle_t handle;
@@ -3484,7 +3485,7 @@ devmap_devmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 int
 devmap_devmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
     uint_t rnumber, offset_t roff, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp)
+    uint_t flags, const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	ddi_acc_handle_t handle;
@@ -3598,14 +3599,10 @@ int
 devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
     struct devmap_callback_ctl *callbackops, ddi_umem_cookie_t cookie,
     offset_t off, size_t len, uint_t maxprot, uint_t flags,
-    ddi_device_acc_attr_t *accattrp)
+    const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct ddi_umem_cookie *cp = (struct ddi_umem_cookie *)cookie;
-
-#ifdef lint
-	dip = dip;
-#endif
 
 	TRACE_4(TR_FAC_DEVMAP, TR_DEVMAP_UMEM_SETUP,
 	    "devmap_umem_setup:start dhp=%p offset=%llx cookie=%p len=%lx",
@@ -3698,7 +3695,7 @@ devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 int
 devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
     ddi_umem_cookie_t cookie, offset_t off, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp)
+    uint_t flags, const ddi_device_acc_attr_t *accattrp)
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct ddi_umem_cookie *cp = (struct ddi_umem_cookie *)cookie;
@@ -3709,10 +3706,6 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	DEBUGF(2, (CE_CONT, "devmap_umem_remap: dhp %p offset %llx "
 	    "cookie %p len %lx\n", (void *)dhp, off, (void *)cookie, len));
 
-#ifdef lint
-	dip = dip;
-	accattrp = accattrp;
-#endif
 	/*
 	 * Reture failure if setup has not been done or no remap permission
 	 * has been granted during the setup.

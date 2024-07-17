@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_REGS_MAP_SETUP 9F "March 6, 2023"
+.TH DDI_REGS_MAP_SETUP 9F "July 13, 2024"
 .SH NAME
 ddi_regs_map_setup \- set up a mapping for a register address space
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ddi_regs_map_setup \- set up a mapping for a register address space
 
 
 \fBint\fR \fBddi_regs_map_setup\fR(\fBdev_info_t\fR \fI*dip\fR, \fBuint_t\fR \fIrnumber\fR, \fBcaddr_t\fR \fI*addrp\fR,
-     \fBoffset_t\fR \fIoffset\fR, \fBoffset_t\fR \fIlen\fR, \fBddi_device_acc_attr_t\fR \fI*accattrp\fR,
+     \fBoffset_t\fR \fIoffset\fR, \fBoffset_t\fR \fIlen\fR, \fBconst ddi_device_acc_attr_t\fR \fI*accattrp\fR,
      \fBddi_acc_handle_t\fR \fI*handlep\fR);
 .fi
 
