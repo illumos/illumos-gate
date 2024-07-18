@@ -62,14 +62,14 @@ extern int i_ddi_map_fault(dev_info_t *dip, dev_info_t *rdip,
  */
 extern int i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attributes,
     size_t length, int cansleep, int streaming,
-    ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
+    const ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
     size_t *real_length, ddi_acc_hdl_t *handlep);
 extern void i_ddi_mem_free(caddr_t kaddr, ddi_acc_hdl_t *ap);
 
 extern int i_ddi_devi_get_ppa(dev_info_t *);
 extern void i_ddi_devi_set_ppa(dev_info_t *, int);
 
-extern void i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp,
+extern void i_ddi_devacc_to_hatacc(const ddi_device_acc_attr_t *devaccp,
     uint_t *hataccp);
 extern void i_ddi_cacheattr_to_hatacc(uint_t flags, uint_t *hataccp);
 extern boolean_t i_ddi_check_cache_attr(uint_t flags);

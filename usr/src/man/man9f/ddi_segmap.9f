@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_SEGMAP 9F "Nov 17, 2003"
+.TH DDI_SEGMAP 9F "July 13, 2024"
 .SH NAME
 ddi_segmap, ddi_segmap_setup \- set up a user mapping using seg_dev
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -25,17 +24,14 @@ ddi_segmap, ddi_segmap_setup \- set up a user mapping using seg_dev
 \fBint\fR \fBddi_segmap_setup\fR(\fBdev_t\fR \fIdev\fR, \fBoff_t\fR \fIoffset\fR, \fBstruct as *\fR\fIasp\fR,
      \fBcaddr_t *\fR\fIaddrp\fR, \fBoff_t\fR \fIlen\fR, \fBuint_t\fR \fIprot\fR,
      \fBuint_t\fR \fImaxprot\fR, \fBuint_t\fR \fIflags\fR, \fBcred_t\fR \fI*credp\fR,
-     \fBddi_device_acc_attr_t\fR \fI*accattrp\fR, \fBuint_t\fR \fIrnumber\fR);
+     \fBconst ddi_device_acc_attr_t\fR \fI*accattrp\fR, \fBuint_t\fR \fIrnumber\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 These interfaces are obsolete. See \fBdevmap\fR(9E) for an alternative to
 \fBddi_segmap()\fR. Use \fBdevmap_setup\fR(9F) instead of
 \fBddi_segmap_setup()\fR.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR \fR
@@ -196,7 +192,6 @@ Pointer to user credential structure.
 .RE
 
 .SS "ddi_segmap_setup(\|)"
-.sp
 .ne 2
 .na
 \fB\fIdev_acc_attr\fR \fR
@@ -216,8 +211,6 @@ Index number to the register address space set.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Future releases of Solaris will provide this function for binary  and source
 compatibility.  However, for increased functionality, use
 \fBddi_devmap_segmap\fR(9F) instead.  See  \fBddi_devmap_segmap\fR(9F) for
@@ -251,8 +244,6 @@ what device access attributes are available.
 \fBddi_segmap_setup()\fR cannot be used directly in the \fBcb_ops\fR(9S)
 structure and requires a driver to have a \fBsegmap\fR(9E) entry point.
 .SH RETURN VALUES
-.sp
-.LP
 \fBddi_segmap()\fR and \fBddi_segmap_setup()\fR return the following values:
 .sp
 .ne 2
@@ -274,13 +265,9 @@ mapped is invalid.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 \fBddi_segmap()\fR and \fBddi_segmap_setup()\fR can be called from user or
 kernel context only.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
@@ -295,8 +282,6 @@ Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR mmap (2),
 .BR attributes (7),
 .BR devmap (9E),

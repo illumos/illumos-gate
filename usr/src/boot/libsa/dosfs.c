@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1996, 1998 Robert Nordier
+ * Copyright 2024 MNX Cloud, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -128,7 +129,7 @@ static DOS_DE dot[2] = {
 #define	okclus(fs, c)	((c) >= LOCLUS && (c) <= (fs)->xclus)
 
 /* Get start cluster from directory entry */
-#define	stclus(sz, de)	((sz) != 32 ? cv2((de)->clus) :          \
+#define	stclus(sz, de)	((sz) != 32 ? (uint_t)cv2((de)->clus) :          \
 			((uint_t)cv2((de)->dex.h_clus) << 16) |  \
 			cv2((de)->clus))
 
@@ -141,7 +142,7 @@ static off_t fsize(DOS_FS *, DOS_DE *);
 static int fatcnt(DOS_FS *, uint_t);
 static int fatget(DOS_FS *, uint_t *);
 static int fatend(uint_t, uint_t);
-static int ioread(DOS_FS *, uint_t, void *, size_t);
+static int ioread(DOS_FS *, uint64_t, void *, size_t);
 static int ioget(struct open_file *, daddr_t, void *, size_t);
 
 static int
@@ -282,7 +283,9 @@ static int
 dos_read(struct open_file *fd, void *buf, size_t nbyte, size_t *resid)
 {
 	off_t size;
-	uint_t nb, off, clus, c, cnt, n;
+	uint64_t off;
+	size_t nb;
+	uint_t clus, c, cnt, n;
 	DOS_FILE *f = (DOS_FILE *)fd->f_fsdata;
 	int err = 0;
 
@@ -293,7 +296,7 @@ dos_read(struct open_file *fd, void *buf, size_t nbyte, size_t *resid)
 	 * 4-5 sec.
 	 */
 	twiddle(4);
-	nb = (uint_t)nbyte;
+	nb = nbyte;
 	if ((size = fsize(f->fs, &f->de)) == -1)
 		return (EINVAL);
 	if (nb > (n = size - f->offset))
@@ -320,8 +323,12 @@ dos_read(struct open_file *fd, void *buf, size_t nbyte, size_t *resid)
 		}
 		if (!clus || (n = f->fs->bsize - off) > cnt)
 			n = cnt;
-		if ((err = ioread(f->fs, (c ? blkoff(f->fs, c) :
-		    secbyt(f->fs->lsndir)) + off, buf, n)))
+		if (c != 0)
+			off += blkoff(f->fs, (uint64_t)c);
+		else
+			off += secbyt(f->fs->lsndir);
+		err = ioread(f->fs, off, buf, n);
+		if (err != 0)
 			goto out;
 		f->offset += n;
 		f->c = c;
@@ -827,11 +834,12 @@ fatend(uint_t sz, uint_t c)
  * Offset-based I/O primitive
  */
 static int
-ioread(DOS_FS *fs, uint_t offset, void *buf, size_t nbyte)
+ioread(DOS_FS *fs, uint64_t offset, void *buf, size_t nbyte)
 {
 	char *s;
-	uint_t off, n;
+	size_t n;
 	int err;
+	uint64_t off;
 	uchar_t local_buf[SECSIZ];
 
 	s = buf;

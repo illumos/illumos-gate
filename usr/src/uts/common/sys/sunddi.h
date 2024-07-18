@@ -664,23 +664,23 @@ int
 devmap_devmem_setup(devmap_cookie_t dhp, dev_info_t *dip,
     struct devmap_callback_ctl *callback_ops,
     uint_t rnumber, offset_t roff, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp);
+    uint_t flags, const ddi_device_acc_attr_t *accattrp);
 
 int
 devmap_umem_setup(devmap_cookie_t dhp, dev_info_t *dip,
     struct devmap_callback_ctl *callback_ops,
     ddi_umem_cookie_t cookie, offset_t off, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp);
+    uint_t flags, const ddi_device_acc_attr_t *accattrp);
 
 int
 devmap_devmem_remap(devmap_cookie_t dhp, dev_info_t *dip,
     uint_t rnumber, offset_t roff, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp);
+    uint_t flags, const ddi_device_acc_attr_t *accattrp);
 
 int
 devmap_umem_remap(devmap_cookie_t dhp, dev_info_t *dip,
     ddi_umem_cookie_t cookie, offset_t off, size_t len, uint_t maxprot,
-    uint_t flags, ddi_device_acc_attr_t *accattrp);
+    uint_t flags, const ddi_device_acc_attr_t *accattrp);
 
 void
 devmap_set_ctx_timeout(devmap_cookie_t dhp, clock_t ticks);
@@ -722,14 +722,14 @@ ddi_segmap(dev_t dev, off_t offset, struct as *asp, caddr_t *addrp, off_t len,
 int
 ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
     off_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cred,
-    ddi_device_acc_attr_t *accattrp, uint_t rnumber);
+    const ddi_device_acc_attr_t *accattrp, uint_t rnumber);
 
 int
 ddi_map_fault(dev_info_t *dip, struct hat *hat, struct seg *seg, caddr_t addr,
     struct devpage *dp, pfn_t pfn, uint_t prot, uint_t lock);
 
 int
-ddi_device_mapping_check(dev_t dev, ddi_device_acc_attr_t *accattrp,
+ddi_device_mapping_check(dev_t dev, const ddi_device_acc_attr_t *accattrp,
     uint_t rnumber, uint_t *hat_flags);
 
 /*
@@ -1308,16 +1308,15 @@ ddi_dma_burstsizes(ddi_dma_handle_t handle);
  */
 
 void
-ddi_dma_attr_merge(ddi_dma_attr_t *attr, ddi_dma_attr_t *mod);
+ddi_dma_attr_merge(ddi_dma_attr_t *attr, const ddi_dma_attr_t *mod);
 
 /*
  * Allocate a DMA handle
  */
 
 int
-ddi_dma_alloc_handle(dev_info_t *dip, ddi_dma_attr_t *attr,
-    int (*waitfp)(caddr_t), caddr_t arg,
-    ddi_dma_handle_t *handlep);
+ddi_dma_alloc_handle(dev_info_t *dip, const ddi_dma_attr_t *attr,
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep);
 
 /*
  * Free DMA handle
@@ -1332,7 +1331,7 @@ ddi_dma_free_handle(ddi_dma_handle_t *handlep);
 
 int
 ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
-    ddi_device_acc_attr_t *accattrp, uint_t xfermodes,
+    const ddi_device_acc_attr_t *accattrp, uint_t xfermodes,
     int (*waitfp)(caddr_t), caddr_t arg, caddr_t *kaddrp,
     size_t *real_length, ddi_acc_handle_t *handlep);
 
@@ -1897,7 +1896,7 @@ extern const ddi_dma_cookie_t *ddi_dma_cookie_one(ddi_dma_handle_t);
 
 int
 ddi_regs_map_setup(dev_info_t *dip, uint_t rnumber, caddr_t *addrp,
-    offset_t offset, offset_t len, ddi_device_acc_attr_t *accattrp,
+    offset_t offset, offset_t len, const ddi_device_acc_attr_t *accattrp,
     ddi_acc_handle_t *handle);
 
 void

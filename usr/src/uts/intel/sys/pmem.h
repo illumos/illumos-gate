@@ -52,7 +52,7 @@ extern "C" {
  */
 int	devmap_pmem_setup(devmap_cookie_t, dev_info_t *dip,
     struct devmap_callback_ctl *, devmap_pmem_cookie_t, offset_t,
-    size_t, uint_t, uint_t, ddi_device_acc_attr_t *);
+    size_t, uint_t, uint_t, const ddi_device_acc_attr_t *);
 
 /*
  * Replace existing mapping using a new cookie, mainly gets called when doing
@@ -60,7 +60,7 @@ int	devmap_pmem_setup(devmap_cookie_t, dev_info_t *dip,
  */
 int	devmap_pmem_remap(devmap_cookie_t, dev_info_t *dip,
     devmap_pmem_cookie_t, offset_t, size_t, uint_t, uint_t,
-    ddi_device_acc_attr_t *);
+    const ddi_device_acc_attr_t *);
 
 /*
  * Directly (i.e., without occupying kernel virtual address space) allocate
