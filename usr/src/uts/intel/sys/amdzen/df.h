@@ -748,10 +748,13 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xc1c }
 #define	DF_ECAM_V4_GET_ADDR(r)		bitx32(r, 31, 20)
+#define	DF_ECAM_V4_SET_ADDR(r, v)	bitset32(r, 31, 20, v)
 #define	DF_ECAM_V4_ADDR_SHIFT		20
 #define	DF_ECAM_LIMIT_EXCL		(1 << DF_ECAM_V4_ADDR_SHIFT)
 #define	DF_ECAM_BASE_V4_GET_EN(r)	bitx32(r, 0, 0)
+#define	DF_ECAM_BASE_V4_SET_EN(r, v)	bitset32(r, 0, 0, v)
 #define	DF_ECAM_EXT_V4_GET_ADDR(r)	bitx32(r, 23, 0)
+#define	DF_ECAM_EXT_V4_SET_ADDR(r, v)	bitset32(r, 23, 0, v)
 #define	DF_ECAM_EXT_V4_ADDR_SHIFT	32
 
 /*
