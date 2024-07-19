@@ -29,6 +29,7 @@ SUBDIRS = \
 	nl_langinfo \
 	priv_gettext \
 	qsort \
+	posix_spawn \
 	random \
 	regex \
 	select \

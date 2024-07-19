@@ -1,0 +1,125 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd January 5, 2025
+.Dt POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR 3C
+.Os
+.Sh NAME
+.Nm posix_spawn_file_actions_addchdir ,
+.Nm posix_spawn_file_actions_addfchdir
+.Nd add directory changing actions to a spawn file actions object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In spawn.h
+.Ft int
+.Fo posix_spawn_file_actions_addchdir
+.Fa "posix_spawn_file_actions_t *restrict file_actions"
+.Fa "const char *restrict path"
+.Fc
+.Ft int
+.Fo posix_spawn_file_actions_addfchdir
+.Fa "posix_spawn_file_actions_t *restrict file_actions"
+.Fa "int fd"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawn_file_actions_addchdir
+and
+.Fn posix_spawn_file_actions_addfchdir
+functions add an action to change the spawned process's current working
+directory to the spawn file actions object,
+.Fa file_actions .
+The
+.Fn posix_spawn_file_actions_addchdir
+function will cause the spawned process to call
+.Xr chdir 2
+on
+.Fa path ,
+while the
+.Fn posix_spawn_file_actions_addfchdir
+function will cause the spawned process to call
+.Xr fchdir 2
+on
+.Fa fd .
+.Pp
+Actions are resolved in the order that they are added.
+This implies that if
+.Fn posix_spawn_file_actions_addchdir
+is called with a relative path, it will be evaluated based on any other
+actions that the process has already taken.
+Similarly, if the
+.Fn posix_spawn_file_actions_addfchdir
+function is passed a file descriptor that a prior action has closed
+.Pq Xr posix_spawn_file_actions_addclose 3C ,
+opened over
+.Pq Xr posix_spawn_file_actions_addopen 3C ,
+or
+duplicated over
+.Pq Xr posix_spawn_file_actions_adddup2 3C ,
+then the
+.Xr fchdir 2
+call will use the new file descriptor.
+This may cause the call to fail, because
+.Fa fd
+no longer refers to a directory, or cause the process to change to a
+different directory than originally expected.
+.Pp
+The
+.Fn posix_spawn_file_actions_addchdir
+function will duplicate the string
+.Fa path ,
+allowing the caller to release any storage associated with it following
+the function returning.
+It does not need to be persisted.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn posix_spawn_file_actions_addchdir
+and
+.Fn posix_spawn_file_actions_addfchdir
+functions return
+.Sy 0
+and record the corresponding file action.
+Otherwise, an error number will be returned.
+.Sh ERRORS
+The
+.Fn posix_spawn_file_actions_addchdir
+and
+.Fn posix_spawn_file_actions_addfchdir
+functions will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+Insufficient memory exists to add the spawn file actions object.
+.El
+.Pp
+Additionally, the
+.Fn posix_spawn_file_actions_addfchdir
+function will fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The file descriptor,
+.Fa fd ,
+is negative or an otherwise invalid file descriptor.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr chdir 2 ,
+.Xr fchdir 2 ,
+.Xr posix_spawn 3C ,
+.Xr posix_spawn_file_actions_addclose 3C ,
+.Xr posix_spawn_file_actions_adddup 3C ,
+.Xr posix_spawn_file_actions_addopen 3C ,
+.Xr posix_spawn_file_actions_init 3C

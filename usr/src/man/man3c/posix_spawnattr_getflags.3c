@@ -43,13 +43,11 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH POSIX_SPAWNATTR_GETFLAGS 3C "Sep 25, 2008"
+.TH POSIX_SPAWNATTR_GETFLAGS 3C "Jan 5, 2025"
 .SH NAME
 posix_spawnattr_getflags, posix_spawnattr_setflags \- get and set spawn-flags
 attribute of spawn attributes object
 .SH SYNOPSIS
-.LP
-.nf
 #include <spawn.h>
 
 \fBint\fR \fBposix_spawnattr_getflags\fR(\fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
@@ -62,8 +60,6 @@ attribute of spawn attributes object
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBposix_spawnattr_getflags()\fR function obtains the value of the
 \fIspawn-flags\fR attribute from the attributes object referenced by
 \fIattr\fR.
@@ -103,6 +99,10 @@ the following flags:
 .in -2
 .br
 .in +2
+\fBPOSIX_SPAWN_SETSID\fR
+.in -2
+.br
+.in +2
 \fBPOSIX_SPAWN_NOSIGCHLD_NP\fR
 .in -2
 .br
@@ -118,8 +118,6 @@ the following flags:
 These flags are defined in \fB<spawn.h>\fR. The default value of this attribute
 is as if no flags were set.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBposix_spawnattr_getflags()\fR returns 0 and
 stores the value of the spawn-flags attribute of attr into the object
 referenced by the flags parameter. Otherwise, an error number is returned to
@@ -129,8 +127,6 @@ indicate the error.
 Upon successful completion, \fBposix_spawnattr_setflags()\fR returns 0.
 Otherwise, an error number is returned to indicate the error.
 .SH ERRORS
-.sp
-.LP
 These functions may fail if:
 .sp
 .ne 2
@@ -154,8 +150,6 @@ The value of the attribute being set is not valid.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -174,8 +168,6 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR posix_spawn (3C),
 .BR posix_spawnattr_destroy (3C),
 .BR posix_spawnattr_getpgroup (3C),

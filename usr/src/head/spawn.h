@@ -51,15 +51,16 @@ extern "C" {
 #define	POSIX_SPAWN_SETSIGMASK		0x0008
 #define	POSIX_SPAWN_SETSCHEDPARAM	0x0010
 #define	POSIX_SPAWN_SETSCHEDULER	0x0020
+#define	POSIX_SPAWN_SETSID		0x0040
 /*
- * non-portable Solaris extensions
+ * non-portable extensions
  */
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+#if !defined(_STRICT_POSIX)
 #define	POSIX_SPAWN_SETSIGIGN_NP	0x0800
 #define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
 #define	POSIX_SPAWN_WAITPID_NP		0x2000
 #define	POSIX_SPAWN_NOEXECERR_NP	0x4000
-#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+#endif	/* !_STRICT_POSIX */
 
 typedef struct {
 	void *__spawn_attrp;	/* implementation-private */
@@ -91,6 +92,10 @@ extern int posix_spawn_file_actions_init(
 extern int posix_spawn_file_actions_destroy(
 	posix_spawn_file_actions_t *file_actions);
 
+extern int posix_spawn_file_actions_addchdir(
+	posix_spawn_file_actions_t *_RESTRICT_KYWD file_actions,
+	const char *_RESTRICT_KYWD path);
+
 extern int posix_spawn_file_actions_addopen(
 	posix_spawn_file_actions_t *_RESTRICT_KYWD file_actions,
 	int filedes,
@@ -106,6 +111,10 @@ extern int posix_spawn_file_actions_adddup2(
 	posix_spawn_file_actions_t *file_actions,
 	int filedes,
 	int newfiledes);
+
+extern int posix_spawn_file_actions_addfchdir(
+	posix_spawn_file_actions_t *_RESTRICT_KYWD file_actions,
+	int fd);
 
 extern int posix_spawnattr_init(
 	posix_spawnattr_t *attr);
@@ -154,9 +163,9 @@ extern int posix_spawnattr_getsigdefault(
 	sigset_t *_RESTRICT_KYWD sigdefault);
 
 /*
- * non-portable Solaris extensions
+ * non-portable extensions
  */
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+#if !defined(_STRICT_POSIX)
 
 extern int posix_spawn_pipe_np(
 	pid_t *_RESTRICT_KYWD pidp,
@@ -178,7 +187,20 @@ extern int posix_spawnattr_getsigignore_np(
 	const posix_spawnattr_t *_RESTRICT_KYWD attr,
 	sigset_t *_RESTRICT_KYWD sigignore);
 
-#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+/*
+ * These _np variants are not documented in the manual, but are provided for
+ * compatibility purposes with folks who have implemented this prior to
+ * standardization in POSIX 2024.
+ */
+extern int posix_spawn_file_actions_addchdir_np(
+	posix_spawn_file_actions_t *_RESTRICT_KYWD file_actions,
+	const char *_RESTRICT_KYWD path);
+
+extern int posix_spawn_file_actions_addfchdir_np(
+	posix_spawn_file_actions_t *_RESTRICT_KYWD file_actions,
+	int fd);
+
+#endif	/* !_STRICT_POSIX */
 
 extern int posix_spawnattr_setsigmask(
 	posix_spawnattr_t *_RESTRICT_KYWD attr,
