@@ -878,13 +878,18 @@ extern int sockprinterr;
 
 #endif /* defined(DEBUG) */
 
-extern struct vfsops			sock_vfsops;
 extern struct vnodeops			*socket_vnodeops;
 extern const struct fs_operation_def	socket_vnodeops_template[];
 
+extern vfs_t				*sock_vfsp;
 extern dev_t				sockdev;
 
 extern krwlock_t			sockconf_lock;
+
+/*
+ * sockfs vfsops
+ */
+extern int	sockfs_statvfs(vfs_t *, struct statvfs64 *);
 
 /*
  * sockfs functions

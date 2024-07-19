@@ -26,12 +26,13 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
  * Generic vnode operations.
  */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1029,4 +1030,41 @@ reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
 		kmem_free(door_args.rbuf, door_args.rsize);
 
 	return (err);
+}
+
+/*
+ * This routine is used to create a single vfs_t that is used globally in the
+ * system for a psuedo-file system that does not actually ever "mount", like
+ * sockfs or fifofs. This constructs a single vfs_t that will not be
+ * accidentally freed nor will it end up on a zone's list of file systems.
+ * Please do not add new file systems that need to use this. The kmem_zalloc
+ * explicitly takes care of ensuring the following (amongst others):
+ *
+ *  - This vfs_t is explicitly not linked on any list (vfs_next/prev are NULL)
+ *  - The vnode is not covered and has no flags
+ *  - There is no mount point, resource, or options
+ *  - There is no zone that nominally owns this
+ *  - There is no file system specific data
+ */
+vfs_t *
+fs_vfsp_global(struct vfsops *ops, dev_t dev, int fstype, uint_t bsize)
+{
+	vfs_t *vfsp = kmem_zalloc(sizeof (struct vfs), KM_SLEEP);
+
+	vfs_setops(vfsp, ops);
+	vfsp->vfs_bsize = bsize;
+	vfsp->vfs_fstype = fstype;
+	vfs_make_fsid(&vfsp->vfs_fsid, dev, fstype);
+	vfsp->vfs_dev = dev;
+
+	/*
+	 * We purposefully bump the reference on this vfs_t to one. This vfs_t
+	 * is intended to always exist regardless of surrounding activity.
+	 * Importantly this ensures that something that incidentally performs a
+	 * VFS_HOLD followed by a VFS_RELE on the vfs_t doesn't end up freeing
+	 * this.
+	 */
+	vfsp->vfs_count = 1;
+
+	return (vfsp);
 }

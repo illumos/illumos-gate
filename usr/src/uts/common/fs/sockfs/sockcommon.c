@@ -604,7 +604,7 @@ sonode_init(struct sonode *so, struct sockparams *sp, int family,
 	so->so_copyflag = 0;
 
 	vn_reinit(vp);
-	vp->v_vfsp	= rootvfs;
+	vp->v_vfsp	= sock_vfsp;
 	vp->v_type	= VSOCK;
 	vp->v_rdev	= sockdev;
 
