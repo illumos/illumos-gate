@@ -1690,7 +1690,7 @@ dump_prfdinfo(note_state_t *state, const char *title)
 {
 	const sl_prfdinfo_layout_t *layout = state->ns_arch->prfdinfo;
 	char buf[1024];
-	uint32_t fileflags, mode;
+	uint32_t fileflags, mode, fdflags;
 
 	indent_enter(state, title, &layout->pr_fd);
 
@@ -1718,7 +1718,9 @@ dump_prfdinfo(note_state_t *state, const char *title)
 	print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_FILEFLAGS),
 	    conv_cnote_fileflags(fileflags, 0, buf, sizeof (buf)));
 
-	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_FDFLAGS), pr_fdflags);
+	fdflags = extract_as_word(state, &layout->pr_fdflags);
+	print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_FDFLAGS),
+	    conv_cnote_fdflags(fdflags, 0, buf, sizeof (buf)));
 
 	PRINT_STRBUF(MSG_ORIG(MSG_CNOTE_T_PR_PATH), pr_path);
 

@@ -124,6 +124,7 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 #define	SOCK_CLOEXEC	0x080000	/* like open(2) O_CLOEXEC for socket */
 #define	SOCK_NONBLOCK	0x100000	/* like O_NONBLOCK */
 #define	SOCK_NDELAY	0x200000	/* like O_NDELAY */
+#define	SOCK_CLOFORK	0x400000	/* set FD_CLOFORK on the socket */
 
 /*
  * Option flags per-socket.
@@ -428,6 +429,8 @@ struct msghdr32 {
 #define	MSG_NOSIGNAL	0x200		/* Don't generate SIGPIPE */
 #define	MSG_DUPCTRL	0x800		/* Save control message for use with */
 					/* with left over data */
+#define	MSG_CMSG_CLOEXEC	0x1000	/* FD_CLOEXEC w/ SCM_RIGHTS */
+#define	MSG_CMSG_CLOFORK	0x2000	/* FD_CLOFORK w/ SCM_RIGHTS */
 #define	MSG_XPG4_2	0x8000		/* Private: XPG4.2 flag */
 
 /* Obsolete but kept for compilation compatibility. Use IOV_MAX. */
@@ -545,7 +548,7 @@ extern int connect(int, const struct sockaddr *, socklen_t);
 extern int getpeername(int, struct sockaddr *_RESTRICT_KYWD, Psocklen_t);
 extern int getsockname(int, struct sockaddr *_RESTRICT_KYWD, Psocklen_t);
 extern int getsockopt(int, int, int, void *_RESTRICT_KYWD, Psocklen_t);
-extern int listen(int, int);	/* XXX - fixme???  where do I go */
+extern int listen(int, int);
 extern int socketpair(int, int, int, int *);
 extern ssize_t recv(int, void *, size_t, int);
 extern ssize_t recvfrom(int, void *_RESTRICT_KYWD, size_t, int,

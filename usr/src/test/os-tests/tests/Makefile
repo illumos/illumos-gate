@@ -35,6 +35,7 @@ SUBDIRS =       \
 		ksid \
 		libtopo \
 		minttl \
+		oclo \
 		pf_key \
 		poll \
 		portfs \

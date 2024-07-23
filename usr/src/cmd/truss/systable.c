@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -282,7 +282,7 @@ const struct systable systable[] = {
 {"execvex",	4, DEC, NOV, STG, HEX, HEX, EXC},		/*  59 */
 {"umask",	1, OCT, NOV, OCT},				/*  60 */
 {"chroot",	1, DEC, NOV, STG},				/*  61 */
-{"fcntl",	3, DEC, NOV, DEC, FCN, HEX},			/*  62 */
+{"fcntl",	4, DEC, NOV, DEC, FCN, HEX, HEX},		/*  62 */
 {"ulimit",	2, DEX, NOV, ULM, DEC},				/*  63 */
 {"renameat",	4, DEC, NOV, ATC, STG, ATC, STG},		/*  64 */
 {"unlinkat",	3, DEC, NOV, ATC, STG, UAT},			/*  65 */
@@ -457,12 +457,12 @@ const struct systable systable[] = {
 {"accept",	5, DEC, NOV, DEC, HEX, HEX, SKV, ACF},		/* 234 */
 {"connect",	4, DEC, NOV, DEC, HEX, DEC, SKV},		/* 235 */
 {"shutdown",	3, DEC, NOV, DEC, SHT, SKV},			/* 236 */
-{"recv",	4, DEC, NOV, DEC, IOB, DEC, DEC},		/* 237 */
-{"recvfrom",	6, DEC, NOV, DEC, IOB, DEC, DEC, HEX, HEX},	/* 238 */
-{"recvmsg",	3, DEC, NOV, DEC, HEX, DEC},			/* 239 */
-{"send",	4, DEC, NOV, DEC, IOB, DEC, DEC},		/* 240 */
-{"sendmsg",	3, DEC, NOV, DEC, HEX, DEC},			/* 241 */
-{"sendto",	6, DEC, NOV, DEC, IOB, DEC, DEC, HEX, DEC},	/* 242 */
+{"recv",	4, DEC, NOV, DEC, IOB, DEC, SRF},		/* 237 */
+{"recvfrom",	6, DEC, NOV, DEC, IOB, DEC, SRF, HEX, HEX},	/* 238 */
+{"recvmsg",	3, DEC, NOV, DEC, HEX, SRF},			/* 239 */
+{"send",	4, DEC, NOV, DEC, IOB, DEC, SRF},		/* 240 */
+{"sendmsg",	3, DEC, NOV, DEC, HEX, SRF},			/* 241 */
+{"sendto",	6, DEC, NOV, DEC, IOB, DEC, SRF, HEX, DEC},	/* 242 */
 {"getpeername", 4, DEC, NOV, DEC, HEX, HEX, SKV},		/* 243 */
 {"getsockname", 4, DEC, NOV, DEC, HEX, HEX, SKV},		/* 244 */
 {"getsockopt",	6, DEC, NOV, DEC, SOL, SON, HEX, HEX, SKV},	/* 245 */
@@ -597,9 +597,11 @@ const	struct systable open64table[] = {
 #define	NOPEN64CODE	(sizeof (open64table) / sizeof (struct systable))
 
 const	struct systable fcntltable[] = {
-{"fcntl",	3, DEC, NOV, DEC, FCN, HEX},			/* 0: default */
-{"fcntl",	2, DEC, NOV, DEC, FCN},				/* 1: no arg */
-{"fcntl",	3, DEC, NOV, DEC, FCN, FFG},			/* 2: F_SETFL */
+{"fcntl",	3, DEC, NOV, DEC, FCN, HEX},		/* 0: default */
+{"fcntl",	2, DEC, NOV, DEC, FCN},			/* 1: no arg */
+{"fcntl",	3, DEC, NOV, DEC, FCN, FFG},		/* 2: F_SETFL */
+{"fcntl",	3, DEC, NOV, DEC, FCN, FFD},		/* 3: F_SETFD */
+{"fcntl",	4, DEC, NOV, DEC, FCN, DEC, FFD},	/* 4: F_DUP3FD */
 };
 #define	NFCNTLCODE	(sizeof (fcntltable) / sizeof (struct systable))
 
@@ -1506,6 +1508,8 @@ getsubcode(private_t *pri)
 				case F_GETOWN:
 				case F_GETXFL:	subcode = 1; break;
 				case F_SETFL:	subcode = 2; break;
+				case F_SETFD:	subcode = 3; break;
+				case F_DUP3FD:	subcode = 4; break;
 				}
 			}
 			break;

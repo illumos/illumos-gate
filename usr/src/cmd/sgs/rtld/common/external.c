@@ -184,6 +184,7 @@
 #include <libintl.h>
 #include <debug.h>
 #include <libc_int.h>
+#include <fcntl.h>
 #include "_elf.h"
 #include "_rtld.h"
 
@@ -622,13 +623,21 @@ int
 fcntl(int fildes, int cmd, ...)
 {
 	extern int __fcntl(int, int, ...);
-	intptr_t arg;
+	intptr_t arg, arg1 = 0;
 	va_list ap;
 
 	va_start(ap, cmd);
-	arg = va_arg(ap, intptr_t);
+	switch (cmd) {
+	case F_DUP3FD:
+		arg = va_arg(ap, int);
+		arg1 = va_arg(ap, int);
+		break;
+	default:
+		arg = va_arg(ap, intptr_t);
+		break;
+	}
 	va_end(ap);
-	return (__fcntl(fildes, cmd, arg));
+	return (__fcntl(fildes, cmd, arg, arg1));
 }
 
 int

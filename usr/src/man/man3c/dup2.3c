@@ -2,10 +2,11 @@
 .\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUP2 3C "February 17, 2023"
+.TH DUP2 3C "June 21, 2024"
 .SH NAME
 dup2, dup3 \- duplicate an open file descriptor
 .SH SYNOPSIS
@@ -32,15 +33,40 @@ to \fIfildes\fR, or if \fIfildes\fR is not a valid open file descriptor,
 .sp
 .LP
 The \fBdup2()\fR function is equivalent to  \fBfcntl\fR(\fIfildes\fR,
-\fBF_DUP2FD\fR, \fIfildes2\fR).
+\fBF_DUP2FD\fR, \fIfildes2\fR).  The returned file descriptor will have neither
+the close-on-exec (\fBFD_CLOEXEC\fR) or close-on-fork (\fBFD_CLOFORK\fR) flags
+set on it, regardless of what is set on \fIfildes\fR.
 .sp
 .LP
 The \fBdup3()\fR function works similarly to the \fBdup2()\fR function with
 two exceptions.  If \fIfildes\fR and \fIfildes2\fR point to the same file
-descriptor, -1 is returned and errno set to \fBEINVAL\fR.  If \fIflags\fR
-is \fBO_CLOEXEC\fR, then \fIfiledes2\fR will have the \fBFD_CLOEXEC\fR flag
-set causing the file descriptor to be closed during any future call of
-\fBexec\fR(2).
+descriptor, -1 is returned and errno set to \fBEINVAL\fR.  The \fIflags\fR
+argument allows for control of the returned file descriptor's flags.  Valid
+values are the bitwise-inclusive-OR of:
+
+.sp
+.ne 2
+.na
+\fB\fBO_CLOEXEC\fR\fR
+.ad
+.RS 12n
+The returned file descriptor will have the close-on-exec flag, \fBFD_CLOEXEC\fR
+set on it.  The file descriptor will be automatically closed when the process
+calls the \fBexec\fR(2) family of functions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBO_CLOFORK\fR\fR
+.ad
+.RS 12n
+The returned file descriptor will have the close-on-fork flag, \fBFD_CLOFORK\fR
+set on it.  The file descriptor will be automatically closed in any child
+processes created with the \fBfork\fR(2) family of functions.  It will remain
+open in the parent.
+.RE
+
 .SH RETURN VALUES
 Upon successful completion a non-negative integer representing the file
 descriptor is returned. Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is
@@ -93,8 +119,9 @@ Additionally, the \fBdup3()\fR function will fail if:
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-\fIflags\fR has a value other than 0 or \fBO_CLOEXEC\fR or \fIfildes\fR and
-\fIfildes2\fR point to the same file descriptor.
+\fIflags\fR has a value other than 0 or the bitwise-inclusive-OR of
+\fBO_CLOEXEC\fR and \fBO_CLOFORK\fR. \fIfildes\fR and \fIfildes2\fR point to
+the same file descriptor.
 .RE
 
 .SH ATTRIBUTES
@@ -118,6 +145,7 @@ MT-Level	Async-Signal-Safe
 .BR creat (2),
 .BR exec (2),
 .BR fcntl (2),
+.BR fork (2),
 .BR getrlimit (2),
 .BR open (2),
 .BR pipe (2),

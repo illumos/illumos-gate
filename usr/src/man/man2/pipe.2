@@ -45,12 +45,12 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 2013, OmniTI Computer Consulting, Inc.
 .\" All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH PIPE 2 "Apr 19, 2013"
+.TH PIPE 2 "June 21, 2024"
 .SH NAME
 pipe \- create an interprocess channel
 .SH SYNOPSIS
-.LP
 .nf
 #include <unistd.h>
 
@@ -60,15 +60,14 @@ pipe \- create an interprocess channel
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpipe()\fR and pipe2() functions create an I/O mechanism called a
 pipe and returns two file descriptors, \fIfildes\fR[\fB0\fR] and
 \fIfildes\fR[\fB1\fR]. The files associated with \fIfildes\fR[\fB0\fR]
 and \fIfildes\fR[\fB1\fR] are streams and are both opened for reading and
 writing.  The \fBpipe()\fR call will clear the \fBO_NDELAY\fR,
-\fBO_NONBLOCK\fR, and \fBFD_CLOEXEC\fR flags on both file descriptors. The
-\fBfcntl\fR(2) function can be used to set these flags.
+\fBO_NONBLOCK\fR, and the \fBFD_CLOEXEC\fR and \fBFD_CLOFORK\fR flags on
+both file descriptors. The \fBfcntl\fR(2) function can be used to set these
+flags.
 .sp
 .LP
 The \fBpipe2()\fR call will clear the \fBO_NDELAY\fR on both filedescriptors.
@@ -99,6 +98,17 @@ descriptors will be closed prior to any future exec() calls.
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBO_CLOFORK\fR\fR
+.ad
+.RS 12n
+Both file descriptors will be opened with the FD_CLOFORK flag set. Both file
+descriptors will be closed in any child processes created with the fork() family
+of calls.
+.RE
+
+.sp
 .LP
 A read from \fIfildes\fR[\fB0\fR] accesses the data written to
 \fIfildes\fR[\fB1\fR] on a first-in-first-out (FIFO) basis and a read from
@@ -109,13 +119,9 @@ on a \fBFIFO\fR basis.
 Upon successful completion \fBpipe()\fR marks for update the \fBst_atime\fR,
 \fBst_ctime\fR, and \fBst_mtime\fR fields of the pipe.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBpipe()\fR and \fBpipe2()\fR functions will fail if:
 .sp
 .ne 2
@@ -155,13 +161,11 @@ The \fBpipe2()\fR function will also fail if:
 .ad
 .RS 10n
 The \fIflags\fR argument is illegal. Valid \fIflags\fR are zero or a
-bitwise inclusive-OR of \fBO_CLOEXEC\fR and \fBO_NONBLOCK\fR.
+bitwise inclusive-OR of \fBO_CLOEXEC\fR, \fBO_CLOFORK\fR, and \fBO_NONBLOCK\fR.
 .RE
 
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -178,8 +182,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR sh (1),
 .BR fcntl (2),
 .BR fstat (2),
@@ -193,8 +195,6 @@ MT-Level	Async-Signal-Safe
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 Since a pipe is bi-directional, there are two separate flows of data.
 Therefore, the size (\fBst_size\fR) returned by a call to \fBfstat\fR(2) with
 argument  \fIfildes\fR[\fB0\fR] or \fIfildes\fR[\fB1\fR] is the number of bytes

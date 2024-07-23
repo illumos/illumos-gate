@@ -47,9 +47,9 @@
 .\" All Rights Reserved.
 .\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2020 Joyent, Inc.
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd February 5, 2022
+.Dd February 5, 2024
 .Dt OPEN 2
 .Os
 .Sh NAME
@@ -113,9 +113,6 @@ function returns a file descriptor for the named file that is the lowest file
 descriptor not currently open for that process.
 The open file description is new, and therefore the file descriptor does not
 share it with any other process in the system.
-The
-.Dv FD_CLOEXEC
-file descriptor flag associated with the new file descriptor is cleared.
 .Pp
 The file offset used to mark the current position within the file is set to the
 beginning of the file.
@@ -311,6 +308,26 @@ to
 If set, the file descriptor returned will be closed prior to any future
 .Xr exec 2
 calls.
+This sets the
+.Dv FD_CLOEXEC
+flag on the file descriptor.
+If not performed at open time, this can later be set with the
+.Dv F_SETFD
+.Xr fcntl 2
+command.
+.It Dv O_CLOFORK
+If set, the file descriptor returned will be closed in any child processses
+created with the
+.Xr fork 2
+family of functions.
+The file descriptor will remain open in the parent.
+This sets the
+.Dv FD_CLOFORK
+flag on the file descriptor.
+If not performed at open time, this can later be set with the
+.Dv F_SETFD
+.Xr fcntl 2
+command.
 .It Dv O_NONBLOCK O_NDELAY
 These flags can affect subsequent reads and writes
 .Po

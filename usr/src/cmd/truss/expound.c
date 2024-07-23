@@ -1813,6 +1813,15 @@ show_ffg(private_t *pri)
 	(void) puts(pri->sys_string);
 }
 
+void
+show_ffd(private_t *pri)
+{
+	(void) putchar('\t');
+	(void) putchar('\t');
+	prt_ffd(pri, 0, pri->Rval1);
+	(void) puts(pri->sys_string);
+}
+
 /* print values in fcntl() pointed-to structure */
 void
 show_fcntl(private_t *pri)
@@ -1821,6 +1830,11 @@ show_fcntl(private_t *pri)
 
 	if (pri->sys_nargs >= 2 && pri->sys_args[1] == F_GETFL) {
 		show_ffg(pri);
+		return;
+	}
+
+	if (pri->sys_nargs >= 2 && pri->sys_args[1] == F_GETFD) {
+		show_ffd(pri);
 		return;
 	}
 

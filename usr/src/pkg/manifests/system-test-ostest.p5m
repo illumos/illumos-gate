@@ -106,6 +106,10 @@ file path=opt/os-tests/tests/libtopo/digraph-test-in.xml mode=0444
 dir  path=opt/os-tests/tests/minttl
 file path=opt/os-tests/tests/minttl/minttl mode=0555
 file path=opt/os-tests/tests/minttl/minttl_err mode=0555
+dir  path=opt/os-tests/tests/oclo
+file path=opt/os-tests/tests/oclo/oclo mode=0555
+file path=opt/os-tests/tests/oclo/oclo_errors mode=0555
+file path=opt/os-tests/tests/oclo/ocloexec_verify mode=0555
 file path=opt/os-tests/tests/odirectory.32 mode=0555
 file path=opt/os-tests/tests/odirectory.64 mode=0555
 dir  path=opt/os-tests/tests/pf_key

@@ -23,10 +23,11 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -62,7 +63,7 @@ static void fd_too_big(proc_t *);
  * File control.
  */
 int
-fcntl(int fdes, int cmd, intptr_t arg)
+fcntl(int fdes, int cmd, intptr_t arg, intptr_t arg1)
 {
 	int iarg;
 	int error = 0;
@@ -94,6 +95,27 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	ASSERT(sizeof (struct flock) == sizeof (struct flock64_64));
 	ASSERT(sizeof (struct flock64) == sizeof (struct flock64_64));
 #endif
+
+	/*
+	 * Most fcntl() calls take either 2 or 3 arguments. The introduction of
+	 * F_DUP3FD added a version that takes a 4th argument (referred to as
+	 * arg1). While fcntl() traditionally has had loose validation, we
+	 * strictly validate this new arg.
+	 */
+	switch (cmd) {
+	case F_DUP3FD:
+		if ((arg1 & ~(FD_CLOEXEC | FD_CLOFORK)) != 0) {
+			error = EINVAL;
+			goto out;
+		}
+		break;
+	default:
+		if (arg1 != 0) {
+			error = EINVAL;
+			goto out;
+		}
+		break;
+	}
 
 	/*
 	 * First, for speed, deal with the subset of cases
@@ -147,6 +169,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	switch (cmd) {
 	case F_DUPFD:
 	case F_DUPFD_CLOEXEC:
+	case F_DUPFD_CLOFORK:
 		p = curproc;
 		if ((uint_t)iarg >= p->p_fno_ctl) {
 			if (iarg >= 0)
@@ -176,12 +199,17 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			error = EMFILE;
 		} else {
 			if (cmd == F_DUPFD_CLOEXEC) {
-				f_setfd(retval, FD_CLOEXEC);
+				f_setfd_or(retval, FD_CLOEXEC);
+			}
+
+			if (cmd == F_DUPFD_CLOFORK) {
+				f_setfd_or(retval, FD_CLOFORK);
 			}
 		}
 		goto done;
 
 	case F_DUP2FD_CLOEXEC:
+	case F_DUP2FD_CLOFORK:
 		if (fdes == iarg) {
 			error = EINVAL;
 			goto done;
@@ -190,6 +218,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		/*FALLTHROUGH*/
 
 	case F_DUP2FD:
+	case F_DUP3FD:
 		p = curproc;
 		if (fdes == iarg) {
 			retval = iarg;
@@ -217,7 +246,11 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			releasef(fdes);
 			if ((error = closeandsetf(iarg, fp)) == 0) {
 				if (cmd == F_DUP2FD_CLOEXEC) {
-					f_setfd(iarg, FD_CLOEXEC);
+					f_setfd_or(iarg, FD_CLOEXEC);
+				} else if (cmd == F_DUP2FD_CLOFORK) {
+					f_setfd_or(iarg, FD_CLOFORK);
+				} else if (cmd == F_DUP3FD) {
+					f_setfd_or(iarg, (int)arg1);
 				}
 				retval = iarg;
 			} else {

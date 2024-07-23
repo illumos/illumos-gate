@@ -203,3 +203,6 @@ arch = i86pc
 
 [/opt/os-tests/tests/saveargs/testmatch/testmatch]
 arch = i86pc
+
+[/opt/os-tests/tests/oclo]
+tests = ['oclo', 'oclo_errors']

@@ -402,7 +402,7 @@ door_create(void (*pc_cookie)(), void *data_cookie, uint_t attributes)
 	    &fd, NULL)) != 0)
 		return (set_errno(err));
 
-	f_setfd(fd, FD_CLOEXEC);
+	f_setfd_or(fd, FD_CLOEXEC);
 	return (fd);
 }
 

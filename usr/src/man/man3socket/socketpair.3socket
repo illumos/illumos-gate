@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCKETPAIR 3SOCKET "Jan 10, 2001"
+.TH SOCKETPAIR 3SOCKET "June 21, 2024"
 .SH NAME
 socketpair \- create a pair of connected sockets
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
 #include <sys/types.h>
@@ -18,20 +17,20 @@ socketpair \- create a pair of connected sockets
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsocketpair()\fR library call creates an unnamed pair of connected
 sockets in the specified address family \fIdomain\fR, of the specified
 \fItype\fR, that uses the optionally specified \fIprotocol\fR. The descriptors
 that are used in referencing the new sockets are returned in \fIsv\fR[0] and
 \fIsv\fR[1]. The two sockets are indistinguishable.
-.SH RETURN VALUES
 .sp
 .LP
+The \fItype\fR arguments supports the various flags that modify the returned
+socket's behavior that are discussed in \fBsocket\fR(3SOCKET):
+\fBSOCK_CLOEXEC\fR, \fBSOCK_CLOFORK\fR, \fBSOCK_NDELAY\fR, and
+\fBSOCK_NONBLOCK\fR.
+.SH RETURN VALUES
 \fBsocketpair()\fR returns \fB\(mi1\fR on failure and \fB0\fR on success.
 .SH ERRORS
-.sp
-.LP
 The call succeeds unless:
 .sp
 .ne 2
@@ -97,8 +96,6 @@ The process does not have appropriate privileges.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -113,14 +110,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR pipe (2),
 .BR read (2),
 .BR write (2),
 .BR socket.h (3HEAD),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 This call is currently implemented only for the \fBAF_UNIX\fR address family.

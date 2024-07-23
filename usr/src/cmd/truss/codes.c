@@ -26,6 +26,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -111,63 +112,58 @@
 #include "proto.h"
 
 #define	FCNTLMIN	F_DUPFD
-#define	FCNTLMAX	F_FLOCKW
+#define	FCNTLMAX	F_DUP3FD
 const char *const FCNTLname[] = {
-	"F_DUPFD",
-	"F_GETFD",
-	"F_SETFD",
-	"F_GETFL",
-	"F_SETFL",
-	"F_O_GETLK",
-	"F_SETLK",
-	"F_SETLKW",
-	"F_CHKFL",
-	"F_DUP2FD",
-	"F_ALLOCSP",
-	"F_FREESP",
-	NULL,		/* 12 */
-	NULL,		/* 13 */
-	"F_GETLK",
-	NULL,		/* 15 */
-	NULL,		/* 16 */
-	NULL,		/* 17 */
-	NULL,		/* 18 */
-	NULL,		/* 19 */
-	NULL,		/* 20 */
-	NULL,		/* 21 */
-	NULL,		/* 22 */
-	"F_GETOWN",
-	"F_SETOWN",
-	"F_REVOKE",
-	"F_HASREMOTELOCKS",
-	"F_FREESP64",
-	NULL,		/* 28 */
-	NULL,		/* 29 */
-	NULL,		/* 30 */
-	NULL,		/* 31 */
-	NULL,		/* 32 */
-	"F_GETLK64",
-	"F_SETLK64",
-	"F_SETLKW64",
-	"F_DUP2FD_CLOEXEC",
-	"F_DUPFD_CLOEXEC",
-	NULL,		/* 38 */
-	NULL,		/* 39 */
-	"F_SHARE",
-	"F_UNSHARE",
-	"F_SETLK_NBMAND",
-	"F_SHARE_NBMAND",
-	"F_SETLK64_NBMAND",
-	NULL,		/* 45 */
-	"F_BADFD",
-	"F_OFD_GETLK",
-	"F_OFD_SETLK",
-	"F_OFD_SETLKW",
-	NULL,		/* 50 */
-	NULL,		/* 51 */
-	NULL,		/* 52 */
-	"F_FLOCK",
-	"F_FLOCKW"
+	[0] = "F_DUPFD",
+	[1] = "F_GETFD",
+	[2] = "F_SETFD",
+	[3] = "F_GETFL",
+	[4] = "F_SETFL",
+	[5] = "F_O_GETLK",
+	[6] = "F_SETLK",
+	[7] = "F_SETLKW",
+	[8] = "F_CHKFL",
+	[9] = "F_DUP2FD",
+	[10] = "F_ALLOCSP",
+	[11] = "F_FREESP",
+	[13] = "F_ISSTREAM",
+	[14] = "F_GETLK",
+	[15] = "F_PRIV",
+	[16] = "F_NPRIV",
+	[17] = "F_QUOTACTL",
+	[18] = "F_BLOCKS",
+	[19] = "F_BLKSIZE",
+	[23] = "F_GETOWN",
+	[24] = "F_SETOWN",
+	[25] = "F_REVOKE",
+	[26] = "F_HASREMOTELOCKS",
+	[27] = "F_FREESP64",
+	[28] = "F_ALLOCSP64",
+	[33] = "F_GETLK64",
+	[34] = "F_SETLK64",
+	[35] = "F_SETLKW64",
+	[36] = "F_DUP2FD_CLOEXEC",
+	[37] = "F_DUPFD_CLOEXEC",
+	[40] = "F_SHARE",
+	[41] = "F_UNSHARE",
+	[42] = "F_SETLK_NBMAND",
+	[43] = "F_SHARE_NBMAND",
+	[44] = "F_SETLK64_NBMAND",
+	[45] = "F_GETXFL",
+	[46] = "F_BADFD",
+	[47] = "F_OFD_GETLK",
+	[48] = "F_OFD_SETLK",
+	[49] = "F_OFD_SETLKW",
+	[50] = "F_OFD_GETLK64",
+	[51] = "F_OFD_SETLK64",
+	[52] = "F_OFD_SETLKW64",
+	[53] = "F_FLOCK",
+	[54] = "F_FLOCKW",
+	[55] = "F_FLOCK64",
+	[56] = "F_FLOCKW64",
+	[57] = "F_DUP2FD_CLOFORK",
+	[58] = "F_DUPFD_CLOFORK",
+	[59] = "F_DUP3FD"
 };
 
 #define	SYSFSMIN	GETFSIND
@@ -2203,7 +2199,7 @@ pathconfname(int code)
 #define	ALL_O_FLAGS \
 	(O_NDELAY|O_APPEND|O_SYNC|O_DSYNC|O_NONBLOCK|O_CREAT|O_TRUNC\
 	|O_EXCL|O_NOCTTY|O_LARGEFILE|O_RSYNC|O_XATTR|O_NOFOLLOW|O_NOLINKS\
-	|O_CLOEXEC|O_DIRECTORY|O_DIRECT|FXATTRDIROPEN)
+	|O_CLOEXEC|O_DIRECTORY|O_DIRECT|O_CLOFORK|FXATTRDIROPEN)
 
 const char *
 openarg(private_t *pri, int arg)
@@ -2267,6 +2263,8 @@ openarg(private_t *pri, int arg)
 		(void) strlcat(str, "|O_DIRECTORY", sizeof (pri->code_buf));
 	if (arg & O_DIRECT)
 		(void) strlcat(str, "|O_DIRECT", sizeof (pri->code_buf));
+	if (arg & O_CLOFORK)
+		(void) strlcat(str, "|O_CLOFORK", sizeof (pri->code_buf));
 	if (arg & FXATTRDIROPEN)
 		(void) strlcat(str, "|FXATTRDIROPEN", sizeof (pri->code_buf));
 

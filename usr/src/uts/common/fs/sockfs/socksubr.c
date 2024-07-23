@@ -25,6 +25,7 @@
  * Copyright 2015, Joyent, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -719,7 +720,7 @@ fdbuf_allocmsg(int size, struct fdbuf *fdbuf)
  */
 /*ARGSUSED*/
 static int
-fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
+fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen, int msg_flags)
 {
 	int	i, fd;
 	int	*rp;
@@ -753,6 +754,12 @@ fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
 		fp->f_count++;
 		mutex_exit(&fp->f_tlock);
 		setf(fd, fp);
+		if ((msg_flags & MSG_CMSG_CLOEXEC) != 0) {
+			f_setfd_or(fd, FD_CLOEXEC);
+		}
+		if ((msg_flags & MSG_CMSG_CLOFORK) != 0) {
+			f_setfd_or(fd, FD_CLOFORK);
+		}
 		*rp++ = fd;
 		if (AU_AUDITING())
 			audit_fdrecv(fd, fp);
@@ -1209,7 +1216,7 @@ so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
  * also be checked for any possible impacts.
  */
 int
-so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
+so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int msg_flags,
     void *control, t_uscalar_t controllen)
 {
 	struct T_opthdr *tohp;
@@ -1217,6 +1224,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 	struct fdbuf *fdbuf;
 	int fdbuflen;
 	int error;
+	int oldflg = (msg_flags & MSG_XPG4_2) == 0;
 #if defined(DEBUG) || defined(__lint)
 	struct cmsghdr *cend = (struct cmsghdr *)
 	    (((uint8_t *)control) + ROUNDUP_cmsglen(controllen));
@@ -1245,7 +1253,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 				return (EPROTO);
 			if (oldflg) {
 				error = fdbuf_extract(fdbuf, control,
-				    (int)controllen);
+				    (int)controllen, msg_flags);
 				if (error != 0)
 					return (error);
 				continue;
@@ -1261,7 +1269,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 				    sizeof (struct cmsghdr));
 
 				error = fdbuf_extract(fdbuf,
-				    CMSG_CONTENT(cmsg), fdlen);
+				    CMSG_CONTENT(cmsg), fdlen, msg_flags);
 				if (error != 0)
 					return (error);
 			}

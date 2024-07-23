@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2017 Joyent, Inc.  All Rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -318,6 +319,26 @@ show_files(struct ps_prochandle *Pr)
 	(void) Pfdinfo_iter(Pr, show_file, Pr);
 }
 
+static void
+show_fdflags(int fdflags)
+{
+	if (fdflags <= 0)
+		return;
+
+	/*
+	 * show_fileflags() already has printed content here. We translate these
+	 * back to the O_ versions for consistency with the flags that were
+	 * already printed.
+	 */
+	if ((fdflags & FD_CLOEXEC) != 0) {
+		(void) printf("|O_CLOEXEC");
+	}
+
+	if ((fdflags & FD_CLOFORK) != 0) {
+		(void) printf("|O_CLOFORK");
+	}
+}
+
 /* examine open file with fcntl() */
 static void
 dofcntl(struct ps_prochandle *Pr, const prfdinfo_t *info, int mandatory,
@@ -333,8 +354,8 @@ dofcntl(struct ps_prochandle *Pr, const prfdinfo_t *info, int mandatory,
 		(void) printf("      ");
 		if (fileflags != -1)
 			show_fileflags(fileflags);
-		if (fdflags != -1 && (fdflags & FD_CLOEXEC))
-			(void) printf(" FD_CLOEXEC");
+		if (fdflags != -1)
+			show_fdflags(fdflags);
 		if (isdoor && (Pstate(Pr) != PS_DEAD))
 			show_door(Pr, info);
 		(void) fputc('\n', stdout);

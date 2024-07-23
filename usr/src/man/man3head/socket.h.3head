@@ -43,8 +43,9 @@
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH SOCKET.H 3HEAD "Sep 18, 2020"
+.TH SOCKET.H 3HEAD "June 21, 2024"
 .SH NAME
 socket.h, socket, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE \- Internet Protocol family
 .SH SYNOPSIS
@@ -120,7 +121,8 @@ header defines the following macros for use as the \fBcmsg_type\fR values when
 .ad
 .RS 14n
 Indicates that the data array contains the access rights (set of open file
-descriptors) to be sent or received.
+descriptors) to be sent or received. Each file descriptor requires one
+\fBint\fR to send or receive.
 .RE
 
 .sp
@@ -386,7 +388,8 @@ int   l_linger  /* linger time, in seconds */
 
 .sp
 .LP
-The \fB<sys/socket.h>\fR header defines the following macros:
+The \fB<sys/socket.h>\fR header defines the following macros which indicate
+types of sockets:
 .sp
 .ne 2
 .na
@@ -408,10 +411,75 @@ Byte-stream socket
 .sp
 .ne 2
 .na
+\fBSOCK_RAW\fR
+.ad
+.RS 18n
+Raw protocol interface
+.RE
+
+.sp
+.ne 2
+.na
+\fBSOCK_RDM\fR
+.ad
+.RS 18n
+Reliably delivered message
+.RE
+
+.sp
+.ne 2
+.na
 \fBSOCK_SEQPACKET\fR
 .ad
 .RS 18n
 Sequenced-packet socket
+.RE
+
+.sp
+.LP
+In some cases, the above types are bitwise-inclusive-ORed with zero or more of
+the following macros which modify the socket's default behavior:
+
+.sp
+.ne 2
+.na
+\fBSOCK_CLOEXEC\fR
+.ad
+.RS 18n
+The socket should have the close-on-exec, \fBFD_CLOEXEC\fR file descriptor flag
+set on it. The socket will be closed when the process calls any of the
+\fBexec\fR(2) family of functions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSOCK_CLOFORK\fR
+.ad
+.RS 18n
+The socket should have the close-on-fork, \fBFD_CLOFORK\fR file descriptor flag
+set on it. The socket will be closed in any child process created with the
+\fBfork\fR(2) family of functions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSOCK_NDELAY\fR
+.ad
+.RS 18n
+The socket should have the \fBO_NDELAY\fR flag set. See \fBopen\fR(2) for a
+discussion of the specific non-blocking behavior this implies.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSOCK_NONBLOCK\fR
+.ad
+.RS 18n
+The socket should have the \fBO_NONBLOCK\fR flag set. See \fBopen\fR(2) for a
+discussion of the specific non-blocking behavior this implies.
 .RE
 
 .sp
@@ -635,6 +703,32 @@ Wait for complete message.
 .ad
 .RS 15n
 Do not generate \fBSIGPIPE\fR signal.
+.RE
+
+.sp
+.ne 2
+.na
+\fBMSG_CMSG_CLOEXEC\fR
+.ad
+.RS 15n
+When receiving a message with the \fBSCM_RIGHTS\fR ancillary data present, all
+file descriptors should have the close-on-exec, \fBFD_CLOEXEC\fR flag set on
+them. They will be closed when the process successfully calls any of the
+\fBexec\fR(2) family of functions. This has no effect when sending
+\fBSCM_RIGHTS\fR ancillary data.
+.RE
+
+.sp
+.ne 2
+.na
+\fBMSG_CMSG_CLOFORK\fR
+.ad
+.RS 15n
+When receiving a message with the \fBSCM_RIGHTS\fR ancillary data present, all
+file descriptors should have the close-on-fork, \fBFD_CLOFORK\fR flag set on
+them. They will be closed in any child processes created with the \fBfork\fR(2)
+family of functions. This has no effect when sending \fBSCM_RIGHTS\fR ancillary
+data.
 .RE
 
 .sp

@@ -24,13 +24,14 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
-#include 	"lint.h"
-#include 	<sys/types.h>
+#include	"lint.h"
+#include	<sys/types.h>
 #include	<fcntl.h>
 #include	<errno.h>
 
@@ -51,10 +52,13 @@ dup2(int fildes, int fildes2)
 int
 dup3(int fildes, int fildes2, int flags)
 {
+	int dflags = 0;
+
 	/*
-	 * The only valid flag is O_CLOEXEC.
+	 * dup3() only supports O_ open flags that translate into file
+	 * descriptor flags in the F_GETFD sense.
 	 */
-	if (flags & ~O_CLOEXEC) {
+	if (flags & ~(O_CLOEXEC | O_CLOFORK)) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -68,6 +72,10 @@ dup3(int fildes, int fildes2, int flags)
 		return (-1);
 	}
 
-	return (fcntl(fildes, (flags == 0) ? F_DUP2FD : F_DUP2FD_CLOEXEC,
-	    fildes2));
+	if ((flags & O_CLOEXEC) != 0)
+		dflags |= FD_CLOEXEC;
+	if ((flags & O_CLOFORK) != 0)
+		dflags |= FD_CLOFORK;
+
+	return (fcntl(fildes, F_DUP3FD, fildes2, dflags));
 }

@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef	_PROTO_H
 #define	_PROTO_H
@@ -108,7 +108,7 @@ extern	int	fltlist(char *, fltset_t *, int *);
 extern	int	fdlist(char *, fileset_t *);
 extern	int	liblist(char *, int);
 
-extern	char 	*fetchstring(private_t *, long, int);
+extern	char	*fetchstring(private_t *, long, int);
 extern	void	show_cred(private_t *, int, int);
 extern	void	errmsg(const char *, const char *);
 extern	void	abend(const char *, const char *);
@@ -145,6 +145,7 @@ extern	void	report_htable_stats(void);
 
 extern	const char *door_flags(private_t *, long);
 extern	void	prt_ffg(private_t *, int, long);
+extern	void	prt_ffd(private_t *, int, long);
 extern	void	escape_string(private_t *, const char *);
 
 #ifdef	__cplusplus

@@ -92,6 +92,9 @@ extern "C" {
 #if !defined(_STRICT_SYMBOLS)
 #define	O_DIRECT	0x2000000	/* direct disk access hint */
 #endif
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG8)
+#define	O_CLOFORK	0x4000000	/* set the close-on-fork flag */
+#endif
 
 /*
  * fcntl(2) requests
@@ -130,6 +133,9 @@ extern "C" {
 #define	F_DUP2FD_CLOEXEC	36	/* Like F_DUP2FD with O_CLOEXEC set */
 					/* EINVAL is fildes matches arg1 */
 #define	F_DUPFD_CLOEXEC	37	/* Like F_DUPFD with O_CLOEXEC set */
+#define	F_DUP2FD_CLOFORK	57	/* This time with FD_CLOFORK */
+#define	F_DUPFD_CLOFORK	58		/* Again, but with FD_CLOFORK */
+#define	F_DUP3FD	59	/* Duplicate fildes, with flags */
 
 #define	F_ISSTREAM	13	/* Is the file desc. a stream ? */
 #define	F_PRIV		15	/* Turn on private access to file */
@@ -342,7 +348,8 @@ typedef struct o_flock {
 
 /* Mask for file access modes */
 #define	O_ACCMODE	(O_SEARCH | O_EXEC | 0x3)
-#define	FD_CLOEXEC	1	/* close on exec flag */
+#define	FD_CLOEXEC	1	/* close-on-exec flag */
+#define	FD_CLOFORK	2	/* close-on-fork flag */
 
 /*
  * DIRECTIO
