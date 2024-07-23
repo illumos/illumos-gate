@@ -57,6 +57,7 @@ PROGS = \
 	printf-15294 \
 	printf-9511 \
 	psignal-5097 \
+	ptsname \
 	quick_exit_order \
 	quick_exit_status \
 	set_constraint_handler_s \
@@ -104,6 +105,9 @@ mutex-16200.32 :=	LDLIBS += -lproc
 mutex-16200.64 :=	LDLIBS64 += -lproc
 mutex-16200.32 :=	CSTD=$(GNU_C99)
 mutex-16200.64 :=	CSTD=$(GNU_C99)
+
+ptsname.32 :=		LDLIBS += -lsocket
+ptsname.64 :=		LDLIBS64 += -lsocket
 
 strtonum.32 :=		CSTD=$(GNU_C99)
 strtonum.64 :=		CSTD=$(GNU_C99)

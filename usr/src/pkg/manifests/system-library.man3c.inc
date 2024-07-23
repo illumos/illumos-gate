@@ -1026,6 +1026,7 @@ file path=usr/share/man/man3c/pthread_spin_unlock.3c
 file path=usr/share/man/man3c/pthread_testcancel.3c
 file path=usr/share/man/man3c/ptrace.3c
 file path=usr/share/man/man3c/ptsname.3c
+link path=usr/share/man/man3c/ptsname_r.3c target=ptsname.3c
 link path=usr/share/man/man3c/putc.3c target=fputc.3c
 link path=usr/share/man/man3c/putc_unlocked.3c target=fputc.3c
 link path=usr/share/man/man3c/putchar.3c target=fputc.3c

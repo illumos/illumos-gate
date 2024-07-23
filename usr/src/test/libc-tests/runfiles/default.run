@@ -136,6 +136,8 @@ timeout = 600
 [/opt/libc-tests/tests/printf-9511.64]
 [/opt/libc-tests/tests/priv_gettext]
 [/opt/libc-tests/tests/psignal]
+[/opt/libc-tests/tests/ptsname.32]
+[/opt/libc-tests/tests/ptsname.64]
 [/opt/libc-tests/tests/quick_exit]
 [/opt/libc-tests/tests/set_constraint_handler_s.32]
 [/opt/libc-tests/tests/set_constraint_handler_s.64]

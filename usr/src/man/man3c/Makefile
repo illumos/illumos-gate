@@ -1159,6 +1159,7 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_setspecific.3c			\
 		pthread_spin_init.3c			\
 		pthread_spin_trylock.3c			\
+		ptsname_r.3c				\
 		putc.3c					\
 		putc_unlocked.3c			\
 		putchar.3c				\
@@ -2290,6 +2291,8 @@ pthread_rwlockattr_destroy.3c		:= LINKSRC = pthread_rwlockattr_init.3c
 pthread_spin_init.3c			:= LINKSRC = pthread_spin_destroy.3c
 
 pthread_spin_trylock.3c			:= LINKSRC = pthread_spin_lock.3c
+
+ptsname_r.3c				:= LINKSRC = ptsname.3c
 
 fputs.3c				:= LINKSRC = puts.3c
 

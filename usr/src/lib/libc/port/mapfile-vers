@@ -79,6 +79,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.47 {
+    protected:
+	ptsname_r;
+} ILLUMOS_0.46;
+
 SYMBOL_VERSION ILLUMOS_0.46 {
     protected:
 	pthread_cond_clockwait;
