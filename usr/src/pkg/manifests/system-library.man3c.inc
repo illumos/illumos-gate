@@ -900,9 +900,13 @@ file path=usr/share/man/man3c/pthread_cleanup_pop.3c
 file path=usr/share/man/man3c/pthread_cleanup_push.3c
 link path=usr/share/man/man3c/pthread_cond_broadcast.3c \
     target=pthread_cond_signal.3c
+link path=usr/share/man/man3c/pthread_cond_clockwait.3c \
+    target=pthread_cond_wait.3c
 link path=usr/share/man/man3c/pthread_cond_destroy.3c \
     target=pthread_cond_init.3c
 file path=usr/share/man/man3c/pthread_cond_init.3c
+link path=usr/share/man/man3c/pthread_cond_relclockwait_np.3c \
+    target=pthread_cond_wait.3c
 link path=usr/share/man/man3c/pthread_cond_reltimedwait_np.3c \
     target=pthread_cond_wait.3c
 file path=usr/share/man/man3c/pthread_cond_signal.3c
@@ -932,12 +936,16 @@ link path=usr/share/man/man3c/pthread_key_create_once_np.3c \
     target=pthread_key_create.3c
 file path=usr/share/man/man3c/pthread_key_delete.3c
 file path=usr/share/man/man3c/pthread_kill.3c
+link path=usr/share/man/man3c/pthread_mutex_clocklock.3c \
+    target=pthread_mutex_timedlock.3c
 file path=usr/share/man/man3c/pthread_mutex_consistent.3c
 link path=usr/share/man/man3c/pthread_mutex_destroy.3c \
     target=pthread_mutex_init.3c
 file path=usr/share/man/man3c/pthread_mutex_getprioceiling.3c
 file path=usr/share/man/man3c/pthread_mutex_init.3c
 file path=usr/share/man/man3c/pthread_mutex_lock.3c
+link path=usr/share/man/man3c/pthread_mutex_relclocklock_np.3c \
+    target=pthread_mutex_timedlock.3c
 link path=usr/share/man/man3c/pthread_mutex_reltimedlock_np.3c \
     target=pthread_mutex_timedlock.3c
 link path=usr/share/man/man3c/pthread_mutex_setprioceiling.3c \
@@ -966,10 +974,18 @@ link path=usr/share/man/man3c/pthread_mutexattr_setrobust.3c \
 link path=usr/share/man/man3c/pthread_mutexattr_settype.3c \
     target=pthread_mutexattr_gettype.3c
 file path=usr/share/man/man3c/pthread_once.3c
+link path=usr/share/man/man3c/pthread_rwlock_clockrdlock.3c \
+    target=pthread_rwlock_timedrdlock.3c
+link path=usr/share/man/man3c/pthread_rwlock_clockwrlock.3c \
+    target=pthread_rwlock_timedwrlock.3c
 link path=usr/share/man/man3c/pthread_rwlock_destroy.3c \
     target=pthread_rwlock_init.3c
 file path=usr/share/man/man3c/pthread_rwlock_init.3c
 file path=usr/share/man/man3c/pthread_rwlock_rdlock.3c
+link path=usr/share/man/man3c/pthread_rwlock_relclockrdlock_np.3c \
+    target=pthread_rwlock_timedrdlock.3c
+link path=usr/share/man/man3c/pthread_rwlock_relclockwrlock_np.3c \
+    target=pthread_rwlock_timedwrlock.3c
 link path=usr/share/man/man3c/pthread_rwlock_reltimedrdlock_np.3c \
     target=pthread_rwlock_timedrdlock.3c
 link path=usr/share/man/man3c/pthread_rwlock_reltimedwrlock_np.3c \
@@ -1115,12 +1131,14 @@ link path=usr/share/man/man3c/seconvert.3c target=econvert.3c
 link path=usr/share/man/man3c/seed48.3c target=drand48.3c
 file path=usr/share/man/man3c/seekdir.3c
 file path=usr/share/man/man3c/select.3c
+link path=usr/share/man/man3c/sem_clockwait.3c target=sem_timedwait.3c
 file path=usr/share/man/man3c/sem_close.3c
 file path=usr/share/man/man3c/sem_destroy.3c
 file path=usr/share/man/man3c/sem_getvalue.3c
 file path=usr/share/man/man3c/sem_init.3c
 file path=usr/share/man/man3c/sem_open.3c
 file path=usr/share/man/man3c/sem_post.3c
+link path=usr/share/man/man3c/sem_relclockwait_np.3c target=sem_timedwait.3c
 link path=usr/share/man/man3c/sem_reltimedwait_np.3c target=sem_timedwait.3c
 file path=usr/share/man/man3c/sem_timedwait.3c
 link path=usr/share/man/man3c/sem_trywait.3c target=sem_wait.3c

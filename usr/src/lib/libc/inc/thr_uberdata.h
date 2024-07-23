@@ -1325,6 +1325,10 @@ extern	void	_flush_windows(void);
 extern	void	set_curthread(void *);
 extern	void	ssp_init(void);
 
+extern	int	sema_relclockwait(sema_t *, clockid_t, const timespec_t *);
+extern	int	sema_clockwait(sema_t *, clockid_t, const timespec_t *);
+
+
 /*
  * Utility function used when waking up many threads (more than MAXLWPS)
  * all at once.  See mutex_wakeup_all(), cond_broadcast(), and rw_unlock().
@@ -1493,7 +1497,8 @@ extern	int	mutex_unlock_internal(mutex_t *, int);
 
 /* not cancellation points: */
 extern	int	__cond_wait(cond_t *, mutex_t *);
-extern	int	__cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	int	__cond_timedwait(cond_t *, mutex_t *, clockid_t,
+		    const timespec_t *);
 extern	int	__cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 
 extern	int	rw_read_held(rwlock_t *);

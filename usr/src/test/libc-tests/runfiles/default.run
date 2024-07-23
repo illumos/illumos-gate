@@ -107,6 +107,8 @@ timeout = 600
 [/opt/libc-tests/tests/c11_tss.64]
 [/opt/libc-tests/tests/call_once.32]
 [/opt/libc-tests/tests/call_once.64]
+[/opt/libc-tests/tests/clock_lock.32]
+[/opt/libc-tests/tests/clock_lock.64]
 [/opt/libc-tests/tests/closefrom.32]
 [/opt/libc-tests/tests/closefrom.64]
 [/opt/libc-tests/tests/catopen]

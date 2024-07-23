@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -203,23 +204,53 @@ sema_wait(sema_t *sp)
 	return (sema_wait_impl(sp, NULL));
 }
 
+/*
+ * sema_relcockwait() and sema_clockwait() are currently only internal to libc
+ * to aid with implementing the POSIX versions of these functions.
+ */
 int
-sema_reltimedwait(sema_t *sp, const timespec_t *reltime)
+sema_relclockwait(sema_t *sp, clockid_t clock, const timespec_t *reltime)
 {
 	timespec_t tslocal = *reltime;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
 	return (sema_wait_impl(sp, &tslocal));
+}
+
+int
+sema_clockwait(sema_t *sp, clockid_t clock, const timespec_t *abstime)
+{
+	timespec_t tslocal;
+
+	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
+	abstime_to_reltime(clock, abstime, &tslocal);
+	return (sema_wait_impl(sp, &tslocal));
+}
+
+int
+sema_reltimedwait(sema_t *sp, const timespec_t *reltime)
+{
+	return (sema_relclockwait(sp, CLOCK_REALTIME, reltime));
 }
 
 int
 sema_timedwait(sema_t *sp, const timespec_t *abstime)
 {
-	timespec_t tslocal;
-
-	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
-	abstime_to_reltime(CLOCK_REALTIME, abstime, &tslocal);
-	return (sema_wait_impl(sp, &tslocal));
+	return (sema_clockwait(sp, CLOCK_REALTIME, abstime));
 }
 
 #pragma weak _sema_trywait = sema_trywait

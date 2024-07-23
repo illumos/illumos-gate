@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright 2015, Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -2348,14 +2349,23 @@ mutex_enter(mutex_t *mp)
 }
 
 int
-pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
-    const struct timespec *_RESTRICT_KYWD abstime)
+pthread_mutex_clocklock(pthread_mutex_t *restrict mp, clockid_t clock,
+    const struct timespec *restrict abstime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
-	abstime_to_reltime(CLOCK_REALTIME, abstime, &tslocal);
+
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	abstime_to_reltime(clock, abstime, &tslocal);
 	error = mutex_lock_impl((mutex_t *)mp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
@@ -2363,18 +2373,41 @@ pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
 }
 
 int
-pthread_mutex_reltimedlock_np(pthread_mutex_t *_RESTRICT_KYWD mp,
-    const struct timespec *_RESTRICT_KYWD reltime)
+pthread_mutex_timedlock(pthread_mutex_t *restrict mp,
+    const struct timespec *restrict abstime)
+{
+	return (pthread_mutex_clocklock(mp, CLOCK_REALTIME, abstime));
+}
+
+int
+pthread_mutex_relclocklock_np(pthread_mutex_t *restrict mp, clockid_t clock,
+    const struct timespec *restrict reltime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
+
 	tslocal = *reltime;
 	error = mutex_lock_impl((mutex_t *)mp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
+}
+
+int
+pthread_mutex_reltimedlock_np(pthread_mutex_t *restrict mp,
+    const struct timespec *restrict reltime)
+{
+	return (pthread_mutex_relclocklock_np(mp, CLOCK_REALTIME, reltime));
 }
 
 #pragma weak pthread_mutex_trylock = mutex_trylock
@@ -3154,6 +3187,10 @@ cond_init(cond_t *cvp, int type, void *arg __unused)
 {
 	if (type != USYNC_THREAD && type != USYNC_PROCESS)
 		return (EINVAL);
+
+	/*
+	 * This memset initializes cond_clock to CLOCK_REALTIME.
+	 */
 	(void) memset(cvp, 0, sizeof (*cvp));
 	cvp->cond_type = (uint16_t)type;
 	cvp->cond_magic = COND_MAGIC;
@@ -3581,8 +3618,7 @@ cond_wait(cond_t *cvp, mutex_t *mp)
  * pthread_cond_wait() is a cancellation point.
  */
 int
-pthread_cond_wait(pthread_cond_t *_RESTRICT_KYWD cvp,
-    pthread_mutex_t *_RESTRICT_KYWD mp)
+pthread_cond_wait(pthread_cond_t *restrict cvp, pthread_mutex_t *restrict mp)
 {
 	int error;
 
@@ -3594,9 +3630,9 @@ pthread_cond_wait(pthread_cond_t *_RESTRICT_KYWD cvp,
  * cond_timedwait() is a cancellation point but __cond_timedwait() is not.
  */
 int
-__cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+__cond_timedwait(cond_t *cvp, mutex_t *mp, clockid_t clock_id,
+    const timespec_t *abstime)
 {
-	clockid_t clock_id = cvp->cond_clockid;
 	timespec_t reltime;
 	int error;
 
@@ -3622,13 +3658,14 @@ __cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	return (error);
 }
 
-int
-cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+static int
+cond_clockwait(cond_t *cvp, mutex_t *mp, clockid_t clock,
+    const timespec_t *abstime)
 {
 	int error;
 
 	_cancelon();
-	error = __cond_timedwait(cvp, mp, abstime);
+	error = __cond_timedwait(cvp, mp, clock, abstime);
 	if (error == EINTR)
 		_canceloff();
 	else
@@ -3636,17 +3673,34 @@ cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	return (error);
 }
 
+int
+cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+{
+	return (cond_clockwait(cvp, mp, cvp->cond_clockid, abstime));
+}
+
 /*
- * pthread_cond_timedwait() is a cancellation point.
+ * pthread_cond_timedwait() and pthread_cond_clockwait() are cancellation
+ * points. We need to check for cancellation before we evaluate whether the
+ * clock is valid.
  */
 int
-pthread_cond_timedwait(pthread_cond_t *_RESTRICT_KYWD cvp,
-    pthread_mutex_t *_RESTRICT_KYWD mp,
-    const struct timespec *_RESTRICT_KYWD abstime)
+pthread_cond_clockwait(pthread_cond_t *restrict cvp,
+    pthread_mutex_t *restrict mp, clockid_t clock,
+    const struct timespec *restrict abstime)
 {
 	int error;
 
-	error = cond_timedwait((cond_t *)cvp, (mutex_t *)mp, abstime);
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	/* We need to translate between the native threads errors and POSIX */
+	error = cond_clockwait((cond_t *)cvp, (mutex_t *)mp, clock, abstime);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	else if (error == EINTR)
@@ -3654,8 +3708,20 @@ pthread_cond_timedwait(pthread_cond_t *_RESTRICT_KYWD cvp,
 	return (error);
 }
 
+int
+pthread_cond_timedwait(pthread_cond_t *restrict cvp,
+    pthread_mutex_t *restrict mp, const struct timespec *restrict abstime)
+{
+	cond_t *cond = (cond_t *)cvp;
+	return (pthread_cond_clockwait(cvp, mp, cond->cond_clockid, abstime));
+}
+
 /*
  * cond_reltimedwait() is a cancellation point but __cond_reltimedwait() is not.
+ *
+ * Note, this function does not actually consume the clock id. Internally all
+ * waits are based upon the highres clock in the system and therefore the actual
+ * clock used is ignored at this point.
  */
 int
 __cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
@@ -3684,11 +3750,19 @@ cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 }
 
 int
-pthread_cond_reltimedwait_np(pthread_cond_t *_RESTRICT_KYWD cvp,
-    pthread_mutex_t *_RESTRICT_KYWD mp,
-    const struct timespec *_RESTRICT_KYWD reltime)
+pthread_cond_relclockwait_np(pthread_cond_t *restrict cvp,
+    pthread_mutex_t *restrict mp, clockid_t clock,
+    const struct timespec *restrict reltime)
 {
 	int error;
+
+	switch (clock) {
+	case CLOCK_REALTIME:
+	case CLOCK_HIGHRES:
+		break;
+	default:
+		return (EINVAL);
+	}
 
 	error = cond_reltimedwait((cond_t *)cvp, (mutex_t *)mp, reltime);
 	if (error == ETIME)
@@ -3696,6 +3770,15 @@ pthread_cond_reltimedwait_np(pthread_cond_t *_RESTRICT_KYWD cvp,
 	else if (error == EINTR)
 		error = 0;
 	return (error);
+}
+
+int
+pthread_cond_reltimedwait_np(pthread_cond_t *restrict cvp,
+    pthread_mutex_t *restrict mp, const struct timespec *restrict reltime)
+{
+	cond_t *cond = (cond_t *)cvp;
+	return (pthread_cond_relclockwait_np(cvp, mp, cond->cond_clockid,
+	    reltime));
 }
 
 #pragma weak pthread_cond_signal = cond_signal

@@ -20,6 +20,7 @@
 
 SUBDIRS = \
 	catopen \
+	clocklock \
 	err \
 	fexecve \
 	fpround \

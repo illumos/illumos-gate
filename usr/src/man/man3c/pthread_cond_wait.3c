@@ -43,263 +43,295 @@
 .\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH PTHREAD_COND_WAIT 3C "Nov 11, 2008"
-.SH NAME
-pthread_cond_wait, pthread_cond_timedwait, pthread_cond_reltimedwait_np \- wait
-on a condition
-.SH SYNOPSIS
-.LP
-.nf
-cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
-#include <pthread.h>
-
-\fBint\fR \fBpthread_cond_wait\fR(\fBpthread_cond_t *restrict\fR \fIcond\fR,
-     \fBpthread_mutex_t *restrict\fR \fImutex\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBpthread_cond_timedwait\fR(\fBpthread_cond_t *restrict\fR \fIcond\fR,
-     \fBpthread_mutex_t *restrict\fR \fImutex\fR,
-     \fBconst struct timespec *restrict\fR \fIabstime\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBpthread_cond_reltimedwait_np\fR(\fBpthread_cond_t *\fR\fIcond\fR,
-     \fBpthread_mutex_t *\fR\fImutex\fR, \fBconst struct timespec *\fR\fIreltime\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBpthread_cond_wait()\fR, \fBpthread_cond_timedwait()\fR, and
-\fBpthread_cond_reltimedwait_np()\fR functions are used to block on a condition
-variable. They are called with \fImutex\fR locked by the calling thread or
-undefined behavior will result.
-.sp
-.LP
-These functions atomically release \fImutex\fR and cause the calling thread to
-block on the condition variable \fIcond\fR. Atomically here means ``atomically
-with respect to access by another  thread to the mutex and then the condition
-variable." That is, if another thread is able to acquire the mutex after the
-about-to-block thread has released it, then a subsequent call to
-\fBpthread_cond_signal()\fR or \fBpthread_cond_broadcast()\fR in that thread
-behaves as if it were issued after the about-to-block thread has blocked.
-.sp
-.LP
+.Dd June 23, 2024
+.Dt PTHREAD_COND_WAIT 3C
+.Os
+.Sh NAME
+.Nm pthread_cond_wait ,
+.Nm pthread_cond_clockwait ,
+.Nm pthread_cond_timedwait ,
+.Nm pthread_cond_relclockwait_np ,
+.Nm pthread_cond_reltimedwait_np
+.Nd wait on a condition
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.Ft int
+.Fo pthread_cond_wait
+.Fa "pthread_cond_t *restrict cond"
+.Fa "pthread_mutex_t *restrict mutex"
+.Fc
+.Ft int
+.Fo pthread_cond_clockwait
+.Fa "pthread_cond_t *restrict cond"
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict abstime"
+.Fc
+.Ft int
+.Fo pthread_cond_timedwait
+.Fa "pthread_cond_t *restrict cond"
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "const struct timespec *restrict abstime"
+.Fc
+.Ft int
+.Fo pthread_cond_relclockwait_np
+.Fa "pthread_cond_t *restrict cond"
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict reltime"
+.Fc
+.Ft int
+.Fo pthread_cond_reltimedwait_np
+.Fa "pthread_cond_t *restrict cond"
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "const struct timespec *restrict reltime"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+and
+.Fn pthread_cond_reltimedwait_np
+functions are used to block on a condition variable.
+They must be called with
+.Fa mutex
+locked by the calling thread or undefined behavior will result.
+.Pp
+These functions atomically release
+.Fa mutex
+and cause the calling thread to block on the condition variable
+.Fa cond .
+Atomically here means atomically with respect to access by another thread to
+the mutex and then the condition variable.
+That is, if another thread is able to acquire the mutex after the about-to-block
+thread has released it, then a subsequent call to
+.Xr pthread_cond_signal 3C
+or
+.Xr pthread_cond_broadcast 3C
+in that thread behaves as if it were issued after the about-to-block thread has
+blocked.
+.Pp
 Upon successful return, the mutex has been locked and is owned by the calling
-thread. If mutex is a robust mutex where an owner terminated while holding the
-lock and the state is recoverable, the mutex is acquired even though the
-function returns an error value.
-.sp
-.LP
+thread.
+If mutex is a robust mutex where an owner terminated while holding the lock and
+the state is recoverable, the mutex is acquired even though the function returns
+an error value.
+.Pp
 When using condition variables there is always a boolean predicate, an
 invariant, associated with each condition wait that must be true before the
-thread should proceed. Spurious wakeups from the \fBpthread_cond_wait()\fR,
-\fBpthread_cond_timedwait()\fR, or \fBpthread_cond_reltimedwait_np()\fR
-functions could occur. Since the return from \fBpthread_cond_wait()\fR,
-\fBpthread_cond_timedwait()\fR, or \fBpthread_cond_reltimedwait_np()\fR does
-not imply anything about the value of this predicate, the predicate should
-always be reevaluated.
-.sp
-.LP
-The order in which blocked threads are awakened by \fBpthread_cond_signal()\fR
-or \fBpthread_cond_broadcast()\fR is determined by the scheduling policy. See
-\fBpthreads\fR(7).
-.sp
-.LP
+thread should proceed.
+Spurious wakeups from the
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+or
+.Fn pthread_cond_reltimedwait_np
+functions could occur.
+The return from these functions does not imply anything about the value of this
+predicate and the predicate must always be reevaluated.
+.Pp
+The order in which blocked threads are awakened by
+.Xr pthread_cond_signal 3C
+or
+.Xr pthread_cond_broadcast 3C
+is determined by the scheduling policy.
+See
+.Xr pthread 7 .
+.Pp
 The effect of using more than one mutex for concurrent
-\fBpthread_cond_wait()\fR, \fBpthread_cond_timedwait()\fR, or
-\fBpthread_cond_reltimedwait_np()\fR operations on the same condition variable
-will result in undefined behavior.
-.sp
-.LP
-A condition wait (whether timed or not) is a cancellation point. When the
-cancelability enable state of a thread is set to \fBPTHREAD_CANCEL_DEFERRED\fR,
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+or
+.Fn pthread_cond_reltimedwait_np
+operations on the same condition variable will result in undefined behavior.
+.Pp
+A condition wait
+.Pq whether timed or not
+is a cancellation point.
+When the cancelability enable state of a thread is set to
+.Dv PTHREAD_CANCEL_DEFERRED ,
 a side effect of acting upon a cancellation request while in a condition wait
 is that the mutex is reacquired before calling the first cancellation cleanup
 handler.
-.sp
-.LP
+.Pp
 A thread that has been unblocked because it has been canceled while blocked in
-a call to \fBpthread_cond_wait()\fR or \fBpthread_cond_timedwait()\fR does not
-consume any condition signal that may be directed concurrently at the condition
-variable if there are other threads blocked on the condition variable.
-.sp
-.LP
-The \fBpthread_cond_timedwait()\fR function is the same as
-\fBpthread_cond_wait()\fR except that an error is returned if the absolute time
-specified by \fIabstime\fR passes (that is, system time equals or exceeds
-\fIabstime\fR) before the condition \fIcond\fR is signaled or broadcast, or if
-the absolute time specified by \fIabstime\fR has already been passed at the
-time of the call. The \fIabstime\fR argument is of type \fBstruct timespec\fR,
-defined in \fBtime.h\fR(3HEAD). When such time-outs occur,
-\fBpthread_cond_timedwait()\fR will nonetheless release and reacquire the mutex
-referenced by \fImutex\fR. The function \fBpthread_cond_timedwait()\fR is also
-a cancellation point.
-.sp
-.LP
-The \fBpthread_cond_reltimedwait_np()\fR function is a non-standard extension
-provided by the Solaris version of POSIX threads as indicated by the
-``\fB_np\fR'' (non-portable) suffix. The \fBpthread_cond_reltimedwait_np()\fR
-function is the same as \fBpthread_cond_timedwait()\fR except that the
-\fIreltime\fR argument specifies a non-negative time relative to the current
-system time rather than an absolute time. The \fIreltime\fR argument is of type
-\fBstruct timespec\fR, defined in \fBtime.h\fR(3HEAD). An error value is
-returned if the relative time passes (that is, system time equals or exceeds
-the starting system time plus the relative time) before the condition
-\fIcond\fR is signaled or broadcast.  When such timeouts occur,
-\fBpthread_cond_reltimedwait_np()\fR releases and reacquires the mutex
-referenced by \fImutex\fR.  The \fBpthread_cond_reltimedwait_np()\fR function
-is also a cancellation point.
-.sp
-.LP
-If a signal is delivered to a thread waiting for a condition variable, upon
-return from the signal handler the thread resumes waiting for the condition
-variable as if it was not interrupted, or it returns \fB0\fR due to spurious
-wakeup.
-.SH RETURN VALUES
-.sp
-.LP
-Except in the case of \fBETIMEDOUT\fR, \fBEOWNERDEAD\fR, or
-\fBENOTRECOVERABLE\fR, all of these error checks act as if they were performed
-immediately at the beginning of processing for the function and cause an error
-return, in effect, prior to modifying the state of the mutex specified by
-\fImutex\fR or the condition variable specified by \fIcond\fR.
-.sp
-.LP
-Upon successful completion, \fB0\fR is returned. Otherwise, an error value is
-returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
-These functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 9n
-The mutex type is \fBPTHREAD_MUTEX_ERRORCHECK\fR or the mutex is a robust
-mutex, and the current thread does not own the mutex.
-.RE
-
-.sp
-.LP
-The  \fBpthread_cond_timedwait()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBETIMEDOUT\fR\fR
-.ad
-.RS 13n
-The absolute time specified by \fIabstime\fR to \fBpthread_cond_timedwait()\fR
-has passed.
-.RE
-
-.sp
-.LP
-The \fBpthread_cond_reltimedwait_np()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 13n
-The value specified by \fIreltime\fR is invalid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIMEDOUT\fR\fR
-.ad
-.RS 13n
-The relative time specified by \fIreltime\fR to
-\fBpthread_cond_reltimedwait_np()\fR has passed.
-.RE
-
-.sp
-.LP
-These functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIcond\fR, \fImutex\fR, \fIabstime\fR, or \fIreltime\fR
+a call to any of these functions does not consume any condition signal that may
+be directed concurrently at the condition variable if there are other threads
+blocked on the condition variable.
+.Pp
+The
+.Fn pthread_cond_wait
+function will block forever until it is signaled.
+With the other functions, it is possible to bound the amount of time that the
+calling thread will block waiting to be signaled.
+When a timeout occurs, the calling threads will return with the mutex held, but
+will instead indicate an error occurred.
+.Pp
+In general, the system provides the ability to program timeouts against
+either the realtime clock,
+.Dv CLOCK_REALTIME ,
+which measures the wall clock and is subject to changes due to time
+synchronization daemons such as NTP and PTP, or the high-resolution clock,
+.Dv CLOCK_HIGHRES ,
+which is a non-adjustable high-resolution clock that is provided by
+system hardware.
+The specified timeout may either be specified as an absolute time in the
+future or as a relative amount of time that should elapse.
+Each clock has its own resolution, which can be determined by
+.Xr clock_getres 3C .
+Timeouts may be rounded up to a given clock's resolution.
+.Pp
+The
+.Fn pthread_cond_timedwait
+and
+.Fn pthrad_cond_reltimedwait_np
+functions determine which clock they use to wait based upon the clock that the
+condition variable was created with.
+By default, all timed condition variables utilize the realtime clock,
+.Dv CLOCK_REALTIME .
+The default clock may be changed on a per-condition variable basis by setting
+the condition variable's attributes with the
+.Xr pthread_condattr_setclock 3C
+function when creating the condition variable.
+.Pp
+The
+.Fn pthread_cond_clockwait
+and
+.Fn pthread_cond_relclockwait_np
+functions ignore the condition variable's defined clock and instead utilize the
+clock specified by the
+.Fa clock
+argument.
+While there are additional clocks in the system, only
+.Dv CLOCK_REALTIME
+or
+.Dv CLOCK_HIGHRES
+may be specified.
+The thread and process-specific CPU time clocks cannot be used.
+.Pp
+The
+.Fn pthread_cond_clockwait
+and
+.Fn pthread_cond_timedwait
+functions treat the timeout value,
+.Fa abstime ,
+as the absolute time in the future when the timeout should expire.
+Conversely, the
+.Fn pthread_cond_relclockwait_np
+and
+.Fn pthread_cond_reltimedwait_np
+functions operate in terms of a relative time.
+The timer will expire when a specified amount of time passes on the
+clock as indicated by
+.Fa reltime .
+.Pp
+The
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+or
+.Fn pthread_cond_reltimedwait_np
+functions split the errors that they return into those that occur before and
+those that occur after dropping the lock in any form.
+In particular, error checking is guaranteed to occur before releasing the mutex
+and waiting on the condition variable.
+The errors
+.Er ETIMEDOUT ,
+.Er EOWNERDEAD ,
+and
+.Er ENOTRECOVERABLE
+are the only errors that may occur after a wait has begun.
+The latter two errors only apply to a robust mutex.
+No matter why the calling functions return, they will always return with the
+mutex
+.Fa mutex
+held, excepting certain unrecoverable robust mutexes.
+In addition, if the calling thread that is waiting on a condition variable
+takes a signal, the thread will never return
+.Er EINTR .
+It may resume blocking or potentially deliver a spurious wakeup.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+and
+.Fn pthread_cond_reltimedwait_np
+functions return 0.
+Otherwise, an error value is returned to indicate the error.
+.Sh ERRORS
+The
+.Fn pthread_cond_wait ,
+.Fn pthread_cond_clockwait ,
+.Fn pthread_cond_timedwait ,
+.Fn pthread_cond_relclockwait_np ,
+and
+.Fn pthread_cond_reltimedwait_np
+functions will fail if:
+.Bl -tag -width Er
+.It Er EPERM
+The mutex type is
+.Dv PTHREAD_MUTEX_ERRORCHECK
+or the mutex is a robust mutex, and the current thread does not own the mutex.
+.It Er ETIMEDOUT
+The absolute or relative time specified by
+.Fa abstime
+and
+.Fa reltime
+respectively, has passed.
+This does not apply to
+.Fn pthread_cond_wait .
+.It Er EINVAL
+One or more of the values specified by
+.Fa cond ,
+.Fa mutex ,
+.Fa abstime ,
+or
+.Fa reltime
 is invalid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Different mutexes were supplied for concurrent operations on the same condition
+.Pp
+Different mutexes were supplied for concurrent operation on the same condition
 variable.
-.RE
-
-.sp
-.LP
-If the mutex specified by \fImutex\fR is a robust mutex (initialized with the
-robustness attribute \fBPTHREAD_MUTEX_ROBUST\fR), the
-\fBpthread_cond_wait()\fR, \fBpthread_cond_timedwait()\fR, and
-\fBpthread_cond_reltimedwait_np()\fR functions will, under the specified
-conditions, return the following error values.  For complete information, see
-the \fBpthread_mutex_lock\fR(3C) and \fBpthread_mutexattr_setrobust\fR(3C)
-manual pages.
-.sp
-.ne 2
-.na
-\fB\fBEOWNERDEAD\fR\fR
-.ad
-.RS 19n
-The last owner of this mutex died while holding the mutex, leaving the state it
-was protecting possibly inconsistent. The mutex is now owned by the caller.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTRECOVERABLE\fR\fR
-.ad
-.RS 19n
-The mutex was protecting state that has now been left irrecoverable. The mutex
-has not been acquired.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR pthread_cond_broadcast (3C),
-.BR pthread_cond_signal (3C),
-.BR pthread_mutex_lock (3C),
-.BR pthread_mutexattr_getrobust (3C),
-.BR time.h (3HEAD),
-.BR attributes (7),
-.BR condition (7),
-.BR pthreads (7),
-.BR standards (7)
+.Pp
+The value of
+.Fa clock
+is either unsupported for timing operations or the value is unknown to the
+system.
+.It Er EOWNERDEAD
+The mutex is a robust mutex initialized with the attribute
+.Dv PTHREAD_MUTEX_ROBUST
+and the last owner of this mutex died while holding the mutex, leaving the
+state it was protecting possibly inconsistent.
+The mutex is now owned by the caller.
+.It Er ENOTRECOVERABLE
+The mutex is a robust mutex initialized with the attribute
+.Dv PTHREAD_MUTEX_ROBUST
+and the mutex was protecting state that has now been left irrecoverable.
+The mutex has not been acquired.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr clock_getres 3C ,
+.Xr pthread_cond_broadcast 3C ,
+.Xr pthread_cond_signal 3C ,
+.Xr pthread_condattr_setclock 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutexattr_getrobust 3C ,
+.Xr time.h 3HEAD ,
+.Xr attributes 7 ,
+.Xr condition 7 ,
+.Xr pthreads 7 ,
+.Xr standards 7

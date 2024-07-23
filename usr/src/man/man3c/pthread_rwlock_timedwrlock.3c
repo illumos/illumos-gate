@@ -42,137 +42,187 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH PTHREAD_RWLOCK_TIMEDWRLOCK 3C "Jan 30, 2004"
-.SH NAME
-pthread_rwlock_timedwrlock, pthread_rwlock_reltimedwrlock_np \- lock a
-read-write lock for writing
-.SH SYNOPSIS
-.LP
-.nf
-cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
-#include <pthread.h>
-#include <time.h>
-
-\fBint\fR \fBpthread_rwlock_timedwrlock\fR(\fBpthread_rwlock_t *restrict\fR \fIrwlock\fR,
-     \fBconst struct timespec *restrict\fR \fIabs_timeout\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBpthread_rwlock_reltimedwrlock_np\fR(\fBpthread_rwlock_t *restrict\fR \fIrwlock\fR,
-     \fBconst struct timespec *restrict\fR \fIrel_timeout\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBpthread_rwlock_timedwrlock()\fR function applies a write lock to the
-read-write lock referenced by \fIrwlock\fR as in the
-\fBpthread_rwlock_wrlock\fR(3C) function. If the lock cannot be acquired
-without waiting for other threads to unlock the lock, this wait will be
-terminated when the specified timeout expires. The timeout expires when the
-absolute time specified by \fIabs_timeout\fR passes, as measured by the
-\fBCLOCK_REALTIME\fR clock (that is, when the value of that clock equals or
-exceeds \fIabs_timeout\fR), or if the absolute time specified by
-\fIabs_timeout\fR has already been passed at the time of the call.
-.sp
-.LP
-The \fBpthread_rwlock_reltimedwrlock_np()\fR function is identical to the
-\fBpthread_rwlock_timedwrlock()\fR function, except that the timeout is
-specified as a relative time interval. The timeout expires when the time
-interval specified by \fIrel_timeout\fR passes, as measured by the
-\fBCLOCK_REALTIME\fR clock, or if the time interval specified by
-\fIrel_timeout\fR is negative at the time of the call.
-.sp
-.LP
-The resolution of the timeout is the resolution of the \fBCLOCK_REALTIME\fR
-clock. The \fBtimespec\fR data type is defined in the <\fBtime.h\fR> header.
-Under no circumstances does either function fail with a timeout if the lock can
-be acquired immediately. The validity of the \fIabs_timeout\fR parameter need
-not be checked if the lock can be immediately acquired.
-.sp
-.LP
-If a signal that causes a signal handler to be executed is delivered to a
-thread blocked on a read- write lock with a call to
-\fBpthread_rwlock_timedwrlock()\fR or \fBpthread_rwlock_reltimedwrlock_np()\fR,
-upon return from the signal handler the thread resumes waiting for the lock as
-if it was not interrupted.
-.sp
-.LP
-The calling thread can deadlock if at the time the call is made it holds the
-read-write lock. The results are undefined if this function is called with an
-uninitialized read-write lock.
-.SH RETURN VALUES
-.LP
-The \fBpthread_rwlock_timedwrlock()\fR and
-\fBpthread_rwlock_reltimedwrlock_np()\fR functions return 0 if the lock for
-writing on the read-write lock object referenced by \fIrwlock\fR is acquired.
+.Dd June 23, 2024
+.Dt PTHREAD_RWLOCK_TIMEDWRLOCK 3C
+.Os
+.Sh NAME
+.Nm pthread_rwlock_clockwdlock ,
+.Nm pthread_rwlock_timedwdlock ,
+.Nm pthread_rwlock_relclockwdlock_np ,
+.Nm pthread_rwlock_reltimedwdlock_np
+.Nd lock a read-write lock for writing
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In pthread.h
+.In time.h
+.Ft int
+.Fo pthread_rwlock_clockwdlock
+.Fa "pthread_rwlock_t *restrict rwlock"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict abstime"
+.Fc
+.Ft int
+.Fo pthread_rwlock_timedwdlock
+.Fa "pthread_rwlock_t *restrict rwlock"
+.Fa "const struct timespec *restrict abstime"
+.Fc
+.Ft int
+.Fo pthread_rwlock_relclockwdlock_np
+.Fa "pthread_rwlock_t *restrict rwlock"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict reltime"
+.Fc
+.Ft int
+.Fo pthread_rwlock_reltimedwdlock_np
+.Fa "pthread_rwlock_t *restrict rwlock"
+.Fa "const struct timespec *restrict reltime"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_rwlock_clockwdlock ,
+.Fn pthread_rwlock_timerwdlock ,
+.Fn pthread_rwlock_relclockwdlock_np ,
+and
+.Fn pthread_rwlock_reltimewrdlock_np
+functions apply a read lock to the read-write lock referenced by
+.Fa rwlock .
+The calling thread will acquire a write lock if there are no readers or
+writers holding the lock, or pending writers.
+However, if the read-write lock
+.Fa rwlock
+is not available, the calling thread will be suspended and wait for the
+lock to become avaialble.
+If the lock does not become available within a specified timeout, then
+the function call will terminate without acquiring the lock and return
+the
+.Er ETIMEDOUT
+error.
+These functions all differ in terms of how the timeout is specified and
+the clock that is used to determine when the timeout has elapsed.
+.Pp
+In general, the system provides the ability to program timeouts against
+either the realtime clock,
+.Dv CLOCK_REALTIME ,
+which measure, the wall clock and is subject to changes due to time
+synchronization daemons such as NTP and PTP, or the high-resolution clock,
+.Dv CLOCK_HIGHRES ,
+which is a non-adjustable high-resolution clock that is provided by
+system hardware.
+The specified timeout may either be specified as an absolute time in the
+future or as a relative amount of time that should elapse.
+Each clock has its own resolution, which can be determined by
+.Xr clock_getres 3C .
+Timeouts may be rounded up to a given clock's resolution.
+Due to scheduling effects, it is possible that more time may elapse than
+was specified in the timeout when the caller does not successfully
+acquire the lock.
+The
+.Fn pthread_rwlock_clockwrlock
+and
+.Fn pthread_rwlock_relclockwrlock_np
+functions allow the clock source to be used to be specified by the
+.Fa clock
+argument.
+While there are additional clocks in the system, only
+.Dv CLOCK_REALTIME
+or
+.Dv CLOCK_HIGHRES
+may be specified.
+The thread and process-specific CPU time clocks cannot be used.
+Conversely, the
+.Fn pthread_rwlock_timedwrlock
+and
+.Fn pthread_rwlock_reltimedwrlock_np
+functions will always utilize the realtime clock,
+.Dv CLOCK_REALTIME .
+.Pp
+The
+.Fn pthread_rwlock_clockwrlock
+and
+.Fn pthread_rwlock_timedwrlock
+functions treat the timeout value,
+.Fa abstime ,
+as the absolute time in the future when the timeout should expire.
+Conversely, the
+.Fn pthread_rwlock_relclockwrlock_np
+and
+.Fn pthread_rwlock_reltimedwrlock_np
+functions operate in terms of a relative time.
+The timer will expire when a specified amount of time passes on the
+clock specified as indicated by
+.Fa reltime .
+If the read-write lock,
+.Fa rwlock ,
+can be immediately write-locked, then the timeout value is ignored
+entirely, Even if the timeout had already expired or represented a
+value that didn't make sense.
+Both are only checked if the thread would block on the read-write lock
+itself.
+.Pp
+Similarly, if a signal that causes a signal handler to be executed is
+delivered to a thread blocked on a read-write lock, then upon return
+from the signal handler, the thread resumes waiting for the lock as
+though it was not interrupted.
+.Pp
+It is illegal for a thread to acquire a write lock on the same read-write
+lock that it already holds either a read or write lock on.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_rwlock_clockwrlock ,
+.Fn pthread_rwlock_timerwrlock ,
+.Fn pthread_rwlock_relclockwrlock_np ,
+and
+.Fn pthread_rwlock_reltimerwrlock_np
+return
+.Sy 0
+and have successfully acquired a write lock on
+.Fa rwlock .
 Otherwise, an error number is returned to indicate the error.
-.SH ERRORS
-.LP
-The \fBpthread_rwlock_timedwrlock()\fR and
-\fBpthread_rwlock_reltimedwrlock_np()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBETIMEDOUT\fR\fR
-.ad
-.RS 13n
-The lock could not be acquired before the specified timeout expired.
-.RE
-
-.sp
-.LP
-The \fBpthread_rwlock_timedwrlock()\fR and
-\fBpthread_rwlock_reltimedwrlock_np()\fR functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEDEADLK\fR\fR
-.ad
-.RS 11n
-The calling thread already holds the rwlock.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 11n
-The value specified by \fIrwlock\fR does not refer to an initialized read-write
-lock object, or the timeout nanosecond value is less than zero or greater than
+.Sh ERRORS
+The
+.Fn pthread_rwlock_clockwrlock ,
+.Fn pthread_rwlock_timerwrlock ,
+.Fn pthread_rwlock_relclockwrlock_np ,
+and
+.Fn pthread_rwlock_reltimerwrlock_np
+will fail if:
+.Bl -tag -width Er
+.It Er EDEADLK
+The calling thread already has a read or write lock on
+.Fa rwlock
+.It Er EINVAL
+The value specified by
+.Fa rwlock
+does not refer to an initialized read-write
+lock object.
+The timeout nanosecond value is less than zero or greater than
 or equal to 1,000 million.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-_
-MT-Level	MT-Safe
-.TE
-
-.sp
-.LP
-The \fBpthread_rwlock_timedwrlock()\fR function is Standard. The
-\fBpthread_rwlock_reltimedwrlock_np()\fR function is Stable.
-.SH SEE ALSO
-.LP
-.BR pthread_rwlock_destroy (3C),
-.BR pthread_rwlock_rdlock (3C),
-.BR pthread_rwlock_timedrdlock (3C),
-.BR pthread_rwlock_trywrlock (3C),
-.BR pthread_rwlock_unlock (3C),
-.BR pthread_rwlock_wrlock (3C),
-.BR attributes (7),
-.BR standards (7)
+.Pp
+For
+.Fn pthread_rwlock_clockwrlock
+and
+.Fn pthread_rwlock_relclockwrlock_np
+the value of
+.Fa clock
+is either unsupported for locking or unknown to the system.
+.It Er ETIMEDOUT
+The lock could not be acquired before the specified timeout expired.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr clock_getres 3C ,
+.Xr pthread_rwlock_destroy 3C ,
+.Xr pthread_rwlock_rdlock 3C ,
+.Xr pthread_rwlock_timedrdlock 3C ,
+.Xr pthread_rwlock_tryrdlock 3C ,
+.Xr pthread_rwlock_trywrlock 3C ,
+.Xr pthread_rwlock_unlock 3C ,
+.Xr pthread_rwlock_wrlock 3C ,
+.Xr attributes 7 ,
+.Xr standards 7

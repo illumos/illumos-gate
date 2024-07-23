@@ -38,6 +38,21 @@
 extern "C" {
 #endif
 
+/*
+ * Including <time.h> has an unfortunate XPG/POSIX history. In XPG6 and POSIX
+ * 1999, sem_timedwait() was added which required making the struct timespec
+ * declared in some form. In XPG7, this is permitted to make all of time.h
+ * visible. In XPG8, the use of the clockid_t is required from time.h. For
+ * better and worse, that is how the ifdef soup is here. We prefer including
+ * time.h so that folks can get a full definition for the time struct timespec
+ * rather than the forward declaration that most other OSes do here.
+ */
+#if !defined(_STRICT_POSIX) || defined(_XPG7)
+#include <time.h>
+#elif defined(_XPG6)
+struct timespec;
+#endif
+
 typedef struct {
 	/* this structure must be the same as sema_t in <synch.h> */
 	uint32_t	sem_count;	/* semaphore count */
@@ -58,19 +73,20 @@ sem_t	*sem_open(const char *, int, ...);
 int	sem_close(sem_t *);
 int	sem_unlink(const char *);
 int	sem_wait(sem_t *);
-/*
- * Inclusion of <time.h> breaks X/Open and POSIX namespace.
- * The timespec structure while allowed in XPG6 and POSIX.1003d-1999,
- * is not permitted in prior POSIX or X/Open specifications even
- * though functions beginning with sem_* are allowed.
- */
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-struct timespec;
+
+#if !defined(_STRICT_POSIX) || defined(_XPG6)
 int	sem_timedwait(sem_t *_RESTRICT_KYWD,
 		const struct timespec *_RESTRICT_KYWD);
 int	sem_reltimedwait_np(sem_t *_RESTRICT_KYWD,
 		const struct timespec *_RESTRICT_KYWD);
-#endif	/* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) ... */
+#endif	/* !_STRICT_POSIX || _XPG6 */
+
+#if !defined(_STRICT_POSIX) || defined(_XPG8)
+int	sem_clockwait(sem_t *_RESTRICT_KYWD, clockid_t,
+		const struct timespec *_RESTRICT_KYWD);
+int	sem_relclockwait_np(sem_t *_RESTRICT_KYWD, clockid_t,
+		const struct timespec *_RESTRICT_KYWD);
+#endif	/* !_STRICT_POSIX || _XPG8 */
 int	sem_trywait(sem_t *);
 int	sem_post(sem_t *);
 int	sem_getvalue(sem_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);

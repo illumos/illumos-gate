@@ -79,6 +79,20 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.46 {
+    protected:
+	pthread_cond_clockwait;
+	pthread_cond_relclockwait_np;
+	pthread_mutex_clocklock;
+	pthread_mutex_relclocklock_np;
+	pthread_rwlock_clockrdlock;
+	pthread_rwlock_relclockrdlock_np;
+	pthread_rwlock_clockwrlock;
+	pthread_rwlock_relclockwrlock_np;
+	sem_clockwait;
+	sem_relclockwait_np;
+} ILLUMOS_0.45;
+
 SYMBOL_VERSION ILLUMOS_0.45 {
     protected:
 	strerrordesc_np;
