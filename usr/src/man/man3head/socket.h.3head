@@ -45,7 +45,7 @@
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.TH SOCKET.H 3HEAD "June 21, 2024"
+.TH SOCKET.H 3HEAD "July 2, 2024"
 .SH NAME
 socket.h, socket, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE \- Internet Protocol family
 .SH SYNOPSIS
@@ -601,10 +601,29 @@ Socket error status.
 .sp
 .ne 2
 .na
+\fBSO_DOMAIN\fR
+.ad
+.RS 17n
+Socket family.
+.RE
+
+.sp
+.ne 2
+.na
 \fBSO_TYPE\fR
 .ad
 .RS 17n
 Socket type.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSO_PROTOCOL\fR,
+.B SO_PROTOTYPE
+.ad
+.RS 17n
+Socket protocol.
 .RE
 
 .sp

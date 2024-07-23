@@ -23,7 +23,8 @@ include $(SRC)/test/Makefile.com
 PROGDA = rights recvmsg
 
 PROG =	conn dgram drop_priv nosignal sockpair \
-	$(PROGDA:%=%.32) $(PROGDA:%=%.64)
+	$(PROGDA:%=%.32) $(PROGDA:%=%.64) \
+	so_protocol
 
 LDLIBS += -lsocket
 LDLIBS64 += -lsocket

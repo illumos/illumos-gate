@@ -186,6 +186,7 @@ struct so_snd_bufinfo {
 #define	SO_ERROR	0x1007		/* get error status and clear */
 #define	SO_TYPE		0x1008		/* get socket type */
 #define	SO_PROTOTYPE	0x1009		/* get/set protocol type */
+#define	SO_PROTOCOL	SO_PROTOTYPE	/* POSIX name */
 #define	SO_ANON_MLP	0x100a		/* create MLP on anonymous bind */
 #define	SO_MAC_EXEMPT	0x100b		/* allow dominated unlabeled peers */
 #define	SO_DOMAIN	0x100c		/* get socket domain */

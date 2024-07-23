@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -1539,6 +1540,29 @@ trill_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	return (error);
 }
 
+/*
+ * This is a token getsockopt() implementation so we can reply to SO_PROTOCOL.
+ */
+static int
+trill_getsockopt(sock_lower_handle_t handle, int level,
+    int option_name, void *optval, socklen_t *optlenp, struct cred *cr)
+{
+	int32_t value;
+
+	if (level != SOL_SOCKET && option_name != SO_PROTOCOL) {
+		return (ENOPROTOOPT);
+	}
+
+	if (*optlenp < sizeof (int32_t)) {
+		return (EINVAL);
+	}
+
+	value = 0;
+	bcopy(&value, optval, sizeof (value));
+	*optlenp = sizeof (value);
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 trill_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
@@ -1651,7 +1675,7 @@ static sock_downcalls_t sock_trill_downcalls = {
 	sock_connect_notsupp,		/* sd_connect */
 	sock_getpeername_notsupp,	/* sd_getpeername */
 	sock_getsockname_notsupp,	/* sd_getsockname */
-	sock_getsockopt_notsupp,	/* sd_getsockopt */
+	trill_getsockopt,		/* sd_getsockopt */
 	sock_setsockopt_notsupp,	/* sd_setsockopt */
 	trill_send,			/* sd_send */
 	NULL,				/* sd_send_uio */

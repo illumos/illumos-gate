@@ -173,6 +173,7 @@ file path=opt/os-tests/tests/sockfs/recvmsg.32 mode=0555
 file path=opt/os-tests/tests/sockfs/recvmsg.64 mode=0555
 file path=opt/os-tests/tests/sockfs/rights.32 mode=0555
 file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
+file path=opt/os-tests/tests/sockfs/so_protocol mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 dir  path=opt/os-tests/tests/stackalign

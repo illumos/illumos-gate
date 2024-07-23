@@ -1700,6 +1700,12 @@ socket_getopt_common(struct sonode *so, int level, int option_name,
 			value = sogeterr(so, B_TRUE);
 			mutex_exit(&so->so_lock);
 			break;
+		/*
+		 * While SO_DOMAIN and SO_TYPE are here, SO_PROTOCOL (aka
+		 * SO_PROTOYPE) is not implemented in the common layer because
+		 * some socket modules support setting the protocol and
+		 * therefore we must ask the module directly.
+		 */
 		case SO_DOMAIN:
 			value = so->so_family;
 			break;

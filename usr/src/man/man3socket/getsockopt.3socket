@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETSOCKOPT 3SOCKET "Jan 27, 2009"
+.TH GETSOCKOPT 3SOCKET "July 2, 2024"
 .SH NAME
 getsockopt, setsockopt \- get and set options on sockets
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
 #include <sys/types.h>
@@ -25,8 +25,6 @@ getsockopt, setsockopt \- get and set options on sockets
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgetsockopt()\fR and \fBsetsockopt()\fR functions manipulate options
 associated with a socket. Options may exist at multiple protocol levels; they
 are always present at the uppermost "socket" level.
@@ -244,12 +242,17 @@ get the domain used in the socket (get only)
 .sp
 .ne 2
 .na
-\fB\fBSO_PROTOTYPE\fR\fR
+\fB\fBSO_PROTOTYPE\fR\fR,
+.B SO_PROTOCOL
 .ad
 .RS 19n
-for socket in domains \fBPF_INET\fR and \fBPF_INET6\fR, get the underlying
-protocol number used in the socket. For socket in domain \fBPF_ROUTE\fR, get
-the address family used in the socket.
+Get the protocol used in the socket. This may not be the protocol passed in
+during a call to \fBsocket\fR(3SOCKET). For example, when protocol 0 is used
+with sockets in the domain, \fBPF_INET\fR and \fBPF_INET6\fR, this will return
+the underlying protocol that is in use, such as \fBIPPROTO_TCP\fR.
+\fBSO_PROTOCOL\fR is the standard POSIX name for this option. \fBSP_PROTOTYPE\fR
+is the traditional operating system name for this option. Most sockets do not
+support setting this option.
 .RE
 
 .sp
@@ -355,14 +358,10 @@ specific address. There is no effect from setting this option in an
 exclusive-IP zone. Setting this option requires the \fBsys_net_config\fR
 privilege. See \fBzones\fR(7).
 .SH RETURN VALUES
-.sp
-.LP
 If successful, \fBgetsockopt()\fR and \fBsetsockopt()\fR return \fB0\fR.
 Otherwise, the functions return \fB\(mi1\fR and set \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.sp
-.LP
 The \fBgetsockopt()\fR and \fBsetsockopt()\fR calls succeed unless:
 .sp
 .ne 2
@@ -503,8 +502,6 @@ has been shut down.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -519,8 +516,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR close (2),
 .BR ioctl (2),
 .BR read (2),

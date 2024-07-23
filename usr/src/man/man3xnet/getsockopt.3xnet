@@ -42,13 +42,12 @@
 .\"
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH GETSOCKOPT 3XNET "Jan 21, 2007"
+.TH GETSOCKOPT 3XNET "July 2, 2024"
 .SH NAME
 getsockopt \- get the socket options
 .SH SYNOPSIS
-.LP
-.nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lxnet\fR [ \fIlibrary\fR... ]
 #include <sys/socket.h>
 
@@ -57,8 +56,6 @@ getsockopt \- get the socket options
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgetsockopt()\fR function retrieves the value for the option specified by
 the \fIoption_name\fR argument for the socket specified by the \fIsocket\fR
 argument. If the size of the option value is greater than \fIoption_len\fR, the
@@ -271,12 +268,17 @@ get the domain used in the socket (get only)
 .sp
 .ne 2
 .na
-\fB\fBSO_PROTOTYPE\fR\fR
+\fB\fBSO_PROTOTYPE\fR\fR,
+.B SO_PROTOCOL
 .ad
 .RS 17n
-for socket in domains \fBAF_INET\fR and \fBAF_INET6\fR, get the underlying
-protocol number used in the socket. For socket in domain \fBAF_ROUTE\fR, get
-the address family used in the socket.
+Get the protocol used in the socket. This may not be the protocol passed in
+during a call to \fBsocket\fR(3SOCKET). For example, when protocol 0 is used
+with sockets in the domain, \fBPF_INET\fR and \fBPF_INET6\fR, this will return
+the underlying protocol that is in use, such as \fBIPPROTO_TCP\fR.
+\fBSO_PROTOCOL\fR is the standard POSIX name for this option. \fBSP_PROTOTYPE\fR
+is the traditional operating system name for this option. Most sockets do not
+support setting this option.
 .RE
 
 .sp
@@ -291,13 +293,9 @@ Options at other protocol levels vary in format and name.
 The socket in use may require the process to have appropriate privileges to use
 the \fBgetsockopt()\fR function.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBgetsockopt()\fR returns \fB0\fR. Otherwise,
 \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBgetsockopt()\fR function will fail if:
 .sp
 .ne 2
@@ -386,8 +384,6 @@ complete.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -404,8 +400,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(2), \fBbind\fR(3XNET), \fBendprotoent\fR(3XNET),
 \fBsetsockopt\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR,
 .BR standards (7)
