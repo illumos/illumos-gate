@@ -873,6 +873,11 @@ smb_session_cancel(smb_session_t *session)
 	smb_session_cancel_requests(session, NULL, NULL);
 
 	/*
+	 * Work around limitations on cancellation of pipe_read.
+	 */
+	smb_session_disconnect_share(session, "IPC$");
+
+	/*
 	 * We wait for the completion of all the requests associated with
 	 * this session.
 	 */
