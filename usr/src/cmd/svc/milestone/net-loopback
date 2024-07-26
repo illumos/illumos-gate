@@ -23,25 +23,40 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2024 Oxide Computer Company
+#
 
 . /lib/svc/share/smf_include.sh
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service 
-# failing if we try to do it), so just bail out. 
+# it tries to do is irrelevant (and will actually lead to the service
+# failing if we try to do it), so just bail out.
 # In the global zone and exclusive-IP zones we proceed.
 #
 smf_configure_ip || exit $SMF_EXIT_OK
+
+rc=$SMF_EXIT_OK
+
+degrade() {
+	echo "$@" >&2
+	rc=$SMF_EXIT_MON_DEGRADE
+}
 
 if [ -f /etc/hostname.lo0 ] || [ -f /etc/hostname6.lo0 ]; then
 	echo "found /etc/hostname.lo0 or /etc/hostname6.lo0; "\
 		    "using ifconfig to create lo0" > /dev/msglog
 	# IPv4 loopback
-	/sbin/ifconfig lo0 plumb 127.0.0.1 up
+	if ! /sbin/ifconfig lo0 >/dev/null 2>&1; then
+		/sbin/ifconfig lo0 plumb 127.0.0.1 up || \
+		    degrade "Failed to create IPv4 loopback"
+	fi
 
 	# IPv6 loopback
-	/sbin/ifconfig lo0 inet6 plumb ::1 up
+	if ! /sbin/ifconfig lo0 inet6 >/dev/null 2>&1; then
+		/sbin/ifconfig lo0 inet6 plumb ::1 up || \
+		    degrade "Failed to create IPv6 loopback"
+	fi
 
 	# Trusted Extensions shares the loopback interface with all zones
 	if (smf_is_system_labeled); then
@@ -53,13 +68,24 @@ if [ -f /etc/hostname.lo0 ] || [ -f /etc/hostname6.lo0 ]; then
 else
 	state=`/sbin/ipadm show-if -p -o state lo0 2>/dev/null`
 	if [ $? -eq 0 -a "$state" = "disabled" ]; then
-		/sbin/ipadm enable-if -t lo0
+		/sbin/ipadm enable-if -t lo0 || \
+		    degrade "Failed to enable loopback interface"
 	else
 		# IPv4 loopback
-		/sbin/ipadm create-addr -t -T static -a 127.0.0.1/8 lo0/v4
+		state=`/sbin/ipadm show-addr -po state lo0/v4`
+		if [ $? -ne 0 -o -z "$state" ]; then
+			/sbin/ipadm create-addr -t \
+			    -T static -a 127.0.0.1/8 lo0/v4 || \
+			    degrade "Failed to create IPv4 loopback"
+		fi
 
 		# IPv6 loopback
-		/sbin/ipadm create-addr -t -T static -a ::1/128 lo0/v6
+		state=`/sbin/ipadm show-addr -po state lo0/v6`
+		if [ $? -ne 0 -o -z "$state" ]; then
+			/sbin/ipadm create-addr -t \
+			    -T static -a ::1/128 lo0/v6 || \
+			    degrade "Failed to create IPv6 loopback"
+		fi
 	fi
 
 	# Trusted Extensions shares the loopback interface with all zones
@@ -71,3 +97,4 @@ else
 	fi
 fi
 
+exit $rc
