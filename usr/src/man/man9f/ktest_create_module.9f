@@ -1,0 +1,272 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Ryan Zezeski
+.\"
+.Dd February 8, 2024
+.Dt KTEST_CREATE_MODULE 9F
+.Os
+.Sh NAME
+.Nm ktest_create_module ,
+.Nm ktest_add_suite ,
+.Nm ktest_add_test ,
+.Nm ktest_register_module ,
+.Nm ktest_unregister_module ,
+.Nm ktest_free_module
+.Nd create and register ktest test modules
+.Sh SYNOPSIS
+.In sys/ktest.h
+.Ft int
+.Fo ktest_create_module
+.Fa "const char *name"
+.Fa "ktest_module_hdl_t **km_hdl"
+.Fc
+.Ft int
+.Fo ktest_add_suite
+.Fa "ktest_module_hdl_t *km_hdl"
+.Fa "const char *name"
+.Fa "ktest_suite_hdl_t **ks_hdl"
+.Fc
+.Ft int
+.Fo ktest_add_test
+.Fa "ktest_suite_hdl_t *ks_hdl"
+.Fa "const char *name"
+.Fa "ktest_fn_t fn"
+.Fa "ktest_test_flags_t flags"
+.Fc
+.Ft int
+.Fo ktest_register_module
+.Fa "ktest_module_hdl_t *km_hdl"
+.Fc
+.Ft void
+.Fo ktest_unregister_module
+.Fa "const char *name"
+.Fc
+.Ft void
+.Fo ktest_free_module
+.Fa "ktest_module_hdl_t *km_hdl"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa name
+The name of the module, suite, or test.
+See the "Names" section below.
+.It Fa km_hdl
+The handle to a ktest module.
+.It Fa ks_hdl
+The handle to a ktest suite.
+.It Fa fn
+A pointer to the test function.
+.It Fa flags
+The set of test flags.
+See the
+.Xr ktest 9
+page for a description of the valid flags.
+.El
+.Sh DESCRIPTION
+A ktest test module is created by building up a module object and
+registering it with the ktest facility.
+The module object consists of a name and one or more suite objects.
+The suite object consists of a name and one or more test objects.
+Each test object consists of a name, a function pointer to the test
+function, and a set of test flags.
+.Pp
+Test module object creation and registration should happen as part of
+the test module's
+.Xr _init 9E
+routine.
+The sequence of calls inside a test module's
+.Xr _init 9E
+should proceed in the following order.
+.Bl -enum -offset 4m
+.It
+.Fn ktest_create_module
+.It
+.Fn ktest_add_suite
+.It
+.Fn ktest_add_test ,
+1 or more times
+.It
+back to step 2 if more than one suite
+.It
+.Fn ktest_register_module
+.El
+.Pp
+Conversely, the test module should unregister its test module object
+as part of its
+.Xr _fini 9E
+routine.
+.Ss Names
+The
+.Fa name
+is the string used to reference a particular module, suite, or test.
+Any given test is uniquely identified by the combination of its
+module, suite, and test name -- also referred to as its "triple".
+This triple is how the user identifies a test when making use of the
+.Xr ktest 8
+command.
+.Pp
+The module name may be the same as the module-under-test, but that
+isn't a requirement.
+At the end of the day, the test module's name is simply a string used
+to organize suites of tests in some logical manner.
+In some cases it makes sense to name the test module something other
+than the module-under-test.
+For example, when the module-under-test is large, such as genunix.
+Or when the test module is testing a property of the larger system
+that spans more than a single module.
+.Pp
+Module names must be unique.
+Suite names must be unique for a given module.
+Test names must be unique for a given suite.
+That implies that suite and test names may be reused so long as they
+are unique within their given namespace.
+.Ss Test Flags
+.Bl -tag -width 4m
+.It Sy KTEST_FLAG_NONE
+No flags specified.
+.It Sy KTEST_FLAG_INPUT
+This test requires an input stream.
+.El
+.Ss Functions
+.Bl -tag -width 2m
+.It Sy ktest_create_module()
+Create a module object.
+Return failure if the name is not valid, or if the object could not be
+allocated.
+.It Sy ktest_add_suite()
+Create a suite object and add it to the module object referenced by
+.Fa km_hdl .
+Return failure if the name is already in use, the name is not valid,
+or if the object could not be allocated.
+.It Sy ktest_add_test()
+Create a test object and add it to the suite object referenced by
+.Fa ks_hdl .
+The
+.Fa fn
+should be a pointer to the test function and
+.Fa flags
+should contain a value derived from a bitwise-OR of one or more test flag
+values.
+Return failure if the name is already in use, the name is not valid,
+or if the object could not be allocated.
+.It Sy ktest_register_module()
+Register the test module object referenced by
+.Fa km_hdl .
+Return failure if the module name already exists.
+.It Sy ktest_unregister_module()
+Unregister the test module object that maps to the
+.Fa name .
+.It Sy ktest_free_module()
+Used to free the module along with its contained suites and tests in
+the event that the module failed to register.
+.El
+.Sh RETURN VALUES
+The
+.Fn ktest_create_module ,
+.Fn ktest_add_suite ,
+.Fn ktest_add_test ,
+and
+.Fn ktest_register_module
+functions return 0 on success or an error value for failure.
+.Sh EXAMPLES
+The following example provides a template for how one would typically
+organize the source code of a test module.
+.Bd -literal
+#include <sys/ktest.h>
+
+void
+foo_test1(ktest_ctx_hdl_t *ctx)
+{
+	...
+}
+
+void
+foo_test2(ktest_ctx_hdl_t *ctx)
+{
+	...
+}
+
+void
+foo_test3(ktest_ctx_hdl_t *ctx)
+{
+	...
+}
+
+static struct modlmisc foo_test_modlmisc = {
+	.misc_modops = &mod_miscops,
+	.misc_linkinfo = "foo ktest module"
+};
+
+static struct modlinkage foo_test_modlinkage = {
+	.ml_rev = MODREV_1,
+	.ml_linkage = { &foo_test_modlmisc, NULL }
+};
+
+int
+_init()
+{
+	int ret;
+	ktest_module_hdl_t *km = NULL;
+	ktest_suite_hdl_t *ks = NULL;
+
+	VERIFY0(ktest_create_module("foo", &km));
+	VERIFY0(ktest_add_suite("suite1", &ks));
+	VERIFY0(ktest_add_test(ks, "foo_test1", foo_test1,
+	    KTEST_FLAG_NONE));
+	VERIFY0(ktest_add_test(ks, "foo_test2", foo_test2,
+	    KTEST_FLAG_NONE));
+	VERIFY0(ktest_add_test(ks, "foo_test3", foo_test3,
+	    KTEST_FLAG_INPUT));
+
+	if ((ret = ktest_register_module(km)) != 0) {
+		ktest_free_module(km);
+		return (ret);
+	}
+
+	if ((ret = mod_install(&foo_test_modlinkage)) != 0) {
+		ktest_unregister_module("foo");
+		return (ret);
+	}
+
+	return (0);
+}
+
+int
+_fini(void)
+{
+	ktest_unregister_module("foo");
+	return (mod_remove(&mac_test_modlinkage));
+}
+.Ed
+.Sh ERRORS
+.Bl -tag -width 4m
+.It Er EEXIST
+The name already exists.
+.It Er EINVAL
+The name contains illegal characters.
+.It Er ENOMEM
+The module, suite, or test object could not be allocated.
+.It Er EOVERFLOW
+The
+.Fa name
+value is too long.
+.El
+.Sh SEE ALSO
+.Xr ktest 8 ,
+.Xr ktest 9 ,
+.Xr _fini 9E ,
+.Xr _init 9E

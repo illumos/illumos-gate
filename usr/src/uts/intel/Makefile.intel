@@ -763,3 +763,15 @@ DRV_KMODS	+= vmm_vtd
 # bhyve drv test interface
 #
 DRV_KMODS	+= vmm_drv_test
+
+#
+#	The kernel test driver.
+#
+DRV_KMODS	+= ktest
+
+#
+#	Test modules that can register with ktest.
+#
+MISC_KMODS	+= mac_test
+MISC_KMODS	+= ktest_selftest
+MISC_KMODS	+= stream_test

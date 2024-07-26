@@ -24,6 +24,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -174,6 +175,9 @@ $(USR_SYS_DIR)/%:	$(OBJS_DIR)/% $(USR_SYS_DIR) FRC
 	$(INS.file)
 
 $(USR_MISC_DIR)/%:	$(OBJS_DIR)/% $(USR_MISC_DIR) FRC
+	$(INS.file)
+
+$(USR_KTEST_DIR)/%:	$(OBJS_DIR)/% $(USR_KTEST_DIR) FRC
 	$(INS.file)
 
 $(USR_DACF_DIR)/%:	$(OBJS_DIR)/% $(USR_DACF_DIR) FRC

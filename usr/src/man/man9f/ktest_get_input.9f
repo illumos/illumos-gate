@@ -1,0 +1,70 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd February 15, 2023
+.Dt KTEST_GET_INPUT 9F
+.Os
+.Sh NAME
+.Nm ktest_get_input
+.Nd get the input stream
+.Sh SYNOPSIS
+.In sys/ktest.h
+.Ft void
+.Fo ktest_get_input
+.Fa "const ktest_ctx_hdl_t *ctx"
+.Fa "uchar_t **bytes"
+.Fa "size_t *len"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa ctx
+A handle to the test context.
+This handle is passed as argument to the test function by the ktest facility.
+.It Fa bytes
+A return parameter used to provide the caller with a pointer to the
+bytes of the input stream.
+.It Fa len
+A return parameter used to provide the caller with the number of bytes
+in the input stream.
+.El
+.Sh DESCRIPTION
+The
+.Fn ktest_get_input
+function is used to get a handle to the input stream passed to the
+test along with its length.
+.Pp
+This function panics when called on a context with no input stream.
+.Sh EXAMPLES
+This examples shows a test that verifies all bytes in the input stream
+are lowercase ASCII.
+.Bd -literal
+void
+is_lower_ascii_test(ktest_ctx_hdl_t *ctx)
+{
+	uchar_t *bytes = NULL;
+	size_t len = 0;
+
+	ktest_get_input(ctx, &bytes, &len);
+
+	for (size_t i = 0; i < len; i++) {
+		KT_ASSERT3U(bytes[i], >=, 'a', ctx);
+		KT_ASSERT3U(bytes[i], <=, 'z', ctx);
+	}
+
+	KT_PASS(ctx);
+}
+.Ed
