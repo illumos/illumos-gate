@@ -26,6 +26,7 @@
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <arpa/inet.h>
@@ -2034,7 +2035,7 @@ do_show_addr(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = 0;
-	char			*aname;
+	char			*aname = NULL;
 	char			*ifname = NULL;
 	char			*cp;
 	boolean_t		found = _B_FALSE;
@@ -2069,7 +2070,7 @@ do_show_addr(int argc, char *argv[], const char *use)
 			aname = NULL;
 		}
 	} else if (optind == argc) {
-		aname = NULL;
+		ifname = aname = NULL;
 	} else {
 		die("Usage: %s", use);
 	}
@@ -2084,16 +2085,27 @@ do_show_addr(int argc, char *argv[], const char *use)
 	state.sa_ofmt = ofmt;
 
 	status = ipadm_addr_info(iph, ifname, &ainfo, 0, LIFC_DEFAULT);
-	/*
-	 * Return without printing any error, if no addresses were found,
-	 * for the case where all addresses are requested.
-	 */
 	if (status != IPADM_SUCCESS)
 		die("Could not get address: %s", ipadm_status2str(status));
-	if (ainfo == NULL) {
-		ofmt_close(ofmt);
-		return;
-	}
+
+	/*
+	 * There is a bit of subtlety to this. If we're here then either:
+	 *
+	 * - no address object parameter was provided, aname == ifname == NULL;
+	 * - an address object was provided and is in aname; ifname == NULL;
+	 * - an interface was provided and is in ifname; aname == NULL.
+	 *
+	 * We can just loop through the returned addresses and see if we found
+	 * anything we care about, and the only case in which we need to report
+	 * an error is if some parameter was provided - that is if `ifname` or
+	 * `aname` are not NULL.
+	 *
+	 * In fact, if we were provided with an argument of the type
+	 * `<interface>/` then we will have passed that <interface> to
+	 * ipadm_addr_info() and if no addresses were found that will have
+	 * already returned an error such as IPADM_NOTFOUND if was unable to
+	 * find any addresses matching the interface.
+	 */
 
 	bzero(&sargs, sizeof (sargs));
 	sargs.sa_state = &state;
@@ -2102,14 +2114,17 @@ do_show_addr(int argc, char *argv[], const char *use)
 		if (aname != NULL) {
 			if (strcmp(sargs.sa_info->ia_aobjname, aname) != 0)
 				continue;
-			found = _B_TRUE;
 		}
+		found = _B_TRUE;
 		ofmt_print(state.sa_ofmt, &sargs);
 	}
-	if (ainfo)
+	if (ainfo != NULL)
 		ipadm_free_addr_info(ainfo);
-	if (aname != NULL && !found)
-		die("Address object not found");
+	if ((ifname != NULL || aname != NULL) && !found) {
+		die("Could not get address: %s",
+		    ipadm_status2str(IPADM_NOTFOUND));
+	}
+	ofmt_close(ofmt);
 }
 
 static boolean_t
