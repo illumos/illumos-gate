@@ -711,11 +711,12 @@ if [ "$BRINGOVER_WS" = "" ]; then
 	BRINGOVER_WS=$CLONE_WS
 fi
 
-#
-# If BRINGOVER_FILES was not specified, default to usr
-#
-if [ "$BRINGOVER_FILES" = "" ]; then
-	BRINGOVER_FILES="usr"
+if [ "$BRINGOVER_REMOTE" = "" ]; then
+	BRINGOVER_REMOTE=nightly_bringover_ws
+fi
+
+if [ "$BRINGOVER_SCM" = "" ]; then
+	BRINGOVER_SCM=git
 fi
 
 check_closed_bins
@@ -907,6 +908,59 @@ TOOLS_PROTO=${TOOLS}/${TOOLS_PROTO_REL};	export TOOLS_PROTO
 
 unset   CFLAGS LD_LIBRARY_PATH LDFLAGS
 
+#
+# Echo the SCM type of the parent workspace, this can't just be which_scm
+# as that does not know how to identify various network repositories.
+#
+function parent_wstype {
+	typeset scm_type junk
+
+	CODEMGR_WS="$BRINGOVER_WS" "$WHICH_SCM" 2>/dev/null \
+	    | read scm_type junk
+	if [[ -z "$scm_type" || "$scm_type" == unknown ]]; then
+		# Probe BRINGOVER_WS to determine its type
+		case "$BRINGOVER_WS" in
+		git://* | http://*.git | https://*.git)
+			scm_type="git"
+			;;
+		ssh://* | http://* | https://* )
+			scm_type="${BRINGOVER_SCM}"
+			;;
+		*)	scm_type="none"
+			;;
+		esac
+	fi
+
+	# fold both unsupported and unrecognized results into "none"
+	case "$scm_type" in
+	mercurial|git)
+		;;
+	*)	scm_type=none
+		;;
+	esac
+
+	echo $scm_type
+}
+
+# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
+function child_wstype {
+	typeset scm_type junk
+
+	# Probe CODEMGR_WS to determine its type
+	if [[ -d $CODEMGR_WS ]]; then
+		$WHICH_SCM | read scm_type junk || exit 1
+	fi
+
+	case "$scm_type" in
+	none|git|mercurial)
+		;;
+	*)	scm_type=none
+		;;
+	esac
+
+	echo $scm_type
+}
+
 # create directories that are automatically removed if the nightly script
 # fails to start correctly
 function newdir {
@@ -932,7 +986,37 @@ function newdir {
 }
 newdirlist=
 
-[ -d $CODEMGR_WS ] || newdir $CODEMGR_WS || exit 1
+# Initialize the git repo before creating the log subdir; "git clone" insists
+# that a preexisting directory be empty.
+# Use --reference-if-able to share most of the parent's .git tree.
+type init_git > /dev/null 2>&1 || function init_git {
+	if [ -d "${BRINGOVER_WS}" ]; then
+		REF_WS="--reference-if-able $(git -C ${BRINGOVER_WS} rev-parse --path-format=absolute --git-common-dir)"
+	fi
+	staffer git clone \
+		--no-checkout \
+		${CLONE_OPTIONS} \
+		--origin ${BRINGOVER_REMOTE} \
+		${REF_WS} \
+		${BRINGOVER_WS} ${CODEMGR_WS}
+}
+
+# All mercurial initialization is done in bringover_mercurial
+type init_mercurial > /dev/null 2>&1 || function init_mercurial {
+	newdir $CODEMGR_WS
+}
+
+type init_none > /dev/null 2>&1 || function init_none {
+	newdir $CODEMGR_WS
+}
+
+function create_build_ws {
+	PARENT_SCM_TYPE=$(parent_wstype)
+
+	eval "init_${PARENT_SCM_TYPE}" 2>&1
+}
+
+[ -d $CODEMGR_WS ] || create_build_ws || exit 1
 
 # since this script assumes the build is from full source, it nullifies
 # variables likely to have been set by a "ws" script; nullification
@@ -1251,58 +1335,6 @@ if [ "$w_FLAG" = "y" -a "$MULTI_PROTO" = yes -a -d "$ROOT-nd" ]; then
 	mv $ROOT-nd $ROOT-nd.prev
 fi
 
-#
-# Echo the SCM type of the parent workspace, this can't just be which_scm
-# as that does not know how to identify various network repositories.
-#
-function parent_wstype {
-	typeset scm_type junk
-
-	CODEMGR_WS="$BRINGOVER_WS" "$WHICH_SCM" 2>/dev/null \
-	    | read scm_type junk
-	if [[ -z "$scm_type" || "$scm_type" == unknown ]]; then
-		# Probe BRINGOVER_WS to determine its type
-		if [[ $BRINGOVER_WS == ssh://* ]]; then
-			scm_type="mercurial"
-		elif [[ $BRINGOVER_WS == http://* ]] && \
-		    wget -q -O- --save-headers "$BRINGOVER_WS/?cmd=heads" | \
-		    egrep -s "application/mercurial" 2> /dev/null; then
-			scm_type="mercurial"
-		else
-			scm_type="none"
-		fi
-	fi
-
-	# fold both unsupported and unrecognized results into "none"
-	case "$scm_type" in
-	mercurial)
-		;;
-	*)	scm_type=none
-		;;
-	esac
-
-	echo $scm_type
-}
-
-# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
-function child_wstype {
-	typeset scm_type junk
-
-	# Probe CODEMGR_WS to determine its type
-	if [[ -d $CODEMGR_WS ]]; then
-		$WHICH_SCM | read scm_type junk || exit 1
-	fi
-
-	case "$scm_type" in
-	none|git|mercurial)
-		;;
-	*)	scm_type=none
-		;;
-	esac
-
-	echo $scm_type
-}
-
 SCM_TYPE=$(child_wstype)
 
 #
@@ -1370,6 +1402,43 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 else
 	echo "\n==== No clobber at `date` ====\n" >> $LOGFILE
 fi
+
+type bringover_git > /dev/null 2>&1 || function bringover_git {
+	typeset -x PATH=$PATH
+
+	if [ "$BRINGOVER_BRANCH" = "" ]; then
+		if [ -d "$BRINGOVER_WS" ]; then
+			BRINGOVER_BRANCH=$(cd "${BRINGOVER_WS}"; git rev-parse --abbrev-ref HEAD)
+			if [ "$BRINGOVER_BRANCH" = "HEAD" ]; then
+				printf "%s: can't determine BRINGOVER_BRANCH from repo in 'detached HEAD' state\n" "$BRINGOVER_WS"
+				touch $TMPDIR/bringover_failed
+				return
+			fi
+		else
+			printf "%s: can't determine BRINGOVER_BRANCH\n" "$BRINGOVER_WS"
+			touch $TMPDIR/bringover_failed
+			return
+		fi
+	fi
+	(cd ${CODEMGR_WS} &&
+		staffer git remote set-url ${BRINGOVER_REMOTE} ${BRINGOVER_WS} &&
+		staffer git fetch ${BRINGOVER_REMOTE} ${BRINGOVER_BRANCH} &&
+		staffer git switch --force-create ${BRINGOVER_BRANCH} \
+			${BRINGOVER_REMOTE}/${BRINGOVER_BRANCH}) \
+		    >$TMPDIR/bringover.out 2>&1
+	if (( $? != 0 )); then
+		printf "%s: update failed as follows:\n\n" "$CODEMGR_WS"
+		cat $TMPDIR/bringover.out
+		touch $TMPDIR/bringover_failed
+		return
+	fi
+
+	printf "%s: local branch '%s' updated to commit %s\n"	\
+		"$CODEMGR_WS" "$BRINGOVER_BRANCH"		\
+		$(cd ${CODEMGR_WS}; git rev-parse HEAD)
+
+	staffer git status --no-short --branch --untracked-files=no
+}
 
 type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 	typeset -x PATH=$PATH

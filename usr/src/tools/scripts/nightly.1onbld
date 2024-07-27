@@ -20,6 +20,7 @@
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "Copyright 2019 Peter Tribble.
 .\" "Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" "Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 .\" "
 .TH NIGHTLY 1ONBLD "May 12, 2020"
 .SH NAME
@@ -253,10 +254,38 @@ information.
 .LP
 .B BRINGOVER_WS
 .RS 5
-This is the workspace from which
+Pathname or URL of the workspace from which
 .I nightly
 will fetch sources to either populate or update your workspace;
 it defaults to $CLONE_WS.
+.RE
+.LP
+.B BRINGOVER_SCM
+.RS 5
+Name of the underlying software configuration management system which
+.I nightly
+will use to fetch sources from remote URLs;
+it defaults to
+.IR git .
+.RE
+.LP
+.B BRINGOVER_BRANCH
+.RS 5
+This names the SCM branch which should be pulled into the build
+workspace.
+.I nightly
+will fetch the branch of this name in $BRINGOVER_WS and create or replace the
+branch of the same name in $CODEMGR_WS.
+Note that any local changes on $BRINGOVER_BRANCH will be unreferenced.
+If $BRINGOVER_WS is local, this defaults to the default branch.
+.RE
+.LP
+.B BRINGOVER_REMOTE
+.RS 5
+This names the
+.I git
+remote in the build workspace which references $BRINGOVER_WS; it defaults to
+.IR nightly_bringover_ws .
 .RE
 .LP
 .B CLONE_WS
@@ -265,6 +294,21 @@ This is the workspace from which
 .I nightly
 will fetch sources by default.  This is
 often distinct from the parent, particularly if the parent is a gate.
+.RE
+.LP
+.B CLONE_OPTIONS
+.RS 5
+Additional options passed to the SCM
+.I clone
+command when creating a new build workspace.  For
+.I git
+workspaces, useful options can include
+.I --config
+and
+.IR --reference .
+See
+.BR git-clone (1)
+for more information.
 .RE
 .LP
 .B SRC
@@ -495,11 +539,88 @@ copy to myenv and make your changes.
 .PD 0
 # grep NIGHTLY_OPTIONS myenv
 .LP
-NIGHTLY_OPTIONS="-ACrlapDm"
+NIGHTLY_OPTIONS="-ACrlapDmn"
 .LP
 export NIGHTLY_OPTIONS
 .LP
 # /opt/onbld/bin/nightly -i myenv
 .PD
 .SH SEE ALSO
-.BR bldenv (1ONBLD)
+.BR bldenv (1ONBLD),
+.BR git (1),
+.BR git-branch (1),
+.BR git-clone (1),
+.BR git-reflog (1),
+.BR git-remote (1),
+.BR git-switch (1)
+.SH WARNINGS
+When using
+.I nightly
+bringover with
+.IR git ,
+the script uses
+.I git switch --force-create
+to check out a version of the sources that exactly match the contents of the
+specified $BRINGOVER_BRANCH in $BRINGOVER_WS.  Uncommitted changes in the
+working tree may cause this to fail, aborting the build.  Prior committed
+contents of that branch in the local workspace may be lost.
+.LP
+Accordingly, a best practice is to always use the
+.I n
+flag in
+.IR NIGHTLY_OPTIONS
+in trees where you are actively making changes and only enable bringover for
+build-only workspaces intended to exactly mirror your development trees.
+.LP
+Committed changes discarded by
+.I git switch
+might be recoverable using the git
+.I reflog
+facility; see
+.IR git-reflog (1)
+and
+.IR git-switch (1)
+for more information.
+.LP
+When possible, the
+.I nightly
+script uses the
+.I --reference-if-able
+option to
+.I git clone
+which avoids fully populating the
+.I .git/objects
+directory in the build workspace, which saves space and significantly speeds
+workspace creation.  This creates a persistent dependency on the contents of
+.I $BRINGOVER_WS
+workspace.
+Some
+.I git
+operations in the build workspace may fail if the referenced workspace
+is deleted, renamed, or otherwise rendered inaccessible, or if
+referenced objects in the parent workspace are released by a
+history-rewriting
+.I git
+operation like
+.I rebase
+or
+.I commit --amend
+and then deleted by a subsequent garbage collection.
+The linkage can be severed by using
+.I git repack
+as documented in the
+.IR git-clone (1)
+manual page.
+.SH NOTES
+The term
+.I bringover
+originates from the Teamware SCM system; it pulled
+changes from another tree into the current workspace.  Other SCM systems
+use words like
+.IR fetch,
+.IR pull,
+.IR merge,
+and
+.I rebase
+to describe parts of the actions performed by
+.IR bringover .
