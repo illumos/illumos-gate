@@ -3673,10 +3673,31 @@ cond_clockwait(cond_t *cvp, mutex_t *mp, clockid_t clock,
 	return (error);
 }
 
+/*
+ * This is a function internal to libc that determines the clockid to return for
+ * a cond_t. The cond_t (and the pthreads / C equivalent) encode a clock id that
+ * should be used as a timing source. When using the static initializers, which
+ * set this to zero, cond_clockid will end up set to __CLOCK_REALTIME0 which
+ * isn't really used in the system any more. Consumers of the clockid call this
+ * to translate this. Note, we fail open such that if someone has corrupted the
+ * clockid it will end up in a well known clock to continue the traditional
+ * system behavior.
+ */
+static clockid_t
+cond_clock(cond_t *cvp)
+{
+	if (cvp->cond_clockid != CLOCK_REALTIME &&
+	    cvp->cond_clockid != CLOCK_MONOTONIC) {
+		return (CLOCK_REALTIME);
+	}
+
+	return (cvp->cond_clockid);
+}
+
 int
 cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 {
-	return (cond_clockwait(cvp, mp, cvp->cond_clockid, abstime));
+	return (cond_clockwait(cvp, mp, cond_clock(cvp), abstime));
 }
 
 /*
@@ -3713,7 +3734,7 @@ pthread_cond_timedwait(pthread_cond_t *restrict cvp,
     pthread_mutex_t *restrict mp, const struct timespec *restrict abstime)
 {
 	cond_t *cond = (cond_t *)cvp;
-	return (pthread_cond_clockwait(cvp, mp, cond->cond_clockid, abstime));
+	return (pthread_cond_clockwait(cvp, mp, cond_clock(cond), abstime));
 }
 
 /*
@@ -3777,7 +3798,7 @@ pthread_cond_reltimedwait_np(pthread_cond_t *restrict cvp,
     pthread_mutex_t *restrict mp, const struct timespec *restrict reltime)
 {
 	cond_t *cond = (cond_t *)cvp;
-	return (pthread_cond_relclockwait_np(cvp, mp, cond->cond_clockid,
+	return (pthread_cond_relclockwait_np(cvp, mp, cond_clock(cond),
 	    reltime));
 }
 

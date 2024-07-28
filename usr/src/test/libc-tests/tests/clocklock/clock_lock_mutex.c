@@ -64,6 +64,7 @@ static void
 clock_mutex_destroy(void *arg)
 {
 	VERIFY0(pthread_mutex_destroy(arg));
+	free(arg);
 }
 
 static void

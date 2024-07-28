@@ -28,6 +28,10 @@
 
 #include "clock_lock.h"
 
+static pthread_cond_t clock_cond_static = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t clock_mutex_static =
+    PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+
 typedef struct {
 	pthread_mutex_t cc_mutex;
 	pthread_cond_t cc_cond;
@@ -77,6 +81,7 @@ clock_cond_destroy(void *arg)
 
 	VERIFY0(pthread_mutex_destroy(&cc->cc_mutex));
 	VERIFY0(pthread_cond_destroy(&cc->cc_cond));
+	free(cc);
 }
 
 /*
@@ -85,6 +90,33 @@ clock_cond_destroy(void *arg)
  */
 const lock_ops_t clock_lock_cond_ops = {
 	.lo_create = clock_cond_create,
+	.lo_destroy = clock_cond_destroy
+};
+
+static void
+clock_cond_static_create(const char *desc, void **argp)
+{
+	clock_cond_t *cc;
+
+	cc = calloc(1, sizeof (clock_cond_t));
+	if (cc == NULL) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to allocate memory "
+		    "for a mutex and condition variable", desc);
+	}
+
+	(void) memcpy(&cc->cc_mutex, &clock_mutex_static,
+	    sizeof (pthread_mutex_t));
+	(void) memcpy(&cc->cc_cond, &clock_cond_static,
+	    sizeof (pthread_cond_t));
+	*argp = cc;
+}
+
+/*
+ * This uses the static versions that we have created of each primitve. This is
+ * a regression test for #16683.
+ */
+const lock_ops_t clock_lock_cond_static_ops = {
+	.lo_create = clock_cond_static_create,
 	.lo_destroy = clock_cond_destroy
 };
 
@@ -377,6 +409,30 @@ const clock_test_t clock_cond_tests[] = { {
 }, {
 	.ct_desc = "cond: fails without lock",
 	.ct_ops = &clock_lock_cond_ops,
+	.ct_test = clock_test_cond_eperm
+}, {
+	.ct_desc = "cond: invalid and unsupported clock sources (static)",
+	.ct_ops = &clock_lock_cond_static_ops,
+	.ct_test = clock_test_cond_invalid_source
+}, {
+	.ct_desc = "cond: invalid timeout fails (absolute, static)",
+	.ct_ops = &clock_lock_cond_static_ops,
+	.ct_test = clock_test_cond_inv_to_abs
+}, {
+	.ct_desc = "cond: invalid timeout fails (relative, static)",
+	.ct_ops = &clock_lock_cond_static_ops,
+	.ct_test = clock_test_cond_inv_to_rel
+}, {
+	.ct_desc = "cond: timeout fires correctly (absolute, static)",
+	.ct_ops = &clock_lock_cond_static_ops,
+	.ct_test = clock_test_cond_to_abs
+}, {
+	.ct_desc = "cond: timeout fires correctly (relative, static)",
+	.ct_ops = &clock_lock_cond_static_ops,
+	.ct_test = clock_test_cond_to_rel
+}, {
+	.ct_desc = "cond: fails without lock (static)",
+	.ct_ops = &clock_lock_cond_static_ops,
 	.ct_test = clock_test_cond_eperm
 } };
 

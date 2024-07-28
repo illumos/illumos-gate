@@ -52,6 +52,7 @@ static void
 clock_rwlock_destroy(void *arg)
 {
 	VERIFY0(pthread_rwlock_destroy(arg));
+	free(arg);
 }
 
 static void

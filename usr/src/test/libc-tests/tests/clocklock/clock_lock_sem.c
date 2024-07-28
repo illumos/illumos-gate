@@ -53,6 +53,7 @@ static void
 clock_sem_destroy(void *arg)
 {
 	VERIFY0(sem_destroy(arg));
+	free(arg);
 }
 
 static void

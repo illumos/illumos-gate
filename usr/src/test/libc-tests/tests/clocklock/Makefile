@@ -31,9 +31,11 @@ ROOTOPTPROGS =	$(PROG32:%=$(ROOTOPTDIR)/%) \
 		$(PROG64:%=$(ROOTOPTDIR)/%)
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 
 CSTD = $(GNU_C99)
 CPPFLAGS += -D_REENTRANT
+CTF_MODE = link
 
 .KEEP_STATE:
 
