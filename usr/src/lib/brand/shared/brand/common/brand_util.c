@@ -289,7 +289,9 @@ brand_close_fh(FILE *file)
 
 	/*
 	 * We're a branded process but our handler isn't installed yet.  We
-	 * can't use the dup() syscall since it no longer exists.
+	 * can't use the dup() syscall since it no longer exists. Unfortunately
+	 * in an S10 branded zone, this will all pick up the old libc and not
+	 * use emulation, which makes it fairly impossible to use safely.
 	 */
 	fd_new = fcntl(fd, F_DUPFD, 0);
 	if (fd_new == -1)

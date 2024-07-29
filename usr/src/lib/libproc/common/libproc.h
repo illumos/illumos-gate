@@ -368,7 +368,7 @@ extern	int	pr_getitimer(struct ps_prochandle *,
 extern	int	pr_setitimer(struct ps_prochandle *,
 			int, const struct itimerval *, struct itimerval *);
 extern	int	pr_ioctl(struct ps_prochandle *, int, int, void *, size_t);
-extern	int	pr_fcntl(struct ps_prochandle *, int, int, void *);
+extern	int	pr_fcntl(struct ps_prochandle *, int, int, void *, void *);
 extern	int	pr_stat(struct ps_prochandle *, const char *, struct stat *);
 extern	int	pr_lstat(struct ps_prochandle *, const char *, struct stat *);
 extern	int	pr_fstat(struct ps_prochandle *, int, struct stat *);

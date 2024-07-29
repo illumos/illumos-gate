@@ -169,7 +169,7 @@ s10_forkall(sysret_t *rval)
 int
 s10_dup(sysret_t *rval, int fd)
 {
-	return (__systemcall(rval, SYS_fcntl + 1024, fd, F_DUPFD, 0));
+	return (__systemcall(rval, SYS_fcntl + 1024, fd, F_DUPFD, 0, 0));
 }
 
 int
