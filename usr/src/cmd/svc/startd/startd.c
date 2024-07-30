@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -239,7 +240,9 @@ startd_state_t *st;
 boolean_t booting_to_single_user = B_FALSE;
 
 const char * const admin_actions[] = {
+    SCF_PROPERTY_RESTORE,
     SCF_PROPERTY_DEGRADED,
+    SCF_PROPERTY_DEGRADE_IMMEDIATE,
     SCF_PROPERTY_MAINT_OFF,
     SCF_PROPERTY_MAINT_ON,
     SCF_PROPERTY_MAINT_ON_IMMEDIATE,
@@ -248,7 +251,9 @@ const char * const admin_actions[] = {
 };
 
 const int admin_events[NACTIONS] = {
+    RESTARTER_EVENT_TYPE_ADMIN_RESTORE,
     RESTARTER_EVENT_TYPE_ADMIN_DEGRADED,
+    RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE,
     RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF,
     RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON,
     RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON_IMMEDIATE,

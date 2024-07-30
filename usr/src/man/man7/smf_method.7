@@ -1,14 +1,14 @@
 '\" te
+.\" Copyright 2017 RackTop Systems.
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_METHOD 7 "February 25, 2019"
+.TH SMF_METHOD 7 "July 30, 2024"
 .SH NAME
 smf_method \- service management framework conventions for methods
 .SH DESCRIPTION
-.LP
 The class of services managed by \fBsvc.startd\fR(8) in the service management
 framework, \fBsmf\fR(7), consists of applications that fit a simple
 \fBfork\fR(2)-\fBexec\fR(2) model. The \fBsvc.startd\fR(8) master daemon and
@@ -17,7 +17,6 @@ with additional capabilities. The \fBsvc.startd\fR(8) daemon and other
 restarters require that the methods which activate, manipulate, or examine a
 service instance follow the conventions described in this manual page.
 .SS "Invocation form"
-.LP
 The form of a method invocation is not dictated by convention. In some cases, a
 method invocation might consist of the direct invocation of the daemon or other
 binary executable that provides the service. For cases in which an executable
@@ -42,7 +41,6 @@ A restarter might define other kinds of methods beyond those referenced in this
 page. The conventions surrounding such extensions are defined by the restarter
 and might not be identical to those given here.
 .SS "Environment Variables"
-.LP
 The restarter provides four environment variables to the method that determine
 the context in which the method is invoked.
 .sp
@@ -98,7 +96,6 @@ shell scripting to compose service methods in the include file described below.
 The method context can cause other environment variables to be set as described
 below.
 .SS "Method Definition"
-.LP
 A method is defined minimally by three properties in a propertygroup of type
 \fBmethod\fR.
 .sp
@@ -137,7 +134,6 @@ Method type. Currently always set to \fBmethod\fR.
 A Method Context can be defined to further refine the execution environment of
 the method. See the \fBMethod Context\fR section for more information.
 .SS "Method Tokens"
-.LP
 When defined in the \fBexec\fR string of the method by the restarter
 \fBsvc.startd\fR, a set of tokens are parsed and expanded with appropriate
 value. Other restarters might not support method tokens. The delegated
@@ -254,7 +250,6 @@ service implementation.
 .RE
 
 .SS "Exiting and Exit Status"
-.LP
 The required behavior of a start method is to delay exiting until the service
 instance is ready to answer requests or is otherwise functional.
 .sp
@@ -280,6 +275,9 @@ T}
 \fBSMF_EXIT_ERR_CONFIG\fR	\fB96\fR	T{
 Unrecoverable configuration error. A common condition that returns this exit status is the absence of required configuration files for an enabled service instance.
 T}
+\fBSMF_EXIT_MON_DEGRADE\fR	\fB97\fR	T{
+Method encountered some problems. The service may not be fully functional.
+T}
 \fBSMF_EXIT_ERR_NOSMF\fR	\fB99\fR	T{
 Method has been mistakenly invoked outside the \fBsmf\fR(7) facility. Services that depend on \fBsmf\fR(7) capabilities should exit with this status value.
 T}
@@ -297,7 +295,6 @@ Use of a precise exit code allows the responsible restarter to categorize an
 error response as likely to be intermittent and worth pursuing restart or
 permanent and request administrative intervention.
 .SS "Timeouts"
-.LP
 Each method can have an independent timeout, given in seconds. The choice of a
 particular timeout should be based on site expectations for detecting a method
 failure due to non-responsiveness. Sites with replicated filesystems or other
@@ -313,7 +310,6 @@ preferred, but is available for services that absolutely require it.
 .LP
 \fB-1 timeout_seconds\fR is also accepted, but is a deprecated specification.
 .SS "Shell Programming Support"
-.LP
 A set of environment variables that define the above exit status values is
 provided with convenience shell functions in the file
 \fB/lib/svc/share/smf_include.sh\fR. This file is a Bourne shell script
@@ -346,7 +342,6 @@ fi
 .LP
 This example shows the use of both convenience functions that are provided.
 .SS "Method Context"
-.LP
 The service management facility offers a common mechanism set the context in
 which the \fBfork\fR(2)-\fBexec\fR(2) model services execute.
 .sp
@@ -571,7 +566,6 @@ Definitions of exit status codes.
 .RE
 
 .SH SEE ALSO
-.LP
 .BR zonename (1),
 .BR exec (2),
 .BR fork (2),
@@ -591,7 +585,6 @@ Definitions of exit status codes.
 .BR svc.startd (8),
 .BR svccfg (8)
 .SH NOTES
-.LP
 The present version of \fBsmf\fR(7) does not support multiple repositories.
 .sp
 .LP

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef	_STARTD_H
@@ -164,10 +165,12 @@ extern pthread_mutexattr_t mutex_attrs;
  *   Note that the ordering in admin_action_t, admin_actions, and admin_events
  *   must match.  admin_actions and admin_events are defined in startd.c.
  */
-#define	NACTIONS			6
+#define	NACTIONS			8
 
 typedef enum {
-	ADMIN_EVENT_DEGRADED = 0x0,
+	ADMIN_EVENT_RESTORE = 0,
+	ADMIN_EVENT_DEGRADED,
+	ADMIN_EVENT_DEGRADE_IMMEDIATE,
 	ADMIN_EVENT_MAINT_OFF,
 	ADMIN_EVENT_MAINT_ON,
 	ADMIN_EVENT_MAINT_ON_IMMEDIATE,
@@ -344,12 +347,14 @@ int32_t libscf_get_stn_tset(scf_instance_t *);
  * Restarter transition outcomes
  */
 typedef enum {
+	DEGRADE_REQUESTED,
 	MAINT_REQUESTED,
 	START_REQUESTED,
 	START_FAILED_REPEATEDLY,
 	START_FAILED_CONFIGURATION,
 	START_FAILED_FATAL,
 	START_FAILED_TIMEOUT_FATAL,
+	START_FAILED_DEGRADED,
 	START_FAILED_OTHER
 } start_outcome_t;
 

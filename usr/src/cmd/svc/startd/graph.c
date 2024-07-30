@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2015, Syneto S.R.L. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright 2016 RackTop Systems.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -902,7 +902,9 @@ vertex_send_event(graph_vertex_t *v, restarter_event_type_t e)
 		break;
 
 	case RESTARTER_EVENT_TYPE_REMOVE_INSTANCE:
+	case RESTARTER_EVENT_TYPE_ADMIN_RESTORE:
 	case RESTARTER_EVENT_TYPE_ADMIN_DEGRADED:
+	case RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE:
 	case RESTARTER_EVENT_TYPE_ADMIN_REFRESH:
 	case RESTARTER_EVENT_TYPE_ADMIN_RESTART:
 	case RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF:
