@@ -276,7 +276,7 @@ Get the protocol used in the socket. This may not be the protocol passed in
 during a call to \fBsocket\fR(3SOCKET). For example, when protocol 0 is used
 with sockets in the domain, \fBPF_INET\fR and \fBPF_INET6\fR, this will return
 the underlying protocol that is in use, such as \fBIPPROTO_TCP\fR.
-\fBSO_PROTOCOL\fR is the standard POSIX name for this option. \fBSP_PROTOTYPE\fR
+\fBSO_PROTOCOL\fR is the standard POSIX name for this option. \fBSO_PROTOTYPE\fR
 is the traditional operating system name for this option. Most sockets do not
 support setting this option.
 .RE
