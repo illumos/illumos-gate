@@ -22,6 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -117,7 +118,9 @@ dconf_init(dumpconf_t *dcp, int dcmode)
 	dcp->dc_conf_fp = NULL;
 	dcp->dc_conf_fd = -1;
 	dcp->dc_dump_fd = -1;
-	dcp->dc_readonly = B_FALSE;
+	dcp->dc_readonly = false;
+	dcp->dc_parsable = false;
+	dcp->dc_headers = true;
 }
 
 int
@@ -143,7 +146,7 @@ dconf_open(dumpconf_t *dcp, const char *dpath, const char *fpath, int dcmode)
 			return (-1);
 		}
 
-		dcp->dc_readonly = B_TRUE;
+		dcp->dc_readonly = true;
 		fpmode = "r";
 	}
 
@@ -533,9 +536,14 @@ dconf_get_dumpsize(dumpconf_t *dcp)
 		return (-1);
 	}
 
-	zfs_nicenum(d, buf, sizeof (buf));
+	if (dcp->dc_parsable)
+		(void) snprintf(buf, sizeof (buf), "%llu", d);
+	else
+		zfs_nicenum(d, buf, sizeof (buf));
 
-	(void) printf(gettext("Estimated dump size: %s\n"), buf);
+	if (dcp->dc_headers)
+		(void) printf(gettext("Estimated dump size: "));
+	(void) printf("%s\n", buf);
 	return (0);
 }
 
