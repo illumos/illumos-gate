@@ -78,6 +78,8 @@ file path=opt/libc-tests/tests/c11_tss.64 mode=0555
 file path=opt/libc-tests/tests/call_once.32 mode=0555
 file path=opt/libc-tests/tests/call_once.64 mode=0555
 file path=opt/libc-tests/tests/catopen mode=0555
+file path=opt/libc-tests/tests/clock_lock.32 mode=0555
+file path=opt/libc-tests/tests/clock_lock.64 mode=0555
 file path=opt/libc-tests/tests/closefrom.32 mode=0555
 file path=opt/libc-tests/tests/closefrom.64 mode=0555
 file path=opt/libc-tests/tests/endian.32 mode=0555
@@ -140,6 +142,8 @@ file path=opt/libc-tests/tests/psignal mode=0555
 file path=opt/libc-tests/tests/psignal-5097.32 mode=0555
 file path=opt/libc-tests/tests/psignal-5097.64 mode=0555
 file path=opt/libc-tests/tests/pthread_attr_get_np mode=0555
+file path=opt/libc-tests/tests/ptsname.32 mode=0555
+file path=opt/libc-tests/tests/ptsname.64 mode=0555
 dir  path=opt/libc-tests/tests/qsort
 file path=opt/libc-tests/tests/qsort/qsort_test mode=0555
 file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH) mode=0555

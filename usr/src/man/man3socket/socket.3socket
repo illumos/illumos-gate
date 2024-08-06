@@ -2,11 +2,12 @@
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2022 Garrett D'Amore
-.TH SOCKET 3SOCKET "July 6, 2022"
+.TH SOCKET 3SOCKET "June 21, 2024"
 .SH NAME
 socket \- create an endpoint for communication
 .SH SYNOPSIS
@@ -82,9 +83,22 @@ following list, defined in <sys/socket.h>.
 \fB\fBSOCK_CLOEXEC\fR\fR
 .ad
 .RS 12n
-Creates the socket with the \fBFD_CLOEXEC\fR flag set, causing the underlying
-file descriptor to be closed prior to any future calls to \fBexec\fR(2). This
-is similar in purpose to the \fBO_CLOEXEC\fR flag to \fBopen\fR(2).
+Creates the socket with the close-on-exec flag, \fBFD_CLOEXEC\fR set.  This
+is similar in purpose to the \fBO_CLOEXEC\fR flag to \fBopen\fR(2).  The file
+descriptor will be closed on any successful calls to the \fBexec\fR(2) family of
+functions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSOCK_CLOFORK\fR\fR
+.ad
+.RS 12n
+Creates the socket with the close-on-fork flag, \fBFD_CLOFORK\fR, set. This
+is similar in purpose to the \fBO_CLOFORK\fR flag to \fBopen\fR(2).  The file
+descriptor will be closed in any children created with the \fBfork\fR(2) family
+of functions.
 .RE
 
 .sp

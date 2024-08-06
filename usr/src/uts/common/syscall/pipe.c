@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <sys/types.h>
@@ -116,7 +116,7 @@ pipe(intptr_t arg, int flags)
 	/*
 	 * Validate allowed flags.
 	 */
-	if ((flags & ~(FCLOEXEC|FNONBLOCK)) != 0) {
+	if ((flags & ~(FCLOEXEC|FNONBLOCK|FCLOFORK)) != 0) {
 		return (set_errno(EINVAL));
 	}
 	/*
@@ -193,11 +193,16 @@ pipe(intptr_t arg, int flags)
 	setf(fd2, fp2);
 
 	/*
-	 * Optionally set the FCLOEXEC flag
+	 * Optionally set the FCLOEXEC and FCLOFORK flags
 	 */
 	if ((flags & FCLOEXEC) != 0) {
-		f_setfd(fd1, FD_CLOEXEC);
-		f_setfd(fd2, FD_CLOEXEC);
+		f_setfd_or(fd1, FD_CLOEXEC);
+		f_setfd_or(fd2, FD_CLOEXEC);
+	}
+
+	if ((flags & FCLOFORK) != 0) {
+		f_setfd_or(fd1, FD_CLOFORK);
+		f_setfd_or(fd2, FD_CLOFORK);
 	}
 
 	return (0);

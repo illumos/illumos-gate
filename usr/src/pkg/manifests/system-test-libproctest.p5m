@@ -1,0 +1,35 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+set name=pkg.fmri value=pkg:/system/test/libproctest@$(PKGVERS)
+set name=pkg.summary value="libproc Test Suite"
+set name=pkg.description value="libproc Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/libproc-tests
+dir  path=opt/libproc-tests/bin
+file path=opt/libproc-tests/bin/libproctest mode=0555
+dir  path=opt/libproc-tests/runfiles
+file path=opt/libproc-tests/runfiles/default.run mode=0444
+dir  path=opt/libproc-tests/tests
+dir  path=opt/libproc-tests/tests/syscall
+file path=opt/libproc-tests/tests/syscall/pr_inject mode=0555
+file path=opt/libproc-tests/tests/syscall/pr_inject.32 mode=0555
+file path=opt/libproc-tests/tests/syscall/pr_inject.64 mode=0555
+file path=opt/libproc-tests/tests/syscall/pr_target.32 mode=0555
+file path=opt/libproc-tests/tests/syscall/pr_target.64 mode=0555
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=system/test/testrunner

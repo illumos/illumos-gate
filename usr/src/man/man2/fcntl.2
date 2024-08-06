@@ -45,9 +45,9 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright 2015 Joyent, Inc.
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH FCNTL 2 "Feb 16, 2015"
+.TH FCNTL 2 "June 21, 2024"
 .SH NAME
 fcntl \- file control
 .SH SYNOPSIS
@@ -78,11 +78,11 @@ The values for \fIcmd\fR are defined in <\fBfcntl.h\fR> and include:
 .RS 15n
 Return a new file descriptor which is the lowest numbered available (that is,
 not already open) file descriptor greater than or equal to the third argument,
-\fIarg\fR, taken as an integer of type \fBint\fR. The new file descriptor
-refers to the same open file description as the original file descriptor, and
-shares any locks. The \fBFD_CLOEXEC\fR flag associated with the new file
-descriptor is cleared to keep the file open across calls to one of the
-\fBexec\fR(2) functions.
+\fIarg\fR, taken as an integer of type \fBint\fR. The new file descriptor refers
+to the same open file description as the original file descriptor, and shares
+any locks. The \fBFD_CLOEXEC\fR or \fBFD_CLOFORK\fR flags associated with the
+new file descriptor is cleared to keep the file open across calls to one of the
+\fBexec\fR(2) or \fBfork\fR(2) functions respectively.
 .RE
 
 .sp
@@ -93,7 +93,23 @@ descriptor is cleared to keep the file open across calls to one of the
 .RS 15n
 Similar to \fBF_DUPFD\fR, but always returns \fIarg\fR. \fBF_DUP2FD\fR closes
 \fIarg\fR if it is open and not equal to \fIfildes.\fR \fBF_DUP2FD\fR is
-equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR).
+equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR). The \fBFD_CLOEXEC\fR and
+\fBFD_CLOFORK\fR flags are cleared on the new descriptor, regardless of how they
+were set on the original descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUP3FD\fR\fR
+.ad
+.RS 15n
+Similar to \fBF_DUP2FD\fR; however, an additional argument is used to set the
+resulting file descriptor flags, rather than simply clearing them. The file
+descriptor flags may be the bitwise-include-OR of \fBFD_CLOEXEC\fR and
+\fBFD_CLOFORK\fR. This fourth argument is taken as type \fBint\fR. Specifying an
+invalid flag in the fourth argument will cause the function to fail and it will
+return \fBEINVAL\fR.
 .RE
 
 .sp
@@ -102,8 +118,20 @@ equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR).
 \fB\fBF_DUPFD_CLOEXEC\fR\fR
 .ad
 .RS 15n
-Similar to \fBF_DUPFD\fR except that instead of clearing \fBFD_CLOEXEC\fR
-it is explicitly set on the returned file descriptor.
+Similar to \fBF_DUPFD\fR except that the returned file descriptor's flags are
+set explicitly to \fBFD_CLOEXEC\fR, regardless of what the original file
+descriptor's flags were.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUPFD_CLOFORK\fR\fR
+.ad
+.RS 15n
+Similar to \fBF_DUPFD\fR except that the returned file descriptor's flags are
+set explicitly to \fBFD_CLOFORK\fR, regardless of what the original file
+descriptor's flags were.
 .RE
 
 .sp
@@ -113,7 +141,18 @@ it is explicitly set on the returned file descriptor.
 .ad
 .RS 15n
 Similar to \fBF_DUP2FD\fR with two exceptions. The \fBFD_CLOEXEC\fR flag is
-explicitly set on the returned file descriptor.  If \fIfiledes\fR equals
+explicitly set on the returned file descriptor.  If \fIfildes\fR equals
+\fIarg\fR, the call will fail setting \fBerrno\fR to \fBEINVAL\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUP2FD_CLOFORK\fR\fR
+.ad
+.RS 15n
+Similar to \fBF_DUP2FD\fR with two exceptions. The \fBFD_CLOFORK\fR flag is
+explicitly set on the returned file descriptor.  If \fIfildes\fR equals
 \fIarg\fR, the call will fail setting \fBerrno\fR to \fBEINVAL\fR.
 .RE
 
@@ -226,9 +265,12 @@ file descriptions.
 .RS 15n
 Set the file descriptor flags defined in <\fBfcntl.h\fR>, that are associated
 with \fIfildes\fR, to the third argument, \fIarg\fR, taken as type \fBint\fR.
-If the \fBFD_CLOEXEC\fR flag in the third argument is 0, the file will remain
-open across the \fBexec()\fR functions; otherwise the file will be closed upon
-successful execution of one of the \fBexec()\fR functions.
+There are two flags that control the behavior of the file descriptor on
+subsequent process activity. The \fBFD_CLOEXEC\fR flag, if set, will cause the
+file descriptor to be closed upon successful execution of one of the
+\fBexec\fR(2) functions. The \fBFD_CLOFORK\fR flag, if set, will cause the file
+descriptor to be closed upon successful execution of one of the \fBfork\fR(2)
+functions.
 .RE
 
 .sp
@@ -486,7 +528,8 @@ that file descriptor terminates. POSIX-style locks are not inherited by a child
 process created using \fBfork\fR(2). An OFD-style lock is scoped to the file
 description for a file, not the process or open file descriptor. Thus all file
 descriptors referring to the same description (i.e. those created via the
-\fBF_DUPFD\fR, \fBF_DUP2FD\fR, \fBF_DUPFD_CLOEXEC\fR, or \fBF_DUP2FD_CLOEXEC\fR
+\fBF_DUPFD\fR, \fBF_DUP2FD\fR, \fBF_DUP3FD\fR, \fBF_DUPFD_CLOEXEC\fR,
+\fBF_DUP2FD_CLOEXEC\fR, \fBF_DUPFD_CLOFORK\fR, or \fBF_DUP2FD_CLOFORK\fR
 commands to the \fBfcntl\fR(2) system call, or those created via the
 \fBdup\fR(2) system call, or those inherited by a child process created via
 \fBfork\fR(2)) reference the same lock, but a file descriptor obtained via a
@@ -728,7 +771,25 @@ Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
 .ne 2
 .na
-\fB\fBF_DUPFD\fR\fR
+\fB\fBF_DUPFD\fR\fR, \fB\fBF_DUP2FD\fR\fR, \fB\fBF_DUP3FD\fR\fR
+.ad
+.RS 14n
+A new file descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUPFD_CLOEXEC\fR\fR, \fB\fBF_DUPFD_CLOFORK\fR\fR
+.ad
+.RS 14n
+A new file descriptor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBF_DUP2FD_CLOEXEC\fR\fR, \fB\fBF_DUP2FD_CLOFORK\fR\fR
 .ad
 .RS 14n
 A new file descriptor.
@@ -983,7 +1044,8 @@ and \fIfildes\fR is not a valid file descriptor open for writing.
 The \fIcmd\fR argument is \fBF_FREESP\fR and \fIfildes\fR is not a valid file
 descriptor open for writing.
 .sp
-The \fIcmd\fR argument is \fBF_DUP2FD\fR, and \fIarg\fR is negative or is not
+The \fIcmd\fR argument is \fBF_DUP2FD\fR, \fBF_DUP2FD_CLOEXEC\fR,
+\fBF_DUP2FD_CLOFORK\fR, or \fBF_DUP3FD\fR and \fIarg\fR is negative or is not
 less than the current resource limit for \fBRLIMIT_NOFILE.\fR
 .sp
 The \fIcmd\fR argument is \fBF_SHARE,\fR the \fBf_access\fR share reservation
@@ -1036,8 +1098,11 @@ does not support locking.
 The \fIcmd\fR argument is \fBF_UNSHARE\fR and a reservation with this
 \fBf_id\fR for this process does not exist.
 .sp
-The \fIcmd\fR argument is \fBF_DUP2FD_CLOEXEC\fR and \fIfildes\fR is equal
-to \fBarg\fR.
+The \fIcmd\fR argument is \fBF_DUP2FD_CLOEXEC\fR or \fIF_DUP2FD_CLOFORK\fR and
+\fIfildes\fR is equal to \fBarg\fR.
+.sp
+The \fIcmd\fR argument is \fBF_DUP3FD\fR and the fourth flags argument contains
+unknown values.
 .RE
 
 .sp

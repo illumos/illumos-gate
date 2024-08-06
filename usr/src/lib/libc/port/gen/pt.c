@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -62,8 +63,6 @@
 #define	PTLEN   32			/* slave name length */
 #define	DEFAULT_TTY_GROUP	"tty"	/* slave device group owner */
 
-static void itoa(int, char *);
-
 /*
  *  Check that fd argument is a file descriptor of an opened master.
  *  Do this by sending an ISPTM ioctl message down stream. Ioctl()
@@ -90,29 +89,52 @@ ptsdev(int fd)
 	return (minor(status.st_rdev));
 }
 
+int
+ptsname_r(int fd, char *name, size_t len)
+{
+	dev_t dev;
+
+	if (name == NULL)
+		return (EINVAL);
+
+	if ((dev = ptsdev(fd)) == NODEV)
+		return (errno);
+
+	if (snprintf(name, len, "%s%d", PTSNAME, dev) >= len)
+		return (ERANGE);
+
+	/*
+	 * This lookup will create the /dev/pts node (if the corresponding pty
+	 * exists). POSIX basically never really indicated whether or not
+	 * ptsname() was allowed to return errors or not, though we did. If we
+	 * played strictly by the book, this should probably be an EINVAL or
+	 * ENOTTY return; however, to help someone have a chance of debugging
+	 * this if something goes wrong we stick with our traditional behavior
+	 * and return a slightly broader errno set. If this causes portability
+	 * issues in practice, then it should be changed to just return EINVAL.
+	 */
+	if (access(name, F_OK) != 0)
+		return (errno);
+
+	return (0);
+}
+
 char *
 ptsname(int fd)
 {
-	dev_t dev;
+	int ret;
 	char *sname;
-
-	if ((dev = ptsdev(fd)) == NODEV)
-		return (NULL);
 
 	sname = tsdalloc(_T_PTSNAME, PTLEN, NULL);
 	if (sname == NULL)
 		return (NULL);
-	(void) strcpy(sname, PTSNAME);
-	itoa(dev, sname + strlen(PTSNAME));
 
-	/*
-	 * This lookup will create the /dev/pts node (if the corresponding
-	 * pty exists.
-	 */
-	if (access(sname, F_OK) ==  0)
-		return (sname);
+	if ((ret = ptsname_r(fd, sname, PTLEN)) != 0) {
+		errno = ret;
+		return (NULL);
+	}
 
-	return (NULL);
+	return (sname);
 }
 
 /*
@@ -227,33 +249,11 @@ zonept(int fd, zoneid_t zoneid)
 }
 
 
-static void
-itoa(int i, char *ptr)
-{
-	int dig = 0;
-	int tempi;
-
-	tempi = i;
-	do {
-		dig++;
-		tempi /= 10;
-	} while (tempi);
-
-	ptr += dig;
-	*ptr = '\0';
-	while (--dig >= 0) {
-		*(--ptr) = i % 10 + '0';
-		i /= 10;
-	}
-}
-
-
 /*
  * added for SUSv3 standard
  *
  * Open a pseudo-terminal device.  External interface.
  */
-
 int
 posix_openpt(int oflag)
 {

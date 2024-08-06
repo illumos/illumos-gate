@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _UTILS_H
@@ -60,7 +61,7 @@ typedef struct {
 	enum preauth_types preauth_type;
 } krb5_module_data_t;
 
-int get_pw_uid(char *, uid_t *);
+int get_pw_uid(const char *, uid_t *);
 int get_pw_gid(char *, gid_t *);
 int get_kmd_kuser(krb5_context, const char *, char *, int);
 int key_in_keytab(const char *, int);

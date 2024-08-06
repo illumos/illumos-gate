@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <syslog.h>
@@ -32,7 +33,7 @@
 #include <security/pam_modules.h>
 #include <libintl.h>
 
-static int parse_allow_name(char *, char *);
+static int parse_allow_name(const char *, char *);
 
 /*
  * pam_sm_acct_mgmt	main account managment routine.
@@ -42,28 +43,22 @@ static int parse_allow_name(char *, char *);
  */
 
 int
-pam_sm_acct_mgmt(
-	pam_handle_t *pamh,
-	int	flags,
-	int	argc,
-	const char **argv)
+pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char	*user;
-	char	*pg;
-	int	i;
-	/*LINTED - set but not used. Would be used in a real module. */
-	int	debug __unused = 0;
-	/*LINTED - set but not used. Would be used in a real module. */
-	int	nowarn __unused = 0;
-	int	error = 0;
+	const char *user;
+	const char *pg;
+	int i;
+	int debug __unused = 0;
+	int nowarn __unused = 0;
+	int error = 0;
 
 	if (argc == 0)
 		return (PAM_SUCCESS);
 
-	if (pam_get_item(pamh, PAM_USER, (void **)&user) != PAM_SUCCESS)
+	if (pam_get_item(pamh, PAM_USER, (const void **)&user) != PAM_SUCCESS)
 		return (PAM_SERVICE_ERR);
 
-	if (pam_get_item(pamh, PAM_SERVICE, (void **)&pg) != PAM_SUCCESS)
+	if (pam_get_item(pamh, PAM_SERVICE, (const void **)&pg) != PAM_SUCCESS)
 		return (PAM_SERVICE_ERR);
 
 	/*
@@ -107,7 +102,7 @@ pam_sm_acct_mgmt(
 static char *getname();
 
 static int
-parse_allow_name(char *who, char *cp)
+parse_allow_name(const char *who, char *cp)
 {
 	char name[256];
 

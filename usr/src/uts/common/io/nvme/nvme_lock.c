@@ -67,7 +67,6 @@ nvme_rwlock_block_ns_wrlock(nvme_t *nvme, nvme_namespace_t *ns)
 	    list_is_empty(&ns->ns_lock.nl_readers) == 0);
 }
 
-
 /*
  * The only thing that blocks acquisition of a controller read lock is if
  * there are outstanding or pending writers on the controller lock. We can
@@ -505,7 +504,6 @@ nvme_rwlock(nvme_minor_t *minor, nvme_ioctl_lock_t *req)
 	 */
 	info->nli_curlevel = is_read ? NVME_LOCK_L_READ : NVME_LOCK_L_WRITE;
 	info->nli_lock = lock;
-
 
 	/*
 	 * We think we can get the lock, hurrah.

@@ -87,7 +87,7 @@ tests = ['runtests.32', 'runtests.64']
 [/opt/os-tests/tests/sockfs]
 user = root
 tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'rights.32', 'rights.64',
-         'sockpair', 'recvmsg.32', 'recvmsg.64']
+         'sockpair', 'recvmsg.32', 'recvmsg.64', 'so_protocol']
 
 [/opt/os-tests/tests/syscall]
 tests = ['fchmodat.32', 'fchmodat.64', 'open.32', 'open.64']
@@ -210,3 +210,6 @@ arch = i86pc
 
 [/opt/os-tests/tests/saveargs/testmatch/testmatch]
 arch = i86pc
+
+[/opt/os-tests/tests/oclo]
+tests = ['oclo', 'oclo_errors']

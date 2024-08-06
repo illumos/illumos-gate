@@ -42,129 +42,184 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH PTHREAD_MUTEX_TIMEDLOCK 3C "Jun 5, 2007"
-.SH NAME
-pthread_mutex_timedlock, pthread_mutex_reltimedlock_np \- lock a mutex
-.SH SYNOPSIS
-.LP
-.nf
-cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
-#include <pthread.h>
-#include <time.h>
-
-\fBint\fR \fBpthread_mutex_timedlock\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
-     \fBconst struct timespec *restrict\fR \fIabs_timeout\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBpthread_mutex_reltimedlock_np\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
-     \fBconst struct timespec *restrict\fR \fIrel_timeout\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBpthread_mutex_timedlock()\fR function locks the mutex object referenced
-by \fImutex\fR. If the mutex is already locked, the calling thread blocks until
-the mutex becomes available as in the \fBpthread_mutex_lock\fR(3C). If the
-mutex cannot be locked without waiting for another thread to unlock the mutex,
-this wait is terminated when the specified timeout expires.
-.sp
-.LP
-The \fBpthread_mutex_reltimedlock_np()\fR function is identical to the
-\fBpthread_mutex_timedlock()\fR function, except that the timeout is specified
-as a relative time interval.
-.sp
-.LP
-For \fBpthread_mutex_timedlock()\fR, the timeout expires when the absolute time
-specified by \fIabs_timeout\fR passes, as measured by the clock on which
-timeouts are based (that is, when the value of that clock equals or exceeds
-\fIabs_timeout\fR), or if the absolute time specified by \fIabs_timeout\fR has
-already been passed at the time of the call.
-.sp
-.LP
-For \fBpthread_mutex_reltimedlock_np()\fR, the timeout expires when the time
-interval specified by \fIrel_timeout\fR passes, as measured by the
-\fBCLOCK_REALTIME\fR clock, or if the time interval specified by
-\fIrel_timeout\fR is negative at the time of the call.
-.sp
-.LP
-The resolution of the timeout is the resolution of the \fBCLOCK_REALTIME\fR
-clock. The \fBtimespec\fR data type is defined in the \fB<time.h>\fRheader.
-.sp
-.LP
-Under no circumstance will either function fail with a timeout if the mutex can
-be locked immediately. The validity of the \fItimeout\fR parameter is not
-checked if the mutex can be locked immediately.
-.sp
-.LP
-As a consequence of the priority inheritance rules (for mutexes initialized
-with the \fBPRIO_INHERIT\fR protocol), if a timed mutex wait is terminated
-because its timeout expires, the priority of the owner of the mutex is adjusted
-as necessary to reflect the fact that this thread is no longer among the
-threads waiting for the mutex.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, the \fBpthread_mutex_timedlock()\fR and
-\fBpthread_mutex_reltimedlock_np()\fR functions return 0. Otherwise, an error
-number is returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBpthread_mutex_timedlock()\fR and \fBpthread_mutex_reltimedlock_np()\fR
-functions will fail for the same reasons as \fBpthread_mutex_lock\fR(3C). In
-addition, they will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 13n
-The caller would have blocked and the \fItimeout\fR parameter specified a
-nanoseconds field value less than zero or greater than or equal to 1,000
-million.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIMEDOUT\fR\fR
-.ad
-.RS 13n
-The mutex could not be locked before the specified \fItimeout\fR expired.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-_
-MT-Level	MT-Safe
-.TE
-
-.sp
-.LP
-The \fBpthread_mutex_timedlock()\fR is Standard. The
-\fBpthread_mutex_reltimedlock_np()\fR function is Stable.
-.SH SEE ALSO
-.sp
-.LP
-.BR time (2),
-.BR pthread_mutex_destroy (3C),
-.BR pthread_mutex_lock (3C),
-.BR pthread_mutex_trylock (3C),
-.BR attributes (7),
-.BR standards (7)
+.Dd June 22, 2024
+.Dt PTHRAD_MUTEX_TIMEDLOCK 3C
+.Os
+.Sh NAME
+.Nm pthread_mutex_clocklock ,
+.Nm pthread_mutex_timedlock ,
+.Nm pthread_mutex_relclocklock_np ,
+.Nm pthread_mutex_reltimedlock_np
+.Nd lock a mutex with a timeout
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In pthread.h
+.In time.h
+.Ft int
+.Fo pthread_mutex_clocklock
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict abs_timeout"
+.Fc
+.Ft int
+.Fo pthread_mutex_timedlock
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "const struct timespec *restrict abs_timeout"
+.Fc
+.Ft int
+.Fo pthread_mutex_relclocklock_np
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "clockid_t clock"
+.Fa "const struct timespec *restrict rel_timeout"
+.Fc
+.Ft int
+.Fo pthread_mutex_reltimedlock_np
+.Fa "pthread_mutex_t *restrict mutex"
+.Fa "const struct timespec *restrict rel_timeout"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_mutex_clocklock ,
+.Fn pthread_mutex_timedlock ,
+.Fn pthread_mutex_relclocklock_np ,
+and
+.Fn pthread_mutex_reltimedlock_np
+functions all lock the mutex object
+.Fa mutex .
+If the mutex is already locked, the calling thread will block until the
+mutex becomes available just as
+.Xr pthread_mutex_lock 3C ;
+however, if the mutex does not become available within a specified
+timeout, then the function call will terminate without acquiring the
+lock and return the
+.Er ETIMEDOUT
+error.
+These functions all differ in terms of how the timeout is specified and
+the clock that is used to determine when the timeout has elapsed.
+.Pp
+In general, the system provides the ability to program timeouts against
+either the realtime clock,
+.Dv CLOCK_REALTIME ,
+which measures the wall clock and is subject to changes due to time
+synchronization daemons such as NTP and PTP, or the high-resolution clock,
+.Dv CLOCK_HIGHRES ,
+which is a non-adjustable high-resolution clock that is provided by
+system hardware.
+The specified timeout may either be specified as an absolute time in the
+future or as a relative amount of time that should elapse.
+Each clock has its own resolution, which can be determined by
+.Xr clock_getres 3C .
+Timeouts may be rounded up to a given clock's resolution.
+Due to scheduling effects, it is possible that more time may elapse than
+was specified in the timeout when the caller does not successfully
+acquire the lock.
+.Pp
+The
+.Fn pthread_mutex_clocklock
+and
+.Fn pthread_mutex_relclocklock_np
+functions allow the clock source to be used to be specified by the
+.Fa clock
+argument.
+While there are additional clocks in the system, only
+.Dv CLOCK_REALTIME
+or
+.Dv CLOCK_HIGHRES
+may be specified.
+The thread and process-specific CPU time clocks cannot be used.
+Conversely, the
+.Fn pthread_mutex_timedlock
+and
+.Fn pthread_mutex_reltimedlock_np
+functions will always utilize the realtime clock,
+.Dv CLOCK_REALTIME .
+.Pp
+The
+.Fn pthread_mutex_clocklock
+and
+.Fn pthread_mutex_timedlock
+functions treat the timeout value,
+.Fa abs_timeout ,
+as the absolute time in the future when the timeout should expire.
+Conversely, the
+.Fn pthread_mutex_relclocklock_np
+and
+.Fn pthread_mutex_reltimedlock_np
+functions operate in terms of a relative time.
+The timer will expire when a specified amount of time passes on the
+clock specified as indicated by
+.Fa rel_timeout .
+.Pp
+If the mutex,
+.Fa mutex ,
+can be immediately locked, then the timeout value is ignored
+entirely, even if the timeout had already expired or represented a
+value that didn't make sense.
+Both are only checked if the thread would block on the mutex itself.
+.Pp
+Mutexes may have priority inheritance enabled via the
+.Dv PTHREAD_PRIO_INHERIT
+attribute.
+When a thread is blocked on a timed mutex, it may boost the priority of
+the mutex owner based on the priority inheritance rules.
+When the timer expires, the calling thread will no longer be blocking on
+the mutex and therefore will no longer provide any potential priority
+inheritance.
+If it had boosted the holder of the mutex, then the owner's scheduling
+priority will be re-evaluated.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_mutex_clocklock ,
+.Fn pthread_mutex_timedlock ,
+.Fn pthread_mutex_relclocklock_np ,
+and
+.Fn pthread_mutex_reltimedlock_np
+functions will return
+.Sy 0
+and successfully have entered the mutex,
+.Fa mutex .
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
+The
+.Fn pthread_mutex_clocklock ,
+.Fn pthread_mutex_timedlock ,
+.Fn pthread_mutex_relclocklock_np ,
+and
+.Fn pthread_mutex_reltimedlock_np
+functions will all fail for the same reasons as
+.Xr pthread_mutex_lock 3C .
+In addition, they will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The caller would have blocked and the
+.Fa timeout
+parameter specified a nanoseconds field value less than zero or greater than or
+equal to 1,000 million.
+.Pp
+For
+.Fn pthread_mutex_clocklock
+and
+.Fn pthread_mutex_relclocklock_np
+the value of
+.Fa clock
+is either unsupported for locking or unknown to the system.
+.It Er ETIMEDOUT
+The mutex could not be locked before the specified
+.Fa timeout
+expired.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr time 2 ,
+.Xr clock_getres 3C ,
+.Xr pthread_mutex_destroy 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutex_trylock  3C ,
+.Xr attributes 7 ,
+.Xr standards 7

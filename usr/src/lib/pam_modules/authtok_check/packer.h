@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 #ifndef _PACKER_H
 #define	_PACKER_H
@@ -103,7 +104,7 @@ char	*GetPW(PWDICT *, uint32_t);
 int packer(char *, char *);
 char *Reverse(char *);
 char *Lowercase(char *);
-int DictCheck(char *, char *);
+int DictCheck(const char *, char *);
 int make_dict_database(char *, char *);
 int build_dict_database(char *, char *);
 int lock_db(char *);

@@ -29,7 +29,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -241,6 +241,10 @@ extern int ttyslot(void);
 extern void *valloc(size_t);
 #endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
 #endif /* defined(__EXTENSIONS__) || ... || defined(_XPG4_2) */
+
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG8)
+extern int ptsname_r(int, char *, size_t);
+#endif	/* _STRICT_SYMBOLS || _XPG8 */
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \

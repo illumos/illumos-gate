@@ -13661,8 +13661,10 @@ f usr/share/man/man3c/pthread_cancel.3c 0444 root bin
 f usr/share/man/man3c/pthread_cleanup_pop.3c 0444 root bin
 f usr/share/man/man3c/pthread_cleanup_push.3c 0444 root bin
 s usr/share/man/man3c/pthread_cond_broadcast.3c=pthread_cond_signal.3c
+s usr/share/man/man3c/pthread_cond_clockwait.3c=pthread_cond_wait.3c
 s usr/share/man/man3c/pthread_cond_destroy.3c=pthread_cond_init.3c
 f usr/share/man/man3c/pthread_cond_init.3c 0444 root bin
+s usr/share/man/man3c/pthread_cond_relclockwait_np.3c=pthread_cond_wait.3c
 s usr/share/man/man3c/pthread_cond_reltimedwait_np.3c=pthread_cond_wait.3c
 f usr/share/man/man3c/pthread_cond_signal.3c 0444 root bin
 s usr/share/man/man3c/pthread_cond_timedwait.3c=pthread_cond_wait.3c
@@ -13686,11 +13688,13 @@ f usr/share/man/man3c/pthread_key_create.3c 0444 root bin
 s usr/share/man/man3c/pthread_key_create_once_np.3c=pthread_key_create.3c
 f usr/share/man/man3c/pthread_key_delete.3c 0444 root bin
 f usr/share/man/man3c/pthread_kill.3c 0444 root bin
+s usr/share/man/man3c/pthread_mutex_clocklock.3c=pthread_mutex_timedlock.3c
 f usr/share/man/man3c/pthread_mutex_consistent.3c 0444 root bin
 s usr/share/man/man3c/pthread_mutex_destroy.3c=pthread_mutex_init.3c
 f usr/share/man/man3c/pthread_mutex_getprioceiling.3c 0444 root bin
 f usr/share/man/man3c/pthread_mutex_init.3c 0444 root bin
 f usr/share/man/man3c/pthread_mutex_lock.3c 0444 root bin
+s usr/share/man/man3c/pthread_mutex_relclocklock_np.3c=pthread_mutex_timedlock.3c
 s usr/share/man/man3c/pthread_mutex_reltimedlock_np.3c=pthread_mutex_timedlock.3c
 s usr/share/man/man3c/pthread_mutex_setprioceiling.3c=pthread_mutex_getprioceiling.3c
 f usr/share/man/man3c/pthread_mutex_timedlock.3c 0444 root bin
@@ -13710,8 +13714,12 @@ s usr/share/man/man3c/pthread_mutexattr_setrobust.3c=pthread_mutexattr_getrobust
 s usr/share/man/man3c/pthread_mutexattr_settype.3c=pthread_mutexattr_gettype.3c
 f usr/share/man/man3c/pthread_once.3c 0444 root bin
 s usr/share/man/man3c/pthread_rwlock_destroy.3c=pthread_rwlock_init.3c
+s usr/share/man/man3c/pthread_rwlock_clockrdlock.3c=pthread_rwlock_timedrdlock.3c
+s usr/share/man/man3c/pthread_rwlock_clockwrlock.3c=pthread_rwlock_timedwrlock.3c
 f usr/share/man/man3c/pthread_rwlock_init.3c 0444 root bin
 f usr/share/man/man3c/pthread_rwlock_rdlock.3c 0444 root bin
+s usr/share/man/man3c/pthread_rwlock_relclockrdlock_np.3c=pthread_rwlock_timedrdlock.3c
+s usr/share/man/man3c/pthread_rwlock_relclockwrlock_np.3c=pthread_rwlock_timedwrlock.3c
 s usr/share/man/man3c/pthread_rwlock_reltimedrdlock_np.3c=pthread_rwlock_timedrdlock.3c
 s usr/share/man/man3c/pthread_rwlock_reltimedwrlock_np.3c=pthread_rwlock_timedwrlock.3c
 f usr/share/man/man3c/pthread_rwlock_timedrdlock.3c 0444 root bin
@@ -13741,6 +13749,7 @@ f usr/share/man/man3c/pthread_spin_unlock.3c 0444 root bin
 f usr/share/man/man3c/pthread_testcancel.3c 0444 root bin
 f usr/share/man/man3c/ptrace.3c 0444 root bin
 f usr/share/man/man3c/ptsname.3c 0444 root bin
+s usr/share/man/man3c/ptsname_r.3c=ptsname.3c
 s usr/share/man/man3c/putc.3c=fputc.3c
 s usr/share/man/man3c/putc_unlocked.3c=fputc.3c
 s usr/share/man/man3c/putchar.3c=fputc.3c
@@ -13832,12 +13841,14 @@ s usr/share/man/man3c/seconvert.3c=econvert.3c
 s usr/share/man/man3c/seed48.3c=drand48.3c
 f usr/share/man/man3c/seekdir.3c 0444 root bin
 f usr/share/man/man3c/select.3c 0444 root bin
+s usr/share/man/man3c/sem_clockwait.3c=sem_timedwait.3c
 f usr/share/man/man3c/sem_close.3c 0444 root bin
 f usr/share/man/man3c/sem_destroy.3c 0444 root bin
 f usr/share/man/man3c/sem_getvalue.3c 0444 root bin
 f usr/share/man/man3c/sem_init.3c 0444 root bin
 f usr/share/man/man3c/sem_open.3c 0444 root bin
 f usr/share/man/man3c/sem_post.3c 0444 root bin
+s usr/share/man/man3c/sem_relclockwait_np.3c=sem_timedwait.3c
 s usr/share/man/man3c/sem_reltimedwait_np.3c=sem_timedwait.3c
 f usr/share/man/man3c/sem_timedwait.3c 0444 root bin
 s usr/share/man/man3c/sem_trywait.3c=sem_wait.3c

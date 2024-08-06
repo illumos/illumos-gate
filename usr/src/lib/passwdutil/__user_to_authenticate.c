@@ -22,13 +22,14 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "passwdutil.h"
 
 int
-__user_to_authenticate(char *name, pwu_repository_t *rep, char **auth_user,
-	int *auth_self)
+__user_to_authenticate(const char *name, pwu_repository_t *rep,
+    char **auth_user, int *auth_self)
 {
 	int repositories;
 	int i;

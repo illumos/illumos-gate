@@ -25,6 +25,7 @@ SUBDIRS = \
 	elf-tests \
 	libc-tests \
 	libmlrpc-tests \
+	libproc-tests \
 	libsec-tests \
 	net-tests \
 	nvme-tests \

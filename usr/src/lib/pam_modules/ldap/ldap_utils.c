@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "ldap_headers.h"
@@ -82,8 +83,8 @@ __ldap_to_pamerror(int ldaperror)
  *	Authentication is checked by calling __ns_ldap_auth.
  */
 int
-authenticate(ns_cred_t **credpp, char *usrname, char *pwd,
-		int *sec_until_expired)
+authenticate(ns_cred_t **credpp, const char *usrname, const char *pwd,
+    int *sec_until_expired)
 {
 	int		result = PAM_AUTH_ERR;
 	int		ldaprc;

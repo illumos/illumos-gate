@@ -11,6 +11,8 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -21,33 +23,43 @@
 #include <sys/lx_misc.h>
 
 /* From usr/src/uts/common/syscall/fcntl.c */
-extern int fcntl(int, int, intptr_t);
+extern int fcntl(int, int, intptr_t, intptr_t);
 
 long
 lx_dup(int fd)
 {
-	return (fcntl(fd, F_DUPFD, 0));
+	return (fcntl(fd, F_DUPFD, 0, 0));
 }
 
 long
 lx_dup2(int oldfd, int newfd)
 {
-	return (fcntl(oldfd, F_DUP2FD, newfd));
+	return (fcntl(oldfd, F_DUP2FD, newfd, 0));
 }
 
 long
 lx_dup3(int oldfd, int newfd, int flags)
 {
-	int rc;
+	int dflags = 0;
 
-	/* The only valid flag is O_CLOEXEC. */
+	/*
+	 * dup3() only supports O_ open flags that translate into file
+	 * descriptor flags in the F_GETFD sense.
+	 * In the future, once Linux supports it, LX_O_CLOFORK should also
+	 * be added here.
+	 */
 	if (flags & ~LX_O_CLOEXEC)
 		return (set_errno(EINVAL));
 
-	/* Only DUP2FD_CLOEXEC returns EINVAL on the same fd's */
+	/*
+	 * This call differs from dup2 such that it is an error when
+	 * oldfd == newfd
+	 */
 	if (oldfd == newfd)
 		return (set_errno(EINVAL));
 
-	rc = fcntl(oldfd, (flags == 0) ? F_DUP2FD : F_DUP2FD_CLOEXEC, newfd);
-	return (rc);
+	if ((flags & LX_O_CLOEXEC) != 0)
+		dflags |= FD_CLOEXEC;
+
+	return (fcntl(oldfd, F_DUP3FD, newfd, dflags));
 }

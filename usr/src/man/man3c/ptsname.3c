@@ -43,19 +43,26 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd February 5, 2022
+.Dd July 2, 2024
 .Dt PTSNAME 3C
 .Os
 .Sh NAME
-.Nm ptsname
+.Nm ptsname ,
+.Nm ptsname_r
 .Nd get the name of the subsidiary device of a pseudo-terminal
 .Sh SYNOPSIS
 .In stdlib.h
 .Ft char *
 .Fo ptsname
 .Fa "int fildes"
+.Fc
+.Ft int
+.Fo ptsname_r
+.Fa "int fildes"
+.Fa "char *name"
+.Fa "size_t namelen"
 .Fc
 .Sh DESCRIPTION
 The
@@ -82,26 +89,104 @@ This string is of the form
 where
 .Sy N
 is a non-negative integer.
+Callers should generally assume that a subsequent call to
+.Fn ptsname
+will overwrite the returned buffer.
+POSIX does not require that the interface be thread-safe.
+While a per-thread buffer is currently being used, that should not be relied
+upon by portable applications and is not a system guarantee.
+.Pp
+The
+.Fn ptsname_r
+function behaves similarly to the
+.Fn ptsname
+function, but rather than use a thread-specific buffer, stores the name of the
+pseudo-terminal subsidiary device of
+.Fa fildes
+in
+.Fa name .
+The size of
+.Fa name
+is indicated by
+.Fa namelen .
+If the buffer is not large enough, then the function will fail with
+.Er ERANGE .
+The name's length will not exceed
+.Brq TTY_NAME_MAX ,
+which can be determined at runtime by calling
+.Xr sysconf 3C
+with the name
+.Dv _SC_TTY_NAME_MAX .
 .Sh RETURN VALUES
-If successful, the
+Upon successful completion, the
 .Fn ptsname
 function returns a pointer to a string which is the name of the pseudo-terminal
 subsidiary device.
 This value points to a static data area that is overwritten by each call to
-.Fn ptsname .
-.Pp
-Upon failure,
 .Fn ptsname
-returns
-.Dv NULL .
-This could occur if
-.Fa fildes
-is an invalid file descriptor or if the subsidiary device name does not exist
-in the file system.
+by the same thread.
+Otherwise,
+.Dv NULL
+is returned and
+.Va errno
+is set to indicate the error that occurred.
+.Pp
+Upon successful completion, the
+.Fn ptsname_r
+function will return
+.Sy 0
+and
+.Fa name
+will be filled in with the subsidiary device's name.
+Otherwise, an error number will be returned.
+.Sh ERRORS
+The
+.Fn ptsname
+and
+.Fn ptsname_r
+functions will fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The file descriptor,
+.Fa fildes ,
+does not refer to a valid file descriptor.
+.It Er EINVAL
+The file descriptor,
+.Fa fildes ,
+does not refer to a manager pseudo-terminal device.
+.Pp
+For the
+.Fn ptsname_r
+function,
+.Fa name
+is a
+.Dv NULL
+pointer.
+.It Er ENOTTY
+The file descriptor,
+.Fa fildes ,
+does not refer to a manager pseudo-terminal device.
+.It Er ERANGE
+For the
+.Fn ptsname_r
+function, the buffer
+.Fa name 's
+size as indicated by
+.Fa namelen
+was too small to hold the actual subsidiary device's name.
+.El
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh MT LEVEL
-.Sy Safe
+The
+.Fn ptsname
+function is
+.Sy Safe .
+.Pp
+The
+.Fn ptsname_r
+function is
+.Sy MT-Safe .
 .Sh SEE ALSO
 .Xr open 2 ,
 .Xr grantpt 3C ,

@@ -1811,8 +1811,8 @@ retry:
 			 */
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
-			error = so_opt2cmsg(mctlp, opt, optlen,
-			    !(flags & MSG_XPG4_2), control, controllen);
+			error = so_opt2cmsg(mctlp, opt, optlen, flags, control,
+			    controllen);
 			if (error) {
 				freemsg(mctlp);
 				if (msg->msg_namelen != 0)
@@ -1870,8 +1870,8 @@ retry:
 			 */
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
-			error = so_opt2cmsg(mctlp, opt, optlen,
-			    !(flags & MSG_XPG4_2), control, controllen);
+			error = so_opt2cmsg(mctlp, opt, optlen, flags, control,
+			    controllen);
 			if (error) {
 				freemsg(mctlp);
 				kmem_free(control, controllen);

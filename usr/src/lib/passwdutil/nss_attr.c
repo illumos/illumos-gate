@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -39,8 +40,8 @@
 struct passwd *private_getpwnam_r(const char *name, struct passwd *result,
     char *buffer, int buflen);
 
-int nss_getattr(char *name, attrlist *item, pwu_repository_t *rep);
-int nss_getpwnam(char *name, attrlist *items, pwu_repository_t *rep,
+int nss_getattr(const char *name, attrlist *item, pwu_repository_t *rep);
+int nss_getpwnam(const char *name, attrlist *items, pwu_repository_t *rep,
     void **buf);
 
 /*
@@ -84,7 +85,8 @@ struct pwbuf {
  */
 /*ARGSUSED*/
 int
-nss_getpwnam(char *name, attrlist *items, pwu_repository_t *rep, void **buf)
+nss_getpwnam(const char *name, attrlist *items, pwu_repository_t *rep,
+    void **buf)
 {
 	attrlist *p;
 	struct pwbuf *pwbuf;
@@ -216,7 +218,7 @@ error:
  * Get attributes specified in list 'items'
  */
 int
-nss_getattr(char *name, attrlist *items, pwu_repository_t *rep)
+nss_getattr(const char *name, attrlist *items, pwu_repository_t *rep)
 {
 	struct pwbuf *pwbuf;
 	struct passwd *pw;

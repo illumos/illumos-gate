@@ -84,7 +84,7 @@ lx_epoll_create1(int flags)
 	mutex_exit(&fp->f_tlock);
 	setf(fd, fp);
 	if (cloexec) {
-		f_setfd(fd, FD_CLOEXEC);
+		f_setfd_or(fd, FD_CLOEXEC);
 	}
 	return (fd);
 

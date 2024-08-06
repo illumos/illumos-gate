@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -384,7 +385,7 @@ static char *r_destructors[] = {
 
 
 int
-FascistLook(PWDICT *pwp, char *instring)
+FascistLook(PWDICT *pwp, const char *instring)
 {
 	int i;
 	char *password;
@@ -434,7 +435,7 @@ FascistLook(PWDICT *pwp, char *instring)
 }
 
 int
-DictCheck(char *password, char *path)
+DictCheck(const char *password, char *path)
 {
 	PWDICT *pwp;
 	int r;

@@ -748,10 +748,13 @@ typedef enum {
 				.drd_func = 0, \
 				.drd_reg = 0xc1c }
 #define	DF_ECAM_V4_GET_ADDR(r)		bitx32(r, 31, 20)
+#define	DF_ECAM_V4_SET_ADDR(r, v)	bitset32(r, 31, 20, v)
 #define	DF_ECAM_V4_ADDR_SHIFT		20
 #define	DF_ECAM_LIMIT_EXCL		(1 << DF_ECAM_V4_ADDR_SHIFT)
 #define	DF_ECAM_BASE_V4_GET_EN(r)	bitx32(r, 0, 0)
+#define	DF_ECAM_BASE_V4_SET_EN(r, v)	bitset32(r, 0, 0, v)
 #define	DF_ECAM_EXT_V4_GET_ADDR(r)	bitx32(r, 23, 0)
+#define	DF_ECAM_EXT_V4_SET_ADDR(r, v)	bitset32(r, 23, 0, v)
 #define	DF_ECAM_EXT_V4_ADDR_SHIFT	32
 
 /*
@@ -1144,6 +1147,42 @@ typedef enum {
 #define	DF_FICAD_HI_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0xbc}
+
+/*
+ * DF::SpecialSysFunctionFabricID1, DF::SpecialSysFunctionFabricID2 -- These
+ * registers are used to look up the FabricID of various functional groups.
+ * These exist in DFv3 and DFv4 at different addresses with slightly different
+ * field widths.
+ */
+/*CSTYLED*/
+#define	DF_SYS_FUN_FID1_V3	(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
+				.drd_func = 1, \
+				.drd_reg = 0x60 }
+#define	DF_SYS_FUN_FID1_V3_GET_MSTR_PIE_FID(r)		bitx32(r, 21, 16)
+#define	DF_SYS_FUN_FID1_V3_GET_LCL_PIE_FID(r)		bitx32(r, 5, 0)
+
+/*CSTYLED*/
+#define	DF_SYS_FUN_FID1_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 4, \
+				.drd_reg = 0x190 }
+#define	DF_SYS_FUN_FID1_V4_GET_MSTR_PIE_FID(r)		bitx32(r, 27, 16)
+#define	DF_SYS_FUN_FID1_V4D2_GET_MSTR_PIE_FID(r)	bitx32(r, 23, 16)
+#define	DF_SYS_FUN_FID1_V4_GET_LCL_PIE_FID(r)		bitx32(r, 11, 0)
+#define	DF_SYS_FUN_FID1_V4D2_GET_LCL_PIE_FID(r)		bitx32(r, 7, 0)
+
+/*CSTYLED*/
+#define	DF_SYS_FUN_FID2_V3	(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
+				.drd_func = 1, \
+				.drd_reg = 0x64 }
+#define	DF_SYS_FUN_FID2_V3_GET_FCH_IOMS_FID(r)		bitx32(r, 21, 16)
+#define	DF_SYS_FUN_FID2_V3_GET_LCL_IOMS_FID(r)		bitx32(r, 5, 0)
+
+/*CSTYLED*/
+#define	DF_SYS_FUN_FID2_V4	(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+				.drd_func = 4, \
+				.drd_reg = 0x194 }
+#define	DF_SYS_FUN_FID2_V4_GET_FCH_IOS_FID(r)		bitx32(r, 27, 16)
+#define	DF_SYS_FUN_FID2_V4D2_GET_FCH_IOS_FID(r)		bitx32(r, 23, 16)
 
 #ifdef __cplusplus
 }

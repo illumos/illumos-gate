@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -70,11 +71,20 @@ __fcntl(int fd, int cmd, ...)
 {
 	int	res;
 	int	pid;
-	intptr_t arg;
+	intptr_t arg, arg1 = 0;
 	va_list ap;
 
+	/*
+	 * The fcntl(2) entry points are responsible for marshalling arguments
+	 * into intptr_t sized objects prior to calling this. The kernel only
+	 * works in terms of intptr_t sized arguments; however, some calls (like
+	 * F_DUP3FD) are in terms of two int sized arguments.
+	 */
 	va_start(ap, cmd);
 	arg = va_arg(ap, intptr_t);
+	if (cmd == F_DUP3FD) {
+		arg1 = va_arg(ap, intptr_t);
+	}
 	va_end(ap);
 
 	switch (cmd) {
@@ -88,6 +98,6 @@ __fcntl(int fd, int cmd, ...)
 		return (res);
 
 	default:
-		return (syscall(SYS_fcntl, fd, cmd, arg));
+		return (syscall(SYS_fcntl, fd, cmd, arg, arg1));
 	}
 }

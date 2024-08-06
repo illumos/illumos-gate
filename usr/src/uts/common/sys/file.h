@@ -121,6 +121,7 @@ typedef struct fpollinfo {
 #define	FCLOEXEC	0x800000	/* O_CLOEXEC = 0x800000 */
 #define	FDIRECTORY	0x1000000	/* O_DIRECTORY = 0x1000000 */
 #define	FDIRECT		0x2000000	/* O_DIRECT = 0x2000000 */
+#define	FCLOFORK	0x4000000	/* O_CLOFORK = 0x4000000 */
 /*
  * Private interface for lx O_PATH|O_NOFOLLOW emulation for symlinks.
  */
@@ -226,7 +227,7 @@ extern void setf(int, file_t *);
 extern int f_getfd_error(int, int *);
 extern char f_getfd(int);
 extern int f_setfd_error(int, int);
-extern void f_setfd(int, char);
+extern void f_setfd_or(int, short);
 extern int f_getfl(int, int *);
 extern int f_badfd(int, int *, int);
 extern int fassign(struct vnode **, int, int *);

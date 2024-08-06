@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2020, Joyent, Inc.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <syslog.h>
@@ -544,7 +545,7 @@ pam_set_item(pam_handle_t *pamh, int item_type, const void *item)
  */
 
 int
-pam_get_item(const pam_handle_t *pamh, int item_type, void **item)
+pam_get_item(const pam_handle_t *pamh, int item_type, const void **item)
 {
 	struct pam_item *pip;
 	char	iname_buf[PAM_MAX_MSG_SIZE];
@@ -682,11 +683,12 @@ parse_user_name(char *user_input, char **ret_username)
 #define	USERNAME	1
 
 int
-pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
+pam_get_user(pam_handle_t *pamh, const char **user,
+    const char *prompt_override)
 {
-	int	status;
-	char	*prompt = NULL;
-	char    *real_username;
+	int status;
+	const char *prompt = NULL;
+	char *real_username;
 	struct pam_response *ret_resp = NULL;
 	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 
@@ -696,7 +698,7 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 	if (pamh == NULL)
 		return (PAM_SYSTEM_ERR);
 
-	if ((status = pam_get_item(pamh, PAM_USER, (void **)user))
+	if ((status = pam_get_item(pamh, PAM_USER, (const void **)user))
 	    != PAM_SUCCESS) {
 		return (status);
 	}
@@ -715,7 +717,8 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 	if (prompt_override != NULL) {
 		prompt = (char *)prompt_override;
 	} else {
-		status = pam_get_item(pamh, PAM_USER_PROMPT, (void**)&prompt);
+		status = pam_get_item(pamh, PAM_USER_PROMPT,
+		    (const void **)&prompt);
 		if (status != PAM_SUCCESS) {
 			return (status);
 		}
@@ -786,7 +789,7 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 	 * the value of user because pam_set_item mallocs the memory.
 	 */
 
-	status = pam_get_item(pamh, PAM_USER, (void**)user);
+	status = pam_get_item(pamh, PAM_USER, (const void**)user);
 	return (status);
 }
 
@@ -1477,7 +1480,7 @@ out:
 /*
  * pam_getenv - retrieve an environment variable from the PAM handle
  */
-char *
+const char *
 pam_getenv(pam_handle_t *pamh, const char *name)
 {
 	int		error = PAM_SYSTEM_ERR;
@@ -1995,19 +1998,19 @@ close_pam_conf(struct pam_fh *pam_fh)
 static int
 read_pam_conf(pam_handle_t *pamh, char *config)
 {
-	struct pam_fh	*pam_fh;
-	pamtab_t	*pamentp;
-	pamtab_t	*tpament;
-	char		*service;
-	int		error;
-	int		i = pamh->include_depth;	/* include depth */
+	struct pam_fh *pam_fh;
+	pamtab_t *pamentp;
+	pamtab_t *tpament;
+	char *service;
+	int error;
+	int i = pamh->include_depth;	/* include depth */
 	/*
 	 * service types:
 	 * error (-1), "auth" (0), "account" (1), "session" (2), "password" (3)
 	 */
 	int service_found[PAM_NUM_MODULE_TYPES+1] = {0, 0, 0, 0, 0};
 
-	(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+	(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 	if (service == NULL || *service == '\0') {
 		__pam_log(LOG_AUTH | LOG_ERR, "No service name");
 		return (PAM_SYSTEM_ERR);
@@ -2646,15 +2649,15 @@ do_conv(pam_handle_t *pamh, int msg_style, int num_msg,
     char messages[][PAM_MAX_MSG_SIZE], void *conv_apdp,
     struct pam_response *ret_respp[])
 {
-	struct pam_message	*msg;
-	struct pam_message	*m;
-	int			i;
-	int			k;
-	int			retcode;
-	struct pam_conv		*pam_convp;
+	struct pam_message *msg;
+	struct pam_message *m;
+	int i;
+	int k;
+	int retcode;
+	struct pam_conv *pam_convp;
 
 	if ((retcode = pam_get_item(pamh, PAM_CONV,
-	    (void **)&pam_convp)) != PAM_SUCCESS) {
+	    (const void **)&pam_convp)) != PAM_SUCCESS) {
 		return (retcode);
 	}
 
@@ -2702,7 +2705,8 @@ do_conv(pam_handle_t *pamh, int msg_style, int num_msg,
 	/*
 	 * Call conv function to display the prompt.
 	 */
-	retcode = (pam_convp->conv)(num_msg, &msg, ret_respp, conv_apdp);
+	retcode = (pam_convp->conv)(num_msg, (const struct pam_message **)&msg,
+	    ret_respp, conv_apdp);
 	pam_trace(PAM_DEBUG_CONV,
 	    "pam_conv_resp(%p pam_conv = %s) ret_respp = %p",
 	    (void *)pamh, pam_strerror(pamh, retcode), (void *)ret_respp);
@@ -2825,7 +2829,7 @@ __pam_get_authtok(pam_handle_t *pamh, int source, int type, char *prompt,
 		case PAM_OLDAUTHTOK:
 
 			if ((error = pam_get_item(pamh, type,
-			    (void **)&new_password)) != PAM_SUCCESS)
+			    (const void **)&new_password)) != PAM_SUCCESS)
 				goto err_ret;
 
 			if (new_password == NULL || new_password[0] == '\0') {
@@ -2864,7 +2868,7 @@ __pam_get_authtok(pam_handle_t *pamh, int source, int type, char *prompt,
 		/* save the new password if this item was NULL */
 		if (type) {
 			if ((error = pam_get_item(pamh, type,
-			    (void **)&new_password)) != PAM_SUCCESS) {
+			    (const void **)&new_password)) != PAM_SUCCESS) {
 				free_resp(1, ret_resp);
 				goto err_ret;
 			}

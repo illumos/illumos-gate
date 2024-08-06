@@ -12,6 +12,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright 2024 MNX Cloud, Inc.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/systm.h>
@@ -34,7 +35,7 @@
 #include <sys/stream.h>
 #include <sys/flock.h>
 
-extern int fcntl(int, int, intptr_t);
+extern int fcntl(int, int, intptr_t, intptr_t);
 extern int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
 extern int lx_pipe_setsz(stdata_t *, uint_t, boolean_t);
 
@@ -151,7 +152,7 @@ lx_fcntl_getfl(int fd)
 	int retval;
 	int rc;
 
-	retval = fcntl(fd, F_GETFL, 0);
+	retval = fcntl(fd, F_GETFL, 0, 0);
 	if (ttolwp(curthread)->lwp_errno != 0)
 		return (ttolwp(curthread)->lwp_errno);
 
@@ -196,7 +197,7 @@ lx_fcntl_setfl(int fd, ulong_t arg)
 	 * fcntl(F_GETFL) so that the value can be carried
 	 * through.
 	 */
-	flags = fcntl(fd, F_GETFL, 0);
+	flags = fcntl(fd, F_GETFL, 0, 0);
 	if (ttolwp(curthread)->lwp_errno != 0)
 		return (ttolwp(curthread)->lwp_errno);
 
@@ -212,7 +213,7 @@ lx_fcntl_setfl(int fd, ulong_t arg)
 	if (arg & LX_O_ASYNC)
 		flags |= FASYNC;
 
-	return (fcntl(fd, F_SETFL, flags));
+	return (fcntl(fd, F_SETFL, flags, 0));
 }
 
 
@@ -286,19 +287,19 @@ lx_fcntl_common(int fd, int cmd, ulong_t arg)
 		return (set_errno(ENOTSUP));
 
 	case LX_F_DUPFD:
-		rc = fcntl(fd, F_DUPFD, arg);
+		rc = fcntl(fd, F_DUPFD, arg, 0);
 		break;
 
 	case LX_F_DUPFD_CLOEXEC:
-		rc = fcntl(fd, F_DUPFD_CLOEXEC, arg);
+		rc = fcntl(fd, F_DUPFD_CLOEXEC, arg, 0);
 		break;
 
 	case LX_F_GETFD:
-		rc = fcntl(fd, F_GETFD, 0);
+		rc = fcntl(fd, F_GETFD, 0, 0);
 		break;
 
 	case LX_F_SETFD:
-		rc = fcntl(fd, F_SETFD, arg);
+		rc = fcntl(fd, F_SETFD, arg, 0);
 		break;
 
 	case LX_F_GETFL:

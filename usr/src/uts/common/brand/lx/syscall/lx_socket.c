@@ -1213,7 +1213,7 @@ lx_cmsg_set_cloexec(void *input, socklen_t inlen)
 
 				flags = f_getfd(fds[i]);
 				flags |= FD_CLOEXEC;
-				f_setfd(fds[i], flags);
+				f_setfd_or(fds[i], flags);
 				releasef(fds[i]);
 			}
 		}
@@ -1535,7 +1535,7 @@ lx_socket(int domain, int type, int protocol)
 
 	setf(fd, fp);
 	if ((options & SOCK_CLOEXEC) != 0) {
-		f_setfd(fd, FD_CLOEXEC);
+		f_setfd_or(fd, FD_CLOEXEC);
 	}
 	return (fd);
 }
@@ -4588,7 +4588,7 @@ lx_accept_common(int sock, struct sockaddr *name, socklen_t *nlp, int flags)
 
 	/* Act on LX_SOCK_CLOEXEC from flags */
 	if (flags & LX_SOCK_CLOEXEC) {
-		f_setfd(nfd, FD_CLOEXEC);
+		f_setfd_or(nfd, FD_CLOEXEC);
 	}
 
 	/*
@@ -4811,8 +4811,8 @@ lx_socketpair(int domain, int type, int protocol, int *sv)
 	setf(fds[1], fps[1]);
 
 	if ((options & SOCK_CLOEXEC) != 0) {
-		f_setfd(fds[0], FD_CLOEXEC);
-		f_setfd(fds[1], FD_CLOEXEC);
+		f_setfd_or(fds[0], FD_CLOEXEC);
+		f_setfd_or(fds[1], FD_CLOEXEC);
 	}
 	if (copyout(fds, sv, sizeof (fds)) != 0) {
 		(void) closeandsetf(fds[0], NULL);

@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -26,9 +27,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <note.h>
 #include <libcustr.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 #include "test_common.h"
 
 char *dname;
@@ -51,21 +52,24 @@ static char *compilation = "compilation.cfg";
 #define	MFLAG "-m32"
 #endif
 
-const char *compilers[] = {
-	"cc",
+static const char *compilers[] = {
 	"gcc",
-	"/opt/SUNWspro/bin/cc",
-	"/opt/gcc/4.4.4/bin/gcc",
-	"/opt/sunstudio12.1/bin/cc",
-	"/opt/sfw/bin/gcc",
-	"/usr/local/bin/gcc",
+	"clang",
 	NULL
 };
 
-char *compiler = NULL;
-const char *c89flags = NULL;
-const char *c99flags = NULL;
-const char *c11flags = NULL;
+/*
+ * We turn off -Wformat-security because the auto-generated tests don't pass
+ * string literals to printf family functions, which will trigger warnings in
+ * some compilers (e.g. clang-16).
+ */
+static const char *compiler = NULL;
+static const char *common_flags = "-Wall -Werror -nostdinc -isystem "
+	"/usr/include -Wno-format-security";
+static const char *c89flags = "-std=c89";
+static const char *c99flags = "-std=c99";
+static const char *c11flags = "-std=c11";
+static const char *c17flags = "-std=c17";
 
 #define	MAXENV	64	/* maximum number of environments (bitmask width) */
 #define	MAXHDR	10	/* maximum # headers to require to access symbol */
@@ -756,7 +760,60 @@ mkworkdir(void)
 	return (0);
 }
 
-void
+typedef enum {
+	SYM_COMP_STUDIO	= 51,
+	SYM_COMP_CLANG,
+	SYM_COMP_GCC,
+	SYM_COMP_UNKNOWN = 99
+} sym_comp_t;
+
+static bool
+test_compiler(test_t t, const char *cc)
+{
+	char cmd[256];
+	int rv;
+
+	(void) snprintf(cmd, sizeof (cmd), "%s %s %s -o %s >/dev/null 2>&1",
+	    cc, MFLAG, cfile, efile);
+	test_debugf(t, "trying %s", cmd);
+	rv = system(cmd);
+
+	test_debugf(t, "result: %d", rv);
+
+	if ((rv < 0) || !WIFEXITED(rv) || WEXITSTATUS(rv) != 0)
+		return (false);
+
+	rv = system(efile);
+	if (rv >= 0 && WIFEXITED(rv)) {
+		rv = WEXITSTATUS(rv);
+	} else {
+		rv = -1;
+	}
+
+	switch (rv) {
+	case SYM_COMP_STUDIO:
+		test_failed(t, "Sun Studio is not supported");
+		return (false);
+	case SYM_COMP_CLANG:
+		test_debugf(t, "Found clang");
+		test_passed(t);
+		break;
+	case SYM_COMP_GCC:
+		test_debugf(t, "Found gcc");
+		test_passed(t);
+		break;
+	case SYM_COMP_UNKNOWN:
+		test_debugf(t, "Found unknown (unsupported) compiler");
+		return (false);
+	default:
+		return (false);
+	}
+
+	test_debugf(t, "compiler: %s", cc);
+	return (true);
+}
+
+static void
 find_compiler(void)
 {
 	test_t t;
@@ -770,79 +827,42 @@ find_compiler(void)
 		    strerror(errno));
 		return;
 	}
-	(void) fprintf(cf, "#include <stdio.h>\n");
+
+	/*
+	 * clang defines both __GNUC__ and __clang__, therefore test for
+	 * __clang__ ahead of __GNUC__.
+	 */
+	(void) fprintf(cf, "#include <stdlib.h>\n");
 	(void) fprintf(cf, "int main(int argc, char **argv) {\n");
 	(void) fprintf(cf, "#if defined(__SUNPRO_C)\n");
-	(void) fprintf(cf, "exit(51);\n");
+	(void) fprintf(cf, "exit(%d);\n", SYM_COMP_STUDIO);
+	(void) fprintf(cf, "#elif defined(__clang__)\n");
+	(void) fprintf(cf, "exit(%d);\n", SYM_COMP_CLANG);
 	(void) fprintf(cf, "#elif defined(__GNUC__)\n");
-	(void) fprintf(cf, "exit(52);\n");
+	(void) fprintf(cf, "exit(%d);\n", SYM_COMP_GCC);
 	(void) fprintf(cf, "#else\n");
-	(void) fprintf(cf, "exit(99)\n");
+	(void) fprintf(cf, "exit(%d)\n", SYM_COMP_UNKNOWN);
 	(void) fprintf(cf, "#endif\n}\n");
 	(void) fclose(cf);
 
+	if (compiler != NULL) {
+		if (test_compiler(t, compiler)) {
+			return;
+		}
+
+		test_failed(t, "compiler %s is not usable", compiler);
+	}
+
 	for (i = 0; compilers[i] != NULL; i++) {
-		char cmd[256];
-		int rv;
-
-		(void) snprintf(cmd, sizeof (cmd),
-		    "%s %s %s -o %s >/dev/null 2>&1",
-		    compilers[i], MFLAG, cfile, efile);
-		test_debugf(t, "trying %s", cmd);
-		rv = system(cmd);
-
-		test_debugf(t, "result: %d", rv);
-
-		if ((rv < 0) || !WIFEXITED(rv) || WEXITSTATUS(rv) != 0)
-			continue;
-
-		rv = system(efile);
-		if (rv >= 0 && WIFEXITED(rv)) {
-			rv = WEXITSTATUS(rv);
-		} else {
-			rv = -1;
+		if (test_compiler(t, compilers[i])) {
+			compiler = compilers[i];
+			return;
 		}
-
-		switch (rv) {
-		case 51:	/* STUDIO */
-			test_debugf(t, "Found Studio C");
-			c89flags = "-Xc -errwarn=%all -v -xc99=%none " MFLAG;
-			c99flags = "-Xc -errwarn=%all -v -xc99=%all " MFLAG;
-			c11flags = NULL;
-			if (extra_debug) {
-				test_debugf(t, "c89flags: %s", c89flags);
-				test_debugf(t, "c99flags: %s", c99flags);
-			}
-			test_passed(t);
-			break;
-		case 52:	/* GCC */
-			test_debugf(t, "Found GNU C");
-			c89flags = "-Wall -Werror -std=c89 -nostdinc "
-			    "-isystem /usr/include " MFLAG;
-			c99flags = "-Wall -Werror -std=c99 -nostdinc "
-			    "-isystem /usr/include " MFLAG;
-			c11flags = "-Wall -Werror -std=c11 -nostdinc "
-			    "-isystem /usr/include " MFLAG;
-			if (extra_debug) {
-				test_debugf(t, "c89flags: %s", c89flags);
-				test_debugf(t, "c99flags: %s", c99flags);
-			}
-			test_passed(t);
-			break;
-		case 99:
-			test_debugf(t, "Found unknown (unsupported) compiler");
-			continue;
-		default:
-			continue;
-		}
-		myasprintf(&compiler, "%s", compilers[i]);
-		test_debugf(t, "compiler: %s", compiler);
-		return;
 	}
 	test_failed(t, "No compiler found.");
 }
 
-int
+static int
 do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 {
 	char *cmd;
@@ -875,6 +895,9 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 	} else if (strcmp(env_lang(cenv), "c11") == 0) {
 		lang = "c11";
 		cflags = c11flags;
+	} else if (strcmp(env_lang(cenv), "c17") == 0) {
+		lang = "c17";
+		cflags = c17flags;
 	} else {
 		lang = "c89";
 		cflags = c89flags;
@@ -886,8 +909,9 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 		return (-1);
 	}
 
-	myasprintf(&cmd, "%s %s %s -c %s -o %s >>%s 2>&1",
-	    compiler, cflags, env_defs(cenv), cfile, ofile, lfile);
+	myasprintf(&cmd, "%s %s %s %s -c %s -o %s >>%s 2>&1",
+	    compiler, cflags, common_flags, env_defs(cenv), cfile, ofile,
+	    lfile);
 
 	if (extra_debug) {
 		test_debugf(t, "command: %s", cmd);
@@ -929,7 +953,7 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 	return (0);
 }
 
-void
+static void
 test_compile(void)
 {
 	struct sym_test *st;
@@ -977,7 +1001,7 @@ main(int argc, char **argv)
 			extra_debug++;
 			break;
 		case 'c':
-			compilation = optarg;
+			compiler = optarg;
 			break;
 		case 'C':
 			optC++;

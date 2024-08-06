@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <kadm5/admin.h>
@@ -45,10 +47,10 @@ static void krb5_migrate_cleanup(pam_handle_t *pamh, void *data,
  * principal to kadmind in order to permit the creation of a new user
  * principal in the client's default realm.
  */
-int pam_sm_authenticate(pam_handle_t *pamh, int flags,
-			int argc, const char **argv)
+int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
+    const char **argv)
 {
-	char *user = NULL;
+	const char *user = NULL;
 	char *userdata = NULL;
 	char *olduserdata = NULL;
 	char *password = NULL;
@@ -96,7 +98,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	if (flags & PAM_SILENT)
 		quiet = 1;
 
-	err = pam_get_item(pamh, PAM_USER, (void**)&user);
+	err = pam_get_item(pamh, PAM_USER, (const void **)&user);
 	if (err != PAM_SUCCESS) {
 		goto cleanup;
 	}
@@ -124,7 +126,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	/*
 	 * Grok the user password
 	 */
-	err = pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
+	err = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 	if (err != PAM_SUCCESS) {
 		goto cleanup;
 	}

@@ -787,11 +787,19 @@ extern "C" {
 /*
  * AMD TOM and TOM2 MSRs. These control the split between DRAM and MMIO below
  * and above 4 GiB respectively. These have existed since family 0xf.
+ *
+ * Note that these widened around the time of Zen 4, going from 48 to 52 bits.
+ * However, in a presumed nod to backwards compatibily, the AMD APM Vol 2
+ * section 7.9.4 ("Top of Memory"), states that "a given processor may implement
+ * fewer than the architecturally-defined number of physical address bits."  It
+ * also states that unused bits are ignored, though system software should zero
+ * them for compatibility future extensions.  These facts taken together suggest
+ * that we are safe to define these masks as the widest architecturally allowed.
  */
 #define	MSR_AMD_TOM				0xc001001a
-#define	MSR_AMD_TOM_MASK(x)			((x) & 0xffffff800000)
+#define	MSR_AMD_TOM_MASK(x)			((x) & 0x000fffffff800000)
 #define	MSR_AMD_TOM2				0xc001001d
-#define	MSR_AMD_TOM2_MASK(x)			((x) & 0xffffff800000)
+#define	MSR_AMD_TOM2_MASK(x)			((x) & 0x000fffffff800000)
 
 
 #define	MCI_CTL_VALUE		0xffffffff

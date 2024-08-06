@@ -47,7 +47,7 @@
 .\" Copyright 2015, Joyent, Inc.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd February 3, 2024
+.Dd June 21, 2024
 .Dt EXEC 2
 .Os
 .Sh NAME
@@ -305,7 +305,9 @@ process image, except for those whose close-on-exec flag
 is set; see
 .Xr fcntl 2 .
 For those file descriptors that remain open, all attributes of the open file
-description, including file locks, remain unchanged.
+description, including file locks and the disposition of the close-on-fork flag
+.Dv FD_CLOFORK ,
+remain unchanged.
 .Pp
 The preferred hardware address translation size
 .Po

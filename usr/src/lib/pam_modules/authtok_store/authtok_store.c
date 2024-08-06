@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -95,11 +97,11 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int nowarn = 0;
 	attrlist l;
 	pwu_repository_t *pwu_rep;
-	char *user;
-	char *oldpw;
-	char *newpw;
-	char *service;
-	struct pam_repository *auth_rep;
+	const char *user;
+	const char *oldpw;
+	const char *newpw;
+	const char *service;
+	const struct pam_repository *auth_rep;
 	int res;
 	char msg[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	int updated_reps = 0;
@@ -133,13 +135,13 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 #endif
 
-	res = pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+	res = pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 	if (res != PAM_SUCCESS) {
 		syslog(LOG_ERR, "pam_authtok_store: error getting SERVICE");
 		return (PAM_SYSTEM_ERR);
 	}
 
-	res = pam_get_item(pamh, PAM_USER, (void **)&user);
+	res = pam_get_item(pamh, PAM_USER, (const void **)&user);
 	if (res != PAM_SUCCESS) {
 		syslog(LOG_ERR, "pam_authtok_store: error getting USER");
 		return (PAM_SYSTEM_ERR);
@@ -150,13 +152,13 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_USER_UNKNOWN);
 	}
 
-	res = pam_get_item(pamh, PAM_OLDAUTHTOK, (void **)&oldpw);
+	res = pam_get_item(pamh, PAM_OLDAUTHTOK, (const void **)&oldpw);
 	if (res != PAM_SUCCESS) {
 		syslog(LOG_ERR, "pam_authtok_store: error getting OLDAUTHTOK");
 		return (PAM_SYSTEM_ERR);
 	}
 
-	res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&newpw);
+	res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&newpw);
 	if (res != PAM_SUCCESS || newpw == NULL) {
 		/*
 		 * A module on the stack has removed PAM_AUTHTOK. We fail
@@ -164,7 +166,9 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_SYSTEM_ERR);
 	}
 
-	l.data.val_s = newpw;
+	l.data.val_s = strdup(newpw);
+	if (l.data.val_s == NULL)
+		return (PAM_BUF_ERR);
 	/*
 	 * If the server_policy option is specified,
 	 * use the special attribute, ATTR_PASSWD_SERVER_POLICY,
@@ -182,8 +186,9 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		l.type = ATTR_PASSWD;
 	l.next = NULL;
 
-	res = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
+	res = pam_get_item(pamh, PAM_REPOSITORY, (const void **)&auth_rep);
 	if (res != PAM_SUCCESS) {
+		free(l.data.val_s);
 		syslog(LOG_ERR, "pam_authtok_store: error getting repository");
 		return (PAM_SYSTEM_ERR);
 	}
@@ -191,14 +196,17 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (auth_rep == NULL) {
 		pwu_rep = PWU_DEFAULT_REP;
 	} else {
-		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL)
+		if ((pwu_rep = calloc(1, sizeof (*pwu_rep))) == NULL) {
+			free(l.data.val_s);
 			return (PAM_BUF_ERR);
+		}
 		pwu_rep->type = auth_rep->type;
 		pwu_rep->scope = auth_rep->scope;
 		pwu_rep->scope_len = auth_rep->scope_len;
 	}
 
 	res = __set_authtoken_attr(user, oldpw, pwu_rep, &l, &updated_reps);
+	free(l.data.val_s);
 
 	if (pwu_rep != PWU_DEFAULT_REP)
 		free(pwu_rep);

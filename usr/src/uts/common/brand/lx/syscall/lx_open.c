@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/systm.h>
@@ -40,7 +40,6 @@
 #include <sys/lx_misc.h>
 #include <sys/brand.h>
 
-extern int fcntl(int, int, intptr_t);
 extern int openat(int, char *, int, int);
 extern int open(char *, int, int);
 extern int close(int);

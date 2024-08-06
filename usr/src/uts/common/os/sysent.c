@@ -25,7 +25,7 @@
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -75,7 +75,7 @@ int	exece(const char *, const char **, const char **, int);
 int	faccessat(int, char *, int, int);
 int	fchmodat(int, char *, int, int);
 int	fchownat(int, char *, uid_t, gid_t, int);
-int	fcntl(int, int, intptr_t);
+int	fcntl(int, int, intptr_t, intptr_t);
 int64_t	vfork();
 int64_t	forksys(int, int);
 int	fstat(int, struct stat *);
@@ -508,7 +508,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 59 */ SYSENT_CI("exece",		exece,		4),
 	/* 60 */ SYSENT_CI("umask",		umask,		1),
 	/* 61 */ SYSENT_CI("chroot",		chroot,		1),
-	/* 62 */ SYSENT_CI("fcntl",		fcntl,		3),
+	/* 62 */ SYSENT_CI("fcntl",		fcntl,		4),
 	/* 63 */ SYSENT_CI("ulimit",		ulimit,		2),
 	/* 64 */ SYSENT_CI("renameat",		renameat,	4),
 	/* 65 */ SYSENT_CI("unlinkat",		unlinkat,	3),
@@ -881,7 +881,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 59 */ SYSENT_CI("exece",		exece,		4),
 	/* 60 */ SYSENT_CI("umask",		umask,		1),
 	/* 61 */ SYSENT_CI("chroot",		chroot,		1),
-	/* 62 */ SYSENT_CI("fcntl",		fcntl,		3),
+	/* 62 */ SYSENT_CI("fcntl",		fcntl,		4),
 	/* 63 */ SYSENT_CI("ulimit",		ulimit32,	2),
 	/* 64 */ SYSENT_CI("renameat",		renameat,	4),
 	/* 65 */ SYSENT_CI("unlinkat",		unlinkat,	3),

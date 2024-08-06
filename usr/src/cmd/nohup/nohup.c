@@ -267,7 +267,7 @@ fd_cb(void *data, int fd)
 	 * there are no available file descriptors left in the victim. If
 	 * our call to pr_open fails, we try to reopen the controlling tty.
 	 */
-	flags = pr_fcntl(g_proc, fd, F_GETFL, NULL);
+	flags = pr_fcntl(g_proc, fd, F_GETFL, NULL, 0);
 	if ((flags & O_ACCMODE) == O_RDONLY || fd == STDIN_FILENO) {
 		fdp = &g_rdfd;
 		oflags = O_RDONLY;
@@ -293,13 +293,14 @@ fd_cb(void *data, int fd)
 
 		if (tmpfd != fd) {
 			(void) pr_fcntl(g_proc, tmpfd, F_DUP2FD,
-				(void *)(uintptr_t)fd);
+			    (void *)(uintptr_t)fd, 0);
 			(void) pr_close(g_proc, tmpfd);
 		}
 
 		*fdp = fd;
 	} else {
-		(void) pr_fcntl(g_proc, *fdp, F_DUP2FD, (void *)(uintptr_t)fd);
+		(void) pr_fcntl(g_proc, *fdp, F_DUP2FD, (void *)(uintptr_t)fd,
+		    0);
 	}
 
 	return (0);
@@ -312,7 +313,8 @@ err:
 	tmpfd = pr_open(g_proc, "/dev/tty", O_RDWR, 0);
 
 	if (tmpfd != fd && tmpfd >= 0) {
-		(void) pr_fcntl(g_proc, tmpfd, F_DUP2FD, (void *)(uintptr_t)fd);
+		(void) pr_fcntl(g_proc, tmpfd, F_DUP2FD, (void *)(uintptr_t)fd,
+		    0);
 		(void) pr_close(g_proc, tmpfd);
 	}
 

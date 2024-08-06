@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <nss_dbdefs.h>
@@ -172,27 +173,28 @@ finddeflim(const char *name, kva_t *kva, void *ctxt, void *pres)
 int
 pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	int	i;
-	int	debug = 0;
-	uint_t	nowarn = flags & PAM_SILENT;
-	int	ret = PAM_SUCCESS;
-	char	*user;
-	char	*auser;
-	char	*rhost;
-	char	*tty;
+	int i;
+	int debug = 0;
+	uint_t nowarn = flags & PAM_SILENT;
+	int ret = PAM_SUCCESS;
+	const char *user;
+	const char *auser;
+	const char *rhost;
+	const char *tty;
 	au_id_t	auid;
 	adt_session_data_t *ah;
-	adt_termid_t	*termid = NULL;
-	priv_set_t	*lim, *def, *tset;
-	char		messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
-	char		buf[PROJECT_BUFSZ];
-	struct project	proj, *pproj;
-	int		error;
-	char		*projname;
-	char		*kvs;
-	struct passwd	pwd;
-	char		pwbuf[NSS_BUFLEN_PASSWD];
-	deflim_t	deflim;
+	adt_termid_t *termid = NULL;
+	priv_set_t *lim, *def, *tset;
+	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	char buf[PROJECT_BUFSZ];
+	struct project proj, *pproj;
+	int error;
+	char *projname;
+	const char *kvs;
+	char *nckvs = NULL;
+	struct passwd pwd;
+	char pwbuf[NSS_BUFLEN_PASSWD];
+	deflim_t deflim;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -206,16 +208,16 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		    "pam_unix_cred: pam_sm_setcred(flags = %x, argc= %d)",
 		    flags, argc);
 
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0') {
 		syslog(LOG_AUTH | LOG_ERR,
 		    "pam_unix_cred: USER NULL or empty!\n");
 		return (PAM_USER_UNKNOWN);
 	}
-	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
-	(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
-	(void) pam_get_item(pamh, PAM_TTY, (void **)&tty);
+	(void) pam_get_item(pamh, PAM_AUSER, (const void **)&auser);
+	(void) pam_get_item(pamh, PAM_RHOST, (const void **)&rhost);
+	(void) pam_get_item(pamh, PAM_TTY, (const void **)&tty);
 	if (debug)
 		syslog(LOG_AUTH | LOG_DEBUG,
 		    "pam_unix_cred: user = %s, auser = %s, rhost = %s, "
@@ -412,12 +414,12 @@ adt_done:
 		return (ret);
 
 	/* Initialize the user's project */
-	(void) pam_get_item(pamh, PAM_RESOURCE, (void **)&kvs);
+	(void) pam_get_item(pamh, PAM_RESOURCE, (const void **)&kvs);
 	if (kvs != NULL) {
 		char *tmp, *lasts, *tok;
 
-		kvs = tmp = strdup(kvs);
-		if (kvs == NULL)
+		nckvs = tmp = strdup(kvs);
+		if (nckvs == NULL)
 			return (PAM_BUF_ERR);
 
 		while ((tok = strtok_r(tmp, ";", &lasts)) != NULL) {
@@ -438,9 +440,8 @@ adt_done:
 		pproj = getprojbyname(projname, &proj, (void *)&buf,
 		    PROJECT_BUFSZ);
 	}
-	/* projname points into kvs, so this is the first opportunity to free */
-	if (kvs != NULL)
-		free(kvs);
+	/* projname points into nckvs; this is the first opportunity to free */
+	free(nckvs);
 	if (pproj == NULL) {
 		syslog(LOG_AUTH | LOG_ERR,
 		    "pam_unix_cred: no default project for user %s", user);

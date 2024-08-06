@@ -31,7 +31,6 @@
 extern "C" {
 #endif
 
-
 /*
  * NVMe constants
  */
@@ -292,6 +291,11 @@ typedef struct {
 #define	NVME_OPC_NVMEMI_SEND	0x1D	/* 1.3 */
 #define	NVME_OPC_NVMEMI_RECV	0x1E	/* 1.3 */
 #define	NVME_OPC_DB_CONFIG	0x7C	/* 1.3 */
+
+#define	NVME_OPC_VENDOR_LOW	0xC0
+#define	NVME_OPC_VENDOR_HIGH	0xFF
+#define	NVME_IS_VENDOR_SPECIFIC_CMD(x)	\
+	((x) >= NVME_OPC_VENDOR_LOW && (x) <= NVME_OPC_VENDOR_HIGH)
 
 /* NVMe NVM command set specific admin command opcodes */
 #define	NVME_OPC_NVM_FORMAT	0x80

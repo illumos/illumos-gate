@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/varargs.h>
@@ -55,7 +57,7 @@ int
 read_authtok(pam_handle_t *pamh, int debug)
 {
 	int res;
-	char *authtok;
+	const char *authtok;
 	char *pwd;
 
 	/*
@@ -64,12 +66,12 @@ read_authtok(pam_handle_t *pamh, int debug)
 	 * to future modules. If OLDAUTHTOK is already set, we leave it alone
 	 */
 
-	res = pam_get_item(pamh, PAM_OLDAUTHTOK, (void **)&authtok);
+	res = pam_get_item(pamh, PAM_OLDAUTHTOK, (const void **)&authtok);
 	if (res != PAM_SUCCESS)
 		return (res);
 
 	if (authtok == NULL) {
-		res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&authtok);
+		res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&authtok);
 		if (res != PAM_SUCCESS)
 			return (res);
 		if (authtok != NULL) {
@@ -95,7 +97,7 @@ read_authtok(pam_handle_t *pamh, int debug)
 		 * In either case, we should *not* prompt for another
 		 * password.
 		 */
-		res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&pwd);
+		res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&pwd);
 		if (res != PAM_SUCCESS)
 			goto out;
 		if (pwd != NULL) {
@@ -116,8 +118,8 @@ read_authtok(pam_handle_t *pamh, int debug)
 		goto out;
 
 	if (pwd == NULL) {
-		char *service;
-		if ((pam_get_item(pamh, PAM_SERVICE, (void **)&service) ==
+		const char *service;
+		if ((pam_get_item(pamh, PAM_SERVICE, (const void **)&service) ==
 		    PAM_SUCCESS) && service != NULL) {
 			error(pamh, dgettext(TEXT_DOMAIN, "%s: Sorry."),
 			    service);
@@ -147,7 +149,7 @@ int
 verify_authtok(pam_handle_t *pamh, int debug)
 {
 	int res;
-	char *authtok;
+	const char *authtok;
 	char *pwd;
 
 	if (debug)
@@ -159,7 +161,7 @@ verify_authtok(pam_handle_t *pamh, int debug)
 	 * the password correctly.
 	 */
 
-	res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&authtok);
+	res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&authtok);
 	if (res != PAM_SUCCESS || authtok == NULL)
 		return (PAM_AUTHTOK_ERR);
 
@@ -170,9 +172,9 @@ verify_authtok(pam_handle_t *pamh, int debug)
 		return (res);
 
 	if (strcmp(authtok, pwd) != 0) {
-		char *service;
+		const char *service;
 
-		if ((pam_get_item(pamh, PAM_SERVICE, (void **)&service) ==
+		if ((pam_get_item(pamh, PAM_SERVICE, (const void **)&service) ==
 		    PAM_SUCCESS) && service != NULL) {
 			error(pamh, dgettext(TEXT_DOMAIN,
 			    "%s: They don't match."), service);
@@ -219,16 +221,15 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-
-	char	*user;
-	char	*password;
-	int	i;
-	int	debug = 0;
-	int	res;
-	int	fail = 0;
+	const char *user;
+	char *password;
+	int i;
+	int debug = 0;
+	int res;
+	int fail = 0;
 
 	attrlist al[1];
-	pam_repository_t *auth_rep = NULL;
+	const pam_repository_t *auth_rep = NULL;
 	pwu_repository_t *pwu_rep  = NULL;
 
 	for (i = 0; i < argc; i++)
@@ -254,7 +255,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_SYSTEM_ERR);
 	}
 
-	res = pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
+	res = pam_get_item(pamh, PAM_AUTHTOK, (const void **)&password);
 	if (res != PAM_SUCCESS)
 		return (res);
 
@@ -266,7 +267,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	 * to obtain a password
 	 */
 
-	res = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
+	res = pam_get_item(pamh, PAM_REPOSITORY, (const void **)&auth_rep);
 	if (res != PAM_SUCCESS) {
 		__pam_log(LOG_AUTH | LOG_ERR,
 		    "pam_authtok_get: error getting repository");
@@ -294,8 +295,8 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if (res == PWU_SUCCESS &&
 	    (al[0].data.val_s == NULL || al[0].data.val_s[0] == '\0')) {
-		char *service = NULL;
-		char *rhost = NULL;
+		const char *service = NULL;
+		const char *rhost = NULL;
 
 		/*
 		 * if PAM_DIASALLOW_NULL_AUTHTOK has not been set, we
@@ -308,8 +309,8 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		 * NULL authtoks are not allowed, so we need to fail.
 		 * We will ask for a password to mask the failure however.
 		 */
-		(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
-		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+		(void) pam_get_item(pamh, PAM_RHOST, (const void **)&rhost);
+		(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 		if (service == NULL)
 			service = "unknown";
 		if (rhost == NULL || *rhost == '\0')
@@ -330,7 +331,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (res);
 
 	if (password != NULL) {
-		(void) pam_set_item(pamh, PAM_AUTHTOK, (void *)password);
+		(void) pam_set_item(pamh, PAM_AUTHTOK, (const void *)password);
 		(void) memset(password, 0, strlen(password));
 		free(password);
 	} else if (debug) {

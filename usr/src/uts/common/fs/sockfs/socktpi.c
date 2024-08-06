@@ -3219,9 +3219,8 @@ retry:
 			 */
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
-			error = so_opt2cmsg(mp, opt, optlen,
-			    !(flags & MSG_XPG4_2),
-			    control, controllen);
+			error = so_opt2cmsg(mp, opt, optlen, flags, control,
+			    controllen);
 			if (error) {
 				freemsg(mp);
 				if (msg->msg_namelen != 0)
@@ -3286,9 +3285,8 @@ retry:
 			 */
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
-			error = so_opt2cmsg(mp, opt, optlen,
-			    !(flags & MSG_XPG4_2),
-			    control, controllen);
+			error = so_opt2cmsg(mp, opt, optlen, flags, control,
+			    controllen);
 			if (error) {
 				freemsg(mp);
 				kmem_free(control, controllen);
@@ -5066,6 +5064,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 #endif /* notyet */
 		case SO_DOMAIN:
 		case SO_DGRAM_ERRIND:
+		case SO_PROTOCOL:
 			if (maxlen < (t_uscalar_t)sizeof (int32_t)) {
 				error = EINVAL;
 				eprintsoline(so, error);
@@ -5227,6 +5226,11 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 		}
 		case SO_DOMAIN:
 			value = so->so_family;
+			option = &value;
+			goto copyout; /* No need to issue T_SVR4_OPTMGMT_REQ */
+
+		case SO_PROTOCOL:
+			value = so->so_protocol;
 			option = &value;
 			goto copyout; /* No need to issue T_SVR4_OPTMGMT_REQ */
 

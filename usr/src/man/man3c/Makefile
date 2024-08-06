@@ -1123,14 +1123,18 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_barrierattr_init.3c		\
 		pthread_barrierattr_setpshared.3c	\
 		pthread_cond_broadcast.3c		\
+		pthread_cond_clockwait.3c		\
 		pthread_cond_destroy.3c			\
+		pthread_cond_relclockwait_np.3c		\
 		pthread_cond_reltimedwait_np.3c		\
 		pthread_cond_timedwait.3c		\
 		pthread_condattr_destroy.3c		\
 		pthread_condattr_setclock.3c		\
 		pthread_condattr_setpshared.3c		\
 		pthread_key_create_once_np.3c		\
+		pthread_mutex_clocklock.3c		\
 		pthread_mutex_destroy.3c		\
+		pthread_mutex_relclocklock_np.3c	\
 		pthread_mutex_reltimedlock_np.3c	\
 		pthread_mutex_setprioceiling.3c		\
 		pthread_mutex_trylock.3c		\
@@ -1141,8 +1145,12 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_mutexattr_setpshared.3c		\
 		pthread_mutexattr_setrobust.3c		\
 		pthread_mutexattr_settype.3c		\
+		pthread_rwlock_clockrdlock.3c		\
+		pthread_rwlock_clockwrlock.3c		\
 		pthread_rwlock_destroy.3c		\
+		pthread_rwlock_relclockrdlock_np.3c	\
 		pthread_rwlock_reltimedrdlock_np.3c	\
+		pthread_rwlock_relclockwrlock_np.3c	\
 		pthread_rwlock_reltimedwrlock_np.3c	\
 		pthread_rwlock_tryrdlock.3c		\
 		pthread_rwlock_trywrlock.3c		\
@@ -1154,6 +1162,7 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_setspecific.3c			\
 		pthread_spin_init.3c			\
 		pthread_spin_trylock.3c			\
+		ptsname_r.3c				\
 		putc.3c					\
 		putc_unlocked.3c			\
 		putchar.3c				\
@@ -1211,6 +1220,8 @@ MANLINKS=	FD_CLR.3c				\
 		schedctl_stop.3c			\
 		seconvert.3c				\
 		seed48.3c				\
+		sem_clockwait.3c			\
+		sem_relclockwait_np.3c			\
 		sem_reltimedwait_np.3c			\
 		sem_trywait.3c				\
 		sema_destroy.3c				\
@@ -2218,6 +2229,8 @@ pthread_cond_destroy.3c			:= LINKSRC = pthread_cond_init.3c
 
 pthread_cond_broadcast.3c		:= LINKSRC = pthread_cond_signal.3c
 
+pthread_cond_clockwait.3c		:= LINKSRC = pthread_cond_wait.3c
+pthread_cond_relclockwait_np.3c		:= LINKSRC = pthread_cond_wait.3c
 pthread_cond_reltimedwait_np.3c		:= LINKSRC = pthread_cond_wait.3c
 pthread_cond_timedwait.3c		:= LINKSRC = pthread_cond_wait.3c
 
@@ -2244,6 +2257,8 @@ pthread_mutex_destroy.3c		:= LINKSRC = pthread_mutex_init.3c
 pthread_mutex_trylock.3c		:= LINKSRC = pthread_mutex_lock.3c
 pthread_mutex_unlock.3c			:= LINKSRC = pthread_mutex_lock.3c
 
+pthread_mutex_clocklock.3c		:= LINKSRC = pthread_mutex_timedlock.3c
+pthread_mutex_relclocklock_np.3c	:= LINKSRC = pthread_mutex_timedlock.3c
 pthread_mutex_reltimedlock_np.3c	:= LINKSRC = pthread_mutex_timedlock.3c
 
 pthread_mutexattr_setprioceiling.3c	:= LINKSRC = pthread_mutexattr_getprioceiling.3c
@@ -2262,8 +2277,12 @@ pthread_rwlock_destroy.3c		:= LINKSRC = pthread_rwlock_init.3c
 
 pthread_rwlock_tryrdlock.3c		:= LINKSRC = pthread_rwlock_rdlock.3c
 
+pthread_rwlock_clockrdlock.3c		:= LINKSRC = pthread_rwlock_timedrdlock.3c
+pthread_rwlock_relclockrdlock_np.3c	:= LINKSRC = pthread_rwlock_timedrdlock.3c
 pthread_rwlock_reltimedrdlock_np.3c	:= LINKSRC = pthread_rwlock_timedrdlock.3c
 
+pthread_rwlock_clockwrlock.3c		:= LINKSRC = pthread_rwlock_timedwrlock.3c
+pthread_rwlock_relclockwrlock_np.3c	:= LINKSRC = pthread_rwlock_timedwrlock.3c
 pthread_rwlock_reltimedwrlock_np.3c	:= LINKSRC = pthread_rwlock_timedwrlock.3c
 
 pthread_rwlock_trywrlock.3c		:= LINKSRC = pthread_rwlock_wrlock.3c
@@ -2275,6 +2294,8 @@ pthread_rwlockattr_destroy.3c		:= LINKSRC = pthread_rwlockattr_init.3c
 pthread_spin_init.3c			:= LINKSRC = pthread_spin_destroy.3c
 
 pthread_spin_trylock.3c			:= LINKSRC = pthread_spin_lock.3c
+
+ptsname_r.3c				:= LINKSRC = ptsname.3c
 
 fputs.3c				:= LINKSRC = puts.3c
 
@@ -2341,6 +2362,8 @@ FD_SET.3c				:= LINKSRC = select.3c
 FD_ZERO.3c				:= LINKSRC = select.3c
 pselect.3c				:= LINKSRC = select.3c
 
+sem_clockwait.3c			:= LINKSRC = sem_timedwait.3c
+sem_relclockwait_np.3c			:= LINKSRC = sem_timedwait.3c
 sem_reltimedwait_np.3c			:= LINKSRC = sem_timedwait.3c
 
 sem_trywait.3c				:= LINKSRC = sem_wait.3c

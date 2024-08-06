@@ -23,6 +23,7 @@
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <errno.h>
@@ -726,8 +727,10 @@ s10_pwrite(sysret_t *rval, int fd, const void *bufferp, size_t num_bytes,
 {
 	int err;
 
-	if ((err = __systemcall(rval, SYS_fcntl + 1024, fd, F_GETFL)) != 0)
+	if ((err = __systemcall(rval, SYS_fcntl + 1024, fd, F_GETFL, 0, 0)) !=
+	    0) {
 		return (err);
+	}
 	if (rval->sys_rval1 & O_APPEND)
 		return (__systemcall(rval, SYS_write + 1024, fd, bufferp,
 		    num_bytes));
@@ -747,8 +750,10 @@ s10_pwrite64(sysret_t *rval, int fd, const void *bufferp, size32_t num_bytes,
 {
 	int err;
 
-	if ((err = __systemcall(rval, SYS_fcntl + 1024, fd, F_GETFL)) != 0)
+	if ((err = __systemcall(rval, SYS_fcntl + 1024, fd, F_GETFL, 0, 0)) !=
+	    0) {
 		return (err);
+	}
 	if (rval->sys_rval1 & O_APPEND)
 		return (__systemcall(rval, SYS_write + 1024, fd, bufferp,
 		    num_bytes));
@@ -1380,6 +1385,15 @@ s10_execve(sysret_t *rval, const char *fname, const char **argp,
 }
 
 /*
+ * fcntl(2) added an additional argument which we need to pass as zero.
+ */
+int
+s10_fcntl(sysret_t *rval, int fd, int cmd, intptr_t arg)
+{
+	return (__systemcall(rval, SYS_fcntl + 1024, fd, cmd, arg, 0));
+}
+
+/*
  * S10's issetugid() syscall is now a subcode to privsys().
  */
 static int
@@ -1964,7 +1978,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	EMULATE(s10_execve, 3 | RV_DEFAULT),	/*  59 */
 	NOSYS,					/*  60 */
 	NOSYS,					/*  61 */
-	NOSYS,					/*  62 */
+	EMULATE(s10_fcntl, 3 | RV_DEFAULT),	/*  62 */
 	NOSYS,					/*  63 */
 	NOSYS,					/*  64 */
 	NOSYS,					/*  65 */

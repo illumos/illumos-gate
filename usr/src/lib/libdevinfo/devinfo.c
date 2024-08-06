@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -163,7 +164,8 @@ di_init_impl(const char *phys_path, uint_t flag,
 	 * Make sure there is no minor name in the path
 	 * and the path do not start with /devices....
 	 */
-	if (strchr(phys_path, ':') ||
+	if (phys_path == NULL ||
+	    strchr(phys_path, ':') ||
 	    (strncmp(phys_path, "/devices", 8) == 0) ||
 	    (strlen(phys_path) > MAXPATHLEN)) {
 		errno = EINVAL;

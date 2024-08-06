@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -341,7 +343,7 @@ static	int	fflag;
 
 static char ** getargs(char *);
 
-static int login_conv(int, struct pam_message **,
+static int login_conv(int, const struct pam_message **,
     struct pam_response **, void *);
 
 static struct pam_conv pam_conv = {login_conv, NULL};
@@ -796,15 +798,14 @@ turn_on_logging(void)
  *	a PAM authentication module to print error messages
  *	or garner information from the user.
  */
-/*ARGSUSED*/
 static int
-login_conv(int num_msg, struct pam_message **msg,
+login_conv(int num_msg, const struct pam_message **msg,
     struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	char			*temp;
-	int			k, i;
+	const struct pam_message *m;
+	struct pam_response *r;
+	char *temp;
+	int k, i;
 
 	if (num_msg <= 0)
 		return (PAM_CONV_ERR);
@@ -931,7 +932,7 @@ static int
 verify_passwd(void)
 {
 	int error;
-	char *user;
+	const char *user;
 	int flag = (Passreqflag ? PAM_DISALLOW_NULL_AUTHTOK : 0);
 
 	/*
@@ -940,7 +941,7 @@ verify_passwd(void)
 	error = pam_authenticate(pamh, flag);
 
 	/* get the user_name from the pam handle */
-	(void) pam_get_item(pamh, PAM_USER, (void**)&user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0')
 		return (PAM_SYSTEM_ERR);
@@ -1774,14 +1775,16 @@ chdir_to_dir_user(void)
 static void
 login_authenticate(void)
 {
-	char *user;
+	const char *user;
 	int err;
 	int login_successful = 0;
 
 	do {
 		/* if scheme broken, then nothing to do but quit */
-		if (pam_get_item(pamh, PAM_USER, (void **)&user) != PAM_SUCCESS)
+		if (pam_get_item(pamh, PAM_USER, (const void **)&user) !=
+		    PAM_SUCCESS) {
 			exit(1);
+		}
 
 		/*
 		 * only get name from utility if it is not already
@@ -2009,14 +2012,14 @@ adjust_nice(void)
 static void
 update_utmpx_entry(int sublogin)
 {
-	int	err;
-	char	*user;
-	static char	*errmsg	= "No utmpx entry. "
+	int err;
+	const char *user;
+	static char *errmsg = "No utmpx entry. "
 	    "You must exec \"login\" from the lowest level \"shell\".";
-	int	tmplen;
-	struct utmpx  *u = (struct utmpx *)0;
-	struct utmpx  utmpx;
-	char	*ttyntail;
+	int tmplen;
+	struct utmpx *u = NULL;
+	struct utmpx utmpx;
+	char *ttyntail;
 
 	/*
 	 * If we're not a sublogin then
@@ -2032,7 +2035,7 @@ update_utmpx_entry(int sublogin)
 		login_exit(1);
 	}
 
-	if ((err = pam_get_item(pamh, PAM_USER, (void **) &user)) !=
+	if ((err = pam_get_item(pamh, PAM_USER, (const void **)&user)) !=
 	    PAM_SUCCESS) {
 		audit_error = ADT_FAIL_PAM + err;
 		login_exit(1);

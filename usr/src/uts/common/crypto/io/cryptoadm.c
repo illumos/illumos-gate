@@ -750,7 +750,7 @@ unload_soft_module(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (copyin(arg, &unload_soft_module,
 	    sizeof (unload_soft_module)) != 0) {
 		error = EFAULT;
-		goto out2;
+		goto out;
 	}
 
 	name = unload_soft_module.sm_name;
@@ -765,14 +765,13 @@ unload_soft_module(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	rv = crypto_unload_soft_module(name);
-out:
 	unload_soft_module.sm_return_value = rv;
 
 	if (copyout(&unload_soft_module, arg,
 	    sizeof (unload_soft_module)) != 0) {
 		error = EFAULT;
 	}
-out2:
+out:
 	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_UNLOAD_SOFT_MODULE, name, NULL, 0, 0,
 		    rv, error);

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -144,7 +145,9 @@ extern "C" {
 #define	PSDLT	102		/* secflagsdelta_t */
 #define	PSFW	103		/* psecflagswhich_t */
 #define	EXC	104		/* execx flags */
-#define	HID	105		/* hidden argument, don't print */
+#define	FFD	105		/* fcntl F_SETFD flags */
+#define	SRF	106		/* send*(), recv() flags */
+#define	HID	107		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

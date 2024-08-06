@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <crypt.h>
@@ -48,22 +50,21 @@
  *			module called by pam_auth_port in the framework
  *			Returns: PAM_AUTH_ERR on failure, 0 on success
  */
-/*ARGSUSED*/
 int
 pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char	*ttyn, *user;
-	FILE 	*fp;
-	char 	defpass[30];
-	char	line[80];
-	char 	*p1 = NULL, *p2 = NULL;
-	struct passwd 	pwd;
-	char	pwd_buffer[1024];
-	char	*password = NULL;
-	int	retcode;
-	int	i;
-	int	debug = 0;
-	int	res;
+	const char *ttyn, *user;
+	FILE *fp;
+	char defpass[30];
+	char line[80];
+	char *p1 = NULL, *p2 = NULL;
+	struct passwd pwd;
+	char pwd_buffer[1024];
+	char *password = NULL;
+	int retcode;
+	int i;
+	int debug = 0;
+	int res;
 
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
@@ -74,7 +75,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if ((retcode = pam_get_user(pamh, &user, NULL))
 					!= PAM_SUCCESS ||
-	    (retcode = pam_get_item(pamh, PAM_TTY, (void **)&ttyn))
+	    (retcode = pam_get_item(pamh, PAM_TTY, (const void **)&ttyn))
 					!= PAM_SUCCESS)
 		return (retcode);
 
@@ -85,9 +86,9 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	if (ttyn == NULL || *ttyn == '\0') {
-		char *service;
+		const char *service;
 
-		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+		(void) pam_get_item(pamh, PAM_SERVICE, (const void **)&service);
 		syslog(LOG_ERR, "pam_dial_auth: terminal-device not specified"
 		    "by %s, returning %s.", service,
 		    pam_strerror(pamh, PAM_SERVICE_ERR));

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <security/pam_appl.h>
@@ -49,7 +50,7 @@ extern const char *error_message(long);
  *	It returns 0 if the user can't be found, otherwise returns 1.
  */
 int
-get_pw_uid(char *user, uid_t *uid)
+get_pw_uid(const char *user, uid_t *uid)
 {
 	struct passwd sp;
 	char buffer[1024];
@@ -170,8 +171,8 @@ key_in_keytab(const char *user, int debug)
 		return (retval);
 	}
 
-	if ((code = get_kmd_kuser(kcontext, (const char *)user, kuser,
-		2*MAXHOSTNAMELEN)) != 0) {
+	if ((code = get_kmd_kuser(kcontext, user, kuser,
+		2 * MAXHOSTNAMELEN)) != 0) {
 		goto out;
 	}
 

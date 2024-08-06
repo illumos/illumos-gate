@@ -315,17 +315,18 @@
  *
  * Command timeouts are currently detected for all admin commands except
  * asynchronous event requests. If a command times out and the hardware appears
- * to be healthy the driver attempts to abort the command. The original command
- * timeout is also applied to the abort command. If the abort times out too the
- * driver assumes the device to be dead, fences it off, and calls FMA to retire
- * it. In all other cases the aborted command should return immediately with a
- * status indicating it was aborted, and the driver will wait indefinitely for
- * that to happen. No timeout handling of normal I/O commands is presently done.
+ * to be healthy the driver attempts to abort the command. The abort command
+ * timeout is a separate tunable but the original command timeout will be used
+ * if it is greater. If the abort times out too the driver assumes the device
+ * to be dead, fences it off, and calls FMA to retire it. In all other cases
+ * the aborted command should return immediately with a status indicating it
+ * was aborted, and the driver will wait indefinitely for that to happen. No
+ * timeout handling of normal I/O commands is presently done.
  *
  * Any command that times out due to the controller dropping dead will be put on
  * nvme_lost_cmds list if it references DMA memory. This will prevent the DMA
- * memory being reused by the system and later be written to by a "dead" NVMe
- * controller.
+ * memory being reused by the system and later being written to by a "dead"
+ * NVMe controller.
  *
  *
  * Locking:
@@ -342,7 +343,7 @@
  * synchronously. In that case it must be held across calls to
  * nvme_submit_{admin,io}_cmd() and nvme_wait_cmd(), which is taken care of by
  * nvme_admin_cmd(). It must also be held whenever the completion state of the
- * command is changed or while a admin command timeout is handled.
+ * command is changed or while an admin command timeout is handled.
  *
  * If both nc_mutex and nq_mutex must be held, nc_mutex must be acquired first.
  * More than one nc_mutex may only be held when aborting commands. In this case,
@@ -357,6 +358,10 @@
  * interrupt thread and nvme_retrieve_cmd() during polled I/O, so the
  * mutex is non-contentious but is required for implementation completeness
  * and safety.
+ *
+ * Each nvme_t has an n_admin_stat_mutex that protects the admin command
+ * statistics structure. If this is taken in conjunction with any other locks,
+ * then it must be taken last.
  *
  * There is one mutex n_minor_mutex which protects all open flags nm_open and
  * exclusive-open thread pointers nm_oexcl of each minor node associated with a
@@ -544,27 +549,44 @@ CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vifrt) == 64);
 
 CTASSERT(sizeof (nvme_nschange_list_t) == 4096);
 
-
 /* NVMe spec version supported */
 static const int nvme_version_major = 2;
 
-/* tunable for admin command timeout in seconds, default is 1s */
-uint32_t nvme_admin_cmd_timeout = 1;
-
-/* tunable for FORMAT NVM command timeout in seconds, default is 600s */
+/* Tunable for FORMAT NVM command timeout in seconds, default is 600s */
 uint32_t nvme_format_cmd_timeout = 600;
 
-/* tunable for firmware commit with NVME_FWC_SAVE, default is 15s */
+/* Tunable for firmware commit with NVME_FWC_SAVE, default is 15s */
 uint32_t nvme_commit_save_cmd_timeout = 15;
 
 /*
- * tunable for the size of arbitrary vendor specific admin commands,
+ * Tunable for the admin command timeout used for commands other than those
+ * with their own timeouts defined above; in seconds. While most commands are
+ * expected to complete very quickly (sub-second), experience has shown that
+ * some controllers can occasionally be a bit slower, and not always consistent
+ * in the time taken - times of up to around 4.2s have been observed. Setting
+ * this to 15s by default provides headroom.
+ */
+uint32_t nvme_admin_cmd_timeout = 15;
+
+/*
+ * Tunable for abort command timeout in seconds, default is 60s. This timeout
+ * is used when issuing an abort command, currently only in response to a
+ * different admin command timing out. Aborts always complete after the command
+ * that they are attempting to abort so we need to allow enough time for the
+ * controller to process the long running command that we are attempting to
+ * abort. The abort timeout here is only used if it is greater than the timeout
+ * for the command that is being aborted.
+ */
+uint32_t nvme_abort_cmd_timeout = 60;
+
+/*
+ * Tunable for the size of arbitrary vendor specific admin commands,
  * default is 16MiB.
  */
 uint32_t nvme_vendor_specific_admin_cmd_size = 1 << 24;
 
 /*
- * tunable for the max timeout of arbitary vendor specific admin commands,
+ * Tunable for the max timeout of arbitary vendor specific admin commands,
  * default is 60s.
  */
 uint_t nvme_vendor_specific_admin_cmd_max_timeout = 60;
@@ -617,9 +639,9 @@ static void nvme_free_cmd(nvme_cmd_t *);
 static nvme_cmd_t *nvme_create_nvm_cmd(nvme_namespace_t *, uint8_t,
     bd_xfer_t *);
 static void nvme_admin_cmd(nvme_cmd_t *, uint32_t);
-static void nvme_submit_admin_cmd(nvme_qpair_t *, nvme_cmd_t *);
+static void nvme_submit_admin_cmd(nvme_qpair_t *, nvme_cmd_t *, uint32_t *);
 static int nvme_submit_io_cmd(nvme_qpair_t *, nvme_cmd_t *);
-static void nvme_submit_cmd_common(nvme_qpair_t *, nvme_cmd_t *);
+static void nvme_submit_cmd_common(nvme_qpair_t *, nvme_cmd_t *, uint32_t *);
 static nvme_cmd_t *nvme_unqueue_cmd(nvme_t *, nvme_qpair_t *, int);
 static nvme_cmd_t *nvme_retrieve_cmd(nvme_t *, nvme_qpair_t *);
 static void nvme_wait_cmd(nvme_cmd_t *, uint_t);
@@ -635,7 +657,7 @@ static inline int nvme_check_cmd_status(nvme_cmd_t *);
 static boolean_t nvme_check_cmd_status_ioctl(nvme_cmd_t *,
     nvme_ioctl_common_t *);
 
-static int nvme_abort_cmd(nvme_cmd_t *, uint_t);
+static int nvme_abort_cmd(nvme_cmd_t *, const uint32_t);
 static void nvme_async_event(nvme_t *);
 static boolean_t nvme_format_nvm(nvme_t *, nvme_ioctl_format_t *);
 static boolean_t nvme_get_logpage_int(nvme_t *, boolean_t, void **, size_t *,
@@ -718,12 +740,14 @@ static ddi_ufm_ops_t nvme_ufm_ops = {
 #define	NVME_MINOR_INST(minor)	((minor) >> NVME_MINOR_INST_SHIFT)
 #define	NVME_MINOR_NSID(minor)	((minor) & ((1 << NVME_MINOR_INST_SHIFT) - 1))
 #define	NVME_MINOR_MAX		(NVME_MINOR(1, 0) - 2)
-#define	NVME_IS_VENDOR_SPECIFIC_CMD(x)	(((x) >= 0xC0) && ((x) <= 0xFF))
 
 #define	NVME_OPEN_NMINORS		(1024 * 1024)
 #define	NVME_OPEN_MINOR_MIN		(MAXMIN32 + 1)
 #define	NVME_OPEN_MINOR_MAX_EXCL	(NVME_OPEN_MINOR_MIN + \
     NVME_OPEN_NMINORS)
+
+#define	NVME_BUMP_STAT(nvme, stat)	\
+	atomic_inc_64(&nvme->n_device_stat.nds_ ## stat.value.ui64)
 
 static void *nvme_state;
 static kmem_cache_t *nvme_cmd_cache;
@@ -1270,9 +1294,8 @@ nvme_free_dma(nvme_dma_t *dma)
 	kmem_free(dma, sizeof (*dma));
 }
 
-/* ARGSUSED */
 static void
-nvme_prp_dma_destructor(void *buf, void *private)
+nvme_prp_dma_destructor(void *buf, void *private __unused)
 {
 	nvme_dma_t *dma = (nvme_dma_t *)buf;
 
@@ -1308,7 +1331,7 @@ nvme_alloc_dma_common(nvme_t *nvme, nvme_dma_t *dma,
 	    &dma->nd_cookie, &dma->nd_ncookie) != DDI_DMA_MAPPED) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to bind DMA memory");
-		atomic_inc_32(&nvme->n_dma_bind_err);
+		NVME_BUMP_STAT(nvme, dma_bind_err);
 		nvme_free_dma_common(dma);
 		return (DDI_FAILURE);
 	}
@@ -1335,9 +1358,8 @@ nvme_zalloc_dma(nvme_t *nvme, size_t len, uint_t flags,
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
 static int
-nvme_prp_dma_constructor(void *buf, void *private, int flags)
+nvme_prp_dma_constructor(void *buf, void *private, int flags __unused)
 {
 	nvme_dma_t *dma = (nvme_dma_t *)buf;
 	nvme_t *nvme = (nvme_t *)private;
@@ -1573,21 +1595,43 @@ fail:
 	return (DDI_FAILURE);
 }
 
+/*
+ * One might reasonably consider that the nvme_cmd_cache should have a cache
+ * constructor and destructor that takes care of the mutex/cv init/destroy, and
+ * that nvme_free_cmd should reset more fields such that allocation becomes
+ * simpler. This is not currently implemented as:
+ * - nvme_cmd_cache is a global cache, shared across nvme instances and
+ *   therefore there is no easy access to the corresponding nvme_t in the
+ *   constructor to determine the required interrupt priority.
+ * - Most fields in nvme_cmd_t would need to be zeroed in nvme_free_cmd while
+ *   preserving the mutex/cv. It is easier to able to zero the entire
+ *   structure and then init the mutex/cv only in the unlikely event that we
+ *   want an admin command.
+ */
 static nvme_cmd_t *
 nvme_alloc_cmd(nvme_t *nvme, int kmflag)
 {
 	nvme_cmd_t *cmd = kmem_cache_alloc(nvme_cmd_cache, kmflag);
 
-	if (cmd == NULL)
-		return (cmd);
+	if (cmd != NULL) {
+		bzero(cmd, sizeof (nvme_cmd_t));
+		cmd->nc_nvme = nvme;
+	}
 
-	bzero(cmd, sizeof (nvme_cmd_t));
+	return (cmd);
+}
 
-	cmd->nc_nvme = nvme;
+static nvme_cmd_t *
+nvme_alloc_admin_cmd(nvme_t *nvme, int kmflag)
+{
+	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, kmflag);
 
-	mutex_init(&cmd->nc_mutex, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(nvme->n_intr_pri));
-	cv_init(&cmd->nc_cv, NULL, CV_DRIVER, NULL);
+	if (cmd != NULL) {
+		cmd->nc_flags |= NVME_CMD_F_USELOCK;
+		mutex_init(&cmd->nc_mutex, NULL, MUTEX_DRIVER,
+		    DDI_INTR_PRI(nvme->n_intr_pri));
+		cv_init(&cmd->nc_cv, NULL, CV_DRIVER, NULL);
+	}
 
 	return (cmd);
 }
@@ -1609,17 +1653,19 @@ nvme_free_cmd(nvme_cmd_t *cmd)
 		cmd->nc_prp = NULL;
 	}
 
-	cv_destroy(&cmd->nc_cv);
-	mutex_destroy(&cmd->nc_mutex);
+	if ((cmd->nc_flags & NVME_CMD_F_USELOCK) != 0) {
+		cv_destroy(&cmd->nc_cv);
+		mutex_destroy(&cmd->nc_mutex);
+	}
 
 	kmem_cache_free(nvme_cmd_cache, cmd);
 }
 
 static void
-nvme_submit_admin_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
+nvme_submit_admin_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd, uint32_t *qtimeoutp)
 {
 	sema_p(&qp->nq_sema);
-	nvme_submit_cmd_common(qp, cmd);
+	nvme_submit_cmd_common(qp, cmd, qtimeoutp);
 }
 
 static int
@@ -1632,17 +1678,27 @@ nvme_submit_io_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 	if (sema_tryp(&qp->nq_sema) == 0)
 		return (EAGAIN);
 
-	nvme_submit_cmd_common(qp, cmd);
+	nvme_submit_cmd_common(qp, cmd, NULL);
 	return (0);
 }
 
+/*
+ * Common command submission routine. If `qtimeoutp` is not NULL then it will
+ * be set to the sum of the timeouts of any active commands ahead of the one
+ * being submitted.
+ */
 static void
-nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd)
+nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd, uint32_t *qtimeoutp)
 {
 	nvme_reg_sqtdbl_t tail = { 0 };
 
+	/*
+	 * We don't need to take a lock on cmd since it is not yet enqueued.
+	 */
+	cmd->nc_submit_ts = gethrtime();
+	cmd->nc_state = NVME_CMD_SUBMITTED;
+
 	mutex_enter(&qp->nq_mutex);
-	cmd->nc_completed = B_FALSE;
 
 	/*
 	 * Now that we hold the queue pair lock, we must check whether or not
@@ -1653,6 +1709,8 @@ nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 	 * semaphore.
 	 */
 	if (cmd->nc_nvme->n_dead) {
+		cmd->nc_queue_ts = gethrtime();
+		cmd->nc_state = NVME_CMD_QUEUED;
 		taskq_dispatch_ent(qp->nq_cq->ncq_cmd_taskq, cmd->nc_callback,
 		    cmd, TQ_NOSLEEP, &cmd->nc_tqent);
 		sema_v(&qp->nq_sema);
@@ -1670,7 +1728,14 @@ nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 		qp->nq_next_cmd = (qp->nq_next_cmd + 1) % qp->nq_nentry;
 	qp->nq_cmd[qp->nq_next_cmd] = cmd;
 
+	/*
+	 * We keep track of the number of active commands in this queue, and
+	 * the sum of the timeouts for those active commands.
+	 */
 	qp->nq_active_cmds++;
+	if (qtimeoutp != NULL)
+		*qtimeoutp = qp->nq_active_timeout;
+	qp->nq_active_timeout += cmd->nc_timeout;
 
 	cmd->nc_sqe.sqe_cid = qp->nq_next_cmd;
 	bcopy(&cmd->nc_sqe, &qp->nq_sq[qp->nq_sqtail], sizeof (nvme_sqe_t));
@@ -1710,6 +1775,8 @@ nvme_unqueue_cmd(nvme_t *nvme, nvme_qpair_t *qp, int cid)
 	qp->nq_cmd[cid] = NULL;
 	ASSERT3U(qp->nq_active_cmds, >, 0);
 	qp->nq_active_cmds--;
+	ASSERT3U(qp->nq_active_timeout, >=, cmd->nc_timeout);
+	qp->nq_active_timeout -= cmd->nc_timeout;
 	sema_v(&qp->nq_sema);
 
 	ASSERT3P(cmd, !=, NULL);
@@ -1717,6 +1784,65 @@ nvme_unqueue_cmd(nvme_t *nvme, nvme_qpair_t *qp, int cid)
 	ASSERT3S(cmd->nc_sqe.sqe_cid, ==, cid);
 
 	return (cmd);
+}
+
+/*
+ * This is called when an admin abort has failed to complete, once for the
+ * original command and once for the abort itself. At this point the controller
+ * has been marked dead. The commands are considered lost, de-queued if
+ * possible, and placed on a global lost commands list so that they cannot be
+ * freed and so that any DMA memory they have have is not re-used.
+ */
+static void
+nvme_lost_cmd(nvme_t *nvme, nvme_cmd_t *cmd)
+{
+	ASSERT(mutex_owned(&cmd->nc_mutex));
+
+	switch (cmd->nc_state) {
+	case NVME_CMD_SUBMITTED: {
+		nvme_qpair_t *qp = nvme->n_ioq[cmd->nc_sqid];
+
+		/*
+		 * The command is still in the submitted state, meaning that we
+		 * have not processed a completion queue entry for it. De-queue
+		 * should be successful and if the hardware does later report
+		 * completion we'll skip it as a command for which we aren't
+		 * expecting a response (see nvme_unqueue_cmd()).
+		 */
+		mutex_enter(&qp->nq_mutex);
+		(void) nvme_unqueue_cmd(nvme, qp, cmd->nc_sqe.sqe_cid);
+		mutex_exit(&qp->nq_mutex);
+	}
+	case NVME_CMD_ALLOCATED:
+	case NVME_CMD_COMPLETED:
+		/*
+		 * If the command has not been submitted, or has completed,
+		 * there is nothing to do here. In the event of an abort
+		 * command timeout, we can end up here in the process of
+		 * "losing" the original command. It's possible that command
+		 * has actually completed (or been queued on the taskq) in the
+		 * interim.
+		 */
+		break;
+	case NVME_CMD_QUEUED:
+		/*
+		 * The command is on the taskq, awaiting callback. This should
+		 * be fairly rapid so wait for completion.
+		 */
+		while (cmd->nc_state != NVME_CMD_COMPLETED)
+			cv_wait(&cmd->nc_cv, &cmd->nc_mutex);
+		break;
+	case NVME_CMD_LOST:
+		dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
+		    "%s: command %p already lost", __func__, (void *)cmd);
+		break;
+	}
+
+	cmd->nc_state = NVME_CMD_LOST;
+
+	mutex_enter(&nvme_lc_mutex);
+	list_insert_head(&nvme_lost_cmds, cmd);
+	mutex_exit(&nvme_lc_mutex);
 }
 
 /*
@@ -1755,7 +1881,7 @@ retry:
 	if (cmd == NULL) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!received completion for unknown cid 0x%x", cqe->cqe_cid);
-		atomic_inc_32(&nvme->n_unknown_cid);
+		NVME_BUMP_STAT(nvme, unknown_cid);
 		/*
 		 * We want to ignore this unexpected completion entry as it
 		 * is most likely a result of a bug in the controller firmware.
@@ -1791,6 +1917,30 @@ nvme_process_iocq(nvme_t *nvme, nvme_cq_t *cq)
 	mutex_enter(&cq->ncq_mutex);
 
 	while ((cmd = nvme_get_completed(nvme, cq)) != NULL) {
+		/*
+		 * NVME_CMD_F_USELOCK is applied to all commands which are
+		 * going to be waited for by another thread in nvme_wait_cmd
+		 * and indicates that the lock should be taken before modifying
+		 * protected fields, and that the mutex has been initialised.
+		 * Commands which do not require the mutex to be held have not
+		 * initialised it (to reduce overhead).
+		 */
+		if ((cmd->nc_flags & NVME_CMD_F_USELOCK) != 0) {
+			mutex_enter(&cmd->nc_mutex);
+			/*
+			 * The command could have been de-queued as lost while
+			 * we waited on the lock, in which case we drop it.
+			 */
+			if (cmd->nc_state == NVME_CMD_LOST) {
+				mutex_exit(&cmd->nc_mutex);
+				completed++;
+				continue;
+			}
+		}
+		cmd->nc_queue_ts = gethrtime();
+		cmd->nc_state = NVME_CMD_QUEUED;
+		if ((cmd->nc_flags & NVME_CMD_F_USELOCK) != 0)
+			mutex_exit(&cmd->nc_mutex);
 		taskq_dispatch_ent(cq->ncq_cmd_taskq, cmd->nc_callback, cmd,
 		    TQ_NOSLEEP, &cmd->nc_tqent);
 
@@ -1911,18 +2061,22 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 	 */
 	case NVME_CQE_SC_GEN_INV_OPC:
 		/* Invalid Command Opcode */
-		if (!cmd->nc_dontpanic)
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_cmd_err);
+		if ((cmd->nc_flags & NVME_CMD_F_DONTPANIC) == 0) {
 			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
 			    "programming error: invalid opcode in cmd %p",
 			    (void *)cmd);
+		}
 		return (EINVAL);
 
 	case NVME_CQE_SC_GEN_INV_FLD:
 		/* Invalid Field in Command */
-		if (!cmd->nc_dontpanic)
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_field_err);
+		if ((cmd->nc_flags & NVME_CMD_F_DONTPANIC) == 0) {
 			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
 			    "programming error: invalid field in cmd %p",
 			    (void *)cmd);
+		}
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_ID_CNFL:
@@ -1933,10 +2087,12 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 
 	case NVME_CQE_SC_GEN_INV_NS:
 		/* Invalid Namespace or Format */
-		if (!cmd->nc_dontpanic)
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_nsfmt_err);
+		if ((cmd->nc_flags & NVME_CMD_F_DONTPANIC) == 0) {
 			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
 			    "programming error: invalid NS/format in cmd %p",
 			    (void *)cmd);
+		}
 		return (EINVAL);
 
 	case NVME_CQE_SC_GEN_NVM_LBA_RANGE:
@@ -1951,7 +2107,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_GEN_DATA_XFR_ERR:
 		/* Data Transfer Error (DMA) */
 		/* TODO: post ereport */
-		atomic_inc_32(&cmd->nc_nvme->n_data_xfr_err);
+		NVME_BUMP_STAT(cmd->nc_nvme, data_xfr_err);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
@@ -1963,7 +2119,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		 * so we pretty much ignore the error here and handle it
 		 * in the async event handler.
 		 */
-		atomic_inc_32(&cmd->nc_nvme->n_internal_err);
+		NVME_BUMP_STAT(cmd->nc_nvme, internal_err);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
@@ -1974,29 +2130,30 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		 * command times out.
 		 */
 		/* TODO: post ereport or change blkdev to handle this? */
-		atomic_inc_32(&cmd->nc_nvme->n_abort_rq_err);
+		NVME_BUMP_STAT(cmd->nc_nvme, abort_rq_err);
 		return (ECANCELED);
 
 	case NVME_CQE_SC_GEN_ABORT_PWRLOSS:
 		/* Command Aborted due to Power Loss Notification */
+		NVME_BUMP_STAT(cmd->nc_nvme, abort_pwrloss_err);
 		nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_ABORT_SQ_DEL:
 		/* Command Aborted due to SQ Deletion */
-		atomic_inc_32(&cmd->nc_nvme->n_abort_sq_del);
+		NVME_BUMP_STAT(cmd->nc_nvme, abort_sq_del);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_NVM_CAP_EXC:
 		/* Capacity Exceeded */
-		atomic_inc_32(&cmd->nc_nvme->n_nvm_cap_exc);
+		NVME_BUMP_STAT(cmd->nc_nvme, nvm_cap_exc);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_MEDIA);
 		return (EIO);
 
 	case NVME_CQE_SC_GEN_NVM_NS_NOTRDY:
 		/* Namespace Not Ready */
-		atomic_inc_32(&cmd->nc_nvme->n_nvm_ns_notrdy);
+		NVME_BUMP_STAT(cmd->nc_nvme, nvm_ns_notrdy);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
@@ -2005,7 +2162,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		/* Format in progress (1.2) */
 		if (!NVME_VERSION_ATLEAST(&cmd->nc_nvme->n_version, 1, 2))
 			return (nvme_check_unknown_cmd_status(cmd));
-		atomic_inc_32(&cmd->nc_nvme->n_nvm_ns_formatting);
+		NVME_BUMP_STAT(cmd->nc_nvme, nvm_ns_formatting);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
@@ -2024,7 +2181,7 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_SPC_INV_CQ:
 		/* Completion Queue Invalid */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_CREATE_SQUEUE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_cq_err);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_cq_err);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_QID:
@@ -2033,14 +2190,14 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_DELETE_SQUEUE ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_CREATE_CQUEUE ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_DELETE_CQUEUE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_qid_err);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_qid_err);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_MAX_QSZ_EXC:
 		/* Max Queue Size Exceeded */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_CREATE_SQUEUE ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_CREATE_CQUEUE);
-		atomic_inc_32(&cmd->nc_nvme->n_max_qsz_exc);
+		NVME_BUMP_STAT(cmd->nc_nvme, max_qsz_exc);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_ABRT_CMD_EXC:
@@ -2061,19 +2218,19 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_SPC_INV_INT_VECT:
 		/* Invalid Interrupt Vector */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_CREATE_CQUEUE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_int_vect);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_int_vect);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_LOG_PAGE:
 		/* Invalid Log Page */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_GET_LOG_PAGE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_log_page);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_log_page);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_FORMAT:
 		/* Invalid Format */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_FORMAT);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_format);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_format);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
@@ -2081,7 +2238,7 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_SPC_INV_Q_DEL:
 		/* Invalid Queue Deletion */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_DELETE_CQUEUE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_q_del);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_q_del);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_NVM_CNFL_ATTR:
@@ -2089,7 +2246,7 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_DSET_MGMT ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_READ ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
-		atomic_inc_32(&cmd->nc_nvme->n_cnfl_attr);
+		NVME_BUMP_STAT(cmd->nc_nvme, cnfl_attr);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
@@ -2099,7 +2256,7 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_COMPARE ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_READ ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
-		atomic_inc_32(&cmd->nc_nvme->n_inv_prot);
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_prot);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
@@ -2107,48 +2264,56 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 	case NVME_CQE_SC_SPC_NVM_READONLY:
 		/* Write to Read Only Range */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_WRITE);
-		atomic_inc_32(&cmd->nc_nvme->n_readonly);
+		NVME_BUMP_STAT(cmd->nc_nvme, readonly);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EROFS);
 
 	case NVME_CQE_SC_SPC_INV_FW_SLOT:
 		/* Invalid Firmware Slot */
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_fwslot);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_FW_IMG:
 		/* Invalid Firmware Image */
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_fwimg);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_FW_RESET:
 		/* Conventional Reset Required */
+		NVME_BUMP_STAT(cmd->nc_nvme, fwact_creset);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (0);
 
 	case NVME_CQE_SC_SPC_FW_NSSR:
 		/* NVMe Subsystem Reset Required */
+		NVME_BUMP_STAT(cmd->nc_nvme, fwact_nssr);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (0);
 
 	case NVME_CQE_SC_SPC_FW_NEXT_RESET:
 		/* Activation Requires Reset */
+		NVME_BUMP_STAT(cmd->nc_nvme, fwact_reset);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (0);
 
 	case NVME_CQE_SC_SPC_FW_MTFA:
 		/* Activation Requires Maximum Time Violation */
+		NVME_BUMP_STAT(cmd->nc_nvme, fwact_mtfa);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EAGAIN);
 
 	case NVME_CQE_SC_SPC_FW_PROHIBITED:
 		/* Activation Prohibited */
+		NVME_BUMP_STAT(cmd->nc_nvme, fwact_prohibited);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_FW_OVERLAP:
 		/* Overlapping Firmware Ranges */
+		NVME_BUMP_STAT(cmd->nc_nvme, fw_overlap);
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_IMAGE_LOAD ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
@@ -2222,47 +2387,87 @@ nvme_check_cmd_status_ioctl(nvme_cmd_t *cmd, nvme_ioctl_common_t *ioc)
 }
 
 static int
-nvme_abort_cmd(nvme_cmd_t *abort_cmd, uint_t sec)
+nvme_abort_cmd(nvme_cmd_t *cmd, const uint32_t sec)
 {
-	nvme_t *nvme = abort_cmd->nc_nvme;
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_t *nvme = cmd->nc_nvme;
+	nvme_cmd_t *abort_cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	nvme_abort_cmd_t ac = { 0 };
 	int ret = 0;
 
 	sema_p(&nvme->n_abort_sema);
 
-	ac.b.ac_cid = abort_cmd->nc_sqe.sqe_cid;
-	ac.b.ac_sqid = abort_cmd->nc_sqid;
+	ac.b.ac_cid = cmd->nc_sqe.sqe_cid;
+	ac.b.ac_sqid = cmd->nc_sqid;
 
-	cmd->nc_sqid = 0;
-	cmd->nc_sqe.sqe_opc = NVME_OPC_ABORT;
-	cmd->nc_callback = nvme_wakeup_cmd;
-	cmd->nc_sqe.sqe_cdw10 = ac.r;
+	abort_cmd->nc_sqid = 0;
+	abort_cmd->nc_sqe.sqe_opc = NVME_OPC_ABORT;
+	abort_cmd->nc_callback = nvme_wakeup_cmd;
+	abort_cmd->nc_sqe.sqe_cdw10 = ac.r;
 
 	/*
 	 * Send the ABORT to the hardware. The ABORT command will return _after_
-	 * the aborted command has completed (aborted or otherwise), but since
-	 * we still hold the aborted command's mutex its callback hasn't been
-	 * processed yet.
+	 * the aborted command has completed (aborted or otherwise) so we must
+	 * drop the aborted command's lock to allow it to complete.
+	 * We want to allow at least `nvme_abort_cmd_timeout` seconds for the
+	 * abort to be processed, but more if we are aborting a long-running
+	 * command to give that time to complete/abort too.
 	 */
-	nvme_admin_cmd(cmd, sec);
+	mutex_exit(&cmd->nc_mutex);
+	nvme_admin_cmd(abort_cmd, MAX(nvme_abort_cmd_timeout, sec));
+	mutex_enter(&cmd->nc_mutex);
+
 	sema_v(&nvme->n_abort_sema);
 
-	if ((ret = nvme_check_cmd_status(cmd)) != 0) {
+	/*
+	 * If the abort command itself has timed out, it will have been
+	 * de-queued so that its callback will not be called after this point,
+	 * and its state will be NVME_CMD_LOST.
+	 *
+	 * nvme_admin_cmd(abort_cmd)
+	 *   -> nvme_wait_cmd(abort_cmd)
+	 *     -> nvme_cmd(abort_cmd)
+	 *     | -> nvme_admin_cmd(cmd)
+	 *     |   -> nvme_wait_cmd(cmd)
+	 *     |     -> nvme_ctrl_mark_dead()
+	 *     |     -> nvme_lost_cmd(cmd)
+	 *     |       -> cmd->nc_stat = NVME_CMD_LOST
+	 *     and here we are.
+	 */
+	if (abort_cmd->nc_state == NVME_CMD_LOST) {
 		dev_err(nvme->n_dip, CE_WARN,
-		    "!ABORT failed with sct = %x, sc = %x",
-		    cmd->nc_cqe.cqe_sf.sf_sct, cmd->nc_cqe.cqe_sf.sf_sc);
-		atomic_inc_32(&nvme->n_abort_failed);
+		    "!ABORT of command %d/%d timed out",
+		    cmd->nc_sqe.sqe_cid, cmd->nc_sqid);
+		NVME_BUMP_STAT(nvme, abort_timeout);
+		ret = EIO;
+	} else if ((ret = nvme_check_cmd_status(abort_cmd)) != 0) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!ABORT of command %d/%d "
+		    "failed with sct = %x, sc = %x",
+		    cmd->nc_sqe.sqe_cid, cmd->nc_sqid,
+		    abort_cmd->nc_cqe.cqe_sf.sf_sct,
+		    abort_cmd->nc_cqe.cqe_sf.sf_sc);
+		NVME_BUMP_STAT(nvme, abort_failed);
 	} else {
+		boolean_t success = ((abort_cmd->nc_cqe.cqe_dw0 & 1) == 0);
+
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!ABORT of command %d/%d %ssuccessful",
-		    abort_cmd->nc_sqe.sqe_cid, abort_cmd->nc_sqid,
-		    cmd->nc_cqe.cqe_dw0 & 1 ? "un" : "");
-		if ((cmd->nc_cqe.cqe_dw0 & 1) == 0)
-			atomic_inc_32(&nvme->n_cmd_aborted);
+		    cmd->nc_sqe.sqe_cid, cmd->nc_sqid,
+		    success ? "" : "un");
+
+		if (success) {
+			NVME_BUMP_STAT(nvme, abort_successful);
+		} else {
+			NVME_BUMP_STAT(nvme, abort_unsuccessful);
+		}
 	}
 
-	nvme_free_cmd(cmd);
+	/*
+	 * This abort abort_cmd has either completed or been de-queued as
+	 * lost in nvme_wait_cmd. Either way it's safe to free it here.
+	 */
+	nvme_free_cmd(abort_cmd);
+
 	return (ret);
 }
 
@@ -2275,66 +2480,83 @@ nvme_abort_cmd(nvme_cmd_t *abort_cmd, uint_t sec)
 static void
 nvme_wait_cmd(nvme_cmd_t *cmd, uint32_t sec)
 {
-	clock_t timeout = ddi_get_lbolt() + drv_usectohz((long)sec * MICROSEC);
 	nvme_t *nvme = cmd->nc_nvme;
 	nvme_reg_csts_t csts;
-	nvme_qpair_t *qp;
 
 	ASSERT(mutex_owned(&cmd->nc_mutex));
 
-	while (!cmd->nc_completed) {
-		if (cv_timedwait(&cmd->nc_cv, &cmd->nc_mutex, timeout) == -1)
-			break;
+	while (cmd->nc_state != NVME_CMD_COMPLETED) {
+		clock_t timeout = ddi_get_lbolt() +
+		    drv_usectohz((long)sec * MICROSEC);
+
+		if (cv_timedwait(&cmd->nc_cv, &cmd->nc_mutex, timeout) == -1) {
+			/*
+			 * If this command is on the task queue then we don't
+			 * consider it to have timed out. We are waiting for
+			 * the callback to be invoked, the timing of which can
+			 * be affected by system load and should not count
+			 * against the device; continue to wait.
+			 * While this doesn't help deal with the possibility of
+			 * a command timing out between being placed on the CQ
+			 * and arriving on the taskq, we expect interrupts to
+			 * run fairly promptly making this a small window.
+			 */
+			if (cmd->nc_state != NVME_CMD_QUEUED)
+				break;
+		}
 	}
 
-	if (cmd->nc_completed)
+	if (cmd->nc_state == NVME_CMD_COMPLETED) {
+		DTRACE_PROBE1(nvme_admin_cmd_completed, nvme_cmd_t *, cmd);
+		nvme_admin_stat_cmd(nvme, cmd);
 		return;
+	}
 
 	/*
 	 * The command timed out.
-	 *
-	 * Check controller for fatal status, any errors associated with the
-	 * register or DMA handle, or for a double timeout (abort command timed
-	 * out). If necessary log a warning and call FMA.
 	 */
+
+	DTRACE_PROBE1(nvme_admin_cmd_timeout, nvme_cmd_t *, cmd);
 	csts.r = nvme_get32(nvme, NVME_REG_CSTS);
 	dev_err(nvme->n_dip, CE_WARN, "!command %d/%d timeout, "
 	    "OPC = %x, CFS = %d", cmd->nc_sqe.sqe_cid, cmd->nc_sqid,
 	    cmd->nc_sqe.sqe_opc, csts.b.csts_cfs);
-	atomic_inc_32(&nvme->n_cmd_timeout);
+	NVME_BUMP_STAT(nvme, cmd_timeout);
 
+	/*
+	 * Check controller for fatal status, any errors associated with the
+	 * register or DMA handle, or for a double timeout (abort command timed
+	 * out). If necessary log a warning and call FMA.
+	 */
 	if (csts.b.csts_cfs ||
 	    nvme_check_regs_hdl(nvme) ||
 	    nvme_check_dma_hdl(cmd->nc_dma) ||
 	    cmd->nc_sqe.sqe_opc == NVME_OPC_ABORT) {
 		nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
-	} else if (nvme_abort_cmd(cmd, sec) == 0) {
-		/*
-		 * If the abort succeeded the command should complete
-		 * immediately with an appropriate status.
-		 */
-		while (!cmd->nc_completed)
-			cv_wait(&cmd->nc_cv, &cmd->nc_mutex);
-
+		nvme_lost_cmd(nvme, cmd);
 		return;
 	}
 
-	qp = nvme->n_ioq[cmd->nc_sqid];
-
-	mutex_enter(&qp->nq_mutex);
-	(void) nvme_unqueue_cmd(nvme, qp, cmd->nc_sqe.sqe_cid);
-	mutex_exit(&qp->nq_mutex);
+	/* Issue an abort for the command that has timed out */
+	if (nvme_abort_cmd(cmd, sec) == 0) {
+		/*
+		 * If the abort completed, whether or not it was
+		 * successful in aborting the command, that command
+		 * will also have completed with an appropriate
+		 * status.
+		 */
+		while (cmd->nc_state != NVME_CMD_COMPLETED)
+			cv_wait(&cmd->nc_cv, &cmd->nc_mutex);
+		return;
+	}
 
 	/*
-	 * As we don't know what the presumed dead hardware might still do with
-	 * the DMA memory, we'll put the command on the lost commands list if it
-	 * has any DMA memory.
+	 * Otherwise, the abort has also timed out or failed, which
+	 * will have marked the controller dead. De-queue the original command
+	 * and add it to the lost commands list.
 	 */
-	if (cmd->nc_dma != NULL) {
-		mutex_enter(&nvme_lc_mutex);
-		list_insert_head(&nvme_lost_cmds, cmd);
-		mutex_exit(&nvme_lc_mutex);
-	}
+	VERIFY(cmd->nc_nvme->n_dead);
+	nvme_lost_cmd(nvme, cmd);
 }
 
 static void
@@ -2342,8 +2564,10 @@ nvme_wakeup_cmd(void *arg)
 {
 	nvme_cmd_t *cmd = arg;
 
+	ASSERT(cmd->nc_flags & NVME_CMD_F_USELOCK);
+
 	mutex_enter(&cmd->nc_mutex);
-	cmd->nc_completed = B_TRUE;
+	cmd->nc_state = NVME_CMD_COMPLETED;
 	cv_signal(&cmd->nc_cv);
 	mutex_exit(&cmd->nc_mutex);
 }
@@ -2400,7 +2624,7 @@ nvme_async_event_task(void *arg)
 
 	/* Clear CQE and re-submit the async request. */
 	bzero(&cmd->nc_cqe, sizeof (nvme_cqe_t));
-	nvme_submit_admin_cmd(nvme->n_adminq, cmd);
+	nvme_submit_admin_cmd(nvme->n_adminq, cmd, NULL);
 	cmd = NULL;	/* cmd can no longer be used after resubmission */
 
 	switch (event.b.ae_type) {
@@ -2415,7 +2639,7 @@ nvme_async_event_task(void *arg)
 			dev_err(nvme->n_dip, CE_WARN, "!wrong logpage in "
 			    "async event reply: type=0x%x logpage=0x%x",
 			    event.b.ae_type, event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_wrong_logpage);
+			NVME_BUMP_STAT(nvme, wrong_logpage);
 			return;
 		}
 
@@ -2433,27 +2657,27 @@ nvme_async_event_task(void *arg)
 		case NVME_ASYNC_ERROR_DIAGFAIL:
 			dev_err(nvme->n_dip, CE_WARN, "!diagnostic failure");
 			nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
-			atomic_inc_32(&nvme->n_diagfail_event);
+			NVME_BUMP_STAT(nvme, diagfail_event);
 			break;
 
 		case NVME_ASYNC_ERROR_PERSISTENT:
 			dev_err(nvme->n_dip, CE_WARN, "!persistent internal "
 			    "device error");
 			nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
-			atomic_inc_32(&nvme->n_persistent_event);
+			NVME_BUMP_STAT(nvme, persistent_event);
 			break;
 
 		case NVME_ASYNC_ERROR_TRANSIENT:
 			dev_err(nvme->n_dip, CE_WARN, "!transient internal "
 			    "device error");
 			/* TODO: send ereport */
-			atomic_inc_32(&nvme->n_transient_event);
+			NVME_BUMP_STAT(nvme, transient_event);
 			break;
 
 		case NVME_ASYNC_ERROR_FW_LOAD:
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!firmware image load error");
-			atomic_inc_32(&nvme->n_fw_load_event);
+			NVME_BUMP_STAT(nvme, fw_load_event);
 			break;
 		}
 		break;
@@ -2469,7 +2693,7 @@ nvme_async_event_task(void *arg)
 			dev_err(nvme->n_dip, CE_WARN, "!wrong logpage in "
 			    "type=0x%x logpage=0x%x", event.b.ae_type,
 			    event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_wrong_logpage);
+			NVME_BUMP_STAT(nvme, wrong_logpage);
 			return;
 		}
 
@@ -2478,21 +2702,21 @@ nvme_async_event_task(void *arg)
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!device reliability compromised");
 			/* TODO: send ereport */
-			atomic_inc_32(&nvme->n_reliability_event);
+			NVME_BUMP_STAT(nvme, reliability_event);
 			break;
 
 		case NVME_ASYNC_HEALTH_TEMPERATURE:
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!temperature above threshold");
 			/* TODO: send ereport */
-			atomic_inc_32(&nvme->n_temperature_event);
+			NVME_BUMP_STAT(nvme, temperature_event);
 			break;
 
 		case NVME_ASYNC_HEALTH_SPARE:
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!spare space below threshold");
 			/* TODO: send ereport */
-			atomic_inc_32(&nvme->n_spare_event);
+			NVME_BUMP_STAT(nvme, spare_event);
 			break;
 		}
 		break;
@@ -2505,14 +2729,14 @@ nvme_async_event_task(void *arg)
 				    "!wrong logpage in async event reply: "
 				    "type=0x%x logpage=0x%x",
 				    event.b.ae_type, event.b.ae_logpage);
-				atomic_inc_32(&nvme->n_wrong_logpage);
+				NVME_BUMP_STAT(nvme, wrong_logpage);
 				break;
 			}
 
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "namespace attribute change event, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 
 			if (!nvme_get_logpage_int(nvme, B_FALSE,
 			    (void **)&nslist, &logsize,
@@ -2538,7 +2762,6 @@ nvme_async_event_task(void *arg)
 				    "!namespace nvme%d/%u has changed.",
 				    ddi_get_instance(nvme->n_dip), nsid);
 
-
 				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
 					continue;
 
@@ -2555,42 +2778,42 @@ nvme_async_event_task(void *arg)
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "firmware activation starting, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		case NVME_ASYNC_NOTICE_TELEMETRY:
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "telemetry log changed, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		case NVME_ASYNC_NOTICE_NS_ASYMM:
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "asymmetric namespace access change, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		case NVME_ASYNC_NOTICE_LATENCYLOG:
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "predictable latency event aggregate log change, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		case NVME_ASYNC_NOTICE_LBASTATUS:
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "LBA status information alert, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		case NVME_ASYNC_NOTICE_ENDURANCELOG:
 			dev_err(nvme->n_dip, CE_NOTE,
 			    "endurance group event aggregate log page change, "
 			    "logpage = 0x%x", event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_notice_event);
+			NVME_BUMP_STAT(nvme, notice_event);
 			break;
 
 		default:
@@ -2598,7 +2821,7 @@ nvme_async_event_task(void *arg)
 			    "!unknown notice async event received, "
 			    "info = 0x%x, logpage = 0x%x", event.b.ae_info,
 			    event.b.ae_logpage);
-			atomic_inc_32(&nvme->n_unknown_event);
+			NVME_BUMP_STAT(nvme, unknown_event);
 			break;
 		}
 		break;
@@ -2607,14 +2830,14 @@ nvme_async_event_task(void *arg)
 		dev_err(nvme->n_dip, CE_WARN, "!vendor specific async event "
 		    "received, info = 0x%x, logpage = 0x%x", event.b.ae_info,
 		    event.b.ae_logpage);
-		atomic_inc_32(&nvme->n_vendor_event);
+		NVME_BUMP_STAT(nvme, vendor_event);
 		break;
 
 	default:
 		dev_err(nvme->n_dip, CE_WARN, "!unknown async event received, "
 		    "type = 0x%x, info = 0x%x, logpage = 0x%x", event.b.ae_type,
 		    event.b.ae_info, event.b.ae_logpage);
-		atomic_inc_32(&nvme->n_unknown_event);
+		NVME_BUMP_STAT(nvme, unknown_event);
 		break;
 	}
 
@@ -2631,9 +2854,22 @@ nvme_async_event_task(void *arg)
 static void
 nvme_admin_cmd(nvme_cmd_t *cmd, uint32_t sec)
 {
+	uint32_t qtimeout;
+
+	ASSERT(cmd->nc_flags & NVME_CMD_F_USELOCK);
+
 	mutex_enter(&cmd->nc_mutex);
-	nvme_submit_admin_cmd(cmd->nc_nvme->n_adminq, cmd);
-	nvme_wait_cmd(cmd, sec);
+	cmd->nc_timeout = sec;
+	nvme_submit_admin_cmd(cmd->nc_nvme->n_adminq, cmd, &qtimeout);
+	/*
+	 * We will wait for a total of this command's specified timeout plus
+	 * the sum of the timeouts of any commands queued ahead of this one. If
+	 * we aren't first in the queue, this will inflate the timeout somewhat
+	 * but these times are not critical and it means that if we get stuck
+	 * behind a long running command such as a namespace format then we
+	 * won't time out and trigger an abort.
+	 */
+	nvme_wait_cmd(cmd, sec + qtimeout);
 	mutex_exit(&cmd->nc_mutex);
 }
 
@@ -2642,13 +2878,13 @@ nvme_async_event(nvme_t *nvme)
 {
 	nvme_cmd_t *cmd;
 
-	cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	cmd->nc_sqid = 0;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_ASYNC_EVENT;
 	cmd->nc_callback = nvme_async_event_task;
-	cmd->nc_dontpanic = B_TRUE;
+	cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
-	nvme_submit_admin_cmd(nvme->n_adminq, cmd);
+	nvme_submit_admin_cmd(nvme->n_adminq, cmd, NULL);
 }
 
 /*
@@ -2681,7 +2917,7 @@ nvme_no_blkdev_attached(nvme_t *nvme, uint32_t nsid)
 static boolean_t
 nvme_format_nvm(nvme_t *nvme, nvme_ioctl_format_t *ioc)
 {
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	nvme_format_nvm_t format_nvm = { 0 };
 	boolean_t ret;
 
@@ -2705,7 +2941,7 @@ nvme_format_nvm(nvme_t *nvme, nvme_ioctl_format_t *ioc)
 	 * all namespaces in one command and we'd prefer to handle that
 	 * gracefully.
 	 */
-	cmd->nc_dontpanic = B_TRUE;
+	cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	nvme_admin_cmd(cmd, nvme_format_cmd_timeout);
 
@@ -2731,7 +2967,7 @@ static boolean_t
 nvme_get_logpage(nvme_t *nvme, boolean_t user, nvme_ioctl_get_logpage_t *log,
     void **buf)
 {
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	nvme_getlogpage_dw10_t dw10;
 	uint32_t offlo, offhi;
 	nvme_getlogpage_dw11_t dw11;
@@ -2749,7 +2985,7 @@ nvme_get_logpage(nvme_t *nvme, boolean_t user, nvme_ioctl_get_logpage_t *log,
 	cmd->nc_sqe.sqe_nsid = log->nigl_common.nioc_nsid;
 
 	if (user)
-		cmd->nc_dontpanic = B_TRUE;
+		cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	/*
 	 * The size field is the number of double words, but is a zeros based
@@ -2873,7 +3109,7 @@ static boolean_t
 nvme_identify(nvme_t *nvme, boolean_t user, nvme_ioctl_identify_t *ioc,
     void **buf)
 {
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	boolean_t ret = B_FALSE;
 	nvme_identify_dw10_t dw10;
 
@@ -2903,7 +3139,7 @@ nvme_identify(nvme_t *nvme, boolean_t user, nvme_ioctl_identify_t *ioc,
 	if (cmd->nc_dma->nd_ncookie > 2) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!too many DMA cookies for IDENTIFY");
-		atomic_inc_32(&nvme->n_too_many_cookies);
+		NVME_BUMP_STAT(nvme, too_many_cookies);
 		ret = nvme_ioctl_error(&ioc->nid_common,
 		    NVME_IOCTL_E_BAD_PRP, 0, 0);
 		goto fail;
@@ -2918,7 +3154,7 @@ nvme_identify(nvme_t *nvme, boolean_t user, nvme_ioctl_identify_t *ioc,
 	}
 
 	if (user)
-		cmd->nc_dontpanic = B_TRUE;
+		cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
 
@@ -2957,7 +3193,7 @@ nvme_set_features(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t feature,
     uint32_t val, uint32_t *res)
 {
 	_NOTE(ARGUNUSED(nsid));
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	int ret = EINVAL;
 
 	ASSERT(res != NULL);
@@ -2969,7 +3205,7 @@ nvme_set_features(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t feature,
 	cmd->nc_sqe.sqe_cdw11 = val;
 
 	if (user)
-		cmd->nc_dontpanic = B_TRUE;
+		cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	switch (feature) {
 	case NVME_FEAT_WRITE_CACHE:
@@ -3078,7 +3314,7 @@ nvme_set_nqueues(nvme_t *nvme)
 static int
 nvme_create_completion_queue(nvme_t *nvme, nvme_cq_t *cq)
 {
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	nvme_create_queue_dw10_t dw10 = { 0 };
 	nvme_create_cq_dw11_t c_dw11 = { 0 };
 	int ret;
@@ -3134,7 +3370,7 @@ nvme_create_io_qpair(nvme_t *nvme, nvme_qpair_t *qp, uint16_t idx)
 	s_dw11.b.sq_pc = 1;
 	s_dw11.b.sq_cqid = cq->ncq_id;
 
-	cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	cmd->nc_sqid = 0;
 	cmd->nc_callback = nvme_wakeup_cmd;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_CREATE_SQUEUE;
@@ -3808,7 +4044,7 @@ nvme_init(nvme_t *nvme)
 	vs.r = nvme_get32(nvme, NVME_REG_VS);
 	nvme->n_version.v_major = vs.b.vs_mjr;
 	nvme->n_version.v_minor = vs.b.vs_mnr;
-	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
+	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d\n",
 	    nvme->n_version.v_major, nvme->n_version.v_minor);
 
 	if (nvme->n_version.v_major > nvme_version_major) {
@@ -4270,7 +4506,6 @@ fail:
 static uint_t
 nvme_intr(caddr_t arg1, caddr_t arg2)
 {
-	/*LINTED: E_PTR_BAD_CAST_ALIGN*/
 	nvme_t *nvme = (nvme_t *)arg1;
 	int inum = (int)(uintptr_t)arg2;
 	int ccnt = 0;
@@ -4279,9 +4514,10 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 	if (inum >= nvme->n_intr_cnt)
 		return (DDI_INTR_UNCLAIMED);
 
-	if (nvme->n_dead)
+	if (nvme->n_dead) {
 		return (nvme->n_intr_type == DDI_INTR_TYPE_FIXED ?
 		    DDI_INTR_UNCLAIMED : DDI_INTR_CLAIMED);
+	}
 
 	/*
 	 * The interrupt vector a queue uses is calculated as queue_idx %
@@ -4711,6 +4947,15 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_progress |= NVME_REGS_MAPPED;
 
 	/*
+	 * Set up kstats
+	 */
+	if (!nvme_stat_init(nvme)) {
+		dev_err(dip, CE_WARN, "!failed to create device kstats");
+		goto fail;
+	}
+	nvme->n_progress |= NVME_STAT_INIT;
+
+	/*
 	 * Create PRP DMA cache
 	 */
 	(void) snprintf(name, sizeof (name), "%s%d_prp_cache",
@@ -4738,7 +4983,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme_lock_init(&nvme->n_lock);
 	nvme->n_progress |= NVME_MGMT_INIT;
 	nvme->n_dead_status = NVME_IOCTL_E_CTRL_DEAD;
-
 
 	/*
 	 * Identify namespaces.
@@ -4948,6 +5192,9 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (nvme->n_progress & NVME_REGS_MAPPED)
 		ddi_regs_map_free(&nvme->n_regh);
+
+	if (nvme->n_progress & NVME_STAT_INIT)
+		nvme_stat_cleanup(nvme);
 
 	if (nvme->n_progress & NVME_FMA_INIT) {
 		if (DDI_FM_ERRCB_CAP(nvme->n_fm_cap))
@@ -5332,10 +5579,12 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 
 	do {
 		cmd = nvme_retrieve_cmd(nvme, ioq);
-		if (cmd != NULL)
+		if (cmd != NULL) {
+			ASSERT0(cmd->nc_flags & NVME_CMD_F_USELOCK);
 			cmd->nc_callback(cmd);
-		else
+		} else {
 			drv_usecwait(10);
+		}
 	} while (ioq->nq_active_cmds != 0);
 
 	return (0);
@@ -5600,7 +5849,6 @@ nvme_ioctl_copyout_error(nvme_ioctl_errno_t err, intptr_t uaddr, int mode)
 	}
 	return (0);
 }
-
 
 /*
  * The companion to the namespace checking. This occurs after any rewriting
@@ -6049,7 +6297,7 @@ nvme_ioc_cmd(nvme_t *nvme, nvme_ioctl_common_t *ioc, nvme_ioc_cmd_args_t *args)
 	nvme_cmd_t *cmd;
 	boolean_t ret = B_FALSE;
 
-	cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
 	cmd->nc_sqid = 0;
 
 	/*
@@ -6059,7 +6307,7 @@ nvme_ioc_cmd(nvme_t *nvme, nvme_ioctl_common_t *ioc, nvme_ioc_cmd_args_t *args)
 	 * the actual command data structure is entirely defined
 	 * by userspace.
 	 */
-	cmd->nc_dontpanic = B_TRUE;
+	cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	cmd->nc_callback = nvme_wakeup_cmd;
 	cmd->nc_sqe = *args->ica_sqe;
@@ -6944,7 +7192,6 @@ nvme_ioctl_lock(nvme_minor_t *minor, intptr_t arg, int mode,
 		mutex_exit(&nvme->n_minor_mutex);
 		goto copyout;
 	}
-
 
 #ifdef	DEBUG
 	/*

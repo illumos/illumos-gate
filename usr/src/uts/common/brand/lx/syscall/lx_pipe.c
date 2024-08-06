@@ -252,8 +252,8 @@ lx_hd_pipe(intptr_t arg, int flags)
 	 * Optionally set the FCLOEXEC flag
 	 */
 	if ((flags & FCLOEXEC) != 0) {
-		f_setfd(fd1, FD_CLOEXEC);
-		f_setfd(fd2, FD_CLOEXEC);
+		f_setfd_or(fd1, FD_CLOEXEC);
+		f_setfd_or(fd2, FD_CLOEXEC);
 	}
 
 	return (0);

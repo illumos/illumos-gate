@@ -2608,6 +2608,29 @@ conv_cnote_filemode(uint32_t mode, Conv_fmt_flags_t fmt_flags,
 	return (buf);
 }
 
+const char *
+conv_cnote_fdflags(uint32_t flags, Conv_fmt_flags_t fmt_flags,
+    char *buf, size_t bufsize)
+{
+	CONV_EXPN_FIELD_ARG arg = { 0 };
+
+	static const Val_desc fdflags[] = {
+		{ 0x01,	MSG_FD_CLOEXEC },
+		{ 0x02,	MSG_FD_CLOFORK },
+		{ 0,	0 }
+	};
+
+	if (flags == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	arg.buf = buf;
+	arg.bufsize = bufsize;
+	arg.oflags = flags;
+	arg.rflags = flags;
+
+	(void) conv_expn_field(&arg, fdflags, fmt_flags);
+	return (buf);
+}
 
 #define	PROCSECFLGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE +		\
 	MSG_ASLR_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\

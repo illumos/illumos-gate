@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <libintl.h>
@@ -50,7 +52,7 @@
 
 extern void krb5_cleanup(pam_handle_t *, void *, int);
 
-static int attempt_refresh_cred(krb5_module_data_t *, char *, int);
+static int attempt_refresh_cred(krb5_module_data_t *, const char *, int);
 static int attempt_delete_initcred(krb5_module_data_t *);
 static krb5_error_code krb5_renew_tgt(krb5_module_data_t *, krb5_principal,
 		krb5_principal, int);
@@ -62,19 +64,15 @@ extern uint_t kwarn_del_warning(char *);
  * pam_sm_setcred
  */
 int
-pam_sm_setcred(
-	pam_handle_t *pamh,
-	int	flags,
-	int	argc,
-	const char **argv)
+pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	int	i;
-	int	err = 0;
-	int	debug = 0;
-	krb5_module_data_t	*kmd = NULL;
-	char			*user = NULL;
-	krb5_repository_data_t	*krb5_data = NULL;
-	pam_repository_t	*rep_data = NULL;
+	int i;
+	int err = 0;
+	int debug = 0;
+	krb5_module_data_t *kmd = NULL;
+	const char *user = NULL;
+	krb5_repository_data_t *krb5_data = NULL;
+	const pam_repository_t *rep_data = NULL;
 
 	for (i = 0; i < argc; i++) {
 		if (strcasecmp(argv[i], "debug") == 0)
@@ -101,12 +99,12 @@ pam_sm_setcred(
 		goto out;
 	}
 
-	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
 
 	if (user == NULL || *user == '\0')
 		return (PAM_USER_UNKNOWN);
 
-	if (pam_get_data(pamh, KRB5_DATA, (const void**)&kmd) != PAM_SUCCESS) {
+	if (pam_get_data(pamh, KRB5_DATA, (const void **)&kmd) != PAM_SUCCESS) {
 		if (debug) {
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): kmd get failed, kmd=0x%p",
@@ -212,7 +210,7 @@ pam_sm_setcred(
 	 * If auth was short-circuited we will not have anything to
 	 * renew, so just return here.
 	 */
-	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (const void **)&rep_data);
 
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
@@ -284,7 +282,7 @@ out:
 static int
 attempt_refresh_cred(
 	krb5_module_data_t	*kmd,
-	char		*user,
+	const char		*user,
 	int	flag)
 {
 	krb5_principal	me;
@@ -310,8 +308,8 @@ attempt_refresh_cred(
 		return (PAM_SYSTEM_ERR);
 	}
 
-	if ((code = get_kmd_kuser(kmd->kcontext, (const char *)user, kuser,
-	    2*MAXHOSTNAMELEN)) != 0) {
+	if ((code = get_kmd_kuser(kmd->kcontext, user, kuser,
+	    2 * MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
 

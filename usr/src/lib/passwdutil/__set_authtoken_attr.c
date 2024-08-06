@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <errno.h>
@@ -35,7 +36,7 @@
 #include "passwdutil.h"
 
 int
-__set_authtoken_attr(char *name, char *oldpw, pwu_repository_t *rep,
+__set_authtoken_attr(const char *name, const char *oldpw, pwu_repository_t *rep,
     attrlist *items, int *updated_reps)
 {
 	attrlist *p;

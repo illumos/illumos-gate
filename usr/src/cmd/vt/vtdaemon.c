@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -435,7 +437,7 @@ vt_clear_events(void)
 	}
 }
 
-static int vt_conv(int, struct pam_message **,
+static int vt_conv(int, const struct pam_message **,
     struct pam_response **, void *);
 
 /*ARGSUSED*/
@@ -540,14 +542,13 @@ vt_getinput(int noecho)
  * SIGINT/EINTR is handled in vt_getinput()/vt_poll().
  */
 
-/*ARGSUSED*/
 static int
-vt_conv(int num_msg, struct pam_message **msg,
+vt_conv(int num_msg, const struct pam_message **msg,
     struct pam_response **response, void *appdata_ptr)
 {
-	struct pam_message	*m;
-	struct pam_response	*r;
-	int			i, k;
+	const struct pam_message *m;
+	struct pam_response *r;
+	int i, k;
 
 	if (num_msg >= PAM_MAX_NUM_MSG) {
 		syslog(LOG_ERR, "too many messages %d >= %d",

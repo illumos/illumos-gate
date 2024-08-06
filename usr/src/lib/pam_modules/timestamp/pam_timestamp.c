@@ -10,6 +10,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -45,19 +46,16 @@ struct user_info {
 int debug = 0;
 
 int
-validate_basic(
-	pam_handle_t		*pamh,
-	char			*user_tty,
-	char 			*timestampfile)
+validate_basic(pam_handle_t *pamh, char *user_tty, char *timestampfile)
 {
-	char			*user;
-	char			*auser;
-	char			*ttyn;
+	const char *user;
+	const char *auser;
+	const char *ttyn;
 
 	/* get user, auser and users's tty */
-	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
-	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
-	(void) pam_get_item(pamh, PAM_TTY, (void **)&ttyn);
+	(void) pam_get_item(pamh, PAM_USER, (const void **)&user);
+	(void) pam_get_item(pamh, PAM_AUSER, (const void **)&auser);
+	(void) pam_get_item(pamh, PAM_TTY, (const void **)&ttyn);
 
 	if (user == NULL || *user == '\0') {
 		syslog(LOG_AUTH | LOG_ERR, "pam_timestamp: "
@@ -174,26 +172,21 @@ create_dir(char *dir)
  *	debug
  *	timeout=	timeout in min, default is 5
  */
-/*ARGSUSED*/
 int
-pam_sm_authenticate(
-	pam_handle_t		*pamh,
-	int 			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	struct			user_info info;
-	struct			stat sb, tty;
-	time_t			timeout = 0;
-	long			tmp = 0;
-	int			result = PAM_IGNORE;
-	int			i;
-	int			fd = -1;
-	char			*p;
-	char			user_tty[MAXPATHLEN];
-	char			timestampdir[MAXPATHLEN];
-	char			timestampfile[MAXPATHLEN];
-	char			*sudir;
+	struct user_info info;
+	struct stat sb, tty;
+	time_t timeout = 0;
+	long tmp = 0;
+	int result = PAM_IGNORE;
+	int i;
+	int fd = -1;
+	char *p;
+	char user_tty[MAXPATHLEN];
+	char timestampdir[MAXPATHLEN];
+	char timestampfile[MAXPATHLEN];
+	char *sudir;
 
 	timeout = TIMESTAMP_TIMEOUT;
 
@@ -324,22 +317,17 @@ pam_sm_authenticate(
  *
  * returns PAM_SUCCESS on success, otherwise PAM_IGNORE
  */
-/*ARGSUSED*/
 int
-pam_sm_setcred(
-	pam_handle_t		*pamh,
-	int			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	struct			stat sb;
-	struct			stat tty;
-	struct			user_info info;
-	int			result = PAM_IGNORE;
-	int			fd = -1;
-	char			user_tty[MAXPATHLEN];
-	char			timestampdir[MAXPATHLEN];
-	char			timestampfile[MAXPATHLEN];
+	struct stat sb;
+	struct stat tty;
+	struct user_info info;
+	int result = PAM_IGNORE;
+	int fd = -1;
+	char user_tty[MAXPATHLEN];
+	char timestampdir[MAXPATHLEN];
+	char timestampfile[MAXPATHLEN];
 
 	/* validate flags */
 	if (flags && !(flags & PAM_ESTABLISH_CRED) &&

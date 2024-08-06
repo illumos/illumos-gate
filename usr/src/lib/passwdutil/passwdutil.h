@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_PASSWDUTIL_H
@@ -122,12 +123,13 @@ typedef struct {
 #define	WARNWEEKS	-1
 
 typedef struct repops {
-	int (*checkhistory)(char *, char *, pwu_repository_t *);
-	int (*getattr)(char *, attrlist *, pwu_repository_t *);
-	int (*getpwnam)(char *, attrlist *, pwu_repository_t *, void **);
+	int (*checkhistory)(const char *, const char *, pwu_repository_t *);
+	int (*getattr)(const char *, attrlist *, pwu_repository_t *);
+	int (*getpwnam)(const char *, attrlist *, pwu_repository_t *, void **);
 	int (*update)(attrlist *, pwu_repository_t *, void *);
-	int (*putpwnam)(char *, char *, pwu_repository_t *, void *);
-	int (*user_to_authenticate)(char *, pwu_repository_t *, char **, int *);
+	int (*putpwnam)(const char *, const char *, pwu_repository_t *, void *);
+	int (*user_to_authenticate)(const char *, pwu_repository_t *, char **,
+	    int *);
 	int (*lock)(void);
 	int (*unlock)(void);
 } repops_t;
@@ -163,16 +165,17 @@ int name_to_int(char *);
 /*
  * __set_authtok_attr.c
  */
-int __set_authtoken_attr(char *, char *, pwu_repository_t *, attrlist *, int *);
+int __set_authtoken_attr(const char *, const char *, pwu_repository_t *,
+    attrlist *, int *);
 /*
  * __get_authtokenn_attr.c
  */
-int __get_authtoken_attr(char *, pwu_repository_t *, attrlist *);
+int __get_authtoken_attr(const char *, pwu_repository_t *, attrlist *);
 
 /*
  * __user_to_authenticate.c
  */
-int __user_to_authenticate(char *, pwu_repository_t *, char **, int *);
+int __user_to_authenticate(const char *, pwu_repository_t *, char **, int *);
 
 /*
  *	Password history definitions
@@ -183,10 +186,10 @@ int __user_to_authenticate(char *, pwu_repository_t *, char **, int *);
 /*
  * __check_history.c
  */
-int __check_history(char *, char *, pwu_repository_t *);
+int __check_history(const char *, const char *, pwu_repository_t *);
 
-int __incr_failed_count(char *, char *, int);
-int __rst_failed_count(char *, char *);
+int __incr_failed_count(const char *, char *, int);
+int __rst_failed_count(const char *, char *);
 
 /*
  * Error / return codes

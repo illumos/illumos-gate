@@ -231,7 +231,11 @@ noxattr:
 					 */
 					setf(fd, fp);
 					if ((filemode & FCLOEXEC) != 0) {
-						f_setfd(fd, FD_CLOEXEC);
+						f_setfd_or(fd, FD_CLOEXEC);
+					}
+
+					if ((filemode & FCLOFORK) != 0) {
+						f_setfd_or(fd, FD_CLOFORK);
 					}
 					return (fd);
 				} else {
@@ -260,7 +264,11 @@ noxattr:
 					mutex_exit(&fp->f_tlock);
 					setf(fd, fp);
 					if ((filemode & FCLOEXEC) != 0) {
-						f_setfd(fd, FD_CLOEXEC);
+						f_setfd_or(fd, FD_CLOEXEC);
+					}
+
+					if ((filemode & FCLOFORK) != 0) {
+						f_setfd_or(fd, FD_CLOFORK);
 					}
 					releasef(dupfd);
 				}

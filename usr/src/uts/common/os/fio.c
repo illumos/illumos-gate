@@ -23,6 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017, Joyent Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -58,6 +59,7 @@
 #include <sys/rctl.h>
 #include <sys/port_impl.h>
 #include <sys/dtrace.h>
+#include <sys/stdbool.h>
 
 #include <c2/audit.h>
 #include <sys/nbmlock.h>
@@ -868,23 +870,50 @@ flist_fork(uf_info_t *pfip, uf_info_t *cfip)
 
 	for (fd = 0, pufp = pfip->fi_list, cufp = cfip->fi_list; fd < nfiles;
 	    fd++, pufp++, cufp++) {
-		cufp->uf_file = pufp->uf_file;
-		cufp->uf_alloc = pufp->uf_alloc;
-		cufp->uf_flag = pufp->uf_flag;
+		boolean_t unreserve = B_FALSE;
+
+		/*
+		 * Check to see if FD_CLOFORK is set. In this case we 'close'
+		 * the file descriptor by simply not duplicating it and leaving
+		 * this entry as an empty descriptor. While we don't need to
+		 * close the underlying file_t, we do need to make sure we take
+		 * care of cleaning up our reservation. We do not reset the
+		 * generation either, simulating a setf here.
+		 */
+		if ((pufp->uf_flag & FD_CLOFORK) == 0) {
+			cufp->uf_file = pufp->uf_file;
+			cufp->uf_flag = pufp->uf_flag;
+		}
 		cufp->uf_busy = pufp->uf_busy;
+		cufp->uf_alloc = pufp->uf_alloc;
 		cufp->uf_gen = pufp->uf_gen;
+
+		/*
+		 * We may have to clean up our allocation tracking. This happens
+		 * either because we have no file due to the fact that we're
+		 * busy or because we had a file and FD_CLOFORK is set. If there
+		 * is no file and we're not busy, then the unreserve was already
+		 * taken care of.
+		 */
 		if (pufp->uf_file == NULL) {
-			ASSERT(pufp->uf_flag == 0);
+			ASSERT3U(pufp->uf_flag, ==, 0);
 			if (pufp->uf_busy) {
-				/*
-				 * Grab locks to appease ASSERTs in fd_reserve
-				 */
-				mutex_enter(&cfip->fi_lock);
-				mutex_enter(&cufp->uf_lock);
-				fd_reserve(cfip, fd, -1);
-				mutex_exit(&cufp->uf_lock);
-				mutex_exit(&cfip->fi_lock);
+				unreserve = B_TRUE;
 			}
+		} else if ((pufp->uf_flag & FD_CLOFORK) != 0) {
+			ASSERT3P(pufp->uf_file, !=, NULL);
+			unreserve = B_TRUE;
+		}
+
+		if (unreserve) {
+			/*
+			 * Grab locks to appease ASSERTs in fd_reserve
+			 */
+			mutex_enter(&cfip->fi_lock);
+			mutex_enter(&cufp->uf_lock);
+			fd_reserve(cfip, fd, -1);
+			mutex_exit(&cufp->uf_lock);
+			mutex_exit(&cfip->fi_lock);
 		}
 	}
 }
@@ -1278,9 +1307,9 @@ f_getfd_error(int fd, int *flagp)
 		error = EBADF;
 	else {
 		UF_ENTER(ufp, fip, fd);
-		if ((fp = ufp->uf_file) == NULL)
+		if ((fp = ufp->uf_file) == NULL) {
 			error = EBADF;
-		else {
+		} else {
 			flag = ufp->uf_flag;
 			if ((fp->f_flag & FWRITE) && pr_isself(fp->f_vnode))
 				flag |= FD_CLOEXEC;
@@ -1306,24 +1335,29 @@ f_getfd(int fd)
 
 /*
  * Given a file descriptor and file flags, set the user's file flags.
- * At present, the only valid flag is FD_CLOEXEC.
+ * At present, the only valid flags are FD_CLOEXEC and FD_CLOFORK.
  * getf() may or may not have been called before calling f_setfd_error().
  */
-int
-f_setfd_error(int fd, int flags)
+static int
+f_setfd_int(int fd, int flags, bool or)
 {
 	uf_info_t *fip = P_FINFO(curproc);
 	uf_entry_t *ufp;
 	int error;
 
-	if ((uint_t)fd >= fip->fi_nfiles)
+	if ((uint_t)fd >= fip->fi_nfiles) {
 		error = EBADF;
-	else {
+	} else {
 		UF_ENTER(ufp, fip, fd);
-		if (ufp->uf_file == NULL)
+		if (ufp->uf_file == NULL) {
 			error = EBADF;
-		else {
-			ufp->uf_flag = flags & FD_CLOEXEC;
+		} else {
+			flags &= (FD_CLOEXEC | FD_CLOFORK);
+			if (or) {
+				ufp->uf_flag |= flags;
+			} else {
+				ufp->uf_flag = flags;
+			}
 			error = 0;
 		}
 		UF_EXIT(ufp);
@@ -1331,10 +1365,16 @@ f_setfd_error(int fd, int flags)
 	return (error);
 }
 
-void
-f_setfd(int fd, char flags)
+int
+f_setfd_error(int fd, int flags)
 {
-	(void) f_setfd_error(fd, flags);
+	return (f_setfd_int(fd, flags, false));
+}
+
+void
+f_setfd_or(int fd, short flags)
+{
+	(void) f_setfd_int(fd, flags, true);
 }
 
 #define	BADFD_MIN	3

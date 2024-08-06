@@ -22,6 +22,8 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <security/pam_appl.h>
@@ -59,27 +61,23 @@
 /*
  * pam_sm_authenticate		- Authenticate user
  */
-/*ARGSUSED*/
 int
-pam_sm_authenticate(
-	pam_handle_t		*pamh,
-	int 			flags,
-	int			argc,
-	const char		**argv)
+pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-	char			*user;
-	struct pam_conv 	*pam_convp;
-	int			err, result = PAM_AUTH_ERR;
-	struct pam_response 	*ret_resp = (struct pam_response *)0;
-	char 			messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
-	int			debug = 0;
-	int			try_first_pass = 0;
-	int			use_first_pass = 0;
-	int			first_pass_good = 0;
-	int			first_pass_bad = 0;
-	int			i, num_msg;
-	char			*firstpass, *password;
-	char			the_password[64];
+	const char *user;
+	const struct pam_conv *pam_convp;
+	int err, result = PAM_AUTH_ERR;
+	struct pam_response *ret_resp = (struct pam_response *)0;
+	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	int debug = 0;
+	int try_first_pass = 0;
+	int use_first_pass = 0;
+	int first_pass_good = 0;
+	int first_pass_bad = 0;
+	int i, num_msg;
+	const char *firstpass;
+	char *password;
+	char the_password[64];
 
 	if (debug)
 		syslog(LOG_DEBUG, "Sample Authentication\n");
@@ -114,11 +112,11 @@ pam_sm_authenticate(
 	if (err != PAM_SUCCESS)
 		return (err);
 
-	err = pam_get_item(pamh, PAM_CONV, (void**) &pam_convp);
+	err = pam_get_item(pamh, PAM_CONV, (const void**)&pam_convp);
 	if (err != PAM_SUCCESS)
 		return (err);
 
-	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **) &firstpass);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (const void **)&firstpass);
 
 	if (firstpass && (use_first_pass || try_first_pass)) {
 
