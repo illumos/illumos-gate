@@ -1122,15 +1122,22 @@ amdzen_setup_df_ccm(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *dfe,
 {
 	amdzen_ccm_data_t *ccm = &dfe->adfe_data.aded_ccm;
 	uint32_t ccd_en;
+	boolean_t wide_en;
 
 	if (df->adf_rev >= DF_REV_4) {
 		uint32_t val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
 		    DF_CCD_EN_V4);
 		ccd_en = DF_CCD_EN_V4_GET_CCD_EN(val);
 
-		val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
-		    DF_CCMCFG4_V4);
-		if (DF_CCMCFG4_V4_GET_WIDE_EN(val) != 0 && ccd_en != 0) {
+		if (df->adf_rev == DF_REV_4D2) {
+			wide_en = DF_CCD_EN_V4D2_GET_WIDE_EN(val);
+		} else {
+			val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
+			    DF_CCMCFG4_V4);
+			wide_en = DF_CCMCFG4_V4_GET_WIDE_EN(val);
+		}
+
+		if (wide_en != 0 && ccd_en != 0) {
 			ccd_en = 0x1;
 		}
 	} else {
