@@ -1119,10 +1119,18 @@ typedef enum {
 #define	DF_FICAA_V2		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
 				.drd_func = 4, \
 				.drd_reg = 0x5c }
+#define	DF_FICAA_V2_REG_MASK	0x7fc
 /*CSTYLED*/
 #define	DF_FICAA_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x8c }
+#define	DF_FICAA_V4_REG_MASK	0xffc
+/*
+ * Across all current versions, the register ignores the lower 2 bits.
+ * That is we can only address and encode things in units of 4 bytes.
+ */
+#define	DF_FICAA_REG_SHIFT	2
+
 #define	DF_FICAA_V2_SET_INST(r, v)		bitset32(r, 23, 16, v)
 #define	DF_FICAA_V2_SET_64B(r, v)		bitset32(r, 14, 14, v)
 #define	DF_FICAA_V2_SET_FUNC(r, v)		bitset32(r, 13, 11, v)
@@ -1147,6 +1155,31 @@ typedef enum {
 #define	DF_FICAD_HI_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0xbc}
+
+/*
+ * Check whether a given register definition is valid for the given DF revision.
+ */
+static inline boolean_t
+df_reg_valid(const df_rev_t rev, const df_reg_def_t def)
+{
+	uint16_t mask;
+
+	switch (rev) {
+	case DF_REV_2:
+	case DF_REV_3:
+	case DF_REV_3P5:
+		mask = DF_FICAA_V2_REG_MASK;
+		break;
+	case DF_REV_4:
+	case DF_REV_4D2:
+		mask = DF_FICAA_V4_REG_MASK;
+		break;
+	default:
+		return (B_FALSE);
+	}
+
+	return ((def.drd_gens & rev) == rev && (def.drd_reg & ~mask) == 0);
+}
 
 /*
  * DF::SpecialSysFunctionFabricID1, DF::SpecialSysFunctionFabricID2 -- These
