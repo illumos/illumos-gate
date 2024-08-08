@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -44,7 +45,7 @@ elif [ $rc -ne 0 ]; then
 	msg="WARNING: /sbin/mountall -l failed: exit status $rc"
 	echo $msg
 	echo "$SMF_FMRI:" $msg >/dev/msglog
-	result=$SMF_EXIT_ERR_FATAL
+	result=$SMF_EXIT_MON_DEGRADE
 fi
 rm -f /var/run/fs-local
 
@@ -93,7 +94,7 @@ if [ -x /usr/sbin/zfs ]; then
 		msg="WARNING: /usr/sbin/zfs mount -a failed: exit status $rc"
 		echo $msg
 		echo "$SMF_FMRI:" $msg >/dev/msglog
-		result=$SMF_EXIT_ERR_FATAL
+		result=$SMF_EXIT_MON_DEGRADE
 	fi
 fi
 
@@ -105,7 +106,7 @@ then
 		msg="WARNING: /sbin/mountall -l failed: exit status $rc"
 		echo $msg
 		echo "$SMF_FMRI:" $msg >/dev/msglog
-		result=$SMF_EXIT_ERR_FATAL
+		result=$SMF_EXIT_MON_DEGRADE
 	fi
 fi
 
