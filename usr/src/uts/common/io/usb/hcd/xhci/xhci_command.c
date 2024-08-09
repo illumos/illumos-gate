@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -796,6 +797,7 @@ xhci_command_stop_endpoint(xhci_t *xhcip, xhci_device_t *xd,
 {
 	int ret, code;
 	xhci_command_t co;
+	xhci_endpoint_context_t *epctx;
 
 	VERIFY(xhcip != NULL);
 	VERIFY(xd != NULL);
@@ -822,23 +824,25 @@ xhci_command_stop_endpoint(xhci_t *xhcip, xhci_device_t *xd,
 		ret = USB_CR_TIMEOUT;
 		break;
 	case XHCI_CODE_CONTEXT_STATE:
-	case XHCI_CODE_SLOT_NOT_ON:
-		xhci_log(xhcip, "!xhci stop endpoint command (%d)/slot "
-		    "(%u) in wrong state: %d", xep->xep_num, xd->xd_slot,
-		    code);
-		if (code == XHCI_CODE_CONTEXT_STATE) {
-			xhci_endpoint_context_t *epctx;
-
-			epctx = xd->xd_endout[xep->xep_num];
-			xhci_log(xhcip, "!endpoint is in state %d",
+		/*
+		 * This error occurs if we try to stop an endpoint that was not
+		 * already in the RUNNING state.  We're trying to get to
+		 * STOPPED, so if we were already there we don't need to
+		 * complain about it.
+		 */
+		epctx = xd->xd_endout[xep->xep_num];
+		if (XHCI_EPCTX_STATE(epctx->xec_info) != XHCI_EP_STOPPED) {
+			xhci_log(xhcip, "!stopped endpoint (%d)/slot (%u) in "
+			    "unexpected state %d", xep->xep_num, xd->xd_slot,
 			    XHCI_EPCTX_STATE(epctx->xec_info));
 		}
 		ret = USB_INVALID_CONTEXT;
 		break;
 	default:
 		ret = USB_HC_HARDWARE_ERROR;
-		xhci_log(xhcip, "!unexpected error when resetting enpoint: %d",
-		    code);
+		xhci_log(xhcip, "!unexpected error (%d) when resetting "
+		    "endpoint (%d)/slot (%u)", code,
+		    xep->xep_num, xd->xd_slot);
 		break;
 	}
 
