@@ -3,24 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TYPES.H 3HEAD "Oct 6, 2004"
+.TH TYPES.H 3HEAD "August 16, 2024"
 .SH NAME
 types.h, types \- primitive system data types
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/types.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The data types defined in <\fBsys/types.h\fR> are as follows:
-.SS "32-bit Solaris"
-.sp
-.LP
+.SS "32-bit illumos"
 The data types listed below are defined in <\fBsys/types.h\fR> for 32-bit
-Solaris.
+illumos.
 .sp
 .in +2
 .nf
@@ -55,11 +50,13 @@ typedef    long              pid_t;
 .fi
 .in -2
 
-.SS "64-bit Solaris"
-.sp
 .LP
+Several of the above types are altered by the 32-bit large file
+compilation environment; see the \fBlfcompile\fR(7) man page for
+additional information on that environment.
+.SS "64-bit illumos"
 The data types listed below are defined in <\fBsys/types.h\fR> for 64-bit
-Solaris.
+illumos.
 .sp
 .in +2
 .nf
@@ -71,7 +68,7 @@ typedef     ulong_t     fsblkcnt_t
 typedef     ulong_t     fsfilcnt_t
 typedef     int         gid_t
 typedef     int         id_t
-typedef     long        ino_t
+typedef     ulong_t     ino_t
 typedef     int         key_t
 typedef     uint_t      major_t
 typedef     uint_t      minor_t
@@ -92,8 +89,6 @@ typedef     int         wchar_t
 .in -2
 
 .SS "Preprocessor Symbols"
-.sp
-.LP
 For 32-bit programs, pointers and the C data types \fBint\fR and \fBlong\fR are
 all 32-bit quantities.  For 64-bit programs, pointers and the C data type
 \fBlong\fR are defined as 64-bit quantities.
@@ -223,8 +218,6 @@ expressed in bytes.
 .RE
 
 .SH USAGE
-.sp
-.LP
 The \fBdaddr_t\fR type is used for disk addresses except in an inode on disk.
 Times are encoded in seconds since 00:00:00 UTC, January 1, 1970. The major and
 minor parts of a device code specify kind and unit number of a device and are
@@ -235,9 +228,7 @@ file.
 The \fBlabel_t[\|]\fR types are used to save the processor state while another
 process is running.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUse of preprocessor symbol \fB_LP64\fR.
-.sp
 .LP
 In the following example, the preprocessor symbol \fB_LP64\fR defines sections
 of code that will be compiled only as part of a 64-bit version of the given C
@@ -262,12 +253,7 @@ program.
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -278,8 +264,7 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR types32.h (3HEAD),
 .BR attributes (7),
+.BR lfcompile (7),
 .BR standards (7)
