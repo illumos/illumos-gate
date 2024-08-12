@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -50,9 +51,9 @@ static vmem_t		*eventfd_minor;		/* minor number arena */
 static void		*eventfd_softstate;	/* softstate pointer */
 static eventfd_state_t	*eventfd_state;		/* global list of state */
 
-/*ARGSUSED*/
 static int
-eventfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
+eventfd_open(dev_t *devp, int flag __unused, int otyp __unused,
+    cred_t *cr __unused)
 {
 	eventfd_state_t *state;
 	major_t major = getemajor(*devp);
@@ -83,9 +84,8 @@ eventfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_read(dev_t dev, uio_t *uio, cred_t *cr)
+eventfd_read(dev_t dev, uio_t *uio, cred_t *cr __unused)
 {
 	eventfd_state_t *state;
 	minor_t minor = getminor(dev);
@@ -202,21 +202,20 @@ eventfd_post(eventfd_state_t *state, uint64_t val, boolean_t is_async,
 	mutex_exit(&state->efd_lock);
 
 	/*
-	 * Notify pollers as well if the eventfd has become readable or has
+	 * Notify pollers that something has changed, or that eventfd has
 	 * transitioned into overflow.
 	 */
-	if (oval == 0) {
-		pollwakeup(&state->efd_pollhd, POLLRDNORM | POLLIN);
-	} else if (overflow && val != 0) {
+	if (overflow && val != 0) {
 		pollwakeup(&state->efd_pollhd, POLLERR);
+	} else {
+		pollwakeup(&state->efd_pollhd, POLLRDNORM | POLLIN);
 	}
 
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_write(dev_t dev, struct uio *uio, cred_t *credp)
+eventfd_write(dev_t dev, struct uio *uio, cred_t *cr __unused)
 {
 	eventfd_state_t *state;
 	boolean_t file_nonblock;
@@ -269,9 +268,9 @@ eventfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
+eventfd_ioctl(dev_t dev, int cmd, intptr_t arg __unused, int md __unused,
+    cred_t *cr __unused, int *rv __unused)
 {
 	eventfd_state_t *state;
 	minor_t minor = getminor(dev);
@@ -305,9 +304,9 @@ eventfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	return (ENOTTY);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
+eventfd_close(dev_t dev, int flag __unused, int otyp __unused,
+    cred_t *cr __unused)
 {
 	eventfd_state_t *state, **sp;
 	minor_t minor = getminor(dev);
@@ -380,9 +379,8 @@ eventfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+eventfd_detach(dev_info_t *dip __unused, ddi_detach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_DETACH:
@@ -407,9 +405,9 @@ eventfd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 static int
-eventfd_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+eventfd_info(dev_info_t *dip __unused, ddi_info_cmd_t infocmd,
+    void *arg __unused, void **result)
 {
 	int error;
 

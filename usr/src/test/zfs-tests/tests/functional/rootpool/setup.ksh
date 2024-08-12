@@ -27,8 +27,14 @@
 
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
 
 verify_runnable "global"
+
+if ! is_zfsroot; then
+	log_unsupported "This is not a zfsroot system."
+fi
+log_pass

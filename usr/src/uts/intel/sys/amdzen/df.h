@@ -1027,7 +1027,8 @@ typedef enum {
  * port can be in wide mode where its two SDPs (Scalable Data Ports) are in fact
  * instead connected to a single CCD. If wide mode is enabled in DF::CCMConfig4,
  * then a value of 0x3 just indicates that both SDP ports are connected to a
- * single CCD.
+ * single CCD. For DFv4D2, the wide mode bit is moved from DF::CCMConfig4 to
+ * this register itself.
  *
  * The CCX related fields are only valid when the dense mode is enabled in the
  * global DF controls. If a CPU doesn't support that, then that field is
@@ -1039,6 +1040,7 @@ typedef enum {
 #define	DF_CCD_EN_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x104 }
+#define	DF_CCD_EN_V4D2_GET_WIDE_EN(r)	bitx32(r, 31, 31)
 #define	DF_CCD_EN_V4_GET_CCX_EN(r)	bitx32(r, 17, 16)
 #define	DF_CCD_EN_V4_GET_CCD_EN(r)	bitx32(r, 1, 0)
 
@@ -1100,9 +1102,10 @@ typedef enum {
  * This varies in each DF revision. That is, while we've found it does exist in
  * DFv3, it is at a different address and the bits have rather different
  * meanings. A subset of the bits are defined below based upon our needs.
+ * The wide mode bit is moved to DF::CCDEnable in DFv4D2.
  */
 /*CSTYLED*/
-#define	DF_CCMCFG4_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
+#define	DF_CCMCFG4_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 3, \
 				.drd_reg = 0x510 }
 #define	DF_CCMCFG4_V4_GET_WIDE_EN(r)		bitx32(r, 26, 26)
@@ -1119,10 +1122,18 @@ typedef enum {
 #define	DF_FICAA_V2		(df_reg_def_t){ .drd_gens = DF_REV_ALL_23, \
 				.drd_func = 4, \
 				.drd_reg = 0x5c }
+#define	DF_FICAA_V2_REG_MASK	0x7fc
 /*CSTYLED*/
 #define	DF_FICAA_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0x8c }
+#define	DF_FICAA_V4_REG_MASK	0xffc
+/*
+ * Across all current versions, the register ignores the lower 2 bits.
+ * That is we can only address and encode things in units of 4 bytes.
+ */
+#define	DF_FICAA_REG_SHIFT	2
+
 #define	DF_FICAA_V2_SET_INST(r, v)		bitset32(r, 23, 16, v)
 #define	DF_FICAA_V2_SET_64B(r, v)		bitset32(r, 14, 14, v)
 #define	DF_FICAA_V2_SET_FUNC(r, v)		bitset32(r, 13, 11, v)
@@ -1147,6 +1158,31 @@ typedef enum {
 #define	DF_FICAD_HI_V4		(df_reg_def_t){ .drd_gens = DF_REV_ALL_4, \
 				.drd_func = 4, \
 				.drd_reg = 0xbc}
+
+/*
+ * Check whether a given register definition is valid for the given DF revision.
+ */
+static inline boolean_t
+df_reg_valid(const df_rev_t rev, const df_reg_def_t def)
+{
+	uint16_t mask;
+
+	switch (rev) {
+	case DF_REV_2:
+	case DF_REV_3:
+	case DF_REV_3P5:
+		mask = DF_FICAA_V2_REG_MASK;
+		break;
+	case DF_REV_4:
+	case DF_REV_4D2:
+		mask = DF_FICAA_V4_REG_MASK;
+		break;
+	default:
+		return (B_FALSE);
+	}
+
+	return ((def.drd_gens & rev) == rev && (def.drd_reg & ~mask) == 0);
+}
 
 /*
  * DF::SpecialSysFunctionFabricID1, DF::SpecialSysFunctionFabricID2 -- These

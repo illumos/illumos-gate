@@ -285,9 +285,9 @@ amdzen_df_read_regdef(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def,
 	df_reg_def_t ficad;
 	uint32_t val = 0;
 	df_rev_t df_rev = azn->azn_dfs[0].adf_rev;
+	VERIFY(df_reg_valid(df_rev, def));
 
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	ASSERT3U(def.drd_gens & df_rev, ==, df_rev);
 	val = DF_FICAA_V2_SET_TARG_INST(val, 1);
 	val = DF_FICAA_V2_SET_FUNC(val, def.drd_func);
 	val = DF_FICAA_V2_SET_INST(val, inst);
@@ -299,18 +299,15 @@ amdzen_df_read_regdef(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def,
 	case DF_REV_3P5:
 		ficaa = DF_FICAA_V2;
 		ficad = DF_FICAD_LO_V2;
-		/*
-		 * Both here and in the DFv4 case, the register ignores the
-		 * lower 2 bits. That is we can only address and encode things
-		 * in units of 4 bytes.
-		 */
-		val = DF_FICAA_V2_SET_REG(val, def.drd_reg >> 2);
+		val = DF_FICAA_V2_SET_REG(val, def.drd_reg >>
+		    DF_FICAA_REG_SHIFT);
 		break;
 	case DF_REV_4:
 	case DF_REV_4D2:
 		ficaa = DF_FICAA_V4;
 		ficad = DF_FICAD_LO_V4;
-		val = DF_FICAA_V4_SET_REG(val, def.drd_reg >> 2);
+		val = DF_FICAA_V4_SET_REG(val, def.drd_reg >>
+		    DF_FICAA_REG_SHIFT);
 		break;
 	default:
 		panic("encountered unexpected DF rev: %u", df_rev);
@@ -1125,15 +1122,22 @@ amdzen_setup_df_ccm(amdzen_t *azn, amdzen_df_t *df, amdzen_df_ent_t *dfe,
 {
 	amdzen_ccm_data_t *ccm = &dfe->adfe_data.aded_ccm;
 	uint32_t ccd_en;
+	boolean_t wide_en;
 
 	if (df->adf_rev >= DF_REV_4) {
 		uint32_t val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
 		    DF_CCD_EN_V4);
 		ccd_en = DF_CCD_EN_V4_GET_CCD_EN(val);
 
-		val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
-		    DF_CCMCFG4_V4);
-		if (DF_CCMCFG4_V4_GET_WIDE_EN(val) != 0 && ccd_en != 0) {
+		if (df->adf_rev == DF_REV_4D2) {
+			wide_en = DF_CCD_EN_V4D2_GET_WIDE_EN(val);
+		} else {
+			val = amdzen_df_read32(azn, df, dfe->adfe_inst_id,
+			    DF_CCMCFG4_V4);
+			wide_en = DF_CCMCFG4_V4_GET_WIDE_EN(val);
+		}
+
+		if (wide_en != 0 && ccd_en != 0) {
 			ccd_en = 0x1;
 		}
 	} else {
