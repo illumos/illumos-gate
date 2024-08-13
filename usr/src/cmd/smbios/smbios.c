@@ -668,6 +668,14 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	} else {
 		oprintf(fp, "  Threads Enabled: Unknown\n");
 	}
+
+	/*
+	 * The Socket Type string overlaps with the upgrade string. Only print
+	 * something if we have a valid value.
+	 */
+	if (*p.smbp_socktype != '\0') {
+		str_print(fp, "  Socket Type", p.smbp_socktype);
+	}
 }
 
 static void

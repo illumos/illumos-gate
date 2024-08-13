@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
- * SMBIOS processor tests. We build two main processors:
+ * SMBIOS processor tests. We build three main processors:
  *
  *   1. An early SMBIOS one based on 2.5 that has the initial core count and
  *     related. A modern client should see the current values.
@@ -23,6 +23,7 @@
  *     the processor family. Most of those were 3.x based. We use 3.6 so we can
  *     get the newer threads enabled field. A pre-3.x client should not see the
  *     same core values as something 3.0+.
+ *   3. One based on SMBIOS 3.8 that has the a socket type string listed.
  */
 
 #include <stdlib.h>
@@ -32,6 +33,7 @@
  * Older revisions lengths per the SMBIOS spec.
  */
 #define	SMBIOS_PROC_LEN_25	0x28
+#define	SMBIOS_PROC_LEN_36	0x33
 
 static const char *smbios_proc_sock = "Gideon";
 static const char *smbios_proc_mfg = "Harrow";
@@ -39,6 +41,7 @@ static const char *smbios_proc_vers = "Nona";
 static const char *smbios_proc_serial = "Alecto";
 static const char *smbios_proc_asset = "Matthias";
 static const char *smbios_proc_pn = "Ortus";
+static const char *smbios_proc_st = "Soul";
 static const uint64_t smbios_proc_cpuid = 0x09099090;
 
 /*
@@ -77,8 +80,7 @@ smbios_test_proc_fill(smb_processor_t *proc)
 	proc->smbpr_corecount2 = htole16(0);
 	proc->smbpr_coresenabled2 = htole16(0);
 	proc->smbpr_threadcount2 = htole16(0);
-	proc->smpbr_threaden = htole16(11);
-
+	proc->smbpr_threaden = htole16(11);
 }
 
 boolean_t
@@ -121,8 +123,8 @@ smbios_test_proc_mktable_36(smbios_test_table_t *table)
 	proc.smbpr_coresenabled2 = htole16(0x717);
 	proc.smbpr_threadcount = 0xff;
 	proc.smbpr_threadcount2 = htole16(0x5445);
-	proc.smpbr_threaden = htole16(0x2232);
-	(void) smbios_test_table_append(table, &proc, sizeof (smb_processor_t));
+	proc.smbpr_threaden = htole16(0x2232);
+	(void) smbios_test_table_append(table, &proc, SMBIOS_PROC_LEN_36);
 	smbios_test_table_append_string(table, smbios_proc_sock);
 	smbios_test_table_append_string(table, smbios_proc_mfg);
 	smbios_test_table_append_string(table, smbios_proc_vers);
@@ -135,6 +137,39 @@ smbios_test_proc_mktable_36(smbios_test_table_t *table)
 	return (B_TRUE);
 }
 
+/*
+ * This is basically the 3.6 table, but we also fill in the socket type string.
+ */
+boolean_t
+smbios_test_proc_mktable_38(smbios_test_table_t *table)
+{
+	smb_processor_t proc;
+
+	smbios_test_proc_fill(&proc);
+	proc.smbpr_hdr.smbh_len = sizeof (smb_processor_t);
+	proc.smbpr_family = 0xfe;
+	proc.smbpr_family2 = htole16(SMB_PRF_RV64);
+	proc.smbpr_corecount = 0xff;
+	proc.smbpr_corecount2 = htole16(0x171);
+	proc.smbpr_coresenabled = 0xff;
+	proc.smbpr_coresenabled2 = htole16(0x717);
+	proc.smbpr_threadcount = 0xff;
+	proc.smbpr_threadcount2 = htole16(0x5445);
+	proc.smbpr_threaden = htole16(0x2232);
+	proc.smbpr_socktype = 7;
+	(void) smbios_test_table_append(table, &proc, sizeof (smb_processor_t));
+	smbios_test_table_append_string(table, smbios_proc_sock);
+	smbios_test_table_append_string(table, smbios_proc_mfg);
+	smbios_test_table_append_string(table, smbios_proc_vers);
+	smbios_test_table_append_string(table, smbios_proc_serial);
+	smbios_test_table_append_string(table, smbios_proc_asset);
+	smbios_test_table_append_string(table, smbios_proc_pn);
+	smbios_test_table_append_string(table, smbios_proc_st);
+	smbios_test_table_str_fini(table);
+	smbios_test_table_append_eot(table);
+
+	return (B_TRUE);
+}
 
 /*
  * Verify common fields that'll be true across all tests. Verifying core,
@@ -427,6 +462,42 @@ smbios_test_proc_verify_36_25(smbios_hdl_t *hdl)
 	if (proc.smbp_threadcount != 0xff) {
 		warnx("processor state mismatch, found unexpected thread "
 		    "count: 0x%x",  proc.smbp_threadcount);
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
+
+boolean_t
+smbios_test_proc_verify_38(smbios_hdl_t *hdl)
+{
+	boolean_t ret = B_TRUE;
+	smbios_struct_t sp;
+	smbios_processor_t proc;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_PROCESSOR, &sp) == -1) {
+		warnx("failed to lookup SMBIOS processor: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_processor(hdl, sp.smbstr_id, &proc) == -1) {
+		warnx("failed to get processor: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_proc_verify_36(hdl)) {
+		ret = B_FALSE;
+	}
+
+	if (proc.smbp_socktype == NULL) {
+		warnx("processor state mismatch: found NULL socket type");
+		ret = B_FALSE;
+	} else if (strcmp(proc.smbp_socktype, smbios_proc_st) != 0) {
+		warnx("processor state mismatch: found unexpected socket type: "
+		    "%s", proc.smbp_socktype);
 		ret = B_FALSE;
 	}
 
