@@ -36,9 +36,24 @@ typedef struct tcpsig_sa {
 	ipsa_key_t			ts_key;
 
 	kmutex_t			ts_lock;
-	/* Following protected by ts_lock */
+
+	/* All of the following are protected by ts_lock */
+
+	time_t				ts_addtime;	/* Time added */
+	time_t				ts_usetime;	/* Time of first use */
+	time_t				ts_lastuse;	/* Time of last use */
+	time_t				ts_softexpiretime; /* First soft exp */
+	time_t				ts_hardexpiretime; /* First hard exp */
+
+	/* Configured lifetimes */
+	uint64_t			ts_softaddlt;
+	uint64_t			ts_softuselt;
+	uint64_t			ts_hardaddlt;
+	uint64_t			ts_harduselt;
+
 	uint64_t			ts_refcnt;
 	bool				ts_tombstoned;
+	uint_t				ts_state;
 } tcpsig_sa_t;
 
 typedef struct tcpsig_db {

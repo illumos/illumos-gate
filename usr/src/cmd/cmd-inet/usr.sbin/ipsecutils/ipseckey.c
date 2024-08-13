@@ -598,6 +598,11 @@ static struct toktable tcpkey_tokens[] = {
 	{"authalg",		TOK_AUTHALG,		NEXTNUMSTR},
 	{"authstring",		TOK_AUTHSTR,		NEXTNUMSTR},
 
+	{"soft_addtime",	TOK_SOFT_ADDTIME,	NEXTNUM},
+	{"soft_usetime",	TOK_SOFT_USETIME,	NEXTNUM},
+	{"hard_addtime",	TOK_HARD_ADDTIME,	NEXTNUM},
+	{"hard_usetime",	TOK_HARD_USETIME,	NEXTNUM},
+
 	{NULL,			TOK_UNKNOWN,		NEXTEOF}
 };
 
@@ -2911,11 +2916,14 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		spi = assoc->sadb_sa_spi;
 		free(assoc);
 	} else {
-		if (satype != SADB_X_SATYPE_TCPSIG && spi == 0)
+		if (satype != SADB_X_SATYPE_TCPSIG) {
+			if (spi == 0) {
+				ERROR1(ep, ebuf, gettext(
+				    "Need to define SPI for %s.\n"), thiscmd);
+			}
 			ERROR1(ep, ebuf, gettext(
-			    "Need to define SPI for %s.\n"), thiscmd);
-		ERROR1(ep, ebuf, gettext(
-		    "Need SA parameters for %s.\n"), thiscmd);
+			    "Need SA parameters for %s.\n"), thiscmd);
+		}
 	}
 
 	if (sadb_pair != NULL) {

@@ -17,7 +17,7 @@
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd April 17, 2024
+.Dd August 14, 2024
 .Dt TCPKEY 8
 .Os
 .Sh NAME
@@ -54,7 +54,42 @@ The
 .Nm
 command is used to manually manipulate the
 .Xr tcp 4P
-security association database.
+security association
+.Pq SA
+database.
+.Pp
+TCP SAs are in one of three states:
+.Bl -tag -width indent
+.It Sy mature
+A newly added SA starts in the mature state and will remain there unless it
+is configured with any limits on its lifetime.
+.It Sy dying
+A mature SA which exceeds a soft lifetime limit will transition into the
+.Sy dying
+state.
+This state is informational only; the SA can continue to be used.
+A
+.Sy dying
+SA can be moved back to the
+.Sy mature
+state by updating its lifetime limits via the
+.Ic update
+command, so that they are no longer exceeded.
+A
+.Sy dying
+SA will transition to
+.Sy dead
+and be removed when it is either deleted via a
+.Ic delete
+or
+.Ic flush
+command, or subsequently exceeds a hard lifetime limit.
+.It Sy dead
+An SA which exceeds a hard lifetime limit will transition into the
+.Sy dead
+state, be unavailable for use on any new connections, and be removed from the
+system as soon as it is no longer used by any established TCP session.
+.El
 .Pp
 While the
 .Nm
@@ -74,9 +109,10 @@ end-of-file is reached.
 .Pp
 .Nm
 uses a
-.Dv PF_KEY
+.Xr pf_key 4P
 socket and the message types
 .Dv SADB_ADD ,
+.Dv SADB_UPDATE ,
 .Dv SADB_DELETE ,
 .Dv SADB_GET
 and
@@ -119,24 +155,41 @@ when this flag is turned on.
 .It Fl v
 Verbose.
 Print the messages being sent into the
-.Dv PF_KEY
+.Xr pf_key 4P
 socket, and print raw seconds values for lifetimes.
 .El
 .Sh COMMANDS
 .Bl -tag -width Ds
 .It Ic add
 Add an SA.
-Because it involves the transfer of keying material, it cannot be invoked from
-the shell, lest the keys be visible in
+Because it involves the transfer of keying material, this command and its
+parameters cannot be passed in as arguments to
+.Nm ,
+lest the keys be visible in
 .Xr ps 1
 output.
-It can be used either from the interactive tcpkey> prompt or in a command
-file specified by the
+It can be used either from the interactive
+.Sq tcpkey>
+prompt or in a command file specified by the
 .Fl f
 option.
 The
 .Ic add
 command accepts all extension-value pairs described below.
+.It Ic update
+Update SA lifetime extensions.
+Like
+.Ic add
+this command can only be used either from the interactive
+.Sq tcpkey>
+prompt or in a command file specified by the
+.Fl f
+option.
+The
+.Ic update
+command accepts all extension-value pairs described below with the exception
+of those used to configure algorithm or keying material, which cannot be
+changed once an SA is established.
 .It Ic delete
 Delete a specific SA.
 This command requires the
@@ -146,7 +199,7 @@ extension, and the
 extension.
 If the SA is in use, it will be marked for deletion and no longer used for new
 connection setup.
-However, existing connections will continue to use it.
+Existing connections will however continue to use it until they are closed.
 .It Ic get
 Look up and display a security association.
 Like
@@ -206,6 +259,56 @@ Authentication string.
 Only ASCII characters are supported and the authentication string must be no
 longer than 80 characters.
 .El
+.Pp
+The next four extensions are lifetime extensions.
+There are two varieties,
+.Dq hard
+and
+.Dq soft .
+If a hard lifetime expires, the SA will be deleted automatically by the system,
+or marked for deletion and no longer used for new connection setup if it is
+in use.
+Existing connections will continue to use the SA until they are closed.
+If a soft lifetime expires, its state is downgraded to dying from mature.
+In either case, an
+.Dv SADB_EXPIRE
+message will be queued by the system and transmitted upstream on the
+.Xr pf_key 4P
+socket the next time a downstream command is received.
+The
+.Xr ipseckey 8
+.Ic monitor
+command to key allows you to view
+.Dv SADB_EXPIRE
+messages.
+.Pp
+.Bl -tag -width xxxxxxxxxxxxxxxxxxxx -compact
+.It Cm soft_addtime
+.It Cm hard_addtime
+Specifies the number of seconds that this SA can exist after being added.
+Updating an SA does not reset the initial time that it was added.
+If the system clock has been altered since the SA was established, you may need
+to adjust the specified duration to achieve the desired outcome.
+If this extension is not present, the default value is zero, which means the SA
+will not expire based on how long it has been since it was added.
+This extension is used by the
+.Ic add
+and
+.Ic update
+commands.
+.It Cm soft_usetime
+.It Cm hard_usetime
+Specifies the number of seconds this SA can exist after first being used.
+If the system clock has been altered since the SA was first used, you may need
+to adjust the specified duration to achieve the desired outcome.
+If this extension is not present, the default value is zero, which means the SA
+will not expire based on how long it has been since it was first used.
+This extension is used by the
+.Ic add
+and
+.Ic update
+commands.
+.El
 .Sh FILES
 .Bl -tag -width Ds
 .It Pa /etc/inet/secret/tcpkeys
@@ -259,4 +362,5 @@ is
 and may change at any time.
 .Sh SEE ALSO
 .Xr ps 1 ,
+.Xr pf_key 4P ,
 .Xr ipseckey 8
