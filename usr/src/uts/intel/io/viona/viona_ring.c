@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 
@@ -98,6 +98,7 @@ typedef struct vq_held_region vq_held_region_t;
 static bool viona_ring_map(viona_vring_t *, bool);
 static void viona_ring_unmap(viona_vring_t *);
 static kthread_t *viona_create_worker(viona_vring_t *);
+static void viona_ring_consolidate_stats(viona_vring_t *);
 
 static vmm_page_t *
 vq_page_hold(viona_vring_t *ring, uint64_t gpa, bool writable)
@@ -337,6 +338,7 @@ viona_ring_init(viona_link_t *link, uint16_t idx,
 
 	/* Clear the stats */
 	bzero(&ring->vr_stats, sizeof (ring->vr_stats));
+	bzero(&ring->vr_err_stats, sizeof (ring->vr_err_stats));
 
 	t = viona_create_worker(ring);
 	if (t == NULL) {
@@ -730,6 +732,12 @@ ring_init:
 
 	VERIFY3U(ring->vr_state, ==, VRS_STOP);
 	VERIFY3U(ring->vr_xfer_outstanding, ==, 0);
+
+	/*
+	 * Consolidate stats data so that it is not lost if/when this ring is
+	 * being stopped.
+	 */
+	viona_ring_consolidate_stats(ring);
 
 	/* Respond to a pause request if the ring is not required to stop */
 	if (vring_pause_req(ring)) {
@@ -1162,4 +1170,50 @@ viona_ring_num_avail(viona_vring_t *ring)
 	    viona_ring_addr(ring, LEGACY_AVAIL_IDX_OFF(ring->vr_size));
 
 	return (*avail_idx - ring->vr_cur_aidx);
+}
+
+/* Record a successfully transferred packet for the ring stats */
+void
+viona_ring_stat_accept(viona_vring_t *ring, uint32_t len)
+{
+	atomic_inc_64(&ring->vr_stats.vts_packets);
+	atomic_add_64(&ring->vr_stats.vts_bytes, len);
+}
+
+/*
+ * Record a dropped packet in the ring stats
+ */
+void
+viona_ring_stat_drop(viona_vring_t *ring)
+{
+	atomic_inc_64(&ring->vr_stats.vts_drops);
+}
+
+/*
+ * Record a packet transfer error in the ring stats
+ */
+void
+viona_ring_stat_error(viona_vring_t *ring)
+{
+	atomic_inc_64(&ring->vr_stats.vts_errors);
+}
+
+/*
+ * Consolidate statistic data for this ring into the totals for the link
+ */
+static void
+viona_ring_consolidate_stats(viona_vring_t *ring)
+{
+	viona_link_t *link = ring->vr_link;
+	struct viona_transfer_stats *lstat =
+	    (ring == &link->l_vrings[VIONA_VQ_RX]) ?
+	    &link->l_stats.vls_rx : &link->l_stats.vls_tx;
+
+	mutex_enter(&link->l_stats_lock);
+	lstat->vts_packets += ring->vr_stats.vts_packets;
+	lstat->vts_bytes += ring->vr_stats.vts_bytes;
+	lstat->vts_drops += ring->vr_stats.vts_drops;
+	lstat->vts_errors += ring->vr_stats.vts_errors;
+	bzero(&ring->vr_stats, sizeof (ring->vr_stats));
+	mutex_exit(&link->l_stats_lock);
 }

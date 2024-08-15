@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2022 Michael Zeller
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -600,12 +600,20 @@ pad_drop:
 			if (err == ENOSPC) {
 				mp->b_next = next;
 				break;
+			} else {
+				/*
+				 * Cases other than the ring being empty of
+				 * available descriptors count as errors for the
+				 * ring/link stats.
+				 */
+				viona_ring_stat_error(ring);
 			}
 		} else {
 			/* Chain successful mblks to be freed later */
 			*mprx_prevp = mp;
 			mprx_prevp = &mp->b_next;
 			nrx++;
+			viona_ring_stat_accept(ring, size);
 		}
 		mp = next;
 	}
@@ -627,6 +635,7 @@ pad_drop:
 		freemsg(mp);
 		mp = next;
 		ndrop++;
+		viona_ring_stat_drop(ring);
 	}
 	VIONA_PROBE3(rx, viona_link_t *, link, size_t, nrx, size_t, ndrop);
 }

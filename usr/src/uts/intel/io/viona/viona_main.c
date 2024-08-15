@@ -36,7 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -240,6 +240,28 @@
  * viona instances for a given netstack, and the unregistration for a netstack
  * instance occurs after all viona instances of the netstack instance have
  * been deleted.
+ *
+ * ------------------
+ * Metrics/Statistics
+ * -----------------
+ *
+ * During operation, Viona tracks certain metrics as certain events occur.
+ *
+ * One class of metrics, known as the "error stats", refer to abnormal
+ * conditions in ring processing which are likely the fault of a misbehaving
+ * guest.  These are tracked on a per-ring basis, and are not formally exposed
+ * to any consumer besides direct memory access through mdb.
+ *
+ * The other class of metrics tracked for an instance are the "transfer stats",
+ * which are the traditional packets/bytes/errors/drops figures.  These are
+ * counted per-ring, and then aggregated into link-wide values exposed via
+ * kstats.  Atomic operations are used to increment those per-ring stats during
+ * operation, and then when a ring is stopped, the values are consolidated into
+ * the link-wide values (to prevent loss when the ring is zeroed) under the
+ * protection of viona_link`l_stats_lock.  When the kstats are being updated,
+ * l_stats_lock is held to protect against a racing consolidation, with the
+ * existing per-ring values being added in at update time to provide an accurate
+ * figure.
  */
 
 #include <sys/conf.h>
@@ -254,7 +276,9 @@
 
 #define	VIONA_NAME		"Virtio Network Accelerator"
 #define	VIONA_CTL_MINOR		0
-#define	VIONA_CLI_NAME		"viona"		/* MAC client name */
+#define	VIONA_MODULE_NAME	"viona"
+#define	VIONA_KSTAT_CLASS	"misc"
+#define	VIONA_KSTAT_NAME	"viona_stat"
 
 
 /*
@@ -496,6 +520,7 @@ viona_open(dev_t *devp, int flag, int otype, cred_t *credp)
 
 	ss = ddi_get_soft_state(viona_state, minor);
 	mutex_init(&ss->ss_lock, NULL, MUTEX_DEFAULT, NULL);
+	ss->ss_minor = minor;
 	*devp = makedevice(getmajor(*devp), minor);
 
 	return (0);
@@ -696,6 +721,107 @@ viona_get_mac_capab(viona_link_t *link)
 }
 
 static int
+viona_kstat_update(kstat_t *ksp, int rw)
+{
+	viona_link_t *link = ksp->ks_private;
+	viona_kstats_t *vk = ksp->ks_data;
+
+	/*
+	 * Avoid the potential for mangled values due to a racing consolidation
+	 * of stats for a ring by performing the kstat update with l_stats_lock
+	 * held while adding up the central (link) and ring values.
+	 */
+	mutex_enter(&link->l_stats_lock);
+
+	const viona_transfer_stats_t *ring_stats =
+	    &link->l_vrings[VIONA_VQ_RX].vr_stats;
+	const viona_transfer_stats_t *link_stats = &link->l_stats.vls_rx;
+
+	vk->vk_rx_packets.value.ui64 =
+	    link_stats->vts_packets + ring_stats->vts_packets;
+	vk->vk_rx_bytes.value.ui64 =
+	    link_stats->vts_bytes + ring_stats->vts_bytes;
+	vk->vk_rx_errors.value.ui64 =
+	    link_stats->vts_errors + ring_stats->vts_errors;
+	vk->vk_rx_drops.value.ui64 =
+	    link_stats->vts_drops + ring_stats->vts_drops;
+
+	ring_stats = &link->l_vrings[VIONA_VQ_TX].vr_stats;
+	link_stats = &link->l_stats.vls_tx;
+
+	vk->vk_tx_packets.value.ui64 =
+	    link_stats->vts_packets + ring_stats->vts_packets;
+	vk->vk_tx_bytes.value.ui64 =
+	    link_stats->vts_bytes + ring_stats->vts_bytes;
+	vk->vk_tx_errors.value.ui64 =
+	    link_stats->vts_errors + ring_stats->vts_errors;
+	vk->vk_tx_drops.value.ui64 =
+	    link_stats->vts_drops + ring_stats->vts_drops;
+
+	mutex_exit(&link->l_stats_lock);
+
+	return (0);
+}
+
+static int
+viona_kstat_init(viona_soft_state_t *ss, const cred_t *cr)
+{
+	zoneid_t zid = crgetzoneid(cr);
+	kstat_t *ksp;
+
+	ASSERT(MUTEX_HELD(&ss->ss_lock));
+	ASSERT3P(ss->ss_kstat, ==, NULL);
+
+	ksp = kstat_create_zone(VIONA_MODULE_NAME, ss->ss_minor,
+	    VIONA_KSTAT_NAME, VIONA_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+	    sizeof (viona_kstats_t) / sizeof (kstat_named_t), 0, zid);
+
+	if (ksp == NULL) {
+		/*
+		 * Without detail from kstat_create_zone(), assume that resource
+		 * exhaustion is to blame for the failure.
+		 */
+		return (ENOMEM);
+	}
+	ss->ss_kstat = ksp;
+
+	/*
+	 * If this instance is associated with a non-global zone, make its
+	 * kstats visible from the GZ.
+	 */
+	if (zid != GLOBAL_ZONEID) {
+		kstat_zone_add(ss->ss_kstat, GLOBAL_ZONEID);
+	}
+
+	viona_kstats_t *vk = ksp->ks_data;
+
+	kstat_named_init(&vk->vk_rx_packets, "rx_packets", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_rx_bytes, "rx_bytes", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_rx_errors, "rx_errors", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_rx_drops, "rx_drops", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_tx_packets, "tx_packets", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_tx_bytes, "tx_bytes", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_tx_errors, "tx_errors", KSTAT_DATA_UINT64);
+	kstat_named_init(&vk->vk_tx_drops, "tx_drops", KSTAT_DATA_UINT64);
+	ksp->ks_private = ss->ss_link;
+	ksp->ks_update = viona_kstat_update;
+
+	kstat_install(ss->ss_kstat);
+	return (0);
+}
+
+static void
+viona_kstat_fini(viona_soft_state_t *ss)
+{
+	ASSERT(MUTEX_HELD(&ss->ss_lock));
+
+	if (ss->ss_kstat != NULL) {
+		kstat_delete(ss->ss_kstat);
+		ss->ss_kstat = NULL;
+	}
+}
+
+static int
 viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 {
 	vioc_create_t	kvc;
@@ -707,6 +833,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	viona_neti_t	*nip = NULL;
 	zoneid_t	zid;
 	mac_diag_t	mac_diag = MAC_DIAG_NONE;
+	boolean_t	rings_allocd = B_FALSE;
 
 	ASSERT(MUTEX_NOT_HELD(&ss->ss_lock));
 
@@ -753,7 +880,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 
 	viona_get_mac_capab(link);
 
-	(void) snprintf(cli_name, sizeof (cli_name), "%s-%d", VIONA_CLI_NAME,
+	(void) snprintf(cli_name, sizeof (cli_name), "%s-%d", VIONA_MODULE_NAME,
 	    link->l_linkid);
 	err = mac_client_open(link->l_mh, &link->l_mch, cli_name, 0);
 	if (err != 0) {
@@ -768,6 +895,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 
 	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_RX]);
 	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_TX]);
+	rings_allocd = B_TRUE;
 
 	/*
 	 * Default to passing up all multicast traffic in addition to
@@ -777,14 +905,16 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	 */
 	link->l_promisc = VIONA_PROMISC_MULTI;
 	if ((err = viona_rx_set(link, link->l_promisc)) != 0) {
-		viona_rx_clear(link);
-		viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
-		viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
 		goto bail;
 	}
 
 	link->l_neti = nip;
 	ss->ss_link = link;
+
+	if ((err = viona_kstat_init(ss, cr)) != 0) {
+		goto bail;
+	}
+
 	mutex_exit(&ss->ss_lock);
 
 	mutex_enter(&nip->vni_lock);
@@ -795,6 +925,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 
 bail:
 	if (link != NULL) {
+		viona_rx_clear(link);
 		if (link->l_mch != NULL) {
 			if (link->l_muh != NULL) {
 				VERIFY0(mac_unicast_remove(link->l_mch,
@@ -806,7 +937,12 @@ bail:
 		if (link->l_mh != NULL) {
 			mac_close(link->l_mh);
 		}
+		if (rings_allocd) {
+			viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
+			viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
+		}
 		kmem_free(link, sizeof (viona_link_t));
+		ss->ss_link = NULL;
 	}
 	if (hold != NULL) {
 		vmm_drv_rele(hold);
@@ -862,6 +998,7 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 	VERIFY0(viona_ring_reset(&link->l_vrings[VIONA_VQ_TX], B_FALSE));
 
 	mutex_enter(&ss->ss_lock);
+	viona_kstat_fini(ss);
 	if (link->l_mch != NULL) {
 		/* Unhook the receive callbacks and close out the client */
 		viona_rx_clear(link);
