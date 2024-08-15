@@ -1897,7 +1897,8 @@ dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
 file path=opt/util-tests/tests/sleep/sleep.d mode=0444
 file path=opt/util-tests/tests/sleep/sleeptest mode=0555
-file path=opt/util-tests/tests/smbios mode=0555
+file path=opt/util-tests/tests/smbios.32 mode=0555
+file path=opt/util-tests/tests/smbios.64 mode=0555
 file path=opt/util-tests/tests/svr4pkg_test mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
