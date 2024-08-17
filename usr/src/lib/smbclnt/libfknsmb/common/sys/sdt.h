@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _SYS_SDT_H
@@ -41,9 +42,9 @@ extern "C" {
  */
 #ifndef	_KERNEL
 
-extern void smb_dtrace1(const char *, long);
-extern void smb_dtrace2(const char *, long, long);
-extern void smb_dtrace3(const char *, long, long, long);
+extern void fknsmb_dtrace1(const char *, long);
+extern void fknsmb_dtrace2(const char *, long, long);
+extern void fknsmb_dtrace3(const char *, long, long, long);
 
 /*
  * These are for the few (specialized) dtrace SDT probes sprinkled
@@ -52,15 +53,15 @@ extern void smb_dtrace3(const char *, long, long, long);
 
 #undef	DTRACE_PROBE1
 #define	DTRACE_PROBE1(n, t1, a1) \
-	smb_dtrace1(#n, (long)a1)
+	fknsmb_dtrace1(#n, (long)a1)
 
 #undef	DTRACE_PROBE2
 #define	DTRACE_PROBE2(n, t1, a1, t2, a2) \
-	smb_dtrace2(#n, (long)a1, (long)a2)
+	fknsmb_dtrace2(#n, (long)a1, (long)a2)
 
 #undef	DTRACE_PROBE3
 #define	DTRACE_PROBE3(n, t1, a1, t2, a2, t3, a3) \
-	smb_dtrace3(#n, (long)a1, (long)a2, (long)a3)
+	fknsmb_dtrace3(#n, (long)a1, (long)a2, (long)a3)
 
 #endif	/* _KERNEL */
 

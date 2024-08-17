@@ -11,8 +11,10 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
+#include <string.h>
 #include <sys/cmn_err.h>
 #include <sys/sdt.h>
 
@@ -23,8 +25,12 @@
 int fknsmb_dtrace_log = 0;
 
 void
-smb_dtrace1(const char *n, long v1)
+fknsmb_dtrace1(const char *n, long v1)
 {
+	if (strcmp(n, "vn__hold") == 0 ||
+	    strcmp(n, "vn__rele") == 0)
+		return;
+
 	if (fknsmb_dtrace_log) {
 		cmn_err(CE_CONT, "dtrace1: %s,"
 		    " 0x%lx\n", n, v1);
@@ -32,7 +38,7 @@ smb_dtrace1(const char *n, long v1)
 }
 
 void
-smb_dtrace2(const char *n, long v1, long v2)
+fknsmb_dtrace2(const char *n, long v1, long v2)
 {
 	if (fknsmb_dtrace_log) {
 		cmn_err(CE_CONT, "dtrace2: %s,"
@@ -41,7 +47,7 @@ smb_dtrace2(const char *n, long v1, long v2)
 }
 
 void
-smb_dtrace3(const char *n, long v1, long v2, long v3)
+fknsmb_dtrace3(const char *n, long v1, long v2, long v3)
 {
 	if (fknsmb_dtrace_log) {
 		cmn_err(CE_CONT, "dtrace3: %s,"
