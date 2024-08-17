@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -78,16 +79,12 @@ function set_dumpsize
 		return 1
 	fi
 
-	log_must zfs set volsize=64m $volume
+	output=$(dumpadm -epH)
 
-	output=$(dumpadm -d /dev/zvol/dsk/$volume 2>&1 | \
-			tail -1 | awk '{print $3}')
+	(( output = ceil(output / 1024.0 / 1024.0) ))
+	(( output = output + output / 5 ))
+	log_must zfs set volsize=${output}m $volume
 
-	if [[ -n $output ]]; then
-		(( output = output / 1024 / 1024 ))
-		(( output = output + output / 5 ))
-		log_must zfs set volsize=${output}m $volume
-	fi
 	return 0
 }
 
