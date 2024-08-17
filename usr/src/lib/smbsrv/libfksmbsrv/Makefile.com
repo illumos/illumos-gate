@@ -23,10 +23,9 @@
 # Use is subject to license terms.
 #
 # Copyright 2014-2021 Tintri by DDN, Inc. All rights reserved.
-#
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020-2024 RackTop Systems, Inc.
 #
-# Copyright 2020 RackTop Systems, Inc.
 
 LIBRARY =	libfksmbsrv.a
 VERS =		.1
@@ -189,6 +188,7 @@ OBJS_CMN_SMBSRV = \
 
 OBJS_MISC = \
 		acl_common.o \
+		avl.o \
 		pathname.o \
 		refstr.o \
 		smb_status2winerr.o \
@@ -226,7 +226,7 @@ INCS += -I$(SRC)/common
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lfakekernel -lidmap -lcmdutils
-LDLIBS +=	-lavl -lnvpair -lnsl -lpkcs11 -lreparse -lc
+LDLIBS +=	-lnvpair -lnsl -lpkcs11 -lreparse -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT -D_FAKE_KERNEL
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
@@ -250,6 +250,11 @@ pics/%.o:	$(SRC)/uts/common/fs/smbsrv/%.c
 
 pics/acl_common.o:	   $(SRC)/common/acl/acl_common.c
 	$(COMPILE.c) -o $@ $(SRC)/common/acl/acl_common.c
+	$(POST_PROCESS_O)
+
+# build avl instead of using -lavl so we get debugging
+pics/avl.o:	   $(SRC)/common/avl/avl.c
+	$(COMPILE.c) -o $@ $(SRC)/common/avl/avl.c
 	$(POST_PROCESS_O)
 
 pics/pathname.o:	   $(SRC)/uts/common/fs/pathname.c

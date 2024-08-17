@@ -11,10 +11,15 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _VNCACHE_H
 #define	_VNCACHE_H
+
+/*
+ * Declarations for thigns in vncache.c
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,8 +29,11 @@ struct stat;
 vnode_t *vncache_lookup(struct stat *);
 vnode_t *vncache_enter(struct stat *, vnode_t *, char *, int);
 void	vncache_renamed(vnode_t *, vnode_t *, char *);
-void 	vncache_inactive(vnode_t *);
-int 	vncache_cmp(const void *, const void *);
+void	vncache_inactive(vnode_t *);
+int	vncache_cmp(const vnode_t *, const vnode_t *);
+
+int	vncache_getfd(vnode_t *);
+void	vncache_setfd(vnode_t *, int);
 
 int vncache_init(void);
 void vncache_fini(void);
