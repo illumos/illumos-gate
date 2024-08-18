@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
+ *	  All Rights Reserved
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 MNX Cloud, Inc.
  */
-
-/*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -43,6 +43,7 @@
 #include <sys/fs/pc_dir.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
+#include <sys/dkio.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -211,16 +212,29 @@ fstyp_mod_dump(fstyp_mod_handle_t handle, FILE *fout, FILE *ferr)
 static int
 read_bootsec(fstyp_pcfs_t *h)
 {
-	char 	buf[PC_SECSIZE];
+	struct dk_minfo dkminfo;
+	char  *buf;
+	size_t size = PC_SECSIZE;
+
+	if (ioctl(h->fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		if (dkminfo.dki_lbsize != 0)
+			size = dkminfo.dki_lbsize;
+	}
+
+	buf = malloc(size);
+	if (buf == NULL)
+		return (FSTYP_ERR_NOMEM);
 
 	(void) lseek(h->fd, h->offset, SEEK_SET);
-	if (read(h->fd, buf, sizeof (buf)) != sizeof (buf)) {
+	if (read(h->fd, buf, size) != (ssize_t)size) {
+		free(buf);
 		return (FSTYP_ERR_IO);
 	}
 
 	bcopy(buf, &h->bs, sizeof (h->bs));
 	bcopy(buf + sizeof (struct bootsec), &h->bs16, sizeof (h->bs16));
 	bcopy(buf + sizeof (struct bootsec), &h->bs32, sizeof (h->bs32));
+	free(buf);
 
 	h->bs.fatsec = ltohs(h->bs.fatsec);
 	h->bs.spt = ltohs(h->bs.spt);
@@ -310,10 +324,12 @@ calculate_parameters(fstyp_pcfs_t *h)
 static void
 determine_fattype(fstyp_pcfs_t *h)
 {
-	if ((h->CountOfClusters >= 4085 && h->CountOfClusters <= 4095) ||
-	    (h->CountOfClusters >= 65525 && h->CountOfClusters <= 65535)) {
+	if (h->CountOfClusters == 0) {
 		h->fattype = 0;
-	} else if (h->CountOfClusters < 4085) {
+		return;
+	}
+
+	if (h->CountOfClusters < 4085) {
 		h->fattype = 12;
 	} else if (h->CountOfClusters < 65525) {
 		h->fattype = 16;
@@ -500,10 +516,17 @@ is_pcfs(fstyp_pcfs_t *h)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
-dumpfs(fstyp_pcfs_t *h, FILE *fout, FILE *ferr)
+dumpfs(fstyp_pcfs_t *h, FILE *fout, FILE *ferr __unused)
 {
+	/*
+	 * If fat type was not detected, then the other data is
+	 * likely bogus.
+	 */
+	if (h->fattype == 0)
+		return (FSTYP_ERR_NO_MATCH);
+
+	(void) fprintf(fout, "Filesystem type: FAT%d\n", h->fattype);
 	(void) fprintf(fout,
 	    "Bytes Per Sector  %d\t\tSectors Per Cluster    %d\n",
 	    h->bps, h->bs.spcl);
@@ -512,10 +535,10 @@ dumpfs(fstyp_pcfs_t *h, FILE *fout, FILE *ferr)
 	    (unsigned short)PC_RESSEC(h), h->bs.nfat);
 	(void) fprintf(fout,
 	    "Root Dir Entries  %d\t\tNumber of Sectors      %d\n",
-	    (unsigned short)PC_NROOTENT(h), (unsigned short)PC_NSEC(h));
+	    (unsigned short)PC_NROOTENT(h), h->TotSec);
 	(void) fprintf(fout,
 	    "Sectors Per FAT   %d\t\tSectors Per Track      %d\n",
-	    h->bs.fatsec, h->bs.spt);
+	    h->FATSz, h->bs.spt);
 	(void) fprintf(fout,
 	    "Number of Heads   %d\t\tNumber Hidden Sectors  %d\n",
 	    h->bs.nhead, h->bs.hiddensec);
