@@ -11,13 +11,20 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 LIBRARY =	libjedec.a
 VERS =		.1
-OBJECTS =	libjedec.o libjedec_spd.o libjedec_spd_ddr4.o bitext.o \
-		libjedec_spd_ddr5.o libjedec_temp.o
+OBJECTS =	libjedec.o \
+		libjedec_spd.o \
+		libjedec_spd_ddr3.o \
+		libjedec_spd_ddr4.o \
+		libjedec_spd_ddr5.o \
+		libjedec_spd_lp4.o \
+		libjedec_spd_lp5.o \
+		libjedec_temp.o \
+		bitext.o
 
 include ../../Makefile.lib
 

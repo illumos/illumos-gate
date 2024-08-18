@@ -1,0 +1,67 @@
+#
+# Micron MT53D1024M32D4 faked up SPD data. LPDDR4/X parts generally have
+# no distinct SPD data and instead someone enters the timing parameters
+# manually into a system memory controller. As such, we manually went
+# through the datasheet for this and tried to make up SPD data that
+# seemed useful enough and exercise our parsing code.
+#
+# The following times were taken across Table 112: Refresh Requirement
+# Parameters, Table 197: Core Timing Parameters, and related. We used
+# this at the speed 4267 Mt/s with the 16 Gb density devices. The MTB is
+# 125ps and the FTB is 1ps. While the datasheet takes the basic LPDDR4
+# 100ns value for tCKAVG_max, that doesn't fit in the actual value.
+# Instead we use the SPD spec's approximate value 0xc just to have
+# something that fits. We were unable to find a tAA value so it was just
+# set to 0x23 arbitrarily.
+#
+#					MTB	FTB	2FTB
+# tCKAVG_min		468ps		0x04	-32	0xe0
+# tCKAVG_max		1.5ns		0x0c
+# tAA					0x23
+# tRCD			18ns		0x90
+# tRPab			21ns		0xa8
+# tRPpb			18ns		0x90
+# tRFCab		380ns		0xbe0
+# tRFCpb		190ns		0x5f0
+# tWR			18ns		0x90
+# tWTR			10ns		0x50
+# tRRD			7.5ns		0x3c
+# tPPD			4 tCK(AVG)
+# tFAW			30ns		0xf0
+# tESCKE		1.75ns
+# tCCD			8 tCK(AVG)
+# tRTP			7.5ns		0x3c
+#
+0000: 23 11 10 0E 17 21 34 18 00 40 00 00 0A 01 00 00
+0010: 88 00 04 0C 00 00 40 00 23 00 90 A8 90 E0 0B F0
+0020: 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0030: 00 00 00 00 00 00 00 00 00 00 00 00 01 21 01 21
+0040: 02 22 02 22 00 00 00 00 00 00 00 00 00 00 00 00
+0050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0060: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0070: 00 00 00 00 00 00 00 00 00 00 00 00 00 E0 65 CD
+0080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00A0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00B0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00C0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00D0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00E0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00F0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0100: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0110: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0120: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0130: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0140: 80 2C 42 AA BB 10 01 02 20 4D 54 35 33 44 31 30
+0150: 32 34 4D 33 32 44 34 20 20 20 20 20 20 2B 00 2C
+0160: B2 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0170: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0180: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0190: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01A0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01B0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01C0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01D0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01E0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01F0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00

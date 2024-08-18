@@ -24,7 +24,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -397,6 +397,7 @@ usr/src/test/util-tests/tests/grep_xpg4/files/gout*
 usr/src/test/util-tests/tests/grep_xpg4/files/test*
 usr/src/test/util-tests/tests/head/*.in
 usr/src/test/util-tests/tests/head/*.out
+usr/src/test/util-tests/tests/libjedec/hex2spd/data/*/*.spd
 usr/src/test/util-tests/tests/libsff/*.out
 usr/src/test/util-tests/tests/pcieadm/*.out
 usr/src/test/util-tests/tests/pcieadm/*.pci

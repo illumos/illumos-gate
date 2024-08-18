@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -102,6 +102,10 @@ topo_dimm_temp2str(uint32_t val)
 		return ("TS5111");
 	case SPD_TEMP_T_TS5110:
 		return ("TS5110");
+	case SPD_TEMP_T_TS5210:
+		return ("TS5210");
+	case SPD_TEMP_T_TS5211:
+		return ("TS5211");
 	default:
 		return ("unknown");
 	}
@@ -117,6 +121,14 @@ topo_dimm_pmic2str(uint32_t val)
 		return ("PMIC5010");
 	case SPD_PMIC_T_PMIC5100:
 		return ("PMIC5100");
+	case SPD_PMIC_T_PMIC5020:
+		return ("PMIC5020");
+	case SPD_PMIC_T_PMIC5120:
+		return ("PMIC5120");
+	case SPD_PMIC_T_PMIC5200:
+		return ("PMIC5200");
+	case SPD_PMIC_T_PMIC5030:
+		return ("PMIC5030");
 	default:
 		return ("unknown");
 	}
@@ -149,6 +161,10 @@ topo_dimm_rcd2str(uint32_t val)
 		return ("DDR5RCD02");
 	case SPD_RCD_T_DDR5RCD03:
 		return ("DDR5RCD03");
+	case SPD_RCD_T_DDR5RCD04:
+		return ("DDR5RCD04");
+	case SPD_RCD_T_DDR5RCD05:
+		return ("DDR5RCD05");
 	default:
 		return ("unknown");
 	}
@@ -166,6 +182,8 @@ topo_dimm_db2str(uint32_t val)
 		return ("DDR5DB01");
 	case SPD_DB_T_DDR5DB02:
 		return ("DDR5DB02");
+	case SPD_DB_T_DDR3MB:
+		return ("DDR3MB");
 	default:
 		return ("unknown");
 	}
@@ -177,6 +195,8 @@ topo_dimm_mrcd2str(uint32_t val)
 	switch (val) {
 	case SPD_MRCD_T_DDR5MRCD01:
 		return ("DDR5MRCD01");
+	case SPD_MRCD_T_DDR5MRCD02:
+		return ("DDR5MRCD02");
 	default:
 		return ("unknown");
 	}
@@ -188,6 +208,8 @@ topo_dimm_mdb2str(uint32_t val)
 	switch (val) {
 	case SPD_MDB_T_DDR5MDB01:
 		return ("DDR5MDB01");
+	case SPD_MDB_T_DDR5MDB02:
+		return ("DDR5MDB02");
 	default:
 		return ("unknown");
 	}
@@ -208,6 +230,8 @@ static const char *
 topo_dimm_spd2str(uint32_t val)
 {
 	switch (val) {
+	case SPD_SPD_T_EE1002:
+		return ("EE1002");
 	case SPD_SPD_T_EE1004:
 		return ("EE1004");
 	case SPD_SPD_T_SPD5118:
@@ -259,14 +283,28 @@ topo_dimm_mod_type2str(spd_module_type_t type)
 		return ("Mini-RDIMM");
 	case SPD_MOD_TYPE_MINI_UDIMM:
 		return ("Mini-UDIMM");
+	case SPD_MOD_TYPE_MINI_CDIMM:
+		return ("Mini-CDIMM");
 	case SPD_MOD_TYPE_72b_SO_RDIMM:
 		return ("72b-SO-RDIMM");
 	case SPD_MOD_TYPE_72b_SO_UDIMM:
 		return ("72b-SO-UDIMM");
+	case SPD_MOD_TYPE_72b_SO_CDIMM:
+		return ("72b-SO-CDIMM");
 	case SPD_MOD_TYPE_16b_SO_DIMM:
 		return ("16b-SO-DIMM");
 	case SPD_MOD_TYPE_32b_SO_DIMM:
 		return ("32b-SO-DIMM");
+	case SPD_MOD_TYPE_CUDIMM:
+		return ("CUDIMM");
+	case SPD_MOD_TYPE_CSODIMM:
+		return ("CSODIMM");
+	case SPD_MOD_TYPE_CAMM2:
+		return ("CAMM2");
+	case SPD_MOD_TYPE_LPDIMM:
+		return ("LP-DIMM");
+	case SPD_MOD_TYPE_MICRO_DIMM:
+		return ("Micro-DIMM");
 	default:
 		return (NULL);
 	}
@@ -1053,6 +1091,62 @@ done:
 	topo_mod_free(mod, rev_keys, alen);
 	return (ret);
 }
+
+static bool
+dimm_comp_mfg_cd(topo_mod_t *mod, tnode_t *dimm, const dimm_comp_t *comp,
+    const spd_cache_t *cache, nvlist_t *spd, void *arg)
+{
+	const char **mfg_keys = NULL, **mfg_str_keys = NULL, **type_keys = NULL;
+	const char **rev_keys = NULL;
+	bool ret = false;
+	uint32_t nents = 0, curent = 0;
+	size_t alen;
+
+	if ((cache->sc_devices & SPD_DEVICE_CD_0) != 0)
+		nents++;
+	if ((cache->sc_devices & SPD_DEVICE_CD_1) != 0)
+		nents++;
+
+	if (nents == 0) {
+		return (true);
+	}
+
+	alen = sizeof (char *) * nents;
+
+	if ((mfg_keys = topo_mod_zalloc(mod, alen)) == NULL ||
+	    (mfg_str_keys = topo_mod_zalloc(mod, alen)) == NULL ||
+	    (type_keys = topo_mod_zalloc(mod, alen)) == NULL ||
+	    (rev_keys = topo_mod_zalloc(mod, alen)) == NULL) {
+		goto done;
+	}
+
+	if ((cache->sc_devices & SPD_DEVICE_CD_0) != 0) {
+		mfg_keys[curent] = SPD_KEY_DEV_CD0_MFG;
+		mfg_str_keys[curent] = SPD_KEY_DEV_CD0_MFG_NAME;
+		type_keys[curent] = SPD_KEY_DEV_CD0_TYPE;
+		rev_keys[curent] = SPD_KEY_DEV_CD0_REV;
+		curent++;
+	}
+
+	if ((cache->sc_devices & SPD_DEVICE_CD_1) != 0) {
+		mfg_keys[curent] = SPD_KEY_DEV_CD1_MFG;
+		mfg_str_keys[curent] = SPD_KEY_DEV_CD1_MFG_NAME;
+		type_keys[curent] = SPD_KEY_DEV_CD1_TYPE;
+		rev_keys[curent] = SPD_KEY_DEV_CD1_REV;
+		curent++;
+	}
+
+	ret = dimm_comp_mfg_common(mod, dimm, comp, spd, mfg_keys,
+	    mfg_str_keys, type_keys, rev_keys, nents);
+
+done:
+	topo_mod_free(mod, mfg_keys, alen);
+	topo_mod_free(mod, mfg_str_keys, alen);
+	topo_mod_free(mod, type_keys, alen);
+	topo_mod_free(mod, rev_keys, alen);
+	return (ret);
+}
+
 static const dimm_comp_t dimm_comps[] = {
 	{ .dc_comp = TOPO_PROP_DIMM_COMP_DIE, .dc_always = true,
 	    .dc_count = dimm_comp_count_dies, .dc_mfg = dimm_comp_mfg_die },
@@ -1067,8 +1161,9 @@ static const dimm_comp_t dimm_comps[] = {
 	{ .dc_comp = TOPO_PROP_DIMM_COMP_PMIC, .dc_mask = SPD_DEVICE_PMIC_0 |
 	    SPD_DEVICE_PMIC_1 | SPD_DEVICE_PMIC_2, .dc_mfg = dimm_comp_mfg_pmic,
 	    .dc_type2str = topo_dimm_pmic2str  },
-	{ .dc_comp = TOPO_PROP_DIMM_COMP_CD, .dc_mask = SPD_DEVICE_CD,
-	    .dc_mfg = dimm_comp_mfg_single, .dc_type2str = topo_dimm_cd2str },
+	{ .dc_comp = TOPO_PROP_DIMM_COMP_CD, .dc_mask = SPD_DEVICE_CD_0 |
+	    SPD_DEVICE_CD_1, .dc_mfg = dimm_comp_mfg_cd,
+	    .dc_type2str = topo_dimm_cd2str },
 	{ .dc_comp = TOPO_PROP_DIMM_COMP_RCD, .dc_mask = SPD_DEVICE_RCD,
 	    .dc_count = dimm_comp_count_regs, .dc_mfg = dimm_comp_mfg_single,
 	    .dc_type2str = topo_dimm_rcd2str },

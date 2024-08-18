@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 18, 2023
+.Dd September 2, 2024
 .Dt LIBJEDEC 3JEDEC
 .Os
 .Sh NAME
@@ -51,6 +51,9 @@ provides an interface to parse a full data payload into a
 .Vt nvlist_t ,
 a name-value pair list usable with
 .Xr libnvpair 3LIB .
+.Pp
+Currently DDR3, DDR4, DDR5, LPDDR3, LPDDR4, LPDDR4X, LPDDR5, and LPDDR5X
+are supported.
 .Ss Vendor ID Translation
 JEDEC Vendor IDs come as a pair of a continuation number and an index
 into a block.
@@ -123,6 +126,12 @@ there is no guarantee that this will apply to future functions.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T DDR5 Serial Presence Detect (SPD) Contents
-.%N JESD400-5A.01
-.%D January 2023
+.%N JESD400-5B Document Release 1.2
+.%D October 2023
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T LPDDR5/5X Serial Presence Detect (SPD) Contents
+.%N JESD406-5 Document Release 1.0
+.%D June 2024
 .Re

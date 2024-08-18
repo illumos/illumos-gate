@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -30,8 +30,8 @@
  * skipped otherwise. For an overview of the actual fields and structures, see
  * libjedec.h.
  *
- * Currently we support all of DDR4 and DDD5 based SPD information with the
- * exception of some NVDIMM properties.
+ * Currently we support all of DDR4, DDD5, and LPDDR5/x based SPD information
+ * with the exception of some NVDIMM properties.
  */
 
 #include <string.h>
@@ -147,6 +147,23 @@ spd_nvl_insert_u64(spd_info_t *si, const char *key, uint64_t data)
 }
 
 void
+spd_nvl_insert_u8_array(spd_info_t *si, const char *key,
+    uint8_t *data, uint_t nent)
+{
+	int ret;
+
+	if (si->si_error != LIBJEDEC_SPD_OK)
+		return;
+
+	ret = nvlist_add_uint8_array(si->si_nvl, key, data, nent);
+	if (ret != 0) {
+		VERIFY3S(ret, ==, ENOMEM);
+		si->si_error = LIBJEDEC_SPD_NOMEM;
+		return;
+	}
+}
+
+void
 spd_nvl_insert_u32_array(spd_info_t *si, const char *key,
     uint32_t *data, uint_t nent)
 {
@@ -156,6 +173,40 @@ spd_nvl_insert_u32_array(spd_info_t *si, const char *key,
 		return;
 
 	ret = nvlist_add_uint32_array(si->si_nvl, key, data, nent);
+	if (ret != 0) {
+		VERIFY3S(ret, ==, ENOMEM);
+		si->si_error = LIBJEDEC_SPD_NOMEM;
+		return;
+	}
+}
+
+void
+spd_nvl_insert_u64_array(spd_info_t *si, const char *key,
+    uint64_t *data, uint_t nent)
+{
+	int ret;
+
+	if (si->si_error != LIBJEDEC_SPD_OK)
+		return;
+
+	ret = nvlist_add_uint64_array(si->si_nvl, key, data, nent);
+	if (ret != 0) {
+		VERIFY3S(ret, ==, ENOMEM);
+		si->si_error = LIBJEDEC_SPD_NOMEM;
+		return;
+	}
+}
+
+void
+spd_nvl_insert_boolean_array(spd_info_t *si, const char *key,
+    boolean_t *data, uint_t nent)
+{
+	int ret;
+
+	if (si->si_error != LIBJEDEC_SPD_OK)
+		return;
+
+	ret = nvlist_add_boolean_array(si->si_nvl, key, data, nent);
 	if (ret != 0) {
 		VERIFY3S(ret, ==, ENOMEM);
 		si->si_error = LIBJEDEC_SPD_NOMEM;
@@ -272,19 +323,33 @@ done:
 	free(trans);
 }
 
+/*
+ * We've been given a value which attempts to fit within a range. This range has
+ * an optional upper and lower bound. The value can be transformed in one of
+ * three ways which are honored in the following order:
+ *
+ * 1) If there is a multiple, we apply that to the raw value first.
+ * 2) There can be a base value which we then add to any adjusted value.
+ * 3) The final value can be treated as an exponent resulting in a bit-shift.
+ *
+ * After this is done we can check against the minimum and maximum values. A
+ * specified min or max of zero is ignored.
+ */
 void
 spd_insert_range(spd_info_t *si, const char *key, uint8_t raw_val,
     const spd_value_range_t *range)
 {
-	/*
-	 * Apply any base or multiple to the value. If the min or max are zero,
-	 * then we ignore them. We apply the base before a multiple.
-	 */
 	uint32_t min = 0, max = UINT32_MAX;
-	uint32_t act = raw_val + range->svr_base;
+	uint32_t act = raw_val;
 
 	if (range->svr_mult != 0) {
 		act *= range->svr_mult;
+	}
+
+	act += range->svr_base;
+
+	if (range->svr_exp) {
+		act = 1 << act;
 	}
 
 	if (range->svr_max != 0) {
@@ -332,7 +397,7 @@ spd_parse_rev(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 {
 	const uint8_t data = si->si_data[off];
 	const uint8_t enc = SPD_DDR4_SPD_REV_ENC(data);
-	const uint8_t add = SPD_DDR4_SPD_REV_ENC(data);
+	const uint8_t add = SPD_DDR4_SPD_REV_ADD(data);
 
 	spd_nvl_insert_u32(si, SPD_KEY_REV_ENC, enc);
 	spd_nvl_insert_u32(si, SPD_KEY_REV_ADD, add);
@@ -377,7 +442,7 @@ spd_parse_jedec_id_str(spd_info_t *si, uint32_t off, uint32_t len,
 void
 spd_parse_string(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 {
-	uint32_t nbytes = 0;
+	uint32_t nbytes = len;
 	char buf[128];
 
 	VERIFY3U(sizeof (buf), >, len);
@@ -457,7 +522,7 @@ spd_parse_hex_vers(spd_info_t *si, uint32_t off, uint32_t len,
 
 	VERIFY3U(len, ==, 1);
 
-	int ret = snprintf(buf, sizeof (buf), "%x.%x", maj, min);
+	int ret = snprintf(buf, sizeof (buf), "%X.%X", maj, min);
 	if (ret < 0) {
 		spd_nvl_err(si, key, SPD_ERROR_INTERNAL,
 		    "snprintf failed unexpectedly for key %s: %s",
@@ -473,6 +538,14 @@ spd_parse_raw_u8(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 {
 	VERIFY3U(len, ==, 1);
 	spd_nvl_insert_u32(si, key, si->si_data[off]);
+}
+
+void
+spd_parse_u8_array(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
+{
+	uint8_t *data = (uint8_t *)si->si_data + off;
+
+	spd_nvl_insert_u8_array(si, key, data, len);
 }
 
 void
@@ -510,25 +583,194 @@ spd_parse_thickness(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 {
 	const uint8_t data = si->si_data[off];
 	const uint8_t front = SPD_DDR5_COM_THICK_FRONT(data);
-	const uint8_t back = SPD_DDR5_COM_THICK_FRONT(data);
+	const uint8_t back = SPD_DDR5_COM_THICK_BACK(data);
 
 	spd_insert_range(si, SPD_KEY_MOD_FRONT_THICK, front, &spd_thick_range);
 	spd_insert_range(si, SPD_KEY_MOD_BACK_THICK, back, &spd_thick_range);
 }
 
 /*
- * Calculate the DRAM CRC16. The crc ranges over [ off, off + len - 2). The crc
- * lsb is at off + len - 2, and the msb is at off + len - 1. The JEDEC specs
- * describe the algorithm (e.g. 21-C Annex L, 8.1.53).
+ * Common timestamp calculation logic for DDR3-4, LPDDR3-5 that assumes 1 ps FT
+ * and 125ps MTB. The MTB may either be an 8-bit, 12-bit, or 16-bit value. The
+ * FTB value is actually a signed two's complement value that we use to adjust
+ * things. We need to check for two illegal values:
+ *
+ * 1. That the value as a whole after adjustment is non-zero.
+ * 2. That the fine adjustment does not cause us to underflow (i.e. unit values
+ *    for the MTB of 1 and the FTB of -126).
  */
 void
-spd_parse_crc(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
+spd_parse_ddr_time(spd_info_t *si, const char *key, uint8_t upper_mtb,
+    uint8_t mtb, uint8_t ftb)
+{
+	uint64_t ps = ((upper_mtb << 8) | mtb) * SPD_DDR4_MTB_PS;
+	int8_t adj = (int8_t)ftb * SPD_DDR4_FTB_PS;
+
+	if (ps == 125 && adj <= -125) {
+		spd_nvl_err(si, key, SPD_ERROR_BAD_DATA,
+		    "MTB (%" PRIu64 "ps) and FTB (%dps) would cause underflow",
+		    ps, adj);
+		return;
+	}
+
+	ps += adj;
+	if (ps == 0) {
+		spd_nvl_err(si, key, SPD_ERROR_NO_XLATE,
+		    "encountered unexpected zero time value");
+		return;
+	}
+	spd_nvl_insert_u64(si, key, ps);
+}
+
+/*
+ * Combine two values into a picosecond value that is split between the MTB and
+ * FTB. The MTB and FTB are split amongst a large number of bytes and are not
+ * contiguous. The MTB is at data[off], and the FTB is at data[off + len - 1].
+ *
+ * This is shared by LPDDR3-5 which all use the same time base parameters. DDR3
+ * also uses it for a number of items based on our assumptions.
+ */
+void
+spd_parse_mtb_ftb_time_pair(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	const uint8_t mtb = si->si_data[off];
+	const uint8_t ftb = si->si_data[off + len - 1];
+
+	return (spd_parse_ddr_time(si, key, 0, mtb, ftb));
+}
+
+/*
+ * Parse a pair of values where the MTB is split across two uint8_t's. The LSB
+ * is in off and the MSB is in off+1.
+ */
+void
+spd_parse_mtb_pair(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	ASSERT3U(len, ==, 2);
+	return (spd_parse_ddr_time(si, key, si->si_data[off + 1],
+	    si->si_data[off], 0));
+}
+
+static const spd_str_map_t spd_ddr_design_map0[32] = {
+	{ 0, "A", false },
+	{ 1, "B", false },
+	{ 2, "C", false },
+	{ 3, "D", false },
+	{ 4, "E", false },
+	{ 5, "F", false },
+	{ 6, "G", false },
+	{ 7, "H", false },
+	{ 8, "J", false },
+	{ 9, "K", false },
+	{ 10, "L", false },
+	{ 11, "M", false },
+	{ 12, "N", false },
+	{ 13, "P", false },
+	{ 14, "R", false },
+	{ 15, "T", false },
+	{ 16, "U", false },
+	{ 17, "V", false },
+	{ 18, "W", false },
+	{ 19, "Y", false },
+	{ 20, "AA", false },
+	{ 21, "AB", false },
+	{ 22, "AC", false },
+	{ 23, "AD", false },
+	{ 24, "AE", false },
+	{ 25, "AF", false },
+	{ 26, "AG", false },
+	{ 27, "AH", false },
+	{ 28, "AJ", false },
+	{ 29, "AK", false },
+	{ 30, "AL", false },
+	{ 31, "ZZ", false }
+};
+
+static const spd_str_map_t spd_ddr_design_map1[32] = {
+	{ 0, "AM", false },
+	{ 1, "AN", false },
+	{ 2, "AP", false },
+	{ 3, "AR", false },
+	{ 4, "AT", false },
+	{ 5, "AU", false },
+	{ 6, "AV", false },
+	{ 7, "AW", false },
+	{ 8, "AY", false },
+	{ 9, "BA", false },
+	{ 10, "BB", false },
+	{ 11, "BC", false },
+	{ 12, "BD", false },
+	{ 13, "BE", false },
+	{ 14, "BF", false },
+	{ 15, "BG", false },
+	{ 16, "BH", false },
+	{ 17, "BJ", false },
+	{ 18, "BK", false },
+	{ 19, "BL", false },
+	{ 20, "BM", false },
+	{ 21, "BN", false },
+	{ 22, "BP", false },
+	{ 23, "BR", false },
+	{ 24, "BT", false },
+	{ 25, "BU", false },
+	{ 26, "BV", false },
+	{ 27, "BW", false },
+	{ 28, "BY", false },
+	{ 29, "CA", false },
+	{ 30, "CB", false },
+	{ 31, "ZZ", false }
+};
+
+/*
+ * In DDR3/4 and LPDDR3-5 the design information contains both a reference raw
+ * card and a revision of the card. The card revision is split between two
+ * bytes, the design and the height field. This is common logic that'll check
+ * both. We use the DDR4 constants for the fields, but they are the same across
+ * all versions.
+ */
+void
+spd_parse_design(spd_info_t *si, uint32_t design, uint32_t height)
+{
+	const uint8_t data = si->si_data[design];
+	const uint8_t rev = SPD_DDR4_RDIMM_REF_REV(data);
+	const uint8_t card = SPD_DDR4_RDIMM_REF_CARD(data);
+
+	if (SPD_DDR4_RDIMM_REF_EXT(data) != 0) {
+		spd_insert_str_map(si, SPD_KEY_MOD_REF_DESIGN, card,
+		    spd_ddr_design_map1, ARRAY_SIZE(spd_ddr_design_map1));
+	} else {
+		spd_insert_str_map(si, SPD_KEY_MOD_REF_DESIGN, card,
+		    spd_ddr_design_map0, ARRAY_SIZE(spd_ddr_design_map0));
+	}
+
+	/*
+	 * The design rev is split between here and the height field. If we
+	 * have the value of three, then we must also add in the height's value
+	 * to this.
+	 */
+	if (rev == SPD_DDR4_RDIMM_REV_USE_HEIGHT) {
+		const uint8_t hdata = si->si_data[height];
+		const uint8_t hrev = SPD_DDR4_RDIMM_HEIGHT_REV(hdata);
+		spd_nvl_insert_u32(si, SPD_KEY_MOD_DESIGN_REV, rev + hrev);
+	} else {
+		spd_nvl_insert_u32(si, SPD_KEY_MOD_DESIGN_REV, rev);
+	}
+}
+
+/*
+ * Calculate the DRAM CRC16. The crc calculation covers [ off, off + len ). The
+ * expected CRC is in expect. The JEDEC specs describe the algorithm (e.g. 21-C
+ * Annex L, 8.1.53).
+ */
+void
+spd_parse_crc_expect(spd_info_t *si, uint32_t off, uint32_t len,
+    uint16_t expect, const char *key)
 {
 	uint32_t crc = 0;
-	const uint16_t expect = si->si_data[off + len - 2] |
-	    (si->si_data[off + len - 1] << 8);
 
-	for (uint32_t i = 0; i < len - 2; i++) {
+	for (uint32_t i = 0; i < len; i++) {
 		crc = crc ^ (uint32_t)si->si_data[off + i] << 8;
 		for (uint32_t c = 0; c < 8; c++) {
 			if (crc & 0x8000) {
@@ -546,6 +788,19 @@ spd_parse_crc(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 		spd_nvl_err(si, key, SPD_ERROR_BAD_DATA, "crc mismatch: "
 		    "expected 0x%x, found 0x%x", expect, crc);
 	}
+}
+
+/*
+ * Calculate the DRAM CRC16. The crc ranges over [ off, off + len - 2). The crc
+ * lsb is at off + len - 2, and the msb is at off + len - 1.
+ */
+void
+spd_parse_crc(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
+{
+	const uint16_t expect = si->si_data[off + len - 2] |
+	    (si->si_data[off + len - 1] << 8);
+
+	spd_parse_crc_expect(si, off, len - 2, expect, key);
 }
 
 void
@@ -636,11 +891,23 @@ libjedec_spd(const uint8_t *buf, size_t nbytes, spd_error_t *err)
 	si.si_error = LIBJEDEC_SPD_OK;
 	si.si_dram = buf[SPD_DRAM_TYPE];
 	switch (si.si_dram) {
+	case SPD_DT_DDR3_SDRAM:
+		spd_parse_ddr3(&si);
+		break;
 	case SPD_DT_DDR4_SDRAM:
 		spd_parse_ddr4(&si);
 		break;
+	case SPD_DT_LPDDR3_SDRAM:
+	case SPD_DT_LPDDR4_SDRAM:
+	case SPD_DT_LPDDR4X_SDRAM:
+		spd_parse_lp4(&si);
+		break;
 	case SPD_DT_DDR5_SDRAM:
 		spd_parse_ddr5(&si);
+		break;
+	case SPD_DT_LPDDR5_SDRAM:
+	case SPD_DT_LPDDR5X_SDRAM:
+		spd_parse_lp5(&si);
 		break;
 	default:
 		*err = LIBJEDEC_SPD_UNSUP_TYPE;

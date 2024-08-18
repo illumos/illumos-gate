@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -19,7 +19,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
-PROGS = libjedec_test libjedec_temp libjedec_spd
+PROGS = libjedec_vendors libjedec_temp libjedec_spd
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
@@ -29,25 +29,40 @@ ROOTOPTPROGS = $(PROGS32:%=$(TESTDIR)/%) \
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
+SUBDIRS = hex2spd
+
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 LDLIBS += -ljedec
 LDLIBS64 += -ljedec
-libjedec_spd.32	:= LDLIBS += -lnvpair
-libjedec_spd.64	:= LDLIBS64 += -lnvpair
+
+libjedec_spd.32		:= LDLIBS += -lnvpair
+libjedec_spd.64		:= LDLIBS64 += -lnvpair
+
 CSTD = $(GNU_C99)
 
-all: $(PROGS32) $(PROGS64)
+#
+# recursive support
+#
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
+
+$(SUBDIRS): FRC
+	cd $@; pwd; $(MAKE) $(TARGET)
+
+all: $(PROGS32) $(PROGS64) $(SUBDIRS)
 
 $(ROOTOPTPROGS): all
 
-install: all $(ROOTOPTPROGS)
+install: all $(ROOTOPTPROGS) $(SUBDIRS)
 
-clobber: clean
+clobber: clean $(SUBDIRS)
 	-$(RM) $(PROGS32) $(PGROGS64)
 
-clean:
+clean: $(SUBDIRS)
 
 $(CMDS): $(TESTDIR) $(PROG)
 
@@ -64,3 +79,5 @@ $(TESTDIR)/%: %
 %.32: %.c
 	$(LINK.c) -o $@ $< $(LDLIBS)
 	$(POST_PROCESS)
+
+FRC:

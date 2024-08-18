@@ -1,0 +1,30 @@
+#
+# Micron MT36KSF2G72PZ-1G6N1 DDR3-1600 LRDIMM 16 GiB
+#
+# Location: 3
+# Year / Week: 09/04
+# SN: CC94AB07
+#
+# Note: In the online SPD data the CRC was claimed to be CC3C (what the
+# order of bytes is is not clear); however, we calculated a different
+# CRC and other CRC calculators agree with us based on this data. Given
+# that the CRC algorithm is the same across the other specifications and
+# we generally match that data, for now we believe that this was
+# incorrect and instead have written the calculated CRC in here.
+#
+0000: 92 12 0B 0B 04 21 02 19 0B 11 01 08 0A 00 FE 00
+0010: 69 78 69 30 69 11 18 81 20 08 3C 3C 00 F0 83 05
+0020: 80 00 00 00 00 00 00 00 00 85 00 00 00 00 00 00
+0030: 00 00 00 00 00 00 00 00 00 00 00 00 10 33 01 89
+0040: 22 04 B3 50 50 00 00 00 12 F6 99 00 00 85 11 F6
+0050: 99 00 00 8D 11 F6 99 00 00 8D 41 49 46 4F 00 00
+0060: 00 00 00 00 00 00 0B 20 E0 01 21 20 01 FF 00 00
+0070: 00 00 00 00 00 80 2C 03 09 04 CC 94 AB 07 D9 19
+0080: 33 36 4B 53 5A 32 47 37 32 4C 44 31 47 36 45 32
+0090: 41 37 45 32 80 2C 00 00 00 00 00 00 00 00 00 00
+00A0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00B0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00C0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00D0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00E0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00F0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00

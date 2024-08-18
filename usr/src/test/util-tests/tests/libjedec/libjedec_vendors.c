@@ -15,7 +15,7 @@
  */
 
 /*
- * Test basic functionality of libjedec.
+ * Test basic vendor lookup functionality.
  */
 
 #include <sys/types.h>

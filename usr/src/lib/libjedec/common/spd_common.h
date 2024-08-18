@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SPD_COMMON_H
@@ -25,8 +25,11 @@
 #include <sys/bitext.h>
 #include <libjedec.h>
 
+#include "spd_ddr3.h"
 #include "spd_ddr4.h"
 #include "spd_ddr5.h"
+#include "spd_lp4.h"
+#include "spd_lp5.h"
 
 #ifdef __cplusplus
 extern "C" {
