@@ -19,10 +19,6 @@ SRCS +=		$(SRC)/common/util/getresponse.c
 CPPFLAGS +=	-I../../common -I$(SRC)/common/util
 LDLIBS +=	-ladm -lfdisk -lefi -lfstyp -luuid -lumem
 
-# getresponse.c and libfdisk.c need this
-LINTFLAGS += \
-	-xerroff=E_NAME_DEF_NOT_USED2
-
 .KEEP_STATE:
 
 all:

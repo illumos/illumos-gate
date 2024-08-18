@@ -252,7 +252,7 @@ install_stage2_cb(void *data, struct partlist *plist)
 		perror("open");
 		return;
 	}
-	offset = plist->pl_device->stage.offset * SECTOR_SIZE;
+	offset = plist->pl_device->stage.offset * sector_size;
 	ret = write_out(fd, bblock->buf, bblock->buf_size, offset);
 	(void) close(fd);
 	if (ret != BC_SUCCESS) {
@@ -262,7 +262,7 @@ install_stage2_cb(void *data, struct partlist *plist)
 	}
 	(void) fprintf(stdout, gettext("bootblock written for %s,"
 	    " %d sectors starting at %d (abs %lld)\n\n"), plist->pl_devname,
-	    (bblock->buf_size / SECTOR_SIZE) + 1, offset / SECTOR_SIZE, abs);
+	    bblock->buf_size / sector_size, offset / sector_size, abs);
 }
 
 static bool
@@ -580,7 +580,8 @@ read_stage1_bbl_cb(struct partlist *plist)
 	void *data;
 	bool rv = false;
 
-	data = malloc(SECTOR_SIZE);
+	/* Allocate actual sector size. */
+	data = calloc(1, sector_size);
 	if (data == NULL)
 		return (rv);
 
@@ -624,7 +625,7 @@ read_stage2_cb(struct partlist *plist)
 
 	device = plist->pl_device;
 	plist->pl_stage = bblock;
-	offset = device->stage.offset * SECTOR_SIZE;
+	offset = device->stage.offset * sector_size;
 	scan_size = MIN(sizeof (mboot_scan),
 	    (device->stage.size - device->stage.offset) * sector_size);
 
@@ -660,7 +661,7 @@ read_stage2_cb(struct partlist *plist)
 	 * in the future.
 	 */
 	size = mboot->load_end_addr - mboot->load_addr;
-	buf_size = P2ROUNDUP(size + SECTOR_SIZE, SECTOR_SIZE);
+	buf_size = P2ROUNDUP(size + sector_size, sector_size);
 	bblock->file_size = size;
 
 	bblock->buf = malloc(buf_size);
@@ -1278,7 +1279,7 @@ probe_gpt(ib_data_t *data)
 		device->stage.start = vtoc->efi_parts[slice].p_start;
 		device->stage.size = vtoc->efi_parts[slice].p_size;
 
-		device->stage.offset = BBLK_ZFS_BLK_OFF;
+		device->stage.offset = BBLK_ZFS_BLK_OFF / sector_size;
 		pl->pl_src_name = stage2;
 		pl->pl_type = IB_BBLK_STAGE2;
 		pl->pl_cb.compare = compare_einfo_cb;
@@ -1754,6 +1755,15 @@ probe_device(ib_data_t *data, const char *dev)
 	if (probe_gpt(data))
 		return (true);
 
+	/*
+	 * We only do support sector size 512 with MBR and VTOC.
+	 * The 4kn sector size with actual hardware is currently
+	 * available with large disks and MBR/VTOC are not usable
+	 * with such devices.
+	 */
+	if (sector_size != SECTOR_SIZE)
+		return (false);
+
 	if (data->device.devtype == IB_DEV_UNKNOWN)
 		if (probe_vtoc(data))
 			return (true);
@@ -1793,18 +1803,19 @@ read_bootblock_from_file(const char *file, ib_bootblock_t *bblock)
 	if (buf_size == 0)
 		goto outfd;
 
-	bblock->buf_size = buf_size;
+	/* Round up to sector size for raw disk write */
+	bblock->buf_size = P2ROUNDUP(buf_size, sector_size);
 	BOOT_DEBUG("bootblock in-memory buffer size is %d\n",
 	    bblock->buf_size);
 
-	bblock->buf = malloc(buf_size);
+	bblock->buf = malloc(bblock->buf_size);
 	if (bblock->buf == NULL) {
 		perror(gettext("Memory allocation failure"));
 		goto outbuf;
 	}
 	bblock->file = bblock->buf;
 
-	if (read(fd, bblock->file, bblock->buf_size) != bblock->buf_size) {
+	if (read(fd, bblock->file, buf_size) != buf_size) {
 		BOOT_DEBUG("Read from %s failed\n", file);
 		perror("read");
 		goto outfd;
@@ -1912,9 +1923,11 @@ prepare_stage1(struct partlist *stage1, struct partlist *stage2, uuid_t uuid)
 
 	bcopy(uuid, dest + STAGE1_STAGE2_UUID, UUID_LEN);
 
+	/* store bytes per sector */
+	*((uint16_t *)(dest + STAGE1_BPB_BPS)) = sector_size;
 	/* set stage2 size */
 	bblk = stage2->pl_src_data;
-	size = bblk->buf_size / SECTOR_SIZE;
+	size = bblk->buf_size / sector_size;
 	*((uint16_t *)(dest + STAGE1_STAGE2_SIZE)) = size;
 
 	/* set stage2 LBA */
