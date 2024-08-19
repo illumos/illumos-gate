@@ -42,7 +42,8 @@ tests = [
 	'npt_ops',
 	'pause_resume',
 	'self_destruct',
-	'vcpu_alloc'
+	'vcpu_alloc',
+	'vlapic_x2apic_state'
 	]
 
 [/opt/bhyve-tests/tests/kdev]
@@ -54,6 +55,7 @@ tests = [
 	'vlapic_freq_periodic',
 	'vlapic_mmio_access',
 	'vlapic_msr_access',
+	'vlapic_x2apic_mode',
 	'vpmtmr_freq',
 	'vrtc_ops',
 	'wrmsr_tsc',

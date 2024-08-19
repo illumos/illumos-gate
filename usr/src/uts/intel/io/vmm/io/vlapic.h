@@ -48,7 +48,7 @@
 
 struct vcpu;
 
-void vlapic_reset(struct vlapic *vlapic);
+void vlapic_reset(struct vlapic *, bool);
 
 int vlapic_mmio_write(struct vlapic *, uint64_t, uint64_t, uint_t);
 int vlapic_mmio_read(struct vlapic *, uint64_t, uint64_t *, uint_t);
@@ -91,8 +91,6 @@ void vlapic_fire_cmci(struct vlapic *vlapic);
 int vlapic_trigger_lvt(struct vlapic *vlapic, int vector);
 
 void vlapic_sync_tpr(struct vlapic *vlapic);
-
-void vlapic_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state s);
 
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);

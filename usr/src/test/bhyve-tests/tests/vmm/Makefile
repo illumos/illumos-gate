@@ -37,7 +37,8 @@ PROG =	mem_partial \
 	time_data \
 	maxcpu \
 	npt_ops \
-	vcpu_alloc
+	vcpu_alloc \
+	vlapic_x2apic_state
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

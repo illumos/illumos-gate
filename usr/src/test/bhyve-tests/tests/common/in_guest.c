@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -63,6 +63,7 @@ static struct vmctx *test_vmctx = NULL;
 static const char *test_name = NULL;
 
 static uint64_t test_msg_addr = 0;
+static struct payload_exc_report test_exc_last;
 
 static int
 setup_rom(struct vmctx *ctx)
@@ -564,6 +565,50 @@ test_setup_vcpu(struct vcpu *vcpu, uint64_t rip, uint64_t rsp)
 	return (0);
 }
 
+/*
+ * Handle an exception reported by the payload via IOP_TEST_EXC.
+ *
+ * This requires the payload having installed handlers via idt_init().
+ * A resumable exception is saved and can be retrieved via test_exc_report().
+ * Any other exception fails the test.
+ */
+static void
+handle_payload_exception(struct vmctx *ctx, uint32_t report_addr)
+{
+	static const char *exc_names[] = {
+		"#DE", "#DB", "NMI", "#BP", "#OF", "#BR", "#UD", "#NM",
+		"#DF", "(9)", "#TS", "#NP", "#SS", "#GP", "#PF", "(15)",
+		"#MF", "#AC", "#MC", "#XM", "#VE", "#CP", "(22)", "(23)",
+		"(24)", "(25)", "(26)", "(27)", "#HV", "#VC", "#SX", "(31)",
+	};
+	const struct payload_exc_report *report = NULL;
+
+	if (report_addr != 0 &&
+	    report_addr + sizeof (*report) <= vm_get_lowmem_size(ctx)) {
+		report = vm_map_gpa(ctx, report_addr, sizeof (*report));
+	}
+	if (report == NULL) {
+		test_fail_msg("Payload reported exception with invalid "
+		    "report address 0x%x\n", report_addr);
+	} else if (report->per_resumable != 0) {
+		test_exc_last = *report;
+	} else {
+		const uint8_t vector = report->per_vector;
+		const char *exc_name = (vector < ARRAY_SIZE(exc_names)) ?
+		    exc_names[vector] : "(invalid)";
+
+		test_fail_msg("Payload took unhandled exception %s "
+		    "(vector %u), error code 0x%lx, at %%rip 0x%lx\n",
+		    exc_name, vector, report->per_errcode, report->per_rip);
+	}
+}
+
+const struct payload_exc_report *
+test_exc_report(void)
+{
+	return (&test_exc_last);
+}
+
 static enum vm_exit_kind
 which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 {
@@ -571,7 +616,7 @@ which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 
 	switch (vexit->exitcode) {
 	case VM_EXITCODE_BOGUS:
-		bzero(ventry, sizeof (ventry));
+		bzero(ventry, sizeof (*ventry));
 		return (VEK_REENTR);
 	case VM_EXITCODE_INOUT:
 		if (inout->port == IOP_TEST_RESULT &&
@@ -588,6 +633,14 @@ which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 			test_msg_addr = inout->eax;
 			ventry_fulfill_inout(vexit, ventry, 0);
 			return (VEK_TEST_MSG);
+		}
+		if (inout->port == IOP_TEST_EXC &&
+		    (inout->flags & INOUT_IN) == 0 &&
+		    inout->bytes == 4) {
+			/* Returns only for a resumable exception */
+			handle_payload_exception(test_vmctx, inout->eax);
+			ventry_fulfill_inout(vexit, ventry, 0);
+			return (VEK_TEST_EXC);
 		}
 		break;
 	default:

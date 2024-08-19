@@ -92,3 +92,6 @@ $(TESTDIR)/%: %
 	$(POST_PROCESS)
 
 $(CPAYLOADS:%=payload_%): payload_utils.o
+
+# Pull in the shared exception handling utilities
+payload_rep_instrs: payload_utils.o

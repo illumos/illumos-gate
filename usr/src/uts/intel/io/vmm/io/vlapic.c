@@ -96,6 +96,15 @@
 
 #define	APICBASE_ADDR_MASK	0xfffffffffffff000UL
 
+#define	APICBASE_STATE_MASK	(APICBASE_X2APIC | APICBASE_ENABLED)
+
+typedef enum apicbase_state {
+	ABS_DISABLED = 0,
+	ABS_XAPIC = APICBASE_ENABLED,
+	ABS_X2APIC = APICBASE_ENABLED | APICBASE_X2APIC,
+	ABS_INVALID = APICBASE_X2APIC,
+} apicbase_state_t;
+
 #define	APIC_VALID_MASK_ESR	(APIC_ESR_SEND_CS_ERROR | \
 		APIC_ESR_RECEIVE_CS_ERROR | APIC_ESR_SEND_ACCEPT | \
 		APIC_ESR_RECEIVE_ACCEPT | APIC_ESR_SEND_ILLEGAL_VECTOR | \
@@ -105,9 +114,15 @@ static void vlapic_set_error(struct vlapic *, uint32_t, bool);
 static void vlapic_callout_handler(void *arg);
 
 static __inline bool
+apicbase_x2mode(uint64_t base)
+{
+	return ((base & APICBASE_X2APIC) != 0);
+}
+
+static __inline bool
 vlapic_x2mode(const struct vlapic *vlapic)
 {
-	return ((vlapic->msr_apicbase & APICBASE_X2APIC) != 0);
+	return (apicbase_x2mode(vlapic->msr_apicbase));
 }
 
 bool
@@ -131,13 +146,19 @@ vlapic_enabled(const struct vlapic *vlapic)
 }
 
 static __inline uint32_t
-vlapic_get_id(const struct vlapic *vlapic)
+vlapic_get_id_for_mode(const struct vlapic *vlapic, bool x2mode)
 {
-
-	if (vlapic_x2mode(vlapic))
+	if (x2mode)
 		return (vlapic->vcpuid);
 	else
 		return (vlapic->vcpuid << 24);
+}
+
+static __inline uint32_t
+vlapic_get_id(const struct vlapic *vlapic)
+{
+
+	return (vlapic_get_id_for_mode(vlapic, vlapic_x2mode(vlapic)));
 }
 
 static uint32_t
@@ -152,17 +173,154 @@ x2apic_ldr(const struct vlapic *vlapic)
 	return (ldr);
 }
 
+static __inline apicbase_state_t
+apicbase_get_state(uint64_t base)
+{
+	return (base & APICBASE_STATE_MASK);
+}
+
+/*
+ * Should attempts to change the APIC base address be explicitly rejected, or
+ * silently ignored?
+ */
+int vlapic_gp_on_addr_change = 1;
+
+/*
+ * Process a requested write to the APICBASE register.  This returns false if
+ * the proposed new value is invalid (due to reserved bits being set, or if it
+ * represents an illegal state change).
+ */
+static bool
+vlapic_apicbase_write_handler(struct vlapic *vlapic, uint64_t val)
+{
+	struct LAPIC *lapic = vlapic->apic_page;
+	const apicbase_state_t old =
+	    apicbase_get_state(vlapic->msr_apicbase);
+	const apicbase_state_t target = apicbase_get_state(val);
+
+	/* Reject changes to reserved bits */
+	if ((val & APICBASE_RESERVED) != 0) {
+		return (false);
+	}
+
+	/*
+	 * Reject invalid state transitions:
+	 * - Anything -> Invalid
+	 * - x2APIC -> xAPIC (must go through disabled first)
+	 * - Disabled -> x2APIC (must go through xAPIC first)
+	 *
+	 * We do not allow the vLAPIC to enter the Invalid state and so
+	 * attempting to transition from that state is a bug.
+	 */
+	VERIFY3U(old, !=, ABS_INVALID);
+	if (target == ABS_INVALID ||
+	    (target == ABS_XAPIC && old == ABS_X2APIC) ||
+	    (target == ABS_X2APIC && old == ABS_DISABLED)) {
+		return (false);
+	}
+
+	/* We do not presently allow the LAPIC access address to be modified. */
+	if ((val & APICBASE_ADDR_MASK) != DEFAULT_APIC_BASE) {
+		/*
+		 * Explicitly rebuffing such requests with a #GP is the most
+		 * straightforward way to handle the situation, but certain
+		 * consumers (such as the KVM unit tests) may balk at the
+		 * otherwise unexpected exception.
+		 */
+		if (vlapic_gp_on_addr_change) {
+			return (false);
+		}
+
+		/* If silence is required, just ignore the address change. */
+		val = (val & ~APICBASE_ADDR_MASK) | DEFAULT_APIC_BASE;
+	}
+
+	/* Ignore/override any attempt to change the read-only BSP flag */
+	if (vlapic->vcpuid == 0) {
+		val |= APICBASE_BSP;
+	} else {
+		val &= ~APICBASE_BSP;
+	}
+
+	vlapic->msr_apicbase = val;
+	if (old != target) {
+		/*
+		 * The local APIC ID register contains the legacy local xAPIC ID
+		 * in either the lower or upper 8 bits depending on the mode.
+		 */
+		lapic->id = vlapic_get_id(vlapic);
+	}
+
+	if (old == ABS_XAPIC && target == ABS_X2APIC) {
+		/*
+		 * APIC loads LDR with logical x2APIC ID during this transition,
+		 * as the register becomes read-only.
+		 */
+		lapic->ldr = x2apic_ldr(vlapic);
+
+		if (vlapic->ops.set_x2apic_mode) {
+			(*vlapic->ops.set_x2apic_mode)(vlapic, true);
+		}
+	} else if (old == ABS_X2APIC && target == ABS_DISABLED) {
+		/*
+		 * Clear the previously calculated logical x2APIC ID.
+		 *
+		 * While the SDM/APM do not specify that this register be
+		 * cleared when going through the x2APIC->Disabled transition,
+		 * discarding a potentially nonsensical value seems reasonable.
+		 */
+		lapic->ldr = 0;
+
+		if (vlapic->ops.set_x2apic_mode) {
+			(*vlapic->ops.set_x2apic_mode)(vlapic, false);
+		}
+	} else if ((old == ABS_XAPIC && target == ABS_DISABLED) ||
+	    (old == ABS_DISABLED && target == ABS_XAPIC)) {
+		/*
+		 * The Intel SDM says "prior initialization to the APIC may be
+		 * lost" when transitioning to the Disabled state.
+		 * For simplicity, we preserve the LAPIC state when
+		 * transitioning between the xAPIC and Disabled states.
+		 */
+	} else {
+		/* All valid transitions should be covered */
+		VERIFY(old == target);
+	}
+	return (true);
+}
+
+/*
+ * Place the vLAPIC in the specific `target` state while transitioning through
+ * any necessary intermediate states.
+ *
+ * This is used by any non-guest initiated changes to the vLAPIC state to ensure
+ * we always remain in a valid architectural state.
+ */
+static void
+vlapic_apicbase_set_state(struct vlapic *vlapic, apicbase_state_t target)
+{
+	const apicbase_state_t old = apicbase_get_state(vlapic->msr_apicbase);
+
+	VERIFY(target == ABS_DISABLED || target == ABS_XAPIC ||
+	    target == ABS_X2APIC);
+
+	if (old == ABS_X2APIC && target != ABS_X2APIC) {
+		/* x2APIC -> xAPIC must go through Disabled first. */
+		VERIFY(vlapic_apicbase_write_handler(vlapic,
+		    DEFAULT_APIC_BASE | ABS_DISABLED));
+	} else if (old == ABS_DISABLED && target == ABS_X2APIC) {
+		/* Disabled -> x2APIC must go through xAPIC first. */
+		VERIFY(vlapic_apicbase_write_handler(vlapic,
+		    DEFAULT_APIC_BASE | ABS_XAPIC));
+	}
+	VERIFY(vlapic_apicbase_write_handler(vlapic,
+	    DEFAULT_APIC_BASE | target));
+}
+
 void
 vlapic_dfr_write_handler(struct vlapic *vlapic)
 {
-	struct LAPIC *lapic;
-
-	lapic = vlapic->apic_page;
-	if (vlapic_x2mode(vlapic)) {
-		/* Ignore write to DFR in x2APIC mode */
-		lapic->dfr = 0;
-		return;
-	}
+	struct LAPIC *lapic = vlapic->apic_page;
 
 	lapic->dfr &= APIC_DFR_MODEL_MASK;
 	lapic->dfr |= APIC_DFR_RESERVED;
@@ -190,8 +348,8 @@ vlapic_id_write_handler(struct vlapic *vlapic)
 	struct LAPIC *lapic;
 
 	/*
-	 * We don't allow the ID register to be modified so reset it back to
-	 * its default value.
+	 * In a departure from the architectural definition, we do not allow the
+	 * APIC ID to be changed, so reset it back to our default value.
 	 */
 	lapic = vlapic->apic_page;
 	lapic->id = vlapic_get_id(vlapic);
@@ -813,9 +971,6 @@ void
 vlapic_calcdest(struct vm *vm, vcpuset_t *dmask, uint32_t dest, bool phys,
     bool lowprio, bool x2apic_dest)
 {
-	struct vlapic *vlapic;
-	uint32_t dfr, ldr, ldest, cluster;
-	uint32_t mda_flat_ldest, mda_cluster_ldest, mda_ldest, mda_cluster_id;
 	vcpuset_t amask;
 	int vcpuid;
 
@@ -828,54 +983,52 @@ vlapic_calcdest(struct vm *vm, vcpuset_t *dmask, uint32_t dest, bool phys,
 		return;
 	}
 
+	amask = vm_active_cpus(vm);
 	if (phys) {
 		/*
 		 * Physical mode: destination is APIC ID.
 		 */
 		vcpuset_zero(dmask);
 		vcpuid = vm_apicid2vcpuid(vm, dest);
-		amask = vm_active_cpus(vm);
 		if (vcpuid >= 0 && vcpuid < vm_get_maxcpus(vm) &&
 		    vcpuset_isset(&amask, vcpuid)) {
 			vcpuset_add(dmask, vcpuid);
 		}
 	} else {
 		/*
-		 * In the "Flat Model" the MDA is interpreted as an 8-bit wide
-		 * bitmask. This model is only available in the xAPIC mode.
-		 */
-		mda_flat_ldest = dest & 0xff;
-
-		/*
-		 * In the "Cluster Model" the MDA is used to identify a
-		 * specific cluster and a set of APICs in that cluster.
-		 */
-		if (x2apic_dest) {
-			mda_cluster_id = dest >> 16;
-			mda_cluster_ldest = dest & 0xffff;
-		} else {
-			mda_cluster_id = (dest >> 4) & 0xf;
-			mda_cluster_ldest = dest & 0xf;
-		}
-
-		/*
 		 * Logical mode: match each APIC that has a bit set
 		 * in its LDR that matches a bit in the ldest.
 		 */
+		const uint32_t mda_cluster_id =
+		    x2apic_dest ? (dest >> 16) : ((dest >> 4) & 0xf);
+		const uint32_t mda_cluster_ldest =
+		    x2apic_dest ? (dest & 0xffff) : (dest & 0xf);
 		vcpuset_zero(dmask);
-		amask = vm_active_cpus(vm);
 		for (vcpuid = vcpuset_find(&amask, 0); vcpuid != -1;
 		    vcpuid = vcpuset_find(&amask, vcpuid + 1)) {
-			vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
-			dfr = vlapic->apic_page->dfr;
-			ldr = vlapic->apic_page->ldr;
+			struct vlapic *vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
+			const uint32_t ldr = vlapic->apic_page->ldr;
+			/* Cluster model is implied for x2APIC */
+			const uint32_t dmodel = vlapic_x2mode(vlapic) ?
+			    APIC_DFR_MODEL_CLUSTER :
+			    (vlapic->apic_page->dfr & APIC_DFR_MODEL_MASK);
 
-			if ((dfr & APIC_DFR_MODEL_MASK) ==
-			    APIC_DFR_MODEL_FLAT) {
+			uint32_t ldest, mda_ldest;
+			if (dmodel == APIC_DFR_MODEL_FLAT) {
+				/*
+				 * In the "Flat Model" the MDA is interpreted as
+				 * an 8-bit wide bitmask. This model is only
+				 * available in the xAPIC mode.
+				 */
 				ldest = ldr >> 24;
-				mda_ldest = mda_flat_ldest;
-			} else if ((dfr & APIC_DFR_MODEL_MASK) ==
-			    APIC_DFR_MODEL_CLUSTER) {
+				mda_ldest = dest & 0xff;
+			} else if (dmodel == APIC_DFR_MODEL_CLUSTER) {
+				/*
+				 * In the "Cluster Model" the MDA is used to
+				 * identify a specific cluster and a set of
+				 * APICs in that cluster.
+				 */
+				uint32_t cluster;
 				if (vlapic_x2mode(vlapic)) {
 					cluster = ldr >> 16;
 					ldest = ldr & 0xffff;
@@ -1405,7 +1558,7 @@ vlapic_write(struct vlapic *vlapic, uint16_t offset, uint32_t data)
 }
 
 void
-vlapic_reset(struct vlapic *vlapic)
+vlapic_reset(struct vlapic *vlapic, bool init_only)
 {
 	struct LAPIC *lapic = vlapic->apic_page;
 	uint32_t *isrptr, *tmrptr, *irrptr;
@@ -1430,9 +1583,10 @@ vlapic_reset(struct vlapic *vlapic)
 		(*vlapic->ops.sync_state)(vlapic);
 	}
 
-	vlapic->msr_apicbase = DEFAULT_APIC_BASE | APICBASE_ENABLED;
-	if (vlapic->vcpuid == 0)
-		vlapic->msr_apicbase |= APICBASE_BSP;
+	if (!init_only) {
+		/* During a vCPU reset, the APIC is returned to xAPIC mode. */
+		vlapic_apicbase_set_state(vlapic, ABS_XAPIC);
+	}
 
 	lapic->id = vlapic_get_id(vlapic);
 	lapic->version = VLAPIC_VERSION;
@@ -1442,8 +1596,12 @@ vlapic_reset(struct vlapic *vlapic)
 	lapic->apr = 0;
 	lapic->ppr = 0;
 
+	/*
+	 * x2APIC mode is preserved across INIT and so LDR must remain valid.
+	 */
+	lapic->ldr = vlapic_x2mode(vlapic) ? x2apic_ldr(vlapic) : 0;
+
 	lapic->eoi = 0;
-	lapic->ldr = 0;
 	lapic->dfr = 0xffffffff;
 	lapic->svr = APIC_SVR_VECTOR;
 	vlapic->svr_last = lapic->svr;
@@ -1482,17 +1640,10 @@ vlapic_init(struct vlapic *vlapic)
 	KASSERT(vlapic->apic_page != NULL, ("vlapic_init: apic_page is not "
 	    "initialized"));
 
-	/*
-	 * If the vlapic is configured in x2apic mode then it will be
-	 * accessed in the critical section via the MSR emulation code.
-	 *
-	 * Therefore the timer mutex must be a spinlock because blockable
-	 * mutexes cannot be acquired in a critical section.
-	 */
 	mutex_init(&vlapic->timer_lock, NULL, MUTEX_ADAPTIVE, NULL);
 	callout_init(&vlapic->callout, 1);
 
-	vlapic_reset(vlapic);
+	vlapic_reset(vlapic, false);
 }
 
 void
@@ -1552,45 +1703,6 @@ vlapic_mmio_write(struct vlapic *vlapic, uint64_t gpa, uint64_t val,
 	return (0);
 }
 
-/* Should attempts to change the APIC base address be rejected with a #GP?  */
-int vlapic_gp_on_addr_change = 1;
-
-static vm_msr_result_t
-vlapic_set_apicbase(struct vlapic *vlapic, uint64_t val)
-{
-	const uint64_t diff = vlapic->msr_apicbase ^ val;
-
-	/*
-	 * Until the LAPIC emulation for switching between xAPIC and x2APIC
-	 * modes is more polished, it will remain off-limits from being altered
-	 * by the guest.
-	 */
-	const uint64_t reserved_bits = APICBASE_RESERVED | APICBASE_X2APIC |
-	    APICBASE_BSP;
-	if ((diff & reserved_bits) != 0) {
-		return (VMR_GP);
-	}
-
-	/* We do not presently allow the LAPIC access address to be modified. */
-	if ((diff & APICBASE_ADDR_MASK) != 0) {
-		/*
-		 * Explicitly rebuffing such requests with a #GP is the most
-		 * straightforward way to handle the situation, but certain
-		 * consumers (such as the KVM unit tests) may balk at the
-		 * otherwise unexpected exception.
-		 */
-		if (vlapic_gp_on_addr_change) {
-			return (VMR_GP);
-		}
-
-		/* If silence is required, just ignore the address change. */
-		val = (val & ~APICBASE_ADDR_MASK) | DEFAULT_APIC_BASE;
-	}
-
-	vlapic->msr_apicbase = val;
-	return (VMR_OK);
-}
-
 static __inline uint16_t
 vlapic_msr_to_regoff(uint32_t msr)
 {
@@ -1632,6 +1744,11 @@ vlapic_rdmsr(struct vlapic *vlapic, uint32_t msr, uint64_t *valp)
 	uint64_t out = 0;
 	const uint16_t reg = vlapic_msr_to_regoff(msr);
 	switch (reg) {
+	case APIC_OFFSET_APR:
+	case APIC_OFFSET_RRR:
+	case APIC_OFFSET_DFR:
+		/* Not valid under x2APIC mode */
+		return (VMR_GP);
 	case APIC_OFFSET_ICR_LOW: {
 		/* Read from ICR register gets entire (64-bit) value */
 		uint32_t low = 0, high = 0;
@@ -1664,7 +1781,21 @@ vlapic_wrmsr(struct vlapic *vlapic, uint32_t msr, uint64_t val)
 	ASSERT(vlapic_owned_msr(msr));
 
 	if (msr == MSR_APICBASE) {
-		return (vlapic_set_apicbase(vlapic, val));
+		/*
+		 * Attempting to enable x2APIC with the x2APIC CPUID feature
+		 * not present is failed with a #GP.
+		 */
+		if (!vlapic_x2mode(vlapic) &&
+		    apicbase_get_state(val) == ABS_X2APIC &&
+		    !vcpu_cpuid_x2apic_enabled(vlapic->vcpu)) {
+			return (VMR_GP);
+		}
+
+		if (!vlapic_apicbase_write_handler(vlapic, val)) {
+			return (VMR_GP);
+		} else {
+			return (VMR_OK);
+		}
 	}
 
 	/* #GP for x2APIC MSR accesses in xAPIC mode */
@@ -1674,6 +1805,16 @@ vlapic_wrmsr(struct vlapic *vlapic, uint32_t msr, uint64_t val)
 
 	const uint16_t reg = vlapic_msr_to_regoff(msr);
 	switch (reg) {
+	case APIC_OFFSET_ID:
+	case APIC_OFFSET_LDR:
+		/*
+		 * ID and LDR are read-only under x2APIC (unlike xAPIC), so
+		 * writes are disallowed.
+		 */
+		return (VMR_GP);
+	case APIC_OFFSET_DFR:
+		/* Not valid under x2APIC mode */
+		return (VMR_GP);
 	case APIC_OFFSET_ICR_LOW: {
 		/* Write to ICR register sets entire (64-bit) value */
 		bool valid;
@@ -1687,54 +1828,40 @@ vlapic_wrmsr(struct vlapic *vlapic, uint32_t msr, uint64_t val)
 	case APIC_OFFSET_ICR_HI:
 		/* Already covered by ICR_LOW */
 		return (VMR_GP);
+	case APIC_OFFSET_EOI:
 	case APIC_OFFSET_ESR:
-		/* Only 0 may be written from x2APIC mode */
+		/* Only 0 may be written while in x2APIC mode */
 		if (val != 0) {
+			return (VMR_GP);
+		}
+		break;
+	case APIC_OFFSET_TPR:
+	case APIC_OFFSET_SELF_IPI:
+		/*
+		 * Only bits 7:0 (the priority or vector) are defined, and in
+		 * x2APIC mode a write setting any reserved bit raises #GP.
+		 */
+		if ((val & ~(uint64_t)APIC_VECTOR_MASK) != 0) {
 			return (VMR_GP);
 		}
 		break;
 	default:
 		break;
 	}
+
+	if ((val >> 32) != 0) {
+		/*
+		 * With the exception of ICR, which has been expanded to 64 bits
+		 * in width (and is handled above), all other registers consider
+		 * the upper 32 bits as reserved.
+		 */
+		return (VMR_GP);
+	}
+
 	if (!vlapic_write(vlapic, reg, val)) {
 		return (VMR_GP);
 	}
 	return (VMR_OK);
-}
-
-void
-vlapic_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state state)
-{
-	struct vlapic *vlapic;
-	struct LAPIC *lapic;
-
-	vlapic = vm_lapic(vcpu);
-
-	if (state == X2APIC_DISABLED)
-		vlapic->msr_apicbase &= ~APICBASE_X2APIC;
-	else
-		vlapic->msr_apicbase |= APICBASE_X2APIC;
-
-	/*
-	 * Reset the local APIC registers whose values are mode-dependent.
-	 *
-	 * XXX this works because the APIC mode can be changed only at vcpu
-	 * initialization time.
-	 */
-	lapic = vlapic->apic_page;
-	lapic->id = vlapic_get_id(vlapic);
-	if (vlapic_x2mode(vlapic)) {
-		lapic->ldr = x2apic_ldr(vlapic);
-		lapic->dfr = 0;
-	} else {
-		lapic->ldr = 0;
-		lapic->dfr = 0xffffffff;
-	}
-
-	if (state == X2APIC_ENABLED) {
-		if (vlapic->ops.enable_x2apic_mode)
-			(*vlapic->ops.enable_x2apic_mode)(vlapic);
-	}
 }
 
 void
@@ -1917,26 +2044,27 @@ vlapic_data_validate(const struct vlapic *vlapic, const vmm_data_req_t *req)
 	ASSERT(req->vdr_version == 1 &&
 	    req->vdr_len >= sizeof (struct vdi_lapic_v1));
 	const struct vdi_lapic_v1 *src = req->vdr_data;
+	bool req_x2mode = apicbase_x2mode(src->vl_msr_apicbase);
 
 	if ((src->vl_esr_pending & ~APIC_VALID_MASK_ESR) != 0 ||
 	    (src->vl_lapic.vlp_esr & ~APIC_VALID_MASK_ESR) != 0) {
 		return (VVE_BAD_ESR);
 	}
 
-	/* Use the same restrictions as the wrmsr accessor for now */
-	const uint64_t apicbase_reserved = APICBASE_RESERVED | APICBASE_X2APIC |
-	    APICBASE_BSP;
-	const uint64_t diff = src->vl_msr_apicbase ^ vlapic->msr_apicbase;
-	if ((diff & apicbase_reserved) != 0) {
+	/* Use the same restrictions as the wrmsr accessor */
+	if ((src->vl_msr_apicbase & APICBASE_RESERVED) != 0 ||
+	    (src->vl_msr_apicbase & APICBASE_ADDR_MASK) != DEFAULT_APIC_BASE ||
+	    apicbase_get_state(src->vl_msr_apicbase) == ABS_INVALID) {
 		return (VVE_BAD_MSR_BASE);
 	}
 
 	const struct vdi_lapic_page_v1 *page = &src->vl_lapic;
 	/*
-	 * Demand that ID match for now.  This can be further updated when some
-	 * of the x2apic handling is improved.
+	 * Make sure the ID matches with the caveat that the current x2APIC mode
+	 * may be different than the incoming vLAPIC state, so we can't simply
+	 * use vlapic_get_id() directly.
 	 */
-	if (page->vlp_id != vlapic_get_id(vlapic)) {
+	if (page->vlp_id != vlapic_get_id_for_mode(vlapic, req_x2mode)) {
 		return (VVE_BAD_ID);
 	}
 
@@ -1993,7 +2121,13 @@ vlapic_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	/* Already ensured by vlapic_data_validate() */
 	VERIFY3U(page->vlp_version, ==, lapic->version);
 
-	vlapic->msr_apicbase = src->vl_msr_apicbase;
+	/*
+	 * The APICBASE contents have already been validated by
+	 * vlapic_data_validate(), so we can set the APIC state accordingly.
+	 */
+	vlapic_apicbase_set_state(vlapic,
+	    apicbase_get_state(src->vl_msr_apicbase));
+
 	vlapic->esr_pending = src->vl_esr_pending;
 
 	lapic->tpr = page->vlp_tpr;

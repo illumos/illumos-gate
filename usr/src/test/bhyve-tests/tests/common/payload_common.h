@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _PAYLOAD_COMMON_H_
@@ -39,6 +39,18 @@
 /* IO port set aside for emitting test value */
 #define	IOP_TEST_VALUE		0xef10U
 
+/*
+ * IO port set aside for reporting an exception taken by the payload with
+ * handlers installed via idt_init().
+ *
+ * The exception handler writes (as a 32-bit OUT) the guest-physical address of
+ * a `struct payload_exc_report` describing the exception.  If the exception is
+ * resumable (as marked by exc_set_resumable()), the handler returns from it
+ * once the OUT has been fulfilled.  Otherwise it halts, and the harness fails
+ * the test.
+ */
+#define	IOP_TEST_EXC		0xef18U
+
 /* IO port set aside for inputting test param(s) */
 #define	IOP_TEST_PARAM		IOP_TEST_PARAM0
 #define	IOP_TEST_PARAM0		0xef20U
@@ -49,5 +61,28 @@
 /* Expected values emitted through IOP_TEST_RESULT */
 #define	TEST_RESULT_PASS	0
 #define	TEST_RESULT_FAIL	1
+
+/*
+ * Sentinel for "no exception" where an exception vector (uint8_t) is expected.
+ */
+#define	EXC_NONE		0xffU
+
+#ifndef _ASM
+
+#include <sys/types.h>
+
+/*
+ * Exception details reported via IOP_TEST_EXC.
+ *
+ * Must match `exc_report` in payload_utils.S
+ */
+struct payload_exc_report {
+	uint64_t	per_errcode;
+	uint64_t	per_rip;
+	uint8_t		per_vector;
+	uint8_t		per_resumable;
+};
+
+#endif /* _ASM */
 
 #endif /* _PAYLOAD_COMMON_H_ */

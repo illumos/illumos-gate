@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _TEST_DEFS_H_
@@ -42,5 +42,7 @@
 #define	ATPIT_TARGET_TICKS	(ATPIT_FREQ / 50)
 
 #define	TSC_TARGET_WRVAL	500000000000
+
+#define	CPUID1_ECX_X2APIC	(1U << 21)
 
 #endif /* _TEST_DEFS_H_ */

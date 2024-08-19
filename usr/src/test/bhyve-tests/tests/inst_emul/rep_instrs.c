@@ -64,12 +64,18 @@ read_rep_state(struct vcpu *vcpu, struct rep_state *state)
 }
 
 /*
- * Advance the test's guest vCPU to the next `pause`.
+ * Entry state carried from one step of the test to the next.
+ */
+static struct vm_entry ventry;
+
+/*
+ * Advance the test's guest vCPU to its next `pause` or, if `to_exception`, to
+ * the next (resumable) exception it reports, from which it will return when
+ * next run.
  */
 int
-advance_test(struct vcpu *vcpu)
+advance_test(struct vcpu *vcpu, bool to_exception)
 {
-	struct vm_entry ventry = { 0 };
 	struct vm_exit vexit = { 0 };
 
 	for (;;) {
@@ -83,15 +89,31 @@ advance_test(struct vcpu *vcpu)
 			 * rep-prefixed instruction yields, are re-entered.
 			 */
 			break;
+		case VEK_TEST_EXC:
+			if (!to_exception) {
+				test_fail_msg("Unexpected exception (vector "
+				    "%u) at %%rip 0x%lx before pause\n",
+				    test_exc_report()->per_vector,
+				    test_exc_report()->per_rip);
+				return (1);
+			}
+			return (0);
 		case VEK_UNHANDLED:
 			if (vexit.exitcode != VM_EXITCODE_PAUSE) {
 				test_fail_vmexit(&vexit);
 				return (1);
 			}
+			if (to_exception) {
+				test_fail_msg("Reached pause without the "
+				    "expected exception\n");
+				return (1);
+			}
+			/* Nothing remains to be fulfilled on the next entry */
+			bzero(&ventry, sizeof (ventry));
 			return (0);
 		default:
-			test_fail_msg("Unexpected exit kind %d before pause\n",
-			    kind);
+			test_fail_msg("Unexpected exit kind %d before %s\n",
+			    kind, to_exception ? "exception" : "pause");
 			return (1);
 		}
 	}
@@ -119,28 +141,20 @@ set_page_present(struct vmctx *ctx, uint64_t addr, bool present)
 }
 
 /*
- * With the guest stopped in its #PF handler, check that the fault was taken
- * at `fault_addr` with the saved %rip pointing at the faulting rep-prefixed
- * instruction (as recorded by the payload in %rbx), so that returning from
- * the handler resumes the remaining iterations.
+ * With the guest having reported its #PF (but not yet returned from it), check
+ * that the fault was taken at `fault_addr` with the saved %rip pointing at the
+ * faulting rep-prefixed instruction (as recorded by the payload in %rbx), so
+ * that returning from the exception resumes the remaining iterations.
  */
 int
-check_page_fault(struct vmctx *ctx, struct vcpu *vcpu, const char *name,
-    uint64_t fault_addr)
+check_page_fault(struct vcpu *vcpu, const char *name, uint64_t fault_addr)
 {
-	uint64_t marker, rsp, inst_rip, cr2;
-	const uint64_t *frame;
+	const struct payload_exc_report *report = test_exc_report();
+	uint64_t inst_rip, cr2;
 
-	if (vm_get_register(vcpu, VM_REG_GUEST_R8, &marker) != 0) {
-		test_fail_errno(errno, "Could not read guest %r8");
-		return (1);
-	}
-	if (marker != PF_VECTOR) {
-		test_fail_msg("%s did not take #PF\n", name);
-		return (1);
-	}
-	if (vm_get_register(vcpu, VM_REG_GUEST_RSP, &rsp) != 0) {
-		test_fail_errno(errno, "Could not read guest %rsp");
+	if (report->per_vector != PF_VECTOR) {
+		test_fail_msg("%s took vector %u, not #PF\n", name,
+		    report->per_vector);
 		return (1);
 	}
 	if (vm_get_register(vcpu, VM_REG_GUEST_RBX, &inst_rip) != 0) {
@@ -152,26 +166,19 @@ check_page_fault(struct vmctx *ctx, struct vcpu *vcpu, const char *name,
 		return (1);
 	}
 
-	/* The stack is identity-mapped, so %rsp is also its GPA */
-	frame = vm_map_gpa(ctx, rsp, 2 * sizeof (uint64_t));
-	if (frame == NULL) {
-		test_fail_msg("Could not map #PF frame at 0x%lx\n", rsp);
-		return (1);
-	}
-
 	if (cr2 != fault_addr) {
 		test_fail_msg("%s faulted with %%cr2=0x%lx, not 0x%lx\n", name,
 		    cr2, fault_addr);
 		return (1);
 	}
-	if (frame[0] != PF_ERR_WRITE) {
+	if (report->per_errcode != PF_ERR_WRITE) {
 		test_fail_msg("%s faulted with error code 0x%lx, not 0x%x\n",
-		    name, frame[0], PF_ERR_WRITE);
+		    name, report->per_errcode, PF_ERR_WRITE);
 		return (1);
 	}
-	if (frame[1] != inst_rip) {
+	if (report->per_rip != inst_rip) {
 		test_fail_msg("%s faulted with saved %%rip=0x%lx, not 0x%lx\n",
-		    name, frame[1], inst_rip);
+		    name, report->per_rip, inst_rip);
 		return (1);
 	}
 
@@ -208,7 +215,7 @@ main(int argc, char *argv[])
 		test_fail_errno(err, "Could not initialize vcpu0");
 	}
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 
@@ -227,7 +234,7 @@ main(int argc, char *argv[])
 	 * rep-prefixed tests will compare against.
 	 */
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 
@@ -250,7 +257,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 
@@ -268,7 +275,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 
@@ -289,11 +296,11 @@ main(int argc, char *argv[])
 	/*
 	 * rep insb of 64 bytes, starting 16 bytes before a not-present page.
 	 */
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, true) != 0) {
 		return (1);
 	}
 
-	if (check_page_fault(ctx, vcpu, "rep insb", INS_FAULT_ADDR) != 0) {
+	if (check_page_fault(vcpu, "rep insb", INS_FAULT_ADDR) != 0) {
 		return (1);
 	}
 
@@ -314,7 +321,7 @@ main(int argc, char *argv[])
 
 	set_page_present(ctx, INS_FAULT_ADDR, true);
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 
@@ -337,11 +344,11 @@ main(int argc, char *argv[])
 	 * rep movsl of 16 dwords from the xAPIC, starting 16 bytes before a
 	 * not-present page.
 	 */
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, true) != 0) {
 		return (1);
 	}
 
-	if (check_page_fault(ctx, vcpu, "rep movsl", MOVS_FAULT_ADDR) != 0) {
+	if (check_page_fault(vcpu, "rep movsl", MOVS_FAULT_ADDR) != 0) {
 		return (1);
 	}
 
@@ -367,7 +374,7 @@ main(int argc, char *argv[])
 
 	set_page_present(ctx, MOVS_FAULT_ADDR, true);
 
-	if (advance_test(vcpu) != 0) {
+	if (advance_test(vcpu, false) != 0) {
 		return (1);
 	}
 

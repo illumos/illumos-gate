@@ -26,7 +26,7 @@
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd October 14, 2026
+.Dd November 3, 2026
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -978,7 +978,7 @@ interrupts.
 Ignore accesses to unimplemented Model Specific Registers (MSRs).
 This is intended for debug purposes.
 .It Fl x
-The guest's local APIC is configured in x2APIC mode.
+Advertise x2APIC support to the guest.
 .It Fl Y
 Disable MPtable generation.
 .It Ar vmname

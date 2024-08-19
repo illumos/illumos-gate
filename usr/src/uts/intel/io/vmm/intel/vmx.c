@@ -313,42 +313,59 @@ static void vmx_tpr_shadow_enter(struct vlapic *vlapic);
 static void vmx_tpr_shadow_exit(struct vlapic *vlapic);
 
 static void
-vmx_allow_x2apic_msrs(struct vmx_vcpu *vcpu)
+vmx_set_x2apic_msr_access(struct vmx_vcpu *vcpu, bool x2apic_enabled)
 {
+	const int bmro = x2apic_enabled ?
+	    MSR_BITMAP_ACCESS_READ : MSR_BITMAP_ACCESS_NONE;
+	const int bmrw = x2apic_enabled ?
+	    MSR_BITMAP_ACCESS_RW : MSR_BITMAP_ACCESS_NONE;
+	const int bmwo = x2apic_enabled ?
+	    MSR_BITMAP_ACCESS_WRITE : MSR_BITMAP_ACCESS_NONE;
+
 	/*
 	 * Allow readonly access to the following x2APIC MSRs from the guest.
+	 *
+	 * With APIC-register virtualization, such a read is satisfied with the
+	 * 8 bytes at offset ((MSR & 0xff) << 4) in the virtual-APIC page (Intel
+	 * SDM Vol. 3C, "Virtualizing MSR-Based APIC Accesses").  For the 32-bit
+	 * registers below, the upper 4 bytes are the (zeroed) padding after
+	 * the register.  The ICR is excluded as its upper 32-bits are stored
+	 * at a separate offset (APIC_OFFSET_ICR_HI), and so a virtualized read
+	 * would not include the upper half.  ICR reads are thus trapped and
+	 * emulated in vlapic_rdmsr() instead.
 	 */
-	guest_msr_ro(vcpu, MSR_APIC_ID);
-	guest_msr_ro(vcpu, MSR_APIC_VERSION);
-	guest_msr_ro(vcpu, MSR_APIC_LDR);
-	guest_msr_ro(vcpu, MSR_APIC_SVR);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_ID, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_VERSION, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_PPR, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LDR, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_SVR, bmro);
 
 	for (uint_t i = 0; i < 8; i++) {
-		guest_msr_ro(vcpu, MSR_APIC_ISR0 + i);
-		guest_msr_ro(vcpu, MSR_APIC_TMR0 + i);
-		guest_msr_ro(vcpu, MSR_APIC_IRR0 + i);
+		vmx_msr_bitmap_change_access(vcpu, MSR_APIC_ISR0 + i, bmro);
+		vmx_msr_bitmap_change_access(vcpu, MSR_APIC_TMR0 + i, bmro);
+		vmx_msr_bitmap_change_access(vcpu, MSR_APIC_IRR0 + i, bmro);
 	}
 
-	guest_msr_ro(vcpu, MSR_APIC_ESR);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_TIMER);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_THERMAL);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_PCINT);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_LINT0);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_LINT1);
-	guest_msr_ro(vcpu, MSR_APIC_LVT_ERROR);
-	guest_msr_ro(vcpu, MSR_APIC_ICR_TIMER);
-	guest_msr_ro(vcpu, MSR_APIC_DCR_TIMER);
-	guest_msr_ro(vcpu, MSR_APIC_ICR);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_ESR, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_TIMER, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_THERMAL, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_PCINT, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_LINT0, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_LINT1, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_LVT_ERROR, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_ICR_TIMER, bmro);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_DCR_TIMER, bmro);
 
 	/*
-	 * Allow TPR, EOI and SELF_IPI MSRs to be read and written by the guest.
+	 * Allow guest R/W access to TPR and write-only access to EOI and
+	 * SELF_IPI MSRs.
 	 *
 	 * These registers get special treatment described in the section
 	 * "Virtualizing MSR-Based APIC Accesses".
 	 */
-	guest_msr_rw(vcpu, MSR_APIC_TPR);
-	guest_msr_rw(vcpu, MSR_APIC_EOI);
-	guest_msr_rw(vcpu, MSR_APIC_SELF_IPI);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_TPR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_EOI, bmwo);
+	vmx_msr_bitmap_change_access(vcpu, MSR_APIC_SELF_IPI, bmwo);
 }
 
 static ulong_t
@@ -2786,7 +2803,7 @@ vmx_run(void *vcpui, uint64_t rip)
 	struct vm_exit *vmexit;
 	struct vlapic *vlapic;
 	uint32_t exit_reason;
-	bool tpr_shadow_active;
+	bool tpr_shadow_enabled;
 	vm_client_t *vmc;
 	int vcpuid;
 
@@ -2799,9 +2816,9 @@ vmx_run(void *vcpui, uint64_t rip)
 	vmexit = vm_exitinfo(vcpu->vcpu);
 	vmc = vm_get_vmclient(vcpu->vcpu);
 	launched = 0;
-	tpr_shadow_active = vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW) &&
-	    !vmx_cap_en(vmx, VMX_CAP_APICV) &&
-	    (vcpu->cap.proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0;
+
+	tpr_shadow_enabled = vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW) &&
+	    !vmx_cap_en(vmx, VMX_CAP_APICV);
 
 	vmx_msr_guest_enter(vcpu);
 
@@ -2825,10 +2842,18 @@ vmx_run(void *vcpui, uint64_t rip)
 	do {
 		enum event_inject_state inject_state;
 		uint64_t eptgen;
+		bool tpr_shadow_active;
 
 		ASSERT3U(vmcs_read(VMCS_GUEST_RIP), ==, rip);
 
 		handled = UNHANDLED;
+
+		/*
+		 * We check this on every iteration because a guest may switch
+		 * to x2APIC mode and thus disable TPR shadowing or vice versa.
+		 */
+		tpr_shadow_active = tpr_shadow_enabled &&
+		    (vcpu->cap.proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0;
 
 		/*
 		 * Perform initial event/exception/interrupt injection before
@@ -3638,7 +3663,7 @@ vmx_apicv_sync_tmr(struct vlapic *vlapic)
 }
 
 static void
-vmx_enable_x2apic_mode_ts(struct vlapic *vlapic)
+vmx_set_x2apic_mode_ts(struct vlapic *vlapic, bool x2apic_enabled)
 {
 	struct vmx_vcpu *vcpu;
 	uint32_t proc_ctls;
@@ -3646,18 +3671,26 @@ vmx_enable_x2apic_mode_ts(struct vlapic *vlapic)
 	vcpu = ((struct vlapic_vtx *)vlapic)->vcpu;
 
 	proc_ctls = vcpu->cap.proc_ctls;
-	proc_ctls &= ~PROCBASED_USE_TPR_SHADOW;
-	proc_ctls |= PROCBASED_CR8_LOAD_EXITING;
-	proc_ctls |= PROCBASED_CR8_STORE_EXITING;
+	if (x2apic_enabled) {
+		proc_ctls &= ~PROCBASED_USE_TPR_SHADOW;
+		proc_ctls |= PROCBASED_CR8_LOAD_EXITING;
+		proc_ctls |= PROCBASED_CR8_STORE_EXITING;
+	} else {
+		proc_ctls |= PROCBASED_USE_TPR_SHADOW;
+		proc_ctls &= ~PROCBASED_CR8_LOAD_EXITING;
+		proc_ctls &= ~PROCBASED_CR8_STORE_EXITING;
+	}
 	vcpu->cap.proc_ctls = proc_ctls;
 
-	vmcs_load(vcpu->vmcs_pa);
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vcpu);
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
-	vmcs_clear(vcpu->vmcs_pa);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vcpu);
+	}
 }
 
 static void
-vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
+vmx_set_x2apic_mode_vid(struct vlapic *vlapic, bool x2apic_enabled)
 {
 	struct vmx_vcpu *vcpu;
 	uint32_t proc_ctls2;
@@ -3665,18 +3698,26 @@ vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 	vcpu = ((struct vlapic_vtx *)vlapic)->vcpu;
 
 	proc_ctls2 = vcpu->cap.proc_ctls2;
-	KASSERT((proc_ctls2 & PROCBASED2_VIRTUALIZE_APIC_ACCESSES) != 0,
-	    ("%s: invalid proc_ctls2 %x", __func__, proc_ctls2));
+	if (x2apic_enabled) {
+		ASSERT((proc_ctls2 & PROCBASED2_VIRTUALIZE_APIC_ACCESSES) != 0);
 
-	proc_ctls2 &= ~PROCBASED2_VIRTUALIZE_APIC_ACCESSES;
-	proc_ctls2 |= PROCBASED2_VIRTUALIZE_X2APIC_MODE;
+		proc_ctls2 &= ~PROCBASED2_VIRTUALIZE_APIC_ACCESSES;
+		proc_ctls2 |= PROCBASED2_VIRTUALIZE_X2APIC_MODE;
+	} else {
+		ASSERT((proc_ctls2 & PROCBASED2_VIRTUALIZE_X2APIC_MODE) != 0);
+
+		proc_ctls2 |= PROCBASED2_VIRTUALIZE_APIC_ACCESSES;
+		proc_ctls2 &= ~PROCBASED2_VIRTUALIZE_X2APIC_MODE;
+	}
 	vcpu->cap.proc_ctls2 = proc_ctls2;
 
-	vmcs_load(vcpu->vmcs_pa);
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vcpu);
 	vmcs_write(VMCS_SEC_PROC_BASED_CTLS, proc_ctls2);
-	vmcs_clear(vcpu->vmcs_pa);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vcpu);
+	}
 
-	vmx_allow_x2apic_msrs(vcpu);
+	vmx_set_x2apic_msr_access(vcpu, x2apic_enabled);
 }
 
 static void
@@ -3794,13 +3835,13 @@ vmx_vlapic_init(void *vcpui)
 	vlapic->apic_page = (struct LAPIC *)vcpu->apic_page;
 
 	if (vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW)) {
-		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
+		vlapic->ops.set_x2apic_mode = vmx_set_x2apic_mode_ts;
 	}
 	if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
 		vlapic->ops.set_intr_ready = vmx_apicv_set_ready;
 		vlapic->ops.sync_state = vmx_apicv_sync;
 		vlapic->ops.intr_accepted = vmx_apicv_accepted;
-		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_vid;
+		vlapic->ops.set_x2apic_mode = vmx_set_x2apic_mode_vid;
 
 		if (vmx_cap_en(vmx, VMX_CAP_APICV_PIR)) {
 			vlapic->ops.post_intr = vmx_apicv_notify;

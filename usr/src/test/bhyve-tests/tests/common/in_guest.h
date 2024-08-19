@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _IN_GUEST_H_
@@ -30,6 +30,7 @@ void test_fail_vmexit(const struct vm_exit *vexit);
 void test_pass(void);
 const char *test_msg_get(struct vmctx *);
 void test_msg_print(struct vmctx *);
+const struct payload_exc_report *test_exc_report(void);
 
 int test_setup_vcpu(struct vcpu *, uint64_t, uint64_t);
 
@@ -42,6 +43,12 @@ enum vm_exit_kind {
 	VEK_TEST_FAIL,
 	/* Payload emitted a message via IOP_TEST_MSG port */
 	VEK_TEST_MSG,
+	/*
+	 * Payload reported a resumable exception via IOP_TEST_EXC port, with
+	 * the details available from test_exc_report().  Any other exception
+	 * triggers a test failure.
+	 */
+	VEK_TEST_EXC,
 	/* Test specific logic must handle exit data */
 	VEK_UNHANDLED,
 };

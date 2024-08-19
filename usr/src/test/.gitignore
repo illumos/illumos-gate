@@ -70,6 +70,7 @@ bhyve-tests/tests/kdev/payload_vlapic_freq
 bhyve-tests/tests/kdev/payload_vlapic_freq_periodic
 bhyve-tests/tests/kdev/payload_vlapic_mmio_access
 bhyve-tests/tests/kdev/payload_vlapic_msr_access
+bhyve-tests/tests/kdev/payload_vlapic_x2apic_mode
 bhyve-tests/tests/kdev/payload_vpmtmr_freq
 bhyve-tests/tests/kdev/payload_vrtc_ops
 bhyve-tests/tests/kdev/payload_wrmsr_tsc
@@ -81,6 +82,7 @@ bhyve-tests/tests/kdev/vlapic_freq
 bhyve-tests/tests/kdev/vlapic_freq_periodic
 bhyve-tests/tests/kdev/vlapic_mmio_access
 bhyve-tests/tests/kdev/vlapic_msr_access
+bhyve-tests/tests/kdev/vlapic_x2apic_mode
 bhyve-tests/tests/kdev/vpmtmr_freq
 bhyve-tests/tests/kdev/vrtc_ops
 bhyve-tests/tests/kdev/wrmsr_tsc
@@ -115,6 +117,7 @@ bhyve-tests/tests/vmm/pause_resume
 bhyve-tests/tests/vmm/self_destruct
 bhyve-tests/tests/vmm/time_data
 bhyve-tests/tests/vmm/vcpu_alloc
+bhyve-tests/tests/vmm/vlapic_x2apic_state
 
 crypto-tests/tests/longhash/longhash_32
 crypto-tests/tests/longhash/longhash_64

@@ -10,7 +10,14 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
+ * Exercise every x2APIC MSR which is architecturally accessible.  None of these
+ * should raise #GP.  Accesses which must raise #GP (e.g., wrmsr to read-only
+ * register, register doesn't exist in x2APIC mode) are tested in
+ * vlapic_x2apic_mode.
  */
 
 #include "payload_common.h"
@@ -31,12 +38,12 @@ reg_readable(uint32_t reg)
 	case 0x803: /* VER */
 
 	case 0x808: /* TPR */
-	case 0x809: /* APR */
+	/* APR (0x809) does not exist in x2APIC mode */
 	case 0x80a: /* PPR */
 
-	case 0x80c: /* RRR */
+	/* RRR (0x80c) does not exist in x2APIC mode */
 	case 0x80d: /* LDR */
-	case 0x80e: /* DFR */
+	/* DFR (0x80e) does not exist in x2APIC mode */
 	case 0x80f: /* SVR */
 
 	case 0x810 ... 0x817: /* ISR */
@@ -68,14 +75,14 @@ static bool
 reg_writable(uint32_t reg)
 {
 	switch (reg) {
-	case 0x802: /* ID */
+	/* ID (0x802) is read-only in x2APIC mode */
 
 	case 0x808: /* TPR */
 
 	case 0x80b: /* EOI */
 
-	case 0x80d: /* LDR */
-	case 0x80e: /* DFR */
+	/* LDR (0x80d) is read-only in x2APIC mode */
+	/* DFR (0x80e) does not exist in x2APIC mode */
 	case 0x80f: /* SVR */
 
 	case 0x828: /* ESR */
@@ -102,9 +109,13 @@ reg_writable(uint32_t reg)
 void
 start(void)
 {
+	/*
+	 * The LAPIC starts in xAPIC mode with x2APIC support enabled.
+	 */
 	uint64_t base = rdmsr(MSR_APICBASE);
+	wrmsr(MSR_APICBASE, base | APICBASE_X2APIC);
+	base = rdmsr(MSR_APICBASE);
 	if ((base & APICBASE_X2APIC) == 0) {
-		/* bail if the host has not enabled x2apic for us */
 		outb(IOP_TEST_RESULT, TEST_RESULT_FAIL);
 	}
 

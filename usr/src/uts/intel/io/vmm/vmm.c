@@ -144,7 +144,7 @@ struct vcpu {
 	bool		reqconsist;	/* (i) req. vcpu exit when consistent */
 	bool		reqbarrier;	/* (i) request vcpu exit barrier */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
-	enum x2apic_state x2apic_state;	/* (i) APIC mode */
+	enum x2apic_state x2apic_state;	/* (i) legacy cpuid x2APIC support */
 	uint64_t	exit_intinfo;	/* (i) events pending at VM exit */
 	uint64_t	exc_pending;	/* (i) exception pending */
 	bool		nmi_pending;	/* (i) NMI pending */
@@ -3165,7 +3165,7 @@ vcpu_arch_reset(struct vcpu *vcpu, bool init_only)
 	VERIFY0(vm_set_seg_desc(vcpu, VM_REG_GUEST_TR, &desc));
 	VERIFY0(vm_set_register(vcpu, VM_REG_GUEST_TR, 0));
 
-	vlapic_reset(vm_lapic(vcpu));
+	vlapic_reset(vm_lapic(vcpu), init_only);
 
 	VERIFY0(vm_set_register(vcpu, VM_REG_GUEST_INTR_SHADOW, 0));
 
@@ -3546,8 +3546,6 @@ vm_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state state)
 		return (EINVAL);
 
 	vcpu->x2apic_state = state;
-
-	vlapic_set_x2apic_state(vcpu, state);
 
 	return (0);
 }

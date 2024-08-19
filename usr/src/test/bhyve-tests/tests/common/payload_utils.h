@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _PAYLOAD_UTILS_H_
@@ -38,6 +38,28 @@ uint64_t getxcr(uint32_t);
 void test_result_pass(void);
 void test_result_fail(void);
 void test_msg(const char *);
+
+/*
+ * Setup rudimentary exception handling.  Any exceptions raised after this
+ * will be reported to the harness via IOP_TEST_EXC.
+ */
+void idt_init(void);
+
+/*
+ * Marks the given exception vector as resumable, allowing the harness to
+ * inspect it without failing the test and letting the payload resume execution.
+ */
+void exc_set_resumable(uint8_t);
+
+/*
+ * Exception-safe versions of rdmsr/wrmsr.  Any exceptions raised during their
+ * operation are trapped with the vector number returned, or EXC_NONE if no
+ * exception occurred.
+ */
+uint8_t rdmsr_safe(uint32_t, uint64_t *);
+uint8_t wrmsr_safe(uint32_t, uint64_t);
+
+#define	EXC_GP		13
 
 #define	__STR2(x)	#x
 #define	__STR(x)	__STR2(x)

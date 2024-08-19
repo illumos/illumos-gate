@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
@@ -21,6 +21,7 @@ PROG =	vpmtmr_freq \
 	vlapic_freq_periodic \
 	vlapic_mmio_access \
 	vlapic_msr_access \
+	vlapic_x2apic_mode \
 	vatpit_freq \
 	vrtc_ops
 

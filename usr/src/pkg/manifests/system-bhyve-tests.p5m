@@ -56,6 +56,7 @@ file path=opt/bhyve-tests/tests/kdev/vlapic_freq mode=0555
 file path=opt/bhyve-tests/tests/kdev/vlapic_freq_periodic mode=0555
 file path=opt/bhyve-tests/tests/kdev/vlapic_mmio_access mode=0555
 file path=opt/bhyve-tests/tests/kdev/vlapic_msr_access mode=0555
+file path=opt/bhyve-tests/tests/kdev/vlapic_x2apic_mode mode=0555
 file path=opt/bhyve-tests/tests/kdev/vpmtmr_freq mode=0555
 file path=opt/bhyve-tests/tests/kdev/vrtc_ops mode=0555
 file path=opt/bhyve-tests/tests/kdev/wrmsr_tsc mode=0555
@@ -102,6 +103,7 @@ file path=opt/bhyve-tests/tests/vmm/pause_resume mode=0555
 file path=opt/bhyve-tests/tests/vmm/self_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/time_data mode=0555
 file path=opt/bhyve-tests/tests/vmm/vcpu_alloc mode=0555
+file path=opt/bhyve-tests/tests/vmm/vlapic_x2apic_state mode=0555
 dir  path=usr/kernel/drv group=sys
 dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/vmm_drv_test

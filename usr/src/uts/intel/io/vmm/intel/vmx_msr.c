@@ -347,30 +347,33 @@ vmx_msr_guest_init(struct vmx_vcpu *vcpu)
 	 * MSR_EFER is saved and restored in the guest VMCS area on a VM
 	 * exit and entry respectively. It is also restored from the
 	 * host VMCS area on a VM exit.
-	 *
+	 */
+	const int bmrw = MSR_BITMAP_ACCESS_RW;
+	vmx_msr_bitmap_change_access(vcpu, MSR_GSBASE, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_FSBASE, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_SYSENTER_CS_MSR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_SYSENTER_ESP_MSR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_SYSENTER_EIP_MSR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_EFER, bmrw);
+
+	/*
 	 * The TSC MSR is exposed read-only. Writes are disallowed as
 	 * that will impact the host TSC.  If the guest does a write the
 	 * "use TSC offsetting" execution control is enabled and the
 	 * difference between the host TSC and the guest TSC is written
 	 * into the TSC offset in the VMCS.
 	 */
-	guest_msr_rw(vcpu, MSR_GSBASE);
-	guest_msr_rw(vcpu, MSR_FSBASE);
-	guest_msr_rw(vcpu, MSR_SYSENTER_CS_MSR);
-	guest_msr_rw(vcpu, MSR_SYSENTER_ESP_MSR);
-	guest_msr_rw(vcpu, MSR_SYSENTER_EIP_MSR);
-	guest_msr_rw(vcpu, MSR_EFER);
-	guest_msr_ro(vcpu, MSR_TSC);
+	vmx_msr_bitmap_change_access(vcpu, MSR_TSC, MSR_BITMAP_ACCESS_READ);
 
 	/*
 	 * The guest may have direct access to these MSRs as they are
 	 * saved/restored in vmx_msr_guest_enter() and vmx_msr_guest_exit().
 	 */
-	guest_msr_rw(vcpu, MSR_LSTAR);
-	guest_msr_rw(vcpu, MSR_CSTAR);
-	guest_msr_rw(vcpu, MSR_STAR);
-	guest_msr_rw(vcpu, MSR_SF_MASK);
-	guest_msr_rw(vcpu, MSR_KGSBASE);
+	vmx_msr_bitmap_change_access(vcpu, MSR_LSTAR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_CSTAR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_STAR, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_SF_MASK, bmrw);
+	vmx_msr_bitmap_change_access(vcpu, MSR_KGSBASE, bmrw);
 
 	/*
 	 * Initialize guest IA32_PAT MSR with default value after reset.

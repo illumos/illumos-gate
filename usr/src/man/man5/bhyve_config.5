@@ -27,7 +27,7 @@
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\" Portions Copyright 2026 Oxide Computer Company
 .\"
-.Dd September 1, 2026
+.Dd November 3, 2026
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -317,7 +317,7 @@ do not use in new configurations.
 .It Va x86.mptable Ta bool Ta true Ta
 Generate an MPTable.
 .It Va x86.x2apic Ta bool Ta false Ta
-Configure guest's local APICs in x2APIC mode.
+Advertise x2APIC support to the guest.
 .It Va x86.strictio Ta bool Ta false Ta
 Exit if a guest accesses an I/O port that is not emulated.
 By default, writes are ignored and reads return all bits set.

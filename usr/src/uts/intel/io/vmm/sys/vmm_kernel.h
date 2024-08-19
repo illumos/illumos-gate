@@ -438,6 +438,7 @@ void legacy_emulate_cpuid(struct vcpu *, uint32_t *, uint32_t *, uint32_t *,
     uint32_t *);
 void vcpu_cpuid_init(vcpu_cpuid_config_t *);
 void vcpu_cpuid_cleanup(vcpu_cpuid_config_t *);
+bool vcpu_cpuid_x2apic_enabled(struct vcpu *);
 
 bool vm_cpuid_capability(struct vcpu *, enum vm_cpuid_capability);
 bool validate_guest_xcr0(uint64_t, uint64_t);

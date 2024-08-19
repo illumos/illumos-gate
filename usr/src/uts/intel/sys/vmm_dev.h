@@ -193,6 +193,13 @@ struct vm_stat_desc {
 	char		desc[128];			/* out */
 };
 
+/*
+ * x2APIC support for a vCPU via VM_SET_X2APIC_STATE/VM_GET_X2APIC_STATE.
+ *
+ * This controls only whether x2APIC is available to the guest (as advertised in
+ * legacy CPUID handling), not the current mode of the vCPU's LAPIC.  It has no
+ * effect when explicit CPUID entries have been provided via VM_SET_CPUID.
+ */
 struct vm_x2apic {
 	int			cpuid;
 	enum x2apic_state	state;
@@ -482,7 +489,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	19
+#define	VMM_CURRENT_INTERFACE_VERSION	20
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))

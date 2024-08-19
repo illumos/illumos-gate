@@ -651,6 +651,7 @@
 #define	MSR_APIC_ID		0x802
 #define	MSR_APIC_VERSION	0x803
 #define	MSR_APIC_TPR		0x808
+#define	MSR_APIC_PPR		0x80a
 #define	MSR_APIC_EOI		0x80b
 #define	MSR_APIC_LDR		0x80d
 #define	MSR_APIC_SVR		0x80f

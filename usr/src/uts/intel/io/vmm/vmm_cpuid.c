@@ -1130,3 +1130,17 @@ default_leaf:
 	*ecx = regs[2];
 	*edx = regs[3];
 }
+
+/*
+ * Returns whether the x2APIC CPUID flag is present for the given vCPU.
+ */
+bool
+vcpu_cpuid_x2apic_enabled(struct vcpu *vcpu)
+{
+	uint64_t regs[4] = { 0 };
+
+	regs[0] = CPUID_0000_0001;
+	vcpu_emulate_cpuid(vcpu, &regs[0], &regs[1], &regs[2], &regs[3]);
+
+	return ((regs[2] & CPUID2_X2APIC) != 0);
+}

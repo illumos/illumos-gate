@@ -115,7 +115,7 @@ struct vlapic_ops {
 	void (*sync_state)(struct vlapic *vlapic);
 	void (*intr_accepted)(struct vlapic *vlapic, int vector);
 	void (*post_intr)(struct vlapic *vlapic, int hostcpu);
-	void (*enable_x2apic_mode)(struct vlapic *vlapic);
+	void (*set_x2apic_mode)(struct vlapic *vlapic, bool x2apic_enabled);
 };
 
 struct vlapic_stats {

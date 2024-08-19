@@ -26,10 +26,6 @@
 # testing. This port for TIMER_CNTR0 is registered in `vm_inout_init()`.
 #define TIMER_CNTR0  $0x40
 
-/* Flat 64-bit code and data segment descriptors */
-#define	GDT_CODE64   $0x00af9b000000ffff
-#define	GDT_DATA     $0x00cf93000000ffff
-
 /*
  * This test is rife with dependencies on x86 UB for which we have picked *a*
  * useful behavior in bhyve. Accesses to the xAPIC registers are expected to
@@ -48,7 +44,7 @@ ENTRY(start)
 	 * values.
 	 */
 	sub     $64, %rsp
-	call    setup_pf_handler
+	call    setup_exceptions
 	call    load_apicbase
 	pause
 
@@ -85,7 +81,6 @@ ENTRY(start)
 	 */
 
 	/* Test `rep insb` faulting on its memory destination.. */
-	xor     %r8d, %r8d
 	mov     TIMER_CNTR0, %dx
 	mov     $(INS_FAULT_ADDR - 16), %rdi
 	mov     $64, %ecx
@@ -95,7 +90,6 @@ ENTRY(start)
 	pause
 
 	/* Test `rep movs` from an MMIO region faulting on its destination.. */
-	xor     %r8d, %r8d
 	call    load_apicbase
 	mov     %rax, %rsi
 	mov     $(MOVS_FAULT_ADDR - 16), %rdi
@@ -124,45 +118,12 @@ ENTRY(load_apicbase)
 SET_SIZE(load_apicbase)
 
 /*
- * The test harness loads the hidden segment state directly and leaves the GDT
- * empty, but both exception delivery and `iretq` consult it.  Fill in
- * descriptors for the %cs and %ss selectors in use, then install a 64-bit
- * interrupt gate for #PF.
+ * Set up the common exception handling, with #PF reported to the test runner
+ * and then returned from, rather than failing the test.
  */
-ENTRY(setup_pf_handler)
-	xor     %eax, %eax
-	mov     %cs, %ax
-	and     $~7, %eax
-	movabs  GDT_CODE64, %rdx
-	mov     %rdx, MEM_LOC_GDT(%rax)
-
-	xor     %eax, %eax
-	mov     %ss, %ax
-	and     $~7, %eax
-	movabs  GDT_DATA, %rdx
-	mov     %rdx, MEM_LOC_GDT(%rax)
-
-	mov     $(MEM_LOC_IDT + PF_VECTOR * 16), %rdi
-	lea     pf_handler(%rip), %rax
-	mov     %ax, 0(%rdi)
-	mov     %cs, %dx
-	mov     %dx, 2(%rdi)
-	movw    $0x8e00, 4(%rdi)
-	shr     $16, %rax
-	mov     %ax, 6(%rdi)
-	shr     $16, %rax
-	mov     %eax, 8(%rdi)
-	movl    $0, 12(%rdi)
+ENTRY(setup_exceptions)
+	call    idt_init
+	movl    $PF_VECTOR, %edi
+	call    exc_set_resumable
 	ret
-SET_SIZE(setup_pf_handler)
-
-/*
- * Mark in %r8 that the fault was taken and let the test runner inspect the
- * exception frame (and make the faulting page present) before returning.
- */
-ENTRY(pf_handler)
-	mov     $PF_VECTOR, %r8d
-	pause
-	add     $8, %rsp
-	iretq
-SET_SIZE(pf_handler)
+SET_SIZE(setup_exceptions)
