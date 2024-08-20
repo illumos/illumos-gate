@@ -22,6 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #ifndef	_DCONF_H
@@ -30,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,7 +47,9 @@ typedef struct dumpconf {
 	FILE *dc_conf_fp;		/* File pointer for config file */
 	int dc_conf_fd;			/* File descriptor for config file */
 	int dc_dump_fd;			/* File descriptor for dump device */
-	boolean_t dc_readonly;		/* Readonly conf file */
+	bool dc_readonly;		/* Readonly conf file */
+	bool dc_parsable;		/* Parsable values */
+	bool dc_headers;		/* Print headers */
 } dumpconf_t;
 
 /*

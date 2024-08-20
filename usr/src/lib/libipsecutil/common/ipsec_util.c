@@ -1861,33 +1861,33 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%sSADB_ASSOC spi=0x%x, replay window size=%u, state="),
 		    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
-		switch (assoc->sadb_sa_state) {
-		case SADB_SASTATE_LARVAL:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN, "LARVAL"));
-			break;
-		case SADB_SASTATE_MATURE:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN, "MATURE"));
-			break;
-		case SADB_SASTATE_DYING:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN, "DYING"));
-			break;
-		case SADB_SASTATE_DEAD:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
-			break;
-		case SADB_X_SASTATE_ACTIVE_ELSEWHERE:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "ACTIVE_ELSEWHERE"));
-			break;
-		case SADB_X_SASTATE_IDLE:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN, "IDLE"));
-			break;
-		default:
-			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "<unknown %u>"), assoc->sadb_sa_state);
-		}
 	} else {
 		(void) fprintf(file,
-		    dgettext(TEXT_DOMAIN, "%sSADB_ASSOC"), prefix);
+		    dgettext(TEXT_DOMAIN, "%sSADB_ASSOC state="), prefix);
+	}
+	switch (assoc->sadb_sa_state) {
+	case SADB_SASTATE_LARVAL:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "LARVAL"));
+		break;
+	case SADB_SASTATE_MATURE:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "MATURE"));
+		break;
+	case SADB_SASTATE_DYING:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DYING"));
+		break;
+	case SADB_SASTATE_DEAD:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
+		break;
+	case SADB_X_SASTATE_ACTIVE_ELSEWHERE:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "ACTIVE_ELSEWHERE"));
+		break;
+	case SADB_X_SASTATE_IDLE:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "IDLE"));
+		break;
+	default:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), assoc->sadb_sa_state);
 	}
 
 	if (assoc->sadb_sa_auth != SADB_AALG_NONE) {

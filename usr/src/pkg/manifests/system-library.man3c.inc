@@ -1290,6 +1290,7 @@ link path=usr/share/man/man3c/swapcontext_extd.3c target=makecontext.3c
 link path=usr/share/man/man3c/swprintf.3c target=fwprintf.3c
 link path=usr/share/man/man3c/swscanf.3c target=fwscanf.3c
 file path=usr/share/man/man3c/sync_instruction_memory.3c
+file path=usr/share/man/man3c/syncfs.3c
 file path=usr/share/man/man3c/sysconf.3c
 file path=usr/share/man/man3c/syslog.3c
 file path=usr/share/man/man3c/system.3c

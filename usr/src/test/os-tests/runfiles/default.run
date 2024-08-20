@@ -39,6 +39,11 @@ tests = ['poll_test', 'epoll_test']
 [/opt/os-tests/tests/clock_gettime.32]
 [/opt/os-tests/tests/clock_gettime.64]
 
+[/opt/os-tests/tests/statvfs.32]
+[/opt/os-tests/tests/statvfs.64]
+[/opt/os-tests/tests/syncfs.32]
+[/opt/os-tests/tests/syncfs.64]
+
 [/opt/os-tests/tests/ucontext.32]
 [/opt/os-tests/tests/ucontext.64]
 [/opt/os-tests/tests/getcontext_extd.32]

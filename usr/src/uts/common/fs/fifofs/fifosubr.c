@@ -353,27 +353,7 @@ fifoinit(int fstype, char *name)
 	}
 	fifodev = makedevice(dev, 0);
 
-	fifovfsp = kmem_zalloc(sizeof (struct vfs), KM_SLEEP);
-	fifovfsp->vfs_next = NULL;
-	vfs_setops(fifovfsp, fifo_vfsops);
-	fifovfsp->vfs_vnodecovered = NULL;
-	fifovfsp->vfs_flag = 0;
-	fifovfsp->vfs_bsize = 1024;
-	fifovfsp->vfs_fstype = fifofstype;
-	vfs_make_fsid(&fifovfsp->vfs_fsid, fifodev, fifofstype);
-	fifovfsp->vfs_data = NULL;
-	fifovfsp->vfs_dev = fifodev;
-	fifovfsp->vfs_bcount = 0;
-
-	/*
-	 * It is necessary to initialize vfs_count here to 1.
-	 * This prevents the fifovfsp from getting freed when
-	 * a thread does a VFS_HOLD followed by a VFS_RELE
-	 * on the fifovfsp
-	 *
-	 * The fifovfsp should never be freed.
-	 */
-	fifovfsp->vfs_count = 1;
+	fifovfsp = fs_vfsp_global(fifo_vfsops, fifodev, fifofstype, 1024);
 
 	mutex_init(&ftable_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&fino_lock, NULL, MUTEX_DEFAULT, NULL);

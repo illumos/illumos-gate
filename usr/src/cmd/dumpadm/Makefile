@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 PROG = dumpadm
@@ -29,7 +30,6 @@ SVCMETHOD= svc-dumpadm
 ETCFILES= dumpadm.conf
 
 OBJS = main.o dconf.o minfree.o utils.o swap.o
-SRCS = $(OBJS:.o=.c)
 
 ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 
@@ -37,6 +37,8 @@ include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 CFLAGS += -I../../lib/libzutil/common
+
+CSTD = $(CSTD_GNU99)
 
 FILEMODE = 0555
 

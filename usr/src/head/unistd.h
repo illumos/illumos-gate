@@ -289,6 +289,7 @@ extern int fexecve(int, char *const[], char *const[]);
 #endif
 #if !defined(_STRICT_SYMBOLS)
 extern int execvpe(const char *, char *const [], char *const []);
+extern int syncfs(int);
 #endif	/* !_STRICT_SYMBOLS */
 extern void _exit(int)
 	__NORETURN;

@@ -468,6 +468,7 @@ MANFILES=	__fbufsize.3c					\
 		strxfrm.3c					\
 		swab.3c						\
 		sync_instruction_memory.3c			\
+		syncfs.3c					\
 		sysconf.3c					\
 		syslog.3c					\
 		system.3c					\

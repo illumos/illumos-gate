@@ -3,23 +3,21 @@
 .\" Copyright 2015 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2024 MNX Cloud, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUMPADM 8 "Jun 15, 2019"
+.TH DUMPADM 8 "Aug 05, 2024"
 .SH NAME
 dumpadm \- configure operating system crash dump
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/sbin/dumpadm\fR [\fB-enuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
+\fB/usr/sbin/dumpadm\fR [\fB-Henpuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
      [\fB-k\fR \fIkey-file\fR] [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
      [\fB-r\fR \fIroot-dir\fR] [\fB-z\fR on | off]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdumpadm\fR program is an administrative command that manages the
 configuration of the operating system crash dump facility. A crash dump is a
 disk copy of the physical memory of the computer at the time of a fatal system
@@ -106,9 +104,18 @@ changes are valid, and if so, reconfigures the crash dump parameters and
 displays the resulting configuration. You must be \fBroot\fR to view or change
 dump parameters.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-H\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not print headers. This option is often paired with \fB-p\fR and only works
+for the dump estimate size option, \fB-e\fR.
+.RE
+
 .sp
 .ne 2
 .na
@@ -296,6 +303,16 @@ retrieval may not be possible.
 .sp
 .ne 2
 .na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display numbers in parsable (exact) values and can only be used with \fB-e\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-r\fR \fIroot-dir\fR\fR
 .ad
 .sp .6
@@ -361,7 +378,6 @@ Turns crash dump compression \fBon\fR or \fBoff\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRReconfiguring The Dump Device To A Dedicated Dump Device:
 .sp
 .LP
@@ -381,10 +397,27 @@ example# dumpadm -d /dev/dsk/c0t2d0s2
 .fi
 .in -2
 .sp
-
-.SH EXIT STATUS
+\fBExample 2\fR Show estimated size of dump device:
 .sp
 .LP
+The following commands will output the estimated dump device size,
+usable for humans and in scripts.
+
+.sp
+.in +2
+.nf
+example# dumpadm -e
+Estimated dump size: 15.2G
+.sp
+example# dumpadm -ep
+Estimated dump size: 16364603392
+.sp
+example# dumpadm -epH
+16364605440
+.fi
+.in -2
+.sp
+.SH EXIT STATUS
 The following exit values are returned:
 .sp
 .ne 2
@@ -418,7 +451,6 @@ Invalid command line options were specified.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/dump\fR\fR
@@ -451,8 +483,6 @@ Contains minimum amount of free space for \fIsavecore-directory\fR. See
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR svcs (1),
 .BR uname (1),
 .BR attributes (7),
@@ -461,8 +491,6 @@ Contains minimum amount of free space for \fIsavecore-directory\fR. See
 .BR svcadm (8),
 .BR swap (8)
 .SH NOTES
-.sp
-.LP
 The system crash dump service is managed by the service management facility,
 \fBsmf\fR(7), under the service identifier:
 .sp
@@ -479,8 +507,6 @@ Administrative actions on this service, such as enabling, disabling, or
 requesting restart, can be performed using \fBsvcadm\fR(8). The service's
 status can be queried using the \fBsvcs\fR(1) command.
 .SS "Dump Device Selection"
-.sp
-.LP
 When the special \fBswap\fR token is specified as the argument to \fBdumpadm\fR
 \fB-d\fR the utility will attempt to configure the most appropriate swap device
 as the dump device. \fBdumpadm\fR configures the largest swap block device as
@@ -490,8 +516,6 @@ can be configured as the dump device, a warning message will be displayed.
 While local and remote swap files can be configured as the dump device, this is
 not recommended.
 .SS "Dump Device/Swap Device Interaction (UFS File Systems Only)"
-.sp
-.LP
 In the event that the dump device is also a swap device, and the swap device is
 deleted by the administrator using the \fBswap\fR \fB-d\fR command, the
 \fBswap\fR command will automatically invoke \fBdumpadm\fR \fB-d\fR \fBswap\fR
@@ -509,8 +533,6 @@ appropriate swap device is added by the administrator, the dump device is not
 changed; the administrator must re-execute \fBdumpadm\fR \fB-d\fR \fBswap\fR to
 reselect the most appropriate device fom the new list of swap devices.
 .SS "Minimum Free Space"
-.sp
-.LP
 If the \fBdumpadm\fR \fB-m\fR option is used to create a \fBminfree\fR file
 based on a percentage of the total size of the file system containing the
 savecore directory, this value is not automatically recomputed if the file
@@ -520,8 +542,6 @@ such file exists in the savecore directory, \fBsavecore\fR will default to a
 free space threshold of one megabyte. If no free space threshold is desired, a
 minfree file containing size 0 can be created.
 .SS "Security Issues"
-.sp
-.LP
 If, upon reboot, the specified savecore directory is not present, it will be
 created prior to the execution of \fBsavecore\fR with permissions 0700 (read,
 write, execute by owner only) and owner \fBroot\fR. It is recommended that

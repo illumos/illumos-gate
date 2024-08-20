@@ -54,6 +54,7 @@ extern "C" {
 extern int	fs_nosys();
 extern int	fs_inval();
 extern int	fs_notdir();
+extern int	fs_nosys_syncfs(vfs_t *, uint64_t, cred_t *);
 extern int	fs_nosys_map(struct vnode *, offset_t, struct as *, caddr_t *,
 			size_t, uchar_t, uchar_t, uint_t, struct cred *,
 			caller_context_t *);
@@ -67,6 +68,7 @@ extern int	fs_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
 			caller_context_t *);
 extern int	fs_fsync(vnode_t *, int, cred_t *, caller_context_t *);
 extern int	fs_sync(struct vfs *, short, cred_t *);
+extern int	fs_syncfs_nop(vfs_t *, uint64_t, cred_t *);
 extern int	fs_rwlock(vnode_t *, int, caller_context_t *);
 extern void	fs_rwunlock(vnode_t *, int, caller_context_t *);
 extern int	fs_cmp(vnode_t *, vnode_t *, caller_context_t *);
@@ -95,6 +97,8 @@ extern int	fs_acl_nontrivial(struct vnode *vp, struct cred *cr);
 extern int	fs_need_estale_retry(int);
 extern void	fs_vscan_register(int (*av_scan)(vnode_t *, cred_t *, int));
 extern int	fs_vscan(vnode_t *, cred_t *, int);
+
+extern vfs_t	*fs_vfsp_global(struct vfsops *, dev_t, int, uint_t);
 
 /* Helper function to detect when epoll checks VOP_POLL handlers */
 extern boolean_t fs_reject_epoll();

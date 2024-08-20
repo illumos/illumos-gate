@@ -252,6 +252,7 @@ CHKHDRS=			\
 	fctio.h			\
 	fdbuffer.h		\
 	fdio.h			\
+	fdsync.h		\
 	feature_tests.h		\
 	fem.h			\
 	file.h			\

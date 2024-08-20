@@ -163,6 +163,7 @@ usr/include/sys/sha2_consts.h
 #
 usr/include/sys/libc_kernel.h
 usr/include/sys/synch32.h
+usr/include/sys/fdsync.h
 #
 # Private interfaces for libdisasm
 #

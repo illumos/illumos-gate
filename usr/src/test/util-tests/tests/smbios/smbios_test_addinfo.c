@@ -170,7 +170,7 @@ smbios_test_addinfo_verify_ents(smbios_hdl_t *hdl)
 
 	if (ent->smbai_ref != smbios_addinfo_ent0_hdl) {
 		warnx("entry 0 mismatch, found unexpected reference handle: "
-		    "0x%lx", ent->smbai_ref);
+		    "0x%" _PRIxID, ent->smbai_ref);
 		ret = B_FALSE;
 	}
 	if (ent->smbai_ref_off != smbios_addinfo_ent0_off) {
@@ -198,7 +198,7 @@ smbios_test_addinfo_verify_ents(smbios_hdl_t *hdl)
 
 	if (ent->smbai_ref != smbios_addinfo_ent1_hdl) {
 		warnx("entry 1 mismatch, found unexpected reference handle: "
-		    "0x%lx", ent->smbai_ref);
+		    "0x%" _PRIxID, ent->smbai_ref);
 		ret = B_FALSE;
 	}
 	if (ent->smbai_ref_off != smbios_addinfo_ent1_off) {
@@ -225,7 +225,7 @@ smbios_test_addinfo_verify_ents(smbios_hdl_t *hdl)
 
 	if (ent->smbai_ref != smbios_addinfo_ent2_hdl) {
 		warnx("entry 2 mismatch, found unexpected reference handle: "
-		    "0x%lx", ent->smbai_ref);
+		    "0x%" _PRIxID, ent->smbai_ref);
 		ret = B_FALSE;
 	}
 	if (ent->smbai_ref_off != smbios_addinfo_ent2_off) {
@@ -410,7 +410,7 @@ smbios_test_addinfo_verify_invlen_multient(smbios_hdl_t *hdl)
 
 	if (ent->smbai_ref != smbios_addinfo_ent0_hdl) {
 		warnx("entry 0 mismatch, found unexpected reference handle: "
-		    "0x%lx", ent->smbai_ref);
+		    "0x%" _PRIxID, ent->smbai_ref);
 		ret = B_FALSE;
 	}
 	if (ent->smbai_ref_off != smbios_addinfo_ent0_off) {

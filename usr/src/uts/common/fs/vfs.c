@@ -26,6 +26,7 @@
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -315,6 +316,12 @@ fsop_sync_by_kind(int fstype, short flag, cred_t *cr)
 		return (ENOTSUP);
 }
 
+int
+fsop_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	return (*(vfsp)->vfs_op->vfs_syncfs)(vfsp, flags, cr);
+}
+
 /*
  * File system initialization.  vfs_setfsops() must be called from a file
  * system's init routine.
@@ -325,38 +332,51 @@ fs_copyfsops(const fs_operation_def_t *template, vfsops_t *actual,
     int *unused_ops)
 {
 	static const fs_operation_trans_def_t vfs_ops_table[] = {
-		VFSNAME_MOUNT, offsetof(vfsops_t, vfs_mount),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_MOUNT, offsetof(vfsops_t, vfs_mount),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_UNMOUNT, offsetof(vfsops_t, vfs_unmount),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_UNMOUNT, offsetof(vfsops_t, vfs_unmount),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_ROOT, offsetof(vfsops_t, vfs_root),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_ROOT, offsetof(vfsops_t, vfs_root),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_STATVFS, offsetof(vfsops_t, vfs_statvfs),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_STATVFS, offsetof(vfsops_t, vfs_statvfs),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_SYNC, offsetof(vfsops_t, vfs_sync),
-			(fs_generic_func_p) fs_sync,
-			(fs_generic_func_p) fs_sync,	/* No errors allowed */
+		{ VFSNAME_SYNC, offsetof(vfsops_t, vfs_sync),
+		    (fs_generic_func_p) fs_sync,
+		    (fs_generic_func_p) fs_sync },	/* No errors allowed */
 
-		VFSNAME_VGET, offsetof(vfsops_t, vfs_vget),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_VGET, offsetof(vfsops_t, vfs_vget),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_MOUNTROOT, offsetof(vfsops_t, vfs_mountroot),
-			fs_nosys, fs_nosys,
+		{ VFSNAME_MOUNTROOT, offsetof(vfsops_t, vfs_mountroot),
+		    fs_nosys, fs_nosys },
 
-		VFSNAME_FREEVFS, offsetof(vfsops_t, vfs_freevfs),
-			(fs_generic_func_p)(uintptr_t)fs_freevfs,
-			/* Shouldn't fail */
-			(fs_generic_func_p)(uintptr_t)fs_freevfs,
+		{ VFSNAME_FREEVFS, offsetof(vfsops_t, vfs_freevfs),
+		    (fs_generic_func_p)(uintptr_t)fs_freevfs,
+		    /* Shouldn't fail */
+		    (fs_generic_func_p)(uintptr_t)fs_freevfs },
 
-		VFSNAME_VNSTATE, offsetof(vfsops_t, vfs_vnstate),
-			(fs_generic_func_p)fs_nosys,
-			(fs_generic_func_p)fs_nosys,
+		{ VFSNAME_VNSTATE, offsetof(vfsops_t, vfs_vnstate),
+		    (fs_generic_func_p)fs_nosys, (fs_generic_func_p)fs_nosys },
 
-		NULL, 0, NULL, NULL
+		/*
+		 * While it is tempting to say that a file system which does not
+		 * implement a VFSNAME_SYNC likely doesn't need a VFSNAME_SYNCFS
+		 * by default, implementing that policy is challenging with the
+		 * way the fs_build_vector logic works and we'd rather a file
+		 * system say that it doesn't support this by default rather
+		 * than incorrectly claim to sync something that either doesn't
+		 * make sense to sync (ala sockfs) or mislead when it didn't
+		 * happen.
+		 */
+		{ VFSNAME_SYNCFS, offsetof(vfsops_t, vfs_syncfs),
+		    (fs_generic_func_p)fs_nosys_syncfs,
+		    (fs_generic_func_p)fs_nosys_syncfs },
+
+		{ NULL, 0, NULL, NULL }
 	};
 
 	return (fs_build_vector(actual, unused_ops, vfs_ops_table, template));
@@ -4181,6 +4201,7 @@ vfsinit(void)
 		VFSNAME_MOUNTROOT,	{ .error = vfs_EIO },
 		VFSNAME_FREEVFS,	{ .error = vfs_EIO },
 		VFSNAME_VNSTATE,	{ .error = vfs_EIO },
+		VFSNAME_SYNCFS,		{ .error = vfs_EIO },
 		NULL, NULL
 	};
 
@@ -4194,6 +4215,7 @@ vfsinit(void)
 		VFSNAME_MOUNTROOT,	{ .error = vfsstray },
 		VFSNAME_FREEVFS,	{ .error = vfsstray },
 		VFSNAME_VNSTATE,	{ .error = vfsstray },
+		VFSNAME_SYNCFS,		{ .error = vfsstray },
 		NULL, NULL
 	};
 

@@ -29,8 +29,12 @@
 
 	.file	"fdsync.s"
 
-/* Underlying function for C library(fsync) and POSIX(fdatasync)*/
-/* int __fdsync(int fildes, int flag)				*/
+/*
+ * Underlying function for the functions fsync(3C), fdatasync(3C), and
+ * syncfs(3C).
+ *
+ * int __fdsync(int filedes, uint32_t arg)
+ */
 
 #include "SYS.h"
 

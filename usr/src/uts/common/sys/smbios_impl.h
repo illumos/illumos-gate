@@ -179,7 +179,8 @@ typedef struct smb_processor {
 	uint16_t smbpr_corecount2;	/* second number of cores per socket */
 	uint16_t smbpr_coresenabled2;	/* second number of enabled cores */
 	uint16_t smbpr_threadcount2;	/* second number of enabled threads */
-	uint16_t smpbr_threaden;	/* enabled thread count */
+	uint16_t smbpr_threaden;	/* enabled thread count */
+	uint8_t smbpr_socktype;		/* socket type string */
 } smb_processor_t;
 
 /*

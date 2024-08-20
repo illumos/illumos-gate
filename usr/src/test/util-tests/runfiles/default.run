@@ -45,7 +45,8 @@ user = root
 [/opt/util-tests/tests/libjedec_test.64]
 [/opt/util-tests/tests/libjedec_temp.64]
 [/opt/util-tests/tests/libjedec_spd.64]
-[/opt/util-tests/tests/smbios]
+[/opt/util-tests/tests/smbios.32]
+[/opt/util-tests/tests/smbios.64]
 
 user = root
 

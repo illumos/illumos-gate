@@ -21,6 +21,7 @@ SUBDIRS_i386 =		\
 	i386		\
 	imc		\
 	saveargs	\
+	vfs		\
 	xsave		\
 	zen_umc
 

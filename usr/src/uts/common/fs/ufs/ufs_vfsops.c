@@ -24,10 +24,11 @@
  * Use is subject to license terms.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -1375,15 +1376,15 @@ out:
 static int
 ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 {
-	dev_t 		dev		= vfsp->vfs_dev;
+	dev_t		dev		= vfsp->vfs_dev;
 	struct ufsvfs	*ufsvfsp	= (struct ufsvfs *)vfsp->vfs_data;
 	struct fs	*fs		= ufsvfsp->vfs_fs;
 	struct ulockfs	*ulp		= &ufsvfsp->vfs_ulockfs;
-	struct vnode 	*bvp, *vp;
+	struct vnode	*bvp, *vp;
 	struct buf	*bp;
 	struct inode	*ip, *inext, *rip;
 	union ihead	*ih;
-	int 		error, flag, i;
+	int		error, flag, i;
 	struct lockfs	lockfs;
 	int		poll_events = POLLPRI;
 	extern struct pollhead ufs_pollhd;
@@ -2070,6 +2071,16 @@ errout:
 }
 
 static int
+ufs_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	if (flags != 0) {
+		return (ENOTSUP);
+	}
+
+	return (ufs_fioffs(vfsp, cr));
+}
+
+static int
 ufsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t ufs_vfsops_template[] = {
@@ -2080,6 +2091,7 @@ ufsinit(int fstype, char *name)
 		VFSNAME_SYNC,		{ .vfs_sync = ufs_sync },
 		VFSNAME_VGET,		{ .vfs_vget = ufs_vget },
 		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = ufs_mountroot },
+		VFSNAME_SYNCFS,		{ .vfs_syncfs = ufs_syncfs },
 		NULL,			NULL
 	};
 	int error;

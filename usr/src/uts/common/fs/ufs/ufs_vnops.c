@@ -1697,7 +1697,7 @@ ufs_ioctl(
 			 */
 			if ((caddr_t)arg != NULL)
 				return (EINVAL);
-			return (ufs_fioffs(vp, NULL, cr));
+			return (ufs_fioffs(vp->v_vfsp, cr));
 
 		case _FIOISBUSY:
 			/*

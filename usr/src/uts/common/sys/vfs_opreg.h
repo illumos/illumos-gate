@@ -54,8 +54,8 @@ typedef union fs_func {
  * File systems use arrays of fs_operation_def structures to form
  * name/value pairs of operations.  These arrays get passed to:
  *
- * 	- vn_make_ops() to create vnodeops
- * 	- vfs_makefsops()/vfs_setfsops() to create vfsops.
+ *	- vn_make_ops() to create vnodeops
+ *	- vfs_makefsops()/vfs_setfsops() to create vfsops.
  */
 typedef struct fs_operation_def {
 	char *name;			/* name of operation (NULL at end) */
@@ -76,9 +76,9 @@ typedef struct fs_operation_def {
  */
 typedef struct fs_operation_trans_def {
 	char *name;			/* name of operation (NULL at end) */
-	int offset;			/* byte offset within ops vector */
+	size_t offset;			/* byte offset within ops vector */
 	fs_generic_func_p defaultFunc;	/* default function */
-	fs_generic_func_p errorFunc; 	/* error function */
+	fs_generic_func_p errorFunc;	/* error function */
 } fs_operation_trans_def_t;
 
 /*

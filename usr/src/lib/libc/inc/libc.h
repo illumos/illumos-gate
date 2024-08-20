@@ -43,6 +43,7 @@
 #include <sys/door.h>
 #include <sys/ieeefp.h>
 #include <sys/mount.h>
+#include <sys/fdsync.h>
 #include <floatingpoint.h>
 #include <nl_types.h>
 #include <regex.h>
@@ -151,7 +152,7 @@ extern char	*__posix_asctime_r(const struct tm *, char *);
 /*
  * Internal routine from fsync.c
  */
-extern int __fdsync(int, int);	/* 2nd arg may be wrong in 64bit mode */
+extern int __fdsync(int, uint32_t);	/* 2nd arg may be wrong in 64bit mode */
 
 /*
  * Internal routine from _xregs_clrptr.c

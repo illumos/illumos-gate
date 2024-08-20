@@ -29,6 +29,7 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include "libc.h"
 #include <stdarg.h>
 #include <poll.h>
 #include <stropts.h>
@@ -764,19 +765,25 @@ fcntl(int fildes, int cmd, ...)
 int
 fdatasync(int fildes)
 {
-	extern int __fdsync(int, int);
 	int rv;
 
-	PERFORM(__fdsync(fildes, FDSYNC))
+	PERFORM(__fdsync(fildes, FDSYNC_DATA))
 }
 
 int
 fsync(int fildes)
 {
-	extern int __fdsync(int, int);
 	int rv;
 
-	PERFORM(__fdsync(fildes, FSYNC))
+	PERFORM(__fdsync(fildes, FDSYNC_FILE))
+}
+
+int
+syncfs(int fildes)
+{
+	int rv;
+
+	PERFORM(__fdsync(fildes, FDSYNC_FS))
 }
 
 int

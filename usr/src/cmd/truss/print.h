@@ -147,7 +147,8 @@ extern "C" {
 #define	EXC	104		/* execx flags */
 #define	FFD	105		/* fcntl F_SETFD flags */
 #define	SRF	106		/* send*(), recv() flags */
-#define	HID	107		/* hidden argument, don't print */
+#define	FDS	107		/* fdsync flags */
+#define	HID	108		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

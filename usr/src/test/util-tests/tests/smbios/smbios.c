@@ -570,6 +570,14 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_desc = "SMBIOS 3.6 processor, 2.5 client"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_38,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_proc_mktable_38,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_proc_verify_38,
+	    .st_desc = "SMBIOS 3.8 processor"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION,
 	    .st_libvers = SMB_VERSION,
 	    .st_mktable = smbios_test_extmem_mktable_cs,

@@ -21,51 +21,59 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
 
-#include <sys/param.h>
-#include <sys/isa_defs.h>
 #include <sys/types.h>
-#include <sys/sysmacros.h>
 #include <sys/cred.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/vnode.h>
+#include <sys/vfs.h>
 #include <sys/file.h>
-#include <sys/mode.h>
-#include <sys/debug.h>
+#include <sys/fdsync.h>
 
 /*
- * Flush output pending for file.
+ * This is the common system call for fsync(), fdatasync(), and syncfs(). It
+ * performs the requested I/O synchronization for the file descriptor.
  */
 int
-fdsync(int fd, int flag)
+fdsync(int fd, uint32_t arg)
 {
 	file_t *fp;
-	register int error;
-	int syncflag;
+	int ret;
 
-	if ((fp = getf(fd)) != NULL) {
-		/*
-		 * This flag will determine the file sync
-		 * or data sync.
-		 * FSYNC : file sync
-		 * FDSYNC : data sync
-		 */
-		syncflag = flag & (FSYNC|FDSYNC);
+	if ((fp = getf(fd)) == NULL) {
+		return (set_errno(EBADF));
+	}
 
-		if (error = VOP_FSYNC(fp->f_vnode, syncflag, fp->f_cred, NULL))
-			(void) set_errno(error);
-		releasef(fd);
-	} else
-		error = set_errno(EBADF);
-	return (error);
+	switch (arg) {
+	case FDSYNC_FS:
+		ret = VFS_SYNCFS(fp->f_vnode->v_vfsp, 0, fp->f_cred);
+		break;
+	case FDSYNC_FILE:
+		ret = VOP_FSYNC(fp->f_vnode, FSYNC, fp->f_cred, NULL);
+		break;
+	case FDSYNC_DATA:
+		ret = VOP_FSYNC(fp->f_vnode, FDSYNC, fp->f_cred, NULL);
+		break;
+	default:
+		ret = EINVAL;
+		break;
+	}
+
+	releasef(fd);
+	if (ret != 0) {
+		(void) set_errno(ret);
+	}
+
+	return (ret);
 }

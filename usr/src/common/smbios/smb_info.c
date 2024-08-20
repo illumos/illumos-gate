@@ -740,7 +740,17 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	}
 
 	if (smb_libgteq(shp, SMB_VERSION_36)) {
-		pp->smbp_threadsenabled = p.smpbr_threaden;
+		pp->smbp_threadsenabled = p.smbpr_threaden;
+	}
+
+	/*
+	 * SMBIOS 3.8 added a socket string which is only required if the
+	 * processor upgrade constant is not present. We don't try to munge
+	 * these two together here and leave it to clients to figure out
+	 * (especially as what'll happen in practice is unknown).
+	 */
+	if (smb_libgteq(shp, SMB_VERSION_38)) {
+		pp->smbp_socktype = smb_strptr(stp, p.smbpr_socktype);
 	}
 
 	return (0);

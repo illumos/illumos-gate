@@ -22,6 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/stat.h>
@@ -36,11 +37,11 @@
 #include "utils.h"
 
 static const char USAGE[] = "\
-Usage: %s [-enuy] [-c kernel | curproc | all ]\n\
+Usage: %s [-Henpuy] [-c kernel | curproc | all ]\n\
 	[-d dump-device | swap | none ] [-k key-file] [-m min {k|m|%%} ]\n\
 	[-s savecore-dir] [-r root-dir] [-z on|off]\n";
 
-static const char OPTS[] = "einuyc:d:m:s:r:z:k:";
+static const char OPTS[] = "Heinpuyc:d:m:s:r:z:k:";
 
 static const char PATH_DEVICE[] = "/dev/dump";
 static const char PATH_CONFIG[] = "/etc/dumpadm.conf";
@@ -115,6 +116,10 @@ main(int argc, char *argv[])
 	for (optind = 1; optind < argc; optind++) {
 		while ((c = getopt(argc, argv, OPTS)) != (int)EOF) {
 			switch (c) {
+			case 'H':
+				dc.dc_headers = false;
+				break;
+
 			case 'c':
 				if (dconf_str2content(&dc, optarg) == -1)
 					return (E_USAGE);
@@ -151,6 +156,10 @@ main(int argc, char *argv[])
 				modified++;
 				break;
 
+			case 'p':
+				dc.dc_parsable = true;
+				break;
+
 			case 's':
 				if (stat(optarg, &st) == -1 ||
 				    !S_ISDIR(st.st_mode)) {
@@ -179,11 +188,19 @@ main(int argc, char *argv[])
 	}
 
 	if (eflag) {
-		if (argc == 2 && argv[1][0] == '-' && argv[1][1] == 'e' &&
-		    !argv[1][2])
+		if (modified < 2 && douuid == 0 && chrooted == 0 &&
+		    dcmode == DC_CURRENT && minfstr == NULL)
 			return (dconf_get_dumpsize(&dc) ? E_SUCCESS : E_ERROR);
 		else
 			die(gettext("-e cannot be used with other options\n"));
+	}
+
+	if (dc.dc_parsable) {
+		die(gettext("-p can only be used with -e\n"));
+	}
+
+	if (!dc.dc_headers) {
+		die(gettext("-H can only be used with -e\n"));
 	}
 
 	if (douuid)

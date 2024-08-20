@@ -52,7 +52,7 @@ visit_dir(const char *path, const struct stat *st,
 	char	*p;
 	int	c;
 	static int first_time = 1;
-	int	inum;
+	ino_t	inum;
 
 	/*
 	 * The first directory is the current directory '.',
@@ -141,7 +141,7 @@ visit_dir(const char *path, const struct stat *st,
 	else
 		inum = st->st_ino;
 
-	(void) printf("%c %-30s %-20s %4lo %-5s %-5s %6d %2ld %2s %2s\n",
+	(void) printf("%c %-30s %-20s %4lo %-5s %-5s %6lu %2ld %2s %2s\n",
 	    ftype, name, symsrc, st->st_mode % 010000, uid, gid,
 	    inum, st->st_nlink, maj, min);
 	return (0);

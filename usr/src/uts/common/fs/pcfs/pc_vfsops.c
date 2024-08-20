@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -88,6 +89,7 @@ static int pc_syncfsnodes(struct pcfs *);
 static int pcfs_sync(struct vfs *, short, struct cred *);
 static int pcfs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp);
 static void pcfs_freevfs(vfs_t *vfsp);
+static int pcfs_syncfs(struct vfs *, uint64_t, struct cred *);
 
 static int pc_readfat(struct pcfs *fsp, uchar_t *fatp);
 static int pc_writefat(struct pcfs *fsp, daddr_t start);
@@ -243,6 +245,7 @@ pcfsinit(int fstype, char *name)
 		VFSNAME_SYNC,		{ .vfs_sync = pcfs_sync },
 		VFSNAME_VGET,		{ .vfs_vget = pcfs_vget },
 		VFSNAME_FREEVFS,	{ .vfs_freevfs = pcfs_freevfs },
+		VFSNAME_SYNCFS,		{ .vfs_syncfs = pcfs_syncfs },
 		NULL,			NULL
 	};
 	int error;
@@ -960,12 +963,8 @@ pc_syncfsnodes(struct pcfs *fsp)
 /*
  * Flush any pending I/O.
  */
-/*ARGSUSED*/
 static int
-pcfs_sync(
-	struct vfs *vfsp,
-	short flag,
-	struct cred *cr)
+pcfs_sync(struct vfs *vfsp, short flag, struct cred *cr)
 {
 	struct pcfs *fsp;
 	int error = 0;
@@ -999,6 +998,29 @@ pcfs_sync(
 	}
 	mutex_exit(&pcfslock);
 	return (error);
+}
+
+static int
+pcfs_syncfs(vfs_t *vfsp, uint64_t flags, cred_t *cr)
+{
+	int ret;
+	struct pcfs *fsp;
+
+	if (flags != 0) {
+		return (ENOTSUP);
+	}
+
+	fsp = VFSTOPCFS(vfsp);
+	if ((fsp->pcfs_flags & PCFS_IRRECOV) == 0) {
+		ret = pc_syncfsnodes(fsp);
+	} else {
+		rw_enter(&pcnodes_lock, RW_WRITER);
+		pc_diskchanged(fsp);
+		rw_exit(&pcnodes_lock);
+		ret = EIO;
+	}
+
+	return (ret);
 }
 
 int

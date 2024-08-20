@@ -19,24 +19,30 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
-OBJS =	smbios.o \
-	smbios_test_addinfo.o \
-	smbios_test_chassis.o \
-	smbios_test_errors.o \
-	smbios_test_extmemdevice.o \
-	smbios_test_fwinfo.o \
-	smbios_test_memdevice.o \
-	smbios_test_proc.o \
-	smbios_test_pinfo.o \
-	smbios_test_slot.o \
-	smbios_test_strings.o \
-	smbios_test_strprop.o
+SRCS =	smbios.c \
+	smbios_test_addinfo.c \
+	smbios_test_chassis.c \
+	smbios_test_errors.c \
+	smbios_test_extmemdevice.c \
+	smbios_test_fwinfo.c \
+	smbios_test_memdevice.c \
+	smbios_test_proc.c \
+	smbios_test_pinfo.c \
+	smbios_test_slot.c \
+	smbios_test_strings.c \
+	smbios_test_strprop.c
 PROGS = smbios
+
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
+
+OBJS32 = $(SRCS:%.c=%.32.o)
+OBJS64 = $(SRCS:%.c=%.64.o)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-CMDS = $(PROGS:%=$(TESTDIR)/%)
+CMDS = $(PROGS32:%=$(TESTDIR)/%) $(PROGS64:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 CSTD = $(GNU_C99)
 
@@ -49,19 +55,21 @@ CSTD = $(GNU_C99)
 STACKPROTECT = all
 
 LDLIBS += -lsmbios -lumem
+LDLIBS64 += -lsmbios -lumem
 CFLAGS += -_gcc=-Wall -_gcc=-Wextra -_gcc=-Wno-unknown-pragmas
+CFLAGS64 += -_gcc=-Wall -_gcc=-Wextra -_gcc=-Wno-unknown-pragmas
 
-all: $(PROGS)
+all: $(PROGS32) $(PROGS64)
 
 install: all $(CMDS)
 
 clobber: clean
-	-$(RM) $(PROGS)
+	-$(RM) $(PROGS32) $(PROGS64)
 
 clean:
-	-$(RM) $(OBJS)
+	-$(RM) $(OBJS32) $(OBJS64)
 
-$(CMDS): $(TESTDIR) $(PROGS)
+$(CMDS): $(TESTDIR) $(PROGS32) $(PROGS64)
 
 $(TESTDIR):
 	$(INS.dir)
@@ -69,6 +77,19 @@ $(TESTDIR):
 $(TESTDIR)/%: %
 	$(INS.file)
 
-$(PROGS): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+%.32.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+
+$(PROGS32): $(OBJS32)
+	$(LINK.c) -o $@ $(OBJS32) $(LDLIBS)
+	$(POST_PROCESS)
+
+$(PROGS64): $(OBJS64)
+	$(LINK64.c) -o $@ $(OBJS64) $(LDLIBS64)
 	$(POST_PROCESS)

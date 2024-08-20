@@ -63,6 +63,7 @@
 #include <atomic.h>
 #include <sys/acl.h>
 #include <sys/socket.h>
+#include <sys/fdsync.h>
 
 #include <s10_brand.h>
 #include <brand_misc.h>
@@ -1394,6 +1395,32 @@ s10_fcntl(sysret_t *rval, int fd, int cmd, intptr_t arg)
 }
 
 /*
+ * Interpose on the SYS_fdsync system call. The structure was chagned to use a
+ * distinct enum rather than passing a combination of the <sys/file.h> flags
+ * FSYNC and FDSYNC. The prior system call implementation only passed those two
+ * flags on to the VFS operation. The system call did not check if the 'flag'
+ * argument was zero or not; however, we know that in illumos it was always
+ * called with either FSYNC or FDSYNC explicitly. To try and fail open in a
+ * sense, we translate any call with no explicit level to a normal fsync(3C)
+ * style operation.
+ */
+static int
+s10_fdsync(sysret_t *rval, int fd, int flag)
+{
+	uint32_t level;
+
+	if ((flag & FSYNC) != 0) {
+		level = FDSYNC_FILE;
+	} else if ((flag & FDSYNC) != 0) {
+		level = FDSYNC_DATA;
+	} else {
+		level = FDSYNC_FILE;
+	}
+
+	return (__systemcall(rval, SYS_fdsync + 1024, fd, level));
+}
+
+/*
  * S10's issetugid() syscall is now a subcode to privsys().
  */
 static int
@@ -1974,7 +2001,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/*  55 */
 	NOSYS,					/*  56 */
 	NOSYS,					/*  57 */
-	NOSYS,					/*  58 */
+	EMULATE(s10_fdsync, 2 | RV_DEFAULT),	/*  58 */
 	EMULATE(s10_execve, 3 | RV_DEFAULT),	/*  59 */
 	NOSYS,					/*  60 */
 	NOSYS,					/*  61 */

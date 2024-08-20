@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -396,31 +397,28 @@ out:
 }
 
 /*
- * ufs_fioffs - ioctl handler for flushing file system
+ * ufs_fioffs - common function for VFS and ioctl entry points to flush a single
+ * file system.
  */
-/* ARGSUSED */
 int
-ufs_fioffs(
-	struct vnode	*vp,
-	char 		*vap,		/* must be NULL - reserved */
-	struct cred	*cr)		/* credentials from ufs_ioctl */
+ufs_fioffs(vfs_t *vfsp, cred_t *cr)
 {
 	int error;
 	struct ufsvfs	*ufsvfsp;
 	struct ulockfs	*ulp;
 
 	/* file system has been forcibly unmounted */
-	ufsvfsp = VTOI(vp)->i_ufsvfs;
-	if (ufsvfsp == NULL)
+	if ((vfsp->vfs_flag & VFS_UNMOUNTED) != 0)
 		return (EIO);
 
+	ufsvfsp = vfsp->vfs_data;
 	ulp = &ufsvfsp->vfs_ulockfs;
 
 	/*
 	 * suspend the delete thread
 	 *	this must be done outside the lockfs locking protocol
 	 */
-	vfs_lock_wait(vp->v_vfsp);
+	vfs_lock_wait(vfsp);
 	ufs_thread_suspend(&ufsvfsp->vfs_delete);
 
 	/* hold the mutex to prevent race with a lockfs request */
@@ -457,15 +455,14 @@ ufs_fioffs(
 				fsp->fs_reclaim &= ~FS_RECLAIM;
 				fsp->fs_reclaim |= FS_RECLAIMING;
 				ufs_thread_start(&ufsvfsp->vfs_reclaim,
-				    ufs_thread_reclaim, vp->v_vfsp);
+				    ufs_thread_reclaim, vfsp);
 				if (!fsp->fs_ronly) {
 					TRANS_SBWRITE(ufsvfsp,
 					    TOP_SBUPDATE_UPDATE);
 					if (err =
 					    geterror(ufsvfsp->vfs_bufp)) {
 						refstr_t	*mntpt;
-						mntpt = vfs_getmntpoint(
-						    vp->v_vfsp);
+						mntpt = vfs_getmntpoint(vfsp);
 						cmn_err(CE_NOTE,
 						    "Filesystem Flush "
 						    "Failed to update "
@@ -483,13 +480,13 @@ ufs_fioffs(
 	}
 
 	/* synchronously flush dirty data and metadata */
-	error = ufs_flush(vp->v_vfsp);
+	error = ufs_flush(vfsp);
 
 out:
 	atomic_dec_ulong(&ufs_quiesce_pend);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
-	vfs_unlock(vp->v_vfsp);
+	vfs_unlock(vfsp);
 
 	/*
 	 * allow the delete thread to continue

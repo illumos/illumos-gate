@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -58,8 +60,6 @@ static vfsdef_t vfw = {
 	VSW_ZMOUNT,
 	NULL
 };
-
-extern struct mod_ops mod_fsops;
 
 /*
  * Module linkage information for the kernel.
@@ -113,3 +113,33 @@ _fini(void)
  * The NO_UNLOAD_STUB in modstub.s must change if this module ever
  * is modified to become unloadable.
  */
+
+/*
+ * In the past, there was no dedicated vfs_t for sockfs ala fifofs and instead
+ * every vnode actually had the root filesystem's vfs_t. While there really
+ * isn't anything that makes that much sense to put in here, we fill out a token
+ * statvfs here. We're not the only system that provides a token, not super
+ * useful vfs_t here.
+ */
+int
+sockfs_statvfs(vfs_t *vfsp, struct statvfs64 *stat)
+{
+	dev32_t d32;
+
+	/*
+	 * We explicitly don't set any kind of fundamental block size and leave
+	 * this at zero.
+	 *
+	 * Similarly we don't even try to lie bout the number of blocks and
+	 * files, especially as our kmem cache stats aren't zone aware.
+	 */
+	bzero(stat, sizeof (struct statvfs64));
+	stat->f_bsize = PAGESIZE;
+
+	(void) cmpldev(&d32, vfsp->vfs_dev);
+	stat->f_fsid = d32;
+
+	(void) strlcpy(stat->f_basetype, "sockfs", sizeof (stat->f_basetype));
+
+	return (0);
+}

@@ -79,7 +79,7 @@ int	fcntl(int, int, intptr_t, intptr_t);
 int64_t	vfork();
 int64_t	forksys(int, int);
 int	fstat(int, struct stat *);
-int	fdsync(int, int);
+int	fdsync(int, uint32_t);
 int64_t	getgid();
 int	ucredsys(int, int, void *);
 int64_t	getpid();

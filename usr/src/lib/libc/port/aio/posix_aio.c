@@ -39,12 +39,11 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include "libc.h"
 #include "asyncio.h"
 #include <atomic.h>
 #include <sys/file.h>
 #include <sys/port.h>
-
-extern int __fdsync(int, int);
 
 cond_t	_aio_waitn_cv = DEFAULTCV;	/* wait for end of aio_waitn */
 
@@ -808,9 +807,9 @@ aio_fsync(int op, aiocb_t *aiocbp)
 	 */
 	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)
-			return (__fdsync(aiocbp->aio_fildes, FDSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC_DATA));
 		else
-			return (__fdsync(aiocbp->aio_fildes, FSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC_FILE));
 	}
 
 	/*
@@ -1665,9 +1664,9 @@ aio_fsync64(int op, aiocb64_t *aiocbp)
 	 */
 	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)
-			return (__fdsync(aiocbp->aio_fildes, FDSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC_DATA));
 		else
-			return (__fdsync(aiocbp->aio_fildes, FSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC_FILE));
 	}
 
 	/*

@@ -61,6 +61,7 @@
 #include <sys/stat.h>
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
+#include <fs/fs_subr.h>
 #include <sys/zone.h>
 
 #include <sys/socket.h>
@@ -100,6 +101,14 @@ dev_t sockdev;	/* For fsid in getattr */
 struct socklist socklist;
 
 struct kmem_cache *socket_cache;
+
+/*
+ * This is a global vfs_t that we have to maintain as the solitary vfs_t that is
+ * used across all sockfs vnodes. This ensures that we have a reasonable vfs_t
+ * present that points to our ops vectors.
+ */
+vfs_t *sock_vfsp;
+static struct vfsops *sockfs_vfsops;
 
 /*
  * sockconf_lock protects the socket configuration (socket types and
@@ -203,6 +212,7 @@ so_update_attrs(struct sonode *so, int flag)
 
 extern so_create_func_t sock_comm_create_function;
 extern so_destroy_func_t sock_comm_destroy_function;
+
 /*
  * Init function called when sockfs is loaded.
  */
@@ -210,13 +220,14 @@ int
 sockinit(int fstype, char *name)
 {
 	static const fs_operation_def_t sock_vfsops_template[] = {
-		NULL, NULL
+		{ VFSNAME_STATVFS,	{ .vfs_statvfs = sockfs_statvfs } },
+		{ NULL, NULL }
 	};
 	int error;
 	major_t dev;
 	char *err_str;
 
-	error = vfs_setfsops(fstype, sock_vfsops_template, NULL);
+	error = vfs_setfsops(fstype, sock_vfsops_template, &sockfs_vfsops);
 	if (error != 0) {
 		zcmn_err(GLOBAL_ZONEID, CE_WARN,
 		    "sockinit: bad vfs ops template");
@@ -284,6 +295,9 @@ sockinit(int fstype, char *name)
 
 	/* Initialize socket filters */
 	sof_init();
+
+	sock_vfsp = fs_vfsp_global(sockfs_vfsops, sockdev, fstype,
+	    PAGESIZE);
 
 	return (0);
 

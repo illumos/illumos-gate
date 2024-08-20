@@ -13999,6 +13999,7 @@ s usr/share/man/man3c/swapcontext_extd.3c=makecontext.3c
 s usr/share/man/man3c/swprintf.3c=fwprintf.3c
 s usr/share/man/man3c/swscanf.3c=fwscanf.3c
 f usr/share/man/man3c/sync_instruction_memory.3c 0444 root bin
+f usr/share/man/man3c/syncfs.3c 0444 root bin
 f usr/share/man/man3c/sysconf.3c 0444 root bin
 f usr/share/man/man3c/syslog.3c 0444 root bin
 f usr/share/man/man3c/system.3c 0444 root bin

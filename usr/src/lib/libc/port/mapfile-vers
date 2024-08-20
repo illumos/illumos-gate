@@ -79,6 +79,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.48 {
+    protected:
+	syncfs;
+} ILLUMOS_0.47;
+
 SYMBOL_VERSION ILLUMOS_0.47 {
     protected:
 	ptsname_r;

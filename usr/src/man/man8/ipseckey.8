@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPSECKEY 8 "April 17, 2024"
+.TH IPSECKEY 8 "August 14, 2024"
 .SH NAME
 ipseckey \- manually manipulate an IPsec Security Association Database (SADB)
 .SH SYNOPSIS
@@ -160,11 +160,12 @@ raw seconds values for lifetimes.
 .ad
 .sp .6
 .RS 4n
-Add an \fBSA\fR. Because it involves the transfer of keying material, it cannot
-be invoked from the shell, lest the keys be visible in \fBps\fR(1) output. It
-can be used either from the interactive \fBipseckey>\fR prompt or in a command
-file specified by the \fB-f\fR command. The \fBadd\fR command accepts all
-extension-value pairs described below.
+Add an \fBSA\fR. Because it involves the transfer of keying material, this
+command and its parameters cannot be passed in as arguments to \fBipseckey\fR,
+lest the keys be visible in \fBps\fR(1) output. It can be used either from the
+interactive \fBipseckey>\fR prompt or in a command file specified by the
+\fB-f\fR option. The \fBadd\fR command accepts all extension-value pairs
+described below.
 .RE
 
 .sp
@@ -176,11 +177,10 @@ extension-value pairs described below.
 .RS 4n
 Update \fBSA\fR lifetime, and in the cases of larval \fBSA\fRs (leftover from
 aborted automated key management), keying material and other extensions. Like
-\fBadd\fR, this command cannot be invoked from the shell because keying
-material would be seen by the \fBps\fR(1) command. It can be used either from
-the interactive \fBipseckey>\fR prompt or in a command file specified by the
-\fB-f\fR command. The \fBupdate\fR command accepts all extension-value pairs,
-but normally is only used for \fBSA\fR lifetime updates.
+\fBadd\fR, this command can only be used either from the interactive
+\fBipseckey>\fR prompt or in a command file specified by the \fB-f\fR option.
+The \fBupdate\fR command accepts all extension-value pairs, but normally is
+only used for \fBSA\fR lifetime updates.
 .RE
 
 .sp
@@ -536,7 +536,7 @@ The next six extensions are lifetime extensions. There are two varieties,
 will be deleted automatically by the system. If a \fBsoft\fR lifetime expires,
 an \fBSADB_EXPIRE\fR message will be transmitted by the system, and its state
 will be downgraded to \fBdying\fR from \fBmature\fR. See \fBpf_key\fR(4P). The
-\fBmonitor\fR command to \fBkey\fR allows you to view \fBSADB_EXPIRE\fR
+\fBmonitor\fR command allows you to view \fBSADB_EXPIRE\fR
 messages.
 .sp
 .ne 2
@@ -604,8 +604,8 @@ and \fBupdate\fR commands.
 .RS 4n
 Specifies the number of seconds this \fBSA\fR can exist after first being used.
 If this extension is not present, the default value is zero, which means the
-\fBSA\fR will not expire based on how long it has been since it was added. This
-extension is used by the \fBadd\fR and \fBupdate\fR commands.
+\fBSA\fR will not expire based on how long it has been since it was first used.
+This extension is used by the \fBadd\fR and \fBupdate\fR commands.
 .RE
 
 .sp

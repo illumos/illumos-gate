@@ -182,8 +182,12 @@ file path=opt/os-tests/tests/spoof-ras mode=0555
 dir  path=opt/os-tests/tests/stackalign
 file path=opt/os-tests/tests/stackalign/stackalign.32 mode=0555
 file path=opt/os-tests/tests/stackalign/stackalign.64 mode=0555
+file path=opt/os-tests/tests/statvfs.32 mode=0555
+file path=opt/os-tests/tests/statvfs.64 mode=0555
 dir  path=opt/os-tests/tests/stress
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
+file path=opt/os-tests/tests/syncfs.32 mode=0555
+file path=opt/os-tests/tests/syncfs.64 mode=0555
 dir  path=opt/os-tests/tests/syscall
 file path=opt/os-tests/tests/syscall/fchmodat.32 mode=0555
 file path=opt/os-tests/tests/syscall/fchmodat.64 mode=0555

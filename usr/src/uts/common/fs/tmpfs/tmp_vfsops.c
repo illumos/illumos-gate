@@ -187,6 +187,7 @@ tmpfsinit(int fstype, char *name)
 		VFSNAME_STATVFS,	{ .vfs_statvfs = tmp_statvfs },
 		VFSNAME_VGET,		{ .vfs_vget = tmp_vget },
 		VFSNAME_FREEVFS,	{ .vfs_freevfs = tmp_freevfs },
+		VFSNAME_SYNCFS,		{ .vfs_syncfs = fs_syncfs_nop },
 		NULL,			NULL
 	};
 	int error;

@@ -152,9 +152,11 @@ extern boolean_t smbios_test_chassis_verify_sku(smbios_hdl_t *);
 
 extern boolean_t smbios_test_proc_mktable_25(smbios_test_table_t *);
 extern boolean_t smbios_test_proc_mktable_36(smbios_test_table_t *);
+extern boolean_t smbios_test_proc_mktable_38(smbios_test_table_t *);
 extern boolean_t smbios_test_proc_verify_25(smbios_hdl_t *);
 extern boolean_t smbios_test_proc_verify_36(smbios_hdl_t *);
 extern boolean_t smbios_test_proc_verify_36_25(smbios_hdl_t *);
+extern boolean_t smbios_test_proc_verify_38(smbios_hdl_t *);
 
 extern boolean_t smbios_test_extmem_mktable_invlen_cs(smbios_test_table_t *);
 extern boolean_t smbios_test_extmem_mktable_nocs(smbios_test_table_t *);
