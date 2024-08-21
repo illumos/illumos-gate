@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999,2001 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -37,12 +38,16 @@
 #include <strings.h>
 #include <libintl.h>
 #include <locale.h>
+#include <unistd.h>
+#include <stropts.h>
 #include <sys/fcntl.h>
 #include <sys/dktp/fdisk.h>
+#include <sys/dkio.h>
 #include "pcfs_common.h"
 #include "fsck_pcfs.h"
 #include "pcfs_bpb.h"
 
+size_t bpsec = MINBPS;
 int32_t BytesPerCluster;
 int32_t TotalClusters;
 int32_t LastCluster;
@@ -79,6 +84,27 @@ extern	ClusterContents	TheRootDir;
 /*
  * Function definitions
  */
+/*
+ * Use DKIOCGMEDIAINFO to get sector size.
+ */
+static int
+get_media_sector_size(int fd, size_t *sizep)
+{
+	struct dk_minfo dkminfo;
+
+	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		*sizep = dkminfo.dki_lbsize;
+		return (0);
+	}
+	/* In case the DKIOCGMEDIAINFO is not supported, return MINBPS. */
+	if (errno == ENOTTY) {
+		*sizep = MINBPS;
+		return (0);
+	}
+
+	return (errno);
+}
+
 static void
 passOne(int fd)
 {
@@ -158,6 +184,7 @@ openFS(char *special, int *inFD, int *outFD)
 	struct stat dinfo;
 	char *actualDisk = NULL;
 	char *suffix = NULL;
+	int rv;
 
 	if (Verbose)
 		(void) fprintf(stderr, gettext("Opening file system.\n"));
@@ -178,6 +205,19 @@ openFS(char *special, int *inFD, int *outFD)
 		actualDisk = InputImage;
 	}
 	doOpen(inFD, outFD, actualDisk, OutputImage);
+	rv = get_media_sector_size(*inFD, &bpsec);
+	if (rv != 0) {
+		(void) fprintf(stderr,
+		    gettext("error detecting device sector size: %s\n"),
+		    strerror(rv));
+		exit(2);
+	}
+	if (bpsec != 512 && bpsec != 1024 && bpsec != 2048 && bpsec != 4096) {
+		(void) fprintf(stderr,
+		    gettext("unsupported sector size: %zu\n"), bpsec);
+		exit(2);
+	}
+
 	if (suffix) {
 		if ((PartitionOffset =
 		    findPartitionOffset(*inFD, suffix)) < 0) {
@@ -197,10 +237,10 @@ openFS(char *special, int *inFD, int *outFD)
 }
 
 void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr,
-		gettext("pcfs Usage: fsck -F pcfs [-o v|p|w] special-file\n"));
+	    gettext("pcfs Usage: fsck -F pcfs [-o v|p|w] special-file\n"));
 	exit(1);
 }
 

@@ -20,10 +20,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011 Gary Mills
- *
  * Copyright (c) 1999,2000 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright (c) 2011 Gary Mills
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -183,7 +183,7 @@ readBPB(int fd)
 	if (Verbose)
 		(void) fprintf(stderr,
 		    gettext("Reading BIOS parameter block\n"));
-	if (read(fd, ubpb.buf, BPSEC) < BPSEC) {
+	if (read(fd, ubpb.buf, bpsec) < bpsec) {
 		mountSanityCheckFails();
 		perror(gettext("Read BIOS parameter block"));
 		(void) close(fd);
@@ -205,16 +205,10 @@ readBPB(int fd)
 	(void) memcpy(&(TheBIOSParameterBlock.ebpb), &(ubpb.bs.bs_ebpb),
 	    sizeof (TheBIOSParameterBlock.ebpb));
 #endif
-	/*
-	 * In general, we would expect the bytes per sector to
-	 * equal 256 (BPSEC).  I personally have yet to see a file
-	 * system where this isn't true but apparently some weird media
-	 * have different sector sizes.  So we'll accept a couple of
-	 * other small multiples of 256 as valid sizes.
-	 */
-	if (TheBIOSParameterBlock.bpb.bytes_per_sector != BPSEC &&
-	    TheBIOSParameterBlock.bpb.bytes_per_sector != 2 * BPSEC &&
-	    TheBIOSParameterBlock.bpb.bytes_per_sector != 4 * BPSEC) {
+	if (TheBIOSParameterBlock.bpb.bytes_per_sector != 512 &&
+	    TheBIOSParameterBlock.bpb.bytes_per_sector != 1024 &&
+	    TheBIOSParameterBlock.bpb.bytes_per_sector != 2048 &&
+	    TheBIOSParameterBlock.bpb.bytes_per_sector != 4096) {
 		mountSanityCheckFails();
 		(void) fprintf(stderr,
 		    gettext("Bogus bytes per sector value.  Giving up.\n"));
