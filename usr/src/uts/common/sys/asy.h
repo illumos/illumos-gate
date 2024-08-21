@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Hans Rosenfeld
  */
 
 #ifndef	_SYS_ASY_H
@@ -194,62 +195,6 @@ extern "C" {
 	((ap)->async_ring[((ap)->async_rget) & RINGMASK] & (c))
 
 /*
- * Asy tracing macros.  These are a bit similar to some macros in sys/vtrace.h .
- *
- * XXX - Needs review:  would it be better to use the macros in sys/vtrace.h ?
- */
-#ifdef DEBUG
-#define	DEBUGWARN0(fac, format) \
-	if (debug & (fac)) \
-		cmn_err(CE_WARN, format)
-#define	DEBUGNOTE0(fac, format) \
-	if (debug & (fac)) \
-		cmn_err(CE_NOTE, format)
-#define	DEBUGNOTE1(fac, format, arg1) \
-	if (debug & (fac)) \
-		cmn_err(CE_NOTE, format, arg1)
-#define	DEBUGNOTE2(fac, format, arg1, arg2) \
-	if (debug & (fac)) \
-		cmn_err(CE_NOTE, format, arg1, arg2)
-#define	DEBUGNOTE3(fac, format, arg1, arg2, arg3) \
-	if (debug & (fac)) \
-		cmn_err(CE_NOTE, format, arg1, arg2, arg3)
-#define	DEBUGCONT0(fac, format) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format)
-#define	DEBUGCONT1(fac, format, arg1) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format, arg1)
-#define	DEBUGCONT2(fac, format, arg1, arg2) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format, arg1, arg2)
-#define	DEBUGCONT3(fac, format, arg1, arg2, arg3) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format, arg1, arg2, arg3)
-#define	DEBUGCONT4(fac, format, arg1, arg2, arg3, arg4) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format, arg1, arg2, arg3, arg4)
-#define	DEBUGCONT10(fac, format, \
-	arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) \
-	if (debug & (fac)) \
-		cmn_err(CE_CONT, format, \
-		arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
-#else
-#define	DEBUGWARN0(fac, format)
-#define	DEBUGNOTE0(fac, format)
-#define	DEBUGNOTE1(fac, format, arg1)
-#define	DEBUGNOTE2(fac, format, arg1, arg2)
-#define	DEBUGNOTE3(fac, format, arg1, arg2, arg3)
-#define	DEBUGCONT0(fac, format)
-#define	DEBUGCONT1(fac, format, arg1)
-#define	DEBUGCONT2(fac, format, arg1, arg2)
-#define	DEBUGCONT3(fac, format, arg1, arg2, arg3)
-#define	DEBUGCONT4(fac, format, arg1, arg2, arg3, arg4)
-#define	DEBUGCONT10(fac, format, \
-	arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
-#endif
-
-/*
  * Hardware channel common data. One structure per port.
  * Each of the fields in this structure is required to be protected by a
  * mutex lock at the highest priority at which it can be altered.
@@ -260,6 +205,9 @@ extern "C" {
  */
 
 struct asycom {
+#ifdef DEBUG
+	int		asy_debug;	/* per-instance debug flags */
+#endif
 	int		asy_flags;	/* random flags  */
 					/* protected by asy_excl_hi lock */
 	uint_t		asy_hwtype;	/* HW type: ASY16550A, etc. */
