@@ -194,6 +194,16 @@ extern "C" {
 #define	RING_ERR(ap, c) \
 	((ap)->async_ring[((ap)->async_rget) & RINGMASK] & (c))
 
+/* definitions for asy_progress */
+typedef enum {
+	ASY_PROGRESS_REGS =	0x01,
+	ASY_PROGRESS_SOFTINT =	0x02,
+	ASY_PROGRESS_INT =	0x04,
+	ASY_PROGRESS_MUTEX =	0x08,
+	ASY_PROGRESS_ASYNC =	0x10,
+	ASY_PROGRESS_MINOR =	0x20
+} asy_progress_t;
+
 /*
  * Hardware channel common data. One structure per port.
  * Each of the fields in this structure is required to be protected by a
@@ -208,6 +218,7 @@ struct asycom {
 #ifdef DEBUG
 	int		asy_debug;	/* per-instance debug flags */
 #endif
+	asy_progress_t	asy_progress;	/* attach progress */
 	int		asy_flags;	/* random flags  */
 					/* protected by asy_excl_hi lock */
 	uint_t		asy_hwtype;	/* HW type: ASY16550A, etc. */
@@ -218,13 +229,21 @@ struct asycom {
 	struct asyncline *asy_priv;	/* protocol private data -- asyncline */
 	dev_info_t	*asy_dip;	/* dev_info */
 	int		asy_unit;	/* which port */
-	ddi_iblock_cookie_t asy_iblock;
 	kmutex_t	asy_excl;	/* asy adaptive mutex */
 	kmutex_t	asy_excl_hi;	/* asy spinlock mutex */
 	kmutex_t	asy_soft_lock;	/* soft lock for guarding softpend. */
 	int		asysoftpend;	/* Flag indicating soft int pending. */
-	ddi_softintr_t	asy_softintr_id;
-	ddi_iblock_cookie_t asy_soft_iblock;
+
+	ddi_softint_handle_t asy_soft_inth;
+	uint_t		asy_soft_intr_pri;
+
+	ddi_intr_handle_t *asy_inth;
+	size_t		asy_inth_sz;
+	uint_t		asy_intr_pri;
+	int		asy_intr_cnt;
+	int		asy_intr_cap;
+	int		asy_intr_type;
+	int		asy_intr_types;
 
 	/*
 	 * The asy_soft_sr mutex should only be taken by the soft interrupt
@@ -378,23 +397,9 @@ struct asyncline {
 #endif
 #define	UNIT(x)		(getminor(x) & ~OUTLINE)
 
-/*
- * ASYSETSOFT macro to pend a soft interrupt if one isn't already pending.
- */
+/* This corresponds to DDI_SOFTINT_MED used by the old softint routines. */
+#define	ASY_SOFT_INT_PRI	6
 
-#define	ASYSETSOFT(asy)	{			\
-	ASSERT(MUTEX_HELD(&asy->asy_excl_hi));		\
-	if (mutex_tryenter(&asy->asy_soft_lock)) {	\
-		asy->asy_flags |= ASY_NEEDSOFT;		\
-		if (!asy->asysoftpend) {		\
-			asy->asysoftpend = 1;		\
-			mutex_exit(&asy->asy_soft_lock);	\
-			ddi_trigger_softintr(asy->asy_softintr_id);	\
-		}					\
-		else					\
-			mutex_exit(&asy->asy_soft_lock);	\
-	}							\
-}
 
 #ifdef __cplusplus
 }
