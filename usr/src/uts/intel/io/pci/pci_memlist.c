@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- *
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -44,7 +44,7 @@ int pci_memlist_debug;
 #define	dprintf if (pci_memlist_debug) printf
 
 void
-memlist_dump(struct memlist *listp)
+pci_memlist_dump(struct memlist *listp)
 {
 	dprintf("memlist 0x%p content: ", (void *)listp);
 	while (listp) {
@@ -56,20 +56,20 @@ memlist_dump(struct memlist *listp)
 }
 
 struct memlist *
-memlist_alloc()
+pci_memlist_alloc()
 {
 	return ((struct memlist *)kmem_zalloc(sizeof (struct memlist),
 	    KM_SLEEP));
 }
 
 void
-memlist_free(struct memlist *buf)
+pci_memlist_free(struct memlist *buf)
 {
 	kmem_free(buf, sizeof (struct memlist));
 }
 
 void
-memlist_free_all(struct memlist **list)
+pci_memlist_free_all(struct memlist **list)
 {
 	struct memlist  *next, *buf;
 
@@ -84,7 +84,7 @@ memlist_free_all(struct memlist **list)
 
 /* insert in the order of addresses */
 void
-memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
+pci_memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 {
 	int merge_left, merge_right;
 	struct memlist *entry;
@@ -116,7 +116,7 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 	if (merge_left && merge_right) {
 		prev->ml_size += size + next->ml_size;
 		prev->ml_next = next->ml_next;
-		memlist_free(next);
+		pci_memlist_free(next);
 		return;
 	}
 
@@ -131,7 +131,7 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 		return;
 	}
 
-	entry = memlist_alloc();
+	entry = pci_memlist_alloc();
 	entry->ml_address = addr;
 	entry->ml_size = size;
 	if (prev == 0) {
@@ -152,7 +152,7 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 #define	IN_RANGE(a, b, e) ((a) >= (b) && (a) <= (e))
 
 int
-memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
+pci_memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 {
 	struct memlist *prev = 0;
 	struct memlist *chunk;
@@ -185,14 +185,14 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 			else
 				chunk = prev->ml_next = chunk->ml_next;
 
-			memlist_free(delete_chunk);
+			pci_memlist_free(delete_chunk);
 			/* skip to start of while-loop */
 			continue;
 		} else if (begin_in_chunk && end_in_chunk &&
 		    chunk_begin != rem_begin && chunk_end != rem_end) {
 			struct memlist *new;
 			/* split chunk */
-			new = memlist_alloc();
+			new = pci_memlist_alloc();
 			new->ml_address = rem_end + 1;
 			new->ml_size = chunk_end - new->ml_address + 1;
 			chunk->ml_size = rem_begin - chunk_begin;
@@ -221,7 +221,7 @@ memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
  * find and claim a memory chunk of given size, first fit
  */
 uint64_t
-memlist_find(struct memlist **listp, uint64_t size, int align)
+pci_memlist_find(struct memlist **listp, uint64_t size, int align)
 {
 	uint64_t delta, total_size;
 	uint64_t paddr;
@@ -247,7 +247,7 @@ memlist_find(struct memlist **listp, uint64_t size, int align)
 	paddr = next->ml_address;
 	if (delta)
 		paddr += align - delta;
-	(void) memlist_remove(listp, paddr, size);
+	(void) pci_memlist_remove(listp, paddr, size);
 
 	return (paddr);
 }
@@ -257,7 +257,7 @@ memlist_find(struct memlist **listp, uint64_t size, int align)
  * at a specified address
  */
 uint64_t
-memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
+pci_memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
     uint64_t size, int align)
 {
 	uint64_t delta, total_size;
@@ -283,7 +283,7 @@ memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
 	paddr = next->ml_address;
 	if (delta)
 		paddr += align - delta;
-	(void) memlist_remove(listp, paddr, size);
+	(void) pci_memlist_remove(listp, paddr, size);
 
 	return (paddr);
 }
@@ -292,16 +292,16 @@ memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
  * Subsume memlist src into memlist dest
  */
 void
-memlist_subsume(struct memlist **src, struct memlist **dest)
+pci_memlist_subsume(struct memlist **src, struct memlist **dest)
 {
 	struct memlist *head, *prev;
 
 	head = *src;
 	while (head) {
-		memlist_insert(dest, head->ml_address, head->ml_size);
+		pci_memlist_insert(dest, head->ml_address, head->ml_size);
 		prev = head;
 		head = head->ml_next;
-		memlist_free(prev);
+		pci_memlist_free(prev);
 	}
 	*src = 0;
 }
@@ -310,13 +310,13 @@ memlist_subsume(struct memlist **src, struct memlist **dest)
  * Merge memlist src into memlist dest; don't destroy src
  */
 void
-memlist_merge(struct memlist **src, struct memlist **dest)
+pci_memlist_merge(struct memlist **src, struct memlist **dest)
 {
 	struct memlist *p;
 
 	p = *src;
 	while (p) {
-		memlist_insert(dest, p->ml_address, p->ml_size);
+		pci_memlist_insert(dest, p->ml_address, p->ml_size);
 		p = p->ml_next;
 	}
 }
@@ -325,12 +325,12 @@ memlist_merge(struct memlist **src, struct memlist **dest)
  * Make a copy of memlist
  */
 struct memlist *
-memlist_dup(struct memlist *listp)
+pci_memlist_dup(struct memlist *listp)
 {
 	struct memlist *head = 0, *prev = 0;
 
 	while (listp) {
-		struct memlist *entry = memlist_alloc();
+		struct memlist *entry = pci_memlist_alloc();
 		entry->ml_address = listp->ml_address;
 		entry->ml_size = listp->ml_size;
 		entry->ml_next = 0;
@@ -346,7 +346,7 @@ memlist_dup(struct memlist *listp)
 }
 
 int
-memlist_count(struct memlist *listp)
+pci_memlist_count(struct memlist *listp)
 {
 	int count = 0;
 	while (listp) {

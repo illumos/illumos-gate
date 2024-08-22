@@ -23,7 +23,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -300,7 +300,7 @@ static void alloc_res_array(void);
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
 static void populate_bus_res(uchar_t bus);
-static void memlist_remove_list(struct memlist **list,
+static void pci_memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
 static void ck804_fix_aer_ptr(dev_info_t *, pcie_req_id_t);
 
@@ -357,27 +357,27 @@ dump_memlists_impl(const char *tag, int bus)
 	printf("Memlist dump at %s - bus %x\n", tag, bus);
 	if (pci_bus_res[bus].io_used != NULL) {
 		printf("    io_used ");
-		memlist_dump(pci_bus_res[bus].io_used);
+		pci_memlist_dump(pci_bus_res[bus].io_used);
 	}
 	if (pci_bus_res[bus].io_avail != NULL) {
 		printf("    io_avail ");
-		memlist_dump(pci_bus_res[bus].io_avail);
+		pci_memlist_dump(pci_bus_res[bus].io_avail);
 	}
 	if (pci_bus_res[bus].mem_used != NULL) {
 		printf("    mem_used ");
-		memlist_dump(pci_bus_res[bus].mem_used);
+		pci_memlist_dump(pci_bus_res[bus].mem_used);
 	}
 	if (pci_bus_res[bus].mem_avail != NULL) {
 		printf("    mem_avail ");
-		memlist_dump(pci_bus_res[bus].mem_avail);
+		pci_memlist_dump(pci_bus_res[bus].mem_avail);
 	}
 	if (pci_bus_res[bus].pmem_used != NULL) {
 		printf("    pmem_used ");
-		memlist_dump(pci_bus_res[bus].pmem_used);
+		pci_memlist_dump(pci_bus_res[bus].pmem_used);
 	}
 	if (pci_bus_res[bus].pmem_avail != NULL) {
 		printf("    pmem_avail ");
-		memlist_dump(pci_bus_res[bus].pmem_avail);
+		pci_memlist_dump(pci_bus_res[bus].pmem_avail);
 	}
 }
 
@@ -622,7 +622,7 @@ pci_setup_tree(void)
 void
 pci_register_isa_resources(int type, uint32_t base, uint32_t size)
 {
-	(void) memlist_insert(
+	(void) pci_memlist_insert(
 	    (type == 1) ?  &isa_res.io_used : &isa_res.mem_used,
 	    base, size);
 }
@@ -648,7 +648,7 @@ remove_subtractive_res()
 			list = pci_bus_res[i].io_used;
 			while (list) {
 				for (j = 0; j <= pci_boot_maxbus; j++)
-					(void) memlist_remove(
+					(void) pci_memlist_remove(
 					    &pci_bus_res[j].io_avail,
 					    list->ml_address, list->ml_size);
 				list = list->ml_next;
@@ -657,10 +657,10 @@ remove_subtractive_res()
 			list = pci_bus_res[i].mem_used;
 			while (list) {
 				for (j = 0; j <= pci_boot_maxbus; j++) {
-					(void) memlist_remove(
+					(void) pci_memlist_remove(
 					    &pci_bus_res[j].mem_avail,
 					    list->ml_address, list->ml_size);
-					(void) memlist_remove(
+					(void) pci_memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
 					    list->ml_address, list->ml_size);
 				}
@@ -670,10 +670,10 @@ remove_subtractive_res()
 			list = pci_bus_res[i].pmem_used;
 			while (list) {
 				for (j = 0; j <= pci_boot_maxbus; j++) {
-					(void) memlist_remove(
+					(void) pci_memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
 					    list->ml_address, list->ml_size);
-					(void) memlist_remove(
+					(void) pci_memlist_remove(
 					    &pci_bus_res[j].mem_avail,
 					    list->ml_address, list->ml_size);
 				}
@@ -699,7 +699,7 @@ setup_bus_res(int bus)
 	 */
 	if (pci_bus_res[bus].bus_avail == NULL) {
 		ASSERT(pci_bus_res[bus].sub_bus >= bus);
-		memlist_insert(&pci_bus_res[bus].bus_avail, bus,
+		pci_memlist_insert(&pci_bus_res[bus].bus_avail, bus,
 		    pci_bus_res[bus].sub_bus - bus + 1);
 	}
 
@@ -712,12 +712,12 @@ setup_bus_res(int bus)
 	par_bus = pci_bus_res[bus].par_bus;
 	if (par_bus != (uchar_t)-1) {
 		ASSERT(pci_bus_res[par_bus].bus_avail != NULL);
-		memlist_remove_list(&pci_bus_res[par_bus].bus_avail,
+		pci_memlist_remove_list(&pci_bus_res[par_bus].bus_avail,
 		    pci_bus_res[bus].bus_avail);
 	}
 
 	/* remove self from bus_avail */;
-	(void) memlist_remove(&pci_bus_res[bus].bus_avail, bus, 1);
+	(void) pci_memlist_remove(&pci_bus_res[bus].bus_avail, bus, 1);
 }
 
 /*
@@ -811,7 +811,7 @@ lookup_parbus_res(uchar_t parbus, uint64_t size, uint64_t align, mem_res_t type)
 	if (*list == NULL)
 		return (0);
 
-	addr = memlist_find(list, size, align);
+	addr = pci_memlist_find(list, size, align);
 
 	return (addr);
 }
@@ -852,12 +852,12 @@ get_parbus_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align,
 	}
 
 	/* Return any existing resources to the parent bus */
-	memlist_subsume(used, avail);
+	pci_memlist_subsume(used, avail);
 	for (struct memlist *m = *avail; m != NULL; m = m->ml_next) {
-		(void) memlist_remove(par_used, m->ml_address, m->ml_size);
-		memlist_insert(par_avail, m->ml_address, m->ml_size);
+		(void) pci_memlist_remove(par_used, m->ml_address, m->ml_size);
+		pci_memlist_insert(par_avail, m->ml_address, m->ml_size);
 	}
-	memlist_free_all(avail);
+	pci_memlist_free_all(avail);
 
 	addr = lookup_parbus_res(parbus, size, align, type);
 
@@ -874,9 +874,9 @@ get_parbus_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align,
 	}
 
 	if (addr != 0) {
-		memlist_insert(par_used, addr, size);
-		(void) memlist_remove(par_avail, addr, size);
-		memlist_insert(avail, addr, size);
+		pci_memlist_insert(par_used, addr, size);
+		(void) pci_memlist_remove(par_avail, addr, size);
+		pci_memlist_insert(avail, addr, size);
 	}
 
 	return (addr);
@@ -1207,14 +1207,14 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		 * from the parent of the PPB.
 		 */
 		for (; range != 0; range--) {
-			if (memlist_find_with_startaddr(
+			if (pci_memlist_find_with_startaddr(
 			    &pci_bus_res[parbus].bus_avail,
 			    subbus + 1, range, 1) != 0) {
 				break; /* find bus range resource at parent */
 			}
 		}
 		if (range != 0) {
-			memlist_insert(&pci_bus_res[secbus].bus_avail,
+			pci_memlist_insert(&pci_bus_res[secbus].bus_avail,
 			    subbus + 1, range);
 			subbus = subbus + range;
 			pci_bus_res[secbus].sub_bus = subbus;
@@ -1397,19 +1397,19 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	 *	- IO space is currently disabled in the command register;
 	 *	- IO space is disabled via base/limit.
 	 */
-	scratch_list = memlist_dup(pci_bus_res[secbus].io_avail);
-	memlist_merge(&pci_bus_res[secbus].io_used, &scratch_list);
+	scratch_list = pci_memlist_dup(pci_bus_res[secbus].io_avail);
+	pci_memlist_merge(&pci_bus_res[secbus].io_used, &scratch_list);
 
 	reprogram_io = !list_is_vga_only(scratch_list, RES_IO) &&
 	    (pci_bus_res[parbus].io_reprogram ||
 	    (cmd_reg & PCI_COMM_IO) == 0 ||
 	    io.base > io.limit);
 
-	memlist_free_all(&scratch_list);
+	pci_memlist_free_all(&scratch_list);
 
 	if (reprogram_io) {
 		if (pci_bus_res[secbus].io_used != NULL) {
-			memlist_subsume(&pci_bus_res[secbus].io_used,
+			pci_memlist_subsume(&pci_bus_res[secbus].io_used,
 			    &pci_bus_res[secbus].io_avail);
 		}
 
@@ -1430,12 +1430,12 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			io.limit = P2ROUNDUP(io.limit, PPB_IO_ALIGNMENT) - 1;
 			io.size = io.limit - io.base + 1;
 			ASSERT3U(io.base, <=, io.limit);
-			memlist_free_all(&pci_bus_res[secbus].io_avail);
-			memlist_insert(&pci_bus_res[secbus].io_avail,
+			pci_memlist_free_all(&pci_bus_res[secbus].io_avail);
+			pci_memlist_insert(&pci_bus_res[secbus].io_avail,
 			    io.base, io.size);
-			memlist_insert(&pci_bus_res[parbus].io_used,
+			pci_memlist_insert(&pci_bus_res[parbus].io_used,
 			    io.base, io.size);
-			(void) memlist_remove(&pci_bus_res[parbus].io_avail,
+			(void) pci_memlist_remove(&pci_bus_res[parbus].io_avail,
 			    io.base, io.size);
 			pci_bus_res[secbus].io_reprogram = B_TRUE;
 		} else {
@@ -1471,20 +1471,20 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	 * resources in the 'avail' list for add_reg_props() to subsequently
 	 * find and assign.
 	 */
-	scratch_list = memlist_dup(pci_bus_res[secbus].mem_avail);
-	memlist_merge(&pci_bus_res[secbus].mem_used, &scratch_list);
+	scratch_list = pci_memlist_dup(pci_bus_res[secbus].mem_avail);
+	pci_memlist_merge(&pci_bus_res[secbus].mem_used, &scratch_list);
 
 	reprogram_mem = !list_is_vga_only(scratch_list, RES_MEM) &&
 	    (pci_bus_res[parbus].mem_reprogram ||
 	    (cmd_reg & PCI_COMM_MAE) == 0 ||
 	    (mem.base > mem.limit && pmem.base > pmem.limit));
 
-	memlist_free_all(&scratch_list);
+	pci_memlist_free_all(&scratch_list);
 
 	if (reprogram_mem) {
 		/* Mem range */
 		if (pci_bus_res[secbus].mem_used != NULL) {
-			memlist_subsume(&pci_bus_res[secbus].mem_used,
+			pci_memlist_subsume(&pci_bus_res[secbus].mem_used,
 			    &pci_bus_res[secbus].mem_avail);
 		}
 
@@ -1510,13 +1510,14 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			mem.limit = P2ROUNDUP(mem.limit, PPB_MEM_ALIGNMENT) - 1;
 			mem.size = mem.limit + 1 - mem.base;
 			ASSERT3U(mem.base, <=, mem.limit);
-			memlist_free_all(&pci_bus_res[secbus].mem_avail);
-			memlist_insert(&pci_bus_res[secbus].mem_avail,
+			pci_memlist_free_all(&pci_bus_res[secbus].mem_avail);
+			pci_memlist_insert(&pci_bus_res[secbus].mem_avail,
 			    mem.base, mem.size);
-			memlist_insert(&pci_bus_res[parbus].mem_used,
+			pci_memlist_insert(&pci_bus_res[parbus].mem_used,
 			    mem.base, mem.size);
-			(void) memlist_remove(&pci_bus_res[parbus].mem_avail,
-			    mem.base, mem.size);
+			(void) pci_memlist_remove(
+			    &pci_bus_res[parbus].mem_avail, mem.base,
+			    mem.size);
 			pci_bus_res[secbus].mem_reprogram = B_TRUE;
 		} else {
 			/* get new mem resource from parent bus */
@@ -1531,7 +1532,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 
 		/* Prefetch mem */
 		if (pci_bus_res[secbus].pmem_used != NULL) {
-			memlist_subsume(&pci_bus_res[secbus].pmem_used,
+			pci_memlist_subsume(&pci_bus_res[secbus].pmem_used,
 			    &pci_bus_res[secbus].pmem_avail);
 		}
 
@@ -1549,13 +1550,14 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			    - 1;
 			pmem.size = pmem.limit + 1 - pmem.base;
 			ASSERT3U(pmem.base, <=, pmem.limit);
-			memlist_free_all(&pci_bus_res[secbus].pmem_avail);
-			memlist_insert(&pci_bus_res[secbus].pmem_avail,
+			pci_memlist_free_all(&pci_bus_res[secbus].pmem_avail);
+			pci_memlist_insert(&pci_bus_res[secbus].pmem_avail,
 			    pmem.base, pmem.size);
-			memlist_insert(&pci_bus_res[parbus].pmem_used,
+			pci_memlist_insert(&pci_bus_res[parbus].pmem_used,
 			    pmem.base, pmem.size);
-			(void) memlist_remove(&pci_bus_res[parbus].pmem_avail,
-			    pmem.base, pmem.size);
+			(void) pci_memlist_remove(
+			    &pci_bus_res[parbus].pmem_avail, pmem.base,
+			    pmem.size);
 			pci_bus_res[secbus].mem_reprogram = B_TRUE;
 		} else {
 			/* get new mem resource from parent bus */
@@ -1663,8 +1665,9 @@ pci_reprogram(void)
 		 *	000A0000 - 000BFFFF	VGA RAM
 		 *	000C0000 - 000FFFFF	ROM area
 		 */
-		(void) memlist_remove(&pci_bus_res[bus].mem_avail, 0, 0x100000);
-		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
+		(void) pci_memlist_remove(&pci_bus_res[bus].mem_avail,
+		    0, 0x100000);
+		(void) pci_memlist_remove(&pci_bus_res[bus].pmem_avail,
 		    0, 0x100000);
 
 		/*
@@ -1712,25 +1715,25 @@ pci_reprogram(void)
 		 * 4. Remove used PCI and ISA resources from bus resource map
 		 */
 
-		memlist_remove_list(&pci_bus_res[bus].io_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].io_avail,
 		    pci_bus_res[bus].io_used);
-		memlist_remove_list(&pci_bus_res[bus].mem_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].mem_avail,
 		    pci_bus_res[bus].mem_used);
-		memlist_remove_list(&pci_bus_res[bus].pmem_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].pmem_avail,
 		    pci_bus_res[bus].pmem_used);
-		memlist_remove_list(&pci_bus_res[bus].mem_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].mem_avail,
 		    pci_bus_res[bus].pmem_used);
-		memlist_remove_list(&pci_bus_res[bus].pmem_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].pmem_avail,
 		    pci_bus_res[bus].mem_used);
 
-		memlist_remove_list(&pci_bus_res[bus].io_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].io_avail,
 		    isa_res.io_used);
-		memlist_remove_list(&pci_bus_res[bus].mem_avail,
+		pci_memlist_remove_list(&pci_bus_res[bus].mem_avail,
 		    isa_res.mem_used);
 	}
 
-	memlist_free_all(&isa_res.io_used);
-	memlist_free_all(&isa_res.mem_used);
+	pci_memlist_free_all(&isa_res.io_used);
+	pci_memlist_free_all(&isa_res.mem_used);
 
 	/* add bus-range property for root/peer bus nodes */
 	for (i = 0; i <= pci_boot_maxbus; i++) {
@@ -1816,11 +1819,13 @@ populate_bus_res(uchar_t bus)
 		 */
 		if (pci_bus_res[0].mem_avail == NULL) {
 			pci_bus_res[0].mem_avail =
-			    memlist_dup(bootops->boot_mem->pcimem);
+			    pci_memlist_dup(bootops->boot_mem->pcimem);
 		}
 		/* Exclude 0x00 to 0xff of the I/O space, used by all PCs */
-		if (pci_bus_res[0].io_avail == NULL)
-			memlist_insert(&pci_bus_res[0].io_avail, 0x100, 0xffff);
+		if (pci_bus_res[0].io_avail == NULL) {
+			pci_memlist_insert(&pci_bus_res[0].io_avail, 0x100,
+			    0xffff);
+		}
 	}
 
 	/*
@@ -1958,17 +1963,17 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 			    pci_bus_res[bus].pmem_size;
 
 			if (pci_bus_res[bus].io_used != NULL) {
-				memlist_merge(&pci_bus_res[bus].io_used,
+				pci_memlist_merge(&pci_bus_res[bus].io_used,
 				    &pci_bus_res[par_bus].io_used);
 			}
 
 			if (pci_bus_res[bus].mem_used != NULL) {
-				memlist_merge(&pci_bus_res[bus].mem_used,
+				pci_memlist_merge(&pci_bus_res[bus].mem_used,
 				    &pci_bus_res[par_bus].mem_used);
 			}
 
 			if (pci_bus_res[bus].pmem_used != NULL) {
-				memlist_merge(&pci_bus_res[bus].pmem_used,
+				pci_memlist_merge(&pci_bus_res[bus].pmem_used,
 				    &pci_bus_res[par_bus].pmem_used);
 			}
 
@@ -2595,8 +2600,8 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 		if (op == CONFIG_INFO) {	/* first pass */
 			/* take out of the resource map of the bus */
 			if (base != 0) {
-				(void) memlist_remove(io_avail, base, len);
-				memlist_insert(io_used, base, len);
+				(void) pci_memlist_remove(io_avail, base, len);
+				pci_memlist_insert(io_used, base, len);
 			} else {
 				reprogram = 1;
 			}
@@ -2606,7 +2611,7 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 			pci_bus_res[bus].io_size += len;
 		} else if ((*io_avail != NULL && base == 0) ||
 		    pci_bus_res[bus].io_reprogram) {
-			base = memlist_find(io_avail, len, len);
+			base = pci_memlist_find(io_avail, len, len);
 			if (base == 0) {
 				cmn_err(CE_WARN, MSGHDR "BAR%u I/O "
 				    "failed to find length 0x%x",
@@ -2637,10 +2642,10 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 						pci_putw(bus, dev, func,
 						    PCI_CONF_COMM, command);
 					}
-					memlist_insert(io_avail, base, len);
+					pci_memlist_insert(io_avail, base, len);
 					base = 0;
 				} else {
-					memlist_insert(io_used, base, len);
+					pci_memlist_insert(io_used, base, len);
 				}
 			}
 		}
@@ -2727,13 +2732,18 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 			/* take out of the resource map of the bus */
 			if (fbase != 0) {
 				/* remove from PMEM and MEM space */
-				(void) memlist_remove(mem_avail, fbase, len);
-				(void) memlist_remove(pmem_avail, fbase, len);
+				(void) pci_memlist_remove(mem_avail, fbase,
+				    len);
+				(void) pci_memlist_remove(pmem_avail, fbase,
+				    len);
 				/* only note as used in correct map */
-				if ((phys_hi & PCI_PREFETCH_B) != 0)
-					memlist_insert(pmem_used, fbase, len);
-				else
-					memlist_insert(mem_used, fbase, len);
+				if ((phys_hi & PCI_PREFETCH_B) != 0) {
+					pci_memlist_insert(pmem_used, fbase,
+					    len);
+				} else {
+					pci_memlist_insert(mem_used, fbase,
+					    len);
+				}
 			} else {
 				reprogram = 1;
 				/*
@@ -2765,7 +2775,7 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 			 */
 			if ((phys_hi & PCI_PREFETCH_B) != 0 &&
 			    *pmem_avail != NULL) {
-				fbase = memlist_find(pmem_avail, len, len);
+				fbase = pci_memlist_find(pmem_avail, len, len);
 				if (fbase != 0)
 					pf = B_TRUE;
 			}
@@ -2774,7 +2784,7 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 			 * failed, attempt ordinary memory allocation.
 			 */
 			if (fbase == 0 && *mem_avail != NULL)
-				fbase = memlist_find(mem_avail, len, len);
+				fbase = pci_memlist_find(mem_avail, len, len);
 
 			base_hi = fbase >> 32;
 			base = fbase & 0xffffffff;
@@ -2830,20 +2840,20 @@ add_bar_reg_props(int op, uchar_t bus, uchar_t dev, uchar_t func, uint_t bar,
 						    PCI_CONF_COMM, command);
 					}
 
-					memlist_insert(
+					pci_memlist_insert(
 					    pf ? pmem_avail : mem_avail,
 					    base, len);
 					base = base_hi = 0;
 				} else {
 					if (pf) {
-						memlist_insert(pmem_used,
+						pci_memlist_insert(pmem_used,
 						    fbase, len);
-						(void) memlist_remove(
+						(void) pci_memlist_remove(
 						    pmem_avail, fbase, len);
 					} else {
-						memlist_insert(mem_used,
+						pci_memlist_insert(mem_used,
 						    fbase, len);
-						(void) memlist_remove(
+						(void) pci_memlist_remove(
 						    mem_avail, fbase, len);
 					}
 				}
@@ -2978,8 +2988,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		nreg++, nasgn++;
 		/* take it out of the memory resource */
 		if (base != 0) {
-			(void) memlist_remove(mem_avail, base, len);
-			memlist_insert(mem_used, base, len);
+			(void) pci_memlist_remove(mem_avail, base, len);
+			pci_memlist_insert(mem_used, base, len);
 			pci_bus_res[bus].mem_size += len;
 		}
 	}
@@ -2998,8 +3008,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		regs[nreg].pci_phys_low = assigned[nasgn].pci_phys_low = 0x3b0;
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = 0xc;
 		nreg++, nasgn++;
-		(void) memlist_remove(io_avail, 0x3b0, 0xc);
-		memlist_insert(io_used, 0x3b0, 0xc);
+		(void) pci_memlist_remove(io_avail, 0x3b0, 0xc);
+		pci_memlist_insert(io_used, 0x3b0, 0xc);
 		pci_bus_res[bus].io_size += 0xc;
 
 		/* VGA hard decode 0x3c0-0x3df */
@@ -3008,8 +3018,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		regs[nreg].pci_phys_low = assigned[nasgn].pci_phys_low = 0x3c0;
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = 0x20;
 		nreg++, nasgn++;
-		(void) memlist_remove(io_avail, 0x3c0, 0x20);
-		memlist_insert(io_used, 0x3c0, 0x20);
+		(void) pci_memlist_remove(io_avail, 0x3c0, 0x20);
+		pci_memlist_insert(io_used, 0x3c0, 0x20);
 		pci_bus_res[bus].io_size += 0x20;
 
 		/* Video memory */
@@ -3021,9 +3031,9 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		    assigned[nasgn].pci_size_low = 0x20000;
 		nreg++, nasgn++;
 		/* remove from MEM and PMEM space */
-		(void) memlist_remove(mem_avail, 0xa0000, 0x20000);
-		(void) memlist_remove(pmem_avail, 0xa0000, 0x20000);
-		memlist_insert(mem_used, 0xa0000, 0x20000);
+		(void) pci_memlist_remove(mem_avail, 0xa0000, 0x20000);
+		(void) pci_memlist_remove(pmem_avail, 0xa0000, 0x20000);
+		pci_memlist_insert(mem_used, 0xa0000, 0x20000);
 		pci_bus_res[bus].mem_size += 0x20000;
 	}
 
@@ -3038,8 +3048,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		regs[nreg].pci_phys_low = assigned[nasgn].pci_phys_low = 0x2e8;
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = 0x1;
 		nreg++, nasgn++;
-		(void) memlist_remove(io_avail, 0x2e8, 0x1);
-		memlist_insert(io_used, 0x2e8, 0x1);
+		(void) pci_memlist_remove(io_avail, 0x2e8, 0x1);
+		pci_memlist_insert(io_used, 0x2e8, 0x1);
 		pci_bus_res[bus].io_size += 0x1;
 
 		/* hard decode 0x2ea-0x2ef */
@@ -3048,8 +3058,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		regs[nreg].pci_phys_low = assigned[nasgn].pci_phys_low = 0x2ea;
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = 0x6;
 		nreg++, nasgn++;
-		(void) memlist_remove(io_avail, 0x2ea, 0x6);
-		memlist_insert(io_used, 0x2ea, 0x6);
+		(void) pci_memlist_remove(io_avail, 0x2ea, 0x6);
+		pci_memlist_insert(io_used, 0x2ea, 0x6);
 		pci_bus_res[bus].io_size += 0x6;
 	}
 
@@ -3191,11 +3201,12 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	} else if (io.base < io.limit) {
 		uint64_t size = io.limit - io.base + 1;
 
-		memlist_insert(&pci_bus_res[secbus].io_avail, io.base, size);
-		memlist_insert(&pci_bus_res[bus].io_used, io.base, size);
+		pci_memlist_insert(&pci_bus_res[secbus].io_avail, io.base,
+		    size);
+		pci_memlist_insert(&pci_bus_res[bus].io_used, io.base, size);
 
 		if (pci_bus_res[bus].io_avail != NULL) {
-			(void) memlist_remove(&pci_bus_res[bus].io_avail,
+			(void) pci_memlist_remove(&pci_bus_res[bus].io_avail,
 			    io.base, size);
 		}
 	}
@@ -3217,12 +3228,13 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	} else if (mem.base < mem.limit) {
 		uint64_t size = mem.limit - mem.base + 1;
 
-		memlist_insert(&pci_bus_res[secbus].mem_avail, mem.base, size);
-		memlist_insert(&pci_bus_res[bus].mem_used, mem.base, size);
+		pci_memlist_insert(&pci_bus_res[secbus].mem_avail, mem.base,
+		    size);
+		pci_memlist_insert(&pci_bus_res[bus].mem_used, mem.base, size);
 		/* remove from parent resource list */
-		(void) memlist_remove(&pci_bus_res[bus].mem_avail,
+		(void) pci_memlist_remove(&pci_bus_res[bus].mem_avail,
 		    mem.base, size);
-		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
+		(void) pci_memlist_remove(&pci_bus_res[bus].pmem_avail,
 		    mem.base, size);
 	}
 
@@ -3236,13 +3248,14 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	} else if (pmem.base < pmem.limit) {
 		uint64_t size = pmem.limit - pmem.base + 1;
 
-		memlist_insert(&pci_bus_res[secbus].pmem_avail,
+		pci_memlist_insert(&pci_bus_res[secbus].pmem_avail,
 		    pmem.base, size);
-		memlist_insert(&pci_bus_res[bus].pmem_used, pmem.base, size);
+		pci_memlist_insert(&pci_bus_res[bus].pmem_used, pmem.base,
+		    size);
 		/* remove from parent resource list */
-		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
+		(void) pci_memlist_remove(&pci_bus_res[bus].pmem_avail,
 		    pmem.base, size);
-		(void) memlist_remove(&pci_bus_res[bus].mem_avail,
+		(void) pci_memlist_remove(&pci_bus_res[bus].mem_avail,
 		    pmem.base, size);
 	}
 
@@ -3258,28 +3271,29 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	if (pci_getw(bus, dev, func, PCI_BCNF_BCNTRL) &
 	    PCI_BCNF_BCNTRL_VGA_ENABLE) {
 
-		memlist_insert(&pci_bus_res[secbus].io_avail, 0x3b0, 0xc);
+		pci_memlist_insert(&pci_bus_res[secbus].io_avail, 0x3b0, 0xc);
 
-		memlist_insert(&pci_bus_res[bus].io_used, 0x3b0, 0xc);
+		pci_memlist_insert(&pci_bus_res[bus].io_used, 0x3b0, 0xc);
 		if (pci_bus_res[bus].io_avail != NULL) {
-			(void) memlist_remove(&pci_bus_res[bus].io_avail,
+			(void) pci_memlist_remove(&pci_bus_res[bus].io_avail,
 			    0x3b0, 0xc);
 		}
 
-		memlist_insert(&pci_bus_res[secbus].io_avail, 0x3c0, 0x20);
+		pci_memlist_insert(&pci_bus_res[secbus].io_avail, 0x3c0, 0x20);
 
-		memlist_insert(&pci_bus_res[bus].io_used, 0x3c0, 0x20);
+		pci_memlist_insert(&pci_bus_res[bus].io_used, 0x3c0, 0x20);
 		if (pci_bus_res[bus].io_avail != NULL) {
-			(void) memlist_remove(&pci_bus_res[bus].io_avail,
+			(void) pci_memlist_remove(&pci_bus_res[bus].io_avail,
 			    0x3c0, 0x20);
 		}
 
-		memlist_insert(&pci_bus_res[secbus].mem_avail, 0xa0000,
+		pci_memlist_insert(&pci_bus_res[secbus].mem_avail, 0xa0000,
 		    0x20000);
 
-		memlist_insert(&pci_bus_res[bus].mem_used, 0xa0000, 0x20000);
+		pci_memlist_insert(&pci_bus_res[bus].mem_used, 0xa0000,
+		    0x20000);
 		if (pci_bus_res[bus].mem_avail != NULL) {
-			(void) memlist_remove(&pci_bus_res[bus].mem_avail,
+			(void) pci_memlist_remove(&pci_bus_res[bus].mem_avail,
 			    0xa0000, 0x20000);
 		}
 	}
@@ -3371,16 +3385,16 @@ add_ranges_prop(int bus, boolean_t ppb)
 
 	iolist = memlist = pmemlist = (struct memlist *)NULL;
 
-	memlist_merge(&pci_bus_res[bus].io_avail, &iolist);
-	memlist_merge(&pci_bus_res[bus].io_used, &iolist);
-	memlist_merge(&pci_bus_res[bus].mem_avail, &memlist);
-	memlist_merge(&pci_bus_res[bus].mem_used, &memlist);
-	memlist_merge(&pci_bus_res[bus].pmem_avail, &pmemlist);
-	memlist_merge(&pci_bus_res[bus].pmem_used, &pmemlist);
+	pci_memlist_merge(&pci_bus_res[bus].io_avail, &iolist);
+	pci_memlist_merge(&pci_bus_res[bus].io_used, &iolist);
+	pci_memlist_merge(&pci_bus_res[bus].mem_avail, &memlist);
+	pci_memlist_merge(&pci_bus_res[bus].mem_used, &memlist);
+	pci_memlist_merge(&pci_bus_res[bus].pmem_avail, &pmemlist);
+	pci_memlist_merge(&pci_bus_res[bus].pmem_used, &pmemlist);
 
-	total = memlist_count(iolist);
-	total += memlist_count(memlist);
-	total += memlist_count(pmemlist);
+	total = pci_memlist_count(iolist);
+	total += pci_memlist_count(memlist);
+	total += pci_memlist_count(pmemlist);
 
 	/* no property is created if no ranges are present */
 	if (total == 0)
@@ -3402,16 +3416,16 @@ add_ranges_prop(int bus, boolean_t ppb)
 	    "ranges", (int *)rp, alloc_size / sizeof (int));
 
 	kmem_free(rp, alloc_size);
-	memlist_free_all(&iolist);
-	memlist_free_all(&memlist);
-	memlist_free_all(&pmemlist);
+	pci_memlist_free_all(&iolist);
+	pci_memlist_free_all(&memlist);
+	pci_memlist_free_all(&pmemlist);
 }
 
 static void
-memlist_remove_list(struct memlist **list, struct memlist *remove_list)
+pci_memlist_remove_list(struct memlist **list, struct memlist *remove_list)
 {
 	while (list && *list && remove_list) {
-		(void) memlist_remove(list, remove_list->ml_address,
+		(void) pci_memlist_remove(list, remove_list->ml_address,
 		    remove_list->ml_size);
 		remove_list = remove_list->ml_next;
 	}
@@ -3464,9 +3478,9 @@ add_bus_available_prop(int bus)
 	if (pci_bus_res[bus].dip == NULL)
 		return;
 
-	count = memlist_count(pci_bus_res[bus].io_avail) +
-	    memlist_count(pci_bus_res[bus].mem_avail) +
-	    memlist_count(pci_bus_res[bus].pmem_avail);
+	count = pci_memlist_count(pci_bus_res[bus].io_avail) +
+	    pci_memlist_count(pci_bus_res[bus].mem_avail) +
+	    pci_memlist_count(pci_bus_res[bus].pmem_avail);
 
 	if (count == 0)		/* nothing available */
 		return;
