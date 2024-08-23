@@ -252,6 +252,7 @@ _MANFILES=	6to4relay.8		\
 		kproplog.8		\
 		krb5kdc.8		\
 		kstat.8			\
+		ktest.8			\
 		ktkt_warnd.8		\
 		labelit.8		\
 		labelit_hsfs.8		\

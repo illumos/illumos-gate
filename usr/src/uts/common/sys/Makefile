@@ -352,6 +352,8 @@ CHKHDRS=			\
 	kstr.h			\
 	ksyms.h			\
 	ksynch.h		\
+	ktest.h			\
+	ktest_impl.h		\
 	ldterm.h		\
 	lgrp.h			\
 	lgrp_user.h		\

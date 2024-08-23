@@ -19,6 +19,7 @@
 #
 TEST_IPS_MANIFEST_FILES = \
     developer-build-make.p5m \
+    driver-ktest.p5m \
     system-bhyve-tests.p5m \
     system-dtrace-tests.p5m \
     system-file-system-zfs-tests.p5m \
@@ -37,4 +38,3 @@ TEST_IPS_MANIFEST_FILES = \
     system-test-vndtest.p5m \
     system-test-smartostest.p5m \
     system-test-zfstest.p5m
-

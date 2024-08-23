@@ -1,0 +1,81 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Ryan Zezeski
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/ktest@$(PKGVERS)
+set name=pkg.summary value="Kernel Test Driver"
+set name=pkg.description value="Kernel Test Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=i386
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/ktest group=sys mode=0755
+file path=kernel/drv/ktest.conf group=sys
+dir  path=usr/bin
+file path=usr/bin/ktest mode=0555
+dir  path=usr/include
+dir  path=usr/include/sys
+file path=usr/include/sys/ktest.h mode=0644
+dir  path=usr/kernel/misc group=sys
+dir  path=usr/kernel/misc/ktest group=sys
+dir  path=usr/kernel/misc/ktest/$(ARCH64) group=sys
+file path=usr/kernel/misc/ktest/$(ARCH64)/ktest_selftest group=sys mode=0755
+file path=usr/kernel/misc/ktest/$(ARCH64)/mac_test group=sys mode=0755
+file path=usr/kernel/misc/ktest/$(ARCH64)/stream_test group=sys mode=0755
+dir  path=usr/lib/devfsadm group=sys
+dir  path=usr/lib/devfsadm/linkmod group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/ktest.8
+dir  path=usr/share/man/man9
+file path=usr/share/man/man9/ktest.9
+dir  path=usr/share/man/man9f
+link path=usr/share/man/man9f/KT_ASSERT.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT0.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT0G.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3P.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3PG.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3S.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3SG.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3U.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERT3UG.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ASSERTG.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_ERROR.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_FAIL.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_PASS.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/KT_SKIP.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_add_suite.9f target=ktest_create_module.9f
+link path=usr/share/man/man9f/ktest_add_test.9f target=ktest_create_module.9f
+file path=usr/share/man/man9f/ktest_create_module.9f
+link path=usr/share/man/man9f/ktest_free_module.9f target=ktest_create_module.9f
+file path=usr/share/man/man9f/ktest_get_fn.9f
+file path=usr/share/man/man9f/ktest_get_input.9f
+link path=usr/share/man/man9f/ktest_hold_mod.9f target=ktest_get_fn.9f
+link path=usr/share/man/man9f/ktest_msg_clear.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_msg_prepend.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_register_module.9f \
+    target=ktest_create_module.9f
+link path=usr/share/man/man9f/ktest_release_mod.9f target=ktest_get_fn.9f
+link path=usr/share/man/man9f/ktest_result_error.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_result_fail.9f target=ktest_result_pass.9f
+file path=usr/share/man/man9f/ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_result_skip.9f target=ktest_result_pass.9f
+link path=usr/share/man/man9f/ktest_unregister_module.9f \
+    target=ktest_create_module.9f
+driver name=ktest
+license lic_CDDL license=lic_CDDL

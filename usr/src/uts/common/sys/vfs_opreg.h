@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * The following union allows us to use C99's "designated initializer"
@@ -105,7 +105,7 @@ int	vfs_makefsops(const fs_operation_def_t *, vfsops_t **);
 void	vfs_freevfsops(vfsops_t *);
 int	vfs_freevfsops_by_type(int);
 
-#endif /* _KERNEL */
+#endif /* _KERNEL || _FAKE_KERNEL */
 
 #ifdef	__cplusplus
 }

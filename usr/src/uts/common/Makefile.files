@@ -2376,3 +2376,15 @@ ENA_OBJS +=	ena.o ena_admin.o ena_dma.o ena_aenq.o ena_gld.o ena_hw.o \
 
 IGC_CORE_OBJS += igc_api.o igc_base.o igc_i225.o igc_mac.o igc_nvm.o igc_phy.o
 IGC_OBJS += $(IGC_CORE_OBJS) igc.o igc_osdep.o igc_gld.o igc_ring.o igc_stat.o
+
+#
+# The Kernel Test driver.
+#
+KTEST_OBJS += ktest.o
+
+#
+# Kernel test modules included with the system.
+#
+MAC_TEST_OBJS += mac_test.o
+KTEST_SELFTEST_OBJS += ktest_selftest.o
+STREAM_TEST_OBJS += stream_test.o

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -64,6 +65,8 @@ fksmbsrv_vfs_init(void)
 	vnode_t *vp;
 	char *name = "/";
 
+	(void) vncache_init();
+
 	if (rootvfs == NULL) {
 		rootvfs = &fake_rootvfs;
 		rootvfs->vfs_mntpt = refstr_alloc(name);
@@ -83,9 +86,8 @@ fksmbsrv_vfs_init(void)
 			(void) close(fd);
 			return (err);
 		}
-		vp = vncache_enter(&st, NULL, "", fd);
-		/* extra hold for rootvp */
-		vn_hold(vp);
+		vp = vncache_enter(&st, NULL, name, fd);
+		/* give this hold to rootdir */
 		rootdir = vp;
 
 		/* VFS stuff in global zone struct. */
@@ -97,6 +99,15 @@ fksmbsrv_vfs_init(void)
 
 }
 
+void
+fksmbsrv_vfs_fini(void)
+{
+	if (rootdir != NULL) {
+		VN_RELE(rootdir);
+		rootdir = NULL;
+	}
+	vncache_fini();
+}
 
 /*
  * Query a vfs for a feature.
@@ -151,7 +162,7 @@ fsop_root(vfs_t *vfsp, vnode_t **vpp)
 	if ((vp = rootdir) == NULL)
 		return (ENXIO);
 
-	vn_hold(vp);
+	VN_HOLD(vp);
 	*vpp = vp;
 	return (0);
 }
@@ -161,12 +172,14 @@ int
 fsop_statfs(vfs_t *vfsp, statvfs64_t *sp)
 {
 	vnode_t *vp;
+	int fd;
 	int rc;
 
 	if ((vp = rootdir) == NULL)
 		return (ENXIO);
+	fd = vncache_getfd(vp);
 
-	rc = fstatvfs64(vp->v_fd, sp);
+	rc = fstatvfs64(fd, sp);
 	if (rc == -1) {
 		rc = errno;
 	}

@@ -10,15 +10,17 @@
 #
 
 #
+# Copyright 2023 Oxide Computer Company
 # Copyright 2017, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	9
+MANSECT=	9
 MANFILES=	Intro.9	\
 		iport.9 \
+		ktest.9 \
 		vmem.9
 
 
@@ -36,4 +38,4 @@ tgtmap.9	:= LINKSRC = iport.9
 
 include		$(SRC)/man/Makefile.man
 
-install: 	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -93,13 +93,38 @@ function verify_disks
 {
 	typeset disk
 	typeset path
+	typeset -lu expected_size
+	typeset -lu size
+
+	# Ensure disks are large enough for the tests: no less than 10GB
+	# and large enough for a crash dump plus overheads: the disk partition
+	# table (about 34k), zpool with 4.5MB for pool label and 128k for pool
+	# data, so we round up pool data + labels to 5MB.
+	expected_size=$(sudo -k -n dumpadm -epH)
+	(( expected_size = expected_size + 5 * 1024 * 1024 ))
+
+	if (( expected_size < 10 * 1024 * 1024 * 1024 )); then
+		(( expected_size = 10 * 1024 * 1024 * 1024 ))
+	fi
+
 	for disk in $DISKS; do
 		case $disk in
 		/*) path=$disk;;
 		*) path=/dev/rdsk/${disk}s0
 		esac
-		sudo -k prtvtoc $path >/dev/null 2>&1
-		[[ $? -eq 0 ]] || return 1
+		set -A disksize $(sudo -k prtvtoc $path 2>&1 |
+			awk '$3 == "bytes/sector" ||
+			    ($3 == "accessible" && $4 == "sectors") {print $2}')
+
+		if [[ (-n "${disksize[0]}") && (-n "${disksize[1]}") ]]; then
+			(( size = disksize[0] * disksize[1] ))
+		else
+			return 1
+		fi
+		if (( size <  expected_size )); then
+			(( size = expected_size / 1024 / 1024 / 1024 ))
+			fail "$disk is too small, need at least ${size}GB"
+		fi
 	done
 	return 0
 }

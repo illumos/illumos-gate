@@ -1,0 +1,202 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd February 17, 2023
+.Dt KTEST 9
+.Os
+.Sh NAME
+.Nm ktest
+.Nd kernel test facility
+.Sh DESCRIPTION
+The ktest facility provides the means for writing and executing kernel
+test modules.
+A kernel test module is a kernel module that contains test functions
+designed to execute and verify some aspect of the kernel.
+You can test any aspect of the kernel for which you can create the
+requisite context, whether that be its local arguments or shared
+state.
+.Pp
+The key design idea behind ktest is to put the test in the same
+context as the code it's testing: kernel context.
+By writing tests as kernel functions it allows one to more thoroughly test
+particular aspects of the kernel.
+The ktest facility complements user-space testing by allowing targeted
+testing of the kernel that is not as easily exercised via user-space.
+.Pp
+The ktest facility provides a kernel API for creating tests as well as
+a character device for interacting with the facility from user-space.
+The latter of which should be done by way of the
+.Xr ktest 8
+command.
+.Pp
+This page concerns itself with the various kernel-side concepts of the
+ktest facility and acts as a guide to the various 9F APIs.
+.Ss The Test Triple
+A test is uniquely identified by its test triple.
+The triple is a three-level namespace comprising of the module name,
+suite name, and test name.
+Each part of the namespace is separated by the ':' character.
+.Bd -literal -offset 4m
+<module>:<suite>:<test>
+.Ed
+.Bl -tag -width 6m
+.It module
+The top of the namespace.
+If the test module is primarily focused on testing one kernel module,
+then its module name is typically named after the module-under-test.
+For example, a test module designed to test all aspects of the
+.Sy mac
+kernel module might use "mac" as the module name.
+This is merely a convention; at the end of the day the module name is
+simply a string meant to represent the general theme of its underlying
+tests.
+.It suite
+Each module consists of one or more suites.
+The suite name provides a second level of organization for grouping
+related tests.
+For example, your "mac" test module may have several tests for
+checksum-related routines.
+In that case it might help to organize all those tests under the
+"checksum" suite.
+.It test
+The name of the test.
+This can be any name you find descriptive of the test.
+For tests that focus on a single function you could use the name of
+the function-under-test with the "_test" suffix attached.
+For tests that exercise many functions do your best to make the name
+descriptive.
+The test functions are typically suffixed with "_test" to visually
+separate them from test-helper functions; and the test name is often
+the same as the test function.
+.El
+.Pp
+For a name to be considered valid it must meet the following criteria.
+.Bl -enum
+.It
+It must be 63 characters or less (the 64th byte must hold the
+.Sy NUL
+character).
+.It
+It must contain only the following ASCII
+characters: 'A-Z', 'a-z', '0-9', '.', '_'.
+.El
+.Ss The Context Handle
+The context handle provides the means through which the test
+communicates with the ktest facility.
+All test functions must conform to the following prototype.
+.Bd -literal -offset 4m
+typedef void (*ktest_fn_t)(ktest_ctx_hdl_t *ctx);
+.Ed
+.Pp
+The test interacts with
+.Fa ctx
+through various ktest routines documented in their requisite sections.
+.Ss Setting Test Results
+The ultimate goal of a test function is to return a result.
+See
+.Xr ktest_result_pass 9f
+for the complete guide to setting test results.
+.Ss Test Input
+Some tests require an input stream to test against.
+The input stream is provided at runtime by the user.
+The user may run the same test against one or more different input
+streams.
+.Pp
+This is useful when a test applies to many different scenarios with
+the same general logic.
+For example, a test that verifies a checksum routine applies to any
+byte stream; or a test that verifies TCP header parsing applies to any
+byte stream as well.
+.Pp
+Writing a test against an input stream provides several benefits.
+.Bl -enum
+.It
+It allows one test to verify innumerable scenarios, reducing the need
+to replicate test logic.
+.It
+It avoids the need to hard-code test input in the test module itself.
+.It
+With the ability to change the input stream at runtime it allows
+testing new scenarios on the spot, avoiding the need for writing a new
+test.
+.El
+.Pp
+A test that requires input must specify the
+.Sy KTEST_FLAG_INPUT
+flag when calling
+.Xr ktest_add_test 9f .
+To retrieve the input stream the test uses the
+.Xr ktest_get_input 9f
+function.
+.Ss Testing Private Functions
+A test facility that can't test private (
+.Ft static
+) functions is going to be pretty limited.
+Some of the most useful functions to test are those that act as
+"helpers" to other, larger functions.
+These functions are often declared
+.Ft static
+and not directly accessible to the test module which is built as its
+own compilation unit.
+.Pp
+One solution would be to alter ktest to also allow declaring test
+functions inside the regular kernel modules themselves, but it
+currently does not offer that capability.
+Instead, ktest provides the
+.Xr ktest_get_fn 9f
+function for obtaining a handle to private functions.
+See that page for more detail.
+.Ss Registering Tests
+Only registered tests are accessible to the user.
+See
+.Xr ktest_create_module 9f
+for more information.
+.Ss Test Module Conventions
+There are several conventions to follow when creating a new test
+module.
+.Bl -enum
+.It
+The test module should be a miscellaneous-type module using the
+.Xr modlmisc 9S
+linkage structure.
+.It
+Test functions are prefixed with their test module name.
+.It
+Test functions are suffixed with "_test" to distinguish them from test
+helper functions.
+.It
+Test registration should happen in
+.Xr _init 9E .
+.It
+Test deregistration should happen in
+.Xr _fini 9E .
+.El
+.Sh SEE ALSO
+.Xr KT_ASSERT 9F ,
+.Xr KT_ERROR 9F ,
+.Xr KT_FAIL 9F ,
+.Xr KT_PASS 9F ,
+.Xr KT_SKIP 9F ,
+.Xr ktest_add_suite 9F ,
+.Xr ktest_add_test 9F ,
+.Xr ktest_create_module 9F ,
+.Xr ktest_create_suite 9F ,
+.Xr ktest_get_fn 9F ,
+.Xr ktest_get_input 9F ,
+.Xr ktest_hold_mod 9F ,
+.Xr ktest_msg_clear 9F ,
+.Xr ktest_msg_prepend 9F ,
+.Xr ktest_register_module 9F ,
+.Xr ktest_release_mod 9F ,
+.Xr ktest_unregister_module 9F ,
+.Xr modlmisc 9S

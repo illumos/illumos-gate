@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -24,11 +25,13 @@
 #include <sys/sysmacros.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/efi_partition.h>
+#include <sys/fs/pc_fs.h>
 #include <sys/vtoc.h>
 
 #include <assert.h>
 #include <ctype.h>
 #include <uuid/uuid.h>
+#include <stdbool.h>
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_debug.h>
@@ -193,8 +196,254 @@ print_fdisk_part(struct ipart *ip, size_t nr)
 	    nr, typestr, ip->bootid, begchs, endchs, ip->relsect, ip->numsect);
 }
 
+/*
+ * Based on pcfs driver and:
+ * "Microsoft Extensible Firmware Initiative FAT32 File System Specification,
+ *  FAT: General Overview of On-Disk Format"
+ *
+ * http://download.microsoft.com/download/1/6/1/
+ * 161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc
+ */
+static void
+show_bpb(char *bpb)
+{
+	bool		fat32 = false;
+	uint32_t	reserved, rdirsec, spc;
+	uint32_t	rec, fsisec, bkbootsec;
+	uint32_t	totsec16, totsec32, totsec;
+	uint32_t	fatsec16, fatsec32, fatsec;
+	uint32_t	numfat, datasec;
+	uint32_t	ncl;
+	char		buf[12];
+
+	mdb_printf("\n");
+	mdb_printf("BPB JMP: ");
+	if (VALID_JMPBOOT(bpb_jmpBoot(bpb))) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf("\n");
+
+	mdb_printf("BPB OEMName: ");
+	if (VALID_OEMNAME(bpb_OEMName(bpb))) {
+		mdb_printf("valid");
+		mdb_printf(" : %*s", 8, bpb_OEMName(bpb));
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf("\n");
+
+	mdb_printf("BPB Bytes per Sector: ");
+	if (VALID_SECSIZE(bpb_get_BytesPerSec(bpb))) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf(" : %hu", bpb_get_BytesPerSec(bpb));
+	mdb_printf("\n");
+
+	mdb_printf("BPB Sectors per Cluster: ");
+	spc = bpb_get_SecPerClus(bpb);
+	if (VALID_SPCL(spc)) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf(" : %u", spc);
+	mdb_printf("\n");
+
+	reserved = bpb_get_RsvdSecCnt(bpb);
+	mdb_printf("BPB Reserved Sectors: ");
+	if (VALID_RSVDSEC(reserved)) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf(" : %u", reserved);
+	mdb_printf("\n");
+
+	mdb_printf("BPB Number of FATs: ");
+	numfat = bpb_get_NumFATs(bpb);
+	if (VALID_NUMFATS(numfat)) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf(" : %u", numfat);
+	mdb_printf("\n");
+
+	rec = bpb_get_RootEntCnt(bpb);
+	mdb_printf("BPB Root Entry Count: ");
+	mdb_printf("%u", rec);
+	mdb_printf("\n");
+
+	totsec16 = bpb_get_TotSec16(bpb);
+	mdb_printf("BPB Total Sectors 16: ");
+	mdb_printf("%u", totsec16);
+	mdb_printf("\n");
+
+	mdb_printf("BPB Media Type: ");
+	if (VALID_MEDIA(bpb_get_Media(bpb))) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf(" : 0x%02x", bpb_get_Media(bpb));
+	mdb_printf("\n");
+
+	fatsec16 = bpb_get_FatSz16(bpb);
+	mdb_printf("BPB FAT Sectors 16: ");
+	mdb_printf("%u", fatsec16);
+	mdb_printf("\n");
+
+	mdb_printf("BPB Sectors Per Track: ");
+	mdb_printf("%u", bpb_get_SecPerTrk(bpb));
+	mdb_printf("\n");
+
+	mdb_printf("BPB Number of Heads: ");
+	mdb_printf("%u", bpb_get_NumHeads(bpb));
+	mdb_printf("\n");
+
+	mdb_printf("BPB Hidden Sectors: ");
+	mdb_printf("%u", bpb_get_HiddSec(bpb));
+	mdb_printf("\n");
+
+	totsec32 = bpb_get_TotSec32(bpb);
+	mdb_printf("BPB Total Sectors 32: ");
+	mdb_printf("%u", totsec32);
+	mdb_printf("\n");
+
+	mdb_printf("BPB Signature: ");
+	if (VALID_BPBSIG(bpb_get_BPBSig(bpb))) {
+		mdb_printf("valid");
+	} else {
+		mdb_printf("invalid");
+	}
+	mdb_printf("\n");
+	/*
+	 * This does conclude the legacy BPB fields.
+	 * FAT12/FAT16 and FAT32 have overlapping fields,
+	 * and we need to determine the fat type to decide which
+	 * alternative we will print (if any).
+	 */
+	fatsec32 = bpb_get_FatSz32(bpb);
+	if (totsec16 == 0 && fatsec16 == 0) {
+		totsec = totsec32;
+		fatsec = fatsec32;
+		fat32 = true;		/* there is no FAT12/FAT16 */
+	} else {
+		totsec = totsec16;
+		fatsec = fatsec16;
+	}
+	if (totsec == 0 || fatsec == 0) {
+		mdb_printf("There is no FAT file system\n");
+		return;
+	}
+	if (!fat32) {
+		mdb_printf("BPB Drive Number: ");
+		mdb_printf("0x%02x", bpb_get_DrvNum16(bpb));
+		mdb_printf("\n");
+
+		mdb_printf("BPB Extended Boot Signature: ");
+		mdb_printf("0x%02x", bpb_get_BootSig16(bpb));
+		mdb_printf("\n");
+
+		if (bpb_get_BootSig16(bpb) == 0x29) {
+			mdb_printf("BPB Volume ID: ");
+			mdb_printf("0x%04x", bpb_get_VolID16(bpb));
+			mdb_printf("\n");
+
+			mdb_printf("BPB Volume Label: ");
+			bcopy(bpb_VolLab16(bpb), buf, 11);
+			buf[11] = '\0';
+			mdb_printf("\"%s\"", buf);
+			mdb_printf("\n");
+
+			mdb_printf("BPB File System Type: ");
+			if (VALID_FSTYPSTR16(bpb_FilSysType16(bpb))) {
+				mdb_printf("valid");
+			} else {
+				mdb_printf("invalid");
+			}
+			bcopy(bpb_FilSysType16(bpb), buf, 8);
+			buf[8] = '\0';
+			mdb_printf(" : \"%s\"", buf);
+			mdb_printf("\n");
+		}
+	} else {
+		mdb_printf("BPB FAT Sectors 32: ");
+		mdb_printf("%u", fatsec32);
+		mdb_printf("\n");
+
+		mdb_printf("BPB Extended Flags 32: ");
+		mdb_printf("0x%04x", bpb_get_ExtFlags32(bpb));
+		mdb_printf("\n");
+
+		mdb_printf("BPB FS Version: ");
+		mdb_printf("0x%02x", bpb_get_FSVer32(bpb));
+		mdb_printf("\n");
+
+		mdb_printf("BPB Root Cluster: ");
+		mdb_printf("%u", bpb_get_RootClus32(bpb));
+		mdb_printf("\n");
+
+		fsisec = bpb_get_FSInfo32(bpb);
+		mdb_printf("BPB FS Info Sector: ");
+		mdb_printf("%u", fsisec);
+		mdb_printf("\n");
+
+		bkbootsec = bpb_get_BkBootSec32(bpb);
+		mdb_printf("BPB Backup Boot Sector: ");
+		mdb_printf("%u", bkbootsec);
+		mdb_printf("\n");
+
+		mdb_printf("BPB Drive Number: ");
+		mdb_printf("0x%02x", bpb_get_DrvNum32(bpb));
+		mdb_printf("\n");
+
+		mdb_printf("BPB Boot Signature: ");
+		mdb_printf("0x%02x", bpb_get_BootSig32(bpb));
+		mdb_printf("\n");
+
+		if (bpb_get_BootSig32(bpb) == 0x29) {
+			mdb_printf("BPB Volume ID: ");
+			mdb_printf("0x%04x", bpb_get_VolID32(bpb));
+			mdb_printf("\n");
+
+			mdb_printf("BPB Volume Label: ");
+			bcopy(bpb_VolLab32(bpb), buf, 11);
+			buf[11] = '\0';
+			mdb_printf("\"%s\"", buf);
+			mdb_printf("\n");
+
+			mdb_printf("BPB File System Type: ");
+			if (VALID_FSTYPSTR32(bpb_FilSysType32(bpb))) {
+				mdb_printf("valid");
+			} else {
+				mdb_printf("invalid");
+			}
+			bcopy(bpb_FilSysType32(bpb), buf, 8);
+			buf[8] = '\0';
+			mdb_printf(" : \"%s\"", buf);
+			mdb_printf("\n");
+		}
+	}
+
+	rdirsec = (rec * 32 + (sector_size - 1)) / sector_size;
+	datasec = totsec - fatsec * numfat - rdirsec - reserved;
+	ncl = datasec / spc;
+	mdb_printf("count of clusters on the volume: %u\n", ncl);
+	if (ncl < 4085)
+		mdb_printf("Volume should be FAT12\n");
+	else if (ncl < 65525)
+		mdb_printf("Volume should be FAT16\n");
+	else
+		mdb_printf("Volume should be FAT32\n");
+}
+
 static mbr_type_t
-mbr_info(struct mboot *mbr)
+mbr_info(struct mboot *mbr, uint_t bpb)
 {
 	mbr_type_t type = MBR_TYPE_UNKNOWN;
 
@@ -242,18 +491,30 @@ mbr_info(struct mboot *mbr)
 		mdb_printf("Loader STAGE1_STAGE2_UUID: %s\n", uuid);
 	}
 
+	if (bpb) {
+		show_bpb(mbr->bootinst);
+	}
 	return (type);
 }
 
+static void
+mbr_help(void)
+{
+	mdb_printf("Display a Master Boot Record.\n\n"
+	    "-b Show BIOS Parameter Block (BPB)\n");
+}
+
 static int
-cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
+cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct mboot *mbr;
 	mbr_type_t type;
+	uint_t opt_b = FALSE;
 
 	CTASSERT(sizeof (*mbr) == SECTOR_SIZE);
 
-	if (argc != 0)
+	if (mdb_getopts(argc, argv,
+	    'b', MDB_OPT_SETBITS, TRUE, &opt_b, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!(flags & DCMD_ADDRSPEC))
@@ -266,7 +527,10 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		return (DCMD_ERR);
 	}
 
-	type = mbr_info(mbr);
+	if (VALID_SECSIZE(bpb_get_BytesPerSec(mbr->bootinst))) {
+		sector_size = bpb_get_BytesPerSec(mbr->bootinst);
+	}
+	type = mbr_info(mbr, opt_b);
 
 	/* If the magic is wrong, stop here. */
 	if (mbr->signature != MBB_MAGIC)
@@ -287,7 +551,7 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 				mdb_warn("failed to read VBR");
 			} else {
 				mdb_printf("\nSTAGE1 in VBR:\n");
-				(void) mbr_info(&vbr);
+				(void) mbr_info(&vbr, opt_b);
 			}
 		}
 		break;
@@ -295,14 +559,20 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		break;
 	}
 
-	mdb_printf("\n%<u>%-4s %-21s %-7s %-11s %-11s %-10s %-9s%</u>\n",
-	    "PART", "TYPE", "ACTIVE", "STARTCHS", "ENDCHS",
-	    "SECTOR", "NUMSECT");
+	if (*(uint16_t *)&mbr->bootinst[STAGE1_STAGE2_SIZE] == 1) {
+		/*
+		 * This is MBR, display partition information.
+		 */
+		mdb_printf(
+		    "\n%<u>%-4s %-21s %-7s %-11s %-11s %-10s %-9s%</u>\n",
+		    "PART", "TYPE", "ACTIVE", "STARTCHS", "ENDCHS",
+		    "SECTOR", "NUMSECT");
 
-	for (size_t i = 0; i < FD_NUMPART; i++) {
-		struct ipart *ip = (struct ipart *)
-		    (mbr->parts + (sizeof (struct ipart) * i));
-		print_fdisk_part(ip, i);
+		for (size_t i = 0; i < FD_NUMPART; i++) {
+			struct ipart *ip = (struct ipart *)
+			    (mbr->parts + (sizeof (struct ipart) * i));
+			print_fdisk_part(ip, i);
+		}
 	}
 
 	return (DCMD_OK);
@@ -583,7 +853,7 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 	return (DCMD_OK);
 }
 
-void
+static void
 gpt_help(void)
 {
 	mdb_printf("Display an EFI GUID Partition Table.\n\n"
@@ -623,7 +893,7 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("VBR info:\n");
-	(void) mbr_info((struct mboot *)buf);
+	(void) mbr_info((struct mboot *)buf, FALSE);
 #endif
 
 	vaddr = addr + DK_LABEL_LOC * sector_size;
@@ -762,7 +1032,7 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-void
+static void
 vtoc_help(void)
 {
 	mdb_printf("Display a Virtual Table of Content (VTOC).\n\n"
@@ -805,14 +1075,15 @@ cmd_sect(uintptr_t addr __unused, uint_t flags __unused, int argc,
 	return (DCMD_OK);
 }
 
-void
+static void
 sect_help(void)
 {
 	mdb_printf("Show or set sector size.\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "mbr", NULL, "dump Master Boot Record information", cmd_mbr },
+	{ "mbr", "?[-b]", "dump Master Boot Record information", cmd_mbr,
+	    mbr_help },
 	{ "gpt", "?[-ag]", "dump an EFI GPT", cmd_gpt, gpt_help },
 	{ "vtoc", "?[-cr]", "dump VTOC information", cmd_vtoc, vtoc_help },
 	{ "sectorsize", NULL, "set or show sector size", cmd_sect, sect_help },

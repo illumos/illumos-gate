@@ -23,15 +23,18 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent Inc.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	All Rights Reserved */
 
 /*
- * The kTLI "shim" over in ./fake_ktli.c uses getf(), releasef() to
- * represent an open socket FD in "fake" vnode_t and file_t objects.
- * This implements minimal getf()/releasef() shims for that purpose.
+ * The kTLI "shim"  in fake_ktli.c uses file_getf(), file_releasef() to
+ * get a file_t pointer, and uses the (private) file_getfd() to access
+ * the socket file descriptor behind that file_t (which is actually a
+ * fake_file_t created here).  These correspond to getf/releasef that
+ * are normally found in os/fio.c but renamed to avoid accidental use.
  */
 
 #include <sys/types.h>
@@ -47,59 +50,72 @@
 #include <sys/debug.h>
 #include <sys/kmem.h>
 
+#include "fake_fio.h"
+
+typedef struct fake_file {
+	struct file ff_file;
+	int	ff_fd;
+} fake_file_t;
+
 #define	FAKEFDS	256
 
 kmutex_t ftlock;
-file_t *ftab[FAKEFDS];
+fake_file_t *ftab[FAKEFDS];
 
 file_t *
-getf(int fd)
+file_getf(int fd)
 {
-	file_t *fp;
-	vnode_t *vp;
+	fake_file_t *fp;
 
-	if (fd >= FAKEFDS)
+	if (fd < 0 || fd >= FAKEFDS)
 		return (NULL);
 
 	mutex_enter(&ftlock);
 	if ((fp = ftab[fd]) != NULL) {
-		fp->f_count++;
+		fp->ff_file.f_count++;
 		mutex_exit(&ftlock);
-		return (fp);
+		return (&fp->ff_file);
 	}
 
 	fp = kmem_zalloc(sizeof (*fp), KM_SLEEP);
-	vp = kmem_zalloc(sizeof (*vp), KM_SLEEP);
-	vp->v_fd = fd;
-	fp->f_vnode = vp;
-	fp->f_count = 1;
-	ftab[fd] = fp;
+	fp->ff_fd = fd;
+	fp->ff_file.f_count = 1;
 
+	ftab[fd] = fp;
 	mutex_exit(&ftlock);
 
-	return (fp);
+	return (&fp->ff_file);
 }
 
 void
-releasef(int fd)
+file_releasef(int fd)
 {
-	file_t *fp;
-	vnode_t *vp;
+	fake_file_t *fp;
 
 	mutex_enter(&ftlock);
 	if ((fp = ftab[fd]) == NULL) {
 		mutex_exit(&ftlock);
 		return;
 	}
-	fp->f_count--;
-	if (fp->f_count > 0) {
+	fp->ff_file.f_count--;
+	if (fp->ff_file.f_count > 0) {
 		mutex_exit(&ftlock);
 		return;
 	}
 	ftab[fd] = NULL;
 	mutex_exit(&ftlock);
 
-	vp = fp->f_vnode;
-	kmem_free(vp, sizeof (*vp));
 	kmem_free(fp, sizeof (*fp));
+}
+
+int
+file_getfd(file_t *fp)
+{
+	fake_file_t *ffp = (fake_file_t *)fp;
+	int fd = ffp->ff_fd;
+
+	VERIFY(fd >= 0 && fd < FAKEFDS);
+	ASSERT(ffp == ftab[fd]);
+
+	return (fd);
 }

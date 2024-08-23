@@ -19751,6 +19751,7 @@ f usr/share/man/man8/kernel.8 0444 root bin
 f usr/share/man/man8/keyserv.8 0444 root bin
 f usr/share/man/man8/killall.8 0444 root bin
 f usr/share/man/man8/kstat.8 0444 root bin
+f usr/share/man/man8/ktest.8 0444 root bin
 f usr/share/man/man8/labelit.8 0444 root bin
 f usr/share/man/man8/labelit_hsfs.8 0444 root bin
 f usr/share/man/man8/labelit_ufs.8 0444 root bin
@@ -19979,6 +19980,7 @@ f usr/share/man/man9/Intro.9 0444 root bin
 s usr/share/man/man9/intro.9=Intro.9
 f usr/share/man/man9/iport.9 0444 root bin
 s usr/share/man/man9/iportmap.9=iport.9
+f usr/share/man/man9/ktest.9 0444 root bin
 s usr/share/man/man9/phymap.9=iport.9
 s usr/share/man/man9/tgtmap.9=iport.9
 f usr/share/man/man9/vmem.9 0444 root bin
@@ -20125,6 +20127,20 @@ s usr/share/man/man9f/AVL_NEXT.9f=avl.9f
 s usr/share/man/man9f/AVL_PREV.9f=avl.9f
 s usr/share/man/man9f/CRED.9f=credentials.9f
 f usr/share/man/man9f/Intro.9f 0444 root bin
+s usr/share/man/man9f/KT_ASSERT.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERTG.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT0.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT0G.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3P.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3PG.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3S.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3SG.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3U.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ASSERT3UG.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_ERROR.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_FAIL.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_PASS.9f=ktest_result_pass.9f
+s usr/share/man/man9f/KT_SKIP.9f=ktest_result_pass.9f
 f usr/share/man/man9f/OTHERQ.9f 0444 root bin
 f usr/share/man/man9f/RD.9f 0444 root bin
 f usr/share/man/man9f/SAMESTR.9f 0444 root bin
@@ -20855,6 +20871,22 @@ s usr/share/man/man9f/kstat_runq_exit.9f=kstat_queue.9f
 s usr/share/man/man9f/kstat_waitq_enter.9f=kstat_queue.9f
 s usr/share/man/man9f/kstat_waitq_exit.9f=kstat_queue.9f
 s usr/share/man/man9f/kstat_waitq_to_runq.9f=kstat_queue.9f
+s usr/share/man/man9f/ktest_add_suite.9f=ktest_create_module.9f
+s usr/share/man/man9f/ktest_add_test.9f=ktest_create_module.9f
+f usr/share/man/man9f/ktest_create_module.9f 0444 root bin
+s usr/share/man/man9f/ktest_free_module.9f=ktest_create_module.9f
+f usr/share/man/man9f/ktest_get_fn.9f 0444 root bin
+f usr/share/man/man9f/ktest_get_input.9f 0444 root bin
+s usr/share/man/man9f/ktest_hold_mod.9f=ktest_get_fn.9f
+s usr/share/man/man9f/ktest_msg_clear.9f=ktest_result_pass.9f
+s usr/share/man/man9f/ktest_msg_prepend.9f=ktest_result_pass.9f
+s usr/share/man/man9f/ktest_register_module.9f=ktest_create_module.9f
+s usr/share/man/man9f/ktest_release_mod.9f=ktest_get_fn.9f
+s usr/share/man/man9f/ktest_result_error.9f=ktest_result_pass.9f
+s usr/share/man/man9f/ktest_result_fail.9f=ktest_result_pass.9f
+f usr/share/man/man9f/ktest_result_pass.9f 0444 root bin
+s usr/share/man/man9f/ktest_result_skip.9f=ktest_result_pass.9f
+s usr/share/man/man9f/ktest_unregister_module.9f=ktest_create_module.9f
 f usr/share/man/man9f/ldi_add_event_handler.9f 0444 root bin
 f usr/share/man/man9f/ldi_aread.9f 0444 root bin
 s usr/share/man/man9f/ldi_awrite.9f=ldi_aread.9f

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019 RackTop Systems.
+ * Copyright 2019-2024 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -48,6 +48,12 @@ vn_compare(vnode_t *vp1, vnode_t *vp2)
 	if (vp2 != NULL && VOP_REALVP(vp2, &realvp, NULL) == 0)
 		vp2 = realvp;
 	return (VN_CMP(vp1, vp2));
+}
+
+vnodeops_t *
+vn_getops(vnode_t *vp)
+{
+	return (vp->v_op);
 }
 
 int

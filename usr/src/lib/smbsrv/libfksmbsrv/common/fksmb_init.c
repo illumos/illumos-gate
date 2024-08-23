@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015-2023 RackTop Systems, Inc.
+ * Copyright 2015-2024 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -110,6 +110,7 @@ int smbsrv_timer_pri	= MINCLSYSPRI;
 static int g_init_done = 0;
 
 int fksmbsrv_vfs_init(void);
+void fksmbsrv_vfs_fini(void);
 
 int
 fksmbsrv_drv_open(void)
@@ -144,6 +145,7 @@ fksmbsrv_drv_close(void)
 
 	if (g_init_done != 0) {
 		smb_server_g_fini();
+		fksmbsrv_vfs_fini();
 		g_init_done = 0;
 	}
 

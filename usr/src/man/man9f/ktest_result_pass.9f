@@ -1,0 +1,417 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd February 15, 2023
+.Dt KTEST_RESULT_PASS 9F
+.Os
+.Sh NAME
+.Nm KT_PASS ,
+.Nm KT_FAIL ,
+.Nm KT_ERROR ,
+.Nm KT_SKIP ,
+.Nm KT_ASSERT ,
+.Nm KT_ASSERT0 ,
+.Nm KT_ASSERT3S ,
+.Nm KT_ASSERT3U ,
+.Nm KT_ASSERT3P ,
+.Nm KT_ASSERTG ,
+.Nm KT_ASSERT0G ,
+.Nm KT_ASSERT3SG ,
+.Nm KT_ASSERT3UG ,
+.Nm KT_ASSERT3PG ,
+.Nm ktest_result_pass ,
+.Nm ktest_result_fail ,
+.Nm ktest_result_error ,
+.Nm ktest_result_skip ,
+.Nm ktest_msg_prepend ,
+.Nm ktest_msg_clear
+.Nd set test result, assert test conditions, add failure context
+.Sh SYNOPSIS
+.In sys/ktest.h
+.Ft void
+.Fo ktest_result_pass
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "int line"
+.Fc
+.Ft void
+.Fo ktest_result_fail
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "int line"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo ktest_result_error
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "int line"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo ktest_result_skip
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "int line"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo ktest_msg_prepend
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo ktest_msg_clear
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_PASS
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_FAIL
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo KT_ERROR
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo KT_SKIP
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "const char *msg"
+.Fa "..."
+.Fc
+.Ft void
+.Fo KT_ASSERT
+.Fa "exp"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_ASSERT0
+.Fa "exp"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_ASSERT3S
+.Fa "int64_t left"
+.Fa "op"
+.Fa "int64_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_ASSERT3U
+.Fa "uint64_t left"
+.Fa "op"
+.Fa "uint64_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_ASSERT3P
+.Fa "uintptr_t left"
+.Fa "op"
+.Fa "uintptr_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fc
+.Ft void
+.Fo KT_ASSERTG
+.Fa "exp"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "label"
+.Fc
+.Ft void
+.Fo KT_ASSERT0G
+.Fa "exp"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "label"
+.Fc
+.Ft void
+.Fo KT_ASSERT3SG
+.Fa "int64_t left"
+.Fa "op"
+.Fa "int64_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "label"
+.Fc
+.Ft void
+.Fo KT_ASSERT3UG
+.Fa "uint64_t left"
+.Fa "op"
+.Fa "uint64_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "label"
+.Fc
+.Ft void
+.Fo KT_ASSERT3PG
+.Fa "uintptr_t left"
+.Fa "op"
+.Fa "uintptr_t right"
+.Fa "ktest_ctx_hdl_t *ctx"
+.Fa "label"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa ctx
+A handle to the test context.
+This handle is passed as argument to the test function by the ktest facility.
+.It Fa exp
+A test condition expression.
+.It Fa left
+The left side value of the test condition.
+This may be an expression.
+.It Fa right
+The right side value of the test condition.
+This may be an expression.
+.It Fa op
+The operator used to compare the
+.Fa left
+and
+.Fa right
+side values.
+.It Fa label
+The source code label to jump to if the test condition is false.
+.It Fa line
+The source line number where the result is set.
+This should always be the
+.Sy __LINE__
+macro.
+.It Fa msg
+A message giving additional context on why a test did not pass.
+.El
+.Sh DESCRIPTION
+These functions and macros are used to set the result of a test function.
+.Ss Result Macros
+These are convenience macros for setting the test result, providing an
+alternative to the verbose result functions.
+In general, you should only need to use the
+.Fn KT_PASS
+and
+.Fn KT_SKIP
+macros.
+For most test assertions it's more convenient to use the "KTest ASSERT
+Macros" described below.
+These macros do not cause a
+.Sy return .
+.Bl -tag -width 2m
+.It Fn KT_PASS
+Set a passing result.
+.It Fn KT_FAIL
+Set a failure result along with the failure message.
+.It Fn KT_ERROR
+Set an error result along with the error message.
+.It Fn KT_SKIP
+Set a skip result along with the skip message.
+.El
+.Ss KTest ASSERT Macros
+These macros evaluate their test condition expression and verify it's true.
+They take care of building a failure message based on the expression
+and calling the
+.Fn ktest_result_fail
+function with the appropriate line number.
+They provide a convenient way to express test conditions and
+automatically build failure messages on the caller's behalf.
+They are essentially the same as the traditional
+.Sy ASSERT3
+family of macros with three exceptions:
+.Bl -enum
+.It
+They all require the additional
+.Fa ctx
+argument in order to set the failure result when the assert trips.
+.It
+They do not panic but instead build a failure message, call
+.Fn ktest_result_fail ,
+and cause an immediate return of the test function.
+.It
+The "goto" variations of these macros provide the ability to cleanup
+test state instead of returning immediately.
+.El
+.Pp
+There are two variations of these macros.
+.Bl -tag -width 6m
+.It Sy KT_ASSERT*
+Essentially the same as the traditional
+.Sy ASSERT3
+family of macros, with the exception that they all take the
+.Fa ctx
+as an additional argument.
+This assert returns from the test function.
+.It Sy KT_ASSERT*G
+Assert the condition or
+.Sy goto
+.Fa label .
+.El
+.Ss KTest Error ASSERT Macros
+These macros are the same as the
+.Fn KT_ASSERT*
+macros with the only exception being that they call the
+.Fn ktest_result_error
+function to indicate an error condition.
+These macros use the same names as the
+.Fn KT_ASSERT*
+macros but prefixed with the character 'E', like so:
+.Fn KT_EASSERT* .
+This is a convenience for checking conditions which are indicative of
+a test error rather than failure.
+For example, for most tests a failure to acquire memory is considered
+an error, not a test failure.
+In that case one could use the following assert to raise a test error.
+.Bd -literal
+	mblk_t *mp = allocb(len, 0);
+	KT_EASSERT(mp != NULL, ctx);
+.Ed
+.Ss Additional Message Context
+Sometimes the failure message generated by the
+.Fn KT_ASSERT*
+macros is not enough.
+You may find the need to prepend additional information to the message
+to disambiguate the reason for failure.
+For example, you might find yourself asserting an invariant against an
+array of values and in order to disambiguate the failure you need to
+know the index of the value which tripped the assert.
+The
+.Fn ktest_msg_prepend
+function provides this ability.
+.Bl -tag -width 4m
+.It Nm ktest_msg_prepend
+Append the given format string to the failure message.
+This overwrites the prepended string of any previous call making it
+more convenient to use in a
+.Sy for
+loop.
+.It Nm ktest_msg_clear
+Clear the prepend buffer.
+This is equivalent to
+.Sy ktest_msg_prepend("") .
+.El
+.Ss Multiple Results
+Given the nature of ktest's design it is trivial to accidentally write
+a test that can produce multiple results for a given execution of its
+code.
+For example, placing the
+.Nm KT_PASS
+call in a cleanup label would overwrite a failure result with a pass
+result.
+This is the unavoidable nature of ktest's implementation: unlike
+typical testing frameworks we are executing in kernel context and it
+would be annoying if test failure was reported by way of host panic.
+.Pp
+To avoid incorrect test results the ktest facility itself checks for
+this scenario.
+For each call to the result API, ktest first checks if a result has
+already been set.
+If no result is present, then it stores the result along with its line
+number.
+However, if a result already exists, it generates an error result
+describing the line number of the overriding result along with the
+line number of the original result.
+.Sh EXAMPLES
+.Ss Test Without Cleanup
+This example shows the basic skeleton of a contrived test for a fictional
+.Ft object_t
+type.
+As there is no allocation or resource acquisition, there is no need
+for cleanup.
+.Bd -literal
+void
+no_cleanup_test(ktest_ctx_hdl_t *ctx)
+{
+	object_t obj;
+
+	obj.obj_value = 7777;
+	obj.obj_state = OBJ_STATE_FIRST;
+
+	if (!check_for_condition_x()) {
+		KT_SKIP(ctx, "condition X was not met");
+		return;
+	}
+
+	KT_ASSERT3U(obj.obj_state, ==, OBJ_STATE_FIRST, ctx);
+	next_state(&obj);
+	KT_ASSERT3U(obj.obj_state, ==, OBJ_STATE_SECOND, ctx);
+
+	<... more obj manipulation and assertions ...>
+
+	KT_PASS(ctx);
+}
+.Ed
+.Ss Test With Cleanup
+It's more likely that your test will require some amount of allocation and
+thus will need to make use of the
+.Fn KT_ASSERTG*
+macros.
+In this scenario
+.Fn KT_PASS
+must come before the
+.Sy cleanup
+label.
+Calling it after the
+.Sy cleanup
+label produces a multiple-result bug when one of the assertions trips.
+The ktest facility automatically catches this type of bug as explained
+in the "Multiple Results" section.
+.Bd -literal
+void
+test_with_cleanup(ktest_ctx_hdl_t *ctx)
+{
+	mblk_t *mp = allocb(74, 0);
+
+	/*
+	 * Failure to allocate is an error, not a test failure.
+	 */
+	KT_EASSERT(mp != NULL, ctx);
+
+	/*
+	 * If any of these assertions trips, a failure result is set
+	 * and execution jumps to the 'cleanup' label.
+	 */
+	KT_ASSERT3UG(msgsize(mp), ==, 0, ctx, cleanup);
+	KT_ASSERT3PG(mp->b_rptr, ==, mp->b_wptr, ctx, cleanup);
+	KT_ASSERT3PG(mp->b_next, ==, NULL, ctx, cleanup);
+	KT_ASSERT3PG(mp->b_cont, ==, NULL, ctx, cleanup);
+
+	/*
+	 * All assertions passed; mark the test a success and let
+	 * execution fall into the 'cleanup' label.
+	 */
+	KT_PASS(ctx);
+
+cleanup:
+	freeb(mp);
+}
+.Ed
+.Ss Additional Failure Context
+This example shows how to prepend additional context to the failure
+message.
+The
+.Fn ktest_msg_clear
+call after the loop is important; otherwise any subsequent assert failure
+would pick up the prepended message from the last iteration of the loop.
+.Bd -literal
+for (uint_t i = 0; i < num_objs; i++) {
+        obj_t *obj = &objs[i];
+
+        ktest_msg_prepend(ctx, "objs[%d]: ", i);
+        KT_ASSERT3U(obj->o_state, ==, EXPECTED_STATE, ctx);
+}
+
+ktest_msg_clear(ctx);
+.Ed

@@ -1,0 +1,212 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd February 15, 2023
+.Dt KTEST_GET_FN 9F
+.Os
+.Sh NAME
+.Nm ktest_get_fn ,
+.Nm ktest_hold_mod ,
+.Nm ktest_release_mod
+.Nd get a pointer to a static function
+.Sh SYNOPSIS
+.In sys/ktest.h
+.Ft int
+.Fo ktest_get_fn
+.Fa "ddi_modhandle_t hdl"
+.Fa "const char *fn_name"
+.Fa "void **fn"
+.Fc
+.Ft int
+.Fo ktest_hold_mod
+.Fa "const char *module"
+.Fa "ddi_modhandle_t *hdl"
+.Fc
+.Ft void
+.Fo ktest_release_mod
+.Fa "ddi_modhandle_t hdl"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa hdl
+A handle to the module.
+.It Fa module
+The name of the module which contains the
+.Ft static
+function you wish to call.
+.It Fa fn_name
+The name of the function.
+.It Fa fn
+A pointer to the function.
+.El
+.Sh DESCRIPTION
+The
+.Fn ktest_get_fn
+function provides the means for accessing private functions (those
+declared with the
+.Ft static
+modifier).
+This is needed when a test module wants to directly test a private
+function.
+.Pp
+In oreder to properly use
+.Fn ktest_get_fn
+there are four steps you must take.
+.Bl -enum
+.It
+Declare a local function pointer with the same type signature as the
+private function you wish to call.
+.It
+Call
+.Fn ktest_hold_mod
+to get a handle to the module containing the private function.
+.It
+Call
+.Fn ktest_get_fn
+to get a pointer to the private function.
+.It
+Make sure to call
+.Fn ktest_release_mod
+as part of test cleanup.
+.El
+.Pp
+First, use a
+.Sy typedef
+to declare a function pointer type with the same signature as the
+private function.
+For example, if the private function has a type signature as follows:
+.Bd -literal -offset 4m
+static uint64_t omnislash(uint64_t level);
+.Ed
+.Pp
+then you should declare a local
+.Sy typedef
+as follows:
+.Bd -literal -offset 4m
+typedef int (*omnislash_t)(uint64_t);
+.Ed
+.Pp
+Notice the use of the "_t" suffix for the typedef.
+With the
+.Sy typedef
+in place you can now easily declare a local function pointer as so:
+.Bd -literal -offset 4m
+omnislash_t omnislash = NULL;
+.Ed
+.Pp
+Next you must call
+.Fn ktest_hold_mod
+to get a handle to the module.
+This also places a hold on the module which acts as an additional
+safety that the function symbol will not go away while the hold
+is outstanding.
+.Pp
+At this point you can now use the module handle to call
+.Fn ktest_get_fn
+to resolve the symbol and fill in the function pointer with the
+correct address.
+Now you can call your local
+.Fn omnislash
+as if it was defined in the test module.
+.Pp
+Finally, you'll want to release the hold as part of test cleanup by
+calling the
+.Fn ktest_release_mod
+function.
+After its completion the function pointer should be considered
+invalid.
+.Pp
+One downside of this approach is that you must be vigilant to
+modifying type signatures of private functions accessed this way.
+The compiler cannot catch a discrepancy in the type signature because
+they are not compiled as a unit.
+It is up to you to make sure the type signature in your test matches
+that of the private function you are calling.
+.Sh RETURN VALUES
+Upon success the
+.Fn ktest_get_fn
+and
+.Fn ktest_hold_mod
+functions return 0.
+Otherwise, these functions return a non-zero value to indicate
+failure.
+The error values returned are not documented because the underlying
+.Xr ddi_modopen 9F
+does not document them.
+.Pp
+The
+.Fn ktest_hold_mod
+function returns the module handle via the
+.Fa hdl
+parameter.
+.Pp
+The
+.Fn ktest_get_fn
+function returns the function pointer via the
+.Fa fn
+parameter.
+.Sh EXAMPLES
+Here's an example of accessing the private function
+.Fn mac_sw_cksum_ipv4 .
+.Bd -literal
+/*
+ * We must declare a local typedef of the private function for
+ * the compiler to generate the call site correctly.
+ */
+typedef boolean_t (*mac_sw_cksum_ipv4_t)(mblk_t *, uint32_t, ipha_t *,
+    const char **);
+
+void
+private_fn_test(ktest_ctx_hdl_t *ctx)
+{
+	ddi_modhandle_t hdl = NULL;
+	mac_sw_cksum_ipv4_t mac_sw_cksum_ipv4 = NULL;
+
+	<... other test state ...>
+
+	/*
+	 * Get a handle to the module and place a hold on it.
+	 */
+	if (ktest_hold_mod("mac", &hdl) != 0) {
+		KT_ERROR(ctx, "failed to hold 'mac' module");
+		return;
+	}
+
+	/*
+	 * Use the module handle to get a pointer to the private
+	 * function.
+	 */
+	if (ktest_get_fn(hdl, "mac_sw_cksum_ipv4",
+	    (void **)&mac_sw_cksum_ipv4) != 0) {
+		KT_ERROR(ctx, "failed to resolve symbol "
+		    "mac`mac_sw_cksum_ipv4");
+		goto cleanup;
+	}
+
+	<... test logic ...>
+
+	KT_ASSERT0G(mac_sw_cksum_ipv4(...), ctx, cleanup);
+	KT_PASS(ctx);
+
+cleanup:
+	if (hdl != NULL) {
+		ktest_release_mod(hdl);
+	}
+}
+.Ed
+.Sh SEE ALSO
+.Xr ddi_modopen 9F

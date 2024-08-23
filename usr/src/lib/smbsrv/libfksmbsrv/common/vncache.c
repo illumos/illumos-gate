@@ -11,6 +11,21 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
+ */
+
+/*
+ * The SMB server supports its local file system operations using
+ * kernel-style VOP_... calls.  This layer simulates creating and
+ * finding vnodes for "libfksmbsrv".
+ *
+ * The vnodes manged here are always paired with a private struct
+ * (see fakefs_node_t) to hold the details we need to find them
+ * in our cache and the file descriptor used in simulations.
+ *
+ * The actual VOP_... and VFS_... call simulations are in other
+ * files, generall named after the original kernel ones.
+ * (eg. fake_vfs.c)
  */
 
 #include <sys/types.h>
@@ -37,43 +52,60 @@
 
 #include "vncache.h"
 
-kmem_cache_t *vn_cache;
+#define	VTOF(vp)	((struct fakefs_node *)(vp)->v_data)
+#define	FTOV(fnp)	((fnp)->fn_vnode)
+
+/* Private to the fake vnode impl. */
+typedef struct fakefs_node {
+	avl_node_t	fn_avl_node;
+	vnode_t		*fn_vnode;
+	dev_t		fn_st_dev;
+	ino_t		fn_st_ino;
+	int		fn_fd;
+	int		fn_mode;
+} fakefs_node_t;
+
+typedef struct fnode_vnode {
+	struct fakefs_node fn;
+	struct vnode vn;
+} fnode_vnode_t;
 
 /*
  * You can dump this AVL tree with mdb, i.e.
- * vncache_avl ::walk avl |::print -s1 vnode_t
+ * fncache_avl ::walk avl |::print fakefs_node_t
+ * fncache_avl ::walk avl |::print fnode_vnode_t fn vn.v_path
  */
-avl_tree_t vncache_avl;
-kmutex_t vncache_lock;
+avl_tree_t fncache_avl;
+kmutex_t fncache_lock;
 
 /*
- * Vnode cache.
+ * Fake node / vnode cache.
  */
+kmem_cache_t *fn_cache;
 
 /* ARGSUSED */
 static int
-vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
+fn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
-	struct vnode *vp;
+	fnode_vnode_t *fvp = buf;
 
-	vp = buf;
-	bzero(vp, sizeof (*vp));
+	bzero(fvp, sizeof (*fvp));
 
-	mutex_init(&vp->v_lock, NULL, MUTEX_DEFAULT, NULL);
-	vp->v_fd = -1;
+	fvp->fn.fn_vnode = &fvp->vn;
+	fvp->fn.fn_fd = -1;
+
+	fvp->vn.v_data = &fvp->fn;
+	mutex_init(&fvp->vn.v_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);
 }
 
 /* ARGSUSED */
 static void
-vn_cache_destructor(void *buf, void *cdrarg)
+fn_cache_destructor(void *buf, void *cdrarg)
 {
-	struct vnode *vp;
-
-	vp = buf;
-
-	mutex_destroy(&vp->v_lock);
+	fnode_vnode_t *fvp = buf;
+	mutex_destroy(&fvp->vn.v_lock);
 }
 
 /*
@@ -83,8 +115,9 @@ vn_cache_destructor(void *buf, void *cdrarg)
 void
 vn_recycle(vnode_t *vp)
 {
+	fakefs_node_t *fnp = VTOF(vp);
 
-	ASSERT(vp->v_fd == -1);
+	ASSERT(fnp->fn_fd == -1);
 
 	vp->v_rdcnt = 0;
 	vp->v_wrcnt = 0;
@@ -122,11 +155,12 @@ vn_reinit(vnode_t *vp)
 vnode_t *
 vn_alloc(int kmflag)
 {
-	vnode_t *vp;
+	fnode_vnode_t *fvp;
+	vnode_t *vp = NULL;
 
-	vp = kmem_cache_alloc(vn_cache, kmflag);
-
-	if (vp != NULL) {
+	fvp = kmem_cache_alloc(fn_cache, kmflag);
+	if (fvp != NULL) {
+		vp = &fvp->vn;
 		vn_reinit(vp);
 	}
 
@@ -136,6 +170,7 @@ vn_alloc(int kmflag)
 void
 vn_free(vnode_t *vp)
 {
+	fakefs_node_t *fnp = VTOF(vp);
 
 	/*
 	 * Some file systems call vn_free() with v_count of zero,
@@ -147,47 +182,64 @@ vn_free(vnode_t *vp)
 		strfree(vp->v_path);
 		vp->v_path = NULL;
 	}
-	ASSERT(vp->v_fd != -1);
-	(void) close(vp->v_fd);
-	vp->v_fd = -1;
+	ASSERT(fnp->fn_fd > 2);
+	(void) close(fnp->fn_fd);
+	fnp->fn_fd = -1;
 
-	kmem_cache_free(vn_cache, vp);
+	/*
+	 * Make sure fnp points to the beginning of fnode_vnode_t,
+	 * which is what we must pass to kmem_cache_free.
+	 */
+	CTASSERT(offsetof(fnode_vnode_t, fn) == 0);
+	kmem_cache_free(fn_cache, fnp);
 }
 
-int
-vncache_cmp(const void *v1, const void *v2)
+static int
+fncache_cmp(const void *v1, const void *v2)
 {
-	const vnode_t *vp1, *vp2;
+	const fakefs_node_t *np1 = v1;
+	const fakefs_node_t *np2 = v2;
 
-	vp1 = v1;
-	vp2 = v2;
+	/* The args are really fnode_vnode_t */
+	CTASSERT(offsetof(fnode_vnode_t, fn) == 0);
 
-	if (vp1->v_st_dev < vp2->v_st_dev)
+	if (np1->fn_st_dev < np2->fn_st_dev)
 		return (-1);
-	if (vp1->v_st_dev > vp2->v_st_dev)
+	if (np1->fn_st_dev > np2->fn_st_dev)
 		return (+1);
-	if (vp1->v_st_ino < vp2->v_st_ino)
+	if (np1->fn_st_ino < np2->fn_st_ino)
 		return (-1);
-	if (vp1->v_st_ino > vp2->v_st_ino)
+	if (np1->fn_st_ino > np2->fn_st_ino)
 		return (+1);
 
 	return (0);
 }
 
+int
+vncache_cmp(const vnode_t *vp1, const vnode_t *vp2)
+{
+	fakefs_node_t *np1 = VTOF(vp1);
+	fakefs_node_t *np2 = VTOF(vp2);
+	return (fncache_cmp(np1, np2));
+}
+
 vnode_t *
 vncache_lookup(struct stat *st)
 {
-	vnode_t tmp_vn;
-	vnode_t *vp;
+	fakefs_node_t tmp_fn;
+	fakefs_node_t *fnp;
+	vnode_t *vp = NULL;
 
-	tmp_vn.v_st_dev = st->st_dev;
-	tmp_vn.v_st_ino = st->st_ino;
+	tmp_fn.fn_st_dev = st->st_dev;
+	tmp_fn.fn_st_ino = st->st_ino;
 
-	mutex_enter(&vncache_lock);
-	vp = avl_find(&vncache_avl, &tmp_vn, NULL);
-	if (vp != NULL)
-		vn_hold(vp);
-	mutex_exit(&vncache_lock);
+	mutex_enter(&fncache_lock);
+	fnp = avl_find(&fncache_avl, &tmp_fn, NULL);
+	if (fnp != NULL) {
+		vp = FTOV(fnp);
+		VN_HOLD(vp);
+	}
+	mutex_exit(&fncache_lock);
 
 	return (vp);
 }
@@ -197,10 +249,14 @@ vncache_enter(struct stat *st, vnode_t *dvp, char *name, int fd)
 {
 	vnode_t *old_vp;
 	vnode_t *new_vp;
+	fakefs_node_t *old_fnp;
+	fakefs_node_t *new_fnp;
 	vfs_t *vfs;
 	char *vpath;
 	avl_index_t	where;
 	int len;
+
+	ASSERT(fd > 2);
 
 	/*
 	 * Fill in v_path
@@ -219,21 +275,28 @@ vncache_enter(struct stat *st, vnode_t *dvp, char *name, int fd)
 		vfs = dvp->v_vfsp;
 	}
 
+	/* Note: (vp : fnp) linkage setup in constructor */
 	new_vp = vn_alloc(KM_SLEEP);
 	new_vp->v_path = vpath;
-	new_vp->v_fd = fd;
-	new_vp->v_st_dev = st->st_dev;
-	new_vp->v_st_ino = st->st_ino;
 	new_vp->v_vfsp = vfs;
 	new_vp->v_type = IFTOVT(st->st_mode);
+	new_fnp = VTOF(new_vp);
+	new_fnp->fn_fd = fd;
+	new_fnp->fn_st_dev = st->st_dev;
+	new_fnp->fn_st_ino = st->st_ino;
 
-	mutex_enter(&vncache_lock);
-	old_vp = avl_find(&vncache_avl, new_vp, &where);
-	if (old_vp != NULL)
-		vn_hold(old_vp);
-	else
-		avl_insert(&vncache_avl, new_vp, where);
-	mutex_exit(&vncache_lock);
+	old_vp = NULL;
+	mutex_enter(&fncache_lock);
+	old_fnp = avl_find(&fncache_avl, new_fnp, &where);
+	if (old_fnp != NULL) {
+		DTRACE_PROBE1(found, fakefs_node_t *, old_fnp);
+		old_vp = FTOV(old_fnp);
+		VN_HOLD(old_vp);
+	} else {
+		DTRACE_PROBE1(insert, fakefs_node_t *, new_fnp);
+		avl_insert(&fncache_avl, new_fnp, where);
+	}
+	mutex_exit(&fncache_lock);
 
 	/* If we lost the race, free new_vp */
 	if (old_vp != NULL) {
@@ -260,10 +323,10 @@ vncache_renamed(vnode_t *vp, vnode_t *to_dvp, char *to_name)
 	vpath = kmem_alloc(len, KM_SLEEP);
 	(void) snprintf(vpath, len, "%s/%s", to_dvp->v_path, to_name);
 
-	mutex_enter(&vncache_lock);
+	mutex_enter(&fncache_lock);
 	ovpath = vp->v_path;
 	vp->v_path = vpath;
-	mutex_exit(&vncache_lock);
+	mutex_exit(&fncache_lock);
 
 	strfree(ovpath);
 }
@@ -272,51 +335,85 @@ vncache_renamed(vnode_t *vp, vnode_t *to_dvp, char *to_name)
  * Last reference to this vnode is (possibly) going away.
  * This is normally called by vn_rele() when v_count==1.
  * Note that due to lock order concerns, we have to take
- * the vncache_lock (for the avl tree) and then recheck
+ * the fncache_lock (for the avl tree) and then recheck
  * v_count, which might have gained a ref during the time
  * we did not hold vp->v_lock.
  */
 void
 vncache_inactive(vnode_t *vp)
 {
+	fakefs_node_t *fnp = VTOF(vp);
+	vnode_t *xvp;
 	uint_t count;
 
-	mutex_enter(&vncache_lock);
+	mutex_enter(&fncache_lock);
 	mutex_enter(&vp->v_lock);
 
 	if ((count = vp->v_count) <= 1) {
 		/* This is (still) the last ref. */
-		avl_remove(&vncache_avl, vp);
+		DTRACE_PROBE1(remove, fakefs_node_t *, fnp);
+		avl_remove(&fncache_avl, fnp);
 	}
 
 	mutex_exit(&vp->v_lock);
-	mutex_exit(&vncache_lock);
+	mutex_exit(&fncache_lock);
 
-	if (count <= 1) {
-		vn_free(vp);
+	if (count > 1)
+		return;
+
+	/*
+	 * See fake_lookup_xattrdir()
+	 */
+	xvp = vp->v_xattrdir;
+	vp->v_xattrdir = NULL;
+	vn_free(vp);
+
+	if (xvp != NULL) {
+		ASSERT((xvp->v_flag & V_XATTRDIR) != 0);
+		VN_RELE(xvp);
 	}
 }
 
-#pragma init(vncache_init)
+int
+vncache_getfd(vnode_t *vp)
+{
+	fakefs_node_t *fnp = VTOF(vp);
+	ASSERT(fnp->fn_fd > 2);
+	return (fnp->fn_fd);
+}
+
+/*
+ * See fake_lookup_xattrdir()
+ * Special case vnode creation.
+ */
+void
+vncache_setfd(vnode_t *vp, int fd)
+{
+	fakefs_node_t *fnp = VTOF(vp);
+	ASSERT(fnp->fn_fd == -1);
+	ASSERT(fd > 2);
+	fnp->fn_fd = fd;
+}
+
+
 int
 vncache_init(void)
 {
-	vn_cache = kmem_cache_create("vn_cache", sizeof (struct vnode),
-	    VNODE_ALIGN, vn_cache_constructor, vn_cache_destructor, NULL, NULL,
-	    NULL, 0);
-	avl_create(&vncache_avl,
-	    vncache_cmp,
-	    sizeof (vnode_t),
-	    offsetof(vnode_t, v_avl_node));
-	mutex_init(&vncache_lock, NULL, MUTEX_DEFAULT, NULL);
+	fn_cache = kmem_cache_create("fn_cache", sizeof (fnode_vnode_t),
+	    VNODE_ALIGN, fn_cache_constructor, fn_cache_destructor,
+	    NULL, NULL, NULL, 0);
+	avl_create(&fncache_avl,
+	    fncache_cmp,
+	    sizeof (fnode_vnode_t),
+	    offsetof(fnode_vnode_t, fn.fn_avl_node));
+	mutex_init(&fncache_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
-#pragma fini(vncache_fini)
 void
 vncache_fini(void)
 {
-	mutex_destroy(&vncache_lock);
-	avl_destroy(&vncache_avl);
-	kmem_cache_destroy(vn_cache);
+	mutex_destroy(&fncache_lock);
+	avl_destroy(&fncache_avl);
+	kmem_cache_destroy(fn_cache);
 }

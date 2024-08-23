@@ -826,3 +826,9 @@ opt/SUNWonld/
 #
 opt/os-tests/tests/cores/libdumper.so
 opt/os-tests/tests/cores/amd64/libdumper.so	i386
+
+#
+# Private ktest definitions which are only needed by the ktest
+# implementation -- which is fully controlled by gate.
+#
+usr/include/sys/ktest_impl.h

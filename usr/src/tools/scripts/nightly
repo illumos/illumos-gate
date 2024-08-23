@@ -192,13 +192,13 @@ function build {
 
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
-	    egrep -e "(^${MAKE}:|[ 	]error[: 	\n]|ld: guidance:)" | \
+	    egrep -e "(^${MAKE}"$':|[\t ]error[:\t ]|ld: guidance:)' | \
 	    egrep -v ": (Entering|Leaving) directory " | \
 	    egrep -v "Ignoring unknown host" | \
 	    egrep -v "cc .* -o error " | \
 	    egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
 	    >> $mail_msg_file
-	    sed -n "/^Undefined[ 	]*first referenced$/,/^ld: fatal:/p" \
+	    sed -n $'/^Undefined[\t ]*first referenced$/,/^ld: fatal:/p' \
 	    < $SRC/${INSTALLOG}.out >> $mail_msg_file
 	if [[ -s $TMPDIR/build_errs${SUFFIX} ]]; then
 		build_ok=n
@@ -373,7 +373,7 @@ function bootstrap_tools {
 	echo "\n==== Bootstrap build errors ====\n" >> $mail_msg_file
 
 	egrep ":" ${TOOLS}/$INSTALLOG.out |
-	    egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
+	    egrep -e "(${MAKE}"$':|[\t ]error[:\t ])' | \
 	    egrep -v ": (Entering|Leaving) directory " | \
 	    egrep -v warning | tee $TMPDIR/bootstrap_errors >> $mail_msg_file
 
@@ -404,7 +404,7 @@ function build_tools {
 	echo "\n==== Tools build errors ====\n" >> $mail_msg_file
 
 	egrep ":" ${TOOLS}/${INSTALLOG}.out |
-		egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
+		egrep -e "(${MAKE}"$':|[\t ]error[:\t ])' | \
 		egrep -v ": (Entering|Leaving) directory " | \
 		egrep -v "Ignoring unknown host" | \
 		egrep -v warning | tee $TMPDIR/tools_errors >> $mail_msg_file
@@ -853,9 +853,7 @@ then
 	maxjobs=
 	if [[ -f $HOME/.make.machines ]]
 	then
-		# Note: there is a hard tab and space character in the []s
-		# below.
-		egrep -i "^[ 	]*${hostname}[ 	\.]" \
+		egrep -i $'^[\t ]*'"${hostname}"$'[\t .]' \
 			$HOME/.make.machines | read host jobs
 		maxjobs=${jobs##*=}
 	fi

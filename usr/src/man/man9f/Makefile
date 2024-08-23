@@ -308,6 +308,10 @@ MANFILES=	ASSERT.9f				\
 		kstat_install.9f			\
 		kstat_named_init.9f			\
 		kstat_queue.9f				\
+		ktest_create_module.9f			\
+		ktest_get_fn.9f				\
+		ktest_get_input.9f			\
+		ktest_result_pass.9f			\
 		ldi_add_event_handler.9f		\
 		ldi_aread.9f				\
 		ldi_devmap.9f				\
@@ -567,6 +571,20 @@ MANFILES=	ASSERT.9f				\
 
 MANLINKS=	AVL_NEXT.9f					\
 		AVL_PREV.9f					\
+		KT_ASSERT.9f					\
+		KT_ASSERT0.9f					\
+		KT_ASSERT3P.9f					\
+		KT_ASSERT3S.9f					\
+		KT_ASSERT3U.9f					\
+		KT_ASSERTG.9f					\
+		KT_ASSERT0G.9f					\
+		KT_ASSERT3PG.9f					\
+		KT_ASSERT3SG.9f					\
+		KT_ASSERT3UG.9f					\
+		KT_ERROR.9f					\
+		KT_FAIL.9f					\
+		KT_PASS.9f					\
+		KT_SKIP.9f					\
 		CRED.9f						\
 		SIZEOF_PTR.9f					\
 		SIZEOF_STRUCT.9f				\
@@ -961,6 +979,18 @@ MANLINKS=	AVL_NEXT.9f					\
 		kstat_waitq_enter.9f				\
 		kstat_waitq_exit.9f				\
 		kstat_waitq_to_runq.9f				\
+		ktest_add_suite.9f				\
+		ktest_add_test.9f				\
+		ktest_free_module.9f				\
+		ktest_hold_mod.9f				\
+		ktest_msg_clear.9f				\
+		ktest_msg_prepend.9f				\
+		ktest_register_module.9f			\
+		ktest_release_mod.9f				\
+		ktest_result_error.9f				\
+		ktest_result_fail.9f				\
+		ktest_result_skip.9f				\
+		ktest_unregister_module.9f			\
 		ldi_awrite.9f					\
 		ldi_close.9f					\
 		ldi_get_devid.9f				\
@@ -1783,6 +1813,36 @@ kstat_runq_exit.9f			:= LINKSRC = kstat_queue.9f
 kstat_waitq_enter.9f			:= LINKSRC = kstat_queue.9f
 kstat_waitq_exit.9f			:= LINKSRC = kstat_queue.9f
 kstat_waitq_to_runq.9f			:= LINKSRC = kstat_queue.9f
+
+ktest_add_suite.9f			:= LINKSRC = ktest_create_module.9f
+ktest_add_test.9f			:= LINKSRC = ktest_create_module.9f
+ktest_free_module.9f			:= LINKSRC = ktest_create_module.9f
+ktest_register_module.9f		:= LINKSRC = ktest_create_module.9f
+ktest_unregister_module.9f		:= LINKSRC = ktest_create_module.9f
+
+ktest_hold_mod.9f			:= LINKSRC = ktest_get_fn.9f
+ktest_release_mod.9f			:= LINKSRC = ktest_get_fn.9f
+
+KT_ASSERT.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT0.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3P.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3S.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3U.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERTG.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT0G.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3PG.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3SG.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ASSERT3UG.9f				:= LINKSRC = ktest_result_pass.9f
+KT_ERROR.9f				:= LINKSRC = ktest_result_pass.9f
+KT_FAIL.9f				:= LINKSRC = ktest_result_pass.9f
+KT_PASS.9f				:= LINKSRC = ktest_result_pass.9f
+KT_SKIP.9f				:= LINKSRC = ktest_result_pass.9f
+
+ktest_msg_clear.9f			:= LINKSRC = ktest_result_pass.9f
+ktest_msg_prepend.9f			:= LINKSRC = ktest_result_pass.9f
+ktest_result_error.9f			:= LINKSRC = ktest_result_pass.9f
+ktest_result_fail.9f			:= LINKSRC = ktest_result_pass.9f
+ktest_result_skip.9f			:= LINKSRC = ktest_result_pass.9f
 
 ldi_awrite.9f				:= LINKSRC = ldi_aread.9f
 

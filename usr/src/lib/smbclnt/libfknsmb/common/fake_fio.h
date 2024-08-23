@@ -10,36 +10,33 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2024 RackTop Systems, Inc.
  */
 
-#ifndef _VNCACHE_H
-#define	_VNCACHE_H
+#ifndef _FAKE_FS_H
+#define	_FAKE_FS_H
 
 /*
- * Declarations for thigns in vncache.c
+ * Fake file system layer for user-level.
  */
+
+#include <sys/isa_defs.h>
+#include <sys/file.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct stat;
-vnode_t *vncache_lookup(struct stat *);
-vnode_t *vncache_enter(struct stat *, vnode_t *, char *, int);
-void	vncache_renamed(vnode_t *, vnode_t *, char *);
-void	vncache_inactive(vnode_t *);
-int	vncache_cmp(const vnode_t *, const vnode_t *);
-
-int	vncache_getfd(vnode_t *);
-void	vncache_setfd(vnode_t *, int);
-
-int vncache_init(void);
-void vncache_fini(void);
+/*
+ * These are private to this library, used by the "ktli" shim.
+ * See fake_fio.c
+ */
+extern file_t *file_getf(int);
+extern void file_releasef(int);
+int file_getfd(struct file *fp);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _VNCACHE_H */
+#endif /* _FAKE_FS_H */

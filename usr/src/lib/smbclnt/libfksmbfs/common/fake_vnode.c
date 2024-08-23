@@ -24,6 +24,7 @@
  * Copyright 2017, Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -193,7 +194,7 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 
 	VOPNAME_RWUNLOCK, offsetof(struct vnodeops, vop_rwunlock),
 	    (fs_generic_func_p)(uintptr_t)fs_rwunlock,
-	    (fs_generic_func_p)(intptr_t)fs_rwunlock,	/* no errors allowed */
+	    (fs_generic_func_p)(uintptr_t)fs_rwunlock,	/* no errors allowed */
 
 	VOPNAME_SEEK, offsetof(struct vnodeops, vop_seek),
 	    fs_nosys, fs_nosys,
@@ -243,8 +244,8 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    fs_nosys, fs_nosys,
 
 	VOPNAME_DISPOSE, offsetof(struct vnodeops, vop_dispose),
-	    (fs_generic_func_p)(intptr_t)fs_dispose,
-	    (fs_generic_func_p)(intptr_t)fs_nodispose,
+	    (fs_generic_func_p)(uintptr_t)fs_dispose,
+	    (fs_generic_func_p)(uintptr_t)fs_nodispose,
 
 	VOPNAME_SETSECATTR, offsetof(struct vnodeops, vop_setsecattr),
 	    fs_nosys, fs_nosys,
@@ -388,17 +389,7 @@ done:
 	return (error);
 }
 
-/*
- * Incremend the hold on a vnode
- * (Real kernel uses a macro)
- */
-void
-vn_hold(struct vnode *vp)
-{
-	mutex_enter(&vp->v_lock);
-	(vp)->v_count++;
-	mutex_exit(&vp->v_lock);
-}
+// See VN_HOLD
 
 /*
  * Release a vnode.  Call VOP_INACTIVE on last reference or
@@ -407,13 +398,13 @@ vn_hold(struct vnode *vp)
 void
 vn_rele(vnode_t *vp)
 {
-	VERIFY(vp->v_count > 0);
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VOP_INACTIVE(vp, CRED(), NULL);
 		return;
 	}
+	VERIFY(vp->v_count > 0);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
@@ -584,10 +575,15 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 
 	bzero(vp, sizeof (*vp));
 	mutex_init(&vp->v_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&vp->v_vsd_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&vp->v_cv, NULL, CV_DEFAULT, NULL);
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
+	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
 	vp->v_path = vn_vpath_empty;
-	vp->v_fd = -1;
-	vp->v_st_dev = NODEV;
+	vp->v_path_stamp = 0;
+	vp->v_mpssdata = NULL;
+	vp->v_vsd = NULL;
+	vp->v_fopdata = NULL;
 
 	return (0);
 }
@@ -601,6 +597,8 @@ vn_cache_destructor(void *buf, void *cdrarg)
 	vp = buf;
 
 	rw_destroy(&vp->v_nbllock);
+	cv_destroy(&vp->v_cv);
+	mutex_destroy(&vp->v_vsd_lock);
 	mutex_destroy(&vp->v_lock);
 }
 
@@ -633,27 +631,40 @@ vn_recycle(vnode_t *vp)
 	 */
 	vp->v_rdcnt = 0;
 	vp->v_wrcnt = 0;
+	vp->v_mmap_read = 0;
+	vp->v_mmap_write = 0;
 
 	/*
 	 * If FEM was in use...
 	 */
+	ASSERT(vp->v_femhead == NULL);
 
 	if (vp->v_path != vn_vpath_empty) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
 		vp->v_path = vn_vpath_empty;
 	}
+	vp->v_path_stamp = 0;
+
+	ASSERT(vp->v_fopdata == NULL);
+	vp->v_mpssdata = NULL;
 	// vsd_free(vp);
 }
 
 /*
  * Used to reset the vnode fields including those that are directly accessible
  * as well as those which require an accessor function.
+ *
+ * Does not initialize:
+ *	synchronization objects: v_lock, v_vsd_lock, v_nbllock, v_cv
+ *	v_data (since FS-nodes and vnodes point to each other and should
+ *		be updated simultaneously)
+ *	v_op (in case someone needs to make a VOP call on this object)
  */
 void
 vn_reinit(vnode_t *vp)
 {
 	vp->v_count = 1;
-	// vp->v_count_dnlc = 0;
+	vp->v_count_dnlc = 0;
 	vp->v_vfsp = NULL;
 	vp->v_stream = NULL;
 	vp->v_vfsmountedhere = NULL;
@@ -661,6 +672,11 @@ vn_reinit(vnode_t *vp)
 	vp->v_type = VNON;
 	vp->v_rdev = NODEV;
 
+	vp->v_filocks = NULL;
+	vp->v_shrlocks = NULL;
+	vp->v_pages = NULL;
+
+	vp->v_locality = NULL;
 	vp->v_xattrdir = NULL;
 
 	/*
@@ -684,8 +700,8 @@ vn_alloc(int kmflag)
 	vp = kmem_cache_alloc(vn_cache, kmflag);
 
 	if (vp != NULL) {
-		// vp->v_femhead = NULL; /* Must be done before vn_reinit() */
-		// vp->v_fopdata = NULL;
+		vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
+		vp->v_fopdata = NULL;
 		vn_reinit(vp);
 	}
 
@@ -698,12 +714,16 @@ vn_free(vnode_t *vp)
 	extern vnode_t *rootdir;
 	ASSERT(vp != rootdir);
 
+	ASSERT(vp->v_shrlocks == NULL);
+	ASSERT(vp->v_filocks == NULL);
+
 	/*
 	 * Some file systems call vn_free() with v_count of zero,
 	 * some with v_count of 1.  In any case, the value should
 	 * never be anything else.
 	 */
 	ASSERT((vp->v_count == 0) || (vp->v_count == 1));
+	ASSERT(vp->v_count_dnlc == 0);
 	VERIFY(vp->v_path != NULL);
 	if (vp->v_path != vn_vpath_empty) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
@@ -711,7 +731,9 @@ vn_free(vnode_t *vp)
 	}
 
 	/* If FEM was in use... */
-
+	ASSERT(vp->v_femhead == NULL);
+	ASSERT(vp->v_fopdata == NULL);
+	vp->v_mpssdata = NULL;
 	// vsd_free(vp);
 	kmem_cache_free(vn_cache, vp);
 }
@@ -776,18 +798,21 @@ vn_is_readonly(vnode_t *vp)
 int
 vn_has_flocks(vnode_t *vp)
 {
+	ASSERT(vp->v_filocks == NULL);
 	return (0);
 }
 
 int
 vn_has_mandatory_locks(vnode_t *vp, int mode)
 {
+	ASSERT(vp->v_filocks == NULL);
 	return (0);
 }
 
 int
 vn_has_cached_data(vnode_t *vp)
 {
+	ASSERT(vp->v_pages == NULL);
 	return (0);
 }
 
@@ -816,9 +841,9 @@ vn_mountedvfs(vnode_t *vp)
 int
 vn_in_dnlc(vnode_t *vp)
 {
+	ASSERT(vp->v_count_dnlc == 0);
 	return (0);
 }
-
 
 /*
  * vn_has_other_opens() checks whether a particular file is opened by more than
@@ -904,6 +929,8 @@ vn_is_mapped(
 	vnode_t *vp,
 	v_mode_t mode)
 {
+	ASSERT(vp->v_mmap_read == 0);
+	ASSERT(vp->v_mmap_write == 0);
 	return (V_FALSE);
 }
 
@@ -916,6 +943,7 @@ vn_setops(vnode_t *vp, vnodeops_t *vnodeops)
 
 	ASSERT(vp != NULL);
 	ASSERT(vnodeops != NULL);
+	ASSERT(vp->v_femhead == NULL);
 
 	vp->v_op = vnodeops;
 }
@@ -928,6 +956,7 @@ vn_getops(vnode_t *vp)
 {
 
 	ASSERT(vp != NULL);
+	ASSERT(vp->v_femhead == NULL);
 
 	return (vp->v_op);
 }

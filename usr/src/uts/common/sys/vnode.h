@@ -23,7 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
- * Copyright 2016-2023 RackTop Systems, Inc.
+ * Copyright 2016-2024 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -53,10 +53,10 @@
 #include <sys/kstat.h>
 #include <sys/kmem.h>
 #include <sys/list.h>
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/buf.h>
 #include <sys/sdt.h>
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -899,7 +899,7 @@ struct as;
 struct pollhead;
 struct taskq;
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * VNODE_OPS defines all the vnode operations.  It is used to define
@@ -1114,7 +1114,7 @@ extern int	fop_reqzcbuf(vnode_t *, enum uio_rw, xuio_t *, cred_t *,
 				caller_context_t *);
 extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 #define	VOP_OPEN(vpp, mode, cr, ct) \
 	fop_open(vpp, mode, cr, ct)
@@ -1292,7 +1292,7 @@ extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 /*
  * Public vnode manipulation functions.
  */
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 vnode_t *vn_alloc(int);
 void	vn_reinit(vnode_t *);
@@ -1365,8 +1365,12 @@ void	vn_vfsunlock(struct vnode *vp);
 int	vn_vfswlock_held(struct vnode *vp);
 vnode_t *specvp(struct vnode *vp, dev_t dev, vtype_t type, struct cred *cr);
 vnode_t *makespecvp(dev_t dev, vtype_t type);
+
+#if !defined(_FAKE_KERNEL)
 vn_vfslocks_entry_t *vn_vfslocks_getlock(void *);
 void	vn_vfslocks_rele(vn_vfslocks_entry_t *);
+#endif
+
 boolean_t vn_is_reparse(vnode_t *, cred_t *, caller_context_t *);
 
 void vn_copypath(struct vnode *src, struct vnode *dst);
@@ -1537,7 +1541,7 @@ typedef enum {
 
 #define	VN_ISKAS(vp)	((vp) >= &kvps[0] && (vp) < &kvps[KV_MAX])
 
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 /*
  * Flags to VOP_SETATTR/VOP_GETATTR.

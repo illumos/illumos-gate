@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -29,6 +30,8 @@
 
 #include <attr.h>
 #include <libnvpair.h>
+
+#include "vncache.h"
 
 static uint64_t zero_times[2];
 
@@ -45,13 +48,14 @@ fop__getxvattr(vnode_t *vp, xvattr_t *xvap)
 {
 	nvlist_t *nvl = NULL;
 	xoptattr_t *xoap = NULL;
+	int fd = vncache_getfd(vp);
 	int error;
 
 	if ((xoap = xva_getxoptattr(xvap)) == NULL) {
 		return (EINVAL);
 	}
 
-	error = fgetattr(vp->v_fd, XATTR_VIEW_READWRITE, &nvl);
+	error = fgetattr(fd, XATTR_VIEW_READWRITE, &nvl);
 	if (error == 0) {
 		error = getxva_parse_nvl(xvap, xoap, nvl);
 		nvlist_free(nvl);
@@ -61,7 +65,7 @@ fop__getxvattr(vnode_t *vp, xvattr_t *xvap)
 	/*
 	 * Also get the readonly attrs, but don't fail.
 	 */
-	if (fgetattr(vp->v_fd, XATTR_VIEW_READONLY, &nvl) == 0) {
+	if (fgetattr(fd, XATTR_VIEW_READONLY, &nvl) == 0) {
 		(void) getxva_parse_nvl(xvap, xoap, nvl);
 		nvlist_free(nvl);
 	}
@@ -204,8 +208,9 @@ fop__setxvattr(vnode_t *vp, xvattr_t *xvap)
 {
 	uint64_t times[2];
 	nvlist_t *nvl;
-	int error;
 	xoptattr_t *xoap;	/* Pointer to optional attributes */
+	int fd = vncache_getfd(vp);
+	int error;
 
 	if ((xoap = xva_getxoptattr(xvap)) == NULL)
 		return (EINVAL);
@@ -263,7 +268,7 @@ fop__setxvattr(vnode_t *vp, xvattr_t *xvap)
 		    xoap->xoa_sparse) == 0);
 	}
 
-	error = fsetattr(vp->v_fd, XATTR_VIEW_READWRITE, nvl);
+	error = fsetattr(fd, XATTR_VIEW_READWRITE, nvl);
 
 	nvlist_free(nvl);
 

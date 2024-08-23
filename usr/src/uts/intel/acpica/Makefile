@@ -56,7 +56,8 @@ SMOFF += all_func_returns
 
 CFLAGS += -DPWRDMN -DACPI_USE_LOCAL_CACHE -DACPI_DEBUG_OUTPUT
 
-$(OBJS_DIR)/utdebug.o := CERRWARN += -_gcc12=-Wno-dangling-pointer
+# We are using stack pointer value there
+$(OBJS_DIR)/utdebug.o := CERRWARN += -_gcc=-Wno-dangling-pointer
 
 #
 #	Default build targets.

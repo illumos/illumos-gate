@@ -21,6 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -34,9 +37,6 @@
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
- */
-/*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -68,7 +68,14 @@
 #include <stropts.h>
 #include <unistd.h>
 
-#include "fake_xti.h"
+/*
+ * While <xti.h> is the perferred interface, we're simulating the
+ * (in-kernel) kTLI here, which forces sys/tiuser.h on us, so just
+ * use the older <tiuser.h> for the simulation.
+ */
+#include <tiuser.h>
+
+#include "fake_fio.h"
 
 /* Size of mblks for tli_recv */
 #define	FKTLI_RCV_SZ	4096
@@ -117,7 +124,6 @@ int
 t_kopen(file_t *fp, dev_t rdev, int flags, TIUSER **tiptr, cred_t *cr)
 {
 	boolean_t madefp = B_FALSE;
-	vnode_t	*vp;
 	TIUSER *tiu;
 	int fd;
 	int rc;
@@ -152,11 +158,10 @@ t_kopen(file_t *fp, dev_t rdev, int flags, TIUSER **tiptr, cred_t *cr)
 		/*
 		 * allocate a file pointer...
 		 */
-		fp = getf(fd);
+		fp = file_getf(fd);
 		madefp = B_TRUE;
 	}
-	vp = fp->f_vnode;
-	fd = vp->v_fd;
+	fd = file_getfd(fp);
 
 	tiu = kmem_zalloc(sizeof (*tiu), KM_SLEEP);
 	rc = t_getinfo(fd, &tiu->tp_info);
@@ -165,7 +170,7 @@ t_kopen(file_t *fp, dev_t rdev, int flags, TIUSER **tiptr, cred_t *cr)
 		cmn_err(CE_NOTE, "t_kopen: t_getinfo terr=%d", rc);
 		kmem_free(tiu, sizeof (*tiu));
 		if (madefp) {
-			releasef(fd);
+			file_releasef(fd);
 			(void) t_close(fd);
 		}
 		return (tlitosyserr(rc));
@@ -189,9 +194,8 @@ t_kclose(TIUSER *tiptr, int callclosef)
 	kmem_free(tiptr, TIUSERSZ);
 
 	if (fp != NULL) {
-		vnode_t *vp = fp->f_vnode;
-		int fd = vp->v_fd;
-		releasef(fd);
+		int fd = file_getfd(fp);
+		file_releasef(fd);
 		(void) t_close(fd);
 	}
 
@@ -202,10 +206,10 @@ int
 t_kbind(TIUSER *tiptr, struct t_bind *req, struct t_bind *ret)
 {
 	file_t		*fp = tiptr->fp;
-	vnode_t		*vp = fp->f_vnode;
+	int		fd = file_getfd(fp);
 	int		rc;
 
-	if (t_bind(vp->v_fd, req, ret) < 0) {
+	if (t_bind(fd, req, ret) < 0) {
 		rc = t_errno;
 		cmn_err(CE_NOTE, "t_kbind: t_bind terr=%d", rc);
 		return (tlitosyserr(rc));
@@ -217,10 +221,10 @@ int
 t_kunbind(TIUSER *tiptr)
 {
 	file_t		*fp = tiptr->fp;
-	vnode_t		*vp = fp->f_vnode;
+	int		fd = file_getfd(fp);
 	int		rc;
 
-	if (t_unbind(vp->v_fd) < 0) {
+	if (t_unbind(fd) < 0) {
 		rc = t_errno;
 		cmn_err(CE_NOTE, "t_kunbind: t_unbind terr=%d", rc);
 		return (tlitosyserr(rc));
@@ -232,10 +236,10 @@ int
 t_kconnect(TIUSER *tiptr, struct t_call *sndcall, struct t_call *rcvcall)
 {
 	file_t		*fp = tiptr->fp;
-	vnode_t		*vp = fp->f_vnode;
+	int		fd = file_getfd(fp);
 	int		rc;
 
-	if (t_connect(vp->v_fd, sndcall, rcvcall) < 0) {
+	if (t_connect(fd, sndcall, rcvcall) < 0) {
 		rc = t_errno;
 		cmn_err(CE_NOTE, "t_kconnect: t_connect terr=%d", rc);
 		if (rc == TLOOK) {
@@ -253,10 +257,10 @@ int
 t_koptmgmt(TIUSER *tiptr, struct t_optmgmt *req, struct t_optmgmt *ret)
 {
 	file_t		*fp = tiptr->fp;
-	vnode_t		*vp = fp->f_vnode;
+	int		fd = file_getfd(fp);
 	int		rc;
 
-	if (t_optmgmt(vp->v_fd, req, ret) < 0) {
+	if (t_optmgmt(fd, req, ret) < 0) {
 		rc = t_errno;
 		cmn_err(CE_NOTE, "t_koptmgmt: t_optmgmt terr=%d", rc);
 		return (tlitosyserr(rc));
@@ -273,13 +277,10 @@ int
 t_kspoll(TIUSER *tiptr, int timo, int waitflg, int *events)
 {
 	struct pollfd	pfds[1];
-	file_t		*fp;
-	vnode_t		*vp;
+	file_t		*fp = tiptr->fp;
+	int		fd = file_getfd(fp);
 	clock_t		timout;	/* milliseconds */
 	int		n;
-
-	fp = tiptr->fp;
-	vp = fp->f_vnode;
 
 	if (events == NULL || ((waitflg & READWAIT) == 0))
 		return (EINVAL);
@@ -290,7 +291,7 @@ t_kspoll(TIUSER *tiptr, int timo, int waitflg, int *events)
 	else
 		timout = TICK_TO_MSEC(timo);
 
-	pfds[0].fd = vp->v_fd;
+	pfds[0].fd = fd;
 	pfds[0].events = POLLIN;
 	pfds[0].revents = 0;
 
@@ -315,18 +316,18 @@ tli_send(TIUSER *tiptr, mblk_t *bp, int fmode)
 	struct strbuf databuf;
 	mblk_t	*m;
 	int	flg, n, rc;
-	vnode_t	*vp;
+	file_t	*fp = tiptr->fp;
+	int	fd = file_getfd(fp);
 
 	if (bp == NULL)
 		return (0);
-	vp = tiptr->fp->f_vnode;
 
 	switch (bp->b_datap->db_type) {
 	case M_DATA:
 		for (m = bp; m != NULL; m = m->b_cont) {
 			n = MBLKL(m);
 			flg = (m->b_cont != NULL) ? T_MORE : 0;
-			rc = t_snd(vp->v_fd, (void *) m->b_rptr, n, flg);
+			rc = t_snd(fd, (void *) m->b_rptr, n, flg);
 			if (rc != n) {
 				rc = EIO;
 				goto out;
@@ -351,7 +352,7 @@ tli_send(TIUSER *tiptr, mblk_t *bp, int fmode)
 			databuf.maxlen = MBLKL(m);
 			databuf.buf = (char *)m->b_rptr;
 		}
-		if (putmsg(vp->v_fd, &ctlbuf, &databuf, 0) < 0) {
+		if (putmsg(fd, &ctlbuf, &databuf, 0) < 0) {
 			rc = errno;
 			cmn_err(CE_NOTE, "tli_send: putmsg err=%d", rc);
 		} else {
@@ -374,15 +375,12 @@ tli_recv(TIUSER *tiptr, mblk_t **bp, int fmode)
 {
 	mblk_t		*mtop = NULL;
 	mblk_t		*m;
-	vnode_t		*vp;
+	file_t		*fp = tiptr->fp;
+	int		fd = file_getfd(fp);
 	int		error;
 	int		flags;
 	int		nread;
 	int		n;
-
-	vp = tiptr->fp->f_vnode;
-
-
 
 	/*
 	 * Get an mblk for the data
@@ -396,7 +394,7 @@ tli_recv(TIUSER *tiptr, mblk_t **bp, int fmode)
 
 again:
 	flags = 0;
-	n = t_rcv(vp->v_fd, (void *) m->b_rptr, nread, &flags);
+	n = t_rcv(fd, (void *) m->b_rptr, nread, &flags);
 	if (n < 0) {
 		n = t_errno;
 		cmn_err(CE_NOTE, "tli_recv: t_rcv terr=%d", n);
