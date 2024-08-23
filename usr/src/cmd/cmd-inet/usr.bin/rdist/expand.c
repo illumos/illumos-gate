@@ -17,6 +17,7 @@
 
 #include "defs.h"
 #include <string.h>
+#include <strings.h>
 
 #define	GAVSIZ	NCARGS / 6
 #define	LC '{'
@@ -37,8 +38,8 @@ int	nleft;
 int	expany;		/* any expansions done? */
 char	*entp;
 char	**sortbase;
-
-char	*index();
+char	*argvbuf[GAVSIZ];
+char	pathbuf[LINESIZE];
 
 static int argcmp(const void *arg1, const void *arg2);
 static void addpath(char c);
@@ -63,14 +64,10 @@ static int execbrc(char *p, char *s);
  * Major portions of this were snarfed from csh/sh.glob.c.
  */
 struct namelist *
-expand(list, wh)
-	struct namelist *list;
-	int wh;
+expand(struct namelist *list, int wh)
 {
-	register struct namelist *nl, *prev;
-	register int n;
-	char pathbuf[LINESIZE];
-	char *argvbuf[GAVSIZ];
+	struct namelist *nl, *prev;
+	int n;
 
 	if (debug) {
 		printf("expand(%x, %d)\nlist = ", list, wh);
@@ -78,7 +75,7 @@ expand(list, wh)
 	}
 
 	if (wh == 0) {
-		register char *cp;
+		char *cp;
 
 		for (nl = list; nl != NULL; nl = nl->n_next)
 			for (cp = nl->n_name; *cp; cp++)
@@ -89,7 +86,7 @@ expand(list, wh)
 	which = wh;
 	path = tpathp = pathp = pathbuf;
 	*pathp = '\0';
-	lastpathp = &path[sizeof pathbuf - 2];
+	lastpathp = &path[sizeof (pathbuf) - 2];
 	tilde = "";
 	eargc = 0;
 	eargv = sortbase = argvbuf;
@@ -122,11 +119,10 @@ expand(list, wh)
 }
 
 static void
-expstr(s)
-	char *s;
+expstr(char *s)
 {
-	register char *cp, *cp1;
-	register struct namelist *tp;
+	char *cp, *cp1;
+	struct namelist *tp;
 	char *tail;
 	char buf[LINESIZE];
 	int savec, oeargc;
@@ -172,7 +168,9 @@ expstr(s)
 		expstr(buf);
 		return;
 	}
-	if ((which & ~E_VARS) == 0 || !strcmp(s, "{") || !strcmp(s, "{}")) {
+	if ((which & ~E_VARS) == 0 ||
+	    strcmp(s, "{") == 0 ||
+	    strcmp(s, "{}") == 0) {
 		Cat(s, "");
 		sort();
 		return;
@@ -247,11 +245,10 @@ argcmp(const void *arg1, const void *arg2)
  * expand into a list, after searching directory
  */
 static void
-expsh(s)
-	char *s;
+expsh(char *s)
 {
-	register char *cp;
-	register char *spathp, *oldcp;
+	char *cp;
+	char *spathp, *oldcp;
 	struct stat stb;
 
 	spathp = pathp;
@@ -285,11 +282,10 @@ endit:
 }
 
 static void
-matchdir(pattern)
-	char *pattern;
+matchdir(char *pattern)
 {
 	struct stat stb;
-	register struct dirent *dp;
+	struct dirent *dp;
 	DIR *dirp;
 
 	dirp = opendir(path);
@@ -338,11 +334,10 @@ patherr2:
 }
 
 static int
-execbrc(p, s)
-	char *p, *s;
+execbrc(char *p, char *s)
 {
 	char restbuf[LINESIZE + 2];
-	register char *pe, *pm, *pl;
+	char *pe, *pm, *pl;
 	int brclev = 0;
 	char *lm, savec, *spathp;
 
@@ -427,11 +422,10 @@ doit:
 }
 
 int
-match(s, p)
-	char *s, *p;
+match(char *s, char *p)
 {
-	register int c;
-	register char *sentp;
+	int c;
+	char *sentp;
 	char sexpany = expany;
 
 	if (*s == '.' && *p != '.')
@@ -445,10 +439,9 @@ match(s, p)
 }
 
 int
-amatch(s, p)
-	register char *s, *p;
+amatch(char *s, char *p)
 {
-	register int scc;
+	int scc;
 	int ok, lc;
 	char *spathp;
 	struct stat stb;
@@ -534,10 +527,9 @@ slash:
 }
 
 int
-smatch(s, p)
-	register char *s, *p;
+smatch(char *s, char *p)
 {
-	register int scc;
+	int scc;
 	int ok, lc;
 	int c, cc;
 
@@ -593,11 +585,10 @@ smatch(s, p)
 }
 
 static void
-Cat(s1, s2)
-	register char *s1, *s2;
+Cat(char *s1, char *s2)
 {
 	int len = strlen(s1) + strlen(s2) + 1;
-	register char *s;
+	char *s;
 
 	nleft -= len;
 	if (nleft <= 0 || ++eargc >= GAVSIZ)
@@ -631,12 +622,9 @@ addpath(char c)
  * part corresponding to `file'.
  */
 char *
-exptilde(buf, len, file)
-	char buf[];
-	unsigned int len;
-	register char *file;
+exptilde(char buf[], unsigned int len, char *file)
 {
-	register char *s1, *s2, *s3;
+	char *s1, *s2, *s3;
 	extern char homedir[];
 
 	if (*file != '~') {
