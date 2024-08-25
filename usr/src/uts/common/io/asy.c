@@ -144,9 +144,6 @@ static	int debug  = 0;
 #define	ASY_DPRINTF(asy, fac, format, ...)
 #endif
 
-/* pnpISA compressed device ids */
-#define	pnpMTS0219 0xb6930219	/* Multitech MT5634ZTX modem */
-
 /*
  * PPS (Pulse Per Second) support.
  */
@@ -829,27 +826,30 @@ async_process_suspq(struct asycom *asy)
 static int
 asy_get_bus_type(dev_info_t *devinfo)
 {
-	char	parent_type[16];
-	int	parentlen;
+	char *prop;
+	int bustype;
 
-	parentlen = sizeof (parent_type);
-
-	if (ddi_prop_op(DDI_DEV_T_ANY, devinfo, PROP_LEN_AND_VAL_BUF, 0,
-	    "device_type", (caddr_t)parent_type, &parentlen)
-	    != DDI_PROP_SUCCESS && ddi_prop_op(DDI_DEV_T_ANY, devinfo,
-	    PROP_LEN_AND_VAL_BUF, 0, "bus-type", (caddr_t)parent_type,
-	    &parentlen) != DDI_PROP_SUCCESS) {
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devinfo, 0, "device_type",
+	    &prop) != DDI_PROP_SUCCESS &&
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, devinfo, 0, "bus-type",
+	    &prop) != DDI_PROP_SUCCESS) {
 		dev_err(devinfo, CE_WARN,
 		    "!%s: can't figure out device type for parent \"%s\"",
 		    __func__, ddi_get_name(ddi_get_parent(devinfo)));
 		return (ASY_BUS_UNKNOWN);
 	}
-	if (strcmp(parent_type, "isa") == 0)
-		return (ASY_BUS_ISA);
-	else if (strcmp(parent_type, "pci") == 0)
+
+	if (strcmp(prop, "isa") == 0)
+		bustype = ASY_BUS_ISA;
+	else if (strcmp(prop, "pci") == 0)
+		bustype = ASY_BUS_PCI;
+	else if (strcmp(prop, "pciex") == 0)
 		return (ASY_BUS_PCI);
 	else
-		return (ASY_BUS_UNKNOWN);
+		bustype = ASY_BUS_UNKNOWN;
+
+	ddi_prop_free(prop);
+	return (bustype);
 }
 
 static int
@@ -866,13 +866,6 @@ asy_get_io_regnum_pci(dev_info_t *devi, struct asycom *asy)
 		    " not found in devices property list", __func__);
 		return (-1);
 	}
-
-	/*
-	 * PCI devices are assumed to not have broken FIFOs;
-	 * Agere/Lucent Venus PCI modem chipsets are an example
-	 */
-	if (asy)
-		asy->asy_flags2 |= ASY2_NO_LOOPBACK;
 
 	regnum = -1;
 	nregs = reglen / sizeof (*reglist);
@@ -902,8 +895,8 @@ asy_get_io_regnum_pci(dev_info_t *devi, struct asycom *asy)
 static int
 asy_get_io_regnum_isa(dev_info_t *devi, struct asycom *asy)
 {
+	int regnum = -1;
 	int reglen, nregs;
-	int regnum, i;
 	struct {
 		uint_t bustype;
 		int base;
@@ -917,22 +910,14 @@ asy_get_io_regnum_isa(dev_info_t *devi, struct asycom *asy)
 		return (-1);
 	}
 
-	regnum = -1;
 	nregs = reglen / sizeof (*reglist);
-	for (i = 0; i < nregs; i++) {
-		switch (reglist[i].bustype) {
-		case 1:			/* I/O bus reg property */
-			if (regnum == -1) /* only use the first one */
-				regnum = i;
-			break;
 
-		case pnpMTS0219:	/* Multitech MT5634ZTX modem */
-			/* Venus chipset can't do loopback test */
-			if (asy)
-				asy->asy_flags2 |= ASY2_NO_LOOPBACK;
-			break;
-
-		default:
+	/*
+	 * Find the first I/O bus in the "reg" property.
+	 */
+	for (int i = 0; i < nregs && regnum == -1; i++) {
+		if (reglist[i].bustype == 1) {
+			regnum = i;
 			break;
 		}
 	}
@@ -940,7 +925,9 @@ asy_get_io_regnum_isa(dev_info_t *devi, struct asycom *asy)
 	/* check for valid count of registers */
 	if ((regnum < 0) || (reglist[regnum].size < 8))
 		regnum = -1;
+
 	kmem_free(reglist, reglen);
+
 	return (regnum);
 }
 
@@ -1716,6 +1703,38 @@ asy_hw_name(struct asycom *asy)
 	return ("?");
 }
 
+static boolean_t
+asy_is_devid(struct asycom *asy, char *venprop, char *devprop,
+    int venid, int devid)
+{
+	int id;
+
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, asy->asy_dip, DDI_PROP_DONTPASS,
+	    venprop, 0) != venid) {
+		return (B_FALSE);
+	}
+
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, asy->asy_dip, DDI_PROP_DONTPASS,
+	    devprop, 0) != devid) {
+		return (B_FALSE);
+	}
+
+	return (B_FALSE);
+}
+
+static void
+asy_check_loopback(struct asycom *asy)
+{
+	if (asy_get_bus_type(asy->asy_dip) != ASY_BUS_PCI)
+		return;
+
+	/* Check if this is a Agere/Lucent Venus PCI modem chipset. */
+	if (asy_is_devid(asy, "vendor-id", "device-id", 0x11c1, 0x0480) ||
+	    asy_is_devid(asy, "subsystem-vendor-id", "subsystem-id", 0x11c1,
+	    0x0480))
+		asy->asy_flags2 |= ASY2_NO_LOOPBACK;
+}
+
 static int
 asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 {
@@ -1728,6 +1747,12 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 	 * until we find out what we actually have.
 	 */
 	asy->asy_hwtype = ASY_MAXCHIP;
+
+	/*
+	 * First, see if we can even do the loopback check, which may not work
+	 * on certain hardware.
+	 */
+	asy_check_loopback(asy);
 
 	if (asy_scr_test) {
 		/* Check that the scratch register works. */
