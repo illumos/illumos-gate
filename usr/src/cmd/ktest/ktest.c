@@ -1332,7 +1332,7 @@ ktest_verify_run_list(nvlist_t *tests, list_t *run_list)
 static boolean_t
 ktest_run_cmd(int argc, char *argv[], int ktdev)
 {
-	char c;
+	int c;
 	nvlist_t *tests = NULL;
 	list_t run_list;
 	char *input_path = NULL;
@@ -1439,7 +1439,7 @@ ktest_run_cmd(int argc, char *argv[], int ktdev)
 static boolean_t
 ktest_run_file_cmd(int argc, char *argv[], int ktdev)
 {
-	char c;
+	int c;
 	nvlist_t *tests = NULL;
 	list_t run_list;
 	char *run_file = NULL;
@@ -1517,7 +1517,7 @@ ktest_run_file_cmd(int argc, char *argv[], int ktdev)
 static void
 ktest_list_cmd(int argc, char *argv[], int dev)
 {
-	char c;
+	int c;
 	list_t triples;
 	nvlist_t *tests = NULL;
 	boolean_t parsable = B_FALSE;
