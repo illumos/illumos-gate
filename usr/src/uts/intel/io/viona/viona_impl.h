@@ -36,7 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IMPL_H
@@ -66,6 +66,23 @@ struct viona_desb;
 typedef struct viona_desb viona_desb_t;
 struct viona_net;
 typedef struct viona_neti viona_neti_t;
+
+typedef struct viona_transfer_stats {
+	/* Packets transferred successfully */
+	uint64_t vts_packets;
+	/* Bytes transferred successfully */
+	uint64_t vts_bytes;
+	/*
+	 * Count of transfers which encountered errors, not including
+	 * insufficient space in ring.
+	 */
+	uint64_t vts_errors;
+	/*
+	 * Count of packets dropped due to insufficient space in the ring or by
+	 * order of associated hook.
+	 */
+	uint64_t vts_drops;
+} viona_transfer_stats_t;
 
 enum viona_ring_state {
 	VRS_RESET	= 0x0,	/* just allocated or reset */
@@ -113,8 +130,11 @@ typedef struct viona_vring {
 	void		**vr_map_pages;
 	vmm_page_t	*vr_map_hold;
 
+	/* Per-ring general statistics */
+	struct viona_transfer_stats vr_stats;
+
 	/* Per-ring error condition statistics */
-	struct viona_ring_stats {
+	struct viona_ring_err_stats {
 		uint64_t	rs_ndesc_too_high;
 		uint64_t	rs_bad_idx;
 		uint64_t	rs_indir_bad_len;
@@ -140,7 +160,7 @@ typedef struct viona_vring {
 
 		uint64_t	rs_rx_hookdrop;
 		uint64_t	rs_tx_hookdrop;
-	} vr_stats;
+	} vr_err_stats;
 } viona_vring_t;
 
 struct viona_link {
@@ -166,6 +186,12 @@ struct viona_link {
 	pollhead_t		l_pollhead;
 
 	viona_neti_t		*l_neti;
+
+	kmutex_t		l_stats_lock;
+	struct viona_link_stats {
+		struct viona_transfer_stats vls_rx;
+		struct viona_transfer_stats vls_tx;
+	} l_stats;
 };
 
 typedef struct viona_nethook {
@@ -192,6 +218,17 @@ struct viona_neti {
 	list_t			vni_dev_list;	/* Protected by vni_lock */
 };
 
+typedef struct viona_kstats {
+	kstat_named_t	vk_rx_packets;
+	kstat_named_t	vk_rx_bytes;
+	kstat_named_t	vk_rx_errors;
+	kstat_named_t	vk_rx_drops;
+	kstat_named_t	vk_tx_packets;
+	kstat_named_t	vk_tx_bytes;
+	kstat_named_t	vk_tx_errors;
+	kstat_named_t	vk_tx_drops;
+} viona_kstats_t;
+
 typedef struct used_elem {
 	uint16_t	id;
 	uint32_t	len;
@@ -201,6 +238,8 @@ typedef struct viona_soft_state {
 	kmutex_t		ss_lock;
 	viona_link_t		*ss_link;
 	list_node_t		ss_node;
+	kstat_t			*ss_kstat;
+	minor_t			ss_minor;
 } viona_soft_state_t;
 
 #pragma pack(1)
@@ -259,9 +298,9 @@ struct virtio_net_hdr {
 #define	VIONA_PROBE_BAD_RING_ADDR(r, a)		\
 	VIONA_PROBE2(bad_ring_addr, viona_vring_t *, r, void *, (void *)(a))
 
+/* Increment one of the named ring error stats */
 #define	VIONA_RING_STAT_INCR(r, name)	\
-	(((r)->vr_stats.rs_ ## name)++)
-
+	(((r)->vr_err_stats.rs_ ## name)++)
 
 #define	VIONA_MAX_HDRS_LEN	(sizeof (struct ether_vlan_header) + \
 	IP_MAX_HDR_LENGTH + TCP_MAX_HDR_LENGTH)
@@ -318,6 +357,10 @@ void viona_ring_set_no_notify(viona_vring_t *, boolean_t);
 void viona_ring_disable_notify(viona_vring_t *);
 void viona_ring_enable_notify(viona_vring_t *);
 uint16_t viona_ring_num_avail(viona_vring_t *);
+
+void viona_ring_stat_accept(viona_vring_t *, uint32_t);
+void viona_ring_stat_drop(viona_vring_t *);
+void viona_ring_stat_error(viona_vring_t *);
 
 
 void viona_rx_init(void);

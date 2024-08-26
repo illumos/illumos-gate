@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 
@@ -715,6 +715,12 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	}
 
 	/*
+	 * From viona's point of view, this is a successful transmit, even if
+	 * something downstream decides to drop the packet.
+	 */
+	viona_ring_stat_accept(ring, len);
+
+	/*
 	 * We're potentially going deep into the networking layer; make sure the
 	 * guest can't run concurrently.
 	 */
@@ -732,7 +738,10 @@ drop_fail:
 	 * On the off chance that memory is not available via the desballoc or
 	 * allocb calls, there are few options left besides to fail and drop
 	 * the frame on the floor.
+	 *
+	 * First account for it in the error stats.
 	 */
+	viona_ring_stat_error(ring);
 
 	if (dp != NULL) {
 		/*
@@ -764,6 +773,9 @@ drop_hook:
 		dp->d_cookie = 0;
 		dp->d_ref = 0;
 	}
+
+	/* Count in the stats as a drop, rather than an error */
+	viona_ring_stat_drop(ring);
 
 	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint32_t, len,
 	    uint16_t, cookie);

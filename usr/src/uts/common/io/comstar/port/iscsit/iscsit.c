@@ -20,8 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
@@ -1711,17 +1710,7 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 
 		rsp = (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr;
 		rsp->itt = itask->it_itt;
-		/*
-		 * ExpDataSN is the number of R2T and Data-In (read)
-		 * PDUs the target has sent for the SCSI command.
-		 *
-		 * Since there is no support for bidirectional transfer
-		 * yet, either idt_exp_datasn or idt_exp_rttsn, but not
-		 * both is valid at any time
-		 */
-		rsp->expdatasn = (itask->it_idm_task->idt_exp_datasn != 0) ?
-		    htonl(itask->it_idm_task->idt_exp_datasn):
-		    htonl(itask->it_idm_task->idt_exp_rttsn);
+		rsp->expdatasn = htonl(itask->it_idm_task->idt_exp_datasn);
 		rsp->cmd_status = task->task_scsi_status;
 		iscsit_pdu_tx(pdu);
 		return (STMF_SUCCESS);
@@ -1758,9 +1747,7 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 		rsp->residual_count = htonl(task->task_resid);
 		rsp->itt = itask->it_itt;
 		rsp->response = ISCSI_STATUS_CMD_COMPLETED;
-		rsp->expdatasn = (itask->it_idm_task->idt_exp_datasn != 0) ?
-		    htonl(itask->it_idm_task->idt_exp_datasn):
-		    htonl(itask->it_idm_task->idt_exp_rttsn);
+		rsp->expdatasn = htonl(itask->it_idm_task->idt_exp_datasn);
 		rsp->cmd_status = task->task_scsi_status;
 		if (task->task_sense_length != 0) {
 			/*

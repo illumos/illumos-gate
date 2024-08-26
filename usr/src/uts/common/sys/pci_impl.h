@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_PCI_IMPL_H
@@ -119,25 +119,19 @@ struct pci_bus_resource {
 
 extern struct pci_bus_resource *pci_bus_res;
 
-/*
- * For now, x86-only to avoid conflicts with <sys/memlist_impl.h>
- */
-#define	memlist_find		memlist_find_pci
-#define	memlist_insert		memlist_insert_pci
-
-extern struct memlist *memlist_alloc(void);
-extern void memlist_free(struct memlist *);
-extern void memlist_free_all(struct memlist **);
-extern void memlist_insert(struct memlist **, uint64_t, uint64_t);
-extern int memlist_remove(struct memlist **, uint64_t, uint64_t);
-extern uint64_t memlist_find(struct memlist **, uint64_t, int);
-extern uint64_t memlist_find_with_startaddr(struct memlist **, uint64_t,
+extern struct memlist *pci_memlist_alloc(void);
+extern void pci_memlist_free(struct memlist *);
+extern void pci_memlist_free_all(struct memlist **);
+extern void pci_memlist_insert(struct memlist **, uint64_t, uint64_t);
+extern int pci_memlist_remove(struct memlist **, uint64_t, uint64_t);
+extern uint64_t pci_memlist_find(struct memlist **, uint64_t, int);
+extern uint64_t pci_memlist_find_with_startaddr(struct memlist **, uint64_t,
     uint64_t, int);
-extern void memlist_dump(struct memlist *);
-extern void memlist_subsume(struct memlist **, struct memlist **);
-extern void memlist_merge(struct memlist **, struct memlist **);
-extern struct memlist *memlist_dup(struct memlist *);
-extern int memlist_count(struct memlist *);
+extern void pci_memlist_dump(struct memlist *);
+extern void pci_memlist_subsume(struct memlist **, struct memlist **);
+extern void pci_memlist_merge(struct memlist **, struct memlist **);
+extern struct memlist *pci_memlist_dup(struct memlist *);
+extern int pci_memlist_count(struct memlist *);
 
 #endif /* __i386 || __amd64 */
 

@@ -375,7 +375,7 @@ _NOTE(LOCK_ORDER(ehci_state::ehci_int_mutex \
 /*
  * EHCI QH and QTD Pool sizes.
  */
-#define	EHCI_QH_POOL_SIZE	100
+#define	EHCI_QH_POOL_SIZE	1000
 #define	EHCI_QTD_POOL_SIZE	200
 #define	EHCI_ITD_POOL_SIZE	200
 
