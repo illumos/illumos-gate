@@ -105,7 +105,7 @@ audit_crontab_modify(char *path, char *tmp_path, int sorf)
 		aug_save_pid(getpid());
 		aug_save_asid(ai.ai_asid);
 		aug_save_tid_ex(ai.ai_termid.at_port, ai.ai_termid.at_addr,
-			ai.ai_termid.at_type);
+		    ai.ai_termid.at_type);
 
 
 		aug_save_path(path);
@@ -169,7 +169,8 @@ audit_crontab_get_diffs(char *cf, char *tmp_name, char **bufptr)
 	struct stat st, st_tmp;
 	uid_t	euid;
 	int	len, r = AUDIT_GET_DIFFS_CRONTAB;
-	char	*buf = NULL, err_buf[128];
+	char	*buf = NULL;
+	static char err_buf[128];
 
 	(void) memset(err_buf, 0, 128);
 	euid = geteuid();
@@ -185,8 +186,8 @@ audit_crontab_get_diffs(char *cf, char *tmp_name, char **bufptr)
 		} else {
 			r = AUDIT_GET_DIFFS_ERR;
 			(void) snprintf(err_buf, sizeof (err_buf),
-				"crontab: %s: stat: %s\n",
-				cf, strerror(errno));
+			    "crontab: %s: stat: %s\n",
+			    cf, strerror(errno));
 			goto exit_diff;
 		}
 		len = 0;
@@ -196,8 +197,8 @@ audit_crontab_get_diffs(char *cf, char *tmp_name, char **bufptr)
 	if (stat(tmp_name, &st_tmp) == -1) {
 		r = AUDIT_GET_DIFFS_ERR;
 		(void) snprintf(err_buf, sizeof (err_buf),
-			"crontab: %s: stat: %s\n",
-			tmp_name, strerror(errno));
+		    "crontab: %s: stat: %s\n",
+		    tmp_name, strerror(errno));
 		goto exit_diff;
 	}
 
@@ -260,7 +261,8 @@ exit_diff:
 #define	PWD_BUFFER_SIZE	512
 
 int
-audit_crontab_not_allowed(uid_t ruid, char *user) {
+audit_crontab_not_allowed(uid_t ruid, char *user)
+{
 	struct passwd		pwd;
 	char			buffer[PWD_BUFFER_SIZE];
 	int			rc = 0;		/* 0 == allow */
@@ -277,7 +279,8 @@ audit_crontab_not_allowed(uid_t ruid, char *user) {
 }
 
 int
-audit_crontab_process_not_audited() {
+audit_crontab_process_not_audited()
+{
 	struct auditpinfo_addr	info;
 	int	rc;
 

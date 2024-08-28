@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2021 Jason King
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/x86_archext.h>
@@ -20,28 +21,45 @@
 #define	CPUID_VM_LEAF_MAX	0x40000000
 
 /*
- * From https://lwn.net/Articles/301888/, CPUID leaf 0x40000010 (when present)
- * on VMware will contain the TSC frequency in kHz. While it would have been
- * nice to locate an official bit of documentation from VMware, implementations
- * in both Linux and FreeBSD agree with the above link, so it seems reasonable
- * to use it as well.
+ * From https://lwn.net/Articles/301888/:
+ * CPUID leaf 0x40000010 (when present on supported VMMs) will contain the TSC
+ * frequency in kHz.
  */
 #define	CPUID_VM_LEAF_FREQ	0x40000010
+
+/*
+ * These get_hwenv() types correspond to the platforms which are known to have
+ * support for exposing the TSC frequency via the aforementioned leaf.
+ */
+#define	HW_SUPPORTS_FREQ	(HW_VMWARE | HW_KVM | HW_VIRTUALBOX | HW_ACRN)
+
+/*
+ * Allow bypassing the platform identification step when trying to determine if
+ * the host has support for the VM frequency leaf.  This allows use of the leaf
+ * on hypervisors which are otherwise unknown.
+ */
+int tscc_vmware_match_any = 0;
 
 static boolean_t
 tsc_calibrate_vmware(uint64_t *freqp)
 {
-	if (get_hwenv() != HW_VMWARE)
-		return (B_FALSE);
-
 	struct cpuid_regs regs = { 0 };
 
-	/* First determine the largest VM leaf supported */
+	/*
+	 * Are we on a platform with support?  (or has the administrator
+	 * expressed their intent to bypass this check via the config option.)
+	 */
+	if ((get_hwenv() & HW_SUPPORTS_FREQ) == 0 &&
+	    tscc_vmware_match_any == 0) {
+		return (B_FALSE);
+	}
+
+	/* ... And does it expose up through the required leaf? */
 	regs.cp_eax = CPUID_VM_LEAF_MAX;
 	__cpuid_insn(&regs);
-
-	if (regs.cp_eax < CPUID_VM_LEAF_FREQ)
+	if (regs.cp_eax < CPUID_VM_LEAF_FREQ) {
 		return (B_FALSE);
+	}
 
 	regs.cp_eax = CPUID_VM_LEAF_FREQ;
 	__cpuid_insn(&regs);
@@ -50,8 +68,9 @@ tsc_calibrate_vmware(uint64_t *freqp)
 	 * While not observed in the wild, as a precautionary measure,
 	 * we treat a value of 0 as a failure out of an excess of caution.
 	 */
-	if (regs.cp_eax == 0)
+	if (regs.cp_eax == 0) {
 		return (B_FALSE);
+	}
 
 	/* Convert from kHz to Hz */
 	*freqp = (uint64_t)regs.cp_eax * 1000;
