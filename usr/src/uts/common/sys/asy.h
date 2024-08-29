@@ -64,7 +64,8 @@ extern "C" {
 #define	ASY_16550A	0x20016551	/* usable FIFO */
 #define	ASY_16750	0x30016750	/* 64 byte FIFO, auto flow control */
 #define	ASY_16650	0x40016650	/* 32 byte FIFO, auto flow control */
-#define	ASY_MAXCHIP	ASY_16650
+#define	ASY_16950	0x50016950	/* 128 byte FIFO, auto flow control */
+#define	ASY_MAXCHIP	ASY_16950
 
 /*
  * Definitions for INS8250 / 16550  chips
@@ -93,6 +94,28 @@ typedef enum {
 	ASY_XON2,		/* XON Character 2		(R/W) */
 	ASY_XOFF1,		/* XOFF Character 1		(R/W) */
 	ASY_XOFF2,		/* XOFF Character 2		(R/W) */
+
+	/* 16950 additional registers */
+	ASY_ASR,		/* Additional Status Register	(R/W) */
+	ASY_RFL,		/* Receiver FIFO Length		(R/W) */
+	ASY_TFL,		/* Transmitter FIFO Length	(R/W) */
+	ASY_ICR,		/* Indexed Control Register	(R/W) */
+
+	/* 16950 indexed registers */
+	ASY_ACR,		/* Additional Control Register  (R/W) */
+	ASY_CPR,		/* Clock Prescaler Register	(R/W) */
+	ASY_TCR,		/* Times Clock Register		(R/W) */
+	ASY_CKS,		/* Clock Select Register	(R/W) */
+	ASY_TTL,		/* Transmitter Trigger Level	(R/W) */
+	ASY_RTL,		/* Receiver Trigger Level	(R/W) */
+	ASY_FCL,		/* Flow Control Low-Level	(R/W) */
+	ASY_FCH,		/* Flow Control High-Level	(R/W) */
+	ASY_ID1,		/* Device Identification 1	(R) */
+	ASY_ID2,		/* Device Identification 2	(R) */
+	ASY_ID3,		/* Device Identification 3	(R) */
+	ASY_REV,		/* Device Revision		(R) */
+	ASY_CSR,		/* Channel Software Reset	(W) */
+	ASY_NMR,		/* Nine-Bit Mode Register	(R/W) */
 
 	ASY_NREG,
 } asy_reg_t;
@@ -216,6 +239,30 @@ typedef enum {
 /* Extended Feature Register (16650) */
 #define	ASY_EFR_ENH_EN	0x10	/* IER[4:7], ISR[4,5], FCR[4,5], MCR[5:7] */
 
+/* Additional Status Register (16950) */
+#define	ASY_ASR_TD	0x01	/* Transmitter Disabled */
+#define	ASY_ASR_RTD	0x02	/* Remote Transmitter Disabled */
+#define	ASY_ASR_RTS	0x04	/* RTS status */
+#define	ASY_ASR_DTR	0x08	/* DTR status */
+#define	ASY_ASR_SCD	0x10	/* Special Character detected */
+#define	ASY_ASR_FIFOSEL	0x20	/* FIFOSEL pin status */
+#define	ASY_ASR_FIFOSZ	0x40	/* FIFO size */
+#define	ASY_ASR_TI	0x80	/* Transmitter Idle */
+
+/* Additional Control Register (16950) */
+#define	ASY_ACR_RD	0x01	/* Receiver Disable */
+#define	ASY_ACR_TD	0x02	/* Transmitter Disable */
+#define	ASY_ACR_DSR	0x04	/* Automatic DSR flow control */
+#define	ASY_ACR_DTR	0x18	/* DTR line configuration */
+#define	ASY_ACR_TRIG	0x20	/* 950 mode trigger levels enable */
+#define	ASY_ACR_ICR	0x40	/* ICR read enable */
+#define	ASY_ACR_ASR	0x80	/* Additional Status Enable */
+
+#define	ASY_ACR_DTR_NORM	0x00	/* DTR normal (compatible) */
+#define	ASY_ACR_DTR_FLOW	0x08	/* DTR used for flow-control */
+#define	ASY_ACR_DTR_RS485_LOW	0x10	/* DTR drives ext. RS485 buffer low */
+#define	ASY_ACR_DTR_RS485_HIGH	0x18	/* DTR drives ext. RS485 buffer high */
+
 
 /* Serial in/out requests */
 
@@ -320,6 +367,7 @@ struct asycom {
 	tcflag_t	asy_ocflag;	/* old console mode bits */
 	uchar_t		asy_com_port;	/* COM port number, or zero */
 	uchar_t		asy_fifor;	/* FIFOR register setting */
+	uint8_t		asy_acr;	/* 16950 additional control register */
 #ifdef DEBUG
 	int		asy_msint_cnt;	/* number of times in async_msint */
 #endif

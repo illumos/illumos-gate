@@ -33,7 +33,7 @@
 
 
 /*
- * Serial I/O driver for 8250/16450/16550A/16650/16750 chips.
+ * Serial I/O driver for 8250/16450/16550A/16650/16750/16950 chips.
  */
 
 #include <sys/param.h>
@@ -167,6 +167,12 @@ static struct ppsclockev asy_ppsev;
 #define	LED_ON
 #define	LED_OFF
 #endif
+
+static void	asy_put_idx(const struct asycom *, asy_reg_t, uint8_t);
+static uint8_t	asy_get_idx(const struct asycom *, asy_reg_t);
+
+static void	asy_put_add(const struct asycom *, asy_reg_t, uint8_t);
+static uint8_t	asy_get_add(const struct asycom *, asy_reg_t);
 
 static void	asy_put_ext(const struct asycom *, asy_reg_t, uint8_t);
 static uint8_t	asy_get_ext(const struct asycom *, asy_reg_t);
@@ -329,6 +335,26 @@ static struct {
 	[ASY_XON2] =  { ASY_16650,  5, asy_get_ext, asy_put_ext },
 	[ASY_XOFF1] = { ASY_16650,  6, asy_get_ext, asy_put_ext },
 	[ASY_XOFF2] = { ASY_16650,  7, asy_get_ext, asy_put_ext },
+	/* 16950 additional registers */
+	[ASY_ASR] =   { ASY_16950,  1, asy_get_add, asy_put_add },
+	[ASY_RFL] =   { ASY_16950,  3, asy_get_add, NULL },
+	[ASY_TFL] =   { ASY_16950,  4, asy_get_add, NULL },
+	[ASY_ICR] =   { ASY_16950,  5, asy_get_reg, asy_put_reg },
+	/* 16950 indexed registers */
+	[ASY_ACR] =   { ASY_16950,  0, asy_get_idx, asy_put_idx },
+	[ASY_CPR] =   { ASY_16950,  1, asy_get_idx, asy_put_idx },
+	[ASY_TCR] =   { ASY_16950,  2, asy_get_idx, asy_put_idx },
+	[ASY_CKS] =   { ASY_16950,  3, asy_get_idx, asy_put_idx },
+	[ASY_TTL] =   { ASY_16950,  4, asy_get_idx, asy_put_idx },
+	[ASY_RTL] =   { ASY_16950,  5, asy_get_idx, asy_put_idx },
+	[ASY_FCL] =   { ASY_16950,  6, asy_get_idx, asy_put_idx },
+	[ASY_FCH] =   { ASY_16950,  7, asy_get_idx, asy_put_idx },
+	[ASY_ID1] =   { ASY_16950,  8, asy_get_idx, NULL },
+	[ASY_ID2] =   { ASY_16950,  9, asy_get_idx, NULL },
+	[ASY_ID3] =   { ASY_16950, 10, asy_get_idx, NULL },
+	[ASY_REV] =   { ASY_16950, 11, asy_get_idx, NULL },
+	[ASY_CSR] =   { ASY_16950, 12, NULL,	    asy_put_idx },
+	[ASY_NMR] =   { ASY_16950, 13, asy_get_idx, asy_put_idx },
 };
 
 
@@ -482,6 +508,109 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+static void
+asy_put_idx(const struct asycom *asy, asy_reg_t reg, uint8_t val)
+{
+	ASSERT(asy->asy_hwtype >= ASY_16950);
+
+	ASSERT(reg >= ASY_ACR);
+	ASSERT(reg <= ASY_NREG);
+
+	/*
+	 * The last value written to LCR must not have been the magic value for
+	 * EFR access. Every time the driver writes that magic value to access
+	 * EFR, XON1, XON2, XOFF1, and XOFF2, the driver restores the original
+	 * value of LCR, so we should be good here.
+	 *
+	 * I'd prefer to ASSERT this, but I'm not sure it's worth the hassle.
+	 */
+
+	/* Write indexed register offset to SPR. */
+	asy_put(asy, ASY_SPR, asy_reg_table[reg].asy_reg_off);
+
+	/* Write value to ICR. */
+	asy_put(asy, ASY_ICR, val);
+}
+
+static uint8_t
+asy_get_idx(const struct asycom *asy, asy_reg_t reg)
+{
+	uint8_t val;
+
+	ASSERT(asy->asy_hwtype >= ASY_16950);
+
+	ASSERT(reg >= ASY_ACR);
+	ASSERT(reg <= ASY_NREG);
+
+	/* Enable access to ICR in ACR. */
+	asy_put(asy, ASY_ACR, ASY_ACR_ICR | asy->asy_acr);
+
+	/* Write indexed register offset to SPR. */
+	asy_put(asy, ASY_SPR, asy_reg_table[reg].asy_reg_off);
+
+	/* Read value from ICR. */
+	val = asy_get(asy, ASY_ICR);
+
+	/* Restore ACR. */
+	asy_put(asy, ASY_ACR, asy->asy_acr);
+
+	return (val);
+}
+
+static void
+asy_put_add(const struct asycom *asy, asy_reg_t reg, uint8_t val)
+{
+	ASSERT(asy->asy_hwtype >= ASY_16950);
+
+	/* Only ASR is writable, RFL and TFL are read-only. */
+	ASSERT(reg == ASY_ASR);
+
+	/*
+	 * Only ASR[0] (Transmitter Disabled) and ASR[1] (Remote Transmitter
+	 * Disabled) are writable.
+	 */
+	ASSERT((val & ~(ASY_ASR_TD | ASY_ASR_RTD)) == 0);
+
+	/* Enable access to ASR in ACR. */
+	asy_put(asy, ASY_ACR, ASY_ACR_ASR | asy->asy_acr);
+
+	/* Write value to ASR. */
+	asy_put_reg(asy, reg, val);
+
+	/* Restore ACR. */
+	asy_put(asy, ASY_ACR, asy->asy_acr);
+}
+
+static uint8_t
+asy_get_add(const struct asycom *asy, asy_reg_t reg)
+{
+	uint8_t val;
+
+	ASSERT(asy->asy_hwtype >= ASY_16950);
+
+	ASSERT(reg >= ASY_ASR);
+	ASSERT(reg <= ASY_TFL);
+
+	/*
+	 * The last value written to LCR must not have been the magic value for
+	 * EFR access. Every time the driver writes that magic value to access
+	 * EFR, XON1, XON2, XOFF1, and XOFF2, the driver restores the original
+	 * value of LCR, so we should be good here.
+	 *
+	 * I'd prefer to ASSERT this, but I'm not sure it's worth the hassle.
+	 */
+
+	/* Enable access to ASR in ACR. */
+	asy_put(asy, ASY_ACR, ASY_ACR_ASR | asy->asy_acr);
+
+	/* Read value from register. */
+	val = asy_get_reg(asy, reg);
+
+	/* Restore ACR. */
+	asy_put(asy, ASY_ACR, 0 | asy->asy_acr);
+
+	return (val);
 }
 
 static void
@@ -1578,6 +1707,8 @@ asy_hw_name(struct asycom *asy)
 		return ("16650");
 	case ASY_16750:
 		return ("16750");
+	case ASY_16950:
+		return ("16950");
 	}
 
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "unknown asy_hwtype: %d",
@@ -1723,7 +1854,7 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 	asy_reset_fifo(asy, 0);
 
 	/*
-	 * Check for Exar/Startech ST16C650, which will still look like
+	 * Check for Exar/Startech ST16C650 or newer, which will still look like
 	 * a 16550A until we enable its enhanced mode.
 	 */
 	if (hwtype >= ASY_16550A && asymaxchip >= ASY_16650 &&
@@ -1758,6 +1889,105 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 			if (asy_max_tx_fifo >= asy->asy_fifo_buf)
 				asy->asy_fifor |= ASY_FCR_THR_TRIG_24;
 			asy_reset_fifo(asy, 0);
+		}
+	}
+
+	/*
+	 * If we think we got a 16650, we may actually have a 16950, so check
+	 * for that.
+	 */
+	if (hwtype >= ASY_16650 && asymaxchip >= ASY_16950) {
+		uint8_t ier, asr;
+
+		/*
+		 * First, clear IER and read it back. That should be a no-op as
+		 * either asyattach() or asy_resume() disabled all interrupts
+		 * before we were called.
+		 */
+		asy_put(asy, ASY_IER, 0);
+		ier = asy_get(asy, ASY_IER);
+		if (ier != 0) {
+			dev_err(asy->asy_dip, CE_WARN, "!%s: UART @ %p "
+			    "interrupt enable register: got 0x%02x", __func__,
+			    (void *)asy->asy_ioaddr, ier);
+			return (DDI_FAILURE);
+		}
+
+		/*
+		 * Next, try to read ASR, which shares the register offset with
+		 * IER. ASR can only be read if the ASR enable bit is set in
+		 * ACR, which itself is an indexed registers. This is taken care
+		 * of by asy_get().
+		 *
+		 * There are a few bits in ASR which should be 1 at this point,
+		 * definitely the TX idle bit (ASR[7]) and also the FIFO size
+		 * bit (ASR[6]) since we've done everything we can to enable any
+		 * deeper FIFO support.
+		 *
+		 * Thus if we read back ASR as 0, we failed to read it, and this
+		 * isn't the chip we're looking for.
+		 */
+		asr = asy_get(asy, ASY_ASR);
+
+		if (asr != ier) {
+			hwtype = ASY_16950;
+
+			if ((asr & ASY_ASR_FIFOSZ) != 0)
+				asy->asy_fifo_buf = 128;
+			else
+				asy->asy_fifo_buf = 16;
+
+			asy_reset_fifo(asy, 0);
+
+			/*
+			 * Enable 16950 specific trigger level registers. Set
+			 * DTR pin to be compatible to 16450, 16550, and 16750.
+			 */
+			asy->asy_acr = ASY_ACR_TRIG | ASY_ACR_DTR_NORM;
+			asy_put(asy, ASY_ACR, asy->asy_acr);
+
+			/* Set half the FIFO size as receive trigger level. */
+			asy_put(asy, ASY_RTL, asy->asy_fifo_buf/2);
+
+			/*
+			 * Set the transmit trigger level to 1.
+			 *
+			 * While one would expect that any transmit trigger
+			 * level would work (the 16550 uses a hardwired level
+			 * of 16), in my tests with a 16950 compatible chip
+			 * (MosChip 9912) I would never see a TX interrupt
+			 * on any transmit trigger level > 1.
+			 */
+			asy_put(asy, ASY_TTL, 1);
+
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "ASR 0x%02x", asr);
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "RFL 0x%02x",
+			    asy_get(asy, ASY_RFL));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "TFL 0x%02x",
+			    asy_get(asy, ASY_TFL));
+
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "ACR 0x%02x",
+			    asy_get(asy, ASY_ACR));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "CPR 0x%02x",
+			    asy_get(asy, ASY_CPR));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "TCR 0x%02x",
+			    asy_get(asy, ASY_TCR));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "CKS 0x%02x",
+			    asy_get(asy, ASY_CKS));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "TTL 0x%02x",
+			    asy_get(asy, ASY_TTL));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "RTL 0x%02x",
+			    asy_get(asy, ASY_RTL));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "FCL 0x%02x",
+			    asy_get(asy, ASY_FCL));
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP, "FCH 0x%02x",
+			    asy_get(asy, ASY_FCH));
+
+			ASY_DPRINTF(asy, ASY_DEBUG_CHIP,
+			    "Chip ID: %02x%02x%02x,%02x",
+			    asy_get(asy, ASY_ID1), asy_get(asy, ASY_ID2),
+			    asy_get(asy, ASY_ID3), asy_get(asy, ASY_REV));
+
 		}
 	}
 
