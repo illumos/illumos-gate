@@ -25,7 +25,7 @@
 # Copyright 2016 RackTop Systems.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2023 Bill Sommerfeld
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 # - This file is sourced by "bldenv" and "nightly" and should not
 #   be executed directly.
@@ -231,7 +231,7 @@ export MULTI_PROTO="no"
 # when the release slips (nah) or you move an environment file to a new
 # release
 #
-export VERSION="${VERSION:-`git describe --long --all HEAD | cut -d/ -f2-`}"
+#export VERSION="${VERSION:-`git describe --long --all HEAD | cut -d/ -f2-`}"
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
