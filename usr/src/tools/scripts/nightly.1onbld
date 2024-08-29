@@ -27,7 +27,8 @@
 .I nightly
 \- build an OS-Net consolidation overnight
 .SH SYNOPSIS
-\fBnightly [-in] [-V VERS] <env_file>\fP
+\fBnightly\fP [\fB-in\fP] [\fB+t\fP] [\fB-V\fP \fIVERS\fP] [\fB-B\fP \fIWS\fP]
+[\fB-b\fP \fIBR\fP] [\fB-d\fP \fIWS\fP] \fIenv_file\fP
 .SH DESCRIPTION
 .I nightly,
 the mother of all build scripts,
@@ -124,8 +125,9 @@ will take as it proceeds.
 The -i, -n, +t and -V options may also be used from the command
 line to control the actions without editing your environment file.
 The -i and -n options complete the build more quickly by bypassing
-some actions. If NIGHTLY_OPTIONS is not set, then "-Bmt" build
-options will be used.
+some actions.  If NIGHTLY_OPTIONS is not set,
+.I nightly
+exits with a non-zero status after printing a usage message.
 
 .B Basic action options
 .TP 10
@@ -229,6 +231,18 @@ Default group of options for building a release (-mp)
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
+.TP 10
+.B \-B WS
+Set \fBBRINGOVER_WS\fR from the command line.
+.TP 10
+.B \-b BR
+Set \fBBRINGOVER_BRANCH\fR from the command line.
+.TP 10
+.B \-d WS
+Set \fBCODEMGR_WS\fR from the command line.
+.LP
+Note that -B, -b, and -d set their respective variables before loading the
+\fIenv_file\fR; settings in that file can override these options.
 
 .SH ENVIRONMENT VARIABLES
 Here is a list of prominent environment variables that

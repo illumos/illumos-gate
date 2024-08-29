@@ -493,12 +493,15 @@ if [ "$OPTHOME" = "" ]; then
 	export OPTHOME
 fi
 
-USAGE='Usage: nightly [-in] [+t] [-V VERS ] <env_file>
+USAGE='Usage: nightly [-in] [+t] [-B WS] [-b BR] [-d WS] [-V VERS] <env_file>
 
 Where:
 	-i	Fast incremental options (no clobber, check)
 	-n      Do not do a bringover
 	+t	Use the build tools in $ONBLD_TOOLS/bin
+	-B WS	bringover from WS (directory or URL)
+	-b BR   bringover branch BR
+	-d WS	do build in WS (directory)
 	-V VERS set the build version string to VERS
 
 	<env_file>  file in Bourne shell syntax that sets and exports
@@ -506,7 +509,7 @@ Where:
 	the scripts this one calls. If <env_file> does not exist,
 	it will be looked for in $OPTHOME/onbld/env.
 
-non-DEBUG is the default build type. Build options can be set in the
+non-DEBUG is the default build type. Build options must be set in the
 NIGHTLY_OPTIONS variable in the <env_file> as follows:
 
 	-A	check for ABI differences in .so files
@@ -568,9 +571,15 @@ build_extras_ok=y
 #
 
 OPTIND=1
-while getopts +intV:W FLAG
+while getopts +b:B:d:intV:W FLAG
 do
 	case $FLAG in
+	  b )	BRINGOVER_BRANCH="$OPTARG"
+		;;
+	  B )	BRINGOVER_WS="$OPTARG"
+		;;
+	  d )	CODEMGR_WS="$OPTARG"
+		;;
 	  i )	i_FLAG=y; i_CMD_LINE_FLAG=y
 		;;
 	  n )	n_FLAG=y
@@ -701,7 +710,9 @@ ps -o project= -p $$ | read build_project
 # See if NIGHTLY_OPTIONS is set
 #
 if [ "$NIGHTLY_OPTIONS" = "" ]; then
-	NIGHTLY_OPTIONS="-aBm"
+	print -u2 "NIGHTLY_OPTIONS must be set in environment file"
+	echo "$USAGE"
+	exit 1
 fi
 
 #
