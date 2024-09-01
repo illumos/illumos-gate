@@ -52,7 +52,7 @@ described in
 .Xr rand 3C ,
 .Xr random 3C ,
 and
-.Xr rand48 3C .
+.Xr drand48 3C .
 .Pp
 Use of these functions is encouraged for almost all random number
 consumption because the other interfaces are deficient in either
@@ -101,6 +101,6 @@ reserved to indicate an error.
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
+.Xr drand48 3C ,
 .Xr rand 3C ,
-.Xr rand48 3C ,
 .Xr random 3C

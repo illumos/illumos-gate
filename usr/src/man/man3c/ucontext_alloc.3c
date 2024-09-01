@@ -38,7 +38,7 @@ function allocates and initializes a
 structure for subsequent use with functions such as
 .Xr getcontext_extd 2
 or
-.Xr swapcontext_extd 2 .
+.Xr swapcontext_extd 3C .
 .Pp
 Traditionally applications declare the
 .Vt ucontext_t
@@ -60,7 +60,7 @@ It is not recommended that the returned
 structure be used with either
 .Xr getcontext 2
 or
-.Xr swapcontext 2 .
+.Xr swapcontext 3C .
 While the resulting calls will work, they will not preserve that space for the
 extended state has been allocated.
 No memory will be leaked as a result of that.

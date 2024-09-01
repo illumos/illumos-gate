@@ -92,7 +92,7 @@ implementation. This reduces system memory since no space is used to store the
 properties.
 .sp
 .LP
-The DDI property interfaces deal in signed numbers. All Size(9P) values should
+The DDI property interfaces deal in signed numbers. All size(9P) values should
 be considered unsigned. It is the responsibility of the code dealing with the
 property value to ensure that an unsigned interpretation occurs.
 .SH ATTRIBUTES

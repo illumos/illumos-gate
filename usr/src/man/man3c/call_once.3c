@@ -18,7 +18,7 @@
 .Nm call_once
 .Nd ensure function is only called once
 .Sh SYNOPSIS
-.In treads.h
+.In threads.h
 .Vt "once_flag once = ONCE_FLAG_INIT;"
 .Ft void
 .Fo call_once
@@ -50,7 +50,7 @@ but use different values for
 then only one of the functions will be successfully called.
 .Pp
 The argument
-.Fn once
+.Fa once
 should always be initialized to the symbol
 .Sy ONCE_FLAG_INIT
 before calling

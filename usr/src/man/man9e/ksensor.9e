@@ -199,7 +199,7 @@ identifier that is unique in the system.
 To create a ksensor, a driver must call either
 .Xr ksensor_create 9F
 or
-.Xr ksensor_create_pcidev 9F
+.Xr ksensor_create_scalar_pcidev 9F
 in its
 .Xr attach 9E
 entry point.

@@ -161,10 +161,10 @@ before dereferencing it.
 The
 .Sy usb_port_status
 contains a
-.Xr usb_port_status_t 9T
+.Sy usb_port_status_t
 entry, which describes the current negotiated speed of the device.
 See
-.Xr usb_port_status_t 9T
+.Xr usba_hcdi 9E
 for more information on the values and types.
 .Pp
 The
@@ -198,5 +198,4 @@ If the device represents the root hub, then this field will be
 .Xr usba_hcdi_device_address 9E ,
 .Xr usba_hcdi_device_fini 9E ,
 .Xr usba_hcdi_device_init 9E ,
-.Xr usba_pipe_handle_data_t 9S ,
-.Xr usb_port_status_t 9T
+.Xr usba_pipe_handle_data_t 9S

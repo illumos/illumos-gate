@@ -75,9 +75,9 @@ consider the following image:
     +-->|  USB  |------>| scsa2usb(4D) | ... | ccid(4D) | ... | hid(4D) | ...
     |   +-------+       +--------------+     +----------+     +---------+
     |
-    |   +---------+     +------------+     +-------------+
-    +-->| Sensors |---->| smntemp(4) | ... | pchtemp(4D) | ...
-    |   +---------+     +------------+     +-------------+
+    |   +---------+     +-------------+     +-------------+
+    +-->| Sensors |---->| smntemp(4D) | ... | pchtemp(4D) | ...
+    |   +---------+     +-------------+     +-------------+
     |
     +-------+-------------+-----------+----------+
             |             v           V          |
@@ -141,7 +141,7 @@ of a hardware device that is found and most state is tied to those instances.
 We'll discuss that more in the next section.
 .Pp
 The
-.Xr info 9E
+.Xr _info 9E
 entry point these days just calls
 .Xr mod_info 9F
 directly and can return it.
@@ -963,7 +963,7 @@ A driver fills in the operations vector discussed in
 and registers it with the kernel by calling
 .Xr ddi_ufm_init 9F .
 These interfaces have entry points include:
-.Bl -column -offset -indent "ddi_ufm_op_fill_image(9E)" "ddi_ufp_op_fill_image(9E)"
+.Bl -column -offset -indent "ddi_ufm_op_fill_image(9E)" "ddi_ufm_op_fill_image(9E)"
 .It Xr ddi_ufm_op_getcaps 9E Ta Xr ddi_ufm_op_nimages 9E
 .It Xr ddi_ufm_op_fill_image 9E Ta Xr ddi_ufm_op_fill_slot 9E
 .It Xr ddi_ufm_op_readimg 9E Ta

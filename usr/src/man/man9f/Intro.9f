@@ -1679,9 +1679,9 @@ the kernel's UFM framework, which is discussed in
 .Xr ddi_ufm 9E .
 .Pp
 The
-.Xr ddi_ufm_init 9E
+.Xr ddi_ufm_init 9F
 and
-.Xr ddi_ufm_fini 9E
+.Xr ddi_ufm_fini 9F
 functions are used to indicate support of the subsystem to the kernel.
 The driver is required to use the
 .Xr ddi_ufm_update 9F
@@ -1757,7 +1757,7 @@ then it is allowed to set up its register attributes to indicate that it
 will check for errors on the register handle after using functions like
 .Xr ddi_get8 9F
 and
-.Xr ddi_set8 9F
+.Xr ddi_put8 9F
 by calling
 .Xr ddi_fm_acc_err_get 9F
 and reacting accordingly.
@@ -1796,7 +1796,7 @@ and
 .Xr tgtmap 9 .
 .Pp
 Device drivers register initially with the kernel by using the
-.Xr scsi_ha_init 9F
+.Xr scsi_hba_init 9F
 function and then, in their attach routine, register specific instances,
 using functions like
 .Xr scsi_hba_iport_register 9F
@@ -1906,8 +1906,8 @@ The full framework and how to use it is described in
 .It Xr mac_prop_info_set_default_uint32 9F Ta Xr mac_prop_info_set_default_uint64 9F
 .It Xr mac_prop_info_set_default_uint8 9F Ta Xr mac_prop_info_set_perm 9F
 .It Xr mac_prop_info_set_range_uint32 9F Ta Xr mac_prop_info 9F
-.It Xr mac_register 9F Ta Xr mac_rx_ring 9F
-.It Xr mac_rx 9F Ta Xr mac_transceiver_info_set_present 9F
+.It Xr mac_register 9F Ta Xr mac_rx 9F
+.It Xr mac_rx_ring 9F Ta Xr mac_transceiver_info_set_present 9F
 .It Xr mac_transceiver_info_set_usable 9F Ta Xr mac_transceiver_info 9F
 .It Xr mac_tx_ring_update 9F Ta Xr mac_tx_update 9F
 .It Xr mac_unregister 9F Ta

@@ -142,7 +142,7 @@ or
 .Xr pthread_cond_broadcast 3C
 is determined by the scheduling policy.
 See
-.Xr pthread 7 .
+.Xr pthreads 7 .
 .Pp
 The effect of using more than one mutex for concurrent
 .Fn pthread_cond_wait ,

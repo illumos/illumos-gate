@@ -814,7 +814,7 @@ memory allocation.
 Individual manual pages indicate the flags that drivers should consult.
 .It Vt usb_port_status_t
 The
-.Sy usb_port_status_t
+.Vt usb_port_status_t
 determines the current negotiated speed of the device.
 The following are valid values that this may be:
 .Bl -tag -width Sy
@@ -830,12 +830,12 @@ This is a USB 2.x device.
 .It Sy USBA_SUPER_SPEED_DEV
 The device is running as a super speed device.
 This is a USB 3.0 device.
+.El
 .It Vt usb_cr_t
 This is a set of codes that may be returned as a part of the call to
 .Xr usba_hcdi_cb 9F .
 The best place for the full set of these is currently in the source
 control headers.
-.El
 .El
 .Ss Interrupts
 While some hardware supports more than one interrupt queue, a single
