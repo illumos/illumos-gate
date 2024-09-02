@@ -225,6 +225,7 @@ static void	async_resume_utbrk(struct asyncline *async);
 static void	async_dtr_free(struct asyncline *async);
 static int	asy_identify_chip(dev_info_t *devi, struct asycom *asy);
 static void	asy_reset_fifo(struct asycom *asy, uchar_t flags);
+static void	asy_carrier_check(struct asycom *);
 static int	asy_getproperty(dev_info_t *devi, struct asycom *asy,
 		    const char *property);
 static boolean_t	async_flowcontrol_sw_input(struct asycom *asy,
@@ -3235,6 +3236,122 @@ asysetsoft(struct asycom *asy)
 }
 
 /*
+ * Check the carrier signal DCD and handle carrier coming up or
+ * going down, cleaning up as needed and signalling waiters.
+ */
+static void
+asy_carrier_check(struct asycom *asy)
+{
+	struct asyncline *async = asy->asy_priv;
+	tty_common_t *tp = &async->async_ttycommon;
+	queue_t *q = tp->t_readq;
+	mblk_t	*bp;
+	int flushflag;
+
+	ASY_DPRINTF(asy, ASY_DEBUG_MODM2,
+	    "asy_msr & DCD = %x, tp->t_flags & TS_SOFTCAR = %x",
+	    asy->asy_msr & ASY_MSR_DCD, tp->t_flags & TS_SOFTCAR);
+
+	if (asy->asy_msr & ASY_MSR_DCD) {
+		/*
+		 * The DCD line is on. If we already had a carrier,
+		 * nothing changed and there's nothing to do.
+		 */
+		if ((async->async_flags & ASYNC_CARR_ON) != 0)
+			return;
+
+		ASY_DPRINTF(asy, ASY_DEBUG_MODM2, "set ASYNC_CARR_ON");
+		async->async_flags |= ASYNC_CARR_ON;
+		if (async->async_flags & ASYNC_ISOPEN) {
+			mutex_exit(&asy->asy_excl_hi);
+			mutex_exit(&asy->asy_excl);
+			(void) putctl(q, M_UNHANGUP);
+			mutex_enter(&asy->asy_excl);
+			mutex_enter(&asy->asy_excl_hi);
+		}
+		cv_broadcast(&async->async_flags_cv);
+
+		return;
+	}
+
+	/*
+	 * The DCD line is off. If we had no carrier, nothing changed
+	 * and there's nothing to do.
+	 */
+	if ((async->async_flags & ASYNC_CARR_ON) == 0)
+		return;
+
+	/*
+	 * The DCD line is off, but we had a carrier. If we're on a local line,
+	 * where carrier is ignored, or we're using a soft carrier, we're done
+	 * here.
+	 */
+	if ((tp->t_cflag & CLOCAL) != 0 || (tp->t_flags & TS_SOFTCAR) != 0)
+		goto out;
+
+	/*
+	 * Else, drop DTR, abort any output in progress, indicate that output
+	 * is not stopped.
+	 */
+	ASY_DPRINTF(asy, ASY_DEBUG_MODEM, "carrier dropped, so drop DTR");
+	asy_clr(asy, ASY_MCR, ASY_MCR_DTR);
+
+	if (async->async_flags & ASYNC_BUSY) {
+		ASY_DPRINTF(asy, ASY_DEBUG_BUSY,
+		    "Carrier dropped. Clearing async_ocnt");
+		async->async_ocnt = 0;
+	}
+
+	async->async_flags &= ~ASYNC_STOPPED;
+
+	/* If nobody had the device open, we're done here. */
+	if ((async->async_flags & ASYNC_ISOPEN) == 0)
+		goto out;
+
+	/* Else, send a hangup notification upstream and clean up. */
+	mutex_exit(&asy->asy_excl_hi);
+	mutex_exit(&asy->asy_excl);
+	(void) putctl(q, M_HANGUP);
+	mutex_enter(&asy->asy_excl);
+	ASY_DPRINTF(asy, ASY_DEBUG_MODEM, "putctl(q, M_HANGUP)");
+
+	/*
+	 * Flush the transmit FIFO. Any data left in there is invalid now.
+	 */
+	if (asy->asy_use_fifo == ASY_FCR_FIFO_EN) {
+		mutex_enter(&asy->asy_excl_hi);
+		asy_reset_fifo(asy, ASY_FCR_THR_FL);
+		mutex_exit(&asy->asy_excl_hi);
+	}
+
+	/*
+	 * Flush our write queue if we have one. If we're in the midst of close,
+	 * then flush everything. Don't leave stale ioctls lying about.
+	 */
+	ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
+	    "Flushing to prevent HUPCL hanging");
+	flushflag = (async->async_flags & ASYNC_CLOSING) ? FLUSHALL : FLUSHDATA;
+	flushq(tp->t_writeq, flushflag);
+
+	/* Free the last active msg. */
+	bp = async->async_xmitblk;
+	if (bp != NULL) {
+		freeb(bp);
+		async->async_xmitblk = NULL;
+	}
+
+	mutex_enter(&asy->asy_excl_hi);
+	async->async_flags &= ~ASYNC_BUSY;
+
+
+out:
+	/* Clear our carrier flag and signal anyone waiting. */
+	async->async_flags &= ~ASYNC_CARR_ON;
+	cv_broadcast(&async->async_flags_cv);
+}
+
+
+/*
  * Handle a second-stage interrupt.
  */
 /*ARGSUSED*/
@@ -3313,6 +3430,7 @@ begin:
 	mutex_enter(&asy->asy_excl);
 	tp = &async->async_ttycommon;
 	q = tp->t_readq;
+
 	if (async->async_flags & ASYNC_OUT_FLW_RESUME) {
 		if (async->async_ocnt > 0) {
 			mutex_enter(&asy->asy_excl_hi);
@@ -3326,107 +3444,12 @@ begin:
 		}
 		async->async_flags &= ~ASYNC_OUT_FLW_RESUME;
 	}
+
 	mutex_enter(&asy->asy_excl_hi);
 	if (async->async_ext) {
 		async->async_ext = 0;
-		/* check for carrier up */
-		ASY_DPRINTF(asy, ASY_DEBUG_MODM2,
-		    "asy_msr & DCD = %x, tp->t_flags & TS_SOFTCAR = %x",
-		    asy->asy_msr & ASY_MSR_DCD, tp->t_flags & TS_SOFTCAR);
-
-		if (asy->asy_msr & ASY_MSR_DCD) {
-			/* carrier present */
-			if ((async->async_flags & ASYNC_CARR_ON) == 0) {
-				ASY_DPRINTF(asy, ASY_DEBUG_MODM2,
-				    "set ASYNC_CARR_ON");
-				async->async_flags |= ASYNC_CARR_ON;
-				if (async->async_flags & ASYNC_ISOPEN) {
-					mutex_exit(&asy->asy_excl_hi);
-					mutex_exit(&asy->asy_excl);
-					(void) putctl(q, M_UNHANGUP);
-					mutex_enter(&asy->asy_excl);
-					mutex_enter(&asy->asy_excl_hi);
-				}
-				cv_broadcast(&async->async_flags_cv);
-			}
-		} else {
-			if ((async->async_flags & ASYNC_CARR_ON) &&
-			    !(tp->t_cflag & CLOCAL) &&
-			    !(tp->t_flags & TS_SOFTCAR)) {
-				int flushflag;
-
-				ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
-				    "carrier dropped, so drop DTR");
-				/*
-				 * Carrier went away.
-				 * Drop DTR, abort any output in
-				 * progress, indicate that output is
-				 * not stopped, and send a hangup
-				 * notification upstream.
-				 */
-				asy_clr(asy, ASY_MCR, ASY_MCR_DTR);
-
-				if (async->async_flags & ASYNC_BUSY) {
-					ASY_DPRINTF(asy, ASY_DEBUG_BUSY,
-					    "Carrier dropped.  "
-					    "Clearing async_ocnt");
-					async->async_ocnt = 0;
-				}	/* if */
-
-				async->async_flags &= ~ASYNC_STOPPED;
-				if (async->async_flags & ASYNC_ISOPEN) {
-					mutex_exit(&asy->asy_excl_hi);
-					mutex_exit(&asy->asy_excl);
-					(void) putctl(q, M_HANGUP);
-					mutex_enter(&asy->asy_excl);
-					ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
-					    "putctl(q, M_HANGUP)");
-					/*
-					 * Flush FIFO buffers
-					 * Any data left in there is invalid now
-					 */
-					if (asy->asy_use_fifo ==
-					    ASY_FCR_FIFO_EN) {
-						mutex_enter(&asy->asy_excl_hi);
-						asy_reset_fifo(asy,
-						    ASY_FCR_THR_FL);
-						mutex_exit(&asy->asy_excl_hi);
-					}
-					/*
-					 * Flush our write queue if we have one.
-					 * If we're in the midst of close, then
-					 * flush everything. Don't leave stale
-					 * ioctls lying about.
-					 */
-					flushflag = (async->async_flags &
-					    ASYNC_CLOSING) ? FLUSHALL :
-					    FLUSHDATA;
-					flushq(tp->t_writeq, flushflag);
-
-					/* active msg */
-					bp = async->async_xmitblk;
-					if (bp != NULL) {
-						freeb(bp);
-						async->async_xmitblk = NULL;
-					}
-
-					mutex_enter(&asy->asy_excl_hi);
-					async->async_flags &= ~ASYNC_BUSY;
-					/*
-					 * This message warns of Carrier loss
-					 * with data left to transmit can hang
-					 * the system.
-					 */
-					ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
-					    "Flushing to prevent HUPCL "
-					    "hanging");
-				}	/* if (ASYNC_ISOPEN) */
-			}	/* if (ASYNC_CARR_ON && CLOCAL) */
-			async->async_flags &= ~ASYNC_CARR_ON;
-			cv_broadcast(&async->async_flags_cv);
-		}	/* else */
-	}	/* if (async->async_ext) */
-
+		asy_carrier_check(asy);
+	}
 	mutex_exit(&asy->asy_excl_hi);
 
 	/*
@@ -3479,19 +3502,22 @@ begin:
 			RING_UNMARK(async);
 			c = RING_GET(async);
 			break;
-		} else
+		} else {
 			*bp->b_wptr++ = RING_GET(async);
+		}
 	} while (--cc);
 	mutex_exit(&asy->asy_excl_hi);
 	mutex_exit(&asy->asy_excl);
 	if (bp->b_wptr > bp->b_rptr) {
-			if (!canput(q)) {
-				asyerror(asy, CE_WARN, "local queue full");
-				freemsg(bp);
-			} else
-				(void) putq(q, bp);
-	} else
+		if (!canput(q)) {
+			asyerror(asy, CE_WARN, "local queue full");
+			freemsg(bp);
+		} else {
+			(void) putq(q, bp);
+		}
+	} else {
 		freemsg(bp);
+	}
 	/*
 	 * If we have a parity error, then send
 	 * up an M_BREAK with the "bad"
