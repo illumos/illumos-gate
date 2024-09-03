@@ -105,7 +105,7 @@ INTERMEDIATES = \
 SMATCH=off
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_ASL_COMPILER -I.
-CPPFLAGS += -DACPI_DATE=\"$(VERSION)\"
+CPPFLAGS += -DACPI_DATE=\"`$(ECHO) $(VERSION) | sed -e 's/ /_/g'`\"
 
 LEX_C_FILES = aslcompilerlex.c dtparserlex.c prparserlex.c
 YACC_C_FILES = aslcompilerparse.c dtparserparse.c prparserparse.c
@@ -136,6 +136,7 @@ GM4FLAGS = -P
 LFLAGS = -i -s
 
 .KEEP_STATE:
+.PARALLEL: $(OBJS)
 
 all: $(YACC_FILES) .WAIT $(PROG)
 
