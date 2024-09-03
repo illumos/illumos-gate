@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Hans Rosenfeld
  *
  * Convenience routines for identifying current or available devices that are
  * suitable for PCI passthrough to a bhyve guest.
@@ -114,13 +115,15 @@ dev_getinfo(di_node_t di_node, pcidb_hdl_t *db,
 		goto out;
 	if ((err = populate_int_prop(di_node, nvl, "device-id", &did)) != 0)
 		goto out;
-	if ((err = populate_int_prop(di_node, nvl,
-	    "subsystem-vendor-id", NULL)) != 0)
-		goto out;
-	if ((err = populate_int_prop(di_node, nvl, "subsystem-id", NULL)) != 0)
-		goto out;
 	if ((err = populate_int_prop(di_node, nvl, "revision-id", NULL)) != 0)
 		goto out;
+
+	/*
+	 * Not all PCI(e) devices have a subsystem id and subsystem vendor id,
+	 * in which case these properties don't exist.
+	 */
+	(void) populate_int_prop(di_node, nvl, "subsystem-vendor-id", NULL);
+	(void) populate_int_prop(di_node, nvl, "subsystem-id", NULL);
 
 	err = dev_getlabel(db, vid, did, label, sizeof (label));
 

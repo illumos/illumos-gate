@@ -8484,7 +8484,6 @@ static int
 show_bridge(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	show_brstate_t	*brstate = arg;
-	void *buf;
 
 	if (brstate->show_stats) {
 		bridge_statfields_buf_t bbuf;
@@ -8492,17 +8491,17 @@ show_bridge(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		bzero(&bbuf, sizeof (bbuf));
 		brstate->state.ls_status = print_bridge_stats(&brstate->state,
 		    linkid, &bbuf);
-		buf = &bbuf;
+		if (brstate->state.ls_status == DLADM_STATUS_OK)
+			ofmt_print(brstate->state.ls_ofmt, &bbuf);
 	} else {
 		bridge_fields_buf_t bbuf;
 
 		bzero(&bbuf, sizeof (bbuf));
 		brstate->state.ls_status = print_bridge(&brstate->state, linkid,
 		    &bbuf);
-		buf = &bbuf;
+		if (brstate->state.ls_status == DLADM_STATUS_OK)
+			ofmt_print(brstate->state.ls_ofmt, &bbuf);
 	}
-	if (brstate->state.ls_status == DLADM_STATUS_OK)
-		ofmt_print(brstate->state.ls_ofmt, buf);
 	return (DLADM_WALK_CONTINUE);
 }
 
@@ -8669,25 +8668,23 @@ bls_out:
 static void
 show_bridge_link(datalink_id_t linkid, show_brstate_t *brstate)
 {
-	void *buf;
-
 	if (brstate->show_stats) {
 		bridge_link_statfields_buf_t bbuf;
 
 		bzero(&bbuf, sizeof (bbuf));
 		brstate->state.ls_status = print_bridge_link_stats(
 		    &brstate->state, linkid, &bbuf);
-		buf = &bbuf;
+		if (brstate->state.ls_status == DLADM_STATUS_OK)
+			ofmt_print(brstate->state.ls_ofmt, &bbuf);
 	} else {
 		bridge_link_fields_buf_t bbuf;
 
 		bzero(&bbuf, sizeof (bbuf));
 		brstate->state.ls_status = print_bridge_link(&brstate->state,
 		    linkid, &bbuf);
-		buf = &bbuf;
+		if (brstate->state.ls_status == DLADM_STATUS_OK)
+			ofmt_print(brstate->state.ls_ofmt, &bbuf);
 	}
-	if (brstate->state.ls_status == DLADM_STATUS_OK)
-		ofmt_print(brstate->state.ls_ofmt, buf);
 }
 
 /* ARGSUSED */

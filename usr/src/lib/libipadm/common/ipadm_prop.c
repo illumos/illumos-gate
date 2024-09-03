@@ -266,7 +266,7 @@ static ipadm_prop_desc_t ipadm_icmp_prop_table[] = {
  * A dummy private property structure, used while handling private
  * protocol properties (properties not yet supported by libipadm).
  */
-static ipadm_prop_desc_t ipadm_privprop =
+static const ipadm_prop_desc_t ipadm_privprop_template =
 	{ NULL, NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop };
 
@@ -1184,6 +1184,7 @@ i_ipadm_getprop_common(ipadm_handle_t iph, const char *ifname,
 	ipadm_status_t		status = IPADM_SUCCESS;
 	ipadm_prop_desc_t	*pdp;
 	char			priv_propname[MAXPROPNAMELEN];
+	ipadm_prop_desc_t	ipadm_privprop = ipadm_privprop_template;
 	boolean_t		is_if = (ifname != NULL);
 	int			err = 0;
 
@@ -1386,6 +1387,7 @@ i_ipadm_setprop_common(ipadm_handle_t iph, const char *ifname,
 	ipadm_prop_desc_t	*pdp;
 	boolean_t		is_if = (ifname != NULL);
 	char			priv_propname[MAXPROPNAMELEN];
+	ipadm_prop_desc_t	ipadm_privprop = ipadm_privprop_template;
 	int			err = 0;
 
 	/* Check that property value is within the allowed size */
