@@ -15,7 +15,7 @@
 
 #
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/bhyve/tests@$(PKGVERS)
@@ -65,7 +65,11 @@ file path=opt/bhyve-tests/tests/mevent/vnode_zvol mode=0555
 dir  path=opt/bhyve-tests/tests/perf
 file path=opt/bhyve-tests/tests/perf/entry_exit mode=0555
 dir  path=opt/bhyve-tests/tests/viona
+file path=opt/bhyve-tests/tests/viona/cleanup mode=0555
+file path=opt/bhyve-tests/tests/viona/create_delete mode=0555
 file path=opt/bhyve-tests/tests/viona/interface_version mode=0555
+file path=opt/bhyve-tests/tests/viona/link_params mode=0555
+file path=opt/bhyve-tests/tests/viona/setup mode=0555
 dir  path=opt/bhyve-tests/tests/vmm
 file path=opt/bhyve-tests/tests/vmm/auto_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/check_iommu mode=0555

@@ -218,7 +218,7 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	ASSERT(msz >= MIN_BUF_SIZE);
 
-	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &pages);
+	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &pages, NULL);
 	if (n <= 0) {
 		/* Without available buffers, the frame must be dropped. */
 		return (ENOSPC);
@@ -317,7 +317,7 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	ASSERT(msz >= MIN_BUF_SIZE);
 
-	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &hdr_pages);
+	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie, &hdr_pages, NULL);
 	if (n <= 0) {
 		/* Without available buffers, the frame must be dropped. */
 		VIONA_PROBE2(no_space, viona_vring_t *, ring, mblk_t *, mp);
@@ -391,7 +391,7 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 				pages = NULL;
 			}
 			n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie,
-			    &pages);
+			    &pages, NULL);
 			if (n <= 0) {
 				/*
 				 * Without more immediate space to perform the

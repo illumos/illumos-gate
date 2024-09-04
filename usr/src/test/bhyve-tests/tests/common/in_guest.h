@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _IN_GUEST_H_
@@ -19,6 +19,7 @@
 #include "payload_common.h"
 
 struct vmctx *test_initialize(const char *);
+struct vmctx *test_initialize_plain(const char *);
 struct vmctx *test_initialize_flags(const char *, uint64_t);
 void test_reinitialize(struct vmctx *, uint64_t);
 void test_cleanup(bool);

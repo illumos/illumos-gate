@@ -92,6 +92,9 @@ struct vq_held_region {
 	 * last entry which has valid contents).
 	 */
 	uint_t		vhr_idx;
+
+	/* Total length of populated entries in `vhr_iov` */
+	uint32_t	vhr_len;
 };
 typedef struct vq_held_region vq_held_region_t;
 
@@ -838,28 +841,27 @@ static int
 vq_map_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
     vq_held_region_t *region)
 {
-	int err;
-
 	if (desc->vd_len == 0) {
 		VIONA_PROBE2(desc_bad_len, viona_vring_t *, ring,
 		    uint32_t, desc->vd_len);
 		VIONA_RING_STAT_INCR(ring, desc_bad_len);
 		return (EINVAL);
+	} else if ((region->vhr_len + desc->vd_len) < region->vhr_len) {
+		VIONA_PROBE1(len_overflow, viona_vring_t *, ring);
+		VIONA_RING_STAT_INCR(ring, len_overflow);
+		return (EOVERFLOW);
 	}
 
-	err = vq_region_hold(ring, desc->vd_addr, desc->vd_len,
+	int err = vq_region_hold(ring, desc->vd_addr, desc->vd_len,
 	    (desc->vd_flags & VRING_DESC_F_WRITE) != 0, region);
-	switch (err) {
-	case E2BIG:
+	if (err == 0) {
+		region->vhr_len += desc->vd_len;
+	} else if (err == E2BIG) {
 		VIONA_PROBE1(too_many_desc, viona_vring_t *, ring);
 		VIONA_RING_STAT_INCR(ring, too_many_desc);
-		break;
-	case EFAULT:
+	} else if (err == EFAULT) {
 		VIONA_PROBE_BAD_RING_ADDR(ring, desc->vd_addr);
 		VIONA_RING_STAT_INCR(ring, bad_ring_addr);
-		break;
-	default:
-		break;
 	}
 
 	return (err);
@@ -970,7 +972,7 @@ vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
 
 int
 vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
-    uint16_t *cookie, vmm_page_t **chain)
+    uint16_t *cookie, vmm_page_t **chain, uint32_t *len)
 {
 	uint16_t ndesc, idx, head, next;
 	struct virtio_desc vdir;
@@ -1045,6 +1047,9 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, uint_t niov,
 
 			*cookie = head;
 			*chain = region.vhr_head;
+			if (len != NULL) {
+				*len = region.vhr_len;
+			}
 			return (region.vhr_idx);
 		}
 	}
@@ -1216,4 +1221,77 @@ viona_ring_consolidate_stats(viona_vring_t *ring)
 	lstat->vts_errors += ring->vr_stats.vts_errors;
 	bzero(&ring->vr_stats, sizeof (ring->vr_stats));
 	mutex_exit(&link->l_stats_lock);
+}
+
+/*
+ * Copy `sz` bytes from iovecs contained in `iob` to `dst.
+ *
+ * Returns `true` if copy was successful (implying adequate data was remaining
+ * in the iov_bunch_t).
+ */
+bool
+iov_bunch_copy(iov_bunch_t *iob, void *dst, uint32_t sz)
+{
+	if (sz > iob->ib_remain) {
+		return (false);
+	}
+	if (sz == 0) {
+		return (true);
+	}
+
+	caddr_t dest = dst;
+	do {
+		struct iovec *iov = iob->ib_iov;
+
+		ASSERT3U(iov->iov_len, <, UINT32_MAX);
+		ASSERT3U(iov->iov_len, !=, 0);
+
+		const uint32_t iov_avail = (iov->iov_len - iob->ib_offset);
+		const uint32_t to_copy = MIN(sz, iov_avail);
+
+		if (to_copy != 0) {
+			bcopy((caddr_t)iov->iov_base + iob->ib_offset, dest,
+			    to_copy);
+		}
+
+		sz -= to_copy;
+		iob->ib_remain -= to_copy;
+		dest += to_copy;
+		iob->ib_offset += to_copy;
+
+		ASSERT3U(iob->ib_offset, <=, iov->iov_len);
+
+		if (iob->ib_offset == iov->iov_len) {
+			iob->ib_iov++;
+			iob->ib_offset = 0;
+		}
+	} while (sz > 0);
+
+	return (true);
+}
+
+/*
+ * Get the data pointer and length of the current head iovec, less any
+ * offsetting from prior copy operations.  This will advanced the iov_bunch_t as
+ * if the caller had performed a copy of that chunk length.
+ *
+ * Returns `true` if the iov_bunch_t had at least one iovec (unconsumed bytes)
+ * remaining, setting `chunk` and `chunk_sz` to the chunk pointer and size,
+ * respectively.
+ */
+bool
+iov_bunch_next_chunk(iov_bunch_t *iob, caddr_t *chunk, uint32_t *chunk_sz)
+{
+	if (iob->ib_remain == 0) {
+		*chunk = NULL;
+		*chunk_sz = 0;
+		return (false);
+	}
+
+	*chunk_sz = iob->ib_iov->iov_len - iob->ib_offset;
+	*chunk = (caddr_t)iob->ib_iov->iov_base + iob->ib_offset;
+	iob->ib_remain -= *chunk_sz;
+	iob->ib_iov++;
+	iob->ib_offset = 0;
+	return (true);
 }

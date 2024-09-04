@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -364,14 +364,8 @@ load_payload(struct vmctx *ctx)
 	return (0);
 }
 
-struct vmctx *
-test_initialize(const char *tname)
-{
-	return (test_initialize_flags(tname, 0));
-}
-
-struct vmctx *
-test_initialize_flags(const char *tname, uint64_t create_flags)
+static struct vmctx *
+test_initialize_opts(const char *tname, uint64_t create_flags, bool is_plain)
 {
 	char vm_name[VM_MAX_NAMELEN];
 	int err;
@@ -395,6 +389,11 @@ test_initialize_flags(const char *tname, uint64_t create_flags)
 	}
 	test_vmctx = ctx;
 
+	/* No further setup required for a "plain" instance */
+	if (is_plain) {
+		return (ctx);
+	}
+
 	err = vm_setup_memory(ctx, MEM_TOTAL_SZ, VM_MMAP_ALL);
 	if (err != 0) {
 		test_fail_errno(err, "Could not set up VM memory");
@@ -414,6 +413,24 @@ test_initialize_flags(const char *tname, uint64_t create_flags)
 	}
 
 	return (ctx);
+}
+
+struct vmctx *
+test_initialize(const char *tname)
+{
+	return (test_initialize_opts(tname, 0, false));
+}
+
+struct vmctx *
+test_initialize_plain(const char *tname)
+{
+	return (test_initialize_opts(tname, 0, true));
+}
+
+struct vmctx *
+test_initialize_flags(const char *tname, uint64_t create_flags)
+{
+	return (test_initialize_opts(tname, create_flags, false));
 }
 
 void

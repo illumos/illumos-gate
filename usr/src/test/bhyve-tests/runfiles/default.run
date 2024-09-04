@@ -74,8 +74,12 @@ tests = [
 
 [/opt/bhyve-tests/tests/viona]
 user = root
+pre = setup
+post = cleanup
 tests = [
-	'interface_version'
+	'interface_version',
+	'create_delete',
+	'link_params'
 	]
 
 # Tests of userspace mevent system, built from cmd/bhyve
