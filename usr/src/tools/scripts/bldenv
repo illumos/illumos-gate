@@ -26,7 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
-# Copyright 2023 Bill Sommerfeld
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -408,6 +408,11 @@ export \
         MAKEFLAGS \
         PARENT_ROOT \
         PARENT_TOOLS_ROOT
+
+if [[ -z "$VERSION" ]]; then
+	export VERSION=$(git -C "${CODEMGR_WS}" describe --long --all --dirty |
+		cut -d/ -f2-)
+fi
 
 printf 'RELEASE      is %s\n'   "$RELEASE"
 printf 'VERSION      is %s\n'   "$VERSION"

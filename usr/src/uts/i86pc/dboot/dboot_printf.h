@@ -44,7 +44,7 @@ extern void dboot_printf(char *fmt, ...)
  * then resets the system
  */
 extern void dboot_panic(char *fmt, ...)
-    __NORETURN __PRINTFLIKE(1);
+    __KPRINTFLIKE(1) __NORETURN;
 
 
 #ifdef	__cplusplus

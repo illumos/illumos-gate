@@ -30,6 +30,7 @@
 # Copyright 2019 Peter Trible.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -875,13 +876,6 @@ if [ -z "${ROOT}" ]; then
 	exit 1
 fi
 
-#
-# if -V flag was given, reset VERSION to V_ARG
-#
-if [ "$V_FLAG" = "y" ]; then
-	VERSION=$V_ARG
-fi
-
 TMPDIR="/tmp/nightly.tmpdir.$$"
 export TMPDIR
 rm -rf ${TMPDIR}
@@ -1241,9 +1235,6 @@ yes|no)	;;
 	;;
 esac
 
-echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
-echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
-
 # Save the current proto area if we're comparing against the last build
 if [ "$w_FLAG" = "y" -a -d "$ROOT" ]; then
     if [ -d "$ROOT.prev" ]; then
@@ -1552,6 +1543,21 @@ fi
 [[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
 [[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
 [[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
+
+#
+# if -V flag was given, reset VERSION to V_ARG
+#
+if [[ "$V_FLAG" == "y" ]]; then
+	export VERSION=$V_ARG
+elif [[ -z "$VERSION" ]]; then
+	export VERSION=$(git -C "${CODEMGR_WS}" describe --long --all --dirty |
+		cut -d/ -f2-)
+fi
+
+[[ -n "$VERSION" ]] || fatal_error "Error: VERSION not set"
+
+echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
+echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
 
 if [[ "$t_FLAG" == "y" ]]; then
 	set_non_debug_build_flags

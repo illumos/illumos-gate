@@ -154,7 +154,6 @@ uint32_t mb_addr;			/* multiboot info package from loader */
 int multiboot_version;
 multiboot_info_t *mb_info;
 multiboot2_info_header_t *mb2_info;
-multiboot_tag_mmap_t *mb2_mmap_tagp;
 int num_entries;			/* mmap entry count */
 boolean_t num_entries_set;		/* is mmap entry count set */
 uintptr_t load_addr;
@@ -360,7 +359,7 @@ build_rsvdmemlists(void)
 /*
  * halt on the hypervisor after a delay to drain console output
  */
-void
+__NORETURN void
 dboot_halt(void)
 {
 	uint_t i = 10000;
@@ -368,6 +367,7 @@ dboot_halt(void)
 	while (--i)
 		(void) HYPERVISOR_yield();
 	(void) HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+	/* never reached */
 	for (;;)
 		;
 }
@@ -717,9 +717,12 @@ dboot_loader_mmap_entries(void)
 		}
 		break;
 	case 2:
+		num_entries = dboot_multiboot2_efi_mmap_nentries(mb2_info);
+		if (num_entries == 0)
+			num_entries = dboot_multiboot2_mmap_nentries(mb2_info);
+		if (num_entries == 0)
+			dboot_panic("No memory map?\n");
 		num_entries_set = B_TRUE;
-		num_entries = dboot_multiboot2_mmap_nentries(mb2_info,
-		    mb2_mmap_tagp);
 		break;
 	default:
 		dboot_panic("Unknown multiboot version: %d\n",
@@ -732,11 +735,54 @@ dboot_loader_mmap_entries(void)
 #endif
 }
 
+#if !defined(__xpv)
+static uint32_t
+dboot_efi_to_smap_type(int index, uint32_t type)
+{
+	uint64_t addr;
+
+	/*
+	 * ACPI 6.1 tells the lower memory should be reported as
+	 * normal memory, so we enforce page 0 type even as
+	 * vmware maps it as acpi reclaimable.
+	 */
+	if (dboot_multiboot2_efi_mmap_get_base(mb2_info, index, &addr)) {
+		if (addr == 0)
+			return (1);
+	}
+
+	/* translate UEFI memory types to SMAP types */
+	switch (type) {
+	case EfiLoaderCode:
+	case EfiLoaderData:
+	case EfiBootServicesCode:
+	case EfiBootServicesData:
+	case EfiConventionalMemory:
+		return (1);
+	case EfiReservedMemoryType:
+	case EfiRuntimeServicesCode:
+	case EfiRuntimeServicesData:
+	case EfiMemoryMappedIO:
+	case EfiMemoryMappedIOPortSpace:
+	case EfiPalCode:
+	case EfiUnusableMemory:
+		return (2);
+	case EfiACPIReclaimMemory:
+		return (3);
+	case EfiACPIMemoryNVS:
+		return (4);
+	}
+
+	return (2);
+}
+#endif
+
 static uint32_t
 dboot_loader_mmap_get_type(int index)
 {
 #if !defined(__xpv)
 	mb_memory_map_t *mp, *mpend;
+	uint32_t type;
 	int i;
 
 	switch (multiboot_version) {
@@ -755,8 +801,13 @@ dboot_loader_mmap_get_type(int index)
 		return (mp->type);
 
 	case 2:
-		return (dboot_multiboot2_mmap_get_type(mb2_info,
-		    mb2_mmap_tagp, index));
+		if (dboot_multiboot2_efi_mmap_get_type(mb2_info, index, &type))
+			return (dboot_efi_to_smap_type(index, type));
+
+		if (dboot_multiboot2_mmap_get_type(mb2_info, index, &type))
+			return (type);
+
+		dboot_panic("Can not get memory type for %d\n", index);
 
 	default:
 		dboot_panic("Unknown multiboot version: %d\n",
@@ -774,6 +825,7 @@ dboot_loader_mmap_get_base(int index)
 {
 #if !defined(__xpv)
 	mb_memory_map_t *mp, *mpend;
+	uint64_t base;
 	int i;
 
 	switch (multiboot_version) {
@@ -793,8 +845,13 @@ dboot_loader_mmap_get_base(int index)
 		    (uint64_t)mp->base_addr_low);
 
 	case 2:
-		return (dboot_multiboot2_mmap_get_base(mb2_info,
-		    mb2_mmap_tagp, index));
+		if (dboot_multiboot2_efi_mmap_get_base(mb2_info, index, &base))
+			return (base);
+
+		if (dboot_multiboot2_mmap_get_base(mb2_info, index, &base))
+			return (base);
+
+		dboot_panic("Can not get memory address for %d\n", index);
 
 	default:
 		dboot_panic("Unknown multiboot version: %d\n",
@@ -813,6 +870,7 @@ dboot_loader_mmap_get_length(int index)
 {
 #if !defined(__xpv)
 	mb_memory_map_t *mp, *mpend;
+	uint64_t length;
 	int i;
 
 	switch (multiboot_version) {
@@ -832,8 +890,15 @@ dboot_loader_mmap_get_length(int index)
 		    (uint64_t)mp->length_low);
 
 	case 2:
-		return (dboot_multiboot2_mmap_get_length(mb2_info,
-		    mb2_mmap_tagp, index));
+		if (dboot_multiboot2_efi_mmap_get_length(mb2_info,
+		    index, &length))
+			return (length);
+
+		if (dboot_multiboot2_mmap_get_length(mb2_info,
+		    index, &length))
+			return (length);
+
+		dboot_panic("Can not get memory length for %d\n", index);
 
 	default:
 		dboot_panic("Unknown multiboot version: %d\n",
@@ -855,6 +920,8 @@ build_pcimemlists(void)
 	uint64_t end;
 	int i, num;
 
+	if (prom_debug)
+		dboot_printf("building pcimemlists:\n");
 	/*
 	 * initialize
 	 */
@@ -1477,8 +1544,13 @@ dboot_process_modules(void)
 #define	CORRUPT_REGION_END	(CORRUPT_REGION_START + CORRUPT_REGION_SIZE)
 
 static void
-dboot_add_memlist(uint64_t start, uint64_t end)
+dboot_add_memlist(struct boot_memlist *mlist, uint_t *indexp,
+    uint32_t type, uint64_t start, uint64_t end)
 {
+	if (type != 1) {
+		goto out;
+	}
+
 	if (end > max_mem)
 		max_mem = end;
 
@@ -1522,10 +1594,30 @@ dboot_add_memlist(uint64_t start, uint64_t end)
 	}
 
 	if (start < CORRUPT_REGION_START && end > CORRUPT_REGION_START) {
-		memlists[memlists_used].addr = start;
-		memlists[memlists_used].size =
-		    CORRUPT_REGION_START - start;
-		++memlists_used;
+		if (memlists_used > MAX_MEMLIST)
+			dboot_panic("too many memlists");
+
+		/*
+		 * Add segment [start, CORRUPT_REGION_START]
+		 */
+		if ((mlist[memlists_used].addr +
+		    mlist[memlists_used].size) == start) {
+			mlist[memlists_used].size =
+			    CORRUPT_REGION_START - mlist[memlists_used].addr;
+		} else {
+			if (mlist[memlists_used].size != 0)
+				memlists_used++;
+			if (memlists_used > MAX_MEMLIST)
+				dboot_panic("too many memlists");
+
+			mlist[memlists_used].addr = start;
+			mlist[memlists_used].size =
+			    CORRUPT_REGION_START - start;
+		}
+
+		/*
+		 * Add segment [CORRUPT_REGION_END, end]
+		 */
 		if (end > CORRUPT_REGION_END)
 			start = CORRUPT_REGION_END;
 		else
@@ -1539,11 +1631,24 @@ dboot_add_memlist(uint64_t start, uint64_t end)
 	}
 
 out:
-	memlists[memlists_used].addr = start;
-	memlists[memlists_used].size = end - start;
-	++memlists_used;
 	if (memlists_used > MAX_MEMLIST)
 		dboot_panic("too many memlists");
+	if (rsvdmemlists_used > MAX_MEMLIST)
+		dboot_panic("too many rsvdmemlists");
+
+	if ((mlist[*indexp].addr + mlist[*indexp].size) == start) {
+		mlist[*indexp].size = end - mlist[*indexp].addr;
+		return;
+	}
+	/* do we need new entry? */
+	if (mlist[*indexp].size != 0) {
+		*indexp = *indexp + 1;
+		if (*indexp > MAX_MEMLIST)
+			return;
+	}
+
+	mlist[*indexp].addr = start;
+	mlist[*indexp].size = end - start;
 }
 
 /*
@@ -1555,7 +1660,7 @@ dboot_process_mmap(void)
 	uint64_t start;
 	uint64_t end;
 	uint64_t page_offset = MMU_PAGEOFFSET;	/* needs to be 64 bits */
-	uint32_t lower, upper;
+	uint32_t lower, upper, type;
 	int i, mmap_entries;
 
 	/*
@@ -1568,12 +1673,12 @@ dboot_process_mmap(void)
 	max_mem = 0;
 	if ((mmap_entries = dboot_loader_mmap_entries()) > 0) {
 		for (i = 0; i < mmap_entries; i++) {
-			uint32_t type = dboot_loader_mmap_get_type(i);
 			start = dboot_loader_mmap_get_base(i);
 			end = start + dboot_loader_mmap_get_length(i);
+			type = dboot_loader_mmap_get_type(i);
 
 			if (prom_debug)
-				dboot_printf("\ttype: %d %" PRIx64 "..%"
+				dboot_printf("\ttype: %u %" PRIx64 "..%"
 				    PRIx64 "\n", type, start, end);
 
 			/*
@@ -1589,20 +1694,43 @@ dboot_process_mmap(void)
 			 */
 			switch (type) {
 			case 1:
-				dboot_add_memlist(start, end);
+				dboot_add_memlist(memlists, &memlists_used,
+				    type, start, end);
 				break;
 			case 2:
-				rsvdmemlists[rsvdmemlists_used].addr = start;
-				rsvdmemlists[rsvdmemlists_used].size =
-				    end - start;
-				++rsvdmemlists_used;
-				if (rsvdmemlists_used > MAX_MEMLIST)
-					dboot_panic("too many rsvdmemlists");
+				dboot_add_memlist(rsvdmemlists,
+				    &rsvdmemlists_used,
+				    type, start, end);
 				break;
 			default:
 				continue;
 			}
 		}
+
+		if (memlists[memlists_used].size != 0) {
+			memlists_used++;
+		}
+		if (rsvdmemlists[rsvdmemlists_used].size != 0) {
+			rsvdmemlists_used++;
+		}
+
+		if (prom_debug) {
+			for (i = 0; i < memlists_used; i++) {
+				dboot_printf("memlists[%u] %"
+				    PRIx64 "..%" PRIx64 "\n",
+				    i,
+				    memlists[i].addr,
+				    memlists[i].size);
+			}
+			for (i = 0; i < rsvdmemlists_used; i++) {
+				dboot_printf("rsvdmemlists[%u] %"
+				    PRIx64 "..%" PRIx64 "\n",
+				    i,
+				    rsvdmemlists[i].addr,
+				    rsvdmemlists[i].size);
+			}
+		}
+
 		build_pcimemlists();
 	} else if (dboot_multiboot_basicmeminfo(&lower, &upper)) {
 		DBG(lower);
@@ -2305,7 +2433,6 @@ dboot_loader_init(void)
 	case MULTIBOOT2_BOOTLOADER_MAGIC:
 		multiboot_version = 2;
 		mb2_info = (multiboot2_info_header_t *)(uintptr_t)mb_addr;
-		mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mb2_info);
 #if defined(_BOOT_TARGET_amd64)
 		load_addr = mb2_load_addr;
 #endif
