@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 
@@ -204,7 +205,7 @@ struct boot_memlist pcimemlists[MAX_MEMLIST];
 uint_t pcimemlists_used = 0;
 struct boot_memlist rsvdmemlists[MAX_MEMLIST];
 uint_t rsvdmemlists_used = 0;
-
+static boolean_t message_enabled = B_TRUE;
 /*
  * This should match what's in the bootloader.  It's arbitrary, but GRUB
  * in particular has limitations on how much space it can use before it
@@ -1581,13 +1582,15 @@ dboot_add_memlist(struct boot_memlist *mlist, uint_t *indexp,
 
 		if (ranges_intersect(mod_start, mod_end, CORRUPT_REGION_START,
 		    CORRUPT_REGION_END)) {
-			if (prom_debug) {
+			/* Output this message only once. */
+			if (prom_debug && message_enabled) {
 				dboot_printf("disabling RICHMOND-16 workaround "
 				"due to module #%d: "
 				"name %s addr %lx size %lx\n",
 				    i, (char *)(uintptr_t)modules[i].bm_name,
 				    (ulong_t)modules[i].bm_addr,
 				    (ulong_t)modules[i].bm_size);
+				message_enabled = B_FALSE;
 			}
 			goto out;
 		}
