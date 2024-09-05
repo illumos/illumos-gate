@@ -94,12 +94,12 @@ dboot_puts(char *s)
 }
 
 static void
-dboot_putnum(uint64_t x, boolean_t is_signed, uint8_t base)
+dboot_putnum(uintmax_t x, boolean_t is_signed, uint8_t base)
 {
 	char buffer[64];	/* digits in reverse order */
 	int i;
 
-	if (is_signed && (int64_t)x < 0) {
+	if (is_signed && (intmax_t)x < 0) {
 		bcons_putchar('-');
 		x = -x;
 	}
@@ -121,7 +121,7 @@ static void
 do_dboot_printf(char *fmt, va_list args)
 {
 	char *s;
-	uint64_t x;
+	uintmax_t x;
 	uint8_t base;
 	uint8_t size;
 
@@ -148,6 +148,10 @@ again:
 			x = va_arg(args, int);
 			bcons_putchar(x);
 			break;
+
+		case 'j':
+			size = sizeof (uintmax_t);
+			goto again;
 
 		case 's':
 			s = va_arg(args, char *);
@@ -202,6 +206,10 @@ unsigned_num:
 				x = va_arg(args, unsigned long long);
 			dboot_putnum(x, B_FALSE, base);
 			break;
+
+		case 'z':
+			size = sizeof (size_t);
+			goto again;
 
 		default:
 			dboot_puts("dboot_printf(): unknown % escape\n");

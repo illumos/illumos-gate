@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/null.h>
 #include <sys/varargs.h>
+#include <sys/stdbool.h>
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
@@ -69,11 +70,12 @@
 size_t
 vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 {
-	uint64_t ul, tmp;
+	uintmax_t ul, tmp;
 	char *bufp = buf;	/* current buffer pointer */
 	char c, pad;
 	int width, base, sign, num;
 	int prec, h_count, l_count, dot_count;
+	bool zflag, jflag;
 	int pad_count, transfer_count, left_align;
 	char *digits, *sp, *bs;
 	char numbuf[65];	/* sufficient for a 64-bit binary value */
@@ -96,6 +98,7 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 			continue;
 		}
 
+		zflag = jflag = false;
 		width = prec = numwidth = 0;
 		left_align = base = sign = 0;
 		h_count = l_count = dot_count = 0;
@@ -157,6 +160,9 @@ next_fmt:
 		case 'h':
 			h_count++;
 			goto next_fmt;
+		case 'j':
+			jflag = true;
+			goto next_fmt;
 		case 'd':
 			sign = 1;
 			/*FALLTHROUGH*/
@@ -215,6 +221,9 @@ next_fmt:
 			while ((left_align) && (pad_count-- > 0))
 				ADDCHAR(' ');
 			break;
+		case 'z':
+			zflag = true;
+			goto next_fmt;
 		case '%':
 			ADDCHAR('%');
 			break;
@@ -223,36 +232,44 @@ next_fmt:
 		if (base == 0)
 			continue;
 
-		if (h_count == 0 && l_count == 0) {
+		if (jflag) {
 			if (sign)
-				ul = (int64_t)va_arg(args, int);
+				ul = va_arg(args, intmax_t);
 			else
-				ul = (int64_t)va_arg(args, unsigned int);
+				ul = va_arg(args, uintmax_t);
+		} else if (zflag) {
+			if (sign)
+				ul = va_arg(args, ssize_t);
+			else
+				ul = va_arg(args, size_t);
+		} else if (h_count == 0 && l_count == 0) {
+			if (sign)
+				ul = va_arg(args, int);
+			else
+				ul = va_arg(args, unsigned int);
 		} else if (l_count > 1) {
 			if (sign)
-				ul = (int64_t)va_arg(args, int64_t);
+				ul = va_arg(args, int64_t);
 			else
-				ul = (int64_t)va_arg(args, uint64_t);
+				ul = va_arg(args, uint64_t);
 		} else if (l_count > 0) {
 			if (sign)
-				ul = (int64_t)va_arg(args, long);
+				ul = va_arg(args, long);
 			else
-				ul = (int64_t)va_arg(args, unsigned long);
+				ul = va_arg(args, unsigned long);
 		} else if (h_count > 1) {
 			if (sign)
-				ul = (int64_t)((char)va_arg(args, int));
+				ul = (signed char)va_arg(args, int);
 			else
-				ul = (int64_t)((unsigned char)va_arg(args,
-				    int));
+				ul = (unsigned char)va_arg(args, int);
 		} else if (h_count > 0) {
 			if (sign)
-				ul = (int64_t)((short)va_arg(args, int));
+				ul = (short)va_arg(args, int);
 			else
-				ul = (int64_t)((unsigned short)va_arg(args,
-				    int));
+				ul = (unsigned short)va_arg(args, int);
 		}
 
-		if (sign && (int64_t)ul < 0)
+		if (sign && (intmax_t)ul < 0)
 			ul = -ul;
 		else
 			sign = 0;
