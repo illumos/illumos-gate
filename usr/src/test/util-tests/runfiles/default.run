@@ -33,6 +33,9 @@ user = root
 [/opt/util-tests/tests/set-linkprop]
 user = root
 
+[/opt/util-tests/tests/show-class-confusion]
+user = root
+
 [/opt/util-tests/tests/libsff/libsff]
 [/opt/util-tests/tests/libjedec_vendors.32]
 [/opt/util-tests/tests/libjedec_temp.32]

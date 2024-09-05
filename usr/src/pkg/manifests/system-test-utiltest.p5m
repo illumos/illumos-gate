@@ -1917,6 +1917,7 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/show-class-confusion mode=0555
 file path=opt/util-tests/tests/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
