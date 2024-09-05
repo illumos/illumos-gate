@@ -1759,6 +1759,7 @@ file path=opt/util-tests/tests/pcieadmtest mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 dir  path=opt/util-tests/tests/sed
 file path=opt/util-tests/tests/sed/multi_test mode=0555
+file path=opt/util-tests/tests/sed/multi_words mode=0444
 dir  path=opt/util-tests/tests/sed/regress.multitest.out
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.1 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/1.10 mode=0444

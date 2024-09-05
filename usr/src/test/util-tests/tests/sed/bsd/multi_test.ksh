@@ -66,8 +66,8 @@ main()
 	REGRESS=${SRCDIR}/regress.multitest.out
 	[[ -d $REGRESS ]] || fatal "Could not locate regress directory"
 
-	DICT=/usr/share/lib/dict/words
-	[[ -r $DICT ]] || fatal "Coult not read dictionary $DICT"
+	DICT=${SRCDIR}/multi_words
+	[[ -r $DICT ]] || fatal "Could not read dictionary $DICT"
 
 	OPDIR=$(mktemp -d)
 	[[ -n "$OPDIR" && -d "$OPDIR" ]] || \

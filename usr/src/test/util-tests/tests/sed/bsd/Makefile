@@ -18,13 +18,14 @@ include $(SRC)/test/Makefile.com
 
 PROG = multi_test
 DATAFILES :sh= (cd regress.multitest.out; print *)
+INFILES = multi_words
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/sed
 DATADIR = $(TESTDIR)/regress.multitest.out
 
 TESTS = $(PROG:%=$(TESTDIR)/%)
-DATAS = $(DATAFILES:%=$(DATADIR)/%)
+DATAS = $(DATAFILES:%=$(DATADIR)/%) $(INFILES:%=$(TESTDIR)/%)
 $(TESTS) := FILEMODE = 0555
 $(DATAS) := FILEMODE = 0444
 
@@ -40,6 +41,9 @@ $(TESTDIR) $(DATADIR):
 
 $(TESTDIR)/%: %.ksh
 	$(INS.rename)
+
+$(TESTDIR)/%: %
+	$(INS.file)
 
 $(DATADIR)/%: regress.multitest.out/%
 	$(INS.file)
