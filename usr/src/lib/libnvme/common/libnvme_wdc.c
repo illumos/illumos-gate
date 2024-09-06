@@ -141,7 +141,7 @@ nvme_wdc_sn840_fw_act_var_len(uint64_t *outp, const void *data, size_t len)
 	return (true);
 }
 
-static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
+static const nvme_log_page_info_t wdc_sn840_log_eol = {
 	.nlpi_short = "wdc/eol",
 	.nlpi_human = "EOL",
 	.nlpi_lid = WDC_SN840_LOG_EOL,
@@ -150,7 +150,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_DB,
 	.nlpi_scope = NVME_LOG_SCOPE_NVM,
 	.nlpi_len = sizeof (wdc_vul_sn840_eol_t)
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_devmgmt = {
 	.nlpi_short = "wdc/devmgmt",
 	.nlpi_human = "Device Manageability",
 	.nlpi_lid = WDC_SN840_LOG_DEV_MANAGE,
@@ -160,7 +162,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL | NVME_LOG_SCOPE_NS,
 	.nlpi_len = sizeof (wdc_vsd_t),
 	.nlpi_var_func = nvme_wdc_log_dev_mgmt_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_pciesi = {
 	.nlpi_short = "wdc/pciesi",
 	.nlpi_human = "PCIe Signal Integrity",
 	.nlpi_lid = WDC_SN840_LOG_PCIE_SI,
@@ -169,7 +173,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_DB,
 	.nlpi_disc = NVME_LOG_DISC_F_NEED_LSP,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_power = {
 	.nlpi_short = "wdc/power",
 	.nlpi_human = "Power Samples",
 	.nlpi_lid = WDC_SN840_LOG_POWER,
@@ -179,7 +185,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (uint32_t),
 	.nlpi_var_func = nvme_wdc_log_samples_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_temp = {
 	.nlpi_short = "wdc/temp",
 	.nlpi_human = "Temperature Samples",
 	.nlpi_lid = WDC_SN840_LOG_TEMP,
@@ -188,7 +196,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (uint32_t),
 	.nlpi_var_func = nvme_wdc_log_samples_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_fwact = {
 	.nlpi_short = "wdc/fwact",
 	.nlpi_human = "Firmware Activation",
 	.nlpi_lid = WDC_SN840_LOG_FW_ACT,
@@ -197,7 +207,9 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (wdc_vul_sn840_fw_act_hdr_t),
 	.nlpi_var_func = nvme_wdc_sn840_fw_act_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn840_log_cdds = {
 	.nlpi_short = "wdc/ccds",
 	.nlpi_human = "CCDS Build Information",
 	.nlpi_lid = WDC_SN840_LOG_CCDS,
@@ -205,18 +217,15 @@ static const nvme_log_page_info_t wdc_sn840_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_DB,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (wdc_vul_sn840_ccds_info_t)
-} };
+};
 
-static const nvme_log_page_info_t wdc_sn65x_log_pages[] = { {
-	.nlpi_short = "ocp/smart",
-	.nlpi_human = "OCP SMART / Health",
-	.nlpi_lid = OCP_LOG_DSSD_SMART,
-	.nlpi_csi = NVME_CSI_NVM,
-	.nlpi_kind = NVME_LOG_ID_VENDOR_SPECIFIC,
-	.nlpi_source = NVME_LOG_DISC_S_DB,
-	.nlpi_scope = NVME_LOG_SCOPE_NVM,
-	.nlpi_len = sizeof (ocp_vul_smart_t),
-}, {
+static const nvme_log_page_info_t *wdc_sn840_log_pages[] = {
+	&wdc_sn840_log_eol, &wdc_sn840_log_devmgmt, &wdc_sn840_log_pciesi,
+	&wdc_sn840_log_power, &wdc_sn840_log_temp, &wdc_sn840_log_fwact,
+	&wdc_sn840_log_cdds
+};
+
+static const nvme_log_page_info_t wdc_sn65x_log_power = {
 	.nlpi_short = "wdc/power",
 	.nlpi_human = "Power Samples",
 	.nlpi_lid = WDC_SN65X_LOG_POWER,
@@ -226,7 +235,9 @@ static const nvme_log_page_info_t wdc_sn65x_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (uint32_t),
 	.nlpi_var_func = nvme_wdc_log_samples_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn65x_log_temp = {
 	.nlpi_short = "wdc/temp",
 	.nlpi_human = "Temperature Samples",
 	.nlpi_lid = WDC_SN65X_LOG_TEMP,
@@ -235,7 +246,9 @@ static const nvme_log_page_info_t wdc_sn65x_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (uint32_t),
 	.nlpi_var_func = nvme_wdc_log_samples_var_len
-}, {
+};
+
+static const nvme_log_page_info_t wdc_sn65x_log_cusmart = {
 	.nlpi_short = "wdc/cusmart",
 	.nlpi_human = "Customer Unique SMART",
 	.nlpi_lid = WDC_SN65X_LOG_UNIQUE_SMART,
@@ -243,7 +256,13 @@ static const nvme_log_page_info_t wdc_sn65x_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_DB,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (wdc_vul_sn65x_smart_t)
-} };
+};
+
+static const nvme_log_page_info_t *wdc_sn65x_log_pages[] = {
+	&ocp_log_smart, &wdc_sn65x_log_power, &wdc_sn65x_log_temp,
+	&wdc_sn65x_log_cusmart
+};
+
 
 /*
  * Currently these commands are shared across the SN840, SN650, and SN655.
@@ -284,30 +303,38 @@ static const nvme_vuc_disc_t wdc_sn840_sn65x_vuc[] = { {
 	.nvd_lock = NVME_VUC_DISC_LOCK_WRITE
 } };
 
+static const nvme_vsd_ident_t wdc_sn840_idents[] = {
+	{
+		.nvdi_vid = WDC_PCI_VID,
+		.nvdi_did = WDC_SN840_DID,
+		.nvdi_human = "WDC Ultrastar DC SN840",
+	}
+};
+
 const nvme_vsd_t wdc_sn840 = {
-	.nvd_vid = WDC_PCI_VID,
-	.nvd_did = WDC_SN840_DID,
-	.nvd_human = "WDC Ultrastar DC SN840",
+	.nvd_ident = wdc_sn840_idents,
+	.nvd_nident = ARRAY_SIZE(wdc_sn840_idents),
 	.nvd_logs = wdc_sn840_log_pages,
 	.nvd_nlogs = ARRAY_SIZE(wdc_sn840_log_pages),
 	.nvd_vuc = wdc_sn840_sn65x_vuc,
 	.nvd_nvuc = ARRAY_SIZE(wdc_sn840_sn65x_vuc)
 };
 
-const nvme_vsd_t wdc_sn650 = {
-	.nvd_vid = WDC_PCI_VID,
-	.nvd_did = WDC_SN650_DID,
-	.nvd_human = "WDC Ultrastar DC SN650",
-	.nvd_logs = wdc_sn65x_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(wdc_sn65x_log_pages),
-	.nvd_vuc = wdc_sn840_sn65x_vuc,
-	.nvd_nvuc = ARRAY_SIZE(wdc_sn840_sn65x_vuc)
+static const nvme_vsd_ident_t wdc_sn65x_idents[] = {
+	{
+		.nvdi_vid = WDC_PCI_VID,
+		.nvdi_did = WDC_SN650_DID,
+		.nvdi_human = "WDC Ultrastar DC SN650",
+	}, {
+		.nvdi_vid = WDC_PCI_VID,
+		.nvdi_did = WDC_SN655_DID,
+		.nvdi_human = "WDC Ultrastar DC SN655",
+	}
 };
 
-const nvme_vsd_t wdc_sn655 = {
-	.nvd_vid = WDC_PCI_VID,
-	.nvd_did = WDC_SN655_DID,
-	.nvd_human = "WDC Ultrastar DC SN655",
+const nvme_vsd_t wdc_sn65x = {
+	.nvd_ident = wdc_sn65x_idents,
+	.nvd_nident = ARRAY_SIZE(wdc_sn65x_idents),
 	.nvd_logs = wdc_sn65x_log_pages,
 	.nvd_nlogs = ARRAY_SIZE(wdc_sn65x_log_pages),
 	.nvd_vuc = wdc_sn840_sn65x_vuc,

@@ -297,7 +297,7 @@ nvme_log_discover_step(nvme_log_iter_t *iter, const nvme_log_disc_t **outp)
 
 	while (iter->nli_cur_idx < ctrl->nc_vsd->nvd_nlogs) {
 		const nvme_log_page_info_t *info =
-		    &ctrl->nc_vsd->nvd_logs[iter->nli_cur_idx];
+		    ctrl->nc_vsd->nvd_logs[iter->nli_cur_idx];
 		iter->nli_cur_idx++;
 		if (nvme_log_discover_one(iter, info)) {
 			*outp = &iter->nli_nld;

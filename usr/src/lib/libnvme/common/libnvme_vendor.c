@@ -25,17 +25,13 @@
 
 const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&wdc_sn840,
-	&wdc_sn650,
-	&wdc_sn655,
-	&micron_7300_pro,
-	&micron_7300_max,
-	&micron_7400_pro,
-	&micron_7400_max,
-	&micron_7450_pro,
-	&micron_7450_max,
-	&micron_6500_ion,
-	&micron_7500_pro,
-	&micron_7500_max
+	&wdc_sn65x,
+	&micron_7300,
+	&micron_74x0,
+	&micron_x500,
+	&intel_p5510,
+	&solidigm_p5x20,
+	&solidigm_ps10x0
 };
 
 /*
@@ -45,7 +41,8 @@ const nvme_vsd_t *const nvme_vsd_devices[] = {
 void
 nvme_vendor_map_ctrl(nvme_ctrl_t *ctrl)
 {
-	int *vid, *did;
+	int *vid, *did, *svidp, *sdidp;
+	uint16_t svid = UINT16_MAX, sdid = UINT16_MAX;
 
 	if (di_prop_lookup_ints(DDI_DEV_T_ANY, ctrl->nc_devi, "vendor-id",
 	    &vid) != 1 || di_prop_lookup_ints(DDI_DEV_T_ANY, ctrl->nc_devi,
@@ -53,10 +50,32 @@ nvme_vendor_map_ctrl(nvme_ctrl_t *ctrl)
 		return;
 	}
 
-	for (size_t i = 0; i < ARRAY_SIZE(nvme_vsd_devices); i++) {
-		if (nvme_vsd_devices[i]->nvd_vid == vid[0] &&
-		    nvme_vsd_devices[i]->nvd_did == did[0]) {
-			ctrl->nc_vsd = nvme_vsd_devices[i];
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, ctrl->nc_devi,
+	    "subsystem-vendor-id", &svidp) == 1) {
+		svid = (uint16_t)*svidp;
+	}
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, ctrl->nc_devi, "subsystem-id",
+	    &sdidp) == 1) {
+		sdid = (uint16_t)*sdidp;
+	}
+
+	for (size_t dev = 0; dev < ARRAY_SIZE(nvme_vsd_devices); dev++) {
+		const nvme_vsd_t *vsd = nvme_vsd_devices[dev];
+
+		for (size_t i = 0; i < vsd->nvd_nident; i++) {
+			const nvme_vsd_ident_t *ident = &vsd->nvd_ident[i];
+			if (ident->nvdi_vid != (uint16_t)vid[0] ||
+			    ident->nvdi_did != (uint16_t)did[0]) {
+				continue;
+			}
+
+			if (ident->nvdi_subsys && (ident->nvdi_svid != svid ||
+			    ident->nvdi_sdid != sdid)) {
+				continue;
+			}
+
+			ctrl->nc_vsd = nvme_vsd_devices[dev];
 			return;
 		}
 	}
