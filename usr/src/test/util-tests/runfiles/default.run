@@ -110,8 +110,5 @@ tests = ['sed_addr', 'multi_test']
 [/opt/util-tests/tests/pcieadm-priv]
 user = root
 
-[/opt/util-tests/tests/svr4pkg_test]
-user = root
-
 [/opt/util-tests/tests/ar/artest]
 [/opt/util-tests/tests/cpio/cpio_test]
