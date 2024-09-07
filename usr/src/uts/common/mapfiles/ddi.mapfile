@@ -11,7 +11,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 RackTop Systems, Inc.
+# Copyright 2020-2024 RackTop Systems, Inc.
 # Copyright 2021 Oxide Computer Company
 #
 
@@ -62,6 +62,7 @@ SYMBOL_SCOPE {
 	assfail				{ FLAGS = EXTERN };
 	assfail3			{ FLAGS = EXTERN };
 	atomic_dec_32_nv		{ FLAGS = EXTERN };
+	atomic_inc_32_nv		{ FLAGS = EXTERN };
 	bcmp				{ FLAGS = EXTERN };
 	bcopy				{ FLAGS = EXTERN };
 	bzero				{ FLAGS = EXTERN };
@@ -75,6 +76,8 @@ SYMBOL_SCOPE {
 	ddi_cb_register			{ FLAGS = EXTERN };
 	ddi_cb_unregister		{ FLAGS = EXTERN };
 	ddi_create_minor_node		{ FLAGS = EXTERN };
+	ddi_copyin			{ FLAGS = EXTERN };
+	ddi_copyout			{ FLAGS = EXTERN };
 	ddi_dev_regsize			{ FLAGS = EXTERN };
 	ddi_dma_addr_bind_handle	{ FLAGS = EXTERN };
 	ddi_dma_alloc_handle		{ FLAGS = EXTERN };
@@ -96,12 +99,15 @@ SYMBOL_SCOPE {
 	ddi_fm_handler_unregister	{ FLAGS = EXTERN };
 	ddi_fm_init			{ FLAGS = EXTERN };
 	ddi_fm_service_impact		{ FLAGS = EXTERN };
+	ddi_get_cred			{ FLAGS = EXTERN };
 	ddi_get_driver_private		{ FLAGS = EXTERN };
 	ddi_get_instance		{ FLAGS = EXTERN };
 	ddi_get_lbolt			{ FLAGS = EXTERN };
 	ddi_get_lbolt64			{ FLAGS = EXTERN };
 	ddi_get_name			{ FLAGS = EXTERN };
 	ddi_get_parent			{ FLAGS = EXTERN };
+	ddi_get_pid			{ FLAGS = EXTERN };
+	ddi_get_soft_state		{ FLAGS = EXTERN };
 	ddi_get16			{ FLAGS = EXTERN };
 	ddi_get32			{ FLAGS = EXTERN };
 	ddi_get64			{ FLAGS = EXTERN };
@@ -118,6 +124,7 @@ SYMBOL_SCOPE {
 	ddi_intr_get_pri		{ FLAGS = EXTERN };
 	ddi_intr_get_supported_types	{ FLAGS = EXTERN };
 	ddi_intr_remove_handler		{ FLAGS = EXTERN };
+	ddi_name_to_major		{ FLAGS = EXTERN };
 	ddi_periodic_add		{ FLAGS = EXTERN };
 	ddi_periodic_delete		{ FLAGS = EXTERN };
 	ddi_power			{ FLAGS = EXTERN };
@@ -132,10 +139,17 @@ SYMBOL_SCOPE {
 	ddi_ptob			{ FLAGS = EXTERN };
 	ddi_put16			{ FLAGS = EXTERN };
 	ddi_put32			{ FLAGS = EXTERN };
+	ddi_quiesce_not_needed		{ FLAGS = EXTERN };
 	ddi_quiesce_not_supported	{ FLAGS = EXTERN };
 	ddi_regs_map_free		{ FLAGS = EXTERN };
 	ddi_regs_map_setup		{ FLAGS = EXTERN };
+	ddi_remove_minor_node		{ FLAGS = EXTERN };
+	ddi_report_dev			{ FLAGS = EXTERN };
 	ddi_set_driver_private		{ FLAGS = EXTERN };
+	ddi_soft_state_fini		{ FLAGS = EXTERN };
+	ddi_soft_state_free		{ FLAGS = EXTERN };
+	ddi_soft_state_init		{ FLAGS = EXTERN };
+	ddi_soft_state_zalloc		{ FLAGS = EXTERN };
 	ddi_strtol			{ FLAGS = EXTERN };
 	ddi_taskq_create		{ FLAGS = EXTERN };
 	ddi_taskq_destroy		{ FLAGS = EXTERN };

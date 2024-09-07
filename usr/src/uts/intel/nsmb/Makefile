@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2024 RackTop Systems, Inc.
 
 #
 #	intel architecture dependent
@@ -44,6 +45,13 @@ ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/fs/smbclnt/netsmb
 OFFSETS_SRC	= $(CONF_SRCDIR)/offsets.in
 IOC_CHECK_H	= $(OBJS_DIR)/ioc_check.h
+
+# What symbols we export (e.g. _init(), ...)
+MAPFILE		= $(CONF_SRCDIR)/$(MODULE).mapfile
+
+# The symbols we link against
+MAPFILE_EXT	= $(CONF_SRCDIR)/nsmb_ext.mapfile
+MAPFILES	+= tlimod ddi
 
 #
 #	Include common rules.
@@ -85,7 +93,8 @@ INSTALL_TARGET_obj64	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CLEANFILES	+= $(IOC_CHECK_H)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
-LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
+LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/kcf -Nmisc/tlimod
+LDFLAGS         += -M $(MAPFILE) -M $(MAPFILE_EXT)
 
 #
 # For now, disable these warnings; maintainers should endeavor
@@ -128,4 +137,5 @@ $(IOC_CHECK_H): $(OFFSETS_SRC)
 #
 #	Include common targets.
 #
+include $(UTSBASE)/Makefile.mapfile
 include $(UTSBASE)/intel/Makefile.targ
