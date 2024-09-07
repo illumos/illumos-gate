@@ -36,6 +36,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright (C) 2001 - 2012 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _NETSMB_SMB_RQ_H_
@@ -61,6 +62,7 @@
 #define	SMBR_COMPOUND_RQ	0x10000	/* SMB 2/3 compound request */
 #define	SMBR_ASYNC		0x20000	/* got async response */
 #define	SMBR_RECONNECTED	0x40000	/* reconnected during request */
+#define	SMBR_ENCRYPTED		0x80000	/* reply was encrypted */
 
 
 #define	SMBT2_ALLSENT		0x0001	/* all data and params are sent */

@@ -23,6 +23,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -62,7 +63,9 @@ static const uint16_t smb2_dialects[NDIALECTS] = {
 };
 
 /* Optional capabilities we advertise (none yet). */
-uint32_t smb2_clnt_caps = 0;
+uint32_t smb2_clnt_caps =
+    SMB2_CAP_LARGE_MTU |
+    SMB2_CAP_ENCRYPTION;
 
 /* How many credits to ask for during ssn. setup. */
 uint16_t smb2_ss_req_credits = 64;
@@ -301,6 +304,11 @@ smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 	if (sp->sv2_capabilities & SMB2_CAP_DFS)
 		sp->sv_caps |= SMB_CAP_DFS;
 
+	if (sp->sv_proto >= SMB2_DIALECT_0300 &&
+	    (sp->sv2_capabilities & SMB2_CAP_ENCRYPTION) != 0) {
+		nsmb_crypt_init_mech(vcp);
+	}
+
 	/*
 	 * A few sanity checks on what we received,
 	 * becuse we will send these in ssnsetup.
@@ -343,7 +351,6 @@ errout:
 int
 smb2_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 {
-	// smb_sopt_t *sv = &vcp->vc_sopt;
 	smbioc_ssn_work_t *wk = &vcp->vc_work;
 	struct smb_rq *rqp = NULL;
 	struct mbchain *mbp = NULL;
@@ -485,6 +492,21 @@ smb2_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 		    sec_buf_len, MB_MUSER);
 		if (err != 0) {
 			ret = err;
+			goto out;
+		}
+	}
+
+	if (ret == 0) {
+		/*
+		 * Final session setup response
+		 */
+		vcp->vc_sopt.sv2_sessflags = session_flags;
+		if ((vcp->vc_sopt.sv2_sessflags &
+		    SMB2_SESSION_FLAG_ENCRYPT_DATA) != 0 &&
+		    vcp->vc3_crypt_mech == NULL) {
+			cmn_err(CE_NOTE, "SMB server requires encryption"
+			    " but no crypto mechanism found");
+			ret = ENOTSUP;
 			goto out;
 		}
 	}
@@ -640,6 +662,17 @@ smb2_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	error = md_get_uint32le(mdp, NULL);	/* maxAccessRights */
 	if (error)
 		goto out;
+
+	/*
+	 * If the share requires encryption, make sure we can.
+	 */
+	if ((ssp->ss2_share_flags & SMB2_SHAREFLAG_ENCRYPT_DATA) != 0 &&
+	    vcp->vc3_crypt_mech == NULL) {
+		cmn_err(CE_NOTE, "SMB share requires encryption"
+		    " but no crypto mechanism found");
+		error = ENOTSUP;
+		goto out;
+	}
 
 	/*
 	 * Convert SMB2 share type to NetShareEnum share type

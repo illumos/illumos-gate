@@ -38,6 +38,7 @@
  *
  * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_CONN_H
@@ -48,7 +49,7 @@
 #include <sys/queue.h> /* for SLIST below */
 #include <sys/uio.h>
 #include <netsmb/smb_dev.h>
-#include "smb_signing.h"
+#include <netsmb/nsmb_kcrypt.h>
 
 /*
  * Credentials of user/process for processing in the connection procedures
@@ -163,6 +164,7 @@ enum smbco_level {
 
 /*
  * SMB1 Negotiated protocol parameters
+ * Note:  All set to zero at start of nsmb_iod_negotiate
  */
 struct smb_sopt {
 	uint16_t	sv_proto;	/* protocol dialect */
@@ -177,12 +179,12 @@ struct smb_sopt {
 	uint32_t	sv_caps;	/* capabilites SMB_CAP_ */
 
 	/* SMB2+ fields */
-	uint32_t	sv2_sessflags;	/* final session setup reply flags */
 	uint32_t	sv2_capabilities;	/* capabilities */
 	uint32_t	sv2_maxtransact;	/* max transact size */
 	uint32_t	sv2_maxread;	/* max read size */
 	uint32_t	sv2_maxwrite;	/* max write size */
 	uint16_t	sv2_security_mode;	/* security mode */
+	uint16_t	sv2_sessflags;	/* final session setup reply flags */
 	uint8_t		sv2_guid[16];	/* GUID */
 };
 typedef struct smb_sopt smb_sopt_t;
@@ -224,7 +226,7 @@ typedef struct smb_vc {
 	int			vc_ssnkeylen;	/* session key length */
 	uint8_t			*vc_mackey;	/* MAC key buffer */
 	uint8_t			*vc_ssnkey;	/* session key buffer */
-	smb_sign_mech_t		vc_signmech;
+	smb_crypto_mech_t	vc_signmech;
 	struct smb_mac_ops	*vc_sign_ops;
 
 	struct smb_tran_desc	*vc_tdesc;	/* transport ops. vector */
@@ -237,6 +239,19 @@ typedef struct smb_vc {
 	uint64_t	vc2_session_id;		/* session id */
 	uint64_t	vc2_prev_session_id;	/* for reconnect */
 	uint32_t	vc2_lease_key;		/* lease key gen */
+
+	/* SMB3+ fields */
+	smb_crypto_mech_t *vc3_crypt_mech;
+
+	uint8_t		vc3_encrypt_key[SMB3_KEYLEN];
+	uint32_t	vc3_encrypt_key_len;
+
+	uint8_t		vc3_decrypt_key[SMB3_KEYLEN];
+	uint32_t	vc3_decrypt_key_len;
+
+	/* SMB 3 Nonce used for encryption */
+	uint64_t	vc3_nonce_high;
+	uint64_t	vc3_nonce_low;
 
 	kcondvar_t		iod_idle;	/* IOD thread idle CV */
 	krwlock_t		iod_rqlock;	/* iod_rqlist */

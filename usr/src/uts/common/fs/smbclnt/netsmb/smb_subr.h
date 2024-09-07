@@ -35,6 +35,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifndef _NETSMB_SMB_SUBR_H_
@@ -180,6 +181,13 @@ int smb_calcmackey(struct smb_vc *, const uchar_t *,
 int smb2_sign_init(struct smb_vc *);
 void smb2_rq_sign(struct smb_rq *);
 int smb2_rq_verify(struct smb_rq *);
+
+void nsmb_crypt_init_mech(struct smb_vc *);
+void nsmb_crypt_free_mech(struct smb_vc *);
+void nsmb_crypt_init_keys(struct smb_vc *);
+
+int smb3_msg_encrypt(struct smb_vc *vcp, mblk_t **mpp);
+int smb3_msg_decrypt(struct smb_vc *vcp, mblk_t **mpp);
 
 /*
  * SMB protocol level functions
