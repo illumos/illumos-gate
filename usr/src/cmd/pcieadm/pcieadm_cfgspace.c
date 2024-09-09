@@ -734,8 +734,8 @@ pcieadm_cfgspace_print_bars(pcieadm_cfgspace_walk_t *walkp,
 				break;
 			}
 
-			pcieadm_field_printf(walkp, "type", "Memory Type", addr,
-			    "%s (0x%x)\n", locstr, type >> 1);
+			pcieadm_field_printf(walkp, "type", "Memory Type",
+			    type >> 1, "%s (0x%x)\n", locstr, type >> 1);
 			pcieadm_field_printf(walkp, "prefetch", "Prefetchable",
 			    pre != 0, "%s (0x%x)\n", pre != 0 ? "yes" : "no",
 			    pre != 0);
