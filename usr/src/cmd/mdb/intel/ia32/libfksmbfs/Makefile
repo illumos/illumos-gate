@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2024 RackTop Systems, Inc.
 #
 
 MODULE = libfksmbfs.so
@@ -39,11 +40,13 @@ MODSRCS_DIR = ../../../common/modules/smbfs
 GENUNIX_DIR = ../../../common/modules/genunix
 
 # Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
-CPPFLAGS.first += -I$(SRC)/lib/smbsrv/libfksmbsrv/common
+CPPFLAGS.first += -I$(SRC)/lib/smbclnt/libfksmbfs/common
+CPPFLAGS.first += -I$(SRC)/lib/smbclnt/libfknsmb/common
 CPPFLAGS.first += -I$(SRC)/lib/libfakekernel/common
 
 CPPFLAGS += -I$(SRC)/uts/common/fs/smbclnt/
 CPPFLAGS += -I$(SRC)/uts/common
+# Note: -D_FAKE_KERNEL is in mdb:smbfs.c
 
 CSTD=		$(CSTD_GNU99)
 
