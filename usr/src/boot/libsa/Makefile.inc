@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 #
@@ -79,73 +80,9 @@ SRCS += $(SASRC)/uuid_to_string.c
 OBJECTS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
 	uuid_to_string.o
 
-# decompression functionality from libbz2
-# NOTE: to actually test this functionality after libbz2 upgrade compile
-# loader(8) with LOADER_BZIP2_SUPPORT defined
-objs/_bzlib.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/_bzlib.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/_bzlib.o: libstand_bzlib_private.h
-pics/_bzlib.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/_bzlib.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/_bzlib.o: libstand_bzlib_private.h
-objs/_crctable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/_crctable.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/_crctable.o: libstand_bzlib_private.h
-pics/_crctable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/_crctable.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/_crctable.o: libstand_bzlib_private.h
-objs/_decompress.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/_decompress.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/_decompress.o: libstand_bzlib_private.h
-pics/_decompress.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/_decompress.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/_decompress.o: libstand_bzlib_private.h
-objs/_huffman.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/_huffman.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/_huffman.o: libstand_bzlib_private.h
-pics/_huffman.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/_huffman.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/_huffman.o: libstand_bzlib_private.h
-objs/_randtable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/_randtable.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/_randtable.o: libstand_bzlib_private.h
-pics/_randtable.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/_randtable.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/_randtable.o: libstand_bzlib_private.h
-objs/bzipfs.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-objs/bzipfs.o := CPPFLAGS += -I$(SRC)/common/bzip2
-objs/bzipfs.o: libstand_bzlib_private.h
-pics/bzipfs.o := CPPFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
-pics/bzipfs.o := CPPFLAGS += -I$(SRC)/common/bzip2
-pics/bzipfs.o: libstand_bzlib_private.h
-SRCS +=	libstand_bzlib_private.h
-
 # too hairy
 objs/_inflate.o := SMATCH=off
 pics/_inflate.o := SMATCH=off
-
-SRCS +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
-OBJECTS += _bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o
-CLEANFILES += _bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
-
-_bzlib.c: $(SRC)/common/bzip2/bzlib.c
-	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
-
-_crctable.c: $(SRC)/common/bzip2/crctable.c
-	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
-
-_decompress.c: $(SRC)/common/bzip2/decompress.c
-	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
-
-_huffman.c: $(SRC)/common/bzip2/huffman.c
-	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
-
-_randtable.c: $(SRC)/common/bzip2/randtable.c
-	sed "s|bzlib_private\.h|libstand_bzlib_private.h|" $^ > $@
-
-CLEANFILES += libstand_bzlib_private.h
-libstand_bzlib_private.h: $(SRC)/common/bzip2/bzlib_private.h
-	sed -e 's|<stdlib.h>|"stand.h"|' $^ > $@
 
 # decompression functionality from zlib
 objs/adler32.o := CPPFLAGS += -I$(ZLIB)
@@ -262,14 +199,12 @@ SRCS += $(SASRC)/nfs.c
 SRCS += $(SASRC)/cd9660.c
 SRCS += $(SASRC)/tftp.c
 SRCS += $(SASRC)/gzipfs.c
-SRCS += $(SASRC)/bzipfs.c
 SRCS += $(SASRC)/dosfs.c
 OBJECTS += ufs.o
 OBJECTS += nfs.o
 OBJECTS += cd9660.o
 OBJECTS += tftp.o
 OBJECTS += gzipfs.o
-OBJECTS += bzipfs.o
 OBJECTS += dosfs.o
 
 # utility
