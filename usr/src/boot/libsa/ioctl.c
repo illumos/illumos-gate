@@ -3,6 +3,7 @@
 /*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * This code is derived from software contributed to Berkeley by
  * The Mach Operating System project at Carnegie-Mellon University.
@@ -74,12 +75,12 @@ ioctl(int fd, ulong_t cmd, char *arg)
 		errno = EBADF;
 		return (-1);
 	}
-	if (f->f_flags & F_RAW) {
+	if (f->f_dev == NULL)
+		errno = EIO;
+	else
 		errno = (f->f_dev->dv_ioctl)(f, cmd, arg);
-		if (errno)
-			return (-1);
-		return (0);
-	}
-	errno = EIO;
-	return (-1);
+
+	if (errno != 0)
+		return (-1);
+	return (0);
 }
