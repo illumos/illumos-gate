@@ -24,6 +24,7 @@
  * Copyright 2015, Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -5576,12 +5577,13 @@ done:
 			clock_t val;
 
 			if (get_udatamodel() == DATAMODEL_NONE ||
-			    get_udatamodel() == DATAMODEL_NATIVE)
-				bcopy(&tl, (struct timeval *)optval,
+			    get_udatamodel() == DATAMODEL_NATIVE) {
+				bcopy((struct timeval *)optval, &tl,
 				    sizeof (struct timeval));
-			else
+			} else {
 				TIMEVAL32_TO_TIMEVAL(&tl,
 				    (struct timeval32 *)optval);
+			}
 			val = tl.tv_sec * 1000 * 1000 + tl.tv_usec;
 			if (option_name == SO_RCVTIMEO)
 				so->so_rcvtimeo = drv_usectohz(val);

@@ -175,6 +175,8 @@ file path=opt/os-tests/tests/sockfs/rights.32 mode=0555
 file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
 file path=opt/os-tests/tests/sockfs/so_protocol mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
+file path=opt/os-tests/tests/sockfs/timeouts.32 mode=0555
+file path=opt/os-tests/tests/sockfs/timeouts.64 mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 dir  path=opt/os-tests/tests/stackalign
 file path=opt/os-tests/tests/stackalign/stackalign.32 mode=0555
