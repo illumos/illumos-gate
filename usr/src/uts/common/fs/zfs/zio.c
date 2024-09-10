@@ -2099,6 +2099,10 @@ zio_resume(spa_t *spa)
 	 * Reexecute all previously suspended i/o.
 	 */
 	mutex_enter(&spa->spa_suspend_lock);
+	if (spa->spa_suspended != ZIO_SUSPEND_NONE)
+		cmn_err(CE_WARN, "Pool '%s' was suspended and is being "
+		    "resumed. Failed I/O will be retried.",
+		    spa_name(spa));
 	spa->spa_suspended = ZIO_SUSPEND_NONE;
 	cv_broadcast(&spa->spa_suspend_cv);
 	pio = spa->spa_suspend_zio_root;
