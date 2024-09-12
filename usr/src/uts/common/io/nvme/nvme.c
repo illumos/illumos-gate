@@ -2095,6 +2095,23 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		}
 		return (EINVAL);
 
+	case NVME_CQE_SC_GEN_CMD_SEQ_ERR:
+		/*
+		 * Command Sequence Error
+		 *
+		 * This can be generated normally by user log page requests that
+		 * come out of order (e.g. getting the persistent event log
+		 * without establishing the context). If the kernel manages this
+		 * on its own then that's problematic.
+		 */
+		NVME_BUMP_STAT(cmd->nc_nvme, inv_cmdseq_err);
+		if ((cmd->nc_flags & NVME_CMD_F_DONTPANIC) == 0) {
+			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
+			    "programming error: command sequencing error %p",
+			    (void *)cmd);
+		}
+		return (EINVAL);
+
 	case NVME_CQE_SC_GEN_NVM_LBA_RANGE:
 		/* LBA Out Of Range */
 		dev_err(cmd->nc_nvme->n_dip, CE_PANIC, "programming error: "

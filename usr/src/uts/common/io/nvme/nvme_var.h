@@ -314,6 +314,7 @@ struct nvme_device_stat {
 	kstat_named_t nds_fwact_mtfa;
 	kstat_named_t nds_fwact_prohibited;
 	kstat_named_t nds_fw_overlap;
+	kstat_named_t nds_inv_cmdseq_err;
 
 	/* Errors reported by asynchronous events */
 	kstat_named_t nds_diagfail_event;

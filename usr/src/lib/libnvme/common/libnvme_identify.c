@@ -80,11 +80,23 @@ nvme_id_req_init_by_cns(nvme_ctrl_t *ctrl, nvme_csi_t csi, uint32_t cns,
 
 	req->nir_ctrl = ctrl;
 	req->nir_info = info;
+
+	/*
+	 * The identify command always wants to write a 4 KiB buffer
+	 * (NVME_IDENTIFY_BUFSIZE) out and therefore we manually tack this onto
+	 * to the need and allow list.
+	 */
 	req->nir_need = info->nii_fields | (1 << NVME_ID_REQ_F_BUF);
-	req->nir_allow = info->nii_fields;
+	req->nir_allow = info->nii_fields | (1 << NVME_ID_REQ_F_BUF);
 
 	*idreqp = req;
 	return (nvme_ctrl_success(ctrl));
+}
+
+static void
+nvme_id_req_set_need(nvme_id_req_t *req, nvme_identify_req_field_t field)
+{
+	req->nir_need |= 1 << field;
 }
 
 static void
@@ -180,6 +192,19 @@ nvme_id_req_set_output(nvme_id_req_t *req, void *buf, size_t len)
 
 	req->nir_buf = buf;
 	nvme_id_req_clear_need(req, NVME_ID_REQ_F_BUF);
+	return (nvme_ctrl_success(req->nir_ctrl));
+}
+
+bool
+nvme_id_req_clear_output(nvme_id_req_t *req)
+{
+	req->nir_buf = NULL;
+
+	/*
+	 * This field is always required so we can just toss a blanket set need
+	 * on here.
+	 */
+	nvme_id_req_set_need(req, NVME_ID_REQ_F_BUF);
 	return (nvme_ctrl_success(req->nir_ctrl));
 }
 

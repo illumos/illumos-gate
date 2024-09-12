@@ -610,6 +610,12 @@ nvme_log_req_init_by_name(nvme_ctrl_t *ctrl, const char *name, uint32_t flags,
 }
 
 static void
+nvme_log_req_set_need(nvme_log_req_t *req, nvme_log_req_field_t field)
+{
+	req->nlr_need |= 1 << field;
+}
+
+static void
 nvme_log_req_clear_need(nvme_log_req_t *req, nvme_log_req_field_t field)
 {
 	req->nlr_need &= ~(1 << field);
@@ -710,6 +716,21 @@ nvme_log_req_set_output(nvme_log_req_t *req, void *buf, size_t buflen)
 	req->nlr_output = buf;
 	req->nlr_output_len = buflen;
 	nvme_log_req_clear_need(req, NVME_LOG_REQ_FIELD_SIZE);
+	return (nvme_ctrl_success(req->nlr_ctrl));
+}
+
+bool
+nvme_log_req_clear_output(nvme_log_req_t *req)
+{
+	req->nlr_output = NULL;
+	req->nlr_output_len = 0;
+
+	/*
+	 * We can always set that we need this again as every log page requires
+	 * a size being set. See the default allow settings for the field in
+	 * nvme_log_fields[] and nvme_log_req_init_by_disc().
+	 */
+	nvme_log_req_set_need(req, NVME_LOG_REQ_FIELD_SIZE);
 	return (nvme_ctrl_success(req->nlr_ctrl));
 }
 

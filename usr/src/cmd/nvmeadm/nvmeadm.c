@@ -1849,6 +1849,59 @@ do_get_logpage_dump(const void *buf, size_t len, const char *file)
 	(void) close(fd);
 }
 
+/*
+ * Here we need to explicitly attempt to release any context that has previously
+ * existed for the persistent event log. It is fine if none exists as the
+ * controller is required not to error. However, if we don't do this and attempt
+ * to establish a new context, then it will generate an error.
+ *
+ * We'll use our existing request, which doesn't ask for data yet and issue the
+ * get log page request with the LSP in question. After it is completed, we'll
+ * reset the LSP to establish a context.
+ */
+static void
+do_get_logpage_pev_relctx(const nvme_process_arg_t *npa, nvme_log_req_t *req)
+{
+	uint32_t buf;
+
+	if (!nvme_log_req_set_lsp(req, NVME_PEV_LSP_REL_CTX)) {
+		nvmeadm_fatal(npa, "failed to set lsp to release the "
+		    "persistent event log context");
+	}
+
+	/*
+	 * In NVMe 2.0 the spec made it explicit that the controller was
+	 * supposed to ignore the length and offset for a request to release the
+	 * context; however, that wasn't present in NVMe 1.4. The number of
+	 * dwords part of the get log page command is a zeros based value,
+	 * meaning there is no explicit way to request zero bytes. Rather than
+	 * trust that all controllers get this right (especially when it wasn't
+	 * exactly specified in NVMe 1.4), we just toss a throwaway buffer here.
+	 */
+	if (!nvme_log_req_set_output(req, &buf, sizeof (buf))) {
+		nvmeadm_fatal(npa, "failed to set zero log length for "
+		    "persistent event log release context");
+	}
+
+	if (!nvme_log_req_exec(req)) {
+		nvmeadm_fatal(npa, "failed to execute log request %s to "
+		    "release the event log context", npa->npa_argv[0]);
+	}
+
+	if (!nvme_log_req_set_lsp(req, NVME_PEV_LSP_EST_CTX_READ)) {
+		nvmeadm_fatal(npa, "failed to set lsp to establish the "
+		    "persistent event log context");
+	}
+
+	/*
+	 * Make sure that our stack buffer is no longer part of the log request.
+	 */
+	if (!nvme_log_req_clear_output(req)) {
+		nvmeadm_fatal(npa, "failed to clear output from persistent "
+		    "event log release context");
+	}
+}
+
 static int
 do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 {
@@ -1884,8 +1937,17 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 
 	/*
 	 * In the future we should add options to allow one to specify and set
-	 * the fields for the lsp, lsi, etc. and set them here.
+	 * the fields for the lsp, lsi, etc. and set them here. Some log pages
+	 * need a specific lsp set and special handling related to contexts. Do
+	 * that now.
 	 */
+	switch (nvme_log_disc_lid(disc)) {
+	case NVME_LOGPAGE_PEV:
+		do_get_logpage_pev_relctx(npa, req);
+		break;
+	default:
+		break;
+	}
 
 	if (npa->npa_ns != NULL) {
 		uint32_t nsid = nvme_ns_info_nsid(npa->npa_ns_info);
@@ -1910,6 +1972,22 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 
 	if (!nvme_log_req_set_output(req, buf, toalloc)) {
 		nvmeadm_fatal(npa, "failed to set output parameters");
+	}
+
+
+	/*
+	 * Again, we need to potentially adjust specific LSP values here for the
+	 * various contexts that exist.
+	 */
+	switch (nvme_log_disc_lid(disc)) {
+	case NVME_LOGPAGE_PEV:
+		if (!nvme_log_req_set_lsp(req, NVME_PEV_LSP_READ)) {
+			nvmeadm_fatal(npa, "failed to set lsp to read the "
+			    "persistent event log");
+		}
+		break;
+	default:
+		break;
 	}
 
 	if (!nvme_log_req_exec(req)) {

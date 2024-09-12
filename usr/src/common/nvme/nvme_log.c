@@ -45,6 +45,7 @@
 #else
 #include <stdio.h>
 #include <inttypes.h>
+#include <strings.h>
 #endif
 
 static bool
@@ -235,6 +236,28 @@ nvme_lpd_cmdeff_sup(const nvme_valid_ctrl_data_t *data,
 	    data->vcd_id->id_lpa.lp_cmdeff != 0);
 }
 
+static bool
+nvme_lpd_pev_sup(const nvme_valid_ctrl_data_t *data,
+    const nvme_log_page_info_t *lpi)
+{
+	return (nvme_field_atleast(data, &nvme_vers_1v4) &&
+	    data->vcd_id->id_lpa.lp_persist != 0);
+}
+
+static bool
+nvme_lpd_pev_len(uint64_t *outp, const void *data, size_t len)
+{
+	nvme_pev_log_t pev;
+
+	if (len < sizeof (pev)) {
+		return (false);
+	}
+
+	(void) memcpy(&pev, data, sizeof (pev));
+	*outp = pev.pel_tll;
+	return (true);
+}
+
 /*
  * The short names here correspond to the well defined names in nvmeadm(8) and
  * libnvme(3LIB) that users expect to be able to use. Please do not change them
@@ -306,7 +329,20 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_source = NVME_LOG_DISC_S_ID_CTRL,
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (nvme_cmdeff_log_t)
-}  };
+}, {
+	.nlpi_short = "pev",
+	.nlpi_human = "persistent event log",
+	.nlpi_lid = NVME_LOGPAGE_PEV,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_1v4,
+	.nlpi_sup_func = nvme_lpd_pev_sup,
+	.nlpi_kind = NVME_LOG_ID_OPTIONAL,
+	.nlpi_source = NVME_LOG_DISC_S_ID_CTRL,
+	.nlpi_disc = NVME_LOG_DISC_F_NEED_LSP,
+	.nlpi_scope = NVME_LOG_SCOPE_NVM,
+	.nlpi_len = sizeof (nvme_pev_log_t),
+	.nlpi_var_func = nvme_lpd_pev_len
+} };
 
 size_t nvme_std_log_npages = ARRAY_SIZE(nvme_std_log_pages);
 

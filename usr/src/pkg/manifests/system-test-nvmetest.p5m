@@ -67,6 +67,8 @@ file path=opt/nvme-tests/tests/libnvme/ns-disc.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-disc.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-info.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-info.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/pev.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/pev.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.64 mode=0555
 dir  path=opt/nvme-tests/tests/nvmeadm

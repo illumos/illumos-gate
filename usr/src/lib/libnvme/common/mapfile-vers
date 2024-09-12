@@ -120,6 +120,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_fw_commit_req_set_action;
 	nvme_fw_commit_req_set_slot;
 	nvme_fw_load;
+	nvme_get_feat_req_clear_output;
 	nvme_get_feat_req_exec;
 	nvme_get_feat_req_fini;
 	nvme_get_feat_req_get_cdw0;
@@ -131,6 +132,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_get_feat_req_set_nsid;
 	nvme_get_feat_req_set_output;
 	nvme_get_feat_req_set_sel;
+	nvme_id_req_clear_output;
 	nvme_id_req_exec;
 	nvme_id_req_fini;
 	nvme_id_req_init_by_cns;
@@ -155,6 +157,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_log_discover_init;
 	nvme_log_discover_step;
 	nvme_log_discover;
+	nvme_log_req_clear_output;
 	nvme_log_req_exec;
 	nvme_log_req_fini;
 	nvme_log_req_init_by_disc;
@@ -223,6 +226,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_vuc_discover_init;
 	nvme_vuc_discover_step;
 	nvme_vuc_discover;
+	nvme_vuc_req_clear_output;
 	nvme_vuc_req_exec;
 	nvme_vuc_req_fini;
 	nvme_vuc_req_get_cdw0;
@@ -239,6 +243,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_vuc_req_set_timeout;
 	nvme_wdc_assert_clear;
 	nvme_wdc_assert_inject;
+	nvme_wdc_e6_req_clear_output;
 	nvme_wdc_e6_req_exec;
 	nvme_wdc_e6_req_fini;
 	nvme_wdc_e6_req_init;

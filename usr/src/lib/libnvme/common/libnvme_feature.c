@@ -507,6 +507,12 @@ nvme_get_feat_req_init_by_name(nvme_ctrl_t *ctrl, const char *name,
 	return (nvme_ctrl_success(ctrl));
 }
 
+static void
+nvme_get_feat_req_set_need(nvme_get_feat_req_t *req,
+    nvme_get_feat_req_field_t field)
+{
+	req->gfr_need |= 1 << field;
+}
 
 static void
 nvme_get_feat_req_clear_need(nvme_get_feat_req_t *req,
@@ -624,12 +630,34 @@ nvme_get_feat_req_set_output(nvme_get_feat_req_t *req, void *buf, size_t len)
 	/*
 	 * Something to consider for the future here is that we know the fixed
 	 * size data that we're expecting for the feature. It would be nice if
-	 * we validated that we have that size now versus later.
+	 * we validated that we have that size now versus later. Related,
+	 * because there is no field check logic for this, we must manually
+	 * check that it is allowed and cannot use nvme_field_check_one().
 	 */
+	if ((req->gfr_allow & (1 << NVME_GET_FEAT_REQ_FIELD_DPTR)) == 0) {
+		return (nvme_ctrl_error(req->gfr_ctrl, NVME_ERR_FEAT_DATA_UNUSE,
+		    0, "field output (dptr) cannot be set in this get feature "
+		    "request"));
+	}
 
 	req->gfr_buf = buf;
 	req->gfr_len = len;
 	nvme_get_feat_req_clear_need(req, NVME_GET_FEAT_REQ_FIELD_DPTR);
+	return (nvme_ctrl_success(req->gfr_ctrl));
+}
+
+bool
+nvme_get_feat_req_clear_output(nvme_get_feat_req_t *req)
+{
+	if ((req->gfr_allow & (1 << NVME_GET_FEAT_REQ_FIELD_DPTR)) == 0) {
+		return (nvme_ctrl_error(req->gfr_ctrl, NVME_ERR_FEAT_DATA_UNUSE,
+		    0, "field output (dptr) cannot be cleared in this get "
+		    "feature request"));
+	}
+
+	req->gfr_buf = NULL;
+	req->gfr_len = 0;
+	nvme_get_feat_req_set_need(req, NVME_GET_FEAT_REQ_FIELD_DPTR);
 	return (nvme_ctrl_success(req->gfr_ctrl));
 }
 

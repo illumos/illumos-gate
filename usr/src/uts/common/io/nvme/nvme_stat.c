@@ -89,6 +89,7 @@ nvme_stat_device_init(nvme_t *nvme)
 	STAT_INIT(fwact_mtfa);
 	STAT_INIT(fwact_prohibited);
 	STAT_INIT(fw_overlap);
+	STAT_INIT(inv_cmdseq_err);
 
 	/* Errors reported by asynchronous events */
 	STAT_INIT(diagfail_event);

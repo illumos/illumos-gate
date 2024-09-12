@@ -773,6 +773,21 @@ static const log_impl_test_t log_impl_tests[] = { {
 	.lit_short = "cmdeff",
 	.lit_data = &nvme_ctrl_base_2v0,
 	.lit_impl = false
+}, {
+	.lit_desc = "persistent event log (1.0)",
+	.lit_short = "pev",
+	.lit_data = &nvme_ctrl_base_1v0,
+	.lit_impl = false
+}, {
+	.lit_desc = "persistent event log (1.4 LPA)",
+	.lit_short = "pev",
+	.lit_data = &nvme_ctrl_ns_1v4,
+	.lit_impl = true
+}, {
+	.lit_desc = "persistent event log (2.0 No LPA)",
+	.lit_short = "pev",
+	.lit_data = &nvme_ctrl_base_2v0,
+	.lit_impl = false
 } };
 
 static const nvme_log_page_info_t *

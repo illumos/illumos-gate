@@ -18,6 +18,10 @@
 # specific NVMe device to target. This must be invoked by the top-level
 # scripts which will validate that the selected device is usable.
 #
+# Tests that involve optional device-specific behavior such as the persistent
+# event log tests are not included as part of this to ensure that this test
+# remains working on the broadest set of devices.
+#
 
 [DEFAULT]
 pre =

@@ -61,6 +61,14 @@ nvme_get_feat_supported_sel(const nvme_field_info_t *field,
 	return (false);
 }
 
+/*
+ * An astute observer will note that there is no instance for the DPTR here.
+ * While a buffer is required for this command, the common code does not
+ * validate buffers. In other pieces we use a length as a proxy for checking the
+ * buffer; however, there is no length argument here. The buffer is expected by
+ * the controller to be of sufficient size. This is validated by the kernel in
+ * nvme_validate_get_feature().
+ */
 const nvme_field_info_t nvme_get_feat_fields[] = {
 	[NVME_GET_FEAT_REQ_FIELD_FID] = {
 		.nlfi_vers = &nvme_vers_1v0,

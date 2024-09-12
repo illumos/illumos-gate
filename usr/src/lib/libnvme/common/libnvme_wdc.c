@@ -481,6 +481,13 @@ nvme_wdc_e6_req_init(nvme_ctrl_t *ctrl, nvme_wdc_e6_req_t **reqp)
 }
 
 static void
+nvme_wdc_e6_req_set_need(nvme_wdc_e6_req_t *req,
+    nvme_wdc_e6_req_field_t field)
+{
+	req->wer_need |= 1 << field;
+}
+
+static void
 nvme_wdc_e6_req_clear_need(nvme_wdc_e6_req_t *req,
     nvme_wdc_e6_req_field_t field)
 {
@@ -526,6 +533,19 @@ nvme_wdc_e6_req_set_output(nvme_wdc_e6_req_t *req, void *buf, size_t len)
 	}
 
 	nvme_wdc_e6_req_clear_need(req, NVME_WDC_E6_REQ_FIELD_LEN);
+	return (nvme_ctrl_success(ctrl));
+}
+
+bool
+nvme_wdc_e6_req_clear_output(nvme_wdc_e6_req_t *req)
+{
+	nvme_ctrl_t *ctrl = req->wer_vuc->nvr_ctrl;
+
+	if (!nvme_vuc_req_clear_output(req->wer_vuc)) {
+		return (false);
+	}
+
+	nvme_wdc_e6_req_set_need(req, NVME_WDC_E6_REQ_FIELD_LEN);
 	return (nvme_ctrl_success(ctrl));
 }
 

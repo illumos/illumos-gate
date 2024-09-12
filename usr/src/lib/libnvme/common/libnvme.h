@@ -699,6 +699,7 @@ extern void nvme_id_req_fini(nvme_id_req_t *);
 extern bool nvme_id_req_set_nsid(nvme_id_req_t *, uint32_t);
 extern bool nvme_id_req_set_ctrlid(nvme_id_req_t *, uint32_t);
 extern bool nvme_id_req_set_output(nvme_id_req_t *, void *, size_t);
+extern bool nvme_id_req_clear_output(nvme_id_req_t *);
 extern bool nvme_id_req_exec(nvme_id_req_t *);
 
 /*
@@ -941,6 +942,7 @@ extern bool nvme_log_req_set_lsi(nvme_log_req_t *, uint32_t);
 extern bool nvme_log_req_set_uuid(nvme_log_req_t *, uint32_t);
 extern bool nvme_log_req_set_nsid(nvme_log_req_t *, uint32_t);
 extern bool nvme_log_req_set_output(nvme_log_req_t *, void *, size_t);
+extern bool nvme_log_req_clear_output(nvme_log_req_t *);
 extern bool nvme_log_req_set_offset(nvme_log_req_t *, uint64_t);
 extern bool nvme_log_req_set_rae(nvme_log_req_t *, bool);
 extern bool nvme_log_req_set_csi(nvme_log_req_t *, nvme_csi_t);
@@ -1025,6 +1027,7 @@ extern bool nvme_get_feat_req_set_sel(nvme_get_feat_req_t *, uint32_t);
 extern bool nvme_get_feat_req_set_nsid(nvme_get_feat_req_t *, uint32_t);
 extern bool nvme_get_feat_req_set_cdw11(nvme_get_feat_req_t *, uint32_t);
 extern bool nvme_get_feat_req_set_output(nvme_get_feat_req_t *, void *, size_t);
+extern bool nvme_get_feat_req_clear_output(nvme_get_feat_req_t *);
 extern bool nvme_get_feat_req_exec(nvme_get_feat_req_t *);
 extern bool nvme_get_feat_req_get_cdw0(nvme_get_feat_req_t *, uint32_t *);
 
@@ -1123,6 +1126,7 @@ extern bool nvme_vuc_req_set_cdw15(nvme_vuc_req_t *, uint32_t);
 extern bool nvme_vuc_req_set_impact(nvme_vuc_req_t *, nvme_vuc_disc_impact_t);
 extern bool nvme_vuc_req_set_input(nvme_vuc_req_t *, const void *, size_t);
 extern bool nvme_vuc_req_set_output(nvme_vuc_req_t *, void *, size_t);
+extern bool nvme_vuc_req_clear_output(nvme_vuc_req_t *);
 
 /*
  * Execute a request. After a request is executed, the status information
@@ -1198,6 +1202,7 @@ extern void nvme_wdc_e6_req_fini(nvme_wdc_e6_req_t *);
 extern bool nvme_wdc_e6_req_set_offset(nvme_wdc_e6_req_t *, uint64_t);
 extern bool nvme_wdc_e6_req_set_output(nvme_wdc_e6_req_t *, void *,
     size_t);
+extern bool nvme_wdc_e6_req_clear_output(nvme_wdc_e6_req_t *);
 extern bool nvme_wdc_e6_req_exec(nvme_wdc_e6_req_t *);
 
 /*
