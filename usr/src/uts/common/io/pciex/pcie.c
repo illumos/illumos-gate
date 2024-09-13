@@ -537,9 +537,16 @@ ushort_t pcie_base_err_default =
     PCIE_DEVCTL_FE_REPORTING_EN |
     PCIE_DEVCTL_UR_REPORTING_EN;
 
-/* PCI-Express Device Control Register */
-uint16_t pcie_devctl_default = PCIE_DEVCTL_RO_EN |
-    PCIE_DEVCTL_MAX_READ_REQ_512;
+/*
+ * This contains default values and masks that are used to manipulate the device
+ * control register and ensure that it is in a normal state. The mask controls
+ * things that are managed by pcie_fabric_setup(), firmware, or other sources
+ * and therefore should be preserved unless we're explicitly trying to change
+ * it.
+ */
+uint16_t pcie_devctl_default = PCIE_DEVCTL_RO_EN | PCIE_DEVCTL_MAX_READ_REQ_512;
+uint16_t pcie_devctl_default_mask = PCIE_DEVCTL_MAX_READ_REQ_MASK |
+    PCIE_DEVCTL_MAX_PAYLOAD_MASK | PCIE_DEVCTL_EXT_TAG_FIELD_EN;
 
 /* PCI-Express AER Root Control Register */
 #define	PCIE_ROOT_SYS_ERR	(PCIE_ROOTCTL_SYS_ERR_ON_CE_EN | \
@@ -1164,13 +1171,14 @@ pcie_initchild(dev_info_t *cdip)
 	}
 
 	if (PCIE_IS_PCIE(bus_p)) {
-		/* Setup PCIe device control register */
+		/*
+		 * Get the device control register into an initial state that
+		 * makes sense. The maximum payload, tagging, and related will
+		 * be dealt with in pcie_fabric_setup().
+		 */
 		reg16 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL);
-		/* note: MPS/MRRS are initialized in pcie_initchild_mps() */
-		tmp16 = (reg16 & (PCIE_DEVCTL_MAX_READ_REQ_MASK |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
-		    (pcie_devctl_default & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK));
+		tmp16 = (reg16 & pcie_devctl_default_mask) |
+		    (pcie_devctl_default & ~pcie_devctl_default_mask);
 		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, tmp16);
 		PCIE_DBG_CAP(cdip, bus_p, "DEVCTL", 16, PCIE_DEVCTL, reg16);
 
@@ -2340,11 +2348,9 @@ pcie_enable_errors(dev_info_t *dip)
 	 */
 	if ((reg16 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL)) !=
 	    PCI_CAP_EINVAL16) {
-		tmp16 = (reg16 & (PCIE_DEVCTL_MAX_READ_REQ_MASK |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
-		    (pcie_devctl_default & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
-		    (pcie_base_err_default & (~PCIE_DEVCTL_CE_REPORTING_EN));
+		tmp16 = (reg16 & pcie_devctl_default_mask) |
+		    (pcie_devctl_default & ~pcie_devctl_default_mask) |
+		    (pcie_base_err_default & ~PCIE_DEVCTL_CE_REPORTING_EN);
 
 		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, tmp16);
 		PCIE_DBG_CAP(dip, bus_p, "DEVCTL", 16, PCIE_DEVCTL, reg16);

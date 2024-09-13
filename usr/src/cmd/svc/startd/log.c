@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2011 Nexenta Systems. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -475,6 +476,10 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 		severity = LOG_INFO;
 	} else {
 		switch (outcome) {
+		case DEGRADE_REQUESTED:
+			action = gettext("transitioned to degraded by "
+			    "request (see 'svcs -xv' for details)");
+			break;
 		case MAINT_REQUESTED:
 			action = gettext("transitioned to maintenance by "
 			    "request (see 'svcs -xv' for details)");
@@ -494,6 +499,10 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 		case START_FAILED_TIMEOUT_FATAL:
 			action = gettext("timed out: transitioned to "
 			    "maintenance (see 'svcs -xv' for details)");
+			break;
+		case START_FAILED_DEGRADED:
+			action = gettext("transitioned to degraded "
+			    "(see 'svcs -xv' for details)");
 			break;
 		case START_FAILED_OTHER:
 			action = gettext("failed: transitioned to "

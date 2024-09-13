@@ -77,7 +77,7 @@ These ranges are in turn defined in JESD402-1A
 .Pc .
 .Pp
 The function
-.Xr libejdec_temp_range 3JEDEC
+.Xr libjedec_temp_range 3JEDEC
 provides a way to translate these named ranges into the corresponding
 lower and upper bounds of the range.
 When other parts of the library parse data, they will emit the
@@ -101,7 +101,7 @@ there is no guarantee that this will apply to future functions.
 .Sh SEE ALSO
 .Xr libjedec_spd 3JEDEC ,
 .Xr libjedec_temp_range 3JEDEC ,
-.Xr libjedev_vendor_string 3JEDEC
+.Xr libjedec_vendor_string 3JEDEC
 .Pp
 .Rs
 .%Q JEDEC Solid State Technology Association

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  * Copyright 2019 Joyent, Inc.
  */
 
@@ -818,10 +819,11 @@ instance_started(restarter_inst_t *inst)
 	assert(MUTEX_HELD(&inst->ri_lock));
 
 	if (inst->ri_i.i_state == RESTARTER_STATE_ONLINE ||
-	    inst->ri_i.i_state == RESTARTER_STATE_DEGRADED)
+	    inst->ri_i.i_state == RESTARTER_STATE_DEGRADED) {
 		ret = 1;
-	else
+	} else {
 		ret = 0;
+	}
 
 	return (ret);
 }
@@ -1750,11 +1752,69 @@ rep_retry:
 	scf_instance_destroy(inst);
 }
 
+static void
+degrade_instance(scf_handle_t *h, restarter_inst_t *rip, restarter_str_t reason)
+{
+	scf_instance_t *scf_inst = NULL;
+
+	assert(MUTEX_HELD(&rip->ri_lock));
+
+	log_instance(rip, B_TRUE, "Marking degraded due to %s.",
+	    restarter_get_str_short(reason));
+	log_framework(LOG_DEBUG, "%s: marking degraded due to %s.\n",
+	    rip->ri_i.i_fmri, restarter_get_str_short(reason));
+
+	/* Services that aren't online are ignored */
+	if (rip->ri_i.i_state != RESTARTER_STATE_ONLINE) {
+		log_framework(LOG_DEBUG,
+		    "%s: degrade_instance -> is not online\n",
+		    rip->ri_i.i_fmri);
+		return;
+	}
+
+	/*
+	 * If reason state is restarter_str_service_request and
+	 * restarter_actions/auxiliary_fmri property is set with a valid fmri,
+	 * copy the fmri to restarter/auxiliary_fmri so svcs -x can use.
+	 */
+	if (reason == restarter_str_service_request &&
+	    libscf_fmri_get_instance(h, rip->ri_i.i_fmri, &scf_inst) == 0) {
+		if (restarter_inst_validate_ractions_aux_fmri(scf_inst) == 0) {
+			if (restarter_inst_set_aux_fmri(scf_inst)) {
+				log_framework(LOG_DEBUG, "%s: "
+				    "restarter_inst_set_aux_fmri failed: ",
+				    rip->ri_i.i_fmri);
+			}
+		} else {
+			log_framework(LOG_DEBUG, "%s: "
+			    "restarter_inst_validate_ractions_aux_fmri "
+			    "failed: ", rip->ri_i.i_fmri);
+
+			if (restarter_inst_reset_aux_fmri(scf_inst)) {
+				log_framework(LOG_DEBUG, "%s: "
+				    "restarter_inst_reset_aux_fmri failed: ",
+				    rip->ri_i.i_fmri);
+			}
+		}
+		scf_instance_destroy(scf_inst);
+	}
+
+	(void) restarter_instance_update_states(h, rip,
+	    RESTARTER_STATE_DEGRADED, RESTARTER_STATE_NONE, RERR_NONE, reason);
+
+	log_transition(rip, DEGRADE_REQUESTED);
+}
+
+/*
+ * Note that the ordering of these must match the restarter event types defined
+ * in librestart.h
+ */
 const char *event_names[] = { "INVALID", "ADD_INSTANCE", "REMOVE_INSTANCE",
 	"ENABLE", "DISABLE", "ADMIN_DEGRADED", "ADMIN_REFRESH",
 	"ADMIN_RESTART", "ADMIN_MAINT_OFF", "ADMIN_MAINT_ON",
 	"ADMIN_MAINT_ON_IMMEDIATE", "STOP", "START", "DEPENDENCY_CYCLE",
-	"INVALID_DEPENDENCY", "ADMIN_DISABLE", "STOP_RESET"
+	"INVALID_DEPENDENCY", "ADMIN_DISABLE", "STOP_RESET",
+	"ADMIN_DEGRADE_IMMEDIATE", "ADMIN_RESTORE"
 };
 
 /*
@@ -1871,11 +1931,17 @@ again:
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_DEGRADED:
-			log_framework(LOG_WARNING, "Restarter: "
-			    "%s command (for %s) unimplemented.\n",
-			    event_names[event->riq_type], inst->ri_i.i_fmri);
+		case RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE:
+			if (event_from_tty(h, inst) == 0) {
+				degrade_instance(h, inst,
+				    restarter_str_service_request);
+			} else {
+				degrade_instance(h, inst,
+				    restarter_str_administrative_request);
+			}
 			break;
 
+		case RESTARTER_EVENT_TYPE_ADMIN_RESTORE:
 		case RESTARTER_EVENT_TYPE_ADMIN_RESTART:
 			if (!instance_started(inst)) {
 				log_framework(LOG_DEBUG, "Restarter: "
@@ -1951,7 +2017,9 @@ is_admin_event(restarter_event_type_t t)
 	case RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON_IMMEDIATE:
 	case RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF:
 	case RESTARTER_EVENT_TYPE_ADMIN_REFRESH:
+	case RESTARTER_EVENT_TYPE_ADMIN_RESTORE:
 	case RESTARTER_EVENT_TYPE_ADMIN_DEGRADED:
+	case RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE:
 	case RESTARTER_EVENT_TYPE_ADMIN_RESTART:
 		return (1);
 	default:

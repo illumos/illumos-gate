@@ -1,0 +1,145 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 RackTop Systems, Inc.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+    global:
+
+	# DDI Interfaces
+	_fini;
+	_init;
+	_info;
+
+	# Things needed by smbfs
+
+	m_cat;
+	m_copym;
+	m_dumpm;
+	m_fixhdr;
+	m_getblk;
+	m_length;
+	m_pullup;
+	m_split;
+
+	mb_done;
+	mb_fixhdr;
+	mb_init;
+	mb_initm;
+	mb_put_align8;
+	mb_put_mbchain;
+	mb_put_mbuf;
+	mb_put_mem;
+	mb_put_padbyte;
+	mb_put_uint16be;
+	mb_put_uint16le;
+	mb_put_uint32be;
+	mb_put_uint32le;
+	mb_put_uint64be;
+	mb_put_uint64le;
+	mb_put_uint8;
+	mb_put_uio;
+	mb_reserve;
+
+	md_done;
+	md_get_mbuf;
+	md_get_mem;
+	md_get_uint16be;
+	md_get_uint16le;
+	md_get_uint32be;
+	md_get_uint32le;
+	md_get_uint64be;
+	md_get_uint64le;
+	md_get_uint8;
+	md_get_uio;
+	md_initm;
+
+	nsmb_version;
+
+	smb2_rq_simple;
+	smb2_rq_simple_timed;
+	smb2_smb_close;
+	smb2_smb_ntcreate;
+
+	smb_credinit;
+	smb_credrele;
+	smb_dev2share;
+	smb_errmsg;
+
+	smb_fh_close;
+	smb_fh_create;
+	smb_fh_hold;
+	smb_fh_opened;
+	smb_fh_rele;
+
+	smb_get_dstring;
+
+	smb_nt_alloc;
+	smb_nt_done;
+	smb_nt_request;
+
+	smb_put_dmem;
+	smb_put_dstring;
+
+	smb_rq_alloc;
+	smb_rq_bend;
+	smb_rq_bstart;
+	smb_rq_done;
+	smb_rq_init;
+	smb_rq_simple;
+	smb_rq_simple_timed;
+	smb_rq_wend;
+	smb_rq_wstart;
+
+	smb_rwuio;
+	smb_share_kill;
+	smb_share_rele;
+
+	smb_smb_close;
+	smb_smb_ntcreate;
+
+	smb_t2_alloc;
+	smb_t2_done;
+	smb_t2_request;
+
+	smb_time_NT2local;
+	smb_time_local2NT;
+	smb_time_local2server;
+	smb_time_server2local;
+
+	smb_timo_append;
+	smb_timo_open;
+	smb_timo_read;
+	smb_timo_write;
+
+	smb_vc_getipaddr;
+
+    local:
+	*;
+};

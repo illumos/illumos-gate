@@ -27,6 +27,7 @@
  * Copyright 2020 Peter Tribble.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2024 H. William Welliver <william@welliver.org>
  */
 
 #include <stdio.h>
@@ -5506,6 +5507,7 @@ do_create_simnet(int argc, char *argv[], const char *use)
 	uint32_t flags;
 	char *altroot = NULL;
 	char *media = NULL;
+	char *maddr = NULL;
 	uint32_t mtype = DL_ETHER;
 	int option;
 	dladm_status_t status;
@@ -5515,7 +5517,7 @@ do_create_simnet(int argc, char *argv[], const char *use)
 	flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":tR:m:",
+	while ((option = getopt_long(argc, argv, ":tR:m:u:",
 	    simnet_lopts, NULL)) != -1) {
 		switch (option) {
 		case 't':
@@ -5527,31 +5529,37 @@ do_create_simnet(int argc, char *argv[], const char *use)
 		case 'm':
 			media = optarg;
 			break;
+		case 'u':
+			maddr = optarg;
+			break;
 		default:
 			die_opterr(optopt, option, use);
 		}
 	}
-
 	/* the simnet id is the required operand */
 	if (optind != (argc - 1))
 		usage();
 
 	if (strlcpy(name, argv[optind], MAXLINKNAMELEN) >= MAXLINKNAMELEN)
-		die("link name too long '%s'", argv[optind]);
+		die_dlerr(DLADM_STATUS_LINKINVAL,
+		    "link name too long '%s'", argv[optind]);
 
 	if (!dladm_valid_linkname(name))
-		die("invalid link name '%s'", name);
+		die_dlerr(DLADM_STATUS_LINKINVAL,
+		    "invalid link name '%s'", name);
 
 	if (media != NULL) {
 		mtype = dladm_str2media(media);
 		if (mtype != DL_ETHER && mtype != DL_WIFI)
-			die("media type '%s' is not supported", media);
+			die_dlerr(DLADM_STATUS_NOTSUP,
+			    "media type '%s' is not supported", media);
 	}
 
 	if (altroot != NULL)
 		altroot_cmd(altroot, argc, argv);
 
-	status = dladm_simnet_create(handle, name, mtype, flags);
+	status = dladm_simnet_create(handle, name, mtype, maddr, flags);
+
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "simnet creation failed");
 }

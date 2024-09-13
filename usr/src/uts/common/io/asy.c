@@ -167,10 +167,9 @@ static struct ppsclockev asy_ppsev;
 #define	LED_OFF
 #endif
 
-static	int max_asy_instance = -1;
-
-static	uint_t	asysoftintr(caddr_t intarg);
-static	uint_t	asyintr(caddr_t argasy);
+static void	asysetsoft(struct asycom *);
+static uint_t	asysoftintr(caddr_t, caddr_t);
+static uint_t	asyintr(caddr_t, caddr_t);
 
 static boolean_t abort_charseq_recognize(uchar_t ch);
 
@@ -322,6 +321,15 @@ struct streamtab asy_str_info = {
 	NULL
 };
 
+static void asy_intr_free(struct asycom *);
+static int asy_intr_setup(struct asycom *, int);
+
+static void asy_softintr_free(struct asycom *);
+static int asy_softintr_setup(struct asycom *);
+
+static int asy_suspend(struct asycom *);
+static int asy_resume(dev_info_t *);
+
 static int asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
 static int asyprobe(dev_info_t *);
@@ -407,7 +415,6 @@ _fini(void)
 			cmn_err(CE_NOTE, "!%s unloading",
 			    modldrv.drv_linkinfo);
 #endif
-		ASSERT(max_asy_instance == -1);
 		mutex_destroy(&asy_glob_lock);
 		/* free "motherboard-serial-ports" property if allocated */
 		if (com_ports != NULL && com_ports != (int *)standard_com_ports)
@@ -608,122 +615,370 @@ asy_get_io_regnum(dev_info_t *devinfo, struct asycom *asy)
 	}
 }
 
+static void
+asy_intr_free(struct asycom *asy)
+{
+	int i;
+
+	for (i = 0; i < asy->asy_intr_cnt; i++) {
+		if (asy->asy_inth[i] == NULL)
+			break;
+
+		if ((asy->asy_intr_cap & DDI_INTR_FLAG_BLOCK) != 0)
+			(void) ddi_intr_block_disable(&asy->asy_inth[i], 1);
+		else
+			(void) ddi_intr_disable(asy->asy_inth[i]);
+
+		(void) ddi_intr_remove_handler(asy->asy_inth[i]);
+		(void) ddi_intr_free(asy->asy_inth[i]);
+	}
+
+	kmem_free(asy->asy_inth, asy->asy_inth_sz);
+	asy->asy_inth = NULL;
+	asy->asy_inth_sz = 0;
+}
+
+static int
+asy_intr_setup(struct asycom *asy, int intr_type)
+{
+	int nintrs, navail, count;
+	int ret;
+	int i;
+
+	if (asy->asy_intr_types == 0) {
+		ret = ddi_intr_get_supported_types(asy->asy_dip,
+		    &asy->asy_intr_types);
+		if (ret != DDI_SUCCESS) {
+			asyerror(asy, CE_WARN,
+			    "ddi_intr_get_supported_types failed");
+			return (ret);
+		}
+	}
+
+	if ((asy->asy_intr_types & intr_type) == 0)
+		return (DDI_FAILURE);
+
+	ret = ddi_intr_get_nintrs(asy->asy_dip, intr_type, &nintrs);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_get_nintrs failed, type %d",
+		    intr_type);
+		return (ret);
+	}
+
+	if (nintrs < 1) {
+		asyerror(asy, CE_WARN, "no interrupts of type %d", intr_type);
+		return (DDI_FAILURE);
+	}
+
+	ret = ddi_intr_get_navail(asy->asy_dip, intr_type, &navail);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_get_navail failed, type %d",
+		    intr_type);
+		return (ret);
+	}
+
+	if (navail < 1) {
+		asyerror(asy, CE_WARN, "no available interrupts, type %d",
+		    intr_type);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Some PCI(e) RS232 adapters seem to support more than one interrupt,
+	 * but the asy driver really doesn't.
+	 */
+	asy->asy_inth_sz = sizeof (ddi_intr_handle_t);
+	asy->asy_inth = kmem_zalloc(asy->asy_inth_sz, KM_SLEEP);
+	ret = ddi_intr_alloc(asy->asy_dip, asy->asy_inth, intr_type, 0, 1,
+	    &count, 0);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_alloc failed, count %d, "
+		    "type %d", navail, intr_type);
+		goto fail;
+	}
+
+	if (count != 1) {
+		asyerror(asy, CE_WARN, "ddi_intr_alloc returned not 1 but %d "
+		    "interrupts of type %d", count, intr_type);
+		goto fail;
+	}
+
+	asy->asy_intr_cnt = count;
+
+	ret = ddi_intr_get_pri(asy->asy_inth[0], &asy->asy_intr_pri);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_get_pri failed, type %d",
+		    intr_type);
+		goto fail;
+	}
+
+	for (i = 0; i < count; i++) {
+		ret = ddi_intr_add_handler(asy->asy_inth[i], asyintr,
+		    (void *)asy, (void *)(uintptr_t)i);
+		if (ret != DDI_SUCCESS) {
+			asyerror(asy, CE_WARN, "ddi_intr_add_handler failed, "
+			    "int %d, type %d", i, intr_type);
+			goto fail;
+		}
+	}
+
+	(void) ddi_intr_get_cap(asy->asy_inth[0], &asy->asy_intr_cap);
+
+	for (i = 0; i < count; i++) {
+		if (asy->asy_intr_cap & DDI_INTR_FLAG_BLOCK)
+			ret = ddi_intr_block_enable(&asy->asy_inth[i], 1);
+		else
+			ret = ddi_intr_enable(asy->asy_inth[i]);
+
+		if (ret != DDI_SUCCESS) {
+			asyerror(asy, CE_WARN,
+			    "enabling interrupt %d failed, type %d",
+			    i, intr_type);
+			goto fail;
+		}
+	}
+
+	asy->asy_intr_type = intr_type;
+	return (DDI_SUCCESS);
+
+fail:
+	asy_intr_free(asy);
+	return (ret);
+}
+
+static void
+asy_softintr_free(struct asycom *asy)
+{
+	(void) ddi_intr_remove_softint(asy->asy_soft_inth);
+}
+
+static int
+asy_softintr_setup(struct asycom *asy)
+{
+	int ret;
+
+	ret = ddi_intr_add_softint(asy->asy_dip, &asy->asy_soft_inth,
+	    ASY_SOFT_INT_PRI, asysoftintr, asy);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_add_softint failed");
+		return (ret);
+	}
+
+	/*
+	 * This may seem pointless since we specified ASY_SOFT_INT_PRI above,
+	 * but then it's probably a good idea to consider the soft interrupt
+	 * priority an opaque value and don't hardcode any assumptions about
+	 * its actual value here.
+	 */
+	ret = ddi_intr_get_softint_pri(asy->asy_soft_inth,
+	    &asy->asy_soft_intr_pri);
+	if (ret != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "ddi_intr_get_softint_pri failed");
+		return (ret);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+static int
+asy_resume(dev_info_t *devi)
+{
+	struct asyncline *async;
+	struct asycom *asy;
+	int instance = ddi_get_instance(devi);	/* find out which unit */
+
+#ifdef	DEBUG
+	if (asy_nosuspend)
+		return (DDI_SUCCESS);
+#endif
+	asy = ddi_get_soft_state(asy_soft_state, instance);
+	if (asy == NULL)
+		return (DDI_FAILURE);
+
+	mutex_enter(&asy->asy_soft_sr);
+	mutex_enter(&asy->asy_excl);
+	mutex_enter(&asy->asy_excl_hi);
+
+	async = asy->asy_priv;
+	/* Disable interrupts */
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
+	if (asy_identify_chip(devi, asy) != DDI_SUCCESS) {
+		mutex_exit(&asy->asy_excl_hi);
+		mutex_exit(&asy->asy_excl);
+		mutex_exit(&asy->asy_soft_sr);
+		asyerror(asy, CE_WARN, "Cannot identify UART chip at %p",
+		    (void *)asy->asy_ioaddr);
+		return (DDI_FAILURE);
+	}
+	asy->asy_flags &= ~ASY_DDI_SUSPENDED;
+	if (async->async_flags & ASYNC_ISOPEN) {
+		asy_program(asy, ASY_INIT);
+		/* Kick off output */
+		if (async->async_ocnt > 0) {
+			async_resume(async);
+		} else {
+			mutex_exit(&asy->asy_excl_hi);
+			if (async->async_xmitblk)
+				freeb(async->async_xmitblk);
+			async->async_xmitblk = NULL;
+			async_start(async);
+			mutex_enter(&asy->asy_excl_hi);
+		}
+		asysetsoft(asy);
+	}
+	mutex_exit(&asy->asy_excl_hi);
+	mutex_exit(&asy->asy_excl);
+	mutex_exit(&asy->asy_soft_sr);
+
+	mutex_enter(&asy->asy_excl);
+	if (async->async_flags & ASYNC_RESUME_BUFCALL) {
+		async->async_wbufcid = bufcall(async->async_wbufcds,
+		    BPRI_HI, (void (*)(void *)) async_reioctl,
+		    (void *)(intptr_t)async->async_common->asy_unit);
+		async->async_flags &= ~ASYNC_RESUME_BUFCALL;
+	}
+	async_process_suspq(asy);
+	mutex_exit(&asy->asy_excl);
+	return (DDI_SUCCESS);
+}
+
+static int
+asy_suspend(struct asycom *asy)
+{
+	struct asyncline *async = asy->asy_priv;
+	unsigned i;
+	uchar_t lsr;
+
+#ifdef	DEBUG
+	if (asy_nosuspend)
+		return (DDI_SUCCESS);
+#endif
+	mutex_enter(&asy->asy_excl);
+
+	ASSERT(async->async_ops >= 0);
+	while (async->async_ops > 0)
+		cv_wait(&async->async_ops_cv, &asy->asy_excl);
+
+	async->async_flags |= ASYNC_DDI_SUSPENDED;
+
+	/* Wait for timed break and delay to complete */
+	while ((async->async_flags & (ASYNC_BREAK|ASYNC_DELAY))) {
+		if (cv_wait_sig(&async->async_flags_cv, &asy->asy_excl) == 0) {
+			async_process_suspq(asy);
+			mutex_exit(&asy->asy_excl);
+			return (DDI_FAILURE);
+		}
+	}
+
+	/* Clear untimed break */
+	if (async->async_flags & ASYNC_OUT_SUSPEND)
+		async_resume_utbrk(async);
+
+	mutex_exit(&asy->asy_excl);
+
+	mutex_enter(&asy->asy_soft_sr);
+	mutex_enter(&asy->asy_excl);
+	if (async->async_wbufcid != 0) {
+		bufcall_id_t bcid = async->async_wbufcid;
+		async->async_wbufcid = 0;
+		async->async_flags |= ASYNC_RESUME_BUFCALL;
+		mutex_exit(&asy->asy_excl);
+		unbufcall(bcid);
+		mutex_enter(&asy->asy_excl);
+	}
+	mutex_enter(&asy->asy_excl_hi);
+
+	/* Disable interrupts from chip */
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
+	asy->asy_flags |= ASY_DDI_SUSPENDED;
+
+	/*
+	 * Hardware interrupts are disabled we can drop our high level
+	 * lock and proceed.
+	 */
+	mutex_exit(&asy->asy_excl_hi);
+
+	/* Process remaining RX characters and RX errors, if any */
+	lsr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
+	async_rxint(asy, lsr);
+
+	/* Wait for TX to drain */
+	for (i = 1000; i > 0; i--) {
+		lsr = ddi_get8(asy->asy_iohandle,
+		    asy->asy_ioaddr + LSR);
+		if ((lsr & (XSRE | XHRE)) == (XSRE | XHRE))
+			break;
+		delay(drv_usectohz(10000));
+	}
+	if (i == 0)
+		asyerror(asy, CE_WARN, "transmitter wasn't drained before "
+		    "driver was suspended");
+
+	mutex_exit(&asy->asy_excl);
+	mutex_exit(&asy->asy_soft_sr);
+
+	return (DDI_SUCCESS);
+}
+
 static int
 asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int instance;
 	struct asycom *asy;
-	struct asyncline *async;
 
 	instance = ddi_get_instance(devi);	/* find out which unit */
 
 	asy = ddi_get_soft_state(asy_soft_state, instance);
 	if (asy == NULL)
 		return (DDI_FAILURE);
-	async = asy->asy_priv;
 
 	switch (cmd) {
 	case DDI_DETACH:
-		ASY_DPRINTF(asy, ASY_DEBUG_INIT, "%s shutdown",
-		    asy_hw_name(asy));
+		break;
+
+	case DDI_SUSPEND:
+		return (asy_suspend(asy));
+
+	default:
+		return (DDI_FAILURE);
+	}
+
+	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "%s shutdown", asy_hw_name(asy));
+
+	if ((asy->asy_progress & ASY_PROGRESS_ASYNC) != 0) {
+		struct asyncline *async = asy->asy_priv;
 
 		/* cancel DTR hold timeout */
 		if (async->async_dtrtid != 0) {
 			(void) untimeout(async->async_dtrtid);
 			async->async_dtrtid = 0;
 		}
+		cv_destroy(&async->async_flags_cv);
+		kmem_free(async, sizeof (struct asyncline));
+		asy->asy_priv = NULL;
+	}
 
-		/* remove all minor device node(s) for this device */
+	if ((asy->asy_progress & ASY_PROGRESS_MINOR) != 0)
 		ddi_remove_minor_node(devi, NULL);
 
+	if ((asy->asy_progress & ASY_PROGRESS_MUTEX) != 0) {
 		mutex_destroy(&asy->asy_excl);
 		mutex_destroy(&asy->asy_excl_hi);
-		cv_destroy(&async->async_flags_cv);
-		ddi_remove_intr(devi, 0, asy->asy_iblock);
-		ddi_regs_map_free(&asy->asy_iohandle);
-		ddi_remove_softintr(asy->asy_softintr_id);
 		mutex_destroy(&asy->asy_soft_lock);
-		ASY_DPRINTF(asy, ASY_DEBUG_INIT, "shutdown complete");
-		asy_soft_state_free(asy);
-		break;
-	case DDI_SUSPEND:
-		{
-		unsigned i;
-		uchar_t lsr;
-
-#ifdef	DEBUG
-		if (asy_nosuspend)
-			return (DDI_SUCCESS);
-#endif
-		mutex_enter(&asy->asy_excl);
-
-		ASSERT(async->async_ops >= 0);
-		while (async->async_ops > 0)
-			cv_wait(&async->async_ops_cv, &asy->asy_excl);
-
-		async->async_flags |= ASYNC_DDI_SUSPENDED;
-
-		/* Wait for timed break and delay to complete */
-		while ((async->async_flags & (ASYNC_BREAK|ASYNC_DELAY))) {
-			if (cv_wait_sig(&async->async_flags_cv, &asy->asy_excl)
-			    == 0) {
-				async_process_suspq(asy);
-				mutex_exit(&asy->asy_excl);
-				return (DDI_FAILURE);
-			}
-		}
-
-		/* Clear untimed break */
-		if (async->async_flags & ASYNC_OUT_SUSPEND)
-			async_resume_utbrk(async);
-
-		mutex_exit(&asy->asy_excl);
-
-		mutex_enter(&asy->asy_soft_sr);
-		mutex_enter(&asy->asy_excl);
-		if (async->async_wbufcid != 0) {
-			bufcall_id_t bcid = async->async_wbufcid;
-			async->async_wbufcid = 0;
-			async->async_flags |= ASYNC_RESUME_BUFCALL;
-			mutex_exit(&asy->asy_excl);
-			unbufcall(bcid);
-			mutex_enter(&asy->asy_excl);
-		}
-		mutex_enter(&asy->asy_excl_hi);
-
-		/* Disable interrupts from chip */
-		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
-		asy->asy_flags |= ASY_DDI_SUSPENDED;
-
-		/*
-		 * Hardware interrupts are disabled we can drop our high level
-		 * lock and proceed.
-		 */
-		mutex_exit(&asy->asy_excl_hi);
-
-		/* Process remaining RX characters and RX errors, if any */
-		lsr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
-		async_rxint(asy, lsr);
-
-		/* Wait for TX to drain */
-		for (i = 1000; i > 0; i--) {
-			lsr = ddi_get8(asy->asy_iohandle,
-			    asy->asy_ioaddr + LSR);
-			if ((lsr & (XSRE | XHRE)) == (XSRE | XHRE))
-				break;
-			delay(drv_usectohz(10000));
-		}
-		if (i == 0)
-			asyerror(asy, CE_WARN, "transmitter wasn't drained "
-			    "before driver was suspended");
-
-		mutex_exit(&asy->asy_excl);
-		mutex_exit(&asy->asy_soft_sr);
-		break;
 	}
-	default:
-		return (DDI_FAILURE);
-	}
+
+	if ((asy->asy_progress & ASY_PROGRESS_INT) != 0)
+		asy_intr_free(asy);
+
+	if ((asy->asy_progress & ASY_PROGRESS_SOFTINT) != 0)
+		asy_softintr_free(asy);
+
+	if ((asy->asy_progress & ASY_PROGRESS_REGS) != 0)
+		ddi_regs_map_free(&asy->asy_iohandle);
+
+	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "shutdown complete");
+	asy_soft_state_free(asy);
 
 	return (DDI_SUCCESS);
 }
@@ -761,103 +1016,16 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		DDI_STRICTORDER_ACC,
 	};
 
-	instance = ddi_get_instance(devi);	/* find out which unit */
-
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
+
 	case DDI_RESUME:
-	{
-		struct asyncline *async;
+		return (asy_resume(devi));
 
-#ifdef	DEBUG
-		if (asy_nosuspend)
-			return (DDI_SUCCESS);
-#endif
-		asy = ddi_get_soft_state(asy_soft_state, instance);
-		if (asy == NULL)
-			return (DDI_FAILURE);
-
-		mutex_enter(&asy->asy_soft_sr);
-		mutex_enter(&asy->asy_excl);
-		mutex_enter(&asy->asy_excl_hi);
-
-		async = asy->asy_priv;
-		/* Disable interrupts */
-		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
-		if (asy_identify_chip(devi, asy) != DDI_SUCCESS) {
-			mutex_exit(&asy->asy_excl_hi);
-			mutex_exit(&asy->asy_excl);
-			mutex_exit(&asy->asy_soft_sr);
-			asyerror(asy, CE_WARN,
-			    "Cannot identify UART chip at %p",
-			    (void *)asy->asy_ioaddr);
-			return (DDI_FAILURE);
-		}
-		asy->asy_flags &= ~ASY_DDI_SUSPENDED;
-		if (async->async_flags & ASYNC_ISOPEN) {
-			asy_program(asy, ASY_INIT);
-			/* Kick off output */
-			if (async->async_ocnt > 0) {
-				async_resume(async);
-			} else {
-				mutex_exit(&asy->asy_excl_hi);
-				if (async->async_xmitblk)
-					freeb(async->async_xmitblk);
-				async->async_xmitblk = NULL;
-				async_start(async);
-				mutex_enter(&asy->asy_excl_hi);
-			}
-			ASYSETSOFT(asy);
-		}
-		mutex_exit(&asy->asy_excl_hi);
-		mutex_exit(&asy->asy_excl);
-		mutex_exit(&asy->asy_soft_sr);
-
-		mutex_enter(&asy->asy_excl);
-		if (async->async_flags & ASYNC_RESUME_BUFCALL) {
-			async->async_wbufcid = bufcall(async->async_wbufcds,
-			    BPRI_HI, (void (*)(void *)) async_reioctl,
-			    (void *)(intptr_t)async->async_common->asy_unit);
-			async->async_flags &= ~ASYNC_RESUME_BUFCALL;
-		}
-		async_process_suspq(asy);
-		mutex_exit(&asy->asy_excl);
-		return (DDI_SUCCESS);
-	}
 	default:
 		return (DDI_FAILURE);
 	}
-
-	ret = ddi_soft_state_zalloc(asy_soft_state, instance);
-	if (ret != DDI_SUCCESS)
-		return (DDI_FAILURE);
-	asy = ddi_get_soft_state(asy_soft_state, instance);
-
-	asy->asy_dip = devi;
-#ifdef DEBUG
-	asy->asy_debug = debug;
-#endif
-	asy->asy_unit = instance;
-	mutex_enter(&asy_glob_lock);
-	if (instance > max_asy_instance)
-		max_asy_instance = instance;
-	mutex_exit(&asy_glob_lock);
-
-	regnum = asy_get_io_regnum(devi, asy);
-
-	if (regnum < 0 ||
-	    ddi_regs_map_setup(devi, regnum, (caddr_t *)&asy->asy_ioaddr,
-	    (offset_t)0, (offset_t)0, &ioattr, &asy->asy_iohandle)
-	    != DDI_SUCCESS) {
-		asyerror(asy, CE_WARN, "could not map UART registers @ %p",
-		    (void *)asy->asy_ioaddr);
-
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
-	}
-
-	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "UART @ %p", (void *)asy->asy_ioaddr);
 
 	mutex_enter(&asy_glob_lock);
 	if (com_ports == NULL) {	/* need to initialize com_ports */
@@ -879,6 +1047,34 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 	mutex_exit(&asy_glob_lock);
 
+
+	instance = ddi_get_instance(devi);	/* find out which unit */
+	ret = ddi_soft_state_zalloc(asy_soft_state, instance);
+	if (ret != DDI_SUCCESS)
+		return (DDI_FAILURE);
+	asy = ddi_get_soft_state(asy_soft_state, instance);
+
+	asy->asy_dip = devi;
+#ifdef DEBUG
+	asy->asy_debug = debug;
+#endif
+	asy->asy_unit = instance;
+
+	regnum = asy_get_io_regnum(devi, asy);
+
+	if (regnum < 0 ||
+	    ddi_regs_map_setup(devi, regnum, (caddr_t *)&asy->asy_ioaddr,
+	    (offset_t)0, (offset_t)0, &ioattr, &asy->asy_iohandle)
+	    != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "could not map UART registers @ %p",
+		    (void *)asy->asy_ioaddr);
+		goto fail;
+	}
+
+	asy->asy_progress |= ASY_PROGRESS_REGS;
+
+	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "UART @ %p", (void *)asy->asy_ioaddr);
+
 	/*
 	 * Lookup the i/o address to see if this is a standard COM port
 	 * in which case we assign it the correct tty[a-d] to match the
@@ -886,7 +1082,6 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * will be assigned /dev/term/[0123...] in some rather arbitrary
 	 * fashion.
 	 */
-
 	for (i = 0; i < num_com_ports; i++) {
 		if (asy->asy_ioaddr == (uint8_t *)(uintptr_t)com_ports[i]) {
 			asy->asy_com_port = i + 1;
@@ -895,18 +1090,25 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * It appears that there was async hardware that on reset
-	 * did not clear ICR.  Hence when we get to
-	 * ddi_get_iblock_cookie below, this hardware would cause
-	 * the system to hang if there was input available.
+	 * It appears that there was async hardware that on reset did not clear
+	 * IER.  Hence when we enable interrupts, this hardware would cause the
+	 * system to hang if there was input available.
 	 */
 
 	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0x00);
 
-	/* establish default usage */
-	asy->asy_mcr |= RTS|DTR;		/* do use RTS/DTR after open */
-	asy->asy_lcr = STOP1|BITS8;		/* default to 1 stop 8 bits */
-	asy->asy_bidx = B9600;			/* default to 9600  */
+	/*
+	 * Establish default settings:
+	 * - use RTS/DTR after open
+	 * - 8N1 data format
+	 * - 9600 baud
+	 */
+	asy->asy_mcr |= RTS|DTR;
+	asy->asy_lcr = STOP1|BITS8;
+	asy->asy_bidx = B9600;
+	asy->asy_fifo_buf = 1;
+	asy->asy_use_fifo = FIFO_OFF;
+
 #ifdef DEBUG
 	asy->asy_msint_cnt = 0;			/* # of times in async_msint */
 #endif
@@ -962,52 +1164,48 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Initialize the port with default settings.
+	 * Install per instance software interrupt handler.
 	 */
+	if (asy_softintr_setup(asy) != DDI_SUCCESS) {
+		asyerror(asy, CE_WARN, "Cannot set soft interrupt");
+		goto fail;
+	}
 
-	asy->asy_fifo_buf = 1;
-	asy->asy_use_fifo = FIFO_OFF;
+	asy->asy_progress |= ASY_PROGRESS_SOFTINT;
 
 	/*
-	 * Get icookie for mutexes initialization
+	 * Install interrupt handler for this device.
 	 */
-	if ((ddi_get_iblock_cookie(devi, 0, &asy->asy_iblock) !=
-	    DDI_SUCCESS) ||
-	    (ddi_get_soft_iblock_cookie(devi, DDI_SOFTINT_MED,
-	    &asy->asy_soft_iblock) != DDI_SUCCESS)) {
-		ddi_regs_map_free(&asy->asy_iohandle);
-		asyerror(asy, CE_WARN,
-		    "could not hook interrupt for UART @ %p",
-		    (void *)asy->asy_ioaddr);
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
+	if ((asy_intr_setup(asy, DDI_INTR_TYPE_MSIX) != DDI_SUCCESS) &&
+	    (asy_intr_setup(asy, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) &&
+	    (asy_intr_setup(asy, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS)) {
+		asyerror(asy, CE_WARN, "Cannot set device interrupt");
+		goto fail;
 	}
+
+	asy->asy_progress |= ASY_PROGRESS_INT;
 
 	/*
 	 * Initialize mutexes before accessing the hardware
 	 */
 	mutex_init(&asy->asy_soft_lock, NULL, MUTEX_DRIVER,
-	    (void *)asy->asy_soft_iblock);
+	    DDI_INTR_PRI(asy->asy_soft_intr_pri));
+	mutex_init(&asy->asy_soft_sr, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(asy->asy_soft_intr_pri));
+
 	mutex_init(&asy->asy_excl, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&asy->asy_excl_hi, NULL, MUTEX_DRIVER,
-	    (void *)asy->asy_iblock);
-	mutex_init(&asy->asy_soft_sr, NULL, MUTEX_DRIVER,
-	    (void *)asy->asy_soft_iblock);
+	    DDI_INTR_PRI(asy->asy_intr_pri));
+
+	asy->asy_progress |= ASY_PROGRESS_MUTEX;
+
 	mutex_enter(&asy->asy_excl);
 	mutex_enter(&asy->asy_excl_hi);
 
 	if (asy_identify_chip(devi, asy) != DDI_SUCCESS) {
-		mutex_exit(&asy->asy_excl_hi);
-		mutex_exit(&asy->asy_excl);
-		mutex_destroy(&asy->asy_soft_lock);
-		mutex_destroy(&asy->asy_excl);
-		mutex_destroy(&asy->asy_excl_hi);
-		mutex_destroy(&asy->asy_soft_sr);
-		ddi_regs_map_free(&asy->asy_iohandle);
 		asyerror(asy, CE_WARN, "Cannot identify UART chip at %p",
 		    (void *)asy->asy_ioaddr);
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
+		goto fail;
 	}
 
 	/* disable all interrupts */
@@ -1025,47 +1223,8 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_exit(&asy->asy_excl_hi);
 	mutex_exit(&asy->asy_excl);
 
-	/*
-	 * Install per instance software interrupt handler.
-	 */
-	if (ddi_add_softintr(devi, DDI_SOFTINT_MED,
-	    &(asy->asy_softintr_id), NULL, 0, asysoftintr,
-	    (caddr_t)asy) != DDI_SUCCESS) {
-		mutex_destroy(&asy->asy_soft_lock);
-		mutex_destroy(&asy->asy_excl);
-		mutex_destroy(&asy->asy_excl_hi);
-		ddi_regs_map_free(&asy->asy_iohandle);
-		asyerror(asy, CE_WARN,
-		    "Can not set soft interrupt for ASY driver");
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
-	}
-
-	mutex_enter(&asy->asy_excl);
-	mutex_enter(&asy->asy_excl_hi);
-
-	/*
-	 * Install interrupt handler for this device.
-	 */
-	if (ddi_add_intr(devi, 0, NULL, 0, asyintr,
-	    (caddr_t)asy) != DDI_SUCCESS) {
-		mutex_exit(&asy->asy_excl_hi);
-		mutex_exit(&asy->asy_excl);
-		ddi_remove_softintr(asy->asy_softintr_id);
-		mutex_destroy(&asy->asy_soft_lock);
-		mutex_destroy(&asy->asy_excl);
-		mutex_destroy(&asy->asy_excl_hi);
-		ddi_regs_map_free(&asy->asy_iohandle);
-		asyerror(asy, CE_WARN,
-		    "Can not set device interrupt for ASY driver");
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
-	}
-
-	mutex_exit(&asy->asy_excl_hi);
-	mutex_exit(&asy->asy_excl);
-
 	asyinit(asy);	/* initialize the asyncline structure */
+	asy->asy_progress |= ASY_PROGRESS_ASYNC;
 
 	/* create minor device nodes for this device */
 	if (asy->asy_com_port != 0) {
@@ -1092,20 +1251,10 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    DDI_NT_SERIAL_DO, 0);
 	}
 
-	if (status != DDI_SUCCESS) {
-		struct asyncline *async = asy->asy_priv;
+	if (status != DDI_SUCCESS)
+		goto fail;
 
-		ddi_remove_minor_node(devi, NULL);
-		ddi_remove_intr(devi, 0, asy->asy_iblock);
-		ddi_remove_softintr(asy->asy_softintr_id);
-		mutex_destroy(&asy->asy_soft_lock);
-		mutex_destroy(&asy->asy_excl);
-		mutex_destroy(&asy->asy_excl_hi);
-		cv_destroy(&async->async_flags_cv);
-		ddi_regs_map_free(&asy->asy_iohandle);
-		asy_soft_state_free(asy);
-		return (DDI_FAILURE);
-	}
+	asy->asy_progress |= ASY_PROGRESS_MINOR;
 
 	/*
 	 * Fill in the polled I/O structure.
@@ -1121,6 +1270,10 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_report_dev(devi);
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "done");
 	return (DDI_SUCCESS);
+
+fail:
+	(void) asydetach(devi, DDI_DETACH);
+	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -1197,17 +1350,6 @@ asy_getproperty(dev_info_t *devi, struct asycom *asy, const char *property)
 static void
 asy_soft_state_free(struct asycom *asy)
 {
-	mutex_enter(&asy_glob_lock);
-	/* If we were the max_asy_instance, work out new value */
-	if (asy->asy_unit == max_asy_instance) {
-		while (--max_asy_instance >= 0) {
-			if (ddi_get_soft_state(asy_soft_state,
-			    max_asy_instance) != NULL)
-				break;
-		}
-	}
-	mutex_exit(&asy_glob_lock);
-
 	if (asy->asy_priv != NULL) {
 		kmem_free(asy->asy_priv, sizeof (struct asyncline));
 		asy->asy_priv = NULL;
@@ -1605,9 +1747,8 @@ again:
 		async->async_startc = CSTART;
 		async->async_stopc = CSTOP;
 		asy_program(asy, ASY_INIT);
-	} else
-		if ((async->async_ttycommon.t_flags & TS_XCLUDE) &&
-		    secpolicy_excl_open(cr) != 0) {
+	} else if ((async->async_ttycommon.t_flags & TS_XCLUDE) &&
+	    secpolicy_excl_open(cr) != 0) {
 		mutex_exit(&asy->asy_excl_hi);
 		mutex_exit(&asy->asy_excl);
 		return (EBUSY);
@@ -2212,7 +2353,7 @@ asy_baudok(struct asycom *asy)
  * the interrupt is from this port.
  */
 uint_t
-asyintr(caddr_t argasy)
+asyintr(caddr_t argasy, caddr_t argunused __unused)
 {
 	struct asycom		*asy = (struct asycom *)argasy;
 	struct asyncline	*async = asy->asy_priv;
@@ -2356,7 +2497,7 @@ async_txint(struct asycom *asy)
 	if (fifo_len <= 0)
 		return;
 
-	ASYSETSOFT(asy);
+	asysetsoft(asy);
 }
 
 /*
@@ -2561,7 +2702,7 @@ check_looplim:
 
 	if ((async->async_flags & ASYNC_SERVICEIMM) || needsoft ||
 	    (RING_FRAC(async)) || (async->async_polltid == 0)) {
-		ASYSETSOFT(asy);	/* need a soft interrupt */
+		asysetsoft(asy);	/* need a soft interrupt */
 	}
 }
 
@@ -2611,7 +2752,7 @@ async_msint_retry:
 		asy_ppsevent(asy, msr);
 
 	async->async_ext++;
-	ASYSETSOFT(asy);
+	asysetsoft(asy);
 	/*
 	 * We will make sure that the modem status presented to us
 	 * during the previous read has not changed. If the chip samples
@@ -2626,11 +2767,32 @@ async_msint_retry:
 }
 
 /*
+ * Pend a soft interrupt if one isn't already pending.
+ */
+static void
+asysetsoft(struct asycom *asy)
+{
+	ASSERT(MUTEX_HELD(&asy->asy_excl_hi));
+
+	if (mutex_tryenter(&asy->asy_soft_lock) == 0)
+		return;
+
+	asy->asy_flags |= ASY_NEEDSOFT;
+	if (!asy->asysoftpend) {
+		asy->asysoftpend = 1;
+		mutex_exit(&asy->asy_soft_lock);
+		(void) ddi_intr_trigger_softint(asy->asy_soft_inth, NULL);
+	} else {
+		mutex_exit(&asy->asy_soft_lock);
+	}
+}
+
+/*
  * Handle a second-stage interrupt.
  */
 /*ARGSUSED*/
 uint_t
-asysoftintr(caddr_t intarg)
+asysoftintr(caddr_t intarg, caddr_t unusedarg __unused)
 {
 	struct asycom *asy = (struct asycom *)intarg;
 	struct asyncline *async;
@@ -2892,7 +3054,7 @@ begin:
 	mutex_enter(&asy->asy_excl);
 	mutex_enter(&asy->asy_excl_hi);
 	if (cc) {
-		ASYSETSOFT(asy);	/* finish cc chars */
+		asysetsoft(asy);	/* finish cc chars */
 	}
 rv:
 	if ((RING_CNT(async) < (RINGSIZE/4)) &&
@@ -3729,7 +3891,7 @@ asyrsrv(queue_t *q)
 	while (canputnext(q) && (bp = getq(q)))
 		putnext(q, bp);
 	mutex_enter(&asy->asy_excl_hi);
-	ASYSETSOFT(asy);
+	asysetsoft(asy);
 	mutex_exit(&asy->asy_excl_hi);
 	async->async_polltid = 0;
 	return (0);

@@ -1,0 +1,107 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 RackTop Systems, Inc.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object scoping must comply with the rules detailed in
+#
+#	usr/src/uts/common/mapfiles/README
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# These are externals needed by "nsmb", kept separately here for now.
+# Most of these could probably go in kernel.mapfile or elsewhere.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	adjmsg				{ FLAGS = EXTERN };
+	allocb_cred_wait		{ FLAGS = EXTERN };
+	allocb_wait			{ FLAGS = EXTERN };
+	avl_add				{ FLAGS = EXTERN };
+	avl_create			{ FLAGS = EXTERN };
+	avl_destroy			{ FLAGS = EXTERN };
+	avl_destroy_nodes		{ FLAGS = EXTERN };
+	avl_find			{ FLAGS = EXTERN };
+	avl_first			{ FLAGS = EXTERN };
+	avl_insert			{ FLAGS = EXTERN };
+	avl_numnodes			{ FLAGS = EXTERN };
+	avl_remove			{ FLAGS = EXTERN };
+	avl_walk			{ FLAGS = EXTERN };
+	copyin				{ FLAGS = EXTERN };
+	copymsg				{ FLAGS = EXTERN };
+	copyout				{ FLAGS = EXTERN };
+	crdup				{ FLAGS = EXTERN };
+	crfree				{ FLAGS = EXTERN };
+	crgetruid			{ FLAGS = EXTERN };
+	crgetzoneid			{ FLAGS = EXTERN };
+	crhold				{ FLAGS = EXTERN };
+	crypto_cancel_ctx		{ FLAGS = EXTERN };
+	crypto_decrypt			{ FLAGS = EXTERN };
+	crypto_digest_final		{ FLAGS = EXTERN };
+	crypto_digest_init		{ FLAGS = EXTERN };
+	crypto_digest_update		{ FLAGS = EXTERN };
+	crypto_encrypt			{ FLAGS = EXTERN };
+	crypto_mac			{ FLAGS = EXTERN };
+	crypto_mac_final		{ FLAGS = EXTERN };
+	crypto_mac_init			{ FLAGS = EXTERN };
+	crypto_mac_update		{ FLAGS = EXTERN };
+	crypto_mech2id			{ FLAGS = EXTERN };
+	cv_reltimedwait_sig		{ FLAGS = EXTERN };
+	cv_timedwait			{ FLAGS = EXTERN };
+	cv_timedwait_sig		{ FLAGS = EXTERN };
+	cv_wait_sig			{ FLAGS = EXTERN };
+	debug_enter			{ FLAGS = EXTERN };
+	dupb				{ FLAGS = EXTERN };
+	dupmsg				{ FLAGS = EXTERN };
+	getf				{ FLAGS = EXTERN };
+	getmajor			{ FLAGS = EXTERN };
+	getminor			{ FLAGS = EXTERN };
+	getzoneid			{ FLAGS = EXTERN };
+	hz				{ FLAGS = EXTERN };
+	kcred				{ FLAGS = EXTERN };
+	linkb				{ FLAGS = EXTERN };
+	makedevice			{ FLAGS = EXTERN };
+	msgdsize			{ FLAGS = EXTERN };
+	pullupmsg			{ FLAGS = EXTERN };
+	random_get_pseudo_bytes		{ FLAGS = EXTERN };
+	releasef			{ FLAGS = EXTERN };
+	rw_downgrade			{ FLAGS = EXTERN };
+	rw_write_held			{ FLAGS = EXTERN };
+	secpolicy_smbfs_login		{ FLAGS = EXTERN };
+	secpolicy_vnode_owner		{ FLAGS = EXTERN };
+	setpflags			{ FLAGS = EXTERN };
+	strcspn				{ FLAGS = EXTERN };
+	strdup				{ FLAGS = EXTERN };
+	strfree				{ FLAGS = EXTERN };
+	strnlen				{ FLAGS = EXTERN };
+	sys_labeling			{ FLAGS = EXTERN };
+	u8_strcmp			{ FLAGS = EXTERN };
+	uconv_u16tou8			{ FLAGS = EXTERN };
+	uconv_u8tou16			{ FLAGS = EXTERN };
+	unlinkb				{ FLAGS = EXTERN };
+	zone_key_create			{ FLAGS = EXTERN };
+	zone_key_delete			{ FLAGS = EXTERN };
+	zprintf				{ FLAGS = EXTERN };
+};

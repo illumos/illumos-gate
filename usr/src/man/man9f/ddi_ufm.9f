@@ -145,7 +145,7 @@ and
 functions are generally called from a device's
 .Xr attach 9E
 and
-.Xr fini 9E
+.Xr _fini 9E
 routines, though they may be called from
 .Sy user
 or
@@ -157,6 +157,6 @@ The
 function may be called from any context except a high-level interrupt
 handler above lock level.
 .Sh SEE ALSO
+.Xr _fini 9E ,
 .Xr attach 9E ,
-.Xr ddi_ufm 9E ,
-.Xr fini 9E
+.Xr ddi_ufm 9E

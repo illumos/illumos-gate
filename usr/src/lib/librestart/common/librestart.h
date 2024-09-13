@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef	_LIBRESTART_H
@@ -106,6 +107,8 @@ typedef uint32_t restarter_event_type_t;
  *		instance caused a dependency cycle
  *	RESTARTER_EVENT_TYPE_INVALID_DEPENDENCY
  *		instance has an invalid dependency
+ *	RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE
+ *	RESTARTER_EVENT_TYPE_ADMIN_RESTORE
  */
 
 #define	RESTARTER_EVENT_TYPE_INVALID			0
@@ -125,6 +128,8 @@ typedef uint32_t restarter_event_type_t;
 #define	RESTARTER_EVENT_TYPE_INVALID_DEPENDENCY		14
 #define	RESTARTER_EVENT_TYPE_ADMIN_DISABLE		15
 #define	RESTARTER_EVENT_TYPE_STOP_RESET			16
+#define	RESTARTER_EVENT_TYPE_ADMIN_DEGRADE_IMMEDIATE	17
+#define	RESTARTER_EVENT_TYPE_ADMIN_RESTORE		18
 
 #define	RESTARTER_EVENT_ERROR			-1
 
@@ -298,16 +303,16 @@ struct method_context {
  * of the error structure.
  *
  * type - usually will be an errno equivalent but could contain
- * 	defined error types for exampe SCF_ERROR_XXX
+ *	defined error types for exampe SCF_ERROR_XXX
  * msg - must be at the end of the structure as if the message is
- * 	longer than EMSGSIZE we will reallocate the structure to
- * 	handle the overflow
+ *	longer than EMSGSIZE we will reallocate the structure to
+ *	handle the overflow
  */
 typedef struct mc_error {
 	int	destroy;	/* Flag to indicate destruction steps */
 	int	type;		/* Type of error for decision making */
 	int	size;		/* The size of the error message string */
-	char 	msg[RESTARTER_ERRMSGSZ];
+	char	msg[RESTARTER_ERRMSGSZ];
 } mc_error_t;
 
 int restarter_rm_libs_loadable(void);

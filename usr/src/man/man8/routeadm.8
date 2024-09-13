@@ -7,7 +7,6 @@
 .SH NAME
 routeadm \- IP forwarding and routing configuration
 .SH SYNOPSIS
-.LP
 .nf
 \fBrouteadm\fR  [\fB-p\fR  [\fIoption\fR]]
 .fi
@@ -34,7 +33,6 @@ routeadm \- IP forwarding and routing configuration
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBrouteadm\fR command is used to administer system-wide configuration for
 IP forwarding and routing. IP forwarding is the passing of IP packets from one
 network to another; IP routing is the use of a routing protocol to determine
@@ -79,7 +77,6 @@ service as appropriate. This conversion process occurs when you issue an enable
 .LP
 The first usage, in the SYNOPSIS above, reports the current configuration.
 .SH OPTIONS
-.LP
 The following command-line options are supported:
 .sp
 .ne 2
@@ -210,7 +207,7 @@ displayed and the program exits. The following variables can be specified:
 .RS 4n
 Specifies the routing daemon services to be enabled. Routing daemon services
 are determined to be IPv4 or IPv6 (and so enabled or disabled when
-\fBrouteadm\fR \fB-e\fR/\fB-d\fR \fBipv4\fR\fI(6)\fR\fB-routing\fR is run) on
+\fBrouteadm\fR \fB-e\fR/\fB-d\fR \fBipv4\fR\fI[or 6]\fR\fB-routing\fR is run) on
 the basis of property values in the \fBrouteadm\fR application property group.
 Default: \fBroute:default ripng:default\fR
 .RE
@@ -403,7 +400,6 @@ interface-specific forwarding flag is set according to the current global
 forwarding value. Thus, the forwarding value forms the "default" for all new
 interfaces.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fREnabling IPv4 Forwarding
 .sp
 .LP
@@ -497,7 +493,6 @@ See \fBin.routed\fR(8) for details of property names and how they relate to
 daemon behavior.
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -527,7 +522,6 @@ Parameters for IP forwarding and routing. (Not to be edited.)
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -542,7 +536,6 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.LP
 .BR gateways (5),
 .BR attributes (7),
 .BR smf (7),

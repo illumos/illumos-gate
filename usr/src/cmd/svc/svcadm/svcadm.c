@@ -24,6 +24,7 @@
  */
 
 /*
+ * Copyright 2017 RackTop Systems.
  * Copyright 2020, Joyent, Inc. All rights reserved.
  * Copyright 2023 Oxide Computer Company
  */
@@ -95,6 +96,15 @@ typedef struct {
 	int ed_flags;
 } enable_data_t;
 
+/*
+ * Callback data for mark.
+ */
+#define	MARK_IMMEDIATE	0x1
+#define	MARK_TEMPORARY	0x2
+
+typedef struct {
+	int md_flags;
+} mark_data_t;
 
 scf_handle_t *h;
 ssize_t max_scf_fmri_sz;
@@ -2004,8 +2014,7 @@ clear_instance(void *data, scf_walkinfo_t *wip)
 
 	if (strcmp(state, SCF_STATE_STRING_MAINT) == 0) {
 		set_inst_action(wip->fmri, wip->inst, SCF_PROPERTY_MAINT_OFF);
-	} else if (strcmp(state, SCF_STATE_STRING_DEGRADED) ==
-	    0) {
+	} else if (strcmp(state, SCF_STATE_STRING_DEGRADED) == 0) {
 		set_inst_action(wip->fmri, wip->inst, SCF_PROPERTY_RESTORE);
 	} else {
 		uu_warn(gettext("Instance \"%s\" is not in a "
@@ -2036,16 +2045,10 @@ set_fmri_action(void *action, scf_walkinfo_t *wip)
 	return (0);
 }
 
-/*
- * Flags to control 'mark' action.
- */
-#define	MARK_IMMEDIATE	0x1
-#define	MARK_TEMPORARY	0x2
-
 static int
 force_degraded(void *data, scf_walkinfo_t *wip)
 {
-	int flags = (int)data;
+	mark_data_t *md = data;
 	char state[MAX_SCF_STATE_STRING_SZ];
 
 	if (inst_get_state(wip->inst, state, wip->fmri, NULL) != 0) {
@@ -2062,7 +2065,7 @@ force_degraded(void *data, scf_walkinfo_t *wip)
 		return (0);
 	}
 
-	set_inst_action(wip->fmri, wip->inst, (flags & MARK_IMMEDIATE) ?
+	set_inst_action(wip->fmri, wip->inst, (md->md_flags & MARK_IMMEDIATE) ?
 	    SCF_PROPERTY_DEGRADE_IMMEDIATE : SCF_PROPERTY_DEGRADED);
 
 	return (0);
@@ -2071,7 +2074,7 @@ force_degraded(void *data, scf_walkinfo_t *wip)
 static int
 force_maintenance(void *data, scf_walkinfo_t *wip)
 {
-	int flags = (int)data;
+	mark_data_t *md = data;
 	const char *prop;
 
 	if (svcsearch) {
@@ -2083,12 +2086,12 @@ force_maintenance(void *data, scf_walkinfo_t *wip)
 			return (0);
 	}
 
-	if (flags & MARK_IMMEDIATE) {
-		prop = (flags & MARK_TEMPORARY) ?
+	if (md->md_flags & MARK_IMMEDIATE) {
+		prop = (md->md_flags & MARK_TEMPORARY) ?
 		    SCF_PROPERTY_MAINT_ON_IMMTEMP :
 		    SCF_PROPERTY_MAINT_ON_IMMEDIATE;
 	} else {
-		prop = (flags & MARK_TEMPORARY) ?
+		prop = (md->md_flags & MARK_TEMPORARY) ?
 		    SCF_PROPERTY_MAINT_ON_TEMPORARY :
 		    SCF_PROPERTY_MAINT_ON;
 	}
@@ -2596,16 +2599,18 @@ again:
 		}
 
 	} else if (strcmp(argv[optind], "mark") == 0) {
-		int flags = 0;
 		scf_walk_callback callback;
+		mark_data_t md = {
+			.md_flags = 0
+		};
 
 		++optind;
 
 		while ((o = getopt(argc, argv, "It")) != -1) {
 			if (o == 'I')
-				flags |= MARK_IMMEDIATE;
+				md.md_flags |= MARK_IMMEDIATE;
 			else if (o == 't')
-				flags |= MARK_TEMPORARY;
+				md.md_flags |= MARK_TEMPORARY;
 			else if (o == '?')
 				usage();
 			else {
@@ -2618,11 +2623,11 @@ again:
 			usage();
 
 		if (strcmp(argv[optind], "degraded") == 0) {
-			if (flags & MARK_TEMPORARY)
-				uu_xdie(UU_EXIT_USAGE, gettext("-t may not be "
-				    "used with degraded.\n"));
+			if ((md.md_flags & MARK_TEMPORARY) != 0) {
+				uu_xdie(UU_EXIT_USAGE, gettext(
+				    "-t may not be used with degraded.\n"));
+			}
 			callback = force_degraded;
-
 		} else if (strcmp(argv[optind], "maintenance") == 0) {
 			callback = force_maintenance;
 		} else {
@@ -2640,9 +2645,9 @@ again:
 			usage();
 
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS, callback,
-		    NULL, &exit_status, pr_warn)) != 0) {
-			pr_warn(gettext("failed to iterate over "
-			    "instances: %s\n"),
+		    (void *)&md, &exit_status, pr_warn)) != 0) {
+			pr_warn(gettext(
+			    "failed to iterate over instances: %s\n"),
 			    scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}

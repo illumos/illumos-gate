@@ -7,7 +7,6 @@
 .SH NAME
 tcpd \- access control facility for internet services
 .SH DESCRIPTION
-.PP
 The \fItcpd\fR program can be set up to monitor incoming requests for
 \fItelnet\fR, \fIfinger\fR, \fIftp\fR, \fIexec\fR, \fIrsh\fR,
 \fIrlogin\fR, \fItftp\fR, \fItalk\fR, \fIcomsat\fR and other services
@@ -40,7 +39,7 @@ for more information.
 .SH LOGGING
 Connections that are monitored by
 .I tcpd
-are reported through the \fIsyslog\fR(3) facility. Each record contains
+are reported through the \fIsyslog\fR(3C) facility. Each record contains
 a time stamp, the client host name and the name of the requested
 service.  The information can be useful to detect unwanted activities,
 especially when logfile information from several hosts is merged.

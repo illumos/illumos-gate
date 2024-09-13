@@ -135,6 +135,31 @@ export ENABLE_SMB_PRINTING=
 export BUILDVERSION_EXEC="git describe --all --long --dirty"
 
 # -----------------------------------------------------------------------------
+# When the 'n' option is not present in NIGHTLY_OPTIONS, nightly updates
+# the build workspace from the sources identified by the following
+# variables.  Defaults are set in nightly if the environment file
+# leaves them unset.
+# -----------------------------------------------------------------------------
+
+# SCM in use.  Defaults to "git"; others are undertested.
+#export BRINGOVER_SCM="git"
+
+# URL or pathname to source workspace.
+#export BRINGOVER_WS="${CLONE_WS}"
+
+# Branch within BRINGOVER_WS; must be specified if BRINGOVER_WS is a URL
+#export BRINGOVER_BRANCH=""
+
+# Short name to use within CODEMGR_WS for BRINGOVER_WS.
+# This is git-specific.
+#export BRINGOVER_REMOTE=nightly_bringover_ws
+
+# Command-line options to add to the clone operation that creates a new
+# workspace.   If git is in use, adding "--reference /path/to/local/illumos-gate"
+# can speed up clones and make them use less disk space.
+#export CLONE_OPTIONS=""
+
+# -----------------------------------------------------------------------------
 # You are less likely to need to modify parameters below.
 # -----------------------------------------------------------------------------
 

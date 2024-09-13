@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 RackTop Systems.
  * Copyright 2020 Joyent, Inc.
  */
 
@@ -1209,6 +1210,9 @@ determine_causes(inst_t *svcp, void *canfailp)
 		 * excluding another service.
 		 */
 		add_svcptr(svcp->causes, svcp);
+		if (strcmp(svcp->state, SCF_STATE_STRING_DEGRADED) == 0)
+			add_svcptr(g_causes, svcp);
+
 		return (UU_WALK_NEXT);
 	}
 
@@ -1500,6 +1504,10 @@ print_method_failure(const inst_t *ip, const char **dcp)
 			} else if (WEXITSTATUS(stat) == SMF_EXIT_ERR_FATAL) {
 				(void) strlcpy(buf, gettext(
 				    "exited with $SMF_EXIT_ERR_FATAL"),
+				    sizeof (buf));
+			} else if (WEXITSTATUS(stat) == SMF_EXIT_MON_DEGRADE) {
+				(void) strlcpy(buf, gettext(
+				    "exited with $SMF_EXIT_MON_DEGRADE"),
 				    sizeof (buf));
 			} else {
 				(void) snprintf(buf, sizeof (buf),
@@ -1832,8 +1840,26 @@ print_reasons(const inst_t *svcp, int verbose)
 		}
 
 	} else if (strcmp(svcp->state, SCF_STATE_STRING_DEGRADED) == 0) {
-		(void) puts(gettext("Reason: Degraded by an administrator."));
-		dc = DC_ADMINDEGR;
+		if (strcmp(svcp->aux_state, "administrative_request") == 0) {
+			(void) puts(gettext(
+			    "Reason: Degraded by an administrator."));
+			dc = DC_ADMINDEGR;
+		} else if (strcmp(svcp->aux_state, "service_request") == 0) {
+			if (svcp->aux_fmri) {
+				(void) printf(gettext(
+				    "Reason: Degraded by \"%s\"\n"),
+				    svcp->aux_fmri);
+				print_aux_fmri_logs(svcp->aux_fmri);
+			} else {
+				(void) puts(gettext(
+				    "Reason: Degraded by another service."));
+			}
+		} else if (strcmp(svcp->aux_state, "method_failed") == 0) {
+			print_method_failure(svcp, &dc);
+		} else {
+			(void) puts(gettext("Reason: Unknown."));
+			dc = DC_UNKNOWN;
+		}
 
 	} else {
 		(void) printf(gettext("Reason: Not in valid state (%s).\n"),
@@ -1842,7 +1868,7 @@ print_reasons(const inst_t *svcp, int verbose)
 	}
 
 diagcode:
-	if (g_msgbase != NULL)
+	if (g_msgbase != NULL && dc != NULL)
 		(void) printf(gettext("   See: %s%s\n"), g_msgbase, dc);
 }
 

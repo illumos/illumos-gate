@@ -8,7 +8,6 @@
 .SH NAME
 inet \- Internet protocol family
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/types.h>\fR
 .fi
@@ -19,7 +18,6 @@ inet \- Internet protocol family
 .fi
 
 .SH DESCRIPTION
-.LP
 The Internet protocol family implements a collection of protocols which are
 centered around the Internet Protocol ("\fBIP\fR") and which share a common
 address format. The Internet family protocols can be accessed using the socket
@@ -28,7 +26,6 @@ interface, where they support the \fBSOCK_STREAM\fR, \fBSOCK_DGRAM\fR, and
 support the connectionless (\fBT_CLTS\fR)  and connection oriented
 (\fBT_COTS_ORD\fR) service types.
 .SH PROTOCOLS
-.LP
 The Internet protocol family is comprised of the Internet Protocol
 ("\fBIP\fR"), the Address Resolution Protocol ("\fBARP\fR"), the Internet
 Control Message Protocol ("\fBICMP\fR"), the Transmission Control Protocol
@@ -81,7 +78,6 @@ Get interface network mask.
 .RE
 
 .SH ADDRESSING
-.LP
 \fBIP\fR addresses are four byte quantities, stored in network byte order.
 \fBIP\fR addresses should be manipulated using the byte order conversion
 routines. See  \fBbyteorder\fR(3C).
@@ -102,7 +98,7 @@ char     sin_zero[8];
 .sp
 .LP
 Library routines are provided to manipulate structures of this form; See
-\fBinet\fR(3SOCKET).
+\fBinet\fR(3C).
 .sp
 .LP
 The \fBsin_addr\fR field of the \fBsockaddr_in\fR structure specifies a local
@@ -152,7 +148,6 @@ restriction by setting the \fBSO_REUSEADDR\fR socket option with
 numbers. These semantics apply when Internet family protocols are used using
 the \fBTLI\fR.
 .SH SEE ALSO
-.LP
 .BR ioctl (2),
 .BR byteorder (3C),
 .BR gethostbyname (3NSL),
@@ -175,7 +170,6 @@ the \fBTLI\fR.
 Network Information Center, \fIDDN Protocol Handbook\fR (3 vols.), Network
 Information Center, \fBSRI\fR International, Menlo Park, Calif., 1985.
 .SH NOTES
-.LP
 The Internet protocol support is subject to change as the Internet protocols
 develop.  Users should not depend on details of the current implementation, but
 rather the services exported.
