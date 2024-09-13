@@ -14,13 +14,14 @@
 # Copyright 2017 Gordon W. Ross
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 # These test programs are built as both 32- and 64-bit variants
-PROGDA = rights recvmsg
+PROGDA = rights recvmsg timeouts
 
 PROG =	conn dgram drop_priv nosignal sockpair \
 	$(PROGDA:%=%.32) $(PROGDA:%=%.64) \

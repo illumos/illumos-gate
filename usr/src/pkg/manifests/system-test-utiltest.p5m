@@ -1564,6 +1564,8 @@ file path=opt/util-tests/tests/files/svr4pkg/data/a/file1.txt mode=0444
 dir  path=opt/util-tests/tests/files/svr4pkg/data/b
 file path=opt/util-tests/tests/files/svr4pkg/data/b/file2.txt mode=0444
 dir  path=opt/util-tests/tests/find
+file path=opt/util-tests/tests/find/find.kshlib mode=0555
+file path=opt/util-tests/tests/find/findroot mode=0555
 file path=opt/util-tests/tests/find/findtest mode=0555
 file path=opt/util-tests/tests/grep_test mode=0555
 dir  path=opt/util-tests/tests/head

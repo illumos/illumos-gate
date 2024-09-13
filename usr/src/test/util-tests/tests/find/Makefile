@@ -17,13 +17,15 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests/tests/find
-PROG = findtest
+PROG = findtest findroot
+LIB = find.kshlib
 
 ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
+ROOTLIB = $(LIB:%=$(ROOTOPTPKG)/%)
 
 all:
 
-install: $(ROOTPROG)
+install: $(ROOTPROG) $(ROOTLIB)
 
 clobber: clean
 

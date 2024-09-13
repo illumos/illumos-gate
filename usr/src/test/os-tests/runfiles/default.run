@@ -91,8 +91,18 @@ tests = ['runtests.32', 'runtests.64']
 
 [/opt/os-tests/tests/sockfs]
 user = root
-tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'rights.32', 'rights.64',
-         'sockpair', 'recvmsg.32', 'recvmsg.64', 'so_protocol']
+tests = ['conn',
+         'dgram',
+         'drop_priv',
+         'nosignal',
+         'recvmsg.32',
+         'recvmsg.64',
+         'rights.32',
+         'rights.64',
+         'so_protocol',
+         'sockpair',
+         'timeouts.32',
+         'timeouts.64']
 
 [/opt/os-tests/tests/syscall]
 tests = ['fchmodat.32', 'fchmodat.64', 'open.32', 'open.64']

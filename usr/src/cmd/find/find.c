@@ -23,7 +23,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Andrew Stormont.  All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 
@@ -48,6 +48,7 @@
 #include <sys/stat.h>
 #include <sys/param.h>
 #include <sys/acl.h>
+#include <aclutils.h>
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -86,10 +87,11 @@ enum Command
 {
 	PRINT,
 	ACL, AMIN, AND, ATIME, CMIN, CPIO, CSIZE, CTIME, DEPTH, EXEC, F_GROUP,
-	F_GROUPACL, F_USER, F_USERACL, FOLLOW, FSTYPE, INAME, INUM, IPATH,
-	IREGEX,	LINKS, LOCAL, LPAREN, LS, MAXDEPTH, MINDEPTH, MMIN, MOUNT,
-	MTIME, NAME, NCPIO, NEWER, NOGRP, NOT, NOUSER, OK, OR, PATH, PERM,
-	PRINT0, PRUNE, REGEX, RPAREN, SIZE, TYPE, VARARGS, XATTR, DELETE
+	GROUPACL, GSID, GSIDACL, F_USER, USERACL, USID, USIDACL, FOLLOW,
+	FSTYPE, INAME, INUM, IPATH, IREGEX, LINKS, LOCAL, LPAREN, LS, MAXDEPTH,
+	MINDEPTH, MMIN, MOUNT, MTIME, NAME, NCPIO, NEWER, NOGRP, NOT, NOUSER,
+	OK, OR, PATH, PERM, PRINT0, PRUNE, REGEX, RPAREN, SIDACL, SIZE, TYPE,
+	VARARGS, XATTR, DELETE
 };
 
 enum Type
@@ -107,7 +109,7 @@ struct Args
 /*
  * Except for pathnames, these are the only legal arguments
  */
-static struct Args commands[] =
+static const struct Args commands[] =
 {
 	"!",		NOT,		Op,
 	"(",		LPAREN,		Unary,
@@ -126,7 +128,9 @@ static struct Args commands[] =
 	"-follow",	FOLLOW,		Unary,
 	"-fstype",	FSTYPE,		Str,
 	"-group",	F_GROUP,	Num,
-	"-groupacl",	F_GROUPACL,	Num,
+	"-groupacl",	GROUPACL,	Num,
+	"-gsid",	GSID,		Num,
+	"-gsidacl",	GSIDACL,	Num,
 	"-iname",	INAME,		Str,
 	"-inum",	INUM,		Num,
 	"-ipath",	IPATH,		Str,
@@ -154,10 +158,13 @@ static struct Args commands[] =
 	"-print0",	PRINT0,		Unary,
 	"-prune",	PRUNE,		Unary,
 	"-regex",	REGEX,		Str,
+	"-sidacl",	SIDACL,		Num,
 	"-size",	SIZE,		Num,
 	"-type",	TYPE,		Num,
 	"-user",	F_USER,		Num,
-	"-useracl",	F_USERACL,	Num,
+	"-useracl",	USERACL,	Num,
+	"-usid",	USID,		Num,
+	"-usidacl",	USIDACL,	Num,
 	"-xattr",	XATTR,		Unary,
 	"-xdev",	MOUNT,		Unary,
 	0,		0,		0
@@ -210,7 +217,7 @@ static int		execute(const char *, const struct stat *, int,
 static int		doexec(const char *, char **, int *);
 static int		dodelete(const char *, const struct stat *,
     struct FTW *);
-static struct Args	*lookup(char *);
+static const struct Args *lookup(char *);
 static int		ok(const char *, char *[]);
 static void		usage(void)	__NORETURN;
 static struct Arglist	*varargs(char **);
@@ -424,7 +431,7 @@ compile(char **argv, struct Node *np, int *actionp)
 	char *b;
 	char **av;
 	struct Node *oldnp = topnode;
-	struct Args *argp;
+	const struct Args *argp;
 	char **com;
 	int i;
 	enum Command wasop = PRINT;
@@ -572,8 +579,8 @@ compile(char **argv, struct Node *np, int *actionp)
 
 		case F_USER:
 		case F_GROUP:
-		case F_USERACL:
-		case F_GROUPACL: {
+		case USERACL:
+		case GROUPACL: {
 			struct	passwd	*pw;
 			struct	group *gr;
 			long value;
@@ -581,7 +588,7 @@ compile(char **argv, struct Node *np, int *actionp)
 
 			value = -1;
 			if (argp->action == F_USER ||
-			    argp->action == F_USERACL) {
+			    argp->action == USERACL) {
 				if ((pw = getpwnam(b)) != 0)
 					value = (long)pw->pw_uid;
 			} else {
@@ -599,6 +606,67 @@ compile(char **argv, struct Node *np, int *actionp)
 				}
 			}
 			np->first.l = value;
+			break;
+		}
+
+		case USID:
+		case GSID:
+		case USIDACL:
+		case GSIDACL: {
+			uid_t value;
+			boolean_t need_user = ((argp->action == USID) ||
+			    (argp->action == USIDACL));
+			value = -1;
+			if (sid_to_id(b, need_user, &value)) {
+				(void) fprintf(stderr, gettext(
+				    "%s: cannot find %s name\n"),
+				    cmdname, *av);
+				exit(1);
+			}
+			np->first.l = value;
+
+			switch (argp->action) {
+			case USID:
+				np->action = F_USER;
+				break;
+
+			case GSID:
+				np->action = F_GROUP;
+				break;
+
+			case USIDACL:
+				np->action = USERACL;
+				break;
+
+			case GSIDACL:
+				np->action = GROUPACL;
+				break;
+			}
+			break;
+		}
+
+		case SIDACL: {
+			uid_t siduid = -1;
+			uid_t sidgid = -1;
+			int nouid = sid_to_id(b, B_TRUE, &siduid);
+			int nogid = sid_to_id(b, B_FALSE, &sidgid);
+
+			if (nouid != 0 && nogid != 0) {
+				(void) fprintf(stderr, gettext(
+				    "%s: cannot find uid or gid from %s\n"),
+				    cmdname, *av);
+				exit(1);
+			}
+			if (nouid != 0) {
+				np->action = GROUPACL;
+				np->first.l = sidgid;
+			} else if (nogid != 0) {
+				np->action = USERACL;
+				np->first.l = siduid;
+			} else {
+				np->first.l = siduid;
+				np->second.l = sidgid;
+			}
 			break;
 		}
 
@@ -810,7 +878,7 @@ aclmatch(struct Node *np, const char *filename)
 	aclent_t *p1;
 	ace_t *p2;
 
-	if (np->action == F_USERACL) {
+	if (np->action == USERACL) {
 		t1 = USER;
 		t2 = 0;
 	} else {
@@ -821,17 +889,33 @@ aclmatch(struct Node *np, const char *filename)
 	if (acl_get(filename, 0, &acl) != 0)
 		return (0);
 
+	/* Old acls can't map sids */
+	if (np->action == SIDACL && acl->acl_type == ACLENT_T)
+		return (0);
+
 	for (i = 0, acl_entry = acl->acl_aclp;
 	    i != acl->acl_cnt; i++) {
+		id_t who = np->first.l;
+
 		if (acl->acl_type == ACLENT_T) {
 			p1 = (aclent_t *)acl_entry;
-			if (p1->a_id == np->first.l && p1->a_type == t1) {
+			if (np->action != SIDACL &&
+			    p1->a_id == who && p1->a_type == t1) {
 				acl_free(acl);
 				return (1);
 			}
 		} else {
 			p2 = (ace_t *)acl_entry;
-			if (p2->a_who == np->first.l &&
+
+			if (np->action == SIDACL) {
+				if (p2->a_flags & ACE_IDENTIFIER_GROUP) {
+					who = np->second.l;
+					t2 = ACE_IDENTIFIER_GROUP;
+				} else {
+					t2 = 0;
+				}
+			}
+			if (p2->a_who == who &&
 			    ((p2->a_flags & ACE_TYPE_FLAGS) == t2)) {
 				acl_free(acl);
 				return (1);
@@ -1133,8 +1217,9 @@ execute(const char *name, const struct stat *statb, int type, struct FTW *state)
 			    gettail(name) : name;
 			val = acl_trivial(filename);
 			break;
-		case F_USERACL:
-		case F_GROUPACL: {
+		case USERACL:
+		case GROUPACL:
+		case SIDACL: {
 			filename = (walkflags & FTW_CHDIR) ?
 			    gettail(name) : name;
 			val = aclmatch(np, filename);
@@ -1388,10 +1473,10 @@ dodelete(const char *name, const struct stat *statb, struct FTW *state)
 /*
  *  Table lookup routine
  */
-static struct Args *
+static const struct Args *
 lookup(char *word)
 {
-	struct Args *argp = commands;
+	const struct Args *argp = commands;
 	int second;
 	if (word == 0 || *word == 0)
 		return (0);
