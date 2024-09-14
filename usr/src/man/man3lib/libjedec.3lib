@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 2, 2024
+.Dd September 14, 2024
 .Dt LIBJEDEC 3JEDEC
 .Os
 .Sh NAME
@@ -74,7 +74,7 @@ Currently the library implements JEP106BH from September 2023.
 Many JEDEC standards embed information about temperature ranges that
 components support for the case operating temperature, the ambient air
 temperature, and related.
-These ranges are in turn defined in JESD402-1A
+These ranges are in turn defined in JESD402-1B
 .Po
 .%T Temperature Range and Measurement Standards for Components and Modules
 .Pc .
@@ -115,8 +115,8 @@ there is no guarantee that this will apply to future functions.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T Temperature Range and Measurement Standards for Components and Modules
-.%N JESD402-1A
-.%D March 2022
+.%N JESD402-1B
+.%D September 2024
 .Re
 .Rs
 .%Q JEDEC Solid State Technology Association

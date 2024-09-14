@@ -44,12 +44,12 @@ extern "C" {
 extern const char *libjedec_vendor_string(uint_t, uint_t);
 
 /*
- * JEDEC operating temperature ranges. These are defined in JESD402-1A (March
- * 2022).
+ * JEDEC operating temperature ranges. These are defined in JESD402-1B
+ * (September 2024).
  */
 typedef enum {
 	/*
-	 * Case Operating Temperature Ranges
+	 * Operating Case Temperature Ranges
 	 */
 	JEDEC_TEMP_CASE_A1T,
 	JEDEC_TEMP_CASE_A2T,
@@ -71,12 +71,53 @@ typedef enum {
 	JEDEC_TEMP_AMB_AO2T,
 	JEDEC_TEMP_AMB_AO1T,
 	/*
-	 * Storage temperature ranges
+	 * Storage Temperature Ranges
 	 */
 	JEDEC_TEMP_STOR_2,
 	JEDEC_TEMP_STOR_1B,
 	JEDEC_TEMP_STOR_1A,
-	JEDEC_TEMP_STOR_ST
+	JEDEC_TEMP_STOR_ST,
+	/*
+	 * Operating Junction Temperature Ranges
+	 */
+	JEDEC_TEMP_JNCT_A135,
+	JEDEC_TEMP_JNCT_A130,
+	JEDEC_TEMP_JNCT_A1T,
+	JEDEC_TEMP_JNCT_A120,
+	JEDEC_TEMP_JNCT_A115,
+	JEDEC_TEMP_JNCT_A110,
+	JEDEC_TEMP_JNCT_A2T,
+	JEDEC_TEMP_JNCT_A100,
+	JEDEC_TEMP_JNCT_A95,
+	JEDEC_TEMP_JNCT_A90,
+	JEDEC_TEMP_JNCT_A3T,
+	JEDEC_TEMP_JNCT_LT135,
+	JEDEC_TEMP_JNCT_LT130,
+	JEDEC_TEMP_JNCT_LT125,
+	JEDEC_TEMP_JNCT_LT120,
+	JEDEC_TEMP_JNCT_LT115,
+	JEDEC_TEMP_JNCT_LT110,
+	JEDEC_TEMP_JNCT_LT105,
+	JEDEC_TEMP_JNCT_LT100,
+	JEDEC_TEMP_JNCT_IT,
+	JEDEC_TEMP_JNCT_LT90,
+	JEDEC_TEMP_JNCT_LT85,
+	JEDEC_TEMP_JNCT_ET120,
+	JEDEC_TEMP_JNCT_ET115,
+	JEDEC_TEMP_JNCT_ET110,
+	JEDEC_TEMP_JNCT_ET,
+	JEDEC_TEMP_JNCT_ET100,
+	JEDEC_TEMP_JNCT_ET95,
+	JEDEC_TEMP_JNCT_ET90,
+	JEDEC_TEMP_JNCT_ST,
+	JEDEC_TEMP_JNCT_120,
+	JEDEC_TEMP_JNCT_115,
+	JEDEC_TEMP_JNCT_110,
+	JEDEC_TEMP_JNCT_105,
+	JEDEC_TEMP_JNCT_100,
+	JEDEC_TEMP_JNCT_XT,
+	JEDEC_TEMP_JNCT_90,
+	JEDEC_TEMP_JNCT_NT
 } libjedec_temp_range_t;
 extern boolean_t libjedec_temp_range(libjedec_temp_range_t, int32_t *,
     int32_t *);

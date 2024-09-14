@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -38,7 +38,12 @@ static const libjedec_temp_test_t temp_tests[] = {
 	{ JEDEC_TEMP_AMB_IOT, B_TRUE, -40, 85, "Ambient temperature IOT" },
 	{ JEDEC_TEMP_AMB_AO1T, B_TRUE,  -40, 125, "Ambient temperature A01T" },
 	{ JEDEC_TEMP_STOR_ST, B_TRUE, -40, 85, "Storage temperature ST" },
-	{ 42, B_FALSE, 0, 0, "invalid temperature (42)" },
+	{ JEDEC_TEMP_JNCT_A90, B_TRUE, -40, 90, "Junction temperature A90" },
+	{ JEDEC_TEMP_JNCT_LT115, B_TRUE, -40, 115,
+	    "Junction temperature LT115" },
+	{ JEDEC_TEMP_JNCT_ET, B_TRUE, -25, 105, "Junction temperature ET" },
+	{ JEDEC_TEMP_JNCT_XT, B_TRUE, 0, 95, "Junction temperature XT" },
+	{ 142, B_FALSE, 0, 0, "invalid temperature (142)" },
 	{ INT32_MAX, B_FALSE, 0, 0, "invalid temperature (INT32_MAX)" },
 	{ UINT32_MAX, B_FALSE, 0, 0, "invalid temperature (UINT32_MAX)" }
 };
@@ -93,6 +98,10 @@ main(void)
 			    test->ltt_desc);
 			ret = EXIT_FAILURE;
 		}
+	}
+
+	if (ret == EXIT_SUCCESS) {
+		(void) printf("All tests passed successfully!\n");
 	}
 
 	return (ret);
