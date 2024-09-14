@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -41,8 +41,8 @@
 
 
 int
-writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
-    char *atfile, struct stat *s1p, struct stat *s2p)
+writefile(int fi, int fo, const char *infile, const char *outfile,
+    const char *asfile, const char *atfile, struct stat *s1p, struct stat *s2p)
 {
 	int mapsize, munmapsize;
 	caddr_t cp;

@@ -97,15 +97,15 @@ typedef struct tree_node {
 extern int sysattr_type(char *);
 
 /* Determine if the underlying file system supports system attributes */
-extern int sysattr_support(char *, int);
+extern int sysattr_support(const char *, int);
 
 /* Copies the content of the source file to the target file */
 #if defined(_LP64) || (_FILE_OFFSET_BITS == 64)
-extern int writefile(int, int, char *, char *, char *, char *,
-	struct stat *, struct stat *);
+extern int writefile(int, int, const char *, const char *, const char *,
+	const char *, struct stat *, struct stat *);
 #else
-extern int writefile(int, int, char *, char *, char *, char *,
-	struct stat64 *, struct stat64 *);
+extern int writefile(int, int, const char *, const char *, const char *,
+	const char *, struct stat64 *, struct stat64 *);
 #endif
 
 /* Gets file descriptors of the source and target attribute files */
@@ -115,7 +115,7 @@ extern int get_attrdirs(int, int, char *, int *, int *);
 extern int mv_xattrs(char *, char *, char *, int, int);
 
 /* Returns non default extended system attribute list */
-extern nvlist_t *sysattr_list(char *, int, char *);
+extern nvlist_t *sysattr_list(const char *, int, const char *);
 
 
 

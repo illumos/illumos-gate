@@ -44,7 +44,7 @@
  * returns 0.
  */
 int
-sysattr_status(char *file, xattr_view_t view)
+sysattr_status(const char *file, xattr_view_t view)
 {
 	nvlist_t	*response = NULL;
 	int		saveerrno;
@@ -64,7 +64,7 @@ sysattr_status(char *file, xattr_view_t view)
  * Returns the type of the specified in file.  If the file name matches
  * the name of either a read-only or read-write extended system attribute
  * file then sysattr_type() returns the type of file:
- * 	return value	file type
+ *	return value	file type
  *	------------	---------
  *	_RO_SATTR	read-only extended system attribute file
  *	_RW_SATTR	read-write extended system attribute file
@@ -106,7 +106,7 @@ sysattr_type(char *file)
  * otherwise, returns -1.
  */
 int
-sysattr_support(char *file, int name)
+sysattr_support(const char *file, int name)
 {
 	int	rc;
 

@@ -23,6 +23,7 @@ SUBDIRS =		\
 	awk		\
 	chown		\
 	cpio		\
+	cpmvln		\
 	ctf		\
 	date		\
 	demangle	\

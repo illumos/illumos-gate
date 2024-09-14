@@ -1074,6 +1074,10 @@ file path=opt/util-tests/tests/cpio/files/freebsd.odc.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/freebsd.pax.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/freebsd.ustar.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/zero.bar mode=0444
+dir  path=opt/util-tests/tests/cpmvln
+file path=opt/util-tests/tests/cpmvln/checker mode=0555
+file path=opt/util-tests/tests/cpmvln/mkobj mode=0555
+file path=opt/util-tests/tests/cpmvln/overwrite mode=0555
 dir  path=opt/util-tests/tests/ctf
 file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555
 file path=opt/util-tests/tests/ctf/check-array mode=0555

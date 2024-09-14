@@ -268,7 +268,7 @@ done:
  */
 
 nvlist_t *
-sysattr_list(char *cmd, int fd, char *fname)
+sysattr_list(const char *cmd, int fd, const char *fname)
 {
 	boolean_t	value;
 	data_type_t	type;
