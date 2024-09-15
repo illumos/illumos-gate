@@ -1320,6 +1320,7 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
+link path=usr/share/man/man9f/vdev_err.9f target=cmn_err.9f
 file path=usr/share/man/man9f/vmem_add.9f
 file path=usr/share/man/man9f/vmem_alloc.9f
 file path=usr/share/man/man9f/vmem_contains.9f
