@@ -44,7 +44,7 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH COND_INIT 3C "December 28, 2020"
+.TH COND_INIT 3C "September 15, 2024"
 .SH NAME
 cond_init, cond_wait, cond_timedwait, cond_reltimedwait, cond_signal,
 cond_broadcast, cond_destroy \- condition variables
@@ -118,7 +118,7 @@ The \fBcond_init()\fR function initializes the condition variable pointed to by
 \fIcvp\fR. A condition variable can have several different types of behavior,
 specified by \fItype\fR. No current type uses \fIarg\fR although a future type
 may specify additional behavior parameters with \fIarg\fR. The \fItype\fR
-argument c take one of the following values:
+argument can take one of the following values:
 .sp
 .ne 2
 .na
@@ -159,7 +159,7 @@ Default condition variable initialization (intra-process):
 .nf
 cond_t cvp;
 
-cond_init(&cvp, NULL, NULL); /*initialize condition variable
+cond_init(&cvp, 0, NULL); /*initialize condition variable
                                 with default*/
 .fi
 .in -2
