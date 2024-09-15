@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd June 17, 2020
+.Dd September 15, 2024
 .Dt WCSWIDTH 3C
 .Os
 .Sh NAME
@@ -97,7 +97,7 @@ main(void)
 {
         wchar_t *str = L"Hello world";
         int ret = wcswidth(str, wcslen(str));
-        (void) printf("wcswidth returned: %d\n", ret);
+        (void) printf("wcswidth returned: %d\en", ret);
         return (0);
 }
 .Ed
