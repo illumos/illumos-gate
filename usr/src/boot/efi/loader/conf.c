@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,9 +60,6 @@ struct fs_ops *file_system[] = {
 	&dosfs_fsops,
 	&tftp_fsops,
 	&nfs_fsops,
-#ifdef LOADER_BZIP2_SUPPORT
-	&bzipfs_fsops,
-#endif
 	NULL
 };
 

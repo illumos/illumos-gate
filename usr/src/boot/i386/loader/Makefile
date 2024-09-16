@@ -12,6 +12,7 @@
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
 # Copyright 2016 RackTop Systems.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -42,8 +43,6 @@ PROG=		$(LOADER).sym
 
 # architecture-specific loader code
 SRCS=		main.c conf.c vers.c chain.c
-
-CPPFLAGS +=	-DLOADER_GZIP_SUPPORT
 
 # Enable BootForth
 CPPFLAGS +=	-DBOOT_FORTH -I$(SRC)/common/ficl -I../../libficl

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 1998 Michael Smith.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -116,18 +117,14 @@ struct fs_ops {
 };
 
 /*
- * libstand-supplied filesystems
+ * libsa-supplied filesystems
  */
 extern struct fs_ops ufs_fsops;
 extern struct fs_ops tftp_fsops;
 extern struct fs_ops nfs_fsops;
 extern struct fs_ops cd9660_fsops;
 extern struct fs_ops gzipfs_fsops;
-extern struct fs_ops bzipfs_fsops;
 extern struct fs_ops dosfs_fsops;
-extern struct fs_ops ext2fs_fsops;
-extern struct fs_ops splitfs_fsops;
-extern struct fs_ops pkgfs_fsops;
 
 /* where values for lseek(2) */
 #define	SEEK_SET	0	/* set file offset to offset */
@@ -199,7 +196,6 @@ extern struct open_file *fd2open_file(int);
 #define	F_RAW		0x0004	/* raw device open - no file system */
 #define	F_NODEV		0x0008	/* network open - no device */
 #define	F_GZIP		0x0010  /* file is compressed by gzip */
-#define	F_BZIP		0x0020	/* file is compressed by bzip */
 #define	F_MASK		0xFFFF
 /* Mode modifier for strategy() */
 #define	F_NORA		(0x01 << 16)	/* Disable Read-Ahead */

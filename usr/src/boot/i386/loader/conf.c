@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,24 +57,13 @@ struct devsw *devsw[] = {
 };
 
 struct fs_ops *file_system[] = {
-#ifdef LOADER_GZIP_SUPPORT
 	&gzipfs_fsops,
-#endif
 	&zfs_fsops,
 	&ufs_fsops,
 	&dosfs_fsops,
-#if 0
-	&ext2fs_fsops,
-#endif
 	&cd9660_fsops,
 	&tftp_fsops,
 	&nfs_fsops,
-#ifdef LOADER_BZIP2_SUPPORT
-	&bzipfs_fsops,
-#endif
-#ifdef LOADER_SPLIT_SUPPORT
-	&splitfs_fsops,
-#endif
 	NULL
 };
 

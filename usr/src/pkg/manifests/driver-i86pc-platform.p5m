@@ -67,8 +67,9 @@ file path=usr/share/man/man4d/asy.4d
 file path=usr/share/man/man4d/cmdk.4d
 file path=usr/share/man/man4d/ecpp.4d
 file path=usr/share/man/man4d/fd.4d
-driver name=asy perms="* 0666 root sys" perms="*,cu 0600 uucp uucp" \
-    alias=pci11c1,480
+driver name=asy \
+    alias=pci11c1,480 \
+    alias=pciclass,0700 perms="* 0666 root sys" perms="*,cu 0600 uucp uucp"
 driver name=cmdk perms="* 0640 root sys"
 driver name=ecpp perms="* 0666 root sys" alias=lp
 driver name=fd perms="* 0666 root sys"
