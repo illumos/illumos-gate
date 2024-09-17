@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -803,7 +804,11 @@ lxpr_lookup_fdnode(vnode_t *dvp, const char *name)
 	 * bogus-named symlink.  If that's the case, report the type as
 	 * VNON to bypass link-following elsewhere in the vfs system.
 	 *
-	 * See lxpr_readlink for more details.
+	 * See lxpr_readlink for details about certain entries.
+	 *
+	 * Note that lxpr_readlink_fdnode() is being used here as a glorified
+	 * checker of lxfp, and it will not acquire any further locks given
+	 * we hold the process lock currently.
 	 */
 	if (lxpr_readlink_fdnode(lxfp, NULL, 0) == 0)
 		vp->v_type = VNON;
@@ -835,12 +840,30 @@ lxpr_readlink_fdnode(lxpr_node_t *lxpnp, char *bp, size_t len)
 		return (-1);
 	}
 
-	/* Fetch the inode of the underlying vnode */
-	if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
-		return (-1);
+	if (bp != NULL) {
+		/*
+		 * We assume the caller in this case does NOT have the target
+		 * process's lock held. The only caller that passes bp != NULL
+		 * is lxpr_readlink(), which does not hold the target process
+		 * lock.  This ensures VOP_GETATTR() doesn't wait on an
+		 * fd-related lock held by the target process.
+		 *
+		 * Fetch the inode of the underlying vnode.
+		 */
+		if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
+			return (-1);
 
-	if (bp != NULL)
 		(void) snprintf(bp, len, format, (ino_t)attr.va_nodeid);
+	}
+	/*
+	 * Otherwise we aren't using the VOP_GETATTR() data anyway.  This is
+	 * good, because the caller that passes (bp == NULL),
+	 * lxpr_lookup_fdnode() above, has the process locked down, which can
+	 * be hazardous if VOP_GETATTR() machinery locks down something held
+	 * by the target process. The target process MIGHT try and hold its
+	 * own process lock while we're blocked, holding the process lock.
+	 * See OS-8575 for such a case.
+	 */
 	return (0);
 }
 
