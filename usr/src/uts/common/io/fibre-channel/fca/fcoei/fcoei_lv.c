@@ -1456,9 +1456,10 @@ fcoei_fill_els_prli_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
 	 */
 	offset = 6;
 
-	FCOE_V2B_2(((fcp_spp->orig_process_assoc_valid << 15) |
+	uint16_t prli_flags = ((fcp_spp->orig_process_assoc_valid << 15) |
 	    (fcp_spp->resp_process_assoc_valid << 14) |
-	    (fcp_spp->establish_image_pair << 13)), FPLD + offset);
+	    (fcp_spp->establish_image_pair << 13));
+	FCOE_V2B_2(prli_flags, FPLD + offset);
 
 	/*
 	 * process associator

@@ -263,6 +263,21 @@ typedef enum {
 #define	ASY_ACR_DTR_RS485_LOW	0x10	/* DTR drives ext. RS485 buffer low */
 #define	ASY_ACR_DTR_RS485_HIGH	0x18	/* DTR drives ext. RS485 buffer high */
 
+/* Clock Select Register (16950) */
+#define	ASY_CKS_RCLK	0x00	/* RCLK pin drives receiver clock */
+#define	ASY_CKS_RDSR	0x01	/* DSR pin drives receiver clock */
+#define	ASY_CKS_RBDOUT	0x02	/* BDOUT pint drives receiver clock */
+#define	ASY_CKS_RTCLK	0x03	/* transmitter clock drives receiver clock */
+
+#define	ASY_CKS_BDO_DIS	0x04	/* Disable BDOUT pin */
+#define	ASY_CKS_RCLK_1X	0x08	/* Receiver clock in isochronous 1x mode */
+
+#define	ASY_CKS_DTR_NO	0x00	/* DTR pin defined by ACR[ASY_ACR_DTR] */
+#define	ASY_CKS_DTR_T1X	0x10	/* Transmitter 1x clock on DTR pin */
+#define	ASY_CKS_DTR_BDO	0x20	/* Baud rate generator output on DTR pin */
+
+#define	ASY_CKS_TCLK_RI	0x40	/* External transmitter clock on RI pin */
+#define	ASY_CKS_TCLK_1X	0x80	/* Transmitter clock in isochronous 1x mode */
 
 /* Serial in/out requests */
 

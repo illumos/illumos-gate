@@ -194,6 +194,7 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 	    0)) != USB_SUCCESS) {
 		USB_DPRINTF_L2(UGEN_PRINT_ATTA, ugenp->ug_log_hdl,
 		    "usb_ugen_attach: usb_get_dev_data failed, rval=%d", rval);
+		usb_ugen_release_hdl((usb_ugen_hdl_t)hdl);
 
 		return (NULL);
 	}
