@@ -525,6 +525,7 @@ _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
+
 static void
 asy_put_idx(const struct asycom *asy, asy_reg_t reg, uint8_t val)
 {
@@ -1446,13 +1447,12 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (num_com_ports > 10) {
 			/* We run out of single digits for device properties */
 			num_com_ports = 10;
-			asyerror(asy, CE_WARN,
-			    "More than %d motherboard-serial-ports",
-			    num_com_ports);
+			cmn_err(CE_WARN,
+			    "%s: more than %d motherboard-serial-ports",
+			    asy_info.mi_idname, num_com_ports);
 		}
 	}
 	mutex_exit(&asy_glob_lock);
-
 
 	instance = ddi_get_instance(devi);	/* find out which unit */
 	ret = ddi_soft_state_zalloc(asy_soft_state, instance);
@@ -1678,9 +1678,8 @@ fail:
 	return (DDI_FAILURE);
 }
 
-/*ARGSUSED*/
 static int
-asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
+asyinfo(dev_info_t *dip __unused, ddi_info_cmd_t infocmd, void *arg,
     void **result)
 {
 	dev_t dev = (dev_t)arg;
@@ -1786,8 +1785,6 @@ static boolean_t
 asy_is_devid(struct asycom *asy, char *venprop, char *devprop,
     int venid, int devid)
 {
-	int id;
-
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, asy->asy_dip, DDI_PROP_DONTPASS,
 	    venprop, 0) != venid) {
 		return (B_FALSE);
@@ -2237,13 +2234,11 @@ asyinit(struct asycom *asy)
 	mutex_exit(&asy->asy_excl);
 }
 
-/*ARGSUSED3*/
 static int
-asyopen(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
+asyopen(queue_t *rq, dev_t *dev, int flag, int sflag __unused, cred_t *cr)
 {
 	struct asycom	*asy;
 	struct asyncline *async;
-	int		mcr;
 	int		unit;
 	int		len;
 	struct termios	*termiosp;
@@ -2455,13 +2450,11 @@ async_dtr_free(struct asyncline *async)
 /*
  * Close routine.
  */
-/*ARGSUSED2*/
 static int
-asyclose(queue_t *q, int flag, cred_t *credp)
+asyclose(queue_t *q, int flag, cred_t *credp __unused)
 {
 	struct asyncline *async;
 	struct asycom	 *asy;
-	int ier, lcr;
 
 	async = (struct asyncline *)q->q_ptr;
 	ASSERT(async != NULL);
@@ -2596,7 +2589,7 @@ nodrain:
 		asy_disable_interrupts(asy, ASY_IER_RIEN);
 
 	mutex_exit(&asy->asy_excl_hi);
-out:
+
 	ttycommon_close(&async->async_ttycommon);
 
 	/*
@@ -2664,8 +2657,6 @@ asy_waiteot(struct asycom *asy)
 static void
 asy_reset_fifo(struct asycom *asy, uchar_t flush)
 {
-	uchar_t lcr = 0;
-
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 
 	/* On a 16750, we have to set DLAB in order to set ASY_FCR_FIFO64. */
@@ -2756,7 +2747,7 @@ asy_program(struct asycom *asy, int mode)
 		async->async_flags &= ~ASYNC_SW_OUT_FLW;
 
 	/* manually flush receive buffer or fifo (workaround for buggy fifos) */
-	if (mode == ASY_INIT)
+	if (mode == ASY_INIT) {
 		if (asy->asy_use_fifo == ASY_FCR_FIFO_EN) {
 			for (flush_reg = asy->asy_fifo_buf; flush_reg-- > 0; ) {
 				(void) asy_get(asy, ASY_RHR);
@@ -2764,6 +2755,7 @@ asy_program(struct asycom *asy, int mode)
 		} else {
 			flush_reg = asy_get(asy, ASY_RHR);
 		}
+	}
 
 	if (ocflags != (c_flag & ~CLOCAL) || mode == ASY_INIT) {
 		/* Set line control */
@@ -2803,10 +2795,11 @@ asy_program(struct asycom *asy, int mode)
 		 * at intialize time, flush if transitioning from
 		 * CREAD off to CREAD on.
 		 */
-		if ((ocflags & CREAD) == 0 && (c_flag & CREAD) ||
-		    mode == ASY_INIT)
+		if (((ocflags & CREAD) == 0 && (c_flag & CREAD)) ||
+		    mode == ASY_INIT) {
 			if (asy->asy_use_fifo == ASY_FCR_FIFO_EN)
 				asy_reset_fifo(asy, ASY_FCR_RHR_FL);
+		}
 
 		/* remember the new cflags */
 		asy->asy_ocflag = c_flag & ~CLOCAL;
@@ -3426,11 +3419,9 @@ out:
 	cv_broadcast(&async->async_flags_cv);
 }
 
-
 /*
  * Handle a second-stage interrupt.
  */
-/*ARGSUSED*/
 uint_t
 asysoftintr(caddr_t intarg, caddr_t unusedarg __unused)
 {
@@ -3486,11 +3477,9 @@ async_softint(struct asycom *asy)
 	uint_t	cc;
 	mblk_t	*bp;
 	queue_t	*q;
-	uchar_t	val;
 	uchar_t	c;
 	tty_common_t	*tp;
 	int nb;
-	int instance = UNIT(async->async_dev);
 
 	ASY_DPRINTF(asy, ASY_DEBUG_PROCS, "enter");
 	mutex_enter(&asy->asy_excl_hi);
@@ -3694,7 +3683,6 @@ async_restart(void *arg)
 {
 	struct asyncline *async = (struct asyncline *)arg;
 	struct asycom *asy = async->async_common;
-	uchar_t lcr;
 
 	ASY_DPRINTF(asy, ASY_DEBUG_PROCS, "enter");
 
@@ -3731,16 +3719,12 @@ async_start(struct asyncline *async)
 	queue_t *q;
 	mblk_t *bp;
 	uchar_t *xmit_addr;
-	uchar_t	val;
 	int	fifo_len = 1;
 	boolean_t didsome;
 	mblk_t *nbp;
 
-#ifdef DEBUG
-	int instance = UNIT(async->async_dev);
-
 	ASY_DPRINTF(asy, ASY_DEBUG_PROCS, "enter");
-#endif
+
 	if (asy->asy_use_fifo == ASY_FCR_FIFO_EN) {
 		fifo_len = asy->asy_fifo_buf; /* with FIFO buffers */
 		if (fifo_len > asy_max_tx_fifo)
@@ -3944,7 +3928,6 @@ async_hold_utbrk(void *arg)
 static void
 async_resume_utbrk(struct asyncline *async)
 {
-	uchar_t	val;
 	struct asycom *asy = async->async_common;
 	ASSERT(mutex_owned(&asy->asy_excl));
 
@@ -3995,9 +3978,7 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp)
 	struct iocblk *iocp;
 	unsigned datasize;
 	int error = 0;
-	uchar_t val;
 	mblk_t *datamp;
-	unsigned int index;
 
 	ASY_DPRINTF(asy, ASY_DEBUG_PROCS, "enter");
 
@@ -4765,9 +4746,6 @@ async_iocdata(queue_t *q, mblk_t *mp)
 	struct asycom		*asy;
 	struct iocblk *ip;
 	struct copyresp *csp;
-#ifdef DEBUG
-	int instance = UNIT(async->async_dev);
-#endif
 
 	asy = async->async_common;
 	ip = (struct iocblk *)mp->b_rptr;
@@ -4876,7 +4854,6 @@ static int
 asymctl(struct asycom *asy, int bits, int how)
 {
 	int mcr_r, msr_r;
-	int instance = asy->asy_unit;
 
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 	ASSERT(mutex_owned(&asy->asy_excl));
@@ -5221,7 +5198,6 @@ async_flowcontrol_sw_input(struct asycom *asy, async_flowc_action onoff,
     int type)
 {
 	struct asyncline *async = asy->asy_priv;
-	int instance = UNIT(async->async_dev);
 	int rval = B_FALSE;
 
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
@@ -5294,7 +5270,6 @@ static void
 async_flowcontrol_sw_output(struct asycom *asy, async_flowc_action onoff)
 {
 	struct asyncline *async = asy->asy_priv;
-	int instance = UNIT(async->async_dev);
 
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 
@@ -5339,7 +5314,6 @@ async_flowcontrol_hw_input(struct asycom *asy, async_flowc_action onoff,
 	uchar_t	mcr;
 	uchar_t	flag;
 	struct asyncline *async = asy->asy_priv;
-	int instance = UNIT(async->async_dev);
 
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 
@@ -5390,7 +5364,6 @@ static void
 async_flowcontrol_hw_output(struct asycom *asy, async_flowc_action onoff)
 {
 	struct asyncline *async = asy->asy_priv;
-	int instance = UNIT(async->async_dev);
 
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 
@@ -5413,7 +5386,6 @@ async_flowcontrol_hw_output(struct asycom *asy, async_flowc_action onoff)
 		break;
 	}
 }
-
 
 /*
  * quiesce(9E) entry point.
