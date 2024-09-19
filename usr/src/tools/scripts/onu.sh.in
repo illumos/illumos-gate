@@ -24,12 +24,11 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-#
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 
 PATH=/usr/bin:/usr/sbin
 export PATH
 
-DEFAULTONURI="http://ipkg.sfbay/on-nightly"
 DEFAULTONPUB="on-nightly"
 
 usage()
@@ -50,12 +49,18 @@ usage()
 	echo "Update to an ON build:"
 	echo "\tonu -t newbe -d /path/to/my/ws/packages/\`uname -p\`/nightly"
 	echo
-	echo "Update to the nightly build:"
-	echo "\tonu -t newbe"
-	echo
 	echo "Re-enable the publishers in the current BE:"
 	echo "\tonu -r -d /path/to/my/ws/packages/\`uname -p\`/nightly"
 	exit 1
+}
+
+srcusage()
+{
+	cat 1>&2 <<EOF
+No package source specified; use -d or -u or set ONURI in environment
+
+EOF
+	usage
 }
 
 exit_error()
@@ -231,7 +236,6 @@ else
 	[ -z "$targetbe" ] && usage
 fi
 [ -z "$uri" ] && uri=$ONURI
-[ -z "$uri" ] && uri=$DEFAULTONURI
 [ -z "$redistpub" ] && redistpub=$ONPUB
 [ -z "$redistpub" ] && redistpub=$DEFAULTONPUB
 
@@ -256,6 +260,8 @@ if [ -n "$repodir" ]; then
 	[[ -n "$redistpub" ]] || exit_error "Repository has no publisher prefix"
 	uri="file://$redistdir"
 fi
+
+[ -z "$uri" ] && srcusage
 
 if [ "$reposonly" -eq 1 ]; then
 	configure_publishers /
