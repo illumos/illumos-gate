@@ -888,7 +888,7 @@ pcfs_root(
 	if (error = pc_lockfs(fsp, 0, 0))
 		return (error);
 
-	pcp = pc_getnode(fsp, (daddr_t)0, 0, (struct pcdir *)0);
+	pcp = pc_getnode(fsp, (daddr_t)0, 0, NULL);
 	pc_unlockfs(fsp);
 	*vpp = PCTOV(pcp);
 	pcp->pc_flags |= PC_EXTERNAL;
@@ -1079,7 +1079,7 @@ pc_syncfat(struct pcfs *fsp)
 	int	error = 0;
 	struct fat_od_fsi *fsinfo_disk;
 
-	if ((fsp->pcfs_fatp == (uchar_t *)0) ||
+	if ((fsp->pcfs_fatp == NULL) ||
 	    !(fsp->pcfs_flags & PCFS_FATMOD))
 		return (0);
 	/*
@@ -1130,7 +1130,7 @@ pc_invalfat(struct pcfs *fsp)
 	struct pcfs *xfsp;
 	int mount_cnt = 0;
 
-	if (fsp->pcfs_fatp == (uchar_t *)0)
+	if (fsp->pcfs_fatp == NULL)
 		panic("pc_invalfat");
 	/*
 	 * Release FAT
@@ -1199,7 +1199,7 @@ pcfs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp)
 	}
 
 	if (pcfid->pcfid_block == 0) {
-		pcp = pc_getnode(fsp, (daddr_t)0, 0, (struct pcdir *)0);
+		pcp = pc_getnode(fsp, (daddr_t)0, 0, NULL);
 		pcp->pc_flags |= PC_EXTERNAL;
 		*vpp = PCTOV(pcp);
 		pc_unlockfs(fsp);
@@ -1363,8 +1363,11 @@ pc_writefat(struct pcfs *fsp, daddr_t start)
 		bp = ngeteblk(writesize);
 		bp->b_edev = fsp->pcfs_xdev;
 		bp->b_dev = cmpdev(bp->b_edev);
-		bp->b_blkno = pc_dbdaddr(fsp, start +
+		bp->b_blkno = start + pc_dbdaddr(fsp,
 		    pc_cltodb(fsp, pc_lblkno(fsp, off)));
+		DTRACE_PROBE3(pc_writefat, longlong_t, bp->b_blkno,
+		    uchar_t *, fatp,
+		    size_t, writesize);
 		bcopy(fatp, bp->b_un.b_addr, writesize);
 		bwrite2(bp);
 		error = geterror(bp);
@@ -1436,7 +1439,7 @@ pcfs_freevfs(vfs_t *vfsp)
 	 * Purging the FAT closes the device - can't do any more
 	 * I/O after this.
 	 */
-	if (fsp->pcfs_fatp != (uchar_t *)0)
+	if (fsp->pcfs_fatp != NULL)
 		pc_invalfat(fsp);
 	mutex_exit(&pcfslock);
 

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -47,14 +48,15 @@ static pc_cluster32_t pc_getcluster(struct pcfs *fsp, pc_cluster32_t cn);
  * Convert file logical block (cluster) numbers to disk block numbers.
  * Also return number of physically contiguous blocks if asked for.
  * Used for reading only. Use pc_balloc for writing.
+ * Arguments:
+ *	pcp -		pcnode for file
+ *	lcn -		logical cluster no
+ *	dbnp-		ptr to phys block no
+ *	contigbp-	ptr to number of contiguous bytes, may be zero
+ *			if not wanted
  */
 int
-pc_bmap(
-	struct pcnode *pcp,		/* pcnode for file */
-	daddr_t lcn,			/* logical cluster no */
-	daddr_t *dbnp,			/* ptr to phys block no */
-	uint_t *contigbp)		/* ptr to number of contiguous bytes */
-					/* may be zero if not wanted */
+pc_bmap(struct pcnode *pcp, daddr_t lcn, daddr_t *dbnp, uint_t *contigbp)
 {
 	struct pcfs *fsp;	/* pcfs that file is in */
 	struct vnode *vp;
@@ -95,7 +97,7 @@ pc_bmap(
 	if (vp->v_type == VREG &&
 	    (pcp->pc_size == 0 ||
 	    lcn >= (daddr_t)howmany((offset_t)pcp->pc_size,
-			fsp->pcfs_clsize))) {
+	    fsp->pcfs_clsize))) {
 		PC_DPRINTF0(2, "pc_bmap: ENOENT3\n");
 		return (ENOENT);
 	}
@@ -366,13 +368,14 @@ pc_getcluster(struct pcfs *fsp, pc_cluster32_t cn)
 {
 	unsigned char *fp;
 
-	if (fsp->pcfs_fatp == (uchar_t *)0 || !pc_validcl(fsp, cn))
+	if (fsp->pcfs_fatp == NULL || !pc_validcl(fsp, cn))
 		panic("pc_getcluster");
 
 	switch (fsp->pcfs_fattype) {
 	case FAT32:
 		fp = fsp->pcfs_fatp + (cn << 2);
-		cn = ltohi(*(pc_cluster32_t *)fp);
+		/* Ignore high 4 bits on read */
+		cn = ltohi(*(pc_cluster32_t *)fp) & 0x0FFFFFFF;
 		break;
 	case FAT16:
 		fp = fsp->pcfs_fatp + (cn << 1);
@@ -407,15 +410,19 @@ pc_setcluster(struct pcfs *fsp, pc_cluster32_t cn, pc_cluster32_t ncn)
 {
 	unsigned char *fp;
 	pc_cluster16_t ncn16;
+	pc_cluster32_t ncn32;
 
-	if (fsp->pcfs_fatp == (uchar_t *)0 || !pc_validcl(fsp, cn))
+	if (fsp->pcfs_fatp == NULL || !pc_validcl(fsp, cn))
 		panic("pc_setcluster");
 	fsp->pcfs_flags |= PCFS_FATMOD;
 	pc_mark_fat_updated(fsp, cn);
 	switch (fsp->pcfs_fattype) {
 	case FAT32:
 		fp = fsp->pcfs_fatp + (cn << 2);
-		*(pc_cluster32_t *)fp = htoli(ncn);
+		/* Preserve high 4 bits on write */
+		ncn32 = ltohi(*(pc_cluster32_t *)fp) & 0xF0000000;
+		ncn32 |= (ncn & 0x0FFFFFFF);
+		*(pc_cluster32_t *)fp = htoli(ncn32);
 		break;
 	case FAT16:
 		fp = fsp->pcfs_fatp + (cn << 1);
@@ -457,7 +464,7 @@ pc_alloccluster(
 	pc_cluster32_t cn;
 	int	error;
 
-	if (fsp->pcfs_fatp == (uchar_t *)0)
+	if (fsp->pcfs_fatp == NULL)
 		panic("pc_addcluster: no FAT");
 
 	for (cn = fsp->pcfs_nxfrecls; pc_validcl(fsp, cn); cn++) {

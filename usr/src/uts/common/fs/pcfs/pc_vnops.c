@@ -22,12 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-/*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/param.h>
@@ -1155,7 +1153,7 @@ pcfs_remove(
 			return (EACCES);
 		}
 	}
-	error = pc_dirremove(pcp, nm, (struct vnode *)0, VREG, ct);
+	error = pc_dirremove(pcp, nm, NULL, VREG, ct);
 	pc_unlockfs(fsp);
 	return (error);
 }
