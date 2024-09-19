@@ -43,65 +43,48 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH TRUE 1 "Feb 1, 1995"
-.SH NAME
-true, false \- provide truth values
-.SH SYNOPSIS
-.LP
-.nf
-\fBtrue\fR
-.fi
-
-.LP
-.nf
-\fBfalse\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBtrue\fR utility does nothing, successfully. The \fBfalse\fR utility does
-nothing, unsuccessfully. They are typically used in a shell script \fBsh\fR as:
-.sp
-.in +2
-.nf
-while true
-do
-            \fIcommand\fR
+.Dd September 19, 2024
+.Dt TRUE 1
+.Os
+.Sh NAME
+.Nm true ,
+.Nm false
+.Nd provide truth values
+.Sh SYNOPSIS
+.Nm true
+.Nm false
+.Sh DESCRIPTION
+The
+.Nm true
+utility does nothing, successfully.
+The
+.Nm false
+utility does nothing, unsuccessfully.
+They are typically used in a shell script as:
+.Bd -literal -offset indent
+while true; do
+	command
 done
-.fi
-.in -2
-
-.sp
-.LP
-which executes \fIcommand\fR forever.
-.SH EXIT STATUS
-.sp
-.LP
-\fBtrue\fR has exit status  \fB0\fR.
-.sp
-.LP
-\fBfalse\fR always will exit with a non-zero value.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR sh (1),
-.BR attributes (7),
-.BR standards (7)
+.Ed
+.Pp
+which executes
+.Sq command
+forever.
+.Sh EXIT STATUS
+.Nm true
+has exit status
+.Sy 0 .
+.Pp
+.Nm false
+will always exit with a non-zero value between 1 and 125, inclusive.
+.Sh INTERFACE STABILITY
+.Nm true
+and
+.Nm false
+are
+.Sy Committed .
+.Sh SEE ALSO
+.Xr sh 1 ,
+.Xr attributes 7
