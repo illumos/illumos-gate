@@ -24,7 +24,7 @@
 #
 # Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019, Joyent, Inc.
-# Copyright 2024 RackTop Systems, Inc.
+# Copyright 2024-2025 RackTop Systems, Inc.
 #
 
 LIBRARY =	libfknsmb.a
@@ -99,7 +99,7 @@ CERRWARN += -_gcc=-Wno-switch
 SMOFF += all_func_returns,deref_check,signed
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lfakekernel -lpkcs11 -lnsl -lc
+LDLIBS +=	-lfakekernel -lpkcs11 -lnsl -lumem -lc
 
 # libfknsmb isn't delivered, and is a special case, disable global data complaints
 ZGUIDANCE= -Wl,-zguidance=noasserts

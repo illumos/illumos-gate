@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2018-2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2021-2024 RackTop Systems, Inc.
+ * Copyright 2021-2025 RackTop Systems, Inc.
  */
 
 /*
@@ -34,7 +34,7 @@
 #include <sys/debug.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
-#include <stdlib.h>
+#include <umem.h>
 #include <strings.h>
 
 size_t	msgsize(mblk_t *);
@@ -214,7 +214,7 @@ nsmb_enc_ctx_done(smb_enc_ctx_t *ctxp)
 int
 nsmb_encrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t clearlen)
 {
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 	size_t inlen, outlen;
 	ulong_t tlen;
 	int err;
@@ -224,34 +224,38 @@ nsmb_encrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t clearlen)
 	outlen = clearlen + SMB2_SIG_SIZE;
 	ASSERT(msgsize(mp) >= outlen);
 
-	buf = malloc(outlen);
+	buf = umem_alloc(outlen, 0);
 	if (buf == NULL)
 		return (-1);
 
 	/* Copy from mblk chain to buf */
 	err = copy_mblks(buf, inlen, UIO_WRITE, mp);
 	if (err != 0)
-		return (-1);
+		goto out;
 
 	/* Encrypt in-place in our work buffer. */
 	tlen = outlen;
 	rv = C_Encrypt(ctxp->ctx, buf, inlen, buf, &tlen);
 	if (rv != CKR_OK) {
 		cmn_err(CE_WARN, "C_Encrypt failed: 0x%lx", rv);
-		return (-1);
+		err = -1;
+		goto out;
 	}
 	if (tlen != outlen) {
 		cmn_err(CE_WARN, "nsmb_encrypt_mblks outlen %d vs %d",
 		    (int)tlen, (int)outlen);
-		return (-1);
+		err = -1;
+		goto out;
 	}
 
 	/* Copy from buf to mblk segs */
 	err = copy_mblks(buf, outlen, UIO_READ, mp);
-	if (err != 0)
-		return (-1);
 
-	return (0);
+out:
+	if (buf != NULL)
+		umem_free(buf, outlen);
+
+	return (err);
 }
 
 /*
@@ -260,7 +264,7 @@ nsmb_encrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t clearlen)
 int
 nsmb_decrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t cipherlen)
 {
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 	size_t inlen, outlen;
 	ulong_t tlen;
 	int err;
@@ -272,34 +276,38 @@ nsmb_decrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t cipherlen)
 	outlen = cipherlen - SMB2_SIG_SIZE;
 	ASSERT(msgsize(mp) >= inlen);
 
-	buf = malloc(inlen);
+	buf = umem_alloc(inlen, 0);
 	if (buf == NULL)
 		return (-1);
 
 	/* Copy from mblk chain to buf */
 	err = copy_mblks(buf, inlen, UIO_WRITE, mp);
 	if (err != 0)
-		return (-1);
+		goto out;
 
 	/* Decrypt in-place in our work buffer. */
 	tlen = outlen;
 	rv = C_Decrypt(ctxp->ctx, buf, inlen, buf, &tlen);
 	if (rv != CKR_OK) {
 		cmn_err(CE_WARN, "C_Decrypt failed: 0x%lx", rv);
-		return (-1);
+		err = -1;
+		goto out;
 	}
 	if (tlen != outlen) {
 		cmn_err(CE_WARN, "nsmb_decrypt_mblks outlen %d vs %d",
 		    (int)tlen, (int)outlen);
-		return (-1);
+		err = -1;
+		goto out;
 	}
 
 	/* Copy from buf to mblk segs */
 	err = copy_mblks(buf, outlen, UIO_READ, mp);
-	if (err != 0)
-		return (-1);
 
-	return (0);
+out:
+	if (buf != NULL)
+		umem_free(buf, inlen);
+
+	return (err);
 }
 
 static int
