@@ -487,6 +487,7 @@ extern const nvme_vsd_t micron_x500;
 extern const nvme_vsd_t intel_p5510;
 extern const nvme_vsd_t solidigm_p5x20;
 extern const nvme_vsd_t solidigm_ps10x0;
+extern const nvme_vsd_t kioxia_cd8;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);

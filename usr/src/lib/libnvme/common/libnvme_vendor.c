@@ -31,7 +31,8 @@ const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&micron_x500,
 	&intel_p5510,
 	&solidigm_p5x20,
-	&solidigm_ps10x0
+	&solidigm_ps10x0,
+	&kioxia_cd8
 };
 
 /*
