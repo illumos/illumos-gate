@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SPD_DDR4_H
@@ -45,16 +45,16 @@ extern "C" {
  * S8.1.1 Number of Bytes Used / Number of Bytes in SPD Device.
  */
 #define	SPD_DDR4_NBYTES	0x000
+#define	SPD_DDR4_NBYTES_TOTAL(r)	bitx8(r, 6, 4)
+#define	SPD_DDR4_NBYTES_TOTAL_UNDEF	0
+#define	SPD_DDR4_NBYTES_TOTAL_256	1
+#define	SPD_DDR4_NBYTES_TOTAL_512	2
 #define	SPD_DDR4_NBYTES_USED(r)		bitx8(r, 3, 0)
 #define	SPD_DDR4_NBYTES_USED_UNDEF	0
 #define	SPD_DDR4_NBYTES_USED_128	1
 #define	SPD_DDR4_NBYTES_USED_256	2
 #define	SPD_DDR4_NBYTES_USED_384	3
 #define	SPD_DDR4_NBYTES_USED_512	4
-#define	SPD_DDR4_NBYTES_TOTAL(r)	bitx8(r, 6, 4)
-#define	SPD_DDR4_NBYTES_TOTAL_UNDEF	0
-#define	SPD_DDR4_NBYTES_TOTAL_256	1
-#define	SPD_DDR4_NBYTES_TOTAL_512	2
 
 /*
  * S8.1.2: SPD Revision. The SPD revision is split into two 4-bit fields. There
@@ -456,7 +456,7 @@ extern "C" {
 #define	SPD_DDR4_MOD_MFG_LOC	0x142
 
 /*
- * S8.5.3 module Manufacturing Date. Encoded as two BCD bytes for the year and
+ * S8.5.3 Module Manufacturing Date. Encoded as two BCD bytes for the year and
  * week.
  */
 #define	SPD_DDR4_MOD_MFG_YEAR	0x143

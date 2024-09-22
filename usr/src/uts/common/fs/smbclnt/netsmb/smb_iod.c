@@ -38,6 +38,7 @@
  *
  * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #ifdef DEBUG
@@ -292,9 +293,11 @@ smb2_iod_sendrq(struct smb_rq *rqp)
 {
 	struct smb_rq *c_rqp;	/* compound */
 	struct smb_vc *vcp = rqp->sr_vc;
+	struct smb_sopt *sv = &vcp->vc_sopt;
 	mblk_t *top_m;
 	mblk_t *cur_m;
 	int error;
+	boolean_t encrypt = B_FALSE;
 
 	ASSERT(vcp);
 	ASSERT(RW_WRITE_HELD(&vcp->iod_rqlock));
@@ -311,23 +314,46 @@ smb2_iod_sendrq(struct smb_rq *rqp)
 		return;
 	}
 
+	/* Determine if outgoing request(s) must be encrypted */
+	if ((sv->sv2_sessflags & SMB2_SESSION_FLAG_ENCRYPT_DATA) != 0) {
+		if (rqp->sr2_command != SMB2_NEGOTIATE) {
+			encrypt = B_TRUE;
+		}
+	} else if (rqp->sr_share != NULL &&
+	    (rqp->sr_share->ss2_share_flags &
+	    SMB2_SHAREFLAG_ENCRYPT_DATA) != 0) {
+		if ((rqp->sr2_command != SMB2_NEGOTIATE) &&
+		    (rqp->sr2_command != SMB2_SESSION_SETUP) &&
+		    (rqp->sr2_command != SMB2_TREE_CONNECT)) {
+			encrypt = B_TRUE;
+		}
+	}
+
 	/*
 	 * Overwrite the SMB header with the assigned MID and
 	 * (if we're signing) sign it.  If there are compounded
 	 * requests after the top one, do those too.
 	 */
 	smb2_rq_fillhdr(rqp);
-	if (rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) {
+	if (!encrypt && (rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) != 0) {
 		smb2_rq_sign(rqp);
 	}
 	c_rqp = rqp->sr2_compound_next;
 	while (c_rqp != NULL) {
 		smb2_rq_fillhdr(c_rqp);
-		if (c_rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) {
+		if (!encrypt &&
+		    (c_rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) != 0) {
 			smb2_rq_sign(c_rqp);
 		}
 		c_rqp = c_rqp->sr2_compound_next;
 	}
+
+	/*
+	 * Want the dtrace probe to expose the clear data,
+	 * not the encrypted data.
+	 */
+	DTRACE_PROBE2(iod_sendrq,
+	    (smb_rq_t *), rqp, (mblk_t *), rqp->sr_rq.mb_top);
 
 	/*
 	 * The transport send consumes the message and we'd
@@ -338,8 +364,14 @@ smb2_iod_sendrq(struct smb_rq *rqp)
 	 * eight-byte aligned.  The caller preparing the
 	 * compounded request has to take care of that
 	 * before we get here and sign messages etc.
+	 *
+	 * If we're encrypting, copy instead, and then
+	 * encrypt the copy in-place.
 	 */
-	top_m = dupmsg(rqp->sr_rq.mb_top);
+	if (encrypt)
+		top_m = copymsg(rqp->sr_rq.mb_top);
+	else
+		top_m = dupmsg(rqp->sr_rq.mb_top);
 	if (top_m == NULL) {
 		error = ENOBUFS;
 		goto fatal;
@@ -348,7 +380,10 @@ smb2_iod_sendrq(struct smb_rq *rqp)
 	while (c_rqp != NULL) {
 		size_t len = msgdsize(top_m);
 		ASSERT((len & 7) == 0);
-		cur_m = dupmsg(c_rqp->sr_rq.mb_top);
+		if (encrypt)
+			cur_m = copymsg(c_rqp->sr_rq.mb_top);
+		else
+			cur_m = dupmsg(c_rqp->sr_rq.mb_top);
 		if (cur_m == NULL) {
 			freemsg(top_m);
 			error = ENOBUFS;
@@ -357,8 +392,11 @@ smb2_iod_sendrq(struct smb_rq *rqp)
 		linkb(top_m, cur_m);
 	}
 
-	DTRACE_PROBE2(iod_sendrq,
-	    (smb_rq_t *), rqp, (mblk_t *), top_m);
+	if (encrypt) {
+		error = smb3_msg_encrypt(vcp, &top_m);
+		if (error != 0)
+			goto fatal;
+	}
 
 	error = SMB_TRAN_SEND(vcp, top_m);
 	top_m = 0; /* consumed by SEND */
@@ -737,6 +775,7 @@ smb2_iod_process(smb_vc_t *vcp, mblk_t *m)
 	uint64_t message_id, async_id;
 	uint32_t flags, next_cmd_off, status;
 	uint16_t command, credits_granted;
+	boolean_t encrypted = B_FALSE;
 	int err;
 
 top:
@@ -765,11 +804,15 @@ top:
 	case SMB_HDR_V2:
 		break;
 	case SMB_HDR_V3E:
-		/*
-		 * Todo: If encryption enabled, decrypt the message
-		 * and restart processing on the cleartext.
-		 */
-		/* FALLTHROUGH */
+		err = smb3_msg_decrypt(vcp, &m);
+		if (err != 0) {
+			SMBIODEBUG("SMB3 decrypt failed\n");
+			m_freem(m);
+			return (ENOMSG);
+		}
+		encrypted = B_TRUE;
+		goto top;
+
 	bad_hdr:
 	default:
 		SMBIODEBUG("Bad SMB2 hdr\n");
@@ -851,6 +894,8 @@ top:
 			rqp = NULL;
 			break;
 		}
+		if (encrypted)
+			rqp->sr_flags |= SMBR_ENCRYPTED;
 		smb_iod_rqprocessed_LH(rqp, 0, 0);
 		SMBRQ_UNLOCK(rqp);
 		break;
@@ -1721,6 +1766,8 @@ smb_iod_vc_work(struct smb_vc *vcp, int flags, cred_t *cr)
 			err = smb_sign_init(vcp);
 		if (err != 0)
 			return (err);
+		if (SMB_DIALECT(vcp) >= SMB2_DIALECT_0300)
+			nsmb_crypt_init_keys(vcp);
 	}
 
 	/*

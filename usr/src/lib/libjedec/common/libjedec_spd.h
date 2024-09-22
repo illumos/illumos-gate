@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _LIBJEDEC_SPD_H
@@ -101,6 +101,7 @@ typedef struct {
 	uint32_t svr_max;
 	uint32_t svr_base;
 	uint32_t svr_mult;
+	bool svr_exp;
 } spd_value_range_t;
 
 /*
@@ -114,6 +115,10 @@ extern void spd_nvl_insert_u32(spd_info_t *, const char *, uint32_t);
 extern void spd_nvl_insert_u64(spd_info_t *, const char *, uint64_t);
 extern void spd_nvl_insert_u32_array(spd_info_t *, const char *,
     uint32_t *, uint_t);
+extern void spd_nvl_insert_u64_array(spd_info_t *, const char *,
+    uint64_t *, uint_t);
+extern void spd_nvl_insert_boolean_array(spd_info_t *, const char *,
+    boolean_t *, uint_t);
 extern void spd_nvl_insert_key(spd_info_t *, const char *);
 
 extern void spd_insert_map(spd_info_t *, const char *, uint8_t,
@@ -136,17 +141,38 @@ extern void spd_parse_hex_string(spd_info_t *, uint32_t, uint32_t,
     const char *);
 extern void spd_parse_hex_vers(spd_info_t *, uint32_t, uint32_t, const char *);
 extern void spd_parse_raw_u8(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_u8_array(spd_info_t *, uint32_t, uint32_t, const char *);
 extern void spd_parse_dram_step(spd_info_t *, uint32_t, uint32_t, const char *);
 extern void spd_parse_crc(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_crc_expect(spd_info_t *, uint32_t, uint32_t, uint16_t,
+    const char *);
 extern void spd_parse_rev(spd_info_t *, uint32_t, uint32_t, const char *);
 extern void spd_parse_height(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_design(spd_info_t *, uint32_t, uint32_t);
 extern void spd_parse_thickness(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_ddr_time(spd_info_t *, const char *, uint8_t, uint8_t,
+    uint8_t);
+extern void spd_parse_mtb_ftb_time_pair(spd_info_t *, uint32_t, uint32_t,
+    const char *);
+extern void spd_parse_mtb_pair(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_lp_trfcxb(spd_info_t *, uint32_t, uint32_t, const char *);
+extern void spd_parse_ddr4_nib_map(spd_info_t *, uint32_t, uint32_t,
+    const char *);
+extern void spd_parse_ddr4_design(spd_info_t *, uint32_t, uint32_t,
+    const char *);
+extern void spd_parse_ddr5_mod_type(spd_info_t *, uint32_t, uint32_t,
+    const char *);
 
 /*
  * Protocol-specific entry points.
  */
+extern void spd_parse_ddr3(spd_info_t *);
 extern void spd_parse_ddr4(spd_info_t *);
 extern void spd_parse_ddr5(spd_info_t *);
+extern void spd_parse_lp4(spd_info_t *);
+extern void spd_parse_lp5(spd_info_t *);
+extern void spd_parse_ddr4_mfg(spd_info_t *);
+extern void spd_parse_ddr5_common(spd_info_t *);
 
 #ifdef __cplusplus
 }

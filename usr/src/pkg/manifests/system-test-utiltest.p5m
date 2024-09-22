@@ -1589,16 +1589,38 @@ file path=opt/util-tests/tests/head/stdin.3.out mode=0444
 file path=opt/util-tests/tests/head/stdin.5.out mode=0444
 file path=opt/util-tests/tests/head/stdin.multi.out mode=0444
 file path=opt/util-tests/tests/head/stdin.nonewline.out mode=0444
+dir  path=opt/util-tests/tests/hex2spd
+dir  path=opt/util-tests/tests/hex2spd/ddr3
+file path=opt/util-tests/tests/hex2spd/ddr3/M393B4G70BM0-CMA09.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/ddr3/MT36KSZF2G72LDZ-1G6E2A7.spd \
+    mode=0444
+dir  path=opt/util-tests/tests/hex2spd/ddr4
+file path=opt/util-tests/tests/hex2spd/ddr4/36ASF8G72PZ-3G2E1.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/ddr4/AQD-D4U32N32-SBW.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/ddr4/AQD-SD4U16GN32-SE1.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/ddr4/M386AAK40B40-CWD70.spd mode=0444
+dir  path=opt/util-tests/tests/hex2spd/ddr5
+file path=opt/util-tests/tests/hex2spd/ddr5/AQD-D5V16GR48-SB.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/ddr5/MTC40F2046S1RC48BA1.spd mode=0444
+dir  path=opt/util-tests/tests/hex2spd/lpddr3
+file path=opt/util-tests/tests/hex2spd/lpddr3/NT6CL256T32CQ.spd mode=0444
+dir  path=opt/util-tests/tests/hex2spd/lpddr4
+file path=opt/util-tests/tests/hex2spd/lpddr4/MT53D1024M32D4.spd mode=0444
+dir  path=opt/util-tests/tests/hex2spd/lpddr5
+file path=opt/util-tests/tests/hex2spd/lpddr5/CAMM2.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/lpddr5/MT62F4G32D8DV-023.spd mode=0444
 file path=opt/util-tests/tests/iconv_test mode=0555
 dir  path=opt/util-tests/tests/libcustr
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555
 file path=opt/util-tests/tests/libcustr/custr_trunc mode=0555
+file path=opt/util-tests/tests/libjedec_hex2spd.32 mode=0555
+file path=opt/util-tests/tests/libjedec_hex2spd.64 mode=0555
 file path=opt/util-tests/tests/libjedec_spd.32 mode=0555
 file path=opt/util-tests/tests/libjedec_spd.64 mode=0555
 file path=opt/util-tests/tests/libjedec_temp.32 mode=0555
 file path=opt/util-tests/tests/libjedec_temp.64 mode=0555
-file path=opt/util-tests/tests/libjedec_test.32 mode=0555
-file path=opt/util-tests/tests/libjedec_test.64 mode=0555
+file path=opt/util-tests/tests/libjedec_vendors.32 mode=0555
+file path=opt/util-tests/tests/libjedec_vendors.64 mode=0555
 dir  path=opt/util-tests/tests/libnvpair_json
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_01_boolean mode=0555

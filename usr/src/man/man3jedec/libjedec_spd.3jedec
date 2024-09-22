@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 22, 2023
+.Dd September 2, 2024
 .Dt LIBJEDEC_SPD 3JEDEC
 .Os
 .Sh NAME
@@ -105,6 +105,27 @@ and
 .Dq ddr5.lrdimm
 for properties that would be specific to DDR4 RDIMMs and DDR5 LRDIMMs
 respectively.
+.Pp
+Similarly, there are subdivisions based on the device in question.
+For example,
+.Dq ddr3.mb
+and
+.Dq ddr4.rcd
+refer to properties of the DDR3 memory buffer and the DDR4 registering
+clock driver respectively.
+.It Dq lp
+This section describes information that is specific to low power
+devices that come from the LPDDR standards.
+.It Dq channel
+This section describes properties that are specific to the
+implementation of a channel.
+DDR3 and DDR4 DIMMs have a single channel.
+DDR5 DIMMs have a single channel that is broken into two sub-channels.
+A channel represents a specific data stream to the host.
+Most DDR channels are 64-bit channels with optional ECC.
+LPDDR devices have rather different channel widths and their soldered
+down form factor may have more than one channel present
+.Pq regardless of sub-channels .
 .It Dq module
 This section relates to information about the physical module which
 includes information such as its physical dimensions, the types of
@@ -217,6 +238,13 @@ comment
 Use
 .Xr nvlist_lookup_uint32_array 3NVPAIR
 to retrieve these keys.
+.Pp
+A few keys will use different sized integer arrays.
+For example, arrays that relate to timing parameters use arrays of
+.Vt uint64_t
+to match the broader pattern of using the
+.Vt uint64_t
+for timing.
 .El
 .Ss Parsing Errors
 There are a number of different issues that can arise when trying to
@@ -435,6 +463,12 @@ is unsupported by the library.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T DDR5 Serial Presence Detect (SPD) Contents
-.%N JESD400-5A.01
-.%D January 2023
+.%N JESD400-5B Document Release 1.2
+.%D October 2023
+.Re
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T LPDDR5/5X Serial Presence Detect (SPD) Contents
+.%N JESD406-5 Document Release 1.0
+.%D June 2024
 .Re

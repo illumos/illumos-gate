@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -43,13 +44,14 @@
 #include <sys/strsun.h>
 #include <sys/sdt.h>
 
+#include <netsmb/nsmb_kcrypt.h>
+
 #include <netsmb/smb_osdep.h>
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
 #include <netsmb/smb_rq.h>
-#include <netsmb/smb_signing.h>
 
 #ifdef DEBUG
 /*
@@ -71,7 +73,7 @@ smb_sign_init(smb_vc_t *vcp)
 	ASSERT(vcp->vc_ssnkey != NULL);
 	ASSERT(vcp->vc_mackey == NULL);
 
-	rc = smb_md5_getmech(&vcp->vc_signmech);
+	rc = nsmb_md5_getmech(&vcp->vc_signmech);
 	if (rc != 0) {
 		cmn_err(CE_NOTE, "smb can't get signing mechanism");
 		return (EAUTH);
@@ -103,7 +105,7 @@ smb_sign_init(smb_vc_t *vcp)
  */
 static int
 smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
-	uint32_t seqno, uchar_t *signature)
+    uint32_t seqno, uchar_t *signature)
 {
 	uchar_t digest[MD5_DIGEST_LENGTH];
 	smb_sign_ctx_t ctx = 0;
@@ -134,11 +136,11 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	if (vcp->vc_mackey == NULL)
 		return (-1);
 
-	if ((rc = smb_md5_init(&ctx, &vcp->vc_signmech)) != 0)
+	if ((rc = nsmb_md5_init(&ctx, &vcp->vc_signmech)) != 0)
 		return (rc);
 
 	/* Digest the MAC Key */
-	rc = smb_md5_update(ctx, vcp->vc_mackey, vcp->vc_mackeylen);
+	rc = nsmb_md5_update(ctx, vcp->vc_mackey, vcp->vc_mackeylen);
 	if (rc != 0)
 		return (rc);
 
@@ -155,7 +157,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	smbhdr.s.sig[0] = htolel(seqno);
 	smbhdr.s.sig[1] = 0;
 
-	rc = smb_md5_update(ctx, &smbhdr.r.raw, size);
+	rc = nsmb_md5_update(ctx, &smbhdr.r.raw, size);
 	if (rc != 0)
 		return (rc);
 
@@ -164,7 +166,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	 * the data just after the SMB header.
 	 */
 	size = MBLKL(m) - SMB_HDRLEN;
-	rc = smb_md5_update(ctx, m->b_rptr + SMB_HDRLEN, size);
+	rc = nsmb_md5_update(ctx, m->b_rptr + SMB_HDRLEN, size);
 	if (rc != 0)
 		return (rc);
 	m = m->b_cont;
@@ -173,13 +175,13 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	while (m != NULL) {
 		size = MBLKL(m);
 		if (size > 0) {
-			rc = smb_md5_update(ctx, m->b_rptr, size);
+			rc = nsmb_md5_update(ctx, m->b_rptr, size);
 			if (rc != 0)
 				return (rc);
 		}
 		m = m->b_cont;
 	}
-	rc = smb_md5_final(ctx, digest);
+	rc = nsmb_md5_final(ctx, digest);
 	if (rc != 0)
 		return (rc);
 

@@ -23,14 +23,15 @@
 # Use is subject to license terms.
 #
 # Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
-#
 # Copyright 2019, Joyent, Inc.
+# Copyright 2024 RackTop Systems, Inc.
 #
 
 LIBRARY =	libfknsmb.a
 VERS =		.1
 
 OBJS_LOCAL = \
+	fksmb_crypt_pkcs.o \
 	fksmb_sign_pkcs.o \
 	fake_ddi.o \
 	fake_fio.o \
@@ -45,9 +46,10 @@ OBJS_LOCAL = \
 
 # See also: $SRC/uts/common/Makefile.files
 # NB: Intentionally ommitted, compared w/ the above:
-#  smb_dev.o smb_pass.o	smb_sign_kcf.o
+#  smb_dev.o smb_pass.o	nsmb_*_kcf.o
 #
 OBJS_NSMB = \
+	nsmb_kdf.o \
 	smb_dev.o \
 	smb_conn.o \
 	smb_iod.o \
@@ -62,6 +64,7 @@ OBJS_NSMB = \
 	smb2_rq.o \
 	smb2_sign.o \
 	smb2_smb.o \
+	smb3_crypt.o \
 	subr_mchain.o
 
 OBJECTS = \

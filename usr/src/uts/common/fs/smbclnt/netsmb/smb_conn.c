@@ -36,6 +36,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 /*
@@ -361,7 +362,10 @@ smb_vc_free(struct smb_connobj *cp)
 	 */
 	ASSERT(vcp->iod_rqlist.tqh_first == NULL);
 
-	if (vcp->vc_tdata)
+	if ((vcp->vc_sopt.sv2_capabilities & SMB2_CAP_ENCRYPTION) != 0)
+		nsmb_crypt_free_mech(vcp);
+
+	if (vcp->vc_tdata != NULL)
 		SMB_TRAN_DONE(vcp);
 
 /*

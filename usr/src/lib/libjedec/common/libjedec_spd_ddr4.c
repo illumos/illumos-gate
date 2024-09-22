@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -201,6 +201,7 @@ spd_parse_ddr4_pri_pkg(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
 	const uint8_t data = si->si_data[off];
+
 	if (SPD_DDR4_PKG_TYPE(data) == SPD_DDR4_PKG_TYPE_NOT) {
 		spd_nvl_insert_key(si, SPD_KEY_PKG_NOT_MONO);
 	}
@@ -238,7 +239,7 @@ static const spd_value_map_t spd_ddr4_mac_map[] = {
 	{ SPD_DDR4_OPT_FEAT_MAC_400K, 400000, false },
 	{ SPD_DDR4_OPT_FEAT_MAC_300K, 300000, false },
 	{ SPD_DDR4_OPT_FEAT_MAC_200K, 200000, false },
-	{ SPD_DDR4_OPT_FEAT_MAC_UNLIMITED, SPD_KEY_DDR4_MAC_UNLIMITED, false }
+	{ SPD_DDR4_OPT_FEAT_MAC_UNLIMITED, SPD_KEY_MAC_UNLIMITED, false }
 };
 
 static void
@@ -248,9 +249,9 @@ spd_parse_ddr4_feat(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 	const uint8_t maw = SPD_DDR4_OPT_FEAT_MAW(data);
 	const uint8_t mac = SPD_DDR4_OPT_FEAT_MAC(data);
 
-	spd_insert_map(si, SPD_KEY_DDR4_MAW, maw, spd_ddr4_maw_map,
+	spd_insert_map(si, SPD_KEY_MAW, maw, spd_ddr4_maw_map,
 	    ARRAY_SIZE(spd_ddr4_maw_map));
-	spd_insert_map(si, SPD_KEY_DDR4_MAC, mac, spd_ddr4_mac_map,
+	spd_insert_map(si, SPD_KEY_MAC, mac, spd_ddr4_mac_map,
 	    ARRAY_SIZE(spd_ddr4_mac_map));
 }
 
@@ -347,8 +348,12 @@ spd_parse_ddr4_bus_width(spd_info_t *si, uint32_t off, uint32_t len,
 	const uint8_t ext = SPD_DDR4_MOD_BUS_WIDTH_EXT(data);
 	const uint8_t pri = SPD_DDR4_MOD_BUS_WIDTH_PRI(data);
 
-	/* Only DDR5 has multiple subchannels */
+	/*
+	 * DDR4 is simpler than LPDDRx and DDR5. It only has a single channel
+	 * and each DRAM is only connected to one channel.
+	 */
 	spd_nvl_insert_u32(si, SPD_KEY_NSUBCHAN, 1);
+	spd_nvl_insert_u32(si, SPD_KEY_DRAM_NCHAN, 1);
 	spd_insert_map(si, SPD_KEY_DATA_WIDTH, pri, spd_ddr4_pri_width,
 	    ARRAY_SIZE(spd_ddr4_pri_width));
 	spd_insert_map(si, SPD_KEY_ECC_WIDTH, ext, spd_ddr4_ext_width,
@@ -361,14 +366,16 @@ spd_parse_ddr4_therm(spd_info_t *si, uint32_t off, uint32_t len,
 {
 	const uint8_t data = si->si_data[off];
 
-	if (SPD_DDR4_MOD_THERM_PRES(data) != 0)
-		spd_upsert_flag(si, key, SPD_DEVICE_TEMP_1);
 	/*
 	 * In DDR4, there is only a single standard temperature device. It is
 	 * often integrated into the EEPROM, but from a JEDEC perspective these
 	 * each have their own device type.
 	 */
-	spd_nvl_insert_u32(si, SPD_KEY_DEV_TEMP_TYPE, SPD_TEMP_T_TSE2004av);
+	if (SPD_DDR4_MOD_THERM_PRES(data) != 0) {
+		spd_upsert_flag(si, key, SPD_DEVICE_TEMP_1);
+		spd_nvl_insert_u32(si, SPD_KEY_DEV_TEMP_TYPE,
+		    SPD_TEMP_T_TSE2004av);
+	}
 }
 
 static const spd_value_map_t spd_ddr4_ts_mtb[] = {
@@ -395,64 +402,6 @@ spd_parse_ddr4_ts(spd_info_t *si, uint32_t off, uint32_t len,
 }
 
 /*
- * Calculate a full timestamp from a given number of FTB units and either an
- * 8-bit, 12-bit, or 16-bit number of MTB units. The FTB units value is actually
- * a signed two's complement value that we use to adjust things. We need to
- * check for two illegal values:
- *
- * 1. That the value as a whole after adjustment is non-zero.
- * 2. That the fine adjustment does not cause us to underflow (i.e. unit values
- *    for the MTB of 1 and the FTB of -126).
- */
-static void
-spd_parse_ddr4_time(spd_info_t *si, const char *key, uint8_t up_nib,
-    uint8_t mtb, uint8_t ftb)
-{
-	uint64_t ps = ((up_nib << 4) + mtb) * SPD_DDR4_MTB_PS;
-	int8_t adj = (int8_t)ftb;
-
-	if (ps == 125 && adj <= -125) {
-		spd_nvl_err(si, key, SPD_ERROR_BAD_DATA,
-		    "MTB (%" PRIu64 "ps) and FTB (%dps) would cause underflow",
-		    ps, adj);
-		return;
-	}
-
-	ps += adj;
-	if (ps == 0) {
-		spd_nvl_err(si, key, SPD_ERROR_NO_XLATE,
-		    "encountered unexpected zero time value");
-		return;
-	}
-	spd_nvl_insert_u64(si, key, ps);
-}
-
-/*
- * Parse a pair of the MTB and FTB. The MTB is the lower byte in off. The FTB is
- * at off + len.
- */
-static void
-spd_parse_ddr4_mtb_ftb(spd_info_t *si, uint32_t off, uint32_t len,
-    const char *key)
-{
-	return (spd_parse_ddr4_time(si, key, 0, si->si_data[off],
-	    si->si_data[off + len]));
-}
-
-/*
- * Parse a pair of values where the MTB is split across two uint8_t's. The LSB
- * is in off and the MSB is in off+1.
- */
-static void
-spd_parse_ddr4_mtb_pair(spd_info_t *si, uint32_t off, uint32_t len,
-    const char *key)
-{
-	ASSERT3U(len, ==, 2);
-	return (spd_parse_ddr4_time(si, key, si->si_data[off + 1],
-	    si->si_data[off], 0));
-}
-
-/*
  * t~RAS~ consists of the upper nibble at off and the MTB at off + 1.
  */
 static void
@@ -462,12 +411,12 @@ spd_parse_ddr4_tras(spd_info_t *si, uint32_t off, uint32_t len,
 	const uint8_t ras_nib = SPD_DDR4_RAS_RC_UPPER_RAS(si->si_data[off]);
 	ASSERT3U(len, ==, 2);
 
-	return (spd_parse_ddr4_time(si, key, ras_nib, si->si_data[off], 0));
+	return (spd_parse_ddr_time(si, key, ras_nib, si->si_data[off + 1], 0));
 }
 
 /*
  * t~RC~ consists of an upper 4-bit nibble at off. Its MTB is at off + 2. The
- * FTB is at off + len.
+ * FTB is at off + len - 1.
  */
 static void
 spd_parse_ddr4_trc(spd_info_t *si, uint32_t off, uint32_t len,
@@ -475,8 +424,8 @@ spd_parse_ddr4_trc(spd_info_t *si, uint32_t off, uint32_t len,
 {
 	const uint8_t rc_nib = SPD_DDR4_RAS_RC_UPPER_RC(si->si_data[off]);
 
-	return (spd_parse_ddr4_time(si, key, rc_nib, si->si_data[off + 2],
-	    si->si_data[off + len]));
+	return (spd_parse_ddr_time(si, key, rc_nib, si->si_data[off + 2],
+	    si->si_data[off + len - 1]));
 }
 
 /*
@@ -487,7 +436,7 @@ spd_parse_ddr4_tfaw(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
 	const uint8_t faw_nib = SPD_DDR4_TFAW_UPPER_FAW(si->si_data[off]);
-	return (spd_parse_ddr4_time(si, key, faw_nib, si->si_data[off + 1], 0));
+	return (spd_parse_ddr_time(si, key, faw_nib, si->si_data[off + 1], 0));
 }
 
 static void
@@ -495,7 +444,7 @@ spd_parse_ddr4_twr(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
 	const uint8_t twr_nib = SPD_DDR4_TWR_MIN_UPPER_TWR(si->si_data[off]);
-	return (spd_parse_ddr4_time(si, key, twr_nib, si->si_data[off + 1], 0));
+	return (spd_parse_ddr_time(si, key, twr_nib, si->si_data[off + 1], 0));
 }
 
 static void
@@ -503,7 +452,7 @@ spd_parse_ddr4_twtrs(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
 	const uint8_t twtrs_nib = SPD_DDR4_TWRT_UPPER_TWRS(si->si_data[off]);
-	return (spd_parse_ddr4_time(si, key, twtrs_nib, si->si_data[off + 1],
+	return (spd_parse_ddr_time(si, key, twtrs_nib, si->si_data[off + 1],
 	    0));
 }
 
@@ -512,7 +461,7 @@ spd_parse_ddr4_twtrl(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
 	const uint8_t twtrl_nib = SPD_DDR4_TWRT_UPPER_TWRL(si->si_data[off]);
-	return (spd_parse_ddr4_time(si, key, twtrl_nib, si->si_data[off + 2],
+	return (spd_parse_ddr_time(si, key, twtrl_nib, si->si_data[off + 2],
 	    0));
 }
 
@@ -533,7 +482,7 @@ spd_parse_ddr4_cas(spd_info_t *si, uint32_t off, uint32_t len,
 	}
 
 	for (uint32_t byte = 0; byte < len; byte++) {
-		uint32_t data = si->si_data[off];
+		uint32_t data = si->si_data[off + byte];
 		uint32_t nbits = NBBY;
 
 		/*
@@ -580,7 +529,10 @@ static const uint32_t spd_ddr4_nib_map[0x18][0x4] = {
 	{ 3, 2, 1, 0 }
 };
 
-static void
+/*
+ * This function is shared between LPDDR3/4 and DDR4. They have the same values.
+ */
+void
 spd_parse_ddr4_nib_map(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
@@ -655,44 +607,44 @@ static const spd_parse_t spd_ddr4_common[] = {
 	{ .sp_off = SPD_DDR4_TIMEBASE, .sp_parse = spd_parse_ddr4_ts },
 	{ .sp_off = SPD_DDR4_TCKAVG_MIN, .sp_key = SPD_KEY_TCKAVG_MIN,
 	    .sp_len = SPD_DDR4_TCKAVG_MIN_FINE - SPD_DDR4_TCKAVG_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TCKAVG_MAX, .sp_key = SPD_KEY_TCKAVG_MAX,
 	    .sp_len = SPD_DDR4_TCKAVG_MAX_FINE - SPD_DDR4_TCKAVG_MAX + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_CAS_SUP0, .sp_key = SPD_KEY_CAS,
 	    .sp_len = SPD_DDR4_CAS_SUP3 - SPD_DDR4_CAS_SUP0 + 1,
 	    .sp_parse = spd_parse_ddr4_cas },
 	{ .sp_off = SPD_DDR4_TAA_MIN, .sp_key = SPD_KEY_TAA_MIN,
 	    .sp_len = SPD_DDR4_TAA_MIN_FINE - SPD_DDR4_TAA_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TRCD_MIN, .sp_key = SPD_KEY_TRCD_MIN,
 	    .sp_len = SPD_DDR4_TRCD_MIN_FINE - SPD_DDR4_TRCD_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TRP_MIN, .sp_key = SPD_KEY_TRP_MIN,
 	    .sp_len = SPD_DDR4_TRP_MIN_FINE - SPD_DDR4_TRP_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_RAS_RC_UPPER, .sp_len = 2,
 	    .sp_key = SPD_KEY_TRAS_MIN, .sp_parse = spd_parse_ddr4_tras },
 	{ .sp_off = SPD_DDR4_RAS_RC_UPPER, .sp_key = SPD_KEY_TRC_MIN,
 	    .sp_len = SPD_DDR4_TRC_MIN_FINE - SPD_DDR4_RAS_RC_UPPER + 1,
 	    .sp_parse = spd_parse_ddr4_trc },
 	{ .sp_off = SPD_DDR4_TRFC1_MIN_LSB, .sp_len = 2,
-	    .sp_key = SPD_KEY_TRFC1_MIN, .sp_parse = spd_parse_ddr4_mtb_pair },
+	    .sp_key = SPD_KEY_TRFC1_MIN, .sp_parse = spd_parse_mtb_pair },
 	{ .sp_off = SPD_DDR4_TRFC2_MIN_LSB, .sp_len = 2,
-	    .sp_key = SPD_KEY_TRFC2_MIN, .sp_parse = spd_parse_ddr4_mtb_pair },
+	    .sp_key = SPD_KEY_TRFC2_MIN, .sp_parse = spd_parse_mtb_pair },
 	{ .sp_off = SPD_DDR4_TRFC4_MIN_LSB, .sp_len = 2,
-	    .sp_key = SPD_KEY_TRFC4_MIN, .sp_parse = spd_parse_ddr4_mtb_pair },
+	    .sp_key = SPD_KEY_TRFC4_MIN, .sp_parse = spd_parse_mtb_pair },
 	{ .sp_off = SPD_DDR4_TFAW_UPPER, .sp_len = 2, .sp_key = SPD_KEY_TFAW,
 	    .sp_parse = spd_parse_ddr4_tfaw },
 	{ .sp_off = SPD_DDR4_TRRDS_MIN, .sp_key = SPD_KEY_TRRD_S_MIN,
 	    .sp_len = SPD_DDR4_TRRDS_MIN_FINE - SPD_DDR4_TRRDS_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TRRDL_MIN, .sp_key = SPD_KEY_TRRD_L_MIN,
 	    .sp_len = SPD_DDR4_TRRDL_MIN_FINE - SPD_DDR4_TRRDL_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TCCDL_MIN, .sp_key = SPD_KEY_TCCD_L_MIN,
 	    .sp_len = SPD_DDR4_TCCDL_MIN_FINE - SPD_DDR4_TCCDL_MIN + 1,
-	    .sp_parse = spd_parse_ddr4_mtb_ftb },
+	    .sp_parse = spd_parse_mtb_ftb_time_pair },
 	{ .sp_off = SPD_DDR4_TWR_MIN_UPPER, .sp_len = 2,
 	    .sp_key = SPD_KEY_TWR_MIN, .sp_parse = spd_parse_ddr4_twr },
 	{ .sp_off = SPD_DDR4_TWRT_UPPER, .sp_len = 2,
@@ -768,105 +720,16 @@ static const spd_parse_t spd_ddr4_mfg[] = {
 	    .sp_parse = spd_parse_dram_step },
 };
 
-static const spd_str_map_t spd_ddr4_design_map0[] = {
-	{ 0, "A", false },
-	{ 1, "B", false },
-	{ 2, "C", false },
-	{ 3, "D", false },
-	{ 4, "E", false },
-	{ 5, "F", false },
-	{ 6, "G", false },
-	{ 7, "H", false },
-	{ 8, "J", false },
-	{ 9, "K", false },
-	{ 10, "L", false },
-	{ 11, "M", false },
-	{ 12, "N", false },
-	{ 13, "P", false },
-	{ 14, "R", false },
-	{ 15, "T", false },
-	{ 16, "U", false },
-	{ 17, "V", false },
-	{ 18, "W", false },
-	{ 19, "Y", false },
-	{ 20, "AA", false },
-	{ 21, "AB", false },
-	{ 22, "AC", false },
-	{ 23, "AD", false },
-	{ 24, "AE", false },
-	{ 25, "AF", false },
-	{ 26, "AG", false },
-	{ 27, "AH", false },
-	{ 28, "AJ", false },
-	{ 29, "AK", false },
-	{ 30, "AL", false },
-	{ 31, "ZZ", false }
-};
-
-static const spd_str_map_t spd_ddr4_design_map1[] = {
-	{ 0, "AM", false },
-	{ 1, "AN", false },
-	{ 2, "AP", false },
-	{ 3, "AR", false },
-	{ 4, "AT", false },
-	{ 5, "AU", false },
-	{ 6, "AV", false },
-	{ 7, "AW", false },
-	{ 8, "AY", false },
-	{ 9, "BA", false },
-	{ 10, "BB", false },
-	{ 11, "BC", false },
-	{ 12, "BD", false },
-	{ 13, "BE", false },
-	{ 14, "BF", false },
-	{ 15, "BG", false },
-	{ 16, "BH", false },
-	{ 17, "BJ", false },
-	{ 18, "BK", false },
-	{ 19, "BL", false },
-	{ 20, "BM", false },
-	{ 21, "BN", false },
-	{ 22, "BP", false },
-	{ 23, "BR", false },
-	{ 24, "BT", false },
-	{ 25, "BU", false },
-	{ 26, "BV", false },
-	{ 27, "BW", false },
-	{ 28, "BY", false },
-	{ 29, "CA", false },
-	{ 30, "CB", false },
-	{ 31, "ZZ", false }
-};
-
-static void
+/*
+ * The offsets and values for design information are identical across DDR4 and
+ * the LPDDR3/4/4X SPD data.
+ */
+void
 spd_parse_ddr4_design(spd_info_t *si, uint32_t off, uint32_t len,
     const char *key)
 {
-	const uint8_t data = si->si_data[off];
-	const uint8_t rev = SPD_DDR4_RDIMM_REF_REV(data);
-	const uint8_t card = SPD_DDR4_RDIMM_REF_CARD(data);
-
-	if (SPD_DDR4_RDIMM_REF_EXT(data) != 0) {
-		spd_insert_str_map(si, SPD_KEY_MOD_REF_DESIGN, card,
-		    spd_ddr4_design_map1, ARRAY_SIZE(spd_ddr4_design_map1));
-	} else {
-		spd_insert_str_map(si, SPD_KEY_MOD_REF_DESIGN, card,
-		    spd_ddr4_design_map0, ARRAY_SIZE(spd_ddr4_design_map0));
-	}
-
-	/*
-	 * The DDR4 design rev is split between here and the height field. If we
-	 * have the value of three, then we must also add in the height's value
-	 * to this.
-	 */
-	if (rev == SPD_DDR4_RDIMM_REV_USE_HEIGHT) {
-		ASSERT3U(off, >=, SPD_DDR4_RDIMM_HEIGHT);
-		const uint8_t height = si->si_data[SPD_DDR4_RDIMM_HEIGHT];
-		const uint8_t hrev = SPD_DDR4_RDIMM_HEIGHT_REV(height);
-		spd_nvl_insert_u32(si, SPD_KEY_MOD_DESIGN_REV, rev + hrev);
-	} else {
-		spd_nvl_insert_u32(si, SPD_KEY_MOD_DESIGN_REV, rev);
-	}
+	ASSERT3U(off, >=, SPD_DDR4_RDIMM_HEIGHT);
+	return (spd_parse_design(si, off, SPD_DDR4_RDIMM_HEIGHT));
 }
 
 static void
@@ -876,7 +739,7 @@ spd_parse_ddr4_edge(spd_info_t *si, uint32_t off, uint32_t len,
 	const uint8_t data = si->si_data[off];
 
 	if (SPD_DDR4_RDIMM_MAP_R1(data) != 0)
-		spd_nvl_insert_key(si, SPD_KEY_DDR4_MIRROR);
+		spd_nvl_insert_key(si, SPD_KEY_MOD_EDGE_MIRROR);
 }
 
 /*
@@ -887,7 +750,10 @@ static const spd_parse_t spd_ddr4_udimm[] = {
 	    .sp_parse = spd_parse_height },
 	{ .sp_off = SPD_DDR4_UDIMM_THICK, .sp_parse = spd_parse_thickness },
 	{ .sp_off = SPD_DDR4_UDIMM_REF, .sp_parse = spd_parse_ddr4_design },
-	{ .sp_off = SPD_DDR4_UDIMM_MAP, .sp_parse = spd_parse_ddr4_edge }
+	{ .sp_off = SPD_DDR4_UDIMM_MAP, .sp_parse = spd_parse_ddr4_edge },
+	{ .sp_off = SPD_DDR4_BLK1_CRC_START, .sp_len = SPD_DDR4_BLK1_CRC_MSB +
+	    1 - SPD_DDR4_BLK1_CRC_START, .sp_key = SPD_KEY_CRC_DDR4_BLK1,
+	    .sp_parse = spd_parse_crc }
 };
 
 /*
@@ -990,8 +856,8 @@ static const spd_parse_t spd_ddr4_rdimm[] = {
 	{ .sp_off = SPD_DDR4_RDIMM_ODS0, .sp_len = 2,
 	    .sp_parse = spd_parse_ddr4_rdimm_ods },
 	{ .sp_off = SPD_DDR4_BLK1_CRC_START, .sp_len = SPD_DDR4_BLK1_CRC_MSB +
-		1 - SPD_DDR4_BLK1_CRC_START, .sp_key = SPD_KEY_CRC_DDR4_BLK1,
-	    .sp_parse = spd_parse_crc },
+	    1 - SPD_DDR4_BLK1_CRC_START, .sp_key = SPD_KEY_CRC_DDR4_BLK1,
+	    .sp_parse = spd_parse_crc }
 };
 
 /*
@@ -1111,7 +977,7 @@ spd_parse_ddr4_lrdimm_vrefdq_r0(spd_info_t *si, uint32_t off, uint32_t len,
 {
 	const uint8_t data = si->si_data[off];
 	const uint8_t volt = SPD_DDR4_LRDIMM_VREFDQ_V(data);
-	const uint8_t range = si->si_data[off + len];
+	const uint8_t range = si->si_data[off + len - 1];
 
 	spd_parse_ddr4_vrefdq_common(si, SPD_DDR4_LRDIMM_VREFDQ_RNG_R0(range),
 	    volt, key);
@@ -1172,7 +1038,7 @@ static const spd_value_map_t spd_ddr4_mdq_ds_map[] = {
 };
 
 static const spd_value_map_t spd_ddr4_rtt_map[] = {
-	{ SPD_DDR4_LRDIMM_MDQ_RTT_DIS, SPD_KEY_DDR4_TERM_DISABLED, false },
+	{ SPD_DDR4_LRDIMM_MDQ_RTT_DIS, SPD_TERM_DISABLED, false },
 	{ SPD_DDR4_LRDIMM_MDQ_RTT_60R, 60, false },
 	{ SPD_DDR4_LRDIMM_MDQ_RTT_120R, 120, false },
 	{ SPD_DDR4_LRDIMM_MDQ_RTT_40R, 40, false },
@@ -1221,10 +1087,10 @@ spd_parse_ddr4_lrdimm_dram(spd_info_t *si, uint32_t off, uint32_t len,
 }
 
 static const spd_value_map_t spd_ddr4_rtt_wr_map[] = {
-	{ SPD_DDR4_LRDIMM_ODT_WR_DYN_OFF, SPD_KEY_DDR4_TERM_DISABLED, false },
+	{ SPD_DDR4_LRDIMM_ODT_WR_DYN_OFF, SPD_TERM_DISABLED, false },
 	{ SPD_DDR4_LRDIMM_ODT_WR_120R, 120, false },
 	{ SPD_DDR4_LRDIMM_ODT_WR_240R, 240, false },
-	{ SPD_DDR4_LRDIMM_ODT_WR_HIZ, SPD_KEY_DDR4_TERM_HIZ, false },
+	{ SPD_DDR4_LRDIMM_ODT_WR_HIZ, SPD_TERM_HIZ, false },
 	{ SPD_DDR4_LRDIMM_ODT_WR_80R, 80, false },
 };
 
@@ -1332,7 +1198,10 @@ static const spd_parse_t spd_ddr4_lrdimm[] = {
 	    .sp_parse = spd_parse_ddr4_lrdimm_odt },
 	{ .sp_off = SPD_DDR4_LRDIMM_PARK_1866, .sp_len = 3,
 	    .sp_parse = spd_parse_ddr4_lrdimm_park },
-	{ .sp_off = SPD_DDR4_LRDIMM_EQ, .sp_parse = spd_parse_ddr4_lrdimm_dfe }
+	{ .sp_off = SPD_DDR4_LRDIMM_EQ, .sp_parse = spd_parse_ddr4_lrdimm_dfe },
+	{ .sp_off = SPD_DDR4_BLK1_CRC_START, .sp_len = SPD_DDR4_BLK1_CRC_MSB +
+	    1 - SPD_DDR4_BLK1_CRC_START, .sp_key = SPD_KEY_CRC_DDR4_BLK1,
+	    .sp_parse = spd_parse_crc }
 };
 
 static void
@@ -1365,6 +1234,12 @@ spd_parse_ddr4_mod_specific(spd_info_t *si)
 	}
 }
 
+void
+spd_parse_ddr4_mfg(spd_info_t *si)
+{
+	spd_parse(si, spd_ddr4_mfg, ARRAY_SIZE(spd_ddr4_mfg));
+}
+
 /*
  * DDR4 processing.
  *
@@ -1390,5 +1265,5 @@ spd_parse_ddr4(spd_info_t *si)
 	 */
 	spd_parse(si, spd_ddr4_common, ARRAY_SIZE(spd_ddr4_common));
 	spd_parse_ddr4_mod_specific(si);
-	spd_parse(si, spd_ddr4_mfg, ARRAY_SIZE(spd_ddr4_mfg));
+	spd_parse_ddr4_mfg(si);
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SPD_DDR5_H
@@ -18,8 +18,9 @@
 
 /*
  * Definitions for use in DDR5 Serial Presence Detect decoding based on JEDEC
- * Standard JESD400-5a.01 DDR5 Serial Presence Detect (SPD) Contents. Release
- * 1.1. This does not cover LPDDR5.
+ * Standard JESD400-5A.01 DDR5 Serial Presence Detect (SPD) Contents. Release
+ * 1.2. This does not cover LPDDR5. While the two are similar, there are enough
+ * differences that we maintain LPDDR5 in its own header (spd_lp5.h).
  *
  * DDR5 modules are organized into a few main regions:
  *
@@ -31,8 +32,7 @@
  *   o Manufacturing Information (0x200-0x27f)
  *   o Optional end-user programmable regions (0x280-0x3ff)
  *
- * This covers all DDR5 variants other than NVDIMMs. LPDDR5 is a different beast
- * entirely.
+ * This covers all DDR5 variants other than NVDIMMs.
  */
 
 #include <sys/bitext.h>
@@ -85,7 +85,10 @@ extern "C" {
 #define	SPD_DDR5_MOD_TYPE_TYPE_UDIMM	2
 #define	SPD_DDR5_MOD_TYPE_TYPE_SODIMM	3
 #define	SPD_DDR5_MOD_TYPE_TYPE_LRDIMM	4
+#define	SPD_DDR5_MOD_TYPE_TYPE_CUDIMM	5
+#define	SPD_DDR5_MOD_TYPE_TYPE_CSODIMM	6
 #define	SPD_DDR5_MOD_TYPE_TYPE_MRDIMM	7
+#define	SPD_DDR5_MOD_TYPE_TYPE_CAMM2	8
 #define	SPD_DDR5_MOD_TYPE_TYPE_DDIMM	10
 #define	SPD_DDR5_MOD_TYPE_TYPE_SOLDER	11
 
@@ -146,10 +149,10 @@ extern "C" {
  */
 #define	SPD_DDR5_BANKS1	0x007
 #define	SPD_DDR5_BANKS2	0x00b
-#define	SPD_DDR5_BANKS_NBG(r)	bitx8(r, 7, 5)
-#define	SPD_DDR5_BANKS_NBG_MAX	8
-#define	SPD_DDR5_BANKS_NBA(r)	bitx8(r, 2, 0)
-#define	SPD_DDR5_BANKS_NBA_MAX	4
+#define	SPD_DDR5_BANKS_NBG_BITS(r)	bitx8(r, 7, 5)
+#define	SPD_DDR5_BANKS_NBG_BITS_MAX	3
+#define	SPD_DDR5_BANKS_NBA_BITS(r)	bitx8(r, 2, 0)
+#define	SPD_DDR5_BANKS_NBA_BITS_MAX	2
 
 /*
  * S8.1.13 SDRAM BL32 and Post Package Repair
@@ -216,8 +219,8 @@ extern "C" {
  */
 
 /*
- * S8.4 SDRAM Minimum Cycle Time t~CKAVG~min (ps)
- * S8.5 SDRAM Maximum Cycle Time t~CKAVG~max (ps)
+ * S8.1.21 SDRAM Minimum Cycle Time t~CKAVG~min (ps)
+ * S8.1.22 SDRAM Maximum Cycle Time t~CKAVG~max (ps)
  */
 #define	SPD_DDR5_TCKAVG_MIN_LSB	0x014
 #define	SPD_DDR5_TCKAVG_MIN_MSB	0x015
@@ -225,7 +228,7 @@ extern "C" {
 #define	SPD_DDR5_TCKAVG_MAX_MSB	0x017
 
 /*
- * S8.6 CAS Latencies. These are 5 bytes which indicate which set o CAS
+ * S8.1.23 CAS Latencies. These are 5 bytes which indicate which set o CAS
  * latencies are supported. The LSB of the SPD_DDR5_CAS_SUP0 corresponds to
  * CL20. Each subsequent bit is an additional 2 CL. So bit 4 is CL28. Byte 2 bit
  * 6 is CL64.
@@ -237,20 +240,20 @@ extern "C" {
 #define	SPD_DDR5_CAS_SUP4	0x01c
 
 /*
- * S8.7 SDRAM Read Command to First Data (t~AA~) (ps)
- * S8.8 SDRAM Activate to Read or Write Command Delay (t~RCD~) (ps)
- * S8.9 SDRAM Row Precharge Time (t~RP~) (ps)
- * S8.10 SDRAM Activate to Precharge Command Period (t~RAS~) (ps)
- * S8.11 SDRAM Activate to to Activate or Refresh Command Period (t~RC~) (ps)
- * S8.12 SDRAM Write Recovery Time (t~WR~) (ps)
- * S8.13 SDRAM Normal Refresh Recovery Time (t~RFC1,tRFC1_slr~) (ns)
- * S8.14 SDRAM Fine Granularity Refresh Recovery Time (t~RFC2,tRFC2_slr~) (ns)
- * S8.15 SDRAM Same Bank Refresh Recovery Time (t~RFCsb,tRFCsb_slr~) (ns)
- * S8.16 SDRAM Normal Refresh Recovery Time, 3DS Different Logical Rank
+ * S8.1.25 SDRAM Read Command to First Data (t~AA~) (ps)
+ * S8.1.26 SDRAM Activate to Read or Write Command Delay (t~RCD~) (ps)
+ * S8.1.27 SDRAM Row Precharge Time (t~RP~) (ps)
+ * S8.1.28 SDRAM Activate to Precharge Command Period (t~RAS~) (ps)
+ * S8.1.29 SDRAM Activate to to Activate or Refresh Command Period (t~RC~) (ps)
+ * S8.1.30 SDRAM Write Recovery Time (t~WR~) (ps)
+ * S8.1.31 SDRAM Normal Refresh Recovery Time (t~RFC1,tRFC1_slr~) (ns)
+ * S8.1.32 SDRAM Fine Granularity Refresh Recovery Time (t~RFC2,tRFC2_slr~) (ns)
+ * S8.1.33 SDRAM Same Bank Refresh Recovery Time (t~RFCsb,tRFCsb_slr~) (ns)
+ * S8.1.34 SDRAM Normal Refresh Recovery Time, 3DS Different Logical Rank
  * (t~RFC1_dlr~) (ns)
- * S8.17 SDRAM Fine Granularity Recovery Time, 3DS Different Logical Rank
+ * S8.1.35 SDRAM Fine Granularity Recovery Time, 3DS Different Logical Rank
  * (t~RFC2_dlr~) (ns)
- * S8.18 SDRAM Fine Granularity Recovery Time, 3DS Different Logical Rank
+ * S8.1.36 SDRAM Fine Granularity Recovery Time, 3DS Different Logical Rank
  * (t~RFCsb_dlr~) (ns)
  */
 #define	SPD_DDR5_TAA_LSB	0x01e
@@ -279,8 +282,8 @@ extern "C" {
 #define	SPD_DDR5_3DS_TRFCSB_MSB	0x035
 
 /*
- * S8.19 SDRAM Refresh Management First SDRAM
- * S8.20 SDRAM Refresh Management Second SDRAM
+ * S8.1.37 SDRAM Refresh Management First SDRAM
+ * S8.1.38 SDRAM Refresh Management Second SDRAM
  *
  * Refresh Management spans two bytes.
  */
@@ -317,7 +320,7 @@ extern "C" {
 #define	SPD_DDR5_RFM1_DRFM_SUP(r)	bitx8(r, 0, 0)
 
 /*
- * S8.21 SDRAM Adaptive Refresh Management. This is broken down so that there
+ * S8.1.39 SDRAM Adaptive Refresh Management. This is broken down so that there
  * are three levels, A, B, and C. There are then two bytes per level. And there
  * is one entry for the first DRAM and one for the second. With the exception of
  * bit 0 of the low byte, which indicates whether or not this is supported,
@@ -338,16 +341,23 @@ extern "C" {
 #define	SPD_DDR5_ARFM_SUP(r)	bitx8(r, 0, 0)
 
 /*
- * S8.22 SDRAM Activate to Activate Command Delay for Same Bank Group (t~RRD_L~)
- * S8.23 SDRAM Read to Read Command Delay for Same Bank Group (t~CDD_L~)
- * S8.24 SDRAM Write to Write Command Delay for Same Bank Group (t~CDD_L_WR~)
- * S8.25 SDRAM Write to Write Command Delay for Same Bank Group, Second Write
+ * S8.1.40 SDRAM Activate to Activate Command Delay for Same Bank Group
+ * (t~RRD_L~)
+ * S8.1.41 SDRAM Read to Read Command Delay for Same Bank Group (t~CDD_L~)
+ * S8.1.42 SDRAM Write to Write Command Delay for Same Bank Group (t~CDD_L_WR~)
+ * S8.1.43 SDRAM Write to Write Command Delay for Same Bank Group, Second Write
  * not RMW (t~CDD_L_WR2~)
- * S8.26 SDRAM Four Activate Window (t~FAW~)
- * S8.27 SDRAM Write to Read Command Delay for Same Bank Group (t~CCD_L_WTR~)
- * S8.28 SDRAM Write to Read Command Delay for Different Bank Group
+ * S8.1.44 SDRAM Four Activate Window (t~FAW~)
+ * S8.1.45 SDRAM Write to Read Command Delay for Same Bank Group (t~CCD_L_WTR~)
+ * S8.1.46 SDRAM Write to Read Command Delay for Different Bank Group
  * (t~CCD_S_WTR~)
- * S8.29 SDRAM Read to Precharge Command Delay (t~RTP~,t~RTP_slr~)
+ * S8.1.47 SDRAM Read to Precharge Command Delay (t~RTP~,t~RTP_slr~)
+ * S8.1.48 (v1.2) SDRAM Read to Read Command Delay for Different Bank in Same
+ * Bank Group (t~CCD_M~)
+ * S8.1.49 (v1.2) SDRAM Write to Write Command Delay for Different Bank in Same
+ * Bank Group (t~CCD_M_WR~)
+ * S8.1.50 (v1.2) SDRAM Write to Read Command Delay for Different Bank in Same
+ * Bank Group (t~CCD_M_WTR~)
  *
  * These timing registers all consist of three bytes. The first two bytes are
  * the LSB / MSB of the value in ps. The third bird defines the number of clock
@@ -377,6 +387,15 @@ extern "C" {
 #define	SPD_DDR5_TRTP_LSB	0x05b
 #define	SPD_DDR5_TRTP_MSB	0x05c
 #define	SPD_DDR5_TRTP_NCK	0x05d
+#define	SPD_DDR5_TCCD_M_LSB	0x05e
+#define	SPD_DDR5_TCCD_M_MSB	0x05f
+#define	SPD_DDR5_TCCD_M_NCK	0x060
+#define	SPD_DDR5_TCCD_M_WR_LSB	0x061
+#define	SPD_DDR5_TCCD_M_WR_MSB	0x062
+#define	SPD_DDR5_TCCD_M_WR_NCK	0x063
+#define	SPD_DDR5_TCCD_M_WTR_LSB	0x064
+#define	SPD_DDR5_TCCD_M_WTR_MSB	0x065
+#define	SPD_DDR5_TCCD_M_WTR_NCK	0x066
 
 /*
  * The remaining bytes in this section are currently reserved. Next, we begin
@@ -425,6 +444,10 @@ extern "C" {
 #define	SPD_DDR5_COM_INFO_TYPE_PMIC5000	0
 #define	SPD_DDR5_COM_INFO_TYPE_PMIC5010	1
 #define	SPD_DDR5_COM_INFO_TYPE_PMIC5100	2
+#define	SPD_DDR5_COM_INFO_TYPE_PMIC5020	3
+#define	SPD_DDR5_COM_INFO_TYPE_PMIC5120	4
+#define	SPD_DDR5_COM_INFO_TYPE_PMIC5200	5
+#define	SPD_DDR5_COM_INFO_TYPE_PMIC5030	6
 #define	SPD_DDR5_COM_REV_PMIC0		0x0c9
 
 #define	SPD_DDR5_COM_MFG_ID0_PMIC1	0x0ca
@@ -443,6 +466,8 @@ extern "C" {
 #define	SPD_DDR5_COM_INFO_TS1_PRES(r)	bitx8(r, 6, 6)
 #define	SPD_DDR5_COM_INFO_TYPE_TS5111	0
 #define	SPD_DDR5_COM_INFO_TYPE_TS5110	1
+#define	SPD_DDR5_COM_INFO_TYPE_TS5211	2
+#define	SPD_DDR5_COM_INFO_TYPE_TS5210	3
 #define	SPD_DDR5_COM_REV_TS		0x0d5
 
 /*
@@ -503,9 +528,8 @@ extern "C" {
  * terms of sub-channels.
  */
 #define	SPD_DDR5_COM_BUS_WIDTH	0x0eb
-#define	SPD_DDR5_COM_BUS_WIDTH_NSC(r)	bitx8(r, 6, 5)
-#define	SPD_DDR5_COM_BUS_WIDTH_NSC_BASE	1
-#define	SPD_DDR5_COM_BUS_WIDTH_NSC_MAX	2
+#define	SPD_DDR5_COM_BUS_WIDTH_NSC(r)	bitx8(r, 7, 5)
+#define	SPD_DDR5_COM_BUS_WIDTH_NSC_MAX	8
 #define	SPD_DDR5_COM_BUS_WIDTH_EXT(r)	bitx8(r, 4, 3)
 #define	SPD_DDR5_COM_BUS_WIDTH_EXT_NONE	0
 #define	SPD_DDR5_COM_BUS_WIDTH_EXT_4b	1
@@ -527,14 +551,45 @@ extern "C" {
  * Annex A.2 Module Specific Bytes for Buffered Memory Module Types.  S13.1
  * UDIMM: Module Specific Device Information. This follows the same pattern as
  * the other device specific manufacturing information with a series of four
- * bytes. See the discussion of S11.3. This is the only defined entry in this
- * annex right now.
+ * bytes. See the discussion of S11.3. Revision 1.0 only defined the CLK
+ * information. Revision 1.1 added several additional pieces of data.
  */
 #define	SPD_DDR5_UDIMM_MFG_ID0_CLK	0x0f0
 #define	SPD_DDR5_UDIMM_MFG_ID1_CLK	0x0f1
 #define	SPD_DDR5_UDIMM_INFO_CLK		0x0f2
 #define	SPD_DDR5_UDIMM_INFO_TYPE_DDR5CK01	0
 #define	SPD_DDR5_UDIMM_REV_CLK		0x0f3
+
+/*
+ * S13.2 UDIMM v1.1: CKD-RW00 CKD Configuration
+ */
+#define	SPD_DDR5_UDIMM_CKD_CFG		0x0f4
+#define	SPD_DDR5_UDIMM_CKD_CFG_CHBQCK1(r)	bitx8(r, 7, 7)
+#define	SPD_DDR5_UDIMM_CKD_CFG_CHBQCK0(r)	bitx8(r, 6, 6)
+#define	SPD_DDR5_UDIMM_CKD_CFG_CHAQCK1(r)	bitx8(r, 5, 5)
+#define	SPD_DDR5_UDIMM_CKD_CFG_CHAQCK0(r)	bitx8(r, 4, 4)
+
+/*
+ * S13.3 UDIMM v1.1: CKD-RW02 QCK Driver Characteristics
+ */
+#define	SPD_DDR5_UDIMM_CKD_DRV		0x0f5
+#define	SPD_DDR5_UDIMM_CKD_DRV_CHBQCK1_DRIVE(r)	bitx8(r, 7, 6)
+#define	SPD_DDR5_UDIMM_CKD_DRV_CHBQCK0_DRIVE(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_UDIMM_CKD_DRV_CHAQCK1_DRIVE(r)	bitx8(r, 3, 2)
+#define	SPD_DDR5_UDIMM_CKD_DRV_CHAQCK0_DRIVE(r)	bitx8(r, 1, 0)
+#define	SPD_DDR5_UDIMM_CKD_DRV_LIGHT	0
+#define	SPD_DDR5_UDIMM_CKD_DRV_MODERATE	1
+#define	SPD_DDR5_UDIMM_CKD_DRV_STRONG	2
+#define	SPD_DDR5_UDIMM_CKD_DRV_WEAK	3
+
+/*
+ * S13.4 UDIMM v1.1: CKD-RW03 QCK Output Differential Slew Rate
+ */
+#define	SPD_DDR5_UDIMM_CKD_SLEW		0x0f6
+#define	SPD_DDR5_UDIMM_CKD_SLEW_CHBQCK_SLEW(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_UDIMM_CKD_SLEW_CHAQCK_SLEW(r)	bitx8(r, 1, 0)
+#define	SPD_DDR5_UDIMM_CKD_SLEW_SLEW_MODERATE	0
+#define	SPD_DDR5_UDIMM_CKD_SLEW_SLEW_FAST	1
 
 /*
  * Annex A.3: Module Specific Bytes for Registered (RDIMM) and Load Reduced
@@ -552,6 +607,8 @@ extern "C" {
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD01	0
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD02	1
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD03	2
+#define	SPD_DDR5_RDIMM_INFO_TYPE_RCD04	3
+#define	SPD_DDR5_RDIMM_INFO_TYPE_RCD05	4
 #define	SPD_DDR5_RDIMM_REV_RCD		0x0f3
 
 #define	SPD_DDR5_RDIMM_MFG_ID0_DB	0x0f4
@@ -588,17 +645,18 @@ extern "C" {
  * S14.7 RDIMM: RCD-RW0C QxCA and QxCS_n Driver Characteristics
  * S14.8 LRDIMM: RCD-RW0D Data Buffer Interface Driver Characteristics
  *
- * These share the same definitions for resistance values. One minor exception
- * is that the LRDIMM BCOM does not support a 10R value.
+ * RDIMM 1.0 phrased these in terms of resistance values; however, RDIMM 1.1
+ * changed them into relative terms used elsewhere like light, moderate, and
+ * strong.
  */
 #define	SPD_DDR5_RDIMM_QCK_DRV	0x0fa
 #define	SPD_DDR5_RDIMM_QCK_DRV_QDCK(r)	bitx8(r, 7, 6)
 #define	SPD_DDR5_RDIMM_QCK_DRV_QCCK(r)	bitx8(r, 5, 4)
 #define	SPD_DDR5_RDIMM_QCK_DRV_QBCK(r)	bitx8(r, 3, 2)
 #define	SPD_DDR5_RDIMM_QCK_DRV_QACK(r)	bitx8(r, 1, 0)
-#define	SPD_DDR5_RDIMM_DRV_20R	0
-#define	SPD_DDR5_RDIMM_DRV_14R	1
-#define	SPD_DDR5_RDIMM_DRV_10R	2
+#define	SPD_DDR5_RDIMM_DRV_LIGHT	0
+#define	SPD_DDR5_RDIMM_DRV_MODERATE	1
+#define	SPD_DDR5_RDIMM_DRV_STRONG	2
 
 #define	SPD_DDR5_RDIMM_QCA_DRV	0x0fc
 #define	SPD_DDR5_RDIMM_QCA_DRV_CS(r)	bitx8(r, 5, 4)
@@ -643,24 +701,111 @@ extern "C" {
 
 /*
  * Annex A.4: Module Specific Bytes for Multiplexed Rank (MRDIMM) Memory Module
- * Types. This only contains a single entry for S15.2 Module Specific Device
- * Information.
+ * Types. Revision 1.0 only defined the type information. Revision 1.1 added
+ * several additional bytes of data that start after the MDB information.
  */
 #define	SPD_DDR5_MRDIMM_MFG_ID0_MRCD	0x0f0
 #define	SPD_DDR5_MRDIMM_MFG_ID1_MRCD	0x0f1
 #define	SPD_DDR5_MRDIMM_INFO_MRCD	0x0f2
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MRCD01	0
+#define	SPD_DDR5_MRDIMM_INFO_TYPE_MRCD02	1
 #define	SPD_DDR5_MRDIMM_REV_MRCD	0x0f3
 
 #define	SPD_DDR5_MRDIMM_MFG_ID0_MDB	0x0f4
 #define	SPD_DDR5_MRDIMM_MFG_ID1_MDB	0x0f5
 #define	SPD_DDR5_MRDIMM_INFO_MDB	0x0f6
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MDB01	0
+#define	SPD_DDR5_MRDIMM_INFO_TYPE_MDB02	1
 #define	SPD_DDR5_MRDIMM_REV_MDB		0x0f7
 
 /*
+ * S15.3 MRDIMM v1.1: MRCD-RW08 Clock Driver Enable
+ */
+#define	SPD_DDR5_MRDIMM_CDEN	0x0f8
+#define	SPD_DDR5_MRDIMM_CDEN_BCK(r)	bitx8(r, 5, 5)
+#define	SPD_DDR5_MRDIMM_CDEN_QDCK(r)	bitx8(r, 3, 3)
+#define	SPD_DDR5_MRDIMM_CDEN_QCCK(r)	bitx8(r, 2, 2)
+#define	SPD_DDR5_MRDIMM_CDEN_QBCK(r)	bitx8(r, 1, 2)
+#define	SPD_DDR5_MRDIMM_CDEN_QACK(r)	bitx8(r, 0, 0)
+
+/*
+ * S15.3 MRDIMM v1.1: MRCD-RW09 Output Address and Control Enable
+ */
+#define	SPD_DDR5_MRDIMM_OACEN	0x0f9
+#define	SPD_DDR5_MRDIMM_CDEN_DCS1(r)	bitx8(r, 7, 7)
+#define	SPD_DDR5_MRDIMM_CDEN_QBCS(r)	bitx8(r, 6, 6)
+#define	SPD_DDR5_MRDIMM_CDEN_QACS(r)	bitx8(r, 5, 5)
+#define	SPD_DDR5_MRDIMM_CDEN_QCA13(r)	bitx8(r, 4, 4)
+#define	SPD_DDR5_MRDIMM_CDEN_BCS(r)	bitx8(r, 3, 3)
+#define	SPD_DDR5_MRDIMM_CDEN_QxCS1(r)	bitx8(r, 2, 2)
+#define	SPD_DDR5_MRDIMM_CDEN_QBCA(r)	bitx8(r, 1, 1)
+#define	SPD_DDR5_MRDIMM_CDEN_QACA(r)	bitx8(r, 0, 0)
+
+/*
+ * S15.4 MRDIMM v1.1: MRCD-RW0A QCK Driver Characteristics
+ * S15.6 MRDIMM v1.1: MRCD-RW0C QxCA and QxCS_n Driver Characteristics
+ * S15.7 MRDIMM v1.1: MRCD-RW0D Data Buffer Interface Driver Characteristics
+ *
+ * Similar to the RDIMM 1.1 version of these. These are all described in terms
+ * of relative rates.
+ */
+#define	SPD_DDR5_MRDIMM_QCK_DRV	0x0fa
+#define	SPD_DDR5_MRDIMM_QCK_DRV_QDCK(r)	bitx8(r, 7, 6)
+#define	SPD_DDR5_MRDIMM_QCK_DRV_QCCK(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_MRDIMM_QCK_DRV_QBCK(r)	bitx8(r, 3, 2)
+#define	SPD_DDR5_MRDIMM_QCK_DRV_QACK(r)	bitx8(r, 1, 0)
+#define	SPD_DDR5_MRDIMM_DRV_LIGHT	0
+#define	SPD_DDR5_MRDIMM_DRV_MODERATE	1
+#define	SPD_DDR5_MRDIMM_DRV_STRONG	2
+
+#define	SPD_DDR5_MRDIMM_QCA_DRV	0x0fc
+#define	SPD_DDR5_MRDIMM_QCA_DRV_QCS1_OUT(r)	bitx8(r, 7, 6)
+#define	SPD_DDR5_MRDIMM_QCA_DRV_QCS1_OUT_NORM	0
+#define	SPD_DDR5_MRDIMM_QCA_DRV_QCS1_OUT_DIS	1
+#define	SPD_DDR5_MRDIMM_QCA_DRV_QCS1_OUT_LOW	2
+#define	SPD_DDR5_MRDIMM_QCA_DRV_CS(r)		bitx8(r, 5, 4)
+#define	SPD_DDR5_MRDIMM_QCA_DRV_CA(r)		bitx8(r, 1, 0)
+
+#define	SPD_DDR5_MRDIMM_DB_DRV	0x0fd
+#define	SPD_DDR5_MRDIMM_DB_DRV_BCK(r)	bitx8(r, 4, 3)
+#define	SPD_DDR5_MRDIMM_DB_DRV_BCOM(r)	bitx8(r, 1, 0)
+
+/*
+ * S15.8 MRDIMM v1.1: MRCD-RW0E QCK, QCA, and QCS Output Slew Rate
+ * S15.9 MRDIMM v1.1: MRCD-RW0F BCK, BCOM, and BCS Output Slew Rate
+ *
+ * Similar to the [LR]DIMM version. These use the same definitions for slew
+ * rates.
+ */
+#define	SPD_DDR5_MRDIMM_QXX_SLEW	0x0fe
+#define	SPD_DDR5_MRDIMM_QXX_SLEW_QCS(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_MRDIMM_SLEW_MODERTE	0
+#define	SPD_DDR5_MRDIMM_SLEW_FAST	1
+#define	SPD_DDR5_MRDIMM_SLEW_SLOW	2
+#define	SPD_DDR5_MRDIMM_QXX_SLEW_QCA(r)	bitx8(r, 3, 2)
+#define	SPD_DDR5_MRDIMM_QXX_SLEW_QCK(r)	bitx8(r, 1, 0)
+
+#define	SPD_DDR5_MRDIMM_BXX_SLEW	0x0ff
+#define	SPD_DDR5_MRDIMM_BXX_SLEW_BCK(r)		bitx8(r, 3, 2)
+#define	SPD_DDR5_MRDIMM_BXX_SLEW_BCOM(r)	bitx8(r, 1, 0)
+
+/*
+ * S15.10 MRDIMM v1.1: MDB-PG[C]RWE0 Duty Cycle Adjuster Configuration
+ */
+#define	SPD_DDR5_MRDIMM_DCA_CFG		0x100
+#define	SPD_DDR5_MRDIMM_DCA_CFG_CFG(r)	bitx8(r, 0, 0)
+
+/*
+ * S15.11 MRDIMM v1.1: MDB-PG[70]RWE1 DRAM Interface Receiver Type
+ */
+#define	SPD_DDR5_MRDIMM_IRXTYPE		0x101
+#define	SPD_DDR5_MRDIMM_IRXTYPE_TYPE(r)	bitx8(r, 0, 0)
+#define	SPD_DDR5_MRDIMM_IRXTYPE_TYPE_UNMATCHED	0
+#define	SPD_DDR5_MRDIMM_IRXTYPE_TYPE_MATCHED	1
+
+/*
  * Annex A.5: Module Specific Bytes for Differential Memory Module Types. Like
- * UDIMMs and MRDIMMs, there is only a single section S16.2 for Module Specific
+ * UDIMMs and MRDIMMs, there is only a single section for Module Specific
  * Device Information.
  */
 #define	SPD_DDR5_DDIMM_MFG_ID0_DMB	0x0f0
@@ -668,6 +813,20 @@ extern "C" {
 #define	SPD_DDR5_DDIMM_INFO_DMB		0x0f2
 #define	SPD_DDR5_DDIMM_INFO_TYPE_DMB501	0
 #define	SPD_DDR5_DDIMM_REV_DMB		0x0f3
+
+/*
+ * Annex A.8: Module Specific Bytes for Compression Attached Memory Module Types
+ * (CAMM2).
+ */
+#define	SPD_DDR5_CAMM2_MFG_ID0_CKD0	0x0f0
+#define	SPD_DDR5_CAMM2_MFG_ID1_CKD0	0x0f1
+#define	SPD_DDR5_CAMM2_INFO_CKD0	0x0f2
+#define	SPD_DDR5_CAMM2_INFO_TYPE_CKD01	0
+#define	SPD_DDR5_CAMM2_INFO_REV_CKD0	0x0f3
+#define	SPD_DDR5_CAMM2_MFG_ID0_CKD1	0x0f4
+#define	SPD_DDR5_CAMM2_MFG_ID1_CKD1	0x0f5
+#define	SPD_DDR5_CAMM2_INFO_CKD1	0x0f6
+#define	SPD_DDR5_CAMM2_INFO_REV_CKD1	0x0f7
 
 /*
  * S7.4 CRC. DDR5 modules have a single CRC calculation that covers bytes 0-509.
@@ -681,8 +840,8 @@ extern "C" {
  */
 
 /*
- * S19.1 Module Manufacturer ID Code
- * S19.7 DRAM Manufacturer ID Code
+ * S20.1 Module Manufacturer ID Code
+ * S20.7 DRAM Manufacturer ID Code
  */
 #define	SPD_DDR5_MOD_MFG_ID0	0x200
 #define	SPD_DDR5_MOD_MFG_ID1	0x201
@@ -690,21 +849,21 @@ extern "C" {
 #define	SPD_DDR5_DRAM_MFG_ID1	0x229
 
 /*
- * S19.2 Module Manufacturing Location. This byte is manufacturer specific.
+ * S20.2 Module Manufacturing Location. This byte is manufacturer specific.
  */
 #define	SPD_DDR5_MOD_MFG_LOC	0x202
 
 /*
- * S19.3 module Manufacturing Date. Encoded as two BCD bytes for the year and
+ * S20.3 module Manufacturing Date. Encoded as two BCD bytes for the year and
  * week.
  */
 #define	SPD_DDR5_MOD_MFG_YEAR	0x203
 #define	SPD_DDR5_MOD_MFG_WEEK	0x204
 
 /*
- * S19.4 Module Serial Number.
- * S19.5 Module Part Number
- * S19.6 Module Revision Code
+ * S20.4 Module Serial Number.
+ * S20.5 Module Part Number
+ * S20.6 Module Revision Code
  */
 #define	SPD_DDR5_MOD_SN		0x205
 #define	SPD_DDR5_MOD_SN_LEN	4
@@ -713,7 +872,7 @@ extern "C" {
 #define	SPD_DDR5_MOD_REV	0x227
 
 /*
- * S19.8 DRAM Stepping
+ * S20.8 DRAM Stepping
  */
 #define	SPD_DDR5_DRAM_STEP	0x22a
 

@@ -23,6 +23,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2024 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -239,10 +240,11 @@ smb2_rq_internal(struct smb_rq *rqp, int timeout)
 		return (error);
 
 	/*
-	 * If the request was signed, validate the
-	 * signature on the response.
+	 * If the request was signed (and reply not encrypted)
+	 * validate the signature on the response.
 	 */
-	if (rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) {
+	if ((rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) != 0 &&
+	    (rqp->sr_flags & SMBR_ENCRYPTED) == 0) {
 		error = smb2_rq_verify(rqp);
 		if (error)
 			return (error);
@@ -279,10 +281,11 @@ smb2_rq_reply(struct smb_rq *rqp)
 		return (error);
 
 	/*
-	 * If the request was signed, validate the
-	 * signature on the response.
+	 * If the request was signed (and reply not encrypted)
+	 * validate the signature on the response.
 	 */
-	if (rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) {
+	if ((rqp->sr2_rqflags & SMB2_FLAGS_SIGNED) != 0 &&
+	    (rqp->sr_flags & SMBR_ENCRYPTED) == 0) {
 		error = smb2_rq_verify(rqp);
 		if (error)
 			return (error);

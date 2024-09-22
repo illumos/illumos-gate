@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022-2024 RackTop Systems, Inc.
  */
 
 /*
@@ -20,19 +21,26 @@
  * There are two implementations of these functions:
  * This one (for kernel) and another for user space:
  * See: lib/smbclnt/libfknsmb/common/fksmb_sign_pkcs.c
+ *
+ * Contrary to what one might assume from the file name,
+ * there should be NO SMB implementation knowledge here
+ * beyond a few carefully selected things (nsmb_kcrypt.h).
  */
 
 #include <sys/types.h>
+#include <sys/crypto/api.h>
+
+#include <netsmb/nsmb_kcrypt.h>
+
+#include <sys/cmn_err.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
-#include <sys/crypto/api.h>
-#include <netsmb/smb_signing.h>
 
 /*
  * Common function to see if a mech is available.
  */
 static int
-find_mech(smb_sign_mech_t *mech, const char *name)
+find_mech(smb_crypto_mech_t *mech, const char *name)
 {
 	crypto_mech_type_t t;
 
@@ -51,7 +59,7 @@ find_mech(smb_sign_mech_t *mech, const char *name)
  */
 
 int
-smb_md5_getmech(smb_sign_mech_t *mech)
+nsmb_md5_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, SUN_CKM_MD5));
 }
@@ -60,7 +68,7 @@ smb_md5_getmech(smb_sign_mech_t *mech)
  * Start the KCF session, load the key
  */
 int
-smb_md5_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech)
+nsmb_md5_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech)
 {
 	int rv;
 
@@ -73,7 +81,7 @@ smb_md5_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech)
  * Digest one segment
  */
 int
-smb_md5_update(smb_sign_ctx_t ctx, void *buf, size_t len)
+nsmb_md5_update(smb_sign_ctx_t ctx, void *buf, size_t len)
 {
 	crypto_data_t data;
 	int rv;
@@ -98,7 +106,7 @@ smb_md5_update(smb_sign_ctx_t ctx, void *buf, size_t len)
  * Get the final digest.
  */
 int
-smb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
+nsmb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 {
 	crypto_data_t out;
 	int rv;
@@ -120,7 +128,7 @@ smb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
  */
 
 int
-smb2_hmac_getmech(smb_sign_mech_t *mech)
+nsmb_hmac_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, SUN_CKM_SHA256_HMAC));
 }
@@ -129,7 +137,7 @@ smb2_hmac_getmech(smb_sign_mech_t *mech)
  * Start the KCF session, load the key
  */
 int
-smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
+nsmb_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len)
 {
 	crypto_key_t ckey;
@@ -149,7 +157,7 @@ smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
  * Digest one segment
  */
 int
-smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
+nsmb_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
 {
 	crypto_data_t data;
 	int rv;
@@ -172,10 +180,11 @@ smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
 
 /*
  * Note, the SMB2 signature is the first 16 bytes of the
- * 32-byte SHA256 HMAC digest.
+ * 32-byte SHA256 HMAC digest.  This is specifically for
+ * SMB2 signing, and NOT a generic HMAC function.
  */
 int
-smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
+nsmb_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 {
 	uint8_t full_digest[SHA256_DIGEST_LENGTH];
 	crypto_data_t out;
@@ -195,12 +204,48 @@ smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 }
 
 /*
+ * One-shot HMAC function used in nsmb_kdf
+ */
+int
+nsmb_hmac_one(smb_crypto_mech_t *mech,
+    uint8_t *key, size_t key_len,
+    uint8_t *data, size_t data_len,
+    uint8_t *mac, size_t mac_len)
+{
+	crypto_key_t ckey;
+	crypto_data_t cdata;
+	crypto_data_t cmac;
+	int rv;
+
+	bzero(&ckey, sizeof (ckey));
+	ckey.ck_format = CRYPTO_KEY_RAW;
+	ckey.ck_data = key;
+	ckey.ck_length = key_len * 8; /* in bits */
+
+	bzero(&cdata, sizeof (cdata));
+	cdata.cd_format = CRYPTO_DATA_RAW;
+	cdata.cd_length = data_len;
+	cdata.cd_raw.iov_base = (void *)data;
+	cdata.cd_raw.iov_len = data_len;
+
+	bzero(&cmac, sizeof (cmac));
+	cmac.cd_format = CRYPTO_DATA_RAW;
+	cmac.cd_length = mac_len;
+	cmac.cd_raw.iov_base = (void *)mac;
+	cmac.cd_raw.iov_len = mac_len;
+
+	rv = crypto_mac(mech, &cdata, &ckey, NULL, &cmac, NULL);
+
+	return (rv == CRYPTO_SUCCESS ? 0 : -1);
+}
+
+/*
  * SMB3 signing helpers:
  * (getmech, init, update, final)
  */
 
 int
-smb3_cmac_getmech(smb_sign_mech_t *mech)
+nsmb_cmac_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, SUN_CKM_AES_CMAC));
 }
@@ -209,7 +254,7 @@ smb3_cmac_getmech(smb_sign_mech_t *mech)
  * Start the KCF session, load the key
  */
 int
-smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
+nsmb_cmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len)
 {
 	crypto_key_t ckey;
@@ -229,7 +274,7 @@ smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
  * Digest one segment
  */
 int
-smb3_cmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
+nsmb_cmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
 {
 	crypto_data_t data;
 	int rv;
@@ -255,7 +300,7 @@ smb3_cmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
  * (both are 16 bytes long)
  */
 int
-smb3_cmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
+nsmb_cmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 {
 	crypto_data_t out;
 	int rv;

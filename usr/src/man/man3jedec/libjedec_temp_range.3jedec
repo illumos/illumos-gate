@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 21, 2023
+.Dd September 14, 2024
 .Dt LIBJEDEC_TEMP_RANGE 3JEDEC
 .Os
 .Sh NAME
@@ -31,7 +31,7 @@
 The
 .Fn libjedec_temp_range
 function is used to translate a known JEDEC temperature range defined in
-JESD402-1A to the corresponding minimum and maximum temperature for the
+JESD402-1B to the corresponding minimum and maximum temperature for the
 range.
 The temperature range to look for is defined in
 .Fa range
@@ -47,6 +47,29 @@ and
 .Fa max
 must be valid pointers and may not be
 .Dv NULL .
+.Pp
+There are four distinct groups of temperature ranges defined:
+.Bl -tag -width Ds
+.It Operating Case Temperature
+This is the temperature of a device's external casing, while it is
+operating.
+For example, for an SSD the case temperature would be the temperature
+of its external enclosure and not the temperature of any interior ASIC,
+circuit board, or storage material.
+Similarly, for a CPU
+.Pq or other ASIC ,
+this represents the temperature on the exterior of the CPU such as where
+a heatsink is making contact.
+.It Operating Ambient Temperature
+This is the temperature of the surrounding environment that a device is
+operating in.
+Generally this is a measure of air temperature.
+.It Operating Junction Temperature
+This is the temperature of a device's internal semiconductors.
+.It Storage Temperature
+This is the equivalent of the case temperature; however, it is used when
+the device is not operating and is powered-off.
+.El
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn libjedec_temp_range
@@ -74,6 +97,6 @@ are not updated.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T Temperature Range and Measurement Standards for Components and Modules
-.%N JESD402-1A
-.%D March 2022
+.%N JESD402-1B
+.%D September 2024
 .Re
