@@ -171,7 +171,7 @@ nsmb_encrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t clearlen)
 	out_cd.cd_mp = mp;
 
 	rv = crypto_encrypt(&ctxp->mech, &in_cd,
-	    &ctxp->ckey, tmpl, &out_cd, NULL);
+	    &ctxp->ckey, NULL, &out_cd, NULL);
 	if (rv != CRYPTO_SUCCESS) {
 		cmn_err(CE_WARN, "nsmb: crypto_encrypt failed: 0x%x", rv);
 		return (-1);
@@ -209,7 +209,7 @@ nsmb_decrypt_mblks(smb_enc_ctx_t *ctxp, mblk_t *mp, size_t cipherlen)
 	out_cd.cd_mp = mp;
 
 	rv = crypto_decrypt(&ctxp->mech, &in_cd,
-	    &ctxp->ckey, tmpl, &out_cd, NULL);
+	    &ctxp->ckey, NULL, &out_cd, NULL);
 	if (rv != CRYPTO_SUCCESS) {
 		cmn_err(CE_WARN, "nsmb: crypto_decrypt failed: 0x%x", rv);
 		return (-1);
