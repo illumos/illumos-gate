@@ -1283,7 +1283,7 @@ typedef struct {
 #define	NVME_LOGPAGE_PLATSET	0x0a	/* Predictable Lat. per NVM Set (1.4) */
 #define	NVME_LOGPAGE_PLATAGG	0x0b	/* Predictable Lat. Event Agg (1.4) */
 #define	NVME_LOGPAGE_ASYMNS	0x0c	/* Asymmetric Namespace Access (1.4) */
-#define	NVME_LOGPAGE_PEVLOG	0x0d	/* Persistent Event Log (1.4) */
+#define	NVME_LOGPAGE_PEV	0x0d	/* Persistent Event Log (1.4) */
 #define	NVME_LOGPAGE_LBASTS	0x0e	/* LBA Status Information (1.4) */
 #define	NVME_LOGPAGE_ENDAGG	0x0f	/* Endurance Group Event Agg. (1.4) */
 
@@ -1453,6 +1453,97 @@ typedef struct {
 
 CTASSERT(sizeof (nvme_cmdeff_log_t) == 4096);
 CTASSERT(offsetof(nvme_cmdeff_log_t, cme_rsvd2048) == 2048);
+
+/*
+ * Persistent Event Log Header. This log was added in NVMe 1.4. It begins with a
+ * 512 byte header which is defined below. It uses the log specific parameter to
+ * determine how to access it. Internally the drive contains the notion of a
+ * context that must be released and accessed.
+ */
+typedef struct {
+	uint8_t		pel_lid;	/* Log Identifier */
+	uint8_t		pel_rsvd1[3];
+	uint32_t	pel_tnev;	/* Total Number of Events */
+	uint64_t	pel_tll;	/* Total Log Length */
+	uint8_t		pel_lrev;	/* Log Revision */
+	uint8_t		pel_rsvd17[1];
+	uint16_t	pel_lhl;	/* Log Header Length */
+	uint64_t	pel_tstmp;	/* Timestamp */
+	nvme_uint128_t	pel_poh;	/* Power on Hours */
+	uint64_t	pel_pwrcc;	/* Power Cycle Count */
+	uint16_t	pel_vid;	/* PCI Vendor ID */
+	uint16_t	pel_ssvid;	/* PCI Subsystem Vendor ID */
+	uint8_t		pel_sn[NVME_SERIAL_SZ];	/* Serial Number */
+	uint8_t		pel_mn[NVME_MODEL_SZ];	/* Model Number */
+	uint8_t		pel_subnqn[372 - 116];	/* NVM Subsystem Qual. Name */
+	uint16_t	pel_gnum;	/* Generation Number (2.0) */
+	struct {			/* Reporting Context Info (2.0) */
+		uint16_t pel_rcpid;	/* Port Identifier */
+		uint16_t pel_rcpit:2;	/* Port Identifier Type */
+		uint16_t pel_rce:1;	/* Reporting Context Exists */
+		uint16_t pel_rsvd19:13;
+	} pel_rci;
+	uint8_t		pel_rsvd378[480 - 378];
+	uint8_t		pel_seb[32];	/* Supported Events Bitmap */
+	uint8_t		pel_data[];
+} nvme_pev_log_t;
+
+/*
+ * This enum represents the bit index for various features in the supported
+ * events bitmap.
+ */
+typedef enum {
+	NVME_SEB_SHLSES	= 1,	/* SMART / Health Log */
+	NVME_SEB_FCES = 2,	/* Firmware Commit */
+	NVME_SEB_TCES = 3,	/* Timestamp Change */
+	NVME_SEB_PRES = 4,	/* Power-on or Reset */
+	NVME_SEB_NSHEES = 5,	/* NVM Subsystem Hardware Error */
+	NVME_SEB_CNES = 6,	/* Change Namespace */
+	NVME_SEB_FNSES = 7,	/* Format NVM Start */
+	NVME_SEB_FNCES = 8,	/* Format NVM Completion */
+	NVME_SEB_SSES = 9,	/* Sanitize Start */
+	NVME_SEB_SCES = 10,	/* Sanitize Completion */
+	NVME_SEB_SFES = 11,	/* Set Feature */
+	NVME_SEB_TLCES = 12,	/* Telemetry Log Create */
+	NVME_SEB_TEES = 13,	/* Thermal Excursion */
+	NVME_SEB_SMVES = 14,	/* Sanitize Media Verification (2.1) */
+	NVME_SEB_VSES = 222,	/* Vendor Specific */
+	NVME_SEB_TCG = 223	/* TCG */
+} nvme_pev_seb_t;
+
+/*
+ * Log specific fields for the persistent event log. These are required by the
+ * log.
+ */
+typedef enum {
+	/*
+	 * Read the persistent event log, presumes that a context has already
+	 * been established.
+	 */
+	NVME_PEV_LSP_READ	= 0,
+	/*
+	 * Establish a new context and then read a portion of the event log. Any
+	 * prior existing context must already have been released.
+	 */
+	NVME_PEV_LSP_EST_CTX_READ,
+	/*
+	 * Releases the persistent event log context. It is legal for this
+	 * context to already have been released.
+	 */
+	NVME_PEV_LSP_REL_CTX,
+	/*
+	 * This establishes a context and reads the fixed 512 bytes. The
+	 * controller is supposed to ignore any offset and length fields and
+	 * always read 512 bytes regardless. This is present starting in NVMe
+	 * 2.0.
+	 */
+	NVME_PEV_LSP_EST_CTX_READ_512
+} nvme_pev_log_lsp_t;
+
+#ifndef __CHECKER__
+CTASSERT(sizeof (nvme_pev_log_t) == 512);
+CTASSERT(offsetof(nvme_pev_log_t, pel_gnum) == 372);
+#endif
 
 /*
  * NVMe Format NVM

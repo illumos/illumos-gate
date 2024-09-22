@@ -28,8 +28,6 @@
 #include <sys/nvme/micron_7300.h>
 #include <sys/nvme/micron_74x0.h>
 #include <sys/nvme/micron_x500.h>
-#include <sys/debug.h>
-#include <sys/stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

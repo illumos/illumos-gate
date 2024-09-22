@@ -20,6 +20,7 @@ PROGS = \
 	missing-field \
 	ns-disc \
 	ns-info \
+	pev \
 	sctostr
 
 COMMON_SRCS = libnvme_test_common.c

@@ -24,6 +24,8 @@
  */
 
 #include <sys/debug.h>
+#include <sys/stdint.h>
+#include <sys/debug.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -23,6 +23,8 @@
  * Vendor-specific definitions for the WDC SN650 and SN655 NVMe devices.
  */
 
+#include <sys/debug.h>
+#include <sys/stdint.h>
 #include <sys/nvme/ocp.h>
 
 #ifdef __cplusplus

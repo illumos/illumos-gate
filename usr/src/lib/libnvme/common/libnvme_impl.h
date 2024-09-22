@@ -454,28 +454,39 @@ extern bool nvme_vers_ns_info_atleast(const nvme_ns_info_t *,
 /*
  * Vendor-specific information.
  */
+typedef struct nvme_vsd_ident {
+	const char *nvdi_human;
+	bool nvdi_subsys;
+	uint16_t nvdi_vid;
+	uint16_t nvdi_did;
+	uint16_t nvdi_svid;
+	uint16_t nvdi_sdid;
+} nvme_vsd_ident_t;
+
 typedef struct nvme_vsd {
-	uint16_t nvd_vid;
-	uint16_t nvd_did;
-	const char *nvd_human;
-	const nvme_log_page_info_t *nvd_logs;
+	const nvme_vsd_ident_t *nvd_ident;
+	size_t nvd_nident;
+	const nvme_log_page_info_t *const *nvd_logs;
 	size_t nvd_nlogs;
 	const nvme_vuc_disc_t *nvd_vuc;
 	size_t nvd_nvuc;
 } nvme_vsd_t;
 
+extern const nvme_log_page_info_t ocp_log_smart;
+extern const nvme_log_page_info_t ocp_log_errrec;
+extern const nvme_log_page_info_t ocp_log_fwact;
+extern const nvme_log_page_info_t ocp_log_lat;
+extern const nvme_log_page_info_t ocp_log_devcap;
+extern const nvme_log_page_info_t ocp_log_unsup;
+
 extern const nvme_vsd_t wdc_sn840;
-extern const nvme_vsd_t wdc_sn650;
-extern const nvme_vsd_t wdc_sn655;
-extern const nvme_vsd_t micron_7300_pro;
-extern const nvme_vsd_t micron_7300_max;
-extern const nvme_vsd_t micron_7400_pro;
-extern const nvme_vsd_t micron_7400_max;
-extern const nvme_vsd_t micron_7450_pro;
-extern const nvme_vsd_t micron_7450_max;
-extern const nvme_vsd_t micron_6500_ion;
-extern const nvme_vsd_t micron_7500_pro;
-extern const nvme_vsd_t micron_7500_max;
+extern const nvme_vsd_t wdc_sn65x;
+extern const nvme_vsd_t micron_7300;
+extern const nvme_vsd_t micron_74x0;
+extern const nvme_vsd_t micron_x500;
+extern const nvme_vsd_t intel_p5510;
+extern const nvme_vsd_t solidigm_p5x20;
+extern const nvme_vsd_t solidigm_ps10x0;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);

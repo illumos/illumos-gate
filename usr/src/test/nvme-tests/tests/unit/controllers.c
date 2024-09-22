@@ -131,6 +131,7 @@ static const nvme_identify_ctrl_t nvme_ctrl_fancy = {
 		.lp_extsup = 1,
 		.lp_smart = 1,
 		.lp_cmdeff = 1,
+		.lp_persist = 1
 	},
 	.id_oaes = {
 		.oaes_nsan = 1
@@ -215,7 +216,8 @@ static const nvme_identify_ctrl_t nvme_ctrl_nons = {
 	.id_lpa = {
 		.lp_extsup = 1,
 		.lp_smart = 1,
-		.lp_cmdeff = 1
+		.lp_cmdeff = 1,
+		.lp_persist = 1
 	},
 	.id_oaes = {
 		.oaes_nsan = 1

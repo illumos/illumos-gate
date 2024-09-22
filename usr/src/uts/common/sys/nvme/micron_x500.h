@@ -23,8 +23,6 @@
  * This covers the Micron 6500 and 7500 series devices.
  */
 
-#include <sys/debug.h>
-#include <sys/stddef.h>
 #include <sys/nvme/ocp.h>
 
 #ifdef __cplusplus

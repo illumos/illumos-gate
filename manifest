@@ -4618,6 +4618,9 @@ f usr/include/sys/nvme/micron_7300.h 0644 root bin
 f usr/include/sys/nvme/micron_74x0.h 0644 root bin
 f usr/include/sys/nvme/micron_x500.h 0644 root bin
 f usr/include/sys/nvme/ocp.h 0644 root bin
+f usr/include/sys/nvme/solidigm.h 0644 root bin
+f usr/include/sys/nvme/solidigm_p5xxx.h 0644 root bin
+f usr/include/sys/nvme/solidigm_ps10x0.h 0644 root bin
 f usr/include/sys/nvme/wdc.h 0644 root bin
 f usr/include/sys/nvme/wdc_sn65x.h 0644 root bin
 f usr/include/sys/nvme/wdc_sn840.h 0644 root bin

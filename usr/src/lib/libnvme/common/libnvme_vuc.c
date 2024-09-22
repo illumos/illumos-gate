@@ -461,6 +461,14 @@ nvme_vuc_req_set_output(nvme_vuc_req_t *req, void *buf, size_t len)
 }
 
 bool
+nvme_vuc_req_clear_output(nvme_vuc_req_t *req)
+{
+	req->nvr_output = NULL;
+	req->nvr_outlen = 0;
+	return (nvme_ctrl_success(req->nvr_ctrl));
+}
+
+bool
 nvme_vuc_req_set_input(nvme_vuc_req_t *req, const void *buf, size_t len)
 {
 	if (!nvme_vuc_req_data_validate(req, buf, len, true)) {
