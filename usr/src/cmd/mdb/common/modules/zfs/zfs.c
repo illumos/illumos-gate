@@ -60,10 +60,10 @@
 
 #ifdef _KERNEL
 #define	ZFS_OBJ_NAME	"zfs"
-extern int64_t mdb_gethrtime(void);
 #else
 #define	ZFS_OBJ_NAME	"libzpool.so.1"
 #endif
+extern int64_t mdb_gethrtime(void);
 
 #define	ZFS_STRUCT	"struct " ZFS_OBJ_NAME "`"
 
@@ -1077,16 +1077,18 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-
 typedef struct dbgmsg_arg {
-	boolean_t da_verbose;
-	boolean_t da_verbose_hr;
 	boolean_t da_address;
+	boolean_t da_hrtime;
+	boolean_t da_timedelta;
+	boolean_t da_time;
+	boolean_t da_whatis;
+
+	hrtime_t da_curtime;
 } dbgmsg_arg_t;
 
-/* ARGSUSED */
 static int
-dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
+dbgmsg_cb(uintptr_t addr, const void *unknown __unused, void *arg)
 {
 	static mdb_ctf_id_t id;
 	static boolean_t gotid;
@@ -1111,12 +1113,11 @@ dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
 		off /= 8;
 	}
 
-
 	if (GETMEMBID(addr, &id, zdm_timestamp, timestamp)) {
 		return (WALK_ERR);
 	}
 
-	if (da->da_verbose_hr) {
+	if (da->da_hrtime || da->da_timedelta) {
 		if (GETMEMBID(addr, &id, zdm_hrtime, hrtime)) {
 			return (WALK_ERR);
 		}
@@ -1129,32 +1130,51 @@ dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
 
 	if (da->da_address)
 		mdb_printf("%p ", addr);
-	if (da->da_verbose)
-		mdb_printf("%Y ", timestamp);
-	if (da->da_verbose_hr)
+
+	if (da->da_timedelta) {
+		int64_t		diff;
+		char		dbuf[32] = { 0 };
+
+		if (da->da_curtime == 0)
+			da->da_curtime = mdb_gethrtime();
+
+		diff = (int64_t)hrtime - da->da_curtime;
+		mdb_nicetime(diff, dbuf, sizeof (dbuf));
+		mdb_printf("%-20s ", dbuf);
+	} else if (da->da_hrtime) {
 		mdb_printf("%016x ", hrtime);
+	} else if (da->da_time) {
+		mdb_printf("%Y ", timestamp);
+	}
 
 	mdb_printf("%s\n", buf);
 
-	if (da->da_verbose || da->da_verbose_hr)
+	if (da->da_whatis)
 		(void) mdb_call_dcmd("whatis", addr, DCMD_ADDRSPEC, 0, NULL);
 
 	return (WALK_NEXT);
 }
 
-/* ARGSUSED */
 static int
-dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+dbgmsg(uintptr_t addr, uint_t flags __unused, int argc, const mdb_arg_t *argv)
 {
 	GElf_Sym sym;
 	dbgmsg_arg_t da = { 0 };
+	boolean_t verbose = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
-	    'v', MDB_OPT_SETBITS, B_TRUE, &da.da_verbose,
-	    'r', MDB_OPT_SETBITS, B_TRUE, &da.da_verbose_hr,
 	    'a', MDB_OPT_SETBITS, B_TRUE, &da.da_address,
-	    NULL) != argc)
+	    'r', MDB_OPT_SETBITS, B_TRUE, &da.da_hrtime,
+	    't', MDB_OPT_SETBITS, B_TRUE, &da.da_timedelta,
+	    'T', MDB_OPT_SETBITS, B_TRUE, &da.da_time,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &verbose,
+	    'w', MDB_OPT_SETBITS, B_TRUE, &da.da_whatis,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
+	}
+
+	if (verbose)
+		da.da_address = da.da_time = B_TRUE;
 
 	if (mdb_lookup_by_obj(ZFS_OBJ_NAME, "zfs_dbgmsgs", &sym)) {
 		mdb_warn("can't find zfs_dbgmsgs");
@@ -1167,6 +1187,21 @@ dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	return (DCMD_OK);
+}
+
+
+static void
+dbgmsg_help(void)
+{
+	mdb_printf("Print entries from the ZFS debug log.\n\n"
+	    "%<b>OPTIONS%</b>\n"
+	    "\t-a\tInclude the address of each zfs_dbgmsg_t.\n"
+	    "\t-r\tDisplay high-resolution timestamps.\n"
+	    "\t-t\tInclude the age of the message.\n"
+	    "\t-T\tInclude the date/time of the message.\n"
+	    "\t-v\tEquivalent to -aT.\n"
+	    "\t-w\tRun ::whatis on each zfs_dbgmsg_t. Useful in DEBUG kernels\n"
+	    "\t\tto show the origin of the message.\n");
 }
 
 /*ARGSUSED*/
@@ -4649,8 +4684,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    sa_attr_table},
 	{ "sa_attr", ": attr_id",
 	    "print SA attribute address when given sa_handle_t", sa_attr_print},
-	{ "zfs_dbgmsg", ":[-var]",
-	    "print zfs debug log", dbgmsg},
+	{ "zfs_dbgmsg", ":[-artTvw]",
+	    "print zfs debug log", dbgmsg, dbgmsg_help},
 	{ "rrwlock", ":",
 	    "print rrwlock_t, including readers", rrwlock},
 	{ "metaslab_weight", "weight",
