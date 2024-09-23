@@ -10054,7 +10054,7 @@ print_overlay_value(char *outbuf, uint_t bufsize, uint_t type, const void *pbuf,
 		break;
 	case OVERLAY_PROP_T_IP:
 		if (psize != sizeof (struct in6_addr)) {
-			warn("malformed overlay IP property: %d bytes\n",
+			warn("malformed overlay IP property: %zd bytes\n",
 			    psize);
 			(void) snprintf(outbuf, bufsize, "--");
 			break;
