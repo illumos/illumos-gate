@@ -36,6 +36,7 @@ user = root
 [/opt/util-tests/tests/show-overlay-exit]
 [/opt/util-tests/tests/vnic-mtu]
 [/opt/util-tests/tests/bunyan/bunyan]
+[/opt/util-tests/tests/show-class-confusion]
 user = root
 
 [/opt/util-tests/tests/libsff/libsff]
@@ -117,3 +118,10 @@ user = root
 
 [/opt/util-tests/tests/ar/artest]
 [/opt/util-tests/tests/cpio/cpio_test]
+
+#
+# This test ndeds to run as an explicitly unprivileged user to ensure that the
+# mv checks around permissions don't fire due to super-user privileges.
+#
+[/opt/util-tests/tests/cpmvln/overwrite]
+user = nobody

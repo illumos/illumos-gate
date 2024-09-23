@@ -44,48 +44,49 @@
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.TH CP 1 "May 17, 2020"
+.TH CP 1 "September 14, 2024"
 .SH NAME
 cp \- copy files
 .SH SYNOPSIS
 .nf
-\fB/usr/bin/cp\fR [\fB-afip@/\fR] \fIsource_file\fR \fItarget_file\fR
+\fB/usr/bin/cp\fR [\fB-afinp@/\fR] \fIsource_file\fR \fItarget_file\fR
 .fi
 
 .LP
 .nf
-\fB/usr/bin/cp\fR [\fB-afip@/\fR] \fIsource_file\fR... \fItarget\fR
+\fB/usr/bin/cp\fR [\fB-afinp@/\fR] \fIsource_file\fR... \fItarget\fR
 .fi
 
 .LP
 .nf
-\fB/usr/bin/cp\fR [\fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afip@/\fR] \fIsource_dir\fR... \fItarget\fR
+\fB/usr/bin/cp\fR [\fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afinp@/\fR] \fIsource_dir\fR... \fItarget\fR
 .fi
 
 .LP
 .nf
-\fB/usr/bin/cp\fR [\fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afip@/\fR] \fIsource_dir\fR... \fItarget\fR
+\fB/usr/bin/cp\fR [\fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afinp@/\fR] \fIsource_dir\fR... \fItarget\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/cp\fR [\fB-afip@/\fR] \fIsource_file\fR \fItarget_file\fR
+\fB/usr/xpg4/bin/cp\fR [\fB-afinp@/\fR] \fIsource_file\fR \fItarget_file\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/cp\fR [\fB-afip@/\fR] \fIsource_file\fR... \fItarget\fR
+\fB/usr/xpg4/bin/cp\fR [\fB-afinp@/\fR] \fIsource_file\fR... \fItarget\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/cp\fR [\fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afip@/\fR] \fIsource_dir\fR... \fItarget\fR
+\fB/usr/xpg4/bin/cp\fR [\fB-r\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afinp@/\fR] \fIsource_dir\fR... \fItarget\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/cp\fR [\fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afip@/\fR] \fIsource_dir\fR... \fItarget\fR
+\fB/usr/xpg4/bin/cp\fR [\fB-R\fR | \fB-R\fR [\fB-H\fR | \fB-L\fR | \fB-P\fR]] [\fB-afinp@/\fR] \fIsource_dir\fR... \fItarget\fR
 .fi
 
 .SH DESCRIPTION
@@ -136,7 +137,8 @@ Archive mode. Same as -RpP.
 .ad
 .RS 6n
 Unlink. If a file descriptor for a destination file cannot be obtained, this
-option attempts to unlink the destination file and proceed.
+option attempts to unlink the destination file and proceed. If the \fB-n\fR
+option is specified then this option is ignored.
 .RE
 
 .sp
@@ -163,7 +165,8 @@ preserved.
 Interactive. \fBcp\fR prompts for confirmation whenever the copy would
 overwrite an existing \fItarget\fR. An affirmative response means that the copy
 should proceed. Any other answer prevents \fBcp\fR from overwriting
-\fItarget\fR.
+\fItarget\fR. If both the \fB-i\fR and \fB-n\fR options are specified, only the
+last one on the command line is honored.
 .RE
 
 .sp
@@ -178,6 +181,19 @@ encountered during traversal of a file hierarchy.
 .sp
 Copies files referenced by symbolic links. Symbolic links encountered during
 traversal of a file hierarchy are not preserved.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+No clobber. When \fBcp\fR encounters a target file that already exists, whether
+specified explicitly, the file is found in a directory, or as part of a
+recursive copy, do not overwrite the file. Files skipped this way are not
+considered errors.  If both the \fB-i\fR and \fB-n\fR options are specified,
+only the last one on the command line is honored.
 .RE
 
 .sp

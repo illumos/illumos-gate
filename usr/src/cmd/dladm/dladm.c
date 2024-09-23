@@ -28,6 +28,7 @@
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 RackTop Systems, Inc.
  * Copyright 2024 H. William Welliver <william@welliver.org>
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -269,14 +270,14 @@ static void	show_ether_xprop(void *, dladm_ether_info_t *);
 static boolean_t	link_is_ether(const char *, datalink_id_t *);
 
 static boolean_t str2int(const char *, int *);
-static void	die(const char *, ...);
+static void	die(const char *, ...) __PRINTFLIKE(1);
 static void	die_optdup(int);
 static void	die_opterr(int, int, const char *);
-static void	die_dlerr(dladm_status_t, const char *, ...);
+static void	die_dlerr(dladm_status_t, const char *, ...) __PRINTFLIKE(2);
 static void	die_dlerrlist(dladm_status_t, dladm_errlist_t *,
-    const char *, ...);
-static void	warn(const char *, ...);
-static void	warn_dlerr(dladm_status_t, const char *, ...);
+    const char *, ...) __PRINTFLIKE(3);
+static void	warn(const char *, ...) __PRINTFLIKE(1);
+static void	warn_dlerr(dladm_status_t, const char *, ...) __PRINTFLIKE(2);
 static void	warn_dlerrlist(dladm_errlist_t *);
 
 typedef struct	cmd {
@@ -4725,9 +4726,17 @@ do_show_vlan(int argc, char *argv[], const char *use)
 
 	/* get link name (optional last argument) */
 	if (optind == (argc-1)) {
+		datalink_class_t	class;
+		char			classbuf[DLADM_STRSIZE];
 		if ((status = dladm_name2info(handle, argv[optind], &linkid,
-		    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
+		    NULL, &class, NULL)) != DLADM_STATUS_OK) {
 			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+
+		if (class != DATALINK_CLASS_VLAN) {
+			(void) dladm_class2str(class, classbuf);
+			die("datalink %s is not a vlan: found class %s",
+			    argv[optind], classbuf);
 		}
 	} else if (optind != argc) {
 		usage();
@@ -5362,12 +5371,27 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 
 	/* get vnic ID (optional last argument) */
 	if (optind == (argc - 1)) {
+		datalink_class_t	class;
+		char			classbuf[DLADM_STRSIZE];
+
 		status = dladm_zname2info(handle, zonename, argv[optind],
-		    &linkid, NULL, NULL, NULL);
+		    &linkid, NULL, &class, NULL);
 		if (status != DLADM_STATUS_OK) {
-			die_dlerr(status, "invalid vnic name '%s'",
+			die_dlerr(status, "invalid %s name '%s'",
+			    etherstub ? "etherstub" : "vnic",
 			    argv[optind]);
 		}
+
+		if (etherstub && class != DATALINK_CLASS_ETHERSTUB) {
+			(void) dladm_class2str(class, classbuf);
+			die("datalink %s is not an etherstub: found class %s",
+			    argv[optind], classbuf);
+		} else if (!etherstub && class != DATALINK_CLASS_VNIC) {
+			(void) dladm_class2str(class, classbuf);
+			die("datalink %s is not a vnic: found class %s",
+			    argv[optind], classbuf);
+		}
+
 		(void) strlcpy(state.vs_vnic, argv[optind], MAXLINKNAMELEN);
 	} else if (optind != argc) {
 		usage();

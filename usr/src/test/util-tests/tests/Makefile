@@ -24,6 +24,7 @@ SUBDIRS =		\
 	bunyan		\
 	chown		\
 	cpio		\
+	cpmvln		\
 	ctf		\
 	date		\
 	demangle	\

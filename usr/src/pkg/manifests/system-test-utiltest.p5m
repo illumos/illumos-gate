@@ -1085,6 +1085,10 @@ file path=opt/util-tests/tests/cpio/files/freebsd.odc.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/freebsd.pax.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/freebsd.ustar.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/zero.bar mode=0444
+dir  path=opt/util-tests/tests/cpmvln
+file path=opt/util-tests/tests/cpmvln/checker mode=0555
+file path=opt/util-tests/tests/cpmvln/mkobj mode=0555
+file path=opt/util-tests/tests/cpmvln/overwrite mode=0555
 dir  path=opt/util-tests/tests/ctf
 file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555
 file path=opt/util-tests/tests/ctf/check-array mode=0555
@@ -1928,6 +1932,7 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/show-class-confusion mode=0555
 file path=opt/util-tests/tests/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
