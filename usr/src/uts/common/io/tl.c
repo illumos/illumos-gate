@@ -5620,6 +5620,9 @@ tl_cl_backenable(tl_endpt_t *tep)
 
 /*
  * Unconnect endpoints.
+ *
+ * Called from tl_close_finish_ser for COTS
+ * Always called via the serializer.
  */
 static void
 tl_co_unconnect(tl_endpt_t *tep)
@@ -5711,6 +5714,11 @@ tl_co_unconnect(tl_endpt_t *tep)
 			    SL_TRACE | SL_ERROR,
 			    "tl_co_unconnect:outgoing:allocb failure"));
 			TL_UNCONNECT(tep->te_oconp);
+			/*
+			 * Could set srv_tep = NULL here but it's
+			 * not used after this so doing that would
+			 * cause compiler warnings.
+			 */
 			goto discon_peer;
 		}
 
@@ -5818,8 +5826,9 @@ discon_peer:
 		 * Disconnect cross-pointers only for close
 		 */
 		if (tep->te_closing) {
-			peer_tep = tep->te_conp;
-			TL_REMOVE_PEER(peer_tep->te_conp);
+			if ((peer_tep = tep->te_conp) != NULL) {
+				TL_REMOVE_PEER(peer_tep->te_conp);
+			}
 			TL_REMOVE_PEER(tep->te_conp);
 		}
 	}
