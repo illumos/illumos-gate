@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -36,6 +36,229 @@
  */
 #define	ZEN_UMC_COD_NBITS	3
 #define	ZEN_UMC_NPS_MOD_NBITS	3
+
+/*
+ * Enumeration that represents which parts of the NPS 1K/2K non-power of 2 hash
+ * we should use. These are ordered such their indexes correspond with the
+ * 'hashes' array indexes used in zen_umc_decode_ileave_nps_k_mod().
+ */
+typedef enum {
+	ZEN_UMC_NP2_K_HASH_8 = 0,
+	ZEN_UMC_NP2_K_HASH_9,
+	ZEN_UMC_NP2_K_HASH_12,
+	ZEN_UMC_NP2_K_HASH_13
+} zen_umc_np2_k_hash_t;
+
+typedef struct {
+	/*
+	 * Indicates what the type of this rule is.
+	 */
+	df_chan_ileave_t zukr_type;
+	/*
+	 * This is the modulus that this rule uses.
+	 */
+	uint32_t zukr_mod;
+	/*
+	 * Indicates that this rule requires socket interleaving. Otherwise we
+	 * expect no socket interleaving to be enabled.
+	 */
+	boolean_t zukr_sock;
+	/*
+	 * This is the 'high' portion of the original address that is used as
+	 * part of the division and modulus logic when we take it. This bit is
+	 * inclusive, e.g. a value of 12 indicates we want addr[64:12].
+	 */
+	uint32_t zukr_high;
+	/*
+	 * This indicates at what point in the modulus address the high bits
+	 * should arrive at.
+	 */
+	uint32_t zukr_mod_shift;
+	/*
+	 * This indicates how we should fill the remaining bits in the modulus
+	 * address. This is either zero filled or an original address bit. Only
+	 * address bits 8 or 9 are ever used so we cheat and treat a zero here
+	 * as zero filled. Only the first zukr_mod_shift bits will be
+	 * considered. This and zukr_mod_shit are used prior to the modulus
+	 * calculation.
+	 */
+	uint32_t zukr_mod_fill[5];
+	/*
+	 * The next series of values defines how to construct the channel. The
+	 * channel is always made up of some number of bits from the modulus
+	 * value and then optionally some of the hash bits. The first value
+	 * indicates how many bits to shift the resulting modulus value by. Any
+	 * bit that it is shifted over by must be filled by a hashed value. The
+	 * indication of which hash bit is indicated by its starting address
+	 * number.
+	 */
+	uint32_t zukr_chan_mod_shift;
+	zen_umc_np2_k_hash_t zukr_chan_fill[2];
+	/*
+	 * Next, it's time to describe how to construct the normalized address.
+	 * There is a portion of it which is divided by the modulus. This is
+	 * always going to be the high bits, but sometimes includes additional
+	 * lower parts of the physical address ORed in. The first value
+	 * indicates how many consecutive address bits should be included. The
+	 * second indicates the starting address.
+	 */
+	uint32_t zukr_div_addr;
+	uint32_t zukr_div_naddr;
+	/*
+	 * Finally the middle portion of the normalized address.
+	 */
+	uint32_t zukr_norm_addr;
+	uint32_t zukr_norm_naddr;
+} zen_umc_np2_k_rule_t;
+
+const zen_umc_np2_k_rule_t zen_umc_np2_k_rules[] = { {
+	.zukr_type = DF_CHAN_ILEAVE_NPS4_3CH_1K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 8, 9 },
+	.zukr_chan_mod_shift = 0,
+	.zukr_div_addr = 8,
+	.zukr_div_naddr = 2,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS4_3CH_2K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 8 },
+	.zukr_chan_mod_shift = 0,
+	.zukr_div_addr = 8,
+	.zukr_div_naddr = 1,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS2_6CH_1K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 9 },
+	.zukr_chan_mod_shift = 1,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8 },
+	.zukr_div_addr = 9,
+	.zukr_div_naddr = 1,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS2_6CH_2K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 0 },
+	.zukr_chan_mod_shift = 1,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS1_12CH_1K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 0 },
+	.zukr_chan_mod_shift = 2,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8, ZEN_UMC_NP2_K_HASH_9 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS1_12CH_1K,
+	.zukr_mod = 3,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 0 },
+	.zukr_chan_mod_shift = 2,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8, ZEN_UMC_NP2_K_HASH_9 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS1_12CH_2K,
+	.zukr_mod = 3,
+	.zukr_high = 13,
+	.zukr_mod_shift = 3,
+	.zukr_mod_fill = { 0, 0, 0 },
+	.zukr_chan_mod_shift = 2,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8, ZEN_UMC_NP2_K_HASH_12 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS0_24CH_1K,
+	.zukr_mod = 3,
+	.zukr_sock = B_TRUE,
+	.zukr_high = 13,
+	.zukr_mod_shift = 3,
+	.zukr_mod_fill = { 0, 0, 0 },
+	.zukr_chan_mod_shift = 2,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_9, ZEN_UMC_NP2_K_HASH_12 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS0_24CH_2K,
+	.zukr_mod = 3,
+	.zukr_sock = B_TRUE,
+	.zukr_high = 14,
+	.zukr_mod_shift = 4,
+	.zukr_mod_fill = { 0, 0, 0, 0 },
+	.zukr_chan_mod_shift = 2,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_12, ZEN_UMC_NP2_K_HASH_13 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS2_5CH_1K,
+	.zukr_mod = 5,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 8, 9 },
+	.zukr_chan_mod_shift = 0,
+	.zukr_div_addr = 8,
+	.zukr_div_naddr = 2,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS2_5CH_2K,
+	.zukr_mod = 5,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 8 },
+	.zukr_chan_mod_shift = 0,
+	.zukr_div_addr = 8,
+	.zukr_div_naddr = 1,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS1_10CH_1K,
+	.zukr_mod = 5,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 9 },
+	.zukr_chan_mod_shift = 1,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8 },
+	.zukr_div_addr = 9,
+	.zukr_div_naddr = 1,
+	.zukr_norm_addr = 10,
+	.zukr_norm_naddr = 2
+}, {
+	.zukr_type = DF_CHAN_ILEAVE_NPS1_10CH_2K,
+	.zukr_mod = 5,
+	.zukr_high = 12,
+	.zukr_mod_shift = 2,
+	.zukr_mod_fill = { 0, 0 },
+	.zukr_chan_mod_shift = 1,
+	.zukr_chan_fill = { ZEN_UMC_NP2_K_HASH_8 },
+	.zukr_div_naddr = 0,
+	.zukr_norm_addr = 9,
+	.zukr_norm_naddr = 3
+} };
 
 /*
  * We want to apply some initial heuristics to determine if a physical address
@@ -206,8 +429,9 @@ zen_umc_determine_ileave_addr(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 {
 	const df_dram_rule_t *rule = dec->dec_df_rule;
 
-	if (umc->umc_df_rev <= DF_REV_3 &&
-	    rule->ddr_chan_ileave != DF_CHAN_ILEAVE_6CH) {
+	if ((umc->umc_df_rev <= DF_REV_3 &&
+	    rule->ddr_chan_ileave != DF_CHAN_ILEAVE_6CH) ||
+	    umc->umc_df_rev >= DF_REV_4D2) {
 		dec->dec_ilv_pa = dec->dec_pa;
 		return (B_TRUE);
 	}
@@ -356,6 +580,78 @@ zen_umc_decode_ileave_cod(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 }
 
 /*
+ * Common logic to perform hashing across the NPS, NPS 1K, and NPS 2K variants.
+ */
+static void
+zen_umc_decode_ileave_nps_common(zen_umc_decoder_t *dec,
+    const uint32_t *addr_bits, const uint32_t *adj, uint32_t nsock_bits,
+    uint32_t nchan_bits, boolean_t df4p0)
+{
+	const df_dram_rule_t *rule = dec->dec_df_rule;
+
+	for (uint32_t i = 0; i < nchan_bits + nsock_bits; i++) {
+		uint8_t hash = 0;
+
+		hash = bitx64(dec->dec_ilv_pa, addr_bits[i], addr_bits[i]);
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_16_18) != 0) {
+			uint8_t val = bitx64(dec->dec_ilv_pa, 16 + adj[i],
+			    16 + adj[i]);
+			hash ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_21_23) != 0) {
+			uint8_t val = bitx64(dec->dec_ilv_pa, 21 + adj[i],
+			    21 + adj[i]);
+			hash ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_30_32) != 0) {
+			uint8_t val = bitx64(dec->dec_ilv_pa, 30 + adj[i], 30 +
+			    adj[i]);
+			hash ^= val;
+		}
+
+		/*
+		 * While 1T is only supported in the NPS 1K/2K variant, rule
+		 * normalization means this won't be set in the plain NPS case.
+		 */
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_40_42) != 0) {
+			uint8_t val = bitx64(dec->dec_ilv_pa, 40 + adj[i],
+			    40 + adj[i]);
+			hash ^= val;
+		}
+
+		/*
+		 * If this is the first bit and we're not doing socket
+		 * interleaving, then we need to add bit 14 to the running hash.
+		 * This is only true for a strict DF v4.0 NPS style hash. We
+		 * don't perform this for the 1K/2K variant.
+		 */
+		if (i == 0 && nsock_bits == 0 && df4p0) {
+			uint8_t val = bitx64(dec->dec_ilv_pa, 14, 14);
+			hash ^= val;
+		}
+
+		/*
+		 * If socket interleaving is going on we need to store the first
+		 * bit as the socket hash and then redirect the remaining bits
+		 * to the channel, taking into account that the shift will be
+		 * adjusted as a result.
+		 */
+		if (nsock_bits > 0) {
+			if (i == 0) {
+				dec->dec_ilv_sock = hash;
+			} else {
+				dec->dec_ilv_chan |= hash << (i - 1);
+			}
+		} else {
+			dec->dec_ilv_chan |= hash << i;
+		}
+	}
+}
+
+
+/*
  * This implements the standard NPS hash for power of 2 based channel
  * configurations that is found in DFv4. For more information, please see the
  * interleaving portion of the zen_umc.c big theory statement.
@@ -370,6 +666,7 @@ zen_umc_decode_ileave_nps(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	 * defined address bit and then skip to bit 12.
 	 */
 	const uint32_t addr_bits[4] = { rule->ddr_addr_start, 12, 13, 14 };
+	const uint32_t adj[4] = { 0, 1, 2, 3 };
 
 	if (rule->ddr_die_ileave_bits != 0) {
 		dec->dec_fail = ZEN_UMC_DECODE_F_NPS_BAD_ILEAVE;
@@ -397,51 +694,84 @@ zen_umc_decode_ileave_nps(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	ASSERT3U(nchan_bit + nsock_bit, <=, 4);
 	dec->dec_ilv_sock = dec->dec_ilv_die = dec->dec_ilv_chan = 0;
 
-	for (uint_t i = 0; i < nchan_bit + nsock_bit; i++) {
-		uint8_t hash = 0;
+	zen_umc_decode_ileave_nps_common(dec, addr_bits, adj, nsock_bit,
+	    nchan_bit, B_TRUE);
+	return (B_TRUE);
+}
 
-		hash = bitx64(dec->dec_ilv_pa, addr_bits[i], addr_bits[i]);
-		if ((rule->ddr_flags & DF_DRAM_F_HASH_16_18) != 0) {
-			uint8_t val = bitx64(dec->dec_ilv_pa, 16 + i, 16 + i);
-			hash ^= val;
-		}
+/*
+ * This implements the Zen 5 (really DF 4D2) NPS variants that work on both 1K
+ * and 2K hashing.
+ */
+static boolean_t
+zen_umc_decode_ileave_nps_k(const zen_umc_t *umc, zen_umc_decoder_t *dec)
+{
+	uint32_t nchan_bit, nsock_bit;
+	const df_dram_rule_t *rule = dec->dec_df_rule;
+	const uint32_t addr_bits_1k[5] = { rule->ddr_addr_start, 9, 12, 13,
+	    14 };
+	const uint32_t addr_bits_2k[4] = { rule->ddr_addr_start, 12, 13, 14 };
+	const uint32_t adj_1k[5] = { 0, 1, 2, 3, 4 };
+	const uint32_t adj_2k[4] = { 0, 2, 3, 4 };
+	const uint32_t *addr_bits;
+	const uint32_t *adj;
 
-		if ((rule->ddr_flags & DF_DRAM_F_HASH_21_23) != 0) {
-			uint8_t val = bitx64(dec->dec_ilv_pa, 21 + i, 21 + i);
-			hash ^= val;
-		}
-
-		if ((rule->ddr_flags & DF_DRAM_F_HASH_30_32) != 0) {
-			uint8_t val = bitx64(dec->dec_ilv_pa, 30 + i, 30 + i);
-			hash ^= val;
-		}
-
-		/*
-		 * If this is the first bit and we're not doing socket
-		 * interleaving, then we need to add bit 14 to the running hash.
-		 */
-		if (i == 0 && nsock_bit == 0) {
-			uint8_t val = bitx64(dec->dec_ilv_pa, 14, 14);
-			hash ^= val;
-		}
-
-		/*
-		 * If socket interleaving is going on we need to store the first
-		 * bit as the socket hash and then redirect the remaining bits
-		 * to the channel, taking into account that the shift will be
-		 * adjusted as a result.
-		 */
-		if (nsock_bit > 0) {
-			if (i == 0) {
-				dec->dec_ilv_sock = hash;
-			} else {
-				dec->dec_ilv_chan |= hash << (i - 1);
-			}
-		} else {
-			dec->dec_ilv_chan |= hash << i;
-		}
+	if (rule->ddr_die_ileave_bits != 0 || rule->ddr_addr_start != 8) {
+		dec->dec_fail = ZEN_UMC_DECODE_F_NPS_BAD_ILEAVE;
+		dec->dec_fail_data = dec->dec_df_ruleno;
+		return (B_FALSE);
 	}
 
+	nsock_bit = rule->ddr_sock_ileave_bits;
+	switch (rule->ddr_chan_ileave) {
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_2CH_2K:
+		nchan_bit = 1;
+		break;
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_2K:
+		nchan_bit = 2;
+		break;
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_2K:
+		nchan_bit = 3;
+		break;
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_2K:
+		nchan_bit = 4;
+		break;
+	default:
+		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
+		dec->dec_fail_data = rule->ddr_chan_ileave;
+		return (B_FALSE);
+	}
+
+	switch (rule->ddr_chan_ileave) {
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+		ASSERT3U(nchan_bit + nsock_bit, <=, 5);
+		addr_bits = addr_bits_1k;
+		adj = adj_1k;
+		break;
+	case DF_CHAN_ILEAVE_NPS4_2CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_2K:
+		ASSERT3U(nchan_bit + nsock_bit, <=, 4);
+		addr_bits = addr_bits_2k;
+		adj = adj_2k;
+		break;
+	default:
+		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
+		dec->dec_fail_data = rule->ddr_chan_ileave;
+		return (B_FALSE);
+	}
+
+	dec->dec_ilv_sock = dec->dec_ilv_die = dec->dec_ilv_chan = 0;
+	zen_umc_decode_ileave_nps_common(dec, addr_bits, adj, nsock_bit,
+	    nchan_bit, B_FALSE);
 	return (B_TRUE);
 }
 
@@ -548,6 +878,41 @@ zen_umc_decode_hash_nps_mod(const df_dram_rule_t *rule, uint64_t pa,
 	}
 }
 
+static void
+zen_umc_decode_hash_nps_k_mod(const df_dram_rule_t *rule, uint64_t pa,
+    uint8_t hashes[4])
+{
+	const uint32_t addr_bits[4] = { rule->ddr_addr_start, 9, 12, 13 };
+
+	for (size_t i = 0; i < ARRAY_SIZE(addr_bits); i++) {
+		hashes[i] = bitx64(pa, addr_bits[i], addr_bits[i]);
+		if (i == 0) {
+			uint8_t val = bitx64(pa, 14, 14);
+			hashes[i] ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_16_18) != 0) {
+			uint8_t val = bitx64(pa, 16 + i, 16 + i);
+			hashes[i] ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_21_23) != 0) {
+			uint8_t val = bitx64(pa, 21 + i, 21 + i);
+			hashes[i] ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_30_32) != 0) {
+			uint8_t val = bitx64(pa, 30 + i, 30 + i);
+			hashes[i] ^= val;
+		}
+
+		if ((rule->ddr_flags & DF_DRAM_F_HASH_40_42) != 0) {
+			uint8_t val = bitx64(pa, 40 + i, 40 + i);
+			hashes[i] ^= val;
+		}
+	}
+}
+
 /*
  * See the big theory statement in zen_umc.c which describes the rules for this
  * computation. This is a little less weird than the Zen 3 one, but still,
@@ -617,6 +982,80 @@ zen_umc_decode_ileave_nps_mod(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 		return (B_FALSE);
 	}
 
+	return (B_TRUE);
+}
+
+/*
+ * Determine the interleave address for the NPS 1K/2K non-power of 2 based
+ * values. Each of these uses a similar style of calculation with rather
+ * different values and as such we use a data table for each of these that maps
+ * to a given rule.
+ */
+static boolean_t
+zen_umc_decode_ileave_nps_k_mod(const zen_umc_t *umc, zen_umc_decoder_t *dec)
+{
+	uint8_t hashes[4] = { 0 };
+	uint32_t chan, mod_val;
+	uint64_t mod_addr;
+	const df_dram_rule_t *rule = dec->dec_df_rule;
+	const zen_umc_np2_k_rule_t *np2 = NULL;
+
+	for (size_t i = 0; i < ARRAY_SIZE(zen_umc_np2_k_rules); i++) {
+		if (rule->ddr_chan_ileave == zen_umc_np2_k_rules[i].zukr_type) {
+			np2 = &zen_umc_np2_k_rules[i];
+			break;
+		}
+	}
+
+	if (np2 == NULL) {
+		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
+		dec->dec_fail_data = rule->ddr_chan_ileave;
+		return (B_FALSE);
+	}
+
+	if (rule->ddr_die_ileave_bits != 0 || rule->ddr_addr_start != 8) {
+		dec->dec_fail = ZEN_UMC_DECODE_F_NPS_BAD_ILEAVE;
+		dec->dec_fail_data = dec->dec_df_ruleno;
+		return (B_FALSE);
+	}
+
+	/*
+	 * These rules either require that socket interleaving is enabled or
+	 * not. Make sure that this matches before we proceed.
+	 */
+	if (np2->zukr_sock != (rule->ddr_sock_ileave_bits == 1)) {
+		dec->dec_fail = ZEN_UMC_DECODE_F_NPS_BAD_ILEAVE;
+		dec->dec_fail_data = dec->dec_df_ruleno;
+		return (B_FALSE);
+	}
+
+	dec->dec_ilv_sock = dec->dec_ilv_die = dec->dec_ilv_chan = 0;
+	zen_umc_decode_hash_nps_k_mod(rule, dec->dec_ilv_pa, hashes);
+	if (rule->ddr_sock_ileave_bits > 0) {
+		ASSERT3U(rule->ddr_sock_ileave_bits, ==, 1);
+		dec->dec_ilv_sock = hashes[0];
+	}
+
+	mod_addr = bitx64(dec->dec_ilv_pa, 63, np2->zukr_high);
+	mod_addr = mod_addr << np2->zukr_mod_shift;
+	for (uint32_t i = 0; i < np2->zukr_mod_shift; i++) {
+		uint32_t bit = np2->zukr_mod_fill[i];
+		if (bit != 0) {
+			uint64_t val = bitx64(dec->dec_ilv_pa, bit, bit);
+			mod_addr = bitset64(mod_addr, i, i, val);
+		}
+	}
+
+	mod_val = (uint32_t)(mod_addr % np2->zukr_mod);
+	chan = mod_val << np2->zukr_chan_mod_shift;
+	for (uint32_t i = 0; i < np2->zukr_chan_mod_shift; i++) {
+		VERIFY3U(np2->zukr_chan_fill[i], <, ARRAY_SIZE(hashes));
+		uint32_t bit = np2->zukr_chan_fill[i];
+		uint32_t val = hashes[np2->zukr_chan_fill[i]];
+		chan = bitset32(chan, bit, bit, val);
+	}
+
+	dec->dec_ilv_chan = chan;
 	return (B_TRUE);
 }
 
@@ -693,6 +1132,37 @@ zen_umc_decode_sysaddr_to_csid(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 			return (B_FALSE);
 		}
 		break;
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_2CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_2K:
+		if (!zen_umc_decode_ileave_nps_k(umc, dec)) {
+			return (B_FALSE);
+		}
+		break;
+	case DF_CHAN_ILEAVE_NPS4_3CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_6CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_12CH_1K:
+	case DF_CHAN_ILEAVE_NPS0_24CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_5CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_10CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_3CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_6CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_12CH_2K:
+	case DF_CHAN_ILEAVE_NPS0_24CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_5CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_10CH_2K:
+		if (!zen_umc_decode_ileave_nps_k_mod(umc, dec)) {
+			return (B_FALSE);
+		}
+		break;
+	case DF_CHAN_ILEAVE_MI3H_8CH:
+	case DF_CHAN_ILEAVE_MI3H_16CH:
+	case DF_CHAN_ILEAVE_MI3H_32CH:
 	default:
 		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
 		dec->dec_fail_data = rule->ddr_chan_ileave;
@@ -886,8 +1356,25 @@ zen_umc_decode_normalize_nohash(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 static boolean_t
 zen_umc_decode_normalize_hash(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 {
-	uint_t nbits = 0;
+	uint_t nbits = 0, nstart = 0;
 	const df_dram_rule_t *rule = dec->dec_df_rule;
+
+	/*
+	 * NPS 1K hashes remove bits 8 and 9 first. Determine how many bits to
+	 * remove from the starting location. This will later be reduced based
+	 * upon how many address bits there actually are.
+	 */
+	switch (rule->ddr_chan_ileave) {
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+		nstart = 2;
+		break;
+	default:
+		nstart = 1;
+		break;
+	}
 
 	/*
 	 * NPS hashes allow for socket interleaving, COD hashes do not. Add
@@ -897,15 +1384,25 @@ zen_umc_decode_normalize_hash(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	switch (rule->ddr_chan_ileave) {
 	case DF_CHAN_ILEAVE_COD4_2CH:
 	case DF_CHAN_ILEAVE_NPS4_2CH:
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_2CH_2K:
 		nbits += 1;
 		break;
 	case DF_CHAN_ILEAVE_COD2_4CH:
 	case DF_CHAN_ILEAVE_NPS2_4CH:
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_2K:
 		nbits += 2;
 		break;
 	case DF_CHAN_ILEAVE_COD1_8CH:
 	case DF_CHAN_ILEAVE_NPS1_8CH:
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_2K:
 		nbits += 3;
+		break;
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_2K:
+		nbits += 4;
 		break;
 	default:
 		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
@@ -913,17 +1410,24 @@ zen_umc_decode_normalize_hash(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	}
 
 	/*
+	 * Don't remove more bits from the start than exist.
+	 */
+	if (nstart > nbits) {
+		nstart = nbits;
+	}
+
+	/*
 	 * Always remove high order bits before low order bits so we don't have
 	 * to adjust the bits we need to remove.
 	 */
-	if (nbits > 1) {
+	if (nbits > nstart) {
 		uint_t start = 12;
-		uint_t end = start + (nbits - 2);
+		uint_t end = start + (nbits - nstart - 1);
 		dec->dec_norm_addr = bitdel64(dec->dec_norm_addr, end, start);
 	}
 
-	dec->dec_norm_addr = bitdel64(dec->dec_norm_addr, rule->ddr_addr_start,
-	    rule->ddr_addr_start);
+	dec->dec_norm_addr = bitdel64(dec->dec_norm_addr,
+	    rule->ddr_addr_start + nstart - 1, rule->ddr_addr_start);
 	return (B_TRUE);
 }
 
@@ -1048,6 +1552,54 @@ zen_umc_decode_normalize_nps_mod(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 }
 
 /*
+ * Construct the normalized address for the NPS 1K/2K non-power of 2 instances.
+ * See the theory statement for the rough formula used here. While each variant
+ * uses slightly different values, that has been abstracted based on our data
+ * table.
+ */
+static boolean_t
+zen_umc_decode_normalize_nps_k_mod(const zen_umc_t *umc, zen_umc_decoder_t *dec)
+{
+	uint64_t high, mid, low;
+	uint_t mid_end;
+	const df_dram_rule_t *rule = dec->dec_df_rule;
+	const zen_umc_np2_k_rule_t *np2 = NULL;
+
+	for (size_t i = 0; i < ARRAY_SIZE(zen_umc_np2_k_rules); i++) {
+		if (rule->ddr_chan_ileave == zen_umc_np2_k_rules[i].zukr_type) {
+			np2 = &zen_umc_np2_k_rules[i];
+			break;
+		}
+	}
+
+	if (np2 == NULL) {
+		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
+		dec->dec_fail_data = rule->ddr_chan_ileave;
+		return (B_FALSE);
+	}
+
+	low = bitx64(dec->dec_norm_addr, rule->ddr_addr_start - 1, 0);
+	mid_end = np2->zukr_norm_addr + np2->zukr_norm_naddr - 1;
+	VERIFY3U(mid_end, >=, rule->ddr_addr_start);
+	mid = bitx64(dec->dec_norm_addr, mid_end, np2->zukr_norm_addr);
+
+	high = bitx64(dec->dec_norm_addr, 63, np2->zukr_high);
+	if (np2->zukr_div_naddr > 0) {
+		uint_t ins_end = np2->zukr_div_addr + np2->zukr_div_naddr - 1;
+		uint64_t insert = bitx64(dec->dec_norm_addr, ins_end,
+		    np2->zukr_div_addr);
+
+		high = high << np2->zukr_div_naddr;
+		high = bitset64(high, np2->zukr_div_naddr - 1, 0, insert);
+	}
+	high = high / np2->zukr_mod;
+
+	dec->dec_norm_addr = low | (mid << rule->ddr_addr_start) | (high <<
+	    (rule->ddr_addr_start + np2->zukr_norm_naddr));
+	return (B_TRUE);
+}
+
+/*
  * Now we need to go through and try to construct a normalized address using all
  * the information that we've gathered to date. To do this we need to take into
  * account all of the following transformations on the address that need to
@@ -1095,6 +1647,14 @@ zen_umc_decode_sysaddr_to_norm(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	case DF_CHAN_ILEAVE_NPS4_2CH:
 	case DF_CHAN_ILEAVE_NPS2_4CH:
 	case DF_CHAN_ILEAVE_NPS1_8CH:
+	case DF_CHAN_ILEAVE_NPS4_2CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_2CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_4CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_8CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_16CH_2K:
 		if (!zen_umc_decode_normalize_hash(umc, dec)) {
 			return (B_FALSE);
 		}
@@ -1113,6 +1673,25 @@ zen_umc_decode_sysaddr_to_norm(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 			return (B_FALSE);
 		}
 		break;
+	case DF_CHAN_ILEAVE_NPS4_3CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_6CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_12CH_1K:
+	case DF_CHAN_ILEAVE_NPS0_24CH_1K:
+	case DF_CHAN_ILEAVE_NPS2_5CH_1K:
+	case DF_CHAN_ILEAVE_NPS1_10CH_1K:
+	case DF_CHAN_ILEAVE_NPS4_3CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_6CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_12CH_2K:
+	case DF_CHAN_ILEAVE_NPS0_24CH_2K:
+	case DF_CHAN_ILEAVE_NPS2_5CH_2K:
+	case DF_CHAN_ILEAVE_NPS1_10CH_2K:
+		if (!zen_umc_decode_normalize_nps_k_mod(umc, dec)) {
+			return (B_FALSE);
+		}
+		break;
+	case DF_CHAN_ILEAVE_MI3H_8CH:
+	case DF_CHAN_ILEAVE_MI3H_16CH:
+	case DF_CHAN_ILEAVE_MI3H_32CH:
 	default:
 		dec->dec_fail = ZEN_UMC_DECODE_F_CHAN_ILEAVE_NOTSUP;
 		dec->dec_fail_data = rule->ddr_chan_ileave;

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -504,6 +504,8 @@ static const zen_umc_test_set_t zen_umc_test_set[] = {
 	{ "multi", zen_umc_test_multi },
 	{ "nps", zen_umc_test_nps },
 	{ "remap", zen_umc_test_remap },
+	{ "nps_k", zen_umc_test_nps_k },
+	{ "np2_k", zen_umc_test_np2_k },
 };
 
 static void

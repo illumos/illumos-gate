@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _ZEN_UMC_TEST_H
@@ -94,6 +94,8 @@ extern const umc_decode_test_t zen_umc_test_ilv[];
 extern const umc_decode_test_t zen_umc_test_multi[];
 extern const umc_decode_test_t zen_umc_test_nps[];
 extern const umc_decode_test_t zen_umc_test_remap[];
+extern const umc_decode_test_t zen_umc_test_nps_k[];
+extern const umc_decode_test_t zen_umc_test_np2_k[];
 
 #ifdef __cplusplus
 }

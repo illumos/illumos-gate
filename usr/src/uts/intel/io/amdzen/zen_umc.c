@@ -487,7 +487,7 @@
  *      [10]    - Channel ID
  *
  *
- * COD and NPS HASHING
+ * COD, NPS, and MI3H HASHING
  *
  * However, this isn't the only primary extraction rule of the above values. The
  * other primary method is using a hash. While the exact hash methods vary
@@ -559,6 +559,61 @@
  *	Channel ID[1] = addr[13] ^ addr[18] ^ addr[23] ^ addr[32]
  *	Channel ID[2] = addr[14] ^ addr[19] ^ addr[24] ^ addr[33]
  *
+ * DF 4D2 NPS 1K/2K
+ *
+ * In our DF 4D2 variant, the interleave controls were changed and the way that
+ * hashes work is different. There are two main families here, a variant on the
+ * prior NPS hashing that is either NPS 1K or NPS 2K and the MI300 variant that
+ * we call MI3H. First, there are two additional address ranges that have been
+ * added:
+ *
+ *   o 4 KiB (starting at bit 12)
+ *   o 1 TiB (starting at bit 40)
+ *
+ * Of these, our understanding is that the 4 KiB range is only used for MI3H
+ * based hashing. When it is used, only bits 12-14 will be used, but that's
+ * because the hash algorithm for the MI3H series is, well, unique. The 1T
+ * otherwise works somewhat as normal. Currently we don't support the MI3H
+ * decoding, but know that it exists in the code so we can provide a better
+ * error code.
+ *
+ * The NPS 1K/2K hashes use a similar style. These are designed to support up to
+ * 32 channel hashes, which causes up to 5 bits to be used. The 5 bit form is
+ * only supported in the 1K variant. It starts at bit 8 (the nominally required
+ * starting interleave address) and then uses bit 9, before jumping up to bits
+ * 12-14 as required. The XOR addresses count up in a similar fashion. So the 64
+ * KiB interleave would use up to bits 16-20 in this scheme (corresponding to
+ * result bits 0-4).
+ *
+ * When the 2K form is used, only 4 bits are supported and the entire bit 9 row
+ * is ignored. This looks very similar to the NPS form; however, the gap is also
+ * there in the XOR bits and there is no longer the question of using bit 14 or
+ * not with socket interleaving. It is only ever used if we need the 5th channel
+ * bit. To see the difference let's look at two examples where the only
+ * difference between the two is whether we are using 1 or 2K hashing.
+ *
+ *   o 8-channel "NPS" 1K hashing, starting at address 8. 64 KiB, 2 MiB, 1 GiB,
+ *     and 1 TiB are enabled. 1-die and 1-socket.
+ *
+ *     In this model, there are always 3 bits for the channel. This means that
+ *     we only will use bits 8, 9, and 12 from the address to start with.
+ *
+ *      Channel ID[0] = addr[8]  ^ addr[16] ^ addr[21] ^ addr[30]
+ *      Channel ID[1] = addr[9]  ^ addr[17] ^ addr[22] ^ addr[31]
+ *      Channel ID[2] = addr[12] ^ addr[18] ^ addr[23] ^ addr[32]
+ *
+ *   o 8-channel "NPS" 2K hashing, starting at address 8. 64 KiB, 2 MiB, 1 GiB,
+ *     and 1 TiB are enabled. 1-die and 1-socket.
+ *
+ *     In this model, we also use 3 bits for the channel. However, we no longer
+ *     use bit 9, which is the 1K mode only. Similarly, you'll see that the bits
+ *     from the hash that would have been used for determining interleaving with
+ *     bit 9 are skipped entirely. This is why the 1K/2K variants are
+ *     incompatible with the original NPS hashing.
+ *
+ *      Channel ID[0] = addr[8]  ^ addr[16] ^ addr[21] ^ addr[30]
+ *      Channel ID[1] = addr[12] ^ addr[18] ^ addr[23] ^ addr[32]
+ *      Channel ID[2] = addr[13] ^ addr[19] ^ addr[24] ^ addr[33]
  *
  * ZEN 3 6-CHANNEL
  *
@@ -586,8 +641,8 @@
  *	increase by 1. Here's how we calculate the hash bits:
  *
  *      hash[0] = addr[11@] ^ addr[14@] ^ addr[23] ^ addr[32]
- *      hash[1] = addr[12@] ^ addr[21] ^ addr[30]
- *      hash[2] = addr[13@] ^ addr[22] ^ addr[31]
+ *      hash[1] = addr[12@] ^ addr[21]  ^ addr[30]
+ *      hash[2] = addr[13@] ^ addr[22]  ^ addr[31]
  *
  *      With this calculated, we always assign the first bit of the channel
  *      based on the hash. The other bits are more complicated as we have to
@@ -660,6 +715,83 @@
  *
  *       Channel ID = Channel ID + (hash[2:1] * 3@)
  *
+ * NPS 1K/2K NON-POWER of 2
+ *
+ * Just as the normal hashing changed with the introduction of the 1K/2K
+ * variants, so does the non-power of 2 hashing. This NP2 scheme is rather
+ * different than the base Zen 4 one. This uses the 64 KiB, 2 MiB, 1 GiB, and 1
+ * TiB ranges for hashing. Logically there are both 3 and 5 channel hashes again
+ * like Zen 4 and when socket interleaving is enabled, address bit 8 is always
+ * going to the socket.
+ *
+ * The 1K and 2K modes change which addresses are used and considered just like
+ * the non-NP2 case. The same interleave bit skipping for 2K still applies,
+ * meaning bit 9 will not be used for hashing and will instead be part of the
+ * normal address calculations that we have.
+ *
+ * Like in the Zen 4 case, we are going to be constructing our normalized
+ * address from three regions of bits. The low region which is everything that
+ * is used before the hashing, the bits skipped in the middle, and then the
+ * upper bits that have been untouched. These are not rearranged, rather its
+ * best to think of it as bits are removed from this, causing shifts and
+ * shrinks.
+ *
+ * Another important difference to call out before we get to examples is that
+ * each variant here uses a different address range as the upper portion to use.
+ * Unfortunately, where as for Zen 4 we had some regular rules, each of these
+ * cases seems rather different. However, there is some general logic which is
+ * that in each case we calculate some modulus value from different addresses
+ * which we use to determine the channel, sometimes mixed with other hash bits.
+ * Then we calculate a new normalized address by taking the divisor as the high
+ * portion. Let's look at some examples here:
+ *
+ *   o 12 Channel 1K Zen 5, starting at address 8. 64K, 2M, 1G, and 1T ranges
+ *     enabled. 1-die and 1-socket interleaving.
+ *
+ *      This 12 channel mode is a modulus 3 case. This particular case needs two
+ *      hash bits. Because it is a 1K mode it uses bits 8 and 9. If we were in a
+ *      2K mode, we'd use bits 8 and 12. Bit 8 always also hashes in bit 14 just
+ *      like the Zen 4 case.
+ *
+ *      hash[0] = addr[8]  ^ addr[16] ^ addr[21] ^ addr[30] ^ addr[40] ^
+ *		  addr[14]
+ *      hash[1] = addr[9]  ^ addr[17] ^ addr[22] ^ addr[31] ^ addr[41]
+ *
+ *      Now that we have that, it's time to calculate the address we need to
+ *      take the modulus of to stick into the channel. For this particular case,
+ *      we construct an address as PA >> 12 | 0b00. In other words we take bits
+ *      [48+, 12] and move them to bit 2. Once we have that, we can go ahead and
+ *      construct the value modulus 3. Symbolically:
+ *
+ *      modAddr = (addr[64:12] & ~3) | 0b00 (or (addr >> 12) << 2)
+ *      modVal = modAddr % 3
+ *
+ *      Channel ID[0] = hash[0]
+ *      Channel ID[1] = hash[1]
+ *      Channel ID[2] = modval[0]
+ *      Channel ID[3] = modval[1]
+ *
+ *      In the 2K version we use (addr[64:13] & ~7) | 0b000 and hash[1] is based
+ *      on addr[12] rather than addr[9].
+ *
+ *   o 5 Channel 2K Zen 5, starting at address 8. 64K, 2M, 1G, and 1T ranges
+ *     enabled. 1-die and 1-socket interleaving.
+ *
+ *      With the 5-channel based mode we now will working modulus five rather
+ *      than three. In this case, we have similar logic, except the way the
+ *      address is constructed to take the mod of is different. We can think of
+ *      this as:
+ *
+ *      modAddr = addr[64:12] | addr[8] | 0b0
+ *      modVal = modAddr % 5
+ *
+ *      Channel ID[0] = modVal[0]
+ *      Channel ID[1] = modVal[1]
+ *      Channel ID[2] = modVal[2]
+ *
+ *      Basically this ends up using a rather similar logical construction;
+ *      however, the values that it plugs in are different. Note, that there was
+ *      no use of the hash in this case.
  *
  * POST BIT EXTRACTION
  *
@@ -679,12 +811,13 @@
  * You'll note the use of the term "logical target" up above. That's because
  * some platforms have the ability to remap logical targets to physical targets
  * (identified by the use of the ZEN_UMC_FAM_F_TARG_REMAP flag in the family
- * data). The way that remapping works changes based on the hardware generation.
- * This was first added in Milan (Zen 3) CPUs. In that model, you would use the
- * socket and component information from the target ID to identify which
- * remapping rules to use. On Genoa (Zen 4) CPUs, you would instead use
- * information in the rule itself to determine which of the remap rule sets to
- * use and then uses the component ID to select which rewrite rule to use.
+ * data or the DF::DfCapability register once we're at the DF 4D2 variant). The
+ * way that remapping works changes based on the hardware generation.  This was
+ * first added in Milan (Zen 3) CPUs. In that model, you would use the socket
+ * and component information from the target ID to identify which remapping
+ * rules to use. On Genoa (Zen 4) CPUs, you would instead use information in the
+ * rule itself to determine which of the remap rule sets to use and then uses
+ * the component ID to select which rewrite rule to use.
  *
  * Finally, there's one small wrinkle with this whole scheme that we haven't
  * discussed: what actually is the address that we plug into this calculation.
@@ -693,9 +826,14 @@
  * itself, it gets normalized based on the DRAM rule, which involves subtracting
  * out the base address and potentially subtracting out the size of the DRAM
  * hole (if the address is above the hole and hoisting is active for that
- * range). When this is performed appears to tie to the DF generation. After Zen
- * 3, it is always the default (e.g. Zen 4 and things from DF gen 3.5). At and
- * before Zen 3, it only occurs if we are doing a non-power of 2 based hashing.
+ * range). When this is performed appears to tie to the DF generation. The
+ * following table relates the DF generation to our behavior:
+ *
+ *   o DF 2 (Zen 1): Use the raw address
+ *   o DF 3 (Zen 2-3): Use the raw address if it's not a power of 2
+ *   o DF 3.5: Use the adjusted address
+ *   o DF 4 (Zen 4): Use the adjusted address
+ *   o DF 4D2 (Zen 4/5): Use the raw address
  *
  * --------------------------------------------
  * Data Fabric Interleave Address Normalization
@@ -772,6 +910,25 @@
  *     +--> Relocated to bit 11 -- shifted by 4 because we removed bits, 8, 12,
  *          13, and 14.
  *
+ * NPS 1K/2K Hashing
+ *
+ * This case is a fairly straightforward variant on what we just discussed. In
+ * fact, 2K hashing looks just like what we've done before. The only difference
+ * with 1K hashing is that we'll consider bit 9 also for removal before we jump
+ * up to bit 12. Let's look at an example:
+ *
+ *   o 8-channel "NPS" 1K hashing, starting at address 8. All three ranges
+ *     enabled. 1-die and 2-socket interleaving.
+ *
+ *     Here we need to remove a total of 4 bits, which is now broken into
+ *     [13:12] and [9:8]. This results in a new address of:
+ *
+ *     orig[63:14] >> 4 | orig[11:10] >> 2 | orig[7:0]
+ *     |                  |                  +-> stays the same
+ *     |                  +-> relocated to bit 8 -- shifted by 2 because we
+ *     |                      removed bits 8 and 9.
+ *     +--> Relocated to bit 11 -- shifted by 4 because we removed bits, 8, 9,
+ *          12, and 13.
  *
  * ZEN 3 6-CHANNEL
  *
@@ -933,6 +1090,41 @@
  *      |                                       1 because we removed bit 8.
  *      +--> Relocated to bit 11 -- shifted by 3 because we removed bits 8, 12,
  *           and 13.
+ *
+ * DF 4D2 NPS 1K/2K NON-POWER OF 2
+ *
+ * Unsurprisingly, if you've followed to this point, there is a slightly
+ * different normalization scheme that is used here. Like in the other cases we
+ * end up breaking the address into the three parts that are used: a lower
+ * portion that remains the same, a middle portion that is from bits that were
+ * not used as part of the interleaving process, and the upper portion which is
+ * where we end up with our division (like the Zen 4 case above). To add to the
+ * fun, the upper portion that gets divided sometimes has some lower parts of
+ * the address tossed up there.
+ *
+ * Because each case is unique, we have created a data table in the decoder:
+ * zen_umc_np2_k_rules. This structure has a number of pieces that describe how
+ * to transform the address. Logically this computation looks like:
+ *
+ *   [ upper address / modulus ] | middle bits | low bits
+ *     |                           |             |
+ *     |                           |             +-> Always bits (rule start, 0]
+ *     |                           |
+ *     |                           +-> The starting bit is zukr_norm_addr. There
+ *     |                               are zukr_norm_naddr bits. This is:
+ *     |                               (zukr_norm_addr + zukr_norm_naddr,
+ *     |                                zukr_norm_addr].
+ *     |
+ *     +--> This has two portions everything from (64, zukr_high] and then the
+ *          optional bonus region, which is indicated by zukr_div_addr and
+ *          zukr_div_naddr. These bits are always the low bit. Meaning that the
+ *          initial bits will be shifted over by zukr_div_naddr before we
+ *          perform the division.
+ *
+ * Once each of these three pieces has been calculated, all the resulting pieces
+ * will be shifted so they are contiguous like the other cases as though the
+ * removed bits didn't exist.
+ *
  *
  * That's most of the normalization process for the time being. We will have to
  * revisit this when we have to transform a normal address into a system address
@@ -1137,11 +1329,14 @@
  *   o Providing memory controller information to FMA so that way it can opt to
  *     do predictive failure or give us more information about what is fault
  *     with ECC errors.
- *   o Figuring out if we will get MCEs for privilged address decoding and if so
- *     mapping those back to system addresses and related.
+ *   o Figuring out if we will get MCEs for privileged address decoding and if
+ *     so mapping those back to system addresses and related.
  *   o 3DS RDIMMs likely will need a little bit of work to ensure we're handling
  *     the resulting combination of the RM bits and CS and reporting it
  *     intelligently.
+ *   o Support for the MI300-specific interleave decoding.
+ *   o Understanding the error flow for CXL related address decoding and if we
+ *     should support it in this driver.
  */
 
 #include <sys/types.h>
@@ -1278,16 +1473,56 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		    UMC_CHAN_HASH_F_CS
 	}, {
 		.zufd_family = X86_PF_AMD_RAPHAEL,
-		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP | ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
-		    UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
 	}, {
 		.zufd_family = X86_PF_AMD_BERGAMO,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
 		    ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
+		    ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 20,
+		.zufd_cs_nrules = 4,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_PHOENIX,
+		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 2,
+		.zufd_cs_nrules = 2,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_STRIX,
+		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 2,
+		.zufd_cs_nrules = 2,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_GRANITE_RIDGE,
+		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 2,
+		.zufd_cs_nrules = 2,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_TURIN,
+		.zufd_flags = ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
+		    ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 20,
+		.zufd_cs_nrules = 4,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_DENSE_TURIN,
+		.zufd_flags = ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
 		    ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 20,
 		.zufd_cs_nrules = 4,
@@ -1599,6 +1834,10 @@ zen_umc_read_dram_rule_df_4(zen_umc_t *umc, const uint_t dfno,
 		rule->ddr_flags |= DF_DRAM_F_HOLE;
 	}
 
+	if (DF_DRAM_CTL_V4_GET_SCM(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_SCM;
+	}
+
 	rule->ddr_sock_ileave_bits = DF_DRAM_ILV_V4_GET_SOCK(ilv);
 	rule->ddr_die_ileave_bits = DF_DRAM_ILV_V4_GET_DIE(ilv);
 	switch (DF_DRAM_ILV_V4_GET_CHAN(ilv)) {
@@ -1672,6 +1911,225 @@ zen_umc_read_dram_rule_df_4(zen_umc_t *umc, const uint_t dfno,
 }
 
 static int
+zen_umc_read_dram_rule_df_4d2(zen_umc_t *umc, const uint_t dfno,
+    const uint_t inst, const uint_t ruleno, df_dram_rule_t *rule)
+{
+	int ret;
+	uint16_t addr_ileave;
+	uint32_t base, limit, ilv, ctl;
+
+	if ((ret = amdzen_c_df_read32(dfno, inst, DF_DRAM_BASE_V4D2(ruleno),
+	    &base)) != 0) {
+		dev_err(umc->umc_dip, CE_WARN, "!failed to read DRAM base "
+		    "register %u on 0x%x/0x%x: %d", ruleno, dfno, inst, ret);
+		return (ret);
+	}
+
+	if ((ret = amdzen_c_df_read32(dfno, inst, DF_DRAM_LIMIT_V4D2(ruleno),
+	    &limit)) != 0) {
+		dev_err(umc->umc_dip, CE_WARN, "!failed to read DRAM limit "
+		    "register %u on 0x%x/0x%x: %d", ruleno, dfno, inst, ret);
+		return (ret);
+	}
+
+	if ((ret = amdzen_c_df_read32(dfno, inst, DF_DRAM_ILV_V4D2(ruleno),
+	    &ilv)) != 0) {
+		dev_err(umc->umc_dip, CE_WARN, "!failed to read DRAM "
+		    "interleave register %u on 0x%x/0x%x: %d", ruleno, dfno,
+		    inst, ret);
+		return (ret);
+	}
+
+	if ((ret = amdzen_c_df_read32(dfno, inst, DF_DRAM_CTL_V4D2(ruleno),
+	    &ctl)) != 0) {
+		dev_err(umc->umc_dip, CE_WARN, "!failed to read DRAM control "
+		    "register %u on 0x%x/0x%x: %d", ruleno, dfno, inst, ret);
+		return (ret);
+	}
+
+	rule->ddr_raw_base = base;
+	rule->ddr_raw_limit = limit;
+	rule->ddr_raw_ileave = ilv;
+	rule->ddr_raw_ctrl = ctl;
+
+	if (!DF_DRAM_CTL_V4_GET_VALID(ctl)) {
+		return (0);
+	}
+
+	rule->ddr_flags |= DF_DRAM_F_VALID;
+	rule->ddr_base = DF_DRAM_BASE_V4_GET_ADDR(base);
+	rule->ddr_base = rule->ddr_base << DF_DRAM_BASE_V4_BASE_SHIFT;
+	rule->ddr_limit = DF_DRAM_LIMIT_V4_GET_ADDR(limit);
+	rule->ddr_limit = (rule->ddr_limit << DF_DRAM_LIMIT_V4_LIMIT_SHIFT) +
+	    DF_DRAM_LIMIT_V4_LIMIT_EXCL;
+	rule->ddr_dest_fabid = DF_DRAM_CTL_V4D2_GET_DEST_ID(ctl);
+
+	if (DF_DRAM_CTL_V4D2_GET_HASH_1T(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HASH_40_42;
+	}
+
+	if (DF_DRAM_CTL_V4_GET_HASH_1G(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HASH_30_32;
+	}
+
+	if (DF_DRAM_CTL_V4_GET_HASH_2M(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HASH_21_23;
+	}
+
+	if (DF_DRAM_CTL_V4_GET_HASH_64K(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HASH_16_18;
+	}
+
+	if (DF_DRAM_CTL_V4D2_GET_HASH_4K(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HASH_12_14;
+	}
+
+	if (DF_DRAM_CTL_V4_GET_REMAP_EN(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_REMAP_EN;
+		rule->ddr_remap_ent = DF_DRAM_CTL_V4D2_GET_REMAP_SEL(ctl);
+	}
+
+	if (DF_DRAM_CTL_V4_GET_HOLE_EN(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_HOLE;
+	}
+
+	if (DF_DRAM_CTL_V4_GET_SCM(ctl) != 0) {
+		rule->ddr_flags |= DF_DRAM_F_SCM;
+	}
+
+	rule->ddr_sock_ileave_bits = DF_DRAM_ILV_V4_GET_SOCK(ilv);
+	rule->ddr_die_ileave_bits = DF_DRAM_ILV_V4_GET_DIE(ilv);
+	switch (DF_DRAM_ILV_V4D2_GET_CHAN(ilv)) {
+	case DF_DRAM_ILV_V4D2_CHAN_1:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_1CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_2:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_2CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_4:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_4CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_8:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_8CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_16:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_16CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_32:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_32CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_16S8CH_1K:
+		if (rule->ddr_sock_ileave_bits == 0) {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_16CH_1K;
+		} else {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_8CH_1K;
+		}
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS0_24CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS0_24CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS4_2CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_4CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_4CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_8S4CH_1K:
+		if (rule->ddr_sock_ileave_bits == 0) {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_8CH_1K;
+		} else {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_4CH_1K;
+		}
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS4_3CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS4_3CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_6CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_6CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_12CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_12CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_5CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_5CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_10CH_1K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_10CH_1K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_MI3H_8CH:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_MI3H_8CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_MI3H_16CH:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_MI3H_16CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_MI3H_32CH:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_MI3H_32CH;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS4_2CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_4CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_4CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_8S4CH_2K:
+		if (rule->ddr_sock_ileave_bits == 0) {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_8CH_2K;
+		} else {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_4CH_2K;
+		}
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_16S8CH_2K:
+		if (rule->ddr_sock_ileave_bits == 0) {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_16CH_2K;
+		} else {
+			rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_8CH_2K;
+		}
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS4_3CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS4_3CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_6CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_6CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS1_12CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_12CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS0_24CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS0_24CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_5CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS2_5CH_2K;
+		break;
+	case DF_DRAM_ILV_V4D2_CHAN_NPS2_10CH_2K:
+		rule->ddr_chan_ileave = DF_CHAN_ILEAVE_NPS1_10CH_2K;
+		break;
+	default:
+		dev_err(umc->umc_dip, CE_WARN, "!encountered invalid channel "
+		    "interleave on rule %u, df/inst 0x%x/0x%x: 0x%x", ruleno,
+		    dfno, inst, DF_DRAM_ILV_V4_GET_CHAN(ilv));
+		break;
+	}
+
+	addr_ileave = DF_DRAM_ILV_V4_GET_ADDR(ilv);
+	switch (addr_ileave) {
+	case DF_DRAM_ILV_ADDR_8:
+	case DF_DRAM_ILV_ADDR_9:
+	case DF_DRAM_ILV_ADDR_10:
+	case DF_DRAM_ILV_ADDR_11:
+	case DF_DRAM_ILV_ADDR_12:
+		break;
+	default:
+		dev_err(umc->umc_dip, CE_WARN, "!encountered invalid address "
+		    "interleave on rule %u, df/inst 0x%x/0x%x: 0x%x", ruleno,
+		    dfno, inst, addr_ileave);
+		return (EINVAL);
+	}
+	rule->ddr_addr_start = DF_DRAM_ILV_ADDR_BASE + addr_ileave;
+
+	return (0);
+}
+
+static int
 zen_umc_read_dram_rule(zen_umc_t *umc, const uint_t dfno, const uint_t instid,
     const uint_t ruleno, df_dram_rule_t *rule)
 {
@@ -1686,6 +2144,10 @@ zen_umc_read_dram_rule(zen_umc_t *umc, const uint_t dfno, const uint_t instid,
 		break;
 	case DF_REV_4:
 		ret = zen_umc_read_dram_rule_df_4(umc, dfno, instid, ruleno,
+		    rule);
+		break;
+	case DF_REV_4D2:
+		ret = zen_umc_read_dram_rule_df_4d2(umc, dfno, instid, ruleno,
 		    rule);
 		break;
 	default:
@@ -1704,11 +2166,79 @@ zen_umc_read_dram_rule(zen_umc_t *umc, const uint_t dfno, const uint_t instid,
 	return (0);
 }
 
+/*
+ * The Extended remapper has up to 4 remap rule sets. Each set addresses up to
+ * 16 remap rules (ala DFv4), but the width of the targets is larger so they are
+ * all split up amongst 3 registers instead. CPUs indicate support for this in
+ * the DF::DfCapability register. Not all CPUs actually use all such entries. We
+ * will read all entries, even if they are not in the PPR with the assumption
+ * that a CPU DRAM rule will only ever refer to the ones that exist for the
+ * moment. Our expectation is that these reserved registers are all 0s or all
+ * 1s, but that has yet to be proven.
+ */
+static int
+zen_umc_read_extremap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
+{
+	const uint_t dfno = df->zud_dfno;
+	const df_reg_def_t remapA[ZEN_UMC_MAX_CS_REMAPS] = {
+	    DF_CS_REMAP0A_V4D2, DF_CS_REMAP1A_V4D2, DF_CS_REMAP2A_V4D2,
+	    DF_CS_REMAP3A_V4D2 };
+	const df_reg_def_t remapB[ZEN_UMC_MAX_CS_REMAPS] = {
+	    DF_CS_REMAP0B_V4D2, DF_CS_REMAP1B_V4D2, DF_CS_REMAP2B_V4D2,
+	    DF_CS_REMAP3B_V4D2 };
+	const df_reg_def_t remapC[ZEN_UMC_MAX_CS_REMAPS] = {
+	    DF_CS_REMAP0C_V4D2, DF_CS_REMAP1C_V4D2, DF_CS_REMAP2C_V4D2,
+	    DF_CS_REMAP3C_V4D2 };
+
+	df->zud_cs_nremap = ZEN_UMC_MAX_CS_REMAPS;
+	for (uint_t i = 0; i < df->zud_cs_nremap; i++) {
+		int ret;
+		uint32_t rm[3];
+		zen_umc_cs_remap_t *remap = &df->zud_remap[i];
+
+		if ((ret = amdzen_c_df_read32(dfno, instid, remapA[i],
+		    &rm[0])) != 0) {
+			dev_err(umc->umc_dip, CE_WARN, "!failed to read "
+			    "df/inst 0x%x/0x%x remap rule %uA: %d", dfno,
+			    instid, i, ret);
+			return (-1);
+		}
+
+		if ((ret = amdzen_c_df_read32(dfno, instid, remapB[i],
+		    &rm[1])) != 0) {
+			dev_err(umc->umc_dip, CE_WARN, "!failed to read "
+			    "df/inst 0x%x/0x%x remap rule %uB: %d", dfno,
+			    instid, i, ret);
+			return (-1);
+		}
+
+		if ((ret = amdzen_c_df_read32(dfno, instid, remapC[i],
+		    &rm[2])) != 0) {
+			dev_err(umc->umc_dip, CE_WARN, "!failed to read "
+			    "df/inst 0x%x/0x%x remap rule %uC: %d", dfno,
+			    instid, i, ret);
+			return (-1);
+		}
+
+		/*
+		 * Remap rule A has CS 0-5, B 6-11, C 12-15
+		 */
+		remap->csr_nremaps = ZEN_UMC_MAX_REMAP_ENTS;
+		for (uint_t ent = 0; ent < remap->csr_nremaps; ent++) {
+			uint_t reg = ent / ZEN_UMC_REMAP_PER_REG_4D2;
+			uint_t idx = ent % ZEN_UMC_REMAP_PER_REG_4D2;
+			remap->csr_remaps[ent] =
+			    DF_CS_REMAP_GET_CSX_V4B(rm[reg], idx);
+		}
+	}
+	return (0);
+}
+
 static int
 zen_umc_read_remap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
 {
 	uint_t nremaps, nents;
-	uint_t dfno = df->zud_dfno;
+	const uint_t dfno = df->zud_dfno;
 	const df_reg_def_t milan_remap0[ZEN_UMC_MILAN_CS_NREMAPS] = {
 	    DF_SKT0_CS_REMAP0_V3, DF_SKT1_CS_REMAP0_V3 };
 	const df_reg_def_t milan_remap1[ZEN_UMC_MILAN_CS_NREMAPS] = {
@@ -1735,6 +2265,8 @@ zen_umc_read_remap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
 		remapA = dfv4_remapA;
 		remapB = dfv4_remapB;
 		break;
+	case DF_REV_4D2:
+		return (zen_umc_read_extremap(umc, df, instid));
 	default:
 		dev_err(umc->umc_dip, CE_WARN, "!encountered unsupported DF "
 		    "revision processing remap rules: 0x%x", umc->umc_df_rev);
@@ -1744,11 +2276,11 @@ zen_umc_read_remap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
 	df->zud_cs_nremap = nremaps;
 	for (uint_t i = 0; i < nremaps; i++) {
 		int ret;
-		uint32_t rmA, rmB;
+		uint32_t rm[2];
 		zen_umc_cs_remap_t *remap = &df->zud_remap[i];
 
 		if ((ret = amdzen_c_df_read32(dfno, instid, remapA[i],
-		    &rmA)) != 0) {
+		    &rm[0])) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "!failed to read "
 			    "df/inst 0x%x/0x%x remap socket %u-0/A: %d", dfno,
 			    instid, i, ret);
@@ -1756,7 +2288,7 @@ zen_umc_read_remap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
 		}
 
 		if ((ret = amdzen_c_df_read32(dfno, instid, remapB[i],
-		    &rmB)) != 0) {
+		    &rm[1])) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "!failed to read "
 			    "df/inst 0x%x/0x%x remap socket %u-1/B: %d", dfno,
 			    instid, i, ret);
@@ -1764,15 +2296,11 @@ zen_umc_read_remap(zen_umc_t *umc, zen_umc_df_t *df, const uint_t instid)
 		}
 
 		remap->csr_nremaps = nents;
-		for (uint_t ent = 0; ent < ZEN_UMC_REMAP_PER_REG; ent++) {
-			uint_t alt = ent + ZEN_UMC_REMAP_PER_REG;
-			boolean_t do_alt = alt < nents;
-			remap->csr_remaps[ent] = DF_CS_REMAP_GET_CSX(rmA,
-			    ent);
-			if (do_alt) {
-				remap->csr_remaps[alt] =
-				    DF_CS_REMAP_GET_CSX(rmB, ent);
-			}
+		for (uint_t ent = 0; ent < remap->csr_nremaps; ent++) {
+			uint_t reg = ent / ZEN_UMC_REMAP_PER_REG;
+			uint_t idx = ent % ZEN_UMC_REMAP_PER_REG;
+			remap->csr_remaps[ent] = DF_CS_REMAP_GET_CSX(rm[reg],
+			    idx);
 		}
 	}
 
@@ -1806,7 +2334,17 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
 	df->zud_ccm_inst = instid;
 
 	/*
-	 * First get the DRAM hole. This has the same layout, albeit different
+	 * Read the DF::DfCapability register. This is not instance specific.
+	 */
+	if ((ret = amdzen_c_df_read32_bcast(dfno, DF_CAPAB, &df->zud_capab)) !=
+	    0) {
+		dev_err(umc->umc_dip, CE_WARN, "!failed to read DF Capability "
+		    "register: %d", ret);
+		return (-1);
+	}
+
+	/*
+	 * Next get the DRAM hole. This has the same layout, albeit different
 	 * registers across our different platforms.
 	 */
 	switch (umc->umc_df_rev) {
@@ -1816,6 +2354,7 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
 		hole = DF_DRAM_HOLE_V2;
 		break;
 	case DF_REV_4:
+	case DF_REV_4D2:
 		hole = DF_DRAM_HOLE_V4;
 		break;
 	default:
@@ -1877,7 +2416,14 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
 		}
 	}
 
-	if ((umc->umc_fdata->zufd_flags & ZEN_UMC_FAM_F_TARG_REMAP) != 0) {
+	/*
+	 * Once AMD got past DF v4.0 there was a feature bit that indicates
+	 * support for the remapping engine in the DF_CAPAB (DF::DfCapability)
+	 * register. Prior to that we must use our table.
+	 */
+	if ((umc->umc_df_rev >= DF_REV_4D2 &&
+	    DF_CAPAB_GET_EXTCSREMAP(df->zud_capab) != 0) ||
+	    (umc->umc_fdata->zufd_flags & ZEN_UMC_FAM_F_TARG_REMAP) != 0) {
 		if (zen_umc_read_remap(umc, df, instid) != 0) {
 			return (-1);
 		}
@@ -2949,6 +3495,7 @@ zen_umc_fill_umc_cb(const uint_t dfno, const uint32_t fabid,
 			off_reg = DF_DRAM_OFFSET_V2;
 			break;
 		case DF_REV_4:
+		case DF_REV_4D2:
 			off_reg = DF_DRAM_OFFSET_V4(i);
 			break;
 		default:
@@ -2977,6 +3524,7 @@ zen_umc_fill_umc_cb(const uint_t dfno, const uint32_t fabid,
 			t = DF_DRAM_OFFSET_V3_GET_OFFSET(offset);
 			break;
 		case DF_REV_4:
+		case DF_REV_4D2:
 			t = DF_DRAM_OFFSET_V4_GET_OFFSET(offset);
 			break;
 		default:
@@ -3303,6 +3851,7 @@ zen_umc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DF_REV_3:
 	case DF_REV_3P5:
 	case DF_REV_4:
+	case DF_REV_4D2:
 		break;
 	default:
 		dev_err(dip, CE_WARN, "!encountered unknown DF revision: %x",

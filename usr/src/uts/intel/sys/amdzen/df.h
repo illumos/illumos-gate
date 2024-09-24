@@ -258,14 +258,17 @@ typedef enum {
 #define	DF_FBIINFO3_GET_INSTID(r)	bitx32(r, 7, 0)
 
 /*
- * DF::DfCapability -- Describes the capabilities that the DF has.
+ * DF::DfCapability -- Describes the capabilities that the DF has. Note that one
+ * must generally check the DF version prior to considering various bits here.
+ * For example, the extended CS remaper is only valid starting in the 4D2
+ * variant.
  */
 /*CSTYLED*/
 #define	DF_CAPAB		(df_reg_def_t){ .drd_gens = DF_REV_ALL, \
 				    .drd_func = 0, .drd_reg = 0x90 }
-#define	DF_CAPAB_GET_EXTCSREMAP(r)	bitx32(r, 2, 2);
-#define	DF_CAPAB_GET_SPF(r)		bitx32(r, 1, 1);
-#define	DF_CAPAB_GET_POISON(r)		bitx32(r, 0, 0);
+#define	DF_CAPAB_GET_EXTCSREMAP(r)	bitx32(r, 2, 2)
+#define	DF_CAPAB_GET_SPF(r)		bitx32(r, 1, 1)
+#define	DF_CAPAB_GET_POISON(r)		bitx32(r, 0, 0)
 
 /*
  * DF::Skt0CsTargetRemap0, DF::Skt0CsTargetRemap1, DF::Skt1CsTargetRemap0,
@@ -642,11 +645,15 @@ typedef enum {
  * We're cheating a bit here. We combine the various different non-overlapping
  * values in the 4D2 variants. In particular, most client parts stick to the
  * first few values while the rest are sometimes used in the moniker "DF 4.5".
+ * The MI300 has a few non-overlapping gaps.
  */
 #define	DF_DRAM_ILV_V4D2_GET_CHAN(r)		bitx32(r, 9, 4)
 #define	DF_DRAM_ILV_V4D2_CHAN_1			0x0
 #define	DF_DRAM_ILV_V4D2_CHAN_2			0x1
 #define	DF_DRAM_ILV_V4D2_CHAN_4			0x3
+#define	DF_DRAM_ILV_V4D2_CHAN_8			0x5
+#define	DF_DRAM_ILV_V4D2_CHAN_16		0x7
+#define	DF_DRAM_ILV_V4D2_CHAN_32		0x8
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS1_16S8CH_1K	0xc
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS0_24CH_1K	0xe
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_1K	0x10
@@ -657,6 +664,9 @@ typedef enum {
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS1_12CH_1K	0x15
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS2_5CH_1K	0x16
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS1_10CH_1K	0x17
+#define	DF_DRAM_ILV_V4D2_CHAN_MI3H_8CH		0x18
+#define	DF_DRAM_ILV_V4D2_CHAN_MI3H_16CH		0x19
+#define	DF_DRAM_ILV_V4D2_CHAN_MI3H_32CH		0x1a
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS4_2CH_2K	0x20
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS2_4CH_2K	0x21
 #define	DF_DRAM_ILV_V4D2_CHAN_NPS1_8S4CH_2K	0x22

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_CLIENT_H
@@ -97,6 +97,8 @@ extern int amdzen_c_smn_read(uint_t, const smn_reg_t, uint32_t *);
 extern int amdzen_c_smn_write(uint_t, const smn_reg_t, const uint32_t);
 extern int amdzen_c_df_read32(uint_t, uint8_t, const df_reg_def_t, uint32_t *);
 extern int amdzen_c_df_read64(uint_t, uint8_t, const df_reg_def_t, uint64_t *);
+
+extern int amdzen_c_df_read32_bcast(uint_t, const df_reg_def_t, uint32_t *);
 
 /*
  * The following are logical types that we can iterate over. Note, that these

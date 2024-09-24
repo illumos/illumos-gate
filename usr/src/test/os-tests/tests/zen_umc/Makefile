@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2023 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
@@ -28,7 +28,9 @@ OBJS =	zen_umc_test.o \
 	zen_umc_test_hole.o \
 	zen_umc_test_ilv.o \
 	zen_umc_test_multi.o \
+	zen_umc_test_np2_k.o \
 	zen_umc_test_nps.o \
+	zen_umc_test_nps_k.o \
 	zen_umc_test_remap.o
 
 #

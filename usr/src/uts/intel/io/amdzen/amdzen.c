@@ -602,6 +602,30 @@ amdzen_c_df_read64(uint_t dfno, uint8_t inst, const df_reg_def_t def,
 }
 
 int
+amdzen_c_df_read32_bcast(uint_t dfno, const df_reg_def_t def, uint32_t *valp)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	if (df->adf_rev == DF_REV_UNKNOWN) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
+	}
+
+	*valp = amdzen_df_read32_bcast(azn, df, def);
+	mutex_exit(&azn->azn_mutex);
+
+	return (0);
+}
+
+int
 amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
     void *arg)
 {

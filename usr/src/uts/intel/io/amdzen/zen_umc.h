@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _ZEN_UMC_H
@@ -74,6 +74,7 @@ extern "C" {
 #define	ZEN_UMC_MILAN_CS_NREMAPS	2
 #define	ZEN_UMC_MILAN_REMAP_ENTS	12
 #define	ZEN_UMC_REMAP_PER_REG		8
+#define	ZEN_UMC_REMAP_PER_REG_4D2	6
 
 /*
  * DRAM Channel related maximums.
@@ -136,6 +137,9 @@ typedef enum df_chan_ileave {
 	DF_CHAN_ILEAVE_COD4_2CH,
 	DF_CHAN_ILEAVE_COD2_4CH,
 	DF_CHAN_ILEAVE_COD1_8CH,
+	/*
+	 * The primary NPS hashes were added in Zen 4 / DF 4.0.
+	 */
 	DF_CHAN_ILEAVE_NPS4_2CH,
 	DF_CHAN_ILEAVE_NPS2_4CH,
 	DF_CHAN_ILEAVE_NPS1_8CH,
@@ -143,7 +147,37 @@ typedef enum df_chan_ileave {
 	DF_CHAN_ILEAVE_NPS2_6CH,
 	DF_CHAN_ILEAVE_NPS1_12CH,
 	DF_CHAN_ILEAVE_NPS2_5CH,
-	DF_CHAN_ILEAVE_NPS1_10CH
+	DF_CHAN_ILEAVE_NPS1_10CH,
+	/*
+	 * The 1K/2K split was primarily introduced in Zen 5. There are no DF
+	 * 4.0 style NPS values in the enumeration.
+	 */
+	DF_CHAN_ILEAVE_NPS4_2CH_1K,
+	DF_CHAN_ILEAVE_NPS2_4CH_1K,
+	DF_CHAN_ILEAVE_NPS1_8CH_1K,
+	DF_CHAN_ILEAVE_NPS1_16CH_1K,
+	DF_CHAN_ILEAVE_NPS4_3CH_1K,
+	DF_CHAN_ILEAVE_NPS2_6CH_1K,
+	DF_CHAN_ILEAVE_NPS1_12CH_1K,
+	DF_CHAN_ILEAVE_NPS0_24CH_1K,
+	DF_CHAN_ILEAVE_NPS2_5CH_1K,
+	DF_CHAN_ILEAVE_NPS1_10CH_1K,
+	DF_CHAN_ILEAVE_NPS4_2CH_2K,
+	DF_CHAN_ILEAVE_NPS2_4CH_2K,
+	DF_CHAN_ILEAVE_NPS1_8CH_2K,
+	DF_CHAN_ILEAVE_NPS1_16CH_2K,
+	DF_CHAN_ILEAVE_NPS4_3CH_2K,
+	DF_CHAN_ILEAVE_NPS2_6CH_2K,
+	DF_CHAN_ILEAVE_NPS1_12CH_2K,
+	DF_CHAN_ILEAVE_NPS0_24CH_2K,
+	DF_CHAN_ILEAVE_NPS2_5CH_2K,
+	DF_CHAN_ILEAVE_NPS1_10CH_2K,
+	/*
+	 * MI300 style hash variants. Internally referred to as "MI3H".
+	 */
+	DF_CHAN_ILEAVE_MI3H_8CH,
+	DF_CHAN_ILEAVE_MI3H_16CH,
+	DF_CHAN_ILEAVE_MI3H_32CH
 } df_chan_ileave_t;
 
 /*
@@ -163,21 +197,30 @@ typedef enum df_dram_flags {
 	 */
 	DF_DRAM_F_HOLE		= 1 << 1,
 	/*
-	 * These next three are used to indicate when hashing is going on, which
-	 * bits to use. These are for 64K, 2M, and 1G parts of addresses
-	 * respectively.
+	 * These next five are used to indicate when hashing is going on, which
+	 * bits to use. These are for 4K, 64K, 2M, 1G, and 1T parts of addresses
+	 * respectively. The 4K and 1T were added starting with DF 4D2. The 4K
+	 * hashing is only currently known to be consumed as part of the MI3H
+	 * series hashed interleaving.
 	 */
-	DF_DRAM_F_HASH_16_18	= 1 << 2,
-	DF_DRAM_F_HASH_21_23	= 1 << 3,
-	DF_DRAM_F_HASH_30_32	= 1 << 4,
+	DF_DRAM_F_HASH_12_14	= 1 << 2,
+	DF_DRAM_F_HASH_16_18	= 1 << 3,
+	DF_DRAM_F_HASH_21_23	= 1 << 4,
+	DF_DRAM_F_HASH_30_32	= 1 << 5,
+	DF_DRAM_F_HASH_40_42	= 1 << 6,
 	/*
 	 * Indicates that this rule should have remap processing and the remap
 	 * target is valid. If the DF_DRAM_F_REMAP_SOCK flag is set, this
 	 * indicates that the processing is based on socket versus a particular
 	 * entry.
 	 */
-	DF_DRAM_F_REMAP_EN	= 1 << 5,
-	DF_DRAM_F_REMAP_SOCK	= 1 << 6
+	DF_DRAM_F_REMAP_EN	= 1 << 7,
+	DF_DRAM_F_REMAP_SOCK	= 1 << 8,
+	/*
+	 * Indicates that this region is backed by "storage class memory".
+	 * Maintained for debugging information.
+	 */
+	DF_DRAM_F_SCM		= 1 << 9
 } df_dram_flags_t;
 
 /*
@@ -430,6 +473,7 @@ typedef struct zen_umc_df {
 	uint_t			zud_dram_nrules;
 	uint_t			zud_nchan;
 	uint_t			zud_cs_nremap;
+	uint32_t		zud_capab;
 	uint32_t		zud_hole_raw;
 	uint32_t		zud_glob_ctl_raw;
 	uint64_t		zud_hole_base;
@@ -465,7 +509,9 @@ typedef enum zen_umc_umc_style {
 typedef enum zen_umc_fam_flags {
 	/*
 	 * Indicates that there's an indirection table for the destinations of
-	 * target rules.
+	 * target rules. This is only required to be set explicitly for systems
+	 * prior to the DF 4D2 variant as after that remapping support is
+	 * indicated in the DF::DfCapability register.
 	 */
 	ZEN_UMC_FAM_F_TARG_REMAP	= 1 << 0,
 	/*
@@ -485,7 +531,8 @@ typedef enum zen_umc_fam_flags {
 	ZEN_UMC_FAM_F_UMC_HASH		= 1 << 3,
 	/*
 	 * Indicates support for extended UMC registers for larger addresses.
-	 * Generally on Server parts.
+	 * Generally on Server parts. This should only be set if there are
+	 * non-reserved bits in the register.
 	 */
 	ZEN_UMC_FAM_F_UMC_EADDR		= 1 << 4,
 	/*
@@ -601,7 +648,7 @@ typedef enum zen_umc_decode_failure {
 	 * Indicates that none of the UMC's chip-selects actually matched a base
 	 * or secondary.
 	 */
-	ZEN_UMC_DECODE_F_NO_CS_BASE_MATCH
+	ZEN_UMC_DECODE_F_NO_CS_BASE_MATCH,
 } zen_umc_decode_failure_t;
 
 /*
