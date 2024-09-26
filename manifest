@@ -4613,6 +4613,8 @@ f usr/include/sys/note.h 0644 root bin
 f usr/include/sys/null.h 0644 root bin
 d usr/include/sys/nvme 0755 root bin
 f usr/include/sys/nvme/discovery.h 0644 root bin
+f usr/include/sys/nvme/kioxia.h 0644 root bin
+f usr/include/sys/nvme/kioxia_cd8.h 0644 root bin
 f usr/include/sys/nvme/micron.h 0644 root bin
 f usr/include/sys/nvme/micron_7300.h 0644 root bin
 f usr/include/sys/nvme/micron_74x0.h 0644 root bin

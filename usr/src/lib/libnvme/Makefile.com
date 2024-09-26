@@ -22,6 +22,7 @@ OBJECTS =	libnvme.o \
 		libnvme_format.o \
 		libnvme_fw.o \
 		libnvme_identify.o \
+		libnvme_kioxia.o \
 		libnvme_log.o \
 		libnvme_micron.o \
 		libnvme_ns_info.o \

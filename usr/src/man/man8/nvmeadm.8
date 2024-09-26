@@ -12,7 +12,7 @@
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd September 12, 2024
+.Dd September 21, 2024
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -642,7 +642,9 @@ Use the
 .Cm list-logpages
 command to determine which are supported for a given device and whether
 they operate on a controller or namespace.
-.Bl -tag -width "wdc/devmgm"
+.Bl -tag -width "solidigm/outlier"
+.It kioxia/extsmart
+Kioxia Extended SMART.
 .It micron/smart
 Micron Vendor Unique SMART.
 .It micron/extsmart

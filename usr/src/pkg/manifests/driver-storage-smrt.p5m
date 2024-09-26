@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include global_zone_only_component>
@@ -19,56 +20,65 @@ set name=pkg.summary value="HP SmartArray SAS HBA Driver"
 set name=pkg.description value="HP SmartArray SAS HBA Driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=i386
+set name=variant.smrt.aliases value=false value=true
 dir  path=kernel group=sys
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/smrt group=sys
 file path=kernel/drv/smrt.conf group=sys
-driver name=smrt class=scsi-self-identifying
 #
-# The smrt driver overlaps with cpqary3 and supports several of the same
+# The cpqary3 driver overlaps with smrt and supports several of the same
 # devices. To ensure that folks can still boot existing systems we have
-# left all the devices supported by smrt commented out as they all
-# overlay with cpqary3. In this form, users may swap over and the driver
-# also provides a useful reference for SCSAv3. When adding these
-# aliases, please make sure to remember to add the appropriate '\' to
-# the driver line above and below as needed.
+# placed all the devices supported by smrt behind a boolean variant which
+# defaults to false. The variant may be changed to true to switch the
+# supported and tested devices over to smrt in a new boot environment.
+# Device paths will change as a result of the driver switch, so if a device
+# is used by the root ZFS pool, the move should be detected during first
+# boot into the new boot environment.
 #
-#   alias=pci103c,1920
-#   alias=pci103c,1921
-#   alias=pci103c,1922
-#   alias=pci103c,1923
-#   alias=pci103c,1924
-#   alias=pci103c,1926
-#   alias=pci103c,1928
-#   alias=pci103c,21bd
-#   alias=pci103c,21be
-#   alias=pci103c,21bf
-#   alias=pci103c,21c0
-#   alias=pci103c,21c1
-#   alias=pci103c,21c2
-#   alias=pci103c,21c3
-#   alias=pci103c,21c5
-#   alias=pci103c,21c6
-#   alias=pci103c,21c7
-#   alias=pci103c,21c8
-#   alias=pci103c,21ca
-#   alias=pci103c,21cb
-#   alias=pci103c,21cc
-#   alias=pci103c,21cd
-#   alias=pci103c,21ce
-#   alias=pci103c,3241
-#   alias=pci103c,3243
-#   alias=pci103c,3245
-#   alias=pci103c,3247
-#   alias=pci103c,3249
-#   alias=pci103c,324a
-#   alias=pci103c,324b
-#   alias=pci103c,3350
-#   alias=pci103c,3351
-#   alias=pci103c,3352
-#   alias=pci103c,3353
-#   alias=pci103c,3354
-#   alias=pci103c,3355
-#   alias=pci103c,3356
+# When the smrt.aliases variant is set to true, the following aliases are
+# assigned to smrt:
+#
+driver name=smrt class=scsi-self-identifying \
+    alias=pci103c,1920 \
+    alias=pci103c,1921 \
+    alias=pci103c,1922 \
+    alias=pci103c,1923 \
+    alias=pci103c,1924 \
+    alias=pci103c,1926 \
+    alias=pci103c,1928 \
+    alias=pci103c,21bd \
+    alias=pci103c,21be \
+    alias=pci103c,21bf \
+    alias=pci103c,21c0 \
+    alias=pci103c,21c1 \
+    alias=pci103c,21c2 \
+    alias=pci103c,21c3 \
+    alias=pci103c,21c5 \
+    alias=pci103c,21c6 \
+    alias=pci103c,21c7 \
+    alias=pci103c,21c8 \
+    alias=pci103c,21ca \
+    alias=pci103c,21cb \
+    alias=pci103c,21cc \
+    alias=pci103c,21cd \
+    alias=pci103c,21ce \
+    alias=pci103c,3241 \
+    alias=pci103c,3243 \
+    alias=pci103c,3245 \
+    alias=pci103c,3247 \
+    alias=pci103c,3249 \
+    alias=pci103c,324a \
+    alias=pci103c,324b \
+    alias=pci103c,3350 \
+    alias=pci103c,3351 \
+    alias=pci103c,3352 \
+    alias=pci103c,3353 \
+    alias=pci103c,3354 \
+    alias=pci103c,3355 \
+    alias=pci103c,3356 variant.smrt.aliases=true
+#
+# When the variant is set to false, no aliases are assigned.
+#
+driver name=smrt class=scsi-self-identifying variant.smrt.aliases=false
 license lic_CDDL license=lic_CDDL
