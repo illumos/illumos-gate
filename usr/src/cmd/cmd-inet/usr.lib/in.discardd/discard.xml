@@ -25,8 +25,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -55,7 +53,7 @@
 		name='inetd_start'
 		exec='/usr/lib/inet/in.discardd -d'
 		timeout_seconds='0'>
-		    <method_context>
+		    <method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		    </method_context>
 	    </exec_method>
@@ -73,7 +71,7 @@
 		exec=':kill'
 		timeout_seconds='0'>
 	    </exec_method>
-	   
+
 		<property_group name='inetd' type='framework'>
 		    <propval name='endpoint_type' type='astring'
 			    value='dgram' />
@@ -88,7 +86,7 @@
 		name='inetd_start'
 		exec='/usr/lib/inet/in.discardd -s'
 		timeout_seconds='0'>
-		    <method_context>
+		    <method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		    </method_context>
 	    </exec_method>
@@ -99,7 +97,7 @@
 		exec=':kill'
 	        timeout_seconds='0'>
 	    </exec_method>
-	   
+
 	    <property_group name='inetd' type='framework'>
 		<propval name='endpoint_type' type='astring'
 			    value='stream' />

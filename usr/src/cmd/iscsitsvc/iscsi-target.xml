@@ -63,7 +63,7 @@ Service manifests for iSCSI Target
 		name='start'
 		exec='/lib/svc/method/iscsi-target start'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -77,7 +77,7 @@ Service manifests for iSCSI Target
 		name='stop'
 		exec='/lib/svc/method/iscsi-target stop'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'

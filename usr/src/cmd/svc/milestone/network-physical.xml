@@ -99,7 +99,7 @@
 		name='start'
 		exec='/lib/svc/method/net-nwam start'
 		timeout_seconds='120' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 				supp_groups='netadm' privileges='zone' />
 		</method_context>
@@ -110,7 +110,7 @@
 		name='stop'
 		exec='/lib/svc/method/net-nwam stop'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 				supp_groups='netadm' privileges='zone' />
 		</method_context>
@@ -121,7 +121,7 @@
 		name='refresh'
 		exec='/lib/svc/method/net-nwam refresh'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 				supp_groups='netadm' privileges='zone' />
 		</method_context>

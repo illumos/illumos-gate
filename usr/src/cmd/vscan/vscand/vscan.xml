@@ -72,7 +72,7 @@
 		name='start'
 		exec='/usr/lib/vscan/vscand'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 				user='root'
 				group='sys'

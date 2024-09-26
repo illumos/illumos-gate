@@ -77,7 +77,7 @@
 		    name='start'
 		    exec='/usr/lib/inet/mdnsd'
 		    timeout_seconds='60'>
-		    <method_context>
+		    <method_context working_directory='/'>
 			    <method_credential user='root' group='root' />
 		    </method_context>
 		</exec_method>

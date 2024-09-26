@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright 2017 RackTop Systems.
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2024 Oxide Computer Company
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_METHOD 7 "July 30, 2024"
+.TH SMF_METHOD 7 "September 26, 2024"
 .SH NAME
 smf_method \- service management framework conventions for methods
 .SH DESCRIPTION
@@ -132,7 +133,13 @@ Method type. Currently always set to \fBmethod\fR.
 .sp
 .LP
 A Method Context can be defined to further refine the execution environment of
-the method. See the \fBMethod Context\fR section for more information.
+the method. See the \fBMethod Context\fR section for more information. If no
+Method Context is present then the service will be started as root (with
+user ID and group ID set to 0 and full privileges in effect) and in the system
+root directory, `\fB/\fR'. However, if a Method Context is used then the
+defaults described below in \fBMethod Context\fR will apply. Note that in
+particular, for services started as root, this may cause a change of working
+directory to `\fB/root\fR'.
 .SS "Method Tokens"
 When defined in the \fBexec\fR string of the method by the restarter
 \fBsvc.startd\fR, a set of tokens are parsed and expanded with appropriate
@@ -448,7 +455,10 @@ An optional string specifying the limit privilege set as defined in
 .RS 4n
 The home directory from which to launch the method. \fB:home\fR can be used as
 a token to indicate the home directory of the user whose \fBuid\fR is used to
-launch the method. If the property is unset, \fB:home\fR is used.
+launch the method. If the property is unset, then the default depends on the
+presence of the \fBuse_profile\fR, \fBprofile\fR, \fBuser\fR and \fBgroup\fR
+properties. If any of these are set, then \fB\fB:home\fR is used, otherwise
+the method will start in the root directory ('/').
 .RE
 
 .sp

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <libintl.h>
@@ -2762,28 +2763,28 @@ out:
  * on what to do next.
  *
  * Error Types :
- * 	E2BIG		Too many values or entry is too big
- * 	EINVAL		Invalid value
- * 	EIO		an I/O error has occured
- * 	ENOENT		no entry for value
- * 	ENOMEM		out of memory
- * 	ENOTSUP		Version mismatch
- * 	ERANGE		value is out of range
- * 	EMFILE/ENFILE	out of file descriptors
+ *	E2BIG		Too many values or entry is too big
+ *	EINVAL		Invalid value
+ *	EIO		an I/O error has occured
+ *	ENOENT		no entry for value
+ *	ENOMEM		out of memory
+ *	ENOTSUP		Version mismatch
+ *	ERANGE		value is out of range
+ *	EMFILE/ENFILE	out of file descriptors
  *
- * 	SCF_ERROR_BACKEND_ACCESS
- * 	SCF_ERROR_CONNECTION_BROKEN
- * 	SCF_ERROR_DELETED
- * 	SCF_ERROR_CONSTRAINT_VIOLATED
- * 	SCF_ERROR_HANDLE_DESTROYED
- * 	SCF_ERROR_INTERNAL
- * 	SCF_ERROR_INVALID_ARGUMENT
- * 	SCF_ERROR_NO_MEMORY
- * 	SCF_ERROR_NO_RESOURCES
- * 	SCF_ERROR_NOT_BOUND
- * 	SCF_ERROR_NOT_FOUND
- * 	SCF_ERROR_NOT_SET
- * 	SCF_ERROR_TYPE_MISMATCH
+ *	SCF_ERROR_BACKEND_ACCESS
+ *	SCF_ERROR_CONNECTION_BROKEN
+ *	SCF_ERROR_DELETED
+ *	SCF_ERROR_CONSTRAINT_VIOLATED
+ *	SCF_ERROR_HANDLE_DESTROYED
+ *	SCF_ERROR_INTERNAL
+ *	SCF_ERROR_INVALID_ARGUMENT
+ *	SCF_ERROR_NO_MEMORY
+ *	SCF_ERROR_NO_RESOURCES
+ *	SCF_ERROR_NOT_BOUND
+ *	SCF_ERROR_NOT_FOUND
+ *	SCF_ERROR_NOT_SET
+ *	SCF_ERROR_TYPE_MISMATCH
  *
  */
 mc_error_t *
@@ -2800,9 +2801,19 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 	scf_type_t ty;
 	uint8_t use_profile;
 	int ret = 0;
-	int mc_used = 0;
 	mc_error_t *err = NULL;
 	struct method_context *cip;
+	enum {
+		MCF_FOUND =		1 << 0,
+		MCF_ENVIRONMENT =	1 << 1,
+		MCF_PROFILE =		1 << 2,
+		MCF_IDS =		1 << 3,
+		MCF_CWD =		1 << 4,
+		MCF_SECFLAGS =		1 << 5,
+		MCF_COREFILE =		1 << 6,
+		MCF_PROJECT =		1 << 7,
+		MCF_RESPOOL =		1 << 8,
+	} mc_flags = 0;
 
 	if ((err = malloc(sizeof (mc_error_t))) == NULL)
 		return (mc_error_create(NULL, ENOMEM, NULL));
@@ -2874,7 +2885,8 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		scf_pg_destroy(instpg);
 		instpg = NULL;
 	} else {
-		mc_used++;
+		/* Found a method_context */
+		mc_flags |= MCF_FOUND;
 	}
 
 	ret = get_environment(h, methpg, cip, prop, val);
@@ -2884,7 +2896,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 
 	switch (ret) {
 	case 0:
-		mc_used++;
+		mc_flags |= MCF_ENVIRONMENT;
 		break;
 	case ENOENT:
 		break;
@@ -2995,16 +3007,18 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 			goto out;
 		}
 
-		mc_used++;
 		ret = scf_value_get_boolean(val, &use_profile);
 		assert(ret == SCF_SUCCESS);
 
 		/* get ids & privileges */
-		if (use_profile)
+		if (use_profile) {
+			mc_flags |= MCF_PROFILE;
 			err = get_profile(pg, instpg, prop, val, cmdline,
 			    cip, err);
-		else
+		} else {
+			mc_flags |= MCF_IDS;
 			err = get_ids(pg, instpg, prop, val, cip, err);
+		}
 
 		if (err->type != 0)
 			goto out;
@@ -3041,7 +3055,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 			goto out;
 		}
 
-		mc_used++;
+		mc_flags |= MCF_CWD;
 		ret = scf_value_get_astring(val, cip->vbuf, cip->vbuf_sz);
 		assert(ret != -1);
 	} else {
@@ -3138,7 +3152,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 			    cip->vbuf_sz);
 			assert(ret != -1);
 		}
-		mc_used++;
+		mc_flags |= MCF_SECFLAGS;
 	} else {
 		ret = scf_error();
 		switch (ret) {
@@ -3221,7 +3235,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 			}
 		}
 
-		mc_used++;
+		mc_flags |= MCF_COREFILE;
 	} else {
 		ret = scf_error();
 		switch (ret) {
@@ -3283,7 +3297,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 				assert(ret != -1);
 			}
 
-			mc_used++;
+			mc_flags |= MCF_PROJECT;
 		} else {
 			(void) strcpy(cip->vbuf, ":default");
 		}
@@ -3370,7 +3384,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 				assert(ret != -1);
 			}
 
-			mc_used++;
+			mc_flags |= MCF_RESPOOL;
 		} else {
 			ret = scf_error();
 			switch (ret) {
@@ -3405,12 +3419,12 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		}
 	}
 
-	/*
-	 * A method_context was not used for any configurable
-	 * elements or attributes, so reset and use the simple
-	 * defaults that provide historic init behavior.
-	 */
-	if (mc_used == 0) {
+	if ((mc_flags & ~MCF_FOUND) == 0) {
+		/*
+		 * A method_context was not used for any configurable
+		 * elements or attributes, so reset and use the simple
+		 * defaults that provide historic init behavior.
+		 */
 		free(cip->pwbuf);
 		free(cip->vbuf);
 		free(cip->working_dir);
@@ -3426,6 +3440,14 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 			    "default security-flags");
 			goto out;
 		}
+	} else if ((mc_flags & (MCF_PROFILE | MCF_IDS | MCF_CWD)) == 0) {
+		/*
+		 * A method context was used to configure some elements, but
+		 * not for any of profile/user/group/working_dir.
+		 * Reset the directory to '/' for historic init behaviour.
+		 */
+		free(cip->working_dir);
+		cip->working_dir = NULL;
 	}
 
 	*mcpp = cip;

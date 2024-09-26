@@ -83,7 +83,7 @@
 		name='start'
 		exec='/usr/lib/zones/zonestatd'
 		timeout_seconds='300'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root'/>
 		</method_context>
 	</exec_method>
@@ -93,7 +93,7 @@
 		name='stop'
 		exec='/lib/svc/method/svc-zonestat %m %{restarter/contract}'
 		timeout_seconds='300'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root'/>
 		</method_context>
 	</exec_method>

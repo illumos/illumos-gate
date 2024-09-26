@@ -58,7 +58,7 @@
 		name='start'
 		exec='/usr/demo/comstar/bin/svc-stmfproxy %{config/proxy_host}'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -66,13 +66,13 @@
 			/>
 		</method_context>
 	</exec_method>
-        
+
 	<exec_method
 		type='method'
 		name='stop'
 		exec=':kill'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -88,7 +88,7 @@
                 <propval name='proxy_port' type='integer'
                         value='6543' />
         </property_group>
-        
+
 	<!--
 	    Create an enabled instance.
 	-->

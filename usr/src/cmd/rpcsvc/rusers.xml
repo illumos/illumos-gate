@@ -59,7 +59,7 @@
 	    name='inetd_start'
 	    exec='/usr/lib/netsvc/rusers/rpc.rusersd'
 	    timeout_seconds='0'>
-		<method_context>
+		<method_context working_directory='/'>
 		    <method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

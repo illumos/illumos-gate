@@ -56,7 +56,7 @@
 		name='inetd_start'
 		exec='/usr/lib/print/in.lpd -u lp -d /var/run/in.lpd'
 		timeout_seconds='0'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='lp' />
 		</method_context>
 	</exec_method>

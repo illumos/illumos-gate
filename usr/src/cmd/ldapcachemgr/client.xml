@@ -61,7 +61,7 @@
 	    name='start'
 	    exec='/lib/svc/method/ldap-client %m'
 	    timeout_seconds='120' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 			    privileges='basic,file_dac_write' />
 		</method_context>
@@ -72,7 +72,7 @@
 	    name='stop'
 	    exec='/lib/svc/method/ldap-client %m'
 	    timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 			    privileges='basic' />
 		</method_context>

@@ -36,7 +36,7 @@
 		name='start'
 		exec='/usr/lib/krb5/krb5kdc'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 				user='root'
 				group='root'
