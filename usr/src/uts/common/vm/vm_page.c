@@ -24,6 +24,7 @@
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T */
@@ -4793,7 +4794,7 @@ do_page_relocate(
 	page_t *targ;
 	page_t *pl = NULL;
 	uint_t ppattr;
-	pfn_t   pfn, repl_pfn;
+	pfn_t   pfn, repl_pfn = 0;
 	uint_t	szc;
 	spgcnt_t npgs, i;
 	int repl_contig = 0;
@@ -4910,10 +4911,6 @@ do_page_relocate(
 		VM_STAT_ADD(vmm_vmstats.ppr_relocok[szc]);
 		return (0);
 	}
-#else
-#if defined(lint)
-	dofree = dofree;
-#endif
 #endif
 
 	first_repl = repl;
