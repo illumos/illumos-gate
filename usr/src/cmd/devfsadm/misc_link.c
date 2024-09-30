@@ -83,7 +83,7 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "enclosure", DDI_NT_SCSI_ENCLOSURE, NULL,
 	    TYPE_EXACT, ILEVEL_0, ses_callback
 	},
-	{ "pseudo", "ddi_pseudo", "(^winlock$)|(^pm$)",
+	{ "pseudo", "ddi_pseudo", "(^pm$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, node_name
 	},
 	{ "pseudo", "ddi_pseudo", "conskbd",

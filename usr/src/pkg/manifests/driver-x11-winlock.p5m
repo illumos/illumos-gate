@@ -24,18 +24,5 @@
 #
 
 set name=pkg.fmri value=pkg:/driver/x11/winlock@$(PKGVERS)
-set name=pkg.summary value="X Windows System Window Drivers"
-set name=pkg.description value="kernel device drivers for X Windows System"
-set name=info.classification value=org.opensolaris.category.2008:System/X11
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir  path=usr group=sys
-dir  path=usr/kernel group=sys
-dir  path=usr/kernel/drv group=sys
-dir  path=usr/kernel/drv/$(ARCH64) group=sys
-file path=usr/kernel/drv/$(ARCH64)/winlock group=sys
-file path=usr/kernel/drv/winlock.conf group=sys
-driver name=winlock perms="* 0666 root sys"
-legacy pkg=SUNWxwdv desc="kernel device drivers for X Windows System" \
-    name="X Windows System Window Drivers"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
