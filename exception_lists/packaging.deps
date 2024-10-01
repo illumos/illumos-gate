@@ -12,6 +12,7 @@ pkg:/gnome/zenity
 pkg:/library/expat
 pkg:/library/glib2
 pkg:/library/libxml2
+pkg:/library/libxml2/32
 pkg:/library/nspr
 pkg:/library/security/openssl
 pkg:/library/security/openssl-10
