@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 1996, 1998 Robert Nordier
- * Copyright 2024 MNX Cloud, Inc.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
