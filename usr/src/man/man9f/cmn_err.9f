@@ -18,8 +18,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd Dec 1, 2016
+.Dd September 15, 2024
 .Dt CMN_ERR 9F
 .Os
 .Sh NAME
@@ -45,6 +46,13 @@
 .In sys/varargs.h
 .Ft void
 .Fo vcmn_err
+.Fa "int level"
+.Fa "char *format"
+.Fa "va_list ap"
+.Fc
+.Ft void
+.Fo vdev_err
+.Fa "dev_info_t *dip"
 .Fa "int level"
 .Fa "char *format"
 .Fa "va_list ap"
@@ -96,6 +104,21 @@ and
 as described for
 .Fn cmn_err ,
 but its third argument is different:
+.Bl -tag -width Ds
+.It Fa ap
+Variable argument list passed to the function.
+.El
+.Ss Fn vdev_err
+The
+.Fn vdev_err
+function takes
+.Fa dip ,
+.Fa level ,
+and
+.Fa format
+as described for
+.Fn dev_err ,
+but its fourth argument is different:
 .Bl -tag -width Ds
 .It Fa ap
 Variable argument list passed to the function.
@@ -258,6 +281,24 @@ Multiple traversals of the argument list, each bracketed by
 and
 .Xr va_end 9F ,
 are possible.
+.Ss Fn vdev_err
+The
+.Fn vdev_err
+function is the combination of
+.Fn vcmn_err
+and
+.Fn dev_err .
+It treats its initial arguments,
+.Fa dip ,
+.Fa level ,
+and
+.Fa format
+the same as
+.Fn dev_err ;
+however, its last argument
+.Fa ap
+is handled the same way as
+.Fn vcmn_err .
 .Ss Fn zcmn_err
 With the exception of its first argument
 .Pq Fa zoneid ,
@@ -292,8 +333,14 @@ above for an explanation on how the
 argument is handled.
 .Sh CONTEXT
 The
-.Fn cmn_err
-function can be called from user, kernel, interrupt, or high-level interrupt
+.Fn cmn_err ,
+.Fn dev_err ,
+.Fn vcmn_err ,
+.Fn vdev_err ,
+.Fn zcmn_err ,
+and
+.Fn vzcmn_err
+functions can be called from user, kernel, interrupt, or high-level interrupt
 context.
 .Sh RETURN VALUES
 None.

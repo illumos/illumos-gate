@@ -1,172 +1,115 @@
-'\" te
+'\"
 .\"  Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_ADD_EVENT_HANDLER 9F "Nov 26, 2017"
-.SH NAME
-ddi_add_event_handler \- add an NDI event service callback handler
-.SH SYNOPSIS
-.nf
-#include <sys/dditypes.h>
-#include <sys/sunddi.h>
-
-\fBint\fR \fBddi_add_event_handler\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_eventcookie_t\fR \fIcookie\fR,
-     \fBvoid (*\fR\fIhandler\fR)(dev_info_t *, ddi_eventcookie_t, void *, void *),
-     \fBvoid *\fR\fIarg\fR, \fBddi_registration_id_t *\fR\fIid\fR);
-.fi
-
-.SH INTERFACE LEVEL
-illumos DDI specific (illumos DDI).
-.SH PARAMETERS
-.ne 2
-.na
-\fB\fBdev_info_t *\fR\fIdip\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Dd September 15, 2024
+.Dt DDI_ADD_EVENT_HANDLER 9F
+.Os
+.Sh NAME
+.Nm ddi_add_event_handler
+.Nd add an NDI event service callback handler
+.Sh SYNOPSIS
+.In sys/dditypes.h
+.In sys/sunddi.h
+.Ft int
+.Fo ddi_add_event_handler
+.Fa "dev_info_t *dip"
+.Fa "ddi_eventcookie_t cookie"
+.Fa "void (*handler)(dev_info_t *dip, ddi_eventcookie_t cookie, void *arg, void *bus)"
+.Fa "void *arg"
+.Fa "ddi_callback_id_t *id"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Pq illumos DDI .
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
 Device node registering the callback.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
-.ad
-.sp .6
-.RS 4n
-Cookie returned from call to \fBddi_get_eventcookie\fR(9F).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBvoid (*\fR\fIhandler\fR\fB)(dev_info_t *, ddi_eventcookie_t, void *, void
-*)\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fa cookie
+Cookie returned from call to
+.Xr ddi_get_eventcookie 9F .
+.It Fa handler
 Callback handler responsible for handling an NDI event service notification.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBvoid *\fR\fIarg\fR\fR
-.ad
-.sp .6
-.RS 4n
-Pointer to opaque data supplied by the caller. Typically, this would be a
-pointer to the driver's \fBsoftstate\fR structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBddi_registration_id_t *\fR\fIid\fR\fR
-.ad
-.sp .6
-.RS 4n
-Pointer to registration ID where a unique registration id will be returned.
-Registration ID must be saved and used when calling
-\fBddi_remove_event_handler\fR(9F) to unregister a callback.
-.RE
-
-.SH DESCRIPTION
-The \fBddi_add_event_handler()\fR function adds a callback handler to be
-invoked in the face of the event specified by \fIcookie\fR. The process of
-adding a callback handler is also known as subscribing to an event. Upon
-successful subscription, the handler will be invoked by the system when the
-event occurs. The handler can be unregistered by using
-\fBddi_remove_event_handler\fR(9F).
-.sp
-.LP
+Its first
+.Vt "void *"
+argument corresponds to
+.Fa arg .
+The second is bus-specific data.
+.It Fa arg
+Pointer to opaque data supplied by the caller.
+Typically, this would be a pointer to the driver's softstate structure.
+.It Fa id
+Pointer to a callback ID.
+The callback ID will be filled in when this function is called and serves as a
+unique identifier for this particular event handler.
+This ID must be saved so it can be used in a later call to
+.Xr ddi_remove_event_handler 9F
+to remove the callback.
+.El
+.Sh DESCRIPTION
+The
+.Fn ddi_add_event_handler
+function adds a callback handler to be invoked in the face of the event
+specified by
+.Fa cookie .
+The process of adding a callback handler is also known as subscribing to an
+event.
+Upon successful subscription, the handler will be invoked by the system when the
+event occurs.
+The handler can be unregistered by using
+.Xr ddi_remove_event_handler 9F .
+.Pp
 An instance of a driver can register multiple handlers for an event or a single
-handler for multiple events. Callback order is not defined and should assumed
-to be random.
-.sp
-.LP
-The routine handler will be invoked with the following arguments:
-.sp
-.ne 2
-.na
-\fB\fBdev_info_t *\fR\fIdip\fR\fR
-.ad
-.RS 28n
+handler for multiple events.
+Callback order is not defined and should assumed to be random.
+.Pp
+The callback.
+.Fa handler
+will be invoked with the following arguments:
+.Bl -tag -width Fa
+.It Fa "dev_info_t *dip"
 Device node requesting the notification.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
-.ad
-.RS 28n
+.It Fa "ddi_eventcookie_t cookie"
 Structure describing event that occurred.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBvoid *\fR\fIarg\fR\fR
-.ad
-.RS 28n
+.It Fa "void *arg"
 Opaque data pointer provided, by the driver, during callback registration.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBvoid *\fR\fIimpl_data\fR\fR
-.ad
-.RS 28n
+.It Fa "void *bus"
 Pointer to event specific data defined by the framework which invokes the
 callback function.
-.RE
-
-.SH RETURN VALUES
-.ne 2
-.na
-\fB\fBDDI_SUCCESS\fR\fR
-.ad
-.RS 15n
-Callback handler registered successfully.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FAILURE\fR\fR
-.ad
-.RS 15n
-Failed to register callback handler. Possible reasons include lack of resources
-or a bad cookie.
-.RE
-
-.SH CONTEXT
-The \fBddi_add_event_handler()\fR and \fBhandler()\fR function can be called
-from user and kernel contexts only.
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Stability Level	Committed
-.TE
-
-.SH SEE ALSO
-.BR attributes (7),
-.BR ddi_get_eventcookie (9F),
-.BR ddi_remove_event_handler (9F)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH NOTES
+.El
+.Sh CONTEXT
+The
+.Fn ddi_add_event_handler
+and
+.Fn handler
+function can be called from user and kernel contexts only.
+.Sh RETURN VALUES
+Upon successful completion,
+the
+.Fn ddi_add_event_handler
+function returns
+.Dv DDI_SUCCESS
+and the callback handler is successfully registered.
+Otherwise,
+.Dv DDI_FAILURE
+is returned and the callback handler failed to register.
+Possible reasons include lack of resources or a bad cookie.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr attributes 7 ,
+.Xr ddi_get_eventcookie 9F ,
+.Xr ddi_remove_event_handler 9F
+.Rs
+.%T Writing Device Drivers
+.Re
+.Sh NOTES
 Drivers must remove all registered callback handlers for a device instance by
-calling \fBddi_remove_event_handler\fR(9F) before detach completes.
+calling
+.Xr ddi_remove_event_handler 9F
+before
+.Xr detach 9E
+completes.

@@ -675,7 +675,7 @@ typedef struct mac_ether_offload_info {
 	size_t		meoi_len;	/* Total message length */
 	uint8_t		meoi_l2hlen;	/* How long is the Ethernet header? */
 	uint16_t	meoi_l3proto;	/* What's the Ethertype */
-	uint8_t		meoi_l3hlen;	/* How long is the header? */
+	uint16_t	meoi_l3hlen;	/* How long is the header? */
 	uint8_t		meoi_l4proto;	/* What is the payload type? */
 	uint8_t		meoi_l4hlen;	/* How long is the L4 header */
 } mac_ether_offload_info_t;

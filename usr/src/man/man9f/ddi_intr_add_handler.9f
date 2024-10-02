@@ -1,198 +1,207 @@
-'\" te
+'\"
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2024 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_INTR_ADD_HANDLER 9F "Apr 22, 2005"
-.SH NAME
-ddi_intr_add_handler, ddi_intr_remove_handler \- add or remove interrupt
-handler
-.SH SYNOPSIS
-.nf
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-
-
-
-\fBint\fR \fBddi_intr_add_handler\fR(\fBddi_intr_handle_t *\fR\fIh\fR,
-     \fBddi_intr_handler_t\fR \fIinthandler\fR, \fBvoid *\fR\fIarg1\fR,
-      \fBvoid *\fR\fIarg2\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBddi_intr_remove_handler\fR(\fBddi_intr_handle_t\fR \fIh\fR);
-.fi
-
-.SH INTERFACE LEVEL
-illumos DDI specific (illumos DDI).
-.SH PARAMETERS
-\fBddi_intr_add_handler()\fR
-.sp
-.ne 2
-.na
-\fB\fIh\fR\fR
-.ad
-.RS 14n
+.Dd September 15, 2024
+.Dt DDI_INTR_ADD_HANDLER 9F
+.Os
+.Sh NAME
+.Nm ddi_intr_add_handler ,
+.Nm ddi_intr_remove_handler
+.Nd add or remove interrupt handler
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/conf.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft typedef uint_t
+.Fo (ddi_intr_handler_t)
+.Fa "caddr_t arg1"
+.Fa "caddr_t arg2"
+.Fc
+.Ft int
+.Fo ddi_intr_add_handler
+.Fa "ddi_intr_handle_t *h"
+.Fa "ddi_intr_handler_t inthandler"
+.Fa "void *arg1"
+.Fa "void *arg2"
+.Fc
+.Ft int
+.Fo ddi_intr_remove_handler
+.Fa "ddi_intr_handle_t h"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Pq illumos DDI .
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa h
 Pointer to the DDI interrupt handle
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIinthandler\fR\fR
-.ad
-.RS 14n
-Pointer to interrupt handler
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIarg1\fR\fR
-.ad
-.RS 14n
+.It Fa inthandler
+Pointer to interrupt handler function
+.It Fa arg1
 First argument for the interrupt handler
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIarg2\fR\fR
-.ad
-.RS 14n
+.It Fa arg2
 Second, optional, argument for the interrupt handler
-.RE
-
-.sp
-.LP
-\fBddi_intr_remove_handler()\fR
-.sp
-.ne 2
-.na
-\fB\fIh\fR\fR
-.ad
-.RS 5n
-DDI interrupt handle
-.RE
-
-.SH DESCRIPTION
-The \fBddi_intr_add_handler()\fR function adds an interrupt handler given by
-the \fIinthandler\fR argument to the system with the handler arguments
-\fIarg1\fR and \fIarg2\fR for the previously allocated interrupt handle
-specified by the \fIh\fR pointer. The arguments \fIarg1\fR and \fIarg2\fR are
-passed as the first and second arguments, respectively, to the interrupt
-handler \fIinthandler\fR. See \fB<sys/ddi_intr.h>\fR for the definition of the
-interrupt handler.
-.sp
-.LP
-The routine \fIinthandler\fR with the arguments \fIarg1\fR and \fIarg2\fR is
-called upon receipt of the appropriate interrupt. The interrupt handler should
-return \fBDDI_INTR_CLAIMED\fR if the interrupt is claimed and
-\fBDDI_INTR_UNCLAIMED\fR otherwise.
-.sp
-.LP
-The \fBddi_intr_add_handler()\fR function must be called after
-\fBddi_intr_alloc()\fR, but before \fBddi_intr_enable()\fR is called. The
-interrupt must be enabled through \fBddi_intr_enable()\fR or
-\fBddi_intr_block_enable()\fR before it can be used.
-.sp
-.LP
-The \fBddi_intr_remove_handler()\fR function removes the handler association,
-added previously with \fBddi_intr_add_handler()\fR, for the interrupt
-identified by the interrupt handle \fIh\fR argument. Unloadable drivers should
-call this routine during their \fBdetach\fR(9E) routine to remove the interrupt
-handler from the system.
-.sp
-.LP
-The \fBddi_intr_remove_handler()\fR function is used to disassociate the
-handler after the interrupt is disabled to remove \fBdup-ed\fR interrupt
-handles. See \fBddi_intr_dup_handler\fR(9F) for \fBdup-ed\fR interrupt handles.
-If a handler is duplicated with the \fBddi_intr_dup_handler()\fR function, all
-added and duplicated instances of the handler must be removed with
-\fBddi_intr_remove_handler()\fR in order for the handler to be completely
-removed.
-.SH RETURN VALUES
-The \fBddi_intr_add_handler()\fR and \fBddi_intr_remove_handler()\fR functions
-return:
-.sp
-.ne 2
-.na
-\fB\fBDDI_SUCCESS\fR\fR
-.ad
-.RS 15n
+.El
+.Sh DESCRIPTION
+The
+.Fn ddi_intr_add_handler
+function adds an interrupt handler given by the
+.Fa inthandler
+argument to the system with the handler arguments
+.Fa arg1
+and
+.Fa arg2
+for the previously allocated interrupt handle specified by the
+.Fa h
+pointer.
+The arguments
+.Fa arg1
+and
+.Fa arg2
+are passed as the first and second arguments, respectively, to the interrupt
+handler
+.Fa inthandler .
+The definition of the interrupt handler,
+.Vt ddi_intr_handler_t
+is provided in the manual synposis and can also be found in
+.In sys/ddi_intr.h .
+.Pp
+The routine
+.Fa inthandler
+with the arguments
+.Fa arg1
+and
+.Fa arg2
+is called upon receipt of the appropriate interrupt.
+The interrupt handler should return
+.Dv DDI_INTR_CLAIMED
+if the interrupt is claimed and
+.Dv DDI_INTR_UNCLAIMED
+otherwise.
+.Pp
+The
+.Fn ddi_intr_add_handler
+function must be called after
+.Fn ddi_intr_alloc ,
+but before
+.Fn ddi_intr_enable
+is called.
+The interrupt must be enabled through
+.Fn ddi_intr_enable
+or
+.Fn ddi_intr_block_enable
+before it can be used.
+.Pp
+The
+.Fn ddi_intr_remove_handler
+function removes the handler association, added previously with
+.Fn ddi_intr_add_handler ,
+for the interrupt identified by the interrupt handle
+.Fa h
+argument.
+Unloadable drivers should call this routine during their
+.Xr detach 9E
+routine to remove the interrupt handler from the system.
+.Pp
+The
+.Fn ddi_intr_remove_handler
+function is used to disassociate the handler after the interrupt is disabled to
+remove duplicated interrupt handles.
+See
+.Xr ddi_intr_dup_handler 9F
+for duplicated interrupt handles.
+If a handler is duplicated with the
+.Fn ddi_intr_dup_handler
+function, all added and duplicated instances of the handler must be removed with
+.Fn ddi_intr_remove_handler
+in order for the handler to be completely removed.
+.Sh CONTEXT
+The
+.Fn ddi_intr_add_handler
+and
+.Fn ddi_intr_remove_handler
+functions can be called from kernel non-interrupt context.
+.Sh RETURN VALUES
+The
+.Fn ddi_intr_add_handler
+and
+.Fn ddi_intr_remove_handler
+functions return:
+.Bl -tag -width Ds
+.It Dv DDI_SUCCESS
 On success.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_EINVAL\fR\fR
-.ad
-.RS 15n
+.It Dv DDI_EINVAL
 On encountering invalid input parameters.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FAILURE\fR\fR
-.ad
-.RS 15n
+.It Dv DDI_FAILURE
 On any implementation specific failure.
-.RE
+.El
+.Sy Interface Stability
+.Sy Committed
+.Sh SEE ALSO
+.Xr attributes 7 ,
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr ddi_intr_alloc 9F ,
+.Xr ddi_intr_block_enable 9F ,
+.Xr ddi_intr_disable 9F ,
+.Xr ddi_intr_dup_handler 9F ,
+.Xr ddi_intr_enable 9F ,
+.Xr ddi_intr_free 9F ,
+.Xr ddi_intr_get_supported_types 9F ,
+.Xr mutex 9F ,
+.Xr mutex_init 9F ,
+.Xr rw_init 9F ,
+.Xr rwlock 9F
+.Pp
+.Rs
+.%T Writing Device Drivers
+.Re
+.Sh NOTES
+When checking the return value of the
+.Fn ddi_intr_add_handler
+and
+.Fn ddi_intr_rem_handler
+functions
+.Pq and more generally other DDI functions
+callers should always write the check by comparing to
+.Dv DDI_SUCCESS .
+Put differently checks should look like:
+.Bd -literal -offset indent
+int ret;
+uintptr_t msi_index = \&.\&.\&.;
 
-.SH CONTEXT
-The \fBddi_intr_add_handler()\fR and \fBddi_intr_remove_handler()\fR functions
-can be called from kernel non-interrupt context.
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
+\&.\&.\&.
 
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.BR attributes (7),
-.BR attach (9E),
-.BR detach (9E),
-.BR ddi_intr_alloc (9F),
-.BR ddi_intr_block_enable (9F),
-.BR ddi_intr_disable (9F),
-.BR ddi_intr_dup_handler (9F),
-.BR ddi_intr_enable (9F),
-.BR ddi_intr_free (9F),
-.BR ddi_intr_get_supported_types (9F),
-.BR mutex (9F),
-.BR mutex_init (9F),
-.BR rw_init (9F),
-.BR rwlock (9F)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH NOTES
-Consumers of these interfaces should verify that the return value is not equal
-to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
-inconsistent behavior among platforms.
-.sp
-.LP
-If a device driver that uses \fBMSI\fR and \fBMSI-X\fR interrupts resets the
-device, the device might reset its configuration space modifications. Such a
-reset could cause a device driver to lose any \fBMSI\fR and \fBMSI-X\fR
+ret = ddi_intr_add_handler(h, intr_func, state, (void *)msi_index);
+if (ret != DDI_SUCCESS) {
+	/* Perform clean up activities */
+}
+.Ed
+.Pp
+Additional error codes may be added over time and checking only for
+.Dv DDI_FAILURE
+could lead to missing that such an error had occurred.
+.Pp
+If a device driver that uses
+.Sy MSI
+and
+.Sy MSI-X
+interrupts resets the device, the device might reset its configuration space
+modifications.
+Such a reset could cause a device driver to lose any
+.Sy MSI
+and
+.Sy MSI-X
 interrupt usage settings that have been applied.
-.sp
-.LP
-The second argument, \fIarg2\fR, is optional. Device drivers are free to use
-the two arguments however they see fit. There is no officially recommended
-model or restrictions. For example, an interrupt handler may wish to use the
-first argument as the pointer to its softstate and the second argument as the
-value of the MSI vector.
+.Pp
+The second argument,
+.Fa arg2 ,
+is optional.
+Device drivers are free to use the two arguments however they see fit.
+There is no officially recommended model or restrictions.
+For example, an interrupt handler may wish to use the first argument as the
+pointer to its softstate and the second argument as the value of the MSI vector.

@@ -348,6 +348,7 @@ struct sge_txq {
 	uint32_t pullup_early;	/* # of pullups before starting frame's SGL */
 	uint32_t pullup_late;	/* # of pullups while building frame's SGL */
 	uint32_t pullup_failed;	/* # of failed pullups */
+	uint32_t csum_failed;	/* # of csum reqs we failed to fulfill */
 };
 
 /* rxq: SGE ingress queue + SGE free list + miscellaneous items */

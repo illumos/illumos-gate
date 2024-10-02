@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NDD 8 "July 17, 2023"
+.TH NDD 8 "September 15, 2024"
 .SH NAME
 ndd \- get and set driver configuration parameters
 .SH SYNOPSIS
@@ -18,6 +18,11 @@ drivers. Currently, \fBndd\fR only supports the drivers that implement the
 make visible using \fBndd\fR. Since these parameters are usually tightly
 coupled to the implementation, they are likely to change from release to
 release. Some parameters may be read-only.
+.sp
+.LP
+The \fBndd\fR command is deprecated. To manage Layer 2 (Data Link Layer)
+properties use \fBdladm\fR(8). To manage Layer 3 and Layer 4 Properties (e.g.
+IP, TCP, UDP) use \fBipadm\fR(8).
 .sp
 .LP
 If the \fB-set\fR option is omitted, \fBndd\fR queries the named \fIdriver\fR,
@@ -84,7 +89,8 @@ example% \fBndd -set /dev/ip ip6_forwarding 0\fR
 .BR tcp (4P),
 .BR udp (4P),
 .BR attributes (7),
-.BR dladm (8)
+.BR dladm (8) ,
+.BR ipadm (8)
 .SH NOTES
 The parameters supported by each driver may change from release to release.
 Like programs that read \fB/dev/kmem\fR, user programs or shell scripts that
@@ -94,12 +100,6 @@ execute \fBndd\fR should be prepared for parameter names to change.
 The \fBioctl()\fR command that \fBndd\fR uses to communicate with drivers is
 likely to change in a future release. User programs should avoid making
 dependencies on it.
-.sp
-.LP
-The use of \fBndd\fR to administer Layer 2 (Data Link layer) drivers is
-strongly discouraged as this capability is to be obsoleted in a future release,
-replaced by \fBdladm\fR(8). Please refer to the driver-specific man page in
-section 4D of the SunOS man pages.
 .sp
 .LP
 The meanings of many \fBndd\fR parameters make sense only if you understand how

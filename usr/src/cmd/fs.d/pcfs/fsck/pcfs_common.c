@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011 Gary Mills
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Gary Mills
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -92,7 +92,7 @@ read_16_bits(uchar_t *bp, uint32_t *value)
 
 /*
  * store_32_bits
- * 	Save the 32 bit value (v) into the provided buffer (pointed
+ *	Save the 32 bit value (v) into the provided buffer (pointed
  *	at by *bp), and increment the buffer pointer as well.  This way
  *	the routine can be called multiple times in succession to fill
  *	buffers.  The value is stored in little-endian order.
@@ -485,7 +485,7 @@ findPartitionOffset(int fd, char *ldrive)
 	if ((drvnum = parse_drvnum(ldrive)) < 0)
 		return (error);
 
-	if (read(fd, &mb, sizeof (mb)) != sizeof (mb)) {
+	if (read(fd, &mb, bpsec) != (ssize_t)bpsec) {
 		(void) fprintf(stderr,
 		    gettext("Couldn't read a Master Boot Record\n"));
 		return (error);
@@ -549,12 +549,12 @@ findPartitionOffset(int fd, char *ldrive)
 			    gettext("No boot partition found on drive\n"));
 			return (error);
 		}
-		found = ltohi(part[bootPart].relsect) * BPSEC;
+		found = ltohi(part[bootPart].relsect) * bpsec;
 		return (found);
 	}
 
 	if (drvnum == PRIMARY_DOS_DRIVE && primaryPart >= 0) {
-		found = ltohi(part[primaryPart].relsect) * BPSEC;
+		found = ltohi(part[primaryPart].relsect) * bpsec;
 		return (found);
 	}
 
@@ -586,7 +586,7 @@ findPartitionOffset(int fd, char *ldrive)
 			 *  Seek the next extended partition, and find
 			 *  logical drives within it.
 			 */
-			if (lseek64(fd, nextseek * BPSEC, SEEK_SET) < 0 ||
+			if (lseek64(fd, nextseek * bpsec, SEEK_SET) < 0 ||
 			    read(fd, &extmboot, sizeof (extmboot)) !=
 			    sizeof (extmboot)) {
 				perror(gettext("Unable to read extended "
@@ -649,7 +649,7 @@ findPartitionOffset(int fd, char *ldrive)
 				    "is not within the partition!\n"), found);
 				return (error);
 			} else {
-				found *= BPSEC;
+				found *= bpsec;
 			}
 			return (found);
 		} else {
@@ -670,7 +670,7 @@ findPartitionOffset(int fd, char *ldrive)
 	 */
 	if (drvnum <= logicalDriveCount + numExtraDrives) {
 		driveIndex = logicalDriveCount + numExtraDrives - drvnum;
-		found = ltohi(part[extraDrives[driveIndex]].relsect) * BPSEC;
+		found = ltohi(part[extraDrives[driveIndex]].relsect) * bpsec;
 		return (found);
 	}
 	return (error);

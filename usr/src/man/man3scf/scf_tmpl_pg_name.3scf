@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCF_TMPL_PG_NAME 3SCF "Oct 28, 2008"
+.TH SCF_TMPL_PG_NAME 3SCF "Sep 15, 2024"
 .SH NAME
 scf_tmpl_pg_name, scf_tmpl_pg_type, scf_tmpl_pg_target, scf_tmpl_pg_required,
 scf_tmpl_pg_common_name, scf_tmpl_pg_description \- retrieve the metadata about
 a specific property group
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
@@ -39,18 +38,16 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .LP
 .nf
 \fBssize_t\fR \fBscf_tmpl_pg_common_name\fR(\fBconst scf_pg_tmpl_t *\fR\fIpg_tmpl\fR,
-     \fBchar *\fR \fIlocale\fR, \fBchar **\fR\fIout\fR);
+     \fBconst char *\fR \fIlocale\fR, \fBchar **\fR\fIout\fR);
 .fi
 
 .LP
 .nf
 \fBssize_t\fR \fBscf_tmpl_pg_description\fR(\fBconst scf_pg_tmpl_t *\fR\fIpg_tmpl\fR,
-     \fBchar *\fR \fIlocale\fR, \fBchar **\fR\fIout\fR);
+     \fBconst char *\fR \fIlocale\fR, \fBchar **\fR\fIout\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions retrieve the metadata about a specific property group. They
 require that the template for the property group has already been located by
 one of the \fBscf_tmpl_pg_create\fR(3SCF) suite of functions.
@@ -101,8 +98,6 @@ description in the C locale. Some templates will not specify the property group
 description.  The caller is responsible for freeing the *\fIout\fR buffer on
 success.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBscf_tmpl_pg_name()\fR,
 \fBscf_tmpl_pg_common_name()\fR, \fBscf_tmpl_pg_description()\fR,
 \fBscf_tmpl_pg_target()\fR, and \fBscf_tmpl_pg_type()\fR return the length of
@@ -113,8 +108,6 @@ return -1.
 Upon successful completion, \fBscf_tmpl_pg_required()\fR returns 0. Otherwise,
 it returns -1.
 .SH ERRORS
-.sp
-.LP
 The \fBscf_tmpl_pg_name()\fR, \fBscf_tmpl_pg_common_name()\fR,
 \fBscf_tmpl_pg_description()\fR, \fBscf_tmpl_pg_required()\fR,
 \fBscf_tmpl_pg_target()\fR, and \fBscf_tmpl_pg_type()\fR functions will fail
@@ -243,8 +236,6 @@ The locale string is too long.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -261,8 +252,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR setlocale (3C),
 .BR scf_tmpl_pg_create (3SCF),
 .BR attributes (7),

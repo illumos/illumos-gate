@@ -21466,6 +21466,7 @@ s usr/share/man/man9f/va_copy.9f=va_arg.9f
 s usr/share/man/man9f/va_end.9f=va_arg.9f
 s usr/share/man/man9f/va_start.9f=va_arg.9f
 s usr/share/man/man9f/vcmn_err.9f=cmn_err.9f
+s usr/share/man/man9f/vdev_err.9f=cmn_err.9f
 f usr/share/man/man9f/vmem_add.9f 0444 root bin
 f usr/share/man/man9f/vmem_alloc.9f 0444 root bin
 f usr/share/man/man9f/vmem_contains.9f 0444 root bin

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -65,6 +65,7 @@ struct txinfo {
 	uint8_t nflits;		/* # of flits needed for the SGL */
 	uint8_t hdls_used;	/* # of DMA handles used */
 	uint32_t txb_used;	/* txb_space used */
+	mac_ether_offload_info_t meoi;	/* pkt hdr info for offloads */
 	struct ulptx_sgl sgl __attribute__((aligned(8)));
 	struct ulptx_sge_pair reserved[TX_SGL_SEGS / 2];
 };
@@ -2464,13 +2465,27 @@ get_frame_txinfo(struct sge_txq *txq, mblk_t **fp, struct txinfo *txinfo,
 	TXQ_LOCK_ASSERT_OWNED(txq);	/* will manipulate txb and dma_hdls */
 
 	mac_hcksum_get(m, NULL, NULL, NULL, NULL, &flags);
-	txinfo->flags = flags;
+	txinfo->flags = (flags & HCK_TX_FLAGS);
 
 	mac_lso_get(m, &txinfo->mss, &flags);
-	txinfo->flags |= flags;
+	txinfo->flags |= (flags & HW_LSO_FLAGS);
 
 	if (flags & HW_LSO)
 		sgl_only = 1;	/* Do not allow immediate data with LSO */
+
+	/*
+	 * If checksum or segmentation offloads are requested, gather
+	 * information about the sizes and types of headers in the packet.
+	 */
+	if (txinfo->flags != 0) {
+		/*
+		 * Even if this fails, the meoi_flags field will be capable of
+		 * communicating the lack of useful packet information.
+		 */
+		(void) mac_ether_offload_info(m, &txinfo->meoi);
+	} else {
+		bzero(&txinfo->meoi, sizeof (txinfo->meoi));
+	}
 
 start:	txinfo->nsegs = 0;
 	txinfo->hdls_used = 0;
@@ -2859,6 +2874,115 @@ write_txpkts_wr(struct sge_txq *txq, struct txpkts *txpkts)
 	txpkts->npkt = 0;	/* emptied */
 }
 
+typedef enum {
+	COS_SUCCESS,	/* ctrl flit contains proper bits for csum offload */
+	COS_IGNORE,	/* no csum offload requested */
+	COS_FAIL,	/* csum offload requested, but pkt data missing */
+} csum_offload_status_t;
+/*
+ * Build a ctrl1 flit for checksum offload in CPL_TX_PKT_XT command
+ */
+static csum_offload_status_t
+csum_to_ctrl(const struct txinfo *txinfo, uint32_t chip_version,
+    uint64_t *ctrlp)
+{
+	const mac_ether_offload_info_t *meoi = &txinfo->meoi;
+	const uint32_t tx_flags = txinfo->flags;
+	const boolean_t needs_l3_csum = (tx_flags & HW_LSO) != 0 ||
+	    (tx_flags & HCK_IPV4_HDRCKSUM) != 0;
+	const boolean_t needs_l4_csum = (tx_flags & HW_LSO) != 0 ||
+	    (tx_flags & (HCK_FULLCKSUM | HCK_PARTIALCKSUM)) != 0;
+
+	/*
+	 * Default to disabling any checksumming both for cases where it is not
+	 * requested, but also if we cannot appropriately interrogate the
+	 * required information from the packet.
+	 */
+	uint64_t ctrl = F_TXPKT_L4CSUM_DIS | F_TXPKT_IPCSUM_DIS;
+	if (!needs_l3_csum && !needs_l4_csum) {
+		*ctrlp = ctrl;
+		return (COS_IGNORE);
+	}
+
+	if (needs_l3_csum) {
+		/* Only IPv4 checksums are supported (for L3) */
+		if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0 ||
+		    meoi->meoi_l3proto != ETHERTYPE_IP) {
+			*ctrlp = ctrl;
+			return (COS_FAIL);
+		}
+		ctrl &= ~F_TXPKT_IPCSUM_DIS;
+	}
+
+	if (needs_l4_csum) {
+		/*
+		 * We need at least all of the L3 header to make decisions about
+		 * the contained L4 protocol.  If not all of the L4 information
+		 * is present, we will leave it to the NIC to checksum all it is
+		 * able to.
+		 */
+		if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0) {
+			*ctrlp = ctrl;
+			return (COS_FAIL);
+		}
+
+		/*
+		 * Since we are parsing the packet anyways, make the checksum
+		 * decision based on the L4 protocol, rather than using the
+		 * Generic TCP/UDP checksum using start & end offsets in the
+		 * packet (like requested with PARTIALCKSUM).
+		 */
+		int csum_type = -1;
+		if (meoi->meoi_l3proto == ETHERTYPE_IP &&
+		    meoi->meoi_l4proto == IPPROTO_TCP) {
+			csum_type = TX_CSUM_TCPIP;
+		} else if (meoi->meoi_l3proto == ETHERTYPE_IPV6 &&
+		    meoi->meoi_l4proto == IPPROTO_TCP) {
+			csum_type = TX_CSUM_TCPIP6;
+		} else if (meoi->meoi_l3proto == ETHERTYPE_IP &&
+		    meoi->meoi_l4proto == IPPROTO_UDP) {
+			csum_type = TX_CSUM_UDPIP;
+		} else if (meoi->meoi_l3proto == ETHERTYPE_IPV6 &&
+		    meoi->meoi_l4proto == IPPROTO_UDP) {
+			csum_type = TX_CSUM_UDPIP6;
+		} else {
+			*ctrlp = ctrl;
+			return (COS_FAIL);
+		}
+
+		ASSERT(csum_type != -1);
+		ctrl &= ~F_TXPKT_L4CSUM_DIS;
+		ctrl |= V_TXPKT_CSUM_TYPE(csum_type);
+	}
+
+	if ((ctrl & F_TXPKT_IPCSUM_DIS) == 0 &&
+	    (ctrl & F_TXPKT_L4CSUM_DIS) != 0) {
+		/*
+		 * If only the IPv4 checksum is requested, we need to set an
+		 * appropriate type in the command for it.
+		 */
+		ctrl |= V_TXPKT_CSUM_TYPE(TX_CSUM_IP);
+	}
+
+	ASSERT(ctrl != (F_TXPKT_L4CSUM_DIS | F_TXPKT_IPCSUM_DIS));
+
+	/*
+	 * Fill in the requisite L2/L3 header length data.
+	 *
+	 * The Ethernet header length is recorded as 'size - 14 bytes'
+	 */
+	const uint8_t eth_len = meoi->meoi_l2hlen - 14;
+	if (chip_version >= CHELSIO_T6) {
+		ctrl |= V_T6_TXPKT_ETHHDR_LEN(eth_len);
+	} else {
+		ctrl |= V_TXPKT_ETHHDR_LEN(eth_len);
+	}
+	ctrl |= V_TXPKT_IPHDR_LEN(meoi->meoi_l3hlen);
+
+	*ctrlp = ctrl;
+	return (COS_SUCCESS);
+}
+
 static int
 write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
     struct txinfo *txinfo)
@@ -2871,6 +2995,7 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 	int nflits, ndesc;
 	struct tx_sdesc *txsd;
 	caddr_t dst;
+	const mac_ether_offload_info_t *meoi = &txinfo->meoi;
 
 	TXQ_LOCK_ASSERT_OWNED(txq);	/* pidx, avail */
 
@@ -2903,36 +3028,34 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 	wr->equiq_to_len16 = cpu_to_be32(ctrl);
 	wr->r3 = 0;
 
-	if (txinfo->flags & HW_LSO) {
-		uint16_t etype;
+	if (txinfo->flags & HW_LSO &&
+	    (meoi->meoi_flags & MEOI_L4INFO_SET) != 0 &&
+	    meoi->meoi_l4proto == IPPROTO_TCP) {
 		struct cpl_tx_pkt_lso_core *lso = (void *)(wr + 1);
-		char *p = (void *)m->b_rptr;
+
 		ctrl = V_LSO_OPCODE((u32)CPL_TX_PKT_LSO) | F_LSO_FIRST_SLICE |
 		    F_LSO_LAST_SLICE;
 
-		etype = ntohs(((struct ether_header *)p)->ether_type);
-		if (etype == ETHERTYPE_VLAN) {
+		if (meoi->meoi_l2hlen > sizeof (struct ether_header)) {
+			/*
+			 * This presently assumes a standard VLAN header,
+			 * without support for Q-in-Q.
+			 */
 			ctrl |= V_LSO_ETHHDR_LEN(1);
-			etype = ntohs(((struct ether_vlan_header *)p)->ether_type);
-			p += sizeof (struct ether_vlan_header);
-		} else {
-			p += sizeof (struct ether_header);
 		}
 
-		switch (etype) {
-		case ETHERTYPE_IP:
-			ctrl |= V_LSO_IPHDR_LEN(IPH_HDR_LENGTH(p) / 4);
-			p += IPH_HDR_LENGTH(p);
-			break;
+		switch (meoi->meoi_l3proto) {
 		case ETHERTYPE_IPV6:
 			ctrl |= F_LSO_IPV6;
-			ctrl |= V_LSO_IPHDR_LEN(sizeof (ip6_t) / 4);
-			p += sizeof (ip6_t);
+			/* FALLTHROUGH */
+		case ETHERTYPE_IP:
+			ctrl |= V_LSO_IPHDR_LEN(meoi->meoi_l3hlen / 4);
+			break;
 		default:
 			break;
 		}
 
-		ctrl |= V_LSO_TCPHDR_LEN(TCP_HDR_LENGTH((tcph_t *)p) / 4);
+		ctrl |= V_LSO_TCPHDR_LEN(meoi->meoi_l4hlen / 4);
 
 		lso->lso_ctrl = cpu_to_be32(ctrl);
 		lso->ipid_ofst = cpu_to_be16(0);
@@ -2946,20 +3069,29 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 		cpl = (void *)(lso + 1);
 
 		txq->tso_wrs++;
-	} else
+	} else {
 		cpl = (void *)(wr + 1);
+	}
 
 	/* Checksum offload */
-	ctrl1 = 0;
-	if (!(txinfo->flags & HCK_IPV4_HDRCKSUM))
-		ctrl1 |= F_TXPKT_IPCSUM_DIS;
-	if (!(txinfo->flags & HCK_FULLCKSUM))
-		ctrl1 |= F_TXPKT_L4CSUM_DIS;
-	if (ctrl1 == 0)
-		txq->txcsum++;	/* some hardware assistance provided */
+	switch (csum_to_ctrl(txinfo,
+	    CHELSIO_CHIP_VERSION(pi->adapter->params.chip), &ctrl1)) {
+	case COS_SUCCESS:
+		txq->txcsum++;
+		break;
+	case COS_FAIL:
+		/*
+		 * Packet will be going out with checksums which are probably
+		 * wrong but there is little we can do now.
+		 */
+		txq->csum_failed++;
+		break;
+	default:
+		break;
+	}
 
 	/* CPL header */
-	cpl->ctrl0 = cpu_to_be32(V_TXPKT_OPCODE(CPL_TX_PKT) |
+	cpl->ctrl0 = cpu_to_be32(V_TXPKT_OPCODE(CPL_TX_PKT_XT) |
 	    V_TXPKT_INTF(pi->tx_chan) | V_TXPKT_PF(pi->adapter->pf));
 	cpl->pack = 0;
 	cpl->len = cpu_to_be16(txinfo->len);
@@ -3028,13 +3160,21 @@ write_ulp_cpl_sgl(struct port_info *pi, struct sge_txq *txq,
 	end = (uintptr_t)txq->eq.spg;
 
 	/* Checksum offload */
-	ctrl = 0;
-	if (!(txinfo->flags & HCK_IPV4_HDRCKSUM))
-		ctrl |= F_TXPKT_IPCSUM_DIS;
-	if (!(txinfo->flags & HCK_FULLCKSUM))
-		ctrl |= F_TXPKT_L4CSUM_DIS;
-	if (ctrl == 0)
-		txq->txcsum++;	/* some hardware assistance provided */
+	switch (csum_to_ctrl(txinfo,
+	    CHELSIO_CHIP_VERSION(pi->adapter->params.chip), &ctrl)) {
+	case COS_SUCCESS:
+		txq->txcsum++;
+		break;
+	case COS_FAIL:
+		/*
+		 * Packet will be going out with checksums which are probably
+		 * wrong but there is little we can do now.
+		 */
+		txq->csum_failed++;
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * The previous packet's SGL must have ended at a 16 byte boundary (this
@@ -3062,9 +3202,9 @@ write_ulp_cpl_sgl(struct port_info *pi, struct sge_txq *txq,
 	if (flitp == end)
 		flitp = start;
 
-	/* CPL_TX_PKT */
+	/* CPL_TX_PKT_XT */
 	cpl = (void *)flitp;
-	cpl->ctrl0 = cpu_to_be32(V_TXPKT_OPCODE(CPL_TX_PKT) |
+	cpl->ctrl0 = cpu_to_be32(V_TXPKT_OPCODE(CPL_TX_PKT_XT) |
 	    V_TXPKT_INTF(pi->tx_chan) | V_TXPKT_PF(pi->adapter->pf));
 	cpl->pack = 0;
 	cpl->len = cpu_to_be16(txinfo->len);
@@ -3736,6 +3876,7 @@ struct txq_kstats {
 	kstat_named_t pullup_early;
 	kstat_named_t pullup_late;
 	kstat_named_t pullup_failed;
+	kstat_named_t csum_failed;
 };
 
 static kstat_t *
@@ -3777,6 +3918,7 @@ setup_txq_kstats(struct port_info *pi, struct sge_txq *txq, int idx)
 	KS_UINIT(pullup_early);
 	KS_UINIT(pullup_late);
 	KS_UINIT(pullup_failed);
+	KS_UINIT(csum_failed);
 
 	ksp->ks_update = update_txq_kstats;
 	ksp->ks_private = (void *)txq;
@@ -3811,6 +3953,7 @@ update_txq_kstats(kstat_t *ksp, int rw)
 	KS_U_FROM(pullup_early, txq);
 	KS_U_FROM(pullup_late, txq);
 	KS_U_FROM(pullup_failed, txq);
+	KS_U_FROM(csum_failed, txq);
 
 	return (0);
 }

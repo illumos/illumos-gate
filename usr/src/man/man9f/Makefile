@@ -1298,6 +1298,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		va_end.9f					\
 		va_start.9f					\
 		vcmn_err.9f					\
+		vdev_err.9f					\
 		vmem_destroy.9f					\
 		vmem_free.9f					\
 		vmem_size.9f					\
@@ -1475,6 +1476,7 @@ bitx32.9f				:= LINKSRC = bitx64.9f
 
 dev_err.9f				:= LINKSRC = cmn_err.9f
 vcmn_err.9f				:= LINKSRC = cmn_err.9f
+vdev_err.9f				:= LINKSRC = cmn_err.9f
 vzcmn_err.9f				:= LINKSRC = cmn_err.9f
 zcmn_err.9f				:= LINKSRC = cmn_err.9f
 

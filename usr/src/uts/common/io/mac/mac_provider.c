@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1757,17 +1757,44 @@ mac_meoi_get_uint16(mblk_t *mp, off_t off, uint16_t *out)
 
 }
 
+static boolean_t
+mac_meoi_ip6eh_proto(uint8_t id)
+{
+	switch (id) {
+	case IPPROTO_HOPOPTS:
+	case IPPROTO_ROUTING:
+	case IPPROTO_FRAGMENT:
+	case IPPROTO_AH:
+	case IPPROTO_DSTOPTS:
+	case IPPROTO_MH:
+	case IPPROTO_HIP:
+	case IPPROTO_SHIM6:
+		/* Currently known extension headers */
+		return (B_TRUE);
+	case IPPROTO_ESP:
+		/*
+		 * While the IANA protocol numbers listing notes ESP as an IPv6
+		 * extension header, we cannot effectively parse it like one.
+		 *
+		 * For now, mac_ether_offload_info() will report it as the L4
+		 * protocol for a parsed packet containing this EH.
+		 */
+	default:
+		return (B_FALSE);
+	}
+}
 
 int
 mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 {
 	size_t off;
-	uint16_t ether;
-	uint8_t ipproto, iplen, l4len, maclen;
+	uint16_t ether, iplen;
+	uint8_t ipproto, ip4verlen, l4len, maclen;
 
 	bzero(meoi, sizeof (mac_ether_offload_info_t));
 
-	meoi->meoi_len = msgsize(mp);
+	const size_t pktlen = msgsize(mp);
+	meoi->meoi_len = pktlen;
 	off = offsetof(struct ether_header, ether_type);
 	if (mac_meoi_get_uint16(mp, off, &ether) != 0)
 		return (-1);
@@ -1781,6 +1808,8 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 	} else {
 		maclen = sizeof (struct ether_header);
 	}
+	if (maclen > pktlen)
+		return (-1);
 	meoi->meoi_flags |= MEOI_L2INFO_SET;
 	meoi->meoi_l2hlen = maclen;
 	meoi->meoi_l3proto = ether;
@@ -1792,25 +1821,74 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 		 * be variable.
 		 */
 		off = offsetof(ipha_t, ipha_version_and_hdr_length) + maclen;
-		if (mac_meoi_get_uint8(mp, off, &iplen) != 0)
+		if (mac_meoi_get_uint8(mp, off, &ip4verlen) != 0)
 			return (-1);
-		iplen &= 0x0f;
-		if (iplen < 5 || iplen > 0x0f)
+		ip4verlen &= 0x0f;
+		if (ip4verlen < 5 || ip4verlen > 0x0f)
 			return (-1);
-		iplen *= 4;
+		iplen = ip4verlen * 4;
 		off = offsetof(ipha_t, ipha_protocol) + maclen;
 		if (mac_meoi_get_uint8(mp, off, &ipproto) == -1)
 			return (-1);
 		break;
 	case ETHERTYPE_IPV6:
-		iplen = 40;
+		iplen = sizeof (ip6_t);
 		off = offsetof(ip6_t, ip6_nxt) + maclen;
 		if (mac_meoi_get_uint8(mp, off, &ipproto) == -1)
 			return (-1);
+		/* Chase any extension headers present in packet */
+		while (mac_meoi_ip6eh_proto(ipproto)) {
+			uint8_t len_val, next_proto;
+			uint16_t eh_len;
+
+			off = maclen + iplen;
+			if (mac_meoi_get_uint8(mp, off, &next_proto) == -1)
+				return (-1);
+			if (ipproto == IPPROTO_FRAGMENT) {
+				/*
+				 * The Fragment extension header bears a
+				 * predefined fixed length, rather than
+				 * communicating it through the EH itself.
+				 */
+				eh_len = 8;
+			} else if (ipproto == IPPROTO_AH) {
+				/*
+				 * The length of the IP Authentication EH is
+				 * stored as (n + 2) * 32-bits, where 'n' is the
+				 * recorded EH length field
+				 */
+				off += 1;
+				if (mac_meoi_get_uint8(mp, off, &len_val) == -1)
+					return (-1);
+				eh_len = ((uint16_t)len_val + 2) * 4;
+			} else {
+				/*
+				 * All other EHs should follow the sizing
+				 * formula of (n + 1) * 64-bits, where 'n' is
+				 * the recorded EH length field.
+				 */
+				off += 1;
+				if (mac_meoi_get_uint8(mp, off, &len_val) == -1)
+					return (-1);
+				eh_len = ((uint16_t)len_val + 1) * 8;
+			}
+			/*
+			 * Protect against overflow in the case of a very
+			 * contrived packet.
+			 */
+			if ((iplen + eh_len) < iplen) {
+				return (-1);
+			}
+
+			iplen += eh_len;
+			ipproto = next_proto;
+		}
 		break;
 	default:
 		return (0);
 	}
+	if (((size_t)maclen + (size_t)iplen) > pktlen)
+		return (-1);
 	meoi->meoi_l3hlen = iplen;
 	meoi->meoi_l4proto = ipproto;
 	meoi->meoi_flags |= MEOI_L3INFO_SET;
@@ -1835,6 +1913,8 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 		return (0);
 	}
 
+	if (((size_t)maclen + (size_t)iplen + (size_t)l4len) > pktlen)
+		return (-1);
 	meoi->meoi_l4hlen = l4len;
 	meoi->meoi_flags |= MEOI_L4INFO_SET;
 	return (0);

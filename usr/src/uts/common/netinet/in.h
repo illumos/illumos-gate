@@ -178,6 +178,9 @@ typedef	uint16_t	sa_family_t;
 #define	IPPROTO_PIM		103		/* PIM routing protocol */
 #define	IPPROTO_SCTP		132		/* Stream Control */
 						/* Transmission Protocol */
+#define	IPPROTO_MH		135		/* Mobility EH */
+#define	IPPROTO_HIP		139		/* Host Identity Protocol */
+#define	IPPROTO_SHIM6		140		/* Shim6 Protocol */
 
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
