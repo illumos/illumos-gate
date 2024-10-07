@@ -298,8 +298,7 @@ struct host_info *host;
 	     * and match against that.
 	     */
 	    if (host->sin == NULL) {
-		if (host->addr == NULL ||
-		    inet_pton(AF_INET6, host->addr, &hostin6) != 1) {
+		if (inet_pton(AF_INET6, host->addr, &hostin6) != 1) {
 		    return (NO);
 		}
 		hip = &hostin6;

@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/param.h>
@@ -843,8 +844,8 @@ done:
  */
 static int
 pc_dirfixdotdot(struct pcnode *dp,	/* child directory being moved */
-	struct pcnode *opdp,		/* old parent directory */
-	struct pcnode *npdp)		/* new parent directory */
+    struct pcnode *opdp,		/* old parent directory */
+    struct pcnode *npdp)		/* new parent directory */
 {
 	pc_cluster32_t cn;
 	struct vnode *vp = PCTOV(dp);
@@ -1006,7 +1007,7 @@ pc_blkatoff(
 		PC_DPRINTF0(5, "pc_blkatoff: ENOENT\n");
 		return (ENOENT);
 	}
-	error = pc_bmap(pcp, pc_lblkno(fsp, offset), &bn, (uint_t *)0);
+	error = pc_bmap(pcp, pc_lblkno(fsp, offset), &bn, NULL);
 	if (error)
 		return (error);
 

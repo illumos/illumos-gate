@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 1996, 1998 Robert Nordier
- * Copyright 2024 MNX Cloud, Inc.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -741,7 +741,7 @@ fsize(DOS_FS *fs, DOS_DE *de)
 	int n;
 
 	if (!(size = cv4(de->size)) && de->attr & FA_DIR) {
-		if (!(c = cv2(de->clus)))
+		if (!(c = stclus(fs->fatsz, de)))
 			size = fs->dirents * sizeof (DOS_DE);
 		else {
 			if ((n = fatcnt(fs, c)) == -1)
