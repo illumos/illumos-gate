@@ -2338,7 +2338,6 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 	if (nctx == NULL || (cmds = (tlm_commands_t *)nctx->nc_cmds) == NULL)
 		return (-1);
 
-	nctx->nc_plname = plname;
 	if ((lcmd = cmds->tcs_command) == NULL ||
 	    lcmd->tc_buffers == NULL)
 		return (-1);
@@ -2351,6 +2350,8 @@ ndmp_iter_zfs(ndmp_context_t *nctx, int (*np_restore_property)(nvlist_t *,
 
 	if ((mhbuf = malloc(size)) == NULL)
 		return (-1);
+
+	nctx->nc_plname = plname;
 
 	/* LINTED improper alignment */
 	while ((mhp = (ndmp_metadata_header_t *)get_read_buffer(size, &rv,

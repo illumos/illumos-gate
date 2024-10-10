@@ -74,7 +74,6 @@ clone:rge 0666 root sys
 fcsm:* 0600 root sys
 bge:* 0666 root sys
 clone:bge 0666 root sys
-winlock:* 0666 root sys
 fp:* 0600 root sys
 fm:* 0644 root sys
 ipf:* 0666 root sys

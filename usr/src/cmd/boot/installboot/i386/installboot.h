@@ -130,12 +130,13 @@ typedef struct _ib_data {
 	part_list_t	*plist;			/* boot blocks */
 } ib_data_t;
 
-#define	BBLK_BLKLIST_OFF	50	/* vtoc/disk boot offset */
-#define	BBLK_ZFS_BLK_OFF	1024	/* vdev boot offset */
-#define	BBLK_ZFS_BLK_SIZE	(7ULL << 19)	/* vdev max boot size */
+#define	BBLK_BLKLIST_OFF	50	/* vtoc/disk boot offset sectors */
+#define	BBLK_ZFS_BLK_OFF	(1 << 19)	/* vdev boot offset bytes */
+#define	BBLK_ZFS_BLK_SIZE	(7ULL << 19)	/* vdev max boot size bytes */
 
 /* locations of MBR parts, must be reviewd if mbr code is changed */
 #define	STAGE1_BPB_OFFSET	(0x3)	/* technically BPB starts at 0xb */
+#define	STAGE1_BPB_BPS		(0xb)	/* Bytes Per Sector */
 #define	STAGE1_BPB_SIZE		(0x3b)
 #define	STAGE1_MBR_VERSION	(0xfa)	/* 2 bytes, not used */
 #define	STAGE1_STAGE2_SIZE	(0xfc)	/* 16bits */

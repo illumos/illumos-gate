@@ -686,7 +686,6 @@ CHKHDRS=			\
 	wait.h			\
 	waitq.h			\
 	watchpoint.h		\
-	winlockio.h		\
 	zcons.h			\
 	zfd.h			\
 	zone.h			\

@@ -53,9 +53,10 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 {
 	char		rqbuf[RQLEN];
 	int		ret;
-	int		i, retries, total_retries;
+	int		f, i, retries, total_retries;
 	int		max_retries = 20;
 
+	f = scmd->uscsi_flags;
 	scmd->uscsi_flags |= USCSI_RQENABLE;
 	scmd->uscsi_rqlen = RQLEN;
 	scmd->uscsi_rqbuf = rqbuf;
@@ -127,6 +128,10 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 		HAL_DEBUG (("total retries: %d\n", total_retries));
 	}
 
+	/* do not leak address from local stack and restore flags */
+	scmd->uscsi_rqbuf = NULL;
+	scmd->uscsi_flags = f;
+	scmd->uscsi_rqlen = 0;
 	return (ret);
 }
 

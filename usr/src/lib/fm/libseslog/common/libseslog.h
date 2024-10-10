@@ -42,18 +42,18 @@ extern "C" {
 enum {
 	SES_LOG_FAILED_TO_OPEN_DEVICE = 1, /* Couldn't open dev path */
 	SES_LOG_FAILED_TO_READ_DEVICE,	/* Couldn't read the log data */
-	SES_LOG_FAILED_NULL_TARGET_PATH,	/* Null target path */
+	SES_LOG_FAILED_NULL_TARGET_PATH,	/* Empty target path */
 	SES_LOG_FAILED_BAD_TARGET_PATH,	/* Couldn't find valid target path */
-	SES_LOG_FAILED_MODE_SENSE,    	/* Mode sense error returned */
+	SES_LOG_FAILED_MODE_SENSE,	/* Mode sense error returned */
 	SES_LOG_FAILED_MODE_SENSE_OFFSET,	/* Offset not correct */
-	SES_LOG_FAILED_BAD_DATA_LEN, 	/* Data length not correct */
+	SES_LOG_FAILED_BAD_DATA_LEN,	/* Data length not correct */
 	SES_LOG_FAILED_BAD_CONTENT_LEN,	/* Content length not correct */
 	SES_LOG_FAILED_FORMAT_PAGE_ERR,	/* Device doesn't support page */
 	SES_LOG_FAILED_NV_UNIQUE,	/* Couldn't add unique to nvlist */
 	SES_LOG_FAILED_NV_LOG,		/* Couldn't add log to nvlist */
 	SES_LOG_FAILED_NV_CODE,		/* Couldn't add code to nvlist */
 	SES_LOG_FAILED_NV_SEV,		/* Couldn't add sev to nvlist */
-	SES_LOG_FAILED_NV_ENTRY,    	/* Couldn't add entry to nvlist */
+	SES_LOG_FAILED_NV_ENTRY,	/* Couldn't add entry to nvlist */
 	SES_LOG_FAILED_MODE_SELECT,	/* Mode select failed */
 	SES_LOG_FAILED_NVLIST_CREATE	/* Couldn't create a nvlist */
 };

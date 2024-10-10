@@ -258,7 +258,6 @@ s dev/udp6=../devices/pseudo/udp6@0:udp6
 s dev/udp=../devices/pseudo/udp@0:udp
 s dev/urandom=../devices/pseudo/random@0:urandom
 s dev/vni=../devices/pseudo/dlpistub@0:vni
-s dev/winlock=../devices/pseudo/winlock@0:winlock
 s dev/wscons=../devices/pseudo/wc@0:wscons
 s dev/zero=../devices/pseudo/mm@0:zero
 s dev/zfs=../devices/pseudo/zfs@0:zfs
@@ -5032,7 +5031,6 @@ f usr/include/sys/vuid_wheel.h 0644 root bin
 f usr/include/sys/wait.h 0644 root bin
 f usr/include/sys/waitq.h 0644 root bin
 f usr/include/sys/watchpoint.h 0644 root bin
-f usr/include/sys/winlockio.h 0644 root bin
 f usr/include/sys/x86_archext.h 0644 root bin
 f usr/include/sys/xen_errno.h 0644 root bin
 f usr/include/sys/xti_inet.h 0644 root bin
