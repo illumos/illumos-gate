@@ -343,6 +343,7 @@ GENUNIX_OBJS +=	\
 		stat.o		\
 		statfs.o	\
 		statvfs.o	\
+		stdbit.o	\
 		stol.o		\
 		str_conf.o	\
 		strcalls.o	\

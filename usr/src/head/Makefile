@@ -171,6 +171,7 @@ HDRS=   $($(MACH)_HDRS)	\
 	spawn.h		\
 	stdalign.h	\
 	stdarg.h	\
+	stdbit.h	\
 	stdbool.h	\
 	stddef.h	\
 	stdint.h	\

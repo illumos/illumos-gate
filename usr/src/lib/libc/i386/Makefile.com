@@ -103,9 +103,11 @@ COMOBJS=			\
 	bcopy.o			\
 	bsearch.o		\
 	bzero.o			\
+	ctzdi2.o		\
 	explicit_bzero.o	\
 	memmem.o		\
 	qsort.o			\
+	popcountdi2.o		\
 	strtol.o		\
 	strtoul.o		\
 	strtoll.o		\
@@ -1009,6 +1011,9 @@ PORTREGEX=			\
 PORTREGEX64=			\
 	glob64.o
 
+BITOBJS=			\
+	stdbit.o
+
 MOSTOBJS=			\
 	$(STRETS)		\
 	$(CRTOBJS)		\
@@ -1053,7 +1058,8 @@ MOSTOBJS=			\
 	$(SYSOBJS)		\
 	$(COMSYSOBJS64)		\
 	$(SYSOBJS64)		\
-	$(VALUES)
+	$(VALUES)		\
+	$(BITOBJS)
 
 TRACEOBJS=			\
 	plockstat.o

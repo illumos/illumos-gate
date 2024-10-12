@@ -12,7 +12,7 @@
 #
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020-2024 RackTop Systems, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 #
@@ -234,6 +234,76 @@ SYMBOL_SCOPE {
 	rw_init				{ FLAGS = EXTERN };
 	snprintf			{ FLAGS = EXTERN };
 	sprintf				{ FLAGS = EXTERN };
+	stdc_bit_ceil_uc		{ FLAGS = EXTERN };
+	stdc_bit_ceil_ui		{ FLAGS = EXTERN };
+	stdc_bit_ceil_ul		{ FLAGS = EXTERN };
+	stdc_bit_ceil_ull		{ FLAGS = EXTERN };
+	stdc_bit_ceil_us		{ FLAGS = EXTERN };
+	stdc_bit_floor_uc		{ FLAGS = EXTERN };
+	stdc_bit_floor_ui		{ FLAGS = EXTERN };
+	stdc_bit_floor_ul		{ FLAGS = EXTERN };
+	stdc_bit_floor_ull		{ FLAGS = EXTERN };
+	stdc_bit_floor_us		{ FLAGS = EXTERN };
+	stdc_bit_width_uc		{ FLAGS = EXTERN };
+	stdc_bit_width_ui		{ FLAGS = EXTERN };
+	stdc_bit_width_ul		{ FLAGS = EXTERN };
+	stdc_bit_width_ull		{ FLAGS = EXTERN };
+	stdc_bit_width_us		{ FLAGS = EXTERN };
+	stdc_count_ones_uc		{ FLAGS = EXTERN };
+	stdc_count_ones_ui		{ FLAGS = EXTERN };
+	stdc_count_ones_ul		{ FLAGS = EXTERN };
+	stdc_count_ones_ull		{ FLAGS = EXTERN };
+	stdc_count_ones_us		{ FLAGS = EXTERN };
+	stdc_count_zeros_uc		{ FLAGS = EXTERN };
+	stdc_count_zeros_ui		{ FLAGS = EXTERN };
+	stdc_count_zeros_ul		{ FLAGS = EXTERN };
+	stdc_count_zeros_ull		{ FLAGS = EXTERN };
+	stdc_count_zeros_us		{ FLAGS = EXTERN };
+	stdc_first_leading_one_uc	{ FLAGS = EXTERN };
+	stdc_first_leading_one_ui	{ FLAGS = EXTERN };
+	stdc_first_leading_one_ul	{ FLAGS = EXTERN };
+	stdc_first_leading_one_ull	{ FLAGS = EXTERN };
+	stdc_first_leading_one_us	{ FLAGS = EXTERN };
+	stdc_first_leading_zero_uc	{ FLAGS = EXTERN };
+	stdc_first_leading_zero_ui	{ FLAGS = EXTERN };
+	stdc_first_leading_zero_ul	{ FLAGS = EXTERN };
+	stdc_first_leading_zero_ull	{ FLAGS = EXTERN };
+	stdc_first_leading_zero_us	{ FLAGS = EXTERN };
+	stdc_first_trailing_one_uc	{ FLAGS = EXTERN };
+	stdc_first_trailing_one_ui	{ FLAGS = EXTERN };
+	stdc_first_trailing_one_ul	{ FLAGS = EXTERN };
+	stdc_first_trailing_one_ull	{ FLAGS = EXTERN };
+	stdc_first_trailing_one_us	{ FLAGS = EXTERN };
+	stdc_first_trailing_zero_uc	{ FLAGS = EXTERN };
+	stdc_first_trailing_zero_ui	{ FLAGS = EXTERN };
+	stdc_first_trailing_zero_ul	{ FLAGS = EXTERN };
+	stdc_first_trailing_zero_ull	{ FLAGS = EXTERN };
+	stdc_first_trailing_zero_us	{ FLAGS = EXTERN };
+	stdc_has_single_bit_uc		{ FLAGS = EXTERN };
+	stdc_has_single_bit_ui		{ FLAGS = EXTERN };
+	stdc_has_single_bit_ul		{ FLAGS = EXTERN };
+	stdc_has_single_bit_ull		{ FLAGS = EXTERN };
+	stdc_has_single_bit_us		{ FLAGS = EXTERN };
+	stdc_leading_ones_uc		{ FLAGS = EXTERN };
+	stdc_leading_ones_ui		{ FLAGS = EXTERN };
+	stdc_leading_ones_ul		{ FLAGS = EXTERN };
+	stdc_leading_ones_ull		{ FLAGS = EXTERN };
+	stdc_leading_ones_us		{ FLAGS = EXTERN };
+	stdc_leading_zeros_uc		{ FLAGS = EXTERN };
+	stdc_leading_zeros_ui		{ FLAGS = EXTERN };
+	stdc_leading_zeros_ul		{ FLAGS = EXTERN };
+	stdc_leading_zeros_ull		{ FLAGS = EXTERN };
+	stdc_leading_zeros_us		{ FLAGS = EXTERN };
+	stdc_trailing_ones_uc		{ FLAGS = EXTERN };
+	stdc_trailing_ones_ui		{ FLAGS = EXTERN };
+	stdc_trailing_ones_ul		{ FLAGS = EXTERN };
+	stdc_trailing_ones_ull		{ FLAGS = EXTERN };
+	stdc_trailing_ones_us		{ FLAGS = EXTERN };
+	stdc_trailing_zeros_uc		{ FLAGS = EXTERN };
+	stdc_trailing_zeros_ui		{ FLAGS = EXTERN };
+	stdc_trailing_zeros_ul		{ FLAGS = EXTERN };
+	stdc_trailing_zeros_ull		{ FLAGS = EXTERN };
+	stdc_trailing_zeros_us		{ FLAGS = EXTERN };
 	strcat				{ FLAGS = EXTERN };
 	strcmp				{ FLAGS = EXTERN };
 	strcpy				{ FLAGS = EXTERN };

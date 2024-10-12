@@ -62,6 +62,7 @@ PROGS = \
 	quick_exit_status \
 	set_constraint_handler_s \
 	strcoll-strxfrm-6907 \
+	stdbit \
 	strerror \
 	strtonum \
 	timespec_get \
@@ -108,6 +109,9 @@ mutex-16200.64 :=	CSTD=$(GNU_C99)
 
 ptsname.32 :=		LDLIBS += -lsocket
 ptsname.64 :=		LDLIBS64 += -lsocket
+
+stdbit.32 :=	CSTD=$(GNU_C99)
+stdbit.64 :=	CSTD=$(GNU_C99)
 
 strtonum.32 :=		CSTD=$(GNU_C99)
 strtonum.64 :=		CSTD=$(GNU_C99)

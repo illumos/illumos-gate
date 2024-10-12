@@ -484,6 +484,16 @@ extern "C" {
 #define	_NORETURN_KYWD
 #endif
 
+/*
+ * C23 adds the notion of attributes. These provide ways to use the attributes
+ * in code (particularly headers) that does not solely support C23.
+ */
+#if defined(_STDC_C23)
+#define	_C23_UNSEQ_ATTR	[[unsequenced]]
+#else
+#define	_C23_UNSEQ_ATTR
+#endif	/* _STDC_C23 */
+
 /* ISO/IEC 9899:2011 Annex K */
 #if defined(__STDC_WANT_LIB_EXT1__)
 #if __STDC_WANT_LIB_EXT1__

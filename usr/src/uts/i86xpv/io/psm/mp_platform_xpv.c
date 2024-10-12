@@ -101,11 +101,6 @@ extern	iflag_t apic_sci_flags;
 extern	int	apic_intr_policy;
 extern	char *psm_name;
 
-/*
- * number of bits per byte, from <sys/param.h>
- */
-#define	UCHAR_MAX	((1 << NBBY) - 1)
-
 /* Max wait time (in repetitions) for flags to clear in an RDT entry. */
 extern int apic_max_reps_clear_pending;
 

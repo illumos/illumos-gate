@@ -446,6 +446,19 @@ MANFILES=	__fbufsize.3c					\
 		stack_inbounds.3c				\
 		stack_setbounds.3c				\
 		stack_violation.3c				\
+		stdc_bit_ceil.3c				\
+		stdc_bit_floor.3c				\
+		stdc_count_ones.3c				\
+		stdc_count_zeros.3c				\
+		stdc_first_leading_one.3c			\
+		stdc_first_leading_zero.3c			\
+		stdc_first_trailing_one.3c			\
+		stdc_first_trailing_zero.3c			\
+		stdc_has_single_bit.3c				\
+		stdc_leading_ones.3c				\
+		stdc_leading_zeros.3c				\
+		stdc_trailing_ones.3c				\
+		stdc_trailing_zeros.3c				\
 		stdio.3c					\
 		str2sig.3c					\
 		strcoll.3c					\
@@ -1266,6 +1279,71 @@ MANLINKS=	FD_CLR.3c				\
 		srand48.3c				\
 		srandom.3c				\
 		sscanf.3c				\
+		stdc_bit_ceil_uc.3c			\
+		stdc_bit_ceil_us.3c			\
+		stdc_bit_ceil_ui.3c			\
+		stdc_bit_ceil_ul.3c			\
+		stdc_bit_ceil_ull.3c			\
+		stdc_bit_floor_uc.3c			\
+		stdc_bit_floor_us.3c			\
+		stdc_bit_floor_ui.3c			\
+		stdc_bit_floor_ul.3c			\
+		stdc_bit_floor_ull.3c			\
+		stdc_count_ones_uc.3c			\
+		stdc_count_ones_us.3c			\
+		stdc_count_ones_ui.3c			\
+		stdc_count_ones_ul.3c			\
+		stdc_count_ones_ull.3c			\
+		stdc_count_zeros_uc.3c			\
+		stdc_count_zeros_us.3c			\
+		stdc_count_zeros_ui.3c			\
+		stdc_count_zeros_ul.3c			\
+		stdc_count_zeros_ull.3c			\
+		stdc_first_leading_one_uc.3c		\
+		stdc_first_leading_one_us.3c		\
+		stdc_first_leading_one_ui.3c		\
+		stdc_first_leading_one_ul.3c		\
+		stdc_first_leading_one_ull.3c		\
+		stdc_first_leading_zero_uc.3c		\
+		stdc_first_leading_zero_us.3c		\
+		stdc_first_leading_zero_ui.3c		\
+		stdc_first_leading_zero_ul.3c		\
+		stdc_first_leading_zero_ull.3c		\
+		stdc_first_trailing_one_uc.3c		\
+		stdc_first_trailing_one_us.3c		\
+		stdc_first_trailing_one_ui.3c		\
+		stdc_first_trailing_one_ul.3c		\
+		stdc_first_trailing_one_ull.3c		\
+		stdc_first_trailing_zero_uc.3c		\
+		stdc_first_trailing_zero_us.3c		\
+		stdc_first_trailing_zero_ui.3c		\
+		stdc_first_trailing_zero_ul.3c		\
+		stdc_first_trailing_zero_ull.3c		\
+		stdc_has_single_bit_uc.3c		\
+		stdc_has_single_bit_us.3c		\
+		stdc_has_single_bit_ui.3c		\
+		stdc_has_single_bit_ul.3c		\
+		stdc_has_single_bit_ull.3c		\
+		stdc_leading_ones_uc.3c			\
+		stdc_leading_ones_us.3c			\
+		stdc_leading_ones_ui.3c			\
+		stdc_leading_ones_ul.3c			\
+		stdc_leading_ones_ull.3c		\
+		stdc_leading_zeros_uc.3c		\
+		stdc_leading_zeros_us.3c		\
+		stdc_leading_zeros_ui.3c		\
+		stdc_leading_zeros_ul.3c		\
+		stdc_leading_zeros_ull.3c		\
+		stdc_trailing_ones_uc.3c		\
+		stdc_trailing_ones_us.3c		\
+		stdc_trailing_ones_ui.3c		\
+		stdc_trailing_ones_ul.3c		\
+		stdc_trailing_ones_ull.3c		\
+		stdc_trailing_zeros_uc.3c		\
+		stdc_trailing_zeros_us.3c		\
+		stdc_trailing_zeros_ui.3c		\
+		stdc_trailing_zeros_ul.3c		\
+		stdc_trailing_zeros_ull.3c		\
 		stderr.3c				\
 		stdin.3c				\
 		stdout.3c				\
@@ -2398,6 +2476,84 @@ sigismember.3c				:= LINKSRC = sigsetops.3c
 sigtimedwait.3c				:= LINKSRC = sigwaitinfo.3c
 
 gsignal.3c				:= LINKSRC = ssignal.3c
+
+stdc_bit_ceil_uc.3c			:= LINKSRC = stdc_bit_ceil.3c
+stdc_bit_ceil_us.3c			:= LINKSRC = stdc_bit_ceil.3c
+stdc_bit_ceil_ui.3c			:= LINKSRC = stdc_bit_ceil.3c
+stdc_bit_ceil_ul.3c			:= LINKSRC = stdc_bit_ceil.3c
+stdc_bit_ceil_ull.3c			:= LINKSRC = stdc_bit_ceil.3c
+
+stdc_bit_floor_uc.3c			:= LINKSRC = stdc_bit_floor.3c
+stdc_bit_floor_us.3c			:= LINKSRC = stdc_bit_floor.3c
+stdc_bit_floor_ui.3c			:= LINKSRC = stdc_bit_floor.3c
+stdc_bit_floor_ul.3c			:= LINKSRC = stdc_bit_floor.3c
+stdc_bit_floor_ull.3c			:= LINKSRC = stdc_bit_floor.3c
+
+stdc_count_ones_uc.3c			:= LINKSRC = stdc_count_ones.3c
+stdc_count_ones_us.3c			:= LINKSRC = stdc_count_ones.3c
+stdc_count_ones_ui.3c			:= LINKSRC = stdc_count_ones.3c
+stdc_count_ones_ul.3c			:= LINKSRC = stdc_count_ones.3c
+stdc_count_ones_ull.3c			:= LINKSRC = stdc_count_ones.3c
+
+stdc_count_zeros_uc.3c			:= LINKSRC = stdc_count_zeros.3c
+stdc_count_zeros_us.3c			:= LINKSRC = stdc_count_zeros.3c
+stdc_count_zeros_ui.3c			:= LINKSRC = stdc_count_zeros.3c
+stdc_count_zeros_ul.3c			:= LINKSRC = stdc_count_zeros.3c
+stdc_count_zeros_ull.3c			:= LINKSRC = stdc_count_zeros.3c
+
+stdc_first_leading_one_uc.3c		:= LINKSRC = stdc_first_leading_one.3c
+stdc_first_leading_one_us.3c		:= LINKSRC = stdc_first_leading_one.3c
+stdc_first_leading_one_ui.3c		:= LINKSRC = stdc_first_leading_one.3c
+stdc_first_leading_one_ul.3c		:= LINKSRC = stdc_first_leading_one.3c
+stdc_first_leading_one_ull.3c		:= LINKSRC = stdc_first_leading_one.3c
+
+stdc_first_leading_zero_uc.3c		:= LINKSRC = stdc_first_leading_zero.3c
+stdc_first_leading_zero_us.3c		:= LINKSRC = stdc_first_leading_zero.3c
+stdc_first_leading_zero_ui.3c		:= LINKSRC = stdc_first_leading_zero.3c
+stdc_first_leading_zero_ul.3c		:= LINKSRC = stdc_first_leading_zero.3c
+stdc_first_leading_zero_ull.3c		:= LINKSRC = stdc_first_leading_zero.3c
+
+stdc_first_trailing_one_uc.3c		:= LINKSRC = stdc_first_trailing_one.3c
+stdc_first_trailing_one_us.3c		:= LINKSRC = stdc_first_trailing_one.3c
+stdc_first_trailing_one_ui.3c		:= LINKSRC = stdc_first_trailing_one.3c
+stdc_first_trailing_one_ul.3c		:= LINKSRC = stdc_first_trailing_one.3c
+stdc_first_trailing_one_ull.3c		:= LINKSRC = stdc_first_trailing_one.3c
+
+stdc_first_trailing_zero_uc.3c		:= LINKSRC = stdc_first_trailing_zero.3c
+stdc_first_trailing_zero_us.3c		:= LINKSRC = stdc_first_trailing_zero.3c
+stdc_first_trailing_zero_ui.3c		:= LINKSRC = stdc_first_trailing_zero.3c
+stdc_first_trailing_zero_ul.3c		:= LINKSRC = stdc_first_trailing_zero.3c
+stdc_first_trailing_zero_ull.3c		:= LINKSRC = stdc_first_trailing_zero.3c
+
+stdc_has_single_bit_uc.3c		:= LINKSRC = stdc_has_single_bit.3c
+stdc_has_single_bit_us.3c		:= LINKSRC = stdc_has_single_bit.3c
+stdc_has_single_bit_ui.3c		:= LINKSRC = stdc_has_single_bit.3c
+stdc_has_single_bit_ul.3c		:= LINKSRC = stdc_has_single_bit.3c
+stdc_has_single_bit_ull.3c		:= LINKSRC = stdc_has_single_bit.3c
+
+stdc_leading_ones_uc.3c			:= LINKSRC = stdc_leading_ones.3c
+stdc_leading_ones_us.3c			:= LINKSRC = stdc_leading_ones.3c
+stdc_leading_ones_ui.3c			:= LINKSRC = stdc_leading_ones.3c
+stdc_leading_ones_ul.3c			:= LINKSRC = stdc_leading_ones.3c
+stdc_leading_ones_ull.3c		:= LINKSRC = stdc_leading_ones.3c
+
+stdc_leading_zeros_uc.3c		:= LINKSRC = stdc_leading_zeros.3c
+stdc_leading_zeros_us.3c		:= LINKSRC = stdc_leading_zeros.3c
+stdc_leading_zeros_ui.3c		:= LINKSRC = stdc_leading_zeros.3c
+stdc_leading_zeros_ul.3c		:= LINKSRC = stdc_leading_zeros.3c
+stdc_leading_zeros_ull.3c		:= LINKSRC = stdc_leading_zeros.3c
+
+stdc_trailing_ones_uc.3c		:= LINKSRC = stdc_trailing_ones.3c
+stdc_trailing_ones_us.3c		:= LINKSRC = stdc_trailing_ones.3c
+stdc_trailing_ones_ui.3c		:= LINKSRC = stdc_trailing_ones.3c
+stdc_trailing_ones_ul.3c		:= LINKSRC = stdc_trailing_ones.3c
+stdc_trailing_ones_ull.3c		:= LINKSRC = stdc_trailing_ones.3c
+
+stdc_trailing_zeros_uc.3c		:= LINKSRC = stdc_trailing_zeros.3c
+stdc_trailing_zeros_us.3c		:= LINKSRC = stdc_trailing_zeros.3c
+stdc_trailing_zeros_ui.3c		:= LINKSRC = stdc_trailing_zeros.3c
+stdc_trailing_zeros_ul.3c		:= LINKSRC = stdc_trailing_zeros.3c
+stdc_trailing_zeros_ull.3c		:= LINKSRC = stdc_trailing_zeros.3c
 
 stderr.3c				:= LINKSRC = stdio.3c
 stdin.3c				:= LINKSRC = stdio.3c

@@ -1,0 +1,97 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_BIT_WIDTH 9F
+.Os
+.Sh NAME
+.Nm stdc_bit_width ,
+.Nm stdc_bit_width_uc ,
+.Nm stdc_bit_width_us ,
+.Nm stdc_bit_width_ui ,
+.Nm stdc_bit_width_ul ,
+.Nm stdc_bit_width_ull
+.Nd determine minimum bit width
+.Sh SYNOPSIS
+.In sys/stdbit.h
+.Ft "unsigned int"
+.Fo stdc_bit_width
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_width_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_width_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_width_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_width_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_width_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_bit_width
+family of functions returns the minimum number of bits required to store
+.Fa value .
+This is calculated by taking the log base 2 of
+.Fa value
+and adding 1; however, if
+.Fa value
+is 0, then the function returns 0.
+The
+.Fn stdc_bit_width
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Sh CONTEXT
+These functions may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_bit_width
+family returns the minimum number of bits required to hold
+.Fa value .
+These functions cannot fail.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr stdc_bit_width 3C ,
+.Xr stdc_bit_ceil 9F ,
+.Xr stdc_bit_floor 9F ,
+.Xr stdc_count_ones 9F ,
+.Xr stdc_count_zero 9F ,
+.Xr stdc_first_leading_one 9F ,
+.Xr stdc_first_leading_zero 9F ,
+.Xr stdc_first_trailing_one 9F ,
+.Xr stdc_first_trailing_zero 9F ,
+.Xr stdc_has_single_bit 9F ,
+.Xr stdc_leading_ones 9F ,
+.Xr stdc_leading_zeros 9F ,
+.Xr stdc_trailing_ones 9F ,
+.Xr stdc_trailing_zeros 9F

@@ -197,6 +197,8 @@ file path=opt/libc-tests/tests/select/select.sh mode=0555
 file path=opt/libc-tests/tests/select/select_test mode=0555
 file path=opt/libc-tests/tests/set_constraint_handler_s.32 mode=0555
 file path=opt/libc-tests/tests/set_constraint_handler_s.64 mode=0555
+file path=opt/libc-tests/tests/stdbit.32 mode=0555
+file path=opt/libc-tests/tests/stdbit.64 mode=0555
 dir  path=opt/libc-tests/tests/stdio
 file path=opt/libc-tests/tests/stdio/fileno.32 mode=0555
 file path=opt/libc-tests/tests/stdio/fileno.64 mode=0555

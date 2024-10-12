@@ -1216,6 +1216,129 @@ file path=usr/share/man/man3c/stack_getbounds.3c
 file path=usr/share/man/man3c/stack_inbounds.3c
 file path=usr/share/man/man3c/stack_setbounds.3c
 file path=usr/share/man/man3c/stack_violation.3c
+file path=usr/share/man/man3c/stdc_bit_ceil.3c
+link path=usr/share/man/man3c/stdc_bit_ceil_uc.3c target=stdc_bit_ceil.3c
+link path=usr/share/man/man3c/stdc_bit_ceil_ui.3c target=stdc_bit_ceil.3c
+link path=usr/share/man/man3c/stdc_bit_ceil_ul.3c target=stdc_bit_ceil.3c
+link path=usr/share/man/man3c/stdc_bit_ceil_ull.3c target=stdc_bit_ceil.3c
+link path=usr/share/man/man3c/stdc_bit_ceil_us.3c target=stdc_bit_ceil.3c
+file path=usr/share/man/man3c/stdc_bit_floor.3c
+link path=usr/share/man/man3c/stdc_bit_floor_uc.3c target=stdc_bit_floor.3c
+link path=usr/share/man/man3c/stdc_bit_floor_ui.3c target=stdc_bit_floor.3c
+link path=usr/share/man/man3c/stdc_bit_floor_ul.3c target=stdc_bit_floor.3c
+link path=usr/share/man/man3c/stdc_bit_floor_ull.3c target=stdc_bit_floor.3c
+link path=usr/share/man/man3c/stdc_bit_floor_us.3c target=stdc_bit_floor.3c
+file path=usr/share/man/man3c/stdc_count_ones.3c
+link path=usr/share/man/man3c/stdc_count_ones_uc.3c target=stdc_count_ones.3c
+link path=usr/share/man/man3c/stdc_count_ones_ui.3c target=stdc_count_ones.3c
+link path=usr/share/man/man3c/stdc_count_ones_ul.3c target=stdc_count_ones.3c
+link path=usr/share/man/man3c/stdc_count_ones_ull.3c target=stdc_count_ones.3c
+link path=usr/share/man/man3c/stdc_count_ones_us.3c target=stdc_count_ones.3c
+file path=usr/share/man/man3c/stdc_count_zeros.3c
+link path=usr/share/man/man3c/stdc_count_zeros_uc.3c target=stdc_count_zeros.3c
+link path=usr/share/man/man3c/stdc_count_zeros_ui.3c target=stdc_count_zeros.3c
+link path=usr/share/man/man3c/stdc_count_zeros_ul.3c target=stdc_count_zeros.3c
+link path=usr/share/man/man3c/stdc_count_zeros_ull.3c target=stdc_count_zeros.3c
+link path=usr/share/man/man3c/stdc_count_zeros_us.3c target=stdc_count_zeros.3c
+file path=usr/share/man/man3c/stdc_first_leading_one.3c
+link path=usr/share/man/man3c/stdc_first_leading_one_uc.3c \
+    target=stdc_first_leading_one.3c
+link path=usr/share/man/man3c/stdc_first_leading_one_ui.3c \
+    target=stdc_first_leading_one.3c
+link path=usr/share/man/man3c/stdc_first_leading_one_ul.3c \
+    target=stdc_first_leading_one.3c
+link path=usr/share/man/man3c/stdc_first_leading_one_ull.3c \
+    target=stdc_first_leading_one.3c
+link path=usr/share/man/man3c/stdc_first_leading_one_us.3c \
+    target=stdc_first_leading_one.3c
+file path=usr/share/man/man3c/stdc_first_leading_zero.3c
+link path=usr/share/man/man3c/stdc_first_leading_zero_uc.3c \
+    target=stdc_first_leading_zero.3c
+link path=usr/share/man/man3c/stdc_first_leading_zero_ui.3c \
+    target=stdc_first_leading_zero.3c
+link path=usr/share/man/man3c/stdc_first_leading_zero_ul.3c \
+    target=stdc_first_leading_zero.3c
+link path=usr/share/man/man3c/stdc_first_leading_zero_ull.3c \
+    target=stdc_first_leading_zero.3c
+link path=usr/share/man/man3c/stdc_first_leading_zero_us.3c \
+    target=stdc_first_leading_zero.3c
+file path=usr/share/man/man3c/stdc_first_trailing_one.3c
+link path=usr/share/man/man3c/stdc_first_trailing_one_uc.3c \
+    target=stdc_first_trailing_one.3c
+link path=usr/share/man/man3c/stdc_first_trailing_one_ui.3c \
+    target=stdc_first_trailing_one.3c
+link path=usr/share/man/man3c/stdc_first_trailing_one_ul.3c \
+    target=stdc_first_trailing_one.3c
+link path=usr/share/man/man3c/stdc_first_trailing_one_ull.3c \
+    target=stdc_first_trailing_one.3c
+link path=usr/share/man/man3c/stdc_first_trailing_one_us.3c \
+    target=stdc_first_trailing_one.3c
+file path=usr/share/man/man3c/stdc_first_trailing_zero.3c
+link path=usr/share/man/man3c/stdc_first_trailing_zero_uc.3c \
+    target=stdc_first_trailing_zero.3c
+link path=usr/share/man/man3c/stdc_first_trailing_zero_ui.3c \
+    target=stdc_first_trailing_zero.3c
+link path=usr/share/man/man3c/stdc_first_trailing_zero_ul.3c \
+    target=stdc_first_trailing_zero.3c
+link path=usr/share/man/man3c/stdc_first_trailing_zero_ull.3c \
+    target=stdc_first_trailing_zero.3c
+link path=usr/share/man/man3c/stdc_first_trailing_zero_us.3c \
+    target=stdc_first_trailing_zero.3c
+file path=usr/share/man/man3c/stdc_has_single_bit.3c
+link path=usr/share/man/man3c/stdc_has_single_bit_uc.3c \
+    target=stdc_has_single_bit.3c
+link path=usr/share/man/man3c/stdc_has_single_bit_ui.3c \
+    target=stdc_has_single_bit.3c
+link path=usr/share/man/man3c/stdc_has_single_bit_ul.3c \
+    target=stdc_has_single_bit.3c
+link path=usr/share/man/man3c/stdc_has_single_bit_ull.3c \
+    target=stdc_has_single_bit.3c
+link path=usr/share/man/man3c/stdc_has_single_bit_us.3c \
+    target=stdc_has_single_bit.3c
+file path=usr/share/man/man3c/stdc_leading_ones.3c
+link path=usr/share/man/man3c/stdc_leading_ones_uc.3c \
+    target=stdc_leading_ones.3c
+link path=usr/share/man/man3c/stdc_leading_ones_ui.3c \
+    target=stdc_leading_ones.3c
+link path=usr/share/man/man3c/stdc_leading_ones_ul.3c \
+    target=stdc_leading_ones.3c
+link path=usr/share/man/man3c/stdc_leading_ones_ull.3c \
+    target=stdc_leading_ones.3c
+link path=usr/share/man/man3c/stdc_leading_ones_us.3c \
+    target=stdc_leading_ones.3c
+file path=usr/share/man/man3c/stdc_leading_zeros.3c
+link path=usr/share/man/man3c/stdc_leading_zeros_uc.3c \
+    target=stdc_leading_zeros.3c
+link path=usr/share/man/man3c/stdc_leading_zeros_ui.3c \
+    target=stdc_leading_zeros.3c
+link path=usr/share/man/man3c/stdc_leading_zeros_ul.3c \
+    target=stdc_leading_zeros.3c
+link path=usr/share/man/man3c/stdc_leading_zeros_ull.3c \
+    target=stdc_leading_zeros.3c
+link path=usr/share/man/man3c/stdc_leading_zeros_us.3c \
+    target=stdc_leading_zeros.3c
+file path=usr/share/man/man3c/stdc_trailing_ones.3c
+link path=usr/share/man/man3c/stdc_trailing_ones_uc.3c \
+    target=stdc_trailing_ones.3c
+link path=usr/share/man/man3c/stdc_trailing_ones_ui.3c \
+    target=stdc_trailing_ones.3c
+link path=usr/share/man/man3c/stdc_trailing_ones_ul.3c \
+    target=stdc_trailing_ones.3c
+link path=usr/share/man/man3c/stdc_trailing_ones_ull.3c \
+    target=stdc_trailing_ones.3c
+link path=usr/share/man/man3c/stdc_trailing_ones_us.3c \
+    target=stdc_trailing_ones.3c
+file path=usr/share/man/man3c/stdc_trailing_zeros.3c
+link path=usr/share/man/man3c/stdc_trailing_zeros_uc.3c \
+    target=stdc_trailing_zeros.3c
+link path=usr/share/man/man3c/stdc_trailing_zeros_ui.3c \
+    target=stdc_trailing_zeros.3c
+link path=usr/share/man/man3c/stdc_trailing_zeros_ul.3c \
+    target=stdc_trailing_zeros.3c
+link path=usr/share/man/man3c/stdc_trailing_zeros_ull.3c \
+    target=stdc_trailing_zeros.3c
+link path=usr/share/man/man3c/stdc_trailing_zeros_us.3c \
+    target=stdc_trailing_zeros.3c
 link path=usr/share/man/man3c/stderr.3c target=stdio.3c
 link path=usr/share/man/man3c/stdin.3c target=stdio.3c
 file path=usr/share/man/man3c/stdio.3c

@@ -1,0 +1,122 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_BIT_CEIL 3C
+.Os
+.Sh NAME
+.Nm stdc_bit_ceil ,
+.Nm stdc_bit_ceil_uc ,
+.Nm stdc_bit_ceil_us ,
+.Nm stdc_bit_ceil_ui ,
+.Nm stdc_bit_ceil_ul ,
+.Nm stdc_bit_ceil_ull
+.Nd find smallest power of 2 not less than value
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdbit.h
+.Ft generic_value_type
+.Fo stdc_bit_ceil
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned char"
+.Fo stdc_bit_ceil_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned short"
+.Fo stdc_bit_ceil_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_bit_ceil_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned long"
+.Fo stdc_bit_ceil_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned long long"
+.Fo stdc_bit_ceil_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_bit_ceil
+family of functions finds the smallest power of 2 that is not less than
+.Fa value .
+If the resulting value would not fit in the type, then 0 is returned.
+For example, if one were to use
+.Dv UINT8_MAX
+with
+.Fn stdc_bit_ceil_uc
+the next power of two would be 0x100, which is larger than would fit in
+an 8-bit unsigned char, resulting in 0.
+.Pp
+The
+.Fn stdc_bit_ceil
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_bit_ceil
+family returns the smallest power of 2 that is not less than
+.Fa value .
+These functions cannot fail.
+.Sh EXAMPLES
+.Sy Example 1
+Printing the bit ceiling of an integer.
+.Bd -literal
+#include <stdbit.h>
+#include <stdio.h>
+#include <limits.h>
+
+int
+main(void)
+{
+	printf("0x%x 0x%x 0x%x 0x%llx\en",
+	    stdc_bit_ceil_uc(0xd2),
+	    stdc_bit_ceil_us(0x7777),
+	    stdc_bit_ceil_ui(0x038fa0ff),
+	    stdc_bit_ceil_ull(0));
+	return (0);
+}
+.Ed
+.Pp
+When compiled and run, this produces:
+.Bd -literal -offset indent
+$ ./a.out
+0x0 0x8000 0x4000000 0x1
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr stdc_bit_floor 3C ,
+.Xr stdc_bit_width 3C ,
+.Xr stdc_count_ones 3C ,
+.Xr stdc_count_zero 3C ,
+.Xr stdc_first_leading_one 3C ,
+.Xr stdc_first_leading_zero 3C ,
+.Xr stdc_first_trailing_one 3C ,
+.Xr stdc_first_trailing_zero 3C ,
+.Xr stdc_has_single_bit 3C ,
+.Xr stdc_leading_ones 3C ,
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_trailing_ones 3C ,
+.Xr stdc_trailing_zeros 3C ,
+.Xr stdbit.h 3HEAD

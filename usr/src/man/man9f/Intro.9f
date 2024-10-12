@@ -9,10 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 17, 2023
+.Dd October 27, 2024
 .Dt INTRO 9F
 .Os
 .Sh NAME
@@ -356,7 +356,7 @@ For more information on vmem, see
 .El
 .Ss String and libc Analogues
 The kernel has many analogues for classic libc functions that deal with
-string processing, memory copying, and related.
+string processing, memory copying, bit manipulation, and related.
 For the most part, these behave similarly to their userland analogues,
 but there can be some differences in return values and for example, in
 the set of supported format characters in the case of
@@ -374,6 +374,13 @@ and related.
 .It Xr memset 9F Ta Xr min 9F
 .It Xr numtos 9F Ta Xr snprintf 9F
 .It Xr sprintf 9F Ta Xr stoi 9F
+.It Xr stdc_bit_ceil 9F Ta Xr stdc_bit_floor 9F
+.It Xr stdc_bit_width 9F Ta Xr stdc_count_ones 9F
+.It Xr stdc_count_zeros 9F Ta Xr stdc_first_leading_one 9F
+.It Xr stdc_first_leading_zero 9F Ta Xr stdc_first_trailing_one 9F
+.It Xr stdc_first_trailing_zero 9F Ta Xr stdc_has_single_bit 9F
+.It Xr stdc_leading_ones 9F Ta Xr stdc_leading_zeros 9F
+.It Xr stdc_trailing_ones 9F Ta Xr stdc_trailing_zeros 9F
 .It Xr strcasecmp 9F Ta Xr strcat 9F
 .It Xr strchr 9F Ta Xr strcmp 9F
 .It Xr strcpy 9F Ta Xr strdup 9F

@@ -323,6 +323,10 @@ $(CHACHAOBJS:%=pics/%): $(SRC)/common/crypto/chacha/$$(@F:.o=.c)
 	    -o $@ $(SRC)/common/crypto/chacha/$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
+pics/%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 # DTrace rules
 pics/%.o: $(LIBCBASE)/../port/threads/%.d $(THREADSOBJS:%=pics/%)
 	$(COMPILE.d) -C -xlazyload -s $< -o $@ $(THREADSOBJS:%=pics/%)

@@ -1,0 +1,123 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 17, 2024
+.Dt STDBIT.H 3HEAD
+.Os
+.Sh NAME
+.Nm stdbit.h
+.Nd bit and byte utilities
+.Sh SYNOPSIS
+.In stdbit.h
+.Sh DESCRIPTION
+The
+.In stdbit.h
+header provides support for C23 bit and byte utilities.
+.Pp
+The
+.In stdbit.h
+header provides the ability to determine the endian mode of the system
+through a series of preprocessor macros at compilation time.
+For more information and examples of how the endian ordering impacts
+data layout, see
+.Xr endian 7 .
+.Bl -tag -width Ds
+.It Dv __STDC_ENDIAN_LITTLE__
+This macro is an integer that represents a little-endian byte order.
+.It Dv __STDC_ENDIAN_BIG__
+This macro is an integer that represents a big-endian byte order.
+.It Dv __STDC_ENDIAN_NATIVE__
+This macro will be defined to indicate the byte order of the system and
+generally be defined to either
+.Dv __STDC_ENDIAN_LITTLE__
+or
+.Dv __STDC_ENDIAN_BIG__ .
+While uncommon and not supported by illumos, if the system is neither
+little- or big-endian, then
+.Dv __STDC_ENDIAN_NATIVE__
+will be defined to a different, platform-defined value.
+.El
+.Pp
+This functionality is analogous to that found in
+.Xr endian.h 3HEAD ,
+but unlike
+.Xr endian.h 3HEAD ,
+this header is standardized and a part of C23.
+.Pp
+The
+.In stdbit.h
+header makes available a number of different families of functions which
+operate on both fixed size integers and have generic forms.
+The generic forms require support for at least C23 to be requested,
+while the non-generic forms are always made available.
+These families are:
+.Bl -tag -width Ds
+.It Xr stdc_bit_ceil 3C
+Finds the smallest power of two that is equal to or larger than a given
+value.
+.It Xr stdc_bit_floor 3C
+Finds the largest power of two that is equal to or less than a given
+value.
+.It Xr stdc_bit_width 3C
+Determines the minimum number of bits required to store a given value.
+.It Xr stdc_count_ones 3C
+Counts the number of one bits in a value.
+This is sometimes called a population count.
+.It Xr stdc_count_zeros 3C
+Counts the number of zero bits in a value.
+.It Xr stdc_first_leading_one 3C
+Finds the first one bit starting from the most significant bit.
+.It Xr stdc_first_leading_zero 3C
+Finds the first zero bit starting from the most significant bit.
+.It Xr stdc_first_trailing_one 3C
+Finds the first one bit starting from the least significant bit.
+This is sometimes called find first set.
+.It Xr stdc_first_trailing_zero 3C
+Finds the first one zero starting from the least significant bit.
+.It Xr stdc_has_single_bit 3C
+Determines whether or not a value only has a single bit set.
+.It Xr stdc_leading_ones 3C
+Counts the number of consecutive one bits starting from the most
+significant bit.
+.It Xr stdc_leading_zeros 3C
+Counts the number of consecutive zero bits starting from the most
+significant bit.
+.It Xr stdc_trailing_ones 3C
+Counts the number of consecutive one bits starting from the least
+significant bit.
+.It Xr stdc_trailing_zeros 3C
+Counts the number of consecutive zero bits starting from the least
+significant bit.
+.El
+.Pp
+This same functionality is made available to device drivers through
+.In sys/stdbit.h .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr stdc_bit_ceil 3C ,
+.Xr stdc_bit_floor 3C ,
+.Xr stdc_bit_width 3C ,
+.Xr stdc_count_ones 3C ,
+.Xr stdc_count_zeros 3C ,
+.Xr stdc_first_leading_one 3C ,
+.Xr stdc_first_leading_zero 3C ,
+.Xr stdc_first_trailing_one 3C ,
+.Xr stdc_first_trailing_zero 3C ,
+.Xr stdc_has_single_bit 3C ,
+.Xr stdc_leading_ones 3C ,
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_trailing_ones 3C ,
+.Xr stdc_trailing_zeros 3C ,
+.Xr endian.h 3HEAD ,
+.Xr endian 7

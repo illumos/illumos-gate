@@ -626,6 +626,8 @@ license usr/src/common/crypto/skein/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/skein/THIRDPARTYLICENSE
 license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/common/util/THIRDPARTYLICENSE.uiuc \
+    license=usr/src/common/util/THIRDPARTYLICENSE.uiuc
 license usr/src/uts/common/inet/cc/THIRDPARTYLICENSE \
     license=usr/src/uts/common/inet/cc/THIRDPARTYLICENSE
 license usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts \

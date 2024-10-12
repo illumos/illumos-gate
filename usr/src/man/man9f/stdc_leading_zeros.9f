@@ -1,0 +1,97 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_LEADING_ZEROS 9F
+.Os
+.Sh NAME
+.Nm stdc_leading_zeros ,
+.Nm stdc_leading_zeros_uc ,
+.Nm stdc_leading_zeros_us ,
+.Nm stdc_leading_zeros_ui ,
+.Nm stdc_leading_zeros_ul ,
+.Nm stdc_leading_zeros_ull
+.Nd count consecutive leading zero bits
+.Sh SYNOPSIS
+.In sys/stdbit.h
+.Ft "unsigned int"
+.Fo stdc_leading_zeros
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_leading_zeros_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_leading_zeros_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_leading_zeros_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_leading_zeros_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_leading_zeros_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_leading_zeros
+family of functions counts the number of consecutive zero bits present in
+.Fa value
+starting at the most significant bit.
+.Pp
+The
+.Fn stdc_leading_zeros
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Pp
+Note that promoting an integer from one type to another increases the
+quantity of leading zeros, thus increasing the return value.
+.Sh CONTEXT
+These functions may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_leading_zeros
+family always return the number of leading zeros found in
+.Fa value .
+These functions cannot fail.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_bit_ceil 9F ,
+.Xr stdc_bit_floor 9F ,
+.Xr stdc_bit_width 9F ,
+.Xr stdc_count_ones 9F ,
+.Xr stdc_count_zeros 9F ,
+.Xr stdc_first_leading_one 9F ,
+.Xr stdc_first_leading_zero 9F ,
+.Xr stdc_first_trailing_one 9F ,
+.Xr stdc_first_trailing_zero 9F ,
+.Xr stdc_has_single_bit 9F ,
+.Xr stdc_leading_ones 9F ,
+.Xr stdc_trailing_ones 9F ,
+.Xr stdc_trailing_zeros 9F
