@@ -163,7 +163,7 @@ main(int argc, const char *argv[])
 	 */
 	flush_and_wait(flush_pipe[1]);
 	count2 = get_count();
-	if (count1 - 1 != count2 ) {
+	if (count1 - 1 != count2) {
 		FAIL(("mevent_delete() did not decrease count by 1: "
 		    "was %d, now %d", count1, count2));
 	}

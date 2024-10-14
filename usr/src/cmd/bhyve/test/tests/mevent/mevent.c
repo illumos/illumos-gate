@@ -13,7 +13,7 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-#include "../../../mevent.c"
+#include "../../../common/mevent.c"
 #include "testlib.h"
 
 /*

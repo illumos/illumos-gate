@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _TESTLIB_H_

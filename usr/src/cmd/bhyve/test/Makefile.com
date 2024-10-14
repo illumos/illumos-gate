@@ -26,7 +26,7 @@ CSTD=		$(CSTD_GNU99)
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
-		-I$(SRC)/cmd/bhyve \
+		-I$(SRC)/cmd/bhyve/common \
 		-DWITHOUT_CAPSICUM
 
 SMOFF += all_func_returns

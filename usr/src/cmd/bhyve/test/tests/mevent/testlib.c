@@ -25,7 +25,8 @@ const char *testlib_prog;
 boolean_t testlib_verbose;
 
 static void
-timed_out(int signo) {
+timed_out(int signo)
+{
 	ASSERT_INT_EQ(("timeout signal"), signo, SIGALRM);
 
 	FAIL(("Timed out"));

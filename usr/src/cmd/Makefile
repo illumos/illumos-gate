@@ -30,7 +30,7 @@
 # Copyright 2018 Gary Mills
 # Copyright 2019 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 MNX Cloud, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 include ../Makefile.master
@@ -469,6 +469,7 @@ COMMON_SUBDIRS=		\
 	zdump		\
 	zfs		\
 	zhack		\
+	zhyve		\
 	zic		\
 	zinject		\
 	zlogin		\
