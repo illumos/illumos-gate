@@ -19,6 +19,7 @@
 .\" "
 .\" "Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2010, Richard Lowe
+.\" "Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 .\" "
 .TH ONU 1ONBLD "Aug 28, 2010"
 .SH NAME
@@ -126,15 +127,11 @@ will attempt to update any ipkg-brand installed zones on the system; the
 .B -Z
 option may be used to disable this behavior.
 .SH EXAMPLES
-\fBExample 1\fR Installing latest ON nightly build
-.LP
-# onu -t new-nightly-be
-.LP
-\fBExample 2\fR Installing an ON build from a directory
+\fBExample 1\fR Installing an ON build from a directory
 .LP
 # onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
 .LP
-\fBExample 3\fR Installing additional packages in the new BE
+\fBExample 2\fR Installing additional packages in the new BE
 .LP
 # onu -d /path/to/my/ws/packages/`uname -p`/nightly -t new-nightly-be
 .br
@@ -149,9 +146,9 @@ option may be used to disable this behavior.
 ONURI
 .IP
 If the -u option is not provided, and this variable is set, it will be used
-as the origin URI for the publisher packaging repository.  If -u is not
-provided and this variable is not set, http://ipkg.sfbay/on-nightly will
-be used.
+as the origin URI for the publisher packaging repository.  If this variable
+is not set, either the -u or the -d option must be used to specify a source
+for the packages.
 .LP
 ONPUB
 .IP
