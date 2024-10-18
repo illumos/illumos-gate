@@ -843,9 +843,17 @@ isa_resource_setup()
 	/* initialize the interrupt space */
 	(void) ndi_ra_free(usedpdip, 0, 16, NDI_RA_TYPE_INTR, 0);
 
+	/*
+	 * The PC/AT had two PICs cascaded together through IRQ 2 on the
+	 * primary with firmware providing compatibility.  Effectively IRQ 2
+	 * and 9 are the same.  Intel platforms have retained compatibility
+	 * for that since.
+	 *
+	 * Mark IRQ 2 as consumed, so it can never be allocated.
+	 */
 #if defined(__x86)
 	bzero(&req, sizeof (req));
-	req.ra_addr = 2;	/* 2 == 9 so never allow */
+	req.ra_addr = 2;
 	req.ra_len = 1;
 	req.ra_flags = NDI_RA_ALLOC_SPECIFIED;
 	(void) ndi_ra_alloc(usedpdip, &req, &retbase, &retlen,
