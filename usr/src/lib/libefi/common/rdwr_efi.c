@@ -26,6 +26,7 @@
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Jason King
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <stdio.h>
@@ -1435,30 +1436,31 @@ efi_auto_sense(int fd, struct dk_gpt **vtoc)
 		(*vtoc)->efi_parts[i].p_start = 0;
 		(*vtoc)->efi_parts[i].p_size = 0;
 	}
-	/*
-	 * Make constants first
-	 * and variable partitions later
-	 */
 
 	/* root partition - s0 128 MB */
-	(*vtoc)->efi_parts[0].p_start = 34;
-	(*vtoc)->efi_parts[0].p_size = 262144;
+	(*vtoc)->efi_parts[0].p_start =
+	    EFI_MIN_ARRAY_SIZE / (*vtoc)->efi_lbasize + 2;
+	(*vtoc)->efi_parts[0].p_size =
+	    (128 * 1024 * 1024) / (*vtoc)->efi_lbasize;
 
 	/* partition - s1  128 MB */
-	(*vtoc)->efi_parts[1].p_start = 262178;
-	(*vtoc)->efi_parts[1].p_size = 262144;
+	(*vtoc)->efi_parts[1].p_start = (*vtoc)->efi_parts[0].p_start +
+	    (*vtoc)->efi_parts[0].p_size;
+	(*vtoc)->efi_parts[1].p_size = (*vtoc)->efi_parts[0].p_size;
 
 	/* partition -s2 is NOT the Backup disk */
 	(*vtoc)->efi_parts[2].p_tag = V_UNASSIGNED;
 
 	/* partition -s6 /usr partition - HOG */
-	(*vtoc)->efi_parts[6].p_start = 524322;
-	(*vtoc)->efi_parts[6].p_size = (*vtoc)->efi_last_u_lba - 524322
-	    - (1024 * 16);
+	(*vtoc)->efi_parts[6].p_start = (*vtoc)->efi_parts[1].p_start +
+	    (*vtoc)->efi_parts[1].p_size;
+	(*vtoc)->efi_parts[6].p_size = (*vtoc)->efi_last_u_lba + 1 -
+	    (*vtoc)->efi_parts[6].p_start - efi_reserved_sectors(*vtoc);
 
 	/* efi reserved partition - s9 16K */
-	(*vtoc)->efi_parts[8].p_start = (*vtoc)->efi_last_u_lba - (1024 * 16);
-	(*vtoc)->efi_parts[8].p_size = (1024 * 16);
+	(*vtoc)->efi_parts[8].p_start = (*vtoc)->efi_parts[6].p_start +
+	    (*vtoc)->efi_parts[6].p_size;
+	(*vtoc)->efi_parts[8].p_size = efi_reserved_sectors(*vtoc);
 	(*vtoc)->efi_parts[8].p_tag = V_RESERVED;
 	return (0);
 }
