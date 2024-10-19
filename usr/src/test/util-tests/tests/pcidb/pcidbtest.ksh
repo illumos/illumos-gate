@@ -12,17 +12,17 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 unalias -a
 set -o pipefail
 
 pcidb_arg0="$(basename $0)"
-pcidb_prog="/usr/lib/pci/pcidb"
+pcidb_prog="${PCIDB:-/usr/lib/pci/pcidb}"
 pcidb_exit=0
 
-warn()
+function warn
 {
 	typeset msg="$*"
 	[[ -z "$msg" ]] && msg="failed"
@@ -32,7 +32,7 @@ warn()
 #
 # The following is intended to catch bad filters.
 #
-pcidb_bad_filter()
+function pcidb_bad_filter
 {
 	typeset filt="$1"
 
@@ -46,7 +46,7 @@ pcidb_bad_filter()
 
 }
 
-pcidb_bad_args()
+function pcidb_bad_args
 {
 	if $pcidb_prog $@ 2>/dev/null 1>/dev/null; then
 		warn "should have failed with args "$@", but passed"
@@ -57,7 +57,29 @@ pcidb_bad_args()
 	printf "TEST PASSED: invalid arguments %s\n" "$*"
 }
 
-pcidb_match()
+function pcidb_no_match
+{
+	if $pcidb_prog $@ 2>/dev/null 1>/dev/null; then
+		warn "should have failed with args "$@", but passed"
+		pcidb_exit=1
+		return
+	fi
+
+	printf "TEST PASSED: no match %s\n" "$*"
+}
+
+function pcidb_pass
+{
+	if ! $pcidb_prog $@ 2>/dev/null 1>/dev/null; then
+		warn "should have passed with args "$@", but failed"
+		pcidb_exit=1
+		return
+	fi
+
+	printf "TEST PASSED: pcidb %s\n" "$*"
+}
+
+function pcidb_match
 {
 	typeset output
 	typeset match="$1"
@@ -110,13 +132,21 @@ pcidb_match "I2O" -S -p -o subclass pciexclass,0e
 pcidb_match "Ethernet 1Gb 2-port 368i Adapter" -s -p -o subsystem pci1590,216,s
 
 #
-# We should get no output when we specify a class or device filter and
-# use a different table or we have an over specified filter.
+# Validate that multiple filters all match something. We don't look for
+# the exact table output due to the breadth of these filters.
 #
-pcidb_match "" -d pciclass,03
-pcidb_match "" -S pci1000
-pcidb_match "" -v pci8086,1234
-pcidb_match "" -c pciclass,010802
+pcidb_pass "pci8086" "pci8086,10d3.8086,a01f"
+pcidb_pass "pci8086,10d3.8086,a01f" "pci8086"
+pcidb_pass "pci8086" "pci8086,10d3.8086,a01f" "pci8086"
+pcidb_pass "pciclass,0c" "pciclass,0b"
+pcidb_pass "pciclass,06" "pciclass,0604"
+
+#
+# Verify valid filters that don't match anything cause use to exit zero
+#
+pcidb_no_match "pci8086" "pci8086,10d3.8086,ffff"
+pcidb_no_match "pci8086,10d3.8086,ffff"
+pcidb_no_match "pciclass,fffefd"
 
 #
 # Run through filter parsing
@@ -215,6 +245,41 @@ pcidb_bad_args -o -p
 pcidb_bad_args -p -o terra
 pcidb_bad_args -p -o subclass -v
 pcidb_bad_args -v -d -c
+
+#
+# Bad table / filter combinations. This covers filters that don't agree
+# with one another, tables and filters that are opposite types, and
+# filters and tables that aren't specific enough.
+#
+pcidb_bad_args "pci8086" "pciclass,0b"
+pcidb_bad_args "pci8086,10d3" "pciclass,0b"
+pcidb_bad_args "pci8086,10d3,p" "pciclass,0b"
+pcidb_bad_args "pci8086,a01f,s" "pciclass,0b"
+pcidb_bad_args "pci8086,10d3.8086" "pciclass,0b"
+pcidb_bad_args "pci8086,10d3.8086.a01f" "pciclass,0b"
+pcidb_bad_args "pci8086" "pciclass,0604"
+pcidb_bad_args "pci8086,10d3" "pciclass,0604"
+pcidb_bad_args "pci8086,10d3,p" "pciclass,0604"
+pcidb_bad_args "pci8086,a01f,s" "pciclass,0604"
+pcidb_bad_args "pci8086,10d3.8086" "pciclass,0604"
+pcidb_bad_args "pci8086,10d3.8086.a01f" "pciclass,0604"
+pcidb_bad_args "pci8086" "pciclass,0c0330"
+pcidb_bad_args "pci8086,10d3" "pciclass,0c0330"
+pcidb_bad_args "pci8086,10d3,p" "pciclass,0c0330"
+pcidb_bad_args "pci8086,a01f,s" "pciclass,0c0330"
+pcidb_bad_args "pci8086,10d3.8086" "pciclass,0c0330"
+pcidb_bad_args "pci8086,10d3.8086.a01f" "pciclass,0c0330"
+
+pcidb_bad_args -c "pci1022"
+pcidb_bad_args -S "pci1022,1650"
+pcidb_bad_args -i "pci1022,1483.01de,fff9"
+pcidb_bad_args -v "pciclass02"
+
+pcidb_bad_args -d pciclass,03
+pcidb_bad_args -S pci1000
+pcidb_bad_args -v pci8086,1234
+pcidb_bad_args -c pciclass,010802
+
 
 if (( pcidb_exit == 0 )); then
 	printf "All tests passed successfully!\n"
