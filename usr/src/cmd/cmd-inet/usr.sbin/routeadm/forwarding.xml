@@ -70,7 +70,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-forwarding %m ipv4'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -80,7 +80,7 @@
 		name='stop'
 		exec='/lib/svc/method/svc-forwarding %m ipv4'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -90,7 +90,7 @@
 		name='refresh'
 		exec='/lib/svc/method/svc-forwarding %m ipv4'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -174,7 +174,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-forwarding %m ipv6'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -184,7 +184,7 @@
 		name='stop'
 		exec='/lib/svc/method/svc-forwarding %m ipv6'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -194,7 +194,7 @@
 		name='refresh'
 		exec='/lib/svc/method/svc-forwarding %m ipv6'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

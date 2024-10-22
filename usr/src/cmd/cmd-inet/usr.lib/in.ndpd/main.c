@@ -469,14 +469,6 @@ if_process(int s, char *ifname, boolean_t first)
 			logmsg(LOG_ERR, "if_process: out of memory\n");
 			return;
 		}
-		/*
-		 * if in.ndpd is restarted, check with ipmgmtd if there is any
-		 * interface id to be configured for this interface.
-		 */
-		if (first) {
-			if (phyint_check_ipadm_intfid(pi) == -1)
-				logmsg(LOG_ERR, "Could not get ipadm info\n");
-		}
 	} else {
 		/*
 		 * if the phyint already exists, synchronize it with
@@ -484,6 +476,18 @@ if_process(int s, char *ifname, boolean_t first)
 		 * calls phyint_init_from_k().
 		 */
 		(void) phyint_init_from_k(pi);
+	}
+	/*
+	 * Immediately after restart, check with ipmgmtd if there is
+	 * any interface id to be configured for this interface.  If
+	 * interface configuration is still in progress as we're
+	 * starting, this will clear pi->pi_autoconf so we don't get
+	 * ahead of ourselves; ipadm will poke us later to turn it
+	 * back on to restart configuration.
+	 */
+	if (first) {
+		if (phyint_check_ipadm_intfid(pi) == -1)
+			logmsg(LOG_ERR, "Could not get ipadm info\n");
 	}
 	if (pi->pi_sock == -1 && !(pi->pi_kernel_state & PI_PRESENT)) {
 		/* Interface is not yet present */
@@ -2556,6 +2560,12 @@ phyint_check_ipadm_intfid(struct phyint *pi)
 		sin6 = (struct sockaddr_in6 *)ifap->ifa_addr;
 		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 			if (ainfop->ia_atype == IPADM_ADDR_IPV6_ADDRCONF) {
+				/*
+				 * Clearing pi_default_token here
+				 * prevents the configured interface
+				 * token from being overwritten later.
+				 */
+				pi->pi_default_token = _B_FALSE;
 				pi->pi_token = sin6->sin6_addr;
 				pi->pi_token._S6_un._S6_u32[0] = 0;
 				pi->pi_token._S6_un._S6_u32[1] = 0;

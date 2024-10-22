@@ -6,8 +6,6 @@
 
         Licensed under the Academic Free License version 2.1
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -80,7 +78,7 @@
 		name='snmp'
 		enabled='false'>
 
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 

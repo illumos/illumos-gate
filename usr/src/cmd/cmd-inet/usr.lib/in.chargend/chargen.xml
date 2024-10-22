@@ -24,8 +24,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -55,7 +53,7 @@
 		name='inetd_start'
 		exec='/usr/lib/inet/in.chargend -d'
 		timeout_seconds='0'>
-	   	    <method_context>
+		    <method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		    </method_context>
 	    </exec_method>
@@ -87,7 +85,7 @@
 		name='inetd_start'
 		exec='/usr/lib/inet/in.chargend -s'
 		timeout_seconds='0'>
-		    <method_context>
+		    <method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		    </method_context>
 	    </exec_method>

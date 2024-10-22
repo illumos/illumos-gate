@@ -61,7 +61,7 @@
 			name='inetd_start'
 			exec='/usr/sbin/in.rlogind'
 			timeout_seconds='0'>
-			<method_context>
+			<method_context working_directory='/'>
 				<method_credential user='root' group='root' />
 			</method_context>
 		</exec_method>
@@ -110,7 +110,7 @@
 			name='inetd_start'
 			exec='/usr/sbin/in.rlogind -kc'
 			timeout_seconds='0'>
-			<method_context>
+			<method_context working_directory='/'>
 				<method_credential user='root' group='root' />
 			</method_context>
 		</exec_method>
@@ -158,7 +158,7 @@ remote login with Kerberos authentication
 			name='inetd_start'
 			exec='/usr/sbin/in.rlogind -kcx'
 			timeout_seconds='0'>
-			<method_context>
+			<method_context working_directory='/'>
 				<method_credential user='root' group='root' />
 			</method_context>
 		</exec_method>

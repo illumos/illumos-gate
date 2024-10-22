@@ -133,7 +133,7 @@ potential to specialize all the properties/methods.
 		name='start'
 		exec='/lib/svc/method/iscsi-initiator %m'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -147,7 +147,7 @@ potential to specialize all the properties/methods.
 		name='stop'
 		exec='/lib/svc/method/iscsi-initiator %m'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'

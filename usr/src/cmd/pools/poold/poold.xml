@@ -64,7 +64,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-poold %m'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -74,7 +74,7 @@
 		name='stop'
 		exec=':kill'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -84,7 +84,7 @@
 		name='refresh'
 		exec=':kill -HUP'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

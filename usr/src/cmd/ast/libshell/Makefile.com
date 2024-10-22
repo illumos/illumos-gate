@@ -67,6 +67,8 @@ CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-char-subscripts
 
+pics/bltins/print.o := CERRWARN += -_gcc14=-Wno-dangling-pointer
+
 # smatch gets out of memory on common/sh/macro.c
 SMATCH= off
 

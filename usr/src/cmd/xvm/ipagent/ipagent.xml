@@ -49,7 +49,7 @@
                 name='start'
                 exec='/lib/svc/method/svc-ipagent %m %{config/report_interval}'
                 timeout_seconds='60'>
-                <method_context>
+                <method_context working_directory='/'>
                         <method_credential user='root' />
                 </method_context>
         </exec_method>

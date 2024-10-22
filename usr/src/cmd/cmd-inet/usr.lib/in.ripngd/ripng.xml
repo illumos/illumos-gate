@@ -71,7 +71,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-ripng'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_chown,sys_ip_config,net_privaddr,net_icmpaccess,net_rawaccess'/>
 		</method_context>
@@ -82,7 +82,7 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 		name='stop'
 		exec=':kill'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'/>
 		</method_context>
 	</exec_method>

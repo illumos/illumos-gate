@@ -73,7 +73,7 @@ POSSIBILITY OF SUCH DAMAGE.
 		name='start'
 		exec='/lib/svc/method/svc-ndmp'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 				user='root' group='sys'
 			/>

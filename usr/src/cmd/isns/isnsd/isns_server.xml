@@ -59,7 +59,7 @@ Service manifests for the iSNS Server
 		name='start'
 		exec='/usr/sbin/isns'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -73,7 +73,7 @@ Service manifests for the iSNS Server
 		name='stop'
 		exec=':kill'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -87,7 +87,7 @@ Service manifests for the iSNS Server
 		name='refresh'
 		exec=':kill -HUP'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'

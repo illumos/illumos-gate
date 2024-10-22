@@ -82,7 +82,7 @@
 		name='start'
 		exec='/lib/svc/method/rpc-bind %m'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 				user='root'
 				group='root'
@@ -103,7 +103,7 @@
 		name='stop'
 		exec='/lib/svc/method/rpc-bind %m %{restarter/contract}'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 				user='root'
 				group='root'

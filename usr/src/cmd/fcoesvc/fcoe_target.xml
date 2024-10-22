@@ -62,7 +62,7 @@ Service manifests for the FCoE target configuration
 		name='start'
 		exec='/lib/svc/method/svc-fcoet'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'
@@ -76,7 +76,7 @@ Service manifests for the FCoE target configuration
 		name='stop'
 		exec=':true'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential
 			user='root'
 			group='root'

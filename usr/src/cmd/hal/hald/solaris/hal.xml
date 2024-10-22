@@ -65,7 +65,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-hal start'
 		timeout_seconds='600'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

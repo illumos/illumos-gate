@@ -61,7 +61,7 @@
 	    name='start'
 	    exec='/lib/svc/method/svc-vrrp start'
 	    timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<!--
 			    We need net_icmpaccess and net_rawaccess
 			    privileges to open the raw socket, the

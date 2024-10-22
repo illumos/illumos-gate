@@ -81,7 +81,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-auditd'
 		timeout_seconds='60'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -91,7 +91,7 @@
 		name='refresh'
 		exec='/lib/svc/method/svc-auditd'
 		timeout_seconds='30'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
@@ -106,7 +106,7 @@
 		name='stop'
 		exec=':kill -TERM'
 		timeout_seconds='30'>
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

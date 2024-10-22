@@ -58,7 +58,7 @@
 		name='start'
 		exec='/lib/svc/method/svc-acpihpd'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root'
 				privileges='basic,!proc_info,sys_config,sys_mount,sys_devices' />
 		</method_context>
@@ -69,7 +69,7 @@
 		name='stop'
 		exec=':kill'
 		timeout_seconds='60' >
-		<method_context>
+		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>

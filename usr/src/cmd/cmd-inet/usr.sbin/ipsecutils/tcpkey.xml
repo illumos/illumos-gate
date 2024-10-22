@@ -66,7 +66,7 @@
 		/>
 	</dependent>
 
-	<method_context>
+	<method_context working_directory='/'>
 		<method_credential user="root"
 			group="root"
 			privileges="basic_test,file_read,proc_fork,proc_exec,sys_ip_config"
