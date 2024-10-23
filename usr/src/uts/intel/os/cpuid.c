@@ -4832,7 +4832,7 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 	case X86_VENDOR_AMD:
 	case X86_VENDOR_HYGON:
 		if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_21) {
-			cp = &cpi->cpi_extd[7];
+			cp = &cpi->cpi_extd[0x21];
 			cp->cp_eax = CPUID_LEAF_EXT_21;
 			cp->cp_ecx = 0;
 			(void) __cpuid_insn(cp);
