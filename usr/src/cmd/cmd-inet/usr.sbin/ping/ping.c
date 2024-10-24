@@ -40,6 +40,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2023 Oxide computer Company
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #include <assert.h>
@@ -213,11 +214,8 @@ int64_t tsum2;			/* sum of squared times, for std. dev. */
 
 static struct targetaddr *build_targetaddr_list(struct addrinfo *,
     union any_in_addr *);
-extern void check_reply(struct addrinfo *, struct msghdr *, int, ushort_t);
-extern void check_reply6(struct addrinfo *, struct msghdr *, int, ushort_t);
-static struct targetaddr *create_targetaddr_item(int, union any_in_addr *,
+static struct targetaddr *create_targetaddr_item(struct sockaddr *,
     union any_in_addr *);
-void find_dstaddr(ushort_t, union any_in_addr *);
 static struct ifaddrlist *find_if(struct ifaddrlist *, int);
 static void finish();
 static void get_gwaddrs(char *[], int, union any_in_addr *,
@@ -225,32 +223,20 @@ static void get_gwaddrs(char *[], int, union any_in_addr *,
 static void get_hostinfo(char *, int, struct addrinfo **);
 static ushort_t in_cksum(ushort_t *, int);
 static int int_arg(char *s, char *what);
-boolean_t is_a_target(struct addrinfo *, union any_in_addr *);
 static void mirror_gws(union any_in_addr *, int);
 static void *ns_warning_thr(void *);
 static void parse_interval(const char *s);
 static void pinger(int, struct sockaddr *, struct msghdr *, int);
-char *pr_name(char *, int);
-char *pr_protocol(int);
 static void print_unknown_host_msg(const char *, const char *);
 static void recv_icmp_packet(struct addrinfo *, int, int, ushort_t, ushort_t);
 static void resolve_nodes(struct addrinfo **, struct addrinfo **,
     union any_in_addr **);
-void schedule_sigalrm();
 static void select_all_src_addrs(union any_in_addr **, struct addrinfo *,
     union any_in_addr *, union any_in_addr *);
 static void select_src_addr(union any_in_addr *, int, union any_in_addr *);
-void send_scheduled_probe();
-boolean_t seq_match(ushort_t, int, ushort_t);
-extern void set_ancillary_data(struct msghdr *, int, union any_in_addr *, int,
-    uint_t);
-extern void set_IPv4_options(int, union any_in_addr *, int, struct in_addr *,
-    struct in_addr *);
 static void set_nexthop(int, struct addrinfo *, int);
 static boolean_t setup_socket(int, int *, int *, int *, ushort_t *,
     struct addrinfo *);
-void sigalrm_handler();
-void tvsub(struct timeval *, struct timeval *);
 static void usage(char *);
 
 /*
@@ -776,18 +762,10 @@ build_targetaddr_list(struct addrinfo *ai_dst, union any_in_addr *src_addr_list)
 	nextp = &head;
 	for (aip = ai_dst, i = 0; aip != NULL; aip = aip->ai_next, i++) {
 		if (aip->ai_family == AF_INET && num_v4 != 0) {
-			targetaddr = create_targetaddr_item(aip->ai_family,
-			    (union any_in_addr *)
-			    /* LINTED E_BAD_PTR_CAST_ALIGN */
-			    &((struct sockaddr_in *)
-			    aip->ai_addr)->sin_addr,
+			targetaddr = create_targetaddr_item(aip->ai_addr,
 			    &src_addr_list[i]);
 		} else if (aip->ai_family == AF_INET6 && num_v6 != 0) {
-			targetaddr = create_targetaddr_item(aip->ai_family,
-			    (union any_in_addr *)
-			    /* LINTED E_BAD_PTR_CAST_ALIGN */
-			    &((struct sockaddr_in6 *)
-			    aip->ai_addr)->sin6_addr,
+			targetaddr = create_targetaddr_item(aip->ai_addr,
 			    &src_addr_list[i]);
 		} else {
 			continue;
@@ -804,24 +782,42 @@ build_targetaddr_list(struct addrinfo *ai_dst, union any_in_addr *src_addr_list)
 }
 
 /*
- * Given an address family, dst and src addresses, by also looking at the
- * options provided at the command line, this function creates a targetaddr
- * to be linked with others, forming a global targetaddr list. Each targetaddr
- * item contains information about probes sent to a specific IP address.
+ * Given a destination sockaddr (containing address family, address, and
+ * perhaps address scope) and a source address, this function creates a
+ * targetaddr structure that will become part of the global targetaddr
+ * list. Each targetaddr tracks the probes sent to a specific destination.
  */
 static struct targetaddr *
-create_targetaddr_item(int family, union any_in_addr *dst_addr,
-    union any_in_addr *src_addr)
+create_targetaddr_item(struct sockaddr *dst_addr, union any_in_addr *src_addr)
 {
 	struct targetaddr *targetaddr;
+	struct sockaddr_in *dst4 = (struct sockaddr_in *)dst_addr;
+	struct sockaddr_in6 *dst6 = (struct sockaddr_in6 *)dst_addr;
 
 	targetaddr = (struct targetaddr *)malloc(sizeof (struct targetaddr));
 	if (targetaddr == NULL) {
 		Fprintf(stderr, "%s: malloc %s\n", progname, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-	targetaddr->family = family;
-	targetaddr->dst_addr = *dst_addr;
+	targetaddr->family = dst_addr->sa_family;
+	switch (dst_addr->sa_family) {
+	case AF_INET:
+		memset(&targetaddr->dst_addr, 0, sizeof (targetaddr->dst_addr));
+		targetaddr->dst_addr.addr = dst4->sin_addr;
+		targetaddr->dst_scope = 0;
+		break;
+	case AF_INET6:
+		memset(&targetaddr->dst_addr, 0, sizeof (targetaddr->dst_addr));
+		targetaddr->dst_addr.addr6 = dst6->sin6_addr;
+		targetaddr->dst_scope = dst6->sin6_scope_id;
+
+		if (if_index != 0 && targetaddr->dst_scope != 0 &&
+		    if_index != targetaddr->dst_scope) {
+			Fprintf(stderr, "%s: warning: conflicting scopes; using"
+			    " %s\n", progname, pr_if(targetaddr->dst_scope));
+		}
+		break;
+	}
 	targetaddr->src_addr = *src_addr;
 	if (stats) {
 		/*
@@ -1867,6 +1863,8 @@ send_scheduled_probe()
 		} else {
 			to6.sin6_addr = current_targetaddr->dst_addr.addr6;
 		}
+		to6.sin6_scope_id = current_targetaddr->dst_scope;
+
 		/*
 		 * Setting the ancillary data once is enough, if we are
 		 * not using source routing through target (-l/-S). In
@@ -1876,13 +1874,21 @@ send_scheduled_probe()
 		 */
 		if (first_probe ||
 		    (send_reply && current_targetaddr->num_sent == 0)) {
+			int scope = if_index;
+			if (scope != 0 && to6.sin6_scope_id != 0)
+				/*
+				 * don't bother setting scope in ancillary data
+				 * as sin6_scope_id will override it.
+				 */
+				scope = 0;
+
 			if (send_reply) {
 				/* target is the middle gateway now */
 				gw_IP_list6[num_gw].addr6 =
 				    current_targetaddr->dst_addr.addr6;
 			}
 			set_ancillary_data(&msg6, hoplimit, gw_IP_list6,
-			    eff_num_gw, if_index);
+			    eff_num_gw, scope);
 			first_probe = _B_FALSE;
 		}
 		pinger(send_sock6, (struct sockaddr *)&to6, &msg6, AF_INET6);
@@ -2180,17 +2186,10 @@ pr_name(char *addr, int family)
 	struct sockaddr_in sin;
 	struct sockaddr_in6 sin6;
 	struct sockaddr *sa;
-	static struct in6_addr prev_addr = IN6ADDR_ANY_INIT;
-	char *cp;
-	char abuf[INET6_ADDRSTRLEN];
-	static char buf[NI_MAXHOST + INET6_ADDRSTRLEN + 3];
-	uint_t slen, alen, hlen;
 
 	switch (family) {
 	case AF_INET:
 		(void) memset(&sin, 0, sizeof (sin));
-		slen = sizeof (struct sockaddr_in);
-		alen = sizeof (struct in_addr);
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		sin.sin_addr = *(struct in_addr *)addr;
 		sin.sin_port = 0;
@@ -2198,21 +2197,54 @@ pr_name(char *addr, int family)
 		break;
 	case AF_INET6:
 		(void) memset(&sin6, 0, sizeof (sin6));
-		slen = sizeof (struct sockaddr_in6);
-		alen = sizeof (struct in6_addr);
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		sin6.sin6_addr = *(struct in6_addr *)addr;
 		sin6.sin6_port = 0;
 		sa = (struct sockaddr *)&sin6;
 		break;
 	default:
+		sa = (struct sockaddr *)&sin6;
+		break;
+	}
+	sa->sa_family = family;
+	return (pr_name_sa(sa));
+}
+
+char *
+pr_name_sa(const struct sockaddr *sa)
+{
+	const struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+	const struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
+	int family = sa->sa_family;
+	static struct in6_addr prev_addr = IN6ADDR_ANY_INIT;
+	static int prev_scope = 0;
+	char *cp;
+	char abuf[INET6_ADDRSTRLEN];
+	static char buf[NI_MAXHOST + INET6_ADDRSTRLEN + 3];
+	uint_t slen, alen, hlen;
+	char *addr;
+	int scope;
+
+	switch (family) {
+	case AF_INET:
+		slen = sizeof (struct sockaddr_in);
+		alen = sizeof (struct in_addr);
+		addr = (char *)&sin->sin_addr;
+		scope = 0;
+		break;
+	case AF_INET6:
+		slen = sizeof (struct sockaddr_in6);
+		alen = sizeof (struct in6_addr);
+		addr = (char *)&sin6->sin6_addr;
+		scope = sin6->sin6_scope_id;
+		break;
+	default:
 		(void) snprintf(buf, sizeof (buf), "<invalid address family>");
 		return (buf);
 	}
-	sa->sa_family = family;
 
 	/* compare with the buffered (previous) lookup */
-	if (memcmp(addr, &prev_addr, alen) != 0) {
+	if (scope != prev_scope || memcmp(addr, &prev_addr, alen) != 0) {
 		int flags = (nflag) ? NI_NUMERICHOST : NI_NAMEREQD;
 		mutex_enter(&ns_lock);
 		ns_active = _B_TRUE;
@@ -2221,9 +2253,10 @@ pr_name(char *addr, int family)
 		if (getnameinfo(sa, slen, buf, sizeof (buf),
 		    NULL, 0, flags) != 0) {
 			/* getnameinfo() failed; return just the address */
-			if (inet_ntop(family, (const void*)addr,
-			    buf, sizeof (buf)) == NULL)
+			if (getnameinfo(sa, slen, buf, sizeof (buf),
+			    NULL, 0, NI_NUMERICHOST) != 0) {
 				buf[0] = 0;
+			}
 		} else if (!nflag) {
 			/* append numeric address to hostname string */
 			hlen = strlen(buf);
@@ -2238,8 +2271,21 @@ pr_name(char *addr, int family)
 
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		prev_addr = *(struct in6_addr *)addr;
+		prev_scope = scope;
 	}
 	return (buf);
+}
+
+char *
+pr_name4(const struct sockaddr_in *sin)
+{
+	return (pr_name_sa((const struct sockaddr *)sin));
+}
+
+char *
+pr_name6(const struct sockaddr_in6 *sin6)
+{
+	return (pr_name_sa((const struct sockaddr *)sin6));
 }
 
 /*
@@ -2273,6 +2319,27 @@ pr_protocol(int prot)
 	}
 
 	return (buf);
+}
+
+char *
+pr_if(int ifindex)
+{
+	static struct ifaddrlist *al = NULL;
+	static int count = 0;
+	static char errbuf[ERRBUFSIZE];
+	int i;
+
+	if (al == NULL) {
+		count = ifaddrlist(&al, AF_INET6, 0, errbuf);
+		if (count < 0)
+			count = 0;
+	}
+	for (i = 0; i < count; i++) {
+		if (al[i].index == ifindex)
+			return (al[i].device);
+	}
+	(void) sprintf(errbuf, "%d", ifindex);
+	return (errbuf);
 }
 
 /*
