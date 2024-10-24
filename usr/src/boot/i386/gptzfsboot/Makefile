@@ -67,6 +67,8 @@ install: all $(ROOTBOOTPROG)
 OBJS =	mb_header.o zfsboot.o sio.o cons.o devopen.o \
 	part.o disk.o bcache.o zfs_cmd.o
 
+cons.o := CFLAGS += -_gcc14=--param=min-pagesize=0
+zfsboot.o := CFLAGS += -_gcc14=--param=min-pagesize=0
 zfsboot.o := CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/uts/common/fs/zfs
 zfs_cmd.o := CPPFLAGS += -I$(SRC)/uts/common
 part.o := CPPFLAGS += -I$(ZLIB)

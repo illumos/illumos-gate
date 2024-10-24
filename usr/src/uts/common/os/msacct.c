@@ -360,6 +360,9 @@ mstate_aggr_state(proc_t *p, int a_state)
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT((unsigned)a_state < NMSTATES);
 
+	if ((unsigned)a_state >= NMSTATES)
+		return (0);
+
 	aggr_time = p->p_acct[a_state];
 	if (a_state == LMS_SYSTEM)
 		aggr_time += p->p_acct[LMS_TRAP];
