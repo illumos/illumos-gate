@@ -1148,13 +1148,14 @@ vrtc_read(struct vrtc *vrtc, uint8_t offset)
 	}
 }
 
-static void
+static int
 vrtc_write(struct vrtc *vrtc, uint8_t offset, uint8_t val)
 {
 	uint8_t *rtc_raw = (uint8_t *)&vrtc->rtcdev;
 
 	ASSERT(VRTC_LOCKED(vrtc));
-	ASSERT(offset < sizeof (struct rtcdev));
+	if (offset >= sizeof (struct rtcdev))
+		return (-1);
 
 	switch (offset) {
 	case RTC_STATUSA:
@@ -1188,7 +1189,7 @@ vrtc_write(struct vrtc *vrtc, uint8_t offset, uint8_t val)
 	if (rtc_field_datetime(offset) && !rtc_halted(vrtc)) {
 		vrtc->base_rtctime = vrtc_cmos_to_secs(vrtc);
 	}
-
+	return (0);
 }
 
 int
@@ -1196,40 +1197,40 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *val)
 {
 	struct vrtc *vrtc = arg;
+	int ret = -1;
 
 	if (bytes != 1) {
-		return (-1);
+		return (ret);
 	}
 
 	VRTC_LOCK(vrtc);
 	const uint8_t offset = vrtc->addr;
-	if (offset >= sizeof (struct rtcdev)) {
-		VRTC_UNLOCK(vrtc);
-		return (-1);
-	}
+	if (offset < sizeof (struct rtcdev)) {
+		ret = 0;
 
-	/* Ensure internal state of RTC is updated */
-	vrtc_update(vrtc, offset);
+		/* Ensure internal state of RTC is updated */
+		vrtc_update(vrtc, offset);
 
-	/*
-	 * Update RTC date/time CMOS fields, if necessary.
-	 *
-	 * While the necessity for reads is obvious, the need for it during
-	 * writes is slightly more subtle: A write to one of the date/time
-	 * fields will requiring (re)parsing them all in order to determine the
-	 * new working date/time for the RTC.
-	 */
-	if (rtc_field_datetime(offset)) {
-		vrtc_time_to_cmos(vrtc, false);
-	}
+		/*
+		 * Update RTC date/time CMOS fields, if necessary.
+		 *
+		 * While the necessity for reads is obvious, the need for it
+		 * during writes is slightly more subtle: A write to one of the
+		 * date/time fields will requiring (re)parsing them all in
+		 * order to determine the new working date/time for the RTC.
+		 */
+		if (rtc_field_datetime(offset)) {
+			vrtc_time_to_cmos(vrtc, false);
+		}
 
-	if (in) {
-		*val = vrtc_read(vrtc, offset);
-	} else {
-		vrtc_write(vrtc, offset, *val);
+		if (in) {
+			*val = vrtc_read(vrtc, offset);
+		} else {
+			ret = vrtc_write(vrtc, offset, *val);
+		}
 	}
 	VRTC_UNLOCK(vrtc);
-	return (0);
+	return (ret);
 }
 
 void
