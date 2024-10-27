@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 14, 2024
+.Dd October 27, 2024
 .Dt LIBJEDEC 3JEDEC
 .Os
 .Sh NAME
@@ -69,7 +69,7 @@ The function
 .Xr libjedec_vendor_string 3JEDEC
 provides the ability to translate the IDs to a well known name.
 .Pp
-Currently the library implements JEP106BH from September 2023.
+Currently the library implements JEP106BK from September 2024.
 .Ss Temperature Ranges
 Many JEDEC standards embed information about temperature ranges that
 components support for the case operating temperature, the ambient air
@@ -109,8 +109,8 @@ there is no guarantee that this will apply to future functions.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T Standard Manufacturer's Identification Code
-.%N JEP106BH
-.%D September 2023
+.%N JEP106BK
+.%D September 2024
 .Re
 .Rs
 .%Q JEDEC Solid State Technology Association

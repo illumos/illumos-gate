@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd September 21, 2023
+.Dd October 27, 2024
 .Dt LIBJEDEC_VENDOR_STRING 3JEDEC
 .Os
 .Sh NAME
@@ -56,7 +56,7 @@ When the value doesn't correspond to a known name then
 .Dv NULL
 is returned.
 .Pp
-Currently the data reflects the JEP106BH data from September 2023.
+Currently the data reflects the JEP106BK data from September 2024.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn libjedec_vendor_string
@@ -74,6 +74,6 @@ is returned to indicate that there is no mapping for the specified IDs.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T Standard Manufacturer's Identification Code
-.%N JEP106BH
-.%D September 2023
+.%N JEP106BK
+.%D September 2024
 .Re
