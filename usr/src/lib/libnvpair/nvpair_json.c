@@ -165,7 +165,7 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 		}
 
 		case DATA_TYPE_UINT8: {
-			FPRINTF(fp, "%hhu", fnvpair_value_uint8_t(curr));
+			FPRINTF(fp, "%hhu", fnvpair_value_uint8(curr));
 			break;
 		}
 
