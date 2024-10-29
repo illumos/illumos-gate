@@ -128,12 +128,12 @@ free:
 
 }
 
-void mark_untracked(struct expression *expr, int param, const char *key, const char *value)
+void mark_untracked(struct expression *expr, int param, char *key, char *value)
 {
 	mark_untracked_lost(expr, param, key, UNTRACKED_PARAM);
 }
 
-void mark_lost(struct expression *expr, int param, const char *key, const char *value)
+void mark_lost(struct expression *expr, int param, char *key, char *value)
 {
 	mark_untracked_lost(expr, param, key, LOST_PARAM);
 }
