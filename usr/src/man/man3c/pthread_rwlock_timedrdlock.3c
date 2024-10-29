@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd June 23, 2024
+.Dd October 29, 2024
 .Dt PTHREAD_RWLOCK_TIMEDRDLOCK 3C
 .Os
 .Sh NAME
@@ -83,10 +83,10 @@
 .Sh DESCRIPTION
 The
 .Fn pthread_rwlock_clockrdlock ,
-.Fn pthread_rwlock_timerrdlock ,
+.Fn pthread_rwlock_timedrdlock ,
 .Fn pthread_rwlock_relclockrdlock_np ,
 and
-.Fn pthread_rwlock_reltimerrdlock_np
+.Fn pthread_rwlock_reltimedrdlock_np
 functions apply a read lock to the read-write lock referenced by
 .Fa rwlock .
 The calling thread will acquire a read lock if there are no writers
@@ -174,10 +174,10 @@ lock that it already holds a write lock on.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn pthread_rwlock_clockrdlock ,
-.Fn pthread_rwlock_timerrdlock ,
+.Fn pthread_rwlock_timedrdlock ,
 .Fn pthread_rwlock_relclockrdlock_np ,
 and
-.Fn pthread_rwlock_reltimerrdlock_np
+.Fn pthread_rwlock_reltimedrdlock_np
 return
 .Sy 0
 and have successfully acquired a read lock on
@@ -186,10 +186,10 @@ Otherwise, an error number is returned to indicate the error.
 .Sh ERRORS
 The
 .Fn pthread_rwlock_clockrdlock ,
-.Fn pthread_rwlock_timerrdlock ,
+.Fn pthread_rwlock_timedrdlock ,
 .Fn pthread_rwlock_relclockrdlock_np ,
 and
-.Fn pthread_rwlock_reltimerrdlock_np
+.Fn pthread_rwlock_reltimedrdlock_np
 will fail if:
 .Bl -tag -width Er
 .It Er EAGAIN
