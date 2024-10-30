@@ -22,6 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ */
 
 
 #ifndef _PING_H
@@ -49,13 +52,13 @@ extern "C" {
  * This is the max it can be. But another limiting factor is the PMTU,
  * so in any instance, it can be less than 127.
  */
-#define	MAX_GWS6 	127
+#define	MAX_GWS6	127
 
 /* maximum of above two */
 #define	MAXMAX_GWS	MAX(MAX_GWS, MAX_GWS6)
 
 /* size of buffer to store the IPv4 gateway addresses */
-#define	ROUTE_SIZE 	(IPOPT_OLEN + IPOPT_OFFSET + \
+#define	ROUTE_SIZE	(IPOPT_OLEN + IPOPT_OFFSET + \
 			MAX_GWS * sizeof (struct in_addr))
 
 #define	A_CNT(ARRAY) (sizeof (ARRAY) / sizeof ((ARRAY)[0]))
@@ -86,6 +89,7 @@ struct targetaddr {
 	int family;
 	union any_in_addr dst_addr;	/* dst address for the probe */
 	union any_in_addr src_addr;	/* src addr to use for this dst addr */
+	int dst_scope;			/* scope of dst addr or zero */
 	int num_probes;			/* num of probes to send to this dst */
 	int num_sent;			/* number of probes already sent */
 	boolean_t got_reply;		/* received a reply from dst while */
@@ -134,7 +138,25 @@ extern boolean_t verbose;
 extern boolean_t send_reply;
 
 extern void ping_gettime(struct msghdr *, struct timeval *);
-
+extern void set_ancillary_data(struct msghdr *, int, union any_in_addr *,
+    int, uint_t);
+extern void check_reply(struct addrinfo *, struct msghdr *, int, ushort_t);
+extern void check_reply6(struct addrinfo *, struct msghdr *, int, ushort_t);
+extern void find_dstaddr(ushort_t, union any_in_addr *);
+extern boolean_t is_a_target(struct addrinfo *, union any_in_addr *);
+extern char *pr_if(int);
+extern char *pr_name(char *, int);
+extern char *pr_name_sa(const struct sockaddr *);
+extern char *pr_name4(const struct sockaddr_in *);
+extern char *pr_name6(const struct sockaddr_in6 *);
+extern char *pr_protocol(int);
+extern void schedule_sigalrm(void);
+extern void send_scheduled_probe(void);
+extern boolean_t seq_match(ushort_t, int, ushort_t);
+extern void set_IPv4_options(int, union any_in_addr *, int, struct in_addr *,
+    struct in_addr *);
+extern void sigalrm_handler();
+extern void tvsub(struct timeval *, struct timeval *);
 #ifdef __cplusplus
 }
 #endif

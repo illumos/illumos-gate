@@ -64,6 +64,7 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-empty-body
+CERRWARN += -_gcc=-Wno-array-bounds
 
 # needs work
 SMOFF += index_overflow
