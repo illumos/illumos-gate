@@ -44,14 +44,14 @@
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd June 23, 2024
+.Dd October 29, 2024
 .Dt PTHREAD_RWLOCK_TIMEDWRLOCK 3C
 .Os
 .Sh NAME
-.Nm pthread_rwlock_clockwdlock ,
-.Nm pthread_rwlock_timedwdlock ,
-.Nm pthread_rwlock_relclockwdlock_np ,
-.Nm pthread_rwlock_reltimedwdlock_np
+.Nm pthread_rwlock_clockwrlock ,
+.Nm pthread_rwlock_timedwrlock ,
+.Nm pthread_rwlock_relclockwrlock_np ,
+.Nm pthread_rwlock_reltimedwrlock_np
 .Nd lock a read-write lock for writing
 .Sh LIBRARY
 .Lb libc
@@ -59,32 +59,32 @@
 .In pthread.h
 .In time.h
 .Ft int
-.Fo pthread_rwlock_clockwdlock
+.Fo pthread_rwlock_clockwrlock
 .Fa "pthread_rwlock_t *restrict rwlock"
 .Fa "clockid_t clock"
 .Fa "const struct timespec *restrict abstime"
 .Fc
 .Ft int
-.Fo pthread_rwlock_timedwdlock
+.Fo pthread_rwlock_timedwrlock
 .Fa "pthread_rwlock_t *restrict rwlock"
 .Fa "const struct timespec *restrict abstime"
 .Fc
 .Ft int
-.Fo pthread_rwlock_relclockwdlock_np
+.Fo pthread_rwlock_relclockwrlock_np
 .Fa "pthread_rwlock_t *restrict rwlock"
 .Fa "clockid_t clock"
 .Fa "const struct timespec *restrict reltime"
 .Fc
 .Ft int
-.Fo pthread_rwlock_reltimedwdlock_np
+.Fo pthread_rwlock_reltimedwrlock_np
 .Fa "pthread_rwlock_t *restrict rwlock"
 .Fa "const struct timespec *restrict reltime"
 .Fc
 .Sh DESCRIPTION
 The
-.Fn pthread_rwlock_clockwdlock ,
-.Fn pthread_rwlock_timerwdlock ,
-.Fn pthread_rwlock_relclockwdlock_np ,
+.Fn pthread_rwlock_clockwrlock ,
+.Fn pthread_rwlock_timedwrlock ,
+.Fn pthread_rwlock_relclockwrlock_np ,
 and
 .Fn pthread_rwlock_reltimewrdlock_np
 functions apply a read lock to the read-write lock referenced by
@@ -172,10 +172,10 @@ lock that it already holds either a read or write lock on.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn pthread_rwlock_clockwrlock ,
-.Fn pthread_rwlock_timerwrlock ,
+.Fn pthread_rwlock_timedwrlock ,
 .Fn pthread_rwlock_relclockwrlock_np ,
 and
-.Fn pthread_rwlock_reltimerwrlock_np
+.Fn pthread_rwlock_reltimedwrlock_np
 return
 .Sy 0
 and have successfully acquired a write lock on
@@ -184,10 +184,10 @@ Otherwise, an error number is returned to indicate the error.
 .Sh ERRORS
 The
 .Fn pthread_rwlock_clockwrlock ,
-.Fn pthread_rwlock_timerwrlock ,
+.Fn pthread_rwlock_timedwrlock ,
 .Fn pthread_rwlock_relclockwrlock_np ,
 and
-.Fn pthread_rwlock_reltimerwrlock_np
+.Fn pthread_rwlock_reltimedwrlock_np
 will fail if:
 .Bl -tag -width Er
 .It Er EDEADLK
