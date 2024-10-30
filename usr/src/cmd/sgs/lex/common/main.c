@@ -19,7 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2024 MNX Cloud, Inc.
  * Copyright (c) 2014 Gary Mills
+ * Copyright (c) 2013, joyent, Inc.  All rights reserved.
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -45,6 +47,24 @@ static void get3core(void);
 #ifdef DEBUG
 static void free3core(void);
 #endif
+
+/*
+ * construct path to file and open it.
+ */
+static FILE *
+lex_open_driver(const char *fname, const char *dir)
+{
+	FILE *fp;
+	char path[PATH_MAX];
+
+	if (dir == NULL)
+		dir = NBASE;
+	(void) snprintf(path, PATH_MAX, "%s/%s", dir, fname);
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		error("Lex driver missing, file %s", path);
+	return (fp);
+}
 
 int
 main(int argc, char **argv)
@@ -84,13 +104,7 @@ main(int argc, char **argv)
 					"lex: -Q should be followed by [y/n]");
 				break;
 			case 'Y':
-				apath = (char *)malloc(strlen(optarg) +
-				    sizeof ("/nceucform") + 1);
-				if (apath == NULL)
-					error("No available memory "
-					    "for directory name.");
-				else
-					apath = strcpy(apath, optarg);
+				apath = optarg;
 				break;
 			case 'c':
 				ratfor = FALSE;
@@ -232,16 +246,11 @@ main(int argc, char **argv)
 	else
 		ypath = ratfor ? RATNAME : CNAME;
 
-	if (apath != NULL)
-		ypath = strcat(apath, strrchr(ypath, '/'));
-	fother = fopen(ypath, "r");
-	if (fother == NULL)
-		error("Lex driver missing, file %s", ypath);
+	fother = lex_open_driver(ypath, apath);
 	while ((i = getc(fother)) != EOF)
 		(void) putc((char)i, fout);
 	(void) fclose(fother);
 	(void) fclose(fout);
-	free(apath);
 	if (report == 1)
 		statistics();
 	(void) fclose(stdout);

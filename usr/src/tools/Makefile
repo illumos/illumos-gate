@@ -49,7 +49,8 @@ BOOT_SUBDIRS=		\
 	install.bin	\
 	.WAIT		\
 	ctf		\
-	yacc
+	yacc		\
+	lex
 
 COMMON_SUBDIRS=		\
 	codesign	\
@@ -113,6 +114,8 @@ ROOTDIRS=					\
 	$(ROOTONBLD)/etc			\
 	$(ROOTONBLD)/etc/exception_lists	\
 	$(ROOTONBLD)/share			\
+	$(ROOTONBLD)/share/lib			\
+	$(ROOTONBLD)/share/lib/ccs		\
 	$(ROOTONBLD)/man			\
 	$(ROOTONBLD)/man/man1onbld
 

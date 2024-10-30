@@ -674,10 +674,14 @@ opt/onbld/bin/i386/geniconvtbl	i386
 opt/onbld/bin/i386/makesoftcore	i386
 opt/onbld/bin/i386/rpcgen	i386
 opt/onbld/bin/i386/vtfontcvt	i386
+opt/onbld/bin/i386/lex		i386
 opt/onbld/bin/i386/yacc		i386
-opt/onbld/lib/yaccpar
 opt/onbld/bin/i386/svc.configd	i386
 opt/onbld/bin/i386/svccfg	i386
+opt/onbld/share/lib/ccs/nceucform
+opt/onbld/share/lib/ccs/ncform
+opt/onbld/share/lib/ccs/nrform
+opt/onbld/share/lib/ccs/yaccpar
 
 #
 # Private libdwarf
