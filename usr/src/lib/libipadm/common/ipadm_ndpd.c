@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -102,7 +102,8 @@ i_ipadm_create_ipv6addrs(ipadm_handle_t iph, ipadm_addrobj_t addr,
 		status = i_ipadm_send_ndpd_cmd(addr->ipadm_ifname, addr,
 		    IPADM_CREATE_ADDRS);
 		if (status != IPADM_SUCCESS &&
-		    status != IPADM_NDPD_NOT_RUNNING) {
+		    status != IPADM_NDPD_NOT_RUNNING &&
+		    status != IPADM_ADDRCONF_EXISTS) {
 			(void) i_ipadm_delete_addr(iph, addr);
 			return (status);
 		}
