@@ -10,10 +10,13 @@ pkg:/developer/macro/cpp
 pkg:/file/gnu-coreutils
 pkg:/gnome/zenity
 pkg:/library/expat
+pkg:/library/expat/32
 pkg:/library/glib2
+pkg:/library/glib2/32
 pkg:/library/libxml2
 pkg:/library/libxml2/32
 pkg:/library/nspr
+pkg:/library/nspr/32
 pkg:/library/security/openssl
 pkg:/library/security/openssl-10
 pkg:/library/security/openssl-11
@@ -45,6 +48,7 @@ pkg:/system/library/libdbus
 pkg:/system/library/libdbus-glib
 pkg:/system/library/mozilla-nss
 pkg:/system/management/snmp/net-snmp
+pkg:/system/management/snmp/net-snmp/32
 pkg:/system/test/fio
 pkg:/system/xvm/xvmstore
 pkg:/text/less
