@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 
 PROG=	snoop
@@ -51,7 +52,7 @@ include ../../../Makefile.ctf
 
 CPPFLAGS += -I. -I$(SRC)/common/net/dhcp \
 	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl -ltsol -luuid
+LDLIBS += -ldhcputil -ldlpi -lresolv -lsocket -lnsl -ltsol -luuid
 LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-implicit-function-declaration

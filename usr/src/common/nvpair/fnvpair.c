@@ -365,6 +365,19 @@ fnvlist_lookup_int64(nvlist_t *nvl, const char *name)
 }
 
 uint8_t
+fnvlist_lookup_uint8(nvlist_t *nvl, const char *name)
+{
+	uint8_t rv;
+	VERIFY0(nvlist_lookup_uint8(nvl, name, &rv));
+	return (rv);
+}
+
+/*
+ * This version with the _t suffix was put in a public version of the libnvpair
+ * mapfile. While it is no longer in the header file, it remains here for binary
+ * compatibility. All new software should use fnvlist_lookup_uint8().
+ */
+uint8_t
 fnvlist_lookup_uint8_t(nvlist_t *nvl, const char *name)
 {
 	uint8_t rv;
@@ -460,6 +473,19 @@ fnvpair_value_int64(nvpair_t *nvp)
 	return (rv);
 }
 
+uint8_t
+fnvpair_value_uint8(nvpair_t *nvp)
+{
+	uint8_t rv;
+	VERIFY0(nvpair_value_uint8(nvp, &rv));
+	return (rv);
+}
+
+/*
+ * This version with the _t suffix was put in a public version of the libnvpair
+ * mapfile. While it is no longer in the header file, it remains here for binary
+ * compatibility. All new software should use fnvpair_value_uint8().
+ */
 uint8_t
 fnvpair_value_uint8_t(nvpair_t *nvp)
 {

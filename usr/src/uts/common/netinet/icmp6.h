@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ */
 
 #ifndef	_NETINET_ICMP6_H
 #define	_NETINET_ICMP6_H
@@ -316,7 +319,7 @@ typedef struct nd_neighbor_advert {	/* neighbor advertisement */
  * defined in this order:
  *	Router flag
  *	Solicited flag
- * 	Override flag
+ *	Override flag
  */
 
 /* Save valuable htonl() cycles on little-endian boxen. */
@@ -359,6 +362,8 @@ typedef struct nd_opt_hdr {	/* Neighbor discovery option header */
 #define	ND_OPT_PREFIX_INFORMATION	3
 #define	ND_OPT_REDIRECTED_HEADER	4
 #define	ND_OPT_MTU			5
+#define	ND_OPT_DNS_RESOLVER		25
+#define	ND_OPT_DNS_SEARCHLIST		31
 
 typedef struct nd_opt_prefix_info {	/* prefix information */
 	uint8_t   nd_opt_pi_type;
@@ -399,6 +404,21 @@ struct nd_opt_lla {
 	uint8_t	nd_opt_lla_hdw_addr[ND_MAX_HDW_LEN];
 };
 
+struct nd_opt_dns_resolver {
+	uint8_t	  nd_opt_dnsr_type;
+	uint8_t	  nd_opt_dnsr_len;	/* in units of 8 octets */
+	uint16_t  nd_opt_dnsr_reserved;
+	uint32_t  nd_opt_dnsr_lifetime;
+	struct in6_addr nd_opt_dnsr_addr[];
+};
+
+struct nd_opt_dns_sl {
+	uint8_t	  nd_opt_dnss_type;
+	uint8_t	  nd_opt_dnss_len;	/* in units of 8 octets */
+	uint16_t  nd_opt_dnss_reserved;
+	uint32_t  nd_opt_dnss_lifetime;
+	uint8_t   nd_opt_dnss_names[];
+};
 
 /* Neighbor discovery protocol constants */
 

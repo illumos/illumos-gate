@@ -224,7 +224,7 @@ nvlist_do_json(nvlist_t *nvl, char **bufp, size_t *blen, off_t *offp)
 
 		case DATA_TYPE_UINT8: {
 			FPRINTF(bufp, blen, offp, "%hhu",
-			    fnvpair_value_uint8_t(curr));
+			    fnvpair_value_uint8(curr));
 			break;
 		}
 

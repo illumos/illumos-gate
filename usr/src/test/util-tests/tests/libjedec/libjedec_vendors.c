@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -65,6 +65,7 @@ static const libjedec_test_t libjedec_expects[] = {
 	{ 0x0b, 0xE6, "NUVIA Inc" },
 	{ 0x0c, 0xC4, "uFound" },
 	{ 0x0d, 0x8A, "Aerospace Science Memory Shenzhen" },
+	{ 0x0f, 0xD0, "PIRATEMAN" },
 	/* Various Failure cases */
 	{ 0x00, 0x05, NULL },
 	{ 0x0d, 0xFF, NULL },
@@ -102,6 +103,10 @@ main(void)
 				    libjedec_expects[i].ljtt_exp, out);
 			}
 		}
+	}
+
+	if (errs == 0) {
+		(void) printf("All tests completed successfully\n");
 	}
 
 	return (errs);

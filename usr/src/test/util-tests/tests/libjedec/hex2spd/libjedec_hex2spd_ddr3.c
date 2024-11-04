@@ -214,7 +214,7 @@ const hex2spd_test_t samsung_ddr3_rdimm = {
 	}, {
 		.hs_key = SPD_KEY_DEV_RCD_MFG_NAME,
 		.hs_type = DATA_TYPE_STRING,
-		.hs_val = { .hs_str = "Inphi Corporation" }
+		.hs_val = { .hs_str = "Marvell (Inphi)" }
 	}, {
 		.hs_key = SPD_KEY_DEV_RCD_REV,
 		.hs_type = DATA_TYPE_STRING,
@@ -482,7 +482,7 @@ const hex2spd_test_t micron_ddr3_lrdimm = {
 	}, {
 		.hs_key = SPD_KEY_DEV_DB_MFG_NAME,
 		.hs_type = DATA_TYPE_STRING,
-		.hs_val = { .hs_str = "Inphi Corporation" }
+		.hs_val = { .hs_str = "Marvell (Inphi)" }
 	}, {
 		.hs_key = SPD_KEY_DDR3_MB_DS_CA,
 		.hs_type = DATA_TYPE_UINT32,

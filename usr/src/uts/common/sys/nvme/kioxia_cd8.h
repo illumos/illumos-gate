@@ -65,14 +65,14 @@ typedef struct {
  * above. Note, entries in the latter part of the log just use zero keys.
  */
 typedef enum {
-	SOLIDIGM_SMART_TYPE_PROGRAM_FAIL	= 0xab,
-	SOLIDIGM_SMART_TYPE_ERASE_FAIL		= 0xac,
-	SOLIDIGM_SMART_TYPE_WEAR_LEVEL		= 0xad,
-	SOLIDIGM_SMART_TYPE_E2E_ERROR_DET	= 0xb8,
-	SOLIDIGM_SMART_TYPE_CRC_ERROR		= 0xc7,
-	SOLIDIGM_SMART_TYPE_NAND_WRITE		= 0xf4,
-	SOLIDIGM_SMART_TYPE_HOST_WRITE		= 0xf5
-} solidigm_smart_type_t;
+	KIOXIA_SMART_TYPE_PROGRAM_FAIL		= 0xab,
+	KIOXIA_SMART_TYPE_ERASE_FAIL		= 0xac,
+	KIOXIA_SMART_TYPE_WEAR_LEVEL		= 0xad,
+	KIOXIA_SMART_TYPE_E2E_ERROR_DET		= 0xb8,
+	KIOXIA_SMART_TYPE_CRC_ERROR		= 0xc7,
+	KIOXIA_SMART_TYPE_NAND_WRITE		= 0xf4,
+	KIOXIA_SMART_TYPE_HOST_WRITE		= 0xf5
+} kioxia_smart_type_t;
 
 
 typedef struct {
