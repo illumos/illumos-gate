@@ -42,6 +42,8 @@
 #
 
 verify_runnable "both"
+# See issue: https://github.com/openzfs/zfs/issues/6066
+log_unsupported "Occasionally aborts"
 
 #		Origin			Clone
 #
@@ -49,7 +51,7 @@ set -A	dtst	"$POOL"			"$POOL/pclone"		\
 		"$POOL/$FS/fs1/fs2"	"$POOL/$FS/fs1/fclone"
 if is_global_zone ; then
 	typeset -i n=${#dtst[@]}
-	dtst[((n))]="$POOL/$FS/vol"; 	dtst[((n+1))]="$POOL/$FS/vclone"
+	dtst[((n))]="$POOL/$FS/vol";	dtst[((n+1))]="$POOL/$FS/vclone"
 fi
 
 function cleanup
@@ -93,8 +95,8 @@ dstds=$(get_dst_ds $POOL $POOL2)
 #
 # Define all the POOL/POOL2 datasets pair
 #
-set -A pair 	"$POOL" 		"$dstds" 		\
-		"$POOL/$FS" 		"$dstds/$FS" 		\
+set -A pair	"$POOL"			"$dstds"		\
+		"$POOL/$FS"		"$dstds/$FS"		\
 		"$POOL/$FS/fs1"		"$dstds/$FS/fs1"	\
 		"$POOL/$FS/fs1/fs2"	"$dstds/$FS/fs1/fs2"	\
 		"$POOL/pclone"		"$dstds/pclone"		\
@@ -102,7 +104,7 @@ set -A pair 	"$POOL" 		"$dstds" 		\
 
 if is_global_zone ; then
 	typeset -i n=${#pair[@]}
-	pair[((n))]="$POOL/vol"; 	pair[((n+1))]="$dstds/vol"
+	pair[((n))]="$POOL/vol";	pair[((n+1))]="$dstds/vol"
 	pair[((n+2))]="$POOL/$FS/vol"	pair[((n+3))]="$dstds/$FS/vol"
 fi
 
