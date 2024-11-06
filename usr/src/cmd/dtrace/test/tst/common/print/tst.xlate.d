@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2024 Ryan Zezeski
  */
 
 #pragma D option quiet
@@ -31,9 +32,53 @@ translator pancakes_t < void *V > {
 	t = *(timespec_t *)`dtrace_zero;
 };
 
+typedef struct stb {
+	uint8_t v;
+	uint8_t z;
+} stb_t;
+
+translator stb_t < void *V > {
+	v = 0x8877665544332211;
+};
+
+typedef struct sth {
+	uint16_t v;
+	uint8_t z;
+} sth_t;
+
+translator sth_t < void *V > {
+	v = 0x8877665544332211;
+};
+
+typedef struct stw {
+	uint32_t v;
+	uint8_t z;
+} stw_t;
+
+translator stw_t < void *V > {
+	v = 0x8877665544332211;
+};
+
+typedef struct stx {
+	uint64_t v;
+	uint8_t z;
+} stx_t;
+
+translator stx_t < void *V > {
+	v = 0x8877665544332211;
+};
+
 BEGIN
 {
 	print(*(xlate < pancakes_t * > ((void *)NULL)));
+	printf("\n");
+	print(*(xlate < stb_t * > ((void *)NULL)));
+	printf("\n");
+	print(*(xlate < sth_t * > ((void *)NULL)));
+	printf("\n");
+	print(*(xlate < stw_t * > ((void *)NULL)));
+	printf("\n");
+	print(*(xlate < stx_t * > ((void *)NULL)));
 }
 
 BEGIN

@@ -6,3 +6,19 @@ pancakes_t {
         long tv_nsec = 0
     }
 }
+stb_t {
+    uint8_t v = 0x11
+    uint8_t z = 0
+}
+sth_t {
+    uint16_t v = 0x2211
+    uint8_t z = 0
+}
+stw_t {
+    uint32_t v = 0x44332211
+    uint8_t z = 0
+}
+stx_t {
+    uint64_t v = 0x8877665544332211
+    uint8_t z = 0
+}
