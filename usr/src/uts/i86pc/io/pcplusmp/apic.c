@@ -108,8 +108,6 @@ static void	apic_enable_intr(processorid_t cpun);
 static int		apic_get_ipivect(int ipl, int type);
 static void	apic_post_cyclic_setup(void *arg);
 
-#define	UCHAR_MAX	UINT8_MAX
-
 /*
  * The following vector assignments influence the value of ipltopri and
  * vectortoipl. Note that vectors 0 - 0x1f are not used. We can program

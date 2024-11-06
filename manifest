@@ -3971,6 +3971,7 @@ f usr/include/spawn.h 0644 root bin
 f usr/include/stack_unwind.h 0644 root bin
 f usr/include/stdalign.h 0644 root bin
 f usr/include/stdarg.h 0644 root bin
+f usr/include/stdbit.h 0644 root bin
 f usr/include/stdbool.h 0644 root bin
 f usr/include/stddef.h 0644 root bin
 f usr/include/stdint.h 0644 root bin
@@ -4842,6 +4843,7 @@ f usr/include/sys/stat_impl.h 0644 root bin
 f usr/include/sys/statfs.h 0644 root bin
 f usr/include/sys/statvfs.h 0644 root bin
 f usr/include/sys/stdalign.h 0644 root bin
+f usr/include/sys/stdbit.h 0644 root bin
 f usr/include/sys/stdbool.h 0644 root bin
 f usr/include/sys/stddef.h 0644 root bin
 f usr/include/sys/stdint.h 0644 root bin
@@ -13929,6 +13931,84 @@ f usr/share/man/man3c/stack_getbounds.3c 0444 root bin
 f usr/share/man/man3c/stack_inbounds.3c 0444 root bin
 f usr/share/man/man3c/stack_setbounds.3c 0444 root bin
 f usr/share/man/man3c/stack_violation.3c 0444 root bin
+f usr/share/man/man3c/stdc_bit_ceil.3c 0444 root bin
+s usr/share/man/man3c/stdc_bit_ceil_uc.3c=stdc_bit_ceil.3c
+s usr/share/man/man3c/stdc_bit_ceil_ui.3c=stdc_bit_ceil.3c
+s usr/share/man/man3c/stdc_bit_ceil_ul.3c=stdc_bit_ceil.3c
+s usr/share/man/man3c/stdc_bit_ceil_ull.3c=stdc_bit_ceil.3c
+s usr/share/man/man3c/stdc_bit_ceil_us.3c=stdc_bit_ceil.3c
+f usr/share/man/man3c/stdc_bit_floor.3c 0444 root bin
+s usr/share/man/man3c/stdc_bit_floor_uc.3c=stdc_bit_floor.3c
+s usr/share/man/man3c/stdc_bit_floor_ui.3c=stdc_bit_floor.3c
+s usr/share/man/man3c/stdc_bit_floor_ul.3c=stdc_bit_floor.3c
+s usr/share/man/man3c/stdc_bit_floor_ull.3c=stdc_bit_floor.3c
+s usr/share/man/man3c/stdc_bit_floor_us.3c=stdc_bit_floor.3c
+f usr/share/man/man3c/stdc_count_ones.3c 0444 root bin
+s usr/share/man/man3c/stdc_count_ones_uc.3c=stdc_count_ones.3c
+s usr/share/man/man3c/stdc_count_ones_ui.3c=stdc_count_ones.3c
+s usr/share/man/man3c/stdc_count_ones_ul.3c=stdc_count_ones.3c
+s usr/share/man/man3c/stdc_count_ones_ull.3c=stdc_count_ones.3c
+s usr/share/man/man3c/stdc_count_ones_us.3c=stdc_count_ones.3c
+f usr/share/man/man3c/stdc_count_zeros.3c 0444 root bin
+s usr/share/man/man3c/stdc_count_zeros_uc.3c=stdc_count_zeros.3c
+s usr/share/man/man3c/stdc_count_zeros_ui.3c=stdc_count_zeros.3c
+s usr/share/man/man3c/stdc_count_zeros_ul.3c=stdc_count_zeros.3c
+s usr/share/man/man3c/stdc_count_zeros_ull.3c=stdc_count_zeros.3c
+s usr/share/man/man3c/stdc_count_zeros_us.3c=stdc_count_zeros.3c
+f usr/share/man/man3c/stdc_first_leading_one.3c 0444 root bin
+s usr/share/man/man3c/stdc_first_leading_one_uc.3c=stdc_first_leading_one.3c
+s usr/share/man/man3c/stdc_first_leading_one_ui.3c=stdc_first_leading_one.3c
+s usr/share/man/man3c/stdc_first_leading_one_ul.3c=stdc_first_leading_one.3c
+s usr/share/man/man3c/stdc_first_leading_one_ull.3c=stdc_first_leading_one.3c
+s usr/share/man/man3c/stdc_first_leading_one_us.3c=stdc_first_leading_one.3c
+f usr/share/man/man3c/stdc_first_leading_zero.3c 0444 root bin
+s usr/share/man/man3c/stdc_first_leading_zero_uc.3c=stdc_first_leading_zero.3c
+s usr/share/man/man3c/stdc_first_leading_zero_ui.3c=stdc_first_leading_zero.3c
+s usr/share/man/man3c/stdc_first_leading_zero_ul.3c=stdc_first_leading_zero.3c
+s usr/share/man/man3c/stdc_first_leading_zero_ull.3c=stdc_first_leading_zero.3c
+s usr/share/man/man3c/stdc_first_leading_zero_us.3c=stdc_first_leading_zero.3c
+f usr/share/man/man3c/stdc_first_trailing_one.3c 0444 root bin
+s usr/share/man/man3c/stdc_first_trailing_one_uc.3c=stdc_first_trailing_one.3c
+s usr/share/man/man3c/stdc_first_trailing_one_ui.3c=stdc_first_trailing_one.3c
+s usr/share/man/man3c/stdc_first_trailing_one_ul.3c=stdc_first_trailing_one.3c
+s usr/share/man/man3c/stdc_first_trailing_one_ull.3c=stdc_first_trailing_one.3c
+s usr/share/man/man3c/stdc_first_trailing_one_us.3c=stdc_first_trailing_one.3c
+f usr/share/man/man3c/stdc_first_trailing_zero.3c 0444 root bin
+s usr/share/man/man3c/stdc_first_trailing_zero_uc.3c=stdc_first_trailing_zero.3c
+s usr/share/man/man3c/stdc_first_trailing_zero_ui.3c=stdc_first_trailing_zero.3c
+s usr/share/man/man3c/stdc_first_trailing_zero_ul.3c=stdc_first_trailing_zero.3c
+s usr/share/man/man3c/stdc_first_trailing_zero_ull.3c=stdc_first_trailing_zero.3c
+s usr/share/man/man3c/stdc_first_trailing_zero_us.3c=stdc_first_trailing_zero.3c
+f usr/share/man/man3c/stdc_has_single_bit.3c 0444 root bin
+s usr/share/man/man3c/stdc_has_single_bit_uc.3c=stdc_has_single_bit.3c
+s usr/share/man/man3c/stdc_has_single_bit_ui.3c=stdc_has_single_bit.3c
+s usr/share/man/man3c/stdc_has_single_bit_ul.3c=stdc_has_single_bit.3c
+s usr/share/man/man3c/stdc_has_single_bit_ull.3c=stdc_has_single_bit.3c
+s usr/share/man/man3c/stdc_has_single_bit_us.3c=stdc_has_single_bit.3c
+f usr/share/man/man3c/stdc_leading_ones.3c 0444 root bin
+s usr/share/man/man3c/stdc_leading_ones_uc.3c=stdc_leading_ones.3c
+s usr/share/man/man3c/stdc_leading_ones_ui.3c=stdc_leading_ones.3c
+s usr/share/man/man3c/stdc_leading_ones_ul.3c=stdc_leading_ones.3c
+s usr/share/man/man3c/stdc_leading_ones_ull.3c=stdc_leading_ones.3c
+s usr/share/man/man3c/stdc_leading_ones_us.3c=stdc_leading_ones.3c
+f usr/share/man/man3c/stdc_leading_zeros.3c 0444 root bin
+s usr/share/man/man3c/stdc_leading_zeros_uc.3c=stdc_leading_zeros.3c
+s usr/share/man/man3c/stdc_leading_zeros_ui.3c=stdc_leading_zeros.3c
+s usr/share/man/man3c/stdc_leading_zeros_ul.3c=stdc_leading_zeros.3c
+s usr/share/man/man3c/stdc_leading_zeros_ull.3c=stdc_leading_zeros.3c
+s usr/share/man/man3c/stdc_leading_zeros_us.3c=stdc_leading_zeros.3c
+f usr/share/man/man3c/stdc_trailing_ones.3c 0444 root bin
+s usr/share/man/man3c/stdc_trailing_ones_uc.3c=stdc_trailing_ones.3c
+s usr/share/man/man3c/stdc_trailing_ones_ui.3c=stdc_trailing_ones.3c
+s usr/share/man/man3c/stdc_trailing_ones_ul.3c=stdc_trailing_ones.3c
+s usr/share/man/man3c/stdc_trailing_ones_ull.3c=stdc_trailing_ones.3c
+s usr/share/man/man3c/stdc_trailing_ones_us.3c=stdc_trailing_ones.3c
+f usr/share/man/man3c/stdc_trailing_zeros.3c 0444 root bin
+s usr/share/man/man3c/stdc_trailing_zeros_uc.3c=stdc_trailing_zeros.3c
+s usr/share/man/man3c/stdc_trailing_zeros_ui.3c=stdc_trailing_zeros.3c
+s usr/share/man/man3c/stdc_trailing_zeros_ul.3c=stdc_trailing_zeros.3c
+s usr/share/man/man3c/stdc_trailing_zeros_ull.3c=stdc_trailing_zeros.3c
+s usr/share/man/man3c/stdc_trailing_zeros_us.3c=stdc_trailing_zeros.3c
 s usr/share/man/man3c/stderr.3c=stdio.3c
 s usr/share/man/man3c/stdin.3c=stdio.3c
 f usr/share/man/man3c/stdio.3c 0444 root bin
@@ -15836,6 +15916,8 @@ s usr/share/man/man3head/stat.3head=stat.h.3head
 f usr/share/man/man3head/stat.h.3head 0444 root bin
 s usr/share/man/man3head/statvfs.3head=statvfs.h.3head
 f usr/share/man/man3head/statvfs.h.3head 0444 root bin
+s usr/share/man/man3head/stdbit.3head=stdbit.h.3head
+f usr/share/man/man3head/stdbit.h.3head 0444 root bin
 s usr/share/man/man3head/stdbool.3head=stdbool.h.3head
 f usr/share/man/man3head/stdbool.h.3head 0444 root bin
 s usr/share/man/man3head/stddef.3head=stddef.h.3head
@@ -21350,6 +21432,84 @@ s usr/share/man/man9f/sema_v.9f=semaphore.9f
 f usr/share/man/man9f/semaphore.9f 0444 root bin
 s usr/share/man/man9f/snprintf.9f=sprintf.9f
 f usr/share/man/man9f/sprintf.9f 0444 root bin
+f usr/share/man/man9f/stdc_bit_ceil.9f 0444 root bin
+s usr/share/man/man9f/stdc_bit_ceil_uc.9f=stdc_bit_ceil.9f
+s usr/share/man/man9f/stdc_bit_ceil_ui.9f=stdc_bit_ceil.9f
+s usr/share/man/man9f/stdc_bit_ceil_ul.9f=stdc_bit_ceil.9f
+s usr/share/man/man9f/stdc_bit_ceil_ull.9f=stdc_bit_ceil.9f
+s usr/share/man/man9f/stdc_bit_ceil_us.9f=stdc_bit_ceil.9f
+f usr/share/man/man9f/stdc_bit_floor.9f 0444 root bin
+s usr/share/man/man9f/stdc_bit_floor_uc.9f=stdc_bit_floor.9f
+s usr/share/man/man9f/stdc_bit_floor_ui.9f=stdc_bit_floor.9f
+s usr/share/man/man9f/stdc_bit_floor_ul.9f=stdc_bit_floor.9f
+s usr/share/man/man9f/stdc_bit_floor_ull.9f=stdc_bit_floor.9f
+s usr/share/man/man9f/stdc_bit_floor_us.9f=stdc_bit_floor.9f
+f usr/share/man/man9f/stdc_count_ones.9f 0444 root bin
+s usr/share/man/man9f/stdc_count_ones_uc.9f=stdc_count_ones.9f
+s usr/share/man/man9f/stdc_count_ones_ui.9f=stdc_count_ones.9f
+s usr/share/man/man9f/stdc_count_ones_ul.9f=stdc_count_ones.9f
+s usr/share/man/man9f/stdc_count_ones_ull.9f=stdc_count_ones.9f
+s usr/share/man/man9f/stdc_count_ones_us.9f=stdc_count_ones.9f
+f usr/share/man/man9f/stdc_count_zeros.9f 0444 root bin
+s usr/share/man/man9f/stdc_count_zeros_uc.9f=stdc_count_zeros.9f
+s usr/share/man/man9f/stdc_count_zeros_ui.9f=stdc_count_zeros.9f
+s usr/share/man/man9f/stdc_count_zeros_ul.9f=stdc_count_zeros.9f
+s usr/share/man/man9f/stdc_count_zeros_ull.9f=stdc_count_zeros.9f
+s usr/share/man/man9f/stdc_count_zeros_us.9f=stdc_count_zeros.9f
+f usr/share/man/man9f/stdc_first_leading_one.9f 0444 root bin
+s usr/share/man/man9f/stdc_first_leading_one_uc.9f=stdc_first_leading_one.9f
+s usr/share/man/man9f/stdc_first_leading_one_ui.9f=stdc_first_leading_one.9f
+s usr/share/man/man9f/stdc_first_leading_one_ul.9f=stdc_first_leading_one.9f
+s usr/share/man/man9f/stdc_first_leading_one_ull.9f=stdc_first_leading_one.9f
+s usr/share/man/man9f/stdc_first_leading_one_us.9f=stdc_first_leading_one.9f
+f usr/share/man/man9f/stdc_first_leading_zero.9f 0444 root bin
+s usr/share/man/man9f/stdc_first_leading_zero_uc.9f=stdc_first_leading_zero.9f
+s usr/share/man/man9f/stdc_first_leading_zero_ui.9f=stdc_first_leading_zero.9f
+s usr/share/man/man9f/stdc_first_leading_zero_ul.9f=stdc_first_leading_zero.9f
+s usr/share/man/man9f/stdc_first_leading_zero_ull.9f=stdc_first_leading_zero.9f
+s usr/share/man/man9f/stdc_first_leading_zero_us.9f=stdc_first_leading_zero.9f
+f usr/share/man/man9f/stdc_first_trailing_one.9f 0444 root bin
+s usr/share/man/man9f/stdc_first_trailing_one_uc.9f=stdc_first_trailing_one.9f
+s usr/share/man/man9f/stdc_first_trailing_one_ui.9f=stdc_first_trailing_one.9f
+s usr/share/man/man9f/stdc_first_trailing_one_ul.9f=stdc_first_trailing_one.9f
+s usr/share/man/man9f/stdc_first_trailing_one_ull.9f=stdc_first_trailing_one.9f
+s usr/share/man/man9f/stdc_first_trailing_one_us.9f=stdc_first_trailing_one.9f
+f usr/share/man/man9f/stdc_first_trailing_zero.9f 0444 root bin
+s usr/share/man/man9f/stdc_first_trailing_zero_uc.9f=stdc_first_trailing_zero.9f
+s usr/share/man/man9f/stdc_first_trailing_zero_ui.9f=stdc_first_trailing_zero.9f
+s usr/share/man/man9f/stdc_first_trailing_zero_ul.9f=stdc_first_trailing_zero.9f
+s usr/share/man/man9f/stdc_first_trailing_zero_ull.9f=stdc_first_trailing_zero.9f
+s usr/share/man/man9f/stdc_first_trailing_zero_us.9f=stdc_first_trailing_zero.9f
+f usr/share/man/man9f/stdc_has_single_bit.9f 0444 root bin
+s usr/share/man/man9f/stdc_has_single_bit_uc.9f=stdc_has_single_bit.9f
+s usr/share/man/man9f/stdc_has_single_bit_ui.9f=stdc_has_single_bit.9f
+s usr/share/man/man9f/stdc_has_single_bit_ul.9f=stdc_has_single_bit.9f
+s usr/share/man/man9f/stdc_has_single_bit_ull.9f=stdc_has_single_bit.9f
+s usr/share/man/man9f/stdc_has_single_bit_us.9f=stdc_has_single_bit.9f
+f usr/share/man/man9f/stdc_leading_ones.9f 0444 root bin
+s usr/share/man/man9f/stdc_leading_ones_uc.9f=stdc_leading_ones.9f
+s usr/share/man/man9f/stdc_leading_ones_ui.9f=stdc_leading_ones.9f
+s usr/share/man/man9f/stdc_leading_ones_ul.9f=stdc_leading_ones.9f
+s usr/share/man/man9f/stdc_leading_ones_ull.9f=stdc_leading_ones.9f
+s usr/share/man/man9f/stdc_leading_ones_us.9f=stdc_leading_ones.9f
+f usr/share/man/man9f/stdc_leading_zeros.9f 0444 root bin
+s usr/share/man/man9f/stdc_leading_zeros_uc.9f=stdc_leading_zeros.9f
+s usr/share/man/man9f/stdc_leading_zeros_ui.9f=stdc_leading_zeros.9f
+s usr/share/man/man9f/stdc_leading_zeros_ul.9f=stdc_leading_zeros.9f
+s usr/share/man/man9f/stdc_leading_zeros_ull.9f=stdc_leading_zeros.9f
+s usr/share/man/man9f/stdc_leading_zeros_us.9f=stdc_leading_zeros.9f
+f usr/share/man/man9f/stdc_trailing_ones.9f 0444 root bin
+s usr/share/man/man9f/stdc_trailing_ones_uc.9f=stdc_trailing_ones.9f
+s usr/share/man/man9f/stdc_trailing_ones_ui.9f=stdc_trailing_ones.9f
+s usr/share/man/man9f/stdc_trailing_ones_ul.9f=stdc_trailing_ones.9f
+s usr/share/man/man9f/stdc_trailing_ones_ull.9f=stdc_trailing_ones.9f
+s usr/share/man/man9f/stdc_trailing_ones_us.9f=stdc_trailing_ones.9f
+f usr/share/man/man9f/stdc_trailing_zeros.9f 0444 root bin
+s usr/share/man/man9f/stdc_trailing_zeros_uc.9f=stdc_trailing_zeros.9f
+s usr/share/man/man9f/stdc_trailing_zeros_ui.9f=stdc_trailing_zeros.9f
+s usr/share/man/man9f/stdc_trailing_zeros_ul.9f=stdc_trailing_zeros.9f
+s usr/share/man/man9f/stdc_trailing_zeros_ull.9f=stdc_trailing_zeros.9f
+s usr/share/man/man9f/stdc_trailing_zeros_us.9f=stdc_trailing_zeros.9f
 f usr/share/man/man9f/stoi.9f 0444 root bin
 s usr/share/man/man9f/strcasecmp.9f=string.9f
 s usr/share/man/man9f/strcat.9f=string.9f

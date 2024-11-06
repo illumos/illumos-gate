@@ -1,0 +1,118 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_COUNT_ZEROS 3C
+.Os
+.Sh NAME
+.Nm stdc_count_zeros ,
+.Nm stdc_count_zeros_uc ,
+.Nm stdc_count_zeros_us ,
+.Nm stdc_count_zeros_ui ,
+.Nm stdc_count_zeros_ul ,
+.Nm stdc_count_zeros_ull
+.Nd count zero bits
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdbit.h
+.Ft "unsigned int"
+.Fo stdc_count_zeros
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_zeros_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_zeros_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_zeros_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_zeros_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_zeros_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_count_zeros
+family of functions returns the number of zero bits present in
+.Fa value .
+.Pp
+The
+.Fn stdc_count_zeros
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Pp
+Note that if an unsigned integer is promoted, it will always be filled
+with leading zeros, increasing the return value.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_count_zeros
+family always return the number of zero bits in
+.Fa value .
+These functions cannot fail.
+.Sh EXAMPLES
+.Sy Example 1
+Printing the total number of zero bits.
+.Bd -literal
+#include <stdbit.h>
+#include <stdio.h>
+#include <limits.h>
+
+int
+main(void)
+{
+	printf("0x%x 0x%x 0x%x 0x%x\en",
+	    stdc_count_zeros_uc(0x23),
+	    stdc_count_zeros_us(0x7777),
+	    stdc_count_zeros_ui(UINT32_MAX),
+	    stdc_count_zeros_ull(0));
+	return (0);
+}
+.Ed
+.Pp
+When compiled and run, this produces:
+.Bd -literal -offset indent
+$ ./a.out
+0x5 0x4 0x0 0x40
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr stdc_bit_ceil 3C ,
+.Xr stdc_bit_floor 3C ,
+.Xr stdc_bit_width 3C ,
+.Xr stdc_count_ones 3C ,
+.Xr stdc_first_leading_one 3C ,
+.Xr stdc_first_leading_zero 3C ,
+.Xr stdc_first_trailing_one 3C ,
+.Xr stdc_first_trailing_zero 3C ,
+.Xr stdc_has_single_bit 3C ,
+.Xr stdc_leading_ones 3C ,
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_trailing_ones 3C ,
+.Xr stdc_trailing_zeros 3C ,
+.Xr stdbit.h 3HEAD

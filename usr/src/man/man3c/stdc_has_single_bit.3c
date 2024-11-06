@@ -1,0 +1,126 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_HAS_SINGLE_BIT 3C
+.Os
+.Sh NAME
+.Nm stdc_has_single_bit ,
+.Nm stdc_has_single_bit_uc ,
+.Nm stdc_has_single_bit_us ,
+.Nm stdc_has_single_bit_ui ,
+.Nm stdc_has_single_bit_ul ,
+.Nm stdc_has_single_bit_ull
+.Nd determine if only one bit is set
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdbit.h
+.Ft bool
+.Fo stdc_has_single_bit
+.Fa "generic_value_type value"
+.Fc
+.Ft bool
+.Fo stdc_has_single_bit_uc
+.Fa "unsigned char value"
+.Fc
+.Ft bool
+.Fo stdc_has_single_bit_us
+.Fa "unsigned short value"
+.Fc
+.Ft bool
+.Fo stdc_has_single_bit_ui
+.Fa "unsigned int value"
+.Fc
+.Ft bool
+.Fo stdc_has_single_bit_ul
+.Fa "unsigned long value"
+.Fc
+.Ft bool
+.Fo stdc_has_single_bit_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_has_single_bit
+family of functions determines whether the value has only a single bit
+set.
+.Fa value .
+The function returns
+.Dv true
+if there is exactly one bit whose value is set to one in
+.Fa value .
+.Pp
+The
+.Fn stdc_has_single_bit
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_has_single_bit
+family return
+.Dv true
+if exactly one bit is set in
+.Fa value .
+Otherwise,
+.Dv false
+is returned.
+These functions cannot fail.
+.Sh EXAMPLES
+.Sy Example 1
+Printing whether only a single bit is set.
+.Bd -literal
+#include <stdbit.h>
+#include <stdio.h>
+#include <limits.h>
+
+int
+main(void)
+{
+	printf("%s %s %s %s\en",
+	    stdc_has_single_bit_uc(0x23) ? "true" : "false",
+	    stdc_has_single_bit_us(0x0080) ? "true" : "false",
+	    stdc_has_single_bit_ui(0x81941b23) ? "true" : "false",
+	    stdc_has_single_bit_ull(0x00200000000000000) ?
+	    "true" : "false");
+	return (0);
+}
+.Ed
+.Pp
+When compiled and run, this produces:
+.Bd -literal -offset indent
+$ ./a.out
+false true false true
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr stdc_bit_ceil 3C ,
+.Xr stdc_bit_floor 3C ,
+.Xr stdc_bit_width 3C ,
+.Xr stdc_count_ones 3C ,
+.Xr stdc_count_zeros 3C ,
+.Xr stdc_first_leading_one 3C ,
+.Xr stdc_first_leading_zero 3C ,
+.Xr stdc_first_trailing_one 3C ,
+.Xr stdc_first_trailing_zero 3C ,
+.Xr stdc_leading_ones 3C ,
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_trailing_ones 3C ,
+.Xr stdc_trailing_zeros 3C ,
+.Xr stdbit.h 3HEAD

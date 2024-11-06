@@ -143,6 +143,8 @@ timeout = 600
 [/opt/libc-tests/tests/quick_exit]
 [/opt/libc-tests/tests/set_constraint_handler_s.32]
 [/opt/libc-tests/tests/set_constraint_handler_s.64]
+[/opt/libc-tests/tests/stdbit.32]
+[/opt/libc-tests/tests/stdbit.64]
 [/opt/libc-tests/tests/strerror.32]
 [/opt/libc-tests/tests/strerror.64]
 [/opt/libc-tests/tests/strtonum.32]

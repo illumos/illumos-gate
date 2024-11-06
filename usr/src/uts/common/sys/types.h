@@ -595,6 +595,21 @@ typedef	unsigned long	ulong;
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
+#define	CHAR_BIT	8		/* max # of bits in a "char" */
+#define	SCHAR_MIN	(-128)		/* min value of a "signed char" */
+#define	SCHAR_MAX	127		/* max value of a "signed char" */
+#define	UCHAR_MAX	255		/* max value of an "unsigned char" */
+
+#if defined(_CHAR_IS_SIGNED)
+#define	CHAR_MIN	SCHAR_MIN	/* min value of a "char" */
+#define	CHAR_MAX	SCHAR_MAX	/* max value of a "char" */
+#elif defined(_CHAR_IS_UNSIGNED)
+#define	CHAR_MIN	0		/* min value of a "char" */
+#define	CHAR_MAX	UCHAR_MAX	/* max value of a "char" */
+#else
+#error "chars are signed or unsigned"
+#endif
+
 #define	SHRT_MIN	(-32768)	/* min value of a "short int" */
 #define	SHRT_MAX	32767		/* max value of a "short int" */
 #define	USHRT_MAX	65535		/* max of "unsigned short int" */

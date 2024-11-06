@@ -58,7 +58,6 @@
 #include <sys/systm.h>
 #define assert ASSERT
 #define	labs(a) (a >= 0 ? a : -a)
-#define	UCHAR_MAX 255
 #define	memset(s, c, n) bzero(s, n)
 #define	memcpy(a,b,c) bcopy((caddr_t)b, (caddr_t)a, c)
 /*

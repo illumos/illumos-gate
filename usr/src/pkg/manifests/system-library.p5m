@@ -1271,6 +1271,8 @@ license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
 license usr/src/common/util/THIRDPARTYLICENSE.multi3 \
     license=usr/src/common/util/THIRDPARTYLICENSE.multi3
+license usr/src/common/util/THIRDPARTYLICENSE.uiuc \
+    license=usr/src/common/util/THIRDPARTYLICENSE.uiuc
 license usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE \
     license=usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
 license usr/src/lib/libc/THIRDPARTYLICENSE \

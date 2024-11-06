@@ -1,0 +1,94 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_COUNT_ONES 9F
+.Os
+.Sh NAME
+.Nm stdc_count_ones ,
+.Nm stdc_count_ones_uc ,
+.Nm stdc_count_ones_us ,
+.Nm stdc_count_ones_ui ,
+.Nm stdc_count_ones_ul ,
+.Nm stdc_count_ones_ull
+.Nd count one bits
+.Sh SYNOPSIS
+.In sys/stdbit.h
+.Ft "unsigned int"
+.Fo stdc_count_ones
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_ones_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_ones_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_ones_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_ones_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_count_ones_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_count_ones
+family of functions returns the number of one bits present in
+.Fa value .
+These functions are sometimes referred to as a population count.
+.Pp
+The
+.Fn stdc_count_ones
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Sh CONTEXT
+These functions may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_count_ones
+family always return the number of one bits in
+.Fa value .
+These functions cannot fail.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr stdc_count_ones 3C ,
+.Xr stdc_bit_ceil 9F ,
+.Xr stdc_bit_floor 9F ,
+.Xr stdc_bit_width 9F ,
+.Xr stdc_count_zeros 9F ,
+.Xr stdc_first_leading_one 9F ,
+.Xr stdc_first_leading_zero 9F ,
+.Xr stdc_first_trailing_one 9F ,
+.Xr stdc_first_trailing_zero 9F ,
+.Xr stdc_has_single_bit 9F ,
+.Xr stdc_leading_ones 9F ,
+.Xr stdc_leading_zeros 9F ,
+.Xr stdc_trailing_ones 9F ,
+.Xr stdc_trailing_zeros 9F

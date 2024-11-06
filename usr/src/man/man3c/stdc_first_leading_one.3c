@@ -1,0 +1,159 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2024 Oxide Computer Company
+.\"
+.Dd October 27, 2024
+.Dt STDC_FIRST_LEADING_ONE 3C
+.Os
+.Sh NAME
+.Nm stdc_first_leading_one ,
+.Nm stdc_first_leading_one_uc ,
+.Nm stdc_first_leading_one_us ,
+.Nm stdc_first_leading_one_ui ,
+.Nm stdc_first_leading_one_ul ,
+.Nm stdc_first_leading_one_ull
+.Nd find index of most significant one bit
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdbit.h
+.Ft "unsigned int"
+.Fo stdc_first_leading_one
+.Fa "generic_value_type value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_first_leading_one_uc
+.Fa "unsigned char value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_first_leading_one_us
+.Fa "unsigned short value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_first_leading_one_ui
+.Fa "unsigned int value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_first_leading_one_ul
+.Fa "unsigned long value"
+.Fc
+.Ft "unsigned int"
+.Fo stdc_first_leading_one_ull
+.Fa "unsigned long long value"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn stdc_first_leading_one
+family of functions returns the 1s-based index of the first one bit in
+.Fa value
+starting at the most significant bit.
+If there is no one bit in
+.Fa value
+then zero is returned.
+.Pp
+The
+.Fn stdc_first_leading_one
+function is generic and will operate on all 8, 16, 32, and 64-bit
+unsigned integers; however, it is only available in C23.
+The other functions all operate on a specific integer type, but
+otherwise behave the same and are available regardless of the C language
+version.
+.Pp
+The way that the index is constructed is not necessarily intuitive.
+The C standard counts the most significant index starting with the most
+significant bit as index value 0.
+Consider the 16-bit value 0x952b.
+Generally we would consider the value
+.Sq b
+as bits 0 to 3 while the value
+.Sq 9
+as bits 12 to 15.
+Bit 15 is actually most significant index 0.
+Bit 14, most significant index 1.
+Bit 0, most significant index 15.
+This example, 0x952b, would return the value 1
+.Po
+when using the generic or
+.Vt unsigned short
+form
+.Pc
+as the function is defined to return this particular index
+.Em plus one .
+Zero is reserved for when there is no leading zero bit at all.
+.Pp
+Note that if a non-zero unsigned integer is promoted, it will always be filled
+with leading zeros which will cause the returned value to increase as
+the first one bit is further away from the most significant bit.
+.Pp
+While this is similar in function to the
+.Xr fls 3C
+functions which find the last set value and identify the same bits, the
+.Xr fls 3C
+functions determine the index starting from the least significant bit,
+instead of the most significant bit.
+.Sh RETURN VALUES
+The functions in the
+.Fn stdc_first_leading_one
+family always return the most significant index of the first leading
+one bit in
+.Fa value ,
+.Em plus one .
+Otherwise, if there are no one bits in
+.Fa value ,
+0 will be returned.
+These functions cannot fail.
+.Sh EXAMPLES
+.Sy Example 1
+Printing the index of the first leading one
+.Pq plus one .
+.Bd -literal
+#include <stdbit.h>
+#include <stdio.h>
+#include <limits.h>
+
+int
+main(void)
+{
+	printf("0x%x 0x%x 0x%x 0x%x\en",
+	    stdc_first_leading_one_uc(0x7f),
+	    stdc_first_leading_one_us(0x0000),
+	    stdc_first_leading_one_ui(UINT32_MAX),
+	    stdc_first_leading_one_ull(0x000fedcba9abcdef));
+	return (0);
+}
+.Ed
+.Pp
+When compiled and run, this produces:
+.Bd -literal -offset indent
+$ ./a.out
+0x2 0x0 0x1 0xd
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr fls 3C ,
+.Xr stdc_bit_ceil 3C ,
+.Xr stdc_bit_floor 3C ,
+.Xr stdc_bit_width 3C ,
+.Xr stdc_count_ones 3C ,
+.Xr stdc_count_zeros 3C ,
+.Xr stdc_first_leading_zero 3C ,
+.Xr stdc_first_trailing_one 3C ,
+.Xr stdc_first_trailing_zero 3C ,
+.Xr stdc_has_single_bit 3C ,
+.Xr stdc_leading_ones 3C ,
+.Xr stdc_leading_zeros 3C ,
+.Xr stdc_trailing_ones 3C ,
+.Xr stdc_trailing_zeros 3C ,
+.Xr stdbit.h 3HEAD

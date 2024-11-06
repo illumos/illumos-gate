@@ -78,6 +78,7 @@ MANFILES=	acct.h.3head		\
 		spawn.h.3head		\
 		stat.h.3head		\
 		statvfs.h.3head		\
+		stdbit.h.3head		\
 		stdbool.h.3head		\
 		stddef.h.3head		\
 		stdint.h.3head		\
@@ -265,6 +266,7 @@ MANLINKS +=	acct.3head		\
 		spawn.3head		\
 		stat.3head		\
 		statvfs.3head		\
+		stdbit.3head		\
 		stdbool.3head		\
 		stddef.3head		\
 		stdint.3head		\
@@ -451,6 +453,7 @@ socket.3head		:= LINKSRC = socket.h.3head
 spawn.3head		:= LINKSRC = spawn.h.3head
 stat.3head		:= LINKSRC = stat.h.3head
 statvfs.3head		:= LINKSRC = statvfs.h.3head
+stdbit.3head		:= LINKSRC = stdbit.h.3head
 stdbool.3head		:= LINKSRC = stdbool.h.3head
 stddef.3head		:= LINKSRC = stddef.h.3head
 stdint.3head		:= LINKSRC = stdint.h.3head

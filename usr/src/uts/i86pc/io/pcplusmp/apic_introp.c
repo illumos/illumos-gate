@@ -42,8 +42,6 @@
 #include <sys/pci_intr_lib.h>
 #include <sys/apic_common.h>
 
-#define	UCHAR_MAX	UINT8_MAX
-
 extern struct av_head autovect[];
 
 /*
@@ -324,7 +322,7 @@ apic_clear_mask(apic_irq_t *irqp)
 	int			intin_no;
 	ulong_t			iflag;
 	int32_t			rdt_entry;
-	int 			apic_ix;
+	int			apic_ix;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_clear_mask: irqp: %p\n",
 	    (void *)irqp));
@@ -353,7 +351,7 @@ static void
 apic_set_mask(apic_irq_t *irqp)
 {
 	int			intin_no;
-	int 			apic_ix;
+	int			apic_ix;
 	ulong_t			iflag;
 	int32_t			rdt_entry;
 
