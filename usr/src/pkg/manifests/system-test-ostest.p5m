@@ -74,6 +74,31 @@ file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
 file path=opt/os-tests/tests/getcontext_extd.32 mode=0555
 file path=opt/os-tests/tests/getcontext_extd.64 mode=0555
+dir  path=opt/os-tests/tests/hexdump
+dir  path=opt/os-tests/tests/hexdump/data
+file path=opt/os-tests/tests/hexdump/data/_input mode=0444
+file path=opt/os-tests/tests/hexdump/data/addr1 mode=0444
+file path=opt/os-tests/tests/hexdump/data/addr2 mode=0444
+file path=opt/os-tests/tests/hexdump/data/address mode=0444
+file path=opt/os-tests/tests/hexdump/data/address+header mode=0444
+file path=opt/os-tests/tests/hexdump/data/align1 mode=0444
+file path=opt/os-tests/tests/hexdump/data/ascii mode=0444
+file path=opt/os-tests/tests/hexdump/data/basic mode=0444
+file path=opt/os-tests/tests/hexdump/data/dedup mode=0444
+file path=opt/os-tests/tests/hexdump/data/default mode=0444
+file path=opt/os-tests/tests/hexdump/data/doublespace mode=0444
+file path=opt/os-tests/tests/hexdump/data/group2 mode=0444
+file path=opt/os-tests/tests/hexdump/data/group4 mode=0444
+file path=opt/os-tests/tests/hexdump/data/group8 mode=0444
+file path=opt/os-tests/tests/hexdump/data/header mode=0444
+file path=opt/os-tests/tests/hexdump/data/indent mode=0444
+file path=opt/os-tests/tests/hexdump/data/marker1 mode=0444
+file path=opt/os-tests/tests/hexdump/data/narrow1 mode=0444
+file path=opt/os-tests/tests/hexdump/data/narrow2 mode=0444
+file path=opt/os-tests/tests/hexdump/data/wide1 mode=0444
+file path=opt/os-tests/tests/hexdump/data/width12 mode=0444
+file path=opt/os-tests/tests/hexdump/hexdump_basic.32 mode=0555
+file path=opt/os-tests/tests/hexdump/hexdump_basic.64 mode=0555
 $(i386_ONLY)dir path=opt/os-tests/tests/i386
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555

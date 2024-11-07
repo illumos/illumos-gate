@@ -473,6 +473,10 @@ usr/include/sys/u8_textprep_data.h
 #
 usr/include/sys/bootbanner.h
 #
+# Private, for hexdump routines:
+#
+usr/include/sys/hexdump.h
+#
 # Private, for ilstr string handling routines:
 #
 usr/include/sys/ilstr.h

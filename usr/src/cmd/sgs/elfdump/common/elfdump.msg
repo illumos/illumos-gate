@@ -24,6 +24,7 @@
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Oxide Computer Company
 #
 
 @ _START_
@@ -389,7 +390,6 @@
 @ MSG_FMT_SECSYM	"%.*s%s"
 
 @ MSG_HEXDUMP_ROW	"%*s%-*s%s"
-@ MSG_HEXDUMP_TOK	"%2.2x"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 

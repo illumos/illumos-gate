@@ -35,6 +35,7 @@ COMMON_OBJS = \
 	crc16.o			\
 	gdb.o			\
 	hexdump.o		\
+	ilstr.o			\
 	iov.o			\
 	mem.o			\
 	mevent.o		\
@@ -128,11 +129,19 @@ pics: FRC
 	$(MKDIR) -p $@
 
 pics/%.o: ../common/%.c
-	$(COMPILE.c) -c -o $@ $<
+	$(COMPILE.c) $< -o $@
 	$(POST_PROCESS_O)
 
 pics/%.o: %.c
-	$(COMPILE.c) -c -o $@ $<
+	$(COMPILE.c) $< -o $@
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/hexdump/%.c
+	$(COMPILE.c) $< -o $@
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/ilstr/%.c
+	$(COMPILE.c) $< -o $@
 	$(POST_PROCESS_O)
 
 $(PROG): pics $(OBJS)

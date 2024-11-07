@@ -22,6 +22,7 @@
 #include <sys/sysmacros.h>
 #include <sys/byteorder.h>
 #include <sys/types.h>
+#include <sys/hexdump.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2482,52 +2483,10 @@ nvme_print_feat_progress(uint32_t cdw0, void *b, size_t s,
 /*
  * This is designed to print out a large buffer as decipherable hexadecimal.
  * This is intended for log pages or command output where there is unknown
- * printing. For an inline hex buffer, see nvme_print_hexbuf(). Our expectation
- * here is that we have approximately 6 digits worth of address on the left then
- * we'll spell out each byte, followed by the translated form on the right. Each
- * of these groups is separated by pipes.
+ * printing. For an inline hex buffer, see nvme_print_hexbuf().
  */
 void
 nvmeadm_dump_hex(const uint8_t *buf, size_t len)
 {
-	size_t off = 0;
-
-	if (len == 0) {
-		return;
-	}
-
-	/*
-	 * First we print the header.
-	 */
-	(void) printf("          ");
-	(void) printf("   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f");
-	(void) printf("   0123456789abcdef\n");
-
-	while (len > 0) {
-		size_t nents = MIN(len, 16);
-		len -= nents;
-
-		(void) printf("0x%06x  |", off);
-		for (size_t i = 0; i < nents; i++) {
-			(void) printf(" %02x", buf[i]);
-		}
-
-		for (size_t i = nents; i < 16; i++) {
-			(void) printf("   ");
-		}
-
-		(void) printf(" | ");
-
-		for (size_t i = 0; i < nents; i++) {
-			if (isprint(buf[i])) {
-				(void) printf("%c", buf[i]);
-			} else {
-				(void) putc('.', stdout);
-			}
-		}
-
-		(void) putc('\n', stdout);
-		buf += nents;
-		off += nents;
-	}
+	(void) hexdump_file(buf, len, HDF_DEFAULT, stdout);
 }

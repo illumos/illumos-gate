@@ -44,51 +44,52 @@ i386_CORE_OBJS += \
 
 sparc_CORE_OBJS +=
 
-COMMON_CORE_OBJS +=		\
-		beep.o		\
-		bitset.o	\
-		bp_map.o	\
-		brand.o		\
-		cpucaps.o	\
-		cmt.o		\
-		cmt_policy.o	\
-		cpu.o		\
-		cpu_uarray.o	\
-		cpu_event.o	\
-		cpu_intr.o	\
-		cpu_pm.o	\
-		cpupart.o	\
-		cap_util.o	\
-		disp.o		\
-		group.o		\
-		kstat_fr.o	\
+COMMON_CORE_OBJS +=			\
+		beep.o			\
+		bitset.o		\
+		bp_map.o		\
+		brand.o			\
+		cap_util.o		\
+		clock_tick.o		\
+		cmt.o			\
+		cmt_policy.o		\
+		cpu.o			\
+		cpu_event.o		\
+		cpu_intr.o		\
+		cpu_pm.o		\
+		cpu_uarray.o		\
+		cpucaps.o		\
+		cpupart.o		\
+		disp.o			\
+		group.o			\
+		hexdump.o		\
+		ilstr.o			\
 		iscsiboot_prop.o	\
-		lgrp.o		\
-		lgrp_topo.o	\
-		mmapobj.o	\
-		mutex.o		\
-		page_lock.o	\
-		page_retire.o	\
-		panic.o		\
-		param.o		\
-		pg.o		\
-		pghw.o		\
-		putnext.o	\
-		rctl_proc.o	\
-		rwlock.o	\
-		seg_kmem.o	\
-		softint.o	\
-		string.o	\
-		strtol.o	\
-		strtoul.o	\
-		strtoll.o	\
-		strtoull.o	\
-		ilstr.o		\
-		thread_intr.o	\
-		vm_page.o	\
-		vm_pagelist.o	\
-		zlib_obj.o	\
-		clock_tick.o
+		kstat_fr.o		\
+		lgrp.o			\
+		lgrp_topo.o		\
+		mmapobj.o		\
+		mutex.o			\
+		page_lock.o		\
+		page_retire.o		\
+		panic.o			\
+		param.o			\
+		pg.o			\
+		pghw.o			\
+		putnext.o		\
+		rctl_proc.o		\
+		rwlock.o		\
+		seg_kmem.o		\
+		softint.o		\
+		string.o		\
+		strtol.o		\
+		strtoll.o		\
+		strtoul.o		\
+		strtoull.o		\
+		thread_intr.o		\
+		vm_page.o		\
+		vm_pagelist.o		\
+		zlib_obj.o
 
 CORE_OBJS +=	$(COMMON_CORE_OBJS) $($(MACH)_CORE_OBJS)
 

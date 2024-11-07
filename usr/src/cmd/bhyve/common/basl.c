@@ -20,7 +20,7 @@
 #include <vmmapi.h>
 
 #ifndef	__FreeBSD__
-#include "hexdump.h"
+#include <sys/hexdump.h>
 #endif
 
 #include "basl.h"
@@ -113,14 +113,25 @@ basl_dump_table(const struct basl_table *const table, const bool mem)
 		}
 	}
 
+#ifdef	__FreeBSD__
 	printf("%.4s @ %8x (%s)\n", header->Signature,
 	    BHYVE_ACPI_BASE + table->off, mem ? "Memory" : "FwCfg");
 	hexdump(data, table->len, NULL, 0);
+#else
+	(void) printf("%.4s @ %8x (%s)\n", header->Signature,
+	    BHYVE_ACPI_BASE + table->off, mem ? "Memory" : "FwCfg");
+	hexdump_t h;
+	hexdump_init(&h);
+	hexdump_set_addr(&h, BHYVE_ACPI_BASE + table->off);
+	(void) hexdump_fileh(&h, data, table->len, HDF_DEFAULT, stdout);
+	hexdump_fini(&h);
+	(void) printf("\n");
+#endif
 
 	return (0);
 }
 
-static int __unused
+static int
 basl_dump(const bool mem)
 {
 	struct basl_table *table;
@@ -377,6 +388,11 @@ basl_finish(void)
 	load_into_memory = get_config_bool_default("acpi_tables_in_memory",
 	    true);
 
+#ifndef __FreeBSD__
+	if (get_config_bool_default("basl.debug", false))
+		basl_dump(false);
+#endif
+
 	/*
 	 * We have to install all tables before we can patch them. Therefore,
 	 * use two loops. The first one installs all tables and the second one
@@ -395,6 +411,11 @@ basl_finish(void)
 		BASL_EXEC(basl_finish_patch_checksums(table));
 	}
 	BASL_EXEC(qemu_loader_finish(basl_loader));
+
+#ifndef __FreeBSD__
+	if (get_config_bool_default("basl.debug", false))
+		basl_dump(true);
+#endif
 
 	return (0);
 }

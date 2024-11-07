@@ -30,6 +30,7 @@
 #include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/bitext.h>
+#include <sys/hexdump.h>
 
 #include <smbios.h>
 #include <alloca.h>
@@ -69,8 +70,7 @@ smbios_vergteq(smbios_version_t *v, uint_t major, uint_t minor)
 	return (B_FALSE);
 }
 
-/*PRINTFLIKE2*/
-static void
+static void __PRINTFLIKE(2)
 smbios_warn(smbios_hdl_t *shp, const char *format, ...)
 {
 	va_list ap;
@@ -87,8 +87,7 @@ smbios_warn(smbios_hdl_t *shp, const char *format, ...)
 	(void) fprintf(stderr, "\n");
 }
 
-/*PRINTFLIKE2*/
-static void
+static void __PRINTFLIKE(2)
 oprintf(FILE *fp, const char *format, ...)
 {
 	va_list ap;
@@ -98,8 +97,7 @@ oprintf(FILE *fp, const char *format, ...)
 	va_end(ap);
 }
 
-/*PRINTFLIKE3*/
-static void
+static void __PRINTFLIKE(3)
 desc_printf(const char *d, FILE *fp, const char *format, ...)
 {
 	va_list ap;
@@ -997,39 +995,17 @@ print_evlog(smbios_hdl_t *shp, id_t id, FILE *fp)
 static void
 print_bytes(const uint8_t *data, size_t size, FILE *fp)
 {
-	size_t row, rows = P2ROUNDUP(size, 16) / 16;
-	size_t col, cols;
+	hexdump_t h;
 
-	char buf[17];
-	uint8_t x;
+	hexdump_init(&h);
+	hexdump_set_grouping(&h, 4);
+	hexdump_set_indent(&h, 2);
 
-	oprintf(fp, "\n  offset:   0 1 2 3  4 5 6 7  8 9 a b  c d e f  "
-	    "0123456789abcdef\n");
+	(void) fprintf(fp, "\n");
+	(void) hexdump_fileh(&h, data, size, HDF_DEFAULT, fp);
+	(void) fprintf(fp, "\n");
 
-	for (row = 0; row < rows; row++) {
-		oprintf(fp, "  %#6lx: ", (ulong_t)row * 16);
-		cols = MIN(size - row * 16, 16);
-
-		for (col = 0; col < cols; col++) {
-			if (col % 4 == 0)
-				oprintf(fp, " ");
-			x = *data++;
-			oprintf(fp, "%02x", x);
-			buf[col] = x <= ' ' || x > '~' ? '.' : x;
-		}
-
-		for (; col < 16; col++) {
-			if (col % 4 == 0)
-				oprintf(fp, " ");
-			oprintf(fp, "  ");
-			buf[col] = ' ';
-		}
-
-		buf[col] = '\0';
-		oprintf(fp, "  %s\n", buf);
-	}
-
-	oprintf(fp, "\n");
+	hexdump_fini(&h);
 }
 
 static void
@@ -1510,7 +1486,6 @@ print_iprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 }
 
-
 static void
 print_boot(smbios_hdl_t *shp, FILE *fp)
 {
@@ -1649,7 +1624,7 @@ print_addinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
 				    *(uint32_t *)ent->smbai_data);
 				break;
 			case 8:
-				oprintf(fp, "    Data: 0x%x\n",
+				oprintf(fp, "    Data: 0x%llx\n",
 				    *(uint64_t *)ent->smbai_data);
 				break;
 			default:
@@ -1766,7 +1741,7 @@ print_battery(smbios_hdl_t *shp, id_t id, FILE *fp)
 	if (bat.smbb_err != UINT8_MAX) {
 		oprintf(fp, "  Maximum Error: %u\n", bat.smbb_err);
 	} else {
-		oprintf(fp, "  Maximum Error: unknown\n", bat.smbb_err);
+		oprintf(fp, "  Maximum Error: unknown\n");
 	}
 	oprintf(fp, "  SBDS Serial Number: %04x\n", bat.smbb_ssn);
 	oprintf(fp, "  SBDS Manufacture Date: %u-%02u-%02u\n", bat.smbb_syear,
@@ -1969,7 +1944,7 @@ print_fwinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "\n  Component Handles:\n");
 	for (i = 0; i < ncomps; i++) {
-		oprintf(fp, "    %ld\n", comps[i]);
+		oprintf(fp, "    %ld\n", comps[i].smbfwe_id);
 	}
 }
 

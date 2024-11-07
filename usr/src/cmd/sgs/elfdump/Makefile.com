@@ -23,6 +23,7 @@
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Oxide Computer Company
 #
 
 PROG=		elfdump
@@ -43,7 +44,10 @@ SGSCOMMONOBJ =	leb128.o
 
 BLTOBJ =	msg.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(SGSCOMMONOBJ)
+EXTOBJ =	hexdump.o ilstr.o
+
+OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(SGSCOMMONOBJ) \
+		$(EXTOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPT=		$(MAPFILE:%=-Wl,-M%)
@@ -74,3 +78,11 @@ SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) $(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES) gen_struct_layout
+
+%.o: $(SRC)/common/hexdump/%.c
+	$(COMPILE.c) $< -o $@
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/ilstr/%.c
+	$(COMPILE.c) $< -o $@
+	$(POST_PROCESS_O)

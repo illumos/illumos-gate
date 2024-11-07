@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -46,6 +47,7 @@
 #include	<_elfdump.h>
 #include	<sys/elf_SPARC.h>
 #include	<sys/elf_amd64.h>
+#include	<sys/hexdump.h>
 
 
 const Cache	cache_init = {NULL, NULL, NULL, NULL, 0};
@@ -162,76 +164,47 @@ detail_usage()
  * entry:
  *	data - Pointer to first byte of data to be displayed
  *	n - # of bytes of data
- *	prefix - String to be output before each line. Useful
- *		for indenting output.
- *	bytes_per_col - # of space separated bytes to output
- *		in each column.
+ *	bytes_per_col - # of space separated bytes to output in each column.
  *	col_per_row - # of columns to output per row
  *
  * exit:
- *	The formatted data has been sent to stdout. Each row of output
- *	shows (bytes_per_col * col_per_row) bytes of data.
+ *	The formatted data has been sent to stdout.
  */
-void
-dump_hex_bytes(const void *data, size_t n, int indent,
-    int bytes_per_col, int col_per_row)
+typedef struct {
+	uint_t	dd_indent;
+} dump_data_t;
+
+static int
+dump_hex_bytes_cb(void *arg, uint64_t addr, const char *str,
+    size_t len __unused)
 {
-	const uchar_t *ldata = data;
-	int	bytes_per_row = bytes_per_col * col_per_row;
-	int	ndx, byte, word;
-	char	string[128], *str = string;
-	char	index[MAXNDXSIZE];
-	int	index_width;
-	int	sp_prefix = 0;
+	char index[MAXNDXSIZE];
+	dump_data_t *dd = arg;
+	size_t index_width;
 
-
-	/*
-	 * Determine the width to use for the index string. We follow
-	 * 8-byte tab rules, but don't use an actual \t character so
-	 * that the output can be arbitrarily shifted without odd
-	 * tab effects, and so that all the columns line up no matter
-	 * how many lines of output are produced.
-	 */
-	ndx = n / bytes_per_row;
-	(void) snprintf(index, sizeof (index),
-	    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
+	(void) snprintf(index, sizeof (index), MSG_ORIG(MSG_FMT_INDEX2),
+	    EC_WORD(addr));
 	index_width = strlen(index);
 	index_width = S_ROUND(index_width, 8);
+	dbg_print(0, MSG_ORIG(MSG_HEXDUMP_ROW),
+	    dd->dd_indent, MSG_ORIG(MSG_STR_EMPTY),
+	    index_width, index, str);
+	return (0);
+}
 
-	for (ndx = byte = word = 0; n > 0; n--, ldata++) {
-		while (sp_prefix-- > 0)
-			*str++ = ' ';
-
-		(void) snprintf(str, sizeof (string),
-		    MSG_ORIG(MSG_HEXDUMP_TOK), (int)*ldata);
-		str += 2;
-		sp_prefix = 1;
-
-		if (++byte == bytes_per_col) {
-			sp_prefix += 2;
-			word++;
-			byte = 0;
-		}
-		if (word == col_per_row) {
-			*str = '\0';
-			(void) snprintf(index, sizeof (index),
-			    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
-			dbg_print(0, MSG_ORIG(MSG_HEXDUMP_ROW),
-			    indent, MSG_ORIG(MSG_STR_EMPTY),
-			    index_width, index, string);
-			sp_prefix = 0;
-			word = 0;
-			ndx += bytes_per_row;
-			str = string;
-		}
-	}
-	if (byte || word) {
-		*str = '\0';	/*  */
-		(void) snprintf(index, sizeof (index),
-		    MSG_ORIG(MSG_FMT_INDEX2), EC_WORD(ndx));
-		dbg_print(0, MSG_ORIG(MSG_HEXDUMP_ROW), indent,
-		    MSG_ORIG(MSG_STR_EMPTY), index_width, index, string);
-	}
+void
+dump_hex_bytes(const void *data, size_t n, int indent, int bytes_per_col,
+    int col_per_row)
+{
+	hexdump_t h;
+	dump_data_t dd = {
+		.dd_indent = indent
+	};
+	hexdump_init(&h);
+	hexdump_set_grouping(&h, bytes_per_col);
+	hexdump_set_width(&h, bytes_per_col * col_per_row);
+	(void) hexdumph(&h, data, n, HDF_DOUBLESPACE, dump_hex_bytes_cb, &dd);
+	hexdump_fini(&h);
 }
 
 /*

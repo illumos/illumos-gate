@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -21,6 +22,7 @@
 #include "atr.h"
 #include <sys/debug.h>
 #include <sys/sysmacros.h>
+#include <sys/hexdump.h>
 
 #ifdef	_KERNEL
 #include <sys/inttypes.h>
@@ -1447,49 +1449,12 @@ atr_data_dump_tc(atr_ti_t *atp, FILE *out, uint_t level)
 void
 atr_data_hexdump(const uint8_t *buf, size_t nbytes, FILE *out)
 {
-	size_t i, j;
+	hexdump_t h;
 
-	/* Print out the header */
-	(void) fprintf(out, "%*s    0", 4, "");
-	for (i = 1; i < 16; i++) {
-		if (i % 4 == 0 && i % 16 != 0) {
-			(void) fprintf(out, " ");
-		}
-
-		(void) fprintf(out, "%2x", i);
-	}
-	(void) fprintf(out, "  0123456789abcdef\n");
-
-	/* Print out data */
-	for (i = 0; i < nbytes; i++) {
-
-		if (i % 16 == 0) {
-			(void) fprintf(out, "%04x:  ", i);
-		}
-
-		if (i % 4 == 0 && i % 16 != 0) {
-			(void) fprintf(out, " ");
-		}
-
-		(void) fprintf(out, "%02x", buf[i]);
-
-		if (i % 16 == 15 || i + 1 == nbytes) {
-			for (j = (i % 16) + 1; j < 16; j++) {
-				if (j % 4 == 0 && j % 16 != 0) {
-					(void) fprintf(out, " ");
-				}
-
-				(void) fprintf(out, "  ");
-			}
-
-			(void) fprintf(out, "  ");
-			for (j = i - (i % 16); j <= i; j++) {
-				(void) fprintf(out, "%c",
-				    isprint(buf[j]) ? buf[j] : '.');
-			}
-			(void) printf("\n");
-		}
-	}
+	hexdump_init(&h);
+	hexdump_set_grouping(&h, 4);
+	(void) hexdump_fileh(&h, buf, nbytes, HDF_DEFAULT, out);
+	hexdump_fini(&h);
 }
 
 static void

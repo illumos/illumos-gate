@@ -21,9 +21,11 @@ include ../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lofmt -lcmdutils
-SRCS = ccidadm.c atr.c ilstr.o
+SRCS = ccidadm.c atr.c hexdump.o ilstr.o
 OBJS = $(SRCS:%.c=%.o)
 CPPFLAGS += -I$(SRC)/common/ccid
+
+hexdump.o := CSTD = $(CSTD_GNU99)
 
 .KEEP_STATE:
 
@@ -36,6 +38,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 %.o: $(SRC)/common/ccid/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/hexdump/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

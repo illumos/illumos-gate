@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_ILSTR_H
@@ -21,6 +21,7 @@
 #include <sys/varargs.h>
 #else
 #include <stdarg.h>
+#include <stddef.h>
 #endif
 
 #ifdef __cplusplus
