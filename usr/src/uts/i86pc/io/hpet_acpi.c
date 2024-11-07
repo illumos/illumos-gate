@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  * Copyright 2020 Joyent, Inc.
  */
 
@@ -352,11 +352,17 @@ hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags, hrtime_t (*stop_fn)(void),
 	hpet_establish_hooks();
 
 	if (idle_cpu_no_deep_c ||
-	    !cpuid_deep_cstates_supported()) {
+	    !cpuid_deep_cstates_supported() ||
+	    cpuid_arat_supported()) {
 		/*
 		 * If Deep C-States are disabled or not supported, then we do
 		 * not need to program the HPET at all as it will not
 		 * subsequently be used.
+		 *
+		 * Otherwise we may need the HPET depending on hardware support.
+		 * If the hardware indicates that LAPIC timers are always
+		 * active, we won't need to use the HPET proxy timer. Skip
+		 * programming it in that case as well.
 		 */
 		PRM_POINT("no need to program the HPET");
 		return (DDI_FAILURE);
