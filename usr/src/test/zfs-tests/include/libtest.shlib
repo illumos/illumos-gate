@@ -27,6 +27,7 @@
 # Copyright (c) 2017 by Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2017 Datto Inc.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -2394,6 +2395,9 @@ function get_fstype
 function labelvtoc
 {
 	typeset disk=$1
+	typeset -i iter=120
+	typeset -i ret_val=1
+
 	if [[ -z $disk ]]; then
 		log_fail "The disk name is unspecified."
 	fi
@@ -2401,15 +2405,13 @@ function labelvtoc
 	typeset arch=$(uname -p)
 
 	if [[ $arch == "i386" ]]; then
+		log_must fdisk -B ${disk}p0
+
 		echo "label" > $label_file
 		echo "0" >> $label_file
 		echo "" >> $label_file
 		echo "q" >> $label_file
 		echo "q" >> $label_file
-
-		fdisk -B $disk >/dev/null 2>&1
-		# wait a while for fdisk finishes
-		sleep 60
 	elif [[ $arch == "sparc" ]]; then
 		echo "label" > $label_file
 		echo "0" >> $label_file
@@ -2421,13 +2423,17 @@ function labelvtoc
 		log_fail "unknown arch type"
 	fi
 
-	format -e -s -d $disk -f $label_file
-	typeset -i ret_val=$?
+	# Disk update from fdisk -B may be delayed
+	while ((iter > 0)); do
+		if format -e -s -d $disk -f $label_file ; then
+			iter=0
+			ret_val=0
+		else
+			sleep 1
+			((iter -= 1))
+		fi
+	done
 	rm -f $label_file
-	#
-	# wait the format to finish
-	#
-	sleep 60
 	if ((ret_val != 0)); then
 		log_fail "unable to label $disk as VTOC."
 	fi
