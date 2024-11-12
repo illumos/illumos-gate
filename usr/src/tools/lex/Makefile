@@ -10,24 +10,26 @@
 #
 
 #
-# Copyright 2024 Toomas Soome <tsoome@me.com>
+# Copyright 2024 MNX Cloud, Inc.
 #
 
-PROG =		yacc
+PROG =		lex
 
 SGSDIR =	../../cmd/sgs
-SRCDIR =	$(SGSDIR)/yacc/common
+SRCDIR =	$(SGSDIR)/lex/common
 
-OBJS =		y1.o y2.o y3.o y4.o
-
-YACCPAR =	yaccpar
+OBJS =		main.o sub1.o sub2.o sub3.o header.o parser.o
 
 include ../Makefile.tools
 
 CPPFLAGS =	-I$(SGSDIR)/include
-CSTD =		$(CSTD_GNU99)
+CSTD=		$(CSTD_GNU99)
 
-ROOTYACCPAR =	$(YACCPAR:%=$(ROOTONBLDSHLIBCCS)/%)
+# unused labels in yaccpar
+CERRWARN +=	-_gnu=-Wno-unused-label
+
+FORMS =		nceucform ncform nrform
+ROOTFORMS =	$(FORMS:%=$(ROOTONBLDSHLIBCCS)/%)
 
 .KEEP_STATE:
 
@@ -40,12 +42,12 @@ $(PROG):	$(OBJS)
 %.o:	$(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 
-install: all $(ROOTONBLDMACHPROG) $(ROOTYACCPAR)
-
-$(ROOTONBLDSHLIBCCS)/%: $(SRCDIR)/%
-	$(INS.file)
+install: all $(ROOTONBLDMACHPROG) $(ROOTFORMS)
 
 clean:
 	$(RM) $(PROG) $(OBJS)
+
+$(ROOTONBLDSHLIBCCS)/%: $(SRCDIR)/%
+	$(INS.file)
 
 include	../Makefile.targ

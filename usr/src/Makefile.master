@@ -134,7 +134,8 @@ ELFEXTRACT=	$(ONBLD_TOOLS)/bin/$(MACH)/elfextract
 MBH_PATCH=	$(ONBLD_TOOLS)/bin/$(MACH)/mbh_patch
 BTXLD=		$(ONBLD_TOOLS)/bin/$(MACH)/btxld
 VTFONTCVT=	$(ONBLD_TOOLS)/bin/$(MACH)/vtfontcvt
-YACC=		$(ONBLD_TOOLS)/bin/$(MACH)/yacc -P $(ONBLD_TOOLS)/lib/yaccpar
+YACC=		$(ONBLD_TOOLS)/bin/$(MACH)/yacc -P \
+	$(ONBLD_TOOLS)/share/lib/ccs/yaccpar
 # echo(1) and true(1) are specified without absolute paths, so that the shell
 # spawned by make(1) may use the built-in versions.  This is minimally
 # problematic, as the shell spawned by make(1) is known and under control, the
@@ -168,7 +169,7 @@ ELFDUMP=	/usr/bin/elfdump
 M4=		/usr/bin/m4
 GM4=		/usr/bin/gm4
 STRIP=		/usr/bin/strip
-LEX=		/usr/bin/lex
+LEX=		$(ONBLD_TOOLS)/bin/$(MACH)/lex -Y $(ONBLD_TOOLS)/share/lib/ccs
 FLEX=		/usr/bin/flex
 BISON=		/usr/bin/bison
 CPP=		/usr/lib/cpp

@@ -26,8 +26,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved	*/
 
-/* Copyright (c) 2013, joyent, Inc.  All rights reserved. */
-
 #ifndef	_ONCE_H
 #define	_ONCE_H
 
@@ -73,8 +71,7 @@ int	peek = '\n';	/* next input character */
 CHR	*pushptr = pushc;
 CHR	*slptr = slist;
 
-#define	NPREFIX	"/usr"
-#define	NBASE "/share/lib/ccs/"
+#define	NBASE "/usr/share/lib/ccs"
 #define	CNAME "ncform"
 #define	RATNAME "nrform"
 #define	EUCNAME "nceucform"
