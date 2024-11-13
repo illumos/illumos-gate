@@ -324,19 +324,25 @@
  * pass that captures it has been executed.  These conditions can be tested
  * using cpuid_checkpass().
  *
- * The Microcode Pass
+ * ---------
+ * Microcode
+ * ---------
  *
- * After a microcode update, we do a selective rescan of the cpuid leaves to
- * determine what features have changed. Microcode updates can provide more
- * details about security related features to deal with issues like Spectre and
- * L1TF. On occasion, vendors have violated their contract and removed bits.
- * However, we don't try to detect that because that puts us in a situation that
- * we really can't deal with. As such, the only thing we rescan are security
- * related features today. See cpuid_pass_ucode().  This pass may be run in a
- * different sequence on APs and therefore is not part of the sequential order;
- * It is invoked directly instead of by cpuid_execpass() and its completion
- * status cannot be checked by cpuid_checkpass().  This could be integrated with
- * a more complex dependency mechanism if warranted by future developments.
+ * Microcode updates may be applied by the firmware (BIOS/UEFI) and/or by the
+ * operating system and may result in architecturally visible changes (e.g.,
+ * changed MSR or CPUID bits). As such, we want to apply any updates as early
+ * as possible during the boot process -- right after the IDENT pass.
+ *
+ * Microcode may also be updated at runtime via ucodeadm(8), after which we do
+ * a selective rescan of the cpuid leaves to determine what features have
+ * changed. Microcode updates can provide more details about security related
+ * features to deal with issues like Spectre and L1TF. On occasion, vendors have
+ * violated their contract and removed bits. However, we don't try to detect
+ * that because that puts us in a situation that we really can't deal with. As
+ * such, the only thing we rescan are security related features today. See
+ * cpuid_pass_ucode(). This is not a pass in the same sense as the others and
+ * is run on demand, via cpuid_post_ucodeadm().
+ *
  *
  * All of the passes are run on all CPUs. However, for the most part we only
  * care about what the boot CPU says about this information and use the other
@@ -6250,7 +6256,7 @@ cpuid_getstep(cpu_t *cpu)
 uint_t
 cpuid_getsig(struct cpu *cpu)
 {
-	ASSERT(cpuid_checkpass(cpu, CPUID_PASS_BASIC));
+	ASSERT(cpuid_checkpass(cpu, CPUID_PASS_IDENT));
 	return (cpu->cpu_m.mcpu_cpi->cpi_std[1].cp_eax);
 }
 

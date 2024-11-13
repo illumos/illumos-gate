@@ -24,7 +24,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -206,6 +206,63 @@ mlsetup(struct regs *rp)
 	init_desctbls();
 
 	/*
+	 * initialize t0
+	 */
+	t0.t_stk = (caddr_t)rp - MINFRAME;
+	t0.t_stkbase = t0stack;
+	t0.t_pri = maxclsyspri - 3;
+	t0.t_schedflag = TS_LOAD | TS_DONT_SWAP;
+	t0.t_procp = &p0;
+	t0.t_plockp = &p0lock.pl_lock;
+	t0.t_lwp = &lwp0;
+	t0.t_forw = &t0;
+	t0.t_back = &t0;
+	t0.t_next = &t0;
+	t0.t_prev = &t0;
+	t0.t_cpu = cpu[0];
+	t0.t_disp_queue = &cpu0_disp;
+	t0.t_bind_cpu = PBIND_NONE;
+	t0.t_bind_pset = PS_NONE;
+	t0.t_bindflag = (uchar_t)default_binding_mode;
+	t0.t_cpupart = &cp_default;
+	t0.t_clfuncs = &sys_classfuncs.thread;
+	t0.t_copyops = NULL;
+	THREAD_ONPROC(&t0, CPU);
+
+	lwp0.lwp_thread = &t0;
+	lwp0.lwp_regs = (void *)rp;
+	lwp0.lwp_procp = &p0;
+	t0.t_tid = p0.p_lwpcnt = p0.p_lwprcnt = p0.p_lwpid = 1;
+
+	p0.p_exec = NULL;
+	p0.p_stat = SRUN;
+	p0.p_flag = SSYS;
+	p0.p_tlist = &t0;
+	p0.p_stksize = 2*PAGESIZE;
+	p0.p_stkpageszc = 0;
+	p0.p_as = &kas;
+	p0.p_lockp = &p0lock;
+	p0.p_brkpageszc = 0;
+	p0.p_t1_lgrpid = LGRP_NONE;
+	p0.p_tr_lgrpid = LGRP_NONE;
+	psecflags_default(&p0.p_secflags);
+
+	sigorset(&p0.p_ignore, &ignoredefault);
+
+	CPU->cpu_thread = &t0;
+	bzero(&cpu0_disp, sizeof (disp_t));
+	CPU->cpu_disp = &cpu0_disp;
+	CPU->cpu_disp->disp_cpu = CPU;
+	CPU->cpu_dispthread = &t0;
+	CPU->cpu_idle_thread = &t0;
+	CPU->cpu_flags = CPU_READY | CPU_RUNNING | CPU_EXISTS | CPU_ENABLE;
+	CPU->cpu_dispatch_pri = t0.t_pri;
+
+	CPU->cpu_id = 0;
+
+	CPU->cpu_pri = 12;		/* initial PIL for the boot CPU */
+
+	/*
 	 * Ensure that we have set the necessary feature bits before setting up
 	 * PCI config space access.
 	 */
@@ -228,9 +285,21 @@ mlsetup(struct regs *rp)
 #endif
 
 	/*
-	 * i86pc doesn't require anything in between the IDENT and BASIC passes;
-	 * we assume that a BIOS has already set up any necessary cpuid feature
-	 * bits, so we run both passes together here.
+	 * While the BIOS may have already applied some microcode updates, we
+	 * may have more recent updates available that we'd like to apply.  The
+	 * application of said microcode may end up resulting in architecturally
+	 * visible changes (e.g., changed MSR or CPUID bits) which we'd like to
+	 * have in place before we start querying the CPU for its capabilities.
+	 * So we first run the IDENT pass to determine the specific CPU vendor,
+	 * model, rev etc., fill out cpu_ucode_info and update the microcode, if
+	 * necessary.
+	 */
+	cpuid_execpass(cpu[0], CPUID_PASS_IDENT, NULL);
+	ucode_init();
+	ucode_check_boot();
+
+	/*
+	 * Now we're ready to run the BASIC cpuid pass.
 	 *
 	 * The x86_featureset is initialized here based on the capabilities of
 	 * the boot CPU.  Note that if we choose to support CPUs that have
@@ -238,7 +307,6 @@ mlsetup(struct regs *rp)
 	 * to set the feature bits to correspond to the feature minimum) this
 	 * value may be altered.
 	 */
-	cpuid_execpass(cpu[0], CPUID_PASS_IDENT, NULL);
 	cpuid_execpass(cpu[0], CPUID_PASS_BASIC, x86_featureset);
 
 #if !defined(__xpv)
@@ -319,62 +387,6 @@ mlsetup(struct regs *rp)
 		setcr4(getcr4() | CR4_SMEP);
 #endif /* __xpv */
 
-	/*
-	 * initialize t0
-	 */
-	t0.t_stk = (caddr_t)rp - MINFRAME;
-	t0.t_stkbase = t0stack;
-	t0.t_pri = maxclsyspri - 3;
-	t0.t_schedflag = TS_LOAD | TS_DONT_SWAP;
-	t0.t_procp = &p0;
-	t0.t_plockp = &p0lock.pl_lock;
-	t0.t_lwp = &lwp0;
-	t0.t_forw = &t0;
-	t0.t_back = &t0;
-	t0.t_next = &t0;
-	t0.t_prev = &t0;
-	t0.t_cpu = cpu[0];
-	t0.t_disp_queue = &cpu0_disp;
-	t0.t_bind_cpu = PBIND_NONE;
-	t0.t_bind_pset = PS_NONE;
-	t0.t_bindflag = (uchar_t)default_binding_mode;
-	t0.t_cpupart = &cp_default;
-	t0.t_clfuncs = &sys_classfuncs.thread;
-	t0.t_copyops = NULL;
-	THREAD_ONPROC(&t0, CPU);
-
-	lwp0.lwp_thread = &t0;
-	lwp0.lwp_regs = (void *)rp;
-	lwp0.lwp_procp = &p0;
-	t0.t_tid = p0.p_lwpcnt = p0.p_lwprcnt = p0.p_lwpid = 1;
-
-	p0.p_exec = NULL;
-	p0.p_stat = SRUN;
-	p0.p_flag = SSYS;
-	p0.p_tlist = &t0;
-	p0.p_stksize = 2*PAGESIZE;
-	p0.p_stkpageszc = 0;
-	p0.p_as = &kas;
-	p0.p_lockp = &p0lock;
-	p0.p_brkpageszc = 0;
-	p0.p_t1_lgrpid = LGRP_NONE;
-	p0.p_tr_lgrpid = LGRP_NONE;
-	psecflags_default(&p0.p_secflags);
-
-	sigorset(&p0.p_ignore, &ignoredefault);
-
-	CPU->cpu_thread = &t0;
-	bzero(&cpu0_disp, sizeof (disp_t));
-	CPU->cpu_disp = &cpu0_disp;
-	CPU->cpu_disp->disp_cpu = CPU;
-	CPU->cpu_dispthread = &t0;
-	CPU->cpu_idle_thread = &t0;
-	CPU->cpu_flags = CPU_READY | CPU_RUNNING | CPU_EXISTS | CPU_ENABLE;
-	CPU->cpu_dispatch_pri = t0.t_pri;
-
-	CPU->cpu_id = 0;
-
-	CPU->cpu_pri = 12;		/* initial PIL for the boot CPU */
 
 	/*
 	 * Initialize thread/cpu microstate accounting
@@ -495,13 +507,6 @@ mlsetup(struct regs *rp)
 	}
 
 	ASSERT_STACK_ALIGNED();
-
-	/*
-	 * Fill out cpu_ucode_info.  Update microcode if necessary.
-	 */
-	ucode_init();
-	ucode_check(CPU);
-	cpuid_pass_ucode(CPU, x86_featureset);
 
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");
