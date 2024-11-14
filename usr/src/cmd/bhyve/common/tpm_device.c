@@ -237,7 +237,6 @@ err_out:
 	return (error);
 }
 
-#ifdef	__FreeBSD__
 static struct tpm_device *lpc_tpm;
 
 int
@@ -259,17 +258,3 @@ init_tpm(struct vmctx *ctx)
 
 	return (0);
 }
-#else
-int
-init_tpm(struct vmctx *ctx __unused)
-{
-	/*
-	 * Until illumos has a TPM 2.0 driver, we can't finish plumbing the TPM
-	 * pass-through.
-	 */
-	if (find_config_node("tpm") != NULL)
-		errx(4, "TPM devices are not yet supported on illumos");
-
-	return (0);
-}
-#endif

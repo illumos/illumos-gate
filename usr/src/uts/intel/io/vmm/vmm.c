@@ -3749,7 +3749,8 @@ vm_copy_setup(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 		uint64_t gpa;
 		int error;
 
-		KASSERT(nused < num_copyinfo, ("insufficient vm_copyinfo"));
+		if (nused >= num_copyinfo)
+			return (EFAULT);
 		error = vm_gla2gpa(vm, vcpuid, paging, gla, prot, &gpa, fault);
 		if (error || *fault)
 			return (error);

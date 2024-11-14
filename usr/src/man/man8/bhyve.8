@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd May 25, 2024
+.Dd November 14, 2024
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -379,7 +379,7 @@ Intel e82545 network interface.
 PCI 16550 serial device.
 .It Cm lpc
 LPC PCI-ISA bridge with COM1, COM2, COM3, and COM4 16550 serial ports,
-a boot ROM, and, optionally, a fwcfg type and the debug/test device.
+a boot ROM, and, optionally, a TPM module, fwcfg type and the debug/test device.
 The LPC bridge emulation can only be configured on bus 0.
 .It Cm fbuf
 Raw framebuffer device attached to VNC server.
@@ -540,7 +540,8 @@ are:
 .It Cm version= Ns Ar version
 Version of the TPM device according to the TCG specification.
 Defaults to
-.Cm 2.0
+.Cm 2.0 ,
+which is the only version currently supported.
 .El
 .Pp
 .Sy Boot ROM device backends :
@@ -648,6 +649,18 @@ Specifies the type of the TPM device.
 Supported types:
 .Bl -tag -width 10n
 .It Cm passthru
+Use a physical TPM device.
+The argument
+.Ar path
+needs to point to a valid TPM device path, e.g.
+.Pa /dev/tpm .
+.It Cm swtpm
+Connect to a running swtpm instance.
+The
+.Ar path
+argument needs to point to a UNIX domain socket on which a
+.Cm swtpm
+is listening.
 .El
 .It Cm version= Ns Ar version
 The

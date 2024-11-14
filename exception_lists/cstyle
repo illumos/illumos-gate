@@ -1247,7 +1247,9 @@ usr/src/cmd/bhyve/common/smbiostbl.[ch]
 usr/src/cmd/bhyve/common/tpm_device.c
 usr/src/cmd/bhyve/common/tpm_emul.h
 usr/src/cmd/bhyve/common/tpm_emul_passthru.c
+usr/src/cmd/bhyve/common/tpm_emul_swtpm.c
 usr/src/cmd/bhyve/common/tpm_intf.h
+usr/src/cmd/bhyve/common/tpm_intf_crb.c
 usr/src/cmd/bhyve/common/tpm_intf_crb.c
 usr/src/cmd/bhyve/common/tpm_ppi.h
 usr/src/cmd/bhyve/common/tpm_ppi_qemu.c

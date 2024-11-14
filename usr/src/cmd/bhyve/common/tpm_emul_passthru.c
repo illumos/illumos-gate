@@ -35,9 +35,16 @@ struct tpm_resp_hdr {
 static int
 tpm_passthru_init(void **sc, nvlist_t *nvl)
 {
+#ifndef	__FreeBSD__
+	/*
+	 * Until illumos has a TPM 2.0 driver, we can't finish plumbing the TPM
+	 * pass-through.
+	 */
+	errx(4, "TPM pass-through devices are not yet supported on illumos");
+#else
 	struct tpm_passthru *tpm;
 	const char *path;
-	
+
 	tpm = calloc(1, sizeof(struct tpm_passthru));
 	if (tpm == NULL) {
 		warnx("%s: failed to allocate tpm passthru", __func__);
@@ -52,6 +59,7 @@ tpm_passthru_init(void **sc, nvlist_t *nvl)
 	}
 
 	*sc = tpm;
+#endif	/* __FreeBSD__ */
 
 	return (0);
 }

@@ -2397,7 +2397,7 @@ static int
 vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid,
     uint32_t *eax)
 {
-	uint32_t mask, val;
+	uint32_t mask, val = 0;
 	bool in;
 	int err;
 
