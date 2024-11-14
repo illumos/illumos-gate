@@ -174,7 +174,7 @@ extern long lx_timerfd_create(int, int);
 extern long lx_timerfd_settime(int, int,
     const struct itimerspec *, struct itimerspec *);
 extern long lx_timerfd_gettime(int, struct itimerspec *);
-extern long lx_utimes(const char *, const struct timeval *);
+extern long lx_utimes(const char *, const struct timeval [2]);
 
 #endif	/* !defined(_ASM) */
 
