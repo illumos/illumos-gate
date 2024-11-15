@@ -21,7 +21,7 @@
 
 #include <sys/viona_io.h>
 
-#define	VIONA_DEV	"/dev/viona"
+#include "viona_suite.h"
 
 int
 main(int argc, char *argv[])

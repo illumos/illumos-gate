@@ -320,6 +320,8 @@ static int viona_ioc_delete(viona_soft_state_t *, boolean_t);
 
 static int viona_ioc_set_notify_ioport(viona_link_t *, uint16_t);
 static int viona_ioc_set_promisc(viona_link_t *, viona_promisc_t);
+static int viona_ioc_get_params(viona_link_t *, void *, int);
+static int viona_ioc_set_params(viona_link_t *, void *, int);
 static int viona_ioc_ring_init(viona_link_t *, void *, int);
 static int viona_ioc_ring_set_state(viona_link_t *, void *, int);
 static int viona_ioc_ring_get_state(viona_link_t *, void *, int);
@@ -329,6 +331,8 @@ static int viona_ioc_ring_pause(viona_link_t *, uint_t);
 static int viona_ioc_ring_set_msi(viona_link_t *, void *, int);
 static int viona_ioc_ring_intr_clear(viona_link_t *, uint_t);
 static int viona_ioc_intr_poll(viona_link_t *, void *, int, int *);
+
+static void viona_params_get_defaults(viona_link_params_t *);
 
 static struct cb_ops viona_cb_ops = {
 	viona_open,
@@ -572,6 +576,13 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	case VNA_IOC_VERSION:
 		*rv = VIONA_CURRENT_INTERFACE_VERSION;
 		return (0);
+	case VNA_IOC_DEFAULT_PARAMS:
+		/*
+		 * With a NULL link parameter, viona_ioc_get_params() will emit
+		 * the default parameters with the same error-handling behavior
+		 * as VNA_IOC_GET_PARAMS.
+		 */
+		return (viona_ioc_get_params(NULL, dptr, md));
 	default:
 		break;
 	}
@@ -642,6 +653,12 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 		break;
 	case VNA_IOC_SET_PROMISC:
 		err = viona_ioc_set_promisc(link, (viona_promisc_t)data);
+		break;
+	case VNA_IOC_GET_PARAMS:
+		err = viona_ioc_get_params(link, dptr, md);
+		break;
+	case VNA_IOC_SET_PARAMS:
+		err = viona_ioc_set_params(link, dptr, md);
 		break;
 	default:
 		err = ENOTTY;
@@ -879,6 +896,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	}
 
 	viona_get_mac_capab(link);
+	viona_params_get_defaults(&link->l_params);
 
 	(void) snprintf(cli_name, sizeof (cli_name), "%s-%d", VIONA_MODULE_NAME,
 	    link->l_linkid);
@@ -1257,6 +1275,217 @@ viona_ioc_set_promisc(viona_link_t *link, viona_promisc_t mode)
 
 	link->l_promisc = mode;
 	return (0);
+}
+
+#define	PARAM_NM_TX_COPY_DATA	"tx_copy_data"
+#define	PARAM_NM_TX_HEADER_PAD	"tx_header_pad"
+
+#define	PARAM_ERR_INVALID_TYPE	"invalid type"
+#define	PARAM_ERR_OUT_OF_RANGE	"value out of range"
+#define	PARAM_ERR_UNK_KEY	"unknown key"
+
+static nvlist_t *
+viona_params_to_nvlist(const viona_link_params_t *vlp)
+{
+	nvlist_t *nvl = fnvlist_alloc();
+
+	fnvlist_add_boolean_value(nvl, PARAM_NM_TX_COPY_DATA,
+	    vlp->vlp_tx_copy_data);
+	fnvlist_add_uint16(nvl, PARAM_NM_TX_HEADER_PAD,
+	    vlp->vlp_tx_header_pad);
+
+	return (nvl);
+}
+
+static nvlist_t *
+viona_params_from_nvlist(nvlist_t *nvl, viona_link_params_t *vlp)
+{
+	nvlist_t *nverr = fnvlist_alloc();
+	nvpair_t *nvp = NULL;
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		const char *name = nvpair_name(nvp);
+		const data_type_t dtype = nvpair_type(nvp);
+
+		if (strcmp(name, PARAM_NM_TX_COPY_DATA) == 0) {
+			if (dtype == DATA_TYPE_BOOLEAN_VALUE) {
+				vlp->vlp_tx_copy_data =
+				    fnvpair_value_boolean_value(nvp);
+			} else {
+				fnvlist_add_string(nverr, name,
+				    PARAM_ERR_INVALID_TYPE);
+			}
+			continue;
+		}
+		if (strcmp(name, PARAM_NM_TX_HEADER_PAD) == 0) {
+			if (dtype == DATA_TYPE_UINT16) {
+				uint16_t value = fnvpair_value_uint16(nvp);
+
+				if (value > viona_max_header_pad) {
+					fnvlist_add_string(nverr, name,
+					    PARAM_ERR_OUT_OF_RANGE);
+				} else {
+					vlp->vlp_tx_header_pad = value;
+				}
+			} else {
+				fnvlist_add_string(nverr, name,
+				    PARAM_ERR_INVALID_TYPE);
+			}
+			continue;
+		}
+
+		/* Reject parameters we do not recognize */
+		fnvlist_add_string(nverr, name, PARAM_ERR_UNK_KEY);
+	}
+
+	if (!nvlist_empty(nverr)) {
+		return (nverr);
+	}
+
+	nvlist_free(nverr);
+	return (NULL);
+}
+
+static void
+viona_params_get_defaults(viona_link_params_t *vlp)
+{
+	vlp->vlp_tx_copy_data = viona_tx_copy_needed();
+	vlp->vlp_tx_header_pad = 0;
+}
+
+static int
+viona_ioc_get_params(viona_link_t *link, void *udata, int md)
+{
+	vioc_get_params_t vgp;
+	int err = 0;
+
+	if (ddi_copyin(udata, &vgp, sizeof (vgp), md) != 0) {
+		return (EFAULT);
+	}
+
+	nvlist_t *nvl = NULL;
+	if (link != NULL) {
+		nvl = viona_params_to_nvlist(&link->l_params);
+	} else {
+		viona_link_params_t vlp = { 0 };
+
+		viona_params_get_defaults(&vlp);
+		nvl = viona_params_to_nvlist(&vlp);
+	}
+
+	VERIFY(nvl != NULL);
+
+	size_t packed_sz;
+	void *packed = fnvlist_pack(nvl, &packed_sz);
+	nvlist_free(nvl);
+
+	if (packed_sz > vgp.vgp_param_sz) {
+		err = E2BIG;
+	}
+	/* Communicate size, even if the data will not fit */
+	vgp.vgp_param_sz = packed_sz;
+
+	if (err == 0 &&
+	    ddi_copyout(packed, vgp.vgp_param, packed_sz, md) != 0) {
+		err = EFAULT;
+	}
+	kmem_free(packed, packed_sz);
+
+	if (ddi_copyout(&vgp, udata, sizeof (vgp), md) != 0) {
+		if (err != 0) {
+			err = EFAULT;
+		}
+	}
+
+	return (err);
+}
+
+static int
+viona_ioc_set_params(viona_link_t *link, void *udata, int md)
+{
+	vioc_set_params_t vsp;
+	int err = 0;
+	nvlist_t *nverr = NULL;
+
+	if (ddi_copyin(udata, &vsp, sizeof (vsp), md) != 0) {
+		return (EFAULT);
+	}
+
+	if (vsp.vsp_param_sz > VIONA_MAX_PARAM_NVLIST_SZ) {
+		err = E2BIG;
+		goto done;
+	} else if (vsp.vsp_param_sz == 0) {
+		/*
+		 * There is no reason to make this ioctl call with no actual
+		 * parameters to be changed.
+		 */
+		err = EINVAL;
+		goto done;
+	}
+
+	const size_t packed_sz = vsp.vsp_param_sz;
+	void *packed = kmem_alloc(packed_sz, KM_SLEEP);
+	if (ddi_copyin(vsp.vsp_param, packed, packed_sz, md) != 0) {
+		kmem_free(packed, packed_sz);
+		err = EFAULT;
+		goto done;
+	}
+
+	nvlist_t *parsed = NULL;
+	if (nvlist_unpack(packed, packed_sz, &parsed, KM_SLEEP) == 0) {
+		/* Use the existing parameters as a starting point */
+		viona_link_params_t new_params;
+		bcopy(&link->l_params, &new_params,
+		    sizeof (new_params));
+
+		nverr = viona_params_from_nvlist(parsed, &new_params);
+		if (nverr == NULL) {
+			/*
+			 * Only apply the updated parameters if there
+			 * were no errors during parsing.
+			 */
+			bcopy(&new_params, &link->l_params,
+			    sizeof (new_params));
+		} else {
+			err = EINVAL;
+		}
+
+	} else {
+		err = EINVAL;
+	}
+	nvlist_free(parsed);
+	kmem_free(packed, packed_sz);
+
+done:
+	if (nverr != NULL) {
+		size_t err_packed_sz;
+		void *err_packed = fnvlist_pack(nverr, &err_packed_sz);
+
+		if (err_packed_sz > vsp.vsp_error_sz) {
+			if (err != 0) {
+				err = E2BIG;
+			}
+		} else if (ddi_copyout(err_packed, vsp.vsp_error,
+		    err_packed_sz, md) != 0 && err == 0) {
+			err = EFAULT;
+		}
+		vsp.vsp_error_sz = err_packed_sz;
+
+		nvlist_free(nverr);
+		kmem_free(err_packed, err_packed_sz);
+	} else {
+		/*
+		 * If there are no detailed per-field errors, it is important to
+		 * communicate that absense to userspace.
+		 */
+		vsp.vsp_error_sz = 0;
+	}
+
+	if (ddi_copyout(&vsp, udata, sizeof (vsp), md) != 0 && err == 0) {
+		err = EFAULT;
+	}
+
+	return (err);
 }
 
 static int

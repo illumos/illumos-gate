@@ -9,36 +9,50 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2022 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/test/Makefile.com
 
-PROG =	interface_version
+PROGS =	interface_version create_delete link_params
 
-CLEAN_OBJS =	$(PROG:%=%.o)
+SCRIPTS =	setup cleanup
+
+COMMON_OBJS =	in_guest.o common.o viona_suite.o null_payload.o
+
+CLEAN_OBJS =	$(PROGS:%=%.o) $(COMMON_OBJS)
 
 ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
 TESTDIR = $(ROOTOPTPKG)/tests/viona
 
-CMDS = $(PROG:%=$(TESTDIR)/%)
+CMDS = \
+	$(PROGS:%=$(TESTDIR)/%) \
+	$(SCRIPTS:%=$(TESTDIR)/%)
+
 $(CMDS) := FILEMODE = 0555
 
 CSTD=		$(CSTD_GNU99)
-CPPFLAGS =	$(CPPFLAGS.master) \
-		-I$(SRC)/uts/intel
+CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
+		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
+		$(CPPFLAGS.master) \
+		-I$(SRC)/uts/intel/io/vmm \
+		-I$(SRC)/uts/intel \
+		-I../common
 
-all: $(PROG)
+$(PROGS) :=	LDLIBS += -lvmmapi -ldladm
+link_params :=	LDLIBS += -lnvpair
+
+all: $(PROGS)
 
 install: all $(CMDS)
 
 clean:
 	-$(RM) $(CLEAN_OBJS)
 clobber: clean
-	-$(RM) $(PROG)
+	-$(RM) $(PROGS)
 
-$(CMDS): $(TESTDIR) $(PROG)
+$(CMDS): $(TESTDIR)
 
 $(TESTDIR):
 	$(INS.dir)
@@ -46,6 +60,13 @@ $(TESTDIR):
 $(TESTDIR)/%: %
 	$(INS.file)
 
-%: %.o
-	$(LINK.c) -o $@ $< $(LDLIBS)
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
+
+%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $^
+	$(POST_PROCESS)
+
+%: %.o $(COMMON_OBJS)
+	$(LINK.c) -o $@ $^ $(LDLIBS)
 	$(POST_PROCESS)

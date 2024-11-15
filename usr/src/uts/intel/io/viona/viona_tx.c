@@ -58,6 +58,11 @@
 boolean_t viona_default_tx_copy = B_TRUE;
 
 /*
+ * Tunable for maximum configured TX header padding.
+ */
+uint_t viona_max_header_pad = 256;
+
+/*
  * copy tx mbufs from virtio ring to avoid necessitating a wait for packet
  * transmission to free resources.
  */
@@ -101,7 +106,7 @@ viona_tx_wait_outstanding(viona_vring_t *ring)
  * Check if full TX packet copying is needed.  This should not be called from
  * viona attach()/detach() context.
  */
-static boolean_t
+boolean_t
 viona_tx_copy_needed(void)
 {
 	boolean_t result;
@@ -141,41 +146,52 @@ viona_tx_copy_needed(void)
 void
 viona_tx_ring_alloc(viona_vring_t *ring, const uint16_t qsz)
 {
-	/* Allocate desb handles for TX ring if packet copying is disabled */
-	if (!viona_tx_copy_needed()) {
-		viona_desb_t *dp;
+	const viona_link_params_t *vlp = &ring->vr_link->l_params;
 
-		dp = kmem_zalloc(sizeof (viona_desb_t) * qsz, KM_SLEEP);
-		ring->vr_txdesb = dp;
+	ring->vr_tx.vrt_header_pad = vlp->vlp_tx_header_pad;
+	/* Allocate desb handles for TX ring if packet copying not forced */
+	if (!ring->vr_link->l_params.vlp_tx_copy_data) {
+		viona_desb_t *dp =
+		    kmem_zalloc(sizeof (viona_desb_t) * qsz, KM_SLEEP);
+		ring->vr_tx.vrt_desb = dp;
+
+		const size_t header_sz =
+		    VIONA_MAX_HDRS_LEN + ring->vr_tx.vrt_header_pad;
 		for (uint_t i = 0; i < qsz; i++, dp++) {
 			dp->d_frtn.free_func = viona_desb_release;
 			dp->d_frtn.free_arg = (void *)dp;
 			dp->d_ring = ring;
-			dp->d_headers = kmem_zalloc(VIONA_MAX_HDRS_LEN,
-			    KM_SLEEP);
+			dp->d_headers = kmem_zalloc(header_sz, KM_SLEEP);
 		}
 	}
 
 	/* Allocate ring-sized iovec buffers for TX */
-	ring->vr_txiov = kmem_alloc(sizeof (struct iovec) * qsz, KM_SLEEP);
+	ring->vr_tx.vrt_iov = kmem_alloc(sizeof (struct iovec) * qsz, KM_SLEEP);
+	ring->vr_tx.vrt_iov_cnt = qsz;
 }
 
 void
 viona_tx_ring_free(viona_vring_t *ring, const uint16_t qsz)
 {
-	if (ring->vr_txdesb != NULL) {
-		viona_desb_t *dp = ring->vr_txdesb;
+	if (ring->vr_tx.vrt_desb != NULL) {
+		viona_desb_t *dp = ring->vr_tx.vrt_desb;
 
+		const size_t header_sz =
+		    VIONA_MAX_HDRS_LEN + ring->vr_tx.vrt_header_pad;
 		for (uint_t i = 0; i < qsz; i++, dp++) {
-			kmem_free(dp->d_headers, VIONA_MAX_HDRS_LEN);
+			kmem_free(dp->d_headers, header_sz);
 		}
-		kmem_free(ring->vr_txdesb, sizeof (viona_desb_t) * qsz);
-		ring->vr_txdesb = NULL;
+		kmem_free(ring->vr_tx.vrt_desb, sizeof (viona_desb_t) * qsz);
+		ring->vr_tx.vrt_desb = NULL;
 	}
 
-	if (ring->vr_txiov != NULL) {
-		kmem_free(ring->vr_txiov, sizeof (struct iovec) * qsz);
-		ring->vr_txiov = NULL;
+	if (ring->vr_tx.vrt_iov != NULL) {
+		ASSERT3U(ring->vr_tx.vrt_iov_cnt, !=, 0);
+
+		kmem_free(ring->vr_tx.vrt_iov,
+		    sizeof (struct iovec) * ring->vr_tx.vrt_iov_cnt);
+		ring->vr_tx.vrt_iov = NULL;
+		ring->vr_tx.vrt_iov_cnt = 0;
 	}
 }
 
@@ -328,124 +344,113 @@ viona_desb_release(viona_desb_t *dp)
 }
 
 static boolean_t
-viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
-    mblk_t *mp, uint32_t len)
+viona_tx_csum(viona_vring_t *ring, const struct virtio_net_mrgrxhdr *hdr,
+    const mac_ether_offload_info_t *meoi, mblk_t *mp, uint32_t len)
 {
 	viona_link_t *link = ring->vr_link;
-	const struct ether_header *eth;
-	uint_t eth_len = sizeof (struct ether_header);
-	ushort_t ftype;
-	ipha_t *ipha = NULL;
-	uint8_t ipproto = IPPROTO_NONE; /* NONE is not exactly right, but ok */
 	uint16_t flags = 0;
 	const uint_t csum_start = hdr->vrh_csum_start;
 	const uint_t csum_stuff = hdr->vrh_csum_offset + csum_start;
+	const uint_t l2hlen = meoi->meoi_l2hlen;
+	const uint_t copied_len = MBLKL(mp);
 
 	/*
 	 * Validate that the checksum offsets provided by the guest are within
 	 * the bounds of the packet.  Additionally, ensure that the checksum
 	 * contents field is within the headers mblk copied by viona_tx().
 	 */
-	if (csum_start >= len || csum_start < eth_len || csum_stuff >= len ||
-	    (csum_stuff + sizeof (uint16_t)) > MBLKL(mp)) {
+	if (csum_start >= len || csum_start < l2hlen || csum_stuff >= len ||
+	    (csum_stuff + sizeof (uint16_t)) > copied_len) {
 		VIONA_PROBE2(fail_hcksum, viona_link_t *, link, mblk_t *, mp);
 		VIONA_RING_STAT_INCR(ring, fail_hcksum);
 		return (B_FALSE);
 	}
 
-	/*
-	 * This is guaranteed to be safe thanks to the header copying
-	 * done in viona_tx().
-	 */
-	eth = (const struct ether_header *)mp->b_rptr;
-	ftype = ntohs(eth->ether_type);
-
-	if (ftype == ETHERTYPE_VLAN) {
-		const struct ether_vlan_header *veth;
-
-		/* punt on QinQ for now */
-		eth_len = sizeof (struct ether_vlan_header);
-		veth = (const struct ether_vlan_header *)eth;
-		ftype = ntohs(veth->ether_type);
+	const uint16_t ftype = meoi->meoi_l3proto;
+	const uint8_t ipproto = meoi->meoi_l4proto;
+	if (ftype != ETHERTYPE_IP && ftype != ETHERTYPE_IPV6) {
+		/*
+		 * Ignore checksum offload requests for non-IP protocols.
+		 */
+		VIONA_PROBE2(fail_hcksum_proto, viona_link_t *, link,
+		    mblk_t *, mp);
+		VIONA_RING_STAT_INCR(ring, fail_hcksum_proto);
+		return (B_FALSE);
 	}
 
-	if (ftype == ETHERTYPE_IP) {
-		ipha = (ipha_t *)(mp->b_rptr + eth_len);
-
-		ipproto = ipha->ipha_protocol;
-	} else if (ftype == ETHERTYPE_IPV6) {
-		ip6_t *ip6h = (ip6_t *)(mp->b_rptr + eth_len);
-
-		ipproto = ip6h->ip6_nxt;
-	}
-
-	/*
-	 * We ignore hdr_len because the spec says it can't be
-	 * trusted. Besides, our own stack will determine the header
-	 * boundary.
-	 */
 	if ((link->l_cap_csum & HCKSUM_INET_PARTIAL) != 0 &&
 	    (hdr->vrh_gso_type & VIRTIO_NET_HDR_GSO_TCPV4) != 0 &&
 	    ftype == ETHERTYPE_IP) {
-		uint16_t	*cksump;
-		uint32_t	cksum;
-		ipaddr_t	src = ipha->ipha_src;
-		ipaddr_t	dst = ipha->ipha_dst;
-
 		/*
-		 * Our native IP stack doesn't set the L4 length field
-		 * of the pseudo header when LSO is in play. Other IP
-		 * stacks, e.g. Linux, do include the length field.
-		 * This is a problem because the hardware expects that
-		 * the length field is not set. When it is set it will
-		 * cause an incorrect TCP checksum to be generated.
-		 * The reason this works in Linux is because Linux
-		 * corrects the pseudo-header checksum in the driver
-		 * code. In order to get the correct HW checksum we
-		 * need to assume the guest's IP stack gave us a bogus
-		 * TCP partial checksum and calculate it ourselves.
+		 * Header copying should have already ensured that the L2-L4 are
+		 * in the first mblk, but double-check here before we go fishing
+		 * about in the L3 headers for a fix-up.
 		 */
-		cksump = IPH_TCPH_CHECKSUMP(ipha, IPH_HDR_LENGTH(ipha));
-		cksum = IP_TCP_CSUM_COMP;
-		cksum += (dst >> 16) + (dst & 0xFFFF) +
-		    (src >> 16) + (src & 0xFFFF);
-		cksum = (cksum & 0xFFFF) + (cksum >> 16);
-		*(cksump) = (cksum & 0xFFFF) + (cksum >> 16);
+		if ((l2hlen + meoi->meoi_l3hlen) > copied_len) {
+			VIONA_PROBE2(fail_hcksum, viona_link_t *, link,
+			    mblk_t *, mp);
+			VIONA_RING_STAT_INCR(ring, fail_hcksum);
+			return (B_FALSE);
+		}
+
+		ipha_t *ipha = (ipha_t *)(mp->b_rptr + l2hlen);
+		uint16_t *cksump =
+		    IPH_TCPH_CHECKSUMP(ipha, IPH_HDR_LENGTH(ipha));
+		uint32_t cksum = IP_TCP_CSUM_COMP;
+		const ipaddr_t src = ipha->ipha_src;
+		const ipaddr_t dst = ipha->ipha_dst;
 
 		/*
-		 * Since viona is a "legacy device", the data stored
-		 * by the driver will be in the guest's native endian
-		 * format (see sections 2.4.3 and 5.1.6.1 of the
-		 * VIRTIO 1.0 spec for more info). At this time the
-		 * only guests using viona are x86 and we can assume
-		 * little-endian.
+		 * Our native IP stack doesn't set the L4 length field of the
+		 * pseudo header when LSO is in play.  Other IP stacks, e.g.
+		 * Linux, do include the length field.  This is a problem
+		 * because the hardware expects that the length field is not
+		 * set. When it is set, it will cause an incorrect TCP checksum
+		 * to be generated.  Linux avoids this issue by correcting the
+		 * pseudo-header checksum in the driver code.
+		 *
+		 * In order to get the correct HW checksum we need to assume the
+		 * guest's IP stack gave us a bogus TCP partial checksum and
+		 * calculate it ourselves.
+		 */
+		cksum += (dst >> 16) + (dst & 0xffff) +
+		    (src >> 16) + (src & 0xffff);
+		cksum = (cksum & 0xffff) + (cksum >> 16);
+		*cksump = (cksum & 0xffff) + (cksum >> 16);
+
+		/*
+		 * Since viona is a "legacy device", the data stored by the
+		 * driver will be in the guest's native endian format (see
+		 * sections 2.4.3 and 5.1.6.1 of the VIRTIO 1.0 spec for more
+		 * info). At this time the only guests using viona are x86 and
+		 * we can assume little-endian.
 		 */
 		lso_info_set(mp, LE_16(hdr->vrh_gso_size), HW_LSO);
 
 		/*
-		 * Hardware, like ixgbe, expects the client to request
+		 * Some hardware, such as ixgbe, expects the client to request
 		 * IP header checksum offload if it's sending LSO (see
 		 * ixgbe_get_context()). Unfortunately, virtio makes
-		 * no allowances for negotiating IP header checksum
-		 * and HW offload, only TCP checksum. We add the flag
-		 * and zero-out the checksum field. This mirrors the
-		 * behavior of our native IP stack (which does this in
-		 * the interest of HW that expects the field to be
-		 * zero).
+		 * no allowances for negotiating L3 checksum offloads.
+		 *
+		 * Out of caution, we zero out the IP checksum field and request
+		 * that the hardware calculate it.  This mirrors the behavior of
+		 * our native IP stack, which does the same to cater to such
+		 * hardware expectations.
 		 */
 		flags |= HCK_IPV4_HDRCKSUM;
 		ipha->ipha_hdr_checksum = 0;
 	}
 
 	/*
-	 * Use DB_CKSUMFLAGS instead of mac_hcksum_get() to make sure
-	 * HW_LSO, if present, is not lost.
+	 * Use DB_CKSUMFLAGS instead of mac_hcksum_get() to make sure HW_LSO, if
+	 * present, is not lost.
 	 */
 	flags |= DB_CKSUMFLAGS(mp);
 
 	/*
-	 * Partial checksum support from the NIC is ideal, since it most
-	 * closely maps to the interface defined by virtio.
+	 * Partial checksum support from the NIC is ideal, since it most closely
+	 * maps to the interface defined by virtio.
 	 */
 	if ((link->l_cap_csum & HCKSUM_INET_PARTIAL) != 0 &&
 	    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
@@ -454,15 +459,15 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 		 * start of the L3 header rather than the L2 frame.
 		 */
 		flags |= HCK_PARTIALCKSUM;
-		mac_hcksum_set(mp, csum_start - eth_len, csum_stuff - eth_len,
-		    len - eth_len, 0, flags);
+		mac_hcksum_set(mp, csum_start - l2hlen, csum_stuff - l2hlen,
+		    len - l2hlen, 0, flags);
 		return (B_TRUE);
 	}
 
 	/*
 	 * Without partial checksum support, look to the L3/L4 protocol
-	 * information to see if the NIC can handle it.  If not, the
-	 * checksum will need to calculated inline.
+	 * information to see if the NIC can handle it.  If not, the checksum
+	 * will need to calculated inline.
 	 */
 	if (ftype == ETHERTYPE_IP) {
 		if ((link->l_cap_csum & HCKSUM_INET_FULL_V4) != 0 &&
@@ -494,32 +499,154 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 		return (B_FALSE);
 	}
 
-	/* Cannot even emulate hcksum for unrecognized protocols */
+	/*
+	 * Note the failure for unrecognized protocols, but soldier on to make
+	 * our best effort at getting the frame out the door.
+	 */
 	VIONA_PROBE2(fail_hcksum_proto, viona_link_t *, link, mblk_t *, mp);
 	VIONA_RING_STAT_INCR(ring, fail_hcksum_proto);
 	return (B_FALSE);
 }
 
+static mblk_t *
+viona_tx_alloc_headers(viona_vring_t *ring, uint16_t cookie, viona_desb_t **dpp,
+    uint32_t len)
+{
+	ASSERT3P(*dpp, ==, NULL);
+
+	mblk_t *mp = NULL;
+	const size_t header_pad = ring->vr_tx.vrt_header_pad;
+
+	if (ring->vr_tx.vrt_desb != NULL) {
+		viona_desb_t *dp = &ring->vr_tx.vrt_desb[cookie];
+		const size_t header_sz = VIONA_MAX_HDRS_LEN + header_pad;
+
+		/*
+		 * If the guest driver is operating properly, each desb slot
+		 * should be available for use when processing a TX descriptor
+		 * from the 'avail' ring.  In the case of drivers that reuse a
+		 * descriptor before it has been posted to the 'used' ring, the
+		 * data is simply dropped.
+		 */
+		if (atomic_cas_uint(&dp->d_ref, 0, 1) != 0) {
+			return (NULL);
+		}
+
+		dp->d_cookie = cookie;
+		mp = desballoc(dp->d_headers, header_sz, 0, &dp->d_frtn);
+
+		if (mp != NULL) {
+			/*
+			 * Account for the successful desballoc, and communicate
+			 * out the desb handle for subsequent use
+			 */
+			dp->d_ref++;
+			*dpp = dp;
+		} else {
+			/* Reset the desb back to its "available" state */
+			dp->d_ref = 0;
+		}
+	} else {
+		/*
+		 * If we are going to be copying the entire packet, we might as
+		 * well allocate for it all in one go.
+		 */
+		mp = allocb(len + header_pad, 0);
+	}
+
+	/* Push pointers forward to account for requested header padding */
+	if (mp != NULL && header_pad != 0) {
+		mp->b_rptr = mp->b_wptr = (DB_BASE(mp) + header_pad);
+	}
+
+	return (mp);
+}
+
+static boolean_t
+viona_tx_copy_headers(viona_vring_t *ring, iov_bunch_t *iob, mblk_t *mp,
+    mac_ether_offload_info_t *meoi)
+{
+	ASSERT(mp->b_cont == NULL);
+
+	if (ring->vr_tx.vrt_desb == NULL) {
+		/*
+		 * If not using guest data loaning through the desb, then we
+		 * expect viona_tx_alloc_headers() to have allocated space for
+		 * the entire packet, which we should copy now.
+		 */
+		const uint32_t pkt_size = iob->ib_remain;
+
+		VERIFY(MBLKTAIL(mp) >= pkt_size);
+		VERIFY(iov_bunch_copy(iob, mp->b_wptr, pkt_size));
+		mp->b_wptr += pkt_size;
+		(void) mac_ether_offload_info(mp, meoi);
+		return (B_TRUE);
+	}
+
+	/*
+	 * We want to maximize the amount of guest data we loan when performing
+	 * packet transmission, with the caveat that we must copy the packet
+	 * headers to prevent TOCTOU issues.
+	 */
+	const uint32_t copy_sz = MIN(iob->ib_remain, MBLKTAIL(mp));
+
+	VERIFY(iov_bunch_copy(iob, mp->b_wptr, copy_sz));
+	mp->b_wptr += copy_sz;
+
+	if (iob->ib_remain == 0) {
+		(void) mac_ether_offload_info(mp, meoi);
+		return (B_TRUE);
+	}
+
+	/*
+	 * Attempt to confirm that our buffer contains at least the entire
+	 * (L2-L4) packet headers.
+	 */
+	if (mac_ether_offload_info(mp, meoi) == 0) {
+		const uint32_t full_hdr_sz =
+		    meoi->meoi_l2hlen + meoi->meoi_l3hlen + meoi->meoi_l4hlen;
+
+		if (copy_sz >= full_hdr_sz) {
+			return (B_TRUE);
+		}
+	}
+
+	/*
+	 * Despite our best efforts, the full headers do not appear to be along
+	 * for the ride yet.  Just allocate a buffer and copy the remainder of
+	 * the packet.
+	 */
+	const uint32_t remain_sz = iob->ib_remain;
+	mblk_t *remain_mp = allocb(remain_sz, 0);
+	if (remain_mp == NULL) {
+		return (B_FALSE);
+	}
+	VERIFY(iov_bunch_copy(iob, remain_mp->b_wptr, remain_sz));
+	remain_mp->b_wptr += remain_sz;
+	mp->b_cont = remain_mp;
+	/* Refresh header info now that we have copied the rest */
+	(void) mac_ether_offload_info(mp, meoi);
+
+	return (B_TRUE);
+}
+
 static void
 viona_tx(viona_link_t *link, viona_vring_t *ring)
 {
-	struct iovec		*iov = ring->vr_txiov;
-	const uint_t		max_segs = ring->vr_size;
+	struct iovec		*iov = ring->vr_tx.vrt_iov;
+	const uint_t		max_segs = ring->vr_tx.vrt_iov_cnt;
 	uint16_t		cookie;
-	int			i, n;
-	uint32_t		len, base_off = 0;
-	uint32_t		min_copy = VIONA_MAX_HDRS_LEN;
-	mblk_t			*mp_head, *mp_tail, *mp;
+	vmm_page_t		*pages = NULL;
+	uint32_t		total_len;
+	mblk_t			*mp_head = NULL;
 	viona_desb_t		*dp = NULL;
-	mac_client_handle_t	link_mch = link->l_mch;
-	const struct virtio_net_hdr *hdr;
-	vmm_page_t *pages = NULL;
-
-	mp_head = mp_tail = NULL;
+	const boolean_t merge_enabled =
+	    ((link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0);
 
 	ASSERT(iov != NULL);
 
-	n = vq_popchain(ring, iov, max_segs, &cookie, &pages);
+	const int n = vq_popchain(ring, iov, max_segs, &cookie, &pages,
+	    &total_len);
 	if (n == 0) {
 		VIONA_PROBE1(tx_absent, viona_vring_t *, ring);
 		VIONA_RING_STAT_INCR(ring, tx_absent);
@@ -533,110 +660,94 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 		return;
 	}
 
-	/* Grab the header and ensure it is of adequate length */
-	hdr = (const struct virtio_net_hdr *)iov[0].iov_base;
-	len = iov[0].iov_len;
-	if (len < sizeof (struct virtio_net_hdr)) {
-		goto drop_fail;
-	}
-
-	/* Make sure the packet headers are always in the first mblk. */
-	if (ring->vr_txdesb != NULL) {
-		dp = &ring->vr_txdesb[cookie];
-
+	/*
+	 * Get setup to copy the VirtIO header from in front of the packet.
+	 *
+	 * With an eye toward supporting VirtIO 1.0 behavior in the future, we
+	 * determine the size of the header based on the device state.  This
+	 * goes a bit beyond the expectations of legacy VirtIO, where the first
+	 * buffer must cover the header and nothing else.
+	 */
+	iov_bunch_t iob = {
+		.ib_iov = iov,
+		.ib_remain = total_len,
+	};
+	struct virtio_net_mrgrxhdr hdr;
+	uint32_t vio_hdr_len = 0;
+	if (merge_enabled) {
 		/*
-		 * If the guest driver is operating properly, each desb slot
-		 * should be available for use when processing a TX descriptor
-		 * from the 'avail' ring.  In the case of drivers that reuse a
-		 * descriptor before it has been posted to the 'used' ring, the
-		 * data is simply dropped.
+		 * Presence of the "num_bufs" member is determined by the
+		 * merge-rxbuf feature on the device, despite the fact that we
+		 * are in transmission context here.
 		 */
-		if (atomic_cas_uint(&dp->d_ref, 0, 1) != 0) {
-			dp = NULL;
-			goto drop_fail;
-		}
-
-		dp->d_cookie = cookie;
-		mp_head = desballoc(dp->d_headers, VIONA_MAX_HDRS_LEN, 0,
-		    &dp->d_frtn);
-
-		/* Account for the successful desballoc. */
-		if (mp_head != NULL)
-			dp->d_ref++;
+		vio_hdr_len = sizeof (struct virtio_net_mrgrxhdr);
 	} else {
-		mp_head = allocb(VIONA_MAX_HDRS_LEN, 0);
+		vio_hdr_len = sizeof (struct virtio_net_hdr);
+		/*
+		 * We ignore "num_bufs" from the guest anyways, but zero it out
+		 * just in case.
+		 */
+		hdr.vrh_bufs = 0;
+	}
+	uint32_t pkt_len = 0;
+	if (!iov_bunch_copy(&iob, &hdr, vio_hdr_len)) {
+		goto drop_fail;
 	}
 
-	if (mp_head == NULL)
+	pkt_len = total_len - vio_hdr_len;
+	if (pkt_len > VIONA_MAX_PACKET_SIZE ||
+	    pkt_len < sizeof (struct ether_header)) {
 		goto drop_fail;
+	}
 
-	mp_tail = mp_head;
+	mp_head = viona_tx_alloc_headers(ring, cookie, &dp, pkt_len);
+	if (mp_head == NULL) {
+		goto drop_fail;
+	}
 
 	/*
-	 * We always copy enough of the guest data to cover the
-	 * headers. This protects us from TOCTOU attacks and allows
-	 * message block length assumptions to be made in subsequent
-	 * code. In many cases, this means copying more data than
-	 * strictly necessary. That's okay, as it is the larger packets
-	 * (such as LSO) that really benefit from desballoc().
+	 * Copy the the packet headers (L2 through L4, if present) to prevent
+	 * TOCTOU attacks in any subsequent consumers of that data.
 	 */
-	for (i = 1; i < n; i++) {
-		const uint32_t to_copy = MIN(min_copy, iov[i].iov_len);
-
-		bcopy(iov[i].iov_base, mp_head->b_wptr, to_copy);
-		mp_head->b_wptr += to_copy;
-		len += to_copy;
-		min_copy -= to_copy;
-
-		/*
-		 * We've met the minimum copy requirement. The rest of
-		 * the guest data can be referenced.
-		 */
-		if (min_copy == 0) {
-			/*
-			 * If we copied all contents of this
-			 * descriptor then move onto the next one.
-			 * Otherwise, record how far we are into the
-			 * current descriptor.
-			 */
-			if (iov[i].iov_len == to_copy)
-				i++;
-			else
-				base_off = to_copy;
-
-			break;
-		}
+	mac_ether_offload_info_t meoi = { 0 };
+	if (!viona_tx_copy_headers(ring, &iob, mp_head, &meoi)) {
+		goto drop_fail;
 	}
 
-	ASSERT3P(mp_head, !=, NULL);
-	ASSERT3P(mp_tail, !=, NULL);
+	if (dp != NULL && iob.ib_remain != 0) {
+		/*
+		 * If this device is loaning guest memory, rather than copying
+		 * the entire body of the packet, we may need to establish mblks
+		 * for the remaining data-to-be-loaned after the header copy.
+		 */
+		uint32_t chunk_sz;
+		caddr_t chunk;
+		mblk_t *mp_tail = mp_head;
 
-	for (; i < n; i++) {
-		uintptr_t base = (uintptr_t)iov[i].iov_base + base_off;
-		uint32_t chunk = iov[i].iov_len - base_off;
-
-		ASSERT3U(base_off, <, iov[i].iov_len);
-		ASSERT3U(chunk, >, 0);
-
-		if (dp != NULL) {
-			mp = desballoc((uchar_t *)base, chunk, 0, &dp->d_frtn);
-			if (mp == NULL) {
-				goto drop_fail;
-			}
-			dp->d_ref++;
-		} else {
-			mp = allocb(chunk, BPRI_MED);
-			if (mp == NULL) {
-				goto drop_fail;
-			}
-			bcopy((uchar_t *)base, mp->b_wptr, chunk);
+		/*
+		 * Ensure that our view of the tail is accurate in the rare case
+		 * that the header allocation/copying logic has already resulted
+		 * in a chained mblk.
+		 */
+		while (mp_tail->b_cont != NULL) {
+			mp_tail = mp_tail->b_cont;
 		}
 
-		base_off = 0;
-		len += chunk;
-		mp->b_wptr += chunk;
-		mp_tail->b_cont = mp;
-		mp_tail = mp;
+		while (iov_bunch_next_chunk(&iob, &chunk, &chunk_sz)) {
+			mblk_t *mp = desballoc((uchar_t *)chunk, chunk_sz, 0,
+			    &dp->d_frtn);
+			if (mp == NULL) {
+				goto drop_fail;
+			}
+
+			mp->b_wptr += chunk_sz;
+			dp->d_ref++;
+			mp_tail->b_cont = mp;
+			mp_tail = mp;
+		}
+	} else {
+		/* The copy-everything strategy should be done by now */
+		VERIFY0(iob.ib_remain);
 	}
 
 	if (VNETHOOK_INTERESTED_OUT(link->l_neti)) {
@@ -660,7 +771,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 		 * mp_head if the hook consumer (i.e. ipf) elects to free mp
 		 * and set mp to NULL.
 		 */
-		mp = mp_head;
+		mblk_t *mp = mp_head;
 		if (viona_hook(link, ring, &mp, B_TRUE) != 0) {
 			if (mp != NULL)
 				freemsgchain(mp);
@@ -686,20 +797,30 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	}
 
 	/*
-	 * Request hardware checksumming, if necessary. If the guest
-	 * sent an LSO packet then it must have also negotiated and
-	 * requested partial checksum; therefore the LSO logic is
-	 * contained within viona_tx_csum().
+	 * Translate request for offloaded checksumming. If the guest sent an
+	 * LSO packet then it must have also negotiated and requested partial
+	 * checksum; therefore the LSO logic is contained within
+	 * viona_tx_csum().
 	 */
 	if ((link->l_features & VIRTIO_NET_F_CSUM) != 0 &&
-	    (hdr->vrh_flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) != 0) {
-		if (!viona_tx_csum(ring, hdr, mp_head, len - iov[0].iov_len)) {
-			goto drop_fail;
+	    (hdr.vrh_flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) != 0) {
+		if (!viona_tx_csum(ring, &hdr, &meoi, mp_head, pkt_len)) {
+			/*
+			 * If processing of any checksum offload request fails,
+			 * we can still pass the packet on for transmission.
+			 * Even with this best-effort behavior, which may in
+			 * fact succeed in the end, we record it as an error.
+			 */
+			viona_ring_stat_error(ring);
 		}
 	}
 
 	if (dp != NULL) {
-		dp->d_len = len;
+		/*
+		 * Record the info required to record this descriptor in the
+		 * used ring once its transmission has completed.
+		 */
+		dp->d_len = total_len;
 		dp->d_pages = pages;
 		mutex_enter(&ring->vr_lock);
 		ring->vr_xfer_outstanding++;
@@ -711,14 +832,14 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 		 * until after successful packet transmission.
 		 */
 		vmm_drv_page_release_chain(pages);
-		viona_tx_done(ring, len, cookie);
+		viona_tx_done(ring, total_len, cookie);
 	}
 
 	/*
 	 * From viona's point of view, this is a successful transmit, even if
 	 * something downstream decides to drop the packet.
 	 */
-	viona_ring_stat_accept(ring, len);
+	viona_ring_stat_accept(ring, pkt_len);
 
 	/*
 	 * We're potentially going deep into the networking layer; make sure the
@@ -729,7 +850,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	 * Ignore, for now, any signal from MAC about whether the outgoing
 	 * packet was dropped or not.
 	 */
-	(void) mac_tx(link_mch, mp_head, 0, MAC_DROP_ON_NO_DESC, NULL);
+	(void) mac_tx(link->l_mch, mp_head, 0, MAC_DROP_ON_NO_DESC, NULL);
 	smt_end_unsafe();
 	return;
 
@@ -760,11 +881,6 @@ drop_fail:
 	freemsgchain(mp_head);
 
 drop_hook:
-	len = 0;
-	for (uint_t i = 0; i < n; i++) {
-		len += iov[i].iov_len;
-	}
-
 	if (dp != NULL) {
 		VERIFY(dp->d_ref == 2);
 
@@ -777,8 +893,8 @@ drop_hook:
 	/* Count in the stats as a drop, rather than an error */
 	viona_ring_stat_drop(ring);
 
-	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint32_t, len,
+	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint32_t, pkt_len,
 	    uint16_t, cookie);
 	vmm_drv_page_release_chain(pages);
-	viona_tx_done(ring, len, cookie);
+	viona_tx_done(ring, total_len, cookie);
 }

@@ -13,7 +13,7 @@
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IO_H_
@@ -23,6 +23,7 @@
 #define	VNA_IOC_CREATE		(VNA_IOC | 0x01)
 #define	VNA_IOC_DELETE		(VNA_IOC | 0x02)
 #define	VNA_IOC_VERSION		(VNA_IOC | 0x03)
+#define	VNA_IOC_DEFAULT_PARAMS	(VNA_IOC | 0x04)
 
 #define	VNA_IOC_RING_INIT	(VNA_IOC | 0x10)
 #define	VNA_IOC_RING_RESET	(VNA_IOC | 0x11)
@@ -38,6 +39,8 @@
 #define	VNA_IOC_GET_FEATURES	(VNA_IOC | 0x22)
 #define	VNA_IOC_SET_NOTIFY_IOP	(VNA_IOC | 0x23)
 #define	VNA_IOC_SET_PROMISC	(VNA_IOC | 0x24)
+#define	VNA_IOC_GET_PARAMS	(VNA_IOC | 0x25)
+#define	VNA_IOC_SET_PARAMS	(VNA_IOC | 0x26)
 
 
 /*
@@ -54,7 +57,7 @@
  * change when the version is modified.  It follows no rules like semver.
  *
  */
-#define	VIONA_CURRENT_INTERFACE_VERSION	2
+#define	VIONA_CURRENT_INTERFACE_VERSION	3
 
 typedef struct vioc_create {
 	datalink_id_t	c_linkid;
@@ -98,5 +101,39 @@ typedef struct vioc_intr_poll {
 	uint32_t	vip_status[VIONA_VQ_MAX];
 } vioc_intr_poll_t;
 
+
+/*
+ * Viona Parameter Interfaces
+ *
+ * A viona link can have various configuration parameters set upon it.  This is
+ * done using packed nvlists in order to communicate those parameters to/from
+ * the device driver.
+ *
+ *
+ * Currently supported parameters are:
+ * - tx_copy_data (boolean): During packet transmission, should viona copy all
+ *   of the packet data, rather than "loaning" those regions of guest memory
+ *   (other than the packet headers) in the mblk.
+ * - tx_header_pad (uint16): How many bytes (if any) should be left as empty
+ *   padding on transmitted packets?  These could be used by subsequent
+ *   encapsulation mechanisms in the network stack without the need to
+ *   reallocate space for the then-longer header.
+ *
+ */
+
+/* Maximum size for parameter (or error) packed nvlist buffers */
+#define	VIONA_MAX_PARAM_NVLIST_SZ	4096
+
+typedef struct vioc_get_params {
+	void	*vgp_param;
+	size_t	vgp_param_sz;
+} vioc_get_params_t;
+
+typedef struct vioc_set_params {
+	void	*vsp_param;
+	size_t	vsp_param_sz;
+	void	*vsp_error;
+	size_t	vsp_error_sz;
+} vioc_set_params_t;
 
 #endif	/* _VIONA_IO_H_ */
