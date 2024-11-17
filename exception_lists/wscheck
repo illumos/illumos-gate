@@ -15,6 +15,7 @@
 #
 syntax: glob
 
+usr/src/cmd/ast/libast/*/FEATURE/*
 usr/src/cmd/cxgbetool/*
 usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
