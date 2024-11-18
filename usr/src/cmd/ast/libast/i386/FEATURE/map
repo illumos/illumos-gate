@@ -83,9 +83,6 @@
 #define dirname		_ast_dirname
 #undef	eaccess
 #define eaccess		_ast_eaccess
-#undef	execvpe
-#define execvpe		_ast_execvpe
-extern __MANGLE__ int		execvpe __PROTO__((const char*, char* const[], char* const[]));
 #undef	fnmatch
 #define fnmatch		_ast_fnmatch
 #undef	fts_children

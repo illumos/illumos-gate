@@ -16,8 +16,3 @@ The FEATURE files can be re-generated based on the current contents of
 proto using 'make _feature' in this directory. This should be done after
 adding new features to the standard libraries that AST can detect and use.
 This needs to be done for all supported architectures.
-
-Note that for the moment, as long as building gate using gcc 4.4.4 as the
-primary compiler is supported, libast/i386/FEATURE/aso has some additional
-local edits to use the appropriate atomic ops for 32-bit objects built
-with this version of gcc.

@@ -29,6 +29,7 @@
 #define _lib_execlp	1	/* execlp() in default lib(s) */
 #define _lib_execve	1	/* execve() in default lib(s) */
 #define _lib_execvp	1	/* execvp() in default lib(s) */
+#define _lib_execvpe	1	/* execvpe() in default lib(s) */
 #define _lib_fchmod	1	/* fchmod() in default lib(s) */
 #define _lib_fcntl	1	/* fcntl() in default lib(s) */
 #define _lib_fmtmsg	1	/* fmtmsg() in default lib(s) */

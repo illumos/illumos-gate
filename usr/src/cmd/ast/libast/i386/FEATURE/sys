@@ -143,7 +143,6 @@
 extern __MANGLE__ void	cfree __PROTO__((__V_*));
 extern __MANGLE__ size_t	confstr __PROTO__((int, char*, size_t));
 extern __MANGLE__ int	eaccess __PROTO__((const char*, int));
-extern __MANGLE__ int	execvpe __PROTO__((const char*, char* const[], char* const[]));
 extern __MANGLE__ __V_*	pvalloc __PROTO__((size_t));
 extern __MANGLE__ pid_t	spawnveg __PROTO__((const char*, char* const[], char* const[], pid_t));
 #undef __MANGLE__

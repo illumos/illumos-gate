@@ -82,6 +82,7 @@ usr/src/cmd/acpi/common/utmath.c
 usr/src/cmd/acpi/common/utnonansi.c
 usr/src/cmd/acpi/common/utprint.c
 usr/src/cmd/acpi/common/utxferror.c
+usr/src/cmd/ast/libast/*/FEATURE/*
 usr/src/cmd/dtrace/test/tst/common/*/*.out
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.h

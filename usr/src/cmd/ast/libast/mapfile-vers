@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -129,7 +129,6 @@ $endif
 	_ast_doprnt;
 	_ast_doscan;
 	_ast_eaccess;
-	_ast_execvpe;
 	_ast_fclose;
 	_ast_fcloseall;
 	_ast_fdopen;

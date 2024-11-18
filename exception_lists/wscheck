@@ -16,11 +16,11 @@
 #
 syntax: glob
 
-usr/src/data/ucode/amd/*
-usr/src/data/ucode/intel/*
+# SmartOS additions...
 usr/src/lib/libresolv2/common/*
 usr/src/lib/libresolv2_joy/common/*
 
+usr/src/cmd/ast/libast/*/FEATURE/*
 usr/src/cmd/cxgbetool/*
 usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
@@ -28,8 +28,6 @@ usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
 usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
-usr/src/uts/common/io/qede/*
-usr/src/uts/common/io/i40e/core/*
 usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/os-tests/tests/definit/init.data
 usr/src/test/util-tests/tests/dis/i386/*.out
@@ -45,7 +43,6 @@ usr/src/uts/common/io/ixgbe/core/*
 usr/src/uts/common/sys/scsi/adapters/mpi/*
 usr/src/contrib/*
 usr/src/cmd/ast/libshell/misc/shell_styleguide.docbook
-usr/src/test/util-tests/tests/dis/i386/*.out
 
 usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
