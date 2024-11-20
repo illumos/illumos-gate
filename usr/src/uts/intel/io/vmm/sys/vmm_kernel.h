@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -293,6 +293,7 @@ typedef enum vcpu_notify {
 void *vcpu_stats(struct vm *vm, int vcpu);
 void vcpu_notify_event(struct vm *vm, int vcpuid);
 void vcpu_notify_event_type(struct vm *vm, int vcpuid, vcpu_notify_t);
+void *vm_get_cookie(struct vm *);
 struct vmspace *vm_get_vmspace(struct vm *vm);
 struct vm_client *vm_get_vmclient(struct vm *vm, int vcpuid);
 struct vatpic *vm_atpic(struct vm *vm);

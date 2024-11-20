@@ -49,8 +49,10 @@
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
+#include <sys/cpu.h>
 
 #include <sys/x86_archext.h>
+#include <sys/archsystm.h>
 #include <sys/trap.h>
 
 #include <machine/cpufunc.h>
@@ -80,17 +82,6 @@ SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
 
-#define	VMCB_CACHE_DEFAULT	(VMCB_CACHE_ASID	|	\
-				VMCB_CACHE_IOPM		|	\
-				VMCB_CACHE_I		|	\
-				VMCB_CACHE_TPR		|	\
-				VMCB_CACHE_CR2		|	\
-				VMCB_CACHE_CR		|	\
-				VMCB_CACHE_DR		|	\
-				VMCB_CACHE_DT		|	\
-				VMCB_CACHE_SEG		|	\
-				VMCB_CACHE_NP)
-
 /*
  * Guardrails for supported guest TSC frequencies.
  *
@@ -101,8 +92,6 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
  */
 #define	AMD_TSC_MIN_FREQ	500000000
 #define	AMD_TSC_MAX_FREQ_RATIO	15
-
-static uint32_t vmcb_clean = VMCB_CACHE_DEFAULT;
 
 /* SVM features advertised by CPUID.8000000AH:EDX */
 static uint32_t svm_feature = 0;
@@ -165,9 +154,6 @@ svm_init(void)
 	const uint32_t demand_bits =
 	    (CPUID_AMD_EDX_NESTED_PAGING | CPUID_AMD_EDX_NRIPS);
 	VERIFY((svm_feature & demand_bits) == demand_bits);
-
-	/* Clear any unexpected bits (set manually) from vmcb_clean */
-	vmcb_clean &= VMCB_CACHE_DEFAULT;
 
 	return (0);
 }
@@ -259,7 +245,7 @@ svm_msr_rd_ok(uint8_t *perm_bitmap, uint64_t msr)
 	svm_msr_perm(perm_bitmap, msr, true, false);
 }
 
-static __inline int
+int
 svm_get_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask)
 {
 	struct vmcb_ctrl *ctrl;
@@ -270,7 +256,7 @@ svm_get_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask)
 	return (ctrl->intercept[idx] & bitmask ? 1 : 0);
 }
 
-static __inline void
+void
 svm_set_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask,
     int enabled)
 {
@@ -290,20 +276,6 @@ svm_set_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask,
 	if (ctrl->intercept[idx] != oldval) {
 		svm_set_dirty(sc, vcpu, VMCB_CACHE_I);
 	}
-}
-
-static __inline void
-svm_disable_intercept(struct svm_softc *sc, int vcpu, int off, uint32_t bitmask)
-{
-
-	svm_set_intercept(sc, vcpu, off, bitmask, 0);
-}
-
-static __inline void
-svm_enable_intercept(struct svm_softc *sc, int vcpu, int off, uint32_t bitmask)
-{
-
-	svm_set_intercept(sc, vcpu, off, bitmask, 1);
 }
 
 static void
@@ -370,6 +342,7 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_INIT);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_NMI);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_SMI);
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_RDPMC);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_SHUTDOWN);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 	    VMCB_INTCPT_FERR_FREEZE);
@@ -508,6 +481,9 @@ svm_vminit(struct vm *vm)
 		vmcb_init(svm_sc, i, iopm_pa, msrpm_pa, pml4_pa);
 		svm_msr_guest_init(svm_sc, i);
 	}
+
+	svm_pmu_init(svm_sc);
+
 	return (svm_sc);
 }
 
@@ -1232,6 +1208,8 @@ svm_handle_msr(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
 			res = vlapic_wrmsr(vlapic, ecx, val);
 		} else if (ecx == MSR_EFER) {
 			res = svm_write_efer(svm_sc, vcpu, val);
+		} else if (svm_pmu_owned_msr(ecx)) {
+			res = svm_pmu_wrmsr(svm_sc, vcpu, ecx, val);
 		} else {
 			res = svm_wrmsr(svm_sc, vcpu, ecx, val);
 		}
@@ -1242,6 +1220,8 @@ svm_handle_msr(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
 			struct vlapic *vlapic = vm_lapic(svm_sc->vm, vcpu);
 
 			res = vlapic_rdmsr(vlapic, ecx, &val);
+		} else if (svm_pmu_owned_msr(ecx)) {
+			res = svm_pmu_rdmsr(svm_sc, vcpu, ecx, &val);
 		} else {
 			res = svm_rdmsr(svm_sc, vcpu, ecx, &val);
 		}
@@ -1266,6 +1246,22 @@ svm_handle_msr(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
 		return (0);
 	default:
 		panic("unexpected msr result %u\n", res);
+	}
+}
+
+static void
+svm_handle_rdpmc(struct svm_softc *svm_sc, int vcpu)
+{
+	struct vmcb_state *state = svm_get_vmcb_state(svm_sc, vcpu);
+	struct svm_regctx *ctx = svm_get_guest_regctx(svm_sc, vcpu);
+	const uint32_t ecx = ctx->sctx_rcx;
+	uint64_t val = 0;
+
+	if (svm_pmu_rdpmc(svm_sc, vcpu, ecx, &val)) {
+		state->rax = (uint32_t)val;
+		ctx->sctx_rdx = val >> 32;
+	} else {
+		vm_inject_gp(svm_sc->vm, vcpu);
 	}
 }
 
@@ -1465,6 +1461,10 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		}
 	case VMCB_EXIT_MSR:
 		handled = svm_handle_msr(svm_sc, vcpu, vmexit, info1 != 0);
+		break;
+	case VMCB_EXIT_RDPMC:
+		svm_handle_rdpmc(svm_sc, vcpu);
+		handled = 1;
 		break;
 	case VMCB_EXIT_IO:
 		handled = svm_handle_inout(svm_sc, vcpu, vmexit);
@@ -1795,8 +1795,11 @@ flush_asid(struct svm_softc *sc, int vcpuid)
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
 	uint8_t flush;
 
+	/* HMA ASID updates are expected to be done with interrupts disabled */
+	const ulong_t iflag = intr_clear();
 	flush = hma_svm_asid_update(&vcpustate->hma_asid, has_flush_by_asid(),
 	    true);
+	intr_restore(iflag);
 
 	ASSERT(flush != VMCB_TLB_FLUSH_NOTHING);
 	ctrl->asid = vcpustate->hma_asid.hsa_asid;
@@ -1807,18 +1810,6 @@ flush_asid(struct svm_softc *sc, int vcpuid)
 	 * associated with the vCPU, since any pending nptgen change requiring a
 	 * flush will be satisfied by the one which has just now been queued.
 	 */
-}
-
-static __inline void
-disable_gintr(void)
-{
-	__asm __volatile("clgi");
-}
-
-static __inline void
-enable_gintr(void)
-{
-	__asm __volatile("stgi");
 }
 
 static __inline void
@@ -1900,7 +1891,6 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 	struct svm_softc *svm_sc;
 	struct svm_vcpu *vcpustate;
 	struct vmcb_state *state;
-	struct vmcb_ctrl *ctrl;
 	struct vm_exit *vmexit;
 	struct vlapic *vlapic;
 	vm_client_t *vmc;
@@ -1914,7 +1904,6 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 
 	vcpustate = svm_get_vcpu(svm_sc, vcpu);
 	state = svm_get_vmcb_state(svm_sc, vcpu);
-	ctrl = svm_get_vmcb_ctrl(svm_sc, vcpu);
 	vmexit = vm_exitinfo(vm, vcpu);
 	vlapic = vm_lapic(vm, vcpu);
 	vmc = vm_get_vmclient(vm, vcpu);
@@ -1970,13 +1959,10 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 		handled = 0;
 
 		/*
-		 * Disable global interrupts to guarantee atomicity during
-		 * loading of guest state. This includes not only the state
-		 * loaded by the "vmrun" instruction but also software state
-		 * maintained by the hypervisor: suspended and rendezvous
-		 * state, NPT generation number, vlapic interrupts etc.
+		 * Disable interrupts while loading VM state and performing
+		 * event injection.
 		 */
-		disable_gintr();
+		const ulong_t iflag = intr_clear();
 
 		/*
 		 * Synchronizing and injecting vlapic state is lock-free and is
@@ -1990,12 +1976,12 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 		 * svm_inject_events() to detect a triple-fault condition.
 		 */
 		if (vcpu_entry_bailout_checks(vm, vcpu, state->rip)) {
-			enable_gintr();
+			intr_restore(iflag);
 			break;
 		}
 
 		if (vcpu_run_state_pending(vm, vcpu)) {
-			enable_gintr();
+			intr_restore(iflag);
 			vm_exit_run_state(vm, vcpu, state->rip);
 			break;
 		}
@@ -2005,7 +1991,7 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 		 * handling, take another lap to handle them.
 		 */
 		if (svm_inject_recheck(svm_sc, vcpu, inject_state)) {
-			enable_gintr();
+			intr_restore(iflag);
 			handled = 1;
 			continue;
 		}
@@ -2026,21 +2012,33 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 		nptgen = vmc_table_enter(vmc);
 		check_asid(svm_sc, vcpu, curcpu, nptgen);
 
-		ctrl->vmcb_clean = vmcb_clean & ~vcpustate->dirty;
-		vcpustate->dirty = 0;
-
-		/* Launch Virtual Machine. */
+		svm_pmu_enter(svm_sc, vcpu);
 		vcpu_ustate_change(vm, vcpu, VU_RUN);
 		svm_dr_enter_guest(gctx);
+		svm_apply_dirty(svm_sc, vcpu);
+
+		/*
+		 * Perform VMRUN to enter guest context.
+		 *
+		 * This is done with the protection of clearing the GIF
+		 * (global interrupt flag) as required by SVM.
+		 */
+		hma_svm_gif_disable();
 		svm_launch(vmcb_pa, gctx, get_pcpu());
+		hma_svm_gif_enable();
+
 		svm_dr_leave_guest(gctx);
 		vcpu_ustate_change(vm, vcpu, VU_EMU_KERN);
+		svm_pmu_exit(svm_sc, vcpu);
 
 		/* Restore host LDTR. */
 		lldt(ldt_sel);
 
-		/* #VMEXIT disables interrupts so re-enable them here. */
-		enable_gintr();
+		/*
+		 * Re-enable interrupts now that necessary CPU state has been
+		 * restored.  Subsequent logic may need to block.
+		 */
+		intr_restore(iflag);
 
 		vmc_table_exit(vmc);
 
@@ -2053,6 +2051,7 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 
 	svm_msr_guest_exit(svm_sc, vcpu);
 
+	ASSERT(interrupts_enabled());
 	VERIFY(vcpustate->loaded && curthread->t_preempt != 0);
 	vcpustate->loaded = B_FALSE;
 
@@ -2577,6 +2576,9 @@ static void
 svm_savectx(void *arg, int vcpu)
 {
 	struct svm_softc *sc = arg;
+
+	/* We should _never_ go off-CPU with the GIF disabled */
+	ASSERT(!hma_svm_gif_is_disabled());
 
 	if (sc->vcpu[vcpu].loaded) {
 		svm_msr_guest_exit(sc, vcpu);

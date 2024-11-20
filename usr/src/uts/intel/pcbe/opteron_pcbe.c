@@ -615,6 +615,10 @@ opt_pcbe_init(void)
 	/*
 	 * Determine whether or not the extended counter set is supported on
 	 * this processor.
+	 *
+	 * If access to counters beyond the 6 defined for OPT_PCBE_EXT_NCOUNTERS
+	 * are added here, the logic in HMA for saving/restoring host CPC state
+	 * will also need to be updated.  See: os/hma.c
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_AMD_PCEC)) {
 		opd.opd_ncounters = OPT_PCBE_EXT_NCOUNTERS;

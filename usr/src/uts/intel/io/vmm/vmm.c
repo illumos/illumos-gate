@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -3647,6 +3647,12 @@ vcpu_ustate_change(struct vm *vm, int vcpuid, enum vcpu_ustate ustate)
 
 	vcpu->ustate_when = now;
 	vcpu->ustate = ustate;
+}
+
+void *
+vm_get_cookie(struct vm *vm)
+{
+	return (vm->cookie);
 }
 
 struct vmspace *
