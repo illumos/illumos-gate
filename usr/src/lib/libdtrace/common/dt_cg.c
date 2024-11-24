@@ -29,6 +29,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2017 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Ryan Zezeski
  */
 
 #include <sys/types.h>
@@ -1423,8 +1424,9 @@ dt_cg_xlate_member(const char *name, ctf_id_t type, ulong_t off, void *arg)
 	instr = DIF_INSTR_FMT(DIF_OP_ADD, dx->dtxl_dreg, reg, reg);
 	dt_irlist_append(dlp, dt_cg_node_alloc(DT_LBL_NONE, instr));
 
-	size = ctf_type_size(mnp->dn_membexpr->dn_ctfp,
-	    mnp->dn_membexpr->dn_type);
+	/* Determine the size of the destination member's type. */
+	size = ctf_type_size(dxp->dx_dst_ctfp, type);
+
 	if (dt_node_is_scalar(mnp->dn_membexpr)) {
 		/*
 		 * Copying scalars is simple.
