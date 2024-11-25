@@ -48,6 +48,13 @@ CFLAGS		+=	$(CCVERBOSE)
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) \
 			-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2
 
+# The openssl_spi.c file is not ported to the OpenSSL 3.x API yet and so we
+# need to make sure the deprecated 1.x API is fully available for it.  Once the
+# openssl_spi.c file is adapted for OpenSSL 3.x this should be updated or
+# removed.
+# See also https://www.illumos.org/issues/16916
+CPPFLAGS	+=	-DOPENSSL_API_COMPAT=10101
+
 CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
 CERRWARN	+=	$(CNOWARN_UNINIT)
