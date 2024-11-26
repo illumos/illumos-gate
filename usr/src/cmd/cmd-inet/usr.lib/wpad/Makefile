@@ -33,6 +33,12 @@ include	../../../Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
 
+# The wpa_enc.c file is not ported to the OpenSSL 3.x API yet and so we need to
+# make sure the deprecated 1.x API is fully available for it.  Once the
+# wpa_enc.c file is adapted for OpenSSL 3.x this should be updated or removed.
+# See also https://www.illumos.org/issues/16917
+CPPFLAGS +=	-DOPENSSL_API_COMPAT=10101
+
 LDLIBS +=	-ldladm -ldlpi
 all install := LDLIBS += -lsunw_crypto
 

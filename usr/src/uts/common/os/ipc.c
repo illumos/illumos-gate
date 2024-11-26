@@ -1283,7 +1283,7 @@ ipc_ids(ipc_service_t *service, int *buf, uint_t nids, uint_t *pnids)
 	size_t	idsize = 0;
 	int	error = 0;
 	int	idcount;
-	int	*ids;
+	int	*ids = NULL;
 	int	numids = 0;
 	zoneid_t zoneid = getzoneid();
 	int	global = INGLOBALZONE(curproc);
@@ -1319,6 +1319,7 @@ ipc_ids(ipc_service_t *service, int *buf, uint_t nids, uint_t *pnids)
 
 		if (idsize != 0) {
 			kmem_free(ids, idsize);
+			ids = NULL;
 			idsize = 0;
 		}
 	}
@@ -1342,7 +1343,7 @@ out:
 	if (suword32(pnids, (uint32_t)numids) ||
 	    (nids != 0 && copyout(ids, buf, numids * sizeof (int))))
 		error = EFAULT;
-	if (idsize != 0)
+	if (ids != NULL)
 		kmem_free(ids, idsize);
 	return (error);
 }

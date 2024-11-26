@@ -57,6 +57,12 @@ SUNENVDEF=	-DSUN_EXTENSIONS -DVENDOR_DEFAULT=VENDOR_SUN \
 
 CPPFLAGS =	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
 
+# The tls.c file is not ported to the OpenSSL 3.x API yet and so we need to
+# make sure the deprecated 1.x API is fully available for it.  Once the tls.c
+# file is adapted for OpenSSL 3.x this should be updated or removed.
+# See also https://www.illumos.org/issues/16918
+CPPFLAGS +=	-DOPENSSL_API_COMPAT=10101
+
 FILEMODE=	2555
 
 ROOTSYMLINKS=	$(ROOTLIBSMTPSM)/newaliases

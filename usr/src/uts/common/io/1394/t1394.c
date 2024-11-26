@@ -144,7 +144,7 @@ t1394_attach(dev_info_t *dip, int version, uint_t flags,
 	attachinfo->dma_attr	= target->on_hal->halinfo.dma_attr;
 
 	unit_dir = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "unit-dir-offset", 0);
+	    DDI_PROP_DONTPASS, "unit-dir-offset", 0);
 	target->unit_dir = unit_dir;
 
 	/* By default, disable all physical AR requests */
@@ -909,7 +909,7 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 	/* If not T1394_ADDR_FIXED, then allocate a block */
 	if (addr_allocp->aa_type != T1394_ADDR_FIXED) {
 		err = s1394_request_addr_blk((s1394_hal_t *)target->on_hal,
-					addr_allocp);
+		    addr_allocp);
 		if (err != DDI_SUCCESS) {
 			*result = T1394_EALLOC_ADDR;
 			/* kstats - addr alloc failures */
@@ -920,7 +920,7 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 		return (err);
 	} else {
 		err = s1394_claim_addr_blk((s1394_hal_t *)target->on_hal,
-					addr_allocp);
+		    addr_allocp);
 		if (err != DDI_SUCCESS) {
 			*result = T1394_EALLOC_ADDR;
 			/* kstats - addr alloc failures */
@@ -1342,7 +1342,7 @@ t1394_cmp_cas(t1394_handle_t t1394_hdl, t1394_cmp_reg_t reg, uint32_t arg_val,
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_cmp_cas((s1394_target_t *)t1394_hdl, reg, arg_val,
-				new_val, old_valp);
+	    new_val, old_valp);
 
 	return (result);
 }
@@ -1432,7 +1432,7 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 	cec_new->filter_channel_mask	= sii->si_channel_mask;
 	cec_new->bandwidth		= sii->si_bandwidth;
 	cec_new->state_transitions	= ISOCH_CEC_FREE | ISOCH_CEC_JOIN |
-					    ISOCH_CEC_SETUP;
+	    ISOCH_CEC_SETUP;
 
 	mutex_enter(&hal->isoch_cec_list_mutex);
 
@@ -1658,7 +1658,7 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	cec_new->bandwidth		= props->cec_bandwidth;
 	cec_new->cec_options		= props->cec_options;
 	cec_new->state_transitions	= ISOCH_CEC_FREE | ISOCH_CEC_JOIN |
-					    ISOCH_CEC_SETUP;
+	    ISOCH_CEC_SETUP;
 
 	mutex_enter(&hal->isoch_cec_list_mutex);
 
@@ -1844,6 +1844,7 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 	    (join_isoch_info->isoch_cec_evts.stop_target	== NULL) ||
 	    (join_isoch_info->isoch_cec_evts.rsrc_fail_target	== NULL) ||
 	    (join_isoch_info->isoch_cec_evts.teardown_target	== NULL))) {
+		kmem_free(member_new, sizeof (s1394_isoch_cec_member_t));
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
 		return (DDI_FAILURE);
@@ -2034,7 +2035,7 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 	int				ret;
 	int				j;
 	int	(*setup_callback)(t1394_isoch_cec_handle_t, opaque_t,
-			    t1394_setup_target_args_t *);
+	    t1394_setup_target_args_t *);
 
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
@@ -3039,7 +3040,7 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 		mutex_exit(&hal->local_config_rom_mutex);
 		hal->config_rom_timer =
 		    timeout(s1394_update_config_rom_callback, hal,
-			drv_usectohz(CONFIG_ROM_UPDATE_DELAY * 1000));
+		    drv_usectohz(CONFIG_ROM_UPDATE_DELAY * 1000));
 	} else {
 		mutex_exit(&hal->local_config_rom_mutex);
 	}
@@ -3099,7 +3100,7 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 		mutex_exit(&hal->local_config_rom_mutex);
 		hal->config_rom_timer =
 		    timeout(s1394_update_config_rom_callback, hal,
-			drv_usectohz(CONFIG_ROM_UPDATE_DELAY * 1000));
+		    drv_usectohz(CONFIG_ROM_UPDATE_DELAY * 1000));
 	} else {
 		mutex_exit(&hal->local_config_rom_mutex);
 	}
