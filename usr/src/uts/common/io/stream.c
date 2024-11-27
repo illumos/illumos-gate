@@ -27,6 +27,7 @@
  *
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1646,21 +1647,15 @@ pullupmsg(mblk_t *mp, ssize_t len)
 mblk_t *
 msgpullup(mblk_t *mp, ssize_t len)
 {
-	mblk_t	*newmp;
-	ssize_t	totlen;
-	ssize_t	n;
+	mblk_t *newmp;
+	ssize_t totlen = xmsgsize(mp);
+	ssize_t offset = 0;
 
-	totlen = xmsgsize(mp);
+	if (len == -1)
+		len = totlen;
 
-	if ((len > 0) && (len > totlen))
+	if (len < 0 || (len > 0 && len > totlen))
 		return (NULL);
-
-	/*
-	 * Copy all of the first msg type into one new mblk, then dupmsg
-	 * and link the rest onto this.
-	 */
-
-	len = totlen;
 
 	if ((newmp = allocb_tmpl(len, mp)) == NULL)
 		return (NULL);
@@ -1669,14 +1664,22 @@ msgpullup(mblk_t *mp, ssize_t len)
 	newmp->b_band = mp->b_band;
 
 	while (len > 0) {
-		n = mp->b_wptr - mp->b_rptr;
-		ASSERT(n >= 0);		/* allow zero-length mblk_t's */
+		ssize_t seglen = MBLKL(mp);
+		ssize_t n = MIN(seglen, len);
+
+		ASSERT3P(mp, !=, NULL);	/* guaranteed by len <= totlen */
+		ASSERT3S(n, >=, 0);	/* allow zero-length mblk_t's */
 		if (n > 0)
 			bcopy(mp->b_rptr, newmp->b_wptr, n);
 		newmp->b_wptr += n;
 		len -= n;
-		mp = mp->b_cont;
+
+		if (n == seglen)
+			mp = mp->b_cont;
+		else if (len == 0)
+			offset = n;
 	}
+	ASSERT3S(len, ==, 0);
 
 	if (mp != NULL) {
 		newmp->b_cont = dupmsg(mp);
@@ -1684,6 +1687,9 @@ msgpullup(mblk_t *mp, ssize_t len)
 			freemsg(newmp);
 			return (NULL);
 		}
+		ASSERT3S(offset, >=, 0);
+		ASSERT3U(MBLKL(newmp->b_cont), >=, offset);
+		newmp->b_cont->b_rptr += offset;
 	}
 
 	return (newmp);
