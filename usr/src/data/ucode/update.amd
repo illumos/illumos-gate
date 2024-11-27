@@ -101,7 +101,9 @@ for f in $tmp/ucode/amd-ucode/*.bin; do
 	bf=${bf#microcode_}
 	bf=${bf%.bin}
 	[[ $bf = amd* ]] || errexit "$f does not look like a firmware file"
-	echo "Converting $bf"
+	echo
+	echo "*** Converting $bf"
+	echo
 	mkdir $tmp/out/$bf
 	cp $f $tmp/amd-fw
 	$UCODEADM -l $tmp/amd-fw
