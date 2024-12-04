@@ -2432,6 +2432,7 @@ dir  path=opt/zfs-tests/tests/functional/fault
 file path=opt/zfs-tests/tests/functional/fault/auto_spare_sorted_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/fault/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/fault/deadlist_read_error mode=0555
 file path=opt/zfs-tests/tests/functional/fault/fault.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/fault/objset_open_prop_error mode=0555
 file path=opt/zfs-tests/tests/functional/fault/setup mode=0555

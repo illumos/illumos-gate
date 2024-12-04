@@ -63,7 +63,7 @@ typedef struct dsl_deadlist_entry {
 	bpobj_t dle_bpobj;
 } dsl_deadlist_entry_t;
 
-void dsl_deadlist_open(dsl_deadlist_t *dl, objset_t *os, uint64_t object);
+int dsl_deadlist_open(dsl_deadlist_t *dl, objset_t *os, uint64_t object);
 void dsl_deadlist_close(dsl_deadlist_t *dl);
 uint64_t dsl_deadlist_alloc(objset_t *os, dmu_tx_t *tx);
 void dsl_deadlist_free(objset_t *os, uint64_t dlobj, dmu_tx_t *tx);

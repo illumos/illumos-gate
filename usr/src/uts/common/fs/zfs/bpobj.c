@@ -155,7 +155,6 @@ bpobj_open(bpobj_t *bpo, objset_t *os, uint64_t object)
 		return (err);
 
 	bzero(bpo, sizeof (*bpo));
-	mutex_init(&bpo->bpo_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	ASSERT(bpo->bpo_dbuf == NULL);
 	ASSERT(bpo->bpo_phys == NULL);
@@ -173,6 +172,7 @@ bpobj_open(bpobj_t *bpo, objset_t *os, uint64_t object)
 	bpo->bpo_havecomp = (doi.doi_bonus_size > BPOBJ_SIZE_V0);
 	bpo->bpo_havesubobj = (doi.doi_bonus_size > BPOBJ_SIZE_V1);
 	bpo->bpo_phys = bpo->bpo_dbuf->db_data;
+	mutex_init(&bpo->bpo_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
