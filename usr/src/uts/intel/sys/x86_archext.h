@@ -1819,7 +1819,11 @@ struct cpu_ucode_info;
 extern void ucode_alloc_space(struct cpu *);
 extern void ucode_free_space(struct cpu *);
 extern void ucode_init(void);
-extern void ucode_check(struct cpu *);
+extern void ucode_check_boot(void);
+extern void ucode_read_rev(struct cpu *);
+extern void ucode_locate(struct cpu *);
+extern void ucode_apply(struct cpu *);
+extern void ucode_finish(struct cpu *);
 extern void ucode_cleanup();
 
 #if !defined(__xpv)

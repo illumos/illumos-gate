@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/bootconf.h>
@@ -52,10 +52,20 @@ static char *ucodepath;
 static kmutex_t ucode_lock;
 static bool ucode_cleanup_done = false;
 
+/*
+ * Flag for use by microcode impls to determine if they can use kmem.  Note this
+ * is meant primarily for gating use of functions like kobj_open_file() which
+ * allocate internally with kmem.  ucode_zalloc() and ucode_free() should
+ * otherwise be used.
+ */
+bool ucode_use_kmem = false;
+
 static const char ucode_failure_fmt[] =
 	"cpu%d: failed to update microcode from version 0x%x to 0x%x";
 static const char ucode_success_fmt[] =
 	"?cpu%d: microcode has been updated from version 0x%x to 0x%x\n";
+
+static const char ucode_path_fmt[] = "/platform/%s/ucode";
 
 SET_DECLARE(ucode_source_set, ucode_source_t);
 
@@ -69,7 +79,30 @@ int ucode_force_update = 0;
 void
 ucode_init(void)
 {
+	ucode_source_t **src;
+
 	mutex_init(&ucode_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	/* Set up function pointers */
+	SET_FOREACH(src, ucode_source_set) {
+		if ((*src)->us_select(CPU)) {
+			ucode = *src;
+			break;
+		}
+	}
+
+	if (ucode == NULL)
+		return;
+
+#ifdef DEBUG
+	cmn_err(CE_CONT, "?ucode: selected %s\n", ucode->us_name);
+
+	if (!ucode->us_capable(CPU)) {
+		cmn_err(CE_CONT,
+		    "?ucode: microcode update not supported on CPU\n");
+		return;
+	}
+#endif
 }
 
 /*
@@ -103,13 +136,13 @@ ucode_path(void)
 }
 
 /*
- * Allocate/free a buffer used to hold ucode data. Space for the boot CPU is
- * allocated with BOP_ALLOC() and does not require a free.
+ * Allocate/free a buffer used to hold ucode data. Space allocated before kmem
+ * is available is allocated with BOP_ALLOC() and does not require a free.
  */
 void *
-ucode_zalloc(processorid_t id, size_t size)
+ucode_zalloc(size_t size)
 {
-	if (id != 0)
+	if (ucode_use_kmem)
 		return (kmem_zalloc(size, KM_NOSLEEP));
 
 	/* BOP_ALLOC() failure results in panic */
@@ -117,9 +150,9 @@ ucode_zalloc(processorid_t id, size_t size)
 }
 
 void
-ucode_free(processorid_t id, void *buf, size_t size)
+ucode_free(void *buf, size_t size)
 {
-	if (id != 0 && buf != NULL)
+	if (ucode_use_kmem && buf != NULL)
 		kmem_free(buf, size);
 }
 
@@ -133,13 +166,13 @@ ucode_cleanup(void)
 {
 	mutex_enter(&ucode_lock);
 	if (ucode != NULL)
-		ucode->us_file_reset(-1);
+		ucode->us_file_reset();
 	ucode_cleanup_done = true;
 	mutex_exit(&ucode_lock);
 
 	/*
 	 * We purposefully do not free 'ucodepath' here so that it persists for
-	 * any future callers to ucode_check(), such as could occur on systems
+	 * any future callers to ucode_locate(), such as could occur on systems
 	 * that support DR.
 	 */
 }
@@ -293,126 +326,229 @@ ucode_update(uint8_t *ucodep, int size)
 }
 
 /*
- * Entry point to microcode update from mlsetup() and mp_startup()
- * Initialize mcpu_ucode_info, and perform microcode update if necessary.
- * cpuid_info must be initialized before ucode_check can be called.
+ * Called when starting up non-boot CPUs from mp_startup() to read the current
+ * microcode revision before the control CPU calls ucode_locate().
  */
 void
-ucode_check(cpu_t *cp)
+ucode_read_rev(cpu_t *cp)
 {
 	cpu_ucode_info_t *uinfop;
-	ucode_errno_t rc = EM_OK;
-	bool bsp = (cp->cpu_id == 0);
 
-	ASSERT(cp != NULL);
+	ASSERT3P(cp, !=, NULL);
+
+	if (ucode == NULL || !ucode->us_capable(cp))
+		return;
+
+	uinfop = cp->cpu_m.mcpu_ucode_info;
+	ASSERT3P(uinfop, !=, NULL);
+
+	ucode->us_read_rev(uinfop);
+}
+
+/*
+ * Called by the control CPU when starting up non-boot CPUs to find any
+ * applicable microcode updates. Initializes mcpu_ucode_info, which will contain
+ * the relevant update to be applied, via ucode_apply(), if one is found.
+ * ucode_read_rev() must be called before this function on the target CPU.
+ */
+void
+ucode_locate(cpu_t *cp)
+{
+	cpu_ucode_info_t *uinfop;
+	size_t sz;
+
+	ASSERT3P(cp, !=, NULL);
+	ASSERT(ucode_use_kmem);
 
 	mutex_enter(&ucode_lock);
 
-	if (bsp) {
-		/* Space statically allocated for BSP; ensure pointer is set */
-		if (cp->cpu_m.mcpu_ucode_info == NULL)
-			cp->cpu_m.mcpu_ucode_info = &cpu_ucode_info0;
-
-		/* Set up function pointers if not already done */
-		if (ucode == NULL) {
-			ucode_source_t **src;
-
-			SET_FOREACH(src, ucode_source_set) {
-				if ((*src)->us_select(cp)) {
-					ucode = *src;
-					break;
-				}
-			}
-
-			if (ucode == NULL)
-				goto out;
-
-#ifdef DEBUG
-			cmn_err(CE_CONT, "?ucode: selected %s\n",
-			    ucode->us_name);
-#endif
-		}
-	}
-
-	if (ucode == NULL)
+	if (ucode == NULL || !ucode->us_capable(cp))
 		goto out;
 
 	if (ucodepath == NULL) {
-		size_t sz;
-		char *plat;
-
-		if (bsp) {
-			const char *prop = "impl-arch-name";
-			int len;
-
-			len = BOP_GETPROPLEN(bootops, prop);
-
-			if (len <= 0) {
-				cmn_err(CE_WARN,
-				    "ucode: could not find %s property", prop);
-				goto out;
-			}
-
-			/*
-			 * On the BSP, this memory is allocated via BOP_ALLOC()
-			 * -- which panics on failure -- and does not need to
-			 * be explicitly freed.
-			 */
-			plat = ucode_zalloc(cp->cpu_id, len + 1);
-			(void) BOP_GETPROP(bootops, prop, plat);
-		} else {
-			/*
-			 * from common/conf/param.c, already filled in by
-			 * setup_ddi() by this point.
-			 */
-			plat = platform;
-		}
-		if (plat[0] == '\0') {
-			/*
-			 * If we can't determine the architecture name,
-			 * we cannot find microcode files for it.
-			 * Return without setting 'ucode'.
-			 */
-			cmn_err(CE_WARN, "ucode: could not determine arch");
-			goto out;
-		}
-
-		sz = snprintf(NULL, 0, "/platform/%s/ucode", plat) + 1;
-		/*
-		 * Note that on the boot CPU, this allocation will be satisfied
-		 * via BOP_ALLOC() and the returned address will not be valid
-		 * once we come back into this function for the remaining CPUs.
-		 * To deal with this, we throw the memory away at the end of
-		 * this function if we are the BSP. The next CPU through here
-		 * will re-create it using kmem and then it persists.
-		 */
-		ucodepath = ucode_zalloc(cp->cpu_id, sz);
+		sz = snprintf(NULL, 0, ucode_path_fmt, platform) + 1;
+		ucodepath = kmem_zalloc(sz, KM_NOSLEEP);
 		if (ucodepath == NULL) {
 			cmn_err(CE_WARN,
 			    "ucode: could not allocate memory for path");
 			goto out;
 		}
-		(void) snprintf(ucodepath, sz, "/platform/%s/ucode", plat);
+		(void) snprintf(ucodepath, sz, ucode_path_fmt, platform);
 	}
 
 	uinfop = cp->cpu_m.mcpu_ucode_info;
-	ASSERT(uinfop != NULL);
+	ASSERT3P(uinfop, !=, NULL);
 
-	if (!ucode->us_capable(cp))
+	/*
+	 * Search for any applicable updates.  If we fail to find a match for
+	 * any reason, free the file structure just in case we have read in a
+	 * partial file.
+	 *
+	 * In case we end up here after ucode_cleanup() has been called, such
+	 * as could occur with CPU hotplug, we also clear the memory and reset
+	 * the data structure as nothing else will call ucode_cleanup() and we
+	 * don't need to cache the data as we do during boot when starting the
+	 * APs.
+	 */
+	if ((ucode->us_locate(cp, uinfop) != EM_OK) || ucode_cleanup_done) {
+		ucode->us_file_reset();
+	}
+
+out:
+	mutex_exit(&ucode_lock);
+}
+
+/*
+ * Called when starting up non-boot CPUs to load any pending microcode updates
+ * found in ucode_locate().  Note this is called very early in the startup
+ * process (before CPU_READY is set and while CPU_QUIESCED is) so we must be
+ * careful about what we do here, e.g., no kmem_free or anything that might call
+ * hat_unload; no kmem_alloc or anything which may cause thread context switch.
+ * We also don't take the ucode_lock here for similar reasons (if contended
+ * the idle thread will spin with CPU_QUIESCED set). This is fine though since
+ * we should not be updating any shared ucode state.
+ */
+void
+ucode_apply(cpu_t *cp)
+{
+	cpu_ucode_info_t *uinfop;
+
+	ASSERT3P(cp, !=, NULL);
+
+	if (ucode == NULL || !ucode->us_capable(cp))
+		return;
+
+	uinfop = cp->cpu_m.mcpu_ucode_info;
+	ASSERT3P(uinfop, !=, NULL);
+
+	/*
+	 * No pending update -- nothing to do.
+	 */
+	if (uinfop->cui_pending_ucode == NULL)
+		return;
+
+	/*
+	 * Apply pending update.
+	 */
+	ucode->us_load(uinfop);
+}
+
+/*
+ * Called when starting up non-boot CPUs to free any pending microcode updates
+ * found in ucode_locate() and print the result of the attempting to load it in
+ * ucode_apply().  This is separate from ucode_apply() as we can't yet call
+ * kmem_free() at that point in the startup process.
+ */
+void
+ucode_finish(cpu_t *cp)
+{
+	cpu_ucode_info_t *uinfop;
+	uint32_t old_rev, new_rev;
+
+	ASSERT3P(cp, !=, NULL);
+
+	if (ucode == NULL || !ucode->us_capable(cp))
+		return;
+
+	uinfop = cp->cpu_m.mcpu_ucode_info;
+	ASSERT3P(uinfop, !=, NULL);
+
+	/*
+	 * No pending update -- nothing to do.
+	 */
+	if (uinfop->cui_pending_ucode == NULL)
+		return;
+
+	old_rev = uinfop->cui_rev;
+	new_rev = uinfop->cui_pending_rev;
+	ucode->us_read_rev(uinfop);
+
+	if (uinfop->cui_rev != new_rev) {
+		ASSERT3U(uinfop->cui_rev, ==, old_rev);
+		cmn_err(CE_WARN, ucode_failure_fmt, cp->cpu_id, old_rev,
+		    new_rev);
+	} else {
+		cmn_err(CE_CONT, ucode_success_fmt, cp->cpu_id, old_rev,
+		    new_rev);
+	}
+
+	ucode_free(uinfop->cui_pending_ucode, uinfop->cui_pending_size);
+	uinfop->cui_pending_ucode = NULL;
+	uinfop->cui_pending_size = 0;
+	uinfop->cui_pending_rev = 0;
+}
+
+/*
+ * Entry point to microcode update from mlsetup() for boot CPU.
+ * Initialize mcpu_ucode_info, and perform microcode update if necessary.
+ * cpuid_info must be initialized before we can be called.
+ */
+void
+ucode_check_boot(void)
+{
+	cpu_t *cp = CPU;
+	cpu_ucode_info_t *uinfop;
+	const char *prop;
+	char *plat;
+	int prop_len;
+	size_t path_len;
+
+	ASSERT3U(cp->cpu_id, ==, 0);
+	ASSERT(!ucode_use_kmem);
+
+	mutex_enter(&ucode_lock);
+
+	/* Space statically allocated for BSP; ensure pointer is set */
+	ASSERT3P(cp->cpu_m.mcpu_ucode_info, ==, NULL);
+	uinfop = cp->cpu_m.mcpu_ucode_info = &cpu_ucode_info0;
+
+	if (ucode == NULL || !ucode->us_capable(cp))
 		goto out;
 
-	ucode->us_read_rev(uinfop);
+	ASSERT3P(ucodepath, ==, NULL);
+
+	prop = "impl-arch-name";
+	prop_len = BOP_GETPROPLEN(bootops, prop);
+	if (prop_len <= 0) {
+		cmn_err(CE_WARN, "ucode: could not find %s property", prop);
+		goto out;
+	}
+
+	/*
+	 * We're running on the boot CPU before kmem is available so we make use
+	 * of BOP_ALLOC() -- which panics on failure -- to allocate any memory
+	 * we need.  That also means we don't need to explicity free it.
+	 */
+	plat = BOP_ALLOC(bootops, NULL, prop_len + 1, MMU_PAGESIZE);
+	(void) BOP_GETPROP(bootops, prop, plat);
+	if (plat[0] == '\0') {
+		/*
+		 * If we can't determine the architecture name,
+		 * we cannot find microcode files for it.
+		 * Return without setting 'ucodepath'.
+		 */
+		cmn_err(CE_WARN, "ucode: could not determine arch");
+		goto out;
+	}
+
+	path_len = snprintf(NULL, 0, ucode_path_fmt, plat) + 1;
+	ucodepath = BOP_ALLOC(bootops, NULL, path_len, MMU_PAGESIZE);
+	(void) snprintf(ucodepath, path_len, ucode_path_fmt, plat);
 
 	/*
 	 * Check to see if we need ucode update
 	 */
-	if ((rc = ucode->us_locate(cp, uinfop)) == EM_OK) {
+	ucode->us_read_rev(uinfop);
+	if (ucode->us_locate(cp, uinfop) == EM_OK) {
 		uint32_t old_rev, new_rev;
 
 		old_rev = uinfop->cui_rev;
-		new_rev = ucode->us_load(uinfop);
+		new_rev = uinfop->cui_pending_rev;
+		ucode->us_load(uinfop);
+		ucode->us_read_rev(uinfop);
 
 		if (uinfop->cui_rev != new_rev) {
+			ASSERT3U(uinfop->cui_rev, ==, old_rev);
 			cmn_err(CE_WARN, ucode_failure_fmt, cp->cpu_id,
 			    old_rev, new_rev);
 		} else {
@@ -422,31 +558,29 @@ ucode_check(cpu_t *cp)
 	}
 
 	/*
-	 * If we fail to find a match for any reason, free the file structure
-	 * just in case we have read in a partial file.
-	 *
-	 * Since the scratch memory for holding the microcode for the boot CPU
-	 * came from BOP_ALLOC, we will reset the data structure as if we
-	 * never did the allocation so we don't have to keep track of this
-	 * special chunk of memory.  We free the memory used for the rest
-	 * of the CPUs in start_other_cpus().
-	 *
-	 * In case we end up here after ucode_cleanup() has been called, such
-	 * as could occur with CPU hotplug, we also clear the memory and reset
-	 * the data structure as nothing else will call ucode_cleanup() and we
-	 * don't need to cache the data as we do during boot when starting the
-	 * APs.
+	 * Regardless of whether we found a match or not, since the scratch
+	 * memory for holding the microcode for the boot CPU came from
+	 * BOP_ALLOC, we will reset the data structure as if we never did the
+	 * allocation so we don't have to keep track of this special chunk of
+	 * memory.
 	 */
-	if (rc != EM_OK || bsp || ucode_cleanup_done)
-		ucode->us_file_reset(cp->cpu_id);
+	ucode->us_file_reset();
+
+	/*
+	 * Similarly clear any pending update that may have been found.
+	 */
+	uinfop->cui_pending_ucode = NULL;
+	uinfop->cui_pending_size = 0;
+	uinfop->cui_pending_rev = 0;
 
 out:
 	/*
-	 * If this is the boot CPU, discard the memory that came from BOP_ALLOC
-	 * and was used to build the ucode path.
+	 * Discard the memory that came from BOP_ALLOC and was used to build the
+	 * ucode path.  Subsequent CPUs will be handled via ucode_locate() at
+	 * which point kmem is available and we can cache the path.
 	 */
-	if (bsp)
-		ucodepath = NULL;
+	ucodepath = NULL;
+	ucode_use_kmem = true;
 
 	mutex_exit(&ucode_lock);
 }

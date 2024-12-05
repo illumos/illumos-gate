@@ -24,7 +24,7 @@
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_SYS_UCODE_H
@@ -115,8 +115,11 @@ extern ucode_errno_t ucode_update(uint8_t *, int);
  * Microcode specific information per core
  */
 typedef struct cpu_ucode_info {
-	uint32_t	cui_platid;	/* platform id */
-	uint32_t	cui_rev;	/* microcode revision */
+	uint32_t	cui_platid;		/* platform id */
+	uint32_t	cui_rev;		/* microcode revision */
+	uint32_t	cui_pending_rev;	/* pending microcode revision */
+	void		*cui_pending_ucode;	/* pending microcode update */
+	size_t		cui_pending_size;	/* pending microcode size */
 } cpu_ucode_info_t;
 
 /*
@@ -142,9 +145,9 @@ typedef struct ucode_source {
 	bool		us_invalidate;
 	bool		(*us_select)(cpu_t *);
 	bool		(*us_capable)(cpu_t *);
-	void		(*us_file_reset)(processorid_t);
+	void		(*us_file_reset)(void);
 	void		(*us_read_rev)(cpu_ucode_info_t *);
-	uint32_t	(*us_load)(cpu_ucode_info_t *);
+	void		(*us_load)(cpu_ucode_info_t *);
 	ucode_errno_t	(*us_validate)(uint8_t *, int);
 	ucode_errno_t	(*us_extract)(ucode_update_t *, uint8_t *, int);
 	ucode_errno_t	(*us_locate)(cpu_t *, cpu_ucode_info_t *);

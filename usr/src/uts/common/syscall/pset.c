@@ -791,7 +791,7 @@ pset_list(psetid_t *psetlist, uint_t *numpsets)
 		}
 	}
 
-	if (real_npsets)
+	if (psets != NULL)
 		kmem_free(psets, real_npsets * sizeof (psetid_t));
 
 	if (error)

@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/stdbool.h>
@@ -36,14 +36,15 @@
 #include <sys/kobj_impl.h>
 #include <sys/ontrap.h>
 #include <sys/sysmacros.h>
+#include <sys/systm.h>
 #include <sys/ucode.h>
 #include <sys/ucode_intel.h>
 #include <ucode/ucode_errno.h>
 #include <ucode/ucode_utils_intel.h>
 #include <sys/x86_archext.h>
 
-extern void *ucode_zalloc(processorid_t, size_t);
-extern void ucode_free(processorid_t, void *, size_t);
+extern void *ucode_zalloc(size_t);
+extern void ucode_free(void *, size_t);
 extern const char *ucode_path(void);
 extern int ucode_force_update;
 
@@ -75,7 +76,7 @@ ucode_capable_intel(cpu_t *cp)
 }
 
 static void
-ucode_file_reset_intel(processorid_t id)
+ucode_file_reset_intel(void)
 {
 	ucode_file_intel_t *ucodefp = &intel_ucodef;
 	int total_size, body_size;
@@ -87,18 +88,18 @@ ucode_file_reset_intel(processorid_t id)
 	body_size = UCODE_BODY_SIZE_INTEL(ucodefp->uf_header->uh_body_size);
 
 	if (ucodefp->uf_body != NULL) {
-		ucode_free(id, ucodefp->uf_body, body_size);
+		ucode_free(ucodefp->uf_body, body_size);
 		ucodefp->uf_body = NULL;
 	}
 
 	if (ucodefp->uf_ext_table != NULL) {
 		int size = total_size - body_size - UCODE_HEADER_SIZE_INTEL;
 
-		ucode_free(id, ucodefp->uf_ext_table, size);
+		ucode_free(ucodefp->uf_ext_table, size);
 		ucodefp->uf_ext_table = NULL;
 	}
 
-	ucode_free(id, ucodefp->uf_header, UCODE_HEADER_SIZE_INTEL);
+	ucode_free(ucodefp->uf_header, UCODE_HEADER_SIZE_INTEL);
 	ucodefp->uf_header = NULL;
 }
 
@@ -142,6 +143,34 @@ ucode_match_intel(int cpi_sig, cpu_ucode_info_t *uinfop,
 	return (EM_NOMATCH);
 }
 
+/*
+ * Copy the given ucode into cpu_ucode_info_t in preparation for loading onto
+ * the corresponding CPU via ucode_load_intel().
+ */
+static ucode_errno_t
+ucode_copy_intel(const ucode_file_intel_t *ucodefp, cpu_ucode_info_t *uinfop)
+{
+	ASSERT3P(ucodefp->uf_header, !=, NULL);
+	ASSERT3P(ucodefp->uf_body, !=, NULL);
+	ASSERT3P(uinfop->cui_pending_ucode, ==, NULL);
+
+	/*
+	 * Allocate memory for the pending microcode update and copy the body.
+	 * We don't need the header or extended signature table which are only
+	 * used for matching.
+	 */
+	size_t sz = UCODE_BODY_SIZE_INTEL(ucodefp->uf_header->uh_body_size);
+	uinfop->cui_pending_ucode = ucode_zalloc(sz);
+	if (uinfop->cui_pending_ucode == NULL)
+		return (EM_NOMEM);
+	memcpy(uinfop->cui_pending_ucode, ucodefp->uf_body, sz);
+
+	uinfop->cui_pending_size = sz;
+	uinfop->cui_pending_rev = ucodefp->uf_header->uh_rev;
+
+	return (EM_OK);
+}
+
 static ucode_errno_t
 ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 {
@@ -154,11 +183,11 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 	ucode_file_intel_t *ucodefp = &intel_ucodef;
 
 	/*
-	 * If the microcode matches the CPU we are processing, use it.
+	 * If the cached microcode matches the CPU we are processing, use it.
 	 */
 	if (ucode_match_intel(cpi_sig, uinfop, ucodefp->uf_header,
 	    ucodefp->uf_ext_table) == EM_OK && ucodefp->uf_body != NULL) {
-		return (EM_OK);
+		return (ucode_copy_intel(ucodefp, uinfop));
 	}
 
 	/*
@@ -176,9 +205,9 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 	 * reset the microcode data structure and read in the new
 	 * file.
 	 */
-	ucode_file_reset_intel(cp->cpu_id);
+	ucode_file_reset_intel();
 
-	ucodefp->uf_header = ucode_zalloc(cp->cpu_id, header_size);
+	ucodefp->uf_header = ucode_zalloc(header_size);
 	if (ucodefp->uf_header == NULL)
 		return (EM_NOMEM);
 
@@ -198,7 +227,7 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 		if ((rc = ucode_header_validate_intel(uhp)) == EM_OK) {
 			total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
 			body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
-			ucodefp->uf_body = ucode_zalloc(cp->cpu_id, body_size);
+			ucodefp->uf_body = ucode_zalloc(body_size);
 			if (ucodefp->uf_body == NULL) {
 				rc = EM_NOMEM;
 				break;
@@ -228,7 +257,7 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 		if (ext_size <= 0)
 			break;
 
-		ucodefp->uf_ext_table = ucode_zalloc(cp->cpu_id, ext_size);
+		ucodefp->uf_ext_table = ucode_zalloc(ext_size);
 		if (ucodefp->uf_ext_table == NULL) {
 			rc = EM_NOMEM;
 			break;
@@ -270,6 +299,9 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop)
 
 	rc = ucode_match_intel(cpi_sig, uinfop, ucodefp->uf_header,
 	    ucodefp->uf_ext_table);
+	if (rc == EM_OK) {
+		return (ucode_copy_intel(ucodefp, uinfop));
+	}
 
 	return (rc);
 }
@@ -298,10 +330,10 @@ ucode_read_rev_intel(cpu_ucode_info_t *uinfop)
 	}
 }
 
-static uint32_t
+static void
 ucode_load_intel(cpu_ucode_info_t *uinfop)
 {
-	ucode_file_intel_t *ucodefp = &intel_ucodef;
+	VERIFY3P(uinfop->cui_pending_ucode, !=, NULL);
 
 	kpreempt_disable();
 	/*
@@ -310,11 +342,8 @@ ucode_load_intel(cpu_ucode_info_t *uinfop)
 	 * processor that the microcode is updating.
 	 */
 	invalidate_cache();
-	wrmsr(MSR_INTC_UCODE_WRITE, (uintptr_t)ucodefp->uf_body);
-	ucode_read_rev_intel(uinfop);
+	wrmsr(MSR_INTC_UCODE_WRITE, (uintptr_t)uinfop->cui_pending_ucode);
 	kpreempt_enable();
-
-	return (ucodefp->uf_header->uh_rev);
 }
 
 static ucode_errno_t
