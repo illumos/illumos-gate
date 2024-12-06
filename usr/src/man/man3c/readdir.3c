@@ -195,7 +195,8 @@ is defined in
 .Pc
 .Pp
 While the
-.Fn readdir_r function was originally added as a re-entrant version of
+.Fn readdir_r
+function was originally added as a re-entrant version of
 .Fn readdir ,
 it is not recommended that
 .Fn readdir_r
