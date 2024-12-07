@@ -27,16 +27,13 @@
 #ifndef _GHD_DEBUG_H
 #define	_GHD_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #include <sys/varargs.h>
 
-/*PRINTFLIKE1*/
-extern void ghd_err(const char *fmt, ...) __PRINTFLIKE(1);
+extern void ghd_err(const char *fmt, ...) __KPRINTFLIKE(1);
 extern	ulong_t	ghd_debug_flags;
 
 #define	GDBG_FLAG_ERROR		0x0001

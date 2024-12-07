@@ -73,14 +73,13 @@ static	uint64_t	ippctl_debug_flags =
 
 static kmutex_t	debug_mutex[1];
 
-/*PRINTFLIKE3*/
 static void	ippctl_debug(uint64_t, char *, char *, ...)
-	__PRINTFLIKE(3);
+	__KPRINTFLIKE(3);
 
-#define	DBG0(_type, _fmt)		    			\
+#define	DBG0(_type, _fmt)					\
 	ippctl_debug((_type), __FN__, (_fmt));
 
-#define	DBG1(_type, _fmt, _a1) 					\
+#define	DBG1(_type, _fmt, _a1)					\
 	ippctl_debug((_type), __FN__, (_fmt), (_a1));
 
 #define	DBG2(_type, _fmt, _a1, _a2)				\
@@ -294,7 +293,7 @@ ippctl_info(
 	dev_info_t	*dip,
 	ddi_info_cmd_t	cmd,
 	void		*arg,
-	void 		**result)
+	void		**result)
 {
 	int		rc = DDI_FAILURE;
 
