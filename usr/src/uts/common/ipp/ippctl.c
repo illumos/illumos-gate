@@ -73,9 +73,8 @@ static	uint64_t	ippctl_debug_flags =
 
 static kmutex_t	debug_mutex[1];
 
-/*PRINTFLIKE3*/
 static void	ippctl_debug(uint64_t, char *, char *, ...)
-	__PRINTFLIKE(3);
+	__KPRINTFLIKE(3);
 
 #define	DBG0(_type, _fmt)		    			\
 	ippctl_debug((_type), __FN__, (_fmt));

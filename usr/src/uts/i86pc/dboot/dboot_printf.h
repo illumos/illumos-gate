@@ -38,7 +38,7 @@ extern "C" {
  *        %%, %b, %c, %d, %o, %p, %s, %x and size specifiers l, ll, j, z
  */
 extern void dboot_printf(char *fmt, ...)
-    __PRINTFLIKE(1);
+    __KPRINTFLIKE(1);
 
 /*
  * Primitive version of panic, prints a message, waits for a keystroke,
