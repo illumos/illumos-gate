@@ -827,7 +827,7 @@ pci_alloc_intr_fixed(dev_info_t *pdip, dev_info_t *rdip,
 	} else {
 		/*
 		 * No APIX module; fall back to the old scheme where the
-		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 * interrupt vector is allocated during ddi_intr_enable() call.
 		 */
 		*(int *)result = 1;
 		ret = DDI_SUCCESS;
@@ -870,7 +870,7 @@ pci_free_intr_fixed(dev_info_t *pdip, dev_info_t *rdip,
 		/*
 		 * No APIX module; fall back to the old scheme where
 		 * the interrupt vector was already freed during
-		 * ddi_disable_intr() call.
+		 * ddi_intr_disable() call.
 		 */
 		ret = DDI_SUCCESS;
 	}

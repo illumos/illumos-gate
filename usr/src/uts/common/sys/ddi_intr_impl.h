@@ -55,8 +55,8 @@ typedef enum {
 	DDI_INTROP_DISABLE,		/* 11 disable interrupt */
 	DDI_INTROP_REMISR,		/* 12 remove interrupt handler */
 	DDI_INTROP_FREE,		/* 13 free interrupt handle */
-	DDI_INTROP_GETCAP,		/* 14 get capacity */
-	DDI_INTROP_SETCAP,		/* 15 set capacity */
+	DDI_INTROP_GETCAP,		/* 14 get capabilities */
+	DDI_INTROP_SETCAP,		/* 15 set capabilities */
 	DDI_INTROP_SETMASK,		/* 16 set mask */
 	DDI_INTROP_CLRMASK,		/* 17 clear mask */
 	DDI_INTROP_GETPENDING,		/* 18 get pending interrupt */
@@ -120,7 +120,7 @@ typedef struct ddi_intr_handle_impl {
 	 * snapshot taken either during ddi_intr_add_handler() or
 	 * get/set_intr_affinity() calls.
 	 */
-	processorid_t 		ih_target;	/* Target ID */
+	processorid_t		ih_target;	/* Target ID */
 } ddi_intr_handle_impl_t;
 
 /* values for ih_state (strictly for interrupt handle) */
@@ -368,7 +368,7 @@ extern	int irm_enable; /* global flag for IRM */
 
 #ifdef DEBUG
 #define	I_DDI_VERIFY_MSIX_HANDLE(hdlp)					\
-	if ((hdlp->ih_type == DDI_INTR_TYPE_MSIX) && 			\
+	if ((hdlp->ih_type == DDI_INTR_TYPE_MSIX) &&			\
 	    (hdlp->ih_flags & DDI_INTR_MSIX_DUP)) {			\
 		ASSERT(hdlp->ih_dip == hdlp->ih_main->ih_dip);		\
 		ASSERT(hdlp->ih_type == hdlp->ih_main->ih_type);	\
