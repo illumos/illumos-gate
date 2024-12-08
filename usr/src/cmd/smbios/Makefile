@@ -29,6 +29,7 @@ OBJS = smbios.o bitext.o hexdump.o ilstr.o
 SRCS = $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsmbios -ljedec
