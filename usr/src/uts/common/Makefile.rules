@@ -1613,6 +1613,10 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/bootbanner/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/hexdump/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/ilstr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

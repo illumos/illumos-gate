@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -37,7 +38,9 @@ PROGS =		\
 	yk-readonly
 
 COMMON_OBJS = \
-	atr.o
+	atr.o		\
+	hexdump.o	\
+	ilstr.o
 
 atrparse := EXTRA_OBJS = $(COMMON_OBJS)
 
@@ -48,6 +51,8 @@ CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 CPPFLAGS += -D_REENTRANT -I$(SRC)/common/ccid/
+
+hexdump.o := CSTD = $(CSTD_GNU99)
 
 all: $(PROGS)
 
@@ -70,6 +75,14 @@ $(TESTDIR)/%: %
 	$(INS.file)
 
 %.o: $(SRC)/common/ccid/%.c
+	$(COMPILE.c) -o $@ -c $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/ilstr/%.c
+	$(COMPILE.c) -o $@ -c $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/hexdump/%.c
 	$(COMPILE.c) -o $@ -c $<
 	$(POST_PROCESS_O)
 

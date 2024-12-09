@@ -1688,6 +1688,7 @@ sol_ucma_evt_hdlr(struct rdma_cm_id *idp, struct rdma_cm_event *eventp)
 			file->file_evt_close_flag = SOL_UCMA_EVT_NONE;
 			cv_broadcast(&file->file_evt_close_cv);
 			mutex_exit(&file->file_mutex);
+			kmem_free(ucma_evt, sizeof (sol_ucma_event_t));
 			return (-1);
 		}
 		req_chan->chan_rdma_id = idp;

@@ -12,11 +12,12 @@
 
 #
 # Copyright (c) 2016, 2017 by Delphix. All rights reserved.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
-verify_runnable "global"
-
 . $STF_SUITE/tests/functional/channel_program/channel_common.kshlib
+
+verify_runnable "global"
 
 snap=$TESTPOOL/$TESTFS@$TESTSNAP
 

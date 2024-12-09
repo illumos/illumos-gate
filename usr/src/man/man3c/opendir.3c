@@ -130,7 +130,7 @@ Upon successful completion, the
 and
 .Fn fdopendir
 functions return a pointer to an object of type
-Ft DIR .
+.Ft DIR .
 Otherwise, a null pointer is returned and
 .Va errno
 is set to indicate the error.

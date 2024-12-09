@@ -30,6 +30,7 @@ usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
 usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/os-tests/tests/definit/init.data
+usr/src/test/os-tests/tests/hexdump/data/*
 usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/test/libc-tests/tests/qsort/*.c
 usr/src/tools/smatch/src/*

@@ -43,7 +43,7 @@ log_must eval "echo $HEXKEY | zfs create -o encryption=on" \
 log_must $ZCP_ROOT/synctask_core/change_key.exe $TESTPOOL/$TESTFS1 $HEXKEY1
 
 # Key shouldn't appear in zpool history when using change_key.exe
-log_mustnot eval "zfs history -il $TESTPOOL | grep $HEXKEY1"
+log_mustnot eval "zpool history -il $TESTPOOL | grep $HEXKEY1"
 
 log_must zfs unmount $TESTPOOL/$TESTFS1
 log_must zfs unload-key $TESTPOOL/$TESTFS1

@@ -22,7 +22,9 @@ OBJS=	nvme_version.o	\
 	nvmeadm.o	\
 	nvmeadm_ofmt.o	\
 	nvmeadm_print.o	\
-	nvmeadm_wdc.o
+	nvmeadm_wdc.o	\
+	ilstr.o		\
+	hexdump.o
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
@@ -52,6 +54,14 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 %.o: $(SRC)/common/nvme/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/ilstr/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/hexdump/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
