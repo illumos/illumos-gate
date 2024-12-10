@@ -201,7 +201,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 	rval = uhci_state_is_operational(uhcip);
 
 	if (rval != USB_SUCCESS) {
-		kmem_free(ph, sizeof (uhci_pipe_private_t));
+		kmem_free(pp, sizeof (uhci_pipe_private_t));
 		mutex_exit(&uhcip->uhci_int_mutex);
 		sema_v(&uhcip->uhci_ocsem);
 
@@ -455,7 +455,7 @@ uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	usb_port_t		port;
-	uint_t 			port_status = 0;
+	uint_t			port_status = 0;
 
 	USB_DPRINTF_L2(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_reset: usb_flags = 0x%x", usb_flags);
@@ -1085,7 +1085,7 @@ uhci_start_periodic_pipe_polling(
  */
 static int
 uhci_stop_periodic_pipe_polling(uhci_state_t *uhcip,
-	usba_pipe_handle_data_t  *ph, usb_flags_t flags)
+    usba_pipe_handle_data_t  *ph, usb_flags_t flags)
 {
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;

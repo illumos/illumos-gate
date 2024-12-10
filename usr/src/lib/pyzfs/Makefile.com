@@ -57,6 +57,10 @@ CPPFLAGS +=	-I../../../common/zfs
 # needs work
 SMOFF += all_func_returns
 
+# Some python headers from the build system have indentation that triggers a
+# smatch warning.
+pics/ioctl.o := SMOFF += indenting
+
 .KEEP_STATE:
 
 all:

@@ -328,6 +328,7 @@ safte_rdstat(ses_softc_t *ssc, int slpflg)
 
 	if (buflen > 0xffff) {
 		cmn_err(CE_WARN, "Illogical SCSI data");
+		kmem_free(driveids, id_size);
 		return (EIO);
 	}
 
@@ -868,10 +869,10 @@ safte_set_objstat(ses_softc_t *ssc, ses_objarg *obp, int slp)
 			return (err);
 		if (obp->cstat[3] & SESCTL_RQSTON) {
 			(void) wrbuf16(ssc, SAFTE_WT_ACTPWS,
-				idx - cc->pwroff, 0, 0, slp);
+			    idx - cc->pwroff, 0, 0, slp);
 		} else {
 			(void) wrbuf16(ssc, SAFTE_WT_ACTPWS,
-				idx - cc->pwroff, 0, 1, slp);
+			    idx - cc->pwroff, 0, 1, slp);
 		}
 		break;
 	case SESTYP_FAN:
@@ -929,7 +930,7 @@ safte_set_objstat(ses_softc_t *ssc, ses_objarg *obp, int slp)
 		ep->priv = obp->cstat[3];
 		mutex_exit(&ssc->ses_devp->sd_mutex);
 		(void) wrbuf16(ssc, SAFTE_WT_GLOBAL, cc->flag1,
-			cc->flag2, 0, slp);
+		    cc->flag2, 0, slp);
 		break;
 	default:
 		break;
@@ -982,7 +983,7 @@ set_objstat_sel(ses_softc_t *ssc, ses_objarg *obp, int slp)
 		 */
 		if (obp->cstat[0] & SESCTL_DISABLE) {
 			(void) wrbuf16(ssc, SAFTE_WT_ACTPWS,
-				idx - cc->pwroff, 0, 0, slp);
+			    idx - cc->pwroff, 0, 0, slp);
 		}
 		break;
 	case SESTYP_FAN:
@@ -1004,7 +1005,7 @@ set_objstat_sel(ses_softc_t *ssc, ses_objarg *obp, int slp)
 			cc->flag2 &= ~FLG2_LOCKDOOR;
 			mutex_exit(&ssc->ses_devp->sd_mutex);
 			(void) wrbuf16(ssc, SAFTE_WT_GLOBAL, cc->flag1,
-				cc->flag2, 0, slp);
+			    cc->flag2, 0, slp);
 		}
 		break;
 	case SESTYP_ALARM:
@@ -1017,7 +1018,7 @@ set_objstat_sel(ses_softc_t *ssc, ses_objarg *obp, int slp)
 			ep->priv |= 0x40;	/* Muted */
 			mutex_exit(&ssc->ses_devp->sd_mutex);
 			(void) wrbuf16(ssc, SAFTE_WT_GLOBAL, cc->flag1,
-				cc->flag2, 0, slp);
+			    cc->flag2, 0, slp);
 		}
 		break;
 	default:

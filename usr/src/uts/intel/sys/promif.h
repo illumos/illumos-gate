@@ -102,10 +102,10 @@ extern	int		prom_stdin_is_keyboard(void);
 extern	int		prom_stdout_is_framebuffer(void);
 extern	void		prom_framebuffer_getpos(int *row, int *col);
 extern	void		prom_framebuffer_getcolors(int *fg, int *bg);
-extern  char    	*prom_stdinpath(void);
-extern  char    	*prom_stdoutpath(void);
-extern  void    	prom_strip_options(char *from, char *to);
-extern  void    	prom_pathname(char *);
+extern	char		*prom_stdinpath(void);
+extern	char		*prom_stdoutpath(void);
+extern	void		prom_strip_options(char *from, char *to);
+extern	void		prom_pathname(char *);
 
 /*
  * Special device nodes: IEEE 1275-1994 only.
