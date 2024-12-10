@@ -34,6 +34,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -1469,7 +1470,6 @@ sfe_interrupt(struct gem_dev *dp)
 	uint32_t	isr;
 	uint32_t	isr_bogus;
 	uint_t		flags = 0;
-	boolean_t	need_to_reset = B_FALSE;
 	struct sfe_dev	*lp = dp->private;
 
 	/* read reason and clear interrupt */
@@ -1543,10 +1543,7 @@ sfe_interrupt(struct gem_dev *dp)
 	if (isr & (ISR_DPERR | ISR_SSERR | ISR_RMABT | ISR_RTABT)) {
 		cmn_err(CE_WARN, "%s: ERROR interrupt: isr %b.",
 		    dp->name, isr, INTR_BITS);
-		need_to_reset = B_TRUE;
-	}
-reset:
-	if (need_to_reset) {
+
 		(void) gem_restart_nic(dp, GEM_RESTART_KEEP_BUF);
 		flags |= INTR_RESTART_TX;
 	}
