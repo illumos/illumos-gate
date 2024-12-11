@@ -52,7 +52,7 @@ int	pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 int	pciide_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 #define	PCIIDE_NATIVE_MODE(dip)						\
-	(!ddi_prop_exists(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, 	\
+	(!ddi_prop_exists(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
 	"compatibility-mode"))
 
 #define	PCIIDE_PRE26(dip)	\
@@ -818,7 +818,7 @@ pciide_alloc_intr(dev_info_t *dip, dev_info_t *rdip,
 	} else {
 		/*
 		 * No APIX module; fall back to the old scheme where the
-		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 * interrupt vector is allocated during ddi_intr_enable() call.
 		 */
 		*(int *)result = hdlp->ih_scratch1;
 		ret = DDI_SUCCESS;
@@ -863,7 +863,7 @@ pciide_free_intr(dev_info_t *dip, dev_info_t *rdip,
 	/*
 	 * No APIX module; fall back to the old scheme where
 	 * the interrupt vector was already freed during
-	 * ddi_disable_intr() call.
+	 * ddi_intr_disable() call.
 	 */
 	return (DDI_SUCCESS);
 }

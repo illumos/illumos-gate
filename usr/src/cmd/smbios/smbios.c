@@ -1563,7 +1563,8 @@ print_powersup(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  Power Supply Group: %u\n", p.smbps_group);
 	if (p.smbps_maxout != 0x8000) {
-		oprintf(fp, "  Maximum Output: %llu mW\n", p.smbps_maxout);
+		oprintf(fp, "  Maximum Output: %" PRIu64 " mW\n",
+		    p.smbps_maxout);
 	} else {
 		oprintf(fp, "  Maximum Output: unknown\n");
 	}
@@ -1580,15 +1581,18 @@ print_powersup(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    fp, "  Type: %u", p.smbps_pstype);
 
 	if (p.smbps_vprobe != 0xffff) {
-		oprintf(fp, "  Voltage Probe Handle: %lu\n", p.smbps_vprobe);
+		oprintf(fp, "  Voltage Probe Handle: %" _PRIuID "\n",
+		    p.smbps_vprobe);
 	}
 
 	if (p.smbps_cooldev != 0xffff) {
-		oprintf(fp, "  Cooling Device Handle: %lu\n", p.smbps_cooldev);
+		oprintf(fp, "  Cooling Device Handle: %" _PRIuID "\n",
+		    p.smbps_cooldev);
 	}
 
 	if (p.smbps_iprobe != 0xffff) {
-		oprintf(fp, "  Current Probe Handle: %lu\n", p.smbps_iprobe);
+		oprintf(fp, "  Current Probe Handle: %" _PRIuID "\n",
+		    p.smbps_iprobe);
 	}
 }
 
@@ -1613,7 +1617,8 @@ print_addinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
 			continue;
 		}
 
-		oprintf(fp, "    Referenced handle: %lu\n", ent->smbai_ref);
+		oprintf(fp, "    Referenced handle: %" _PRIuID "\n",
+		    ent->smbai_ref);
 		oprintf(fp, "    Handle offset: %u\n", ent->smbai_ref_off);
 		if (ent->smbai_str != NULL) {
 			str_print(fp, "    Information String", ent->smbai_str);
@@ -1644,7 +1649,7 @@ print_addinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
 				    *(uint32_t *)ent->smbai_data);
 				break;
 			case 8:
-				oprintf(fp, "    Data: 0x%llx\n",
+				oprintf(fp, "    Data: 0x%" PRIx64 "\n",
 				    *(uint64_t *)ent->smbai_data);
 				break;
 			default:
@@ -1964,7 +1969,7 @@ print_fwinfo(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "\n  Component Handles:\n");
 	for (i = 0; i < ncomps; i++) {
-		oprintf(fp, "    %ld\n", comps[i].smbfwe_id);
+		oprintf(fp, "    %" _PRIdID "\n", comps[i].smbfwe_id);
 	}
 }
 
