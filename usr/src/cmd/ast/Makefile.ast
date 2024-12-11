@@ -145,8 +145,8 @@ LIBSHELLCPPFLAGS= \
 	    "[--catalog?libshell]"'
 
 # Default CFLAGS/CFLAGS64 for AST sources
-ASTCFLAGS= $(CCVERBOSE)
-ASTCFLAGS64= $(CCVERBOSE)
+ASTCFLAGS= $(CCVERBOSE) -_gnu=-Wno-unknown-pragmas
+ASTCFLAGS64= $(CCVERBOSE) -_gnu=-Wno-unknown-pragmas
 
 # Generated header files generated using this system have a number of
 # artifacts that are cleaned up by the following action.

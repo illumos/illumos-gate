@@ -50,7 +50,6 @@ extern int umem_ready;
 extern thread_t umem_init_thr;		/* the thread doing the init */
 
 extern int umem_init(void);		/* do umem's initialization */
-#pragma rarely_called(umem_init)
 
 extern umem_log_header_t *umem_transaction_log;
 extern umem_log_header_t *umem_content_log;

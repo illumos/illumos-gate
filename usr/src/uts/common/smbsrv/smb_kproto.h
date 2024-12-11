@@ -926,7 +926,6 @@ vnode_t *smb_lookuppathvptovp(smb_request_t *, char *, vnode_t *, vnode_t *);
 int smb_vss_extract_gmttoken(char *, char *);
 
 void smb_panic(char *, const char *, int);
-#pragma	does_not_return(smb_panic)
 #define	SMB_PANIC()	smb_panic(__FILE__, __func__, __LINE__)
 
 void smb_latency_init(smb_latency_t *);

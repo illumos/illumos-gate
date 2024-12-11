@@ -268,11 +268,9 @@ extern	void		prom_pnode_to_pathname(pnode_t, char *);
 
 extern	void		prom_printf(const char *fmt, ...)
 	__KPRINTFLIKE(1);
-#pragma rarely_called(prom_printf)
 
 extern	void		prom_vprintf(const char *fmt, __va_list adx)
 	__KVPRINTFLIKE(1);
-#pragma rarely_called(prom_vprintf)
 
 extern	char		*prom_sprintf(char *s, const char *fmt, ...)
 	__KPRINTFLIKE(2);

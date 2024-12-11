@@ -224,8 +224,6 @@ static struct modlinkage modlinkage = {
 /*
  *    ========== RealTek chip register access Routines ==========
  */
-static uint8_t rtls_reg_get8(rtls_t *rtlsp, uint32_t reg);
-#pragma	inline(rtls_reg_get8)
 static uint8_t
 rtls_reg_get8(rtls_t *rtlsp, uint32_t reg)
 {
@@ -235,8 +233,6 @@ rtls_reg_get8(rtls_t *rtlsp, uint32_t reg)
 	return (ddi_get8(rtlsp->io_handle, addr));
 }
 
-static uint16_t rtls_reg_get16(rtls_t *rtlsp, uint32_t reg);
-#pragma	inline(rtls_reg_get16)
 static uint16_t
 rtls_reg_get16(rtls_t *rtlsp, uint32_t reg)
 {
@@ -246,8 +242,6 @@ rtls_reg_get16(rtls_t *rtlsp, uint32_t reg)
 	return (ddi_get16(rtlsp->io_handle, addr));
 }
 
-static uint32_t rtls_reg_get32(rtls_t *rtlsp, uint32_t reg);
-#pragma	inline(rtls_reg_get32)
 static uint32_t
 rtls_reg_get32(rtls_t *rtlsp, uint32_t reg)
 {
@@ -257,8 +251,6 @@ rtls_reg_get32(rtls_t *rtlsp, uint32_t reg)
 	return (ddi_get32(rtlsp->io_handle, addr));
 }
 
-static void rtls_reg_set8(rtls_t *rtlsp, uint32_t reg, uint8_t value);
-#pragma	inline(rtls_reg_set8)
 static void
 rtls_reg_set8(rtls_t *rtlsp, uint32_t reg, uint8_t value)
 {
@@ -268,8 +260,6 @@ rtls_reg_set8(rtls_t *rtlsp, uint32_t reg, uint8_t value)
 	ddi_put8(rtlsp->io_handle, addr, value);
 }
 
-static void rtls_reg_set16(rtls_t *rtlsp, uint32_t reg, uint16_t value);
-#pragma	inline(rtls_reg_set16)
 static void
 rtls_reg_set16(rtls_t *rtlsp, uint32_t reg, uint16_t value)
 {
@@ -279,8 +269,6 @@ rtls_reg_set16(rtls_t *rtlsp, uint32_t reg, uint16_t value)
 	ddi_put16(rtlsp->io_handle, addr, value);
 }
 
-static void rtls_reg_set32(rtls_t *rtlsp, uint32_t reg, uint32_t value);
-#pragma	inline(rtls_reg_set32)
 static void
 rtls_reg_set32(rtls_t *rtlsp, uint32_t reg, uint32_t value)
 {
@@ -1491,7 +1479,7 @@ rtls_intr(caddr_t arg)
  */
 static int
 rtls_alloc_dma_mem(rtls_t *rtlsp, size_t memsize,
-	ddi_device_acc_attr_t *attr_p, uint_t dma_flags, dma_area_t *dma_p)
+    ddi_device_acc_attr_t *attr_p, uint_t dma_flags, dma_area_t *dma_p)
 {
 	caddr_t vaddr;
 	int err;

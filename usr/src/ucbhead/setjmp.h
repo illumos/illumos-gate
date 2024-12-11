@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -106,27 +106,11 @@ typedef long sigjmp_buf[_SIGJBLEN];
 #define	_setjmp(env)		_sigsetjmp((env), 0)
 #define	_longjmp(env, val)	_siglongjmp((env), (val))
 
-#if defined(__STDC__)
-
 extern int _sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
-#pragma unknown_control_flow(_sigsetjmp)
 extern void _siglongjmp(sigjmp_buf, int) __NORETURN;
 
-extern int	sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
-#pragma unknown_control_flow(sigsetjmp)
-extern void	siglongjmp(sigjmp_buf, int) __NORETURN;
-
-#else
-
-extern int _sigsetjmp() __RETURNS_TWICE;
-#pragma unknown_control_flow(_sigsetjmp)
-extern void _siglongjmp();
-
-extern int sigsetjmp() __RETURNS_TWICE;
-#pragma unknown_control_flow(sigsetjmp)
-extern void siglongjmp();
-
-#endif  /* __STDC__ */
+extern int sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
+extern void siglongjmp(sigjmp_buf, int) __NORETURN;
 
 #ifdef __cplusplus
 }

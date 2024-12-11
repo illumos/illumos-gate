@@ -64,7 +64,6 @@ extern "C" {
 #endif
 
 extern int getcontext(ucontext_t *) __RETURNS_TWICE;
-#pragma unknown_control_flow(getcontext)
 extern int setcontext(const ucontext_t *);
 extern int swapcontext(ucontext_t *_RESTRICT_KYWD,
 		const ucontext_t *_RESTRICT_KYWD);
@@ -74,7 +73,6 @@ extern void makecontext(ucontext_t *, void(*)(), int, ...);
 extern ucontext_t *ucontext_alloc(uint32_t);
 extern void ucontext_free(ucontext_t *);
 extern int getcontext_extd(ucontext_t *, uint32_t) __RETURNS_TWICE;
-#pragma unknown_control_flow(getcontext_extd)
 extern int swapcontext_extd(ucontext_t *_RESTRICT_KYWD, uint32_t,
 		const ucontext_t *_RESTRICT_KYWD);
 extern int walkcontext(const ucontext_t *, int (*)(uintptr_t, int, void *),

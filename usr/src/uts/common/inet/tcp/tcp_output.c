@@ -1734,8 +1734,6 @@ tcp_shutdown_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	}
 }
 
-#pragma inline(tcp_send_data)
-
 void
 tcp_send_data(tcp_t *tcp, mblk_t *mp)
 {

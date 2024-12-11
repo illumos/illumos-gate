@@ -550,8 +550,6 @@ so_sendmblk_impl(struct sonode *so, struct nmsghdr *msg, int fflag,
 	return (error);
 }
 
-#pragma inline(so_sendmblk_impl)
-
 int
 so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
     struct cred *cr, mblk_t **mpp)
@@ -1403,8 +1401,6 @@ space_check:
 	}
 	goto done_unlock;
 }
-
-#pragma	inline(so_queue_msg_impl)
 
 ssize_t
 so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,

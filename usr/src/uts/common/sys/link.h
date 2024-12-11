@@ -632,7 +632,6 @@ typedef struct {
  */
 extern void	_ld_libc(void *);
 
-#pragma unknown_control_flow(_ld_libc)
 #endif /* _ASM */
 
 #ifdef	__cplusplus

@@ -168,7 +168,6 @@ CERRWARN = -errtags=yes -errwarn=%all
 
 CERRWARN += -_gcc=-Wno-missing-braces
 CERRWARN += -_gcc=-Wno-sign-compare
-CERRWARN += -_gcc=-Wno-unknown-pragmas
 CERRWARN += -_gcc=-Wno-unused-parameter
 CERRWARN += -_gcc=-Wno-missing-field-initializers
 CERRWARN += $(CCWARNINLINE)

@@ -970,7 +970,6 @@ gem_txbuf_free_dma_resources(struct txbuf *tbp)
 	tbp->txb_nfrags = 0;
 	tbp->txb_flag = 0;
 }
-#pragma inline(gem_txbuf_free_dma_resources)
 
 /*
  * reclaim active tx buffers and reset positions in tx rings.
@@ -1204,8 +1203,6 @@ gem_reclaim_txbuf(struct gem_dev *dp)
 
 	return (err);
 }
-#pragma inline(gem_reclaim_txbuf)
-
 
 /*
  * Make tx descriptors in out-of-order manner
@@ -1326,7 +1323,6 @@ gem_setup_txbuf_copy(struct gem_dev *dp, mblk_t *mp, struct txbuf *tbp)
 #endif
 	return (off);
 }
-#pragma inline(gem_setup_txbuf_copy)
 
 __INLINE__
 static void
@@ -1366,7 +1362,6 @@ gem_tx_start_unit(struct gem_dev *dp)
 	/* advance softq head and active tail */
 	dp->tx_softq_head = dp->tx_active_tail = tail;
 }
-#pragma inline(gem_tx_start_unit)
 
 #ifdef GEM_DEBUG_LEVEL
 static int gem_send_cnt[10];
@@ -1760,7 +1755,6 @@ gem_append_rxbuf(struct gem_dev *dp, struct rxbuf *rbp_head)
 		dp->rx_active_tail = tail = tail + 1;
 	}
 }
-#pragma inline(gem_append_rxbuf)
 
 mblk_t *
 gem_get_packet_default(struct gem_dev *dp, struct rxbuf *rbp, size_t len)

@@ -89,9 +89,6 @@
  * copying) and that method doesn't need any special per-buffer action
  * for recycling.
  */
-static boolean_t bge_recycle_ring(bge_t *bgep, send_ring_t *srp);
-#pragma	inline(bge_recycle_ring)
-
 static boolean_t
 bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 {
@@ -205,7 +202,6 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
  * if only one send ring is being used.
  */
 boolean_t bge_recycle(bge_t *bgep, bge_status_t *bsp);
-#pragma	no_inline(bge_recycle)
 
 boolean_t
 bge_recycle(bge_t *bgep, bge_status_t *bsp)
@@ -335,7 +331,6 @@ bge_get_txbuf(bge_t *bgep, send_ring_t *srp)
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
 static void bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp);
-#pragma	inline(bge_send_copy)
 
 static void
 bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp)

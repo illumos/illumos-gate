@@ -43,10 +43,10 @@ static const long double xscale = 5192296858534827628530496329220096.0L;
 /*
  * if pseudo-denormal, replace by the equivalent normal
  */
-#define	X86PDNRM(k, x)	if (k == 0 && (((int *) &x)[1] & 0x80000000) != 0) \
-				((int *) &x)[2] |= k = 1
+#define	X86PDNRM(k, x)	if (k == 0 && (((int *)&x)[1] & 0x80000000) != 0) \
+				((int *)&x)[2] |= k = 1
 #if defined(HANDLE_UNSUPPORTED)				/* assuming k != 0 */
-#define	ISNORMALL(k, x)	(k != 0x7fff && (((int *) &x)[1] & 0x80000000) != 0)
+#define	ISNORMALL(k, x)	(k != 0x7fff && (((int *)&x)[1] & 0x80000000) != 0)
 #else
 #define	ISNORMALL(k, x)	(k != 0x7fff)
 #endif
@@ -55,14 +55,15 @@ static const long double xscale = 9223372036854775808.0L;	/* 2^63 */
 #endif
 
 static long double
-raise_division(long double v) {
-#pragma STDC FENV_ACCESS ON
+raise_division(long double v)
+{
 	static const long double zero = 0.0L;
 	return (v / zero);
 }
 
 long double
-logbl(long double x) {
+logbl(long double x)
+{
 	int k = XBIASED_EXP(x);
 
 	X86PDNRM(k, x);

@@ -49,13 +49,6 @@ static boolean_t ixgbe_check_context(ixgbe_tx_ring_t *,
 static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
     ixgbe_tx_context_t *);
 
-#ifndef IXGBE_DEBUG
-#pragma inline(ixgbe_save_desc)
-#pragma inline(ixgbe_get_context)
-#pragma inline(ixgbe_check_context)
-#pragma inline(ixgbe_fill_context)
-#endif
-
 /*
  * ixgbe_ring_tx
  *

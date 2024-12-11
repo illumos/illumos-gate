@@ -33,7 +33,6 @@ extern "C" {
 #include <npi.h>
 
 static void TXDMA_REG_READ64(npi_handle_t, uint64_t, int, uint64_t *);
-#pragma inline(TXDMA_REG_READ64)
 
 /*
  * TXDMA_REG_READ64
@@ -41,10 +40,10 @@ static void TXDMA_REG_READ64(npi_handle_t, uint64_t, int, uint64_t *);
  *	Read a 64-bit value from a DMC register.
  *
  * Arguments:
- * 	handle	The NPI handle to use.
- * 	offset	The offset into the DMA CSR (the register).
- * 	channel	The channel, which is used as a multiplicand.
- * 	value	Where to put the 64-bit value to be read.
+ *	handle	The NPI handle to use.
+ *	offset	The offset into the DMA CSR (the register).
+ *	channel	The channel, which is used as a multiplicand.
+ *	value	Where to put the 64-bit value to be read.
  *
  * Notes:
  *	For reference, here is the old macro:

@@ -60,8 +60,8 @@ STACKPROTECT = all
 
 LDLIBS += -lsmbios -lumem
 LDLIBS64 += -lsmbios -lumem
-CFLAGS += -_gcc=-Wall -_gcc=-Wextra -_gcc=-Wno-unknown-pragmas
-CFLAGS64 += -_gcc=-Wall -_gcc=-Wextra -_gcc=-Wno-unknown-pragmas
+CFLAGS += -_gcc=-Wall -_gcc=-Wextra
+CFLAGS64 += -_gcc=-Wall -_gcc=-Wextra
 
 all: $(PROGS32) $(PROGS64)
 

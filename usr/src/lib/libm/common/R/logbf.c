@@ -40,7 +40,8 @@ static const float two25 = 33554432.0F;
  * v: a non-zero subnormal |x|
  */
 static int
-ilogbf_subnormal(unsigned v) {
+ilogbf_subnormal(unsigned v)
+{
 	int r = -126 - 23;
 
 	if (v & 0xffff0000)
@@ -55,15 +56,16 @@ ilogbf_subnormal(unsigned v) {
 #endif	/* defined(__x86) */
 
 static float
-raise_division(float t) {
-#pragma STDC FENV_ACCESS ON
+raise_division(float t)
+{
 	static const float zero = 0.0F;
 	return (t / zero);
 }
 
 float
-logbf(float x) {
-	int k = *((int *) &x) & ~0x80000000;
+logbf(float x)
+{
+	int k = *((int *)&x) & ~0x80000000;
 
 	if (k < 0x00800000) {
 		if (k == 0)
@@ -71,15 +73,15 @@ logbf(float x) {
 		else if ((__xpg6 & _C99SUSv3_logb) != 0) {
 #if defined(__x86)
 			x *= two25;
-			return ((float) (((*((int *) &x) & 0x7f800000) >> 23) -
-				152));
+			return ((float)(((*((int *)&x) & 0x7f800000) >> 23) -
+			    152));
 #else
-			return ((float) ilogbf_subnormal(k));
+			return ((float)ilogbf_subnormal(k));
 #endif
 		} else
 			return (-126.F);
 	} else if (k < 0x7f800000)
-		return ((float) ((k >> 23) - 127));
+		return ((float)((k >> 23) - 127));
 	else
 		return (x * x);
 }

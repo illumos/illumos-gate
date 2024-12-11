@@ -133,7 +133,7 @@
 #include <errno.h>
 #include "fsck.h"
 
-static void usage(void);
+static void usage(void) __NORETURN;
 static long argtol(int, char *, char *, int);
 static void checkfilesys(char *);
 static void check_sanity(char *);
@@ -243,11 +243,6 @@ main(int argc, char *argv[])
 			 */
 			if (optarg == NULL) {
 				usage();
-				/*
-				 * lint does not believe this, nor does it
-				 * believe #pragma does_not_return(usage)
-				 */
-				/* NOTREACHED */
 			}
 			suboptions = optarg;
 			while (*suboptions != '\0') {
@@ -843,7 +838,7 @@ hasvfsopt(struct vfstab *vfs, char *opt)
 	return (hasmntopt(&mtab, opt));
 }
 
-void
+static void __NORETURN
 usage(void)
 {
 	(void) fprintf(stderr,

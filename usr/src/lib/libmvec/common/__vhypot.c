@@ -31,20 +31,21 @@
 #include "libm_inlines.h"
 
 #ifdef _LITTLE_ENDIAN
-#define HI(x)	*(1+(int*)x)
-#define LO(x)	*(unsigned*)x
+#define	HI(x)	*(1+(int *)x)
+#define	LO(x)	*(unsigned *)x
 #else
-#define HI(x)	*(int*)x
-#define LO(x)	*(1+(unsigned*)x)
+#define	HI(x)	*(int *)x
+#define	LO(x)	*(1+(unsigned *)x)
 #endif
 
 #ifdef __RESTRICT
-#define restrict _Restrict
+#define	restrict _Restrict
 #else
-#define restrict
+#define	restrict
 #endif
 
-/* double hypot(double x, double y)
+/*
+ * double hypot(double x, double y)
  *
  * Method :
  *	1. Special cases:
@@ -75,12 +76,10 @@ static const unsigned long long LCONST[] = {
 };
 
 static void
-__vhypot_n(int n, double * restrict px, int stridex, double * restrict py,
-	int stridey, double * restrict pz, int stridez);
+__vhypot_n(int n, double *restrict px, int stridex, double *restrict py,
+    int stridey, double *restrict pz, int stridez);
 
-#pragma no_inline(__vhypot_n)
-
-#define RETURN(ret)						\
+#define	RETURN(ret)						\
 {								\
 	*pz = (ret);						\
 	py += stridey;						\
@@ -89,7 +88,9 @@ __vhypot_n(int n, double * restrict px, int stridex, double * restrict py,
 	{							\
 		hx0 = HI(px);					\
 		hy0 = HI(py);					\
-		spx = px; spy = py; spz = pz;			\
+		spx = px;					\
+		spy = py;					\
+		spz = pz;					\
 		continue;					\
 	}							\
 	n--;							\
@@ -97,8 +98,8 @@ __vhypot_n(int n, double * restrict px, int stridex, double * restrict py,
 }
 
 void
-__vhypot(int n, double * restrict px, int stridex, double * restrict py,
-	int stridey, double * restrict pz, int stridez)
+__vhypot(int n, double *restrict px, int stridex, double *restrict py,
+    int stridey, double *restrict pz, int stridez)
 {
 	int		hx0, hx1, hy0, j0, diff;
 	double		x_hi, x_lo, y_hi, y_lo;
@@ -106,26 +107,24 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 	double		x, y, res;
 	double		*spx, *spy, *spz;
 	int		n_n;
-	double		D2ON28 = ((double*)LCONST)[0];		/* 2 ** 28	*/
-	double		D2ONM1022 = ((double*)LCONST)[1];	/* 2 **-1022	*/
-	double		D2ONP1022 = ((double*)LCONST)[2];	/* 2 ** 1022	*/
+	double		D2ON28 = ((double *)LCONST)[0];	 /* 2 ** 28	*/
+	double		D2ONM1022 = ((double *)LCONST)[1]; /* 2 **-1022	*/
+	double		D2ONP1022 = ((double *)LCONST)[2]; /* 2 ** 1022	*/
 
-	while (n > 1)
-	{
+	while (n > 1) {
 		n_n = 0;
 		spx = px;
 		spy = py;
 		spz = pz;
 		hx0 = HI(px);
 		hy0 = HI(py);
-		for (; n > 1 ; n--)
-		{
+		for (; n > 1; n--) {
 			px += stridex;
 			hx0 &= 0x7fffffff;
 			hy0 &= 0x7fffffff;
 
-			if (hx0 >= 0x7fe00000)	/* |X| >= 2**1023 or Inf or NaN */
-			{
+			if (hx0 >= 0x7fe00000) {
+				/* |X| >= 2**1023 or Inf or NaN */
 				diff = hy0 - hx0;
 				j0 = diff >> 31;
 				j0 = hy0 - (diff & j0);
@@ -134,20 +133,24 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 				y = *py;
 				x = fabs(x);
 				y = fabs(y);
-				if (j0 >= 0x7ff00000)	/* |X| or |Y| = Inf or NaN */
-				{
+				if (j0 >= 0x7ff00000) {
+					/* |X| or |Y| = Inf or NaN */
 					int lx = LO((px - stridex));
 					int ly = LO(py);
-					if (hx0 == 0x7ff00000 && lx == 0) res = x == y ? y : x;
-					else if (hy0 == 0x7ff00000 && ly == 0) res = x == y ? x : y;
-					else res = x + y;
-					RETURN (res)
-				}
-				else
-				{
+					if (hx0 == 0x7ff00000 && lx == 0)
+						res = x == y ? y : x;
+					else if (hy0 == 0x7ff00000 && ly == 0)
+						res = x == y ? x : y;
+					else
+						res = x + y;
+					RETURN(res)
+				} else {
 					j0 = diff >> 31;
-					if (((diff ^ j0) - j0) < 0x03600000)	/* max(|X|,|Y|)/min(|X|,|Y|) < 2**54 */
-					{
+					if (((diff ^ j0) - j0) < 0x03600000) {
+						/*
+						 * max(|X|,|Y|)/min(|X|,|Y|) <
+						 * 2**54
+						 */
 						x *= D2ONM1022;
 						y *= D2ONM1022;
 
@@ -155,19 +158,21 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 						x_lo = x - x_hi;
 						y_hi = (y + D2ON28) - D2ON28;
 						y_lo = y - y_hi;
-						res = (x_hi * x_hi + y_hi * y_hi);
-						res += ((x + x_hi) * x_lo + (y + y_hi) * y_lo);
+						res = x_hi * x_hi + y_hi * y_hi;
+						res += ((x + x_hi) * x_lo +
+						    (y + y_hi) * y_lo);
 
-						res = sqrt (res);
+						res = sqrt(res);
 
 						res = D2ONP1022 * res;
-						RETURN (res)
+						RETURN(res)
+					} else {
+						RETURN(x + y)
 					}
-					else RETURN (x + y)
 				}
 			}
-			if (hy0 >= 0x7fe00000)	/* |Y| >= 2**1023 or Inf or NaN */
-			{
+			if (hy0 >= 0x7fe00000) {
+				/* |Y| >= 2**1023 or Inf or NaN */
 				diff = hy0 - hx0;
 				j0 = diff >> 31;
 				j0 = hy0 - (diff & j0);
@@ -176,20 +181,24 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 				y = *py;
 				x = fabs(x);
 				y = fabs(y);
-				if (j0 >= 0x7ff00000)	/* |X| or |Y| = Inf or NaN */
-				{
+				if (j0 >= 0x7ff00000) {
+					/* |X| or |Y| = Inf or NaN */
 					int lx = LO((px - stridex));
 					int ly = LO(py);
-					if (hx0 == 0x7ff00000 && lx == 0) res = x == y ? y : x;
-					else if (hy0 == 0x7ff00000 && ly == 0) res = x == y ? x : y;
-					else res = x + y;
-					RETURN (res)
-				}
-				else
-				{
+					if (hx0 == 0x7ff00000 && lx == 0)
+						res = x == y ? y : x;
+					else if (hy0 == 0x7ff00000 && ly == 0)
+						res = x == y ? x : y;
+					else
+						res = x + y;
+					RETURN(res)
+				} else {
 					j0 = diff >> 31;
-					if (((diff ^ j0) - j0) < 0x03600000)	/* max(|X|,|Y|)/min(|X|,|Y|) < 2**54 */
-					{
+					if (((diff ^ j0) - j0) < 0x03600000) {
+						/*
+						 * max(|X|,|Y|)/min(|X|,|Y|) <
+						 * 2**54
+						 */
 						x *= D2ONM1022;
 						y *= D2ONM1022;
 
@@ -197,22 +206,24 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 						x_lo = x - x_hi;
 						y_hi = (y + D2ON28) - D2ON28;
 						y_lo = y - y_hi;
-						res = (x_hi * x_hi + y_hi * y_hi);
-						res += ((x + x_hi) * x_lo + (y + y_hi) * y_lo);
+						res = x_hi * x_hi + y_hi * y_hi;
+						res += ((x + x_hi) * x_lo +
+						    (y + y_hi) * y_lo);
 
-						res = sqrt (res);
+						res = sqrt(res);
 
 						res = D2ONP1022 * res;
-						RETURN (res)
+						RETURN(res)
+					} else {
+						RETURN(x + y)
 					}
-					else RETURN (x + y)
 				}
 			}
 
 			hx1 = HI(px);
 
-			if (hx0 < 0x00100000 && hy0 < 0x00100000)	/* X and Y are subnormal */
-			{
+			if (hx0 < 0x00100000 && hy0 < 0x00100000) {
+				/* X and Y are subnormal */
 				x = *(px - stridex);
 				y = *py;
 
@@ -229,7 +240,7 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 				res = sqrt(res);
 
 				res = D2ONM1022 * res;
-				RETURN (res)
+				RETURN(res)
 			}
 
 			hx0 = hx1;
@@ -239,11 +250,11 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 			hy0 = HI(py);
 		}
 		if (n_n > 0)
-			__vhypot_n (n_n, spx, stridex, spy, stridey, spz, stridez);
+			__vhypot_n(n_n, spx, stridex, spy, stridey, spz,
+			    stridez);
 	}
 
-	if (n > 0)
-	{
+	if (n > 0) {
 		x = *px;
 		y = *py;
 		hx0 = HI(px);
@@ -257,25 +268,26 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 		j0 = hy0 - (diff & j0);
 		j0 &= 0x7ff00000;
 
-		if (j0 >= 0x7fe00000)	/* max(|X|,|Y|) >= 2**1023 or X or Y = Inf or NaN */
-		{
+		if (j0 >= 0x7fe00000) {
+			/* max(|X|,|Y|) >= 2**1023 or X or Y = Inf or NaN */
 			x = fabs(x);
 			y = fabs(y);
 			if (j0 >= 0x7ff00000)	/* |X| or |Y| = Inf or NaN */
 			{
 				int lx = LO(px);
 				int ly = LO(py);
-				if (hx0 == 0x7ff00000 && lx == 0) res = x == y ? y : x;
-				else if (hy0 == 0x7ff00000 && ly == 0) res = x == y ? x : y;
-				else res = x + y;
+				if (hx0 == 0x7ff00000 && lx == 0)
+					res = x == y ? y : x;
+				else if (hy0 == 0x7ff00000 && ly == 0)
+					res = x == y ? x : y;
+				else
+					res = x + y;
 				*pz = res;
 				return;
-			}
-			else
-			{
+			} else {
 				j0 = diff >> 31;
-				if (((diff ^ j0) - j0) < 0x03600000)	/* max(|X|,|Y|)/min(|X|,|Y|) < 2**54 */
-				{
+				if (((diff ^ j0) - j0) < 0x03600000) {
+					/* max(|X|,|Y|)/min(|X|,|Y|) < 2**54 */
 					x *= D2ONM1022;
 					y *= D2ONM1022;
 
@@ -284,24 +296,22 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 					y_hi = (y + D2ON28) - D2ON28;
 					y_lo = y - y_hi;
 					res = (x_hi * x_hi + y_hi * y_hi);
-					res += ((x + x_hi) * x_lo + (y + y_hi) * y_lo);
+					res += ((x + x_hi) * x_lo +
+					    (y + y_hi) * y_lo);
 
-					res = sqrt (res);
+					res = sqrt(res);
 
 					res = D2ONP1022 * res;
 					*pz = res;
 					return;
-				}
-				else
-				{
+				} else {
 					*pz = x + y;
 					return;
 				}
 			}
 		}
 
-		if (j0 < 0x00100000)	/* X and Y are subnormal */
-		{
+		if (j0 < 0x00100000) {	/* X and Y are subnormal */
 			x *= D2ONP1022;
 			y *= D2ONP1022;
 
@@ -342,16 +352,15 @@ __vhypot(int n, double * restrict px, int stridex, double * restrict py,
 }
 
 static void
-__vhypot_n(int n, double * restrict px, int stridex, double * restrict py,
-	int stridey, double * restrict pz, int stridez)
+__vhypot_n(int n, double *restrict px, int stridex, double *restrict py,
+    int stridey, double *restrict pz, int stridez)
 {
 	int		hx0, hy0, j0, diff0;
 	double		x_hi0, x_lo0, y_hi0, y_lo0, scl0 = 0;
 	double		x0, y0, res0;
-	double		D2ON28 = ((double*)LCONST)[0];		/* 2 ** 28	*/
+	double		D2ON28 = ((double *)LCONST)[0]; /* 2 ** 28 */
 
-	for(; n > 0 ; n--)
-	{
+	for (; n > 0; n--) {
 		x0 = *px;
 		y0 = *py;
 		hx0 = HI(px);

@@ -96,15 +96,6 @@ static void		dca_schedtimeout(void *);
 #endif
 
 /*
- * We want these inlined for performance.
- */
-#ifndef	DEBUG
-#pragma inline(dca_freereq, dca_getreq, dca_freework, dca_getwork)
-#pragma inline(dca_enqueue, dca_dequeue, dca_rmqueue, dca_done)
-#pragma inline(dca_reverse, dca_length)
-#endif
-
-/*
  * Device operations.
  */
 static struct dev_ops devops = {

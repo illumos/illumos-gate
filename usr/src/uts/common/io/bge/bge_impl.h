@@ -1204,12 +1204,9 @@ void bge_chip_stop_nonblocking(bge_t *bgep);
 #endif
 #ifdef BGE_IPMI_ASF
 void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
-#pragma	inline(bge_nic_put32)
 uint32_t bge_nic_read32(bge_t *bgep, bge_regno_t addr);
 void bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val);
-#pragma inline(bge_ind_put32)
 uint32_t bge_ind_get32(bge_t *bgep, bge_regno_t regno);
-#pragma inline(bge_ind_get32)
 void bge_asf_update_status(bge_t *bgep);
 void bge_asf_heartbeat(void *bgep);
 void bge_asf_stop_timer(bge_t *bgep);

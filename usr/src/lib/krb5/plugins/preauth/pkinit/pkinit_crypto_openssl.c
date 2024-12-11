@@ -6580,8 +6580,6 @@ pkcs7_decrypt(krb5_context context,
 	pkiDebug("unable to decrypt pkcs7 object\n");
 	return 0;
     }
-/* Solaris Kerberos: Suppress sun studio compiler warning */
-#pragma error_messages (off, E_END_OF_LOOP_CODE_NOT_REACHED)
     for(;;) {
 	i = BIO_read(tmpmem, buf, sizeof(buf));
 	if (i <= 0) break;
@@ -6589,7 +6587,6 @@ pkcs7_decrypt(krb5_context context,
 	BIO_free_all(tmpmem);
 	return 1;
     }
-#pragma error_messages (default, E_END_OF_LOOP_CODE_NOT_REACHED)
 
     return 0;
 }

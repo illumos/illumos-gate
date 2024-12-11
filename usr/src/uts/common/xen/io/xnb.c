@@ -83,9 +83,7 @@ mblk_t		*xnb_copy_to_peer(xnb_t *, mblk_t *);
 
 static void		setup_gop(xnb_t *, gnttab_copy_t *, uchar_t *,
     size_t, size_t, size_t, grant_ref_t);
-#pragma inline(setup_gop)
 static boolean_t	is_foreign(void *);
-#pragma inline(is_foreign)
 
 #define	INVALID_GRANT_HANDLE	((grant_handle_t)-1)
 #define	INVALID_GRANT_REF	((grant_ref_t)-1)

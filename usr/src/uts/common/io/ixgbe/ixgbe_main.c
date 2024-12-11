@@ -4249,7 +4249,6 @@ ixgbe_find_mac_address(ixgbe_t *ixgbe)
 	return (B_TRUE);
 }
 
-#pragma inline(ixgbe_arm_watchdog_timer)
 static void
 ixgbe_arm_watchdog_timer(ixgbe_t *ixgbe)
 {
@@ -4646,7 +4645,6 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 	}
 }
 
-#pragma inline(ixgbe_intr_rx_work)
 /*
  * ixgbe_intr_rx_work - RX processing of ISR.
  */
@@ -4665,7 +4663,6 @@ ixgbe_intr_rx_work(ixgbe_rx_ring_t *rx_ring)
 		    rx_ring->ring_gen_num);
 }
 
-#pragma inline(ixgbe_intr_tx_work)
 /*
  * ixgbe_intr_tx_work - TX processing of ISR.
  */
@@ -4691,7 +4688,6 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 	}
 }
 
-#pragma inline(ixgbe_intr_other_work)
 /*
  * ixgbe_intr_other_work - Process interrupt types other than tx/rx
  */
@@ -5394,7 +5390,6 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 	return (IXGBE_SUCCESS);
 }
 
-#pragma inline(ixgbe_map_rxring_to_vector)
 /*
  * ixgbe_map_rxring_to_vector - Map given rx ring to given interrupt vector.
  */
@@ -5418,7 +5413,6 @@ ixgbe_map_rxring_to_vector(ixgbe_t *ixgbe, int r_idx, int v_idx)
 	ixgbe->rx_rings[r_idx].vect_bit = 1 << v_idx;
 }
 
-#pragma inline(ixgbe_map_txring_to_vector)
 /*
  * ixgbe_map_txring_to_vector - Map given tx ring to given interrupt vector.
  */

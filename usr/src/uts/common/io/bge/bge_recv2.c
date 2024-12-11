@@ -36,7 +36,6 @@
 #define	BGE_DBG		BGE_DBG_RECV	/* debug flag for this code	*/
 
 static void bge_refill(bge_t *bgep, buff_ring_t *brp, sw_rbd_t *srbdp);
-#pragma	inline(bge_refill)
 
 /*
  * Return the specified buffer (srbdp) to the ring it came from (brp).
@@ -67,7 +66,6 @@ bge_refill(bge_t *bgep, buff_ring_t *brp, sw_rbd_t *srbdp)
 
 static mblk_t *bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p,
     recv_ring_t *rrp);
-#pragma	inline(bge_receive_packet)
 
 static mblk_t *
 bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p, recv_ring_t *rrp)
@@ -276,9 +274,6 @@ error:
  * the chip to indicate the packets it has accepted from the ring.
  */
 static mblk_t *bge_receive_ring(bge_t *bgep, recv_ring_t *rrp);
-#ifndef	DEBUG
-#pragma	inline(bge_receive_ring)
-#endif
 
 static mblk_t *
 bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
@@ -408,7 +403,6 @@ bge_poll_ring(void *arg, int bytes_to_pickup)
  * Receive all packets in all rings.
  */
 void bge_receive(bge_t *bgep, bge_status_t *bsp);
-#pragma	no_inline(bge_receive)
 
 void
 bge_receive(bge_t *bgep, bge_status_t *bsp)

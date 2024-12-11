@@ -45,7 +45,6 @@
 
 static void tavor_cq_doorbell(tavor_state_t *state, uint32_t cq_cmd,
     uint32_t cqn, uint32_t cq_param);
-#pragma inline(tavor_cq_doorbell)
 static int tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
     tavor_hw_cqe_t *cqe, ibt_wc_t *wc);
 static int tavor_cq_errcqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,

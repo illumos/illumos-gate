@@ -59,15 +59,6 @@
 #include "amd8111s_hw.h"
 #include "amd8111s_main.h"
 
-
-#pragma inline(mdlTransmit)
-#pragma inline(mdlReceive)
-
-#pragma inline(mdlReadInterrupt)
-#pragma inline(mdlEnableInterrupt)
-#pragma inline(mdlDisableInterrupt)
-
-
 static void mdlEnableMagicPacketWakeUp(struct LayerPointers *);
 
 /* PMR (Pattern Match RAM) */

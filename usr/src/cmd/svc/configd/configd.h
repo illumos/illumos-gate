@@ -788,7 +788,6 @@ rep_protocol_responseid_t backend_switch(int);
  * and exits with a "Database Bad" error code.
  */
 void backend_panic(const char *, ...) __NORETURN;
-#pragma rarely_called(backend_panic)
 
 backend_query_t *backend_query_alloc(void);
 void backend_query_append(backend_query_t *, const char *);

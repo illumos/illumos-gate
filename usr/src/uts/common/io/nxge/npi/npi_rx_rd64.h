@@ -47,39 +47,39 @@ extern "C" {
  * -------------------------------------------------------------
  * #if defined(REG_TRACE)
  * #define	NXGE_REG_RD64(handle, offset, val_p) {	\
- * 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);			\
- * 	npi_rtrace_update(handle, B_FALSE, &npi_rtracebuf, (uint32_t)offset, \
- * 			(uint64_t)(*(val_p)));				\
+ *	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);			\
+ *	npi_rtrace_update(handle, B_FALSE, &npi_rtracebuf, (uint32_t)offset, \
+ *			(uint64_t)(*(val_p)));				\
  * }
  * #elif defined(REG_SHOW)
  * #define	NXGE_REG_RD64(handle, offset, val_p) {\
- * 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
- * 	rt_show_reg(0xbadbad, B_FALSE, (uint32_t)offset, (uint64_t)(*(val_p)));\
+ *	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
+ *	rt_show_reg(0xbadbad, B_FALSE, (uint32_t)offset, (uint64_t)(*(val_p)));\
  * }
  * #elif defined(AXIS_DEBUG) && !defined(LEGION)
  * #define	NXGE_REG_RD64(handle, offset, val_p) {\
- * 	int	n;				\
- * 	for (n = 0; n < AXIS_WAIT_LOOP; n++) {	\
- * 		*(val_p) = 0;		\
- * 		*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
- * 		if (*(val_p) != (~0)) { \
- * 			break; \
- * 		}	\
- * 		drv_usecwait(AXIS_WAIT_PER_LOOP); \
- * 		if (n < 20) { \
- * 			cmn_err(CE_WARN, "NXGE_REG_RD64: loop %d " \
- * 			"REG 0x%x(0x%llx)", \
- * 			n, offset, *val_p);\
- * 		}	\
- * 	} \
- * 	if (n >= AXIS_WAIT_LOOP) {	\
- * 		cmn_err(CE_WARN, "(FATAL)NXGE_REG_RD64 on offset 0x%x " \
- * 			"with -1!!!", offset); \
- * 	}	\
+ *	int	n;				\
+ *	for (n = 0; n < AXIS_WAIT_LOOP; n++) {	\
+ *		*(val_p) = 0;		\
+ *		*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
+ *		if (*(val_p) != (~0)) { \
+ *			break; \
+ *		}	\
+ *		drv_usecwait(AXIS_WAIT_PER_LOOP); \
+ *		if (n < 20) { \
+ *			cmn_err(CE_WARN, "NXGE_REG_RD64: loop %d " \
+ *			"REG 0x%x(0x%llx)", \
+ *			n, offset, *val_p);\
+ *		}	\
+ *	} \
+ *	if (n >= AXIS_WAIT_LOOP) {	\
+ *		cmn_err(CE_WARN, "(FATAL)NXGE_REG_RD64 on offset 0x%x " \
+ *			"with -1!!!", offset); \
+ *	}	\
  * }
  * #else
  * #define	NXGE_REG_RD64(handle, offset, val_p) {\
- * 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
+ *	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
  * }
  * #endif
  *
@@ -87,12 +87,12 @@ extern "C" {
  * -------------------------------------------------------------
  * #if defined(__i386)
  * #define	NXGE_NPI_PIO_READ64(npi_handle, offset)		\
- * 	(ddi_get64(NPI_REGH(npi_handle),		\
- * 	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset)))
+ *	(ddi_get64(NPI_REGH(npi_handle),		\
+ *	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset)))
  * #else
  * #define	NXGE_NPI_PIO_READ64(npi_handle, offset)		\
- * 	(ddi_get64(NPI_REGH(npi_handle),		\
- * 	(uint64_t *)(NPI_REGP(npi_handle) + offset)))
+ *	(ddi_get64(NPI_REGH(npi_handle),		\
+ *	(uint64_t *)(NPI_REGP(npi_handle) + offset)))
  * #endif
  *
  * -------------------------------------------------------------
@@ -102,7 +102,7 @@ extern "C" {
  * Now let's tackle NXGE_RXDMA_OFFSET
  * -------------------------------------------------------------
  * #define	NXGE_RXDMA_OFFSET(x, v, channel) (x + \
- * 		(!v ? DMC_OFFSET(channel) : \
+ *		(!v ? DMC_OFFSET(channel) : \
  *			RDMC_PIOVADDR_OFFSET(channel)))
  *
  * -------------------------------------------------------------
@@ -138,7 +138,6 @@ extern "C" {
  */
 
 static void RXDMA_REG_READ64(npi_handle_t, uint64_t, int, uint64_t *);
-#pragma inline(RXDMA_REG_READ64)
 
 /*
  * RXDMA_REG_READ64
@@ -146,10 +145,10 @@ static void RXDMA_REG_READ64(npi_handle_t, uint64_t, int, uint64_t *);
  *	Read a 64-bit value from a DMC register.
  *
  * Arguments:
- * 	handle	The NPI handle to use.
- * 	offset	The offset into the DMA CSR (the register).
- * 	channel	The channel, which is used as a multiplicand.
- * 	value	Where to put the 64-bit value to be read.
+ *	handle	The NPI handle to use.
+ *	offset	The offset into the DMA CSR (the register).
+ *	channel	The channel, which is used as a multiplicand.
+ *	value	Where to put the 64-bit value to be read.
  *
  * Notes:
  *	If handle.regp is a virtual address (the address of a VR),

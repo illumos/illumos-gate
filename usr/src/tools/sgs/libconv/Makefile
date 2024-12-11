@@ -42,4 +42,4 @@ include		$(SRC)/Makefile.master.64
 install all:	$(LIBRARY)
 
 include		$(SGSHOME)/libconv/Makefile.targ
-
+include		$(SRC)/Makefile.master.64

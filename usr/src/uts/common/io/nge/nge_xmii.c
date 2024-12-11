@@ -49,7 +49,6 @@ static const int8_t nge_copper_link_duplex[] = {
 
 static uint16_t nge_mii_access(nge_t *ngep, nge_regno_t regno,
     uint16_t data, uint32_t cmd);
-#pragma	inline(nge_mii_access)
 
 static uint16_t
 nge_mii_access(nge_t *ngep, nge_regno_t regno, uint16_t data, uint32_t cmd)
@@ -132,7 +131,6 @@ nge_mii_access(nge_t *ngep, nge_regno_t regno, uint16_t data, uint32_t cmd)
 }
 
 uint16_t nge_mii_get16(nge_t *ngep, nge_regno_t regno);
-#pragma	inline(nge_mii_get16)
 
 uint16_t
 nge_mii_get16(nge_t *ngep, nge_regno_t regno)
@@ -142,7 +140,6 @@ nge_mii_get16(nge_t *ngep, nge_regno_t regno)
 }
 
 void nge_mii_put16(nge_t *ngep, nge_regno_t regno, uint16_t data);
-#pragma	inline(nge_mii_put16)
 
 void
 nge_mii_put16(nge_t *ngep, nge_regno_t regno, uint16_t data)

@@ -644,10 +644,7 @@ extern int dev_minorperm(dev_info_t *, char *, mperm_t *);
 extern void dev_devices_cleanup(void);
 
 /*
- * Declarations used for dynamic linking support routines.  Interfaces
- * are marked with the pragma "unknown_control_flow" to prevent tail call
- * optimization, so that implementations can reliably use caller() to
- * determine initiating module.
+ * Declarations used for dynamic linking support routines.
  */
 #define	KRTLD_MODE_FIRST	0x0001
 typedef	struct __ddi_modhandle	*ddi_modhandle_t;
@@ -656,7 +653,6 @@ extern ddi_modhandle_t		ddi_modopen(const char *,
 extern void			*ddi_modsym(ddi_modhandle_t,
 				    const char *, int *);
 extern int			ddi_modclose(ddi_modhandle_t);
-#pragma	unknown_control_flow(ddi_modopen, ddi_modsym, ddi_modclose)
 
 /*
  * Only the following are part of the DDI/DKI

@@ -138,8 +138,6 @@ static void	ip_input_broadcast_v4(ire_t *, mblk_t *, ipha_t *,
 static void	ip_input_multicast_v4(ire_t *, mblk_t *, ipha_t *,
     ip_recv_attr_t *);
 
-#pragma inline(ip_input_common_v4, ip_input_local_v4, ip_forward_xmit_v4)
-
 /*
  * Direct read side procedure capable of dealing with chains. GLDv3 based
  * drivers call this function directly with mblk chains while STREAMS

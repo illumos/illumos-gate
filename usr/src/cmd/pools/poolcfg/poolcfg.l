@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma       error_messages(off, E_STATEMENT_NOT_REACHED)
-
 /*
  * poolcfg.l
  *

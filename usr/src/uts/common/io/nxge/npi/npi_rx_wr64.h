@@ -47,18 +47,18 @@ extern "C" {
  * -------------------------------------------------------------
  * #if defined(REG_TRACE)
  * #define	NXGE_REG_WR64(handle, offset, val) {	\
- * 	NXGE_NPI_PIO_WRITE64(handle, (offset), (val));			\
- * 	npi_rtrace_update(handle, B_TRUE, &npi_rtracebuf, (uint32_t)offset, \
- * 				(uint64_t)(val));			\
+ *	NXGE_NPI_PIO_WRITE64(handle, (offset), (val));			\
+ *	npi_rtrace_update(handle, B_TRUE, &npi_rtracebuf, (uint32_t)offset, \
+ *				(uint64_t)(val));			\
  * }
  * #elif defined(REG_SHOW)
  * #define	NXGE_REG_WR64(handle, offset, val) {\
- * 	NXGE_NPI_PIO_WRITE64(handle, offset, (val));\
- * 	rt_show_reg(0xbadbad, B_TRUE, (uint32_t)offset, (uint64_t)(val));\
+ *	NXGE_NPI_PIO_WRITE64(handle, offset, (val));\
+ *	rt_show_reg(0xbadbad, B_TRUE, (uint32_t)offset, (uint64_t)(val));\
  * }
  * #else
  * #define	NXGE_REG_WR64(handle, offset, val) {\
- * 	NXGE_NPI_PIO_WRITE64(handle, (offset), (val));\
+ *	NXGE_NPI_PIO_WRITE64(handle, (offset), (val));\
  * }
  * #endif
  *
@@ -66,12 +66,12 @@ extern "C" {
  * -------------------------------------------------------------
  * #if defined(__i386)
  * #define	NXGE_NPI_PIO_WRITE64(npi_handle, offset, data)	\
- * 	(ddi_put64(NPI_REGH(npi_handle),		\
- * 	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset), data))
+ *	(ddi_put64(NPI_REGH(npi_handle),		\
+ *	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset), data))
  * #else
  * #define	NXGE_NPI_PIO_WRITE64(npi_handle, offset, data)	\
- * 	(ddi_put64(NPI_REGH(npi_handle),		\
- * 	(uint64_t *)(NPI_REGP(npi_handle) + offset), data))
+ *	(ddi_put64(NPI_REGH(npi_handle),		\
+ *	(uint64_t *)(NPI_REGP(npi_handle) + offset), data))
  * #endif
  *
  * -------------------------------------------------------------
@@ -81,7 +81,7 @@ extern "C" {
  * Now let's tackle NXGE_RXDMA_OFFSET
  * -------------------------------------------------------------
  * #define	NXGE_RXDMA_OFFSET(x, v, channel) (x + \
- * 		(!v ? DMC_OFFSET(channel) : \
+ *		(!v ? DMC_OFFSET(channel) : \
  *			RDMC_PIOVADDR_OFFSET(channel)))
  *
  * -------------------------------------------------------------
@@ -116,7 +116,6 @@ extern "C" {
  */
 
 static void RXDMA_REG_WRITE64(npi_handle_t, uint64_t, int, uint64_t);
-#pragma inline(RXDMA_REG_WRITE64)
 
 /*
  * RXDMA_REG_WRITE64
@@ -124,10 +123,10 @@ static void RXDMA_REG_WRITE64(npi_handle_t, uint64_t, int, uint64_t);
  *	Write a 64-bit value to a DMC register.
  *
  * Arguments:
- * 	handle	The NPI handle to use.
- * 	offset	The offset into the DMA CSR (the register).
- * 	channel	The channel, which is used as a multiplicand.
- * 	value	The 64-bit value to write.
+ *	handle	The NPI handle to use.
+ *	offset	The offset into the DMA CSR (the register).
+ *	channel	The channel, which is used as a multiplicand.
+ *	value	The 64-bit value to write.
  *
  * Notes:
  *	If handle.regp is a virtual address (the address of a VR),

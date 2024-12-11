@@ -3486,8 +3486,6 @@ igb_find_mac_address(igb_t *igb)
 	return (B_TRUE);
 }
 
-#pragma inline(igb_arm_watchdog_timer)
-
 static void
 igb_arm_watchdog_timer(igb_t *igb)
 {
@@ -4050,7 +4048,6 @@ igb_set_internal_serdes_loopback(igb_t *igb)
 	E1000_WRITE_REG(hw, E1000_CONNSW, connsw);
 }
 
-#pragma inline(igb_intr_rx_work)
 /*
  * igb_intr_rx_work - rx processing of ISR
  */
@@ -4068,7 +4065,6 @@ igb_intr_rx_work(igb_rx_ring_t *rx_ring)
 		    rx_ring->ring_gen_num);
 }
 
-#pragma inline(igb_intr_tx_work)
 /*
  * igb_intr_tx_work - tx processing of ISR
  */
@@ -4089,7 +4085,6 @@ igb_intr_tx_work(igb_tx_ring_t *tx_ring)
 	}
 }
 
-#pragma inline(igb_intr_link_work)
 /*
  * igb_intr_link_work - link-status-change processing of ISR
  */

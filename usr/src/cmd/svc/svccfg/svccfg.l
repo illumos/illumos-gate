@@ -24,12 +24,6 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-
-#pragma error_messages(off, E_BLOCK_DECL_UNUSED)
-#pragma error_messages(off, E_EQUALITY_NOT_ASSIGNMENT)
-#pragma error_messages(off, E_FUNC_RET_MAYBE_IGNORED2)
-#pragma error_messages(off, E_STMT_NOT_REACHED)
-
 #include <libintl.h>
 #include <string.h>
 

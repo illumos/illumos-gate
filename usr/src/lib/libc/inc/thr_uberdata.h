@@ -1274,9 +1274,7 @@ extern	int	__nanosleep(const timespec_t *, timespec_t *);
 extern	void	getgregs(ulwp_t *, gregset_t);
 extern	void	setgregs(ulwp_t *, gregset_t);
 extern	void	thr_panic(const char *) __NORETURN;
-#pragma rarely_called(thr_panic)
 extern	void	mutex_panic(mutex_t *, const char *) __NORETURN;
-#pragma rarely_called(mutex_panic)
 extern	ulwp_t	*find_lwp(thread_t);
 extern	void	finish_init(void);
 extern	void	update_sched(ulwp_t *);
@@ -1483,7 +1481,6 @@ extern	int	__sigprocmask(int, const sigset_t *, sigset_t *);
 extern	int	__lwp_sigmask(int, const sigset_t *);
 extern	void	__sighndlr(int, siginfo_t *, ucontext_t *, void (*)());
 extern	caddr_t	__sighndlrend;
-#pragma unknown_control_flow(__sighndlr)
 
 /* belongs in <pthread.h> */
 #define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */

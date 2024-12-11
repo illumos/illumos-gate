@@ -439,7 +439,6 @@ CERRWARN = -errtags=yes -errwarn=%all
 
 CERRWARN += -_gcc=-Wno-missing-braces
 CERRWARN += -_gcc=-Wno-sign-compare
-CERRWARN += -_gcc=-Wno-unknown-pragmas
 CERRWARN += -_gcc=-Wno-unused-parameter
 CERRWARN += -_gcc=-Wno-missing-field-initializers
 
@@ -457,7 +456,6 @@ CCERRWARN = -errtags=yes -errwarn=%all
 
 CCERRWARN += -_gcc=-Wno-missing-braces
 CCERRWARN += -_gcc=-Wno-sign-compare
-CCERRWARN += -_gcc=-Wno-unknown-pragmas
 CCERRWARN += -_gcc=-Wno-unused-parameter
 CCERRWARN += -_gcc=-Wno-missing-field-initializers
 

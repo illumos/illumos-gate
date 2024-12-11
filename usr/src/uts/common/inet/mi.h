@@ -117,7 +117,6 @@ extern int	mi_open_link(void **mi_head, IDP ptr, dev_t *devp, int flag,
 extern uint8_t *mi_offset_param(mblk_t *mp, size_t offset, size_t len);
 extern uint8_t *mi_offset_paramc(mblk_t *mp, size_t offset, size_t len);
 
-/*PRINTFLIKE2*/
 extern int	mi_sprintf(char *buf, char *fmt, ...)
 	__KPRINTFLIKE(2);
 extern int	mi_sprintf_putc(char *cookie, int ch);
@@ -125,10 +124,8 @@ extern int	mi_sprintf_putc(char *cookie, int ch);
 extern int	mi_strcmp(const char *cp1, const char *cp2);
 extern size_t	mi_strlen(const char *str);
 
-/*PRINTFLIKE4*/
 extern int	mi_strlog(queue_t *q, char level, ushort_t flags,
 		    char *fmt, ...) __KPRINTFLIKE(4);
-#pragma rarely_called(mi_strlog)
 
 extern long	mi_strtol(const char *str, char **ptr, int base);
 

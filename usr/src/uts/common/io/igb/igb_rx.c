@@ -32,11 +32,6 @@ static mblk_t *igb_rx_bind(igb_rx_data_t *, uint32_t, uint32_t);
 static mblk_t *igb_rx_copy(igb_rx_data_t *, uint32_t, uint32_t);
 static void igb_rx_assoc_hcksum(mblk_t *, uint32_t);
 
-#ifndef IGB_DEBUG
-#pragma inline(igb_rx_assoc_hcksum)
-#endif
-
-
 /*
  * igb_rx_recycle - the call-back function to reclaim rx buffer
  *

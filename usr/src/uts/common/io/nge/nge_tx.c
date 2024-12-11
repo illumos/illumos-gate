@@ -49,7 +49,6 @@ static void nge_tx_dmah_push(nge_dmah_list_t *, nge_dmah_list_t *);
 
 
 void nge_tx_recycle_all(nge_t *ngep);
-#pragma	no_inline(nge_tx_recycle_all)
 
 void
 nge_tx_recycle_all(nge_t *ngep)
@@ -346,7 +345,6 @@ nge_tx_start(nge_t *ngep, uint32_t slotnum)
 
 static enum send_status
 nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp);
-#pragma	inline(nge_send_copy)
 
 static enum send_status
 nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
@@ -421,7 +419,6 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 /*
  * static enum send_status
  * nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno);
- * #pragma	inline(nge_send_mapped)
  */
 
 static enum send_status
@@ -518,7 +515,7 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	 * Now allocate tx descriptors and fill them
 	 * IMPORTANT:
 	 *	Up to the point where it claims a place, It is impossibel
-	 * 	to fail.
+	 *	to fail.
 	 *
 	 * In this version, there's no setup to be done here, and there's
 	 * nothing that can fail, so we can go straight to claiming our
@@ -731,7 +728,7 @@ nge_sum_txd_check(const void *hwd)
 
 void
 nge_hot_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
-	size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
+    size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
 {
 	hot_tx_bd * hw_sbd_p = hwdesc;
 
@@ -770,7 +767,7 @@ nge_hot_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
 
 void
 nge_sum_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
-	size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
+    size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
 {
 	sum_tx_bd * hw_sbd_p = hwdesc;
 

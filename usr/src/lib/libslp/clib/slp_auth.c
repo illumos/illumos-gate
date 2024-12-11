@@ -68,7 +68,7 @@
 /* Prototypes for dynamically loaded (dl'd) AMI functions */
 static ami_algid **ami_rsa_aid, **ami_dsa_aid;
 static AMI_STATUS (*dld_ami_init)(ami_handle_t **, const char *,
-				    const char *, const u_int, const u_int,
+				    const char *, const uint_t, const uint_t,
 				    const char *);
 
 static AMI_STATUS (*dld_ami_sign)(ami_handle_t *,
@@ -156,8 +156,6 @@ SLPError slp_sign(struct iovec *authiov, int authiov_len, time_t ts,
 	 */
 	return (SLP_SECURITY_UNAVAILABLE);
 
-#pragma	error_messages(off, E_STATEMENT_NOT_REACHED)
-
 	/* else we should sign this advert */
 	if (!(sign_as = (char *)SLPGetProperty(SLP_CONFIG_SIGN_AS)) ||
 /*LINTED statement not reached*/
@@ -216,7 +214,6 @@ done:
 	}
 
 	return (err);
-#pragma	error_messages(on, E_STATEMENT_NOT_REACHED)
 }
 
 /*
@@ -257,8 +254,6 @@ SLPError slp_verify(struct iovec *authiov, int authiov_len,
 	 * security is re-enabled.
 	 */
 	return (SLP_SECURITY_UNAVAILABLE);
-#pragma	error_messages(off, E_STATEMENT_NOT_REACHED)
-
 	/* For all other scenarios, we must verify the auth blocks */
 /*LINTED statement not reached*/
 	if (get_security_backend() != SLP_OK || n == 0) {
@@ -325,7 +320,6 @@ done:
 	*total = off;
 
 	return (err);
-#pragma	error_messages(on, E_STATEMENT_NOT_REACHED)
 }
 
 /*
@@ -389,8 +383,8 @@ static SLPError get_security_backend() {
 	if (!(dld_ami_init = (AMI_STATUS (*)(ami_handle_t **,
 					    const char *,
 					    const char *,
-					    const u_int,
-					    const u_int,
+					    const uint_t,
+					    const uint_t,
 					    const char *))dlsym(
 						    dl, "ami_init"))) {
 	    slp_err(LOG_INFO, 0, "get_security_backend",

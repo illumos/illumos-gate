@@ -205,8 +205,6 @@ int		udp_getpeername(sock_lower_handle_t,
 static int	udp_do_connect(conn_t *, const struct sockaddr *, socklen_t,
     cred_t *, pid_t);
 
-#pragma inline(udp_output_connected, udp_output_newdst, udp_output_lastdst)
-
 /*
  * Checks if the given destination addr/port is allowed out.
  * If allowed, registers the (dest_addr/port, node_ID) mapping at Cluster.

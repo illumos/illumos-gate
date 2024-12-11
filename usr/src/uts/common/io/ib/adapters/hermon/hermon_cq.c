@@ -51,9 +51,7 @@ int hermon_should_panic = 0;	/* debugging aid */
 
 static int hermon_cq_arm_doorbell(hermon_state_t *state, hermon_cqhdl_t cq,
     uint_t cmd);
-#pragma inline(hermon_cq_arm_doorbell)
 static void hermon_arm_cq_dbr_init(hermon_dbr_t *cq_arm_dbr);
-#pragma inline(hermon_arm_cq_dbr_init)
 static void hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
     hermon_hw_cqe_t *cqe, ibt_wc_t *wc);
 static void hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
@@ -749,7 +747,7 @@ hermon_cq_resize(hermon_state_t *state, hermon_cqhdl_t cq, uint_t req_size,
 	 * in the cq_hdl, and setting up for the next cqe polling
 	 */
 
-	resize_hdl->cq_buf 	= buf;
+	resize_hdl->cq_buf	= buf;
 	resize_hdl->cq_bufsz	= (1 << log_cq_size);
 	resize_hdl->cq_mrhdl	= mr;
 	resize_hdl->cq_log_cqsz = log_cq_size;
@@ -1592,7 +1590,7 @@ hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 void
 hermon_cq_resize_helper(hermon_state_t *state, hermon_cqhdl_t cq)
 {
-	hermon_cqhdl_t 		resize_hdl;
+	hermon_cqhdl_t		resize_hdl;
 	int			status;
 
 	/*

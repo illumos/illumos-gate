@@ -58,7 +58,6 @@ typedef int sigjmp_buf[_SIGJBLEN];
 #endif
 
 extern int sigsetjmp(sigjmp_buf, int) __RETURNS_TWICE;
-#pragma unknown_control_flow(sigsetjmp)
 extern void siglongjmp(sigjmp_buf, int) __NORETURN;
 #endif
 

@@ -71,56 +71,48 @@ isdigit(char c)
 {
 	return (ISDIGIT(c));
 }
-#pragma inline(isdigit)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isxdigit(char c)
 {
 	return (ISXDIGIT(c));
 }
-#pragma inline(isxdigit)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 islower(char c)
 {
 	return (ISLOWER(c));
 }
-#pragma inline(islower)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isupper(char c)
 {
 	return (ISUPPER(c));
 }
-#pragma inline(isupper)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isalpha(char c)
 {
 	return (ISALPHA(c));
 }
-#pragma inline(isalpha)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isalnum(char c)
 {
 	return (ISALNUM(c));
 }
-#pragma inline(isalnum)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isprint(char c)
 {
 	return (ISPRINT(c));
 }
-#pragma inline(isprint)
 
 static __GNU_INLINE boolean_t	/* LINTED E_STATIC_UNUSED */
 isspace(char c)
 {
 	return (ISSPACE(c));
 }
-#pragma inline(isspace)
 
 #ifdef	__cplusplus
 }

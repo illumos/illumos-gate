@@ -46,16 +46,6 @@ static oce_rq_bdesc_t *oce_rqb_alloc(struct oce_rq *rq);
 static void oce_rqb_free(struct oce_rq *rq, oce_rq_bdesc_t *rqbd);
 static void oce_rq_post_buffer(struct oce_rq *rq, int nbufs);
 
-#pragma	inline(oce_rx)
-#pragma	inline(oce_rx_bcopy)
-#pragma	inline(oce_rq_charge)
-#pragma	inline(oce_rx_insert_tag)
-#pragma	inline(oce_set_rx_oflags)
-#pragma	inline(oce_rx_drop_pkt)
-#pragma	inline(oce_rqb_alloc)
-#pragma	inline(oce_rqb_free)
-#pragma inline(oce_rq_post_buffer)
-
 static ddi_dma_attr_t oce_rx_buf_attr = {
 	DMA_ATTR_V0,		/* version number */
 	0x0000000000000000ull,	/* low address */

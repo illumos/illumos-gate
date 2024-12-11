@@ -65,20 +65,6 @@ static void e1000g_82547_timeout(void *);
 static void e1000g_82547_tx_move_tail(e1000g_tx_ring_t *);
 static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 
-#ifndef E1000G_DEBUG
-#pragma inline(e1000g_tx_copy)
-#pragma inline(e1000g_tx_bind)
-#pragma inline(e1000g_retrieve_context)
-#pragma inline(e1000g_check_context)
-#pragma inline(e1000g_fill_tx_ring)
-#pragma inline(e1000g_fill_context_descriptor)
-#pragma inline(e1000g_fill_tx_desc)
-#pragma inline(e1000g_fill_82544_desc)
-#pragma inline(e1000g_tx_workaround_PCIX_82544)
-#pragma inline(e1000g_tx_workaround_jumbo_82544)
-#pragma inline(e1000g_free_tx_swpkt)
-#endif
-
 /*
  * e1000g_free_tx_swpkt	- free up the tx sw packet
  *
@@ -1639,8 +1625,6 @@ e1000g_tx_workaround_jumbo_82544(p_tx_sw_packet_t packet,
 
 	return (desc_count);
 }
-
-#pragma inline(e1000g_82547_tx_move_tail_work)
 
 static void
 e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)

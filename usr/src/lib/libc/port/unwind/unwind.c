@@ -45,8 +45,6 @@
  */
 extern	void	_ex_clnup_handler(void *, void (*)(void *)) __RETURNS_TWICE;
 extern	void	_ex_unwind_local(void) __RETURNS_TWICE;
-#pragma unknown_control_flow(_ex_clnup_handler)
-#pragma unknown_control_flow(_ex_unwind_local)
 
 /*
  * _t_cancel(fp):calls cleanup handlers if there are any in

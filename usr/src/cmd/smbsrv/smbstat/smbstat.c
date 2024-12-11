@@ -274,8 +274,6 @@ static void smbstat_req_order(void);
 static double smbstat_zero(double);
 static void smbstat_termio_init(void);
 
-#pragma does_not_return(smbstat_fail, smbstat_usage)
-
 static char *smbstat_cpu_states[CPU_TICKS_SENTINEL] = {
 	"cpu_ticks_idle",
 	"cpu_ticks_user",

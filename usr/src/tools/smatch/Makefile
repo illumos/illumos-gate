@@ -36,7 +36,7 @@ sparc_SMATCHFLAGS =
 # consistent.
 CFLAGS = -O -m64 -std=gnu99 -nodefaultlibs -D__sun $($(NATIVE_MACH)_SMATCHFLAGS)
 CFLAGS += -fno-builtin
-CFLAGS += -Wall -Wno-unknown-pragmas -Wno-psabi
+CFLAGS += -Wall -Wno-psabi
 
 SMATCHDATADIR = $(ROOTONBLDSHARE)/smatch
 

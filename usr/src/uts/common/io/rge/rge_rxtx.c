@@ -34,9 +34,6 @@
 
 #define	RGE_DBG		RGE_DBG_RECV	/* debug flag for this code	*/
 
-static uint32_t rge_atomic_reserve(uint32_t *count_p, uint32_t n);
-#pragma	inline(rge_atomic_reserve)
-
 static uint32_t
 rge_atomic_reserve(uint32_t *count_p, uint32_t n)
 {
@@ -57,9 +54,6 @@ rge_atomic_reserve(uint32_t *count_p, uint32_t n)
 /*
  * Atomically increment a counter
  */
-static void rge_atomic_renounce(uint32_t *count_p, uint32_t n);
-#pragma	inline(rge_atomic_renounce)
-
 static void
 rge_atomic_renounce(uint32_t *count_p, uint32_t n)
 {
@@ -123,9 +117,6 @@ rge_rx_recycle(caddr_t arg)
 	mutex_exit(rgep->rc_lock);
 }
 
-static int rge_rx_refill(rge_t *rgep, uint32_t slot);
-#pragma	inline(rge_rx_refill)
-
 static int
 rge_rx_refill(rge_t *rgep, uint32_t slot)
 {
@@ -157,9 +148,6 @@ rge_rx_refill(rge_t *rgep, uint32_t slot)
 		return (0);
 	}
 }
-
-static mblk_t *rge_receive_packet(rge_t *rgep, uint32_t slot);
-#pragma	inline(rge_receive_packet)
 
 static mblk_t *
 rge_receive_packet(rge_t *rgep, uint32_t slot)
@@ -307,9 +295,6 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
  * This function must SET the OWN bit of BD to indicate the packets
  * it has accepted from the ring.
  */
-static mblk_t *rge_receive_ring(rge_t *rgep);
-#pragma	inline(rge_receive_ring)
-
 static mblk_t *
 rge_receive_ring(rge_t *rgep)
 {
@@ -354,9 +339,6 @@ rge_receive_ring(rge_t *rgep)
 /*
  * Receive all ready packets.
  */
-void rge_receive(rge_t *rgep);
-#pragma	no_inline(rge_receive)
-
 void
 rge_receive(rge_t *rgep)
 {
@@ -378,9 +360,6 @@ rge_receive(rge_t *rgep)
 /*
  * ========== Send-side recycle routines ==========
  */
-static uint32_t rge_send_claim(rge_t *rgep);
-#pragma	inline(rge_send_claim)
-
 static uint32_t
 rge_send_claim(rge_t *rgep)
 {
@@ -413,9 +392,6 @@ rge_send_claim(rge_t *rgep)
  * h/w transmit done in ISR.  Instead, we call this function in the
  * rge_send() when there're few or no free tx BDs remained.
  */
-void rge_send_recycle(rge_t *rgep);
-#pragma	inline(rge_send_recycle)
-
 void
 rge_send_recycle(rge_t *rgep)
 {
@@ -473,9 +449,6 @@ resched:
 /*
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
-static void rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci);
-#pragma	inline(rge_send_copy)
-
 static void
 rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 {

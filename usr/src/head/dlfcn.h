@@ -119,11 +119,6 @@ extern int	dlinfo(void *, int, void *);
 extern Dl_amd64_unwindinfo  *dlamd64getunwind(void *, Dl_amd64_unwindinfo *);
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
-#pragma unknown_control_flow(dlopen, dlsym, dlclose, dlerror)
-#if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
-#pragma unknown_control_flow(dlmopen, dladdr, dladdr1, dldump, dlinfo)
-#endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
-
 /*
  * Valid values for handle argument to dlsym(3C).
  */

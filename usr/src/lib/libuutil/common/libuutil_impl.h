@@ -42,7 +42,6 @@ extern "C" {
 #endif
 
 void uu_set_error(uint_t);
-#pragma rarely_called(uu_set_error)
 
 struct uu_dprintf {
 	char	*uud_name;

@@ -43,13 +43,6 @@ static boolean_t igb_check_tx_context(igb_tx_ring_t *, tx_context_t *);
 static void igb_fill_tx_context(struct e1000_adv_tx_context_desc *,
     tx_context_t *, uint32_t);
 
-#ifndef IGB_DEBUG
-#pragma inline(igb_save_desc)
-#pragma inline(igb_get_tx_context)
-#pragma inline(igb_check_tx_context)
-#pragma inline(igb_fill_tx_context)
-#endif
-
 mblk_t *
 igb_tx_ring_send(void *arg, mblk_t *mp)
 {

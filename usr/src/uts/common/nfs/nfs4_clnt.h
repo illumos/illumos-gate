@@ -86,9 +86,9 @@ extern "C" {
  * Macro to wakeup sleeping async worker threads.
  */
 #define	NFS4_WAKE_ASYNC_WORKER(work_cv)	{				\
-	if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_QUEUE])) 		\
+	if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_QUEUE]))			\
 		cv_signal(&work_cv[NFS4_ASYNC_QUEUE]);			\
-	else if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_PGOPS_QUEUE])) 	\
+	else if (CV_HAS_WAITERS(&work_cv[NFS4_ASYNC_PGOPS_QUEUE]))	\
 		cv_signal(&work_cv[NFS4_ASYNC_PGOPS_QUEUE]);		\
 }
 
@@ -975,16 +975,16 @@ typedef struct mntinfo4 {
 	len_t		mi_maxfilesize; /* for pathconf _PC_FILESIZEBITS */
 	int		mi_curread;	/* current read size */
 	int		mi_curwrite;	/* current write size */
-	uint_t 		mi_count; 	/* ref count */
+	uint_t		mi_count;	/* ref count */
 	/*
 	 * Async I/O management
 	 * We have 2 pools of threads working on async I/O:
-	 * 	(1) Threads which work on all async queues. Default number of
+	 *	(1) Threads which work on all async queues. Default number of
 	 *	threads in this queue is 8. Threads in this pool work on async
 	 *	queue pointed by mi_async_curr[NFS4_ASYNC_QUEUE]. Number of
 	 *	active threads in this pool is tracked by
 	 *	mi_threads[NFS4_ASYNC_QUEUE].
-	 * 	(ii)Threads which work only on page op async queues.
+	 *	(ii)Threads which work only on page op async queues.
 	 *	Page ops queue comprises of NFS4_PUTAPAGE, NFS4_PAGEIO &
 	 *	NFS4_COMMIT. Default number of threads in this queue is 2
 	 *	(NUM_ASYNC_PGOPS_THREADS). Threads in this pool work on async
@@ -1034,7 +1034,7 @@ typedef struct mntinfo4 {
 	 * Client Side Failover stats
 	 */
 	uint_t		mi_noresponse;	/* server not responding count */
-	uint_t		mi_failover; 	/* failover to new server count */
+	uint_t		mi_failover;	/* failover to new server count */
 	uint_t		mi_remap;	/* remap to new server count */
 	/*
 	 * Kstat statistics
@@ -1112,7 +1112,7 @@ typedef struct mntinfo4 {
  *	MI4_HARD		 hard or soft mount
  *	MI4_PRINTED		 responding message printed
  *	MI4_INT			 allow INTR on hard mount
- * 	MI4_DOWN		 server is down
+ *	MI4_DOWN		 server is down
  *	MI4_NOAC		 don't cache attributes
  *	MI4_NOCTO		 no close-to-open consistency
  *	MI4_LLOCK		 local locking only (no lockmgr)
@@ -1544,11 +1544,11 @@ extern void	nfs_free_mi4(mntinfo4_t *);
 extern void	sv4_free(servinfo4_t *);
 extern void	nfs4_mi_zonelist_add(mntinfo4_t *);
 extern int	nfs4_mi_zonelist_remove(mntinfo4_t *);
-extern int 	nfs4_secinfo_recov(mntinfo4_t *, vnode_t *, vnode_t *);
+extern int	nfs4_secinfo_recov(mntinfo4_t *, vnode_t *, vnode_t *);
 extern void	nfs4_secinfo_init(void);
 extern void	nfs4_secinfo_fini(void);
 extern int	nfs4_secinfo_path(mntinfo4_t *, cred_t *, int);
-extern int 	nfs4_secinfo_vnode_otw(vnode_t *, char *, cred_t *);
+extern int	nfs4_secinfo_vnode_otw(vnode_t *, char *, cred_t *);
 extern void	secinfo_free(sv_secinfo_t *);
 extern void	save_mnt_secinfo(servinfo4_t *);
 extern void	check_mnt_secinfo(servinfo4_t *, vnode_t *);
@@ -1568,7 +1568,7 @@ extern void	nfs4_error_zinit(nfs4_error_t *);
 extern void	nfs4_error_init(nfs4_error_t *, int);
 extern void	nfs4_free_args(struct nfs_args *);
 
-extern void 	mi_hold(mntinfo4_t *);
+extern void	mi_hold(mntinfo4_t *);
 extern void	mi_rele(mntinfo4_t *);
 
 extern vnode_t	*find_referral_stubvp(vnode_t *, char *, cred_t *);
@@ -1704,10 +1704,10 @@ typedef struct nfs4_open_stream {
 	int			os_dc_openacc;
 	int			os_ref_count;
 	unsigned		os_valid:1;
-	unsigned 		os_delegation:1;
+	unsigned		os_delegation:1;
 	unsigned		os_final_close:1;
-	unsigned 		os_pending_close:1;
-	unsigned 		os_failed_reopen:1;
+	unsigned		os_pending_close:1;
+	unsigned		os_failed_reopen:1;
 	unsigned		os_force_close:1;
 	int			os_open_ref_count;
 	long			os_mapcnt;
@@ -2108,8 +2108,6 @@ extern void	nfs4_queue_event(nfs4_event_type_t, mntinfo4_t *, char *,
 		    nfs4_tag_type_t, nfs4_tag_type_t, seqid4, seqid4);
 extern void	nfs4_queue_fact(nfs4_fact_type_t, mntinfo4_t *, nfsstat4,
 		    nfs4_recov_t, nfs_opnum4, bool_t, char *, int, vnode_t *);
-#pragma	rarely_called(nfs4_queue_event)
-#pragma	rarely_called(nfs4_queue_fact)
 
 /* Used for preformed "." and ".." dirents */
 extern char	*nfs4_dot_entries;

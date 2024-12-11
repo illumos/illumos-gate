@@ -89,9 +89,7 @@ typedef int	jmp_buf[_JBLEN];
 #endif
 
 extern int setjmp(jmp_buf) __RETURNS_TWICE;
-#pragma unknown_control_flow(setjmp)
 extern int _setjmp(jmp_buf) __RETURNS_TWICE;
-#pragma unknown_control_flow(_setjmp)
 extern void longjmp(jmp_buf, int) __NORETURN;
 extern void _longjmp(jmp_buf, int) __NORETURN;
 

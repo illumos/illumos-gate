@@ -113,7 +113,6 @@ dapli_tavor_cq_doorbell(dapls_hw_uar_t ia_uar, uint32_t cq_cmd, uint32_t cqn,
 	    &((tavor_hw_uar_t *)ia_uar)->cq);
 #endif
 }
-#pragma inline(dapli_tavor_cq_doorbell)
 
 #endif	/* _LP64 */
 
@@ -166,7 +165,6 @@ dapli_tavor_qp_send_doorbell(dapls_hw_uar_t ia_uar, uint32_t nda,
 #endif
 #endif
 }
-#pragma inline(dapli_tavor_qp_send_doorbell)
 #endif	/* _LP64 */
 
 #if defined(_LP64) || defined(__lint)
@@ -217,9 +215,7 @@ dapli_tavor_qp_recv_doorbell(dapls_hw_uar_t ia_uar, uint32_t nda,
 #endif
 #endif
 }
-#pragma inline(dapli_tavor_qp_recv_doorbell)
 #endif	/* _LP64 */
-
 
 /*
  * dapls_tavor_max_inline()

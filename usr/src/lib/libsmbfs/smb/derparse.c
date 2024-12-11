@@ -35,7 +35,6 @@
 // the array below, that a mechanism can be found.
 //
 
-#pragma error_messages (off,E_INITIALIZATION_TYPE_MISMATCH)
 MECH_OID g_stcMechOIDList [] =
 {
         {(unsigned char *)"\x06\x09\x2a\x86\x48\x82\xf7\x12\x01\x02\x02",
@@ -49,7 +48,6 @@ MECH_OID g_stcMechOIDList [] =
 	{(unsigned char *)"", 0,  0, spnego_mech_oid_NotUsed  // Placeholder
         }
 };
-#pragma error_messages (default,E_INITIALIZATION_TYPE_MISMATCH)
 
 /////////////////////////////////////////////////////////////////////////////
 //

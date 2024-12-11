@@ -257,25 +257,18 @@ static void xnf_release_mblks(xnf_t *);
 static int xnf_buf_constructor(void *, void *, int);
 static void xnf_buf_destructor(void *, void *);
 static xnf_buf_t *xnf_buf_get(xnf_t *, int, boolean_t);
-#pragma inline(xnf_buf_get)
 static void xnf_buf_put(xnf_t *, xnf_buf_t *, boolean_t);
-#pragma inline(xnf_buf_put)
 static void xnf_buf_refresh(xnf_buf_t *);
-#pragma inline(xnf_buf_refresh)
 static void xnf_buf_recycle(xnf_buf_t *);
 
 static int xnf_tx_buf_constructor(void *, void *, int);
 static void xnf_tx_buf_destructor(void *, void *);
 
 static grant_ref_t xnf_gref_get(xnf_t *);
-#pragma inline(xnf_gref_get)
 static void xnf_gref_put(xnf_t *, grant_ref_t);
-#pragma inline(xnf_gref_put)
 
 static xnf_txid_t *xnf_txid_get(xnf_t *);
-#pragma inline(xnf_txid_get)
 static void xnf_txid_put(xnf_t *, xnf_txid_t *);
-#pragma inline(xnf_txid_put)
 
 static void xnf_rxbuf_hang(xnf_t *, xnf_buf_t *);
 static int xnf_tx_clean_ring(xnf_t  *);

@@ -561,7 +561,6 @@ extern int unlink(const char *);
 extern char *getwd(char *);
 extern int usleep(useconds_t);
 extern pid_t vfork(void) __RETURNS_TWICE;
-#pragma unknown_control_flow(vfork)
 #endif
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void vhangup(void);

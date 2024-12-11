@@ -173,9 +173,6 @@ static int bge_intr_max_loop = 1;
 
 #if	BGE_CFG_IO8
 
-static void bge_cfg_clr16(bge_t *bgep, bge_regno_t regno, uint16_t bits);
-#pragma	inline(bge_cfg_clr16)
-
 static void
 bge_cfg_clr16(bge_t *bgep, bge_regno_t regno, uint16_t bits)
 {
@@ -194,9 +191,6 @@ bge_cfg_clr16(bge_t *bgep, bge_regno_t regno, uint16_t bits)
 }
 
 #endif	/* BGE_CFG_IO8 */
-
-static void bge_cfg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
-#pragma	inline(bge_cfg_clr32)
 
 static void
 bge_cfg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
@@ -231,9 +225,6 @@ bge_cfg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
  * it's been thoroughly tested for all access sizes on all supported
  * architectures (SPARC *and* x86!).
  */
-uint32_t bge_ind_get32(bge_t *bgep, bge_regno_t regno);
-#pragma	inline(bge_ind_get32)
-
 uint32_t
 bge_ind_get32(bge_t *bgep, bge_regno_t regno)
 {
@@ -259,9 +250,6 @@ bge_ind_get32(bge_t *bgep, bge_regno_t regno)
 	return (val);
 }
 
-void bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val);
-#pragma	inline(bge_ind_put32)
-
 void
 bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val)
 {
@@ -283,9 +271,6 @@ bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val)
 #endif	/* BGE_IND_IO32 */
 
 #if	BGE_DEBUGGING
-
-static void bge_pci_check(bge_t *bgep);
-#pragma	no_inline(bge_pci_check)
 
 static void
 bge_pci_check(bge_t *bgep)
@@ -323,9 +308,6 @@ bge_pci_check(bge_t *bgep)
  * Memory Space cycles!  In this case, <enable_dma> is B_TRUE, and
  * it is effectively performing steps 6-8.
  */
-void bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma);
-#pragma	no_inline(bge_chip_cfg_init)
-
 void
 bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 {
@@ -589,9 +571,6 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
  * for PCI-Express based network interface card. This is the work-around
  * for those nics.
  */
-static boolean_t bge_get_em64t_type(void);
-#pragma	inline(bge_get_em64t_type)
-
 static boolean_t
 bge_get_em64t_type(void)
 {
@@ -603,10 +582,6 @@ bge_get_em64t_type(void)
 /*
  * Operating register get/set access routines
  */
-
-uint32_t bge_reg_get32(bge_t *bgep, bge_regno_t regno);
-#pragma	inline(bge_reg_get32)
-
 uint32_t
 bge_reg_get32(bge_t *bgep, bge_regno_t regno)
 {
@@ -615,9 +590,6 @@ bge_reg_get32(bge_t *bgep, bge_regno_t regno)
 
 	return (ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno)));
 }
-
-void bge_reg_put32(bge_t *bgep, bge_regno_t regno, uint32_t data);
-#pragma	inline(bge_reg_put32)
 
 void
 bge_reg_put32(bge_t *bgep, bge_regno_t regno, uint32_t data)
@@ -628,9 +600,6 @@ bge_reg_put32(bge_t *bgep, bge_regno_t regno, uint32_t data)
 	ddi_put32(bgep->io_handle, PIO_ADDR(bgep, regno), data);
 	BGE_PCICHK(bgep);
 }
-
-void bge_reg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
-#pragma	inline(bge_reg_set32)
 
 void
 bge_reg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
@@ -645,9 +614,6 @@ bge_reg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	bge_reg_put32(bgep, regno, regval);
 }
 
-void bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
-#pragma	inline(bge_reg_clr32)
-
 void
 bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 {
@@ -660,9 +626,6 @@ bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	regval &= ~bits;
 	bge_reg_put32(bgep, regno, regval);
 }
-
-static uint64_t bge_reg_get64(bge_t *bgep, bge_regno_t regno);
-#pragma	inline(bge_reg_get64)
 
 static uint64_t
 bge_reg_get64(bge_t *bgep, bge_regno_t regno)
@@ -705,9 +668,6 @@ bge_reg_get64(bge_t *bgep, bge_regno_t regno)
 
 	return (regval);
 }
-
-static void bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data);
-#pragma	inline(bge_reg_put64)
 
 static void
 bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
@@ -758,9 +718,6 @@ bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
  * The DDI doesn't provide get/put functions for 128 bit data
  * so we put RCBs out as two 64-bit chunks instead.
  */
-static void bge_reg_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp);
-#pragma	inline(bge_reg_putrcb)
-
 static void
 bge_reg_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 {
@@ -776,9 +733,6 @@ bge_reg_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	bge_reg_put64(bgep, addr, *p++);
 	bge_reg_put64(bgep, addr+8, *p);
 }
-
-void bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t data);
-#pragma	inline(bge_mbx_put)
 
 void
 bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t data)
@@ -803,9 +757,6 @@ bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t data)
 #endif	/* _BIG_ENDIAN */
 	BGE_PCICHK(bgep);
 }
-
-uint32_t bge_mbx_get(bge_t *bgep, bge_regno_t regno);
-#pragma inline(bge_mbx_get)
 
 uint32_t
 bge_mbx_get(bge_t *bgep, bge_regno_t regno)
@@ -833,9 +784,6 @@ bge_mbx_get(bge_t *bgep, bge_regno_t regno)
 
 
 #if	BGE_DEBUGGING
-
-void bge_led_mark(bge_t *bgep);
-#pragma	no_inline(bge_led_mark)
 
 void
 bge_led_mark(bge_t *bgep)
@@ -868,10 +816,6 @@ bge_led_mark(bge_t *bgep)
  * to can be directly addressed in the upper 32K of the 64K of PCI
  * memory space used for the device.
  */
-
-static void bge_nic_setwin(bge_t *bgep, bge_regno_t base);
-#pragma	inline(bge_nic_setwin)
-
 static void
 bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 {
@@ -905,9 +849,6 @@ bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, base);
 }
 
-static uint32_t bge_nic_get32(bge_t *bgep, bge_regno_t addr);
-#pragma	inline(bge_nic_get32)
-
 static uint32_t
 bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 {
@@ -938,9 +879,6 @@ bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 
 	return (data);
 }
-
-void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
-#pragma inline(bge_nic_put32)
 
 void
 bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
@@ -976,9 +914,6 @@ bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 	BGE_PCICHK(bgep);
 #endif
 }
-
-static uint64_t bge_nic_get64(bge_t *bgep, bge_regno_t addr);
-#pragma	inline(bge_nic_get64)
 
 static uint64_t
 bge_nic_get64(bge_t *bgep, bge_regno_t addr)
@@ -1023,9 +958,6 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 
 	return (data);
 }
-
-static void bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data);
-#pragma	inline(bge_nic_put64)
 
 static void
 bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
@@ -1075,9 +1007,6 @@ bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
  * The DDI doesn't provide get/put functions for 128 bit data
  * so we put RCBs out as two 64-bit chunks instead.
  */
-static void bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp);
-#pragma	inline(bge_nic_putrcb)
-
 static void
 bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 {
@@ -1138,9 +1067,6 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	BGE_PCICHK(bgep);
 }
 
-static void bge_nic_zero(bge_t *bgep, bge_regno_t addr, uint32_t nbytes);
-#pragma	inline(bge_nic_zero)
-
 static void
 bge_nic_zero(bge_t *bgep, bge_regno_t addr, uint32_t nbytes)
 {
@@ -1169,10 +1095,6 @@ bge_nic_zero(bge_t *bgep, bge_regno_t addr, uint32_t nbytes)
 
 #undef	BGE_DBG
 #define	BGE_DBG		BGE_DBG_MII	/* debug flag for this code	*/
-
-static uint16_t bge_mii_access(bge_t *bgep, bge_regno_t regno,
-				uint16_t data, uint32_t cmd);
-#pragma	no_inline(bge_mii_access)
 
 static uint16_t
 bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
@@ -1282,9 +1204,6 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 	return ((regval2 & MI_COMMS_DATA_MASK) >> MI_COMMS_DATA_SHIFT);
 }
 
-uint16_t bge_mii_get16(bge_t *bgep, bge_regno_t regno);
-#pragma	no_inline(bge_mii_get16)
-
 uint16_t
 bge_mii_get16(bge_t *bgep, bge_regno_t regno)
 {
@@ -1299,9 +1218,6 @@ bge_mii_get16(bge_t *bgep, bge_regno_t regno)
 
 	return (bge_mii_access(bgep, regno, 0, MI_COMMS_COMMAND_READ));
 }
-
-void bge_mii_put16(bge_t *bgep, bge_regno_t regno, uint16_t data);
-#pragma	no_inline(bge_mii_put16)
 
 void
 bge_mii_put16(bge_t *bgep, bge_regno_t regno, uint16_t data)
@@ -1329,8 +1245,6 @@ bge_phydsp_read(bge_t *bgep, bge_regno_t regno)
 	bge_mii_put16(bgep, MII_DSP_ADDRESS, regno);
 	return bge_mii_get16(bgep, MII_DSP_RW_PORT);
 }
-
-#pragma	no_inline(bge_phydsp_write)
 
 void
 bge_phydsp_write(bge_t *bgep, bge_regno_t regno, uint16_t data)
@@ -1367,10 +1281,6 @@ bge_phydsp_write(bge_t *bgep, bge_regno_t regno, uint16_t data)
  * <*dp> is an input to a SEEPROM_ACCESS_WRITE operation, or an output
  * from a (successful) SEEPROM_ACCESS_READ.
  */
-static int bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr,
-				uint32_t *dp);
-#pragma	no_inline(bge_seeprom_access)
-
 static int
 bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 {
@@ -1494,10 +1404,6 @@ bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
  * <*dp> is an input to a NVM_FLASH_CMD_WR operation, or an output
  * from a (successful) NVM_FLASH_CMD_RD.
  */
-static int bge_flash_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr,
-				uint32_t *dp);
-#pragma	no_inline(bge_flash_access)
-
 static int
 bge_flash_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 {
@@ -1603,9 +1509,6 @@ bge_flash_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 #define	NVM_RESET_REQ	NVM_RESET_REQ1
 #define	NVM_SET_REQ	NVM_SET_REQ1
 
-static void bge_nvmem_relinquish(bge_t *bgep);
-#pragma	no_inline(bge_nvmem_relinquish)
-
 static void
 bge_nvmem_relinquish(bge_t *bgep)
 {
@@ -1650,9 +1553,6 @@ bge_nvmem_relinquish(bge_t *bgep)
  *	EAGAIN if the device is in use (retryable)
  *	ENODEV if the NVmem device is missing or otherwise unusable
  */
-static int bge_nvmem_acquire(bge_t *bgep);
-#pragma	no_inline(bge_nvmem_acquire)
-
 static int
 bge_nvmem_acquire(bge_t *bgep)
 {
@@ -1758,9 +1658,6 @@ bge_nvmem_acquire(bge_t *bgep)
  * The caller should hold <genlock> and *also* have already acquired the
  * right to access the NVmem, via bge_nvmem_acquire() above.
  */
-static void bge_nvmem_protect(bge_t *bgep, boolean_t protect);
-#pragma	inline(bge_nvmem_protect)
-
 static void
 bge_nvmem_protect(bge_t *bgep, boolean_t protect)
 {
@@ -1913,9 +1810,6 @@ bge_nvmem_write32(bge_t *bgep, bge_regno_t addr, uint32_t *dp)
 /*
  * Attempt to get a MAC address from the SEEPROM or Flash, if any
  */
-static uint64_t bge_get_nvmac(bge_t *bgep);
-#pragma no_inline(bge_get_nvmac)
-
 static uint64_t
 bge_get_nvmac(bge_t *bgep)
 {
@@ -1979,9 +1873,6 @@ bge_get_nvmac(bge_t *bgep)
 /*
  * Dummy version for when we're not supporting NVmem access
  */
-static uint64_t bge_get_nvmac(bge_t *bgep);
-#pragma inline(bge_get_nvmac)
-
 static uint64_t
 bge_get_nvmac(bge_t *bgep)
 {
@@ -1994,9 +1885,6 @@ bge_get_nvmac(bge_t *bgep)
 /*
  * Determine the type of NVmem that is (or may be) attached to this chip,
  */
-static enum bge_nvmem_type bge_nvmem_id(bge_t *bgep);
-#pragma no_inline(bge_nvmem_id)
-
 static enum bge_nvmem_type
 bge_nvmem_id(bge_t *bgep)
 {
@@ -2100,9 +1988,6 @@ bge_nvmem_id(bge_t *bgep)
 #undef	BGE_DBG
 #define	BGE_DBG		BGE_DBG_APE	/* debug flag for this code	*/
 
-uint32_t bge_ape_get32(bge_t *bgep, bge_regno_t regno);
-#pragma	inline(bge_ape_get32)
-
 uint32_t
 bge_ape_get32(bge_t *bgep, bge_regno_t regno)
 {
@@ -2111,9 +1996,6 @@ bge_ape_get32(bge_t *bgep, bge_regno_t regno)
 
 	return (ddi_get32(bgep->ape_handle, APE_ADDR(bgep, regno)));
 }
-
-void bge_ape_put32(bge_t *bgep, bge_regno_t regno, uint32_t data);
-#pragma	inline(bge_ape_put32)
 
 void
 bge_ape_put32(bge_t *bgep, bge_regno_t regno, uint32_t data)
@@ -2571,9 +2453,6 @@ bge_init_recv_rule(bge_t *bgep)
  * to refer to this chip, the correct settings for various registers, and
  * of course whether the device and/or subsystem are supported!
  */
-int bge_chip_id_init(bge_t *bgep);
-#pragma	no_inline(bge_chip_id_init)
-
 int
 bge_chip_id_init(bge_t *bgep)
 {
@@ -3201,10 +3080,6 @@ bge_chip_msi_trig(bge_t *bgep)
  * or disable operation, returning B_TRUE on success (bit reached the
  * required state) or B_FALSE on timeout (200*100us == 20ms).
  */
-static boolean_t bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
-					uint32_t mask, uint32_t val);
-#pragma	no_inline(bge_chip_poll_engine)
-
 static boolean_t
 bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
 	uint32_t mask, uint32_t val)
@@ -3243,9 +3118,6 @@ bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
  * access!  So we just have to assume that it will all complete in
  * 100us.  See Broadcom document 570X-PG102-R, p102, steps 4-5.
  */
-static boolean_t bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno);
-#pragma	no_inline(bge_chip_reset_engine)
-
 static boolean_t
 bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 {
@@ -3398,10 +3270,6 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
  * The return value is B_TRUE on success (enable bit cleared), or
  * B_FALSE if the state machine didn't stop :(
  */
-static boolean_t bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno,
-						uint32_t morebits);
-#pragma	no_inline(bge_chip_disable_engine)
-
 static boolean_t
 bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 {
@@ -3465,10 +3333,6 @@ bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
  * The return value is B_TRUE on success (enable bit set), or
  * B_FALSE if the state machine didn't start :(
  */
-static boolean_t bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno,
-					uint32_t morebits);
-#pragma	no_inline(bge_chip_enable_engine)
-
 static boolean_t
 bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 {
@@ -3509,9 +3373,6 @@ bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
  * Reprogram the Ethernet, Transmit, and Receive MAC
  * modes to match the param_* variables
  */
-void bge_sync_mac_modes(bge_t *bgep);
-#pragma	no_inline(bge_sync_mac_modes)
-
 void
 bge_sync_mac_modes(bge_t *bgep)
 {
@@ -3593,13 +3454,6 @@ bge_sync_mac_modes(bge_t *bgep)
  * the multicast hash table, the required level of promiscuity, and
  * the current loopback mode ...
  */
-#ifdef BGE_IPMI_ASF
-int bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
-#else
-int bge_chip_sync(bge_t *bgep);
-#endif
-#pragma	no_inline(bge_chip_sync)
-
 int
 #ifdef BGE_IPMI_ASF
 bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive)
@@ -3750,9 +3604,6 @@ static bge_regno_t quiesce_regs[] = {
 	BGE_REGNO_NONE
 };
 
-void bge_chip_stop_nonblocking(bge_t *bgep);
-#pragma no_inline(bge_chip_stop_nonblocking)
-
 /*
  * This function is called by bge_quiesce(). We
  * turn off all the DMA engines here.
@@ -3785,9 +3636,6 @@ bge_chip_stop_nonblocking(bge_t *bgep)
  * we've detected a problem internally; otherwise, this is a normal
  * (clean) stop (at user request i.e. the last STREAM has been closed).
  */
-void bge_chip_stop(bge_t *bgep, boolean_t fault);
-#pragma	no_inline(bge_chip_stop)
-
 void
 bge_chip_stop(bge_t *bgep, boolean_t fault)
 {
@@ -3883,9 +3731,6 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
  * Poll for completion of chip's ROM firmware; also, at least on the
  * first time through, find and return the hardware MAC address, if any.
  */
-static uint64_t bge_poll_firmware(bge_t *bgep);
-#pragma	no_inline(bge_poll_firmware)
-
 static uint64_t
 bge_poll_firmware(bge_t *bgep)
 {
@@ -3963,13 +3808,6 @@ bge_poll_firmware(bge_t *bgep)
  * by calling bge_nvmem_acquire()
  */
 #define	MAX_TRY_NVMEM_ACQUIRE	10000
-
-#ifdef BGE_IPMI_ASF
-int bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
-#else
-int bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
-#endif
-#pragma	no_inline(bge_chip_reset)
 
 int
 #ifdef BGE_IPMI_ASF
@@ -4347,8 +4185,6 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
  * bge_chip_start() -- start the chip transmitting and/or receiving,
  * including enabling interrupts
  */
-int bge_chip_start(bge_t *bgep, boolean_t reset_phys);
-#pragma	no_inline(bge_chip_start)
 
 void
 bge_chip_coalesce_update(bge_t *bgep)
@@ -5049,9 +4885,6 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
  * the <flags> word of the status block, returning the value of the
  * <tag> and the <flags> before the bits were cleared.
  */
-static int bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags);
-#pragma	inline(bge_status_sync)
-
 static int
 bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 {
@@ -5076,9 +4909,6 @@ bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 
 	return (retval);
 }
-
-void bge_wake_factotum(bge_t *bgep);
-#pragma	inline(bge_wake_factotum)
 
 void
 bge_wake_factotum(bge_t *bgep)
@@ -5141,9 +4971,6 @@ bge_intr_error_handler(bge_t *bgep)
 /*
  *	bge_intr() -- handle chip interrupts
  */
-uint_t bge_intr(caddr_t arg1, caddr_t arg2);
-#pragma	no_inline(bge_intr)
-
 uint_t
 bge_intr(caddr_t arg1, caddr_t arg2)
 {
@@ -5385,9 +5212,6 @@ chip_stop:
 /*
  * Factotum routine to check for Tx stall, using the 'watchdog' counter
  */
-static boolean_t bge_factotum_stall_check(bge_t *bgep);
-#pragma	no_inline(bge_factotum_stall_check)
-
 static boolean_t
 bge_factotum_stall_check(bge_t *bgep)
 {
@@ -5433,9 +5257,6 @@ bge_factotum_stall_check(bge_t *bgep)
  * not do from inside a hardware interrupt handler or high-level cyclic.
  * Its main task is to reset & restart the chip after an error.
  */
-uint_t bge_chip_factotum(caddr_t arg);
-#pragma	no_inline(bge_chip_factotum)
-
 uint_t
 bge_chip_factotum(caddr_t arg)
 {
@@ -5592,9 +5413,6 @@ bge_chip_factotum(caddr_t arg)
  * factotum, and prods the chip to update the status block (which
  * will cause a hardware interrupt when complete).
  */
-void bge_chip_cyclic(void *arg);
-#pragma	no_inline(bge_chip_cyclic)
-
 void
 bge_chip_cyclic(void *arg)
 {
@@ -5658,9 +5476,6 @@ bge_chip_cyclic(void *arg)
 
 #if	BGE_DEBUGGING || BGE_DO_PPIO
 
-static void bge_chip_peek_cfg(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_cfg)
-
 static void
 bge_chip_peek_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5693,9 +5508,6 @@ bge_chip_peek_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 	ppd->pp_acc_data = regval;
 }
 
-static void bge_chip_poke_cfg(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_cfg)
-
 static void
 bge_chip_poke_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5726,9 +5538,6 @@ bge_chip_poke_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 		break;
 	}
 }
-
-static void bge_chip_peek_reg(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_reg)
 
 static void
 bge_chip_peek_reg(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5762,9 +5571,6 @@ bge_chip_peek_reg(bge_t *bgep, bge_peekpoke_t *ppd)
 	ppd->pp_acc_data = regval;
 }
 
-static void bge_chip_poke_reg(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_reg)
-
 static void
 bge_chip_poke_reg(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5796,9 +5602,6 @@ bge_chip_poke_reg(bge_t *bgep, bge_peekpoke_t *ppd)
 	}
 	BGE_PCICHK(bgep);
 }
-
-static void bge_chip_peek_nic(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_nic)
 
 static void
 bge_chip_peek_nic(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5837,9 +5640,6 @@ bge_chip_peek_nic(bge_t *bgep, bge_peekpoke_t *ppd)
 	ppd->pp_acc_data = regval;
 }
 
-static void bge_chip_poke_nic(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_nic)
-
 static void
 bge_chip_poke_nic(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5877,9 +5677,6 @@ bge_chip_poke_nic(bge_t *bgep, bge_peekpoke_t *ppd)
 	BGE_PCICHK(bgep);
 }
 
-static void bge_chip_peek_mii(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_mii)
-
 static void
 bge_chip_peek_mii(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5888,9 +5685,6 @@ bge_chip_peek_mii(bge_t *bgep, bge_peekpoke_t *ppd)
 
 	ppd->pp_acc_data = bge_mii_get16(bgep, ppd->pp_acc_offset/2);
 }
-
-static void bge_chip_poke_mii(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_mii)
 
 static void
 bge_chip_poke_mii(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5902,9 +5696,6 @@ bge_chip_poke_mii(bge_t *bgep, bge_peekpoke_t *ppd)
 }
 
 #if	BGE_SEE_IO32
-
-static void bge_chip_peek_seeprom(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_seeprom)
 
 static void
 bge_chip_peek_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5918,9 +5709,6 @@ bge_chip_peek_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
 	err = bge_nvmem_rw32(bgep, BGE_SEE_READ, ppd->pp_acc_offset, &data);
 	ppd->pp_acc_data = err ? ~0ull : data;
 }
-
-static void bge_chip_poke_seeprom(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_seeprom)
 
 static void
 bge_chip_poke_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5937,9 +5725,6 @@ bge_chip_poke_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
 
 #if	BGE_FLASH_IO32
 
-static void bge_chip_peek_flash(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_flash)
-
 static void
 bge_chip_peek_flash(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -5952,9 +5737,6 @@ bge_chip_peek_flash(bge_t *bgep, bge_peekpoke_t *ppd)
 	err = bge_nvmem_rw32(bgep, BGE_FLASH_READ, ppd->pp_acc_offset, &data);
 	ppd->pp_acc_data = err ? ~0ull : data;
 }
-
-static void bge_chip_poke_flash(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_flash)
 
 static void
 bge_chip_poke_flash(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -5969,9 +5751,6 @@ bge_chip_poke_flash(bge_t *bgep, bge_peekpoke_t *ppd)
 	    ppd->pp_acc_offset, &data);
 }
 #endif	/* BGE_FLASH_IO32 */
-
-static void bge_chip_peek_mem(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_peek_mem)
 
 static void
 bge_chip_peek_mem(bge_t *bgep, bge_peekpoke_t *ppd)
@@ -6008,9 +5787,6 @@ bge_chip_peek_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 	ppd->pp_acc_data = regval;
 }
 
-static void bge_chip_poke_mem(bge_t *bgep, bge_peekpoke_t *ppd);
-#pragma	no_inline(bge_chip_poke_mem)
-
 static void
 bge_chip_poke_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 {
@@ -6044,10 +5820,6 @@ bge_chip_poke_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 		break;
 	}
 }
-
-static enum ioc_reply bge_pp_ioctl(bge_t *bgep, int cmd, mblk_t *mp,
-					struct iocblk *iocp);
-#pragma	no_inline(bge_pp_ioctl)
 
 static enum ioc_reply
 bge_pp_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
@@ -6246,10 +6018,6 @@ bge_pp_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 	return (peek ? IOC_REPLY : IOC_ACK);
 }
 
-static enum ioc_reply bge_diag_ioctl(bge_t *bgep, int cmd, mblk_t *mp,
-					struct iocblk *iocp);
-#pragma	no_inline(bge_diag_ioctl)
-
 static enum ioc_reply
 bge_diag_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 {
@@ -6289,10 +6057,6 @@ bge_diag_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 }
 
 #endif	/* BGE_DEBUGGING || BGE_DO_PPIO */
-
-static enum ioc_reply bge_mii_ioctl(bge_t *bgep, int cmd, mblk_t *mp,
-				    struct iocblk *iocp);
-#pragma	no_inline(bge_mii_ioctl)
 
 static enum ioc_reply
 bge_mii_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
@@ -6334,10 +6098,6 @@ bge_mii_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 
 #if	BGE_SEE_IO32
 
-static enum ioc_reply bge_see_ioctl(bge_t *bgep, int cmd, mblk_t *mp,
-				    struct iocblk *iocp);
-#pragma	no_inline(bge_see_ioctl)
-
 static enum ioc_reply
 bge_see_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 {
@@ -6378,10 +6138,6 @@ bge_see_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 
 #if	BGE_FLASH_IO32
 
-static enum ioc_reply bge_flash_ioctl(bge_t *bgep, int cmd, mblk_t *mp,
-				    struct iocblk *iocp);
-#pragma	no_inline(bge_flash_ioctl)
-
 static enum ioc_reply
 bge_flash_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 {
@@ -6419,10 +6175,6 @@ bge_flash_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 }
 
 #endif	/* BGE_FLASH_IO32 */
-
-enum ioc_reply bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp,
-				struct iocblk *iocp);
-#pragma	no_inline(bge_chip_ioctl)
 
 enum ioc_reply
 bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)

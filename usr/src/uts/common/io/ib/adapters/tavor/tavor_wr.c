@@ -44,10 +44,8 @@
 
 static void tavor_qp_send_doorbell(tavor_state_t *state, uint32_t nda,
     uint32_t nds, uint32_t qpn, uint32_t fence, uint32_t nopcode);
-#pragma inline(tavor_qp_send_doorbell)
 static void tavor_qp_recv_doorbell(tavor_state_t *state, uint32_t nda,
     uint32_t nds, uint32_t qpn, uint32_t credits);
-#pragma inline(tavor_qp_recv_doorbell)
 static uint32_t tavor_wr_get_immediate(ibt_send_wr_t *wr);
 static int tavor_wr_bind_check(tavor_state_t *state, ibt_send_wr_t *wr);
 static int tavor_wqe_send_build(tavor_state_t *state, tavor_qphdl_t qp,

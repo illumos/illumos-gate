@@ -263,7 +263,6 @@ void suword64_noerr(void *, uint64_t);
 int setjmp(label_t *) __RETURNS_TWICE;
 extern void longjmp(label_t *)
 	__NORETURN;
-#pragma unknown_control_flow(setjmp)
 #endif
 
 void prefetch_read_once(void *);
@@ -305,8 +304,6 @@ void _remque(caddr_t);
 /* casts to keep lint happy */
 #define	insque(q, p)	_insque((caddr_t)q, (caddr_t)p)
 #define	remque(q)	_remque((caddr_t)q)
-
-#pragma unknown_control_flow(on_fault)
 
 struct timeval;
 extern void	uniqtime(struct timeval *);
@@ -431,7 +428,6 @@ extern uint_t get_syscall32_args(klwp_t *lwp, int *argp, int *nargp);
 #endif
 
 extern uint_t set_errno(uint_t error);
-#pragma rarely_called(set_errno)
 
 extern int64_t syscall_ap(void);
 extern int64_t loadable_syscall(long, long, long, long, long, long, long, long);

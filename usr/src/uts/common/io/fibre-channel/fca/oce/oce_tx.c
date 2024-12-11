@@ -420,7 +420,6 @@ oce_get_wq(struct oce_dev *dev, mblk_t *mp)
  *
  * return none
  */
-#pragma inline(oce_fill_ring_descs)
 static void
 oce_fill_ring_descs(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 {
@@ -896,7 +895,6 @@ wqe_fail:
  *
  * return none
  */
-#pragma inline(oce_free_wqed)
 static void
 oce_free_wqed(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 {
@@ -907,8 +905,8 @@ oce_free_wqed(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 
 	for (i = 0; i < wqed->nhdl; i++) {
 		if (wqed->hdesc[i].type == COPY_WQE) {
-		oce_wqb_free(wq, wqed->hdesc[i].hdl);
-		} else 	if (wqed->hdesc[i].type == MAPPED_WQE) {
+			oce_wqb_free(wq, wqed->hdesc[i].hdl);
+		} else if (wqed->hdesc[i].type == MAPPED_WQE) {
 			oce_wqmd_free(wq, wqed->hdesc[i].hdl);
 		}
 	}

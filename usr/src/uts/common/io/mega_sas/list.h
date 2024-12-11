@@ -190,14 +190,6 @@ static void mlist_splice(struct mlist_head *list, struct mlist_head *head)
 }
 
 
-
-/* TODO: set this */
-#if 0
-#pragma	inline(list_add, list_add_tail, __list_del, list_del,
-		list_del_init, list_empty, list_splice)
-#endif
-
-
 /*
  * mlist_entry - get the struct for this entry
  * @ptr:	the &struct mlist_head pointer.

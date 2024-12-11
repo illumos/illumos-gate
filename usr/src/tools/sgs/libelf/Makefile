@@ -55,3 +55,4 @@ $(ROOTONBLDLIBMACH64)/$(LIBLINKS): $(ROOTONBLDLIBMACH64)/$(DYNLIB)
 		$(SYMLINK) $(DYNLIB) $(ROOTONBLDLIBMACH64)/$(LIBLINKS)
 
 include		$(SGSHOME)/libelf/Makefile.targ
+include		$(SRC)/Makefile.master.64

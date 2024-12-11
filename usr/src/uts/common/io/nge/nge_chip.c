@@ -41,7 +41,6 @@ static void nge_sync_mac_modes(nge_t *);
  * Operating register get/set access routines
  */
 uint8_t nge_reg_get8(nge_t *ngep, nge_regno_t regno);
-#pragma	inline(nge_reg_get8)
 
 uint8_t
 nge_reg_get8(nge_t *ngep, nge_regno_t regno)
@@ -52,7 +51,6 @@ nge_reg_get8(nge_t *ngep, nge_regno_t regno)
 }
 
 void nge_reg_put8(nge_t *ngep, nge_regno_t regno, uint8_t data);
-#pragma	inline(nge_reg_put8)
 
 void
 nge_reg_put8(nge_t *ngep, nge_regno_t regno, uint8_t data)
@@ -64,7 +62,6 @@ nge_reg_put8(nge_t *ngep, nge_regno_t regno, uint8_t data)
 }
 
 uint16_t nge_reg_get16(nge_t *ngep, nge_regno_t regno);
-#pragma	inline(nge_reg_get16)
 
 uint16_t
 nge_reg_get16(nge_t *ngep, nge_regno_t regno)
@@ -74,7 +71,6 @@ nge_reg_get16(nge_t *ngep, nge_regno_t regno)
 }
 
 void nge_reg_put16(nge_t *ngep, nge_regno_t regno, uint16_t data);
-#pragma	inline(nge_reg_put16)
 
 void
 nge_reg_put16(nge_t *ngep, nge_regno_t regno, uint16_t data)
@@ -86,7 +82,6 @@ nge_reg_put16(nge_t *ngep, nge_regno_t regno, uint16_t data)
 }
 
 uint32_t nge_reg_get32(nge_t *ngep, nge_regno_t regno);
-#pragma	inline(nge_reg_get32)
 
 uint32_t
 nge_reg_get32(nge_t *ngep, nge_regno_t regno)
@@ -96,7 +91,6 @@ nge_reg_get32(nge_t *ngep, nge_regno_t regno)
 }
 
 void nge_reg_put32(nge_t *ngep, nge_regno_t regno, uint32_t data);
-#pragma	inline(nge_reg_put32)
 
 void
 nge_reg_put32(nge_t *ngep, nge_regno_t regno, uint32_t data)
@@ -109,7 +103,6 @@ nge_reg_put32(nge_t *ngep, nge_regno_t regno, uint32_t data)
 
 #if	NGE_DEBUGGING
 static int nge_chip_peek_cfg(nge_t *ngep, nge_peekpoke_t *ppd);
-#pragma	no_inline(nge_chip_peek_cfg)
 
 static int
 nge_chip_peek_cfg(nge_t *ngep, nge_peekpoke_t *ppd)
@@ -260,7 +253,6 @@ nge_chip_poke_reg(nge_t *ngep, nge_peekpoke_t *ppd)
 }
 
 static int nge_chip_peek_mii(nge_t *ngep, nge_peekpoke_t *ppd);
-#pragma	no_inline(nge_chip_peek_mii)
 
 static int
 nge_chip_peek_mii(nge_t *ngep, nge_peekpoke_t *ppd)
@@ -273,7 +265,6 @@ nge_chip_peek_mii(nge_t *ngep, nge_peekpoke_t *ppd)
 }
 
 static int nge_chip_poke_mii(nge_t *ngep, nge_peekpoke_t *ppd);
-#pragma	no_inline(nge_chip_poke_mii)
 
 static int
 nge_chip_poke_mii(nge_t *ngep, nge_peekpoke_t *ppd)
@@ -581,7 +572,6 @@ nge_init_dev_spec_param(nge_t *ngep)
  *   returning the data in the structure pointed to by <infop>.
  */
 void nge_chip_cfg_init(nge_t *ngep, chip_info_t *infop, boolean_t reset);
-#pragma	no_inline(nge_chip_cfg_init)
 
 void
 nge_chip_cfg_init(nge_t *ngep, chip_info_t *infop, boolean_t reset)
@@ -1958,7 +1948,6 @@ nge_pp_ioctl(nge_t *ngep, int cmd, mblk_t *mp, struct iocblk *iocp)
 
 static enum ioc_reply nge_diag_ioctl(nge_t *ngep, int cmd, mblk_t *mp,
 					struct iocblk *iocp);
-#pragma	no_inline(nge_diag_ioctl)
 
 static enum ioc_reply
 nge_diag_ioctl(nge_t *ngep, int cmd, mblk_t *mp, struct iocblk *iocp)

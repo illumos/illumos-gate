@@ -39,12 +39,6 @@ static mblk_t *ixgbe_lro_copy(ixgbe_rx_data_t *, uint32_t, uint32_t, uint32_t);
 static int ixgbe_lro_get_start(ixgbe_rx_data_t *, uint32_t);
 static uint32_t ixgbe_lro_get_first(ixgbe_rx_data_t *, uint32_t);
 
-#ifndef IXGBE_DEBUG
-#pragma inline(ixgbe_rx_assoc_hcksum)
-#pragma inline(ixgbe_lro_get_start)
-#pragma inline(ixgbe_lro_get_first)
-#endif
-
 /*
  * ixgbe_rx_recycle - The call-back function to reclaim rx buffer.
  *

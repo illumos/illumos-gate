@@ -47,7 +47,6 @@
 #include "e1000g_debug.h"
 
 static p_rx_sw_packet_t e1000g_get_buf(e1000g_rx_data_t *rx_data);
-#pragma	inline(e1000g_get_buf)
 
 /*
  * e1000g_rxfree_func - the call-back function to reclaim rx buffer

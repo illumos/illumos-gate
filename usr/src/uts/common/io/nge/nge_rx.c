@@ -138,7 +138,6 @@ nge_recv_recycle(caddr_t arg)
  * end_index: the end indexer of BDs for one packet.
  */
 static mblk_t *nge_recv_packet(nge_t *ngep, uint32_t start_index, size_t len);
-#pragma	inline(nge_recv_packet)
 
 static mblk_t *
 nge_recv_packet(nge_t *ngep, uint32_t start_index, size_t len)
@@ -249,7 +248,6 @@ nge_recv_packet(nge_t *ngep, uint32_t start_index, size_t len)
  */
 static uint32_t
 nge_rxsta_handle(nge_t *ngep, uint32_t stflag, uint32_t *pflags);
-#pragma	inline(nge_rxsta_handle)
 
 static uint32_t
 nge_rxsta_handle(nge_t *ngep,  uint32_t stflag, uint32_t *pflags)
