@@ -27,6 +27,7 @@
  * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2015 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <ctype.h>
@@ -34,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/hexdump.h>
 #include <sys/sysmacros.h>
 #include <sys/elf_SPARC.h>
 
@@ -189,7 +191,7 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 		/*
 		 * Print out the line as:
 		 *
-		 * 	address:	bytes	text
+		 *	address:	bytes	text
 		 *
 		 * If there are more than 6 bytes in any given instruction,
 		 * spread the bytes across two lines.  We try to get symbolic
@@ -325,70 +327,32 @@ do_read(void *data, uint64_t addr, void *buf, size_t len)
 
 /*
  * Routine to dump raw data in a human-readable format.  Used by the -d and -D
- * options.  We model our output after the xxd(1) program, which gives nicely
- * formatted output, along with an ASCII translation of the result.
+ * options.
  */
 void
 dump_data(uint64_t addr, void *data, size_t datalen)
 {
-	uintptr_t curaddr = addr & (~0xf);
-	uint8_t *bytes = data;
-	int i;
-	int width;
+	hexdump_t h;
+
+	hexdump_init(&h);
+	/* Print out data in two-byte chunks. */
+	hexdump_set_grouping(&h, 2);
+	hexdump_set_addr(&h, addr);
 
 	/*
 	 * Determine if the address given to us fits in 32-bit range, in which
 	 * case use a 4-byte width.
 	 */
 	if (((addr + datalen) & 0xffffffff00000000ULL) == 0ULL)
-		width = 8;
+		hexdump_set_addrwidth(&h, 8);
 	else
-		width = 16;
+		hexdump_set_addrwidth(&h, 16);
 
-	while (curaddr < addr + datalen) {
-		/*
-		 * Display leading address
-		 */
-		(void) printf("%0*x: ", width, curaddr);
 
-		/*
-		 * Print out data in two-byte chunks.  If the current address
-		 * is before the starting address or after the end of the
-		 * section, print spaces.
-		 */
-		for (i = 0; i < 16; i++) {
-			if (curaddr + i < addr ||curaddr + i >= addr + datalen)
-				(void) printf("  ");
-			else
-				(void) printf("%02x",
-				    bytes[curaddr + i - addr]);
+	(void) hexdump_fileh(&h, data, datalen, HDF_DEFAULT | HDF_ALIGN,
+	    stdout);
 
-			if (i & 1)
-				(void) printf(" ");
-		}
-
-		(void) printf(" ");
-
-		/*
-		 * Print out the ASCII representation
-		 */
-		for (i = 0; i < 16; i++) {
-			if (curaddr + i < addr ||
-			    curaddr + i >= addr + datalen) {
-				(void) printf(" ");
-			} else {
-				uint8_t byte = bytes[curaddr + i - addr];
-				if (isprint(byte))
-					(void) printf("%c", byte);
-				else
-					(void) printf(".");
-			}
-		}
-
-		(void) printf("\n");
-
-		curaddr += 16;
-	}
+	hexdump_fini(&h);
 }
 
 /*

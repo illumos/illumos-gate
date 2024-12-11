@@ -39,20 +39,18 @@ PROGS =		\
 
 COMMON_OBJS = \
 	atr.o		\
-	hexdump.o	\
-	ilstr.o
+	$(HEXDUMP_OBJS)
 
 atrparse := EXTRA_OBJS = $(COMMON_OBJS)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+include $(SRC)/common/hexdump/Makefile.com
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 CPPFLAGS += -D_REENTRANT -I$(SRC)/common/ccid/
-
-hexdump.o := CSTD = $(CSTD_GNU99)
 
 all: $(PROGS)
 
@@ -78,14 +76,6 @@ $(TESTDIR)/%: %
 	$(COMPILE.c) -o $@ -c $<
 	$(POST_PROCESS_O)
 
-%.o: $(SRC)/common/ilstr/%.c
-	$(COMPILE.c) -o $@ -c $<
-	$(POST_PROCESS_O)
-
-%.o: $(SRC)/common/hexdump/%.c
-	$(COMPILE.c) -o $@ -c $<
-	$(POST_PROCESS_O)
-
 %.o: %.c
 	$(COMPILE.c) -o $@ -c $<
 	$(POST_PROCESS_O)
@@ -93,3 +83,5 @@ $(TESTDIR)/%: %
 %: %.o
 	$(LINK.c) -o $@ $< $(EXTRA_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
+
+include $(SRC)/common/hexdump/Makefile.targ

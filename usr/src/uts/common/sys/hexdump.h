@@ -79,6 +79,7 @@ typedef enum {
  */
 typedef struct {
 	uint64_t	h_addr;		/* display address */
+	uint8_t		h_addrwidth;	/* Minimum address width */
 	uint8_t		h_width;	/* bytes per row */
 	uint8_t		h_grouping;	/* display bytes in groups of.. */
 	uint8_t		h_indent;	/* Left indent */
@@ -98,6 +99,13 @@ extern void hexdump_fini(hexdump_t *);
  * display addresses in conjunction with the HDF_ADDRESS option.
  */
 extern void hexdump_set_addr(hexdump_t *, uint64_t);
+
+/*
+ * Set a minimum width, in characters, for the addresses shown in conjunction
+ * with the HDF_ADDRESS option. The default behaviour is to calculate the width
+ * required to show all addresses and use that for all rows.
+ */
+extern void hexdump_set_addrwidth(hexdump_t *, uint8_t);
 
 /*
  * Select the number of bytes per line. The default is 16.

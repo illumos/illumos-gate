@@ -19,6 +19,7 @@ usr/src/common/acpica/utilities/utnonansi.c
 usr/src/common/acpica/utilities/utxferror.c
 usr/src/cmd/ast/libshell/common/illumos_cmdlist.h
 usr/src/cmd/cxgbetool/*
+usr/src/cmd/hal/hald/util.c
 usr/src/cmd/hal/tools/hal_set_property.c
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.c

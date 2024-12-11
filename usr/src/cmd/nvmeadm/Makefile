@@ -23,12 +23,12 @@ OBJS=	nvme_version.o	\
 	nvmeadm_ofmt.o	\
 	nvmeadm_print.o	\
 	nvmeadm_wdc.o	\
-	ilstr.o		\
-	hexdump.o
+	$(HEXDUMP_OBJS)
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
 include ../Makefile.ctf
+include $(SRC)/common/hexdump/Makefile.com
 
 .KEEP_STATE:
 
@@ -57,14 +57,6 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-%.o: $(SRC)/common/ilstr/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
-%.o: $(SRC)/common/hexdump/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
 install: all $(ROOTUSRSBINPROG)
 
 clean:
@@ -72,4 +64,5 @@ clean:
 
 lint:	lint_SRCS
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

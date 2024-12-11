@@ -18,14 +18,13 @@ PROG= ccidadm
 
 include ../Makefile.cmd
 include ../Makefile.ctf
+include $(SRC)/common/hexdump/Makefile.com
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lofmt -lcmdutils
 SRCS = ccidadm.c atr.c hexdump.o ilstr.o
 OBJS = $(SRCS:%.c=%.o)
 CPPFLAGS += -I$(SRC)/common/ccid
-
-hexdump.o := CSTD = $(CSTD_GNU99)
 
 .KEEP_STATE:
 
@@ -41,10 +40,6 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-%.o: $(SRC)/common/hexdump/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
 %.o: $(SRC)/common/ilstr/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
@@ -56,4 +51,5 @@ install: all $(ROOTUSRSBINPROG)
 clean:
 	$(RM) $(OBJS) $(PROG)
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

@@ -23,13 +23,14 @@
 # Use is subject to license terms.
 #
 # Copyright 2018 Jason King
+# Copyright 2024 Oxide Computer Company
 #
 
 PROG=	dis
-OBJS=	dis_target.o dis_main.o dis_util.o dis_list.o
-SRCS=	$(OBJS:%.o=%.c)
+OBJS=	dis_target.o dis_main.o dis_util.o dis_list.o $(HEXDUMP_OBJS)
 
 include	../Makefile.cmd
+include $(SRC)/common/hexdump/Makefile.com
 
 LDLIBS += -ldisasm -luutil -lelf -ldemangle-sys
 CERRWARN += $(CNOWARN_UNINIT)
@@ -47,7 +48,6 @@ install: all $(ROOTPROG) $(ROOTCCSBINLINK)
 clean:
 	$(RM) $(OBJS) $(PROG)
 
-lint: lint_SRCS
-
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ
 include ../Makefile.ctf

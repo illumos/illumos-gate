@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -21,6 +22,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/hexdump.h>
 #include <fcntl.h>
 #include <strings.h>
 #include <errno.h>
@@ -52,50 +54,36 @@ static int dltran_errors;
  * This routine basically assumes that we'll have 16 byte aligned output to
  * print out the human readable output.
  */
+static int
+dltran_dump_page_cb(void *arg, uint64_t addr, const char *buf,
+    size_t len __unused)
+{
+	uint_t page = (uint_t)(uintptr_t)arg;
+	int ret;
+
+	if (addr == UINT64_MAX) {
+		/* Header row */
+		ret = printf("page  %s\n", buf);
+	} else {
+		ret = printf("0x%02x  %s\n", page, buf);
+	}
+
+	return (ret < 0 ? -1 : 0);
+}
+
 static void
 dltran_dump_page(uint8_t *buf, size_t nbytes, uint_t page)
 {
-	size_t i;
 	static boolean_t first = B_TRUE;
+	hexdump_flag_t flags = HDF_DEFAULT;
 
-	if (first) {
-		(void) printf("page  %*s    0", 4, "");
-		for (i = 1; i < 16; i++) {
-			if (i % 4 == 0 && i % 16 != 0) {
-				(void) printf(" ");
-			}
-
-			(void) printf("%2x", i);
-		}
-		(void) printf("  v123456789abcdef\n");
+	if (first)
 		first = B_FALSE;
-	}
-	for (i = 0; i < nbytes; i++) {
+	else
+		flags &= ~HDF_HEADER;
 
-		if (i % 16 == 0) {
-			(void) printf("0x%02x  %04x:  ", page, i);
-		}
-
-		if (i % 4 == 0 && i % 16 != 0) {
-			(void) printf(" ");
-		}
-
-
-		(void) printf("%02x", buf[i]);
-
-		if (i % 16 == 15) {
-			int j;
-			(void) printf("  ");
-			for (j = i - (i % 16); j <= i; j++) {
-				if (!isprint(buf[j])) {
-					(void) printf(".");
-				} else {
-					(void) printf("%c", buf[j]);
-				}
-			}
-			(void) printf("\n");
-		}
-	}
+	(void) hexdump(buf, nbytes, flags, dltran_dump_page_cb,
+	    (void *)(uintptr_t)page);
 }
 
 static int

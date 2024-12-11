@@ -25,11 +25,12 @@
 # Copyright 2024 Oxide Computer Company
 
 PROG = smbios
-OBJS = smbios.o bitext.o hexdump.o ilstr.o
+OBJS = smbios.o bitext.o $(HEXDUMP_OBJS)
 SRCS = $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
+include $(SRC)/common/hexdump/Makefile.com
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsmbios -ljedec
@@ -49,19 +50,10 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-%.o: $(SRC)/common/hexdump/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
-%.o: $(SRC)/common/ilstr/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
-hexdump.o := CSTD = $(CSTD_GNU99)
-
 clean:
 	$(RM) $(OBJS)
 
 install: $(ROOTUSRSBINPROG)
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

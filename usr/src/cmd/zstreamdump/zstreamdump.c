@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <ctype.h>
@@ -37,6 +38,7 @@
 #include <unistd.h>
 #include <stddef.h>
 
+#include <sys/hexdump.h>
 #include <sys/dmu.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zio.h>
@@ -133,67 +135,20 @@ read_hdr(dmu_replay_record_t *drr, zio_cksum_t *cksum)
 }
 
 /*
- * Print part of a block in ASCII characters
- */
-static void
-print_ascii_block(char *subbuf, int length)
-{
-	int i;
-
-	for (i = 0; i < length; i++) {
-		char char_print = isprint(subbuf[i]) ? subbuf[i] : '.';
-		if (i != 0 && i % DUMP_GROUPING == 0) {
-			(void) printf(" ");
-		}
-		(void) printf("%c", char_print);
-	}
-	(void) printf("\n");
-}
-
-/*
  * print_block - Dump the contents of a modified block to STDOUT
- *
- * Assume that buf has capacity evenly divisible by BYTES_PER_LINE
  */
 static void
 print_block(char *buf, int length)
 {
-	int i;
-	/*
-	 * Start printing ASCII characters at a constant offset, after
-	 * the hex prints. Leave 3 characters per byte on a line (2 digit
-	 * hex number plus 1 space) plus spaces between characters and
-	 * groupings.
-	 */
-	int ascii_start = BYTES_PER_LINE * 3 +
-	    BYTES_PER_LINE / DUMP_GROUPING + 2;
+	hexdump_t h;
 
-	for (i = 0; i < length; i += BYTES_PER_LINE) {
-		int j;
-		int this_line_length = MIN(BYTES_PER_LINE, length - i);
-		int print_offset = 0;
-
-		for (j = 0; j < this_line_length; j++) {
-			int buf_offset = i + j;
-
-			/*
-			 * Separate every DUMP_GROUPING bytes by a space.
-			 */
-			if (buf_offset % DUMP_GROUPING == 0) {
-				print_offset += printf(" ");
-			}
-
-			/*
-			 * Print the two-digit hex value for this byte.
-			 */
-			unsigned char hex_print = buf[buf_offset];
-			print_offset += printf("%02x ", hex_print);
-		}
-
-		(void) printf("%*s", ascii_start - print_offset, " ");
-
-		print_ascii_block(buf + i, this_line_length);
-	}
+	hexdump_init(&h);
+	hexdump_set_width(&h, BYTES_PER_LINE);
+	hexdump_set_grouping(&h, DUMP_GROUPING);
+	hexdump_set_indent(&h, 1);
+	(void) hexdump_fileh(&h, (const uint8_t *)buf, length,
+	    HDF_DEFAULT | HDF_DOUBLESPACE, stdout);
+	hexdump_fini(&h);
 }
 
 /*

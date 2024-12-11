@@ -21,10 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * ipcs - IPC status
@@ -46,6 +48,7 @@
 #include <sys/msg.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/hexdump.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
@@ -510,34 +513,16 @@ dumpmsgq(int msqid)
 void
 dumpmsg(long type, char *msg, size_t msgsize)
 {
-	size_t i, j, k;
-	int c;
+	const uint8_t *data = (const uint8_t *)msg;
+	hexdump_t h;
 
 	(void) printf(gettext("  message type %ld, size %lu\n"),
 	    type, (ulong_t)msgsize);
 
-	for (i = 0; i < msgsize; i += 16) {
-		/* first in hex */
-		(void) printf(" %5ld:  ", (ulong_t)i);
-		for (j = 0; j < 16; j++) {
-			if ((k = i + j) < msgsize)
-				(void) printf("%2.2x ", msg[k] & 0xff);
-			else
-				(void) printf("   ");
-		}
-		/* then in ascii */
-		(void) printf("   ");
-		for (j = 0; j < 16; j++) {
-			if ((k = i + j) >= msgsize)
-				break;
-			c = msg[k] & 0xff;
-			if (isascii(c) && isprint(c))
-				(void) printf("%c", c);
-			else
-				(void) printf(".");
-		}
-		(void) printf("\n");
-	}
+	hexdump_init(&h);
+	hexdump_set_indent(&h, 4);
+	(void) hexdump_fileh(&h, data, msgsize, HDF_DEFAULT, stdout);
+	hexdump_fini(&h);
 }
 
 /* convert string containing zone name or id to a numeric id */
