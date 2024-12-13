@@ -20,6 +20,10 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #ifndef __CXGBE_ADAPTER_H
 #define	__CXGBE_ADAPTER_H
 
@@ -91,7 +95,12 @@ enum {
 #define	CLR_BUSY(sc)	do { sc->flags &= ~CXGBE_BUSY; } while (0)
 
 struct port_info {
-	PORT_INFO_HDR;
+	dev_info_t *dip;
+	mac_handle_t mh;
+	mac_callbacks_t *mc;
+	void *props;
+	int mtu;
+	uint8_t hw_addr[ETHERADDRL];
 
 	kmutex_t lock;
 	struct adapter *adapter;
@@ -170,6 +179,13 @@ enum {
 	IQS_DISABLED	= 0,
 	IQS_BUSY	= 1,
 	IQS_IDLE	= 2,
+};
+
+struct rxbuf_cache_params {
+	dev_info_t		*dip;
+	ddi_dma_attr_t		dma_attr_rx;
+	ddi_device_acc_attr_t	acc_attr_rx;
+	size_t			buf_size;
 };
 
 /*
@@ -582,32 +598,20 @@ struct memwin {
 /* One for errors, one for firmware events */
 #define	T4_EXTRA_INTR 2
 
-typedef kmutex_t t4_os_lock_t;
-
-static inline void t4_os_lock(t4_os_lock_t *lock)
-{
-	mutex_enter(lock);
-}
-
-static inline void t4_os_unlock(t4_os_lock_t *lock)
-{
-	mutex_exit(lock);
-}
-
 static inline void t4_mbox_list_add(struct adapter *adap,
 				    struct t4_mbox_list *entry)
 {
-	t4_os_lock(&adap->mbox_lock);
+	mutex_enter(&adap->mbox_lock);
 	STAILQ_INSERT_TAIL(&adap->mbox_list, entry, link);
-	t4_os_unlock(&adap->mbox_lock);
+	mutex_exit(&adap->mbox_lock);
 }
 
 static inline void t4_mbox_list_del(struct adapter *adap,
 				    struct t4_mbox_list *entry)
 {
-	t4_os_lock(&adap->mbox_lock);
+	mutex_enter(&adap->mbox_lock);
 	STAILQ_REMOVE(&adap->mbox_list, entry, t4_mbox_list, link);
-	t4_os_unlock(&adap->mbox_lock);
+	mutex_exit(&adap->mbox_lock);
 }
 
 static inline struct t4_mbox_list *
@@ -791,7 +795,6 @@ static inline unsigned int t4_use_ldst(struct adapter *adap)
 {
 	return (adap->flags & FW_OK);
 }
-#define t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
 
 static inline void t4_db_full(struct adapter *adap) {}
 static inline void t4_db_dropped(struct adapter *adap) {}
@@ -842,4 +845,9 @@ int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);
 struct l2t_data *t4_init_l2t(struct adapter *sc);
 int begin_synchronized_op(struct port_info *pi, int hold, int waitok);
 void end_synchronized_op(struct port_info *pi, int held);
+
+#define	setbit(a, i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
+#define	clrbit(a, i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
+#define	isset(a, i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
+
 #endif /* __CXGBE_ADAPTER_H */

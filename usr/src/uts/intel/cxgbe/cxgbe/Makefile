@@ -12,6 +12,8 @@
 #
 # Copyright (c) 2013 by Chelsio Communications, Inc. All rights reserved.
 #
+# Copyright 2024 Oxide Computer Company
+#
 
 #
 # This makefile drives the production of the Chelsio Terminator 4 10G Ethernet
@@ -41,13 +43,13 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET = $(BINARY)
 INSTALL_TARGET = $(BINARY) $(ROOTMODULE)
 
-CFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
-	-I$(UTSBASE)/common/io/cxgbe/t4nex -I$(UTSBASE)/common/io/cxgbe/shared
+CFLAGS += -I$(UTSBASE)/common/io/cxgbe/t4nex \
+	-I$(UTSBASE)/common/io/cxgbe/shared
 
 #
 # Driver depends
 #
-LDFLAGS += -N misc/mac -N drv/ip
+LDFLAGS += -N misc/mac -N drv/ip -N drv/t4nex
 
 #
 # Default build targets.

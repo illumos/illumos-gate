@@ -439,7 +439,8 @@ usr/src/uts/common/gssapi/mechs/krb5/krb5/os/toffset.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seed.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seqnum.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/val_cred.c
-usr/src/uts/common/io/cxgbe/*
+usr/src/uts/common/io/cxgbe/common
+usr/src/uts/common/io/cxgbe/firmware
 usr/src/uts/common/io/i40e/core/*
 usr/src/uts/common/io/iwn/THIRDPARTYLICENSE
 usr/src/uts/common/io/iwn/THIRDPARTYLICENSE.descrip

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -43,6 +43,9 @@
 #include <sys/containerof.h>
 #include <sys/sensors.h>
 #include <sys/firmload.h>
+#include <sys/mac_provider.h>
+#include <sys/mac_ether.h>
+#include <sys/vlan.h>
 
 #include "version.h"
 #include "common/common.h"
@@ -95,7 +98,7 @@ static int t4_devo_probe(dev_info_t *dip);
 static int t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int t4_devo_quiesce(dev_info_t *dip);
-struct dev_ops t4_dev_ops = {
+static struct dev_ops t4_dev_ops = {
 	.devo_rev =		DEVO_REV,
 	.devo_getinfo =		t4_devo_getinfo,
 	.devo_identify =	nulldev,
@@ -108,15 +111,15 @@ struct dev_ops t4_dev_ops = {
 	.devo_quiesce =		&t4_devo_quiesce,
 };
 
-static struct modldrv modldrv = {
+static struct modldrv t4nex_modldrv = {
 	.drv_modops =		&mod_driverops,
-	.drv_linkinfo =		"Chelsio T4 nexus " DRV_VERSION,
+	.drv_linkinfo =		"Chelsio T4-T6 nexus " DRV_VERSION,
 	.drv_dev_ops =		&t4_dev_ops
 };
 
-static struct modlinkage modlinkage = {
+static struct modlinkage t4nex_modlinkage = {
 	.ml_rev =		MODREV_1,
-	.ml_linkage =		{&modldrv, NULL},
+	.ml_linkage =		{&t4nex_modldrv, NULL},
 };
 
 void *t4_list;
@@ -196,7 +199,7 @@ _init(void)
 	if (rc != 0)
 		return (rc);
 
-	rc = mod_install(&modlinkage);
+	rc = mod_install(&t4nex_modlinkage);
 	if (rc != 0)
 		ddi_soft_state_fini(&t4_list);
 
@@ -211,7 +214,7 @@ _fini(void)
 {
 	int rc;
 
-	rc = mod_remove(&modlinkage);
+	rc = mod_remove(&t4nex_modlinkage);
 	if (rc != 0)
 		return (rc);
 
@@ -222,7 +225,7 @@ _fini(void)
 int
 _info(struct modinfo *mi)
 {
-	return (mod_info(&modlinkage, mi));
+	return (mod_info(&t4nex_modlinkage, mi));
 }
 
 /* ARGSUSED */
@@ -785,7 +788,7 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(s->eqmap, s->eqmap_sz * sizeof (struct sge_eq *));
 
 	if (s->rxbuf_cache != NULL)
-		rxbuf_cache_destroy(s->rxbuf_cache);
+		kmem_cache_destroy(s->rxbuf_cache);
 
 	if (sc->flags & INTR_ALLOCATED) {
 		for (i = 0; i < sc->intr_count; i++) {
@@ -1461,7 +1464,8 @@ adap__pre_init_tweaks(struct adapter *sc)
 	 * Line Size, etc.  The firmware default is for a 4KB Page Size and
 	 * 64B Cache Line Size ...
 	 */
-	(void) t4_fixup_host_params_compat(sc, PAGE_SIZE, CACHE_LINE, T5_LAST_REV);
+	(void) t4_fixup_host_params_compat(sc, PAGE_SIZE, _CACHE_LINE_SIZE,
+	    T5_LAST_REV);
 
 	t4_set_reg_field(sc, A_SGE_CONTROL,
 			 V_PKTSHIFT(M_PKTSHIFT), V_PKTSHIFT(rx_dma_offset));
@@ -1918,7 +1922,8 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	    "interrupt-forwarding") != 0 ||
 	    ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "interrupt-forwarding") != 0) {
-		UNIMPLEMENTED();
+		cmn_err(CE_WARN, "%s (%s:%d) unimplemented.",
+		    __func__, __FILE__, __LINE__);
 		(void) ddi_prop_create(dev, dip, DDI_PROP_CANSLEEP,
 		    "interrupt-forwarding", NULL, 0);
 	}
@@ -3011,4 +3016,63 @@ err:
 	nvlist_free(misc);
 	return (ret);
 
+}
+
+
+int
+t4_cxgbe_attach(struct port_info *pi, dev_info_t *dip)
+{
+	ASSERT(pi != NULL);
+
+	mac_register_t *mac = mac_alloc(MAC_VERSION);
+	if (mac == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	mac->m_driver = pi;
+	mac->m_dip = dip;
+	mac->m_src_addr = pi->hw_addr;
+	mac->m_callbacks = pi->mc;
+	mac->m_max_sdu = pi->mtu;
+	mac->m_priv_props = pi->props;
+	mac->m_margin = VLAN_TAGSZ;
+
+	if (!mac->m_callbacks->mc_unicst) {
+		/* Multiple rings enabled */
+		mac->m_v12n = MAC_VIRT_LEVEL1;
+	}
+
+	mac_handle_t mh = NULL;
+	const int rc = mac_register(mac, &mh);
+	mac_free(mac);
+	if (rc != 0) {
+		return (DDI_FAILURE);
+	}
+
+	pi->mh = mh;
+
+	/*
+	 * Link state from this point onwards to the time interface is plumbed,
+	 * should be set to LINK_STATE_UNKNOWN. The mac should be updated about
+	 * the link state as either LINK_STATE_UP or LINK_STATE_DOWN based on
+	 * the actual link state detection after interface plumb.
+	 */
+	mac_link_update(mh, LINK_STATE_UNKNOWN);
+
+	return (DDI_SUCCESS);
+}
+
+int
+t4_cxgbe_detach(struct port_info *pi)
+{
+	ASSERT(pi != NULL);
+	ASSERT(pi->mh != NULL);
+
+	if (mac_unregister(pi->mh) == 0) {
+		pi->mh = NULL;
+		return (DDI_SUCCESS);
+	}
+
+	return (DDI_FAILURE);
 }
