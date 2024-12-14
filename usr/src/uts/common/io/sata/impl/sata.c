@@ -16969,7 +16969,7 @@ sata_check_modser(char *buf, int buf_len)
 	boolean_t ret;
 	char *s;
 	int i;
-	int tb;
+	int tb = 0;
 	char ch;
 
 	ret = B_FALSE;
