@@ -26,6 +26,7 @@
  *
  * Copyright 2018 Richard Lowe.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -40,7 +41,7 @@
  * If you modify this file, you must increment CW_VERSION.  This is a semver,
  * incompatible changes should bump the major, anything else the minor.
  */
-#define	CW_VERSION	"9.1"
+#define	CW_VERSION	"10.0"
 
 /*
  * -#		Verbose mode
@@ -71,6 +72,7 @@
  * -R<dir[:dir]> Build runtime search path list into executable
  * -S		Compile and only generate assembly code (.s)
  * -s		Strip symbol table from the executable file
+ * -std=	Set the C standard (note this is in the GNU syntax)
  * -t		Turn off duplicate symbol warnings when linking
  * -U<name>	Delete initial definition of preprocessor symbol <name>
  * -V		Report version number of each compilation phase
@@ -118,6 +120,7 @@
  * -p				pass-thru
  * -R<dir[:dir]>		pass-thru
  * -S				pass-thru
+ * -std=			pass-thru
  * -U<name>			pass-thru
  * -V				--version
  * -v				-Wall
@@ -183,6 +186,15 @@ typedef enum {
 	SUN,
 	SMATCH
 } compiler_style_t;
+
+typedef enum {
+	SOURCE_FILE_T_NONE,
+	SOURCE_FILE_T_C,
+	SOURCE_FILE_T_S,
+	SOURCE_FILE_T_CPP,
+	SOURCE_FILE_T_CCX,
+	SOURCE_FILE_T_I
+} source_file_type_t;
 
 typedef struct {
 	char *c_name;
@@ -441,41 +453,36 @@ discard_file_name(cw_ictx_t *ctx, const char *path)
 	return (ret);
 }
 
-static bool
-is_source_file(const char *path)
+static source_file_type_t
+id_source_file(const char *path)
 {
-	char *ext = strrchr(path, '.');
+	const char *ext = strrchr(path, '.');
 
 	if ((ext == NULL) || (*(ext + 1) == '\0'))
-		return (false);
+		return (SOURCE_FILE_T_NONE);
 
 	ext += 1;
 
-	if ((strcasecmp(ext, "c") == 0) ||
-	    (strcmp(ext, "cc") == 0) ||
-	    (strcmp(ext, "i") == 0) ||
-	    (strcasecmp(ext, "s") == 0) ||
-	    (strcmp(ext, "cpp") == 0)) {
-		return (true);
+	if (strcasecmp(ext, "c") == 0) {
+		return (SOURCE_FILE_T_C);
+	} else if (strcmp(ext, "cc") == 0) {
+		return (SOURCE_FILE_T_CCX);
+	} else if (strcmp(ext, "i") == 0) {
+		return (SOURCE_FILE_T_I);
+	} else if (strcasecmp(ext, "s") == 0) {
+		return (SOURCE_FILE_T_S);
+	} else if (strcmp(ext, "cpp") == 0) {
+		return (SOURCE_FILE_T_CPP);
 	}
 
-	return (false);
+	return (SOURCE_FILE_T_NONE);
+
 }
 
 static bool
 is_asm_file(const char *path)
 {
-	char *ext = strrchr(path, '.');
-
-	if ((ext == NULL) || (*(ext + 1) == '\0'))
-		return (false);
-
-	ext += 1;
-
-	if (strcasecmp(ext, "s") == 0)
-		return (true);
-
-	return (false);
+	return (id_source_file(path) == SOURCE_FILE_T_S);
 }
 
 static void
@@ -483,11 +490,12 @@ do_gcc(cw_ictx_t *ctx)
 {
 	int c;
 	int nolibc = 0;
-	int in_output = 0, seen_o = 0, c_files = 0;
+	int in_output = 0, seen_o = 0, src_files = 0;
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
 	char *nameflag;
 	int mflag = 0;
+	bool seen_cstd = false, check_cstd = false;
 
 	if (ctx->i_flags & CW_F_PROG) {
 		newae(ctx->i_ae, "--version");
@@ -525,8 +533,13 @@ do_gcc(cw_ictx_t *ctx)
 		if (*arg == '-') {
 			arglen--;
 		} else {
-			if (!in_output && is_source_file(arg))
-				c_files++;
+			if (!in_output) {
+				source_file_type_t type = id_source_file(arg);
+				if (type != SOURCE_FILE_T_NONE)
+					src_files++;
+				if (type == SOURCE_FILE_T_C)
+					check_cstd = true;
+			}
 
 			/*
 			 * Otherwise, filenames and partial arguments
@@ -706,6 +719,12 @@ do_gcc(cw_ictx_t *ctx)
 				nolibc = 1;
 				break;
 			}
+
+			if (strncmp(arg, "-std=", 4) == 0) {
+				seen_cstd = true;
+				newae(ctx->i_ae, arg);
+				break;
+			}
 			error(arg);
 			break;
 
@@ -768,10 +787,12 @@ do_gcc(cw_ictx_t *ctx)
 				break;
 			case 'c':
 				if (strncmp(arg, "-xc99=%all", 10) == 0) {
+					seen_cstd = true;
 					newae(ctx->i_ae, "-std=gnu99");
 					break;
 				}
 				if (strncmp(arg, "-xc99=%none", 11) == 0) {
+					seen_cstd = true;
 					newae(ctx->i_ae, "-std=gnu89");
 					break;
 				}
@@ -869,6 +890,19 @@ do_gcc(cw_ictx_t *ctx)
 	free(nameflag);
 
 	/*
+	 * We would like to catch occurrences where we have left out a -std
+	 * argument so we don't end up with the compiler's default. The use of
+	 * check_cstd keys on seeing a .c file, which ensures that we don't
+	 * check C++, assembly, or other files, though we should check C++ at
+	 * some point. In addition, if we do a link in a single action, it will
+	 * actually catch it as well because we will see a .c file. However, if
+	 * we're doing a normal link of multiple files then it won't misfire.
+	 */
+	if (check_cstd && !seen_cstd) {
+		errx(2, "missing required -std= specification");
+	}
+
+	/*
 	 * When compiling multiple source files in a single invocation some
 	 * compilers output objects into the current directory with
 	 * predictable and conventional names.
@@ -877,7 +911,7 @@ do_gcc(cw_ictx_t *ctx)
 	 * any such objects created by a shadow can't escape into a later
 	 * link-edit.
 	 */
-	if (c_files > 1 && op != CW_O_PREPROCESS) {
+	if (src_files > 1 && op != CW_O_PREPROCESS) {
 		errx(2, "multiple source files are "
 		    "allowed only with -E or -P");
 	}
@@ -912,7 +946,7 @@ do_gcc(cw_ictx_t *ctx)
 	if (ctx->i_flags & CW_F_SHADOW) {
 		if (op == CW_O_PREPROCESS)
 			exit(0);
-		else if (op == CW_O_LINK && c_files == 0)
+		else if (op == CW_O_LINK && src_files == 0)
 			exit(0);
 	}
 
@@ -982,7 +1016,8 @@ do_cc(cw_ictx_t *ctx)
 		}
 
 		if (*arg != '-') {
-			if (!in_output && is_source_file(arg))
+			if (!in_output && id_source_file(arg) !=
+			    SOURCE_FILE_T_NONE)
 				c_files++;
 
 			if (in_output == 0 || !(ctx->i_flags & CW_F_SHADOW)) {

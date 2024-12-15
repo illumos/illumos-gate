@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = statvfs \
@@ -29,7 +29,7 @@ ROOTOPTPROGS =	$(PROGS32:%=$(ROOTOPTDIR)/%) \
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.ctf
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 CTF_MODE = link
 
 statvfs.32	:= CPPFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64

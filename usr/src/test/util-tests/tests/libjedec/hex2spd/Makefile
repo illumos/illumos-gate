@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = libjedec_hex2spd
@@ -54,7 +54,7 @@ $(ROOTHEXSPD) := FILEMODE = 0444
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.ctf
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 CTF_MODE = link
 LDLIBS += -ljedec -lnvpair
 LDLIBS64 += -ljedec -lnvpair

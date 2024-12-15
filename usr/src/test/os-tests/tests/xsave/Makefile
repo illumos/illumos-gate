@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = \
@@ -83,7 +83,7 @@ $(ROOTOPTDATA) := FILEMODE = 0444
 LDLIBS += -lproc
 LDLIBS64 += -lproc
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 
 .KEEP_STATE:
 

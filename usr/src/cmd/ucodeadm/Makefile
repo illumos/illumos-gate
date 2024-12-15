@@ -24,7 +24,7 @@
 #
 # Copyright 2017 RackTop Systems.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROG = ucodeadm
@@ -41,7 +41,7 @@ include	../Makefile.ctf
 POFILE = ucodeadm_all.po
 POFILES = $(PROG_OBJS:%.o=%.po)
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 CPPFLAGS += -I$(SRC)/common
 CFLAGS	+= $(CCVERBOSE)
 LDLIBS += -lgen

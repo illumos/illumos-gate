@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROG = clock_lock
@@ -33,7 +33,7 @@ ROOTOPTPROGS =	$(PROG32:%=$(ROOTOPTDIR)/%) \
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.ctf
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 CPPFLAGS += -D_REENTRANT
 CTF_MODE = link
 

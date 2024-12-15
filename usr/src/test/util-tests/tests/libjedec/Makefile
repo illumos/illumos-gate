@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -40,7 +40,7 @@ LDLIBS64 += -ljedec
 libjedec_spd.32		:= LDLIBS += -lnvpair
 libjedec_spd.64		:= LDLIBS64 += -lnvpair
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 
 #
 # recursive support

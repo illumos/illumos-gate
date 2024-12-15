@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROG = secmapper
@@ -29,7 +29,7 @@ include ../Makefile.com
 ROOTOPTPROGS = $(PROG:%=$(ROOTOPTCORE)/%)
 
 LDLIBS += -lproc -lelf
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 
 .KEEP_STATE:
 
