@@ -26,6 +26,7 @@
 
 # Copyright 2010, Richard Lowe
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 Oxide Computer Company
 
 #
 # Various database lookup classes/methods, i.e.:
@@ -82,7 +83,12 @@ class BugDB(object):
 
 	def __illbug(self, cr):
 		url = "http://illumos.org/issues/%s.xml" % cr
-		req = Request(url)
+		req = Request(
+			url,
+			headers = {
+				"User-Agent": "git-pbchk"
+			}
+		)
 
 		try:
 			data = urlopen(req)
