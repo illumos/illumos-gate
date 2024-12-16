@@ -35,6 +35,7 @@ file path=opt/bhyve-tests/tests/inst_emul/cpuid mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_consistent mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_paging mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/imul mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/inout mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/page_dirty mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/rdmsr mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/suspend_info mode=0555

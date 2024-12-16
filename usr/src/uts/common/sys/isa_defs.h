@@ -74,14 +74,14 @@
  * _POINTER_ALIGNMENT / _FLOAT_ALIGNMENT:
  *	The ABI defines alignment requirements of each of the primitive
  *	object types.  Some, if not all, may be hardware requirements as
- * 	well.  The values are expressed in "byte-alignment" units.
+ *	well.  The values are expressed in "byte-alignment" units.
  *
  * _MAX_ALIGNMENT:
  *	The most stringent alignment requirement as specified by the ABI.
  *	Equal to the maximum of all the above _XXX_ALIGNMENT values.
  *
  * _MAX_ALIGNMENT_TYPE:
- * 	The name of the C type that has the value descried in _MAX_ALIGNMENT.
+ *	The name of the C type that has the value descried in _MAX_ALIGNMENT.
  *
  * _ALIGNMENT_REQUIRED:
  *	True or false (1 or 0) whether or not the hardware requires the ABI
@@ -97,6 +97,9 @@
  *	instruction as defined by Intel.  (Intel allows other vendors
  *	to extend the instruction for their own purposes.)
  *
+ * _CACHE_LINE_SHIFT
+ * _CACHE_LINE_SIZE
+ *	Compile time maximum cache line size for an architecture.
  *
  * Implementation Choices:
  *
@@ -261,6 +264,8 @@ extern "C" {
 #define	_MAX_ALIGNMENT			16
 #define	_ALIGNMENT_REQUIRED		1
 #define	_MAX_ALIGNMENT_TYPE		long double
+#define	_CACHE_LINE_SHIFT		6
+#define	_CACHE_LINE_SIZE		(1 << _CACHE_LINE_SHIFT)
 
 /*
  * Different alignment constraints for the i386 ABI in compatibility mode
@@ -327,6 +332,8 @@ extern "C" {
 #define	_MAX_ALIGNMENT			4
 #define	_ALIGNMENT_REQUIRED		0
 #define	_MAX_ALIGNMENT_TYPE		long
+#define	_CACHE_LINE_SHIFT		6
+#define	_CACHE_LINE_SIZE		(1 << _CACHE_LINE_SHIFT)
 
 #define	_LONG_LONG_ALIGNMENT_32		_LONG_LONG_ALIGNMENT
 

@@ -25,14 +25,14 @@
 extern "C" {
 #endif
 
-#define	CACHE_LINE_SIZE	64
+typedef struct aggsum_bucket aggsum_bucket_t;
 
-typedef struct aggsum_bucket {
+struct aggsum_bucket {
 	kmutex_t asc_lock;
 	int64_t asc_delta;
 	uint64_t asc_borrowed;
 	uint64_t asc_pad[4]; /* pad out to cache line (64 bytes) */
-} aggsum_bucket_t __aligned(CACHE_LINE_SIZE);
+} __cacheline_aligned;
 
 /*
  * Fan out over FANOUT cpus.
@@ -42,7 +42,7 @@ typedef struct aggsum {
 	int64_t as_lower_bound;
 	int64_t as_upper_bound;
 	uint64_t as_numbuckets;
-	aggsum_bucket_t *as_buckets;
+	aggsum_bucket_t *as_buckets __cacheline_aligned;
 } aggsum_t;
 
 void aggsum_init(aggsum_t *, uint64_t);

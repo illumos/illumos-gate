@@ -2464,12 +2464,10 @@ ibnex_vppa_conf_entry_delete(char *msg, char *service)
 	}
 
 	/* Replace existing pointer to VPPA services w/ newly adjusted one */
-	if (ibnex.ibnex_vppa_comm_svc_names) {
-		kmem_free(ibnex.ibnex_vppa_comm_svc_names, nsvcs *
-		    sizeof (char *));
-		ibnex.ibnex_nvppa_comm_svcs--;
-		ibnex.ibnex_vppa_comm_svc_names = service_name;
-	}
+	kmem_free(ibnex.ibnex_vppa_comm_svc_names, nsvcs * sizeof (char *));
+	ibnex.ibnex_nvppa_comm_svcs--;
+	ibnex.ibnex_vppa_comm_svc_names = service_name;
+
 	return (0);
 }
 
@@ -2545,11 +2543,10 @@ ibnex_port_conf_entry_delete(char *msg, char *service)
 	}
 
 	/* Replace existing pointer to Port services w/ newly adjusted one */
-	if (ibnex.ibnex_comm_svc_names) {
-		kmem_free(ibnex.ibnex_comm_svc_names, nsvcs * sizeof (char *));
-		ibnex.ibnex_num_comm_svcs--;
-		ibnex.ibnex_comm_svc_names = service_name;
-	}
+	kmem_free(ibnex.ibnex_comm_svc_names, nsvcs * sizeof (char *));
+	ibnex.ibnex_num_comm_svcs--;
+	ibnex.ibnex_comm_svc_names = service_name;
+
 	return (0);
 }
 
@@ -2628,12 +2625,10 @@ ibnex_hcasvc_conf_entry_delete(char *msg, char *service)
 	}
 
 	/* Replace existing pointer to VPPA services w/ newly adjusted one */
-	if (ibnex.ibnex_hcasvc_comm_svc_names) {
-		kmem_free(ibnex.ibnex_hcasvc_comm_svc_names, nsvcs *
-		    sizeof (char *));
-		ibnex.ibnex_nhcasvc_comm_svcs--;
-		ibnex.ibnex_hcasvc_comm_svc_names = service_name;
-	}
+	kmem_free(ibnex.ibnex_hcasvc_comm_svc_names, nsvcs * sizeof (char *));
+	ibnex.ibnex_nhcasvc_comm_svcs--;
+	ibnex.ibnex_hcasvc_comm_svc_names = service_name;
+
 	return (0);
 }
 

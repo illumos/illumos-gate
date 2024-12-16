@@ -28,6 +28,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/x86_archext.h>
@@ -329,6 +330,56 @@ acpi_cpu_check_wakeup(void *arg)
 }
 
 /*
+ * Idle the current CPU via ACPI-defined System I/O read to an ACPI-specified
+ * address.
+ */
+static void
+acpi_io_idle(uint32_t address)
+{
+	uint32_t value;
+	ACPI_TABLE_FADT *gbl_FADT;
+
+	/*
+	 * Do we need to work around an ancient chipset bug in early ACPI
+	 * implementations that would result in a late STPCLK# assertion?
+	 *
+	 * Must be true when running on systems where the ACPI-indicated I/O
+	 * read to enter low-power states may resolve before actually stopping
+	 * the processor that initiated a low-power transition. On such systems,
+	 * it is possible the processor would proceed past the idle point and
+	 * *then* be stopped.
+	 *
+	 * An early workaround that has been carried forward is to read the ACPI
+	 * PM Timer after requesting a low-power transition. The timer read will
+	 * take long enough that we are certain the processor is safe to be
+	 * stopped.
+	 *
+	 * From some investigation, this was only ever necessary on older Intel
+	 * chipsets. Additionally, the timer read can take upwards of a thousand
+	 * CPU clocks, so for systems that work correctly, it's just a tarpit
+	 * for the CPU as it is woken back up.
+	 */
+	boolean_t need_stpclk_workaround =
+	    cpuid_getvendor(CPU) == X86_VENDOR_Intel;
+
+	/*
+	 * The following call will cause us to halt which will cause the store
+	 * buffer to be repartitioned, potentially exposing us to the Intel CPU
+	 * vulnerability MDS. As such, we need to explicitly call that here.
+	 * The other idle methods do this automatically as part of the
+	 * implementation of i86_mwait().
+	 */
+	x86_md_clear();
+	(void) cpu_acpi_read_port(address, &value, 8);
+	if (need_stpclk_workaround) {
+		acpica_get_global_FADT(&gbl_FADT);
+		(void) cpu_acpi_read_port(
+		    gbl_FADT->XPmTimerBlock.Address,
+		    &value, 32);
+	}
+}
+
+/*
  * enter deep c-state handler
  */
 static void
@@ -514,32 +565,11 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 			}
 		}
 	} else if (type == ACPI_ADR_SPACE_SYSTEM_IO) {
-		uint32_t value;
-		ACPI_TABLE_FADT *gbl_FADT;
-
 		if (*mcpu_mwait == MWAIT_WAKEUP_IPI) {
 			if (cpu_idle_enter((uint_t)cs_type, 0,
 			    check_func, (void *)mcpu_mwait) == 0) {
 				if (*mcpu_mwait == MWAIT_WAKEUP_IPI) {
-					/*
-					 * The following calls will cause us to
-					 * halt which will cause the store
-					 * buffer to be repartitioned,
-					 * potentially exposing us to the Intel
-					 * CPU vulnerability MDS. As such, we
-					 * need to explicitly call that here.
-					 * The other idle methods in this
-					 * function do this automatically as
-					 * part of the implementation of
-					 * i86_mwait().
-					 */
-					x86_md_clear();
-					(void) cpu_acpi_read_port(
-					    cstate->cs_address, &value, 8);
-					acpica_get_global_FADT(&gbl_FADT);
-					(void) cpu_acpi_read_port(
-					    gbl_FADT->XPmTimerBlock.Address,
-					    &value, 32);
+					acpi_io_idle(cstate->cs_address);
 				}
 				cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
 			}
@@ -649,7 +679,15 @@ cpu_deep_cstates_supported(void)
 		return (B_TRUE);
 	}
 
-	if ((hpet.supported == HPET_FULL_SUPPORT) &&
+	/*
+	 * In theory we can use the HPET as a proxy timer in case we can't rely
+	 * on the LAPIC in deep C-states. In practice on AMD it seems something
+	 * isn't quite right and we just don't get woken up, so the proxy timer
+	 * approach doesn't work. Only set up the HPET as proxy timer on Intel
+	 * systems for now.
+	 */
+	if (cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
+	    (hpet.supported == HPET_FULL_SUPPORT) &&
 	    hpet.install_proxy()) {
 		cpu_cstate_hpet = B_TRUE;
 		return (B_TRUE);
@@ -941,7 +979,7 @@ cpuidle_cstate_instance(cpu_t *cp)
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t	handle;
 	struct machcpu		*mcpu;
-	cpuset_t 		dom_cpu_set;
+	cpuset_t		dom_cpu_set;
 	kmutex_t		*pm_lock;
 	int			result = 0;
 	processorid_t		cpu_id;

@@ -171,6 +171,7 @@ extern "C" {
 #define	__used			__attribute__((__used__))
 #define	__weak_symbol		__attribute__((__weak__))
 #define	__HIDDEN		__attribute__((visibility("hidden")))
+#define	__cacheline_aligned	__aligned(_CACHE_LINE_SIZE)
 
 #ifdef	__cplusplus
 }

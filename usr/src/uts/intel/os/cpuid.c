@@ -7841,6 +7841,8 @@ cpuid_deep_cstates_supported(void)
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
+	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		if (cpi->cpi_xmaxeax < 0x80000007)
 			return (0);
 
@@ -7953,6 +7955,8 @@ cpuid_arat_supported(void)
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
+	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		/*
 		 * Always-running Local APIC Timer is
 		 * indicated by CPUID.6.EAX[2].

@@ -586,7 +586,7 @@ legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 				logical_cpus = MIN(0xfff, logical_cpus - 1);
 				regs[0] = (logical_cpus << 14) | (1 << 8) |
 				    (level << 5) | func;
-				regs[1] = func > 0 ? CACHE_LINE_SIZE - 1 : 0;
+				regs[1] = func > 0 ? _CACHE_LINE_SIZE - 1 : 0;
 			}
 			regs[2] = 0;
 			regs[3] = 0;
