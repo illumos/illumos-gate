@@ -1158,8 +1158,8 @@ i_dlstat_rx_bcast_stats(dladm_handle_t handle, const char *linkname)
 	head->dc_statentry = rx_lane_stat_entry;
 	head->dc_next = NULL;
 
-	free(misc_stat_entry);
 done:
+	free(misc_stat_entry);
 	return (head);
 }
 
@@ -1208,6 +1208,7 @@ i_dlstat_rx_defunctlane_stats(dladm_handle_t handle, const char *linkname)
 	head->dc_next = NULL;
 
 done:
+	free(misc_stat_entry);
 	return (head);
 }
 
@@ -1380,8 +1381,8 @@ i_dlstat_tx_bcast_stats(dladm_handle_t handle, const char *linkname)
 	head->dc_statentry = tx_lane_stat_entry;
 	head->dc_next = NULL;
 
-	free(misc_stat_entry);
 done:
+	free(misc_stat_entry);
 	return (head);
 }
 
@@ -1420,6 +1421,7 @@ i_dlstat_tx_defunctlane_stats(dladm_handle_t handle, const char *linkname)
 	head->dc_next = NULL;
 
 done:
+	free(misc_stat_entry);
 	return (head);
 }
 
@@ -1523,9 +1525,9 @@ dlstat_rx_lane_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 	(void) strlcpy(total_head->dc_statheader, "mac_rx_lane_total",
 	    sizeof (total_head->dc_statheader));
 	total_head->dc_next = NULL;
-	free(rx_lane_head);
 
 done:
+	dladm_link_stat_free(rx_lane_head);
 	return (total_head);
 }
 
@@ -1567,9 +1569,9 @@ dlstat_tx_lane_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 	(void) strlcpy(total_head->dc_statheader, "mac_tx_lane_total",
 	    sizeof (total_head->dc_statheader));
 	total_head->dc_next = NULL;
-	free(tx_lane_head);
 
 done:
+	dladm_link_stat_free(tx_lane_head);
 	return (total_head);
 }
 
@@ -1960,9 +1962,9 @@ dlstat_rx_ring_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 	(void) strlcpy(total_head->dc_statheader, "mac_rx_ring_total",
 	    sizeof (total_head->dc_statheader));
 	total_head->dc_next = NULL;
-	free(rx_ring_head);
 
 done:
+	dladm_link_stat_free(rx_ring_head);
 	return (total_head);
 }
 
@@ -2003,9 +2005,9 @@ dlstat_tx_ring_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 	(void) strlcpy(total_head->dc_statheader, "mac_tx_ring_total",
 	    sizeof (total_head->dc_statheader));
 	total_head->dc_next = NULL;
-	free(tx_ring_head);
 
 done:
+	dladm_link_stat_free(tx_ring_head);
 	return (total_head);
 }
 
@@ -2039,8 +2041,8 @@ void *
 dlstat_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 {
 	dladm_stat_chain_t	*head = NULL;
-	dladm_stat_chain_t	*rx_total;
-	dladm_stat_chain_t	*tx_total;
+	dladm_stat_chain_t	*rx_total = NULL;
+	dladm_stat_chain_t	*tx_total = NULL;
 	total_stat_entry_t	*total_stat_entry;
 	rx_lane_stat_entry_t	*rx_lane_stat_entry;
 	tx_lane_stat_entry_t	*tx_lane_stat_entry;
@@ -2085,10 +2087,10 @@ dlstat_total_stats(dladm_handle_t dh, datalink_id_t linkid)
 	(void) strlcpy(head->dc_statheader, "mac_lane_total",
 	    sizeof (head->dc_statheader));
 	head->dc_next = NULL;
-	free(rx_total);
-	free(tx_total);
 
 done:
+	dladm_link_stat_free(rx_total);
+	dladm_link_stat_free(tx_total);
 	return (head);
 }
 

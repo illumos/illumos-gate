@@ -1534,10 +1534,11 @@ show_link_stats(datalink_id_t linkid, show_state_t state, uint32_t interval)
 			(void) show_queried_stats(handle, linkid, &state);
 		}
 
+		cleanup_removed_links(&state);
+
 		if (interval == 0)
 			break;
 
-		cleanup_removed_links(&state);
 		(void) sleep(interval);
 	}
 }
