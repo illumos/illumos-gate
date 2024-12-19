@@ -39,15 +39,15 @@
 #include <sys/mutex.h>
 
 
-#define CH_DUMP_MBOX(adap, mbox, data_reg, size)	do {} while (0)
+#define	CH_DUMP_MBOX(adap, mbox, data_reg, size)	do {} while (0)
 
-#define PCI_VENDOR_ID           0x00
-#define PCI_DEVICE_ID           0x02
+#define	PCI_VENDOR_ID		0x00
+#define	PCI_DEVICE_ID		0x02
 
-#define PCI_BASE_ADDRESS_0	0x10
-#define PCI_BASE_ADDRESS_1	0x14
-#define PCI_BASE_ADDRESS_2	0x18
-#define PCI_BASE_ADDRESS_MEM_MASK	(~0x0fUL)
+#define	PCI_BASE_ADDRESS_0	0x10
+#define	PCI_BASE_ADDRESS_1	0x14
+#define	PCI_BASE_ADDRESS_2	0x18
+#define	PCI_BASE_ADDRESS_MEM_MASK	(~0x0fUL)
 
 #define	PCI_CAP_ID_EXP		PCI_CAP_ID_PCI_E
 #define	PCI_EXP_DEVCTL		PCIE_DEVCTL
@@ -115,16 +115,16 @@ typedef int64_t		s64;
 #define	PAGE_SHIFT 12
 #endif
 
-#define ETH_ALEN		6
+#define	ETH_ALEN		6
 
 #define	isspace(x) ((x) == ' ' || (x) == '\t')
 
 #ifdef _KERNEL
 
-#define t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
+#define	t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
 #define	fls(x) ddi_fls(x)
 
-static __inline__ int
+static inline int
 ilog2(long x)
 {
 	return (ddi_fls(x) - 1);
@@ -132,12 +132,14 @@ ilog2(long x)
 
 typedef kmutex_t t4_os_lock_t;
 
-static inline void t4_os_lock(t4_os_lock_t *lock)
+static inline void
+t4_os_lock(t4_os_lock_t *lock)
 {
 	mutex_enter(lock);
 }
 
-static inline void t4_os_unlock(t4_os_lock_t *lock)
+static inline void
+t4_os_unlock(t4_os_lock_t *lock)
 {
 	mutex_exit(lock);
 }
