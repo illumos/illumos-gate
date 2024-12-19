@@ -96,10 +96,6 @@ struct port_info {
 	kmutex_t lock;
 	struct adapter *adapter;
 
-#ifdef TCP_OFFLOAD_ENABLE
-	void *tdev;
-#endif
-
 	unsigned int flags;
 
 	uint16_t viid;
@@ -109,12 +105,6 @@ struct port_info {
 	uint16_t first_txq;	/* index of first tx queue */
 	uint16_t nrxq;		/* # of rx queues */
 	uint16_t first_rxq;	/* index of first rx queue */
-#ifdef TCP_OFFLOAD_ENABLE
-	uint16_t nofldtxq;		/* # of offload tx queues */
-	uint16_t first_ofld_txq;	/* index of first offload tx queue */
-	uint16_t nofldrxq;		/* # of offload rx queues */
-	uint16_t first_ofld_rxq;	/* index of first offload rx queue */
-#endif
 	uint8_t  lport;		/* associated offload logical port */
 	int8_t   mdio_addr;
 	uint8_t  port_type;
@@ -214,9 +204,6 @@ struct sge_iq {
 enum {
 	EQ_CTRL		= 1,
 	EQ_ETH		= 2,
-#ifdef TCP_OFFLOAD_ENABLE
-	EQ_OFLD		= 3,
-#endif
 
 	/* eq flags */
 	EQ_TYPEMASK	= 7,		/* 3 lsbits hold the type */
@@ -373,45 +360,12 @@ struct sge_rxq {
 	uint32_t nomem;		/* mblk allocation during rx failed */
 };
 
-#ifdef TCP_OFFLOAD_ENABLE
-/* ofld_rxq: SGE ingress queue + SGE free list + miscellaneous items */
-struct sge_ofld_rxq {
-	struct sge_iq iq;	/* MUST be first */
-	struct sge_fl fl;
-};
-
-/*
- * wrq: SGE egress queue that is given prebuilt work requests.  Both the control
- * and offload tx queues are of this type.
- */
-struct sge_wrq {
-	struct sge_eq eq;	/* MUST be first */
-
-	struct adapter *adapter;
-
-	/* List of WRs held up due to lack of tx descriptors */
-	struct mblk_pair wr_list;
-
-	/* stats for common events first */
-
-	uint64_t tx_wrs;	/* # of tx work requests */
-
-	/* stats for not-that-common events */
-
-	uint32_t no_desc;	/* out of hardware descriptors */
-};
-#endif
-
 struct sge {
 	int fl_starve_threshold;
 	int s_qpp;
 
 	int nrxq;	/* total rx queues (all ports and the rest) */
 	int ntxq;	/* total tx queues (all ports and the rest) */
-#ifdef TCP_OFFLOAD_ENABLE
-	int nofldrxq;	/* total # of TOE rx queues */
-	int nofldtxq;	/* total # of TOE tx queues */
-#endif
 	int niq;	/* total ingress queues */
 	int neq;	/* total egress queues */
 	int stat_len;	/* length of status page at ring end */
@@ -419,16 +373,8 @@ struct sge {
 	int fl_align;	/* response queue message alignment */
 
 	struct sge_iq fwq;	/* Firmware event queue */
-#ifdef TCP_OFFLOAD_ENABLE
-	struct sge_wrq mgmtq;	/* Management queue (Control queue) */
-#endif
 	struct sge_txq *txq;	/* NIC tx queues */
 	struct sge_rxq *rxq;	/* NIC rx queues */
-#ifdef TCP_OFFLOAD_ENABLE
-	struct sge_wrq *ctrlq;	/* Control queues */
-	struct sge_wrq *ofld_txq;	/* TOE tx queues */
-	struct sge_ofld_rxq *ofld_rxq;	/* TOE rx queues */
-#endif
 
 	int iq_start; /* iq context id map start index */
 	int eq_start; /* eq context id map start index */
@@ -456,12 +402,6 @@ struct driver_properties {
 	int max_nrxq_10g;
 	int max_ntxq_1g;
 	int max_nrxq_1g;
-#ifdef TCP_OFFLOAD_ENABLE
-	int max_nofldtxq_10g;
-	int max_nofldrxq_10g;
-	int max_nofldtxq_1g;
-	int max_nofldrxq_1g;
-#endif
 	int intr_types;
 	int tmr_idx_10g;
 	int pktc_idx_10g;
@@ -543,14 +483,6 @@ struct adapter {
 	struct adapter_params params;
 	struct t4_virt_res vres;
 
-#ifdef TCP_OFFLOAD_ENABLE
-	struct uld_softc tom;
-	struct tom_tunables tt;
-#endif
-
-#ifdef TCP_OFFLOAD_ENABLE
-	int offload_map;
-#endif
 	uint16_t linkcaps;
 	uint16_t niccaps;
 	uint16_t toecaps;
@@ -807,21 +739,6 @@ is_10XG_port(const struct port_info *pi)
 		is_25G_port(pi) || is_50G_port(pi) ||
 		is_100G_port(pi));
 }
-
-#ifdef TCP_OFFLOAD_ENABLE
-int t4_wrq_tx_locked(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m0);
-
-static inline int
-t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m)
-{
-	int rc;
-
-	TXQ_LOCK(wrq);
-	rc = t4_wrq_tx_locked(sc, wrq, m);
-	TXQ_UNLOCK(wrq);
-	return (rc);
-}
-#endif
 
 /**
  * t4_os_pci_read_seeprom - read four bytes of SEEPROM/VPD contents

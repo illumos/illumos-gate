@@ -137,33 +137,6 @@ struct tom_tunables {
 	int ddp_thres;
 };
 
-#ifdef TCP_OFFLOAD_ENABLE
-struct offload_req {
-	__be32 sip[4];
-	__be32 dip[4];
-	__be16 sport;
-	__be16 dport;
-	__u8   ipvers_opentype;
-	__u8   tos;
-	__be16 vlan;
-	__u32  mark;
-};
-
-enum { OPEN_TYPE_LISTEN, OPEN_TYPE_ACTIVE, OPEN_TYPE_PASSIVE };
-
-struct offload_settings {
-	__u8  offload;
-	int8_t  ddp;
-	int8_t  rx_coalesce;
-	int8_t  cong_algo;
-	int32_t	rssq;
-	int16_t sched_class;
-	int8_t  tstamp;
-	int8_t  sack;
-
-};
-#endif
-
 extern int t4_register_uld(struct uld_info *ui);
 extern int t4_unregister_uld(struct uld_info *ui);
 

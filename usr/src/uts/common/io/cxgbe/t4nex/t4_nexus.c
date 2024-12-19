@@ -129,12 +129,6 @@ struct intrs_and_queues {
 	int nrxq10g;		/* # of NIC rxq's for each 10G port */
 	int ntxq1g;		/* # of NIC txq's for each 1G port */
 	int nrxq1g;		/* # of NIC rxq's for each 1G port */
-#ifdef TCP_OFFLOAD_ENABLE
-	int nofldtxq10g;	/* # of TOE txq's for each 10G port */
-	int nofldrxq10g;	/* # of TOE rxq's for each 10G port */
-	int nofldtxq1g;		/* # of TOE txq's for each 1G port */
-	int nofldrxq1g;		/* # of TOE rxq's for each 1G port */
-#endif
 };
 
 static int cpl_not_handled(struct sge_iq *iq, const struct rss_header *rss,
@@ -167,17 +161,8 @@ static int remove_child_node(struct adapter *sc, int idx);
 static kstat_t *setup_kstats(struct adapter *sc);
 static kstat_t *setup_wc_kstats(struct adapter *);
 static int update_wc_kstats(kstat_t *, int);
-#ifdef TCP_OFFLOAD_ENABLE
-static int toe_capability(struct port_info *pi, int enable);
-static int activate_uld(struct adapter *sc, int id, struct uld_softc *usc);
-static int deactivate_uld(struct uld_softc *usc);
-#endif
 static kmutex_t t4_adapter_list_lock;
 static SLIST_HEAD(, adapter) t4_adapter_list;
-#ifdef TCP_OFFLOAD_ENABLE
-static kmutex_t t4_uld_list_lock;
-static SLIST_HEAD(, uld_info) t4_uld_list;
-#endif
 
 static int t4_temperature_read(void *, sensor_ioctl_scalar_t *);
 static int t4_voltage_read(void *, sensor_ioctl_scalar_t *);
@@ -217,11 +202,6 @@ _init(void)
 
 	mutex_init(&t4_adapter_list_lock, NULL, MUTEX_DRIVER, NULL);
 	SLIST_INIT(&t4_adapter_list);
-
-#ifdef TCP_OFFLOAD_ENABLE
-	mutex_init(&t4_uld_list_lock, NULL, MUTEX_DRIVER, NULL);
-	SLIST_INIT(&t4_uld_list);
-#endif
 
 	return (rc);
 }
@@ -302,9 +282,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	struct sge *s;
 	int i, instance, rc = DDI_SUCCESS, rqidx, tqidx, q;
 	int irq = 0, nxg = 0, n1g = 0;
-#ifdef TCP_OFFLOAD_ENABLE
-	int ofld_rqidx, ofld_tqidx;
-#endif
 	char name[16];
 	struct driver_properties *prp;
 	struct intrs_and_queues iaq;
@@ -600,30 +577,9 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	s->nrxq = nxg * iaq.nrxq10g + n1g * iaq.nrxq1g;
 	s->ntxq = nxg * iaq.ntxq10g + n1g * iaq.ntxq1g;
 	s->neq = s->ntxq + s->nrxq;	/* the fl in an rxq is an eq */
-#ifdef TCP_OFFLOAD_ENABLE
-	/* control queues, 1 per port + 1 mgmtq */
-	s->neq += sc->params.nports + 1;
-#endif
 	s->niq = s->nrxq + 1;		/* 1 extra for firmware event queue */
 	if (iaq.intr_fwd != 0)
 		sc->flags |= INTR_FWD;
-#ifdef TCP_OFFLOAD_ENABLE
-	if (is_offload(sc) != 0) {
-
-		s->nofldrxq = nxg * iaq.nofldrxq10g + n1g * iaq.nofldrxq1g;
-		s->nofldtxq = nxg * iaq.nofldtxq10g + n1g * iaq.nofldtxq1g;
-		s->neq += s->nofldtxq + s->nofldrxq;
-		s->niq += s->nofldrxq;
-
-		s->ofld_rxq = kmem_zalloc(s->nofldrxq *
-		    sizeof (struct sge_ofld_rxq), KM_SLEEP);
-		s->ofld_txq = kmem_zalloc(s->nofldtxq *
-		    sizeof (struct sge_wrq), KM_SLEEP);
-		s->ctrlq = kmem_zalloc(sc->params.nports *
-		    sizeof (struct sge_wrq), KM_SLEEP);
-
-	}
-#endif
 	s->rxq = kmem_zalloc(s->nrxq * sizeof (struct sge_rxq), KM_SLEEP);
 	s->txq = kmem_zalloc(s->ntxq * sizeof (struct sge_txq), KM_SLEEP);
 	s->iqmap = kmem_zalloc(s->iqmap_sz * sizeof (struct sge_iq *), KM_SLEEP);
@@ -637,9 +593,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * tx queues that each port should get.
 	 */
 	rqidx = tqidx = 0;
-#ifdef TCP_OFFLOAD_ENABLE
-	ofld_rqidx = ofld_tqidx = 0;
-#endif
 	for_each_port(sc, i) {
 		struct port_info *pi = sc->port[i];
 
@@ -661,31 +614,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		rqidx += pi->nrxq;
 		tqidx += pi->ntxq;
 
-#ifdef TCP_OFFLOAD_ENABLE
-		if (is_offload(sc) != 0) {
-			/* LINTED: E_ASSIGN_NARROW_CONV */
-			pi->first_ofld_rxq = ofld_rqidx;
-			pi->nofldrxq = max(1, pi->nrxq / 4);
-
-			/* LINTED: E_ASSIGN_NARROW_CONV */
-			pi->first_ofld_txq = ofld_tqidx;
-			pi->nofldtxq = max(1, pi->ntxq / 2);
-
-			ofld_rqidx += pi->nofldrxq;
-			ofld_tqidx += pi->nofldtxq;
-		}
-#endif
-
 		/*
 		 * Enable hw checksumming and LSO for all ports by default.
 		 * They can be disabled using ndd (hw_csum and hw_lso).
 		 */
 		pi->features |= (CXGBE_HW_CSUM | CXGBE_HW_LSO);
 	}
-
-#ifdef TCP_OFFLOAD_ENABLE
-		sc->l2t = t4_init_l2t(sc);
-#endif
 
 	/*
 	 * Setup Interrupts.
@@ -728,17 +662,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		for_each_port(sc, i) {
 			struct port_info *pi = sc->port[i];
 			struct sge_rxq *rxq;
-#ifdef TCP_OFFLOAD_ENABLE
-			struct sge_ofld_rxq *ofld_rxq;
-
-			/*
-			 * Skip over the NIC queues if they aren't taking direct
-			 * interrupts.
-			 */
-			if ((sc->flags & INTR_FWD) &&
-			    pi->nofldrxq > pi->nrxq)
-				goto ofld_queues;
-#endif
 			rxq = &s->rxq[pi->first_rxq];
 			for (q = 0; q < pi->nrxq; q++, rxq++) {
 				(void) ddi_intr_add_handler(
@@ -746,23 +669,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				    &rxq->iq);
 				irq++;
 			}
-
-#ifdef TCP_OFFLOAD_ENABLE
-			/*
-			 * Skip over the offload queues if they aren't taking
-			 * direct interrupts.
-			 */
-			if ((sc->flags & INTR_FWD))
-				continue;
-ofld_queues:
-			ofld_rxq = &s->ofld_rxq[pi->first_ofld_rxq];
-			for (q = 0; q < pi->nofldrxq; q++, ofld_rxq++) {
-				(void) ddi_intr_add_handler(
-				    sc->intr_handle[irq], t4_intr, sc,
-				    &ofld_rxq->iq);
-				irq++;
-			}
-#endif
 		}
 
 	}
@@ -871,16 +777,6 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	s = &sc->sge;
 	if (s->rxq != NULL)
 		kmem_free(s->rxq, s->nrxq * sizeof (struct sge_rxq));
-#ifdef TCP_OFFLOAD_ENABLE
-	if (s->ofld_txq != NULL)
-		kmem_free(s->ofld_txq, s->nofldtxq * sizeof (struct sge_wrq));
-	if (s->ofld_rxq != NULL)
-		kmem_free(s->ofld_rxq,
-		    s->nofldrxq * sizeof (struct sge_ofld_rxq));
-	if (s->ctrlq != NULL)
-		kmem_free(s->ctrlq,
-		    sc->params.nports * sizeof (struct sge_wrq));
-#endif
 	if (s->txq != NULL)
 		kmem_free(s->txq, s->ntxq * sizeof (struct sge_txq));
 	if (s->iqmap != NULL)
@@ -1964,24 +1860,6 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	(void) ddi_prop_update_int(dev, dip, "max-nrxq-1G-port",
 	    p->max_nrxq_1g);
 
-#ifdef TCP_OFFLOAD_ENABLE
-	p->max_nofldtxq_10g = prop_lookup_int(sc, "max-nofldtxq-10G-port", 8);
-	(void) ddi_prop_update_int(dev, dip, "max-ntxq-10G-port",
-	    p->max_nofldtxq_10g);
-
-	p->max_nofldrxq_10g = prop_lookup_int(sc, "max-nofldrxq-10G-port", 2);
-	(void) ddi_prop_update_int(dev, dip, "max-nrxq-10G-port",
-	    p->max_nofldrxq_10g);
-
-	p->max_nofldtxq_1g = prop_lookup_int(sc, "max-nofldtxq-1G-port", 2);
-	(void) ddi_prop_update_int(dev, dip, "max-ntxq-1G-port",
-	    p->max_nofldtxq_1g);
-
-	p->max_nofldrxq_1g = prop_lookup_int(sc, "max-nofldrxq-1G-port", 1);
-	(void) ddi_prop_update_int(dev, dip, "max-nrxq-1G-port",
-	    p->max_nofldrxq_1g);
-#endif
-
 	/*
 	 * Holdoff parameters for 10G and 1G ports.
 	 */
@@ -2113,19 +1991,9 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 	iaq->ntxq1g = min(nc, p->max_ntxq_1g);
 	iaq->nrxq10g = min(nc, p->max_nrxq_10g);
 	iaq->nrxq1g = min(nc, p->max_nrxq_1g);
-#ifdef TCP_OFFLOAD_ENABLE
-	iaq->nofldtxq10g = min(nc, p->max_nofldtxq_10g);
-	iaq->nofldtxq1g = min(nc, p->max_nofldtxq_1g);
-	iaq->nofldrxq10g = min(nc, p->max_nofldrxq_10g);
-	iaq->nofldrxq1g = min(nc, p->max_nofldrxq_1g);
-#endif
 
 	pfres_rxq = iaq->nrxq10g * n10g + iaq->nrxq1g * n1g;
 	pfres_txq = iaq->ntxq10g * n10g + iaq->ntxq1g * n1g;
-#ifdef TCP_OFFLOAD_ENABLE
-	pfres_rxq += iaq->nofldrxq10g * n10g + iaq->nofldrxq1g * n1g;
-	pfres_txq += iaq->nofldtxq10g * n10g + iaq->nofldtxq1g * n1g;
-#endif
 
 	/* If current configuration of max number of Rxqs and Txqs exceed
 	 * the max available for all the ports under this PF, then shrink
@@ -2163,18 +2031,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			pfres_rxq -= n1g;
 		}
 
-#ifdef TCP_OFFLOAD_ENABLE
-		if (iaq->nofldrxq10g > 1) {
-			iaq->nofldrxq10g--;
-			pfres_rxq -= n10g;
-		}
-
-		if (iaq->nofldrxq1g > 1) {
-			iaq->nofldrxq1g--;
-			pfres_rxq -= n1g;
-		}
-#endif
-
 		/* Break if nothing changed */
 		if (pfresq == pfres_rxq)
 			break;
@@ -2193,18 +2049,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			iaq->ntxq1g--;
 			pfres_txq -= n1g;
 		}
-
-#ifdef TCP_OFFLOAD_ENABLE
-		if (iaq->nofldtxq10g > 1) {
-			iaq->nofldtxq10g--;
-			pfres_txq -= n10g;
-		}
-
-		if (iaq->nofldtxq1g > 1) {
-			iaq->nofldtxq1g--;
-			pfres_txq -= n1g;
-		}
-#endif
 
 		/* Break if nothing changed */
 		if (pfresq == pfres_txq)
@@ -2247,10 +2091,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 		iaq->nirq = T4_EXTRA_INTR;
 		iaq->nirq += n10g * iaq->nrxq10g;
 		iaq->nirq += n1g * iaq->nrxq1g;
-#ifdef TCP_OFFLOAD_ENABLE
-		iaq->nirq += n10g * iaq->nofldrxq10g;
-		iaq->nirq += n1g * iaq->nofldrxq1g;
-#endif
 
 		if (iaq->nirq <= navail &&
 		    (itype != DDI_INTR_TYPE_MSI || ISP2(iaq->nirq))) {
@@ -2264,13 +2104,8 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 		 * offload rxq's.
 		 */
 		iaq->nirq = T4_EXTRA_INTR;
-#ifdef TCP_OFFLOAD_ENABLE
-		iaq->nirq += n10g * max(iaq->nrxq10g, iaq->nofldrxq10g);
-		iaq->nirq += n1g * max(iaq->nrxq1g, iaq->nofldrxq1g);
-#else
 		iaq->nirq += n10g * iaq->nrxq10g;
 		iaq->nirq += n1g * iaq->nrxq1g;
-#endif
 		if (iaq->nirq <= navail &&
 		    (itype != DDI_INTR_TYPE_MSI || ISP2(iaq->nirq))) {
 			iaq->intr_fwd = 1;
@@ -2291,9 +2126,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			if (n10g > 0) {
 				int target = iaq->nrxq10g;
 
-#ifdef TCP_OFFLOAD_ENABLE
-				target = max(target, iaq->nofldrxq10g);
-#endif
 				n = 1;
 				while (n < target && leftover >= n10g) {
 					leftover -= n10g;
@@ -2301,17 +2133,11 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 					n++;
 				}
 				iaq->nrxq10g = min(n, iaq->nrxq10g);
-#ifdef TCP_OFFLOAD_ENABLE
-				iaq->nofldrxq10g = min(n, iaq->nofldrxq10g);
-#endif
 			}
 
 			if (n1g > 0) {
 				int target = iaq->nrxq1g;
 
-#ifdef TCP_OFFLOAD_ENABLE
-				target = max(target, iaq->nofldrxq1g);
-#endif
 				n = 1;
 				while (n < target && leftover >= n1g) {
 					leftover -= n1g;
@@ -2319,9 +2145,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 					n++;
 				}
 				iaq->nrxq1g = min(n, iaq->nrxq1g);
-#ifdef TCP_OFFLOAD_ENABLE
-				iaq->nofldrxq1g = min(n, iaq->nofldrxq1g);
-#endif
 			}
 
 			/* We have arrived at a minimum value required to enable
@@ -2331,12 +2154,7 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			 * Hence enable Interrupt forwarding only for offload
 			 * case.
 			 */
-#ifdef TCP_OFFLOAD_ENABLE
-			if (itype != DDI_INTR_TYPE_MSI || ISP2(iaq->nirq)) {
-				iaq->intr_fwd = 1;
-#else
 			if (itype != DDI_INTR_TYPE_MSI) {
-#endif
 				goto allocate;
 			}
 		}
@@ -2345,9 +2163,6 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 		 * Least desirable option: one interrupt vector for everything.
 		 */
 		iaq->nirq = iaq->nrxq10g = iaq->nrxq1g = 1;
-#ifdef TCP_OFFLOAD_ENABLE
-		iaq->nofldrxq10g = iaq->nofldrxq1g = 1;
-#endif
 		iaq->intr_fwd = 1;
 
 allocate:
@@ -2757,22 +2572,6 @@ adapter_full_init(struct adapter *sc)
 	t4_intr_enable(sc);
 	sc->flags |= FULL_INIT_DONE;
 
-#ifdef TCP_OFFLOAD_ENABLE
-	/* TODO: wrong place to enable TOE capability */
-	if (is_offload(sc) != 0) {
-		for_each_port(sc, i) {
-			struct port_info *pi = sc->port[i];
-			rc = toe_capability(pi, 1);
-			if (rc != 0) {
-				cxgb_printf(pi->dip, CE_WARN,
-				    "Failed to activate toe capability: %d",
-				    rc);
-				rc = 0;		/* not a fatal error */
-			}
-		}
-	}
-#endif
-
 done:
 	if (rc != 0)
 		(void) adapter_full_uninit(sc);
@@ -2875,9 +2674,6 @@ enable_port_queues(struct port_info *pi)
 	int i;
 	struct sge_iq *iq;
 	struct sge_rxq *rxq;
-#ifdef TCP_OFFLOAD_ENABLE
-	struct sge_ofld_rxq *ofld_rxq;
-#endif
 
 	ASSERT(pi->flags & PORT_INIT_DONE);
 
@@ -2886,18 +2682,6 @@ enable_port_queues(struct port_info *pi)
 	 * back in disable_port_queues will be processed now, after an unbounded
 	 * delay.  This can't be good.
 	 */
-
-#ifdef TCP_OFFLOAD_ENABLE
-	for_each_ofld_rxq(pi, i, ofld_rxq) {
-		iq = &ofld_rxq->iq;
-		if (atomic_cas_uint(&iq->state, IQS_DISABLED, IQS_IDLE) !=
-		    IQS_DISABLED)
-			panic("%s: iq %p wasn't disabled", __func__,
-			    (void *)iq);
-		t4_write_reg(sc, MYPF_REG(A_SGE_PF_GTS),
-		    V_SEINTARM(iq->intr_params) | V_INGRESSQID(iq->cntxt_id));
-	}
-#endif
 
 	for_each_rxq(pi, i, rxq) {
 		iq = &rxq->iq;
@@ -2916,23 +2700,12 @@ disable_port_queues(struct port_info *pi)
 	int i;
 	struct adapter *sc = pi->adapter;
 	struct sge_rxq *rxq;
-#ifdef TCP_OFFLOAD_ENABLE
-	struct sge_ofld_rxq *ofld_rxq;
-#endif
 
 	ASSERT(pi->flags & PORT_INIT_DONE);
 
 	/*
 	 * TODO: need proper implementation for all tx queues (ctrl, eth, ofld).
 	 */
-
-#ifdef TCP_OFFLOAD_ENABLE
-	for_each_ofld_rxq(pi, i, ofld_rxq) {
-		while (atomic_cas_uint(&ofld_rxq->iq.state, IQS_IDLE,
-		    IQS_DISABLED) != IQS_IDLE)
-			msleep(1);
-	}
-#endif
 
 	for_each_rxq(pi, i, rxq) {
 		while (atomic_cas_uint(&rxq->iq.state, IQS_IDLE,
@@ -2941,10 +2714,6 @@ disable_port_queues(struct port_info *pi)
 	}
 
 	mutex_enter(&sc->sfl_lock);
-#ifdef TCP_OFFLOAD_ENABLE
-	for_each_ofld_rxq(pi, i, ofld_rxq)
-	    ofld_rxq->fl.flags |= FL_DOOMED;
-#endif
 	for_each_rxq(pi, i, rxq)
 	    rxq->fl.flags |= FL_DOOMED;
 	mutex_exit(&sc->sfl_lock);
@@ -3066,162 +2835,6 @@ t4_register_fw_msg_handler(struct adapter *sc, int type, fw_msg_handler_t h)
 
 	return (0);
 }
-
-#ifdef TCP_OFFLOAD_ENABLE
-static int
-toe_capability(struct port_info *pi, int enable)
-{
-	int rc;
-	struct adapter *sc = pi->adapter;
-
-	if (!is_offload(sc))
-		return (ENODEV);
-
-	if (enable != 0) {
-		if (isset(&sc->offload_map, pi->port_id) != 0)
-			return (0);
-
-		if (sc->offload_map == 0) {
-			rc = activate_uld(sc, ULD_TOM, &sc->tom);
-			if (rc != 0)
-				return (rc);
-		}
-
-		setbit(&sc->offload_map, pi->port_id);
-	} else {
-		if (!isset(&sc->offload_map, pi->port_id))
-			return (0);
-
-		clrbit(&sc->offload_map, pi->port_id);
-
-		if (sc->offload_map == 0) {
-			rc = deactivate_uld(&sc->tom);
-			if (rc != 0) {
-				setbit(&sc->offload_map, pi->port_id);
-				return (rc);
-			}
-		}
-	}
-
-	return (0);
-}
-
-/*
- * Add an upper layer driver to the global list.
- */
-int
-t4_register_uld(struct uld_info *ui)
-{
-	int rc = 0;
-	struct uld_info *u;
-
-	mutex_enter(&t4_uld_list_lock);
-	SLIST_FOREACH(u, &t4_uld_list, link) {
-		if (u->uld_id == ui->uld_id) {
-			rc = EEXIST;
-			goto done;
-		}
-	}
-
-	SLIST_INSERT_HEAD(&t4_uld_list, ui, link);
-	ui->refcount = 0;
-done:
-	mutex_exit(&t4_uld_list_lock);
-	return (rc);
-}
-
-int
-t4_unregister_uld(struct uld_info *ui)
-{
-	int rc = EINVAL;
-	struct uld_info *u;
-
-	mutex_enter(&t4_uld_list_lock);
-
-	SLIST_FOREACH(u, &t4_uld_list, link) {
-		if (u == ui) {
-			if (ui->refcount > 0) {
-				rc = EBUSY;
-				goto done;
-			}
-
-			SLIST_REMOVE(&t4_uld_list, ui, uld_info, link);
-			rc = 0;
-			goto done;
-		}
-	}
-done:
-	mutex_exit(&t4_uld_list_lock);
-	return (rc);
-}
-
-static int
-activate_uld(struct adapter *sc, int id, struct uld_softc *usc)
-{
-	int rc = EAGAIN;
-	struct uld_info *ui;
-
-	mutex_enter(&t4_uld_list_lock);
-
-	SLIST_FOREACH(ui, &t4_uld_list, link) {
-		if (ui->uld_id == id) {
-			rc = ui->attach(sc, &usc->softc);
-			if (rc == 0) {
-				ASSERT(usc->softc != NULL);
-				ui->refcount++;
-				usc->uld = ui;
-			}
-			goto done;
-		}
-	}
-done:
-	mutex_exit(&t4_uld_list_lock);
-
-	return (rc);
-}
-
-static int
-deactivate_uld(struct uld_softc *usc)
-{
-	int rc;
-
-	mutex_enter(&t4_uld_list_lock);
-
-	if (usc->uld == NULL || usc->softc == NULL) {
-		rc = EINVAL;
-		goto done;
-	}
-
-	rc = usc->uld->detach(usc->softc);
-	if (rc == 0) {
-		ASSERT(usc->uld->refcount > 0);
-		usc->uld->refcount--;
-		usc->uld = NULL;
-		usc->softc = NULL;
-	}
-done:
-	mutex_exit(&t4_uld_list_lock);
-
-	return (rc);
-}
-
-void
-t4_iterate(void (*func)(int, void *), void *arg)
-{
-	struct adapter *sc;
-
-	mutex_enter(&t4_adapter_list_lock);
-	SLIST_FOREACH(sc, &t4_adapter_list, link) {
-		/*
-		 * func should not make any assumptions about what state sc is
-		 * in - the only guarantee is that sc->sc_lock is a valid lock.
-		 */
-		func(ddi_get_instance(sc->dip), arg);
-	}
-	mutex_exit(&t4_adapter_list_lock);
-}
-
-#endif
 
 static int
 t4_sensor_read(struct adapter *sc, uint32_t diag, uint32_t *valp)

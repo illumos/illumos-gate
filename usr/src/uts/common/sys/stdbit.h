@@ -232,8 +232,14 @@ extern unsigned long long stdc_bit_ceil_ull(unsigned long long) _C23_UNSEQ_ATTR;
  * signed and unsigned _BitInt() values that are able to be translated into
  * standard sizes.  We always use the ull versions for 64-bit values as that is
  * always 64-bit regardless if we're in an ILP32 or LP64 environment.
+ *
+ * _Generic was introduced in C11. As we currently don't have any _Generic
+ * statements that aren't valid in C11, we reduce our guard for these to C11 as
+ * there isn't really a good way to test for the presence of the _Generic
+ * construct otherwise. If we end up having to modify these to use more explicit
+ * types, we'll have to have per-standard versions of these macros.
  */
-#if defined(_STDC_C23)
+#if defined(_STDC_C11)
 /* CSTYLED */
 #define	stdc_leading_zeros(val)	_Generic((char(*)[sizeof (val)]){ 0 },	\
     char(*)[1]:	stdc_leading_zeros_uc(val),	\
@@ -331,7 +337,7 @@ extern unsigned long long stdc_bit_ceil_ull(unsigned long long) _C23_UNSEQ_ATTR;
     char(*)[2]:	stdc_bit_ceil_us(val),	\
     char(*)[4]:	stdc_bit_ceil_ui(val),	\
     char(*)[8]:	stdc_bit_ceil_ull(val))
-#endif	/* STDC_C23 */
+#endif	/* STDC_C11 */
 
 #ifdef __cplusplus
 }
