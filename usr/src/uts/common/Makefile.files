@@ -1988,7 +1988,7 @@ CH_COM_OBJS =	ch_mac.o ch_subr.o cspi.o espi.o ixf1010.o mc3.o mc4.o mc5.o \
 #	Chelsio Terminator 4 10G NIC nexus driver module
 #
 CXGBE_COM_OBJS =	t4_hw.o common.o
-CXGBE_NEX_OBJS =	t4_nexus.o t4_sge.o t4_mac.o t4_ioctl.o shared.o \
+CXGBE_NEX_OBJS =	t4_nexus.o t4_sge.o t4_mac.o t4_ioctl.o t4_debug.o \
 			t4_l2t.o cudbg_lib.o cudbg_wtp.o fastlz.o \
 			fastlz_api.o cudbg_common.o cudbg_flash_utils.o \
 			cudbg.o
