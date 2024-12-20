@@ -27,7 +27,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 Hans Rosenfeld
  */
 
@@ -1353,9 +1353,20 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "%s shutdown", asy_hw_name(asy));
 
+	/*
+	 * Ensure that interrupts are disabled prior to destroying data and
+	 * mutexes that they depend on.
+	 */
+	if ((asy->asy_progress & ASY_PROGRESS_INT) != 0)
+		asy_intr_free(asy);
+
+	if ((asy->asy_progress & ASY_PROGRESS_SOFTINT) != 0)
+		asy_softintr_free(asy);
+
 	if ((asy->asy_progress & ASY_PROGRESS_ASYNC) != 0) {
 		struct asyncline *async = asy->asy_priv;
 
+		asy->asy_priv = NULL;
 		/* cancel DTR hold timeout */
 		if (async->async_dtrtid != 0) {
 			(void) untimeout(async->async_dtrtid);
@@ -1363,7 +1374,6 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		}
 		cv_destroy(&async->async_flags_cv);
 		kmem_free(async, sizeof (struct asyncline));
-		asy->asy_priv = NULL;
 	}
 
 	if ((asy->asy_progress & ASY_PROGRESS_MINOR) != 0)
@@ -1374,12 +1384,6 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		mutex_destroy(&asy->asy_excl_hi);
 		mutex_destroy(&asy->asy_soft_lock);
 	}
-
-	if ((asy->asy_progress & ASY_PROGRESS_INT) != 0)
-		asy_intr_free(asy);
-
-	if ((asy->asy_progress & ASY_PROGRESS_SOFTINT) != 0)
-		asy_softintr_free(asy);
 
 	if ((asy->asy_progress & ASY_PROGRESS_REGS) != 0)
 		ddi_regs_map_free(&asy->asy_iohandle);
@@ -1418,9 +1422,10 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	char name[ASY_MINOR_LEN];
 	int status;
 	static ddi_device_acc_attr_t ioattr = {
-		DDI_DEVICE_ATTR_V0,
-		DDI_NEVERSWAP_ACC,
-		DDI_STRICTORDER_ACC,
+		.devacc_attr_version = DDI_DEVICE_ATTR_V1,
+		.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC,
+		.devacc_attr_dataorder = DDI_STRICTORDER_ACC,
+		.devacc_attr_access = DDI_DEFAULT_ACC
 	};
 
 	switch (cmd) {
@@ -1503,8 +1508,8 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Don't use asy_disable_interrupts() as the mutexes haven't been
 	 * initialized yet.
 	 */
-	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ASY_IER, 0);
-
+	ddi_put8(asy->asy_iohandle,
+	    asy->asy_ioaddr + asy_reg_table[ASY_IER].asy_reg_off, 0);
 
 	/*
 	 * Establish default settings:
@@ -2247,7 +2252,7 @@ asyopen(queue_t *rq, dev_t *dev, int flag, int sflag __unused, cred_t *cr)
 	asy = ddi_get_soft_state(asy_soft_state, unit);
 	if (asy == NULL)
 		return (ENXIO);		/* unit not configured */
-	ASY_DPRINTF(asy, ASY_DEBUG_CLOSE, "enter");
+	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "enter");
 	async = asy->asy_priv;
 	mutex_enter(&asy->asy_excl);
 
@@ -2331,9 +2336,9 @@ again:
 		ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
 		    "ASY_IGNORE_CD set, set TS_SOFTCAR");
 		async->async_ttycommon.t_flags |= TS_SOFTCAR;
-	}
-	else
+	} else {
 		async->async_ttycommon.t_flags &= ~TS_SOFTCAR;
+	}
 
 	/*
 	 * Check carrier.
@@ -2874,13 +2879,18 @@ uint_t
 asyintr(caddr_t argasy, caddr_t argunused __unused)
 {
 	struct asycom		*asy = (struct asycom *)argasy;
-	struct asyncline	*async = asy->asy_priv;
+	struct asyncline	*async;
 	int			ret_status = DDI_INTR_UNCLAIMED;
 
 	mutex_enter(&asy->asy_excl_hi);
-	if ((async == NULL) ||
-	    !(async->async_flags & (ASYNC_ISOPEN|ASYNC_WOPEN))) {
+	async = asy->asy_priv;
+	if (async == NULL ||
+	    (async->async_flags & (ASYNC_ISOPEN|ASYNC_WOPEN)) == 0) {
 		const uint8_t intr_id = asy_get(asy, ASY_ISR);
+
+		ASY_DPRINTF(asy, ASY_DEBUG_INTR,
+		    "not open async=%p flags=0x%x interrupt_id=0x%x",
+		    async, async == NULL ? 0 : async->async_flags, intr_id);
 
 		if ((intr_id & ASY_ISR_NOINTR) == 0) {
 			/*
@@ -2916,14 +2926,23 @@ asyintr(caddr_t argasy, caddr_t argunused __unused)
 	 */
 	for (;;) {
 		const uint8_t intr_id = asy_get(asy, ASY_ISR);
+		/*
+		 * Reading LSR will clear any error bits (ASY_LSR_ERRORS) which
+		 * are set which is why the value is passed through to
+		 * async_rxint() and not re-read there. In the unexpected event
+		 * that we've ended up here without a pending interrupt, the
+		 * ASY_ISR_NOINTR case, it should do no harm to have cleared
+		 * the error bits, and it means we can get some additional
+		 * information in the debug message if it's enabled.
+		 */
+		const uint8_t lsr = asy_get(asy, ASY_LSR);
+
+		ASY_DPRINTF(asy, ASY_DEBUG_INTR,
+		    "interrupt_id=0x%x LSR=0x%x",
+		    intr_id, lsr);
 
 		if (intr_id & ASY_ISR_NOINTR)
 			break;
-
-		ASY_DPRINTF(asy, ASY_DEBUG_INTR, "interrupt_id = 0x%x",
-		    intr_id);
-
-		const uint8_t lsr = asy_get(asy, ASY_LSR);
 
 		switch (intr_id & ASY_ISR_MASK) {
 		case ASY_ISR_ID_RLST:
@@ -2964,7 +2983,7 @@ asyintr(caddr_t argasy, caddr_t argunused __unused)
 
 		/* Refill the output FIFO if it has gone empty */
 		if ((lsr & ASY_LSR_THRE) && (async->async_flags & ASYNC_BUSY) &&
-		    (async->async_ocnt > 0))
+		    async->async_ocnt > 0)
 			async_txint(asy);
 	}
 
