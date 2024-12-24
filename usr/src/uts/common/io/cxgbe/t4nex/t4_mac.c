@@ -1682,7 +1682,7 @@ begin_synchronized_op(struct port_info *pi, int hold, int waitok)
 	int rc = 0;
 
 	ADAPTER_LOCK(sc);
-	while (!IS_DOOMED(pi) && IS_BUSY(sc)) {
+	while (sc->flags & TAF_BUSY) {
 		if (!waitok) {
 			rc = EBUSY;
 			goto failed;
@@ -1691,13 +1691,7 @@ begin_synchronized_op(struct port_info *pi, int hold, int waitok)
 			goto failed;
 		}
 	}
-	if (IS_DOOMED(pi) != 0) {	/* shouldn't happen on Solaris */
-		rc = ENXIO;
-		goto failed;
-	}
-	ASSERT(!IS_BUSY(sc));
-	/* LINTED: E_CONSTANT_CONDITION */
-	SET_BUSY(sc);
+	sc->flags |= TAF_BUSY;
 
 	if (!hold)
 		ADAPTER_UNLOCK(sc);
@@ -1717,9 +1711,8 @@ end_synchronized_op(struct port_info *pi, int held)
 		ADAPTER_LOCK(sc);
 
 	ADAPTER_LOCK_ASSERT_OWNED(sc);
-	ASSERT(IS_BUSY(sc));
-	/* LINTED: E_CONSTANT_CONDITION */
-	CLR_BUSY(sc);
+	ASSERT(sc->flags & TAF_BUSY);
+	sc->flags &= ~TAF_BUSY;
 	cv_signal(&sc->cv);
 	ADAPTER_UNLOCK(sc);
 }
@@ -1735,11 +1728,11 @@ t4_init_synchronized(struct port_info *pi)
 	if (isset(&sc->open_device_map, pi->port_id) != 0)
 		return (0);	/* already running */
 
-	if (!(sc->flags & FULL_INIT_DONE) &&
+	if (!(sc->flags & TAF_INIT_DONE) &&
 	    ((rc = adapter_full_init(sc)) != 0))
 		return (rc);	/* error message displayed already */
 
-	if (!(pi->flags & PORT_INIT_DONE)) {
+	if (!(pi->flags & TPF_INIT_DONE)) {
 		rc = port_full_init(pi);
 		if (rc != 0)
 			return (rc); /* error message displayed already */

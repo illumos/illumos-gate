@@ -36,7 +36,6 @@
 #include <inet/ip.h>
 #include <inet/tcp.h>
 
-#include "version.h"
 #include "common/common.h"
 #include "common/t4_msg.h"
 #include "common/t4_regs.h"
@@ -90,7 +89,7 @@ static inline void init_iq(struct sge_iq *iq, struct adapter *sc, int tmr_idx,
     int8_t pktc_idx, int qsize, uint8_t esize);
 static inline void init_fl(struct sge_fl *fl, uint16_t qsize);
 static inline void init_eq(struct adapter *sc, struct sge_eq *eq,
-    uint16_t eqtype, uint16_t qsize, uint8_t tx_chan, uint16_t iqid);
+    uint16_t qsize, uint8_t tx_chan, uint16_t iqid);
 static int alloc_iq_fl(struct port_info *pi, struct sge_iq *iq,
     struct sge_fl *fl, int intr_idx, int cong);
 static int free_iq_fl(struct port_info *pi, struct sge_iq *iq,
@@ -100,7 +99,6 @@ static int free_fwq(struct adapter *sc);
 static int alloc_rxq(struct port_info *pi, struct sge_rxq *rxq, int intr_idx,
     int i);
 static int free_rxq(struct port_info *pi, struct sge_rxq *rxq);
-static int ctrl_eq_alloc(struct adapter *sc, struct sge_eq *eq);
 static int eth_eq_alloc(struct adapter *sc, struct port_info *pi,
     struct sge_eq *eq);
 static int alloc_eq(struct adapter *sc, struct port_info *pi,
@@ -387,7 +385,7 @@ first_vector(struct port_info *pi)
 		 * NIC queues exist and they'd better be taking direct
 		 * interrupts.
 		 */
-		ASSERT(!(sc->flags & INTR_FWD));
+		ASSERT(!(sc->flags & TAF_INTR_FWD));
 		rc += p->nrxq;
 	}
 	return (rc);
@@ -412,7 +410,7 @@ port_intr_iq(struct port_info *pi, int idx)
 	 * Not compiled with offload support and intr_count > 1.  Only NIC
 	 * queues exist and they'd better be taking direct interrupts.
 	 */
-	ASSERT(!(sc->flags & INTR_FWD));
+	ASSERT(!(sc->flags & TAF_INTR_FWD));
 
 	idx %= pi->nrxq;
 	iq = &s->rxq[pi->first_rxq + idx].iq;
@@ -448,7 +446,7 @@ t4_setup_port_queues(struct port_info *pi)
 
 		init_fl(&rxq->fl, p->qsize_rxq / 8); /* 8 bufs in each entry */
 
-		if ((!(sc->flags & INTR_FWD)) ||
+		if ((!(sc->flags & TAF_INTR_FWD)) ||
 		    (sc->intr_count > 1 && pi->nrxq)) {
 			rxq->iq.flags |= IQ_INTR;
 			rc = alloc_rxq(pi, rxq, intr_idx, i);
@@ -484,7 +482,7 @@ t4_setup_port_queues(struct port_info *pi)
 		uint16_t iqid;
 
 		iqid = port_intr_iq(pi, j)->cntxt_id;
-		init_eq(sc, &txq->eq, EQ_ETH, p->qsize_txq, pi->tx_chan, iqid);
+		init_eq(sc, &txq->eq, p->qsize_txq, pi->tx_chan, iqid);
 		rc = alloc_txq(pi, txq, i);
 		if (rc != 0)
 			goto done;
@@ -1050,14 +1048,13 @@ init_fl(struct sge_fl *fl, uint16_t qsize)
 }
 
 static inline void
-init_eq(struct adapter *sc, struct sge_eq *eq, uint16_t eqtype, uint16_t qsize,
-    uint8_t tx_chan, uint16_t iqid)
+init_eq(struct adapter *sc, struct sge_eq *eq, uint16_t qsize, uint8_t tx_chan,
+    uint16_t iqid)
 {
 	struct sge *s = &sc->sge;
 	uint32_t r;
 
 	ASSERT(tx_chan < NCHAN);
-	ASSERT(eqtype <= EQ_TYPEMASK);
 
 	if (is_t5(sc->params.chip)) {
 		r = t4_read_reg(sc, A_SGE_EGRESS_QUEUES_PER_PAGE_PF);
@@ -1066,7 +1063,7 @@ init_eq(struct adapter *sc, struct sge_eq *eq, uint16_t eqtype, uint16_t qsize,
 		s->s_qpp = r & M_QUEUESPERPAGEPF0;
 	}
 
-	eq->flags = eqtype & EQ_TYPEMASK;
+	eq->flags = 0;
 	eq->tx_chan = tx_chan;
 	eq->iqid = iqid;
 	eq->qsize = qsize;
@@ -1380,50 +1377,6 @@ free_rxq(struct port_info *pi, struct sge_rxq *rxq)
 }
 
 static int
-ctrl_eq_alloc(struct adapter *sc, struct sge_eq *eq)
-{
-	int rc, cntxt_id;
-	struct fw_eq_ctrl_cmd c;
-
-	bzero(&c, sizeof (c));
-
-	c.op_to_vfn = BE_32(V_FW_CMD_OP(FW_EQ_CTRL_CMD) | F_FW_CMD_REQUEST |
-	    F_FW_CMD_WRITE | F_FW_CMD_EXEC | V_FW_EQ_CTRL_CMD_PFN(sc->pf) |
-	    V_FW_EQ_CTRL_CMD_VFN(0));
-	c.alloc_to_len16 = BE_32(F_FW_EQ_CTRL_CMD_ALLOC |
-	    F_FW_EQ_CTRL_CMD_EQSTART | FW_LEN16(c));
-	c.cmpliqid_eqid = htonl(V_FW_EQ_CTRL_CMD_CMPLIQID(eq->iqid)); /* TODO */
-	c.physeqid_pkd = BE_32(0);
-	c.fetchszm_to_iqid =
-	    BE_32(V_FW_EQ_CTRL_CMD_HOSTFCMODE(X_HOSTFCMODE_STATUS_PAGE) |
-	    V_FW_EQ_CTRL_CMD_PCIECHN(eq->tx_chan) |
-	    F_FW_EQ_CTRL_CMD_FETCHRO | V_FW_EQ_CTRL_CMD_IQID(eq->iqid));
-	c.dcaen_to_eqsize =
-	    BE_32(V_FW_EQ_CTRL_CMD_FBMIN(X_FETCHBURSTMIN_64B) |
-	    V_FW_EQ_CTRL_CMD_FBMAX(X_FETCHBURSTMAX_512B) |
-	    V_FW_EQ_CTRL_CMD_CIDXFTHRESH(X_CIDXFLUSHTHRESH_32) |
-	    V_FW_EQ_CTRL_CMD_EQSIZE(eq->qsize));
-	c.eqaddr = BE_64(eq->ba);
-
-	rc = -t4_wr_mbox(sc, sc->mbox, &c, sizeof (c), &c);
-	if (rc != 0) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "failed to create control queue %d: %d", eq->tx_chan, rc);
-		return (rc);
-	}
-	eq->flags |= EQ_ALLOCATED;
-
-	eq->cntxt_id = G_FW_EQ_CTRL_CMD_EQID(BE_32(c.cmpliqid_eqid));
-	cntxt_id = eq->cntxt_id - sc->sge.eq_start;
-	if (cntxt_id >= sc->sge.eqmap_sz)
-		panic("%s: eq->cntxt_id (%d) more than the max (%d)", __func__,
-		    cntxt_id, sc->sge.eqmap_sz - 1);
-	sc->sge.eqmap[cntxt_id] = eq;
-
-	return (rc);
-}
-
-static int
 eth_eq_alloc(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 {
 	int rc, cntxt_id;
@@ -1487,19 +1440,7 @@ alloc_eq(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 	eq->pidx = eq->cidx = 0;
 	eq->doorbells = sc->doorbells;
 
-	switch (eq->flags & EQ_TYPEMASK) {
-	case EQ_CTRL:
-		rc = ctrl_eq_alloc(sc, eq);
-		break;
-
-	case EQ_ETH:
-		rc = eth_eq_alloc(sc, pi, eq);
-		break;
-
-	default:
-		panic("%s: invalid eq type %d.", __func__,
-		    eq->flags & EQ_TYPEMASK);
-	}
+	rc = eth_eq_alloc(sc, pi, eq);
 
 	if (eq->doorbells & (DOORBELL_UDB | DOORBELL_UDBWC | DOORBELL_WCWR)) {
 		uint32_t s_qpp = sc->sge.s_qpp;
@@ -1520,8 +1461,7 @@ alloc_eq(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 
 	if (rc != 0) {
 		cxgb_printf(sc->dip, CE_WARN,
-		    "failed to allocate egress queue(%d): %d",
-		    eq->flags & EQ_TYPEMASK, rc);
+		    "failed to allocate egress queue: %d", rc);
 	}
 
 	return (rc);
@@ -1533,24 +1473,10 @@ free_eq(struct adapter *sc, struct sge_eq *eq)
 	int rc;
 
 	if (eq->flags & EQ_ALLOCATED) {
-		switch (eq->flags & EQ_TYPEMASK) {
-		case EQ_CTRL:
-			rc = -t4_ctrl_eq_free(sc, sc->mbox, sc->pf, 0,
-			    eq->cntxt_id);
-			break;
-
-		case EQ_ETH:
-			rc = -t4_eth_eq_free(sc, sc->mbox, sc->pf, 0,
-			    eq->cntxt_id);
-			break;
-		default:
-			panic("%s: invalid eq type %d.", __func__,
-			    eq->flags & EQ_TYPEMASK);
-		}
+		rc = -t4_eth_eq_free(sc, sc->mbox, sc->pf, 0, eq->cntxt_id);
 		if (rc != 0) {
 			cxgb_printf(sc->dip, CE_WARN,
-			    "failed to free egress queue (%d): %d",
-			    eq->flags & EQ_TYPEMASK, rc);
+			    "failed to free egress queue: %d", rc);
 			return (rc);
 		}
 		eq->flags &= ~EQ_ALLOCATED;
@@ -2871,7 +2797,7 @@ static inline void
 ring_tx_db(struct adapter *sc, struct sge_eq *eq)
 {
 	int val, db_mode;
-	uint_t db = eq->doorbells;
+	t4_doorbells_t db = eq->doorbells;
 
 	if (eq->pending > 1)
 		db &= ~DOORBELL_WCWR;

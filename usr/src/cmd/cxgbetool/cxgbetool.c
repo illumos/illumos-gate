@@ -36,7 +36,6 @@
 #include <libdevinfo.h>
 
 #include "t4nex.h"
-#include "version.h"
 #include "osdep.h"
 #include "t4fw_interface.h"
 #include "cudbg.h"
@@ -49,6 +48,9 @@
 #ifndef MAX
 #define MAX(x, y)       ((x) > (y) ? (x) : (y))
 #endif
+
+#define	T4_NEXUS_NAME	"t4nex"
+#define	T4_PORT_NAME	"cxgbe"
 
 struct reg_info {
 	const char *name;
@@ -69,7 +71,6 @@ static char cxgbetool_nexus[PATH_MAX];
 char *option_list[] = {
 	"--collect",
 	"--view",
-	"--version",
 };
 
 enum {
@@ -1031,12 +1032,6 @@ main(int argc, char *argv[])
 		if (strcmp(argv[1], "-h") == 0 ||
 		    strcmp(argv[1], "--help") == 0) {
 			usage(stdout);
-		}
-
-		if (strcmp(argv[1], "-v") == 0 ||
-		    strcmp(argv[1], "--version") == 0) {
-			printf("cxgbetool version %s\n", DRV_VERSION);
-			exit(0);
 		}
 	}
 
