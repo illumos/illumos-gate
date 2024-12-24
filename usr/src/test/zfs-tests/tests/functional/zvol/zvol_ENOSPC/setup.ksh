@@ -36,10 +36,10 @@ verify_runnable "global"
 
 default_zvol_setup $DISK $VOLSIZE
 
-echo "y" | newfs -v /dev/zvol/rdsk/$TESTPOOL/$TESTVOL >/dev/null 2>&1
+new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL >/dev/null 2>&1
 (( $? != 0 )) && log_fail "Unable to newfs(8) $TESTPOOL/$TESTVOL"
 
 log_must mkdir $TESTDIR
-log_must mount /dev/zvol/dsk/$TESTPOOL/$TESTVOL $TESTDIR
+log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR
 
 log_pass

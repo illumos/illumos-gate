@@ -113,8 +113,8 @@ function verify_readonly # $1 dataset, $2 on|off
 			fi
 			;;
 		volume)
-			$expect eval "echo 'y' | newfs \
-			    /dev/zvol/dsk/$dataset > /dev/null 2>&1"
+			$expect eval "new_fs \
+			    ${ZVOL_RDEVDIR}/$dataset > /dev/null 2>&1"
 			;;
 		*)
 			;;

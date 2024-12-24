@@ -74,12 +74,9 @@ function create_blockfile
 		log_must mkdir -p $dir
 	fi
 
-	echo "y" | newfs /dev/rdsk/$disk >/dev/null 2>&1
-	(( $? != 0 )) &&
-		log_fail "Create ufs file system fail."
-
-        log_must mount /dev/dsk/$disk $dir
-        log_must mkfile $size $file
+	log_must new_fs ${DEV_RDSKDIR}/$disk
+	log_must mount ${DEV_DSKDIR}/$disk $dir
+	log_must mkfile $size $file
 }
 
 #
