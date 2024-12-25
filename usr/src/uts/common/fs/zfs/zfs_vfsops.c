@@ -2811,6 +2811,91 @@ zfs_get_vfs_flag_unmounted(objset_t *os)
 	return (unmounted);
 }
 
+/*
+ * Takes a dataset, a property, a value and that value's setpoint as
+ * found in the ZAP. Checks if the property has been changed in the vfs.
+ * If so, val and setpoint will be overwritten with updated content.
+ * Otherwise, they are left unchanged.
+ *
+ * OpenZFS moved it to os specific zfs_vfsops.c, we keep it here for now.
+ */
+int
+zfs_get_temporary_prop(dsl_dataset_t *ds, zfs_prop_t zfs_prop, uint64_t *val,
+    char *setpoint)
+{
+	int error;
+	zfsvfs_t *zfvp;
+	vfs_t *vfsp;
+	objset_t *os;
+	uint64_t tmp = *val;
+
+	error = dmu_objset_from_ds(ds, &os);
+	if (error != 0)
+		return (error);
+
+	error = getzfsvfs_impl(os, &zfvp);
+	if (error != 0)
+		return (error);
+
+	vfsp = zfvp->z_vfs;
+
+	switch (zfs_prop) {
+	case ZFS_PROP_ATIME:
+		if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_ATIME, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_DEVICES:
+		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_EXEC:
+		if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_SETUID:
+		if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_READONLY:
+		if (vfs_optionisset(vfsp, MNTOPT_RW, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_RO, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_XATTR:
+		if (vfs_optionisset(vfsp, MNTOPT_NOXATTR, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_XATTR, NULL))
+			tmp = 1;
+		break;
+	case ZFS_PROP_NBMAND:
+		if (vfs_optionisset(vfsp, MNTOPT_NONBMAND, NULL))
+			tmp = 0;
+		if (vfs_optionisset(vfsp, MNTOPT_NBMAND, NULL))
+			tmp = 1;
+		break;
+	default:
+		VFS_RELE(vfsp);
+		return (ENOENT);
+	}
+
+	VFS_RELE(vfsp);
+	if (tmp != *val) {
+		if (setpoint != NULL)
+			(void) strcpy(setpoint, "temporary");
+		*val = tmp;
+	}
+	return (0);
+}
+
 static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	MNTTYPE_ZFS,
