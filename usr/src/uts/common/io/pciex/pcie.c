@@ -1079,7 +1079,6 @@ pcie_initchild(dev_info_t *cdip)
 {
 	uint16_t		tmp16, reg16;
 	pcie_bus_t		*bus_p;
-	uint32_t		devid, venid;
 
 	bus_p = PCIE_DIP2BUS(cdip);
 	if (bus_p == NULL) {
@@ -1091,29 +1090,6 @@ pcie_initchild(dev_info_t *cdip)
 
 	if (pcie_init_cfghdl(cdip) != DDI_SUCCESS)
 		return (DDI_FAILURE);
-
-	/*
-	 * Update pcie_bus_t with real Vendor Id Device Id.
-	 *
-	 * For assigned devices in IOV environment, the OBP will return
-	 * faked device id/vendor id on configration read and for both
-	 * properties in root domain. translate_devid() function will
-	 * update the properties with real device-id/vendor-id on such
-	 * platforms, so that we can utilize the properties here to get
-	 * real device-id/vendor-id and overwrite the faked ids.
-	 *
-	 * For unassigned devices or devices in non-IOV environment, the
-	 * operation below won't make a difference.
-	 *
-	 * The IOV implementation only supports assignment of PCIE
-	 * endpoint devices. Devices under pci-pci bridges don't need
-	 * operation like this.
-	 */
-	devid = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-	    "device-id", -1);
-	venid = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-	    "vendor-id", -1);
-	bus_p->bus_dev_ven_id = (devid << 16) | (venid & 0xffff);
 
 	/* Clear the device's status register */
 	reg16 = PCIE_GET(16, bus_p, PCI_CONF_STAT);

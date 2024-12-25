@@ -1586,7 +1586,6 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 			 * locking needed.
 			 */
 			link_node(dip);
-			translate_devid((dev_info_t *)dip);
 			i_ddi_set_node_state(dip, DS_LINKED);
 			break;
 		case DS_LINKED:
@@ -2857,6 +2856,11 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	if (formp)
 		*formp = NULL;
 
+	/*
+	 * The "ddi-assigned" property indicates a device has been given to a
+	 * virtualized environment.  Prevent its use.  This is only used by
+	 * Xen and (previously) by sun4v LDOMs.  See pcie_init_dom().
+	 */
 	if (ddi_prop_exists(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 	    "ddi-assigned")) {
 		major = ddi_name_to_major("nulldriver");

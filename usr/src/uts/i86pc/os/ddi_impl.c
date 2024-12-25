@@ -2988,12 +2988,6 @@ i_ddi_dma_max(dev_info_t *dip, ddi_dma_attr_t *attrp)
 	return ((uint32_t)maxxfer);
 }
 
-/*ARGSUSED*/
-void
-translate_devid(dev_info_t *dip)
-{
-}
-
 pfn_t
 i_ddi_paddr_to_pfn(paddr_t paddr)
 {
