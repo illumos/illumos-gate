@@ -39,7 +39,7 @@
 
 function cleanup
 {
-        mdb -kwe "zfs_initialize_value/Z $ORIG_PATTERN"
+        set_tunable64 zfs_initialize_value $ORIG_PATTERN
         zpool import -d $TESTDIR $TESTPOOL
 
         if datasetexists $TESTPOOL ; then
@@ -54,15 +54,15 @@ log_onexit cleanup
 PATTERN="deadbeefdeadbeef"
 SMALLFILE="$TESTDIR/smallfile"
 
-ORIG_PATTERN=$(mdb -ke "zfs_initialize_value/J" | tail -1 | awk '{print $NF}')
-log_must mdb -kwe "zfs_initialize_value/Z $PATTERN"
+ORIG_PATTERN=$(get_tunable zfs_initialize_value)
+log_must set_tunable64 zfs_initialize_value $(printf %llu 0x$PATTERN)
 
 log_must mkdir "$TESTDIR"
 log_must mkfile $MINVDEVSIZE "$SMALLFILE"
 log_must zpool create $TESTPOOL "$SMALLFILE"
 log_must zpool initialize $TESTPOOL
 
-while [[ "$(initialize_progress $TESTPOOL $SMALLFILE)" -lt "100" ]]; do
+while (( $(initialize_progress $TESTPOOL $SMALLFILE) < "100" )); do
         sleep 0.5
 done
 
@@ -86,7 +86,7 @@ while read -r offset size; do
 	    log_fail "Pattern not found in metaslab free space"
 done
 
-if [[ $metaslabs -eq 0 ]];then
+if (( metaslabs == 0 )); then
 	log_fail "Did not find any metaslabs to check"
 else
 	log_pass "Initializing wrote to each metaslab"

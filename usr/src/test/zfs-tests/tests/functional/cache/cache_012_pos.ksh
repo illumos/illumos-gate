@@ -52,7 +52,7 @@ function cleanup
 		destroy_pool $TESTPOOL
 	fi
 
-	log_must set_tunable32 l2arc_write_max $write_max
+	log_must set_tunable64 l2arc_write_max $write_max
 	log_must set_tunable32 l2arc_noprefetch $noprefetch
 }
 log_onexit cleanup
@@ -78,7 +78,7 @@ export SYNC_TYPE=0
 export DIRECT=1
 export FILE_SIZE=$(( floor($fill_mb / $NUMJOBS) ))
 
-log_must set_tunable32 l2arc_write_max $(( $VCACHE_SZ * 2 ))
+log_must set_tunable64 l2arc_write_max $(( $VCACHE_SZ * 2 ))
 
 log_must truncate -s $VCACHE_SZ $VCACHE
 log_must truncate -s $VDEV_SZ $VDEV
@@ -92,11 +92,11 @@ typeset write_max2=$(get_tunable l2arc_write_max)
 
 log_must test $write_max2 -eq $write_max
 
-log_must set_tunable32 l2arc_write_max $(( 64 * 1024 * 1024 ))
+log_must set_tunable64 l2arc_write_max $(( 64 * 1024 * 1024 ))
 export RUNTIME=1
 
 typeset do_once=true
-while $do_once || [[ $l2_size1 -le $l2_size2 ]]; do
+while $do_once || (( l2_size1 <= l2_size2 )); do
 	typeset l2_size1=$(get_arcstat l2_size)
 	log_must fio $FIO_SCRIPTS/random_reads.fio
 	typeset l2_size2=$(get_arcstat l2_size)

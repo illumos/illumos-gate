@@ -21,20 +21,14 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-function set_metaslab_force_ganging # new_value
-{
-	typeset new_value=$1
-	echo "metaslab_force_ganging/W $new_value" | mdb -kw
-}
-
 function cleanup
 {
-	log_must set_metaslab_force_ganging 0t$((2**17 + 1))
+	log_must set_tunable64 metaslab_force_ganging $((2**17 + 1))
 	default_cleanup_noexit
 }
 
 default_setup_noexit "$DISKS"
-log_must set_metaslab_force_ganging 0t$((2**14))
+log_must set_tunable64 metaslab_force_ganging $((2**14))
 log_onexit cleanup
 
 FILE_CONTENTS="Leeloo Dallas mul-ti-pass."

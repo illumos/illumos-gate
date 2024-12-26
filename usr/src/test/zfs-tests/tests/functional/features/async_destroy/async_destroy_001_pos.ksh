@@ -46,20 +46,16 @@ TEST_FS=$TESTPOOL/async_destroy
 
 verify_runnable "both"
 
-function set_max_blocks
-{
-	echo "zfs_async_block_max_blocks/Z$1" | mdb -kw
-}
-
 function cleanup
 {
 	datasetexists $TEST_FS && log_must zfs destroy $TEST_FS
-	log_must set_max_blocks ffffffffffffffff
+	log_must set_tunable64 zfs_async_block_max_blocks $ORIG_VALUE
 }
 
 log_onexit cleanup
 log_assert "async_destroy can suspend and resume traversal"
 
+ORIG_VALUE=$(get_tunable zfs_async_block_max_blocks)
 log_must zfs create -o recordsize=1k -o compression=off $TEST_FS
 
 # Fill with 128,000 blocks.
@@ -69,7 +65,7 @@ log_must dd bs=1024k count=128 if=/dev/zero of=/$TEST_FS/file
 # Decrease the max blocks to free each txg, so that freeing takes
 # long enough that we can observe it.
 #
-log_must set_max_blocks 0t100
+log_must set_tunable64 zfs_async_block_max_blocks 100
 
 sync_all_pools
 log_must zfs destroy $TEST_FS
@@ -80,24 +76,24 @@ log_must zfs destroy $TEST_FS
 #
 t0=$SECONDS
 count=0
-while [[ $((SECONDS - t0)) -lt 10 ]]; do
+while (( $((SECONDS - t0)) < 10 )); do
 	[[ "0" != "$(zpool list -Ho freeing $TESTPOOL)" ]] && ((count++))
-	[[ $count -gt 1 ]] && break
+	(( count > 1 )) && break
 	sleep 1
 done
 
-[[ $count -eq 0 ]] && log_fail "Freeing property remained empty"
+(( count == 0 )) && log_fail "Freeing property remained empty"
 
 #
 # After a bit, go back to allowing an unlimited amount of freeing
 # per txg.
 #
 sleep 10
-log_must set_max_blocks ffffffffffffffff
+log_must set_tunable64 zfs_async_block_max_blocks $ORIG_VALUE
 
 # Wait for everything to be freed.
 while [[ "0" != "$(zpool list -Ho freeing $TESTPOOL)" ]]; do
-	[[ $((SECONDS - t0)) -gt 180 ]] && \
+	(( $((SECONDS - t0)) > 180 )) && \
 	    log_fail "Timed out waiting for freeing to drop to zero"
 done
 

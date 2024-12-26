@@ -81,7 +81,7 @@ function nesting_cleanup
 	# before resetting it, it will be left at the modified
 	# value for the remaining tests. That's the reason
 	# we reset it again here just in case.
-	mdb_set_uint32 zfs_max_dataset_nesting 50
+	set_tunable32 zfs_max_dataset_nesting 50
 }
 
 log_onexit nesting_cleanup
@@ -93,13 +93,13 @@ log_must zfs create -p $TESTPOOL/$dsC16
 log_mustnot zfs rename $TESTPOOL/$dsA02 $TESTPOOL/$dsB15A
 
 # extend limit
-mdb_set_uint32 zfs_max_dataset_nesting 64
+set_tunable32 zfs_max_dataset_nesting 64
 
 log_mustnot zfs rename $TESTPOOL/$dsA02 $TESTPOOL/$dsB16A
 log_must zfs rename $TESTPOOL/$dsA02 $TESTPOOL/$dsB15A
 
 # bring back old limit
-mdb_set_uint32 zfs_max_dataset_nesting 50
+set_tunable32 zfs_max_dataset_nesting 50
 
 log_mustnot zfs rename $TESTPOOL/$dsC01 $TESTPOOL/$dsB15A47C
 log_must zfs rename $TESTPOOL/$dsB15A47A $TESTPOOL/$dsB15A47B

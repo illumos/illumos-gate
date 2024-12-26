@@ -48,7 +48,7 @@ function cleanup
 	fi
 
 	log_must set_tunable32 l2arc_noprefetch $noprefetch
-	log_must set_tunable32 l2arc_rebuild_blocks_min_l2size \
+	log_must set_tunable64 l2arc_rebuild_blocks_min_l2size \
 		$rebuild_blocks_min_l2size
 }
 log_onexit cleanup
@@ -57,7 +57,7 @@ log_onexit cleanup
 typeset noprefetch=$(get_tunable l2arc_noprefetch)
 typeset rebuild_blocks_min_l2size=$(get_tunable l2arc_rebuild_blocks_min_l2size)
 log_must set_tunable32 l2arc_noprefetch 0
-log_must set_tunable32 l2arc_rebuild_blocks_min_l2size 0
+log_must set_tunable64 l2arc_rebuild_blocks_min_l2size 0
 
 typeset fill_mb=800
 typeset cache_sz=$(( floor($fill_mb / 2) ))

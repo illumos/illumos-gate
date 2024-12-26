@@ -2775,24 +2775,6 @@ function current_epoch
 }
 
 #
-# Get decimal value of global uint32_t variable using mdb.
-#
-function mdb_get_uint32
-{
-	typeset variable=$1
-	typeset value
-
-	value=$(mdb -k -e "$variable/X | ::eval .=U")
-	if [[ $? -ne 0 ]]; then
-		log_fail "Failed to get value of '$variable' from mdb."
-		return 1
-	fi
-
-	echo $value
-	return 0
-}
-
-#
 # Wait for every device replace operation to complete
 #
 # $1 pool name
@@ -2805,41 +2787,6 @@ function wait_replacing #pool
 		    awk '/replacing-[0-9]+/ {print $1}')" ]] && break
 		log_must sleep 1
 	done
-}
-
-#
-# Set global uint32_t variable to a decimal value using mdb.
-#
-function mdb_set_uint32
-{
-	typeset variable=$1
-	typeset value=$2
-
-	mdb -kw -e "$variable/W 0t$value" > /dev/null
-	if [[ $? -ne 0 ]]; then
-		echo "Failed to set '$variable' to '$value' in mdb."
-		return 1
-	fi
-
-	return 0
-}
-
-#
-# Set global scalar integer variable to a hex value using mdb.
-# Note: Target should have CTF data loaded.
-#
-function mdb_ctf_set_int
-{
-	typeset variable=$1
-	typeset value=$2
-
-	mdb -kw -e "$variable/z $value" > /dev/null
-	if [[ $? -ne 0 ]]; then
-		echo "Failed to set '$variable' to '$value' in mdb."
-		return 1
-	fi
-
-	return 0
 }
 
 #
@@ -2915,7 +2862,7 @@ function get_tunable_impl
 		return $?
 		;;
 	SunOS)
-		typeset value=$(mdb -k -e "$tunable/X | ::eval .=U")
+		typeset value=$(mdb -k -e "$tunable::print | ::eval .=E")
 		if [[ $? -ne 0 ]]; then
 			log_fail "Failed to get value of '$tunable' from mdb."
 			return 1
