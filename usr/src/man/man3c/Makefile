@@ -561,6 +561,8 @@ MANFILES=	__fbufsize.3c					\
 		wcscoll.3c					\
 		wcsdup.3c					\
 		wcsftime.3c					\
+		wcslcat.3c					\
+		wcslcpy.3c					\
 		wcslen.3c					\
 		wcsrtombs.3c					\
 		wcsstr.3c					\

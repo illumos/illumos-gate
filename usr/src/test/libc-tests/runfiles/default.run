@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 [DEFAULT]
@@ -154,6 +154,10 @@ timeout = 600
 [/opt/libc-tests/tests/uchar.64]
 [/opt/libc-tests/tests/utimes.32]
 [/opt/libc-tests/tests/utimes.64]
+[/opt/libc-tests/tests/wcslcat.32]
+[/opt/libc-tests/tests/wcslcat.64]
+[/opt/libc-tests/tests/wcslcpy.32]
+[/opt/libc-tests/tests/wcslcpy.64]
 
 #
 # root privs required for priority changes

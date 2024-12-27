@@ -66,6 +66,8 @@ PROGS = \
 	strerror \
 	strtonum \
 	timespec_get \
+	wcslcat \
+	wcslcpy \
 	wcsncasecmp \
 	wcsncasecmp-7344 \
 	wcsncasecmp-7350 \
@@ -115,6 +117,11 @@ stdbit.64 :=	CSTD=$(GNU_C99)
 
 strtonum.32 :=		CSTD=$(GNU_C99)
 strtonum.64 :=		CSTD=$(GNU_C99)
+
+wcslcat.32 :=		CSTD=$(GNU_C99)
+wcslcat.64 :=		CSTD=$(GNU_C99)
+wcslcpy.32 :=		CSTD=$(GNU_C99)
+wcslcpy.64 :=		CSTD=$(GNU_C99)
 
 ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \

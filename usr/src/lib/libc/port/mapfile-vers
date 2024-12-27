@@ -79,6 +79,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.50 {
+    protected:
+	wcslcat;
+	wcslcpy;
+} ILLUMOS_0.49;
+
 SYMBOL_VERSION ILLUMOS_0.49 {
     protected:
 	stdc_bit_ceil_uc;
