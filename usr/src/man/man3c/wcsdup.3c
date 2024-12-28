@@ -19,12 +19,10 @@
 .Nd duplicate wide-character string
 .Sh SYNOPSIS
 .In wchar.h
-.
-.Ft wchar_t
+.Ft "wchar_t *"
 .Fo wcsdup
 .Fa "const wchar_t *string"
 .Fc
-.
 .Sh DESCRIPTION
 The
 .Fn wcsdup
