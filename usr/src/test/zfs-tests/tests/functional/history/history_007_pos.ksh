@@ -62,7 +62,7 @@ migratedpoolname=$MIGRATEDPOOLNAME
 typeset -i RET=1
 typeset -i linenum=0
 
-[[ ! -d $import_dir ]] && log_must mkdir $import_dir
+[[ ! -d $import_dir ]] && log_must mkdir -p $import_dir
 
 # We test the migrations on both uniform platform and cross platform
 for arch in "i386" "sparc"; do
@@ -70,7 +70,7 @@ for arch in "i386" "sparc"; do
 	orig_cmds_f=$import_dir/${arch}.orig_history.txt
 	# remove blank line
 	orig_cmds_f1=$import_dir/${arch}.orig_history_1.txt
-	cat $orig_cmds_f | grep -v "^$" > $orig_cmds_f1
+	cat $orig_cmds_f | grep -v '^$' > $orig_cmds_f1
 
 	log_must cp $tst_dir/${arch}.migratedpool.DAT.Z $import_dir
 	log_must uncompress $import_dir/${arch}.migratedpool.DAT.Z
@@ -80,10 +80,10 @@ for arch in "i386" "sparc"; do
 	    log_must zpool destroy -f $migratedpoolname
 
 	log_must zpool import -d $import_dir $migratedpoolname
-	TZ=$TIMEZONE zpool history $migratedpoolname | grep -v "^$" \
+	TZ=$TIMEZONE zpool history $migratedpoolname | grep -v '^$' \
 	    >$migrated_cmds_f
 	RET=$?
-	(( $RET != 0 )) && log_fail "zpool histroy $migratedpoolname fails."
+	(( RET != 0 )) && log_fail "zpool histroy $migratedpoolname fails."
 
 	# The migrated history file should differ with original history file on
 	# two commands -- 'export' and 'import', which are included in migrated
@@ -94,7 +94,7 @@ for arch in "i386" "sparc"; do
 	for subcmd in "export" "import"; do
 		grep "$subcmd" $migrated_cmds_f >/dev/null 2>&1
 		RET=$?
-		(( $RET != 0 )) && log_fail "zpool $subcmd is not logged for" \
+		(( RET != 0 )) && log_fail "zpool $subcmd is not logged for" \
 		    "the imported pool $migratedpoolname."
 	done
 
