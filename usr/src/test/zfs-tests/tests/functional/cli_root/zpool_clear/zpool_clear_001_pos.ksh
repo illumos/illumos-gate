@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -91,13 +92,13 @@ function check_err # <pool> [<vdev>]
 
 	[[ "$output" ==  "$healthstr" ]] && return $errnum
 
-	zpool status -x $pool | grep -v "^$" | grep -v "pool:" \
+	zpool status -x $pool | grep -v '^$' | grep -v "pool:" \
 			| grep -v "state:" | grep -v "config:" \
 			| grep -v "errors:" > $tmpfile
 	typeset line
 	typeset -i fetchbegin=1
 	while read line; do
-		if (( $fetchbegin != 0 )); then
+		if (( fetchbegin != 0 )); then
                         echo $line | grep "NAME" >/dev/null 2>&1
                         (( $? == 0 )) && (( fetchbegin = 0 ))
                          continue
@@ -126,6 +127,7 @@ function check_err # <pool> [<vdev>]
 			(( errnum = errnum + 1 ))
 		fi
 	done <$tmpfile
+	rm $tmpfile
 
 	return $errnum
 }
@@ -149,30 +151,30 @@ function do_testing #<clear type> <vdevs>
 	while true ; do
 		file_write -o create -f $file.$i -b $BLOCKSZ -c $NUM_WRITES
 		ret=$?
-		(( $ret != 0 )) && break
+		(( ret != 0 )) && break
 		(( i = i + 1 ))
 	done
-	(( $ret != 28 )) && log_fail "file_write fails to fully fill up the $FS."
+	(( ret != 28 )) && log_fail "file_write fails to fully fill up the $FS."
 
 	#
 	#Make errors to the testing pool by overwrite the vdev device with
 	#/usr/bin/dd command. We donot want to have a full overwrite. That
 	#may cause the system panic. So, we should skip the vdev label space.
 	#
-	(( i = $RANDOM % 3 ))
+	(( i = RANDOM % 3 ))
 	typeset -i wcount=0
 	typeset -i size
 	case $FILESIZE in
 		*g|*G)
-			(( size = ${FILESIZE%%[g|G]} ))
+			size=${FILESIZE%%[gG]}
 			(( wcount = size*1024*1024 - 512 ))
 			;;
 		*m|*M)
-			(( size = ${FILESIZE%%[m|M]} ))
+			size=${FILESIZE%%[mM]}
 			(( wcount = size*1024 - 512 ))
 			;;
 		*k|*K)
-			(( size = ${FILESIZE%%[k|K]} ))
+			size=${FILESIZE%%[kK]}
 			(( wcount = size - 512 ))
 			;;
 		*)
