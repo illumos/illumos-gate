@@ -85,7 +85,7 @@ These functions cannot fail.
 .Xr stdc_bit_ceil 9F ,
 .Xr stdc_bit_width 9F ,
 .Xr stdc_count_ones 9F ,
-.Xr stdc_count_zero 9F ,
+.Xr stdc_count_zeros 9F ,
 .Xr stdc_first_leading_one 9F ,
 .Xr stdc_first_leading_zero 9F ,
 .Xr stdc_first_trailing_one 9F ,

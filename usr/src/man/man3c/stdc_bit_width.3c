@@ -106,7 +106,7 @@ $ ./a.out
 .Xr stdc_bit_ceil 3C ,
 .Xr stdc_bit_floor 3C ,
 .Xr stdc_count_ones 3C ,
-.Xr stdc_count_zero 3C ,
+.Xr stdc_count_zeros 3C ,
 .Xr stdc_first_leading_one 3C ,
 .Xr stdc_first_leading_zero 3C ,
 .Xr stdc_first_trailing_one 3C ,
