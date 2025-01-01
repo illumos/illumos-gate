@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 <contributor>
+ * Copyright 2025 <contributor>
  */
 
 	.file	"prototype.s"
