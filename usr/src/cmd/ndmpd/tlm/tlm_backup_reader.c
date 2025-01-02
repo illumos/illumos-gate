@@ -575,7 +575,7 @@ tlm_readlink(char *nm, char *snap, char *buf, int bufsize)
 
 	if ((len = readlink(snap, buf, bufsize)) >= 0) {
 		/*
-		 * realink(2) doesn't null terminate the link name.  We must
+		 * readlink(2) doesn't null terminate the link name.  We must
 		 * do it here.
 		 */
 		buf[len] = '\0';

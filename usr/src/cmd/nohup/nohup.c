@@ -711,7 +711,7 @@ pgid_ok:
 			 * because of this call to kill(2) or if it was
 			 * already stopped when we got here. If the user
 			 * job control stops the victim between the call
-			 * to gethrtime(2) and kill(2), we may send
+			 * to gethrtime(3C) and kill(2), we may send
 			 * SIGCONT when we really shouldn't -- we assume
 			 * that the user is not trying to shoot himself in
 			 * the foot.

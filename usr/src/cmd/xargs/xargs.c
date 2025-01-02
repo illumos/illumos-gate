@@ -244,7 +244,7 @@ main(int argc, char **argv)
 			 * it's not given, then the string INSPAT_STR will
 			 * be assumed.
 			 *
-			 * Since getopts(3C) doesn't handle the case of an
+			 * Since getopt(3C) doesn't handle the case of an
 			 * optional variable argument at all, we have to
 			 * parse this by hand:
 			 */
@@ -390,7 +390,7 @@ main(int argc, char **argv)
 		*ARGV++ = addarg(cmdname);	/* use the default cmd.	*/
 	} else {	/* otherwise keep parsing rest of the string.	*/
 		/*
-		 * note that we can't use getopts(3C), and *must* parse
+		 * note that we can't use getopt(3C), and *must* parse
 		 * this by hand, as we don't know apriori what options the
 		 * command will take.
 		 */
@@ -1064,9 +1064,9 @@ usage()
 /*
  * parseargs():		modify the args
  *	since the -e, -i and -l flags all take optional subarguments,
- *	and getopts(3C) is clueless about this nonsense, we change the
+ *	and getopt(3C) is clueless about this nonsense, we change
  *	our local argument count and strings to separate this out,
- *	and make it easier to handle via getopts(3c).
+ *	and make it easier to handle via getopt(3C).
  *
  *	-e	-> "-e ""
  *	-e3	-> "-e "3"

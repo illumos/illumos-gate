@@ -542,7 +542,7 @@ comsubst(int trimflag)
 		int	ret = 0;
 
 		while ((ret = waitpid(parent,&stat,0)) != parent) {
-			/* break out if waitpid(2) has failed */
+			/* break out if waitpid(3C) has failed */
 			if (ret == -1)
 				break;
 		}

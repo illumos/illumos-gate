@@ -511,7 +511,7 @@ dev_info_t	*scsi_hba_iport_find(
  *				scsi_device_hba_private_[gs]et(9F).  The HBA
  *				driver must maintain a private representation
  *				of the scsi_device(9S) unit-address - typically
- *				established during tran_tgt_init(9F) based on
+ *				established during tran_tgt_init(9E) based on
  *				property values.
  *
  * SCSI_HBA_TRAN_PHCI		The host adapter is an mpxio/scsi_vhci pHCI.

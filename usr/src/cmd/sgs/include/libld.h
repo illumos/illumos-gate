@@ -1510,7 +1510,7 @@ typedef enum {
 /*
  * Structure to manage archive member caching.  Each archive has an archive
  * descriptor (Ar_desc) associated with it.  This contains pointers to the
- * archive symbol table (obtained by elf_getarsyms(3ELF)) and an auxiliary
+ * archive symbol table (obtained by elf_getarsym(3ELF)) and an auxiliary
  * structure (Ar_uax[]) that parallels this symbol table.  The member element
  * of this auxiliary table indicates whether the archive member associated with
  * the symbol offset has already been extracted (AREXTRACTED) or partially

@@ -64,7 +64,7 @@ static void smb_autohome_parse_options(smb_share_t *);
 static int smb_autohome_add_private(const char *, uid_t, gid_t);
 
 /*
- * Add an autohome share.  See smb_autohome(5) for details.
+ * Add an autohome share.  See smbautohome(5) for details.
  *
  * If share directory contains backslash path separators, they will
  * be converted to forward slash to support NT/DOS path style for

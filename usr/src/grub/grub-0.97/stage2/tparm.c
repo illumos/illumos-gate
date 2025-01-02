@@ -71,7 +71,7 @@ typedef char grub_bool;
  *	tparm(string, ...)
  *
  *	Substitute the given parameters into the given string by the following
- *	rules (taken from terminfo(7)):
+ *	rules (taken from terminfo(5)):
  *
  *	     Cursor addressing and other strings  requiring  parame-
  *	ters in the terminal are described by a parameterized string

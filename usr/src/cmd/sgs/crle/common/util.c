@@ -237,7 +237,7 @@ addlib(Crle_desc *crle, char **lib, const char *args)
 
 /*
  * -f option expansion.  Interpret its argument as a numeric or symbolic
- * representation of the dldump(3dl) flags.
+ * representation of the dldump(3C) flags.
  */
 int
 dlflags(Crle_desc *crle, const char *arg)

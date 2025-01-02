@@ -14,7 +14,7 @@
  */
 
 /*
- * This test exercises the swapcontext_extd(2) functionality and verifies that
+ * This test exercises the swapcontext_extd(3C) functionality and verifies that
  * we can swap contexts that have both extended and non-extended ucontext_t's
  * and that we can get at that state in both cases. This test relies on extended
  * states as we try to validate and ensure that they exist.

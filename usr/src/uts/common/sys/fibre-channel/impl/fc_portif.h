@@ -77,7 +77,7 @@ extern "C" {
  * FP_SOFT_IN_DETACH is set in fp_detach_handler(), which is called from
  * fp_detach() for the DDI_DETACH flag. FP_SOFT_IN_DETACH is checked in
  * numerous places. It is never explicitly cleared -- apparently the code
- * relies on ddi_softstate_free(9F) to clear it.
+ * relies on ddi_soft_state_free(9F) to clear it.
  */
 #define	FP_SOFT_IN_DETACH		0x0002
 

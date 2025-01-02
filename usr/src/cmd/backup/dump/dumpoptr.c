@@ -221,7 +221,7 @@ interrupt(int sig)
 }
 
 /*
- *	We use wall(1) to do the actual broadcasting, so
+ *	We use wall(8) to do the actual broadcasting, so
  *	that we don't have to worry about duplicated code
  *	only getting fixed in one place.  This also saves
  *	us from having to worry about process groups,

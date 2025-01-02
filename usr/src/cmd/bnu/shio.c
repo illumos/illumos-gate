@@ -78,7 +78,7 @@ char *cmd, *fi, *fo, *fe;
 
 	/*
 	 * the status returned from wait can never be -1
-	 * see man page wait(2)
+	 * see man page wait(3C)
 	 * So we use the -1 value to indicate fork failed
 	 * or the wait failed.
 	 */

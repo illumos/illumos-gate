@@ -94,7 +94,7 @@ _caller(caddr_t cpc, int flags)
 #pragma weak _dlerror = dlerror
 
 /*
- * External entry for dlerror(3dl).  Returns a pointer to the string describing
+ * External entry for dlerror(3C).  Returns a pointer to the string describing
  * the last occurring error.  The last occurring error is cleared.
  */
 char *
@@ -587,7 +587,7 @@ dlclose_check(void *handle, Rt_map *clmp)
 #pragma weak _dlclose = dlclose
 
 /*
- * External entry for dlclose(3dl).  Returns 0 for success, non-zero otherwise.
+ * External entry for dlclose(3C).  Returns 0 for success, non-zero otherwise.
  */
 int
 dlclose(void *handle)
@@ -1009,7 +1009,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
 #pragma weak _dlopen = dlopen
 
 /*
- * External entry for dlopen(3dl).  On success, returns a pointer (handle) to
+ * External entry for dlopen(3C).  On success, returns a pointer (handle) to
  * the structure containing information about the newly added object, ie. can
  * be used by dlsym(). On failure, returns a null pointer.
  */
@@ -1036,7 +1036,7 @@ dlopen(const char *path, int mode)
 #pragma weak _dlmopen = dlmopen
 
 /*
- * External entry for dlmopen(3dl).
+ * External entry for dlmopen(3C).
  */
 void *
 dlmopen(Lmid_t lmid, const char *path, int mode)
@@ -1556,7 +1556,7 @@ dladdr_core(Rt_map *almp, void *addr, Dl_info_t *dlip, void **info, int flags)
 #pragma weak _dladdr = dladdr
 
 /*
- * External entry for dladdr(3dl) and dladdr1(3dl).  Returns an information
+ * External entry for dladdr(3C) and dladdr1(3C).  Returns an information
  * structure that reflects the symbol closest to the address specified.
  */
 int
@@ -2178,7 +2178,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 #pragma weak _dlinfo = dlinfo
 
 /*
- * External entry for dlinfo(3dl).
+ * External entry for dlinfo(3C).
  */
 int
 dlinfo(void *handle, int request, void *p)

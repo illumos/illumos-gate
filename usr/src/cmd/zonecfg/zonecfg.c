@@ -1318,7 +1318,7 @@ usage(boolean_t verbose, uint_t flags)
 		    gettext("\t\t<IPv6-address>/<IPv6-prefix-length> |\n"));
 		(void) fprintf(fp,
 		    gettext("\t\t<hostname>[/<IPv4-prefix-length>]\n"));
-		(void) fprintf(fp, gettext("See inet(3SOCKET) for IPv4 and "
+		(void) fprintf(fp, gettext("See inet(3C) for IPv4 and "
 		    "IPv6 address syntax.\n"));
 		(void) fprintf(fp, gettext("<IPv4-prefix-length> := [0-32]\n"));
 		(void) fprintf(fp,

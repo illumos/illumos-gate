@@ -36,7 +36,7 @@ extern "C" {
 /*
  * Multi-threaded programs should avoid MT-unsafe library calls (i.e., any-
  * thing which could try to acquire a user-level lock unprotected by an atfork
- * handler) between fork(2) and exec(2).  See the pthread_atfork(3THR) man
+ * handler) between fork(2) and exec(2).  See the pthread_atfork(3C) man
  * page for details.  In particular, we want to avoid calls to zerror() in
  * such situations, as it calls setlocale(3c) which is susceptible to such
  * problems.  So instead we have the child use one of the special exit codes

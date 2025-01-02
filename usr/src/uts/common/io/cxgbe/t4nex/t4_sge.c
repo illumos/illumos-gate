@@ -621,7 +621,7 @@ t4_intr_err(caddr_t arg1, caddr_t arg2)
  * messages from FW or HW.
  *
  * It returns a chain of mblks containing the received data, to be
- * passed up to mac_ring_rx().
+ * passed up to mac_rx_ring().
  */
 mblk_t *
 t4_ring_rx(struct sge_rxq *rxq, int budget)

@@ -183,11 +183,11 @@ struct pckt_info {
 /*
  * Dummy qbufcall callback routine used by open and close.
  * The framework will wake up qwait_sig when we return from
- * this routine (as part of leaving the perimeters.)
+ * this routine (as part of leaving the perimeters).
  * (The framework enters the perimeters before calling the qbufcall() callback
  * and leaves the perimeters after the callback routine has executed. The
  * framework performs an implicit wakeup of any thread in qwait/qwait_sig
- * when it leaves the perimeter. See qwait(9E).)
+ * when it leaves the perimeter. See qwait(9F).)
  */
 /* ARGSUSED */
 static void

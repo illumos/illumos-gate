@@ -75,7 +75,7 @@
  * PORT_SOURCE_AIO	 : events submitted per transaction completion from
  *			   POSIX-I/O framework.
  * PORT_SOURCE_TIMER	 : events submitted when a timer fires
- *			   (see timer_create(3RT)).
+ *			   (see timer_create(3C)).
  * PORT_SOURCE_FD	 : events submitted per file descriptor (see poll(2)).
  * PORT_SOURCE_ALERT	 : events submitted from user. This is not really a
  *			   single event, this is actually a port mode

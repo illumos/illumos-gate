@@ -28,7 +28,7 @@
  * method.c - method execution functions
  *
  * This file contains the routines needed to run a method:  a fork(2)-exec(2)
- * invocation monitored using either the contract filesystem or waitpid(2).
+ * invocation monitored using either the contract filesystem or waitpid(3C).
  * (Plain fork1(2) support is provided in fork.c.)
  *
  * Contract Transfer

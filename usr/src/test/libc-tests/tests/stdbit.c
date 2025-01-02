@@ -14,7 +14,7 @@
  */
 
 /*
- * Test various aspects of the libc stdbit(3C) interfaces. This does not test
+ * Test various aspects of the libc stdbit(3HEAD) interfaces. This does not test
  * the generic interfaces so that way this can be built and run by compilers
  * that don't support C23 and we also want to explicitly test the various type
  * specific values.

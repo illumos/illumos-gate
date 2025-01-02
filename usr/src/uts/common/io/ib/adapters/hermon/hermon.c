@@ -4818,7 +4818,7 @@ hermon_intr_disable(hermon_state_t *state)
 	return (DDI_SUCCESS);
 }
 
-/* Hermon quiesce(9F) entry */
+/* Hermon quiesce(9E) entry */
 static int
 hermon_quiesce(dev_info_t *dip)
 {

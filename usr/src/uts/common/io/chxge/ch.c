@@ -281,9 +281,9 @@ static struct ether_addr etherbroadcastaddr = {
  * Module initialization functions.
  *
  *      Routine         Called by
- *      _init(9E)       modload(9F)
- *      _info(9E)       modinfo(9F)
- *      _fini(9E)       modunload(9F)
+ *      _init(9E)       modload(8)
+ *      _info(9E)       modinfo(8)
+ *      _fini(9E)       modunload(8)
  */
 
 /*
@@ -308,7 +308,7 @@ _init(void)
  * _fini(9E): It is here that any device information that was allocated
  * during the _init(9E) routine should be released and the module removed
  * from the system.  In the case of per-instance information, that information
- * should be released in the _detach(9E) routine.
+ * should be released in the detach(9E) routine.
  */
 
 int
@@ -344,14 +344,14 @@ _info(struct modinfo *modinfop)
 }
 
 /*
- * Attach(9E) - This is called on the open to the device.  It creates
+ * attach(9E) - This is called on the open to the device.  It creates
  * an instance of the driver.  In this routine we create the minor
  * device node.  The routine also initializes all per-unit
  * mutex's and conditional variables.
  *
  * If we were resuming a suspended instance of a device due to power
  * management, then that would be handled here as well.  For more on
- * that subject see the man page for pm(9E)
+ * that subject see the man page for pm(9P)
  *
  * Interface exists: make available by filling in network interface
  * record.  System will initialize the interface when it is ready

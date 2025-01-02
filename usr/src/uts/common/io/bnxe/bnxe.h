@@ -414,7 +414,7 @@ typedef struct _RxQueue
     u32_t             idx; /* this ring's index */
 
     mac_ring_handle_t ringHandle;
-    uint64_t          genNumber; /* set by mac and passed up in mac_ring_rx */
+    uint64_t          genNumber; /* set by mac and passed up in mac_rx_ring */
 
     volatile u32_t    inPollMode;
     u8_t              intrDisableCnt;

@@ -2492,7 +2492,7 @@ segdev_setpagesize(struct seg *seg, caddr_t addr, size_t len,
 
 /*
  * devmap_device: Used by devmap framework to establish mapping
- *                called by devmap_seup(9F) during map setup time.
+ *                called by devmap_setup(9F) during map setup time.
  */
 /*ARGSUSED*/
 static int

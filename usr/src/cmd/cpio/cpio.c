@@ -2561,7 +2561,7 @@ data_copy_with_holes(int ifd, int ofd, int rw_sysattr, off_t bytes,
 			/*
 			 * There is a hole at the end of file. To create
 			 * such hole, we append one byte, and truncate the
-			 * last block. This is necessary because ftruncate(2)
+			 * last block. This is necessary because ftruncate(3C)
 			 * alone allocates one block on the end of file.
 			 */
 			rv = write_zeros(ofd, buf, 1, maxwrite, data_in_info);
@@ -8361,7 +8361,7 @@ xattrs_out(int (*func)())
 	}
 
 	if ((dirp = fdopendir(dirpfd)) == NULL) {
-		msg(ERRN, "Cannot fdopendir(2) directory file descriptor");
+		msg(ERRN, "Cannot fdopendir(3C) directory file descriptor");
 		return;
 	}
 

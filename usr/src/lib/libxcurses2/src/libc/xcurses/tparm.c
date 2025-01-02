@@ -46,7 +46,7 @@ static char rcsID[] =
 
 /*
  * Substitute the given parameters into the given string by the
- * following rules (taken from terminfo(7)):
+ * following rules (taken from terminfo(5)):
  *
  * Cursor addressing and other strings  requiring  parameters
  * in the terminal are described by a parameterized string

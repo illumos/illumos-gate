@@ -970,8 +970,8 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 		    BAD_CAST "dummy");
 		if ((node_comment = xmlNewDocComment(info.ktx_doc,
 		    BAD_CAST "\nConfiguration for pools facility. Do NOT"
-		    " edit this file by hand - use poolcfg(1)"
-		    " or libpool(3POOL) instead.\n")) == NULL) {
+		    " edit this file by hand - use poolcfg(8)"
+		    " or libpool(3LIB) instead.\n")) == NULL) {
 			xmlFreeDoc(info.ktx_doc);
 			pool_seterror(POE_DATASTORE);
 			return (PO_FAIL);

@@ -544,8 +544,8 @@ cgetlabel(bslabel_t *label_p, vnode_t *vp)
 }
 
 /*
- * fgetlabel(2TSOL) - get file label
- * getlabel(2TSOL) - get file label
+ * fgetlabel(3TSOL) - get file label
+ * getlabel(3TSOL) - get file label
  */
 int
 getlabel(const char *path, bslabel_t *label_p)

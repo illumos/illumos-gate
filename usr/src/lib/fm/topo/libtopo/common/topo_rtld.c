@@ -35,7 +35,7 @@
 #include <topo_subr.h>
 
 typedef struct topo_rtld {
-	void *rtld_dlp;		/* libdl(3DL) handle for shared library */
+	void *rtld_dlp;		/* libdl handle for shared library */
 	int (*rtld_init)(topo_mod_t *, topo_version_t); /* .so _topo_init() */
 	void (*rtld_fini)(topo_mod_t *); /* .so _topo_fini() */
 } topo_rtld_t;

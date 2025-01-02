@@ -331,7 +331,7 @@ check_utmpx(struct utmpx *entryx)
 		 * the UID to be written to the utmp file. This was thought
 		 * necessary to allow the utmp file to be updated when
 		 * logging out from an xterm(1) window after running
-		 * exec login. Instead we now rely upon utmpd(1) to update
+		 * exec login. Instead we now rely upon utmpd(8) to update
 		 * the utmp file for us.
 		 *
 		 */

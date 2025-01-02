@@ -65,7 +65,7 @@ smb_svc_log(int pri, const char *fmt, va_list ap)
 
 /*
  * Provide a replacement for libsmb:smb_vsyslog() that prints messages
- * both to the normal sysloc(3c), and to stdout, which ends up in:
+ * both to the normal syslog(3C), and to stdout, which ends up in:
  *  /var/svc/log/network-smb-server:default.log
  * It's much easier to follow debug messages in the service log.
  */

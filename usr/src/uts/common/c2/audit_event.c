@@ -4957,7 +4957,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 }
 
 /*
- * XXX socket(2) may be equivalent to open(2) on a unix domain
+ * XXX socket(3SOCKET) may be equivalent to open(2) on a unix domain
  * socket. This needs investigation.
  */
 

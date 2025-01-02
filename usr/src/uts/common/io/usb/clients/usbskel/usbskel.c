@@ -1225,7 +1225,7 @@ usbskel_open_pipes(usbskel_state_t *usbskelp)
 	 * attributes with USB_ATTRS_SHORT_XFER_OK | USB_ATTRS_AUTOCLEARING,
 	 * initialize length to be packetsize of the endpoint, specify the
 	 * callbacks.  Pass this request to usb_pipe_intr_xfer to start polling.
-	 * Call usb_pipe_stop_intr_poling(9F) to stop polling.
+	 * Call usb_pipe_stop_intr_polling(9F) to stop polling.
 	 */
 
 	return (rval);

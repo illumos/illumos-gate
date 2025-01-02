@@ -44,7 +44,7 @@ extern "C" {
 #endif
 
 /*
- * Library versioning support (c.f. elf_version(3e)).
+ * Library versioning support (c.f. elf_version(3elf)).
  *
  * You can enquire about the version number of the library
  * by passing POOL_VER_NONE.  POOL_VER_CURRENT is the current

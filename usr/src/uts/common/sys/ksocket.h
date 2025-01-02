@@ -132,7 +132,7 @@ extern void	ksocket_rele(ksocket_t);
  * When the receive function receives data, it is responsible for always
  * consuming all of the data. The return value of the callback function
  * is used to indicate flow control and backpressure (similar to
- * mac_tx(9E)). If, after processing the data, additional data can be
+ * mc_tx(9E)). If, after processing the data, additional data can be
  * received and processed, then the callback function should return
  * B_TRUE. Otherwise it should return B_FALSE. This will result in the
  * lower level socket interfaces (e.g. TCP) understanding that

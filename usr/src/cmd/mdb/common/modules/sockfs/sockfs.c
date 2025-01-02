@@ -60,7 +60,7 @@ sockparams_walk_list(const char *symname, int argc, const mdb_arg_t *argv)
  * dcmd to print sockparams info.
  *
  * If no address is given then the default is to print all sockparams on the
- * global list (i.e., installed with soconfig(1)). To also print the ephemeral
+ * global list (i.e., installed with soconfig(8)). To also print the ephemeral
  * entries the '-e' flag should be used. Only ephemeral entries can be printed
  * by specifying the '-E' flag.
  */

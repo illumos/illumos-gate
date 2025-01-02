@@ -337,7 +337,7 @@ done:
 	 * Indicate (via SQ_PROCESS) that it is acceptable for the squeue to
 	 * attempt to drain a pending request relevant to this connection when
 	 * exiting the synchronous context.  This can improve the performance
-	 * and efficiency of TCP connect(2) operations to localhost.
+	 * and efficiency of TCP connect(3socket) operations to localhost.
 	 */
 	squeue_synch_exit(connp, SQ_PROCESS);
 

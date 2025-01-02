@@ -680,7 +680,7 @@ __s_api_ip2hostname(char *ipaddr, char **hostname) {
 
 /*
  * This function obtains data returned by an LDAP search request and puts it
- * in a string in the ldap_cachmgr(1) door call format.
+ * in a string in the ldap_cachemgr(8) door call format.
  *
  * INPUT:
  *     ld - a pointer to an LDAP structure used for a search operation,

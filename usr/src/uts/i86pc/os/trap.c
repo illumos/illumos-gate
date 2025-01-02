@@ -1732,7 +1732,7 @@ instr_is_sys_rtt(caddr_t pc)
  *
  * This can happen in a couple of ways: someone - either accidentally or
  * on purpose - creates (setcontext(2), lwp_create(2)) or modifies
- * (signal(2)) a ucontext that contains silly segment register values.
+ * (signal(3C)) a ucontext that contains silly segment register values.
  * Or someone - either accidentally or on purpose - modifies the prgregset_t
  * of a subject process via /proc to contain silly segment register values.
  *

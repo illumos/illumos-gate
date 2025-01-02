@@ -2894,7 +2894,7 @@ post_os(POST_ARGS)
 	 * 1. the argument of the `Os' macro, unless empty
 	 * 2. the -Ios=foo command line argument, if provided
 	 * 3. -DOSNAME="\"foo\"", if provided during compilation
-	 * 4. "sysname release" from uname(3)
+	 * 4. "sysname release" from uname(2)
 	 */
 
 	free(mdoc->meta.os);

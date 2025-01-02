@@ -182,7 +182,7 @@ genconfig(Crle_desc *crle)
 	}
 
 	/*
-	 * Save the mapped files info for possible dldump(3dl) updates.
+	 * Save the mapped files info for possible dldump(3C) updates.
 	 */
 	crle->c_tempaddr = addr;
 	crle->c_tempsize = size;
