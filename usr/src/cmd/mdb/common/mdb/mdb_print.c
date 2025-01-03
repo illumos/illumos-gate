@@ -27,7 +27,7 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -2919,9 +2919,21 @@ printf_string(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt)
 
 	bzero(buf, sizeof (buf));
 
-	if (mdb_vread(buf, MIN(r.mta_nelems, sizeof (buf) - 1), addr) == -1) {
-		mdb_warn("failed to read array at %p", addr);
-		return (DCMD_ERR);
+	if (r.mta_nelems != 0) {
+		const size_t read_sz = MIN(r.mta_nelems, sizeof (buf) - 1);
+		if (mdb_vread(buf, read_sz, addr) == -1) {
+			mdb_warn("failed to read array at %p", addr);
+			return (DCMD_ERR);
+		}
+	} else {
+		/*
+		 * If the element count is zero, assume that the input is a
+		 * flexible length array which is NUL terminated.
+		 */
+		if (mdb_readstr(buf, sizeof (buf), addr) < 0) {
+			mdb_warn("failed to read string at %llx", addr);
+			return (DCMD_ERR);
+		}
 	}
 
 	mdb_printf(fmt, buf);
