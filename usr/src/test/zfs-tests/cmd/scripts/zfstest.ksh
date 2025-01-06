@@ -20,6 +20,7 @@
 # Copyright 2024 MNX Cloud, Inc.
 #
 
+export LC_ALL=C.UTF-8
 export PATH="/usr/bin"
 export NOINUSE_CHECK=1
 export STF_SUITE="/opt/zfs-tests"
@@ -50,7 +51,7 @@ function find_disks
 	typeset disk used avail_disks
 	for disk in $all_disks; do
 		for used in $used_disks; do
-			[[ "$disk" = "$used" ]] && continue 2
+			[[ "$disk" == "$used" ]] && continue 2
 		done
 		[[ -n $avail_disks ]] && avail_disks="$avail_disks $disk"
 		[[ -z $avail_disks ]] && avail_disks="$disk"
@@ -70,9 +71,9 @@ function find_runfile
 	typeset distro=
 	if [[ -d /opt/delphix && -h /etc/delphix/version ]]; then
 		distro=delphix
-	elif [[ 0 -ne $(grep -c OpenIndiana /etc/release 2>/dev/null) ]]; then
+	elif grep -qs OpenIndiana /etc/release; then
 		distro=openindiana
-	elif [[ 0 -ne $(grep -c OmniOS /etc/release 2>/dev/null) ]]; then
+	elif grep -qs OmniOS /etc/release; then
 		distro=omnios
 	elif [[ 0 -ne $(grep -c SmartOS /etc/release 2>/dev/null) ]]; then
 		distro=smartos
@@ -83,10 +84,10 @@ function find_runfile
 
 function verify_id
 {
-	[[ $(id -u) = "0" ]] && fail "This script must not be run as root."
+	[[ $(id -u) == "0" ]] && fail "This script must not be run as root."
 
-	sudo -k -n id >/dev/null 2>&1
-	[[ $? -eq 0 ]] || fail "User must be able to sudo without a password."
+	sudo -k -n id >/dev/null 2>&1 ||
+		fail "User must be able to sudo without a password."
 }
 
 function verify_disks
@@ -230,7 +231,7 @@ export KEEP="^$(echo $KEEP | sed 's/ /$|^/g')\$"
 . $STF_SUITE/include/default.cfg
 
 num_disks=$(echo $DISKS | awk '{print NF}')
-[[ $num_disks -lt 3 ]] && fail "Not enough disks to run ZFS Test Suite"
+(( num_disks < 3 )) && fail "Not enough disks to run ZFS Test Suite"
 
 # Ensure user has only basic privileges.
 ppriv -s EIP=basic -e $runner -c $runfiles $xargs

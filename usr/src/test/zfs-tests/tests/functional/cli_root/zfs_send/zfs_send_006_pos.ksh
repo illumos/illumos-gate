@@ -36,7 +36,7 @@ verify_runnable "both"
 
 function cleanup
 {
-	mdb_set_uint32 zfs_override_estimate_recordsize 8192
+	set_tunable64 zfs_override_estimate_recordsize 8192
 	for ds in $datasets; do
                 datasetexists $ds && zfs destroy -rf $ds
 	done
@@ -86,14 +86,14 @@ function verify_size_estimates
 
 	[[ -z $refer_diff && -z $file_diff && -z $expected_diff ]] && \
 	    log_fail "zfs send $options failed"
-	[[ $refer_diff -le $expected_diff &&  \
-	    $file_diff -le $expected_diff ]] || \
+	(( refer_diff <= expected_diff &&  \
+	    file_diff <= expected_diff )) || \
 	    log_fail "zfs send $options gives wrong size estimates"
 }
 
 log_assert "Verify 'zfs send -nvP' generates valid stream estimates"
 log_onexit cleanup
-mdb_set_uint32 zfs_override_estimate_recordsize 0
+set_tunable64 zfs_override_estimate_recordsize 0
 typeset -l block_count=0
 typeset -l block_size
 typeset -i PERCENT=1

@@ -12,6 +12,7 @@
 
 #
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -51,8 +52,8 @@ for d in {1..4}; do
 	DATA_DEVS+=($DEV)
 done
 for d in {1..2}; do
-	DEV="$TMPDIR/data-dev$d"
-	typeset -r "SPARE_DEV$d"="$TMPDIR/spare-dev$d"
+	DEV="$TMPDIR/spare-dev$d"
+	typeset -r "SPARE_DEV$d"="$DEV"
 	SPARE_DEVS+=($DEV)
 done
 

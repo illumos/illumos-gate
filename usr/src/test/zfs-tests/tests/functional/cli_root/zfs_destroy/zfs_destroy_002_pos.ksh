@@ -48,9 +48,8 @@ verify_runnable "both"
 function cleanup
 {
 	typeset -i i=0
-	while (( $i < ${#data_objs[*]} )); do
-		datasetexists "${data_objs[i]}" && \
-			zfs destroy -rf ${data_objs[i]}
+	while (( i < ${#data_objs[*]} )); do
+		destroy_dataset "${data_objs[i]}" "-rf"
 		((i = i + 1))
 	done
 }
@@ -79,15 +78,15 @@ if is_global_zone ; then
 fi
 
 typeset -i i=0
-while (( $i < ${#data_objs[*]} )); do
+while (( i < ${#data_objs[*]} )); do
 	datasetexists ${data_objs[i]} || \
 		log_fail "Create <filesystem>|<volume>|<snapshot> fail."
 	((i = i + 1))
 done
 
 i=0
-while (( $i < ${#data_objs[*]} )); do
-	log_must zfs destroy ${data_objs[i]}
+while (( i < ${#data_objs[*]} )); do
+	destroy_dataset "${data_objs[i]}"
 	datasetexists ${data_objs[i]} && \
 		log_fail "'zfs destroy <filesystem>|<volume>|<snapshot>' fail."
 	((i = i + 1))

@@ -65,7 +65,8 @@ verify_runnable "global"
 
 function test_cleanup
 {
-	log_must mdb_ctf_set_int zfs_async_block_max_blocks 0xffffffffffffffff
+	log_must set_tunable64 zfs_async_block_max_blocks \
+	    $(print "%llu" 0xffffffffffffffff)
 	poolexists $NESTEDPOOL && destroy_pool $NESTEDPOOL
 	log_must zpool destroy $TESTPOOL
 }
@@ -90,7 +91,7 @@ function wait_until_extra_reserved
 	free=$(zpool list | awk '{print $1,$4}' | \
 	    grep $NESTEDPOOL | awk '{print $2}' | cut -d"M" -f1 | \
 	    cut -d"." -f1)
-	while (( $free > 32 )); do
+	while (( free > 32 )); do
 		sleep 5
 		free=$(zpool list | awk '{print $1,$4}' | \
 		    grep $NESTEDPOOL | awk '{print $2}' | cut -d"M" -f1 | \
@@ -218,7 +219,7 @@ log_must zpool list $NESTEDPOOL
 # amount of checkpointed blocks that we "free"
 # every txg.
 #
-log_must mdb_ctf_set_int zfs_async_block_max_blocks 0t10000
+log_must set_tunable64 zfs_async_block_max_blocks 10000
 
 log_must zfs destroy $FS0
 

@@ -308,32 +308,32 @@ function pool_is_replacing
 
 function set_vdev_validate_skip
 {
-	mdb_set_uint32 "vdev_validate_skip" "$1"
+	set_tunable32 "vdev_validate_skip" "$1"
 }
 
 function get_zfs_txg_timeout
 {
-	echo $(mdb_get_uint32 "zfs_txg_timeout")
+	echo $(get_tunable "zfs_txg_timeout")
 }
 
 function set_zfs_txg_timeout
 {
-	mdb_set_uint32 "zfs_txg_timeout" "$1"
+	set_tunable32 "zfs_txg_timeout" "$1"
 }
 
 function set_spa_load_verify_metadata
 {
-	mdb_set_uint32 "spa_load_verify_metadata" "$1"
+	set_tunable32 "spa_load_verify_metadata" "$1"
 }
 
 function set_spa_load_verify_data
 {
-	mdb_set_uint32 "spa_load_verify_data" "$1"
+	set_tunable32 "spa_load_verify_data" "$1"
 }
 
 function set_zfs_max_missing_tvds
 {
-	mdb_set_uint32 "zfs_max_missing_tvds" "$1"
+	set_tunable32 "zfs_max_missing_tvds" "$1"
 }
 
 #

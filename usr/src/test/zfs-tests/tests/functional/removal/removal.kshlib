@@ -62,7 +62,7 @@ function attempt_during_removal # pool disk callback [args]
 	typeset callback=$3
 
 	shift 3
-	mdb_ctf_set_int zfs_removal_suspend_progress 0t1
+	set_tunable32 zfs_removal_suspend_progress 1
 
 	log_must zpool remove $pool $disk
 
@@ -81,7 +81,7 @@ function attempt_during_removal # pool disk callback [args]
 	#
 	log_must is_pool_removing $pool
 
-	mdb_ctf_set_int zfs_removal_suspend_progress 0t0
+	set_tunable32 zfs_removal_suspend_progress 0
 
 	log_must wait_for_removal $pool
 	log_mustnot vdevs_in_pool $pool $disk
@@ -119,13 +119,6 @@ function start_random_writer # file
 		done
 		log_note "Stopping writer for $file"
 	) &
-}
-
-function set_min_bytes # bytes
-{
-	typeset bytes=$1
-	echo "zfs_condense_min_mapping_bytes/W 0t$bytes" | \
-	    mdb -kw
 }
 
 function test_removal_with_operation # callback [args]
