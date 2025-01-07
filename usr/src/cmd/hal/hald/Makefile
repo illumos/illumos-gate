@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2024 Oxide Computer Company
 
 SUBDIRS =	solaris
 
@@ -32,11 +33,13 @@ OBJS =		hald_marshal.o device.o device_info.o device_store.o hald.o \
 OBJS_SOL =	devinfo.o devinfo_ieee1394.o devinfo_misc.o devinfo_pci.o devinfo_storage.o \
 		devinfo_usb.o hotplug.o osspec.o sysevent.o devinfo_acpi.o \
 		devinfo_cpu.o
-OBJS_ALL =	$(OBJS) $(OBJS_SOL:%=solaris/%)
+OBJS_COMMON =	$(HEXDUMP_OBJS)
+OBJS_ALL =	$(OBJS) $(OBJS_SOL:%=solaris/%) $(OBJS_COMMON)
 SRCS =		$(OBJS:%.o=%.c)
 
 include ../../Makefile.cmd
 include ../Makefile.hal
+include $(SRC)/common/hexdump/Makefile.com
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
@@ -81,11 +84,12 @@ $(PROG): $(SUBDIRS) .WAIT $(OBJS_ALL)
 install: all $(ROOTCMD) $(SUBDIRS)
 
 clean: $(SUBDIRS)
-	$(RM) $(OBJS) $(OBJS_SOL)
+	$(RM) $(OBJS) $(OBJS_SOL) $(OBJS_COMMON)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../../Makefile.targ

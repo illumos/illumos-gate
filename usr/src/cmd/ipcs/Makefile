@@ -24,11 +24,14 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 
 PROG=		ipcs
 XPG4PROG=	$(PROG)
+OBJS=		ipcs.o $(HEXDUMP_OBJS)
 
 include ../Makefile.cmd
+include $(SRC)/common/hexdump/Makefile.com
 
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lproject
@@ -42,10 +45,18 @@ all: $(PROG)
 
 install: all $(ROOTXPG4PROG)
 
+clean:
+	$(RM) $(OBJS)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
 $(ROOTXPG4PROG):	$(ROOTPROG)
 	-$(RM) $(ROOTXPG4PROG)
 	-$(LN) -s ../../bin/$(PROG) $(ROOTXPG4PROG)
 
 clean:
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

@@ -76,6 +76,7 @@ clean:
 
 install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 
+include		$(SRC)/common/hexdump/Makefile.targ
 include		$(SRC)/cmd/Makefile.targ
 
 # Derived source and header files (messaging).

@@ -30,6 +30,7 @@ PROG=		elfdump
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/common/hexdump/Makefile.com
 
 COMOBJ =	main.o			corenote.o \
 		dwarf.o			struct_layout.o \
@@ -44,7 +45,7 @@ SGSCOMMONOBJ =	leb128.o
 
 BLTOBJ =	msg.o
 
-EXTOBJ =	hexdump.o ilstr.o
+EXTOBJ =	$(HEXDUMP_OBJS)
 
 OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(SGSCOMMONOBJ) \
 		$(EXTOBJ)
@@ -78,11 +79,3 @@ SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) $(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES) gen_struct_layout
-
-%.o: $(SRC)/common/hexdump/%.c
-	$(COMPILE.c) $< -o $@
-	$(POST_PROCESS_O)
-
-%.o: $(SRC)/common/ilstr/%.c
-	$(COMPILE.c) $< -o $@
-	$(POST_PROCESS_O)

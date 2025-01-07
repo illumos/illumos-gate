@@ -4375,19 +4375,15 @@ usbgem_do_attach(dev_info_t *dip,
 
 	DPRINTF(2, (CE_CONT, "!usbgem%d: %s: called", unit, __func__));
 
-	/*
-	 * Allocate soft data structure
-	 */
-	dp = kmem_zalloc(USBGEM_LOCAL_DATA_SIZE(gc), KM_SLEEP);
-	if (dp == NULL) {
-		return (NULL);
-	}
-
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		cmn_err(CE_WARN, "!gem%d: %s: mac_alloc failed",
 		    unit, __func__);
 		return (NULL);
 	}
+	/*
+	 * Allocate soft data structure
+	 */
+	dp = kmem_zalloc(USBGEM_LOCAL_DATA_SIZE(gc), KM_SLEEP);
 
 	/* link to private area */
 	dp->private = lp;

@@ -11,12 +11,14 @@
 
 #
 # Copyright (c) 2017, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 #
 
 PROG= dltraninfo dlsend dlrecv dlled
-LINTPROGS= $(PROG:%=%.ln)
+DLTRANINFO_OBJS = dltraninfo.o $(HEXDUMP_OBJS)
 
 include ../Makefile.cmd
+include $(SRC)/common/hexdump/Makefile.com
 
 ROOTCMDDIR = $(ROOTLIB)/dl
 CFLAGS += $(CCVERBOSE)
@@ -25,11 +27,6 @@ dltraninfo :=   LDLIBS += -ldladm -lsff -lnvpair
 dlled :=	LDLIBS += -ldladm
 dlsend :=	LDLIBS += -ldlpi -lsocket
 dlrecv :=	LDLIBS += -ldlpi
-
-dltraninfo.ln :=   LDLIBS += -ldladm -lsff -lnvpair
-dlled.ln :=	LDLIBS += -ldladm
-dlsend.ln :=	LDLIBS += -ldlpi -lsocket
-dlrecv.ln :=	LDLIBS += -ldlpi
 
 ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
 
@@ -40,10 +37,11 @@ all: $(PROG)
 install: all $(ROOTCMD)
 
 clean:
+	$(RM) $(DLTRANINFO_OBJS)
 
-%.ln: %.c
-	$(LINT.c) $< $(LDLIBS)
+dltraninfo: $(DLTRANINFO_OBJS)
+	$(LINK.c) -o $@ $(DLTRANINFO_OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-lint:	$(LINTPROGS)
-
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

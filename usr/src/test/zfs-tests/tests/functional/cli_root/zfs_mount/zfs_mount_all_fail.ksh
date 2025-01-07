@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -43,8 +44,9 @@ typeset fscount=10
 function setup_all
 {
 	# Create $fscount filesystems at the top level of $path
-	for ((i=0; i<$fscount; i++)); do
+	for ((i=0; i<fscount; i++)); do
 		setup_filesystem "$DISKS" "$TESTPOOL" $i "$path/$i" ctr
+		filesystems+=($i)
 	done
 
 	zfs list -r $TESTPOOL
@@ -57,6 +59,12 @@ function cleanup_all
 	export __ZFS_POOL_RESTRICT="$TESTPOOL"
 	log_must zfs $unmountall
 	unset __ZFS_POOL_RESTRICT
+	# make sure we leave $TESTPOOL mounted
+	log_must zfs mount $TESTPOOL
+
+	for fs in ${filesystems[@]}; do
+		cleanup_filesystem "$TESTPOOL" "$fs"
+	done
 
 	[[ -d ${TEST_BASE_DIR%%/}/testroot$$ ]] && \
 		rm -rf ${TEST_BASE_DIR%%/}/testroot$$
@@ -75,7 +83,7 @@ log_must zfs $unmountall
 unset __ZFS_POOL_RESTRICT
 
 # All of our filesystems should be unmounted at this point
-for ((i=0; i<$fscount; i++)); do
+for ((i=0; i<fscount; i++)); do
 	log_mustnot mounted "$TESTPOOL/$i"
 done
 
@@ -89,7 +97,7 @@ unset __ZFS_POOL_RESTRICT
 
 # All filesystems except for "0" should be mounted
 log_mustnot mounted "$TESTPOOL/0"
-for ((i=1; i<$fscount; i++)); do
+for ((i=1; i<fscount; i++)); do
 	log_must mounted "$TESTPOOL/$i"
 done
 

@@ -23,13 +23,14 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2024 Oxide Computer Company
 
 PROG=		zstreamdump
-OBJS=		zstreamdump.o
-SRCS=		$(OBJS:%.o=%.c)
+OBJS=		zstreamdump.o $(HEXDUMP_OBJS)
 POFILE=		zstreamdump.po
 
 include ../Makefile.cmd
+include $(SRC)/common/hexdump/Makefile.com
 
 INCS +=	-I../../uts/common/fs/zfs
 INCS +=	-I../../common/zfs
@@ -63,4 +64,5 @@ clean:
 
 FRC:
 
+include $(SRC)/common/hexdump/Makefile.targ
 include ../Makefile.targ

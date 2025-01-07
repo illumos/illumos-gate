@@ -39,8 +39,8 @@
  *
  * System power management is not yet supported by the driver.
  *
- * 	NOTE:
- * 	This driver depends on the misc/ac97 and drv/audio modules being
+ *	NOTE:
+ *	This driver depends on the misc/ac97 and drv/audio modules being
  *	loaded first.
  */
 #include <sys/types.h>
@@ -493,7 +493,7 @@ audioixp_stop(void *arg)
  *	void	*arg		The DMA engine to start
  *
  * Returns:
- *	0 	on success (never fails, errno if it did)
+ *	0	on success (never fails, errno if it did)
  */
 static int
 audioixp_start(void *arg)
@@ -735,7 +735,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 		break;
 	default:
 		audio_dev_warn(adev, "bad port number (%d)!", num);
-		return (DDI_FAILURE);
+		goto free_port;
 	}
 
 	port->nframes = 4096;
@@ -748,7 +748,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	    NULL, &port->samp_dmah);
 	if (rc != DDI_SUCCESS) {
 		audio_dev_warn(adev, "ddi_dma_alloc_handle failed: %d", rc);
-		return (DDI_FAILURE);
+		goto free_port;
 	}
 	/* allocate DMA buffer */
 	rc = ddi_dma_mem_alloc(port->samp_dmah, port->samp_size, &buf_attr,
@@ -756,7 +756,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	    &port->samp_size, &port->samp_acch);
 	if (rc == DDI_FAILURE) {
 		audio_dev_warn(adev, "dma_mem_alloc failed");
-		return (DDI_FAILURE);
+		goto free_dma_handle;
 	}
 
 	/* bind DMA buffer */
@@ -766,7 +766,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	if ((rc != DDI_DMA_MAPPED) || (count != 1)) {
 		audio_dev_warn(adev,
 		    "ddi_dma_addr_bind_handle failed: %d", rc);
-		return (DDI_FAILURE);
+		goto free_dma_mem;
 	}
 	port->samp_paddr = cookie.dmac_address;
 
@@ -778,7 +778,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	    NULL, &port->bdl_dmah);
 	if (rc != DDI_SUCCESS) {
 		audio_dev_warn(adev, "ddi_dma_alloc_handle(bdlist) failed");
-		return (DDI_FAILURE);
+		goto unbind_dma_handle;
 	}
 
 	/*
@@ -790,7 +790,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	    &port->bdl_kaddr, &port->bdl_size, &port->bdl_acch);
 	if (rc != DDI_SUCCESS) {
 		audio_dev_warn(adev, "ddi_dma_mem_alloc(bdlist) failed");
-		return (DDI_FAILURE);
+		goto free_dma_handle1;
 	}
 
 	rc = ddi_dma_addr_bind_handle(port->bdl_dmah, NULL, port->bdl_kaddr,
@@ -798,7 +798,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	    NULL, &cookie, &count);
 	if ((rc != DDI_DMA_MAPPED) || (count != 1)) {
 		audio_dev_warn(adev, "addr_bind_handle failed");
-		return (DDI_FAILURE);
+		goto free_dma_mem1;
 	}
 	port->bdl_paddr = cookie.dmac_address;
 
@@ -824,13 +824,28 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	port->engine = audio_engine_alloc(&audioixp_engine_ops, caps);
 	if (port->engine == NULL) {
 		audio_dev_warn(adev, "audio_engine_alloc failed");
-		return (DDI_FAILURE);
+		goto fail;
 	}
 
 	audio_engine_set_private(port->engine, port);
 	audio_dev_add_engine(adev, port->engine);
 
 	return (DDI_SUCCESS);
+fail:
+	(void) ddi_dma_unbind_handle(port->bdl_dmah);
+free_dma_mem1:
+	ddi_dma_mem_free(&port->bdl_acch);
+free_dma_handle1:
+	ddi_dma_free_handle(&port->bdl_dmah);
+unbind_dma_handle:
+	(void) ddi_dma_unbind_handle(port->samp_dmah);
+free_dma_mem:
+	ddi_dma_mem_free(&port->samp_acch);
+free_dma_handle:
+	ddi_dma_free_handle(&port->samp_dmah);
+free_port:
+	kmem_free(port, sizeof (*port));
+	return (DDI_FAILURE);
 }
 
 /*
@@ -1032,7 +1047,7 @@ audioixp_codec_ready(audioixp_state_t *statep)
 static int
 audioixp_codec_sync(audioixp_state_t *statep)
 {
-	int 		i;
+	int		i;
 	uint32_t	cmd;
 
 	for (i = 0; i < 300; i++) {
@@ -1218,7 +1233,7 @@ audioixp_chip_init(audioixp_state_t *statep)
  *
  * Description:
  *	Attach an instance of the audioixp driver. This routine does
- * 	the device dependent attach tasks.
+ *	the device dependent attach tasks.
  *
  * Arguments:
  *	dev_info_t	*dip	Pointer to the device's dev_info struct

@@ -26,6 +26,7 @@
 #
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -35,9 +36,8 @@ verify_runnable "global"
 
 DISK=${DISKS%% *}
 
-ismounted "$TESTPOOL/$TESTFS"
-(( $? == 0 )) && \
-        log_must zfs umount $TESTDIR
+ismounted "$TESTPOOL/$TESTFS" && log_must zfs umount $TESTDIR
+log_must rmdir $TESTDIR
 
 destroy_pool $TESTPOOL
 #

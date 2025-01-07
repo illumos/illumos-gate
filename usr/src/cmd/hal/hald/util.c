@@ -40,6 +40,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/file.h>
+#include <sys/hexdump.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
@@ -954,43 +955,8 @@ hal_util_strdup_valid_utf8 (const char *str)
 void
 hal_util_hexdump (const void *mem, unsigned int size)
 {
-	unsigned int i;
-	unsigned int j;
-	unsigned int n;
-	const char *buf = (const char *) mem;
-
-	n = 0;
-	printf ("Dumping %d=0x%x bytes\n", size, size);
-	while (n < size) {
-
-		printf ("0x%04x: ", n);
-
-		j = n;
-		for (i = 0; i < 16; i++) {
-			if (j >= size)
-				break;
-			printf ("%02x ", buf[j]);
-			j++;
-		}
-
-		for ( ; i < 16; i++) {
-			printf ("   ");
-		}
-
-		printf ("   ");
-
-		j = n;
-		for (i = 0; i < 16; i++) {
-			if (j >= size)
-				break;
-			printf ("%c", isprint(buf[j]) ? buf[j] : '.');
-			j++;
-		}
-
-		printf ("\n");
-
-		n += 16;
-	}
+	(void) printf ("Dumping %d=0x%x bytes\n", size, size);
+	(void) hexdump_file(mem, size, HDF_DEFAULT, stdout);
 }
 
 gboolean

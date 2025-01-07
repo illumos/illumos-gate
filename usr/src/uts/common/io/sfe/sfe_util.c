@@ -1212,7 +1212,7 @@ gem_reclaim_txbuf(struct gem_dev *dp)
  */
 static void
 gem_tx_load_descs_oo(struct gem_dev *dp,
-	seqnum_t start_slot, seqnum_t end_slot, uint64_t flags)
+    seqnum_t start_slot, seqnum_t end_slot, uint64_t flags)
 {
 	seqnum_t	sn;
 	struct txbuf	*tbp;
@@ -1806,7 +1806,7 @@ gem_receive(struct gem_dev *dp)
 	struct rxbuf	*newbufs;
 	struct rxbuf	**newbufs_tailp;
 	mblk_t		*rx_head;
-	mblk_t 		**rx_tailp;
+	mblk_t		**rx_tailp;
 	int		rx_ring_size = dp->gc.gc_rx_ring_size;
 	seqnum_t	active_head;
 	uint64_t	(*rx_desc_stat)(struct gem_dev *dp,
@@ -4732,8 +4732,8 @@ gem_read_conf(struct gem_dev *dp)
 
 struct gem_dev *
 gem_do_attach(dev_info_t *dip, int port,
-	struct gem_conf *gc, void *base, ddi_acc_handle_t *regs_handlep,
-	void *lp, int lmsize)
+    struct gem_conf *gc, void *base, ddi_acc_handle_t *regs_handlep,
+    void *lp, int lmsize)
 {
 	struct gem_dev		*dp;
 	int			i;
@@ -4762,6 +4762,7 @@ gem_do_attach(dev_info_t *dip, int port,
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		cmn_err(CE_WARN, "!gem%d: %s: mac_alloc failed",
 		    unit, __func__);
+		kmem_free(dp, GEM_LOCAL_DATA_SIZE(gc));
 		return (NULL);
 	}
 	/* ddi_set_driver_private(dip, dp); */
@@ -5270,7 +5271,7 @@ err:
  */
 uint8_t
 gem_search_pci_cap(dev_info_t *dip,
-		ddi_acc_handle_t conf_handle, uint8_t target)
+    ddi_acc_handle_t conf_handle, uint8_t target)
 {
 	uint8_t		pci_cap_ptr;
 	uint32_t	pci_cap;
@@ -5292,7 +5293,7 @@ gem_search_pci_cap(dev_info_t *dip,
 
 int
 gem_pci_set_power_state(dev_info_t *dip,
-		ddi_acc_handle_t conf_handle, uint_t new_mode)
+    ddi_acc_handle_t conf_handle, uint_t new_mode)
 {
 	uint8_t		pci_cap_ptr;
 	uint32_t	pmcsr;
@@ -5341,8 +5342,8 @@ gem_pci_set_power_state(dev_info_t *dip,
  */
 int
 gem_pci_regs_map_setup(dev_info_t *dip, uint32_t which, uint32_t mask,
-	struct ddi_device_acc_attr *attrp,
-	caddr_t *basep, ddi_acc_handle_t *hp)
+    struct ddi_device_acc_attr *attrp,
+    caddr_t *basep, ddi_acc_handle_t *hp)
 {
 	struct pci_phys_spec	*regs;
 	uint_t		len;

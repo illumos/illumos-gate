@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 /*
@@ -2884,16 +2885,30 @@ ibnex_comm_svc_init(char *property, ibnex_node_type_t type)
 		return (IBNEX_SUCCESS);
 	}
 
-	comm_svcp = kmem_zalloc((ncomm_svcs * sizeof (char *)), KM_SLEEP);
-	if (type == IBNEX_PORT_COMMSVC_NODE) {
+	switch (type) {
+	case IBNEX_PORT_COMMSVC_NODE:
+		comm_svcp =
+		    kmem_zalloc((ncomm_svcs * sizeof (char *)), KM_SLEEP);
 		ibnex.ibnex_comm_svc_names = comm_svcp;
 		ibnex.ibnex_num_comm_svcs = ncomm_svcs;
-	} else if (type == IBNEX_VPPA_COMMSVC_NODE) {
+		break;
+
+	case IBNEX_VPPA_COMMSVC_NODE:
+		comm_svcp =
+		    kmem_zalloc((ncomm_svcs * sizeof (char *)), KM_SLEEP);
 		ibnex.ibnex_vppa_comm_svc_names = comm_svcp;
 		ibnex.ibnex_nvppa_comm_svcs = ncomm_svcs;
-	} else if (type == IBNEX_HCASVC_COMMSVC_NODE) {
+		break;
+
+	case IBNEX_HCASVC_COMMSVC_NODE:
+		comm_svcp =
+		    kmem_zalloc((ncomm_svcs * sizeof (char *)), KM_SLEEP);
 		ibnex.ibnex_hcasvc_comm_svc_names = comm_svcp;
 		ibnex.ibnex_nhcasvc_comm_svcs = ncomm_svcs;
+		break;
+
+	default:
+		goto done;
 	}
 
 	/* copy the services into an array of strings */
@@ -2906,6 +2921,7 @@ ibnex_comm_svc_init(char *property, ibnex_node_type_t type)
 		    "\t\tService [%d]: %s", i, comm_svcp[i]);
 		++i;
 	}
+done:
 	ddi_prop_free(servicep);
 	kmem_free(valid, nservices * sizeof (int));
 	return (IBNEX_SUCCESS);

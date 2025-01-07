@@ -128,6 +128,12 @@ hexdump_set_addr(hexdump_t *h, uint64_t addr)
 }
 
 void
+hexdump_set_addrwidth(hexdump_t *h, uint8_t width)
+{
+	h->h_addrwidth = width;
+}
+
+void
 hexdump_set_marker(hexdump_t *h, uint8_t marker)
 {
 	h->h_marker = marker;
@@ -354,6 +360,8 @@ hexdumph(hexdump_t *h, const uint8_t *data, size_t len, hexdump_flag_t flags,
 	 * We need one character for every four bits of the final address.
 	 */
 	hdp.hdp_addrwidth = (flsll(hdp.hdp_baseaddr + len) + 3) / 4;
+	if (h != NULL && h->h_addrwidth > hdp.hdp_addrwidth)
+		hdp.hdp_addrwidth = h->h_addrwidth;
 
 	/*
 	 * If alignment was requested and the address is not already aligned,
