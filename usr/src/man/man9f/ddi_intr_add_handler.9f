@@ -1,10 +1,24 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+'\"
 '\"
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2024 Oxide Computer Company
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd September 15, 2024
+'\"
+.Dd January 7, 2025
 .Dt DDI_INTR_ADD_HANDLER 9F
 .Os
 .Sh NAME
@@ -23,7 +37,7 @@
 .Fc
 .Ft int
 .Fo ddi_intr_add_handler
-.Fa "ddi_intr_handle_t *h"
+.Fa "ddi_intr_handle_t h"
 .Fa "ddi_intr_handler_t inthandler"
 .Fa "void *arg1"
 .Fa "void *arg2"
@@ -38,7 +52,7 @@ illumos DDI specific
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa h
-Pointer to the DDI interrupt handle
+DDI interrupt handle
 .It Fa inthandler
 Pointer to interrupt handler function
 .It Fa arg1
@@ -88,12 +102,12 @@ The
 function must be called after
 .Fn ddi_intr_alloc ,
 but before
-.Fn ddi_intr_enable
+.Xr ddi_intr_enable 9F
 is called.
 The interrupt must be enabled through
-.Fn ddi_intr_enable
+.Xr ddi_intr_enable 9F
 or
-.Fn ddi_intr_block_enable
+.Xr ddi_intr_block_enable 9F
 before it can be used.
 .Pp
 The
@@ -115,7 +129,7 @@ See
 .Xr ddi_intr_dup_handler 9F
 for duplicated interrupt handles.
 If a handler is duplicated with the
-.Fn ddi_intr_dup_handler
+.Xr ddi_intr_dup_handler 9F
 function, all added and duplicated instances of the handler must be removed with
 .Fn ddi_intr_remove_handler
 in order for the handler to be completely removed.
@@ -131,7 +145,7 @@ The
 and
 .Fn ddi_intr_remove_handler
 functions return:
-.Bl -tag -width Ds
+.Bl -tag -width DDI_SUCCESS
 .It Dv DDI_SUCCESS
 On success.
 .It Dv DDI_EINVAL
@@ -139,7 +153,7 @@ On encountering invalid input parameters.
 .It Dv DDI_FAILURE
 On any implementation specific failure.
 .El
-.Sy Interface Stability
+.Sh INTERFACE STABILITY
 .Sy Committed
 .Sh SEE ALSO
 .Xr attributes 7 ,
@@ -164,7 +178,7 @@ On any implementation specific failure.
 When checking the return value of the
 .Fn ddi_intr_add_handler
 and
-.Fn ddi_intr_rem_handler
+.Fn ddi_intr_remove_handler
 functions
 .Pq and more generally other DDI functions
 callers should always write the check by comparing to
