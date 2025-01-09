@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 Michael Zeller
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -486,7 +486,9 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 	mblk_t *mprx = NULL, **mprx_prevp = &mprx;
 	mblk_t *mpdrop = NULL, **mpdrop_prevp = &mpdrop;
 	const boolean_t do_merge =
-	    ((link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0);
+	    (link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0;
+	const boolean_t allow_gro =
+	    (link->l_features & VIRTIO_NET_F_GUEST_TSO4) != 0;
 
 	size_t nrx = 0, ndrop = 0;
 
@@ -520,6 +522,58 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 			}
 			mp = next;
 			continue;
+		}
+
+		/*
+		 * Virtio devices are prohibited from passing on packets larger
+		 * than the MTU + Eth if the guest has not negotiated GRO flags
+		 * (e.g., GUEST_TSO*). This occurs irrespective of `do_merge`.
+		 */
+		if (size > sizeof (struct ether_header) + link->l_mtu) {
+			const boolean_t can_emu_lso = DB_LSOMSS(mp) != 0;
+			const boolean_t attempt_emu =
+			    !allow_gro || size > VIONA_GRO_MAX_PACKET_SIZE;
+
+			if ((DB_CKSUMFLAGS(mp) & HW_LSO) == 0 ||
+			    (attempt_emu && !can_emu_lso)) {
+				VIONA_PROBE3(rx_drop_over_mtu, viona_vring_t *,
+				    ring, mblk_t *, mp, size_t, size);
+				VIONA_RING_STAT_INCR(ring, rx_drop_over_mtu);
+				err = E2BIG;
+				goto pad_drop;
+			}
+
+			/*
+			 * If the packet has come from another device or viona
+			 * which expected to make use of LSO, we can split the
+			 * packet on its behalf.
+			 */
+			if (attempt_emu) {
+				mblk_t *tail = NULL;
+				uint_t n_pkts = 0;
+
+				DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM |
+				    HCK_FULLCKSUM;
+				mac_hw_emul(&mp, &tail, &n_pkts, MAC_ALL_EMULS);
+				if (mp == NULL) {
+					VIONA_RING_STAT_INCR(ring,
+					    rx_gro_fallback_fail);
+					viona_ring_stat_error(ring);
+					mp = next;
+					continue;
+				}
+				VIONA_PROBE4(rx_gro_fallback, viona_vring_t *,
+				    ring, mblk_t *, mp, size_t, size,
+				    uint_t, n_pkts);
+				VIONA_RING_STAT_INCR(ring, rx_gro_fallback);
+				ASSERT3P(tail, !=, NULL);
+				if (tail != mp) {
+					tail->b_next = next;
+					next = mp->b_next;
+					mp->b_next = NULL;
+				}
+				size = msgsize(mp);
+			}
 		}
 
 		/*
