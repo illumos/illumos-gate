@@ -67,11 +67,10 @@ NUM_WRITES=40
 
 log_must zfs set volsize=128m $TESTPOOL/$TESTVOL
 
-echo "y" | newfs -v /dev/zvol/rdsk/$TESTPOOL/$TESTVOL >/dev/null 2>&1
-(( $? != 0 )) && log_fail "Unable to newfs(8) $TESTPOOL/$TESTVOL"
+log_must new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL
 
 log_must mkdir $TESTDIR
-log_must mount /dev/zvol/dsk/$TESTPOOL/$TESTVOL $TESTDIR
+log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR
 
 typeset -i fn=0
 typeset -i retval=0
@@ -80,7 +79,7 @@ while (( 1 )); do
 	file_write -o create -f $TESTDIR/testfile$$.$fn \
 	    -b $BLOCKSZ -c $NUM_WRITES
 	retval=$?
-	if (( $retval != 0 )); then
+	if (( retval != 0 )); then
 		break
 	fi
 	(( fn = fn + 1 ))
@@ -92,6 +91,6 @@ log_must zfs snapshot $TESTPOOL/$TESTVOL@snap
 
 fsck -n /dev/zvol/rdsk/$TESTPOOL/$TESTVOL@snap >/dev/null 2>&1
 retval=$?
-(( $retval == 39 )) || log_fail "fsck exited with wrong value $retval "
+(( retval == 39 )) || log_fail "fsck exited with wrong value $retval "
 
 log_pass "Verify that ZFS volume snapshot could be fscked"

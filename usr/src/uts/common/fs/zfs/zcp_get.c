@@ -213,92 +213,6 @@ get_dsl_dir_prop(dsl_dataset_t *ds, zfs_prop_t zfs_prop,
 }
 
 /*
- * Takes a dataset, a property, a value and that value's setpoint as
- * found in the ZAP. Checks if the property has been changed in the vfs.
- * If so, val and setpoint will be overwritten with updated content.
- * Otherwise, they are left unchanged.
- */
-static int
-get_temporary_prop(dsl_dataset_t *ds, zfs_prop_t zfs_prop, uint64_t *val,
-    char *setpoint)
-{
-#ifndef _KERNEL
-	return (0);
-#else
-	int error;
-	zfsvfs_t *zfvp;
-	vfs_t *vfsp;
-	objset_t *os;
-	uint64_t tmp = *val;
-
-	error = dmu_objset_from_ds(ds, &os);
-	if (error != 0)
-		return (error);
-
-	error = getzfsvfs_impl(os, &zfvp);
-	if (error != 0)
-		return (error);
-
-	vfsp = zfvp->z_vfs;
-
-	switch (zfs_prop) {
-	case ZFS_PROP_ATIME:
-		if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_ATIME, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_DEVICES:
-		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_EXEC:
-		if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_SETUID:
-		if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_READONLY:
-		if (vfs_optionisset(vfsp, MNTOPT_RW, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_RO, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_XATTR:
-		if (vfs_optionisset(vfsp, MNTOPT_NOXATTR, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_XATTR, NULL))
-			tmp = 1;
-		break;
-	case ZFS_PROP_NBMAND:
-		if (vfs_optionisset(vfsp, MNTOPT_NONBMAND, NULL))
-			tmp = 0;
-		if (vfs_optionisset(vfsp, MNTOPT_NBMAND, NULL))
-			tmp = 1;
-		break;
-	default:
-		VFS_RELE(vfsp);
-		return (ENOENT);
-	}
-
-	VFS_RELE(vfsp);
-	if (tmp != *val) {
-		(void) strcpy(setpoint, "temporary");
-		*val = tmp;
-	}
-	return (0);
-#endif
-}
-
-/*
  * Check if the property we're looking for is stored at the dsl_dataset or
  * dsl_dir level. If so, push the property value and source onto the lua stack
  * and return 0. If it is not present or a failure occurs in lookup, return a
@@ -529,10 +443,18 @@ get_zap_prop(lua_State *state, dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 	} else {
 		error = dsl_prop_get_ds(ds, prop_name, sizeof (numval),
 		    1, &numval, setpoint);
+		if (error != 0)
+			goto out;
 
+#ifdef _KERNEL
 		/* Fill in temorary value for prop, if applicable */
-		(void) get_temporary_prop(ds, zfs_prop, &numval, setpoint);
-
+		(void) zfs_get_temporary_prop(ds, zfs_prop, &numval, setpoint);
+#else
+		kmem_free(strval, ZAP_MAXVALUELEN);
+		return (luaL_error(state,
+		    "temporary properties only supported in kernel mode",
+		    prop_name));
+#endif
 		/* Push value to lua stack */
 		if (prop_type == PROP_TYPE_INDEX) {
 			const char *propval;
@@ -545,6 +467,7 @@ get_zap_prop(lua_State *state, dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 				(void) lua_pushnumber(state, numval);
 		}
 	}
+out:
 	kmem_free(strval, ZAP_MAXVALUELEN);
 	if (error == 0)
 		get_prop_src(state, setpoint, zfs_prop);

@@ -82,8 +82,8 @@ log_mustnot zpool add -f "$TESTPOOL" ${disk}s${SLICE1}
 log_mustnot zpool add -f "$TESTPOOL" $mnttab_dev
 log_mustnot zpool add -f "$TESTPOOL" $vfstab_dev
 
-log_must echo "y" | newfs /dev/dsk/$dump_dev > /dev/null 2>&1
-log_must dumpadm -u -d /dev/dsk/$dump_dev > /dev/null
+log_must eval "new_fs ${DEV_RDSKDIR}/$dump_dev > /dev/null 2>&1"
+log_must dumpadm -u -d ${DEV_DSKDIR}/$dump_dev > /dev/null
 log_mustnot zpool add -f "$TESTPOOL" $dump_dev
 
 log_pass "'zpool add' should fail with inapplicable scenarios."

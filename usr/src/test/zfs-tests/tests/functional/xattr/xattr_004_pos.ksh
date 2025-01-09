@@ -62,10 +62,10 @@ log_onexit cleanup
 
 # Create a UFS file system that we can work in
 log_must zfs create -V128m $TESTPOOL/$TESTFS/zvol
-log_must eval "echo y | newfs /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol > /dev/null 2>&1"
+log_must eval "new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTFS/zvol > /dev/null 2>&1"
 
 log_must mkdir /tmp/ufs.$$
-log_must mount /dev/zvol/dsk/$TESTPOOL/$TESTFS/zvol /tmp/ufs.$$
+log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTFS/zvol /tmp/ufs.$$
 
 # Create files in ufs and tmpfs, and set some xattrs on them.
 log_must touch /tmp/ufs.$$/ufs-file.$$

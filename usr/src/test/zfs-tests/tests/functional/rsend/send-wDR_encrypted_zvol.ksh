@@ -71,15 +71,15 @@ log_must zfs create -o dedup=on -o encryption=on -o keyformat=passphrase \
 log_must block_device_wait
 
 if is_linux; then
-	log_must eval "echo 'y' | newfs -t ext4 -v $zdev"
+	log_must eval "new_fs -t ext4 -v $zdev"
 else
-	log_must eval "echo 'y' | newfs $zdev"
+	log_must eval "new_fs $zdev"
 fi
 log_must mkdir -p $mntpnt
 log_must mkdir -p $recvmnt
 log_must mount $zdev $mntpnt
 
-for ((i = 1; i <= $snap_count; i++)); do
+for ((i = 1; i <= snap_count; i++)); do
 	log_must dd if=/dev/urandom of=$mntpnt/file bs=1M count=1
 	for ((j = 0; j < 10; j++)); do
 		log_must cp $mntpnt/file $mntpnt/file$j

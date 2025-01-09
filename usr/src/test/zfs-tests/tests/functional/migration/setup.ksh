@@ -60,7 +60,7 @@ log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 rm -rf $NONZFS_TESTDIR  || log_unresolved Could not remove $NONZFS_TESTDIR
 mkdir -p $NONZFS_TESTDIR || log_unresolved Could not create $NONZFS_TESTDIR
 
-echo "y" | newfs -v /dev/rdsk/$NONZFSSIDE_DISK
+new_fs ${DEV_RDSKDIR}/$NONZFSSIDE_DISK
 (( $? != 0 )) &&
 	log_untested "Unable to setup a UFS file system"
 

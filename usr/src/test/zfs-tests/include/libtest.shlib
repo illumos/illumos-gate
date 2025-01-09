@@ -2875,6 +2875,21 @@ function get_tunable_impl
 	return 1
 }
 
+function new_fs #<args>
+{
+	case "$(uname)" in
+	FreeBSD)
+		newfs "$@"
+		;;
+	SunOS)
+		echo y | newfs "$@"
+		;;
+	*)
+		echo y | newfs -v "$@"
+		;;
+	esac
+}
+
 #
 # Wait for the specified arcstat to reach non-zero quiescence.
 # If echo is 1 echo the value after reaching quiescence, otherwise

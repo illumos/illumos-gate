@@ -75,8 +75,7 @@ function setup_snap_env
 		# mount it. Otherwise, only check if this ufs file system
 		# was mounted.
 		#
-		log_must eval "echo "y" | \
-			newfs -v /dev/zvol/dsk/$VOL > /dev/null 2>&1"
+		log_must new_fs ${ZVOL_RDEVDIR}/$VOL
 
 		[[ ! -d $TESTDIR1 ]] && log_must mkdir $TESTDIR1
 
@@ -85,7 +84,7 @@ function setup_snap_env
 		df -lhF ufs "/dev/zvol/dsk/$VOL" > /dev/null 2>&1
 		if (( $? != 0 )); then
 			log_must mount \
-				/dev/zvol/dsk/$TESTPOOL/$TESTVOL $TESTDIR1
+				${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR1
 		fi
 	fi
 

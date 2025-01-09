@@ -49,7 +49,7 @@ function cleanup
 {
 	if datasetexists $vol_name; then
 		swap -l | grep $TMP_FILE > /dev/null 2>&1
-		if [[ $? -eq 0 ]]; then
+		if (( $? == 0 )); then
 			log_must swap -d $TMP_FILE
 		fi
 		rm -f $TMP_FILE
@@ -78,8 +78,8 @@ typeset TMP_FILE=$mntp/tmpfile.$$
 
 create_pool $TESTPOOL $pool_dev
 log_must zfs create -V 100m $vol_name
-log_must echo "y" | newfs /dev/zvol/dsk/$vol_name > /dev/null 2>&1
-log_must mount /dev/zvol/dsk/$vol_name $mntp
+log_must eval "new_fs ${ZVOL_RDEVDIR}/$vol_name > /dev/null 2>&1"
+log_must mount ${ZVOL_DEVDIR}/$vol_name $mntp
 
 log_must mkfile 50m $TMP_FILE
 log_must swap -a $TMP_FILE
