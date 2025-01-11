@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -1680,6 +1680,9 @@ free_txq(struct port_info *pi, struct sge_txq *txq)
 			if (txq->tx_dhdl[i] != NULL)
 				ddi_dma_free_handle(&txq->tx_dhdl[i]);
 		}
+		kmem_free(txq->tx_dhdl,
+		    sizeof (ddi_dma_handle_t) * txq->tx_dhdl_total);
+		txq->tx_dhdl = NULL;
 	}
 
 	(void) free_eq(sc, &txq->eq);
