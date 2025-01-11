@@ -3,8 +3,8 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
-.\" Copyright 2024 Oxide Computer Company
-.Dd July 3, 2024
+.\" Copyright 2025 Oxide Computer Company
+.Dd January 11, 2025
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -154,8 +154,8 @@ AMD Family 19h Zen 4 processors, including models 10-1fh, 60-7fh, and
 a0-afh.
 Includes Ryzen and EPYC branded processors.
 .It Xr amd_f1ah_zen5_events 3CPC
-AMD Family 19h Zen 5 processors including models 00-1fh, 20-2f, and
-40-4fh.
+AMD Family 1ah Zen 5 processors including models 00-1fh, 20-2f, 40-4fh,
+60-6fh, and 70-77h.
 Includes Ryzen and EPYC branded processors.
 .El
 .Ss Using Attributes

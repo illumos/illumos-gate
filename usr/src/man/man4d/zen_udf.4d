@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd October 7, 2020
+.Dd January 11, 2025
 .Dt ZEN_UDF 4D
 .Os
 .Sh NAME
@@ -25,7 +25,11 @@ The
 driver provides the ability to read data from the AMD data fabric
 .Pq DF
 on AMD Family 17h
-.Pq Zen, Zen+, and Zen 2
+.Pq Zen, Zen+, and Zen 2 ,
+AMD Family 19h
+.Pq Zen 3 and Zen 4 ,
+and AMD Family 1ah
+.Pq Zen 5
 processors.
 .Pp
 This driver is intended strictly for facilitating platform development

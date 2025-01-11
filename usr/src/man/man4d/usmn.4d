@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd July 30, 2021
+.Dd January 11, 2025
 .Dt USMN 4D
 .Os
 .Sh NAME
@@ -26,9 +26,11 @@ driver provides the ability to read and write data from the AMD System
 Management Network
 .Pq SMN
 on AMD Family 17h
-.Pq Zen, Zen+, and Zen 2
-and AMD Family 19h
-.Pq Zen 3
+.Pq Zen, Zen+, and Zen 2 ,
+AMD Family 19h
+.Pq Zen 3 and Zen 4 ,
+and AMD Family 1ah
+.Pq Zen 5
 processors.
 .Pp
 This driver is intended strictly for facilitating platform development

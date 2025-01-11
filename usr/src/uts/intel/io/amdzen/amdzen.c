@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -211,8 +211,10 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x14e8,
 	/* Family 1Ah Turin */
 	0x153a,
-	/* Family 1Ah 20-2fh */
-	0x1507
+	/* Family 1Ah 20-2fh, 70-77h */
+	0x1507,
+	/* Family 1Ah 60-6fh */
+	0x1122
 };
 
 typedef struct {

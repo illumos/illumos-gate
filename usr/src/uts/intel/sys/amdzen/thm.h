@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_AMDZEN_THM_H
@@ -91,6 +91,8 @@ static inline uint16_t
 THM_DIE_MAX_UNITS(x86_processor_family_t fam)
 {
 	switch (fam) {
+	case X86_PF_AMD_STRIX_HALO:
+		return (2);
 	case X86_PF_AMD_NAPLES:
 	case X86_PF_AMD_PINNACLE_RIDGE:
 	case X86_PF_AMD_RAVEN_RIDGE:
@@ -118,6 +120,7 @@ THM_DIE_MAX_UNITS(x86_processor_family_t fam)
 	case X86_PF_AMD_DENSE_TURIN:
 		return (16);
 	case X86_PF_AMD_STRIX:
+	case X86_PF_AMD_KRACKAN:
 	default:
 		return (0);
 	}
@@ -161,6 +164,9 @@ THM_DIE(uint8_t dieno, x86_processor_family_t fam)
 	case X86_PF_AMD_TURIN:
 	case X86_PF_AMD_DENSE_TURIN:
 		regdef.srd_reg = 0x1f0;
+		break;
+	case X86_PF_AMD_STRIX_HALO:
+		regdef.srd_reg = 0x78;
 		break;
 	default:
 		panic("encountered unknown family 0x%x while constructing "
