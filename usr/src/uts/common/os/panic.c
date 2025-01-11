@@ -147,6 +147,7 @@
 #include <sys/panic.h>
 #include <sys/fm/util.h>
 #include <sys/clock_impl.h>
+#include <sys/sunddi.h>
 
 /*
  * Panic variables which are set once during the QUIESCE state by the
@@ -171,6 +172,7 @@ int panic_ipl;				/* ipl on panic_cpu at time of panic */
 ushort_t panic_schedflag;		/* t_schedflag for panic_thread */
 cpu_t *panic_bound_cpu;			/* t_bound_cpu for panic_thread */
 char panic_preempt;			/* t_preempt for panic_thread */
+dev_info_t *panic_dip;			/* from dev_err(dip, CE_PANIC, ...) */
 
 /*
  * Panic variables which can be set via /etc/system or patched while
@@ -335,6 +337,10 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 #endif
 			printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id,
 			    (void *)t);
+		if (panic_dip != NULL) {
+			printf("%s%d: ", ddi_driver_name(panic_dip),
+			    ddi_get_instance(panic_dip));
+		}
 		vprintf(format, alist);
 		printf("\n\n");
 

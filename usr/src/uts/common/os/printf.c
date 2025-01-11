@@ -251,8 +251,11 @@ static void
 vzdcmn_err(zoneid_t zoneid, void *site, int ce, const char *fmt, va_list adx,
     dev_info_t *dip)
 {
-	if (ce == CE_PANIC)
+	if (ce == CE_PANIC) {
+		panic_dip = dip;
 		vpanic(fmt, adx);
+	}
+
 	if ((uint_t)ce < CE_IGNORE) {
 		cprintf(fmt, adx, ce_to_sl[ce] | SL_CONSOLE,
 		    ce_prefix[ce], ce_suffix[ce], site, 0, 0, 0,
