@@ -1481,6 +1481,7 @@ link path=usr/share/man/man3c/timerfd_settime.3c target=timerfd_create.3c
 link path=usr/share/man/man3c/timerisset.3c target=timeradd.3c
 link path=usr/share/man/man3c/timersub.3c target=timeradd.3c
 file path=usr/share/man/man3c/timespec_get.3c
+link path=usr/share/man/man3c/timespec_getres.3c target=timespec_get.3c
 file path=usr/share/man/man3c/tmpfile.3c
 file path=usr/share/man/man3c/tmpnam.3c
 link path=usr/share/man/man3c/tmpnam_r.3c target=tmpnam.3c

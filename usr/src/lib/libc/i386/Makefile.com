@@ -619,7 +619,7 @@ PORTGEN=			\
 	tfind.o			\
 	time_data.o		\
 	time_gdata.o		\
-	timespec_get.o		\
+	timespec_cstd.o		\
 	tls_data.o		\
 	truncate.o		\
 	tsdalloc.o		\

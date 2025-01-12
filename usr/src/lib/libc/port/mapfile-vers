@@ -79,6 +79,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.52 {
+    protected:
+	timespec_getres;
+} ILLUMOS_0.51;
+
 SYMBOL_VERSION ILLUMOS_0.51 {
     protected:
 	posix_spawn_file_actions_addchdir;

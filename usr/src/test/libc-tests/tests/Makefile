@@ -67,6 +67,7 @@ PROGS = \
 	strerror \
 	strtonum \
 	timespec_get \
+	timespec_getres \
 	wcslcat \
 	wcslcpy \
 	wcsncasecmp \
@@ -118,6 +119,11 @@ stdbit.64 :=	CSTD=$(CSTD_GNU17)
 
 strtonum.32 :=		CSTD=$(CSTD_GNU17)
 strtonum.64 :=		CSTD=$(CSTD_GNU17)
+
+timespec_get.32 :=	CSTD=$(CSTD_GNU17)
+timespec_get.64 :=	CSTD=$(CSTD_GNU17)
+timespec_getres.32 :=	CSTD=$(CSTD_GNU17)
+timespec_getres.64 :=	CSTD=$(CSTD_GNU17)
 
 wcslcat.32 :=		CSTD=$(CSTD_GNU17)
 wcslcat.64 :=		CSTD=$(CSTD_GNU17)

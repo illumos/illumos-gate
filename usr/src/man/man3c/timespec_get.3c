@@ -10,12 +10,14 @@
 .\"
 .\"
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd "Mar 25, 2016"
+.Dd "January 12, 2025"
 .Dt TIMESPEC_GET 3C
 .Os
 .Sh NAME
-.Nm timespec_get
+.Nm timespec_get ,
+.Nm timespec_getres
 .Nd get time information
 .Sh SYNOPSIS
 .In time.h
@@ -24,33 +26,111 @@
 .Fa "struct timespec *ts"
 .Fa "int base"
 .Fc
+.Ft int
+.Fo timespec_getres
+.Fa "struct timespec *ts"
+.Fa "int base"
+.Fc
 .Sh DESCRIPTION
 The
 .Fn timespec_get
-function provides access nanosecond resolution time.
+function provides access to nanosecond resolution time.
+The
+.Fn timespec_getres
+function provides access to the underlying clock's resolution.
 The meaning and source of time is defined by the
 .Fa base
 argument.
 The following values are defined for
 .Fa base :
 .Bl -tag -width Ds
-.It Sy TIME_UTC
+.It Dv TIME_UTC
 Obtain the current time of day from the realtime clock on the system.
 It represents the amount of time in second and nanoseconds since the Epoch.
 This is logically equivalent to calling
 .Xr clock_gettime 3C
 with
-.Sy CLOCK_REALTIME .
+.Dv CLOCK_REALTIME .
+.It Dv TIME_MONOTONIC
+The system's monotonic clock is a non-adjustable, high-resolution clock.
+The returned value is not subject to adjustments from time of day drift
+nor can it be set.
+This clock is generally only useful for measuring elapsed time relative
+to a prior reading.
+This is logically equivalent to using the
+.Dv CLOCK_HIGHRES
+and
+.Dv CLOCK_MONOTONIC
+clocks or calling
+.Xr gethrtime 3C .
+.It Dv TIME_THREAD_ACTIVE
+This clock measures the elapsed system and user CPU-time of the current
+thread.
+The amount of time it has spent executing code is measured in seconds
+and nanoseconds.
+The
+.Fa pr_utime
+member of the
+.Vt lwpsinfo_t
+or
+.Vt prusage_t
+structures discussed in
+.Xr proc 5
+are alternative ways to see the user component.
+The system component is a combination of both the system and trap time
+that the thread has experienced.
+In the
+.Vt lwpsinfo_t
+this is covered solely by the
+.Fa pr_stime
+member.
+For the
+.Vt prusage_t
+these are separated out into the
+.Fa pr_stime
+and
+.Fa pr_ttime
+members respectively.
+.Pp
+This is logically equivalent to using the
+.Dv CLOCK_THREAD_CPUTIME_ID
+clock .
+This clock is optional and may not be present on other platforms.
+.It Dv TIME_THREAD_ACTIVE_USR
+This clock is similar to the
+.Dv TIME_THREAD_ACTIVE
+clock, except it only counts user time that has elapsed.
+This is logically equivalent to using the
+.Dv CLOCK_VIRTUAL
+clock or calling
+.Xr gethrvtime 3C .
+This clock is an extension and may not be available on other platforms.
+.It Dv TIME_ACTIVE
+This clock measures the elapsed system and user CPU-time of the current
+process, including all of its threads.
+None of the process's children are counted in this measure, whether
+running or terminated.
+The value read here will be the same as combining the corresponding
+.Xr proc 5
+.Vt psinfo_t
+structure's
+.Fa pr_stime
+and
+.Fa pr_utime
+members.
+This clock is optional and may not be present on other platforms.
 .El
 .Pp
 For the definition of the
-.Sy timespec
+.Vt timespec
 structure, see
 .Xr time.h 3HEAD .
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn timespec_get
-function returns the passed in value of
+and
+.Fn timespec_getres
+functions return the passed in value of
 .Fa base .
 Otherwise,
 .Sy 0
@@ -58,11 +138,15 @@ is returned to represent an error.
 .Sh ERRORS
 Unlike other functions, the
 .Fn timespec_get
-function is not defined to set
-.Sy errno .
+and
+.Fn timespec_getres
+functions are not defined to set
+.Vt errno .
 However, the
 .Fn timespec_get
-function will fail if:
+and
+.Fn timespec_getres
+functions will fail if:
 .Bl -bullet -offset indent
 .It
 The value of
@@ -77,6 +161,9 @@ There was an error obtaining the time for
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
+.Xr clock_getres 3C ,
 .Xr clock_gettime 3C ,
+.Xr gethrtime 3C ,
+.Xr gethrvtime 3C ,
 .Xr time.h 3HEAD ,
 .Xr attributes 7

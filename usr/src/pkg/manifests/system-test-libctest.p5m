@@ -261,6 +261,8 @@ hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
 file path=opt/libc-tests/tests/thread_name mode=0555
 file path=opt/libc-tests/tests/timespec_get.32 mode=0555
 file path=opt/libc-tests/tests/timespec_get.64 mode=0555
+file path=opt/libc-tests/tests/timespec_getres.32 mode=0555
+file path=opt/libc-tests/tests/timespec_getres.64 mode=0555
 file path=opt/libc-tests/tests/uchar.32 mode=0555
 file path=opt/libc-tests/tests/uchar.64 mode=0555
 file path=opt/libc-tests/tests/utimes.32 mode=0555

@@ -1424,6 +1424,7 @@ MANLINKS=	FD_CLR.3c				\
 		timerfd_settime.3c			\
 		timerisset.3c				\
 		timersub.3c				\
+		timespec_getres.3c			\
 		tmpnam_r.3c				\
 		tolower_l.3c				\
 		toupper_l.3c				\
@@ -2667,6 +2668,8 @@ timersub.3c				:= LINKSRC = timeradd.3c
 
 timerfd_gettime.3c			:= LINKSRC = timerfd_create.3c
 timerfd_settime.3c			:= LINKSRC = timerfd_create.3c
+
+timespec_getres.3c			:= LINKSRC = timespec_get.3c
 
 tempnam.3c				:= LINKSRC = tmpnam.3c
 tmpnam_r.3c				:= LINKSRC = tmpnam.3c

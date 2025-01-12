@@ -152,6 +152,8 @@ timeout = 600
 [/opt/libc-tests/tests/thread_name]
 [/opt/libc-tests/tests/timespec_get.32]
 [/opt/libc-tests/tests/timespec_get.64]
+[/opt/libc-tests/tests/timespec_getres.32]
+[/opt/libc-tests/tests/timespec_getres.64]
 [/opt/libc-tests/tests/uchar.32]
 [/opt/libc-tests/tests/uchar.64]
 [/opt/libc-tests/tests/utimes.32]
