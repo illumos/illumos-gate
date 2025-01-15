@@ -15,7 +15,7 @@
 
 #
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/bhyve/tests@$(PKGVERS)
@@ -32,6 +32,7 @@ file path=opt/bhyve-tests/runfiles/default.run mode=0444
 dir  path=opt/bhyve-tests/tests
 dir  path=opt/bhyve-tests/tests/inst_emul
 file path=opt/bhyve-tests/tests/inst_emul/cpuid mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/cpuid_guest_state mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_consistent mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_paging mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/imul mode=0555

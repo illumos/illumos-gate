@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 
 [DEFAULT]
 pre =
@@ -61,6 +61,7 @@ tests = [
 user = root
 tests = [
 	'cpuid',
+	'cpuid_guest_state',
 	'imul',
 	'rdmsr',
 	'wrmsr',
