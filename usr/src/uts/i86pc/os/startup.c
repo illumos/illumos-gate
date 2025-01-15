@@ -25,9 +25,8 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2022 Oxide Computer Company
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
- * Copyright 2022 Oxide Computer Co.
+ * Copyright 2025 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -2155,7 +2154,17 @@ startup_end(void)
 	PRM_POINT("configure() done");
 
 	/*
-	 * We can now setup for XSAVE because fpu_probe is done in configure().
+	 * configure() will have called fpu_probe() so we can now finish off
+	 * the last pieces.
+	 */
+
+	/*
+	 * Set up the FPU save area for LWP0.
+	 */
+	lwp_fp_init(&lwp0);
+
+	/*
+	 * Set up for XSAVE.
 	 */
 	if (fp_save_mech == FP_XSAVE) {
 		PRM_POINT("xsave_setup_msr()");
