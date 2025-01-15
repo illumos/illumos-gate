@@ -48,9 +48,9 @@
  *
  *  -c file	defines the output configuration file.
  *
- *  -f flag	flags for dldump(3dl).
+ *  -f flag	flags for dldump(3C).
  *
- *  -o dir	defines the output directory for any dldump(3dl) objects
+ *  -o dir	defines the output directory for any dldump(3C) objects
  *		that follow.  For backward compatibility (RTC_VER_ONE only
  *		allowed one output directory) allow the first occurrence of this
  *		specification to catch any previous files.  If not specified,
@@ -66,11 +66,11 @@
  * string table which will be used to create the eventual configuration file.
  *
  *  -a name	add the individual name, with an alternative to the
- *		configuration cache.  No alternative is created via dldump(3dl),
+ *		configuration cache.  No alternative is created via dldump(3C),
  *		it is the users responsibility to furnish the alternative.
  *
  *  -A name	add the individual name, with an optional alternative to the
- *		configuration cache.  No alternative is created via dldump(3dl),
+ *		configuration cache.  No alternative is created via dldump(3C),
  *		it is the users responsibility to furnish the alternative.
  *
  *  -e envar	replaceable environment variable
@@ -81,14 +81,14 @@
  *		is a directory each shared object within the directory is added
  *		to the cache.
  *
- *  -I name	same as -i, but in addition any ELF objects are dldump(3dl)'ed.
+ *  -I name	same as -i, but in addition any ELF objects are dldump(3C)'ed.
  *
  *  -g name	add the group name to the configuration cache.  Each object is
  *		expanded to determine its dependencies and these are added to
  *		the cache.  If name is a directory each shared object within the
  *		directory and its dependencies are added to the cache.
  *
- *  -G app	same as -g, but in addition any ELF objects are dldump(3dl)'ed.
+ *  -G app	same as -g, but in addition any ELF objects are dldump(3C)'ed.
  *
  *  -l dir	library search directory
  *
@@ -98,7 +98,7 @@
 /*
  * Establish a structure for maintaining current object directory attributes.
  * We wish to validate the access of any object directory that will be written
- * to (dldump(3dl), and thus by maintaining a current object directory and its
+ * to dldump(3C), and thus by maintaining a current object directory and its
  * intended use we can perform this validation later.
  */
 typedef struct {
@@ -178,7 +178,7 @@ main(int argc, char **argv, char **envp)
 			crle.c_flags |= (CRLE_PRMENV | CRLE_CREAT);
 			break;
 
-		case 'f':			/* dldump(3dl) flags */
+		case 'f':			/* dldump(3C) flags */
 			if (crle.c_dlflags) {
 				(void) fprintf(stderr, MSG_INTL(MSG_ARG_MULT),
 				    crle.c_name, MSG_ORIG(MSG_ARG_F));
@@ -390,7 +390,7 @@ main(int argc, char **argv, char **envp)
 	}
 
 	/*
-	 * If an object directory is required to hold dldump(3dl) output assign
+	 * If an object directory is required to hold dldump(3C) output assign
 	 * a default if necessary and insure we're able to write there.
 	 */
 	if (crle.c_flags & CRLE_ALTER) {
@@ -421,7 +421,7 @@ main(int argc, char **argv, char **envp)
 		}
 
 		/*
-		 * If we're going to dldump(3dl) images ourself make sure we
+		 * If we're going to dldump(3C) images ourself make sure we
 		 * can access any directories.
 		 */
 		if (crle.c_flags & CRLE_DUMP) {
@@ -605,7 +605,7 @@ main(int argc, char **argv, char **envp)
 	}
 
 	/*
-	 * If dldump(3dl) images are required spawn a process to create them.
+	 * If dldump(3C) images are required spawn a process to create them.
 	 */
 	if (crle.c_flags & CRLE_DUMP) {
 		if (dump(&crle) != 0) {

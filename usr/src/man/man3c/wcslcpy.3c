@@ -1,0 +1,97 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd January 5, 2025
+.Dt WCSLCPY 3C
+.Os
+.Sh NAME
+.Nm wcslcpy
+.Nd copy a wide-character string
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In wchar.h
+.Ft size_t
+.Fo wcslcpy
+.Fa "wchar_t *restrict dst"
+.Fa "wchar_t *restrict src"
+.Fa "size_t dstlen"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn wcslcpy
+function is the wide-character version of
+.Xr strlcpy 3C .
+It copies wide characters from
+.Fa src
+to
+.Fa dst ,
+while ensuring that
+.Fa dst
+is always properly terminated with the null wide-character
+.Pq L'\e0' .
+.Pp
+Characters from
+.Fa src
+are copied until either the null wide-character is found in
+.Fa src
+or
+.Fa dstlen
+- 1 wide characters have been copied, whichever comes first.
+In the latter case, the copy of
+.Fa src
+in
+.Fa dst
+will be truncated.
+If
+.Fa dstlen
+is zero, then no characters are copied.
+.Sh RETURN VALUES
+The
+.Fn wcslcpy
+function always returns the total number of wide characters in
+.Fa src ,
+excluding the terminating null wide-character.
+.Sh EXAMPLES
+.Sy Example 1
+Checking for overflow
+.Pp
+The following example shows how one would check if a copy using the
+.Fn wcslcpy
+function would have overflowed a fixed size buffer.
+Note, the use of
+.Sq >=
+down below is required because the
+.Fn wcslcpy
+function always ensures that the buffer has a terminating null wide-character.
+.Bd -literal -offset 2
+#include <wchar.h>
+#include <stdio.h>
+
+#define	BUFLEN	32
+wchar_t buf[BUFLEN];
+
+\&...
+	if (wcslcpy(buf, src, BUFLEN) >= BUFLEN) {
+		(void) fprintf(stderr, "overflow detected!");
+		goto out;
+	}
+\&...
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr strlcpy 3C ,
+.Xr wcslcat 3C

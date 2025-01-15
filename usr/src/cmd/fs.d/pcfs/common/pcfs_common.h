@@ -20,10 +20,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011 Gary Mills
- *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright (c) 2011 Gary Mills
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #ifndef _PCFS_COMMON_H
@@ -37,6 +37,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -70,8 +71,9 @@ extern "C" {
 /*
  * Function prototypes
  */
-extern off64_t findPartitionOffset(int fd, char *ldrive);
-extern char *stat_actual_disk(char *diskname, struct stat *info, char **suffix);
+extern off64_t findPartitionOffset(int fd, size_t bpsec, char *ldrive);
+extern char *stat_actual_disk(const char *diskname, struct stat *info,
+	char **suffix);
 extern void header_for_dump(void);
 extern void store_16_bits(uchar_t **bp, uint32_t v);
 extern void store_32_bits(uchar_t **bp, uint32_t v);
@@ -81,7 +83,8 @@ extern void missing_arg(char *option);
 extern void dump_bytes(uchar_t *b, int n);
 extern void bad_arg(char *option);
 extern void usage(void);
-extern int  yes(void);
+extern bool is_sector_size_valid(size_t size);
+extern int  get_media_sector_size(int fd, size_t *sizep);
 
 /*
  *	The assumption here is that _BIG_ENDIAN implies sparc, and

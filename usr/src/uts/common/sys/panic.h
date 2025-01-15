@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/cpuvar.h>
+#include <sys/dditypes.h>
 #endif	/* !_ASM */
 
 #ifdef	__cplusplus
@@ -65,7 +66,7 @@ extern "C" {
  * register values.  The number of items in pd_nvdata is computed as follows:
  *
  * (pd_msgoff - (sizeof (panic_data_t) - sizeof (panic_nv_t))) /
- * 	sizeof (panic_nv_t);
+ *	sizeof (panic_nv_t);
  *
  * In addition to panicbuf, debuggers can access the panic_* variables shown
  * below to determine more information about the initiator of the panic.
@@ -147,6 +148,7 @@ extern int panic_dump;
 extern int64_t panic_lbolt64;
 extern label_t panic_regs;
 extern struct regs *panic_reg;
+extern dev_info_t *panic_dip;
 
 /*
  * Panic functions called from the common panic code which must be

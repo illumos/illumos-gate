@@ -20,14 +20,15 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
-#include <sys/atomic.h>
-#include <sys/ethernet.h>
 #include <sys/mac_provider.h>
-#include <sys/mac_ether.h>
 
 /*
  * NOTE:  The "real" NIC driver is in the nexus.  This is just a thin wrapper
@@ -35,10 +36,6 @@
  */
 #include "shared.h"
 #include "version.h"
-
-struct port_info_stub {
-	PORT_INFO_HDR;
-};
 
 static struct cb_ops cxgbe_cb_ops = {
 	.cb_open =		nulldev,
@@ -62,7 +59,7 @@ static struct cb_ops cxgbe_cb_ops = {
 
 static int cxgbe_devo_attach(dev_info_t *, ddi_attach_cmd_t);
 static int cxgbe_devo_detach(dev_info_t *, ddi_detach_cmd_t);
-struct dev_ops cxgbe_dev_ops = {
+static struct dev_ops cxgbe_dev_ops = {
 	.devo_rev =		DEVO_REV,
 	.devo_identify =	nulldev,
 	.devo_probe =		nulldev,
@@ -72,15 +69,15 @@ struct dev_ops cxgbe_dev_ops = {
 	.devo_cb_ops =		&cxgbe_cb_ops,
 };
 
-static struct modldrv modldrv = {
+static struct modldrv cxgbe_modldrv = {
 	.drv_modops =		&mod_driverops,
-	.drv_linkinfo =		"Chelsio T4/T5 NIC " DRV_VERSION,
+	.drv_linkinfo =		"Chelsio T4-T6 NIC " DRV_VERSION,
 	.drv_dev_ops =		&cxgbe_dev_ops
 };
 
-static struct modlinkage modlinkage = {
+static struct modlinkage cxgbe_modlinkage = {
 	.ml_rev =		MODREV_1,
-	.ml_linkage =		{&modldrv, NULL},
+	.ml_linkage =		{&cxgbe_modldrv, NULL},
 };
 
 int
@@ -89,7 +86,7 @@ _init(void)
 	int rc;
 
 	mac_init_ops(&cxgbe_dev_ops, T4_PORT_NAME);
-	rc = mod_install(&modlinkage);
+	rc = mod_install(&cxgbe_modlinkage);
 	if (rc != 0)
 		mac_fini_ops(&cxgbe_dev_ops);
 
@@ -101,7 +98,7 @@ _fini(void)
 {
 	int rc;
 
-	rc = mod_remove(&modlinkage);
+	rc = mod_remove(&cxgbe_modlinkage);
 	if (rc != 0)
 		return (rc);
 
@@ -112,86 +109,39 @@ _fini(void)
 int
 _info(struct modinfo *mi)
 {
-	return (mod_info(&modlinkage, mi));
+	return (mod_info(&cxgbe_modlinkage, mi));
 }
 
 static int
 cxgbe_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	struct port_info_stub *pi;
-	mac_register_t *mac;
-	mac_handle_t mh;
-	int rc;
-
-	if (cmd != DDI_ATTACH)
-		return (DDI_FAILURE);
-
-	pi = ddi_get_parent_data(dip);
-	if (pi == NULL)
-		return (DDI_FAILURE);
-
-	mac = mac_alloc(MAC_VERSION);
-	if (mac == NULL) {
-		cmn_err(CE_WARN, "%s%d: failed to allocate version %d mac.",
-		    ddi_driver_name(pi->dip), ddi_get_instance(pi->dip),
-		    MAC_VERSION);
+	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
 
-	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
-	mac->m_driver = pi;
-	mac->m_dip = dip;
-	mac->m_src_addr = pi->hw_addr;
-	mac->m_callbacks = pi->mc;
-	mac->m_max_sdu = pi->mtu;
-	mac->m_priv_props = pi->props;
-	mac->m_margin = 22; /* TODO: mac_register(9s) and onnv code disagree */
-
-	if (!mac->m_callbacks->mc_unicst) {
-		cmn_err(CE_NOTE, "%s%d: Multiple Rings Enabled",
-			ddi_driver_name(pi->dip), ddi_get_instance(pi->dip));
-		mac->m_v12n = MAC_VIRT_LEVEL1;
-	} else
-		cmn_err(CE_NOTE, "%s%d: Multiple Rings Disbled",
-			ddi_driver_name(pi->dip), ddi_get_instance(pi->dip));
-	rc = mac_register(mac, &mh);
-	mac_free(mac);
-	if (rc != 0) {
-		cmn_err(CE_WARN, "%s%d: failed to register version %d mac.",
-		    ddi_driver_name(pi->dip), ddi_get_instance(pi->dip),
-		    MAC_VERSION);
+	struct port_info *pi = ddi_get_parent_data(dip);
+	if (pi == NULL) {
 		return (DDI_FAILURE);
 	}
-	pi->mh = mh;
 
-	/*
-	 * Link state from this point onwards to the time interface is plumbed,
-	 * should be set to LINK_STATE_UNKNOWN. The mac should be updated about
-	 * the link state as either LINK_STATE_UP or LINK_STATE_DOWN based on
-	 * the actual link state detection after interface plumb.
-	 */
-	mac_link_update(mh, LINK_STATE_UNKNOWN);
-
-	ddi_report_dev(dip);
-
-	return (DDI_SUCCESS);
+	const int rc = t4_cxgbe_attach(pi, dip);
+	if (rc == DDI_SUCCESS) {
+		ddi_report_dev(dip);
+	}
+	return (rc);
 }
 
 static int
 cxgbe_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct port_info_stub *pi;
-	mac_handle_t mh;
-
-	if (cmd != DDI_DETACH)
+	if (cmd != DDI_DETACH) {
 		return (DDI_FAILURE);
+	}
 
-	pi = ddi_get_parent_data(dip);
-	if (pi == NULL)
+	struct port_info *pi = ddi_get_parent_data(dip);
+	if (pi == NULL) {
 		return (DDI_FAILURE);
+	}
 
-	mh = pi->mh;
-	pi->mh = NULL;
-
-	return (mac_unregister(mh));
+	return (t4_cxgbe_detach(pi));
 }

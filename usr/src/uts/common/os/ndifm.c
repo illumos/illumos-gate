@@ -52,7 +52,7 @@
  *      Similarly, bus_fm_fini() is called by child drivers and should
  *      clean-up any resources allocated during bus_fm_init().
  *      These functions are called from passive kernel context, typically from
- *      driver attach(9F) and detach(9F) entry points.
+ *      driver attach(9E) and detach(9E) entry points.
  *
  * Error Handler Dispatching
  *

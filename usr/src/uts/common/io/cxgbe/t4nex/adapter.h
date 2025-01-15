@@ -20,6 +20,10 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #ifndef __CXGBE_ADAPTER_H
 #define	__CXGBE_ADAPTER_H
 
@@ -91,7 +95,12 @@ enum {
 #define	CLR_BUSY(sc)	do { sc->flags &= ~CXGBE_BUSY; } while (0)
 
 struct port_info {
-	PORT_INFO_HDR;
+	dev_info_t *dip;
+	mac_handle_t mh;
+	mac_callbacks_t *mc;
+	void *props;
+	int mtu;
+	uint8_t hw_addr[ETHERADDRL];
 
 	kmutex_t lock;
 	struct adapter *adapter;
@@ -172,6 +181,13 @@ enum {
 	IQS_IDLE	= 2,
 };
 
+struct rxbuf_cache_params {
+	dev_info_t		*dip;
+	ddi_dma_attr_t		dma_attr_rx;
+	ddi_device_acc_attr_t	acc_attr_rx;
+	size_t			buf_size;
+};
+
 /*
  * Ingress Queue: T4 is producer, driver is consumer.
  */
@@ -216,7 +232,12 @@ enum {
 };
 
 /* Listed in order of preference.  Update t4_sysctls too if you change these */
-enum {DOORBELL_UDB=0x1 , DOORBELL_WCWR=0x2, DOORBELL_UDBWC=0x4, DOORBELL_KDB=0x8};
+enum {
+	DOORBELL_UDB	= 0x1,
+	DOORBELL_WCWR	= 0x2,
+	DOORBELL_UDBWC	= 0x4,
+	DOORBELL_KDB	= 0x8
+};
 
 /*
  * Egress Queue: driver is producer, T4 is consumer.
@@ -235,7 +256,7 @@ struct sge_eq {
 	struct sge_qstat *spg;	/* status page, for convenience */
 	int doorbells;
 	volatile uint32_t *udb; /* KVA of doorbell (lies within BAR2) */
-	u_int udb_qid;		/* relative qid within the doorbell page */
+	uint_t udb_qid;		/* relative qid within the doorbell page */
 	uint16_t cap;		/* max # of desc, for convenience */
 	uint16_t avail;		/* available descriptors, for convenience */
 	uint16_t qsize;		/* size (# of entries) of the queue */
@@ -582,38 +603,26 @@ struct memwin {
 /* One for errors, one for firmware events */
 #define	T4_EXTRA_INTR 2
 
-typedef kmutex_t t4_os_lock_t;
-
-static inline void t4_os_lock(t4_os_lock_t *lock)
-{
-	mutex_enter(lock);
-}
-
-static inline void t4_os_unlock(t4_os_lock_t *lock)
-{
-	mutex_exit(lock);
-}
-
 static inline void t4_mbox_list_add(struct adapter *adap,
 				    struct t4_mbox_list *entry)
 {
-	t4_os_lock(&adap->mbox_lock);
+	mutex_enter(&adap->mbox_lock);
 	STAILQ_INSERT_TAIL(&adap->mbox_list, entry, link);
-	t4_os_unlock(&adap->mbox_lock);
+	mutex_exit(&adap->mbox_lock);
 }
 
 static inline void t4_mbox_list_del(struct adapter *adap,
 				    struct t4_mbox_list *entry)
 {
-	t4_os_lock(&adap->mbox_lock);
+	mutex_enter(&adap->mbox_lock);
 	STAILQ_REMOVE(&adap->mbox_list, entry, t4_mbox_list, link);
-	t4_os_unlock(&adap->mbox_lock);
+	mutex_exit(&adap->mbox_lock);
 }
 
 static inline struct t4_mbox_list *
 t4_mbox_list_first_entry(struct adapter *adap)
 {
-	return STAILQ_FIRST(&adap->mbox_list);
+	return (STAILQ_FIRST(&adap->mbox_list));
 }
 
 static inline uint32_t
@@ -736,11 +745,11 @@ static inline bool
 is_10XG_port(const struct port_info *pi)
 {
 	return (is_10G_port(pi) || is_40G_port(pi) ||
-		is_25G_port(pi) || is_50G_port(pi) ||
-		is_100G_port(pi));
+	    is_25G_port(pi) || is_50G_port(pi) ||
+	    is_100G_port(pi));
 }
 
-/**
+/*
  * t4_os_pci_read_seeprom - read four bytes of SEEPROM/VPD contents
  * @adapter: the adapter
  * @addr: SEEPROM/VPD Address to read
@@ -750,18 +759,18 @@ is_10XG_port(const struct port_info *pi)
  * must be four-byte aligned.  Returns 0 on success, a negative erro number
  * on failure.
  */
-static inline int t4_os_pci_read_seeprom(adapter_t *adapter,
-					 int addr, u32 *valp)
+static inline int t4_os_pci_read_seeprom(adapter_t *adapter, int addr,
+    u32 *valp)
 {
 	int t4_seeprom_read(struct adapter *adapter, u32 addr, u32 *data);
 	int ret;
 
 	ret = t4_seeprom_read(adapter, addr, valp);
 
-	return ret >= 0 ? 0 : ret;
+	return (ret >= 0 ? 0 : ret);
 }
 
-/**
+/*
  * t4_os_pci_write_seeprom - write four bytes of SEEPROM/VPD contents
  * @adapter: the adapter
  * @addr: SEEPROM/VPD Address to write
@@ -771,27 +780,25 @@ static inline int t4_os_pci_read_seeprom(adapter_t *adapter,
  * must be four-byte aligned.  Returns 0 on success, a negative erro number
  * on failure.
  */
-static inline int t4_os_pci_write_seeprom(adapter_t *adapter,
-					  int addr, u32 val)
+static inline int t4_os_pci_write_seeprom(adapter_t *adapter, int addr, u32 val)
 {
 	int t4_seeprom_write(struct adapter *adapter, u32 addr, u32 data);
 	int ret;
 
 	ret = t4_seeprom_write(adapter, addr, val);
 
-	return ret >= 0 ? 0 : ret;
+	return (ret >= 0 ? 0 : ret);
 }
 
 static inline int t4_os_pci_set_vpd_size(struct adapter *adapter, size_t len)
 {
-	return 0;
+	return (0);
 }
 
 static inline unsigned int t4_use_ldst(struct adapter *adap)
 {
 	return (adap->flags & FW_OK);
 }
-#define t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
 
 static inline void t4_db_full(struct adapter *adap) {}
 static inline void t4_db_dropped(struct adapter *adap) {}
@@ -842,4 +849,9 @@ int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);
 struct l2t_data *t4_init_l2t(struct adapter *sc);
 int begin_synchronized_op(struct port_info *pi, int hold, int waitok);
 void end_synchronized_op(struct port_info *pi, int held);
+
+#define	setbit(a, i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
+#define	clrbit(a, i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
+#define	isset(a, i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
+
 #endif /* __CXGBE_ADAPTER_H */

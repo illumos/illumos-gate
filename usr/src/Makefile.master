@@ -28,7 +28,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2019 RackTop Systems.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2020 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Joyent, Inc.
@@ -465,6 +465,7 @@ CCERRWARN += -_gcc=-Wno-missing-field-initializers
 # C standard
 CSTD_GNU89=	-xc99=%none
 CSTD_GNU99=	-xc99=%all
+CSTD_GNU17=	-std=gnu17
 CSTD=		$(CSTD_GNU89)
 
 # In most places, assignments to these macros should be appended with +=

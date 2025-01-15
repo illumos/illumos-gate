@@ -41,7 +41,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/tparm.c 1.2 1995/08/31 
 
 /*l
  * Substitute the given parameters into the given string by the
- * following rules (taken from terminfo(7)):
+ * following rules (taken from terminfo(5)):
  *
  * Cursor addressing and other strings  requiring  parameters
  * in the terminal are described by a parameterized string

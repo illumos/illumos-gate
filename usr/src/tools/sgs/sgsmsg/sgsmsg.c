@@ -22,7 +22,7 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * sgsmsg generates several message files from an input template file.  Messages
- * are constructed for use with gettext(3i) - the default - or catgets(3c).  The
+ * are constructed for use with gettext(3C) - the default - or catgets(3C).  The
  * files generate are:
  *
  * msg.h	a header file containing definitions for each message.  The -h
@@ -33,7 +33,7 @@
  *		offsets into this array.  The -d option triggers the creation of
  *		these definitions and specifies the name to use.
  *
- * messages	a message file suitable for catgets(3c) or gettext(3i) use.  The
+ * messages	a message file suitable for catgets(3C) or gettext(3C) use.  The
  *		-m option triggers this output and specifies the filename to be
  *		used.
  *
@@ -56,7 +56,7 @@
  *		Besides the reserved output indicators, a single token is taken
  *		to be a message identifier which will be subsituted for a
  *		`setid' for catgets(3c) output, or a `domain' name for
- *		gettext(3i) output.  This value is determine by substituting the
+ *		gettext(3C) output.  This value is determine by substituting the
  *		token for the associated definition found in the message
  *		identifier file (specified with the -i option).
  *
@@ -784,7 +784,7 @@ file()
 				/*
 				 * For catgets(3c) make sure a message
 				 * identifier has been established (this is
-				 * normally a domain for gettext(3i), but for
+				 * normally a domain for gettext(3C), but for
 				 * sgsmsg use this could be argued as being
 				 * redundent).  Also make sure that the message
 				 * definitions haven't exceeeded the maximum
@@ -812,7 +812,7 @@ file()
 				/*
 				 * For catgets(3c) write the definition and the
 				 * message string to the message file.  For
-				 * gettext(3i) write the message string as a
+				 * gettext(3C) write the message string as a
 				 * mesgid - indicate a mesgid has been output
 				 * so that a msgstr can follow.
 				 */

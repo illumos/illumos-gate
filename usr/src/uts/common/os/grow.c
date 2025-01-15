@@ -89,8 +89,8 @@ brk(caddr_t nva)
 	as_rangelock(p->p_as);
 
 	/*
-	 * As a special case to aid the implementation of sbrk(3C), if given a
-	 * new brk of 0, return the current brk.  We'll hide this in brk(3C).
+	 * As a special case to aid the implementation of sbrk(2), if given a
+	 * new brk of 0, return the current brk.  We'll hide this in brk(2).
 	 */
 	if (nva == 0) {
 		intptr_t base = (intptr_t)(p->p_brkbase + p->p_brksize);

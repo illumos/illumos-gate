@@ -2104,7 +2104,7 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 * if we need to create cmdk-style devid for all the disk devices
 	 * attached to this controller. This property may have been set
 	 * from HBA driver's .conf file or by the HBA driver in its
-	 * attach(9F) function.
+	 * attach(9E) function.
 	 */
 	if ((sdinfo->satadrv_type == SATA_DTYPE_ATADISK) &&
 	    (ddi_getprop(DDI_DEV_T_ANY, hba_dip, DDI_PROP_DONTPASS,
@@ -2232,7 +2232,7 @@ sata_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	/*
 	 * If devid was previously created but not freed up from
-	 * sd(4D) driver (i.e during detach(9F)) then do it here.
+	 * sd(4D) driver (i.e during detach(9E)) then do it here.
 	 */
 	if ((sdinfo->satadrv_type == SATA_DTYPE_ATADISK) &&
 	    (ddi_getprop(DDI_DEV_T_ANY, hba_dip, DDI_PROP_DONTPASS,

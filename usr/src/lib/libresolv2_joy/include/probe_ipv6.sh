@@ -26,7 +26,9 @@ EOF
 cat > tmp$$c.c <<EOF
 #include <sys/types.h>
 #include <netinet/in.h>
+
 struct sockaddr_in6 xx;
+int
 main() { xx.sin6_scope_id = 0; }
 EOF
 
@@ -39,23 +41,26 @@ cat > ${new} <<EOF
 
 EOF
 
-if ${CC} -c tmp$$a.c > /dev/null 2>&1
+if ${CC} ${CPPFLAGS} -c tmp$$a.c > /dev/null 2>&1
 then
         echo "#define HAS_INET6_STRUCTS" >> ${new}
-        if ${CC} -c tmp$$b.c > /dev/null 2>&1
+        if ${CC} ${CPPFLAGS} -c tmp$$b.c > /dev/null 2>&1
         then
 		:
 	else
-                echo "#define in6_addr in_addr6" >> ${new}
+		printf "build failed to detect struct in6_addr\n" >&2
+		exit 1
         fi
-	if ${CC} -c tmp$$c.c > /dev/null 2>&1
+	if ${CC} ${CPPFLAGS} -c tmp$$c.c > /dev/null 2>&1
 	then
 		echo "#define HAVE_SIN6_SCOPE_ID" >> ${new}
 	else
-		echo "#undef HAVE_SIN6_SCOPE_ID" >> ${new}
+		printf "build failed to detect sin6_scope_id\n" >&2
+		exit 1
 	fi
 else
-        echo "#undef HAS_INET6_STRUCTS" >> ${new}
+	printf "build failed to detect struct sockaddr_in6\n" >&2
+	exit 1
 fi
 echo  >> ${new}
 echo "#endif" >> ${new}

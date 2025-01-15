@@ -440,7 +440,7 @@ dis_tgt_create(const char *file)
 	int cmd;
 
 	if (elf_version(EV_CURRENT) == EV_NONE)
-		die("libelf(3ELF) out of date");
+		die("libelf out of date");
 
 	tgt = safe_malloc(sizeof (dis_tgt_t));
 

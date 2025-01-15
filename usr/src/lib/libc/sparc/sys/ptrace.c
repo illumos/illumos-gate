@@ -25,7 +25,7 @@
  */
 
 /*
- * ptrace(2) interface built on top of proc(5).
+ * ptrace(3C) interface built on top of proc(5).
  */
 
 

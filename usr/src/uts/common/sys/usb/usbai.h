@@ -1719,7 +1719,7 @@ int usb_clr_feature(
  *	dip		- devinfo pointer.
  *	cfg_index	- Index of configuration to set.  Corresponds to
  *			  index in the usb_client_dev_data_t tree of
- *			  configurations.  See usb_client_dev_data_t(9F).
+ *			  configurations.  See usb_client_dev_data(9S).
  *	usb_flags	- USB_FLAGS_SLEEP:
  *				wait for completion.
  *	cb		- if USB_FLAGS_SLEEP has not been specified

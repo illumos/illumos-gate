@@ -166,11 +166,11 @@ reg_block_dump(struct adapter *sc, uint8_t *buf, unsigned int start,
  * - bits 10..15: chip revision
  * - bits 16..23: register dump version
  */
-static inline
-unsigned int mk_adap_vers(const struct adapter *sc)
+static inline unsigned int
+mk_adap_vers(const struct adapter *sc)
 {
-	return CHELSIO_CHIP_VERSION(sc->params.chip) |
-		(CHELSIO_CHIP_RELEASE(sc->params.chip) << 10) | (1 << 16);
+	return (CHELSIO_CHIP_VERSION(sc->params.chip) |
+	    (CHELSIO_CHIP_RELEASE(sc->params.chip) << 10) | (1 << 16));
 }
 
 static int
@@ -1766,18 +1766,18 @@ regdump(struct adapter *sc, void *data, int flags)
 	buf = kmem_zalloc(buf_size, KM_SLEEP);
 	if (buf == NULL)
 		return (ENOMEM);
- 
+
 	for (i = 0; i < arr_size; i += 2)
 		reg_block_dump(sc, buf, reg_ranges[i], reg_ranges[i + 1]);
 
 	/* Copyout device log buffer and then carrier buffer */
-	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof(r)), r.len,
-			flags) < 0) {
+	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof (r)), r.len,
+	    flags) < 0) {
 		rc = EFAULT;
 		goto free;
 	}
 
-	if (ddi_copyout(&r, data, sizeof(r), flags) < 0)
+	if (ddi_copyout(&r, data, sizeof (r), flags) < 0)
 		rc = EFAULT;
 free:
 	kmem_free(buf, buf_size);
@@ -1879,7 +1879,7 @@ validate_mem_range(struct adapter *sc, uint32_t addr, int len)
 		maddr = G_EDRAM0_BASE(addr_len) << 20;
 		mlen = G_EDRAM0_SIZE(addr_len) << 20;
 		if (mlen > 0 && addr >= maddr && addr < maddr + mlen &&
-				addr + len <= maddr + mlen)
+		    addr + len <= maddr + mlen)
 			return (0);
 	}
 	if (em & F_EDRAM1_ENABLE) {
@@ -1887,7 +1887,7 @@ validate_mem_range(struct adapter *sc, uint32_t addr, int len)
 		maddr = G_EDRAM1_BASE(addr_len) << 20;
 		mlen = G_EDRAM1_SIZE(addr_len) << 20;
 		if (mlen > 0 && addr >= maddr && addr < maddr + mlen &&
-				addr + len <= maddr + mlen)
+		    addr + len <= maddr + mlen)
 			return (0);
 	}
 	if (em & F_EXT_MEM_ENABLE) {
@@ -1895,7 +1895,7 @@ validate_mem_range(struct adapter *sc, uint32_t addr, int len)
 		maddr = G_EXT_MEM_BASE(addr_len) << 20;
 		mlen = G_EXT_MEM_SIZE(addr_len) << 20;
 		if (mlen > 0 && addr >= maddr && addr < maddr + mlen &&
-				addr + len <= maddr + mlen)
+		    addr + len <= maddr + mlen)
 			return (0);
 	}
 	if (!is_t4(sc->params.chip) && em & F_EXT_MEM1_ENABLE) {
@@ -1903,7 +1903,7 @@ validate_mem_range(struct adapter *sc, uint32_t addr, int len)
 		maddr = G_EXT_MEM1_BASE(addr_len) << 20;
 		mlen = G_EXT_MEM1_SIZE(addr_len) << 20;
 		if (mlen > 0 && addr >= maddr && addr < maddr + mlen &&
-				addr + len <= maddr + mlen)
+		    addr + len <= maddr + mlen)
 			return (0);
 	}
 
@@ -2003,17 +2003,16 @@ get_devlog(struct adapter *sc, void *data, int flags)
 	}
 
 	rc = -t4_memory_rw(sc, sc->params.drv_memwin, dparams->memtype,
-			   dparams->start, dparams->size, (void *)buf,
-			   T4_MEMORY_READ);
+	    dparams->start, dparams->size, (void *)buf, T4_MEMORY_READ);
 	if (rc != 0)
 		goto done1;
 
 	/* Copyout device log buffer and then carrier buffer */
-	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof(dl)), dl.len,
+	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof (dl)), dl.len,
 	    flags) < 0)
 		rc = EFAULT;
 
-	if (ddi_copyout(&dl, data, sizeof(dl), flags) < 0)
+	if (ddi_copyout(&dl, data, sizeof (dl), flags) < 0)
 		rc = EFAULT;
 
 done1:
@@ -2035,17 +2034,17 @@ read_cim_qcfg(struct adapter *sc, void *data, int flags)
 		goto _exit;
 	}
 
-        if (is_t4(sc->params.chip)) {
+	if (is_t4(sc->params.chip)) {
 		t4cimqcfg.num_obq = CIM_NUM_OBQ;
-                ibq_rdaddr = A_UP_IBQ_0_RDADDR;
-                obq_rdaddr = A_UP_OBQ_0_REALADDR;
-        } else {
-                t4cimqcfg.num_obq = CIM_NUM_OBQ_T5;
-                ibq_rdaddr = A_UP_IBQ_0_SHADOW_RDADDR;
-                obq_rdaddr = A_UP_OBQ_0_SHADOW_REALADDR;
-        }
+		ibq_rdaddr = A_UP_IBQ_0_RDADDR;
+		obq_rdaddr = A_UP_OBQ_0_REALADDR;
+	} else {
+		t4cimqcfg.num_obq = CIM_NUM_OBQ_T5;
+		ibq_rdaddr = A_UP_IBQ_0_SHADOW_RDADDR;
+		obq_rdaddr = A_UP_OBQ_0_SHADOW_REALADDR;
+	}
 	nq = CIM_NUM_IBQ + t4cimqcfg.num_obq;
- 
+
 	rc = -t4_cim_read(sc, ibq_rdaddr, 4 * nq, t4cimqcfg.stat);
 	if (rc == 0)
 		rc = -t4_cim_read(sc, obq_rdaddr, 2 * t4cimqcfg.num_obq,
@@ -2098,7 +2097,7 @@ read_edc(struct adapter *sc, void *data, int flags)
 		u32 len;
 
 		rc = t4_memory_rw(sc, sc->params.drv_memwin, memoffset, pos,
-				  count, edc, T4_MEMORY_READ);
+		    count, edc, T4_MEMORY_READ);
 		if (rc != 0) {
 			kmem_free(edc, t4edc.len);
 			goto _exit;
@@ -2229,20 +2228,20 @@ flash_fw(struct adapter *sc, void *data, int flags)
 	u8 *ptr = NULL;
 	int rc = 0;
 
-	if (ddi_copyin(data, &fw, sizeof(struct t4_ldfw), flags) < 0)
-		return EFAULT;
+	if (ddi_copyin(data, &fw, sizeof (struct t4_ldfw), flags) < 0)
+		return (EFAULT);
 
 	if (!fw.len)
-		return EINVAL;
+		return (EINVAL);
 
 	ptr = (u8 *)kmem_zalloc(fw.len, KM_NOSLEEP);
 	if (ptr == NULL)
-		return ENOMEM;
+		return (ENOMEM);
 
-	if (ddi_copyin((void *)((uintptr_t)data + sizeof(fw)), ptr, fw.len,
+	if (ddi_copyin((void *)((uintptr_t)data + sizeof (fw)), ptr, fw.len,
 	    flags) < 0) {
 		kmem_free(ptr, fw.len);
-		return EFAULT;
+		return (EFAULT);
 	}
 
 	if (sc->flags & FULL_INIT_DONE)
@@ -2265,13 +2264,13 @@ get_cudbg(struct adapter *sc, void *data, int flags)
 	int size;
 	int rc = 0;
 
-	if (ddi_copyin(data, &dump, sizeof(struct t4_cudbg_dump), flags) < 0)
-		return EFAULT;
+	if (ddi_copyin(data, &dump, sizeof (struct t4_cudbg_dump), flags) < 0)
+		return (EFAULT);
 
 	size = dump.len;
 	buf = (u8 *)kmem_zalloc(dump.len, KM_NOSLEEP);
 	if (buf == NULL)
-		return ENOMEM;
+		return (ENOMEM);
 
 	handle = cudbg_alloc_handle();
 	if (handle == NULL) {
@@ -2283,7 +2282,7 @@ get_cudbg(struct adapter *sc, void *data, int flags)
 	cudbg->adap = sc;
 	cudbg->print = cxgb_printf;
 
-	memcpy(cudbg->dbg_bitmap, dump.bitmap, sizeof(cudbg->dbg_bitmap));
+	memcpy(cudbg->dbg_bitmap, dump.bitmap, sizeof (cudbg->dbg_bitmap));
 
 	rc = cudbg_collect(handle, buf, &dump.len);
 	if (rc != 0) {
@@ -2291,12 +2290,12 @@ get_cudbg(struct adapter *sc, void *data, int flags)
 		goto exit;
 	}
 
-	if(ddi_copyout(buf, (void *)((uintptr_t)data + sizeof(dump)),
-	   dump.len, flags) < 0){
+	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof (dump)),
+	    dump.len, flags) < 0) {
 		rc = EFAULT;
 	}
 
-	if (ddi_copyout(&dump, data, sizeof(dump), flags) < 0){
+	if (ddi_copyout(&dump, data, sizeof (dump), flags) < 0) {
 		rc = EFAULT;
 	}
 exit:
@@ -2304,5 +2303,5 @@ exit:
 free:
 	kmem_free(buf, size);
 
-	return rc;
+	return (rc);
 }

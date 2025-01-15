@@ -3052,7 +3052,7 @@ tavor_intr_disable(tavor_state_t *state)
 	return (DDI_SUCCESS);
 }
 
-/* Tavor quiesce(9F) entry */
+/* Tavor quiesce(9E) entry */
 static int
 tavor_quiesce(dev_info_t *dip)
 {

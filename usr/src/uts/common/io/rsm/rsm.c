@@ -4068,7 +4068,7 @@ rsm_intr_event(rsmipc_request_t *msg)
 		 * We must hold the segment lock here, or else the segment
 		 * can be freed while pollwakeup is using it. This implies
 		 * that we MUST NOT grab the segment lock during rsm_chpoll,
-		 * as outlined in the chpoll(2) man page.
+		 * as outlined in the chpoll(9E) man page.
 		 */
 		if (seg->s_pollflag & RSM_SEGMENT_POLL)
 			pollwakeup(&seg->s_poll, POLLRDNORM);

@@ -75,8 +75,8 @@ extern "C" {
 void libtecla_version(int *major, int *minor, int *micro);
 
 /*-----------------------------------------------------------------------
- * The getline module provides interactive command-line input, recall
- * and editing by users at terminals. See the gl_getline(3) man page for
+ * The getline module provides interactive command-line input, recall and
+ * editing by users at terminals. See the gl_get_line(3TECLA) man page for
  * more details.
  *-----------------------------------------------------------------------*/
 
@@ -88,7 +88,7 @@ typedef struct GetLine GetLine;
 
 /*
  * The following two functions are used to create and delete the
- * resource objects that are used by the gl_getline() function.
+ * resource objects that are used by the gl_get_line() function.
  */
 GetLine *new_GetLine(size_t linelen, size_t histlen);
 GetLine *del_GetLine(GetLine *gl);

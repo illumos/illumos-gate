@@ -21,6 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2024 MNX Cloud, Inc.
 #
 
 FSTYPE=		pcfs
@@ -29,7 +30,9 @@ ATTMK=		$(LIBPROG)
 
 include		../../Makefile.fstype
 
-FSCKOBJS=	fsck.o bpb.o clusters.o fat.o dir.o pcfs_common.o
+COMMONOBJS=	pcfs_common.o getresponse.o
+COMMONSRCS=	../common/pcfs_common.c $(SRC)/common/util/getresponse.c
+FSCKOBJS=	fsck_main.o bpb.o clusters.o fat.o dir.o
 FSCKSRCS=	$(FSCKOBJS:%.o=%.c)
 
 #
@@ -38,17 +41,19 @@ FSCKSRCS=	$(FSCKOBJS:%.o=%.c)
 #DEBUGOBJS=	inject.o
 #DEBUGSRCS=	$(DEBUGOBJS:%.o=%.c)
 
-OBJS=		$(FSCKOBJS) $(DEBUGOBJS)
-SRCS=		$(FSCKSRCS) $(DEBUGSRCS)
-LSRCS=		$(FSCKSRCS) $(DEBUGSRCS)
+OBJS=		$(FSCKOBJS) $(DEBUGOBJS) $(COMMONOBJS)
+SRCS=		$(FSCKSRCS) $(DEBUGSRCS) $(COMMONSRCS)
 
 # for messaging catalog
 #
-POFILE= fsck.po
+POFILES=	$(OBJS:%.o=%.po)
+POFILE=		fsck.po
 
 catalog:        $(POFILE)
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+CPPFLAGS +=	-I../common
+CPPFLAGS +=	-I$(SRC)/common/util
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
@@ -58,5 +63,20 @@ $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
+%.o : ../common/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+%.o : $(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+$(POFILE):
+	$(RM) $@
+	$(COMPILE.cpp) $(SRCS) > $(POFILE).i
+	$(XGETTEXT) $(XGETFLAGS) $(POFILE).i
+	sed "/^domain/d" messages.po > $@
+	$(RM) $(POFILE).i messages.po
+
 clean:
-	$(RM) $(FSCKOBJS) $(DEBUGOBJS)
+	$(RM) $(FSCKOBJS) $(DEBUGOBJS) $(COMMONOBJS) $(POFILE).i messages.po

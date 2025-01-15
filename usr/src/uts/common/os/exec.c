@@ -1279,7 +1279,7 @@ execpermissions(struct vnode *vp, struct vattr *vattrp, struct uarg *args)
 	if ((p->p_plist || (p->p_proc_flag & (P_PR_PTRACE|P_PR_TRACE))) &&
 	    (error = VOP_ACCESS(vp, VREAD, 0, p->p_cred, NULL))) {
 		/*
-		 * If process is under ptrace(2) compatibility,
+		 * If process is under ptrace(3C) compatibility,
 		 * fail the exec(2).
 		 */
 		if (p->p_proc_flag & P_PR_PTRACE)

@@ -61,8 +61,8 @@ struct ddi_ufm_image {
 struct ddi_ufm_handle {
 	/*
 	 * The following fields get filled in when a UFM-aware driver calls
-	 * ddi_ufm_init(9E).  They remain valid until the driver calls
-	 * ddi_ufm_fini(9E).  You can test for validity of these fields by
+	 * ddi_ufm_init(9F).  They remain valid until the driver calls
+	 * ddi_ufm_fini(9F).  You can test for validity of these fields by
 	 * checking if the DDI_UFM_STATE_INIT flag is set in ufmh_state.
 	 */
 	kmutex_t		ufmh_lock;

@@ -23,6 +23,7 @@
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2024 Bill Sommerfeld
+# Copyright 2024 Oxide Computer Company
 #
 
 from __future__ import print_function
@@ -522,21 +523,24 @@ def print_checks():
 
 def main(cmd, args):
     parent_branch = None
+    allow_questionable_requests = False
 
     checklist = []
 
     try:
-        opts, args = getopt.getopt(args, 'lb:c:p:')
+        opts, args = getopt.getopt(args, 'lfb:c:p:')
     except getopt.GetoptError as e:
         sys.stderr.write(str(e) + '\n')
-        sys.stderr.write("Usage: %s [-l] [-c check] [-p branch] [path...]\n"
-                         % cmd)
+        sys.stderr.write("Usage: %s [-l] [-f] [-c check] [-p branch] "
+                         "[path...]\n" % cmd)
         sys.exit(1)
 
     for opt, arg in opts:
         if opt == '-l':
             print_checks()
             sys.exit(0)
+        elif opt == '-f':
+            allow_questionable_requests = True
         # We accept "-b" as an alias of "-p" for backwards compatibility.
         elif opt == '-p' or opt == '-b':
             parent_branch = arg
@@ -548,6 +552,13 @@ def main(cmd, args):
 
     if not parent_branch:
         parent_branch = git_parent_branch(git_branch())
+
+    comments = git_comments(parent_branch)
+    if len(comments) > 5 and not allow_questionable_requests:
+        sys.stderr.write("Declining to check history since %s, would be %d "
+                         "commits. Rerun with -f if you really mean to.\n" %
+                         (parent_branch, len(comments)))
+        sys.exit(1)
 
     if len(checklist) == 0:
         if cmd == 'git-pbchk':

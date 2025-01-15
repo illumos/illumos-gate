@@ -36,8 +36,8 @@
  *
  * In order to track and provide fast lookups of a driver instance's UFM
  * handle, the DDI UFM subsystem stores a pointer to the handle in a global AVL
- * tree. UFM handles are added to the tree when a driver calls ddi_ufm_init(9E)
- * and removed from the tree when a driver calls ddi_ufm_fini(9E).
+ * tree. UFM handles are added to the tree when a driver calls ddi_ufm_init(9F)
+ * and removed from the tree when a driver calls ddi_ufm_fini(9F).
  *
  * Some notes on the locking strategy/rules.
  *

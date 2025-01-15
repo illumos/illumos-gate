@@ -28,6 +28,7 @@ include		../../../Makefile.master
 
 HDRS=		os_version.h port_ipv6.h
 TMPHDRS=	new_os_version.h new_port_ipv6.h
+CSTD=		$(CSTD_GNU17)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -36,7 +37,7 @@ install :=	TARGET= install
 
 .KEEP_STATE:
 
-all lint: $(HDRS)
+all: $(HDRS)
 
 install: all
 
@@ -53,6 +54,6 @@ os_version.h: make_os_version FRC
 	./make_os_version
 
 port_ipv6.h: probe_ipv6 FRC
-	CC="$(CC)" ./probe_ipv6
+	CC="$(CC)" CPPFLAGS="$(CPPFLAGS) $(CSTD)" ./probe_ipv6
 
 FRC:

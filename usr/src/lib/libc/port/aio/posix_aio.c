@@ -803,7 +803,7 @@ aio_fsync(int op, aiocb_t *aiocbp)
 	 * create a bunch of workers (via __uaio_init()).  If the number
 	 * of workers is zero then the number of pending asynchronous I/O
 	 * requests is zero.  In such a case only execute the standard
-	 * fsync(3C) or fdatasync(3RT) as appropriate.
+	 * fsync(3C) or fdatasync(3C) as appropriate.
 	 */
 	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)
@@ -1660,7 +1660,7 @@ aio_fsync64(int op, aiocb64_t *aiocbp)
 	 * create a bunch of workers (via __uaio_init()).  If the number
 	 * of workers is zero then the number of pending asynchronous I/O
 	 * requests is zero.  In such a case only execute the standard
-	 * fsync(3C) or fdatasync(3RT) as appropriate.
+	 * fsync(3C) or fdatasync(3C) as appropriate.
 	 */
 	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)

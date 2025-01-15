@@ -477,7 +477,7 @@ qede_fill_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 		/*
 		 * mri_start callback will supply a mac rings generation
 		 * number which is needed while indicating packets
-		 * upstream via mac_ring_rx() call
+		 * upstream via mac_rx_ring() call
 		 */
 		infop->mri_start = qede_rx_ring_start;
 		infop->mri_stop = qede_rx_ring_stop;

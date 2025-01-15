@@ -15897,7 +15897,7 @@ sd_free_rqs(struct sd_lun *un)
  *
  * Description: Reduces the maximum # of outstanding commands on a
  *		target to the current number of outstanding commands.
- *		Queues a tiemout(9F) callback to restore the limit
+ *		Queues a timeout(9F) callback to restore the limit
  *		after a specified interval has elapsed.
  *		Typically used when we get a TRAN_BUSY return code
  *		back from scsi_transport().

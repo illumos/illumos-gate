@@ -807,7 +807,7 @@ ntwdt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		/*
 		 * release resources in opposite (LIFO) order as
-		 * were allocated in attach(9f).
+		 * were allocated in attach(9e).
 		 */
 		ddi_remove_minor_node(dip, NULL);
 

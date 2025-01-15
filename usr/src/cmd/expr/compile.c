@@ -26,7 +26,7 @@
  */
 
 /*
- * xcompile, xstep, xadvance - simulate compile(3g), step(3g), advance(3g)
+ * xcompile, xstep, xadvance: simulate compile(3gen), step(3gen), advance(3gen)
  *	using regcomp(3c), regexec(3c) interfaces. This is an XCU4
  *	porting aid. switches out to libgen compile/step if collation
  *	table not present.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
@@ -77,7 +77,10 @@ typedef enum spa_feature {
 typedef enum zfeature_flags {
 	/* Can open pool readonly even if this feature is not supported. */
 	ZFEATURE_FLAG_READONLY_COMPAT =		(1 << 0),
-	/* Is this feature necessary to read the MOS? */
+	/*
+	 * Is this feature necessary to load the pool? i.e. do we need this
+	 * feature to read the full feature list out of the MOS?
+	 */
 	ZFEATURE_FLAG_MOS =			(1 << 1),
 	/* Activate this feature at the same time it is enabled. */
 	ZFEATURE_FLAG_ACTIVATE_ON_ENABLE =	(1 << 2),
@@ -85,12 +88,19 @@ typedef enum zfeature_flags {
 	ZFEATURE_FLAG_PER_DATASET =		(1 << 3)
 } zfeature_flags_t;
 
+typedef enum zfeature_type {
+	ZFEATURE_TYPE_BOOLEAN,
+	ZFEATURE_TYPE_UINT64_ARRAY,
+	ZFEATURE_NUM_TYPES
+} zfeature_type_t;
+
 typedef struct zfeature_info {
 	spa_feature_t fi_feature;
 	const char *fi_uname;	/* User-facing feature name */
 	const char *fi_guid;	/* On-disk feature identifier */
 	const char *fi_desc;	/* Feature description */
 	zfeature_flags_t fi_flags;
+	zfeature_type_t fi_type; /* Only relevant for PER_DATASET features */
 	/* array of dependencies, terminated by SPA_FEATURE_NONE */
 	const spa_feature_t *fi_depends;
 } zfeature_info_t;

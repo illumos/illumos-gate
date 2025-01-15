@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -43,6 +43,9 @@
 #include <sys/containerof.h>
 #include <sys/sensors.h>
 #include <sys/firmload.h>
+#include <sys/mac_provider.h>
+#include <sys/mac_ether.h>
+#include <sys/vlan.h>
 
 #include "version.h"
 #include "common/common.h"
@@ -95,7 +98,7 @@ static int t4_devo_probe(dev_info_t *dip);
 static int t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int t4_devo_quiesce(dev_info_t *dip);
-struct dev_ops t4_dev_ops = {
+static struct dev_ops t4_dev_ops = {
 	.devo_rev =		DEVO_REV,
 	.devo_getinfo =		t4_devo_getinfo,
 	.devo_identify =	nulldev,
@@ -108,15 +111,15 @@ struct dev_ops t4_dev_ops = {
 	.devo_quiesce =		&t4_devo_quiesce,
 };
 
-static struct modldrv modldrv = {
+static struct modldrv t4nex_modldrv = {
 	.drv_modops =		&mod_driverops,
-	.drv_linkinfo =		"Chelsio T4 nexus " DRV_VERSION,
+	.drv_linkinfo =		"Chelsio T4-T6 nexus " DRV_VERSION,
 	.drv_dev_ops =		&t4_dev_ops
 };
 
-static struct modlinkage modlinkage = {
+static struct modlinkage t4nex_modlinkage = {
 	.ml_rev =		MODREV_1,
-	.ml_linkage =		{&modldrv, NULL},
+	.ml_linkage =		{&t4nex_modldrv, NULL},
 };
 
 void *t4_list;
@@ -196,7 +199,7 @@ _init(void)
 	if (rc != 0)
 		return (rc);
 
-	rc = mod_install(&modlinkage);
+	rc = mod_install(&t4nex_modlinkage);
 	if (rc != 0)
 		ddi_soft_state_fini(&t4_list);
 
@@ -211,7 +214,7 @@ _fini(void)
 {
 	int rc;
 
-	rc = mod_remove(&modlinkage);
+	rc = mod_remove(&t4nex_modlinkage);
 	if (rc != 0)
 		return (rc);
 
@@ -222,7 +225,7 @@ _fini(void)
 int
 _info(struct modinfo *mi)
 {
-	return (mod_info(&modlinkage, mi));
+	return (mod_info(&t4nex_modlinkage, mi));
 }
 
 /* ARGSUSED */
@@ -335,7 +338,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Initialize the driver properties */
 	prp = &sc->props;
-	(void)init_driver_props(sc, prp);
+	(void) init_driver_props(sc, prp);
 
 	/*
 	 * Enable access to the PCI config space.
@@ -373,14 +376,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	for (i = 0; i < NCHAN; i++) {
-		(void) snprintf(name, sizeof (name), "%s-%d",
-				"reclaim", i);
-		sc->tq[i] = ddi_taskq_create(sc->dip,
-		   name, 1, TASKQ_DEFAULTPRI, 0);
+		(void) snprintf(name, sizeof (name), "%s-%d", "reclaim", i);
+		sc->tq[i] = ddi_taskq_create(sc->dip, name, 1,
+		    TASKQ_DEFAULTPRI, 0);
 
 		if (sc->tq[i] == NULL) {
-			cxgb_printf(dip, CE_WARN,
-				   "failed to create task queues");
+			cxgb_printf(dip, CE_WARN, "failed to create taskqs");
 			rc = DDI_FAILURE;
 			goto done;
 		}
@@ -411,10 +412,11 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				/*
 				 * Enable write combining on BAR2.  This is the
 				 * userspace doorbell BAR and is split into 128B
-				 * (UDBS_SEG_SIZE) doorbell regions, each associated
-				 * with an egress queue.  The first 64B has the doorbell
-				 * and the second 64B can be used to submit a tx work
-				 * request with an implicit doorbell.
+				 * (UDBS_SEG_SIZE) doorbell regions, each
+				 * associated with an egress queue.  The first
+				 * 64B has the doorbell and the second 64B can
+				 * be used to submit a tx work request with an
+				 * implicit doorbell.
 				 */
 				sc->doorbells &= ~DOORBELL_UDB;
 				sc->doorbells |= (DOORBELL_WCWR |
@@ -515,8 +517,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Allocate the vi and initialize parameters like mac addr */
 	rc = -t4_port_init(sc, sc->mbox, sc->pf, 0);
 	if (rc) {
-		cxgb_printf(dip, CE_WARN,
-			    "unable to initialize port: %d", rc);
+		cxgb_printf(dip, CE_WARN, "unable to initialize port: %d", rc);
 		goto done;
 	}
 
@@ -582,11 +583,13 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc->flags |= INTR_FWD;
 	s->rxq = kmem_zalloc(s->nrxq * sizeof (struct sge_rxq), KM_SLEEP);
 	s->txq = kmem_zalloc(s->ntxq * sizeof (struct sge_txq), KM_SLEEP);
-	s->iqmap = kmem_zalloc(s->iqmap_sz * sizeof (struct sge_iq *), KM_SLEEP);
-	s->eqmap = kmem_zalloc(s->eqmap_sz * sizeof (struct sge_eq *), KM_SLEEP);
+	s->iqmap =
+	    kmem_zalloc(s->iqmap_sz * sizeof (struct sge_iq *), KM_SLEEP);
+	s->eqmap =
+	    kmem_zalloc(s->eqmap_sz * sizeof (struct sge_eq *), KM_SLEEP);
 
-	sc->intr_handle = kmem_zalloc(sc->intr_count *
-	    sizeof (ddi_intr_handle_t), KM_SLEEP);
+	sc->intr_handle =
+	    kmem_zalloc(sc->intr_count * sizeof (ddi_intr_handle_t), KM_SLEEP);
 
 	/*
 	 * Second pass over the ports.  This time we know the number of rx and
@@ -705,12 +708,11 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	t4_dump_version_info(sc);
 
-	cxgb_printf(dip, CE_NOTE,
-		    "(%d rxq, %d txq total) %d %s.",
-		    rqidx, tqidx, sc->intr_count,
-		    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
-		    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
-		    "fixed interrupt");
+	cxgb_printf(dip, CE_NOTE, "(%d rxq, %d txq total) %d %s.",
+	    rqidx, tqidx, sc->intr_count,
+	    sc->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X interrupts" :
+	    sc->intr_type == DDI_INTR_TYPE_MSI ? "MSI interrupts" :
+	    "fixed interrupt");
 
 	sc->ksp = setup_kstats(sc);
 	sc->ksp_stat = setup_wc_kstats(sc);
@@ -785,7 +787,7 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(s->eqmap, s->eqmap_sz * sizeof (struct sge_eq *));
 
 	if (s->rxbuf_cache != NULL)
-		rxbuf_cache_destroy(s->rxbuf_cache);
+		kmem_cache_destroy(s->rxbuf_cache);
 
 	if (sc->flags & INTR_ALLOCATED) {
 		for (i = 0; i < sc->intr_count; i++) {
@@ -1083,7 +1085,7 @@ prep_firmware(struct adapter *sc)
 	/* We may need FW version info for later reporting */
 	t4_get_version_info(sc);
 
-	switch(CHELSIO_CHIP_VERSION(sc->params.chip)) {
+	switch (CHELSIO_CHIP_VERSION(sc->params.chip)) {
 	case CHELSIO_T4:
 		fw_file = "t4fw.bin";
 		break;
@@ -1215,7 +1217,7 @@ static const struct memwin t5_memwin[] = {
  */
 int
 validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, int len,
-	uint32_t *addr)
+    uint32_t *addr)
 {
 	uint32_t em, addr_len, maddr, mlen;
 
@@ -1290,7 +1292,7 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 {
 	int rc = 0;
 	size_t cflen, cfbaselen;
-	u_int i, n;
+	uint_t i, n;
 	uint32_t param, val, addr, mtype, maddr;
 	uint32_t off, mw_base, mw_aperture;
 	uint32_t *cfdata, *cfbase;
@@ -1321,12 +1323,12 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 		break;
 	default:
 		cxgb_printf(sc->dip, CE_WARN, "Invalid Adapter detected\n");
-		return EINVAL;
+		return (EINVAL);
 	}
 
 	if (firmware_open(T4_PORT_NAME, cfg_file, &fw_hdl) != 0) {
 		cxgb_printf(sc->dip, CE_WARN, "Could not open %s\n", cfg_file);
-		return EINVAL;
+		return (EINVAL);
 	}
 
 	cflen = firmware_get_size(fw_hdl);
@@ -1362,7 +1364,7 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 		    cfg_file);
 		firmware_close(fw_hdl);
 		kmem_free(cfbase, cfbaselen);
-		return EINVAL;
+		return (EINVAL);
 	}
 	firmware_close(fw_hdl);
 
@@ -1461,12 +1463,13 @@ adap__pre_init_tweaks(struct adapter *sc)
 	 * Line Size, etc.  The firmware default is for a 4KB Page Size and
 	 * 64B Cache Line Size ...
 	 */
-	(void) t4_fixup_host_params_compat(sc, PAGE_SIZE, CACHE_LINE, T5_LAST_REV);
+	(void) t4_fixup_host_params_compat(sc, PAGE_SIZE, _CACHE_LINE_SIZE,
+	    T5_LAST_REV);
 
-	t4_set_reg_field(sc, A_SGE_CONTROL,
-			 V_PKTSHIFT(M_PKTSHIFT), V_PKTSHIFT(rx_dma_offset));
+	t4_set_reg_field(sc, A_SGE_CONTROL, V_PKTSHIFT(M_PKTSHIFT),
+	    V_PKTSHIFT(rx_dma_offset));
 
-	return 0;
+	return (0);
 }
 /*
  * Retrieve parameters that are needed (or nice to have) prior to calling
@@ -1565,9 +1568,8 @@ get_params__post_init(struct adapter *sc)
 	param[1] = FW_PARAM_PFVF(EQ_END);
 	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 2, param, val);
 	if (rc != 0) {
-		cxgb_printf(sc->dip, CE_WARN,
-			    "failed to query eq/iq map size parameters (post_init): %d.\n",
-			    rc);
+		cxgb_printf(sc->dip, CE_WARN, "failed to query eq/iq map "
+		    "size parameters (post_init): %d.\n", rc);
 		return (rc);
 	}
 
@@ -1613,7 +1615,7 @@ get_params__post_init(struct adapter *sc)
 	rc = -t4_get_pfres(sc);
 	if (rc != 0) {
 		cxgb_printf(sc->dip, CE_WARN,
-			    "failed to query PF resource params: %d.\n", rc);
+		    "failed to query PF resource params: %d.\n", rc);
 		return (rc);
 	}
 
@@ -1634,7 +1636,7 @@ set_params__post_init(struct adapter *sc)
 	/* ask for encapsulated CPLs */
 	param = FW_PARAM_PFVF(CPLFW4MSG_ENCAP);
 	val = 1;
-	(void)t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
+	(void) t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
 
 	return (0);
 }
@@ -1688,7 +1690,8 @@ setup_memwin(struct adapter *sc)
 	    V_WINDOW(ilog2(mem_win2_aperture) - 10));
 
 	/* flush */
-	(void)t4_read_reg(sc, PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 2));
+	(void) t4_read_reg(sc,
+	    PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_BASE_WIN, 2));
 }
 
 /*
@@ -1918,7 +1921,8 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	    "interrupt-forwarding") != 0 ||
 	    ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "interrupt-forwarding") != 0) {
-		UNIMPLEMENTED();
+		cmn_err(CE_WARN, "%s (%s:%d) unimplemented.",
+		    __func__, __FILE__, __LINE__);
 		(void) ddi_prop_create(dev, dip, DDI_PROP_CANSLEEP,
 		    "interrupt-forwarding", NULL, 0);
 	}
@@ -1945,7 +1949,7 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	p->multi_rings = prop_lookup_int(sc, "multi-rings", 1);
 	if (p->multi_rings != 0 && p->multi_rings != 1) {
 		cxgb_printf(dip, CE_NOTE,
-			   "multi-rings: using value 1 instead of %d", p->multi_rings);
+		    "multi-rings: using value 1 instead of %d", p->multi_rings);
 		p->multi_rings = 1;
 	}
 
@@ -1995,7 +1999,8 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 	pfres_rxq = iaq->nrxq10g * n10g + iaq->nrxq1g * n1g;
 	pfres_txq = iaq->ntxq10g * n10g + iaq->ntxq1g * n1g;
 
-	/* If current configuration of max number of Rxqs and Txqs exceed
+	/*
+	 * If current configuration of max number of Rxqs and Txqs exceed
 	 * the max available for all the ports under this PF, then shrink
 	 * the queues to max available. Reduce them in a way that each
 	 * port under this PF has equally distributed number of queues.
@@ -2017,8 +2022,9 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 	 * neq due to lack of resources based on firmware configuration,
 	 * then take the lower value.
 	 */
-	while (pfres_rxq >
-	       min(sc->params.pfres.neq / 2, sc->params.pfres.niqflint)) {
+	const uint_t max_rxq =
+	    MIN(sc->params.pfres.neq / 2, sc->params.pfres.niqflint);
+	while (pfres_rxq > max_rxq) {
 		pfresq = pfres_rxq;
 
 		if (iaq->nrxq10g > 1) {
@@ -2036,8 +2042,9 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 			break;
 	}
 
-	while (pfres_txq >
-	       min(sc->params.pfres.neq / 2, sc->params.pfres.nethctrl)) {
+	const uint_t max_txq =
+	    MIN(sc->params.pfres.neq / 2, sc->params.pfres.nethctrl);
+	while (pfres_txq > max_txq) {
 		pfresq = pfres_txq;
 
 		if (iaq->ntxq10g > 1) {
@@ -2147,7 +2154,8 @@ cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
 				iaq->nrxq1g = min(n, iaq->nrxq1g);
 			}
 
-			/* We have arrived at a minimum value required to enable
+			/*
+			 * We have arrived at a minimum value required to enable
 			 * per queue irq(either NIC or offload). Thus for non-
 			 * offload case, we will get a vector per queue, while
 			 * offload case, we will get a vector per offload/NIC q.
@@ -2239,20 +2247,20 @@ static char *
 print_port_speed(const struct port_info *pi)
 {
 	if (!pi)
-		return "-";
+		return ("-");
 
 	if (is_100G_port(pi))
-		return "100G";
+		return ("100G");
 	else if (is_50G_port(pi))
-		return "50G";
+		return ("50G");
 	else if (is_40G_port(pi))
-		return "40G";
+		return ("40G");
 	else if (is_25G_port(pi))
-		return "25G";
+		return ("25G");
 	else if (is_10G_port(pi))
-		return "10G";
+		return ("10G");
 	else
-		return "1G";
+		return ("1G");
 }
 
 #define	KS_UINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_ULONG)
@@ -2347,10 +2355,10 @@ setup_kstats(struct adapter *sc)
 	KS_C_SET(pci_device_id, "0x%x", pci_device);
 
 	KS_C_SET(port_type, "%s/%s/%s/%s",
-		 print_port_speed(sc->port[0]),
-		 print_port_speed(sc->port[1]),
-		 print_port_speed(sc->port[2]),
-		 print_port_speed(sc->port[3]));
+	    print_port_speed(sc->port[0]),
+	    print_port_speed(sc->port[1]),
+	    print_port_speed(sc->port[2]),
+	    print_port_speed(sc->port[3]));
 
 	/* Do NOT set ksp->ks_update.  These kstats do not change. */
 
@@ -2373,9 +2381,9 @@ setup_wc_kstats(struct adapter *sc)
 {
 	kstat_t *ksp;
 	struct t4_wc_kstats *kstatp;
-	int ndata;
 
-	ndata = sizeof(struct t4_wc_kstats) / sizeof(kstat_named_t);
+	const uint_t ndata =
+	    sizeof (struct t4_wc_kstats) / sizeof (kstat_named_t);
 	ksp = kstat_create(T4_NEXUS_NAME, ddi_get_instance(sc->dip), "stats",
 	    "nexus", KSTAT_TYPE_NAMED, ndata, 0);
 	if (ksp == NULL) {
@@ -2831,7 +2839,7 @@ t4_register_fw_msg_handler(struct adapter *sc, int type, fw_msg_handler_t h)
 
 	new = h ? h : fw_msg_not_handled;
 	loc = &sc->fw_msg_handler[type];
-	(void)atomic_swap_ptr(loc, (void *)new);
+	(void) atomic_swap_ptr(loc, (void *)new);
 
 	return (0);
 }
@@ -3011,4 +3019,63 @@ err:
 	nvlist_free(misc);
 	return (ret);
 
+}
+
+
+int
+t4_cxgbe_attach(struct port_info *pi, dev_info_t *dip)
+{
+	ASSERT(pi != NULL);
+
+	mac_register_t *mac = mac_alloc(MAC_VERSION);
+	if (mac == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	mac->m_driver = pi;
+	mac->m_dip = dip;
+	mac->m_src_addr = pi->hw_addr;
+	mac->m_callbacks = pi->mc;
+	mac->m_max_sdu = pi->mtu;
+	mac->m_priv_props = pi->props;
+	mac->m_margin = VLAN_TAGSZ;
+
+	if (!mac->m_callbacks->mc_unicst) {
+		/* Multiple rings enabled */
+		mac->m_v12n = MAC_VIRT_LEVEL1;
+	}
+
+	mac_handle_t mh = NULL;
+	const int rc = mac_register(mac, &mh);
+	mac_free(mac);
+	if (rc != 0) {
+		return (DDI_FAILURE);
+	}
+
+	pi->mh = mh;
+
+	/*
+	 * Link state from this point onwards to the time interface is plumbed,
+	 * should be set to LINK_STATE_UNKNOWN. The mac should be updated about
+	 * the link state as either LINK_STATE_UP or LINK_STATE_DOWN based on
+	 * the actual link state detection after interface plumb.
+	 */
+	mac_link_update(mh, LINK_STATE_UNKNOWN);
+
+	return (DDI_SUCCESS);
+}
+
+int
+t4_cxgbe_detach(struct port_info *pi)
+{
+	ASSERT(pi != NULL);
+	ASSERT(pi->mh != NULL);
+
+	if (mac_unregister(pi->mh) == 0) {
+		pi->mh = NULL;
+		return (DDI_SUCCESS);
+	}
+
+	return (DDI_FAILURE);
 }

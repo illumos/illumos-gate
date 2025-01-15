@@ -140,7 +140,7 @@ adreaper(void *arg __unused)
 
 	for (;;) {
 		/*
-		 * nanosleep(3RT) is thead-safe (no SIGALRM) and more
+		 * nanosleep(3C) is thread-safe (no SIGALRM) and more
 		 * portable than usleep(3C)
 		 */
 		(void) nanosleep(&ts, NULL);

@@ -3860,7 +3860,7 @@ randomgeneration()
 	struct dinode	*dp;
 
 	/*
-	 * always perform fsirand(1) function... newfs will notice that
+	 * always perform fsirand(8) function... newfs will notice that
 	 * the inodes have been randomized and will not call fsirand itself
 	 */
 	for (i = 0, dp = zino; i < sblock.fs_inopb; ++i, ++dp)
@@ -5196,7 +5196,7 @@ ulockfs()
 		(void) fprintf(stderr,
 		    gettext("FILE SYSTEM CHANGED DURING GROWFS!\n"));
 		(void) fprintf(stderr,
-		    gettext("   See lockfs(1), umount(1), and fsck(1)\n"));
+		    gettext("   See lockfs(8), umount(8), and fsck(8)\n"));
 		lockexit(32);
 	}
 	/*

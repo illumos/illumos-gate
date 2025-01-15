@@ -242,7 +242,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 
 /*
  * For each archive descriptor, maintain an `Ar_aux' table to parallel the
- * archive symbol table (returned from elf_getarsym(3e)).  Use this table to
+ * archive symbol table (returned from elf_getarsym(3elf)).  Use this table to
  * hold a `Sym_desc' for each symbol (thus reducing the number of
  * ld_sym_find()'s), and to hold the `Ar_mem' pointer.  The `Ar_mem' element
  * can have one of three values indicating the state of the archive member

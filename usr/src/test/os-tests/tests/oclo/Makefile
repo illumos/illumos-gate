@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = \
@@ -26,7 +26,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/cmd/Makefile.ctf
 
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 CTF_MODE = link
 CPPFLAGS += -D_XOPEN_SOURCE=800 -D__EXTENSIONS__
 

@@ -22,7 +22,7 @@ VPATH = $(SRC)/uts/common/io/cxgbe/t4nex/
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE) -I$(SRC)/uts/common/io/cxgbe/t4nex -I$(SRC)/uts/common/io/cxgbe/firmware \
-	  -I$(SRC)/uts/common/io/cxgbe/common
+	  -I$(SRC)/uts/common/io/cxgbe/common -I$(SRC)/uts/common/io/cxgbe/shared
 
 LDLIBS += -ldevinfo
 SMOFF += all_func_returns

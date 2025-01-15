@@ -267,7 +267,7 @@ ndp_setup_handler(sigset_t *oset)
 
 	/*
 	 * Mask off SIGALRM so we only trigger the handler when we're ready
-	 * using sigsuspend(3C), in case the child process takes longer to
+	 * using sigsuspend(2), in case the child process takes longer to
 	 * run than the alarm interval.
 	 */
 	if (sigprocmask(0, NULL, oset) != 0) {

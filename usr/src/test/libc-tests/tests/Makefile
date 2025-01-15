@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 SUBDIRS = \
@@ -67,6 +67,8 @@ PROGS = \
 	strerror \
 	strtonum \
 	timespec_get \
+	wcslcat \
+	wcslcpy \
 	wcsncasecmp \
 	wcsncasecmp-7344 \
 	wcsncasecmp-7350 \
@@ -85,37 +87,42 @@ PROGS64 = \
 	$(PROGS:%=%.64) \
 	printf-6961.64
 
-aligned_alloc.32 :=	CSTD=$(GNU_C99)
-aligned_alloc.64 :=	CSTD=$(GNU_C99)
+aligned_alloc.32 :=	CSTD=$(CSTD_GNU17)
+aligned_alloc.64 :=	CSTD=$(CSTD_GNU17)
 aligned_alloc.32 :=	LDLIBS += -lproc
 aligned_alloc.64 :=	LDLIBS64 += -lproc
 posix_memalign.32 :=	LDLIBS += -lproc
 posix_memalign.64 :=	LDLIBS64 += -lproc
 
-asprintf-14933.32 :=	CSTD=$(GNU_C99)
-asprintf-14933.64 :=	CSTD=$(GNU_C99)
+asprintf-14933.32 :=	CSTD=$(CSTD_GNU17)
+asprintf-14933.64 :=	CSTD=$(CSTD_GNU17)
 
 memset_s.32 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 memset_s.64 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 set_constraint_handler_s.32 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 set_constraint_handler_s.64 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 
-isatty.32 :=	CSTD=$(GNU_C99)
-isatty.64 :=	CSTD=$(GNU_C99)
+isatty.32 :=	CSTD=$(CSTD_GNU17)
+isatty.64 :=	CSTD=$(CSTD_GNU17)
 
 mutex-16200.32 :=	LDLIBS += -lproc
 mutex-16200.64 :=	LDLIBS64 += -lproc
-mutex-16200.32 :=	CSTD=$(GNU_C99)
-mutex-16200.64 :=	CSTD=$(GNU_C99)
+mutex-16200.32 :=	CSTD=$(CSTD_GNU17)
+mutex-16200.64 :=	CSTD=$(CSTD_GNU17)
 
 ptsname.32 :=		LDLIBS += -lsocket
 ptsname.64 :=		LDLIBS64 += -lsocket
 
-stdbit.32 :=	CSTD=$(GNU_C99)
-stdbit.64 :=	CSTD=$(GNU_C99)
+stdbit.32 :=	CSTD=$(CSTD_GNU17)
+stdbit.64 :=	CSTD=$(CSTD_GNU17)
 
-strtonum.32 :=		CSTD=$(GNU_C99)
-strtonum.64 :=		CSTD=$(GNU_C99)
+strtonum.32 :=		CSTD=$(CSTD_GNU17)
+strtonum.64 :=		CSTD=$(CSTD_GNU17)
+
+wcslcat.32 :=		CSTD=$(CSTD_GNU17)
+wcslcat.64 :=		CSTD=$(CSTD_GNU17)
+wcslcpy.32 :=		CSTD=$(CSTD_GNU17)
+wcslcpy.64 :=		CSTD=$(CSTD_GNU17)
 
 ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \

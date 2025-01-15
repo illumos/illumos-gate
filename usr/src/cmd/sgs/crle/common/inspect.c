@@ -32,7 +32,7 @@
  * Each hash table is defined via a Hash_tbl structure.  These are organized:
  *
  *  c_strtbl	contains a hash entry for every file, directory, pathname and
- *		alternative path (dldump(3dl) image) processed.
+ *		alternative path (dldump(3C) image) processed.
  *		c_strsize and c_objnum maintain the size and count of the
  *		strings added to this table and are used to size the output
  *		configuration file.
@@ -569,7 +569,7 @@ enterfile(Crle_desc *crle, const char *opath, const char *ofile, Half flags,
 	}
 
 	/*
-	 * Identify this entry and its directory as real paths.  If dldump(3dl)
+	 * Identify this entry and its directory as real paths.  If dldump(3C)
 	 * processing is required this flag is checked, as we only need to dump
 	 * the real pathname.  Many other objects may point to the same
 	 * alternative, but only one needs to be dumped.  In addition, during
@@ -740,7 +740,7 @@ inspect_file(Crle_desc *crle, const char *path, const char *file, Half flags,
 
 	/*
 	 * Dynamic executables can be examined to determine their dependencies,
-	 * dldump(3dl) their dependencies, and may even be dldump(3dl)'ed
+	 * dldump(3C) their dependencies, and may even be dldump(3C)'ed
 	 * themselves.
 	 *
 	 * If we come across an executable while searching a directory
@@ -789,7 +789,7 @@ inspect_file(Crle_desc *crle, const char *path, const char *file, Half flags,
 	if (flags & RTC_OBJ_ALTER) {
 		/*
 		 * If this object is marked as non-dumpable make sure we don't
-		 * create a dldump(3dl) alternative.  A user requested
+		 * create a dldump(3C) alternative.  A user requested
 		 * alternative is acceptable.
 		 */
 		if ((flags & RTC_OBJ_DUMP) && (dyflags & DF_1_NODUMP)) {

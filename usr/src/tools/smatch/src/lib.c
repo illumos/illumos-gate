@@ -997,7 +997,13 @@ static char **handle_switch_s(const char *arg, char **next)
 			 !strcmp(arg, "iso9899:2011"))
 			standard = STANDARD_C11;
 
-		else if (!strcmp(arg, "gnu11"))
+		/*
+		 * For the interim, allow GNU17 to be treated as GNU11 as C17 is
+		 * mostly just a clean up of C11 and is not supposed to add any
+		 * new features.
+		 */
+		else if (!strcmp(arg, "gnu11") ||
+		         !strcmp(arg, "gnu17"))
 			standard = STANDARD_GNU11;
 
 		else

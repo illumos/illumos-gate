@@ -142,7 +142,7 @@ extern "C" {
 #endif /* defined(__EXTENSIONS__) || !defined(_XOPEN_SOURCE) */
 
 /*
- * and the definitions of functions langinfo(3C)
+ * and the definitions of functions nl_langinfo(3C)
  */
 char   *nl_langinfo(nl_item);	/* get a string from the database	*/
 

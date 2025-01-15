@@ -32,7 +32,7 @@
  * control.
  *
  * This code implements a very trimmed down version of the capabilities found
- * via setlocale(3c), textdomain(3i) and gettext(3i).  Dragging in the original
+ * via setlocale(3C), textdomain(3C) and gettext(3C).  Dragging in the original
  * routines from libc/libintl isn't possible as they cause all i18n support to
  * be included which is far too expensive for ld.so.1.
  */
@@ -205,7 +205,7 @@ open_mofile(Domain * dom)
 
 /*
  * Two interfaces are established to support our internationalization.
- * gettext(3i) calls originate from all link-editor libraries, and thus the
+ * gettext(3C) calls originate from all link-editor libraries, and thus the
  * SUNW_OST_SGS domain is assumed.  dgettext() calls originate from
  * dependencies such as libelf and libc.
  *

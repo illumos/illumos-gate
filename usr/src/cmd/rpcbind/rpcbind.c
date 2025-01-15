@@ -52,7 +52,7 @@
  * default it is defined).
  *
  * The implementation is based on top of the networking services library -
- * libnsl(3lib) and uses Automatic MT mode (see rcp_control(3nsl) and
+ * libnsl(3lib) and uses Automatic MT mode (see rpc_control(3nsl) and
  * svc_run(3nsl) for more details).
  *
  * Usually, when a thread handles an RPCBIND procedure (one that arrived from a

@@ -2493,7 +2493,7 @@ exec_map(struct ps_prochandle *P)
  * The third case is a convenience for callers and may not be necessary.
  *
  * As the exact same object name may be loaded on different link maps (see
- * dlmopen(3DL)), we also allow the caller to resolve the object name by
+ * dlmopen(3C)), we also allow the caller to resolve the object name by
  * specifying a particular link map id.  If lmid is PR_LMID_EVERY, the
  * first matching name will be returned, regardless of the link map id.
  */

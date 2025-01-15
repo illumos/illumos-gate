@@ -31,8 +31,8 @@ CPP_CMD		= $(CC) -E -Xs
 # in that case setting it back to gnu89, which _also_ accepts C99 syntax as
 # far as is important.
 CSTD		=
-CFLAGS		+= -_gcc=-std=gnu89
-CFLAGS64	+= -_gcc=-std=gnu89
+CFLAGS		+= -std=gnu89
+CFLAGS64	+= -std=gnu89
 
 M4FLAGS		= -D__STDC__ -DPIC
 

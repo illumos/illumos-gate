@@ -2772,7 +2772,7 @@ init_exit:
  * Calculate the dvma burstsize by setting up a dvma temporarily.  Return
  * 0 as burstsize upon failure as it signifies no burst size.
  * Requests for 64-bit transfer setup, if the platform supports it.
- * NOTE: Do not use ddi_dma_alloc_handle(9f) then ddi_dma_burstsize(9f),
+ * NOTE: Do not use ddi_dma_alloc_handle(9f) then ddi_dma_burstsizes(9f),
  * sun4u Ultra-2 incorrectly returns a 32bit transfer.
  */
 static int

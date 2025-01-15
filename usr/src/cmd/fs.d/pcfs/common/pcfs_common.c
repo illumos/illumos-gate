@@ -26,25 +26,27 @@
  */
 
 /*
- * fsck_pcfs -- common.c
- *	All the routines in this file are being swiped directly from
- *	mkfs_pcfs.  Eventually this file should only exist in one place
- *	and be part of a library that both mkfs and fsck link against.
+ * common functions used by pcfs tools.
  */
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <err.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <libintl.h>
+#include <locale.h>
+#include <langinfo.h>
+#include <regex.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/fcntl.h>
 #include <sys/dktp/fdisk.h>
+#include <sys/dkio.h>
 #include <sys/fs/pc_fs.h>
 #include <sys/fs/pc_dir.h>
 #include <sys/fs/pc_label.h>
-#include "fsck_pcfs.h"
 #include "pcfs_common.h"
 #include "pcfs_bpb.h"
 
@@ -60,10 +62,36 @@ void swap_pack_grabbpb(bpb_t *wbpb, struct _boot_sector *bsp);
 #endif /* _BIG_ENDIAN */
 
 /*
- *  Global variables related to input questions
+ * Validate sector size.
  */
-extern int AlwaysYes;
-extern int AlwaysNo;
+bool
+is_sector_size_valid(size_t size)
+{
+	if (size != 512 && size != 1024 && size != 2048 && size != 4096)
+		return (false);
+	return (true);
+}
+
+/*
+ * Use DKIOCGMEDIAINFO to get sector size.
+ */
+int
+get_media_sector_size(int fd, size_t *sizep)
+{
+	struct dk_minfo dkminfo;
+
+	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		*sizep = dkminfo.dki_lbsize;
+		return (0);
+	}
+	/* In case the DKIOCGMEDIAINFO is not supported, return MINBPS. */
+	if (errno == ENOTTY) {
+		*sizep = MINBPS;
+		return (0);
+	}
+
+	return (errno);
+}
 
 /*
  * store_16_bits
@@ -185,7 +213,7 @@ header_for_dump(void)
 	for (byte = 0; byte < BPL; byte++)
 		(void) fprintf(stderr, "%02x ", byte);
 	(void) fprintf(stderr, "\n       ");
-	byte = 3*BPL;
+	byte = 3 * BPL;
 	while (byte-- > 0)
 		(void) fprintf(stderr, "-");
 }
@@ -290,39 +318,12 @@ swap_pack_grab32bpb(bpb_t *wbpb, struct _boot_sector *bsp)
 }
 #endif	/* _BIG_ENDIAN */
 
-int
-yes(void)
-{
-	char *affirmative = gettext("yY");
-	char *a = affirmative;
-	char input[80];
-
-	if (AlwaysYes) {
-		(void) printf("y\n");
-		return (1);
-	} else if (AlwaysNo) {
-		(void) printf("n\n");
-		return (0);
-	}
-	if (fgets(input, sizeof (input), stdin) == NULL) {
-		AlwaysNo = 1;
-		(void) printf("n\n");
-		return (0);
-	}
-	while (*a) {
-		if (input[0] == (int)*a)
-			break;
-		a++;
-	}
-	return ((int)*a);
-}
-
 char *
-stat_actual_disk(char *diskname, struct stat *info, char **suffix)
+stat_actual_disk(const char *diskname, struct stat *info, char **suffix)
 {
 	char *actualdisk;
 
-	if (stat(diskname, info)) {
+	if (stat(diskname, info) != 0) {
 		/*
 		 *  Device named on command line doesn't exist.  That
 		 *  probably means there is a partition-specifying
@@ -339,8 +340,8 @@ stat_actual_disk(char *diskname, struct stat *info, char **suffix)
 		}
 
 		if (stat(actualdisk, info)) {
-			perror(actualdisk);
-			exit(2);
+			err(2, "Failed to stat disk device %s",
+			    actualdisk);
 		}
 	} else {
 		if ((actualdisk = strdup(diskname)) == NULL) {
@@ -451,7 +452,7 @@ isBootPart(uchar_t checkMe)
 }
 
 off64_t
-findPartitionOffset(int fd, char *ldrive)
+findPartitionOffset(int fd, size_t bpsec, char *ldrive)
 {
 	struct ipart part[FD_NUMPART];
 	struct mboot extmboot;

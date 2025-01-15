@@ -25,7 +25,7 @@
 
 
 /*
- * svccfg(1) interpreter and command execution engine.
+ * svccfg(8) interpreter and command execution engine.
  */
 
 #include <sys/mman.h>

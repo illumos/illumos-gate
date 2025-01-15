@@ -72,12 +72,12 @@
  *
  * 2. Door Thread Pool Management
  * ------------------------------
- * Whenever door_return(3door) returns from the kernel and there are no
+ * Whenever door_return(3C) returns from the kernel and there are no
  * other configd threads waiting for requests, libdoor automatically
  * invokes a function registered with door_server_create(), to request a new
  * door server thread.  The default function just creates a thread that calls
- * door_return(3door).  Unfortunately, since it can take a while for the new
- * thread to *get* to door_return(3door), a stream of requests can cause a
+ * door_return(3C).  Unfortunately, since it can take a while for the new
+ * thread to *get* to door_return(3C), a stream of requests can cause a
  * large number of threads to be created, even though they aren't all needed.
  *
  * In our callback, new_server_needed(), we limit ourself to two new threads

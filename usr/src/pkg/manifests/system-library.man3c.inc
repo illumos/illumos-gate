@@ -1598,6 +1598,8 @@ link path=usr/share/man/man3c/wcscspn.3c target=wcstring.3c
 file path=usr/share/man/man3c/wcsdup.3c
 link path=usr/share/man/man3c/wcsetno.3c target=cset.3c
 file path=usr/share/man/man3c/wcsftime.3c
+file path=usr/share/man/man3c/wcslcat.3c
+file path=usr/share/man/man3c/wcslcpy.3c
 file path=usr/share/man/man3c/wcslen.3c
 link path=usr/share/man/man3c/wcsncasecmp.3c target=wcscasecmp.3c
 link path=usr/share/man/man3c/wcsncasecmp_l.3c target=wcscasecmp.3c

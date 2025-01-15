@@ -300,7 +300,7 @@ statjob(struct job *jp, int stat, int fg, int rc)
  * called after each command is executed, with wnohang == 0, and as part
  * of "wait" builtin with wnohang == WNOHANG
  *
- * We do not need to call chktrap here if waitpid(2) is called with
+ * We do not need to call chktrap here if waitpid(3C) is called with
  * wnohang == 0, because that only happens from syswait() which is called
  * from builtin() where chktrap() is already called.
  */

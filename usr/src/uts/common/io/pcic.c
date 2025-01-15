@@ -112,7 +112,7 @@ static int pcic_apply_avail_ranges(dev_info_t *, pcm_regs_t *,
 int pci_resource_setup_avail(dev_info_t *, pci_regspec_t *, int);
 
 /*
- * On x86 platforms the ddi_iobp_alloc(9F) and ddi_mem_alloc(9F) calls
+ * On x86 platforms the ddi_iobp_alloc(9F) and ddi_umem_alloc(9F) calls
  * are xlated into DMA ctlops. To make this nexus work on x86, we
  * need to have the default ddi_dma_mctl ctlops in the bus_ops
  * structure, just to pass the request to the parent. The correct

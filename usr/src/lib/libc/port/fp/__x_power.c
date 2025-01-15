@@ -220,7 +220,7 @@ __multiply_base_ten_vector(unsigned short n, unsigned short *px,
  *
  * On exit, if the product is small enough, it overwrites *pbf, and
  * *pnewbf is set to pbf.  If the product is too large to fit in *pbf,
- * this routine calls malloc(3M) to allocate storage and sets *pnewbf
+ * this routine calls malloc(3MALLOC) to allocate storage and sets *pnewbf
  * to point to this area; it is the caller's responsibility to free
  * this storage when it is no longer needed.  Note that *pbf may be
  * modified even when the routine allocates new storage.

@@ -36,7 +36,7 @@
 #include "svccfg.h"
 
 /*
- * Internal representation manipulation routines for svccfg(1)
+ * Internal representation manipulation routines for svccfg(8)
  */
 
 static uu_list_pool_t	*entity_pool;

@@ -309,10 +309,10 @@ retry:
 		 * Return ENOENT if the lookup was triggered by a wildcard
 		 * access.  Wildcard entries only exist if they can be
 		 * mounted.  They can not be listed otherwise (through
-		 * a readdir(2)).
+		 * a readdir(3C)).
 		 * Return EACCES if the lookup was not triggered by a
 		 * wildcard access.  Map entries that are explicitly defined
-		 * in maps are visible via readdir(2), therefore we return
+		 * in maps are visible via readdir(3C), therefore we return
 		 * EACCES to indicate that the entry exists, but the directory
 		 * can not be opened.  This is the same behavior of a Unix
 		 * directory that exists, but has its execute bit turned off.

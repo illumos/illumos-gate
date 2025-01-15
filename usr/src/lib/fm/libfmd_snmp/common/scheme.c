@@ -64,7 +64,7 @@ typedef struct fmd_scheme_opd {
 typedef struct fmd_scheme {
 	struct fmd_scheme *sch_next;    /* next scheme on list of schemes */
 	char *sch_name;			/* name of this scheme (fmri prefix) */
-	void *sch_dlp;			/* libdl(3DL) shared library handle */
+	void *sch_dlp;			/* libdl shared library handle */
 	int sch_err;			/* if negative entry, errno to return */
 	fmd_scheme_ops_t sch_ops;	/* scheme function pointers */
 } fmd_scheme_t;

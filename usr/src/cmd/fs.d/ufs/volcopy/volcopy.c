@@ -421,7 +421,7 @@ fsname /devfrom volfrom /devto volto\n");
 		R_blks = V_labl.v_reelblks;
 	Otape = tapeck(&Out, OUTPUT);
 	if (Otape && Itape)
-		perr(10, "Use dd(1) command to copy tapes\n");
+		perr(10, "Use dd(8) command to copy tapes\n");
 	(void) mem_setup();
 	if (Bufflg && !Ipc)
 		perr(1, "The -buf option requires ipc\n");

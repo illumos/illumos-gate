@@ -28,7 +28,7 @@
 
 
 /*
- * autopush(1) is the command interface to the STREAMS autopush
+ * autopush(8) is the command interface to the STREAMS autopush
  * mechanism.  The autopush command can be used to configure autopush
  * information about a STREAMS driver, remove autopush information,
  * and report on current configuration information.  Its use is as

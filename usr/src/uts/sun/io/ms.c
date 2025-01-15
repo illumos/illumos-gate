@@ -254,7 +254,7 @@ static void	msincr(void *);
  * (The framework enters the perimeters before calling the qbufcall() callback
  * and leaves the perimeters after the callback routine has executed. The
  * framework performs an implicit wakeup of any thread in qwait/qwait_sig
- * when it leaves the perimeter. See qwait(9E).)
+ * when it leaves the perimeter. See qwait(9F).)
  */
 /* ARGSUSED */
 static void

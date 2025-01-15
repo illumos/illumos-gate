@@ -4112,7 +4112,7 @@ contract_make_template(uint_t info, uint_t critical, uint_t fatal,
 }
 
 /*
- * Create the templates and open an event file descriptor.  We use dup2(2) to
+ * Create the templates and open an event file descriptor.  We use dup2(3C) to
  * get these descriptors away from the stdin/stdout/stderr group.
  */
 static void

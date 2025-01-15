@@ -1,0 +1,119 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd January 5, 2025
+.Dt WCSLCAT 3C
+.Os
+.Sh NAME
+.Nm wcslcat
+.Nd concatenate wide-character strings
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In wchar.h
+.Ft size_t
+.Fo wcslcat
+.Fa "wchar_t *restrict dst"
+.Fa "wchar_t *restrict src"
+.Fa "size_t dstlen"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn wcslcat
+function is the wide-character version of
+.Xr strlcat 3C .
+It concatenates the wide-character string in
+.Fa src
+with the wide-character string in
+.Fa dst ,
+while ensuring that
+.Fa dst
+is always properly terminated with the null wide-character
+.Pq L'\e0' .
+.Pp
+Wide characters in
+.Fa src
+will be appended to
+.Fa dst
+starting at the end of an existing wide-character string in
+.Fa dst ,
+replacing an existing terminating null wide-character.
+Put differently, copying will begin at the result of a call to the
+equivalent of
+.Em wcsnlen(dst, dstlen) .
+Characters will be copied until either a terminating null wide-character
+is found in
+.Fa src
+or the destination buffer would be full, whichever comes first.
+This may result in a truncated portion of
+.Fa src ,
+or none at all, appearing in
+.Fa dst .
+.Pp
+A terminating null wide-character is inserted unless the initial
+wide-character string in
+.Fa dst
+contained
+.Fa dstlen
+characters without a terminating null wide-character.
+However, if
+.Fa dstlen
+is zero, then
+.Fa dst
+will not be touched.
+.Sh RETURN VALUES
+The
+.Fn wcslcat
+function returns the total number of wide characters that would be required to
+store the concatenated wide-character string, excluding the terminating null
+wide-character.
+.Sh EXAMPLES
+.Sy Example 1
+Checking for overflow
+.Pp
+The following example shows how one would check if string concatenation
+with the
+.Fn wcslcat
+function resulted in overflow.
+Note, the use of
+.Sq >=
+down below is required because the
+.Fn wcslcat
+function always ensures that the buffer has a terminating null wide-character.
+.Bd -literal -offset 2
+#include <wchar.h>
+#include <err.h>
+#include <stdlib.h>
+
+#define	BUFLEN	32
+wchar_t buf[BUFLEN] = { L'\e0' };
+
+\&...
+
+static void
+concat(const wchar_t *src)
+{
+	if (wcslcat(buf, src, BUFLEN) >= BUFLEN) {
+		errx(EXIT_FAILURE, "overflow detected!");
+	}
+}
+
+\&...
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr strlcat 3C ,
+.Xr wcslcpy 3C

@@ -14,7 +14,7 @@
  */
 
 /*
- * Test memory based streams: opem_memstream(3C), open_wmemstream(3C), and
+ * Test memory based streams: open_memstream(3C), open_wmemstream(3C), and
  * fmemopen(3C).
  */
 

@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -44,7 +44,7 @@ include $(SRC)/test/Makefile.com
 
 CMDS = $(PROGS32:%=$(TESTDIR)/%) $(PROGS64:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
-CSTD = $(GNU_C99)
+CSTD = $(CSTD_GNU17)
 
 #
 # Since this program uses quite a number of variables declared on the

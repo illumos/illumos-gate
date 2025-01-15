@@ -75,7 +75,7 @@ static uint32_t hpet_capabilities;
 
 /*
  * Contains the full pathname of the template to be passed
- * to mkstemp/mktemps(3)
+ * to mkstemp/mkstemps(3C)
  */
 static char basl_template[MAXPATHLEN];
 static char basl_stemplate[MAXPATHLEN];

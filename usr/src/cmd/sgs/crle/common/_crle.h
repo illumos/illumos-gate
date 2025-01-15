@@ -132,10 +132,10 @@ typedef	struct crle_desc {
 	Addr		c_tempheadaddr;	/* Ptr to Rtc_head within c_tempaddr */
 	char		*c_confil;	/* configuration file */
 	char		*c_objdir;	/* current object directory for */
-					/*	dldump(3dl) */
+					/*	dldump(3C) */
 	char		*c_audit;	/* audit library name */
 	uint_t		c_flags;	/* state flags for crle processing */
-	int		c_dlflags;	/* current dldump(3dl) flags */
+	int		c_dlflags;	/* current dldump(3C) flags */
 	int		c_strbkts;	/* internal hash table initialization */
 	int		c_inobkts;	/*	parameters */
 	uint_t		c_dirnum;	/* no. of directories processed */
@@ -156,7 +156,7 @@ typedef	struct crle_desc {
 
 #define	CRLE_CREAT	0x0001		/* config file creation required */
 #define	CRLE_ALTER	0x0002		/* alternative entries required */
-#define	CRLE_DUMP	0x0004		/* alternative create by dldump(3dl) */
+#define	CRLE_DUMP	0x0004		/* alternative create by dldump(3C) */
 #define	CRLE_ADDID	0x0008		/* Add Rtc_id to head of new files */
 #define	CRLE_VERBOSE	0x0010		/* verbose mode */
 /* 0x20 was previously used for a.out support */

@@ -39,7 +39,7 @@ extern "C" {
 /*
  * Per-command EMUL64 private data
  *
- *	- Allocated at same time as scsi_pkt by scsi_hba_pkt_alloc(9E)
+ *	- Allocated at same time as scsi_pkt by scsi_hba_pkt_alloc(9F)
  *	- Pointed to by pkt_ha_private field in scsi_pkt
  */
 struct emul64_cmd {

@@ -27,6 +27,7 @@
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -72,6 +73,7 @@
 #include <sys/dmu_objset.h>
 #include <sys/spa_boot.h>
 #include <sys/vdev_impl.h>
+#include <sys/ilstr.h>
 #include "zfs_comutil.h"
 
 int zfsfstype;
@@ -786,11 +788,11 @@ zfs_userspace_many(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 }
 
 /*
- * buf must be big enough (eg, 32 bytes)
+ * buf must be big enough (eg, 16+1 bytes)
  */
 static int
 id_to_fuidstr(zfsvfs_t *zfsvfs, const char *domain, uid_t rid,
-    char *buf, boolean_t addok)
+    ilstr_t *ils, boolean_t addok)
 {
 	uint64_t fuid;
 	int domainid = 0;
@@ -801,7 +803,7 @@ id_to_fuidstr(zfsvfs_t *zfsvfs, const char *domain, uid_t rid,
 			return (SET_ERROR(ENOENT));
 	}
 	fuid = FUID_ENCODE(domainid, rid);
-	(void) sprintf(buf, "%llx", (longlong_t)fuid);
+	ilstr_aprintf(ils, "%llx", (longlong_t)fuid);
 	return (0);
 }
 
@@ -809,11 +811,12 @@ int
 zfs_userspace_one(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
     const char *domain, uint64_t rid, uint64_t *valp)
 {
+	ilstr_t ils;
 	char buf[20 + DMU_OBJACCT_PREFIX_LEN];
-	int offset = 0;
 	int err;
 	uint64_t obj;
 
+	ilstr_init_prealloc(&ils, buf, sizeof (buf));
 	*valp = 0;
 
 	if (!dmu_objset_userspace_present(zfsvfs->z_os))
@@ -841,14 +844,14 @@ zfs_userspace_one(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 
 	if (type == ZFS_PROP_USEROBJUSED || type == ZFS_PROP_GROUPOBJUSED ||
 	    type == ZFS_PROP_PROJECTOBJUSED) {
-		strncpy(buf, DMU_OBJACCT_PREFIX, DMU_OBJACCT_PREFIX_LEN);
-		offset = DMU_OBJACCT_PREFIX_LEN;
+		ilstr_append_str(&ils, DMU_OBJACCT_PREFIX);
 	}
 
-	err = id_to_fuidstr(zfsvfs, domain, rid, buf + offset, B_FALSE);
+	err = id_to_fuidstr(zfsvfs, domain, rid, &ils, B_FALSE);
 	if (err)
 		return (err);
 
+	VERIFY3S(ilstr_errno(&ils), ==, ILSTR_ERROR_OK);
 	err = zap_lookup(zfsvfs->z_os, obj, buf, 8, 1, valp);
 	if (err == ENOENT)
 		err = 0;
@@ -901,9 +904,12 @@ zfs_set_userquota(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 		return (SET_ERROR(EINVAL));
 	}
 
-	err = id_to_fuidstr(zfsvfs, domain, rid, buf, B_TRUE);
+	ilstr_t ils;
+	ilstr_init_prealloc(&ils, buf, sizeof (buf));
+	err = id_to_fuidstr(zfsvfs, domain, rid, &ils, B_TRUE);
 	if (err)
 		return (err);
+	VERIFY3S(ilstr_errno(&ils), ==, ILSTR_ERROR_OK);
 	fuid_dirtied = zfsvfs->z_fuid_dirty;
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -1577,17 +1583,20 @@ static int
 zfs_statfs_project(zfsvfs_t *zfsvfs, znode_t *zp, struct statvfs64 *statp,
     uint32_t bshift)
 {
+	ilstr_t ils;
 	char buf[20 + DMU_OBJACCT_PREFIX_LEN];
 	uint64_t offset = DMU_OBJACCT_PREFIX_LEN;
 	uint64_t quota;
 	uint64_t used;
 	int err;
 
-	strlcpy(buf, DMU_OBJACCT_PREFIX, DMU_OBJACCT_PREFIX_LEN + 1);
-	err = id_to_fuidstr(zfsvfs, NULL, zp->z_projid, buf + offset, B_FALSE);
+	ilstr_init_prealloc(&ils, buf, sizeof (buf));
+	ilstr_append_str(&ils, DMU_OBJACCT_PREFIX);
+	err = id_to_fuidstr(zfsvfs, NULL, zp->z_projid, &ils, B_FALSE);
 	if (err)
 		return (err);
 
+	VERIFY3S(ilstr_errno(&ils), ==, ILSTR_ERROR_OK);
 	if (zfsvfs->z_projectquota_obj == 0)
 		goto objs;
 

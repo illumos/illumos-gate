@@ -20,56 +20,37 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2024 Oxide Computer Company
+ */
+
 #ifndef __CXGBE_SHARED_H
 #define	__CXGBE_SHARED_H
 
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#define	UNIMPLEMENTED() cmn_err(CE_WARN, "%s (%s:%d) unimplemented.", \
-    __func__, __FILE__, __LINE__)
+#include "osdep.h"
 
-#define	bitloc(a, i)	((a)[(i)/NBBY])
-#define	setbit(a, i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
-#define	clrbit(a, i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
-#define	isset(a, i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
-#define	isclr(a, i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
+#define	CH_ERR(sc, ...)		cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)
+#define	CH_WARN(sc, ...)	cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)
+#define	CH_WARN_RATELIMIT(sc, ...) cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)
+#define	CH_ALERT(sc, ...)	cxgb_printf(sc->dip, CE_NOTE, ##__VA_ARGS__)
+#define	CH_INFO(sc, ...)	cxgb_printf(sc->dip, CE_NOTE, ##__VA_ARGS__)
 
-/* TODO: really icky, but we don't want to include adapter.h in cxgb/cxgbe */
-#define	PORT_INFO_HDR \
-	dev_info_t *dip; \
-	void *mh; \
-	void *mc; \
-	void *props; \
-	int mtu; \
-	uint8_t hw_addr[ETHERADDRL]
+#define	CH_MSG(sc, level, category, fmt, ...)	do {} while (0)
+#ifdef DEBUG
+#define	CH_DBG(sc, category, fmt, ...)	\
+	cxgb_printf(sc->dip, CE_NOTE, ##__VA_ARGS__)
+#else
+#define	CH_DBG(sc, category, fmt, ...)		do {} while (0)
+#endif
 
-struct mblk_pair {
-	mblk_t *head, *tail;
-};
+extern int cxgb_printf(dev_info_t *dip, int level, char *f, ...);
 
-struct rxbuf {
-	kmem_cache_t *cache;		/* the kmem_cache this rxb came from */
-	ddi_dma_handle_t dhdl;
-	ddi_acc_handle_t ahdl;
-	caddr_t va;			/* KVA of buffer */
-	uint64_t ba;			/* bus address of buffer */
-	frtn_t freefunc;
-	uint_t buf_size;
-	volatile uint_t ref_cnt;
-};
-
-struct rxbuf_cache_params {
-	dev_info_t		*dip;
-	ddi_dma_attr_t		dma_attr_rx;
-	ddi_device_acc_attr_t	acc_attr_rx;
-	size_t			buf_size;
-};
-
-int cxgb_printf(dev_info_t *dip, int level, char *f, ...);
-kmem_cache_t *rxbuf_cache_create(struct rxbuf_cache_params *p);
-void rxbuf_cache_destroy(kmem_cache_t *cache);
-struct rxbuf *rxbuf_alloc(kmem_cache_t *cache, int kmflags, uint_t ref_cnt);
-void rxbuf_free(struct rxbuf *rxb);
+/* Attach/detach logic used by cxgbe, calling into t4nex */
+struct port_info;
+extern int t4_cxgbe_attach(struct port_info *, dev_info_t *);
+extern int t4_cxgbe_detach(struct port_info *);
 
 #endif /* __CXGBE_SHARED_H */

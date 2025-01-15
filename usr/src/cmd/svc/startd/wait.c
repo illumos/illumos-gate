@@ -181,7 +181,7 @@ wait_ignore_by_fmri(const char *fmri)
  *   wait_register is called after we have called fork(2), and know which pid we
  *   wish to monitor.  However, since the child may have already exited by the
  *   time we are called, we must handle the error cases from open(2)
- *   appropriately.  The am_parent flag is recorded to handle waitpid(2)
+ *   appropriately.  The am_parent flag is recorded to handle waitpid(3C)
  *   behaviour on removal; similarly, the direct flag is passed through to a
  *   potential call to wait_remove() to govern its behaviour in different
  *   contexts.

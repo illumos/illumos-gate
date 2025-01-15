@@ -44,17 +44,15 @@
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.TH WCHAR.H 3HEAD "Aug 15, 2014"
+.TH WCHAR.H 3HEAD "Dec 28, 2024"
 .SH NAME
 wchar.h, wchar \- wide-character handling
 .SH SYNOPSIS
-.LP
 .nf
 #include <\fBwchar.h\fR>
 .fi
 
 .SH DESCRIPTION
-.LP
 The <\fBwchar.h\fR> header defines the following types:
 .sp
 .ne 2
@@ -217,6 +215,8 @@ Interface Stability	Standard
 .BR wcscoll (3C),
 .BR wcsdup (3C),
 .BR wcsftime (3C),
+.BR wcslcat (3C),
+.BR wcslcpy (3C),
 .BR wcslen (3C),
 .BR wcsrtombs (3C),
 .BR wcsstr (3C),

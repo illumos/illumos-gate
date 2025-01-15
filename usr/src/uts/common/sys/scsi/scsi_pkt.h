@@ -88,12 +88,14 @@ struct scsi_pkt {
 	 * rare cases access conditioned by scsi_pkt_allocated_correctly() is
 	 * permitted.
 	 */
-	/* HBA driver only, iff scsi_hba_pkt_alloc(9F)|tran_seup_pkt(9E) used */
+	/*
+	 * HBA driver only, iff scsi_hba_pkt_alloc(9F) | tran_setup_pkt(9E) used
+	 */
 	uint_t	pkt_cdblen;		/* length of pkt_cdbp */
 	uint_t	pkt_tgtlen;		/* length of pkt_private */
 	uint_t	pkt_scblen;		/* lenght of pkt_scbp */
 
-	/* HBA driver only, iff tran_seup_pkt(9E) used */
+	/* HBA driver only, iff tran_setup_pkt(9E) used */
 	ddi_dma_handle_t pkt_handle;	/* private */
 	uint_t	pkt_numcookies;		/* number of DMA cookies */
 	off_t	pkt_dma_offset;		/* private */

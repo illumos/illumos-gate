@@ -222,7 +222,7 @@ static	const char *const type_message[MANDOCERR_MAX] = {
 	"argument is not numeric, using 1",
 	"argument is not a character",
 	"missing manual name, using \"\"",
-	"uname(3) system call failed, using UNKNOWN",
+	"uname(2) system call failed, using UNKNOWN",
 	"unknown standard specifier",
 	"skipping request without numeric argument",
 	"excessive shift",

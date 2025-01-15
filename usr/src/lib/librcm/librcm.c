@@ -1496,7 +1496,7 @@ rcm_daemon_is_alive()
 	/*
 	 * Attempt to start the daemon.
 	 * If caller has SIGCHLD set to SIG_IGN or its SA_NOCLDWAIT
-	 * flag set, waitpid(2) (hence rcm_exec_cmd) will fail.
+	 * flag set, waitpid(3C) (hence rcm_exec_cmd) will fail.
 	 * get_event_service will determine if the rcm_daemon started.
 	 */
 	dprintf((stderr, "exec: %s\n", RCM_DAEMON_START));
