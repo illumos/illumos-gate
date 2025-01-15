@@ -32,7 +32,7 @@
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 MNX Cloud, Inc.
  */
 
@@ -1691,6 +1691,7 @@ extern uint64_t xrdmsr(uint_t);
 extern void xwrmsr(uint_t, const uint64_t);
 extern int checked_rdmsr(uint_t, uint64_t *);
 extern int checked_wrmsr(uint_t, uint64_t);
+extern void wrmsr_and_test(uint_t, const uint64_t);
 
 extern void invalidate_cache(void);
 extern ulong_t getcr4(void);
