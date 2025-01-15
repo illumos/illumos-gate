@@ -56,6 +56,9 @@ function cleanup
 log_assert "Ensure MMP uberblocks update at the correct interval"
 log_onexit cleanup
 
+# we do not have pool multihost kstat
+log_unsupported "unimplemented kstats"
+
 log_must set_tunable32 zfs_txg_timeout $TXG_TIMEOUT_LONG
 log_must mmp_set_hostid $HOSTID1
 

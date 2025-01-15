@@ -53,6 +53,9 @@ function cleanup
 log_assert "mmp threads notified when zfs_multihost_interval reduced"
 log_onexit cleanup
 
+# we do not have pool multihost kstat
+log_unsupported "unimplemented kstats"
+
 log_must set_tunable64 zfs_multihost_interval $MMP_INTERVAL_HOUR
 log_must mmp_set_hostid $HOSTID1
 

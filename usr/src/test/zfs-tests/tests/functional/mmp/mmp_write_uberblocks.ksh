@@ -45,6 +45,9 @@ function cleanup
 log_assert "mmp behaves correctly when failing to write uberblocks."
 log_onexit cleanup
 
+# we do not have pool multihost kstat
+log_unsupported "unimplemented kstats"
+
 log_must mmp_set_hostid $HOSTID1
 default_mirror_setup_noexit $DISKS
 log_must zpool set multihost=on $TESTPOOL

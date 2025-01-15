@@ -45,7 +45,7 @@ function unlinked_size_is
 	MAX_ITERS=5 # iteration to do before we consider reported number stable
 	iters=0
 	last_usize=0
-	while [[ $iters -le $MAX_ITERS ]]; do
+	while (( iters <= MAX_ITERS )); do
 		kstat_file=$(grep -nrwl /proc/spl/kstat/zfs/$2/objset-0x* -e $3)
 		nunlinks=`cat $kstat_file | grep nunlinks | awk '{print $3}'`
 		nunlinked=`cat $kstat_file | grep nunlinked | awk '{print $3}'`
@@ -70,6 +70,9 @@ UNLINK_SP_PARAM=/sys/module/zfs/parameters/zfs_unlink_suspend_progress
 default_unlink_sp=$(get_tunable zfs_unlink_suspend_progress)
 
 log_onexit cleanup
+
+# we do not have pool dataset kstats
+log_unsupported "unimplemented kstats"
 
 log_assert "Unlinked list drain does not hold up mounting of fs"
 

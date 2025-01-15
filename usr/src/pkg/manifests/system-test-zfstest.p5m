@@ -59,6 +59,7 @@ dir  path=opt/zfs-tests/include
 file path=opt/zfs-tests/include/blkdev.shlib mode=0444
 file path=opt/zfs-tests/include/commands.cfg mode=0444
 file path=opt/zfs-tests/include/default.cfg mode=0444
+file path=opt/zfs-tests/include/kstat.shlib mode=0444
 file path=opt/zfs-tests/include/libtest.shlib mode=0444
 file path=opt/zfs-tests/include/math.shlib mode=0444
 file path=opt/zfs-tests/include/properties.shlib mode=0444

@@ -27,8 +27,11 @@
 # Copyright (c) 2017 by Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2017 Datto Inc.
 # Copyright 2020 Joyent, Inc.
+# Copyright (c) 2025, Klara, Inc.
 # Copyright 2024 MNX Cloud, Inc.
 #
+
+UNAME=$(uname)
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
 . ${STF_SUITE}/include/math.shlib
@@ -40,11 +43,24 @@
 
 function is_linux
 {
-	if [[ $(uname -o) == "GNU/Linux" ]]; then
-		return 0
-	else
-		return 1
-	fi
+	[ "$UNAME" = "Linux" ]
+}
+
+# Determine if this is an illumos test system
+#
+# Return 0 if platform illumos, 1 if otherwise
+function is_illumos
+{
+	[ "$UNAME" = "SunOS" ]
+}
+
+# Determine if this is a FreeBSD test system
+#
+# Return 0 if platform FreeBSD, 1 if otherwise
+
+function is_freebsd
+{
+	[ "$UNAME" = "FreeBSD" ]
 }
 
 # Determine whether a dataset is mounted
@@ -2906,9 +2922,9 @@ function arcstat_quiescence # stat echo
 	fi
 
 	while $do_once || [ $stat1 -ne $stat2 ] || [ $stat2 -eq 0 ]; do
-		typeset stat1=$(get_arcstat $stat)
+		typeset stat1=$(kstat arcstats.$stat)
 		sleep 2
-		typeset stat2=$(get_arcstat $stat)
+		typeset stat2=$(kstat arcstats.$stat)
 		do_once=false
 	done
 
@@ -2948,16 +2964,4 @@ function sha256digest
 	return 0
 }
 
-function get_arcstat # stat
-{
-	if is_linux; then
-		typeset stat=$1
-		typeset zfs_arcstats="/proc/spl/kstat/zfs/arcstats"
-		[[ -f "$zfs_arcstats" ]] || return 1
-		grep $stat $zfs_arcstats | awk '{print $3}'
-		return $?
-	else
-		kstat -p zfs::arcstats:$1 | awk '{ print $2 }'
-		return $?
-	fi
-}
+. ${STF_SUITE}/include/kstat.shlib

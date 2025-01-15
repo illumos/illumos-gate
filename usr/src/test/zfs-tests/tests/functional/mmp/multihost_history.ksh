@@ -49,6 +49,9 @@ function cleanup
 log_assert "zfs_multihost_history records writes and skipped writes"
 log_onexit cleanup
 
+# we do not have pool multihost kstat
+log_unsupported "unimplemented kstats"
+
 mmp_pool_create_simple $MMP_POOL $MMP_DIR
 log_must zinject -d $MMP_DIR/vdev1 -D$((2*MMP_INTERVAL_DEFAULT)):10 $MMP_POOL
 log_must zinject -d $MMP_DIR/vdev2 -D$((2*MMP_INTERVAL_DEFAULT)):10 $MMP_POOL
