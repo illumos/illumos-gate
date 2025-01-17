@@ -205,8 +205,9 @@ _init(void)
 
 	mutex_init(&t4_adapter_list_lock, NULL, MUTEX_DRIVER, NULL);
 	SLIST_INIT(&t4_adapter_list);
+	t4_debug_init();
 
-	return (rc);
+	return (0);
 }
 
 int
@@ -219,6 +220,8 @@ _fini(void)
 		return (rc);
 
 	ddi_soft_state_fini(&t4_list);
+	t4_debug_fini();
+
 	return (0);
 }
 
@@ -871,10 +874,6 @@ t4_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 		pi = ddi_get_parent_data(rdip);
 		pi->instance = ddi_get_instance(dip);
 		pi->child_inst = ddi_get_instance(rdip);
-		cmn_err(CE_CONT, "?%s%d is port %s on %s%d\n",
-		    ddi_node_name(rdip), ddi_get_instance(rdip),
-		    ddi_get_name_addr(rdip), ddi_driver_name(dip),
-		    ddi_get_instance(dip));
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_INITCHILD:
@@ -1912,20 +1911,6 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	p->intr_types = prop_lookup_int(sc, "interrupt-types",
 	    DDI_INTR_TYPE_MSIX | DDI_INTR_TYPE_MSI | DDI_INTR_TYPE_FIXED);
 	(void) ddi_prop_update_int(dev, dip, "interrupt-types", p->intr_types);
-
-	/*
-	 * Forwarded interrupt queues.  Create this property to force the driver
-	 * to use forwarded interrupt queues.
-	 */
-	if (ddi_prop_exists(dev, dip, DDI_PROP_DONTPASS,
-	    "interrupt-forwarding") != 0 ||
-	    ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "interrupt-forwarding") != 0) {
-		cmn_err(CE_WARN, "%s (%s:%d) unimplemented.",
-		    __func__, __FILE__, __LINE__);
-		(void) ddi_prop_create(dev, dip, DDI_PROP_CANSLEEP,
-		    "interrupt-forwarding", NULL, 0);
-	}
 
 	/*
 	 * Write combining

@@ -35,7 +35,6 @@
 #include <sys/strsun.h>
 #include <inet/ip.h>
 #include <inet/tcp.h>
-#include <sys/cmn_err.h>
 
 #include "version.h"
 #include "common/common.h"
@@ -1731,9 +1730,6 @@ alloc_dma_memory(struct adapter *sc, size_t len, int flags,
 	 */
 	rc = ddi_dma_alloc_handle(sc->dip, dma_attr, DDI_DMA_SLEEP, 0, &dhdl);
 	if (rc != DDI_SUCCESS) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "failed to allocate DMA handle: %d", rc);
-
 		return (rc == DDI_DMA_NORESOURCES ? ENOMEM : EINVAL);
 	}
 
@@ -1744,16 +1740,8 @@ alloc_dma_memory(struct adapter *sc, size_t len, int flags,
 	    flags & DDI_DMA_CONSISTENT ? DDI_DMA_CONSISTENT : DDI_DMA_STREAMING,
 	    DDI_DMA_SLEEP, 0, &va, &real_len, &ahdl);
 	if (rc != DDI_SUCCESS) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "failed to allocate DMA memory: %d", rc);
-
 		ddi_dma_free_handle(&dhdl);
 		return (ENOMEM);
-	}
-
-	if (len != real_len) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "%s: len (%u) != real_len (%u)\n", len, real_len);
 	}
 
 	/*
@@ -1762,17 +1750,14 @@ alloc_dma_memory(struct adapter *sc, size_t len, int flags,
 	rc = ddi_dma_addr_bind_handle(dhdl, NULL, va, real_len, flags, NULL,
 	    NULL, &cookie, &ccount);
 	if (rc != DDI_DMA_MAPPED) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "failed to map DMA memory: %d", rc);
-
 		ddi_dma_mem_free(&ahdl);
 		ddi_dma_free_handle(&dhdl);
 		return (ENOMEM);
 	}
 	if (ccount != 1) {
-		cxgb_printf(sc->dip, CE_WARN,
-		    "unusable DMA mapping (%d segments)", ccount);
+		/* unusable DMA mapping */
 		(void) free_desc_ring(&dhdl, &ahdl);
+		return (ENOMEM);
 	}
 
 	bzero(va, real_len);
@@ -2021,9 +2006,7 @@ get_fl_payload(struct adapter *sc, struct sge_fl *fl, uint32_t len_newbuf,
 		frame.head = m = allocb(len, BPRI_HI);
 		if (m == NULL) {
 			fl->allocb_fail++;
-			cmn_err(CE_WARN, "%s: mbuf allocation failure "
-			    "count = %llu", __func__,
-			    (unsigned long long)fl->allocb_fail);
+			DTRACE_PROBE1(t4__fl_alloc_fail, struct sge_fl *, fl);
 			fl->cidx = rcidx;
 			fl->offset = roffset;
 			return (NULL);
@@ -2044,10 +2027,8 @@ get_fl_payload(struct adapter *sc, struct sge_fl *fl, uint32_t len_newbuf,
 			    BPRI_HI, &rxb->freefunc);
 			if (m == NULL) {
 				fl->allocb_fail++;
-				cmn_err(CE_WARN,
-				    "%s: mbuf allocation failure "
-				    "count = %llu", __func__,
-				    (unsigned long long)fl->allocb_fail);
+				DTRACE_PROBE1(t4__fl_alloc_fail,
+				    struct sge_fl *, fl);
 				if (frame.head)
 					freemsgchain(frame.head);
 				fl->cidx = rcidx;

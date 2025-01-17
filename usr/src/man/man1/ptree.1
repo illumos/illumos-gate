@@ -1,122 +1,124 @@
-'\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2019 Joyent, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTREE 1 "Nov 13, 2019"
-.SH NAME
-ptree \- print process trees
-.SH SYNOPSIS
-.nf
-\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-g\fR] [\fB-w\fR] [\fB-s\fR \fIsvc\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
-.fi
-
-.SH DESCRIPTION
-The \fBptree\fR utility prints the process trees containing the specified
-\fIpid\fRs or \fIuser\fRs, with child processes indented from their respective
-parent processes. An argument of all digits is taken to be a process-ID,
-otherwise it is assumed to be a user login name. The default is all processes.
-.SH OPTIONS
+.\" Copyright 2019, Joyent, Inc.
+.\" Copyright 2024 Jason King
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 9, 2025
+.Dt PTREE 1
+.Os
+.Sh NAME
+.Nm ptree
+.Nd print process trees
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Op Fl c
+.Op Fl g
+.Op Fl w
+.Op Fl s Ar svc
+.Op Fl z Ar zone
+.Oo Ar pid | Ar user Oc Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+utility prints the process trees containing the specified
+.Ar pid Ns s
+or
+.Ar user Ns s ,
+with child processes indented from their respective parent processes.
+An argument of all digits is taken to be a process-ID,
+otherwise it is assumed to be a user login name.
+The default is all processes.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.RS 11n
-All. Print all processes, including children of process 0.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-c\fR\fR
-.ad
-.RS 11n
-Contracts. Print process contract memberships and their associated SMF FMRIs,
-in addition to parent-child relationships. See \fBprocess\fR(5).
-This option implies the \fB-a\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-g\fR\fR
-.ad
-.RS 11n
-Use line drawing characters. If the current locale is a UTF-8 locale, the
-UTF-8 line drawing characters are used, otherwise ASCII line drawing
-characters are used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fIsvc\fR\fR
-.ad
-.RS 11n
-Print only processes with an SMF service FMRI matching the argument. The FMRI
-may be in truncated form (such as 'console-login'). This includes child
-processes even if they are not members of the service contract.
-See \fBprocess\fR(5).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-w\fR\fR
-.ad
-.RS 11n
-Allow output lines to wrap. Normally output lines are truncated to the current
-width of the terminal window.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fIzone\fR\fR
-.ad
-.RS 11n
-Zones. Print only processes in the specified \fIzone\fR. Each zone \fBID\fR can
-be specified as either a zone name or a numerical zone \fBID\fR.
-.sp
+.Bl -tag -width "-z zone"
+.It Fl a
+All.
+Print all processes, including children of process 0.
+.It Fl c
+Contracts.
+Print process contract memberships and their associated SMF FMRIs, in addition
+to parent-child relationships.
+See
+.Xr process 5 .
+This option implies the
+.Fl a
+option.
+.It Fl g
+Use line drawing characters.
+If the current locale is a UTF-8 locale, the UTF-8 line drawing characters are
+used, otherwise ASCII line drawing characters are used.
+.It Fl s Ar svc
+Print only processes with an SMF service FMRI matching the argument.
+The FMRI may be in truncated form
+.Po
+such as
+.Ql console-login
+.Pc .
+This includes child processes even if they are not members of the service
+contract.
+See
+.Xr process 5 .
+.It Fl w
+Allow output lines to wrap.
+Normally output lines are truncated to the current width of the terminal window.
+.It Fl z Ar zone
+Zones.
+Print only processes in the specified
+.Ar zone .
+Each zone
+.Sy ID
+can be specified as either a zone name or a numerical zone
+.Sy ID .
+.Pp
 This option is only useful when executed in the global zone.
-.RE
-
-.SH OPERANDS
+.El
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIpid\fR\fR
-.ad
-.RS 8n
-Process-id or a list of process-ids. \fBptree\fR also accepts
-\fB/proc/\fR\fInnn\fR as a process-id, so the shell expansion \fB/proc/*\fR can
-be used to specify all processes in the system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIuser\fR\fR
-.ad
-.RS 8n
-Username or list of usernames. Processes whose effective user IDs match those
+.Bl -tag -width "user"
+.It Ar pid
+Process-id or a list of process-ids.
+.Nm
+also accepts
+.Pa /proc/ Ns Em nnn
+as a process-id, so the shell expansion
+.Pa /proc/*
+can be used to specify all processes in the system.
+.It Ar user
+Username or list of usernames.
+Processes whose effective user IDs match those
 given are displayed.
-.RE
-
-.SH EXAMPLES
-\fBExample 1 \fRUsing ptree
-.sp
-.LP
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /proc/*
+process files
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bl -inset
+.It Sy Example 1
+Using ptree
+.Pp
 The following example prints the process tree (including children of process 0)
-for processes which match the command name \fBssh\fR:
-
-.sp
-.in +2
-.nf
+for processes which match the command name
+.Sy ssh :
+.Bd -literal -offset 2n
 $ ptree -a `pgrep ssh`
         1     /sbin/init
           100909 /usr/lib/ssh/sshd
@@ -126,20 +128,14 @@ $ ptree -a `pgrep ssh`
                   569171 bash
                     569173 /bin/ksh
                       569193 bash
-.fi
-.in -2
-.sp
-
-\fBExample 2\fR
-.sp
-.LP
+.Ed
+.It Sy Example 2
+.Pp
 The following example prints the process tree (including children of process 0)
-for processes which match the command name \fBssh\fR with ASCII line drawing
-characters:
-
-.sp
-.in +2
-.nf
+for processes which match the command name
+.Ql ssh
+with ASCII line drawing characters:
+.Bd -literal -offset 2n
 $ ptree -ag `pgrep ssh`
         1     /sbin/init
         `-100909 /usr/lib/ssh/sshd
@@ -149,80 +145,19 @@ $ ptree -ag `pgrep ssh`
                 `-569171 bash
                   `-569173 /bin/ksh
                     `-569193 bash
-.fi
-.in -2
-.sp
-
-.SH EXIT STATUS
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 12n
-Successful operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fBnon-zero\fR
-.ad
-.RS 12n
-An error has occurred.
-.RE
-
-.SH FILES
-.ne 2
-.na
-\fB\fB/proc/*\fR\fR
-.ad
-.RS 11n
-process files
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-.TE
-
-.sp
-.LP
-The human readable output is Unstable. The options are Evolving.
-.SH SEE ALSO
-.BR gcore (1),
-.BR ldd (1),
-.BR pargs (1),
-.BR pgrep (1),
-.BR pkill (1),
-.BR plimit (1),
-.BR pmap (1),
-.BR ppgsz (1),
-.BR preap (1),
-.BR proc (1),
-.BR ps (1),
-.BR pwd (1),
-.BR rlogin (1),
-.BR time (1),
-.BR truss (1),
-.BR wait (1),
-.BR fcntl (2),
-.BR fstat (2),
-.BR setuid (2),
-.BR dlopen (3C),
-.BR signal.h (3HEAD),
-.BR core (5),
-.BR proc (5),
-.BR process (5),
-.BR attributes (7),
-.BR zones (7)
+.Ed
+.El
+.Sh INTERFACE STABILITY
+Not-an-Interface
+.Sh SEE ALSO
+.Xr pargs 1 ,
+.Xr pgrep 1 ,
+.Xr pkill 1 ,
+.Xr preap 1 ,
+.Xr proc 1 ,
+.Xr ps 1 ,
+.Xr contract 5 ,
+.Xr proc 5 ,
+.Xr process 5 ,
+.Xr attributes 7 ,
+.Xr zones 7

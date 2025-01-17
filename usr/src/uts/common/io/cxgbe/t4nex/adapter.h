@@ -816,6 +816,10 @@ int t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h);
 int t4_register_fw_msg_handler(struct adapter *, int, fw_msg_handler_t);
 void t4_iterate(void (*func)(int, void *), void *arg);
 
+/* t4_debug.c */
+void t4_debug_init(void);
+void t4_debug_fini(void);
+
 /* t4_sge.c */
 void t4_sge_init(struct adapter *sc);
 int t4_setup_adapter_queues(struct adapter *sc);

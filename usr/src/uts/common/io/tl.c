@@ -5331,6 +5331,10 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		udind = (struct T_unitdata_ind *)mp->b_rptr;
 		udind->PRIM_type = T_UNITDATA_IND;
 		udind->SRC_length = tep->te_alen;
+		ASSERT3U(udind->OPT_offset, ==,
+		    (t_scalar_t)T_ALIGN(udind->SRC_offset + udind->SRC_length));
+		udind->OPT_length = olen;
+		mp->b_wptr = mp->b_rptr + ui_sz;
 		addr_startp = mp->b_rptr + udind->SRC_offset;
 		bcopy(tep->te_abuf, addr_startp, tep->te_alen);
 
