@@ -10,16 +10,20 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/mdb/progs
-PROGS = number_symbol bitfields
+PROGS = \
+	anon		\
+	bitfields	\
+	number_symbol
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
@@ -27,6 +31,7 @@ CTF_MODE = link
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
+CSTD = $(CSTD_GNU17)
 
 all: $(PROGS)
 

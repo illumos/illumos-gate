@@ -132,10 +132,13 @@ extern boolean_t ctftest_check_enum(const char *, ctf_file_t *,
 /*
  * Checks that all of the members of a structure or union are present and have
  * the right types and byte offsets. This can be used for either structures or
- * unions.
+ * unions. The second version of this instead uses ctf_member_info() to look at
+ * and evaluate that function.
  */
 extern boolean_t ctftest_check_members(const char *, ctf_file_t *, int, size_t,
     const check_member_t *);
+extern boolean_t ctftest_check_member_info(const char *, ctf_file_t *, int,
+    size_t, const check_member_t *);
 
 /*
  * Check that the named function or function pointer has the correct return

@@ -16,7 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -1702,8 +1702,12 @@ dir  path=opt/util-tests/tests/mdb/options
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb mode=0444
 file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb.out mode=0444
 dir  path=opt/util-tests/tests/mdb/progs
+file path=opt/util-tests/tests/mdb/progs/anon mode=0555
 file path=opt/util-tests/tests/mdb/progs/bitfields mode=0555
 file path=opt/util-tests/tests/mdb/progs/number_symbol mode=0555
+dir  path=opt/util-tests/tests/mdb/sou
+file path=opt/util-tests/tests/mdb/sou/tst.anon.ksh mode=0444
+file path=opt/util-tests/tests/mdb/sou/tst.anon.ksh.out mode=0444
 dir  path=opt/util-tests/tests/mdb/typedef
 file path=opt/util-tests/tests/mdb/typedef/err.badid-leadnum.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/err.badid-leadschar.ksh mode=0444

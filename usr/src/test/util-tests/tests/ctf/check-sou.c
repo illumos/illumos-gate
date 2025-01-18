@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -340,6 +341,63 @@ static check_member_test_t members[] = {
 	{ NULL }
 };
 
+#ifdef	TARGET_LP64
+static check_member_t check_member_anon_basic[] = {
+	{ "a", "int", 0 },
+	{ "b", "int", 8 * NBBY },
+	{ "c", "double", 8 * NBBY },
+	{ "d", "const char *", 8 * NBBY },
+	{ "e", "int", 16 * NBBY },
+	{ "f", "const char *", 24 * NBBY },
+	{ "g", "unsigned int [10]", 32 * NBBY },
+	{ NULL }
+};
+#else	/* !TARGET_LP64 */
+static check_member_t check_member_anon_basic[] = {
+	{ "a", "int", 0 },
+	{ "b", "int", 4 * NBBY },
+	{ "c", "double", 4 * NBBY },
+	{ "d", "const char *", 4 * NBBY },
+	{ "e", "int", 12 * NBBY },
+	{ "f", "const char *", 16 * NBBY },
+	{ "g", "unsigned int [10]", 20 * NBBY },
+	{ NULL }
+};
+#endif	/* TARGET_LP64 */
+
+static check_member_t check_member_nested[] = {
+	{ "a", "int", 0 },
+	{ "b", "int", 4 * NBBY },
+	{ "c", "int", 4 * NBBY },
+	{ "d", "int", 8 * NBBY },
+	{ "e", "int", 12 * NBBY },
+	{ "g", "int", 16 * NBBY },
+	{ "h", "int", 16 * NBBY },
+	{ "i", "int", 20 * NBBY },
+	{ "j", "int", 24 * NBBY },
+	{ "k", "int", 28 * NBBY },
+	{ "l", "int", 28 * NBBY },
+	{ "m", "int", 32 * NBBY },
+	{ "n", "int", 28 * NBBY },
+	{ "o", "int", 28 * NBBY },
+	{ "p", "int", 32 * NBBY },
+	{ NULL }
+};
+
+/*
+ * This contains members tests that involve anonyous unions and structures and
+ * therefore only are for the ctftest_check_member_info() version.
+ */
+static check_member_test_t anon_members[] = {
+#ifdef	TARGET_LP64
+	{ "struct anon_basic", CTF_K_STRUCT, 72, check_member_anon_basic },
+#else
+	{ "struct anon_basic", CTF_K_STRUCT, 60, check_member_anon_basic },
+#endif
+	{ "struct nested", CTF_K_STRUCT, 36, check_member_nested},
+	{ NULL }
+};
+
 static check_descent_t check_descent_head[] = {
 	{ "nlist_t", CTF_K_TYPEDEF },
 	{ "struct nlist", CTF_K_STRUCT },
@@ -386,16 +444,15 @@ static check_descent_test_t alt_descents[] = {
 int
 main(int argc, char *argv[])
 {
-	int i, ret = 0;
+	int ret = 0;
 
 	if (argc < 2) {
 		errx(EXIT_FAILURE, "missing test files");
 	}
 
-	for (i = 1; i < argc; i++) {
+	for (int i = 1; i < argc; i++) {
 		ctf_file_t *fp;
 		int alt_ok = 0;
-		uint_t j;
 
 		if ((fp = ctf_open(argv[i], &ret)) == NULL) {
 			warnx("failed to open %s: %s", argv[i],
@@ -408,14 +465,14 @@ main(int argc, char *argv[])
 			ret = EXIT_FAILURE;
 		if (!ctftest_check_symbols(fp, check_syms))
 			ret = EXIT_FAILURE;
-		for (j = 0; descents[j].cdt_sym != NULL; j++) {
+		for (size_t j = 0; descents[j].cdt_sym != NULL; j++) {
 			if (!ctftest_check_descent(descents[j].cdt_sym, fp,
 			    descents[j].cdt_tests, B_FALSE)) {
 				ret = EXIT_FAILURE;
 			}
 		}
 
-		for (j = 0; alt_descents[j].cdt_sym != NULL; j++) {
+		for (size_t j = 0; alt_descents[j].cdt_sym != NULL; j++) {
 			if (ctftest_check_descent(alt_descents[j].cdt_sym, fp,
 			    alt_descents[j].cdt_tests, B_TRUE)) {
 				alt_ok = 1;
@@ -429,7 +486,7 @@ main(int argc, char *argv[])
 			ret = EXIT_FAILURE;
 		}
 
-		for (j = 0; members[j].cmt_type != NULL; j++) {
+		for (size_t j = 0; members[j].cmt_type != NULL; j++) {
 			if (ctftest_skip(members[j].cmt_skips)) {
 				warnx("skipping members test %s due to "
 				    "known compiler issue",
@@ -440,6 +497,21 @@ main(int argc, char *argv[])
 			if (!ctftest_check_members(members[j].cmt_type, fp,
 			    members[j].cmt_kind, members[j].cmt_size,
 			    members[j].cmt_members)) {
+				ret = EXIT_FAILURE;
+			}
+
+			if (!ctftest_check_member_info(members[j].cmt_type, fp,
+			    members[j].cmt_kind, members[j].cmt_size,
+			    members[j].cmt_members)) {
+				ret = EXIT_FAILURE;
+			}
+		}
+
+		for (size_t j = 0; anon_members[j].cmt_type != NULL; j++) {
+			if (!ctftest_check_member_info(anon_members[j].cmt_type,
+			    fp, anon_members[j].cmt_kind,
+			    anon_members[j].cmt_size,
+			    anon_members[j].cmt_members)) {
 				ret = EXIT_FAILURE;
 			}
 		}

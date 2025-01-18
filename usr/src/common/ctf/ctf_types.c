@@ -27,6 +27,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <ctf_impl.h>
@@ -805,55 +806,138 @@ ctf_type_compat(ctf_file_t *lfp, ctf_id_t ltype,
 	}
 }
 
+typedef struct {
+	ctf_file_t *cms_fp;
+	const ctf_type_t *cms_tp;
+	ulong_t cms_curoff;
+} ctf_member_stack_t;
+
 /*
- * Return the type and offset for a given member of a STRUCT or UNION.
+ * Determine whether or not we should push this frame on. If we're at our depth,
+ * then that's it. In particular for us to look at this we need to:
+ *
+ * 1) Have no name.
+ * 2) Be a struct or union (implicitly that means we can look this up).
+ * 3) Not exceed our internal depth.
+ */
+static void
+ctf_member_info_push(ctf_member_stack_t *stack, size_t *depthp, size_t max,
+    const ctf_member_stack_t *cur, ushort_t mtype, const char *mname,
+    ulong_t moff)
+{
+	uint_t kind;
+	ctf_member_stack_t *cms;
+
+	if (*depthp == max)
+		return;
+
+	if (*mname != '\0')
+		return;
+
+	cms = &stack[*depthp];
+	cms->cms_fp = cur->cms_fp;
+	cms->cms_tp = ctf_lookup_by_id(&cms->cms_fp, mtype);
+	if (cms->cms_tp == NULL)
+		return;
+	kind = LCTF_INFO_KIND(cms->cms_fp, cms->cms_tp->ctt_info);
+	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION)
+		return;
+	cms->cms_curoff = cur->cms_curoff + moff;
+	*depthp = *depthp + 1;
+}
+
+/*
+ * Return the type and offset for a given member of a STRUCT or UNION. C11
+ * officially added anonymous structs and unions. These are members whose name
+ * is the empty string. When looking for a member, we will search anonymous
+ * structures and unions it. This can nest to an arbitrary depth; however, we
+ * use a fixed bound to limit our overall stack usage. This will cause us to go
+ * through and visit all of our current members before considering any anonymous
+ * entries. Note, this is okay because there are no duplicate member names
+ * allowed.
  */
 int
-ctf_member_info(ctf_file_t *fp, ctf_id_t type, const char *name,
+ctf_member_info(ctf_file_t *ifp, ctf_id_t type, const char *name,
     ctf_membinfo_t *mip)
 {
-	ctf_file_t *ofp = fp;
-	const ctf_type_t *tp;
-	ssize_t size, increment;
-	uint_t kind, n;
+	uint_t kind;
+	ctf_member_stack_t stack[128];
+	size_t depth = 0;
 
-	if ((type = ctf_type_resolve(fp, type)) == CTF_ERR)
+	/*
+	 * We only ever resolve the top-level type while searching.
+	 */
+	if ((type = ctf_type_resolve(ifp, type)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
-	if ((tp = ctf_lookup_by_id(&fp, type)) == NULL)
+	stack[depth].cms_fp = ifp;
+	stack[depth].cms_curoff = 0;
+	stack[depth].cms_tp = ctf_lookup_by_id(&stack[depth].cms_fp, type);
+	if (stack[depth].cms_tp == NULL)
 		return (CTF_ERR); /* errno is set for us */
 
-	(void) ctf_get_ctt_size(fp, tp, &size, &increment);
-	kind = LCTF_INFO_KIND(fp, tp->ctt_info);
+	kind = LCTF_INFO_KIND(stack[depth].cms_fp,
+	    stack[depth].cms_tp->ctt_info);
 
 	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION)
-		return (ctf_set_errno(ofp, ECTF_NOTSOU));
+		return (ctf_set_errno(ifp, ECTF_NOTSOU));
 
-	if (fp->ctf_version == CTF_VERSION_1 || size < CTF_LSTRUCT_THRESH) {
-		const ctf_member_t *mp = (const ctf_member_t *)
-		    ((uintptr_t)tp + increment);
+	depth++;
+	while (depth != 0) {
+		ssize_t size, increment;
+		ctf_member_stack_t cms;
 
-		for (n = LCTF_INFO_VLEN(fp, tp->ctt_info); n != 0; n--, mp++) {
-			if (strcmp(ctf_strptr(fp, mp->ctm_name), name) == 0) {
-				mip->ctm_type = mp->ctm_type;
-				mip->ctm_offset = mp->ctm_offset;
-				return (0);
+		depth--;
+		cms = stack[depth];
+
+		(void) ctf_get_ctt_size(cms.cms_fp, cms.cms_tp, &size,
+		    &increment);
+
+		if (cms.cms_fp->ctf_version == CTF_VERSION_1 ||
+		    size < CTF_LSTRUCT_THRESH) {
+			const ctf_member_t *mp = (const ctf_member_t *)
+			    ((uintptr_t)cms.cms_tp + increment);
+
+			for (uint_t n = LCTF_INFO_VLEN(cms.cms_fp,
+			    cms.cms_tp->ctt_info); n != 0; n--, mp++) {
+				const char *mname = ctf_strptr(cms.cms_fp,
+				    mp->ctm_name);
+
+				if (strcmp(mname, name) == 0) {
+					mip->ctm_type = mp->ctm_type;
+					mip->ctm_offset = mp->ctm_offset +
+					    cms.cms_curoff;
+					return (0);
+				}
+
+				ctf_member_info_push(stack, &depth,
+				    ARRAY_SIZE(stack), &cms, mp->ctm_type,
+				    mname, mp->ctm_offset);
+			}
+		} else {
+			const ctf_lmember_t *lmp = (const ctf_lmember_t *)
+			    ((uintptr_t)cms.cms_tp + increment);
+
+			for (uint_t n = LCTF_INFO_VLEN(cms.cms_fp,
+			    cms.cms_tp->ctt_info); n != 0; n--, lmp++) {
+				const char *mname = ctf_strptr(cms.cms_fp,
+				    lmp->ctlm_name);
+				ulong_t off = (ulong_t)CTF_LMEM_OFFSET(lmp);
+				if (strcmp(mname, name) == 0) {
+					mip->ctm_type = lmp->ctlm_type;
+					mip->ctm_offset = cms.cms_curoff + off;
+					return (0);
+				}
+
+				ctf_member_info_push(stack, &depth,
+				    ARRAY_SIZE(stack), &cms, lmp->ctlm_type,
+				    mname, off);
 			}
 		}
-	} else {
-		const ctf_lmember_t *lmp = (const ctf_lmember_t *)
-		    ((uintptr_t)tp + increment);
 
-		for (n = LCTF_INFO_VLEN(fp, tp->ctt_info); n != 0; n--, lmp++) {
-			if (strcmp(ctf_strptr(fp, lmp->ctlm_name), name) == 0) {
-				mip->ctm_type = lmp->ctlm_type;
-				mip->ctm_offset = (ulong_t)CTF_LMEM_OFFSET(lmp);
-				return (0);
-			}
-		}
 	}
 
-	return (ctf_set_errno(ofp, ECTF_NOMEMBNAM));
+	return (ctf_set_errno(ifp, ECTF_NOMEMBNAM));
 }
 
 /*

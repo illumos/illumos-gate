@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -569,6 +570,66 @@ ctftest_check_members(const char *type, ctf_file_t *fp, int kind,
 	}
 
 	return (B_TRUE);
+}
+
+boolean_t
+ctftest_check_member_info(const char *type, ctf_file_t *fp, int kind,
+    size_t size, const check_member_t *members)
+{
+	boolean_t ret = B_TRUE;
+	ctf_id_t base;
+
+	if ((base = ctftest_lookup_type(fp, type)) == CTF_ERR) {
+		warnx("failed to look up type %s", type);
+		return (B_FALSE);
+	}
+
+	if (ctf_type_kind(fp, base) != kind) {
+		warnx("%s has kind %s, expected %s", type,
+		    ctf_kind_name(fp, ctf_type_kind(fp, base)),
+		    ctf_kind_name(fp, kind));
+		return (B_FALSE);
+	}
+
+	if (size != ctf_type_size(fp, base)) {
+		warnx("%s has bad size, expected %zu, found %zd",
+		    type, size, ctf_type_size(fp, base));
+		ret = B_FALSE;
+	}
+
+	for (size_t i = 0; members[i].cm_name != NULL; i++) {
+		ctf_membinfo_t mi;
+		char buf[2048];
+
+		if (ctf_member_info(fp, base, members[i].cm_name, &mi) ==
+		    CTF_ERR) {
+			warnx("failed to look up member %s in %s: %s",
+			    members[i].cm_name, type,
+			    ctf_errmsg(ctf_errno(fp)));
+		}
+
+		if (mi.ctm_offset != members[i].cm_offset) {
+			warnx("member %s of type %s has mismatched bit offset: "
+			    "found %lu, expected %lu", members[i].cm_name, type,
+			    mi.ctm_offset, members[i].cm_offset);
+			ret = B_FALSE;
+		}
+
+		if (ctf_type_name(fp, mi.ctm_type, buf, sizeof (buf)) == NULL) {
+			warnx("failed to obtain type name for member %s in %s: "
+			    "%s", members[i].cm_name, type,
+			    ctf_errmsg(ctf_errno(fp)));
+			ret = B_FALSE;
+		} else if (strcmp(buf, members[i].cm_type) != 0) {
+			warnx("member %s in %s has bad type, found %s, "
+			    "expected %s", members[i].cm_name, type, buf,
+			    members[i].cm_type);
+			ret = B_FALSE;
+		}
+
+	}
+
+	return (ret);
 }
 
 boolean_t

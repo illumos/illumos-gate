@@ -13,7 +13,7 @@ broken_t {
     unsigned int:1 brk_l :1 = 0
     unsigned int:1 brk_m :1 = 0x1
 }
-broken6491_t {
+broken6461_t {
     unsigned short:1 a :1 = 0x1
     unsigned short:8 b :8 = 0x2
     unsigned short:3 c :3 = 0

@@ -572,7 +572,8 @@ mdb_tab_complete_member_by_id(mdb_tab_cookie_t *mcp, mdb_ctf_id_t id,
 {
 	if (member != NULL)
 		mdb_tab_setmbase(mcp, member);
-	(void) mdb_ctf_member_iter(id, tab_complete_member, mcp);
+	(void) mdb_ctf_member_iter(id, tab_complete_member, mcp,
+	    MDB_CTF_F_ITER_ANON);
 	return (0);
 }
 

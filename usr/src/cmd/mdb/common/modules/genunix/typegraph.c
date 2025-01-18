@@ -638,7 +638,7 @@ typegraph_hasfam(mdb_ctf_id_t type, mdb_ctf_id_t *atype)
 		return (0);
 
 	mdb_ctf_type_invalidate(&last);
-	mdb_ctf_member_iter(type, typegraph_lastmember, &last);
+	mdb_ctf_member_iter(type, typegraph_lastmember, &last, 0);
 
 	if (!mdb_ctf_type_valid(last))
 		return (0);
@@ -780,7 +780,7 @@ typegraph_type_offset(mdb_ctf_id_t type, size_t offset, tg_edge_t *e,
 		mdb_ctf_type_invalidate(&toffs.tgto_type);
 
 		mdb_ctf_member_iter(type,
-		    (mdb_ctf_member_f *)typegraph_offiter, &toffs);
+		    (mdb_ctf_member_f *)typegraph_offiter, &toffs, 0);
 
 		return (toffs.tgto_type);
 
@@ -818,7 +818,7 @@ typegraph_type_offset(mdb_ctf_id_t type, size_t offset, tg_edge_t *e,
 		 * Try to bust the union...
 		 */
 		if (mdb_ctf_member_iter(type,
-		    (mdb_ctf_member_f *)typegraph_union, &toffs) != 0) {
+		    (mdb_ctf_member_f *)typegraph_union, &toffs, 0) != 0) {
 			/*
 			 * There was at least one valid pointer in there.
 			 * Return "void *".
@@ -3004,7 +3004,8 @@ findlocks_findmutex(const char *name, mdb_ctf_id_t type, ulong_t offs,
 		fl->fl_depth++;
 	}
 
-	mdb_ctf_member_iter(type, (mdb_ctf_member_f *)findlocks_findmutex, fl);
+	mdb_ctf_member_iter(type, (mdb_ctf_member_f *)findlocks_findmutex, fl,
+	    0);
 
 	fl->fl_addr = addr;
 	fl->fl_parent = parent;
@@ -3275,7 +3276,7 @@ findfalse_findsync(const char *name, mdb_ctf_id_t type, ulong_t offs,
 		return (0);
 
 	if (mdb_ctf_member_iter(type,
-	    (mdb_ctf_member_f *)findfalse_findsync, NULL) != 0)
+	    (mdb_ctf_member_f *)findfalse_findsync, NULL, 0) != 0)
 		return (1);
 
 	return (0);

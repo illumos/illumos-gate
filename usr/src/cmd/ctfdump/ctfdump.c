@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -34,6 +34,7 @@
 #include <string.h>
 #include <strings.h>
 #include <err.h>
+#include <stdbool.h>
 
 #define	MAX_NAMELEN (512)
 
@@ -484,6 +485,8 @@ static int
 ctfdump_member_cb(const char *member, ctf_id_t type, ulong_t off, void *arg)
 {
 	int *count = arg;
+	if (*member == '\0')
+		member = "<anon>";
 	ctfdump_printf(CTFDUMP_TYPES, "\t%s type=%ld off=%lu bits (%lu.%lu "
 	    "bytes)\n", member, type, off, off / 8, off % 8);
 	*count = *count + 1;
@@ -497,6 +500,14 @@ ctfdump_enum_cb(const char *name, int value, void *arg)
 	ctfdump_printf(CTFDUMP_TYPES, "\t%s = %d\n", name, value);
 	*count = *count + 1;
 	return (0);
+}
+
+static bool
+is_anon_refname(const char *refname)
+{
+	return ((strcmp(refname, "struct ") == 0 ||
+	    strcmp(refname, "union ") == 0 ||
+	    strcmp(refname, "enum ") == 0));
 }
 
 static int
@@ -596,6 +607,9 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 		if (size == CTF_ERR)
 			ctfdump_fatal("failed to get size of %s: %s\n", name,
 			    ctf_errmsg(ctf_errno(g_fp)));
+		if (is_anon_refname(name)) {
+			(void) strlcat(name, "<anon>", sizeof (name));
+		}
 		ctfdump_printf(CTFDUMP_TYPES, "%s (%zd bytes)\n", name, size);
 		count = 0;
 		if (ctf_member_iter(g_fp, id, ctfdump_member_cb, &count) != 0)
@@ -743,14 +757,6 @@ ctfsrc_enum_cb(const char *name, int value, void *arg)
 	_NOTE(ARGUNUSED(arg));
 	printf("\t%s = %d,\n", name, value);
 	return (0);
-}
-
-static int
-is_anon_refname(const char *refname)
-{
-	return ((strcmp(refname, "struct ") == 0 ||
-	    strcmp(refname, "union ") == 0 ||
-	    strcmp(refname, "enum ") == 0));
 }
 
 static int

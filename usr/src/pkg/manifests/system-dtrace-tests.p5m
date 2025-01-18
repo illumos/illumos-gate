@@ -1012,6 +1012,9 @@ file path=opt/SUNWdtrt/tst/common/offsetof/err.D_UNKNOWN.badmemb.d mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofAlias.d mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofArith.d mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.OffsetofUnion.d mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.anon.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.anon.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/offsetof/tst.anon.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.struct.d mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.struct.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/offsetof/tst.union.d mode=0444
@@ -1197,6 +1200,9 @@ dir  path=opt/SUNWdtrt/tst/common/print
 file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_AGG.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/err.D_PRINT_VOID.bad.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/err.D_PROTO_LEN.bad.d mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.anon.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/print/tst.anon.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/print/tst.anon.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.array.d mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.array.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/print/tst.bitfield.d mode=0444
