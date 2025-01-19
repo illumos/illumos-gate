@@ -1234,6 +1234,7 @@ MANLINKS=	FD_CLR.3c				\
 		schedctl_start.3c			\
 		schedctl_stop.3c			\
 		seconvert.3c				\
+		secure_getenv.3c			\
 		seed48.3c				\
 		sem_clockwait.3c			\
 		sem_relclockwait_np.3c			\
@@ -1938,6 +1939,8 @@ vwscanf.3c				:= LINKSRC = fwscanf.3c
 wscanf.3c				:= LINKSRC = fwscanf.3c
 
 gethomelgroup.3c			:= LINKSRC = getcpuid.3c
+
+secure_getenv.3c			:= LINKSRC = getenv.3c
 
 endgrent.3c				:= LINKSRC = getgrnam.3c
 fgetgrent.3c				:= LINKSRC = getgrnam.3c

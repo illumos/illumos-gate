@@ -15,7 +15,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
 #
 
@@ -183,6 +183,9 @@ file path=opt/os-tests/tests/secflags/secflags_syscall mode=0555
 file path=opt/os-tests/tests/secflags/secflags_truss mode=0555
 file path=opt/os-tests/tests/secflags/secflags_zonecfg mode=0555
 file path=opt/os-tests/tests/secflags/stacky mode=0555
+dir  path=opt/os-tests/tests/secure_getenv
+file path=opt/os-tests/tests/secure_getenv/checker mode=0555
+file path=opt/os-tests/tests/secure_getenv/secure_getenv mode=0555
 dir  path=opt/os-tests/tests/signalfd
 file path=opt/os-tests/tests/signalfd/basic_args mode=0555
 file path=opt/os-tests/tests/signalfd/basic_read mode=0555
