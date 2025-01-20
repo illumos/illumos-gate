@@ -36,7 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IMPL_H
@@ -186,6 +186,9 @@ typedef struct viona_vring {
 		uint64_t	rs_rx_merge_underrun;
 		uint64_t	rs_rx_pad_short;
 		uint64_t	rs_rx_mcast_check;
+		uint64_t	rs_rx_drop_over_mtu;
+		uint64_t	rs_rx_gro_fallback;
+		uint64_t	rs_rx_gro_fallback_fail;
 		uint64_t	rs_too_short;
 		uint64_t	rs_tx_absent;
 		uint64_t	rs_tx_gso_fail;
@@ -212,6 +215,7 @@ struct viona_link {
 	uint32_t		l_features_hw;
 	uint32_t		l_cap_csum;
 	viona_link_params_t	l_params;
+	uint16_t		l_mtu;
 
 	uint16_t		l_notify_ioport;
 	void			*l_notify_cookie;
@@ -391,8 +395,23 @@ struct virtio_net_hdr {
  * Place an upper bound on the size of packets viona is willing to handle,
  * particularly in the TX case, where guest behavior directs the sizing of
  * buffer allocations.
+ * In the RX case, upper bounds are provided by the MTU (below) and a
+ * GRO-specific limit provided by the specification.
  */
 #define	VIONA_MAX_PACKET_SIZE		UINT16_MAX
+#define	VIONA_GRO_MAX_PACKET_SIZE	65550
+
+/*
+ * Virtio v1.1+ allow the host to communicate its underlying MTU to the guest,
+ * which the guest uses to determine the maximum packet it is able to receive.
+ * Devices/drivers (legacy and otherwise) which do not negotiate this behave as
+ * though the MTU is 1500.
+ * The value for max MTU is part of the virtio spec (v1.0--1.3), and may need to
+ * change in future to account for IPv6 jumbograms (64 KiB..4GiB).
+ */
+#define	VIONA_MIN_MTU			68
+#define	VIONA_MAX_MTU			UINT16_MAX
+#define	VIONA_DEFAULT_MTU		1500
 
 struct viona_ring_params {
 	uint64_t	vrp_pa;

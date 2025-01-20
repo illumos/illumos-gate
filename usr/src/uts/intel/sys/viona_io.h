@@ -13,7 +13,7 @@
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IO_H_
@@ -41,6 +41,8 @@
 #define	VNA_IOC_SET_PROMISC	(VNA_IOC | 0x24)
 #define	VNA_IOC_GET_PARAMS	(VNA_IOC | 0x25)
 #define	VNA_IOC_SET_PARAMS	(VNA_IOC | 0x26)
+#define	VNA_IOC_GET_MTU		(VNA_IOC | 0x27)
+#define	VNA_IOC_SET_MTU		(VNA_IOC | 0x28)
 
 
 /*
@@ -57,7 +59,7 @@
  * change when the version is modified.  It follows no rules like semver.
  *
  */
-#define	VIONA_CURRENT_INTERFACE_VERSION	3
+#define	VIONA_CURRENT_INTERFACE_VERSION	4
 
 typedef struct vioc_create {
 	datalink_id_t	c_linkid;

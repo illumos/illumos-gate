@@ -36,7 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -660,6 +660,15 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	case VNA_IOC_SET_PARAMS:
 		err = viona_ioc_set_params(link, dptr, md);
 		break;
+	case VNA_IOC_GET_MTU:
+		*rv = (int)link->l_mtu;
+		break;
+	case VNA_IOC_SET_MTU:
+		if (data < VIONA_MIN_MTU || data > VIONA_MAX_MTU)
+			err = EINVAL;
+		else
+			link->l_mtu = (uint16_t)data;
+		break;
 	default:
 		err = ENOTTY;
 		break;
@@ -889,6 +898,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	link = kmem_zalloc(sizeof (viona_link_t), KM_SLEEP);
 	link->l_linkid = kvc.c_linkid;
 	link->l_vm_hold = hold;
+	link->l_mtu = VIONA_DEFAULT_MTU;
 
 	err = mac_open_by_linkid(link->l_linkid, &link->l_mh);
 	if (err != 0) {
