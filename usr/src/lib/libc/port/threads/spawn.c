@@ -45,6 +45,7 @@
 		POSIX_SPAWN_SETSIGMASK |	\
 		POSIX_SPAWN_SETSCHEDPARAM |	\
 		POSIX_SPAWN_SETSCHEDULER |	\
+		POSIX_SPAWN_SETSID |		\
 		POSIX_SPAWN_SETSIGIGN_NP |	\
 		POSIX_SPAWN_NOSIGCHLD_NP |	\
 		POSIX_SPAWN_WAITPID_NP |	\
@@ -60,10 +61,19 @@ typedef struct {
 	sigset_t	sa_sigmask;
 } spawn_attr_t;
 
+typedef enum file_action {
+	FA_OPEN,
+	FA_CLOSE,
+	FA_DUP2,
+	FA_CLOSEFROM,
+	FA_CHDIR,
+	FA_FCHDIR
+} file_action_t;
+
 typedef struct file_attr {
 	struct file_attr *fa_next;	/* circular list of file actions */
 	struct file_attr *fa_prev;
-	enum {FA_OPEN, FA_CLOSE, FA_DUP2, FA_CLOSEFROM} fa_type;
+	file_action_t	fa_type;	/* type of action */
 	int		fa_need_dirbuf;	/* only consulted in the head action */
 	char		*fa_path;	/* copied pathname for open() */
 	uint_t		fa_pathsize;	/* size of fa_path[] array */
@@ -175,6 +185,12 @@ perform_flag_actions(spawn_attr_t *sap)
 			return (errno);
 	}
 
+	if (sap->sa_psflags & POSIX_SPAWN_SETSID) {
+		if (setsid() == (pid_t)-1) {
+			return (errno);
+		}
+	}
+
 	if (sap->sa_psflags & POSIX_SPAWN_SETPGROUP) {
 		if (setpgid(0, sap->sa_pgroup) != 0)
 			return (errno);
@@ -210,6 +226,10 @@ perform_file_actions(file_attr_t *fap, void *dirbuf)
 				(void) __close(fd);
 			}
 			break;
+		case FA_CHDIR:
+			if (chdir(fap->fa_path) == -1)
+				return (errno);
+			break;
 		case FA_CLOSE:
 			if (__close(fap->fa_filedes) == -1 &&
 			    errno != EBADF)	/* already closed, no error */
@@ -223,6 +243,10 @@ perform_file_actions(file_attr_t *fap, void *dirbuf)
 			break;
 		case FA_CLOSEFROM:
 			if (spawn_closefrom(fap->fa_filedes, dirbuf))
+				return (errno);
+			break;
+		case FA_FCHDIR:
+			if (fchdir(fap->fa_filedes) == -1)
 				return (errno);
 			break;
 		}
@@ -529,7 +553,7 @@ posix_spawn_file_actions_destroy(
 	if ((fap = froot) != NULL) {
 		do {
 			next = fap->fa_next;
-			if (fap->fa_type == FA_OPEN)
+			if (fap->fa_type == FA_OPEN || fap->fa_type == FA_CHDIR)
 				lfree(fap->fa_path, fap->fa_pathsize);
 			lfree(fap, sizeof (*fap));
 		} while ((fap = next) != froot);
@@ -563,9 +587,9 @@ add_file_attr(posix_spawn_file_actions_t *file_actions, file_attr_t *fap)
 
 int
 posix_spawn_file_actions_addopen(
-	posix_spawn_file_actions_t *file_actions,
+	posix_spawn_file_actions_t *restrict file_actions,
 	int filedes,
-	const char *path,
+	const char *restrict path,
 	int oflag,
 	mode_t mode)
 {
@@ -581,7 +605,7 @@ posix_spawn_file_actions_addopen(
 		lfree(fap, sizeof (*fap));
 		return (ENOMEM);
 	}
-	(void) strcpy(fap->fa_path, path);
+	(void) memcpy(fap->fa_path, path, fap->fa_pathsize);
 
 	fap->fa_type = FA_OPEN;
 	fap->fa_oflag = oflag;
@@ -594,7 +618,7 @@ posix_spawn_file_actions_addopen(
 
 int
 posix_spawn_file_actions_addclose(
-	posix_spawn_file_actions_t *file_actions,
+	posix_spawn_file_actions_t *restrict file_actions,
 	int filedes)
 {
 	file_attr_t *fap;
@@ -613,7 +637,7 @@ posix_spawn_file_actions_addclose(
 
 int
 posix_spawn_file_actions_adddup2(
-	posix_spawn_file_actions_t *file_actions,
+	posix_spawn_file_actions_t *restrict file_actions,
 	int filedes,
 	int newfiledes)
 {
@@ -634,7 +658,7 @@ posix_spawn_file_actions_adddup2(
 
 int
 posix_spawn_file_actions_addclosefrom_np(
-	posix_spawn_file_actions_t *file_actions,
+	posix_spawn_file_actions_t *restrict file_actions,
 	int lowfiledes)
 {
 	file_attr_t *fap;
@@ -648,6 +672,62 @@ posix_spawn_file_actions_addclosefrom_np(
 	add_file_attr(file_actions, fap);
 
 	return (0);
+}
+
+int
+posix_spawn_file_actions_addchdir(
+    posix_spawn_file_actions_t *restrict file_actions,
+    const char *restrict path)
+{
+	file_attr_t *fap;
+
+	if ((fap = lmalloc(sizeof (*fap))) == NULL)
+		return (ENOMEM);
+
+	fap->fa_pathsize = strlen(path) + 1;
+	if ((fap->fa_path = lmalloc(fap->fa_pathsize)) == NULL) {
+		lfree(fap, sizeof (*fap));
+		return (ENOMEM);
+	}
+	(void) memcpy(fap->fa_path, path, fap->fa_pathsize);
+
+	fap->fa_type = FA_CHDIR;
+	add_file_attr(file_actions, fap);
+
+	return (0);
+}
+
+int
+posix_spawn_file_actions_addchdir_np(
+    posix_spawn_file_actions_t *restrict file_actions,
+    const char *restrict path)
+{
+	return (posix_spawn_file_actions_addchdir(file_actions, path));
+}
+
+int
+posix_spawn_file_actions_addfchdir(
+    posix_spawn_file_actions_t *restrict file_actions,
+    int fd)
+{
+	file_attr_t *fap;
+
+	if (fd < 0)
+		return (EBADF);
+	if ((fap = lmalloc(sizeof (*fap))) == NULL)
+		return (ENOMEM);
+	fap->fa_type = FA_FCHDIR;
+	fap->fa_filedes = fd;
+	add_file_attr(file_actions, fap);
+	return (0);
+}
+
+int
+posix_spawn_file_actions_addfchdir_np(
+    posix_spawn_file_actions_t *restrict file_actions,
+    int fd)
+{
+	return (posix_spawn_file_actions_addfchdir(file_actions, fd));
 }
 
 int

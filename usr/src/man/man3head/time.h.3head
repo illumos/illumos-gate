@@ -43,9 +43,9 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Joyent, Inc.
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd October 4, 2021
+.Dd January 12, 2025
 .Dt TIME.H 3HEAD
 .Os
 .Sh NAME
@@ -124,11 +124,34 @@ Null pointer constant.
 Flag indicating time is absolute.
 For functions taking timer objects, this refers to the clock associated
 with the timer.
+.El
+.Pp
+The
+.In time.h
+header defines the following clock constants which are used with the
+.Xr timespec_get 3C
+and
+.Xr timespec_getres 3C
+calls.
+Each one has a
+.Dv CLOCK_*
+equivalent.
+.Bl -tag -width Ds
 .It Dv TIME_UTC
-The identifier for the system-wide realtime clock with no time zone
-translation.
-Used in
-.Fn timespec_get .
+The equivalent of
+.Dv CLOCK_REALTIME .
+.It Dv TIME_MONOTONIC
+The equivalent of
+.Dv CLOCK_HIGHRES .
+.It Dv TIME_ACTIVE
+The equivalent of
+.Dv CLOCK_PROCESS_CPUTIME_ID .
+.It Dv TIME_THREAD_ACTIVE
+The equivalent of
+.Dv CLOCK_THREAD_CPUTIME_ID .
+.It Dv TIME_THREAD_ACTIVE_USR
+The equivalent of
+.Dv CLOCK_VIRTUAL .
 .El
 .Pp
 The

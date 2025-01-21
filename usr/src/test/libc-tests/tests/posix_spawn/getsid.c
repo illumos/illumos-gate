@@ -10,24 +10,25 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
-/*
- * C11 timespec_get(3C). Note the standard does not want us mucking about with
- * errno, but at least we don't have to preserve it.
- */
-
-#include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 int
-timespec_get(struct timespec *ts, int base)
+main(void)
 {
-	if (base != TIME_UTC)
-		return (0);
+	pid_t pg = getpgid(0);
+	pid_t sid = getsid(0);
 
-	if (clock_gettime(CLOCK_REALTIME, ts) != 0)
-		return (0);
+	if (write(STDOUT_FILENO, &sid, sizeof (sid)) != sizeof (sid)) {
+		return (EXIT_FAILURE);
+	}
 
-	return (TIME_UTC);
+	if (write(STDOUT_FILENO, &pg, sizeof (pg)) != sizeof (pg)) {
+		return (EXIT_FAILURE);
+	}
+
+	return (EXIT_SUCCESS);
 }

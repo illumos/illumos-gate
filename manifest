@@ -13591,9 +13591,11 @@ f usr/share/man/man3c/posix_madvise.3c 0444 root bin
 f usr/share/man/man3c/posix_memalign.3c 0444 root bin
 f usr/share/man/man3c/posix_openpt.3c 0444 root bin
 f usr/share/man/man3c/posix_spawn.3c 0444 root bin
+f usr/share/man/man3c/posix_spawn_file_actions_addchdir.3c 0444 root bin
 f usr/share/man/man3c/posix_spawn_file_actions_addclose.3c 0444 root bin
 f usr/share/man/man3c/posix_spawn_file_actions_addclosefrom_np.3c 0444 root bin
 f usr/share/man/man3c/posix_spawn_file_actions_adddup2.3c 0444 root bin
+s usr/share/man/man3c/posix_spawn_file_actions_addfchdir.3c=posix_spawn_file_actions_addchdir.3c
 s usr/share/man/man3c/posix_spawn_file_actions_addopen.3c=posix_spawn_file_actions_addclose.3c
 f usr/share/man/man3c/posix_spawn_file_actions_destroy.3c 0444 root bin
 s usr/share/man/man3c/posix_spawn_file_actions_init.3c=posix_spawn_file_actions_destroy.3c
@@ -14162,6 +14164,7 @@ s usr/share/man/man3c/timerfd_settime.3c=timerfd_create.3c
 s usr/share/man/man3c/timerisset.3c=timeradd.3c
 s usr/share/man/man3c/timersub.3c=timeradd.3c
 f usr/share/man/man3c/timespec_get.3c 0444 root bin
+s usr/share/man/man3c/timespec_getres.3c=timespec_get.3c
 f usr/share/man/man3c/tmpfile.3c 0444 root bin
 f usr/share/man/man3c/tmpnam.3c 0444 root bin
 s usr/share/man/man3c/tmpnam_r.3c=tmpnam.3c

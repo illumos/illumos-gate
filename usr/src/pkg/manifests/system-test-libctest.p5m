@@ -16,7 +16,7 @@
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -112,6 +112,7 @@ file path=opt/libc-tests/tests/fnmatch.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/getsid.64 mode=0555
 dir  path=opt/libc-tests/tests/i18n
 file path=opt/libc-tests/tests/i18n/bindtextdomain_test mode=0555
 file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH) mode=0555
@@ -132,6 +133,8 @@ file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/posix_memalign.32 mode=0555
 file path=opt/libc-tests/tests/posix_memalign.64 mode=0555
+file path=opt/libc-tests/tests/posix_spawn.32 mode=0555
+file path=opt/libc-tests/tests/posix_spawn.64 mode=0555
 file path=opt/libc-tests/tests/printf-15294.32 mode=0555
 file path=opt/libc-tests/tests/printf-15294.64 mode=0555
 file path=opt/libc-tests/tests/printf-6961.64 mode=0555
@@ -260,6 +263,8 @@ hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
 file path=opt/libc-tests/tests/thread_name mode=0555
 file path=opt/libc-tests/tests/timespec_get.32 mode=0555
 file path=opt/libc-tests/tests/timespec_get.64 mode=0555
+file path=opt/libc-tests/tests/timespec_getres.32 mode=0555
+file path=opt/libc-tests/tests/timespec_getres.64 mode=0555
 file path=opt/libc-tests/tests/uchar.32 mode=0555
 file path=opt/libc-tests/tests/uchar.64 mode=0555
 file path=opt/libc-tests/tests/utimes.32 mode=0555

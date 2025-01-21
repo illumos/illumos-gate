@@ -303,9 +303,17 @@ extern size_t strftime_l(char *_RESTRICT_KYWD, size_t,
  * Note, the C11 standard requires that all the various base values that are
  * passed into timespec_get() be non-zero. Hence why TIME_UTC starts at one.
  */
-#define	TIME_UTC	0x1		/* timespec_get base */
+#define	TIME_UTC		0x1		/* CLOCK_REALTIME */
+#define	TIME_MONOTONIC		0x2		/* CLOCK_HIGHRES */
+#define	TIME_ACTIVE		0x3		/* CLOCK_PROCESS_CPUTIME_ID */
+#define	TIME_THREAD_ACTIVE	0x4		/* CLOCK_THREAD_CPUTIME_ID */
+#define	TIME_THREAD_ACTIVE_USR	0x5		/* CLOCK_VIRTUAL */
 
 extern int timespec_get(struct timespec *, int);
+#endif
+
+#if !defined(_STRICT_SYMBOLS) || defined(_STDC_C23)
+extern int timespec_getres(struct timespec *, int);
 #endif
 
 #ifdef	__cplusplus

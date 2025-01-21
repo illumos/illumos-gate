@@ -291,6 +291,7 @@ MANFILES=	__fbufsize.3c					\
 		posix_memalign.3c				\
 		posix_openpt.3c					\
 		posix_spawn.3c					\
+		posix_spawn_file_actions_addchdir.3c		\
 		posix_spawn_file_actions_addclose.3c		\
 		posix_spawn_file_actions_addclosefrom_np.3c	\
 		posix_spawn_file_actions_adddup2.3c		\
@@ -1088,6 +1089,7 @@ MANLINKS=	FD_CLR.3c				\
 		port_dissociate.3c			\
 		port_getn.3c				\
 		port_sendn.3c				\
+		posix_spawn_file_actions_addfchdir.3c	\
 		posix_spawn_file_actions_addopen.3c	\
 		posix_spawn_file_actions_init.3c	\
 		posix_spawnattr_init.3c			\
@@ -1425,6 +1427,7 @@ MANLINKS=	FD_CLR.3c				\
 		timerfd_settime.3c			\
 		timerisset.3c				\
 		timersub.3c				\
+		timespec_getres.3c			\
 		tmpnam_r.3c				\
 		tolower_l.3c				\
 		toupper_l.3c				\
@@ -2228,6 +2231,7 @@ port_sendn.3c				:= LINKSRC = port_send.3c
 
 posix_spawnp.3c				:= LINKSRC = posix_spawn.3c
 
+posix_spawn_file_actions_addfchdir.3c	:= LINKSRC = posix_spawn_file_actions_addchdir.3c
 posix_spawn_file_actions_addopen.3c	:= LINKSRC = posix_spawn_file_actions_addclose.3c
 posix_spawn_file_actions_init.3c	:= LINKSRC = posix_spawn_file_actions_destroy.3c
 
@@ -2667,6 +2671,8 @@ timersub.3c				:= LINKSRC = timeradd.3c
 
 timerfd_gettime.3c			:= LINKSRC = timerfd_create.3c
 timerfd_settime.3c			:= LINKSRC = timerfd_create.3c
+
+timespec_getres.3c			:= LINKSRC = timespec_get.3c
 
 tempnam.3c				:= LINKSRC = tmpnam.3c
 tmpnam_r.3c				:= LINKSRC = tmpnam.3c

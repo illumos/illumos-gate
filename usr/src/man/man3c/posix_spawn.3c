@@ -43,13 +43,12 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2011 by Delphix.  All rights reserved.
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.TH POSIX_SPAWN 3C "Feb 20, 2009"
+.TH POSIX_SPAWN 3C "Jan 5, 2025"
 .SH NAME
 posix_spawn, posix_spawnp \- spawn a process
 .SH SYNOPSIS
-.LP
-.nf
 #include <spawn.h>
 
 \fBint\fR \fBposix_spawn\fR(\fBpid_t *restrict\fR \fIpid\fR, \fBconst char *restrict\fR \fIpath\fR,
@@ -67,8 +66,6 @@ posix_spawn, posix_spawnp \- spawn a process
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions create a new process
 (child process) from the specified process image. The new process image is
 constructed from a regular executable file called the new process image file.
@@ -174,8 +171,31 @@ Any file descriptor that has its \fBFD_CLOEXEC\fR flag set (see
 .RE
 .sp
 .LP
+The child's working directory is dependent on the file actions specified. By
+default, the child inherits the parent's current working directory. However,
+this may be changed by using the \fBposix_spawn_file_actions_addchdir\fR(3C)
+family of functions. These file actions are processed like any other file
+actions and are handled per the steps described above.
+.sp
+.LP
 The \fBposix_spawnattr_t\fR spawn attributes object type is defined in
 <\fBspawn.h\fR>. It contains at least the attributes defined below.
+.sp
+.LP
+By default, the child process inherits the existing session and progress group
+of the parent process. This behavior can be changed by specifying one of the
+\fBPOSIX_SPAWN_SETSID\fR or \fBPOSIX_SPAWN_SETPGROUP\fR flags described below.
+.sp
+.LP
+If the \fBPOSIX_SPAWN_SETSID\fR flag is set in the \fIspawn-flags\fR attribute
+of the object referenced by \fIattrp\fR then the child will have all the effects
+of calling
+.BR setsid(2)
+applied. Chiefly, it will have no controlling terminal, it will be the leader of
+a new process group, and it will be the leader of a new session. POSIX leaves
+undefined the behavior of setting both the \fBPOSIX_SPAWN_SETSID\fR and
+\fBPOSIX_SPAWN_SETPGROUP\fR (described below) flags. It is recommended to only
+set one or the other.
 .sp
 .LP
 If the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the \fIspawn-flags\fR
@@ -189,11 +209,6 @@ As a special case, if the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the
 \fIspawn-flags\fR attribute of the object referenced by \fIattrp\fR, and the
 \fIspawn-pgroup\fR attribute of the same object is set to zero, then the child
 will be in a new process group with a process group ID equal to its process ID.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETPGROUP\fR flag is not set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, the new child process
-inherits the parent's process group.
 .sp
 .LP
 If the \fBPOSIX_SPAWN_SETSCHEDPARAM\fR flag is set in the \fIspawn-flags\fR
@@ -328,8 +343,6 @@ child process to execute the new process image.
 The fork handlers are not run when \fBposix_spawn()\fR or \fBposix_spawnp()\fR
 is called.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBposix_spawn()\fR and \fBposix_spawnp()\fR return
 the process ID of the child process to the parent process in the variable
 pointed to by a non-null \fIpid\fR argument, and return zero as the function
@@ -339,8 +352,6 @@ is returned as the function return value to indicate the error. If the
 \fIpid\fR argument is a null pointer, the process ID of the child is not
 returned to the caller.
 .SH ERRORS
-.sp
-.LP
 The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions will fail if:
 .sp
 .ne 2
@@ -394,8 +405,6 @@ descriptor that is not open at the time of the call to \fBposix_spawn()\fR or
 \fBposix_spawnp()\fR, the action does not cause \fBposix_spawn()\fR or
 \fBposix_spawnp()\fR to fail.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -414,8 +423,6 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR alarm (2),
 .BR chmod (2),
 .BR close (2),
@@ -432,6 +439,7 @@ Standard	See \fBstandards\fR(7).
 .BR times (2),
 .BR dup2 (3C),
 .BR popen (3C),
+.BR posix_spawn_file_actions_addchdir (3C),
 .BR posix_spawn_file_actions_addclose (3C),
 .BR posix_spawn_file_actions_adddup2 (3C),
 .BR posix_spawn_file_actions_addopen (3C),
@@ -461,12 +469,9 @@ Standard	See \fBstandards\fR(7).
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
-The SUSv3 POSIX standard (The Open Group Base Specifications Issue 6, IEEE Std
-1003.1-2001) permits the \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions
-to return successfully before some of the above-described errors are detected,
-allowing the child process to fail instead:
+The POSIX standard permits the \fBposix_spawn()\fR and \fBposix_spawnp()\fR
+functions to return successfully before some of the above-described errors are
+detected, allowing the child process to fail instead:
 .sp
 .in +2
 .nf

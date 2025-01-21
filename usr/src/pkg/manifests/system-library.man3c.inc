@@ -785,9 +785,12 @@ file path=usr/share/man/man3c/posix_madvise.3c
 file path=usr/share/man/man3c/posix_memalign.3c
 file path=usr/share/man/man3c/posix_openpt.3c
 file path=usr/share/man/man3c/posix_spawn.3c
+file path=usr/share/man/man3c/posix_spawn_file_actions_addchdir.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_addclose.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_addclosefrom_np.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_adddup2.3c
+link path=usr/share/man/man3c/posix_spawn_file_actions_addfchdir.3c \
+    target=posix_spawn_file_actions_addchdir.3c
 link path=usr/share/man/man3c/posix_spawn_file_actions_addopen.3c \
     target=posix_spawn_file_actions_addclose.3c
 file path=usr/share/man/man3c/posix_spawn_file_actions_destroy.3c
@@ -1478,6 +1481,7 @@ link path=usr/share/man/man3c/timerfd_settime.3c target=timerfd_create.3c
 link path=usr/share/man/man3c/timerisset.3c target=timeradd.3c
 link path=usr/share/man/man3c/timersub.3c target=timeradd.3c
 file path=usr/share/man/man3c/timespec_get.3c
+link path=usr/share/man/man3c/timespec_getres.3c target=timespec_get.3c
 file path=usr/share/man/man3c/tmpfile.3c
 file path=usr/share/man/man3c/tmpnam.3c
 link path=usr/share/man/man3c/tmpnam_r.3c target=tmpnam.3c
