@@ -14,7 +14,7 @@
  * Copyright 2019 Unix Software Ltd.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Racktop Systems.
- * Copyright 2024 Oxide Computer Company.
+ * Copyright 2025 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -4372,13 +4372,6 @@ nvme_init(nvme_t *nvme)
 		goto fail;
 	}
 
-	if (nvme->n_namespace_count > NVME_MINOR_MAX) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!too many namespaces: %d, limiting to %d\n",
-		    nvme->n_namespace_count, NVME_MINOR_MAX);
-		nvme->n_namespace_count = NVME_MINOR_MAX;
-	}
-
 	nvme->n_ns = kmem_zalloc(sizeof (nvme_namespace_t) *
 	    nvme->n_namespace_count, KM_SLEEP);
 
@@ -5006,6 +4999,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 
+	boolean_t minor_logged = B_FALSE;
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
 
@@ -5024,6 +5018,25 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail;
 		}
 
+		/*
+		 * We only create compat minor nodes for the namespace for the
+		 * first NVME_MINOR_MAX namespaces. Those that are beyond this
+		 * can only be accessed through the primary controller node,
+		 * which is generally fine as that's what libnvme uses and is
+		 * our preferred path. Not having a minor is better than not
+		 * having the namespace!
+		 */
+		if (i > NVME_MINOR_MAX) {
+			if (!minor_logged) {
+				dev_err(dip, CE_WARN, "namespace minor "
+				    "creation limited to the first %u "
+				    "namespaces, device has %u",
+				    NVME_MINOR_MAX, nvme->n_namespace_count);
+				minor_logged = B_TRUE;
+			}
+			continue;
+		}
+
 		if (ddi_create_minor_node(nvme->n_dip, ns->ns_name, S_IFCHR,
 		    NVME_MINOR(ddi_get_instance(nvme->n_dip), i),
 		    DDI_NT_NVME_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
@@ -5032,6 +5045,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    "!failed to create minor node for namespace %d", i);
 			goto fail;
 		}
+		ns->ns_progress |= NVME_NS_MINOR;
 	}
 
 	if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
@@ -5709,7 +5723,7 @@ nvme_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (nvme == NULL)
 		return (ENXIO);
 
-	if (nsid > nvme->n_namespace_count)
+	if (nsid > MIN(nvme->n_namespace_count, NVME_MINOR_MAX))
 		return (ENXIO);
 
 	if (nvme->n_dead)

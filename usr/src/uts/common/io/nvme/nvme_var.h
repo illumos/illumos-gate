@@ -13,7 +13,7 @@
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Unix Software Ltd.
- * Copyright 2024 Oxide Computer Company.
+ * Copyright 2025 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -53,7 +53,17 @@ typedef enum {
 } nvme_progress_t;
 
 typedef enum {
-	NVME_NS_LOCK	= 1 << 0
+	NVME_NS_LOCK	= 1 << 0,
+	/*
+	 * This flag indicates whether or not we've created a minor node for
+	 * this namespace. We limit the number of minor nodes that we actually
+	 * create in the file system due to minor node constraints. The
+	 * controller minors are preferred to the namespace minors, so the lack
+	 * of such a minor is considered a non-fatal condition. Minor nodes are
+	 * removed all in one go right now when we detach, so this currently
+	 * serves as an internal signifier.
+	 */
+	NVME_NS_MINOR	= 1 << 1
 } nvme_ns_progress_t;
 
 typedef enum {
