@@ -235,11 +235,6 @@ extern int i_ddi_incr_locked_memory(proc_t *, rctl_qty_t);
 extern void i_ddi_decr_locked_memory(proc_t *, rctl_qty_t);
 
 /*
- * Direct I/O support functions
- */
-extern void translate_devid(dev_info_t *dip);
-
-/*
  * Support routine for file systems that need to scan block devices searching
  * for a label as part of mounting the root file system.
  */

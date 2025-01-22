@@ -374,7 +374,7 @@ extern "C" {
 #define	TOPO_PGROUP_CACHE_TYPES_INSTR	"instruction"
 #define	TOPO_PGROUP_CACHE_FLAGS		"cache-flags"
 #define	TOPO_PGROUP_CACHE_FLAGS_UNIFIED	"unified"
-#define	TOPO_PGROUP_CACHE_FLAGS_FA	"fully-assosciative"
+#define	TOPO_PGROUP_CACHE_FLAGS_FA	"fully-associative"
 
 #ifdef	__cplusplus
 }

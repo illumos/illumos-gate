@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 MNX Cloud, Inc.
  */
 /*
@@ -8440,7 +8440,7 @@ cpuid_getcache(struct cpu *cpu, uint32_t cno, x86_cache_t *cache)
 		return (EINVAL);
 	}
 
-	bzero(cache, sizeof (cache));
+	bzero(cache, sizeof (x86_cache_t));
 	cp = cpi->cpi_cache_leaves[cno];
 	switch (CPI_CACHE_TYPE(cp)) {
 	case CPI_CACHE_TYPE_DATA:

@@ -394,9 +394,3 @@ dip_to_cpu_id(dev_info_t *dip, processorid_t *cpu_id)
 	}
 	return (DDI_FAILURE);
 }
-
-/* ARGSUSED */
-void
-translate_devid(dev_info_t *dip)
-{
-}
