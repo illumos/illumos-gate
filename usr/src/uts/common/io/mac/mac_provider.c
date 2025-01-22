@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -57,6 +57,7 @@
 #include <sys/ddi_intr_impl.h>
 #include <sys/disp.h>
 #include <sys/sdt.h>
+#include <sys/stdbool.h>
 #include <sys/pattr.h>
 #include <sys/strsun.h>
 #include <sys/vlan.h>
@@ -1688,77 +1689,8 @@ mac_transceiver_info_set_usable(mac_transceiver_info_t *infop,
 	infop->mti_usable = usable;
 }
 
-/*
- * We should really keep track of our offset and not walk everything every
- * time. I can't imagine that this will be kind to us at high packet rates;
- * however, for the moment, let's leave that.
- *
- * This walks a message block chain without pulling up to fill in the context
- * information. Note that the data we care about could be hidden across more
- * than one mblk_t.
- */
-static int
-mac_meoi_get_uint8(mblk_t *mp, off_t off, uint8_t *out)
-{
-	size_t mpsize;
-	uint8_t *bp;
-
-	mpsize = msgsize(mp);
-	/* Check for overflow */
-	if (off + sizeof (uint16_t) > mpsize)
-		return (-1);
-
-	mpsize = MBLKL(mp);
-	while (off >= mpsize) {
-		mp = mp->b_cont;
-		off -= mpsize;
-		mpsize = MBLKL(mp);
-	}
-
-	bp = mp->b_rptr + off;
-	*out = *bp;
-	return (0);
-
-}
-
-static int
-mac_meoi_get_uint16(mblk_t *mp, off_t off, uint16_t *out)
-{
-	size_t mpsize;
-	uint8_t *bp;
-
-	mpsize = msgsize(mp);
-	/* Check for overflow */
-	if (off + sizeof (uint16_t) > mpsize)
-		return (-1);
-
-	mpsize = MBLKL(mp);
-	while (off >= mpsize) {
-		mp = mp->b_cont;
-		off -= mpsize;
-		mpsize = MBLKL(mp);
-	}
-
-	/*
-	 * Data is in network order. Note the second byte of data might be in
-	 * the next mp.
-	 */
-	bp = mp->b_rptr + off;
-	*out = *bp << 8;
-	if (off + 1 == mpsize) {
-		mp = mp->b_cont;
-		bp = mp->b_rptr;
-	} else {
-		bp++;
-	}
-
-	*out |= *bp;
-	return (0);
-
-}
-
-static boolean_t
-mac_meoi_ip6eh_proto(uint8_t id)
+static bool
+mac_parse_is_ipv6eh(uint8_t id)
 {
 	switch (id) {
 	case IPPROTO_HOPOPTS:
@@ -1770,7 +1702,7 @@ mac_meoi_ip6eh_proto(uint8_t id)
 	case IPPROTO_HIP:
 	case IPPROTO_SHIM6:
 		/* Currently known extension headers */
-		return (B_TRUE);
+		return (true);
 	case IPPROTO_ESP:
 		/*
 		 * While the IANA protocol numbers listing notes ESP as an IPv6
@@ -1780,70 +1712,361 @@ mac_meoi_ip6eh_proto(uint8_t id)
 		 * protocol for a parsed packet containing this EH.
 		 */
 	default:
-		return (B_FALSE);
+		return (false);
 	}
 }
 
-int
-mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
+typedef struct mac_mblk_cursor {
+	mblk_t	*mmc_head;
+	mblk_t	*mmc_cur;
+	size_t	mmc_off_total;
+	size_t	mmc_off_mp;
+} mac_mblk_cursor_t;
+
+static void mac_mmc_advance(mac_mblk_cursor_t *, size_t);
+static void mac_mmc_reset(mac_mblk_cursor_t *);
+
+static void
+mac_mmc_init(mac_mblk_cursor_t *cursor, mblk_t *mp)
 {
-	size_t off;
-	uint16_t ether, iplen;
-	uint8_t ipproto, ip4verlen, l4len, maclen;
+	cursor->mmc_head = mp;
+	mac_mmc_reset(cursor);
+}
 
-	bzero(meoi, sizeof (mac_ether_offload_info_t));
+static void
+mac_mmc_reset(mac_mblk_cursor_t *cursor)
+{
+	ASSERT(cursor->mmc_head != NULL);
 
-	const size_t pktlen = msgsize(mp);
-	meoi->meoi_len = pktlen;
-	off = offsetof(struct ether_header, ether_type);
-	if (mac_meoi_get_uint16(mp, off, &ether) != 0)
-		return (-1);
+	cursor->mmc_cur = cursor->mmc_head;
+	cursor->mmc_off_total = cursor->mmc_off_mp = 0;
 
-	if (ether == ETHERTYPE_VLAN) {
-		off = offsetof(struct ether_vlan_header, ether_type);
-		if (mac_meoi_get_uint16(mp, off, &ether) != 0)
-			return (-1);
-		meoi->meoi_flags |= MEOI_VLAN_TAGGED;
-		maclen = sizeof (struct ether_vlan_header);
+	/* Advance past any zero-length mblks at head */
+	mac_mmc_advance(cursor, 0);
+}
+
+static inline size_t
+mac_mmc_mp_left(const mac_mblk_cursor_t *cursor)
+{
+	if (cursor->mmc_cur != NULL) {
+		const size_t mp_len = MBLKL(cursor->mmc_cur);
+
+		ASSERT3U(mp_len, >=, cursor->mmc_off_mp);
+
+		return (mp_len - cursor->mmc_off_mp);
 	} else {
-		maclen = sizeof (struct ether_header);
+		return (0);
 	}
-	if (maclen > pktlen)
-		return (-1);
-	meoi->meoi_flags |= MEOI_L2INFO_SET;
-	meoi->meoi_l2hlen = maclen;
-	meoi->meoi_l3proto = ether;
+}
 
-	switch (ether) {
-	case ETHERTYPE_IP:
+static inline uint8_t *
+mac_mmc_mp_ptr(const mac_mblk_cursor_t *cursor)
+{
+	return (cursor->mmc_cur->b_rptr + cursor->mmc_off_mp);
+}
+
+static inline size_t
+mac_mmc_offset(const mac_mblk_cursor_t *cursor)
+{
+	return (cursor->mmc_off_total);
+}
+
+/*
+ * Advance cursor forward `len` bytes.
+ *
+ * The length to advance must be no greater than the number of bytes remaining
+ * in the current mblk.  If the position reaches (exactly) the end of the
+ * current mblk, the cursor will be pushed forward to the next non-zero-length
+ * mblk in the chain.
+ */
+static inline void
+mac_mmc_advance(mac_mblk_cursor_t *cursor, size_t len)
+{
+	ASSERT(cursor->mmc_cur != NULL);
+
+	const size_t mp_len = MBLKL(cursor->mmc_cur);
+
+	ASSERT3U(cursor->mmc_off_mp + len, <=, mp_len);
+
+	cursor->mmc_off_total += len;
+	cursor->mmc_off_mp += len;
+
+	if (cursor->mmc_off_mp == mp_len) {
+		cursor->mmc_off_mp = 0;
+		cursor->mmc_cur = cursor->mmc_cur->b_cont;
+	}
+
+	/* Skip over any 0-length mblks */
+	while (cursor->mmc_cur != NULL && MBLKL(cursor->mmc_cur) == 0) {
+		cursor->mmc_cur = cursor->mmc_cur->b_cont;
+	}
+}
+
+/*
+ * Attempt to seek to byte offset `off` in mblk chain.
+ *
+ * Returns true if the offset is <= the total chain length.
+ */
+static bool
+mac_mmc_seek(mac_mblk_cursor_t *cursor, const size_t off)
+{
+	ASSERT(cursor->mmc_head != NULL);
+
+	if (off == cursor->mmc_off_total) {
 		/*
-		 * For IPv4 we need to get the length of the header, as it can
-		 * be variable.
+		 * Any prior init, reset, or seek operation will have advanced
+		 * past any zero-length mblks, making this short-circuit safe.
 		 */
-		off = offsetof(ipha_t, ipha_version_and_hdr_length) + maclen;
-		if (mac_meoi_get_uint8(mp, off, &ip4verlen) != 0)
-			return (-1);
-		ip4verlen &= 0x0f;
-		if (ip4verlen < 5 || ip4verlen > 0x0f)
-			return (-1);
-		iplen = ip4verlen * 4;
-		off = offsetof(ipha_t, ipha_protocol) + maclen;
-		if (mac_meoi_get_uint8(mp, off, &ipproto) == -1)
-			return (-1);
-		break;
-	case ETHERTYPE_IPV6:
-		iplen = sizeof (ip6_t);
-		off = offsetof(ip6_t, ip6_nxt) + maclen;
-		if (mac_meoi_get_uint8(mp, off, &ipproto) == -1)
-			return (-1);
+		return (true);
+	} else if (off < cursor->mmc_off_total) {
+		/* Rewind to beginning if offset precedes current position */
+		mac_mmc_reset(cursor);
+	}
+
+	size_t seek_left = off - cursor->mmc_off_total;
+	while (cursor->mmc_cur != NULL) {
+		const size_t mp_left = mac_mmc_mp_left(cursor);
+
+		if (mp_left > seek_left) {
+			/* Target position is within current mblk */
+			cursor->mmc_off_mp += seek_left;
+			cursor->mmc_off_total += seek_left;
+			return (true);
+		}
+
+		/* Move on to the next mblk... */
+		mac_mmc_advance(cursor, mp_left);
+		seek_left -= mp_left;
+	}
+
+	/*
+	 * We have reached the end of the mblk chain, but there is a chance that
+	 * it corresponds to the target seek position.
+	 */
+	return (cursor->mmc_off_total == off);
+}
+
+/*
+ * Attempt to read uint8_t at offset `pos` in mblk chain.
+ *
+ * Returns true (and sets value in `out`) if the offset is within the chain.
+ */
+static bool
+mac_mmc_get_uint8(mac_mblk_cursor_t *cursor, size_t pos, uint8_t *out)
+{
+	if (!mac_mmc_seek(cursor, pos)) {
+		return (false);
+	}
+
+	if (mac_mmc_mp_left(cursor) != 0) {
+		*out = *(mac_mmc_mp_ptr(cursor));
+		mac_mmc_advance(cursor, 1);
+		return (true);
+	}
+
+	return (false);
+}
+
+/*
+ * Attempt to read uint16_t at offset `pos` in mblk chain.  The two
+ * network-order bytes are converted into a host-order value.
+ *
+ * Returns true (and sets value in `out`) if the 16-bit region specified by the
+ * offset is within the chain.
+ */
+static bool
+mac_mmc_get_uint16(mac_mblk_cursor_t *cursor, size_t pos, uint16_t *out)
+{
+	if (!mac_mmc_seek(cursor, pos)) {
+		return (false);
+	}
+
+	const size_t mp_left = mac_mmc_mp_left(cursor);
+	uint16_t result = 0;
+
+	if (mp_left >= 2) {
+		uint8_t *bp = mac_mmc_mp_ptr(cursor);
+
+		result = (uint16_t)bp[0] << 8;
+		result |= bp[1];
+		mac_mmc_advance(cursor, 2);
+		*out = result;
+		return (true);
+	} else if (mp_left == 1) {
+		result = (uint16_t)*(mac_mmc_mp_ptr(cursor));
+		mac_mmc_advance(cursor, 1);
+
+		if (mac_mmc_mp_left(cursor) == 0) {
+			return (false);
+		}
+
+		result = result << 8;
+		result |= (uint16_t)*(mac_mmc_mp_ptr(cursor));
+		mac_mmc_advance(cursor, 1);
+		*out = result;
+		return (true);
+	}
+
+	return (false);
+}
+
+/*
+ * Attempt to read `count` bytes at offset `pos` in mblk chain.
+ *
+ * Returns true (and copies data to `out`) if `count` length region is available
+ * at offset within the chain.
+ */
+static bool
+mac_mmc_get_bytes(mac_mblk_cursor_t *cursor, size_t pos, uint8_t *out,
+    size_t count)
+{
+	if (!mac_mmc_seek(cursor, pos)) {
+		return (false);
+	}
+
+	while (count > 0) {
+		const size_t mp_left = mac_mmc_mp_left(cursor);
+
+		if (mp_left == 0) {
+			return (false);
+		}
+		const size_t to_copy = MIN(mp_left, count);
+
+		bcopy(mac_mmc_mp_ptr(cursor), out, to_copy);
+		out += to_copy;
+		mac_mmc_advance(cursor, to_copy);
+		count -= to_copy;
+	}
+	return (true);
+}
+
+/*
+ * Attempt to parse ethernet header (VLAN or not) from mblk chain.
+ *
+ * Returns true if header was successfully parsed.  Parsing will begin at
+ * current offset of `cursor`.  Any non-NULL arguments for VLAN, SAP, and header
+ * size will be populated on success.  A value of MEOI_VLAN_TCI_INVALID will be
+ * reported for the TCI if the header does not bear VLAN infomation.
+ */
+static bool
+mac_mmc_parse_ether(mac_mblk_cursor_t *cursor, uint8_t *dst_addrp,
+    uint32_t *vlan_tcip, uint16_t *ethertypep, uint16_t *hdr_sizep)
+{
+	const size_t l2_off = mac_mmc_offset(cursor);
+
+	if (dst_addrp != NULL) {
+		if (!mac_mmc_get_bytes(cursor, l2_off, dst_addrp, ETHERADDRL)) {
+			return (false);
+		}
+	}
+
+	uint16_t ethertype = 0;
+	if (!mac_mmc_get_uint16(cursor,
+	    l2_off + offsetof(struct ether_header, ether_type), &ethertype)) {
+		return (false);
+	}
+
+	uint32_t tci = MEOI_VLAN_TCI_INVALID;
+	uint16_t hdrsize = sizeof (struct ether_header);
+
+	if (ethertype == ETHERTYPE_VLAN) {
+		uint16_t tci_val;
+
+		if (!mac_mmc_get_uint16(cursor,
+		    l2_off + offsetof(struct ether_vlan_header, ether_tci),
+		    &tci_val)) {
+			return (false);
+		}
+		if (!mac_mmc_get_uint16(cursor,
+		    l2_off + offsetof(struct ether_vlan_header, ether_type),
+		    &ethertype)) {
+			return (false);
+		}
+		hdrsize = sizeof (struct ether_vlan_header);
+		tci = (uint32_t)tci_val;
+	}
+
+	if (vlan_tcip != NULL) {
+		*vlan_tcip = tci;
+	}
+	if (ethertypep != NULL) {
+		*ethertypep = ethertype;
+	}
+	if (hdr_sizep != NULL) {
+		*hdr_sizep = hdrsize;
+	}
+	return (true);
+}
+
+/*
+ * Attempt to parse L3 protocol header from mblk chain.
+ *
+ * The SAP/ethertype of the containing header must be specified by the caller.
+ *
+ * Returns true if header was successfully parsed.  Parsing will begin at
+ * current offset of `cursor`.  Any non-NULL arguments for IP protocol and
+ * header size will be populated on success.
+ */
+static bool
+mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
+    bool *is_fragp, uint16_t *hdr_sizep)
+{
+	const size_t l3_off = mac_mmc_offset(cursor);
+
+	if (l3_sap == ETHERTYPE_IP) {
+		uint8_t verlen, ipproto;
+		uint16_t frag_off;
+
+		if (!mac_mmc_get_uint8(cursor, l3_off, &verlen)) {
+			return (false);
+		}
+		verlen &= 0x0f;
+		if (verlen < 5 || verlen > 0x0f) {
+			return (false);
+		}
+
+		if (!mac_mmc_get_uint16(cursor,
+		    l3_off + offsetof(ipha_t, ipha_fragment_offset_and_flags),
+		    &frag_off)) {
+			return (false);
+		}
+
+		if (!mac_mmc_get_uint8(cursor,
+		    l3_off + offsetof(ipha_t, ipha_protocol), &ipproto)) {
+			return (false);
+		}
+
+		if (ipprotop != NULL) {
+			*ipprotop = ipproto;
+		}
+		if (is_fragp != NULL) {
+			*is_fragp = ((frag_off & (IPH_MF | IPH_OFFSET)) != 0);
+		}
+		if (hdr_sizep != NULL) {
+			*hdr_sizep = verlen * 4;
+		}
+		return (true);
+	}
+	if (l3_sap == ETHERTYPE_IPV6) {
+		uint16_t ip_len = sizeof (ip6_t);
+		uint8_t ipproto;
+		bool found_frag_eh = false;
+
+		if (!mac_mmc_get_uint8(cursor,
+		    l3_off + offsetof(ip6_t, ip6_nxt), &ipproto)) {
+			return (false);
+		}
+
 		/* Chase any extension headers present in packet */
-		while (mac_meoi_ip6eh_proto(ipproto)) {
-			uint8_t len_val, next_proto;
+		while (mac_parse_is_ipv6eh(ipproto)) {
+			uint8_t len_val, next_hdr;
 			uint16_t eh_len;
 
-			off = maclen + iplen;
-			if (mac_meoi_get_uint8(mp, off, &next_proto) == -1)
-				return (-1);
+			const size_t hdr_off = l3_off + ip_len;
+			if (!mac_mmc_get_uint8(cursor, hdr_off, &next_hdr)) {
+				return (false);
+			}
+
 			if (ipproto == IPPROTO_FRAGMENT) {
 				/*
 				 * The Fragment extension header bears a
@@ -1851,15 +2074,17 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 				 * communicating it through the EH itself.
 				 */
 				eh_len = 8;
+				found_frag_eh = true;
 			} else if (ipproto == IPPROTO_AH) {
 				/*
 				 * The length of the IP Authentication EH is
 				 * stored as (n + 2) * 32-bits, where 'n' is the
 				 * recorded EH length field
 				 */
-				off += 1;
-				if (mac_meoi_get_uint8(mp, off, &len_val) == -1)
-					return (-1);
+				if (!mac_mmc_get_uint8(cursor, hdr_off + 1,
+				    &len_val)) {
+					return (false);
+				}
 				eh_len = ((uint16_t)len_val + 2) * 4;
 			} else {
 				/*
@@ -1867,55 +2092,199 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 				 * formula of (n + 1) * 64-bits, where 'n' is
 				 * the recorded EH length field.
 				 */
-				off += 1;
-				if (mac_meoi_get_uint8(mp, off, &len_val) == -1)
-					return (-1);
+				if (!mac_mmc_get_uint8(cursor, hdr_off + 1,
+				    &len_val)) {
+					return (false);
+				}
 				eh_len = ((uint16_t)len_val + 1) * 8;
 			}
 			/*
 			 * Protect against overflow in the case of a very
 			 * contrived packet.
 			 */
-			if ((iplen + eh_len) < iplen) {
+			if ((ip_len + eh_len) < ip_len) {
 				return (-1);
 			}
 
-			iplen += eh_len;
-			ipproto = next_proto;
+			ipproto = next_hdr;
+			ip_len += eh_len;
 		}
-		break;
-	default:
-		return (0);
+
+		if (ipprotop != NULL) {
+			*ipprotop = ipproto;
+		}
+		if (is_fragp != NULL) {
+			*is_fragp = found_frag_eh;
+		}
+		if (hdr_sizep != NULL) {
+			*hdr_sizep = ip_len;
+		}
+		return (true);
 	}
-	if (((size_t)maclen + (size_t)iplen) > pktlen)
-		return (-1);
-	meoi->meoi_l3hlen = iplen;
-	meoi->meoi_l4proto = ipproto;
-	meoi->meoi_flags |= MEOI_L3INFO_SET;
+
+	return (false);
+}
+
+/*
+ * Attempt to parse L4 protocol header from mblk chain.
+ *
+ * The IP protocol of the containing header must be specified by the caller.
+ *
+ * Returns true if header was successfully parsed.  Parsing will begin at
+ * current offset of `cursor`.  A non-NULL argument for header size will be
+ * populated on success.
+ */
+static bool
+mac_mmc_parse_l4(mac_mblk_cursor_t *cursor, uint8_t ipproto, uint8_t *hdr_sizep)
+{
+	ASSERT(hdr_sizep != NULL);
+
+	const size_t l4_off = mac_mmc_offset(cursor);
+	uint8_t tcp_doff;
 
 	switch (ipproto) {
 	case IPPROTO_TCP:
-		off = offsetof(tcph_t, th_offset_and_rsrvd) + maclen + iplen;
-		if (mac_meoi_get_uint8(mp, off, &l4len) == -1)
-			return (-1);
-		l4len = (l4len & 0xf0) >> 4;
-		if (l4len < 5 || l4len > 0xf)
-			return (-1);
-		l4len *= 4;
-		break;
+		if (!mac_mmc_get_uint8(cursor,
+		    l4_off + offsetof(tcph_t, th_offset_and_rsrvd),
+		    &tcp_doff)) {
+			return (false);
+		}
+		tcp_doff = (tcp_doff & 0xf0) >> 4;
+		if (tcp_doff < 5 || tcp_doff > 0xf) {
+			return (false);
+		}
+		*hdr_sizep = tcp_doff * 4;
+		return (true);
 	case IPPROTO_UDP:
-		l4len = sizeof (struct udphdr);
-		break;
+		*hdr_sizep = sizeof (struct udphdr);
+		return (true);
 	case IPPROTO_SCTP:
-		l4len = sizeof (sctp_hdr_t);
-		break;
+		*hdr_sizep = sizeof (sctp_hdr_t);
+		return (true);
 	default:
-		return (0);
+		return (false);
+	}
+}
+
+/*
+ * Parse destination MAC address and VLAN TCI (if any) from mblk chain.
+ *
+ * If packet ethertype does not indicate that a VLAN is present,
+ * MEOI_VLAN_TCI_INVALID will be returned for the TCI.
+ */
+int
+mac_ether_l2_info(mblk_t *mp, uint8_t *dst_addrp, uint32_t *vlan_tcip)
+{
+	mac_mblk_cursor_t cursor;
+
+	mac_mmc_init(&cursor, mp);
+	if (!mac_mmc_parse_ether(&cursor, dst_addrp, vlan_tcip, NULL, NULL)) {
+		return (-1);
 	}
 
-	if (((size_t)maclen + (size_t)iplen + (size_t)l4len) > pktlen)
-		return (-1);
-	meoi->meoi_l4hlen = l4len;
-	meoi->meoi_flags |= MEOI_L4INFO_SET;
 	return (0);
+}
+
+/*
+ * Perform a partial parsing of offload info from a frame and/or packet.
+ *
+ * Beginning at the provided byte offset (`off`) in the mblk, attempt to parse
+ * any offload info which has not yet been populated in `meoi`.  The contents of
+ * `meoi_flags` upon entry will be considered as "already parsed", their
+ * corresponding data fields will be considered valid.
+ *
+ * A motivating example: A non-Ethernet packet could be parsed for L3/L4 offload
+ * information by setting MEOI_L2INFO_SET in `meoi_flags`, and the L3 SAP in
+ * `meoi_l3_proto`. With a value in `meoi_l2hlen` that, when combined with the
+ * provided `off`, will direct the parser to the start of the L3 header in the
+ * mblk, the rest of the logic will be free to run.
+ *
+ * Alternatively, this could be used to parse the headers in an encapsulated
+ * Ethernet packet by simply specifying the start of its header in `off`.
+ *
+ * Returns 0 if parsing was able to proceed all the way through the L4 header.
+ * The meoi_flags field will be updated regardless for any partial (L2/L3)
+ * parsing which was successful.
+ */
+int
+mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
+{
+	mac_mblk_cursor_t cursor;
+
+	mac_mmc_init(&cursor, mp);
+
+	if (!mac_mmc_seek(&cursor, off)) {
+		return (-1);
+	}
+
+	if ((meoi->meoi_flags & MEOI_L2INFO_SET) == 0) {
+		uint32_t vlan_tci;
+		uint16_t l2_sz, ethertype;
+		if (!mac_mmc_parse_ether(&cursor, NULL, &vlan_tci, &ethertype,
+		    &l2_sz)) {
+			return (-1);
+		}
+
+		meoi->meoi_flags |= MEOI_L2INFO_SET;
+		meoi->meoi_l2hlen = l2_sz;
+		meoi->meoi_l3proto = ethertype;
+		if (vlan_tci != MEOI_VLAN_TCI_INVALID) {
+			ASSERT3U(meoi->meoi_l2hlen, ==,
+			    sizeof (struct ether_vlan_header));
+			meoi->meoi_flags |= MEOI_VLAN_TAGGED;
+		}
+	}
+	const size_t l2_end = off + (size_t)meoi->meoi_l2hlen;
+	if (!mac_mmc_seek(&cursor, l2_end)) {
+		meoi->meoi_flags &= ~MEOI_L2INFO_SET;
+		return (-1);
+	}
+
+	if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0) {
+		uint8_t ipproto;
+		uint16_t l3_sz;
+		bool is_frag;
+		if (!mac_mmc_parse_l3(&cursor, meoi->meoi_l3proto, &ipproto,
+		    &is_frag, &l3_sz)) {
+			return (-1);
+		}
+
+		meoi->meoi_l3hlen = l3_sz;
+		meoi->meoi_l4proto = ipproto;
+		meoi->meoi_flags |= MEOI_L3INFO_SET;
+		if (is_frag) {
+			meoi->meoi_flags |= MEOI_L3_FRAGMENT;
+		}
+	}
+	const size_t l3_end = l2_end + (size_t)meoi->meoi_l3hlen;
+	if (!mac_mmc_seek(&cursor, l3_end)) {
+		meoi->meoi_flags &= ~MEOI_L3INFO_SET;
+		return (-1);
+	}
+
+	if ((meoi->meoi_flags & MEOI_L4INFO_SET) == 0) {
+		uint8_t l4_sz;
+		if (!mac_mmc_parse_l4(&cursor, meoi->meoi_l4proto, &l4_sz)) {
+			return (-1);
+		}
+
+		meoi->meoi_l4hlen = l4_sz;
+		meoi->meoi_flags |= MEOI_L4INFO_SET;
+	}
+	const size_t l4_end = l3_end + (size_t)meoi->meoi_l4hlen;
+	if (!mac_mmc_seek(&cursor, l4_end)) {
+		meoi->meoi_flags &= ~MEOI_L4INFO_SET;
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
+{
+	bzero(meoi, sizeof (mac_ether_offload_info_t));
+	meoi->meoi_len = msgdsize(mp);
+
+	return (mac_partial_offload_info(mp, 0, meoi));
 }
