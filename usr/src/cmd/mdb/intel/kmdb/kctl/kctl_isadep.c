@@ -34,7 +34,6 @@
 #include <sys/kobj_impl.h>
 #include <sys/cpuvar.h>
 #include <sys/kdi_impl.h>
-#include <sys/x86_archext.h>
 #include <sys/controlregs.h>
 #include <sys/archsystm.h>
 

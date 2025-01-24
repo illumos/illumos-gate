@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd July 3, 2024
+.Dd January 11, 2025
 .Dt AMDZEN 4D
 .Os
 .Sh NAME
@@ -43,10 +43,10 @@ AMD Zen 3 Cezanne, Milan, and Vermeer
 AMD Zen 3+ Rembrandt
 .Pq Family 19h
 .It
-AMD Zen 4 Genoa, Bergamo, Raphael, and Phoenix
+AMD Zen 4 Genoa, Bergamo, Siena, Raphael, and Phoenix
 .Pq Family 19h
 .It
-Amd Zen 5 Turin, Strix, and Granite Ridge
+Amd Zen 5 Turin, Strix, Krackan, Strix Halo, and Granite Ridge
 .Pq Family 1ah
 .El
 .Pp

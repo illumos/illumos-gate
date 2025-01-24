@@ -5438,9 +5438,6 @@ cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_f_geometry_is_valid = B_TRUE;
 			goto no_solaris_partition;
 		}
-	} else if (capacity < 0) {
-		ASSERT(mutex_owned(CMLB_MUTEX(cl)));
-		return (EINVAL);
 	}
 
 	/*

@@ -34,7 +34,7 @@
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -361,9 +361,11 @@ static uint32_t amd_skts[][16] = {
 
 	/*
 	 * Family 0x1a models 20-2f	(Zen 5 - Strix)
+	 * Family 0x1a models 60-6f	(Zen 5 - Krackan)
 	 */
 #define	A_SKTS_STRIX			31
 	{
+		[0] = X86_SOCKET_AM5,
 		[1] = X86_SOCKET_FP8
 	},
 
@@ -374,6 +376,14 @@ static uint32_t amd_skts[][16] = {
 	{
 		[0] = X86_SOCKET_AM5,
 		[1] = X86_SOCKET_FL1
+	},
+
+	/*
+	 * Family 0x1a models 70-77	(Zen 5 - Strix Halo)
+	 */
+#define	A_SKTS_STRIX_HALO		33
+	{
+		[1] = X86_SOCKET_FP11
 	}
 };
 
@@ -430,6 +440,7 @@ static struct amd_sktmap_s amd_sktmap_strs[] = {
 	{ X86_SOCKET_FL1,	"FL1" },
 	{ X86_SOCKET_SP6,	"SP6" },
 	{ X86_SOCKET_TR5,	"TR5" },
+	{ X86_SOCKET_FP11,	"FP11" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }	/* Must be last! */
 };
 
@@ -830,18 +841,26 @@ static const struct amd_rev_mapent {
 	{ 0x1a, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_DENSE_TURIN_UNKNOWN,
 	    "BRHD-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_TURIN },
 
-	/* Strix */
+	/* Strix and Krackan */
 	{ 0x1a, 0x24, 0x24, 0x0, 0x0, X86_CHIPREV_AMD_STRIX_B0,
 	    "STX-B0", X86_UARCHREV_AMD_ZEN5_B0, A_SKTS_STRIX },
 	{ 0x1a, 0x20, 0x2f, 0x0, 0xf, X86_CHIPREV_AMD_STRIX_UNKNOWN,
 	    "STX-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_STRIX },
+	{ 0x1a, 0x60, 0x60, 0x0, 0x0, X86_CHIPREV_AMD_KRACKAN_A0,
+	    "KRK-A0", X86_UARCHREV_AMD_ZEN5_A0, A_SKTS_STRIX },
+	{ 0x1a, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_KRACKAN_UNKNOWN,
+	    "KRK-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_STRIX },
 
 	/* Granite Ridge */
 	{ 0x1a, 0x44, 0x44, 0x0, 0x0, X86_CHIPREV_AMD_GRANITE_RIDGE_B0,
 	    "GNR-B0", X86_UARCHREV_AMD_ZEN5_B0, A_SKTS_GRANITE_RIDGE },
 	{ 0x1a, 0x40, 0x4f, 0x0, 0xf, X86_CHIPREV_AMD_GRANITE_RIDGE_UNKNOWN,
-	    "GNR-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_GRANITE_RIDGE }
+	    "GNR-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_GRANITE_RIDGE },
 
+	{ 0x1a, 0x70, 0x70, 0x0, 0x0, X86_CHIPREV_AMD_STRIX_HALO_A0,
+	    "STXH-A0", X86_UARCHREV_AMD_ZEN5_A0, A_SKTS_STRIX_HALO },
+	{ 0x1a, 0x70, 0x77, 0x0, 0xf, X86_CHIPREV_AMD_STRIX_HALO_UNKNOWN,
+	    "STXH-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_STRIX_HALO }
 };
 
 /*

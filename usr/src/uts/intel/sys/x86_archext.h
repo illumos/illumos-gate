@@ -32,7 +32,7 @@
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 MNX Cloud, Inc.
  */
 
@@ -1119,6 +1119,8 @@ typedef enum x86_processor_family {
 	X86_PF_AMD_DENSE_TURIN,
 	X86_PF_AMD_STRIX,
 	X86_PF_AMD_GRANITE_RIDGE,
+	X86_PF_AMD_KRACKAN,
+	X86_PF_AMD_STRIX_HALO,
 
 	X86_PF_ANY = 0xff
 } x86_processor_family_t;
@@ -1313,6 +1315,15 @@ typedef enum x86_chiprev {
 	_DECL_CHIPREV(AMD, GRANITE_RIDGE, B0, 0x0002),
 	_DECL_CHIPREV(AMD, GRANITE_RIDGE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
 
+	_DECL_CHIPREV(AMD, KRACKAN, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, KRACKAN, A0, 0x0002),
+	_DECL_CHIPREV(AMD, KRACKAN, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, STRIX_HALO, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, STRIX_HALO, A0, 0x0002),
+	_DECL_CHIPREV(AMD, STRIX_HALO, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+
 	/* Keep at the end */
 	X86_CHIPREV_ANY = _X86_CHIPREV_MKREV(_X86_VENDOR_MATCH_ALL, X86_PF_ANY,
 	    _X86_CHIPREV_REV_MATCH_ALL)
@@ -1476,7 +1487,8 @@ typedef enum x86_uarchrev {
 #define	X86_SOCKET_FL1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x2b)
 #define	X86_SOCKET_SP6		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x2c)
 #define	X86_SOCKET_TR5		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x2d)
-#define	X86_NUM_SOCKETS_AMD	0x2d
+#define	X86_SOCKET_FP11		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x2e)
+#define	X86_NUM_SOCKETS_AMD	0x2e
 
 /*
  * Hygon socket types
@@ -1691,6 +1703,7 @@ extern uint64_t xrdmsr(uint_t);
 extern void xwrmsr(uint_t, const uint64_t);
 extern int checked_rdmsr(uint_t, uint64_t *);
 extern int checked_wrmsr(uint_t, uint64_t);
+extern void wrmsr_and_test(uint_t, const uint64_t);
 
 extern void invalidate_cache(void);
 extern ulong_t getcr4(void);

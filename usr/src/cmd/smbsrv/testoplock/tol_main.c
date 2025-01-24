@@ -439,7 +439,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		if (prompt) {
 			(void) fputs(prompt, stdout);
-			fflush(stdout);
+			(void) fflush(stdout);
 		}
 
 		cmd = fgets(cmdbuf, sizeof (cmdbuf), stdin);

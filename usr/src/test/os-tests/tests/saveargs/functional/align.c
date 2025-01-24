@@ -20,7 +20,7 @@ int
 test(long a, long b, long c, long d, long e)
 {
 	printf("%ld %ld %ld %ld %ld\n", a, b, c, d, e);
-	fflush(stdout);
+	(void) fflush(stdout);
 
 	for (;;)
 		(void) sleep(60);

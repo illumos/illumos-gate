@@ -25,6 +25,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 #	This Makefile defines the build rules for the directory uts/i86pc
@@ -230,36 +231,33 @@ DBOOT_MACH_32	= -D_BOOT_TARGET_i386
 DBOOT_MACH_64	= -D_BOOT_TARGET_amd64
 DBOOT_DEFS	= -D_BOOT $(DBOOT_MACH_$(CLASS))
 DBOOT_DEFS	+= -D_MACHDEP -U_KERNEL -D_I32LPx
-DBOOT_FLAGS	= $(CFLAGS_XARCH_32) $(CCVERBOSE) $(CSTD) $(CERRWARN)
-DBOOT_FLAGS	+= $(CCNOAUTOINLINE)
+DBOOT_FLAGS	= $(CFLAGS_XARCH_32) $(NO_SIMD) $(CCVERBOSE) $(CSTD) $(CERRWARN)
+DBOOT_FLAGS	+= $(CCNOAUTOINLINE) $(COPTFLAG) $(CSOURCEDEBUGFLAGS)
 DBOOT_ASFLAGS	= $(ASFLAGS_XARCH_32) -D_ASM
 
 DBOOT_CC_INCL	= -I$(SRC)/common -I$(SRC)/common/util $(INCLUDE_PATH)
 DBOOT_AS_INCL	= $(AS_INC_PATH)
 
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(SRC)/common/font/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/$(FONT).c:	$(FONT_DIR)/$(FONT_SRC).bdf
 	$(VTFONTCVT) -f source -o $@ $(FONT_DIR)/$(FONT_SRC).bdf
 
 $(DBOOT_OBJS_DIR)/%.o:		$(DBOOT_OBJS_DIR)/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/sha1/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
-
-$(DBOOT_OBJS_DIR)/%.o:		$(DBOOT_OBJS_DIR)/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
-	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+	$(i386_CC) $(DBOOT_FLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.S
 	$(AS) $(DBOOT_DEFS) $(DBOOT_ASFLAGS) $(DBOOT_AS_INCL) -c -o $@ $<

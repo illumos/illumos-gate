@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1187,6 +1188,21 @@ checked_wrmsr(uint_t msr, uint64_t value)
 		return (ENOTSUP);
 	wrmsr(msr, value);
 	return (0);
+}
+
+void
+wrmsr_and_test(uint_t msr, const uint64_t v)
+{
+	wrmsr(msr, v);
+
+#ifdef	DEBUG
+	uint64_t rv = rdmsr(msr);
+
+	if (rv != v) {
+		cmn_err(CE_PANIC, "MSR 0x%x written with value 0x%lx "
+		    "has value 0x%lx\n", msr, v, rv);
+	}
+#endif
 }
 
 /*

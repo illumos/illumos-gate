@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -32,6 +32,9 @@ file path=usr/share/man/man4d/amdzen.4d
 link path=usr/share/man/man4d/amdzen_stub.4d target=amdzen.4d
 driver name=amdzen
 #
+# 1122: f1ah m60-6f nb
+# 1248-124f: f1ah m60-6fh df
+# 12b8-12bf: f1ah m70-77h df
 # 12c0-12c7: f1ah m00-1fh df
 # 1440-1447: f17h m70-7fh, f19h m20-2f df
 # 1448-144f: f17h m60-6fh df
@@ -39,7 +42,7 @@ driver name=amdzen
 # 1460-1467: f17h m00-0f df
 # 1480: f17h m30-3f/70-7f, f19h m00-0f, m20-2f nb
 # 1490-1497: f17h m30-3f df
-# 14a4: f19h m10-1f, m1a0-af nb
+# 14a4: f19h m10-1f, ma0-af nb
 # 14ad-14b4: f19h m10-1fh, a0-af df
 # 14b5: f17h ma0-af, f19h m40-4f nb
 # 14d8: f19h m60-6f, f1ah m40-4f nb
@@ -58,6 +61,23 @@ driver name=amdzen
 # 1724-172b: f17h ma0-af df
 #
 driver name=amdzen_stub \
+    alias=pci1022,1122,p \
+    alias=pci1022,1248,p \
+    alias=pci1022,1249,p \
+    alias=pci1022,124a,p \
+    alias=pci1022,124b,p \
+    alias=pci1022,124c,p \
+    alias=pci1022,124d,p \
+    alias=pci1022,124e,p \
+    alias=pci1022,124f,p \
+    alias=pci1022,12b8,p \
+    alias=pci1022,12b9,p \
+    alias=pci1022,12ba,p \
+    alias=pci1022,12bb,p \
+    alias=pci1022,12bc,p \
+    alias=pci1022,12bd,p \
+    alias=pci1022,12be,p \
+    alias=pci1022,12bf,p \
     alias=pci1022,12c0,p \
     alias=pci1022,12c1,p \
     alias=pci1022,12c2,p \

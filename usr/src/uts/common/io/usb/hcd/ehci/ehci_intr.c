@@ -398,15 +398,13 @@ ehci_create_done_qtd_list(
 
 			Set_QTD(curr_qtd->qtd_active_qtd_next, 0);
 
-			if (done_qtd_list) {
+			if (last_done_qtd != NULL) {
 				Set_QTD(last_done_qtd->qtd_active_qtd_next,
 				    ehci_qtd_cpu_to_iommu(ehcip, curr_qtd));
-
-				last_done_qtd = curr_qtd;
 			} else {
 				done_qtd_list = curr_qtd;
-				last_done_qtd = curr_qtd;
 			}
+			last_done_qtd = curr_qtd;
 		}
 
 		curr_qtd = next_qtd;

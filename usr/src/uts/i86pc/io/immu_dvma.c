@@ -675,7 +675,6 @@ immu_dvma_get_immu(dev_info_t *dip, immu_flags_t immu_flags)
 			    "immu units found for device. Expected (%p), "
 			    "actual (%p)", (void *)immu,
 			    (void *)immu_devi->imd_immu);
-			mutex_exit(&(DEVI(dip)->devi_lock));
 			/*NOTREACHED*/
 		}
 	}
