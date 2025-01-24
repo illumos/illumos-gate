@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Gary Mills
- * Copyright 2024 MNX Cloud, Inc.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -83,7 +83,7 @@
 #define	ERR_USER	5	/* User input */
 #define	ERR_INVAL	6	/* Invalid data */
 
-static char	*BootBlkFn = "/boot/pmbr";
+static char	*BootBlkFn = "/usr/lib/fs/pcfs/pmbr";
 static char	*DiskName = NULL;
 static char	*FirstFn = NULL;
 static char	*Label = DEFAULT_LABEL;

@@ -12,6 +12,7 @@
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 #
@@ -33,7 +34,10 @@ LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary $(GLDTARGET)
 
 all: $(PROG)
 
+# XXX SmartOS -- also install pmbr in usr/lib/fs/pcfs/pmbr.
 install: $(PROG:%=$(ROOT_BOOT)/%)
+	$(MKDIR) -p $(ROOT)/usr/lib/fs/pcfs
+	$(CP) $(ROOT_BOOT)/$(PROG) $(ROOT)/usr/lib/fs/pcfs/.
 
 $(PROG): $(OBJS)
 	$(GLD) $(LDFLAGS) -o $(PROG) $(OBJS)

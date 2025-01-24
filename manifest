@@ -6120,6 +6120,7 @@ f usr/lib/fs/pcfs/fstyp.so.1 0555 root bin
 h usr/lib/fs/pcfs/fstyp=usr/sbin/fstyp
 f usr/lib/fs/pcfs/mkfs 0555 root bin
 f usr/lib/fs/pcfs/mount 0555 root bin
+f usr/lib/fs/pcfs/pmbr 0444 root bin
 d usr/lib/fs/proc 0755 root sys
 f usr/lib/fs/proc/mount 0555 root bin
 d usr/lib/fs/sharefs 0755 root sys
