@@ -27,6 +27,9 @@
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2025 Hans Rosenfeld
+ */
 
 #include "lint.h"
 #include "file64.h"
@@ -43,10 +46,21 @@
 #include <sys/types.h>
 #include "libc.h"
 #include "mse.h"
+#include <stdio_ext.h>
+#include <upanic.h>
+
+#ifdef _C89_INTMAX32
+#pragma redefine_extname vfwprintf _vfwprintf_c89
+#pragma redefine_extname vswprintf _vswprintf_c89
+#pragma redefine_extname vwprintf _vwprintf_c89
+#pragma redefine_extname fwprintf _fwprintf_c89
+#pragma redefine_extname swprintf _swprintf_c89
+#pragma redefine_extname wprintf _wprintf_c89
+#endif
 
 /*
- * 32-bit shadow functions _vwprintf_c89(), _vfwprintf_c89(),
- * _vswprintf_c89() are included here.
+ * 32-bit shadow functions _vwprintf_c89(), _vfwprintf_c89(), _vswprintf_c89(),
+ * _wprintf_c89(), _fwprintf_c89(), and _swprintf_c89() are included here.
  * When using the c89 compiler to build 32-bit applications, the size
  * of intmax_t is 32-bits, otherwise the size of intmax_t is 64-bits.
  * The shadow function uses 32-bit size of intmax_t for j conversion.
@@ -56,57 +70,7 @@
  */
 
 int
-#ifdef _C89_INTMAX32		/* _C89_INTMAX32 version in 32-bit libc only */
-_vwprintf_c89(const wchar_t *format, va_list ap)
-#else
-vwprintf(const wchar_t *format, va_list ap)
-#endif
-{
-	ssize_t	count;
-	rmutex_t	*lk;
-
-	FLOCKFILE(lk, stdout);
-
-	if (GET_NO_MODE(stdout))
-		_setorientation(stdout, _WC_MODE);
-	if (!(stdout->_flag & _IOWRT)) {
-		/* if no write flag */
-		if (stdout->_flag & _IORW) {
-			/* if ok, cause read-write */
-			stdout->_flag |= _IOWRT;
-		} else {
-			/* else error */
-			errno = EBADF;
-			FUNLOCKFILE(lk);
-			return (EOF);
-		}
-	}
-#ifdef _C89_INTMAX32
-	count = _ndoprnt(format, ap, stdout, _F_INTMAX32);
-#else
-	count = _ndoprnt(format, ap, stdout, 0);
-#endif  /* _C89_INTMAX32 */
-
-	if (FERROR(stdout) || count == EOF) {
-		FUNLOCKFILE(lk);
-		return (EOF);
-	}
-	FUNLOCKFILE(lk);
-	/* check for overflow */
-	if ((size_t)count > MAXINT) {
-		errno = EOVERFLOW;
-		return (EOF);
-	} else {
-		return ((int)count);
-	}
-}
-
-int
-#ifdef _C89_INTMAX32		/* _C89_INTMAX32 version in 32-bit libc only */
-_vfwprintf_c89(FILE *iop, const wchar_t *format, va_list ap)
-#else
 vfwprintf(FILE *iop, const wchar_t *format, va_list ap)
-#endif
 {
 	ssize_t	count;
 	rmutex_t	*lk;
@@ -142,44 +106,90 @@ vfwprintf(FILE *iop, const wchar_t *format, va_list ap)
 	if ((size_t)count > MAXINT) {
 		errno = EOVERFLOW;
 		return (EOF);
-	} else {
-		return ((int)count);
 	}
+
+	return ((int)count);
 }
 
 int
-#ifdef _C89_INTMAX32		/* _C89_INTMAX32 version in 32-bit libc only */
-_vswprintf_c89(wchar_t *string, size_t n, const wchar_t *format, va_list ap)
-#else
-vswprintf(wchar_t *string, size_t n, const wchar_t *format, va_list ap)
-#endif
+fwprintf(FILE *iop, const wchar_t *format, ...)
 {
-	ssize_t	count;
+	int count;
+	va_list	ap;
+
+	va_start(ap, format);
+	count = vfwprintf(iop, format, ap);
+	va_end(ap);
+
+	return (count);
+}
+
+int
+vwprintf(const wchar_t *format, va_list ap)
+{
+	int count;
+
+	count = vfwprintf(stdout, format, ap);
+
+	return (count);
+}
+
+int
+wprintf(const wchar_t *format, ...)
+{
+	int count;
+	va_list	ap;
+
+	va_start(ap, format);
+	count = vfwprintf(stdout, format, ap);
+	va_end(ap);
+
+	return (count);
+}
+
+int
+vswprintf(wchar_t *string, size_t n, const wchar_t *format, va_list ap)
+{
+	int	count;
 	FILE	siop;
 	wchar_t	*wp;
 
 	if (n == 0)
 		return (EOF);
 
+	/*
+	 * The dummy FILE * created for vswprintf has the _IOREAD
+	 * flag set to distinguish it from wprintf and wfprintf
+	 * invocations. It also has the _IOWRT flag set to indicate
+	 * it is writable, which is checked later by vfwprintf().
+	 */
+	siop._flag = _IOWRT | _IOREAD;
 	siop._cnt = (ssize_t)n - 1;
 	siop._base = siop._ptr = (unsigned char *)string;
-	siop._flag = _IOREAD;
 
-#ifdef _C89_INTMAX32
-	count = _ndoprnt(format, ap, &siop, _F_INTMAX32);
-#else
-	count = _ndoprnt(format, ap, &siop, 0);
-#endif
+	/*
+	 * Mark the dummy FILE so that no locking is ever done.
+	 */
+	if (__fsetlocking(&siop, FSETLOCKING_BYCALLER) == -1)
+		upanic(NULL, 0);	/* this should never happen */
+
+	count = vfwprintf(&siop, format, ap);
+
 	wp = (wchar_t *)(uintptr_t)siop._ptr;
 	*wp = L'\0';
-	if (count == EOF) {
-		return (EOF);
-	}
-	/* check for overflow */
-	if ((size_t)count > MAXINT) {
-		errno = EOVERFLOW;
-		return (EOF);
-	} else {
-		return ((int)count);
-	}
+
+	return (count);
+}
+
+int
+swprintf(wchar_t *string, size_t n, const wchar_t *format, ...)
+{
+	int count;
+	va_list	ap;
+
+	va_start(ap, format);
+	count = vswprintf(string, n, format, ap);
+	va_end(ap);
+
+	return (count);
 }

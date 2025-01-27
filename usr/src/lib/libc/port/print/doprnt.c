@@ -265,6 +265,11 @@ _lowlldigit(long long *valptr)
 static ssize_t
 _dowrite(const char *p, ssize_t n, FILE *iop, unsigned char **ptrptr)
 {
+	/*
+	 * If we're writing to a FILE that has _IOREAD set, this is a dummy
+	 * FILE created by vsprintf(), vsnprintf(), or vswprintf(), so we have
+	 * to call memcpy() instead of fwrite().
+	 */
 	if (!(iop->_flag & _IOREAD)) {
 		iop->_cnt -= (*ptrptr - iop->_ptr);
 		iop->_ptr = *ptrptr;

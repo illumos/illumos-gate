@@ -27,6 +27,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Oxide Computer Company
+# Copyright 2025 Hans Rosenfeld
 #
 
 LIBCBASE=	.
@@ -614,18 +615,12 @@ PORTINET=			\
 
 PORTPRINT_W=			\
 	doprnt_w.o		\
-	vwprintf.o		\
-	wprintf.o
+	vwprintf.o
 
 PORTPRINT=			\
 	asprintf.o		\
 	doprnt.o		\
-	fprintf.o		\
-	printf.o		\
-	snprintf.o		\
-	sprintf.o		\
 	vfprintf.o		\
-	vprintf.o		\
 	vsnprintf.o		\
 	vsprintf.o
 

@@ -26,6 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Hans Rosenfeld
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -648,18 +649,12 @@ PORTINET=			\
 
 PORTPRINT_W=			\
 	doprnt_w.o		\
-	vwprintf.o		\
-	wprintf.o
+	vwprintf.o
 
 PORTPRINT=			\
 	asprintf.o		\
 	doprnt.o		\
-	fprintf.o		\
-	printf.o		\
-	snprintf.o		\
-	sprintf.o		\
 	vfprintf.o		\
-	vprintf.o		\
 	vsnprintf.o		\
 	vsprintf.o
 
@@ -670,7 +665,6 @@ PORTPRINT_C89_W=		\
 
 PORTPRINT_C89=			\
 	vfprintf_c89.o		\
-	vprintf_c89.o		\
 	vsnprintf_c89.o		\
 	vsprintf_c89.o
 
