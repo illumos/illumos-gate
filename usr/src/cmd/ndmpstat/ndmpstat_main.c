@@ -11,10 +11,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -84,13 +84,12 @@ main(int argc, char **argv)
 
 	if (argc > 0) {
 		long interval;
-		char *endptr;
+		const char *errstr;
 
 		errno = 0;
-		interval = strtol(argv[0], &endptr, 10);
+		interval = strtonum(argv[0], 1, MAXLONG, &errstr);
 
-		if (errno > 0 || *endptr != '\0' || interval <= 0 ||
-		    interval > MAXLONG) {
+		if (errstr != NULL) {
 			usage();
 			return (1);
 		}
@@ -101,8 +100,8 @@ main(int argc, char **argv)
 		}
 		iter = MAXLONG;
 		if (argc > 1) {
-			iter = strtol(argv[1], NULL, 10);
-			if (errno > 0 || *endptr != '\0' || iter <= 0) {
+			iter = strtonum(argv[1], 1, MAXLONG, &errstr);
+			if (errstr != NULL) {
 				usage();
 				return (1);
 			}

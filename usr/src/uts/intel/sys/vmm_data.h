@@ -11,7 +11,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _VMM_DATA_H_
@@ -26,6 +26,7 @@
 #define	VDC_FPU		4	/* FPU (and associated SIMD) */
 #define	VDC_LAPIC	5	/* Local APIC */
 #define	VDC_VMM_ARCH	6	/* Arch-specific VMM state (VMX/SVM) */
+#define	VDC_PMU_AMD	14	/* PMU for AMD CPUs */
 
 /* Classes for system-wide devices */
 #define	VDC_IOAPIC	7	/* bhyve IO-APIC */
@@ -38,7 +39,7 @@
 #define	VDC_VMM_TIME	13	/* Time-related VMM data */
 
 /* Indicates top of VMM Data Class range, updated as classes are added */
-#define	VDC_MAX		(VDC_VMM_TIME + 1)
+#define	VDC_MAX		(VDC_PMU_AMD + 1)
 
 
 /* VMM Data Identifiers */
@@ -108,6 +109,13 @@ struct vdi_lapic_v1 {
 /*
  * VDC_VMM_ARCH:
  */
+
+/* VDC_PMU_AMD: */
+
+struct vdi_pmu_amd_v1 {
+	uint64_t	vpa_evtsel[6];
+	uint64_t	vpa_ctr[6];
+};
 
 /*
  * Version 1 identifiers:

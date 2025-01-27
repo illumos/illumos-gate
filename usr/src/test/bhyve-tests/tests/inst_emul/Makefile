@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
@@ -19,6 +19,7 @@ PROG =	rdmsr \
 	wrmsr \
 	imul \
 	cpuid \
+	cpuid_guest_state \
 	inout
 
 # These should probably go in the `vmm` tests, but since they depend on
@@ -32,6 +33,7 @@ PROG +=	triple_fault \
 
 # C-based payloads need additional utils object
 CPAYLOADS =	cpuid \
+		cpuid_guest_state \
 		suspend_info
 
 PAYLOADS = $(PROG)

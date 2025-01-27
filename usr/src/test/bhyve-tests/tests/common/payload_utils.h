@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _PAYLOAD_UTILS_H_
@@ -30,6 +30,10 @@ void wrmsr(uint32_t, uint64_t);
 void cpuid(uint32_t, uint32_t, uint32_t *);
 uint64_t rdtsc(void);
 void ud2a(void);
+void setcr4(uint64_t);
+uint64_t getcr4(void);
+void setxcr(uint32_t, uint64_t);
+uint64_t getxcr(uint32_t);
 
 void test_result_pass(void);
 void test_result_fail(void);

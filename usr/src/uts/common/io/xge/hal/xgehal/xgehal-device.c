@@ -5288,7 +5288,7 @@ xge_hal_device_initialize(xge_hal_device_t *hldev, xge_hal_device_attr_t *attr,
 	}
 	left_dram_size = total_dram_size_max - total_dram_size;
 	if (left_dram_size < 0 ||
-	    (ring_auto_dram_cfg && left_dram_size / ring_auto_dram_cfg == 0))  {
+	    (ring_auto_dram_cfg && left_dram_size < ring_auto_dram_cfg))  {
 		xge_debug_device(XGE_ERR,
 			 "ring config: exceeded DRAM size %d MB",
 			 total_dram_size_max);

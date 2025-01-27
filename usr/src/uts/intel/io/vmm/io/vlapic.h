@@ -105,4 +105,6 @@ void vlapic_localize_resources(struct vlapic *vlapic);
 void vlapic_pause(struct vlapic *);
 void vlapic_resume(struct vlapic *);
 
+bool vlapic_hw_disabled(const struct vlapic *);
+
 #endif	/* _VLAPIC_H_ */

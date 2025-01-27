@@ -151,6 +151,7 @@ struct svm_softc;
 #define	VMCB_EXIT_INIT			0x63
 #define	VMCB_EXIT_VINTR			0x64
 #define	VMCB_EXIT_CR0_SEL_WRITE		0x65
+#define	VMCB_EXIT_RDPMC			0x6f
 #define	VMCB_EXIT_PUSHF			0x70
 #define	VMCB_EXIT_POPF			0x71
 #define	VMCB_EXIT_CPUID			0x72

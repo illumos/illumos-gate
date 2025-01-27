@@ -11,7 +11,7 @@
 
 #
 # Copyright 2022 MNX Cloud, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 [DEFAULT]
@@ -66,6 +66,7 @@ tests = [
 user = root
 tests = [
 	'cpuid',
+	'cpuid_guest_state',
 	'imul',
 	'rdmsr',
 	'wrmsr',

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef _SYS_HMA_H
@@ -64,6 +64,48 @@ typedef struct hma_svm_asid hma_svm_asid_t;
 
 extern void hma_svm_asid_init(hma_svm_asid_t *);
 extern uint8_t hma_svm_asid_update(hma_svm_asid_t *, boolean_t, boolean_t);
+
+/*
+ * Disable, enable, or query the GIF on CPUs supporting SVM.
+ */
+extern void hma_svm_gif_disable(void);
+extern void hma_svm_gif_enable(void);
+extern boolean_t hma_svm_gif_is_disabled(void);
+
+typedef enum hma_cpc_flags {
+	/* Guest not using CPCs */
+	HCF_DISABLED = 0,
+
+	/* Base (0-3) CPCs usable by guest */
+	HCF_EN_BASE = (1 << 0),
+	/* Extended (4-5) CPCs usable by guest */
+	HCF_EN_EXTD = (1 << 1),
+} hma_cpc_flags_t;
+
+#define	HMA_CPC_REGS_MAX	6
+
+typedef struct hma_cpc {
+	uint64_t hc_evtsel;
+	uint64_t hc_ctr;
+} hma_cpc_t;
+
+struct hma_svm_cpc_state {
+	hma_cpc_t	hscs_regs[HMA_CPC_REGS_MAX];
+	hma_cpc_flags_t	hscs_flags;
+};
+
+typedef enum hma_svm_cpc_res {
+	/* Base (empty) case */
+	HSCR_EMPTY = 0,
+
+	/* Direct guest access to RDPMC instruction allowed */
+	HSCR_ACCESS_RDPMC = (1 << 0),
+	/* Direct guest access to CPC CTR MSRs allowed */
+	HSCR_ACCESS_CTR_MSR = (1 << 1),
+} hma_svm_cpc_res_t;
+
+extern hma_svm_cpc_res_t hma_svm_cpc_enter(struct hma_svm_cpc_state *);
+extern void hma_svm_cpc_exit(struct hma_svm_cpc_state *);
 
 /*
  * FPU related management. These functions provide a set of APIs to manage the

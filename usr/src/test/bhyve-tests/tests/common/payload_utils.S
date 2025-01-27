@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -107,6 +107,39 @@ SET_SIZE(rdtsc)
 ENTRY(ud2a)
 	ud2a
 SET_SIZE(ud2a)
+
+/* void setcr4(uint64_t) */
+ENTRY(setcr4)
+	movq    %rdi, %cr4
+	ret
+SET_SIZE(setcr4)
+
+/* uint64_t getcr4(void) */
+ENTRY(getcr4)
+	movq    %cr4, %rax
+	ret
+SET_SIZE(getcr4)
+
+/* void setxcr(uint32_t, uint64_t) */
+ENTRY(setxcr)
+	movq    %rsi, %rdx
+	shrq    $32, %rdx
+	movl    %esi, %eax
+	movl    %edi, %ecx
+	#xsetbv
+	.byte   0x0f,0x01,0xd1
+	ret
+SET_SIZE(setxcr)
+
+/* uint64_t getxcr(uint32_t) */
+ENTRY(getxcr)
+	movl	%edi, %ecx
+	#xgetbv
+	.byte 0x0f,0x01,0xd0
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+SET_SIZE(getxcr)
 
 /* void test_result_pass(void) */
 ENTRY(test_result_pass)

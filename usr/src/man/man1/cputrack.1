@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" Copyright 2025 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPUTRACK 1 "April 9, 2016"
+.TH CPUTRACK 1 "January 17, 2025"
 .SH NAME
 cputrack \- monitor process and LWP behavior using CPU performance counters
 .SH SYNOPSIS
-.LP
 .nf
 \fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... [\fB-efntvD\fR]
      [\fB-N\fR \fIcount\fR] [\fB-o\fR \fIpathname\fR] [\fB-T\fR \fIinterval\fR] \fIcommand\fR [\fIargs\fR]
@@ -25,7 +25,6 @@ cputrack \- monitor process and LWP behavior using CPU performance counters
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBcputrack\fR utility allows \fBCPU\fR performance counters to be used to
 monitor the behavior of a process or family of processes running on the system.
 If \fIinterval\fR is specified with the \fB-T\fR option, \fBcputrack\fR samples
@@ -42,7 +41,6 @@ Because \fBcputrack\fR is an unprivileged program, it is subject to the same
 restrictions that apply to \fBtruss\fR(1). For example, \fBsetuid\fR(2)
 executables cannot be tracked.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -187,7 +185,6 @@ Enables more verbose output.
 .RE
 
 .SH USAGE
-.LP
 The operating system enforces certain restrictions on the tracing of processes.
 In particular, a command whose object file cannot be read by a user cannot be
 tracked by that user; set-uid and set-gid commands can only be tracked by a
@@ -253,7 +250,6 @@ when the process creates or destroys an \fBLWP\fR, or it invokes \fBfork\fR(2),
 \fBexec\fR(2), or \fBexit\fR(2).
 .SH EXAMPLES
 .SS "SPARC"
-.LP
 \fBExample 1 \fRUsing Performance Counters to Count Clock Cycles
 .sp
 .LP
@@ -322,7 +318,6 @@ unlimited
 .sp
 
 .SS "x86"
-.LP
 \fBExample 3 \fRCounting Instructions
 .sp
 .LP
@@ -362,8 +357,13 @@ example% \fBcputrack -c ITLB_reference,emask=1 date\fR
 .in -2
 .sp
 
+.SH NOTES
+Performance counters are a limited resource on the CPU.  When virtualized
+guests, such as those running under \fBbhyve\fR(8), are allowed access to use
+the counters themselves, concurrent measurements made by \fBcpustat\fR could be
+impacted when the CPU(s) in question are in guest context.
+
 .SH WARNINGS
-.LP
 By running any instance of the \fBcpustat\fR(8) utility, all existing
 performance counter context is forcibly invalidated across the machine. This
 may in turn cause all invocations of the \fBcputrack\fR command to exit
@@ -390,7 +390,6 @@ the problem and possible solutions.
 If a short interval is requested, \fBcputrack\fR may not be able to keep up
 with the desired sample rate. In this case, some samples may be dropped.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -404,7 +403,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 .BR nawk (1),
 .BR perl (1),
 .BR proc (1),

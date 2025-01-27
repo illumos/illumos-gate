@@ -26,7 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -100,9 +100,23 @@ ENTRY_NP(svm_launch)
 	movq	SCTX_RDI(%rsi), %rdi
 	movq	SCTX_RSI(%rsi), %rsi	/* %rsi must be restored last */
 
+
+	/*
+	 * We are under the protection of a cleared GIF here, re-enable the
+	 * %rflags interrupt mask so the host CPU is capable of receiving
+	 * interrupts while the GIF is re-asserted in guest context.
+	 */
+	sti
+
 	vmload	%rax
 	vmrun	%rax
 	vmsave	%rax
+
+	/*
+	 * GIF is cleared again here, but the caller expects the interrupts to
+	 * still be masked via %rflags.
+	 */
+	cli
 
 	/* Grab the svm_regctx pointer */
 	movq	SVMSTK_RSI(%rsp), %rax

@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/cpuvar.h>
@@ -37,22 +38,86 @@ static list_t hma_registrations;
 static boolean_t hma_exclusive = B_FALSE;
 int hma_disable = 0;
 
-static boolean_t hma_vmx_ready = B_FALSE;
-static const char *hma_vmx_error = NULL;
-static id_space_t *hma_vmx_vpid;
+typedef enum hma_cpu_status {
+	HCS_UNINITIALIZED = 0,
+	HCS_READY,
+	HCS_ERROR
+} hma_cpu_status_t;
 
 /*
+ * When both host and guest want simultaneous use of the CPU performance
+ * counters, which should take priority?
+ *
+ * Defer to the guest by default, making its activity invisible to
+ * host-configured CPC measurements.  This is necessary since the Capacity &
+ * Utilization system keeps the CPCs active at all times when not in use by
+ * libcpc or dtrace users.
+ */
+typedef enum hma_cpc_priority {
+	HCP_HOST_WINS = 0,
+	HCP_GUEST_WINS = 1,
+} hma_cpc_priority_t;
+static hma_cpc_priority_t hma_cpc_priority = HCP_GUEST_WINS;
+
+/*
+ * VMX-specific per-CPU data
+ */
+typedef struct hma_vmx_cpu {
+	void		*hvc_vmxon_page;
+	uintptr_t	hvc_vmxon_pa;
+
+} hma_vmx_cpu_t;
+
+/*
+ * SVM-specific per-CPU data
+ */
+typedef struct hma_svm_cpu {
+	void		*hsc_hsave_page;
+	uintptr_t	hsc_hsave_pa;
+	hma_svm_asid_t	hsc_asid;
+	uint_t		hsc_gif_disabled;
+	/*
+	 * hsc_cpc_saved_flags stores the state of guest performance counters
+	 * while inside the hma_svm_cpc_enter/hma_svm_cpc_exit critical section.
+	 *
+	 * If, due to the state of host counters, requested guest counters, and
+	 * hma_cpc_priority, the guest counters are _not_ loaded during
+	 * hma_svm_cpc_enter(), then this field will hold HCF_DISABLED,
+	 * indicating that no state restoration is required during
+	 * hma_svm_cpc_exit().
+	 *
+	 * When hsc_cpc_saved_flags is not HCF_DISABLED, then hsc_cpc_host_regs
+	 * will hold the saved host CPC state while the guest state occupies
+	 * those registers in the CPU.
+	 */
+	hma_cpc_flags_t	hsc_cpc_saved_flags;
+	hma_cpc_t	hsc_cpc_host_regs[6];
+} hma_svm_cpu_t;
+
+/*
+ * Combined per-CPU state data
+ *
  * The bulk of HMA state (VMX & SVM) is protected by cpu_lock, rather than a
  * mutex specific to the module.  It (cpu_lock) is already required for the
  * state needed to perform setup on all CPUs, so it was a natural fit to
  * protect this data too.
  */
-typedef enum hma_cpu_state {
-	HCS_UNINITIALIZED = 0,
-	HCS_READY,
-	HCS_ERROR
-} hma_cpu_state_t;
-static hma_cpu_state_t hma_cpu_status[NCPU];
+struct hma_cpu {
+	union {
+		struct hma_vmx_cpu vmx;
+		struct hma_svm_cpu svm;
+	} hc_u;
+	hma_cpu_status_t	hc_status;
+	uintptr_t		_hc_padding[6];
+} hma_cpu[NCPU];
+
+/* Keep per-CPU state aligned to cache line size to avoid false sharing */
+CTASSERT(sizeof (struct hma_cpu) % _CACHE_LINE_SIZE == 0);
+
+
+static boolean_t hma_vmx_ready = B_FALSE;
+static const char *hma_vmx_error = NULL;
+static id_space_t *hma_vmx_vpid;
 
 /* HMA-internal tracking of optional VMX capabilities */
 typedef enum {
@@ -62,8 +127,6 @@ typedef enum {
 	HVC_INVEPT_ALL	= (1 << 3),
 } hma_vmx_capab_t;
 
-static void *hma_vmx_vmxon_page[NCPU];
-static uintptr_t hma_vmx_vmxon_pa[NCPU];
 static uint32_t hma_vmx_revision;
 static hma_vmx_capab_t hma_vmx_capabs = 0;
 
@@ -71,12 +134,7 @@ static boolean_t hma_svm_ready = B_FALSE;
 static const char *hma_svm_error = NULL;
 static uint32_t hma_svm_features;
 static uint32_t hma_svm_max_asid;
-
-static void *hma_svm_hsave_page[NCPU];
-static uintptr_t hma_svm_hsave_pa[NCPU];
-
-static hma_svm_asid_t hma_svm_cpu_asid[NCPU];
-
+static hma_cpc_flags_t hma_svm_cpc_allowed = HCF_DISABLED;
 
 static int hma_vmx_init(void);
 static int hma_svm_init(void);
@@ -192,6 +250,18 @@ hma_unregister(hma_reg_t *reg)
 	kmem_free(reg, sizeof (*reg));
 }
 
+static __inline hma_vmx_cpu_t *
+hma_vmx_cpu(processorid_t id)
+{
+	return (&hma_cpu[id].hc_u.vmx);
+}
+
+static __inline hma_svm_cpu_t *
+hma_svm_cpu(processorid_t id)
+{
+	return (&hma_cpu[id].hc_u.svm);
+}
+
 /*
  * VPID 0 is reserved for instances where VPID is disabled.  Some hypervisors
  * (read: bhyve) reserve lower-order VPIDs for use in fallback behavior if
@@ -270,11 +340,11 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
     xc_arg_t arg3 __unused)
 {
 	uint64_t fctrl;
-	processorid_t id = CPU->cpu_seqid;
-	void *vmxon_region = hma_vmx_vmxon_page[id];
-	uintptr_t vmxon_pa = hma_vmx_vmxon_pa[id];
+	const processorid_t id = CPU->cpu_seqid;
+	hma_vmx_cpu_t *vmx_cpu = hma_vmx_cpu(id);
 
-	VERIFY(vmxon_region != NULL && vmxon_pa != 0);
+	VERIFY(vmx_cpu->hvc_vmxon_page != NULL);
+	VERIFY(vmx_cpu->hvc_vmxon_pa != 0);
 
 	/*
 	 * Ensure that the VMX support and lock bits are enabled in the
@@ -289,10 +359,10 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
 
 	setcr4(getcr4() | CR4_VMXE);
 
-	if (hma_vmx_vmxon(vmxon_pa) == 0) {
-		hma_cpu_status[id] = HCS_READY;
+	if (hma_vmx_vmxon(vmx_cpu->hvc_vmxon_pa) == 0) {
+		hma_cpu[id].hc_status = HCS_READY;
 	} else {
-		hma_cpu_status[id] = HCS_ERROR;
+		hma_cpu[id].hc_status = HCS_ERROR;
 
 		/*
 		 * If VMX has already been marked active and available for the
@@ -310,7 +380,7 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
 static int
 hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 {
-	hma_cpu_state_t state;
+	hma_vmx_cpu_t *vmx_cpu = hma_vmx_cpu(id);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(id >= 0 && id < NCPU);
@@ -328,19 +398,19 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		return (0);
 	}
 
-	state = hma_cpu_status[id];
-	if (state == HCS_ERROR) {
+	const hma_cpu_status_t status = hma_cpu[id].hc_status;
+	if (status == HCS_ERROR) {
 		return (-1);
 	}
 
 	/* Allocate the VMXON page for this CPU, if not already done */
-	if (hma_vmx_vmxon_page[id] == NULL) {
+	if (vmx_cpu->hvc_vmxon_page == NULL) {
 		caddr_t va;
 		pfn_t pfn;
 
 		va = kmem_alloc(PAGESIZE, KM_SLEEP);
 		VERIFY0((uintptr_t)va & PAGEOFFSET);
-		hma_vmx_vmxon_page[id] = va;
+		vmx_cpu->hvc_vmxon_page = va;
 
 		/* Initialize the VMX revision field as expected */
 		bcopy(&hma_vmx_revision, va, sizeof (hma_vmx_revision));
@@ -351,12 +421,12 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		 * hat_getpfnum would be less acceptable.
 		 */
 		pfn = hat_getpfnum(kas.a_hat, va);
-		hma_vmx_vmxon_pa[id] = (pfn << PAGESHIFT);
+		vmx_cpu->hvc_vmxon_pa = (pfn << PAGESHIFT);
 	} else {
-		VERIFY(hma_vmx_vmxon_pa[id] != 0);
+		VERIFY(vmx_cpu->hvc_vmxon_pa != 0);
 	}
 
-	if (state == HCS_UNINITIALIZED) {
+	if (status == HCS_UNINITIALIZED) {
 		cpuset_t set;
 
 		/* Activate VMX on this CPU */
@@ -364,7 +434,7 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		cpuset_add(&set, id);
 		xc_call(0, 0, 0, CPUSET2BV(set), hma_vmx_cpu_vmxon);
 	} else {
-		VERIFY3U(state, ==, HCS_READY);
+		VERIFY3U(status, ==, HCS_READY);
 
 		/*
 		 * If an already-initialized CPU is going back online, perform
@@ -381,7 +451,7 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		}
 	}
 
-	return (hma_cpu_status[id] != HCS_READY);
+	return (hma_cpu[id].hc_status != HCS_READY);
 }
 
 /*
@@ -523,9 +593,16 @@ uint8_t
 hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
     boolean_t npt_flush)
 {
-	hma_svm_asid_t *hcp;
-	ulong_t iflag;
-	uint8_t res = VMCB_FLUSH_NOTHING;
+	/*
+	 * Most ASID resource updates are expected to be performed as part of
+	 * VMM entry into guest context, where interrupts would be disabled for
+	 * the sake of state consistency.
+	 *
+	 * We demand this be the case, even though other situations which might
+	 * incur an ASID update, such as userspace manipulation of guest vCPU
+	 * state, may not require such consistency.
+	 */
+	ASSERT(!interrupts_enabled());
 
 	/*
 	 * If NPT changes dictate a TLB flush and by-ASID flushing is not
@@ -535,17 +612,7 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
 		vcp->hsa_gen = 0;
 	}
 
-	/*
-	 * It is expected that ASID resource updates will commonly be done
-	 * inside a VMM critical section where the GIF is already cleared,
-	 * preventing any possibility of interruption.  Since that cannot be
-	 * checked (there is no easy way to read the GIF), %rflags.IF is also
-	 * cleared for edge cases where an ASID update is performed outside of
-	 * such a GIF-safe critical section.
-	 */
-	iflag = intr_clear();
-
-	hcp = &hma_svm_cpu_asid[CPU->cpu_seqid];
+	hma_svm_asid_t *hcp = &(hma_svm_cpu(CPU->cpu_seqid)->hsc_asid);
 	if (vcp->hsa_gen != hcp->hsa_gen) {
 		hcp->hsa_asid++;
 
@@ -568,17 +635,237 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
 		ASSERT3U(vcp->hsa_asid, <, hma_svm_max_asid);
 
 		if (flush_by_asid) {
-			res = VMCB_FLUSH_ASID;
+			return (VMCB_FLUSH_ASID);
 		} else {
-			res = VMCB_FLUSH_ALL;
+			return (VMCB_FLUSH_ALL);
 		}
 	} else if (npt_flush) {
 		ASSERT(flush_by_asid);
-		res = VMCB_FLUSH_ASID;
+		return (VMCB_FLUSH_ASID);
 	}
 
-	intr_restore(iflag);
-	return (res);
+	return (VMCB_FLUSH_NOTHING);
+}
+
+void
+hma_svm_gif_disable(void)
+{
+	/*
+	 * Clear the GIF (masking interrupts) first, so the subsequent
+	 * housekeeping can be done under its protection.
+	 */
+	__asm__ __volatile__("clgi");
+
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	const uint_t old_gif = atomic_swap_uint(&svm_cpu->hsc_gif_disabled, 1);
+
+	if (old_gif != 0) {
+		panic("GIF disable is set when expected to be clear");
+	}
+}
+
+void
+hma_svm_gif_enable(void)
+{
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	const uint_t old_gif = atomic_swap_uint(&svm_cpu->hsc_gif_disabled, 0);
+
+	if (old_gif == 0) {
+		panic("GIF disable is clear when expected to be set");
+	}
+
+	/*
+	 * Set the GIF last (un-masking interrupts) last, so the housekeeping
+	 * will have been completed under its protection.
+	 */
+	__asm__ __volatile__("stgi");
+}
+
+boolean_t
+hma_svm_gif_is_disabled(void)
+{
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+
+	/*
+	 * At the time of this writing, there exists no mechanism by which the
+	 * state of the GIF on a CPU can be directly queried.  Rather than
+	 * attempting an indirect means of checking its state, we track it
+	 * manually through the HMA disable/enable functions.
+	 */
+	return (svm_cpu->hsc_gif_disabled != 0);
+}
+
+#define	EVTSEL_EN(evt) (((evt) & AMD_PERF_EVTSEL_CTR_EN) != 0)
+#define	CPC_BASE_REGS	4
+#define	CPC_EXTD_REGS	6
+#define	MSR_CPC_EXTD_EVTSEL(idx)	(MSR_AMD_F15H_PERF_EVTSEL0 + (idx * 2))
+#define	MSR_CPC_EXTD_CTR(idx)		(MSR_AMD_F15H_PERF_CTR0 + (idx * 2))
+
+/*
+ * AMD CPU Performance Counter Support
+ *
+ * This provides a means of safely saving/loading host CPC state, along with
+ * loading/saving guest CPC state upon guest entry/exit (respectively).
+ * Currently, this only supports the 6 "extended" performance counters
+ * (in MSRs C0010200h - C001020bh).  It pays no head to any other CPC state such
+ * as the Northbridge counters or PerfMonV2 registers.
+ */
+
+hma_svm_cpc_res_t
+hma_svm_cpc_enter(struct hma_svm_cpc_state *cpc_state)
+{
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+
+	ASSERT(!interrupts_enabled());
+
+	svm_cpu->hsc_cpc_saved_flags = HCF_DISABLED;
+
+	const hma_cpc_flags_t req_flags =
+	    cpc_state->hscs_flags & hma_svm_cpc_allowed;
+	if (req_flags == HCF_DISABLED) {
+		return (HSCR_EMPTY);
+	}
+
+	/* Extended regs should not be enabled without base */
+	IMPLY((req_flags & HCF_EN_EXTD) != 0, (req_flags & HCF_EN_BASE) != 0);
+
+	const uint_t max_guest_reg =
+	    (req_flags & HCF_EN_EXTD) != 0 ? CPC_EXTD_REGS : CPC_BASE_REGS;
+	uint_t guest_active = 0;
+	for (uint_t i = 0; i < max_guest_reg; i++) {
+		if (EVTSEL_EN(cpc_state->hscs_regs[i].hc_evtsel)) {
+			guest_active++;
+		}
+	}
+
+	/*
+	 * Guest is not currently measuring with any of the CPCs, so leave any
+	 * host counters in place.
+	 */
+	if (guest_active == 0) {
+		return (HSCR_EMPTY);
+	}
+
+	/*
+	 * Read (and save) the host evtsel values, counting the number of
+	 * registers in active use
+	 */
+	uint_t host_active = 0;
+	for (uint_t i = 0; i < CPC_EXTD_REGS; i++) {
+		const uint64_t evtsel = rdmsr(MSR_CPC_EXTD_EVTSEL(i));
+
+		svm_cpu->hsc_cpc_host_regs[i].hc_evtsel = evtsel;
+		if (EVTSEL_EN(evtsel)) {
+			host_active++;
+		}
+	}
+
+	if (host_active != 0) {
+		if (hma_cpc_priority == HCP_HOST_WINS) {
+			/*
+			 * Host has priority access to the perf counters over
+			 * the guest, so just leave everything in place.
+			 */
+			DTRACE_PROBE2(hma_svm__guest_deferred,
+			    processorid_t, CPU->cpu_seqid,
+			    uint_t, guest_active);
+			return (HSCR_EMPTY);
+		}
+
+		DTRACE_PROBE2(hma_svm__host_deferred,
+		    processorid_t, CPU->cpu_seqid, uint_t, host_active);
+
+		/*
+		 * Disable any active host counters, trying to do so in as
+		 * consistent a manner as possible.
+		 */
+		for (uint_t i = 0; i < CPC_EXTD_REGS; i++) {
+			const uint64_t evtsel =
+			    svm_cpu->hsc_cpc_host_regs[i].hc_evtsel;
+			wrmsr(MSR_CPC_EXTD_EVTSEL(i),
+			    evtsel & ~AMD_PERF_EVTSEL_CTR_EN);
+		}
+	}
+
+	/*
+	 * With any active host counters stopped from collecting new events,
+	 * save the counter values themselves before loading guest state.
+	 */
+	for (uint_t i = 0; i < CPC_EXTD_REGS; i++) {
+		svm_cpu->hsc_cpc_host_regs[i].hc_ctr =
+		    rdmsr(MSR_CPC_EXTD_CTR(i));
+	}
+
+	/*
+	 * Now load the guest state, fixing it up with the flag necessary to
+	 * collect events only while in guest context.
+	 */
+	for (uint_t i = 0; i < max_guest_reg; i++) {
+		uint64_t evtsel = cpc_state->hscs_regs[i].hc_evtsel;
+
+		/*
+		 * Clear any existing HG flags, as well as any request for
+		 * interrupt enable. (Trapping the interrupt from guest counters
+		 * is not presently supported.)
+		 */
+		evtsel &= ~(AMD_PERF_EVTSEL_HG_MASK | AMD_PERF_EVTSEL_INT_EN);
+		/* And indicate guest-only event tracking */
+		evtsel |= AMD_PERF_EVTSEL_HG_GUEST;
+
+		wrmsr(MSR_CPC_EXTD_EVTSEL(i), evtsel);
+		wrmsr(MSR_CPC_EXTD_CTR(i), cpc_state->hscs_regs[i].hc_ctr);
+	}
+
+	svm_cpu->hsc_cpc_saved_flags = req_flags;
+	return (HSCR_ACCESS_RDPMC | HSCR_ACCESS_CTR_MSR);
+}
+
+void
+hma_svm_cpc_exit(struct hma_svm_cpc_state *cpc_state)
+{
+	ASSERT(!interrupts_enabled());
+
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+
+	const hma_cpc_flags_t saved_flags = svm_cpu->hsc_cpc_saved_flags;
+	if (saved_flags == HCF_DISABLED) {
+		return;
+	}
+
+	/* Save the guest counter values. */
+	const uint_t max_guest_reg =
+	    (saved_flags & HCF_EN_EXTD) != 0 ? CPC_EXTD_REGS : CPC_BASE_REGS;
+	for (uint_t i = 0; i < max_guest_reg; i++) {
+		cpc_state->hscs_regs[i].hc_ctr = rdmsr(MSR_CPC_EXTD_CTR(i));
+	}
+
+	/*
+	 * Load the host values back, once again taking care to toggle the
+	 * counter enable state as a separate step in an attempt to keep
+	 * readings as consistent as possible
+	 */
+	uint_t host_active = 0;
+	for (uint_t i = 0; i < CPC_EXTD_REGS; i++) {
+		const uint64_t evtsel = svm_cpu->hsc_cpc_host_regs[i].hc_evtsel;
+
+		if (EVTSEL_EN(evtsel)) {
+			host_active++;
+		}
+		wrmsr(MSR_CPC_EXTD_EVTSEL(i), evtsel & ~AMD_PERF_EVTSEL_CTR_EN);
+		wrmsr(MSR_CPC_EXTD_CTR(i),
+		    svm_cpu->hsc_cpc_host_regs[i].hc_ctr);
+	}
+
+	/*
+	 * Allow any enabled host counters to collect events, now that all of
+	 * the other state is loaded.
+	 */
+	if (host_active != 0) {
+		for (uint_t i = 0; i < CPC_EXTD_REGS; i++) {
+			wrmsr(MSR_CPC_EXTD_EVTSEL(i),
+			    svm_cpu->hsc_cpc_host_regs[i].hc_evtsel);
+		}
+	}
 }
 
 static int
@@ -586,7 +873,7 @@ hma_svm_cpu_activate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
     xc_arg_t arg3 __unused)
 {
 	const processorid_t id = CPU->cpu_seqid;
-	const uintptr_t hsave_pa = hma_svm_hsave_pa[id];
+	const uintptr_t hsave_pa = hma_svm_cpu(id)->hsc_hsave_pa;
 	uint64_t efer;
 
 	VERIFY(hsave_pa != 0);
@@ -599,13 +886,15 @@ hma_svm_cpu_activate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
 	/* Setup hsave area */
 	wrmsr(MSR_AMD_VM_HSAVE_PA, hsave_pa);
 
-	hma_cpu_status[id] = HCS_READY;
+	hma_cpu[id].hc_status = HCS_READY;
 	return (0);
 }
 
 static int
 hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 {
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(id);
+
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(id >= 0 && id < NCPU);
 
@@ -627,18 +916,18 @@ hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 	}
 
 	/* Perform initialization if it has not been previously attempted. */
-	if (hma_cpu_status[id] != HCS_UNINITIALIZED) {
-		return ((hma_cpu_status[id] == HCS_READY) ? 0 : -1);
+	if (hma_cpu[id].hc_status != HCS_UNINITIALIZED) {
+		return ((hma_cpu[id].hc_status == HCS_READY) ? 0 : -1);
 	}
 
 	/* Allocate the hsave page for this CPU */
-	if (hma_svm_hsave_page[id] == NULL) {
+	if (svm_cpu->hsc_hsave_page == NULL) {
 		caddr_t va;
 		pfn_t pfn;
 
 		va = kmem_alloc(PAGESIZE, KM_SLEEP);
 		VERIFY0((uintptr_t)va & PAGEOFFSET);
-		hma_svm_hsave_page[id] = va;
+		svm_cpu->hsc_hsave_page = va;
 
 		/*
 		 * Cache the physical address of the hsave page rather than
@@ -646,9 +935,9 @@ hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		 * hat_getpfnum would be less acceptable.
 		 */
 		pfn = hat_getpfnum(kas.a_hat, va);
-		hma_svm_hsave_pa[id] = (pfn << PAGESHIFT);
+		svm_cpu->hsc_hsave_pa = (pfn << PAGESHIFT);
 	} else {
-		VERIFY(hma_svm_hsave_pa[id] != 0);
+		VERIFY(svm_cpu->hsc_hsave_pa != 0);
 	}
 
 	kpreempt_disable();
@@ -666,7 +955,7 @@ hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		xc_call(0, 0, 0, CPUSET2BV(set), hma_svm_cpu_activate);
 	}
 
-	return (hma_cpu_status[id] != HCS_READY);
+	return (hma_cpu[id].hc_status != HCS_READY);
 }
 
 static int
@@ -735,8 +1024,18 @@ hma_svm_init(void)
 		 * ASID is unneeded, since it will be incremented during the
 		 * first allocation.
 		 */
-		hma_svm_cpu_asid[i].hsa_gen = 1;
-		hma_svm_cpu_asid[i].hsa_asid = 0;
+		hma_svm_asid_t *cpu_asid = &hma_svm_cpu(i)->hsc_asid;
+		cpu_asid->hsa_gen = 1;
+		cpu_asid->hsa_asid = 0;
+	}
+
+	/*
+	 * For now, only expose performance counter support if the host supports
+	 * "extended" counters.  This makes MSR access more consistent for logic
+	 * handling that state.
+	 */
+	if (is_x86_feature(x86_featureset, X86FSET_AMD_PCEC)) {
+		hma_svm_cpc_allowed = HCF_EN_BASE | HCF_EN_EXTD;
 	}
 
 	hma_svm_ready = B_TRUE;
