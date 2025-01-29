@@ -82,9 +82,9 @@ vwprintf(const wchar_t *format, va_list ap)
 		}
 	}
 #ifdef _C89_INTMAX32
-	count = _wndoprnt(format, ap, stdout, _F_INTMAX32);
+	count = _ndoprnt(format, ap, stdout, _F_INTMAX32);
 #else
-	count = _wndoprnt(format, ap, stdout, 0);
+	count = _ndoprnt(format, ap, stdout, 0);
 #endif  /* _C89_INTMAX32 */
 
 	if (FERROR(stdout) || count == EOF) {
@@ -129,9 +129,9 @@ vfwprintf(FILE *iop, const wchar_t *format, va_list ap)
 		}
 	}
 #ifdef _C89_INTMAX32
-	count = _wndoprnt(format, ap, iop, _F_INTMAX32);
+	count = _ndoprnt(format, ap, iop, _F_INTMAX32);
 #else
-	count = _wndoprnt(format, ap, iop, 0);
+	count = _ndoprnt(format, ap, iop, 0);
 #endif
 	if (FERROR(iop) || count == EOF) {
 		FUNLOCKFILE(lk);
@@ -166,9 +166,9 @@ vswprintf(wchar_t *string, size_t n, const wchar_t *format, va_list ap)
 	siop._flag = _IOREAD;
 
 #ifdef _C89_INTMAX32
-	count = _wndoprnt(format, ap, &siop, _F_INTMAX32);
+	count = _ndoprnt(format, ap, &siop, _F_INTMAX32);
 #else
-	count = _wndoprnt(format, ap, &siop, 0);
+	count = _ndoprnt(format, ap, &siop, 0);
 #endif
 	wp = (wchar_t *)(uintptr_t)siop._ptr;
 	*wp = L'\0';

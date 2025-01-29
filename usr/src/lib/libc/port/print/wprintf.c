@@ -82,7 +82,7 @@ wprintf(const wchar_t *format, ...)
 		}
 	}
 
-	count = _wndoprnt(format, ap, stdout, 0);
+	count = _ndoprnt(format, ap, stdout, 0);
 	va_end(ap);
 	if (FERROR(stdout) || count == EOF) {
 		FUNLOCKFILE(lk);
@@ -125,7 +125,7 @@ fwprintf(FILE *iop, const wchar_t *format, ...)
 		}
 	}
 
-	count = _wndoprnt(format, ap, iop, 0);
+	count = _ndoprnt(format, ap, iop, 0);
 	va_end(ap);
 	if (FERROR(iop) || count == EOF) {
 		FUNLOCKFILE(lk);
@@ -156,7 +156,7 @@ swprintf(wchar_t *string, size_t n, const wchar_t *format, ...)
 	siop._flag = _IOREAD;
 
 	va_start(ap, format);
-	count = _wndoprnt(format, ap, &siop, 0);
+	count = _ndoprnt(format, ap, &siop, 0);
 	va_end(ap);
 	wp = (wchar_t *)(uintptr_t)siop._ptr;
 	*wp = L'\0';
