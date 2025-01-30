@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -592,6 +592,14 @@ nvme_ctrl_fini(nvme_ctrl_t *ctrl)
 {
 	if (ctrl == NULL) {
 		return;
+	}
+
+	if (ctrl->nc_sup_logs != NULL) {
+		free(ctrl->nc_sup_logs);
+	}
+
+	if (ctrl->nc_sup_logs_err != NULL) {
+		free(ctrl->nc_sup_logs_err);
 	}
 
 	if (ctrl->nc_devi_path != NULL) {

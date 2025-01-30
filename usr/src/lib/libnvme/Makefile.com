@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 LIBRARY =	libnvme.a
@@ -27,6 +27,7 @@ OBJECTS =	libnvme.o \
 		libnvme_micron.o \
 		libnvme_ns_info.o \
 		libnvme_ocp.o \
+		libnvme_phison.o \
 		libnvme_solidigm.o \
 		libnvme_vendor.o \
 		libnvme_vuc.o \

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_MICRON_H
@@ -28,6 +28,7 @@
 #include <sys/nvme/micron_7300.h>
 #include <sys/nvme/micron_74x0.h>
 #include <sys/nvme/micron_x500.h>
+#include <sys/nvme/micron_9550.h>
 
 #ifdef __cplusplus
 extern "C" {

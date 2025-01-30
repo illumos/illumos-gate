@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -261,7 +261,9 @@ nvme_lpd_pev_len(uint64_t *outp, const void *data, size_t len)
 /*
  * The short names here correspond to the well defined names in nvmeadm(8) and
  * libnvme(3LIB) that users expect to be able to use. Please do not change them
- * without accounting for aliases and backwards compatibility.
+ * without accounting for aliases and backwards compatibility. The index of the
+ * supported log pages entry is expected to be the first entry here. This is
+ * relied upon by log discovery in nvme_log_discover_fetch_sup_logs().
  */
 const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_short = "suplog",
