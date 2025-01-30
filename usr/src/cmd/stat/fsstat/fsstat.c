@@ -131,7 +131,7 @@ usage()
 	(newvsp->member.value.ui64 - (oldvsp ? oldvsp->member.value.ui64 : 0))
 
 #define	PRINTSTAT(isnice, nicestring, rawstring, rawval, buf)		\
-	(isnice) ?	 						\
+	(isnice) ?							\
 		nicenum(rawval, buf, sizeof (buf)),			\
 		(void) printf((nicestring), (buf))			\
 	:								\
@@ -303,7 +303,7 @@ naming_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 		(void) printf("%10s ", #vop);				\
 	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(n##vop), buf);
 
-#define	PRINT_VOPSTAT(niceflag, vop) 					\
+#define	PRINT_VOPSTAT(niceflag, vop)					\
 	PRINT_VOPSTAT_CMN(niceflag, vop);				\
 	if (niceflag)							\
 		(void) printf("\n");
@@ -530,7 +530,7 @@ parse_operands(
 	}
 
 	for (/* void */; argc > optind; optind++) {
-		char	*endptr;
+		const char	*errstr;
 
 		/* If we have more than two operands left to process */
 		if ((argc - optind) > 2) {
@@ -539,17 +539,19 @@ parse_operands(
 		}
 
 		/* If we're here, then we only have one or two operands left */
-		errno = 0;
 		out_of_range = 0;
-		*interval = strtol(argv[optind], &endptr, 10);
-		if (*endptr && !isdigit((int)*endptr)) {
-			/* Operand was not a number */
-			(*entityp)[nentities++].e_name = strdup(argv[optind]);
-			continue;
-		} else if (errno == ERANGE || *interval <= 0 ||
-		    *interval > MAXLONG) {
-			/* Operand was a number, just out of range */
-			out_of_range++;
+		*interval = strtonum(argv[optind], 1, MAXLONG, &errstr);
+		if (errstr != NULL) {
+			if (errno == EINVAL) {
+				/* Operand was not a number */
+				(*entityp)[nentities++].e_name =
+				    strdup(argv[optind]);
+				continue;
+			}
+			if (errno == ERANGE) {
+				/* Operand was a number, just out of range */
+				out_of_range++;
+			}
 		}
 
 		/*
@@ -581,18 +583,25 @@ parse_operands(
 		 * defaults.  In that case, both the current and the previous
 		 * operands are stat-able entities.
 		 */
-		errno = 0;
-		*count = strtol(argv[optind + 1], &endptr, 10);
-		if (*endptr && !isdigit((int)*endptr)) {
-			/*
-			 * Faked out!  The last operand wasn't a number so
-			 * the current and previous operands should be
-			 * stat-able entities. We also need to reset interval.
-			 */
-			*interval = 0;
-			(*entityp)[nentities++].e_name = strdup(argv[optind++]);
-			(*entityp)[nentities++].e_name = strdup(argv[optind++]);
-		} else if (out_of_range || errno == ERANGE || *count <= 0) {
+		*count = strtonum(argv[optind + 1], 1, MAXLONG, &errstr);
+		if (errstr != NULL) {
+			if (errno == EINVAL) {
+				/*
+				 * Faked out!  The last operand wasn't a number
+				 * so the current and previous operands should
+				 * be stat-able entities.
+				 * We also need to reset interval.
+				 */
+				*interval = 0;
+				(*entityp)[nentities++].e_name =
+				    strdup(argv[optind++]);
+				(*entityp)[nentities++].e_name =
+				    strdup(argv[optind++]);
+			}
+			if (errno == ERANGE)
+				out_of_range++;
+		}
+		if (out_of_range != 0) {
 			(void) fprintf(stderr, gettext(
 			    "Both interval and count must be between 1 "
 			    "and %ld (inclusive)\n"), MAXLONG);
@@ -798,7 +807,7 @@ main(int argc, char *argv[])
 	int		nfstypes;	/* Number of fstypes */
 	int		dispflag = 0;	/* Flags for display control */
 	long		count = 0;	/* Number of iterations for display */
-	int		forever; 	/* Run forever */
+	int		forever;	/* Run forever */
 	long		interval = 0;
 	boolean_t	fstypes_only = B_FALSE;	/* Display fstypes only */
 	char		**fstypes;	/* Array of names of all fstypes */

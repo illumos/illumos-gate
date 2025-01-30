@@ -14,7 +14,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
 #
 
@@ -231,3 +231,6 @@ arch = i86pc
 
 [/opt/os-tests/tests/oclo]
 tests = ['oclo', 'oclo_errors']
+
+[/opt/os-tests/tests/secure_getenv/secure_getenv]
+user = root

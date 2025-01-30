@@ -13861,6 +13861,7 @@ s usr/share/man/man3c/schedctl_lookup.3c=schedctl_init.3c
 s usr/share/man/man3c/schedctl_start.3c=schedctl_init.3c
 s usr/share/man/man3c/schedctl_stop.3c=schedctl_init.3c
 s usr/share/man/man3c/seconvert.3c=econvert.3c
+s usr/share/man/man3c/secure_getenv.3c=getenv.3c
 s usr/share/man/man3c/seed48.3c=drand48.3c
 f usr/share/man/man3c/seekdir.3c 0444 root bin
 f usr/share/man/man3c/select.3c 0444 root bin

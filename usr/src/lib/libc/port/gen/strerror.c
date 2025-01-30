@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2015 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -33,20 +33,16 @@
 
 #include "lint.h"
 #include "_libc_gettext.h"
+#include "syserr.h"
 #include <string.h>
 #include <sys/types.h>
 #include <errno.h>
 
-extern const char _sys_errs[];
-extern const int _sys_index[];
-extern int _sys_num_err;
-extern const char *_sys_err_names[];
-
 char *
 strerror_l(int errnum, locale_t loc)
 {
-	if (errnum < _sys_num_err && errnum >= 0)
-		return (_libc_gettext_l(&_sys_errs[_sys_index[errnum]],
+	if (errnum < _sys_num_nerr && errnum >= 0)
+		return (_libc_gettext_l(&_sys_nerrs[_sys_nindex[errnum]],
 		    loc));
 
 	errno = EINVAL;
@@ -66,8 +62,8 @@ strerror(int errnum)
 const char *
 strerrordesc_np(int errnum)
 {
-	if (errnum < _sys_num_err && errnum >= 0)
-		return (&_sys_errs[_sys_index[errnum]]);
+	if (errnum < _sys_num_nerr && errnum >= 0)
+		return (&_sys_nerrs[_sys_nindex[errnum]]);
 
 	errno = EINVAL;
 	return (NULL);
@@ -76,7 +72,7 @@ strerrordesc_np(int errnum)
 const char *
 strerrorname_np(int errnum)
 {
-	if (errnum >= 0 && errnum < _sys_num_err &&
+	if (errnum >= 0 && errnum < _sys_num_nerr &&
 	    _sys_err_names[errnum] != NULL) {
 		return (_sys_err_names[errnum]);
 	}
@@ -94,8 +90,8 @@ strerror_r(int errnum, char *strerrbuf, size_t buflen)
 	char *buf;
 	int ret = 0;
 
-	if (errnum < _sys_num_err && errnum >= 0) {
-		buf = _libc_gettext((char *)&_sys_errs[_sys_index[errnum]]);
+	if (errnum < _sys_num_nerr && errnum >= 0) {
+		buf = _libc_gettext((char *)&_sys_nerrs[_sys_nindex[errnum]]);
 	} else {
 		buf = _libc_gettext("Unknown error");
 		ret = errno = EINVAL;

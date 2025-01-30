@@ -1132,6 +1132,7 @@ link path=usr/share/man/man3c/schedctl_lookup.3c target=schedctl_init.3c
 link path=usr/share/man/man3c/schedctl_start.3c target=schedctl_init.3c
 link path=usr/share/man/man3c/schedctl_stop.3c target=schedctl_init.3c
 link path=usr/share/man/man3c/seconvert.3c target=econvert.3c
+link path=usr/share/man/man3c/secure_getenv.3c target=getenv.3c
 link path=usr/share/man/man3c/seed48.3c target=drand48.3c
 file path=usr/share/man/man3c/seekdir.3c
 file path=usr/share/man/man3c/select.3c

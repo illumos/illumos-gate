@@ -22,10 +22,11 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #pragma	weak _putenv = putenv
 
@@ -38,6 +39,7 @@
 #include <errno.h>
 #include <string.h>
 #include <atomic.h>
+#include <unistd.h>
 
 #define	MIN_ENV_SIZE		128
 
@@ -490,4 +492,18 @@ getenv(const char *name)
 		return (value);
 
 	return (NULL);
+}
+
+/*
+ * This is a version of getenv() that is designed to fail if the program is
+ * operating under various sets of privilege escalation.
+ */
+char *
+secure_getenv(const char *name)
+{
+	if (issetugid() != 0) {
+		return (NULL);
+	}
+
+	return (getenv(name));
 }

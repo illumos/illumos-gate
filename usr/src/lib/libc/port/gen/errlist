@@ -22,24 +22,15 @@
 
 /*
  * WARNING!
- *	  Do NOT add entries to this list such that it grows the list
- *	  beyond the last entry:
- *		151	Stale NFS file handle
- *	  Growing this list may damage programs because this array is
- *	  copied into a reserved array at runtime.  See bug 4097669.
+ *	  Do NOT add or modify entries to this list before the end of legacy
+ *	  entries marker. Amending this list may damage programs because data
+ *	  is copied into reserved arrays at runtime. See bug 4097669.
  *
- *	  If you need to add an entry please use one of the empty
- *	  slots.
- *	  The arrays _sys_errs[], accessible via perror(3C) and strerror(3C)
- *	  interfaces, and sys_errlist[] are created from this list.
- *	  It is the direct referencing of sys_errlist[] that is the problem.
- *	  Your code should only use perror() or strerror().
- *
- *	  The table is organized with the first column being the error number.
- *	  The second column is the error's name. If the error should be skipped
- *	  from the list, it has the magic name 'SKIP'. This generally is for
- *	  the XENIX errors. The third column to the end of the file is the
- *	  string that shows up when you run strerror().
+ * The table is organized with the first column being the error number.
+ * The second column is the error's name. If the error should be skipped
+ * from the list, it has the magic name 'SKIP'. This generally is for
+ * the XENIX errors. The third column to the end of the file is the
+ * string that shows up when you run strerror().
  */
 
 1	EPERM	Not owner
@@ -113,6 +104,12 @@
 69	ESRMNT	Srmount error
 70	ECOMM	Communication error on send
 71	EPROTO	Protocol error
+/*
+ * The trailing space on the next line is historic but must now be preserved
+ * since to do otherwise would change the size of, and offset into, the
+ * copy-relocated data in the 32-bit library. The string is replaced by a
+ * cleaned version later in the list for non-legacy use.
+ */
 72	ELOCKUNMAPPED	Locked lock was unmapped 
 73	ENOTACTIVE	Facility is not active
 74	EMULTIHOP	Multihop attempted
@@ -168,3 +165,11 @@
 149	EALREADY	Operation already in progress
 150	EINPROGRESS	Operation now in progress
 151	ESTALE	Stale NFS file handle
+/*
+ * Entries after this line are not used to generate the legacy data exported in
+ * the 32-bit library.
+ */
+== End of legacy entries ==
+72	ELOCKUNMAPPED	Locked lock was unmapped
+91	ERESTART	Restartable system call
+92	ESTRPIPE	If pipe/FIFO, don't sleep in stream head

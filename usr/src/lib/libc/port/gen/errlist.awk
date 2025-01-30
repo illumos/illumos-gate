@@ -21,112 +21,134 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
-# Create two files from a list of input strings;
-# new_list.c contains an array of characters indexed into by perror and
-# strerror and an array of strings for strerrorname_np;
-# errlst.c contains an array of pointers to strings for compatibility
-# with existing user programs that reference it directly;
-# errlst.c references the strings in new_list.c indirectly using a library
-# private symbol, __sys_errs[], in order to get relative relocations.
+# Create two files from a list of input strings.
 #
-# Since the 64 bit ABI doesn't define the old symbols, the second file
-# should be left out 64 bit libraries.
+# new_list.c:
+#     contains an array of characters indexed into by perror and
+#     strerror and an array of strings for strerrorname_np.
+#     -> _sys_nerrs, _sys_nindex and _sys_err_names
 #
-# WARNING!
-#        Do NOT add entries to this list such that it grows the list
-#        beyond the last entry:
-#              151     Stale NFS file handle
-#        Growing this list may damage programs because this array is
-#        copied into a reserved array at runtime.  See bug 4097669.
+# errlst.c:
+#     contains an array of pointers to strings for compatibility
+#     with existing user programs that reference it directly;
+#     errlst.c references the strings indirectly using a library private symbol,
+#     __sys_errs[], in order to get relative relocations.
+#     -> _sys_errs, _sys_index, _sys_num_err, sys_errlist[]
 #
-#        If you need to add an entry please use one of the empty
-#        slots.
-#        The arrays _sys_errs[], accessible via perror(3C) and strerror(3C)
-#        interfaces, and sys_errlist[] are created from this list.
-#        It is the direct referencing of sys_errlist[] that is the problem.
-#        Your code should only use perror() or strerror().
-
+# Since the 64 bit ABI doesn't define the old symbols, the second file is left
+# out of 64 bit libraries.
 
 BEGIN	{
-		FS = "\t"
-		hi = 0
+	FS = "\t"
 
-		newfile = "new_list.c"
-		oldfile = "errlst.c"
+	# This is the number of entries for the legacy sys_errlist[].
+	# This cannot change as old binaries may reference the copy
+	# relocated sys_errlist, and the data to which it points, directly. New
+	# code should always use perror(), strerror() et al., and that is the
+	# only interface available in the 64-bit library. This is not the only
+	# check to guard against unintended changes, there are also constraints
+	# in the libc mapfile that will cause a link failure if the size
+	# changes.
+	legacynum = 151
 
-		print "#pragma weak _sys_errlist = sys_errlist\n" >oldfile
-		print "#include \"lint.h\"\n" >oldfile
-		# We need to include the errors strings proper in the
-		# C source for gettext; the macro C allows us to embed
-		# them as comment.
-		print "#define\tC(x)\n" >oldfile
-		print "extern const char __sys_errs[];\n" >oldfile
-		print "const char *sys_errlist[] = {" >oldfile
+	newfile = "new_list.c"
+	oldfile = "errlst.c"
 
-		print "#include \"lint.h\"" >newfile
-		print "#include <sys/isa_defs.h>\n" >newfile
-		print "#include <errno.h>\n" >newfile
-		print "#pragma weak __sys_errs = _sys_errs\n" >newfile
-	}
+	print "#pragma weak _sys_errlist = sys_errlist" >oldfile
+	print "#pragma weak __sys_errs = _sys_errs" >oldfile
+	print "#include \"lint.h\"\n" >oldfile
+	# We need to include the errors strings proper in the
+	# C source for gettext; the macro C allows us to embed
+	# them as a comment.
+	print "#define\tC(x)\n" >oldfile
+
+	print "#include \"lint.h\"" >newfile
+	print "#include <sys/isa_defs.h>" >newfile
+	print "#include <errno.h>" >newfile
+	print "" >newfile
+}
 
 /^[0-9]+/ {
-		if ($1 > hi)
-			hi = $1
-		aname[$1] = $2
-		astr[$1] = $3
+	aname[$1] = $2
+	astr[$1] = $3
+	if ($1 > max)
+		max = $1
+}
+
+function genlists(outfile, v_index, v_errs, v_num) {
+	for (j = 0; j <= max; ++j) {
+		if (astr[j] == "")
+			astr[j] = sprintf("Error %d", j)
 	}
+
+	k = 0
+	printf "const int %s[%s] = {\n", v_index, max + 1 >outfile
+	for (j = 0; j <= max; ++j) {
+		printf "\t%d,\n", k >outfile
+		k += length(astr[j]) + 1
+	}
+	print "};\n" >outfile
+
+	print "/* This is one long string */" >outfile
+	printf "const char %s[%d] =\n", v_errs, k >outfile
+	for (j = 0; j <= max; ++j)
+		printf "\t\"%s\\0\"\n", astr[j] >outfile
+	print ";\n" >outfile
+	printf "const int %s = %d;\n\n", v_num, max + 1 >outfile
+}
+
+/^== End of legacy/ {
+	#
+	# Generate the legacy lists that have become part of the ABI
+	# and must not change.
+	#
+
+	# Check that the legacy sys_errlist[] is the correct size.
+	if (max != legacynum) {
+		printf "awk: ERROR! sys_errlist[] != %d entries\n", legacynum
+		printf "Please read comments in"
+		printf " usr/src/lib/libc/port/gen/errlist\n"
+		exit 1
+	}
+
+
+	genlists(oldfile, "_sys_index", "_sys_errs", "_sys_num_err")
+	print "#undef sys_nerr" >oldfile
+	print "#pragma weak _sys_nerr = _sys_num_err" >oldfile
+	print "#pragma weak sys_nerr = _sys_num_err" >oldfile
+
+	k = 0
+	print "const char *sys_errlist[] = {" >oldfile
+	for (j = 0; j <= max; ++j) {
+		printf "\t&_sys_errs[%d], C(\"%s\")\n", k, astr[j] \
+		    >oldfile
+		k += length(astr[j]) + 1
+	}
+	print "};\n" >oldfile
+}
 
 END	{
-		print "const int _sys_index[] =\n{" >newfile
-		k = 0
-		mx = 151	# max number of entries for sys_errlist[]
-		if (hi > mx)
-		{
-			printf "awk: ERROR! sys_errlist[] > %d entries\n", mx
-			printf "Please read comments in"
-			printf " usr/src/lib/libc/port/gen/errlist\n"
-			exit 1
-		}
-		for (j = 0; j <= hi; ++j)
-		{
-			if (astr[j] == "")
-				astr[j] = sprintf("Error %d", j)
-			printf "\t%d,\n", k >newfile
-			printf "\t&__sys_errs[%d], C(\"%s\")\n", k, astr[j] \
-				>oldfile
-			k += length(astr[j]) + 1
-		}
-		print "};\n" >newfile
+	#
+	# Generate the new lists that are used internally by libc and
+	# do not form part of the ABI.
+	#
 
-		print "/* This is one long string */" >newfile
-		printf "const char _sys_errs[%d] =\n", k >newfile
-		for (j = 0; j <= hi; ++j)
-		{
-			printf "\t\"%s\\0\"\n", astr[j] >newfile
-		}
-		print ";\n" >newfile
-		print "};\n" >oldfile
+	genlists(newfile, "_sys_nindex", "_sys_nerrs", "_sys_num_nerr")
 
-		#
-		# This stanza is used to generate the array of names for mapping
-		# an errno to its constant (e.g. "ENOENT").
-		#
-		printf "const char *_sys_err_names[%d] = {\n", hi + 1 >newfile
-		printf "\t[0] = \"0\",\n" >newfile
-		for (j = 1; j <= hi; ++j)
-		{
-			if (aname[j] != "" && aname[j] != "SKIP")
-				printf "\t[%s] = \"%s\",\n", aname[j], aname[j] \
-				>newfile
-		}
-		print "};\n" > newfile
+	#
+	# This stanza is used to generate the array of names for mapping
+	# an errno to its constant (e.g. "ENOENT").
+	#
 
-		print "const int _sys_num_err = " hi + 1 ";\n" >newfile
-		print "#undef sys_nerr" >newfile
-		print "#ifndef _LP64" >newfile
-		print "#pragma weak _sys_nerr = _sys_num_err" >newfile
-		print "#pragma weak sys_nerr = _sys_num_err" >newfile
-		print "#endif /* _LP64 */" >newfile
+	printf "const char *_sys_err_names[%d] = {\n", max + 1 >newfile
+	printf "\t[0] = \"0\",\n" >newfile
+	for (j = 1; j <= max; ++j)
+	{
+		if (aname[j] == "" || aname[j] == "SKIP")
+			continue
+		printf "\t[%s] = \"%s\",\n", aname[j], aname[j] >newfile
 	}
+	print "};\n" > newfile
+}

@@ -644,14 +644,13 @@ static int
 getint(const char *name, const char *s)
 {
 	long val;
-	char *p;
+	const char *errstr;
 
-	errno = 0;
-	val = strtol(s, &p, 10);
+	val = strtonum(s, 0, INT_MAX, &errstr);
 
-	if (errno != 0 || p == s || *p != '\0' || val < 0 || val > INT_MAX) {
-		(void) fprintf(stderr, "%s: invalid %s argument -- %s\n",
-		    g_pname, name, s);
+	if (errstr != NULL) {
+		(void) fprintf(stderr, "%s: invalid %s argument -- %s: %s\n",
+		    g_pname, name, s, errstr);
 		exit(FMSTAT_EXIT_USAGE);
 	}
 
@@ -662,14 +661,14 @@ static uint32_t
 getu32(const char *name, const char *s)
 {
 	u_longlong_t val;
-	char *p;
+	const char *errstr;
 
 	errno = 0;
-	val = strtoull(s, &p, 0);
+	val = strtonum(s, 0, UINT32_MAX, &errstr);
 
-	if (errno != 0 || p == s || *p != '\0' || val > UINT32_MAX) {
-		(void) fprintf(stderr, "%s: invalid %s argument -- %s\n",
-		    g_pname, name, s);
+	if (errstr != NULL) {
+		(void) fprintf(stderr, "%s: invalid %s argument -- %s: %s\n",
+		    g_pname, name, s, errstr);
 		exit(FMSTAT_EXIT_USAGE);
 	}
 

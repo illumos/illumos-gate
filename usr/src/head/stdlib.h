@@ -29,7 +29,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -205,17 +205,24 @@ extern int	mkstemps64(char *, int);
 
 #if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
 extern char	*mkdtemp(char *);
-#endif	/* !defined(_STRICT_SYMBOLS) || defined(_XPG7) */
+#endif	/* !_STRICT_SYMBOLS || _XPG7 */
 
-#if !defined(_STRICT_SYMBOLS)
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG8)
 extern int		mkostemp(char *, int);
-extern int		mkostemps(char *, int, int);
 #if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 		!defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int		mkostemp64(char *, int);
+#endif	/* _LARGEFILE64_SOURCE || !((_FILE_OFFSET_BITS == 64) ... */
+#endif	/* !_STRICT_SYMBOLS || _XPG8  */
+
+#if !defined(_STRICT_SYMBOLS)
+extern int		mkostemps(char *, int, int);
+#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
+		!defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int		mkostemps64(char *, int, int);
-#endif	/* defined(_LARGEFILE64_SOURCE) || !((_FILE_OFFSET_BITS == 64) ... */
-#endif	/* !defined(_STRICT_SYMBOLS) */
+#endif	/* _LARGEFILE64_SOURCE || !((_FILE_OFFSET_BITS == 64) ... */
+#endif	/* !_STRICT_SYMBOLS */
+
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
@@ -241,10 +248,6 @@ extern int ttyslot(void);
 extern void *valloc(size_t);
 #endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
 #endif /* defined(__EXTENSIONS__) || ... || defined(_XPG4_2) */
-
-#if !defined(_STRICT_SYMBOLS) || defined(_XPG8)
-extern int ptsname_r(int, char *, size_t);
-#endif	/* _STRICT_SYMBOLS || _XPG8 */
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
@@ -324,17 +327,23 @@ extern uint32_t arc4random(void);
 extern void arc4random_buf(void *, size_t);
 extern uint32_t arc4random_uniform(uint32_t);
 extern void freezero(void *, size_t);
-extern void *reallocarray(void *, size_t, size_t);
 extern void *recallocarray(void *, size_t, size_t, size_t);
 extern long long strtonum(const char *, long long, long long, const char **);
 extern long long strtonumx(const char *, long long, long long, const char **,
     int);
 extern void *reallocf(void *, size_t);
-
-extern void qsort_r(void *, size_t, size_t,
-    int (*)(const void *, const void *, void *), void *);
 #endif	/* !_STRICT_SYBMOLS */
 
+/*
+ * POSIX 2024 functions.
+ */
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG8)
+extern int ptsname_r(int, char *, size_t);
+extern void qsort_r(void *, size_t, size_t,
+    int (*)(const void *, const void *, void *), void *);
+extern void *reallocarray(void *, size_t, size_t);
+extern char *secure_getenv(const char *);
+#endif	/* !_STRICT_SYMBOLS || _XPG8 */
 
 #ifdef	__cplusplus
 }

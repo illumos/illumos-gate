@@ -26,6 +26,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Oxide Computer Company
 #
 
 LIBCBASE=	.
@@ -123,7 +124,6 @@ GENOBJS=			\
 	cuexit.o		\
 	ecvt.o			\
 	endian.o		\
-	errlst.o		\
 	amd64_data.o		\
 	ldivide.o		\
 	lock.o			\
@@ -1113,7 +1113,6 @@ BUILD.AR= $(RM) $@ ; \
 
 # extra files for the clean target
 CLEANFILES +=			\
-	$(LIBCDIR)/port/gen/errlst.c	\
 	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
 	genassym		\
@@ -1203,10 +1202,7 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 GENASSYM_C = genassym.c
 
 # derived C source and related explicit dependencies
-$(LIBCDIR)/port/gen/errlst.c + \
 $(LIBCDIR)/port/gen/new_list.c: $(LIBCDIR)/port/gen/errlist $(LIBCDIR)/port/gen/errlist.awk
 	cd $(LIBCDIR)/port/gen; pwd; $(AWK) -f errlist.awk < errlist
-
-pics/errlst.o: $(LIBCDIR)/port/gen/errlst.c
 
 pics/new_list.o: $(LIBCDIR)/port/gen/new_list.c

@@ -23,6 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -184,6 +185,7 @@
 #include <libintl.h>
 #include <debug.h>
 #include <libc_int.h>
+#include <syserr.h>
 #include <fcntl.h>
 #include "_elf.h"
 #include "_rtld.h"
@@ -765,16 +767,12 @@ gettimeofday(struct timeval *tv, void *tz)
  * version of strerror, as it is implemented in terms of the locale aware
  * strerror_l, and we'd rather not have the full set of libc symbols used here.
  */
-extern const char _sys_errs[];
-extern const int _sys_index[];
-extern int _sys_num_err;
-
 char *
 strerror(int errnum)
 {
-	if (errnum < _sys_num_err && errnum >= 0) {
+	if (errnum < _sys_num_nerr && errnum >= 0) {
 		return (dgettext("SUNW_OST_OSLIB",
-		    (char *)&_sys_errs[_sys_index[errnum]]));
+		    &_sys_nerrs[_sys_nindex[errnum]]));
 	}
 
 	errno = EINVAL;
