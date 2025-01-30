@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 
@@ -139,6 +140,7 @@ struct pci_viona_softc {
 	uint16_t	vsc_vq_size;
 
 	uint8_t		vsc_macaddr[6];
+	uint16_t	vsc_mtu;
 
 	bool		vsc_resetting;
 	bool		vsc_msix_active;
@@ -687,6 +689,34 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 	return (err);
 }
 
+static uint16_t
+pci_viona_query_mtu(dladm_handle_t handle, datalink_id_t linkid)
+{
+	char buf[DLADM_PROP_VAL_MAX];
+	char *propval = buf;
+	uint_t propcnt = 1;
+
+	if (dladm_get_linkprop(handle, linkid, DLADM_PROP_VAL_CURRENT, "mtu",
+	    &propval, &propcnt) == DLADM_STATUS_OK && propcnt == 1) {
+		ulong_t parsed = strtoul(buf, NULL, 10);
+
+		/*
+		 * The virtio spec notes that for devices implementing
+		 * VIRTIO_NET_F_MTU, that the noted MTU MUST be between
+		 * 68-65535, inclusive.  Although the viona device does not
+		 * offer that feature today (the reporting of the MTU to the
+		 * guest), we can still use those bounds for how we configure
+		 * the limits of the in-kernel emulation.
+		 */
+		if (parsed >= 68 && parsed <= 65535)  {
+			return (parsed);
+		}
+	}
+
+	/* Default to 1500 if query is unsuccessful */
+	return (1500);
+}
+
 static int
 pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
@@ -740,8 +770,8 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 		free(sc);
 		return (1);
 	}
-
 	memcpy(sc->vsc_macaddr, attr.va_mac_addr, ETHERADDRL);
+	sc->vsc_mtu = pci_viona_query_mtu(handle, sc->vsc_linkid);
 
 	dladm_close(handle);
 
@@ -749,6 +779,11 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 	if (error != 0) {
 		free(sc);
 		return (1);
+	}
+
+	if (ioctl(sc->vsc_vnafd, VNA_IOC_SET_MTU, sc->vsc_mtu) != 0) {
+		WPRINTF("error setting viona MTU(%u): %s", sc->vsc_mtu,
+		    strerror(errno));
 	}
 
 	error = pthread_create(&tid, NULL, pci_viona_poll_thread, sc);
