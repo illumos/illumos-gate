@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022-2023 RackTop Systems, Inc.
+ * Copyright 2022-2025 RackTop Systems, Inc.
  */
 
 /*
@@ -1321,7 +1321,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 {
 	smb_attr_t	attr;
 	char		*name;
-	vnode_t		*fvp = NULL;
+	vnode_t		*fvp = NULL, *tvp;
 	int		de_flags;
 	int		rc;
 	boolean_t	case_conflict;
@@ -1349,6 +1349,20 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	if (rc != 0)
 		return (rc);
 
+	tvp = fvp;
+	rc = smb_vop_traverse_check(&tvp);
+
+	if (rc != 0) {
+		VN_RELE(tvp);
+		return (rc);
+	}
+
+	if (tvp != fvp) {
+		fvp = tvp;
+		attr.sa_mask = SMB_AT_ALL;
+		(void) smb_vop_getattr(fvp, NULL, &attr, 0, zone_kcred());
+	}
+
 	/*
 	 * follow link to get target node & attr
 	 */
@@ -1362,7 +1376,6 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		 * but symlinks are not so common.
 		 */
 		smb_node_t *tnode = NULL;
-		vnode_t *tvp = NULL;
 
 		if (smb_odir_lookup_link(sr, od, odirent->od_name, &tnode)) {
 
