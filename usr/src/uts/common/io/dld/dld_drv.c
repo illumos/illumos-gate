@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent Inc.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*
@@ -624,6 +625,35 @@ done:
 }
 
 /*
+ * Sometimes certain properties may be allowed to be accessed by the zone that
+ * is assigned the datalink device, as opposed to the zone that created the
+ * device. Currently that access is restricted to only the reading of select
+ * properties.
+ */
+static boolean_t
+dld_macprop_assigned_zone_exception(zoneid_t zoneid, dls_dl_handle_t dlh,
+    dld_ioc_macprop_t *kprop, boolean_t set)
+{
+	/*
+	 * No exceptions for setting! No exceptions unless the zoneid is
+	 * the assigned zone.
+	 */
+	if (set || zoneid != dls_devnet_getzid(dlh))
+		return (B_FALSE);
+
+	/*
+	 * The current list of read-only exceptions are enumerated below.
+	 */
+	switch (kprop->pr_num) {
+	case MAC_PROP_MTU:
+	case MAC_PROP_STATUS:
+		return (B_TRUE);
+	default:
+		return (B_FALSE);
+	}
+}
+
+/*
  * DLDIOC_SET/GETMACPROP
  */
 static int
@@ -679,10 +709,15 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		goto done;
 
 	/*
-	 * Don't allow a process to get or set properties of a link if that
-	 * link doesn't belong to that zone.
+	 * In general, don't allow a process to get or set properties of a
+	 * link if that link doesn't belong to that zone.
+	 *
+	 * There are exceptions however, if the dlh's *assigned* zone (as
+	 * determined by dls_devnet_getzid()) is the one calling here.  See
+	 * the local function dld_macprop_assigned_zone_exception() above.
 	 */
-	if (zoneid != dls_devnet_getownerzid(dlh)) {
+	if (zoneid != dls_devnet_getownerzid(dlh) &&
+	    !dld_macprop_assigned_zone_exception(zoneid, dlh, kprop, set)) {
 		err = ENOENT;
 		goto done;
 	}
