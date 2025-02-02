@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/promif.h>
@@ -33,6 +34,7 @@
 #include <sys/prom_emul.h>
 #include <sys/obpdefs.h>
 #include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 
 static prom_node_t *promif_top;
 
@@ -139,34 +141,44 @@ promif_create_device_tree(void)
 }
 
 static prom_node_t *
-find_node_work(prom_node_t *pnp, pnode_t n)
-{
-	prom_node_t *qnp;
-
-	if (pnp->pn_nodeid == n)
-		return (pnp);
-
-	if (pnp->pn_child)
-		if ((qnp = find_node_work(pnp->pn_child, n)) != NULL)
-			return (qnp);
-
-	if (pnp->pn_sibling)
-		if ((qnp = find_node_work(pnp->pn_sibling, n)) != NULL)
-			return (qnp);
-
-	return (NULL);
-}
-
-static prom_node_t *
 promif_find_node(pnode_t nodeid)
 {
+	/*
+	 * We keep track of sibling and child nodes that we haven't visited yet
+	 * in a small stack, and pop them off as we check them. The tree is not
+	 * particularly broad or deep so a small number of slots will suffice;
+	 * allocating 64 slots uses only 512 bytes of stack and is an order
+	 * of magnitude more than we need.
+	 */
+	prom_node_t *stack[64];
+	uint_t top = 0;
+
 	if (nodeid == OBP_NONODE)
 		return (promif_top);
 
 	if (promif_top == NULL)
 		return (NULL);
 
-	return (find_node_work(promif_top, nodeid));
+	stack[top++] = promif_top;
+
+	while (top > 0) {
+		prom_node_t *cur = stack[--top];
+
+		if (cur->pn_nodeid == nodeid)
+			return (cur);
+
+		if (cur->pn_sibling != NULL)
+			stack[top++] = cur->pn_sibling;
+
+		VERIFY3U(top, <, ARRAY_SIZE(stack));
+
+		if (cur->pn_child != NULL)
+			stack[top++] = cur->pn_child;
+
+		VERIFY3U(top, <, ARRAY_SIZE(stack));
+	}
+
+	return (NULL);
 }
 
 pnode_t

@@ -1132,7 +1132,7 @@ devfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
 {
 	ASSERT(vp->v_type == VDIR);
 	dcmn_err2(("devfs_seek %s\n", VTODV(vp)->dv_name));
-	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
+	return (*noffp < 0 ? EINVAL : 0);
 }
 
 vnodeops_t *dv_vnodeops;

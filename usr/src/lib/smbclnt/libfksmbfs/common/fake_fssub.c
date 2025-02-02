@@ -199,7 +199,7 @@ fs_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 int
 fs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
-	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
+	return (*noffp < 0 ? EINVAL : 0);
 }
 
 /*

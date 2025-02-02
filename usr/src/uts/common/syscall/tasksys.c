@@ -77,7 +77,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	if (secpolicy_tasksys(CRED()) != 0)
 		return (set_errno(EPERM));
 
-	if (projid < 0 || projid > MAXPROJID)
+	if (projid < 0)
 		return (set_errno(EINVAL));
 
 	if (flags & ~TASK_FINAL)

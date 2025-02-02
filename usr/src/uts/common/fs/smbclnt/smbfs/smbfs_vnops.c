@@ -780,7 +780,7 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 * that is after the limit.
 	 */
 	limit = uiop->uio_llimit;
-	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
+	if (limit == RLIM64_INFINITY)
 		limit = MAXOFFSET_T;
 	if (uiop->uio_loffset >= limit) {
 #ifdef	_KERNEL
