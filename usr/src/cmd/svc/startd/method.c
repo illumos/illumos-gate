@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -595,6 +596,9 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 	log_preexec();
 
 	(void) execle(SBIN_SH, SBIN_SH, "-c", cmd, NULL, nenv);
+
+	(void) fprintf(stderr, "Failed to exec %s -c '%s': %s\n",
+	    SBIN_SH, cmd, strerror(errno));
 
 	exit(10);
 }
