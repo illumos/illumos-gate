@@ -39,6 +39,7 @@
 #include <sys/types32.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/ethernet.h>
 
 #include <libnvpair.h>
 #include <libktest.h>
@@ -156,6 +157,8 @@ struct payload_opts {
 	boolean_t	po_cksum_partial;
 	boolean_t	po_cksum_full;
 	boolean_t	po_cksum_ipv4;
+	boolean_t	po_split_ether;
+	uint_t		po_split_manual;
 };
 
 static char *
@@ -178,6 +181,19 @@ build_payload(const void *pkt_buf, uint_t pkt_sz,
 		fnvlist_add_boolean(payload, "cksum_ipv4");
 	}
 
+	uint_t nsplit = 0;
+	uint32_t splits[2];
+	if (popts->po_split_ether) {
+		splits[nsplit++] = sizeof (struct ether_header);
+	}
+	if (popts->po_split_manual != 0) {
+		splits[nsplit++] = popts->po_split_manual;
+	}
+	if (nsplit > 0) {
+		fnvlist_add_uint32_array(payload, "cksum_splits", splits,
+		    nsplit);
+	}
+
 	char *packed = fnvlist_pack(payload, payload_sz);
 	nvlist_free(payload);
 
@@ -192,8 +208,11 @@ mac_cksum_usage(void)
 	    "\t-4\temulate HCK_IPV4_HDRCKSUM\n"
 	    "\t-f\temulate HCK_FULLCKSUM\t(cannot be used with -p)\n"
 	    "\t-p\temulate HCK_PARTIALCKSUM\t(cannot be used with -f)\n"
+	    "\t-e\tsplit mblk after Ethernet header\n"
 	    "Options:\n"
 	    "\t-b <len>\tpad mblk with <len> bytes (must be even)\n"
+	    "\t-s <len>\tsplit mblk after len bytes (must be even)\n"
+	    "\t\t\tif -e is specified, will be applied after that split\n"
 	    "Arguments:\n"
 	    "\t<cap_file> is a snoop capture of packets to test.\n"
 	    "\tAny TCP or UDP packets (or plain IPv4) are expected to have\n"
@@ -214,7 +233,7 @@ main(int argc, char *argv[])
 
 	struct payload_opts popts = { 0 };
 	int c;
-	while ((c = getopt(argc, argv, "4fpb:")) != -1) {
+	while ((c = getopt(argc, argv, "4fpeb:s:")) != -1) {
 		switch (c) {
 		case 'p':
 			popts.po_cksum_partial = B_TRUE;
@@ -233,6 +252,18 @@ main(int argc, char *argv[])
 				    "invalid padding value %s", optarg);
 			}
 			break;
+		case 'e':
+			popts.po_split_ether = B_TRUE;
+			break;
+		case 's':
+			errno = 0;
+			popts.po_split_manual = strtoul(optarg, NULL, 0);
+			if (errno != 0) {
+				err(EXIT_FAILURE,
+				    "invalid split value %s", optarg);
+			}
+			break;
+
 		case '?':
 			warnx("unknown run option: -%c", optopt);
 			mac_cksum_usage();
