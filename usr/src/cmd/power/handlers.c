@@ -219,7 +219,7 @@ cpuidle(void)
 
 int
 S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
-	char *behavior, int *didyes, int suppress)
+    char *behavior, int *didyes, int suppress)
 {
 	int oflags = SMB_O_NOCKSUM | SMB_O_NOVERS;
 	smbios_hdl_t *shp;
@@ -772,8 +772,8 @@ get_thresh(int **vlistp, int *vcntp)
 
 /*
  * Set device thresholds from (3) formats:
- * 	path	"always-on"
- * 	path	time-spec: [0-9]+[{h,m,s}]
+ *	path	"always-on"
+ *	path	time-spec: [0-9]+[{h,m,s}]
  *	path	(ts1 ts2 ...)+
  */
 int
@@ -814,11 +814,12 @@ static int
 scan_int(char *src, int *dst)
 {
 	long lval;
+	const char *errstr;
 
 	errno = 0;
 
-	lval = strtol(LINEARG(1), NULL, 0);
-	if (errno || lval > INT_MAX || lval < 0) {
+	lval = strtonumx(LINEARG(1), 0, INT_MAX, &errstr, 0);
+	if (errstr != NULL) {
 		mesg(MERR, nerr_fmt, src);
 		return (NOUP);
 	}

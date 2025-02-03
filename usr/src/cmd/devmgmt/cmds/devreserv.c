@@ -25,7 +25,7 @@
  */
 
 /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
-/*      All Rights Reserved   */
+/*	All Rights Reserved */
 
 #include	<sys/types.h>
 #include	<sys/param.h>
@@ -38,7 +38,6 @@
 #include	<devtab.h>
 #include	<values.h>
 
-
 /*
  *  Local definitions
  *	TRUE		Boolean TRUE value
@@ -110,11 +109,12 @@ static char  ***buildreqlist();
 static void	freereqlist();
 static int	ndevsin();
 
-#define	stdmsg(r,l,s,m)	(void) fmtmsg(MM_PRINT|MM_UTIL|r,l,s,m,MM_NULLACT,MM_NULLTAG)
+#define	stdmsg(r, l, s, m)	\
+	(void) fmtmsg(MM_PRINT | MM_UTIL | r, l, s, m, MM_NULLACT, MM_NULLTAG)
 
 static	char	lbl[MM_MXLABELLN+1];
 static	char	txt[MM_MXTXTLN+1];
-
+
 /*
  *  devreserv [key [devlist [devlist [...]]]]
  *
@@ -148,15 +148,15 @@ main(int argc, char *argv[])
 {
 
 	/* Automatics */
-	char		     ***reqlist;	/* * to list of lists */
-	char		      **argp;		/* Ptr to current argument */
-	char		      **alloclist;	/* List of allocated devices */
-	char		      **pp;		/* Temp ptr to char ptrs */
-	struct reservdev      **rsvd;		/* Ptr to list of rsvd devs */
-	struct reservdev      **plk;		/* Running ptr to locks */
-	char		       *p;		/* Temp char ptr */
-	char		       *devtab;		/* Device table pathname */
-	char		       *rsvtab;		/* Dev-rsv tbl pathname */
+	char			***reqlist;	/* * to list of lists */
+	char			**argp;		/* Ptr to current argument */
+	char			**alloclist;	/* List of allocated devices */
+	char			**pp;		/* Temp ptr to char ptrs */
+	struct reservdev	**rsvd;		/* Ptr to list of rsvd devs */
+	struct reservdev	**plk;		/* Running ptr to locks */
+	char			*p;		/* Temp char ptr */
+	char			*devtab;	/* Device table pathname */
+	char			*rsvtab;	/* Dev-rsv tbl pathname */
 	int			argcount;	/* Number of args on cmd */
 	long			lkey;		/* Key for locking (long) */
 	int			key;		/* Key for locking */
@@ -165,6 +165,7 @@ main(int argc, char *argv[])
 	int			syntaxerr;	/* Flag, TRUE if syntax error */
 	int			c;		/* Option character */
 	int			i;		/* Temp counter */
+	const char		*errstr;
 
 
 	/*
@@ -174,7 +175,7 @@ main(int argc, char *argv[])
 	/* Build a message label */
 	if (p = strrchr(argv[0], '/')) p++;
 	else p = argv[0];
-	(void) strlcat(strcpy(lbl, "UX:"), p, sizeof(lbl));
+	(void) strlcat(strcpy(lbl, "UX:"), p, sizeof (lbl));
 
 
 	/*
@@ -191,16 +192,17 @@ main(int argc, char *argv[])
 
 	opterr = 0;
 	syntaxerr = FALSE;
-	while ((c = getopt(argc, argv, "")) != EOF) switch(c) {
-	default:
-	    syntaxerr = FALSE;
-	    break;
-	}
+	while ((c = getopt(argc, argv, "")) != EOF)
+		switch (c) {
+		default:
+			syntaxerr = FALSE;
+			break;
+		}
 
 	/* If there's (an obvious) syntax error, write a message and quit */
 	if (syntaxerr) {
-	    stdmsg(MM_NRECOV, lbl, MM_ERROR, M_USAGE);
-	    exit(EX_ERROR);
+		stdmsg(MM_NRECOV, lbl, MM_ERROR, M_USAGE);
+		exit(EX_ERROR);
 	}
 
 	/* Argument initializations */
@@ -211,95 +213,109 @@ main(int argc, char *argv[])
 	/*
 	 *  devreserv
 	 *
-	 *  	If euid == 0, write a list of all currently allocated devices.
+	 *	If euid == 0, write a list of all currently allocated devices.
 	 */
 
 	if (argcount == 0) {
 
-	    /* Get the list of reserved devices */
-	    if (rsvd = reservdev()) {
+		/* Get the list of reserved devices */
+		if (rsvd = reservdev()) {
 
-		/* Write the list of reserved devices with the key
-		 * that the device was locked on.  The key should go
-		 * in column 16, but separate it from the alias with at
-		 * least one space */
+			/*
+			 * Write the list of reserved devices with the key
+			 * that the device was locked on.  The key should go
+			 * in column 16, but separate it from the alias with at
+			 * least one space
+			 */
 
-		exitcode = EX_OK;
-		for (plk = rsvd ; *plk ; plk++) {
-		    if ((i = fputs((*plk)->devname, stdout)) >= 0) do
-			(void) fputc(' ', stdout);
-		    while (++i < 16);
-		    (void) fprintf(stdout, "%ld\n", (*plk)->key);
-		}
+			exitcode = EX_OK;
+			for (plk = rsvd; *plk; plk++) {
+				if ((i = fputs((*plk)->devname, stdout)) >= 0)
+					do {
+						(void) fputc(' ', stdout);
+					} while (++i < 16);
+				(void) fprintf(stdout, "%ld\n", (*plk)->key);
+			}
 
-	    } else {
-
-		/* Problems getting the list of reserved devices */
-		if (((errno == EINVAL) || (errno == EACCES)) && (rsvtab = _rsvtabpath())) {
-		    (void) snprintf(txt, sizeof(txt), M_RSVTAB, rsvtab);
-		    exitcode = EX_TABLES;
-		    sev = MM_ERROR;
 		} else {
-		    (void) sprintf(txt, M_ERROR, errno);
-		    exitcode = EX_ERROR;
-		    sev = MM_HALT;
-		}
-		stdmsg(MM_NRECOV, lbl, sev, txt);
-	    }
 
-	    /* Finished */
-	    exit(exitcode);
+			/* Problems getting the list of reserved devices */
+			if (((errno == EINVAL) || (errno == EACCES)) &&
+			    (rsvtab = _rsvtabpath())) {
+				(void) snprintf(txt, sizeof (txt), M_RSVTAB,
+				    rsvtab);
+				exitcode = EX_TABLES;
+				sev = MM_ERROR;
+			} else {
+				(void) sprintf(txt, M_ERROR, errno);
+				exitcode = EX_ERROR;
+				sev = MM_HALT;
+			}
+			stdmsg(MM_NRECOV, lbl, sev, txt);
+		}
+
+		/* Finished */
+		exit(exitcode);
 	}
 
 
 	/*
 	 *  devreserv key
 	 *
-	 *  	Generate a list of the devices allocated on a specific key.
+	 *	Generate a list of the devices allocated on a specific key.
 	 */
 
 	if (argcount == 1) {
 
-	    /* Extract the key from the command */
-	    lkey = strtol(*argp, &p, 10);
-	    if (*p || (lkey <= 0) || (lkey > MAXINT)) {
+		/* Extract the key from the command */
+		lkey = strtonum(*argp, 1, MAXINT, &errstr);
+		if (errstr != NULL) {
 
-		/* <key> argument invalid */
-		(void) snprintf(txt, sizeof(txt), M_INVKEY, *argp);
-		stdmsg(MM_NRECOV, lbl, MM_ERROR, txt);
-		exitcode = EX_ERROR;
-
-	    } else {
-
-		key = (int) lkey;
-
-		/* Get the list of reserved devices ... */
-		if (rsvd = reservdev()) {
-
-		    /* For each reserved device, write the alias to stdout */
-		    exitcode = EX_OK;
-		    for (plk = rsvd ; *plk ; plk++) {
-			if ((*plk)->key == key) (void) puts((*plk)->devname);
-		    }
+			/* <key> argument invalid */
+			(void) snprintf(txt, sizeof (txt), M_INVKEY, *argp);
+			stdmsg(MM_NRECOV, lbl, MM_ERROR, txt);
+			exitcode = EX_ERROR;
 
 		} else {
 
-		    /* Problems getting the list of reserved devices */
-		    if (((errno == EINVAL) || (errno == EACCES)) && (rsvtab = _rsvtabpath())) {
-			(void) snprintf(txt, sizeof(txt), M_RSVTAB, rsvtab);
-			exitcode = EX_TABLES;
-			sev = MM_ERROR;
-		    } else {
-			(void) sprintf(txt, M_ERROR, errno);
-			exitcode = EX_ERROR;
-			sev = MM_HALT;
-		    }
-		    stdmsg(MM_NRECOV, lbl, sev, txt);
-		}
-	    }
+			key = (int)lkey;
 
-	    /* Finished */
-	    exit(exitcode);
+			/* Get the list of reserved devices ... */
+			if (rsvd = reservdev()) {
+
+				/*
+				 * For each reserved device, write the alias
+				 * to stdout
+				 */
+				exitcode = EX_OK;
+				for (plk = rsvd; *plk; plk++) {
+					if ((*plk)->key == key)
+						(void) puts((*plk)->devname);
+				}
+
+			} else {
+
+				/*
+				 * Problems getting the list of reserved
+				 * devices
+				 */
+				if (((errno == EINVAL) || (errno == EACCES)) &&
+				    (rsvtab = _rsvtabpath())) {
+					(void) snprintf(txt, sizeof (txt),
+					    M_RSVTAB, rsvtab);
+					exitcode = EX_TABLES;
+					sev = MM_ERROR;
+				} else {
+					(void) sprintf(txt, M_ERROR, errno);
+					exitcode = EX_ERROR;
+					sev = MM_HALT;
+				}
+				stdmsg(MM_NRECOV, lbl, sev, txt);
+			}
+		}
+
+		/* Finished */
+		exit(exitcode);
 	}
 
 
@@ -311,72 +327,71 @@ main(int argc, char *argv[])
 
 	/* Open the device file (if there's one to be opened) */
 	if (!_opendevtab("r")) {
-	    if (devtab = _devtabpath()) {
-		(void) snprintf(txt, sizeof(txt), M_DEVTAB, devtab);
-		exitcode = EX_TABLES;
-		sev = MM_ERROR;
-	    } else {
-		(void) sprintf(txt, M_ERROR, errno);
-		exitcode = EX_ERROR;
-		sev = MM_HALT;
-	    }
-	    stdmsg(MM_NRECOV, lbl, sev, txt);
-	    exit(exitcode);
+		if (devtab = _devtabpath()) {
+			(void) snprintf(txt, sizeof (txt), M_DEVTAB, devtab);
+			exitcode = EX_TABLES;
+			sev = MM_ERROR;
+		} else {
+			(void) sprintf(txt, M_ERROR, errno);
+			exitcode = EX_ERROR;
+			sev = MM_HALT;
+		}
+		stdmsg(MM_NRECOV, lbl, sev, txt);
+		exit(exitcode);
 	}
 
 	/* Extract the key from the command */
-	lkey = strtol(*argp, &p, 10);
-	if (*p || (lkey <= 0) || (lkey > MAXINT)) {
-	    (void) snprintf(txt, sizeof(txt), M_INVKEY, *argp);
-	    stdmsg(MM_NRECOV, lbl, MM_ERROR, txt);
-	    exit(EX_ERROR);
+	lkey = strtonum(*argp, 1, MAXINT, &errstr);
+	if (errstr != NULL) {
+		(void) snprintf(txt, sizeof (txt), M_INVKEY, *argp);
+		stdmsg(MM_NRECOV, lbl, MM_ERROR, txt);
+		exit(EX_ERROR);
 	}
 
-	key = (int) lkey;
+	key = (int)lkey;
 	argp++;
 
 	/* Build the device request list from the command arguments */
 	if (reqlist = buildreqlist(argp)) {
 
-	    /* Attempt to allocate the devices */
-	    if (alloclist = devreserv(key, reqlist)) {
+		/* Attempt to allocate the devices */
+		if (alloclist = devreserv(key, reqlist)) {
 
-		/*
-		 * For each allocated device, write the alias to stdout
-		 * and free the space allocated for the string.
-		 */
+			/*
+			 * For each allocated device, write the alias to stdout
+			 * and free the space allocated for the string.
+			 */
 
-		for (pp = alloclist; *pp; pp++) {
-		    (void) puts(*pp);
-		    free(*pp);
-		}
+			for (pp = alloclist; *pp; pp++) {
+				(void) puts(*pp);
+				free(*pp);
+			}
 
-		/* Free the list of allocated devices */
-		free((char *) alloclist);
-		exitcode = EX_OK;
-	    }
-	    else {
-		/* Device allocation failed */
-		if (errno == EAGAIN) {
-		    stdmsg(MM_NRECOV, lbl, MM_ERROR, M_UNABLE);
-		    exitcode = EX_NOALLOC;
-		} else if (errno == ENODEV) {
-		    stdmsg(MM_NRECOV, lbl, MM_ERROR, M_NODEV);
-		    exitcode = EX_NOALLOC;
+			/* Free the list of allocated devices */
+			free(alloclist);
+			exitcode = EX_OK;
 		} else {
-		    (void) sprintf(txt, M_ERROR, errno);
-		    stdmsg(MM_NRECOV, lbl, MM_HALT, txt);
-		    exitcode = EX_ERROR;
+			/* Device allocation failed */
+			if (errno == EAGAIN) {
+				stdmsg(MM_NRECOV, lbl, MM_ERROR, M_UNABLE);
+				exitcode = EX_NOALLOC;
+			} else if (errno == ENODEV) {
+				stdmsg(MM_NRECOV, lbl, MM_ERROR, M_NODEV);
+				exitcode = EX_NOALLOC;
+			} else {
+				(void) sprintf(txt, M_ERROR, errno);
+				stdmsg(MM_NRECOV, lbl, MM_HALT, txt);
+				exitcode = EX_ERROR;
+			}
 		}
-	    }
-	    freereqlist(reqlist);
+		freereqlist(reqlist);
 	}
 
 
 	/* Exit with the appropriate code */
-	return(exitcode);
+	return (exitcode);
 }
-
+
 /*
  * char ***buildreqlist(args)
  *	char   **args
@@ -400,14 +415,13 @@ main(int argc, char *argv[])
  */
 
 static char ***
-buildreqlist(args)
-	char  **args;
+buildreqlist(char **args)
 {
 	/* Local automatic data */
-	char	     ***addrlist;	/* Addr of space for ptrs to lists */
-	char	     ***ppp;		/* Pointer to pointers to pointers */
-	char	      **pp;		/* Pointer to pointers */
-	char	      **qq;		/* Pointer to pointers */
+	char		***addrlist;	/* Addr of space for ptrs to lists */
+	char		***ppp;		/* Pointer to pointers to pointers */
+	char		**pp;		/* Pointer to pointers */
+	char		**qq;		/* Pointer to pointers */
 	int		noerror;	/* FLAG, TRUE if all's well */
 	int		i;		/* Counter */
 	int		n;		/* Another counter */
@@ -415,35 +429,39 @@ buildreqlist(args)
 
 	/* Count the number of lists we have to work with */
 	i = 1;
-	for (pp = args ; *pp ; pp++) i++;
+	for (pp = args; *pp; pp++)
+		i++;
 
 
 	/* If we can allocate space for the list of lists ... */
-	if (addrlist = (char ***) malloc(i*sizeof(char **))) {
+	if (addrlist = malloc(i * sizeof (char **))) {
 
-	    /* Parse each list, putting that list in the list of lists */
-	    ppp = addrlist;
-	    noerror = TRUE;
-	    for (pp = args ; noerror && *pp ; pp++) {
-		n = ndevsin(*pp, TOKDELIMS);
-		if (*ppp = (char **) malloc((n+1)*sizeof(char *))) {
-		     qq = *ppp++;
-		     if (*qq++ = strtok(*pp, TOKDELIMS))
-			 while (*qq++ = strtok((char *) NULL, TOKDELIMS));
-		} else noerror = FALSE;
-	    }
+		/* Parse each list, putting that list in the list of lists */
+		ppp = addrlist;
+		noerror = TRUE;
+		for (pp = args; noerror && *pp; pp++) {
+			n = ndevsin(*pp, TOKDELIMS);
+			if (*ppp = malloc((n + 1) * sizeof (char *))) {
+				qq = *ppp++;
+				if (*qq++ = strtok(*pp, TOKDELIMS))
+					while (*qq++ = strtok(NULL, TOKDELIMS))
+						;
+			} else {
+				noerror = FALSE;
+			}
+		}
 
-	    /* If there was an error, clean up the malloc()s we've made */
-	    if (!noerror) {
-		freereqlist(addrlist);
-		addrlist = (char ***) NULL;
-	    }
+		/* If there was an error, clean up the malloc()s we've made */
+		if (!noerror) {
+			freereqlist(addrlist);
+			addrlist = NULL;
+		}
 	}
 
 	/* Return ptr to the list of addresses of lists (or NULL if none) */
-	return(addrlist);
+	return (addrlist);
 }
-
+
 /*
  *  void freereqlist(list)
  *	char ***list
@@ -458,16 +476,16 @@ buildreqlist(args)
  */
 
 static void
-freereqlist(list)
-	char ***list;
+freereqlist(char ***list)
 {
 	char ***ppp;
 	if (list) {
-	    for (ppp = list ; *ppp ; ppp++) free((char *) *ppp);
-	    free((char *) list);
+		for (ppp = list; *ppp; ppp++)
+			free(*ppp);
+		free(list);
 	}
 }
-
+
 /*
  * int ndevsin(list, delims)
  *	char   *list
@@ -490,9 +508,7 @@ freereqlist(list)
  */
 
 static int
-ndevsin(list, delims)
-	char   *list;			/* List to scan */
-	char   *delims;			/* Delimiters */
+ndevsin(char *list, char *delims)
 {
 	char   *p;			/* Running character pointer */
 	int	count;			/* Number of tokens seen so far */
@@ -502,18 +518,22 @@ ndevsin(list, delims)
 	tokflag = FALSE;		/* Not in a token */
 
 	/* Scan the character-string containing the list of tokens */
-	for (p = list ; *p ; p++) {
+	for (p = list; *p; p++) {
 
-	    /* If a delimiter, we're not in a token */
-	    if (strchr(delims, *p)) tokflag = FALSE;
+		/* If a delimiter, we're not in a token */
+		if (strchr(delims, *p)) {
+			tokflag = FALSE;
 
-	    /* Otherwise, if we weren't in a token, we've found one */
-	    else if (!tokflag) {
-		tokflag = TRUE;
-		count++;
-	    }
+		} else if (!tokflag) {
+			/*
+			 * Otherwise, if we weren't in a token,
+			 * we've found one
+			 */
+			tokflag = TRUE;
+			count++;
+		}
 	}
 
 	/* Return the number of elements in the list */
-	return(count);
+	return (count);
 }
