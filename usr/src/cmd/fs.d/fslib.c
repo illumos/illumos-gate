@@ -293,7 +293,7 @@ static char *empty_opt_vector[] = {
  */
 void
 cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
-	char *special, char *mountp)
+    char *special, char *mountp)
 {
 	char	*option_ptr, *actopt, *equalptr;
 	int	found;
@@ -302,7 +302,10 @@ cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
 	if (requested_opts == NULL)
 		return;
 
-	bufp = alloca(strlen(actual_opts) + 1);
+	if (actual_opts == NULL)
+		bufp = alloca(1);
+	else
+		bufp = alloca(strlen(actual_opts) + 1);
 
 	while (*requested_opts != '\0') {
 		(void) getsubopt(&requested_opts, empty_opt_vector,
@@ -385,7 +388,8 @@ cmp_requested_to_actual_options(char *requested_opts, char *actual_opts,
  *			- 1 if maxphys is found
  */
 int
-fsgetmaxphys(int *maxphys, int *error) {
+fsgetmaxphys(int *maxphys, int *error)
+{
 
 	int	gotit = 0;
 	int	fp = open("/", O_RDONLY);
