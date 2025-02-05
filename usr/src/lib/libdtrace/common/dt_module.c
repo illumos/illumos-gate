@@ -21,9 +21,8 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1372,6 +1371,114 @@ dtrace_lookup_by_addr(dtrace_hdl_t *dtp, GElf_Addr addr,
 	return (0);
 }
 
+/*
+ * We've been asked to try to find a type that's in a module that corresponds to
+ * a user process. There are multiple CTF libraries that are associated with
+ * this module (hopefully) and we will find the one that matches this type. The
+ * type "name" that we get may have a particular CTF object named in it. The way
+ * that the D compiler structures this is that it's a qualifier on the name of
+ * the type, but may keep the type keyword (struct, union, or enum) first. That
+ * means we may have something that looks like any of the following:
+ *
+ *  - struct foo
+ *  - foo_t
+ *  - libc.so.1`bar_t
+ *  - a.out`bar_t (replace a.out with the program's executable name)
+ *  - struct a.out`foo_t
+ *
+ * When we have an object to search we need to pull that out and make sure that
+ * we include that keyword as part of the name.
+ */
+static int
+dtrace_lookup_by_type_user(dtrace_hdl_t *dtp, dt_module_t *dmp,
+    const char *name, ctf_file_t **fpp, ctf_id_t *idp)
+{
+	size_t obj_off;
+	char *dup, *obj_end, *type_buf = NULL;
+	const char *obj, *type;
+	ctf_file_t *fp;
+	ctf_id_t id;
+
+	if (dmp->dm_nctflibs == 0) {
+		*fpp = NULL;
+		*idp = CTF_ERR;
+		return (0);
+	}
+
+	/*
+	 * When there is no backtick in the name, then there is no object
+	 * specified in the type name. As a result, we don't have to tear apart
+	 * and reassemble the type name. Unfortunately it does mean we have to
+	 * search all of the module's CTF containers to try to find it. We'll
+	 * take the first one that we find.
+	 */
+	if (strchr(name, '`') == NULL) {
+		uint_t i;
+
+		for (i = 0; i < dmp->dm_nctflibs; i++) {
+			id = ctf_lookup_by_name(dmp->dm_libctfp[i], name);
+			if (id != CTF_ERR) {
+				*fpp = dmp->dm_libctfp[i];
+				*idp = id;
+				return (0);
+			}
+		}
+
+		*fpp = NULL;
+		*idp = CTF_ERR;
+		return (0);
+	}
+
+	/*
+	 * We have an object name. Check to see if it begins with a struct,
+	 * enum, or union. Note the space is intentional here as if it's present
+	 * the space should always be here and we want to ensure that we skip
+	 * past it.
+	 */
+	if (strncmp(name, "struct ", strlen("struct ")) == 0) {
+		obj_off = strlen("struct ");
+	} else if (strncmp(name, "union ", strlen("union ")) == 0) {
+		obj_off = strlen("union ");
+	} else if (strncmp(name, "enum ", strlen("enum ")) == 0) {
+		obj_off = strlen("enum ");
+	} else {
+		obj_off = 0;
+	}
+
+	dup = strdup(name);
+	if (dup == NULL) {
+		return (dt_set_errno(dtp, EDT_NOMEM));
+	}
+
+	obj_end = strchr(dup, '`');
+	*obj_end = '\0';
+	if (obj_off != 0) {
+		obj = dup + obj_off;
+		dup[obj_off - 1] = '\0';
+		if (asprintf(&type_buf, "%s %s", dup, obj_end + 1) == -1) {
+			free(dup);
+			return (dt_set_errno(dtp, EDT_NOMEM));
+		}
+		type = type_buf;
+	} else {
+		obj = dup;
+		type = obj_end + 1;
+	}
+
+	fp = dt_module_getctflib(dtp, dmp, obj);
+	if (fp != NULL && ((id = ctf_lookup_by_name(fp, type)) != CTF_ERR)) {
+		*fpp = fp;
+		*idp = id;
+	} else {
+		*fpp = NULL;
+		*idp = CTF_ERR;
+	}
+
+	free(dup);
+	free(type_buf);
+	return (0);
+}
+
 int
 dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
     dtrace_typeinfo_t *tip)
@@ -1437,26 +1544,9 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 			id = ctf_lookup_by_name(dmp->dm_ctfp, name);
 			fp = dmp->dm_ctfp;
 		} else {
-			if ((p = strchr(name, '`')) != NULL) {
-				buf = strdup(name);
-				if (buf == NULL)
-					return (dt_set_errno(dtp, EDT_NOMEM));
-				p = strchr(buf, '`');
-				if ((q = strchr(p + 1, '`')) != NULL)
-					p = q;
-				*p = '\0';
-				fp = dt_module_getctflib(dtp, dmp, buf);
-				if (fp == NULL || (id = ctf_lookup_by_name(fp,
-				    p + 1)) == CTF_ERR)
-					id = CTF_ERR;
-				free(buf);
-			} else {
-				for (i = 0; i < dmp->dm_nctflibs; i++) {
-					fp = dmp->dm_libctfp[i];
-					id = ctf_lookup_by_name(fp, name);
-					if (id != CTF_ERR)
-						break;
-				}
+			if (dtrace_lookup_by_type_user(dtp, dmp, name,
+			    &fp, &id) != 0) {
+				return (-1);
 			}
 		}
 		if (id != CTF_ERR) {
