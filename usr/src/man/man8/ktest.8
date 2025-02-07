@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd February 13, 2023
+.Dd February 12, 2025
 .Dt KTEST 8
 .Os
 .Sh NAME
@@ -20,21 +20,24 @@
 .Sh SYNOPSIS
 .Nm ktest Cm help
 .Pp
-.Nm ktest Cm list
+.Nm Cm list
 .Op Fl H
 .Op Oo Fl p Oc Fl o Ar field Ns Op ,...
 .Op Ar triple...
 .Pp
-.Nm ktest Cm run
+.Nm Cm run
 .Op Fl H
+.Op Fl n
 .Op Oo Fl p Oc Fl o Ar field Ns Op ,...
 .Op -i Ar input
 .Ar triple...
 .Pp
-.Nm ktest Cm run-file
-.Op Fl H
-.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
-.Op Ar runfile
+.Nm Cm load
+.Op Fl a
+.Op Ar name
+.Nm Cm unload
+.Op Fl a
+.Op Ar name
 .Sh DESCRIPTION
 The
 .Nm
@@ -51,7 +54,111 @@ pseudo device.
 A process must run in the Global Zone and have the
 .Sy PRIV_SYS_DEVICES
 privilege in order to access the device.
-.Ss OUTPUT FIELDS
+.Sh SUBCOMMANDS
+.Nm ktest help
+.Bd -ragged -offset 2m
+Print command usage.
+.Ed
+.Pp
+The
+.Cm list
+and
+.Cm run
+subcommands share the options described in
+.Sx OUTPUT OPTIONS .
+.Pp
+.Nm Cm list
+.Op Fl H
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Ar triple...
+.Bd -ragged -offset 2m
+List all registered tests.
+One or more triples may be specified to narrow the listing.
+.Pp
+.Ed
+.Pp
+.Nm Cm run
+.Op Fl H
+.Op Fl n
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Fl i Ar file
+.Ar triple...
+.Bd -ragged -offset 2m
+Run registered tests.
+One or more triples may be specified to limit which tests are run.
+At least one triple must be specified.
+.Bl -tag -width Ds
+.It Fl i Ar file
+Specify a
+.Ar file
+to act as the input stream for all tests requiring one.
+.It Fl n
+Omit tests which require input when none provided via
+.Fl i .
+.El
+.Ed
+.Pp
+.Nm Cm load
+.Op Fl a
+.Op Ar name
+.Bd -ragged -offset 2m
+Load one or more ktest modules to make their tests available to
+.Cm list
+and
+.Cm run .
+.Bl -tag -width Ds
+.It Fl a
+Load all available modules
+.It Ar name
+Load a specific module
+.El
+.Ed
+.Pp
+.Nm Cm unload
+.Op Fl a
+.Op Ar name
+.Bd -ragged -offset 2m
+Unload one or more ktest modules.
+.Bl -tag -width Ds
+.It Fl a
+Unload all modules
+.It Ar name
+Unoad a specific module
+.El
+.Ed
+.Sh OUTPUT
+Available tests and the results of running said tests are emitted by the
+.Cm list
+and
+.Cm run
+commands, respectively.
+.Ss OPTIONS
+Output from the
+.Cm list
+and
+.Cm run
+commands is controlled by the following options:
+.Bl -tag -width Ar
+.It Fl H
+Omit column headers when printing output.
+.It Fl o Ar field Ns Op ,...
+A case-insensitive, comma-separated list of output fields to display.
+.Pp
+The available fields and their contents are described in
+.Sx FIELDS
+section below.
+.It Fl p
+Display in a machine-parsable format and elide test stats output when
+executing the
+.Cm run
+command.
+.Pp
+The
+.Fl o
+option is required with
+.Fl p .
+.El
+.Ss FIELDS
 The following is a list of output fields used by the
 .Nm
 command along with their meanings.
@@ -69,9 +176,12 @@ For the
 command this indicates if the test requires an input stream: [Y]es or [N]o.
 For the
 .Sy run
-and
-.Sy run-file
-commands it is the path to the input stream.
+command, it is the path to the input stream.
+.El
+The following fields are only applicable to the
+.Cm run
+command.
+.Bl -tag -offset 4m -width 8m
 .It Sy LINE
 The source code line number that produced the test
 .Sy RESULT .
@@ -84,32 +194,17 @@ Upon detection of multiple results this value indicates the line that
 overwrote the previous result and the
 .Sy RESULT
 field contains a message with the line number of the previous result.
-This field applies only to the
-.Sy run
-and
-.Sy run-file
-commands.
 .It Sy RESULT
 The test result.
 The
-.Sy TEST RESULTS
+.Sx TEST RESULTS
 section explains the different types of results.
-This field applies only to the
-.Sy run
-and
-.Sy run-file
-commands.
 .It Sy REASON
 Additional context when the test result is one of
 .Sy FAIL ,
 .Sy ERROR ,
 or
 .Sy SKIP .
-This field applies only to the
-.Sy run
-and
-.Sy run-file
-commands.
 .El
 .Ss TEST RESULTS
 The different types of results that a test can produce.
@@ -130,85 +225,6 @@ For example, some type of missing resource or hardware.
 The test failed to produce a result.
 This is a bug in the test and should be fixed.
 .El
-.Ss OPTIONS
-The following is a list of options shared across all subcommands.
-This field applies only to the
-.Sy run
-and
-.Sy run-file
-commands.
-.Pp
-.Fl H
-.Bd -ragged -offset 2m
-Omit column headers when printing output.
-.Ed
-.Pp
-.Fl o Ar field Ns Op ,...
-.Bd -ragged -offset 2m
-A case-insensitive, comma-separated list of output fields to display.
-.Ed
-.Pp
-.Fl p
-.Bd -ragged -offset 2m
-Display in a machine-parsable format and elide test stats output when
-executing the
-.Sy run
-or
-.Sy run-file
-commands.
-The
-.Fl o
-option is required with
-.Fl p .
-.Ed
-.Ss SUBCOMMANDS
-.Nm ktest help
-.Bd -ragged -offset 2m
-Print command usage.
-.Ed
-.Pp
-.Nm ktest list
-.Op Fl H
-.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
-.Op Ar triple...
-.Bd -ragged -offset 2m
-List all registered tests.
-One or more triples may be specified to narrow the listing.
-.Pp
-.Ed
-.Pp
-.Nm ktest run
-.Op Fl H
-.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
-.Op Fl i Ar file
-.Ar triple...
-.Bd -ragged -offset 2m
-Run registered tests.
-One or more triples may be specified to limit which tests are run.
-At least one triple must be specified.
-.Pp
-.Fl i Ar file
-.Ed
-.Bd -ragged -offset 4m
-Specify a
-.Ar file
-to act as the input stream for all tests requiring one.
-.Ed
-.Pp
-.\" ktest run-file
-.Nm
-run-file
-.Op Fl H
-.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
-.Op Ar runfile
-.Bd -ragged -offset 2m
-Run the tests specified by the
-.Ar runfile .
-If no
-.Ar runfile
-is specified, then use stdin as the contents of the
-.Ar runfile .
-.Ed
 .Sh EXIT STATUS
 The following exit values are returned:
 .Bl -tag -width indent
@@ -216,16 +232,12 @@ The following exit values are returned:
 Successful completion of the command.
 For the
 .Sy run
-and
-.Sy run-file
-commands this also indicates that all tests produced a PASS or SKIP result.
+command, this also indicates that all tests produced a PASS or SKIP result.
 .It 1
 An error occurred while executing the command.
 For the
 .Sy run
-and
-.Sy run-file
-commands this also indicates that one or more tests produced
+command, this also indicates that one or more tests produced
 a result other than PASS or SKIP.
 .It 2
 An invalid combination of command line options or arguments were
@@ -251,14 +263,6 @@ This includes all suites under the
 module and all tests under each suite.
 .Bd -literal -offset ident
 ktest run 'mac::'
-.Ed
-.Ss Execute a run file
-Executes the run file named
-.Sy mac.runfile
-and outputs the results in parsable format to stdout.
-This is useful for integrating ktest into a larger testing framework.
-.Bd -literal -offset ident
-ktest run-file -Hpo result,module,suite,test,input,line,reason mac.runfile
 .Ed
 .Ss Run a test with an input file
 Execute a specific test which requires an input stream.

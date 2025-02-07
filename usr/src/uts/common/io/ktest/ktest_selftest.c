@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 Ryan Zezeski
  */
 
@@ -215,11 +215,15 @@ _init()
 	}
 
 	/*
-	 * It would be nice to test this in ktest_st_test_unique(),
-	 * but we can't because this call grabs the ktest_lock, and
-	 * the lock is already held while a test is running. If you
-	 * see a panic here, check ktest_register_module() to make
-	 * sure it's enforcing module name uniqueness.
+	 * It would be nice to test this in ktest_st_test_unique(), but we can't
+	 * because this call grabs the ktest_lock, and the lock is already held
+	 * while a test is running. If you see a panic here, check the logic in
+	 * ktest_register_module() to make sure it's enforcing module name
+	 * uniqueness.
+	 *
+	 * There is special logic in ktest_register_module() to suppress error
+	 * output from this specific failed attempt, as it would be unsporting
+	 * to alarm an operator with deliberate and expected behavior.
 	 */
 	VERIFY(ktest_register_module(km) == EEXIST);
 

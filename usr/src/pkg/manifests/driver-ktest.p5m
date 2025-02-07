@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2024 Ryan Zezeski
 #
 
@@ -29,14 +29,23 @@ file path=kernel/drv/ktest.conf group=sys
 dir  path=usr/bin
 file path=usr/bin/ktest mode=0555
 dir  path=usr/include
+file path=usr/include/libktest.h mode=0644
 dir  path=usr/include/sys
 file path=usr/include/sys/ktest.h mode=0644
 dir  path=usr/kernel/misc group=sys
 dir  path=usr/kernel/misc/ktest group=sys
 dir  path=usr/kernel/misc/ktest/$(ARCH64) group=sys
-file path=usr/kernel/misc/ktest/$(ARCH64)/ktest_selftest group=sys mode=0755
-file path=usr/kernel/misc/ktest/$(ARCH64)/mac_test group=sys mode=0755
-file path=usr/kernel/misc/ktest/$(ARCH64)/stream_test group=sys mode=0755
+file path=usr/kernel/misc/ktest/$(ARCH64)/ktest_ktest group=sys mode=0755
+file path=usr/kernel/misc/ktest/$(ARCH64)/mac_ktest group=sys mode=0755
+file path=usr/kernel/misc/ktest/$(ARCH64)/stream_ktest group=sys mode=0755
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+# Although ktest (and thus libktest) is only usable from the global zone, there
+# are package dependants which are marked for use from the non-global zone which
+# would go unfulfilled if the library was not also available.
+link path=usr/lib/$(ARCH64)/libktest.so target=libktest.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/$(ARCH64)/libktest.so.1 variant.opensolaris.zone=__NODEFAULT
 dir  path=usr/lib/devfsadm group=sys
 dir  path=usr/lib/devfsadm/linkmod group=sys
 dir  path=usr/share/man

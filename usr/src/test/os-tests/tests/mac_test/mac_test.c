@@ -37,11 +37,14 @@
 #include <sys/sysmacros.h>
 
 #include <libnvpair.h>
+#include <libktest.h>
 #include <sys/ethernet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
+
+static ktest_hdl_t *kthdl = NULL;
 
 /*
  * Clones of in-kernel types to specify desired results.
@@ -359,52 +362,60 @@ build_ether_payload(test_pkt_t *tp, uint8_t *dstaddr, uint32_t tci,
 	return (payload);
 }
 
+struct test_tuple {
+	const char *tt_module;
+	const char *tt_suite;
+	const char *tt_test;
+};
+const struct test_tuple tuple_meoi = {
+	.tt_module = "mac",
+	.tt_suite = "parsing",
+	.tt_test = "mac_ether_offload_info_test"
+};
+const struct test_tuple tuple_partial_meoi = {
+	.tt_module = "mac",
+	.tt_suite = "parsing",
+	.tt_test = "mac_partial_offload_info_test"
+};
+const struct test_tuple tuple_l2info = {
+	.tt_module = "mac",
+	.tt_suite = "parsing",
+	.tt_test = "mac_ether_l2_info_test"
+};
+
 static bool
-run_test(nvlist_t *payload, char *test_tuple)
+run_test(nvlist_t *payload, const struct test_tuple *tuple)
 {
 	size_t payload_sz;
 	char *payload_packed = fnvlist_pack(payload, &payload_sz);
 	VERIFY(payload_packed != NULL);
 	nvlist_free(payload);
 
-	char payload_path[] = "/tmp/mac_test.payload.XXXXXX";
-	int fd = mkstemp(payload_path);
-	if (fd < 0) {
-		err(EXIT_FAILURE, "failed to open payload file");
+	ktest_run_req_t req = {
+		.krq_module = tuple->tt_module,
+		.krq_suite = tuple->tt_suite,
+		.krq_test = tuple->tt_test,
+		.krq_input = (uchar_t *)payload_packed,
+		.krq_input_len = payload_sz,
+	};
+	ktest_run_result_t result = { 0 };
+
+	if (!ktest_run(kthdl, &req, &result)) {
+		err(EXIT_FAILURE, "error while attempting ktest_run()");
 	}
 
-	for (size_t written = 0; written < payload_sz; ) {
-		ssize_t block = write(fd, &payload_packed[written],
-		    payload_sz - written);
-		if (block < 1) {
-			if (errno == EINTR) {
-				continue;
-			}
-			err(EXIT_FAILURE, "error while writing payload");
-		}
-		written += block;
+	const char *cname = ktest_code_name(result.krr_code);
+	if (result.krr_code == KTEST_CODE_PASS) {
+		(void) printf("%s: %s\n", tuple->tt_test, cname);
+		free(result.krr_msg);
+		return (true);
+	} else {
+		(void) printf("%s: %s @ line %u\n",
+		    tuple->tt_test, cname, result.krr_line);
+		(void) printf("\tmsg: %s", result.krr_msg);
+		free(result.krr_msg);
+		return (false);
 	}
-
-	pid_t child;
-
-	char *args[] = {"ktest", "run", "-p",
-	    "-o", "test,result,line,reason", "-i", payload_path,
-	    test_tuple, NULL};
-	if (posix_spawnp(&child, "ktest", NULL, NULL, args, NULL) != 0) {
-		err(EXIT_FAILURE, "failed to spawn ktest");
-	}
-
-	int status, err;
-	do {
-		err = waitpid(child, &status, 0);
-	} while (err == -1 && errno == EINTR);
-
-	(void) unlink(payload_path);
-	if (err < 0) {
-		errx(EXIT_FAILURE, "error while waiting for ktest child");
-	}
-
-	return (WEXITSTATUS(status) == 0);
 }
 
 static uint32_t *
@@ -455,6 +466,10 @@ split_print(const uint32_t *splits, uint_t num_splits)
 	}
 }
 
+/*
+ * Run variations of mac_ether_offload_info() test against packet/meoi pair.
+ * Returns true if any variation failed.
+ */
 static bool
 run_meoi_variants(const char *prefix, test_pkt_t *tp,
     const mac_ether_offload_info_t *meoi, bool is_err)
@@ -463,31 +478,31 @@ run_meoi_variants(const char *prefix, test_pkt_t *tp,
 	bool any_failed = false;
 	uint32_t *splits = NULL;
 	uint_t num_splits;
-	char *test_tuple = "mac:parsing:mac_ether_offload_info_test";
 
 	(void) printf("%s - simple - ", prefix);
-	(void) fflush(stdout);
 	payload = build_meoi_payload(tp, meoi, NULL, 0, is_err);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_meoi);
 
 	(void) printf("%s - split-single-bytes - ", prefix);
-	(void) fflush(stdout);
 	splits = split_gen_single(tp->tp_sz);
 	payload = build_meoi_payload(tp, meoi, splits, tp->tp_sz, is_err);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_meoi);
 	free(splits);
 
 	(void) printf("%s - split-random - ", prefix);
-	(void) fflush(stdout);
 	splits = split_gen_random(tp->tp_sz, &num_splits);
 	payload = build_meoi_payload(tp, meoi, splits, num_splits, is_err);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_meoi);
 	split_print(splits, num_splits);
 	free(splits);
 
-	return (!any_failed);
+	return (any_failed);
 }
 
+/*
+ * Run variations of mac_partial_offload_info() test against packet/meoi pair.
+ * Returns true if any variation failed.
+ */
 static bool
 run_partial_variants(const char *prefix, test_pkt_t *tp,
     const mac_ether_offload_info_t *meoi)
@@ -496,7 +511,6 @@ run_partial_variants(const char *prefix, test_pkt_t *tp,
 	bool any_failed = false;
 	uint32_t *splits = NULL;
 	uint_t num_splits;
-	char *test_tuple = "mac:parsing:mac_partial_offload_info_test";
 
 	/* skip over the l2 header but ask for the rest to be filled */
 	uint32_t offset = meoi->meoi_l2hlen;
@@ -510,30 +524,31 @@ run_partial_variants(const char *prefix, test_pkt_t *tp,
 	result.meoi_l2hlen = 0;
 
 	(void) printf("%s - simple - ", prefix);
-	(void) fflush(stdout);
 	payload = build_partial_payload(tp, offset, &partial, &result, NULL, 0);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_partial_meoi);
 
 	(void) printf("%s - split-single-bytes - ", prefix);
-	(void) fflush(stdout);
 	splits = split_gen_single(tp->tp_sz);
 	payload = build_partial_payload(tp, offset, &partial, &result, splits,
 	    tp->tp_sz);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_partial_meoi);
 	free(splits);
 
 	(void) printf("%s - split-random - ", prefix);
-	(void) fflush(stdout);
 	splits = split_gen_random(tp->tp_sz, &num_splits);
 	payload = build_partial_payload(tp, offset, &partial, &result, splits,
 	    num_splits);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_partial_meoi);
 	split_print(splits, num_splits);
 	free(splits);
 
-	return (!any_failed);
+	return (any_failed);
 }
 
+/*
+ * Run variations of mac_ether_l2_info() test against packet/data pairing.
+ * Returns true if any variation failed.
+ */
 static bool
 run_ether_variants(const char *prefix, test_pkt_t *tp, uint8_t *dstaddr,
     uint32_t tci)
@@ -541,35 +556,38 @@ run_ether_variants(const char *prefix, test_pkt_t *tp, uint8_t *dstaddr,
 	nvlist_t *payload;
 	bool any_failed = false;
 	uint32_t *splits = NULL;
-	char *test_tuple = "mac:parsing:mac_ether_l2_info_test";
 
 	(void) printf("%s - simple - ", prefix);
-	(void) fflush(stdout);
 	payload = build_ether_payload(tp, dstaddr, tci, NULL, 0);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_l2info);
 
 	(void) printf("%s - split-single-bytes - ", prefix);
-	(void) fflush(stdout);
 	splits = split_gen_single(tp->tp_sz);
 	payload = build_ether_payload(tp, dstaddr, tci, splits, tp->tp_sz);
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_l2info);
 	free(splits);
 
 	/* intentionally split dstaddr, tpid, tci, and ethertype */
 	uint32_t intentional_splits[] = { 4, 9, 2, 2 };
 	(void) printf("%s - split-intentional - ", prefix);
-	(void) fflush(stdout);
 	payload = build_ether_payload(tp, dstaddr, tci, intentional_splits,
 	    ARRAY_SIZE(intentional_splits));
-	any_failed |= !run_test(payload, test_tuple);
+	any_failed |= !run_test(payload, &tuple_l2info);
 	split_print(intentional_splits, ARRAY_SIZE(intentional_splits));
 
-	return (!any_failed);
+	return (any_failed);
 }
 
 int
 main(int argc, char *argv[])
 {
+	if (!ktest_mod_load("mac")) {
+		err(EXIT_FAILURE, "could not load mac ktest module");
+	}
+	if ((kthdl = ktest_init()) == NULL) {
+		err(EXIT_FAILURE, "could not initialize libktest");
+	}
+
 	bool any_failed = false;
 
 	/* Use fixed seed for deterministic "random" output */
@@ -582,11 +600,11 @@ main(int argc, char *argv[])
 	test_pkt_t *tp_tcp6 = build_tcp6(&meoi_tcp6);
 
 	any_failed |=
-	    !run_meoi_variants("basic tcp4", tp_tcp4, &meoi_tcp4, false);
+	    run_meoi_variants("basic tcp4", tp_tcp4, &meoi_tcp4, false);
 	any_failed |=
-	    !run_meoi_variants("basic tcp6", tp_tcp6, &meoi_tcp6, false);
-	any_failed |= !run_partial_variants("basic tcp4", tp_tcp4, &meoi_tcp4);
-	any_failed |= !run_partial_variants("basic tcp6", tp_tcp6, &meoi_tcp6);
+	    run_meoi_variants("basic tcp6", tp_tcp6, &meoi_tcp6, false);
+	any_failed |= run_partial_variants("basic tcp4", tp_tcp4, &meoi_tcp4);
+	any_failed |= run_partial_variants("basic tcp6", tp_tcp6, &meoi_tcp6);
 
 	/*
 	 * Truncate the tcp header to induce a parse failure, but expect that
@@ -598,18 +616,18 @@ main(int argc, char *argv[])
 	meoi_tcp6.meoi_flags &= ~MEOI_L4INFO_SET;
 
 	any_failed |=
-	    !run_meoi_variants("truncated tcp4", tp_tcp4, &meoi_tcp4, true);
+	    run_meoi_variants("truncated tcp4", tp_tcp4, &meoi_tcp4, true);
 	any_failed |=
-	    !run_meoi_variants("truncated tcp6", tp_tcp6, &meoi_tcp6, true);
+	    run_meoi_variants("truncated tcp6", tp_tcp6, &meoi_tcp6, true);
 
 	mac_ether_offload_info_t meoi_frag_v4 = { 0 };
 	mac_ether_offload_info_t meoi_frag_v6 = { 0 };
 	test_pkt_t *tp_frag_v4 = build_frag_v4(&meoi_frag_v4);
 	test_pkt_t *tp_frag_v6 = build_frag_v6(&meoi_frag_v6);
 
-	any_failed |= !run_meoi_variants("fragment ipv4", tp_frag_v4,
+	any_failed |= run_meoi_variants("fragment ipv4", tp_frag_v4,
 	    &meoi_frag_v4, false);
-	any_failed |= !run_meoi_variants("fragment ipv6", tp_frag_v6,
+	any_failed |= run_meoi_variants("fragment ipv6", tp_frag_v6,
 	    &meoi_frag_v6, false);
 
 	test_pkt_t *tp_ether_plain = tp_alloc();
@@ -641,5 +659,6 @@ main(int argc, char *argv[])
 	tp_free(tp_ether_plain);
 	tp_free(tp_ether_vlan);
 
+	ktest_fini(kthdl);
 	return (any_failed ? EXIT_FAILURE : EXIT_SUCCESS);
 }

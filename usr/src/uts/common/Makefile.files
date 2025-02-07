@@ -2356,6 +2356,6 @@ KTEST_OBJS += ktest.o
 #
 # Kernel test modules included with the system.
 #
-MAC_TEST_OBJS += mac_test.o
-KTEST_SELFTEST_OBJS += ktest_selftest.o
-STREAM_TEST_OBJS += stream_test.o
+MAC_KTEST_OBJS += mac_ktest.o
+KTEST_KTEST_OBJS += ktest_selftest.o
+STREAM_KTEST_OBJS += stream_ktest.o

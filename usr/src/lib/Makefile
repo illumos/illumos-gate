@@ -158,6 +158,7 @@ SUBDIRS +=				\
 	libkmf		\
 	libkrb5		\
 	libkstat	\
+	libktest	\
 	libkvm		\
 	libldap5	\
 	liblgrp		\
@@ -416,6 +417,7 @@ HDRSUBDIRS=				\
 	libiscsit	\
 	libkrb5		\
 	libkstat	\
+	libktest	\
 	libkvm		\
 	libmail		\
 	libmapid	\
@@ -635,6 +637,7 @@ libipsecutil:	libtecla libtsol libkmf
 libiscsit:	libstmf libuuid
 libhotplug:	libnvpair
 libkmf:		libcryptoutil pkcs11 libcustr
+libktest:	libnvpair
 libkvm:		../cmd/sgs/libelf
 libldap5:	libsasl
 libmapid:	libresolv2 libscf

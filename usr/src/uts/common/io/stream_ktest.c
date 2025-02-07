@@ -187,14 +187,14 @@ cleanup:
 		freemsg(pullmp);
 }
 
-static struct modlmisc stream_test_modlmisc = {
+static struct modlmisc stream_ktest_modlmisc = {
 	.misc_modops = &mod_miscops,
 	.misc_linkinfo = "stream ktest module"
 };
 
-static struct modlinkage stream_test_modlinkage = {
+static struct modlinkage stream_ktest_modlinkage = {
 	.ml_rev = MODREV_1,
-	.ml_linkage = { &stream_test_modlmisc, NULL }
+	.ml_linkage = { &stream_ktest_modlmisc, NULL }
 };
 
 int
@@ -217,7 +217,7 @@ _init()
 		return (ret);
 	}
 
-	if ((ret = mod_install(&stream_test_modlinkage)) != 0) {
+	if ((ret = mod_install(&stream_ktest_modlinkage)) != 0) {
 		ktest_unregister_module("stream");
 		return (ret);
 	}
@@ -229,11 +229,11 @@ int
 _fini()
 {
 	ktest_unregister_module("stream");
-	return (mod_remove(&stream_test_modlinkage));
+	return (mod_remove(&stream_ktest_modlinkage));
 }
 
 int
 _info(struct modinfo *modinfop)
 {
-	return (mod_info(&stream_test_modlinkage, modinfop));
+	return (mod_info(&stream_ktest_modlinkage, modinfop));
 }

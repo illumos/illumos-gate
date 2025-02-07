@@ -26,7 +26,7 @@ include ../Makefile.ctf
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
-LDLIBS += -L$(ROOT)/lib -lumem -lgen -lnvpair -lofmt -lcmdutils
+LDLIBS += -L$(ROOT)/lib -lumem -lgen -lofmt -lcmdutils -lktest
 
 CSTD = $(CSTD_GNU99)
 

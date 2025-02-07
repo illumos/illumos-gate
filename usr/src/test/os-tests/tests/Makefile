@@ -34,6 +34,7 @@ SUBDIRS =       \
 		ilstr \
 		ksensor \
 		ksid \
+		ktest \
 		libtopo \
 		mac_test \
 		minttl \
