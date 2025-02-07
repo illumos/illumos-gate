@@ -248,14 +248,12 @@ atge_l1c_mii_reset(void *arg)
 	phyaddr = mii_get_addr(atgep->atge_mii);
 
 	/* Reset magic from Linux, via Freebsd */
-	OUTW(atgep, ATGE_GPHY_CTRL,
-	    GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE | GPHY_CTRL_SEL_ANA_RESET);
+	OUTW(atgep, ATGE_GPHY_CTRL, GPHY_CTRL_SEL_ANA_RESET);
 	(void) INW(atgep, ATGE_GPHY_CTRL);
 	drv_usecwait(10 * 1000);
 
 	OUTW(atgep, ATGE_GPHY_CTRL,
-	    GPHY_CTRL_EXT_RESET | GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE |
-	    GPHY_CTRL_SEL_ANA_RESET);
+	    GPHY_CTRL_EXT_RESET | GPHY_CTRL_SEL_ANA_RESET);
 	(void) INW(atgep, ATGE_GPHY_CTRL);
 	drv_usecwait(10 * 1000);
 
