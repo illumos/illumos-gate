@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2025 Oxide computer Company
 #
 
 #
@@ -43,7 +44,7 @@
 # 3 x tcp:::send (2 during the TCP handshake, then a FIN)
 # 2 x ip:::receive (1 during the TCP handshake, then the FIN ACK)
 # 2 x tcp:::receive (1 during the TCP handshake, then the FIN ACK)
-# 
+#
 
 if (( $# != 1 )); then
 	print -u2 "expected one argument: <dtrace-path>"
@@ -53,7 +54,6 @@ fi
 dtrace=$1
 getaddr=./get.ipv4remote.pl
 tcpport=22
-DIR=/var/tmp/dtest.$$
 
 if [[ ! -x $getaddr ]]; then
         print -u2 "could not find or execute sub program: $getaddr"
@@ -64,21 +64,7 @@ if (( $? != 0 )); then
         exit 4
 fi
 
-mkdir $DIR
-cd $DIR
-
-cat > test.pl <<-EOPERL
-	use IO::Socket;
-	my \$s = IO::Socket::INET->new(
-	    Proto => "tcp",
-	    PeerAddr => "$dest",
-	    PeerPort => $tcpport,
-	    Timeout => 3);
-	die "Could not connect to host $dest port $tcpport" unless \$s;
-	close \$s;
-EOPERL
-
-$dtrace -c 'perl test.pl' -qs /dev/stdin <<EODTRACE
+$dtrace -c "./msnc.exe $dest $tcpport" -qs /dev/stdin <<EODTRACE
 BEGIN
 {
 	ipsend = tcpsend = ipreceive = tcpreceive = 0;
@@ -121,8 +107,5 @@ END
 EODTRACE
 
 status=$?
-
-cd /
-/usr/bin/rm -rf $DIR
 
 exit $?
