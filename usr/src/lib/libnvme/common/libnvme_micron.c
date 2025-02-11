@@ -10,13 +10,13 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
  * libnvme logic specific to Micron device families. Currently this has support
- * for the Micron 7300, 7400, 7450, 6500, and 7500 device generations. Right now
- * we only have support for some of the device-specific log pages.
+ * for the Micron 7300, 7400, 7450, 6500, 7500, and 9550 device generations.
+ * Right now we only have support for some of the device-specific log pages.
  */
 
 #include <sys/sysmacros.h>
@@ -68,6 +68,11 @@ static const nvme_log_page_info_t *micron_74x0_log_pages[] = {
 static const nvme_log_page_info_t *micron_x500_log_pages[] = {
 	&ocp_log_smart, &ocp_log_errrec, &ocp_log_fwact, &ocp_log_lat,
 	&ocp_log_devcap, &ocp_log_unsup
+};
+
+static const nvme_log_page_info_t *micron_9550_log_pages[] = {
+	&ocp_log_smart, &ocp_log_errrec, &ocp_log_fwact, &ocp_log_lat,
+	&ocp_log_devcap, &ocp_log_unsup, &ocp_log_telstr
 };
 
 static const nvme_vsd_ident_t micron_7300_idents[] = {
@@ -137,4 +142,23 @@ const nvme_vsd_t micron_x500 = {
 	.nvd_nident = ARRAY_SIZE(micron_x500_idents),
 	.nvd_logs = micron_x500_log_pages,
 	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages)
+};
+
+static const nvme_vsd_ident_t micron_9550_idents[] = {
+	{
+		.nvdi_vid = MICRON_PCI_VID,
+		.nvdi_did = MICRON_9550_PRO_DID,
+		.nvdi_human = "Micron 9550 Pro",
+	}, {
+		.nvdi_vid = MICRON_PCI_VID,
+		.nvdi_did = MICRON_9550_MAX_DID,
+		.nvdi_human = "Micron 9550 Max",
+	}
+};
+
+const nvme_vsd_t micron_9550 = {
+	.nvd_ident = micron_9550_idents,
+	.nvd_nident = ARRAY_SIZE(micron_9550_idents),
+	.nvd_logs = micron_9550_log_pages,
+	.nvd_nlogs = ARRAY_SIZE(micron_9550_log_pages)
 };

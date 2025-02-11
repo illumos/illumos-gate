@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _LIBNVME_IMPL_H
@@ -61,6 +61,26 @@ struct nvme_ctrl_iter {
 	nvme_ctrl_disc_t ni_disc;
 };
 
+typedef enum {
+	/*
+	 * This indicates that we have attempted to fill in the NVMe 2.0
+	 * supported logs page information and therefore can use it as part of
+	 * log page discovery. This is filled in lazily on a handle and will
+	 * persist as long as a handle does. If the log page is not supported or
+	 * an error occurred then the VALID flag will be set, but the
+	 * nc_sup_logs member will be set to NULL to indicate that we don't have
+	 * the information.
+	 *
+	 * When the log page is supported, but something has gone wrong, we will
+	 * set the FAILED flag to indicate that. Presuming it wasn't a memory
+	 * failure, then we try to save a copy of the resulting nvme_err_data_t.
+	 * This information isn't exposed outside of the library, but is kept on
+	 * the handle to aid debugging.
+	 */
+	NVME_CTRL_F_SUP_LOGS_VALID	= 1 << 0,
+	NVME_CTRL_F_SUP_LOGS_FAILED	= 1 << 1
+} nvme_ctrl_flags_t;
+
 struct nvme_ctrl {
 	nvme_t *nc_nvme;
 	nvme_err_data_t nc_err;
@@ -72,6 +92,9 @@ struct nvme_ctrl {
 	nvme_version_t nc_vers;
 	nvme_identify_ctrl_t nc_info;
 	const struct nvme_vsd *nc_vsd;
+	nvme_ctrl_flags_t nc_flags;
+	nvme_suplog_log_t *nc_sup_logs;
+	nvme_err_data_t *nc_sup_logs_err;
 };
 
 struct nvme_ns_disc {
@@ -478,16 +501,20 @@ extern const nvme_log_page_info_t ocp_log_fwact;
 extern const nvme_log_page_info_t ocp_log_lat;
 extern const nvme_log_page_info_t ocp_log_devcap;
 extern const nvme_log_page_info_t ocp_log_unsup;
+extern const nvme_log_page_info_t ocp_log_telstr;
 
 extern const nvme_vsd_t wdc_sn840;
 extern const nvme_vsd_t wdc_sn65x;
+extern const nvme_vsd_t wdc_sn861;
 extern const nvme_vsd_t micron_7300;
 extern const nvme_vsd_t micron_74x0;
 extern const nvme_vsd_t micron_x500;
+extern const nvme_vsd_t micron_9550;
 extern const nvme_vsd_t intel_p5510;
 extern const nvme_vsd_t solidigm_p5x20;
 extern const nvme_vsd_t solidigm_ps10x0;
 extern const nvme_vsd_t kioxia_cd8;
+extern const nvme_vsd_t phison_x200;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);

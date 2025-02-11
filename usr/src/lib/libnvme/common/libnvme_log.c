@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -198,6 +198,83 @@ nvme_log_discover_validate(nvme_ctrl_t *ctrl, nvme_log_disc_scope_t scopes,
 	return (true);
 }
 
+/*
+ * The NVMe 2.0 specification adds a mandatory log page that describes which log
+ * pages are actually implemented, though not as much information as we use in
+ * discovery. We will attempt once per controller handle to get this log page
+ * and use it to augment the supported information in the discovery process.
+ * This log page is the first entry of the nvme_std_log_pages array.
+ */
+static void
+nvme_log_discover_fetch_sup_logs(nvme_ctrl_t *ctrl)
+{
+	const nvme_log_page_info_t *sup_info = &nvme_std_log_pages[0];
+	nvme_suplog_log_t *sup = NULL;
+	nvme_log_req_t *req = NULL;
+	nvme_valid_ctrl_data_t data;
+
+	VERIFY3U(sup_info->nlpi_lid, ==, NVME_LOGPAGE_SUP);
+
+	/*
+	 * Mark the data in the nvme_ctrl_t as valid at this point. If this
+	 * fails, we swallow this error and just will have slightly less
+	 * information available on certain log pages. In general, this only
+	 * impacts the detection of vendor defined log pages where our built-in
+	 * information is not as accurate due to the lack of firmware
+	 * information.
+	 */
+	ctrl->nc_sup_logs = NULL;
+	ctrl->nc_flags |= NVME_CTRL_F_SUP_LOGS_VALID;
+
+	data.vcd_vers = &ctrl->nc_vers;
+	data.vcd_id = &ctrl->nc_info;
+
+	if (!nvme_log_page_info_supported(sup_info, &data)) {
+		return;
+	}
+
+	sup = calloc(1, sizeof (nvme_suplog_log_t));
+	if (sup == NULL) {
+		int e = errno;
+		(void) nvme_ctrl_error(ctrl, NVME_ERR_NO_MEM, e, "failed to "
+		    "allocate memory for internal log page info: %s",
+		    strerror(e));
+		goto err;
+	}
+
+	if (!nvme_log_req_init(ctrl, &req)) {
+		goto err;
+	}
+
+	if (!nvme_log_req_set_lid(req, sup_info->nlpi_lid) ||
+	    !nvme_log_req_set_csi(req, sup_info->nlpi_csi) ||
+	    !nvme_log_req_set_output(req, sup, sizeof (nvme_suplog_log_t)) ||
+	    !nvme_log_req_exec(req)) {
+		goto err;
+	}
+
+	ctrl->nc_sup_logs = sup;
+	nvme_log_req_fini(req);
+	return;
+
+err:
+	/*
+	 * Flag this as failed and attempt to save the error that got us here.
+	 * If a memory allocation failure occurs here, then there's not much
+	 * more we can do, but at least this flag set and no error information
+	 * does indicate a memory problem. Regardless, we clear out the error
+	 * from the nvme_ctrl_t.
+	 */
+	ctrl->nc_flags |= NVME_CTRL_F_SUP_LOGS_FAILED;
+	if ((ctrl->nc_sup_logs_err = calloc(1, sizeof (nvme_err_data_t))) !=
+	    NULL) {
+		nvme_ctrl_err_save(ctrl, ctrl->nc_sup_logs_err);
+	}
+	(void) nvme_ctrl_success(ctrl);
+	nvme_log_req_fini(req);
+	free(sup);
+}
+
 void
 nvme_log_discover_fini(nvme_log_iter_t *iter)
 {
@@ -209,6 +286,7 @@ nvme_log_discover_one(nvme_log_iter_t *iter, const nvme_log_page_info_t *info)
 {
 	bool var;
 	nvme_log_disc_t *disc = &iter->nli_nld;
+	nvme_ctrl_t *ctrl = iter->nli_ctrl;
 	nvme_log_disc_scope_t scope;
 	nvme_valid_ctrl_data_t data;
 
@@ -252,7 +330,19 @@ nvme_log_discover_one(nvme_log_iter_t *iter, const nvme_log_page_info_t *info)
 		disc->nld_alloc_len = NVME_LOG_MAX_SIZE;
 	}
 
-	if (nvme_log_page_info_supported(info, &data)) {
+	/*
+	 * Determine if a log page is supported. This uses the per-log knowledge
+	 * built into the nvme_log_page_info_t structures by default. When we
+	 * have the NVMe 2.0 Supported Log Pages log, then we require both that
+	 * and the internal bits fire. We've encountered some cases where the
+	 * datasheet indicates something is supported, but firmware does not for
+	 * some surprising reason. We haven't yet found cases where our logic
+	 * says something is implemented but the log page information is wrong.
+	 * That will likely come some day and we'll need a quirks list.
+	 */
+	if (nvme_log_page_info_supported(info, &data) &&
+	    (ctrl->nc_sup_logs == NULL ||
+	    ctrl->nc_sup_logs->nl_logs[info->nlpi_lid].ns_lsupp) != 0) {
 		disc->nld_flags |= NVME_LOG_DISC_F_IMPL;
 	}
 
@@ -271,10 +361,11 @@ nvme_log_discover_step(nvme_log_iter_t *iter, const nvme_log_disc_t **outp)
 
 	/*
 	 * We start by walking the list of spec pages and then check the device
-	 * specific ones. In the NVMe 2.x era or when we have support for a
-	 * vendor-specific method for getting supported log pages then we should
-	 * prefer executing that and using that info to provide information
-	 * where possible.
+	 * specific ones. While we may have the NVMe 2.0 Supported Log Page
+	 * information, we don't really use that in discovery right now as it's
+	 * rather hard to communicate useful discovery information with that. We
+	 * mostly use this as a check on whether or not the log page is actually
+	 * implemented based on our knowledge.
 	 */
 	if (!iter->nli_std_done) {
 		while (iter->nli_cur_idx < nvme_std_log_npages) {
@@ -332,6 +423,10 @@ nvme_log_discover_init(nvme_ctrl_t *ctrl, nvme_log_disc_scope_t scopes,
 		return (nvme_ctrl_error(ctrl, NVME_ERR_NO_MEM, e, "failed to "
 		    "allocate memory for a new nvme_log_iter_t: %s",
 		    strerror(e)));
+	}
+
+	if ((ctrl->nc_flags & NVME_CTRL_F_SUP_LOGS_VALID) == 0) {
+		nvme_log_discover_fetch_sup_logs(ctrl);
 	}
 
 	iter->nli_ctrl = ctrl;

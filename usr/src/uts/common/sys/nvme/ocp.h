@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_OCP_H
@@ -73,9 +73,9 @@ typedef enum {
 	OCP_LOG_DSSD_TCG	= 0xc7,
 	/*
 	 * This is the telemetry string log. Added in v2.5. Scoped to the NVM
-	 * subsystem.
+	 * subsystem. See the ocp_vul_telstr_t.
 	 */
-	OCP_LOG_DSSD_TELEMTRY	= 0xc9
+	OCP_LOG_DSSD_TELEMETRY	= 0xc9
 } ocp_vul_t;
 
 typedef enum {
@@ -638,6 +638,103 @@ typedef struct {
 } ocp_vul_unsup_req_t;
 
 /*
+ * Telemetry String Log. This log, added in OCP v2.5 is structured with a header
+ * of fixed tables followed by variable information based upon the header
+ * information.
+ */
+typedef struct {
+	/*
+	 * v2.5: 1
+	 */
+	uint8_t ots_vers[1];
+	uint8_t ots_rsvd1[15];
+	/*
+	 * Log Page GUID: B13A83691A8F408B9EA495940057AA44h
+	 */
+	uint8_t ots_guid[16];
+	/*
+	 * These members generally indicate different parts of the table size.
+	 * Each of them is a number of uint32_t's long (aka dwords).
+	 */
+	uint64_t ots_sls_ndw;
+	uint8_t ots_rsvd40[24];
+	uint64_t ots_sit_off_ndw;
+	uint64_t ots_sit_len_ndw;
+	uint64_t ots_est_off_ndw;
+	uint64_t ots_est_len_ndw;
+	uint64_t ots_vuest_off_ndw;
+	uint64_t ots_vuest_len_ndw;
+	uint64_t ots_asct_off_ndw;
+	uint64_t ots_asct_len_ndw;
+	/*
+	 * These are nominally ASCII strings that are supposed to cover various
+	 * FIFOs.
+	 */
+	uint8_t ots_fifo0[16];
+	uint8_t ots_fifo1[16];
+	uint8_t ots_fifo2[16];
+	uint8_t ots_fifo3[16];
+	uint8_t ots_fifo4[16];
+	uint8_t ots_fifo5[16];
+	uint8_t ots_fifo6[16];
+	uint8_t ots_fifo7[16];
+	uint8_t ots_fifo8[16];
+	uint8_t ots_fifo9[16];
+	uint8_t ots_fifo10[16];
+	uint8_t ots_fifo11[16];
+	uint8_t ots_fifo12[16];
+	uint8_t ots_fifo13[16];
+	uint8_t ots_fifo14[16];
+	uint8_t ots_fifo15[16];
+	uint8_t ots_rsvd384[48];
+	/*
+	 * After this we have the various tables. While in theory they are
+	 * supposed to be ordered such that its SITS, ESTS, VUEST, ASCTS, in
+	 * theory these could be at any offset. The individual structures which
+	 * this could be are defined below.
+	 */
+	uint8_t ots_data[];
+} ocp_vul_telstr_t;
+
+/*
+ * These three structures all have the same general form. They contain a 0s
+ * based length and then an offset from the start of the ASCII string table. The
+ * actual string table is spaced in uint32_t increments and padded with spaces.
+ * There is no NULL terminator in it.
+ */
+typedef struct {
+	uint16_t ocp_sit_id;
+	uint8_t ocp_sit_rsvd2[1];
+	/*
+	 * Zeros based length, so add one.
+	 */
+	uint8_t ocp_sit_len;
+	/*
+	 * Offset from the start of the ASCII table for this entry.
+	 */
+	uint64_t ocp_sit_off;
+	uint8_t ocp_sit_rsvd12[4];
+} ocp_vul_telstr_sit_t;
+
+typedef struct {
+	uint8_t ocp_est_class;
+	uint16_t ocp_est_eid;
+	uint8_t ocp_est_len;
+	uint64_t ocp_est_off;
+	uint8_t ocp_est_rsvd12[4];
+} ocp_vul_telstr_est_t;
+
+typedef struct {
+	uint8_t ocp_vuest_class;
+	uint16_t ocp_vuest_eid;
+	uint8_t ocp_vuest_len;
+	uint64_t ocp_vuest_off;
+	uint8_t ocp_vuest_rsvd12[4];
+} ocp_vul_telstr_vuest_t;
+
+
+
+/*
  * Our current version of smatch cannot handle packed structures.
  */
 #ifndef __CHECKER__
@@ -663,6 +760,12 @@ CTASSERT(sizeof (ocp_vul_devcap_t) == 4096);
 CTASSERT(offsetof(ocp_vul_devcap_t, odc_rsvd144) == 144);
 CTASSERT(sizeof (ocp_req_str_t) == 16);
 CTASSERT(sizeof (ocp_vul_unsup_req_t) == 4096);
+CTASSERT(sizeof (ocp_vul_telstr_t) == 432);
+CTASSERT(offsetof(ocp_vul_telstr_t, ots_fifo0) == 128);
+CTASSERT(offsetof(ocp_vul_telstr_t, ots_rsvd384) == 384);
+CTASSERT(sizeof (ocp_vul_telstr_sit_t) == 16);
+CTASSERT(sizeof (ocp_vul_telstr_est_t) == 16);
+CTASSERT(sizeof (ocp_vul_telstr_vuest_t) == 16);
 #endif
 
 #pragma	pack()	/* pack(1) */

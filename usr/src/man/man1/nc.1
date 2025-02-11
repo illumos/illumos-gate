@@ -28,8 +28,9 @@
 .\"
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 MNX Cloud, Inc.
 .\"
-.Dd April 27, 2024
+.Dd February 10, 2025
 .Dt NC 1
 .Os
 .Sh NAME
@@ -39,7 +40,7 @@
 .Nm
 .Fl h
 .Nm
-.Op Fl 46dnrStuvz
+.Op Fl 46BdnrStuvz
 .Op Fl i Ar interval
 .Op Fl M Ar ttl
 .Op Fl m Ar minttl
@@ -122,6 +123,16 @@ to use IPv4 addresses only.
 Force
 .Nm
 to use IPv6 addresses only.
+.It Fl B
+Attempt to bypass IPsec policy and force cleartext.
+Will fail without the
+.Sy sys_ip_config
+privilege, or with the
+.Fl l
+or
+.Fl U
+flags.
+If no IPsec policy exists, this flag is extraneous.
 .It Fl D
 Enable debugging on the socket.
 .It Fl d
@@ -544,6 +555,9 @@ To bind to a privileged port number
 .Nm
 needs to be granted the
 .Sy net_privaddr
+privilege.
+Bypassing IPsec policy requires the
+.Sy sys_ip_config
 privilege.
 If Trusted Extensions are configured and the port
 .Nm

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_WDC_H
@@ -27,6 +27,7 @@
 
 #include <sys/nvme/wdc_sn840.h>
 #include <sys/nvme/wdc_sn65x.h>
+#include <sys/nvme/wdc_sn861.h>
 
 #ifdef __cplusplus
 extern "C" {

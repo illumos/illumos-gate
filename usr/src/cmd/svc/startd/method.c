@@ -468,7 +468,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 
 	cmd = uu_msprintf("exec %s", method);
 
-	if (inst->ri_utmpx_prefix[0] != '\0' && inst->ri_utmpx_prefix != NULL)
+	if (inst->ri_utmpx_prefix != NULL && inst->ri_utmpx_prefix[0] != '\0')
 		(void) utmpx_mark_init(getpid(), inst->ri_utmpx_prefix);
 
 	setlog(inst->ri_logstem);

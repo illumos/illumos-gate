@@ -29,7 +29,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Peter Tribble.
 # Copyright 2015, Joyent, Inc. All rights reserved.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -901,13 +901,16 @@ NVMEHDRS=		\
 	micron_7300.h		\
 	micron_74x0.h		\
 	micron_x500.h		\
+	micron_9550.h		\
 	ocp.h			\
+	phison.h		\
 	solidigm.h		\
 	solidigm_p5xxx.h	\
 	solidigm_ps10x0.h	\
 	wdc.h			\
 	wdc_sn840.h		\
-	wdc_sn65x.h
+	wdc_sn65x.h		\
+	wdc_sn861.h
 
 SCSIHDRS=		\
 	scsi.h		\

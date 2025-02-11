@@ -16,6 +16,7 @@
 #
 # Copyright 2016 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -46,14 +47,17 @@ file path=usr/include/sys/nvme/kioxia_cd8.h
 file path=usr/include/sys/nvme/micron.h
 file path=usr/include/sys/nvme/micron_7300.h
 file path=usr/include/sys/nvme/micron_74x0.h
+file path=usr/include/sys/nvme/micron_9550.h
 file path=usr/include/sys/nvme/micron_x500.h
 file path=usr/include/sys/nvme/ocp.h
+file path=usr/include/sys/nvme/phison.h
 file path=usr/include/sys/nvme/solidigm.h
 file path=usr/include/sys/nvme/solidigm_p5xxx.h
 file path=usr/include/sys/nvme/solidigm_ps10x0.h
 file path=usr/include/sys/nvme/wdc.h
 file path=usr/include/sys/nvme/wdc_sn65x.h
 file path=usr/include/sys/nvme/wdc_sn840.h
+file path=usr/include/sys/nvme/wdc_sn861.h
 dir  path=usr/lib
 dir  path=usr/lib/$(ARCH64)
 link path=usr/lib/$(ARCH64)/libnvme.so target=libnvme.so.1

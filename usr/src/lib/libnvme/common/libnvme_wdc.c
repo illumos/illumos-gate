@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -339,6 +339,26 @@ const nvme_vsd_t wdc_sn65x = {
 	.nvd_nlogs = ARRAY_SIZE(wdc_sn65x_log_pages),
 	.nvd_vuc = wdc_sn840_sn65x_vuc,
 	.nvd_nvuc = ARRAY_SIZE(wdc_sn840_sn65x_vuc)
+};
+
+static const nvme_vsd_ident_t wdc_sn861_idents[] = {
+	{
+		.nvdi_vid = WDC_PCI_VID,
+		.nvdi_did = WDC_SN861_DID,
+		.nvdi_human = "WDC Ultrastar DC SN861",
+	}
+};
+
+static const nvme_log_page_info_t *wdc_sn861_log_pages[] = {
+	&ocp_log_smart, &ocp_log_errrec, &ocp_log_fwact, &ocp_log_lat,
+	&ocp_log_devcap, &ocp_log_unsup
+};
+
+const nvme_vsd_t wdc_sn861 = {
+	.nvd_ident = wdc_sn861_idents,
+	.nvd_nident = ARRAY_SIZE(wdc_sn861_idents),
+	.nvd_logs = wdc_sn861_log_pages,
+	.nvd_nlogs = ARRAY_SIZE(wdc_sn861_log_pages),
 };
 
 static nvme_vuc_req_t *

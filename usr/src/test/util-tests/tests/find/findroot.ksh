@@ -10,6 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 #
@@ -21,8 +22,20 @@
 
 . "$(dirname $0)/find.kshlib"
 
+# If we need to, and can, enable idmap temporarily as that's all that
+# should be needed to run this test.
+pretest_idmap_state=$(svcs -H -o state svc:/system/idmap)
+if [ "$pretest_idmap_state" == "disabled" ]; then
+    svcadm enable -st svc:/system/idmap
+fi
+
+# Now check for sure if we're can run this test.
 if [ $(svcs -H -o state svc:/system/idmap) != "online" ]; then
     echo "svc:/system/idmap not enabled and online; can't do SID-to-UID mapping" >&2
+    # Disable idmap if we brought it up solely for this test.
+    if [ "$pretest_idmap_state" == "disabled" ]; then
+	svcadm disable svc:/system/idmap
+    fi
     exit 4
 fi
 
@@ -63,5 +76,10 @@ testfind "./a,./d," $find_prog . -sidacl ${sidb}
 
 cd -
 rm -rf $find_dir
+
+# Disable idmap if we brought it up solely for this test.
+if [ "$pretest_idmap_state" == "disabled" ]; then
+    svcadm disable svc:/system/idmap
+fi
 
 exit $find_exit
