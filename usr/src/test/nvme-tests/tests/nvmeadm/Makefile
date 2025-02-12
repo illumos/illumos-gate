@@ -10,10 +10,11 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 SCRIPTS = \
+	nvmeadm_lifecycle \
 	nvmeadm_test
 
 TESTDIR = nvmeadm

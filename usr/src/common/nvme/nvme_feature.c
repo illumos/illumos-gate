@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -116,7 +116,7 @@ const nvme_field_info_t nvme_get_feat_fields[] = {
 	}
 };
 
-size_t nvme_get_feat_nfields = ARRAY_SIZE(nvme_get_feat_fields);
+const size_t nvme_get_feat_nfields = ARRAY_SIZE(nvme_get_feat_fields);
 
 static bool
 nvme_feat_write_cache_sup(const nvme_valid_ctrl_data_t *data,
@@ -307,7 +307,7 @@ const nvme_feat_info_t nvme_std_feats[] = { {
 	.nfeat_out_get = NVME_FEAT_OUTPUT_CDW0
 } };
 
-size_t nvme_std_nfeats = ARRAY_SIZE(nvme_std_feats);
+const size_t nvme_std_nfeats = ARRAY_SIZE(nvme_std_feats);
 
 /*
  * Now it's time to answer the only hard question here: is this feature actually

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -27,9 +27,11 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir  path=opt/nvme-tests
 dir  path=opt/nvme-tests/bin
+file path=opt/nvme-tests/bin/destructive mode=0555
 file path=opt/nvme-tests/bin/non-destructive mode=0555
 file path=opt/nvme-tests/bin/unit mode=0555
 dir  path=opt/nvme-tests/runfiles
+file path=opt/nvme-tests/runfiles/destruct.run mode=0444
 file path=opt/nvme-tests/runfiles/non-destruct.run mode=0444
 file path=opt/nvme-tests/runfiles/unit.run mode=0444
 dir  path=opt/nvme-tests/tests
@@ -46,6 +48,8 @@ file path=opt/nvme-tests/tests/ioctl/basic-lock.32 mode=0555
 file path=opt/nvme-tests/tests/ioctl/basic-lock.64 mode=0555
 file path=opt/nvme-tests/tests/ioctl/ctrl-block-lock.32 mode=0555
 file path=opt/nvme-tests/tests/ioctl/ctrl-block-lock.64 mode=0555
+file path=opt/nvme-tests/tests/ioctl/general-errors.32 mode=0555
+file path=opt/nvme-tests/tests/ioctl/general-errors.64 mode=0555
 file path=opt/nvme-tests/tests/ioctl/lock-order.32 mode=0555
 file path=opt/nvme-tests/tests/ioctl/lock-order.64 mode=0555
 file path=opt/nvme-tests/tests/ioctl/lock-signal.32 mode=0555
@@ -55,23 +59,41 @@ file path=opt/nvme-tests/tests/ioctl/multi-lock-err.64 mode=0555
 file path=opt/nvme-tests/tests/ioctl/multi-reader-lock.32 mode=0555
 file path=opt/nvme-tests/tests/ioctl/multi-reader-lock.64 mode=0555
 dir  path=opt/nvme-tests/tests/libnvme
+file path=opt/nvme-tests/tests/libnvme/bad-req-nsmgmt.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/bad-req-nsmgmt.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/bad-req.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/bad-req.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/check-destruct.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ctrl-disc.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ctrl-disc.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/device-empty.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/device-reset.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/format.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/format.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/info-roundtrip.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/info-roundtrip.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/missing-field-destruct.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/missing-field-destruct.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/missing-field.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/missing-field.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/need-write-lock.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/need-write-lock.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-cap.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-cap.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-disc.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-disc.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-info.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/ns-info.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-lifecycle.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-lifecycle.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-max.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/ns-max.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/pev.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/pev.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.64 mode=0555
 dir  path=opt/nvme-tests/tests/nvmeadm
+file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_lifecycle mode=0555
 file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_test mode=0555
 dir  path=opt/nvme-tests/tests/unit
 file path=opt/nvme-tests/tests/unit/feature.32 mode=0555
@@ -84,6 +106,8 @@ file path=opt/nvme-tests/tests/unit/identify.32 mode=0555
 file path=opt/nvme-tests/tests/unit/identify.64 mode=0555
 file path=opt/nvme-tests/tests/unit/logs.32 mode=0555
 file path=opt/nvme-tests/tests/unit/logs.64 mode=0555
+file path=opt/nvme-tests/tests/unit/nsmgmt.32 mode=0555
+file path=opt/nvme-tests/tests/unit/nsmgmt.64 mode=0555
 file path=opt/nvme-tests/tests/unit/version.32 mode=0555
 file path=opt/nvme-tests/tests/unit/version.64 mode=0555
 file path=opt/nvme-tests/tests/unit/vuc.32 mode=0555

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -39,6 +39,8 @@ tests = [
 	'identify.64',
 	'logs.32',
 	'logs.64',
+	'nsmgmt.32',
+	'nsmgmt.64',
 	'version.32',
 	'version.64'
 	'vuc.32',

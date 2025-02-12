@@ -325,6 +325,12 @@ struct nvme_device_stat {
 	kstat_named_t nds_fwact_prohibited;
 	kstat_named_t nds_fw_overlap;
 	kstat_named_t nds_inv_cmdseq_err;
+	kstat_named_t nds_ns_attached;
+	kstat_named_t nds_ns_priv;
+	kstat_named_t nds_ns_not_attached;
+	kstat_named_t nds_inc_ctrl_list;
+	kstat_named_t nds_ana_attach;
+	kstat_named_t nds_ns_attach_lim;
 
 	/* Errors reported by asynchronous events */
 	kstat_named_t nds_diagfail_event;
@@ -491,11 +497,7 @@ struct nvme_namespace {
 	size_t ns_block_count;
 	size_t ns_block_size;
 	size_t ns_best_block_size;
-
-	boolean_t ns_allocated;
-	boolean_t ns_active;
-	boolean_t ns_ignore;
-	boolean_t ns_attached;
+	nvme_ns_state_t ns_state;
 
 	nvme_identify_nsid_t *ns_idns;
 
@@ -528,6 +530,12 @@ typedef enum {
 	 * operation.
 	 */
 	NVME_IOCTL_EXCL_WRITE,
+	/*
+	 * This indicates that a write lock over the controller is required to
+	 * perform the operation. An example of this is creating a namespace
+	 * because it operates on the controller as a whole.
+	 */
+	NVME_IOCTL_EXCL_CTRL,
 	/*
 	 * This indicates that the exclusive check should be skipped. The only
 	 * case this should be used in is the lock and unlock ioctls as they
@@ -612,6 +620,10 @@ extern boolean_t nvme_validate_vuc(nvme_t *, nvme_ioctl_passthru_t *);
 extern boolean_t nvme_validate_format(nvme_t *, nvme_ioctl_format_t *);
 extern boolean_t nvme_validate_fw_load(nvme_t *, nvme_ioctl_fw_load_t *);
 extern boolean_t nvme_validate_fw_commit(nvme_t *, nvme_ioctl_fw_commit_t *);
+extern boolean_t nvme_validate_ctrl_attach_detach_ns(nvme_t *,
+    nvme_ioctl_common_t *);
+extern boolean_t nvme_validate_ns_delete(nvme_t *, nvme_ioctl_common_t *);
+extern boolean_t nvme_validate_ns_create(nvme_t *, nvme_ioctl_ns_create_t *);
 
 /*
  * Locking functions

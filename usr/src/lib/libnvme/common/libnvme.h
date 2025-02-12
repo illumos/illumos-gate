@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _LIBNVME_H
@@ -405,11 +405,11 @@ typedef enum {
 	 */
 	NVME_ERR_LOCK_WOULD_BLOCK,
 	/*
-	 * These indicate that the respective attach and detach operations
-	 * failed to complete due to an error in the underlying kernel
-	 * subsystems. For detach this might happen because of a disk being
-	 * open, busy in a zpool, or something else. For attach, it may suggest
-	 * and NDI or other issue.
+	 * These indicate that the respective blkdev attach and detach
+	 * operations failed to complete due to an error in the underlying
+	 * kernel subsystems. For detach this might happen because of a disk
+	 * being open, busy in a zpool, or something else. For attach, it may
+	 * suggest an NDI or other issue.
 	 */
 	NVME_ERR_DETACH_KERN,
 	NVME_ERR_ATTACH_KERN,
@@ -434,7 +434,61 @@ typedef enum {
 	 * to hotplug).
 	 */
 	NVME_ERR_CTRL_DEAD,
-	NVME_ERR_CTRL_GONE
+	NVME_ERR_CTRL_GONE,
+	/*
+	 * Indicates that the controller does not support namespace management
+	 * operations including controller attach/detach and namespace
+	 * create/delete.
+	 */
+	NVME_ERR_NS_MGMT_UNSUP_BY_DEV,
+	/*
+	 * Indicates that the controller does not support thin provisioning.
+	 */
+	NVME_ERR_THIN_PROV_UNSUP_BY_DEV,
+	/*
+	 * These indicate that the corresponding requests cannot be executed due
+	 * to missing fields.
+	 */
+	NVME_ERR_NS_ATTACH_REQ_MISSING_FIELDS,
+	NVME_ERR_NS_CREATE_REQ_MISSING_FIELDS,
+	NVME_ERR_NS_DELETE_REQ_MISSING_FIELDS,
+	/*
+	 * This specifically is used by the namespace creation functions to
+	 * indicate that a requested CSI is not supported. Currently this could
+	 * be because the CSI is invalid, the device doesn't support it, the
+	 * kernel doesn't support it, etc.
+	 *
+	 * The namespace attach variant is the same logic, just applied to the
+	 * selector. Both of these are phrased differently as the set of fields
+	 * that may or may not be valid for a given request of these types can
+	 * vary based on the type.
+	 */
+	NVME_ERR_NS_CREATE_BAD_CSI,
+	NVME_ERR_NS_ATTACH_BAD_SEL,
+	/*
+	 * Indicates that the NSID result value is not valid because we have not
+	 * yet executed a namespace create request.
+	 */
+	NVME_ERR_NS_CREATE_NO_RESULTS,
+	/*
+	 * Indicates that the create namespace field is outside of the valid
+	 * range for the field.
+	 */
+	NVME_ERR_NS_CREATE_NCAP_RANGE,
+	NVME_ERR_NS_CREATE_NSZE_RANGE,
+	NVME_ERR_NS_CREATE_NMIC_RANGE,
+	NVME_ERR_NS_CREATE_FLBAS_RANGE,
+	/*
+	 * Indicates that the operation cannot proceed because the namespace is
+	 * already attached or not attached to a controller respectively.
+	 */
+	NVME_ERR_NS_CTRL_ATTACHED,
+	NVME_ERR_NS_CTRL_NOT_ATTACHED,
+	/*
+	 * Indicates that the namespace is unallocated and therefore the
+	 * operation cannot proceed.
+	 */
+	NVME_ERR_NS_UNALLOC
 } nvme_err_t;
 
 /*
@@ -509,6 +563,9 @@ typedef struct nvme_format_req nvme_format_req_t;
 typedef struct nvme_feat_disc nvme_feat_disc_t;
 typedef struct nvme_feat_iter nvme_feat_iter_t;
 typedef struct nvme_get_feat_req nvme_get_feat_req_t;
+typedef struct nvme_ns_attach_req nvme_ns_attach_req_t;
+typedef struct nvme_ns_create_req nvme_ns_create_req_t;
+typedef struct nvme_ns_delete_req nvme_ns_delete_req_t;
 
 /*
  * Vendor-specific forwards.
@@ -1179,6 +1236,39 @@ extern bool nvme_format_req_set_lbaf(nvme_format_req_t *, uint32_t);
 extern bool nvme_format_req_set_ses(nvme_format_req_t *, uint32_t);
 extern bool nvme_format_req_set_nsid(nvme_format_req_t *, uint32_t);
 extern bool nvme_format_req_exec(nvme_format_req_t *);
+
+/*
+ * NVMe Namespace Attach
+ *
+ * This is used to attach or detach a collection of controllers to a namespace.
+ * Currently the only way to specify a controller is to use the self flag on
+ * here. In the future, we will likely have support for listing the explicit
+ * controllers to specify here.
+ */
+extern bool nvme_ns_attach_req_init_by_sel(nvme_ctrl_t *, uint32_t,
+    nvme_ns_attach_req_t **);
+extern void nvme_ns_attach_req_fini(nvme_ns_attach_req_t *);
+extern bool nvme_ns_attach_req_set_nsid(nvme_ns_attach_req_t *, uint32_t);
+extern bool nvme_ns_attach_req_set_ctrlid_self(nvme_ns_attach_req_t *);
+extern bool nvme_ns_attach_req_exec(nvme_ns_attach_req_t *);
+
+/*
+ * NVMe Namesapce Create and Delete
+ */
+extern bool nvme_ns_create_req_init_by_csi(nvme_ctrl_t *, nvme_csi_t,
+    nvme_ns_create_req_t **);
+extern void nvme_ns_create_req_fini(nvme_ns_create_req_t *);
+extern bool nvme_ns_create_req_set_flbas(nvme_ns_create_req_t *, uint32_t);
+extern bool nvme_ns_create_req_set_nsze(nvme_ns_create_req_t *, uint64_t);
+extern bool nvme_ns_create_req_set_ncap(nvme_ns_create_req_t *, uint64_t);
+extern bool nvme_ns_create_req_set_nmic(nvme_ns_create_req_t *, uint32_t);
+extern bool nvme_ns_create_req_exec(nvme_ns_create_req_t *);
+extern bool nvme_ns_create_req_get_nsid(nvme_ns_create_req_t *, uint32_t *);
+
+extern bool nvme_ns_delete_req_init(nvme_ctrl_t *, nvme_ns_delete_req_t **);
+extern void nvme_ns_delete_req_fini(nvme_ns_delete_req_t *);
+extern bool nvme_ns_delete_req_set_nsid(nvme_ns_delete_req_t *, uint32_t);
+extern bool nvme_ns_delete_req_exec(nvme_ns_delete_req_t *);
 
 /*
  * Vendor-specific interfaces.

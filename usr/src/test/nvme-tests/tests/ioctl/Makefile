@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = \
@@ -22,6 +22,7 @@ PROGS = \
 	ctrl-block-lock \
 	lock-order \
 	lock-signal \
+	general-errors \
 	multi-lock-err \
 	multi-reader-lock
 

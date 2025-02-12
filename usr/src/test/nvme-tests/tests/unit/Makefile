@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 PROGS = \
@@ -19,6 +19,7 @@ PROGS = \
 	format \
 	identify \
 	logs \
+	nsmgmt \
 	version \
 	vuc
 
@@ -30,6 +31,7 @@ COMMON_SRCS = \
 	nvme_format.c \
 	nvme_identify.c \
 	nvme_log.c \
+	nvme_nsmgmt.c \
 	nvme_version.c \
 	nvme_vuc.c
 

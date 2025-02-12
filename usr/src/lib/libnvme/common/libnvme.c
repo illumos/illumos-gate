@@ -902,22 +902,24 @@ nvme_nsleveltostr(nvme_ns_disc_level_t level)
 nvme_ns_disc_level_t
 nvme_ns_state_to_disc_level(nvme_ns_state_t state)
 {
-	if ((state & NVME_NS_STATE_ALLOCATED) == 0) {
+	char msg[1024];
+	size_t len;
+
+	switch (state) {
+	case NVME_NS_STATE_UNALLOCATED:
 		return (NVME_NS_DISC_F_ALL);
-	}
-
-	if ((state & NVME_NS_STATE_ACTIVE) == 0) {
+	case NVME_NS_STATE_ALLOCATED:
 		return (NVME_NS_DISC_F_ALLOCATED);
-	}
-
-	if ((state & NVME_NS_STATE_IGNORED) != 0) {
+	case NVME_NS_STATE_ACTIVE:
 		return (NVME_NS_DISC_F_ACTIVE);
-	}
-
-	if ((state & NVME_NS_STATE_ATTACHED) == 0) {
+	case NVME_NS_STATE_NOT_IGNORED:
 		return (NVME_NS_DISC_F_NOT_IGNORED);
-	} else {
+	case NVME_NS_STATE_ATTACHED:
 		return (NVME_NS_DISC_F_BLKDEV);
+	default:
+		len = snprintf(msg, sizeof (msg), "encountered unknown kernel "
+		    "state: 0x%x", state);
+		upanic(msg, len + 1);
 	}
 }
 
@@ -1325,7 +1327,7 @@ nvme_ns_bd_attach(nvme_ns_t *ns)
 	(void) memset(&com, 0, sizeof (com));
 	com.nioc_nsid = ns->nn_nsid;
 
-	if (ioctl(ns->nn_ctrl->nc_fd, NVME_IOC_ATTACH, &com) != 0) {
+	if (ioctl(ns->nn_ctrl->nc_fd, NVME_IOC_BD_ATTACH, &com) != 0) {
 		int e = errno;
 		return (nvme_ioctl_syserror(ctrl, e, "namespace attach"));
 	}
@@ -1346,7 +1348,7 @@ nvme_ns_bd_detach(nvme_ns_t *ns)
 	(void) memset(&com, 0, sizeof (com));
 	com.nioc_nsid = ns->nn_nsid;
 
-	if (ioctl(ns->nn_ctrl->nc_fd, NVME_IOC_DETACH, &com) != 0) {
+	if (ioctl(ns->nn_ctrl->nc_fd, NVME_IOC_BD_DETACH, &com) != 0) {
 		int e = errno;
 		return (nvme_ioctl_syserror(ctrl, e, "namespace detach"));
 	}

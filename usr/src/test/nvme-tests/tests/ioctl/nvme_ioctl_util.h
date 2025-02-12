@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _NVME_IOCTL_UTIL_H
@@ -42,9 +42,11 @@ extern const nvme_ioctl_unlock_t nvme_test_ctrl_unlock;
 extern const nvme_ioctl_unlock_t nvme_test_ns_unlock;
 
 extern int nvme_ioctl_test_get_fd(uint32_t);
+extern int nvme_ioctl_test_get_fd_flags(uint32_t, int);
 extern void nvme_ioctl_test_lock(int, const nvme_ioctl_lock_t *);
 extern bool nvme_ioctl_test_thr_blocked(thread_t);
 
+extern const char *nvme_ioctl_test_cmdstr(int);
 
 #ifdef __cplusplus
 }

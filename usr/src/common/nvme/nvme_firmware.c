@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -146,7 +146,7 @@ const nvme_field_info_t nvme_fw_load_fields[] = {
 	}
 };
 
-size_t nvme_fw_load_nfields = ARRAY_SIZE(nvme_fw_load_fields);
+const size_t nvme_fw_load_nfields = ARRAY_SIZE(nvme_fw_load_fields);
 
 static bool
 nvme_fw_commit_field_valid_slot(const nvme_field_info_t *field,
@@ -195,4 +195,4 @@ const nvme_field_info_t nvme_fw_commit_fields[] = {
 	}
 };
 
-size_t nvme_fw_commit_nfields = ARRAY_SIZE(nvme_fw_commit_fields);
+const size_t nvme_fw_commit_nfields = ARRAY_SIZE(nvme_fw_commit_fields);

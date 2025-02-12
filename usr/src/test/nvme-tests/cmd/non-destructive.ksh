@@ -12,12 +12,16 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
 # Validate that the NVMe device in question is usable for these tests.
 # What we care about is that namespace one is present.
+#
+
+#
+# Environment sanity and debugging.
 #
 export LC_ALL=C.UTF-8
 export LD_PRELOAD=libumem.so
@@ -39,7 +43,6 @@ function fatal
         [[ -z "$msg" ]] && msg="failed"
         echo "$nd_arg0: $msg" >&2
         exit 1
-
 }
 
 #
@@ -48,7 +51,7 @@ function fatal
 #
 function check_device
 {
-	typeset nn
+	typeset state
 
 	if ! $nd_nvmeadm list "$nd_device" >/dev/null; then
 		fatal "failed to find device $nd_device"
@@ -57,6 +60,12 @@ function check_device
 	if ! $nd_nvmeadm list "$nd_device/1" >/dev/null; then
 		fatal "failed to find namespace 1 on $nd_device"
 	fi
+
+	state=$(nvmeadm list -p -o ns-state "$nd_device/1")
+	if [[ "$state" != "blkdev" ]]; then
+		fatal "$nd_device/1 namespace is not attached to blkdev"
+	fi
+
 }
 
 #

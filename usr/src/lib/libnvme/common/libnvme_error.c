@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -647,6 +647,36 @@ nvme_errtostr(nvme_t *nvme, nvme_err_t err)
 		return ("NVME_ERR_CTRL_DEAD");
 	case NVME_ERR_CTRL_GONE:
 		return ("NVME_ERR_CTRL_GONE");
+	case NVME_ERR_NS_MGMT_UNSUP_BY_DEV:
+		return ("NVME_ERR_NS_MGMT_UNSUP_BY_DEV");
+	case NVME_ERR_THIN_PROV_UNSUP_BY_DEV:
+		return ("NVME_ERR_THIN_PROV_UNSUP_BY_DEV");
+	case NVME_ERR_NS_ATTACH_REQ_MISSING_FIELDS:
+		return ("NVME_ERR_NS_ATTACH_REQ_MISSING_FIELDS");
+	case NVME_ERR_NS_CREATE_REQ_MISSING_FIELDS:
+		return ("NVME_ERR_NS_CREATE_REQ_MISSING_FIELDS");
+	case NVME_ERR_NS_DELETE_REQ_MISSING_FIELDS:
+		return ("NVME_ERR_NS_DELETE_REQ_MISSING_FIELDS");
+	case NVME_ERR_NS_CREATE_BAD_CSI:
+		return ("NVME_ERR_NS_CREATE_BAD_CSI");
+	case NVME_ERR_NS_ATTACH_BAD_SEL:
+		return ("NVME_ERR_NS_ATTACH_BAD_SEL");
+	case NVME_ERR_NS_CREATE_NO_RESULTS:
+		return ("NVME_ERR_NS_CREATE_NO_RESULTS");
+	case NVME_ERR_NS_CREATE_NCAP_RANGE:
+		return ("NVME_ERR_NS_CREATE_NCAP_RANGE");
+	case NVME_ERR_NS_CREATE_NSZE_RANGE:
+		return ("NVME_ERR_NS_CREATE_NSZE_RANGE");
+	case NVME_ERR_NS_CREATE_NMIC_RANGE:
+		return ("NVME_ERR_NS_CREATE_NMIC_RANGE");
+	case NVME_ERR_NS_CREATE_FLBAS_RANGE:
+		return ("NVME_ERR_NS_CREATE_FLBAS_RANGE");
+	case NVME_ERR_NS_CTRL_ATTACHED:
+		return ("NVME_ERR_NS_CTRL_ATTACHED");
+	case NVME_ERR_NS_CTRL_NOT_ATTACHED:
+		return ("NVME_ERR_NS_CTRL_NOT_ATTACHED");
+	case NVME_ERR_NS_UNALLOC:
+		return ("NVME_ERR_NS_UNALLOC");
 	default:
 		return ("unknown error");
 	}
@@ -1007,12 +1037,41 @@ static const nvme_ktolmap_t nvme_ktolmap[] = {
 	    "programmer error: asked to unlock namespace lock that was not "
 	    "held" },
 	{ NVME_IOCTL_E_NS_BLKDEV_ATTACH, NVME_ERR_NS_BLKDEV_ATTACH, "cannot "
-	    "execute request while namespace is attached" },
+	    "execute request while blkdev is attached to the namespace" },
 	/*
 	 * We purposefully skip NVME_IOCTL_E_BD_ADDR_OVER right now because
 	 * there is nothing that a user can do about this. This is a
 	 * libnvme/kernel interface issue.
 	 */
+	{ NVME_IOCTL_E_CTRL_NS_MGMT_UNSUP, NVME_ERR_NS_MGMT_UNSUP_BY_DEV,
+	    "controller does not support namespace management" },
+	{ NVME_IOCTL_E_NS_CTRL_ATTACHED, NVME_ERR_NS_CTRL_ATTACHED,
+	    "cannot execute request against an attached namespace" },
+	{ NVME_IOCTL_E_NS_CTRL_NOT_ATTACHED, NVME_ERR_NS_CTRL_NOT_ATTACHED,
+	    "cannot execute request against an unattached namespace" },
+	{ NVME_IOCTL_E_NS_NO_NS, NVME_ERR_NS_UNALLOC, "cannot execute request "
+	    "against an unallocated namespace" },
+	{ NVME_IOCTL_E_NS_CREATE_NSZE_RANGE, NVME_ERR_NS_CREATE_NSZE_RANGE,
+	    "invalid namespace create size specified" },
+	{ NVME_IOCTL_E_NS_CREATE_NCAP_RANGE, NVME_ERR_NS_CREATE_NCAP_RANGE,
+	    "invalid namespace create capacity specified" },
+	/*
+	 * Right now the library only has a single error for an invalid CSI on
+	 * namespace create regardless of the reason.
+	 */
+	{ NVME_IOCTL_E_NS_CREATE_CSI_RANGE, NVME_ERR_NS_CREATE_BAD_CSI,
+	    "invalid namespace create command set identifier specified" },
+	{ NVME_IOCTL_E_NS_CREATE_FLBAS_RANGE, NVME_ERR_NS_CREATE_FLBAS_RANGE,
+	    "invalid namespace create LBA format specified" },
+	{ NVME_IOCTL_E_NS_CREATE_NMIC_RANGE, NVME_ERR_NS_CREATE_NMIC_RANGE,
+	    "invalid namespace multi-path and sharing capability specified" },
+	{ NVME_IOCTL_E_NS_CREATE_CSI_UNSUP, NVME_ERR_NS_CREATE_BAD_CSI, "the "
+	    "controller does not support specifying a CSI when creating "
+	    "namespaces" },
+	{ NVME_IOCTL_E_DRV_CSI_UNSUP, NVME_ERR_NS_CREATE_BAD_CSI, "the nvme "
+	    "driver does not supporting CSIs with that value" },
+	{ NVME_IOCTL_E_CTRL_THIN_PROV_UNSUP, NVME_ERR_THIN_PROV_UNSUP_BY_DEV,
+	    "controller does not support thin provisioning of namespaces" },
 };
 
 /*

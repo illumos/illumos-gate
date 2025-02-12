@@ -13,7 +13,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -488,6 +488,29 @@ typedef union {
 	} b;
 	uint32_t r;
 } nvme_identify_dw10_t;
+
+/*
+ * NVMe Namespace Management and Namespace Attach Commands. cdw11 is only used
+ * when performing a namespace create.
+ */
+typedef union {
+	struct {
+		uint32_t nsm_sel:4;
+		uint32_t nsm_rsvd0:28;
+	} b;
+	uint32_t r;
+} nvme_ns_mgmt_dw10_t;
+
+typedef union {
+	struct {
+		uint32_t nsm_rsvd0:24;
+		uint32_t nsm_csi:8;
+	} b;
+	uint32_t r;
+} nvme_ns_mgmt_dw11_t;
+
+#define	NVME_NS_MGMT_NS_CREATE		0
+#define	NVME_NS_MGMT_NS_DELETE		1
 
 #ifdef __cplusplus
 }

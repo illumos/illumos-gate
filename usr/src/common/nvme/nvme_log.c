@@ -194,7 +194,7 @@ const nvme_field_info_t nvme_log_fields[] = {
 	}
 };
 
-size_t nvme_log_nfields = ARRAY_SIZE(nvme_log_fields);
+const size_t nvme_log_nfields = ARRAY_SIZE(nvme_log_fields);
 
 static uint64_t
 nvme_lpd_error_len(const nvme_valid_ctrl_data_t *data,
@@ -346,7 +346,7 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_var_func = nvme_lpd_pev_len
 } };
 
-size_t nvme_std_log_npages = ARRAY_SIZE(nvme_std_log_pages);
+const size_t nvme_std_log_npages = ARRAY_SIZE(nvme_std_log_pages);
 
 nvme_log_disc_scope_t
 nvme_log_page_info_scope(const nvme_log_page_info_t *info,

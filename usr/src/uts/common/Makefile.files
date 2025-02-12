@@ -28,7 +28,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2023 RackTop Systems, Inc.
 #
 
@@ -1955,7 +1955,8 @@ SKD_OBJS = skd.o
 #
 NVME_OBJS += nvme.o nvme_validate.o nvme_lock.o nvme_stat.o
 NVME_OBJS += nvme_feature.o nvme_field.o nvme_firmware.o nvme_format.o \
-		nvme_identify.o nvme_log.o nvme_version.o nvme_vuc.o
+		nvme_identify.o nvme_log.o nvme_nsmgmt.o nvme_version.o \
+		nvme_vuc.o
 
 PVSCSI_OBJS = pvscsi.o
 

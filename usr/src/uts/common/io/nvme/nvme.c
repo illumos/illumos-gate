@@ -34,8 +34,9 @@
  * endian systems without changes to the code accessing registers and data
  * structures used by the hardware.
  *
- *
- * Interrupt Usage:
+ * ---------------
+ * Interrupt Usage
+ * ---------------
  *
  * The driver will use a single interrupt while configuring the device as the
  * specification requires, but contrary to the specification it will try to use
@@ -48,8 +49,9 @@
  * handler will retrieve completed commands from all queues sharing an interrupt
  * vector and will post them to a taskq for completion processing.
  *
- *
- * Command Processing:
+ * ------------------
+ * Command Processing
+ * ------------------
  *
  * NVMe devices can have up to 65535 I/O queue pairs, with each queue holding up
  * to 65536 I/O commands. The driver will configure one I/O queue pair per
@@ -76,16 +78,18 @@
  * as the configured queue length. Queue overrun is prevented by the semaphore,
  * so a command submission may block if the queue is full.
  *
- *
- * Polled I/O Support:
+ * ------------------
+ * Polled I/O Support
+ * ------------------
  *
  * For kernel core dump support the driver can do polled I/O. As interrupts are
  * turned off while dumping the driver will just submit a command in the regular
  * way, and then repeatedly attempt a command retrieval until it gets the
  * command back.
  *
- *
- * Namespace Support:
+ * -----------------
+ * Namespace Support
+ * -----------------
  *
  * NVMe devices can have multiple namespaces, each being a independent data
  * store. The driver supports multiple namespaces and creates a blkdev interface
@@ -99,15 +103,77 @@
  * if present to generate the devid, and passes the EUI64 to blkdev to use it
  * in the device node names.
  *
- * We currently support only (2 << NVME_MINOR_INST_SHIFT) - 2 namespaces in a
- * single controller. This is an artificial limit imposed by the driver to be
- * able to address a reasonable number of controllers and namespaces while
+ * When a device has more than (2 << NVME_MINOR_INST_SHIFT) - 2 namespaces in a
+ * single controller, additional namespaces will not have minor nodes created.
+ * They can still be used and specified by the controller and libnvme. This
+ * limit is trying to balance the number of controllers and namespaces while
  * fitting within the constraints of MAXMIN32, aka a 32-bit device number which
  * only has 18-bits for the minor number. See the minor node section for more
  * information.
  *
+ * The driver supports namespace management, meaning the ability to create and
+ * destroy namespaces, and to attach and detach namespaces from controllers.
+ * Each namespace has an associated nvme_ns_state_t, which transitions through
+ * several states. The UNALLOCATED, ALLOCATED, and ACTIVE states are states that
+ * are defined by the NVMe specification. Not all ACTIVE namespaces may be
+ * attached to blkdev(4D) due to the use of features we don't support, for
+ * example, metadata protection. Such namespaces are automatically in the
+ * NOT_IGNORED state. Once they are attached to blkdev they enter the ATTACHED
+ * state.
  *
- * Minor nodes:
+ * By default, a device can only transition one such state at a time. Each
+ * command that transitions between states has a corresponding array of errnos
+ * to use to transition. Examples of this are the nvme_ns_delete_states[],
+ * nvme_ctrl_attach_states[], etc. These dictate whether it is okay or not for a
+ * command that changes state to occur or not based on the current state. Each
+ * of these returns a specific error allowing one to understand why something
+ * isn't in the proper state. This allows library consumers to determine whether
+ * or not a namespace is already in the current state it's targeting to be
+ * ignored or not. The following diagram summarizes namespace transitions:
+ *
+ *                       +-------------+
+ *                       |             |
+ *                       | Unallocated |
+ *                       |             |
+ *                       +-------------+
+ *                          |       ^
+ *                          |       |
+ * Namespace Management: . .*       * . . . Namespace Management:
+ * Create                   |       |       Delete
+ * NVME_IOC_NS_CREATE       |       |       NVME_IOC_NS_DELETE
+ *                          v       |
+ *                       +-------------+
+ *                       |             |
+ *                       |  Allocated  |
+ *                       |             |
+ *                       +-------------+
+ *                          |       ^
+ *                          |       |
+ * Namespace Attachment: . .*       * . . . Namespace Attachment:
+ * Controller Attach        |       |       Controller Detach
+ * NVME_IOC_CTRL_ATTACH     |       |       NVME_IOC_CTRL_DETACH
+ *                          v       |
+ *              +------------+      |
+ *              |            |      |     +----------+
+ *              |   Active   |>-----+----<|   Not    |
+ *              |            |--*-------->| Ignored  |
+ *              +------------+  .         +----------+
+ *                              .           |      ^
+ *    automatic kernel transition           |      |
+ *                                          |      * . . blkdev Detach
+ *                       blkdev attach  . . *      |     NVME_IOC_BD_DETACH
+ *                       NVME_IOC_BD_ATTACH |      |
+ *                                          v      |
+ *                                        +----------+
+ *                                        |          |
+ *                                        |  blkdev  |
+ *                                        | attached |
+ *                                        |          |
+ *                                        +----------+
+ *
+ * -----------
+ * Minor nodes
+ * -----------
  *
  * For each NVMe device the driver exposes one minor node for the controller and
  * one minor node for each namespace. The only operations supported by those
@@ -134,8 +200,9 @@
  * minor, everything else occurs in the context of one of these ephemeral
  * minors.
  *
- *
- * ioctls, Errors, and Exclusive Access:
+ * ------------------------------------
+ * ioctls, Errors, and Exclusive Access
+ * ------------------------------------
  *
  * All of the logical commands that one can issue are driven through the
  * ioctl(9E) interface. All of our ioctls have a similar shape where they
@@ -274,7 +341,9 @@
  *         |  +------------------------+ |     |  +------------------------+ |
  *         +-----------------------------+     +-----------------------------+
  *
- * Blkdev Interface:
+ * ----------------
+ * Blkdev Interface
+ * ----------------
  *
  * This driver uses blkdev to do all the heavy lifting involved with presenting
  * a disk device to the system. As a result, the processing of I/O requests is
@@ -292,8 +361,9 @@
  * present, or composed using the device vendor ID, model number, serial number,
  * and the namespace ID.
  *
- *
- * Error Handling:
+ * --------------
+ * Error Handling
+ * --------------
  *
  * Error handling is currently limited to detecting fatal hardware errors,
  * either by asynchronous events, or synchronously through command status or
@@ -328,8 +398,9 @@
  * memory being reused by the system and later being written to by a "dead"
  * NVMe controller.
  *
- *
- * Locking:
+ * -------
+ * Locking
+ * -------
  *
  * Each queue pair has a nq_mutex and ncq_mutex. The nq_mutex must be held
  * when accessing shared state and submission queue registers, ncq_mutex
@@ -388,14 +459,18 @@
  * allows us to make consistent progress and honor the blkdev lock ordering
  * requirements, albeit it is not as straightforward as a simple mutex.
  *
- * Quiesce / Fast Reboot:
+ * ---------------------
+ * Quiesce / Fast Reboot
+ * ---------------------
  *
  * The driver currently does not support fast reboot. A quiesce(9E) entry point
  * is still provided which is used to send a shutdown notification to the
  * device.
  *
  *
- * NVMe Hotplug:
+ * ------------
+ * NVMe Hotplug
+ * ------------
  *
  * The driver supports hot removal. The driver uses the NDI event framework
  * to register a callback, nvme_remove_callback, to clean up when a disk is
@@ -411,16 +486,18 @@
  * The NVMe driver instance itself will remain until the final close of the
  * device.
  *
- *
+ * ---------------
  * DDI UFM Support
+ * ---------------
  *
  * The driver supports the DDI UFM framework for reporting information about
  * the device's firmware image and slot configuration. This data can be
  * queried by userland software via ioctls to the ufm driver. For more
  * information, see ddi_ufm(9E).
  *
- *
- * Driver Configuration:
+ * --------------------
+ * Driver Configuration
+ * --------------------
  *
  * The following driver properties can be changed to control some aspects of the
  * drivers operation:
@@ -473,7 +550,6 @@
  * - FMA handling of media errors
  * - support for devices supporting very large I/O requests using chained PRPs
  * - support for configuring hardware parameters like interrupt coalescing
- * - support for media formatting and hard partitioning into namespaces
  * - support for big-endian systems
  * - support for fast reboot
  * - support for NVMe Subsystem Reset (1.1)
@@ -716,8 +792,8 @@ static int nvme_close(dev_t, int, int, cred_t *);
 static int nvme_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 static int nvme_init_ns(nvme_t *, uint32_t);
-static boolean_t nvme_attach_ns(nvme_t *, nvme_ioctl_common_t *);
-static boolean_t nvme_detach_ns(nvme_t *, nvme_ioctl_common_t *);
+static boolean_t nvme_bd_attach_ns(nvme_t *, nvme_ioctl_common_t *);
+static boolean_t nvme_bd_detach_ns(nvme_t *, nvme_ioctl_common_t *);
 
 static int nvme_minor_comparator(const void *, const void *);
 
@@ -900,12 +976,38 @@ static const nvme_ioctl_check_t nvme_check_format = {
 };
 
 /*
- * Attach and detach must always target a minor. However, the broadcast
- * namespace is not allowed. We still perform rewriting so that way specifying
- * the controller node with 0 will be caught.
+ * blkdev and controller attach and detach must always target a namespace.
+ * However, the broadcast namespace is not allowed. We still perform rewriting
+ * so that way specifying the controller node with 0 will be caught.
  */
 static const nvme_ioctl_check_t nvme_check_attach_detach = {
 	.nck_ns_ok = B_TRUE, .nck_ns_minor_ok = B_TRUE,
+	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_TRUE,
+	.nck_bcast_ok = B_FALSE, .nck_excl = NVME_IOCTL_EXCL_WRITE
+};
+
+/*
+ * Namespace creation operations cannot target a namespace as the new namespace
+ * ID will be returned in the operation. This operation requires the entire
+ * controller lock to be owned as one has to coordinate this operation with all
+ * of the actual namespace logic that's present.
+ */
+static const nvme_ioctl_check_t nvme_check_ns_create = {
+	.nck_ns_ok = B_FALSE, .nck_ns_minor_ok = B_FALSE,
+	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_FALSE,
+	.nck_bcast_ok = B_FALSE, .nck_excl = NVME_IOCTL_EXCL_CTRL
+};
+
+/*
+ * NVMe namespace delete must always target a namespace. The broadcast namespace
+ * isn't allowed. We perform rewriting so that way we can catch this.
+ * Importantly this only requires holding an exclusive lock on the namespace,
+ * not on the whole device like creating a namespace does. Note, we don't allow
+ * this on the namespace minor itself as part of our path towards transitioning
+ * away from its use.
+ */
+static const nvme_ioctl_check_t nvme_check_ns_delete = {
+	.nck_ns_ok = B_TRUE, .nck_ns_minor_ok = B_FALSE,
 	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_TRUE,
 	.nck_bcast_ok = B_FALSE, .nck_excl = NVME_IOCTL_EXCL_WRITE
 };
@@ -945,6 +1047,62 @@ static const nvme_ioctl_check_t nvme_check_locking = {
 	.nck_ns_ok = B_TRUE, .nck_ns_minor_ok = B_TRUE,
 	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_FALSE,
 	.nck_bcast_ok = B_FALSE, .nck_excl = NVME_IOCTL_EXCL_SKIP
+};
+
+/*
+ * These data tables indicate how we handle the various states a namespace may
+ * be in before we put it through the namespace state transition diagram. Note,
+ * namespace creation does not allow one to specify a namespace ID, therefore
+ * there it doesn't have a set of entries here.
+ *
+ * See Namespace Support in the theory statement for more information.
+ */
+static const nvme_ioctl_errno_t nvme_ns_delete_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_NS_BLKDEV_ATTACH
+};
+
+static const nvme_ioctl_errno_t nvme_ctrl_attach_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_NS_BLKDEV_ATTACH
+};
+
+static const nvme_ioctl_errno_t nvme_ctrl_detach_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_NS_CTRL_NOT_ATTACHED,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_NS_BLKDEV_ATTACH
+};
+
+static const nvme_ioctl_errno_t nvme_bd_attach_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_NS_CTRL_NOT_ATTACHED,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_UNSUP_ATTACH_NS,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_NS_BLKDEV_ATTACH,
+};
+
+static const nvme_ioctl_errno_t nvme_bd_detach_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_NS_CTRL_NOT_ATTACHED,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_OK,
+};
+
+static const nvme_ioctl_errno_t nvme_format_nvm_states[] = {
+	[NVME_NS_STATE_UNALLOCATED] = NVME_IOCTL_E_NS_NO_NS,
+	[NVME_NS_STATE_ALLOCATED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ACTIVE] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_NOT_IGNORED] = NVME_IOCTL_E_OK,
+	[NVME_NS_STATE_ATTACHED] = NVME_IOCTL_E_NS_BLKDEV_ATTACH
 };
 
 static struct cb_ops nvme_cb_ops = {
@@ -1159,13 +1317,11 @@ nvme_mgmt_unlock(nvme_t *nvme)
 	mutex_exit(&lock->nml_lock);
 }
 
-#ifdef	DEBUG
 static boolean_t
-nvme_mgmt_lock_held(nvme_t *nvme)
+nvme_mgmt_lock_held(const nvme_t *nvme)
 {
 	return (MUTEX_HELD(&nvme->n_mgmt.nml_lock) != 0);
 }
-#endif	/* DEBUG */
 
 static void
 nvme_mgmt_lock(nvme_t *nvme, nvme_mgmt_lock_level_t level)
@@ -1205,6 +1361,20 @@ nvme_mgmt_bd_end(nvme_t *nvme)
 	mutex_enter(&lock->nml_lock);
 	VERIFY3U(lock->nml_bd_own, ==, (uintptr_t)curthread);
 	lock->nml_bd_own = 0;
+}
+
+static boolean_t
+nvme_ns_state_check(const nvme_namespace_t *ns, nvme_ioctl_common_t *ioc,
+    const nvme_ioctl_errno_t states[NVME_NS_NSTATES])
+{
+	VERIFY(nvme_mgmt_lock_held(ns->ns_nvme));
+	VERIFY3U(ns->ns_state, <, NVME_NS_NSTATES);
+
+	if (states[ns->ns_state] == NVME_IOCTL_E_OK) {
+		return (B_TRUE);
+	}
+
+	return (nvme_ioctl_error(ioc, states[ns->ns_state], 0, 0));
 }
 
 /*
@@ -2016,7 +2186,13 @@ nvme_check_unknown_cmd_status(nvme_cmd_t *cmd)
 	if (cmd->nc_xfer != NULL)
 		bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 
-	if (cmd->nc_nvme->n_strict_version) {
+	/*
+	 * User commands should never cause us to mark the controller dead.
+	 * Though whether we ever should mark it dead as there currently isn't a
+	 * useful recovery path is another question.
+	 */
+	if (((cmd->nc_flags & NVME_CMD_F_DONTPANIC) == 0) &&
+	    cmd->nc_nvme->n_strict_version) {
 		nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
 	}
 
@@ -2264,7 +2440,8 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 
 	case NVME_CQE_SC_SPC_INV_FORMAT:
 		/* Invalid Format */
-		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_FORMAT);
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NVM_FORMAT ||
+		    cmd->nc_sqe.sqe_opc == NVME_OPC_NS_MGMT);
 		NVME_BUMP_STAT(cmd->nc_nvme, inv_format);
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
@@ -2352,6 +2529,42 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_IMAGE_LOAD ||
 		    cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
 		return (EINVAL);
+
+	case NVME_CQE_SC_SPC_NS_ATTACHED:
+		/* Namespace Already Attached */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ns_attached);
+		return (EEXIST);
+
+	case NVME_CQE_SC_SPC_NS_PRIV:
+		/* Namespace Is Private */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ns_priv);
+		return (EACCES);
+
+	case NVME_CQE_SC_SPC_NS_NOT_ATTACH:
+		/* Namespace Not Attached */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ns_not_attached);
+		return (ENOENT);
+
+	case NVME_CQE_SC_SPC_INV_CTRL_LIST:
+		/* Controller List Invalid */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ana_attach);
+		return (EINVAL);
+
+	case NVME_CQE_SC_SPC_ANA_ATTACH:
+		/* ANA Attach Failed */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ana_attach);
+		return (EIO);
+
+	case NVME_CQE_SC_SPC_NS_ATTACH_LIM:
+		/* Namespace Attachment Limit Exceeded */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_NS_ATTACH);
+		NVME_BUMP_STAT(cmd->nc_nvme, ns_attach_lim);
+		return (EOVERFLOW);
 
 	default:
 		return (nvme_check_unknown_cmd_status(cmd));
@@ -2453,6 +2666,7 @@ nvme_abort_cmd(nvme_cmd_t *cmd, const uint32_t sec)
 
 	sema_v(&nvme->n_abort_sema);
 
+	/* BEGIN CSTYLED */
 	/*
 	 * If the abort command itself has timed out, it will have been
 	 * de-queued so that its callback will not be called after this point,
@@ -2468,6 +2682,7 @@ nvme_abort_cmd(nvme_cmd_t *cmd, const uint32_t sec)
 	 *     |       -> cmd->nc_stat = NVME_CMD_LOST
 	 *     and here we are.
 	 */
+	/* END CSTYLED */
 	if (abort_cmd->nc_state == NVME_CMD_LOST) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!ABORT of command %d/%d timed out",
@@ -2789,6 +3004,7 @@ nvme_async_event_task(void *arg)
 			nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
 			for (uint_t i = 0; i < NVME_NSCHANGE_LIST_SIZE; i++) {
 				uint32_t nsid = nslist->nscl_ns[i];
+				nvme_namespace_t *ns;
 
 				if (nsid == 0)	/* end of list */
 					break;
@@ -2800,9 +3016,12 @@ nvme_async_event_task(void *arg)
 				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
 					continue;
 
+				ns = nvme_nsid2ns(nvme, nsid);
+				if (ns->ns_state <= NVME_NS_STATE_NOT_IGNORED)
+					continue;
+
 				nvme_mgmt_bd_start(nvme);
-				bd_state_change(nvme_nsid2ns(nvme,
-				    nsid)->ns_bd_hdl);
+				bd_state_change(ns->ns_bd_hdl);
 				nvme_mgmt_bd_end(nvme);
 			}
 			nvme_mgmt_unlock(nvme);
@@ -2935,13 +3154,13 @@ nvme_no_blkdev_attached(nvme_t *nvme, uint32_t nsid)
 
 	if (nsid != NVME_NSID_BCAST) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, nsid);
-		return (!ns->ns_attached);
+		return (ns->ns_state < NVME_NS_STATE_ATTACHED);
 	}
 
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
 
-		if (ns->ns_attached) {
+		if (ns->ns_state >= NVME_NS_STATE_ATTACHED) {
 			return (B_FALSE);
 		}
 	}
@@ -3516,8 +3735,8 @@ nvme_shutdown(nvme_t *nvme, boolean_t quiesce)
 /*
  * Return length of string without trailing spaces.
  */
-static int
-nvme_strlen(const char *str, int len)
+static size_t
+nvme_strlen(const char *str, size_t len)
 {
 	if (len <= 0)
 		return (0);
@@ -3579,7 +3798,7 @@ nvme_config_list(nvme_t *nvme)
 {
 	char	**config_list;
 	uint_t	nelem;
-	int	rv, i;
+	int	rv;
 
 	/*
 	 * We're following the pattern of 'sd-config-list' here, but extend it.
@@ -3604,11 +3823,11 @@ nvme_config_list(nvme_t *nvme)
 		goto out;
 	}
 
-	for (i = 0; i < nelem; i += 3) {
+	for (uint_t i = 0; i < nelem; i += 3) {
 		char	*model = config_list[i];
 		char	*fwrev = config_list[i + 1];
 		char	*nvp, *save_nv;
-		int	id_model_len, id_fwrev_len;
+		size_t	id_model_len, id_fwrev_len;
 
 		id_model_len = nvme_strlen(nvme->n_idctl->id_model,
 		    sizeof (nvme->n_idctl->id_model));
@@ -3835,8 +4054,7 @@ nvme_init_ns(nvme_t *nvme, uint32_t nsid)
 {
 	nvme_namespace_t *ns = nvme_nsid2ns(nvme, nsid);
 	nvme_identify_nsid_t *idns;
-	boolean_t was_ignored;
-	int last_rp;
+	nvme_ns_state_t orig_state;
 
 	ns->ns_nvme = nvme;
 
@@ -3861,10 +4079,28 @@ nvme_init_ns(nvme_t *nvme, uint32_t nsid)
 	ns->ns_idns = idns;
 	ns->ns_id = nsid;
 
-	was_ignored = ns->ns_ignore;
-
-	ns->ns_allocated = nvme_allocated_ns(ns);
-	ns->ns_active = nvme_active_ns(ns);
+	/*
+	 * Save the current state so we can tell what changed. Look at the
+	 * current state of the device. We will flag active devices that should
+	 * be ignored after this.
+	 */
+	orig_state = ns->ns_state;
+	if (nvme_active_ns(ns)) {
+		/*
+		 * If the device previously had blkdev active, then that is its
+		 * current state. Otherwise, we consider this an upgrade and
+		 * just set it to not ignored.
+		 */
+		if (orig_state == NVME_NS_STATE_ATTACHED) {
+			ns->ns_state = NVME_NS_STATE_ATTACHED;
+		} else {
+			ns->ns_state = NVME_NS_STATE_NOT_IGNORED;
+		}
+	} else if (nvme_allocated_ns(ns)) {
+		ns->ns_state = NVME_NS_STATE_ALLOCATED;
+	} else {
+		ns->ns_state = NVME_NS_STATE_UNALLOCATED;
+	}
 
 	ns->ns_block_count = idns->id_nsize;
 	ns->ns_block_size =
@@ -3893,8 +4129,7 @@ nvme_init_ns(nvme_t *nvme, uint32_t nsid)
 	 * Find the LBA format with no metadata and the best relative
 	 * performance. A value of 3 means "degraded", 0 is best.
 	 */
-	last_rp = 3;
-	for (int j = 0; j <= idns->id_nlbaf; j++) {
+	for (uint32_t j = 0, last_rp = 3; j <= idns->id_nlbaf; j++) {
 		if (idns->id_lbaf[j].lbaf_lbads == 0)
 			break;
 		if (idns->id_lbaf[j].lbaf_ms != 0)
@@ -3909,63 +4144,70 @@ nvme_init_ns(nvme_t *nvme, uint32_t nsid)
 	if (ns->ns_best_block_size < nvme->n_min_block_size)
 		ns->ns_best_block_size = nvme->n_min_block_size;
 
-	was_ignored = ns->ns_ignore;
-
 	/*
 	 * We currently don't support namespaces that are inactive, or use
 	 * either:
 	 * - protection information
 	 * - illegal block size (< 512)
 	 */
-	if (!ns->ns_active) {
-		ns->ns_ignore = B_TRUE;
-	} else if (idns->id_dps.dp_pinfo) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!ignoring namespace %d, unsupported feature: "
-		    "pinfo = %d", nsid, idns->id_dps.dp_pinfo);
-		ns->ns_ignore = B_TRUE;
-	} else if (ns->ns_block_size < 512) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!ignoring namespace %d, unsupported block size %"PRIu64,
-		    nsid, (uint64_t)ns->ns_block_size);
-		ns->ns_ignore = B_TRUE;
-	} else {
-		ns->ns_ignore = B_FALSE;
+	if (ns->ns_state >= NVME_NS_STATE_NOT_IGNORED) {
+		if (idns->id_dps.dp_pinfo) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!ignoring namespace %d, unsupported feature: "
+			    "pinfo = %d", nsid, idns->id_dps.dp_pinfo);
+			ns->ns_state = NVME_NS_STATE_ACTIVE;
+		}
+
+		if (ns->ns_block_size < 512) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!ignoring namespace %d, unsupported block size "
+			    "%"PRIu64, nsid, (uint64_t)ns->ns_block_size);
+			ns->ns_state = NVME_NS_STATE_ACTIVE;
+		}
+	}
+
+	/*
+	 * If we were previously in a state where blkdev was active and suddenly
+	 * we think it should not be because ignore is set, then something has
+	 * gone behind our backs and this is not going to be recoverable.
+	 */
+	if (orig_state == NVME_NS_STATE_ATTACHED &&
+	    ns->ns_state != NVME_NS_STATE_ATTACHED) {
+		dev_err(nvme->n_dip, CE_PANIC, "namespace %u state "
+		    "unexpectedly changed and removed blkdev support!", nsid);
 	}
 
 	/*
 	 * Keep a count of namespaces which are attachable.
 	 * See comments in nvme_bd_driveinfo() to understand its effect.
 	 */
-	if (was_ignored) {
+	if (orig_state > NVME_NS_STATE_ACTIVE) {
+		/*
+		 * Wasn't attachable previously, but now needs to be.
+		 * Discount it.
+		 */
+		if (ns->ns_state < NVME_NS_STATE_NOT_IGNORED)
+			nvme->n_namespaces_attachable--;
+	} else if (ns->ns_state >= NVME_NS_STATE_NOT_IGNORED) {
 		/*
 		 * Previously ignored, but now not. Count it.
 		 */
-		if (!ns->ns_ignore)
-			nvme->n_namespaces_attachable++;
-	} else {
-		/*
-		 * Wasn't ignored previously, but now needs to be.
-		 * Discount it.
-		 */
-		if (ns->ns_ignore)
-			nvme->n_namespaces_attachable--;
+		nvme->n_namespaces_attachable++;
 	}
 
 	return (DDI_SUCCESS);
 }
 
 static boolean_t
-nvme_attach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
+nvme_bd_attach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 {
 	nvme_namespace_t *ns = nvme_nsid2ns(nvme, com->nioc_nsid);
 	int ret;
 
 	ASSERT(nvme_mgmt_lock_held(nvme));
 
-	if (ns->ns_ignore) {
-		return (nvme_ioctl_error(com, NVME_IOCTL_E_UNSUP_ATTACH_NS,
-		    0, 0));
+	if (!nvme_ns_state_check(ns, com, nvme_bd_attach_states)) {
+		return (B_FALSE);
 	}
 
 	if (ns->ns_bd_hdl == NULL) {
@@ -3993,21 +4235,22 @@ nvme_attach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 		    0, 0));
 	}
 
-	ns->ns_attached = B_TRUE;
+	ns->ns_state = NVME_NS_STATE_ATTACHED;
 
 	return (B_TRUE);
 }
 
 static boolean_t
-nvme_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
+nvme_bd_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 {
 	nvme_namespace_t *ns = nvme_nsid2ns(nvme, com->nioc_nsid);
 	int ret;
 
 	ASSERT(nvme_mgmt_lock_held(nvme));
 
-	if (ns->ns_ignore || !ns->ns_attached)
-		return (B_TRUE);
+	if (!nvme_ns_state_check(ns, com, nvme_bd_detach_states)) {
+		return (B_FALSE);
+	}
 
 	nvme_mgmt_bd_start(nvme);
 	ASSERT3P(ns->ns_bd_hdl, !=, NULL);
@@ -4019,7 +4262,7 @@ nvme_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
 		    0));
 	}
 
-	ns->ns_attached = B_FALSE;
+	ns->ns_state = NVME_NS_STATE_NOT_IGNORED;
 	return (B_TRUE);
 
 }
@@ -4037,7 +4280,7 @@ nvme_rescan_ns(nvme_t *nvme, uint32_t nsid)
 	if (nsid != NVME_NSID_BCAST) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, nsid);
 
-		ASSERT3U(ns->ns_attached, ==, B_FALSE);
+		ASSERT3U(ns->ns_state, <, NVME_NS_STATE_ATTACHED);
 		(void) nvme_init_ns(nvme, nsid);
 		return;
 	}
@@ -4045,7 +4288,7 @@ nvme_rescan_ns(nvme_t *nvme, uint32_t nsid)
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
 
-		ASSERT3U(ns->ns_attached, ==, B_FALSE);
+		ASSERT3U(ns->ns_state, <, NVME_NS_STATE_ATTACHED);
 		(void) nvme_init_ns(nvme, i);
 	}
 }
@@ -4806,7 +5049,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int nregs;
 	off_t regsize;
 	char name[32];
-	boolean_t attached_ns;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -5041,12 +5283,14 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ns->ns_progress |= NVME_NS_LOCK;
 
 		/*
-		 * Namespaces start out ignored. When nvme_init_ns() checks
-		 * their properties and finds they can be used, it will set
-		 * ns_ignore to B_FALSE. It will also use this state change
-		 * to keep an accurate count of attachable namespaces.
+		 * Namespaces start out in the active state. This is the
+		 * default state until we find out information about the
+		 * namespaces in more detail. nvme_init_ns() will go through and
+		 * determine what the proper state should be. It will also use
+		 * this state change to keep an accurate count of attachable
+		 * namespaces.
 		 */
-		ns->ns_ignore = B_TRUE;
+		ns->ns_state = NVME_NS_STATE_ACTIVE;
 		if (nvme_init_ns(nvme, i) != 0) {
 			nvme_mgmt_unlock(nvme);
 			goto fail;
@@ -5091,25 +5335,22 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	attached_ns = B_FALSE;
+	/*
+	 * Attempt to attach all namespaces that are in a reasonable state. This
+	 * should not fail attach.
+	 */
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
+		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
 		nvme_ioctl_common_t com = { .nioc_nsid = i };
 
-		if (nvme_attach_ns(nvme, &com)) {
-			attached_ns = B_TRUE;
-		} else if (com.nioc_drv_err != NVME_IOCTL_E_UNSUP_ATTACH_NS) {
+		if (ns->ns_state < NVME_NS_STATE_NOT_IGNORED)
+			continue;
+
+		if (!nvme_bd_attach_ns(nvme, &com) && com.nioc_drv_err !=
+		    NVME_IOCTL_E_UNSUP_ATTACH_NS) {
 			dev_err(nvme->n_dip, CE_WARN, "!failed to attach "
-			    "namespace %d due to blkdev error", i);
-			/*
-			 * Once we have successfully attached a namespace we
-			 * can no longer fail the driver attach as there is now
-			 * a blkdev child node linked to this device, and
-			 * our node is not yet in the attached state.
-			 */
-			if (!attached_ns) {
-				nvme_mgmt_unlock(nvme);
-				goto fail;
-			}
+			    "namespace %d due to blkdev error (0x%x)", i,
+			    com.nioc_drv_err);
 		}
 	}
 
@@ -5971,6 +6212,15 @@ nvme_ioctl_excl_check(nvme_minor_t *minor, nvme_ioctl_common_t *ioc,
 	ASSERT0(ctrl_is_excl && ns_is_excl);
 	mutex_exit(&nvme->n_minor_mutex);
 
+	if (check->nck_excl == NVME_IOCTL_EXCL_CTRL) {
+		if (have_ctrl) {
+			return (B_TRUE);
+		}
+
+		return (nvme_ioctl_error(ioc, NVME_IOCTL_E_NEED_CTRL_WRLOCK,
+		    0, 0));
+	}
+
 	if (check->nck_excl == NVME_IOCTL_EXCL_WRITE) {
 		if (ns == NULL) {
 			if (have_ctrl) {
@@ -6217,19 +6467,11 @@ nvme_ioctl_ns_info(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 	kmem_free(idbuf, NVME_IDENTIFY_BUFSIZE);
 
 	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
-	if (ns->ns_allocated)
-		ns_info->nni_state |= NVME_NS_STATE_ALLOCATED;
-
-	if (ns->ns_active)
-		ns_info->nni_state |= NVME_NS_STATE_ACTIVE;
-
-	if (ns->ns_ignore)
-		ns_info->nni_state |= NVME_NS_STATE_IGNORED;
-
-	if (ns->ns_attached) {
+	ns_info->nni_state = ns->ns_state;
+	if (ns->ns_state >= NVME_NS_STATE_ATTACHED) {
 		const char *addr;
 
-		ns_info->nni_state |= NVME_NS_STATE_ATTACHED;
+		ns_info->nni_state = NVME_NS_STATE_ATTACHED;
 		addr = bd_address(ns->ns_bd_hdl);
 		if (strlcpy(ns_info->nni_addr, addr,
 		    sizeof (ns_info->nni_addr)) >= sizeof (ns_info->nni_addr)) {
@@ -6674,12 +6916,29 @@ nvme_ioctl_format(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 		goto copyout;
 	}
 
+	/*
+	 * The broadcast namespace can format all namespaces attached to the
+	 * controller, meaning active namespaces. However, a targeted format can
+	 * impact any allocated namespace, even one not attached. As such, we
+	 * need different checks for each situation.
+	 */
 	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
-	if (!nvme_no_blkdev_attached(nvme, ioc.nif_common.nioc_nsid)) {
-		nvme_mgmt_unlock(nvme);
-		(void) nvme_ioctl_error(&ioc.nif_common,
-		    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
-		goto copyout;
+	if (ioc.nif_common.nioc_nsid == NVME_NSID_BCAST) {
+		if (!nvme_no_blkdev_attached(nvme, ioc.nif_common.nioc_nsid)) {
+			nvme_mgmt_unlock(nvme);
+			(void) nvme_ioctl_error(&ioc.nif_common,
+			    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
+			goto copyout;
+		}
+	} else {
+		nvme_namespace_t *ns = nvme_nsid2ns(nvme,
+		    ioc.nif_common.nioc_nsid);
+
+		if (!nvme_ns_state_check(ns, &ioc.nif_common,
+		    nvme_format_nvm_states)) {
+			nvme_mgmt_unlock(nvme);
+			goto copyout;
+		}
 	}
 
 	if (nvme_format_nvm(nvme, &ioc)) {
@@ -6698,7 +6957,8 @@ copyout:
 }
 
 static int
-nvme_ioctl_detach(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
+nvme_ioctl_bd_detach(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
 {
 	nvme_t *const nvme = minor->nm_ctrl;
 	nvme_ioctl_common_t com;
@@ -6719,7 +6979,7 @@ nvme_ioctl_detach(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 	}
 
 	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
-	if (nvme_detach_ns(nvme, &com)) {
+	if (nvme_bd_detach_ns(nvme, &com)) {
 		nvme_ioctl_success(&com);
 	}
 	nvme_mgmt_unlock(nvme);
@@ -6734,7 +6994,7 @@ copyout:
 }
 
 static int
-nvme_ioctl_attach(nvme_minor_t *minor, intptr_t arg, int mode,
+nvme_ioctl_bd_attach(nvme_minor_t *minor, intptr_t arg, int mode,
     cred_t *cred_p)
 {
 	nvme_t *const nvme = minor->nm_ctrl;
@@ -6766,13 +7026,321 @@ nvme_ioctl_attach(nvme_minor_t *minor, intptr_t arg, int mode,
 	 * as a bit of a safety check lest we give the kernel something bad or a
 	 * vendor unique command somehow did something behind our backs.
 	 */
-	if (!ns->ns_attached) {
-		(void) nvme_rescan_ns(nvme, com.nioc_nsid);
-		if (nvme_attach_ns(nvme, &com)) {
+	if (ns->ns_state < NVME_NS_STATE_ATTACHED) {
+		nvme_rescan_ns(nvme, com.nioc_nsid);
+	}
+
+	if (nvme_bd_attach_ns(nvme, &com)) {
+		nvme_ioctl_success(&com);
+	}
+	nvme_mgmt_unlock(nvme);
+
+copyout:
+	if (ddi_copyout(&com, (void *)(uintptr_t)arg, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+/*
+ * Attach or detach a controller from the specified namespace. While this in
+ * theory allows for multiple controllers to be specified, currently we only
+ * support using the controller that we've issued this ioctl on. In the future
+ * when we have better ways to test dual-attached controllers then this should
+ * be extended to take the controller list from userland.
+ */
+static boolean_t
+nvme_ctrl_attach_detach_ns(nvme_t *nvme, nvme_namespace_t *ns,
+    nvme_ioctl_common_t *ioc, boolean_t attach)
+{
+	nvme_ioc_cmd_args_t args = { NULL };
+	nvme_sqe_t sqe;
+	nvme_ns_mgmt_dw10_t dw10;
+	uint16_t ctrlids[2];
+
+	ASSERT(nvme_mgmt_lock_held(nvme));
+
+	bzero(&sqe, sizeof (sqe));
+	sqe.sqe_nsid = ioc->nioc_nsid;
+	sqe.sqe_opc = NVME_OPC_NS_ATTACH;
+
+	dw10.r = 0;
+	dw10.b.nsm_sel = attach ? NVME_NS_ATTACH_CTRL_ATTACH :
+	    NVME_NS_ATTACH_CTRL_DETACH;
+	sqe.sqe_cdw10 = dw10.r;
+
+	/*
+	 * As we only support sending our current controller's id along, we can
+	 * simplify this and don't need both allocating a full
+	 * nvme_identify_ctrl_list_t for two items.
+	 */
+	ctrlids[0] = 1;
+	ctrlids[1] = nvme->n_idctl->id_cntlid;
+
+	args.ica_sqe = &sqe;
+	args.ica_data = ctrlids;
+	args.ica_data_len = sizeof (ctrlids);
+	args.ica_dma_flags = DDI_DMA_WRITE;
+	args.ica_copy_flags = FKIOCTL;
+	args.ica_timeout = nvme_admin_cmd_timeout;
+
+	return (nvme_ioc_cmd(nvme, ioc, &args));
+}
+
+static int
+nvme_ioctl_ctrl_detach(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
+{
+	nvme_t *const nvme = minor->nm_ctrl;
+	nvme_ioctl_common_t com;
+	nvme_namespace_t *ns;
+
+	if ((mode & FWRITE) == 0)
+		return (EBADF);
+
+	if (secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (ddi_copyin((void *)(uintptr_t)arg, &com, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	if (!nvme_ioctl_check(minor, &com, &nvme_check_attach_detach)) {
+		goto copyout;
+	}
+
+	if (!nvme_validate_ctrl_attach_detach_ns(nvme, &com)) {
+		goto copyout;
+	}
+
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
+	ns = nvme_nsid2ns(nvme, com.nioc_nsid);
+
+	if (nvme_ns_state_check(ns, &com, nvme_ctrl_detach_states)) {
+		if (nvme_ctrl_attach_detach_ns(nvme, ns, &com, B_FALSE)) {
+			nvme_rescan_ns(nvme, com.nioc_nsid);
 			nvme_ioctl_success(&com);
 		}
+	}
+	nvme_mgmt_unlock(nvme);
+
+copyout:
+	if (ddi_copyout(&com, (void *)(uintptr_t)arg, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
+nvme_ioctl_ns_create(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
+{
+	nvme_t *const nvme = minor->nm_ctrl;
+	nvme_ioctl_ns_create_t create;
+
+	if ((mode & FWRITE) == 0)
+		return (EBADF);
+
+	if (secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (ddi_copyin((void *)(uintptr_t)arg, &create, sizeof (create),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	if (!nvme_ioctl_check(minor, &create.nnc_common,
+	    &nvme_check_ns_create)) {
+		goto copyout;
+	}
+
+	if (!nvme_validate_ns_create(nvme, &create)) {
+		goto copyout;
+	}
+
+	/*
+	 * Now that we've validated this, proceed to build up the actual data
+	 * request. We need to fill out the relevant identify namespace data
+	 * structure fields.
+	 */
+	nvme_identify_nsid_t *idns = kmem_zalloc(sizeof (nvme_identify_nsid_t),
+	    KM_NOSLEEP_LAZY);
+	if (idns == NULL) {
+		(void) nvme_ioctl_error(&create.nnc_common,
+		    NVME_IOCTL_E_NO_KERN_MEM, 0, 0);
+		goto copyout;
+	}
+
+	idns->id_nsize = create.nnc_nsze;
+	idns->id_ncap = create.nnc_ncap;
+	idns->id_flbas.lba_format = create.nnc_flbas;
+	idns->id_nmic.nm_shared = bitx32(create.nnc_nmic, 0, 0);
+
+	nvme_ioc_cmd_args_t args = { NULL };
+	nvme_sqe_t sqe;
+	nvme_ns_mgmt_dw10_t dw10;
+	nvme_ns_mgmt_dw11_t dw11;
+
+	bzero(&sqe, sizeof (sqe));
+	sqe.sqe_nsid = create.nnc_common.nioc_nsid;
+	sqe.sqe_opc = NVME_OPC_NS_MGMT;
+
+	dw10.r = 0;
+	dw10.b.nsm_sel = NVME_NS_MGMT_NS_CREATE;
+	sqe.sqe_cdw10 = dw10.r;
+
+	dw11.r = 0;
+	dw11.b.nsm_csi = create.nnc_csi;
+	sqe.sqe_cdw11 = dw11.r;
+
+	args.ica_sqe = &sqe;
+	args.ica_data = idns;
+	args.ica_data_len = sizeof (nvme_identify_nsid_t);
+	args.ica_dma_flags = DDI_DMA_WRITE;
+	args.ica_copy_flags = FKIOCTL;
+	args.ica_timeout = nvme_format_cmd_timeout;
+
+	/*
+	 * This command manipulates our understanding of a namespace's state.
+	 * While we don't need to check anything before we proceed, we still
+	 * logically require the lock.
+	 */
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
+	if (nvme_ioc_cmd(nvme, &create.nnc_common, &args)) {
+		create.nnc_nsid = args.ica_cdw0;
+		nvme_rescan_ns(nvme, create.nnc_nsid);
+		nvme_ioctl_success(&create.nnc_common);
+	}
+	nvme_mgmt_unlock(nvme);
+	kmem_free(idns, sizeof (nvme_identify_nsid_t));
+
+copyout:
+	if (ddi_copyout(&create, (void *)(uintptr_t)arg, sizeof (create),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+
+}
+
+static int
+nvme_ioctl_ns_delete(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
+{
+	nvme_t *const nvme = minor->nm_ctrl;
+	nvme_ioctl_common_t com;
+
+	if ((mode & FWRITE) == 0)
+		return (EBADF);
+
+	if (secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (ddi_copyin((void *)(uintptr_t)arg, &com, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	if (!nvme_ioctl_check(minor, &com, &nvme_check_ns_delete)) {
+		goto copyout;
+	}
+
+	if (!nvme_validate_ns_delete(nvme, &com)) {
+		goto copyout;
+	}
+
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
+	if (com.nioc_nsid == NVME_NSID_BCAST) {
+		if (!nvme_no_blkdev_attached(nvme, com.nioc_nsid)) {
+			nvme_mgmt_unlock(nvme);
+			(void) nvme_ioctl_error(&com,
+			    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
+			goto copyout;
+		}
 	} else {
+		nvme_namespace_t *ns = nvme_nsid2ns(nvme, com.nioc_nsid);
+
+		if (!nvme_ns_state_check(ns, &com, nvme_ns_delete_states)) {
+			nvme_mgmt_unlock(nvme);
+			goto copyout;
+		}
+	}
+
+	nvme_ioc_cmd_args_t args = { NULL };
+	nvme_sqe_t sqe;
+	nvme_ns_mgmt_dw10_t dw10;
+
+	bzero(&sqe, sizeof (sqe));
+	sqe.sqe_nsid = com.nioc_nsid;
+	sqe.sqe_opc = NVME_OPC_NS_MGMT;
+
+	dw10.r = 0;
+	dw10.b.nsm_sel = NVME_NS_MGMT_NS_DELETE;
+	sqe.sqe_cdw10 = dw10.r;
+
+	args.ica_sqe = &sqe;
+	args.ica_data = NULL;
+	args.ica_data_len = 0;
+	args.ica_dma_flags = 0;
+	args.ica_copy_flags = 0;
+	args.ica_timeout = nvme_format_cmd_timeout;
+
+	if (nvme_ioc_cmd(nvme, &com, &args)) {
+		nvme_rescan_ns(nvme, com.nioc_nsid);
 		nvme_ioctl_success(&com);
+	}
+	nvme_mgmt_unlock(nvme);
+
+copyout:
+	if (ddi_copyout(&com, (void *)(uintptr_t)arg, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
+nvme_ioctl_ctrl_attach(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
+{
+	nvme_t *const nvme = minor->nm_ctrl;
+	nvme_ioctl_common_t com;
+	nvme_namespace_t *ns;
+
+	if ((mode & FWRITE) == 0)
+		return (EBADF);
+
+	if (secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (ddi_copyin((void *)(uintptr_t)arg, &com, sizeof (com),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	if (!nvme_ioctl_check(minor, &com, &nvme_check_attach_detach)) {
+		goto copyout;
+	}
+
+	if (!nvme_validate_ctrl_attach_detach_ns(nvme, &com)) {
+		goto copyout;
+	}
+
+	nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
+	ns = nvme_nsid2ns(nvme, com.nioc_nsid);
+
+	if (nvme_ns_state_check(ns, &com, nvme_ctrl_attach_states)) {
+		if (nvme_ctrl_attach_detach_ns(nvme, ns, &com, B_TRUE)) {
+			nvme_rescan_ns(nvme, com.nioc_nsid);
+			nvme_ioctl_success(&com);
+		}
 	}
 	nvme_mgmt_unlock(nvme);
 
@@ -7429,6 +7997,7 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(rval_p));
 #endif
+	int ret;
 	nvme_minor_t *minor;
 	nvme_t *nvme;
 
@@ -7444,7 +8013,7 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	if (IS_DEVCTL(cmd))
 		return (ndi_devctl_ioctl(nvme->n_dip, cmd, arg, mode, 0));
 
-	if (nvme->n_dead && (cmd != NVME_IOC_DETACH && cmd !=
+	if (nvme->n_dead && (cmd != NVME_IOC_BD_DETACH && cmd !=
 	    NVME_IOC_UNLOCK)) {
 		if (IS_NVME_IOC(cmd) == 0) {
 			return (EIO);
@@ -7459,36 +8028,63 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	 */
 	switch (cmd) {
 	case NVME_IOC_CTRL_INFO:
-		return (nvme_ioctl_ctrl_info(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_ctrl_info(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_IDENTIFY:
-		return (nvme_ioctl_identify(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_identify(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_GET_LOGPAGE:
-		return (nvme_ioctl_get_logpage(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_get_logpage(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_GET_FEATURE:
-		return (nvme_ioctl_get_feature(minor, arg, mode, cred_p));
-	case NVME_IOC_DETACH:
-		return (nvme_ioctl_detach(minor, arg, mode, cred_p));
-	case NVME_IOC_ATTACH:
-		return (nvme_ioctl_attach(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_get_feature(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_BD_DETACH:
+		ret = nvme_ioctl_bd_detach(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_BD_ATTACH:
+		ret = nvme_ioctl_bd_attach(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_FORMAT:
-		return (nvme_ioctl_format(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_format(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_FIRMWARE_DOWNLOAD:
-		return (nvme_ioctl_firmware_download(minor, arg, mode,
-		    cred_p));
+		ret = nvme_ioctl_firmware_download(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_FIRMWARE_COMMIT:
-		return (nvme_ioctl_firmware_commit(minor, arg, mode,
-		    cred_p));
+		ret = nvme_ioctl_firmware_commit(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_NS_INFO:
-		return (nvme_ioctl_ns_info(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_ns_info(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_PASSTHRU:
-		return (nvme_ioctl_passthru(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_passthru(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_LOCK:
-		return (nvme_ioctl_lock(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_lock(minor, arg, mode, cred_p);
+		break;
 	case NVME_IOC_UNLOCK:
-		return (nvme_ioctl_unlock(minor, arg, mode, cred_p));
+		ret = nvme_ioctl_unlock(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_CTRL_DETACH:
+		ret = nvme_ioctl_ctrl_detach(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_CTRL_ATTACH:
+		ret = nvme_ioctl_ctrl_attach(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_NS_CREATE:
+		ret = nvme_ioctl_ns_create(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_NS_DELETE:
+		ret = nvme_ioctl_ns_delete(minor, arg, mode, cred_p);
+		break;
 	default:
-		return (ENOTTY);
+		ret = ENOTTY;
+		break;
 	}
+
+	ASSERT(!nvme_mgmt_lock_held(nvme));
+	return (ret);
 }
 
 /*
