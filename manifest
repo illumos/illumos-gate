@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2023 MNX Cloud, Inc.
+# Copyright 2025 MNX Cloud, Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
@@ -6675,6 +6675,7 @@ f usr/lib/iconv/amd64/UCS-2LE%UTF-8.so 0755 root bin
 f usr/lib/iconv/amd64/UTF-8%646.so 0755 root bin
 f usr/lib/iconv/amd64/UTF-8%UCS-2.so 0755 root bin
 f usr/lib/iconv/amd64/UTF-8%UCS-2LE.so 0755 root bin
+f usr/lib/iconv/alias 0444 root bin
 f usr/lib/idmapd 0555 root bin
 d usr/lib/inet 0755 root bin
 d usr/lib/inet/amd64 0755 root bin
