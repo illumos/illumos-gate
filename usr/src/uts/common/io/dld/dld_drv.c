@@ -625,32 +625,47 @@ done:
 }
 
 /*
- * Sometimes certain properties may be allowed to be accessed by the zone that
- * is assigned the datalink device, as opposed to the zone that created the
- * device. Currently that access is restricted to only the reading of select
- * properties.
+ * Calculate caller's allowed permissions to a property.
  */
-static boolean_t
-dld_macprop_assigned_zone_exception(zoneid_t zoneid, dls_dl_handle_t dlh,
-    dld_ioc_macprop_t *kprop, boolean_t set)
+static uint_t
+dld_macprop_perm_mask(dls_dl_handle_t dlh, const dld_ioc_macprop_t *prop,
+    const cred_t *cred)
 {
-	/*
-	 * No exceptions for setting! No exceptions unless the zoneid is
-	 * the assigned zone.
-	 */
-	if (set || zoneid != dls_devnet_getzid(dlh))
-		return (B_FALSE);
+	const zoneid_t zid = crgetzoneid(cred);
+	const boolean_t is_owner = zid == dls_devnet_getownerzid(dlh);
+	const boolean_t is_in_zone = zid == dls_devnet_getzid(dlh);
+	const boolean_t is_in_global = zid == GLOBAL_ZONEID;
+	uint_t mask = 0;
 
-	/*
-	 * The current list of read-only exceptions are enumerated below.
-	 */
-	switch (kprop->pr_num) {
+	/* If the zone owns the datalink device, it should have full access. */
+	if (is_owner) {
+		mask = MAC_PROP_PERM_RW;
+	}
+
+	switch (prop->pr_num) {
 	case MAC_PROP_MTU:
 	case MAC_PROP_STATUS:
-		return (B_TRUE);
+		/*
+		 * These properties remain readable inside a zone which has been
+		 * assigned (but does not own) a datalink device.
+		 */
+		if (is_in_zone) {
+			mask |= MAC_PROP_PERM_READ;
+		}
+		break;
+	case MAC_PROP_ZONE:
+		/*
+		 * Actors outside global zone are not allowed to change the zone
+		 * ownership property.
+		 */
+		if (!is_in_global) {
+			mask &= ~MAC_PROP_PERM_WRITE;
+		}
+		break;
 	default:
-		return (B_FALSE);
+		break;
 	}
+	return (mask);
 }
 
 /*
@@ -667,7 +682,6 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	dld_ioc_macprop_t	*kprop;
 	datalink_id_t		linkid;
 	datalink_class_t	class;
-	zoneid_t		zoneid = crgetzoneid(cred);
 	uint_t			dsize;
 
 	/*
@@ -708,17 +722,10 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
 		goto done;
 
-	/*
-	 * In general, don't allow a process to get or set properties of a
-	 * link if that link doesn't belong to that zone.
-	 *
-	 * There are exceptions however, if the dlh's *assigned* zone (as
-	 * determined by dls_devnet_getzid()) is the one calling here.  See
-	 * the local function dld_macprop_assigned_zone_exception() above.
-	 */
-	if (zoneid != dls_devnet_getownerzid(dlh) &&
-	    !dld_macprop_assigned_zone_exception(zoneid, dlh, kprop, set)) {
-		err = ENOENT;
+	const uint_t perm_req = set ? MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+	const uint_t perm_mask = dld_macprop_perm_mask(dlh, kprop, cred);
+	if ((perm_req & perm_mask) != perm_req) {
+		err = EACCES;
 		goto done;
 	}
 
@@ -733,10 +740,6 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		if (set) {
 			dld_ioc_zid_t *dzp = (dld_ioc_zid_t *)kprop->pr_val;
 
-			if (zoneid != GLOBAL_ZONEID) {
-				err = EACCES;
-				goto done;
-			}
 			err = dls_devnet_setzid(dlh, dzp->diz_zid);
 		} else {
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
@@ -835,6 +838,9 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		}
 	}
 	}
+
+	/* Properly communicate allowed permissions */
+	kprop->pr_perm_flags &= perm_mask;
 
 done:
 	if (!set && ddi_copyout(kprop, (void *)arg, dsize, mode) != 0)
