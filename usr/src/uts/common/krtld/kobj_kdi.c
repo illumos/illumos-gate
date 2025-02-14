@@ -136,7 +136,6 @@ kobj_kdi_mods_changed(void)
 	return (state != KOBJ_KDI_MOD_IDLE);
 }
 
-/*ARGSUSED1*/
 void
 kobj_kdi_mod_notify(uint_t why, struct modctl *what)
 {

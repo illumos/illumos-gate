@@ -34,8 +34,8 @@
 #include <sys/varargs.h>
 #include <sys/reboot.h>
 
-extern void (*_kobj_printf)(void *, const char *fmt, ...);
-extern void (*_vkobj_printf)(void *, const char *fmt, va_list);
+extern void (*_vkobj_printf)(void *, const char *fmt, va_list)
+    __KVPRINTFLIKE(2);
 extern int get_weakish_int(int *);
 extern struct bootops *ops;
 extern struct boot_fs_ops bufs_ops, bhsfs_ops, bbootfs_ops, bcpio_ops;
@@ -47,6 +47,7 @@ struct boot_fs_ops *bfs_tab[] = {
 	&bufs_ops, &bhsfs_ops, &bbootfs_ops, &bcpio_ops, NULL,
 };
 
+int bootrd_debug = 0;
 static uintptr_t scratch_max = 0;
 
 #define	_kmem_ready	get_weakish_int(&kmem_ready)
@@ -145,9 +146,9 @@ diskread(fileid_t *filep)
 
 	diskloc = (caddr_t)(uintptr_t)rd_start + blocknum * DEV_BSIZE;
 	if (diskloc + filep->fi_count > (caddr_t)(uintptr_t)rd_end) {
-		_kobj_printf(ops, "diskread: start = 0x%p, size = 0x%x\n",
+		kobj_printf("diskread: start = 0x%p, size = 0x%x\n",
 		    diskloc, filep->fi_count);
-		_kobj_printf(ops, "reading beyond end of ramdisk\n");
+		kobj_printf("reading beyond end of ramdisk\n");
 		return (-1);
 	}
 
@@ -170,13 +171,11 @@ kobj_boot_mountroot()
 	    BOP_GETPROP(ops, "ramdisk_start", (void *)&rd_start) != 0 ||
 	    BOP_GETPROPLEN(ops, "ramdisk_end") != 8 ||
 	    BOP_GETPROP(ops, "ramdisk_end", (void *)&rd_end) != 0) {
-		_kobj_printf(ops,
-		    "failed to get ramdisk from boot\n");
+		kobj_printf("failed to get ramdisk from boot\n");
 		return (-1);
 	}
 #ifdef KOBJ_DEBUG
-	_kobj_printf(ops,
-	    "ramdisk range: 0x%llx-%llx\n", rd_start, rd_end);
+	kobj_printf("ramdisk range: 0x%llx-%llx\n", rd_start, rd_end);
 #endif
 
 	/*
@@ -188,7 +187,7 @@ kobj_boot_mountroot()
 			return (0);
 	}
 
-	_kobj_printf(ops, "failed to mount ramdisk from boot\n");
+	kobj_printf("failed to mount ramdisk from boot\n");
 	return (-1);
 }
 
@@ -197,7 +196,7 @@ kobj_boot_unmountroot()
 {
 #ifdef	DEBUG
 	if (boothowto & RB_VERBOSE)
-		_kobj_printf(ops, "boot scratch memory used: 0x%lx\n",
+		kobj_printf("boot scratch memory used: 0x%lx\n",
 		    scratch_max);
 #endif
 	(void) BRD_UNMOUNTROOT(bfs_ops);
@@ -227,7 +226,6 @@ bkmem_alloc(size_t size)
 	return (addr);
 }
 
-/*ARGSUSED*/
 void
 bkmem_free(void *p, size_t size)
 {
@@ -238,7 +236,6 @@ bkmem_free(void *p, size_t size)
 		kobj_free(p, size);
 }
 
-/*PRINTFLIKE1*/
 void
 kobj_printf(char *fmt, ...)
 {

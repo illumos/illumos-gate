@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*
@@ -42,13 +43,9 @@
 #include <sys/fs/hsfs_susp.h>
 #include <sys/fs/hsfs_rrip.h>
 #include <sys/bootvfs.h>
+#include <sys/kobj.h>
 #include <sys/filep.h>
-
-#ifdef	_BOOT
-#include "../common/util.h"
-#else
 #include <sys/sunddi.h>
-#endif
 
 #define	hdbtodb(n)	((ISO_SECTOR_SIZE / DEV_BSIZE) * (n))
 
@@ -68,16 +65,6 @@
 #define	RRIP_RF_IX	11
 #define	RRIP_RR_IX	12
 #define	RRIP_NM_IX	13
-
-#ifdef	_BOOT
-#define	dprintf	if (bootrd_debug) printf
-#else
-#define	printf	kobj_printf
-#define	dprintf	if (bootrd_debug) kobj_printf
-
-/* PRINTFLIKE1 */
-extern void kobj_printf(char *, ...);
-#endif
 
 extern int bootrd_debug;
 extern void *bkmem_alloc(size_t);
@@ -158,7 +145,8 @@ opendir(ino_t inode, fileid_t *filep)
 {
 	struct hs_direct hsdep;
 
-	dprintf("opendir: inode = %ld\n", inode);
+	if (bootrd_debug)
+		kobj_printf("opendir: inode = %ld\n", inode);
 	/* Set up the IO request */
 	filep->fi_offset = 0;
 	filep->fi_blocknum = hdbtodb(inode);
@@ -197,7 +185,8 @@ find(char *path, fileid_t *filep)
 	ino_t n;
 
 	n = 0;
-	dprintf("find: %s\n", path);
+	if (bootrd_debug)
+		kobj_printf("find: %s\n", path);
 	if (path == NULL || *path == '\0')
 		return (0);
 
@@ -238,7 +227,8 @@ dlook(char *s, fileid_t *filep)
 	struct dirstuff dirp;
 	int len;
 
-	dprintf("dlook: %s\n", s);
+	if (bootrd_debug)
+		kobj_printf("dlook: %s\n", s);
 	ip = filep->fi_inode;
 	if (s == NULL || *s == '\0')
 		return (0);
@@ -291,7 +281,8 @@ readdir(struct dirstuff *dirp)
 	daddr_t lbn;
 	int off;
 
-	dprintf("readdir: start\n");
+	if (bootrd_debug)
+		kobj_printf("readdir: start\n");
 	filep = dirp->filep;
 	ip = filep->fi_inode;
 	for (;;) {
@@ -305,7 +296,10 @@ readdir(struct dirstuff *dirp)
 			filep->fi_count = ISO_SECTOR_SIZE;
 			filep->fi_memp = 0;
 			if (diskread(filep)) {
-				dprintf("readdir: diskread failed\n");
+				if (bootrd_debug) {
+					kobj_printf(
+					    "readdir: diskread failed\n");
+				}
 				return (NULL);
 			}
 		}
@@ -325,7 +319,8 @@ getblock(fileid_t *filep)
 	int off, size, diff;
 	daddr_t lbn;
 
-	dprintf("getblock: start\n");
+	if (bootrd_debug)
+		kobj_printf("getblock: start\n");
 	diff = ip->i_size - filep->fi_offset;
 	if (diff <= 0)
 		return (-1);
@@ -344,7 +339,8 @@ getblock(fileid_t *filep)
 		filep->fi_count = diff + off;
 	filep->fi_count -= off;
 	filep->fi_memp += off;
-	dprintf("getblock: end\n");
+	if (bootrd_debug)
+		kobj_printf("getblock: end\n");
 	return (0);
 }
 
@@ -356,8 +352,8 @@ bhsfs_read(int fd, caddr_t buf, size_t count)
 	struct inode *ip;
 	caddr_t n;
 
-	dprintf("bhsfs_read %d, ", fd);
-	dprintf("count 0x%lx\n", count);
+	if (bootrd_debug)
+		kobj_printf("bhsfs_read %d, count 0x%lx\n", fd, count);
 	filep = find_fp(fd);
 	if (filep == NULL)
 		return (-1);
@@ -392,20 +388,21 @@ bhsfs_read(int fd, caddr_t buf, size_t count)
 		i -= j;
 	}
 
-	dprintf("bhsfs_read: read 0x%x\n", (int)(buf - n));
+	if (bootrd_debug)
+		kobj_printf("bhsfs_read: read 0x%x\n", (int)(buf - n));
 	return (buf - n);
 }
 
-/*ARGSUSED*/
 static int
-bhsfs_mountroot(char *str)
+bhsfs_mountroot(char *str __unused)
 {
 	char *bufp;
 
 	if (hsfsp != NULL)
 		return (0);	/* already mounted */
 
-	dprintf("mounting ramdisk as hsfs\n");
+	if (bootrd_debug)
+		kobj_printf("mounting ramdisk as hsfs\n");
 
 	hsfsp = bkmem_alloc(sizeof (*hsfsp));
 	bzero(hsfsp, sizeof (*hsfsp));
@@ -419,7 +416,7 @@ bhsfs_mountroot(char *str)
 	head->fi_count = ISO_SECTOR_SIZE;
 	head->fi_memp = head->fi_buf;
 	if (diskread(head)) {
-		printf("failed to read superblock\n");
+		kobj_printf("failed to read superblock\n");
 		bhsfs_closeall();
 		return (-1);
 	}
@@ -429,7 +426,8 @@ bhsfs_mountroot(char *str)
 	if ((ISO_DESC_TYPE(bufp) != ISO_VD_PVD) ||
 	    (strncmp((const char *)ISO_std_id(bufp), ISO_ID_STRING,
 	    ISO_ID_STRLEN) != 0) || (ISO_STD_VER(bufp) != ISO_ID_VER)) {
-		dprintf("volume type does not match\n");
+		if (bootrd_debug)
+			kobj_printf("volume type does not match\n");
 		bhsfs_closeall();
 		return (-1);
 	}
@@ -444,7 +442,7 @@ bhsfs_mountroot(char *str)
 
 	/* Make sure we have a valid logical block size */
 	if (hsfsp->lbn_size & ~(1 << hsfsp->lbn_shift)) {
-		printf("%d invalid logical block size\n", hsfsp->lbn_size);
+		kobj_printf("%d invalid logical block size\n", hsfsp->lbn_size);
 		bhsfs_closeall();
 		return (-1);
 	}
@@ -468,16 +466,16 @@ bhsfs_unmountroot(void)
 /*
  * Open a file.
  */
-/*ARGSUSED*/
 int
-bhsfs_open(char *str, int flags)
+bhsfs_open(char *str, int flags __unused)
 {
 	static int filedes = 1;
 
 	fileid_t *filep;
 	ino_t ino;
 
-	dprintf("open %s\n", str);
+	if (bootrd_debug)
+		kobj_printf("open %s\n", str);
 	filep = (fileid_t *)bkmem_alloc(sizeof (fileid_t));
 	filep->fi_back = head->fi_back;
 	filep->fi_forw = head;
@@ -505,7 +503,8 @@ bhsfs_open(char *str, int flags)
 
 	if (cf_check_compressed(filep) != 0)
 		return (-1);
-	dprintf("open done\n");
+	if (bootrd_debug)
+		kobj_printf("open done\n");
 	return (filep->fi_filedes);
 }
 
@@ -514,12 +513,13 @@ bhsfs_close(int fd)
 {
 	fileid_t *filep;
 
-	dprintf("close %d\n", fd);
+	if (bootrd_debug)
+		kobj_printf("close %d\n", fd);
 	if (!(filep = find_fp(fd)))
 		return (-1);
 
 	if (filep->fi_taken == 0 || filep == head) {
-		printf("File descripter %d not allocated!\n", fd);
+		kobj_printf("File descripter %d not allocated!\n", fd);
 		return (-1);
 	}
 
@@ -531,7 +531,8 @@ bhsfs_close(int fd)
 		bkmem_free(filep->fi_inode, sizeof (struct inode));
 	bkmem_free(filep->fi_path, strlen(filep->fi_path) + 1);
 	bkmem_free((char *)filep, sizeof (fileid_t));
-	dprintf("close done\n");
+	if (bootrd_debug)
+		kobj_printf("close done\n");
 	return (0);
 }
 
@@ -542,7 +543,7 @@ bhsfs_closeall(void)
 
 	while ((filep = head->fi_forw) != head)
 		if (filep->fi_taken && bhsfs_close(filep->fi_filedes))
-			printf("Filesystem may be inconsistent.\n");
+			kobj_printf("Filesystem may be inconsistent.\n");
 
 	bkmem_free(hsfsp, sizeof (*hsfsp));
 	bkmem_free(head, sizeof (fileid_t));
@@ -558,8 +559,8 @@ bhsfs_lseek(int fd, off_t addr, int whence)
 {
 	fileid_t *filep;
 
-	dprintf("lseek %d, ", fd);
-	dprintf("off = %lx\n", addr);
+	if (bootrd_debug)
+		kobj_printf("lseek %d, off = %lx\n", fd, addr);
 	if (!(filep = find_fp(fd)))
 		return (-1);
 
@@ -575,7 +576,8 @@ bhsfs_lseek(int fd, off_t addr, int whence)
 			break;
 		default:
 		case SEEK_END:
-			printf("lseek(): invalid whence value %d\n", whence);
+			kobj_printf("lseek(): invalid whence value %d\n",
+			    whence);
 			break;
 		}
 		filep->fi_blocknum = addr / DEV_BSIZE;
@@ -648,7 +650,8 @@ parse_dir(fileid_t *filep, int offset, struct hs_direct *hsdep)
 	uint_t i;
 	uchar_t c;
 
-	dprintf("parse_dir: offset = %d\n", offset);
+	if (bootrd_debug)
+		kobj_printf("parse_dir: offset = %d\n", offset);
 	/* a zero length dir entry terminates the dir block */
 	udp->d_reclen = IDE_DIR_LEN(bufp);
 	if (udp->d_reclen == 0)
@@ -675,7 +678,7 @@ parse_dir(fileid_t *filep, int offset, struct hs_direct *hsdep)
 		hdp->mode = IFDIR;
 		hdp->nlink = 2;
 	} else {
-		printf("pd(): file type=0x%x unknown.\n", c);
+		kobj_printf("pd(): file type=0x%x unknown.\n", c);
 	}
 
 	/*
@@ -736,7 +739,7 @@ parse_dir(fileid_t *filep, int offset, struct hs_direct *hsdep)
 			filep->fi_blocknum = hdbtodb(ce_lbn);
 			filep->fi_memp = 0;
 			if (diskread(filep)) {
-				printf("failed to read cont. area\n");
+				kobj_printf("failed to read cont. area\n");
 				ce_len = 0;
 				ce_lbn = 0;
 				break;
@@ -767,7 +770,8 @@ parse_susp(char *bufp, uint_t *len, struct hs_direct *hsdep)
 	uint_t ce_lbn = 0;
 	uint_t i;
 
-	dprintf("parse_susp: len = %d\n", *len);
+	if (bootrd_debug)
+		kobj_printf("parse_susp: len = %d\n", *len);
 	while (cur_off < blk_len) {
 		susp = (char *)(bufp + cur_off);
 

@@ -215,10 +215,10 @@ license lic_CDDL license=lic_CDDL
 license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \
     license=usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/common/fs/THIRDPARTYLICENSE.bootrd_cpio \
+    license=usr/src/common/fs/THIRDPARTYLICENSE.bootrd_cpio
 license usr/src/contrib/zlib/THIRDPARTYLICENSE \
     license=usr/src/contrib/zlib/THIRDPARTYLICENSE
-license usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio \
-    license=usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 $(i386_ONLY)license usr/src/uts/intel/THIRDPARTYLICENSE \

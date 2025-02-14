@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include <sys/bootconf.h>
@@ -24,12 +25,7 @@
 #include <sys/bootvfs.h>
 #include <sys/bootinfo.h>
 #include <sys/filep.h>
-
-#ifdef	_BOOT
-#include "../common/util.h"
-#else
 #include <sys/sunddi.h>
-#endif
 
 #define	MAX_FILES	MAX_BOOT_MODULES
 #define	MAX_FDS		256
@@ -120,9 +116,8 @@ canonicalise(const char *fn, char *out)
 	*q = '\0';
 }
 
-/* ARGSUSED */
 static int
-bbootfs_mountroot(char *str)
+bbootfs_mountroot(char *str __unused)
 {
 	return (-1);
 }
@@ -181,9 +176,8 @@ bbootfs_init(void)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-bbootfs_open(char *fn, int flags)
+bbootfs_open(char *fn, int flags __unused)
 {
 	uint_t i;
 	bfile_t *fp;
@@ -299,9 +293,8 @@ bbootfs_fstat(int fd, struct bootstat *bsp)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
-bbootfs_closeall(int flag)
+bbootfs_closeall(int flag __unused)
 {
 	bfile_t *fp;
 

@@ -1,5 +1,6 @@
 /*
  * Copyright 2011-2017 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright 2025 MNX Cloud, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +22,7 @@
 #include <sys/filep.h>
 #include <sys/sunddi.h>
 #include <sys/ccompile.h>
+#include <sys/kobj.h>
 #include <sys/queue.h>
 
 /*
@@ -60,6 +62,9 @@ struct cpio_file {
 	SLIST_ENTRY(cpio_file) next;
 };
 
+/*
+ * in bootrd.c
+ */
 extern void *bkmem_alloc(size_t);
 extern void bkmem_free(void *, size_t);
 
@@ -68,21 +73,6 @@ static void cpio_closeall(int flag);
 static bool mounted;
 static SLIST_HEAD(cpio_file_list, cpio_file)
     open_files = SLIST_HEAD_INITIALIZER(open_files);
-
-static int
-cpio_strcmp(const char *a, const char *b)
-{
-	while ((*a != '\0') && (*b != '\0') && (*a == *b)) {
-		a++;
-		b++;
-	}
-
-	if (*a == *b)
-		return (0);
-	if (*a < *b)
-		return (-1);
-	return (1);
-}
 
 /*
  * Returns the parsed number on success, or UINT64_MAX on error.  This is
@@ -236,6 +226,16 @@ parse_stat(const struct cpio_hdr *hdr, struct bootstat *stat)
 	return (true);
 }
 
+static int
+check_archive_hdr(const struct cpio_hdr *hdr)
+{
+	if ((hdr->magic[0] != '0') || (hdr->magic[1] != '7') ||
+	    (hdr->magic[2] != '0') || (hdr->magic[3] != '7') ||
+	    (hdr->magic[4] != '0') || (hdr->magic[5] != '7'))
+		return (-1);
+	return (0);
+}
+
 /*
  * Check if specified header is for a file with a specific path.  If so,
  * fill in the file struct and return 0.  If not, return number of bytes to
@@ -252,9 +252,7 @@ scan_archive_hdr(const struct cpio_hdr *hdr, size_t off,
 	const char *path;
 	const void *data;
 
-	if ((hdr->magic[0] != '0') || (hdr->magic[1] != '7') ||
-	    (hdr->magic[2] != '0') || (hdr->magic[3] != '7') ||
-	    (hdr->magic[4] != '0') || (hdr->magic[5] != '7'))
+	if (check_archive_hdr(hdr))
 		return (-1);
 
 	if (!get_uint32(hdr->namesize, sizeof (hdr->namesize), &namesize))
@@ -275,10 +273,10 @@ scan_archive_hdr(const struct cpio_hdr *hdr, size_t off,
 	if (path == NULL || data == NULL)
 		return (-1);
 
-	if (cpio_strcmp(path, "TRAILER!!!") == 0)
+	if (strcmp(path, "TRAILER!!!") == 0)
 		return (-2);
 
-	if (cpio_strcmp(path, wanted_path) != 0)
+	if (strcmp(path, wanted_path) != 0)
 		return (offsetof(struct cpio_hdr, data[namesize + filesize]));
 
 	/*
@@ -319,7 +317,8 @@ find_filename(char *path, struct cpio_file *file)
 		const struct cpio_hdr *hdr;
 		ssize_t size;
 
-		hdr = read_ramdisk(off, sizeof (struct cpio_hdr));
+		hdr = (struct cpio_hdr *)read_ramdisk(off,
+		    sizeof (struct cpio_hdr));
 		if (hdr == NULL)
 			return (-1);
 
@@ -331,11 +330,19 @@ find_filename(char *path, struct cpio_file *file)
 	}
 }
 
-/* ARGSUSED */
 static int
 bcpio_mountroot(char *str __unused)
 {
+	const struct cpio_hdr *hdr;
+
 	if (mounted)
+		return (-1);
+
+	hdr = (struct cpio_hdr *)read_ramdisk(0, sizeof (struct cpio_hdr));
+	if (hdr == NULL)
+		return (-1);
+
+	if (check_archive_hdr(hdr))
 		return (-1);
 
 	mounted = true;
@@ -354,7 +361,6 @@ bcpio_unmountroot(void)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 bcpio_open(char *path, int flags __unused)
 {
@@ -394,7 +400,6 @@ bcpio_close(int fd)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 bcpio_closeall(int flag __unused)
 {
@@ -403,8 +408,10 @@ bcpio_closeall(int flag __unused)
 	while (!SLIST_EMPTY(&open_files)) {
 		file = SLIST_FIRST(&open_files);
 
-		if (bcpio_close(file->fd) != 0)
-			printf("closeall invoked close(%d) failed\n", file->fd);
+		if (bcpio_close(file->fd) != 0) {
+			kobj_printf("closeall invoked close(%d) failed\n",
+			    file->fd);
+		}
 	}
 }
 
@@ -450,7 +457,8 @@ bcpio_lseek(int fd, off_t addr, int whence)
 			file->off = file->stat.st_size;
 			break;
 		default:
-			printf("lseek(): invalid whence value %d\n", whence);
+			kobj_printf("lseek(): invalid whence value %d\n",
+			    whence);
 			return (-1);
 	}
 

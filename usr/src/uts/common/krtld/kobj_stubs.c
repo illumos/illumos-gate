@@ -32,215 +32,198 @@
  * the stand-alone linker/loader.
  */
 
-/*ARGSUSED*/
 int
-kobj_load_module(struct modctl *modp, int use_path)
+kobj_load_module(struct modctl *modp __unused, int use_path __unused)
 {
 	return (EINVAL);
 }
 
-/*ARGSUSED*/
 int
-kobj_load_primary_module(struct modctl *modp)
+kobj_load_primary_module(struct modctl *modp __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 void
-kobj_unload_module(struct modctl *modp)
-{}
+kobj_unload_module(struct modctl *modp __unused)
+{
+}
 
-/*ARGSUSED*/
 int
-kobj_path_exists(char *name, int use_path)
+kobj_path_exists(char *name __unused, int use_path __unused)
 {
 	return (0);
 }
 
-/*ARGSUSED*/
 struct _buf *
-kobj_open_path(char *name, int use_path, int use_moddir_suffix)
+kobj_open_path(char *name __unused, int use_path __unused,
+    int use_moddir_suffix __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 struct _buf *
-kobj_open_file(char *name)
+kobj_open_file(char *name __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 int
-kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
+kobj_read_file(struct _buf *file __unused, char *buf __unused,
+    unsigned size __unused, unsigned off __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 void
-kobj_close_file(struct _buf *file)
-{}
+kobj_close_file(struct _buf *file __unused)
+{
+}
 
-/*ARGSUSED*/
 intptr_t
-kobj_open(char *filename)
+kobj_open(char *filename __unused)
 {
 	return (-1L);
 }
 
-/*ARGSUSED*/
 int
-kobj_read(intptr_t descr, char *buf, unsigned size, unsigned offset)
+kobj_read(intptr_t descr __unused, char *buf __unused, unsigned size __unused,
+    unsigned offset __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 void
-kobj_close(intptr_t descr)
-{}
+kobj_close(intptr_t descr __unused)
+{
+}
 
-/*ARGSUSED*/
 int
-kobj_fstat(intptr_t descr, struct bootstat *buf)
+kobj_fstat(intptr_t descr __unused, struct bootstat *buf __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 int
-kobj_get_filesize(struct _buf *file, uint64_t *size)
+kobj_get_filesize(struct _buf *file __unused, uint64_t *size __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 int
-kobj_filbuf(struct _buf *f)
+kobj_filbuf(struct _buf *f __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 int
-kobj_addrcheck(void *xmp, caddr_t adr)
+kobj_addrcheck(void *xmp __unused, caddr_t adr __unused)
 {
 	return (1);
 }
 
-/*ARGSUSED*/
 uintptr_t
-kobj_getelfsym(char *name, void *mp, int *size)
+kobj_getelfsym(char *name __unused, void *mp __unused, int *size __unused)
 {
 	return (0);
 }
 
-/*ARGSUSED*/
 void
-kobj_getmodinfo(void *xmp, struct modinfo *modinfo)
-{}
+kobj_getmodinfo(void *xmp __unused, struct modinfo *modinfo __unused)
+{
+}
 
 void
-kobj_getpagesize()
-{}
+kobj_getpagesize(void)
+{
+}
 
-/*ARGSUSED*/
 char *
-kobj_getsymname(uintptr_t value, ulong_t *offset)
+kobj_getsymname(uintptr_t value __unused, ulong_t *offset __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 uintptr_t
-kobj_getsymvalue(char *name, int kernelonly)
+kobj_getsymvalue(char *name __unused, int kernelonly __unused)
 {
 	return (0);
 }
 
-/*ARGSUSED*/
 char *
-kobj_searchsym(struct module *mp, uintptr_t value, ulong_t *offset)
+kobj_searchsym(struct module *mp __unused, uintptr_t value __unused,
+    ulong_t *offset __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 uintptr_t
-kobj_lookup(struct module *mod, const char *name)
+kobj_lookup(struct module *mod __unused, const char *name __unused)
 {
 	return (0);
 }
 
-/*ARGSUSED*/
 Sym *
-kobj_lookup_all(struct module *mp, char *name, int include_self)
+kobj_lookup_all(struct module *mp __unused, char *name __unused,
+    int include_self __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void *
-kobj_alloc(size_t size, int flag)
+kobj_alloc(size_t size __unused, int flag __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void *
-kobj_zalloc(size_t size, int flag)
+kobj_zalloc(size_t size __unused, int flag __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void
-kobj_free(void *address, size_t size)
-{}
+kobj_free(void *address __unused, size_t size __unused)
+{
+}
 
-/*ARGSUSED*/
 void
 kobj_sync(void)
-{}
-
-/*ARGSUSED*/
-void
-kobj_stat_get(kobj_stat_t *kp)
-{}
-
-/*ARGSUSED*/
-void
-kobj_sync_instruction_memory(caddr_t addr, size_t size)
 {
 }
 
-/*ARGSUSED*/
+void
+kobj_stat_get(kobj_stat_t *kp __unused)
+{
+}
+
+void
+kobj_sync_instruction_memory(caddr_t addr __unused, size_t size __unused)
+{
+}
+
 int
-kobj_notify_add(kobj_notify_list_t *knp)
+kobj_notify_add(kobj_notify_list_t *knp __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 int
-kobj_notify_remove(kobj_notify_list_t *knp)
+kobj_notify_remove(kobj_notify_list_t *knp __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 void
-kobj_export_module(struct module *mp)
+kobj_export_module(struct module *mp __unused)
 {
 }
 
 #ifndef sparc
 void
 kobj_boot_unmountroot(void)
-{}
+{
+}
 #endif
 
 /*
