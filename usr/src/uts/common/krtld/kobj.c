@@ -3153,6 +3153,12 @@ kobj_getsymname(uintptr_t value, ulong_t *offset)
 	struct module *mp;
 
 	/*
+	 * Trap handler got us there, but we may not have whole kernel yet.
+	 */
+	if (standalone)
+		return (NULL);
+
+	/*
 	 * Loop through the primary kernel modules.
 	 */
 	for (lp = kobj_lm_lookup(KOBJ_LM_PRIMARY); lp; lp = lp->modl_next) {
