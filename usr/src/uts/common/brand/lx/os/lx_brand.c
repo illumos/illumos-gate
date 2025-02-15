@@ -2363,8 +2363,27 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * library will ask us for this data later, when it is ready to set
 	 * things up for the lx executable.
 	 */
-	edp.ed_phdr = (uphdr_vaddr == -1) ? voffset + ehdr.e_phoff :
-	    voffset + uphdr_vaddr;
+	if (uphdr_vaddr == -1) {
+		edp.ed_phdr = voffset + ehdr.e_phoff;
+	} else if (ehdr.e_type == ET_EXEC && interp == NULL) {
+		/*
+		 * For statically linked executable, use vaddr from Phdr.
+		 */
+		edp.ed_phdr = uphdr_vaddr;
+	} else {
+		/*
+		 * Dynamic executable with found or determined Phdr.
+		 *
+		 *  - voffset is either address where exec file is mapped
+		 *   (for ET_DYN Type) or is zero.
+		 *
+		 * According to ELF format for PT_PHDR:
+		 *  - vaddr is the virtual address at which the first byte of
+		 *    the segment resides in memory.
+		 */
+		edp.ed_phdr = voffset + uphdr_vaddr;
+	}
+
 	edp.ed_entry = voffset + ehdr.e_entry;
 	edp.ed_phent = ehdr.e_phentsize;
 	edp.ed_phnum = ehdr.e_phnum;
