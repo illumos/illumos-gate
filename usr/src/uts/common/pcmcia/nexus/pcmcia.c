@@ -1082,7 +1082,7 @@ struct regspec *
 pcmcia_cons_regspec(dev_info_t *dip, int type, uchar_t *buff, ra_return_t *ret)
 {
 	int ptype = -1, len, bus;
-	char device_type[MODMAXNAMELEN + 1];
+	char device_type[MODMAXNAMELEN];
 	dev_info_t *pdip;
 	struct regspec *defreg;
 	pci_regspec_t *pcireg;

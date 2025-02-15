@@ -369,6 +369,8 @@ struct modconfig32 {
 
 /*
  * Parameters for modinfo
+ *
+ * Maximum string lengths include terminating NUL
  */
 #define	MODMAXNAMELEN 32		/* max module name length */
 #define	MODMAXLINKINFOLEN 32		/* max link info length */

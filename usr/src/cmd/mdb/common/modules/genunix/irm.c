@@ -103,8 +103,8 @@ irmpools_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ddi_irm_pool_t	pool;
 	struct dev_info	dev;
-	char		driver[MODMAXNAMELEN + 1] = "";
-	char		devname[MODMAXNAMELEN + 1] = "";
+	char		driver[MODMAXNAMELEN] = "";
+	char		devname[MODMAXNAMELEN] = "";
 
 	if (argc != 0)
 		return (DCMD_USAGE);
@@ -190,8 +190,8 @@ irmreq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	ddi_irm_req_t		req;
 	struct dev_info		dev;
 	struct devinfo_intr	intr;
-	char			driver[MODMAXNAMELEN + 1] = "";
-	char			devname[MODMAXNAMELEN + 1] = "";
+	char			driver[MODMAXNAMELEN] = "";
+	char			devname[MODMAXNAMELEN] = "";
 
 	if (argc != 0)
 		return (DCMD_USAGE);

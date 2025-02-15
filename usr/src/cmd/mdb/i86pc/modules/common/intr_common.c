@@ -146,7 +146,7 @@ interrupt_print_isr(uintptr_t vector, uintptr_t arg1, uintptr_t dip)
 	 * figure out the real ISR function name from gld_intr()
 	 */
 	if (isr_addr == gld_intr_addr) {
-		gld_mac_info_t 	macinfo;
+		gld_mac_info_t macinfo;
 
 		if (mdb_vread(&macinfo, sizeof (gld_mac_info_t), arg1) != -1) {
 			/* verify gld data structure and get the real ISR */
@@ -156,7 +156,7 @@ interrupt_print_isr(uintptr_t vector, uintptr_t arg1, uintptr_t dip)
 	}
 
 	if ((option_flags & INTR_DISPLAY_DRVR_INST) && dip) {
-		char drvr_name[MODMAXNAMELEN + 1];
+		char drvr_name[MODMAXNAMELEN];
 
 		if (dip && mdb_devinfo2driver(dip, drvr_name,
 		    sizeof (drvr_name)) == 0) {

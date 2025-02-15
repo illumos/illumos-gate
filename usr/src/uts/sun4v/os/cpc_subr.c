@@ -103,7 +103,7 @@ kcpc_hw_startup_cpu(ushort_t cpflags)
 int
 kcpc_hw_load_pcbe(void)
 {
-	char		modname[MODMAXNAMELEN+1];
+	char		modname[MODMAXNAMELEN];
 	char		*p, *q;
 	int		len, stat;
 	extern char	*boot_cpu_compatible_list;

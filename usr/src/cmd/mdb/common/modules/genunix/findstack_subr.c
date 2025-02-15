@@ -301,7 +301,7 @@ stacks_findstack_cleanup()
 int
 stacks_module_cb(uintptr_t addr, const modctl_t *mp, stacks_module_t *smp)
 {
-	char mod_modname[MODMAXNAMELEN + 1];
+	char mod_modname[MODMAXNAMELEN];
 
 	if (!mp->mod_modname)
 		return (WALK_NEXT);
