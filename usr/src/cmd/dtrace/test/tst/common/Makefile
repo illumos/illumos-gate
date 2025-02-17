@@ -53,6 +53,8 @@ CLOBBERFILES += usdt/forker.h usdt/lazyprobe.h
 fasttrap/tst.fasttrap.exe := LDLIBS += -ldtrace
 fasttrap/tst.stack.exe := LDLIBS += -ldtrace
 
+ip/msnc.exe := LDLIBS += -lsocket
+
 sysevent/tst.post.exe := LDLIBS += -lsysevent
 sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 

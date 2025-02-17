@@ -26,6 +26,7 @@
  * Copyright 2011 Bayard G. Bell <buffer.g.overflow@gmail.com>.
  * All rights reserved. Use is subject to license terms.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*
@@ -403,16 +404,16 @@ kobj_init(
 		goto fail;
 	}
 #else
-	{
-		/* on x86, we always boot with a ramdisk */
-		(void) kobj_boot_mountroot();
-
-		/*
-		 * Now that the ramdisk is mounted, finish boot property
-		 * initialization.
-		 */
-		read_bootenvrc();
+	/* on x86, we always boot with a ramdisk */
+	if (kobj_boot_mountroot() != 0) {
+		goto fail;
 	}
+
+	/*
+	 * Now that the ramdisk is mounted, finish boot property
+	 * initialization.
+	 */
+	read_bootenvrc();
 
 #if !defined(_UNIX_KRTLD)
 	/*
@@ -3150,6 +3151,12 @@ kobj_getsymname(uintptr_t value, ulong_t *offset)
 
 	struct modctl_list *lp;
 	struct module *mp;
+
+	/*
+	 * Trap handler got us there, but we may not have whole kernel yet.
+	 */
+	if (standalone)
+		return (NULL);
 
 	/*
 	 * Loop through the primary kernel modules.

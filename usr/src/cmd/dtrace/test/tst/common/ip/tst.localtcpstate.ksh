@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2025 Oxide computer Company
 #
 
 #
@@ -63,25 +64,12 @@ fi
 
 dtrace=$1
 local=127.0.0.1
-tcpport=22
-DIR=/var/tmp/dtest.$$
+tcpport=12345
 
-mkdir $DIR
-cd $DIR
+nc -l $local $tcpport >/dev/null &
+child=$!
 
-cat > test.pl <<-EOPERL
-	use IO::Socket;
-	my \$s = IO::Socket::INET->new(
-	    Proto => "tcp",
-	    PeerAddr => "$local",
-	    PeerPort => $tcpport,
-	    Timeout => 3);
-	die "Could not connect to host $local port $tcpport" unless \$s;
-	print \$s "testing state machine transitions";
-	close \$s;
-EOPERL
-
-$dtrace -c 'perl test.pl' -qs /dev/stdin <<EODTRACE
+$dtrace -c "./msnc.exe $local $tcpport" -qs /dev/stdin <<EODTRACE
 BEGIN
 {
 	ipsend = tcpsend = ipreceive = tcpreceive = 0;
@@ -175,8 +163,5 @@ END
 EODTRACE
 
 status=$?
-
-cd /
-/usr/bin/rm -rf $DIR
 
 exit $status

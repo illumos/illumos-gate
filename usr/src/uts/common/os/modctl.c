@@ -22,10 +22,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 Joyent, Inc.
- */
-
-/*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -98,6 +95,7 @@ static struct modctl	*mod_hold_by_name_common(struct modctl *, const char *);
 static struct modctl	*mod_hold_next_by_id(modid_t);
 static struct modctl	*mod_hold_loaded_mod(struct modctl *, char *, int *);
 static struct modctl	*mod_hold_installed_mod(char *, int, int, int *);
+static struct modctl	*mod_find_by_name(const char *);
 
 static void		mod_release(struct modctl *);
 static void		mod_make_requisite(struct modctl *, struct modctl *);
@@ -433,6 +431,12 @@ modctl_modinfo(modid_t id, struct modinfo *umodi)
 		modi.mi_info = modi32.mi_info;
 		modi.mi_id = modi32.mi_id;
 		modi.mi_nextid = modi32.mi_nextid;
+		if (modi.mi_info & MI_INFO_BY_NAME) {
+			bcopy(modi32.mi_name, modi.mi_name,
+			    sizeof (modi.mi_name));
+			CTASSERT(sizeof (modi.mi_name) ==
+			    sizeof (modi32.mi_name));
+		}
 		nobase = modi.mi_info & MI_INFO_NOBASE;
 	}
 #endif
@@ -440,6 +444,14 @@ modctl_modinfo(modid_t id, struct modinfo *umodi)
 	 * This flag is -only- for the kernels use.
 	 */
 	modi.mi_info &= ~MI_INFO_LINKAGE;
+
+	if (modi.mi_info & MI_INFO_BY_NAME) {
+		/* By-name search string must be NUL-terminated */
+		if (strnlen(modi.mi_name, sizeof (modi.mi_name)) ==
+		    sizeof (modi.mi_name)) {
+			return (EINVAL);
+		}
+	}
 
 	retval = modinfo(id, &modi);
 	if (retval)
@@ -2884,25 +2896,33 @@ static int
 modinfo(modid_t id, struct modinfo *modinfop)
 {
 	struct modctl	*modp;
-	modid_t		mid;
-	int		i;
 
-	mid = modinfop->mi_id;
 	if (modinfop->mi_info & MI_INFO_ALL) {
+		modid_t mid = modinfop->mi_id;
 		while ((modp = mod_hold_next_by_id(mid++)) != NULL) {
 			if ((modinfop->mi_info & MI_INFO_CNT) ||
 			    modp->mod_installed)
 				break;
 			mod_release_mod(modp);
 		}
-		if (modp == NULL)
-			return (EINVAL);
+	} else if (modinfop->mi_info & MI_INFO_BY_NAME) {
+		mutex_enter(&mod_lock);
+		modp = mod_find_by_name(modinfop->mi_name);
+		if (modp != NULL) {
+			(void) mod_hold_by_modctl(modp,
+			    MOD_LOCK_HELD | MOD_WAIT_FOREVER);
+		}
+		mutex_exit(&mod_lock);
 	} else {
 		modp = mod_hold_by_id(id);
-		if (modp == NULL)
-			return (EINVAL);
+	}
+
+	if (modp == NULL) {
+		return (EINVAL);
+	}
+	if (!(modinfop->mi_info & MI_INFO_ALL)) {
 		if (!(modinfop->mi_info & MI_INFO_CNT) &&
-		    (modp->mod_installed == 0)) {
+		    modp->mod_installed == 0) {
 			mod_release_mod(modp);
 			return (EINVAL);
 		}
@@ -2910,7 +2930,7 @@ modinfo(modid_t id, struct modinfo *modinfop)
 
 	modinfop->mi_rev = 0;
 	modinfop->mi_state = 0;
-	for (i = 0; i < MODMAXLINK; i++) {
+	for (uint_t i = 0; i < MODMAXLINK; i++) {
 		modinfop->mi_msinfo[i].msi_p0 = -1;
 		modinfop->mi_msinfo[i].msi_linkinfo[0] = 0;
 	}
@@ -2926,7 +2946,8 @@ modinfo(modid_t id, struct modinfo *modinfop)
 
 	modinfop->mi_id = modp->mod_id;
 	modinfop->mi_loadcnt = modp->mod_loadcnt;
-	(void) strcpy(modinfop->mi_name, modp->mod_modname);
+	(void) strlcpy(modinfop->mi_name, modp->mod_modname,
+	    sizeof (modinfop->mi_name));
 
 	mod_release_mod(modp);
 	return (0);
@@ -3205,6 +3226,24 @@ mod_find_by_filename(char *subdir, char *filename)
 		}
 	} while ((mp = mp->mod_next) != &modules);
 	mutex_exit(&mod_lock);
+	return (NULL);
+}
+
+/*
+ * Find a loaded module by name.
+ * Must be called with `mod_lock` held.
+ */
+static struct modctl *
+mod_find_by_name(const char *modname)
+{
+	ASSERT(MUTEX_HELD(&mod_lock));
+
+	struct modctl *mp = &modules;
+	do {
+		if (strcmp(modname, mp->mod_modname) == 0) {
+			return (mp);
+		}
+	} while ((mp = mp->mod_next) != &modules);
 	return (NULL);
 }
 

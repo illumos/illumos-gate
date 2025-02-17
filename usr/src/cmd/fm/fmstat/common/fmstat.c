@@ -664,7 +664,7 @@ getu32(const char *name, const char *s)
 	const char *errstr;
 
 	errno = 0;
-	val = strtonum(s, 0, UINT32_MAX, &errstr);
+	val = strtonumx(s, 0, UINT32_MAX, &errstr, 0);
 
 	if (errstr != NULL) {
 		(void) fprintf(stderr, "%s: invalid %s argument -- %s: %s\n",

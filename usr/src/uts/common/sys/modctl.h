@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_MODCTL_H
@@ -428,18 +429,21 @@ struct modinfo32 {
 #endif /* _SYSCALL32 */
 
 /* Values for mi_info flags */
-#define	MI_INFO_ONE	1
-#define	MI_INFO_ALL	2
-#define	MI_INFO_CNT	4
+#define	MI_INFO_ONE	(1 << 0)
+#define	MI_INFO_ALL	(1 << 1)
+#define	MI_INFO_CNT	(1 << 2)
 #ifdef _KERNEL
-#define	MI_INFO_LINKAGE	8	/* used internally to extract modlinkage */
+/* used internally to extract modlinkage */
+#define	MI_INFO_LINKAGE	(1 << 3)
 #endif
 /*
  * MI_INFO_NOBASE indicates caller does not need mi_base. Failure to use this
  * flag may lead 32-bit apps to receive an EOVERFLOW error from modctl(MODINFO)
  * when used with a 64-bit kernel.
  */
-#define	MI_INFO_NOBASE	16
+#define	MI_INFO_NOBASE	(1 << 4)
+/* Query by-name, rather than by-id, when used with MI_INFO_ONE */
+#define	MI_INFO_BY_NAME	(1 << 5)
 
 /* Values for mi_state */
 #define	MI_LOADED	1

@@ -21,10 +21,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <strings.h>
@@ -34,12 +34,60 @@
 #include <stdlib.h>
 #include <sys/modctl.h>
 #include <zone.h>
+#include <spawn.h>
+#include <err.h>
+#include <stdbool.h>
 
-void	usage();
-void	exec_userfile(char *execfile, int id, char **envp);
 
-extern void fatal(char *fmt, ...);
-extern void error(char *fmt, ...);
+static void
+usage(void)
+{
+	(void) fprintf(stderr,
+	    "usage:  modunload [-e <exec_file>] -i <id> | <name>\n");
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * Execute the user file.
+ */
+static void
+exec_userfile(char *execfile, const struct modinfo *modinfo, char **envp)
+{
+	char modid[8], mod0[8];
+	char *child_args[] = {execfile, modid, mod0, NULL};
+
+	(void) snprintf(modid, sizeof (modid), "%d", modinfo->mi_id);
+	(void) snprintf(mod0, sizeof (mod0), "%d",
+	    modinfo->mi_msinfo[0].msi_p0);
+
+	const short desired_attrs =
+	    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP;
+	posix_spawnattr_t attr;
+	int res;
+	if ((res = posix_spawnattr_init(&attr)) != 0 ||
+	    (res = posix_spawnattr_setflags(&attr, desired_attrs)) != 0) {
+		errc(EXIT_FAILURE, res, "could not set spawn attrs");
+	}
+
+	pid_t child;
+	if (posix_spawn(&child, execfile, NULL, &attr, child_args, envp) != 0) {
+		err(EXIT_FAILURE, "could not exec %s", execfile);
+	}
+	(void) posix_spawnattr_destroy(&attr);
+
+	int status, error;
+	do {
+		error = waitpid(child, &status, 0);
+	} while (error == -1 && errno == EINTR);
+	if (error < 0) {
+		err(EXIT_FAILURE, "error while waiting for child");
+	}
+
+	if (WEXITSTATUS(status) != 0) {
+		errx(WEXITSTATUS(status),
+		    "%s returned error %d.", execfile, status);
+	}
+}
 
 /*
  * Unload a loaded module.
@@ -47,87 +95,91 @@ extern void error(char *fmt, ...);
 int
 main(int argc, char *argv[], char *envp[])
 {
-	int child;
-	int status;
-	int id;
+	int id = -1;
 	char *execfile = NULL;
+	char *unload_name = NULL;
 	int opt;
-	extern char *optarg;
+	bool has_mod_id = false;
 
-	if (argc < 3)
+	if (argc < 2)
 		usage();
 
 	while ((opt = getopt(argc, argv, "i:e:")) != -1) {
 		switch (opt) {
 		case 'i':
-			if (sscanf(optarg, "%d", &id) != 1)
-				fatal("Invalid id %s\n", optarg);
+			if (has_mod_id) {
+				errx(EXIT_FAILURE,
+				    "Only one module id can be specified");
+			}
+			if (sscanf(optarg, "%d", &id) != 1 || id < 0)
+				errx(EXIT_FAILURE, "Invalid id %s", optarg);
+			has_mod_id = true;
 			break;
 		case 'e':
 			execfile = optarg;
+			break;
+		case '?':
+			usage();
+			break;
 		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 1) {
+		unload_name = argv[0];
+	} else if (argc > 1) {
+		errx(EXIT_FAILURE, "Only one module name can be specified");
+	}
+
+	/* One must specify a name (x)or an ID, not both */
+	if (unload_name == NULL && !has_mod_id) {
+		(void) fprintf(stderr,
+		    "missing required module id or name\n");
+		usage();
+	} else if (unload_name != NULL && has_mod_id) {
+		(void) fprintf(stderr,
+		    "invalid to specify both module id and name\n");
+		usage();
 	}
 
 	if (getzoneid() != GLOBAL_ZONEID) {
-		fatal("modunload can only be run from the global zone\n");
+		errx(EXIT_FAILURE,
+		    "modunload can only be run from the global zone");
+	}
+
+	struct modinfo modinfo;
+	if (execfile != NULL || unload_name != NULL) {
+		modinfo.mi_id = modinfo.mi_nextid = id;
+		modinfo.mi_info = MI_INFO_ONE;
+		if (unload_name != NULL) {
+			(void) strlcpy(modinfo.mi_name, unload_name,
+			    sizeof (modinfo.mi_name));
+			modinfo.mi_info |= MI_INFO_BY_NAME;
+		}
+		if (modctl(MODINFO, id, &modinfo) < 0) {
+			err(EXIT_FAILURE, "can't get module information");
+		}
+		if (unload_name != NULL) {
+			id = modinfo.mi_id;
+		}
 	}
 
 	if (execfile) {
-		child = fork();
-		if (child == -1)
-			error("can't fork %s", execfile);
-		else if (child == 0)
-			exec_userfile(execfile, id, envp);
-		else {
-			(void) wait(&status);
-			if (status != 0) {
-				(void) printf("%s returned error %d.\n",
-				    execfile, status);
-				(void) exit(status >> 8);
-			}
-		}
+		exec_userfile(execfile, &modinfo, envp);
 	}
 
 	/*
 	 * Unload the module.
 	 */
 	if (modctl(MODUNLOAD, id) < 0) {
-		if (errno == EPERM)
-			fatal("Insufficient privileges to unload a module\n");
-		else if (id != 0)
-			error("can't unload the module");
+		if (errno == EPERM) {
+			errx(EXIT_FAILURE,
+			    "Insufficient privileges to unload a module");
+		} else if (id != 0) {
+			err(EXIT_FAILURE, "can't unload the module");
+		}
 	}
 
-	return (0);			/* success */
-}
-
-/*
- * exec the user file.
- */
-void
-exec_userfile(char *execfile, int id, char **envp)
-{
-	struct modinfo modinfo;
-
-	char modid[8];
-	char mod0[8];
-
-	modinfo.mi_id = modinfo.mi_nextid = id;
-	modinfo.mi_info = MI_INFO_ONE;
-	if (modctl(MODINFO, id, &modinfo) < 0)
-		error("can't get module information");
-
-	(void) sprintf(modid, "%d", id);
-	(void) sprintf(mod0, "%d", modinfo.mi_msinfo[0].msi_p0);
-
-	(void) execle(execfile, execfile, modid, mod0, NULL, envp);
-
-	error("couldn't exec %s\n", execfile);
-}
-
-
-void
-usage()
-{
-	fatal("usage:  modunload -i <module_id> [-e <exec_file>]\n");
+	return (EXIT_SUCCESS);
 }

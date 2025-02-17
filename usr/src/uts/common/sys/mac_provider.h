@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -662,12 +662,17 @@ extern void			mac_transceiver_info_set_usable(
 /*
  * This represents a provisional set of currently illumos-private APIs to get
  * information about a mblk_t chain's type. This is an evolving interface.
+ *
+ * These flags and mac_ether_offload_info struct below are currently duplicated
+ * by the userspace mac_test program, which should be kept in sync if changes to
+ * either are made here.
  */
 typedef enum mac_ether_offload_flags {
 	MEOI_L2INFO_SET		= 1 << 0,
-	MEOI_VLAN_TAGGED	= 1 << 1,
-	MEOI_L3INFO_SET		= 1 << 2,
-	MEOI_L4INFO_SET		= 1 << 3
+	MEOI_L3INFO_SET		= 1 << 1,
+	MEOI_L4INFO_SET		= 1 << 2,
+	MEOI_VLAN_TAGGED	= 1 << 3,
+	MEOI_L3_FRAGMENT	= 1 << 4
 } mac_ether_offload_flags_t;
 
 typedef struct mac_ether_offload_info {
@@ -680,8 +685,19 @@ typedef struct mac_ether_offload_info {
 	uint8_t		meoi_l4hlen;	/* How long is the L4 header */
 } mac_ether_offload_info_t;
 
-extern int			mac_ether_offload_info(mblk_t *,
-				    mac_ether_offload_info_t *);
+/*
+ * When querying the VLAN TCI from packet headers via mac_ether_l2_info(), or
+ * as part of the internal logic in mac_ether_offload_info(), a value of
+ * MEOI_VLAN_TCI_INVALID indicates that the packet does not bear a VLAN header
+ * as indicated by the ethertype.  This is to disambiguate it from any of the
+ * 16-bit contents (valid or invalid) which the TCI may hold.
+ */
+#define	MEOI_VLAN_TCI_INVALID	UINT32_MAX
+
+extern int mac_ether_l2_info(mblk_t *, uint8_t *, uint32_t *);
+extern int mac_ether_offload_info(mblk_t *, mac_ether_offload_info_t *);
+extern int mac_partial_offload_info(mblk_t *, size_t,
+    mac_ether_offload_info_t *);
 
 
 #endif	/* _KERNEL */
