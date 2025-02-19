@@ -282,6 +282,7 @@ extern dladm_stat_chain_t	*dladm_link_stat_diffchain(dladm_stat_chain_t *,
 				    dladm_stat_chain_t *, dladm_stat_type_t);
 extern dladm_stat_chain_t	*dladm_link_stat_query_all(dladm_handle_t,
 				    datalink_id_t, dladm_stat_type_t);
+extern void			dladm_link_stat_free(dladm_stat_chain_t *);
 
 extern flow_stat_t		*dladm_flow_stat_query(dladm_handle_t,
 				    const char *);
