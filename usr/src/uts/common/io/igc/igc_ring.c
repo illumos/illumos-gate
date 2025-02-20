@@ -1494,7 +1494,7 @@ igc_tx_ring_write_descs(igc_t *igc, igc_tx_ring_t *ring, mblk_t *mp,
 
 	/*
 	 * Now see if the context descriptor has changed, if required. If not,
-	 * then we can reduce the number of descriptors required. We wnt to do
+	 * then we can reduce the number of descriptors required. We want to do
 	 * this after we've checked for descriptors because this will mutate the
 	 * next tx descriptor we have to load.
 	 */
@@ -1628,6 +1628,39 @@ igc_tx_ring_write_descs(igc_t *igc, igc_tx_ring_t *ring, mblk_t *mp,
 	return (true);
 }
 
+static bool
+igc_meoi_checks(mblk_t *mp, igc_tx_state_t *tx)
+{
+	/*
+	 * Inability to parse all the way through L4 is not a concern unless
+	 * requested offloads require it.
+	 */
+	(void) mac_ether_offload_info(mp, &tx->itx_meoi);
+
+	const mac_ether_offload_info_t *meoi = &tx->itx_meoi;
+	if ((tx->itx_cksum & HCK_IPV4_HDRCKSUM) != 0) {
+		if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0 ||
+		    meoi->meoi_l3proto != ETHERTYPE_IP) {
+			return (false);
+		}
+	}
+	if ((tx->itx_cksum & HCK_PARTIALCKSUM) != 0) {
+		if ((meoi->meoi_flags & MEOI_L4INFO_SET) == 0) {
+			return (false);
+		}
+	}
+	if ((tx->itx_lso & HW_LSO) != 0) {
+		if ((tx->itx_cksum & HCK_PARTIALCKSUM) == 0) {
+			return (false);
+		}
+		if (meoi->meoi_l3proto == ETHERTYPE_IP &&
+		    (tx->itx_cksum & HCK_IPV4_HDRCKSUM) == 0) {
+			return (false);
+		}
+	}
+	return (true);
+}
+
 mblk_t *
 igc_ring_tx(void *arg, mblk_t *mp)
 {
@@ -1637,14 +1670,18 @@ igc_ring_tx(void *arg, mblk_t *mp)
 
 	ASSERT3P(mp->b_next, ==, NULL);
 
-	if (mac_ether_offload_info(mp, &tx.itx_meoi) != 0) {
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &tx.itx_cksum);
+	mac_lso_get(mp, &tx.itx_mss, &tx.itx_lso);
+
+	/*
+	 * Attempt to parse headers and confirm that they are adequate for any
+	 * requested offloads.
+	 */
+	if (!igc_meoi_checks(mp, &tx)) {
 		freemsg(mp);
 		ring->itr_stat.its_bad_meo.value.ui64++;
 		return (NULL);
 	}
-
-	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &tx.itx_cksum);
-	mac_lso_get(mp, &tx.itx_mss, &tx.itx_lso);
 
 	/*
 	 * Note, we don't really care that the following check of the number of

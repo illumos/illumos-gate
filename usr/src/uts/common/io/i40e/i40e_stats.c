@@ -1242,9 +1242,6 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_tso_force_copy.value.ui64 = 0;
 
-	kstat_named_init(&tsp->itxs_hck_meoifail, "tx_hck_meoifail",
-	    KSTAT_DATA_UINT64);
-	tsp->itxs_hck_meoifail.value.ui64 = 0;
 	kstat_named_init(&tsp->itxs_hck_nol2info, "tx_hck_nol2info",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_hck_nol2info.value.ui64 = 0;
