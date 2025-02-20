@@ -129,7 +129,6 @@ file path=opt/os-tests/tests/libtopo/digraph-test-in-badelement.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in-badnum.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in-badscheme.xml mode=0444
 file path=opt/os-tests/tests/libtopo/digraph-test-in.xml mode=0444
-file path=opt/os-tests/tests/mac_test mode=0555
 dir  path=opt/os-tests/tests/minttl
 file path=opt/os-tests/tests/minttl/minttl mode=0555
 file path=opt/os-tests/tests/minttl/minttl_err mode=0555
@@ -306,7 +305,6 @@ file path=opt/os-tests/tests/zen_umc_test mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=developer/dtrace
-depend type=require fmri=driver/ktest
 depend type=require fmri=system/io/tests
 depend type=require fmri=system/kernel/dtrace/providers
 depend type=require fmri=system/ksensor
