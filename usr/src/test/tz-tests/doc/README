@@ -1,0 +1,52 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+TZ Code and Data Related Tests
+------------------------------
+
+This suite contains programs that are intended to help verify the
+behavior of code and data updates to time zone related information.
+The programs included here are not on their own sufficient to validate
+information, but should be useful when making updates and comparisons.
+
+The tzdata files that come from the upstream IANA source are kept in
+$SRC/data/zoneinfo. These data files are compiled by zic(8), a copy of
+which is kept in the tools build, and then installed into the proto area
+where it is consumed by:
+
+- libc's time implementation (e.g. localtime(3C))
+- libzoneinfo
+- various third party software
+
+The data format is standardized in various RFCs. As of 2025, the latest
+RFC that documents the data format is RFC 9636.
+
+When using these tests, we assume the only thing that is changing is the
+tzcode files related to zic and zdump. Specifically, if you are changing
+the tzdata, then some bets are off. Most programs are designed to take
+an output directory and write out information on a per timezone or
+related structure basis. It is then up to the person using these tests
+to compare old and new versions of these.
+
+Because of this construction, there is no runfile that is provided. All
+of the resultant files are installed in /opt/tz-tests/tests.
+
+We generally provide 32-bit and 64-bit variants of a subset of the
+dumping programs to allow that to be chosen. When there is no specific
+need, we only provide a 64-bit program.
+
+Some of these programs embed implementation details of how the data is
+laid out privately in libc. This may mean that changes to libc will
+cause these programs to not work as expected.
