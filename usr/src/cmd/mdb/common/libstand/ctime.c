@@ -20,13 +20,13 @@
 #include <tzfile.h>
 #include <errno.h>
 
-static int mon_lengths[2][MONS_PER_YEAR] = {
+static int mon_lengths[2][MONSPERYEAR] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
 	31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
 static int year_lengths[2] = {
-	DAYS_PER_NYEAR, DAYS_PER_LYEAR
+	DAYSPERNYEAR, DAYSPERLYEAR
 };
 
 struct tm *
@@ -41,23 +41,23 @@ localtime(const time_t *clock)
 	static struct tm tm;
 
 	tmp = &tm;
-	days = *clock / SECS_PER_DAY;
-	rem = *clock % SECS_PER_DAY;
+	days = *clock / SECSPERDAY;
+	rem = *clock % SECSPERDAY;
 	while (rem < 0) {
-		rem += SECS_PER_DAY;
+		rem += SECSPERDAY;
 		--days;
 	}
-	while (rem >= SECS_PER_DAY) {
-		rem -= SECS_PER_DAY;
+	while (rem >= SECSPERDAY) {
+		rem -= SECSPERDAY;
 		++days;
 	}
-	tmp->tm_hour = (int)(rem / SECS_PER_HOUR);
-	rem = rem % SECS_PER_HOUR;
-	tmp->tm_min = (int)(rem / SECS_PER_MIN);
-	tmp->tm_sec = (int)(rem % SECS_PER_MIN);
-	tmp->tm_wday = (int)((EPOCH_WDAY + days) % DAYS_PER_WEEK);
+	tmp->tm_hour = (int)(rem / SECSPERHOUR);
+	rem = rem % SECSPERHOUR;
+	tmp->tm_min = (int)(rem / SECSPERMIN);
+	tmp->tm_sec = (int)(rem % SECSPERMIN);
+	tmp->tm_wday = (int)((EPOCH_WDAY + days) % DAYSPERWEEK);
 	if (tmp->tm_wday < 0)
-		tmp->tm_wday += DAYS_PER_WEEK;
+		tmp->tm_wday += DAYSPERWEEK;
 	y = EPOCH_YEAR;
 	if (days >= 0) {
 		for (;;) {

@@ -110,6 +110,7 @@ file path=usr/share/man/man5/terminfo.5
 file path=usr/share/man/man5/timezone.5
 file path=usr/share/man/man5/ttydefs.5
 file path=usr/share/man/man5/ttysrch.5
+file path=usr/share/man/man5/tzfile.5
 file path=usr/share/man/man5/ufsdump.5
 file path=usr/share/man/man5/user_attr.5
 file path=usr/share/man/man5/utmp.5

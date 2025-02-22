@@ -38,13 +38,21 @@ TEXT_DOMAIN=	SUNW_OST_ZONEINFO
 MSGDOMAIN=	$(MSGROOT)/$(TEXT_DOMAIN)
 POFILE=		zoneinfo.po
 
+#
+# We must instruct zic to output backwards-compatible output, aka still include
+# the v1 data in addition to the v2 data. This is useful for readers of
+# different eras and what most systems do as well. When this is omitted then the
+# current zic default is to include a v1 header with no information.
+#
+ZICMODE=	-b fat
+
 .KEEP_STATE:
 
 all:		$(TZFILES) $(TABFILES)
 
 install:	$(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTLIBTZSRCFILES) \
 		$(ROOTLIBTZTABFILES)
-		$(ZIC) -d $(ROOTTZD) $(TZFILES)
+		$(ZIC) $(ZICMODE) -d $(ROOTTZD) $(TZFILES)
 
 $(ROOTTZSRCD)/%: %
 		$(INS.file)

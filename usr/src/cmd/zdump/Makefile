@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -32,10 +31,14 @@ OBJS= zdump.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
 .KEEP_STATE:
 
+CSTD= $(CSTD_GNU17)
 CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -I$(SRC)/cmd/zic
+SMATCH = off
 
 all: $(PROG)
 
