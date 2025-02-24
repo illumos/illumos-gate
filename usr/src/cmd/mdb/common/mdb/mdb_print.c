@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2024 Oxide Computer Company
  */
@@ -1732,52 +1732,6 @@ elt_print(const char *name, mdb_ctf_id_t id, mdb_ctf_id_t base,
 			mdb_printf("%s%s", pap->pa_prefix,
 			    (depth == 0) ? "" : pap->pa_suffix);
 		mdb_printf("%s", name);
-
-		/*
-		 * When no name is present (i.e. an unnamed struct or union),
-		 * display '(anon)' instead only when no prefix is present.
-		 * When printing out a struct or union (sou), prefixes are
-		 * only present (i.e. !NULL or non-empty)  when printing
-		 * individual members of that sou, e.g.
-		 * `::print struct foo f_member`.  When printing an entire sou,
-		 * the prefix will be NULL or empty.  We end up with:
-		 *
-		 *	> ::print struct foo
-		 *	{
-		 *		...
-		 *		f_member = 0xabcd
-		 *		(anon) = {
-		 *			anon_member = 0x1234
-		 *			....
-		 *		}
-		 *		...
-		 *	}
-		 *
-		 * and
-		 *
-		 *	> ::print struct foo anon_member
-		 *	anon_member = 0x1234
-		 *
-		 * instead of:
-		 *
-		 *	> ::print struct foo
-		 *	{
-		 *		...
-		 *		f_member = 0xabcd
-		 *		= {
-		 *			anon_member = 0x1234
-		 *		}
-		 *		...
-		 *	}
-		 *
-		 * and
-		 *
-		 *	> ::print struct foo anon_member
-		 *	anon_member(anon) = 0x1234
-		 */
-		if (depth > 0 && strlen(name) == 0 &&
-		    (pap->pa_prefix == NULL || strlen(pap->pa_prefix) == 0))
-			mdb_printf("(anon)");
 	}
 
 	if ((pap->pa_flags & PA_SHOWTYPE) && kind == CTF_K_INTEGER) {
@@ -1796,9 +1750,8 @@ elt_print(const char *name, mdb_ctf_id_t id, mdb_ctf_id_t base,
 	}
 
 	if (depth != 0 ||
-	    ((pap->pa_flags & PA_SHOWNAME) && pap->pa_prefix != NULL)) {
+	    ((pap->pa_flags & PA_SHOWNAME) && pap->pa_prefix != NULL))
 		mdb_printf("%s ", pap->pa_flags & PA_SHOWVAL ? " =" : "");
-	}
 
 	if (depth == 0 && pap->pa_prefix != NULL)
 		name = pap->pa_prefix;
@@ -2517,10 +2470,8 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				kind = mdb_ctf_type_kind(rid);
 				if (last_deref && IS_SOU(kind)) {
 					char *end;
-					size_t len = strlen(member);
 					(void) mdb_snprintf(buf, sizeof (buf),
-					    "%s", (len == 0) ?
-					    "<anon>" : member);
+					    "%s", member);
 					end = strrchr(buf, '[');
 					*end = '\0';
 					pa.pa_suffix = "->";
