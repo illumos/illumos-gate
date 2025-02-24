@@ -411,7 +411,7 @@ devinfo_walk_fini(mdb_walk_state_t *wsp)
 int
 devinfo2driver(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	char dname[MODMAXNAMELEN + 1];
+	char dname[MODMAXNAMELEN];
 	struct dev_info devi;
 
 
@@ -964,7 +964,7 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 	 * We know the walker passes us extra data after the dev_info.
 	 */
 	char		binding_name[128];
-	char		dname[MODMAXNAMELEN + 1];
+	char		dname[MODMAXNAMELEN];
 	devinfo_node_t	*din = (devinfo_node_t *)dev;
 	ddi_prop_t	*global_props = NULL;
 	boolean_t	hdname = B_FALSE;
@@ -1378,7 +1378,7 @@ devnames(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	major_t major;
 	size_t i;
 
-	char name[MODMAXNAMELEN + 1];
+	char name[MODMAXNAMELEN];
 	struct devnames dn;
 
 	if ((i = mdb_getopts(argc, argv,

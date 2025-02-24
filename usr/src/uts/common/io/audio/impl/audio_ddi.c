@@ -495,7 +495,7 @@ struct audio_ops_helper {
 	struct qinit		rqinit;
 	struct qinit		wqinit;
 	struct module_info	minfo;
-	char			name[MODMAXNAMELEN+1];
+	char			name[MODMAXNAMELEN];
 };
 
 void

@@ -2280,6 +2280,31 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	return (0);
 }
 
+/*
+ * Attempt to parse packet headers to extract information useful for various
+ * offloads.  This includes header protocols and lengths.
+ *
+ * The meoi_flags field will indicate the extent to which parsing was able to
+ * complete.  Each in turn promises that subsequent fields are populated, and
+ * that the mblk chain is large enough to contain the parsed header(s):
+ *
+ * - MEOI_L2INFO_SET: meoi_l3_proto and meoi_l2hlen
+ * - MEOI_L3INFO_SET: meoi_l4_proto and meoi_l3hlen
+ * - MEOI_L4INFO_SET: meoi_l4hlen
+ *
+ * When any of those flags are absent, their corresponding data fields will be
+ * zeroed.
+ *
+ * These additional flags are set when certain conditions are met during
+ * parsing:
+ *
+ * - MEOI_VLAN_TAGGED: Ethernet header is tagged with a VLAN
+ * - MEOI_L3_FRAGMENT: L3 header indicated fragmentation
+ *
+ * When parsing is able to complete through the end of the L4 header, a value of
+ * 0 is returned.  Otherwise a non-0 value is returned, although any partial
+ * results will be set in meoi as described above.
+ */
 int
 mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 {

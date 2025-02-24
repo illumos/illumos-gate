@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -253,3 +254,62 @@ get_regress(void)
 {
 	return (regress[0].i[2]);
 }
+
+/*
+ * Now we have a series of different anonymous unions and structures.
+ */
+struct anon_basic {
+	int a;
+	union {
+		int b;
+		double c;
+		const char *d;
+	};
+	struct {
+		int e;
+		const char *f;
+		unsigned int g[10];
+	};
+};
+
+struct anon_basic anon_basic;
+
+struct nested {
+	int a;
+	union {
+		int b;
+		struct {
+			int c;
+			int d;
+			int e;
+			union {
+				int g;
+				struct {
+					int h;
+				};
+			};
+			struct {
+				int i;
+				struct {
+					int j;
+					union {
+						int k;
+						struct {
+							int l;
+							int m;
+						};
+						union {
+							int n;
+							struct {
+								int o;
+								int p;
+							};
+						};
+					};
+				};
+			};
+		};
+	};
+};
+
+struct nested nested;

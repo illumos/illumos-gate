@@ -1318,10 +1318,7 @@ vioif_send(vioif_t *vif, mblk_t *mp)
 		mblk_t *pullmp = NULL;
 		tcpha_t *tcpha;
 
-		if (mac_ether_offload_info(mp, &meo) != 0) {
-			goto fail;
-		}
-
+		(void) mac_ether_offload_info(mp, &meo);
 		needed = MEOI_L2INFO_SET | MEOI_L3INFO_SET | MEOI_L4INFO_SET;
 		if ((meo.meoi_flags & needed) != needed) {
 			goto fail;

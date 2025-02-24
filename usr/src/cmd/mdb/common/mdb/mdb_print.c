@@ -27,7 +27,7 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -1731,6 +1731,16 @@ elt_print(const char *name, mdb_ctf_id_t id, mdb_ctf_id_t base,
 		if (pap->pa_prefix != NULL && depth <= 1)
 			mdb_printf("%s%s", pap->pa_prefix,
 			    (depth == 0) ? "" : pap->pa_suffix);
+
+		/*
+		 * Figure out if we're printing an anonymous struct or union. If
+		 * so, indicate that this is anonymous.
+		 */
+		if (depth != 0 && *name == '\0' && (kind == CTF_K_STRUCT ||
+		    kind == CTF_K_UNION)) {
+			name = "<anon>";
+		}
+
 		mdb_printf("%s", name);
 	}
 

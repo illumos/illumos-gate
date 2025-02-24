@@ -62,11 +62,9 @@ LDFLAGS		+= -N misc/dls -N misc/mac
 #
 
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 # needs work
-$(OBJS_DIR)/dld_proto.o := SMOFF += signed
 $(OBJS_DIR)/dld_drv.o := SMOFF += cast_assign
 
 #

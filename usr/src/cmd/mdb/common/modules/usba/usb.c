@@ -503,7 +503,7 @@ usba_device(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	int		status;
 	char		pathname[MAXNAMELEN];
-	char		dname[MODMAXNAMELEN + 1] = "<unatt>"; /* Driver name */
+	char		dname[MODMAXNAMELEN] = "<unatt>"; /* Driver name */
 	char		drv_statep[MODMAXNAMELEN+ 10];
 	uint_t		usb_flag  = 0;
 	boolean_t	no_driver_attached = FALSE;

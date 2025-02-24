@@ -1772,11 +1772,11 @@ afe_freerxring(afe_t *afep)
 {
 	int		i;
 
-	for (i = 0; i < AFE_RXRING; i++) {
-		afe_destroyrxbuf(afep->afe_rxbufs[i]);
-	}
-
 	if (afep->afe_rxbufs) {
+		for (i = 0; i < AFE_RXRING; i++) {
+			afe_destroyrxbuf(afep->afe_rxbufs[i]);
+		}
+
 		kmem_free(afep->afe_rxbufs,
 		    AFE_RXRING * sizeof (afe_rxbuf_t *));
 	}
@@ -1794,11 +1794,11 @@ afe_freetxring(afe_t *afep)
 {
 	int			i;
 
-	for (i = 0; i < AFE_TXRING; i++) {
-		afe_destroytxbuf(afep->afe_txbufs[i]);
-	}
-
 	if (afep->afe_txbufs) {
+		for (i = 0; i < AFE_TXRING; i++) {
+			afe_destroytxbuf(afep->afe_txbufs[i]);
+		}
+
 		kmem_free(afep->afe_txbufs,
 		    AFE_TXRING * sizeof (afe_txbuf_t *));
 	}

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 oxide Computer Company
+ * Copyright 2025 oxide Computer Company
  */
 
 /*
@@ -52,16 +52,16 @@ broken_t first = {
 	.brk_m = 1
 };
 
-typedef struct broken6491 {
+typedef struct broken6461 {
 	unsigned short a:1;
 	unsigned short b:8;
 	unsigned short c:3;
 	unsigned short d:2;
 	unsigned short e:1;
 	unsigned short f:1;
-} broken6491_t;
+} broken6461_t;
 
-broken6491_t second = {
+broken6461_t second = {
 	.a = 1,
 	.b = 2,
 	.e = 1

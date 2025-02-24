@@ -1479,11 +1479,11 @@ void
 mxfe_checklinkmii(mxfe_t *mxfep)
 {
 	/* read MII state registers */
-	uint16_t 	bmsr;
-	uint16_t 	bmcr;
-	uint16_t 	anar;
-	uint16_t 	anlpar;
-	uint16_t 	aner;
+	uint16_t	bmsr;
+	uint16_t	bmcr;
+	uint16_t	anar;
+	uint16_t	anlpar;
+	uint16_t	aner;
 
 	/* read this twice, to clear latched link state */
 	bmsr = mxfe_miiread(mxfep, mxfep->mxfe_phyaddr, MII_STATUS);
@@ -1942,7 +1942,7 @@ mxfe_destroytxbuf(mxfe_txbuf_t *txb)
 mxfe_rxbuf_t *
 mxfe_allocrxbuf(mxfe_t *mxfep)
 {
-	mxfe_rxbuf_t 		*rxb;
+	mxfe_rxbuf_t		*rxb;
 	size_t			len;
 	unsigned		ccnt;
 	ddi_dma_cookie_t	dmac;
@@ -2119,11 +2119,11 @@ mxfe_freerxring(mxfe_t *mxfep)
 {
 	int		i;
 
-	for (i = 0; i < MXFE_RXRING; i++) {
-		mxfe_destroyrxbuf(mxfep->mxfe_rxbufs[i]);
-	}
-
 	if (mxfep->mxfe_rxbufs) {
+		for (i = 0; i < MXFE_RXRING; i++) {
+			mxfe_destroyrxbuf(mxfep->mxfe_rxbufs[i]);
+		}
+
 		kmem_free(mxfep->mxfe_rxbufs,
 		    MXFE_RXRING * sizeof (mxfe_rxbuf_t *));
 	}
@@ -2141,11 +2141,11 @@ mxfe_freetxring(mxfe_t *mxfep)
 {
 	int			i;
 
-	for (i = 0; i < MXFE_TXRING; i++) {
-		mxfe_destroytxbuf(mxfep->mxfe_txbufs[i]);
-	}
-
 	if (mxfep->mxfe_txbufs) {
+		for (i = 0; i < MXFE_TXRING; i++) {
+			mxfe_destroytxbuf(mxfep->mxfe_txbufs[i]);
+		}
+
 		kmem_free(mxfep->mxfe_txbufs,
 		    MXFE_TXRING * sizeof (mxfe_txbuf_t *));
 	}

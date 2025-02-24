@@ -1045,7 +1045,7 @@ mdb_name_to_major(const char *name, major_t *major)
 const char *
 mdb_major_to_name(major_t major)
 {
-	static char name[MODMAXNAMELEN + 1];
+	static char name[MODMAXNAMELEN];
 
 	uintptr_t devnamesp;
 	struct devnames dn;
@@ -1059,7 +1059,7 @@ mdb_major_to_name(major_t major)
 	    major * sizeof (struct devnames)) != sizeof (struct devnames))
 		return (NULL);
 
-	if (mdb_readstr(name, MODMAXNAMELEN + 1, (uintptr_t)dn.dn_name) == -1)
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)dn.dn_name) == -1)
 		return (NULL);
 
 	return ((const char *)name);

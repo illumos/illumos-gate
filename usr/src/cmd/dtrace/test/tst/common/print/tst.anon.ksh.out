@@ -1,0 +1,105 @@
+struct elves {
+    int feanor = 0x1497
+    struct  {
+        int fingolfin = 0x467
+    }
+    union  {
+        int maedhros = 0x587
+        int fingon = 0x587
+        struct  {
+            int aredhel = 0x587
+            union  {
+                int turgon = 0x510
+                struct  {
+                    int tuor = 0x510
+                    int idril = 0x525
+                    struct  {
+                        union  {
+                            int earendil = 0x7777
+                            int elwing = 0x7777
+                        }
+                        int silmaril = 0x9999
+                    }
+                }
+                union  {
+                    int maeglin = 0x510
+                    int morgoth = 0x510
+                    union  {
+                        int balrog = 0x510
+                        int gondolin = 0x510
+                        int glorfindel = 0x510
+                        int ecthelion = 0x510
+                    }
+                }
+            }
+        }
+    }
+    struct  {
+        int elrond = 0x3021
+        int elros = 0x442
+    }
+}
+int 0x510
+int 0x510
+int 0x3021
+int 0x9999
+struct elves {
+    int feanor = 0x1497
+    struct  {
+        int fingolfin = 0x467
+    }
+    union  {
+        int maedhros = 0x587
+        int fingon = 0x587
+        struct  {
+            int aredhel = 0x587
+            union  {
+                int turgon = 0x510
+                struct  {
+                    int tuor = 0x510
+                    int idril = 0x525
+                    struct  {
+                        union  {
+                            int earendil = 0x7777
+                            int elwing = 0x7777
+                        }
+                        int silmaril = 0x9999
+                    }
+                }
+                union  {
+                    int maeglin = 0x510
+                    int morgoth = 0x510
+                    union  {
+                        int balrog = 0x510
+                        int gondolin = 0x510
+                        int glorfindel = 0x510
+                        int ecthelion = 0x510
+                    }
+                }
+            }
+        }
+    }
+    struct  {
+        int elrond = 0x3021
+        int elros = 0x442
+    }
+}
+feanor: 0x1497
+fingolfin: 0x467
+maedhros: 0x587
+aredhel: 0x587
+fingon: 0x587
+turgon: 0x510
+tuor: 0x510
+idril: 0x525
+earendil: 0x7777
+elwing: 0x7777
+silamril: 0x9999
+maeglin: 0x510
+morgoth: 0x510
+balrog: 0x510
+gondolin: 0x510
+glorfindel: 0x510
+elrond: 0x3021
+elros: 0x442
+

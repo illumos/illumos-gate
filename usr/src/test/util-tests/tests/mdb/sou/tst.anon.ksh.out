@@ -1,0 +1,87 @@
+offsetof (struct foo, foo) = 0, sizeof (...->foo) = 4
+offsetof (struct bar, bar) = 0, sizeof (...->bar) = 8
+offsetof (struct bar, bar_foo) = 8, sizeof (...->bar_foo) = 4
+offsetof (struct bar, bar_int) = 8, sizeof (...->bar_int) = 4
+offsetof (struct baz, baz_str) = 0, sizeof (...->baz_str) = 8
+offsetof (struct baz, baz_anon) = 8, sizeof (...->baz_anon) = 4
+offsetof (struct baz, baz_int) = 0x10, sizeof (...->baz_int) = 4
+offsetof (struct foobar, foobar_int) = 0, sizeof (...->foobar_int) = 4
+offsetof (struct foobar, foo) = 8, sizeof (...->foo) = 4
+offsetof (struct foobar, bar) = 8, sizeof (...->bar) = 0x10
+offsetof (struct foobar, baz) = 8, sizeof (...->baz) = 0x18
+offsetof (struct foobar, foobar_anon) = 0x10, sizeof (...->foobar_anon) = 4
+offsetof (struct foobar, a) = 0x20, sizeof (...->a) = 4
+offsetof (struct foobar, b) = 0x24, sizeof (...->b) = 4
+offsetof (struct foobar, c) = 0x28, sizeof (...->c) = 4
+offsetof (struct foobar, d) = 0x2c, sizeof (...->d) = 4
+offsetof (struct foobar, e) = 0x2c, sizeof (...->e) = 4
+offsetof (struct foobar, f) = 0x2c, sizeof (...->f) = 4
+sizeof (struct foo) = 4
+sizeof (struct bar) = 0x10
+sizeof (struct baz) = 0x18
+sizeof (struct foobar) = 0x30
+{
+    foo = 0x2a
+}
+foo = 0x2a
+hello world
+bar_foo = {
+    bar_foo.foo = 0x7777
+}
+bar_foo.foo = 0x7777
+bar_foo.foo = 0x7777
+bar_int = 0x7777
+It's a trap?!
+0x9999 0xfffffffc
+0x9876 0x12345 0xb22b 0xfdcba 0xfdcba 0xfdcba
+Elbereth Elbereth
+foobar_int = 0xb295
+0x7777 0x7777 0x7777 0x7777
+{
+    <anon> = {
+        <anon> = {
+            life = 0xaa7777aa
+            hope = 0x339999ee
+        }
+        dreams = 0xaa7777aa
+        <anon> = {
+            k = '\252'
+            e = 0x77aa
+            f = 0xaa7777aa
+            a = 0x339999eeaa7777aa
+        }
+        destroy = +3.9829317e-60
+    }
+}
+struct stringless {
+    union  <anon> = {
+        struct  <anon> = {
+            int life = 0xaa7777aa
+            int hope = 0x339999ee
+        }
+        int dreams = 0xaa7777aa
+        union  <anon> = {
+            char k = '\252'
+            short e = 0x77aa
+            int f = 0xaa7777aa
+            long a = 0x339999eeaa7777aa
+        }
+        double destroy = +3.9829317e-60
+    }
+}
+<anon> = {
+    <anon>.bar_foo = {
+        foo = 0x7777
+    }
+    <anon>.bar_int = 0x7777
+}
+<anon> = {
+    <anon>.a = 0x9876
+    <anon>.b = 0x12345
+    <anon>.c = 0xb22b
+}
+<anon> = {
+    <anon>.d = 0xfdcba
+    <anon>.e = 0xfdcba
+    <anon>.f = 0xfdcba
+}

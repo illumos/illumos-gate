@@ -93,14 +93,28 @@ json/tst.usdt.exe: json/tst.usdt.o json/usdt.o
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 #
-# Tests that use the next four programs rely on the binaries having
-# valid CTF data.
+# Tests that use the next programs rely on the binaries having valid CTF
+# data.
 #
 bitfields/tst.bitfields.exe: bitfields/tst.bitfields.c
 	$(COMPILE.c) $(CTF_FLAGS) -o bitfields/tst.bitfields.o bitfields/tst.bitfields.c
 	$(CTFCONVERT) -i -L VERSION bitfields/tst.bitfields.o
 	$(LINK.c) -o bitfields/tst.bitfields.exe bitfields/tst.bitfields.o $(LDLIBS)
 	$(CTFMERGE) -L VERSION -o $@ bitfields/tst.bitfields.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+offsetof/tst.anon.exe: offsetof/tst.anon.c
+	$(COMPILE.c) $(CTF_FLAGS) -o offsetof/tst.anon.o offsetof/tst.anon.c
+	$(CTFCONVERT) -i -L VERSION offsetof/tst.anon.o
+	$(LINK.c) -o offsetof/tst.anon.exe offsetof/tst.anon.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ offsetof/tst.anon.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+print/tst.anon.exe: print/tst.anon.c
+	$(COMPILE.c) $(CTF_FLAGS) -o print/tst.anon.o print/tst.anon.c
+	$(CTFCONVERT) -i -L VERSION print/tst.anon.o
+	$(LINK.c) -o print/tst.anon.exe print/tst.anon.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ print/tst.anon.o
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 uctf/tst.aouttype.exe: uctf/tst.aouttype.c

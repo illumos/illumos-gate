@@ -13,6 +13,7 @@
 
 #
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -35,7 +36,8 @@ ctf_cxx="g++"
 ctf_as="gas"
 ctf_convert="ctfconvert"
 ctf_merge="ctfmerge"
-ctf_debugflags="-gdwarf-2 "
+ctf_debugdef="-gdwarf-2"
+ctf_debugflags=
 ctf_mach32="-m32"
 ctf_mach64="-m64"
 ctf_temp="$TMPDIR/ctftest.$$.o"
@@ -252,7 +254,7 @@ run_tests()
 
 		(cd $outdir && $f)
 
-		if [[ $? -ne 0 ]]; then
+		if (( $? != 0 )); then
 			test_fail "$f failed"
 		else
 			echo "TEST PASSED: $f"
@@ -274,7 +276,7 @@ while getopts ":a:C:c:g:m:t:" c $@; do
 		ctf_cc=$OPTARG
 		;;
 	g)
-		ctf_debugflags=$OPTARG
+		ctf_debugflags+=" -g$OPTARG"
 		;;
 	m)
 		ctf_merge=$OPTARG
@@ -291,6 +293,10 @@ while getopts ":a:C:c:g:m:t:" c $@; do
 	esac
 done
 
+if [[ -z "$ctf_debugflags" ]]; then
+	ctf_debugflags=$ctf_debugdef
+fi
+
 ctf_32cflags="$ctf_mach32 $ctf_debugflags"
 ctf_64cflags="$ctf_mach64 $ctf_debugflags"
 
@@ -303,8 +309,8 @@ announce
 
 run_tests
 
-if [[ $ctf_nerrs -ne 0 ]]; then
-	if [[ $ctf_nerrs -eq 1 ]]; then
+if (( ctf_nerrs != 0 )); then
+	if (( ctf_nerrs == 1 )); then
 		printf "\n%s: %u test failed\n" "$ctf_arg0" "$ctf_nerrs"
 	else
 		printf "\n%s: %u tests failed\n" "$ctf_arg0" "$ctf_nerrs"

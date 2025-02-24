@@ -1772,6 +1772,9 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 		/*
 		 * LSO requires that checksum offloads are enabled.  If for
 		 * some reason they're not we bail out with an error.
+		 *
+		 * Fulfilling this requirement also ensures that the L4 info was
+		 * parsed by meoi, which is also necessary for LSO.
 		 */
 		if ((meo->meoi_l3proto == ETHERTYPE_IP &&
 		    (chkflags & HCK_IPV4_HDRCKSUM) == 0) ||
@@ -2735,12 +2738,12 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		return (NULL);
 	}
 
-	if (mac_ether_offload_info(mp, &meo) != 0) {
-		freemsg(mp);
-		itrq->itrq_txstat.itxs_hck_meoifail.value.ui64++;
-		i40e_ring_tx_exit(itrq);
-		return (NULL);
-	}
+	/*
+	 * Parse packet headers for use by any requested offloads.  That offload
+	 * logic will later determine if the results here were adequate, so do
+	 * not fret in the face of failure to parse through L4.
+	 */
+	(void) mac_ether_offload_info(mp, &meo);
 
 	/*
 	 * Figure out the relevant context about this frame that we might need

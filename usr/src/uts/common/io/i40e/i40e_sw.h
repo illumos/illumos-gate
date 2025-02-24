@@ -541,7 +541,6 @@ typedef struct i40e_txq_stat {
 	/*
 	 * Various failure conditions.
 	 */
-	kstat_named_t	itxs_hck_meoifail;	/* ether offload failures */
 	kstat_named_t	itxs_hck_nol2info;	/* Missing l2 info */
 	kstat_named_t	itxs_hck_nol3info;	/* Missing l3 info */
 	kstat_named_t	itxs_hck_nol4info;	/* Missing l4 info */
