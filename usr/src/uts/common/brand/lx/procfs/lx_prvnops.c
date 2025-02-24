@@ -236,6 +236,8 @@ static void lxpr_read_sys_fs_pipe_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_caplcap(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_corepatt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_hostname(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_overflowuid(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_overflowgid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmnb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmni(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -567,6 +569,8 @@ static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_CAPLCAP,	"cap_last_cap" },
 	{ LXPR_SYS_KERNEL_COREPATT,	"core_pattern" },
 	{ LXPR_SYS_KERNEL_HOSTNAME,	"hostname" },
+	{ LXPR_SYS_KERNEL_OVERFLOWUID,	"overflowuid" },
+	{ LXPR_SYS_KERNEL_OVERFLOWGID,	"overflowgid" },
 	{ LXPR_SYS_KERNEL_MSGMAX,	"msgmax" },
 	{ LXPR_SYS_KERNEL_MSGMNB,	"msgmnb" },
 	{ LXPR_SYS_KERNEL_MSGMNI,	"msgmni" },
@@ -926,6 +930,8 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_sys_kernel_caplcap,	/* /proc/sys/kernel/cap_last_cap */
 	lxpr_read_sys_kernel_corepatt,	/* /proc/sys/kernel/core_pattern */
 	lxpr_read_sys_kernel_hostname,	/* /proc/sys/kernel/hostname */
+	lxpr_read_sys_kernel_overflowuid,	/* /proc/sys/kernel/overflowuid */
+	lxpr_read_sys_kernel_overflowgid,	/* /proc/sys/kernel/overflowgid */
 	lxpr_read_sys_kernel_msgmax,	/* /proc/sys/kernel/msgmax */
 	lxpr_read_sys_kernel_msgmnb,	/* /proc/sys/kernel/msgmnb */
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
@@ -1100,6 +1106,8 @@ static vnode_t *(*lxpr_lookup_function[])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/hostname */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/overflowuid */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/overflowgid */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmax */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmnb */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmni */
@@ -1274,6 +1282,8 @@ static int (*lxpr_readdir_function[])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/hostname */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/overflowuid */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/overflowgid */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmax */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmnb */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmni */
@@ -4865,6 +4875,39 @@ lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_HOSTNAME);
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uts_nodename());
 }
+
+/* 
+ * Some programs, such as steamcmd, expect overflowuid and overflowgid
+ * entries to exist. The default value for both entries is hardcoded to 65534,
+ * unlike Linux, where it is a sysctl tunable.
+ * However, this should be 'good enough' for emulation purposes.
+ * In illumos 65534 maps to:
+ * nobody4:x:65534:65534:SunOS 4.x NFS Anonymous Access User:/:
+ * and in Linux it maps to:
+ * nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+ */
+
+static void
+lxpr_read_sys_kernel_overflowuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	uint_t val = 65534;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_OVERFLOWUID);
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
+}
+
+static void
+lxpr_read_sys_kernel_overflowgid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	uint_t val = 65534;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_OVERFLOWGID);
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
+}
+
+
 
 static void
 lxpr_read_sys_kernel_msgmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)

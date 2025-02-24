@@ -221,6 +221,8 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_CAPLCAP,	/* /proc/sys/kernel/cap_last_cap */
 	LXPR_SYS_KERNEL_COREPATT,	/* /proc/sys/kernel/core_pattern */
 	LXPR_SYS_KERNEL_HOSTNAME,	/* /proc/sys/kernel/hostname */
+	LXPR_SYS_KERNEL_OVERFLOWUID,	/* /proc/sys/kernel/overflowuid */
+	LXPR_SYS_KERNEL_OVERFLOWGID,	/* /proc/sys/kernel/overflowgid */
 	LXPR_SYS_KERNEL_MSGMAX,	/* /proc/sys/kernel/msgmax */
 	LXPR_SYS_KERNEL_MSGMNB,	/* /proc/sys/kernel/msgmnb */
 	LXPR_SYS_KERNEL_MSGMNI,	/* /proc/sys/kernel/msgmni */
