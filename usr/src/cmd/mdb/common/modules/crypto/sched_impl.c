@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -678,13 +679,8 @@ crypto_find_reqid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc > i)
 		argp = &argv[i];
 
-	if ((argp != NULL)) {
-		if (argp->a_type == MDB_TYPE_IMMEDIATE)
-			cbdata.cb_reqid = argp->a_un.a_val;
-		else
-			cbdata.cb_reqid = (crypto_req_id_t)
-			    mdb_strtoull(argp->a_un.a_str);
-	}
+	if ((argp != NULL))
+		cbdata.cb_reqid = (crypto_req_id_t)mdb_argtoull(argp);
 	status = mdb_pwalk("kcf_reqid_table", (mdb_walk_cb_t)crypto_pr_reqid,
 	    &cbdata, addr);
 

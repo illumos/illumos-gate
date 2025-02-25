@@ -23,6 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -3250,10 +3251,7 @@ smb_mbuf_dump_dcmd(uintptr_t addr, uint_t flags, int argc,
 	mdata = (uintptr_t)mh.mh_data;
 
 	if (argc > 0) {
-		if (argv[0].a_type == MDB_TYPE_IMMEDIATE)
-			max_len = argv[0].a_un.a_val;
-		else
-			max_len = mdb_strtoull(argv[0].a_un.a_str);
+		max_len = (int)mdb_argtoull(&argv[0]);
 		if (len > max_len)
 			len = max_len;
 	}

@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -84,10 +85,7 @@ rctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 0) {
 		const mdb_arg_t *argp = &argv[0];
 
-		if (argp->a_type == MDB_TYPE_IMMEDIATE)
-			hndl = (rctl_hndl_t)argp->a_un.a_val;
-		else
-			hndl = (rctl_hndl_t)mdb_strtoull(argp->a_un.a_str);
+		hndl = (rctl_hndl_t)mdb_argtoull(argp);
 
 		if (rctl.rc_id != hndl)
 			return (DCMD_OK);
@@ -216,11 +214,7 @@ rctl_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 */
 		const mdb_arg_t *argp = &argv[0];
 
-		if (argp->a_type == MDB_TYPE_IMMEDIATE)
-			rdict.hndl = (rctl_hndl_t)argp->a_un.a_val;
-		else
-			rdict.hndl =
-			    (rctl_hndl_t)mdb_strtoull(argp->a_un.a_str);
+		rdict.hndl = (rctl_hndl_t)mdb_argtoull(argp);
 
 		if (mdb_walk("rctl_dict_list", (mdb_walk_cb_t)hndl2dict,
 		    &rdict) == -1) {

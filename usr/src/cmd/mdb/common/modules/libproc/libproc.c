@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <libproc.h>
@@ -186,10 +186,7 @@ pr_addr2map(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC) || argc != 1)
 		return (DCMD_USAGE);
 
-	if (argv[0].a_type == MDB_TYPE_IMMEDIATE)
-		search = argv[0].a_un.a_val;
-	else
-		search = mdb_strtoull(argv[0].a_un.a_str);
+	search = (uintptr_t)mdb_argtoull(&argv[0]);
 
 	if (mdb_vread(&psp, sizeof (ps_prochandle_t), addr) == -1) {
 		mdb_warn("failed to read ps_prochandle at %p", addr);

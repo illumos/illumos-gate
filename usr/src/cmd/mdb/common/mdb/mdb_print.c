@@ -818,10 +818,7 @@ cmd_array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ABORT);
 		}
 
-		if (argv[1].a_type == MDB_TYPE_IMMEDIATE)
-			nelem = argv[1].a_un.a_val;
-		else
-			nelem = mdb_strtoull(argv[1].a_un.a_str);
+		nelem = (int)mdb_argtoull(&argv[1]);
 
 		elemsize = mdb_ctf_type_size(id);
 	} else if (addr_to_sym(t, addr, tn, sizeof (tn), &sym, &s_info)
