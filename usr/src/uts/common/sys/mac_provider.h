@@ -694,9 +694,9 @@ typedef struct mac_ether_offload_info {
  */
 #define	MEOI_VLAN_TCI_INVALID	UINT32_MAX
 
-extern int mac_ether_l2_info(mblk_t *, uint8_t *, uint32_t *);
-extern int mac_ether_offload_info(mblk_t *, mac_ether_offload_info_t *);
-extern int mac_partial_offload_info(mblk_t *, size_t,
+extern boolean_t mac_ether_l2_info(mblk_t *, uint8_t *, uint32_t *);
+extern void mac_ether_offload_info(mblk_t *, mac_ether_offload_info_t *);
+extern void mac_partial_offload_info(mblk_t *, size_t,
     mac_ether_offload_info_t *);
 
 

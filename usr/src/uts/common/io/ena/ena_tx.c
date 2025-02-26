@@ -431,7 +431,7 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	 * Failing to parse the L2 header would be a surprise.  Until we wire up
 	 * other offloads, high level protocols are not a concern.
 	 */
-	(void) mac_ether_offload_info(mp, &meo);
+	mac_ether_offload_info(mp, &meo);
 	if ((meo.meoi_flags & MEOI_L2INFO_SET) == 0) {
 		freemsg(mp);
 		mutex_enter(&txq->et_stat_lock);

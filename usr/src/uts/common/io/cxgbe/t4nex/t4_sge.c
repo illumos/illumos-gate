@@ -2105,11 +2105,7 @@ get_frame_txinfo(struct sge_txq *txq, mblk_t **fp, struct txinfo *txinfo,
 	 * information about the sizes and types of headers in the packet.
 	 */
 	if (txinfo->flags != 0) {
-		/*
-		 * Even if this fails, the meoi_flags field will be capable of
-		 * communicating the lack of useful packet information.
-		 */
-		(void) mac_ether_offload_info(m, &txinfo->meoi);
+		mac_ether_offload_info(m, &txinfo->meoi);
 	} else {
 		bzero(&txinfo->meoi, sizeof (txinfo->meoi));
 	}

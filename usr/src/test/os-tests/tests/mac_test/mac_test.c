@@ -301,7 +301,7 @@ meoi_to_nvlist(const mac_ether_offload_info_t *meoi)
 
 static nvlist_t *
 build_meoi_payload(test_pkt_t *tp, const mac_ether_offload_info_t *results,
-    uint32_t *splits, uint_t num_splits, bool is_err)
+    uint32_t *splits, uint_t num_splits)
 {
 	nvlist_t *nvl_results = meoi_to_nvlist(results);
 
@@ -310,9 +310,6 @@ build_meoi_payload(test_pkt_t *tp, const mac_ether_offload_info_t *results,
 	if (num_splits != 0 && splits != NULL) {
 		fnvlist_add_uint32_array(payload, "splits", splits,
 		    num_splits);
-	}
-	if (is_err) {
-		fnvlist_add_boolean(nvl_results, "is_err");
 	}
 	fnvlist_add_nvlist(payload, "results", nvl_results);
 
@@ -472,7 +469,7 @@ split_print(const uint32_t *splits, uint_t num_splits)
  */
 static bool
 run_meoi_variants(const char *prefix, test_pkt_t *tp,
-    const mac_ether_offload_info_t *meoi, bool is_err)
+    const mac_ether_offload_info_t *meoi)
 {
 	nvlist_t *payload;
 	bool any_failed = false;
@@ -480,18 +477,18 @@ run_meoi_variants(const char *prefix, test_pkt_t *tp,
 	uint_t num_splits;
 
 	(void) printf("%s - simple - ", prefix);
-	payload = build_meoi_payload(tp, meoi, NULL, 0, is_err);
+	payload = build_meoi_payload(tp, meoi, NULL, 0);
 	any_failed |= !run_test(payload, &tuple_meoi);
 
 	(void) printf("%s - split-single-bytes - ", prefix);
 	splits = split_gen_single(tp->tp_sz);
-	payload = build_meoi_payload(tp, meoi, splits, tp->tp_sz, is_err);
+	payload = build_meoi_payload(tp, meoi, splits, tp->tp_sz);
 	any_failed |= !run_test(payload, &tuple_meoi);
 	free(splits);
 
 	(void) printf("%s - split-random - ", prefix);
 	splits = split_gen_random(tp->tp_sz, &num_splits);
-	payload = build_meoi_payload(tp, meoi, splits, num_splits, is_err);
+	payload = build_meoi_payload(tp, meoi, splits, num_splits);
 	any_failed |= !run_test(payload, &tuple_meoi);
 	split_print(splits, num_splits);
 	free(splits);
@@ -600,9 +597,9 @@ main(int argc, char *argv[])
 	test_pkt_t *tp_tcp6 = build_tcp6(&meoi_tcp6);
 
 	any_failed |=
-	    run_meoi_variants("basic tcp4", tp_tcp4, &meoi_tcp4, false);
+	    run_meoi_variants("basic tcp4", tp_tcp4, &meoi_tcp4);
 	any_failed |=
-	    run_meoi_variants("basic tcp6", tp_tcp6, &meoi_tcp6, false);
+	    run_meoi_variants("basic tcp6", tp_tcp6, &meoi_tcp6);
 	any_failed |= run_partial_variants("basic tcp4", tp_tcp4, &meoi_tcp4);
 	any_failed |= run_partial_variants("basic tcp6", tp_tcp6, &meoi_tcp6);
 
@@ -616,9 +613,9 @@ main(int argc, char *argv[])
 	meoi_tcp6.meoi_flags &= ~MEOI_L4INFO_SET;
 
 	any_failed |=
-	    run_meoi_variants("truncated tcp4", tp_tcp4, &meoi_tcp4, true);
+	    run_meoi_variants("truncated tcp4", tp_tcp4, &meoi_tcp4);
 	any_failed |=
-	    run_meoi_variants("truncated tcp6", tp_tcp6, &meoi_tcp6, true);
+	    run_meoi_variants("truncated tcp6", tp_tcp6, &meoi_tcp6);
 
 	mac_ether_offload_info_t meoi_frag_v4 = { 0 };
 	mac_ether_offload_info_t meoi_frag_v6 = { 0 };
@@ -626,9 +623,9 @@ main(int argc, char *argv[])
 	test_pkt_t *tp_frag_v6 = build_frag_v6(&meoi_frag_v6);
 
 	any_failed |= run_meoi_variants("fragment ipv4", tp_frag_v4,
-	    &meoi_frag_v4, false);
+	    &meoi_frag_v4);
 	any_failed |= run_meoi_variants("fragment ipv6", tp_frag_v6,
-	    &meoi_frag_v6, false);
+	    &meoi_frag_v6);
 
 	test_pkt_t *tp_ether_plain = tp_alloc();
 	struct ether_header hdr_l2_plain = {

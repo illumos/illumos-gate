@@ -626,7 +626,7 @@ viona_tx_copy_headers(viona_vring_t *ring, iov_bunch_t *iob, mblk_t *mp,
 		VERIFY(MBLKTAIL(mp) >= pkt_size);
 		VERIFY(iov_bunch_copy(iob, mp->b_wptr, pkt_size));
 		mp->b_wptr += pkt_size;
-		(void) mac_ether_offload_info(mp, meoi);
+		mac_ether_offload_info(mp, meoi);
 		return (B_TRUE);
 	}
 
@@ -641,27 +641,28 @@ viona_tx_copy_headers(viona_vring_t *ring, iov_bunch_t *iob, mblk_t *mp,
 	mp->b_wptr += copy_sz;
 
 	if (iob->ib_remain == 0) {
-		(void) mac_ether_offload_info(mp, meoi);
+		mac_ether_offload_info(mp, meoi);
 		return (B_TRUE);
 	}
 
-	/*
-	 * Attempt to confirm that our buffer contains at least the entire
-	 * (L2-L4) packet headers.
-	 */
-	if (mac_ether_offload_info(mp, meoi) == 0) {
+	mac_ether_offload_info(mp, meoi);
+	if ((meoi->meoi_flags & MEOI_L2INFO_SET) == 0) {
+		/* If the L2 header cannot be parsed, give up now */
+		return (B_FALSE);
+	}
+	if ((meoi->meoi_flags & MEOI_L4INFO_SET) != 0) {
 		const uint32_t full_hdr_sz =
 		    meoi->meoi_l2hlen + meoi->meoi_l3hlen + meoi->meoi_l4hlen;
-
 		if (copy_sz >= full_hdr_sz) {
+			/* All headers are already copied */
 			return (B_TRUE);
 		}
 	}
 
 	/*
-	 * Despite our best efforts, the full headers do not appear to be along
-	 * for the ride yet.  Just allocate a buffer and copy the remainder of
-	 * the packet.
+	 * The full headers do not appear to be along for the ride yet, or the
+	 * packet bears a protocol we do not handle.  Just allocate a
+	 * buffer and copy the remainder of the packet.
 	 */
 	const uint32_t remain_sz = iob->ib_remain;
 	mblk_t *remain_mp = allocb(remain_sz, 0);
@@ -672,7 +673,7 @@ viona_tx_copy_headers(viona_vring_t *ring, iov_bunch_t *iob, mblk_t *mp,
 	remain_mp->b_wptr += remain_sz;
 	mp->b_cont = remain_mp;
 	/* Refresh header info now that we have copied the rest */
-	(void) mac_ether_offload_info(mp, meoi);
+	mac_ether_offload_info(mp, meoi);
 
 	return (B_TRUE);
 }
