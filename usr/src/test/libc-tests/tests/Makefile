@@ -27,6 +27,7 @@ SUBDIRS = \
 	i18n \
 	newlocale \
 	nl_langinfo \
+	printf-intmax \
 	priv_gettext \
 	qsort \
 	posix_spawn \
