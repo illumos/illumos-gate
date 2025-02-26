@@ -337,7 +337,7 @@ mac_sw_cksum_ipv6(mblk_t *mp, uint32_t ip_hdr_offset, const char **err)
 	 * extension headers; the idea is to subtract the extension
 	 * header length to get the real payload length.
 	 */
-	len = ntohs(ip6h->ip6_plen) - (ip_hdr_sz - IPV6_HDR_LEN);
+	len = ip6h->ip6_plen - htons(ip_hdr_sz - IPV6_HDR_LEN);
 	cksum += len;
 
 	/*

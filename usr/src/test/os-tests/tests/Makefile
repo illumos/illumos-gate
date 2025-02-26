@@ -36,7 +36,7 @@ SUBDIRS =       \
 		ksid \
 		ktest \
 		libtopo \
-		mac_test \
+		mac \
 		minttl \
 		oclo \
 		pf_key \
