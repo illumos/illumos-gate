@@ -4545,9 +4545,8 @@ kobj_boot_close(int fd)
 #endif
 }
 
-/*ARGSUSED*/
 static int
-kobj_boot_seek(int fd, off_t hi, off_t lo)
+kobj_boot_seek(int fd, off_t hi __unused, off_t lo)
 {
 #if defined(_OBP)
 	return (BOP_SEEK(fd, lo) == -1 ? -1 : 0);

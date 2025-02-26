@@ -23,9 +23,8 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 RackTop Systems.
- */
-/*
  * Copyright (c) 2017 Joyent, Inc.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #ifndef _SYS_KOBJ_H
@@ -132,7 +131,7 @@ struct _buf {
 	intptr_t	 _fd;
 	char		*_ptr;
 	char		*_base;
-	char 		*_name;
+	char		*_name;
 	char		*_dbuf;
 	int		 _size;
 	int		_cnt;
@@ -213,6 +212,7 @@ extern void kobj_texthole_free(caddr_t, size_t);
 extern void kobj_stat_get(kobj_stat_t *);
 extern void kobj_textwin_alloc(struct module *);
 extern void kobj_textwin_free(struct module *);
+extern void kobj_printf(char *, ...) __KPRINTFLIKE(1);
 
 #endif	/* defined(_KERNEL) || defined(_FAKE_KERNEL) */
 

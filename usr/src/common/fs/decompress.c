@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*
@@ -33,28 +34,15 @@
 #include <sys/vnode.h>
 #include <sys/bootvfs.h>
 #include <sys/filep.h>
+#include <sys/kobj.h>
 #include <zlib.h>
-
-#ifdef	_BOOT
-#include "../common/util.h"
-#else
 #include <sys/sunddi.h>
-#endif
 
 #define	MAX_DECOMP_BUFS		8
 #define	GZIP_ID_BYTE_1		0x1f
 #define	GZIP_ID_BYTE_2		0x8b
 #define	GZIP_CM_DEFLATE		0x08
 #define	SEEKBUFSIZE		8192
-
-extern void prom_printf(const char *fmt, ...);
-
-#ifdef	_BOOT
-#define	dprintf	if (cf_debug) prom_printf
-#else
-#define	dprintf	if (cf_debug) prom_printf
-
-#endif
 
 extern int bootrd_debug;
 extern void *bkmem_alloc(size_t);
@@ -89,9 +77,8 @@ cf_alloc(void *opaque, unsigned int items, unsigned int size)
  * Decompression scratch memory free routine, does nothing since we free
  * the entire scratch area all at once on file close.
  */
-/* ARGSUSED */
 void
-cf_free(void *opaque, void *addr)
+cf_free(void *opaque __unused, void *addr __unused)
 {
 }
 
@@ -133,7 +120,8 @@ cf_check_compressed(fileid_t *filep)
 		return (0); /* not compressed */
 	filep->fi_flags |= FI_COMPRESSED;
 
-	dprintf("file %s is compressed\n", filep->fi_path);
+	if (cf_debug)
+		kobj_printf("file %s is compressed\n", filep->fi_path);
 
 	/*
 	 * Allocate decompress scratch buffer
@@ -160,7 +148,8 @@ cf_check_compressed(fileid_t *filep)
 	zsp->avail_out = 0;
 	zsp->next_out = NULL;
 	if (inflateInit2(zsp, MAX_WBITS | 0x20) != Z_OK) {
-		dprintf("inflateInit2() failed\n");
+		if (cf_debug)
+			kobj_printf("inflateInit2() failed\n");
 		return (-1);
 	}
 	return (0);
@@ -176,7 +165,8 @@ cf_close(fileid_t *filep)
 {
 	if ((filep->fi_flags & FI_COMPRESSED) == 0)
 		return;
-	dprintf("cf_close: %s\n", filep->fi_path);
+	if (cf_debug)
+		kobj_printf("cf_close: %s\n", filep->fi_path);
 	(void) inflateEnd(filep->fi_dcstream);
 	bkmem_free(filep->fi_dcstream, sizeof (z_stream));
 	if (free_dcomp_bufs == MAX_DECOMP_BUFS) {
@@ -191,7 +181,8 @@ cf_rewind(fileid_t *filep)
 {
 	z_stream *zsp;
 
-	dprintf("cf_rewind: %s\n", filep->fi_path);
+	if (cf_debug)
+		kobj_printf("cf_rewind: %s\n", filep->fi_path);
 	zsp = filep->fi_dcstream;
 	zsp->avail_in = 0;
 	zsp->next_in = NULL;
@@ -218,11 +209,12 @@ cf_read(fileid_t *filep, caddr_t buf, size_t count)
 	off_t soff;
 	caddr_t smemp;
 
-	dprintf("cf_read: %s ", filep->fi_path);
-	dprintf("%lx bytes\n", count);
+	if (cf_debug)
+		kobj_printf("cf_read: %s %lx bytes\n", filep->fi_path, count);
 	zsp = filep->fi_dcstream;
 	ip = filep->fi_inode;
-	dprintf("   reading at offset %lx\n", zsp->total_out);
+	if (cf_debug)
+		kobj_printf("   reading at offset %lx\n", zsp->total_out);
 	zsp->next_out = (unsigned char *)buf;
 	zsp->avail_out = count;
 	while (zsp->avail_out != 0) {
@@ -244,11 +236,17 @@ cf_read(fileid_t *filep, caddr_t buf, size_t count)
 			filep->fi_cfoff += filep->fi_count;
 		}
 		infbytes = zsp->avail_out;
-		dprintf("attempting inflate of %x bytes to buf at: %lx\n",
-		    zsp->avail_out, (unsigned long)zsp->next_out);
+		if (cf_debug) {
+			kobj_printf("attempting inflate of %x bytes to "
+			    "buf at: %lx\n",
+			    zsp->avail_out, (unsigned long)zsp->next_out);
+		}
 		err = inflate(zsp, Z_NO_FLUSH);
 		infbytes -= zsp->avail_out;
-		dprintf("inflated %x bytes, errcode=%d\n", infbytes, err);
+		if (cf_debug) {
+			kobj_printf("inflated %x bytes, errcode=%d\n",
+			    infbytes, err);
+		}
 		/*
 		 * break out if we hit end of the compressed file
 		 * or the end of the compressed byte stream
@@ -256,7 +254,10 @@ cf_read(fileid_t *filep, caddr_t buf, size_t count)
 		if (filep->fi_cfoff >= ip->i_size || err == Z_STREAM_END)
 			break;
 	}
-	dprintf("cf_read: returned %lx bytes\n", count - zsp->avail_out);
+	if (cf_debug) {
+		kobj_printf("cf_read: returned %lx bytes\n",
+		    count - zsp->avail_out);
+	}
 	return (count - zsp->avail_out);
 }
 
@@ -269,8 +270,8 @@ cf_seek(fileid_t *filep, off_t addr, int whence)
 	z_stream *zsp;
 	int readsz;
 
-	dprintf("cf_seek: %s ", filep->fi_path);
-	dprintf("to %lx\n", addr);
+	if (cf_debug)
+		kobj_printf("cf_seek: %s to %lx\n", filep->fi_path, addr);
 	zsp = filep->fi_dcstream;
 	if (whence == SEEK_CUR)
 		addr += zsp->total_out;

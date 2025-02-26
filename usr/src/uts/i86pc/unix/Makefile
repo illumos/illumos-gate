@@ -128,8 +128,6 @@ SMOFF += index_overflow
 # needs work
 SMOFF += all_func_returns
 
-$(OBJS_DIR)/bootrd_cpio.o := SMOFF += allocating_enough_data
-
 # too hairy
 $(OBJS_DIR)/inflate.o := SMATCH=off
 
