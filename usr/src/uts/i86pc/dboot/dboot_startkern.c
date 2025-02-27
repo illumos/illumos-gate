@@ -1947,7 +1947,6 @@ print_efi32(EFI_SYSTEM_TABLE32 *efi)
 static void
 print_efi64(EFI_SYSTEM_TABLE64 *efi)
 {
-	uint16_t *data;
 	EFI_CONFIGURATION_TABLE64 *conf;
 	int i;
 
@@ -1956,9 +1955,13 @@ print_efi64(EFI_SYSTEM_TABLE64 *efi)
 	dboot_printf("EFI system version: ");
 	dboot_print_efi_version(efi->Hdr.Revision);
 	dboot_printf("EFI system vendor: ");
-	data = (uint16_t *)(uintptr_t)efi->FirmwareVendor;
-	for (i = 0; data[i] != 0; i++)
-		dboot_printf("%c", (char)data[i]);
+	if (efi->FirmwareVendor > ~(uintptr_t)0) {
+		dboot_printf("<unreachable>");
+	} else {
+		uint16_t *data = (uint16_t *)(uintptr_t)efi->FirmwareVendor;
+		for (i = 0; data[i] != 0; i++)
+			dboot_printf("%c", (char)data[i]);
+	}
 	dboot_printf("\nEFI firmware revision: ");
 	dboot_print_efi_version(efi->FirmwareRevision);
 	dboot_printf("EFI system table number of entries: %" PRIu64 "\n",
