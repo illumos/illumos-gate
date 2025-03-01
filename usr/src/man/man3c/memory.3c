@@ -19,7 +19,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd January 25, 2022
+.Dd March 01, 2025
 .Dt MEMORY 3C
 .Os
 .Sh NAME
@@ -44,7 +44,7 @@
 .Fc
 .Ft "void *"
 .Fo memchr
-.Fa "void *s"
+.Fa "const void *s"
 .Fa "int c"
 .Fa "size_t n"
 .Fc
@@ -75,7 +75,7 @@
 .Fc
 .Ft "void *"
 .Fo memrchr
-.Fa "void *s"
+.Fa "const void *s"
 .Fa "int c"
 .Fa "size_t n"
 .Fc
