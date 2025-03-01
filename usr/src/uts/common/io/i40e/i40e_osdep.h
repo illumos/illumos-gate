@@ -26,6 +26,7 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/pci_cap.h>
 #include <sys/sysmacros.h>
+#include <sys/stdbool.h>
 
 #define	DEBUGOUT(S)				i40e_debug(NULL, 0, S)
 #define	DEBUGOUT1(S, A)				i40e_debug(NULL, 0, S, A)
@@ -57,10 +58,8 @@ extern "C" {
  * the shared code will be upset.
  */
 #ifndef _I40E_MDB_DMOD
-#define	FALSE	B_FALSE
-#define	false	B_FALSE
-#define	TRUE	B_TRUE
-#define	true	B_TRUE
+#define	FALSE	false
+#define	TRUE	true
 #endif /* _I40E_MDB_DMOD */
 
 
@@ -84,10 +83,8 @@ extern "C" {
 
 #define	FIELD_SIZEOF(x, y) (sizeof (((x*)0)->y))
 
-#define	BIT(a) 		(1UL << (a))
-#define	BIT_ULL(a) 	(1ULL << (a))
-
-typedef boolean_t	bool;
+#define	BIT(a)		(1UL << (a))
+#define	BIT_ULL(a)	(1ULL << (a))
 
 typedef uint8_t		u8;
 typedef int8_t		s8;
@@ -124,8 +121,8 @@ struct i40e_spinlock {
 
 struct i40e_osdep {
 	off_t			ios_reg_size;
-	ddi_acc_handle_t 	ios_reg_handle;
-	ddi_acc_handle_t 	ios_cfg_handle;
+	ddi_acc_handle_t	ios_reg_handle;
+	ddi_acc_handle_t	ios_cfg_handle;
 	struct i40e		*ios_i40e;
 };
 
@@ -134,7 +131,7 @@ struct i40e_osdep {
  * cannot structure prefix it, even if we want to.
  */
 struct i40e_virt_mem {
-	void 	*va;
+	void	*va;
 	u32	size;
 };
 

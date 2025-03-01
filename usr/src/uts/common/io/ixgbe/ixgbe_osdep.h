@@ -56,6 +56,7 @@ extern "C" {
 #include <sys/pci.h>
 #include <sys/atomic.h>
 #include <sys/note.h>
+#include <sys/stdbool.h>
 #include "ixgbe_debug.h"
 
 /* Cheesy hack for EWARN() */
@@ -72,10 +73,8 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 
 #define	OS_DEP(hw)		((struct ixgbe_osdep *)((hw)->back))
 
-#define	false		B_FALSE
-#define	true		B_TRUE
-#define	FALSE		B_FALSE
-#define	TRUE		B_TRUE
+#define	FALSE		false
+#define	TRUE		true
 
 #define	IXGBE_READ_PCIE_WORD	ixgbe_read_pci_cfg
 #define	IXGBE_WRITE_PCIE_WORD	ixgbe_write_pci_cfg
@@ -144,7 +143,6 @@ typedef	uint8_t		u8;
 typedef	uint16_t	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-typedef	boolean_t	bool;
 
 /* shared code requires this */
 #define	__le16  u16
