@@ -118,9 +118,11 @@
  *		Long/Pointer are 64 bits, Int is 32 bits.  This is the chosen
  *		implementation for 64-bit ABIs such as SPARC V9.
  *
- *	_I32LPx:
- *		A compilation environment where 'int' is 32-bit, and
- *		longs and pointers are simply the same size.
+ *	NOTE: This header used to define _I32LPx, which expressed a compilation
+ *	environment where 'int' is 32-bit, and 'long' and pointers are the same
+ *	size (although that size is not specified).  This was true for all
+ *	compilation targets, making it of little value.  Additionally, it was
+ *	erroneously interpreted as implying that long/pointer were 64-bit.
  *
  *	In all cases, Char is 8 bits and Short is 16 bits.
  *
@@ -278,9 +280,6 @@ extern "C" {
 #if !defined(_LP64)
 #define	_LP64
 #endif
-#if !defined(_I32LPx) && defined(_KERNEL)
-#define	_I32LPx
-#endif
 #define	_MULTI_DATAMODEL
 #define	_SUNOS_VTOC_16
 #define	_DMA_USES_PHYSADDR
@@ -342,9 +341,6 @@ extern "C" {
  */
 #if !defined(_ILP32)
 #define	_ILP32
-#endif
-#if !defined(_I32LPx) && defined(_KERNEL)
-#define	_I32LPx
 #endif
 #define	_SUNOS_VTOC_16
 #define	_DMA_USES_PHYSADDR
@@ -451,9 +447,6 @@ extern "C" {
 #if !defined(_ILP32)
 #define	_ILP32
 #endif
-#if !defined(_I32LPx) && defined(_KERNEL)
-#define	_I32LPx
-#endif
 
 /*
  * The following set of definitions characterize the implementation of
@@ -478,9 +471,6 @@ extern "C" {
  */
 #if !defined(_LP64)
 #define	_LP64
-#endif
-#if !defined(_I32LPx)
-#define	_I32LPx
 #endif
 #define	_MULTI_DATAMODEL
 

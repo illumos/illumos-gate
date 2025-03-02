@@ -255,7 +255,7 @@ extern FILE		*_lastbuf;
 
 #ifndef	_SSIZE_T
 #define	_SSIZE_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long	ssize_t;	/* size of something in bytes or -1 */
 #else
 typedef int	ssize_t;	/* (historical version) */

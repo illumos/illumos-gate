@@ -79,7 +79,7 @@ namespace std {
 
 #if defined(__i386) || defined(__amd64) || \
 	defined(__sparc) || defined(__sparcv9)
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long	jmp_buf[_JBLEN];
 #else
 typedef int	jmp_buf[_JBLEN];

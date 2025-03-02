@@ -85,30 +85,30 @@ typedef struct rds_s {
 	zoneid_t	rds_zoneid;
 } rds_t;
 
-#define	RDS_CLOSING 	0x1
+#define	RDS_CLOSING	0x1
 
-#define	RDS_INCR_REF_CNT(rds)  { 	\
+#define	RDS_INCR_REF_CNT(rds)  {	\
 	mutex_enter(&rds->rds_lock);	\
-	rds->rds_refcnt++;	\
-	ASSERT(rds->rds_refcnt != 0); \
-	mutex_exit(&rds->rds_lock); \
+	rds->rds_refcnt++;		\
+	ASSERT(rds->rds_refcnt != 0);	\
+	mutex_exit(&rds->rds_lock);	\
 }
 
-#define	RDS_DEC_REF_CNT(rds)  { 	\
-	mutex_enter(&rds->rds_lock);	\
-	ASSERT(rds->rds_refcnt > 0); \
-	rds->rds_refcnt--;	\
-	if (rds->rds_refcnt == 1)	\
-		cv_broadcast(&(rds)->rds_refcv); \
-	if (rds->rds_refcnt == 0) {	\
-		rds_free(rds);	\
-	} else {	\
-		mutex_exit(&rds->rds_lock); \
-	}	\
+#define	RDS_DEC_REF_CNT(rds)  {				\
+	mutex_enter(&rds->rds_lock);			\
+	ASSERT(rds->rds_refcnt > 0);			\
+	rds->rds_refcnt--;				\
+	if (rds->rds_refcnt == 1)			\
+		cv_broadcast(&(rds)->rds_refcv);	\
+	if (rds->rds_refcnt == 0) {			\
+		rds_free(rds);				\
+	} else {					\
+		mutex_exit(&rds->rds_lock);		\
+	}						\
 }
 
 
-#define	RDS_MATCH(rdsp, lport, laddr)               \
+#define	RDS_MATCH(rdsp, lport, laddr)		\
 	(((rdsp)->rds_port == lport) &&		\
 	((rdsp)->rds_src == laddr))
 
@@ -116,7 +116,7 @@ typedef struct rds_s {
 typedef struct rds_bind_fanout_s {
 	rds_t *rds_bf_rds;
 	kmutex_t rds_bf_lock;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	char    bf_pad[48];
 #else
 	char    bf_pad[56];

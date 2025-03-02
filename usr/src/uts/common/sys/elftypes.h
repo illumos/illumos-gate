@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef unsigned int		Elf32_Addr;
 typedef unsigned short		Elf32_Half;
 typedef unsigned int		Elf32_Off;

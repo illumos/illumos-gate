@@ -116,7 +116,7 @@ typedef uint32_t		uintmax_t;
  * to hold any data pointer; that is, data pointers can be assigned into or
  * from these integer types without losing precision.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long			intptr_t;
 typedef unsigned long		uintptr_t;
 #else

@@ -82,19 +82,19 @@ typedef unsigned long   ulong_t;
 
 
 /* For BSD compatibility */
-typedef char 		*addr_t;	/* ?<core address> type */
+typedef char		*addr_t;	/* ?<core address> type */
 
-typedef char 		*caddr_t;	/* ?<core address> type */
+typedef char		*caddr_t;	/* ?<core address> type */
 typedef long		daddr_t;	/* <disk address> type */
 typedef short		cnt_t;		/* ?<count> type */
 typedef ulong_t		pgcnt_t;	/* number of pages */
 
 #ifdef _ILP32
-typedef ulong_t 	paddr_t;	/* <physical address> type */
+typedef ulong_t		paddr_t;	/* <physical address> type */
 typedef	long		swblk_t;
 #endif
 
-typedef uchar_t 	use_t;		/* use count for swap.  */
+typedef uchar_t		use_t;		/* use count for swap.  */
 typedef short		sysid_t;
 typedef short		index_t;
 typedef short		lock_t;		/* lock work for busy wait */
@@ -224,13 +224,13 @@ typedef	longlong_t	diskaddr_t;
  * to use them instead of int32_t and uint32_t because DEC had
  * shipped 64-bit wide.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef int32_t		t_scalar_t;
 typedef uint32_t	t_uscalar_t;
 #else
 typedef long		t_scalar_t;	/* historical versions */
 typedef unsigned long	t_uscalar_t;
-#endif	/* defined(_LP64) || defined(_I32LPx) */
+#endif	/* defined(_LP64) */
 
 /*
  * Partial support for 64-bit file offset enclosed herein,
@@ -280,7 +280,7 @@ typedef union lldaddr {
 
 typedef ulong_t k_fltset_t;	/* kernel fault set type */
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef int		id_t;		/* A process id,	*/
 					/* process group id,	*/
 					/* session id,		*/

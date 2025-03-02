@@ -77,7 +77,7 @@ typedef struct ilb_rule_kstat {
 	    (rule));						\
 	((rule)->ir_kstat.x.value.ui64++);			\
 }
-#define	ILB_R_KSTAT_UPDATE(rule, x, y) 				\
+#define	ILB_R_KSTAT_UPDATE(rule, x, y)				\
 {								\
 	DTRACE_PROBE1(ilb__r__kstat__##x, ilb_rule_t *,	\
 	    (rule));						\
@@ -249,7 +249,7 @@ typedef struct ilb_rule_s {
 typedef struct ilb_hash_s {
 	ilb_rule_t	*ilb_hash_rule;
 	kmutex_t	ilb_hash_lock;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	char		ilb_hash_pad[48];
 #else
 	char		ilb_hash_pad[56];

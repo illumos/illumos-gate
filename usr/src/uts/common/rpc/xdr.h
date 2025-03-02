@@ -117,9 +117,9 @@ enum xdr_op {
 typedef struct XDR {
 	enum xdr_op	x_op;	/* operation; fast additional param */
 	struct xdr_ops *x_ops;
-	caddr_t 	x_public; /* users' data */
+	caddr_t		x_public; /* users' data */
 	caddr_t		x_private; /* pointer to private data */
-	caddr_t 	x_base;	/* private used for position info */
+	caddr_t		x_base;	/* private used for position info */
 	int		x_handy; /* extra private word */
 } XDR;
 
@@ -299,7 +299,7 @@ typedef	bool_t (*xdrproc_t)();
 
 #define	NULL_xdrproc_t ((xdrproc_t)0)
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	xdr_rpcvers(xdrs, versp)	xdr_u_int(xdrs, versp)
 #define	xdr_rpcprog(xdrs, progp)	xdr_u_int(xdrs, progp)
 #define	xdr_rpcproc(xdrs, procp)	xdr_u_int(xdrs, procp)

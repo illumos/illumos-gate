@@ -62,7 +62,7 @@ namespace std {
 
 #if !defined(_PTRDIFF_T) || __cplusplus >= 199711L
 #define	_PTRDIFF_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	long	ptrdiff_t;		/* pointer difference */
 #else
 typedef int	ptrdiff_t;		/* (historical version) */
@@ -71,7 +71,7 @@ typedef int	ptrdiff_t;		/* (historical version) */
 
 #if !defined(_SIZE_T) || __cplusplus >= 199711L
 #define	_SIZE_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef unsigned long	size_t;		/* size of something in bytes */
 #else
 typedef unsigned int	size_t;		/* (historical version) */

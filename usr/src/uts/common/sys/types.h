@@ -88,13 +88,13 @@ typedef union {
  * to use them instead of int32_t and uint32_t because DEC had
  * shipped 64-bit wide.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef int32_t		t_scalar_t;
 typedef uint32_t	t_uscalar_t;
 #else
 typedef long		t_scalar_t;	/* historical versions */
 typedef unsigned long	t_uscalar_t;
-#endif	/* defined(_LP64) || defined(_I32LPx) */
+#endif	/* defined(_LP64) */
 
 /*
  * POSIX Extensions
@@ -110,7 +110,7 @@ typedef	short		cnt_t;		/* ?<count> type */
 
 #if !defined(_PTRDIFF_T) || __cplusplus >= 199711L
 #define	_PTRDIFF_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	long	ptrdiff_t;		/* pointer difference */
 #else
 typedef	int	ptrdiff_t;		/* (historical version) */
@@ -335,7 +335,7 @@ typedef uint_t k_fltset_t;	/* kernel fault set type */
  * a process id, process group id, session id, scheduling class id,
  * user id, group id, project id, task id or zone id.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef int		id_t;
 #else
 typedef	long		id_t;		/* (historical version) */
@@ -357,7 +357,7 @@ typedef long	suseconds_t;	/* signed # of microseconds */
 /*
  * Typedefs for dev_t components.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef uint_t	major_t;	/* major part of device number */
 typedef uint_t	minor_t;	/* minor part of device number */
 #else
@@ -400,7 +400,7 @@ typedef ushort_t o_ino_t;		/* old inode type	*/
  * POSIX and XOPEN Declarations
  */
 typedef	int	key_t;			/* IPC key type		*/
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	uint_t	mode_t;			/* file attribute type	*/
 #else
 typedef	ulong_t	mode_t;			/* (historical version) */
@@ -538,7 +538,7 @@ typedef struct {
 
 typedef ulong_t	dev_t;			/* expanded device type */
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	uint_t nlink_t;			/* file link type	*/
 typedef int	pid_t;			/* process id type	*/
 #else
@@ -548,7 +548,7 @@ typedef	long	pid_t;			/* (historical version) */
 
 #if !defined(_SIZE_T) || __cplusplus >= 199711L
 #define	_SIZE_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	ulong_t	size_t;		/* size of something in bytes */
 #else
 typedef	uint_t	size_t;		/* (historical version) */
@@ -557,7 +557,7 @@ typedef	uint_t	size_t;		/* (historical version) */
 
 #ifndef _SSIZE_T
 #define	_SSIZE_T
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long	ssize_t;	/* size of something in bytes or -1 */
 #else
 typedef int	ssize_t;	/* (historical version) */

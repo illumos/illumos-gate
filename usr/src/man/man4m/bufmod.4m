@@ -7,7 +7,6 @@
 .SH NAME
 bufmod \- STREAMS Buffer Module
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/bufmod.h>\fR
 .fi
@@ -18,8 +17,6 @@ bufmod \- STREAMS Buffer Module
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBbufmod\fR is a \fBSTREAMS\fR module that buffers incoming messages, reducing
 the number of system calls and the associated overhead required to read and
 process them. Although \fBbufmod\fR was originally designed to be used in
@@ -27,8 +24,6 @@ conjunction with \fBSTREAMS-based\fR networking device drivers, the version
 described here is general purpose so that it can be used anywhere \fBSTREAMS\fR
 input buffering is required.
 .SS "Read-side Behavior"
-.sp
-.LP
 The behavior of \fBbufmod\fR depends on various parameters and flags that can
 be set and queried as described below under \fBIOCTLS\fR. \fBbufmod\fR collects
 incoming \fBM_DATA\fR messages into chunks, passing each chunk upstream when
@@ -71,7 +66,7 @@ struct sb_hdr {
         uint_t   sbh_msglen;
         uint_t   sbh_totlen;
         uint_t   sbh_drops;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
         struct  timeval32 sbh_timestamp;
 #else
         struct  timeval sbh_timestamp;
@@ -136,15 +131,11 @@ If the \fBSB_SEND_ON_WRITE\fR flag is set, \fBbufmod\fR passes up the read side
 any buffered data when a message is received on the write side.
 \fBSB_SEND_ON_WRITE\fR and \fBSB_DEFER_CHUNK\fR are often used together.
 .SS "Write-side Behavior"
-.sp
-.LP
 \fBbufmod\fR intercepts \fBM_IOCTL\fR messages for the \fBioctl\fRs described
 below. The module passes all other messages through unaltered to its lower
 neighbor. If \fBSB_SEND_ON_WRITE\fR is set, message arrival on the writer side
 suffices to close and transmit the current read side chunk.
 .SH IOCTLS
-.sp
-.LP
 \fBbufmod\fR responds to the following \fBioctl\fRs.
 .sp
 .ne 2
@@ -290,13 +281,9 @@ final argument.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR pfmod (4M),
 .BR dlpi (4P)
 .SH NOTES
-.sp
-.LP
 Older versions of \fBbufmod\fR did not support the behavioral flexibility
 controlled by the \fBSBIOCSFLAGS\fR \fBioctl\fR. Applications that wish to take
 advantage of this flexibility can guard themselves against old versions of the
@@ -315,8 +302,6 @@ truncation can have a significant  influence on data traffic at the stream head
 and therefore the stream head high and low water marks are adjusted to new
 values appropriate for the smaller truncated message sizes.
 .SH BUGS
-.sp
-.LP
 \fBbufmod\fR does not defend itself against allocation failures, so that it is
 possible, although very unlikely, for the stream head to use inappropriate high
 and low water marks after the chunk size or  snapshot length have changed.

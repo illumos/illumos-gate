@@ -121,7 +121,7 @@ struct sb_hdr {
 	uint_t	sbh_msglen;
 	uint_t	sbh_totlen;
 	uint_t	sbh_drops;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	struct	timeval32 sbh_timestamp;
 #else
 	struct	timeval sbh_timestamp;

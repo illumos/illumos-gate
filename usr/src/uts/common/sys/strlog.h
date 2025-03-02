@@ -48,9 +48,9 @@ extern "C" {
 typedef struct log_ctl {
 	short	mid;
 	short	sid;
-	char 	level;		/* level of message for tracing */
+	char	level;		/* level of message for tracing */
 	short	flags;		/* message disposition */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	clock32_t ltime;	/* time in machine ticks since boot */
 	time32_t ttime;		/* time in seconds since 1970 */
 #else

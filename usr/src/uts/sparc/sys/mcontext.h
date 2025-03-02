@@ -63,7 +63,7 @@ extern "C" {
 
 #ifndef	_ASM
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long	greg_t;
 #else
 typedef int	greg_t;

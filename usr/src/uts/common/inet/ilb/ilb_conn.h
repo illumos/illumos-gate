@@ -44,7 +44,7 @@ typedef struct ilb_conn_hash_s {
 	struct ilb_conn_s	*ilb_connp;
 	kmutex_t		ilb_conn_hash_lock;
 	uint32_t		 ilb_conn_cnt;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	char			ilb_conn_hash_pad[44];
 #else
 	char			ilb_conn_hash_pad[52];
@@ -185,7 +185,7 @@ typedef struct ilb_sticky_hash_s {
 	list_t			sticky_head;
 	kmutex_t		sticky_lock;
 	uint32_t		sticky_cnt;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	char			sticky_pad[20];
 #else
 	char			sticky_pad[36];
