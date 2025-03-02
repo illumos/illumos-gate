@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -19,7 +19,7 @@
 
 /*
  * This section of the library is dedicated to decoding the JEDEC vendor codes
- * as defined in JEP106BK (September 2024). The vendor code is encoded as a
+ * as defined in JEP106BL (February 2025). The vendor code is encoded as a
  * series of continuation bytes and then the current vendor value. Each of the
  * tables below corresponds to one of the continuation values and is ordered
  * based on JEP-106. Note, the first batch of entries in JEP-106 Table 1 has
@@ -43,7 +43,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_1[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "AMD" },
 	{ 0x02, "AMI" },
 	{ 0x83, "Fairchild" },
-	{ 0x04, "Fujitsu" },
+	{ 0x04, "RAMXEED Limited" },
 	{ 0x85, "GTE" },
 	{ 0x86, "Harris" },
 	{ 0x07, "Hitachi" },
@@ -1812,7 +1812,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_14[LIBJEDEC_TABLE_SIZE] = {
 	{ 0xDF, "Guangdong OPPO Mobile Telecommunication" },
 	{ 0xE0, "Akeana" },
 	{ 0x61, "Lyczar" },
-	{ 0x62, "Shenzhen Qiji Technology Co Ltd" },
+	{ 0x62, "QJTEK" },
 	{ 0xE3, "Shenzhen Shangzhaoyuan Technology" },
 	{ 0x64, "Han Stor" },
 	{ 0xE5, "China Micro Semicon Co., Ltd." },
@@ -1972,7 +1972,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_15[LIBJEDEC_TABLE_SIZE] = {
 	{ 0xFE, "Fine Made Microelectronics Group Co Ltd" },
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_16[116] = {
+static const libjedec_vendor_pair_t libjedec_vendors_16[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x01, "Changxin Memory Technology (Shanghai)" },
 	{ 0x02, "Synconv" },
 	{ 0x83, "MULTIUNIT" },
@@ -2088,7 +2088,43 @@ static const libjedec_vendor_pair_t libjedec_vendors_16[116] = {
 	{ 0xF1, "TRASNA Semiconductor" },
 	{ 0xF2, "KEYSOM" },
 	{ 0x73, "Shenzhen YYF Info Tech Co Ltd" },
-	{ 0xF4, "Sharetronics Data Technology Co Ltd" }
+	{ 0xF4, "Sharetronics Data Technology Co Ltd" },
+	{ 0x75, "AptCore Limited" },
+	{ 0x76, "Uchampion Semiconductor Co Ltd" },
+	{ 0xF7, "YCT Semiconductor" },
+	{ 0xF8, "FADU Inc" },
+	{ 0x79, "Hefei CLT Microelectronics Co LTD" },
+	{ 0x7A, "Smart Technologies (BD) Ltd" },
+	{ 0xFB, "Zhangdian District Qunyuan Computer Firm" },
+	{ 0x7C, "Silicon Xpandas Electronics Co Ltd" },
+	{ 0xFD, "PC Components Y Multimedia S" },
+	{ 0xFE, "Shenzhen Tanlr Technology Group Co Ltd" }
+};
+
+static const libjedec_vendor_pair_t libjedec_vendors_17[23] = {
+	{ 0x01, "Shenzhen JIEQING Technology Co Ltd" },
+	{ 0x02, "Orionix" },
+	{ 0x83, "JoulWatt Technology Co Ltd" },
+	{ 0x04, "Tenstorrent" },
+	{ 0x85, "Unis Flash Memory Technology (Chengdu)" },
+	{ 0x86, "Huatu Stars" },
+	{ 0x07, "Ardor Gaming" },
+	{ 0x08, "QuanZhou KunFang Semiconductor Co Ltd" },
+	{ 0x89, "EIAI PLANET" },
+	{ 0x8A, "Ningbo Lingkai Semiconductor Technology Inc" },
+	{ 0x0B, "Shenzhen Hancun Technology Co Ltd" },
+	{ 0x8C, "Hongkong Manyi Technology Co Limited" },
+	{ 0x0D, "Shenzhen Storgon Technology Co Ltd" },
+	{ 0x0E, "YUNTU Microelectronics" },
+	{ 0x8F, "Essencore" },
+	{ 0x10, "Shenzhen Xingyun Lianchuang Computer Tech" },
+	{ 0x91, "ShenZhen Aoscar Digital Tech Co Ltd" },
+	{ 0x92, "XOC Technologies Inc" },
+	{ 0x13, "BOS Semiconductors" },
+	{ 0x94, "Eliyan Corp" },
+	{ 0x15, "Hangzhou Lishu Technology Co Ltd" },
+	{ 0x16, "Tier IV Inc" },
+	{ 0x97, "Wuhan Xuanluzhe Network Technology Co" }
 };
 
 const char *
@@ -2166,6 +2202,10 @@ libjedec_vendor_string(uint_t cont, uint_t val)
 	case 15:
 		pairs = libjedec_vendors_16;
 		nents = ARRAY_SIZE(libjedec_vendors_16);
+		break;
+	case 16:
+		pairs = libjedec_vendors_17;
+		nents = ARRAY_SIZE(libjedec_vendors_17);
 		break;
 	default:
 		return (NULL);
