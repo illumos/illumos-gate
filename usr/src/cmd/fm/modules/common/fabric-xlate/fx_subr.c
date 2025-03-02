@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Andreas Wacknitz
  */
 #include <strings.h>
 #include <fm/topo_hc.h>
@@ -249,13 +250,16 @@ fab_xpath_query(fmd_hdl_t *hdl, const char *query)
 	    xpathObj->type);
 	nodes = xpathObj->nodesetval;
 
-	if (nodes) {
+	if (nodes != NULL && nodes->nodeTab != NULL &&
+	    nodes->nodeTab[0] != NULL) {
 		temp = (char *)xmlNodeGetContent(nodes->nodeTab[0]);
-		fmd_hdl_debug(hdl, "query result: %s\n", temp);
-		res = fmd_hdl_strdup(hdl, temp, FMD_SLEEP);
-		xmlFree(temp);
-		xmlXPathFreeObject(xpathObj);
-		return (res);
+		if (temp != NULL) {
+			fmd_hdl_debug(hdl, "query result: %s\n", temp);
+			res = fmd_hdl_strdup(hdl, temp, FMD_SLEEP);
+			xmlFree(temp);
+			xmlXPathFreeObject(xpathObj);
+			return (res);
+		}
 	}
 	xmlXPathFreeObject(xpathObj);
 	return (NULL);
