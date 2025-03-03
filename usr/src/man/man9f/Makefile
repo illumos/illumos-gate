@@ -507,6 +507,7 @@ MANFILES=	ASSERT.9f				\
 		sprintf.9f				\
 		stdc_bit_ceil.9f			\
 		stdc_bit_floor.9f			\
+		stdc_bit_width.9f			\
 		stdc_count_ones.9f			\
 		stdc_count_zeros.9f			\
 		stdc_first_leading_one.9f		\
@@ -1263,6 +1264,11 @@ MANLINKS=	AVL_NEXT.9f					\
 		stdc_bit_floor_ui.9f				\
 		stdc_bit_floor_ul.9f				\
 		stdc_bit_floor_ull.9f				\
+		stdc_bit_width_uc.9f				\
+		stdc_bit_width_us.9f				\
+		stdc_bit_width_ui.9f				\
+		stdc_bit_width_ul.9f				\
+		stdc_bit_width_ull.9f				\
 		stdc_count_ones_uc.9f				\
 		stdc_count_ones_us.9f				\
 		stdc_count_ones_ui.9f				\
@@ -2246,6 +2252,12 @@ stdc_bit_floor_us.9f			:= LINKSRC = stdc_bit_floor.9f
 stdc_bit_floor_ui.9f			:= LINKSRC = stdc_bit_floor.9f
 stdc_bit_floor_ul.9f			:= LINKSRC = stdc_bit_floor.9f
 stdc_bit_floor_ull.9f			:= LINKSRC = stdc_bit_floor.9f
+
+stdc_bit_width_uc.9f			:= LINKSRC = stdc_bit_width.9f
+stdc_bit_width_us.9f			:= LINKSRC = stdc_bit_width.9f
+stdc_bit_width_ui.9f			:= LINKSRC = stdc_bit_width.9f
+stdc_bit_width_ul.9f			:= LINKSRC = stdc_bit_width.9f
+stdc_bit_width_ull.9f			:= LINKSRC = stdc_bit_width.9f
 
 stdc_count_ones_uc.9f			:= LINKSRC = stdc_count_ones.9f
 stdc_count_ones_us.9f			:= LINKSRC = stdc_count_ones.9f

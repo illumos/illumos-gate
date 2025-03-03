@@ -1232,6 +1232,12 @@ link path=usr/share/man/man3c/stdc_bit_floor_ui.3c target=stdc_bit_floor.3c
 link path=usr/share/man/man3c/stdc_bit_floor_ul.3c target=stdc_bit_floor.3c
 link path=usr/share/man/man3c/stdc_bit_floor_ull.3c target=stdc_bit_floor.3c
 link path=usr/share/man/man3c/stdc_bit_floor_us.3c target=stdc_bit_floor.3c
+file path=usr/share/man/man3c/stdc_bit_width.3c
+link path=usr/share/man/man3c/stdc_bit_width_uc.3c target=stdc_bit_width.3c
+link path=usr/share/man/man3c/stdc_bit_width_ui.3c target=stdc_bit_width.3c
+link path=usr/share/man/man3c/stdc_bit_width_ul.3c target=stdc_bit_width.3c
+link path=usr/share/man/man3c/stdc_bit_width_ull.3c target=stdc_bit_width.3c
+link path=usr/share/man/man3c/stdc_bit_width_us.3c target=stdc_bit_width.3c
 file path=usr/share/man/man3c/stdc_count_ones.3c
 link path=usr/share/man/man3c/stdc_count_ones_uc.3c target=stdc_count_ones.3c
 link path=usr/share/man/man3c/stdc_count_ones_ui.3c target=stdc_count_ones.3c
