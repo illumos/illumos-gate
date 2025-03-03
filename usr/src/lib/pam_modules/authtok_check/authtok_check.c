@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -91,7 +92,7 @@ mutex_t dictlock = DEFAULTMUTEX;
  */
 struct pwdefaults {
 	boolean_t server_policy;	/* server policy flag from pam.conf */
-	uint_t minlength;	/* minimum password lenght */
+	uint_t minlength;	/* minimum password length */
 	uint_t maxlength;	/* maximum (significant) length */
 	boolean_t do_namecheck;	/* check password against user's gecos */
 	char db_location[MAXPATHLEN]; /* location of the generated database */
@@ -101,7 +102,7 @@ struct pwdefaults {
 	uint_t minalpha;	/* minimum alpha characters required */
 	uint_t minupper;	/* minimum uppercase characters required */
 	uint_t minlower;	/* minimum lowercase characters required */
-	uint_t minnonalpha; 	/* minimum special (non alpha) required */
+	uint_t minnonalpha;	/* minimum special (non alpha) required */
 	uint_t maxrepeat;	/* maximum number of repeating chars allowed */
 	uint_t minspecial;	/* punctuation characters */
 	uint_t mindigit;	/* minimum number of digits required */
@@ -174,78 +175,6 @@ get_passwd_defaults(pam_handle_t *pamh, const char *user, struct pwdefaults *p)
 	p->minspecial = 0;
 	p->mindigit = 0;
 	p->whitespace = B_TRUE;
-
-	if ((defp = defopen_r(PWADMIN)) == NULL)
-		return (PAM_SUCCESS);
-
-	(void) defread_int("PASSLENGTH=", &p->minlength, defp);
-
-	if ((q = defread_r("NAMECHECK=", defp)) != NULL &&
-	    strcasecmp(q, "NO") == 0)
-		p->do_namecheck = B_FALSE;
-
-	if ((q = defread_r("DICTIONLIST=", defp)) != NULL) {
-		if ((p->dicts = strdup(q)) == NULL) {
-			syslog(LOG_ERR, "pam_authtok_check: out of memory");
-			defclose_r(defp);
-			return (PAM_BUF_ERR);
-
-		}
-		p->do_dictcheck = B_TRUE;
-	} else {
-		p->dicts = NULL;
-	}
-
-	if ((q = defread_r("DICTIONDBDIR=", defp)) != NULL) {
-		if (strlcpy(p->db_location, q, sizeof (p->db_location)) >=
-		    sizeof (p->db_location)) {
-			syslog(LOG_ERR, "pam_authtok_check: value for "
-			    "DICTIONDBDIR too large.");
-			defclose_r(defp);
-			return (PAM_SYSTEM_ERR);
-		}
-		p->do_dictcheck = B_TRUE;
-	} else {
-		(void) strlcpy(p->db_location, CRACK_DIR,
-		    sizeof (p->db_location));
-	}
-
-	(void) defread_int("MINDIFF=", &p->mindiff, defp);
-	(void) defread_int("MINALPHA=", &p->minalpha, defp);
-	(void) defread_int("MINUPPER=", &p->minupper, defp);
-	(void) defread_int("MINLOWER=", &p->minlower, defp);
-	if (defread_int("MINNONALPHA=", &p->minnonalpha, defp))
-		minnonalpha_defined = B_TRUE;
-	(void) defread_int("MAXREPEATS=", &p->maxrepeat, defp);
-
-	if (defread_int("MINSPECIAL=", &p->minspecial, defp)) {
-		if (minnonalpha_defined) {
-			syslog(LOG_ERR, "pam_authtok_check: %s contains "
-			    "definition for MINNONALPHA and for MINSPECIAL. "
-			    "These options are mutually exclusive.", PWADMIN);
-			defclose_r(defp);
-			return (PAM_SYSTEM_ERR);
-		}
-		p->minnonalpha = 0;
-	}
-
-	if (defread_int("MINDIGIT=", &p->mindigit, defp)) {
-		if (minnonalpha_defined) {
-			syslog(LOG_ERR, "pam_authtok_check: %s contains "
-			    "definition for MINNONALPHA and for MINDIGIT. "
-			    "These options are mutually exclusive.", PWADMIN);
-			defclose_r(defp);
-			return (PAM_SYSTEM_ERR);
-		}
-		p->minnonalpha = 0;
-	}
-
-	if ((q = defread_r("WHITESPACE=", defp)) != NULL)
-		p->whitespace =
-		    (strcasecmp(q, "no") == 0 || strcmp(q, "0") == 0)
-		    ? B_FALSE : B_TRUE;
-
-	defclose_r(defp);
 
 	/*
 	 * Determine the number of significant characters in a password
@@ -320,6 +249,78 @@ get_passwd_defaults(pam_handle_t *pamh, const char *user, struct pwdefaults *p)
 		free(attr[1].data.val_s);
 	}
 
+	if ((defp = defopen_r(PWADMIN)) == NULL)
+		return (PAM_SUCCESS);
+
+	(void) defread_int("PASSLENGTH=", &p->minlength, defp);
+
+	if ((q = defread_r("NAMECHECK=", defp)) != NULL &&
+	    strcasecmp(q, "NO") == 0)
+		p->do_namecheck = B_FALSE;
+
+	if ((q = defread_r("DICTIONLIST=", defp)) != NULL) {
+		if ((p->dicts = strdup(q)) == NULL) {
+			syslog(LOG_ERR, "pam_authtok_check: out of memory");
+			defclose_r(defp);
+			return (PAM_BUF_ERR);
+
+		}
+		p->do_dictcheck = B_TRUE;
+	} else {
+		p->dicts = NULL;
+	}
+
+	if ((q = defread_r("DICTIONDBDIR=", defp)) != NULL) {
+		if (strlcpy(p->db_location, q, sizeof (p->db_location)) >=
+		    sizeof (p->db_location)) {
+			syslog(LOG_ERR, "pam_authtok_check: value for "
+			    "DICTIONDBDIR too large.");
+			defclose_r(defp);
+			return (PAM_SYSTEM_ERR);
+		}
+		p->do_dictcheck = B_TRUE;
+	} else {
+		(void) strlcpy(p->db_location, CRACK_DIR,
+		    sizeof (p->db_location));
+	}
+
+	(void) defread_int("MINDIFF=", &p->mindiff, defp);
+	(void) defread_int("MINALPHA=", &p->minalpha, defp);
+	(void) defread_int("MINUPPER=", &p->minupper, defp);
+	(void) defread_int("MINLOWER=", &p->minlower, defp);
+	if (defread_int("MINNONALPHA=", &p->minnonalpha, defp))
+		minnonalpha_defined = B_TRUE;
+	(void) defread_int("MAXREPEATS=", &p->maxrepeat, defp);
+
+	if (defread_int("MINSPECIAL=", &p->minspecial, defp)) {
+		if (minnonalpha_defined) {
+			syslog(LOG_ERR, "pam_authtok_check: %s contains "
+			    "definition for MINNONALPHA and for MINSPECIAL. "
+			    "These options are mutually exclusive.", PWADMIN);
+			defclose_r(defp);
+			return (PAM_SYSTEM_ERR);
+		}
+		p->minnonalpha = 0;
+	}
+
+	if (defread_int("MINDIGIT=", &p->mindigit, defp)) {
+		if (minnonalpha_defined) {
+			syslog(LOG_ERR, "pam_authtok_check: %s contains "
+			    "definition for MINNONALPHA and for MINDIGIT. "
+			    "These options are mutually exclusive.", PWADMIN);
+			defclose_r(defp);
+			return (PAM_SYSTEM_ERR);
+		}
+		p->minnonalpha = 0;
+	}
+
+	if ((q = defread_r("WHITESPACE=", defp)) != NULL)
+		p->whitespace =
+		    (strcasecmp(q, "no") == 0 || strcmp(q, "0") == 0)
+		    ? B_FALSE : B_TRUE;
+
+	defclose_r(defp);
+
 	/* sanity check of the configured parameters */
 	if (p->minlength < p->mindigit + p->minspecial + p->minnonalpha +
 	    p->minalpha) {
@@ -367,10 +368,10 @@ free_passwd_defaults(struct pwdefaults *p)
  * of string "s", i.e. "ABCDE" vs. "DCBAE".
  */
 static int
-check_circular(s, t)
-	char *s, *t;
+check_circular(const char *s, const char *t)
 {
-	char c, *p, *o, *r, *buff, *ubuff, *pubuff;
+	const char *p;
+	char c, *u, *o, *r, *buff, *ubuff, *pubuff;
 	unsigned int i, j, k, l, m;
 	size_t len;
 	int ret = 0;
@@ -387,44 +388,49 @@ check_circular(s, t)
 
 	if (buff == NULL || ubuff == NULL || pubuff == NULL) {
 		syslog(LOG_ERR, "pam_authtok_check: out of memory.");
+		free(buff);
+		free(ubuff);
+		free(pubuff);
 		return (-1);
 	}
 
 	m = 2;
 	o = &ubuff[0];
-	for (p = s; c = *p++; *o++ = c)
+	for (p = s; c = *p++; *o++ = c) {
 		if (islower(c))
 			c = toupper(c);
+	}
 	*o = '\0';
 	o = &pubuff[0];
-	for (p = t; c = *p++; *o++ = c)
+	for (p = t; c = *p++; *o++ = c) {
 		if (islower(c))
 			c = toupper(c);
+	}
 
 	*o = '\0';
 
-	p = &ubuff[0];
+	u = &ubuff[0];
 	while (m--) {
 		for (k = 0; k  <  i; k++) {
-			c = *p++;
-			o = p;
+			c = *u++;
+			o = u;
 			l = i;
 			r = &buff[0];
 			while (--l)
 				*r++ = *o++;
 			*r++ = c;
 			*r = '\0';
-			p = &buff[0];
-			if (strcmp(p, pubuff) == 0) {
+			u = &buff[0];
+			if (strcmp(u, pubuff) == 0) {
 				ret = 1;
 				goto out;
 			}
 		}
-		p = p + i;
+		u = u + i;
 		r = &ubuff[0];
 		j = i;
 		while (j--)
-			*--p = *r++;	/* reverse test-string for m==0 pass */
+			*--u = *r++;	/* reverse test-string for m==0 pass */
 	}
 out:
 	(void) memset(buff, 0, len);
