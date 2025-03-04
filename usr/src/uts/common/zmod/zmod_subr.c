@@ -37,9 +37,8 @@ struct zchdr {
 
 #define	ZCH_MAGIC	0x3cc13cc1
 
-/*ARGSUSED*/
 void *
-zcalloc(void *opaque, uint_t items, uint_t size)
+zcalloc(void *opaque __unused, uint_t items, uint_t size)
 {
 	size_t nbytes = sizeof (struct zchdr) + items * size;
 	struct zchdr *z = kobj_zalloc(nbytes, KM_NOWAIT|KM_TMP);
@@ -53,9 +52,8 @@ zcalloc(void *opaque, uint_t items, uint_t size)
 	return (z + 1);
 }
 
-/*ARGSUSED*/
 void
-zcfree(void *opaque, void *ptr)
+zcfree(void *opaque __unused, void *ptr)
 {
 	struct zchdr *z = ((struct zchdr *)ptr) - 1;
 
@@ -63,22 +61,4 @@ zcfree(void *opaque, void *ptr)
 		panic("zcfree region corrupt: hdr=%p ptr=%p", (void *)z, ptr);
 
 	kobj_free(z, z->zch_size);
-}
-
-void
-zmemcpy(void *dest, const void *source, uint_t len)
-{
-	bcopy(source, dest, len);
-}
-
-int
-zmemcmp(const void *s1, const void *s2, uint_t len)
-{
-	return (bcmp(s1, s2, len));
-}
-
-void
-zmemzero(void *dest, uint_t len)
-{
-	bzero(dest, len);
 }

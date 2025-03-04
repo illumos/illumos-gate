@@ -51,7 +51,7 @@ extern "C" {
 	defined(__EXTENSIONS__)
 /* non-ANSI standard compilation */
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef long sigjmp_buf[_SIGJBLEN];
 #else
 typedef int sigjmp_buf[_SIGJBLEN];

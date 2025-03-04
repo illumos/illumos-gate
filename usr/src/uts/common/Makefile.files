@@ -246,7 +246,6 @@ GENUNIX_OBJS +=	\
 		main.o		\
 		mmapobjsys.o	\
 		memcntl.o	\
-		memstr.o	\
 		lgrpsys.o	\
 		mkdir.o		\
 		mknod.o		\

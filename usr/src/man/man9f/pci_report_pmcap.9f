@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCI_REPORT_PMCAP 9F "Aug 13, 1999"
+.TH PCI_REPORT_PMCAP 9F "August 22, 2023"
 .SH NAME
 pci_report_pmcap \- Report Power Management capability of a PCI device
 .SH SYNOPSIS
@@ -58,7 +58,7 @@ Following are the supported capabilities as indicated by the \fBcap\fR:
 lowest PCI clock speed that a device can tolerate when idle, and is  applicable
 only to 33 MHz PCI bus. \fBarg\fR represents the lowest possible idle speed in
 KHz (1 KHz is 1000 Hz). The integer value representing the speed should be cast
-to \fB(void *)\fRbefore passing as \fBarg\fR to \fBpci_report_pmcap()\fR.
+to \fB(void *)\fR before passing as \fBarg\fR to \fBpci_report_pmcap()\fR.
 .sp
 .LP
 The special values of \fBarg\fR are:

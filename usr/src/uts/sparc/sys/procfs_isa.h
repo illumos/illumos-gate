@@ -68,7 +68,7 @@ typedef	uint32_t	instr_t;
  * Registers are 32 bits for ILP32, 64 bits for LP64.
  */
 #define	NPRGREG	38
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	long		prgreg_t;
 #else
 typedef	int		prgreg_t;

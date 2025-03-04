@@ -55,7 +55,7 @@ typedef int enum_t;
  */
 typedef u_longlong_t ulonglong_t;
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	uint32_t rpcprog_t;
 typedef	uint32_t rpcvers_t;
 typedef	uint32_t rpcproc_t;

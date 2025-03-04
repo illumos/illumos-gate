@@ -77,7 +77,7 @@ extern "C" {
 #endif
 
 #include <sys/ioccom.h>
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #include <sys/types32.h>
 #else
 #include <sys/types.h>
@@ -107,7 +107,7 @@ struct event_abs_axis {
 };
 
 struct event_input {
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	struct timeval32 time;
 #else
 	struct timeval time;

@@ -92,6 +92,7 @@ CORE_OBJS +=			\
 	mem_config_arch.o	\
 	memlist_new.o		\
 	memnode.o		\
+	memstr.o		\
 	microcode_amd.o		\
 	microcode_intel.o	\
 	mlsetup.o		\

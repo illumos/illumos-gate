@@ -39,7 +39,7 @@ typedef unsigned short uint16_t;
 typedef unsigned char uint8_t;
 typedef unsigned char uchar_t;
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 typedef	unsigned long size_t;
 #else
 typedef	unsigned int size_t;

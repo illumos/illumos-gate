@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_EV_REGISTER_CALLBACKS 9F "Oct 24, 2012"
+.TH LDI_EV_REGISTER_CALLBACKS 9F "August 22, 2023"
 .SH NAME
 ldi_ev_register_callbacks \- add a notify and/or finalize callback
 .SH SYNOPSIS
@@ -211,12 +211,12 @@ the device. See number 5 below for the exception to this rule.
 .RS +4
 .TP
 5.
-A layered driver that closes it's \fBLDI\fR handle in it's notify routine
+A layered driver that closes its \fBLDI\fR handle in its notify routine
 receives the corresponding finalize callback after the event has occurred.
 Because the \fBLDI\fR handle has been closed, the finalize callback is invoked
 with a \fBNULL\fR \fBLDI\fR handle. It is the responsibility of the layered
-driver to maintain state in it's private "\fIarg\fR" parameter so that it can
-reopen the device (if desired) in it's finalize callback.
+driver to maintain state in its private "\fIarg\fR" parameter so that it can
+reopen the device (if desired) in its finalize callback.
 .sp
 One example where this may happen is with the \fBLDI_EV_OFFLINE\fR event. A
 layered driver's notify callback may be invoked for an offline event. The
@@ -224,10 +224,10 @@ layered driver may choose to allow this event to proceed. In that case, since
 it has a layered open of the device, it must close the \fBLDI\fR handle so that
 the offline event can succeed (an offline of a device does not succeed if there
 is any open of the device, layered or otherwise). Since the layered driver has
-closed the \fBLDI\fR handle in the notify routine, it's finalize callback (if
+closed the \fBLDI\fR handle in the notify routine, its finalize callback (if
 any) is invoked with a \fBNULL\fR \fBLDI\fR handle. It is the responsibility of
 the layered driver to maintain state (such as the device path or \fBdevid\fR)
-in it's private "\fIarg\fR" parameter, so that in the finalize routine, it can
+in its private "\fIarg\fR" parameter, so that in the finalize routine, it can
 do a layered open of the device if the device offline failed.
 .sp
 This is the only exception where the finalize callback is invoked if the
@@ -259,7 +259,7 @@ corresponding callbacks have not been unregistered.
 8.
 The \fBLDI\fR event framework guarantees that if a layered driver receives a
 notify event, it also receives a finalize event except if the layered consumer
-itself blocked the event (that is, it returned \fBLDI_EV_FAILURE\fR from it's
+itself blocked the event (that is, it returned \fBLDI_EV_FAILURE\fR from its
 notify callback. In this case, the layered driver knows that the event has been
 blocked and therefore does not need the finalize callback.
 .RE
@@ -268,11 +268,11 @@ blocked and therefore does not need the finalize callback.
 9.
 If a layered driver propagates notify events on minors it imports to minors
 it exports, it must first propagate these events up the software stack via
-\fBldi_eve_notify()\fR in it's notify callback. It must do so before attempting
+\fBldi_eve_notify()\fR in its notify callback. It must do so before attempting
 to check if it blocks the event. This is required, because a layered driver
 cannot release the device if consumers up the stack are still using the device.
 If \fBldi_ev_notify()\fR returns \fBLDI_EV_FAILURE\fR, the callback must
-immediately return \fBLDI_EV_FAILURE\fR from it's notify callback. If
+immediately return \fBLDI_EV_FAILURE\fR from its notify callback. If
 \fBldi_ev_notify()\fR  returns \fBLDI_EV_SUCCESS\fR, then the state change is
 permissible as far as consumers higher up in the software stack are concerned.
 The layered driver must then determine if it can permit the state change. If
@@ -280,7 +280,7 @@ the state change is to be allowed, the layered driver must return
 \fBLDI_EV_SUCCESS\fR. If the layered driver determines that the state change
 should not be permitted, it must invoke \fBldi_ev_finalize()\fR  on minors it
 exports with a result of \fBLDI_EV_FAILURE\fR (to inform consumers up the
-stack) and then return \fBLDI_EV_FAILURE\fR from it's notify callback.
+stack) and then return \fBLDI_EV_FAILURE\fR from its notify callback.
 .RE
 .RS +4
 .TP
@@ -290,7 +290,7 @@ point where a failure is detected. If the failure is detected in the framework
 (such as in \fBldi_ev_notify()\fR) the framework generates the finalize events.
 In the event that a failure is first detected in a layered driver (that is, in
 the notify callback of a layered driver) the layered driver must use
-\fBldi_ev_finalize()\fR  to send finalize events up the software stack . See
+\fBldi_ev_finalize()\fR  to send finalize events up the software stack. See
 the examples for code snippets describing this scenario.
 .RE
 .RS +4

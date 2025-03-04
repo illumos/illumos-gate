@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd Apr 30, 2019
+.Dd August 22, 2023
 .Dt DDI_UFM_IMAGE 9F
 .Os
 .Sh NAME
@@ -51,7 +51,7 @@ A human-readable description of the firmware image.
 .It Fa nvl
 An nvlist_t with ancillary, device-specific data.
 .It Fa nslots
-The number of firmware slots supported by this firmare image.
+The number of firmware slots supported by this firmware image.
 .El
 .Sh DESCRIPTION
 The

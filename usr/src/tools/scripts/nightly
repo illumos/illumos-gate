@@ -30,7 +30,7 @@
 # Copyright 2019 Peter Trible.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+# Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -336,7 +336,7 @@ function build {
 			egrep "${MAKE}|ERROR|WARNING" $SRC/pkg/${INSTALLOG}.out | \
 				grep ':' | \
 				grep -v PSTAMP | \
-				egrep -v "${MAKE}: (Entering|Leaving) directory " | \
+				egrep -v ": (Entering|Leaving) directory " | \
 				egrep -v "Ignoring unknown host" | \
 				tee $TMPDIR/package >> $mail_msg_file
 			if [[ -s $TMPDIR/package ]]; then
@@ -1688,7 +1688,7 @@ fi
 	touch $TMPDIR/nocompiler
   done
   echo
-) | egrep -v "${MAKE}: (Entering|Leaving) directory " \
+) | egrep -v ": (Entering|Leaving) directory " \
     | tee -a $build_environ_file >> $LOGFILE
 
 if [ -f $TMPDIR/nocompiler ]; then

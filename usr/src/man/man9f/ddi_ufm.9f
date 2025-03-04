@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2019, Joyent, Inc.
 .\"
-.Dd Apr 30, 2019
+.Dd August 22, 2023
 .Dt DDI_UFM 9F
 .Os
 .Sh NAME
@@ -59,7 +59,7 @@ See
 .Xr ddi_ufm 9E
 for more information.
 .It Fa ufmp
-A pinter to the opaque handle returned from
+A pointer to the opaque handle returned from
 .Fn ddi_ufm_init .
 .It Fa ufmpp
 A pointer to store the opaque handle from

@@ -1427,7 +1427,7 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 			tiov[tiovcnt].iov_base = (uint8_t *)iov[pv].iov_base +
 			    pvoff;
 #else
-			tiov[tiovcnt].iov_base += pvoff;
+			tiov[tiovcnt].iov_base = iov[pv].iov_base + pvoff;
 #endif
 			tiov[tiovcnt++].iov_len = nnow;
 			if (pvoff + nnow == iov[pv].iov_len) {

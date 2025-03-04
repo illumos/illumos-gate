@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -144,10 +145,7 @@ kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		if (argv->a_type == MDB_TYPE_CHAR || argc > 1)
 			return (DCMD_USAGE);
 
-		if (argv->a_type == MDB_TYPE_STRING)
-			arg = (void *)(uintptr_t)mdb_strtoull(argv->a_un.a_str);
-		else
-			arg = (void *)(uintptr_t)argv->a_un.a_val;
+		arg = (void *)(uintptr_t)mdb_argtoull(argv);
 	}
 
 	(void) mdb_isa_kvm_stack_iter(mdb.m_target, grp, func, arg);
@@ -249,15 +247,6 @@ kmt_in_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-static uint64_t
-kmt_numarg(const mdb_arg_t *arg)
-{
-	if (arg->a_type == MDB_TYPE_STRING)
-		return (mdb_strtoull(arg->a_un.a_str));
-	else
-		return (arg->a_un.a_val);
-}
-
 /*ARGSUSED1*/
 int
 kmt_out_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -274,7 +263,7 @@ kmt_out_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		len = mdb.m_dcount;
 
 	argv += argc - 1;
-	val = kmt_numarg(argv);
+	val = mdb_argtoull(argv);
 
 	if (kmt_io_check(len, addr, IOCHECK_WARN) < 0)
 		return (DCMD_ERR);
@@ -337,7 +326,7 @@ kmt_wrmsr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC) || argc != 1)
 		return (DCMD_USAGE);
 
-	val = kmt_numarg(argv);
+	val = mdb_argtoull(argv);
 
 	if (kmt_rwmsr(addr, &val, wrmsr)) {
 		warn("wrmsr failed");
@@ -411,9 +400,9 @@ kmt_pcicfg_common(uintptr_t off, uint32_t *valp, const mdb_arg_t *argv,
 	uint32_t bus, dev, func;
 	uint32_t addr;
 
-	bus = kmt_numarg(&argv[0]);
-	dev = kmt_numarg(&argv[1]);
-	func = kmt_numarg(&argv[2]);
+	bus = (uint32_t)mdb_argtoull(&argv[0]);
+	dev = (uint32_t)mdb_argtoull(&argv[1]);
+	func = (uint32_t)mdb_argtoull(&argv[2]);
 
 	if ((bus & 0xffff) != bus) {
 		warn("invalid bus number (must be 0-0xffff)\n");
@@ -479,7 +468,7 @@ kmt_wrpcicfg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 4 || !(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	val = (uint32_t)kmt_numarg(&argv[3]);
+	val = (uint32_t)mdb_argtoull(&argv[3]);
 
 	if (kmt_pcicfg_common(addr, &val, argv, kmt_out) != DCMD_OK)
 		return (DCMD_ERR);

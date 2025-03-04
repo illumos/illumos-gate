@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_MODOPEN 9F "Mar 17, 2008"
+.TH DDI_MODOPEN 9F "August 22, 2023"
 .SH NAME
 ddi_modopen, ddi_modsym, ddi_modclose \- dynamically-loaded kernel module
 functions
@@ -99,7 +99,7 @@ environment, so the new \fIerrnop\fR return argument was added for
 \fBddi_modopen()\fR and \fBddi_modsym()\fR.
 .sp
 .LP
-The \fBddi_modopen()\fRfunction makes a dynamically-loaded kernel module named
+The \fBddi_modopen()\fR function makes a dynamically-loaded kernel module named
 by "modname" available to a running kernel. \fBddi_modopen()\fR returns a
 handle that the caller can use on subsequent calls to \fBddi_modsym()\fR and
 \fBddi_modclose()\fR. The value of this handle should not be interpreted in any
@@ -129,9 +129,8 @@ A -> A's _depends_on -> unix -> unix's _depends_on
 .sp
 .LP
 A single-level, left-to-right search in \fB_depends_on\fR (or the "ld -N"
-alternative) modules occurs. For \fBUNIX\fR on \fBSparc\fR, \fB_depends_on\fR
-is similar to "genunix misc/platmod cpu/SUNW,UltraSPARC-III+  dtracestubs" for
-\fBIntel\fR, it is "genunix dtracestubs". The \fBddi_modsym()\fR search is
+alternative) modules occurs. For \fBUNIX\fR on \fBIntel\fR, \fB_depends_on\fR
+is "genunix dtracestubs". The \fBddi_modsym()\fR search is
 limited to the module directly associated with the handle.
 .sp
 .LP
@@ -154,7 +153,7 @@ function is called, all \fBddi_modsym()\fR resolutions obtained (either
 directly or indirectly) using the now closed \fIhandle\fR are invalid; further
 use of these resolutions can cause undefined behavior (that is, may lead to a
 panic). When the last \fBddi_modclose()\fR of a module occurs, and there are no
-further references to the module, the module \fB_fini\fR(9E)entry point may be
+further references to the module, the module \fB_fini\fR(9E) entry point may be
 called. If \fB_fini\fR returns success then the module may be unloaded.
 .SH RETURN VALUES
 The \fBddi_modopen()\fR function returns a handle to the dynamically-loaded
@@ -303,6 +302,6 @@ rv = ddi_modclose(modp);
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-A \fBsystem\fR(5)forceload must be established for modules targeted by
+A \fBsystem\fR(5) forceload must be established for modules targeted by
 \fBddi_modopen()\fR by code involved in the mount of root on "bootdev" during
 machine \fBboot\fR(8).

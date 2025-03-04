@@ -64,7 +64,7 @@ extern "C" {
 typedef struct udp_fanout_s {
 	struct udp_s *uf_udp;
 	kmutex_t uf_lock;
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 	char	uf_pad[48];
 #else
 	char	uf_pad[56];

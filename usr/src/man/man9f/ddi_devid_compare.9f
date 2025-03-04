@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DEVID_COMPARE 9F "May 23, 2021"
+.TH DDI_DEVID_COMPARE 9F "August 22, 2023"
 .SH NAME
 ddi_devid_compare, ddi_devid_free, ddi_devid_init, ddi_devid_register,
 ddi_devid_sizeof, ddi_devid_str_decode, ddi_devid_str_encode,
@@ -136,7 +136,7 @@ World Wide Name associated with SCSI-3 devices.
 \fB\fBDEVID_SCSI_SERIAL\fR\fR
 .ad
 .RS 21n
-Vendor \fBID\fRand serial number associated with a SCSI device. Note: This may
+Vendor \fBID\fR and serial number associated with a SCSI device. Note: This may
 only be used if known to be unique; otherwise a fabricated device id must be
 used.
 .RE
@@ -269,7 +269,7 @@ pointer to it. The driver must free the memory allocated by this function using
 the \fBddi_devid_free()\fR function.
 .sp
 .LP
-The \fBddi_devid_str_encode()\fR function encodes a \fIdevid\fR and minor_name
+The \fBddi_devid_str_encode()\fR function encodes a \fIdevid\fR and \fIminor_name\fR
 into a null-terminated ASCII string, returning a pointer to that string. If
 both a \fIdevid\fR and a \fIminor_name\fR are non-null, then a slash (\fB/\fR)
 is used to separate the \fIdevid\fR from the \fIminor_name\fR in the encoded
@@ -282,7 +282,7 @@ freed by calling \fBdevid_str_free()\fR.
 .LP
 The \fBddi_devid_str_decode()\fR function takes a string previously produced by
 the \fBdevid_str_encode\fR(3DEVID) or \fBddi_devid_str_encode()\fR function and
-decodes the contained device ID and minor_name, allocating and returning
+decodes the contained device ID and minor name, allocating and returning
 pointers to the extracted parts through the \fIretdevid\fR and
 \fIretminor_name\fR arguments. If the special \fIdevidstr\fR \fBid0\fR was
 specified then the returned device ID and minor name will both be null. A

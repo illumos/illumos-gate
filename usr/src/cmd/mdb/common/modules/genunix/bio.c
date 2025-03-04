@@ -22,6 +22,7 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -143,10 +144,7 @@ bufpagefind(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 1)
 		return (DCMD_USAGE);
 
-	if (argv->a_type == MDB_TYPE_IMMEDIATE)
-		arg = (uintptr_t)argv->a_un.a_val;
-	else
-		arg = (uintptr_t)mdb_strtoull(argv->a_un.a_str);
+	arg = (uintptr_t)mdb_argtoull(argv);
 
 	if (mdb_vread(&b, sizeof (buf_t), b_addr) == -1)
 		return (DCMD_ERR);

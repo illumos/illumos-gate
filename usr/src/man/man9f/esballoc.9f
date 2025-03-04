@@ -14,9 +14,9 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ESBALLOC 9F "Aug 17, 2022"
+.TH ESBALLOC 9F "August 22, 2023"
 .SH NAME
-esballoc, desballoc esballoca, desballoca \-
+esballoc, desballoc, esballoca, desballoca \-
 allocate a message block using a caller-supplied buffer
 .SH SYNOPSIS
 .nf

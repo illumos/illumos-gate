@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -82,10 +82,7 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
 		if (argv->a_type == MDB_TYPE_CHAR || argc > 1)
 			return (DCMD_USAGE);
 
-		if (argv->a_type == MDB_TYPE_STRING)
-			arg = (void *)(uint_t)mdb_strtoull(argv->a_un.a_str);
-		else
-			arg = (void *)(uint_t)argv->a_un.a_val;
+		arg = (void *)(uint_t)mdb_argtoull(argv);
 	}
 
 	(void) mdb_ia32_kvm_stack_iter(mdb.m_target, grp, func, arg);

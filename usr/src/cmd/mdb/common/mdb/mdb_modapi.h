@@ -25,7 +25,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
  * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_MDB_MODAPI_H
@@ -259,6 +259,7 @@ extern int mdb_thread_name(mdb_tid_t, char *, size_t);
 extern int mdb_getopts(int, const mdb_arg_t *, ...) __sentinel(0);
 
 extern u_longlong_t mdb_strtoull(const char *);
+extern u_longlong_t mdb_argtoull(const mdb_arg_t *);
 
 #define	UM_NOSLEEP	0x0	/* Do not call failure handler; may fail */
 #define	UM_SLEEP	0x1	/* Can block for memory; will always succeed */

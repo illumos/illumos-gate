@@ -12,7 +12,7 @@
 .\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd July 26, 2016
+.Dd August 22, 2023
 .Dt DEVFS_CLEAN 9F
 .Os
 .Sh NAME
@@ -63,7 +63,7 @@ Each of these entries shows up in the file system of the global zone under
 .Po see
 .Xr devfs 4FS
 .Pc .
-These nodes are referred to as a devfs nodes
+These nodes are referred to as devfs nodes
 .Pq Vt dv_node .
 .Pp
 .Nm devfs
@@ -117,4 +117,5 @@ The
 .Fn devfs_clean
 function always succeeds and returns zero.
 .Sh SEE ALSO
-.Xr devfs 4FS
+.Xr devfs 4FS ,
+.Xr ddi_create_minor_node 9F

@@ -228,7 +228,7 @@ extern "C" {
  * fprintf macros for pointers
  */
 
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	PRIdPTR			"ld"
 #define	PRIiPTR			"li"
 #define	PRIoPTR			"lo"
@@ -242,7 +242,7 @@ extern "C" {
 #define	PRIuPTR			"u"
 #define	PRIxPTR			"x"
 #define	PRIXPTR			"X"
-#endif /* defined(_LP64) || defined(_I32LPx) */
+#endif /* defined(_LP64) */
 
 /*
  * fscanf macros for signed integers

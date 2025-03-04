@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #define	DUMP_SUPPORT
@@ -98,7 +99,7 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 	int32_t instance_count;
 	uint32_t ddiinst;
 
-	if (argc != 1) {
+	if (argc != 1 || argv[0].a_type != MDB_TYPE_STRING) {
 		mdb_printf("Usage:   ::%s_msgbuf  <instance(hex)>\n",
 		    DRIVER_NAME);
 		mdb_printf("mdb: try \"::help %s_msgbuf\" for more information",
@@ -338,8 +339,7 @@ emlxs_dump_help()
 
 /*ARGSUSED*/
 int
-emlxs_dump(uintptr_t base_addr, uint_t flags, int argc,
-				const mdb_arg_t *argv)
+emlxs_dump(uintptr_t base_addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t  addr;
 	emlxs_device_t device;
@@ -358,7 +358,8 @@ emlxs_dump(uintptr_t base_addr, uint_t flags, int argc,
 	uint32_t size;
 	uint32_t file;
 
-	if (argc != 2) {
+	if (argc != 2 || argv[0].a_type != MDB_TYPE_STRING ||
+	    argv[1].a_type != MDB_TYPE_STRING) {
 		goto usage;
 	}
 

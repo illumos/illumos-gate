@@ -12,7 +12,7 @@
 .\" Copyright 2016 Joyent, Inc.
 .\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd February 25, 2021
+.Dd August 22, 2023
 .Dt MAC_PROP_INFO 9F
 .Os
 .Sh NAME
@@ -94,7 +94,7 @@ property description in the
 section of
 .Xr mac 9E .
 .It Fa str
-A null-terminated ASCII character string that describes that contains a
+A null-terminated ASCII character string that contains a
 value of a property.
 .It Fa u8
 An 8-bit unsigned value.
@@ -126,7 +126,7 @@ and
 A 32-bit unsigned value that represents the lowest possible value of an
 integer property, generally inclusive.
 .It Fa high
-A 32-bit unsigned value that represents the highest possible value an
+A 32-bit unsigned value that represents the highest possible value of an
 integer property, generally inclusive.
 .El
 .Sh DESCRIPTION

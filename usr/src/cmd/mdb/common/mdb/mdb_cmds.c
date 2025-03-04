@@ -30,7 +30,7 @@
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/elf.h>
@@ -3118,6 +3118,66 @@ dump_help(void)
 	    "      (default is 1, maximum is 16)\n");
 }
 
+static void
+bitx_help(void)
+{
+	mdb_printf(
+	    "Extract bits from an integer or, with the optional third\n"
+	    "argument, set the value in the provided bit range and show\n"
+	    "the result.\n\n"
+	    "Bit positions are inclusive and specified with the high bit\n"
+	    "first.\n");
+}
+
+static int
+cmd_bitx(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint64_t val = addr;
+	uint8_t high, low;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (argc != 2 && argc != 3)
+		return (DCMD_USAGE);
+
+	high = (uint8_t)mdb_argtoull(&argv[0]);
+	low = (uint8_t)mdb_argtoull(&argv[1]);
+
+	if (high > 63 || low > 63) {
+		mdb_warn("bit positions must be in the range [0,%r]\n", 63);
+		return (DCMD_ERR);
+	}
+
+	if (high < low) {
+		mdb_warn("high bit must not be less than the low bit\n");
+		return (DCMD_ERR);
+	}
+
+	uint64_t mask = (1ULL << (high - low + 1)) - 1ULL;
+
+	if (argc == 3) {
+		uint64_t nval = (uint64_t)mdb_argtoull(&argv[2]);
+
+		if ((~mask & nval) != 0) {
+			mdb_warn(
+			    "value (%lr) too large for bit range [%r:%r]\n",
+			    nval, high, low);
+			return (DCMD_ERR);
+		}
+
+		val &= ~(mask << low);
+		val |= nval << low;
+
+		mdb_nv_set_value(mdb.m_dot, val);
+	} else {
+		val = ((val >> low) & mask);
+	}
+	mdb_printf("%lr\n", val);
+
+	return (DCMD_OK);
+}
+
 /*
  * Table of built-in dcmds associated with the root 'mdb' module.  Future
  * expansion of this program should be done here, or through the external
@@ -3168,6 +3228,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ ":z", NULL, "delete all traced software events", cmd_zapall },
 	{ "array", ":[type count] [variable]", "print each array element's "
 	    "address", cmd_array },
+	{ "bitx", ":<high bit> <low bit> [new value]",
+	    "extract bits from, or set bits in, a value", cmd_bitx, bitx_help },
 	{ "bp", "?[+/-dDestT] [-c cmd] [-n count] sym ...", "breakpoint at the "
 	    "specified addresses or symbols", cmd_bp, bp_help },
 	{ "dcmds", "[[-n] pattern]",

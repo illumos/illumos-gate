@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMA_SYNC 9F "Jan 16, 2006"
+.TH DDI_DMA_SYNC 9F "August 22, 2023"
 .SH NAME
 ddi_dma_sync \- synchronize CPU and I/O views of memory
 .SH SYNOPSIS
@@ -60,7 +60,7 @@ synchronize. The possible values are \fBDDI_DMA_SYNC_FORDEV\fR,
 .SH DESCRIPTION
 The \fBddi_dma_sync()\fR function is used to selectively synchronize either a
 \fBDMA\fR device's or a \fBCPU\fR's view of a memory object that has \fBDMA\fR
-resources allocated for I/O . This may involve operations such as flushes of
+resources allocated for I/O. This may involve operations such as flushes of
 \fBCPU\fR or I/O caches, as well as other more complex operations such as
 stalling until hardware write buffers have drained.
 .sp

@@ -29,7 +29,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 .\" POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd January 22, 2016
+.Dd August 22, 2023
 .Dt FIRMLOAD 9F
 .Os
 .Sh NAME
@@ -67,7 +67,7 @@ This is used as the subdirectory holding the firmware images.
 .It Fa imgname
 The file name of a firmware image.
 .It Fa fhp
-The pointer used for returing a firmware handle.
+The pointer used for returning a firmware handle.
 .It Fa fh
 The firmware handle.
 .It Fa offset

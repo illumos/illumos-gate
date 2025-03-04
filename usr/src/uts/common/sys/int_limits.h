@@ -144,7 +144,7 @@ extern "C" {
  * defined in this header. They are needed in case the architecture can't
  * represent a pointer in any standard integral type.
  */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	INTPTR_MAX	INT64_MAX
 #define	UINTPTR_MAX	UINT64_MAX
 #else
@@ -153,7 +153,7 @@ extern "C" {
 #endif
 
 /* Maximum limits of ptrdiff_t defined in <sys/types.h> */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	PTRDIFF_MAX	9223372036854775807L
 #else
 #define	PTRDIFF_MAX	2147483647
@@ -228,14 +228,14 @@ extern "C" {
 #endif
 
 /* Minimum value of a pointer-holding signed integer type */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	INTPTR_MIN	INT64_MIN
 #else
 #define	INTPTR_MIN	INT32_MIN
 #endif
 
 /* Minimum limits of ptrdiff_t defined in <sys/types.h> */
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 #define	PTRDIFF_MIN	(-9223372036854775807L-1L)
 #else
 #define	PTRDIFF_MIN	(-2147483647-1)

@@ -199,7 +199,7 @@ can be read with
 .Xr man 1 .
 In addition, some corresponding concepts are documented in section 9 and
 some groups of functions are present to support a specific type of
-device driver, which is discussed more in section 9E .
+device driver, which is discussed more in section 9E.
 .Ss Logging Functions
 Through the kernel there are often needs to log messages that either
 make it into the system log or on the console.

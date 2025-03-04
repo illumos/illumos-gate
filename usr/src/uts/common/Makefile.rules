@@ -48,6 +48,9 @@
 #
 #	Section 1a: C objects build rules
 #
+$(OBJS_DIR)/deflate.o := CPPFLAGS += -DHAVE_MEMCPY
+$(OBJS_DIR)/inflate.o := CPPFLAGS += -DHAVE_MEMCPY
+$(OBJS_DIR)/trees.o := CPPFLAGS += -DHAVE_MEMCPY
 $(OBJS_DIR)/decompress.o := CPPFLAGS += -I$(SRC)/contrib/zlib
 $(OBJS_DIR)/zmod.o := CPPFLAGS += -I$(SRC)/contrib/zlib
 $(OBJS_DIR)/zmod_subr.o := CPPFLAGS += -I$(SRC)/contrib/zlib

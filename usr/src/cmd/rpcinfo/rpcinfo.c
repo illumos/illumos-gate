@@ -41,7 +41,7 @@
 
 /*
  * rpcinfo: ping a particular rpc program
- * 	or dump the the registered programs on the remote machine.
+ * or dump the the registered programs on the remote machine.
  */
 
 /*
@@ -983,8 +983,8 @@ rpcbaddrlist(netid, argc, argv)
 	minutetimeout.tv_sec = 60;
 	minutetimeout.tv_usec = 0;
 
-	parms.r_prog = 	getprognum(argv[1]);
-	parms.r_vers = 	getvers(argv[2]);
+	parms.r_prog = getprognum(argv[1]);
+	parms.r_vers = getvers(argv[2]);
 	parms.r_netid = client->cl_netid;
 	if (targaddr == NULL) {
 		parms.r_addr = nullstring;	/* for XDRing */
@@ -1776,7 +1776,7 @@ print_rmtcallstat(rtype, infp)
 		if (rpc)
 			(void) printf("%-16s", rpc->r_name);
 		else
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 			(void) printf("%-16u", pr->prog);
 		(void) printf("%u\t%u\t%-7s ",
 #else
@@ -1805,7 +1805,7 @@ print_getaddrstat(rtype, infp)
 		if (rpc)
 			(void) printf("%-16s", rpc->r_name);
 		else
-#if defined(_LP64) || defined(_I32LPx)
+#if defined(_LP64)
 			(void) printf("%-16u", al->prog);
 		(void) printf("%u\t%-9s %-12d\t%d\n",
 #else

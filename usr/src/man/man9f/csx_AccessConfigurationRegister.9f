@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSX_ACCESSCONFIGURATIONREGISTER 9F "Jul 19, 1996"
+.TH CSX_ACCESSCONFIGURATIONREGISTER 9F "August 22, 2023"
 .SH NAME
 csx_AccessConfigurationRegister \- read or write a PC Card Configuration
 Register
@@ -38,7 +38,7 @@ Pointer to an \fBaccess_config_reg_t\fR structure.
 .RE
 
 .SH DESCRIPTION
-This function allows a client to read or write a \fBPC\fRCard Configuration
+This function allows a client to read or write a \fBPC\fR Card Configuration
 Register.
 .SH STRUCTURE MEMBERS
 The structure members of \fBaccess_config_reg_t\fR are:
@@ -85,8 +85,8 @@ only updated by a \fBCONFIG_REG_READ\fR request.
 \fB\fBOffset\fR\fR
 .ad
 .RS 10n
-Specifies the byte offset for the desired configuration register from the \fBPC
-\fRCard configuration register base specified in
+Specifies the byte offset for the desired configuration register from the
+\fBPC\fR Card configuration register base specified in
 \fBcsx_RequestConfiguration\fR(9F).
 .RE
 
@@ -114,7 +114,7 @@ the register to determine the appropriate setting for the interrupt mode (Bit
 6) before writing to the register.
 .sp
 .LP
-If a client wants to reset a \fBPC\fRCard, the \fBcsx_ResetFunction\fR(9F)
+If a client wants to reset a \fBPC\fR Card, the \fBcsx_ResetFunction\fR(9F)
 function should be used. Unlike \fBcsx_AccessConfigurationRegister()\fR, the
 \fBcsx_ResetFunction\fR(9F) function generates a series of event notifications
 to all clients using the \fBPC \fRCard, so they can re-establish the
@@ -163,7 +163,7 @@ Client handle is invalid.
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-No \fBPC \fRcard in socket.
+No \fBPC\fR Card in socket.
 .RE
 
 .sp
