@@ -178,8 +178,8 @@ is not -1 and there is no error, the value of
 is returned.
 .Sh ERRORS
 The
-.Fn signalfd function
-will fail if:
+.Fn signalfd
+function will fail if:
 .Bl -tag -width Er
 .It Er EBADF
 The
