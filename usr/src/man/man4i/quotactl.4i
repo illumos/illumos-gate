@@ -145,7 +145,7 @@ are ignored.
 .El
 .Sh RETURN VALUES
 This
-Fn ioctl
+.Fn ioctl
 returns:
 .Bl -tag -width xx
 .It Sy 0
