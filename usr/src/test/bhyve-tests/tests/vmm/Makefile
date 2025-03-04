@@ -9,10 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright 2022 MNX Cloud, Inc.
 # Copyright 2023 Oxide Computer Company
-#
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
@@ -39,8 +36,6 @@ PROG =	mem_partial \
 	maxcpu \
 	npt_ops
 
-SCRIPT = vmm_drv_test_fini vmm_drv_test_init
-
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)
 
@@ -48,7 +43,6 @@ ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
 TESTDIR = $(ROOTOPTPKG)/tests/vmm
 
 CMDS = $(PROG:%=$(TESTDIR)/%)
-CMDS += $(SCRIPT:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 CSTD=		$(CSTD_GNU99)

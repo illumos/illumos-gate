@@ -9,10 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright 2022 MNX Cloud, Inc.
 # Copyright 2025 Oxide Computer Company
-#
 
 [DEFAULT]
 pre =
@@ -24,7 +21,6 @@ outputdir = /var/tmp/test_results
 
 [/opt/bhyve-tests/tests/vmm]
 user = root
-pre = vmm_drv_test_init
 tests = [
 	'auto_destruct',
 	'cpuid_ioctl',
@@ -45,7 +41,6 @@ tests = [
 	'pause_resume',
 	'self_destruct'
 	]
-post = vmm_drv_test_fini
 
 [/opt/bhyve-tests/tests/kdev]
 user = root

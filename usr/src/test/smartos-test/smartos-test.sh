@@ -13,7 +13,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2024 MNX Cloud, Inc.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 #
@@ -47,6 +47,10 @@ FAILED_TESTS=""
 function fatal {
     echo "ERROR: $@"
     exit 1
+}
+
+function driver_install_fail {
+    fatal "failed to add $1 driver"
 }
 
 function warn {
@@ -300,6 +304,12 @@ EOF
     fi
 }
 
+#
+# *_test_check() functions exist because some illumos tests assume some
+# reality checks, test drivers, or other prerequisites, that we cannot just
+# extract from the tests-tar tarball.
+#
+
 function zfs_test_check {
     # DISKS is set either in our environment, or in the .profile of ~ztest.
     zprofile=/zones/global/ztest/.profile
@@ -328,10 +338,9 @@ function zfs_test_check {
     fi
 
     # Allow access to ZFS unit tests driver.
-    add_drv zut
+    add_drv zut || driver_install_fail zut
     # OKAY, now we can run it!
     log_test zfstest su - ztest -c /opt/zfs-tests/bin/zfstest
-    rem_drv zut
 }
 
 function nvme_test_check {
@@ -346,17 +355,33 @@ function nvme_test_check {
     fi
 }
 
+function bhyve_test_check {
+    # Add the VMM test driver. It needs to be a bit more permissive than
+    # just root@gz safe.
+    add_drv -m '* 0666 root sys' \
+	-p 'read_priv_set=sys_devices write_priv_set=sys_devices' \
+	vmm_drv_test || driver_install_fail vmm_drv_test
+
+    log_test bhyvetest /opt/bhyve-tests/bin/bhyvetest
+}
+
+function os_tests_check {
+    # Add the ktest driver.
+    add_drv ktest || driver_install_fail ktest
+    # OKAY, now we can run it!
+    log_testrunner os-tests /opt/os-tests/runfiles/default.run
+}
+
 #
 # By using log_test or log_testrunner, we accumulate the exit codes from each
 # test run to $RESULT.
 #
-# We don't - yet - run net-tests, smbclient-tests, zfs-tests, or the dtrace
-# suite.
+# We don't - yet - run net-tests, smbclient-tests, or the dtrace suite.
 #
 function execute_tests {
 
     log "Starting test runs"
-    log_test bhyvetest /opt/bhyve-tests/bin/bhyvetest
+    bhyve_test_check
     log_testrunner crypto-tests /opt/crypto-tests/runfiles/default.run
     log_testrunner elf-tests /opt/elf-tests/runfiles/default.run
     log_testrunner libc-tests /opt/libc-tests/runfiles/default.run
@@ -364,7 +389,7 @@ function execute_tests {
     log_testrunner libproc-tests /opt/libproc-tests/runfiles/default.run
     log_test vndtest /opt/vndtest/bin/vndtest -a
     log_testrunner util-tests /opt/util-tests/runfiles/default.run
-    log_testrunner os-tests /opt/os-tests/runfiles/default.run
+    os_tests_check
     nvme_test_check
     zfs_test_check
 
