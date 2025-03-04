@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMA_GETWIN 9F "Jan 18, 2020"
+.TH DDI_DMA_GETWIN 9F "August 22, 2023"
 .SH NAME
 ddi_dma_getwin \- activate a new DMA window
 .SH SYNOPSIS
@@ -94,7 +94,7 @@ window number from the range  \fI[0..N-1]\fR as the parameter \fIwin\fR and
 makes it the current  \fBDMA\fR window.
 .sp
 .LP
-\fBddi_dma_getwin()\fR allocates and assosciates a number of
+\fBddi_dma_getwin()\fR allocates and associates a number of
 \fBDMA\fR cookies with \fIhandle\fR.  To get the total number of
 cookies, callers should use the \fBddi_dma_ncookies\fR(9F) function. To
 get all of the cookies, callers should use the

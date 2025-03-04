@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd August 22, 2023
 .Dt PASFD 3PROC
 .Os
 .Sh NAME
@@ -28,7 +28,7 @@
 .Sh DESCRIPTION
 The
 .Fn Pasfd
-funtion returns a file descriptor that allows direct access to the
+function returns a file descriptor that allows direct access to the
 address space of the process handle
 .Fa P .
 A defined file descriptor is provided when using the

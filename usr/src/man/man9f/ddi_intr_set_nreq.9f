@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_INTR_SET_NREQ 9F "Jan 5, 2009"
+.TH DDI_INTR_SET_NREQ 9F "August 22, 2023"
 .SH NAME
 ddi_intr_set_nreq \- set the number of interrupts requested for a device driver
 instance
@@ -56,7 +56,7 @@ or when it is allowed to allocate more interrupts as a result of its new
 \fInreq\fR parameter.
 .sp
 .LP
-The \fBddi_intr_set_nreq()\fRfunction is not supported unless a driver is
+The \fBddi_intr_set_nreq()\fR function is not supported unless a driver is
 already consuming interrupts, and if it has a registered callback handler that
 can process actions related to changes in interrupt availability. See
 \fBddi_cb_register\fR(9F) for an explanation on how to enable this

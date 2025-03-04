@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DEV_IS_SID 9F "Jan 16, 2006"
+.TH DDI_DEV_IS_SID 9F "August 22, 2023"
 .SH NAME
 ddi_dev_is_sid \- tell whether a device is self-identifying
 .SH SYNOPSIS
@@ -32,7 +32,7 @@ A pointer to the device's \fBdev_info\fR structure.
 The \fBddi_dev_is_sid()\fR function tells the caller whether the device
 described by \fIdip\fR is self-identifying, that is, a device that can
 unequivocally tell the system that it exists. This is useful for drivers that
-support both a self-identifying as well as a non-self-identifying variants of a
+support both a self-identifying as well as non-self-identifying variants of a
 device (and therefore must be probed).
 .SH RETURN VALUES
 .ne 2
@@ -81,4 +81,7 @@ kernel context.
 .in -2
 
 .SH SEE ALSO
-\fBprobe\fR(9E) \fIWriting Device Drivers\fR
+.BR probe (9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,16 +1,17 @@
 '\" te
+.\" Copyright 2023 Peter Tribble
 .\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_EV_REMOVE_CALLBACKS 9F "Oct 24, 2012"
+.TH LDI_EV_REMOVE_CALLBACKS 9F "August 22, 2023"
 .SH NAME
 ldi_ev_remove_callbacks \- remove all callbacks for a given callback ID
 .SH SYNOPSIS
 .nf
 #include <sys/sunldi.h>
 
-\fBvoid\fR \fBldi_ev_remove_callbacks\fR(\fIldi_callback_id_t id\fR);
+\fBint\fR \fBldi_ev_remove_callbacks\fR(\fIldi_callback_id_t id\fR);
 .fi
 
 .SH INTERFACE LEVEL
@@ -40,9 +41,13 @@ system if the entity registering the callback (a \fBdev_t\fR, \fBdip\fR or
 \fBmodule\fR) no longer exists on the system and the callbacks have not been
 unregistered.
 .SH RETURN VALUES
-None.
+Upon successful completion, the \fBldi_ev_remove_callback()\fR function returns
+\fBLDI_EV_SUCCESS\fR. Otherwise, if an invalid callback \fBID\fR of \fB0\fR
+is supplied, or if the underlying call to \fBddi_remove_event_handler\fR(9F)
+failed, \fBLDI_EV_FAILURE\fR is returned.
 .SH CONTEXT
 This function can be called from user and kernel contexts only.
 .SH SEE ALSO
+.BR ddi_remove_event_handler (9F),
 .BR ldi_ev_get_cookie (9F),
 .BR ldi_ev_register_callbacks (9F)

@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ESBBCALL 9F "Jan 16, 2006"
+.TH ESBBCALL 9F "August 22, 2023"
 .SH NAME
 esbbcall \- call function when buffer is available
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 
@@ -19,11 +18,8 @@ esbbcall \- call function when buffer is available
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpri\fR\fR
@@ -52,8 +48,6 @@ Argument to \fIfunc\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBesbbcall()\fR function, like \fBbufcall\fR(9F), serves as a
 \fBtimeout\fR(9F) call of indeterminate length. If \fBesballoc\fR(9F) is unable
 to allocate a message and data block header to go with its externally supplied
@@ -62,20 +56,14 @@ to be called with the argument \fIarg\fR when a buffer becomes available. The
 \fIfunc\fR argument can be a routine that calls \fBesballoc\fR(9F) or it may be
 another kernel function.
 .SH RETURN VALUES
-.sp
-.LP
-On success, a \fBbufcall\fR \fBID\fRis returned. On failure, \fB0\fR is
+On success, a \fBbufcall\fR \fBID\fR is returned. On failure, \fB0\fR is
 returned. The value returned from a successful call should be saved for
 possible future use with \fBunbufcall()\fR should it become necessary to cancel
 the \fBesbbcall()\fR request (as at driver close time).
 .SH CONTEXT
-.sp
-.LP
 The \fBesbbcall()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
-.LP
 .BR allocb (9F),
 .BR bufcall (9F),
 .BR esballoc (9F),

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSX_PARSE_CISTPL_FUNCE 9F "Dec 20, 1996"
+.TH CSX_PARSE_CISTPL_FUNCE 9F "August 22, 2023"
 .SH NAME
 csx_Parse_CISTPL_FUNCE \- parse Function Extension tuple
 .SH SYNOPSIS
@@ -64,7 +64,7 @@ form usable by \fBPC \fRCard drivers.
 .sp
 .LP
 The \fBCISTPL_FUNCE\fR tuple is used to describe information about a specific
-\fBPC\fRCard function. The information provided is determined by the Function
+\fBPC\fR Card function. The information provided is determined by the Function
 Identification tuple, \fBCISTPL_FUNCID,\fR that is being extended. Each
 function has a defined set of extension tuples.
 .SH STRUCTURE MEMBERS

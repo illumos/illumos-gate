@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_PROP_LOOKUP_INT_ARRAY 9F "Jun 3, 2003"
+.TH LDI_PROP_LOOKUP_INT_ARRAY 9F "August 22, 2023"
 .SH NAME
 ldi_prop_lookup_int_array, ldi_prop_lookup_int64_array,
 ldi_prop_lookup_string_array, ldi_prop_lookup_string,
@@ -231,7 +231,7 @@ DDI_DEV_T_NONE.
 name must always be set to the name of the property being looked up.
 .sp
 .LP
-For the l\fBdi_prop_lookup_int_array()\fR, \fBldi_prop_lookup_int64_array()\fR,
+For the \fBldi_prop_lookup_int_array()\fR, \fBldi_prop_lookup_int64_array()\fR,
 \fBldi_prop_lookup_string_array()\fR, \fBldi_prop_lookup_string()\fR, and
 \fBldi_prop_lookup_byte_array()\fR functions, datap is the address of a pointer
 which, upon successful return, points to memory containing the value of the
@@ -320,7 +320,7 @@ property.
 .RS 4n
 This function searches for and returns a property that is an array of bytes.
 datap should be set to the address of a pointer to an array of bytes which,
-upon    successful return, points to memory containing the byte array value of
+upon successful return, points to memory containing the byte array value of
 the property.
 .RE
 
@@ -331,7 +331,7 @@ the property.
 .ad
 .sp .6
 .RS 4n
-Frees the resources associated with a property previously      allocated using
+Frees the resources associated with a property previously allocated using
 \fBldi_prop_lookup_int_array()\fR, \fBldi_prop_lookup_int64_array()\fR,
 \fBldi_prop_lookup_string_array()\fR, \fBldi_prop_lookup_string()\fR, and
 \fBldi_prop_lookup_byte_array()\fR.
@@ -425,8 +425,10 @@ Using ldi_prop_lookup_int64_array().
 .in -2
 
 .SH SEE ALSO
-\fBexecve\fR(2), \fBddi_prop_free\fR(9F), \fBddi_prop_lookup\fR(9F),
-\fBldi_prop_exists\fR(9F) .
+.BR execve (2),
+.BR ddi_prop_free (9F),
+.BR ddi_prop_lookup (9F),
+.BR ldi_prop_exists (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

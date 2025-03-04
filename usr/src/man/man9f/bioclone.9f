@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BIOCLONE 9F "Jan 16, 2006"
+.TH BIOCLONE 9F "August 22, 2023"
 .SH NAME
 bioclone \- clone another buffer
 .SH SYNOPSIS
@@ -132,7 +132,7 @@ buffer.
 The \fBbioclone()\fR function returns a pointer to the initialized buffer
 header, or \fBNULL\fR if no space is available.
 .SH CONTEXT
-The \fBbioclone()\fR function can be called from user, interrup, or interrupt
+The \fBbioclone()\fR function can be called from user, interrupt, or kernel
 context. Drivers must not allow \fBbioclone()\fR to sleep if called from an
 interrupt routine.
 .SH EXAMPLES

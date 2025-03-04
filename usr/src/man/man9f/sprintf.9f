@@ -309,7 +309,8 @@ format specifier.
 .It Sy s
 The argument is taken to be a string
 .Pq character pointer ,
-and characters from the string are printed until a null character is ecountered.
+and characters from the string are printed until a null character is
+encountered.
 If the character pointer is
 .Sy NULL ,
 the string

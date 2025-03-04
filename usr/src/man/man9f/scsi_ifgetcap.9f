@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_IFGETCAP 9F "April 9, 2016"
+.TH SCSI_IFGETCAP 9F "August 22, 2023"
 .SH NAME
 scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
 .SH SYNOPSIS
@@ -306,7 +306,7 @@ the \fBtran_reset()\fR function of the \fBHBA\fR driver can be called with the
 .ad
 .RS 24n
 Capability held in the \fBtran_interconnect_type\fR element of struct
-\fBscsi_hba_tran\fR that indicates the \fBHBA\fR transport interconnect type .
+\fBscsi_hba_tran\fR that indicates the \fBHBA\fR transport interconnect type.
 The integer value of the interconnect type of the transport is defined in the
 \fBservices.h\fR header file.
 .RE

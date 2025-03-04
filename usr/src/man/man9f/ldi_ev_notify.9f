@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_EV_NOTIFY 9F "Aug 21, 2007"
+.TH LDI_EV_NOTIFY 9F "August 22, 2023"
 .SH NAME
 ldi_ev_notify \- propagate notification of a state change event
 .SH SYNOPSIS
@@ -96,7 +96,7 @@ driver must generate another event cookie via a new \fBldi_ev_get_cookie\fR(9F)
 call.
 .sp
 .LP
-The\fBldi_ev_*\fR interfaces are designed to ensure that a "finalize" call is
+The \fBldi_ev_*\fR interfaces are designed to ensure that a "finalize" call is
 generated for layered driver consumers at the earliest point where an
 \fBLDI_EV_FAILURE\fR is detected. If this happens inside the \fBLDI\fR event
 framework, then the framework will invoke finalize. In the event a layered

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_CTRL_XFER 9F "Sep 16, 2016"
+.TH USB_PIPE_CTRL_XFER 9F "August 22, 2023"
 .SH NAME
 usb_pipe_ctrl_xfer, usb_pipe_ctrl_xfer_wait \- USB control pipe transfer
 functions
@@ -397,7 +397,7 @@ context.
       pipe,
       &setup_params,
       &data,
-      &compleetion_reason,
+      &completion_reason,
       &callback_flags,
       0) != USB_SUCCESS) {
           cmn_err (CE_WARN,

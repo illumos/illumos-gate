@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMA_ADDR_BIND_HANDLE 9F "Jan 18, 2020"
+.TH DDI_DMA_ADDR_BIND_HANDLE 9F "August 22, 2023"
 .SH NAME
 ddi_dma_addr_bind_handle \- binds an address to a DMA handle
 .SH SYNOPSIS
@@ -278,7 +278,7 @@ this condition by returning status \fBDDI_DMA_PARTIAL_MAP\fR. At a later point,
 the caller can use \fBddi_dma_getwin\fR(9F) to change the valid portion of the
 object for which resources are allocated. If resources were allocated for only
 part of the object, \fBddi_dma_addr_bind_handle()\fR returns resources for the
-first \fBDMA\fRwindow. Even when \fBDDI_DMA_PARTIAL\fR is set, the system may
+first \fBDMA\fR window. Even when \fBDDI_DMA_PARTIAL\fR is set, the system may
 decide to allocate resources for the entire object (less overhead) in which
 case \fBDDI_DMA_MAPPED\fR is returned.
 .RE

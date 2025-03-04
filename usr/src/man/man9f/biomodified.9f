@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BIOMODIFIED 9F "Nov 20, 1996"
+.TH BIOMODIFIED 9F "August 22, 2023"
 .SH NAME
 biomodified \- check if a buffer is modified
 .SH SYNOPSIS
@@ -27,8 +27,8 @@ Pointer to the buffer header structure.
 
 .SH DESCRIPTION
 The \fBbiomodified()\fR function returns status to indicate if the buffer is
-modified. The  \fBbiomodified()\fR function is only supported for paged- \fBI/O
-\fRrequest, that is the \fBB_PAGEIO\fRflag must be set in the \fIb_flags\fR
+modified. The \fBbiomodified()\fR function is only supported for paged-\fBI/O\fR
+request, that is the \fBB_PAGEIO\fR flag must be set in the \fIb_flags\fR
 field of the \fBbuf\fR(9S) structure.  The  \fBbiomodified()\fR function will
 check the memory pages associated with this buffer whether the Virtual Memory
 system's modification bit is set.  If at least one of these pages is modified,

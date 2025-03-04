@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Dec 20, 2016
+.Dd August 22, 2023
 .Dt USBA_HCDI_CB_OPS 9E
 .Os
 .Sh NAME
@@ -100,7 +100,7 @@ and it should not perform any cloning or renumbering in its
 .Xr open 9E
 entry point.
 .Sh EXAMPLES
-The following example is adapated from the
+The following example is adapted from the
 .Xr xhci 4D
 driver which shows how an HCD driver might arrange things.
 This assumes that a driver is following the recommendations in
