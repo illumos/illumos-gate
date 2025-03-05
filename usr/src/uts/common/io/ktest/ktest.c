@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2024 Ryan Zezeski
  */
 
@@ -57,7 +57,7 @@
  * - Module: The top of the namespace, typically named after the
  *   module-under-test (MUT). The convention is to append the '_test'
  *   suffix to the module-under-test. For example, the 'mac' module
- *   might have a 'mac_test' test module. However, there is no hard
+ *   might have a 'mac_ktest' test module. However, there is no hard
  *   rule that a test module must be named after its
  *   module-under-test, it’s merely a suggestion. Such a convention is
  *   a bit unwieldy for large modules like genunix. In those cases it
@@ -588,9 +588,26 @@ ktest_register_module(ktest_module_hdl_t *km_hdl)
 
 	mutex_enter(&ktest_lock);
 
-	if (ktest_find_module(km->km_name) != NULL) {
+	ktest_module_t *conflict = ktest_find_module(km->km_name);
+	if (conflict != NULL) {
+		/*
+		 * The ktest self-test module will, as part of its duties,
+		 * attempt to double-register its module to confirm that it
+		 * receives an EEXIST rejection.
+		 *
+		 * For that one specific case, the error output to the console
+		 * is suppressed, since the behavior is anticipated and the
+		 * operator should not be alarmed.
+		 */
+		const boolean_t selftest_suppress_msg =
+		    conflict == km &&
+		    strncmp(km->km_name, "ktest", KTEST_MAX_NAME_LEN) == 0;
 		mutex_exit(&ktest_lock);
-		cmn_err(CE_NOTE, "test module already exists: %s", km->km_name);
+
+		if (!selftest_suppress_msg) {
+			cmn_err(CE_NOTE, "test module already exists: %s",
+			    km->km_name);
+		}
 		return (EEXIST);
 	}
 

@@ -50,7 +50,8 @@ function instead.
 The traditional
 .Xr sync 2
 function has two primary differences from the
-.Fn syncfs function:
+.Fn syncfs
+function:
 .Xr sync 2
 instructs the system to schedule all I/O across all file
 systems to be synchronized and it does not guarantee that all that

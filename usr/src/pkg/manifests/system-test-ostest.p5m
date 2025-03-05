@@ -122,6 +122,10 @@ file path=opt/os-tests/tests/ksensor/ksensor_unload mode=0555
 dir  path=opt/os-tests/tests/ksid
 file path=opt/os-tests/tests/ksid/ksid.32 mode=0555
 file path=opt/os-tests/tests/ksid/ksid.64 mode=0555
+dir  path=opt/os-tests/tests/ktest
+file path=opt/os-tests/tests/ktest/ktest_ktest mode=0555
+file path=opt/os-tests/tests/ktest/mac_ktest mode=0555
+file path=opt/os-tests/tests/ktest/stream_ktest mode=0555
 dir  path=opt/os-tests/tests/libtopo
 file path=opt/os-tests/tests/libtopo/digraph-test mode=0555
 file path=opt/os-tests/tests/libtopo/digraph-test-in-badedge.xml mode=0444

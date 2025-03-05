@@ -66,7 +66,8 @@ function sets whether or not the transceiver is present and plugged into
 the system.
 If the transceiver is not plugged in, then the function
 should be called with
-.Fa present set to
+.Fa present
+set to
 .Dv B_FALSE ,
 otherwise it should use
 .Dv B_TRUE .

@@ -938,14 +938,15 @@ done:
 	freemsg(etp.etp_mp);
 }
 
-static struct modlmisc mac_test_modlmisc = {
+
+static struct modlmisc mac_ktest_modlmisc = {
 	.misc_modops = &mod_miscops,
 	.misc_linkinfo = "mac ktest module"
 };
 
-static struct modlinkage mac_test_modlinkage = {
+static struct modlinkage mac_ktest_modlinkage = {
 	.ml_rev = MODREV_1,
-	.ml_linkage = { &mac_test_modlmisc, NULL }
+	.ml_linkage = { &mac_ktest_modlmisc, NULL }
 };
 
 int
@@ -978,7 +979,7 @@ _init()
 		return (ret);
 	}
 
-	if ((ret = mod_install(&mac_test_modlinkage)) != 0) {
+	if ((ret = mod_install(&mac_ktest_modlinkage)) != 0) {
 		ktest_unregister_module("mac");
 		return (ret);
 	}
@@ -990,11 +991,11 @@ int
 _fini(void)
 {
 	ktest_unregister_module("mac");
-	return (mod_remove(&mac_test_modlinkage));
+	return (mod_remove(&mac_ktest_modlinkage));
 }
 
 int
 _info(struct modinfo *modinfop)
 {
-	return (mod_info(&mac_test_modlinkage, modinfop));
+	return (mod_info(&mac_ktest_modlinkage, modinfop));
 }

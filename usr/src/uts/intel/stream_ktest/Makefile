@@ -13,10 +13,10 @@
 # Copyright 2023 Oxide Computer Company
 #
 
-UTSBASE = ../..
+UTSBASE	= ../..
 
-MODULE		= ktest_selftest
-OBJECTS		= $(KTEST_SELFTEST_OBJS:%=$(OBJS_DIR)/%)
+MODULE		= stream_ktest
+OBJECTS		= $(STREAM_KTEST_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(USR_KTEST_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
@@ -28,14 +28,14 @@ LDFLAGS		+= -N drv/ktest
 
 .KEEP_STATE:
 
-def:		$(DEF_DEPS)
+def:           $(DEF_DEPS)
 
-all:		$(ALL_DEPS)
+all:           $(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:         $(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:       $(CLOBBER_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:       $(INSTALL_DEPS)
 
 include $(UTSBASE)/intel/Makefile.targ

@@ -452,6 +452,7 @@ MANFILES=	__fbufsize.3c					\
 		stack_violation.3c				\
 		stdc_bit_ceil.3c				\
 		stdc_bit_floor.3c				\
+		stdc_bit_width.3c				\
 		stdc_count_ones.3c				\
 		stdc_count_zeros.3c				\
 		stdc_first_leading_one.3c			\
@@ -1297,6 +1298,11 @@ MANLINKS=	FD_CLR.3c				\
 		stdc_bit_floor_ui.3c			\
 		stdc_bit_floor_ul.3c			\
 		stdc_bit_floor_ull.3c			\
+		stdc_bit_width_uc.3c			\
+		stdc_bit_width_us.3c			\
+		stdc_bit_width_ui.3c			\
+		stdc_bit_width_ul.3c			\
+		stdc_bit_width_ull.3c			\
 		stdc_count_ones_uc.3c			\
 		stdc_count_ones_us.3c			\
 		stdc_count_ones_ui.3c			\
@@ -2500,6 +2506,12 @@ stdc_bit_floor_us.3c			:= LINKSRC = stdc_bit_floor.3c
 stdc_bit_floor_ui.3c			:= LINKSRC = stdc_bit_floor.3c
 stdc_bit_floor_ul.3c			:= LINKSRC = stdc_bit_floor.3c
 stdc_bit_floor_ull.3c			:= LINKSRC = stdc_bit_floor.3c
+
+stdc_bit_width_uc.3c			:= LINKSRC = stdc_bit_width.3c
+stdc_bit_width_us.3c			:= LINKSRC = stdc_bit_width.3c
+stdc_bit_width_ui.3c			:= LINKSRC = stdc_bit_width.3c
+stdc_bit_width_ul.3c			:= LINKSRC = stdc_bit_width.3c
+stdc_bit_width_ull.3c			:= LINKSRC = stdc_bit_width.3c
 
 stdc_count_ones_uc.3c			:= LINKSRC = stdc_count_ones.3c
 stdc_count_ones_us.3c			:= LINKSRC = stdc_count_ones.3c

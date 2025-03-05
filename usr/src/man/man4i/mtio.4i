@@ -789,7 +789,8 @@ The user-level application is responsible for allocating and releasing the
 memory for
 .Fa mtee_cdb_buf
 and
-.Fa scsi_arq_status of each
+.Fa scsi_arq_status
+of each
 .Vt mterror_entry .
 Before issuing the ioctl, the
 .Fa mtee_arq_status_len

@@ -15,8 +15,8 @@
 
 UTSBASE	= ../..
 
-MODULE		= stream_test
-OBJECTS		= $(STREAM_TEST_OBJS:%=$(OBJS_DIR)/%)
+MODULE		= mac_ktest
+OBJECTS		= $(MAC_KTEST_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(USR_KTEST_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
@@ -24,18 +24,19 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -N drv/ktest
+LDFLAGS		+= -N misc/mac -N drv/ktest
 
 .KEEP_STATE:
 
-def:           $(DEF_DEPS)
+def:		$(DEF_DEPS)
 
-all:           $(ALL_DEPS)
+all:		$(ALL_DEPS)
 
-clean:         $(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS)
 
-clobber:       $(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS)
 
-install:       $(INSTALL_DEPS)
+install:	$(INSTALL_DEPS)
 
 include $(UTSBASE)/intel/Makefile.targ
+

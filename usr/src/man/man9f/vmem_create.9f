@@ -183,7 +183,8 @@ flag set at arena creation time differentiates between these two cases.
 .Pp
 The
 .Fa afunc ,
-.Fa ffunc , and
+.Fa ffunc ,
+and
 .Fa source
 arguments combine to support a hierarchical structure of arenas, each
 importing from a single parent (the

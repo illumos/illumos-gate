@@ -234,3 +234,10 @@ tests = ['oclo', 'oclo_errors']
 
 [/opt/os-tests/tests/secure_getenv/secure_getenv]
 user = root
+
+[/opt/os-tests/tests/mac_test]
+user = root
+
+[/opt/os-tests/tests/ktest]
+user = root
+tests = ['stream_ktest', 'mac_ktest', 'ktest_ktest']

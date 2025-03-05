@@ -13,39 +13,34 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-include $(SRC)/Makefile.master
+SCRIPTS = \
+	stream_ktest \
+	mac_ktest \
+	ktest_ktest
 
-ROOTOPTPKG = $(ROOT)/opt/os-tests
-TESTDIR = $(ROOTOPTPKG)/tests
-
-PROGS = mac_test
+ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
+ROOTOPTKTEST = $(ROOTOPTDIR)/ktest
+ROOTOPTPROGS = $(SCRIPTS:%=$(ROOTOPTKTEST)/%)
 
 include $(SRC)/cmd/Makefile.cmd
-include $(SRC)/cmd/Makefile.cmd.64
-include $(SRC)/test/Makefile.com
 
-LDLIBS += -lnvpair -lktest
-CSTD= $(CSTD_GNU17)
+.KEEP_STATE:
 
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
+all:
 
-all: $(PROGS)
-
-install: all $(CMDS)
-
-lint:
-
-clobber: clean
-	-$(RM) $(PROGS)
+install: $(ROOTOPTPROGS)
 
 clean:
-	-$(RM) *.o
 
-$(CMDS): $(TESTDIR) $(PROGS)
+clobber:
 
-$(TESTDIR):
+$(ROOTOPTPROGS): $(ROOTOPTKTEST)
+
+$(ROOTOPTDIR):
 	$(INS.dir)
 
-$(TESTDIR)/%: %
-	$(INS.file)
+$(ROOTOPTKTEST): $(ROOTOPTDIR)
+	$(INS.dir)
+
+$(ROOTOPTKTEST)/%: %.ksh
+	$(INS.rename)
