@@ -21476,11 +21476,11 @@ s usr/share/man/man9f/stdc_bit_floor_ul.9f=stdc_bit_floor.9f
 s usr/share/man/man9f/stdc_bit_floor_ull.9f=stdc_bit_floor.9f
 s usr/share/man/man9f/stdc_bit_floor_us.9f=stdc_bit_floor.9f
 f usr/share/man/man9f/stdc_bit_width.9f 0444 root bin
-s usr/share/man/man9f/stdc_bit_width_uc.3c=stdc_bit_width.9f
-s usr/share/man/man9f/stdc_bit_width_ui.3c=stdc_bit_width.9f
-s usr/share/man/man9f/stdc_bit_width_ul.3c=stdc_bit_width.9f
-s usr/share/man/man9f/stdc_bit_width_ull.3c=stdc_bit_width.9f
-s usr/share/man/man9f/stdc_bit_width_us.3c=stdc_bit_width.9f
+s usr/share/man/man9f/stdc_bit_width_uc.9f=stdc_bit_width.9f
+s usr/share/man/man9f/stdc_bit_width_ui.9f=stdc_bit_width.9f
+s usr/share/man/man9f/stdc_bit_width_ul.9f=stdc_bit_width.9f
+s usr/share/man/man9f/stdc_bit_width_ull.9f=stdc_bit_width.9f
+s usr/share/man/man9f/stdc_bit_width_us.9f=stdc_bit_width.9f
 f usr/share/man/man9f/stdc_count_ones.9f 0444 root bin
 s usr/share/man/man9f/stdc_count_ones_uc.9f=stdc_count_ones.9f
 s usr/share/man/man9f/stdc_count_ones_ui.9f=stdc_count_ones.9f
