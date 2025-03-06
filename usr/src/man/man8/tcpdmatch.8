@@ -3,15 +3,14 @@
 .\" Modified for Solaris to to add the Solaris stability classification,
 .\" and to add a note about source availability.
 .\"
-.TH TCPDMATCH 8 "Sep 15, 2011"
+.TH TCPDMATCH 8 "March 5, 2025"
 .SH NAME
 tcpdmatch \- tcp wrapper oracle
-.SH SYNOPSYS
+.SH SYNOPSIS
 tcpdmatch [-d] [-i inet_conf] daemon client
 .sp
 tcpdmatch [-d] [-i inet_conf] daemon[@server] [user@]client
 .SH DESCRIPTION
-.PP
 \fItcpdmatch\fR predicts how the tcp wrapper would handle a specific
 request for service.  Examples are given below.
 .PP
@@ -75,7 +74,6 @@ tcpdmatch in.telnetd paranoid
 On some systems, daemon names have no `in.' prefix, or \fItcpdmatch\fR
 may need some help to locate the inetd configuration file.
 .SH FILES
-.PP
 The default locations of the \fItcpd\fR access control tables are:
 .PP
 /etc/hosts.allow

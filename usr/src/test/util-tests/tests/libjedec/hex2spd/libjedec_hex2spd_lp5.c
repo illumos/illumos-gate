@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -322,7 +322,7 @@ const hex2spd_test_t fake_lp5_camm2 = {
 	}, {
 		.hs_key = SPD_KEY_DEV_CD0_MFG_NAME,
 		.hs_type = DATA_TYPE_STRING,
-		.hs_val = { .hs_str = "Fujitsu" }
+		.hs_val = { .hs_str = "RAMXEED Limited" }
 	}, {
 		.hs_key = SPD_KEY_DEV_CD0_TYPE,
 		.hs_type = DATA_TYPE_UINT32,

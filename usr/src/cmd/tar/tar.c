@@ -23,6 +23,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -6784,51 +6785,63 @@ append_secattr(
 
 /*
  * write_ancillary(): write out an ancillary file.
- *      The file has the same header as normal file except the type and size
- *      fields. The type is 'A' and size is the sum of all attributes
- *	in bytes.
- *	The body contains a list of attribute type, size and info. Currently,
- *	there is only ACL info.  This file is put before the normal file.
+ *
+ * The file has the same header as a normal file except for the type and size
+ * fields.  The type is 'A' and the size is the length of the encoded
+ * attributes in bytes.  The body contains a description of security
+ * information and extended attributes, rendered into "secinfo" by other
+ * routines. This file is included in the archive stream immediately prior to
+ * the normal file to which it applies.
  */
 void
 write_ancillary(union hblock *dblockp, char *secinfo, int len, char hdrtype)
 {
-	long    blocks;
-	int	savflag;
-	int	savsize;
+	int savflag;
+	off_t savsize;
 
-	/* Just tranditional permissions or no security attribute info */
-	if (len == 0 || secinfo == NULL)
+	if (len == 0 || secinfo == NULL) {
+		/*
+		 * This file has no additional security information to include.
+		 */
 		return;
+	}
 
-	/* save flag and size */
+	/*
+	 * The in-progress header block has been assembled at this point, so we
+	 * need to preserve the file type and the file size from that header:
+	 */
 	savflag = (dblockp->dbuf).typeflag;
-	(void) sscanf(dblockp->dbuf.size, "%12o", (uint_t *)&savsize);
+	(void) sscanf(dblockp->dbuf.size, "%12" FMT_off_t_o, &savsize);
 
-	/* special flag for ancillary file */
+	/*
+	 * Overwrite the header block for the normal file with the particulars
+	 * of the ancillary file.  Note that we force the ancillary file to be
+	 * user-readable for compatibility with truly ancient versions of tar
+	 * that are likely no longer relevant.
+	 */
 	if (hdrtype == _XATTR_HDRTYPE)
 		dblockp->dbuf.typeflag = _XATTR_HDRTYPE;
 	else
 		dblockp->dbuf.typeflag = 'A';
-
-	/* for pre-2.5 versions of tar, need to make sure */
-	/* the ACL file is readable			  */
 	(void) sprintf(dblock.dbuf.mode, "%07lo",
 	    (stbuf.st_mode & POSIXMODES) | 0000200);
 	(void) sprintf(dblockp->dbuf.size, "%011o", len);
 	(void) sprintf(dblockp->dbuf.chksum, "%07o", checksum(dblockp));
 
-	/* write out the header */
+	/*
+	 * Write out the ancillary header and body:
+	 */
 	(void) writetbuf((char *)dblockp, 1);
+	(void) writetbuf((char *)secinfo, TBLOCKS(len));
 
-	/* write out security info */
-	blocks = TBLOCKS(len);
-	(void) writetbuf((char *)secinfo, (int)blocks);
-
-	/* restore mode, flag and size */
+	/*
+	 * Restore the parts of the original header block that we saved
+	 * earlier.  We don't recalculate the checksum here; it occurs
+	 * elsewhere as part of writing out the file itself.
+	 */
 	(void) sprintf(dblock.dbuf.mode, "%07lo", stbuf.st_mode & POSIXMODES);
 	dblockp->dbuf.typeflag = savflag;
-	(void) sprintf(dblockp->dbuf.size, "%011o", savsize);
+	(void) sprintf(dblockp->dbuf.size, "%011" FMT_off_t_o, savsize);
 }
 
 /*

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Aug 7, 2016
+.Dd March 5, 2025
 .Dt USB_EP_XDESCR_FILL 9F
 .Os
 .Sh NAME
@@ -28,7 +28,7 @@
 .Fc
 .Sh INTERFACE STABILITY
 illumos DDI specific
-.Sh PARAMETESR
+.Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa version
 Indicates the current version of the
