@@ -140,6 +140,10 @@ file path=opt/libc-tests/tests/printf-15294.64 mode=0555
 file path=opt/libc-tests/tests/printf-6961.64 mode=0555
 file path=opt/libc-tests/tests/printf-9511.32 mode=0555
 file path=opt/libc-tests/tests/printf-9511.64 mode=0555
+file path=opt/libc-tests/tests/printf-intmax mode=0555
+file path=opt/libc-tests/tests/printf-intmax.32 mode=0555
+file path=opt/libc-tests/tests/printf-intmax.64 mode=0555
+file path=opt/libc-tests/tests/printf-intmax.c89 mode=0555
 file path=opt/libc-tests/tests/priv_gettext mode=0555
 file path=opt/libc-tests/tests/psignal mode=0555
 file path=opt/libc-tests/tests/psignal-5097.32 mode=0555

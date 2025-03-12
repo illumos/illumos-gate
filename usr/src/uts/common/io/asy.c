@@ -5430,8 +5430,10 @@ asyquiesce(dev_info_t *devi)
 
 	asy_disable_interrupts(asy, ASY_IER_ALL);
 
-	/* Flush the FIFOs */
-	asy_reset_fifo(asy, ASY_FCR_THR_FL | ASY_FCR_RHR_FL);
+	/* Flush the FIFOs, if required */
+	if (asy->asy_use_fifo == ASY_FCR_FIFO_EN) {
+		asy_reset_fifo(asy, ASY_FCR_THR_FL | ASY_FCR_RHR_FL);
+	}
 
 	return (DDI_SUCCESS);
 }
