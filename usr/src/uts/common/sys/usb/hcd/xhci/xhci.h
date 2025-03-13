@@ -857,9 +857,9 @@ extern void xhci_fm_runtime_reset(xhci_t *);
  */
 extern int xhci_endpoint_init(xhci_t *, xhci_device_t *,
     usba_pipe_handle_data_t *);
-extern int xhci_endpoint_reinit(xhci_t *, xhci_device_t *,
+extern int xhci_endpoint_reopen(xhci_t *, xhci_device_t *,
     xhci_endpoint_t *, usba_pipe_handle_data_t *);
-extern void xhci_endpoint_release(xhci_t *, xhci_endpoint_t *);
+extern void xhci_endpoint_close(xhci_t *, xhci_endpoint_t *);
 extern void xhci_endpoint_fini(xhci_device_t *, int);
 extern int xhci_endpoint_update_default(xhci_t *, xhci_device_t *,
     xhci_endpoint_t *);

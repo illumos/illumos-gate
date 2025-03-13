@@ -76,8 +76,20 @@ xhci_endpoint_timeout_cancel(xhci_t *xhcip, xhci_endpoint_t *xep)
 	}
 }
 
+/*
+ * Close an endpoint that has been initialised and is presently considered
+ * open; i.e., either xhci_endpoint_init() or xhci_endpoint_reopen() have
+ * completed successfully.  This clears the open state and ensures the periodic
+ * routine is not running for this endpoint, but critically it does not disturb
+ * the controller state.
+ *
+ * A closed endpoint must either be fully unconfigured and then freed with
+ * xhci_endpoint_fini(), or if it is a bulk or control endpoint it can remain
+ * in this state until subsequent reanimation with xhci_endpoint_reopen() the
+ * next time the pipe is opened.
+ */
 void
-xhci_endpoint_release(xhci_t *xhcip, xhci_endpoint_t *xep)
+xhci_endpoint_close(xhci_t *xhcip, xhci_endpoint_t *xep)
 {
 	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
 	VERIFY3U(xep->xep_num, !=, XHCI_DEFAULT_ENDPOINT);
@@ -94,7 +106,9 @@ xhci_endpoint_release(xhci_t *xhcip, xhci_endpoint_t *xep)
 
 /*
  * The assumption is that someone calling this owns this endpoint / device and
- * that it's in a state where it's safe to zero out that information.
+ * that it's in a state where it's safe to zero out that information.  In
+ * particular, if the endpoint has ever been initialised and was thus marked
+ * open, xhci_endpoint_close() must have been called before this routine.
  */
 void
 xhci_endpoint_fini(xhci_device_t *xd, int endpoint)
@@ -102,9 +116,14 @@ xhci_endpoint_fini(xhci_device_t *xd, int endpoint)
 	xhci_endpoint_t *xep = xd->xd_endpoints[endpoint];
 
 	VERIFY(xep != NULL);
+	VERIFY3P(xep->xep_pipe, ==, NULL);
 	xd->xd_endpoints[endpoint] = NULL;
 
 	if (endpoint != XHCI_DEFAULT_ENDPOINT) {
+		/*
+		 * Make sure xhci_endpoint_close() was called before we get
+		 * here:
+		 */
 		VERIFY(!(xep->xep_state & XHCI_ENDPOINT_OPEN));
 	}
 
@@ -698,8 +717,15 @@ xhci_endpoint_init(xhci_t *xhcip, xhci_device_t *xd,
 	return (0);
 }
 
+/*
+ * Mark as open an endpoint that has previously been closed with
+ * xhci_endpoint_close(), but was left otherwise configured with the
+ * controller.  This step ensures that we are attempting to open the endpoint
+ * with parameters that are compatible with the last time it was opened, and
+ * marks the endpoint as eligible for periodic routines.
+ */
 int
-xhci_endpoint_reinit(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
+xhci_endpoint_reopen(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
     usba_pipe_handle_data_t *ph)
 {
 	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
