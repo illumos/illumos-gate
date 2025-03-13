@@ -71,7 +71,6 @@ struct serial {
     uint8_t	ignore_cd;	/* boolean */
     uint8_t	rtsdtr_off;	/* boolean */
     int		ioaddr;
-    uint32_t	locator;
 };
 
 static void	comc_probe(struct console *);
@@ -81,9 +80,6 @@ static int	comc_getchar(struct console *);
 int		comc_getspeed(int);
 static int	comc_ischar(struct console *);
 static int	comc_ioctl(struct console *, int, void *);
-static uint32_t comc_parse_pcidev(const char *);
-static int	comc_pcidev_set(struct env_var *, int, const void *);
-static int	comc_pcidev_handle(struct console *, uint32_t);
 static bool	comc_setup(struct console *);
 static char	*comc_asprint_mode(struct serial *);
 static int	comc_parse_mode(struct serial *, const char *);
@@ -109,6 +105,42 @@ comc_port_is_present(int ioaddr)
 #define	COMC_TEST	0xbb
 	outb(ioaddr + com_scr, COMC_TEST);
 	return (inb(ioaddr + com_scr) == COMC_TEST);
+}
+
+/*
+ * Set up following environment variables:
+ * ttyX-mode
+ * ttyX-rts-dtr-off
+ * ttyX-ignore-cd
+ */
+static void
+comc_setup_env(struct console *tty)
+{
+	struct serial *port;
+	char name[20];
+	char value[20];
+	char *env;
+
+	port = tty->c_private;
+	snprintf(name, sizeof (name), "%s-mode", tty->c_name);
+	env = comc_asprint_mode(port);
+	if (env != NULL) {
+		unsetenv(name);
+		env_setenv(name, EV_VOLATILE, env, comc_mode_set, env_nounset);
+		free(env);
+	}
+
+	snprintf(name, sizeof (name), "%s-rts-dtr-off", tty->c_name);
+	snprintf(value, sizeof (value), "%s",
+	    port->rtsdtr_off? "true" : "false");
+	unsetenv(name);
+	env_setenv(name, EV_VOLATILE, value, comc_rtsdtr_set, env_nounset);
+
+	snprintf(name, sizeof (name), "%s-ignore-cd", tty->c_name);
+	snprintf(value, sizeof (value), "%s",
+	    port->ignore_cd? "true" : "false");
+	unsetenv(name);
+	env_setenv(name, EV_VOLATILE, value, comc_cd_set, env_nounset);
 }
 
 /*
@@ -209,6 +241,7 @@ comc_ini(void)
 
 		tty->c_private = port;
 		consoles[c++] = tty;
+		comc_setup_env(tty);
 
 		/* Reset terminal to initial normal settings with ESC [ 0 m */
 		comc_putchar(tty, 0x1b);
@@ -225,73 +258,6 @@ comc_ini(void)
 static void
 comc_probe(struct console *cp)
 {
-	struct serial *port;
-	char name[20];
-	char value[20];
-	char *env;
-
-	port = cp->c_private;
-	if (port->speed != 0)
-		return;
-
-	port->speed = COMSPEED;
-
-	/*
-	 * Assume that the speed was set by an earlier boot loader if
-	 * comconsole is already the preferred console.
-	 */
-	snprintf(name, sizeof (name), "%s-mode", cp->c_name);
-	env = getenv(name);
-	if (env != NULL) {
-		port->speed = comc_getspeed(port->ioaddr);
-	}
-	env = comc_asprint_mode(port);
-
-	if (env != NULL) {
-		unsetenv(name);
-		env_setenv(name, EV_VOLATILE, env, comc_mode_set, env_nounset);
-		free(env);
-	}
-
-	snprintf(name, sizeof (name), "%s-ignore-cd", cp->c_name);
-	env = getenv(name);
-	if (env != NULL) {
-		if (strcmp(env, "true") == 0)
-			port->ignore_cd = 1;
-		else if (strcmp(env, "false") == 0)
-			port->ignore_cd = 0;
-	}
-
-	snprintf(value, sizeof (value), "%s",
-	    port->ignore_cd? "true" : "false");
-	unsetenv(name);
-	env_setenv(name, EV_VOLATILE, value, comc_cd_set, env_nounset);
-
-	snprintf(name, sizeof (name), "%s-rts-dtr-off", cp->c_name);
-	env = getenv(name);
-	if (env != NULL) {
-		if (strcmp(env, "true") == 0)
-			port->rtsdtr_off = 1;
-		else if (strcmp(env, "false") == 0)
-			port->rtsdtr_off = 0;
-	}
-
-	snprintf(value, sizeof (value), "%s",
-	    port->rtsdtr_off? "true" : "false");
-	unsetenv(name);
-	env_setenv(name, EV_VOLATILE, value, comc_rtsdtr_set, env_nounset);
-
-	snprintf(name, sizeof (name), "%s-pcidev", cp->c_name);
-	env = getenv(name);
-	if (env != NULL) {
-		port->locator = comc_parse_pcidev(env);
-		if (port->locator != 0)
-			comc_pcidev_handle(cp, port->locator);
-	}
-
-	unsetenv(name);
-	env_setenv(name, EV_VOLATILE, env, comc_pcidev_set, env_nounset);
-
 	cp->c_flags = 0;
 	if (comc_setup(cp))
 		cp->c_flags = C_PRESENTIN | C_PRESENTOUT;
@@ -548,110 +514,6 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
-	return (CMD_OK);
-}
-
-/*
- * Input: bus:dev:func[:bar]. If bar is not specified, it is 0x10.
- * Output: bar[24:16] bus[15:8] dev[7:3] func[2:0]
- */
-static uint32_t
-comc_parse_pcidev(const char *string)
-{
-#ifdef EFI
-	(void) string;
-	return (0);
-#else
-	char *p, *p1;
-	uint8_t bus, dev, func, bar;
-	uint32_t locator;
-	int pres;
-
-	errno = 0;
-	pres = strtoul(string, &p, 10);
-	if (errno != 0 || p == string || *p != ':' || pres < 0)
-		return (0);
-	bus = pres;
-	p1 = ++p;
-
-	pres = strtoul(p1, &p, 10);
-	if (errno != 0 || p == string || *p != ':' || pres < 0)
-		return (0);
-	dev = pres;
-	p1 = ++p;
-
-	pres = strtoul(p1, &p, 10);
-	if (errno != 0 || p == string || (*p != ':' && *p != '\0') || pres < 0)
-		return (0);
-	func = pres;
-
-	if (*p == ':') {
-		p1 = ++p;
-		pres = strtoul(p1, &p, 10);
-		if (errno != 0 || p == string || *p != '\0' || pres <= 0)
-			return (0);
-		bar = pres;
-	} else
-		bar = 0x10;
-
-	locator = (bar << 16) | biospci_locator(bus, dev, func);
-	return (locator);
-#endif
-}
-
-static int
-comc_pcidev_handle(struct console *cp, uint32_t locator)
-{
-#ifdef EFI
-	(void) cp;
-	(void) locator;
-	return (CMD_ERROR);
-#else
-	struct serial *sp = cp->c_private;
-	uint32_t port;
-
-	if (biospci_read_config(locator & 0xffff,
-	    (locator & 0xff0000) >> 16, 2, &port) == -1) {
-		printf("Cannot read bar at 0x%x\n", locator);
-		return (CMD_ERROR);
-	}
-	if (!PCI_BAR_IO(port)) {
-		printf("Memory bar at 0x%x\n", locator);
-		return (CMD_ERROR);
-	}
-	port &= PCIM_BAR_IO_BASE;
-
-	(void) comc_setup(cp);
-
-	sp->locator = locator;
-
-	return (CMD_OK);
-#endif
-}
-
-static int
-comc_pcidev_set(struct env_var *ev, int flags, const void *value)
-{
-	struct console *cp;
-	struct serial *sp;
-	uint32_t locator;
-	int error;
-
-	if ((cp = cons_get_console(ev->ev_name)) == NULL)
-		return (CMD_ERROR);
-	sp = cp->c_private;
-
-	if (value == NULL || (locator = comc_parse_pcidev(value)) <= 0) {
-		printf("Invalid pcidev\n");
-		return (CMD_ERROR);
-	}
-	if ((cp->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) != 0 &&
-	    sp->locator != locator) {
-		error = comc_pcidev_handle(cp, locator);
-		if (error != CMD_OK)
-			return (error);
-	}
-	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 	return (CMD_OK);
 }
 
