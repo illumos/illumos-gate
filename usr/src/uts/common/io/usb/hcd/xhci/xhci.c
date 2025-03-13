@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -366,7 +366,7 @@
  * These rings are used to issue I/O to individual endpoints, to issue commands
  * to the controller, and to receive notification of changes and completions.
  * Issued commands go on the special ring called the command ring while the
- * change and completion notifications go on the event ring.  More details are
+ * change and completion notifications go on the event ring. More details are
  * available in xhci_ring.c. Each of these structures is represented by an
  * xhci_ring_t.
  *
@@ -400,11 +400,22 @@
  * may open and close a pipe several times -- ugen(4D) in particular is known
  * for this -- and we will stop and start the ring accordingly.
  *
- * It is tempting to fully unconfigure an endpoint when a pipe is closed, but
- * some host controllers appear to exhibit undefined behaviour each time the
- * endpoint is re-enabled this way; e.g., silently dropped transfers. As such,
- * we wait until the whole device is being torn down to disable all previously
- * enabled endpoints at once, as part of disabling the device slot.
+ * Periodic endpoints (viz., interrupt and isochronous) require reserved
+ * bandwidth in order to guarantee a certain latency of response. The
+ * controller manages these reservations as endpoints are configured and
+ * unconfigured. All hub ports have a maximum available bandwidth, whether a
+ * root port or an external hub. If too many devices have configured periodic
+ * endpoints and the available bandwidth on a particular port is exhausted, the
+ * controller will explicitly fail to configure any more endpoints. To release
+ * bandwidth reservations we must unconfigure the endpoints that have them,
+ * which we do for periodic endpoints when the pipe is closed.
+ *
+ * It is tempting to fully unconfigure all types of endpoint when any pipe is
+ * closed, but some host controllers appear to exhibit undefined behaviour each
+ * time a bulk endpoint is re-enabled this way; e.g., silently dropped
+ * transfers. As such, we wait until the whole device is being torn down to
+ * disable all previously enabled bulk endpoints at once, as part of disabling
+ * the device slot.
  *
  * Each endpoint has its own ring as described in the previous section. We place
  * TRBs (transfer request blocks) onto a given ring to request I/O be performed.
@@ -672,7 +683,7 @@
  *   o xhci_device_t`xd_imtx
  *
  * There is only one xcr_lock per controller, like the xhci_lock. It protects
- * the state of the command ring. However, there is on xd_imtx per device.
+ * the state of the command ring. However, there is one xd_imtx per device.
  * Recall that each device is scoped to a given controller. This protects the
  * input slot context for a given device.
  *

@@ -570,8 +570,7 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 
 	/*
 	 * We clean up the endpoint by stopping it and cancelling any transfers
-	 * that were in flight at the time.  The endpoint is not unconfigured
-	 * until the device is torn down later.
+	 * that were in flight at the time.
 	 */
 	xhci_endpoint_timeout_cancel(xhcip, xep);
 	xep->xep_state |= XHCI_ENDPOINT_QUIESCE;
@@ -600,6 +599,37 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	}
 
 	xhci_endpoint_close(xhcip, xep);
+
+	/*
+	 * The endpoint is now totally detached and inactive.  We leave bulk
+	 * and control endpoints configured (see endpoint management comments
+	 * in xhci.c).  Periodic endpoints maintain a bandwidth reservation
+	 * which inhibits the use of other devices, so we attempt to
+	 * unconfigure those here.
+	 */
+	if (xep->xep_type == USB_EP_ATTR_INTR ||
+	    xep->xep_type == USB_EP_ATTR_ISOCH) {
+		if ((ret = xhci_endpoint_unconfigure(xhcip, xd, xep)) ==
+		    USB_SUCCESS) {
+			/*
+			 * If we were able to unconfigure the endpoint from the
+			 * device we can free everything.  The endpoint will be
+			 * recreated if a pipe is opened again later.
+			 */
+			xhci_endpoint_fini(xd, epid);
+		} else {
+			/*
+			 * Report the error and keep the endpoint object around
+			 * as we do for a bulk endpoint.  From the USB
+			 * framework perspective the pipe is closed, so don't
+			 * fail the whole operation.
+			 */
+			xhci_error(xhcip, "failed to unconfigure periodic "
+			    "endpoint %u of device with slot %hhu and port %hd "
+			    "(%d)",
+			    epid, xd->xd_slot, xd->xd_port, ret);
+		}
+	}
 
 remove:
 	ph->p_hcd_private = NULL;
