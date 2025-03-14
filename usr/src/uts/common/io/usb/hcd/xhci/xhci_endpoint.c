@@ -38,6 +38,22 @@ xhci_endpoint_is_periodic_in(xhci_endpoint_t *xep)
 	    (ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK) == USB_EP_DIR_IN);
 }
 
+static int
+xhci_input_context_sync(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep)
+{
+	XHCI_DMA_SYNC(xd->xd_ictx, DDI_DMA_SYNC_FORDEV);
+	if (xhci_check_dma_handle(xhcip, &xd->xd_ictx) != DDI_FM_OK) {
+		xhci_error(xhcip, "failed to initialize device input "
+		    "context on slot %d and port %d for endpoint %u: "
+		    "encountered fatal FM error synchronizing input context "
+		    "DMA memory", xd->xd_slot, xd->xd_port, xep->xep_num);
+		xhci_fm_runtime_reset(xhcip);
+		return (EIO);
+	}
+
+	return (0);
+}
+
 /*
  * Endpoints are a bit weirdly numbered. Endpoint zero is the default control
  * endpoint, so the direction doesn't matter. For all the others, they're
@@ -76,8 +92,20 @@ xhci_endpoint_timeout_cancel(xhci_t *xhcip, xhci_endpoint_t *xep)
 	}
 }
 
+/*
+ * Close an endpoint that has been initialised and is presently considered
+ * open; i.e., either xhci_endpoint_init() or xhci_endpoint_reopen() have
+ * completed successfully.  This clears the open state and ensures the periodic
+ * routine is not running for this endpoint, but critically it does not disturb
+ * the controller state.
+ *
+ * A closed endpoint must either be fully unconfigured and then freed with
+ * xhci_endpoint_fini(), or if it is a bulk or control endpoint it can remain
+ * in this state until subsequent reanimation with xhci_endpoint_reopen() the
+ * next time the pipe is opened.
+ */
 void
-xhci_endpoint_release(xhci_t *xhcip, xhci_endpoint_t *xep)
+xhci_endpoint_close(xhci_t *xhcip, xhci_endpoint_t *xep)
 {
 	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
 	VERIFY3U(xep->xep_num, !=, XHCI_DEFAULT_ENDPOINT);
@@ -93,8 +121,59 @@ xhci_endpoint_release(xhci_t *xhcip, xhci_endpoint_t *xep)
 }
 
 /*
+ * Attempt to unconfigure an endpoint that was previously initialised, but has
+ * now been closed.  If this function succeeds, it is then safe to call
+ * xhci_endpoint_fini().
+ */
+int
+xhci_endpoint_unconfigure(xhci_t *xhcip, xhci_device_t *xd,
+    xhci_endpoint_t *xep)
+{
+	int ret;
+
+	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
+	VERIFY3U(xep->xep_num, !=, XHCI_DEFAULT_ENDPOINT);
+	VERIFY(!(xep->xep_state & XHCI_ENDPOINT_OPEN));
+	VERIFY(xep->xep_state & XHCI_ENDPOINT_TEARDOWN);
+
+	/*
+	 * We only do this for periodic endpoints, in order to make their
+	 * reserved bandwidth available.
+	 */
+	VERIFY(xep->xep_type == USB_EP_ATTR_INTR ||
+	    xep->xep_type == USB_EP_ATTR_ISOCH);
+
+	/*
+	 * Drop the endpoint we are unconfiguring.  We make sure to always set
+	 * the slot as having changed in the context field as the specification
+	 * suggests we should and some hardware requires it.
+	 */
+	mutex_enter(&xd->xd_imtx);
+	xd->xd_input->xic_drop_flags =
+	    LE_32(XHCI_INCTX_MASK_DCI(xep->xep_num + 1));
+	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(0));
+	ret = xhci_input_context_sync(xhcip, xd, xep);
+
+	mutex_exit(&xhcip->xhci_lock);
+
+	if (ret != 0) {
+		ret = USB_HC_HARDWARE_ERROR;
+		goto done;
+	}
+
+	ret = xhci_command_configure_endpoint(xhcip, xd);
+
+done:
+	mutex_exit(&xd->xd_imtx);
+	mutex_enter(&xhcip->xhci_lock);
+	return (ret);
+}
+
+/*
  * The assumption is that someone calling this owns this endpoint / device and
- * that it's in a state where it's safe to zero out that information.
+ * that it's in a state where it's safe to zero out that information.  In
+ * particular, if the endpoint has ever been initialised and was thus marked
+ * open, xhci_endpoint_close() must have been called before this routine.
  */
 void
 xhci_endpoint_fini(xhci_device_t *xd, int endpoint)
@@ -102,9 +181,14 @@ xhci_endpoint_fini(xhci_device_t *xd, int endpoint)
 	xhci_endpoint_t *xep = xd->xd_endpoints[endpoint];
 
 	VERIFY(xep != NULL);
+	VERIFY3P(xep->xep_pipe, ==, NULL);
 	xd->xd_endpoints[endpoint] = NULL;
 
 	if (endpoint != XHCI_DEFAULT_ENDPOINT) {
+		/*
+		 * Make sure xhci_endpoint_close() was called before we get
+		 * here:
+		 */
 		VERIFY(!(xep->xep_state & XHCI_ENDPOINT_OPEN));
 	}
 
@@ -177,17 +261,7 @@ xhci_endpoint_setup_default_context(xhci_t *xhcip, xhci_device_t *xd,
 	ectx->xec_txinfo = LE_32(XHCI_EPCTX_MAX_ESIT_PAYLOAD(0) |
 	    XHCI_EPCTX_AVG_TRB_LEN(XHCI_CONTEXT_DEF_CTRL_ATL));
 
-	XHCI_DMA_SYNC(xd->xd_ictx, DDI_DMA_SYNC_FORDEV);
-	if (xhci_check_dma_handle(xhcip, &xd->xd_ictx) != DDI_FM_OK) {
-		xhci_error(xhcip, "failed to initialize default device input "
-		    "context on slot %d and port %d for endpoint %u:  "
-		    "encountered fatal FM error synchronizing input context "
-		    "DMA memory", xd->xd_slot, xd->xd_port, xep->xep_num);
-		xhci_fm_runtime_reset(xhcip);
-		return (EIO);
-	}
-
-	return (0);
+	return (xhci_input_context_sync(xhcip, xd, xep));
 }
 
 /*
@@ -223,9 +297,15 @@ xhci_endpoint_update_default(xhci_t *xhcip, xhci_device_t *xd,
 	xd->xd_input->xic_drop_flags = LE_32(0);
 	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(1));
 
-	ret = xhci_command_evaluate_context(xhcip, xd);
-	mutex_exit(&xd->xd_imtx);
+	if (xhci_input_context_sync(xhcip, xd, xep) != 0) {
+		ret = USB_HC_HARDWARE_ERROR;
+		goto done;
+	}
 
+	ret = xhci_command_evaluate_context(xhcip, xd);
+
+done:
+	mutex_exit(&xd->xd_imtx);
 	return (ret);
 }
 
@@ -474,6 +554,7 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 	xhci_endpoint_params_t new_xepp;
 	xhci_endpoint_context_t *ectx;
 	uint64_t deq;
+	int ret;
 
 	/*
 	 * Explicitly zero this entire struct to start so that we can compare
@@ -611,14 +692,8 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 	    XHCI_EPCTX_MAX_ESIT_PAYLOAD(new_xepp.xepp_max_esit) |
 	    XHCI_EPCTX_AVG_TRB_LEN(new_xepp.xepp_avgtrb));
 
-	XHCI_DMA_SYNC(xd->xd_ictx, DDI_DMA_SYNC_FORDEV);
-	if (xhci_check_dma_handle(xhcip, &xd->xd_ictx) != DDI_FM_OK) {
-		xhci_error(xhcip, "failed to initialize device input "
-		    "context on slot %d and port %d for endpoint %u:  "
-		    "encountered fatal FM error synchronizing input context "
-		    "DMA memory", xd->xd_slot, xd->xd_port, xep->xep_num);
-		xhci_fm_runtime_reset(xhcip);
-		return (EIO);
+	if ((ret = xhci_input_context_sync(xhcip, xd, xep)) != 0) {
+		return (ret);
 	}
 
 	bcopy(&new_xepp, &xep->xep_params, sizeof (new_xepp));
@@ -698,8 +773,15 @@ xhci_endpoint_init(xhci_t *xhcip, xhci_device_t *xd,
 	return (0);
 }
 
+/*
+ * Mark as open an endpoint that has previously been closed with
+ * xhci_endpoint_close(), but was left otherwise configured with the
+ * controller.  This step ensures that we are attempting to open the endpoint
+ * with parameters that are compatible with the last time it was opened, and
+ * marks the endpoint as eligible for periodic routines.
+ */
 int
-xhci_endpoint_reinit(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
+xhci_endpoint_reopen(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
     usba_pipe_handle_data_t *ph)
 {
 	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));

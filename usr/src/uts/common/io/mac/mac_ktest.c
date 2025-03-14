@@ -639,7 +639,6 @@ typedef struct meoi_test_params {
 	mac_ether_offload_info_t	mtp_partial;
 	mac_ether_offload_info_t	mtp_results;
 	uint_t				mtp_offset;
-	boolean_t			mtp_is_err;
 } meoi_test_params_t;
 
 static void
@@ -735,7 +734,6 @@ alloc_split_pkt(ktest_ctx_hdl_t *ctx, nvlist_t *nvl, const char *pkt_field)
  * - results (nvlist): mac_ether_offload_info result struct to compare
  *   - Field names and types should match those in the mac_ether_offload_info
  *     struct. Any fields not specified will be assumed to be zero.
- * - is_err (boolean): if test function should return error
  *
  * For mac_partial_offload_info tests, two additional fields are parsed:
  *
@@ -787,7 +785,6 @@ meoi_test_parse_input(ktest_ctx_hdl_t *ctx, meoi_test_params_t *mtp,
 	}
 
 	nvlist_to_meoi(results, &mtp->mtp_results);
-	mtp->mtp_is_err = nvlist_lookup_boolean(results, "is_err") == 0;
 
 	nvlist_free(params);
 	return (B_TRUE);
@@ -803,10 +800,8 @@ mac_ether_offload_info_test(ktest_ctx_hdl_t *ctx)
 	}
 
 	mac_ether_offload_info_t result;
-	const boolean_t is_err =
-	    mac_ether_offload_info(mtp.mtp_mp, &result) != 0;
+	mac_ether_offload_info(mtp.mtp_mp, &result);
 
-	KT_ASSERTG(is_err == mtp.mtp_is_err, ctx, done);
 	const mac_ether_offload_info_t *expect = &mtp.mtp_results;
 	KT_ASSERT3UG(result.meoi_flags, ==, expect->meoi_flags, ctx, done);
 	KT_ASSERT3UG(result.meoi_l2hlen, ==, expect->meoi_l2hlen, ctx, done);
@@ -831,10 +826,8 @@ mac_partial_offload_info_test(ktest_ctx_hdl_t *ctx)
 	}
 
 	mac_ether_offload_info_t *result = &mtp.mtp_partial;
-	const boolean_t is_err =
-	    mac_partial_offload_info(mtp.mtp_mp, mtp.mtp_offset, result) != 0;
+	mac_partial_offload_info(mtp.mtp_mp, mtp.mtp_offset, result);
 
-	KT_ASSERTG(is_err == mtp.mtp_is_err, ctx, done);
 	const mac_ether_offload_info_t *expect = &mtp.mtp_results;
 	KT_ASSERT3UG(result->meoi_flags, ==, expect->meoi_flags, ctx, done);
 	KT_ASSERT3UG(result->meoi_l2hlen, ==, expect->meoi_l2hlen, ctx, done);
@@ -925,7 +918,7 @@ mac_ether_l2_info_test(ktest_ctx_hdl_t *ctx)
 	uint8_t dstaddr[ETHERADDRL];
 	uint32_t vlan_tci = 0;
 	const boolean_t is_err =
-	    mac_ether_l2_info(etp.etp_mp, dstaddr, &vlan_tci) != 0;
+	    !mac_ether_l2_info(etp.etp_mp, dstaddr, &vlan_tci);
 
 	KT_ASSERTG(is_err == etp.etp_is_err, ctx, done);
 	KT_ASSERTG(bcmp(dstaddr, etp.etp_dstaddr, ETHERADDRL) == 0, ctx,

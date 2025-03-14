@@ -2171,18 +2171,21 @@ mac_mmc_parse_l4(mac_mblk_cursor_t *cursor, uint8_t ipproto, uint8_t *hdr_sizep)
  *
  * If packet ethertype does not indicate that a VLAN is present,
  * MEOI_VLAN_TCI_INVALID will be returned for the TCI.
+ *
+ * Returns B_TRUE if header could be parsed for destination MAC address and VLAN
+ * TCI, otherwise B_FALSE.
  */
-int
+boolean_t
 mac_ether_l2_info(mblk_t *mp, uint8_t *dst_addrp, uint32_t *vlan_tcip)
 {
 	mac_mblk_cursor_t cursor;
 
 	mac_mmc_init(&cursor, mp);
 	if (!mac_mmc_parse_ether(&cursor, dst_addrp, vlan_tcip, NULL, NULL)) {
-		return (-1);
+		return (B_FALSE);
 	}
 
-	return (0);
+	return (B_TRUE);
 }
 
 /*
@@ -2202,11 +2205,9 @@ mac_ether_l2_info(mblk_t *mp, uint8_t *dst_addrp, uint32_t *vlan_tcip)
  * Alternatively, this could be used to parse the headers in an encapsulated
  * Ethernet packet by simply specifying the start of its header in `off`.
  *
- * Returns 0 if parsing was able to proceed all the way through the L4 header.
- * The meoi_flags field will be updated regardless for any partial (L2/L3)
- * parsing which was successful.
+ * The degree to which parsing was able to proceed is stored in `meoi_flags`.
  */
-int
+void
 mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 {
 	mac_mblk_cursor_t cursor;
@@ -2214,7 +2215,7 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	mac_mmc_init(&cursor, mp);
 
 	if (!mac_mmc_seek(&cursor, off)) {
-		return (-1);
+		return;
 	}
 
 	if ((meoi->meoi_flags & MEOI_L2INFO_SET) == 0) {
@@ -2222,7 +2223,7 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 		uint16_t l2_sz, ethertype;
 		if (!mac_mmc_parse_ether(&cursor, NULL, &vlan_tci, &ethertype,
 		    &l2_sz)) {
-			return (-1);
+			return;
 		}
 
 		meoi->meoi_flags |= MEOI_L2INFO_SET;
@@ -2237,7 +2238,7 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	const size_t l2_end = off + (size_t)meoi->meoi_l2hlen;
 	if (!mac_mmc_seek(&cursor, l2_end)) {
 		meoi->meoi_flags &= ~MEOI_L2INFO_SET;
-		return (-1);
+		return;
 	}
 
 	if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0) {
@@ -2246,7 +2247,7 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 		bool is_frag;
 		if (!mac_mmc_parse_l3(&cursor, meoi->meoi_l3proto, &ipproto,
 		    &is_frag, &l3_sz)) {
-			return (-1);
+			return;
 		}
 
 		meoi->meoi_l3hlen = l3_sz;
@@ -2259,13 +2260,13 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	const size_t l3_end = l2_end + (size_t)meoi->meoi_l3hlen;
 	if (!mac_mmc_seek(&cursor, l3_end)) {
 		meoi->meoi_flags &= ~MEOI_L3INFO_SET;
-		return (-1);
+		return;
 	}
 
 	if ((meoi->meoi_flags & MEOI_L4INFO_SET) == 0) {
 		uint8_t l4_sz;
 		if (!mac_mmc_parse_l4(&cursor, meoi->meoi_l4proto, &l4_sz)) {
-			return (-1);
+			return;
 		}
 
 		meoi->meoi_l4hlen = l4_sz;
@@ -2274,10 +2275,7 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	const size_t l4_end = l3_end + (size_t)meoi->meoi_l4hlen;
 	if (!mac_mmc_seek(&cursor, l4_end)) {
 		meoi->meoi_flags &= ~MEOI_L4INFO_SET;
-		return (-1);
 	}
-
-	return (0);
 }
 
 /*
@@ -2300,16 +2298,12 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
  *
  * - MEOI_VLAN_TAGGED: Ethernet header is tagged with a VLAN
  * - MEOI_L3_FRAGMENT: L3 header indicated fragmentation
- *
- * When parsing is able to complete through the end of the L4 header, a value of
- * 0 is returned.  Otherwise a non-0 value is returned, although any partial
- * results will be set in meoi as described above.
  */
-int
+void
 mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
 {
 	bzero(meoi, sizeof (mac_ether_offload_info_t));
 	meoi->meoi_len = msgdsize(mp);
 
-	return (mac_partial_offload_info(mp, 0, meoi));
+	mac_partial_offload_info(mp, 0, meoi);
 }

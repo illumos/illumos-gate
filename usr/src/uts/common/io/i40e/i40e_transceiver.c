@@ -2740,10 +2740,9 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 
 	/*
 	 * Parse packet headers for use by any requested offloads.  That offload
-	 * logic will later determine if the results here were adequate, so do
-	 * not fret in the face of failure to parse through L4.
+	 * logic will later determine if the results here were adequate.
 	 */
-	(void) mac_ether_offload_info(mp, &meo);
+	mac_ether_offload_info(mp, &meo);
 
 	/*
 	 * Figure out the relevant context about this frame that we might need
