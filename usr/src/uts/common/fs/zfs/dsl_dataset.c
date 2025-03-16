@@ -742,7 +742,7 @@ dsl_dataset_hold_flags(dsl_pool_t *dp, const char *name, ds_hold_flags_t flags,
 			return (SET_ERROR(ENOENT));
 		}
 
-		dprintf("looking for snapshot '%s'\n", snapname);
+		dprintf_zfs("looking for snapshot '%s'\n", snapname);
 		err = dsl_dataset_snap_lookup(ds, snapname, &obj);
 		if (err == 0) {
 			err = dsl_dataset_hold_obj_flags(dp, obj, flags, tag,

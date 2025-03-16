@@ -66,11 +66,11 @@ extern boolean_t zfs_free_leak_on_eio;
 #ifdef ZFS_DEBUG
 extern void __dprintf(const char *file, const char *func,
     int line, const char *fmt, ...);
-#define	dprintf(...) \
+#define	dprintf_zfs(...) \
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) \
 		__dprintf(__FILE__, __func__, __LINE__, __VA_ARGS__)
 #else
-#define	dprintf(...) ((void)0)
+#define	dprintf_zfs(...) ((void)0)
 #endif /* ZFS_DEBUG */
 
 extern void zfs_panic_recover(const char *fmt, ...);

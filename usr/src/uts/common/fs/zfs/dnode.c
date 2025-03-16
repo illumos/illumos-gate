@@ -587,7 +587,7 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 
 	ibs = MIN(MAX(ibs, DN_MIN_INDBLKSHIFT), DN_MAX_INDBLKSHIFT);
 
-	dprintf("os=%p obj=%" PRIu64 " txg=%" PRIu64
+	dprintf_zfs("os=%p obj=%" PRIu64 " txg=%" PRIu64
 	    " blocksize=%d ibs=%d dn_slots=%d\n",
 	    dn->dn_objset, dn->dn_object, tx->tx_txg, blocksize, ibs, dn_slots);
 	DNODE_STAT_BUMP(dnode_allocate);
@@ -2325,7 +2325,7 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 	boolean_t hole;
 	int i, inc, error, span;
 
-	dprintf("probing object %llu offset %llx level %d of %u\n",
+	dprintf_zfs("probing object %llu offset %llx level %d of %u\n",
 	    dn->dn_object, *offset, lvl, dn->dn_phys->dn_nlevels);
 
 	ASSERT(RW_LOCK_HELD(&dn->dn_struct_rwlock));

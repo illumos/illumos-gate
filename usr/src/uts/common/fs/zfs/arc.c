@@ -1105,7 +1105,7 @@ buf_dest(void *vbuf, void *unused)
 static void
 hdr_recl(void *unused)
 {
-	dprintf("hdr_recl called\n");
+	dprintf_zfs("hdr_recl called\n");
 	/*
 	 * umem calls the reclaim func when we destroy the buf cache,
 	 * which is after we do arc_fini().
@@ -6864,7 +6864,7 @@ arc_tempreserve_space(spa_t *spa, uint64_t reserve, uint64_t txg)
 		    &arc_anon->arcs_esize[ARC_BUFC_METADATA]);
 		uint64_t data_esize =
 		    zfs_refcount_count(&arc_anon->arcs_esize[ARC_BUFC_DATA]);
-		dprintf("failing, arc_tempreserve=%lluK anon_meta=%lluK "
+		dprintf_zfs("failing, arc_tempreserve=%lluK anon_meta=%lluK "
 		    "anon_data=%lluK tempreserve=%lluK arc_c=%lluK\n",
 		    arc_tempreserve >> 10, meta_esize >> 10,
 		    data_esize >> 10, reserve >> 10, arc_c >> 10);

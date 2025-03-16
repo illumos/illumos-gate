@@ -1075,7 +1075,7 @@ extern void zfs_post_dle_sysevent(const char *);
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) {			\
 	char *__blkbuf = kmem_alloc(BP_SPRINTF_LEN, KM_SLEEP);	\
 	snprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, (bp));	\
-	dprintf(fmt " %s\n", __VA_ARGS__, __blkbuf);		\
+	dprintf_zfs(fmt " %s\n", __VA_ARGS__, __blkbuf);	\
 	kmem_free(__blkbuf, BP_SPRINTF_LEN);			\
 	} \
 _NOTE(CONSTCOND) } while (0)

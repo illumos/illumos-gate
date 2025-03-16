@@ -1251,7 +1251,8 @@ dsl_scan_should_clear(dsl_scan_t *scn)
 		mutex_exit(&tvd->vdev_scan_io_queue_lock);
 	}
 
-	dprintf("current scan memory usage: %llu bytes\n", (longlong_t)mused);
+	dprintf_zfs("current scan memory usage: %llu bytes\n",
+	    (longlong_t)mused);
 
 	if (mused == 0)
 		ASSERT0(scn->scn_bytes_pending);
@@ -1315,7 +1316,8 @@ dsl_scan_check_suspend(dsl_scan_t *scn, const zbookmark_phys_t *zb)
 	    spa_shutting_down(scn->scn_dp->dp_spa) ||
 	    (zfs_scan_strict_mem_lim && dsl_scan_should_clear(scn))) {
 		if (zb) {
-			dprintf("suspending at bookmark %llx/%llx/%llx/%llx\n",
+			dprintf_zfs("suspending at bookmark "
+			    "%llx/%llx/%llx/%llx\n",
 			    (longlong_t)zb->zb_objset,
 			    (longlong_t)zb->zb_object,
 			    (longlong_t)zb->zb_level,
@@ -1324,7 +1326,7 @@ dsl_scan_check_suspend(dsl_scan_t *scn, const zbookmark_phys_t *zb)
 		} else {
 			dsl_scan_phys_t *scnp = &scn->scn_phys;
 
-			dprintf("suspending at DDT bookmark "
+			dprintf_zfs("suspending at DDT bookmark "
 			    "%llx/%llx/%llx/%llx\n",
 			    (longlong_t)scnp->scn_ddt_bookmark.ddb_class,
 			    (longlong_t)scnp->scn_ddt_bookmark.ddb_type,
@@ -1735,7 +1737,7 @@ dsl_scan_check_resume(dsl_scan_t *scn, const dnode_phys_t *dnp,
 		 */
 		if (bcmp(zb, &scn->scn_phys.scn_bookmark, sizeof (*zb)) == 0 ||
 		    zb->zb_object > scn->scn_phys.scn_bookmark.zb_object) {
-			dprintf("resuming at %llx/%llx/%llx/%llx\n",
+			dprintf_zfs("resuming at %llx/%llx/%llx/%llx\n",
 			    (longlong_t)zb->zb_objset,
 			    (longlong_t)zb->zb_object,
 			    (longlong_t)zb->zb_level,
@@ -2532,7 +2534,7 @@ dsl_scan_ddt(dsl_scan_t *scn, dmu_tx_t *tx)
 
 		if (ddb->ddb_class > scn->scn_phys.scn_ddt_class_max)
 			break;
-		dprintf("visiting ddb=%llu/%llu/%llu/%llx\n",
+		dprintf_zfs("visiting ddb=%llu/%llu/%llu/%llx\n",
 		    (longlong_t)ddb->ddb_class,
 		    (longlong_t)ddb->ddb_type,
 		    (longlong_t)ddb->ddb_checksum,

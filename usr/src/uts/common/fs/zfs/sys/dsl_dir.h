@@ -197,7 +197,7 @@ boolean_t dsl_dir_is_zapified(dsl_dir_t *dd);
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
 	char *__ds_name = kmem_alloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP); \
 	dsl_dir_name(dd, __ds_name); \
-	dprintf("dd=%s " fmt, __ds_name, __VA_ARGS__); \
+	dprintf_zfs("dd=%s " fmt, __ds_name, __VA_ARGS__); \
 	kmem_free(__ds_name, ZFS_MAX_DATASET_NAME_LEN); \
 	} \
 _NOTE(CONSTCOND) } while (0)

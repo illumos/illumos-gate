@@ -616,8 +616,8 @@ dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 
 			/* XXX txh_arg2 better not be zero... */
 
-			dprintf("found txh type %x beginblk=%llx endblk=%llx\n",
-			    txh->txh_type, beginblk, endblk);
+			dprintf_zfs("found txh type %x beginblk=%llx "
+			    "endblk=%llx\n", txh->txh_type, beginblk, endblk);
 
 			switch (txh->txh_type) {
 			case THT_WRITE:
