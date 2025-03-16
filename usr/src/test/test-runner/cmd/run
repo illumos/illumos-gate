@@ -217,7 +217,7 @@ User: %s
         """
         me = getpwuid(os.getuid())
 
-        if not user or user == me:
+        if not user or user == me.pw_name:
             return cmd
 
         ret = '%s -E -u %s %s' % (SUDO, user, cmd)
