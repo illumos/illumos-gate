@@ -1227,24 +1227,42 @@ nvme_ctrl_mark_dead(nvme_t *nvme, boolean_t removed)
 	 */
 	was_dead = atomic_cas_32((volatile uint32_t *)&nvme->n_dead, B_FALSE,
 	    B_TRUE);
+
+	/*
+	 * If we were removed, note this in our death status, regardless of
+	 * whether or not we were already dead.  We need to know this so that we
+	 * can decide if it is safe to try and interact the the device in e.g.
+	 * reset and shutdown.
+	 */
+	if (removed) {
+		nvme->n_dead_status = NVME_IOCTL_E_CTRL_GONE;
+	}
+
 	if (was_dead) {
 		return;
 	}
 
 	/*
 	 * If this was removed, there is no reason to change the service impact.
-	 * However, then we need to change our default return code that we use
-	 * here to indicate that it was gone versus that it is dead.
+	 * Otherwise, we need to change our default return code to indicate that
+	 * the device is truly dead, and not simply gone.
 	 */
-	if (removed) {
-		nvme->n_dead_status = NVME_IOCTL_E_CTRL_GONE;
-	} else {
+	if (!removed) {
 		ASSERT3U(nvme->n_dead_status, ==, NVME_IOCTL_E_CTRL_DEAD);
 		ddi_fm_service_impact(nvme->n_dip, DDI_SERVICE_LOST);
 	}
 
 	taskq_dispatch_ent(nvme_dead_taskq, nvme_rwlock_ctrl_dead, nvme,
 	    TQ_NOSLEEP, &nvme->n_dead_tqent);
+}
+
+static boolean_t
+nvme_ctrl_is_gone(const nvme_t *nvme)
+{
+	if (nvme->n_dead && nvme->n_dead_status == NVME_IOCTL_E_CTRL_GONE)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 static boolean_t
@@ -3414,6 +3432,14 @@ nvme_reset(nvme_t *nvme, boolean_t quiesce)
 	nvme_reg_csts_t csts;
 	int i;
 
+	/*
+	 * If the device is gone, do not try to interact with it.  We define
+	 * that resetting such a device is impossible, and always fails.
+	 */
+	if (nvme_ctrl_is_gone(nvme)) {
+		return (B_FALSE);
+	}
+
 	nvme_put32(nvme, NVME_REG_CC, 0);
 
 	csts.r = nvme_get32(nvme, NVME_REG_CSTS);
@@ -3461,6 +3487,14 @@ nvme_shutdown(nvme_t *nvme, boolean_t quiesce)
 	nvme_reg_cc_t cc;
 	nvme_reg_csts_t csts;
 	int i;
+
+	/*
+	 * Do not try to interact with the device if it is gone.  Since it is
+	 * not there, in some sense it must already be shut down anyway.
+	 */
+	if (nvme_ctrl_is_gone(nvme)) {
+		return;
+	}
 
 	cc.r = nvme_get32(nvme, NVME_REG_CC);
 	cc.b.cc_shn = NVME_CC_SHN_NORMAL;
