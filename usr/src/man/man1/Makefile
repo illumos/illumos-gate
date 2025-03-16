@@ -131,7 +131,6 @@ MANFILES=	acctcom.1			\
 		exstr.1				\
 		factor.1			\
 		fdformat.1			\
-		file.1				\
 		filesync.1			\
 		find.1				\
 		finger.1			\
@@ -448,6 +447,7 @@ MANLINKS=	batch.1		\
 		fc.1		\
 		fg.1		\
 		fgrep.1		\
+		file.1		\
 		for.1		\
 		foreach.1	\
 		function.1	\
@@ -725,6 +725,8 @@ whence.1	:= LINKSRC = typeset.1
 # Links to usr/has/man
 
 edit.1		:= LINKSRC = ../../../has/man/man1has/edit.1has
+
+file.1		:= LINKSRC = ../../../has/man/man1has/file.1has
 
 vedit.1		:= LINKSRC = ../../../has/man/man1has/vi.1has
 

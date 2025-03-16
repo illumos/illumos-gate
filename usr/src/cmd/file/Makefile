@@ -96,7 +96,12 @@ $(POFILE):	$(POFILES)
 	$(RM) $@
 	cat $(POFILES) > $@
 
-install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTETCMAGIC)
+$(ROOTPROG) := INSLINKTARGET=../has/bin/$(PROG)
+
+$(ROOTPROG):
+	$(INS.symlink)
+
+install: all $(ROOTPROG) $(ROOTHASBINPROG) $(ROOTXPG4PROG) $(ROOTETCMAGIC)
 
 clean:
 	$(RM) $(OBJS) $(XPG4OBJS)

@@ -22,6 +22,7 @@ MANFILES=			\
 		csh.1has	\
 		ctags.1has	\
 		edit.1has	\
+		file.1has	\
 		ex.1has		\
 		sh.1has		\
 		vi.1has

@@ -1,6 +1,4 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -158,7 +156,7 @@ $command_name = basename($0);
 
 $cmd_dump	= '/usr/ccs/bin/dump';
 $cmd_elfdump	= '/usr/ccs/bin/elfdump';
-$cmd_file	= '/usr/bin/file';
+$cmd_file	= '/usr/has/bin/file';
 $cmd_find	= '/usr/bin/find';
 $cmd_ldd	= '/usr/bin/ldd';
 $cmd_ls		= '/usr/bin/ls';
@@ -293,7 +291,7 @@ sub next_dir_name
 }
 
 #
-# When appcert started up, it stored the /usr/bin/file output in the
+# When appcert started up, it stored the file(1) output in the
 # app's output directory (appcert: record_binary()). This subroutine
 # retrieves it.  If it cannot find it, it runs the file command
 # instead.  The result is stored in memory in %cmd_output_file_cache
@@ -325,7 +323,7 @@ sub cmd_output_file
 		}
 	}
 
-	# Otherwise run /usr/bin/file on it:
+	# Otherwise run file(1) on it:
 	if (! defined($str) && -f $filename && $filename !~ /'/) {
 		c_locale(1);
 		$str = `$cmd_file '$filename' 2>/dev/null`;
@@ -577,9 +575,9 @@ sub c_locale
 
 	#
 	# example usage:
-	# 	c_locale(1);
-	# 	$output = `some_cmd some_args 2>/dev/null`;
-	# 	c_locale(0);
+	#	c_locale(1);
+	#	$output = `some_cmd some_args 2>/dev/null`;
+	#	c_locale(0);
 	#
 
 	if ($action) {
@@ -1097,7 +1095,7 @@ sub is_elf
 # Returns 0 if it is not.
 #
 # Routine uses the dump -Lv output to determine this.  Failing that, it
-# examines  the /usr/bin/file output.
+# examines  the file(1) output.
 #
 sub is_shared_object
 {
@@ -1242,7 +1240,7 @@ sub bin_type
 		return ($abi, $type, $wordsize, $endian);
 	}
 
-	# Otherwise, process /usr/bin/file output:
+	# Otherwise, process file(1) output:
 	my $file_output;
 	$file_output = cmd_output_file($filename);
 
@@ -1536,7 +1534,7 @@ sub load_model_index
 		#
 		# record the device/inode too, used to avoid confusion due
 		# to symlinks between *directories* instead of files. E.g.:
-		# 	/usr/lib/64 -> /usr/lib/sparcv9
+		#	/usr/lib/64 -> /usr/lib/sparcv9
 		# under some crle(1) configurations this can be
 		# particularly problematic.
 		#
