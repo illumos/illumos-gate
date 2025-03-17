@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -514,14 +515,33 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+kt_stack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   include frame pointer information (this is the default "
+	    "with %<b>$C%</b>)\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
+}
+
 static const mdb_dcmd_t kt_dcmds[] = {
-	{ "$c", "?[cnt]", "print stack backtrace", kt_stack },
-	{ "$C", "?[cnt]", "print stack backtrace", kt_stackv },
+	{ "$c", "?[-stv] [cnt]", "print stack backtrace", kt_stack,
+	    kt_stack_help },
+	{ "$C", "?[-stv] [cnt]", "print stack backtrace", kt_stackv,
+	    kt_stack_help },
 	{ "$r", NULL, "print general-purpose registers", kt_regs },
 	{ "$?", NULL, "print status and registers", kt_regs },
 	{ "regs", NULL, "print general-purpose registers", kt_regs },
-	{ "stack", "?[cnt]", "print stack backtrace", kt_stack },
-	{ "stackregs", "?", "print stack backtrace and registers", kt_stackr },
+	{ "stack", "?[-stv] [cnt]", "print stack backtrace", kt_stack,
+	    kt_stack_help },
+	{ "stackregs", "?[-stv] [cnt]", "print stack backtrace and registers",
+	    kt_stackr, kt_stack_help },
 #ifdef __x86
 	{ "cpustack", "?[-v] [-c cpuid] [cnt]", "print stack backtrace for a "
 	    "specific CPU", kt_cpustack },

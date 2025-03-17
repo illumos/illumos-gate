@@ -27,6 +27,7 @@
  * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -39,6 +40,7 @@
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_stack.h>
 #include <mdb/mdb_isautil.h>
 #include <mdb/mdb_amd64util.h>
 #include <mdb/mdb_ctf.h>
@@ -500,45 +502,14 @@ mdb_amd64_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 	return (0);
 }
 
-/*ARGSUSED*/
 int
-mdb_amd64_kvm_frame(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
+mdb_amd64_kvm_frame(void *argp, uintptr_t pc, uint_t argc, const long *argv,
     const mdb_tgt_gregset_t *gregs)
 {
-	argc = MIN(argc, (uintptr_t)arglim);
-	mdb_printf("%a(", pc);
+	mdb_stack_frame_hdl_t *hdl = argp;
+	uint64_t bp;
 
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
-
-	mdb_printf(")\n");
-	return (0);
-}
-
-int
-mdb_amd64_kvm_framev(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
-    const mdb_tgt_gregset_t *gregs)
-{
-	/*
-	 * Historically adb limited stack trace argument display to a fixed-
-	 * size number of arguments since no symbolic debugging info existed.
-	 * On amd64 we can detect the true number of saved arguments so only
-	 * respect an arglim of zero; otherwise display the entire argv[].
-	 */
-	if (arglim == 0)
-		argc = 0;
-
-	mdb_printf("%0?lr %a(", gregs->kregs[KREG_RBP], pc);
-
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
-
-	mdb_printf(")\n");
+	bp = gregs->kregs[KREG_RBP];
+	mdb_stack_frame(hdl, pc, bp, argc, argv);
 	return (0);
 }

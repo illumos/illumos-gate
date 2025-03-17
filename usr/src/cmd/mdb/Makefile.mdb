@@ -28,6 +28,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2021 Joyent, Inc.
 # Copyright 2018 Jason King
+# Copyright 2025 Oxide Computer Company
 #
 
 .KEEP_STATE:
@@ -80,6 +81,7 @@ SRCS += \
 	mdb_set.c \
 	mdb_shell.c \
 	mdb_signal.c \
+	mdb_stack.c \
 	mdb_stdlib.c \
 	mdb_string.c \
 	mdb_strio.c \

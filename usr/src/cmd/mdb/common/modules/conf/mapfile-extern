@@ -161,6 +161,10 @@ SYMBOL_SCOPE {
 		mdb_set_pipe			{ FLAGS = EXTERN };
 		mdb_snprintf			{ FLAGS = EXTERN };
 		mdb_strtoull			{ FLAGS = EXTERN };
+		mdb_stack_frame			{ FLAGS = EXTERN };
+		mdb_stack_frame_arglim		{ FLAGS = EXTERN };
+		mdb_stack_frame_flags_set	{ FLAGS = EXTERN };
+		mdb_stack_frame_init		{ FLAGS = EXTERN };
 		mdb_symbol_iter			{ FLAGS = EXTERN };
 		mdb_tgt_notsup			{ FLAGS = EXTERN };
 		mdb_thread_name			{ FLAGS = EXTERN };

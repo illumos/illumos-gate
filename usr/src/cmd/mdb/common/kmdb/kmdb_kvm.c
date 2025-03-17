@@ -23,7 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  *
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -610,9 +610,26 @@ kmt_switch(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+kmt_stack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   include frame pointer information (this is the default "
+	    "for %<b>$C%</b>)\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
+}
+
 static const mdb_dcmd_t kmt_dcmds[] = {
-	{ "$c", "?[cnt]", "print stack backtrace", kmt_stack },
-	{ "$C", "?[cnt]", "print stack backtrace", kmt_stackv },
+	{ "$c", "?[-stv] [cnt]", "print stack backtrace", kmt_stack,
+	    kmt_stack_help },
+	{ "$C", "?[-stv] [cnt]", "print stack backtrace", kmt_stackv,
+	    kmt_stack_help },
 	{ "$r", NULL, "print general-purpose registers", kmt_regs },
 	{ "$?", NULL, "print status and registers", kmt_regs },
 	{ ":x", ":", "change the active CPU", kmt_switch },
@@ -628,14 +645,16 @@ static const mdb_dcmd_t kmt_dcmds[] = {
 	{ "rdmsr", ":", "read an MSR", kmt_rdmsr },
 	{ "wrmsr", ": val", "write an MSR", kmt_wrmsr },
 	{ "rdpcicfg", ": bus dev func", "read a register in PCI config space",
-	kmt_rdpcicfg },
-	{ "wrpcicfg", ": bus dev func val", "write a register in PCI config "
-	"space", kmt_wrpcicfg },
+	    kmt_rdpcicfg },
+	{ "wrpcicfg", ": bus dev func val",
+	    "write a register in PCI config space", kmt_wrpcicfg },
 #endif
 	{ "noducttape", NULL, NULL, kmt_noducttape },
 	{ "regs", NULL, "print general-purpose registers", kmt_regs },
-	{ "stack", "?[cnt]", "print stack backtrace", kmt_stack },
-	{ "stackregs", "?", "print stack backtrace and registers", kmt_stackr },
+	{ "stack", "?[-stv] [cnt]", "print stack backtrace", kmt_stack,
+	    kmt_stack_help },
+	{ "stackregs", "?[-stv] [cnt]", "print stack backtrace and registers",
+	    kmt_stackr, kmt_stack_help },
 	{ "status", NULL, "print summary of current target", kmt_status_dcmd },
 	{ "switch", ":", "change the active CPU", kmt_switch },
 	{ NULL }

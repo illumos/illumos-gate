@@ -4127,10 +4127,24 @@ time_help(void)
 	    "if called from, kmdb(1); the core dump's high resolution \n"
 	    "time if inspecting one; or the running hires time if we're \n"
 	    "looking at a live system.\n\n"
-	    "Switches:\n"
+	    "Options:\n"
 	    "  -d   report times in decimal\n"
 	    "  -l   prints the number of clock ticks since system boot\n"
 	    "  -x   report times in hexadecimal\n");
+}
+
+static void
+findstack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   show function arguments\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
 }
 
 extern int cmd_refstr(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -4253,7 +4267,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    devinfo_fmce},
 
 	/* from findstack.c */
-	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
+	{ "findstack", ":[-stv]", "find kernel thread stack", findstack,
+		findstack_help },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
 		findstack_debug },
 	{ "stacks", "?[-afiv] [-c func] [-C func] [-m module] [-M module] "

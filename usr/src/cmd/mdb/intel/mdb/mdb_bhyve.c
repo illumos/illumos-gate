@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -58,6 +58,7 @@
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_signal.h>
+#include <mdb/mdb_stack.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_io_impl.h>
 #include <mdb/mdb_kreg_impl.h>
@@ -350,13 +351,16 @@ bhyve_regs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 static int
 bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
-    const mdb_arg_t *argv, int vcpu, boolean_t verbose)
+    const mdb_arg_t *argv, int vcpu, mdb_stack_frame_flags_t sflags)
 {
 	bhyve_data_t *bd = mdb.m_target->t_data;
-	void *arg = (void *)(uintptr_t)mdb.m_nargs;
+	mdb_stack_frame_hdl_t *hdl;
+	mdb_tgt_t *t = mdb.m_target;
+	uint_t arglim = mdb.m_nargs;
+	int ret = DCMD_OK;
+	int i;
 
 	mdb_tgt_gregset_t gregs;
-	mdb_tgt_stack_f *func;
 
 	if (vcpu == -1)
 		vcpu = bd->bd_curcpu;
@@ -367,25 +371,37 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 	} else if (bhyve_get_gregset(bd, vcpu, &gregs) != 0)
 		return (DCMD_ERR);
 
-	switch (vmm_vcpu_isa(bd->bd_vmm, vcpu)) {
-	case VMM_ISA_64:
-		func = verbose ? mdb_amd64_kvm_framev : mdb_amd64_kvm_frame;
-		(void) mdb_amd64_kvm_stack_iter(mdb.m_target, &gregs, func,
-		    arg);
-		break;
-	case VMM_ISA_32:
-		func = verbose ? mdb_ia32_kvm_framev : mdb_amd64_kvm_frame;
-		(void) mdb_ia32_kvm_stack_iter(mdb.m_target, &gregs, func, arg);
-		break;
-	case VMM_ISA_16:
-		mdb_warn("IA16 stack tracing not implemented\n");
-		return (DCMD_ERR);
-	default:
-		mdb_warn("CPU %d mode unknown", vcpu);
+	i = mdb_getopts(argc, argv,
+	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
+	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
+	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if ((hdl = mdb_stack_frame_init(t, arglim, sflags)) == NULL) {
+		mdb_warn("failed to init stack frame\n");
 		return (DCMD_ERR);
 	}
 
-	return (DCMD_OK);
+	switch (vmm_vcpu_isa(bd->bd_vmm, vcpu)) {
+	case VMM_ISA_32:
+	case VMM_ISA_64:
+		(void) mdb_isa_kvm_stack_iter(mdb.m_target, &gregs,
+		    mdb_isa_kvm_frame, (void *)hdl);
+		break;
+	case VMM_ISA_16:
+		mdb_warn("IA16 stack tracing not implemented\n");
+		ret = DCMD_ERR;
+		break;
+	default:
+		mdb_warn("CPU %d mode unknown", vcpu);
+		ret = DCMD_ERR;
+		break;
+	}
+
+	return (ret);
 }
 
 static int
@@ -418,25 +434,26 @@ bhyve_cpustack_dcmd(uintptr_t addr, uint_t flags, int argc,
 	if (argc != 0)
 		return (DCMD_USAGE);
 
-	return (bhyve_stack_common(addr, flags, argc, argv, cpu, verbose));
+	return (bhyve_stack_common(addr, flags, argc, argv, cpu,
+	    verbose ? MSF_VERBOSE : 0));
 }
 
 static int
 bhyve_stack_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (bhyve_stack_common(addr, flags, argc, argv, -1, B_FALSE));
+	return (bhyve_stack_common(addr, flags, argc, argv, -1, 0));
 }
 
 static int
 bhyve_stackv_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (bhyve_stack_common(addr, flags, argc, argv, -1, B_TRUE));
+	return (bhyve_stack_common(addr, flags, argc, argv, -1, MSF_VERBOSE));
 }
 
 static int
 bhyve_stackr_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (bhyve_stack_common(addr, flags, argc, argv, -1, B_TRUE));
+	return (bhyve_stack_common(addr, flags, argc, argv, -1, MSF_VERBOSE));
 }
 
 static int
@@ -853,9 +870,26 @@ bhyve_defseg_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+bhyve_stack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   include frame pointer information (this is the default "
+	    "with %<b>$C%</b>)\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
+}
+
 static const mdb_dcmd_t bhyve_dcmds[] = {
-	{ "$c", NULL, "print stack backtrace", bhyve_stack_dcmd },
-	{ "$C", NULL, "print stack backtrace", bhyve_stackv_dcmd },
+	{ "$c", "[-stv]", "print stack backtrace", bhyve_stack_dcmd,
+	    bhyve_stack_help },
+	{ "$C", "[-stv]", "print stack backtrace", bhyve_stackv_dcmd,
+	    bhyve_stack_help },
 	{ "$r", NULL, "print general-purpose registers", bhyve_regs_dcmd },
 	{ "$?", NULL, "print status and registers", bhyve_regs_dcmd },
 	{ ":x", ":", "change the active CPU", bhyve_switch_dcmd },
@@ -868,9 +902,10 @@ static const mdb_dcmd_t bhyve_dcmds[] = {
 	{ "defseg", "?[-s segment]", "change the default segment used to "
 	    "translate addresses", bhyve_defseg_dcmd },
 	{ "regs", NULL, "print general-purpose registers", bhyve_regs_dcmd },
-	{ "stack", NULL, "print stack backtrace", bhyve_stack_dcmd },
-	{ "stackregs", NULL, "print stack backtrace and registers",
-	    bhyve_stackr_dcmd },
+	{ "stack", "[-stv]", "print stack backtrace", bhyve_stack_dcmd,
+	    bhyve_stack_help },
+	{ "stackregs", "[-stv]", "print stack backtrace and registers",
+	    bhyve_stackr_dcmd, bhyve_stack_help },
 	{ "status", NULL, "print summary of current target",
 	    bhyve_status_dcmd },
 	{ "sysregs", "?[-c cpuid]", "print system registers for a specific CPU",
@@ -882,7 +917,6 @@ static const mdb_dcmd_t bhyve_dcmds[] = {
 	    "address", bhyve_vtop_dcmd },
 	{ NULL }
 };
-
 
 /*
  * t_setflags: change target flags

@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_MDB_CTF_H
@@ -91,6 +92,7 @@ extern int mdb_ctf_type_cmp(mdb_ctf_id_t, mdb_ctf_id_t);
 
 extern int mdb_ctf_type_resolve(mdb_ctf_id_t, mdb_ctf_id_t *);
 extern char *mdb_ctf_type_name(mdb_ctf_id_t, char *, size_t);
+extern ssize_t mdb_ctf_type_lname(mdb_ctf_id_t, char *, size_t);
 extern ssize_t mdb_ctf_type_size(mdb_ctf_id_t);
 extern int mdb_ctf_type_kind(mdb_ctf_id_t);
 extern int mdb_ctf_type_reference(const mdb_ctf_id_t, mdb_ctf_id_t *);

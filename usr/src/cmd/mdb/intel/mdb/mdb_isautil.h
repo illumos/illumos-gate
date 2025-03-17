@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _MDB_ISAUTIL_H
@@ -48,7 +49,6 @@ typedef uchar_t mdb_instr_t;
 #define	mdb_isa_kvm_stack_iter	mdb_amd64_kvm_stack_iter
 
 #define	mdb_isa_kvm_frame	mdb_amd64_kvm_frame
-#define	mdb_isa_kvm_framev	mdb_amd64_kvm_framev
 
 #else
 #include <mdb/mdb_ia32util.h>
@@ -62,7 +62,6 @@ typedef uchar_t mdb_instr_t;
 #define	mdb_isa_kvm_stack_iter	mdb_ia32_kvm_stack_iter
 
 #define	mdb_isa_kvm_frame	mdb_ia32_kvm_frame
-#define	mdb_isa_kvm_framev	mdb_ia32_kvm_framev
 
 #endif
 
