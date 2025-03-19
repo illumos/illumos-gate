@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 /*
@@ -488,14 +489,15 @@ kcrsid_setsidlist(credsid_t *okcr, ksidlist_t *ksl)
 			return (NULL);
 		}
 	}
+	/* This might return 'okcr' if the refcnt is 1 */
 	nkcr = kcrsid_dup(okcr);
 	if (nkcr->kr_sidlist != NULL)
 		ksidlist_rele(nkcr->kr_sidlist);
 
-	/* sort the lists so that we can do binary search */
 	nkcr->kr_sidlist = ksl;
 
-	if (ksl->ksl_sorted == NULL) {
+	/* sort the lists so that we can do binary search */
+	if (ksl != NULL && ksl->ksl_sorted == NULL) {
 		qsort(ksl->ksl_sids, ksl->ksl_nsid, sizeof (ksid_t),
 		    ksid_sid_cmp);
 

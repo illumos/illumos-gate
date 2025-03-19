@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 /*
@@ -299,6 +300,12 @@ main(int argc, char *argv[])
 		printf("all tests completed successfully!\n");
 	}
 
+	/* Clear ksidlist. This should free the credsid_t. */
+	kcr = kcrsid_setsidlist(kcr, NULL);
+	/* Add a core ksid. This should allocate a credsid_t. */
+	kcr = kcrsid_setsid(kcr, &ksl->ksl_sids[0], KSID_GROUP);
+	/* Set the ksidlist to NULL again. This should be a no-op. */
+	kcr = kcrsid_setsidlist(kcr, NULL);
 	kcrsid_rele(kcr);
 
 	return (num_failures);
