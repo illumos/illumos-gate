@@ -17,7 +17,7 @@
 # Copyright 2022 RackTop Systems, Inc.
 # Copyright 2023 Oxide Computer Company
 # Copyright 2022 Garrett D'Amore
-# Copyright 2023 Peter Tribble
+# Copyright 2025 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -1341,6 +1341,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		strnlen.9f					\
 		strrchr.9f					\
 		strspn.9f					\
+		strtok_r.9f					\
 		uconv_u16tou8.9f				\
 		uconv_u32tou16.9f				\
 		uconv_u32tou8.9f				\
@@ -2343,6 +2344,7 @@ strncpy.9f				:= LINKSRC = string.9f
 strnlen.9f				:= LINKSRC = string.9f
 strrchr.9f				:= LINKSRC = string.9f
 strspn.9f				:= LINKSRC = string.9f
+strtok_r.9f				:= LINKSRC = string.9f
 
 ddi_taskq_create.9f			:= LINKSRC = taskq.9f
 ddi_taskq_destroy.9f			:= LINKSRC = taskq.9f
