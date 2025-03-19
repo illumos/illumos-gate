@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2025 Peter Tribble
 #
 
 link path=usr/share/man/man9e/GLDv3.9e target=mac.9e
@@ -32,6 +33,7 @@ link path=usr/share/man/man9e/ddi_ufm_op_fill_image.9e target=ddi_ufm.9e
 link path=usr/share/man/man9e/ddi_ufm_op_fill_slot.9e target=ddi_ufm.9e
 link path=usr/share/man/man9e/ddi_ufm_op_getcaps.9e target=ddi_ufm.9e
 link path=usr/share/man/man9e/ddi_ufm_op_nimages.9e target=ddi_ufm.9e
+link path=usr/share/man/man9e/ddi_ufm_op_readimg.9e target=ddi_ufm.9e
 file path=usr/share/man/man9e/detach.9e
 file path=usr/share/man/man9e/devmap.9e
 file path=usr/share/man/man9e/devmap_access.9e

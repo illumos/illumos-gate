@@ -11,8 +11,9 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2025 Peter Tribble
 .\"
-.Dd June 2, 2023
+.Dd March 19, 2025
 .Dt DDI_UFM 9E
 .Os
 .Sh NAME
@@ -20,7 +21,8 @@
 .Nm ddi_ufm_op_nimages ,
 .Nm ddi_ufm_op_fill_image ,
 .Nm ddi_ufm_op_fill_slot ,
-.Nm ddi_ufm_op_getcaps
+.Nm ddi_ufm_op_getcaps ,
+.Nm ddi_ufm_op_readimg
 .Nd DDI upgradable firmware module entry points
 .Sh SYNOPSIS
 .Vt typedef struct ddi_ufm_handle ddi_ufm_handle_t
