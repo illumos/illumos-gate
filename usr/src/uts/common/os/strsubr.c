@@ -30,6 +30,7 @@
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -113,7 +114,6 @@ typedef struct str_stat {
 	kstat_named_t	strwaits;
 	kstat_named_t	taskqfails;
 	kstat_named_t	bufcalls;
-	kstat_named_t	qhelps;
 	kstat_named_t	qremoved;
 	kstat_named_t	sqremoved;
 	kstat_named_t	bcwaits;
@@ -130,7 +130,6 @@ static str_stat_t str_statistics = {
 	{ "strwaits",		KSTAT_DATA_UINT64 },
 	{ "taskqfails",		KSTAT_DATA_UINT64 },
 	{ "bufcalls",		KSTAT_DATA_UINT64 },
-	{ "qhelps",		KSTAT_DATA_UINT64 },
 	{ "qremoved",		KSTAT_DATA_UINT64 },
 	{ "sqremoved",		KSTAT_DATA_UINT64 },
 	{ "bcwaits",		KSTAT_DATA_UINT64 },
@@ -8412,17 +8411,6 @@ stream_runservice(stdata_t *stp)
 
 	stp->sd_svcflags &= ~STRS_WILLSERVICE;
 	mutex_exit(&stp->sd_qlock);
-	/*
-	 * Help backup background thread to drain the qhead/qtail list.
-	 */
-	while (qhead != NULL) {
-		STRSTAT(qhelps);
-		mutex_enter(&service_queue);
-		DQ(q, qhead, qtail, q_link);
-		mutex_exit(&service_queue);
-		if (q != NULL)
-			queue_service(q);
-	}
 }
 
 void

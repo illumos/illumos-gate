@@ -30,7 +30,6 @@ MANFILES=	basename.1b	\
 		file.1b		\
 		from.1b		\
 		groups.1b	\
-		grpck.1b	\
 		ln.1b		\
 		logger.1b	\
 		lpc.1b		\

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUP 5 "Feb 17, 2023"
+.TH GROUP 5 "March 11, 2025"
 .SH NAME
 group \- group file
 .SH DESCRIPTION
@@ -69,7 +69,7 @@ be given and subsequent group specifications will be ignored.
 .LP
 Malformed entries cause routines that read this file to halt, in which case
 group assignments specified further along are never made. To prevent this from
-happening, use \fBgrpck\fR(1B) to check the \fB/etc/group\fR database from time
+happening, use \fBgrpck\fR(8) to check the \fB/etc/group\fR database from time
 to time.
 .sp
 .LP
@@ -152,14 +152,14 @@ maps would be effectively incorporated after the entry for stooges.
 .SH SEE ALSO
 .BR groups (1),
 .BR newgrp (1),
-.BR grpck (1B),
 .BR getgrnam (3C),
 .BR initgroups (3C),
 .BR unistd.h (3HEAD),
 .BR nsswitch.conf (5),
 .BR groupadd (8),
 .BR groupdel (8),
-.BR groupmod (8)
+.BR groupmod (8),
+.BR grpck (8)
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR

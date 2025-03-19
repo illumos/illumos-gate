@@ -95,12 +95,15 @@ typedef union {
 
 typedef struct {
     struct open_file *fd;	/* file descriptor */
+    uchar_t *secbuf;		/* sector cache */
     uchar_t *fatbuf;		/* FAT cache buffer */
     uint_t fatbuf_blknum;	/* number of 128K block in FAT cache buffer */
     uint_t links;		/* active links to structure */
+    uint_t sshift;		/* sector shift */
     uint_t spc;			/* sectors per cluster */
     uint_t bsize;		/* cluster size in bytes */
     uint_t bshift;		/* cluster conversion shift */
+    uint_t dshift;		/* directory entries shift */
     uint_t dirents;		/* root directory entries */
     uint_t spf;			/* sectors per fat */
     uint_t rdcl;		/* root directory start cluster */
