@@ -1,0 +1,64 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+# Objects
+*.o
+*.a
+
+*.so
+*.so.*
+!man/**/*.so*
+
+# Translation artifacts
+*.po
+*.mo
+!cmd/fm/dicts/*.po
+!cmd/vgrind/vgrind_ksh.po
+!cmd/zic/tzselect.po
+!data/**/*.po
+!lib/libslp/clib/libslp.po
+
+# Java build artifacts
+*.class
+*.jar
+
+# lex/yacc
+lex.yy.c
+y.tab.c
+y.tab.h
+
+# cscope & ctags
+cscope.files
+cscope.out
+ncscope.out
+cscope.in.out
+cscope.po.out
+tags
+
+# Make and build state
+.make.state*
+/.build.tstamp
+/ELF-data.*
+/check-*.out
+/clobber-*.out
+/install-*.out
+/lint-*.out
+/lint-noise-*.out
+/lint-noise-*.ref
+/noise-*.out
+/noise-*.ref
+
+# IPS artifacts
+pkg/packages.*/

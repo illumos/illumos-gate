@@ -13,12 +13,9 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-# Note: this does not try to ignore all files in a fully built workspace.
-# Rather, you are expected to "make clobber" before running "git status".
 
-/closed
-/log
-/packages
-/proto
-/webrev
-/.vscode
+install*.out
+
+license-list
+
+proto_list_*

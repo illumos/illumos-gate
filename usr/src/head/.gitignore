@@ -13,12 +13,16 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-# Note: this does not try to ignore all files in a fully built workspace.
-# Rather, you are expected to "make clobber" before running "git status".
-
-/closed
-/log
-/packages
-/proto
-/webrev
-/.vscode
+rpcsvc/bootparam_prot.h
+rpcsvc/mount.h
+rpcsvc/nfs4_prot.h
+rpcsvc/nfs_acl.h
+rpcsvc/nfs_prot.c
+rpcsvc/nfs_prot.h
+rpcsvc/nis.h
+rpcsvc/rquota.h
+rpcsvc/rstat.h
+rpcsvc/rusers.h
+rpcsvc/rwall.h
+rpcsvc/spray.h
+rpcsvc/ufs_prot.h

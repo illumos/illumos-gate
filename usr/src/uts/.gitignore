@@ -1,0 +1,67 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+**/debug32/
+**/debug64/
+**/obj32/
+**/obj64/
+
+**/*.symbols.debug64.*
+**/*.symbols.obj64.*
+
+intel/core_pcbe/*.[ch]
+intel/opteron_pcbe/*.[ch]
+
+common/os/priv_const.c
+common/sys/priv_const.h
+common/sys/priv_names.h
+intel/os/priv_names
+
+common/rpcsvc/*.h
+common/gssapi/gssd_prot.c
+common/gssapi/gssd_prot.h
+common/gssapi/gssd_xdr.c
+common/idmap/idmap_xdr.c
+common/klm/nlm_prot_clnt.c
+common/klm/nlm_prot_xdr.c
+common/klm/nsm_addr_clnt.c
+common/klm/nsm_addr_xdr.c
+common/klm/sm_inter_clnt.c
+common/klm/sm_inter_xdr.c
+common/rpc/key_prot.h
+common/rpc/pmap_prot.h
+common/rpc/rpc_sztypes.h
+common/rpc/rpcb_prot.h
+
+intel/arcfour/*-x86_64.S
+intel/md5/*.S
+intel/sha[12]/*.S
+
+i86pc/io/acpi/drmach_acpi/drmach_err.c
+i86pc/io/acpi/drmach_acpi/sbdgenerr
+i86pc/io/dr/dr_err.c
+i86pc/io/dr/sbdgenerr
+
+i86pc/cpu/scripts/ao_gendisp
+i86xpv/cpu/scripts/ao_gendisp
+i86xpv/cpu/scripts/ao_gendisp.pl
+
+common/io/fibre-channel/fca/qlc/ql_fw_table.c
+
+common/sys/usb/usbdevs.h
+
+intel/mwlfw/mw88W8363fw
+intel/mwlfw/mwlboot
+intel/uathfw/uathbin

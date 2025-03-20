@@ -782,6 +782,11 @@ opt/onbld/bin/i386/smatch	i386
 opt/onbld/share/smatch
 
 #
+# check-gitignore script is used only within the source tree
+#
+opt/onbld/bin/check-gitignore
+
+#
 # libdwarf is private for the moment
 #
 lib/amd64/libdwarf.so			i386
