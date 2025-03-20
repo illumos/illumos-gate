@@ -70,3 +70,4 @@ compare c99.exp c99.64
 
 (( FAILED != 0 )) && exit 1
 
+exit 0
