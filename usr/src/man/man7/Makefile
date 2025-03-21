@@ -136,8 +136,6 @@ _MANFILES=	Intro.7			\
 		zones.7			\
 		zpool-features.7
 
-sparc_MANFILES=
-
 i386_MANFILES=	beastie.4th.7		\
 		brand.4th.7		\
 		check-password.4th.7	\
@@ -152,85 +150,11 @@ i386_MANFILES=	beastie.4th.7		\
 		pxeboot.7		\
 		version.4th.7
 
-MANLINKS=	ANSI.7		\
-		C++.7		\
-		C.7		\
-		CSI.7		\
-		ISO.7		\
-		MT-Level.7	\
-		POSIX.1.7	\
-		POSIX.2.7	\
-		POSIX.7		\
-		RBAC.7		\
-		SUS.7		\
-		SUSv2.7		\
-		SUSv3.7		\
-		SVID.7		\
-		SVID3.7		\
-		XNS.7		\
-		XNS4.7		\
-		XNS5.7		\
-		XPG.7		\
-		XPG3.7		\
-		XPG4.7		\
-		XPG4v2.7	\
-		advance.7	\
-		architecture.7	\
-		availability.7	\
-		compile.7	\
-		endian.7	\
-		intro.7		\
-		pthreads.7	\
-		stability.7	\
-		standard.7	\
-		step.7		\
-		teclarc.7
-
 MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
-
-intro.7		:= LINKSRC = Intro.7
-
-CSI.7		:= LINKSRC = attributes.7
-MT-Level.7	:= LINKSRC = attributes.7
-architecture.7	:= LINKSRC = attributes.7
-availability.7	:= LINKSRC = attributes.7
-stability.7	:= LINKSRC = attributes.7
-standard.7	:= LINKSRC = attributes.7
-
-endian.7	:= LINKSRC = byteorder.7
-
-RBAC.7		:= LINKSRC = rbac.7
-
-advance.7	:= LINKSRC = regexp.7
-compile.7	:= LINKSRC = regexp.7
-step.7		:= LINKSRC = regexp.7
-
-ANSI.7		:= LINKSRC = standards.7
-C++.7		:= LINKSRC = standards.7
-C.7		:= LINKSRC = standards.7
-ISO.7		:= LINKSRC = standards.7
-POSIX.1.7	:= LINKSRC = standards.7
-POSIX.2.7	:= LINKSRC = standards.7
-POSIX.7		:= LINKSRC = standards.7
-SUS.7		:= LINKSRC = standards.7
-SUSv2.7		:= LINKSRC = standards.7
-SUSv3.7		:= LINKSRC = standards.7
-SVID.7		:= LINKSRC = standards.7
-SVID3.7		:= LINKSRC = standards.7
-XNS.7		:= LINKSRC = standards.7
-XNS4.7		:= LINKSRC = standards.7
-XNS5.7		:= LINKSRC = standards.7
-XPG.7		:= LINKSRC = standards.7
-XPG3.7		:= LINKSRC = standards.7
-XPG4.7		:= LINKSRC = standards.7
-XPG4v2.7	:= LINKSRC = standards.7
-
-teclarc.7	:= LINKSRC = tecla.7
-
-pthreads.7	:= LINKSRC = threads.7
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

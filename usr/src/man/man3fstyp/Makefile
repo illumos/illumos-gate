@@ -16,29 +16,17 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3fstyp
+MANSECT=	3fstyp
 
-MANFILES= 	fstyp_get_attr.3fstyp	\
+MANFILES=	fstyp_get_attr.3fstyp	\
 		fstyp_ident.3fstyp	\
 		fstyp_init.3fstyp	\
 		fstyp_mod_init.3fstyp	\
 		fstyp_strerror.3fstyp
 
-MANLINKS=	fstyp_fini.3fstyp		\
-	 	fstyp_mod_dump.3fstyp		\
-	 	fstyp_mod_fini.3fstyp		\
-	 	fstyp_mod_get_attr.3fstyp	\
-	 	fstyp_mod_ident.3fstyp
-
-fstyp_fini.3fstyp		:= LINKSRC = fstyp_init.3fstyp
-
-fstyp_mod_dump.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
-fstyp_mod_fini.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
-fstyp_mod_get_attr.3fstyp	:= LINKSRC = fstyp_mod_init.3fstyp
-fstyp_mod_ident.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

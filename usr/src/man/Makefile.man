@@ -37,7 +37,10 @@ $(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTHASMAN)/man$(MANSECT)
 $(ROOTMAN)/man$(MANSECT)/% : % $(ROOTMAN)/man$(MANSECT)
 		$(INS.file)
 
-#
+MANLINK_SRCS=	Manlink $($(MACH)_MANLINK_SRC)
+
+MANLINK_INSTALL=$(MANLINK) -d $(ROOTMAN)/man$(MANSECT) $(MANLINK_SRCS)
+
 # Note that new mandoc adds some checks for lots of extra whitespace.
 # We don't want to check our legacy pages for that.  There are thousands
 # and thousands of them in our man pages.  Please still check them
@@ -51,12 +54,6 @@ $(MANCHECKS):
 		$(MANDOC) -Tlint -Wwarning $(@:%.check=%); \
 		fi
 
-$(MANLINKS):
-		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
-
-$(ROOTMANLINKS): $(MANLINKS) $(ROOTMAN)/man$(MANSECT)
-		$(RM) $@; $(CP) -RP $(@F) $(@D)
-
 all:
 
 check:		$(MANCHECKS)
@@ -64,7 +61,6 @@ check:		$(MANCHECKS)
 clean:
 
 clobber:
-		$(RM) $(MANLINKS)
 
 .PARALLEL:
 

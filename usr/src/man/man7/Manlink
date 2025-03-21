@@ -1,0 +1,56 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+Intro.7
+	intro.7
+attributes.7
+	CSI.7
+	MT-Level.7
+	architecture.7
+	availability.7
+	stability.7
+	standard.7
+byteorder.7
+	endian.7
+rbac.7
+	RBAC.7
+regexp.7
+	advance.7
+	compile.7
+	step.7
+standards.7
+	ANSI.7
+	C++.7
+	C.7
+	ISO.7
+	POSIX.1.7
+	POSIX.2.7
+	POSIX.7
+	SUS.7
+	SUSv2.7
+	SUSv3.7
+	SVID.7
+	SVID3.7
+	XNS.7
+	XNS4.7
+	XNS5.7
+	XPG.7
+	XPG3.7
+	XPG4.7
+	XPG4v2.7
+tecla.7
+	teclarc.7
+threads.7
+	pthreads.7

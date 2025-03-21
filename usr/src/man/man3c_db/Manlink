@@ -1,0 +1,56 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+td_sync_get_info.3c_db
+	td_ta_sync_tracking_enable.3c_db
+	td_sync_get_stats.3c_db
+	td_sync_setstate.3c_db
+	td_sync_waiters.3c_db
+td_ta_enable_stats.3c_db
+	td_ta_get_stats.3c_db
+	td_ta_reset_stats.3c_db
+td_ta_event_addr.3c_db
+	td_event_addset.3c_db
+	td_event_delset.3c_db
+	td_event_emptyset.3c_db
+	td_event_fillset.3c_db
+	td_eventisempty.3c_db
+	td_eventismember.3c_db
+	td_ta_clear_event.3c_db
+	td_ta_event_getmsg.3c_db
+	td_ta_set_event.3c_db
+	td_thr_clear_event.3c_db
+	td_thr_event_enable.3c_db
+	td_thr_event_getmsg.3c_db
+	td_thr_set_event.3c_db
+td_ta_map_id2thr.3c_db
+	td_ta_map_lwp2thr.3c_db
+td_ta_new.3c_db
+	td_ta_delete.3c_db
+	td_ta_get_ph.3c_db
+td_ta_sync_iter.3c_db
+	td_ta_thr_iter.3c_db
+	td_ta_tsd_iter.3c_db
+td_thr_dbsuspend.3c_db
+	td_thr_dbresume.3c_db
+td_thr_getgregs.3c_db
+	td_thr_getfpregs.3c_db
+	td_thr_getxregs.3c_db
+	td_thr_getxregsize.3c_db
+	td_thr_setfpregs.3c_db
+	td_thr_setgregs.3c_db
+	td_thr_setxregs.3c_db
+td_thr_setsigpending.3c_db
+	td_thr_sigsetmask.3c_db

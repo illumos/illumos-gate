@@ -1,0 +1,135 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+Intro.8
+	intro.8
+Uutry.8
+	uutry.8
+accept.8
+	reject.8
+acct.8
+	acctdisk.8
+	acctdusg.8
+	accton.8
+	acctwtmp.8
+	closewtmp.8
+	utmp2wtmp.8
+acctcon.8
+	acctcon1.8
+	acctcon2.8
+acctprc.8
+	acctprc1.8
+	acctprc2.8
+acctsh.8
+	chargefee.8
+	ckpacct.8
+	dodisk.8
+	lastlogin.8
+	monacct.8
+	nulladm.8
+	prctmp.8
+	prdaily.8
+	prtacct.8
+	shutacct.8
+	startup.8
+	turnacct.8
+clri.8
+	dcopy.8
+devfsadm.8
+	audlinks.8
+	devfsadmd.8
+fcinfo.8
+	fcadm.8
+fwtmp.8
+	wtmpfix.8
+hal-find.8
+	hal-find-by-capability.8
+	hal-find-by-property.8
+hal-get-property.8
+	hal-set-property.8
+halt.8
+	poweroff.8
+in.comsat.8
+	comsat.8
+in.fingerd.8
+	fingerd.8
+in.rarpd.8
+	rarpd.8
+in.rdisc.8
+	rdisc.8
+in.rexecd.8
+	rexecd.8
+in.rlogind.8
+	rlogind.8
+in.routed.8
+	routed.8
+in.rshd.8
+	rshd.8
+in.rwhod.8
+	rwhod.8
+in.talkd.8
+	talkd.8
+in.telnetd.8
+	telnetd.8
+in.tftpd.8
+	tftpd.8
+in.uucpd.8
+	uucpd.8
+init.8
+	telinit.8
+kadmin.8
+	kadmin.local.8
+link.8
+	unlink.8
+mount.8
+	umount.8
+mount_smbfs.8
+	umount_smbfs.8
+mountall.8
+	umountall.8
+pwck.8
+	grpck.8
+quotaon.8
+	quotaoff.8
+rpc.bootparamd.8
+	bootparamd.8
+rpc.rstatd.8
+	rstatd.8
+rpc.rusersd.8
+	rusersd.8
+rpc.rwalld.8
+	rwalld.8
+rpc.sprayd.8
+	sprayd.8
+rpc.yppasswdd.8
+	yppasswdd.8
+rpc.ypupdated.8
+	ypupdated.8
+rsh.8
+	restricted_shell.8
+sar.8
+	sa1.8
+	sa2.8
+	sadc.8
+shareall.8
+	unshareall.8
+ypserv.8
+	ypxfrd.8
+ypstart.8
+	ypstop.8
+ypxfr.8
+	ypxfr_1perday.8
+	ypxfr_1perhour.8
+	ypxfr_2perday.8

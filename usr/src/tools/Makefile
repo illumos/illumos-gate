@@ -61,6 +61,7 @@ COMMON_SUBDIRS=		\
 	lintdump	\
 	make		\
 	makesoftcore	\
+	manlink		\
 	ndrgen		\
 	onbld		\
 	protocmp	\

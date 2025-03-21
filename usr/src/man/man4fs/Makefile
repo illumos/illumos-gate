@@ -17,34 +17,27 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	4fs
+MANSECT=	4fs
 
-MANFILES= 	bootfs.4fs	\
+MANFILES=	bootfs.4fs	\
 		ctfs.4fs	\
-	 	dcfs.4fs	\
-	 	dev.4fs		\
-	 	devfs.4fs	\
+		dcfs.4fs	\
+		dev.4fs		\
+		devfs.4fs	\
 		fd.4fs		\
-	 	hsfs.4fs	\
-	 	lofs.4fs	\
-	 	objfs.4fs	\
-	 	pcfs.4fs	\
-	 	sharefs.4fs	\
-	 	smbfs.4fs	\
-	 	tmpfs.4fs	\
-	 	udfs.4fs	\
-	 	ufs.4fs
-
-MANLINKS=	stderr.4fs	\
-		stdin.4fs	\
-		stdout.4fs
-
-stderr.4fs	:= LINKSRC = fd.4fs
-stdin.4fs	:= LINKSRC = fd.4fs
-stdout.4fs	:= LINKSRC = fd.4fs
+		hsfs.4fs	\
+		lofs.4fs	\
+		objfs.4fs	\
+		pcfs.4fs	\
+		sharefs.4fs	\
+		smbfs.4fs	\
+		tmpfs.4fs	\
+		udfs.4fs	\
+		ufs.4fs
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

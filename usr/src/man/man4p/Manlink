@@ -1,0 +1,39 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+arp.4p
+	ARP.4p
+icmp.4p
+	ICMP.4p
+if_tcp.4p
+	if.4p
+ip.4p
+	IP.4p
+ipsecah.4p
+	AH.4p
+ipsecesp.4p
+	ESP.4p
+ndp.4p
+	NDP.4p
+rarp.4p
+	RARP.4p
+sctp.4p
+	SCTP.4p
+tcp.4p
+	TCP.4p
+udp.4p
+	UDP.4p
+vxlan.4p
+	VXLAN.4p

@@ -675,6 +675,7 @@ usr/lib/amd64/libvrrpadm.so		i386
 # These are only used during the -t tools build
 #
 opt/onbld/bin/i386/mandoc	i386
+opt/onbld/bin/i386/manlink	i386
 opt/onbld/bin/i386/geniconvtbl	i386
 opt/onbld/bin/i386/makesoftcore	i386
 opt/onbld/bin/i386/rpcgen	i386

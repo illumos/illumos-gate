@@ -15,21 +15,9 @@ MANSECT=	3utempter
 
 MANFILES=	utempter_add_record.3utempter
 
-MANLINKS=	addToUtmp.3utempter \
-		removeFromUtmp.3utempter \
-		removeLineFromUtmp.3utempter \
-		utempter_remove_added_record.3utempter \
-		utempter_remove_record.3utempter
-
-
-addToUtmp.3utempter	:= LINKSRC = utempter_add_record.3utempter
-removeFromUtmp.3utempter := LINKSRC = utempter_add_record.3utempter
-removeLineFromUtmp.3utempter	:= LINKSRC = utempter_add_record.3utempter
-utempter_remove_added_record.3utempter := LINKSRC = utempter_add_record.3utempter
-utempter_remove_record.3utempter := LINKSRC = utempter_add_record.3utempter
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

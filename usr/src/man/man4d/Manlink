@@ -1,0 +1,34 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+fd.4d
+	fdc.4d
+ieee1394.4d
+	1394.4d
+	firewire.4d
+ipnet.4d
+	lo0.4d
+mem.4d
+	allkmem.4d
+	kmem.4d
+ptm.4d
+	pts.4d
+random.4d
+	urandom.4d
+ticlts.4d
+	ticots.4d
+	ticotsord.4d
+usba.4d
+	usb.4d

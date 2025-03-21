@@ -108,7 +108,7 @@ _MANFILES=	Intro.5				\
 		magic.5				\
 		mailer.conf.5			\
 		mech.5				\
-		menu.lst.5				\
+		menu.lst.5			\
 		mnttab.5			\
 		mpapi.conf.5			\
 		ndmp.5				\
@@ -203,91 +203,13 @@ i386_MANFILES=	bhyve_config.5			\
 		loader.conf.5			\
 		sysbus.5
 
-_MANLINKS=	addresses.5			\
-		devid_cache.5			\
-		devname_cache.5			\
-		dir.5				\
-		dumpdates.5			\
-		fbtab.5				\
-		forward.5			\
-		fs.5				\
-		hosts.allow.5			\
-		hosts.deny.5			\
-		intro.5				\
-		ipf.conf.5			\
-		ipf6.conf.5			\
-		ipmon.conf.5			\
-		ipnat.conf.5			\
-		ippool.conf.5			\
-		mdi_ib_cache.5			\
-		mdi_scsi_vhci_cache.5		\
-		pci_unitaddr_persistent.5	\
-		pcie.5				\
-		qop.5				\
-		rhosts.5			\
-		TIMEZONE.5			\
-		sendmail.cf.5			\
-		snapshot_cache.5		\
-		submit.cf.5			\
-		wtmp.5				\
-		wtmpx.5
-
-i386_MANLINKS=	isa.5
-
 MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
-MANLINKS=	$(_MANLINKS) $($(MACH)_MANLINKS)
 
-intro.5				:= LINKSRC = Intro.5
-
-addresses.5			:= LINKSRC = aliases.5
-forward.5			:= LINKSRC = aliases.5
-
-fs.5				:= LINKSRC = default_fs.5
-
-devid_cache.5			:= LINKSRC = devices.5
-devname_cache.5			:= LINKSRC = devices.5
-mdi_ib_cache.5			:= LINKSRC = devices.5
-mdi_scsi_vhci_cache.5		:= LINKSRC = devices.5
-pci_unitaddr_persistent.5	:= LINKSRC = devices.5
-snapshot_cache.5		:= LINKSRC = devices.5
-
-dir.5				:= LINKSRC = dir_ufs.5
-
-rhosts.5			:= LINKSRC = hosts.equiv.5
-
-TIMEZONE.5			:= LINKSRC = init.5
-
-hosts.allow.5			:= LINKSRC = hosts_access.5
-hosts.deny.5			:= LINKSRC = hosts_access.5
-
-ipf.conf.5			:= LINKSRC = ipf.5
-ipf6.conf.5			:= LINKSRC = ipf.5
-
-ipmon.conf.5			:= LINKSRC = ipmon.5
-
-ipnat.conf.5			:= LINKSRC = ipnat.5
-
-ippool.conf.5			:= LINKSRC = ippool.5
-
-fbtab.5				:= LINKSRC = logindevperm.5
-
-qop.5				:= LINKSRC = mech.5
-
-pcie.5				:= LINKSRC = pci.5
-
-sendmail.cf.5			:= LINKSRC = sendmail.5
-submit.cf.5			:= LINKSRC = sendmail.5
-
-isa.5				:= LINKSRC = sysbus.5
-
-dumpdates.5			:= LINKSRC = ufsdump.5
-
-wtmp.5				:= LINKSRC = utmp.5
-
-wtmpx.5				:= LINKSRC = utmpx.5
+i386_MANLINK_SRC=	Manlink.i386
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

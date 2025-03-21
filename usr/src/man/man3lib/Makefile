@@ -111,93 +111,9 @@ MANFILES=	libMPAPI.3lib		\
 		libxnet.3lib		\
 		liby.3lib
 
-MANLINKS=	SMHBA_GetAdapterAttributes.3lib			\
-		SMHBA_GetAdapterPortAttributes.3lib		\
-		SMHBA_GetBindingCapability.3lib			\
-		SMHBA_GetBindingSupport.3lib			\
-		SMHBA_GetDiscoveredPortAttributes.3lib		\
-		SMHBA_GetFCPhyAttributes.3lib			\
-		SMHBA_GetLUNStatistics.3lib			\
-		SMHBA_GetNumberofPorts.3lib			\
-		SMHBA_GetPersistentBinding.3lib			\
-		SMHBA_GetPhyStatistics.3lib			\
-		SMHBA_GetPortAttributesByWWN.3lib		\
-		SMHBA_GetPortType.3lib				\
-		SMHBA_GetProtocolStatistics.3lib		\
-		SMHBA_GetSASPhyAttributes.3lib			\
-		SMHBA_GetTargetMapping.3lib			\
-		SMHBA_GetVendorLibraryAttributes.3lib		\
-		SMHBA_GetVersion.3lib				\
-		SMHBA_GetWrapperLibraryAttributes.3lib		\
-		SMHBA_RegisterForAdapterAddEvents.3lib		\
-		SMHBA_RegisterForAdapterEvents.3lib		\
-		SMHBA_RegisterForAdapterPhyStatEvents.3lib	\
-		SMHBA_RegisterForAdapterPortEvents.3lib		\
-		SMHBA_RegisterForAdapterPortStatEvents.3lib	\
-		SMHBA_RegisterForTargetEvents.3lib		\
-		SMHBA_RegisterLibrary.3lib			\
-		SMHBA_RemoveAllPersistentBindings.3lib		\
-		SMHBA_RemovePersistentBinding.3lib		\
-		SMHBA_ScsiInquiry.3lib				\
-		SMHBA_ScsiReadCapacity.3lib			\
-		SMHBA_ScsiReportLuns.3lib			\
-		SMHBA_SendECHO.3lib				\
-		SMHBA_SendSMPPassThru.3lib			\
-		SMHBA_SendTEST.3lib				\
-		SMHBA_SetBindingSupport.3lib			\
-		SMHBA_SetPersistentBinding.3lib			\
-		libmpapi.3lib					\
-		libposix4.3lib					\
-		libsmhbaapi.3lib				\
-		libtermcap.3lib					\
-		libtermlib.3lib
-
-libmpapi.3lib					:= LINKSRC = libMPAPI.3lib
-
-SMHBA_GetAdapterAttributes.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetAdapterPortAttributes.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetBindingCapability.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetBindingSupport.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetDiscoveredPortAttributes.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetFCPhyAttributes.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetLUNStatistics.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetNumberofPorts.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetPersistentBinding.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetPhyStatistics.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetPortAttributesByWWN.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetPortType.3lib				:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetProtocolStatistics.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetSASPhyAttributes.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetTargetMapping.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetVendorLibraryAttributes.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetVersion.3lib				:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_GetWrapperLibraryAttributes.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForAdapterAddEvents.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForAdapterEvents.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForAdapterPhyStatEvents.3lib	:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForAdapterPortEvents.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForAdapterPortStatEvents.3lib	:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterForTargetEvents.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RegisterLibrary.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RemoveAllPersistentBindings.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_RemovePersistentBinding.3lib		:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_ScsiInquiry.3lib				:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_ScsiReadCapacity.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_ScsiReportLuns.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_SendECHO.3lib				:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_SendSMPPassThru.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_SendTEST.3lib				:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_SetBindingSupport.3lib			:= LINKSRC = libSMHBAAPI.3lib
-SMHBA_SetPersistentBinding.3lib			:= LINKSRC = libSMHBAAPI.3lib
-libsmhbaapi.3lib				:= LINKSRC = libSMHBAAPI.3lib
-
-libtermcap.3lib					:= LINKSRC = libcurses.3lib
-libtermlib.3lib					:= LINKSRC = libcurses.3lib
-
-libposix4.3lib					:= LINKSRC = librt.3lib
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)
