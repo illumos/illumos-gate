@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2025 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -111,6 +112,7 @@ MANLINKS=	ddi_ufm_op_fill_image.9e	\
 		ddi_ufm_op_fill_slot.9e	\
 		ddi_ufm_op_getcaps.9e	\
 		ddi_ufm_op_nimages.9e	\
+		ddi_ufm_op_readimg.9e	\
 		_info.9e		\
 		_init.9e		\
 		gldv3.9e		\
@@ -160,6 +162,7 @@ ddi_ufm_op_fill_image.9e	:= LINKSRC = ddi_ufm.9e
 ddi_ufm_op_fill_slot.9e		:= LINKSRC = ddi_ufm.9e
 ddi_ufm_op_getcaps.9e		:= LINKSRC = ddi_ufm.9e
 ddi_ufm_op_nimages.9e		:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_readimg.9e		:= LINKSRC = ddi_ufm.9e
 intro.9e			:= LINKSRC = Intro.9e
 
 _info.9e			:= LINKSRC = _fini.9e

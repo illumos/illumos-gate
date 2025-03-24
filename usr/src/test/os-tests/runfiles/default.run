@@ -235,9 +235,10 @@ tests = ['oclo', 'oclo_errors']
 [/opt/os-tests/tests/secure_getenv/secure_getenv]
 user = root
 
-[/opt/os-tests/tests/mac_test]
+[/opt/os-tests/tests/mac]
 user = root
+tests = ['mac_parsing', 'mac_ktest']
 
 [/opt/os-tests/tests/ktest]
 user = root
-tests = ['stream_ktest', 'mac_ktest', 'ktest_ktest']
+tests = ['stream_ktest', 'ktest_ktest']

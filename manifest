@@ -20119,7 +20119,7 @@ s usr/share/man/man9e/ddi_ufm_op_fill_image.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_fill_slot.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_getcaps.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_nimages.9e=ddi_ufm.9e
-s usr/share/man/man9e/ddi_ufm_op_nslots.9e=ddi_ufm.9e
+s usr/share/man/man9e/ddi_ufm_op_readimg.9e=ddi_ufm.9e
 f usr/share/man/man9e/detach.9e 0444 root bin
 f usr/share/man/man9e/devmap.9e 0444 root bin
 f usr/share/man/man9e/devmap_access.9e 0444 root bin

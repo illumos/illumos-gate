@@ -65,6 +65,7 @@
 #include <inet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/sctp.h>
+#include <netinet/icmp6.h>
 
 /*
  * MAC Provider Interface.
@@ -2157,6 +2158,9 @@ mac_mmc_parse_l4(mac_mblk_cursor_t *cursor, uint8_t ipproto, uint8_t *hdr_sizep)
 		return (true);
 	case IPPROTO_UDP:
 		*hdr_sizep = sizeof (struct udphdr);
+		return (true);
+	case IPPROTO_ICMPV6:
+		*hdr_sizep = sizeof (icmp6_t);
 		return (true);
 	case IPPROTO_SCTP:
 		*hdr_sizep = sizeof (sctp_hdr_t);

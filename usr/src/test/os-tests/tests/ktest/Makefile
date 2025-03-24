@@ -15,7 +15,6 @@
 
 SCRIPTS = \
 	stream_ktest \
-	mac_ktest \
 	ktest_ktest
 
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests

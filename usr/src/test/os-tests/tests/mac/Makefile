@@ -16,23 +16,47 @@
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
-TESTDIR = $(ROOTOPTPKG)/tests
+TESTDIR = $(ROOTOPTPKG)/tests/mac
+DATADIR = $(TESTDIR)/data
 
-PROGS = mac_test
+PROGS = \
+	mac_cksum \
+	mac_parsing
+
+SCRIPTS = mac_ktest
+
+DATAFILES = \
+	ipv4_bad_proto.snoop \
+	ipv4_icmp.snoop \
+	ipv4_sctp.snoop \
+	ipv4_tcp.snoop \
+	ipv4_udp.snoop \
+	ipv6_icmp.snoop \
+	ipv6_sctp.snoop \
+	ipv6_tcp.snoop \
+	ipv6_udp.snoop \
+	ipv6_eh_udp.snoop
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
+include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
-LDLIBS += -lnvpair -lktest
+CTF_MODE = link
+LDLIBS += -lktest -lnvpair
 CSTD= $(CSTD_GNU17)
 
-CMDS = $(PROGS:%=$(TESTDIR)/%)
+CMDS = $(PROGS:%=$(TESTDIR)/%) \
+	$(SCRIPTS:%=$(TESTDIR)/%)
+TESTDATA = $(DATAFILES:%=$(DATADIR)/%)
+
 $(CMDS) := FILEMODE = 0555
+$(SCRIPTS) := FILEMODE = 0555
+$(TESTDATA) := FILEMODE = 0444
 
 all: $(PROGS)
 
-install: all $(CMDS)
+install: all $(CMDS) $(TESTDATA)
 
 lint:
 
@@ -40,12 +64,18 @@ clobber: clean
 	-$(RM) $(PROGS)
 
 clean:
-	-$(RM) *.o
 
 $(CMDS): $(TESTDIR) $(PROGS)
 
 $(TESTDIR):
 	$(INS.dir)
+$(DATADIR): $(TESTDIR)
+	$(INS.dir)
+
+$(TESTDATA): $(DATADIR)
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
