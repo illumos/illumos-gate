@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -362,11 +362,10 @@ int
 pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *typep)
 {
 	mattr_t	*ap;
-	int type;
 
 	if (attr == NULL || (ap = attr->__pthread_mutexattrp) == NULL ||
 	    typep == NULL)
 		return (EINVAL);
-	*typep = type;
+	*typep = ap->type;
 	return (0);
 }
