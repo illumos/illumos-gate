@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -783,11 +784,12 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	ksid_t		*ksid = crgetsid(cr, KSID_GROUP);
 	ksidlist_t	*ksidlist = crgetsidlist(cr);
 	uid_t		gid;
+	uint32_t	idx = FUID_INDEX(id);
+	uint32_t	rid = FUID_RID(id);
 
-	if (ksid && ksidlist && id != IDMAP_WK_CREATOR_GROUP_GID) {
-		uint32_t	idx = FUID_INDEX(id);
-		uint32_t	rid = FUID_RID(id);
+	if (ksid != NULL && id != IDMAP_WK_CREATOR_GROUP_GID) {
 		const char	*domain = NULL;
+		int ngroups;
 
 		if (idx != 0) {
 			domain = zfs_fuid_find_by_idx(zfsvfs, idx);
@@ -797,12 +799,29 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 			    IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
 				return (B_FALSE);
 
-			if (ksidlist_has_sid(ksidlist, domain, rid))
+			if (strcmp(ksid_getdomain(ksid), domain) == 0 &&
+			    rid == ksid_getrid(ksid))
+				return (B_TRUE);
+
+			if (ksidlist != NULL &&
+			    ksidlist_has_sid(ksidlist, domain, rid))
 				return (B_TRUE);
 		} else {
-			if (ksidlist_has_pid(ksidlist, rid))
+			if (ksid_getid(ksid) == rid)
+				return (B_TRUE);
+
+			if (ksidlist != NULL &&
+			    ksidlist_has_pid(ksidlist, rid))
 				return (B_TRUE);
 		}
+
+		/* If there are no useful subgroups, skip the idmap lookup */
+		gid = crgetgid(cr);
+		ngroups = crgetngroups(cr);
+		if (ksid_getid(ksid) == gid &&
+		    (ngroups == 0 ||
+		    (ngroups == 1 && crgetgroups(cr)[0] == gid)))
+			return (B_FALSE);
 	}
 
 	/*
