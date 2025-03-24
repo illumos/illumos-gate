@@ -36,6 +36,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -284,6 +285,7 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_NO_MEDIA,			ENOMEDIUM},
 	{NT_STATUS_NO_MEDIA_IN_DEVICE,		ENOMEDIUM},
 	{NT_STATUS_NO_MEMORY,			ENOMEM},
+	{NT_STATUS_NO_MORE_FILES,		ENOENT},
 	{NT_STATUS_NO_SUCH_DEVICE,		ENODEV},
 	{NT_STATUS_NO_SUCH_FILE,		ENOENT},
 	{NT_STATUS_NO_SUCH_LOGON_SESSION,	EAUTH},
