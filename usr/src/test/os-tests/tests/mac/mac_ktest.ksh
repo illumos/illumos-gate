@@ -21,7 +21,7 @@ mac_data_dir="$mac_test_dir/data"
 mac_cksum="$mac_test_dir/mac_cksum"
 mac_exit=0
 
-run_test()
+run_one()
 {
 	typeset input="$mac_data_dir/$1"
 	shift
@@ -31,20 +31,25 @@ run_test()
 	if (( $? != 0 )); then
 		mac_exit=1
 	fi
+}
 
-	# And again with 2 bytes of padding to offset the data in memory
-	echo "$mac_cksum $* -b 2 $input"
-	$mac_cksum $* -b 2 $input
-	if (( $? != 0 )); then
-		mac_exit=1
-	fi
+run_test()
+{
+	# Run with and without 2-byte padding for offset reasons
+	run_one $*
+	run_one $* -b 2
+
+	# Try some various mblk split combinations
+	run_one $* -e
+	run_one $* -s 20
+	run_one $* -e -s 8
 }
 
 # The bad-L4-proto case should only try getting a IPv4 checksum.
 # It would fail to get an L4 checksum
 run_test ipv4_bad_proto.snoop -4
 
-ipv4_cases="ipv4_tcp.snoop ipv4_udp.snoop"
+ipv4_cases="ipv4_icmp.snoop ipv4_tcp.snoop ipv4_udp.snoop"
 for c in $ipv4_cases; do
 	run_test $c -4 -p
 	run_test $c -4 -f
@@ -53,11 +58,6 @@ done
 ipv6_cases="ipv6_icmp.snoop ipv6_tcp.snoop ipv6_udp.snoop ipv6_eh_udp.snoop"
 for c in $ipv6_cases; do
 	run_test $c -p
-	if [[ $c == "ipv6_icmp.snoop" || $c == "ipv6_eh_udp.snoop" ]]; then
-		# Full checksums on ICMPv6 or those bearing extension headers are not
-		# presently supported.  Skip such testing for now.
-		continue
-	fi
 	run_test $c -f
 done
 

@@ -21569,6 +21569,7 @@ f usr/share/man/man9f/strqget.9f 0444 root bin
 f usr/share/man/man9f/strqset.9f 0444 root bin
 s usr/share/man/man9f/strrchr.9f=string.9f
 s usr/share/man/man9f/strspn.9f=string.9f
+s usr/share/man/man9f/strtok_r.9f=string.9f
 f usr/share/man/man9f/swab.9f 0444 root bin
 f usr/share/man/man9f/taskq.9f 0444 root bin
 f usr/share/man/man9f/testb.9f 0444 root bin

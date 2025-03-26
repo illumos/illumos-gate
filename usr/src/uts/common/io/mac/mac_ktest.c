@@ -19,9 +19,6 @@
  */
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
-#include <inet/sctp_ip.h>
-#include <inet/tcp.h>
-#include <inet/udp_impl.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/ktest.h>
@@ -31,6 +28,10 @@
 
 typedef mblk_t *(*mac_sw_cksum_t)(mblk_t *, mac_emul_t);
 
+/* Arbitrary limits for cksum tests */
+#define	PADDING_MAX	32
+#define	SPLITS_MAX	8
+
 typedef struct cksum_test_params {
 	mblk_t		*ctp_mp;
 	uchar_t		*ctp_raw;
@@ -38,10 +39,54 @@ typedef struct cksum_test_params {
 	boolean_t	ctp_do_partial;
 	boolean_t	ctp_do_full;
 	boolean_t	ctp_do_ipv4;
+	uint_t		ctp_splits[SPLITS_MAX];
 } cksum_test_params_t;
 
-/* Arbitrary limit to padding allowed for cksum tests */
-#define	PADDING_MAX	32
+static mblk_t *
+cksum_alloc_pkt(const cksum_test_params_t *ctp, uint32_t padding)
+{
+	uint32_t remain = ctp->ctp_raw_sz;
+	uint_t split_idx = 0;
+	const uint8_t *pkt_bytes = ctp->ctp_raw;
+
+	mblk_t *head = NULL, *tail = NULL;
+	while (remain > 0) {
+		const boolean_t has_split = ctp->ctp_splits[split_idx] != 0;
+		const uint32_t to_copy = has_split ?
+		    MIN(remain, ctp->ctp_splits[split_idx]) : remain;
+		const uint32_t to_alloc = padding + to_copy;
+
+		mblk_t *mp = allocb(to_alloc, 0);
+		if (mp == NULL) {
+			freemsg(head);
+			return (NULL);
+		}
+		if (head == NULL) {
+			head = mp;
+		}
+		if (tail != NULL) {
+			tail->b_cont = mp;
+		}
+		tail = mp;
+
+		/* Pad the first mblk with zeros, if requested */
+		if (padding != 0) {
+			bzero(mp->b_rptr, padding);
+			mp->b_rptr += padding;
+			mp->b_wptr += padding;
+			padding = 0;
+		}
+
+		bcopy(pkt_bytes, mp->b_rptr, to_copy);
+		mp->b_wptr += to_copy;
+		pkt_bytes += to_copy;
+		remain -= to_copy;
+		if (has_split) {
+			split_idx++;
+		}
+	}
+	return (head);
+}
 
 static boolean_t
 cksum_test_parse_input(ktest_ctx_hdl_t *ctx, cksum_test_params_t *ctp)
@@ -64,57 +109,78 @@ cksum_test_parse_input(ktest_ctx_hdl_t *ctx, cksum_test_params_t *ctp)
 	if (nvlist_lookup_byte_array(params, "pkt_bytes", &pkt_bytes,
 	    &pkt_sz) != 0) {
 		KT_ERROR(ctx, "Input missing pkt_bytes field");
-		return (B_FALSE);
+		goto bail;
 	}
 	if (pkt_sz == 0) {
 		KT_ERROR(ctx, "Packet must not be 0-length");
-		return (B_FALSE);
+		goto bail;
 	}
 
 	uint32_t padding = 0;
 	(void) nvlist_lookup_uint32(params, "padding", &padding);
 	if (padding & 1) {
 		KT_ERROR(ctx, "padding must be even");
-		return (B_FALSE);
+		goto bail;
 	} else if (padding > PADDING_MAX) {
 		KT_ERROR(ctx, "padding greater than max of %u", PADDING_MAX);
-		return (B_FALSE);
+		goto bail;
 	}
 
 	ctp->ctp_do_ipv4 = fnvlist_lookup_boolean(params, "cksum_ipv4");
 	ctp->ctp_do_partial = fnvlist_lookup_boolean(params, "cksum_partial");
 	ctp->ctp_do_full = fnvlist_lookup_boolean(params, "cksum_full");
 
-	if (ctp->ctp_do_partial && ctp->ctp_do_full) {
-		KT_ERROR(ctx, "Cannot request full and partial cksum");
-		return (B_FALSE);
+	uint32_t *splits;
+	uint_t nsplits;
+	if (nvlist_lookup_uint32_array(params, "cksum_splits", &splits,
+	    &nsplits) == 0) {
+		if (nsplits > SPLITS_MAX) {
+			KT_ERROR(ctx, "Too many splits requested");
+			goto bail;
+		}
+		for (uint_t i = 0; i < nsplits; i++) {
+			if (splits[i] == 0) {
+				KT_ERROR(ctx, "Splits should not be 0");
+				goto bail;
+			} else if (splits[i] & 1) {
+				KT_ERROR(ctx, "Splits must be 2-byte aligned");
+				goto bail;
+			}
+			ctp->ctp_splits[i] = splits[i];
+		}
 	}
 
-	mblk_t *mp = allocb(pkt_sz + padding, 0);
-	if (mp == NULL) {
-		KT_ERROR(ctx, "Could not allocate mblk");
-		return (B_FALSE);
+	if (ctp->ctp_do_partial && ctp->ctp_do_full) {
+		KT_ERROR(ctx, "Cannot request full and partial cksum");
+		goto bail;
 	}
-	if (padding != 0) {
-		bzero(mp->b_rptr, padding);
-		mp->b_rptr += padding;
-		mp->b_wptr += padding;
-	}
-	bcopy(pkt_bytes, mp->b_rptr, pkt_sz);
-	mp->b_wptr += pkt_sz;
-	ctp->ctp_mp = mp;
 
 	ctp->ctp_raw = kmem_alloc(pkt_sz, KM_SLEEP);
 	bcopy(pkt_bytes, ctp->ctp_raw, pkt_sz);
 	ctp->ctp_raw_sz = pkt_sz;
 
+	ctp->ctp_mp = cksum_alloc_pkt(ctp, padding);
+	if (ctp->ctp_mp == NULL) {
+		KT_ERROR(ctx, "Could not allocate mblk");
+		goto bail;
+	}
+
 	nvlist_free(params);
 	return (B_TRUE);
+
+bail:
+	if (ctp->ctp_raw != NULL) {
+		kmem_free(ctp->ctp_raw, ctp->ctp_raw_sz);
+	}
+	if (params != NULL) {
+		nvlist_free(params);
+	}
+	return (B_FALSE);
 }
 
 /* Calculate pseudo-header checksum for a packet */
 static uint16_t
-cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, mblk_t *mp,
+cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, const uint8_t *pkt_data,
     const mac_ether_offload_info_t *meoi)
 {
 	if ((meoi->meoi_flags & MEOI_L4INFO_SET) == 0) {
@@ -122,8 +188,7 @@ cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, mblk_t *mp,
 		return (0);
 	}
 
-	const uint16_t *iphs =
-	    (const uint16_t *)(mp->b_rptr + meoi->meoi_l2hlen);
+	const uint16_t *iphs = (const uint16_t *)(pkt_data + meoi->meoi_l2hlen);
 	uint32_t cksum = 0;
 
 	/* Copied from ip_input_cksum_pseudo_v[46]() */
@@ -150,7 +215,7 @@ cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, mblk_t *mp,
 		cksum += IP_ICMPV6_CSUM_COMP;
 		break;
 	default:
-		KT_ERROR(ctx, "unexpected l4 proto %u", meoi->meoi_l4proto);
+		KT_ERROR(ctx, "unexpected L4 proto %u", meoi->meoi_l4proto);
 		return (0);
 	}
 
@@ -165,7 +230,7 @@ cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, mblk_t *mp,
 		 * Reach into the v4 header to make that calculation.
 		 */
 		const ipha_t *ipha =
-		    (const ipha_t *)(mp->b_rptr + meoi->meoi_l2hlen);
+		    (const ipha_t *)(pkt_data + meoi->meoi_l2hlen);
 		ulp_len = ntohs(ipha->ipha_length) - meoi->meoi_l3hlen;
 	}
 
@@ -174,6 +239,74 @@ cksum_calc_pseudo(ktest_ctx_hdl_t *ctx, mblk_t *mp,
 	cksum = (cksum >> 16) + (cksum & 0xffff);
 	cksum = (cksum >> 16) + (cksum & 0xffff);
 	return (cksum);
+}
+
+/*
+ * Overwrite 2 bytes in mblk at given offset.
+ *
+ * Assumes:
+ * - offset is 2-byte aligned
+ * - mblk(s) in chain reference memory which is 2-byte aligned
+ * - offset is within mblk chain
+ */
+static void
+mblk_write16(mblk_t *mp, uint_t off, uint16_t val)
+{
+	VERIFY(mp != NULL);
+	VERIFY3U(off & 1, ==, 0);
+	VERIFY3U(off + 2, <=, msgdsize(mp));
+
+	while (off >= MBLKL(mp)) {
+		off -= MBLKL(mp);
+		mp = mp->b_cont;
+		VERIFY(mp != NULL);
+	}
+
+	uint16_t *datap = (uint16_t *)(mp->b_rptr + off);
+	*datap = val;
+}
+
+/* Compare resulting mblk with known good value in test parameters.  */
+static boolean_t
+cksum_result_compare(ktest_ctx_hdl_t *ctx, const cksum_test_params_t *ctp,
+    mblk_t *mp)
+{
+	if (msgdsize(mp) != ctp->ctp_raw_sz) {
+		KT_FAIL(ctx, "mp size %u != %u", msgdsize(mp), ctp->ctp_raw_sz);
+		return (B_FALSE);
+	}
+
+	uint32_t fail_val = 0, good_val = 0;
+	uint_t mp_off = 0, fail_len = 0, i;
+	for (i = 0; i < ctp->ctp_raw_sz; i++) {
+		/*
+		 * If we encounter a mismatch, collect up to 4 bytes of context
+		 * to print with the failure.
+		 */
+		if (mp->b_rptr[mp_off] != ctp->ctp_raw[i] || fail_len != 0) {
+			fail_val |= mp->b_rptr[mp_off] << (fail_len * 8);
+			good_val |= ctp->ctp_raw[i] << (fail_len * 8);
+
+			fail_len++;
+			if (fail_len == 4) {
+				break;
+			}
+		}
+
+		mp_off++;
+		if (mp_off == MBLKL(mp)) {
+			mp = mp->b_cont;
+			mp_off = 0;
+		}
+	}
+
+	if (fail_len != 0) {
+		KT_FAIL(ctx, "mp[%02X] %08X != %08X", (i - fail_len),
+		    fail_val, good_val);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 /*
@@ -219,32 +352,37 @@ mac_sw_cksum_test(ktest_ctx_hdl_t *ctx)
 	mac_emul_t emul_flags = 0;
 	uint_t hck_flags = 0, hck_start = 0, hck_stuff = 0, hck_end = 0;
 	if (meoi.meoi_l3proto == ETHERTYPE_IP && ctp.ctp_do_ipv4) {
-		ipha_t *ipha = (ipha_t *)(mp->b_rptr + meoi.meoi_l2hlen);
-
-		ipha->ipha_hdr_checksum = 0;
+		mblk_write16(mp,
+		    meoi.meoi_l2hlen + offsetof(ipha_t, ipha_hdr_checksum), 0);
 		emul_flags |= MAC_IPCKSUM_EMUL;
 		hck_flags |= HCK_IPV4_HDRCKSUM;
 	}
 
 	const boolean_t do_l4 = ctp.ctp_do_partial || ctp.ctp_do_full;
 	if ((meoi.meoi_flags & MEOI_L4INFO_SET) != 0 && do_l4) {
-		boolean_t valid_proto = B_FALSE;
+		boolean_t skip_pseudo = B_FALSE;
 		hck_start = meoi.meoi_l2hlen + meoi.meoi_l3hlen;
 		hck_stuff = hck_start;
 		hck_end = meoi.meoi_len;
 
 		switch (meoi.meoi_l4proto) {
 		case IPPROTO_TCP:
-			hck_stuff += offsetof(tcpha_t, tha_sum);
-			valid_proto = B_TRUE;
+			hck_stuff += TCP_CHECKSUM_OFFSET;
 			break;
 		case IPPROTO_UDP:
-			hck_stuff += offsetof(udpha_t, uha_checksum);
-			valid_proto = B_TRUE;
+			hck_stuff += UDP_CHECKSUM_OFFSET;
+			break;
+		case IPPROTO_ICMP:
+			hck_stuff += ICMP_CHECKSUM_OFFSET;
+			/*
+			 * ICMP does not include the pseudo-header content in
+			 * its checksum, but we can still do a partial with that
+			 * field cleared.
+			 */
+			skip_pseudo = B_TRUE;
 			break;
 		case IPPROTO_ICMPV6:
-			hck_stuff += offsetof(icmp6_t, icmp6_cksum);
-			valid_proto = B_TRUE;
+			hck_stuff += ICMPV6_CHECKSUM_OFFSET;
 			break;
 		case IPPROTO_SCTP:
 			/*
@@ -252,40 +390,40 @@ mac_sw_cksum_test(ktest_ctx_hdl_t *ctx)
 			 * test logic for clearing the existing sum needs to
 			 * account for its increased width.
 			 */
-			hck_stuff += offsetof(sctp_hdr_t, sh_chksum);
+			hck_stuff += SCTP_CHECKSUM_OFFSET;
 			if (ctp.ctp_do_full) {
-				uint32_t *lckp =
-				    (uint32_t *)(mp->b_rptr + hck_stuff);
-				*lckp = 0;
-				/*
-				 * Set the emulation flags ourself, and skip the
-				 * logic below by leaving valid_proto as false.
-				 */
-				hck_flags |= HCK_FULLCKSUM;
-				emul_flags |= MAC_HWCKSUM_EMUL;
+				mblk_write16(mp, hck_stuff, 0);
+				mblk_write16(mp, hck_stuff + 2, 0);
+			} else {
+				KT_SKIP(ctx,
+				    "Partial L4 cksum not supported for SCTP");
 			}
 			break;
 		default:
-			break;
+			KT_SKIP(ctx,
+			    "Partial L4 cksum not supported for proto");
+			goto cleanup;
 		}
 
-		if (valid_proto) {
-			uint16_t *ckp = (uint16_t *)(mp->b_rptr + hck_stuff);
-
-			emul_flags |= MAC_HWCKSUM_EMUL;
-			if (ctp.ctp_do_partial) {
-				hck_flags |= HCK_PARTIALCKSUM;
+		emul_flags |= MAC_HWCKSUM_EMUL;
+		if (ctp.ctp_do_partial) {
+			hck_flags |= HCK_PARTIALCKSUM;
+			if (!skip_pseudo) {
 				/* Populate L4 pseudo-header cksum */
-				*ckp = cksum_calc_pseudo(ctx, mp, &meoi);
+				const uint16_t pcksum =
+				    cksum_calc_pseudo(ctx, ctp.ctp_raw, &meoi);
+				mblk_write16(mp, hck_stuff, pcksum);
 			} else {
-				hck_flags |= HCK_FULLCKSUM;
-				/* Zero out the L4 cksum */
-				*ckp = 0;
+				mblk_write16(mp, hck_stuff, 0);
 			}
+		} else {
+			hck_flags |= HCK_FULLCKSUM;
+			/* Zero out the L4 cksum */
+			mblk_write16(mp, hck_stuff, 0);
 		}
 	}
 	if (do_l4 && (hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0) {
-		KT_SKIP(ctx, "L4 checksum not support for packet");
+		KT_SKIP(ctx, "L4 checksum not supported for packet");
 		goto cleanup;
 	}
 
@@ -302,30 +440,16 @@ mac_sw_cksum_test(ktest_ctx_hdl_t *ctx)
 			hck_stuff -= meoi.meoi_l2hlen;
 			hck_end -= meoi.meoi_l2hlen;
 		}
-		mac_hcksum_set(mp, hck_start, hck_stuff, hck_end, 0, hck_flags);
+		/* Set hcksum information on all mblks in chain */
+		for (mblk_t *cmp = mp; cmp != NULL; cmp = cmp->b_cont) {
+			mac_hcksum_set(cmp, hck_start, hck_stuff, hck_end, 0,
+			    hck_flags);
+		}
 		ctp.ctp_mp = mp = mac_sw_cksum(mp, emul_flags);
 
 		KT_ASSERT3UG(mp, !=, NULL, ctx, cleanup);
-		const uint_t input_pkt_sz = ctp.ctp_raw_sz;
-		KT_ASSERT3UG(MBLKL(mp), ==, input_pkt_sz, ctx, cleanup);
-
-		for (uint_t i = 0; i < input_pkt_sz; i++) {
-			/*
-			 * If there is any mismatch from the expected output,
-			 * print the contents of the first "bad" byte.
-			 */
-			if (mp->b_rptr[i] != ctp.ctp_raw[i]) {
-				if (i + 2 < input_pkt_sz) {
-					KT_FAIL(ctx, "mp[%x] %04X != %04X",
-					    i,
-					    *(uint16_t *)&mp->b_rptr[i],
-					    *(uint16_t *)&ctp.ctp_raw[i]);
-				} else {
-					KT_FAIL(ctx, "mp[%x] %02X != %02X",
-					    i, mp->b_rptr[i], ctp.ctp_raw[i]);
-				}
-				goto cleanup;
-			}
+		if (!cksum_result_compare(ctx, &ctp, mp)) {
+			goto cleanup;
 		}
 	} else {
 		KT_SKIP(ctx, "no checksums supported for packet");
@@ -339,7 +463,7 @@ cleanup:
 		ktest_release_mod(hdl);
 	}
 	if (ctp.ctp_mp != NULL) {
-		freeb(ctp.ctp_mp);
+		freemsg(ctp.ctp_mp);
 	}
 	if (ctp.ctp_raw != NULL) {
 		kmem_free(ctp.ctp_raw, ctp.ctp_raw_sz);

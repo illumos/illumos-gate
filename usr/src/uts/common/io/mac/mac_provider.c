@@ -65,6 +65,7 @@
 #include <inet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/sctp.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 
 /*
@@ -2158,6 +2159,13 @@ mac_mmc_parse_l4(mac_mblk_cursor_t *cursor, uint8_t ipproto, uint8_t *hdr_sizep)
 		return (true);
 	case IPPROTO_UDP:
 		*hdr_sizep = sizeof (struct udphdr);
+		return (true);
+	case IPPROTO_ICMP:
+		/*
+		 * Only count the parts of the header which are common to
+		 * message types.
+		 */
+		*hdr_sizep = offsetof(struct icmp, icmp_hun);
 		return (true);
 	case IPPROTO_ICMPV6:
 		*hdr_sizep = sizeof (icmp6_t);
