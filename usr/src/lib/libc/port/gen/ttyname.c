@@ -510,8 +510,15 @@ srch_dir(const entry_t path,	/* current path */
 		return (0);
 	}
 
-	path_len = strlen(path.name);
-	(void) strcpy(file_name, path.name);
+	/*
+	 * Note, we only make sure we can fit path.name + '/' into
+	 * file_name here.
+	 */
+	path_len = strlcpy(file_name, path.name, sizeof (file_name));
+	if (path_len + 1 >= sizeof (file_name)) {
+		(void) closedir(dirp);
+		return (0);
+	}
 	last_comp = file_name + path_len;
 	*last_comp++ = '/';
 

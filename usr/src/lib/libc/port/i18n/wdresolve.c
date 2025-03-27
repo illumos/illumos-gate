@@ -57,12 +57,10 @@ static int	initialized = 0;
 static int
 _wdinitialize(void)
 {
-#define	_DFLTLOCPATH_LEN	(sizeof (_DFLT_LOC_PATH) - 1)
-#define	_WDMODPATH_LEN		(sizeof (_WDMOD_PATH) - 1)
 	char	wdmodpath[PATH_MAX];
 	char	*loc;
-	size_t	loclen;
 	locale_t	curloc;
+	int rv;
 
 	initialized = 1;
 
@@ -71,16 +69,14 @@ _wdinitialize(void)
 
 	curloc = uselocale(NULL);
 	loc = current_locale(curloc, LC_CTYPE);
-	loclen = strlen(loc);
-	if (_DFLTLOCPATH_LEN + loclen + _WDMODPATH_LEN >= sizeof (wdmodpath)) {
+
+	rv = snprintf(wdmodpath, sizeof (wdmodpath), "%s%s%s",
+	    _DFLT_LOC_PATH, loc, _WDMOD_PATH);
+	if (rv < 0 || rv >= sizeof (wdmodpath)) {
 		/* pathname too long */
 		modhandle = NULL;
 		goto C_fallback;
 	}
-
-	(void) strcpy(wdmodpath, _DFLT_LOC_PATH);
-	(void) strcpy(wdmodpath + _DFLTLOCPATH_LEN, loc);
-	(void) strcpy(wdmodpath + _DFLTLOCPATH_LEN + loclen, _WDMOD_PATH);
 
 	if ((modhandle = dlopen(wdmodpath, RTLD_LAZY)) != NULL) {
 		wdchknd = (int(*)(wchar_t))dlsym(modhandle, "_wdchkind_");

@@ -2482,9 +2482,11 @@ getsystemTZ()
 			break;
 	}
 	if (tzn == NULL) {
+		size_t tzl = strlen(tz) + 1;
+
 		/* This is new timezone name */
-		tzn = lmalloc(sizeof (tznmlist_t *) + strlen(tz) + 1);
-		(void) strcpy(tzn->name, tz);
+		tzn = lmalloc(sizeof (tznmlist_t *) + tzl);
+		(void) memcpy(tzn->name, tz, tzl);
 		tzn->link = systemTZrec;
 		systemTZrec = tzn;
 	}
@@ -2515,6 +2517,7 @@ set_one_tzname(const char *name, int idx)
 	int	hashid, i;
 	char	*s;
 	tznmlist_t *tzn;
+	size_t tznl;
 
 	if (name == _tz_gmt || name == _tz_spaces) {
 		tzname[idx] = (char *)name;
@@ -2536,11 +2539,12 @@ set_one_tzname(const char *name, int idx)
 	/*
 	 * allocate new entry. This entry is never freed, so use lmalloc
 	 */
-	tzn = lmalloc(sizeof (tznmlist_t *) + strlen(name) + 1);
+	tznl = strlen(name) + 1;
+	tzn = lmalloc(sizeof (tznmlist_t *) + tznl);
 	if (tzn == NULL)
 		return (1);
 
-	(void) strcpy(tzn->name, name);
+	(void) memcpy(tzn->name, name, tznl);
 
 	/* link it */
 	tzn->link = tznmhash[hashid];
