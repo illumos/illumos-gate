@@ -192,6 +192,14 @@ if [ $? -ne 0 ]; then
             mount -F lofs /usbkey/ssh /etc/ssh
         fi
 
+	#
+	# Set primarycache=metadata to avoid keeping swap data in RAM via the ARC.
+	# Set secondarycache=none to disable L2ARC for swap.
+	#
+	zfs set primarycache=metadata ${SYS_ZPOOL}/swap || \
+            fatal "failed to set primarycache=metadata on swap zvol"
+	zfs set secondarycache=none ${SYS_ZPOOL}/swap || \
+            fatal "failed to set secondarycache=none on swap zvol"
         swap -a /dev/zvol/dsk/${SYS_ZPOOL}/swap || \
             fatal "failed to configure swap device"
 
