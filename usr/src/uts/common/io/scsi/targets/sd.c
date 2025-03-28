@@ -3464,8 +3464,7 @@ sd_process_sdconf_file(struct sd_lun *un)
 					    dataname_ptr, version);
 					rval = SD_FAILURE;
 				}
-				if (data_list)
-					ddi_prop_free(data_list);
+				ddi_prop_free(data_list);
 			}
 		}
 	}
@@ -9542,9 +9541,15 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 
 	/* check for previous exclusive open */
 	SD_TRACE(SD_LOG_OPEN_CLOSE, un, "sdopen: un=%p\n", (void *)un);
-	SD_TRACE(SD_LOG_OPEN_CLOSE, un,
-	    "sdopen: exclopen=%x, flag=%x, regopen=%x\n",
-	    un->un_exclopen, flag, un->un_ocmap.regopen[otyp]);
+	if (otyp == OTYP_LYR) {
+		SD_TRACE(SD_LOG_OPEN_CLOSE, un,
+		    "sdopen: exclopen=%x, flag=%x, un_ocmap.lyropen=%x\n",
+		    un->un_exclopen, flag, un->un_ocmap.lyropen[part]);
+	} else {
+		SD_TRACE(SD_LOG_OPEN_CLOSE, un,
+		    "sdopen: exclopen=%x, flag=%x, regopen=%x\n",
+		    un->un_exclopen, flag, un->un_ocmap.regopen[otyp]);
+	}
 
 	if (un->un_exclopen & (partmask)) {
 		goto excl_open_fail;

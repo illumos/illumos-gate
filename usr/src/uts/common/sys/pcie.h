@@ -356,6 +356,7 @@ extern "C" {
 #define	PCIE_SLOTCTL_EMI_LOCK_CONTROL	0x0800	/* EMI Lock control */
 #define	PCIE_SLOTCTL_DLL_STATE_EN	0x1000	/* DLL State Changed En */
 #define	PCIE_SLOTCTL_AUTO_SLOT_PL_DIS	0x2000	/* Auto Slot Power Limit Dis */
+#define	PCIE_SLOTCTL_INB_PRES_DET_DIS	0x4000	/* Inband Presence Detect Dis */
 #define	PCIE_SLOTCTL_ATTN_INDICATOR_MASK 0x00C0	/* Attn Indicator mask */
 #define	PCIE_SLOTCTL_PWR_INDICATOR_MASK	0x0300	/* Power Indicator mask */
 #define	PCIE_SLOTCTL_INTR_MASK		0x103f	/* Supported intr mask */
@@ -536,6 +537,11 @@ extern "C" {
 #define	PCIE_LINKSTS2_XLINK_RES		0x0300
 #define	PCIE_LINKSTS2_DS_COMP_PRES_MASK	0x7000
 #define	PCIE_LINKSTS2_DRS_MSG_RX	0x8000
+
+/*
+ * Slot Capabilities 2 Register (4 bytes)
+ */
+#define	PCIE_SLOTCAP2_INB_PRES_DET_DIS_SUP	0x1
 
 /*
  * PCI-Express Enhanced Capabilities Link Entry Bit Offsets
