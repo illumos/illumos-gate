@@ -20,12 +20,13 @@
  */
 
 /*
+ * Copyright 2025 MNX Cloud, Inc.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -170,7 +171,7 @@ struct anchor {
 
 #define	HAS_HISTOGRAM	0x0001		/* this buffer has a histogram */
 
-static ANCHOR 	*curAnchor = NULL;	/* addr of anchor for current block */
+static ANCHOR	*curAnchor = NULL;	/* addr of anchor for current block */
 static ANCHOR    firstAnchor;		/* the first anchor to use */
 					/* - hopefully the Only one needed */
 					/* a speedup for most cases. */
@@ -189,7 +190,7 @@ struct cnt *_mcount_newent(void);
  */
 void
 monitor(int (*alowpc)(void), int (*ahighpc)(void), WORD *buffer,
-	size_t bufsize, size_t nfunc)
+    size_t bufsize, size_t nfunc)
 {
 	uint_t scale;
 	long text;
@@ -241,7 +242,8 @@ monitor(int (*alowpc)(void), int (*ahighpc)(void), WORD *buffer,
 		return;
 	}
 
-	if ((s = getenv(PROFDIR)) == NULL) { /* PROFDIR not in environment */
+	s = getenv(PROFDIR);
+	if (s == NULL || ___Argv == NULL) {
 		mon_out = MON_OUT; /* use default "mon.out" */
 	} else if (*s == '\0') { /* value of PROFDIR is NULL */
 		lmutex_unlock(&mon_lock);
@@ -254,8 +256,8 @@ monitor(int (*alowpc)(void), int (*ahighpc)(void), WORD *buffer,
 
 		len = strlen(s);
 		/* 15 is space for /pid.mon.out\0, if necessary */
-		if ((mon_out = libc_malloc(len + strlen(___Argv[0]) + 15))
-		    == NULL) {
+		mon_out = libc_malloc(len + strlen(___Argv[0]) + 15);
+		if (mon_out == NULL) {
 			lmutex_unlock(&mon_lock);
 			perror("");
 			return;
@@ -434,7 +436,7 @@ writeBlocks(void)
 /*
  * call libc_malloc() to get an anchor & a regn1&2 block, together
  */
-#define	GETTHISMUCH	(sizeof (ANCHOR) + 	/* get an ANCHOR */  \
+#define	GETTHISMUCH	(sizeof (ANCHOR) +	/* get an ANCHOR */  \
 			(sizeof (struct hdr) +	/* get Region 1 */   \
 			THISMANYFCNS * sizeof (struct cnt))) /* Region 2 */  \
 						/* but No region 3 */
