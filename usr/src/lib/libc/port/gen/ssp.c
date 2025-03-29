@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <upanic.h>
@@ -49,7 +49,7 @@ ssp_init(void)
 		 * off the ground.
 		 */
 		hrtime_t t = gethrtime();
-#ifdef	_LP32
+#ifdef	_ILP32
 		const uint16_t guard = '\n' << 8 | '\0';
 		__stack_chk_guard = guard  << 16 | (uint16_t)t;
 #else

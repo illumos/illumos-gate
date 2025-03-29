@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -1070,7 +1070,7 @@ stdbit_test_one(const stdbit_test_t *test, const stdbit_ops_t *ops)
 			ret = false;
 		}
 
-#ifdef	_LP32
+#ifdef	_ILP32
 		res = ops->so_ul(test->st_val);
 		if (res != comp) {
 			warnx("TEST FAILED: %s (0x%" PRIx64 ") 32-bit (ulong) "
@@ -1078,7 +1078,7 @@ stdbit_test_one(const stdbit_test_t *test, const stdbit_ops_t *ops)
 			    ops->so_name, test->st_val, res, comp);
 			ret = false;
 		}
-#endif	/* _LP32 */
+#endif	/* _ILP32 */
 
 		comp += ops->so_delta[2];
 	}
@@ -1262,7 +1262,7 @@ stdbit_1b_test_one(const stdbit_test_t *test)
 			ret = false;
 		}
 
-#ifdef	_LP32
+#ifdef	_ILP32
 		res = stdc_has_single_bit_ul(test->st_val);
 		if (res != comp) {
 			warnx("TEST FAILED: Single-bit (0x%" PRIx64 ") 32-bit "
@@ -1270,7 +1270,7 @@ stdbit_1b_test_one(const stdbit_test_t *test)
 			    res ? "true" : "false", comp ? "true" : "false");
 			ret = false;
 		}
-#endif	/* _LP32 */
+#endif	/* _ILP32 */
 	}
 
 	if ((test->st_types & STDBIT_TEST_U64) != 0) {
@@ -1495,7 +1495,7 @@ stdbit_fc_test_one(const stdbit_fc_test_t *test)
 			ret = false;
 		}
 
-#ifdef	_LP32
+#ifdef	_ILP32
 		res = stdc_bit_floor_ul(test->sfc_val);
 		if (res != test->sfc_floor) {
 			warnx("TEST FAILED: Bit Floor (0x%" PRIx64 ") 32-bit "
@@ -1511,7 +1511,7 @@ stdbit_fc_test_one(const stdbit_fc_test_t *test)
 			    PRIx64, test->sfc_val, res, test->sfc_ceil);
 			ret = false;
 		}
-#endif	/* _LP32 */
+#endif	/* _ILP32 */
 	}
 
 	if ((test->sfc_types & STDBIT_TEST_U64) != 0) {
