@@ -55,6 +55,7 @@ PROGS = \
 	isatty \
 	memchr \
 	memset_s \
+	mutex_attr \
 	mutex-16200 \
 	posix_memalign \
 	printf-15294 \
@@ -112,6 +113,8 @@ mutex-16200.32 :=	LDLIBS += -lproc
 mutex-16200.64 :=	LDLIBS64 += -lproc
 mutex-16200.32 :=	CSTD=$(CSTD_GNU17)
 mutex-16200.64 :=	CSTD=$(CSTD_GNU17)
+mutex_attr.32 :=	CSTD=$(CSTD_GNU17)
+mutex_attr.64 :=	CSTD=$(CSTD_GNU17)
 
 ptsname.32 :=		LDLIBS += -lsocket
 ptsname.64 :=		LDLIBS64 += -lsocket

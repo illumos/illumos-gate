@@ -87,6 +87,7 @@ fab_update_topo(fmd_hdl_t *hdl)
 		fmd_hdl_topo_rele(hdl, thp);
 		goto cleanup;
 	}
+	fflush(fp);
 
 	/* Release topology */
 	fmd_hdl_topo_rele(hdl, thp);
