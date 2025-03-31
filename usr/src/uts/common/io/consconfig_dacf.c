@@ -1496,7 +1496,7 @@ consconfig_init_input(cons_state_t *sp)
 			consconfig_setup_polledio(sp, cons_final_dev);
 	}
 
-	kadb_uses_kernel();
+	prom_io_use_kernel();
 }
 
 /*

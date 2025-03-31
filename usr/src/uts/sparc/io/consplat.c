@@ -220,12 +220,6 @@ plat_stdout_is_framebuffer(void)
 }
 
 void
-kadb_uses_kernel()
-{
-	/* only used on intel */
-}
-
-void
 plat_tem_get_inverses(int *inverse, int *inverse_screen)
 {
 	prom_get_tem_inverses(inverse, inverse_screen);
