@@ -440,11 +440,6 @@ struct driver_properties {
 	int t4_fw_install;
 };
 
-struct rss_header;
-typedef int (*cpl_handler_t)(struct sge_iq *, const struct rss_header *,
-    mblk_t *);
-typedef int (*fw_msg_handler_t)(struct adapter *, const __be64 *);
-
 struct t4_mbox_list {
 	STAILQ_ENTRY(t4_mbox_list) link;
 };
@@ -510,9 +505,6 @@ struct adapter {
 	uint16_t rdmacaps;
 	uint16_t iscsicaps;
 	uint16_t fcoecaps;
-
-	fw_msg_handler_t fw_msg_handler[5]; /* NUM_FW6_TYPES */
-	cpl_handler_t cpl_handler[0xef]; /* NUM_CPL_CMDS */
 
 	kmutex_t lock;
 	kcondvar_t cv;
@@ -812,8 +804,6 @@ int port_full_init(struct port_info *pi);
 int port_full_uninit(struct port_info *pi);
 void enable_port_queues(struct port_info *pi);
 void disable_port_queues(struct port_info *pi);
-int t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h);
-int t4_register_fw_msg_handler(struct adapter *, int, fw_msg_handler_t);
 void t4_iterate(void (*func)(int, void *), void *arg);
 
 /* t4_debug.c */

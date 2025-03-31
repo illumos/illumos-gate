@@ -164,8 +164,9 @@ static kstat_t *setup_txq_kstats(struct port_info *pi, struct sge_txq *txq,
 static int update_txq_kstats(kstat_t *ksp, int rw);
 static int handle_sge_egr_update(struct sge_iq *, const struct rss_header *,
     mblk_t *);
-static int handle_fw_rpl(struct sge_iq *iq, const struct rss_header *rss,
-    mblk_t *m);
+static int t4_handle_cpl_msg(struct sge_iq *, const struct rss_header *,
+    mblk_t *);
+static int t4_handle_fw_msg(struct sge_iq *, const struct rss_header *);
 
 static kmem_cache_t *rxbuf_cache_create(struct rxbuf_cache_params *);
 static struct rxbuf *rxbuf_alloc(kmem_cache_t *, int, uint_t);
@@ -325,14 +326,6 @@ t4_sge_init(struct adapter *sc)
 	t4_write_reg(sc, A_SGE_TIMER_VALUE_4_AND_5,
 	    V_TIMERVALUE4(us_to_core_ticks(sc, p->timer_val[4])) |
 	    V_TIMERVALUE5(us_to_core_ticks(sc, p->timer_val[5])));
-
-	(void) t4_register_cpl_handler(sc, CPL_FW4_MSG, handle_fw_rpl);
-	(void) t4_register_cpl_handler(sc, CPL_FW6_MSG, handle_fw_rpl);
-	(void) t4_register_cpl_handler(sc, CPL_SGE_EGR_UPDATE,
-	    handle_sge_egr_update);
-	(void) t4_register_cpl_handler(sc, CPL_RX_PKT, t4_eth_rx);
-	(void) t4_register_fw_msg_handler(sc, FW6_TYPE_CMD_RPL,
-	    t4_handle_fw_rpl);
 }
 
 /*
@@ -702,8 +695,7 @@ t4_ring_rx(struct sge_rxq *rxq, int budget)
 			/* FALLTHROUGH */
 
 		case X_RSPD_TYPE_CPL:
-			ASSERT(rss->opcode < NUM_CPL_CMDS);
-			sc->cpl_handler[rss->opcode](iq, rss, m);
+			(void) t4_handle_cpl_msg(iq, rss, m);
 			break;
 
 		default:
@@ -800,9 +792,7 @@ service_iq(struct sge_iq *iq, int budget)
 
 			/* FALLTHRU */
 			case X_RSPD_TYPE_CPL:
-
-				ASSERT(rss->opcode < NUM_CPL_CMDS);
-				sc->cpl_handler[rss->opcode](iq, rss, m);
+				(void) t4_handle_cpl_msg(iq, rss, m);
 				break;
 
 			case X_RSPD_TYPE_INTR:
@@ -3056,6 +3046,57 @@ write_txqflush_wr(struct sge_txq *txq)
 }
 
 static int
+t4_handle_cpl_msg(struct sge_iq *iq, const struct rss_header *rss, mblk_t *mp)
+{
+	const uint8_t opcode = rss->opcode;
+
+	DTRACE_PROBE4(t4__cpl_msg, struct sge_iq *, iq, uint8_t, opcode,
+	    const struct rss_header *, rss, mblk_t *, mp);
+
+	switch (opcode) {
+	case CPL_FW4_MSG:
+	case CPL_FW6_MSG:
+		ASSERT3P(mp, ==, NULL);
+		return (t4_handle_fw_msg(iq, rss));
+	case CPL_SGE_EGR_UPDATE:
+		return (handle_sge_egr_update(iq, rss, mp));
+	case CPL_RX_PKT:
+		return (t4_eth_rx(iq, rss, mp));
+	default:
+		cxgb_printf(iq->adapter->dip, CE_WARN,
+		    "unhandled CPL opcode 0x%02x", opcode);
+		if (mp != NULL) {
+			freemsg(mp);
+		}
+		return (0);
+	}
+}
+
+static int
+t4_handle_fw_msg(struct sge_iq *iq, const struct rss_header *rss)
+{
+	const struct cpl_fw6_msg *cpl = (const void *)(rss + 1);
+	const uint8_t msg_type = cpl->type;
+	const struct rss_header *rss2;
+	struct adapter *sc = iq->adapter;
+
+	DTRACE_PROBE3(t4__fw_msg, struct sge_iq *, iq, uint8_t, msg_type,
+	    const struct rss_header *, rss);
+
+	switch (msg_type) {
+	case FW_TYPE_RSSCPL:	/* also synonym for FW6_TYPE_RSSCPL */
+		rss2 = (const struct rss_header *)&cpl->data[0];
+		return (t4_handle_cpl_msg(iq, rss2, NULL));
+	case FW6_TYPE_CMD_RPL:
+		return (t4_handle_fw_rpl(sc, &cpl->data[0]));
+	default:
+		cxgb_printf(sc->dip, CE_WARN,
+		    "unhandled fw_msg type 0x%02x", msg_type);
+		return (0);
+	}
+}
+
+static int
 t4_eth_rx(struct sge_iq *iq, const struct rss_header *rss, mblk_t *m)
 {
 	bool csum_ok;
@@ -3189,23 +3230,6 @@ handle_sge_egr_update(struct sge_iq *iq, const struct rss_header *rss,
 	    (void *)txq, DDI_NOSLEEP);
 
 	return (0);
-}
-
-static int
-handle_fw_rpl(struct sge_iq *iq, const struct rss_header *rss, mblk_t *m)
-{
-	struct adapter *sc = iq->adapter;
-	const struct cpl_fw6_msg *cpl = (const void *)(rss + 1);
-
-	ASSERT(m == NULL);
-
-	if (cpl->type == FW_TYPE_RSSCPL || cpl->type == FW6_TYPE_RSSCPL) {
-		const struct rss_header *rss2;
-
-		rss2 = (const struct rss_header *)&cpl->data[0];
-		return (sc->cpl_handler[rss2->opcode](iq, rss2, m));
-	}
-	return (sc->fw_msg_handler[cpl->type](sc, &cpl->data[0]));
 }
 
 int
