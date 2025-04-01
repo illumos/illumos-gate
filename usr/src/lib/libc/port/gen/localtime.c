@@ -22,6 +22,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*
@@ -164,7 +165,7 @@
 #else /* little endian */
 
 #define	GET_BYTE(x) \
-	    ((x) & 0xff)
+	    ((uchar_t)(x) & 0xff)
 
 #define	SWAP_BYTES(x) ((\
 	    GET_BYTE(x) << 8) |\
