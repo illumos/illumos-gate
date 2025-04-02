@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifdef _KERNEL
@@ -134,7 +134,7 @@ bootbanner_print_one(ilstr_t *s, void (*printfunc)(const char *, uint_t),
 	bootbanner_expand_template(template, s);
 
 	if (ilstr_errno(s) == ILSTR_ERROR_OK) {
-		if (ilstr_len(s) > 0) {
+		if (!ilstr_is_empty(s)) {
 			printfunc(ilstr_cstr(s), *nump);
 			*nump += 1;
 		}

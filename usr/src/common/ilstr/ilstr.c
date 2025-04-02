@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifdef _KERNEL
@@ -20,6 +20,7 @@
 #include <sys/sunddi.h>
 #include <sys/stdbool.h>
 #include <sys/varargs.h>
+#include <sys/systm.h>
 #else
 #include <stdio.h>
 #include <stdbool.h>
@@ -31,6 +32,17 @@
 #include <sys/sysmacros.h>
 
 #include <sys/ilstr.h>
+
+#ifdef	_KERNEL
+/*
+ * Like a strategically placed banana peel, bcopy(9F) is documented as being
+ * _unsafe_ for overlapping copies: the opposite of the well-known and
+ * standardised behaviour of bcopy(3C)!
+ */
+#define	bmove(src, dst, len)		ovbcopy(src, dst, len)
+#else
+#define	bmove(src, dst, len)		bcopy(src, dst, len)
+#endif
 
 static bool ilstr_have_space(ilstr_t *, size_t);
 
@@ -113,6 +125,37 @@ ilstr_fini(ilstr_t *ils)
 	}
 
 	bzero(ils, sizeof (*ils));
+}
+
+void
+ilstr_prepend_str(ilstr_t *ils, const char *s)
+{
+	size_t len;
+
+	if (ils->ils_errno != ILSTR_ERROR_OK) {
+		return;
+	}
+
+	if ((len = strlen(s)) < 1) {
+		return;
+	}
+
+	if (!ilstr_have_space(ils, len)) {
+		return;
+	}
+
+	/*
+	 * Move the existing string, including the terminating byte, to make
+	 * room for the incoming prefix:
+	 */
+	bmove(ils->ils_data, ils->ils_data + len, ils->ils_strlen + 1);
+
+	/*
+	 * Copy the incoming prefix, without copying the terminating byte over
+	 * the top of the existing string:
+	 */
+	bcopy(s, ils->ils_data, len);
+	ils->ils_strlen += len;
 }
 
 void
@@ -208,6 +251,12 @@ ilstr_have_space(ilstr_t *ils, size_t needbytes)
 #else
 			free(ils->ils_data);
 #endif
+		} else {
+			/*
+			 * Ensure that the first chunk we allocate begins as a
+			 * valid zero-length string:
+			 */
+			new_data[0] = '\0';
 		}
 
 		ils->ils_data = new_data;
@@ -292,6 +341,21 @@ ilstr_append_char(ilstr_t *ils, char c)
 	ilstr_append_str(ils, buf);
 }
 
+void
+ilstr_prepend_char(ilstr_t *ils, char c)
+{
+	char buf[2];
+
+	if (ils->ils_errno != ILSTR_ERROR_OK) {
+		return;
+	}
+
+	buf[0] = c;
+	buf[1] = '\0';
+
+	ilstr_prepend_str(ils, buf);
+}
+
 ilstr_errno_t
 ilstr_errno(ilstr_t *ils)
 {
@@ -319,6 +383,12 @@ size_t
 ilstr_len(ilstr_t *ils)
 {
 	return (ils->ils_strlen);
+}
+
+bool
+ilstr_is_empty(ilstr_t *ils)
+{
+	return (ilstr_len(ils) == 0);
 }
 
 const char *

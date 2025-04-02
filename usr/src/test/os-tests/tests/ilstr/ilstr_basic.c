@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -23,9 +23,23 @@
 #include <strings.h>
 #include <errno.h>
 #include <upanic.h>
+#include <umem.h>
 #include <sys/ilstr.h>
 #include <sys/sysmacros.h>
 #include <sys/debug.h>
+
+#define	VERIFYSTRING(ils, expected)				\
+	do {							\
+		const char *check = ilstr_cstr(ils);		\
+		VERIFY(check != NULL);				\
+		if (strcmp(check, (expected)) != 0) {		\
+			char buf[2048];				\
+			(void) snprintf(buf, sizeof (buf),	\
+			    "\"%s\" != expected \"%s\"",	\
+			    check, (expected));			\
+			assfail(buf, __FILE__, __LINE__);	\
+		}						\
+	} while (0)
 
 typedef enum ilstr_test_types {
 	ITT_STD = 0x01,
@@ -60,6 +74,7 @@ int
 ist_empty(ilstr_t *ils)
 {
 	VERIFY3U(ilstr_len(ils), ==, 0);
+	VERIFY(ilstr_is_empty(ils));
 	VERIFY(ilstr_cstr(ils) != NULL);
 	VERIFY3U(ilstr_cstr(ils)[0], ==, '\0');
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
@@ -70,22 +85,102 @@ ist_empty(ilstr_t *ils)
 int
 ist_prealloc_toobig(ilstr_t *ils)
 {
+	/*
+	 * Fill the buffer all the way up with characters:
+	 */
 	for (uint_t n = 0; n < PREALLOC_SZ - 1; n++) {
 		ilstr_append_str(ils, "A");
 	}
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
 
+	/*
+	 * Confirm that we cannot append strings:
+	 */
 	ilstr_append_str(ils, "A");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
 
 	ilstr_append_str(ils, "A");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
 
+	/*
+	 * Confirm that we cannot prepend a character:
+	 */
+	ilstr_prepend_char(ils, 'A');
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
+
+	/*
+	 * Clear out the string and make sure we can start again:
+	 */
 	ilstr_reset(ils);
 
 	ilstr_append_str(ils, "B");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
-	VERIFY(strcmp(ilstr_cstr(ils), "B") == 0);
+	VERIFYSTRING(ils, "B");
+
+	/*
+	 * Fill the buffer all the way up with characters:
+	 */
+	ilstr_reset(ils);
+	for (uint_t n = 0; n < PREALLOC_SZ - 1; n++) {
+		ilstr_append_str(ils, "C");
+	}
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+
+	/*
+	 * Confirm that we cannot prepend strings:
+	 */
+	ilstr_prepend_str(ils, "D");
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
+
+	ilstr_prepend_str(ils, "D");
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
+
+	/*
+	 * Confirm that we cannot append a character:
+	 */
+	ilstr_append_char(ils, 'D');
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
+
+	return (0);
+}
+
+int
+ist_standard_toobig(ilstr_t *ils)
+{
+	/*
+	 * Pack the buffer with characters, so that we've been forced to
+	 * allocate at least one extra chunk:
+	 */
+	for (uint_t n = 0; n < PREALLOC_SZ - 1; n++) {
+		ilstr_append_str(ils, "A");
+	}
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+
+	/*
+	 * Continue adding characters until we hit apparent memory exhaustion:
+	 */
+	for (uint_t n = 0; n < PREALLOC_SZ - 1; n++) {
+		/*
+		 * Use the umem fault injection facility to fail any
+		 * allocations made while we append to the string:
+		 */
+		umem_setmtbf(1);
+		ilstr_append_str(ils, "A");
+		umem_setmtbf(0);
+
+		if (ilstr_errno(ils) == ILSTR_ERROR_NOMEM) {
+			break;
+		}
+
+		VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+	}
+
+	/*
+	 * Confirm that we ran out of memory along the way, and didn't write
+	 * too many characters in the process:
+	 */
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_NOMEM);
+	VERIFY3U(ilstr_len(ils), <, 2 * PREALLOC_SZ);
 
 	return (0);
 }
@@ -109,6 +204,7 @@ ist_huge(ilstr_t *ils)
 
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
 	VERIFY3U(ilstr_len(ils), ==, target);
+	VERIFY(!ilstr_is_empty(ils));
 
 	return (0);
 }
@@ -120,7 +216,7 @@ ist_printf_1(ilstr_t *ils)
 
 	ilstr_aprintf(ils, "a\nb\n%u\n%s\n", 1000, "test string");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
-	VERIFY(strcmp(ilstr_cstr(ils), want) == 0);
+	VERIFYSTRING(ils, want);
 
 	return (0);
 }
@@ -163,28 +259,29 @@ ist_printf_2(ilstr_t *ils)
 int
 ist_resets(ilstr_t *ils)
 {
-	VERIFY(strcmp(ilstr_cstr(ils), "") == 0);
+	VERIFYSTRING(ils, "");
 
 	ilstr_reset(ils);
-	VERIFY(strcmp(ilstr_cstr(ils), "") == 0);
+	VERIFYSTRING(ils, "");
 
 	ilstr_append_str(ils, "abc");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
-	VERIFY(strcmp(ilstr_cstr(ils), "abc") == 0);
+	VERIFYSTRING(ils, "abc");
 
 	ilstr_append_str(ils, "def");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
-	VERIFY(strcmp(ilstr_cstr(ils), "abcdef") == 0);
+	VERIFYSTRING(ils, "abcdef");
 
 	ilstr_reset(ils);
-	VERIFY(strcmp(ilstr_cstr(ils), "") == 0);
+	VERIFYSTRING(ils, "");
 
 	ilstr_append_str(ils, "xyz");
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
-	VERIFY(strcmp(ilstr_cstr(ils), "xyz") == 0);
+	VERIFYSTRING(ils, "xyz");
 
 	ilstr_reset(ils);
 	VERIFY(strcmp(ilstr_cstr(ils), "") == 0);
+	VERIFYSTRING(ils, "");
 
 	return (0);
 }
@@ -201,6 +298,7 @@ ist_random(ilstr_t *ils)
 	}
 
 	VERIFY3U(ilstr_len(ils), ==, 0);
+	VERIFY(ilstr_is_empty(ils));
 	VERIFY3U(ilstr_cstr(ils)[0], ==, '\0');
 	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
 
@@ -212,14 +310,82 @@ ist_random(ilstr_t *ils)
 
 		VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
 		VERIFY3U(ilstr_len(ils), ==, n + 1);
-		VERIFY(strcmp(ilstr_cstr(ils), work) == 0);
+		VERIFY(!ilstr_is_empty(ils));
+		VERIFYSTRING(ils, work);
 	}
 
+	VERIFY(!ilstr_is_empty(ils));
 	VERIFY3U(ilstr_len(ils), ==, target);
-	VERIFY(strcmp(ilstr_cstr(ils), work) == 0);
+	VERIFYSTRING(ils, work);
 	printf(" - final string: %s\n", work);
 
 	free(work);
+	return (0);
+}
+
+int
+ist_prepend_char(ilstr_t *ils)
+{
+	ilstr_append_str(ils, "ackwards");
+	ilstr_prepend_char(ils, 'B');
+	ilstr_append_char(ils, '!');
+
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+	VERIFYSTRING(ils, "Backwards!");
+
+	return (0);
+}
+
+int
+ist_prepend_str(ilstr_t *ils)
+{
+	ilstr_prepend_str(ils, "string was prepended");
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+	VERIFYSTRING(ils, "string was prepended");
+
+	ilstr_prepend_str(ils, "this ");
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+	VERIFYSTRING(ils, "this string was prepended");
+
+	ilstr_append_str(ils, ", successfully");
+	VERIFY3U(ilstr_errno(ils), ==, ILSTR_ERROR_OK);
+	VERIFYSTRING(ils, "this string was prepended, successfully");
+
+	return (0);
+}
+
+int
+ist_building_list(ilstr_t *ils)
+{
+	const char *items[] = { "one", "two", "three" };
+	const char *expect[] = {
+		"empty list",
+		"populated list (one)",
+		"populated list (one, two)",
+		"populated list (one, two, three)",
+	};
+
+	for (uint_t n = 0; n <= 3; n++) {
+		ilstr_reset(ils);
+
+		for (uint_t i = 0; i < n; i++) {
+			if (!ilstr_is_empty(ils)) {
+				ilstr_append_str(ils, ", ");
+			}
+
+			ilstr_append_str(ils, items[i]);
+		}
+
+		if (ilstr_is_empty(ils)) {
+			ilstr_append_str(ils, "empty list");
+		} else {
+			ilstr_prepend_str(ils, "populated list (");
+			ilstr_append_str(ils, ")");
+		}
+
+		VERIFYSTRING(ils, expect[n]);
+	}
+
 	return (0);
 }
 
@@ -273,6 +439,10 @@ static const ilstr_test_t ilstr_tests[] = {
 	{ "printf-1",		ist_printf_1,		1,	ITT_ALL },
 	{ "printf-2",		ist_printf_2,		1,	ITT_ALL },
 	{ "prealloc_toobig",	ist_prealloc_toobig,	1,	ITT_PRE },
+	{ "standard_toobig",	ist_standard_toobig,	1,	ITT_STD },
+	{ "prepend_char",	ist_prepend_char,	1,	ITT_ALL },
+	{ "prepend_str",	ist_prepend_str,	1,	ITT_ALL },
+	{ "building_list",	ist_building_list,	1,	ITT_ALL },
 	/*
 	 * Run the random generation test many times, as an attempt at fuzzing:
 	 */
