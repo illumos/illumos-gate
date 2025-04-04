@@ -86,7 +86,7 @@ typedef uint64_t	EFI_PHYSICAL_ADDRESS;
 typedef uint64_t	EFI_VIRTUAL_ADDRESS;
 
 /*
- * EFI_MEMORY_TYPE enum is defined in UEFI v2.7 page 185.
+ * EFI_MEMORY_TYPE enum is defined in UEFI Specification, Version 2.9 page 167.
  */
 typedef enum {
 	EfiReservedMemoryType,
@@ -104,6 +104,7 @@ typedef enum {
 	EfiMemoryMappedIOPortSpace,
 	EfiPalCode,
 	EfiPersistentMemory,
+	EfiUnacceptedMemoryType,
 	EfiMaxMemoryType
 } EFI_MEMORY_TYPE;
 

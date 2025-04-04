@@ -737,7 +737,13 @@ dboot_efi_to_smap_type(int index, uint32_t type)
 			return (1);
 	}
 
-	/* translate UEFI memory types to SMAP types */
+	/*
+	 * Translate UEFI memory types to SMAP types.
+	 * See "ACPI Specification Release 6.5 Errata A"
+	 * Table 15-6 (page 785), UEFI Memory Types and mapping to ACPI address
+	 * range types.
+	 */
+
 	switch (type) {
 	case EfiLoaderCode:
 	case EfiLoaderData:
