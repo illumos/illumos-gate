@@ -114,7 +114,7 @@ typedef struct cons_state {
 
 #define	DPRINTF consconfig_dprintf
 
-extern void	kadb_uses_kernel(void);
+extern void	prom_io_use_kernel(void);
 
 #ifdef	__cplusplus
 }

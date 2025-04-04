@@ -27,8 +27,8 @@ PROG=		btxld
 MAN1ONBLDFILES=	btxld.1onbld
 SRCS=		btxld.c elfh.c version.c $(UTILS_SRC) $(EINFO_SRC) $(EXTRA_SRC)
 OBJS=		btxld.o elfh.o version.o bblk_einfo.o mboot_extra.o boot_utils.o
-LDLIBS +=	-lmd5
-NATIVE_LIBS +=	libmd5.so
+LDLIBS +=	-lmd
+NATIVE_LIBS +=	libmd.so
 CSTD=	$(CSTD_GNU99)
 CPPFLAGS +=	-I$(SRC)/uts/common -I$(COMMON_SRC)
 

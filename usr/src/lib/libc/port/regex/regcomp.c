@@ -1857,6 +1857,10 @@ computematchjumps(struct parse *p, struct re_guts *g)
 				 * of k+1...k+mlen-i-1
 				 */
 
+	/* calm static analyzer, see comment above */
+	if (g->mlen < 1)
+		return;
+
 	/* Avoid making errors worse */
 	if (p->error != 0)
 		return;

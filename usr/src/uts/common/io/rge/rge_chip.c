@@ -464,6 +464,7 @@ rge_phy_update(rge_t *rgep)
 			} else {
 				rgep->param_link_speed = 100;
 				adv_100fdx = B_TRUE;
+			}
 			break;
 		}
 	}
@@ -485,10 +486,9 @@ rge_phy_update(rge_t *rgep)
 	 */
 	if (!adv_1000fdx && !adv_100fdx && !adv_10fdx &&
 	    !adv_1000hdx && !adv_100hdx && !adv_10hdx) {
-		if (rgep->chipid.mac_ver != MAC_VER_8101E)
+		if (rgep->chipid.mac_ver != MAC_VER_8101E) {
 			adv_1000fdx = B_TRUE;
 		} else {
-			adv_1000fdx = B_FALSE;
 			adv_100fdx = B_TRUE;
 		}
 	}
@@ -592,7 +592,7 @@ rge_phy_init(rge_t *rgep)
 	 */
 	switch (rgep->chipid.mac_ver) {
 	case MAC_VER_8169S_D:
-	case MAC_VER_8169S_E :
+	case MAC_VER_8169S_E:
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
 		rge_mii_put16(rgep, PHY_15_REG, 0x1000);
 		rge_mii_put16(rgep, PHY_18_REG, 0x65c7);

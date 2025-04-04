@@ -646,13 +646,13 @@ static struct boot_syscalls kern_sysp = {
 int using_kern_polledio;
 #endif
 
+/*
+ * Switch the prom_* layer to using kernel routines for I/O after the system
+ * is sufficiently booted
+ */
 void
-kadb_uses_kernel()
+prom_io_use_kernel()
 {
-	/*
-	 * This routine is now totally misnamed, since it does not in fact
-	 * control kadb's I/O; it only controls the kernel's prom_* I/O.
-	 */
 	sysp = &kern_sysp;
 #if defined(__xpv)
 	using_kern_polledio = 1;

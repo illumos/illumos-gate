@@ -134,10 +134,6 @@ struct intrs_and_queues {
 	int nrxq1g;		/* # of NIC rxq's for each 1G port */
 };
 
-static int cpl_not_handled(struct sge_iq *iq, const struct rss_header *rss,
-    mblk_t *m);
-static int fw_msg_not_handled(struct adapter *, const __be64 *);
-int t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h);
 static unsigned int getpf(struct adapter *sc);
 static int prep_firmware(struct adapter *sc);
 static int upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma);
@@ -366,17 +362,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	(void) memset(sc->chan_map, 0xff, sizeof (sc->chan_map));
-
-	/*
-	 * Initialize cpl handler.
-	 */
-	for (i = 0; i < ARRAY_SIZE(sc->cpl_handler); i++) {
-		sc->cpl_handler[i] = cpl_not_handled;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(sc->fw_msg_handler); i++) {
-		sc->fw_msg_handler[i] = fw_msg_not_handled;
-	}
 
 	for (i = 0; i < NCHAN; i++) {
 		(void) snprintf(name, sizeof (name), "%s-%d", "reclaim", i);
@@ -2769,64 +2754,6 @@ t4_os_portmod_changed(struct adapter *sc, int idx)
 	if ((isset(&sc->open_device_map, pi->port_id) != 0) &&
 	    pi->link_cfg.new_module)
 		pi->link_cfg.redo_l1cfg = true;
-}
-
-/* ARGSUSED */
-static int
-cpl_not_handled(struct sge_iq *iq, const struct rss_header *rss, mblk_t *m)
-{
-	if (m != NULL)
-		freemsg(m);
-	return (0);
-}
-
-int
-t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h)
-{
-	uint_t *loc, new;
-
-	if (opcode >= ARRAY_SIZE(sc->cpl_handler))
-		return (EINVAL);
-
-	new = (uint_t)(unsigned long) (h ? h : cpl_not_handled);
-	loc = (uint_t *)&sc->cpl_handler[opcode];
-	(void) atomic_swap_uint(loc, new);
-
-	return (0);
-}
-
-static int
-fw_msg_not_handled(struct adapter *sc, const __be64 *data)
-{
-	struct cpl_fw6_msg *cpl;
-
-	cpl = __containerof((void *)data, struct cpl_fw6_msg, data);
-
-	cxgb_printf(sc->dip, CE_WARN, "%s fw_msg type %d", __func__, cpl->type);
-	return (0);
-}
-
-int
-t4_register_fw_msg_handler(struct adapter *sc, int type, fw_msg_handler_t h)
-{
-	fw_msg_handler_t *loc, new;
-
-	if (type >= ARRAY_SIZE(sc->fw_msg_handler))
-		return (EINVAL);
-
-	/*
-	 * These are dispatched by the handler for FW{4|6}_CPL_MSG using the CPL
-	 * handler dispatch table.  Reject any attempt to install a handler for
-	 * this subtype.
-	 */
-	if (type == FW_TYPE_RSSCPL || type == FW6_TYPE_RSSCPL)
-		return (EINVAL);
-
-	new = h ? h : fw_msg_not_handled;
-	loc = &sc->fw_msg_handler[type];
-	(void) atomic_swap_ptr(loc, (void *)new);
-
-	return (0);
 }
 
 static int

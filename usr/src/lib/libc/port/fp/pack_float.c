@@ -27,17 +27,15 @@
 #include "lint.h"
 #include "base_conversion.h"
 
+/* Right shift significand sticky by n bits.  */
 static void
 __fp_rightshift(unpacked *pu, int n)
-
-/* Right shift significand sticky by n bits.  */
-
 {
 	int		i;
 
 	if (n >= (32 * UNPACKED_SIZE)) {	/* drastic */
-		for (i = 0; (pu->significand[i] == 0) && (i < UNPACKED_SIZE);
-				i++);
+		for (i = 0; i < UNPACKED_SIZE && pu->significand[i] == 0; i++)
+			;
 		if (i >= UNPACKED_SIZE) {
 			pu->fpclass = fp_zero;
 			return;
@@ -69,11 +67,9 @@ __fp_rightshift(unpacked *pu, int n)
 	}
 }
 
+/* Returns 1 if overflow should go to infinity, 0 if to max finite. */
 static int
 overflow_to_infinity(int sign, enum fp_direction_type rd)
-
-/* Returns 1 if overflow should go to infinity, 0 if to max finite. */
-
 {
 	int		inf;
 
@@ -94,12 +90,12 @@ overflow_to_infinity(int sign, enum fp_direction_type rd)
 	return (inf);
 }
 
-static void
-round(unpacked *pu, int roundword, enum fp_direction_type rd, int *ex)
 /*
  * Round according to current rounding mode. pu must be shifted to so that
  * the roundbit is pu->significand[roundword] & 0x80000000
  */
+static void
+round(unpacked *pu, int roundword, enum fp_direction_type rd, int *ex)
 {
 	int		increment;	/* boolean to indicate round up */
 	int		is;
@@ -135,14 +131,15 @@ round(unpacked *pu, int roundword, enum fp_direction_type rd, int *ex)
 			is--;
 			pu->significand[is]++;
 		}
-		while ((pu->significand[is] == 0) && (is > 0));
+		while ((pu->significand[is] == 0) && (is > 0))
+			;
 		if (pu->significand[0] < msw) {	/* rounding carried out */
 			pu->exponent++;
 			pu->significand[0] = 0x80000000;
 		}
 	}
 	if ((rd == fp_nearest) &&
-		(pu->significand[roundword] == 0x80000000)) {
+	    (pu->significand[roundword] == 0x80000000)) {
 		/* ambiguous case */
 		pu->significand[roundword - 1] &= ~1; /* force round to even */
 	}
@@ -150,7 +147,7 @@ round(unpacked *pu, int roundword, enum fp_direction_type rd, int *ex)
 
 void
 __pack_single(unpacked *pu, single *px, enum fp_direction_type rd,
-	fp_exception_field_type *ex)
+    fp_exception_field_type *ex)
 {
 	single_equivalence kluge;
 	int		e;
@@ -214,7 +211,7 @@ ret:
 
 void
 __pack_double(unpacked *pu, double *px, enum fp_direction_type rd,
-	fp_exception_field_type *ex)
+    fp_exception_field_type *ex)
 {
 	double_equivalence kluge;
 	int		e;
@@ -287,7 +284,7 @@ ret:
 
 void
 __pack_extended(unpacked *pu, extended *px, enum fp_direction_type rd,
-	fp_exception_field_type *ex)
+    fp_exception_field_type *ex)
 {
 	extended_equivalence kluge;
 	int		e;
@@ -355,7 +352,7 @@ ret:
 
 void
 __pack_quadruple(unpacked *pu, quadruple *px, enum fp_direction_type rd,
-	fp_exception_field_type *ex)
+    fp_exception_field_type *ex)
 {
 	quadruple_equivalence kluge;
 	int		e;
