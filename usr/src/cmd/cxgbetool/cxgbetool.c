@@ -15,7 +15,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -420,11 +420,9 @@ get_regdump(int argc, char *argv[], int start_arg, const char *iff_name)
 	is_pcie = (regs->version & 0x80000000) != 0;
 
 	if (vers == 5) {
-		return dump_regs_t5(argc, argv, start_arg,
-				(uint32_t *)regs->data);
+		return dump_regs_t5(argc, argv, start_arg, regs->data);
 	} else if (vers == 6) {
-		return dump_regs_t6(argc, argv, start_arg,
-				(uint32_t *)regs->data);
+		return dump_regs_t6(argc, argv, start_arg, regs->data);
 	} else {
 		errx(1, "unknown card type %d.%d.%d", vers, revision, is_pcie);
 	}

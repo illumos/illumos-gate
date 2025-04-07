@@ -20,6 +20,10 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
+
 #ifndef __T4NEX_H
 #define	__T4NEX_H
 
@@ -61,9 +65,9 @@ struct t4_reg32_cmd {
 #define	T5_REGDUMP_SIZE (332 * 1024)
 
 struct t4_regdump {
-	uint32_t  version;
-	uint32_t  len;
-	uint32_t  *data;
+	uint32_t version;
+	uint32_t len;
+	uint32_t data[];
 };
 
 struct t4_sge_context {
