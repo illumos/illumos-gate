@@ -13165,6 +13165,7 @@ f usr/share/man/man3c/fcloseall.3c 0444 root bin
 s usr/share/man/man3c/fconvert.3c=econvert.3c
 s usr/share/man/man3c/fcvt.3c=ecvt.3c
 f usr/share/man/man3c/fdatasync.3c 0444 root bin
+f usr/share/man/man3c/fdclose.3c 0444 root bin
 f usr/share/man/man3c/fdetach.3c 0444 root bin
 f usr/share/man/man3c/fdopen.3c 0444 root bin
 s usr/share/man/man3c/fdopendir.3c=opendir.3c

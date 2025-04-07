@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2025 Hans Rosenfeld
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -270,6 +271,7 @@ extern char	*tmpnam_r(char *);
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int fdclose(FILE *, int *);
 extern int fcloseall(void);
 extern void setbuffer(FILE *, char *, size_t);
 extern int setlinebuf(FILE *);

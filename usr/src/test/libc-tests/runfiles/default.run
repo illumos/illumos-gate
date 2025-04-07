@@ -77,6 +77,8 @@ user = root
 [/opt/libc-tests/tests/select/select.sh]
 timeout = 600
 
+[/opt/libc-tests/tests/stdio/fdclose.32]
+[/opt/libc-tests/tests/stdio/fdclose.64]
 [/opt/libc-tests/tests/stdio/fileno.32]
 [/opt/libc-tests/tests/stdio/fileno.64]
 [/opt/libc-tests/tests/stdio/fmemopentest.32]

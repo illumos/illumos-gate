@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2025 Hans Rosenfeld
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,6 +30,12 @@
 
 /*
  *	_doprnt: common code for printf, fprintf, sprintf
+ *
+ * This file is compiled twice, once with _WIDE defined and once without.
+ *
+ * When _WIDE is defined, the wide-character variant of the code will be built.
+ * In print.h, a #pragma redefine_extname will make sure the externally visible
+ * symbols will be _wdoprnt and _wndoprnt, and CHAR_T will be defined wchar_t.
  */
 
 #include "lint.h"
@@ -62,28 +69,28 @@ static const wchar_t widenullstr[] = L"(null)";
 #endif /* !defined(__i386) && !defined(__sparcv9) */
 
 #ifdef	_WIDE
-#define	STRCHR	wcschr
-#define	STRSPN	wcsspn
-#define	ATOI(x)	_watoi((wchar_t *)x)
-#define	_P_HYPHEN	L"-"
-#define	_P_PLUS		L"+"
-#define	_P_BLANK	L" "
-#define	_P_ZEROx	L"0x"
-#define	_P_ZEROX	L"0X"
+#define	L(x)		L##x
+#define	STRCHR(s, c)	wcschr(s, c)
+#define	STRSPN(s1, s2)	wcsspn(s1, s2)
+#define	STRLEN(s)	wcslen(s)
+#define	ATOI(x)		_watoi((wchar_t *)x)
 #define	_M_ISDIGIT(c)	(((c) >= 0) && ((c) < 256) && isdigit((c)))
 #define	_M_ISUPPER(c)	(((c) >= 0) && ((c) < 256) && isupper((c)))
 #else  /* _WIDE */
-#define	STRCHR	strchr
-#define	STRSPN	strspn
-#define	ATOI(x)	atoi(x)
-#define	_P_HYPHEN	"-"
-#define	_P_PLUS		"+"
-#define	_P_BLANK	" "
-#define	_P_ZEROx	"0x"
-#define	_P_ZEROX	"0X"
+#define	L(x)		x
+#define	STRCHR(s, c)	strchr(s, c)
+#define	STRSPN(s1, s2)	strspn(s1, s2)
+#define	STRLEN(s)	strlen(s)
+#define	ATOI(x)		atoi(x)
 #define	_M_ISDIGIT(c)	isdigit((c))
 #define	_M_ISUPPER(c)	isupper((c))
 #endif /* _WIDE */
+
+#define	_P_HYPHEN	L("-")
+#define	_P_PLUS		L("+")
+#define	_P_BLANK	L(" ")
+#define	_P_ZEROx	L("0x")
+#define	_P_ZEROX	L("0X")
 
 #ifdef	_WIDE
 #define	PUT(p, n) \
@@ -115,7 +122,7 @@ static const wchar_t widenullstr[] = L"(null)";
 		while (*cp) { \
 			*wp++ = (wchar_t)*cp++; \
 		} \
-		*wp = L'\0'; \
+		*wp = L('\0'); \
 	}
 
 #else  /* _WIDE */
@@ -194,13 +201,8 @@ static const wchar_t widenullstr[] = L"(null)";
 #define	XLONG   0x1000	/* ll for long long */
 #define	CHAR    0x2000	/* hh for char */
 
-#ifdef	_WIDE
-static wchar_t *insert_decimal_point(wchar_t *ep);
-static wchar_t *insert_thousands_sep(wchar_t *bp, wchar_t *ep);
-#else  /* _WIDE */
-static char *insert_decimal_point(char *ep);
-static char *insert_thousands_sep(char *bp, char *ep);
-#endif /* _WIDE */
+static CHAR_T *insert_decimal_point(CHAR_T *ep);
+static CHAR_T *insert_thousands_sep(CHAR_T *bp, CHAR_T *ep);
 
 static int	_rec_scrswidth(wchar_t *, ssize_t);
 
@@ -222,14 +224,11 @@ typedef struct stva_list {
 	va_list	ap;
 } stva_list;
 
-#ifdef	_WIDE
-static void _wmkarglst(wchar_t *, stva_list, stva_list [], int);
-static void _wgetarg(wchar_t *, stva_list *, long, int);
-#else  /* _WIDE */
-static void _mkarglst(char *, stva_list, stva_list [], int);
-void _getarg(char *, stva_list *, long, int);
-#endif /* _WIDE */
-
+static void _mkarglst(CHAR_T *, stva_list, stva_list [], int);
+#ifdef _WIDE
+static
+#endif
+void _getarg(CHAR_T *, stva_list *, long, int);
 
 
 
@@ -287,13 +286,12 @@ _dowrite(const char *p, ssize_t n, FILE *iop, unsigned char **ptrptr)
 #define	PAD_LEN	20
 	static const char _blanks[] = "                    ";
 	static const char _zeroes[] = "00000000000000000000";
-#ifdef	_WIDE
-	static const wchar_t uc_digs[] = L"0123456789ABCDEF";
-	static const wchar_t lc_digs[] = L"0123456789abcdef";
-#else /* _WIDE */
-	static const char uc_digs[] = "0123456789ABCDEF";
-	static const char lc_digs[] = "0123456789abcdef";
-#endif /* _WIDE */
+
+	static const CHAR_T uc_digs[] = L("0123456789ABCDEF");
+	static const CHAR_T lc_digs[] = L("0123456789abcdef");
+
+	static const CHAR_T digits[] = L("01234567890");
+	static const CHAR_T skips[] = L("# +-.'0123456789h$");
 
 #ifdef	_WIDE
 static int
@@ -396,28 +394,15 @@ pad_wide(FILE *iop, unsigned char **bufptr,
 }
 #endif /* _WIDE */
 
-#ifdef	_WIDE
 ssize_t
-_wdoprnt(const wchar_t *format, va_list in_args, FILE *iop)
-{
-	return (_wndoprnt(format, in_args, iop, 0));
-}
-#else	/* _WIDE */
-ssize_t
-_doprnt(const char *format, va_list in_args, FILE *iop)
+_doprnt(const CHAR_T *format, va_list in_args, FILE *iop)
 {
 	return (_ndoprnt(format, in_args, iop, 0));
 }
-#endif	/* _WIDE */
 
 
-#ifdef	_WIDE
 ssize_t
-_wndoprnt(const wchar_t *format, va_list in_args, FILE *iop, int prflag)
-#else  /* _WIDE */
-ssize_t
-_ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
-#endif /* _WIDE */
+_ndoprnt(const CHAR_T *format, va_list in_args, FILE *iop, int prflag)
 {
 
 #ifdef	_WIDE
@@ -444,21 +429,13 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	int	count = 0;
 #endif /* _WIDE */
 
-#ifdef	_WIDE
-	wchar_t	*bp;
-	size_t bpsize;
-	wchar_t	*p;
-	char	*cbp;
-
-#else  /* _WIDE */
 	/* Starting and ending points for value to be printed */
-	char	*bp;
-	char *p;
+	CHAR_T	*bp;
+	CHAR_T	*p;
 
-	/* Field width and precision */
-	ssize_t preco;
-	char tmpbuf[10];
-	int	retcode;
+#ifdef	_WIDE
+	size_t bpsize;
+	char	*cbp;
 #endif /* _WIDE */
 	/* Field width and precision */
 	int	prec = 0;
@@ -469,13 +446,15 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	char wflag;
 	char lflag;
 	int quote;		/* ' */
+	int retcode;
+#ifndef _WIDE
+	ssize_t preco;
+	char tmpbuf[10];
+#endif  /* _WIDE */
 
-#ifdef	_WIDE
 	/* Format code */
-	wchar_t	fcode;
-#else  /* _WIDE */
-	/* Format code */
-	char	fcode;
+	CHAR_T	fcode;
+#ifndef	_WIDE
 	ssize_t sec_display;
 #endif /* _WIDE */
 
@@ -490,35 +469,19 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 
 	ssize_t	flagword;
 
-#ifdef	_WIDE
 	/* Values are developed in this buffer */
-	wchar_t	buf[max(MAXLLDIGS, 1034)];
-	wchar_t	cvtbuf[512 + DECIMAL_STRING_LENGTH];
+	CHAR_T	buf[max(MAXLLDIGS, 1034)];
+	CHAR_T	cvtbuf[512 + DECIMAL_STRING_LENGTH];
 
 	/* Pointer to sign, "0x", "0X", or empty */
-	wchar_t	*prefix;
-	wchar_t	prefixbuf[4];
+	CHAR_T	*prefix;
+	CHAR_T	prefixbuf[4];
 
 	/* Exponent or empty */
-	wchar_t	*suffix;
+	CHAR_T	*suffix;
 
 	/* Buffer to create exponent */
-	wchar_t	expbuf[MAXESIZ + 1];
-#else  /* _WIDE */
-	/* Values are developed in this buffer */
-	char	buf[max(MAXLLDIGS, 1034)];
-	char	cvtbuf[512 + DECIMAL_STRING_LENGTH];
-
-	/* Pointer to sign, "0x", "0X", or empty */
-	char	*prefix;
-	char	prefixbuf[4];
-
-	/* Exponent or empty */
-	char	*suffix;
-
-	/* Buffer to create exponent */
-	char	expbuf[MAXESIZ + 1];
-#endif /* _WIDE */
+	CHAR_T	expbuf[MAXESIZ + 1];
 
 	/* Length of prefix and of suffix */
 	ssize_t	prefixlength, suffixlength;
@@ -538,13 +501,8 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	/* Output values from fcvt and ecvt */
 	int	decpt, sign;
 
-#ifdef	_WIDE
 	/* Pointer to a translate table for digits of whatever radix */
-	const wchar_t *tab;
-#else  /* _WIDE */
-	/* Pointer to a translate table for digits of whatever radix */
-	const char *tab;
-#endif /* _WIDE */
+	const CHAR_T *tab;
 
 	/* Work variables */
 	ssize_t	k, lradix, mradix;
@@ -552,14 +510,12 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	int	inf_nan = 0;
 	int	inf_nan_mixed_case = 0;
 
-#ifdef	_WIDE
-	/* variables for positional parameters */
+	/*
+	 * variables for positional parameters
+	 */
+
 	/* save the beginning of the format */
-	wchar_t *sformat = (wchar_t *)format;
-#else  /* _WIDE */
-	/* variables for positional parameters */
-	char *sformat = (char *)format; /* save the beginning of the format */
-#endif
+	CHAR_T *sformat = (CHAR_T *)format;
 
 	int	fpos = 1;		/* 1 if first positional parameter */
 	stva_list	args,	/* used to step through the argument list */
@@ -661,11 +617,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 		ssize_t n;
 
 		if ((fcode = *format) != '\0' && fcode != '%') {
-#ifdef	_WIDE
-			bp = (wchar_t *)format;
-#else  /* _WIDE */
-			bp = (char *)format;
-#endif /* _WIDE */
+			bp = (CHAR_T *)format;
 			do {
 				format++;
 			} while ((fcode = *format) != '\0' && fcode != '%');
@@ -772,11 +724,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 			ssize_t		position;
 			stva_list	targs;
 			if (fpos) {
-#ifdef	_WIDE
-				_wmkarglst(sformat, sargs, arglst, prflag);
-#else  /* _WIDE */
 				_mkarglst(sformat, sargs, arglst, prflag);
-#endif /* _WIDE */
 				fpos = 0;
 			}
 			if (flagword & DOTSEEN) {
@@ -795,11 +743,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 				targs = arglst[position - 1];
 			} else {
 				targs = arglst[MAXARGS - 1];
-#ifdef	_WIDE
-				_wgetarg(sformat, &targs, position, prflag);
-#else  /* _WIDE */
 				_getarg(sformat, &targs, position, prflag);
-#endif /* _WIDE */
 			}
 			if (!starflg)
 				args = targs;
@@ -1051,57 +995,29 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 			long long tll;
 			if (flagword & XLONG) {
 				if (lll < 10LL) {
-#ifdef	_WIDE
 					if (lll != 0LL || !(flagword & DOTSEEN))
-						*--bp = (wchar_t)lll + L'0';
-#else  /* _WIDE */
-					if (lll != 0LL || !(flagword & DOTSEEN))
-						*--bp = (char)lll + '0';
-#endif /* _WIDE */
+						*--bp = (CHAR_T)lll + L('0');
 				} else {
 					do {
 						tll = lll;
 						lll /= 10;
-#ifdef	_WIDE
-						*--bp = (wchar_t)
+						*--bp = (CHAR_T)
 						    (tll - lll * 10 + '0');
-#else  /* _WIDE */
-						*--bp = (char) \
-						    (tll - lll * 10 + '0');
-#endif /* _WIDE */
 					} while (lll >= 10);
-#ifdef	_WIDE
-					*--bp = (wchar_t)lll + '0';
-#else  /* _WIDE */
-					*--bp = (char)lll + '0';
-#endif /* _WIDE */
+					*--bp = (CHAR_T)lll + '0';
 				}
 			} else {
 				if (qval <= 9) {
-#ifdef	_WIDE
 					if (qval != 0 || !(flagword & DOTSEEN))
-						*--bp = (wchar_t)qval + '0';
-#else  /* _WIDE */
-					if (qval != 0 || !(flagword & DOTSEEN))
-						*--bp = (char)qval + '0';
-#endif /* _WIDE */
+						*--bp = (CHAR_T)qval + '0';
 				} else {
 					do {
 						n = qval;
 						qval /= 10;
-#ifdef	_WIDE
-						*--bp = (wchar_t) \
+						*--bp = (CHAR_T) \
 						    (n - qval * 10 + '0');
-#else  /* _WIDE */
-						*--bp = (char) \
-						    (n - qval * 10 + '0');
-#endif /* _WIDE */
 					} while (qval > 9);
-#ifdef	_WIDE
-					*--bp = (wchar_t)qval + '0';
-#else  /* _WIDE */
-					*--bp = (char)qval + '0';
-#endif /* _WIDE */
+					*--bp = (CHAR_T)qval + '0';
 				}
 			}
 			}
@@ -1189,13 +1105,8 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 			if ((flagword & PADZERO) && (flagword & DOTSEEN))
 				flagword &= ~PADZERO; /* ignore 0 flag */
 
-#ifdef	_WIDE
-			/* Set translate table for digits */
-			tab = (wchar_t *)((fcode == 'X') ? uc_digs : lc_digs);
-#else  /* _WIDE */
 			/* Set translate table for digits */
 			tab = (fcode == 'X') ? uc_digs : lc_digs;
-#endif /* _WIDE */
 
 			/* Fetch the argument to be printed */
 			if (flagword & XLONG) {
@@ -1632,11 +1543,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 			{
 				int kk = prec;
 				if (!(flagword & FSHARP)) {
-#ifdef	_WIDE
-					n = wcslen(bp);
-#else  /* _WIDE */
-					n = strlen(bp);
-#endif /* _WIDE */
+					n = STRLEN(bp);
 					if (n < kk)
 						kk = (int)n;
 					while (kk >= 1 && bp[kk-1] == '0')
@@ -1667,30 +1574,25 @@ wide_C:
 				wchar_t	temp;
 
 				temp = va_arg(args.ap, wchar_t);
+				if (temp) {
 #ifdef	_WIDE
-				if (temp) {
+					retcode = 1;
 					buf[0] = temp;
-					p = (bp = buf) + 1;
-				} else {
-					buf[0] = 0;
-					p = (bp = buf) + 1;
-				}
-				wcount = 1;
-				wflag = 1;
 #else  /* _WIDE */
-				if (temp) {
 					retcode = wctomb(buf, temp);
 					if (retcode == -1) {
 						errno = EILSEQ;
 						return (EOF);
-					} else {
-						p = (bp = buf) + retcode;
 					}
+#endif /* _WIDE */
+					p = (bp = buf) + retcode;
 				} else { /* NULL character */
 					buf[0] = 0;
 					p = (bp = buf) + 1;
 				}
 				wcount = p - bp;
+#ifdef	_WIDE
+				wflag = 1;
 #endif /* _WIDE */
 			}
 			break;
@@ -1720,11 +1622,7 @@ wide_C:
 				if (flagword & XLONG) {
 					long long temp;
 					temp = va_arg(args.ap, long long);
-#ifdef	_WIDE
-					buf[0] = (wchar_t)temp;
-#else  /* _WIDE */
-					buf[0] = (char)temp;
-#endif /* _WIDE */
+					buf[0] = (CHAR_T)temp;
 				} else
 					buf[0] = va_arg(args.ap, int);
 			c_merge:
@@ -1744,33 +1642,13 @@ wide_S:
 			if (!lflag) {
 				lflag++;
 			}
-			bp = va_arg(args.ap, wchar_t *);
-			if (bp == NULL)
-				bp = (wchar_t *)widenullstr;
-			if (!(flagword & DOTSEEN)) {
-				/* wide character handling */
-				prec = MAXINT;
-			}
-
-			wp = bp;
-			wcount = 0;
-			while (*wp) {
-				if ((prec - wcount - 1) >= 0) {
-					wcount++;
-					wp++;
-				} else {
-					break;
-				}
-			}
-			p = wp;
-			wflag = 1;
-			break;
 #else  /* _WIDE */
 			if (!wflag)
 				wflag++;
-			bp = va_arg(args.ap, char *);
+#endif
+			bp = va_arg(args.ap, CHAR_T *);
 			if (bp == NULL)
-				bp = (char *)widenullstr;
+				bp = (CHAR_T *)widenullstr;
 			if (!(flagword & DOTSEEN)) {
 				/* wide character handling */
 				prec = MAXINT;
@@ -1781,11 +1659,15 @@ wide_S:
 			while (*wp) {
 				int nbytes;
 
+#ifdef	_WIDE
+				nbytes = 1;
+#else  /* _WIDE */
 				nbytes = wctomb(tmpbuf, *wp);
 				if (nbytes < 0) {
 					errno = EILSEQ;
 					return (EOF);
 				}
+#endif
 				if ((prec - (wcount + nbytes)) >= 0) {
 					wcount += nbytes;
 					wp++;
@@ -1793,10 +1675,13 @@ wide_S:
 					break;
 				}
 			}
+#ifndef	_WIDE
 			sec_display = wcount;
-			p = (char *)wp;
-			break;
+#else  /* _WIDE */
+			wflag = 1;
 #endif /* _WIDE */
+			p = (CHAR_T *)wp;
+			break;
 		case 's':
 			if (lflag) {
 				goto wide_S;
@@ -2092,26 +1977,17 @@ wide_S:
 		/* Calculate number of padding blanks */
 		n = p - bp; /* n == size of the converted value (in bytes) */
 
-#ifdef	_WIDE
-		k = n;
-#else  /* _WIDE */
+#ifndef	_WIDE
 		if (sec_display) /* when format is %s or %ws or %S */
 			k = sec_display;
 		else
+#endif /* !_WIDE */
 			k = n;
-#endif /* _WIDE */
 		/*
 		 * k is the (screen) width or # of bytes of the converted value
 		 */
 		k += prefixlength + otherlength;
 
-#ifdef	_WIDE
-		if (wflag) {
-			count += wcount;
-		} else {
-			count += n;
-		}
-#else  /* _WIDE */
 		/*
 		 * update count which is the overall size of the output data
 		 * and passed to memchr()
@@ -2128,7 +2004,7 @@ wide_S:
 			 * value is n (= p-bp) bytes
 			 */
 			count += n;
-#endif /* _WIDE */
+
 		count += prefixlength + otherlength;
 
 		if (width > k) {
@@ -2161,15 +2037,8 @@ wide_S:
 			/* (!(flagword & SHORT) || !(flagword & FMINUS)) */
 			PAD(_zeroes, lzero);
 
-#ifdef	_WIDE
-		if (n > 0)
-			PUT(bp, n);
-		if ((fcode == 's') && !lflag) {
-			if (bp)
-				lfree(bp, bpsize);
-		}
-#else  /* _WIDE */
 		/* The value itself */
+#ifndef	_WIDE
 		if ((fcode == 's' || fcode == 'S') && wflag) {
 			/* wide character handling */
 			wchar_t *wp = (wchar_t *)(uintptr_t)bp;
@@ -2187,8 +2056,15 @@ wide_S:
 				printn--;
 			}
 		} else {	/* non wide character value */
+#endif  /* !_WIDE */
 			if (n > 0)
 				PUT(bp, n);
+#ifdef  _WIDE
+			if ((fcode == 's') && !lflag) {
+				if (bp)
+					lfree(bp, bpsize);
+			}
+#else  /* _WIDE */
 		}
 #endif /* _WIDE */
 
@@ -2247,22 +2123,9 @@ _watoi(wchar_t *fmt)
 #define	FLAG_LONG_LONG	0x04
 #define	FLAG_LONG_DBL	0x08
 
-#ifdef	_WIDE
 static void
-_wmkarglst(wchar_t *fmt, stva_list args, stva_list arglst[],
-    int prflag __unused)
-#else  /* _WIDE */
-static void
-_mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag __unused)
-#endif /* _WIDE */
+_mkarglst(CHAR_T *fmt, stva_list args, stva_list arglst[], int prflag __unused)
 {
-#ifdef	_WIDE
-	static const wchar_t	digits[] = L"01234567890";
-	static const wchar_t	skips[] = L"# +-.'0123456789h$";
-#else  /* _WIDE */
-	static const char digits[] = "01234567890";
-	static const char skips[] = "# +-.'0123456789h$";
-#endif /* _WIDE */
 	enum types {INT = 1, LONG, CHAR_PTR, DOUBLE, LONG_DOUBLE, VOID_PTR,
 	    LONG_PTR, INT_PTR, LONG_LONG, LONG_LONG_PTR};
 	enum types typelst[MAXARGS], curtype;
@@ -2328,12 +2191,7 @@ _mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag __unused)
 			goto again;
 		case '*':	/* int argument used for value */
 			/* check if there is a positional parameter */
-#ifdef	_WIDE
-			if ((*fmt >= 0) && (*fmt < 256) && isdigit(*fmt))
-#else  /* _WIDE */
-			if (isdigit(*fmt))
-#endif /* _WIDE */
-			{
+			if (_M_ISDIGIT(*fmt)) {
 				int	targno;
 				targno = ATOI(fmt) - 1;
 				fmt += STRSPN(fmt, digits);
@@ -2444,24 +2302,13 @@ _mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag __unused)
  * unusual circumstances.
  * pargs is assumed to contain the value of arglst[MAXARGS - 1].
  */
-#ifdef	_WIDE
-static void
-_wgetarg(wchar_t *fmt, stva_list *pargs, long argno, int prflag __unused)
-#else  /* _WIDE */
+#ifdef _WIDE
+static
+#endif
 void
-_getarg(char *fmt, stva_list *pargs, long argno, int prflag __unused)
-#endif /* _WIDE */
+_getarg(CHAR_T *fmt, stva_list *pargs, long argno, int prflag __unused)
 {
-
-#ifdef	_WIDE
-	static const wchar_t	digits[] = L"01234567890";
-	static const wchar_t	skips[] = L"# +-.'0123456789h$";
-	wchar_t	*sfmt = fmt;
-#else  /* _WIDE */
-	static const char digits[] = "01234567890";
-	static const char skips[] = "# +-.'0123456789h$";
-	char	*sfmt = fmt;
-#endif /* _WIDE */
+	CHAR_T	*sfmt = fmt;
 	ssize_t n;
 	int i, curargno, flags;
 	int	found = 1;
@@ -2593,27 +2440,16 @@ _getarg(char *fmt, stva_list *pargs, long argno, int prflag __unused)
 	}
 }
 
-#ifdef	_WIDE
-static wchar_t *
-insert_thousands_sep(wchar_t *bp, wchar_t *ep)
-#else  /* _WIDE */
-static char *
-insert_thousands_sep(char *bp, char *ep)
-#endif /* _WIDE */
+static CHAR_T *
+insert_thousands_sep(CHAR_T *bp, CHAR_T *ep)
 {
 	char thousep;
 	struct lconv *locptr;
 	ssize_t buf_index;
 	int i;
-#ifdef	_WIDE
-	wchar_t *obp = bp;
-	wchar_t buf[371];
-	wchar_t *bufptr = buf;
-#else  /* _WIDE */
-	char *obp = bp;
-	char buf[371];
-	char *bufptr = buf;
-#endif /* _WIDE */
+	CHAR_T *obp = bp;
+	CHAR_T buf[371];
+	CHAR_T *bufptr = buf;
 	char *grp_ptr;
 
 	/* get the thousands sep. from the current locale */
@@ -2636,11 +2472,7 @@ insert_thousands_sep(char *bp, char *ep)
 			*bufptr++ = *(bp + buf_index);
 
 		if (buf_index > 0) {
-#ifdef	_WIDE
-			*bufptr++ = (wchar_t)thousep;
-#else  /* _WIDE */
-			*bufptr++ = thousep;
-#endif /* _WIDE */
+			*bufptr++ = (CHAR_T)thousep;
 			ep++;
 		}
 		else
@@ -2656,13 +2488,8 @@ insert_thousands_sep(char *bp, char *ep)
 	return (ep);
 }
 
-#ifdef _WIDE
-static wchar_t *
-insert_decimal_point(wchar_t *ep)
-#else
-static char *
-insert_decimal_point(char *ep)
-#endif
+static CHAR_T *
+insert_decimal_point(CHAR_T *ep)
 {
 	struct lconv *locptr = localeconv();
 	char	*dp = locptr->decimal_point;

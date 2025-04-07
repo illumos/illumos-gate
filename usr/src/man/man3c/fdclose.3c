@@ -1,0 +1,122 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2025, Hans Rosenfeld
+.\"
+.Dd "April 25, 2024"
+.Dt FDCLOSE 3C
+.Os
+.Sh NAME
+.Nm fdclose
+.Nd close a standard I/O stream without closing the underlying file descriptor
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdio.h
+.Ft int
+.Fo fdclose
+.Fa "FILE *stream"
+.Fa "int *fdp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn fdclose
+function is equivalent to
+.Xr fclose 3C ,
+closing the given standard I/O stream, except that it does not close the
+underlying file descriptor.
+.Pp
+If
+.Fa fdp
+is not
+.Dv NULL ,
+it will be used to return the underlying file descriptor of the I/O stream.
+If the stream does not have an underlying file descriptor associated with it,
+.Fa fdp
+will be set to
+.Sy -1 .
+This is always done, regardless of any error returned by
+.Fn fdclose .
+.Pp
+If
+.Fa fdp
+is
+.Dv NULL ,
+no file descriptor will be returned.
+Note that regardless of the value passed for
+.Fa fdp ,
+the I/O stream will be closed without closing the underlying file descriptor.
+Usually callers who pass
+.Dv NULL
+for
+.Fa fdp
+already have the file descriptor's value available.
+.Pp
+The equivalent of
+.Xr fflush 3C
+is called on the stream before closing, thus any buffered or pending
+input is discarded while any buffered or pending output is written out
+to the underlying file.
+This includes the standard streams,
+.Va stdin ,
+.Va stdout ,
+and
+.Va stderr .
+.Pp
+After the call to
+.Fn fdclose ,
+any use of
+.Fa stream
+causes undefined
+behavior.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn fdclose
+function returns 0.
+Otherwise,
+.Dv EOF
+is returned
+and the global variable
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn fdclose
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOTSUP
+The stream does not have an associated file descriptor.
+The stream was closed nonetheless, and if
+.Fa fdp
+was not
+.Dv NULL ,
+it will have been set to -1.
+.El
+.Pp
+The
+.Fn fdclose
+function may also fail and set
+.Va errno
+for any of the errors specified in
+.Xr fflush 3C .
+.Pp
+Even in the case of an error returned by
+.Fn fdclose ,
+.Fa stream
+should be considered closed.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Mt-Safe
+.Sh SEE ALSO
+.Xr fclose 3C ,
+.Xr fflush 3C ,
+.Xr attributes 7

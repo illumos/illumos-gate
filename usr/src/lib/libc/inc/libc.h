@@ -302,11 +302,6 @@ extern int _insert(pid_t pid, int fd);
 extern pid_t _delete(int fd);
 
 /*
- * defined in port/print/doprnt.c
- */
-extern ssize_t	_wdoprnt(const wchar_t *, va_list, FILE *);
-
-/*
  * defined in fgetwc.c
  */
 extern wint_t _fgetwc_unlocked(FILE *);

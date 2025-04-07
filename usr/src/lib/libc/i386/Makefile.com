@@ -647,7 +647,9 @@ PORTINET=			\
 	inet_pton.o
 
 PORTPRINT_W=			\
-	doprnt_w.o
+	doprnt_w.o		\
+	vwprintf.o		\
+	wprintf.o
 
 PORTPRINT=			\
 	asprintf.o		\
@@ -659,17 +661,18 @@ PORTPRINT=			\
 	vfprintf.o		\
 	vprintf.o		\
 	vsnprintf.o		\
-	vsprintf.o		\
-	vwprintf.o		\
-	wprintf.o
+	vsprintf.o
 
 # c89 variants to support 32-bit size of c89 u/intmax_t (32-bit libc only)
+PORTPRINT_C89_W=		\
+	vwprintf_c89.o
+
+
 PORTPRINT_C89=			\
 	vfprintf_c89.o		\
 	vprintf_c89.o		\
 	vsnprintf_c89.o		\
-	vsprintf_c89.o		\
-	vwprintf_c89.o
+	vsprintf_c89.o
 
 PORTSTDIO_C89=			\
 	vscanf_c89.o		\
@@ -1038,6 +1041,7 @@ MOSTOBJS=			\
 	$(PORTLOCALE)		\
 	$(PORTPRINT)		\
 	$(PORTPRINT_C89)	\
+	$(PORTPRINT_C89_W)	\
 	$(PORTPRINT_W)		\
 	$(PORTREGEX)		\
 	$(PORTREGEX64)		\
@@ -1219,6 +1223,9 @@ $(PORTPRINT_W:%=pics/%) := \
 
 $(PORTPRINT_C89:%=pics/%) := \
 	CPPFLAGS += -D_C89_INTMAX32
+
+$(PORTPRINT_C89_W:%=pics/%) := \
+	CPPFLAGS += -D_C89_INTMAX32 -D_WIDE
 
 $(PORTSTDIO_C89:%=pics/%) := \
 	CPPFLAGS += -D_C89_INTMAX32

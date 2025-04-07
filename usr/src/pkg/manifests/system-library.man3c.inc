@@ -17,6 +17,7 @@
 # Copyright 2018 Jason King
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Hans Rosenfeld
 #
 
 link path=usr/share/man/man3c/FD_CLR.3c target=select.3c
@@ -359,6 +360,7 @@ file path=usr/share/man/man3c/fcloseall.3c
 link path=usr/share/man/man3c/fconvert.3c target=econvert.3c
 link path=usr/share/man/man3c/fcvt.3c target=ecvt.3c
 file path=usr/share/man/man3c/fdatasync.3c
+file path=usr/share/man/man3c/fdclose.3c
 file path=usr/share/man/man3c/fdetach.3c
 file path=usr/share/man/man3c/fdopen.3c
 link path=usr/share/man/man3c/fdopendir.3c target=opendir.3c

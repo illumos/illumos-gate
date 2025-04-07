@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Robert Mustacchi
+ * Copyright 2025 Hans Rosenfeld
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -692,9 +693,9 @@ _fflush_u(FILE *iop)
 	return (res);
 }
 
-/* flush buffer and close stream */
-int
-fclose(FILE *iop)
+/* helper for fclose/fdclose/fcloseall */
+static int
+fclose_helper(FILE *iop, boolean_t doclose)
 {
 	int res = 0;
 	rmutex_t *lk;
@@ -708,25 +709,79 @@ fclose(FILE *iop)
 		FUNLOCKFILE(lk);
 		return (EOF);
 	}
+
 	/* Is not unbuffered and opened for read and/or write ? */
 	if (!(iop->_flag & _IONBF) && (iop->_flag & (_IOWRT | _IOREAD | _IORW)))
 		res = _fflush_u(iop);
-	if (_xclose(iop) < 0)
-		res = EOF;
+
+	if (doclose)
+		if (_xclose(iop) < 0)
+			res = EOF;
+
 	if (iop->_flag & _IOMYBUF) {
 		(void) free((char *)iop->_base - PUSHBACK);
 	}
+
 	iop->_base = NULL;
 	iop->_ptr = NULL;
 	iop->_cnt = 0;
 	iop->_flag = 0;			/* marks it as available */
 	FUNLOCKFILE(lk);
 
+	return (res);
+}
+
+/* flush buffer and close stream */
+int
+fclose(FILE *iop)
+{
+	int res = 0;
+
+	res = fclose_helper(iop, B_TRUE);
+
 	if (__libc_threaded)
 		cancel_safe_mutex_lock(&_first_link_lock);
 	fcloses++;
 	if (__libc_threaded)
 		cancel_safe_mutex_unlock(&_first_link_lock);
+
+	return (res);
+}
+
+/*
+ * fdclose() works like fclose(), except it doesn't close the underlying file
+ * descriptor.
+ *
+ * That is, however, not true for streams which aren't backed by a file
+ * descriptor such as memory streams, as indicated by them having a special
+ * ops vector, which we infer from the file descriptor being -1. In this case
+ * fdclose() returns EOF, sets errno to EOPNOTSUP, but still closes the FILE
+ * just like fclose() would. This is to make sure we're compatible with BSD.
+ */
+int
+fdclose(FILE *iop, int *fdp)
+{
+	int res = 0;
+	int fd = _get_fd(iop);
+
+	if (fd == -1) {
+		res = fclose_helper(iop, B_TRUE);
+		errno = ENOTSUP;
+	} else {
+		res = fclose_helper(iop, B_FALSE);
+	}
+
+	if (__libc_threaded)
+		cancel_safe_mutex_lock(&_first_link_lock);
+	fcloses++;
+	if (__libc_threaded)
+		cancel_safe_mutex_unlock(&_first_link_lock);
+
+	if (fdp != NULL)
+		*fdp = fd;
+
+	if (fd == -1)
+		res = EOF;
 
 	return (res);
 }
@@ -738,7 +793,6 @@ fcloseall(void)
 	FPDECL(iop);
 
 	struct _link_ *lp;
-	rmutex_t *lk;
 
 	if (__libc_threaded)
 		cancel_safe_mutex_lock(&_first_link_lock);
@@ -750,26 +804,7 @@ fcloseall(void)
 
 		FIRSTFP(lp, iop);
 		for (i = lp->niob; --i >= 0; NEXTFP(iop)) {
-			/* code stolen from fclose(), above */
-
-			FLOCKFILE(lk, iop);
-			if (iop->_flag == 0) {
-				FUNLOCKFILE(lk);
-				continue;
-			}
-
-			/* Not unbuffered and opened for read and/or write? */
-			if (!(iop->_flag & _IONBF) &&
-			    (iop->_flag & (_IOWRT | _IOREAD | _IORW)))
-				(void) _fflush_u(iop);
-			(void) _xclose(iop);
-			if (iop->_flag & _IOMYBUF)
-				free((char *)iop->_base - PUSHBACK);
-			iop->_base = NULL;
-			iop->_ptr = NULL;
-			iop->_cnt = 0;
-			iop->_flag = 0;		/* marks it as available */
-			FUNLOCKFILE(lk);
+			(void) fclose_helper(iop, B_TRUE);
 			fcloses++;
 		}
 	} while ((lp = lp->next) != NULL);

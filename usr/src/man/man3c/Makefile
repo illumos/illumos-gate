@@ -17,6 +17,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2018 Jason King
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Hans Rosenfeld
 #
 
 include		$(SRC)/Makefile.master
@@ -129,6 +130,7 @@ MANFILES=	__fbufsize.3c					\
 		fclose.3c					\
 		fcloseall.3c					\
 		fdatasync.3c					\
+		fdclose.3c					\
 		fdetach.3c					\
 		fdopen.3c					\
 		ferror.3c					\
