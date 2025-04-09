@@ -5682,6 +5682,9 @@ f usr/lib/brand/bhyve/platform.xml 0444 root sys
 f usr/lib/brand/bhyve/statechange 0555 root sys
 f usr/lib/brand/bhyve/uninstall 0555 root sys
 f usr/lib/brand/bhyve/zhyve 0555 root sys
+d usr/lib/brand/builder 0555 root sys
+f usr/lib/brand/builder/config.xml 0444 root root
+f usr/lib/brand/builder/platform.xml 0444 root root
 d usr/lib/brand/jcommon 0755 root bin
 f usr/lib/brand/jcommon/cattach 0444 root root
 f usr/lib/brand/jcommon/cdetach 0444 root root

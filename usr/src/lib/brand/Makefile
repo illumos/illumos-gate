@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2025 MNX Cloud, Inc.
 #
 include ../../Makefile.master
 
@@ -30,7 +31,7 @@ i386_SUBDIRS= bhyve kvm lx
 i386_MSGSUBDIRS= lx
 
 SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled \
-    jcommon joyent joyent-minimal $($(MACH)_SUBDIRS)
+    jcommon joyent joyent-minimal builder $($(MACH)_SUBDIRS)
 
 MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
 
