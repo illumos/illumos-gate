@@ -672,7 +672,8 @@ typedef enum mac_ether_offload_flags {
 	MEOI_L3INFO_SET		= 1 << 1,
 	MEOI_L4INFO_SET		= 1 << 2,
 	MEOI_VLAN_TAGGED	= 1 << 3,
-	MEOI_L3_FRAGMENT	= 1 << 4
+	MEOI_L3_FRAG_MORE	= 1 << 4,
+	MEOI_L3_FRAG_OFFSET	= 1 << 5
 } mac_ether_offload_flags_t;
 
 typedef struct mac_ether_offload_info {

@@ -2011,7 +2011,7 @@ mac_mmc_parse_ether(mac_mblk_cursor_t *cursor, uint8_t *dst_addrp,
  */
 static bool
 mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
-    bool *is_fragp, uint16_t *hdr_sizep)
+    mac_ether_offload_flags_t *fragp, uint16_t *hdr_sizep)
 {
 	const size_t l3_off = mac_mmc_offset(cursor);
 
@@ -2041,8 +2041,15 @@ mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
 		if (ipprotop != NULL) {
 			*ipprotop = ipproto;
 		}
-		if (is_fragp != NULL) {
-			*is_fragp = ((frag_off & (IPH_MF | IPH_OFFSET)) != 0);
+		if (fragp != NULL) {
+			mac_ether_offload_flags_t frag_flags = 0;
+			if ((frag_off & IPH_MF) != 0) {
+				frag_flags |= MEOI_L3_FRAG_MORE;
+			}
+			if ((frag_off & IPH_OFFSET) != 0) {
+				frag_flags |= MEOI_L3_FRAG_OFFSET;
+			}
+			*fragp = frag_flags;
 		}
 		if (hdr_sizep != NULL) {
 			*hdr_sizep = verlen * 4;
@@ -2052,7 +2059,7 @@ mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
 	if (l3_sap == ETHERTYPE_IPV6) {
 		uint16_t ip_len = sizeof (ip6_t);
 		uint8_t ipproto;
-		bool found_frag_eh = false;
+		mac_ether_offload_flags_t frag_flags = 0;
 
 		if (!mac_mmc_get_uint8(cursor,
 		    l3_off + offsetof(ip6_t, ip6_nxt), &ipproto)) {
@@ -2076,7 +2083,20 @@ mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
 				 * communicating it through the EH itself.
 				 */
 				eh_len = 8;
-				found_frag_eh = true;
+
+				uint16_t frag_off;
+				if (!mac_mmc_get_uint16(cursor, hdr_off + 2,
+				    &frag_off)) {
+					return (false);
+				}
+				/* IP6F_* defines already in network order */
+				frag_off = htons(frag_off);
+				if ((frag_off & IP6F_MORE_FRAG) != 0) {
+					frag_flags |= MEOI_L3_FRAG_MORE;
+				}
+				if ((frag_off & IP6F_OFF_MASK) != 0) {
+					frag_flags |= MEOI_L3_FRAG_OFFSET;
+				}
 			} else if (ipproto == IPPROTO_AH) {
 				/*
 				 * The length of the IP Authentication EH is
@@ -2115,8 +2135,8 @@ mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
 		if (ipprotop != NULL) {
 			*ipprotop = ipproto;
 		}
-		if (is_fragp != NULL) {
-			*is_fragp = found_frag_eh;
+		if (fragp != NULL) {
+			*fragp = frag_flags;
 		}
 		if (hdr_sizep != NULL) {
 			*hdr_sizep = ip_len;
@@ -2256,18 +2276,20 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0) {
 		uint8_t ipproto;
 		uint16_t l3_sz;
-		bool is_frag;
+		mac_ether_offload_flags_t frag_flags;
+
 		if (!mac_mmc_parse_l3(&cursor, meoi->meoi_l3proto, &ipproto,
-		    &is_frag, &l3_sz)) {
+		    &frag_flags, &l3_sz)) {
 			return;
 		}
 
+		/* Only the fragment-related flags should be emitted */
+		ASSERT3U(frag_flags &
+		    ~(MEOI_L3_FRAG_MORE | MEOI_L3_FRAG_OFFSET), ==, 0);
+
 		meoi->meoi_l3hlen = l3_sz;
 		meoi->meoi_l4proto = ipproto;
-		meoi->meoi_flags |= MEOI_L3INFO_SET;
-		if (is_frag) {
-			meoi->meoi_flags |= MEOI_L3_FRAGMENT;
-		}
+		meoi->meoi_flags |= MEOI_L3INFO_SET | frag_flags;
 	}
 	const size_t l3_end = l2_end + (size_t)meoi->meoi_l3hlen;
 	if (!mac_mmc_seek(&cursor, l3_end)) {
@@ -2276,6 +2298,15 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
 	}
 
 	if ((meoi->meoi_flags & MEOI_L4INFO_SET) == 0) {
+		if ((meoi->meoi_flags & MEOI_L3_FRAG_OFFSET) != 0) {
+			/*
+			 * If this packet is a fragment, and is offset into the
+			 * data (not at the "head"), then we are past where the
+			 * L4 header would be, and should parse no further.
+			 */
+			return;
+		}
+
 		uint8_t l4_sz;
 		if (!mac_mmc_parse_l4(&cursor, meoi->meoi_l4proto, &l4_sz)) {
 			return;
@@ -2309,7 +2340,10 @@ mac_partial_offload_info(mblk_t *mp, size_t off, mac_ether_offload_info_t *meoi)
  * parsing:
  *
  * - MEOI_VLAN_TAGGED: Ethernet header is tagged with a VLAN
- * - MEOI_L3_FRAGMENT: L3 header indicated fragmentation
+ * - MEOI_L3_FRAG_MORE: L3 indicated that this packet is fragmented into one or
+ *   more packets to follow
+ * - MEOI_L3_FRAG_OFFSET: L3 header that this packet is a fragment which is
+ *   offset (following) from the head of the data
  */
 void
 mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
