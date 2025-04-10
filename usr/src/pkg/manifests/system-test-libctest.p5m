@@ -82,6 +82,8 @@ file path=opt/libc-tests/tests/clock_lock.32 mode=0555
 file path=opt/libc-tests/tests/clock_lock.64 mode=0555
 file path=opt/libc-tests/tests/closefrom.32 mode=0555
 file path=opt/libc-tests/tests/closefrom.64 mode=0555
+file path=opt/libc-tests/tests/dprintf.32 mode=0555
+file path=opt/libc-tests/tests/dprintf.64 mode=0555
 file path=opt/libc-tests/tests/endian.32 mode=0555
 file path=opt/libc-tests/tests/endian.64 mode=0555
 file path=opt/libc-tests/tests/env-7076.32 mode=0555

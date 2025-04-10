@@ -20,12 +20,13 @@
  */
 
 /*
+ * Copyright 2025 Hans Rosenfeld
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <thread.h>
@@ -39,23 +40,31 @@
 #include "libc.h"
 #include "mse.h"
 
+#ifdef _C89_INTMAX32
 /*
- * 32-bit shadow function of vfprintf() is included here.
+ * 32-bit shadow functions of vfprintf(), fprintf(), vprintf(), and printf()
+ * are built here.
  * When using the c89 compiler to build 32-bit applications, the size
  * of intmax_t is 32-bits, otherwise the size of intmax_t is 64-bits.
  * The shadow function uses 32-bit size of intmax_t for %j conversion.
  * The #pragma redefine_extname in <stdio.h> selects the proper routine
  * at compile time for the user application.
- * NOTE: this function is only available in the 32-bit library.
+ * NOTE: these functions are only available in the 32-bit library.
  */
-
-/*VARARGS2*/
-int
-#ifdef _C89_INTMAX32	/* _C89_INTMAX32 version in 32-bit libc only */
-_vfprintf_c89(FILE *iop, const char *format, va_list ap)
+#pragma redefine_extname vfprintf _vfprintf_c89
+#pragma redefine_extname fprintf _fprintf_c89
+#pragma redefine_extname vprintf _vprintf_c89
+#pragma redefine_extname printf _printf_c89
 #else
-vfprintf(FILE *iop, const char *format, va_list ap)
+/*
+ * This symbol should not be defined, but there are some
+ * miserable old compiler libraries that depend on it.
+ */
+#pragma weak _fprintf = fprintf
 #endif
+
+int
+vfprintf(FILE *iop, const char *format, va_list ap)
 {
 	ssize_t count;
 	rmutex_t *lk;
@@ -95,7 +104,43 @@ vfprintf(FILE *iop, const char *format, va_list ap)
 	if ((size_t)count > MAXINT) {
 		errno = EOVERFLOW;
 		return (EOF);
-	} else {
-		return ((int)count);
 	}
+
+	return ((int)count);
+}
+
+int
+fprintf(FILE *iop, const char *format, ...)
+{
+	int count;
+	va_list ap;
+
+	va_start(ap, format);
+	count = vfprintf(iop, format, ap);
+	va_end(ap);
+
+	return (count);
+}
+
+int
+vprintf(const char *format, va_list ap)
+{
+	int count;
+
+	count = vfprintf(stdout, format, ap);
+
+	return (count);
+}
+
+int
+printf(const char *format, ...)
+{
+	int count;
+	va_list ap;
+
+	va_start(ap, format);
+	count = vfprintf(stdout, format, ap);
+	va_end(ap);
+
+	return (count);
 }

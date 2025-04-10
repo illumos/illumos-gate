@@ -822,9 +822,14 @@ cmd_array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		elemsize = mdb_ctf_type_size(id);
 	} else if (addr_to_sym(t, addr, tn, sizeof (tn), &sym, &s_info)
-	    != NULL && mdb_ctf_lookup_by_symbol(&sym, &s_info, &id)
-	    == 0 && mdb_ctf_type_kind(id) == CTF_K_ARRAY &&
+	    != NULL &&
+	    mdb_ctf_lookup_by_symbol(&sym, &s_info, &id) == 0 &&
+	    mdb_ctf_type_kind(id) == CTF_K_ARRAY &&
 	    mdb_ctf_array_info(id, &ar) != -1) {
+		if (ar.mta_nelems == 0) {
+			mdb_warn("array has 0 elements\n");
+			return (DCMD_ERR);
+		}
 		elemsize = mdb_ctf_type_size(id) / ar.mta_nelems;
 		nelem = ar.mta_nelems;
 	} else {

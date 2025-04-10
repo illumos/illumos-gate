@@ -222,6 +222,8 @@ atomic_swap_long(volatile u_long *p, u_long v)
 #define	atomic_store_int(p, v)		\
 	    (*(volatile u_int *)(p) = (u_int)(v))
 
+#define	atomic_load_32(p)  (*(volatile uint32_t *)(p))
+#define	atomic_load_64(p)  (*(volatile uint64_t *)(p))
 
 #define	atomic_readandclear_int(p)	atomic_swap_int(p, 0)
 #define	atomic_readandclear_long(p)	atomic_swap_long(p, 0)

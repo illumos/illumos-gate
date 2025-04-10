@@ -659,10 +659,33 @@ void sh_done(void *ptr, register int sig)
 			vlimit(RLIMIT_CORE,0);
 #endif
 		}
-		signal(sig,SIG_DFL);
-		sigrelease(sig);
-		kill(getpid(),sig);
-		pause();
+		/*
+		 * If the child has received a signal that will cause a core
+		 * dump, don't pass this on to ksh too.
+		 * These are the signals which are listed in signal.h(3HEAD) as
+		 * defaulting to "Core", and in the order listed there
+		 * (ordered by the signal value).
+		 */
+		switch (sig) {
+		case SIGQUIT:
+		case SIGILL:
+		case SIGTRAP:
+		case SIGABRT:
+		case SIGEMT:
+		case SIGFPE:
+		case SIGBUS:
+		case SIGSEGV:
+		case SIGSYS:
+		case SIGXCPU:
+		case SIGXFSZ:
+			exit(128 + sig);
+			break;
+		default:
+			signal(sig,SIG_DFL);
+			sigrelease(sig);
+			kill(getpid(),sig);
+			pause();
+		}
 	}
 #if SHOPT_KIA
 	if(sh_isoption(SH_NOEXEC))

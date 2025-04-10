@@ -35,7 +35,10 @@
  * A full copy of the text of the CDDL should have accompanied this
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
- *
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
@@ -2397,7 +2400,7 @@ static int
 vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid,
     uint32_t *eax)
 {
-	uint32_t mask, val;
+	uint32_t mask, val = 0;
 	bool in;
 	int err;
 

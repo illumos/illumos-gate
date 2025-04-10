@@ -20,5 +20,6 @@
 #include_next <limits.h>
 
 #define	OFF_MAX		((off_t)-1)
+#define	SIZE_T_MAX	SIZE_MAX
 
 #endif	/* _COMPAT_FREEBSD_SYS_LIMITS_H_ */

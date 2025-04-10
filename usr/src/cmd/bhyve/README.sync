@@ -5,11 +5,11 @@ The bhyve userland code in this directory, and its associated libraries and
 parts of the kernel module have been updated to the latest upstream FreeBSD
 sources as of:
 
-    commit a305f44d1404fbf386bb2b50ab7233ce9eabe0bb
-    Author: Ed Maste <emaste@FreeBSD.org>
-    Date:   Thu Sep 19 14:57:42 2024 -0400
+    commit d70230783ae27594a77560582093dd86426d3360
+    Author: Mark Johnston <markj@FreeBSD.org>
+    Date:   Thu Nov 7 20:07:39 2024 +0000
 
-        bhyve: validate corb->wp to avoid infinite loop
+        vmm: Postpone vmm module initialization to after SI_SUB_DEVFS
 
 Divergence Notes:
 

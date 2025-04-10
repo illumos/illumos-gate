@@ -63,6 +63,7 @@ COMMON_OBJS = \
 	sockstream.o		\
 	tpm_device.o		\
 	tpm_emul_passthru.o	\
+	tpm_emul_swtpm.o	\
 	tpm_intf_crb.o		\
 	tpm_ppi_qemu.o		\
 	uart_backend.o		\
@@ -87,7 +88,7 @@ CPPFLAGS =	-I../common \
 		-I$(SRC)/uts/common \
 		-I$(SRC)/uts/intel \
 		-DWITHOUT_CAPSICUM \
-		-DOPENSSL_API_COMPAT=0x10100000L
+		-DOPENSSL_API_COMPAT=10101
 
 SMOFF += all_func_returns
 rfb.o := SMOFF=

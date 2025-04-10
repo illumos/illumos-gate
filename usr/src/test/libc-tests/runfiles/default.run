@@ -114,6 +114,8 @@ timeout = 600
 [/opt/libc-tests/tests/closefrom.32]
 [/opt/libc-tests/tests/closefrom.64]
 [/opt/libc-tests/tests/catopen]
+[/opt/libc-tests/tests/dprintf.32]
+[/opt/libc-tests/tests/dprintf.64]
 [/opt/libc-tests/tests/endian.32]
 [/opt/libc-tests/tests/endian.64]
 [/opt/libc-tests/tests/env-OS-4089.32]

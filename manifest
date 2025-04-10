@@ -13124,6 +13124,7 @@ s usr/share/man/man3c/door_setparam.3c=door_getparam.3c
 f usr/share/man/man3c/door_ucred.3c 0444 root bin
 s usr/share/man/man3c/door_unbind.3c=door_bind.3c
 s usr/share/man/man3c/double_to_decimal.3c=floating_to_decimal.3c
+s usr/share/man/man3c/dprintf.3c=printf.3c
 f usr/share/man/man3c/drand48.3c 0444 root bin
 f usr/share/man/man3c/dup2.3c 0444 root bin
 s usr/share/man/man3c/dup3.3c=dup2.3c
@@ -14251,6 +14252,7 @@ s usr/share/man/man3c/utmpname.3c=getutent.3c
 s usr/share/man/man3c/utmpxname.3c=getutxent.3c
 s usr/share/man/man3c/valloc.3c=malloc.3c
 s usr/share/man/man3c/vasprintf.3c=vprintf.3c
+s usr/share/man/man3c/vdprintf.3c=vprintf.3c
 s usr/share/man/man3c/verr.3c=err.3c
 s usr/share/man/man3c/verrc.3c=err.3c
 s usr/share/man/man3c/verrx.3c=err.3c

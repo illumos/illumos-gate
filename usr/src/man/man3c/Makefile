@@ -801,6 +801,7 @@ MANLINKS=	FD_CLR.3c				\
 		door_setparam.3c			\
 		door_unbind.3c				\
 		double_to_decimal.3c			\
+		dprintf.3c				\
 		dup3.3c					\
 		duplocale.3c				\
 		edata.3c				\
@@ -1485,6 +1486,7 @@ MANLINKS=	FD_CLR.3c				\
 		verr.3c					\
 		verrc.3c				\
 		verrx.3c				\
+		vdprintf.3c				\
 		vfprintf.3c				\
 		vfscanf.3c				\
 		vfwscanf.3c				\
@@ -2263,6 +2265,7 @@ posix_spawnattr_setsigignore_np.3c	:= LINKSRC = posix_spawnattr_getsigignore_np.
 posix_spawnattr_setsigmask.3c		:= LINKSRC = posix_spawnattr_getsigmask.3c
 
 asprintf.3c				:= LINKSRC = printf.3c
+dprintf.3c				:= LINKSRC = printf.3c
 fprintf.3c				:= LINKSRC = printf.3c
 snprintf.3c				:= LINKSRC = printf.3c
 sprintf.3c				:= LINKSRC = printf.3c
@@ -2744,6 +2747,7 @@ vswprintf.3c				:= LINKSRC = vfwprintf.3c
 vwprintf.3c				:= LINKSRC = vfwprintf.3c
 
 vasprintf.3c				:= LINKSRC = vprintf.3c
+vdprintf.3c				:= LINKSRC = vprintf.3c
 vfprintf.3c				:= LINKSRC = vprintf.3c
 vsnprintf.3c				:= LINKSRC = vprintf.3c
 vsprintf.3c				:= LINKSRC = vprintf.3c
