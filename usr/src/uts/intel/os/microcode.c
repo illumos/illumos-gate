@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/bootconf.h>
@@ -355,6 +355,7 @@ void
 ucode_locate(cpu_t *cp)
 {
 	cpu_ucode_info_t *uinfop;
+	ucode_errno_t rc;
 	size_t sz;
 
 	ASSERT3P(cp, !=, NULL);
@@ -380,19 +381,32 @@ ucode_locate(cpu_t *cp)
 	ASSERT3P(uinfop, !=, NULL);
 
 	/*
-	 * Search for any applicable updates.  If we fail to find a match for
-	 * any reason, free the file structure just in case we have read in a
-	 * partial file.
+	 * Search for any applicable updates.
 	 *
-	 * In case we end up here after ucode_cleanup() has been called, such
-	 * as could occur with CPU hotplug, we also clear the memory and reset
-	 * the data structure as nothing else will call ucode_cleanup() and we
-	 * don't need to cache the data as we do during boot when starting the
-	 * APs.
+	 * A return value of EM_HIGHERREV indicates that no update was applied
+	 * due to the CPU already being at that or a higher revision, but both
+	 * EM_HIGHERREV and EM_OK indicate that some microcode that matches the
+	 * CPU was successfully located. In either of these cases it's worth
+	 * keeping it around in case it's useful for the next CPU -- and if it
+	 * isn't it will end up being discarded. In all other cases we clear it
+	 * out just in case we have read in a partial or invalid file.
+	 *
+	 * Architectural note:
+	 *   Depending on the platform, the cpu_t being processed may represent
+	 *   a thread within a CPU core. If updating one thread's microcode
+	 *   implicitly updates all sibling threads in the core, it's normal to
+	 *   see a mix of EM_OK and EM_HIGHERREV when iterating over those
+	 *   threads.
+	 *
+	 * There's one additional consideration. If we are here after
+	 * ucode_cleanup() has been called, such as could occur with CPU
+	 * hotplug, we also clear the memory and reset the data structure as
+	 * nothing else will call ucode_cleanup() and we don't need to cache
+	 * the data as we do during boot when starting the APs.
 	 */
-	if ((ucode->us_locate(cp, uinfop) != EM_OK) || ucode_cleanup_done) {
+	rc = ucode->us_locate(cp, uinfop);
+	if ((rc != EM_OK && rc != EM_HIGHERREV) || ucode_cleanup_done)
 		ucode->us_file_reset();
-	}
 
 out:
 	mutex_exit(&ucode_lock);
