@@ -112,6 +112,8 @@ file path=opt/libc-tests/tests/fnmatch.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/getlocname.32 mode=0555
+file path=opt/libc-tests/tests/getlocname.64 mode=0555
 file path=opt/libc-tests/tests/getsid.64 mode=0555
 dir  path=opt/libc-tests/tests/i18n
 file path=opt/libc-tests/tests/i18n/bindtextdomain_test mode=0555

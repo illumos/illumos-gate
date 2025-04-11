@@ -52,6 +52,7 @@ PROGS = \
 	endian \
 	env-7076 \
 	fnmatch \
+	getlocname \
 	isatty \
 	memchr \
 	memset_s \
@@ -110,6 +111,9 @@ memset_s.32 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 memset_s.64 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 set_constraint_handler_s.32 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 set_constraint_handler_s.64 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
+
+getlocname.32 := CSTD=$(CSTD_GNU17)
+getlocname.64 := CSTD=$(CSTD_GNU17)
 
 isatty.32 :=	CSTD=$(CSTD_GNU17)
 isatty.64 :=	CSTD=$(CSTD_GNU17)

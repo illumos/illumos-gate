@@ -123,6 +123,8 @@ timeout = 600
 [/opt/libc-tests/tests/err/err.ksh]
 [/opt/libc-tests/tests/fnmatch.32]
 [/opt/libc-tests/tests/fnmatch.64]
+[/opt/libc-tests/tests/getlocname.32]
+[/opt/libc-tests/tests/getlocname.64]
 [/opt/libc-tests/tests/isatty.32]
 [/opt/libc-tests/tests/isatty.64]
 [/opt/libc-tests/tests/memchr.32]
