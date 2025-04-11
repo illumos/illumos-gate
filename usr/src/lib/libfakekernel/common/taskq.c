@@ -183,6 +183,12 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t tqflags)
 }
 
 void
+taskq_init_ent(taskq_ent_t *tqe)
+{
+	tqe->tqent_flags = 0;
+}
+
+void
 taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
     taskq_ent_t *t)
 {

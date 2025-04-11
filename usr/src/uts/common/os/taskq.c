@@ -769,15 +769,13 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 /*
  * Do-nothing task which may be used to prepopulate thread caches.
  */
-/*ARGSUSED*/
 void
-nulltask(void *unused)
+nulltask(void *unused __unused)
 {
 }
 
-/*ARGSUSED*/
 static int
-taskq_constructor(void *buf, void *cdrarg, int kmflags)
+taskq_constructor(void *buf, void *cdrarg __unused, int kmflags __unused)
 {
 	taskq_t *tq = buf;
 
@@ -796,9 +794,8 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
-taskq_destructor(void *buf, void *cdrarg)
+taskq_destructor(void *buf, void *cdrarg __unused)
 {
 	taskq_t *tq = buf;
 
@@ -815,21 +812,26 @@ taskq_destructor(void *buf, void *cdrarg)
 	cv_destroy(&tq->tq_maxalloc_cv);
 }
 
-/*ARGSUSED*/
+void
+taskq_init_ent(taskq_ent_t *tqe)
+{
+	tqe->tqent_un.tqent_flags = 0;
+	tqe->tqent_thread = NULL;
+	cv_init(&tqe->tqent_cv, NULL, CV_DEFAULT, NULL);
+}
+
 static int
-taskq_ent_constructor(void *buf, void *cdrarg, int kmflags)
+taskq_ent_constructor(void *buf, void *cdrarg __unused, int kmflags __unused)
 {
 	taskq_ent_t *tqe = buf;
 
-	tqe->tqent_thread = NULL;
-	cv_init(&tqe->tqent_cv, NULL, CV_DEFAULT, NULL);
+	taskq_init_ent(tqe);
 
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
-taskq_ent_destructor(void *buf, void *cdrarg)
+taskq_ent_destructor(void *buf, void *cdrarg __unused)
 {
 	taskq_ent_t *tqe = buf;
 

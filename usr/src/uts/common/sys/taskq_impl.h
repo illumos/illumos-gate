@@ -66,7 +66,7 @@ typedef struct tqstat {
 	uint_t		tqs_hits;
 	uint_t		tqs_misses;
 	uint_t		tqs_overflow;	/* no threads to allocate   */
-	uint_t		tqs_tcreates;	/* threads created 	*/
+	uint_t		tqs_tcreates;	/* threads created	*/
 	uint_t		tqs_tdeaths;	/* threads died		*/
 	uint_t		tqs_maxthreads;	/* max # of alive threads */
 	uint_t		tqs_disptcreates;
@@ -154,7 +154,7 @@ struct taskq {
 
 /* Special form of taskq dispatch that uses preallocated entries. */
 void taskq_dispatch_ent(taskq_t *, task_func_t, void *, uint_t, taskq_ent_t *);
-
+void taskq_init_ent(taskq_ent_t *);
 
 #define	tq_thread tq_thr._tq_thread
 #define	tq_threadlist tq_thr._tq_threadlist

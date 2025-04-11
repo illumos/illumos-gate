@@ -94,6 +94,7 @@ extern "C" {
 #define	TREE_PCMP(a, b)	\
 	(((uintptr_t)(a) > (uintptr_t)(b)) - ((uintptr_t)(a) < (uintptr_t)(b)))
 
+#define	defclsyspri	minclsyspri
 
 #ifdef	__cplusplus
 }

@@ -285,6 +285,7 @@ extern vnode_t *rootdir;
 
 #define	minclsyspri	60
 #define	maxclsyspri	99
+#define	defclsyspri	minclsyspri
 
 #if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
 #define	_zfs_expect(expr, value)    (__builtin_expect((expr), (value)))

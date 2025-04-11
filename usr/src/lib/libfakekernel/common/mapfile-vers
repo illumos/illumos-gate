@@ -238,6 +238,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	taskq_dispatch;
 	taskq_dispatch_ent;
 	taskq_empty;
+	taskq_init_ent;
 	taskq_member;
 	taskq_empty;
 	taskq_wait;
