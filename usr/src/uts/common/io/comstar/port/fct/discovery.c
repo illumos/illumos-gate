@@ -2654,6 +2654,8 @@ fct_gspn_cb(fct_i_cmd_t *icmd)
 	if (query_irp) {
 		spnlen = resp[16];
 		if (spnlen > 0) {
+			spnlen = strnlen((char *)resp + 17, spnlen);
+
 			if (query_irp->irp_spn) {
 				kmem_free(query_irp->irp_spn,
 				    strlen(query_irp->irp_spn) + 1);
