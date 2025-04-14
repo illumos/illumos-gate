@@ -2760,7 +2760,7 @@ f usr/bin/fdformat 4555 root bin
 h usr/bin/fg=usr/bin/alias
 h usr/bin/fgrep=usr/bin/grep
 f usr/bin/ficl-sys 0555 root bin
-f usr/bin/file 0555 root bin
+s usr/bin/file=../has/bin/file
 f usr/bin/filesync 0555 root bin
 f usr/bin/find 0555 root bin
 f usr/bin/fmt 0555 root bin
@@ -3130,10 +3130,13 @@ d usr/gnu/share/man/man3 0755 root bin
 d usr/gnu/share/man/man5 0755 root bin
 d usr/gnu/share/man/man7 0755 root bin
 d usr/has 0755 root bin
+d usr/has/bin 0755 root bin
+f usr/has/bin/file 0755 root bin
 d usr/has/man 0755 root bin
 d usr/has/man/man1has 0755 root bin
 f usr/has/man/man1has/csh.1has 0444 root bin
 f usr/has/man/man1has/edit.1has 0444 root bin
+f usr/has/man/man1has/file.1has 0444 root bin
 f usr/has/man/man1has/vi.1has 0444 root bin
 d usr/include 0755 root bin
 f usr/include/aclutils.h 0644 root bin
@@ -12207,7 +12210,7 @@ s usr/share/man/man1/fc.1=history.1
 f usr/share/man/man1/fdformat.1 0444 root bin
 s usr/share/man/man1/fg.1=jobs.1
 s usr/share/man/man1/fgrep.1=grep.1
-f usr/share/man/man1/file.1 0444 root bin
+s usr/share/man/man1/file.1=../../../has/man/man1has/file.1has
 f usr/share/man/man1/filesync.1 0444 root bin
 f usr/share/man/man1/find.1 0444 root bin
 f usr/share/man/man1/fmt.1 0444 root bin

@@ -100,7 +100,8 @@ link path=usr/share/man/man1/fc.1 target=history.1
 file path=usr/share/man/man1/fdformat.1
 link path=usr/share/man/man1/fg.1 target=jobs.1
 link path=usr/share/man/man1/fgrep.1 target=grep.1
-file path=usr/share/man/man1/file.1
+link path=usr/share/man/man1/file.1 target=../../../has/man/man1has/file.1has \
+    mediator=file mediator-implementation=illumos
 file path=usr/share/man/man1/find.1
 file path=usr/share/man/man1/fmt.1
 file path=usr/share/man/man1/fmtmsg.1

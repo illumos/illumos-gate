@@ -21,8 +21,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -524,7 +522,7 @@ sub record_binary
 	close($path_fh);
 
 	#
-	# Record /usr/bin/file output.  Note that the programmatical way
+	# Record file(1) output.  Note that the programmatical way
 	# to access this info is through the command cmd_output_file().
 	#
 	my $file_fh = do { local *FH; *FH };

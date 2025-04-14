@@ -226,7 +226,7 @@ sub do_pvs
 
 	# get the file(1) output for each item:
 	my $file_fh = do { local *FH; *FH };
-	open($file_fh, "/usr/bin/file $paths 2>&1 |") || die "$!\n";
+	open($file_fh, "/usr/has/bin/file $paths 2>&1 |") || die "$!\n";
 	my ($file, $out);
 	while (<$file_fh>) {
 		($file, $out) = split(/:/, $_, 2);

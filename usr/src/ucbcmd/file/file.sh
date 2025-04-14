@@ -24,8 +24,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # This script invokes /usr/bin/file with -h option by default and
 # turns off -h when passed with -L option.
@@ -48,4 +46,4 @@ do
 	esac
 done
 shift `expr $OPTIND - 1`
-exec /usr/bin/file $HFLAG $CFLAG $MFLAG $MARG $FFLAG $FARG "$@"
+exec /usr/has/bin/file $HFLAG $CFLAG $MFLAG $MARG $FFLAG $FARG "$@"
