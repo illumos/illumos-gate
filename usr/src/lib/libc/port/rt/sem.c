@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include "lint.h"
@@ -134,9 +135,7 @@ sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 		errno = ENOMEM;
 		goto out;
 	}
-	cr_flag |= ALLOC_MEM;
 
-	/* LINTED */
 	sem = (sem_t *)mmap64(NULL, sizeof (sem_t), PROT_READ|PROT_WRITE,
 	    MAP_SHARED, fd, (off64_t)0);
 	(void) __close_nc(fd);
@@ -172,8 +171,7 @@ out:
 		(void) __close_nc(fd);
 	if ((cr_flag & DFILE_CREATE) != 0)
 		(void) __pos4obj_unlink(path, SEM_DATA_TYPE);
-	if ((cr_flag & ALLOC_MEM) != 0)
-		free(next);
+	free(next);
 	if ((cr_flag & DFILE_MMAP) != 0)
 		(void) munmap((caddr_t)sem, sizeof (sem_t));
 	(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include "lint.h"
@@ -385,7 +386,7 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	ssize_t		maxmsg;
 	uint64_t	temp;
 	void		*ptr;
-	mqdes_t		*mqdp;
+	mqdes_t		*mqdp = NULL;
 	mqhdr_t		*mqhp;
 	struct mq_dn	*mqdnp;
 
@@ -483,7 +484,6 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 		errno = ENOMEM;
 		goto out;
 	}
-	cr_flag |= ALLOC_MEM;
 
 	if ((ptr = mmap64(NULL, total_size, PROT_READ|PROT_WRITE,
 	    MAP_SHARED, fd, (off64_t)0)) == MAP_FAILED)
@@ -554,8 +554,7 @@ out:
 		(void) __pos4obj_unlink(path, MQ_DATA_TYPE);
 	if ((cr_flag & PFILE_CREATE) != 0)
 		(void) __pos4obj_unlink(path, MQ_PERM_TYPE);
-	if ((cr_flag & ALLOC_MEM) != 0)
-		free((void *)mqdp);
+	free(mqdp);
 	if ((cr_flag & DFILE_MMAP) != 0)
 		(void) munmap((caddr_t)mqhp, (size_t)total_size);
 	if ((cr_flag & MQDNP_MMAP) != 0)
