@@ -26,6 +26,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2021 Joyent, Inc.
+# Copyright 2025 Oxide Computer Company
 #
 
 KMDBSRCS += \
@@ -77,6 +78,7 @@ KMDBSRCS += \
 	mdb_set.c \
 	kmdb_shell.c \
 	mdb_signal.c \
+	mdb_stack.c \
 	mdb_string.c \
 	mdb_strio.c \
 	kmdb_stubs.c \

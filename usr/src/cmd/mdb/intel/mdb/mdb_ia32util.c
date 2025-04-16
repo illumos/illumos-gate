@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -38,6 +39,7 @@
 #include <mdb/mdb_ia32util.h>
 #include <mdb/mdb_target_impl.h>
 #include <mdb/mdb_kreg_impl.h>
+#include <mdb/mdb_stack.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_err.h>
@@ -424,41 +426,14 @@ mdb_ia32_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 }
 #endif
 
-/*ARGSUSED*/
 int
-mdb_ia32_kvm_frame(void *arglim, uintptr_t pc, uint_t argc, const long *largv,
+mdb_ia32_kvm_frame(void *argp, uintptr_t pc, uint_t argc, const long *argv,
     const mdb_tgt_gregset_t *gregs)
 {
-	const uint32_t *argv = (const uint32_t *)largv;
+	mdb_stack_frame_hdl_t *hdl = argp;
+	uint64_t bp;
 
-	argc = MIN(argc, (uintptr_t)arglim);
-	mdb_printf("%a(", pc);
-
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
-
-	mdb_printf(")\n");
-	return (0);
-}
-
-int
-mdb_ia32_kvm_framev(void *arglim, uintptr_t pc, uint_t argc, const long *largv,
-    const mdb_tgt_gregset_t *gregs)
-{
-	const uint32_t *argv = (const uint32_t *)largv;
-
-	argc = MIN(argc, (uintptr_t)arglim);
-	mdb_printf("%08lr %a(", gregs->kregs[KREG_EBP], pc);
-
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
-
-	mdb_printf(")\n");
+	bp = gregs->kregs[KREG_EBP];
+	mdb_stack_frame(hdl, pc, bp, argc, argv);
 	return (0);
 }

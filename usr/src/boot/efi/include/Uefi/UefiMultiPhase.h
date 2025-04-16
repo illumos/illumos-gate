@@ -103,6 +103,15 @@ typedef enum {
   /// however it happens to also support byte-addressable non-volatility.
   ///
   EfiPersistentMemory,
+  ///
+  /// A memory region that represents unaccepted memory, that must be
+  /// accepted by the boot target before it can be used. Unless otherwise noted, all
+  /// other EFI memory types are accepted. For platforms that support unaccepted
+  /// memory, all unaccepted valid memory will be reported as unaccepted in the
+  /// memory map. Unreported physical address ranges must be treated as not-
+  /// present memory.
+  ///
+  EfiUnacceptedMemoryType,
   EfiMaxMemoryType
 } EFI_MEMORY_TYPE;
 

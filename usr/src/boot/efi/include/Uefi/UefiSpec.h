@@ -177,7 +177,7 @@ typedef struct {
                                 2) MemoryType is in the range
                                 EfiMaxMemoryType..0x6FFFFFFF.
                                 3) Memory is NULL.
-                                4) MemoryType is EfiPersistentMemory.
+                                4) MemoryType is EfiPersistentMemory or EfiUnacceptedMemoryType.
   @retval EFI_OUT_OF_RESOURCES  The pages could not be allocated.
   @retval EFI_NOT_FOUND         The requested pages could not be found.
 

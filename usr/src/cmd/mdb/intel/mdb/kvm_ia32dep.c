@@ -45,6 +45,7 @@
 #include <mdb/mdb_disasm.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_conf.h>
+#include <mdb/mdb_stack.h>
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_isautil.h>
 #include <mdb/mdb_ia32util.h>
@@ -64,12 +65,15 @@ kt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 static int
-kt_stack_common(uintptr_t addr, uint_t flags, int argc,
-    const mdb_arg_t *argv, mdb_tgt_stack_f *func)
+kt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
+    mdb_stack_frame_flags_t sflags, mdb_tgt_stack_f *func)
 {
-	kt_data_t *kt = mdb.m_target->t_data;
-	void *arg = (void *)mdb.m_nargs;
+	mdb_tgt_t *t = mdb.m_target;
+	kt_data_t *kt = t->t_data;
 	mdb_tgt_gregset_t gregs, *grp;
+	mdb_stack_frame_hdl_t *hdl;
+	uint_t arglim = mdb.m_nargs;
+	int i;
 
 	if (flags & DCMD_ADDRSPEC) {
 		bzero(&gregs, sizeof (gregs));
@@ -78,27 +82,43 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
 	} else
 		grp = kt->k_regs;
 
+	i = mdb_getopts(argc, argv,
+	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
+	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
+	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
 	if (argc != 0) {
 		if (argv->a_type == MDB_TYPE_CHAR || argc > 1)
 			return (DCMD_USAGE);
 
-		arg = (void *)(uint_t)mdb_argtoull(argv);
+		arglim = mdb_argtoull(argv);
 	}
 
-	(void) mdb_ia32_kvm_stack_iter(mdb.m_target, grp, func, arg);
+	if ((hdl = mdb_stack_frame_init(t, arglim, sflags)) == NULL) {
+		mdb_warn("failed to init stack frame\n");
+		return (DCMD_ERR);
+	}
+
+	(void) mdb_ia32_kvm_stack_iter(mdb.m_target, grp, func, (void *)hdl);
 	return (DCMD_OK);
 }
 
 int
 kt_stack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (kt_stack_common(addr, flags, argc, argv, mdb_ia32_kvm_frame));
+	return (kt_stack_common(addr, flags, argc, argv, 0,
+	    mdb_ia32_kvm_frame));
 }
 
 int
 kt_stackv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (kt_stack_common(addr, flags, argc, argv, mdb_ia32_kvm_framev));
+	return (kt_stack_common(addr, flags, argc, argv, MSF_VERBOSE,
+	    mdb_ia32_kvm_frame));
 }
 
 const mdb_tgt_ops_t kt_ia32_ops = {

@@ -88,6 +88,7 @@
 #include <mdb/mdb_proc.h>
 #include <mdb/mdb_disasm.h>
 #include <mdb/mdb_signal.h>
+#include <mdb/mdb_stack.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_module.h>
 #include <mdb/mdb_debug.h>
@@ -997,76 +998,78 @@ pt_setflags(mdb_tgt_t *t, int flags)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-pt_frame(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
+pt_frame(void *argp, uintptr_t pc, uint_t argc, const long *argv,
     const mdb_tgt_gregset_t *gregs)
 {
-	argc = MIN(argc, (uint_t)(uintptr_t)arglim);
-	mdb_printf("%a(", pc);
+	mdb_stack_frame_hdl_t *hdl = argp;
+	uint64_t bp;
 
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
-
-	mdb_printf(")\n");
-	return (0);
-}
-
-static int
-pt_framev(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
-    const mdb_tgt_gregset_t *gregs)
-{
-	argc = MIN(argc, (uint_t)(uintptr_t)arglim);
 #if defined(__i386) || defined(__amd64)
-	mdb_printf("%0?lr %a(", gregs->gregs[R_FP], pc);
+	bp = gregs->gregs[R_FP];
 #else
-	mdb_printf("%0?lr %a(", gregs->gregs[R_SP], pc);
+	bp = gregs->gregs[R_SP];
 #endif
-	if (argc != 0) {
-		mdb_printf("%lr", *argv++);
-		for (argc--; argc != 0; argc--)
-			mdb_printf(", %lr", *argv++);
-	}
 
-	mdb_printf(")\n");
+	mdb_stack_frame(hdl, pc, bp, argc, argv);
+
 	return (0);
 }
 
 static int
-pt_framer(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
+pt_framer(void *argp, uintptr_t pc, uint_t argc, const long *argv,
     const mdb_tgt_gregset_t *gregs)
 {
-	if (pt_frameregs(arglim, pc, argc, argv, gregs, pc == PC_FAKE) == -1) {
+	mdb_stack_frame_hdl_t *hdl = argp;
+
+	uint_t arglim = mdb_stack_frame_arglim(hdl);
+
+	if (pt_frameregs((void *)(uintptr_t)arglim, pc,
+	    argc, argv, gregs, pc == PC_FAKE) == -1) {
 		/*
 		 * Use verbose format if register format is not supported.
 		 */
-		return (pt_framev(arglim, pc, argc, argv, gregs));
+		mdb_stack_frame_flags_set(hdl, MSF_VERBOSE);
+		return (pt_frame((void *)hdl, pc, argc, argv, gregs));
 	}
 
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 pt_stack_common(uintptr_t addr, uint_t flags, int argc,
-    const mdb_arg_t *argv, mdb_tgt_stack_f *func, prgreg_t saved_pc)
+    const mdb_arg_t *argv, mdb_stack_frame_flags_t sflags,
+    mdb_tgt_stack_f *func, prgreg_t saved_pc)
 {
-	void *arg = (void *)(uintptr_t)mdb.m_nargs;
 	mdb_tgt_t *t = mdb.m_target;
 	mdb_tgt_gregset_t gregs;
+	mdb_stack_frame_hdl_t *hdl;
+	uint_t arglim = mdb.m_nargs;
+	int i;
+
+	i = mdb_getopts(argc, argv,
+	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
+	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
+	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
 
 	if (argc != 0) {
 		if (argv->a_type == MDB_TYPE_CHAR || argc > 1)
 			return (DCMD_USAGE);
 
-		arg = (void *)(uintptr_t)mdb_argtoull(argv);
+		arglim = mdb_argtoull(argv);
 	}
 
 	if (t->t_pshandle == NULL || Pstate(t->t_pshandle) == PS_IDLE) {
 		mdb_warn("no process active\n");
+		return (DCMD_ERR);
+	}
+
+	if ((hdl = mdb_stack_frame_init(t, arglim, sflags)) == NULL) {
+		mdb_warn("failed to init stack frame\n");
 		return (DCMD_ERR);
 	}
 
@@ -1087,20 +1090,21 @@ pt_stack_common(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 	}
 
-	(void) mdb_tgt_stack_iter(t, &gregs, func, arg);
+	(void) mdb_tgt_stack_iter(t, &gregs, func, (void *)hdl);
 	return (DCMD_OK);
 }
 
 static int
 pt_stack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (pt_stack_common(addr, flags, argc, argv, pt_frame, 0));
+	return (pt_stack_common(addr, flags, argc, argv, 0, pt_frame, 0));
 }
 
 static int
 pt_stackv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	return (pt_stack_common(addr, flags, argc, argv, pt_framev, 0));
+	return (pt_stack_common(addr, flags, argc, argv, MSF_VERBOSE,
+	    pt_frame, 0));
 }
 
 static int
@@ -1110,7 +1114,8 @@ pt_stackr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Force printing of first register window, by setting  the
 	 * saved pc (%i7) to PC_FAKE.
 	 */
-	return (pt_stack_common(addr, flags, argc, argv, pt_framer, PC_FAKE));
+	return (pt_stack_common(addr, flags, argc, argv, 0,
+	    pt_framer, PC_FAKE));
 }
 
 /*ARGSUSED*/
@@ -1331,15 +1336,20 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_tgt_t *t = mdb.m_target;
 	mdb_tgt_gregset_t gregs;
-	int showargs = 0;
+	boolean_t showargs = B_FALSE;
+	boolean_t types = B_FALSE;
+	boolean_t sizes = B_FALSE;
 	int count;
 	uintptr_t pc, sp;
-	char name[128];
+	char buf[128];
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	count = mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &showargs,
+	count = mdb_getopts(argc, argv,
+	    's', MDB_OPT_SETBITS, TRUE, &sizes,
+	    't', MDB_OPT_SETBITS, TRUE, &types,
+	    'v', MDB_OPT_SETBITS, TRUE, &showargs,
 	    NULL);
 	argc -= count;
 	argv += count;
@@ -1359,21 +1369,25 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 	sp = gregs.gregs[R_SP];
 #endif
 
-	(void) pt_thread_name(t, tid, name, sizeof (name));
+	(void) pt_thread_name(t, tid, buf, sizeof (buf));
 
-	mdb_printf("stack pointer for thread %s: %p\n", name, sp);
+	mdb_printf("stack pointer for thread %s: %p\n", buf, sp);
 	if (pc != 0)
 		mdb_printf("[ %0?lr %a() ]\n", sp, pc);
 
 	(void) mdb_inc_indent(2);
 	mdb_set_dot(sp);
 
-	if (argc == 1)
+	if (argc == 1) {
 		(void) mdb_eval(argv->a_un.a_str);
-	else if (showargs)
-		(void) mdb_eval("<.$C");
-	else
-		(void) mdb_eval("<.$C0");
+	} else {
+		(void) mdb_snprintf(buf, sizeof (buf),
+		    "<.$C%s%s%s",
+		    sizes ? " -s" : "",
+		    types ? " -t" : "",
+		    showargs ? "" : " 0");
+		(void) mdb_eval(buf);
+	}
 
 	(void) mdb_dec_indent(2);
 	return (DCMD_OK);
@@ -2171,9 +2185,40 @@ getenv_help(void)
 	    " instead of initial environment.\n");
 }
 
+static void
+pt_stack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   include frame pointer information (this is the default "
+	    "for %<b>$C%</b>)\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
+}
+
+static void
+pt_findstack_help(void)
+{
+	mdb_printf(
+	    "Options:\n"
+	    "  -s   show the size of each stack frame to the left\n"
+	    "  -t   where CTF is present, show types for functions and "
+	    "arguments\n"
+	    "  -v   show function arguments\n"
+	    "\n"
+	    "If the optional %<u>cnt%</u> is given, no more than %<u>cnt%</u> "
+	    "arguments are shown\nfor each stack frame.\n");
+}
+
 static const mdb_dcmd_t pt_dcmds[] = {
-	{ "$c", "?[cnt]", "print stack backtrace", pt_stack },
-	{ "$C", "?[cnt]", "print stack backtrace", pt_stackv },
+	{ "$c", "?[-stv] [cnt]", "print stack backtrace", pt_stack,
+	    pt_stack_help },
+	{ "$C", "?[-stv] [cnt]", "print stack backtrace", pt_stackv,
+	    pt_stack_help },
 	{ "$i", NULL, "print signals that are ignored", pt_ignored },
 	{ "$l", NULL, "print the representative thread's lwp id", pt_lwpid },
 	{ "$L", NULL, "print list of the active lwp ids", pt_lwpids },
@@ -2189,7 +2234,8 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ ":R", "[-a]", "release the previously attached process", pt_detach },
 	{ "attach", "?[core|pid]",
 	    "attach to process or core file", pt_attach },
-	{ "findstack", ":[-v]", "find user thread stack", pt_findstack },
+	{ "findstack", ":[-stv]", "find user thread stack", pt_findstack,
+	    pt_findstack_help },
 	{ "gcore", "[-o prefix] [-c content]",
 	    "produce a core file for the attached process", pt_gcore },
 	{ "getenv", "[-t] [name]", "display an environment variable",
@@ -2200,8 +2246,10 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "regs", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "fpregs", "?[-dqs]", "print floating point registers", pt_fpregs },
 	{ "setenv", "name=value", "set an environment variable", pt_setenv },
-	{ "stack", "?[cnt]", "print stack backtrace", pt_stack },
-	{ "stackregs", "?", "print stack backtrace and registers", pt_stackr },
+	{ "stack", "?[-stv] [cnt]", "print stack backtrace", pt_stack,
+	    pt_stack_help },
+	{ "stackregs", "?[-stv]", "print stack backtrace and registers",
+	    pt_stackr, pt_stack_help },
 	{ "status", NULL, "print summary of current target", pt_status_dcmd },
 	{ "tls", ":symbol",
 	    "lookup TLS data in the context of a given thread", pt_tls },

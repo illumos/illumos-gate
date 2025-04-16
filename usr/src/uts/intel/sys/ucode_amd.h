@@ -24,7 +24,7 @@
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_UCODE_AMD_H
@@ -54,18 +54,21 @@ typedef struct ucode_header_amd {
 	uint32_t uh_match[8];
 } ucode_header_amd_t;
 
+/*
+ * This is the maximum size of a microcode blob that we are prepared to load
+ * in the kernel. AMD Turin microcode files are 14KiB and the size has been
+ * increasing with each generation. This value provides some margin for the
+ * future.
+ */
+#define	UCODE_AMD_MAXSIZE	(256 * 1024)
+
 typedef struct ucode_file_amd {
-	/*
-	 * The combined size of these fields adds up to 8KiB (8192 bytes).
-	 * If support is needed for larger update files, increase the size of
-	 * the uf_encr element.
-	 */
 	ucode_header_amd_t uf_header;
 	uint8_t uf_data[896];
 	uint8_t uf_resv[896];
 	uint8_t uf_code_present;
 	uint8_t uf_code[191];
-	uint8_t uf_encr[6144];
+	uint8_t uf_encr[];
 } ucode_file_amd_t;
 
 typedef struct ucode_eqtbl_amd {

@@ -573,6 +573,18 @@ mdb_ctf_type_name(mdb_ctf_id_t id, char *buf, size_t len)
 }
 
 ssize_t
+mdb_ctf_type_lname(mdb_ctf_id_t id, char *buf, size_t len)
+{
+	mdb_ctf_impl_t *idp = (mdb_ctf_impl_t *)&id;
+	char *ret;
+
+	if (!mdb_ctf_type_valid(id))
+		return (set_errno(EINVAL));
+
+	return (ctf_type_lname(idp->mci_fp, idp->mci_id, buf, len));
+}
+
+ssize_t
 mdb_ctf_type_size(mdb_ctf_id_t id)
 {
 	mdb_ctf_impl_t *idp = (mdb_ctf_impl_t *)&id;

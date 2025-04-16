@@ -52,10 +52,6 @@ The script "update.amd" in this directory can be used to help automate
 the update by automatically checking out the latest upstream firmware and
 inserting it into the tree and package manifest. Be careful about new files.
 
-NOTE: If any microcode file is larger than 8KiB (8192 bytes), then the size of
-      the ucode_file_amd_t structure in uts/common/sys/ucode.h will need
-      increasing to cater for this.
-
 AMD - see:
     usr/src/pkg/manifests/system-microcode-amd.p5m
 for exact current version

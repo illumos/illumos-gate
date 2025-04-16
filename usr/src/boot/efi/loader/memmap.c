@@ -38,7 +38,8 @@ static struct bios_smap *smapbase;
 static int smaplen;
 
 /*
- * See ACPI 6.1 Table 15-330 UEFI Memory Types and mapping to ACPI address
+ * See "ACPI Specification Release 6.5 Errata A"
+ * Table 15-6 (page 785), UEFI Memory Types and mapping to ACPI address
  * range types.
  */
 static int

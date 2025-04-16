@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _KVM_H
@@ -145,7 +146,7 @@ extern int kmt_next(mdb_tgt_t *, uintptr_t *);
 extern int kmt_stack(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmt_stackv(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmt_stackr(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int kmt_cpustack(uintptr_t, uint_t, int, const mdb_arg_t *, int, int);
+extern int kmt_cpustack(uintptr_t, uint_t, int, const mdb_arg_t *, int, uint_t);
 
 extern const char *kmt_trapname(int);
 

@@ -44,7 +44,7 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2021 Oxide Computer Company
 .\"
-.Dd February 25, 2021
+.Dd April 15, 2025
 .Dt OPENDIR 3C
 .Os
 .Sh NAME
@@ -56,7 +56,7 @@
 .In dirent.h
 .Ft "DIR *"
 .Fo opendir
-.Fa "dirname"
+.Fa "const char *dirname"
 .Fc
 .Ft "DIR *"
 .Fo fdopendir
@@ -143,7 +143,7 @@ function will fail if:
 Search permission is denied for any component of the path prefix of
 .Fa dirname
 or read permission is denied for
-.Fa Idirname .
+.Fa dirname .
 .It Er ELOOP
 Too many symbolic links were encountered in resolving
 .Fa path .

@@ -2,11 +2,11 @@
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2019, Joyent, Inc. All Rights Reserved.
 .\" Copyright (c) 2014, 2017 by Delphix. All rights reserved.
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "February 21, 2023"
+.TH MDB 1 "March 23, 2025"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
@@ -1665,16 +1665,71 @@ representative thread.
 .sp
 .ne 2
 .na
-\fB[ \fIaddress\fR ] \fB$C\fR [ \fIcount\fR ]\fR
+[ \fIaddress\fR ] \fB::stack\fR [-stv] [ \fIcount\fR ]
+.ad
+.br
+.na
+[ \fIaddress\fR ] \fB$c\fR [-stv] [ \fIcount\fR ]
+.ad
+.br
+.na
+[ \fIaddress\fR ] \fB$C\fR [-stv] [ \fIcount\fR ]
 .ad
 .sp .6
 .RS 4n
-Print a C stack backtrace, including stack frame pointer information. If the
-dcmd is preceded by an explicit \fIaddress\fR, a backtrace beginning at this
-virtual memory address is displayed. Otherwise the stack of the representative
-thread is displayed. If an optional count value is given as an argument, no
-more than \fIcount\fR arguments are displayed for each stack frame in the
-output.
+Print a C stack backtrace. If the dcmd is preceded by an explicit
+\fIaddress\fR, a backtrace beginning at this virtual memory address is
+displayed. Otherwise the stack of the representative thread is displayed. If an
+optional count value is given as an argument, no more than \fIcount\fR
+arguments are displayed for each stack frame in the output.
+This dcmd recognizes the following options:
+.sp
+.ne 2
+.na
+\fB-s\fR
+.ad
+.RS 17n
+Shows the difference in stack size between frames in square brackets to the
+left of each frame.
+.RE
+
+.ne 2
+.na
+\fB-t\fR
+.ad
+.RS 17n
+Where type information is available, show the function return type and the
+type of each argument. Some argument types, such as enums, are further
+decoded when possible.
+.RE
+
+.ne 2
+.na
+\fB-v\fR
+.ad
+.RS 17n
+Show stack frame pointer information. This option is enabled by default with
+the \fB$C\fR variant of this command.
+.RE
+
+In the following example output, the size of each stack frame is shown in
+the first column in square brackets, the frame pointer address is in the
+second column and the type information is displayed inline with the
+function name and arguments.
+.sp
+.in +2
+.nf
+> $C -st
+         fffffe004121cd10 void swtch+0x17f()
+  [  60] fffffe004121cd70 int cv_wait_sig+0x190(
+             (kcondvar_t *)fffffe2db1c002d2,
+             (kmutex_t *)fffffe2db1c002d8)
+  [  50] fffffe004121cdc0 int svc_wait+0xab((int)1)
+  [  e0] fffffe004121cea0 int nfssys+0x22d(
+             (enum nfssys_op)SVCPOOL_WAIT, (void *)fed21fa4)
+.fi
+.in -2
+
 .RE
 
 .sp
@@ -3367,24 +3422,6 @@ described under \fBSymbol Name Resolution\fR, above. The \fB::sizeof\fR dcmd
 can only be used with objects that contain symbolic debugging information
 designed for use with \fBmdb\fR. Refer to NOTES, \fBSymbolic Debugging
 Information\fR, below for more information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB[ \fIaddress\fR ] \fB::stack \fR [ \fIcount\fR ]\fR
-.ad
-.br
-.na
-\fB[ \fI address\fR ] \fB$c\fR [ \fIcount\fR ]\fR
-.ad
-.sp .6
-.RS 4n
-Print a C stack backtrace. If the dcmd is preceded by an explicit
-\fIaddress\fR, a backtrace beginning at this virtual memory address is
-displayed. Otherwise the stack of the representative thread is displayed. If an
-optional count value is given as an argument, no more than \fIcount\fR
-arguments are displayed for each stack frame in the output.
 .RE
 
 .sp
