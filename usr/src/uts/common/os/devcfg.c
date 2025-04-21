@@ -25,7 +25,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/note.h>
@@ -1922,6 +1922,30 @@ ndi_rele_driver(dev_info_t *dip)
 }
 
 /*
+ * Functions that protect critical sections when modifying a `dev_info_t`
+ * node's children.
+ *
+ * Note that the critical section ordering protocols here can be somewhat
+ * complex, and prone to deadlock without care.  In particular, if we are
+ * ever in a context where we may be in a critical section on a node and
+ * subsequently need to enter one on that node's parent (such as a code
+ * sequence that may end up invoking `pcicfg_configure`), we _must_ ensure
+ * that we have already entered on the parent before entering on the node
+ * itself.  This is because we may be racing against another thread that
+ * is walking the tree from the root, and that thread may have already
+ * entered on the parent and be blocked waiting to enter on the node; if
+ * the thread that has already entered on the node then attempts to enter
+ * on the parent, we will deadlock.
+ *
+ * In general, to avoid deadlock, we must obey a strict hierarchical
+ * ordering so that that we always enter critical sections from the nodes
+ * closest to the root towards the leaves.
+ *
+ * See the notes in `pcicfg_configure`, `ddihp_modctl` and
+ * `ndi_hp_state_change_req` for more details.
+ */
+
+/*
  * Single thread entry into devinfo node for modifying its children (devinfo,
  * pathinfo, and minor). To verify in ASSERTS use DEVI_BUSY_OWNED macro.
  */
@@ -1949,9 +1973,6 @@ ndi_devi_enter(dev_info_t *dip)
 		 * If we are called when we are panicking, then we are
 		 * single-threaded, and would otherwise loop forever, so
 		 * we test for that here and early return if applicable.
-		 * Note that we also test for this in `ndi_devi_enter`;
-		 * regardless we must test again here in case we start
-		 * panicking while contended.
 		 */
 		if (panicstr != NULL) {
 			mutex_exit(&devi->devi_lock);

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -333,6 +333,9 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 	 * to prevent deadlocks, we maintain the invariant that, if we lock a
 	 * child, the parent must already be locked.  This is the first place
 	 * in the call stack where we may do so, so we lock the parent here.
+	 *
+	 * See the theory statement near `ndi_devi_enter` in
+	 * `common/os/devcfg.c` for more details.
 	 */
 	pdip = ddi_get_parent(dip);
 	if (pdip != NULL)
