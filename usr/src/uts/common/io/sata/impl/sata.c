@@ -217,17 +217,19 @@ static	int sata_txlt_start_stop_unit(sata_pkt_txlate_t *);
 static	int sata_txlt_read_capacity(sata_pkt_txlate_t *);
 static	int sata_txlt_read_capacity16(sata_pkt_txlate_t *);
 static  int sata_txlt_unmap(sata_pkt_txlate_t *);
+static	boolean_t sata_txlt_unmap_supported(sata_pkt_txlate_t *,
+    sata_drive_info_t *);
 static	int sata_txlt_request_sense(sata_pkt_txlate_t *);
 static	int sata_txlt_read(sata_pkt_txlate_t *);
 static	int sata_txlt_write(sata_pkt_txlate_t *);
 static	int sata_txlt_log_sense(sata_pkt_txlate_t *);
-static	int sata_txlt_log_select(sata_pkt_txlate_t *);
 static	int sata_txlt_mode_sense(sata_pkt_txlate_t *);
 static	int sata_txlt_mode_select(sata_pkt_txlate_t *);
 static	int sata_txlt_ata_pass_thru(sata_pkt_txlate_t *);
 static	int sata_txlt_synchronize_cache(sata_pkt_txlate_t *);
 static	int sata_txlt_write_buffer(sata_pkt_txlate_t *);
 static	int sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *);
+static	int sata_txlt_supported_ops(sata_pkt_txlate_t *);
 
 static	int sata_hba_start(sata_pkt_txlate_t *, int *);
 static	int sata_txlt_invalid_command(sata_pkt_txlate_t *);
@@ -620,6 +622,154 @@ _NOTE(SCHEME_PROTECTS_DATA("No Mutex Needed", sata_atapi_trace_index))
 #endif
 
 /* End of warlock directives */
+
+/*
+ * A number of SCSI commands (e.g. LOG SENSE, READ CAPACITY (16),
+ * REPORT SUPPORTED OPERATION CODES) take a parameter 'ALLOCATION LENGTH' as a
+ * parameter, and then return up to ALLOCATION LENGTH bytes of the response
+ * while still reporting the total amount of data available. In other words,
+ * the commands return the total amount of data available, but truncate what
+ * is sent to ALLOCATION LENGTH bytes if this amount is smaller.
+ *
+ * To simplify translating such commands, we define a number of helper
+ * functions that allow us to write to struct buf->b_un.b_addr safely while
+ * tracking the total length of the output. Basically, these will stop
+ * writing out bytes once we've reached our limit (either due to the size of
+ * struct buf->b_bcount or capped by the ALLOCATION LENGTH parameter) while
+ * still tracking the total number of bytes we want to write out for the
+ * complete response.
+ *
+ * Currently these are just used with the REPORT SUPPORTED OPERATION CODES op.
+ * In the future, other commands could be modified to use these to simplify
+ * their implementation (with the side benefit of often avoiding additional
+ * allocations).
+ */
+struct sata_txlt_buf {
+	uint8_t *stb_ptr;	/* Start of the buffer */
+	uint32_t stb_idx;	/* Current index/# bytes we want to write */
+	uint32_t stb_len;	/* Max # of bytes to actually write */
+};
+
+static inline void
+sbuf_init(struct sata_txlt_buf *sbuf, struct buf *bp, uint32_t alc_len)
+{
+	sbuf->stb_ptr = (uint8_t *)bp->b_un.b_addr;
+	sbuf->stb_idx = 0;
+	sbuf->stb_len = MIN(bp->b_bcount, alc_len);
+}
+
+static inline void
+sbuf_put8(struct sata_txlt_buf *sb, uint8_t val)
+{
+	if (sb->stb_idx >= sb->stb_len) {
+		sb->stb_idx++;
+		return;
+	}
+
+	sb->stb_ptr[sb->stb_idx++] = val;
+}
+
+static inline void
+sbuf_put16(struct sata_txlt_buf *sb, uint16_t val)
+{
+	sbuf_put8(sb, val >> 8);
+	sbuf_put8(sb, val & 0xff);
+}
+
+static inline void
+sbuf_put32(struct sata_txlt_buf *sb, uint32_t val)
+{
+	sbuf_put8(sb, val >> 24);
+	sbuf_put8(sb, (val >> 16) & 0xff);
+	sbuf_put8(sb, (val >> 8) & 0xff);
+	sbuf_put8(sb, val & 0xff);
+}
+
+static inline void
+sbuf_copy(struct sata_txlt_buf *sb, const void *src, size_t len)
+{
+	ssize_t max = sb->stb_len - sb->stb_idx;
+
+	if (len == 0)
+		return;
+
+	if (max <= 0) {
+		sb->stb_idx += len;
+		return;
+	}
+
+	size_t amt = MIN(max, len);
+
+	ASSERT3U(sb->stb_idx + amt, <=, sb->stb_len);
+
+	bcopy(src, sb->stb_ptr + sb->stb_idx, amt);
+	sb->stb_idx += len;
+}
+
+/*
+ * Set the length field at 'offset' in the buffer to the total amount
+ * of data that we want to write minus 'adj' bytes.
+ * llen is the size (in bytes) of the field.
+ */
+static inline void
+sbuf_set_len(struct sata_txlt_buf *sb, uint32_t offset, uint32_t llen,
+    uint32_t adj)
+{
+	/*
+	 * Because we have to worry about pathological cases (where the
+	 * length field is truncated, we have to be a bit more cautious
+	 * (and thus complicated).
+	 *
+	 * We start with the MSB of the size (based on llen) and use that
+	 * to determine how many bits of stb->stb_idx we need to shift
+	 * right, and then (space permitting) write out the byte, then
+	 * continue on until we've either reached the end of the buf, or
+	 * have written out the entire length.
+	 */
+	uint_t shift = (llen - 1) * NBBY;
+	uint64_t val = sb->stb_idx - adj;
+
+	ASSERT3U(adj, <=, sb->stb_idx);
+	ASSERT3U(llen, >, 0);
+
+	for (uint_t i = 0; i < llen; i++) {
+		if (offset >= sb->stb_len)
+			return;
+		sb->stb_ptr[offset++] = (val >> shift) & 0xff;
+		shift -= NBBY;
+	}
+}
+
+static inline size_t
+sbuf_resid(const struct sata_txlt_buf *sb, const struct buf *bp,
+    int32_t alc_len)
+{
+	/*
+	 * There's a bit of sublety here. We have two different potential
+	 * constraints on the actual amount of data that's ultimately
+	 * return to the higher layers of the stack. The first is the value
+	 * of the ALLOCATION LENGTH parameter in the CDB (alc_len). The
+	 * second is the size of bp (bp->b_bcount).
+	 *
+	 * The resid value is defined as 'the amount of data not transferred'.
+	 * The question then is 'relative to what?'. The most sensical choice
+	 * here is 'relative to the size of bp'.  This is because as far as
+	 * processing the CDB, the ALLOCATION LENGTH is (for any SCSI device)
+	 * the maximum amount of data the device will return. It is expected
+	 * that the issuer of the CDB will retry (if necessary) with a larger
+	 * ALLOCATION LENGTH if the initial value is too small. In other words,
+	 * truncation due to ALLOCATION LENGTH is something that should be
+	 * dealt with at a higher layer (e.g. sd driver, uscsi caller, etc),
+	 * so the resid should reflect truncation due to our internal buffers
+	 * being too small.
+	 */
+	const size_t expected = MIN(alc_len, sb->stb_idx);
+	const size_t written = MIN(bp->b_bcount, sb->stb_idx);
+
+	ASSERT3U(written, <=, expected);
+
+	return ((written <= expected) ? 0 : expected - written);
+}
 
 /* ************** loadable module configuration functions ************** */
 
@@ -2427,6 +2577,146 @@ fail:
 	return (NULL);
 }
 
+typedef enum sata_cmd_info_flags {
+	SCF_NONE =	0,
+	SCF_SVC_ACT =	(1 << 0),	/* Op uses SVC ACTION field */
+	SCF_MAPIN =	(1 << 1),	/* Op doesn't map in buf */
+} sata_cmd_info_flags_t;
+
+/* The largest CDB we support */
+#define	CDB_MAXLEN	16
+
+/*
+ * New commands should be added to this struct. This is used to both
+ * dispatch commands as well as with REPORT SUPPORTED OPERATIONS.
+ * Currently no order is required for these.
+ */
+static const struct sata_cmd_info {
+	uint8_t			sci_op;		/* SCSI op code */
+	uint16_t		sci_svcact;	/* SCSI service action */
+	sata_cmd_info_flags_t	sci_flags;
+	int			(*sci_cmd)(sata_pkt_txlate_t *spx);
+	boolean_t		(*sci_supported)(sata_pkt_txlate_t *,
+				    sata_drive_info_t *);
+	uint8_t			sci_cdbusage[CDB_MAXLEN];
+} sata_cmd_info[] = {
+	{ SCMD_INQUIRY, 0, SCF_MAPIN, sata_txlt_inquiry, NULL,
+	    { SCMD_INQUIRY, 0x01, 0xff, 0xff, 0xff, 0x00 } },
+	{ SCMD_TEST_UNIT_READY, 0, SCF_NONE, sata_txlt_test_unit_ready, NULL,
+	    { SCMD_TEST_UNIT_READY, 0x00, 0x00, 0x00, 0x00, 0x00 } },
+	{ SCMD_START_STOP, 0, SCF_NONE, sata_txlt_start_stop_unit, NULL,
+	    { SCMD_START_STOP, 0x01, 0x00, 0x0f, 0xf7, 0x00 } },
+	{ SCMD_READ_CAPACITY, 0, SCF_MAPIN, sata_txlt_read_capacity, NULL,
+	    { SCMD_READ_CAPACITY, 0x00, 0x00, 0x00, 0x00, 0x00 } },
+	{ SCMD_SVC_ACTION_IN_G4, SSVC_ACTION_READ_CAPACITY_G4,
+	    SCF_SVC_ACT|SCF_MAPIN, sata_txlt_read_capacity16, NULL,
+	    { SCMD_SVC_ACTION_IN_G4, SSVC_ACTION_READ_CAPACITY_G4, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
+	    0x00 } },
+	{ SCMD_REQUEST_SENSE, 0, SCF_MAPIN, sata_txlt_request_sense, NULL,
+	    { SCMD_REQUEST_SENSE, 0x00, 0x00, 0x00, 0x00, 0x00 } },
+	{ SCMD_LOG_SENSE_G1, 0, SCF_MAPIN, sata_txlt_log_sense, NULL,
+	    { SCMD_LOG_SENSE_G1, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff,
+	    0xff } },
+	{ SCMD_MODE_SENSE, 0, SCF_MAPIN, sata_txlt_mode_sense, NULL,
+	    { SCMD_MODE_SENSE, 0x08, 0xff, 0xff, 0xff, 0x00 } },
+	{ SCMD_MODE_SENSE_G1, 0, SCF_MAPIN, sata_txlt_mode_sense, NULL,
+	    { SCMD_MODE_SENSE_G1, 0x18, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff,
+	    0xff, 0x00 } },
+	{ SCMD_MODE_SELECT, 0, SCF_MAPIN, sata_txlt_mode_select, NULL,
+	    { SCMD_MODE_SELECT, 0x00, 0x00, 0x00, 0xff, 0x00 } },
+	{ SCMD_MODE_SELECT_G1, 0, SCF_MAPIN, sata_txlt_mode_select, NULL,
+	    { SCMD_MODE_SELECT_G1, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00 } },
+	{ SCMD_SYNCHRONIZE_CACHE, 0, SCF_NONE, sata_txlt_synchronize_cache,
+	    NULL, { SCMD_SYNCHRONIZE_CACHE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00 } },
+	{ SCMD_SYNCHRONIZE_CACHE_G1, 0, SCF_NONE,
+	    sata_txlt_synchronize_cache, NULL,
+	    { SCMD_SYNCHRONIZE_CACHE_G1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } },
+	{ SCMD_READ, 0, SCF_NONE, sata_txlt_read, NULL,
+	    { SCMD_READ, 0x1f, 0xff, 0xff, 0xff, 0x00 } },
+	{ SCMD_READ_G1, 0, SCF_NONE, sata_txlt_read, NULL,
+	    { SCMD_READ_G1, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff,
+	    0x00 } },
+	{ SCMD_READ_G4, 0, SCF_NONE, sata_txlt_read, NULL,
+	    { SCMD_READ_G4, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00 } },
+	{ SCMD_READ_G5, 0, SCF_NONE, sata_txlt_read, NULL,
+	    { SCMD_READ_G5, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0x00, 0x00 } },
+	{ SCMD_WRITE_BUFFER, 0, SCF_MAPIN, sata_txlt_write_buffer, NULL,
+	    { SCMD_WRITE_BUFFER, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00 } },
+	{ SCMD_WRITE, 0, SCF_NONE, sata_txlt_write, NULL,
+	    { SCMD_WRITE, 0x1f, 0xff, 0xff, 0xff, 0x00, 0x00 } },
+	{ SCMD_WRITE_G1, 0, SCF_NONE, sata_txlt_write, NULL,
+	    { SCMD_WRITE_G1, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff,
+	    0x00 } },
+	{ SCMD_WRITE_G4, 0, SCF_NONE, sata_txlt_write, NULL,
+	    { SCMD_WRITE_G4, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00 } },
+	{ SCMD_WRITE_G5, 0, SCF_NONE, sata_txlt_write, NULL,
+	    { SCMD_WRITE_G5, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0x00, 0x00 } },
+	{ SCMD_SEEK, 0, SCF_NONE, sata_txlt_nodata_cmd_immediate, NULL,
+	    { SCMD_SEEK, 0x00, 0x00, 0x00, 0x00, 0x00 } },
+	{ SPC3_CMD_ATA_COMMAND_PASS_THROUGH12, 0, SCF_MAPIN,
+	    sata_txlt_ata_pass_thru, NULL,
+	    { SPC3_CMD_ATA_COMMAND_PASS_THROUGH12, 0x1e, 0xff, 0xff, 0xff,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00 } },
+	{ SPC3_CMD_ATA_COMMAND_PASS_THROUGH16, 0, SCF_MAPIN,
+	    sata_txlt_ata_pass_thru, NULL,
+	    { SPC3_CMD_ATA_COMMAND_PASS_THROUGH16, 0x1f, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } },
+	{ SPC3_CMD_UNMAP, 0, SCF_MAPIN, sata_txlt_unmap,
+	    sata_txlt_unmap_supported, { SPC3_CMD_UNMAP, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0xff, 0xff, 0x00 } },
+	{ SCMD_MAINTENANCE_IN, SSVC_ACTION_GET_SUPPORTED_OPERATIONS,
+	    SCF_SVC_ACT|SCF_MAPIN, sata_txlt_supported_ops, NULL,
+	    { SCMD_MAINTENANCE_IN, SSVC_ACTION_GET_SUPPORTED_OPERATIONS, 0x07,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00 } },
+};
+
+static const struct sata_cmd_info scmd_invalid = {
+	.sci_op = 0,
+	.sci_svcact = 0,
+	.sci_flags = SCF_NONE,
+	.sci_cmd = sata_txlt_invalid_command,
+	.sci_supported = NULL,
+};
+
+static inline uint16_t
+sata_cmd_cdblen(const struct sata_cmd_info *cmd)
+{
+	switch (CDB_GROUPID(cmd->sci_op)) {
+	case CDB_GROUPID_0:
+		return (CDB_GROUP0);
+	case CDB_GROUPID_1:
+		return (CDB_GROUP1);
+	case CDB_GROUPID_2:
+		return (CDB_GROUP2);
+	case CDB_GROUPID_3:
+		return (CDB_GROUP3);
+	case CDB_GROUPID_4:
+		return (CDB_GROUP4);
+	case CDB_GROUPID_5:
+		return (CDB_GROUP5);
+	case CDB_GROUPID_6:
+		return (CDB_GROUP6);
+	case CDB_GROUPID_7:
+		return (CDB_GROUP7);
+	default:
+		/* We should never get here */
+		cmn_err(CE_PANIC, "invalid CDB size for op %x\n", cmd->sci_op);
+
+#ifndef __CHECKER__
+		/* Make gcc happy */
+		return (0);
+#endif
+	}
+}
+
 /*
  * Implementation of scsi tran_start.
  * Translate scsi cmd into sata operation and return status.
@@ -2458,6 +2748,7 @@ fail:
  * SCMD_WRITE_G5
  * SCMD_SEEK		(noop)
  * SCMD_SDIAG
+ * SCMD_MAINTENANCE_IN (SSVC_ACTION_GET_SUPPORTED_OPERATIONS)
  *
  * All other commands are rejected as unsupported.
  *
@@ -2489,8 +2780,9 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	SATADBG1(SATA_DBG_SCSI_IF, sata_hba_inst,
 	    "sata_scsi_start: cmd 0x%02x\n", pkt->pkt_cdbp[0]);
 
-	ASSERT(spx != NULL &&
-	    spx->txlt_scsi_pkt == pkt && spx->txlt_sata_pkt != NULL);
+	ASSERT3P(spx, !=, NULL);
+	ASSERT3P(spx->txlt_scsi_pkt, ==, pkt);
+	ASSERT3P(spx->txlt_scsi_pkt, !=, NULL);
 
 	cport = SCSI_TO_SATA_CPORT(ap->a_target);
 	pmport = SCSI_TO_SATA_PMPORT(ap->a_target);
@@ -2529,34 +2821,29 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	}
 
 	if (dev_gone == B_TRUE) {
+		taskq_t		*tq = SATA_TXLT_TASKQ(spx);
+		task_func_t	*func = (task_func_t *)pkt->pkt_comp;
+		uint_t		flags = servicing_interrupt() ?
+		    TQ_NOSLEEP : TQ_SLEEP;
+
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 		pkt->pkt_reason = CMD_DEV_GONE;
+
 		/*
 		 * The sd target driver is checking CMD_DEV_GONE pkt_reason
-		 * only in callback function (for normal requests) and
+		 * only in the callback function (for normal requests) and
 		 * in the dump code path.
-		 * So, if the callback is available, we need to do
+		 *
+		 * If the callback is available, we need to dispatch
 		 * the callback rather than returning TRAN_FATAL_ERROR here.
 		 */
-		if (pkt->pkt_comp != NULL) {
-			/* scsi callback required */
-			if (servicing_interrupt()) {
-				if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-				    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
-				    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) ==
-				    TASKQID_INVALID) {
-					return (TRAN_BUSY);
-				}
-			} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
-			    spx->txlt_scsi_pkt, TQ_SLEEP) == TASKQID_INVALID) {
-				/* Scheduling the callback failed */
-				return (TRAN_BUSY);
-			}
-			return (TRAN_ACCEPT);
-		}
-		/* No callback available */
-		return (TRAN_FATAL_ERROR);
+		if (pkt->pkt_comp == NULL)
+			return (TRAN_FATAL_ERROR);
+
+		if (taskq_dispatch(tq, func, pkt, flags) == TASKQID_INVALID)
+			return (TRAN_BUSY);
+
+		return (TRAN_ACCEPT);
 	}
 
 	if (sdinfo->satadrv_type & SATA_DTYPE_ATAPI) {
@@ -2566,7 +2853,6 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		    "sata_scsi_start atapi: rval %d\n", rval);
 		return (rval);
 	}
-	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 
 	/*
 	 * Checking for power state, if it was on
@@ -2578,6 +2864,7 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if (((sdinfo->satadrv_power_level == SATA_POWER_STANDBY) ||
 	    (sdinfo->satadrv_power_level == SATA_POWER_STOPPED)) &&
 	    (SATA_IS_MEDIUM_ACCESS_CMD(pkt->pkt_cdbp[0]))) {
+		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 		return (sata_txlt_check_condition(spx, KEY_NOT_READY,
 		    SD_SCSI_ASC_LU_NOT_READY));
 	}
@@ -2586,122 +2873,39 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 
-	switch (pkt->pkt_cdbp[0]) {
+	/*
+	 * Default cmd to 'invalid command'. If the SCSI OP doesn't
+	 * exist in sata_cmd_info, we fall back to this (which returns
+	 * INVALID OPERATION CODE).
+	 */
+	const struct sata_cmd_info *cmd = &scmd_invalid;
 
-	case SCMD_INQUIRY:
-		/* Mapped to identify device */
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_inquiry(spx);
-		break;
+	for (uint_t i = 0; i < ARRAY_SIZE(sata_cmd_info); i++) {
+		if (pkt->pkt_cdbp[0] != sata_cmd_info[i].sci_op)
+			continue;
 
-	case SCMD_TEST_UNIT_READY:
-		/*
-		 * SAT "SATA to ATA Translation" doc specifies translation
-		 * to ATA CHECK POWER MODE.
-		 */
-		rval = sata_txlt_test_unit_ready(spx);
-		break;
+		if ((sata_cmd_info[i].sci_flags & SCF_SVC_ACT) != 0 &&
+		    (pkt->pkt_cdbp[1] & 0x1f) != sata_cmd_info[i].sci_svcact) {
+			continue;
+		}
 
-	case SCMD_START_STOP:
-		/* Mapping depends on the command */
-		rval = sata_txlt_start_stop_unit(spx);
-		break;
-
-	case SCMD_READ_CAPACITY:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_read_capacity(spx);
-		break;
-
-	case SCMD_SVC_ACTION_IN_G4:		/* READ CAPACITY (16) */
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_read_capacity16(spx);
-		break;
-
-	case SCMD_REQUEST_SENSE:
-		/*
-		 * Always No Sense, since we force ARQ
-		 */
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_request_sense(spx);
-		break;
-
-	case SCMD_LOG_SENSE_G1:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_log_sense(spx);
-		break;
-
-	case SCMD_LOG_SELECT_G1:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_log_select(spx);
-		break;
-
-	case SCMD_MODE_SENSE:
-	case SCMD_MODE_SENSE_G1:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_mode_sense(spx);
-		break;
-
-
-	case SCMD_MODE_SELECT:
-	case SCMD_MODE_SELECT_G1:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_mode_select(spx);
-		break;
-
-	case SCMD_SYNCHRONIZE_CACHE:
-	case SCMD_SYNCHRONIZE_CACHE_G1:
-		rval = sata_txlt_synchronize_cache(spx);
-		break;
-
-	case SCMD_READ:
-	case SCMD_READ_G1:
-	case SCMD_READ_G4:
-	case SCMD_READ_G5:
-		rval = sata_txlt_read(spx);
-		break;
-	case SCMD_WRITE_BUFFER:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_write_buffer(spx);
-		break;
-
-	case SCMD_WRITE:
-	case SCMD_WRITE_G1:
-	case SCMD_WRITE_G4:
-	case SCMD_WRITE_G5:
-		rval = sata_txlt_write(spx);
-		break;
-
-	case SCMD_SEEK:
-		rval = sata_txlt_nodata_cmd_immediate(spx);
-		break;
-
-	case SPC3_CMD_ATA_COMMAND_PASS_THROUGH12:
-	case SPC3_CMD_ATA_COMMAND_PASS_THROUGH16:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_ata_pass_thru(spx);
-		break;
-
-		/* Other cases will be filed later */
-		/* postponed until phase 2 of the development */
-	case SPC3_CMD_UNMAP:
-		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
-			bp_mapin(bp);
-		rval = sata_txlt_unmap(spx);
-		break;
-	default:
-		rval = sata_txlt_invalid_command(spx);
+		cmd = &sata_cmd_info[i];
 		break;
 	}
+
+	if (cmd->sci_supported != NULL && !cmd->sci_supported(spx, sdinfo)) {
+		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+		return (sata_txlt_invalid_command(spx));
+	}
+
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+
+	if ((cmd->sci_flags & SCF_MAPIN) && bp != NULL &&
+	    (bp->b_flags & (B_PHYS | B_PAGEIO))) {
+		bp_mapin(bp);
+	}
+
+	rval = cmd->sci_cmd(spx);
 
 	SATADBG1(SATA_DBG_SCSI_IF, sata_hba_inst,
 	    "sata_scsi_start: rval %d\n", rval);
@@ -6203,20 +6407,6 @@ done:
 }
 
 /*
- * Translate command: Log Select
- * Not implemented at this time - returns invalid command response.
- */
-static	int
-sata_txlt_log_select(sata_pkt_txlate_t *spx)
-{
-	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-	    "sata_txlt_log_select\n", NULL);
-
-	return (sata_txlt_invalid_command(spx));
-}
-
-
-/*
  * Translate command: Read (various types).
  * Translated into appropriate type of ATA READ command
  * for SATA hard disks.
@@ -7074,6 +7264,230 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 	return (TRAN_ACCEPT);
 }
 
+#define	RCTD(pkt) (pkt->pkt_cdbp[1] & 0x80)
+static int
+sata_txlt_supported_ops(sata_pkt_txlate_t *spx)
+{
+	struct scsi_pkt *pkt = spx->txlt_scsi_pkt;
+	struct buf	*bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
+	sata_drive_info_t *sdinfo;
+	const struct sata_cmd_info *sci = NULL;
+	struct sata_txlt_buf sbuf;
+	uint32_t	alc_len;
+	uint_t		i;
+	int		reason, rval;
+	uint16_t	svcact;
+	uint8_t		op, reporting_opts;
+
+	if (bp == NULL || bp->b_un.b_addr == 0 || bp->b_bcount == 0) {
+		*pkt->pkt_scbp = STATUS_GOOD;
+		goto done;
+	}
+
+	mutex_enter(&SATA_TXLT_CPORT_MUTEX(spx));
+	rval = sata_txlt_generic_pkt_info(spx, &reason, 1);
+	if (rval != TRAN_ACCEPT || reason == CMD_DEV_GONE) {
+		mutex_exit(&SATA_TXLT_CPORT_MUTEX(spx));
+		return (rval);
+	}
+
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+
+	sata_scsi_dmafree(NULL, pkt);
+
+	pkt->pkt_reason = CMD_CMPLT;
+	pkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
+	    STATE_GOT_STATUS;
+
+	op = pkt->pkt_cdbp[3];
+	svcact = BE_IN16(&pkt->pkt_cdbp[4]);
+	alc_len = BE_IN32(&pkt->pkt_cdbp[6]);
+	reporting_opts = pkt->pkt_cdbp[2] & 0x07;
+
+	if (reporting_opts > 0x03) {
+		/* Values > 0x03 are reserved */
+		struct scsi_extended_sense *sense;
+
+		*pkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+		goto done;
+	}
+
+	sbuf_init(&sbuf, bp, alc_len);
+
+	/* Skip length when reporting all_commands */
+	if (reporting_opts == 0)
+		sbuf_put32(&sbuf, 0);
+
+	for (i = 0, sci = &sata_cmd_info[0]; i < ARRAY_SIZE(sata_cmd_info);
+	    i++, sci++) {
+		const boolean_t has_svc_act = (sci->sci_flags & SCF_SVC_ACT) ?
+		    B_TRUE : B_FALSE;
+
+		if (reporting_opts == 0) {
+			uint8_t flags = 0;
+
+			if (sci->sci_supported != NULL &&
+			    !sci->sci_supported(spx, sdinfo)) {
+				continue;
+			}
+
+			if (has_svc_act)
+				flags |= 0x01;
+			if (RCTD(pkt))
+				flags |= 0x02;
+
+			/* Write all_commands parameter data format */
+			sbuf_put8(&sbuf, sci->sci_op);
+			sbuf_put8(&sbuf, 0);	/* Reserved */
+			sbuf_put16(&sbuf, sci->sci_svcact);
+			sbuf_put8(&sbuf, 0);	/* Reserved */
+			sbuf_put8(&sbuf, flags);
+			sbuf_put16(&sbuf, sata_cmd_cdblen(sci));
+
+			/*
+			 * SPC-5 6.34.2 Table 256 uggests that for the
+			 * all_commands paramater data format that each
+			 * command descriptor should include a command
+			 * duration timeout descriptor, however the CTDP
+			 * flag (byte 5, bit 1) implies it should only be
+			 * present when this flag is set.
+			 * sg3_utils at least believes the CTDP indicates
+			 * if a command duration timeout descriptor is
+			 * present. Since we don't support command timeouts
+			 * at all, we follow this an omit the command timeout
+			 * descriptor.
+			 */
+			if (RCTD(pkt)) {
+				sbuf_put16(&sbuf, 0x0a); /* Length */
+				sbuf_put8(&sbuf, 0);	/* Reserved */
+				sbuf_put8(&sbuf, 0);	/* cmd specific */
+				sbuf_put32(&sbuf, 0);	/* nominal timeout */
+				sbuf_put32(&sbuf, 0);	/* recommended to */
+			}
+
+			continue;
+		}
+
+		if (sci->sci_op != op)
+			continue;
+
+		if (has_svc_act) {
+			if (reporting_opts == 0x01) {
+				struct scsi_extended_sense *sense;
+
+				*pkt->pkt_scbp = STATUS_CHECK;
+				sense = sata_arq_sense(spx);
+				sense->es_key = KEY_ILLEGAL_REQUEST;
+				sense->es_add_code =
+				    SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+				goto done;
+			}
+
+			if (sci->sci_svcact != svcact)
+				continue;
+		} else {
+			if (reporting_opts == 0x02) {
+				struct scsi_extended_sense *sense;
+
+				*pkt->pkt_scbp = STATUS_CHECK;
+				sense = sata_arq_sense(spx);
+				sense->es_key = KEY_ILLEGAL_REQUEST;
+				sense->es_add_code =
+				    SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+				goto done;
+			}
+		}
+
+		/* Found a match */
+		break;
+	}
+
+	if (reporting_opts > 0) {
+		/* Write one_command parameter data format */
+		uint16_t cdblen;
+		uint8_t support;
+
+		if (i < ARRAY_SIZE(sata_cmd_info)) {
+			cdblen = sata_cmd_cdblen(sci);
+
+			if (sci->sci_supported == NULL ||
+			    sci->sci_supported(spx, sdinfo)) {
+				support = 0x03;
+			} else {
+				/*
+				 * We have a command we conditionally
+				 * support translating, but the SATA disk
+				 * doesn't support the translated command
+				 * (e.g. UNMAP). SPC-5 isn't entirely clear
+				 * on the response. We return what we do know
+				 * (i.e. CDB length), but still indicate it
+				 * is not supported. We should be able to
+				 * adjust this behavior if needed (or future
+				 * revisions clarify the behavior and our
+				 * current behavior conflicts) in the future.
+				 */
+				support = 0x01;
+			}
+		} else {
+			/* A command we don't recognize at all */
+			cdblen = 0;
+			support = 0x01;
+		}
+
+		if (RCTD(pkt))
+			support |= 0x80;
+
+		/* Write one_command parameter format */
+		sbuf_put8(&sbuf, 0);		/* Reserved */
+		sbuf_put8(&sbuf, support);	/* Command supported */
+		sbuf_put16(&sbuf, cdblen);	/* CDB Length */
+		sbuf_copy(&sbuf, sci->sci_cdbusage, cdblen);
+
+		if (RCTD(pkt)) {
+			sbuf_put16(&sbuf, 0x0a); /* Length */
+			sbuf_put8(&sbuf, 0);	/* Reserved */
+			sbuf_put8(&sbuf, 0);	/* cmd specific */
+			sbuf_put32(&sbuf, 0);	/* nominal timeout */
+			sbuf_put32(&sbuf, 0);	/* recommended timeout */
+		}
+	}
+
+	/*
+	 * When reporting all_commands, set the total length in the first
+	 * 4 bytes. When reporting one_command, the output has a fixed
+	 * header which includes the CDB length, the CDB usage data,
+	 * and (if specified) the command timeout descriptor, so the
+	 * size of the output is inferred from the CDB length field (per SPC-5).
+	 */
+	if (reporting_opts == 0)
+		sbuf_set_len(&sbuf, 0, sizeof (uint32_t), 4);
+
+	pkt->pkt_state |= STATE_XFERRED_DATA;
+	pkt->pkt_resid = sbuf_resid(&sbuf, bp, alc_len);
+	*pkt->pkt_scbp = STATUS_GOOD;
+
+done:
+	mutex_exit(&SATA_TXLT_CPORT_MUTEX(spx));
+
+	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+	    "Scsi_pkt completion reason %x\n", pkt->pkt_reason);
+
+	taskq_t *tq = SATA_TXLT_TASKQ(spx);
+	task_func_t *func = (task_func_t *)pkt->pkt_comp;
+	uint_t tq_flags = servicing_interrupt() ? TQ_NOSLEEP : TQ_SLEEP;
+
+	if ((pkt->pkt_flags & FLAG_NOINTR) != 0 || pkt->pkt_comp == NULL)
+		return (TRAN_ACCEPT);
+
+	if (taskq_dispatch(tq, func, pkt, tq_flags) == TASKQID_INVALID)
+		return (TRAN_BUSY);
+
+	return (TRAN_ACCEPT);
+}
 
 /*
  * Send pkt to SATA HBA driver

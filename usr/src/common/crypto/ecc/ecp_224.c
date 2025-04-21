@@ -292,13 +292,15 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 			r3b = (int)(r3 >>32);
 		}
 		/* check for final reduction */
-		/* now the only way we are over is if the top 4 words are all ones */
+		/* now the only way we are over is if the top 4 words are
+		 * all ones. Subtract the curve. (curve is 2^224 - 2^96 +1)
+		 */
 		if ((r3 == (MP_DIGIT_MAX >> 32)) && (r2 == MP_DIGIT_MAX)
 			&& ((r1 & MP_DIGIT_MAX << 32)== MP_DIGIT_MAX << 32) &&
 			 ((r1 != MP_DIGIT_MAX << 32 ) || (r0 != 0)) ) {
 			/* one last subraction */
 			MP_SUB_BORROW(r0, 1, r0, 0,     carry);
-			MP_SUB_BORROW(r1, 0, r1, carry, carry);
+			MP_SUB_BORROW(r1, MP_DIGIT_MAX << 32, r1, carry, carry);
 			r2 = r3 = 0;
 		}
 
@@ -315,6 +317,7 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		MP_DIGIT(r, 0) = r0;
 #endif
 	}
+	s_mp_clamp(r);
 
   CLEANUP:
 	return res;

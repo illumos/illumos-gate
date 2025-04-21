@@ -101,6 +101,8 @@ ec_GFp_nistp521_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		if (MP_DIGIT(r, FIRST_DIGIT) & 0x200) {
 			MP_CHECKOK(s_mp_add_d(r,1));
 			MP_DIGIT(r,FIRST_DIGIT) &=  0x1FF;
+		} else if (s_mp_cmp(r, &meth->irr) == 0) {
+			mp_zero(r);
 		}
 		s_mp_clamp(r);
 	}
