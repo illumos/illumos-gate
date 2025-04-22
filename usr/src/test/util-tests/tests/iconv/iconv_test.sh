@@ -88,6 +88,7 @@ mkbuf_8859() {
 
 # Test some simple, built-in conversions
 
+test_conv ascii 646 abcdef abcdef
 test_conv ascii utf-8 abcdef abcdef
 test_conv utf-8 ascii abcdef abcdef
 test_conv ascii ucs-2le abc 'a\0b\0c\0\n\0\c'
