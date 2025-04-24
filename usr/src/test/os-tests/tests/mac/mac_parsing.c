@@ -46,6 +46,8 @@
 
 static ktest_hdl_t *kthdl = NULL;
 
+static bool print_raw_pkts = false;
+
 /*
  * Clones of in-kernel types to specify desired results.
  * N.B. These must be kept in sync with those in mac_provider.h
@@ -55,7 +57,8 @@ typedef enum mac_ether_offload_flags {
 	MEOI_L3INFO_SET		= 1 << 1,
 	MEOI_L4INFO_SET		= 1 << 2,
 	MEOI_VLAN_TAGGED	= 1 << 3,
-	MEOI_L3_FRAGMENT	= 1 << 4
+	MEOI_L3_FRAG_MORE	= 1 << 4,
+	MEOI_L3_FRAG_OFFSET	= 1 << 5
 } mac_ether_offload_flags_t;
 
 typedef struct mac_ether_offload_info {
@@ -207,7 +210,7 @@ build_frag_v4(mac_ether_offload_info_t *meoi)
 	struct ip hdr_ip = {
 		.ip_v = 4,
 		.ip_hl = 5,
-		.ip_off = IP_MF,
+		.ip_off = htons(IP_MF),
 		.ip_p = IPPROTO_TCP,
 	};
 	tp_append(tp, &hdr_ip, sizeof (hdr_ip));
@@ -216,7 +219,7 @@ build_frag_v4(mac_ether_offload_info_t *meoi)
 
 	mac_ether_offload_info_t expected = {
 		.meoi_flags = MEOI_L2INFO_SET | MEOI_L3INFO_SET |
-		    MEOI_L4INFO_SET | MEOI_L3_FRAGMENT,
+		    MEOI_L4INFO_SET | MEOI_L3_FRAG_MORE,
 		.meoi_l2hlen = sizeof (struct ether_header),
 		.meoi_l3hlen = sizeof (struct ip),
 		.meoi_l4hlen = sizeof (struct tcphdr),
@@ -245,6 +248,7 @@ build_frag_v6(mac_ether_offload_info_t *meoi)
 	};
 	struct ip6_frag eh_frag = {
 		.ip6f_nxt = IPPROTO_DSTOPTS,
+		.ip6f_offlg = IP6F_MORE_FRAG,
 	};
 	struct ip6_dstopt {
 		struct ip6_opt ip6dst_hdr;
@@ -272,12 +276,97 @@ build_frag_v6(mac_ether_offload_info_t *meoi)
 
 	mac_ether_offload_info_t expected = {
 		.meoi_flags = MEOI_L2INFO_SET | MEOI_L3INFO_SET |
-		    MEOI_L4INFO_SET | MEOI_L3_FRAGMENT,
+		    MEOI_L4INFO_SET | MEOI_L3_FRAG_MORE,
 		.meoi_l2hlen = sizeof (struct ether_header),
 		.meoi_l3hlen = l3sz,
 		.meoi_l4hlen = sizeof (struct tcphdr),
 		.meoi_l3proto = ETHERTYPE_IPV6,
 		.meoi_l4proto = IPPROTO_TCP
+	};
+	*meoi = expected;
+
+	return (tp);
+}
+
+static test_pkt_t *
+build_frag_off_v4(mac_ether_offload_info_t *meoi)
+{
+	test_pkt_t *tp = tp_alloc();
+	append_ether(tp, ETHERTYPE_IP);
+
+	struct ip hdr_ip = {
+		.ip_v = 4,
+		.ip_hl = 5,
+		.ip_off = htons(0xff << 3),
+		.ip_p = IPPROTO_TCP,
+	};
+	tp_append(tp, &hdr_ip, sizeof (hdr_ip));
+
+	append_tcp(tp);
+
+	mac_ether_offload_info_t expected = {
+		.meoi_flags = MEOI_L2INFO_SET | MEOI_L3INFO_SET |
+		    MEOI_L3_FRAG_OFFSET,
+		.meoi_l2hlen = sizeof (struct ether_header),
+		.meoi_l3hlen = sizeof (struct ip),
+		.meoi_l3proto = ETHERTYPE_IP,
+		.meoi_l4proto = IPPROTO_TCP,
+	};
+	*meoi = expected;
+
+	return (tp);
+}
+
+static test_pkt_t *
+build_frag_off_v6(mac_ether_offload_info_t *meoi)
+{
+	test_pkt_t *tp = tp_alloc();
+	append_ether(tp, ETHERTYPE_IPV6);
+
+	struct ip6_hdr hdr_ip6 = { 0 };
+	hdr_ip6.ip6_vfc = 0x60;
+	hdr_ip6.ip6_nxt = IPPROTO_ROUTING;
+
+	struct ip6_rthdr0 eh_route = {
+		.ip6r0_nxt = IPPROTO_FRAGMENT,
+		.ip6r0_len = 0,
+		/* Has padding for len=0 8-byte boundary */
+	};
+	struct ip6_frag eh_frag = {
+		.ip6f_nxt = IPPROTO_DSTOPTS,
+		.ip6f_offlg = htons(0xff << 3),
+	};
+	struct ip6_dstopt {
+		struct ip6_opt ip6dst_hdr;
+		/* pad out to required 8-byte boundary */
+		uint8_t ip6dst_data[6];
+	} eh_dstopts = {
+		.ip6dst_hdr = {
+			.ip6o_type = IPPROTO_TCP,
+			.ip6o_len = 0,
+		}
+	};
+
+	/*
+	 * Mark the packet for fragmentation, but do so in the middle of the EHs
+	 * as a more contrived case.
+	 */
+	VERIFY(tp->tp_sz == sizeof (struct ether_header));
+	tp_append(tp, &hdr_ip6, sizeof (hdr_ip6));
+	tp_append(tp, &eh_route, sizeof (eh_route));
+	tp_append(tp, &eh_frag, sizeof (eh_frag));
+	tp_append(tp, &eh_dstopts, sizeof (eh_dstopts));
+	const size_t l3sz = tp->tp_sz - sizeof (struct ether_header);
+
+	append_tcp(tp);
+
+	mac_ether_offload_info_t expected = {
+		.meoi_flags = MEOI_L2INFO_SET | MEOI_L3INFO_SET |
+		    MEOI_L3_FRAG_OFFSET,
+		.meoi_l2hlen = sizeof (struct ether_header),
+		.meoi_l3hlen = l3sz,
+		.meoi_l3proto = ETHERTYPE_IPV6,
+		.meoi_l4proto = IPPROTO_TCP,
 	};
 	*meoi = expected;
 
@@ -409,7 +498,7 @@ run_test(nvlist_t *payload, const struct test_tuple *tuple)
 	} else {
 		(void) printf("%s: %s @ line %u\n",
 		    tuple->tt_test, cname, result.krr_line);
-		(void) printf("\tmsg: %s", result.krr_msg);
+		(void) printf("\tmsg: %s\n", result.krr_msg);
 		free(result.krr_msg);
 		return (false);
 	}
@@ -463,6 +552,25 @@ split_print(const uint32_t *splits, uint_t num_splits)
 	}
 }
 
+static void
+pkt_print(const test_pkt_t *tp)
+{
+	if (!print_raw_pkts) {
+		return;
+	}
+
+	for (uint_t i = 0; i < tp->tp_sz; i++) {
+		const bool begin_line = (i % 16) == 0;
+		const bool end_line = (i % 16) == 15 || i == (tp->tp_sz - 1);
+		if (begin_line) {
+			(void) printf("%04x\t", i);
+		}
+		(void) printf("%s%02x%s", begin_line ? "" : " ",
+		    tp->tp_bytes[i], end_line ? "\n" : "");
+	}
+	(void) fflush(stdout);
+}
+
 /*
  * Run variations of mac_ether_offload_info() test against packet/meoi pair.
  * Returns true if any variation failed.
@@ -475,6 +583,8 @@ run_meoi_variants(const char *prefix, test_pkt_t *tp,
 	bool any_failed = false;
 	uint32_t *splits = NULL;
 	uint_t num_splits;
+
+	pkt_print(tp);
 
 	(void) printf("%s - simple - ", prefix);
 	payload = build_meoi_payload(tp, meoi, NULL, 0);
@@ -520,6 +630,8 @@ run_partial_variants(const char *prefix, test_pkt_t *tp,
 	bcopy(meoi, &result, sizeof (result));
 	result.meoi_l2hlen = 0;
 
+	pkt_print(tp);
+
 	(void) printf("%s - simple - ", prefix);
 	payload = build_partial_payload(tp, offset, &partial, &result, NULL, 0);
 	any_failed |= !run_test(payload, &tuple_partial_meoi);
@@ -554,6 +666,8 @@ run_ether_variants(const char *prefix, test_pkt_t *tp, uint8_t *dstaddr,
 	bool any_failed = false;
 	uint32_t *splits = NULL;
 
+	pkt_print(tp);
+
 	(void) printf("%s - simple - ", prefix);
 	payload = build_ether_payload(tp, dstaddr, tci, NULL, 0);
 	any_failed |= !run_test(payload, &tuple_l2info);
@@ -583,6 +697,12 @@ main(int argc, char *argv[])
 	}
 	if ((kthdl = ktest_init()) == NULL) {
 		err(EXIT_FAILURE, "could not initialize libktest");
+	}
+
+	if (getenv("PRINT_RAW") != NULL) {
+		print_raw_pkts = true;
+	} else {
+		(void) printf("Set PRINT_RAW env var for raw pkt output\n");
 	}
 
 	bool any_failed = false;
@@ -627,6 +747,17 @@ main(int argc, char *argv[])
 	any_failed |= run_meoi_variants("fragment ipv6", tp_frag_v6,
 	    &meoi_frag_v6);
 
+	mac_ether_offload_info_t meoi_frag_off_v4 = { 0 };
+	mac_ether_offload_info_t meoi_frag_off_v6 = { 0 };
+	test_pkt_t *tp_frag_off_v4 = build_frag_off_v4(&meoi_frag_off_v4);
+	test_pkt_t *tp_frag_off_v6 = build_frag_off_v6(&meoi_frag_off_v6);
+
+	any_failed |= run_meoi_variants("fragment offset ipv4", tp_frag_off_v4,
+	    &meoi_frag_off_v4);
+	any_failed |= run_meoi_variants("fragment offset ipv6", tp_frag_off_v6,
+	    &meoi_frag_off_v6);
+
+
 	test_pkt_t *tp_ether_plain = tp_alloc();
 	struct ether_header hdr_l2_plain = {
 		.ether_dhost = { 0x86, 0x1d, 0xe0, 0x11, 0x22, 0x33},
@@ -653,6 +784,8 @@ main(int argc, char *argv[])
 	tp_free(tp_tcp6);
 	tp_free(tp_frag_v4);
 	tp_free(tp_frag_v6);
+	tp_free(tp_frag_off_v4);
+	tp_free(tp_frag_off_v6);
 	tp_free(tp_ether_plain);
 	tp_free(tp_ether_vlan);
 

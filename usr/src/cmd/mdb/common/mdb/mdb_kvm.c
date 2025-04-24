@@ -520,6 +520,7 @@ kt_stack_help(void)
 {
 	mdb_printf(
 	    "Options:\n"
+	    "  -n   do not resolve addresses to names\n"
 	    "  -s   show the size of each stack frame to the left\n"
 	    "  -t   where CTF is present, show types for functions and "
 	    "arguments\n"
@@ -531,16 +532,16 @@ kt_stack_help(void)
 }
 
 static const mdb_dcmd_t kt_dcmds[] = {
-	{ "$c", "?[-stv] [cnt]", "print stack backtrace", kt_stack,
+	{ "$c", "?[-nstv] [cnt]", "print stack backtrace", kt_stack,
 	    kt_stack_help },
-	{ "$C", "?[-stv] [cnt]", "print stack backtrace", kt_stackv,
+	{ "$C", "?[-nstv] [cnt]", "print stack backtrace", kt_stackv,
 	    kt_stack_help },
 	{ "$r", NULL, "print general-purpose registers", kt_regs },
 	{ "$?", NULL, "print status and registers", kt_regs },
 	{ "regs", NULL, "print general-purpose registers", kt_regs },
-	{ "stack", "?[-stv] [cnt]", "print stack backtrace", kt_stack,
+	{ "stack", "?[-nstv] [cnt]", "print stack backtrace", kt_stack,
 	    kt_stack_help },
-	{ "stackregs", "?[-stv] [cnt]", "print stack backtrace and registers",
+	{ "stackregs", "?[-nstv] [cnt]", "print stack backtrace and registers",
 	    kt_stackr, kt_stack_help },
 #ifdef __x86
 	{ "cpustack", "?[-v] [-c cpuid] [cnt]", "print stack backtrace for a "

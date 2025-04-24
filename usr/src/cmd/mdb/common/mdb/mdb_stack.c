@@ -25,6 +25,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_isautil.h>
 #include <mdb/mdb_stack.h>
 #include <mdb/mdb.h>
 
@@ -33,6 +34,7 @@ typedef struct {
 	uint_t			msfd_arglim;
 	mdb_stack_frame_flags_t	msfd_flags;
 	uintptr_t		msfd_lastbp;
+	boolean_t		(*msfd_callcheck)(uintptr_t);
 	char			*msfd_buf;
 	size_t			msfd_buflen;
 } mdb_stack_frame_data_t;
@@ -117,16 +119,52 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 	mdb_ctf_funcinfo_t mcfi;
 	boolean_t ctf;
 	mdb_syminfo_t msi;
+	uintptr_t npc;
 	GElf_Sym sym;
 	uint_t i;
+	int ret;
 
 	ctf = B_FALSE;
+	npc = pc;
 
-	if ((data->msfd_flags & MSF_TYPES) &&
-	    mdb_tgt_lookup_by_addr(data->msfd_tgt, pc, MDB_TGT_SYM_FUZZY,
-	    NULL, 0, &sym, &msi) == 0 &&
-	    mdb_ctf_func_info(&sym, &msi, &mcfi) == 0) {
-		ctf = B_TRUE;
+	ret = mdb_tgt_lookup_by_addr(data->msfd_tgt, pc, MDB_TGT_SYM_FUZZY,
+	    NULL, 0, &sym, &msi);
+
+	if (ret != 0 || sym.st_value == pc) {
+		/*
+		 * One of two things is going on here. Either:
+		 *
+		 * - this address is not covered by a symbol, or
+		 * - there is a symbol but our address points directly to the
+		 *   start of it.
+		 *
+		 * Both cases can arise when the return address is from a call
+		 * to a function that the compiler knows will never return. In
+		 * these cases the compiler may elide the caller’s epilogue,
+		 * leaving the return address pointing just past the end of the
+		 * callee; either into the next function or into padding
+		 * between functions.
+		 *
+		 * If the previous address is covered by a symbol, we use that
+		 * symbol instead and mark it as approximate with a tilde (~)
+		 * in the output. The platform must provide a callback that
+		 * uses heuristics to to determine whether the preceding
+		 * instruction could plausibly represent a function call that
+		 * would result in the current return address. For example, an
+		 * unconditional jump is typically not valid as it would not
+		 * preserve the return address.
+		 */
+		if (pc > 0) {
+			ret = mdb_tgt_lookup_by_addr(data->msfd_tgt, pc - 1,
+			    MDB_TGT_SYM_FUZZY, NULL, 0, &sym, &msi);
+			if (ret == 0 && mdb_isa_prev_callcheck(pc))
+				npc = pc - 1;
+		}
+	}
+
+	if (ret == 0 && (data->msfd_flags & MSF_TYPES)) {
+		if (mdb_ctf_func_info(&sym, &msi, &mcfi) == 0)
+			ctf = B_TRUE;
 	}
 
 	if (data->msfd_flags & MSF_SIZES) {
@@ -147,7 +185,13 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 		}
 	}
 
-	mdb_printf("%a(", pc);
+	if (data->msfd_flags & MSF_ADDR) {
+		mdb_printf("%0?lr(", pc);
+	} else {
+		if (npc != pc)
+			mdb_printf("~");
+		mdb_printf("%a(", npc);
+	}
 
 	if (ctf && mdb_ctf_func_args(&mcfi, nargc, argtypes) != 0)
 		ctf = B_FALSE;

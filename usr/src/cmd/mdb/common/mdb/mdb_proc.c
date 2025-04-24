@@ -95,6 +95,8 @@
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_types.h>
+#include <mdb/mdb_isautil.h>
+
 #include <mdb/mdb.h>
 
 #include <sys/utsname.h>
@@ -1048,6 +1050,7 @@ pt_stack_common(uintptr_t addr, uint_t flags, int argc,
 	int i;
 
 	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, MSF_ADDR, &sflags,
 	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
 	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
 	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
@@ -1339,6 +1342,7 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 	boolean_t showargs = B_FALSE;
 	boolean_t types = B_FALSE;
 	boolean_t sizes = B_FALSE;
+	boolean_t addrs = B_FALSE;
 	int count;
 	uintptr_t pc, sp;
 	char buf[128];
@@ -1347,6 +1351,7 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	count = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, TRUE, &addrs,
 	    's', MDB_OPT_SETBITS, TRUE, &sizes,
 	    't', MDB_OPT_SETBITS, TRUE, &types,
 	    'v', MDB_OPT_SETBITS, TRUE, &showargs,
@@ -1382,7 +1387,8 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_eval(argv->a_un.a_str);
 	} else {
 		(void) mdb_snprintf(buf, sizeof (buf),
-		    "<.$C%s%s%s",
+		    "<.$C%s%s%s%s",
+		    addrs ? " -n" : "",
 		    sizes ? " -s" : "",
 		    types ? " -t" : "",
 		    showargs ? "" : " 0");
@@ -2205,6 +2211,7 @@ pt_findstack_help(void)
 {
 	mdb_printf(
 	    "Options:\n"
+	    "  -n   do not resolve addresses to names\n"
 	    "  -s   show the size of each stack frame to the left\n"
 	    "  -t   where CTF is present, show types for functions and "
 	    "arguments\n"
@@ -2215,9 +2222,9 @@ pt_findstack_help(void)
 }
 
 static const mdb_dcmd_t pt_dcmds[] = {
-	{ "$c", "?[-stv] [cnt]", "print stack backtrace", pt_stack,
+	{ "$c", "?[-nstv] [cnt]", "print stack backtrace", pt_stack,
 	    pt_stack_help },
-	{ "$C", "?[-stv] [cnt]", "print stack backtrace", pt_stackv,
+	{ "$C", "?[-nstv] [cnt]", "print stack backtrace", pt_stackv,
 	    pt_stack_help },
 	{ "$i", NULL, "print signals that are ignored", pt_ignored },
 	{ "$l", NULL, "print the representative thread's lwp id", pt_lwpid },
@@ -2234,7 +2241,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ ":R", "[-a]", "release the previously attached process", pt_detach },
 	{ "attach", "?[core|pid]",
 	    "attach to process or core file", pt_attach },
-	{ "findstack", ":[-stv]", "find user thread stack", pt_findstack,
+	{ "findstack", ":[-nstv]", "find user thread stack", pt_findstack,
 	    pt_findstack_help },
 	{ "gcore", "[-o prefix] [-c content]",
 	    "produce a core file for the attached process", pt_gcore },
@@ -2246,9 +2253,9 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "regs", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "fpregs", "?[-dqs]", "print floating point registers", pt_fpregs },
 	{ "setenv", "name=value", "set an environment variable", pt_setenv },
-	{ "stack", "?[-stv] [cnt]", "print stack backtrace", pt_stack,
+	{ "stack", "?[-nstv] [cnt]", "print stack backtrace", pt_stack,
 	    pt_stack_help },
-	{ "stackregs", "?[-stv]", "print stack backtrace and registers",
+	{ "stackregs", "?[-nstv]", "print stack backtrace and registers",
 	    pt_stackr, pt_stack_help },
 	{ "status", NULL, "print summary of current target", pt_status_dcmd },
 	{ "tls", ":symbol",

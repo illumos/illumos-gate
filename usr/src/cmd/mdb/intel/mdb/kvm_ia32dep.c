@@ -83,6 +83,7 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		grp = kt->k_regs;
 
 	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, MSF_ADDR, &sflags,
 	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
 	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
 	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,

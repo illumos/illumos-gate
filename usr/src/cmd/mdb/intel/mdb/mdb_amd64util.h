@@ -49,6 +49,7 @@ extern int mdb_amd64_kvm_stack_iter(mdb_tgt_t *, const mdb_tgt_gregset_t *,
 
 extern int mdb_amd64_kvm_frame(void *, uintptr_t, uint_t, const long *,
     const mdb_tgt_gregset_t *);
+extern boolean_t mdb_amd64_prev_callcheck(uintptr_t);
 
 #ifdef __cplusplus
 }

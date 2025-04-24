@@ -4109,6 +4109,7 @@ findstack_help(void)
 {
 	mdb_printf(
 	    "Options:\n"
+	    "  -n   do not resolve addresses to names\n"
 	    "  -s   show the size of each stack frame to the left\n"
 	    "  -t   where CTF is present, show types for functions and "
 	    "arguments\n"
@@ -4238,7 +4239,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    devinfo_fmce},
 
 	/* from findstack.c */
-	{ "findstack", ":[-stv]", "find kernel thread stack", findstack,
+	{ "findstack", ":[-nstv]", "find kernel thread stack", findstack,
 		findstack_help },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
 		findstack_debug },

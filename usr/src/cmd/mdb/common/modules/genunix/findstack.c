@@ -58,10 +58,12 @@ print_stack(uintptr_t sp, uintptr_t pc, uintptr_t addr,
 	boolean_t showargs = B_FALSE;
 	boolean_t types = B_FALSE;
 	boolean_t sizes = B_FALSE;
+	boolean_t addrs = B_FALSE;
 	int count, err;
 	char tdesc[128] = "";
 
 	count = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, TRUE, &addrs,
 	    's', MDB_OPT_SETBITS, TRUE, &sizes,
 	    't', MDB_OPT_SETBITS, TRUE, &types,
 	    'v', MDB_OPT_SETBITS, TRUE, &showargs,
@@ -86,7 +88,8 @@ print_stack(uintptr_t sp, uintptr_t pc, uintptr_t addr,
 		err = mdb_eval(argv->a_un.a_str);
 	} else {
 		(void) mdb_snprintf(tdesc, sizeof (tdesc),
-		    "<.$C%s%s%s",
+		    "<.$C%s%s%s%s",
+		    addrs ? " -n" : "",
 		    sizes ? " -s" : "",
 		    types ? " -t" : "",
 		    showargs ? "" : " 0");
