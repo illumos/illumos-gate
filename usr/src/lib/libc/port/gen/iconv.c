@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2025 Hans Rosenfeld
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,6 +43,7 @@
 #include "../i18n/_loc_path.h"
 
 static iconv_p	iconv_open_all(const char *, const char *, char *);
+static iconv_p	iconv_open_passthru(void);
 static iconv_p	iconv_open_private(const char *, const char *);
 static iconv_p	iconv_search_alias(const char *, const char *, char *);
 static size_t	passthru_icv_iconv(iconv_t, const char **, size_t *, char **,
@@ -114,35 +116,8 @@ iconv_open(const char *tocode, const char *fromcode)
 	cd->_conv = iconv_search_alias(tocode, fromcode, ipath);
 	free(ipath);
 	if (cd->_conv == (iconv_p)-1) {
-		/*
-		 * As the last resort, check if the tocode and the fromcode
-		 * are referring to the same codeset name or not. If so,
-		 * assign the embedded pass-through code conversion.
-		 */
-		if (strcasecmp(tocode, fromcode) != 0) {
-			/*
-			 * No valid conversion available. Do failure retrun
-			 * with the errno set by iconv_search_alias().
-			 */
-			free(cd);
-			return ((iconv_t)-1);
-		}
-
-		/*
-		 * For a pass-through byte-by-byte code conversion, allocate
-		 * an internal conversion descriptor and initialize the data
-		 * fields appropriately and we are done.
-		 */
-		cd->_conv = malloc(sizeof (struct _iconv_fields));
-		if (cd->_conv == NULL) {
-			free(cd);
-			return ((iconv_t)-1);
-		}
-
-		cd->_conv->_icv_handle = NULL;
-		cd->_conv->_icv_iconv = passthru_icv_iconv;
-		cd->_conv->_icv_close = passthru_icv_close;
-		cd->_conv->_icv_state = (void *)PASSTHRU_MAGIC_NUMBER;
+		free(cd);
+		return ((iconv_t)-1);
 	}
 
 	/* found a valid module for this conversion */
@@ -235,13 +210,20 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 	int	len;
 
 	/*
-	 * First, try using the geniconvtbl conversion, which is
-	 * performed by /usr/lib/iconv/geniconvtbl.so with
-	 * the conversion table file:
+	 * First, check if the 'to' and the 'from' are referring to the same
+	 * codeset name or not. If so, assign the embedded pass-through code
+	 * conversion.
+	 */
+	if (strcasecmp(to, from) == 0)
+		return (iconv_open_passthru());
+
+	/*
+	 * Next, try using the geniconvtbl conversion, which is performed by
+	 * /usr/lib/iconv/geniconvtbl.so with the conversion table file:
 	 * /usr/lib/iconv/geniconvtbl/binarytables/fromcode%tocode.bt
 	 *
-	 * If the geniconvtbl conversion cannot be done,
-	 * try the conversion by the individual shared object.
+	 * If the geniconvtbl conversion cannot be done, try the conversion
+	 * by the individual shared object.
 	 */
 
 	len = snprintf(ipath, MAXPATHLEN, _GENICONVTBL_PATH, from, to);
@@ -256,7 +238,7 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 		}
 	}
 
-	/* Next, try /usr/lib/iconv/from%to.so */
+	/* Finally, try /usr/lib/iconv/from%to.so */
 	len = snprintf(ipath, MAXPATHLEN, _ICONV_PATH, from, to);
 	if ((len <= MAXPATHLEN) && (access(ipath, R_OK) == 0)) {
 		/*
@@ -265,6 +247,7 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 		 */
 		return (iconv_open_private(ipath, NULL));
 	}
+
 	/* no valid module for this conversion found */
 	errno = EINVAL;
 	return ((iconv_p)-1);
@@ -331,6 +314,28 @@ iconv_search_alias(const char *tocode, const char *fromcode, char *ipath)
 
 	/* errno set by iconv_open_all on error */
 	return (cv);
+}
+
+static iconv_p
+iconv_open_passthru(void)
+{
+	iconv_p cdpath;
+
+	/*
+	 * For a pass-through byte-by-byte code conversion, allocate
+	 * an internal conversion descriptor and initialize the data
+	 * fields appropriately and we are done.
+	 */
+	cdpath = malloc(sizeof (struct _iconv_fields));
+	if (cdpath == NULL)
+		return ((iconv_p)-1);
+
+	cdpath->_icv_handle = NULL;
+	cdpath->_icv_iconv = passthru_icv_iconv;
+	cdpath->_icv_close = passthru_icv_close;
+	cdpath->_icv_state = (void *)PASSTHRU_MAGIC_NUMBER;
+
+	return (cdpath);
 }
 
 static iconv_p

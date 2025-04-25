@@ -13283,6 +13283,7 @@ f usr/share/man/man3c/gethrtime.3c 0444 root bin
 s usr/share/man/man3c/gethrvtime.3c=gethrtime.3c
 f usr/share/man/man3c/getline.3c 0444 root bin
 f usr/share/man/man3c/getloadavg.3c 0444 root bin
+f usr/share/man/man3c/getlocalename_l.3c 0444 root bin
 f usr/share/man/man3c/getlogin.3c 0444 root bin
 s usr/share/man/man3c/getlogin_r.3c=getlogin.3c
 s usr/share/man/man3c/getmntany.3c=getmntent.3c

@@ -94,6 +94,10 @@ extern locale_t			__global_locale(void);
 
 #endif	/* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
+#if defined(_XPG8) || !defined(_STRICT_SYMBOLS)
+extern const char *getlocalename_l(int, locale_t);
+#endif	/* _XPG8 || !_STRICT_SYMBOLS */
+
 #ifdef	__cplusplus
 }
 #endif

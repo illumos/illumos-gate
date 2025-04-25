@@ -472,6 +472,7 @@ file path=usr/share/man/man3c/gethrtime.3c
 link path=usr/share/man/man3c/gethrvtime.3c target=gethrtime.3c
 file path=usr/share/man/man3c/getline.3c
 file path=usr/share/man/man3c/getloadavg.3c
+file path=usr/share/man/man3c/getlocalename_l.3c
 file path=usr/share/man/man3c/getlogin.3c
 link path=usr/share/man/man3c/getlogin_r.3c target=getlogin.3c
 link path=usr/share/man/man3c/getmntany.3c target=getmntent.3c

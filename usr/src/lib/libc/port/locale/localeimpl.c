@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -582,4 +583,50 @@ mklocname(locale_t loc)
 		    sizeof (loc->locname));
 	}
 	return (loc);
+}
+
+/*
+ * POSIX has several lifetime requirements that vary on the type of locale.
+ *
+ * If the locale is LC_GLOBAL_LOCALE, the returned string is required to live
+ * beyond the locale's use as the global locale. The specification suggests that
+ * this use a thread-local buffer and cautions that it may disappear when the
+ * thread terminates or another LC_GLOBAL_LOCALE call is made. In our case,
+ * because we will never free a locale that is set with setlocale() (see
+ * port/locale/setlocale.c), we can simply return the name of the locale
+ * directly.
+ *
+ * If the locale is any other locale, it is allowed to be invalidated by a call
+ * to uselocale() or newlocale().
+ *
+ * In both of these cases this means that we can simply return the string from
+ * the current object. POSIX importantly states that the application is not
+ * allowed to assume the name will stay the same across invocations and
+ * therefore it cannot be relied upon for serialization. However, it will work
+ * with setlocale() again.
+ */
+const char *
+getlocalename_l(int category, locale_t loc)
+{
+	if (loc == NULL) {
+		return (NULL);
+	}
+
+	switch (category) {
+	case LC_CTYPE:
+	case LC_NUMERIC:
+	case LC_TIME:
+	case LC_COLLATE:
+	case LC_MONETARY:
+	case LC_MESSAGES:
+		return (loc->locdata[category]->l_lname);
+	case LC_ALL:
+		return (loc->locname);
+	default:
+		/*
+		 * POSIX does not define any errors here so we can't indicate
+		 * anything via errno or similar.
+		 */
+		return (NULL);
+	}
 }

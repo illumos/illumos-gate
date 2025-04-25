@@ -1,0 +1,139 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd April 11, 2025
+.Dt GETLOCALENAME_L 3C
+.Os
+.Sh NAME
+.Nm getlocalename_l
+.Nd get name of locale
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In locale.h
+.Ft "const char *"
+.Fo getlocalename_l
+.Fa "int category"
+.Fa "locale_t locale"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getlocalename_l
+function returns the name of the specific
+.Fa category
+of the specified
+.Fa locale .
+If
+.Fa locale
+is
+.Dv LC_GLOBAL_LOCALE ,
+then information will be returned about the current global locale.
+The global locale is changed by calls to
+.Xr setlocale 3C
+and not impacted by a thread calling
+.Xr uselocale 3C .
+.Pp
+When the category is
+.Dv LC_ALL ,
+the returned string is a form that when passed to
+.Xr setlocale 3C
+it will result in the same locale being activated.
+Similarly, passing this locale to
+.Xr newlocale 3C
+will result in a comparable locale.
+Note, the latter is not strictly guaranteed by POSIX so portable applications
+may not want to rely on this behavior.
+.Pp
+The returned string's lifetime and the validity of the pointer is tied to the
+lifetime of the locale itself.
+This varies depending on whether this refers to the global locale or not.
+If it is not the global locale, calling either
+.Xr newlocale 3C
+or
+.Xr freelocale 3C
+on
+.Fa locale ,
+means that the string is no longer valid.
+.Pp
+When querying the global locale, data lifetimes are more complicated.
+It is possible that calls to the
+.Fn getlocalename_l
+function may race with other threads calling
+.Xr setlocale 3C .
+The returned data will always be valid; however, depending on the interleaving
+of thread execution, the returned name may be from the prior locale during a
+contemporaneous
+.Xr setlocale 3C .
+This is the exception to the thread safety documented for this function.
+Portable applications should assume that data returned related to the global
+locale may be invalidated by the calling thread exiting or calling
+.Fn getlocalename_l
+again with
+.Dv LC_GLOBAL_LOCALE .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn getlocalename_l
+returns the name of the
+.Fa category
+of
+.Fa locale .
+Otherwise,
+.Dv NULL
+is returned.
+.Sh EXAMPLES
+.Sy Example 1
+Printing the current thread's locale.
+.Pp
+This example queries the current thread's locale; however, it does not call
+.Xr freelocale 3C .
+Locales that are queried at run-time are still in use and therefore should not
+be freed.
+Instead, the logic that set the locale should free it after it changes the
+locale again.
+.Bd -literal
+#include <stdio.h>
+#include <locale.h>
+
+void
+print_locale(void)
+{
+        locale_t loc = uselocale(NULL);
+        printf("%s\en", getlocalename_l(LC_ALL, LC_GLOBAL_LOCALE));
+}
+.Ed
+.Pp
+.Sy Example 2
+Printing the global locale.
+.Bd -literal
+#include <stdio.h>
+#include <locale.h>
+
+int
+main(void)
+{
+        (void) setlocale(LC_ALL, "");
+        printf("%s\en", getlocalename_l(LC_ALL, LC_GLOBAL_LOCALE));
+        return (0);
+}
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe with Exceptions
+.Sh SEE ALSO
+.Xr locale 1 ,
+.Xr freelocale 3C ,
+.Xr newlocale 3C ,
+.Xr setlocale 3C ,
+.Xr uselocale 3C ,
+.Xr locale 7

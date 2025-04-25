@@ -180,6 +180,7 @@ MANFILES=	__fbufsize.3c					\
 		gethrtime.3c					\
 		getline.3c					\
 		getloadavg.3c					\
+		getlocalename_l.3c				\
 		getlogin.3c					\
 		getmntent.3c					\
 		getnetgrent.3c					\
