@@ -195,6 +195,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 12, 9, 0,	"CANbus",				"canbus" },
 	{ 12, 10, 0,	"MIPI I3C Host Controller Interface",	"unknown" },
 	{ 12, 11, 0,	"CXL Fabric Managment Host Interface",	"unknown" },
+	{ 12, 12, 0,	"Memory Mapped Buffer Interface endpoint", "unknown" },
 	{ 12, 0x80, 0,	"Serial Bus Controller",		"unknown" },
 
 	{ 13, 0, 0,	"IRDA Wireless controller",		"irda" },

@@ -614,6 +614,10 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_FLIT_ERR	0x34	/* Flit Error Injection */
 #define	PCIE_EXT_CAP_ID_SVC		0x35	/* Streamlined Virtual Chan. */
 #define	PCIE_EXT_CAP_ID_MMIO_RBL	0x36	/* MMIO Register Block Loc. */
+#define	PCIE_EXT_CAP_ID_NOP_FLIT	0x37	/* NOP Flit */
+#define	PCIE_EXT_CAP_ID_SIOV		0x38	/* Scalable I/O Virt. */
+#define	PCIE_EXT_CAP_ID_PL128GT		0x39	/* Physical Layer 128.0 GT/s */
+#define	PCIE_EXT_CAP_ID_CAP_DATA	0x3a	/* Captured Data */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets
