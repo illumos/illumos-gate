@@ -210,15 +210,7 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 	int	len;
 
 	/*
-	 * First, check if the 'to' and the 'from' are referring to the same
-	 * codeset name or not. If so, assign the embedded pass-through code
-	 * conversion.
-	 */
-	if (strcasecmp(to, from) == 0)
-		return (iconv_open_passthru());
-
-	/*
-	 * Next, try using the geniconvtbl conversion, which is performed by
+	 * First, try using the geniconvtbl conversion, which is performed by
 	 * /usr/lib/iconv/geniconvtbl.so with the conversion table file:
 	 * /usr/lib/iconv/geniconvtbl/binarytables/fromcode%tocode.bt
 	 *
@@ -238,7 +230,7 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 		}
 	}
 
-	/* Finally, try /usr/lib/iconv/from%to.so */
+	/* Next, try /usr/lib/iconv/from%to.so */
 	len = snprintf(ipath, MAXPATHLEN, _ICONV_PATH, from, to);
 	if ((len <= MAXPATHLEN) && (access(ipath, R_OK) == 0)) {
 		/*
@@ -247,6 +239,14 @@ iconv_open_all(const char *to, const char *from, char *ipath)
 		 */
 		return (iconv_open_private(ipath, NULL));
 	}
+
+	/*
+	 * Finally, as a last resort check if the 'to' and the 'from' are
+	 * referring to the same codeset name or not. If so, assign the
+	 * embedded pass-through code conversion.
+	 */
+	if (strcasecmp(to, from) == 0)
+		return (iconv_open_passthru());
 
 	/* no valid module for this conversion found */
 	errno = EINVAL;
