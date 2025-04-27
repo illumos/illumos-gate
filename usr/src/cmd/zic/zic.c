@@ -15,7 +15,20 @@
 #include "version.h"
 #include "private.h"
 #include "tzdir.h"
+
+/*
+ * illumos builds zic twice: once in the tools proto area for use on the build
+ * system and once in the normal proto area for the target system. To ensure
+ * we're always using the correct version of tzfile.h for the tools version we
+ * use the -include compiler option to unconditionally include the correct
+ * version of the header. However, this means that the compiler may not be able
+ * to find tzfile.h itself due to the set up. We don't want to include all of
+ * $SRC/head as that includes headers which may not work on the build system.
+ * Our compromise is the following macro used by the tools build.
+ */
+#ifndef ZIC_TOOLS_BUILD
 #include "tzfile.h"
+#endif	/* ZIC_TOOLS_BUILD */
 
 #include <fcntl.h>
 #include <locale.h>
