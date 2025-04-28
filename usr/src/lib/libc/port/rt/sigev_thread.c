@@ -71,7 +71,7 @@ init_sigev_thread(void)
  */
 /*PRINTFLIKE1*/
 static void
-dprintf(const char *format, ...)
+_rt_dprintf(const char *format, ...)
 {
 	if (_rt_debug) {
 		va_list alist;
@@ -121,7 +121,7 @@ notifier(void *arg)
  */
 static int
 sigev_add_work(thread_communication_data_t *tcdp,
-	void (*function)(union sigval), union sigval argument)
+    void (*function)(union sigval), union sigval argument)
 {
 	tpool_t *tpool = tcdp->tcd_poolp;
 	sigev_thread_data_t *stdp;
@@ -192,7 +192,7 @@ timer_spawner(void *arg)
 
 	for (;;) {
 		if (port_get(tcdp->tcd_port, &port_event, NULL) != 0) {
-			dprintf("port_get on port %d failed with %d <%s>\n",
+			_rt_dprintf("port_get on port %d failed with %d <%s>\n",
 			    tcdp->tcd_port, errno, strerror(errno));
 			break;
 		}
@@ -204,7 +204,7 @@ timer_spawner(void *arg)
 				errno = EPROTO;
 			goto out;
 		default:
-			dprintf("port_get on port %d returned %u "
+			_rt_dprintf("port_get on port %d returned %u "
 			    "(not PORT_SOURCE_TIMER)\n",
 			    tcdp->tcd_port, port_event.portev_source);
 			errno = EPROTO;
@@ -285,7 +285,7 @@ aio_spawner(void *arg)
 	while (error == 0) {
 		if (port_get(tcdp->tcd_port, &port_event, NULL) != 0) {
 			error = errno;
-			dprintf("port_get on port %d failed with %d <%s>\n",
+			_rt_dprintf("port_get on port %d failed with %d <%s>\n",
 			    tcdp->tcd_port, error, strerror(error));
 			break;
 		}
@@ -297,7 +297,7 @@ aio_spawner(void *arg)
 				errno = EPROTO;
 			goto out;
 		default:
-			dprintf("port_get on port %d returned %u "
+			_rt_dprintf("port_get on port %d returned %u "
 			    "(not PORT_SOURCE_AIO)\n",
 			    tcdp->tcd_port, port_event.portev_source);
 			errno = EPROTO;
@@ -374,7 +374,7 @@ aio_spawner(void *arg)
 		}
 
 		if (error) {
-			dprintf("Cannot add work, error=%d <%s>.\n",
+			_rt_dprintf("Cannot add work, error=%d <%s>.\n",
 			    error, strerror(error));
 			if (error == EAGAIN || error == ENOMEM) {
 				/* (Temporary) no resources are available. */
@@ -555,7 +555,7 @@ del_sigev_timer(timer_t timer)
 		if (tcdp->tcd_port >= 0) {
 			if ((rc = port_alert(tcdp->tcd_port,
 			    PORT_ALERT_SET, SIGEV_THREAD_TERM, NULL)) == 0) {
-				dprintf("del_sigev_timer(%d) OK.\n", timer);
+				_rt_dprintf("del_sigev_timer(%d) OK.\n", timer);
 			}
 		}
 		timer_tcd[timer] = NULL;
@@ -598,7 +598,7 @@ del_sigev_mq(thread_communication_data_t *tcdp)
 	tcdp->tcd_msg_closing = 1;
 	if ((rc = pthread_cancel(server_id)) != 0) {	/* "can't happen" */
 		sig_mutex_unlock(&tcdp->tcd_lock);
-		dprintf("Fail to cancel %u with error %d <%s>.\n",
+		_rt_dprintf("Fail to cancel %u with error %d <%s>.\n",
 		    server_id, rc, strerror(rc));
 		return;
 	}

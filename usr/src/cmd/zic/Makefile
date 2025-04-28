@@ -4,6 +4,7 @@
 #
 
 include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/Makefile.cmd.64
 include		$(SRC)/cmd/Makefile.ctf
 include		$(SRC)/cmd/zic/Makefile.common
 

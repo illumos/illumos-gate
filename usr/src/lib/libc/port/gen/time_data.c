@@ -25,11 +25,11 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include	"lint.h"
-#include 	<time.h>
-#include 	<tzfile.h>
+#include	<time.h>
+#include	<tzfile.h>
 /*
  * This file contains constant data used by the functions in localtime.c.
  * The data is in a separate file to get around a limitation in the current
@@ -38,13 +38,13 @@
  * of data has an impact on dynamic shared library performance
  */
 
-const int	__mon_lengths[2][MONS_PER_YEAR] = {
+const int	__mon_lengths[2][MONSPERYEAR] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
 	31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
 const int	__year_lengths[2] = {
-	DAYS_PER_NYEAR, DAYS_PER_LYEAR
+	DAYSPERNYEAR, DAYSPERLYEAR
 };
 
 const int __yday_to_month[12] = {0, 31, 59, 90, 120, 151, 181, 212,

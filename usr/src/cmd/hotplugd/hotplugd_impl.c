@@ -69,8 +69,8 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 	boolean_t	use_rcm = B_FALSE;
 	int		rv;
 
-	dprintf("changestate(path=%s, connection=%s, state=0x%x, flags=0x%x)\n",
-	    path, connection, state, flags);
+	hp_dprintf("changestate(path=%s, connection=%s, state=0x%x, "
+	    "flags=0x%x)\n", path, connection, state, flags);
 
 	/* Initialize results */
 	*resultsp = NULL;
@@ -81,7 +81,8 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 	/* Get an information snapshot, without usage details */
 	if ((rv = getinfo(path, connection, 0, &root)) != 0) {
 		(void) pthread_mutex_unlock(&hotplug_lock);
-		dprintf("changestate: getinfo() failed (%s)\n", strerror(rv));
+		hp_dprintf("changestate: getinfo() failed (%s)\n",
+		    strerror(rv));
 		return (rv);
 	}
 
@@ -94,11 +95,11 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 	/* If RCM is required, perform RCM offline */
 	if (use_rcm) {
 
-		dprintf("changestate: RCM offline is required.\n");
+		hp_dprintf("changestate: RCM offline is required.\n");
 
 		/* Get RCM resources */
 		if ((rv = rcm_resources(root, &rsrcs)) != 0) {
-			dprintf("changestate: rcm_resources() failed.\n");
+			hp_dprintf("changestate: rcm_resources() failed.\n");
 			(void) pthread_mutex_unlock(&hotplug_lock);
 			hp_fini(root);
 			return (rv);
@@ -107,7 +108,7 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 		/* Request RCM offline */
 		if ((rsrcs != NULL) &&
 		    ((rv = rcm_offline(rsrcs, flags, root)) != 0)) {
-			dprintf("changestate: rcm_offline() failed.\n");
+			hp_dprintf("changestate: rcm_offline() failed.\n");
 			rcm_online(rsrcs);
 			(void) pthread_mutex_unlock(&hotplug_lock);
 			free_rcm_resources(rsrcs);
@@ -121,7 +122,7 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 
 	/* Stop now if QUERY flag was specified */
 	if (flags & HPQUERY) {
-		dprintf("changestate: operation was QUERY only.\n");
+		hp_dprintf("changestate: operation was QUERY only.\n");
 		rcm_online(rsrcs);
 		(void) pthread_mutex_unlock(&hotplug_lock);
 		free_rcm_resources(rsrcs);
@@ -132,7 +133,7 @@ changestate(const char *path, const char *connection, int state, uint_t flags,
 	rv = 0;
 	if (modctl(MODHPOPS, MODHPOPS_CHANGE_STATE, path, connection, state))
 		rv = errno;
-	dprintf("changestate: modctl(MODHPOPS_CHANGE_STATE) = %d.\n", rv);
+	hp_dprintf("changestate: modctl(MODHPOPS_CHANGE_STATE) = %d.\n", rv);
 
 	/*
 	 * If RCM is required, then perform an RCM online or RCM remove
@@ -170,12 +171,12 @@ private_options(const char *path, const char *connection, hp_cmd_t cmd,
 	char			*values = NULL;
 	int			rv;
 
-	dprintf("private_options(path=%s, connection=%s, options='%s')\n",
+	hp_dprintf("private_options(path=%s, connection=%s, options='%s')\n",
 	    path, connection, options);
 
 	/* Initialize property arguments */
 	if ((rv = pack_properties(options, &prop)) != 0) {
-		dprintf("private_options: failed to pack properties.\n");
+		hp_dprintf("private_options: failed to pack properties.\n");
 		return (rv);
 	}
 
@@ -184,7 +185,7 @@ private_options(const char *path, const char *connection, hp_cmd_t cmd,
 	results.buf_size = HP_PRIVATE_BUF_SZ;
 	results.nvlist_buf = (char *)calloc(1, HP_PRIVATE_BUF_SZ);
 	if (results.nvlist_buf == NULL) {
-		dprintf("private_options: failed to allocate buffer.\n");
+		hp_dprintf("private_options: failed to allocate buffer.\n");
 		free_properties(&prop);
 		return (ENOMEM);
 	}
@@ -198,12 +199,14 @@ private_options(const char *path, const char *connection, hp_cmd_t cmd,
 		if (modctl(MODHPOPS, MODHPOPS_BUS_GET, path, connection,
 		    &prop, &results))
 			rv = errno;
-		dprintf("private_options: modctl(MODHPOPS_BUS_GET) = %d\n", rv);
+		hp_dprintf("private_options: modctl(MODHPOPS_BUS_GET) = %d\n",
+		    rv);
 	} else {
 		if (modctl(MODHPOPS, MODHPOPS_BUS_SET, path, connection,
 		    &prop, &results))
 			rv = errno;
-		dprintf("private_options: modctl(MODHPOPS_BUS_SET) = %d\n", rv);
+		hp_dprintf("private_options: modctl(MODHPOPS_BUS_SET) = %d\n",
+		    rv);
 	}
 
 	/* Unlock hotplug */
@@ -270,7 +273,7 @@ pack_properties(const char *options, ddi_hp_property_t *prop)
 
 	/* Do nothing if options string is empty */
 	if ((len = strlen(options)) == 0) {
-		dprintf("pack_properties: options string is empty.\n");
+		hp_dprintf("pack_properties: options string is empty.\n");
 		return (ENOENT);
 	}
 
@@ -352,7 +355,7 @@ unpack_properties(ddi_hp_property_t *prop, char **optionsp)
 
 	/* Do nothing if properties do not exist */
 	if ((prop->nvlist_buf == NULL) || (prop->buf_size == 0)) {
-		dprintf("unpack_properties: no properties exist.\n");
+		hp_dprintf("unpack_properties: no properties exist.\n");
 		return;
 	}
 

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -206,6 +206,7 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 	 * the event handler without queuing the event.
 	 */
 	if (flag & DDI_HP_REQ_SYNC) {
+		dev_info_t		*pdip;
 		ddi_hp_cn_handle_t	*hdlp;
 		int			ret;
 
@@ -213,11 +214,27 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 		if (servicing_interrupt())
 			return (NDI_FAILURE);
 
+		/*
+		 * We know that some of the functions that are called further
+		 * from here on may enter critical sections on the parent of
+		 * this node.  In order to prevent deadlocks, we maintain the
+		 * invariant that, if we lock a child, the parent must already
+		 * be locked.  This is the first place in the call stack where
+		 * we may do so, so we lock the parent here.
+		 *
+		 * See the theory statement near `ndi_devi_enter` in
+		 * `common/os/devcfg.c` for more details.
+		 */
+		pdip = ddi_get_parent(dip);
+		if (pdip != NULL)
+			ndi_devi_enter(pdip);
 		ndi_devi_enter(dip);
 
 		hdlp = ddihp_cn_name_to_handle(dip, cn_name);
 		if (hdlp == NULL) {
 			ndi_devi_exit(dip);
+			if (pdip != NULL)
+				ndi_devi_exit(pdip);
 
 			return (NDI_EINVAL);
 		}
@@ -229,6 +246,8 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 		ret = ddihp_cn_req_handler(hdlp, state);
 
 		ndi_devi_exit(dip);
+		if (pdip != NULL)
+			ndi_devi_exit(pdip);
 
 		return (ret);
 	}

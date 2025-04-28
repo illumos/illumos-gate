@@ -8,7 +8,7 @@ CMDDIR=		$(SRC)/cmd/zic
 include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
-CPPFLAGS +=	-I$(CMDDIR)
+CPPFLAGS +=	-include $(SRC)/head/tzfile.h -I$(CMDDIR) -DZIC_TOOLS_BUILD
 
 .KEEP_STATE:
 

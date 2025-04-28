@@ -410,7 +410,7 @@ static int link_cmp(cache_link_t *clp, const char *content, int type);
 static void delete_unused_nodes(di_devlink_handle_t hdp, cache_node_t *cnp);
 static void delete_unused_minor(di_devlink_handle_t hdp, cache_minor_t *cmnp);
 static int synchronize_db(di_devlink_handle_t hdp);
-static void dprintf(debug_level_t msglevel, const char *fmt, ...);
+static void devlink_dprintf(debug_level_t msglevel, const char *fmt, ...);
 static di_devlink_handle_t devlink_snapshot(const char *root_dir);
 static int devlink_create(const char *root, const char *name, int dca_flags);
 static int dca_init(const char *name, struct dca_off *dcp, int dca_flags);

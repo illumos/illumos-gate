@@ -386,14 +386,14 @@ log_info(char *fmt, ...)
 }
 
 /*
- * dprintf()
+ * hp_dprintf()
  *
  *	Print a debug tracing statement.  Only works in debug
  *	mode, and always prints to stdout.
  */
 /*PRINTFLIKE1*/
 void
-dprintf(char *fmt, ...)
+hp_dprintf(char *fmt, ...)
 {
 	va_list	ap;
 

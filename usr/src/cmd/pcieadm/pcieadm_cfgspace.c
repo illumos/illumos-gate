@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -4898,7 +4898,11 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	    "Flit Performance Measurement" },
 	{ PCIE_EXT_CAP_ID_FLIT_ERR, "flterr", "Flit Error Injection" },
 	{ PCIE_EXT_CAP_ID_SVC, "svc", "Streamlined Virtual Channel" },
-	{ PCIE_EXT_CAP_ID_MMIO_RBL, "mrbl", "MMIO Register Block Locator" }
+	{ PCIE_EXT_CAP_ID_MMIO_RBL, "mrbl", "MMIO Register Block Locator" },
+	{ PCIE_EXT_CAP_ID_NOP_FLIT, "nop", "NOP Flit" },
+	{ PCIE_EXT_CAP_ID_SIOV, "siov", "Scalable I/O Virtualization" },
+	{ PCIE_EXT_CAP_ID_PL128GT, "pl128g", "Physical Layer 128.0 GT/s" },
+	{ PCIE_EXT_CAP_ID_CAP_DATA, "cdata", "Captured Data" }
 };
 
 static const pcieadm_pci_cap_t *

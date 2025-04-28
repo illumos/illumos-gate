@@ -1524,7 +1524,6 @@ file path=usr/include/time.h
 file path=usr/include/tiuser.h
 dir  path=usr/include/tsol
 file path=usr/include/tsol/label.h
-file path=usr/include/tzfile.h
 file path=usr/include/uchar.h
 file path=usr/include/ucontext.h
 file path=usr/include/ucred.h

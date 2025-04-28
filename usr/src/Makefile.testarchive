@@ -37,4 +37,5 @@ TEST_IPS_MANIFEST_FILES = \
     system-test-utiltest.p5m \
     system-test-vndtest.p5m \
     system-test-smartostest.p5m \
+    system-test-tztest.p5m \
     system-test-zfstest.p5m

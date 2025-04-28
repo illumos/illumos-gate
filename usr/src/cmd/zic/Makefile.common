@@ -6,12 +6,11 @@
 
 PROG=		zic
 
-OBJS=		ialloc.o \
-		scheck.o \
-		zic.o
+OBJS=		zic.o
 SRCS=		$(OBJS:%.o=%.c)
 
+CSTD =		$(CSTD_GNU17)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	$(CNOWARN_UNINIT)
 
-SMOFF +=	signed
+SMATCH =	off

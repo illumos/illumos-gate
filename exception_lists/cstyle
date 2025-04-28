@@ -91,6 +91,8 @@ usr/src/cmd/pools/poold/libjpool/jpool.h
 usr/src/cmd/pools/poold/libjsyslog/jsyslog.h
 usr/src/cmd/ttymon/sttyparse.c
 usr/src/cmd/vi/
+usr/src/cmd/zic/
+usr/src/cmd/zdump/
 usr/src/common/ficl/ficltokens.h
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c

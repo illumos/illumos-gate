@@ -5077,7 +5077,6 @@ f usr/include/time.h 0644 root bin
 f usr/include/tiuser.h 0644 root bin
 d usr/include/tsol 0755 root bin
 f usr/include/tsol/label.h 0644 root bin
-f usr/include/tzfile.h 0644 root bin
 f usr/include/uchar.h 0644 root bin
 f usr/include/ucontext.h 0644 root bin
 f usr/include/ucred.h 0644 root bin
@@ -11557,6 +11556,7 @@ f usr/share/lib/zoneinfo/America/Ciudad_Juarez 0644 root bin
 h usr/share/lib/zoneinfo/America/Coral_Harbour=usr/share/lib/zoneinfo/America/Panama
 h usr/share/lib/zoneinfo/America/Cordoba=usr/share/lib/zoneinfo/America/Argentina/Cordoba
 f usr/share/lib/zoneinfo/America/Costa_Rica 0644 root bin
+f usr/share/lib/zoneinfo/America/Coyhaique 0644 root bin
 h usr/share/lib/zoneinfo/America/Creston=usr/share/lib/zoneinfo/America/Phoenix
 f usr/share/lib/zoneinfo/America/Cuiaba 0644 root bin
 h usr/share/lib/zoneinfo/America/Curacao=usr/share/lib/zoneinfo/America/Puerto_Rico
@@ -11718,7 +11718,7 @@ f usr/share/lib/zoneinfo/Asia/Bishkek 0644 root bin
 h usr/share/lib/zoneinfo/Asia/Brunei=usr/share/lib/zoneinfo/Asia/Kuching
 h usr/share/lib/zoneinfo/Asia/Calcutta=usr/share/lib/zoneinfo/Asia/Kolkata
 f usr/share/lib/zoneinfo/Asia/Chita 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Choibalsan 0644 root bin
+h usr/share/lib/zoneinfo/Asia/Choibalsan=usr/share/lib/zoneinfo/Asia/Ulaanbaatar
 h usr/share/lib/zoneinfo/Asia/Chongqing=usr/share/lib/zoneinfo/Asia/Shanghai
 h usr/share/lib/zoneinfo/Asia/Chungking=usr/share/lib/zoneinfo/Asia/Shanghai
 f usr/share/lib/zoneinfo/Asia/Colombo 0644 root bin
@@ -11840,8 +11840,8 @@ h usr/share/lib/zoneinfo/Brazil/Acre=usr/share/lib/zoneinfo/America/Rio_Branco
 f usr/share/lib/zoneinfo/Brazil/DeNoronha 0644 root bin
 f usr/share/lib/zoneinfo/Brazil/East 0644 root bin
 f usr/share/lib/zoneinfo/Brazil/West 0644 root bin
-f usr/share/lib/zoneinfo/CET 0644 root bin
-f usr/share/lib/zoneinfo/CST6CDT 0644 root bin
+h usr/share/lib/zoneinfo/CET=usr/share/lib/zoneinfo/Europe/Brussels
+h usr/share/lib/zoneinfo/CST6CDT=usr/share/lib/zoneinfo/America/Chicago
 d usr/share/lib/zoneinfo/Canada 0755 root bin
 f usr/share/lib/zoneinfo/Canada/Atlantic 0644 root bin
 f usr/share/lib/zoneinfo/Canada/Central 0644 root bin
@@ -11855,9 +11855,9 @@ d usr/share/lib/zoneinfo/Chile 0755 root bin
 f usr/share/lib/zoneinfo/Chile/Continental 0644 root bin
 f usr/share/lib/zoneinfo/Chile/EasterIsland 0644 root bin
 f usr/share/lib/zoneinfo/Cuba 0644 root bin
-f usr/share/lib/zoneinfo/EET 0644 root bin
-f usr/share/lib/zoneinfo/EST 0644 root bin
-f usr/share/lib/zoneinfo/EST5EDT 0644 root bin
+h usr/share/lib/zoneinfo/EET=usr/share/lib/zoneinfo/Europe/Athens
+h usr/share/lib/zoneinfo/EST=usr/share/lib/zoneinfo/America/Panama
+h usr/share/lib/zoneinfo/EST5EDT=usr/share/lib/zoneinfo/America/New_York
 f usr/share/lib/zoneinfo/Egypt 0644 root bin
 f usr/share/lib/zoneinfo/Eire 0644 root bin
 d usr/share/lib/zoneinfo/Etc 0755 root bin
@@ -11969,7 +11969,7 @@ h usr/share/lib/zoneinfo/GMT+0=usr/share/lib/zoneinfo/GMT
 h usr/share/lib/zoneinfo/GMT-0=usr/share/lib/zoneinfo/GMT
 h usr/share/lib/zoneinfo/GMT0=usr/share/lib/zoneinfo/GMT
 h usr/share/lib/zoneinfo/Greenwich=usr/share/lib/zoneinfo/GMT
-f usr/share/lib/zoneinfo/HST 0644 root bin
+h usr/share/lib/zoneinfo/HST=usr/share/lib/zoneinfo/Pacific/Honolulu
 f usr/share/lib/zoneinfo/Hongkong 0644 root bin
 h usr/share/lib/zoneinfo/Iceland=usr/share/lib/zoneinfo/Africa/Abidjan
 d usr/share/lib/zoneinfo/Indian 0755 root bin
@@ -11990,9 +11990,9 @@ f usr/share/lib/zoneinfo/Jamaica 0644 root bin
 f usr/share/lib/zoneinfo/Japan 0644 root bin
 f usr/share/lib/zoneinfo/Kwajalein 0644 root bin
 f usr/share/lib/zoneinfo/Libya 0644 root bin
-f usr/share/lib/zoneinfo/MET 0644 root bin
-f usr/share/lib/zoneinfo/MST 0644 root bin
-f usr/share/lib/zoneinfo/MST7MDT 0644 root bin
+h usr/share/lib/zoneinfo/MET=usr/share/lib/zoneinfo/Europe/Brussels
+h usr/share/lib/zoneinfo/MST=usr/share/lib/zoneinfo/America/Phoenix
+h usr/share/lib/zoneinfo/MST7MDT=usr/share/lib/zoneinfo/America/Denver
 d usr/share/lib/zoneinfo/Mexico 0755 root bin
 h usr/share/lib/zoneinfo/Mexico/BajaNorte=usr/share/lib/zoneinfo/America/Tijuana
 f usr/share/lib/zoneinfo/Mexico/BajaSur 0644 root bin
@@ -12001,7 +12001,7 @@ f usr/share/lib/zoneinfo/NZ 0644 root bin
 f usr/share/lib/zoneinfo/NZ-CHAT 0644 root bin
 h usr/share/lib/zoneinfo/Navajo=usr/share/lib/zoneinfo/US/Mountain
 f usr/share/lib/zoneinfo/PRC 0644 root bin
-f usr/share/lib/zoneinfo/PST8PDT 0644 root bin
+h usr/share/lib/zoneinfo/PST8PDT=usr/share/lib/zoneinfo/America/Los_Angeles
 d usr/share/lib/zoneinfo/Pacific 0755 root bin
 f usr/share/lib/zoneinfo/Pacific/Apia 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Auckland 0644 root bin
@@ -12070,7 +12070,7 @@ f usr/share/lib/zoneinfo/US/Samoa 0644 root bin
 f usr/share/lib/zoneinfo/UTC 0644 root bin
 h usr/share/lib/zoneinfo/Universal=usr/share/lib/zoneinfo/UTC
 f usr/share/lib/zoneinfo/W-SU 0644 root bin
-f usr/share/lib/zoneinfo/WET 0644 root bin
+h usr/share/lib/zoneinfo/WET=usr/share/lib/zoneinfo/Europe/Lisbon
 h usr/share/lib/zoneinfo/Zulu=usr/share/lib/zoneinfo/UTC
 s usr/share/lib/zoneinfo/posixrules=US/Eastern
 d usr/share/lib/zoneinfo/src 0755 root bin
@@ -19529,6 +19529,7 @@ f usr/share/man/man5/timezone.5 0444 root bin
 f usr/share/man/man5/ts_dptbl.5 0444 root bin
 f usr/share/man/man5/ttydefs.5 0444 root bin
 f usr/share/man/man5/ttysrch.5 0444 root bin
+f usr/share/man/man5/tzfile.5 0444 root bin
 f usr/share/man/man5/ufsdump.5 0444 root bin
 f usr/share/man/man5/updaters.5 0444 root bin
 f usr/share/man/man5/user_attr.5 0444 root bin

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -590,7 +590,10 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 	 * the structure of the tree, working from the root towards leaves.
 	 * `pcie_fabric_setup`, if called, will call `ddi_walk_devs` which
 	 * requires that the parent is locked; therefore, to obey the lock
-	 * ordering, we must lock the parent here.
+	 * ordering, we must lock the parent here as well.
+	 *
+	 * See the theory statement near `ndi_devi_enter` in
+	 * `common/os/devcfg.c` for more details.
 	 */
 	ndi_devi_enter(ddi_get_parent(devi));
 	ndi_devi_enter(devi);

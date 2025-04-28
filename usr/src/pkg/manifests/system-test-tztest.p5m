@@ -1,0 +1,40 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/test/tztest@$(PKGVERS)
+set name=pkg.summary value="Timezone Test Suite"
+set name=pkg.description value="Timezone Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/tz-tests
+dir  path=opt/tz-tests
+file path=opt/tz-tests/README mode=0444
+dir  path=opt/tz-tests/tests
+file path=opt/tz-tests/tests/basic_tzs mode=0555
+file path=opt/tz-tests/tests/tz_dump mode=0555
+file path=opt/tz-tests/tests/tzlist.64 mode=0555
+file path=opt/tz-tests/tests/tzload.32 mode=0555
+file path=opt/tz-tests/tests/tzload.64 mode=0555
+file path=opt/tz-tests/tests/tzparams.64 mode=0555
+file path=opt/tz-tests/tests/zoneinfo_dump.32 mode=0555
+file path=opt/tz-tests/tests/zoneinfo_dump.64 mode=0555
+license lic_CDDL license=lic_CDDL
