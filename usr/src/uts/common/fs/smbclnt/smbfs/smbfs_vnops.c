@@ -35,6 +35,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 /*
@@ -472,7 +473,6 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
  * Helper for smbfs_close.  Decrement the reference count
  * for an SMB-level file or directory ID, and when the last
  * reference for the fid goes away, do the OtW close.
- * Also called in smbfs_inactive (defensive cleanup).
  */
 static void
 smbfs_rele_fid(smbnode_t *np, struct smb_cred *scred)
@@ -617,7 +617,8 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	    !vn_has_cached_data(vp))) {
 
 		/* Shared lock for n_fid use in smb_rwuio */
-		if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER,
+		    SMBINTR(vp)))
 			return (EINTR);
 		smb_credinit(&scred, cr);
 
@@ -831,7 +832,8 @@ smbfs_fwrite:
 			timo = smb_timo_append;
 
 		/* Shared lock for n_fid use in smb_rwuio */
-		if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER,
+		    SMBINTR(vp)))
 			return (EINTR);
 		smb_credinit(&scred, cr);
 
@@ -950,7 +952,8 @@ smbfs_fwrite:
 			} else {
 				base = segmap_getmapflt(segkmap, vp, off + on,
 				    n, 0, S_READ);
-				error = smbfs_writenp(np, base + on, n, uiop, 0);
+				error = smbfs_writenp(np, base + on, n, uiop,
+				    0);
 			}
 		}
 
@@ -2056,13 +2059,17 @@ smbfsflush(smbnode_t *np, struct smb_cred *scrp)
 }
 
 /*
- * Last reference to vnode went away.
+ * Last reference to vnode MAY be going away.  Caution:
+ * Note that vn_rele() calls this when vp->v_count == 1
+ * but drops vp->v_lock before calling.  This function is
+ * expected to take whatever FS-specific locks it needs,
+ * then re-enter v_lock and re-check v_count before doing
+ * any actual destruction.  That happens in smbfs_addfree.
  */
 /* ARGSUSED */
 static void
 smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
-	struct smb_cred scred;
 	smbnode_t	*np = VTOSMB(vp);
 	int error;
 
@@ -2108,68 +2115,6 @@ smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 		}
 		smbfs_invalidate_pages(vp, (u_offset_t)0, cr);
 	}
-	/*
-	 * This vnode should have lost all cached data.
-	 */
-	ASSERT(vn_has_cached_data(vp) == 0);
-
-	/*
-	 * Defend against the possibility that higher-level callers
-	 * might not correctly balance open and close calls.  If we
-	 * get here with open references remaining, it means there
-	 * was a missing VOP_CLOSE somewhere.  If that happens, do
-	 * the close here so we don't "leak" FIDs on the server.
-	 *
-	 * Exclusive lock for modifying n_fid stuff.
-	 * Don't want this one ever interruptible.
-	 */
-	(void) smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, 0);
-	smb_credinit(&scred, cr);
-
-	switch (np->n_ovtype) {
-	case VNON:
-		/* not open (OK) */
-		break;
-
-	case VDIR:
-		if (np->n_dirrefs == 0)
-			break;
-		SMBVDEBUG("open dir: refs %d path %s\n",
-		    np->n_dirrefs, np->n_rpath);
-		/* Force last close. */
-		np->n_dirrefs = 1;
-		smbfs_rele_fid(np, &scred);
-		break;
-
-	case VREG:
-		if (np->n_fidrefs == 0)
-			break;
-		SMBVDEBUG("open file: refs %d path %s\n",
-		    np->n_fidrefs, np->n_rpath);
-		/* Force last close. */
-		np->n_fidrefs = 1;
-		smbfs_rele_fid(np, &scred);
-		break;
-
-	default:
-		SMBVDEBUG("bad n_ovtype %d\n", np->n_ovtype);
-		np->n_ovtype = VNON;
-		break;
-	}
-
-	smb_credrele(&scred);
-	smbfs_rw_exit(&np->r_lkserlock);
-
-	/*
-	 * XATTR directories (and the files under them) have
-	 * little value for reclaim, so just remove them from
-	 * the "hash" (AVL) as soon as they go inactive.
-	 * Note that the node may already have been removed
-	 * from the hash by smbfsremove.
-	 */
-	if ((np->n_flag & N_XATTR) != 0 &&
-	    (np->r_flags & RHASHED) != 0)
-		smbfs_rmhash(np);
 
 	smbfs_addfree(np);
 }
@@ -3888,7 +3833,8 @@ again:
 			 */
 			if ((pp = page_create_va(vp, off,
 			    PAGESIZE, PG_WAIT, seg, addr)) == NULL)
-				cmn_err(CE_PANIC, "smbfs_getapage: page_create");
+				cmn_err(CE_PANIC,
+				    "smbfs_getapage: page_create");
 			io_len = PAGESIZE;
 			mutex_enter(&np->r_statelock);
 			np->r_nextr = off + PAGESIZE;
