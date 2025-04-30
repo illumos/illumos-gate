@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -305,11 +305,8 @@ vmm_gpt_node_next(vmm_gpt_node_t *node, bool only_seq)
 
 	/* Try our next sibling */
 	vmm_gpt_node_t *next = node->vgn_sib_next;
-	if (next != NULL) {
-		if (next->vgn_gpa == gpa_match || !only_seq) {
-			return (next);
-		}
-	} else {
+
+	if (next == NULL) {
 		/*
 		 * If the next-sibling pointer is NULL on the node, it can mean
 		 * one of two things:
@@ -322,17 +319,21 @@ vmm_gpt_node_next(vmm_gpt_node_t *node, bool only_seq)
 		 *    boundary of the node.
 		 *
 		 * Either way, the proper course of action is to check the first
-		 * child of our parent's next sibling.
+		 * child of our parent's next sibling (if the parent is not the
+		 * root of the GPT itself).
 		 */
-		vmm_gpt_node_t *pibling = node->vgn_parent->vgn_sib_next;
-		if (pibling != NULL) {
-			next = pibling->vgn_children;
-			if (next != NULL) {
-				if (next->vgn_gpa == gpa_match || !only_seq) {
-					return (next);
-				}
+		if (node->vgn_parent != NULL && node->vgn_level > LEVEL3) {
+			vmm_gpt_node_t *psibling =
+			    vmm_gpt_node_next(node->vgn_parent, true);
+			if (psibling != NULL) {
+				next = psibling->vgn_children;
 			}
 		}
+	}
+
+	if (next != NULL &&
+	    (next->vgn_gpa == gpa_match || !only_seq)) {
+		return (next);
 	}
 
 	return (NULL);

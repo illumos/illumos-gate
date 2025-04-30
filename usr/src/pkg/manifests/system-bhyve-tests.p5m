@@ -87,6 +87,7 @@ file path=opt/bhyve-tests/tests/vmm/interface_version mode=0555
 file path=opt/bhyve-tests/tests/vmm/legacy_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/maxcpu mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555
+file path=opt/bhyve-tests/tests/vmm/mem_high mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
 file path=opt/bhyve-tests/tests/vmm/npt_ops mode=0555

@@ -17,6 +17,7 @@ include $(SRC)/test/Makefile.com
 
 PROG =	mem_partial \
 	mem_seg_map \
+	mem_high \
 	mem_devmem \
 	fpu_getset \
 	interface_version \

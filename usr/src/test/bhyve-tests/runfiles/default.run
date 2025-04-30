@@ -35,6 +35,7 @@ tests = [
 	'legacy_destruct',
 	'maxcpu',
 	'mem_devmem',
+	'mem_high',
 	'mem_partial',
 	'mem_seg_map',
 	'npt_ops',
