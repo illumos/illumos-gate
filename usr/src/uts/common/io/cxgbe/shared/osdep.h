@@ -38,7 +38,6 @@
 #include <sys/sysmacros.h>
 #include <sys/mutex.h>
 
-
 #define	CH_DUMP_MBOX(adap, mbox, data_reg, size)	do {} while (0)
 
 #define	PCI_VENDOR_ID		0x00
@@ -121,7 +120,6 @@ typedef int64_t		s64;
 
 #ifdef _KERNEL
 
-#define	t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
 #define	fls(x) ddi_fls(x)
 
 static inline int
@@ -132,23 +130,18 @@ ilog2(long x)
 
 typedef kmutex_t t4_os_lock_t;
 
-static inline void
-t4_os_lock(t4_os_lock_t *lock)
-{
-	mutex_enter(lock);
-}
-
-static inline void
-t4_os_unlock(t4_os_lock_t *lock)
-{
-	mutex_exit(lock);
-}
-
 /*
  * The common code reaches directly into the adapter flags, so we must conform
  * our prefix in order to meet its expectations.
  */
 #define	FW_OK	TAF_FW_OK
+
+/* Exposed by t4_nexus.c */
+struct adapter;
+
+int t4_os_find_pci_capability(struct adapter *, uint8_t);
+void t4_os_portmod_changed(struct adapter *, int);
+void t4_os_set_hw_addr(struct adapter *, int, const uint8_t *);
 
 #endif /* _KERNEL */
 

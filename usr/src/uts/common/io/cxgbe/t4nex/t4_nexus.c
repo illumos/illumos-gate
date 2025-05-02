@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -52,75 +52,10 @@
 #include "common/t4_regs.h"
 #include "common/t4_extra_regs.h"
 
-static int t4_cb_open(dev_t *devp, int flag, int otyp, cred_t *credp);
-static int t4_cb_close(dev_t dev, int flag, int otyp, cred_t *credp);
-static int t4_cb_ioctl(dev_t dev, int cmd, intptr_t d, int mode, cred_t *credp,
-    int *rp);
-struct cb_ops t4_cb_ops = {
-	.cb_open =		t4_cb_open,
-	.cb_close =		t4_cb_close,
-	.cb_strategy =		nodev,
-	.cb_print =		nodev,
-	.cb_dump =		nodev,
-	.cb_read =		nodev,
-	.cb_write =		nodev,
-	.cb_ioctl =		t4_cb_ioctl,
-	.cb_devmap =		nodev,
-	.cb_mmap =		nodev,
-	.cb_segmap =		nodev,
-	.cb_chpoll =		nochpoll,
-	.cb_prop_op =		ddi_prop_op,
-	.cb_flag =		D_MP,
-	.cb_rev =		CB_REV,
-	.cb_aread =		nodev,
-	.cb_awrite =		nodev
-};
+static void *t4_soft_state;
 
-static int t4_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
-    void *arg, void *result);
-static int t4_bus_config(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op,
-    void *arg, dev_info_t **cdipp);
-static int t4_bus_unconfig(dev_info_t *dip, uint_t flags,
-    ddi_bus_config_op_t op, void *arg);
-struct bus_ops t4_bus_ops = {
-	.busops_rev =		BUSO_REV,
-	.bus_ctl =		t4_bus_ctl,
-	.bus_prop_op =		ddi_bus_prop_op,
-	.bus_config =		t4_bus_config,
-	.bus_unconfig =		t4_bus_unconfig,
-};
-
-static int t4_devo_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
-    void **rp);
-static int t4_devo_probe(dev_info_t *dip);
-static int t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
-static int t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
-static int t4_devo_quiesce(dev_info_t *dip);
-static struct dev_ops t4_dev_ops = {
-	.devo_rev =		DEVO_REV,
-	.devo_getinfo =		t4_devo_getinfo,
-	.devo_identify =	nulldev,
-	.devo_probe =		t4_devo_probe,
-	.devo_attach =		t4_devo_attach,
-	.devo_detach =		t4_devo_detach,
-	.devo_reset =		nodev,
-	.devo_cb_ops =		&t4_cb_ops,
-	.devo_bus_ops =		&t4_bus_ops,
-	.devo_quiesce =		&t4_devo_quiesce,
-};
-
-static struct modldrv t4nex_modldrv = {
-	.drv_modops =		&mod_driverops,
-	.drv_linkinfo =		"Chelsio T4-T6 nexus " DRV_VERSION,
-	.drv_dev_ops =		&t4_dev_ops
-};
-
-static struct modlinkage t4nex_modlinkage = {
-	.ml_rev =		MODREV_1,
-	.ml_linkage =		{&t4nex_modldrv, NULL},
-};
-
-void *t4_list;
+static kmutex_t t4_adapter_list_lock;
+static list_t t4_adapter_list;
 
 struct intrs_and_queues {
 	int intr_type;		/* DDI_INTR_TYPE_* */
@@ -140,15 +75,10 @@ static int adap__pre_init_tweaks(struct adapter *sc);
 static int get_params__pre_init(struct adapter *sc);
 static int get_params__post_init(struct adapter *sc);
 static int set_params__post_init(struct adapter *);
-static void setup_memwin(struct adapter *sc);
+static void t4_setup_adapter_memwin(struct adapter *sc);
 static int validate_mt_off_len(struct adapter *, int, uint32_t, int,
     uint32_t *);
-void memwin_info(struct adapter *, int, uint32_t *, uint32_t *);
-uint32_t position_memwin(struct adapter *, int, uint32_t);
-static int prop_lookup_int_array(struct adapter *sc, char *name, int *data,
-    uint_t count);
-static int prop_lookup_int_array(struct adapter *sc, char *name, int *data,
-    uint_t count);
+static uint32_t t4_position_memwin(struct adapter *, int, uint32_t);
 static int init_driver_props(struct adapter *sc, struct driver_properties *p);
 static int remove_extra_props(struct adapter *sc, int n10g, int n1g);
 static int cfg_itype_and_nqueues(struct adapter *sc, int n10g, int n1g,
@@ -158,8 +88,7 @@ static int remove_child_node(struct adapter *sc, int idx);
 static kstat_t *setup_kstats(struct adapter *sc);
 static kstat_t *setup_wc_kstats(struct adapter *);
 static int update_wc_kstats(kstat_t *, int);
-static kmutex_t t4_adapter_list_lock;
-static SLIST_HEAD(, adapter) t4_adapter_list;
+static int t4_port_full_uninit(struct port_info *);
 
 static int t4_temperature_read(void *, sensor_ioctl_scalar_t *);
 static int t4_voltage_read(void *, sensor_ioctl_scalar_t *);
@@ -184,47 +113,6 @@ static ddi_ufm_ops_t t4_ufm_ops = {
 	.ddi_ufm_op_getcaps = t4_ufm_getcaps
 };
 
-int
-_init(void)
-{
-	int rc;
-
-	rc = ddi_soft_state_init(&t4_list, sizeof (struct adapter), 0);
-	if (rc != 0)
-		return (rc);
-
-	rc = mod_install(&t4nex_modlinkage);
-	if (rc != 0)
-		ddi_soft_state_fini(&t4_list);
-
-	mutex_init(&t4_adapter_list_lock, NULL, MUTEX_DRIVER, NULL);
-	SLIST_INIT(&t4_adapter_list);
-	t4_debug_init();
-
-	return (0);
-}
-
-int
-_fini(void)
-{
-	int rc;
-
-	rc = mod_remove(&t4nex_modlinkage);
-	if (rc != 0)
-		return (rc);
-
-	ddi_soft_state_fini(&t4_list);
-	t4_debug_fini();
-
-	return (0);
-}
-
-int
-_info(struct modinfo *mi)
-{
-	return (mod_info(&t4nex_modlinkage, mi));
-}
-
 /* ARGSUSED */
 static int
 t4_devo_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **rp)
@@ -235,7 +123,7 @@ t4_devo_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **rp)
 	minor = getminor((dev_t)arg);	/* same as instance# in our case */
 
 	if (cmd == DDI_INFO_DEVT2DEVINFO) {
-		sc = ddi_get_soft_state(t4_list, minor);
+		sc = ddi_get_soft_state(t4_soft_state, minor);
 		if (sc == NULL)
 			return (DDI_FAILURE);
 
@@ -275,6 +163,8 @@ t4_devo_probe(dev_info_t *dip)
 	return (DDI_PROBE_DONTCARE);
 }
 
+static int t4_devo_detach(dev_info_t *, ddi_detach_cmd_t);
+
 static int
 t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -290,7 +180,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
 		.devacc_attr_dataorder = DDI_STRICTORDER_ACC
 	};
-	ddi_device_acc_attr_t da1 = {
+	ddi_device_acc_attr_t da_bar2 = {
 		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
 		.devacc_attr_dataorder = DDI_STRICTORDER_ACC
@@ -303,14 +193,14 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Allocate space for soft state.
 	 */
 	instance = ddi_get_instance(dip);
-	rc = ddi_soft_state_zalloc(t4_list, instance);
+	rc = ddi_soft_state_zalloc(t4_soft_state, instance);
 	if (rc != DDI_SUCCESS) {
 		cxgb_printf(dip, CE_WARN,
 		    "failed to allocate soft state: %d", rc);
 		return (DDI_FAILURE);
 	}
 
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 	sc->dip = dip;
 	sc->dev = makedevice(ddi_driver_major(dip), instance);
 	mutex_init(&sc->lock, NULL, MUTEX_DRIVER, NULL);
@@ -321,7 +211,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	STAILQ_INIT(&sc->mbox_list);
 
 	mutex_enter(&t4_adapter_list_lock);
-	SLIST_INSERT_HEAD(&t4_adapter_list, sc, link);
+	list_insert_tail(&t4_adapter_list, sc);
 	mutex_exit(&t4_adapter_list_lock);
 
 	sc->pf = getpf(sc);
@@ -350,7 +240,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* TODO: Set max read request to 4K */
 
 	/*
-	 * Enable MMIO access.
+	 * Enable BAR0 access.
 	 */
 	rc = ddi_regs_map_setup(dip, 1, &sc->regp, 0, 0, &da, &sc->regh);
 	if (rc != DDI_SUCCESS) {
@@ -360,18 +250,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	(void) memset(sc->chan_map, 0xff, sizeof (sc->chan_map));
-
-	for (i = 0; i < NCHAN; i++) {
-		(void) snprintf(name, sizeof (name), "%s-%d", "reclaim", i);
-		sc->tq[i] = ddi_taskq_create(sc->dip, name, 1,
-		    TASKQ_DEFAULTPRI, 0);
-
-		if (sc->tq[i] == NULL) {
-			cxgb_printf(dip, CE_WARN, "failed to create taskqs");
-			rc = DDI_FAILURE;
-			goto done;
-		}
-	}
 
 	/*
 	 * Prepare the adapter for operation.
@@ -383,16 +261,17 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Enable BAR1 access.
+	 * Enable BAR2 access.
 	 */
 	sc->doorbells |= DOORBELL_KDB;
-	rc = ddi_regs_map_setup(dip, 2, &sc->reg1p, 0, 0, &da1, &sc->reg1h);
+	rc = ddi_regs_map_setup(dip, 2, &sc->bar2_ptr, 0, 0, &da_bar2,
+	    &sc->bar2_hdl);
 	if (rc != DDI_SUCCESS) {
 		cxgb_printf(dip, CE_WARN,
-		    "failed to map BAR1 device registers: %d", rc);
+		    "failed to map BAR2 device registers: %d", rc);
 		goto done;
 	} else {
-		if (is_t5(sc->params.chip)) {
+		if (t4_cver_ge(sc, CHELSIO_T5)) {
 			sc->doorbells |= DOORBELL_UDB;
 			if (prp->wc) {
 				/*
@@ -407,8 +286,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				sc->doorbells &= ~DOORBELL_UDB;
 				sc->doorbells |= (DOORBELL_WCWR |
 				    DOORBELL_UDBWC);
+
+				const uint32_t stat_mode =
+				    t4_cver_ge(sc, CHELSIO_T6) ?
+				    V_T6_STATMODE(0) : V_STATMODE(0);
 				t4_write_reg(sc, A_SGE_STAT_CFG,
-				    V_STATSOURCE_T5(7) | V_STATMODE(0));
+				    V_STATSOURCE_T5(7) | stat_mode);
 			}
 		}
 	}
@@ -426,7 +309,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* Do this early. Memory window is required for loading config file. */
-	setup_memwin(sc);
+	t4_setup_adapter_memwin(sc);
 
 	/* Prepare the firmware for operation */
 	rc = prep_firmware(sc);
@@ -466,9 +349,14 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 
 	/* tweak some settings */
-	t4_write_reg(sc, A_TP_SHIFT_CNT, V_SYNSHIFTMAX(6) | V_RXTSHIFTMAXR1(4) |
-	    V_RXTSHIFTMAXR2(15) | V_PERSHIFTBACKOFFMAX(8) | V_PERSHIFTMAX(8) |
-	    V_KEEPALIVEMAXR1(4) | V_KEEPALIVEMAXR2(9));
+	t4_write_reg(sc, A_TP_SHIFT_CNT,
+	    V_SYNSHIFTMAX(6) |
+	    V_RXTSHIFTMAXR1(4) |
+	    V_RXTSHIFTMAXR2(15) |
+	    V_PERSHIFTBACKOFFMAX(8) |
+	    V_PERSHIFTMAX(8) |
+	    V_KEEPALIVEMAXR1(4) |
+	    V_KEEPALIVEMAXR2(9));
 	t4_write_reg(sc, A_ULP_RX_TDDP_PSZ, V_HPZ0(PAGE_SHIFT - 12));
 
 	/*
@@ -496,7 +384,6 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* These must be set before t4_port_init */
 		pi->adapter = sc;
-		/* LINTED: E_ASSIGN_NARROW_CONV */
 		pi->port_id = i;
 	}
 
@@ -513,7 +400,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(&pi->lock, NULL, MUTEX_DRIVER, NULL);
 		pi->mtu = ETHERMTU;
 
-		if (is_10XG_port(pi)) {
+		if (t4_port_is_10xg(pi)) {
 			nxg++;
 			pi->tmr_idx = prp->tmr_idx_10g;
 			pi->pktc_idx = prp->pktc_idx_10g;
@@ -522,20 +409,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pi->tmr_idx = prp->tmr_idx_1g;
 			pi->pktc_idx = prp->pktc_idx_1g;
 		}
+		pi->dbq_timer_idx = prp->dbq_timer_idx;
 
 		pi->xact_addr_filt = -1;
-		t4_mc_init(pi);
-
-		setbit(&sc->registered_device_map, i);
 	}
 
 	(void) remove_extra_props(sc, nxg, n1g);
-
-	if (sc->registered_device_map == 0) {
-		cxgb_printf(dip, CE_WARN, "no usable ports");
-		rc = DDI_FAILURE;
-		goto done;
-	}
 
 	rc = cfg_itype_and_nqueues(sc, nxg, n1g, &iaq);
 	if (rc != 0)
@@ -589,16 +468,10 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			continue;
 
 		t4_mc_cb_init(pi);
-		/* LINTED: E_ASSIGN_NARROW_CONV */
 		pi->first_rxq = rqidx;
-		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->nrxq = (is_10XG_port(pi)) ? iaq.nrxq10g
-		    : iaq.nrxq1g;
-		/* LINTED: E_ASSIGN_NARROW_CONV */
+		pi->nrxq = (t4_port_is_10xg(pi)) ? iaq.nrxq10g : iaq.nrxq1g;
 		pi->first_txq = tqidx;
-		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->ntxq = (is_10XG_port(pi)) ? iaq.ntxq10g
-		    : iaq.ntxq1g;
+		pi->ntxq = (t4_port_is_10xg(pi)) ? iaq.ntxq10g : iaq.ntxq1g;
 
 		rqidx += pi->nrxq;
 		tqidx += pi->ntxq;
@@ -687,6 +560,27 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto done;
 	}
 	ddi_ufm_update(sc->ufm_hdl);
+
+	if ((rc = t4_alloc_fwq(sc)) != 0) {
+		cxgb_printf(dip, CE_WARN, "failed to alloc FWQ: %d", rc);
+		rc = DDI_FAILURE;
+		goto done;
+	}
+
+	if (sc->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		(void) ddi_intr_block_enable(sc->intr_handle, sc->intr_count);
+	} else {
+		for (i = 0; i < sc->intr_count; i++)
+			(void) ddi_intr_enable(sc->intr_handle[i]);
+	}
+	t4_intr_enable(sc);
+
+	/*
+	 * At this point, adapter-level initialization can be considered
+	 * successful.  The ports themselves will be initialized later when mac
+	 * attaches/starts them via cxgbe.
+	 */
+	sc->flags |= TAF_INIT_DONE;
 	ddi_report_dev(dip);
 
 	/*
@@ -727,7 +621,7 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	instance = ddi_get_instance(dip);
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 	if (sc == NULL)
 		return (DDI_SUCCESS);
 
@@ -736,9 +630,20 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		for_each_port(sc, i) {
 			pi = sc->port[i];
 			if (pi && pi->flags & TPF_INIT_DONE)
-				(void) port_full_uninit(pi);
+				(void) t4_port_full_uninit(pi);
 		}
-		(void) adapter_full_uninit(sc);
+
+		if (sc->intr_cap & DDI_INTR_FLAG_BLOCK) {
+			(void) ddi_intr_block_disable(sc->intr_handle,
+			    sc->intr_count);
+		} else {
+			for (i = 0; i < sc->intr_count; i++)
+				(void) ddi_intr_disable(sc->intr_handle[i]);
+		}
+
+		(void) t4_free_fwq(sc);
+
+		sc->flags &= ~TAF_INIT_DONE;
 	}
 
 	/* Safe to call no matter what */
@@ -749,13 +654,6 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	(void) ksensor_remove(dip, KSENSOR_ALL_IDS);
 	ddi_prop_remove_all(dip);
 	ddi_remove_minor_node(dip, NULL);
-
-	for (i = 0; i < NCHAN; i++) {
-		if (sc->tq[i]) {
-			ddi_taskq_wait(sc->tq[i]);
-			ddi_taskq_destroy(sc->tq[i]);
-		}
-	}
 
 	if (sc->ksp != NULL)
 		kstat_delete(sc->ksp);
@@ -793,24 +691,30 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		if (pi != NULL) {
 			mutex_destroy(&pi->lock);
 			kmem_free(pi, sizeof (*pi));
-			clrbit(&sc->registered_device_map, i);
 		}
 	}
 
 	if (sc->flags & FW_OK)
 		(void) t4_fw_bye(sc, sc->mbox);
 
-	if (sc->reg1h != NULL)
-		ddi_regs_map_free(&sc->reg1h);
+	if (sc->bar2_hdl != NULL) {
+		ddi_regs_map_free(&sc->bar2_hdl);
+		sc->bar2_hdl = NULL;
+		sc->bar2_ptr = NULL;
+	}
 
-	if (sc->regh != NULL)
+	if (sc->regh != NULL) {
 		ddi_regs_map_free(&sc->regh);
+		sc->regh = NULL;
+		sc->regp = NULL;
+	}
 
-	if (sc->pci_regh != NULL)
+	if (sc->pci_regh != NULL) {
 		pci_config_teardown(&sc->pci_regh);
+	}
 
 	mutex_enter(&t4_adapter_list_lock);
-	SLIST_REMOVE(&t4_adapter_list, sc, adapter, link);
+	list_remove(&t4_adapter_list, sc);
 	mutex_exit(&t4_adapter_list_lock);
 
 	mutex_destroy(&sc->mbox_lock);
@@ -821,7 +725,7 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 #ifdef DEBUG
 	bzero(sc, sizeof (*sc));
 #endif
-	ddi_soft_state_free(t4_list, instance);
+	ddi_soft_state_free(t4_soft_state, instance);
 
 	return (DDI_SUCCESS);
 }
@@ -833,7 +737,7 @@ t4_devo_quiesce(dev_info_t *dip)
 	struct adapter *sc;
 
 	instance = ddi_get_instance(dip);
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 	if (sc == NULL)
 		return (DDI_SUCCESS);
 
@@ -888,7 +792,7 @@ t4_bus_config(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op, void *arg,
 	struct adapter *sc;
 
 	instance = ddi_get_instance(dip);
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 
 	if (op == BUS_CONFIG_ONE) {
 		char *c;
@@ -931,7 +835,7 @@ t4_bus_unconfig(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op,
 	struct adapter *sc;
 
 	instance = ddi_get_instance(dip);
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 
 	if (op == BUS_CONFIG_ONE || op == BUS_UNCONFIG_ALL ||
 	    op == BUS_UNCONFIG_DRIVER)
@@ -973,7 +877,7 @@ t4_cb_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 
-	sc = ddi_get_soft_state(t4_list, getminor(*devp));
+	sc = ddi_get_soft_state(t4_soft_state, getminor(*devp));
 	if (sc == NULL)
 		return (ENXIO);
 
@@ -986,7 +890,7 @@ t4_cb_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	struct adapter *sc;
 
-	sc = ddi_get_soft_state(t4_list, getminor(dev));
+	sc = ddi_get_soft_state(t4_soft_state, getminor(dev));
 	if (sc == NULL)
 		return (EINVAL);
 
@@ -1006,7 +910,7 @@ t4_cb_ioctl(dev_t dev, int cmd, intptr_t d, int mode, cred_t *credp, int *rp)
 		return (EPERM);
 
 	instance = getminor(dev);
-	sc = ddi_get_soft_state(t4_list, instance);
+	sc = ddi_get_soft_state(t4_soft_state, instance);
 	if (sc == NULL)
 		return (EINVAL);
 
@@ -1231,8 +1135,10 @@ validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, int len,
 			mlen = G_EXT_MEM_SIZE(addr_len) << 20;
 			break;
 		case MEM_MC1:
-			if (is_t4(sc->params.chip) || !(em & F_EXT_MEM1_ENABLE))
+			if (t4_cver_eq(sc, CHELSIO_T4) ||
+			    !(em & F_EXT_MEM1_ENABLE)) {
 				return (EINVAL);
+			}
 			addr_len = t4_read_reg(sc, A_MA_EXT_MEMORY1_BAR);
 			maddr = G_EXT_MEM1_BASE(addr_len) << 20;
 			mlen = G_EXT_MEM1_SIZE(addr_len) << 20;
@@ -1249,12 +1155,12 @@ validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, int len,
 	return (EFAULT);
 }
 
-void
+static void
 memwin_info(struct adapter *sc, int win, uint32_t *base, uint32_t *aperture)
 {
 	const struct memwin *mw;
 
-	if (is_t4(sc->params.chip)) {
+	if (t4_cver_eq(sc, CHELSIO_T4)) {
 		mw = &t4_memwin[win];
 	} else {
 		mw = &t5_memwin[win];
@@ -1352,7 +1258,7 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 
 	memwin_info(sc, 2, &mw_base, &mw_aperture);
 	while (cflen) {
-		off = position_memwin(sc, 2, addr);
+		off = t4_position_memwin(sc, 2, addr);
 		n = min(cflen, mw_aperture - off);
 		for (i = 0; i < n; i += 4)
 			t4_write_reg(sc, mw_base + off + i, *cfdata++);
@@ -1484,6 +1390,11 @@ get_params__pre_init(struct adapter *sc)
 		return (rc);
 	}
 
+	if (val[0] == 0) {
+		cxgb_printf(sc->dip, CE_WARN, "no usable ports");
+		return (ENODEV);
+	}
+
 	sc->params.portvec = val[0];
 	sc->params.nports = 0;
 	while (val[0]) {
@@ -1511,6 +1422,9 @@ get_params__pre_init(struct adapter *sc)
 		dlog->size = ntohl(cmd.memsize_devlog);
 	}
 
+	sc->sge.fwq_tmr_idx = sc->props.fwq_tmr_idx;
+	sc->sge.fwq_pktc_idx = sc->props.fwq_pktc_idx;
+
 	return (rc);
 }
 
@@ -1522,7 +1436,7 @@ static int
 get_params__post_init(struct adapter *sc)
 {
 	int rc;
-	uint32_t param[7], val[7];
+	uint32_t param[4], val[4];
 	struct fw_caps_config_cmd caps;
 
 	param[0] = FW_PARAM_PFVF(IQFLINT_START);
@@ -1541,6 +1455,11 @@ get_params__post_init(struct adapter *sc)
 	sc->sge.iqmap_sz = val[2] - sc->sge.iq_start + 1;
 	sc->sge.eqmap_sz = val[3] - sc->sge.eq_start + 1;
 
+	uint32_t r = t4_read_reg(sc, A_SGE_EGRESS_QUEUES_PER_PAGE_PF);
+	r >>= S_QUEUESPERPAGEPF0 +
+	    (S_QUEUESPERPAGEPF1 - S_QUEUESPERPAGEPF0) * sc->pf;
+	sc->sge.s_qpp = r & M_QUEUESPERPAGEPF0;
+
 	/* get capabilites */
 	bzero(&caps, sizeof (caps));
 	caps.op_to_write = htonl(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
@@ -1551,6 +1470,21 @@ get_params__post_init(struct adapter *sc)
 		cxgb_printf(sc->dip, CE_WARN,
 		    "failed to get card capabilities: %d.\n", rc);
 		return (rc);
+	}
+
+	/* Check if DBQ timer is available for tracking egress completions */
+	param[0] = (V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
+	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_DBQ_TIMERTICK));
+	rc = t4_query_params(sc, sc->mbox, sc->pf, 0, 1, param, val);
+	if (rc == 0) {
+		sc->sge.dbq_timer_tick = val[0];
+		rc = t4_read_sge_dbqtimers(sc,
+		    ARRAY_SIZE(sc->sge.dbq_timers), sc->sge.dbq_timers);
+		if (rc == 0) {
+			sc->flags |= TAF_DBQ_TIMER;
+		} else {
+			sc->sge.dbq_timer_tick = 0;
+		}
 	}
 
 	rc = -t4_get_pfres(sc);
@@ -1565,8 +1499,9 @@ get_params__post_init(struct adapter *sc)
 	sc->params.tp.tre = G_TIMERRESOLUTION(val[0]);
 	sc->params.tp.dack_re = G_DELAYEDACKRESOLUTION(val[0]);
 	t4_read_mtu_tbl(sc, sc->params.mtus, NULL);
+	(void) t4_init_sge_params(sc);
 
-	return (rc);
+	return (0);
 }
 
 static int
@@ -1584,7 +1519,7 @@ set_params__post_init(struct adapter *sc)
 
 /* TODO: verify */
 static void
-setup_memwin(struct adapter *sc)
+t4_setup_adapter_memwin(struct adapter *sc)
 {
 	pci_regspec_t *data;
 	int rc;
@@ -1605,7 +1540,7 @@ setup_memwin(struct adapter *sc)
 	bar0 = ((uint64_t)data[0].pci_phys_mid << 32) | data[0].pci_phys_low;
 	ddi_prop_free(data);
 
-	if (is_t4(sc->params.chip)) {
+	if (t4_cver_eq(sc, CHELSIO_T4)) {
 		mem_win0_base = bar0 + MEMWIN0_BASE;
 		mem_win1_base = bar0 + MEMWIN1_BASE;
 		mem_win2_base = bar0 + MEMWIN2_BASE;
@@ -1640,8 +1575,8 @@ setup_memwin(struct adapter *sc)
  * address in the chip's address space.  The return value is the offset of addr
  * from the start of the window.
  */
-uint32_t
-position_memwin(struct adapter *sc, int n, uint32_t addr)
+static uint32_t
+t4_position_memwin(struct adapter *sc, int n, uint32_t addr)
 {
 	uint32_t start, pf;
 	uint32_t reg;
@@ -1652,7 +1587,7 @@ position_memwin(struct adapter *sc, int n, uint32_t addr)
 		return (EFAULT);
 	}
 
-	if (is_t4(sc->params.chip)) {
+	if (t4_cver_eq(sc, CHELSIO_T4)) {
 		pf = 0;
 		start = addr & ~0xf;    /* start must be 16B aligned */
 	} else {
@@ -1665,61 +1600,6 @@ position_memwin(struct adapter *sc, int n, uint32_t addr)
 	(void) t4_read_reg(sc, reg);
 
 	return (addr - start);
-}
-
-
-/*
- * Reads the named property and fills up the "data" array (which has at least
- * "count" elements).  We first try and lookup the property for our dev_t and
- * then retry with DDI_DEV_T_ANY if it's not found.
- *
- * Returns non-zero if the property was found and "data" has been updated.
- */
-static int
-prop_lookup_int_array(struct adapter *sc, char *name, int *data, uint_t count)
-{
-	dev_info_t *dip = sc->dip;
-	dev_t dev = sc->dev;
-	int rc, *d;
-	uint_t i, n;
-
-	rc = ddi_prop_lookup_int_array(dev, dip, DDI_PROP_DONTPASS,
-	    name, &d, &n);
-	if (rc == DDI_PROP_SUCCESS)
-		goto found;
-
-	if (rc != DDI_PROP_NOT_FOUND) {
-		cxgb_printf(dip, CE_WARN,
-		    "failed to lookup property %s for minor %d: %d.",
-		    name, getminor(dev), rc);
-		return (0);
-	}
-
-	rc = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    name, &d, &n);
-	if (rc == DDI_PROP_SUCCESS)
-		goto found;
-
-	if (rc != DDI_PROP_NOT_FOUND) {
-		cxgb_printf(dip, CE_WARN,
-		    "failed to lookup property %s: %d.", name, rc);
-		return (0);
-	}
-
-	return (0);
-
-found:
-	if (n > count) {
-		cxgb_printf(dip, CE_NOTE,
-		    "property %s has too many elements (%d), ignoring extras",
-		    name, n);
-	}
-
-	for (i = 0; i < n && i < count; i++)
-		data[i] = d[i];
-	ddi_prop_free(d);
-
-	return (1);
 }
 
 static int
@@ -1735,54 +1615,32 @@ prop_lookup_int(struct adapter *sc, char *name, int defval)
 	    name, defval));
 }
 
+const uint_t t4_holdoff_timer_default[SGE_NTIMERS] = {5, 10, 20, 50, 100, 200};
+const uint_t t4_holdoff_pktcnt_default[SGE_NCOUNTERS] = {1, 8, 16, 32};
+
 static int
 init_driver_props(struct adapter *sc, struct driver_properties *p)
 {
 	dev_t dev = sc->dev;
 	dev_info_t *dip = sc->dip;
-	int i, *data;
-	uint_t tmr[SGE_NTIMERS] = {5, 10, 20, 50, 100, 200};
-	uint_t cnt[SGE_NCOUNTERS] = {1, 8, 16, 32}; /* 63 max */
+	int i;
 
 	/*
-	 * Holdoff timer
+	 * For now, just use the defaults for the hold-off timers and counters.
+	 *
+	 * They can be turned back into writable properties if/when there is a
+	 * demonstrable need.
 	 */
-	data = &p->timer_val[0];
-	for (i = 0; i < SGE_NTIMERS; i++)
-		data[i] = tmr[i];
-	(void) prop_lookup_int_array(sc, "holdoff-timer-values", data,
-	    SGE_NTIMERS);
-	for (i = 0; i < SGE_NTIMERS; i++) {
-		int limit = 200U;
-		if (data[i] > limit) {
-			cxgb_printf(dip, CE_WARN,
-			    "holdoff timer %d is too high (%d), lowered to %d.",
-			    i, data[i], limit);
-			data[i] = limit;
-		}
+	for (uint_t i = 0; i < SGE_NTIMERS; i++) {
+		p->holdoff_timer_us[i] = t4_holdoff_timer_default[i];
 	}
-	(void) ddi_prop_update_int_array(dev, dip, "holdoff-timer-values",
-	    data, SGE_NTIMERS);
-
-	/*
-	 * Holdoff packet counter
-	 */
-	data = &p->counter_val[0];
-	for (i = 0; i < SGE_NCOUNTERS; i++)
-		data[i] = cnt[i];
-	(void) prop_lookup_int_array(sc, "holdoff-pkt-counter-values", data,
-	    SGE_NCOUNTERS);
-	for (i = 0; i < SGE_NCOUNTERS; i++) {
-		int limit = M_THRESHOLD_0;
-		if (data[i] > limit) {
-			cxgb_printf(dip, CE_WARN,
-			    "holdoff pkt-counter %d is too high (%d), "
-			    "lowered to %d.", i, data[i], limit);
-			data[i] = limit;
-		}
+	for (uint_t i = 0; i < SGE_NCOUNTERS; i++) {
+		p->holdoff_pktcnt[i] = t4_holdoff_pktcnt_default[i];
 	}
+	(void) ddi_prop_update_int_array(dev, dip, "holdoff-timer-us-values",
+	    (int *)p->holdoff_timer_us, SGE_NTIMERS);
 	(void) ddi_prop_update_int_array(dev, dip, "holdoff-pkt-counter-values",
-	    data, SGE_NCOUNTERS);
+	    (int *)p->holdoff_pktcnt, SGE_NCOUNTERS);
 
 	/*
 	 * Maximum # of tx and rx queues to use for each
@@ -1822,6 +1680,12 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	p->pktc_idx_1g = prop_lookup_int(sc, "holdoff-pktc-idx-1G", 2);
 	(void) ddi_prop_update_int(dev, dip, "holdoff-pktc-idx-1G",
 	    p->pktc_idx_1g);
+
+	/*
+	 * Holdoff parameters for FW queue
+	 */
+	p->fwq_tmr_idx = 0;
+	p->fwq_pktc_idx = -1;
 
 	/*
 	 * Size (number of entries) of each tx and rx queue.
@@ -1881,6 +1745,9 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	}
 
 	(void) ddi_prop_update_int(dev, dip, "multi-rings", p->multi_rings);
+
+	/* TX (completion) DBQ Timer */
+	p->dbq_timer_idx = 0;
 
 	return (0);
 }
@@ -2170,24 +2037,27 @@ done:
 	return (rc);
 }
 
-static char *
-print_port_speed(const struct port_info *pi)
+static const char *
+t4_port_speed_name(const struct port_info *pi)
 {
-	if (!pi)
+	if (pi == NULL) {
 		return ("-");
+	}
 
-	if (is_100G_port(pi))
+	const uint32_t pcaps = pi->link_cfg.pcaps;
+	if (pcaps & FW_PORT_CAP32_SPEED_100G) {
 		return ("100G");
-	else if (is_50G_port(pi))
+	} else if (pcaps & FW_PORT_CAP32_SPEED_50G) {
 		return ("50G");
-	else if (is_40G_port(pi))
+	} else if (pcaps & FW_PORT_CAP32_SPEED_40G) {
 		return ("40G");
-	else if (is_25G_port(pi))
+	} else if (pcaps & FW_PORT_CAP32_SPEED_25G) {
 		return ("25G");
-	else if (is_10G_port(pi))
+	} else if (pcaps & FW_PORT_CAP32_SPEED_10G) {
 		return ("10G");
-	else
+	} else {
 		return ("1G");
+	}
 }
 
 #define	KS_UINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_ULONG)
@@ -2275,17 +2145,17 @@ setup_kstats(struct adapter *sc)
 	KS_U_SET(core_clock, v->cclk);
 	KS_U_SET(port_cnt, sc->params.nports);
 
-	t4_os_pci_read_cfg2(sc, PCI_CONF_VENID, &pci_vendor);
+	pci_vendor = pci_config_get16(sc->pci_regh, PCI_CONF_VENID);
 	KS_C_SET(pci_vendor_id, "0x%x", pci_vendor);
 
-	t4_os_pci_read_cfg2(sc, PCI_CONF_DEVID, &pci_device);
+	pci_device = pci_config_get16(sc->pci_regh, PCI_CONF_DEVID);
 	KS_C_SET(pci_device_id, "0x%x", pci_device);
 
 	KS_C_SET(port_type, "%s/%s/%s/%s",
-	    print_port_speed(sc->port[0]),
-	    print_port_speed(sc->port[1]),
-	    print_port_speed(sc->port[2]),
-	    print_port_speed(sc->port[3]));
+	    t4_port_speed_name(sc->port[0]),
+	    t4_port_speed_name(sc->port[1]),
+	    t4_port_speed_name(sc->port[2]),
+	    t4_port_speed_name(sc->port[3]));
 
 	/* Do NOT set ksp->ks_update.  These kstats do not change. */
 
@@ -2341,7 +2211,7 @@ update_wc_kstats(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (0);
 
-	if (is_t5(sc->params.chip)) {
+	if (t4_cver_ge(sc, CHELSIO_T5)) {
 		wc_total = t4_read_reg(sc, A_SGE_STAT_TOTAL);
 		wc_failure = t4_read_reg(sc, A_SGE_STAT_MATCH);
 		wc_success = wc_total - wc_failure;
@@ -2389,8 +2259,8 @@ read_fec_pair(struct port_info *pi, uint32_t lo_reg, uint32_t high_reg)
 	uint8_t port = pi->tx_chan;
 	uint32_t low, high, ret;
 
-	low = t4_read_reg32(sc, T5_PORT_REG(port, lo_reg));
-	high = t4_read_reg32(sc, T5_PORT_REG(port, high_reg));
+	low = t4_read_reg(sc, T5_PORT_REG(port, lo_reg));
+	high = t4_read_reg(sc, T5_PORT_REG(port, high_reg));
 	ret = low & 0xffff;
 	ret |= (high & 0xffff) << 16;
 	return (ret);
@@ -2451,7 +2321,7 @@ setup_port_fec_kstats(struct port_info *pi)
 	kstat_t *ksp;
 	struct cxgbe_port_fec_kstats *kstatp;
 
-	if (!is_t6(pi->adapter->params.chip)) {
+	if (!t4_cver_ge(pi->adapter, CHELSIO_T6)) {
 		return (NULL);
 	}
 
@@ -2488,64 +2358,13 @@ setup_port_fec_kstats(struct port_info *pi)
 }
 
 int
-adapter_full_init(struct adapter *sc)
-{
-	int i, rc = 0;
-
-	ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
-
-	rc = t4_setup_adapter_queues(sc);
-	if (rc != 0)
-		goto done;
-
-	if (sc->intr_cap & DDI_INTR_FLAG_BLOCK)
-		(void) ddi_intr_block_enable(sc->intr_handle, sc->intr_count);
-	else {
-		for (i = 0; i < sc->intr_count; i++)
-			(void) ddi_intr_enable(sc->intr_handle[i]);
-	}
-	t4_intr_enable(sc);
-	sc->flags |= TAF_INIT_DONE;
-
-done:
-	if (rc != 0)
-		(void) adapter_full_uninit(sc);
-
-	return (rc);
-}
-
-int
-adapter_full_uninit(struct adapter *sc)
-{
-	int i, rc = 0;
-
-	ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
-
-	if (sc->intr_cap & DDI_INTR_FLAG_BLOCK)
-		(void) ddi_intr_block_disable(sc->intr_handle, sc->intr_count);
-	else {
-		for (i = 0; i < sc->intr_count; i++)
-			(void) ddi_intr_disable(sc->intr_handle[i]);
-	}
-
-	rc = t4_teardown_adapter_queues(sc);
-	if (rc != 0)
-		return (rc);
-
-	sc->flags &= ~TAF_INIT_DONE;
-
-	return (0);
-}
-
-int
-port_full_init(struct port_info *pi)
+t4_port_full_init(struct port_info *pi)
 {
 	struct adapter *sc = pi->adapter;
 	uint16_t *rss;
 	struct sge_rxq *rxq;
 	int rc, i;
 
-	ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 	ASSERT((pi->flags & TPF_INIT_DONE) == 0);
 
 	/*
@@ -2578,7 +2397,7 @@ port_full_init(struct port_info *pi)
 	pi->flags |= TPF_INIT_DONE;
 done:
 	if (rc != 0)
-		(void) port_full_uninit(pi);
+		(void) t4_port_full_uninit(pi);
 
 	return (rc);
 }
@@ -2586,8 +2405,8 @@ done:
 /*
  * Idempotent.
  */
-int
-port_full_uninit(struct port_info *pi)
+static int
+t4_port_full_uninit(struct port_info *pi)
 {
 
 	ASSERT(pi->flags & TPF_INIT_DONE);
@@ -2603,34 +2422,43 @@ port_full_uninit(struct port_info *pi)
 }
 
 void
-enable_port_queues(struct port_info *pi)
+t4_port_queues_enable(struct port_info *pi)
 {
-	struct adapter *sc = pi->adapter;
-	int i;
-	struct sge_iq *iq;
-	struct sge_rxq *rxq;
-
 	ASSERT(pi->flags & TPF_INIT_DONE);
 
 	/*
 	 * TODO: whatever was queued up after we set iq->state to IQS_DISABLED
-	 * back in disable_port_queues will be processed now, after an unbounded
-	 * delay.  This can't be good.
+	 * back in t4_port_queues_disable will be processed now, after an
+	 * unbounded delay.  This can't be good.
 	 */
 
+	int i;
+	struct adapter *sc = pi->adapter;
+	struct sge_rxq *rxq;
+
+	mutex_enter(&sc->sfl_lock);
 	for_each_rxq(pi, i, rxq) {
-		iq = &rxq->iq;
+		struct sge_iq *iq = &rxq->iq;
+
 		if (atomic_cas_uint(&iq->state, IQS_DISABLED, IQS_IDLE) !=
 		    IQS_DISABLED)
 			panic("%s: iq %p wasn't disabled", __func__,
 			    (void *) iq);
-		t4_write_reg(sc, MYPF_REG(A_SGE_PF_GTS),
-		    V_SEINTARM(iq->intr_params) | V_INGRESSQID(iq->cntxt_id));
+
+		/*
+		 * Freelists which were marked "doomed" by a previous
+		 * t4_port_queues_disable() call should clear that status.
+		 */
+		rxq->fl.flags &= ~FL_DOOMED;
+
+		t4_iq_gts_update(iq, iq->intr_params, 0);
+
 	}
+	mutex_exit(&sc->sfl_lock);
 }
 
 void
-disable_port_queues(struct port_info *pi)
+t4_port_queues_disable(struct port_info *pi)
 {
 	int i;
 	struct adapter *sc = pi->adapter;
@@ -2649,8 +2477,9 @@ disable_port_queues(struct port_info *pi)
 	}
 
 	mutex_enter(&sc->sfl_lock);
-	for_each_rxq(pi, i, rxq)
-	    rxq->fl.flags |= FL_DOOMED;
+	for_each_rxq(pi, i, rxq) {
+		rxq->fl.flags |= FL_DOOMED;
+	}
 	mutex_exit(&sc->sfl_lock);
 	/* TODO: need to wait for all fl's to be removed from sc->sfl */
 }
@@ -2665,24 +2494,25 @@ t4_fatal_err(struct adapter *sc)
 }
 
 int
-t4_os_find_pci_capability(struct adapter *sc, int cap)
+t4_os_find_pci_capability(struct adapter *sc, uint8_t cap)
 {
-	uint16_t stat;
-	uint8_t cap_ptr, cap_id;
-
-	t4_os_pci_read_cfg2(sc, PCI_CONF_STAT, &stat);
-	if ((stat & PCI_STAT_CAP) == 0)
-		return (0); /* does not implement capabilities */
-
-	t4_os_pci_read_cfg1(sc, PCI_CONF_CAP_PTR, &cap_ptr);
-	while (cap_ptr) {
-		t4_os_pci_read_cfg1(sc, cap_ptr + PCI_CAP_ID, &cap_id);
-		if (cap_id == cap)
-			return (cap_ptr); /* found */
-		t4_os_pci_read_cfg1(sc, cap_ptr + PCI_CAP_NEXT_PTR, &cap_ptr);
+	const uint16_t stat = pci_config_get16(sc->pci_regh, PCI_CONF_STAT);
+	if ((stat & PCI_STAT_CAP) == 0) {
+		return (0);
 	}
 
-	return (0); /* not found */
+	uint8_t cap_ptr = pci_config_get8(sc->pci_regh, PCI_CONF_CAP_PTR);
+	while (cap_ptr) {
+		uint8_t cap_id =
+		    pci_config_get8(sc->pci_regh, cap_ptr + PCI_CAP_ID);
+		if (cap_id == cap) {
+			return (cap_ptr);
+		}
+		cap_ptr =
+		    pci_config_get8(sc->pci_regh, cap_ptr + PCI_CAP_NEXT_PTR);
+	}
+
+	return (0);
 }
 
 void
@@ -2708,33 +2538,67 @@ t4_os_portmod_changed(struct adapter *sc, int idx)
 		cxgb_printf(pi->dip, CE_NOTE, "transceiver (type %d) inserted.",
 		    pi->mod_type);
 
-	if ((isset(&sc->open_device_map, pi->port_id) != 0) &&
-	    pi->link_cfg.new_module)
+	if ((pi->flags & TPF_OPEN) != 0 && pi->link_cfg.new_module) {
 		pi->link_cfg.redo_l1cfg = true;
+	}
+}
+
+void
+t4_os_set_hw_addr(struct adapter *sc, int idx, const uint8_t *hw_addr)
+{
+	bcopy(hw_addr, sc->port[idx]->hw_addr, ETHERADDRL);
+}
+
+uint32_t
+t4_read_reg(struct adapter *sc, uint32_t reg)
+{
+	const uint32_t val = ddi_get32(sc->regh, (uint32_t *)(sc->regp + reg));
+	DTRACE_PROBE3(t4__reg__read, struct adapter *, sc, uint32_t, reg,
+	    uint64_t, val);
+	return (val);
+}
+
+void
+t4_write_reg(struct adapter *sc, uint32_t reg, uint32_t val)
+{
+	DTRACE_PROBE3(t4__reg__write, struct adapter *, sc, uint32_t, reg,
+	    uint64_t, val);
+	ddi_put32(sc->regh, (uint32_t *)(sc->regp + reg), val);
+}
+
+uint64_t
+t4_read_reg64(struct adapter *sc, uint32_t reg)
+{
+	const uint64_t val = ddi_get64(sc->regh, (uint64_t *)(sc->regp + reg));
+	DTRACE_PROBE3(t4__reg__read, struct adapter *, sc, uint32_t, reg,
+	    uint64_t, val);
+	return (val);
+}
+
+void
+t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val)
+{
+	DTRACE_PROBE3(t4__reg__write, struct adapter *, sc, uint32_t, reg,
+	    uint64_t, val);
+	ddi_put64(sc->regh, (uint64_t *)(sc->regp + reg), val);
 }
 
 static int
 t4_sensor_read(struct adapter *sc, uint32_t diag, uint32_t *valp)
 {
 	int rc;
-	struct port_info *pi = sc->port[0];
 	uint32_t param, val;
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0) {
-		return (rc);
-	}
+	ADAPTER_LOCK(sc);
 	param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
 	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_DIAG) |
 	    V_FW_PARAMS_PARAM_Y(diag);
 	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(sc);
 
 	if (rc != 0) {
 		return (rc);
-	}
-
-	if (val == 0) {
+	} else if (val == 0) {
 		return (EIO);
 	}
 
@@ -2890,7 +2754,6 @@ err:
 
 }
 
-
 int
 t4_cxgbe_attach(struct port_info *pi, dev_info_t *dip)
 {
@@ -2901,13 +2764,17 @@ t4_cxgbe_attach(struct port_info *pi, dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	size_t prop_size;
+	const char **props = t4_get_priv_props(pi, &prop_size);
+
 	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mac->m_driver = pi;
 	mac->m_dip = dip;
 	mac->m_src_addr = pi->hw_addr;
 	mac->m_callbacks = pi->mc;
 	mac->m_max_sdu = pi->mtu;
-	mac->m_priv_props = pi->props;
+	/* mac_register() treats this as const, so we can cast it away */
+	mac->m_priv_props = (char **)props;
 	mac->m_margin = VLAN_TAGSZ;
 
 	if (!mac->m_callbacks->mc_unicst) {
@@ -2918,6 +2785,7 @@ t4_cxgbe_attach(struct port_info *pi, dev_info_t *dip)
 	mac_handle_t mh = NULL;
 	const int rc = mac_register(mac, &mh);
 	mac_free(mac);
+	kmem_free(props, prop_size);
 	if (rc != 0) {
 		return (DDI_FAILURE);
 	}
@@ -2947,4 +2815,104 @@ t4_cxgbe_detach(struct port_info *pi)
 	}
 
 	return (DDI_FAILURE);
+}
+
+struct cb_ops t4_cb_ops = {
+	.cb_open =		t4_cb_open,
+	.cb_close =		t4_cb_close,
+	.cb_strategy =		nodev,
+	.cb_print =		nodev,
+	.cb_dump =		nodev,
+	.cb_read =		nodev,
+	.cb_write =		nodev,
+	.cb_ioctl =		t4_cb_ioctl,
+	.cb_devmap =		nodev,
+	.cb_mmap =		nodev,
+	.cb_segmap =		nodev,
+	.cb_chpoll =		nochpoll,
+	.cb_prop_op =		ddi_prop_op,
+	.cb_flag =		D_MP,
+	.cb_rev =		CB_REV,
+	.cb_aread =		nodev,
+	.cb_awrite =		nodev
+};
+
+struct bus_ops t4_bus_ops = {
+	.busops_rev =		BUSO_REV,
+	.bus_ctl =		t4_bus_ctl,
+	.bus_prop_op =		ddi_bus_prop_op,
+	.bus_config =		t4_bus_config,
+	.bus_unconfig =		t4_bus_unconfig,
+};
+
+static struct dev_ops t4_dev_ops = {
+	.devo_rev =		DEVO_REV,
+	.devo_getinfo =		t4_devo_getinfo,
+	.devo_identify =	nulldev,
+	.devo_probe =		t4_devo_probe,
+	.devo_attach =		t4_devo_attach,
+	.devo_detach =		t4_devo_detach,
+	.devo_reset =		nodev,
+	.devo_cb_ops =		&t4_cb_ops,
+	.devo_bus_ops =		&t4_bus_ops,
+	.devo_quiesce =		&t4_devo_quiesce,
+};
+
+static struct modldrv t4nex_modldrv = {
+	.drv_modops =		&mod_driverops,
+	.drv_linkinfo =		"Chelsio T4-T6 nexus " DRV_VERSION,
+	.drv_dev_ops =		&t4_dev_ops
+};
+
+static struct modlinkage t4nex_modlinkage = {
+	.ml_rev =		MODREV_1,
+	.ml_linkage =		{&t4nex_modldrv, NULL},
+};
+
+int
+_init(void)
+{
+	int rc;
+
+	rc = ddi_soft_state_init(&t4_soft_state, sizeof (struct adapter), 0);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	mutex_init(&t4_adapter_list_lock, NULL, MUTEX_DRIVER, NULL);
+	list_create(&t4_adapter_list, sizeof (adapter_t),
+	    offsetof(adapter_t, node));
+	t4_debug_init();
+
+	rc = mod_install(&t4nex_modlinkage);
+	if (rc != 0) {
+		ddi_soft_state_fini(&t4_soft_state);
+		mutex_destroy(&t4_adapter_list_lock);
+		list_destroy(&t4_adapter_list);
+		t4_debug_fini();
+	}
+
+	return (rc);
+}
+
+int
+_fini(void)
+{
+	const int rc = mod_remove(&t4nex_modlinkage);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	mutex_destroy(&t4_adapter_list_lock);
+	list_destroy(&t4_adapter_list);
+	ddi_soft_state_fini(&t4_soft_state);
+	t4_debug_fini();
+
+	return (0);
+}
+
+int
+_info(struct modinfo *mi)
+{
+	return (mod_info(&t4nex_modlinkage, mi));
 }

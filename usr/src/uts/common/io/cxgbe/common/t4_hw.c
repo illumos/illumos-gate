@@ -29,6 +29,104 @@
 #include "t4_regs_values.h"
 #include "t4fw_interface.h"
 
+static inline void
+t4_os_lock(t4_os_lock_t *lock)
+{
+	mutex_enter(lock);
+}
+
+static inline void
+t4_os_unlock(t4_os_lock_t *lock)
+{
+	mutex_exit(lock);
+}
+
+static inline void
+t4_os_pci_read_cfg1(struct adapter *sc, int reg, uint8_t *val)
+{
+	*val = pci_config_get8(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg1(struct adapter *sc, int reg, uint8_t val)
+{
+	pci_config_put8(sc->pci_regh, reg, val);
+}
+
+static inline void
+t4_os_pci_read_cfg2(struct adapter *sc, int reg, uint16_t *val)
+{
+	*val = pci_config_get16(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg2(struct adapter *sc, int reg, uint16_t val)
+{
+	pci_config_put16(sc->pci_regh, reg, val);
+}
+
+static inline void
+t4_os_pci_read_cfg4(struct adapter *sc, int reg, uint32_t *val)
+{
+	*val = pci_config_get32(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg4(struct adapter *sc, int reg, uint32_t val)
+{
+	pci_config_put32(sc->pci_regh, reg, val);
+}
+
+static inline void *
+t4_os_alloc(size_t size)
+{
+	return (kmem_alloc(size, KM_SLEEP));
+}
+
+int t4_seeprom_read(struct adapter *adapter, u32 addr, u32 *data);
+int t4_seeprom_write(struct adapter *adapter, u32 addr, u32 data);
+
+/*
+ * t4_os_pci_read_seeprom - read four bytes of SEEPROM/VPD contents
+ * @adapter: the adapter
+ * @addr: SEEPROM/VPD Address to read
+ * @valp: where to store the value read
+ *
+ * Read a 32-bit value from the given address in the SEEPROM/VPD.  The address
+ * must be four-byte aligned.  Returns 0 on success, a negative error number
+ * on failure.
+ */
+static inline int t4_os_pci_read_seeprom(adapter_t *adapter, int addr,
+    u32 *valp)
+{
+	const int ret = t4_seeprom_read(adapter, addr, valp);
+	return (ret >= 0 ? 0 : ret);
+}
+
+/*
+ * t4_os_pci_write_seeprom - write four bytes of SEEPROM/VPD contents
+ * @adapter: the adapter
+ * @addr: SEEPROM/VPD Address to write
+ * @val: the value write
+ *
+ * Write a 32-bit value to the given address in the SEEPROM/VPD.  The address
+ * must be four-byte aligned.  Returns 0 on success, a negative error number
+ * on failure.
+ */
+static inline int t4_os_pci_write_seeprom(adapter_t *adapter, int addr, u32 val)
+{
+	const int ret = t4_seeprom_write(adapter, addr, val);
+	return (ret >= 0 ? 0 : ret);
+}
+
+
+static inline int t4_os_pci_set_vpd_size(struct adapter *adapter, size_t len)
+{
+	/* Presently unused on illumos. */
+	return (0);
+}
+
+
 /**
  *	t4_wait_op_done_val - wait until an operation is completed
  *	@adapter: the adapter performing the operation

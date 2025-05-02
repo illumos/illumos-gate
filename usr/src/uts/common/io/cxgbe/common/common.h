@@ -608,8 +608,6 @@ static inline int t4_link_l1cfg_ns(struct adapter *adapter, unsigned int mbox,
 }
 
 int t4_restart_aneg(struct adapter *adap, unsigned int mbox, unsigned int port);
-int t4_seeprom_read(struct adapter *adapter, u32 addr, u32 *data);
-int t4_seeprom_write(struct adapter *adapter, u32 addr, u32 data);
 int t4_eeprom_ptov(unsigned int phys_addr, unsigned int fn, unsigned int sz);
 int t4_seeprom_wp(struct adapter *adapter, int enable);
 int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p);

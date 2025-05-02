@@ -83,10 +83,10 @@ pci_rw(struct adapter *sc, void *data, int flags, int write)
 	/* address must be 32 bit aligned */
 	r.reg &= ~0x3;
 
-	if (write != 0)
-		t4_os_pci_write_cfg4(sc, r.reg, r.value);
-	else {
-		t4_os_pci_read_cfg4(sc, r.reg, &r.value);
+	if (write != 0) {
+		pci_config_put32(sc->pci_regh, r.reg, r.value);
+	} else {
+		r.value = pci_config_get32(sc->pci_regh, r.reg);
 		if (ddi_copyout(&r, data, sizeof (r), flags) < 0)
 			return (EFAULT);
 	}
@@ -120,7 +120,6 @@ static void
 reg_block_dump(struct adapter *sc, uint8_t *buf, unsigned int start,
     unsigned int end)
 {
-	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	uint32_t *p = (uint32_t *)(buf + start);
 
 	for (/* */; start <= end; start += sizeof (uint32_t))
@@ -1701,7 +1700,7 @@ regdump(struct adapter *sc, void *data, int flags)
 	if (ddi_copyin(data, &r, sizeof (r), flags) < 0)
 		return (EFAULT);
 
-	if (is_t4(sc->params.chip)) {
+	if (t4_cver_eq(sc, CHELSIO_T4)) {
 		if (r.len > T4_REGDUMP_SIZE)
 			r.len = T4_REGDUMP_SIZE;
 		else if (r.len < T4_REGDUMP_SIZE)
@@ -1716,11 +1715,11 @@ regdump(struct adapter *sc, void *data, int flags)
 
 	r.version = mk_adap_vers(sc);
 
-	if (is_t4(sc->params.chip)) {
+	if (t4_cver_eq(sc, CHELSIO_T4)) {
 		reg_ranges = &t4_reg_ranges[0];
 		arr_size = ARRAY_SIZE(t4_reg_ranges);
 		buf_size = T4_REGDUMP_SIZE;
-	} else if (is_t5(sc->params.chip)) {
+	} else if (t4_cver_eq(sc, CHELSIO_T5)) {
 		reg_ranges = &t5_reg_ranges[0];
 		arr_size = ARRAY_SIZE(t5_reg_ranges);
 		buf_size = T5_REGDUMP_SIZE;

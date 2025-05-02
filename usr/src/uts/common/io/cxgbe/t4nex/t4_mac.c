@@ -52,11 +52,10 @@ static void t4_mc_propinfo(void *arg, const char *name, mac_prop_id_t id,
 
 static int t4_init_synchronized(struct port_info *pi);
 static int t4_uninit_synchronized(struct port_info *pi);
-static void propinfo(struct port_info *pi, const char *name,
-    mac_prop_info_handle_t ph);
-static int getprop(struct port_info *pi, const char *name, uint_t size,
-    void *val);
-static int setprop(struct port_info *pi, const char *name, const void *val);
+static void t4_propinfo_priv(struct port_info *, const char *,
+    mac_prop_info_handle_t);
+static int t4_getprop_priv(struct port_info *, const char *, uint_t, void *);
+static int t4_setprop_priv(struct port_info *, const char *, const void *);
 
 mac_callbacks_t t4_m_callbacks = {
 	.mc_callbacks	= MC_GETCAPAB | MC_PROPERTIES,
@@ -88,27 +87,87 @@ mac_callbacks_t t4_m_ring_callbacks = {
 	.mc_propinfo	= t4_mc_propinfo,
 };
 
-#define	T4PROP_TMR_IDX		"_holdoff_timer_idx"
-#define	T4PROP_PKTC_IDX		"_holdoff_pktc_idx"
-#define	T4PROP_MTU		"_mtu"
-#define	T4PROP_HW_CSUM		"_hw_csum"
-#define	T4PROP_HW_LSO		"_hw_lso"
-#define	T4PROP_TX_PAUSE		"_tx_pause"
-#define	T4PROP_RX_PAUSE		"_rx_pause"
-
-char *t4_priv_props[] = {
-	T4PROP_TMR_IDX,
-	T4PROP_PKTC_IDX,
-#if MAC_VERSION == 1
-	/* MAC_VERSION 1 doesn't seem to use MAC_PROP_MTU, hmmmm */
-	T4PROP_MTU,
-#endif
+typedef enum t4_prop_id {
+	T4PROP_FW_TMR,
+	T4PROP_FW_PKTC,
+	T4PROP_RX_TMR,
+	T4PROP_RX_PKTC,
+	T4PROP_TX_TMR,
 	T4PROP_HW_CSUM,
 	T4PROP_HW_LSO,
-	T4PROP_TX_PAUSE,
 	T4PROP_RX_PAUSE,
-	NULL
+	T4PROP_TX_PAUSE,
+} t4_prop_id_t;
+
+typedef struct t4_priv_prop {
+	const char	*tpp_name;
+	t4_prop_id_t	tpp_id;
+	bool		tpp_is_bool;
+} t4_priv_prop_t;
+
+static const t4_priv_prop_t t4_priv_props[] = {
+	/*
+	 * Because there is a single FWQ for the entire NIC, all ports will be
+	 * impacted by changes to these properties.
+	 */
+	{ "_fw_coalesce_timer_us", T4PROP_FW_TMR },
+	{ "_fw_coalesce_count", T4PROP_FW_PKTC },
+
+	{ "_rx_coalesce_timer_us", T4PROP_RX_TMR },
+	{ "_rx_coalesce_count", T4PROP_RX_PKTC },
+	{ "_tx_reclaim_timer_us", T4PROP_TX_TMR },
+	{ "_hw_csum", T4PROP_HW_CSUM, true },
+	{ "_hw_lso", T4PROP_HW_LSO, true },
+	{ "_rx_pause", T4PROP_RX_PAUSE, true },
+	{ "_tx_pause", T4PROP_TX_PAUSE, true },
 };
+
+static const t4_priv_prop_t *
+t4_priv_prop_match(const char *name)
+{
+	for (uint_t i = 0; i < ARRAY_SIZE(t4_priv_props); i++) {
+		const t4_priv_prop_t *prop = &t4_priv_props[i];
+		if (strcmp(prop->tpp_name, name) == 0) {
+			return (prop);
+		}
+	}
+	return (NULL);
+}
+
+static bool
+t4_priv_prop_supported(struct port_info *pi, const t4_priv_prop_t *prop)
+{
+	struct adapter *sc = pi->adapter;
+
+	switch (prop->tpp_id) {
+	case T4PROP_TX_TMR:
+		return ((sc->flags & TAF_DBQ_TIMER) != 0);
+
+	default:
+		return (true);
+	}
+}
+
+const char **
+t4_get_priv_props(struct port_info *pi, size_t *alloc_sz)
+{
+	/*
+	 * Just alloc for all possible options, skipping those which are not
+	 * supported (and appending extra NULLs).
+	 */
+	const size_t sz = (ARRAY_SIZE(t4_priv_props) + 1) * sizeof (char *);
+	const char **out = kmem_zalloc(sz, KM_SLEEP);
+
+	uint_t filled = 0;
+	for (uint_t i = 0; i < ARRAY_SIZE(t4_priv_props); i++) {
+		if (t4_priv_prop_supported(pi, &t4_priv_props[i])) {
+			out[filled++] = t4_priv_props[i].tpp_name;
+		}
+	}
+
+	*alloc_sz = sz;
+	return (out);
+}
 
 /*
  * To determine the actual Ethernet mode that we're in we need to look at the
@@ -664,13 +723,10 @@ static int
 t4_mc_start(void *arg)
 {
 	struct port_info *pi = arg;
-	int rc;
 
-	rc = begin_synchronized_op(pi, 0, 1);
-	if (rc != 0)
-		return (rc);
-	rc = t4_init_synchronized(pi);
-	end_synchronized_op(pi, 0);
+	ADAPTER_LOCK(pi->adapter);
+	const int rc = t4_init_synchronized(pi);
+	ADAPTER_UNLOCK(pi->adapter);
 
 	return (rc);
 }
@@ -680,10 +736,9 @@ t4_mc_stop(void *arg)
 {
 	struct port_info *pi = arg;
 
-	while (begin_synchronized_op(pi, 0, 1) != 0)
-		continue;
+	ADAPTER_LOCK(pi->adapter);
 	(void) t4_uninit_synchronized(pi);
-	end_synchronized_op(pi, 0);
+	ADAPTER_UNLOCK(pi->adapter);
 }
 
 static int
@@ -693,12 +748,10 @@ t4_mc_setpromisc(void *arg, boolean_t on)
 	struct adapter *sc = pi->adapter;
 	int rc;
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0)
-		return (rc);
+	ADAPTER_LOCK(sc);
 	rc = -t4_set_rxmode(sc, sc->mbox, pi->viid, -1, on ? 1 : 0, -1, -1, -1,
 	    false);
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(sc);
 
 	return (rc);
 }
@@ -725,11 +778,9 @@ t4_mc_multicst(void *arg, boolean_t add, const uint8_t *mcaddr)
 	    FW_VI_MAC_MAC_BASED_FREE));
 	bcopy(mcaddr, &c.u.exact[0].macaddr, ETHERADDRL);
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0)
-		return (rc);
+	ADAPTER_LOCK(sc);
 	rc = -t4_wr_mbox_meat(sc, sc->mbox, &c, len16 * 16, &c, true);
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(sc);
 	if (rc != 0)
 		return (rc);
 #ifdef DEBUG
@@ -762,13 +813,11 @@ t4_mc_unicst(void *arg, const uint8_t *ucaddr)
 	if (ucaddr == NULL)
 		return (EINVAL);
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0)
-		return (rc);
+	ADAPTER_LOCK(sc);
 
 	/* We will support adding only one mac address */
 	if (pi->adapter->props.multi_rings && pi->macaddr_cnt) {
-		end_synchronized_op(pi, 1);
+		ADAPTER_UNLOCK(sc);
 		return (ENOSPC);
 	}
 	rc = t4_change_mac(sc, sc->mbox, pi->viid, pi->xact_addr_filt, ucaddr,
@@ -780,7 +829,7 @@ t4_mc_unicst(void *arg, const uint8_t *ucaddr)
 		pi->xact_addr_filt = rc;
 		rc = 0;
 	}
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(sc);
 
 	return (rc);
 }
@@ -795,14 +844,10 @@ static int
 t4_remmac(void *arg, const uint8_t *mac_addr)
 {
 	struct port_info *pi = arg;
-	int rc;
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0)
-		return (rc);
-
+	ADAPTER_LOCK(pi->adapter);
 	pi->macaddr_cnt--;
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(pi->adapter);
 
 	return (0);
 }
@@ -851,15 +896,12 @@ int
 t4_ring_intr_enable(mac_intr_handle_t intrh)
 {
 	struct sge_rxq *rxq = (struct sge_rxq *)intrh;
-	struct adapter *sc = rxq->port->adapter;
-	struct sge_iq *iq;
+	struct sge_iq *iq = &rxq->iq;
 
-	iq = &rxq->iq;
 	RXQ_LOCK(rxq);
 	iq->polling = 0;
 	iq->state = IQS_IDLE;
-	t4_write_reg(sc, MYPF_REG(A_SGE_PF_GTS),
-	    V_SEINTARM(iq->intr_params) | V_INGRESSQID(iq->cntxt_id));
+	t4_iq_gts_update(iq, iq->intr_params, 0);
 	RXQ_UNLOCK(rxq);
 	return (0);
 }
@@ -874,8 +916,8 @@ t4_ring_intr_disable(mac_intr_handle_t intrh)
 	struct sge_iq *iq;
 
 	/*
-	 * Nothing to be done here wrt interrupt, as it will not fire, until we
-	 * write back to A_SGE_PF_GTS.SEIntArm in t4_ring_intr_enable.
+	 * Nothing to be done here WRT the interrupt, as it will not fire until
+	 * re-enabled through the t4_iq_gts_update() in t4_ring_intr_enable().
 	 */
 
 	iq = &rxq->iq;
@@ -1046,9 +1088,6 @@ t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 	struct port_info *pi = arg;
 	struct adapter *sc = pi->adapter;
 	int rc;
-	size_t i, maxread;
-	/* LINTED: E_FUNC_VAR_UNUSED */
-	struct fw_ldst_cmd ldst __unused;
 
 	if (id != 0 || bp == NULL || nbytes == 0 || nread == NULL ||
 	    (page != 0xa0 && page != 0xa2) || offset < 0)
@@ -1057,16 +1096,13 @@ t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 	if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256))
 		return (EINVAL);
 
-	rc = begin_synchronized_op(pi, 0, 1);
-	if (rc != 0)
-		return (rc);
-
+	ADAPTER_LOCK(sc);
 	/*
 	 * Firmware has a maximum size that we can read. Don't read more than it
 	 * allows.
 	 */
-	maxread = sizeof (ldst.u.i2c.data);
-	for (i = 0; i < nbytes; i += maxread) {
+	const size_t maxread = sizeof (((struct fw_ldst_cmd *)0)->u.i2c.data);
+	for (size_t i = 0; i < nbytes; i += maxread) {
 		size_t toread = MIN(maxread, nbytes - i);
 		rc = -t4_i2c_rd(sc, sc->mbox, pi->port_id, page, offset, toread,
 		    bp);
@@ -1075,7 +1111,8 @@ t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 		offset += toread;
 		bp = (void *)((uintptr_t)bp + toread);
 	}
-	end_synchronized_op(pi, 0);
+	ADAPTER_UNLOCK(sc);
+
 	if (rc == 0)
 		*nread = nbytes;
 	return (rc);
@@ -1103,11 +1140,9 @@ t4_port_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 		return (ENOTSUP);
 	}
 
-	rc = begin_synchronized_op(pi, 1, 1);
-	if (rc != 0)
-		return (rc);
+	ADAPTER_LOCK(sc);
 	rc = -t4_identify_port(sc, sc->mbox, pi->viid, val);
-	end_synchronized_op(pi, 1);
+	ADAPTER_UNLOCK(sc);
 
 	return (rc);
 }
@@ -1327,8 +1362,6 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 	int relink = 0, rx_mode = 0, rc = 0;
 	uint32_t v32 = *(uint32_t *)val;
 	uint8_t v8 = *(uint8_t *)val;
-	link_flowctrl_t fc;
-	link_fec_t fec;
 
 	switch (id) {
 	case MAC_PROP_AUTONEG:
@@ -1344,18 +1377,17 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 			(void) mac_maxsdu_update(pi->mh, v32);
 			rx_mode = 1;
 		}
-
 		break;
 
 	case MAC_PROP_FLOWCTRL:
-		fc = *(link_flowctrl_t *)val;
-		rc = t4_mac_flowctrl_to_link_caps(pi, fc, &new_caps);
+		rc = t4_mac_flowctrl_to_link_caps(pi,
+		    *(const link_flowctrl_t *)val, &new_caps);
 		relink = 1;
 		break;
 
 	case MAC_PROP_EN_FEC_CAP:
-		fec = *(link_fec_t *)val;
-		rc = t4_mac_fec_cap_to_link_caps(pi, fec, &new_caps);
+		rc = t4_mac_fec_cap_to_link_caps(pi,
+		    *(const link_fec_t *)val, &new_caps);
 		relink = 1;
 		break;
 
@@ -1402,8 +1434,7 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 		break;
 
 	case MAC_PROP_PRIVATE:
-		rc = setprop(pi, name, val);
-		break;
+		return (t4_setprop_priv(pi, name, val));
 
 	default:
 		rc = ENOTSUP;
@@ -1413,14 +1444,12 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 	if (rc != 0)
 		return (rc);
 
-	if (isset(&sc->open_device_map, pi->port_id) != 0) {
+	if ((pi->flags & TPF_OPEN) != 0) {
 		if (relink != 0) {
-			rc = begin_synchronized_op(pi, 1, 1);
-			if (rc != 0)
-				return (rc);
+			ADAPTER_LOCK(sc);
 			rc = -t4_link_l1cfg(sc, sc->mbox, pi->tx_chan, lc,
 			    new_caps);
-			end_synchronized_op(pi, 1);
+			ADAPTER_UNLOCK(sc);
 			if (rc != 0) {
 				cxgb_printf(pi->dip, CE_WARN,
 				    "%s link config failed: %d", __func__, rc);
@@ -1429,12 +1458,10 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 		}
 
 		if (rx_mode != 0) {
-			rc = begin_synchronized_op(pi, 1, 1);
-			if (rc != 0)
-				return (rc);
+			ADAPTER_LOCK(sc);
 			rc = -t4_set_rxmode(sc, sc->mbox, pi->viid, v32, -1,
 			    -1, -1, -1, false);
-			end_synchronized_op(pi, 1);
+			ADAPTER_UNLOCK(sc);
 			if (rc != 0) {
 				cxgb_printf(pi->dip, CE_WARN,
 				    "set_rxmode failed: %d", rc);
@@ -1560,7 +1587,7 @@ t4_mc_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 		break;
 
 	case MAC_PROP_PRIVATE:
-		return (getprop(pi, name, size, val));
+		return (t4_getprop_priv(pi, name, size, val));
 
 	default:
 		return (ENOTSUP);
@@ -1667,54 +1694,12 @@ t4_mc_propinfo(void *arg, const char *name, mac_prop_id_t id,
 		break;
 
 	case MAC_PROP_PRIVATE:
-		propinfo(pi, name, ph);
+		t4_propinfo_priv(pi, name, ph);
 		break;
 
 	default:
 		break;
 	}
-}
-
-int
-begin_synchronized_op(struct port_info *pi, int hold, int waitok)
-{
-	struct adapter *sc = pi->adapter;
-	int rc = 0;
-
-	ADAPTER_LOCK(sc);
-	while (sc->flags & TAF_BUSY) {
-		if (!waitok) {
-			rc = EBUSY;
-			goto failed;
-		} else if (cv_wait_sig(&sc->cv, &sc->lock) == 0) {
-			rc = EINTR;
-			goto failed;
-		}
-	}
-	sc->flags |= TAF_BUSY;
-
-	if (!hold)
-		ADAPTER_UNLOCK(sc);
-
-	return (0);
-failed:
-	ADAPTER_UNLOCK(sc);
-	return (rc);
-}
-
-void
-end_synchronized_op(struct port_info *pi, int held)
-{
-	struct adapter *sc = pi->adapter;
-
-	if (!held)
-		ADAPTER_LOCK(sc);
-
-	ADAPTER_LOCK_ASSERT_OWNED(sc);
-	ASSERT(sc->flags & TAF_BUSY);
-	sc->flags &= ~TAF_BUSY;
-	cv_signal(&sc->cv);
-	ADAPTER_UNLOCK(sc);
 }
 
 static int
@@ -1723,21 +1708,25 @@ t4_init_synchronized(struct port_info *pi)
 	struct adapter *sc = pi->adapter;
 	int rc = 0;
 
-	ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
+	ADAPTER_LOCK_ASSERT_OWNED(pi->adapter);
+	ASSERT(sc->flags & TAF_INIT_DONE);
 
-	if (isset(&sc->open_device_map, pi->port_id) != 0)
+	PORT_LOCK(pi);
+
+	if ((pi->flags & TPF_OPEN) != 0) {
+		PORT_UNLOCK(pi);
 		return (0);	/* already running */
-
-	if (!(sc->flags & TAF_INIT_DONE) &&
-	    ((rc = adapter_full_init(sc)) != 0))
-		return (rc);	/* error message displayed already */
+	}
 
 	if (!(pi->flags & TPF_INIT_DONE)) {
-		rc = port_full_init(pi);
-		if (rc != 0)
+		rc = t4_port_full_init(pi);
+		if (rc != 0) {
+			PORT_UNLOCK(pi);
 			return (rc); /* error message displayed already */
-	} else
-		enable_port_queues(pi);
+		}
+	} else {
+		t4_port_queues_enable(pi);
+	}
 
 	rc = -t4_set_rxmode(sc, sc->mbox, pi->viid, pi->mtu, 0, 0, 1, 0, false);
 	if (rc != 0) {
@@ -1750,9 +1739,9 @@ t4_init_synchronized(struct port_info *pi)
 		cxgb_printf(pi->dip, CE_WARN, "change_mac failed: %d", rc);
 		rc = -rc;
 		goto done;
-	} else
-		/* LINTED: E_ASSIGN_NARROW_CONV */
+	} else {
 		pi->xact_addr_filt = rc;
+	}
 
 	rc = -t4_link_l1cfg(sc, sc->mbox, pi->tx_chan, &pi->link_cfg,
 	    pi->link_cfg.admin_caps);
@@ -1768,8 +1757,9 @@ t4_init_synchronized(struct port_info *pi)
 	}
 
 	/* all ok */
-	setbit(&sc->open_device_map, pi->port_id);
+	pi->flags |= TPF_OPEN;
 done:
+	PORT_UNLOCK(pi);
 	if (rc != 0)
 		(void) t4_uninit_synchronized(pi);
 
@@ -1785,8 +1775,9 @@ t4_uninit_synchronized(struct port_info *pi)
 	struct adapter *sc = pi->adapter;
 	int rc;
 
-	ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
+	ADAPTER_LOCK_ASSERT_OWNED(pi->adapter);
 
+	PORT_LOCK(pi);
 	/*
 	 * Disable the VI so that all its data in either direction is discarded
 	 * by the MPS.  Leave everything else (the queues, interrupts, and 1Hz
@@ -1797,221 +1788,386 @@ t4_uninit_synchronized(struct port_info *pi)
 	rc = -t4_enable_vi(sc, sc->mbox, pi->viid, false, false);
 	if (rc != 0) {
 		cxgb_printf(pi->dip, CE_WARN, "disable_vi failed: %d", rc);
+		PORT_UNLOCK(pi);
 		return (rc);
 	}
 
-	disable_port_queues(pi);
+	t4_port_queues_disable(pi);
 
-	clrbit(&sc->open_device_map, pi->port_id);
-
+	pi->flags &= ~TPF_OPEN;
 	pi->link_cfg.link_ok = 0;
+	PORT_UNLOCK(pi);
+
 	mac_link_update(pi->mh, LINK_STATE_UNKNOWN);
 
 	return (0);
 }
 
+static uint_t
+t4_convert_holdoff_timer(struct adapter *sc, uint_t idx)
+{
+	ASSERT(idx < SGE_NTIMERS);
+	return (sc->props.holdoff_timer_us[idx]);
+}
+
+static int
+t4_convert_holdoff_pktcnt(struct adapter *sc, int idx)
+{
+	if (idx < 0) {
+		return (-1);
+	} else {
+		ASSERT(idx < SGE_NCOUNTERS);
+		return (sc->props.holdoff_pktcnt[idx]);
+	}
+}
+
+static uint_t
+t4_convert_dbq_timer(struct adapter *sc, uint_t idx)
+{
+	ASSERT(idx < SGE_NDBQTIMERS);
+	return (sc->sge.dbq_timers[idx]);
+}
+
 static void
-propinfo(struct port_info *pi, const char *name, mac_prop_info_handle_t ph)
+t4_propinfo_priv(struct port_info *pi, const char *name,
+    mac_prop_info_handle_t ph)
 {
 	struct adapter *sc = pi->adapter;
-	struct driver_properties *p = &sc->props;
+	struct driver_properties *dp = &sc->props;
 	struct link_config *lc = &pi->link_cfg;
-	int v;
-	char str[16];
 
-	if (strcmp(name, T4PROP_TMR_IDX) == 0)
-		v = is_10G_port(pi) ? p->tmr_idx_10g : p->tmr_idx_1g;
-	else if (strcmp(name, T4PROP_PKTC_IDX) == 0)
-		v = is_10G_port(pi) ? p->pktc_idx_10g : p->pktc_idx_1g;
-	else if (strcmp(name, T4PROP_HW_CSUM) == 0)
-		v = (pi->features & CXGBE_HW_CSUM) ? 1 : 0;
-	else if (strcmp(name, T4PROP_HW_LSO) == 0)
-		v = (pi->features & CXGBE_HW_LSO) ? 1 : 0;
-	else if (strcmp(name, T4PROP_TX_PAUSE) == 0)
-		v = (lc->pcaps & FW_PORT_CAP32_FC_TX) ? 1 : 0;
-	else if (strcmp(name, T4PROP_RX_PAUSE) == 0)
-		v = (lc->pcaps & FW_PORT_CAP32_FC_RX) ? 1 : 0;
-#if MAC_VERSION == 1
-	else if (strcmp(name, T4PROP_MTU) == 0)
-		v = ETHERMTU;
-#endif
-	else
+	const t4_priv_prop_t *prop = t4_priv_prop_match(name);
+	if (prop == NULL || !t4_priv_prop_supported(pi, prop)) {
 		return;
+	}
 
+	int v = 0;
+	switch (prop->tpp_id) {
+	case T4PROP_FW_TMR:
+		v = t4_convert_holdoff_timer(sc, sc->props.fwq_tmr_idx);
+		break;
+	case T4PROP_FW_PKTC:
+		v = t4_convert_holdoff_pktcnt(sc, sc->props.fwq_pktc_idx);
+		break;
+	case T4PROP_RX_TMR:
+		v = t4_convert_holdoff_timer(sc, t4_port_is_10xg(pi) ?
+		    dp->tmr_idx_10g : dp->tmr_idx_1g);
+		break;
+	case T4PROP_RX_PKTC:
+		v = t4_convert_holdoff_pktcnt(sc, t4_port_is_10xg(pi) ?
+		    dp->pktc_idx_10g : dp->pktc_idx_1g);
+		break;
+	case T4PROP_TX_TMR:
+		v = t4_convert_dbq_timer(sc, dp->dbq_timer_idx);
+		break;
+	case T4PROP_HW_CSUM:
+		v = (pi->features & CXGBE_HW_CSUM) ? 1 : 0;
+		break;
+	case T4PROP_HW_LSO:
+		v = (pi->features & CXGBE_HW_LSO) ? 1 : 0;
+		break;
+	case T4PROP_TX_PAUSE:
+		v = (lc->pcaps & FW_PORT_CAP32_FC_TX) ? 1 : 0;
+		break;
+	case T4PROP_RX_PAUSE:
+		v = (lc->pcaps & FW_PORT_CAP32_FC_RX) ? 1 : 0;
+		break;
+	default:
+		return;
+	}
+
+	char str[16];
 	(void) snprintf(str, sizeof (str), "%d", v);
 	mac_prop_info_set_default_str(ph, str);
 }
 
 static int
-getprop(struct port_info *pi, const char *name, uint_t size, void *val)
+t4_getprop_priv(struct port_info *pi, const char *name, uint_t size, void *val)
 {
+	struct adapter *sc = pi->adapter;
 	struct link_config *lc = &pi->link_cfg;
-	int v;
 
-	if (strcmp(name, T4PROP_TMR_IDX) == 0)
-		v = pi->tmr_idx;
-	else if (strcmp(name, T4PROP_PKTC_IDX) == 0)
-		v = pi->pktc_idx;
-	else if (strcmp(name, T4PROP_HW_CSUM) == 0)
-		v = (pi->features & CXGBE_HW_CSUM) ? 1 : 0;
-	else if (strcmp(name, T4PROP_HW_LSO) == 0)
-		v = (pi->features & CXGBE_HW_LSO) ? 1 : 0;
-	else if (strcmp(name, T4PROP_TX_PAUSE) == 0)
-		v = (lc->link_caps & FW_PORT_CAP32_FC_TX) ? 1 : 0;
-	else if (strcmp(name, T4PROP_RX_PAUSE) == 0)
-		v = (lc->link_caps & FW_PORT_CAP32_FC_RX) ? 1 : 0;
-#if MAC_VERSION == 1
-	else if (strcmp(name, T4PROP_MTU) == 0)
-		v = pi->mtu;
-#endif
-	else
+	const t4_priv_prop_t *prop = t4_priv_prop_match(name);
+	if (prop == NULL || !t4_priv_prop_supported(pi, prop)) {
 		return (ENOTSUP);
+	}
+
+	PORT_LOCK(pi);
+	int v = 0;
+	switch (prop->tpp_id) {
+	case T4PROP_FW_TMR:
+		v = t4_convert_holdoff_timer(sc, sc->sge.fwq_tmr_idx);
+		break;
+	case T4PROP_FW_PKTC:
+		v = t4_convert_holdoff_pktcnt(sc, sc->sge.fwq_pktc_idx);
+		break;
+	case T4PROP_RX_TMR:
+		v = t4_convert_holdoff_timer(sc, pi->tmr_idx);
+		break;
+	case T4PROP_RX_PKTC:
+		v = t4_convert_holdoff_pktcnt(sc, pi->pktc_idx);
+		break;
+	case T4PROP_TX_TMR:
+		v = t4_convert_dbq_timer(sc, pi->dbq_timer_idx);
+		break;
+	case T4PROP_HW_CSUM:
+		v = (pi->features & CXGBE_HW_CSUM) ? 1 : 0;
+		break;
+	case T4PROP_HW_LSO:
+		v = (pi->features & CXGBE_HW_LSO) ? 1 : 0;
+		break;
+	case T4PROP_TX_PAUSE:
+		v = (lc->link_caps & FW_PORT_CAP32_FC_TX) ? 1 : 0;
+		break;
+	case T4PROP_RX_PAUSE:
+		v = (lc->link_caps & FW_PORT_CAP32_FC_RX) ? 1 : 0;
+		break;
+	default:
+		PORT_UNLOCK(pi);
+		return (ENOTSUP);
+	}
+	PORT_UNLOCK(pi);
 
 	(void) snprintf(val, size, "%d", v);
 	return (0);
 }
 
-static int
-setprop(struct port_info *pi, const char *name, const void *val)
+#define	ABS_DELTA(left, right)		\
+	(((left) > (right)) ? (left) - (right) : (right) - (left))
+
+static uint8_t
+t4_choose_holdoff_timer(struct adapter *sc, uint_t target_us)
 {
-	struct link_config *lc = &pi->link_cfg;
-	fw_port_cap32_t new_caps = lc->admin_caps;
-	int i, rc = 0, relink = 0, rx_mode = 0;
+	const uint_t *timer_us = sc->props.holdoff_timer_us;
+
+	uint_t delta = UINT_MAX;
+	uint_t chosen_idx = 0;
+	for (uint_t i = 0; i < SGE_NTIMERS; i++) {
+		const uint_t next_delta = ABS_DELTA(target_us, timer_us[i]);
+
+		if (next_delta < delta) {
+			chosen_idx = i;
+			delta = next_delta;
+		}
+	}
+
+	ASSERT3U(chosen_idx, <, SGE_NTIMERS);
+	return (chosen_idx);
+}
+
+static int8_t
+t4_choose_holdoff_pktcnt(struct adapter *sc, int target_cnt)
+{
+	const uint_t *pkt_cnt = sc->props.holdoff_pktcnt;
+
+	if (target_cnt <= 0) {
+		/* -1 is sentinel value for do-not-use */
+		return (-1);
+	}
+
+	uint_t delta = UINT_MAX;
+	uint_t chosen_idx = 0;
+	for (uint_t i = 0; i < SGE_NCOUNTERS; i++) {
+		const uint_t next_delta = ABS_DELTA(target_cnt, pkt_cnt[i]);
+
+		if (next_delta < delta) {
+			chosen_idx = i;
+			delta = next_delta;
+		}
+	}
+
+	ASSERT3U(chosen_idx, <, SGE_NCOUNTERS);
+	return (chosen_idx);
+}
+
+static uint_t
+t4_choose_dbq_timer(struct adapter *sc, uint_t target_us)
+{
+	const uint16_t *dbq_us = sc->sge.dbq_timers;
+
+	uint_t delta = UINT_MAX;
+	uint_t chosen_idx = 0;
+	for (uint_t i = 0; i < SGE_NDBQTIMERS; i++) {
+		const uint_t next_delta = ABS_DELTA(target_us, dbq_us[i]);
+
+		if (next_delta < delta) {
+			chosen_idx = i;
+			delta = next_delta;
+		}
+	}
+
+	ASSERT3U(chosen_idx, <, SGE_NDBQTIMERS);
+	return (chosen_idx);
+}
+
+
+static int
+t4_setprop_priv(struct port_info *pi, const char *name, const void *val)
+{
 	struct adapter *sc = pi->adapter;
-	struct sge_rxq *rxq;
-	cc_pause_t fc = 0;
 	long v;
 
+	const t4_priv_prop_t *prop = t4_priv_prop_match(name);
+	if (prop == NULL || !t4_priv_prop_supported(pi, prop)) {
+		return (ENOTSUP);
+	}
+
 	(void) ddi_strtol(val, NULL, 0, &v);
+	if (prop->tpp_is_bool && v != 0 && v != 1) {
+		return (EINVAL);
+	}
+	const bool vbool = (v != 0);
 
-	if (strcmp(name, T4PROP_TMR_IDX) == 0) {
-		if (v < 0 || v >= SGE_NTIMERS)
-			return (EINVAL);
-		if (v == pi->tmr_idx)
-			return (0);
+	/* XXX: this needs better locking to deal with adapter init */
 
-		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->tmr_idx = v;
-		for_each_rxq(pi, i, rxq) {
-			rxq->iq.intr_params = V_QINTR_TIMER_IDX(v) |
-			    V_QINTR_CNT_EN(pi->pktc_idx >= 0);
+	bool update_rx_intr_cfg = false;
+	bool update_link_cfg = false;
+	struct link_config *lc = &pi->link_cfg;
+	fw_port_cap32_t new_caps = lc->admin_caps;
+	cc_pause_t fc = 0;
+
+	switch (prop->tpp_id) {
+	case T4PROP_FW_TMR: {
+		struct sge_iq *fwq = &sc->sge.fwq;
+		const uint8_t idx = t4_choose_holdoff_timer(sc, MAX(0, v));
+
+		IQ_LOCK(fwq);
+		sc->sge.fwq_tmr_idx = idx;
+		t4_iq_update_intr_cfg(fwq, sc->sge.fwq_tmr_idx,
+		    sc->sge.fwq_pktc_idx);
+		IQ_UNLOCK(fwq);
+		break;
+	}
+	case T4PROP_FW_PKTC: {
+		struct sge_iq *fwq = &sc->sge.fwq;
+		const int8_t idx = t4_choose_holdoff_pktcnt(sc, (int)v);
+
+		IQ_LOCK(fwq);
+		sc->sge.fwq_pktc_idx = idx;
+		t4_iq_update_intr_cfg(fwq, sc->sge.fwq_tmr_idx,
+		    sc->sge.fwq_pktc_idx);
+		IQ_UNLOCK(fwq);
+		break;
+	}
+	case T4PROP_RX_TMR: {
+		const uint8_t idx = t4_choose_holdoff_timer(sc, MAX(0, v));
+		if (idx != pi->tmr_idx) {
+			pi->tmr_idx = idx;
+			update_rx_intr_cfg = true;
 		}
-
-	} else if (strcmp(name, T4PROP_PKTC_IDX) == 0) {
-		if (v >= SGE_NCOUNTERS)
-			return (EINVAL);
-		if (v == pi->pktc_idx || (v < 0 && pi->pktc_idx == -1))
-			return (0);
-
-		/* LINTED: E_ASSIGN_NARROW_CONV */
-		pi->pktc_idx = v < 0 ? -1 : v;
-		for_each_rxq(pi, i, rxq) {
-			rxq->iq.intr_params = V_QINTR_TIMER_IDX(pi->tmr_idx) |
-			    /* takes effect right away */
-			    V_QINTR_CNT_EN(v >= 0);
-			/* LINTED: E_ASSIGN_NARROW_CONV */
-			rxq->iq.intr_pktc_idx = v; /* this needs fresh plumb */
+		break;
+	}
+	case T4PROP_RX_PKTC: {
+		const int8_t idx = t4_choose_holdoff_pktcnt(sc, (int)v);
+		if (idx != pi->pktc_idx) {
+			pi->pktc_idx = idx;
+			update_rx_intr_cfg = true;
 		}
-	} else if (strcmp(name, T4PROP_HW_CSUM) == 0) {
-		if (v != 0 && v != 1)
+		break;
+	}
+	case T4PROP_TX_TMR: {
+		ASSERT(sc->flags & TAF_DBQ_TIMER);
+		if (v <= 0) {
 			return (EINVAL);
-		if (v == 1)
+		}
+		const uint_t idx = t4_choose_dbq_timer(sc, (uint_t)v);
+		PORT_LOCK(pi);
+		if ((pi->flags & TPF_OPEN) != 0 &&
+		    idx != pi->dbq_timer_idx) {
+			pi->dbq_timer_idx = idx;
+
+			int i;
+			struct sge_txq *txq;
+			for_each_txq(pi, i, txq) {
+				struct sge_eq *eq = &txq->eq;
+
+				EQ_LOCK(eq);
+				t4_eq_update_dbq_timer(eq, pi);
+				EQ_UNLOCK(eq);
+			}
+		}
+		PORT_UNLOCK(pi);
+		return (0);
+	}
+	case T4PROP_HW_CSUM:
+		if (vbool)
 			pi->features |= CXGBE_HW_CSUM;
 		else
 			pi->features &= ~CXGBE_HW_CSUM;
-	} else if (strcmp(name, T4PROP_HW_LSO) == 0) {
-		if (v != 0 && v != 1)
-			return (EINVAL);
-		if (v == 1)
+		break;
+	case T4PROP_HW_LSO:
+		if (vbool)
 			pi->features |= CXGBE_HW_LSO;
 		else
 			pi->features &= ~CXGBE_HW_LSO;
-	} else if (strcmp(name, T4PROP_TX_PAUSE) == 0) {
-		if (v != 0 && v != 1)
-			return (EINVAL);
-
-		if ((new_caps & FW_PORT_CAP32_FC_TX) && (v == 1))
-			fc |= PAUSE_TX;
-		if (new_caps & FW_PORT_CAP32_FC_RX)
-			fc |= PAUSE_RX;
-		if (lc->admin_caps & FW_PORT_CAP32_ANEG)
+		break;
+	case T4PROP_TX_PAUSE:
+	case T4PROP_RX_PAUSE:
+		if (new_caps & FW_PORT_CAP32_FC_TX) {
+			if (prop->tpp_id == T4PROP_TX_PAUSE) {
+				fc |= vbool ? PAUSE_TX : 0;
+			} else {
+				fc |= PAUSE_TX;
+			}
+		}
+		if (new_caps & FW_PORT_CAP32_FC_RX) {
+			if (prop->tpp_id == T4PROP_RX_PAUSE) {
+				fc |= vbool ? PAUSE_RX : 0;
+			} else {
+				fc |= PAUSE_RX;
+			}
+		}
+		if (new_caps & FW_PORT_CAP32_ANEG) {
 			fc |= PAUSE_AUTONEG;
-
-		t4_link_set_pause(pi, fc, &new_caps);
-		relink = 1;
-
-	} else if (strcmp(name, T4PROP_RX_PAUSE) == 0) {
-		if (v != 0 && v != 1)
-			return (EINVAL);
-
-		if (new_caps & FW_PORT_CAP32_FC_TX)
-			fc |= PAUSE_TX;
-		if ((new_caps & FW_PORT_CAP32_FC_RX) && (v == 1))
-			fc |= PAUSE_RX;
-		if (lc->admin_caps & FW_PORT_CAP32_ANEG)
-			fc |= PAUSE_AUTONEG;
-
-		t4_link_set_pause(pi, fc, &new_caps);
-		relink = 1;
-	}
-#if MAC_VERSION == 1
-	else if (strcmp(name, T4PROP_MTU) == 0) {
-		if (v < 46 || v > MAX_MTU)
-			return (EINVAL);
-		if (v == pi->mtu)
-			return (0);
-
-		pi->mtu = (int)v;
-		(void) mac_maxsdu_update(pi->mh, v);
-		rx_mode = 1;
-	}
-#endif
-	else
+		}
+		update_link_cfg = true;
+		break;
+	default:
 		return (ENOTSUP);
+	}
 
-	if (!(relink || rx_mode))
-		return (0);
+	if (update_rx_intr_cfg) {
+		struct sge_rxq *rxq;
+		int i;
 
-	/* If we are here, either relink or rx_mode is 1 */
-	if (isset(&sc->open_device_map, pi->port_id) != 0) {
-		if (relink != 0) {
-			rc = begin_synchronized_op(pi, 1, 1);
-			if (rc != 0)
-				return (rc);
+		PORT_LOCK(pi);
+		if ((pi->flags & TPF_OPEN) != 0) {
+			for_each_rxq(pi, i, rxq) {
+				struct sge_iq *iq = &rxq->iq;
+
+				IQ_LOCK(iq);
+				t4_iq_update_intr_cfg(iq, pi->tmr_idx,
+				    pi->pktc_idx);
+				IQ_UNLOCK(iq);
+			}
+		}
+		PORT_UNLOCK(pi);
+	}
+	if (update_link_cfg) {
+		int rc = 0;
+
+		ADAPTER_LOCK(pi->adapter);
+		PORT_LOCK(pi);
+		t4_link_set_pause(pi, fc, &new_caps);
+		if ((pi->flags & TPF_OPEN) != 0) {
 			rc = -t4_link_l1cfg(sc, sc->mbox, pi->tx_chan, lc,
 			    new_caps);
-			end_synchronized_op(pi, 1);
 			if (rc != 0) {
 				cxgb_printf(pi->dip, CE_WARN,
 				    "%s link config failed: %d",
 				    __func__, rc);
-				return (rc);
-			}
-		} else if (rx_mode != 0) {
-			rc = begin_synchronized_op(pi, 1, 1);
-			if (rc != 0)
-				return (rc);
-			rc = -t4_set_rxmode(sc, sc->mbox, pi->viid, v, -1, -1,
-			    -1, -1, false);
-			end_synchronized_op(pi, 1);
-			if (rc != 0)  {
-				cxgb_printf(pi->dip, CE_WARN,
-				    "set_rxmode failed: %d", rc);
-				return (rc);
 			}
 		}
+
+		if (rc == 0) {
+			lc->admin_caps = new_caps;
+		}
+		PORT_UNLOCK(pi);
+		ADAPTER_UNLOCK(pi->adapter);
+		return (rc);
 	}
 
-	if (relink != 0)
-		lc->admin_caps = new_caps;
-
 	return (0);
-}
-
-void
-t4_mc_init(struct port_info *pi)
-{
-	pi->props = t4_priv_props;
 }
 
 void
