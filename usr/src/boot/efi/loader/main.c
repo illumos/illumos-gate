@@ -1348,7 +1348,8 @@ command_chain(int argc, char *argv[])
 	status = BS->LoadImage(FALSE, IH, NULL, buf, st.st_size, &loaderhandle);
 	(void) BS->FreePool(buf);
 	if (status != EFI_SUCCESS) {
-		command_errmsg = "LoadImage failed";
+		printf("LoadImage failed: status code: %lu\n",
+		    DECODE_ERROR(status));
 		return (CMD_ERROR);
 	}
 	status = OpenProtocolByHandle(loaderhandle,
@@ -1364,6 +1365,7 @@ command_chain(int argc, char *argv[])
 		len *= sizeof (*argp);
 		loaded_image->LoadOptions = argp = malloc(len);
 		if (loaded_image->LoadOptions == NULL) {
+			command_errmsg = "Adding LoadOptions: out of memory";
 			(void) BS->UnloadImage(loaded_image);
 			return (CMD_ERROR);
 		}
@@ -1416,14 +1418,15 @@ command_chain(int argc, char *argv[])
 	dev_cleanup();
 	status = BS->StartImage(loaderhandle, NULL, NULL);
 	if (status != EFI_SUCCESS) {
-		command_errmsg = "StartImage failed";
+		printf("StartImage failed: status code: %lu\n",
+		    DECODE_ERROR(status));
 		free(loaded_image->LoadOptions);
 		loaded_image->LoadOptions = NULL;
 		status = BS->UnloadImage(loaded_image);
 		return (CMD_ERROR);
 	}
 
-	return (CMD_ERROR);	/* not reached */
+	return (CMD_ERROR);
 }
 
 COMMAND_SET(chain, "chain", "chain load file", command_chain);
