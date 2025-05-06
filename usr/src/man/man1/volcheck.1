@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VOLCHECK 1 "Feb 28, 2007"
+.TH VOLCHECK 1 "March 23, 2025"
 .SH NAME
 volcheck \- checks for media in a drive and by default checks all floppy media
 .SH SYNOPSIS
-.LP
 .nf
 \fBvolcheck\fR [\fB-v\fR] [\fB-i\fR \fIsecs\fR] [\fB-t\fR \fIsecs\fR] \fIpathname\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBvolcheck\fR utility tells volume management to look at each
 \fBdev/\fR\fIpathname\fR in sequence and determine if new media has been
 inserted in the drive.
@@ -23,8 +20,6 @@ inserted in the drive.
 The default action is to \fBvolcheck\fR all checkable media managed by volume
 management.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -57,8 +52,6 @@ Verbose.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -70,7 +63,6 @@ The path name of a media device.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA sample of the \fBvolcheck\fR command.
 .sp
 .LP
@@ -106,25 +98,11 @@ The following example
 asks volume management if there is a floppy in the floppy drive every 2 seconds
 for 600 seconds (10 minutes).
 
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/volctl\fR\fR
-.ad
-.RS 15n
-volume management control port
-.RE
-
 .SH SEE ALSO
-.sp
-.LP
 .BR eject (1),
-.BR attributes (7),
-.BR rmmount (8)
+.BR rmmount (1),
+.BR attributes (7)
 .SH WARNINGS
-.sp
-.LP
 Due to a hardware limitation in many floppy drives, the act of checking for
 media causes mechanical action in the floppy drive.   \fBContinuous polling of
 the floppy drive will cause the drive to wear out.\fR It is recommended that
