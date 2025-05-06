@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VOLRMMOUNT 1 "Feb 28, 2007"
+.TH VOLRMMOUNT 1 "March 23, 2025"
 .SH NAME
 volrmmount \- call rmmount to mount or unmount media
 .SH SYNOPSIS
-.LP
 .nf
 \fBvolrmmount\fR [\fB-i\fR | \fB-e\fR] [\fIname\fR | \fInickname\fR]
 .fi
@@ -18,9 +17,7 @@ volrmmount \- call rmmount to mount or unmount media
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The \fBvolrmmount\fR utility calls \fBrmmount\fR(8) to, in effect, simulate an
+The \fBvolrmmount\fR utility calls \fBrmmount\fR(1) to, in effect, simulate an
 insertion (\fB-i\fR) or an ejection (\fB-e\fR). Simulating an insertion often
 means that \fBrmmount\fR will mount the media. Conversely, simulating an
 ejection often means that \fBrmmount\fR will unmount the media. However, these
@@ -35,8 +32,6 @@ mounted. However, you can configure \fBrmmount\fR so that it calls
 This command allows you to override volume management's usual handling of media
 (see EXAMPLES below).
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -67,8 +62,6 @@ device is used if no \fIname\fR or \fInickname\fR is supplied.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -132,7 +125,6 @@ rmdisk0	/dev/rdsk/cXtYdZ/\fIlabel\fR
 .TE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the volrmmount command
 .sp
 .LP
@@ -166,21 +158,9 @@ example% \fBvolrmmount \(mii floppy0\fR
 Notice that if you are using a named floppy, you can use its name in place of
 \fBfloppy0\fR.
 
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/volctl\fR\fR
-.ad
-.RS 15n
-volume management control port
-.RE
-
 .SH SEE ALSO
-.sp
-.LP
 .BR cpio (1),
 .BR eject (1),
+.BR rmmount (1),
 .BR tar (1),
-.BR attributes (7),
-.BR rmmount (8)
+.BR attributes (7)

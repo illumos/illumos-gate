@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RMFORMAT 1 "Feb 19, 2009"
+.TH RMFORMAT 1 "March 23, 2025"
 .SH NAME
 rmformat \- removable rewritable media format utility
 .SH SYNOPSIS
-.LP
 .nf
 \fBrmformat\fR [\fB-DeHUv\fR] [\fB-b\fR \fIlabel\fR] [\fB-c\fR \fIblockno\fR]
      [\fB-F\fRquick | long | force ] [\fB-s\fR \fIfilename\fR] [\fIdevname\fR]
@@ -24,8 +23,6 @@ rmformat \- removable rewritable media format utility
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBrmformat\fR utility is used to format, label, partition, and perform
 other miscellaneous functions on removable, rewritable media that include
 floppy drives, and the \fBPCMCIA\fR memory and \fBata\fR cards. The
@@ -41,8 +38,6 @@ maintain compatibility with the behavior of \fBfdformat\fR. The partition
 information can be changed with the help of other options provided by
 \fBrmformat\fR.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -262,8 +257,6 @@ repairing.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -288,7 +281,6 @@ the appropriate relative device pathname from the current working directory.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRFormatting a Diskette
 .sp
 .in +2
@@ -389,7 +381,6 @@ Access permissions: Medium is not write protected.
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/diskette0\fR\fR
@@ -508,11 +499,10 @@ cards and other removable media devices.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR cpio (1),
 .BR eject (1),
 .BR fdformat (1),
+.BR rmmount (1),
 .BR tar (1),
 .BR volcheck (1),
 .BR volrmmount (1),
@@ -526,14 +516,11 @@ cards and other removable media devices.
 .BR mount (8),
 .BR newfs (8),
 .BR prtvtoc (8),
-.BR rmmount (8),
 .BR rpc.smserverd (8)
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
 .SH NOTES
-.sp
-.LP
 A rewritable media or \fBPCMCIA\fR memory card or \fBPCMCIA\fR ata card
 containing a \fBufs\fR file system created on a SPARC-based system (using
 \fBnewfs\fR(8)) is not identical to a rewritable media or \fBPCMCIA\fR memory
@@ -547,8 +534,6 @@ and \fBudfs\fR(4FS).
 \fBrmformat\fR might not list all removable devices in virtualization
 environments.
 .SH BUGS
-.sp
-.LP
 Currently, bad sector mapping is not supported on floppy diskettes or
 \fBPCMCIA\fR memory cards. Therefore, a diskette or memory card is unusable if
 \fBrmformat\fR finds an error (\fBbad sector\fR).

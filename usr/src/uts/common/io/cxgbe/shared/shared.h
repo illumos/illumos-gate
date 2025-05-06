@@ -32,6 +32,11 @@
 
 #include "osdep.h"
 
+#define	DRV_VERSION "2.2.1.0"
+
+#define	T4_NEXUS_NAME   "t4nex"
+#define	T4_PORT_NAME    "cxgbe"
+
 #define	CH_ERR(sc, ...)		cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)
 #define	CH_WARN(sc, ...)	cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)
 #define	CH_WARN_RATELIMIT(sc, ...) cxgb_printf(sc->dip, CE_WARN, ##__VA_ARGS__)

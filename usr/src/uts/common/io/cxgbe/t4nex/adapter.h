@@ -34,65 +34,42 @@
 #include <sys/containerof.h>
 #include <sys/ddi_ufm.h>
 
-#include "offload.h"
 #include "firmware/t4fw_interface.h"
 #include "shared.h"
 
 struct adapter;
 typedef struct adapter adapter_t;
 
-enum {
-	FW_IQ_QSIZE = 256,
-	FW_IQ_ESIZE = 64,	/* At least 64 mandated by the firmware spec */
+#define	FW_IQ_QSIZE	256
+#define	FW_IQ_ESIZE	64	/* At least 64 mandated by the firmware spec */
 
-	RX_IQ_QSIZE = 1024,
-	RX_IQ_ESIZE = 64,	/* At least 64 so CPL_RX_PKT will fit */
+#define	RX_IQ_QSIZE	1024
+#define	RX_IQ_ESIZE	64	/* At least 64 so CPL_RX_PKT will fit */
 
-	EQ_ESIZE = 64,		/* All egres queues use this entry size */
+#define	EQ_ESIZE	64	/* All egress queues use this entry size */
 
-	RX_FL_ESIZE = 64,	/* 8 64bit addresses */
+#define	RX_FL_ESIZE	64	/* 8 64bit addresses */
 
-	FL_BUF_SIZES = 4,
+#define	FL_BUF_SIZES	4
 
-	CTRL_EQ_QSIZE = 128,
+#define	CTRL_EQ_QSIZE	128
 
-	TX_EQ_QSIZE = 1024,
-	TX_SGL_SEGS = 36,
-	TX_WR_FLITS = SGE_MAX_WR_LEN / 8
-};
+#define	TX_EQ_QSIZE	1024
+#define	TX_SGL_SEGS	36
+#define	TX_WR_FLITS	(SGE_MAX_WR_LEN / 8)
 
-enum {
-	/* adapter flags */
-	FULL_INIT_DONE	= (1 << 0),
-	FW_OK		= (1 << 1),
-	INTR_FWD	= (1 << 2),
-	INTR_ALLOCATED	= (1 << 3),
-	MASTER_PF	= (1 << 4),
+#define	UDBS_SEG_SHIFT	7	/* log2(UDBS_SEG_SIZE) */
+#define	UDBS_DB_OFFSET	8	/* offset of the 4B doorbell in a segment */
+#define	UDBS_WR_OFFSET	64	/* offset of the work request in a segment */
 
-	CXGBE_BUSY	= (1 << 9),
+typedef enum t4_port_flags {
+	TPF_INIT_DONE	= (1 << 0),
+} t4_port_flags_t;
 
-	/* port flags */
-	DOOMED		= (1 << 0),
-	PORT_INIT_DONE	= (1 << 1),
-};
-
-enum {
-	/* Features */
+typedef enum t4_port_feat {
 	CXGBE_HW_LSO	= (1 << 0),
 	CXGBE_HW_CSUM	= (1 << 1),
-};
-
-enum {
-	UDBS_SEG_SHIFT	= 7,	/* log2(UDBS_SEG_SIZE) */
-	UDBS_DB_OFFSET	= 8,	/* offset of the 4B doorbell in a segment */
-	UDBS_WR_OFFSET	= 64,	/* offset of the work request in a segment */
-};
-
-#define	IS_DOOMED(pi)	(pi->flags & DOOMED)
-#define	SET_DOOMED(pi)	do { pi->flags |= DOOMED; } while (0)
-#define	IS_BUSY(sc)	(sc->flags & CXGBE_BUSY)
-#define	SET_BUSY(sc)	do { sc->flags |= CXGBE_BUSY; } while (0)
-#define	CLR_BUSY(sc)	do { sc->flags &= ~CXGBE_BUSY; } while (0)
+} t4_port_feat_t;
 
 struct port_info {
 	dev_info_t *dip;
@@ -105,7 +82,7 @@ struct port_info {
 	kmutex_t lock;
 	struct adapter *adapter;
 
-	unsigned int flags;
+	t4_port_flags_t flags;
 
 	uint16_t viid;
 	int16_t  xact_addr_filt; /* index of exact MAC address filter */
@@ -128,7 +105,7 @@ struct port_info {
 	int8_t	pktc_idx;
 	struct link_config link_cfg;
 	struct port_stats stats;
-	uint32_t features;
+	t4_port_feat_t features;
 	uint8_t macaddr_cnt;
 	u8 rss_mode;
 	u16 viid_mirror;
@@ -169,17 +146,17 @@ struct tx_sdesc {
 	uint16_t desc_used;	/* # of hardware descriptors used */
 };
 
-enum {
-	/* iq flags */
+typedef enum t4_iq_flags {
 	IQ_ALLOCATED	= (1 << 0),	/* firmware resources allocated */
 	IQ_INTR		= (1 << 1),	/* iq takes direct interrupt */
 	IQ_HAS_FL	= (1 << 2),	/* iq has fl */
+} t4_iq_flags_t;
 
-	/* iq state */
+typedef enum t4_iq_state {
 	IQS_DISABLED	= 0,
 	IQS_BUSY	= 1,
 	IQS_IDLE	= 2,
-};
+} t4_iq_state_t;
 
 struct rxbuf_cache_params {
 	dev_info_t		*dip;
@@ -192,11 +169,12 @@ struct rxbuf_cache_params {
  * Ingress Queue: T4 is producer, driver is consumer.
  */
 struct sge_iq {
-	unsigned int flags;
+	t4_iq_state_t state;
+	t4_iq_flags_t flags;
+
 	ddi_dma_handle_t dhdl;
 	ddi_acc_handle_t ahdl;
 
-	volatile uint_t state;
 	__be64 *desc;		/* KVA of descriptor ring */
 	uint64_t ba;		/* bus address of descriptor ring */
 	const __be64 *cdesc;	/* current descriptor */
@@ -217,27 +195,18 @@ struct sge_iq {
 	STAILQ_ENTRY(sge_iq) link;
 };
 
-enum {
-	EQ_CTRL		= 1,
-	EQ_ETH		= 2,
+typedef enum t4_eq_flags {
+	EQ_ALLOCATED	= (1 << 0),	/* firmware resources allocated */
+	EQ_MTX		= (1 << 1),	/* mutex has been initialized */
+} t4_eq_flags_t;
 
-	/* eq flags */
-	EQ_TYPEMASK	= 7,		/* 3 lsbits hold the type */
-	EQ_ALLOCATED	= (1 << 3),	/* firmware resources allocated */
-	EQ_DOOMED	= (1 << 4),	/* about to be destroyed */
-	EQ_CRFLUSHED	= (1 << 5),	/* expecting an update from SGE */
-	EQ_STALLED	= (1 << 6),	/* out of hw descriptors or dmamaps */
-	EQ_MTX		= (1 << 7),	/* mutex has been initialized */
-	EQ_STARTED	= (1 << 8),	/* started */
-};
-
-/* Listed in order of preference.  Update t4_sysctls too if you change these */
-enum {
-	DOORBELL_UDB	= 0x1,
-	DOORBELL_WCWR	= 0x2,
-	DOORBELL_UDBWC	= 0x4,
-	DOORBELL_KDB	= 0x8
-};
+/* Listed in order of preference. */
+typedef enum t4_doorbells {
+	DOORBELL_UDB	= (1 << 0),
+	DOORBELL_WCWR	= (1 << 1),
+	DOORBELL_UDBWC	= (1 << 2),
+	DOORBELL_KDB	= (1 << 3),
+} t4_doorbells_t;
 
 /*
  * Egress Queue: driver is producer, T4 is consumer.
@@ -248,13 +217,13 @@ enum {
 struct sge_eq {
 	ddi_dma_handle_t desc_dhdl;
 	ddi_acc_handle_t desc_ahdl;
-	unsigned int flags;
+	t4_eq_flags_t flags;
 	kmutex_t lock;
 
 	struct tx_desc *desc;	/* KVA of descriptor ring */
 	uint64_t ba;		/* bus address of descriptor ring */
 	struct sge_qstat *spg;	/* status page, for convenience */
-	int doorbells;
+	t4_doorbells_t doorbells;
 	volatile uint32_t *udb; /* KVA of doorbell (lies within BAR2) */
 	uint_t udb_qid;		/* relative qid within the doorbell page */
 	uint16_t cap;		/* max # of desc, for convenience */
@@ -268,18 +237,17 @@ struct sge_eq {
 	uint32_t cntxt_id;	/* SGE context id for the eq */
 };
 
-enum {
-	/* fl flags */
+typedef enum t4_fl_flags {
 	FL_MTX		= (1 << 0),	/* mutex has been initialized */
 	FL_STARVING	= (1 << 1),	/* on the list of starving fl's */
 	FL_DOOMED	= (1 << 2),	/* about to be destroyed */
-};
+} t4_fl_flags_t;
 
 #define	FL_RUNNING_LOW(fl)	(fl->cap - fl->needed <= fl->lowat)
 #define	FL_NOT_RUNNING_LOW(fl)	(fl->cap - fl->needed >= 2 * fl->lowat)
 
 struct sge_fl {
-	unsigned int flags;
+	t4_fl_flags_t flags;
 	kmutex_t lock;
 	ddi_dma_handle_t dhdl;
 	ddi_acc_handle_t ahdl;
@@ -444,6 +412,16 @@ struct t4_mbox_list {
 	STAILQ_ENTRY(t4_mbox_list) link;
 };
 
+typedef enum t4_adapter_flags {
+	TAF_INIT_DONE	= (1 << 0),
+	TAF_FW_OK	= (1 << 1),
+	TAF_INTR_FWD	= (1 << 2),
+	TAF_INTR_ALLOC	= (1 << 3),
+	TAF_MASTER_PF	= (1 << 4),
+
+	TAF_BUSY	= (1 << 9),
+} t4_adapter_flags_t;
+
 struct adapter {
 	SLIST_ENTRY(adapter) link;
 	dev_info_t *dip;
@@ -487,17 +465,13 @@ struct adapter {
 	uint8_t chan_map[NCHAN];
 	uint32_t filter_mode;
 
-	struct l2t_data *l2t;	/* L2 table */
-	struct tid_info tids;
-
-	int doorbells;
+	t4_adapter_flags_t flags;
+	t4_doorbells_t doorbells;
 	int registered_device_map;
 	int open_device_map;
-	int flags;
 
 	unsigned int cfcsum;
 	struct adapter_params params;
-	struct t4_virt_res vres;
 
 	uint16_t linkcaps;
 	uint16_t niccaps;
@@ -523,13 +497,6 @@ struct adapter {
 	/* support for single-threading access to adapter mailbox registers */
 	kmutex_t mbox_lock;
 	STAILQ_HEAD(, t4_mbox_list) mbox_list;
-};
-
-enum {
-	NIC_H = 0,
-	TOM_H,
-	IW_H,
-	ISCSI_H
 };
 
 struct memwin {
@@ -583,12 +550,6 @@ struct memwin {
 #define	for_each_rxq(pi, iter, rxq) \
 	rxq = &pi->adapter->sge.rxq[pi->first_rxq]; \
 	for (iter = 0; iter < pi->nrxq; ++iter, ++rxq)
-#define	for_each_ofld_txq(pi, iter, ofld_txq) \
-	ofld_txq = &pi->adapter->sge.ofld_txq[pi->first_ofld_txq]; \
-	for (iter = 0; iter < pi->nofldtxq; ++iter, ++ofld_txq)
-#define	for_each_ofld_rxq(pi, iter, ofld_rxq) \
-	ofld_rxq = &pi->adapter->sge.ofld_rxq[pi->first_ofld_rxq]; \
-	for (iter = 0; iter < pi->nofldrxq; ++iter, ++ofld_rxq)
 
 #define	NFIQ(sc) ((sc)->intr_count > 1 ? (sc)->intr_count - 1 : 1)
 
@@ -840,7 +801,6 @@ int t4_addmac(void *arg, const uint8_t *ucaddr);
 /* t4_ioctl.c */
 int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);
 
-struct l2t_data *t4_init_l2t(struct adapter *sc);
 int begin_synchronized_op(struct port_info *pi, int hold, int waitok);
 void end_synchronized_op(struct port_info *pi, int held);
 

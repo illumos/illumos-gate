@@ -57,7 +57,6 @@ link path=usr/share/man/man1/rmumount.1 target=rmmount.1
 file path=usr/share/man/man1/volcheck.1
 file path=usr/share/man/man1/volrmmount.1
 dir  path=usr/share/man/man8
-file path=usr/share/man/man8/rmmount.8
 file path=usr/share/man/man8/rmvolmgr.8
 legacy pkg=SUNWrmvolmgr desc="Non-graphical removable volume manager" \
     name="Removable volume manager"

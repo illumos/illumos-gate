@@ -144,6 +144,12 @@ t4_os_unlock(t4_os_lock_t *lock)
 	mutex_exit(lock);
 }
 
+/*
+ * The common code reaches directly into the adapter flags, so we must conform
+ * our prefix in order to meet its expectations.
+ */
+#define	FW_OK	TAF_FW_OK
+
 #endif /* _KERNEL */
 
 #endif /* __CXGBE_OSDEP_H */

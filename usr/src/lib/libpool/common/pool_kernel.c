@@ -673,7 +673,7 @@ remove_dead_elems(const void *key, void **value, void *cl)
 
 	assert(dict_remove(prov->pkc_elements, pke) != NULL);
 #ifdef DEBUG
-	dprintf("remove_dead_elems:\n");
+	pool_dprintf("remove_dead_elems:\n");
 	pool_elem_dprintf(TO_ELEM(pke));
 #endif	/* DEBUG */
 	pool_knl_elem_free(pke, PO_TRUE);
@@ -1208,7 +1208,7 @@ pool_knl_recover(pool_conf_t *conf)
 
 	prov->pkc_log->l_state = LS_RECOVER;
 	if (log_reverse_walk(prov->pkc_log, log_item_undo) != PO_SUCCESS) {
-		dprintf("Library configuration consistency error\n");
+		pool_dprintf("Library configuration consistency error\n");
 		prov->pkc_log->l_state = LS_FAIL;
 		pool_seterror(POE_INVALID_CONF);
 		return (PO_FAIL);
@@ -1227,7 +1227,7 @@ pool_knl_rollback(pool_conf_t *conf)
 
 	prov->pkc_log->l_state = LS_UNDO;
 	if (log_reverse_walk(prov->pkc_log, log_item_undo) != PO_SUCCESS) {
-		dprintf("Kernel configuration consistency error\n");
+		pool_dprintf("Kernel configuration consistency error\n");
 		(void) log_walk(prov->pkc_log, log_item_release);
 		log_empty(prov->pkc_log);
 		prov->pkc_log->l_state = LS_FAIL;
@@ -1663,7 +1663,7 @@ pool_knl_elem_wrap(pool_conf_t *conf, pool_elem_class_t class,
 	if (dict_put(((pool_knl_connection_t *)conf->pc_prov)->pkc_leaks,
 	    elem, elem) != NULL)
 		assert(!"leak map put failed");
-	dprintf("allocated %p\n", elem);
+	pool_dprintf("allocated %p\n", elem);
 #endif	/* DEBUG */
 	return (elem);
 }
@@ -1851,7 +1851,8 @@ pool_knl_set_container(pool_elem_t *pp, pool_elem_t *pc)
 /* ARGSUSED */
 int
 pool_knl_res_transfer(pool_resource_t *src, pool_resource_t *tgt,
-    uint64_t size) {
+    uint64_t size)
+{
 	return (PO_FAIL);
 }
 
@@ -1860,7 +1861,8 @@ pool_knl_res_transfer(pool_resource_t *src, pool_resource_t *tgt,
  */
 int
 pool_knl_res_xtransfer(pool_resource_t *src, pool_resource_t *tgt,
-    pool_component_t **rl) {
+    pool_component_t **rl)
+{
 	pool_elem_t *src_e = TO_ELEM(src);
 	pool_elem_t *tgt_e = TO_ELEM(tgt);
 	pool_xtransfer_undo_t *xtransfer;
@@ -1904,8 +1906,8 @@ pool_knl_res_xtransfer(pool_resource_t *src, pool_resource_t *tgt,
 	    xtransfer->pxu_ioctl.px_o_complist_size++)
 		/* calculate the size using the terminating NULL */;
 	if ((xtransfer->pxu_ioctl.px_o_comp_list =
-		calloc(xtransfer->pxu_ioctl.px_o_complist_size,
-		sizeof (id_t))) == NULL) {
+	    calloc(xtransfer->pxu_ioctl.px_o_complist_size,
+	    sizeof (id_t))) == NULL) {
 		pool_seterror(POE_SYSTEM);
 		return (PO_FAIL);
 	}
@@ -2215,11 +2217,11 @@ pool_knl_elem_printf_cb(const void *key, void **value, void *cl)
 	pool_knl_elem_t *pke = (pool_knl_elem_t *)key;
 	dict_hdl_t *map = (dict_hdl_t *)cl;
 
-	dprintf("leak elem:%p\n", pke);
+	pool_dprintf("leak elem:%p\n", pke);
 	if (pke->pke_properties != NULL) {
 		nvlist_print(stdout, pke->pke_properties);
 	} else
-		dprintf("no properties\n");
+		pool_dprintf("no properties\n");
 	assert(dict_get(map, pke) == NULL);
 }
 #endif	/* DEBUG */
@@ -2234,11 +2236,11 @@ pool_knl_elem_free(pool_knl_elem_t *pke, int freeprop)
 	pool_conf_t *conf = TO_CONF(TO_ELEM(pke));
 	if (dict_remove(((pool_knl_connection_t *)conf->pc_prov)->pkc_leaks,
 	    pke) == NULL)
-		dprintf("%p, wasn't in the leak map\n", pke);
+		pool_dprintf("%p, wasn't in the leak map\n", pke);
 	if (freeprop == PO_TRUE) {
 		pool_elem_dprintf(TO_ELEM(pke));
 	}
-	dprintf("released %p\n", pke);
+	pool_dprintf("released %p\n", pke);
 #endif	/* DEBUG */
 	if (freeprop == PO_TRUE) {
 		nvlist_free(pke->pke_properties);
@@ -2258,8 +2260,8 @@ pool_knl_elem_free_cb(const void *key, void **value, void *cl)
 	pool_knl_elem_t *pke = (pool_knl_elem_t *)key;
 
 #ifdef DEBUG
-	dprintf("pool_knl_elem_free_cb:\n");
-	dprintf("about to release %p ", pke);
+	pool_dprintf("pool_knl_elem_free_cb:\n");
+	pool_dprintf("about to release %p ", pke);
 	pool_elem_dprintf(TO_ELEM(pke));
 #endif	/* DEBUG */
 	pool_knl_elem_free(pke, PO_TRUE);
@@ -2278,7 +2280,8 @@ pool_knl_connection_free(pool_knl_connection_t *prov)
 	if (prov->pkc_elements != NULL) {
 		dict_map(prov->pkc_elements, pool_knl_elem_free_cb, NULL);
 #if DEBUG
-		dprintf("dict length is %llu\n", dict_length(prov->pkc_leaks));
+		pool_dprintf("dict length is %llu\n",
+		    dict_length(prov->pkc_leaks));
 		dict_map(prov->pkc_leaks, pool_knl_elem_printf_cb,
 		    prov->pkc_elements);
 		assert(dict_length(prov->pkc_leaks) == 0);
@@ -2806,7 +2809,8 @@ log_item_commit(log_item_t *li)
 			return (PO_FAIL);
 		}
 #ifdef DEBUG
-		dprintf("log_item_commit: POOL_CREATE, remove from dict\n");
+		pool_dprintf("log_item_commit: POOL_CREATE, "
+		    "remove from dict\n");
 		pool_elem_dprintf(create->pcu_elem);
 #endif	/* DEBUG */
 		/*
@@ -2868,7 +2872,7 @@ log_item_commit(log_item_t *li)
 			return (PO_FAIL);
 		}
 #ifdef DEBUG
-		dprintf("log_item_commit: POOL_DESTROY\n");
+		pool_dprintf("log_item_commit: POOL_DESTROY\n");
 		pool_elem_dprintf(destroy->pdu_elem);
 #endif	/* DEBUG */
 		li->li_state = LS_UNDO;
@@ -2919,7 +2923,7 @@ log_item_commit(log_item_t *li)
 			xtransfer->pxu_ioctl.px_o_comp_list[size] =
 			    elem_get_sysid(TO_ELEM(xtransfer->pxu_rl[size]));
 #ifdef DEBUG
-			dprintf("log_item_commit: POOL_XTRANSFER\n");
+			pool_dprintf("log_item_commit: POOL_XTRANSFER\n");
 			pool_elem_dprintf(TO_ELEM(xtransfer->pxu_rl[size]));
 #endif	/* DEBUG */
 		}
@@ -2934,7 +2938,7 @@ log_item_commit(log_item_t *li)
 		    ioctl(prov->pkc_fd, POOL_XTRANSFER,
 		    &xtransfer->pxu_ioctl) < 0) {
 #ifdef DEBUG
-			dprintf("log_item_commit: POOL_XTRANSFER, ioctl "
+			pool_dprintf("log_item_commit: POOL_XTRANSFER, ioctl "
 			    "failed\n");
 #endif	/* DEBUG */
 			pool_seterror(POE_SYSTEM);
@@ -3029,9 +3033,10 @@ log_item_undo(log_item_t *li)
 
 		(void) dict_remove(prov->pkc_elements, create->pcu_elem);
 #ifdef DEBUG
-		dprintf("log_item_undo: POOL_CREATE\n");
+		pool_dprintf("log_item_undo: POOL_CREATE\n");
 		assert(create->pcu_elem != NULL);
-		dprintf("log_item_undo: POOL_CREATE %p\n", create->pcu_elem);
+		pool_dprintf("log_item_undo: POOL_CREATE %p\n",
+		    create->pcu_elem);
 		pool_elem_dprintf(create->pcu_elem);
 #endif	/* DEBUG */
 		pool_knl_elem_free((pool_knl_elem_t *)create->pcu_elem,
@@ -3425,7 +3430,7 @@ log_item_release(log_item_t *li)
 		destroy = (pool_destroy_undo_t *)li->li_details;
 
 #ifdef DEBUG
-		dprintf("log_item_release: POOL_DESTROY\n");
+		pool_dprintf("log_item_release: POOL_DESTROY\n");
 #endif	/* DEBUG */
 
 		if (li->li_state == LS_UNDO) {

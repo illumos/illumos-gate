@@ -35,7 +35,6 @@
  * whose only purpose is to register the mac.
  */
 #include "shared.h"
-#include "version.h"
 
 static struct cb_ops cxgbe_cb_ops = {
 	.cb_open =		nulldev,

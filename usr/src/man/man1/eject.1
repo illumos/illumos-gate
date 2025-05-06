@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EJECT 1 "Sep 8, 2009"
+.TH EJECT 1 "March 23, 2025"
 .SH NAME
 eject \- eject media such as CD-ROM and floppy from drive
 .SH SYNOPSIS
-.LP
 .nf
 \fBeject\fR [\fB-dflqt\fR] [ [\fIdevice\fR | \fInickname\fR]]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBeject\fR utility is used for those removable media devices that do not
 have a manual eject button, or for those that might be locked due to, for
 instance, being mounted. The device may be specified by its name or by a
@@ -47,8 +44,6 @@ Pressing the physical media eject button located on some drives' front panel
 has the same effect as invoking \fBeject\fR for the respective drive. Not all
 drives have this capability.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -98,8 +93,6 @@ Not all devices support this command.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -125,7 +118,6 @@ nickname.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fREjecting Media
 .sp
 .LP
@@ -154,8 +146,6 @@ example> \fBeject floppy0\fR
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit codes are returned:
 .sp
 .ne 2
@@ -205,7 +195,6 @@ Manually ejectable media is now okay to remove.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/diskette0\fR\fR
@@ -224,10 +213,8 @@ default \fBCD-ROM\fR file (deprecated)
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
+.BR rmmount (1),
 .BR volcheck (1),
 .BR ioctl (2),
 .BR attributes (7),
-.BR mount (8),
-.BR rmmount (8)
+.BR mount (8)

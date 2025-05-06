@@ -19,9 +19,9 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Garrett D'Amore
-# Copyright 2023 Peter Tribble
 # Copyright 2023 MNX Cloud, Inc.
 # Copyright 2024 Oxide Computer Company
+# Copyright 2025 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -394,7 +394,6 @@ _MANFILES=	6to4relay.8		\
 		remove_allocatable.8	\
 		removef.8		\
 		repquota.8		\
-		rmmount.8		\
 		rmt.8			\
 		rmvolmgr.8		\
 		roleadd.8		\

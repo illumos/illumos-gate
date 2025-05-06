@@ -2349,10 +2349,10 @@ setup_transfer(pool_conf_t *conf, pool_resource_t *src, pool_resource_t *tgt,
 		 * size + receiving <= tgt.max (except for default)
 		 */
 #ifdef DEBUG
-		dprintf("conf is %s\n", pool_conf_location(conf));
-		dprintf("setup_transfer: src_size %llu\n", *src_size);
+		pool_dprintf("conf is %s\n", pool_conf_location(conf));
+		pool_dprintf("setup_transfer: src_size %llu\n", *src_size);
 		pool_elem_dprintf(TO_ELEM(src));
-		dprintf("setup_transfer: tgt_size %llu\n", *tgt_size);
+		pool_dprintf("setup_transfer: tgt_size %llu\n", *tgt_size);
 		pool_elem_dprintf(TO_ELEM(tgt));
 #endif	/* DEBUG */
 		if (*src_size - size < src_min ||
@@ -2428,13 +2428,13 @@ pool_resource_xtransfer(pool_conf_t *conf, pool_resource_t *src,
 	 */
 	for (i = 0; rl[i] != NULL; i++) {
 #ifdef DEBUG
-		dprintf("resource xtransfer\n");
-		dprintf("in conf %s\n", pool_conf_location(conf));
-		dprintf("transferring component\n");
+		pool_dprintf("resource xtransfer\n");
+		pool_dprintf("in conf %s\n", pool_conf_location(conf));
+		pool_dprintf("transferring component\n");
 		pool_elem_dprintf(TO_ELEM(rl[i]));
-		dprintf("from\n");
+		pool_dprintf("from\n");
 		pool_elem_dprintf(TO_ELEM(src));
-		dprintf("to\n");
+		pool_dprintf("to\n");
 		pool_elem_dprintf(TO_ELEM(tgt));
 #endif	/* DEBUG */
 
@@ -2459,9 +2459,9 @@ pool_resource_xtransfer(pool_conf_t *conf, pool_resource_t *src,
 		pool_value_t val = POOL_VALUE_INITIALIZER;
 
 #ifdef DEBUG
-		dprintf("src_size %llu\n", src_size);
-		dprintf("tgt_size %llu\n", tgt_size);
-		dprintf("size %llu\n", size);
+		pool_dprintf("src_size %llu\n", src_size);
+		pool_dprintf("tgt_size %llu\n", tgt_size);
+		pool_dprintf("size %llu\n", size);
 #endif	/* DEBUG */
 		src_size -= size;
 		tgt_size += size;
