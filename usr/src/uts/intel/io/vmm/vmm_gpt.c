@@ -97,7 +97,7 @@ struct vmm_gpt_node {
 	vmm_gpt_node_t	*vgn_children;
 	vmm_gpt_node_t	*vgn_sib_next;
 	vmm_gpt_node_t	*vgn_sib_prev;
-	uint64_t	*vgn_entries;
+	vmm_gpt_entry_t	*vgn_entries;
 	uint64_t	vgn_gpa;
 };
 
@@ -135,7 +135,7 @@ vmm_gpt_node_alloc(void)
 	 * guaranteed to be page-aligned.
 	 */
 	page = kmem_zalloc(PAGESIZE, KM_SLEEP);
-	node->vgn_entries = (uint64_t *)page;
+	node->vgn_entries = (vmm_gpt_entry_t *)page;
 	node->vgn_host_pfn = hat_getpfnum(kas.a_hat, page);
 
 	return (node);
@@ -200,7 +200,7 @@ vmm_gpt_lvl_index(vmm_gpt_node_level_t level, uint64_t gpa)
 {
 	ASSERT(level < MAX_GPT_LEVEL);
 
-	const uint16_t mask = (1U << 9) - 1;
+	const uint16_t mask = MAX_NODE_IDX;
 	switch (level) {
 	case LEVEL4: return ((gpa >> 39) & mask);
 	case LEVEL3: return ((gpa >> 30) & mask);
@@ -241,6 +241,14 @@ vmm_gpt_lvl_len(vmm_gpt_node_level_t level)
 	default:
 		panic("impossible level value");
 	};
+}
+
+/* Get the index of a PTE pointer based on its offset in that table */
+static inline uint16_t
+vmm_gpt_ptep_index(const vmm_gpt_entry_t *ptep)
+{
+	const uintptr_t offset = (uintptr_t)ptep & 0xffful;
+	return (offset / sizeof (uint64_t));
 }
 
 /*
@@ -449,43 +457,159 @@ vmm_gpt_node_remove(vmm_gpt_node_t *child)
  * Walks the GPT for the given GPA, accumulating entries to the given depth.  If
  * the walk terminates before the depth is reached, the remaining entries are
  * written with NULLs.
+ *
+ * Returns the GPA corresponding to the deepest populated (non-NULL) entry
+ * encountered during the walk.
  */
-void
-vmm_gpt_walk(vmm_gpt_t *gpt, uint64_t gpa, uint64_t **entries,
+uint64_t
+vmm_gpt_walk(vmm_gpt_t *gpt, uint64_t gpa, vmm_gpt_entry_t **entries,
     vmm_gpt_node_level_t depth)
 {
-	uint64_t *current_entries, entry;
-	pfn_t pfn;
-
 	ASSERT(gpt != NULL);
-	current_entries = gpt->vgpt_root->vgn_entries;
-	for (uint_t i = 0; i < depth; i++) {
+	ASSERT3U(depth, <, MAX_GPT_LEVEL);
+
+	vmm_gpt_entry_t *current_entries = gpt->vgpt_root->vgn_entries;
+	uint64_t mask = 0;
+	for (uint_t lvl = LEVEL4; lvl <= depth; lvl++) {
 		if (current_entries == NULL) {
-			entries[i] = NULL;
+			entries[lvl] = NULL;
 			continue;
 		}
-		entries[i] = &current_entries[vmm_gpt_lvl_index(i, gpa)];
-		entry = *entries[i];
-		if (!gpt->vgpt_pte_ops->vpeo_pte_is_present(entry)) {
+		entries[lvl] = &current_entries[vmm_gpt_lvl_index(lvl, gpa)];
+		mask = vmm_gpt_lvl_mask(lvl);
+		const vmm_gpt_entry_t pte = *entries[lvl];
+		if (!gpt->vgpt_pte_ops->vpeo_pte_is_present(pte)) {
 			current_entries = NULL;
 			continue;
 		}
-		pfn = gpt->vgpt_pte_ops->vpeo_pte_pfn(entry);
-		current_entries = (uint64_t *)hat_kpm_pfn2va(pfn);
+		const pfn_t pfn = gpt->vgpt_pte_ops->vpeo_pte_pfn(pte);
+		current_entries = (vmm_gpt_entry_t *)hat_kpm_pfn2va(pfn);
 	}
+	return (gpa & mask);
 }
 
 /*
- * Looks up an entry given GPA.
+ * Given a `gpa`, and the corresponding `entries` array as queried by a call to
+ * `vmm_gpt_walk()`, attempt to advance to the next PTE at the `depth` provided
+ * by the caller.
+ *
+ * As there may not be PTEs present at the requested `depth`, the amount that
+ * the GPA is advanced may be larger than what is expected for that provided
+ * depth.
+ *
+ * Returns the GPA correspending to the PTE to which `entries` was advanced to.
  */
-uint64_t *
-vmm_gpt_lookup(vmm_gpt_t *gpt, uint64_t gpa)
+static uint64_t
+vmm_gpt_walk_advance(vmm_gpt_t *gpt, uint64_t gpa, vmm_gpt_entry_t **entries,
+    vmm_gpt_node_level_t depth)
 {
-	uint64_t *entries[MAX_GPT_LEVEL];
+	ASSERT(gpt != NULL);
+	ASSERT3U(depth, <, MAX_GPT_LEVEL);
+	ASSERT0(gpa & ~vmm_gpt_lvl_mask(depth));
 
-	vmm_gpt_walk(gpt, gpa, entries, MAX_GPT_LEVEL);
+	/*
+	 * Advanced to the next entry in the deepest level of PTE possible,
+	 * ascending to higher levels if we reach the end of a table at any
+	 * given point.
+	 */
+	int lvl;
+	for (lvl = depth; lvl >= LEVEL4; lvl--) {
+		vmm_gpt_entry_t *ptep = entries[lvl];
 
-	return (entries[LEVEL1]);
+		if (ptep == NULL) {
+			continue;
+		}
+
+		uint16_t index = vmm_gpt_ptep_index(ptep);
+		ASSERT3U(vmm_gpt_lvl_index(lvl, gpa), ==, index);
+		if (index == MAX_NODE_IDX) {
+			continue;
+		}
+
+		gpa = (gpa & vmm_gpt_lvl_mask(lvl)) + vmm_gpt_lvl_len(lvl);
+		entries[lvl] = ptep + 1;
+		break;
+	}
+
+	if (lvl < LEVEL4) {
+		/* Advanced off the end of the tables */
+		return (UINT64_MAX);
+	}
+
+	/*
+	 * Attempt to walk back down to the target level if any ascension was
+	 * necessary during the above advancement.
+	 */
+	vmm_gpt_entry_t pte = *entries[lvl];
+	lvl++;
+	for (; lvl < MAX_GPT_LEVEL; lvl++) {
+		if (lvl > depth ||
+		    !gpt->vgpt_pte_ops->vpeo_pte_is_present(pte)) {
+			entries[lvl] = NULL;
+			continue;
+		}
+
+		const pfn_t pfn = gpt->vgpt_pte_ops->vpeo_pte_pfn(pte);
+		vmm_gpt_entry_t *next_table =
+		    (vmm_gpt_entry_t *)hat_kpm_pfn2va(pfn);
+		const uint16_t index = vmm_gpt_lvl_index(lvl, gpa);
+		pte = next_table[index];
+		entries[lvl] = &next_table[index];
+	}
+
+	return (gpa);
+}
+
+/*
+ * Initialize iteration over GPT leaf entries between [addr, addr + len).  The
+ * specified interval must be page-aligned and not overflow the end of the
+ * address space.
+ *
+ * Subsequent calls to vmm_gpt_iter_next() will emit the encountered entries.
+ */
+void
+vmm_gpt_iter_init(vmm_gpt_iter_t *iter, vmm_gpt_t *gpt, uint64_t addr,
+    uint64_t len)
+{
+	ASSERT0(addr & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
+	ASSERT3U((addr + len), >=, addr);
+
+	iter->vgi_gpt = gpt;
+	iter->vgi_addr = addr;
+	iter->vgi_end = addr + len;
+	iter->vgi_current = vmm_gpt_walk(gpt, addr, iter->vgi_entries, LEVEL1);
+}
+
+/*
+ * Fetch the next entry (if any) from an iterator initialized from a preceding
+ * call to vmm_gpt_iter_init().  Returns true when the next GPT leaf entry
+ * inside the iterator range has been populated in `entry`.  Returns `false`
+ * when there are no such entries available or remaining in the range.
+ */
+bool
+vmm_gpt_iter_next(vmm_gpt_iter_t *iter, vmm_gpt_iter_entry_t *entry)
+{
+	if (iter->vgi_current >= iter->vgi_end) {
+		return (false);
+	}
+
+	while (iter->vgi_current < iter->vgi_end) {
+		bool found = false;
+		if (iter->vgi_entries[LEVEL1] != NULL) {
+			entry->vgie_gpa = iter->vgi_current;
+			entry->vgie_ptep = iter->vgi_entries[LEVEL1];
+			found = true;
+		}
+
+		iter->vgi_current = vmm_gpt_walk_advance(iter->vgi_gpt,
+		    iter->vgi_current, iter->vgi_entries, LEVEL1);
+
+		if (found) {
+			return (true);
+		}
+	}
+	return (false);
 }
 
 /*
@@ -622,40 +746,26 @@ vmm_gpt_populate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 
 /*
  * Format a PTE and install it in the provided PTE-pointer.
+ *
+ * The caller must ensure that a conflicting PFN is not mapped at the requested
+ * location.  Racing operations to map the same PFN at one location are
+ * acceptable and properly handled.
  */
 bool
-vmm_gpt_map_at(vmm_gpt_t *gpt, uint64_t *ptep, pfn_t pfn, uint_t prot,
+vmm_gpt_map_at(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, pfn_t pfn, uint_t prot,
     uint8_t attr)
 {
-	uint64_t entry, old_entry;
+	vmm_gpt_entry_t pte, old_pte;
 
-	entry = gpt->vgpt_pte_ops->vpeo_map_page(pfn, prot, attr);
-	old_entry = atomic_cas_64(ptep, 0, entry);
-	if (old_entry != 0) {
-		ASSERT3U(gpt->vgpt_pte_ops->vpeo_pte_pfn(entry), ==,
-		    gpt->vgpt_pte_ops->vpeo_pte_pfn(old_entry));
+	pte = gpt->vgpt_pte_ops->vpeo_map_page(pfn, prot, attr);
+	old_pte = atomic_cas_64(ptep, 0, pte);
+	if (old_pte != 0) {
+		ASSERT3U(gpt->vgpt_pte_ops->vpeo_pte_pfn(pte), ==,
+		    gpt->vgpt_pte_ops->vpeo_pte_pfn(old_pte));
 		return (false);
 	}
 
 	return (true);
-}
-
-/*
- * Inserts an entry for a given GPA into the table.  The caller must
- * ensure that a conflicting PFN is not mapped at the requested location.
- * Racing operations to map the same PFN at one location is acceptable and
- * properly handled.
- */
-bool
-vmm_gpt_map(vmm_gpt_t *gpt, uint64_t gpa, pfn_t pfn, uint_t prot, uint8_t attr)
-{
-	uint64_t *entries[MAX_GPT_LEVEL];
-
-	ASSERT(gpt != NULL);
-	vmm_gpt_walk(gpt, gpa, entries, MAX_GPT_LEVEL);
-	ASSERT(entries[LEVEL1] != NULL);
-
-	return (vmm_gpt_map_at(gpt, entries[LEVEL1], pfn, prot, attr));
 }
 
 /*
@@ -733,16 +843,16 @@ vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 bool
 vmm_gpt_unmap(vmm_gpt_t *gpt, uint64_t gpa)
 {
-	uint64_t *entries[MAX_GPT_LEVEL], entry;
+	vmm_gpt_entry_t *entries[MAX_GPT_LEVEL], pte;
 
 	ASSERT(gpt != NULL);
-	vmm_gpt_walk(gpt, gpa, entries, MAX_GPT_LEVEL);
+	(void) vmm_gpt_walk(gpt, gpa, entries, LEVEL1);
 	if (entries[LEVEL1] == NULL)
 		return (false);
 
-	entry = *entries[LEVEL1];
+	pte = *entries[LEVEL1];
 	*entries[LEVEL1] = 0;
-	return (gpt->vgpt_pte_ops->vpeo_pte_is_present(entry));
+	return (gpt->vgpt_pte_ops->vpeo_pte_is_present(pte));
 }
 
 /*
@@ -755,10 +865,19 @@ vmm_gpt_unmap_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 	ASSERT0(addr & PAGEOFFSET);
 	ASSERT0(len & PAGEOFFSET);
 
-	const uint64_t end = addr + len;
+	vmm_gpt_iter_t state;
+	vmm_gpt_iter_entry_t entry;
 	size_t num_unmapped = 0;
-	for (uint64_t gpa = addr; gpa < end; gpa += PAGESIZE) {
-		if (vmm_gpt_unmap(gpt, gpa) != 0) {
+
+	vmm_gpt_iter_init(&state, gpt, addr, len);
+	while (vmm_gpt_iter_next(&state, &entry)) {
+		if (entry.vgie_ptep == NULL) {
+			continue;
+		}
+
+		const vmm_gpt_entry_t pte = *entry.vgie_ptep;
+		*entry.vgie_ptep = 0;
+		if (gpt->vgpt_pte_ops->vpeo_pte_is_present(pte)) {
 			num_unmapped++;
 		}
 	}
@@ -772,9 +891,10 @@ vmm_gpt_unmap_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
  * bits of the entry.  Otherwise, it will be ignored.
  */
 bool
-vmm_gpt_is_mapped(vmm_gpt_t *gpt, uint64_t *ptep, pfn_t *pfnp, uint_t *protp)
+vmm_gpt_is_mapped(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, pfn_t *pfnp,
+    uint_t *protp)
 {
-	uint64_t entry;
+	vmm_gpt_entry_t pte;
 
 	ASSERT(pfnp != NULL);
 	ASSERT(protp != NULL);
@@ -782,47 +902,47 @@ vmm_gpt_is_mapped(vmm_gpt_t *gpt, uint64_t *ptep, pfn_t *pfnp, uint_t *protp)
 	if (ptep == NULL) {
 		return (false);
 	}
-	entry = *ptep;
-	if (!gpt->vgpt_pte_ops->vpeo_pte_is_present(entry)) {
+	pte = *ptep;
+	if (!gpt->vgpt_pte_ops->vpeo_pte_is_present(pte)) {
 		return (false);
 	}
-	*pfnp = gpt->vgpt_pte_ops->vpeo_pte_pfn(entry);
-	*protp = gpt->vgpt_pte_ops->vpeo_pte_prot(entry);
+	*pfnp = gpt->vgpt_pte_ops->vpeo_pte_pfn(pte);
+	*protp = gpt->vgpt_pte_ops->vpeo_pte_prot(pte);
 	return (true);
 }
 
 /*
- * Resets the accessed bit on the page table entry pointed to be `entry`.
+ * Resets the accessed bit on the page table entry pointed to be `ptep`.
  * If `on` is true, the bit will be set, otherwise it will be cleared.
  * The old value of the bit is returned.
  */
 uint_t
-vmm_gpt_reset_accessed(vmm_gpt_t *gpt, uint64_t *entry, bool on)
+vmm_gpt_reset_accessed(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, bool on)
 {
-	ASSERT(entry != NULL);
-	return (gpt->vgpt_pte_ops->vpeo_reset_accessed(entry, on));
+	ASSERT(ptep != NULL);
+	return (gpt->vgpt_pte_ops->vpeo_reset_accessed(ptep, on));
 }
 
 /*
- * Resets the dirty bit on the page table entry pointed to be `entry`.
+ * Resets the dirty bit on the page table entry pointed to be `ptep`.
  * If `on` is true, the bit will be set, otherwise it will be cleared.
  * The old value of the bit is returned.
  */
 uint_t
-vmm_gpt_reset_dirty(vmm_gpt_t *gpt, uint64_t *entry, bool on)
+vmm_gpt_reset_dirty(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, bool on)
 {
-	ASSERT(entry != NULL);
-	return (gpt->vgpt_pte_ops->vpeo_reset_dirty(entry, on));
+	ASSERT(ptep != NULL);
+	return (gpt->vgpt_pte_ops->vpeo_reset_dirty(ptep, on));
 }
 
 /*
- * Query state from PTE pointed to by `entry`.
+ * Query state from PTE pointed to by `ptep`.
  */
 bool
-vmm_gpt_query(vmm_gpt_t *gpt, uint64_t *entry, vmm_gpt_query_t query)
+vmm_gpt_query(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, vmm_gpt_query_t query)
 {
-	ASSERT(entry != NULL);
-	return (gpt->vgpt_pte_ops->vpeo_query(entry, query));
+	ASSERT(ptep != NULL);
+	return (gpt->vgpt_pte_ops->vpeo_query(ptep, query));
 }
 
 /*

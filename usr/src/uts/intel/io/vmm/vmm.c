@@ -181,7 +181,7 @@ struct mem_seg {
 struct mem_map {
 	vm_paddr_t	gpa;
 	size_t		len;
-	vm_ooffset_t	segoff;
+	uintptr_t	segoff;
 	int		segid;
 	int		prot;
 	int		flags;
@@ -861,7 +861,7 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 	if (ident < 0 || ident >= VM_MAX_MEMSEGS)
 		return (EINVAL);
 
-	if (len == 0 || (len & PAGE_MASK))
+	if (len == 0 || (len & PAGEOFFSET))
 		return (EINVAL);
 
 	seg = &vm->mem_segs[ident];
@@ -917,14 +917,9 @@ vm_free_memseg(struct vm *vm, int ident)
 }
 
 int
-vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
+vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, uintptr_t off,
     size_t len, int prot, int flags)
 {
-	struct mem_seg *seg;
-	struct mem_map *m, *map;
-	vm_ooffset_t last;
-	int i, error;
-
 	if (prot == 0 || (prot & ~(PROT_ALL)) != 0)
 		return (EINVAL);
 
@@ -933,31 +928,28 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 
 	if (segid < 0 || segid >= VM_MAX_MEMSEGS)
 		return (EINVAL);
-
-	seg = &vm->mem_segs[segid];
+	const struct mem_seg *seg = &vm->mem_segs[segid];
 	if (seg->object == NULL)
 		return (EINVAL);
 
-	last = first + len;
-	if (first < 0 || first >= last || last > seg->len)
+	const uintptr_t end = off + len;
+	if (((gpa | off | end) & PAGEOFFSET) != 0)
+		return (EINVAL);
+	if (end < off || end > seg->len)
 		return (EINVAL);
 
-	if ((gpa | first | last) & PAGE_MASK)
-		return (EINVAL);
-
-	map = NULL;
-	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
-		m = &vm->mem_maps[i];
+	struct mem_map *map = NULL;
+	for (int i = 0; i < VM_MAX_MEMMAPS; i++) {
+		struct mem_map *m = &vm->mem_maps[i];
 		if (m->len == 0) {
 			map = m;
 			break;
 		}
 	}
-
 	if (map == NULL)
 		return (ENOSPC);
 
-	error = vmspace_map(vm->vmspace, seg->object, first, gpa, len, prot);
+	int error = vmspace_map(vm->vmspace, seg->object, off, gpa, len, prot);
 	if (error != 0)
 		return (EFAULT);
 
@@ -973,7 +965,7 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 
 	map->gpa = gpa;
 	map->len = len;
-	map->segoff = first;
+	map->segoff = off;
 	map->segid = segid;
 	map->prot = prot;
 	map->flags = flags;
@@ -1000,7 +992,7 @@ vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len)
 
 int
 vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
-    vm_ooffset_t *segoff, size_t *len, int *prot, int *flags)
+    uintptr_t *segoff, size_t *len, int *prot, int *flags)
 {
 	struct mem_map *mm, *mmnext;
 	int i;
