@@ -121,6 +121,8 @@ file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/isatty.32 mode=0555
 file path=opt/libc-tests/tests/isatty.64 mode=0555
+file path=opt/libc-tests/tests/localeconv.32 mode=0555
+file path=opt/libc-tests/tests/localeconv.64 mode=0555
 file path=opt/libc-tests/tests/memchr.32 mode=0555
 file path=opt/libc-tests/tests/memchr.64 mode=0555
 file path=opt/libc-tests/tests/memset_s.32 mode=0555
@@ -239,6 +241,8 @@ file path=opt/libc-tests/tests/strerror.32 mode=0555
 file path=opt/libc-tests/tests/strerror.64 mode=0555
 file path=opt/libc-tests/tests/strtonum.32 mode=0555
 file path=opt/libc-tests/tests/strtonum.64 mode=0555
+file path=opt/libc-tests/tests/strtox.32 mode=0555
+file path=opt/libc-tests/tests/strtox.64 mode=0555
 dir  path=opt/libc-tests/tests/symbols
 hardlink path=opt/libc-tests/tests/symbols/assert_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/ctype_h target=setup
@@ -279,6 +283,10 @@ file path=opt/libc-tests/tests/uchar.32 mode=0555
 file path=opt/libc-tests/tests/uchar.64 mode=0555
 file path=opt/libc-tests/tests/utimes.32 mode=0555
 file path=opt/libc-tests/tests/utimes.64 mode=0555
+file path=opt/libc-tests/tests/wcsftime.32 mode=0555
+file path=opt/libc-tests/tests/wcsftime.64 mode=0555
+file path=opt/libc-tests/tests/wcsftime_old.32 mode=0555
+file path=opt/libc-tests/tests/wcsftime_old.64 mode=0555
 file path=opt/libc-tests/tests/wcslcat.32 mode=0555
 file path=opt/libc-tests/tests/wcslcat.64 mode=0555
 file path=opt/libc-tests/tests/wcslcpy.32 mode=0555

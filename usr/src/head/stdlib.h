@@ -332,6 +332,15 @@ extern long long strtonum(const char *, long long, long long, const char **);
 extern long long strtonumx(const char *, long long, long long, const char **,
     int);
 extern void *reallocf(void *, size_t);
+
+/* these three are also in xlocale.h */
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct _locale *locale_t;
+#endif
+extern float strtof_l(const char *, char **, locale_t);
+extern double strtod_l(const char *, char **, locale_t);
+extern long double strtold_l(const char *, char **, locale_t);
 #endif	/* !_STRICT_SYBMOLS */
 
 /*

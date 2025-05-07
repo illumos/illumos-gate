@@ -567,6 +567,8 @@ iswctype.3c
 	iswctype_l.3c
 lckpwdf.3c
 	ulckpwdf.3c
+localeconv.3c
+	localeconv_l.3c
 lsearch.3c
 	lfind.3c
 makecontext.3c
@@ -1086,12 +1088,16 @@ string.3c
 string_to_decimal.3c
 	file_to_decimal.3c
 	func_to_decimal.3c
+	string_to_decimal_l.3c
 strptime.3c
 	strptime_l.3c
 strtod.3c
 	atof.3c
+	strtod_l.3c
 	strtof.3c
+	strtof_l.3c
 	strtold.3c
+	strtold_l.3c
 strtoimax.3c
 	strtoumax.3c
 strtol.3c
@@ -1213,6 +1219,8 @@ wcscasecmp.3c
 wcscoll.3c
 	wcscoll_l.3c
 	wscoll.3c
+wcsftime.3c
+	wcsftime_l.3c
 wcslen.3c
 	wcsnlen.3c
 wcsrtombs.3c

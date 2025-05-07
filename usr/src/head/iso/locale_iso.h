@@ -80,10 +80,11 @@ struct lconv {
 /*
  * New in IEEE Std 1003.1-2001 for alignment with the ISO/IEC 9899:1999
  * standard.  Namespace and binary compatibility dictate that visibility
- * of these new members be limited.  Visibility is limited to a strictly
- * conforming ANSI C environment (-Xc) or if _LCONV_C99 is defined.
+ * of these new members be limited, but all instances of this structure created
+ * by libc include space for the new fields.   The new fields are excluded in a
+ * strictly-conforming pre-C99 environment if _LCONV_C99 is not also defined.
  */
-#if (defined(_STRICT_STDC) && defined(_STDC_C99)) || defined(_LCONV_C99)
+#if !defined(_STRICT_SYMBOLS) || defined(_STDC_C99) || defined(_LCONV_C99)
 	char int_p_cs_precedes;
 	char int_p_sep_by_space;
 	char int_n_cs_precedes;

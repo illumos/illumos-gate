@@ -43,10 +43,11 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2025 Bill Sommerfeld
 .\"
-.TH STRTOD 3C "Apr 21, 2021"
+.TH STRTOD 3C "May 10, 2025"
 .SH NAME
-strtod, strtof, strtold, atof \- convert string to floating-point number
+strtod, strtof, strtold, atof, strtod_l, strtof_l, strtold_l \- convert string to floating-point number
 .SH SYNOPSIS
 .nf
 #include <stdlib.h>
@@ -69,11 +70,32 @@ strtod, strtof, strtold, atof \- convert string to floating-point number
 \fBdouble\fR \fBatof\fR(\fBconst char *\fR\fIstr\fR);
 .fi
 
+#include <xlocale.h>
+
+.nf
+\fBdouble\fR \fBstrtod_l\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR, \fBlocale_t\fR \fIloc\rR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBstrtof_l\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR, \fBlocale_t\fR \fIloc\rR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBstrtold_l\fR(\fBconst char *restrict\fR \fInptr\fR, \fBchar **restrict\fR \fIendptr\fR, \fBlocale_t\fR \fIloc\rR);
+.fi
+
 .SH DESCRIPTION
 The \fBstrtod()\fR, \fBstrtof()\fR, and \fBstrtold()\fR functions convert the
 initial portion of the string pointed to by \fInptr\fR to \fBdouble\fR,
-\fBfloat\fR, and \fBlong double\fR representation, respectively. First they
-decompose the input string into three parts:
+\fBfloat\fR, and \fBlong double\fR representation, respectively, using the
+current locale's radix point representation.
+Similarly, \fBstrtod_l()\fR, \fBstrtof_l()\fR, and \fBstrtold_l()\fR
+functions operate using the radix point representation of the
+locale specified by \fIloc\fR.
+
+All of these functions first decompose the input string into three parts:
 .RS +4
 .TP
 1.
@@ -239,14 +261,14 @@ No conversion could be performed.
 .SH USAGE
 Since 0 is returned on error and is also a valid return on success, an
 application wishing to check for error situations should set \fBerrno\fR to 0,
-then call \fBstrtod()\fR, \fBstrtof()\fR, or \fBstrtold()\fR, then check
-\fBerrno\fR.
+then call \fBstrtod()\fR, \fBstrtof()\fR, \fBstrtold()\fR, or the
+corresponding \fBstrto*_l\R functions, then check \fBerrno\fR.
 .sp
 .LP
-The changes to \fBstrtod()\fR introduced by the ISO/IEC 9899: 1999 standard can
-alter the behavior of well-formed applications complying with the ISO/IEC 9899:
-1990 standard and thus earlier versions of IEEE Std 1003.1-200x. One such
-example would be:
+The changes to \fBstrtod()\fR and its kin introduced by the ISO/IEC 9899: 1999
+standard can alter the behavior of well-formed applications complying with
+the ISO/IEC 9899: 1990 standard and thus earlier versions of IEEE Std 1003.1-200x.
+One such example would be:
 .sp
 .in +2
 .nf
@@ -321,14 +343,17 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	strtof, strtod, strtold, atof: Standard
+	strtof_l, strtod_l, strtold_l: Committed
 _
 MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
+.BR freelocale (3C),
 .BR isspace (3C),
 .BR localeconv (3C),
+.BR newlocale (3C),
 .BR scanf (3C),
 .BR setlocale (3C),
 .BR strtol (3C),
@@ -337,8 +362,11 @@ MT-Level	MT-Safe with exceptions
 .BR standards (7)
 .SH NOTES
 The \fBstrtod()\fR and \fBatof()\fR functions can be used safely in
-multithreaded applications, as long as \fBsetlocale\fR(3C) is not called to
-change the locale.
+multithreaded applications, as long as \fBsetlocale\fR(3C) is not
+called to change the locale.  The \fBstrto*_l\fR functions may be used
+safely in multithreaded applications as long as \fBfreelocale\fR(3C)
+or \fBnewlocale\fR(3C) is not called to destroy a locale in use by
+another thread.
 .sp
 .LP
 The DESCRIPTION and RETURN VALUES sections above are very similar to the

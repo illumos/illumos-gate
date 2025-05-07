@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #ifndef _XLOCALE_H
@@ -38,6 +39,7 @@
 #include <wchar.h>
 #include <locale.h>
 #include <stdio.h>
+#include <floatingpoint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,6 +97,19 @@ extern unsigned char __mb_cur_max_l(locale_t);
 #define	MB_CUR_MAX_L(l)	(__mb_cur_max_l(l))
 #endif
 
+extern struct lconv *localeconv_l(locale_t);
+
+extern size_t wcsftime_l(wchar_t *_RESTRICT_KYWD,
+    size_t, const wchar_t *_RESTRICT_KYWD, const struct tm *_RESTRICT_KYWD,
+    locale_t);
+
+/* these three are also in stdlib.h */
+extern float strtof_l(const char *, char **, locale_t);
+extern double strtod_l(const char *, char **, locale_t);
+extern long double strtold_l(const char *, char **, locale_t);
+
+extern void string_to_decimal_l(char **, int, int, decimal_record *,
+    enum decimal_string_form *, char **, locale_t);
 
 #if defined(_XPG4) && !defined(_FILEDEFED) || __cplusplus >= 199711L
 #define	_FILEDEFED
