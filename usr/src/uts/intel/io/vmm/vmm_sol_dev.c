@@ -984,7 +984,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		error = vm_mmap_getnext(sc->vmm_vm, &mm.gpa, &mm.segid,
-		    &mm.segoff, &mm.len, &mm.prot, &mm.flags);
+		    (uintptr_t *)&mm.segoff, &mm.len, &mm.prot, &mm.flags);
 		if (error == 0 && ddi_copyout(&mm, datap, sizeof (mm), md)) {
 			error = EFAULT;
 			break;
@@ -998,8 +998,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_mmap_memseg(sc->vmm_vm, mm.gpa, mm.segid, mm.segoff,
-		    mm.len, mm.prot, mm.flags);
+		error = vm_mmap_memseg(sc->vmm_vm, mm.gpa, mm.segid,
+		    (uintptr_t)mm.segoff, mm.len, mm.prot, mm.flags);
 		break;
 	}
 	case VM_MUNMAP_MEMSEG: {
