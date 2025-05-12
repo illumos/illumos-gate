@@ -223,7 +223,8 @@ reset_font_flags(void)
 }
 
 __weak_symbol bitmap_data_t *
-gfx_get_font(void)
+gfx_get_font(short rows __unused, short cols __unused, short height __unused,
+    short width __unused)
 {
 	return (NULL);
 }
@@ -254,7 +255,7 @@ set_font(short *rows, short *cols, short h, short w)
 	}
 
 	if (font == NULL)
-		font = gfx_get_font();
+		font = gfx_get_font(*rows, *cols, h, w);
 
 	if (font != NULL) {
 		*rows = (height - BORDER_PIXELS) / font->height;

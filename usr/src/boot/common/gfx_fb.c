@@ -1879,7 +1879,7 @@ gfx_get_ppi(void)
  * not smaller than calculated size value.
  */
 bitmap_data_t *
-gfx_get_font(void)
+gfx_get_font(short rows, short cols, short height, short width)
 {
 	unsigned ppi, size;
 	bitmap_data_t *font = NULL;
@@ -1903,13 +1903,20 @@ gfx_get_font(void)
 	size = roundup(size * 2, 10) / 10;
 
 	STAILQ_FOREACH(fl, &fonts, font_next) {
+		/*
+		 * Skip too large fonts.
+		 */
+		font = fl->font_data;
+		if (height / font->height < rows ||
+		    width / font->width < cols)
+			continue;
+
 		next = STAILQ_NEXT(fl, font_next);
 		/*
 		 * If this is last font or, if next font is smaller,
 		 * we have our font. Make sure, it actually is loaded.
 		 */
 		if (next == NULL || next->font_data->height < size) {
-			font = fl->font_data;
 			if (font->font == NULL ||
 			    fl->font_flags == FONT_RELOAD) {
 				if (fl->font_load != NULL &&
@@ -1918,6 +1925,7 @@ gfx_get_font(void)
 			}
 			break;
 		}
+		font = NULL;
 	}
 
 	return (font);
