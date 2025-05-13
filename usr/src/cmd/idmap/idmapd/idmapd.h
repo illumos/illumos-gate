@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2025 Bill Sommerfeld
  */
 
 #ifndef _IDMAPD_H
@@ -96,6 +97,7 @@ typedef struct idmapd_state {
 	idmap_cfg_t	*cfg;			/* config */
 	bool_t		daemon_mode;
 	char		hostname[MAX_NAME_LEN];	/* my hostname */
+	pthread_mutex_t	id_lock;		/* id allocator lock */
 	uid_t		next_uid;
 	gid_t		next_gid;
 	uid_t		limit_uid;

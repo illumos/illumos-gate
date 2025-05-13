@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2025 Bill Sommerfeld
  */
 
 /*
@@ -3292,14 +3293,17 @@ get_next_eph_uid(uid_t *next_uid)
 	int err;
 
 	*next_uid = (uid_t)-1;
+	pthread_mutex_lock(&_idmapdstate.id_lock);
 	uid = _idmapdstate.next_uid++;
 	if (uid >= _idmapdstate.limit_uid) {
-		if ((err = allocids(0, 8192, &uid, 0, &gid)) != 0)
+		if ((err = allocids(0, 8192, &uid, 0, &gid)) != 0) {
+			pthread_mutex_unlock(&_idmapdstate.id_lock);
 			return (err);
-
+		}
 		_idmapdstate.limit_uid = uid + 8192;
-		_idmapdstate.next_uid = uid;
+		_idmapdstate.next_uid = uid + 1;
 	}
+	pthread_mutex_unlock(&_idmapdstate.id_lock);
 	*next_uid = uid;
 
 	return (0);
@@ -3314,14 +3318,17 @@ get_next_eph_gid(gid_t *next_gid)
 	int err;
 
 	*next_gid = (uid_t)-1;
+	pthread_mutex_lock(&_idmapdstate.id_lock);
 	gid = _idmapdstate.next_gid++;
 	if (gid >= _idmapdstate.limit_gid) {
-		if ((err = allocids(0, 0, &uid, 8192, &gid)) != 0)
+		if ((err = allocids(0, 0, &uid, 8192, &gid)) != 0) {
+			pthread_mutex_unlock(&_idmapdstate.id_lock);
 			return (err);
-
+		}
 		_idmapdstate.limit_gid = gid + 8192;
-		_idmapdstate.next_gid = gid;
+		_idmapdstate.next_gid = gid + 1;
 	}
+	pthread_mutex_unlock(&_idmapdstate.id_lock);
 	*next_gid = gid;
 
 	return (0);
