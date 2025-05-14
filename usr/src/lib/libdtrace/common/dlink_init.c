@@ -53,12 +53,12 @@ dtrace_drti_init(void)
 	dtrace_link_init();
 
 	if (dlinfo(RTLD_SELF, RTLD_DI_LINKMAP, &lmp) == -1 || lmp == NULL) {
-		dprintf(1, "couldn't discover module name or address\n");
+		dl_dprintf(1, "couldn't discover module name or address\n");
 		return;
 	}
 
 	if (dlinfo(RTLD_SELF, RTLD_DI_LMID, &lmid) == -1) {
-		dprintf(1, "couldn't discover link map ID\n");
+		dl_dprintf(1, "couldn't discover link map ID\n");
 		return;
 	}
 
@@ -72,14 +72,14 @@ dtrace_drti_fini(void)
 	int fd;
 
 	if ((fd = open64(devname, O_RDWR)) < 0) {
-		dprintf(1, "failed to open helper device %s", devname);
+		dl_dprintf(1, "failed to open helper device %s", devname);
 		return;
 	}
 
 	if ((gen = ioctl(fd, DTRACEHIOC_REMOVE, gen)) == -1)
-		dprintf(1, "DTrace ioctl failed to remove DOF (%d)\n", gen);
+		dl_dprintf(1, "DTrace ioctl failed to remove DOF (%d)\n", gen);
 	else
-		dprintf(1, "DTrace ioctl removed DOF (%d)\n", gen);
+		dl_dprintf(1, "DTrace ioctl removed DOF (%d)\n", gen);
 
 	(void) close(fd);
 }

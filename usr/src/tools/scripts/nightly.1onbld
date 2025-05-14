@@ -27,7 +27,7 @@
 .I nightly
 \- build an OS-Net consolidation overnight
 .SH SYNOPSIS
-\fBnightly\fP [\fB-in\fP] [\fB+t\fP] [\fB-V\fP \fIVERS\fP] [\fB-B\fP \fIWS\fP]
+\fBnightly\fP [\fB-in\fP] [\fB-V\fP \fIVERS\fP] [\fB-B\fP \fIWS\fP]
 [\fB-b\fP \fIBR\fP] [\fB-d\fP \fIWS\fP] \fIenv_file\fP
 .SH DESCRIPTION
 .I nightly,
@@ -181,9 +181,6 @@ Send mail to $MAILTO at end of build
 .TP
 .B \-t
 Build and use the tools in $SRC/tools (default setting).
-.TP
-.B +t
-Use the build tools in "$ONBLD_TOOLS/bin".
 
 .LP
 .B Code checking options

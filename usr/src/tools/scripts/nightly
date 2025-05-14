@@ -28,7 +28,7 @@
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Trible.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
@@ -493,12 +493,11 @@ if [ "$OPTHOME" = "" ]; then
 	export OPTHOME
 fi
 
-USAGE='Usage: nightly [-in] [+t] [-B WS] [-b BR] [-d WS] [-V VERS] <env_file>
+USAGE='Usage: nightly [-in] [-B WS] [-b BR] [-d WS] [-V VERS] <env_file>
 
 Where:
 	-i	Fast incremental options (no clobber, check)
 	-n      Do not do a bringover
-	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-B WS	bringover from WS (directory or URL)
 	-b BR   bringover branch BR
 	-d WS	do build in WS (directory)
@@ -531,7 +530,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-p	create packages
 	-r	check ELF runtime attributes in the proto area
 	-t	build and use the tools in $SRC/tools (default setting)
-	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-u	update proto_list_$MACH and friends in the parent workspace;
 		when used with -f, also build an unrefmaster.out in the parent
 	-w	report on differences between previous and current proto areas
@@ -584,7 +582,10 @@ do
 		;;
 	  n )	n_FLAG=y
 		;;
-	 +t )	t_FLAG=n
+	 +t )
+		 # Builds which do not use in-gate tools are not supported, but
+		 # for legacy sake the option is still accepted.
+		 t_FLAG=n
 		;;
 	  V )	V_FLAG=y
 		V_ARG="$OPTARG"
@@ -778,7 +779,10 @@ do
 		;;
 	  r )	r_FLAG=y
 		;;
-	 +t )	t_FLAG=n
+	 +t )
+		 # Builds which do not use in-gate tools are not supported, but
+		 # for legacy sake the option is still accepted.
+		 t_FLAG=n
 		;;
 	  U )   if [ -z "${PARENT_ROOT}" ]; then
 			echo "PARENT_ROOT must be set if the U flag is" \
@@ -1311,6 +1315,11 @@ if [ "$f_FLAG" = "y" ]; then
 		    "ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
+fi
+
+if [[ "$t_FLAG" != "y" ]]; then
+	echo "WARNING: building using out-of-gate tools (via +t flag) " \
+	    "is not supported\n" | tee -a $mail_msg_file >> $LOGFILE
 fi
 
 if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then
