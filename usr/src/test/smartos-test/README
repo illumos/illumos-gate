@@ -11,7 +11,7 @@
 
 #
 # Copyright 2019 Joyent. Inc.
-# Copyright 2024 MNX Cloud, Inc.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 Strictly speaking, this is not a set of tests. Rather, it is a wrapper that
@@ -21,9 +21,10 @@ execution, optionally running those tests.
 The smartos-test script should be extracted from the test archive to ensure
 the correct version is being executed. If you download it, download it
 directly, as the test archive .tgz file is needed by the smartos-test script
-itself.  Furthermore, the directory you extract it in should NOT be a
-system-level directory (e.g. /tmp/.) but in its own subdirectory
-(e.g. /tmp/test/.)
+itself.  As of release-20250515, you may extract it in any directory without
+the directory's permissions getting changed (e.g. /tmp/.), see OS-8655 for
+details. Please understand that most of the test archive is intended for
+extraction by smartos-test itself, and it may overwrite existing files.
 
 For example:
 
