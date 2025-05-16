@@ -1377,19 +1377,22 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_HYGON_DHYANA,
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_DALI,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_ROME,
 		.zufd_flags = ZEN_UMC_FAM_F_NP2 | ZEN_UMC_FAM_F_NORM_HASH |
@@ -1398,7 +1401,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_RENOIR,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
@@ -1406,7 +1410,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
-		    UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_MATISSE,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH | ZEN_UMC_FAM_F_UMC_HASH,
@@ -1414,21 +1419,24 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_VAN_GOGH,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_HYBRID_LPDDR5,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_MENDOCINO,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_HYBRID_LPDDR5,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_MILAN,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP | ZEN_UMC_FAM_F_NP2 |
@@ -1437,7 +1445,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_GENOA,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
@@ -1447,7 +1456,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 4,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_VERMEER,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH | ZEN_UMC_FAM_F_UMC_HASH,
@@ -1456,13 +1466,15 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_REMBRANDT,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_CEZANNE,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
@@ -1470,7 +1482,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
-		    UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_RAPHAEL,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
@@ -1478,7 +1491,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_BERGAMO,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
@@ -1488,35 +1502,40 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 4,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_PHOENIX,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_STRIX,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_KRACKAN,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_STRIX_HALO,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 3,
 		.zufd_cs_nrules = 3,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
-		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_GRANITE_RIDGE,
 		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
@@ -1524,7 +1543,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_TURIN,
 		.zufd_flags = ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
@@ -1533,7 +1553,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 4,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}, {
 		.zufd_family = X86_PF_AMD_DENSE_TURIN,
 		.zufd_flags = ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
@@ -1542,7 +1563,8 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_cs_nrules = 4,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
-		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS,
+		.zufd_base_instid = 0
 	}
 };
 
@@ -3475,15 +3497,36 @@ zen_umc_fill_umc_cb(const uint_t dfno, const uint32_t fabid,
 	 * should be continuous in their fabric ID space; however, we don't
 	 * want to rely on specific ID locations. The UMC SMN addresses are
 	 * organized in a relative order. To determine the SMN ID to use (the
-	 * chan_logid) we end up making the following assumptions:
+	 * chan_logid) we assume the iteration order will always be from the
+	 * lowest Instance ID to the highest Instance ID. But using the
+	 * iteration index is not enough as there's still an unstated assumption
+	 * that we'll encounter all the UMCs -- even those with no DIMMs
+	 * populated. While this previously seemed like a reasonable assumption
+	 * (every system in question behaved as such), it is seemingly no longer
+	 * always the case:
 	 *
-	 *  o The iteration order will always be from the lowest component ID
-	 *    to the highest component ID.
-	 *  o The relative order that we encounter will be the same as the SMN
-	 *    order. That is, the first thing we find (regardless of component
-	 *    ID) will be SMN UMC entry 0, the next 1, etc.
+	 * On a 12-channel SP5 system (running either Genoa or Turin), the DF
+	 * reports 16 CS entities (of which 12 should be the UMCs). But with
+	 * DIMMs only in channels A and G (each of which are mapped to different
+	 * UMCs and not necessarily in alphabetic order), we only discover
+	 * 2 UMCs and so end up with something like:
+	 *	zud_nchan = 2
+	 *	zud_chan[0].chan_instid	= 3	// (A)
+	 *	zud_chan[1].chan_instid	= 9	// (G)
+	 *
+	 * Attempting to use the logical zud_chan index (0/1) as the SMN ID
+	 * for the UMC registers returns misleading results, e.g., our DIMM
+	 * presence check claims there are none whereas using the Instance
+	 * IDs (3/9) returns the correct results.
+	 *
+	 * Taking that all into account then we arrive at
+	 *	chan_logid = chan_instid - <Base UMC Instance ID>
+	 *
+	 * Unfortunately though, there's no way to determine what that base ID
+	 * should be programmatically and so we hardcore it as part of the
+	 * static per SoC family data.
 	 */
-	chan->chan_logid = df->zud_nchan - 1;
+	chan->chan_logid = instid - umc->umc_fdata->zufd_base_instid;
 	chan->chan_fabid = fabid;
 	chan->chan_instid = instid;
 	chan->chan_nrules = umc->umc_fdata->zufd_cs_nrules;

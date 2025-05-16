@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _ZEN_UMC_H
@@ -554,6 +554,7 @@ typedef struct zen_umc_fam_data {
 	uint8_t			zufd_cs_nrules;
 	zen_umc_umc_style_t	zufd_umc_style;
 	umc_chan_hash_flags_t	zufd_chan_hash;
+	uint32_t		zufd_base_instid;
 } zen_umc_fam_data_t;
 
 /*
