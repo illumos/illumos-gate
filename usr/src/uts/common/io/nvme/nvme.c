@@ -2691,14 +2691,14 @@ nvme_async_event_task(void *arg)
 
 		case NVME_ASYNC_ERROR_DIAGFAIL:
 			dev_err(nvme->n_dip, CE_WARN, "!diagnostic failure");
-			nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
+			nvme_ctrl_mark_dead(nvme, B_FALSE);
 			NVME_BUMP_STAT(nvme, diagfail_event);
 			break;
 
 		case NVME_ASYNC_ERROR_PERSISTENT:
 			dev_err(nvme->n_dip, CE_WARN, "!persistent internal "
 			    "device error");
-			nvme_ctrl_mark_dead(cmd->nc_nvme, B_FALSE);
+			nvme_ctrl_mark_dead(nvme, B_FALSE);
 			NVME_BUMP_STAT(nvme, persistent_event);
 			break;
 
