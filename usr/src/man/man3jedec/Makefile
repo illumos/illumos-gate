@@ -15,9 +15,9 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT =	3jedec
+MANSECT=	3jedec
 
-MANFILES =					\
+MANFILES=					\
 		libjedec_spd.3jedec		\
 		libjedec_temp_range.3jedec	\
 		libjedec_vendor_string.3jedec
@@ -26,4 +26,4 @@ MANFILES =					\
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES)

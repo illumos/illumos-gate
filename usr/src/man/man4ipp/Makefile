@@ -16,15 +16,15 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	4ipp
+MANSECT=	4ipp
 
-MANFILES= 	dlcosmk.4ipp	\
-	 	dscpmk.4ipp	\
-	 	flowacct.4ipp	\
-	 	ipgpc.4ipp	\
-	 	ipqos.4ipp	\
-	 	tokenmt.4ipp	\
-	 	tswtclmt.4ipp
+MANFILES=	dlcosmk.4ipp	\
+		dscpmk.4ipp	\
+		flowacct.4ipp	\
+		ipgpc.4ipp	\
+		ipqos.4ipp	\
+		tokenmt.4ipp	\
+		tswtclmt.4ipp
 
 .KEEP_STATE:
 

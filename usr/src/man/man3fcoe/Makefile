@@ -16,9 +16,9 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3fcoe
+MANSECT=	3fcoe
 
-MANFILES= 	FCOE_CreatePort.3fcoe	\
+MANFILES=	FCOE_CreatePort.3fcoe	\
 		FCOE_DeletePort.3fcoe	\
 		FCOE_GetPortList.3fcoe
 

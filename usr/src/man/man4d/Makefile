@@ -231,46 +231,13 @@ i386_MANFILES=	ahci.4d		\
 		zen_udf.4d	\
 		zyd.4d
 
-_MANLINKS=	1394.4d		\
-		allkmem.4d	\
-		fdc.4d		\
-		firewire.4d	\
-		kmem.4d		\
-		lo0.4d		\
-		pts.4d		\
-		ticots.4d	\
-		ticotsord.4d	\
-		urandom.4d	\
-		usb.4d
+MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
 
-i386_MANLINKS=	amdzen_stub.4d
-
-MANFILES =	$(_MANFILES) $($(MACH)_MANFILES)
-MANLINKS =	$(_MANLINKS) $($(MACH)_MANLINKS)
-
-amdzen_stub.4d	:= LINKSRC = amdzen.4d
-
-fdc.4d		:= LINKSRC = fd.4d
-
-1394.4d		:= LINKSRC = ieee1394.4d
-firewire.4d	:= LINKSRC = ieee1394.4d
-
-lo0.4d		:= LINKSRC = ipnet.4d
-
-pts.4d		:= LINKSRC = ptm.4d
-
-allkmem.4d	:= LINKSRC = mem.4d
-kmem.4d		:= LINKSRC = mem.4d
-
-urandom.4d	:= LINKSRC = random.4d
-
-ticots.4d	:= LINKSRC = ticlts.4d
-ticotsord.4d	:= LINKSRC = ticlts.4d
-
-usb.4d		:= LINKSRC = usba.4d
+i386_MANLINK_SRC=	Manlink.i386
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

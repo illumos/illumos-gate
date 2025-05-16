@@ -41,12 +41,8 @@ MANFILES=	audio.4i	\
 		visual_io.4i	\
 		vt.4i
 
-MANLINKS=	uccid.4i
-
-uccid.7i	:= LINKSRC = ../man4d/ccid.4d
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES)

@@ -20,12 +20,12 @@ include		$(SRC)/Makefile.master
 MANSECT=	3perl
 
 MANFILES=	Kstat.3perl			\
-	 	Lgrp.3perl			\
-	 	Project.3perl			\
-	 	Task.3perl
+		Lgrp.3perl			\
+		Project.3perl			\
+		Task.3perl
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES)

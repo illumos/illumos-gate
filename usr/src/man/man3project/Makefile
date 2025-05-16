@@ -16,33 +16,15 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3project
+MANSECT=	3project
 
-MANFILES= 	getprojent.3project		\
-	 	project_walk.3project		\
-	 	setproject.3project
-
-
-MANLINKS=	endprojent.3project		\
-		fgetprojent.3project		\
-		getdefaultproj.3project		\
-		getprojbyid.3project		\
-		getprojbyname.3project		\
-		getprojidbyname.3project	\
-		inproj.3project			\
-		setprojent.3project
-
-endprojent.3project		:= LINKSRC = getprojent.3project
-fgetprojent.3project		:= LINKSRC = getprojent.3project
-getdefaultproj.3project		:= LINKSRC = getprojent.3project
-getprojbyid.3project		:= LINKSRC = getprojent.3project
-getprojbyname.3project		:= LINKSRC = getprojent.3project
-getprojidbyname.3project	:= LINKSRC = getprojent.3project
-inproj.3project			:= LINKSRC = getprojent.3project
-setprojent.3project		:= LINKSRC = getprojent.3project
+MANFILES=	getprojent.3project		\
+		project_walk.3project		\
+		setproject.3project
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

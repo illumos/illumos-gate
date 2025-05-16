@@ -101,68 +101,9 @@ MANFILES=	Intro.9s			\
 		usba_hcdi_register_args.9s	\
 		usba_pipe_handle_data.9s
 
-
-MANLINKS=	dblk.9s				\
-		intro.9s			\
-		mac_callbacks_t.9s		\
-		mac_group_info_t.9s		\
-		mac_intr_t.9s			\
-		mac_register_t.9s		\
-		mac_ring_info_t.9s		\
-		mblk.9s				\
-		usb_ep_ss_comp_descr_t.9s	\
-		usb_ep_xdescr_t.9s		\
-		usb_bulk_req_t.9s		\
-		usb_bulk_request.9s		\
-		usb_ctrl_req_t.9s		\
-		usb_ctrl_request.9s		\
-		usb_intr_req_t.9s		\
-		usb_intr_request.9s		\
-		usb_isoc_req_t.9s		\
-		usb_isoc_request.9s		\
-		usba_device_t.9s		\
-		usba_hcdi_ops_t.9s		\
-		usba_hcdi_register_args_t.9s	\
-		usba_pipe_handle_data_t.9s
-
-
-intro.9s		:= LINKSRC = Intro.9s
-
-dblk.9s			:= LINKSRC = datab.9s
-
-mac_callbacks_t.9s	:= LINKSRC = mac_callbacks.9s
-mac_group_info_t.9s	:= LINKSRC = mac_group_info.9s
-mac_intr_t.9s		:= LINKSRC = mac_intr.9s
-mac_register_t.9s	:= LINKSRC = mac_register.9s
-mac_ring_info_t.9s	:= LINKSRC = mac_ring_info.9s
-
-mblk.9s			:= LINKSRC = msgb.9s
-
-#
-# The usb_*_req(9S) pages used to be called usb_*_request(9S). We've
-# kept the old name around as a link to help folks out, but changed the
-# name so that they actually matched the structures.
-#
-usb_bulk_req_t.9s	:= LINKSRC =	usb_bulk_req.9s
-usb_bulk_request.9s	:= LINKSRC =	usb_bulk_req.9s
-usb_ctrl_req_t.9s	:= LINKSRC =	usb_ctrl_req.9s
-usb_ctrl_request.9s	:= LINKSRC =	usb_ctrl_req.9s
-usb_intr_req_t.9s	:= LINKSRC =	usb_intr_req.9s
-usb_intr_request.9s	:= LINKSRC =	usb_intr_req.9s
-usb_isoc_req_t.9s	:= LINKSRC =	usb_isoc_req.9s
-usb_isoc_request.9s	:= LINKSRC =	usb_isoc_req.9s
-
-usb_ep_ss_comp_descr_t.9s	:= LINKSRC =	usb_ep_ss_comp_descr.9s
-usb_ep_xdescr_t.9s		:= LINKSRC =	usb_ep_xdescr.9s
-usba_hcdi_register_args_t.9s	:= LINKSRC =	usba_hcdi_register_args.9s
-
-usba_device_t.9s		:= LINKSRC =	usba_device.9s
-usba_hcdi_ops_t.9s		:= LINKSRC =	usba_hcdi_ops.9s
-usba_hcdi_register_args_t.9s	:= LINKSRC =	usba_hcdi_register_args.9s
-usba_pipe_handle_data_t.9s	:= LINKSRC =	usba_pipe_handle_data.9s
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

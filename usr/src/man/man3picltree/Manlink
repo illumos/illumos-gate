@@ -1,0 +1,33 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+ptree_add_node.3picltree
+	ptree_delete_node.3picltree
+ptree_add_prop.3picltree
+	ptree_delete_prop.3picltree
+ptree_create_node.3picltree
+	ptree_destroy_node.3picltree
+ptree_create_prop.3picltree
+	ptree_destroy_prop.3picltree
+ptree_create_table.3picltree
+	ptree_add_row_to_table.3picltree
+ptree_get_first_prop.3picltree
+	ptree_get_next_prop.3picltree
+ptree_get_next_by_row.3picltree
+	ptree_get_next_by_col.3picltree
+ptree_get_propval.3picltree
+	ptree_get_propval_by_name.3picltree
+ptree_update_propval.3picltree
+	ptree_update_propval_by_name.3picltree

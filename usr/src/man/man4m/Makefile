@@ -17,9 +17,9 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	4m
+MANSECT=	4m
 
-_MANFILES = 	bufmod.4m	\
+MANFILES=	bufmod.4m	\
 		connld.4m	\
 		datafilt.4m	\
 		ldterm.4m	\
@@ -36,24 +36,9 @@ _MANFILES = 	bufmod.4m	\
 		usbms.4m	\
 		vuidmice.4m
 
-sparc_MANFILES=
-
-MANLINKS=	vuid2ps2.4m	\
-		vuid3ps2.4m	\
-		vuidm3p.4m	\
-		vuidm4p.4m	\
-		vuidm5p.4m
-
-MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
-
-vuid2ps2.4m	:= LINKSRC = vuidmice.4m
-vuid3ps2.4m	:= LINKSRC = vuidmice.4m
-vuidm3p.4m	:= LINKSRC = vuidmice.4m
-vuidm4p.4m	:= LINKSRC = vuidmice.4m
-vuidm5p.4m	:= LINKSRC = vuidmice.4m
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

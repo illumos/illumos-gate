@@ -461,10 +461,11 @@ load_modepages(ds_scsi_info_t *sip)
 		 * support the necessary transport.
 		 */
 		if (datalength < 0)
-			dprintf("command returned invalid data length (%d)\n",
+			ds_dprintf(
+			    "command returned invalid data length (%d)\n",
 			    datalength);
 		else
-			dprintf("failed to load modepages (KEY=0x%x "
+			ds_dprintf("failed to load modepages (KEY=0x%x "
 			    "ASC=0x%x ASCQ=0x%x)\n", skey, asc, ascq);
 
 		result = scsi_set_errno(sip, EDS_NO_TRANSPORT);
@@ -522,7 +523,7 @@ verify_logpage(ds_scsi_info_t *sip, logpage_validation_entry_t *lp)
 			return (-1);
 		}
 	} else {
-		dprintf("failed to load %s log page (KEY=0x%x "
+		ds_dprintf("failed to load %s log page (KEY=0x%x "
 		    "ASC=0x%x ASCQ=0x%x)\n", lp->ve_desc, kp, asc, ascq);
 	}
 
@@ -596,7 +597,7 @@ load_logpages(ds_scsi_info_t *sip)
 		}
 
 	} else {
-		dprintf("failed to get log pages "
+		ds_dprintf("failed to get log pages "
 		    "(KEY=0x%x ASC=0x%x ASCq=0x%x)\n", sk, asc, ascq);
 	}
 
@@ -646,7 +647,7 @@ logpage_ie_verify(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
 
 	if (!seen) {
 		sip->si_supp_log &= ~LOGPAGE_SUPP_IE;
-		dprintf("IE logpage validation failed\n");
+		ds_dprintf("IE logpage validation failed\n");
 	}
 
 	return (0);
@@ -705,7 +706,7 @@ logpage_temp_verify(ds_scsi_info_t *sip,
 
 	if (bad_length || !has_reftemp) {
 		sip->si_supp_log &= ~LOGPAGE_SUPP_TEMP;
-		dprintf("temperature logpage validation failed\n");
+		ds_dprintf("temperature logpage validation failed\n");
 	}
 
 	return (0);
@@ -756,7 +757,7 @@ logpage_selftest_verify(ds_scsi_info_t *sip,
 
 	if (bad) {
 		sip->si_supp_log &= ~LOGPAGE_SUPP_SELFTEST;
-		dprintf("selftest logpage validation failed\n");
+		ds_dprintf("selftest logpage validation failed\n");
 	}
 
 	return (0);
@@ -790,7 +791,8 @@ logpage_ssm_verify(ds_scsi_info_t *sip,
 				    "invalid-length", lphp->lph_length) != 0)
 					return (scsi_set_errno(sip, EDS_NOMEM));
 
-				dprintf("solid state media logpage bad len\n");
+				ds_dprintf(
+				    "solid state media logpage bad len\n");
 				break;
 			}
 
@@ -834,7 +836,7 @@ load_ie_modepage(ds_scsi_info_t *sip)
 	}
 
 	if (result != 0) {
-		dprintf("failed to get IEC modepage (KEY=0x%x "
+		ds_dprintf("failed to get IEC modepage (KEY=0x%x "
 		    "ASC=0x%x ASCQ=0x%x)", skey, asc, ascq);
 		sip->si_supp_mode &= ~MODEPAGE_SUPP_IEC;
 	} else  {
@@ -933,7 +935,7 @@ scsi_enable_ie(ds_scsi_info_t *sip, boolean_t *changed)
 		    MODEPAGE_INFO_EXCPT_LEN, &hdrs, &skey, &asc, &ascq) == 0) {
 			*changed = B_TRUE;
 		} else {
-			dprintf("failed to enable IE (KEY=0x%x "
+			ds_dprintf("failed to enable IE (KEY=0x%x "
 			    "ASC=0x%x ASCQ=0x%x)\n", skey, asc, ascq);
 			*changed = B_FALSE;
 		}
@@ -967,19 +969,19 @@ clear_gltsd(ds_scsi_info_t *sip)
 	    MODEPAGE_CTRL_MODE_LEN, &hdrs, &skey, &asc, &ascq);
 
 	if (result != 0) {
-		dprintf("failed to read Control mode page (KEY=0x%x "
+		ds_dprintf("failed to read Control mode page (KEY=0x%x "
 		    "ASC=0x%x ASCQ=0x%x)\n", skey, asc, ascq);
 	} else if (control_pg_cur.mode_page.length !=
 	    PAGELENGTH_MODE_CONTROL_SCSI3) {
-		dprintf("SCSI-3 control mode page not supported\n");
+		ds_dprintf("SCSI-3 control mode page not supported\n");
 	} else if ((result = scsi_mode_sense(sip,
 	    MODEPAGE_CTRL_MODE, PC_CHANGEABLE, &control_pg_chg,
 	    MODEPAGE_CTRL_MODE_LEN, &junk_hdrs, &skey, &asc, &ascq))
 	    != 0) {
-		dprintf("failed to read changeable Control mode page (KEY=0x%x "
-		    "ASC=0x%x ASCQ=0x%x)\n", skey, asc, ascq);
+		ds_dprintf("failed to read changeable Control mode page "
+		    "(KEY=0x%x ASC=0x%x ASCQ=0x%x)\n", skey, asc, ascq);
 	} else if (control_pg_cur.gltsd && !GLTSD_CHANGEABLE(control_pg_chg)) {
-		dprintf("gltsd is set and not changeable\n");
+		ds_dprintf("gltsd is set and not changeable\n");
 		if (nvlist_add_boolean_value(sip->si_dsp->ds_state,
 		    "gltsd", control_pg_cur.gltsd) != 0)
 			return (scsi_set_errno(sip, EDS_NOMEM));
@@ -989,7 +991,7 @@ clear_gltsd(ds_scsi_info_t *sip)
 		    MODEPAGE_CTRL_MODE, MODE_SELECT_PF, &control_pg_cur,
 		    MODEPAGE_CTRL_MODE_LEN, &hdrs, &skey, &asc, &ascq);
 		if (result != 0)
-			dprintf("failed to enable GLTSD (KEY=0x%x "
+			ds_dprintf("failed to enable GLTSD (KEY=0x%x "
 			    "ASC=0x%x ASCQ=0x%x\n", skey, asc, ascq);
 		if (nvlist_add_boolean_value(sip->si_dsp->ds_state,
 		    "gltsd", control_pg_cur.gltsd) != 0)
@@ -1247,7 +1249,7 @@ logpage_ssm_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
 	 * If we got this far we didn't see LOGPARAM_PRCNT_USED
 	 * which is strange since we verified that it's there
 	 */
-	dprintf("solid state media logpage analyze failed\n");
+	ds_dprintf("solid state media logpage analyze failed\n");
 #if DEBUG
 	abort();
 #endif
@@ -1271,7 +1273,7 @@ analyze_ie_sense(ds_scsi_info_t *sip)
 		return (0);
 
 	if (scsi_request_sense(sip, &skey, &asc, &ascq) != 0) {
-		dprintf("failed to request IE page (KEY=0x%x ASC=0x%x "
+		ds_dprintf("failed to request IE page (KEY=0x%x ASC=0x%x "
 		    "ASCQ=0x%x)\n", skey, asc, ascq);
 		return (scsi_set_errno(sip, EDS_IO));
 	} else if (skey == KEY_NO_SENSE) {
@@ -1317,11 +1319,11 @@ ds_scsi_close(void *arg)
  *
  * 2. If the IE page is available, try to set the following parameters:
  *
- *    	DEXCPT		0	Enable exceptions
- *    	MRIE		6	Only report IE information on request
- *    	EWASC		1	Enable warning reporting
- *    	REPORT COUNT	1	Only report an IE exception once
- *    	LOGERR		1	Enable logging of errors
+ *	DEXCPT		0	Enable exceptions
+ *	MRIE		6	Only report IE information on request
+ *	EWASC		1	Enable warning reporting
+ *	REPORT COUNT	1	Only report an IE exception once
+ *	LOGERR		1	Enable logging of errors
  *
  *    The remaining fields are left as-is, preserving the current values.  If we
  *    cannot set some of these fields, then we do our best.  Some drives may

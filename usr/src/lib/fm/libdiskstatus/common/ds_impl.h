@@ -62,7 +62,7 @@ struct disk_status {
 #define	DS_FAULT_TESTFAIL	0x4
 #define	DS_FAULT_SSMWEAROUT	0x8
 
-extern void dprintf(const char *, ...);
+extern void ds_dprintf(const char *, ...);
 extern void ddump(const char *, const void *, size_t);
 extern boolean_t ds_debug;
 

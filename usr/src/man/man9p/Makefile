@@ -16,40 +16,19 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	9p
+MANSECT=	9p
 
-MANFILES= 	ddi-forceattach.9p		\
-	 	inquiry-device-type.9p		\
-	 	no-involuntary-power-cycles.9p	\
-	 	pm-components.9p		\
-	 	pm.9p				\
-	 	removable-media.9p		\
-	 	size.9p
-
-MANLINKS=	Nblock.9p		\
-	 	blksize.9p		\
-	 	ddi-no-autodetach.9p	\
-	 	device-blksize.9p	\
-	 	device-nblocks.9p	\
-	 	inquiry-product-id.9p	\
-	 	inquiry-revision-id.9p	\
-	 	inquiry-serial-no.9p	\
-	 	inquiry-vendor-id.9p
-
-ddi-no-autodetach.9p	:= LINKSRC = ddi-forceattach.9p
-
-inquiry-product-id.9p	:= LINKSRC = inquiry-device-type.9p
-inquiry-revision-id.9p	:= LINKSRC = inquiry-device-type.9p
-inquiry-serial-no.9p	:= LINKSRC = inquiry-device-type.9p
-inquiry-vendor-id.9p	:= LINKSRC = inquiry-device-type.9p
-
-Nblock.9p		:= LINKSRC = size.9p
-blksize.9p		:= LINKSRC = size.9p
-device-blksize.9p	:= LINKSRC = size.9p
-device-nblocks.9p	:= LINKSRC = size.9p
+MANFILES=	ddi-forceattach.9p		\
+		inquiry-device-type.9p		\
+		no-involuntary-power-cycles.9p	\
+		pm-components.9p		\
+		pm.9p				\
+		removable-media.9p		\
+		size.9p
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

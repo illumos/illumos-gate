@@ -26,7 +26,7 @@
 # Copyright 2019 Peter Tribble.
 # Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Joyent, Inc.
-# Copyright 2024 MNX Cloud, Inc.
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 #
@@ -36,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20241112,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20250512,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -486,14 +486,6 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/00050655-04 target=00050655-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050655-10 target=00050655-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050655-20 target=00050655-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050655-80 target=00050655-01
-file path=platform/i86pc/ucode/GenuineIntel/00050656-01 group=sys mode=0444 \
-    reboot-needed=true
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-02 target=00050656-01
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-04 target=00050656-01
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-08 target=00050656-01
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-10 target=00050656-01
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-20 target=00050656-01
-hardlink path=platform/i86pc/ucode/GenuineIntel/00050656-80 target=00050656-01
 file path=platform/i86pc/ucode/GenuineIntel/00050657-01 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050657-02 target=00050657-01
@@ -658,10 +650,24 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000A06A4-04 target=000A06A4-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000A06A4-20 target=000A06A4-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000A06A4-40 target=000A06A4-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000A06A4-80 target=000A06A4-02
+file path=platform/i86pc/ucode/GenuineIntel/000A06D1-01 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06D1-04 target=000A06D1-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06D1-10 target=000A06D1-01
+file path=platform/i86pc/ucode/GenuineIntel/000A06D1-20 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06D1-80 target=000A06D1-01
+file path=platform/i86pc/ucode/GenuineIntel/000A06F3-01 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000B0650-80 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000B0671-02 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0671-10 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0671-20 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-02 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-10 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-20 target=000B0671-02
 file path=platform/i86pc/ucode/GenuineIntel/000B06A2-20 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06A2-40 target=000B06A2-20
@@ -672,6 +678,8 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000B06A3-80 target=000B06A2-20
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06A8-20 target=000B06A2-20
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06A8-40 target=000B06A2-20
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06A8-80 target=000B06A2-20
+file path=platform/i86pc/ucode/GenuineIntel/000B06D1-80 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000B06E0-01 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06E0-08 target=000B06E0-01
@@ -682,6 +690,21 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F2-04 target=00090672-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F5-01 target=00090672-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F5-02 target=00090672-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F5-04 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F6-01 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F6-02 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F6-04 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F7-01 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F7-02 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F7-04 target=00090672-01
+file path=platform/i86pc/ucode/GenuineIntel/000C0652-02 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C0652-80 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C0662-02 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C0662-80 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C0664-02 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C0664-80 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06A2-02 target=000C0652-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06A2-80 target=000C0652-02
 file path=platform/i86pc/ucode/GenuineIntel/000C06F1-01 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F1-02 target=000C06F1-01

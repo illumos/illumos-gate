@@ -16,33 +16,27 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3lgrp
+MANSECT=	3lgrp
 
 MANFILES=	lgrp_affinity_get.3lgrp		\
-	 	lgrp_children.3lgrp		\
-	 	lgrp_cookie_stale.3lgrp		\
-	 	lgrp_cpus.3lgrp			\
-	 	lgrp_fini.3lgrp			\
-	 	lgrp_home.3lgrp			\
-	 	lgrp_init.3lgrp			\
-	 	lgrp_latency.3lgrp		\
-	 	lgrp_mem_size.3lgrp		\
-	 	lgrp_nlgrps.3lgrp		\
-	 	lgrp_parents.3lgrp		\
-	 	lgrp_resources.3lgrp		\
-	 	lgrp_root.3lgrp			\
-	 	lgrp_version.3lgrp		\
-	 	lgrp_view.3lgrp
-
-MANLINKS=	lgrp_affinity_set.3lgrp		\
-		lgrp_latency_cookie.3lgrp
-
-lgrp_affinity_set.3lgrp		:= LINKSRC = lgrp_affinity_get.3lgrp
-
-lgrp_latency_cookie.3lgrp	:= LINKSRC = lgrp_latency.3lgrp
+		lgrp_children.3lgrp		\
+		lgrp_cookie_stale.3lgrp		\
+		lgrp_cpus.3lgrp			\
+		lgrp_fini.3lgrp			\
+		lgrp_home.3lgrp			\
+		lgrp_init.3lgrp			\
+		lgrp_latency.3lgrp		\
+		lgrp_mem_size.3lgrp		\
+		lgrp_nlgrps.3lgrp		\
+		lgrp_parents.3lgrp		\
+		lgrp_resources.3lgrp		\
+		lgrp_root.3lgrp			\
+		lgrp_version.3lgrp		\
+		lgrp_view.3lgrp
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

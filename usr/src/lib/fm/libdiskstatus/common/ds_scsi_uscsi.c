@@ -662,9 +662,9 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq, int rqlen)
 	char msgbuf[MSGBUFLEN];
 
 	if (find_string(sensekey_strings, rq->es_key) == NULL)
-		dprintf("unknown error");
+		ds_dprintf("unknown error");
 
-	dprintf("during %s:",
+	ds_dprintf("during %s:",
 	    find_string(scsi_cmdname_strings, ucmd->uscsi_cdb[0]));
 
 	/*
@@ -677,9 +677,9 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq, int rqlen)
 	case CODE_FMT_DESCR_DEFERRED:
 		blkno = (diskaddr_t)scsi_extract_sense_info_descr(sdsp, rqlen);
 		if (blkno != (diskaddr_t)-1)
-			dprintf(": block %lld (0x%llx)", blkno, blkno);
-		dprintf("\n");
-		dprintf("ASC: 0x%x   ASCQ: 0x%x    (%s)\n",
+			ds_dprintf(": block %lld (0x%llx)", blkno, blkno);
+		ds_dprintf("\n");
+		ds_dprintf("ASC: 0x%x   ASCQ: 0x%x    (%s)\n",
 		    sdsp->ds_add_code, sdsp->ds_qual_code,
 		    scsi_util_asc_ascq_name(sdsp->ds_add_code,
 		    sdsp->ds_qual_code, msgbuf, MSGBUFLEN));
@@ -693,11 +693,11 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq, int rqlen)
 			blkno = (rq->es_info_1 << 24) |
 			    (rq->es_info_2 << 16) |
 			    (rq->es_info_3 << 8) | rq->es_info_4;
-			dprintf(": block %lld (0x%llx)", blkno, blkno);
+			ds_dprintf(": block %lld (0x%llx)", blkno, blkno);
 		}
-		dprintf("\n");
+		ds_dprintf("\n");
 		if (rq->es_add_len >= 6) {
-			dprintf("ASC: 0x%x   ASCQ: 0x%x    (%s)\n",
+			ds_dprintf("ASC: 0x%x   ASCQ: 0x%x    (%s)\n",
 			    rq->es_add_code,
 			    rq->es_qual_code,
 			    scsi_util_asc_ascq_name(rq->es_add_code,
@@ -835,34 +835,34 @@ scsi_print_extended_sense(struct scsi_extended_sense *rq, int rqlen)
 		return;
 	}
 
-	dprintf("\n%s%s\n", *p++, rq->es_valid ? "yes" : "no");
-	dprintf("%s0x%02x\n", *p++, (rq->es_class << 4) + rq->es_code);
-	dprintf("%s%d\n", *p++, rq->es_segnum);
-	dprintf("%s%s\n", *p++, rq->es_filmk ? "yes" : "no");
-	dprintf("%s%s\n", *p++, rq->es_eom ? "yes" : "no");
-	dprintf("%s%s\n", *p++, rq->es_ili ? "yes" : "no");
-	dprintf("%s%d\n", *p++, rq->es_key);
+	ds_dprintf("\n%s%s\n", *p++, rq->es_valid ? "yes" : "no");
+	ds_dprintf("%s0x%02x\n", *p++, (rq->es_class << 4) + rq->es_code);
+	ds_dprintf("%s%d\n", *p++, rq->es_segnum);
+	ds_dprintf("%s%s\n", *p++, rq->es_filmk ? "yes" : "no");
+	ds_dprintf("%s%s\n", *p++, rq->es_eom ? "yes" : "no");
+	ds_dprintf("%s%s\n", *p++, rq->es_ili ? "yes" : "no");
+	ds_dprintf("%s%d\n", *p++, rq->es_key);
 
-	dprintf("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++, rq->es_info_1,
+	ds_dprintf("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++, rq->es_info_1,
 	    rq->es_info_2, rq->es_info_3, rq->es_info_4);
-	dprintf("%s%d\n", *p++, rq->es_add_len);
-	dprintf("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++,
+	ds_dprintf("%s%d\n", *p++, rq->es_add_len);
+	ds_dprintf("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++,
 	    rq->es_cmd_info[0], rq->es_cmd_info[1], rq->es_cmd_info[2],
 	    rq->es_cmd_info[3]);
-	dprintf("%s0x%02x = %d\n", *p++, rq->es_add_code,
+	ds_dprintf("%s0x%02x = %d\n", *p++, rq->es_add_code,
 	    rq->es_add_code);
-	dprintf("%s0x%02x = %d\n", *p++, rq->es_qual_code,
+	ds_dprintf("%s0x%02x = %d\n", *p++, rq->es_qual_code,
 	    rq->es_qual_code);
-	dprintf("%s%d\n", *p++, rq->es_fru_code);
-	dprintf("%s0x%02x 0x%02x 0x%02x\n", *p++,
+	ds_dprintf("%s%d\n", *p++, rq->es_fru_code);
+	ds_dprintf("%s0x%02x 0x%02x 0x%02x\n", *p++,
 	    rq->es_skey_specific[0], rq->es_skey_specific[1],
 	    rq->es_skey_specific[2]);
 	if (rqlen >= sizeof (*rq)) {
-		dprintf("%s0x%02x 0x%02x%s\n", *p, rq->es_add_info[0],
+		ds_dprintf("%s0x%02x 0x%02x%s\n", *p, rq->es_add_info[0],
 		    rq->es_add_info[1], (rqlen > sizeof (*rq)) ? " ..." : "");
 	}
 
-	dprintf("\n");
+	ds_dprintf("\n");
 }
 
 /*
@@ -893,15 +893,15 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 		return;
 
 	/* Print descriptor sense header */
-	dprintf("%s0x%02x\n", *p++, (rq->ds_class << 4) + rq->ds_code);
-	dprintf("%s%d\n", *p++, rq->ds_key);
+	ds_dprintf("%s0x%02x\n", *p++, (rq->ds_class << 4) + rq->ds_code);
+	ds_dprintf("%s%d\n", *p++, rq->ds_key);
 
-	dprintf("%s%d\n", *p++, rq->ds_addl_sense_length);
-	dprintf("%s0x%02x = %d\n", *p++, rq->ds_add_code,
+	ds_dprintf("%s%d\n", *p++, rq->ds_addl_sense_length);
+	ds_dprintf("%s0x%02x = %d\n", *p++, rq->ds_add_code,
 	    rq->ds_add_code);
-	dprintf("%s0x%02x = %d\n", *p++, rq->ds_qual_code,
+	ds_dprintf("%s0x%02x = %d\n", *p++, rq->ds_qual_code,
 	    rq->ds_qual_code);
-	dprintf("\n");
+	ds_dprintf("\n");
 
 	/*
 	 * Now print any sense descriptors.   The first descriptor will
@@ -944,7 +944,7 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 			    ((uint64_t)isd->isd_information[5] << 16) |
 			    ((uint64_t)isd->isd_information[6] << 8)  |
 			    ((uint64_t)isd->isd_information[7]));
-			dprintf("Information field:               "
+			ds_dprintf("Information field:               "
 			    "%0" PRIx64 "\n", information);
 			break;
 		}
@@ -962,7 +962,7 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 			    ((uint64_t)c->css_cmd_specific_info[5] << 16) |
 			    ((uint64_t)c->css_cmd_specific_info[6] << 8)  |
 			    ((uint64_t)c->css_cmd_specific_info[7]));
-			dprintf("Command-specific information:    "
+			ds_dprintf("Command-specific information:    "
 			    "%0" PRIx64 "\n", cmd_specific);
 			break;
 		}
@@ -970,7 +970,7 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 			struct scsi_sk_specific_sense_descr *ssd =
 			    (struct scsi_sk_specific_sense_descr *)isd;
 			uint8_t *sk_spec_ptr = (uint8_t *)&ssd->sss_data;
-			dprintf("Sense-key specific:              "
+			ds_dprintf("Sense-key specific:              "
 			    "0x%02x 0x%02x 0x%02x\n", sk_spec_ptr[0],
 			    sk_spec_ptr[1], sk_spec_ptr[2]);
 			break;
@@ -978,14 +978,14 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 		case DESCR_FRU: {
 			struct scsi_fru_sense_descr *fsd =
 			    (struct scsi_fru_sense_descr *)isd;
-			dprintf("Field replaceable unit code:     "
+			ds_dprintf("Field replaceable unit code:     "
 			    "%d\n", fsd->fs_fru_code);
 			break;
 		}
 		case DESCR_BLOCK_COMMANDS: {
 			struct scsi_block_cmd_sense_descr *bsd =
 			    (struct scsi_block_cmd_sense_descr *)isd;
-			dprintf("Incorrect length indicator:      "
+			ds_dprintf("Incorrect length indicator:      "
 			    "%s\n", bsd->bcs_ili ? "yes" : "no");
 			break;
 		}
@@ -1003,7 +1003,7 @@ scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 		descr_offset += (isd->isd_addl_length + 2);
 	}
 
-	dprintf("\n");
+	ds_dprintf("\n");
 }
 
 static int
@@ -1109,13 +1109,13 @@ uscsi_cmd(int fd, struct uscsi_cmd *ucmd, void *rqbuf, int *rqlen)
 	 * may be able to use that to print a reasonable error msg.
 	 */
 	if (ucmd->uscsi_rqstatus == IMPOSSIBLE_SCSI_STATUS) {
-		dprintf("No request sense for command %s\n",
+		ds_dprintf("No request sense for command %s\n",
 		    find_string(scsi_cmdname_strings,
 		    ucmd->uscsi_cdb[0]));
 		return (-1);
 	}
 	if (ucmd->uscsi_rqstatus != STATUS_GOOD) {
-		dprintf("Request sense status for command %s: 0x%x\n",
+		ds_dprintf("Request sense status for command %s: 0x%x\n",
 		    find_string(scsi_cmdname_strings,
 		    ucmd->uscsi_cdb[0]),
 		    ucmd->uscsi_rqstatus);
@@ -1128,11 +1128,11 @@ uscsi_cmd(int fd, struct uscsi_cmd *ucmd, void *rqbuf, int *rqlen)
 	if ((((int)rq->es_add_len) + 8) < MIN_REQUEST_SENSE_LEN ||
 	    rq->es_class != CLASS_EXTENDED_SENSE ||
 	    *rqlen < MIN_REQUEST_SENSE_LEN) {
-		dprintf("Request sense for command %s failed\n",
+		ds_dprintf("Request sense for command %s failed\n",
 		    find_string(scsi_cmdname_strings,
 		    ucmd->uscsi_cdb[0]));
 
-		dprintf("Sense data:\n");
+		ds_dprintf("Sense data:\n");
 		ddump(NULL, (caddr_t)rqbuf, *rqlen);
 
 		return (-1);
@@ -1179,7 +1179,7 @@ uscsi_request_sense(int fd, caddr_t buf, int buflen, void *rqbuf, int *rqblen)
 	ucmd.uscsi_buflen = buflen;
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 	if (status)
-		dprintf("Request sense failed\n");
+		ds_dprintf("Request sense failed\n");
 	if (status == 0)
 		ddump("Request Sense data:", buf, buflen);
 
@@ -1229,7 +1229,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	ucmd.uscsi_buflen = nbytes;
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 	if (status) {
-		dprintf("Mode sense page 0x%x failed\n", page_code);
+		ds_dprintf("Mode sense page 0x%x failed\n", page_code);
 		return (-1);
 	}
 
@@ -1250,15 +1250,15 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	 * type.
 	 */
 	if (hdr->length == 0) {
-		dprintf("\nMode sense page 0x%x: has header length for zero\n",
-		    page_code);
+		ds_dprintf("\nMode sense page 0x%x: has header length for "
+		    "zero\n", page_code);
 		ddump("Mode sense:", mode_sense_buf, nbytes);
 		return (-1);
 	}
 
 	if (hdr->bdesc_length != sizeof (struct block_descriptor) &&
 	    hdr->bdesc_length != 0) {
-		dprintf("\nMode sense page 0x%x: block descriptor "
+		ds_dprintf("\nMode sense page 0x%x: block descriptor "
 		    "length %d incorrect\n", page_code, hdr->bdesc_length);
 		ddump("Mode sense:", mode_sense_buf, nbytes);
 		return (-1);
@@ -1273,7 +1273,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 
 		if ((hdr->length + sizeof (header->ms_header.length)) <
 		    (MODE_HEADER_LENGTH + hdr->bdesc_length)) {
-			dprintf("\nHeader length would spiral into a "
+			ds_dprintf("\nHeader length would spiral into a "
 			    "negative bcopy\n");
 			return (-1);
 		}
@@ -1283,7 +1283,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 		    (MODE_HEADER_LENGTH + hdr->bdesc_length));
 
 		pc = find_string(page_control_strings, page_control);
-		dprintf("\nMode sense page 0x%x (%s):\n", page_code,
+		ds_dprintf("\nMode sense page 0x%x (%s):\n", page_code,
 		    pc != NULL ? pc : "");
 		ddump("header:", (caddr_t)header,
 		    sizeof (struct scsi_ms_header));
@@ -1296,7 +1296,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	}
 
 	if (pg->code != page_code) {
-		dprintf("\nMode sense page 0x%x: incorrect page code 0x%x\n",
+		ds_dprintf("\nMode sense page 0x%x: incorrect page code 0x%x\n",
 		    page_code, pg->code);
 		ddump("Mode sense:", mode_sense_buf, nbytes);
 		return (-1);
@@ -1309,7 +1309,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	 */
 	maximum = page_size - sizeof (struct mode_page);
 	if (((int)pg->length) > maximum) {
-		dprintf("Mode sense page 0x%x: incorrect page "
+		ds_dprintf("Mode sense page 0x%x: incorrect page "
 		    "length %d - expected max %d\n",
 		    page_code, pg->length, maximum);
 		ddump("Mode sense:", mode_sense_buf, nbytes);
@@ -1319,7 +1319,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	(void) memcpy(page_data, (caddr_t)pg, MODESENSE_PAGE_LEN(pg));
 
 	pc = find_string(page_control_strings, page_control);
-	dprintf("\nMode sense page 0x%x (%s):\n", page_code,
+	ds_dprintf("\nMode sense page 0x%x (%s):\n", page_code,
 	    pc != NULL ? pc : "");
 	ddump("header:", (caddr_t)header, sizeof (struct scsi_ms_header));
 	ddump("data:", page_data, MODESENSE_PAGE_LEN(pg));
@@ -1370,7 +1370,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 	if (status) {
-		dprintf("Mode sense(10) page 0x%x failed\n",
+		ds_dprintf("Mode sense(10) page 0x%x failed\n",
 		    page_code);
 		return (-1);
 	}
@@ -1392,7 +1392,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 	(void) memset((caddr_t)header, 0, sizeof (struct scsi_ms_header_g1));
 	if (bdesc_length != sizeof (struct block_descriptor) &&
 	    bdesc_length != 0) {
-		dprintf("\nMode sense(10) page 0x%x: block descriptor "
+		ds_dprintf("\nMode sense(10) page 0x%x: block descriptor "
 		    "length %d incorrect\n", page_code, bdesc_length);
 		ddump("Mode sense(10):", mode_sense_buf, nbytes);
 		return (-1);
@@ -1410,7 +1410,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 		    (MODE_HEADER_LENGTH_G1 + bdesc_length));
 
 		pc = find_string(page_control_strings, page_control);
-		dprintf("\nMode sense(10) page 0x%x (%s):\n",
+		ds_dprintf("\nMode sense(10) page 0x%x (%s):\n",
 		    page_code, pc != NULL ? pc : "");
 		ddump("header:", (caddr_t)header,
 		    MODE_HEADER_LENGTH_G1 + bdesc_length);
@@ -1423,7 +1423,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 	}
 
 	if (pg->code != page_code) {
-		dprintf("\nMode sense(10) page 0x%x: incorrect page "
+		ds_dprintf("\nMode sense(10) page 0x%x: incorrect page "
 		    "code 0x%x\n", page_code, pg->code);
 		ddump("Mode sense(10):", mode_sense_buf, nbytes);
 		return (-1);
@@ -1436,7 +1436,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 	 */
 	maximum = page_size - sizeof (struct mode_page);
 	if (((int)pg->length) > maximum) {
-		dprintf("Mode sense(10) page 0x%x: incorrect page "
+		ds_dprintf("Mode sense(10) page 0x%x: incorrect page "
 		    "length %d - expected max %d\n",
 		    page_code, pg->length, maximum);
 		ddump("Mode sense(10):", mode_sense_buf,
@@ -1447,7 +1447,7 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 	(void) memcpy(page_data, (caddr_t)pg, MODESENSE_PAGE_LEN(pg));
 
 	pc = find_string(page_control_strings, page_control);
-	dprintf("\nMode sense(10) page 0x%x (%s):\n", page_code,
+	ds_dprintf("\nMode sense(10) page 0x%x (%s):\n", page_code,
 	    pc != NULL ? pc : "");
 	ddump("header:", (caddr_t)header,
 	    sizeof (struct scsi_ms_header_g1));
@@ -1492,7 +1492,7 @@ uscsi_mode_select(int fd, int page_code, int options, caddr_t page_data,
 
 	s = find_string(mode_select_strings,
 	    options & (MODE_SELECT_SP|MODE_SELECT_PF));
-	dprintf("\nMode select page 0x%x%s:\n", page_code,
+	ds_dprintf("\nMode select page 0x%x%s:\n", page_code,
 	    s != NULL ? s : "");
 	ddump("header:", (caddr_t)header, nbytes);
 	ddump("data:", (caddr_t)page_data, page_size);
@@ -1519,7 +1519,7 @@ uscsi_mode_select(int fd, int page_code, int options, caddr_t page_data,
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 
 	if (status)
-		dprintf("Mode select page 0x%x failed\n", page_code);
+		ds_dprintf("Mode select page 0x%x failed\n", page_code);
 
 	return (status);
 }
@@ -1564,7 +1564,7 @@ uscsi_mode_select_10(int fd, int page_code, int options,
 	 */
 	s = find_string(mode_select_strings,
 	    options & (MODE_SELECT_SP|MODE_SELECT_PF));
-	dprintf("\nMode select(10) page 0x%x%s:\n", page_code,
+	ds_dprintf("\nMode select(10) page 0x%x%s:\n", page_code,
 	    s != NULL ? s : "");
 	ddump("header:", (caddr_t)header, nbytes);
 	ddump("data:", (caddr_t)page_data, page_size);
@@ -1591,7 +1591,7 @@ uscsi_mode_select_10(int fd, int page_code, int options,
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 
 	if (status)
-		dprintf("Mode select(10) page 0x%x failed\n", page_code);
+		ds_dprintf("Mode select(10) page 0x%x failed\n", page_code);
 
 	return (status);
 }
@@ -1633,7 +1633,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	ucmd.uscsi_buflen = page_size;
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 	if (status) {
-		dprintf("Log sense page 0x%x failed\n", page_code);
+		ds_dprintf("Log sense page 0x%x failed\n", page_code);
 		free(log_sense_buf);
 		return (-1);
 	}
@@ -1650,7 +1650,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	len = BE_16(hdr->lh_length);
 
 	if (hdr->lh_code != page_code) {
-		dprintf("\nLog sense page 0x%x: incorrect page code 0x%x\n",
+		ds_dprintf("\nLog sense page 0x%x: incorrect page code 0x%x\n",
 		    page_code, hdr->lh_code);
 		ddump("Log sense:", log_sense_buf, page_size);
 		free(log_sense_buf);
@@ -1669,7 +1669,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	    sizeof (scsi_log_header_t));
 
 	pc = find_string(page_control_strings, page_control);
-	dprintf("\nLog sense page 0x%x (%s):\n", page_code,
+	ds_dprintf("\nLog sense page 0x%x (%s):\n", page_code,
 	    pc != NULL ? pc : "");
 	ddump("header:", (caddr_t)hdr,
 	    sizeof (scsi_log_header_t));

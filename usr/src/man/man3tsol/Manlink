@@ -1,0 +1,56 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+blcompare.3tsol
+	bldominates.3tsol
+	blequal.3tsol
+	blinrange.3tsol
+	blstrictdom.3tsol
+blminmax.3tsol
+	blmaximum.3tsol
+	blminimum.3tsol
+bltocolor.3tsol
+	bltocolor_r.3tsol
+bltos.3tsol
+	bcleartos.3tsol
+	bsltos.3tsol
+btohex.3tsol
+	bcleartoh.3tsol
+	bcleartoh_r.3tsol
+	bsltoh.3tsol
+	bsltoh_r.3tsol
+	h_alloc.3tsol
+	h_free.3tsol
+getlabel.3tsol
+	fgetlabel.3tsol
+getzonelabelbyid.3tsol
+	getzoneidbylabel.3tsol
+	getzonelabelbyname.3tsol
+getzonerootbyid.3tsol
+	getzonerootbylabel.3tsol
+	getzonerootbyname.3tsol
+hextob.3tsol
+	htobclear.3tsol
+	htobsl.3tsol
+m_label.3tsol
+	m_label_alloc.3tsol
+	m_label_dup.3tsol
+	m_label_free.3tsol
+sbltos.3tsol
+	sbcleartos.3tsol
+	sbsltos.3tsol
+stobl.3tsol
+	stobclear.3tsol
+	stobsl.3tsol

@@ -16,38 +16,22 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3sec
+MANSECT=	3sec
 
-MANFILES= 	acl_check.3sec		\
-	 	acl_free.3sec		\
-	 	acl_get.3sec		\
-	 	acl_strip.3sec		\
-	 	acl_totext.3sec		\
-	 	acl_trivial.3sec	\
-	 	aclcheck.3sec		\
-	 	aclsort.3sec		\
-	 	acltomode.3sec		\
-	 	acltotext.3sec
-
-MANLINKS=	acl_fromtext.3sec	\
-		acl_set.3sec		\
-		aclfrommode.3sec	\
-		aclfromtext.3sec	\
-		facl_get.3sec		\
-		facl_set.3sec
-
-acl_set.3sec		:= LINKSRC = acl_get.3sec
-facl_get.3sec		:= LINKSRC = acl_get.3sec
-facl_set.3sec		:= LINKSRC = acl_get.3sec
-
-acl_fromtext.3sec	:= LINKSRC = acl_totext.3sec
-
-aclfrommode.3sec	:= LINKSRC = acltomode.3sec
-
-aclfromtext.3sec	:= LINKSRC = acltotext.3sec
+MANFILES=	acl_check.3sec		\
+		acl_free.3sec		\
+		acl_get.3sec		\
+		acl_strip.3sec		\
+		acl_totext.3sec		\
+		acl_trivial.3sec	\
+		aclcheck.3sec		\
+		aclsort.3sec		\
+		acltomode.3sec		\
+		acltotext.3sec
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

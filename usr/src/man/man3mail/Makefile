@@ -16,19 +16,13 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3mail
+MANSECT=	3mail
 
 MANFILES=	maillock.3mail
-
-MANLINKS=	mailunlock.3mail	\
-		touchlock.3mail
-
-mailunlock.3mail	:= LINKSRC = maillock.3mail
-
-touchlock.3mail		:= LINKSRC = maillock.3mail
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

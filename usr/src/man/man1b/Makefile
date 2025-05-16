@@ -53,18 +53,9 @@ MANFILES=	basename.1b	\
 		whereis.1b	\
 		whoami.1b
 
-MANLINKS=	Mail.1b		\
-		fasthalt.1b	\
-		reset.1b
-
-Mail.1b		:= LINKSRC = mail.1b
-
-fasthalt.1b	:= LINKSRC = fastboot.1b
-
-reset.1b	:= LINKSRC = tset.1b
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

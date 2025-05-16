@@ -13,9 +13,9 @@
 
 include ../../Makefile.master
 
-MANSECT = 	3mvec
+MANSECT=	3mvec
 
-MANFILES =	vatan2_.3mvec \
+MANFILES=	vatan2_.3mvec \
 		vatan_.3mvec \
 		vcos_.3mvec \
 		vcospi_.3mvec \

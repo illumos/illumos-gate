@@ -26,43 +26,6 @@ MANFILES=	vnd_create.3vnd 	\
 		vnd_prop_writeable.3vnd	\
 		vnd_walk.3vnd
 
-MANLINKS=	frameio_t.3vnd		\
-		framevec_t.3vnd		\
-		vnd_close.3vnd		\
-		vnd_frameio_write.3vnd	\
-		vnd_open.3vnd 		\
-		vnd_prop_set.3vnd	\
-		vnd_prop_iter_f.3vnd	\
-		vnd_strerror.3vnd	\
-		vnd_strsyserror.3vnd	\
-		vnd_syserrno.3vnd	\
-		vnd_unlink.3vnd 	\
-		vnd_walk_cb_f.3vnd
-
-# vnd_create.3vnd
-vnd_open.3vnd		:= LINKSRC = vnd_create.3vnd
-vnd_unlink.3vnd		:= LINKSRC = vnd_create.3vnd
-vnd_close.3vnd		:= LINKSRC = vnd_create.3vnd
-
-# vnd_errno.3vnd
-vnd_strerror.3vnd	:= LINKSRC = vnd_errno.3vnd
-vnd_syserrno.3vnd	:= LINKSRC = vnd_errno.3vnd 
-vnd_strsyserror.3vnd	:= LINKSRC = vnd_errno.3vnd 
-
-# vnd_frameio_read.3vnd
-vnd_frameio_write.3vnd	:= LINKSRC = vnd_frameio_read.3vnd 
-framevec_t.3vnd		:= LINKSRC = vnd_frameio_read.3vnd
-frameio_t.3vnd		:= LINKSRC = vnd_frameio_read.3vnd
-
-# vnd_prop_get.3vnd
-vnd_prop_set.3vnd	:= LINKSRC = vnd_prop_get.3vnd
-
-# vnd_prop_iter.3vnd
-vnd_prop_iter_f.3vnd	:= LINKSRC = vnd_prop_iter.3vnd
-
-# vnd_walk.3vnd
-vnd_walk_cb_f.3vnd	:= LINKSRC = vnd_walk.3vnd
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man

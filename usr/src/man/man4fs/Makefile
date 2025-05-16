@@ -37,16 +37,9 @@ MANFILES=	bootfs.4fs	\
 		udfs.4fs	\
 		ufs.4fs
 
-MANLINKS=	stderr.4fs	\
-		stdin.4fs	\
-		stdout.4fs
-
-stderr.4fs	:= LINKSRC = fd.4fs
-stdin.4fs	:= LINKSRC = fd.4fs
-stdout.4fs	:= LINKSRC = fd.4fs
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

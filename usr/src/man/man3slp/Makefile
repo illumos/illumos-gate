@@ -16,26 +16,26 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3slp
+MANSECT=	3slp
 
-MANFILES= 	SLPClose.3slp			\
-	 	SLPDelAttrs.3slp		\
-	 	SLPDereg.3slp			\
-	 	SLPEscape.3slp			\
-	 	SLPFindAttrs.3slp		\
-	 	SLPFindScopes.3slp		\
-	 	SLPFindSrvTypes.3slp		\
-	 	SLPFindSrvs.3slp		\
-	 	SLPFree.3slp			\
-	 	SLPGetProperty.3slp		\
-	 	SLPGetRefreshInterval.3slp	\
-	 	SLPOpen.3slp			\
-	 	SLPParseSrvURL.3slp		\
-	 	SLPReg.3slp			\
-	 	SLPSetProperty.3slp		\
-	 	SLPUnescape.3slp		\
-	 	slp_api.3slp			\
-	 	slp_strerror.3slp
+MANFILES=	SLPClose.3slp			\
+		SLPDelAttrs.3slp		\
+		SLPDereg.3slp			\
+		SLPEscape.3slp			\
+		SLPFindAttrs.3slp		\
+		SLPFindScopes.3slp		\
+		SLPFindSrvTypes.3slp		\
+		SLPFindSrvs.3slp		\
+		SLPFree.3slp			\
+		SLPGetProperty.3slp		\
+		SLPGetRefreshInterval.3slp	\
+		SLPOpen.3slp			\
+		SLPParseSrvURL.3slp		\
+		SLPReg.3slp			\
+		SLPSetProperty.3slp		\
+		SLPUnescape.3slp		\
+		slp_api.3slp			\
+		slp_strerror.3slp
 
 .KEEP_STATE:
 

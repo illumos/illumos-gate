@@ -16,21 +16,15 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3rpc
+MANSECT=	3rpc
 
-MANFILES= 	rstat.3rpc	\
-	 	rusers.3rpc	\
-	 	rwall.3rpc
-
-MANLINKS=	havedisk.3rpc	\
-		rnusers.3rpc
-
-havedisk.3rpc	:= LINKSRC = rstat.3rpc
-
-rnusers.3rpc	:= LINKSRC = rusers.3rpc
+MANFILES=	rstat.3rpc	\
+		rusers.3rpc	\
+		rwall.3rpc
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

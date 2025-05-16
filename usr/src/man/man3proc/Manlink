@@ -1,0 +1,180 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+Paddr_to_ctf.3proc
+	Plmid_to_ctf.3proc
+	Pname_to_ctf.3proc
+Paddr_to_loadobj.3proc
+	Plmid_to_loadobj.3proc
+	Pname_to_loadobj.3proc
+Paddr_to_map.3proc
+	Paddr_to_text_map.3proc
+	Plmid_to_map.3proc
+	Pname_to_map.3proc
+Pclearfault.3proc
+	Lclearfault.3proc
+Pclearsig.3proc
+	Lclearsig.3proc
+Pcreate.3proc
+	Pcreate_callback.3proc
+	Pxcreate.3proc
+Pcwd.3proc
+	Pcwd_free.3proc
+Pgcore.3proc
+	Pfgcore.3proc
+Pgetareg.3proc
+	Lgetareg.3proc
+	Lputareg.3proc
+	Pputareg.3proc
+Pgrab_core.3proc
+	Pfgrab_core.3proc
+Pissyscall.3proc
+	Pissyscall_prev.3proc
+Pldt.3proc
+	proc_get_ldt.3proc
+Plookup_by_addr.3proc
+	Plookup_by_name.3proc
+	Pxlookup_by_addr.3proc
+	Pxlookup_by_addr_resolved.3proc
+	Pxlookup_by_name.3proc
+Plwp_getasrs.3proc
+	Plwp_setasrs.3proc
+Plwp_getregs.3proc
+	Lgetfpregs.3proc
+	Lgetregs.3proc
+	Lsetfpregs.3proc
+	Lsetregs.3proc
+	Plwp_getfpregs.3proc
+	Plwp_setfpregs.3proc
+	Plwp_setregs.3proc
+Plwp_getxregs.3proc
+	Lgetxregs.3proc
+	Lsetxregs.3proc
+	Plwp_freexregs.3proc
+	Plwp_setxregs.3proc
+Plwp_iter.3proc
+	Plwp_iter_all.3proc
+Plwp_stack.3proc
+	Lalt_stack.3proc
+	Lmain_stack.3proc
+	Lstack.3proc
+	Plwp_alt_stack.3proc
+	Plwp_main_stack.3proc
+Pmapping_iter.3proc
+	Pmapping_iter_resolved.3proc
+	Pobject_iter.3proc
+	Pobject_iter_resolved.3proc
+Pobjname.3proc
+	Pobjname_resolved.3proc
+Ppriv.3proc
+	Ppriv_free.3proc
+Pread.3proc
+	Pread_string.3proc
+Prelease.3proc
+	Pfree.3proc
+Psecflags.3proc
+	Psecflags_free.3proc
+Psetflags.3proc
+	Punsetflags.3proc
+Psetrun.3proc
+	Lsetrun.3proc
+Psetsysentry.3proc
+	Psetsysexit.3proc
+Pstopstatus.3proc
+	Ldstop.3proc
+	Lstop.3proc
+	Lwait.3proc
+	Pdstop.3proc
+	Pstop.3proc
+	Pwait.3proc
+Psymbol_iter.3proc
+	Psymbol_iter_by_addr.3proc
+	Psymbol_iter_by_lmid.3proc
+	Psymbol_iter_by_name.3proc
+	Pxsymbol_iter.3proc
+Psync.3proc
+	Lsync.3proc
+Psysentry.3proc
+	Psysexit.3proc
+Pupanic.3proc
+	Pupanic_free.3proc
+Pxecbkpt.3proc
+	Lxecbkpt.3proc
+	Lxecwapt.3proc
+	Pxecwapt.3proc
+Pzonename.3proc
+	Pzonepath.3proc
+	Pzoneroot.3proc
+pr_getrlimit.3proc
+	pr_getrlimit64.3proc
+pr_setrlimit.3proc
+	pr_setrlimit64.3proc
+pr_stat.3proc
+	pr_fstat.3proc
+	pr_fstat64.3proc
+	pr_lstat.3proc
+	pr_lstat64.3proc
+	pr_stat64.3proc
+proc_arg_grab.3proc
+	proc_arg_xgrab.3proc
+proc_arg_psinfo.3proc
+	proc_arg_xpsinfo.3proc
+proc_content2str.3proc
+	proc_str2content.3proc
+proc_fltname.3proc
+	proc_dmodelname.3proc
+	proc_signame.3proc
+	proc_sysname.3proc
+proc_fltset2str.3proc
+	proc_sigset2str.3proc
+	proc_sysset2str.3proc
+proc_get_fdinfo.3proc
+	proc_fdinfo_free.3proc
+proc_get_lwpsinfo.3proc
+	proc_get_lwpstatus.3proc
+proc_get_priv.3proc
+	proc_free_priv.3proc
+proc_initstdio.3proc
+	proc_finistdio.3proc
+	proc_flushstdio.3proc
+proc_lwp_in_set.3proc
+	proc_lwp_range_valid.3proc
+proc_str2flt.3proc
+	proc_str2sig.3proc
+	proc_str2sys.3proc
+proc_str2fltset.3proc
+	proc_str2sigset.3proc
+	proc_str2sysset.3proc
+ps_lgetregs.3proc
+	ps_lgetfpregs.3proc
+	ps_lgetxregs.3proc
+	ps_lgetxregsize.3proc
+	ps_lsetfpregs.3proc
+	ps_lsetregs.3proc
+	ps_lsetxregs.3proc
+ps_pglobal_lookup.3proc
+	ps_pglobal_sym.3proc
+ps_pread.3proc
+	ps_pdread.3proc
+	ps_pdwrite.3proc
+	ps_ptread.3proc
+	ps_ptwrite.3proc
+	ps_pwrite.3proc
+ps_pstop.3proc
+	ps_kill.3proc
+	ps_lcontinue.3proc
+	ps_lrolltoaddr.3proc
+	ps_lstop.3proc
+	ps_pcontinue.3proc

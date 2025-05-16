@@ -16,26 +16,14 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3
+MANSECT=	3
 
-MANFILES= 	Intro.3		\
+MANFILES=	Intro.3		\
 		hosts_access.3
-
-MANLINKS=	intro.3		\
-		hosts_ctl.3	\
-		libwrap.3	\
-		request_init.3	\
-		request_set.3
-
-intro.3		:= LINKSRC = Intro.3
-
-hosts_ctl.3	:= LINKSRC = hosts_access.3
-libwrap.3	:= LINKSRC = hosts_access.3
-request_init.3	:= LINKSRC = hosts_access.3
-request_set.3	:= LINKSRC = hosts_access.3
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

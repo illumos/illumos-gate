@@ -1,0 +1,207 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+# Copyright 2025 MNX Cloud, Inc.
+#
+
+../../../has/man/man1has/csh.1has
+	csh.1
+../../../has/man/man1has/ctags.1has
+	ctags.1
+../../../has/man/man1has/edit.1has
+	edit.1
+../../../has/man/man1has/file.1has
+	file.1
+../../../has/man/man1has/vi.1has
+	vedit.1
+Intro.1
+	intro.1
+alias.1
+	unalias.1
+apropos.1
+	whatis.1
+at.1
+	batch.1
+awk.1
+	nawk.1
+basename.1
+	dirname.1
+break.1
+	continue.1
+cd.1
+	chdir.1
+	dirs.1
+	popd.1
+	pushd.1
+ckdate.1
+	errdate.1
+	helpdate.1
+	valdate.1
+ckgid.1
+	errgid.1
+	helpgid.1
+	valgid.1
+ckint.1
+	errint.1
+	helpint.1
+	valint.1
+ckitem.1
+	erritem.1
+	helpitem.1
+ckpath.1
+	errpath.1
+	helppath.1
+	valpath.1
+ckrange.1
+	errange.1
+	helprange.1
+	valrange.1
+ckstr.1
+	errstr.1
+	helpstr.1
+	valstr.1
+cktime.1
+	errtime.1
+	helptime.1
+	valtime.1
+ckuid.1
+	erruid.1
+	helpuid.1
+	valuid.1
+ckyorn.1
+	erryorn.1
+	helpyorn.1
+	valyorn.1
+compress.1
+	uncompress.1
+	zcat.1
+ed.1
+	red.1
+enable.1
+	disable.1
+encrypt.1
+	decrypt.1
+eqn.1
+	checkeq.1
+	neqn.1
+exec.1
+	eval.1
+	source.1
+exit.1
+	goto.1
+	return.1
+expand.1
+	unexpand.1
+grep.1
+	egrep.1
+	fgrep.1
+hash.1
+	hashstat.1
+	rehash.1
+	unhash.1
+history.1
+	fc.1
+	hist.1
+jobs.1
+	bg.1
+	fg.1
+	notify.1
+	stop.1
+ksh93.1
+	jsh.1
+	ksh.1
+	rksh.1
+	rksh93.1
+	sh.1
+ldapmodify.1
+	ldapadd.1
+limit.1
+	ulimit.1
+	unlimit.1
+loadkeys.1
+	dumpkeys.1
+mail.1
+	rmail.1
+machid.1
+	i286.1
+	i386.1
+	i486.1
+	sparc.1
+	sun.1
+make.1
+	dmake.1
+more.1
+	page.1
+pack.1
+	pcat.1
+	unpack.1
+pargs.1
+	pauxv.1
+	penv.1
+pfexec.1
+	pfcsh.1
+	pfksh.1
+	pfsh.1
+pgrep.1
+	pkill.1
+proc.1
+	pcred.1
+	pfiles.1
+	pflags.1
+	pldd.1
+	prun.1
+	psig.1
+	pstack.1
+	pstop.1
+	ptime.1
+	pwait.1
+	pwdx.1
+rm.1
+	rmdir.1
+rmmount.1
+	rmumount.1
+rsh.1
+	remote_shell.1
+	remsh.1
+sendmail-mailq.1
+	mailq.1
+set.1
+	export.1
+	setenv.1
+	unset.1
+	unsetenv.1
+shell_builtins.1
+	case.1
+	for.1
+	foreach.1
+	function.1
+	if.1
+	repeat.1
+	select.1
+	switch.1
+	until.1
+	while.1
+spell.1
+	hashcheck.1
+	hashmake.1
+	spellin.1
+strchg.1
+	strconf.1
+touch.1
+	settime.1
+trap.1
+	onintr.1
+true.1
+	false.1
+typeset.1
+	whence.1

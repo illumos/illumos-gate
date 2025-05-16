@@ -16,15 +16,15 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	1s
-
-MANLINKS=	dmake.1s make.1s
-
-dmake.1s	:= LINKSRC = ../man1/make.1
-make.1s		:= LINKSRC = ../man1/make.1
+MANSECT=	1s
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)
+
+# Force an explicit dependency on the directory, since this section currently
+# lacks any files to install
+install: $(ROOTMAN)/man$(MANSECT)

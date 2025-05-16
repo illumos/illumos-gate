@@ -16,20 +16,17 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	4
+MANSECT=	4
 
-MANFILES= 	FSS.4	\
+MANFILES=	FSS.4	\
 		Intro.4	\
 		cpr.4	\
 		ibmf.4 \
 		swap.4
 
-MANLINKS=	intro.4
-
-intro.4		:= LINKSRC = Intro.4
-
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

@@ -16,59 +16,53 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3stmf
+MANSECT=	3stmf
 
 MANFILES=	stmfAddToHostGroup.3stmf		\
-	 	stmfAddToTargetGroup.3stmf		\
-	 	stmfAddViewEntry.3stmf			\
-	 	stmfClearProviderData.3stmf		\
-	 	stmfCreateHostGroup.3stmf		\
-	 	stmfCreateLu.3stmf			\
-	 	stmfCreateLuResource.3stmf		\
-	 	stmfCreateTargetGroup.3stmf		\
-	 	stmfDeleteHostGroup.3stmf		\
-	 	stmfDeleteLu.3stmf			\
-	 	stmfDeleteTargetGroup.3stmf		\
-	 	stmfDevidFromIscsiName.3stmf		\
-	 	stmfDevidFromWwn.3stmf			\
-	 	stmfFreeLuResource.3stmf		\
-	 	stmfFreeMemory.3stmf			\
-	 	stmfGetHostGroupList.3stmf		\
-	 	stmfGetHostGroupMembers.3stmf		\
-	 	stmfGetLogicalUnitList.3stmf		\
-	 	stmfGetLogicalUnitProperties.3stmf	\
-	 	stmfGetLuResource.3stmf			\
-	 	stmfGetPersistMethod.3stmf		\
-	 	stmfGetProviderData.3stmf		\
-	 	stmfGetProviderDataProt.3stmf		\
-	 	stmfGetState.3stmf			\
-	 	stmfGetTargetGroupList.3stmf		\
-	 	stmfGetTargetGroupMembers.3stmf		\
-	 	stmfGetTargetList.3stmf			\
-	 	stmfGetTargetProperties.3stmf		\
-	 	stmfGetViewEntryList.3stmf		\
-	 	stmfModifyLu.3stmf			\
-	 	stmfOfflineLogicalUnit.3stmf		\
-	 	stmfOfflineTarget.3stmf			\
-	 	stmfOnlineLogicalUnit.3stmf		\
-	 	stmfOnlineTarget.3stmf			\
-	 	stmfRemoveFromHostGroup.3stmf		\
-	 	stmfRemoveFromTargetGroup.3stmf		\
-	 	stmfRemoveViewEntry.3stmf		\
-	 	stmfSetLuProp.3stmf			\
-	 	stmfSetPersistMethod.3stmf		\
-	 	stmfSetProviderData.3stmf		\
-	 	stmfSetProviderDataProt.3stmf
-
-MANLINKS=	stmfGetLuProp.3stmf			\
-		stmfModifyLuByFname.3stmf
-
-stmfModifyLuByFname.3stmf	:= LINKSRC = stmfModifyLu.3stmf
-
-stmfGetLuProp.3stmf		:= LINKSRC = stmfSetLuProp.3stmf
+		stmfAddToTargetGroup.3stmf		\
+		stmfAddViewEntry.3stmf			\
+		stmfClearProviderData.3stmf		\
+		stmfCreateHostGroup.3stmf		\
+		stmfCreateLu.3stmf			\
+		stmfCreateLuResource.3stmf		\
+		stmfCreateTargetGroup.3stmf		\
+		stmfDeleteHostGroup.3stmf		\
+		stmfDeleteLu.3stmf			\
+		stmfDeleteTargetGroup.3stmf		\
+		stmfDevidFromIscsiName.3stmf		\
+		stmfDevidFromWwn.3stmf			\
+		stmfFreeLuResource.3stmf		\
+		stmfFreeMemory.3stmf			\
+		stmfGetHostGroupList.3stmf		\
+		stmfGetHostGroupMembers.3stmf		\
+		stmfGetLogicalUnitList.3stmf		\
+		stmfGetLogicalUnitProperties.3stmf	\
+		stmfGetLuResource.3stmf			\
+		stmfGetPersistMethod.3stmf		\
+		stmfGetProviderData.3stmf		\
+		stmfGetProviderDataProt.3stmf		\
+		stmfGetState.3stmf			\
+		stmfGetTargetGroupList.3stmf		\
+		stmfGetTargetGroupMembers.3stmf		\
+		stmfGetTargetList.3stmf			\
+		stmfGetTargetProperties.3stmf		\
+		stmfGetViewEntryList.3stmf		\
+		stmfModifyLu.3stmf			\
+		stmfOfflineLogicalUnit.3stmf		\
+		stmfOfflineTarget.3stmf			\
+		stmfOnlineLogicalUnit.3stmf		\
+		stmfOnlineTarget.3stmf			\
+		stmfRemoveFromHostGroup.3stmf		\
+		stmfRemoveFromTargetGroup.3stmf		\
+		stmfRemoveViewEntry.3stmf		\
+		stmfSetLuProp.3stmf			\
+		stmfSetPersistMethod.3stmf		\
+		stmfSetProviderData.3stmf		\
+		stmfSetProviderDataProt.3stmf
 
 .KEEP_STATE:
 
 include		$(SRC)/man/Makefile.man
 
-install:	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(MANLINK_SRCS)
+	$(MANLINK_INSTALL)

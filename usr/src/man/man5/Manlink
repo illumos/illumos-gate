@@ -1,0 +1,62 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+Intro.5
+	intro.5
+aliases.5
+	addresses.5
+	forward.5
+default_fs.5
+	fs.5
+devices.5
+	devid_cache.5
+	devname_cache.5
+	mdi_ib_cache.5
+	mdi_scsi_vhci_cache.5
+	pci_unitaddr_persistent.5
+	snapshot_cache.5
+dir_ufs.5
+	dir.5
+hosts.equiv.5
+	rhosts.5
+hosts_access.5
+	hosts.allow.5
+	hosts.deny.5
+init.5
+	TIMEZONE.5
+ipf.5
+	ipf.conf.5
+	ipf6.conf.5
+ipmon.5
+	ipmon.conf.5
+ipnat.5
+	ipnat.conf.5
+ippool.5
+	ippool.conf.5
+logindevperm.5
+	fbtab.5
+mech.5
+	qop.5
+pci.5
+	pcie.5
+sendmail.5
+	sendmail.cf.5
+	submit.cf.5
+ufsdump.5
+	dumpdates.5
+utmp.5
+	wtmp.5
+utmpx.5
+	wtmpx.5
