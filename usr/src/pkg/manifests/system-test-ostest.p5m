@@ -104,6 +104,11 @@ $(i386_ONLY)dir path=opt/os-tests/tests/i386
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/badseg_exec mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
+dir  path=opt/os-tests/tests/idmap
+file path=opt/os-tests/tests/idmap/idmap_fini mode=0555
+file path=opt/os-tests/tests/idmap/idmap_init mode=0555
+file path=opt/os-tests/tests/idmap/idmaptest.32 mode=0555
+file path=opt/os-tests/tests/idmap/idmaptest.64 mode=0555
 dir  path=opt/os-tests/tests/ilstr
 file path=opt/os-tests/tests/ilstr/ilstr_basic.32 mode=0555
 file path=opt/os-tests/tests/ilstr/ilstr_basic.64 mode=0555

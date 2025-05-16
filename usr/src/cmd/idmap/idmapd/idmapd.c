@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2025 Bill Sommerfeld
  */
 
 
@@ -419,6 +420,8 @@ init_idmapd()
 		    strerror(errno));
 		goto errout;
 	}
+
+	pthread_mutex_init(&_idmapdstate.id_lock, NULL);
 
 	if ((error = allocids(_idmapdstate.new_eph_db,
 	    8192, &_idmapdstate.next_uid,
