@@ -368,6 +368,7 @@ topo_zen_map_caches(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 
 		ct = zen_topo_determine_cache(mod, level, type, shift);
 		switch (ct) {
+		default:
 		case ZEN_TOPO_CACHE_UNKNOWN:
 			topo_mod_dprintf(mod, "failed to map CPU %u cache %u "
 			    "with id 0x%" PRIx64 " level %u, type 0x%x, APIC "

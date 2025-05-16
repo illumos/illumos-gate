@@ -393,6 +393,7 @@ sunFmModuleTable_init(void)
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
+		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((mod_name_avl = uu_avl_create(mod_name_avl_pool, NULL,
@@ -415,6 +416,7 @@ sunFmModuleTable_init(void)
 		SNMP_FREE(handler);
 		uu_avl_destroy(mod_name_avl);
 		uu_avl_pool_destroy(mod_name_avl_pool);
+		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((mod_index_avl = uu_avl_create(mod_index_avl_pool, NULL,

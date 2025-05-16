@@ -392,6 +392,7 @@ sunFmResourceTable_init(void)
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
+		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((rsrc_fmri_avl = uu_avl_create(rsrc_fmri_avl_pool, NULL,
@@ -416,6 +417,7 @@ sunFmResourceTable_init(void)
 		SNMP_FREE(handler);
 		uu_avl_destroy(rsrc_fmri_avl);
 		uu_avl_pool_destroy(rsrc_fmri_avl_pool);
+		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((rsrc_index_avl = uu_avl_create(rsrc_index_avl_pool, NULL,
