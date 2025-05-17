@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -29,23 +29,30 @@
 #include <zen_udf.h>
 
 static void
-udf_readone(int fd, uint8_t inst, uint8_t func, uint16_t reg, boolean_t do64)
+udf_readone(int fd, uint8_t inst, uint8_t func, uint16_t reg,
+    zen_udf_flags_t flags)
 {
 	int ret;
 	zen_udf_io_t zui;
 
 	bzero(&zui, sizeof (zui));
+	zui.zui_flags = flags;
 	zui.zui_inst = inst;
 	zui.zui_func = func;
 	zui.zui_reg = reg;
 
-	ret = ioctl(fd, do64 ? ZEN_UDF_READ64 : ZEN_UDF_READ32, &zui);
+	ret = ioctl(fd, ZEN_UDF_READ, &zui);
 	if (ret != 0) {
 		err(EXIT_FAILURE, "failed to issue read ioctl");
 	}
 
-	(void) printf("ifr %x/%x/%x: 0x%" PRIx64 "\n",
-	    inst, func, reg, zui.zui_data);
+	if ((flags & ZEN_UDF_F_BCAST) == 0) {
+		(void) printf("ifr %x/%x/%x: 0x%" PRIx64 "\n",
+		    inst, func, reg, zui.zui_data);
+	} else {
+		(void) printf("ifr bcast/%x/%x: 0x%" PRIx64 "\n",
+		    func, reg, zui.zui_data);
+	}
 }
 
 int
@@ -56,13 +63,13 @@ main(int argc, char *argv[])
 	const char *funcstr = NULL;
 	const char *inststr = NULL;
 	const char *regstr = NULL;
-	uint8_t func, inst;
+	zen_udf_flags_t flags = 0;
+	uint8_t func, inst = UINT8_MAX;
 	uint16_t reg;
 	unsigned long lval;
 	char *eptr;
-	boolean_t do64 = B_FALSE;
 
-	while ((c = getopt(argc, argv, "d:f:i:r:l")) != -1) {
+	while ((c = getopt(argc, argv, "d:f:bi:r:l")) != -1) {
 		switch (c) {
 		case 'd':
 			device = optarg;
@@ -70,11 +77,14 @@ main(int argc, char *argv[])
 		case 'f':
 			funcstr = optarg;
 			break;
+		case 'b':
+			flags |= ZEN_UDF_F_BCAST;
+			break;
 		case 'i':
 			inststr = optarg;
 			break;
 		case 'l':
-			do64 = B_TRUE;
+			flags |= ZEN_UDF_F_64;
 			break;
 		case 'r':
 			regstr = optarg;
@@ -82,11 +92,12 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (device == NULL || funcstr == NULL || inststr == NULL ||
-	    regstr == NULL) {
+	if (device == NULL || funcstr == NULL || regstr == NULL ||
+	    (inststr == NULL && (flags & ZEN_UDF_F_BCAST) == 0)) {
 		warnx("missing required arguments");
-		(void) fprintf(stderr, "Usage: udf [-l] -d device -f func -i "
-		    "inst -r reg\n");
+		(void) fprintf(stderr, "Usage: "
+		    "\tudf \t[-l] -d device -f func -b -r reg\n"
+		    "\t\t[-l] -d device -f func -i inst -r reg\n");
 		exit(2);
 	}
 
@@ -97,11 +108,15 @@ main(int argc, char *argv[])
 	}
 	func = (uint8_t)lval;
 
-	lval = strtoul(inststr, &eptr, 0);
-	if (errno != 0 || lval > UINT8_MAX || *eptr != '\0') {
-		errx(EXIT_FAILURE, "failed to parse -i: %s", inststr);
+	if ((flags & ZEN_UDF_F_BCAST) == 0) {
+		lval = strtoul(inststr, &eptr, 0);
+		if (errno != 0 || lval > UINT8_MAX || *eptr != '\0') {
+			errx(EXIT_FAILURE, "failed to parse -i: %s", inststr);
+		}
+		inst = (uint8_t)lval;
+	} else if (inststr != NULL) {
+		errx(EXIT_FAILURE, "pass just one of -b or -i inst");
 	}
-	inst = (uint8_t)lval;
 
 	lval = strtoul(regstr, &eptr, 0);
 	if (errno != 0 || lval > UINT16_MAX || *eptr != '\0') {
@@ -113,7 +128,7 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "failed to open %s", device);
 	}
 
-	udf_readone(fd, inst, func, reg, do64);
+	udf_readone(fd, inst, func, reg, flags);
 	(void) close(fd);
 	return (0);
 }
