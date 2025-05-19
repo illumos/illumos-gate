@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -97,6 +97,7 @@ static const zen_umc_t zen_umc_chan_no_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -113,6 +114,7 @@ static const zen_umc_t zen_umc_chan_no_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x800000000,
 						.udb_valid = B_TRUE
@@ -135,6 +137,7 @@ static const zen_umc_t zen_umc_chan_no_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 1,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x1000000000,
 						.udb_valid = B_TRUE
@@ -151,6 +154,7 @@ static const zen_umc_t zen_umc_chan_no_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x1800000000,
 						.udb_valid = B_TRUE
@@ -237,6 +241,7 @@ static const zen_umc_t zen_umc_chan_ilv = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -253,6 +258,7 @@ static const zen_umc_t zen_umc_chan_ilv = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x20000,
 						.udb_valid = B_TRUE
@@ -275,6 +281,7 @@ static const zen_umc_t zen_umc_chan_ilv = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 1,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x40000,
 						.udb_valid = B_TRUE
@@ -291,6 +298,7 @@ static const zen_umc_t zen_umc_chan_ilv = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x60000,
 						.udb_valid = B_TRUE
@@ -373,6 +381,7 @@ static const zen_umc_t zen_umc_chan_ilv_cs_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -389,6 +398,7 @@ static const zen_umc_t zen_umc_chan_ilv_cs_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x20000,
 						.udb_valid = B_TRUE
@@ -411,6 +421,7 @@ static const zen_umc_t zen_umc_chan_ilv_cs_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 1,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x40000,
 						.udb_valid = B_TRUE
@@ -427,6 +438,7 @@ static const zen_umc_t zen_umc_chan_ilv_cs_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x60000,
 						.udb_valid = B_TRUE
@@ -520,6 +532,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -536,6 +549,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x20000,
 						.udb_valid = B_TRUE
@@ -558,6 +572,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 1,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x40000,
 						.udb_valid = B_TRUE
@@ -574,6 +589,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_hash = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x60000,
 						.udb_valid = B_TRUE
@@ -676,6 +692,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_swap = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -692,6 +709,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_swap = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x7,
 					    0x8, 0xc, 0xd, 0xe, 0xf, 0x10 }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x20000,
 						.udb_valid = B_TRUE
@@ -714,6 +732,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_swap = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 1,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x40000,
 						.udb_valid = B_TRUE
@@ -730,6 +749,7 @@ static const zen_umc_t zen_umc_chan_ilv_bank_swap = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x7,
 					    0x8, 0xc, 0xd, 0xe, 0xf, 0x10 }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x60000,
 						.udb_valid = B_TRUE
@@ -811,6 +831,7 @@ static const zen_umc_t zen_umc_chan_subchan_no_hash = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE

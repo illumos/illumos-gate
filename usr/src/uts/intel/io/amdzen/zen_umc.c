@@ -2504,7 +2504,7 @@ zen_umc_calc_dimm_size(umc_dimm_t *dimm)
 		uint64_t nrc;
 		const umc_cs_t *cs = &dimm->ud_cs[i];
 
-		if (!cs->ucs_base.udb_valid && !cs->ucs_sec.udb_valid) {
+		if ((cs->ucs_flags & UMC_CS_F_DECODE_EN) == 0) {
 			continue;
 		}
 
@@ -2569,8 +2569,7 @@ zen_umc_fill_dimm_common(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 	 * we think this entry should be usable based on enabled chip-selects.
 	 */
 	for (uint_t i = 0; i < ZEN_UMC_MAX_CHAN_BASE; i++) {
-		if (dimm->ud_cs[i].ucs_base.udb_valid ||
-		    dimm->ud_cs[i].ucs_sec.udb_valid) {
+		if ((dimm->ud_cs[i].ucs_flags & UMC_CS_F_DECODE_EN) != 0) {
 			dimm->ud_flags |= UMC_DIMM_F_VALID;
 			break;
 		}
@@ -2645,6 +2644,11 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 		addr = (uint64_t)UMC_BASE_GET_ADDR(val) << UMC_BASE_ADDR_SHIFT;
 		dimm->ud_cs[i].ucs_sec.udb_base = addr;
 		dimm->ud_cs[i].ucs_sec.udb_valid = UMC_BASE_GET_EN(val);
+
+		if (dimm->ud_cs[i].ucs_base.udb_valid ||
+		    dimm->ud_cs[i].ucs_sec.udb_valid) {
+			dimm->ud_cs[i].ucs_flags |= UMC_CS_F_DECODE_EN;
+		}
 	}
 
 	reg = UMC_MASK_DDR4(id, dimmno);
@@ -2871,6 +2875,10 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 		addr = (uint64_t)UMC_BASE_EXT_GET_ADDR(val) <<
 		    UMC_BASE_EXT_ADDR_SHIFT;
 		cs->ucs_sec.udb_base |= addr;
+	}
+
+	if (cs->ucs_base.udb_valid || cs->ucs_sec.udb_valid) {
+		cs->ucs_flags |= UMC_CS_F_DECODE_EN;
 	}
 
 	reg = UMC_MASK_DDR5(id, regno);

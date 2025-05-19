@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -85,6 +85,7 @@ static const zen_umc_t zen_umc_cod_4ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -128,6 +129,7 @@ static const zen_umc_t zen_umc_cod_4ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -172,6 +174,7 @@ static const zen_umc_t zen_umc_cod_4ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -216,6 +219,7 @@ static const zen_umc_t zen_umc_cod_4ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -296,6 +300,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -340,6 +345,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -384,6 +390,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -428,6 +435,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -472,6 +480,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -516,6 +525,7 @@ static const zen_umc_t zen_umc_cod_6ch = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE

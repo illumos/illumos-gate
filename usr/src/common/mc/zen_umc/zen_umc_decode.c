@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -1727,6 +1727,10 @@ static boolean_t
 zen_umc_decoder_cs_matches(const umc_cs_t *cs, const uint64_t norm,
     boolean_t *matched_sec)
 {
+	if ((cs->ucs_flags & UMC_CS_F_DECODE_EN) == 0) {
+		return (B_FALSE);
+	}
+
 	if (cs->ucs_base.udb_valid != 0) {
 		uint64_t imask = ~cs->ucs_base_mask;
 		if ((norm & imask) == (cs->ucs_base.udb_base & imask)) {
