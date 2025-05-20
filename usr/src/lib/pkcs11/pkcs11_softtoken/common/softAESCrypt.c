@@ -24,6 +24,7 @@
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Jason King.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <pthread.h>
@@ -1609,6 +1610,10 @@ soft_aes_mac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	return (rv);
 }
 
+/*
+ * Compare with crypto_free_mode_ctx()
+ * in $SRC/common/crypto/modes/modes.c
+ */
 void
 soft_aes_free_ctx(aes_ctx_t *ctx)
 {
@@ -1624,8 +1629,20 @@ soft_aes_free_ctx(aes_ctx_t *ctx)
 	} else if (ctx->ac_flags & CTR_MODE) {
 		len = sizeof (ctr_ctx_t);
 	} else if (ctx->ac_flags & CCM_MODE) {
+		ccm_ctx_t *ccm_ctx = &ctx->acu.acu_ccm;
+		if (ccm_ctx->ccm_pt_buf != NULL) {
+			freezero(ccm_ctx->ccm_pt_buf,
+			    ccm_ctx->ccm_data_len);
+			ccm_ctx->ccm_pt_buf = NULL;
+		}
 		len = sizeof (ccm_ctx_t);
 	} else if (ctx->ac_flags & GCM_MODE) {
+		gcm_ctx_t *gcm_ctx = &ctx->acu.acu_gcm;
+		if (gcm_ctx->gcm_pt_buf != NULL) {
+			freezero(gcm_ctx->gcm_pt_buf,
+			    gcm_ctx->gcm_pt_buf_len);
+			gcm_ctx->gcm_pt_buf = NULL;
+		}
 		len = sizeof (gcm_ctx_t);
 	}
 
