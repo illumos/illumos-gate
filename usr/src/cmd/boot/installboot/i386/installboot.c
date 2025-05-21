@@ -22,6 +22,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Toomas Soome <tsoome@me.com>
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 #include <stdio.h>
@@ -2354,8 +2355,10 @@ handle_mirror(char *progname, int argc, char **argv)
 
 		/* Free source list */
 		pl_src = STAILQ_LAST(src.plist, partlist, pl_next);
-		STAILQ_REMOVE(src.plist, pl_src, partlist, pl_next);
-		partlist_free(pl_src);
+		if (pl_src != NULL) {
+			STAILQ_REMOVE(src.plist, pl_src, partlist, pl_next);
+			partlist_free(pl_src);
+		}
 	}
 	retval = BC_SUCCESS;
 
