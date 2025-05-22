@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -58,6 +58,7 @@ zen_umc_dump_cs(umc_cs_t *cs)
 	nvlist_t *base = fnvlist_alloc();
 	nvlist_t *sec = fnvlist_alloc();
 
+	fnvlist_add_uint32(nvl, "ucs_flags", cs->ucs_flags);
 	fnvlist_add_uint64(base, "udb_base", cs->ucs_base.udb_base);
 	fnvlist_add_uint8(base, "udb_valid", cs->ucs_base.udb_valid);
 	fnvlist_add_nvlist(nvl, "ucs_base", base);
@@ -371,6 +372,7 @@ zen_umc_restore_cs(nvlist_t *nvl, umc_cs_t *cs)
 	uint_t nbanks, ncols, nrm, nrm_sec;
 
 	if (nvlist_lookup_pairs(nvl, 0,
+	    "ucs_flags", DATA_TYPE_UINT32, &cs->ucs_flags,
 	    "ucs_base", DATA_TYPE_NVLIST, &base,
 	    "ucs_sec", DATA_TYPE_NVLIST, &sec,
 	    "ucs_base_mask", DATA_TYPE_UINT64, &cs->ucs_base_mask,

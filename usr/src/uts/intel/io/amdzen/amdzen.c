@@ -347,6 +347,13 @@ amdzen_df_read32_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
 	return (amdzen_stub_get32(df->adf_funcs[def.drd_func], def.drd_reg));
 }
 
+static uint64_t
+amdzen_df_read64_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
+{
+	VERIFY(MUTEX_HELD(&azn->azn_mutex));
+	return (amdzen_stub_get64(df->adf_funcs[def.drd_func], def.drd_reg));
+}
+
 static uint32_t
 amdzen_smn_read(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg)
 {
@@ -622,6 +629,30 @@ amdzen_c_df_read32_bcast(uint_t dfno, const df_reg_def_t def, uint32_t *valp)
 	}
 
 	*valp = amdzen_df_read32_bcast(azn, df, def);
+	mutex_exit(&azn->azn_mutex);
+
+	return (0);
+}
+
+int
+amdzen_c_df_read64_bcast(uint_t dfno, const df_reg_def_t def, uint64_t *valp)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	if (df->adf_rev == DF_REV_UNKNOWN) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOTSUP);
+	}
+
+	*valp = amdzen_df_read64_bcast(azn, df, def);
 	mutex_exit(&azn->azn_mutex);
 
 	return (0);

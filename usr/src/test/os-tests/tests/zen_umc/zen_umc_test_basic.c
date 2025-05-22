@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -84,6 +84,7 @@ static const zen_umc_t zen_umc_basic_1p1c1d = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -162,6 +163,7 @@ static const zen_umc_t zen_umc_basic_1p1c1d_64g = {
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0,
 						.udb_valid = B_TRUE
@@ -178,6 +180,7 @@ static const zen_umc_t zen_umc_basic_1p1c1d_64g = {
 					.ucs_col_bits = { 0x3, 0x4, 0x5, 0x6,
 					    0x7, 0x8, 0x9, 0xa, 0xb, 0xc }
 				}, {
+					.ucs_flags = UMC_CS_F_DECODE_EN,
 					.ucs_base = {
 						.udb_base = 0x800000000,
 						.udb_valid = B_TRUE

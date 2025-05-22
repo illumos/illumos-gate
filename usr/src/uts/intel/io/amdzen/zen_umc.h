@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _ZEN_UMC_H
@@ -292,6 +292,14 @@ typedef enum umc_dimm_flags {
 	UMC_DIMM_F_VALID	= 1 << 0,
 } umc_dimm_flags_t;
 
+typedef enum umc_cs_flags {
+	/*
+	 * This flag indicates that at least one of the base or secondary
+	 * chip-select decoding register is enabled.
+	 */
+	UMC_CS_F_DECODE_EN	= 1 << 0,
+} umc_cs_flags_t;
+
 /*
  * A DIMM may have one or more ranks, which is an independent logical item that
  * is activated by a 'chip-select' signal on a DIMM (e.g. CS_L[1:0]). In a given
@@ -315,6 +323,7 @@ typedef enum umc_dimm_flags {
  * represented that way in the UMC.
  */
 typedef struct umc_cs {
+	umc_cs_flags_t		ucs_flags;
 	umc_dimm_base_t		ucs_base;
 	umc_dimm_base_t		ucs_sec;
 	uint64_t		ucs_base_mask;
@@ -554,6 +563,7 @@ typedef struct zen_umc_fam_data {
 	uint8_t			zufd_cs_nrules;
 	zen_umc_umc_style_t	zufd_umc_style;
 	umc_chan_hash_flags_t	zufd_chan_hash;
+	uint32_t		zufd_base_instid;
 } zen_umc_fam_data_t;
 
 /*

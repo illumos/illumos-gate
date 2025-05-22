@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -76,8 +76,9 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	zen_udf_t *zen_udf = &zen_udf_data;
 	zen_udf_io_t zui;
 	df_reg_def_t def;
+	boolean_t bcast, do64;
 
-	if (cmd != ZEN_UDF_READ32 && cmd != ZEN_UDF_READ64) {
+	if (cmd != ZEN_UDF_READ) {
 		return (ENOTTY);
 	}
 
@@ -95,6 +96,13 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (EFAULT);
 	}
 
+	if ((zui.zui_flags & ~(ZEN_UDF_F_BCAST | ZEN_UDF_F_64)) != 0) {
+		return (EINVAL);
+	}
+
+	bcast = (zui.zui_flags & ZEN_UDF_F_BCAST) != 0;
+	do64 = (zui.zui_flags & ZEN_UDF_F_64) != 0;
+
 	/*
 	 * Cons up a register definition based on the user request. We set the
 	 * gen to our current one.
@@ -103,11 +111,13 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	def.drd_func = zui.zui_func;
 	def.drd_reg = zui.zui_reg;
 
-	if (cmd == ZEN_UDF_READ32) {
+	if (!do64) {
 		int ret;
 		uint32_t data;
 
-		ret = amdzen_c_df_read32(dfno, zui.zui_inst, def, &data);
+		ret = bcast ?
+		    amdzen_c_df_read32_bcast(dfno, def, &data) :
+		    amdzen_c_df_read32(dfno, zui.zui_inst, def, &data);
 		if (ret != 0) {
 			return (ret);
 		}
@@ -116,8 +126,9 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	} else {
 		int ret;
 
-		ret = amdzen_c_df_read64(dfno, zui.zui_inst, def,
-		    &zui.zui_data);
+		ret = bcast ?
+		    amdzen_c_df_read64_bcast(dfno, def, &zui.zui_data) :
+		    amdzen_c_df_read64(dfno, zui.zui_inst, def, &zui.zui_data);
 		if (ret != 0) {
 			return (ret);
 		}
