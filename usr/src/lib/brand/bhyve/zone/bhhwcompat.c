@@ -66,7 +66,7 @@ main(int argc, char *argv[])
  * Uggh, recent changes to sys/vmm.h exclude this from userland. Keep in synch.
  * See illumos#14691 for the correct answer to this problem.
  */
-#define	VM_MAXCPU 32
+#define	VM_MAXCPU 64
 	if (max_cpu) {
 		(void) printf("%d\n", VM_MAXCPU);
 	}

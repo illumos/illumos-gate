@@ -145,7 +145,7 @@ enum x2apic_state {
 #define	VM_MAX_SEG_NAMELEN	128
 
 #ifdef _KERNEL
-#define	VM_MAXCPU	32			/* maximum virtual cpus */
+#define	VM_MAXCPU	64			/* maximum virtual cpus */
 #endif
 
 /*
