@@ -585,7 +585,7 @@ public class slpd extends SLPConfig {
 	    if (msg.getErrorCode() != ServiceLocationException.OK) {
 		config.writeLog("slpd_sa_stop_failure",
 				new Object[] {
-		    new Integer(msg.getErrorCode())});
+		    Integer.valueOf(msg.getErrorCode())});
 
 	    }
 
@@ -593,7 +593,7 @@ public class slpd extends SLPConfig {
 
 	    if (ex.getErrorCode() != ServiceLocationException.NETWORK_ERROR) {
 		config.writeLog("slpd_sa_stop_failure",
-				new Object[] {new Integer(ex.getErrorCode())});
+			new Object[] {Integer.valueOf(ex.getErrorCode())});
 
 	    }
 
@@ -634,7 +634,7 @@ public class slpd extends SLPConfig {
 	default:
 	    System.err.println(formatMessageInternal("slpd_err",
 						     new Object[] {
-		new Integer(ex.getErrorCode()),
+		Integer.valueOf(ex.getErrorCode()),
 		    ex.getMessage()},
 		bundle));
 

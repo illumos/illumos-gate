@@ -29,6 +29,7 @@ pkg:/package/pkg
 pkg:/release/name
 pkg:/runtime/java
 pkg:/runtime/java/openjdk11
+pkg:/runtime/java/openjdk17
 pkg:/runtime/java/openjdk8
 pkg:/runtime/java/runtime64
 pkg:/runtime/perl

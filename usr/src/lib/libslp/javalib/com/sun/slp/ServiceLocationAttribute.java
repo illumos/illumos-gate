@@ -635,7 +635,7 @@ public class ServiceLocationAttribute extends Object
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"char_not_reserved_attr",
-				new Object[] {new Character(c), string});
+				new Object[] {Character.valueOf(c), string});
 		}
 
 	    } else {
@@ -647,7 +647,7 @@ public class ServiceLocationAttribute extends Object
 			new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"reserved_not_escaped",
-				new Object[] {new Character(c)});
+				new Object[] {Character.valueOf(c)});
 		}
 
 	    }
@@ -717,7 +717,7 @@ public class ServiceLocationAttribute extends Object
 	if (b.length > 3) {
 	    Assert.slpassert(false,
 			  "illegal_utf8",
-			  new Object[] {new Character(c)});
+			  new Object[] {Character.valueOf(c)});
 
 	}
 

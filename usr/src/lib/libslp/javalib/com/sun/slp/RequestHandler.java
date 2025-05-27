@@ -247,7 +247,8 @@ class RequestHandler extends Thread {
 	    xid = (int)((char)xidBuf[0] & 0xFF) << 8;
 	    xid += (int)((char)xidBuf[1] & 0xFF);
 	    String syncTableKey =
-		(new Integer(xid)).toString() +  clientAddr.getHostAddress();
+		(Integer.valueOf(xid)).toString() +
+		clientAddr.getHostAddress();
 	    boolean there = false;
 
 	    synchronized (inProgress) {
@@ -266,7 +267,7 @@ class RequestHandler extends Thread {
 		if (config.traceDrop()) {
 		    config.writeLog("rh_rqst_in_progress",
 				    new Object[] {clientAddr,
-						      new Integer(port),
+						      Integer.valueOf(port),
 						      interfac});
 		}
 		return;
@@ -302,7 +303,7 @@ class RequestHandler extends Thread {
 		if (config.traceDrop()) {
 		    config.writeLog("rh_datagram_ioe",
 				    new Object[] {clientAddr,
-						      new Integer(port),
+						      Integer.valueOf(port),
 						      interfac,
 						      ex.getMessage()});
 
@@ -377,7 +378,7 @@ class RequestHandler extends Thread {
 		    } catch (ServiceLocationException ex) {
 			config.writeLog("sa_forwarding_exception",
 					new Object[] {
-			    new Short(ex.getErrorCode()),
+			    Short.valueOf(ex.getErrorCode()),
 				Integer.toHexString(toForward.getHeader().xid),
 				ex.getMessage()});
 		    }
@@ -390,7 +391,7 @@ class RequestHandler extends Thread {
 
 		    config.writeLog("rh_tcp_error",
 				    new Object[] {clientAddr,
-						      new Integer(port),
+						      Integer.valueOf(port),
 						      interfac});
 
 		    break;
@@ -404,7 +405,7 @@ class RequestHandler extends Thread {
 	    if (config.traceMsg()) {
 		config.writeLog("rh_socket_closed",
 				new Object[] {clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -416,7 +417,7 @@ class RequestHandler extends Thread {
 	    if (config.traceDrop()) {
 		config.writeLog("ioexception_server_stream",
 				new Object[] {clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac,
 						  ex.getMessage()});
 	    }
@@ -456,7 +457,7 @@ class RequestHandler extends Thread {
 		} catch (ServiceLocationException ex) {
 		    config.writeLog("sle_forward_error",
 			  new Object[] {
-			new Integer(ex.getErrorCode()),
+			Integer.valueOf(ex.getErrorCode()),
 			    Integer.toHexString(toForward.getHeader().xid),
 			    ex.getMessage()});
 		}
@@ -469,7 +470,7 @@ class RequestHandler extends Thread {
 	    if (config.traceDrop()) {
 		config.writeLog("rh_socket_error",
 				new Object[] {clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac,
 						  ex.getMessage()});
 	    }
@@ -481,7 +482,7 @@ class RequestHandler extends Thread {
 		config.writeLog(
 				"rh_ioexception_reply",
 				new Object[] {clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac,
 						  ex.getMessage()});
 	    }
@@ -525,7 +526,7 @@ class RequestHandler extends Thread {
 		    config.writeLog("rh_rqst_in",
 				    new Object[] {Integer.toHexString(hdr.xid),
 						      clientAddr,
-						      new Integer(port),
+						      Integer.valueOf(port),
 						      interfac,
 						      msg.getHeader()});
 		}
@@ -544,7 +545,7 @@ class RequestHandler extends Thread {
 					new Object[] {
 			    Integer.toHexString(hdr.xid),
 				clientAddr,
-				new Integer(port),
+				Integer.valueOf(port),
 				interfac});
 
 		    }
@@ -565,7 +566,7 @@ class RequestHandler extends Thread {
 			    msg.getClass().getName(),
 				Integer.toHexString(hdr.xid),
 				clientAddr,
-				new Integer(port),
+				Integer.valueOf(port),
 				interfac});
 
 
@@ -604,7 +605,7 @@ class RequestHandler extends Thread {
 		config.writeLog("rh_rply_out",
 				new Object[] {Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac,
 						  rply.getHeader()});
 	    }
@@ -641,7 +642,7 @@ class RequestHandler extends Thread {
 	    config.writeLog("rh_rply_null",
 			    new Object[] {xidStr,
 					      clientAddr,
-					      new Integer(port),
+					      Integer.valueOf(port),
 					      interfac});
 	}
 
@@ -719,9 +720,9 @@ class RequestHandler extends Thread {
 			new ServiceLocationException(
 				ServiceLocationException.VERSION_NOT_SUPPORTED,
 				"rh_version_number_error",
-				new Object[] {new Integer(ver),
+				new Object[] {Integer.valueOf(ver),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 		} else {
 		    return null;
@@ -801,10 +802,10 @@ class RequestHandler extends Thread {
 
 	    config.writeLog("rh_unparse_exception",
 			    new Object[] {clientAddr,
-					      new Integer(port),
+					      Integer.valueOf(port),
 					      interfac,
-					      new Integer(ver),
-					      new Integer(fun),
+					      Integer.valueOf(ver),
+					      Integer.valueOf(fun),
 					      exMsg,
 					      sw.toString()});
 	}
@@ -970,7 +971,7 @@ class RequestHandler extends Thread {
 		config.writeLog("rh_client_sa_advert_drop",
 				new Object[] {Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1000,7 +1001,7 @@ class RequestHandler extends Thread {
 		config.writeLog("rh_prev_resp",
 				new Object[] {Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1054,7 +1055,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvReg",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1096,7 +1097,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvDereg",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1140,7 +1141,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvTypeRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1162,7 +1163,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvTypeRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 
 
@@ -1193,7 +1194,7 @@ class RequestHandler extends Thread {
 				new Object[] {"AttrRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1215,7 +1216,7 @@ class RequestHandler extends Thread {
 				new Object[] {"AttrRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 
 	    }
@@ -1258,7 +1259,7 @@ class RequestHandler extends Thread {
 		if ((hdr.errCode != ServiceLocationException.OK) &&
 		    config.traceMsg()) {
 		    config.writeLog("rh_advert_error",
-				    new Object[] { new Integer(hdr.errCode),
+				    new Object[] { Integer.valueOf(hdr.errCode),
 						       "DAAdvert",
 						       ""});
 
@@ -1278,7 +1279,7 @@ class RequestHandler extends Thread {
 			"DA SrvRqst",
 			    Integer.toHexString(hdr.xid),
 			    clientAddr,
-			    new Integer(port),
+			    Integer.valueOf(port),
 			    interfac});
 
 		}
@@ -1305,7 +1306,7 @@ class RequestHandler extends Thread {
 			"SA SrvRqst",
 			    Integer.toHexString(hdr.xid),
 			    clientAddr,
-			    new Integer(port),
+			    Integer.valueOf(port),
 			    interfac});
 
 		}
@@ -1323,9 +1324,9 @@ class RequestHandler extends Thread {
 
 	    } catch (ServiceLocationException ex) {
 		config.writeLog("rh_advert_error",
-				new Object [] {new Integer(ex.getErrorCode()),
-						   "SAAdvert",
-						   ex.getMessage()});
+			new Object [] {Integer.valueOf(ex.getErrorCode()),
+					   "SAAdvert",
+					   ex.getMessage()});
 
 	    }
 
@@ -1336,7 +1337,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SA SrvRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 
 	    }
@@ -1355,7 +1356,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 	    }
 
@@ -1377,7 +1378,7 @@ class RequestHandler extends Thread {
 				new Object[] {"SrvRqst",
 						  Integer.toHexString(hdr.xid),
 						  clientAddr,
-						  new Integer(port),
+						  Integer.valueOf(port),
 						  interfac});
 
 	    }

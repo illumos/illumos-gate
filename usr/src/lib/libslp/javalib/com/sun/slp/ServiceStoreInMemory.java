@@ -1074,7 +1074,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	    default:
 		Assert.slpassert(false,
 			      "ssim_unk_qop",
-			      new Object[] {new Character((char)op)});
+			      new Object[] {Character.valueOf((char)op)});
 	    }
 
 	    return match;
@@ -2686,7 +2686,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
     private List addToAgeOutQueue(ServiceRecordInMemory rec) {
 
-	Long exTime = new Long(rec.getExpirationTime());
+	Long exTime = Long.valueOf(rec.getExpirationTime());
 	return ageOutQueue.add(exTime, rec);
 
     }
@@ -3317,10 +3317,10 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 	// Add a new one if none there, otherwise, bump up old.
 
 	if (numRegs == null) {
-	    numRegs = new Integer(1);
+	    numRegs = Integer.valueOf(1);
 
 	} else {
-	    numRegs = new Integer(numRegs.intValue() + 1);
+	    numRegs = Integer.valueOf(numRegs.intValue() + 1);
 
 	}
 
@@ -3363,7 +3363,7 @@ class ServiceStoreInMemory extends Object implements ServiceStore {
 
 	// Bump down by one, remove if zero.
 
-	numRegs = new Integer(numRegs.intValue() - 1);
+	numRegs = Integer.valueOf(numRegs.intValue() - 1);
 
 	if (numRegs.intValue() <= 0) {
 	    langTable.remove(lang);

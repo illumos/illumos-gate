@@ -47,7 +47,7 @@ extern int do_prominfo();
 void indent_to_level(int);
 extern int do_productinfo();
 
-extern void dprintf(const char *, ...);
+extern void dbgprintf(const char *, ...);
 
 struct prt_opts {
 	int o_verbose;

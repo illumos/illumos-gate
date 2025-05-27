@@ -164,7 +164,7 @@ public class TestBean {
     getTuple()
     {
 	ValueRecord r1 = new ScalarRecord("cat", 256);
-	ValueRecord r2 = new ScalarRecord(new Integer(9), 2);
+	ValueRecord r2 = new ScalarRecord(Integer.valueOf(9), 2);
 	ValueRecord r3 = new KernelStackRecord(
 		new StackFrame[] {
 		    new StackFrame("has"),
@@ -359,7 +359,7 @@ public class TestBean {
     {
 	List < ValueRecord > list = new ArrayList < ValueRecord > ();
 	ValueRecord v1 = getScalarRecord();
-	ValueRecord v2 = new ScalarRecord(new Integer(7), 4);
+	ValueRecord v2 = new ScalarRecord(Integer.valueOf(7), 4);
 	list.add(v1);
 	list.add(v2);
 	PrintfRecord r = new PrintfRecord(list,
@@ -370,7 +370,8 @@ public class TestBean {
     public static ProbeData
     getProbeData()
     {
-	List < Record > list = new ArrayList < Record > ();
+	List < org.opensolaris.os.dtrace.Record > list =
+	    new ArrayList < org.opensolaris.os.dtrace.Record > ();
 	list.add(getPrintaRecord());
 	list.add(getPrintfRecord());
 	list.add(getScalarRecord());
@@ -395,8 +396,8 @@ public class TestBean {
 	ValueRecord v2 = new ScalarRecord("dog", 256);
 	ValueRecord v3 = new ScalarRecord("mouse", 256);
 	ValueRecord v4 = new ScalarRecord("mouse", 256);
-	ValueRecord v5 = new ScalarRecord(new Byte((byte) 'C'), 1);
-	ValueRecord v6 = new ScalarRecord(new Short((short) 7), 2);
+	ValueRecord v5 = new ScalarRecord(Byte.valueOf((byte) 'C'), 1);
+	ValueRecord v6 = new ScalarRecord(Short.valueOf((short) 7), 2);
 	Tuple tuple = new Tuple(v1, v2, v3, v4, v5, v6);
 	AggregationValue value = getCountValue();
 	r = new AggregationRecord(tuple, value);

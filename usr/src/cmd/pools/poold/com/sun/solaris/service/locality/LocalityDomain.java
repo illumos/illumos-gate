@@ -201,14 +201,14 @@ public class LocalityDomain
 			Integer score = (Integer) grps.get(group);
 			if (score != null) {
 				int iscore = score.intValue() + 1;
-				grps.put(group, new Integer(iscore));
+				grps.put(group, Integer.valueOf(iscore));
 			} else {
-				grps.put(group, new Integer(1));
+				grps.put(group, Integer.valueOf(1));
 			}
 		}
 		Iterator groupIt = grps.keySet().iterator();
 		LocalityGroup centre = null;
-		Integer highest = new Integer(0);
+		Integer highest = Integer.valueOf(0);
 		while (groupIt.hasNext()) {
 			LocalityGroup cand = (LocalityGroup) groupIt.next();
 			Integer value = (Integer) grps.get(cand);

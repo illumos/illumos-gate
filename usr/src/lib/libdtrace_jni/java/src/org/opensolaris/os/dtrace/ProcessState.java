@@ -251,7 +251,7 @@ public final class ProcessState implements Serializable {
     private void
     setExitStatus(int status)
     {
-	exitStatus = new Integer(status);
+	exitStatus = Integer.valueOf(status);
     }
 
     /**

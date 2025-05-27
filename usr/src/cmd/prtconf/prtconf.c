@@ -65,7 +65,7 @@ setpname(const char *name)
 
 /*PRINTFLIKE1*/
 void
-dprintf(const char *fmt, ...)
+dbgprintf(const char *fmt, ...)
 {
 	if (dbg.d_debug) {
 		va_list ap;

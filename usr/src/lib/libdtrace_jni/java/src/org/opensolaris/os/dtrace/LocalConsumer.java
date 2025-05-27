@@ -1111,7 +1111,7 @@ public class LocalConsumer implements Consumer {
     {
 	checkGoCalled();
 	synchronized (LocalConsumer.class) {
-	    return _lookupKernelFunction(new Integer(address));
+	    return _lookupKernelFunction(Integer.valueOf(address));
 	}
     }
 
@@ -1120,7 +1120,7 @@ public class LocalConsumer implements Consumer {
     {
 	checkGoCalled();
 	synchronized (LocalConsumer.class) {
-	    return _lookupKernelFunction(new Long(address));
+	    return _lookupKernelFunction(Long.valueOf(address));
 	}
     }
 
@@ -1129,7 +1129,7 @@ public class LocalConsumer implements Consumer {
     {
 	checkGoCalled();
 	synchronized (LocalConsumer.class) {
-	    return _lookupUserFunction(pid, new Integer(address));
+	    return _lookupUserFunction(pid, Integer.valueOf(address));
 	}
     }
 
@@ -1138,7 +1138,7 @@ public class LocalConsumer implements Consumer {
     {
 	checkGoCalled();
 	synchronized (LocalConsumer.class) {
-	    return _lookupUserFunction(pid, new Long(address));
+	    return _lookupUserFunction(pid, Long.valueOf(address));
 	}
     }
 

@@ -948,8 +948,7 @@ class AttributeVerifier
 		}
 
 		try {
-
-		    new Float(version);
+		    Float.valueOf(version);
 		} catch (NumberFormatException ex) {
 
 		    throw
@@ -2027,7 +2026,7 @@ class AttributeVerifier
 	    } else if (tt == StreamTokenizer.TT_EOF) {
 		errorToken = "<end of file>";
 	    } else {
-		errorToken = (new Character((char)tt)).toString();
+		errorToken = (Character.valueOf((char)tt)).toString();
 	    }
 
 	    throw
@@ -2085,11 +2084,11 @@ class AttributeVerifier
 
 	    if (reqTok.equalsIgnoreCase(TRUE_TOKEN)) {
 
-		reqVal = new Boolean(true);
+		reqVal = Boolean.valueOf(true);
 
 	    } else if (reqTok.equalsIgnoreCase(FALSE_TOKEN)) {
 
-		reqVal = new Boolean(false);
+		reqVal = Boolean.valueOf(false);
 
 	    } else {
 

@@ -320,7 +320,7 @@ class SystemMonitor implements Monitor
 			util = (DoubleStatistic)mon.getDerivedStatistic(
 			    "utilization");
 		} catch (NoSuchElementException nsee) {
-			util = new DoubleStatistic(new Double(0));
+			util = new DoubleStatistic(Double.valueOf(0));
 		}
 		Poold.MON_LOG.log(Severity.DEBUG,
 		    res + " utilization " + util.toString());

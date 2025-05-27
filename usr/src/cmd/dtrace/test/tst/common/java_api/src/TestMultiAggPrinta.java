@@ -71,8 +71,8 @@ public class TestMultiAggPrinta {
 	buf.append(data.getFlow());
 	buf.append(", records = ");
 
-	List <Record> records = data.getRecords();
-	Record record;
+	List <org.opensolaris.os.dtrace.Record> records = data.getRecords();
+	org.opensolaris.os.dtrace.Record record;
 	Object value;
 	buf.append('[');
 	for (int i = 0; i < records.size(); ++i) {
@@ -112,8 +112,9 @@ public class TestMultiAggPrinta {
 	consumer.addConsumerListener(new ConsumerAdapter() {
 	    public void dataReceived(DataEvent e) {
 		ProbeData data = e.getProbeData();
-		List <Record> records = data.getRecords();
-		for (Record r : records) {
+		List <org.opensolaris.os.dtrace.Record> records =
+		    data.getRecords();
+		for (org.opensolaris.os.dtrace.Record r : records) {
 		    if (r instanceof ExitRecord) {
 			ExitRecord exitRecord = (ExitRecord)r;
 			exitStatus = exitRecord.getStatus();

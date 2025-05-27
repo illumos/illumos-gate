@@ -514,7 +514,7 @@ class StatisticOperations implements StatisticListener
 	public StatisticOperations(StatisticList statistics)
 	{
 		this.statistics = statistics;
-		total = new DoubleStatistic(new Double(0.0));
+		total = new DoubleStatistic(Double.valueOf(0.0));
 	}
 
 	/**

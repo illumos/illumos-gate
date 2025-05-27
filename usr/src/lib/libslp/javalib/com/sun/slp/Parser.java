@@ -451,7 +451,7 @@ abstract class Parser extends Object {
 		new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"par_wild_op",
-				new Object[] {new Character(op)});
+				new Object[] {Character.valueOf(op)});
 
 	}
 
@@ -464,7 +464,7 @@ abstract class Parser extends Object {
 		new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"par_bool_op",
-				new Object[] {new Character(op)});
+				new Object[] {Character.valueOf(op)});
 
 	}
 
@@ -476,7 +476,7 @@ abstract class Parser extends Object {
 		new ServiceLocationException(
 				ServiceLocationException.PARSE_ERROR,
 				"par_key_op",
-				new Object[] {new Character(op)});
+				new Object[] {Character.valueOf(op)});
 	}
 
 	if (eval) {

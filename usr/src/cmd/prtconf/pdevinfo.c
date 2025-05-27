@@ -177,7 +177,7 @@ prtconf_devinfo(void)
 	uint_t			flag;
 	char			*rootpath;
 
-	dprintf("verbosemode %s\n", opts.o_verbose ? "on" : "off");
+	dbgprintf("verbosemode %s\n", opts.o_verbose ? "on" : "off");
 
 	/* determine what info we need to get from kernel */
 	flag = DINFOSUBTREE;
@@ -754,7 +754,7 @@ dump_devs(di_node_t node, void *arg)
 
 	if (dbg.d_debug) {
 		char *path = di_devfs_path(node);
-		dprintf("Dump node %s\n", path);
+		dbgprintf("Dump node %s\n", path);
 		di_devfs_path_free(path);
 	}
 
@@ -974,12 +974,12 @@ walk(uchar_t *buf, uint_t size, int level)
 		uchar_t *nodebuf;
 		uint_t nodesize;
 		if (strcmp("node", name) != 0) {
-			dprintf("unexpected nvpair name %s != name\n", name);
+			dbgprintf("unexpected nvpair name %s != name\n", name);
 			continue;
 		}
 		if (type != DATA_TYPE_BYTE_ARRAY) {
-			dprintf("unexpected nvpair type %d, not byte array \n",
-			    type);
+			dbgprintf("unexpected nvpair type %d, "
+			    "not byte array \n", type);
 			continue;
 		}
 

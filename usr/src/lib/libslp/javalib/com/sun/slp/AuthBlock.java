@@ -398,7 +398,7 @@ class AuthBlock {
 	    return null;
 	}
 
-	answer.put(DN, new Integer(ibsd));
+	answer.put(DN, Integer.valueOf(ibsd));
 
 	return answer;
     }
@@ -757,7 +757,7 @@ class AuthBlock {
 		ServiceLocationException.INTERNAL_SYSTEM_ERROR,
 		"cant_get_security_provider",
 		new Object[] {
-			new Integer(bsd),
+			Integer.valueOf(bsd),
 			algo,
 			e.getMessage()});
 	}
@@ -767,7 +767,7 @@ class AuthBlock {
 	    ServiceLocationException.INTERNAL_SYSTEM_ERROR,
 	    "cant_get_security_provider",
 	    new Object[] {
-		new Integer(bsd),
+		Integer.valueOf(bsd),
 		algo,
 		"Unknown or unsupported BSD"});
     }

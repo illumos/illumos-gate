@@ -240,10 +240,10 @@ public class JDTrace {
 			buf.toString());
 	    }
 	}
-	Record record = null;
+	org.opensolaris.os.dtrace.Record record = null;
 	Object value;
-	List <Record> records = data.getRecords();
-	Iterator <Record> itr = records.iterator();
+	List <org.opensolaris.os.dtrace.Record> records = data.getRecords();
+	Iterator <org.opensolaris.os.dtrace.Record> itr = records.iterator();
 	while (itr.hasNext()) {
 	    record = itr.next();
 

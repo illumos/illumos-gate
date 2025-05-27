@@ -341,7 +341,7 @@ class Transact extends Object implements Runnable {
 
 			config.writeLog("da_exception_trace",
 					new Object[] {
-			    new Short(ex.getErrorCode()),
+			    Short.valueOf(ex.getErrorCode()),
 				addr,
 				ex.getMessage()});
 
@@ -704,8 +704,8 @@ class Transact extends Object implements Runnable {
 				ServiceLocationException.BUFFER_OVERFLOW,
 				"buffer_overflow",
 				new Object[] {
-		    new Integer(outbuf.length),
-			new Integer(config.getMTU())});
+		    Integer.valueOf(outbuf.length),
+			Integer.valueOf(config.getMTU())});
 	}
 
 	return outbuf;
@@ -785,7 +785,7 @@ class Transact extends Object implements Runnable {
 		    new ServiceLocationException(
 				ServiceLocationException.VERSION_NOT_SUPPORTED,
 				"version_number_error",
-				new Object[] {new Integer(ver)});
+				new Object[] {Integer.valueOf(ver)});
 
 	    }
 
@@ -938,7 +938,7 @@ class Transact extends Object implements Runnable {
 
 	if (ex != null && config.traceDATraffic()) {
 	    config.writeLog("sdat_active_err",
-			    new Object[] {new Integer(ex.getErrorCode()),
+			    new Object[] {Integer.valueOf(ex.getErrorCode()),
 					      ex.getMessage()});
 
 	    throw ex;

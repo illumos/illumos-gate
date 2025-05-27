@@ -363,7 +363,7 @@ class ServiceTable extends Object {
 
 		conf.writeLog("st_serialized_seex",
 			      new Object[] {
-		    new Integer(ex.getErrorCode()),
+		    Integer.valueOf(ex.getErrorCode()),
 			surl,
 			(msg == null ? "<no message>":msg)});
 
