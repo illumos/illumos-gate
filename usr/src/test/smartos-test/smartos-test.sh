@@ -122,7 +122,7 @@ function zone_check {
 function version_check {
     PLATFORM_VERSION=$(uname -v | sed -e 's/^joyent_//g')
     mkdir -p /tmp/version_check.$$
-    tar xzf $1 -C /tmp/version_check.$$ ./tests.buildstamp
+    tar xzf $1 -C /tmp/version_check.$$ tests.buildstamp
     TESTS_VERSION=$(cat /tmp/version_check.$$/tests.buildstamp)
     rm -rf /tmp/version_check.$$
     log "Platform version: $PLATFORM_VERSION"
@@ -163,7 +163,7 @@ function add_loopback_mounts {
         else
             log "Extracting new test archive to lofs-mounted /usr"
             # extract the current test archive to it
-            log_must tar -xzf $test_archive -C $lofs_home ./usr
+            log_must tar -xzf $test_archive -C $lofs_home usr
         fi
     # Otherwise, setup a lofs mount for it.
     else
@@ -171,7 +171,7 @@ function add_loopback_mounts {
         rm -rf $lofs_home
         mkdir -p $lofs_home
         find /usr | cpio -pdum $lofs_home
-        log_must tar -xzf $test_archive -C $lofs_home ./usr
+        log_must tar -xzf $test_archive -C $lofs_home usr
         # keep /usr read-only in an attempt to preserve smartos behaviour
         # unless specifically asked to
         if [[ "$mount_usr_rw" = "true" ]]; then
@@ -202,7 +202,7 @@ function shadow_fix {
 #
 function extract_remaining_test_bits {
     log_must tar -xzf $1 -C / \
-        ./opt ./kernel ./tests.manifest.gen ./tests.buildstamp
+        opt kernel tests.manifest.gen tests.buildstamp
 }
 
 function setup_pkgsrc {
