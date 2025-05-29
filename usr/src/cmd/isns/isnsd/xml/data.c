@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -236,7 +240,7 @@ get_xml_doc(
 		/* validate the xml file */
 
 		/* open the xml file */
-		xml_doc = xmlParseFile(xml_file);
+		xml_doc = xmlReadFile(xml_file, NULL, XML_PARSE_NOBLANKS);
 	}
 
 	*docp = xml_doc;

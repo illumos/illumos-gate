@@ -26,6 +26,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG = isns
@@ -41,6 +42,9 @@ POFILE= isns.po
 POFILES	= $(COBJS:%.o=%.po)
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
+
+CTF_MODE = link
 
 DATA_STORE	= xml
 XML_DIR		= xml_def
