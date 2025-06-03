@@ -23,46 +23,19 @@
  * Use is subject to license terms.
  */
 
-	.file	"gethrtime.s"
+	.file	"__gethrtime_sys.s"
 
 #include "SYS.h"
 
 /*
- * hrtime_t __gethrtime(void)
+ * hrtime_t __gethrtime_sys(void)
  *
  * Returns the current hi-res real time (via fasttrap).
- */
-
-#if !defined(__amd64) && !defined(__i386)
-	ENTRY(__gethrtime)
-	SYSFASTTRAP(GETHRTIME)
-#if defined(__sparcv9)
-	/*
-	 * Note that the fast trap actually assumes V8 parameter passing
-	 * conventions, so we have to reassemble a 64-bit value here.
-	 */
-	sllx	%o0, 32, %o0
-	or	%o1, %o0, %o0
-#endif
-	RET
-	SET_SIZE(__gethrtime)
-#endif /* !defined(__amd64) && !defined(__i386) */
-
-/*
- * hrtime_t gethrvtime(void)
  *
- * Returns the current hi-res LWP virtual time.
+ * This is intended as a fallback options for cases where hrtime calculation
+ * via the comm page is not possible.
  */
-
-	ENTRY(gethrvtime)
-	SYSFASTTRAP(GETHRVTIME)
-#if defined(__sparcv9)
-	/*
-	 * Note that the fast trap actually assumes V8 parameter passing
-	 * conventions, so we have to reassemble a 64-bit value here.
-	 */
-	sllx	%o0, 32, %o0
-	or	%o1, %o0, %o0
-#endif
+	ENTRY(__gethrtime_sys)
+	SYSFASTTRAP(GETHRTIME)
 	RET
-	SET_SIZE(gethrvtime)
+	SET_SIZE(__gethrtime_sys)

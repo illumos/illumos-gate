@@ -38,6 +38,7 @@
 extern int __clock_getres(clockid_t, timespec_t *);
 extern int __clock_gettime(clockid_t, timespec_t *);
 extern int __clock_settime(clockid_t, const timespec_t *);
+extern hrtime_t __gethrtime(void);
 extern int __timer_create(clockid_t, struct sigevent *, timer_t *);
 extern int __timer_delete(timer_t);
 extern int __timer_getoverrun(timer_t);
@@ -76,6 +77,12 @@ int
 clock_settime(clockid_t clock_id, const timespec_t *tp)
 {
 	return (__clock_settime(clock_id, tp));
+}
+
+hrtime_t
+gethrtime(void)
+{
+	return (__gethrtime());
 }
 
 int
@@ -145,7 +152,7 @@ timer_gettime(timer_t timerid, itimerspec_t *value)
 
 int
 timer_settime(timer_t timerid, int flags, const itimerspec_t *value,
-	itimerspec_t *ovalue)
+    itimerspec_t *ovalue)
 {
 	return (__timer_settime(timerid, flags, value, ovalue));
 }
