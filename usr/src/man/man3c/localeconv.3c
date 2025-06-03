@@ -43,27 +43,32 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2025 Bill Sommerfeld
 .\"
-.TH LOCALECONV 3C "Dec 12, 2003"
+.TH LOCALECONV 3C "May 10, 2025"
 .SH NAME
-localeconv \- get numeric formatting information
+localeconv, localeconv_l \- get numeric formatting information
 .SH SYNOPSIS
-.LP
-.nf
 #include <locale.h>
 
 \fBstruct lconv *\fR\fBlocaleconv\fR(\fBvoid\fR);
 .fi
 
+#include <xlocale.h>
+
+\fBstruct lconv *\fR\fBlocaleconv_l\fR(\fBlocale_t\fR \fIloc\rR);
+.fi
+
 .SH DESCRIPTION
-.sp
-.LP
-The \fBlocaleconv()\fR function sets the components of an object with type
-\fBstruct lconv\fR (defined in \fB<locale.h>\fR) with the values appropriate
-for the formatting of numeric quantities (monetary and otherwise) according to
-the rules of the current locale (see \fBsetlocale\fR(3C)). The definition of
-\fBstruct lconv\fR is given  below (the values for the fields in the "C" locale
-are given in comments).
+The \fBlocaleconv()\fR and \fBlocaleconv_l()\fR functions set the
+components of an object with type \fBstruct lconv\fR (defined in
+\fB<locale.h>\fR) with locale-specific values appropriate for the
+formatting of numeric quantities (monetary and otherwise).  The
+\fBlocaleconv()\fR function uses the current locale (see
+\fBsetlocale\fR(3C) and \fBuselocale\fR(3C)), while \fBlocaleconv_l\fR
+uses the locale identified by the argument \fIloc\fR.  The definition
+of \fBstruct lconv\fR is given below (the values for the fields in the
+"C" locale are given in comments).
 .sp
 .in +2
 .nf
@@ -482,23 +487,21 @@ The sign string immediately precedes the \fBcurrency_symbol\fR or
 The sign string immediately succeeds the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
-
 .SH RETURN VALUES
-.sp
-.LP
-The \fBlocaleconv()\fR function returns a pointer to the filled-in object. The
-structure pointed to by the return value may be overwritten  by a subsequent
-call to \fBlocaleconv()\fR.
+The \fBlocaleconv()\fR and \fBlocaleconv_l()\fR functions each return
+a pointer to a filled-in \fBstruct lconv\fR.  While it is not declared
+\fBconst\fR, the structure should not be modified by the application.
+The structure returned by \fBlocaleconv()\fR may, however, be
+overwritten by a subsequent call to \fBlocaleconv\fR() or
+\fBsetlocale\fR(3C).  The structure returned by \fBlocaleconv_l()\fR
+may be overwritten, freed, or otherwise invalidated if the
+\fBlocale_t\fR argument \fIloc\fR is freed.
 .SH EXAMPLES
+\fBExample 1 \fRRules used by four countries to format monetary
+quantities.
 .LP
-\fBExample 1 \fRRules used by four countries to format monetary quantities.
-.sp
-.LP
-The following table illustrates the rules used by four countries to format
-monetary quantities.
-
-.sp
-
+The following table illustrates the rules used by four countries to
+format monetary quantities.
 .sp
 .TS
 l | l | l | l
@@ -550,8 +553,6 @@ l l l l l .
 .TE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -573,11 +574,14 @@ MT-Level	MT-Safe with exceptions
 .LP
 The \fBlocaleconv()\fR function can be used safely in multithreaded
 applications, as long as \fBsetlocale\fR(3C) is not being called to change the
-locale.
+locale.  The \fBlocaleconv_l()\fR function and the object it returns can be used
+safely in multithreaded applications as long as the \fIloc\fR argument is not
+freed, such as by another thread calling \fBfreelocale\fR(3C) or \fBnewlocale\fR(3C).
 .SH SEE ALSO
-.sp
-.LP
 .BR setlocale (3C),
+.BR newlocale (3C),
+.BR freelocale (3C),
 .BR attributes (7),
 .BR environ (7),
+.BR locale (7),
 .BR standards (7)

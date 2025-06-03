@@ -201,12 +201,12 @@ vold_rmmount(int argc, char **argv)
 		volume_user = getenv("VOLUME_USER");
 	}
 	if (volume_action == NULL) {
-		dprintf("%s(%ld): VOLUME_ACTION was null!!\n",
+		dbgprintf("%s(%ld): VOLUME_ACTION was null!!\n",
 		    prog_name, prog_pid);
 		return (-1);
 	}
 	if (volume_mediatype == NULL) {
-		dprintf("%s(%ld): VOLUME_MEDIATYPE was null!!\n",
+		dbgprintf("%s(%ld): VOLUME_MEDIATYPE was null!!\n",
 		    prog_name, prog_pid);
 		return (-1);
 	}
@@ -214,12 +214,12 @@ vold_rmmount(int argc, char **argv)
 		volume_mount_mode = "rw";
 	}
 	if (volume_name == NULL) {
-		dprintf("%s(%ld): VOLUME_NAME was null!!\n",
+		dbgprintf("%s(%ld): VOLUME_NAME was null!!\n",
 		    prog_name, prog_pid);
 		return (-1);
 	}
 	if (volume_path == NULL) {
-		dprintf("%s(%ld): VOLUME_PATH was null!!\n",
+		dbgprintf("%s(%ld): VOLUME_PATH was null!!\n",
 		    prog_name, prog_pid);
 		return (-1);
 	}
@@ -227,7 +227,7 @@ vold_rmmount(int argc, char **argv)
 		volume_pcfs_id = "";
 	}
 	if (volume_symdev == NULL) {
-		dprintf("%s(%ld): VOLUME_SYMDEV was null!!\n",
+		dbgprintf("%s(%ld): VOLUME_SYMDEV was null!!\n",
 		    prog_name, prog_pid);
 		return (-1);
 	}
@@ -239,7 +239,7 @@ vold_rmmount(int argc, char **argv)
 			    getzoneidbyname(volume_zonename)) != -1) {
 				if (zone_getattr(mnt_zoneid, ZONE_ATTR_ROOT,
 				    mnt_zoneroot, MAXPATHLEN) == -1) {
-					dprintf("%s(%ld): NO ZONEPATH!!\n",
+					dbgprintf("%s(%ld): NO ZONEPATH!!\n",
 					    prog_name, prog_pid);
 					return (-1);
 				}
@@ -252,7 +252,7 @@ vold_rmmount(int argc, char **argv)
 			struct passwd	 *pw;
 
 			if ((pw = getpwnam(volume_user)) == NULL) {
-				dprintf("%s(%ld) %s\n", prog_name, prog_pid,
+				dbgprintf("%s(%ld) %s\n", prog_name, prog_pid,
 				    ": VOLUME_USER was not a valid user!");
 				return (-1);
 			}
@@ -477,7 +477,7 @@ vold_action(struct action_arg *aap)
 	struct action_arg *aa[2];
 	struct action_arg a1;
 
-	dprintf("%s[%d]: entering action()\n", __FILE__, __LINE__);
+	dbgprintf("%s[%d]: entering action()\n", __FILE__, __LINE__);
 
 	/*
 	 * on Trusted Extensions, actions are executed in the user's zone
@@ -521,13 +521,13 @@ vold_action(struct action_arg *aap)
 			/* entered zone, proceed to action */
 			break;
 		case -1:
-			dprintf("fork1 failed \n ");
+			dbgprintf("fork1 failed \n ");
 			return (1);
 		default :
 			(void) ct_tmpl_clear(tmpl_fd);
 			(void) close(tmpl_fd);
 			if (waitpid(pid, &status, 0) < 0) {
-				dprintf("%s(%ld): waitpid() "
+				dbgprintf("%s(%ld): waitpid() "
 				    "failed (errno %d) \n",
 				    prog_name, prog_pid, errno);
 				return (1);
@@ -581,7 +581,7 @@ vold_action(struct action_arg *aap)
 			notify_act = UNMOUNT;
 		}
 	} else {
-		dprintf("%s[%d]: action(): invalid action: %s\n",
+		dbgprintf("%s[%d]: action(): invalid action: %s\n",
 		    __FILE__, __LINE__, action);
 		result = FALSE;
 	}
@@ -590,7 +590,7 @@ vold_action(struct action_arg *aap)
 		result = notify_clients(notify_act, do_notify);
 	}
 
-	dprintf("%s[%d]: leaving action(), result = %s\n",
+	dbgprintf("%s[%d]: leaving action(), result = %s\n",
 	    __FILE__, __LINE__, result_strings[result]);
 
 	if (mnt_zoneid > GLOBAL_ZONEID) {
@@ -641,7 +641,8 @@ create_notify_files(struct action_arg **aa)
 	int	result;
 	char	*symdev;
 
-	dprintf("%s[%d]: entering create_notify_files()\n", __FILE__, __LINE__);
+	dbgprintf("%s[%d]: entering create_notify_files()\n",
+	    __FILE__, __LINE__);
 
 	ai = 0;
 	result = FALSE;
@@ -727,18 +728,18 @@ create_notify_files(struct action_arg **aa)
 		    symdev);
 		ai++;
 	}
-	dprintf("%s[%d]: leaving create_notify_files(), result = %s\n",
+	dbgprintf("%s[%d]: leaving create_notify_files(), result = %s\n",
 	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
 
 static int
 create_one_notify_file(char *fstype,
-	char *mount_point,
-	char *notify_file,
-	char *raw_partitionp,
-	char *reason,
-	char *symdev)
+    char *mount_point,
+    char *notify_file,
+    char *raw_partitionp,
+    char *reason,
+    char *symdev)
 {
 	/*
 	 * For a mounted partition, create a notification file
@@ -761,19 +762,21 @@ create_one_notify_file(char *fstype,
 	FILE	*filep;
 	int	result;
 
-	dprintf("%s[%d]:Entering create_one_notify_file()\n",
+	dbgprintf("%s[%d]:Entering create_one_notify_file()\n",
 	    __FILE__, __LINE__);
-	dprintf("\tcreate_one_notify_file(): fstype = %s\n", fstype);
-	dprintf("\tcreate_one_notify_file(): mount_point = %s\n", mount_point);
-	dprintf("\tcreate_one_notify_file(): notify_file = %s\n", notify_file);
-	dprintf("\tcreate_one_notify_file(): raw_partitionp = %s\n",
+	dbgprintf("\tcreate_one_notify_file(): fstype = %s\n", fstype);
+	dbgprintf("\tcreate_one_notify_file(): mount_point = %s\n",
+	    mount_point);
+	dbgprintf("\tcreate_one_notify_file(): notify_file = %s\n",
+	    notify_file);
+	dbgprintf("\tcreate_one_notify_file(): raw_partitionp = %s\n",
 	    raw_partitionp);
 	if (reason != NULL) {
-		dprintf("\tcreate_one_notify_file(): reason = %s\n", reason);
+		dbgprintf("\tcreate_one_notify_file(): reason = %s\n", reason);
 	} else {
-		dprintf("\tcreate_one_notify_file(): reason = NULL\n");
+		dbgprintf("\tcreate_one_notify_file(): reason = NULL\n");
 	}
-	dprintf("\tcreate_one_notify_file(): symdev = %s\n", symdev);
+	dbgprintf("\tcreate_one_notify_file(): symdev = %s\n", symdev);
 
 	result = TRUE;
 	/*
@@ -818,7 +821,7 @@ create_one_notify_file(char *fstype,
 		file_descriptor =
 		    open(notify_file, O_CREAT|O_EXCL|O_WRONLY, 0644);
 		if (file_descriptor < 0) {
-			dprintf("%s[%d]: can't create %s/%s; %m\n",
+			dbgprintf("%s[%d]: can't create %s/%s; %m\n",
 			    __FILE__, __LINE__, NOTIFY_DIR, notify_file);
 			result = FALSE;
 		} else {
@@ -830,7 +833,7 @@ create_one_notify_file(char *fstype,
 					    raw_partitionp,
 					    fstype);
 					(void) fclose(filep);
-				dprintf("%s[%d]: Just wrote %s %s %s to %s\n",
+				dbgprintf("%s[%d]: Just wrote %s %s %s to %s\n",
 				    __FILE__,
 				    __LINE__,
 				    mount_point,
@@ -841,7 +844,7 @@ create_one_notify_file(char *fstype,
 					(void) fprintf(filep, "%s %s",
 					    reason, raw_partitionp);
 					(void) fclose(filep);
-				dprintf("%s[%d]: Just wrote %s %s to %s\n",
+				dbgprintf("%s[%d]: Just wrote %s %s to %s\n",
 				    __FILE__,
 				    __LINE__,
 				    reason,
@@ -849,7 +852,7 @@ create_one_notify_file(char *fstype,
 				    notify_file);
 				}
 			} else {
-				dprintf("%s[%d]: can't write %s/%s; %m\n",
+				dbgprintf("%s[%d]: can't write %s/%s; %m\n",
 				    __FILE__, __LINE__,
 				    NOTIFY_DIR, notify_file);
 				(void) close(file_descriptor);
@@ -858,7 +861,7 @@ create_one_notify_file(char *fstype,
 		}
 		popdir(current_working_dir_fd);
 	}
-	dprintf("%s[%d]: leaving create_one_notify_file, result = %s\n",
+	dbgprintf("%s[%d]: leaving create_one_notify_file, result = %s\n",
 	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
@@ -888,7 +891,7 @@ notify_clients(action_t action, int do_notify)
 	int		result;
 	struct stat	sb;
 
-	dprintf("%s[%d]: entering notify_clients()\n", __FILE__, __LINE__);
+	dbgprintf("%s[%d]: entering notify_clients()\n", __FILE__, __LINE__);
 
 	result = TRUE;
 	/*
@@ -906,7 +909,7 @@ notify_clients(action_t action, int do_notify)
 	if (result == TRUE) {
 		dirp = opendir(".");
 		if (dirp == NULL) {
-			dprintf("%s[%d]:opendir failed on '.'; %m\n",
+			dbgprintf("%s[%d]:opendir failed on '.'; %m\n",
 			    __FILE__, __LINE__);
 			popdir(current_working_dir_fd);
 			result = FALSE;
@@ -932,7 +935,7 @@ notify_clients(action_t action, int do_notify)
 			(void) sprintf(namebuf, "%s/%s",
 			    NOTIFY_DIR, dir_entryp->d_name);
 			if ((fd = open(namebuf, O_WRONLY|O_NDELAY)) < 0) {
-				dprintf("%s[%d]: open failed for %s; %m\n",
+				dbgprintf("%s[%d]: open failed for %s; %m\n",
 				    __FILE__, __LINE__, namebuf);
 				continue;
 			}
@@ -942,7 +945,7 @@ notify_clients(action_t action, int do_notify)
 			 * enable unauthorized access to the system root.
 			 */
 			if ((fstat(fd, &sb) < 0) || (!S_ISFIFO(sb.st_mode))) {
-				dprintf("%s[%d]: %s isn't a named pipe\n",
+				dbgprintf("%s[%d]: %s isn't a named pipe\n",
 				    __FILE__, __LINE__, namebuf);
 
 				(void) close(fd);
@@ -950,7 +953,7 @@ notify_clients(action_t action, int do_notify)
 			}
 			notify_character = notify_characters[action];
 			if (write(fd, &notify_character, 1) < 0) {
-				dprintf("%s[%d]: write failed for %s; %m\n",
+				dbgprintf("%s[%d]: write failed for %s; %m\n",
 				    __FILE__, __LINE__, namebuf);
 				(void) close(fd);
 				continue;
@@ -961,7 +964,7 @@ notify_clients(action_t action, int do_notify)
 		(void) signal(SIGPIPE, old_signal_handler);
 		popdir(current_working_dir_fd);
 	}
-	dprintf("%s[%d]: leaving notify_clients(), result = %s\n",
+	dbgprintf("%s[%d]: leaving notify_clients(), result = %s\n",
 	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
@@ -975,7 +978,7 @@ popdir(int fd)
 	 * on failure.
 	 */
 	if (fchdir(fd) < 0) {
-		dprintf("%s[%d]: popdir() failed\n", __FILE__, __LINE__);
+		dbgprintf("%s[%d]: popdir() failed\n", __FILE__, __LINE__);
 		exit(1);
 	}
 	(void) close(fd);
@@ -1006,26 +1009,26 @@ pushdir(const char *dir)
 	struct stat	stat_buf;
 
 	if (lstat(dir, &stat_buf) < 0) {
-		dprintf("%s[%d]: push_dir_and_check(): %s does not exist\n",
+		dbgprintf("%s[%d]: push_dir_and_check(): %s does not exist\n",
 		    __FILE__, __LINE__, dir);
 		return (-1);
 	}
 
 	if (!(S_ISDIR(stat_buf.st_mode))) {
-		dprintf("%s[%d]: push_dir_and_check(): %s not a directory.\n",
+		dbgprintf("%s[%d]: push_dir_and_check(): %s not a directory.\n",
 		    __FILE__, __LINE__, dir);
 		(void) remove(dir);
 		return (-1);
 	}
 	if ((current_working_dir_fd = open(".", O_RDONLY)) < 0) {
-		dprintf("%s[%d]: push_dir_and_check(): can't open %s.\n",
+		dbgprintf("%s[%d]: push_dir_and_check(): can't open %s.\n",
 		    __FILE__, __LINE__, dir);
 		return (-1);
 	}
 	if (chdir(dir) < 0) {
 		(void) close(current_working_dir_fd);
-		dprintf("%s[%d]: push_dir_and_check(): can't chdir() to %s.\n",
-		    __FILE__, __LINE__, dir);
+		dbgprintf("%s[%d]: push_dir_and_check(): "
+		    "can't chdir() to %s.\n", __FILE__, __LINE__, dir);
 		return (-1);
 	}
 	return (current_working_dir_fd);
@@ -1040,7 +1043,8 @@ remove_notify_files(struct action_arg **aa)
 	int	result;
 	char	*symdev;
 
-	dprintf("%s[%d]: entering remove_notify_files()\n", __FILE__, __LINE__);
+	dbgprintf("%s[%d]: entering remove_notify_files()\n",
+	    __FILE__, __LINE__);
 
 	ai = 0;
 	result = TRUE;
@@ -1070,7 +1074,7 @@ remove_notify_files(struct action_arg **aa)
 			result = FALSE;
 		}
 		if ((result == TRUE) && (remove(notify_file) < 0)) {
-			dprintf("%s[%d]: remove %s/%s; %m\n",
+			dbgprintf("%s[%d]: remove %s/%s; %m\n",
 			    __FILE__, __LINE__, NOTIFY_DIR, notify_file);
 			result = FALSE;
 		}
@@ -1079,7 +1083,7 @@ remove_notify_files(struct action_arg **aa)
 		}
 		ai++;
 	}
-	dprintf("%s[%d]: leaving remove_notify_files(), result = %s\n",
+	dbgprintf("%s[%d]: leaving remove_notify_files(), result = %s\n",
 	    __FILE__, __LINE__, result_strings[result]);
 
 	return (result);

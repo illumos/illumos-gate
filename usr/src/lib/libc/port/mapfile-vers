@@ -80,6 +80,16 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.57 {
+    protected:
+	localeconv_l;
+	wcsftime_l;
+	strtof_l;
+	strtod_l;
+	strtold_l;
+	string_to_decimal_l;
+} ILLUMOS_0.56;
+
 SYMBOL_VERSION ILLUMOS_0.56 {
     protected:
 	getlocalename_l;

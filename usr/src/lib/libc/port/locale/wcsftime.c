@@ -25,8 +25,13 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2025 Bill Sommerfeld
+ */
+
 #include "lint.h"
 #include "mse_int.h"
+#include <xlocale.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -61,6 +66,15 @@ size_t
 __wcsftime_xpg5(wchar_t *wcs, size_t maxsize, const wchar_t *format,
     const struct tm *timeptr)
 {
+	return (wcsftime_l(wcs, maxsize, format, timeptr,
+	    uselocale(NULL)));
+}
+
+
+size_t
+wcsftime_l(wchar_t *wcs, size_t maxsize, const wchar_t *format,
+    const struct tm *timeptr, locale_t loc)
+{
 	static const mbstate_t initial = { 0 };
 	mbstate_t mbs;
 	char *dst, *sformat;
@@ -77,13 +91,13 @@ __wcsftime_xpg5(wchar_t *wcs, size_t maxsize, const wchar_t *format,
 	 */
 	mbs = initial;
 	formatp = format;
-	sflen = wcsrtombs(NULL, &formatp, 0, &mbs);
+	sflen = wcsrtombs_l(NULL, &formatp, 0, &mbs, loc);
 	if (sflen == (size_t)-1)
 		goto error;
 	if ((sformat = malloc(sflen + 1)) == NULL)
 		goto error;
 	mbs = initial;
-	(void) wcsrtombs(sformat, &formatp, sflen + 1, &mbs);
+	(void) wcsrtombs_l(sformat, &formatp, sflen + 1, &mbs, loc);
 
 	/*
 	 * Allocate memory for longest multibyte sequence that will fit
@@ -98,11 +112,11 @@ __wcsftime_xpg5(wchar_t *wcs, size_t maxsize, const wchar_t *format,
 	}
 	if ((dst = malloc(maxsize * MB_CUR_MAX)) == NULL)
 		goto error;
-	if (strftime(dst, maxsize, sformat, timeptr) == 0)
+	if (strftime_l(dst, maxsize, sformat, timeptr, loc) == 0)
 		goto error;
 	dstp = dst;
 	mbs = initial;
-	n = mbsrtowcs(wcs, &dstp, maxsize, &mbs);
+	n = mbsrtowcs_l(wcs, &dstp, maxsize, &mbs, loc);
 	if (n == (size_t)-2 || n == (size_t)-1 || dstp != NULL)
 		goto error;
 
@@ -125,15 +139,16 @@ wcsftime(wchar_t *wcs, size_t maxsize, const char *format,
 	int	len;
 	wchar_t	*wfmt;
 	size_t rv;
+	locale_t loc = uselocale(NULL);
 
 	/* Convert the format (mb string) to wide char array */
 	len = strlen(format) + 1;
 	wfmt = malloc(sizeof (wchar_t) * len);
-	if (mbstowcs(wfmt, format, len) == (size_t)-1) {
+	if (mbstowcs_l(wfmt, format, len, loc) == (size_t)-1) {
 		free(wfmt);
 		return (0);
 	}
-	rv = __wcsftime_xpg5(wcs, maxsize, wfmt, timeptr);
+	rv = wcsftime_l(wcs, maxsize, wfmt, timeptr, loc);
 	free(wfmt);
 	return (rv);
 }

@@ -42,34 +42,36 @@
 .\"
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2025 Bill Sommerfeld
 .\"
-.TH WCSFTIME 3C "Nov 1, 2003"
+.TH WCSFTIME 3C "May 10, 2025"
 .SH NAME
-wcsftime \- convert date and time to wide character string
+wcsftime, wcsftime_l \- convert date and time to wide character string
 .SH SYNOPSIS
-.LP
 .nf
 #include <wchar.h>
 .fi
 
 .SS "XPG4 and SUS"
-.LP
 .nf
 \fBsize_t\fR \fBwcsftime\fR(\fBwchar_t *\fR\fIwcs\fR, \fBsize_t\fR \fImaxsize\fR, \fBconst char *\fR\fIformat\fR,
      \fBconst struct tm *\fR\fItimptr\fR);
 .fi
 
 .SS "Default and other standards"
-.LP
 .nf
 \fBsize_t\fR \fBwcsftime\fR(\fBwchar_t *restrict\fR \fIwcs\fR, \fBsize_t\fR \fImaxsize\fR,
      \fBconst wchar_t *restrict\fR \fIformat\fR,
      \fBconst struct tm *restrict\fR \fItimptr\fR);
 .fi
 
+\fBsize_t\fR \fBwcsftime_l\fR(\fBwchar_t *restrict\fR \fIwcs\fR, \fBsize_t\fR \fImaxsize\fR,
+     \fBconst wchar_t *restrict\fR \fIformat\fR,
+     \fBconst struct tm *restrict\fR \fItimptr\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+
+
 .SH DESCRIPTION
-.sp
-.LP
 The \fBwcsftime()\fR function is equivalent to the \fBstrftime\fR(3C) function,
 except that:
 .RS +4
@@ -103,22 +105,22 @@ array.
 .sp
 .LP
 If copying takes place between objects that overlap, the behavior is undefined.
-.SH RETURN VALUES
-.sp
 .LP
+Likewise, the \fBwcsftime_l()\fR function is equivalent to the
+\fRstrftime_l\fR(3C), with the same changes as \fBwcsftime\fR.
+
+.SH RETURN VALUES
 If the total number of resulting wide character  codes (including the
 terminating null wide-character code) is no more than \fImaxsize\fR,
-\fBwcsftime()\fR returns the number of wide-character codes  placed into the
+both functions return the number of wide-character codes  placed into the
 array pointed to by \fIwcs\fR, not including the terminating null
 wide-character code. Otherwise, \fB0\fR is returned and the contents of the
 array are indeterminate.
 .sp
 .LP
-The \fBwcfstime()\fR function uses \fBmalloc\fR(3C) and should \fBmalloc()\fR
-fail, \fBerrno\fR will be set by \fBmalloc()\fR.
+Both functions may use \fBmalloc\fR(3C); should \fBmalloc()\fR
+fail, they will return \fB0\fR and \fBerrno\fR will be set by \fBmalloc()\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -131,21 +133,18 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	wcsftime: Standard
+	wcsftime_l: Committed
 _
 MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR malloc (3C),
 .BR setlocale (3C),
 .BR strftime (3C),
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 The \fBwcsftime()\fR function can be used safely in multithreaded applications,
 as long as \fBsetlocale\fR(3C) is not being called to change the locale.

@@ -120,7 +120,7 @@ static const ucode_source_t ucode_sources[] = {
 const ucode_source_t *ucode;
 
 static void
-dprintf(const char *format, ...)
+dbgprintf(const char *format, ...)
 {
 	if (ucode_debug) {
 		va_list alist;
@@ -304,7 +304,7 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 	/* write container file */
 	(void) snprintf(common_path, PATH_MAX, "%s/%s", path, "container");
 
-	dprintf("path = %s\n", common_path);
+	dbgprintf("path = %s\n", common_path);
 	fd = open(common_path, O_WRONLY | O_CREAT | O_TRUNC,
 	    S_IRUSR | S_IRGRP | S_IROTH);
 
@@ -331,7 +331,7 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 	    UCODE_AMD_EQUIVALENCE_TABLE_NAME);
 
 	for (;;) {
-		dprintf("path = %s\n", common_path);
+		dbgprintf("path = %s\n", common_path);
 		fd = open(common_path, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IRUSR | S_IRGRP | S_IROTH);
 
@@ -402,7 +402,7 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 
 		(void) snprintf(firstname, PATH_MAX, "%s/%08X-%02X",
 		    common_path, uhp->uh_signature, uhp->uh_proc_flags);
-		dprintf("firstname = %s\n", firstname);
+		dbgprintf("firstname = %s\n", firstname);
 
 		if (ucode_should_update_intel(firstname, uhp->uh_rev) != 0) {
 			int fd;
@@ -438,7 +438,7 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 			(void) snprintf(name, PATH_MAX,
 			    "%s/%08X-%02X", path, uhp->uh_signature, platid);
 
-			dprintf("proc_flags = %x, platid = %x, name = %s\n",
+			dbgprintf("proc_flags = %x, platid = %x, name = %s\n",
 			    uhp->uh_proc_flags, platid, name);
 
 			if (ucode_should_update_intel(name,
@@ -478,7 +478,7 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 				    "%s/%08X-%02X", path,
 				    uesp->ues_signature, id);
 
-				dprintf("extsig: proc_flags = %x, "
+				dbgprintf("extsig: proc_flags = %x, "
 				    "platid = %x, name = %s\n",
 				    uesp->ues_proc_flags, id, name);
 
@@ -792,7 +792,8 @@ main(int argc, char *argv[])
 			for (uint_t i = 0; i < ARRAY_SIZE(ucode_sources); i++) {
 				const ucode_source_t *src = &ucode_sources[i];
 
-				dprintf("i = %d, filestr = %s, filename = %s\n",
+				dbgprintf("i = %d, filestr = %s, "
+				    "filename = %s\n",
 				    i, src->us_prefix, filename);
 				if (strncasecmp(src->us_prefix,
 				    basename(filename),
@@ -813,7 +814,7 @@ main(int argc, char *argv[])
 			goto out;
 		}
 
-		dprintf("Selected microcode type %s (%s)\n",
+		dbgprintf("Selected microcode type %s (%s)\n",
 		    ucode->us_prefix, ucode->us_vendor);
 
 		if ((stat(filename, &filestat)) < 0) {
@@ -837,7 +838,7 @@ main(int argc, char *argv[])
 
 		ucode_size = ucode->us_convert(filename, buf, filestat.st_size);
 
-		dprintf("ucode_size = %d\n", ucode_size);
+		dbgprintf("ucode_size = %d\n", ucode_size);
 
 		if (ucode_size == 0) {
 			rc = EM_FILEFORMAT;

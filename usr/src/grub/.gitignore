@@ -13,12 +13,21 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-# Note: this does not try to ignore all files in a fully built workspace.
-# Rather, you are expected to "make clobber" before running "git status".
+*.exec
+*_stage1_5
 
-/closed
-/log
-/packages
-/proto
-/webrev
-/.vscode
+grub-0.97/grub/grub
+grub-0.97/stage1/stage1
+grub-0.97/stage2/diskless
+grub-0.97/stage2/nbgrub
+grub-0.97/stage2/nbloader
+grub-0.97/stage2/pre_stage2
+grub-0.97/stage2/pxegrub
+grub-0.97/stage2/pxeloader
+grub-0.97/stage2/stage2
+grub-0.97/stage2/stage2_eltorito
+grub-0.97/stage2/start
+grub-0.97/stage2/start_eltorito
+
+grub-0.97/stage2/diskless_size.h
+grub-0.97/stage2/stage2_size.h

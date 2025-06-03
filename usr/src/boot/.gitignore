@@ -1,0 +1,52 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+*.bin
+*.sym
+*.efi
+*.out
+
+*/amd64/machine
+*/amd64/x86
+*/i386/machine
+*/i386/x86
+efi/*/amd64/machine
+efi/*/amd64/x86
+efi/*/i386/machine
+efi/*/i386/x86
+i386/*/machine
+i386/*/x86
+
+i386/btx/btx/btx
+i386/btx/btxldr/btxldr
+i386/cdboot/cdboot
+i386/gptzfsboot/gptzfsboot
+i386/isoboot/isoboot
+i386/loader/loader
+i386/loader/loader.help
+i386/pmbr/pmbr
+i386/pxeldr/loader
+i386/pxeldr/pxeboot
+i386/pxeldr/pxeldr
+
+libsa/amd64/*.[ch]
+libsa/i386/*.[ch]
+efi/loader/amd64/*.[ch]
+efi/loader/i386/*.[ch]
+
+i386/loader/8x16.c
+i386/loader/vers.c
+libficl/softcore/softcore.c
+libsa/amd64/sha1-x86_64.S

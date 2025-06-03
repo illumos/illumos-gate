@@ -76,7 +76,8 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 	 * setup D-Bus connection
 	 */
 	if (!(dbus_conn = dbus_bus_get(DBUS_BUS_SYSTEM, error))) {
-		dprintf("cannot get system bus: %s\n", rmm_strerror(error, -1));
+		dbgprintf("cannot get system bus: %s\n",
+		    rmm_strerror(error, -1));
 		*rmm_error = RMM_EDBUS_CONNECT;
 		return (NULL);
 	}
@@ -86,7 +87,7 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 	dbus_connection_set_exit_on_disconnect(dbus_conn, B_TRUE);
 
 	if ((ctx = libhal_ctx_new()) == NULL) {
-		dprintf("libhal_ctx_new failed");
+		dbgprintf("libhal_ctx_new failed");
 		*rmm_error = RMM_EHAL_CONNECT;
 		return (NULL);
 	}
@@ -105,7 +106,7 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 	if (propmod_cb != NULL) {
 		libhal_ctx_set_device_property_modified(ctx, propmod_cb);
 		if (!libhal_device_property_watch_all(ctx, error)) {
-			dprintf("property_watch_all failed %s",
+			dbgprintf("property_watch_all failed %s",
 			    rmm_strerror(error, -1));
 			libhal_ctx_free(ctx);
 			*rmm_error = RMM_EHAL_CONNECT;
@@ -117,7 +118,8 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 	}
 
 	if (!libhal_ctx_init(ctx, error)) {
-		dprintf("libhal_ctx_init failed: %s", rmm_strerror(error, -1));
+		dbgprintf("libhal_ctx_init failed: %s",
+		    rmm_strerror(error, -1));
 		libhal_ctx_free(ctx);
 		*rmm_error = RMM_EHAL_CONNECT;
 		return (NULL);
@@ -129,7 +131,7 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 	 * Check by invoking a method.
 	 */
 	if (!(devices = libhal_get_all_devices(ctx, &nr, error))) {
-		dprintf("HAL is not running: %s", rmm_strerror(error, -1));
+		dbgprintf("HAL is not running: %s", rmm_strerror(error, -1));
 		libhal_ctx_shutdown(ctx, NULL);
 		libhal_ctx_free(ctx);
 		*rmm_error = RMM_EHAL_CONNECT;
@@ -499,11 +501,11 @@ rmm_hal_mount(LibHalContext *hal_ctx, const char *udi,
 	DBusMessage	*dmesg, *reply;
 	char		*fstype;
 
-	dprintf("mounting %s...\n", udi);
+	dbgprintf("mounting %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal", udi,
 	    "org.freedesktop.Hal.Device.Volume", "Mount"))) {
-		dprintf(
+		dbgprintf(
 		    "mount failed for %s: cannot create dbus message\n", udi);
 		return (B_FALSE);
 	}
@@ -517,7 +519,7 @@ rmm_hal_mount(LibHalContext *hal_ctx, const char *udi,
 	    DBUS_TYPE_STRING, &fstype,
 	    DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &opts, num_opts,
 	    DBUS_TYPE_INVALID)) {
-		dprintf("mount failed for %s: cannot append args\n", udi);
+		dbgprintf("mount failed for %s: cannot append args\n", udi);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
@@ -525,12 +527,12 @@ rmm_hal_mount(LibHalContext *hal_ctx, const char *udi,
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, RMM_MOUNT_TIMEOUT, error))) {
-		dprintf("mount failed for %s: %s\n", udi, error->message);
+		dbgprintf("mount failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
 
-	dprintf("mounted %s\n", udi);
+	dbgprintf("mounted %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -551,18 +553,18 @@ rmm_hal_unmount(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	DBusMessage *dmesg, *reply;
 	char **opts = NULL;
 
-	dprintf("unmounting %s...\n", udi);
+	dbgprintf("unmounting %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal", udi,
 	    "org.freedesktop.Hal.Device.Volume", "Unmount"))) {
-		dprintf(
+		dbgprintf(
 		    "unmount failed %s: cannot create dbus message\n", udi);
 		return (B_FALSE);
 	}
 
 	if (!dbus_message_append_args(dmesg, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
 	    &opts, 0, DBUS_TYPE_INVALID)) {
-		dprintf("unmount failed %s: cannot append args\n", udi);
+		dbgprintf("unmount failed %s: cannot append args\n", udi);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
@@ -570,12 +572,12 @@ rmm_hal_unmount(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, RMM_UNMOUNT_TIMEOUT, error))) {
-		dprintf("unmount failed for %s: %s\n", udi, error->message);
+		dbgprintf("unmount failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
 
-	dprintf("unmounted %s\n", udi);
+	dbgprintf("unmounted %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -597,18 +599,18 @@ rmm_hal_eject(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	char		**options = NULL;
 	uint_t		num_options = 0;
 
-	dprintf("ejecting %s...\n", udi);
+	dbgprintf("ejecting %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal", udi,
 	    "org.freedesktop.Hal.Device.Storage", "Eject"))) {
-		dprintf("eject %s: cannot create dbus message\n", udi);
+		dbgprintf("eject %s: cannot create dbus message\n", udi);
 		return (B_FALSE);
 	}
 
 	if (!dbus_message_append_args(dmesg,
 	    DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &options, num_options,
 	    DBUS_TYPE_INVALID)) {
-		dprintf("eject %s: cannot append args to dbus message ", udi);
+		dbgprintf("eject %s: cannot append args to dbus message ", udi);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
@@ -616,12 +618,12 @@ rmm_hal_eject(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, RMM_EJECT_TIMEOUT, error))) {
-		dprintf("eject %s: %s\n", udi, error->message);
+		dbgprintf("eject %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
 
-	dprintf("ejected %s\n", udi);
+	dbgprintf("ejected %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -642,11 +644,11 @@ rmm_hal_closetray(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	char		**options = NULL;
 	uint_t		num_options = 0;
 
-	dprintf("closing tray %s...\n", udi);
+	dbgprintf("closing tray %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal", udi,
 	    "org.freedesktop.Hal.Device.Storage", "CloseTray"))) {
-		dprintf(
+		dbgprintf(
 		    "closetray failed for %s: cannot create dbus message\n",
 		    udi);
 		return (B_FALSE);
@@ -655,7 +657,7 @@ rmm_hal_closetray(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	if (!dbus_message_append_args(dmesg,
 	    DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &options, num_options,
 	    DBUS_TYPE_INVALID)) {
-		dprintf("closetray %s: cannot append args to dbus message ",
+		dbgprintf("closetray %s: cannot append args to dbus message ",
 		    udi);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
@@ -664,12 +666,12 @@ rmm_hal_closetray(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, RMM_CLOSETRAY_TIMEOUT, error))) {
-		dprintf("closetray failed for %s: %s\n", udi, error->message);
+		dbgprintf("closetray failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
 
-	dprintf("closetray ok %s\n", udi);
+	dbgprintf("closetray ok %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -688,11 +690,11 @@ rmm_hal_rescan(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	DBusConnection	*dbus_conn = libhal_ctx_get_dbus_connection(hal_ctx);
 	DBusMessage	*dmesg, *reply;
 
-	dprintf("rescanning %s...\n", udi);
+	dbgprintf("rescanning %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal", udi,
 	    "org.freedesktop.Hal.Device", "Rescan"))) {
-		dprintf("rescan failed for %s: cannot create dbus message\n",
+		dbgprintf("rescan failed for %s: cannot create dbus message\n",
 		    udi);
 		return (B_FALSE);
 	}
@@ -700,12 +702,12 @@ rmm_hal_rescan(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, -1, error))) {
-		dprintf("rescan failed for %s: %s\n", udi, error->message);
+		dbgprintf("rescan failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
 
-	dprintf("rescan ok %s\n", udi);
+	dbgprintf("rescan ok %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -723,18 +725,18 @@ rmm_hal_claim_branch(LibHalContext *hal_ctx, const char *udi)
 	DBusMessage *dmesg, *reply;
 	const char *claimed_by = "rmvolmgr";
 
-	dprintf("claiming branch %s...\n", udi);
+	dbgprintf("claiming branch %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal",
 	    "/org/freedesktop/Hal/Manager", "org.freedesktop.Hal.Manager",
 	    "ClaimBranch"))) {
-		dprintf("cannot create dbus message\n");
+		dbgprintf("cannot create dbus message\n");
 		return (B_FALSE);
 	}
 
 	if (!dbus_message_append_args(dmesg, DBUS_TYPE_STRING, &udi,
 	    DBUS_TYPE_STRING, &claimed_by, DBUS_TYPE_INVALID)) {
-		dprintf("cannot append args to dbus message\n");
+		dbgprintf("cannot append args to dbus message\n");
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
@@ -742,13 +744,13 @@ rmm_hal_claim_branch(LibHalContext *hal_ctx, const char *udi)
 	dbus_error_init(&error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, -1, &error))) {
-		dprintf("cannot send dbus message\n");
+		dbgprintf("cannot send dbus message\n");
 		dbus_message_unref(dmesg);
 		rmm_dbus_error_free(&error);
 		return (B_FALSE);
 	}
 
-	dprintf("claim branch ok %s\n", udi);
+	dbgprintf("claim branch ok %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -764,18 +766,18 @@ rmm_hal_unclaim_branch(LibHalContext *hal_ctx, const char *udi)
 	DBusMessage *dmesg, *reply;
 	const char *claimed_by = "rmvolmgr";
 
-	dprintf("unclaiming branch %s...\n", udi);
+	dbgprintf("unclaiming branch %s...\n", udi);
 
 	if (!(dmesg = dbus_message_new_method_call("org.freedesktop.Hal",
 	    "/org/freedesktop/Hal/Manager", "org.freedesktop.Hal.Manager",
 	    "UnclaimBranch"))) {
-		dprintf("cannot create dbus message\n");
+		dbgprintf("cannot create dbus message\n");
 		return (B_FALSE);
 	}
 
 	if (!dbus_message_append_args(dmesg, DBUS_TYPE_STRING, &udi,
 	    DBUS_TYPE_STRING, &claimed_by, DBUS_TYPE_INVALID)) {
-		dprintf("cannot append args to dbus message\n");
+		dbgprintf("cannot append args to dbus message\n");
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
 	}
@@ -783,13 +785,13 @@ rmm_hal_unclaim_branch(LibHalContext *hal_ctx, const char *udi)
 	dbus_error_init(&error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
 	    dmesg, -1, &error))) {
-		dprintf("cannot send dbus message\n");
+		dbgprintf("cannot send dbus message\n");
 		dbus_message_unref(dmesg);
 		rmm_dbus_error_free(&error);
 		return (B_FALSE);
 	}
 
-	dprintf("unclaim branch ok %s\n", udi);
+	dbgprintf("unclaim branch ok %s\n", udi);
 
 	dbus_message_unref(dmesg);
 	dbus_message_unref(reply);
@@ -889,7 +891,7 @@ rmm_action(LibHalContext *hal_ctx, const char *name, action_t action,
 	struct action_arg aa_local;
 	boolean_t	ret = B_FALSE;
 
-	dprintf("rmm_action %s %s\n", name, action_strings[action]);
+	dbgprintf("rmm_action %s %s\n", name, action_strings[action]);
 
 	if (aap == NULL) {
 		bzero(&aa_local, sizeof (aa_local));
@@ -940,7 +942,7 @@ rmm_action(LibHalContext *hal_ctx, const char *name, action_t action,
 		}
 		if (aap == &aa_local) {
 			if (!rmm_volume_aa_from_prop(hal_ctx, udi, v, aap)) {
-				dprintf("rmm_volume_aa_from_prop failed %s\n",
+				dbgprintf("rmm_volume_aa_from_prop failed %s\n",
 				    udi);
 				continue;
 			}
@@ -988,7 +990,7 @@ rmm_rescan(LibHalContext *hal_ctx, const char *name, boolean_t query)
 	int		i;
 	boolean_t	ret = B_FALSE;
 
-	dprintf("rmm_rescan %s\n", name != NULL ? name : "all");
+	dbgprintf("rmm_rescan %s\n", name != NULL ? name : "all");
 
 	dbus_error_init(&error);
 
@@ -1080,13 +1082,13 @@ rmm_volume_aa_from_prop(LibHalContext *hal_ctx, const char *udi_arg,
 	}
 	if (volume == NULL) {
 		if ((volume = libhal_volume_from_udi(hal_ctx, udi)) == NULL) {
-			dprintf("cannot get volume %s\n", udi);
+			dbgprintf("cannot get volume %s\n", udi);
 			goto out;
 		}
 	}
 	if (udi == NULL) {
 		if ((udi = libhal_volume_get_udi(volume)) == NULL) {
-			dprintf("cannot get udi\n");
+			dbgprintf("cannot get udi\n");
 			goto out;
 		}
 	}
@@ -1094,13 +1096,13 @@ rmm_volume_aa_from_prop(LibHalContext *hal_ctx, const char *udi_arg,
 
 	if (!(aap->aa_symdev = libhal_device_get_property_string(hal_ctx,
 	    drive_udi, "storage.solaris.legacy.symdev", NULL))) {
-		dprintf("property %s not found %s\n",
+		dbgprintf("property %s not found %s\n",
 		    "storage.solaris.legacy.symdev", drive_udi);
 		goto out;
 	}
 	if (!(aap->aa_media = libhal_device_get_property_string(hal_ctx,
 	    drive_udi, "storage.solaris.legacy.media_type", NULL))) {
-		dprintf("property %s not found %s\n",
+		dbgprintf("property %s not found %s\n",
 		    "storage.solaris.legacy.media_type", drive_udi);
 		goto out;
 	}
@@ -1131,18 +1133,18 @@ rmm_volume_aa_from_prop(LibHalContext *hal_ctx, const char *udi_arg,
 
 	if (!(aap->aa_path = libhal_device_get_property_string(hal_ctx, udi,
 	    "block.device", NULL))) {
-		dprintf("property %s not found %s\n", "block.device", udi);
+		dbgprintf("property %s not found %s\n", "block.device", udi);
 		goto out;
 	}
 	if (!(aap->aa_rawpath = libhal_device_get_property_string(hal_ctx, udi,
 	    "block.solaris.raw_device", NULL))) {
-		dprintf("property %s not found %s\n",
+		dbgprintf("property %s not found %s\n",
 		    "block.solaris.raw_device", udi);
 		goto out;
 	}
 	if (!(aap->aa_type = libhal_device_get_property_string(hal_ctx, udi,
 	    "volume.fstype", NULL))) {
-		dprintf("property %s not found %s\n", "volume.fstype", udi);
+		dbgprintf("property %s not found %s\n", "volume.fstype", udi);
 		goto out;
 	}
 	if (!libhal_device_get_property_bool(hal_ctx, udi,
@@ -1150,13 +1152,13 @@ rmm_volume_aa_from_prop(LibHalContext *hal_ctx, const char *udi_arg,
 		aap->aa_partname = NULL;
 	} else if (!(aap->aa_partname = libhal_device_get_property_string(
 	    hal_ctx, udi, "block.solaris.slice", NULL))) {
-		dprintf("property %s not found %s\n",
+		dbgprintf("property %s not found %s\n",
 		    "block.solaris.slice", udi);
 		goto out;
 	}
 	if (!(mountpoint = libhal_device_get_property_string(hal_ctx, udi,
 	    "volume.mount_point", NULL))) {
-		dprintf("property %s not found %s\n",
+		dbgprintf("property %s not found %s\n",
 		    "volume.mount_point", udi);
 		goto out;
 	}
@@ -1167,7 +1169,7 @@ rmm_volume_aa_from_prop(LibHalContext *hal_ctx, const char *udi_arg,
 	aap->aa_mountpoint = strdup(mountpoint);
 	libhal_free_string(mountpoint);
 	if (aap->aa_mountpoint == NULL) {
-		dprintf("mountpoint is NULL %s\n", udi);
+		dbgprintf("mountpoint is NULL %s\n", udi);
 		goto out;
 	}
 
@@ -1376,7 +1378,7 @@ makepath(char *dir, mode_t mode)
 
 
 void
-dprintf(const char *fmt, ...)
+dbgprintf(const char *fmt, ...)
 {
 
 	va_list		ap;

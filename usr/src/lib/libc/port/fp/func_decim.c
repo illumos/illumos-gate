@@ -29,18 +29,20 @@
 #include <ctype.h>
 #include <stdio.h>
 #include "base_conversion.h"
+#include <xlocale.h>
 #include <locale.h>
 
 void
 func_to_decimal(char **ppc, int nmax, int fortran_conventions,
-		decimal_record *pd, enum decimal_string_form *pform,
-		char **pechar, int (*pget)(void), int *pnread,
-		int (*punget)(int))
+    decimal_record *pd, enum decimal_string_form *pform,
+    char **pechar, int (*pget)(void), int *pnread,
+    int (*punget)(int))
 {
 	char	*cp = *ppc - 1;	/* last character seen */
 	char	*good = cp;	/* last character accepted */
 	int	current;	/* *cp or EOF */
 	int	nread = 0;	/* number of characters read so far */
+	locale_t loc = uselocale(NULL);
 
 #define	NEXT \
 	if (nread < nmax) { \

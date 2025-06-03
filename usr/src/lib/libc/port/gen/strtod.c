@@ -25,7 +25,11 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2025 Bill Sommerfeld
+ */
 
 #include "lint.h"
 #include <errno.h>
@@ -34,11 +38,18 @@
 #include <floatingpoint.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <xlocale.h>
 #include "libc.h"
 #include "xpg6.h"
 
 double
 strtod(const char *cp, char **ptr)
+{
+	return (strtod_l(cp, ptr, uselocale(NULL)));
+}
+
+double
+strtod_l(const char *cp, char **ptr, locale_t loc)
 {
 	double		x;
 	decimal_mode	mr;
@@ -49,7 +60,7 @@ strtod(const char *cp, char **ptr)
 	int		lc;
 
 	lc = (__xpg6 & _C99SUSv3_recognize_hexfp)? -1 : 0;
-	string_to_decimal((char **)&cp, MAXINT, lc, &dr, &form, &pechar);
+	string_to_decimal_l((char **)&cp, MAXINT, lc, &dr, &form, &pechar, loc);
 	if (ptr != NULL)
 		*ptr = (char *)cp;
 	if (form == invalid_form)
@@ -73,6 +84,12 @@ strtod(const char *cp, char **ptr)
 float
 strtof(const char *cp, char **ptr)
 {
+	return (strtof_l(cp, ptr, uselocale(NULL)));
+}
+
+float
+strtof_l(const char *cp, char **ptr, locale_t loc)
+{
 	float		x;
 	decimal_mode	mr;
 	decimal_record	dr;
@@ -80,7 +97,7 @@ strtof(const char *cp, char **ptr)
 	enum decimal_string_form form;
 	char		*pechar;
 
-	string_to_decimal((char **)&cp, MAXINT, -1, &dr, &form, &pechar);
+	string_to_decimal_l((char **)&cp, MAXINT, -1, &dr, &form, &pechar, loc);
 	if (ptr != NULL)
 		*ptr = (char *)cp;
 	if (form == invalid_form)
@@ -104,6 +121,12 @@ strtof(const char *cp, char **ptr)
 long double
 strtold(const char *cp, char **ptr)
 {
+	return (strtold_l(cp, ptr, uselocale(NULL)));
+}
+
+long double
+strtold_l(const char *cp, char **ptr, locale_t loc)
+{
 	long double	x;
 	decimal_mode	mr;
 	decimal_record	dr;
@@ -111,7 +134,7 @@ strtold(const char *cp, char **ptr)
 	enum decimal_string_form form;
 	char		*pechar;
 
-	string_to_decimal((char **)&cp, MAXINT, -1, &dr, &form, &pechar);
+	string_to_decimal_l((char **)&cp, MAXINT, -1, &dr, &form, &pechar, loc);
 	if (ptr != NULL)
 		*ptr = (char *)cp;
 	if (form == invalid_form)

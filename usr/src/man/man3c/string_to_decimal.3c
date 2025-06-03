@@ -3,12 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING_TO_DECIMAL 3C "Oct 1, 2003"
+.\" Copyright 2025 Bill Sommerfeld
+.TH STRING_TO_DECIMAL 3C "May 10, 2025"
 .SH NAME
-string_to_decimal, file_to_decimal, func_to_decimal \- parse characters into
+string_to_decimal, string_to_decimal_l, file_to_decimal, func_to_decimal \- parse characters into
 decimal record
 .SH SYNOPSIS
-.LP
 .nf
 #include <floatingpoint.h>
 
@@ -35,9 +35,16 @@ decimal record
      \fBFILE *\fR\fIpf\fR, \fBint *\fR\fIpnread\fR);
 .fi
 
+#include <xlocale.h>
+
+\fBvoid\fR \fBstring_to_decimal_l\fR(\fBchar **\fR\fIpc\fR, \fBint\fR \fInmax\fR,
+     \fBint\fR \fIfortran_conventions\fR, \fBdecimal_record *\fR\fIpd\fR,
+     \fBenum decimal_string_form *\fR\fIpform\fR, \fBchar **\fR\fIpechar\fR,
+     \fBlocale_t\fR \fIloc\rR);
+.fi
+
+
 .SH DESCRIPTION
-.sp
-.LP
 These functions attempt to parse a numeric token from at most \fInmax\fR
 characters read from a string **\fIpc\fR, a file *\fIpf\fR, or function
 (*\fIpget\fR). They set the decimal record *\fIpd\fR to reflect the value of
@@ -213,12 +220,16 @@ On entry, *\fIpc\fR points to the beginning of a character string buffer.  The
 \fBstring_to_decimal()\fR function reads characters from this buffer until
 either enough characters are read to delimit the accepted token (for example, a
 null character marking the end of the string is found) or the limit of
-\fInmax\fR characters is reached. The \fBfile_to_decimal()\fR function reads
+\fInmax\fR characters is reached. The \fBstring_to_decimal_l()\fR function
+behaves the same but uses the decimal point representation from the locale
+passed in the \fIloc\fR argument.
+The \fBfile_to_decimal()\fR function reads
 characters from the file *\fIpf\fR and stores them in the buffer. The
 \fBfunc_to_decimal()\fR function reads characters one at a time by calling the
 function (*\fIpget\fR)() and stores them in the buffer; (*\fIpget\fR)() must
 return integer values in the range \(mi1 to 255, where \(mi1 is interpreted as
-EOF and 0, ..., 255 are interpreted as \fBunsigned char\fR values. Both
+EOF and 0, ..., 255 are interpreted as \fBunsigned char\fR values.
+Both
 \fBfile_to_decimal()\fR and \fBfunc_to_decimal()\fR read characters until
 either enough characters are read to delimit the accepted token, EOF is
 encountered, or the limit of \fInmax\fR characters is reached. These functions,
@@ -248,8 +259,6 @@ to the position in the buffer where the first character of the exponent field
 is stored.  If the accepted token does not contain an exponent part,
 *\fIpechar\fR is set to \fINULL\fR.
 .SH USAGE
-.sp
-.LP
 If the \fB_IOWRT\fR flag is set in *\fIpf\fR, \fBfile_to_decimal()\fR reads
 characters directly from the file buffer until a null character is found.  (The
 \fB_IOWRT\fR flag should only be set when \fBfile_to_decimal()\fR is called
@@ -257,8 +266,6 @@ from \fBsscanf\fR(3C).)  Otherwise, \fBfile_to_decimal()\fR uses
 \fBgetc_unlocked\fR(3C), so it is not MT-safe unless the caller holds the
 stream lock.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -273,8 +280,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ctype (3C),
 .BR decimal_to_floating (3C),
 .BR getc_unlocked (3C),

@@ -31,6 +31,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include "base_conversion.h"
+#include <xlocale.h>
 #include <locale.h>
 #include <thread.h>
 #include <synch.h>
@@ -48,13 +49,14 @@
 
 void
 file_to_decimal(char **ppc, int nmax, int fortran_conventions,
-		decimal_record *pd, enum decimal_string_form *pform,
-		char **pechar, FILE *pf, int *pnread)
+    decimal_record *pd, enum decimal_string_form *pform,
+    char **pechar, FILE *pf, int *pnread)
 {
 	char	*cp = *ppc - 1;	/* last character seen */
 	char	*good = cp;	/* last character accepted */
 	int	current;	/* *cp or EOF */
 	int	nread = 0;	/* number of characters read so far */
+	locale_t loc = uselocale(NULL);
 
 /* if the _IOWRT flag is set, this must be a call from sscanf */
 #define	NEXT \

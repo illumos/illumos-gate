@@ -30,6 +30,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2025 Bill Sommerfeld
+ */
+
 #ifndef	_LCONV_C99
 #define	_LCONV_C99	/* so we get all the extensions */
 #endif
@@ -55,12 +59,16 @@
 struct lconv *
 localeconv(void)
 {
+	return (localeconv_l(uselocale(NULL)));
+}
+
+struct lconv *
+localeconv_l(locale_t loc)
+{
 	struct lconv	*lconv;
-	locale_t	loc;
 	struct lc_monetary	*mptr;
 	struct lc_numeric	*nptr;
 
-	loc = uselocale(NULL);
 	lconv = &loc->lconv;
 
 	if (loc->loaded[LC_MONETARY] == 0) {

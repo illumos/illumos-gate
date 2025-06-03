@@ -13,12 +13,12 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-# Note: this does not try to ignore all files in a fully built workspace.
-# Rather, you are expected to "make clobber" before running "git status".
+consfonts/*.fnt
 
-/closed
-/log
-/packages
-/proto
-/webrev
-/.vscode
+
+hwdata/THIRDPARTYLICENSE.efifixes
+hwdata/THIRDPARTYLICENSE.pciids
+
+locale/locale
+
+zoneinfo/zoneinfo.po
