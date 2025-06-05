@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -299,23 +299,10 @@ static zen_topo_cache_type_t
 zen_topo_determine_cache(topo_mod_t *mod, uint32_t level, uint32_t type,
     uint32_t shift)
 {
-	zen_topo_t *zen = topo_mod_getspecific(mod);
-
 	for (size_t i = 0; i < ARRAY_SIZE(zen_topo_cache_map); i++) {
 		const zen_topo_cache_map_t *map = &zen_topo_cache_map[i];
-		uint32_t apic;
 
-		if (map->ztcm_level != level || map->ztcm_type != type) {
-			continue;
-		}
-
-		if (map->ztcm_core) {
-			apic = zen->zt_base.atb_apic_decomp.aad_core_shift;
-		} else {
-			apic = zen->zt_base.atb_apic_decomp.aad_ccx_shift;
-		}
-
-		if (shift == apic) {
+		if (map->ztcm_level == level && map->ztcm_type == type) {
 			return (map->ztcm_cache);
 		}
 	}
@@ -326,12 +313,22 @@ zen_topo_determine_cache(topo_mod_t *mod, uint32_t level, uint32_t type,
 /*
  * We have mapped a logical CPU to a position in the hierarchy. We must now walk
  * its caches and attempt to install them up the chain. We assume that there
- * there are four caches right now: an L1i, L1d, L2, and L3 cache. We will
- * verify that these are shared at the points in the hierarchy that we expect.
+ * there are four caches right now: an L1i, L1d, L2, and L3 cache.
+ *
  * Note, AMD has mixed designs with 1 CCX and 2 CCXs. When there is only 1 CCX
  * then we often describe the CCX and CCD as equivalent though if you look at
  * the PPR it describes each CCD as having a single CCX. This is why the L3
  * cache lives on the CCX right now.
+ *
+ * Historically we tried to leverage the APIC shift information that the kernel
+ * provides around the number of CPUs that shared a cache and map that to the
+ * APIC ID decomposition information that we had. Unfortunately, this heuristic
+ * was useful, but inaccurate. In particular the CPUID interface gives us a
+ * count of logical CPUs that share something. If you had less CPUs in a CCD
+ * than the APIC split would be at, then this would fail. A prime example is a
+ * 32 CPU where there are 4 cores in each of 8 CCDs. This would result in 8
+ * logical CPUs sharing the CPU; however, the APIC split was often shifting over
+ * at 4 because the CCD design was for up to 8 cores.
  */
 static boolean_t
 topo_zen_map_caches(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
@@ -348,8 +345,6 @@ topo_zen_map_caches(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 	 *  o Determine the type of cache that this is. While the upper layers
 	 *    guarantee us the L1 caches come before L2 and L2 before L3, we
 	 *    don't care.
-	 *  o Use the APIC shift and our APIC decomp to confirm the level of the
-	 *    hierarchy this should operate at.
 	 *  o If a cache is already there, it should have the same ID as the one
 	 *    that we already have.
 	 */
