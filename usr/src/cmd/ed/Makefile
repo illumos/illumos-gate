@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
 
 PROG= ed
 XPG4PROG= ed
@@ -37,12 +38,15 @@ SRCS= ./ed.c ../expr/compile.c
 POFILES= $(EDOBJ:%.o=%.po)
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += $(CNOWARN_UNINIT)
+
+CTF_MODE = link
 
 # not linted
 SMATCH=off
@@ -80,18 +84,23 @@ $(XPG6): edobjs.xpg6 $(XPG6EDOBJ)  $(MAPFILE.INT)
 
 compile.o:	../expr/compile.c
 	$(COMPILE.c) -o $@ ../expr/compile.c
+	$(POST_PROCESS_O)
 
 edobjs.xpg4/%.o:	%.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 edobjs.xpg4/%.o:	../expr/compile.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 edobjs.xpg6/%.o:	%.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 edobjs.xpg6/%.o:	../expr/compile.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 edobjs.xpg4:
 	-@mkdir -p $@
@@ -109,9 +118,11 @@ install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTXPG6PROG)
 
 values-xpg4.o: ../../lib/crt/common/values-xpg4.c
 	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
+	$(POST_PROCESS_O)
 
 values-xpg6.o: ../../lib/crt/common/values-xpg6.c
 	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg6.c
+	$(POST_PROCESS_O)
 
 clean:
 	-@rm -rf $(OBJS) $(XPG4) $(XPG6) edobjs.xpg4 edobjs.xpg6 \

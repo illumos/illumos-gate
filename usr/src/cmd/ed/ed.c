@@ -27,6 +27,10 @@
 /*	  All Rights Reserved	*/
 
 /*
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Editor
  */
 
@@ -1402,9 +1406,10 @@ getfile(void)
 					crflag = -2;
 			}
 			fp = genbuf;
-			if (crflag > 0)
-			if (run_crypt(count, genbuf, ninbuf+1, perm) == -1)
+			if (crflag > 0 &&
+			    run_crypt(count, genbuf, ninbuf+1, perm) == -1) {
 				(void) error(63);
+			}
 		}
 		if (lp >= &linebuf[LBSIZE]) {
 			lastc = '\n';
@@ -1449,6 +1454,8 @@ putfile(void)
 	fp = genbuf;
 	a1 = addr1;
 	do {
+		if (a1 > endcore)
+			break;
 		lp = getaline(a1++->cur);
 		if (fss.Ffill && fss.Flim && lenchk(linebuf, &fss) < 0) {
 			write(1, gettext("line too long: lno = "),
@@ -1462,9 +1469,10 @@ putfile(void)
 		for (;;) {
 			if (--nib < 0) {
 				n = fp-genbuf;
-				if (kflag)
-				if (run_crypt(count-n, genbuf, n, perm) == -1)
+				if (kflag &&
+				    run_crypt(count-n, genbuf, n, perm) == -1) {
 					(void) error(63);
+				}
 				if (write(io, genbuf, n) != n)
 					(void) error(29);
 				nib = LBSIZE - 1;
@@ -2686,9 +2694,10 @@ eopen(char *string, int rw)
 					else
 						crflag = -2;
 				}
-				if (crflag > 0)
-				if (run_crypt(0L, crbuf, chcount, perm) == -1)
-						(void) error(63);
+				if (crflag > 0 &&
+				    run_crypt(0L, crbuf, chcount, perm) == -1) {
+					(void) error(63);
+				}
 				if (fspec(crbuf, &fss, 0) < 0) {
 					fss.Ffill = 0;
 					fflg = 0;
@@ -3173,17 +3182,18 @@ undo(void)
 		i->cur = i->sav;
 		i->sav = tmp;
 	}
-		/*
-		 * If the current text lines are swapped with the
-		 * text lines in the save buffer, then swap the current
-		 * marks with those in the save area.
-		 */
 
-		for (j = 0; j <= 25; j++) {
-			tmp = names[j];
-			names[j] = savnames[j];
-			savnames[j] = tmp;
-		}
+	/*
+	 * If the current text lines are swapped with the
+	 * text lines in the save buffer, then swap the current
+	 * marks with those in the save area.
+	 */
+
+	for (j = 0; j <= 25; j++) {
+		tmp = names[j];
+		names[j] = savnames[j];
+		savnames[j] = tmp;
+	}
 }
 
 static wchar_t
