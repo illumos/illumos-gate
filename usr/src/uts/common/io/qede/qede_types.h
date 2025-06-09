@@ -20,17 +20,8 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
-* and Distribution License, v.1,  (the "License").
-
-* You may not use this file except in compliance with the License.
-
-* You can obtain a copy of the License at available 
-* at http://opensource.org/licenses/CDDL-1.0
-
-* See the License for the specific language governing permissions and 
-* limitations under the License.
+* Copyright 2014-2017 Cavium, Inc.
+* Copyright 2025 Oxide Computer Company
 */
 
 #ifndef _QEDE_TYPES_H
@@ -44,7 +35,6 @@ typedef uint32_t		u32;
 typedef uint32_t		U32;
 typedef uint64_t		u64;
 typedef	uint64_t		U64;
-typedef	boolean_t		bool;
 
 typedef u16			__le16;
 typedef	u32			__le32;
