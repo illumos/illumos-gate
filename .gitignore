@@ -11,6 +11,7 @@
 
 #
 # Copyright 2025 Oxide Computer Company
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 # Note: this does not try to ignore all files in a fully built workspace.
@@ -22,3 +23,5 @@
 /proto
 /webrev
 /.vscode
+/on-closed-bin*.tar.bz2
+/illumos.sh

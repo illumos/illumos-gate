@@ -11,6 +11,7 @@
 
 #
 # Copyright 2025 Oxide Computer Company
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 # Common binary names...
@@ -234,6 +235,7 @@ os-tests/tests/spoof-ras/spoof-ras
 os-tests/tests/stress/dladm-kstat
 os-tests/tests/tcpsig/tcpsig
 os-tests/tests/timer/timer_limit
+os-tests/tests/tmpfs/tmpfs_full
 os-tests/tests/uccid/atrparse
 os-tests/tests/uccid/excl-badread
 os-tests/tests/uccid/excl-basic
@@ -265,6 +267,7 @@ smbsrv-tests/tests/smb_sid/large_sids_kern
 smbsrv-tests/tests/smb_sid/large_sids_lib
 smbsrv-tests/tests/smb_sid/smb_sid.c
 
+util-tests/tests/bunyan/btest
 util-tests/tests/cpmvln/checker
 util-tests/tests/cpmvln/mkobj
 util-tests/tests/ctf/check-array
@@ -339,6 +342,7 @@ zfs-tests/cmd/randwritecomp/randwritecomp
 zfs-tests/cmd/readmmap/readmmap
 zfs-tests/cmd/rename_dir/rename_dir
 zfs-tests/cmd/rm_lnkcnt_zero_file/rm_lnkcnt_zero_file
+zfs-tests/cmd/watch_dir/watch_dir
 zfs-tests/tests/functional/channel_program/lua_core/nvlist_to_lua.exe
 zfs-tests/tests/functional/channel_program/synctask_core/change_key.exe
 zfs-tests/tests/functional/checksum/edonr/amd64/edonr_test
