@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -515,6 +516,40 @@ sprunlock(proc_t *p)
 
 	ASSERT(p->p_proc_flag & P_PR_LOCK);
 	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	if ((p->p_flag & SKILLED) && p->p_tlist != NULL) {
+		/*
+		 * While P_PR_LOCK was set, this process received a SIGKILL.
+		 * The signal was posted in p->p_sig and p->p_extsig, but we
+		 * skipped resuming stopped threads because P_PR_LOCK prevented
+		 * the process' shape from changing.  If all threads were
+		 * stopped by SIGSTOP or /proc PCSTOP, none will run to witness
+		 * the SIGKILL and this process will end up stuck.
+		 *
+		 * While only one thread needs to be runnable to witness the
+		 * SIGKILL, set as many running as we can in case there are
+		 * mixed scheduler priorities.  It would otherwise be
+		 * unfortunate if we set a single low-priority thread runnable
+		 * in an otherwise-stopped process and did not promptly notice
+		 * the SIGKILL.
+		 *
+		 * * TS_XSTART undoes the stopping effect of SIGSTOP.
+		 * * TS_PSTART undoes the stopping effect of /proc PCSTOP.
+		 *
+		 * Notably, other TS_* bits are inappropriate here:
+		 * * Do not set TS_CSTART or TS_UNPAUSE; lwps may be stopped by
+		 *   PR_SUSPEND for many reasons. Some cases, like holdlwps(),
+		 *   will resume the process before the corresponding syscall
+		 *   returns. Other cases, like dumping core, the suspender
+		 *   will tear down the lwps as it completes.
+		 * * Do not set TS_RESUME out of caution; not sure about the
+		 *   consequences of a process going away during CPR resume and
+		 *   CPR should set the process running eventually.
+		 * * Do not set TS_CREATE because lwp creation expects threads
+		 *   to remain paused until lwp completes.
+		 */
+		runlwps(p, TS_XSTART | TS_PSTART);
+	}
 
 	cv_signal(&pr_pid_cv[p->p_slot]);
 	p->p_proc_flag &= ~P_PR_LOCK;
