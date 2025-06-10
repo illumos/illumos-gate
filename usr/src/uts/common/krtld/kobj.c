@@ -27,6 +27,7 @@
  * All rights reserved. Use is subject to license terms.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -874,6 +875,20 @@ load_exec(val_t *bootaux, char *filename)
 	return (mp);
 }
 
+static boolean_t
+is_extended_ehdr(const Ehdr *hdr)
+{
+	/*
+	 * If any of e_shnum, e_shstrndx, or e_phnum are at their sentinel
+	 * value, this indicates that an extended ELF header is in use. That
+	 * means that one or more of these values is too large to fit in the
+	 * elf header and the true values for those are in the first section
+	 * header.
+	 */
+	return ((hdr->e_shnum == 0 && hdr->e_shoff != 0) ||
+	    hdr->e_phnum == PN_XNUM || hdr->e_shstrndx == SHN_XINDEX);
+}
+
 /*
  * Set up the linker module (if it's compiled in, LDNAME is NULL)
  */
@@ -888,6 +903,7 @@ load_linker(val_t *bootaux)
 	Sym *sp;
 	int shsize;
 	char *dlname = (char *)bootaux[BA_LDNAME].ba_ptr;
+	Ehdr *ehdr = (Ehdr *)bootaux[BA_LDELF].ba_ptr;
 
 	/*
 	 * On some architectures, krtld is compiled into the kernel.
@@ -895,17 +911,31 @@ load_linker(val_t *bootaux)
 	if (dlname == NULL)
 		return;
 
+	/*
+	 * We don't support loading the linker from an ELF object which uses an
+	 * extended header. That's identified by looking for sentinel values in
+	 * selected header fields.
+	 */
+	if (is_extended_ehdr(ehdr)) {
+		bop_panic(
+		    "linker %s has an extended ELF header; unable to load.",
+		    dlname);
+	}
+
 	cp = add_primary(dlname, KOBJ_LM_PRIMARY);
 
 	mp = kobj_zalloc(sizeof (struct module), KM_WAIT);
 
 	cp->mod_mp = mp;
-	mp->hdr = *(Ehdr *)bootaux[BA_LDELF].ba_ptr;
-	shsize = mp->hdr.e_shentsize * mp->hdr.e_shnum;
+	mp->hdr = *ehdr;
+	mp->shnum = mp->hdr.e_shnum;
+	mp->phnum = mp->hdr.e_phnum;
+	mp->shstrndx = mp->hdr.e_shstrndx;
+	shsize = mp->hdr.e_shentsize * mp->shnum;
 	mp->shdrs = kobj_alloc(shsize, KM_WAIT);
 	bcopy(bootaux[BA_LDSHDR].ba_ptr, mp->shdrs, shsize);
 
-	for (i = 1; i < (int)mp->hdr.e_shnum; i++) {
+	for (i = 1; i < (int)mp->shnum; i++) {
 		shp = (Shdr *)(mp->shdrs + (i * mp->hdr.e_shentsize));
 
 		if (shp->sh_flags & SHF_ALLOC) {
@@ -1120,6 +1150,47 @@ add_primary(const char *filename, int lmid)
 }
 
 static int
+kobj_load_elfhdr(struct _buf *file, struct module *mp)
+{
+	if (kobj_read_file(file, (char *)&mp->hdr, sizeof (mp->hdr), 0) < 0) {
+		_kobj_printf(ops, "kobj_load_elfhdr: %s read header failed\n",
+		    mp->filename);
+		return (-1);
+	}
+
+	mp->shnum = mp->hdr.e_shnum;
+	mp->shstrndx = mp->hdr.e_shstrndx;
+	mp->phnum = mp->hdr.e_phnum;
+
+	/*
+	 * If there is an extended ELF header we need to read in the first
+	 * section header to access the values for fields that don't fit in
+	 * the standard header.
+	 */
+	if (is_extended_ehdr(&mp->hdr)) {
+		Shdr hdr0;
+
+		if (mp->hdr.e_shoff == 0 ||
+		    kobj_read_file(file, (char *)&hdr0, sizeof (hdr0),
+		    mp->hdr.e_shoff) < 0) {
+			_kobj_printf(ops,
+			    "kobj_load_elfhdr: %s read ext header failed\n",
+			    mp->filename);
+			return (-1);
+		}
+
+		if (mp->shnum == 0)
+			mp->shnum = hdr0.sh_size;
+		if (mp->shstrndx == SHN_XINDEX)
+			mp->shstrndx = hdr0.sh_link;
+		if (mp->phnum == PN_XNUM && hdr0.sh_info != 0)
+			mp->phnum = hdr0.sh_info;
+	}
+
+	return (0);
+}
+
+static int
 bind_primary(val_t *bootaux, int lmid)
 {
 	struct modctl_list *linkmap = kobj_lm_lookup(lmid);
@@ -1222,10 +1293,9 @@ bind_primary(val_t *bootaux, int lmid)
 			file = kobj_open_file(mp->filename);
 			if (file == (struct _buf *)-1)
 				return (-1);
-			if (kobj_read_file(file, (char *)&mp->hdr,
-			    sizeof (mp->hdr), 0) < 0)
+			if (kobj_load_elfhdr(file, mp) < 0)
 				return (-1);
-			n = mp->hdr.e_shentsize * mp->hdr.e_shnum;
+			n = mp->hdr.e_shentsize * mp->shnum;
 			mp->shdrs = kobj_alloc(n, KM_WAIT);
 			if (kobj_read_file(file, mp->shdrs, n,
 			    mp->hdr.e_shoff) < 0)
@@ -1555,7 +1625,7 @@ kobj_export_ksyms(struct module *mp)
 	/*
 	 * Fill in the new section headers (symtab and strtab).
 	 */
-	mp->hdr.e_shnum = 2;
+	mp->shnum = 2;
 	mp->symtbl_section = 0;
 
 	mp->symhdr->sh_type = SHT_SYMTAB;
@@ -1599,7 +1669,7 @@ kobj_export_ksyms(struct module *mp)
 		uint_t	shn;
 		Shdr	*shp;
 
-		for (shn = 1; shn < omp->hdr.e_shnum; shn++) {
+		for (shn = 1; shn < omp->shnum; shn++) {
 			shp = (Shdr *)(omp->shdrs + shn * omp->hdr.e_shentsize);
 			switch (shp->sh_type) {
 			case SHT_RELA:
@@ -1611,7 +1681,7 @@ kobj_export_ksyms(struct module *mp)
 				break;
 			}
 		}
-		kobj_free(omp->shdrs, omp->hdr.e_shentsize * omp->hdr.e_shnum);
+		kobj_free(omp->shdrs, omp->hdr.e_shentsize * omp->shnum);
 	}
 	/*
 	 * Discard the old symbol table and our copy of the module strucure.
@@ -1741,7 +1811,7 @@ do_dynamic(struct module *mp, struct _buf *file)
 
 	/* find and validate the dynamic section (if any) */
 
-	for (dshp = NULL, shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (dshp = NULL, shn = 1; shn < mp->shnum; shn++) {
 		shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 		switch (shp->sh_type) {
 		case SHT_DYNAMIC:
@@ -1762,7 +1832,7 @@ do_dynamic(struct module *mp, struct _buf *file)
 	if (dshp == NULL)
 		return (0);
 
-	if (dshp->sh_link > mp->hdr.e_shnum) {
+	if (dshp->sh_link > mp->shnum) {
 		_kobj_printf(ops, "krtld: get_dynamic: %s, ", mp->filename);
 		_kobj_printf(ops, "no section for sh_link %d\n", dshp->sh_link);
 		return (-1);
@@ -1882,13 +1952,12 @@ kobj_load_module(struct modctl *modp, int use_path)
 	mp->filename = kobj_alloc(strlen(file->_name) + 1, KM_WAIT);
 	(void) strcpy(mp->filename, file->_name);
 
-	if (kobj_read_file(file, (char *)&mp->hdr, sizeof (mp->hdr), 0) < 0) {
-		_kobj_printf(ops, "kobj_load_module: %s read header failed\n",
-		    modname);
+	if (kobj_load_elfhdr(file, mp) != 0) {
 		kobj_free(mp->filename, strlen(file->_name) + 1);
 		kobj_free(mp, sizeof (*mp));
 		goto bad;
 	}
+
 	for (i = 0; i < SELFMAG; i++) {
 		if (mp->hdr.e_ident[i] != ELFMAG[i]) {
 			if (_moddebug & MODDEBUG_ERRMSG)
@@ -1939,7 +2008,7 @@ kobj_load_module(struct modctl *modp, int use_path)
 		goto bad;
 	}
 
-	n = mp->hdr.e_shentsize * mp->hdr.e_shnum;
+	n = mp->hdr.e_shentsize * mp->shnum;
 	mp->shdrs = kobj_alloc(n, KM_WAIT);
 
 	if (kobj_read_file(file, mp->shdrs, n, mp->hdr.e_shoff) < 0) {
@@ -2215,7 +2284,7 @@ free_module_data(struct module *mp)
 		uint_t shn;
 		Shdr *shp;
 
-		for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+		for (shn = 1; shn < mp->shnum; shn++) {
 			shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 			switch (shp->sh_type) {
 			case SHT_RELA:
@@ -2228,8 +2297,7 @@ free_module_data(struct module *mp)
 		}
 
 		if (!(mp->flags & KOBJ_PRIM)) {
-			kobj_free(mp->shdrs,
-			    mp->hdr.e_shentsize * mp->hdr.e_shnum);
+			kobj_free(mp->shdrs, mp->hdr.e_shentsize * mp->shnum);
 		}
 	}
 
@@ -2386,7 +2454,7 @@ get_progbits(struct module *mp, struct _buf *file)
 	data = ALIGN((uintptr_t)mp->data, dp->align);
 
 	/* now loop though sections assigning addresses and loading the data */
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (!(shp->sh_flags & SHF_ALLOC))
 			continue;
@@ -2437,7 +2505,7 @@ done:
 	 * buffer was unallocated.
 	 */
 	if (err != 0) {
-		kobj_free(mp->shdrs, mp->hdr.e_shentsize * mp->hdr.e_shnum);
+		kobj_free(mp->shdrs, mp->hdr.e_shentsize * mp->shnum);
 		mp->shdrs = NULL;
 	}
 
@@ -2470,22 +2538,29 @@ static int
 get_syms(struct module *mp, struct _buf *file)
 {
 	uint_t		shn;
-	Shdr	*shp;
+	Shdr		*shp;
 	uint_t		i;
-	Sym	*sp, *ksp;
+	Sym		*sp, *ksp;
+	Shdr		*symxhdr = NULL;
+	Elf32_Word	*symxtbl = NULL;
 	char		*symname;
 	int		dosymtab = 0;
+	int		err = -1;
 
 	/*
 	 * Find the interesting sections.
 	 */
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 		switch (shp->sh_type) {
 		case SHT_SYMTAB:
 			mp->symtbl_section = shn;
 			mp->symhdr = shp;
 			dosymtab++;
+			break;
+
+		case SHT_SYMTAB_SHNDX:
+			symxhdr = shp;
 			break;
 
 		case SHT_RELA:
@@ -2530,7 +2605,7 @@ get_syms(struct module *mp, struct _buf *file)
 	/*
 	 * get the associated string table header
 	 */
-	if ((mp->symhdr == 0) || (mp->symhdr->sh_link >= mp->hdr.e_shnum))
+	if (mp->symhdr == NULL || mp->symhdr->sh_link >= mp->shnum)
 		return (-1);
 	mp->strhdr = (Shdr *)
 	    (mp->shdrs + mp->symhdr->sh_link * mp->hdr.e_shentsize);
@@ -2551,10 +2626,28 @@ get_syms(struct module *mp, struct _buf *file)
 	mp->strings = (char *)(mp->chains + mp->nsyms);
 
 	if (kobj_read_file(file, mp->symtbl,
-	    mp->symhdr->sh_size, mp->symhdr->sh_offset) < 0 ||
-	    kobj_read_file(file, mp->strings,
-	    mp->strhdr->sh_size, mp->strhdr->sh_offset) < 0)
+	    mp->symhdr->sh_size, mp->symhdr->sh_offset) < 0) {
+		_kobj_printf(ops, "%s failed to read symbol table\n",
+		    file->_name);
 		return (-1);
+	}
+	if (kobj_read_file(file, mp->strings,
+	    mp->strhdr->sh_size, mp->strhdr->sh_offset) < 0) {
+		_kobj_printf(ops, "%s failed to read string table\n",
+		    file->_name);
+		return (-1);
+	}
+
+	if (symxhdr != NULL) {
+		symxtbl = kobj_zalloc(symxhdr->sh_size, KM_WAIT|KM_SCRATCH);
+		if (kobj_read_file(file, (char *)symxtbl, symxhdr->sh_size,
+		    symxhdr->sh_offset) < 0) {
+			_kobj_printf(ops,
+			    "%s failed to read symbol shndx table\n",
+			    file->_name);
+			goto out;
+		}
+	}
 
 	/*
 	 * loop through the symbol table adjusting values to account
@@ -2562,25 +2655,43 @@ get_syms(struct module *mp, struct _buf *file)
 	 * fill in the hash table.
 	 */
 	for (i = 1; i < mp->nsyms; i++) {
+		Elf32_Word shndx;
+
 		sp = (Sym *)(mp->symtbl + i * mp->symhdr->sh_entsize);
-		if (sp->st_shndx < SHN_LORESERVE) {
-			if (sp->st_shndx >= mp->hdr.e_shnum) {
+
+		/*
+		 * If the section header value is the sentinel value SHN_XINDEX
+		 * and we found a SHT_SYMTAB_SHNDX section, look up the
+		 * real index from there.
+		 */
+		shndx = sp->st_shndx;
+		if (shndx == SHN_XINDEX && symxhdr != NULL) {
+			if (i * sizeof (Elf32_Word) >= symxhdr->sh_size) {
+				_kobj_printf(ops,
+				    "%s extended shndx out of range ",
+				    file->_name);
+				_kobj_printf(ops, "in symbol %d\n", i);
+				goto out;
+			}
+			shndx = symxtbl[i];
+		}
+
+		if (shndx < SHN_LORESERVE) {
+			if (shndx >= mp->shnum) {
 				_kobj_printf(ops, "%s bad shndx ",
 				    file->_name);
 				_kobj_printf(ops, "in symbol %d\n", i);
-				return (-1);
+				goto out;
 			}
-			shp = (Shdr *)
-			    (mp->shdrs +
-			    sp->st_shndx * mp->hdr.e_shentsize);
+			shp = (Shdr *)(mp->shdrs + shndx * mp->hdr.e_shentsize);
 			if (!(mp->flags & KOBJ_EXEC))
 				sp->st_value += shp->sh_addr;
 		}
 
-		if (sp->st_name == 0 || sp->st_shndx == SHN_UNDEF)
+		if (sp->st_name == 0 || shndx == SHN_UNDEF)
 			continue;
 		if (sp->st_name >= mp->strhdr->sh_size)
-			return (-1);
+			goto out;
 
 		symname = mp->strings + sp->st_name;
 
@@ -2616,7 +2727,13 @@ get_syms(struct module *mp, struct _buf *file)
 		sym_insert(mp, symname, i);
 	}
 
-	return (0);
+	err = 0;
+
+out:
+	if (symxhdr != NULL)
+		kobj_free(symxtbl, symxhdr->sh_size);
+
+	return (err);
 }
 
 static int
@@ -2630,15 +2747,15 @@ get_ctf(struct module *mp, struct _buf *file)
 	if (_moddebug & MODDEBUG_NOCTF)
 		return (0); /* do not attempt to even load CTF data */
 
-	if (mp->hdr.e_shstrndx >= mp->hdr.e_shnum) {
+	if (mp->shstrndx >= mp->shnum) {
 		_kobj_printf(ops, "krtld: get_ctf: %s, ",
 		    mp->filename);
-		_kobj_printf(ops, "corrupt e_shstrndx %u\n",
-		    mp->hdr.e_shstrndx);
+		_kobj_printf(ops, "corrupt shstrndx %u\n",
+		    mp->shstrndx);
 		return (-1);
 	}
 
-	shp = (Shdr *)(mp->shdrs + mp->hdr.e_shstrndx * mp->hdr.e_shentsize);
+	shp = (Shdr *)(mp->shdrs + mp->shstrndx * mp->hdr.e_shentsize);
 	shstrlen = shp->sh_size;
 	shstrtab = kobj_alloc(shstrlen, KM_WAIT|KM_TMP);
 
@@ -2646,12 +2763,12 @@ get_ctf(struct module *mp, struct _buf *file)
 		_kobj_printf(ops, "krtld: get_ctf: %s, ",
 		    mp->filename);
 		_kobj_printf(ops, "error reading section %u\n",
-		    mp->hdr.e_shstrndx);
+		    mp->shstrndx);
 		kobj_free(shstrtab, shstrlen);
 		return (-1);
 	}
 
-	for (i = 0; i < mp->hdr.e_shnum; i++) {
+	for (i = 0; i < mp->shnum; i++) {
 		shp = (Shdr *)(mp->shdrs + i * mp->hdr.e_shentsize);
 
 		if (shp->sh_size != 0 && shp->sh_name < shstrlen &&
@@ -2694,7 +2811,7 @@ crypto_es_hash(struct module *mp, char *hash, char *shstrtab)
 
 	SHA1Init(&ctx);
 
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (!(shp->sh_flags & SHF_ALLOC) || shp->sh_size == 0)
 			continue;
@@ -2734,15 +2851,15 @@ get_signature(struct module *mp, struct _buf *file)
 	Shdr *shp;
 	uint_t i;
 
-	if (mp->hdr.e_shstrndx >= mp->hdr.e_shnum) {
+	if (mp->shstrndx >= mp->shnum) {
 		_kobj_printf(ops, "krtld: get_signature: %s, ",
 		    mp->filename);
-		_kobj_printf(ops, "corrupt e_shstrndx %u\n",
-		    mp->hdr.e_shstrndx);
+		_kobj_printf(ops, "corrupt shstrndx %u\n",
+		    mp->shstrndx);
 		return;
 	}
 
-	shp = (Shdr *)(mp->shdrs + mp->hdr.e_shstrndx * mp->hdr.e_shentsize);
+	shp = (Shdr *)(mp->shdrs + mp->shstrndx * mp->hdr.e_shentsize);
 	shstrlen = shp->sh_size;
 	shstrtab = kobj_alloc(shstrlen, KM_WAIT|KM_TMP);
 
@@ -2750,12 +2867,12 @@ get_signature(struct module *mp, struct _buf *file)
 		_kobj_printf(ops, "krtld: get_signature: %s, ",
 		    mp->filename);
 		_kobj_printf(ops, "error reading section %u\n",
-		    mp->hdr.e_shstrndx);
+		    mp->shstrndx);
 		kobj_free(shstrtab, shstrlen);
 		return;
 	}
 
-	for (i = 0; i < mp->hdr.e_shnum; i++) {
+	for (i = 0; i < mp->shnum; i++) {
 		shp = (Shdr *)(mp->shdrs + i * mp->hdr.e_shentsize);
 		if (shp->sh_size != 0 && shp->sh_name < shstrlen &&
 		    strcmp(shstrtab + shp->sh_name,

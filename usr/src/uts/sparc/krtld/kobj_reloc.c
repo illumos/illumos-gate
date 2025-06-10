@@ -138,7 +138,7 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 		int i;
 		Shdr * shp;
 		shp = (Shdr *)mp->shdrs;
-		for (i = 0; i < mp->hdr.e_shnum; i++, shp++) {
+		for (i = 0; i < mp->shnum; i++, shp++) {
 			if (shp->sh_addr == baseaddr) {
 				if ((shp->sh_flags & SHF_ALLOC) &&
 				    !(shp->sh_flags & SHF_WRITE))
@@ -289,7 +289,7 @@ do_relocations(struct module *mp)
 	uint_t nreloc;
 
 	/* do the relocations */
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		rshp = (Shdr *)
 		    (mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (rshp->sh_type == SHT_REL) {
@@ -304,7 +304,7 @@ do_relocations(struct module *mp)
 			    mp->filename);
 			return (-1);
 		}
-		if (rshp->sh_info >= mp->hdr.e_shnum) {
+		if (rshp->sh_info >= mp->shnum) {
 			_kobj_printf(ops, "do_relocations: %s ", mp->filename);
 			_kobj_printf(ops, " sh_info out of range %d\n", shn);
 			goto bad;
