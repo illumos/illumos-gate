@@ -49,6 +49,7 @@ tags
 
 # Make and build state
 .make.state*
+.make.dependency.*
 /.build.tstamp
 /ELF-data.*
 /check-*.out
@@ -59,6 +60,8 @@ tags
 /lint-noise-*.ref
 /noise-*.out
 /noise-*.ref
+/unref-*.out
+/unref-*.ref
 
 # IPS artifacts
 pkg/packages.*/
