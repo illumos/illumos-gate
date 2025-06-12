@@ -83,6 +83,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/i86pc_ktest/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 SBD_IOCTL	= $(UTSBASE)/i86pc/sys/sbd_ioctl.h
 DRMACH_IO	= $(UTSBASE)/i86pc/io/acpi/drmach_acpi
 DRMACH_GENERR	= $(DRMACH_IO)/sbdgenerr

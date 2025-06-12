@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 
@@ -40,9 +41,8 @@ comm_page_mapin()
 #if !defined(__xpv)
 	proc_t *p = curproc;
 	caddr_t addr = NULL;
-	size_t len = COMM_PAGE_SIZE;
-	uint_t prot = PROT_USER | PROT_READ;
-	segumap_crargs_t suarg;
+	const size_t len = sizeof (comm_page_t);
+	const uint_t prot = PROT_USER | PROT_READ;
 
 	map_addr(&addr, len, (offset_t)0, 1, 0);
 	if (addr == NULL || valid_usr_range(addr, len, prot, p->p_as,
@@ -50,8 +50,11 @@ comm_page_mapin()
 		return (NULL);
 	}
 
-	suarg.kaddr = (caddr_t)&comm_page;
-	suarg.prot = suarg.maxprot = prot;
+	segumap_crargs_t suarg = {
+		.kaddr = (caddr_t)&comm_page,
+		.prot = prot,
+		.maxprot = prot,
+	};
 	if (as_map(p->p_as, addr, len, segumap_create, &suarg) != 0) {
 		return (NULL);
 	}

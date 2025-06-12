@@ -2,6 +2,7 @@
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 \ Copyright 2019 Joyent, Inc.
+\ Copyright 2025 Oxide Computer Company
 \
 \ CDDL HEADER START
 \
@@ -503,3 +504,6 @@ wc_wakecode
 	wc_cpu
 
 comm_page_s	COMM_PAGE_S_SIZE
+	_cp_pad1	COMM_PAGE_PAD1
+	cp_tsc_sync_tick_delta	COMM_PAGE_TSC_SYNC_TICK_DELTA
+	_cp_pad2	COMM_PAGE_PAD2

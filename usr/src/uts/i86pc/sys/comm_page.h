@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _COMM_PAGE_H
@@ -20,13 +21,12 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/sysmacros.h>
 #endif /* _ASM */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define	COMM_PAGE_SIZE	PAGESIZE
 
 #ifndef _ASM
 
@@ -61,12 +61,16 @@ typedef struct comm_page_s {
 	int64_t			cp_hrestime_adj;
 	hrtime_t		cp_hres_last_tick;
 	uint32_t		cp_tsc_ncpu;
-	uint32_t		_cp_pad;
+	uint32_t		_cp_pad0;
 	volatile int64_t	cp_hrestime[2];
+	uint64_t		_cp_pad1[502];	/* pad to page boundary */
 #if defined(_MACHDEP)
 	hrtime_t		cp_tsc_sync_tick_delta[NCPU];
+	/* fill any remaining space in page with padding */
+#define	_CP_PAD2_SZ	P2ROUNDUP(NCPU, PAGESIZE / sizeof (hrtime_t)) - NCPU
+	uint64_t		_cp_pad2[_CP_PAD2_SZ];
 #else
-	/* length resides in cp_ncpu */
+	/* length resides in cp_tsc_ncpu */
 	hrtime_t		cp_tsc_sync_tick_delta[];
 #endif /* defined(_MACHDEP) */
 } comm_page_t;
@@ -75,6 +79,11 @@ typedef struct comm_page_s {
 extern comm_page_t comm_page;
 
 #if defined(_MACHDEP)
+
+#include <sys/debug.h>
+CTASSERT((offsetof(comm_page_t, cp_tsc_sync_tick_delta) & PAGEOFFSET) == 0);
+CTASSERT((sizeof (comm_page_t) & PAGEOFFSET) == 0);
+
 extern hrtime_t tsc_last;
 extern hrtime_t tsc_hrtime_base;
 extern hrtime_t tsc_resume_cap;
@@ -87,6 +96,7 @@ extern hrtime_t hres_last_tick;
 extern uint32_t tsc_ncpu;
 extern volatile timestruc_t hrestime;
 extern hrtime_t tsc_sync_tick_delta[NCPU];
+
 #endif /* defined(_MACHDEP) */
 #endif /* defined(_KERNEL) */
 
