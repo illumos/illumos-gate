@@ -51,14 +51,13 @@ typedef struct usba_reg_state {
 	int		st_cfg_to_build;	/* Configuration to build */
 	int		st_total_cfg_length;	/* Len of all descriptors */
 						/* for the current config */
-	uchar_t 	*st_curr_raw_descr;	/* Ptr to raw curr descr */
-	uchar_t 	st_curr_raw_descr_type;    /* Type of curr descr */
-	uchar_t 	st_curr_raw_descr_len;    /* Length of curr descr */
+	uchar_t		*st_curr_raw_descr;	/* Ptr to raw curr descr */
+	uchar_t		st_curr_raw_descr_type;	   /* Type of curr descr */
+	uchar_t		st_curr_raw_descr_len;	  /* Length of curr descr */
 	char		*st_curr_cfg_str;    /* Cfg string from usba_device */
 	usb_reg_parse_lvl_t st_dev_parse_level;	/* All, curr cfg, 1 iface */
 	usb_cfg_data_t	*st_dev_cfg;		/* Cfg array, root of tree */
 	uint_t		st_dev_n_cfg;		/* Number cfgs in tree */
-	boolean_t	st_build_ep_comp;	/* for wusb only */
 } usba_reg_state_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only", usb_cvs_data))
