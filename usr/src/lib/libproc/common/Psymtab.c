@@ -781,7 +781,7 @@ Pconvert_file_ctf(file_info_t *fptr)
 		fp = ctf_elfconvert(cch, fptr->file_fd, fptr->file_dbgelf, &err,
 		    errmsg, sizeof (errmsg));
 		if (fp == NULL) {
-			dprintf("failed to convert %s: %s\n", fptr->file_pname,
+			Pdprintf("failed to convert %s: %s\n", fptr->file_pname,
 			    err == ECTF_CONVBKERR ? errmsg : ctf_errmsg(err));
 		}
 	}
@@ -789,7 +789,7 @@ Pconvert_file_ctf(file_info_t *fptr)
 		fp = ctf_elfconvert(cch, fptr->file_fd, fptr->file_elf, &err,
 		    errmsg, sizeof (errmsg));
 		if (fp == NULL) {
-			dprintf("failed to convert %s: %s\n", fptr->file_pname,
+			Pdprintf("failed to convert %s: %s\n", fptr->file_pname,
 			    err == ECTF_CONVBKERR ? errmsg : ctf_errmsg(err));
 		}
 	}

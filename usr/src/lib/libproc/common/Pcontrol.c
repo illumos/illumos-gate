@@ -1871,7 +1871,7 @@ prldump(const char *caller, lwpstatus_t *lsp)
 		Pdprintf("%s: SUSPENDED\n", caller);
 		break;
 	case PR_BRAND:
-		dprintf("%s: BRANDPRIVATE (%d)\n", caller, lsp->pr_what);
+		Pdprintf("%s: BRANDPRIVATE (%d)\n", caller, lsp->pr_what);
 		break;
 	default:
 		Pdprintf("%s: Unknown\n", caller);
