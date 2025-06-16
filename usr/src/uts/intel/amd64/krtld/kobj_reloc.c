@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 /*
  * Copyright (c) 2017 Joyent, Inc.
@@ -301,7 +301,7 @@ do_relocations(struct module *mp)
 	uint_t nreloc;
 
 	/* do the relocations */
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		rshp = (Shdr *)
 		    (mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (rshp->sh_type == SHT_REL) {
@@ -316,7 +316,7 @@ do_relocations(struct module *mp)
 			    mp->filename);
 			return (-1);
 		}
-		if (rshp->sh_info >= mp->hdr.e_shnum) {
+		if (rshp->sh_info >= mp->shnum) {
 			_kobj_printf(ops, "do_relocations: %s sh_info ",
 			    mp->filename);
 			_kobj_printf(ops, "out of range %d\n", shn);

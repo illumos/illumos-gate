@@ -320,6 +320,8 @@ COMSYSOBJS=			\
 SYSOBJS=			\
 	__clock_gettime.o	\
 	__clock_gettime_sys.o	\
+	__gethrtime.o		\
+	__gethrtime_sys.o	\
 	__getcontext.o		\
 	__uadmin.o		\
 	_lwp_mutex_unlock.o	\
@@ -1231,6 +1233,7 @@ $(PORTI18N_COND:%=pics/%) := \
 pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 
 pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
+pics/__gethrtime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 pics/gettimeofday.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 
 #

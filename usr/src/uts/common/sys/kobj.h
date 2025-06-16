@@ -25,6 +25,7 @@
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017 Joyent, Inc.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_KOBJ_H
@@ -36,6 +37,7 @@
 #include <sys/vmem.h>
 #include <sys/sdt.h>
 #include <sys/bootstat.h>
+#include <sys/types.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -55,7 +57,7 @@ typedef struct hotinline_desc {
 	struct hotinline_desc *hid_next;	/* next hotinline */
 } hotinline_desc_t;
 
-typedef unsigned short	symid_t;		/* symbol table index */
+typedef uint32_t	symid_t;		/* symbol table index */
 typedef unsigned char	*reloc_dest_t;
 
 typedef	void	module_mach;
@@ -64,6 +66,9 @@ struct module {
 	int total_allocated;
 
 	Ehdr hdr;
+	Elf64_Word shnum;
+	Elf64_Word phnum;
+	Elf64_Word shstrndx;
 	char *shdrs;
 	Shdr *symhdr, *strhdr;
 

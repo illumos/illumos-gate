@@ -46,7 +46,7 @@ extern int prset_ismember(void *, size_t, uint_t);
 /*
  * Routine to print debug messages:
  */
-extern void dprintf(const char *, ...);
+extern void Pdprintf(const char *, ...);
 
 extern void Pinit_ops(ps_ops_t *, const ps_ops_t *);
 

@@ -104,43 +104,6 @@ stkptr(void)
 	return (__value);
 }
 
-extern __GNU_INLINE hrtime_t
-gethrtime(void)		/* note: caller-saved registers are trashed */
-{
-#if defined(__amd64)
-	hrtime_t __value;
-	__asm__ __volatile__(
-	    "movl $3, %%eax\n\t"
-	    "int $0xd2"
-	    : "=a" (__value)
-	    : : "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "cc");
-#elif defined(__i386)
-	hrtime_t __value;
-	__asm__ __volatile__(
-	    "movl $3, %%eax\n\t"
-	    "int $0xd2"
-	    : "=A" (__value)
-	    : : "ecx", "cc");
-#elif defined(__sparcv9)
-	register hrtime_t __value __asm__("o0");
-	__asm__ __volatile__(
-	    "ta 0x24\n\t"
-	    "sllx %%o0, 32, %0\n\t"
-	    "or %%o1, %0, %0"
-	    : "=r" (__value)
-	    : : "o1", "o2", "o3", "o4", "o5", "cc");
-#elif defined(__sparc)
-	register hrtime_t __value __asm__("o0");
-	__asm__ __volatile__(
-	    "ta 0x24"
-	    : "=r" (__value)
-	    : : "o2", "o3", "o4", "o5", "cc");
-#else
-#error	"port me"
-#endif
-	return (__value);
-}
-
 extern __GNU_INLINE int
 set_lock_byte(volatile uint8_t *__lockp)
 {

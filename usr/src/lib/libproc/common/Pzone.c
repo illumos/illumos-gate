@@ -252,7 +252,7 @@ Pzoneroot(struct ps_prochandle *P, char *s, size_t n)
 			errno = ENOMEM;
 			return (NULL);
 		}
-		dprintf("Pzoneroot defaulting to '%s'\n", GLOBAL_ZONENAME);
+		Pdprintf("Pzoneroot defaulting to '%s'\n", GLOBAL_ZONENAME);
 		(void) strlcpy(s, P->zoneroot, n);
 		return (s);
 	}
@@ -262,7 +262,7 @@ Pzoneroot(struct ps_prochandle *P, char *s, size_t n)
 			errno = ENOMEM;
 			return (NULL);
 		}
-		dprintf(
+		Pdprintf(
 		    "Pzoneroot zone not found '%s', defaulting to '%s'\n",
 		    zname, GLOBAL_ZONENAME);
 		(void) strlcpy(s, P->zoneroot, n);
@@ -275,7 +275,7 @@ Pzoneroot(struct ps_prochandle *P, char *s, size_t n)
 			errno = ENOMEM;
 			return (NULL);
 		}
-		dprintf(
+		Pdprintf(
 		    "Pzoneroot can't access '%s:%s', defaulting to '%s'\n",
 		    zname, zpath, GLOBAL_ZONENAME);
 		(void) strlcpy(s, P->zoneroot, n);
@@ -288,7 +288,7 @@ Pzoneroot(struct ps_prochandle *P, char *s, size_t n)
 		errno = ENOMEM;
 		return (NULL);
 	}
-	dprintf("Pzoneroot found zone root '%s:%s'\n", zname, zpath);
+	Pdprintf("Pzoneroot found zone root '%s:%s'\n", zname, zpath);
 	(void) strlcpy(s, P->zoneroot, n);
 	return (s);
 }
@@ -316,7 +316,7 @@ Plofspath(const char *path, char *s, size_t n)
 	char *p, *p2;
 	int rv;
 
-	dprintf("Plofspath path '%s'\n", path);
+	Pdprintf("Plofspath path '%s'\n", path);
 
 	/* We only deal with absolute paths */
 	if (path[0] != '/')
@@ -447,7 +447,7 @@ Plofspath(const char *path, char *s, size_t n)
 
 			/* Copy out our final resolved lofs source path */
 			(void) strlcpy(s, tmp, n);
-			dprintf("Plofspath path result '%s'\n", s);
+			Pdprintf("Plofspath path result '%s'\n", s);
 			return (s);
 		}
 
@@ -523,7 +523,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 	char *p;
 	int i, rv;
 
-	dprintf("Pzonepath lookup '%s'\n", path);
+	Pdprintf("Pzonepath lookup '%s'\n", path);
 
 	/* First lookup the zone root */
 	if (Pzoneroot(P, zroot, sizeof (zroot)) == NULL)
@@ -545,7 +545,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 	 */
 	if (strcmp(tmp, zroot) == 0) {
 		(void) Plofspath(zroot, zroot, sizeof (zroot));
-		dprintf("Pzonepath found zone path (1) '%s'\n", zroot);
+		Pdprintf("Pzonepath found zone path (1) '%s'\n", zroot);
 		(void) strlcpy(s, zroot, n);
 		return (s);
 	}
@@ -556,7 +556,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 	/* If no path is passed in, then it maps to the zone root */
 	if (strlen(tmp) == 0) {
 		(void) Plofspath(zroot, zroot, sizeof (zroot));
-		dprintf("Pzonepath found zone path (2) '%s'\n", zroot);
+		Pdprintf("Pzonepath found zone path (2) '%s'\n", zroot);
 		(void) strlcpy(s, zroot, n);
 		return (s);
 	}
@@ -630,14 +630,14 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 			/* Verify that the path actually exists */
 			rv = resolvepath(zpath, tmp, sizeof (tmp) - 1);
 			if (rv < 0) {
-				dprintf("Pzonepath invalid native path '%s'\n",
+				Pdprintf("Pzonepath invalid native path '%s'\n",
 				    zpath);
 				return (NULL);
 			}
 			tmp[rv] = '\0';
 
 			/* Return the path */
-			dprintf("Pzonepath found native path '%s'\n", tmp);
+			Pdprintf("Pzonepath found native path '%s'\n", tmp);
 			(void) Plofspath(tmp, tmp, sizeof (tmp));
 			(void) strlcpy(s, tmp, n);
 			return (s);
@@ -672,7 +672,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 				continue;
 
 			/* We have a loop.  Fail. */
-			dprintf("Pzonepath symlink loop '%s'\n", zpath);
+			Pdprintf("Pzonepath symlink loop '%s'\n", zpath);
 			pn_free2(&pn_stack, &pn_links);
 			return (NULL);
 		}
@@ -691,7 +691,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 			return (NULL);
 		}
 
-		dprintf("Pzonepath following symlink '%s' -> '%s'\n",
+		Pdprintf("Pzonepath following symlink '%s' -> '%s'\n",
 		    zpath, link);
 
 		/*
@@ -735,7 +735,7 @@ Pzonepath(struct ps_prochandle *P, const char *path, char *s, size_t n)
 	(void) strlcpy(zpath, tmp, sizeof (zpath));
 
 	(void) Plofspath(zpath, zpath, sizeof (zpath));
-	dprintf("Pzonepath found zone path (3) '%s'\n", zpath);
+	Pdprintf("Pzonepath found zone path (3) '%s'\n", zpath);
 
 	(void) strlcpy(s, zpath, n);
 	return (s);
@@ -746,7 +746,7 @@ Pfindobj(struct ps_prochandle *P, const char *path, char *s, size_t n)
 {
 	int len;
 
-	dprintf("Pfindobj '%s'\n", path);
+	Pdprintf("Pfindobj '%s'\n", path);
 
 	/* We only deal with absolute paths */
 	if (path[0] != '/')

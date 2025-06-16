@@ -77,10 +77,7 @@ abstime_to_reltime(clockid_t clock_id, const timespec_t *abstime,
 	extern int __clock_gettime(clockid_t, timespec_t *);
 	timespec_t now;
 
-	if (clock_id == CLOCK_HIGHRES)
-		hrt2ts(gethrtime(), &now);
-	else
-		(void) __clock_gettime(clock_id, &now);
+	(void) __clock_gettime(clock_id, &now);
 	if (abstime->tv_nsec >= now.tv_nsec) {
 		reltime->tv_sec = abstime->tv_sec - now.tv_sec;
 		reltime->tv_nsec = abstime->tv_nsec - now.tv_nsec;

@@ -81,7 +81,7 @@ Pscantext(struct ps_prochandle *P)
 	(void) snprintf(mapfile, sizeof (mapfile), "%s/%d/map",
 	    procfs_path, (int)P->pid);
 	if ((mapfd = open(mapfile, O_RDONLY)) < 0) {
-		dprintf("failed to open %s: %s\n", mapfile, strerror(errno));
+		Pdprintf("failed to open %s: %s\n", mapfile, strerror(errno));
 		return (-1);
 	}
 
@@ -92,13 +92,13 @@ Pscantext(struct ps_prochandle *P)
 	for (;;) {
 		prbuf = malloc(nmap * sizeof (prmap_t));
 		if (prbuf == NULL) {
-			dprintf("Pscantext: failed to allocate buffer\n");
+			Pdprintf("Pscantext: failed to allocate buffer\n");
 			(void) close(mapfd);
 			return (-1);
 		}
 		nmappings = pread(mapfd, prbuf, nmap * sizeof (prmap_t), 0L);
 		if (nmappings < 0) {
-			dprintf("Pscantext: failed to read map file: %s\n",
+			Pdprintf("Pscantext: failed to read map file: %s\n",
 			    strerror(errno));
 			free(prbuf);
 			(void) close(mapfd);
@@ -155,15 +155,15 @@ Pscantext(struct ps_prochandle *P)
 				if ((nbytes = n2bytes) <= 0)
 					break;
 				(void) memcpy(buf,
-					&buf[BLKSIZE / sizeof (buf[0])],
-					nbytes);
+				    &buf[BLKSIZE / sizeof (buf[0])],
+				    nbytes);
 				n2bytes = 0;
 				p = (uchar_t *)buf;
 				if (nbytes == BLKSIZE &&
 				    offset + BLKSIZE < endoff)
 					n2bytes = read(P->asfd,
-						&buf[BLKSIZE / sizeof (buf[0])],
-						BLKSIZE);
+					    &buf[BLKSIZE / sizeof (buf[0])],
+					    BLKSIZE);
 			}
 
 			if (syspri = Pissyscall_text(P, p, nbytes))

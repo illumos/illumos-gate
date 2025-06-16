@@ -127,7 +127,7 @@ idle_add_mapping(struct ps_prochandle *P, GElf_Phdr *php, file_info_t *fp)
 {
 	prmap_t pmap;
 
-	dprintf("mapping base %llx filesz %llu memsz %llu offset %llu\n",
+	Pdprintf("mapping base %llx filesz %llu memsz %llu offset %llu\n",
 	    (u_longlong_t)php->p_vaddr, (u_longlong_t)php->p_filesz,
 	    (u_longlong_t)php->p_memsz, (u_longlong_t)php->p_offset);
 
@@ -164,13 +164,13 @@ Pgrab_file(const char *fname, int *perr)
 	int i;
 
 	if ((fd = open64(fname, O_RDONLY)) < 0) {
-		dprintf("couldn't open file");
+		Pdprintf("couldn't open file");
 		*perr = (errno == ENOENT) ? G_NOEXEC : G_STRANGE;
 		return (NULL);
 	}
 
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		dprintf("libproc ELF version is more recent than libelf");
+		Pdprintf("libproc ELF version is more recent than libelf");
 		*perr = G_ELF;
 		goto err;
 	}
@@ -254,7 +254,7 @@ Pgrab_file(const char *fname, int *perr)
 		goto err;
 	}
 
-	dprintf("Pgrab_file: program header count = %lu\n", (ulong_t)phnum);
+	Pdprintf("Pgrab_file: program header count = %lu\n", (ulong_t)phnum);
 
 	/*
 	 * Sift through the program headers making the relevant maps.

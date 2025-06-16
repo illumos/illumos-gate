@@ -201,7 +201,7 @@ load_uclist(uclist_t *ucl, const lwpstatus_t *psp)
 		if (Pread(P, &uc, sizeof (uc), addr) != sizeof (uc))
 			break; /* abort if we fail to read ucontext */
 
-		dprintf("detected lwp %d signal context at %p\n",
+		Pdprintf("detected lwp %d signal context at %p\n",
 		    (int)psp->pr_lwpid, (void *)addr);
 		ucl->uc_addrs[ucl->uc_nelems++] = addr;
 

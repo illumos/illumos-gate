@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Miscellaneous ISA-specific code.
  */
@@ -98,7 +96,7 @@ kobj_sync_instruction_memory(caddr_t addr, size_t len)
 /* ARGSUSED3 */
 int
 get_progbits_size(struct module *mp, struct proginfo *tp, struct proginfo *dp,
-	struct proginfo *sdp)
+    struct proginfo *sdp)
 {
 	struct proginfo *pp;
 	uint_t shn;
@@ -108,7 +106,7 @@ get_progbits_size(struct module *mp, struct proginfo *tp, struct proginfo *dp,
 	 * loop through sections to find out how much space we need
 	 * for text, data, (also bss that is already assigned)
 	 */
-	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
+	for (shn = 1; shn < mp->shnum; shn++) {
 		shp = (Shdr *)(mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (!(shp->sh_flags & SHF_ALLOC))
 			continue;
