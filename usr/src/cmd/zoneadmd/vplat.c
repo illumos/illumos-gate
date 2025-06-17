@@ -213,7 +213,7 @@ autofs_cleanup(zoneid_t zoneid)
 	 * Handle ENOSYS in the case that the autofs kernel module is not
 	 * installed.
 	 */
-	r = _autofssys(AUTOFS_UNMOUNTALL, (void *)zoneid);
+	r = _autofssys(AUTOFS_UNMOUNTALL, (void *)((uintptr_t)zoneid));
 	if (r != 0 && errno == ENOSYS) {
 		return (0);
 	}

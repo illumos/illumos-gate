@@ -18,18 +18,20 @@
 #
 # CDDL HEADER END
 
-
-#
-
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
+# Copyright 2025 Edgecast Cloud LLC.
 #
 
 PROG= zoneadmd
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 include ../Makefile.ctf
+
+CSTD= $(CSTD_GNU99)
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
