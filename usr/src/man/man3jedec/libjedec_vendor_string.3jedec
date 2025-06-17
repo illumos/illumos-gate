@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd March 2, 2025
+.Dd June 17, 2025
 .Dt LIBJEDEC_VENDOR_STRING 3JEDEC
 .Os
 .Sh NAME
@@ -56,7 +56,7 @@ When the value doesn't correspond to a known name then
 .Dv NULL
 is returned.
 .Pp
-Currently the data reflects the JEP106BL data from Feburary 2025.
+Currently the data reflects the JEP106BM data from June 2025.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn libjedec_vendor_string
@@ -74,6 +74,6 @@ is returned to indicate that there is no mapping for the specified IDs.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T Standard Manufacturer's Identification Code
-.%N JEP106BL
-.%D February 2025
+.%N JEP106BM
+.%D June 2025
 .Re
