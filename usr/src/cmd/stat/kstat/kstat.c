@@ -25,6 +25,7 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2020 Peter Tribble.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 /*
@@ -79,6 +80,7 @@ static boolean_t g_jflg = B_FALSE;
 static boolean_t g_lflg = B_FALSE;
 static boolean_t g_pflg = B_FALSE;
 static boolean_t g_qflg = B_FALSE;
+static boolean_t g_Vflg = B_FALSE;
 static ks_pattern_t	g_ks_class = {"*", 0};
 
 static boolean_t g_matched = B_FALSE;
@@ -86,6 +88,41 @@ static boolean_t g_matched = B_FALSE;
 /* Sorted list of kstat instances */
 static list_t	instances_list;
 static list_t	selector_list;
+
+static boolean_t
+invalid_value(char *str)
+{
+	/* Empty string is same as "*" */
+	if (str == NULL)
+		return (B_TRUE);
+	if (strchr(str, '*') != NULL)
+		return (B_TRUE);
+
+	/* regex is enclosed between // */
+	if (str[0] == '/') {
+		size_t s = strlen(str);
+		if (str[s - 1] == '/')
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+static boolean_t
+invalid_values(ks_selector_t *selector)
+{
+	/*
+	 * -V needs exact match of module and statistics or
+	 *  name and statistics.
+	 */
+	if ((!invalid_value(selector->ks_module.pstr) ||
+	    !invalid_value(selector->ks_name.pstr)) &&
+	    !invalid_value(selector->ks_statistic.pstr))
+		return (B_FALSE);
+
+	(void) fprintf(stderr, gettext(
+	    "-V needs exact module or name, and statistics\n"));
+	return (B_TRUE);
+}
 
 int
 main(int argc, char **argv)
@@ -124,7 +161,7 @@ main(int argc, char **argv)
 	/*
 	 * Parse named command line arguments.
 	 */
-	while ((c = getopt(argc, argv, "h?CqjlpT:m:i:n:s:c:")) != EOF)
+	while ((c = getopt(argc, argv, "h?CqjlpT:Vm:i:n:s:c:")) != EOF)
 		switch (c) {
 		case 'h':
 		case '?':
@@ -165,6 +202,9 @@ main(int argc, char **argv)
 				errflg = B_TRUE;
 			}
 			break;
+		case 'V':
+			g_Vflg = B_TRUE;
+			break;
 		case 'm':
 			nselflg = B_TRUE;
 			nselector->ks_module.pstr =
@@ -194,6 +234,17 @@ main(int argc, char **argv)
 			break;
 		}
 
+	if (g_Vflg && !g_pflg) {
+		(void) fprintf(stderr, gettext(
+		    "-V can only be used with -p\n"));
+		errflg = B_TRUE;
+	}
+	if (g_Vflg && (g_timestamp_fmt != NODATE ||
+	    g_lflg || g_jflg || g_cflg)) {
+		(void) fprintf(stderr, gettext(
+		    "-jlCT and -V are mutually exclusive\n"));
+		errflg = B_TRUE;
+	}
 	if (g_qflg && (g_jflg || g_pflg)) {
 		(void) fprintf(stderr, gettext(
 		    "-q and -lpj are mutually exclusive\n"));
@@ -262,6 +313,12 @@ main(int argc, char **argv)
 				}
 			}
 
+			/*
+			 * With -V, only do allow exact matches.
+			 */
+			if (g_Vflg && invalid_values(uselector)) {
+				exit(2);
+			}
 			uselflg = B_TRUE;
 			list_insert_tail(&selector_list, uselector);
 		} else {
@@ -306,6 +363,12 @@ main(int argc, char **argv)
 			free(nselector);
 		}
 	} else {
+		/*
+		 * With -V, only do allow exact matches.
+		 */
+		if (g_Vflg && invalid_values(nselector)) {
+			exit(2);
+		}
 		list_insert_tail(&selector_list, nselector);
 	}
 
@@ -362,10 +425,10 @@ usage(void)
 {
 	(void) fprintf(stderr, gettext(
 	    "Usage:\n"
-	    "kstat [ -Cjlpq ] [ -T d|u ] [ -c class ]\n"
+	    "kstat [ -Cjlq ] [ -p [ -V ]] [ -T d|u ] [ -c class ]\n"
 	    "      [ -m module ] [ -i instance ] [ -n name ] [ -s statistic ]\n"
 	    "      [ interval [ count ] ]\n"
-	    "kstat [ -Cjlpq ] [ -T d|u ] [ -c class ]\n"
+	    "kstat [ -Cjlq ] [ -p [ -V ]] [ -T d|u ] [ -c class ]\n"
 	    "      [ module[:instance[:name[:statistic]]] ... ]\n"
 	    "      [ interval [ count ] ]\n"));
 }
@@ -767,11 +830,14 @@ ks_instance_print(ks_instance_t *ksi, ks_nvpair_t *nvpair, boolean_t last)
 	}
 
 	if (g_pflg) {
-		(void) fprintf(stdout, KS_PFMT,
-		    ksi->ks_module, ksi->ks_instance,
-		    ksi->ks_name, nvpair->name);
+		if (!g_Vflg) {
+			(void) fprintf(stdout, KS_PFMT,
+			    ksi->ks_module, ksi->ks_instance,
+			    ksi->ks_name, nvpair->name);
+		}
 		if (!g_lflg) {
-			(void) putchar(g_cflg ? ':': '\t');
+			if (!g_Vflg)
+				(void) putchar(g_cflg ? ':': '\t');
 			ks_value_print(nvpair);
 		}
 	} else {
