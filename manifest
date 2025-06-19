@@ -10765,10 +10765,7 @@ f usr/lib/xhci/xhci_portsc 0555 root bin
 d usr/lib/zfs 0755 root bin
 f usr/lib/zfs/availdevs 0555 root bin
 d usr/lib/zones 0755 root bin
-d usr/lib/zones/amd64 0755 root bin
-f usr/lib/zones/amd64/zoneadmd 0555 root bin
-d usr/lib/zones/i86 0755 root bin
-h usr/lib/zones/zoneadmd=usr/lib/isaexec
+f usr/lib/zones/zoneadmd 0555 root bin
 f usr/lib/zones/zoneshare 0555 root bin
 f usr/lib/zones/zoneunshare 0555 root bin
 d usr/libexec 07555 root bin

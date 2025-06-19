@@ -21,42 +21,41 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright (c) 2011, Joyent, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
+# Copyright 2025 Edgecast Cloud LLC.
 #
 
 PROG= zoneadmd
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 include ../Makefile.ctf
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+CSTD= $(CSTD_GNU99)
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+ROOTCMDDIR=	$(ROOTLIB)/zones
+
+OBJS= zoneadmd.o zcons.o zfd.o vplat.o log.o
+SRCS = $(OBJS:.o=.c)
 
 CFLAGS += $(CCVERBOSE)
 
+LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
+	-linetutil -lscf -lppt -lcustr
 XGETFLAGS += -a -x zoneadmd.xcl
-
-ROOTUSRLIBZONES			= $(ROOT)/usr/lib/zones
 
 .KEEP_STATE:
 
 .PARALLEL:
 
-all: $(SUBDIRS)
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: $(SUBDIRS)
-	-$(RM) $(ROOTUSRLIBZONES)/$(PROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRLIBZONES)/$(PROG)
+install: all $(ROOTCMD)
 
 $(POFILE):
 
@@ -64,11 +63,6 @@ clean:
 	$(RM) $(OBJS)
 
 check:
-	$(CSTYLE) -p -P *.c
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+	$(CSTYLE) -p -P $(SRCS:%=%)
 
 include ../Makefile.targ
