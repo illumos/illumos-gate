@@ -368,7 +368,7 @@ dofusers(vnode_t *fvp, int flags)
 
 		/*
 		 * it's safe to drop p_lock here because we
-		 * called sprlock() before and it set the SPRLOCK
+		 * called sprlock() before and it set the P_PR_LOCK
 		 * flag for the process so it won't go away.
 		 */
 		mutex_exit(&prp->p_lock);
@@ -466,7 +466,7 @@ dofusers(vnode_t *fvp, int flags)
 		 */
 		if (nbmandonly && (!(use_flag & F_NBM))) {
 			/*
-			 * grab the process lock again, clear the SPRLOCK
+			 * grab the process lock again, clear the P_PR_LOCK
 			 * flag, release the process, and continue.
 			 */
 			mutex_enter(&prp->p_lock);
@@ -608,7 +608,7 @@ dofusers(vnode_t *fvp, int flags)
 		}
 
 		/*
-		 * grab the process lock again, clear the SPRLOCK
+		 * grab the process lock again, clear the P_PR_LOCK
 		 * flag, release the process, and continue.
 		 */
 		mutex_enter(&prp->p_lock);

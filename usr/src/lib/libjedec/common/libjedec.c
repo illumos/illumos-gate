@@ -19,7 +19,7 @@
 
 /*
  * This section of the library is dedicated to decoding the JEDEC vendor codes
- * as defined in JEP106BL (February 2025). The vendor code is encoded as a
+ * as defined in JEP106BM (June 2025). The vendor code is encoded as a
  * series of continuation bytes and then the current vendor value. Each of the
  * tables below corresponds to one of the continuation values and is ordered
  * based on JEP-106. Note, the first batch of entries in JEP-106 Table 1 has
@@ -108,7 +108,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_1[LIBJEDEC_TABLE_SIZE] = {
 	{ 0xC2, "Macronix" },
 	{ 0x43, "Xerox" },
 	{ 0xC4, "Plus Logic" },
-	{ 0x45, "Western Digital Technologies Inc" },
+	{ 0x45, "SanDisk Technologies Inc" },
 	{ 0x46, "Elan Circuit Tech." },
 	{ 0xC7, "European Silicon Str." },
 	{ 0xC8, "Apple Computer" },
@@ -2101,7 +2101,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_16[LIBJEDEC_TABLE_SIZE] = {
 	{ 0xFE, "Shenzhen Tanlr Technology Group Co Ltd" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_17[23] = {
+static const libjedec_vendor_pair_t libjedec_vendors_17[58] = {
 	{ 0x01, "Shenzhen JIEQING Technology Co Ltd" },
 	{ 0x02, "Orionix" },
 	{ 0x83, "JoulWatt Technology Co Ltd" },
@@ -2124,7 +2124,42 @@ static const libjedec_vendor_pair_t libjedec_vendors_17[23] = {
 	{ 0x94, "Eliyan Corp" },
 	{ 0x15, "Hangzhou Lishu Technology Co Ltd" },
 	{ 0x16, "Tier IV Inc" },
-	{ 0x97, "Wuhan Xuanluzhe Network Technology Co" }
+	{ 0x97, "Wuhan Xuanluzhe Network Technology Co" },
+	{ 0x98, "EA Semi (Shanghai) Limited" },
+	{ 0x19, "Tech Vision Information Technology Co" },
+	{ 0x1A, "Zhihe Computing Technology" },
+	{ 0x9B, "Beijing Apexichips Tech" },
+	{ 0x1C, "Yemas Holdingsl Limited" },
+	{ 0x9D, "Eluktronics" },
+	{ 0x9E, "Walton Digi-Tech Industries Ltd" },
+	{ 0x1F, "Beijing Qixin Gongli Technology Co Ltd" },
+	{ 0x20, "M.RED" },
+	{ 0xA1, "Shenzhen Damay Semiconductor Co Ltd" },
+	{ 0xA2, "Corelab Tech Singapore Holding PTE LTD" },
+	{ 0x23, "EmBestor Technology Inc" },
+	{ 0xA4, "XConn Technologies" },
+	{ 0x25, "Flagchip" },
+	{ 0x26, "CUNNUC" },
+	{ 0xA7, "SGMicro" },
+	{ 0xA8, "Lanxin Computing (Shenzhen) Technology" },
+	{ 0x29, "FuturePlus Systems LLC" },
+	{ 0x2A, "Shenzhen Jielong Storage Technology Co" },
+	{ 0xAB, "Precision Planting LLC" },
+	{ 0x2C, "Sichuan ZeroneStor Microelectronics Tech" },
+	{ 0xAD, "The University of Tokyo" },
+	{ 0xAE, "Aodu (Fujian) Information Technology Co" },
+	{ 0x2F, "Bytera Memory Inc" },
+	{ 0xB0, "XSemitron Technology Inc" },
+	{ 0x31, "Cloud Ridge Ltd" },
+	{ 0x32, "Shenzhen XinChiTai Technology Co Ltd" },
+	{ 0xB3, "Shenzhen Xinxin Semiconductor Co Ltd" },
+	{ 0x34, "Shenzhen ShineKing Electronics Co Ltd." },
+	{ 0xB5, "Shenzhen Shande Semiconductor Co. Ltd." },
+	{ 0xB6, "AheadComputing" },
+	{ 0x37, "Beijing Ronghua Kangweiye Technology" },
+	{ 0x38, "Shanghai Yunsilicon Technology Co Ltd" },
+	{ 0xB9, "Shenzhen Wolongtai Technology Co Ltd." },
+	{ 0xBA, "Vervesemi Microelectronics" }
 };
 
 const char *

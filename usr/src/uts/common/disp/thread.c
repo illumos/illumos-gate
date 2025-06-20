@@ -1406,16 +1406,12 @@ setrun_locked(kthread_t *t)
 		waitq_setrun(t);
 	} else if (t->t_state == TS_STOPPED) {
 		/*
-		 * All of the sending of SIGCONT (TC_XSTART) and /proc
-		 * (TC_PSTART) and lwp_continue() (TC_CSTART) must have
-		 * requested that the thread be run.
 		 * Just calling setrun() is not sufficient to set a stopped
-		 * thread running.  TP_TXSTART is always set if the thread
-		 * is not stopped by a jobcontrol stop signal.
-		 * TP_TPSTART is always set if /proc is not controlling it.
-		 * TP_TCSTART is always set if lwp_suspend() didn't stop it.
-		 * The thread won't be stopped unless one of these
-		 * three mechanisms did it.
+		 * thread running.  All bits indicating that a thread can be
+		 * run, which we group as TS_ALLSTART, must be set.  Any cleared
+		 * bits under this mask are reasons the thread is not currently
+		 * runnable.  The thread won't be stopped except for one of
+		 * those reasons.
 		 *
 		 * These flags must be set before calling setrun_locked(t).
 		 * They can't be passed as arguments because the streams
