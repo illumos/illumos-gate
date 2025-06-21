@@ -15,7 +15,7 @@
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -1465,6 +1465,26 @@ i40e_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
 		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_1GB) != 0);
+		break;
+	case MAC_PROP_ADV_2500FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_2_5GB) != 0);
+		break;
+	case MAC_PROP_EN_2500FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_2_5GB) != 0);
+		break;
+	case MAC_PROP_ADV_5000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_5GB) != 0);
+		break;
+	case MAC_PROP_EN_5000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_5GB) != 0);
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
