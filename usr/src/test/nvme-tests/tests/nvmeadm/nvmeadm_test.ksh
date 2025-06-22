@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -428,11 +428,6 @@ nvmeadm_pass get-features $nt_dev temp,vector
 nvmeadm_pass get-features $nt_dev,$nt_dev arb
 
 nvmeadm_pass list-firmware $nt_dev
-
-#
-# Here we come back and use bad controller names that should not work.
-# These specifically do not rely on $nt_dev.
-#
 
 if (( nt_exit == 0 )); then
 	printf "All tests passed successfully!\n"

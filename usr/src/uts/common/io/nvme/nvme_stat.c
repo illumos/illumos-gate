@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include "nvme_reg.h"
@@ -90,6 +90,12 @@ nvme_stat_device_init(nvme_t *nvme)
 	STAT_INIT(fwact_prohibited);
 	STAT_INIT(fw_overlap);
 	STAT_INIT(inv_cmdseq_err);
+	STAT_INIT(ns_attached);
+	STAT_INIT(ns_priv);
+	STAT_INIT(ns_not_attached);
+	STAT_INIT(inc_ctrl_list);
+	STAT_INIT(ana_attach);
+	STAT_INIT(ns_attach_lim);
 
 	/* Errors reported by asynchronous events */
 	STAT_INIT(diagfail_event);

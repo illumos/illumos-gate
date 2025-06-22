@@ -9,10 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd September 21, 2024
+.Dd April 22, 2025
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -87,11 +87,32 @@
 .Ar ctl[/ns]
 .Nm
 .Op Fl dv
-.Cm detach
-.Ar ctl[/ns]
+.Cm create-namespace
+.Fl b Ar block-size | Fl f Ar flbas
+.Op Fl c Ar cap
+.Op Fl n Ar nmic
+.Op Fl t Ar type
+.Ar ctl
+.Ar size
+.Nm
+.Op Fl dv
+.Cm delete-namespace
+.Ar ctl/ns
+.Nm
+.Op Fl dv
+.Cm attach-namespace
+.Ar ctl/ns
+.Nm
+.Op Fl dv
+.Cm detach-namespace
+.Ar ctl/ns
 .Nm
 .Op Fl dv
 .Cm attach
+.Ar ctl[/ns]
+.Nm
+.Op Fl dv
+.Cm detach
 .Ar ctl[/ns]
 .Nm
 .Op Fl dv
@@ -244,6 +265,38 @@ The short form is
 .Pp
 For more information on the differences between these, please see the
 NVMe specification.
+.It Ar size
+Indicates a size in bytes.
+The size may be specified in base 10 or in hexadecimal.
+An optional binary prefix may follow the string.
+For example, a size of 10G would indicate 10 GiB
+.Pq Gibibytes
+or 10,737,418,240 bytes.
+Valid binary prefixes include:
+.Bl -tag -width Ds
+.It Sy b, B
+The size is in bytes.
+It is not adjusted.
+.It Sy k, K
+The size is in KiB.
+It will be multiplied by 2^10.
+.It Sy m, M
+The size is in MiB.
+It will be multiplied by 2^20.
+.It Sy g, G
+The size is in GiB.
+It will be multiplied by 2^30.
+.It Sy t, T
+The size is in TiB.
+It will be multiplied by 2^40.
+.It Sy p, P
+The size is in PiB.
+It will be multiplied by 2^50.
+.El
+.Pp
+This is used by the
+.Cm create-namespace
+command.
 .It Ar slot
 Specifies the firmware slot into which a firmware set is committed
 using the
@@ -334,6 +387,27 @@ The numerical value of the namespace which can be used as part of other
 operations.
 .It Sy DISK
 The name of the disk device that corresponds to the namespace, if any.
+.It Sy NS-STATE
+The current state of the namespace.
+This is one of the following:
+.Bl -tag -width Ds
+.It Dq unallocated
+the namesapce is currently unallocated.
+There is no non-volatile memory assosciated with it.
+.It Dq allocated
+The namespace has non-volatile memory allocated to it, but it is not currently
+attached to the controller.
+.It Dq active
+The namespace is currently attached to the local controller; however, the kernel
+cannot actively attach a block device to the driver.
+.It Dq active-usable
+The namespace is currently attached to the local controller and the kernel can
+use the namespace with
+.Xr blkdev 4D .
+.It Dq blkdev
+The namespace is exposing a block device and is actively attached to
+.Xr blkdev 4D .
+.El
 .El
 .Pp
 When using the
@@ -973,21 +1047,175 @@ Note that not all devices support erasing individual or all
 namespaces, or support erasing at all.
 .It Xo
 .Nm
-.Cm detach
-.Ar ctl[/ns]
+.Cm create-namespace
+.Fl b Ar block-size | Fl f Ar flbas
+.Op Fl c Ar cap
+.Op Fl n Ar nmic
+.Op Fl t Ar type
+.Ar ctl
+.Ar size
 .Xc
-Temporarily detaches the
-.Xr blkdev 4D
-instance from the specified namespace or all namespaces of the controller.
-This will prevent I/O access to the affected namespace(s).
-Detach will only succeed if the affected namespace(s) are not
-currently opened.
-The detached state will not persist across reboots or reloads of the
-.Xr nvme 4D
-driver.
+Creates a new namespace of size
+.Ar size
+in the controller
+.Ar ctl .
+NVM will be allocated for the namespace and the namespace will transition to the
+allocated state.
+A created namespace must subsequently be attached to the local controller,
+.Cm attach-namespace ,
+and to the block device framework
+.Pq Xr blkdev 4D ,
+.Cm attach ,
+to provide I/O capabilities.
 .Pp
-It is not an error to detach a namespace that is already detached, any such
-request will be silently ignored.
+By default, a newly created namespace:
+.Bl -bullet
+.It
+Uses the NVM command set interface
+.Pq CSI .
+This can be changed with the
+.Fl t
+option.
+.It
+Has the namespace's capacity set to the namespace's size.
+To thinly provision a namespace, you may use the
+.Fl c
+option to specify a value less than the
+.Ar size
+argument.
+Note, the controller may not support thin provisioning.
+.It
+Configures the namespace so it may only be used with one controller at a time.
+This can be changed with the
+.Fl n
+option.
+.El
+.Pp
+When creating a namespace, one must specify what formatted LBA index to use.
+This index may be specified directly with the
+.Fl f
+option or instead the target block size may be specified with the
+.Fl b
+option.
+If
+.Fl b
+is specified, then the command will search for a namespace with that block size,
+with no metdata section, and with the highest relative performance and use that.
+Available LBA format options may be listed by printing the Common Namespace
+Identification values through the
+.Nm identify-controller
+option with the
+.Fl C
+option.
+.Pp
+The
+.Cm create-namespace
+command supports the following options:
+.Bl -tag -width Fl
+.It Fl b Ar block-size
+Specifies the target data block size of the namespace to be created.
+This option is exclusive with the
+.Fl f
+option.
+.Ar block-size
+allow a binary prefix to be specified as per the description of the
+.Ar size
+operand.
+.It Fl c Ar cap
+Specifies the namespace's capacity in bytes, which may use a binary prefix like,
+such as
+100G,
+as per the description of the
+.Ar size
+operand.
+If this option is left out, the namespace's capacity will be set to its size,
+fully provisioning the namespace.
+Not all controllers support thinly provisioning a namespace.
+.It Fl f Ar flbas
+Specifies the index of the formatted LBA size.
+.It Fl n Ar nmic
+Specifies the multipath I/O and namespace sharing capabilities.
+The current valid options for this are:
+.Bl -tag -width Ds
+.It Sy none
+Indicates that only a single controller may attach to the namespace at any given
+time.
+.It Sy shared
+Indicates that two or more controllers may attach to the namespace at the same
+time.
+.El
+.It Fl t Ar type
+Specifies the command set interface for newly created namespace.
+The default is
+.Dq nvm .
+The system understands the following command set interfaces; however, not all
+controllers support all CSIs and currently the
+.Xr nvme 4D
+driver only supports the
+NVM CSI.
+.Bl -tag -width Ds
+.It nvm
+The non-volatile memory CSI.
+This is the default CSI of all NVMe devices and provides a regular block
+interface.
+.It kv
+Key Value command set interface.
+This interface does not provide standard a logical block abstraction and instead
+allows for someone to read and write an arbitrary-sized object with a 128-bit
+key.
+.It zns
+Zoned namespace command set interface.
+This interface provides a block-like abstraction where blocks are broken into
+different sized zones, which contain ranges of logical blocks.
+Writing to a zone offers different semantics from a common block device.
+.El
+.El
+.It Xo
+.Nm
+.Cm delete-namespace
+.Ar ctl/ns
+.Xc
+This deletes the specified namespace, freeing any capacity back to the
+underlying NVM subsystem.
+The namespace identifier will be considered inactive in
+.Ar ctl .
+.Pp
+To delete a namespace, the namespace must already be detached from all
+controllers through the
+.Cm detach-namespace
+command.
+.Pp
+Upon deleting a namespace, all information that was contained in the namespace
+.Sy will be lost .
+.It Xo
+.Nm
+.Cm attach-namespace
+.Ar ctl/ns
+.Xc
+Attach the specified namespace to the controller
+.Ar ctl .
+This will transition the namespace to the active state, allowing additional
+information about the namespace to be queried.
+This also allows the namespace to provide a block device interface through
+.Xr blkdev 4D ,
+which can be enabled by subsequently using the
+.Cm attach
+command.
+.It Xo
+.Nm
+.Cm detach-namespace
+.Ar ctl/ns
+.Xc
+Detach the specified namespace from the controller
+.Ar ctl .
+The namespace must already be detached from
+.Xr blkdev 4D
+through the
+.Cm detach command.
+When detached, the namespace transitions from active to allocated in the
+controller.
+Data in the namespace remains valid; however, not all commands will function
+against the namespace and I/O may not be performed to it.
 .It Xo
 .Nm
 .Cm attach
@@ -1003,6 +1231,23 @@ previous
 command.
 .Pp
 It is not an error to attach a namespace that is already attached, any such
+request will be silently ignored.
+.It Xo
+.Nm
+.Cm detach
+.Ar ctl[/ns]
+.Xc
+Temporarily detaches the
+.Xr blkdev 4D
+instance from the specified namespace or all namespaces of the controller.
+This will prevent I/O access to the affected namespace(s).
+Detach will only succeed if the affected namespace(s) are not
+currently opened.
+The detached state will not persist across reboots or reloads of the
+.Xr nvme 4D
+driver.
+.Pp
+It is not an error to detach a namespace that is already detached, any such
 request will be silently ignored.
 .It Xo
 .Nm

@@ -1,0 +1,72 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# This exercises destructive tests against an NVMe device. ALL DATA ON A DEVICE
+# WILL BE ERASED BY THIS. We don't explicitly set the user for these tests as we
+# want the user to already have elevated privileges. The wrapper script will
+# have already run check-destruct.64 and set the corresponding device that
+# should be used in the environment.
+#
+# We set a 300s per-test timeout as some of these tests take operation on a
+# per-namespace basis which can add up when you are creating hundreds of
+# namespaces.
+#
+
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 300
+post =
+outputdir = /var/tmp/test_results
+
+[/opt/nvme-tests/tests/libnvme/bad-req-nsmgmt.32]
+[/opt/nvme-tests/tests/libnvme/bad-req-nsmgmt.64]
+[/opt/nvme-tests/tests/libnvme/missing-field-destruct.32]
+[/opt/nvme-tests/tests/libnvme/missing-field-destruct.64]
+
+[/opt/nvme-tests/tests/libnvme/format.32]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+[/opt/nvme-tests/tests/libnvme/format.64]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+
+[/opt/nvme-tests/tests/libnvme/need-write-lock.32]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+[/opt/nvme-tests/tests/libnvme/need-write-lock.64]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+
+[/opt/nvme-tests/tests/libnvme/ns-cap.32]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+[/opt/nvme-tests/tests/libnvme/ns-cap.64]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+
+[/opt/nvme-tests/tests/libnvme/ns-lifecycle.32]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+[/opt/nvme-tests/tests/libnvme/ns-lifecycle.64]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+
+[/opt/nvme-tests/tests/libnvme/ns-max.32]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+[/opt/nvme-tests/tests/libnvme/ns-max.64]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64
+
+[/opt/nvme-tests/tests/ioctl/general-errors.32]
+pre = /opt/nvme-tests/tests/libnvme/device-reset.64
+[/opt/nvme-tests/tests/ioctl/general-errors.64]
+pre = /opt/nvme-tests/tests/libnvme/device-reset.64
+
+[/opt/nvme-tests/tests/nvmeadm/nvmeadm_lifecycle]
+pre = /opt/nvme-tests/tests/libnvme/device-empty.64

@@ -13,7 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -32,7 +32,7 @@
 #endif
 
 /*
- * Declarations used for communication between nvmeadm(8) and nvme(4D)
+ * Declarations used for communication between nvme(4D) and libnvme.
  */
 
 #ifdef __cplusplus
@@ -49,15 +49,19 @@ extern "C" {
 #define	NVME_IOC_GET_LOGPAGE		(NVME_IOC | 2)
 #define	NVME_IOC_GET_FEATURE		(NVME_IOC | 3)
 #define	NVME_IOC_FORMAT			(NVME_IOC | 4)
-#define	NVME_IOC_DETACH			(NVME_IOC | 5)
-#define	NVME_IOC_ATTACH			(NVME_IOC | 6)
+#define	NVME_IOC_BD_DETACH		(NVME_IOC | 5)
+#define	NVME_IOC_BD_ATTACH		(NVME_IOC | 6)
 #define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 7)
 #define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 8)
 #define	NVME_IOC_PASSTHRU		(NVME_IOC | 9)
 #define	NVME_IOC_NS_INFO		(NVME_IOC | 10)
 #define	NVME_IOC_LOCK			(NVME_IOC | 11)
 #define	NVME_IOC_UNLOCK			(NVME_IOC | 12)
-#define	NVME_IOC_MAX			NVME_IOC_NS_INFO
+#define	NVME_IOC_CTRL_ATTACH		(NVME_IOC | 13)
+#define	NVME_IOC_CTRL_DETACH		(NVME_IOC | 14)
+#define	NVME_IOC_NS_CREATE		(NVME_IOC | 15)
+#define	NVME_IOC_NS_DELETE		(NVME_IOC | 16)
+#define	NVME_IOC_MAX			NVME_IOC_NS_DELETE
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -457,13 +461,59 @@ typedef enum {
 	 * Indicates that the blkdev address somehow would have overflowed our
 	 * internal buffer.
 	 */
-	NVME_IOCTL_E_BD_ADDR_OVER
+	NVME_IOCTL_E_BD_ADDR_OVER,
+	/*
+	 * Indicates that Namespace Management commands are not supported by the
+	 * controller at all.
+	 */
+	NVME_IOCTL_E_CTRL_NS_MGMT_UNSUP,
+	/*
+	 * Indicates that the request could not proceed because the namespace is
+	 * currently attached to a controller.
+	 */
+	NVME_IOCTL_E_NS_CTRL_ATTACHED,
+	NVME_IOCTL_E_NS_CTRL_NOT_ATTACHED,
+	/*
+	 * This indicates that the namespace ID is valid; however, there is no
+	 * namespace actually allocated for this ID. For example, when trying to
+	 * attach or detach a controller to an unallocated namespace.
+	 *
+	 * When a namespace ID is invalid, the kernel will generally instead
+	 * return NVME_IOCTL_E_NS_RANGE.
+	 */
+	NVME_IOCTL_E_NS_NO_NS,
+	/*
+	 * Namespace Create fields with bad values
+	 */
+	NVME_IOCTL_E_NS_CREATE_NSZE_RANGE,
+	NVME_IOCTL_E_NS_CREATE_NCAP_RANGE,
+	NVME_IOCTL_E_NS_CREATE_CSI_RANGE,
+	NVME_IOCTL_E_NS_CREATE_FLBAS_RANGE,
+	NVME_IOCTL_E_NS_CREATE_NMIC_RANGE,
+	/*
+	 * Namespace Create fields with unsupported versions. Currently this can
+	 * only apply to the CSI. Note, there aren't unusable errors yet;
+	 * however, that'll change when we support other CSI types.
+	 */
+	NVME_IOCTL_E_NS_CREATE_CSI_UNSUP,
+	/*
+	 * We may have a valid CSI, but not support it at our end. This error
+	 * indicates that. Similarly, the device may not support thin
+	 * provisioning.
+	 */
+	NVME_IOCTL_E_DRV_CSI_UNSUP,
+	NVME_IOCTL_E_CTRL_THIN_PROV_UNSUP
 } nvme_ioctl_errno_t;
 
 /*
  * This structure is embedded as the first item of every ioctl. It is also used
- * directly for the attach (NVME_IOC_ATTACH) and detach (NVME_IOC_DETACH)
- * ioctls.
+ * directly for the following ioctls:
+ *
+ *  - blkdev attach (NVME_IOC_ATTACH)
+ *  - blkdev detach (NVME_IOC_DETACH)
+ *  - controller attach (NVME_IOC_CTRL_ATTACH)
+ *  - controller detach (NVME_IOC_CTRL_DETACH)
+ *  - namespace delete (NVME_IOC_NS_DELETE)
  */
 typedef struct {
 	/*
@@ -674,6 +724,58 @@ typedef struct {
 	nvme_ioctl_common_t niu_common;
 	nvme_lock_ent_t niu_ent;
 } nvme_ioctl_unlock_t;
+
+/*
+ * Namespace Management related structures and constants. Note, namespace
+ * controller attach, controller detach, and namespace delete all use the common
+ * ioctl structure at this time.
+ */
+#define	NVME_NS_ATTACH_CTRL_ATTACH	0
+#define	NVME_NS_ATTACH_CTRL_DETACH	1
+
+/*
+ * Constants related to fields here. These represent the specifications maximum
+ * size, even though there are additional constraints placed on it by the driver
+ * (e.g. we only allow creating a namespace with the NVM CSI).
+ */
+#define	NVME_NS_MGMT_MAX_CSI	0xff
+#define	NVME_NS_MGMT_MAX_FLBAS	0xf
+#define	NVME_NS_MGMT_NMIC_MASK	0x1
+
+/*
+ * Logical values for namespace multipath I/O and sharing capabilities (NMIC).
+ */
+typedef enum {
+	/*
+	 * Indicates that no NVMe namespace sharing is permitted between
+	 * controllers.
+	 */
+	NVME_NS_NMIC_T_NONE	= 0,
+	/*
+	 * Indicates that namespace sharing is allowed between controllers. This
+	 * is equivalent to the SHRNS bit being set.
+	 */
+	NVME_NS_NMIC_T_SHARED,
+	/*
+	 * Indicates that this is a dispersed namespace. A dispersed namespace
+	 * implies a shared namespace and indicates that DISNS and SHRNS are
+	 * both set.
+	 */
+	NVME_NS_NMIC_T_DISPERSED
+} nvme_ns_nmic_t;
+
+/*
+ * Namespace create structure (NVME_IOC_NS_CREATE).
+ */
+typedef struct {
+	nvme_ioctl_common_t nnc_common;
+	uint64_t nnc_nsze;
+	uint64_t nnc_ncap;
+	uint32_t nnc_csi;
+	uint32_t nnc_flbas;
+	uint32_t nnc_nmic;
+	uint32_t nnc_nsid;
+} nvme_ioctl_ns_create_t;
 
 /*
  * 32-bit ioctl structures. These must be packed to be 4 bytes to get the proper
@@ -1996,31 +2098,65 @@ typedef struct {
 } nvme_ioctl_ctrl_info_t;
 
 /*
- * NVME namespace state flags.
+ * NVME namespace states.
  *
  * The values are defined entirely by the driver. Some states correspond to
  * namespace states described by the NVMe specification r1.3 section 6.1, others
  * are specific to the implementation of this driver. These are present in the
- * nvme_ns_kinfo_t that is used with the NVME_IOC_NS_INFO ioctl.
+ * nvme_ns_kinfo_t that is used with the NVME_IOC_NS_INFO ioctl. Devices that
+ * support Namespace Management have the ability to transition through these
+ * states directly. Devices without it may be able to have namespaces in these
+ * states depending on the version.
  *
  * The states are as follows:
- * - ALLOCATED: the namespace exists in the controller as per the NVMe spec
- * - ACTIVE: the namespace exists and is attached to this controller as per the
- *   NVMe spec. Any namespace that is ACTIVE is also ALLOCATED. This must not be
- *   confused with the ATTACHED state.
- * - ATTACHED: the driver has attached a blkdev(4D) instance to this namespace.
- *   This state can be changed by userspace with the ioctls NVME_IOC_ATTACH and
- *   NVME_IOC_DETACH. A namespace can only be ATTACHED when it is not IGNORED.
- * - IGNORED: the driver ignores this namespace, it never attaches a blkdev(4D).
- *   Namespaces are IGNORED when they are not ACTIVE, or if they are ACTIVE but
- *   have certain properties that the driver cannot handle.
+ * - UNALLOCATED: The namespace ID exists, but has no corresponding NVM
+ *   allocation as per the NVMe spec. It leaves this state with an NVMe
+ *   Namespace Management NS create command: NVME_IOC_NS_CREATE.
+ *
+ * - ALLOCATED: The namespace exists in the controller as per the NVMe spec. It
+ *   becomes ACTIVE (or IGNORED) by performing a controller attach comand:
+ *   NVME_IOC_CTRL_ATTACH. It becomes unallocated by performing an NVMe
+ *   Namespace Management NS delete command: NVME_IOC_NS_DELETE.
+ *
+ * - ACTIVE: The namespace exists and is attached to this controller as per the
+ *   NVMe spec. From the hardware's perspective the namespace is usable.
+ *
+ *   Not all namespaces are supported by the kernel. For example, a namespace
+ *   may use features that the NVMe device driver does not support such as
+ *   end-to-end data protection features or a different command set.
+ *
+ *   When a namespace enters the active state, we will immediately evaluate
+ *   whether or not we can support a block device (via blkdev(4D)) on this
+ *   namespace. If we can, then we will immediately advance to the NOT_IGNORED
+ *   state. Otherwise, to transition to the NOT_IGNORED state, the namespace
+ *   must be formatted with the FORMAT NVM command with supported settings. The
+ *   namespace can transition back to the ALLOCATED state by performing a
+ *   NVME_IOC_CTRL_DETACH ioctl.
+ *
+ * - NOT_IGNORED: The namespace is active from the controller perspective and is
+ *   formatted with settings that would support blkdev(4D) being attached;
+ *   however, there is no blkdev(4D) instance currently attached. A device
+ *   transitions from the NOT_IGNORED to the ATTACHED state by actively
+ *   attaching a blkdev(4D) instance to the namespace through the
+ *   NVME_IOC_BD_ATTACH ioctl. A namespace can transition back to the ACTIVE
+ *   state by issuing a FORMAT NVM command with unsupported settings. It can
+ *   also go to the ALLOCATED state by performing the NVME_IOC_CTRL_DETACH
+ *   ioctl.
+ *
+ * - ATTACHED: the driver has attached a blkdev(4D) instance to this namespace
+ *   and it is usable as a block device. Certain operations such as a FORMAT NVM
+ *   or similar are rejected during this state. The device can go back to ACTIVE
+ *   with the NVME_IOC_BD_DETACH ioctl.
  */
 typedef enum {
-	NVME_NS_STATE_ALLOCATED	=	1 << 0,
-	NVME_NS_STATE_ACTIVE	=	1 << 1,
-	NVME_NS_STATE_ATTACHED	=	1 << 2,
-	NVME_NS_STATE_IGNORED	=	1 << 3
+	NVME_NS_STATE_UNALLOCATED = 0,
+	NVME_NS_STATE_ALLOCATED,
+	NVME_NS_STATE_ACTIVE,
+	NVME_NS_STATE_NOT_IGNORED,
+	NVME_NS_STATE_ATTACHED
 } nvme_ns_state_t;
+
+#define	NVME_NS_NSTATES	5
 
 /*
  * This is the maximum length of the NVMe namespace's blkdev address. This is

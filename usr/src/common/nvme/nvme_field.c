@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -66,6 +66,21 @@ nvme_field_range_check(const nvme_field_info_t *field, uint64_t min,
 	(void) snprintf(msg, msglen, "field %s (%s) value 0x%"
 	    PRIx64 " is outside the valid range: [0x%" PRIx64 ", 0x%" PRIx64
 	    "]", field->nlfi_human, field->nlfi_spec, value, min, max);
+	return (false);
+}
+
+bool
+nvme_field_mask_check(const nvme_field_info_t *field, uint64_t valid_mask,
+    char *msg, size_t msglen, uint64_t value)
+{
+	uint64_t inval = ~valid_mask & value;
+	if (inval == 0) {
+		return (true);
+	}
+
+	(void) snprintf(msg, msglen, "field %s (%s) value 0x%" PRIx64
+	    " uses bits outside of the mask 0x%" PRIx64 ": 0x%" PRIx64,
+	    field->nlfi_human, field->nlfi_spec, value, valid_mask, inval);
 	return (false);
 }
 

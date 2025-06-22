@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -18,8 +18,8 @@
 # tests.
 #
 
-PROGS32 = $(PROGS:%=%.32)
-PROGS64 = $(PROGS:%=%.64)
+PROGS32 += $(PROGS:%=%.32)
+PROGS64 += $(PROGS:%=%.64)
 
 EXTRA_OBJS32 = $(COMMON_SRCS:%.c=%.o.32)
 EXTRA_OBJS64 = $(COMMON_SRCS:%.c=%.o.64)
@@ -34,7 +34,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.ctf
 
 CPPFLAGS += -D_REENTRANT
-CSTD = $(CSTD_GNU99)
+CSTD = $(CSTD_GNU17)
 CTF_MODE = link
 
 .KEEP_STATE:

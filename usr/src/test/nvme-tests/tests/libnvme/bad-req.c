@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -149,6 +149,19 @@ bad_vuc_req(nvme_ctrl_t *ctrl, nvme_vuc_req_t **reqp, nvme_err_t exp_err,
 		nvme_vuc_req_fini(*reqp);
 		return (false);
 	} else if (nvme_ctrl_err(ctrl) != exp_err) {
+		/*
+		 * We don't have any vendor unique commands for some devices.
+		 * Swallow those rather than error.
+		 */
+		if (nvme_ctrl_err(ctrl) == NVME_ERR_VUC_UNSUP_BY_DEV) {
+			warnx("TEST IGNORED: nvme_vuc_req_init() returned "
+			    "%s (0x%x), not %s (0x%x) due to lack of VUC "
+			    "support",
+			    nvme_ctrl_errtostr(ctrl, nvme_ctrl_err(ctrl)),
+			    nvme_ctrl_err(ctrl), nvme_ctrl_errtostr(ctrl,
+			    exp_err), exp_err);
+			return (true);
+		}
 		warnx("TEST FAILED: nvme_vuc_req_init() returned "
 		    "wrong error %s (0x%x), not %s (0x%x)",
 		    nvme_ctrl_errtostr(ctrl, nvme_ctrl_err(ctrl)),
@@ -225,118 +238,119 @@ main(void)
 
 	if (!bad_id_req(ctrl, NVME_CSI_NVM, NVME_IDENTIFY_CTRL, NULL,
 	    NVME_ERR_BAD_PTR, "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_id_req(ctrl, 0xff, NVME_IDENTIFY_CTRL, &id_req,
 	    NVME_ERR_IDENTIFY_UNKNOWN, "unknown identify (bad csi)")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_id_req(ctrl, NVME_CSI_NVM, UINT32_MAX, &id_req,
 	    NVME_ERR_IDENTIFY_UNKNOWN, "unknown identify (bad cns)")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req(ctrl, NULL, NVME_ERR_BAD_PTR, "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req_by_name(ctrl, "health", 0, NULL, NVME_ERR_BAD_PTR,
 	    "bad output pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req_by_name(ctrl, NULL, 0, &log_req, NVME_ERR_BAD_PTR,
 	    "bad name pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req_by_name(ctrl, NULL, 0x12345678, &log_req,
 	    NVME_ERR_BAD_PTR, "bad flags")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req_by_name(ctrl, "elbereth", 0, &log_req,
 	    NVME_ERR_LOG_NAME_UNKNOWN, "unknown log")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req(ctrl, NULL, NVME_ERR_BAD_PTR,
 	    "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req_by_name(ctrl, "health", 0, NULL, NVME_ERR_BAD_PTR,
 	    "bad output pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req_by_name(ctrl, NULL, 0, &feat_req,
 	    NVME_ERR_BAD_PTR, "bad name pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req_by_name(ctrl, NULL, 0x87654321, &feat_req,
 	    NVME_ERR_BAD_PTR, "bad flags")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req_by_name(ctrl, "elbereth", 0, &feat_req,
 	    NVME_ERR_FEAT_NAME_UNKNOWN, "unknown feat")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_vuc_req(ctrl, NULL, NVME_ERR_BAD_PTR, "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_fw_commit_req(ctrl, NULL, NVME_ERR_BAD_PTR,
 	    "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_format_req(ctrl, NULL, NVME_ERR_BAD_PTR,
 	    "invalid req pointer")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	umem_setmtbf(1);
 	if (!bad_id_req(ctrl, NVME_CSI_NVM, NVME_IDENTIFY_CTRL, &id_req,
 	    NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req(ctrl, &log_req, NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_log_req_by_name(ctrl, "health", 0, &log_req, NVME_ERR_NO_MEM,
 	    "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req(ctrl, &feat_req, NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_get_feat_req_by_name(ctrl, "health", 0, &feat_req,
 	    NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_vuc_req(ctrl, &vuc_req, NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_fw_commit_req(ctrl, &fw_commit_req, NVME_ERR_NO_MEM,
 	    "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
 
 	if (!bad_format_req(ctrl, &format_req, NVME_ERR_NO_MEM, "no memory")) {
-		ret = false;
+		ret = EXIT_FAILURE;
 	}
+
 	umem_setmtbf(0);
 
 	if (ret == EXIT_SUCCESS) {

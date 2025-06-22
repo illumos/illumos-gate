@@ -33,6 +33,10 @@
 * limitations under the License.
 */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include "qede.h"
 #include <sys/pci.h>
 #include <sys/pcie.h>
@@ -297,45 +301,16 @@ qede_osal_dma_free_coherent(struct ecore_dev *edev, void *vaddr,
 	mutex_exit(&qede->phys_mem_list.lock);
 }
 
-static int 
-qede_get_port_type(uint32_t media_type)
-{
-        uint32_t port_type;
-
-        switch (media_type) {
-        case MEDIA_SFPP_10G_FIBER:
-        case MEDIA_SFP_1G_FIBER:
-        case MEDIA_XFP_FIBER:
-        case MEDIA_KR:
-                port_type = GLDM_FIBER;
-                break;
-        case MEDIA_DA_TWINAX:
-                port_type = GLDM_BNC; /* Check? */
-                break;
-        case MEDIA_BASE_T:
-                port_type = GLDM_TP;
-                break;
-        case MEDIA_NOT_PRESENT:
-        case MEDIA_UNSPECIFIED:
-        default:
-                port_type = GLDM_UNKNOWN;
-                break;
-        }
-        return (port_type);
-}
-
 void
 qede_get_link_info(struct ecore_hwfn *hwfn, struct qede_link_cfg *lnkCfg)
 {
         struct ecore_dev *edev = (struct ecore_dev *)hwfn->p_dev;
         qede_t *qede = (qede_t *)(void *)edev;
-        uint32_t media_type;
         struct ecore_mcp_link_state lnk_state;
         struct ecore_mcp_link_params lnk_params;
         struct ecore_mcp_link_capabilities lnk_caps;
 
-        ecore_mcp_get_media_type(edev, &media_type);
-        lnkCfg->port = qede_get_port_type(media_type);
+	qede_update_media_info(edev, lnkCfg);
 
         memcpy(&lnk_state, ecore_mcp_get_link_state(hwfn), 
 	    sizeof (lnk_state));

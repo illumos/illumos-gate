@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -53,7 +53,7 @@ const nvme_field_info_t nvme_format_fields[] = {
 	}
 };
 
-size_t nvme_format_nfields = ARRAY_SIZE(nvme_format_fields);
+const size_t nvme_format_nfields = ARRAY_SIZE(nvme_format_fields);
 
 bool
 nvme_format_cmds_supported(const nvme_valid_ctrl_data_t *data)

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -101,8 +101,8 @@ static boolean_t do_get_feat_temp_thresh(const nvme_process_arg_t *,
 static int do_get_features(const nvme_process_arg_t *);
 static int do_format(const nvme_process_arg_t *);
 static int do_secure_erase(const nvme_process_arg_t *);
-static int do_attach(const nvme_process_arg_t *);
-static int do_detach(const nvme_process_arg_t *);
+static int do_attach_bd(const nvme_process_arg_t *);
+static int do_detach_bd(const nvme_process_arg_t *);
 static int do_firmware_load(const nvme_process_arg_t *);
 static int do_firmware_commit(const nvme_process_arg_t *);
 static int do_firmware_activate(const nvme_process_arg_t *);
@@ -126,7 +126,7 @@ static void usage_list_features(const char *);
 static void usage_get_features(const char *);
 static void usage_format(const char *);
 static void usage_secure_erase(const char *);
-static void usage_attach_detach(const char *);
+static void usage_attach_detach_bd(const char *);
 static void usage_firmware_list(const char *);
 static void usage_firmware_load(const char *);
 static void usage_firmware_commit(const char *);
@@ -303,11 +303,53 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NVMEADM_C_EXCL
 	},
 	{
+		"create-namespace",
+		"create a new namespace",
+		"  -b block-size\tNamespace format chosen to match the "
+		"requested block-size\n"
+		"  -c cap\tSpecifies the namespace capacity in bytes, defaults "
+		"to the\n\t\tnamespace's size. When the size is greater than "
+		"the\n\t\tcapacity, the namespace is thin provisioned.\n"
+		"  -f flbas\tformatted LBA block size index\n"
+		"  -n nmic\tmulti-path I/O and namespace sharing capabilities, "
+		"valid values:\n"
+		"\t\tnone\tno namespace sharing\n"
+		"\t\tshared\tthe namespace may be attached by two or more "
+		"controllers\n"
+		"  -t csi\tspecifies the namespace's command set interface, "
+		"defaults to\n\t\tnvm\n",
+		NULL,
+		do_create_ns, usage_create_ns, optparse_create_ns,
+		NVMEADM_C_EXCL
+	},
+	{
+		"delete-namespace",
+		"delete a namespace",
+		NULL, NULL,
+		do_delete_ns, usage_delete_ns, NULL,
+		NVMEADM_C_EXCL
+	},
+	{
+		"attach-namespace",
+		"attach a namespace to a controller",
+		NULL, NULL,
+		do_attach_ns, usage_attach_ns, NULL,
+		NVMEADM_C_EXCL
+	},
+	{
+		"detach-namespace",
+		"detach a namespace from a controller",
+		NULL, NULL,
+		do_detach_ns, usage_detach_ns, NULL,
+		NVMEADM_C_EXCL
+	},
+
+	{
 		"detach",
 		"detach blkdev(4D) from namespace(s) of a controller",
 		NULL,
 		NULL,
-		do_detach, usage_attach_detach, NULL,
+		do_detach_bd, usage_attach_detach_bd, NULL,
 		NVMEADM_C_EXCL
 	},
 	{
@@ -315,7 +357,7 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"attach blkdev(4D) to namespace(s) of a controller",
 		NULL,
 		NULL,
-		do_attach, usage_attach_detach, NULL,
+		do_attach_bd, usage_attach_detach_bd, NULL,
 		NVMEADM_C_EXCL
 	},
 	{
@@ -1030,25 +1072,30 @@ static void
 do_list_nsid(const nvme_process_arg_t *npa, nvme_ctrl_info_t *ctrl,
     nvme_ns_info_t *ns)
 {
-	const char *bd_addr, *disk = NULL;
+	const char *bd_addr, *disk = NULL, *state = NULL;
 	char *disk_path = NULL;
 	di_node_t ctrl_devi;
 
 	switch (nvme_ns_info_level(ns)) {
 	case NVME_NS_DISC_F_ALL:
 		disk = "unallocated";
+		state = "unallocated";
 		break;
 	case NVME_NS_DISC_F_ALLOCATED:
 		disk = "inactive";
+		state = "allocated";
 		break;
 	case NVME_NS_DISC_F_ACTIVE:
 		disk = "ignored";
+		state = "active";
 		break;
 	case NVME_NS_DISC_F_NOT_IGNORED:
 		disk = "unattached";
+		state = "active-usable";
 		break;
 	case NVME_NS_DISC_F_BLKDEV:
 		disk = "unknown";
+		state = "blkdev";
 		if (nvme_ns_info_bd_addr(ns, &bd_addr) &&
 		    nvme_ctrl_devi(npa->npa_ctrl, &ctrl_devi)) {
 			disk_path = nvme_dskname(ctrl_devi, bd_addr);
@@ -1064,6 +1111,7 @@ do_list_nsid(const nvme_process_arg_t *npa, nvme_ctrl_info_t *ctrl,
 		oarg.nloa_ctrl = ctrl;
 		oarg.nloa_ns = ns;
 		oarg.nloa_disk = disk_path;
+		oarg.nloa_state = state;
 
 		ofmt_print(npa->npa_ofmt, &oarg);
 	} else {
@@ -2795,7 +2843,7 @@ do_format_common(const nvme_process_arg_t *npa, uint32_t lbaf,
 		    npa->npa_name);
 	}
 
-	if (do_detach(npa) != 0) {
+	if (do_detach_bd(npa) != 0) {
 		errx(-1, "cannot %s %s due to namespace detach failure",
 		    npa->npa_cmd->c_name, npa->npa_name);
 	}
@@ -2806,7 +2854,7 @@ do_format_common(const nvme_process_arg_t *npa, uint32_t lbaf,
 		ret = -1;
 	}
 
-	if (do_attach(npa) != 0)
+	if (do_attach_bd(npa) != 0)
 		ret = -1;
 
 	return (ret);
@@ -2941,7 +2989,7 @@ do_secure_erase(const nvme_process_arg_t *npa)
 }
 
 static void
-usage_attach_detach(const char *c_name)
+usage_attach_detach_bd(const char *c_name)
 {
 	(void) fprintf(stderr, "%s <ctl>[/<ns>]\n\n"
 	    "  %c%s blkdev(4D) %s one or all namespaces of the "
@@ -2950,8 +2998,18 @@ usage_attach_detach(const char *c_name)
 	    c_name[0] == 'd' ? "from" : "to");
 }
 
+/*
+ * nvmeadm does not generate an error when trying to attach blkdev to something
+ * that already has it attached. Swallow that here.
+ */
+static boolean_t
+swallow_attach_bd_err(const nvme_process_arg_t *npa)
+{
+	return (nvme_ctrl_err(npa->npa_ctrl) == NVME_ERR_NS_BLKDEV_ATTACH);
+}
+
 static int
-do_attach(const nvme_process_arg_t *npa)
+do_attach_bd(const nvme_process_arg_t *npa)
 {
 	int rv;
 	nvme_ns_iter_t *iter = NULL;
@@ -2959,7 +3017,8 @@ do_attach(const nvme_process_arg_t *npa)
 	const nvme_ns_disc_t *disc;
 
 	if (npa->npa_ns != NULL) {
-		if (!nvme_ns_bd_attach(npa->npa_ns)) {
+		if (!nvme_ns_bd_attach(npa->npa_ns) &&
+		    !swallow_attach_bd_err(npa)) {
 			nvmeadm_warn(npa, "faild to attach %s", npa->npa_name);
 			return (-1);
 		}
@@ -2988,7 +3047,11 @@ do_attach(const nvme_process_arg_t *npa)
 			continue;
 		}
 
-		if (!nvme_ns_bd_attach(ns)) {
+		/*
+		 * nvmeadm has historically swallowed the case where you ask to
+		 * attach an already attached namespace.
+		 */
+		if (!nvme_ns_bd_attach(ns) && !swallow_attach_bd_err(npa)) {
 			nvmeadm_warn(npa, "failed to attach namespace "
 			    "%s/%u", npa->npa_name, nsid);
 			rv = -1;
@@ -3006,8 +3069,25 @@ do_attach(const nvme_process_arg_t *npa)
 	return (rv);
 }
 
+/*
+ * nvmeadm does not generate an error when trying to attach blkdev to something
+ * that already has it attached. Swallow that here.
+ */
+static boolean_t
+swallow_detach_bd_err(const nvme_process_arg_t *npa)
+{
+	switch (nvme_ctrl_err(npa->npa_ctrl)) {
+	case NVME_ERR_NS_UNALLOC:
+	case NVME_ERR_NS_CTRL_NOT_ATTACHED:
+	case NVME_ERR_NS_CTRL_ATTACHED:
+		return (B_TRUE);
+	default:
+		return (B_FALSE);
+	}
+}
+
 static int
-do_detach(const nvme_process_arg_t *npa)
+do_detach_bd(const nvme_process_arg_t *npa)
 {
 	int rv;
 	nvme_ns_iter_t *iter = NULL;
@@ -3015,7 +3095,8 @@ do_detach(const nvme_process_arg_t *npa)
 	const nvme_ns_disc_t *disc;
 
 	if (npa->npa_ns != NULL) {
-		if (!nvme_ns_bd_detach(npa->npa_ns)) {
+		if (!nvme_ns_bd_detach(npa->npa_ns) &&
+		    !swallow_detach_bd_err(npa)) {
 			nvmeadm_warn(npa, "failed to detach %s", npa->npa_name);
 			return (-1);
 		}
@@ -3040,9 +3121,9 @@ do_detach(const nvme_process_arg_t *npa)
 			continue;
 		}
 
-		if (!nvme_ns_bd_detach(ns)) {
-			nvmeadm_warn(npa, "failed to detach namespace "
-			    "%s/%u", npa->npa_name, nsid);
+		if (!nvme_ns_bd_detach(ns) && !swallow_detach_bd_err(npa)) {
+			nvmeadm_warn(npa, "failed to detach namespace %s/%u",
+			    npa->npa_name, nsid);
 			rv = -1;
 		}
 		nvme_ns_fini(ns);

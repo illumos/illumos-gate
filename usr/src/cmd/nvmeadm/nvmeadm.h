@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -105,6 +105,15 @@ typedef struct {
 } nvmeadm_features_t;
 
 typedef struct {
+	boolean_t ncn_use_flbas;
+	nvme_csi_t ncn_csi;
+	uint64_t ncn_size;
+	uint64_t ncn_cap;
+	uint32_t ncn_lba;
+	uint32_t ncn_nmic;
+} nvmeadm_create_ns_t;
+
+typedef struct {
 	const char *ngl_output;
 } nvmeadm_get_logpage_t;
 
@@ -174,6 +183,7 @@ typedef struct {
 	nvme_ctrl_info_t *nloa_ctrl;
 	nvme_ns_info_t *nloa_ns;
 	const char *nloa_disk;
+	const char *nloa_state;
 } nvmeadm_list_ofmt_arg_t;
 
 extern const ofmt_field_t nvmeadm_list_ctrl_ofmt[];
@@ -210,6 +220,22 @@ extern void nvmeadm_hdl_warn(const nvme_process_arg_t *, const char *,
     ...) __PRINTFLIKE(2);
 extern void nvmeadm_hdl_fatal(const nvme_process_arg_t *, const char *,
     ...) __PRINTFLIKE(2) __NORETURN;
+
+/*
+ * Namespace Management Commands
+ */
+extern int do_create_ns(const nvme_process_arg_t *);
+extern void optparse_create_ns(nvme_process_arg_t *);
+extern void usage_create_ns(const char *);
+
+extern int do_delete_ns(const nvme_process_arg_t *);
+extern void usage_delete_ns(const char *);
+
+extern int do_attach_ns(const nvme_process_arg_t *);
+extern void usage_attach_ns(const char *);
+
+extern int do_detach_ns(const nvme_process_arg_t *);
+extern void usage_detach_ns(const char *);
 
 /*
  * Vendor specific commands.

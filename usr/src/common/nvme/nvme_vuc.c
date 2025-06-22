@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -159,4 +159,4 @@ const nvme_field_info_t nvme_vuc_fields[] = {
 	}
 };
 
-size_t nvme_vuc_nfields = ARRAY_SIZE(nvme_vuc_fields);
+const size_t nvme_vuc_nfields = ARRAY_SIZE(nvme_vuc_fields);

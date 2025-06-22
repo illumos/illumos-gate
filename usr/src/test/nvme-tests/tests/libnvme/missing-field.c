@@ -10,12 +10,13 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
  * Verify that we generate the appropriate missing field error for the
- * non-vendor-specific request types.
+ * non-vendor-specific request types. Destructive requests are in
+ * missing-field-destruct.c.
  */
 
 #include <err.h>
@@ -48,8 +49,6 @@ main(void)
 	nvme_log_req_t *log_req = NULL;
 	nvme_get_feat_req_t *get_feat_req = NULL;
 	nvme_vuc_req_t *vuc_req = NULL;
-	nvme_fw_commit_req_t *fw_commit_req = NULL;
-	nvme_format_req_t *format_req = NULL;
 
 	libnvme_test_init(&nvme, &ctrl);
 
@@ -126,51 +125,6 @@ main(void)
 		    "fields error\n");
 	}
 	nvme_vuc_req_fini(vuc_req);
-
-	if (!nvme_fw_commit_req_init(ctrl, &fw_commit_req)) {
-		if (nvme_ctrl_err(ctrl) == NVME_ERR_FW_UNSUP_BY_DEV) {
-			warnx("TEST SKIPPED: device does not support firmware "
-			    "requests");
-		} else {
-			libnvme_test_ctrl_warn(ctrl, "failed to initialize fw "
-			    "commit request");
-			ret = EXIT_FAILURE;
-		}
-	} else if (nvme_fw_commit_req_exec(fw_commit_req)) {
-		warnx("TEST FAILED: fw commit request succeeded despite "
-		    "missing fields");
-		ret = EXIT_FAILURE;
-	} else if (!missing_field_err(ctrl, "fw commit request",
-	    NVME_ERR_FW_COMMIT_REQ_MISSING_FIELDS)) {
-		ret = EXIT_FAILURE;
-	} else {
-		(void) printf("TEST PASSED: fw commit request generated "
-		    "missing fields error\n");
-	}
-	nvme_fw_commit_req_fini(fw_commit_req);
-
-
-	if (!nvme_format_req_init(ctrl, &format_req)) {
-		if (nvme_ctrl_err(ctrl) == NVME_ERR_FORMAT_UNSUP_BY_DEV) {
-			warnx("TEST SKIPPED: device does not support format "
-			    "requests");
-		} else {
-			libnvme_test_ctrl_warn(ctrl, "failed to initialize "
-			    "format request");
-			ret = EXIT_FAILURE;
-		}
-	} else if (nvme_format_req_exec(format_req)) {
-		warnx("TEST FAILED: format request succeeded despite missing "
-		    "fields");
-		ret = EXIT_FAILURE;
-	} else if (!missing_field_err(ctrl, "format request",
-	    NVME_ERR_FORMAT_REQ_MISSING_FIELDS)) {
-		ret = EXIT_FAILURE;
-	} else {
-		(void) printf("TEST PASSED: format request generated missing "
-		    "fields error\n");
-	}
-	nvme_format_req_fini(format_req);
 
 	if (ret == EXIT_SUCCESS) {
 		(void) printf("All tests passed successfully\n");

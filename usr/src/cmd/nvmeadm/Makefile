@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
@@ -20,6 +20,7 @@ PROG= nvmeadm
 
 OBJS=	nvme_version.o	\
 	nvmeadm.o	\
+	nvmeadm_nsmgmt.o \
 	nvmeadm_ofmt.o	\
 	nvmeadm_print.o	\
 	nvmeadm_wdc.o	\

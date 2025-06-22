@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _NVME_COMMON_H
@@ -113,6 +113,8 @@ extern bool nvme_field_valid_nsid(const nvme_field_info_t *,
     const nvme_valid_ctrl_data_t *, uint64_t, char *, size_t);
 extern bool nvme_field_range_check(const nvme_field_info_t *, uint64_t,
     uint64_t, char *, size_t, uint64_t);
+extern bool nvme_field_mask_check(const nvme_field_info_t *, uint64_t, char *,
+    size_t, uint64_t);
 
 /*
  * Log page request information. The goal with these structures and fields is to
@@ -139,7 +141,7 @@ typedef enum {
 } nvme_log_req_field_t;
 
 extern const nvme_field_info_t nvme_log_fields[];
-extern size_t nvme_log_nfields;
+extern const size_t nvme_log_nfields;
 
 /*
  * We now use the field based information to have a common structure to define
@@ -211,7 +213,7 @@ struct nvme_log_page_info {
 };
 
 extern const nvme_log_page_info_t nvme_std_log_pages[];
-extern size_t nvme_std_log_npages;
+extern const size_t nvme_std_log_npages;
 
 /*
  * These are functions that can be used to compute information about what's
@@ -268,9 +270,9 @@ struct nvme_identify_info {
 };
 
 extern const nvme_field_info_t nvme_identify_fields[];
-extern size_t nvme_identify_nfields;
+extern const size_t nvme_identify_nfields;
 extern const nvme_identify_info_t nvme_identify_cmds[];
-extern size_t nvme_identify_ncmds;
+extern const size_t nvme_identify_ncmds;
 
 extern bool nvme_identify_info_supported(const nvme_identify_info_t *,
     const nvme_valid_ctrl_data_t *);
@@ -298,7 +300,7 @@ typedef enum {
 } nvme_vuc_req_field_t;
 
 extern const nvme_field_info_t nvme_vuc_fields[];
-extern size_t nvme_vuc_nfields;
+extern const size_t nvme_vuc_nfields;
 
 /*
  * Firmware download and commit related fields and routines.
@@ -309,7 +311,7 @@ typedef enum {
 } nvme_fw_load_req_field_t;
 
 extern const nvme_field_info_t nvme_fw_load_fields[];
-extern size_t nvme_fw_load_nfields;
+extern const size_t nvme_fw_load_nfields;
 
 extern bool nvme_fw_cmds_supported(const nvme_valid_ctrl_data_t *);
 extern uint32_t nvme_fw_load_granularity(const nvme_valid_ctrl_data_t *);
@@ -320,7 +322,7 @@ typedef enum {
 } nvme_fw_commit_req_field_t;
 
 extern const nvme_field_info_t nvme_fw_commit_fields[];
-extern size_t nvme_fw_commit_nfields;
+extern const size_t nvme_fw_commit_nfields;
 
 /*
  * Format NVM operations
@@ -332,7 +334,7 @@ typedef enum {
 } nvme_format_req_field_t;
 
 extern const nvme_field_info_t nvme_format_fields[];
-extern size_t nvme_format_nfields;
+extern const size_t nvme_format_nfields;
 
 extern bool nvme_format_cmds_supported(const nvme_valid_ctrl_data_t *);
 
@@ -348,7 +350,7 @@ typedef enum {
 } nvme_get_feat_req_field_t;
 
 extern const nvme_field_info_t nvme_get_feat_fields[];
-extern size_t nvme_get_feat_nfields;
+extern const size_t nvme_get_feat_nfields;
 
 /*
  * Common feature information.
@@ -392,10 +394,58 @@ struct nvme_feat_info {
 };
 
 extern const nvme_feat_info_t nvme_std_feats[];
-extern size_t nvme_std_nfeats;
+extern const size_t nvme_std_nfeats;
 
 extern nvme_feat_impl_t nvme_feat_supported(const nvme_feat_info_t *,
     const nvme_valid_ctrl_data_t *);
+
+/*
+ * Namespace Management and Namespace Attach Commands.
+ *
+ * These operations have their own sets of NVMe admin operations codes.
+ * Separately, they then each have a means of selecting what they operate on in
+ * dw10. Unlike other operations like Get Features or Get Log Page, these are
+ * broken into separate ioctls in the kernel. In libnvme, namespace attach has a
+ * single command, but namespace create and delete are treated separately.
+ */
+
+typedef enum {
+	NVME_NS_CREATE_REQ_FIELD_CSI = 0,
+	NVME_NS_CREATE_REQ_FIELD_NSZE,
+	NVME_NS_CREATE_REQ_FIELD_NCAP,
+	NVME_NS_CREATE_REQ_FIELD_FLBAS,
+	NVME_NS_CREATE_REQ_FIELD_NMIC
+} nvme_ns_create_req_field_t;
+
+typedef enum {
+	NVME_NS_DELETE_REQ_FIELD_NSID = 0
+} nvme_ns_delete_req_field_t;
+
+/*
+ * Strictly speaking some of these fields, such as the controller list, are
+ * specific to the type of sub-command put into the SEL field.
+ */
+typedef enum {
+	NVME_NS_ATTACH_REQ_FIELD_SEL = 0,
+	NVME_NS_ATTACH_REQ_FIELD_NSID,
+	NVME_NS_ATTACH_REQ_FIELD_DPTR
+} nvme_ns_attach_req_field_t;
+
+extern bool nvme_nsmgmt_cmds_supported(const nvme_valid_ctrl_data_t *);
+extern const nvme_field_info_t nvme_ns_attach_fields[];
+extern const size_t nvme_ns_attach_nfields;
+extern const nvme_field_info_t nvme_ns_create_fields[];
+extern const size_t nvme_ns_create_nfields;
+extern const nvme_field_info_t nvme_ns_delete_fields[];
+extern const size_t nvme_ns_delete_nfields;
+
+/*
+ * Allowed and required fields by CSI.
+ */
+extern const nvme_ns_create_req_field_t nvme_ns_create_fields_nvm_req[];
+extern const size_t nvme_ns_create_fields_nvm_nreq;
+extern const nvme_ns_create_req_field_t nvme_ns_create_fields_nvm_allow[];
+extern const size_t nvme_ns_create_fields_nvm_nallow;
 
 #ifdef __cplusplus
 }

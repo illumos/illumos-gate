@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -66,6 +66,7 @@ typedef enum nvme_list_ofmt_field {
 	NVME_LIST_NAMESPACE,
 	NVME_LIST_DISK,
 	NVME_LIST_UNALLOC,
+	NVME_LIST_NS_STATE
 } nvme_list_ofmt_field_t;
 
 static boolean_t
@@ -187,6 +188,9 @@ nvmeadm_list_nsid_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 			return (B_FALSE);
 		}
 		break;
+	case NVME_LIST_NS_STATE:
+		ret = strlcpy(buf, list->nloa_state, buflen);
+		break;
 	default:
 		warnx("internal programmer error: encountered unknown ofmt "
 		    "argument id 0x%x", ofmt_arg->ofmt_id);
@@ -221,6 +225,7 @@ const ofmt_field_t nvmeadm_list_nsid_ofmt[] = {
 	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvmeadm_list_common_ofmt_cb },
 	{ "NAMESPACE", 10, NVME_LIST_NAMESPACE, nvmeadm_list_nsid_ofmt_cb },
 	{ "DISK", 15, NVME_LIST_DISK, nvmeadm_list_nsid_ofmt_cb },
+	{ "NS-STATE", 10, NVME_LIST_NS_STATE, nvmeadm_list_nsid_ofmt_cb },
 	{ NULL, 0, 0, NULL }
 };
 

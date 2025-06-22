@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -72,7 +72,7 @@ const nvme_ioctl_unlock_t nvme_test_ns_unlock = {
 };
 
 static int
-nvme_ioctl_test_find_nsid(di_node_t di, uint32_t nsid)
+nvme_ioctl_test_find_nsid(di_node_t di, uint32_t nsid, int oflag)
 {
 	int fd;
 	const char *type;
@@ -113,7 +113,7 @@ nvme_ioctl_test_find_nsid(di_node_t di, uint32_t nsid)
 	}
 	di_devfs_path_free(mpath);
 
-	fd = open(path, O_RDWR);
+	fd = open(path, oflag);
 	if (fd < 0) {
 		err(EXIT_FAILURE, "failed to open minor path %s", path);
 	}
@@ -126,13 +126,13 @@ nvme_ioctl_test_find_nsid(di_node_t di, uint32_t nsid)
  * against. Translate that device into an fd.
  */
 int
-nvme_ioctl_test_get_fd(uint32_t nsid)
+nvme_ioctl_test_get_fd_flags(uint32_t nsid, int oflag)
 {
 	const char *dev, *errstr;
 	long long ll;
 
 	if (nvme_test_dev != NULL) {
-		return (nvme_ioctl_test_find_nsid(nvme_test_dev, nsid));
+		return (nvme_ioctl_test_find_nsid(nvme_test_dev, nsid, oflag));
 	}
 
 	dev = getenv(NVME_TEST_DEV_ENVVAR);
@@ -165,12 +165,18 @@ nvme_ioctl_test_get_fd(uint32_t nsid)
 	    di != DI_NODE_NIL; di = di_drv_next_node(di)) {
 		if (di_instance(di) == (int)ll) {
 			nvme_test_dev = di;
-			return (nvme_ioctl_test_find_nsid(di, nsid));
+			return (nvme_ioctl_test_find_nsid(di, nsid, oflag));
 		}
 	}
 
 	errx(EXIT_FAILURE, "failed to find %s environment variable device %s: "
 	    "cannot run test", NVME_TEST_DEV_ENVVAR, dev);
+}
+
+int
+nvme_ioctl_test_get_fd(uint32_t nsid)
+{
+	return (nvme_ioctl_test_get_fd_flags(nsid, O_RDWR));
 }
 
 /*
@@ -219,4 +225,47 @@ nvme_ioctl_test_thr_blocked(thread_t thr)
 		return (false);
 
 	return (strcmp(name, "ioctl") == 0);
+}
+
+const char *
+nvme_ioctl_test_cmdstr(int cmd)
+{
+	switch (cmd) {
+	case NVME_IOC_CTRL_INFO:
+		return ("NVME_IOC_CTRL_INFO");
+	case NVME_IOC_IDENTIFY:
+		return ("NVME_IOC_IDENTIFY");
+	case NVME_IOC_GET_LOGPAGE:
+		return ("NVME_IOC_GET_LOGPAGE");
+	case NVME_IOC_GET_FEATURE:
+		return ("NVME_IOC_GET_FEATURE");
+	case NVME_IOC_FORMAT:
+		return ("NVME_IOC_FORMAT");
+	case NVME_IOC_BD_DETACH:
+		return ("NVME_IOC_BD_DETACH");
+	case NVME_IOC_BD_ATTACH:
+		return ("NVME_IOC_BD_ATTACH");
+	case NVME_IOC_FIRMWARE_DOWNLOAD:
+		return ("NVME_IOC_FIRMWARE_DOWNLOAD");
+	case NVME_IOC_FIRMWARE_COMMIT:
+		return ("NVME_IOC_FIRMWARE_COMMIT");
+	case NVME_IOC_PASSTHRU:
+		return ("NVME_IOC_PASSTHRU");
+	case NVME_IOC_NS_INFO:
+		return ("NVME_IOC_NS_INFO");
+	case NVME_IOC_LOCK:
+		return ("NVME_IOC_LOCK");
+	case NVME_IOC_UNLOCK:
+		return ("NVME_IOC_UNLOCK");
+	case NVME_IOC_CTRL_ATTACH:
+		return ("NVME_IOC_CTRL_ATTACH");
+	case NVME_IOC_CTRL_DETACH:
+		return ("NVME_IOC_CTRL_DETACH");
+	case NVME_IOC_NS_CREATE:
+		return ("NVME_IOC_NS_CREATE");
+	case NVME_IOC_NS_DELETE:
+		return ("NVME_IOC_NS_DELETE");
+	default:
+		return ("unknown");
+	}
 }

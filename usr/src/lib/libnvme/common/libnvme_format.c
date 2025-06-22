@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -52,7 +52,7 @@ nvme_format_req_init(nvme_ctrl_t *ctrl, nvme_format_req_t **reqp)
 	if (req == NULL) {
 		int e = errno;
 		return (nvme_ctrl_error(ctrl, NVME_ERR_NO_MEM, e, "failed to "
-		    "allocate memory for a new nvme_log_req_t: %s",
+		    "allocate memory for a new nvme_format_req_t: %s",
 		    strerror(e)));
 	}
 

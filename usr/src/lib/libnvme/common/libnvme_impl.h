@@ -373,6 +373,44 @@ struct nvme_format_req {
 };
 
 /*
+ * Namespace Attach request.
+ */
+struct nvme_ns_attach_req {
+	nvme_ctrl_t *nar_ctrl;
+	uint32_t nar_need;
+	uint32_t nar_nsid;
+	uint32_t nar_sel;
+};
+
+/*
+ * Namespace Delete request.
+ */
+struct nvme_ns_delete_req {
+	nvme_ctrl_t *ndr_ctrl;
+	uint32_t ndr_need;
+	uint32_t ndr_nsid;
+};
+
+/*
+ * Namespace Create request.
+ */
+struct nvme_ns_create_req {
+	nvme_ctrl_t *ncr_ctrl;
+	nvme_csi_t ncr_csi;
+	uint32_t ncr_need;
+	uint32_t ncr_allow;
+	uint64_t ncr_nsze;
+	uint64_t ncr_ncap;
+	uint32_t ncr_flbas;
+	uint32_t ncr_nmic;
+	/*
+	 * The following are set on exec.
+	 */
+	bool ncr_results_valid;
+	uint32_t ncr_nsid;
+};
+
+/*
  * WDC e6 request. This was made an opaque request style structure to try to
  * safeguard us against future changes where something like the optional mode
  * byte was required (right now it's just always zero).

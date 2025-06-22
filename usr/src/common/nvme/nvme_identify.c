@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -85,7 +85,7 @@ const nvme_field_info_t nvme_identify_fields[] = {
 	}
 };
 
-size_t nvme_identify_nfields = ARRAY_SIZE(nvme_identify_fields);
+const size_t nvme_identify_nfields = ARRAY_SIZE(nvme_identify_fields);
 
 static bool
 nvme_identify_support_nsid(const nvme_valid_ctrl_data_t *data)
@@ -152,7 +152,7 @@ const nvme_identify_info_t nvme_identify_cmds[] = { {
 	.nii_fields = (1 << NVME_ID_REQ_F_CTRLID)
 } };
 
-size_t nvme_identify_ncmds = ARRAY_SIZE(nvme_identify_cmds);
+const size_t nvme_identify_ncmds = ARRAY_SIZE(nvme_identify_cmds);
 
 bool
 nvme_identify_info_supported(const nvme_identify_info_t *info,

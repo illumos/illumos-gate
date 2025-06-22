@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -131,6 +131,36 @@
  * When we opt to perform a firmware commit, then all we check is that the
  * command is supported, that we aren't going to a read-only slot when saving,
  * or related.
+ *
+ * Namesapce Management
+ * --------------------
+ *
+ * Namespace management consists of four commands: namespace create, namespace
+ * delete, controller attach, and controller detach. Namespace create is the
+ * most complicated of these. A namespace create must first validate that we
+ * support namespace management. After that, we have to validate all of the
+ * different fields that will be submitted through the identify namespace data
+ * structure.
+ *
+ * We do not attempt to validate whether or not there is sufficient capacity to
+ * create the namespace and leave that to the controller and the backend.
+ * However, we do verify if the request does require thin provisioning support.
+ * Most other fields are basic range checks against what's supported in the
+ * version. We are looser on the LBA format for a create namespace to allow for
+ * more flexibility and just require that the LBA is within range for the
+ * device.
+ *
+ * The most notable piece here is the CSI. Create namespace adds the notion of a
+ * CSI starting in NVME 2.0. Prior to this, it is implicitly the NVM CSI. Right
+ * now the kernel only supports the NVM command set and therefore restricts
+ * namespace creation to that CSI.
+ *
+ * Namespace delete is straightforward. The only thing that we need to validate
+ * is that the device supports namespace commands as the surrounding kernel code
+ * ensures that the namespace is both valid and in the correct state. Attaching
+ * and detaching a controller to a namespace is the same as we currently only
+ * support attaching and detaching with the controller that we're talking
+ * through.
  */
 
 #include <sys/sysmacros.h>
@@ -933,6 +963,135 @@ nvme_validate_fw_commit(nvme_t *nvme, nvme_ioctl_fw_commit_t *fw)
 	    fw->fwc_action == NVME_FWC_SAVE_ACTIVATE)) {
 		return (nvme_ioctl_error(&fw->fwc_common,
 		    NVME_IOCTL_E_RO_FW_SLOT, 0, 0));
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Right now we do not allow a controller list to be specified and only will
+ * ever insert our own local controller's ID into the list.
+ */
+boolean_t
+nvme_validate_ctrl_attach_detach_ns(nvme_t *nvme, nvme_ioctl_common_t *com)
+{
+	nvme_valid_ctrl_data_t ctrl_data;
+
+	ctrl_data.vcd_vers = &nvme->n_version;
+	ctrl_data.vcd_id = nvme->n_idctl;
+
+	if (!nvme_fw_cmds_supported(&ctrl_data)) {
+		return (nvme_ioctl_error(com, NVME_IOCTL_E_CTRL_NS_MGMT_UNSUP,
+		    0, 0));
+	}
+
+	return (B_TRUE);
+}
+
+boolean_t
+nvme_validate_ns_delete(nvme_t *nvme, nvme_ioctl_common_t *com)
+{
+	nvme_valid_ctrl_data_t ctrl_data;
+
+	ctrl_data.vcd_vers = &nvme->n_version;
+	ctrl_data.vcd_id = nvme->n_idctl;
+
+	if (!nvme_fw_cmds_supported(&ctrl_data)) {
+		return (nvme_ioctl_error(com, NVME_IOCTL_E_CTRL_NS_MGMT_UNSUP,
+		    0, 0));
+	}
+
+	return (B_TRUE);
+}
+
+static const nvme_validate_info_t nvme_valid_ns_create_nsze = {
+	nvme_ns_create_fields, NVME_NS_CREATE_REQ_FIELD_NSZE, 0,
+	NVME_IOCTL_E_NS_CREATE_NSZE_RANGE, 0, 0
+};
+
+static const nvme_validate_info_t nvme_valid_ns_create_ncap = {
+	nvme_ns_create_fields, NVME_NS_CREATE_REQ_FIELD_NCAP, 0,
+	NVME_IOCTL_E_NS_CREATE_NCAP_RANGE, 0, 0
+};
+
+static const nvme_validate_info_t nvme_valid_ns_create_csi = {
+	nvme_ns_create_fields, NVME_NS_CREATE_REQ_FIELD_CSI, 0,
+	NVME_IOCTL_E_NS_CREATE_CSI_RANGE, NVME_IOCTL_E_NS_CREATE_CSI_UNSUP, 0
+};
+
+static const nvme_validate_info_t nvme_valid_ns_create_nmic = {
+	nvme_ns_create_fields, NVME_NS_CREATE_REQ_FIELD_NMIC, 0,
+	NVME_IOCTL_E_NS_CREATE_NMIC_RANGE, 0, 0
+};
+
+boolean_t
+nvme_validate_ns_create(nvme_t *nvme, nvme_ioctl_ns_create_t *ioc)
+{
+	const nvme_identify_nsid_t *idns = nvme->n_idcomns;
+	nvme_valid_ctrl_data_t ctrl_data;
+
+	ctrl_data.vcd_vers = &nvme->n_version;
+	ctrl_data.vcd_id = nvme->n_idctl;
+
+	if (!nvme_nsmgmt_cmds_supported(&ctrl_data)) {
+		return (nvme_ioctl_error(&ioc->nnc_common,
+		    NVME_IOCTL_E_CTRL_NS_MGMT_UNSUP, 0, 0));
+	}
+
+	if (!nvme_validate_one_field(&ioc->nnc_common, ioc->nnc_nsze,
+	    &nvme_valid_ns_create_nsze, &ctrl_data, 0)) {
+		return (B_FALSE);
+	}
+
+	if (!nvme_validate_one_field(&ioc->nnc_common, ioc->nnc_ncap,
+	    &nvme_valid_ns_create_ncap, &ctrl_data, 0)) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * Verify whether or not thin provisioning is supported. Thin
+	 * provisioning was added in version 1.0. Because we have already
+	 * validated NS management commands are supported, which requires
+	 * version 1.2, we can just check the identify controller bit.
+	 */
+	if (ioc->nnc_nsze > ioc->nnc_ncap && idns->id_nsfeat.f_thin == 0) {
+		return (nvme_ioctl_error(&ioc->nnc_common,
+		    NVME_IOCTL_E_CTRL_THIN_PROV_UNSUP, 0, 0));
+	}
+
+	/*
+	 * We do CSI validation in two parts. The first is a standard CSI
+	 * validation technique to see if we have a non-zero value that we have
+	 * a minimum version that we support, etc. The second is then the
+	 * constraint that we have today in the driver that we only support
+	 * creating namespaces whose CSI are of type NVM.
+	 */
+	if (!nvme_validate_one_field(&ioc->nnc_common, ioc->nnc_csi,
+	    &nvme_valid_ns_create_csi, &ctrl_data, 0)) {
+		return (B_FALSE);
+	}
+
+	if (ioc->nnc_csi != NVME_CSI_NVM) {
+		return (nvme_ioctl_error(&ioc->nnc_common,
+		    NVME_IOCTL_E_DRV_CSI_UNSUP, 0, 0));
+	}
+
+	/*
+	 * See our notes around the LBA format in nvme_validate_format(). Unlike
+	 * format, today we don't validate that the driver can actually use it.
+	 * We try to be a little more flexible and just ensure that this is a
+	 * valid choice. However, we currently treat the field as just
+	 * indicating the LBA format and currently don't support the NVMe 2.0
+	 * host behavior around the extended LBA format size.
+	 */
+	if (ioc->nnc_flbas > idns->id_nlbaf) {
+		return (nvme_ioctl_error(&ioc->nnc_common,
+		    NVME_IOCTL_E_NS_CREATE_FLBAS_RANGE, 0, 0));
+	}
+
+	if (!nvme_validate_one_field(&ioc->nnc_common, ioc->nnc_nmic,
+	    &nvme_valid_ns_create_nmic, &ctrl_data, 0)) {
+		return (B_FALSE);
 	}
 
 	return (B_TRUE);
