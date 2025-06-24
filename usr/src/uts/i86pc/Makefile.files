@@ -246,6 +246,8 @@ AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
 
 PCI_PRD_OBJS += pci_prd_i86pc.o pci_memlist.o
 
+I86PC_KTEST_OBJS =	i86pc_ktest.o
+
 #
 #	Build up defines and paths.
 #

@@ -244,6 +244,7 @@ DRV_KMODS	+= dr
 DRV_KMODS	+= ioat
 DRV_KMODS	+= fipe
 DRV_KMODS	+= vmm
+DRV_KMODS	+= i86pc_ktest
 
 DRV_KMODS	+= cpudrv
 

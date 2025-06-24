@@ -249,3 +249,8 @@ tests = ['mac_parsing', 'mac_ktest']
 [/opt/os-tests/tests/ktest]
 user = root
 tests = ['stream_ktest', 'ktest_ktest']
+
+[/opt/os-tests/tests/comm_page]
+user = root
+pre = comm_page_pre
+tests = ['comm_page_ktest']

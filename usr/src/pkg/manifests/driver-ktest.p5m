@@ -35,6 +35,8 @@ file path=usr/include/sys/ktest.h mode=0644
 dir  path=usr/kernel/misc group=sys
 dir  path=usr/kernel/misc/ktest group=sys
 dir  path=usr/kernel/misc/ktest/$(ARCH64) group=sys
+$(i386_ONLY)file path=usr/kernel/misc/ktest/$(ARCH64)/i86pc_ktest group=sys \
+    mode=0755
 file path=usr/kernel/misc/ktest/$(ARCH64)/ktest_ktest group=sys mode=0755
 file path=usr/kernel/misc/ktest/$(ARCH64)/mac_ktest group=sys mode=0755
 file path=usr/kernel/misc/ktest/$(ARCH64)/stream_ktest group=sys mode=0755

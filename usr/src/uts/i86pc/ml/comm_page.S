@@ -12,6 +12,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -75,14 +76,15 @@ comm_page_t comm_page;
 	.fill	1, 8, 0
 	DGDEF2(tsc_ncpu, 4)
 	.fill	1, 4, 0
-	/* _cp_pad */
+	/* _cp_pad0 */
 	.fill	1, 4, 0
 	DGDEF2(hrestime, _MUL(2, 8))
 	.fill	2, 8, 0
+	/* _cp_pad1 */
+	.fill	502, 8, 0
 	DGDEF2(tsc_sync_tick_delta, _MUL(NCPU, 8))
 	.fill	_CONST(NCPU), 8, 0
-
-	/* pad out the rest of the page from the struct end */
-	.fill	_CONST(COMM_PAGE_SIZE - COMM_PAGE_S_SIZE), 1, 0
+	/* _cp_pad2 */
+	.fill	_CONST(COMM_PAGE_S_SIZE - COMM_PAGE_PAD2), 1, 0
 
 #endif /* defined(_GENCTF) */
