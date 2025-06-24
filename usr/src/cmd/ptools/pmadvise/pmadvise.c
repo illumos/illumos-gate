@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -140,6 +141,8 @@
  */
 #define	ROUNDUP_KB(x)	(((x) + (KILOBYTE - 1)) / KILOBYTE)
 
+#define	INVALID_ADDRESS		(uintptr_t)(-1)
+
 #define	NO_ADVICE		0
 
 /*
@@ -186,6 +189,8 @@ static	struct ps_prochandle *Pr;
 
 static	lwpstack_t *stacks;
 static	uint_t	nstacks;
+
+static uintptr_t comm_page = INVALID_ADDRESS;
 
 static char	*suboptstr[] = {
 	"private",
@@ -593,6 +598,13 @@ create_maplist(void *arg, const prmap_t *pmp, const char *object_name)
 		lname = anon_name(newmap->label, Psp, stacks, nstacks,
 		    pmp->pr_vaddr, pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid,
 		    &newmap->mtypes);
+	}
+
+	if (lname == NULL && comm_page != INVALID_ADDRESS &&
+	    pmp->pr_vaddr == comm_page) {
+		(void) strlcpy(newmap->label, "  [ comm ]",
+		    sizeof (newmap->label));
+		lname = newmap->label;
 	}
 
 	/*
@@ -1089,6 +1101,8 @@ main(int argc, char **argv)
 				    "be available\n"),
 				    progname);
 			}
+
+			comm_page = Pgetauxval(Pr, AT_SUN_COMMPAGE);
 
 			/*
 			 * Create linked list of mappings for current process
