@@ -24,9 +24,7 @@ include ../Makefile.ctf
 CLEANFILES += $(OBJS)
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lvnd
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 all	:= TARGET += all
 clean	:= TARGET += clean
@@ -46,8 +44,6 @@ $(PROG): $(OBJS)
 
 clean: $(SUBDIRS)
 	-$(RM) $(CLEANFILES)
-
-lint: lint_PROG $(SUBDIRS)
 
 %.o: ../%.c
 	$(COMPILE.c) $<

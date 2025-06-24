@@ -30,8 +30,7 @@ SMOFF +=	free
 
 SRCDIR =	../common
 
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 .KEEP_STATE:
 

@@ -84,14 +84,11 @@ ZGUIDANCE =	-Wl,-zguidance=nounused
 # not linted
 SMATCH=off
 
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include ../../../../Makefile.targ
 include ../../../../Makefile.usdt

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2018 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -19,8 +19,7 @@ include $(SRC)/cmd/Makefile.cmd
 #
 # Force c99 for everything
 #
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+CSTD=		$(CSTD_GNU99)
 
 #
 # Deal with odd lint bits.
