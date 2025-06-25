@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -18,8 +18,9 @@
  * the series of passed in arguments from the 'oclo' program. Arguments are
  * passed as a string that represents the flags that were originally verified
  * pre-fork/exec via fcntl(F_GETFD). In addition, anything that was originally
- * closed because it had FD_CLOFORK set was reopened with the same flags so we
- * can verify that things with only FD_CLOFORK survive exec.
+ * closed because it had FD_CLOFORK set was reopened with the same flags. This
+ * allows us to verify that the combinations worked and that FD_CLOFORK was
+ * properly cleared.
  */
 
 #include <err.h>
@@ -38,11 +39,19 @@ verify_fdwalk_cb(void *arg, int fd)
 	return (0);
 }
 
+/*
+ * Our flags may have FD_CLOFORK set in them (anything with FD_CLOEXEC Should
+ * not exist by definition). FD_CLOFORK is supposed to be cleared on exec. We
+ * still indicate which file descriptors FD_CLOFORK so we can check where it
+ * wasn't cleared.
+ */
 static bool
 verify_flags(int fd, int exp_flags)
 {
 	bool fail = (exp_flags & FD_CLOEXEC) != 0;
 	int flags = fcntl(fd, F_GETFD, NULL);
+	bool clofork = (exp_flags & FD_CLOFORK) != 0;
+	exp_flags &= ~FD_CLOFORK;
 
 	if (flags < 0) {
 		int e = errno;
@@ -71,6 +80,12 @@ verify_flags(int fd, int exp_flags)
 	if (fail) {
 		warnx("TEST FAILED: post-fork fd %d: received flags %d, but "
 		    "expected to fail based on flags %d", fd, flags, exp_flags);
+		return (false);
+	}
+
+	if (clofork && (flags & FD_CLOFORK) != 0) {
+		warnx("TEST FAILED: post-fork fd %d (flags %d) retained "
+		    "FD_CLOFORK, but it should have been cleared", fd, flags);
 		return (false);
 	}
 

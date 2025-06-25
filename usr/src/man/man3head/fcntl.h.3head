@@ -42,9 +42,9 @@
 .\"
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.TH FCNTL.H 3HEAD "June 21, 2024"
+.TH FCNTL.H 3HEAD "June 25, 2025"
 .SH NAME
 fcntl.h, fcntl \- file control options
 .SH SYNOPSIS
@@ -305,6 +305,14 @@ Close the file descriptor upon execution of an \fBexec\fR function (see
 .RS 14n
 Close the file descriptor in any child process created with the \fBfork\fR(2)
 family functions.
+When a process executes an \fBexec\fR function (see \fBexec\fR(2)), this flag is
+not inherited by the new process image. All file descriptors with this flag set
+remain open (unless \fBFD_CLOEXEC\fR is specified) but have the
+\fBFD_CLOFORK\fR flag cleared.
+.sp
+While the majority of systems clear the \fBFD_CLOFORK\fR flag on execution of an
+\fBexec\fR family function, this is a deviation from the original POSIX 2024
+specification.
 .RE
 
 .sp

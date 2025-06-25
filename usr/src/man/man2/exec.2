@@ -45,9 +45,9 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright 2015, Joyent, Inc.
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd June 21, 2024
+.Dd June 25, 2025
 .Dt EXEC 2
 .Os
 .Sh NAME
@@ -302,12 +302,18 @@ alignment bytes are included in this total.
 File descriptors open in the calling process image remain open in the new
 process image, except for those whose close-on-exec flag
 .Dv FD_CLOEXEC
-is set; see
-.Xr fcntl 2 .
-For those file descriptors that remain open, all attributes of the open file
-description, including file locks and the disposition of the close-on-fork flag
-.Dv FD_CLOFORK ,
-remain unchanged.
+is set.
+For those file descriptors that remain open, most attributes of the open file
+descriptor, including file locks, remain unchanged; however, the close-on-fork
+flag
+.Dv FD_CLOFORK
+is cleared from all file descriptors.
+See
+.Xr fcntl 2
+for more information on
+.Dv FD_CLOEXEC
+and
+.Dv FD_CLOFORK .
 .Pp
 The preferred hardware address translation size
 .Po
