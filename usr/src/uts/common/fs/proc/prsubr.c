@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 MNX Cloud, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -852,8 +852,34 @@ prunlock(prnode_t *pnp)
 	if ((p->p_flag & SKILLED) &&
 	    !(p->p_flag & SEXITING) &&
 	    !(pcp->prc_flags & PRC_DESTROY) &&
-	    !((pcp->prc_flags & PRC_LWP) && pcp->prc_tslot == -1))
-		(void) pr_setrun(pnp, 0);
+	    !((pcp->prc_flags & PRC_LWP) && pcp->prc_tslot == -1)) {
+		int err = pr_setrun(pnp, 0);
+		/*
+		 * EBUSY here means either the process was not stopped by /proc
+		 * or there is an agent lwp.  If there's an agent lwp, we don't
+		 * need to do anything as it will run and witness the SIGKILL.
+		 * However, if there's no agent lwp and the process was not
+		 * stopped by /proc, it may have been stopped by SIGSTOP; try
+		 * getting lwps running with TS_XSTART to undo SIGSTOP effect.
+		 *
+		 * Notably, other TS_* bits are inappropriate here:
+		 * * Do not set TS_PSTART; pr_setrun() above would have already
+		 *   set this if it did anything for this process.
+		 * * Do not set TS_CSTART or TS_UNPAUSE; lwps may be stopped by
+		 *   PR_SUSPEND for many reasons. Some cases, like holdlwps(),
+		 *   will resume the process before the corresponding syscall
+		 *   returns. Other cases, like dumping core, the suspender
+		 *   will tear down the lwps as it completes.
+		 * * Do not set TS_RESUME out of caution; not sure about the
+		 *   consequences of a process going away during CPR resume and
+		 *   CPR should set the process running eventually.
+		 * * Do not set TS_CREATE because lwp creation expects threads
+		 *   to remain paused until lwp completes.
+		 */
+		if (err == EBUSY && p->p_agenttp == NULL) {
+			runlwps(p, TS_XSTART);
+		}
+	}
 	prunmark(p);
 	mutex_exit(&p->p_lock);
 }
