@@ -5,6 +5,7 @@
 \ All rights reserved.
 \ Copyright 2019 Joyent, Inc.
 \ Copyright 2023 MNX Cloud, Inc.
+\ Copyright 2025 Edgecast Cloud LLC.
 \
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
@@ -570,33 +571,42 @@ also menu-infrastructure definitions
 	then
 ;
 
-\ Takes a single integer on the stack and updates the timeout display. The
-\ integer must be between 0 and 9 (we will only update a single digit in the
-\ source message).
-\
+\ output or clear the line
+\ if N is 0, we output spaces.
+: menu-timeout-draw ( N c-addr/u -- N )
+	>R	( length to return stack )
+	over	( N addr N )
+	0= if	\ if N is 0, output spaces
+		drop
+		R> spaces
+	else
+		R> type
+	then
+;
+
+\ Takes a integer on the stack and updates the timeout display.
 : menu-timeout-update ( N -- )
 
 	\ Enforce minimum
 	dup 0 < if drop 0 then
 
+	s" Autoboot in " menu-timeout-draw
+	dup 0 <# #S #> menu-timeout-draw
+	s"  second" menu-timeout-draw
+	dup 1 > if s" s" menu-timeout-draw then
 	s" headnode" getenv? if
 		do_ipxe if
-			s" Autoboot in N seconds from PXE. [Space] to pause" ( n -- n c-addr/u )
+			s"  from PXE"
 		else
-			s" Autoboot in N seconds from the USB Key. [Space] to pause" ( n -- n c-addr/u )
+			s"  from the USB Key"
 		then
-	else
-		s" Autoboot in N seconds. [Space] to pause" ( n -- n c-addr/u )
+		menu-timeout-draw
 	then
+	s" ." menu-timeout-draw
 
-	dup 0> if
-		s" Autoboot in " type
-		dup . s" second" type
-		1 > if [char] s emit then
-		s" . [Space] to pause " type
-	else
-		drop 40 spaces \ erase message
-	then
+	s"  [Space] to pause" menu-timeout-draw
+	space	\ clear last char from previous output
+	drop
 
 	at-bl
 ;
