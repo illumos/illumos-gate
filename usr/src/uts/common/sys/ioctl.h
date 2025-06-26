@@ -40,11 +40,11 @@ extern "C" {
  *	BSD flags into this file creates compilation problems
  *	with flags such as ECHO, NL1 etc., if termio.h and ioctl.h
  *	are included by the same file. Since these two files can
- *	be only included by System V applications, /usr/inclule/sys/ioctl.h
+ *	be only included by System V applications, /usr/include/sys/ioctl.h
  *	will be System V mode and all the BSD flags will be turned off
  *	using #ifdef BSD_COMP. This file will also exist in
  *	/usr/ucbinclude/sys/ioctl.h for BSD applications but without the
- *	BSD flags turned off. System V appliactions can use ioctl.h without
+ *	BSD flags turned off. System V applications can use ioctl.h without
  *	any changes, System V applications requiring BSD flags should
  *	-D BSD_COMP when compiling (and be warned about the common
  *	flags between System V and BSD) and BSD applications should
