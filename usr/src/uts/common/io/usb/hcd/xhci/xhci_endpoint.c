@@ -1231,7 +1231,7 @@ xhci_endpoint_reschedule_periodic(xhci_t *xhcip, xhci_device_t *xd,
 	ret = xhci_endpoint_schedule(xhcip, xd, xep, xt, B_TRUE);
 	if (ret != 0) {
 		xhci_log(xhcip, "!failed to reschedule periodic endpoint %u "
-		    "(type %u) on slot %d: %d\n", xep->xep_num, xep->xep_type,
+		    "(type %u) on slot %d: %d", xep->xep_num, xep->xep_type,
 		    xd->xd_slot, ret);
 	}
 	mutex_exit(&xhcip->xhci_lock);

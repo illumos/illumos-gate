@@ -1243,7 +1243,7 @@ xhci_read_params(xhci_t *xhcip)
 	xcap->xcap_max_ports = XHCI_HCS1_N_PORTS(struc1);
 	if (xcap->xcap_max_ports > MAX_PORTS) {
 		xhci_error(xhcip, "Root hub has %d ports, but system only "
-		    "supports %d, limiting to %d\n", xcap->xcap_max_ports,
+		    "supports %d, limiting to %d", xcap->xcap_max_ports,
 		    MAX_PORTS, MAX_PORTS);
 		xcap->xcap_max_ports = MAX_PORTS;
 	}
@@ -1290,7 +1290,7 @@ xhci_read_params(xhci_t *xhcip)
 		psize = 0x2000;
 	} else {
 		xhci_error(xhcip, "Encountered host page size that the driver "
-		    "doesn't know how to handle: %lx\n", ps);
+		    "doesn't know how to handle: %lx", ps);
 		return (B_FALSE);
 	}
 
@@ -1532,7 +1532,7 @@ xhci_port_count(xhci_t *xhcip)
 			fusb2 = first;
 		} else {
 			xhci_error(xhcip, "encountered port capabilities with "
-			    "unknown USB version: %x.%x\n", maj, min);
+			    "unknown USB version: %x.%x", maj, min);
 		}
 	}
 

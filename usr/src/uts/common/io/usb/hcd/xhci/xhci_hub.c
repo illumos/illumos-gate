@@ -581,14 +581,14 @@ xhci_root_hub_ctrl_req(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 			xhci_root_hub_get_descriptor(xhcip, ucrp);
 			break;
 		default:
-			xhci_error(xhcip, "Unhandled hub request: 0x%x\n",
+			xhci_error(xhcip, "Unhandled hub request: 0x%x",
 			    ucrp->ctrl_bRequest);
 			ret = USB_CR_NOT_SUPPORTED;
 			break;
 		}
 		break;
 	default:
-		xhci_error(xhcip, "Unhandled hub request type: %x\n",
+		xhci_error(xhcip, "Unhandled hub request type: %x",
 		    ucrp->ctrl_bmRequestType);
 		ret = USB_CR_NOT_SUPPORTED;
 		break;
