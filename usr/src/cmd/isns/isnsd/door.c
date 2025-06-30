@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include    <libxml/xmlreader.h>
 #include    <libxml/xmlwriter.h>
 #include    <libxml/tree.h>
@@ -1427,7 +1431,7 @@ setup_mgmt_door(msg_queue_t *sys_q)
 				"<DiscoveryDomain name=\"default\">"
 				"</DiscoveryDomain></isnsObject></get>"
 				"</isnsRequest>";
-		darg.data_size = xmlStrlen((xmlChar *)darg.data_ptr) + 1;
+		darg.data_size = xmlStrlen((xmlChar *)darg.data_ptr);
 		darg.desc_ptr = NULL;
 		darg.desc_num = 0;
 		darg.rbuf = NULL;

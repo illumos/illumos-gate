@@ -20,22 +20,9 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
-* and Distribution License, v.1,  (the "License").
-
-* You may not use this file except in compliance with the License.
-
-* You can obtain a copy of the License at available 
-* at http://opensource.org/licenses/CDDL-1.0
-
-* See the License for the specific language governing permissions and 
-* limitations under the License.
-*/
-
-/*
+ * Copyright 2014-2017 Cavium, Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include "qede.h"
@@ -2244,7 +2231,7 @@ qede_mac_set_property(void *        arg,
 			qede->forced_speed_10G = *(uint8_t *)pr_val;
 		}
 		if (qede->qede_state == QEDE_STATE_STARTED) {
-			qede_configure_link(qede,1);
+			qede_configure_link(qede, true);
 		} else {
 			mutex_exit(&qede->gld_lock);
 			return (0);

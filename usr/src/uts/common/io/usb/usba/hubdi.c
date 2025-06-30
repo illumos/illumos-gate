@@ -2345,7 +2345,6 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	usb_port_t port;
 	hubd_t *hubd;
 	major_t hub_major = ddi_name_to_major("hubd");
-	major_t hwahc_major = ddi_name_to_major("hwahc");
 	major_t usbmid_major = ddi_name_to_major("usb_mid");
 
 	/*
@@ -2362,12 +2361,8 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 			return (DDI_WALK_CONTINUE);
 		}
 
-		/* TODO: DWA device may also need special handling */
-
-		if (((ddi_driver_major(dip) != hub_major) &&
-		    (ddi_driver_major(dip) != hwahc_major)) ||
+		if ((ddi_driver_major(dip) != hub_major) ||
 		    !i_ddi_devi_attached(dip)) {
-
 			return (DDI_WALK_PRUNECHILD);
 		}
 	}
@@ -2381,35 +2376,19 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	/* walk child list and remove nodes with flag DEVI_DEVICE_REMOVED */
 	ndi_devi_enter(dip);
 
-	if (ddi_driver_major(dip) != hwahc_major) {
-		/* for normal usb hub or root hub */
-		mutex_enter(HUBD_MUTEX(hubd));
-		for (port = 1; port <= hubd->h_nports; port++) {
-			dev_info_t *cdip = hubd->h_children_dips[port];
+	/* for normal usb hub or root hub */
+	mutex_enter(HUBD_MUTEX(hubd));
+	for (port = 1; port <= hubd->h_nports; port++) {
+		dev_info_t *cdip = hubd->h_children_dips[port];
 
-			if (cdip == NULL || DEVI_IS_DEVICE_REMOVED(cdip) == 0) {
-
-				continue;
-			}
-
-			(void) hubd_delete_child(hubd, port, NDI_DEVI_REMOVE,
-			    B_TRUE);
+		if (cdip == NULL || DEVI_IS_DEVICE_REMOVED(cdip) == 0) {
+			continue;
 		}
-		mutex_exit(HUBD_MUTEX(hubd));
-	} else {
-		/* for HWA */
-		if (hubd->h_cleanup_child != NULL) {
-			if (hubd->h_cleanup_child(dip) != USB_SUCCESS) {
-				ndi_devi_exit(dip);
 
-				return (DDI_WALK_PRUNECHILD);
-			}
-		} else {
-			ndi_devi_exit(dip);
-
-			return (DDI_WALK_PRUNECHILD);
-		}
+		(void) hubd_delete_child(hubd, port, NDI_DEVI_REMOVE,
+		    B_TRUE);
 	}
+	mutex_exit(HUBD_MUTEX(hubd));
 
 	ndi_devi_exit(dip);
 

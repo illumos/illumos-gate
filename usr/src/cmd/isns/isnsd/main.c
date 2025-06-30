@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -100,7 +104,7 @@ msg_queue_t *scn_q = NULL;
 
 #ifdef DEBUG
 extern void *cli_test(void *argv);
-extern dump_db(void);
+extern int dump_db(void);
 #endif
 
 extern void sigalrm(int);
@@ -410,6 +414,7 @@ main(
 
 #ifdef DEBUG
 	if (!daemonlize) {
+		pthread_t tid;
 		(void) pthread_create(&tid,
 		    NULL,
 		    cli_test,

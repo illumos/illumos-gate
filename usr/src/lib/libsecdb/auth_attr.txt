@@ -32,11 +32,6 @@ solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
 #
 solaris.admin.idmap.rules:::Manage Identity Mapping Rules::help=IdmapRules.html
 #
-solaris.admin.wusb.:::Administer Wireless USB::help=WUSBHeader.html
-solaris.admin.wusb.read:::Read Wireless USB Host and Device Information::help=WUSBread.html
-solaris.admin.wusb.modify:::Add or delete information of Wireless USB Device::help=WUSBmodify.html
-solaris.admin.wusb.host:::Manage Wireless USB Host::help=WUSBhost.html
-#
 solaris.audit.:::Audit System-wide Management::help=AuditHeader.html
 #
 solaris.device.:::Device Allocation::help=DevAllocHeader.html
@@ -192,7 +187,7 @@ solaris.system.maintenance:::Enter Maintenance (single-user) Mode::help=SysMaint
 solaris.system.shutdown:::Shutdown the System::help=SysShutdown.html
 solaris.system.power.:::System Power Management::help=SysPowerMgmtHeader.html
 solaris.system.power.suspend.:::Suspend the System::help=SysPowerMgmtSuspend.html
-solaris.system.power.suspend.disk:::Suspend to Disk::help=SysPowerMgmtSuspendtoDisk.html 
+solaris.system.power.suspend.disk:::Suspend to Disk::help=SysPowerMgmtSuspendtoDisk.html
 solaris.system.power.suspend.ram:::Suspend to RAM::help=SysPowerMgmtSuspendToRAM.html
 solaris.system.power.brightness:::Control LCD Brightness::help=SysPowerMgmtBrightness.html
 solaris.system.power.cpu:::Manage CPU related power::help=SysCpuPowerMgmt.html

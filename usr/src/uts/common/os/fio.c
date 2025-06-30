@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017, Joyent Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1495,23 +1495,30 @@ fcnt_add(uf_info_t *fip, int incr)
 
 /*
  * This is called from exec to close all fd's that have the FD_CLOEXEC flag
- * set and also to close all self-open for write /proc file descriptors.
+ * set and also to close all self-open for write /proc file descriptors. In
+ * addition, we clear the close-on-fork flag from any file descriptors that have
+ * it present.
  */
 void
 close_exec(uf_info_t *fip)
 {
-	int fd;
-	file_t *fp;
-	fpollinfo_t *fpip;
-	uf_entry_t *ufp;
-	portfd_t *pfd;
+	uf_entry_t *ufp = fip->fi_list;
 
-	ufp = fip->fi_list;
-	for (fd = 0; fd < fip->fi_nfiles; fd++, ufp++) {
-		if ((fp = ufp->uf_file) != NULL &&
-		    ((ufp->uf_flag & FD_CLOEXEC) ||
-		    ((fp->f_flag & FWRITE) && pr_isself(fp->f_vnode)))) {
-			fpip = ufp->uf_fpollinfo;
+	for (int fd = 0; fd < fip->fi_nfiles; fd++, ufp++) {
+		file_t *fp;
+
+		/*
+		 * If this is a hole in the file descriptor space we can simply
+		 * skip it.
+		 */
+		if ((fp = ufp->uf_file) == NULL)
+			continue;
+
+		if ((ufp->uf_flag & FD_CLOEXEC) ||
+		    ((fp->f_flag & FWRITE) && pr_isself(fp->f_vnode))) {
+			portfd_t *pfd;
+			fpollinfo_t *fpip = ufp->uf_fpollinfo;
+
 			mutex_enter(&fip->fi_lock);
 			mutex_enter(&ufp->uf_lock);
 			fd_reserve(fip, fd, -1);
@@ -1540,6 +1547,26 @@ close_exec(uf_info_t *fip)
 			if (pfd)
 				port_close_fd(pfd);
 			(void) closef(fp);
+		} else if ((ufp->uf_flag & FD_CLOFORK) != 0) {
+			/*
+			 * We are in the case where a file descriptor has
+			 * FD_CLOFORK set and must clear it. This has a bit of a
+			 * history. In the original POSIX 2024 specification
+			 * FD_CLOFORK is noted to be preserved across an exec(2)
+			 * call. A process that has inherited this flag and
+			 * didn't put it there itself could be quite surprised
+			 * when a file descriptor disappears especially if this
+			 * refers to stdout, stdin, or stderr.
+			 *
+			 * Originally we implemented the POSIX version of this.
+			 * As other folks evaluated this, this issue was raised
+			 * and in general most implementations have agreed to
+			 * clear this on exec despite the original standard
+			 * wording.
+			 */
+			mutex_enter(&ufp->uf_lock);
+			ufp->uf_flag &= ~FD_CLOFORK;
+			mutex_exit(&ufp->uf_lock);
 		}
 	}
 

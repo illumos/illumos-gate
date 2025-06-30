@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 /* This file is getting large unexpectly, a lex & yacc */
 /* implementation is expected. */
 
@@ -470,7 +474,7 @@ test_cli_help(
 	printf("quit   - stop iSNS server and quit.\n");
 }
 
-static enum {
+enum {
 	CMD_LIST, CMD_LISTNE, CMD_LISTP, CMD_LISTPG,
 	CMD_LISTDD, CMD_LISTDDS, CMD_LISTDDN, CMD_LISTDDSN,
 	CMD_NEWDD, CMD_NEWDDS, CMD_NEWDDN, CMD_NEWDDSN,
@@ -1342,6 +1346,7 @@ new_dd_dds(
 			name = (char *)argv[1];
 			len = strlen(name) + 1;
 			len += 4 - (len % 4);
+			/* FALLTHROUGH */
 		case 1:
 			uid = argv[0];
 		}
@@ -1368,6 +1373,7 @@ new_dd_dds(
 			name = (char *)argv[1];
 			len = strlen(name) + 1;
 			len += 4 - (len % 4);
+			/* FALLTHROUGH */
 		case 1:
 			uid = argv[0];
 		}

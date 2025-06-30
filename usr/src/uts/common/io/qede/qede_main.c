@@ -20,17 +20,8 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
-* and Distribution License, v.1,  (the "License").
-
-* You may not use this file except in compliance with the License.
-
-* You can obtain a copy of the License at available 
-* at http://opensource.org/licenses/CDDL-1.0
-
-* See the License for the specific language governing permissions and 
-* limitations under the License.
+* Copyright 2014-2017 Cavium, Inc.
+* Copyright 2025 Oxide Computer Company
 */
 
 
@@ -1430,9 +1421,9 @@ qede_vport_update(qede_t *qede,
 	 * and set other params as well.
 	 */
 	if (state == QEDE_VPORT_ON) {
-	    new_state = B_TRUE;
+	    new_state = true;
 	} else if (state == QEDE_VPORT_OFF) {
-	    new_state = B_FALSE;
+	    new_state = false;
 	} else {
 		cmn_err(CE_WARN, "qede_vport_update: "
 		    "invalid, state = %d", state);
@@ -1450,14 +1441,14 @@ qede_vport_update(qede_t *qede,
 
 		vport_params->update_vport_active_rx_flg =
 		    1;
-                if (new_state == B_TRUE)
+                if (new_state)
                         vport_params->vport_active_rx_flg = 1;
                 else
                         vport_params->vport_active_rx_flg = 0;
 
 		vport_params->update_vport_active_tx_flg =
 		    1;
-                if (new_state == B_TRUE)
+                if (new_state)
                         vport_params->vport_active_tx_flg = 1;
                 else
                         vport_params->vport_active_tx_flg = 0;
@@ -1500,8 +1491,7 @@ qede_vport_update(qede_t *qede,
 
 		vport_params->sge_tpa_params = NULL;
 
-		if (qede->lro_enable &&
-		    (new_state == B_TRUE)) {
+		if (qede->lro_enable && new_state) {
 			qede_print("!%s(%d): enabling LRO ",
 				__func__, qede->instance);
 
@@ -1524,7 +1514,7 @@ qede_vport_update(qede_t *qede,
 			vport_params->sge_tpa_params = &tpa_params;
 		}
 
-		/* 
+		/*
 		 * Get the rss_params to be configured
 		 */
 		if (qede_get_active_rss_params(qede, i /* hwfn id */)) {
@@ -1546,8 +1536,6 @@ qede_vport_update(qede_t *qede,
 		}
 		cmn_err(CE_NOTE, "!ecore_sp_vport_update: "
 		    "SUCCESS for hwfn%d ", i);
-
-					
 	}
 	return (DDI_SUCCESS);
 }
@@ -1857,12 +1845,12 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 	bool free_rx_buffer;
 
 	bufs_per_page = rx_buf_area->bufs_per_page;
-	
+
 	rx_buffer = &rx_buf_area->rx_buf_pool[0];
 
 	if (rx_buf_area) {
 		for (i = 0; i < rx_ring->rx_buf_count; i += bufs_per_page) {
-			free_rx_buffer = B_TRUE;
+			free_rx_buffer = true;
 			for (j = 0; j < bufs_per_page; j++) {
 				if (!j) {
 					first_rx_buf_in_page = rx_buffer;
@@ -1885,13 +1873,13 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 						 * held up in Stack,
 						 * we cant free the whole page
 						 */
-						free_rx_buffer = B_FALSE;
+						free_rx_buffer = false;
 					}
 				}
 				rx_buffer++;
 			}
 
-			if (free_rx_buffer == B_TRUE) {
+			if (free_rx_buffer) {
 				qede_pci_free_consistent(
 				    &first_rx_buf_in_page->dma_info.dma_handle,
 			    	    &first_rx_buf_in_page->dma_info.acc_handle);
@@ -1911,7 +1899,6 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 			if (atomic_cas_32(&qede->detach_unsafe, 2, 2)) {
 				atomic_dec_32(&qede->detach_unsafe);
 			}
-			
 		}
 	}
 }
@@ -3085,7 +3072,7 @@ qede_stop(qede_t *qede)
 	mac_link_update(qede->mac_handle, LINK_STATE_DOWN);
 
 	qede_disable_all_fastpath_intrs(qede);
-	status = qede_configure_link(qede, 0 /* Re-Set */);
+	status = qede_configure_link(qede, false /* Re-Set */);
 	if (status) {
 		/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 		cmn_err(CE_NOTE, "!%s(%d): Failed to reset link",
@@ -3157,7 +3144,7 @@ qede_start(qede_t *qede)
 
 	cmn_err(CE_NOTE, "qede_start fp_start_queues qede=%p\n", qede);
 
-	status = qede_configure_link(qede, 1 /* Set */);
+	status = qede_configure_link(qede, true /* Set */);
 	if (status) {
 		cmn_err(CE_NOTE, "!%s(%d): Failed to configure link",
 		    __func__, qede->instance);

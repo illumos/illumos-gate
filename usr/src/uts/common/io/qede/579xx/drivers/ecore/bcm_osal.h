@@ -20,17 +20,8 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
-* and Distribution License, v.1,  (the "License").
-
-* You may not use this file except in compliance with the License.
-
-* You can obtain a copy of the License at available 
-* at http://opensource.org/licenses/CDDL-1.0
-
-* See the License for the specific language governing permissions and 
-* limitations under the License.
+* Copyright 2014-2017 Cavium, Inc.
+* Copyright 2025 Oxide Computer Company
 */
 
 #ifndef	_BCM_OSAL_H
@@ -50,6 +41,7 @@
 #include <sys/list_impl.h>
 #include <sys/byteorder.h>
 #include <sys/containerof.h>
+#include <sys/stdbool.h>
 
 #include "qede_types.h"
 #include "qede_list.h"
@@ -169,7 +161,7 @@ u32 qede_osal_direct_reg_read32(struct ecore_hwfn *hwfn, void *addr);
 
 static inline bool OSAL_NVM_IS_ACCESS_ENABLED(void *p_hwfn)
 {
-	return (1);
+	return (true);
 }
 
 /*

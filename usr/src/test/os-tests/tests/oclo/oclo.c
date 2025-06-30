@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -38,7 +38,11 @@
  * every file descriptor is accounted for (ignoring stdin, stdout, and stderr).
  *
  * We pass a record of each file descriptor that was recorded to a verification
- * program that will verify everything is correctly honored after an exec.
+ * program that will verify everything is correctly honored after an exec. Note
+ * that O_CLOFORK is cleared after exec. The original specification in POSIX has
+ * it being retained; however, this issue was raised after the spec was
+ * published as folks went to implement it and we have ended up following along
+ * with the divergence of other implementations.
  */
 
 #include <stdlib.h>
@@ -1163,10 +1167,14 @@ oclo_verify_fork(void)
 
 /*
  * Here we proceed to re-open any fd that was closed due to O_CLOFORK again to
- * make sure it makes it to our child verifier. This also serves as a test to
- * make sure that our opening of the lowest fd is correct. While this doesn't
- * actually use the same method as was done previously, While it might be ideal
- * to use the method as originally, this should get us most of the way there.
+ * make sure that the file descriptor makes it to our child verifier.
+ * Importantly, with the changes that cause O_CLOFORK to be cleared on exec, we
+ * should not see any file descriptors with the flag in the child. This allows
+ * us to confirm that this is what we expect.
+ *
+ * In addition, this serves as a test to make sure that our opening of the
+ * lowest fd is correct. While this doesn't actually use the same method as was
+ * done previously, this should get us most of the way there.
  */
 static void
 oclo_child_reopen(void)

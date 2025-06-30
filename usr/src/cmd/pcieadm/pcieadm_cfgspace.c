@@ -878,7 +878,7 @@ static const pcieadm_regdef_t pcieadm_regdef_status[] = {
  */
 static const pcieadm_regdef_t pcieadm_regdef_class[] = {
 	{ 16, 23, "class", "Class Code", PRDV_HEX },
-	{ 7, 15, "sclass", "Sub-Class Code", PRDV_HEX },
+	{ 8, 15, "sclass", "Sub-Class Code", PRDV_HEX },
 	{ 0, 7, "pi", "Programming Interface", PRDV_HEX },
 	{ -1, -1, NULL }
 };

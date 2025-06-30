@@ -20,17 +20,8 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
-* and Distribution License, v.1,  (the "License").
-
-* You may not use this file except in compliance with the License.
-
-* You can obtain a copy of the License at available 
-* at http://opensource.org/licenses/CDDL-1.0
-
-* See the License for the specific language governing permissions and 
-* limitations under the License.
+* Copyright 2014-2017 Cavium, Inc.
+* Copyright 2025 Oxide Computer Company
 */
 
 #include "qede.h"
@@ -293,7 +284,7 @@ qede_get_next_lro_buffer(qede_rx_ring_t *rx_ring,
 }
 #ifdef DEBUG_LRO
 int agg_count = 0;
-bool agg_print = B_TRUE;
+bool agg_print = true;
 #endif
 static void
 qede_lro_start(qede_rx_ring_t *rx_ring,
@@ -484,7 +475,7 @@ qede_lro_end(qede_rx_ring_t *rx_ring,
 
 #ifdef DEBUG_JUMBO
 int jumbo_count = 0;
-bool jumbo_print = B_TRUE;
+bool jumbo_print = true;
 #endif
 static mblk_t *
 qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
@@ -892,7 +883,7 @@ qede_pkt_parse_lso_headers(qede_tx_pktinfo_t *pktinfo, mblk_t *mp)
 
 static void
 qede_get_pkt_offload_info(qede_t *qede, mblk_t *mp,
-    u32 *use_cksum, boolean_t *use_lso, uint16_t *mss)
+    u32 *use_cksum, bool *use_lso, uint16_t *mss)
 {
 	u32 pflags;
 
@@ -1091,7 +1082,7 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 	ddi_dma_handle_t dma_handle;
 	mblk_t *bp;
 	u32 mblen;
-	bool is_premapped = B_FALSE;
+	bool is_premapped = false;
 	u64 dma_premapped = 0, dma_bound = 0;
 	u32 hdl_reserved = 0;
 	u8 nbd = 0;
@@ -1119,7 +1110,7 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 		if (mblen == 0) {
 			continue;
 		}
-		is_premapped = B_FALSE;
+		is_premapped = false;
 		/*
 		 * If the mblk is premapped then get the
 		 * dma_handle and sync the dma mem. otherwise
@@ -1137,7 +1128,7 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 			    bp->b_datap, &cookie[index],
 			    &ncookies, &dma_handle);
 			if (ret == DDI_DMA_MAPPED) {
-				is_premapped = B_TRUE;
+				is_premapped = true;
 				dma_premapped++;
 				(void) ddi_dma_sync(dma_handle, 0, 0,
 				    DDI_DMA_SYNC_FORDEV);
@@ -1416,7 +1407,7 @@ err_map_sec:
 static enum qede_xmit_status
 qede_send_tx_packet(qede_t *qede, qede_tx_ring_t *tx_ring, mblk_t *mp)
 {
-	boolean_t force_pullup = B_FALSE;
+	bool force_pullup = false;
 	enum qede_xmit_status status = XMIT_FAILED;
 	enum qede_xmit_mode xmit_mode = USE_BCOPY;
 	qede_tx_pktinfo_t pktinfo;
@@ -1605,7 +1596,7 @@ do_pullup:
 	}
 
 	if (xmit_mode == USE_PULLUP) {
-		force_pullup = B_TRUE;
+		force_pullup = true;
 		tx_ring->tx_pullup_count++;
 		goto do_pullup;
 	}
