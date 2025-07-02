@@ -27,6 +27,7 @@
 /*
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2019 Nexenta by DDN, Inc.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #ifndef _NFS4_H
@@ -82,7 +83,7 @@ typedef uint8_t nfs4_minor_t;
 #define	FIRST_NFS4_OP   OP_ACCESS
 #define	LAST_NFS40_OP   OP_RELEASE_LOCKOWNER
 #define	LAST_NFS41_OP   OP_RECLAIM_COMPLETE
-#define	LAST_NFS42_OP   OP_RECLAIM_COMPLETE
+#define	LAST_NFS42_OP   OP_CLONE
 #define	LAST_NFS4_OP    LAST_NFS42_OP
 
 /*

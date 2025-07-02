@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2017-2025 RackTop Systems, Inc.
  */
 
 /*
@@ -360,6 +360,134 @@ xdr_fs_charset_cap4(XDR *xdrs, fs_charset_cap4 *objp)
 		return (FALSE);
 	return (TRUE);
 }
+
+bool_t
+xdr_netloc_type4(XDR *xdrs, netloc_type4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_netloc4(XDR *xdrs, netloc4 *objp)
+{
+
+	if (!xdr_netloc_type4(xdrs, &objp->nl_type))
+		return (FALSE);
+	switch (objp->nl_type) {
+	case NL4_NAME:
+		if (!xdr_utf8str_cis(xdrs, &objp->netloc4_u.nl_name))
+			return (FALSE);
+		break;
+	case NL4_URL:
+		if (!xdr_utf8str_cis(xdrs, &objp->netloc4_u.nl_url))
+			return (FALSE);
+		break;
+	case NL4_NETADDR:
+		if (!xdr_netaddr4(xdrs, &objp->netloc4_u.nl_addr))
+			return (FALSE);
+		break;
+	default:
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_change_attr_type4(XDR *xdrs, change_attr_type4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+/* xdr_labelformat_spec4 */
+/* xdr_sec_label4 */
+
+bool_t
+xdr_app_data_block4(XDR *xdrs, app_data_block4 *objp)
+{
+
+	if (!xdr_offset4(xdrs, &objp->adb_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->adb_block_size))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->adb_block_count))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->adb_reloff_blocknum))
+		return (FALSE);
+	if (!xdr_count4(xdrs, &objp->adb_block_num))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->adb_reloff_pattern))
+		return (FALSE);
+	if (!xdr_bytes(xdrs, (char **)&objp->adb_pattern.adb_pattern_val,
+	    (uint_t *) &objp->adb_pattern.adb_pattern_len, ~0))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_data4(XDR *xdrs, data4 *objp)
+{
+
+	if (!xdr_offset4(xdrs, &objp->d_offset))
+		return (FALSE);
+	if (!xdr_bytes(xdrs, (char **)&objp->d_data.d_data_val,
+	    (uint_t *) &objp->d_data.d_data_len, ~0))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_data_info4(XDR *xdrs, data_info4 *objp)
+{
+
+	if (!xdr_offset4(xdrs, &objp->di_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->di_length))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_data_content4(XDR *xdrs, data_content4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_stable_how4(XDR *xdrs, stable_how4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_write_response4(XDR *xdrs, write_response4 *objp)
+{
+
+	if (!xdr_array(xdrs, (char **)&objp->wr_callback_id.wr_callback_id_val,
+	    (uint_t *) &objp->wr_callback_id.wr_callback_id_len, 1,
+	    sizeof (stateid4), (xdrproc_t)xdr_stateid4))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->wr_count))
+		return (FALSE);
+	if (!xdr_stable_how4(xdrs, &objp->wr_committed))
+		return (FALSE);
+	if (!xdr_verifier4(xdrs, (verifier4 *)&objp->wr_writeverf))
+		return (FALSE);
+	return (TRUE);
+}
+
+/* xdr_fattr4_supported_attrs */
 
 bool_t
 xdr_fattr4_mode_set_masked(XDR *xdrs, fattr4_mode_set_masked *objp)
@@ -1859,6 +1987,526 @@ xdr_RECLAIM_COMPLETE4res(XDR *xdrs, RECLAIM_COMPLETE4res *objp)
 	return (TRUE);
 }
 
+/* new args, res, etc. for NFSv4.2 */
+
+bool_t
+xdr_nfs_opnum4(XDR *xdrs, nfs_opnum4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_ALLOCATE4args(XDR *xdrs, ALLOCATE4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->aa_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->aa_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->aa_length))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_ALLOCATE4res(XDR *xdrs, ALLOCATE4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->ar_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY4args(XDR *xdrs, COPY4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->ca_src_stateid))
+		return (FALSE);
+	if (!xdr_stateid4(xdrs, &objp->ca_dst_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->ca_src_offset))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->ca_dst_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->ca_count))
+		return (FALSE);
+	if (!xdr_bool(xdrs, &objp->ca_consecutive))
+		return (FALSE);
+	if (!xdr_bool(xdrs, &objp->ca_synchronous))
+		return (FALSE);
+	if (!xdr_array(xdrs,
+	    (char **)&objp->ca_source_server.ca_source_server_val,
+	    (uint_t *) &objp->ca_source_server.ca_source_server_len, ~0,
+	    sizeof (netloc4), (xdrproc_t)xdr_netloc4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_copy_requirements4(XDR *xdrs, copy_requirements4 *objp)
+{
+
+	if (!xdr_bool(xdrs, &objp->cr_consecutive))
+		return (FALSE);
+	if (!xdr_bool(xdrs, &objp->cr_synchronous))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY4resok(XDR *xdrs, COPY4resok *objp)
+{
+
+	if (!xdr_write_response4(xdrs, &objp->cr_response))
+		return (FALSE);
+	if (!xdr_copy_requirements4(xdrs, &objp->cr_requirements))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY4res(XDR *xdrs, COPY4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->cr_status))
+		return (FALSE);
+	switch (objp->cr_status) {
+	case NFS4_OK:
+		if (!xdr_COPY4resok(xdrs, &objp->COPY4res_u.cr_resok4))
+			return (FALSE);
+		break;
+	case NFS4ERR_OFFLOAD_NO_REQS:
+		if (!xdr_copy_requirements4(xdrs,
+		    &objp->COPY4res_u.cr_requirements))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY_NOTIFY4args(XDR *xdrs, COPY_NOTIFY4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->cna_src_stateid))
+		return (FALSE);
+	if (!xdr_netloc4(xdrs, &objp->cna_destination_server))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY_NOTIFY4resok(XDR *xdrs, COPY_NOTIFY4resok *objp)
+{
+
+	if (!xdr_nfstime4(xdrs, &objp->cnr_lease_time))
+		return (FALSE);
+	if (!xdr_stateid4(xdrs, &objp->cnr_stateid))
+		return (FALSE);
+	if (!xdr_array(xdrs,
+	    (char **)&objp->cnr_source_server.cnr_source_server_val,
+	    (uint_t *) &objp->cnr_source_server.cnr_source_server_len, ~0,
+	    sizeof (netloc4), (xdrproc_t)xdr_netloc4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_COPY_NOTIFY4res(XDR *xdrs, COPY_NOTIFY4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->cnr_status))
+		return (FALSE);
+	switch (objp->cnr_status) {
+	case NFS4_OK:
+		if (!xdr_COPY_NOTIFY4resok(xdrs,
+		    &objp->COPY_NOTIFY4res_u.resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_DEALLOCATE4args(XDR *xdrs, DEALLOCATE4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->da_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->da_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->da_length))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_DEALLOCATE4res(XDR *xdrs, DEALLOCATE4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->dr_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_IO_ADVISE_type4(XDR *xdrs, IO_ADVISE_type4 *objp)
+{
+
+	if (!xdr_enum(xdrs, (enum_t *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_IO_ADVISE4args(XDR *xdrs, IO_ADVISE4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->iaa_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->iaa_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->iaa_count))
+		return (FALSE);
+	if (!xdr_bitmap4(xdrs, &objp->iaa_hints))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_IO_ADVISE4resok(XDR *xdrs, IO_ADVISE4resok *objp)
+{
+
+	if (!xdr_bitmap4(xdrs, &objp->ior_hints))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_IO_ADVISE4res(XDR *xdrs, IO_ADVISE4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->ior_status))
+		return (FALSE);
+	switch (objp->ior_status) {
+	case NFS4_OK:
+		if (!xdr_IO_ADVISE4resok(xdrs, &objp->IO_ADVISE4res_u.resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_device_error4(XDR *xdrs, device_error4 *objp)
+{
+
+	if (!xdr_deviceid4(xdrs, objp->de_deviceid))
+		return (FALSE);
+	if (!xdr_nfsstat4(xdrs, &objp->de_status))
+		return (FALSE);
+	if (!xdr_nfs_opnum4(xdrs, &objp->de_opnum))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_LAYOUTERROR4args(XDR *xdrs, LAYOUTERROR4args *objp)
+{
+
+	if (!xdr_offset4(xdrs, &objp->lea_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->lea_length))
+		return (FALSE);
+	if (!xdr_stateid4(xdrs, &objp->lea_stateid))
+		return (FALSE);
+	if (!xdr_array(xdrs, (char **)&objp->lea_errors.lea_errors_val,
+	    (uint_t *) &objp->lea_errors.lea_errors_len, ~0,
+	    sizeof (device_error4), (xdrproc_t)xdr_device_error4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_LAYOUTERROR4res(XDR *xdrs, LAYOUTERROR4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->ler_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_io_info4(XDR *xdrs, io_info4 *objp)
+{
+
+	if (!xdr_uint64_t(xdrs, &objp->ii_count))
+		return (FALSE);
+	if (!xdr_uint64_t(xdrs, &objp->ii_bytes))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_LAYOUTSTATS4args(XDR *xdrs, LAYOUTSTATS4args *objp)
+{
+
+	if (!xdr_offset4(xdrs, &objp->lsa_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->lsa_length))
+		return (FALSE);
+	if (!xdr_stateid4(xdrs, &objp->lsa_stateid))
+		return (FALSE);
+	if (!xdr_io_info4(xdrs, &objp->lsa_read))
+		return (FALSE);
+	if (!xdr_io_info4(xdrs, &objp->lsa_write))
+		return (FALSE);
+	if (!xdr_deviceid4(xdrs, objp->lsa_deviceid))
+		return (FALSE);
+	if (!xdr_layoutupdate4(xdrs, &objp->lsa_layoutupdate))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_LAYOUTSTATS4res(XDR *xdrs, LAYOUTSTATS4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->lsr_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_OFFLOAD_CANCEL4args(XDR *xdrs, OFFLOAD_CANCEL4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->oca_stateid))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_OFFLOAD_CANCEL4res(XDR *xdrs, OFFLOAD_CANCEL4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->ocr_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_OFFLOAD_STATUS4args(XDR *xdrs, OFFLOAD_STATUS4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->osa_stateid))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_OFFLOAD_STATUS4resok(XDR *xdrs, OFFLOAD_STATUS4resok *objp)
+{
+
+	if (!xdr_length4(xdrs, &objp->osr_count))
+		return (FALSE);
+	if (!xdr_array(xdrs, (char **)&objp->osr_complete.osr_complete_val,
+	    (uint_t *) &objp->osr_complete.osr_complete_len, 1,
+	    sizeof (nfsstat4), (xdrproc_t)xdr_nfsstat4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_OFFLOAD_STATUS4res(XDR *xdrs, OFFLOAD_STATUS4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->osr_status))
+		return (FALSE);
+	switch (objp->osr_status) {
+	case NFS4_OK:
+		if (!xdr_OFFLOAD_STATUS4resok(xdrs,
+		    &objp->OFFLOAD_STATUS4res_u.osr_resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_READ_PLUS4args(XDR *xdrs, READ_PLUS4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->rpa_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->rpa_offset))
+		return (FALSE);
+	if (!xdr_count4(xdrs, &objp->rpa_count))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_read_plus_content(XDR *xdrs, read_plus_content *objp)
+{
+
+	if (!xdr_data_content4(xdrs, &objp->rpc_content))
+		return (FALSE);
+	switch (objp->rpc_content) {
+	case NFS4_CONTENT_DATA:
+		if (!xdr_data4(xdrs, &objp->read_plus_content_u.rpc_data))
+			return (FALSE);
+		break;
+	case NFS4_CONTENT_HOLE:
+		if (!xdr_data_info4(xdrs, &objp->read_plus_content_u.rpc_hole))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_read_plus_res4(XDR *xdrs, read_plus_res4 *objp)
+{
+
+	if (!xdr_bool(xdrs, &objp->rpr_eof))
+		return (FALSE);
+	if (!xdr_array(xdrs, (char **)&objp->rpr_contents.rpr_contents_val,
+	    (uint_t *) &objp->rpr_contents.rpr_contents_len, ~0,
+	    sizeof (read_plus_content), (xdrproc_t)xdr_read_plus_content))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_READ_PLUS4res(XDR *xdrs, READ_PLUS4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->rp_status))
+		return (FALSE);
+	switch (objp->rp_status) {
+	case NFS4_OK:
+		if (!xdr_read_plus_res4(xdrs, &objp->READ_PLUS4res_u.rp_resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_SEEK4args(XDR *xdrs, SEEK4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->sa_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->sa_offset))
+		return (FALSE);
+	if (!xdr_data_content4(xdrs, &objp->sa_what))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_seek_res4(XDR *xdrs, seek_res4 *objp)
+{
+
+	if (!xdr_bool(xdrs, &objp->sr_eof))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->sr_offset))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_SEEK4res(XDR *xdrs, SEEK4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->sa_status))
+		return (FALSE);
+	switch (objp->sa_status) {
+	case NFS4_OK:
+		if (!xdr_seek_res4(xdrs, &objp->SEEK4res_u.resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_WRITE_SAME4args(XDR *xdrs, WRITE_SAME4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->wsa_stateid))
+		return (FALSE);
+	if (!xdr_stable_how4(xdrs, &objp->wsa_stable))
+		return (FALSE);
+	if (!xdr_app_data_block4(xdrs, &objp->wsa_adb))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_WRITE_SAME4res(XDR *xdrs, WRITE_SAME4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->wsr_status))
+		return (FALSE);
+	switch (objp->wsr_status) {
+	case NFS4_OK:
+		if (!xdr_write_response4(xdrs, &objp->WRITE_SAME4res_u.resok4))
+			return (FALSE);
+		break;
+	default:
+		break;
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_CLONE4args(XDR *xdrs, CLONE4args *objp)
+{
+
+	if (!xdr_stateid4(xdrs, &objp->cl_src_stateid))
+		return (FALSE);
+	if (!xdr_stateid4(xdrs, &objp->cl_dst_stateid))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->cl_src_offset))
+		return (FALSE);
+	if (!xdr_offset4(xdrs, &objp->cl_dst_offset))
+		return (FALSE);
+	if (!xdr_length4(xdrs, &objp->cl_count))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_CLONE4res(XDR *xdrs, CLONE4res *objp)
+{
+
+	if (!xdr_nfsstat4(xdrs, &objp->cl_status))
+		return (FALSE);
+	return (TRUE);
+}
+
+
 /* new operations for NFSv4.1 */
 
 bool_t
@@ -1961,6 +2609,70 @@ xdr_nfs4x_argop4(XDR *xdrs, nfs_argop4 *objp)
 		    &objp->nfs_argop4_u.opreclaim_complete))
 			return (FALSE);
 		break;
+
+	case OP_ALLOCATE:
+		if (!xdr_ALLOCATE4args(xdrs,
+		    &objp->nfs_argop4_u.opallocate))
+			return (FALSE);
+		break;
+	case OP_COPY:
+		if (!xdr_COPY4args(xdrs, &objp->nfs_argop4_u.opcopy))
+			return (FALSE);
+		break;
+	case OP_COPY_NOTIFY:
+		if (!xdr_COPY_NOTIFY4args(xdrs,
+		    &objp->nfs_argop4_u.opoffload_notify))
+			return (FALSE);
+		break;
+	case OP_DEALLOCATE:
+		if (!xdr_DEALLOCATE4args(xdrs,
+		    &objp->nfs_argop4_u.opdeallocate))
+			return (FALSE);
+		break;
+	case OP_IO_ADVISE:
+		if (!xdr_IO_ADVISE4args(xdrs,
+		    &objp->nfs_argop4_u.opio_advise))
+			return (FALSE);
+		break;
+	case OP_LAYOUTERROR:
+		if (!xdr_LAYOUTERROR4args(xdrs,
+		    &objp->nfs_argop4_u.oplayouterror))
+			return (FALSE);
+		break;
+	case OP_LAYOUTSTATS:
+		if (!xdr_LAYOUTSTATS4args(xdrs,
+		    &objp->nfs_argop4_u.oplayoutstats))
+			return (FALSE);
+		break;
+	case OP_OFFLOAD_CANCEL:
+		if (!xdr_OFFLOAD_CANCEL4args(xdrs,
+		    &objp->nfs_argop4_u.opoffload_cancel))
+			return (FALSE);
+		break;
+	case OP_OFFLOAD_STATUS:
+		if (!xdr_OFFLOAD_STATUS4args(xdrs,
+		    &objp->nfs_argop4_u.opoffload_status))
+			return (FALSE);
+		break;
+	case OP_READ_PLUS:
+		if (!xdr_READ_PLUS4args(xdrs,
+		    &objp->nfs_argop4_u.opread_plus))
+			return (FALSE);
+		break;
+	case OP_SEEK:
+		if (!xdr_SEEK4args(xdrs, &objp->nfs_argop4_u.opseek))
+			return (FALSE);
+		break;
+	case OP_WRITE_SAME:
+		if (!xdr_WRITE_SAME4args(xdrs,
+		    &objp->nfs_argop4_u.opwrite_same))
+			return (FALSE);
+		break;
+	case OP_CLONE:
+		if (!xdr_CLONE4args(xdrs, &objp->nfs_argop4_u.opclone))
+			return (FALSE);
+		break;
+
 	default:
 		return (FALSE);
 	}
@@ -2067,6 +2779,65 @@ xdr_nfs4x_resop4(XDR *xdrs, nfs_resop4 *objp)
 		    &objp->nfs_resop4_u.opreclaim_complete))
 			return (FALSE);
 		break;
+
+	case OP_ALLOCATE:
+		if (!xdr_ALLOCATE4res(xdrs, &objp->nfs_resop4_u.opallocate))
+			return (FALSE);
+		break;
+	case OP_COPY:
+		if (!xdr_COPY4res(xdrs, &objp->nfs_resop4_u.opcopy))
+			return (FALSE);
+		break;
+	case OP_COPY_NOTIFY:
+		if (!xdr_COPY_NOTIFY4res(xdrs,
+		    &objp->nfs_resop4_u.opcopy_notify))
+			return (FALSE);
+		break;
+	case OP_DEALLOCATE:
+		if (!xdr_DEALLOCATE4res(xdrs, &objp->nfs_resop4_u.opdeallocate))
+			return (FALSE);
+		break;
+	case OP_IO_ADVISE:
+		if (!xdr_IO_ADVISE4res(xdrs, &objp->nfs_resop4_u.opio_advise))
+			return (FALSE);
+		break;
+	case OP_LAYOUTERROR:
+		if (!xdr_LAYOUTERROR4res(xdrs,
+		    &objp->nfs_resop4_u.oplayouterror))
+			return (FALSE);
+		break;
+	case OP_LAYOUTSTATS:
+		if (!xdr_LAYOUTSTATS4res(xdrs,
+		    &objp->nfs_resop4_u.oplayoutstats))
+			return (FALSE);
+		break;
+	case OP_OFFLOAD_CANCEL:
+		if (!xdr_OFFLOAD_CANCEL4res(xdrs,
+		    &objp->nfs_resop4_u.opoffload_cancel))
+			return (FALSE);
+		break;
+	case OP_OFFLOAD_STATUS:
+		if (!xdr_OFFLOAD_STATUS4res(xdrs,
+		    &objp->nfs_resop4_u.opoffload_status))
+			return (FALSE);
+		break;
+	case OP_READ_PLUS:
+		if (!xdr_READ_PLUS4res(xdrs, &objp->nfs_resop4_u.opread_plus))
+			return (FALSE);
+		break;
+	case OP_SEEK:
+		if (!xdr_SEEK4res(xdrs, &objp->nfs_resop4_u.opseek))
+			return (FALSE);
+		break;
+	case OP_WRITE_SAME:
+		if (!xdr_WRITE_SAME4res(xdrs, &objp->nfs_resop4_u.opwrite_same))
+			return (FALSE);
+		break;
+	case OP_CLONE:
+		if (!xdr_CLONE4res(xdrs, &objp->nfs_resop4_u.opclone))
+			return (FALSE);
+		break;
+
 	default:
 		return (FALSE);
 	}

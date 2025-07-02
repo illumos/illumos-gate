@@ -32,7 +32,7 @@
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.
  * Copyright 2019 Nexenta by DDN, Inc.
- * Copyright 2021 Racktop Systems, Inc.
+ * Copyright 2021-2025 Racktop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -504,6 +504,49 @@ static struct rfsv4disp rfsv4disptab[] = {
 
 	/* OP_RECLAIM_COMPLETE = 58 */
 	{rfs4x_op_reclaim_complete,  nullfree,  0},
+
+	/*
+	 * NFSv4.2 operations
+	 */
+	/* OP_ALLOCATE = 59 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_COPY = 60 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_COPY_NOTIFY = 61 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_DEALLOCATE = 62 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_IO_ADVISE = 63 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_LAYOUTERROR = 64 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_LAYOUTSTATS = 65 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_OFFLOAD_CANCEL = 66 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_OFFLOAD_STATUS = 67 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_READ_PLUS = 68 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_SEEK = 69 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_WRITE_SAME = 70 */
+	{rfs4_op_notsup,  nullfree,  0},
+
+	/* OP_CLONE = 71 */
+	{rfs4_op_notsup,  nullfree,  0},
+
 };
 
 static uint_t rfsv4disp_cnt = sizeof (rfsv4disptab) / sizeof (rfsv4disptab[0]);
@@ -577,6 +620,21 @@ static char    *rfs4_op_string[] = {
 	"want_delegation",
 	"destroy_clientid",
 	"reclaim_complete",
+	/* NFSv4.2 */
+	"allocate",
+	"copy",
+	"copy_notify",
+	"deallocate",
+	"io_advise",
+	"layouterror",
+	"layoutstats",
+	"offload_cancel",
+	"offload_status",
+	"read_plus",
+	"seek",
+	"write_same",
+	"clone",
+
 	"rfs4_op_illegal"
 };
 
