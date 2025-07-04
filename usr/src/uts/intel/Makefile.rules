@@ -198,6 +198,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/pci/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/pci-ide/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/pciex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

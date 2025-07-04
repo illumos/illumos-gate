@@ -63,7 +63,6 @@
 #include <sys/callb.h>
 #include <sys/open.h>
 #include <sys/ddidmareq.h>
-#include <sys/dma_engine.h>
 #include <sys/kstat.h>
 #include <sys/kmem.h>
 #include <sys/modctl.h>
