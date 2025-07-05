@@ -1220,10 +1220,10 @@ def compareByDumping(base, ptch, quiet, fileType) :
 			  " | grep -v PASS[1-3]:" +
 			  " > " + tmpFile2)
 	elif fileType == "Sqlite Database" :
-		baseCmd = ("echo .dump | " + sqlite_cmd + base + " > " +
-			  tmpFile1)
-		ptchCmd = ("echo .dump | " + sqlite_cmd + ptch + " > " +
-			  tmpFile2)
+		baseCmd = ("echo .dump | " + sqlite_cmd + " -init /dev/null " +
+                           base + " > " + tmpFile1)
+		ptchCmd = ("echo .dump | " + sqlite_cmd + " -init /dev/null " +
+                           ptch + " > " + tmpFile2)
 
 	os.system(baseCmd)
 	os.system(ptchCmd)
