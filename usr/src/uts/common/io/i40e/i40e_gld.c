@@ -15,7 +15,7 @@
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -229,7 +229,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 
 
 	ret = i40e_aq_set_vsi_unicast_promiscuous(hw, I40E_DEF_VSI_SEID(i40e),
-	    on, NULL, B_FALSE);
+	    on ? true : false, NULL, false);
 	if (ret != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to %s unicast promiscuity on "
 		    "the default VSI: %d", on == B_TRUE ? "enable" : "disable",
@@ -259,7 +259,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 		 * to be in.
 		 */
 		ret = i40e_aq_set_vsi_unicast_promiscuous(hw,
-		    I40E_DEF_VSI_SEID(i40e), !on, NULL, B_FALSE);
+		    I40E_DEF_VSI_SEID(i40e), !on, NULL, false);
 		if (ret != I40E_SUCCESS) {
 			i40e_error(i40e, "failed to %s unicast promiscuity on "
 			    "the default VSI after toggling multicast failed: "
@@ -295,7 +295,7 @@ i40e_multicast_add(i40e_t *i40e, const uint8_t *multicast_address)
 		if (i40e->i40e_mcast_promisc_count == 0 &&
 		    i40e->i40e_promisc_on == B_FALSE) {
 			ret = i40e_aq_set_vsi_multicast_promiscuous(hw,
-			    I40E_DEF_VSI_SEID(i40e), B_TRUE, NULL);
+			    I40E_DEF_VSI_SEID(i40e), true, NULL);
 			if (ret != I40E_SUCCESS) {
 				i40e_error(i40e, "failed to enable multicast "
 				    "promiscuous mode on VSI %d: %d",
@@ -382,7 +382,7 @@ i40e_multicast_remove(i40e_t *i40e, const uint8_t *multicast_address)
 		if (i40e->i40e_mcast_promisc_count == 1 &&
 		    i40e->i40e_promisc_on == B_FALSE) {
 			ret = i40e_aq_set_vsi_multicast_promiscuous(hw,
-			    I40E_DEF_VSI_SEID(i40e), B_FALSE, NULL);
+			    I40E_DEF_VSI_SEID(i40e), false, NULL);
 			if (ret != I40E_SUCCESS) {
 				i40e_error(i40e, "failed to disable "
 				    "multicast promiscuous mode on VSI %d: %d",
@@ -716,13 +716,13 @@ i40e_gld_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 		}
 		break;
 	case MAC_LED_IDENT:
-		i40e_led_set(hw, 0xf, B_TRUE);
+		i40e_led_set(hw, 0xf, true);
 		break;
 	case MAC_LED_OFF:
-		i40e_led_set(hw, 0x0, B_FALSE);
+		i40e_led_set(hw, 0x0, false);
 		break;
 	case MAC_LED_ON:
-		i40e_led_set(hw, 0xf, B_FALSE);
+		i40e_led_set(hw, 0xf, false);
 		break;
 	default:
 		return (ENOTSUP);
@@ -1009,7 +1009,7 @@ i40e_update_fec(i40e_t *i40e, link_fec_t fec)
 	if (fec != 0)
 		return (EINVAL);
 
-	if (i40e_aq_get_phy_capabilities(hw, B_FALSE, B_FALSE, &abilities,
+	if (i40e_aq_get_phy_capabilities(hw, false, false, &abilities,
 	    NULL) != I40E_SUCCESS)
 		return (EIO);
 
@@ -1465,6 +1465,26 @@ i40e_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
 		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_1GB) != 0);
+		break;
+	case MAC_PROP_ADV_2500FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_2_5GB) != 0);
+		break;
+	case MAC_PROP_EN_2500FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_2_5GB) != 0);
+		break;
+	case MAC_PROP_ADV_5000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_5GB) != 0);
+		break;
+	case MAC_PROP_EN_5000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_5GB) != 0);
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);

@@ -560,12 +560,12 @@ void
 i40e_link_check(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
-	boolean_t ls;
+	bool ls;
 	int ret;
 
 	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
 
-	hw->phy.get_link_info = B_TRUE;
+	hw->phy.get_link_info = true;
 	if ((ret = i40e_get_link_status(hw, &ls)) != I40E_SUCCESS) {
 		i40e->i40e_s_link_status_errs++;
 		i40e->i40e_s_link_status_lasterr = ret;
@@ -576,7 +576,7 @@ i40e_link_check(i40e_t *i40e)
 	 * Firmware abstracts all of the mac and phy information for us, so we
 	 * can use i40e_get_link_status to determine the current state.
 	 */
-	if (ls == B_TRUE) {
+	if (ls) {
 		enum i40e_aq_link_speed speed;
 
 		speed = i40e_get_link_speed(hw);
@@ -2004,14 +2004,14 @@ i40e_get_hw_state(i40e_t *i40e, i40e_hw_t *hw)
 	i40e_link_check(i40e);
 
 	/*
-	 * Try and determine our PHY. Note that we may have to retry to and
+	 * Try and determine our PHY. Note that we may have to retry and
 	 * delay to detect fiber correctly.
 	 */
-	rc = i40e_aq_get_phy_capabilities(hw, B_FALSE, B_TRUE, &i40e->i40e_phy,
+	rc = i40e_aq_get_phy_capabilities(hw, false, true, &i40e->i40e_phy,
 	    NULL);
 	if (rc == I40E_ERR_UNKNOWN_PHY) {
 		i40e_msec_delay(200);
-		rc = i40e_aq_get_phy_capabilities(hw, B_FALSE, B_TRUE,
+		rc = i40e_aq_get_phy_capabilities(hw, false, true,
 		    &i40e->i40e_phy, NULL);
 	}
 
@@ -2422,7 +2422,7 @@ i40e_config_rss_hlut(i40e_t *i40e, i40e_hw_t *hw)
 	if (i40e_is_x722(i40e)) {
 		enum i40e_status_code status;
 
-		status = i40e_aq_set_rss_lut(hw, 0, B_TRUE, (uint8_t *)hlut,
+		status = i40e_aq_set_rss_lut(hw, 0, true, (uint8_t *)hlut,
 		    I40E_HLUT_TABLE_SIZE);
 
 		if (status != I40E_SUCCESS) {
@@ -2521,7 +2521,7 @@ i40e_chip_start(i40e_t *i40e)
 
 	/* For now, we always disable Ethernet Flow Control. */
 	hw->fc.requested_mode = I40E_FC_NONE;
-	rc = i40e_set_fc(hw, &err, B_TRUE);
+	rc = i40e_set_fc(hw, &err, true);
 	if (rc != I40E_SUCCESS) {
 		i40e_error(i40e, "Setting flow control failed, returned %d"
 		    " with error: 0x%x", rc, err);
@@ -2563,7 +2563,7 @@ i40e_chip_start(i40e_t *i40e)
 	 * downlink port.
 	 */
 	rc = i40e_aq_add_veb(hw, i40e->i40e_mac_seid, I40E_DEF_VSI_SEID(i40e),
-	    0x1, B_TRUE, &i40e->i40e_veb_seid, B_FALSE, NULL);
+	    0x1, true, &i40e->i40e_veb_seid, false, NULL);
 	if (rc != I40E_SUCCESS) {
 		i40e_error(i40e, "i40e_aq_add_veb() failed %d: %d", rc,
 		    hw->aq.asq_last_status);
@@ -2635,7 +2635,7 @@ i40e_shutdown_tx_ring(i40e_trqpair_t *itrq)
 	/*
 	 * Step 2. Set the SET_QDIS flag for the queue.
 	 */
-	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, B_FALSE);
+	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, false);
 
 	/*
 	 * Step 3. Wait at least 400 usec.
@@ -2987,7 +2987,7 @@ i40e_setup_tx_ring(i40e_trqpair_t *itrq)
 	 * Step 1. Clear the queue disable flag and verify that the
 	 * index is set correctly.
 	 */
-	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, B_TRUE);
+	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, true);
 
 	/*
 	 * Step 2. Prepare the queue's FPM/HMC context.
@@ -3177,7 +3177,7 @@ i40e_start(i40e_t *i40e)
 	 * Enable broadcast traffic; however, do not enable multicast traffic.
 	 * That's handle exclusively through MAC's mc_multicst routines.
 	 */
-	err = i40e_aq_set_vsi_broadcast(hw, I40E_DEF_VSI_SEID(i40e), B_TRUE,
+	err = i40e_aq_set_vsi_broadcast(hw, I40E_DEF_VSI_SEID(i40e), true,
 	    NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to set default VSI: %d", err);
@@ -3185,8 +3185,8 @@ i40e_start(i40e_t *i40e)
 		goto done;
 	}
 
-	err = i40e_aq_set_mac_config(hw, i40e->i40e_frame_max, B_TRUE, 0,
-	    B_FALSE, NULL);
+	err = i40e_aq_set_mac_config(hw, i40e->i40e_frame_max, true, 0,
+	    false, NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to set MAC config: %d", err);
 		rc = B_FALSE;

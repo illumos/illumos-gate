@@ -51,6 +51,7 @@ extern "C" {
 #include <sys/pci_cap.h>
 #include <sys/atomic.h>
 #include <sys/note.h>
+#include <sys/stdbool.h>
 #include "igb_debug.h"
 
 #define	usec_delay(x)		drv_usecwait(x)
@@ -71,8 +72,6 @@ extern "C" {
 
 #define	OS_DEP(hw)		((struct igb_osdep *)((hw)->back))
 
-#define	false			B_FALSE
-#define	true			B_TRUE
 #define	FALSE			false
 #define	TRUE			true
 
@@ -165,10 +164,9 @@ typedef	int16_t		s16;
 typedef	int32_t		s32;
 typedef	int64_t		s64;
 typedef uint8_t		u8;
-typedef	uint16_t 	u16;
+typedef	uint16_t	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-typedef	boolean_t	bool;
 
 /*
  * igb only uses the first two of the ddi_acc_handle_t, the latter end up coming

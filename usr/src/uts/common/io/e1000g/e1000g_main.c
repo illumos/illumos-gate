@@ -803,7 +803,7 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	hw = &Adapter->shared;
 
 	/* Set MAC type and initialize hardware functions */
-	if (e1000_setup_init_funcs(hw, B_TRUE) != E1000_SUCCESS) {
+	if (e1000_setup_init_funcs(hw, true) != E1000_SUCCESS) {
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 		    "Could not setup hardware functions");
 		return (DDI_FAILURE);
@@ -818,23 +818,23 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	e1000_read_pci_cfg(hw, PCI_COMMAND_REGISTER, &hw->bus.pci_cmd_word);
 
-	hw->mac.autoneg_failed = B_TRUE;
+	hw->mac.autoneg_failed = true;
 
 	/* Set the autoneg_wait_to_complete flag to B_FALSE */
-	hw->phy.autoneg_wait_to_complete = B_FALSE;
+	hw->phy.autoneg_wait_to_complete = false;
 
 	/* Adaptive IFS related changes */
-	hw->mac.adaptive_ifs = B_TRUE;
+	hw->mac.adaptive_ifs = true;
 
 	/* Enable phy init script for IGP phy of 82541/82547 */
 	if ((hw->mac.type == e1000_82547) ||
 	    (hw->mac.type == e1000_82541) ||
 	    (hw->mac.type == e1000_82547_rev_2) ||
 	    (hw->mac.type == e1000_82541_rev_2))
-		e1000_init_script_state_82541(hw, B_TRUE);
+		e1000_init_script_state_82541(hw, true);
 
 	/* Enable the TTL workaround for 82541/82547 */
-	e1000_set_ttl_workaround_state_82541(hw, B_TRUE);
+	e1000_set_ttl_workaround_state_82541(hw, true);
 
 #ifdef __sparc
 	Adapter->strip_crc = B_TRUE;
@@ -868,7 +868,7 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	/* copper options */
 	if (hw->phy.media_type == e1000_media_type_copper) {
 		hw->phy.mdix = 0;	/* AUTO_ALL_MODES */
-		hw->phy.disable_polarity_correction = B_FALSE;
+		hw->phy.disable_polarity_correction = false;
 		hw->phy.ms_type = e1000_ms_hw_default;	/* E1000_MASTER_SLAVE */
 	}
 
@@ -1460,7 +1460,7 @@ e1000g_init(struct e1000g *Adapter)
 	}
 
 	/* Set LAA state for 82571 chipset */
-	e1000_set_laa_state_82571(hw, B_TRUE);
+	e1000_set_laa_state_82571(hw, true);
 
 	/* Master Latency Timer implementation */
 	if (Adapter->master_latency_timer) {
@@ -1561,7 +1561,7 @@ e1000g_init(struct e1000g *Adapter)
 		hw->fc.pause_time = 0xFFFF;
 	else
 		hw->fc.pause_time = E1000_FC_PAUSE_TIME;
-	hw->fc.send_xon = B_TRUE;
+	hw->fc.send_xon = true;
 
 	/*
 	 * Reset the adapter hardware the second time.
@@ -2592,7 +2592,7 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&
-		    (e1000_get_laa_state_82571(hw) == B_TRUE))
+		    e1000_get_laa_state_82571(hw))
 			Adapter->unicst_total--;
 
 		/* VMware doesn't support multiple mac addresses properly */
@@ -2609,7 +2609,7 @@ e1000g_init_unicst(struct e1000g *Adapter)
 	} else {
 		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&
-		    (e1000_get_laa_state_82571(hw) == B_TRUE))
+		    e1000_get_laa_state_82571(hw))
 			(void) e1000_rar_set(hw, hw->mac.addr, LAST_RAR_ENTRY);
 
 		/* Re-configure the RAR registers */
@@ -2664,7 +2664,7 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 	/* Workaround for an erratum of 82571 chipst */
 	if (slot == 0) {
 		if ((hw->mac.type == e1000_82571) &&
-		    (e1000_get_laa_state_82571(hw) == B_TRUE))
+		    e1000_get_laa_state_82571(hw)) {
 			if (mac_addr == NULL) {
 				E1000_WRITE_REG_ARRAY(hw, E1000_RA,
 				    slot << 1, 0);
@@ -2676,6 +2676,7 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 				(void) e1000_rar_set(hw, (uint8_t *)mac_addr,
 				    LAST_RAR_ENTRY);
 			}
+		}
 	}
 
 	/*
@@ -3469,7 +3470,7 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			Adapter->param_adv_autoneg = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_FLOWCTRL:
-			fc->send_xon = B_TRUE;
+			fc->send_xon = true;
 			bcopy(pr_val, &flowctrl, sizeof (flowctrl));
 
 			switch (flowctrl) {
@@ -4200,7 +4201,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * FlowControl
 	 */
-	hw->fc.send_xon = B_TRUE;
+	hw->fc.send_xon = true;
 	(void) e1000g_get_prop(Adapter, "FlowControl",
 	    e1000_fc_none, 4, DEFAULT_FLOW_CONTROL, &propval);
 	hw->fc.requested_mode = propval;
@@ -4522,7 +4523,7 @@ e1000g_reset_link(struct e1000g *Adapter)
 		goto out;
 
 	if (Adapter->param_adv_autoneg == 1) {
-		mac->autoneg = B_TRUE;
+		mac->autoneg = true;
 		phy->autoneg_advertised = 0;
 
 		/*
@@ -4546,7 +4547,7 @@ e1000g_reset_link(struct e1000g *Adapter)
 		if (phy->autoneg_advertised == 0)
 			invalid = B_TRUE;
 	} else {
-		mac->autoneg = B_FALSE;
+		mac->autoneg = false;
 
 		/*
 		 * For Intel copper cards, 1000fdx and 1000hdx are not
@@ -4569,7 +4570,7 @@ e1000g_reset_link(struct e1000g *Adapter)
 		e1000g_log(Adapter, CE_WARN,
 		    "Invalid link settings. Setup link to "
 		    "support autonegotiation with all link capabilities.");
-		mac->autoneg = B_TRUE;
+		mac->autoneg = true;
 		phy->autoneg_advertised = AUTONEG_ADVERTISE_SPEED_DEFAULT;
 	}
 
@@ -4667,8 +4668,7 @@ e1000g_local_timer(void *ws)
 	 * be overwritten when there is a reset on the other port.
 	 * Detect this circumstance and correct it.
 	 */
-	if ((hw->mac.type == e1000_82571) &&
-	    (e1000_get_laa_state_82571(hw) == B_TRUE)) {
+	if ((hw->mac.type == e1000_82571) && e1000_get_laa_state_82571(hw)) {
 		ether_addr.reg.low = E1000_READ_REG_ARRAY(hw, E1000_RA, 0);
 		ether_addr.reg.high = E1000_READ_REG_ARRAY(hw, E1000_RA, 1);
 
@@ -4757,28 +4757,28 @@ e1000g_force_speed_duplex(struct e1000g *Adapter)
 		/*
 		 * Disable Auto Negotiation
 		 */
-		mac->autoneg = B_FALSE;
+		mac->autoneg = false;
 		mac->forced_speed_duplex = ADVERTISE_10_HALF;
 		break;
 	case GDIAG_10_FULL:
 		/*
 		 * Disable Auto Negotiation
 		 */
-		mac->autoneg = B_FALSE;
+		mac->autoneg = false;
 		mac->forced_speed_duplex = ADVERTISE_10_FULL;
 		break;
 	case GDIAG_100_HALF:
 		/*
 		 * Disable Auto Negotiation
 		 */
-		mac->autoneg = B_FALSE;
+		mac->autoneg = false;
 		mac->forced_speed_duplex = ADVERTISE_100_HALF;
 		break;
 	case GDIAG_100_FULL:
 		/*
 		 * Disable Auto Negotiation
 		 */
-		mac->autoneg = B_FALSE;
+		mac->autoneg = false;
 		mac->forced_speed_duplex = ADVERTISE_100_FULL;
 		break;
 	case GDIAG_1000_FULL:
@@ -4789,11 +4789,11 @@ e1000g_force_speed_duplex(struct e1000g *Adapter)
 		 * 1000Mbps.  This is different from 10/100 operation, where
 		 * we are allowed to link without any negotiation.
 		 */
-		mac->autoneg = B_TRUE;
+		mac->autoneg = true;
 		phy->autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	default:	/* obey the setting of AutoNegAdvertised */
-		mac->autoneg = B_TRUE;
+		mac->autoneg = true;
 		(void) e1000g_get_prop(Adapter, "AutoNegAdvertised",
 		    0, AUTONEG_ADVERTISE_SPEED_DEFAULT,
 		    AUTONEG_ADVERTISE_SPEED_DEFAULT, &propval);
@@ -4866,7 +4866,7 @@ e1000g_pch_limits(struct e1000g *Adapter)
 
 	/* only applies to frames larger than ethernet default */
 	if (Adapter->max_frame_size > DEFAULT_FRAME_SIZE) {
-		hw->mac.autoneg = B_TRUE;
+		hw->mac.autoneg = true;
 		hw->phy.autoneg_advertised = ADVERTISE_1000_FULL;
 
 		Adapter->param_adv_autoneg = 1;
@@ -5588,9 +5588,9 @@ e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 
 	if (mode == E1000G_LB_NONE) {
 		/* Reset the chip */
-		hw->phy.autoneg_wait_to_complete = B_TRUE;
+		hw->phy.autoneg_wait_to_complete = true;
 		(void) e1000g_reset_adapter(Adapter);
-		hw->phy.autoneg_wait_to_complete = B_FALSE;
+		hw->phy.autoneg_wait_to_complete = false;
 		return (B_TRUE);
 	}
 
@@ -5652,9 +5652,9 @@ again:
 		Adapter->loopback_mode = E1000G_LB_NONE;
 
 		/* Reset the chip */
-		hw->phy.autoneg_wait_to_complete = B_TRUE;
+		hw->phy.autoneg_wait_to_complete = true;
 		(void) e1000g_reset_adapter(Adapter);
-		hw->phy.autoneg_wait_to_complete = B_FALSE;
+		hw->phy.autoneg_wait_to_complete = false;
 
 		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 		    "Set loopback mode failed, reset to loopback none");
