@@ -23,8 +23,6 @@
  * Copyright 2020 Oxide Computer Company
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2022 Joyent, Inc.
- * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -262,8 +260,8 @@ log_init(void)
 #ifdef	LEGACY_BANNER
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
-	/* NOTE: We might switch to BOOTBANNER after this. */
-	printf("Copyright 2022-2025 MNX Cloud, Inc.\n");
+	printf("Copyright (c) 1983, 2010, Oracle and/or its affiliates. "
+	    "All rights reserved.\n");
 #else
 	bootbanner_print(log_bootbanner_print);
 #endif

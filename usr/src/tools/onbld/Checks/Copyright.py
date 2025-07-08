@@ -27,6 +27,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 MNX Cloud, Inc.
+# Copyright 2025 Edgecast Cloud LLC.
 
 # Make sure there is a copyright claim for the current year.
 
@@ -39,7 +40,7 @@ def is_copyright(line):
 	return re.search(r'Copyright (?!\[yyyy\])', line)
 
 def is_current_copyright(line):
-	return re.search(r'Copyright %s MNX Cloud, Inc.$' % time.strftime('%Y'), line)
+	return re.search(r'Copyright %s Edgecast Cloud LLC.$' % time.strftime('%Y'), line)
 
 def copyright(fh, filename=None, output=sys.stderr):
 	ret = rights = goodrights = 0
@@ -58,7 +59,7 @@ def copyright(fh, filename=None, output=sys.stderr):
 		err(output, "no copyright message found", filename)
 		ret = 1
 	elif goodrights == 0:
-		err(output, "'Copyright %s MNX Cloud, Inc.' not found" %
+		err(output, "'Copyright %s Edgecast Cloud LLC.' not found" %
 		    time.strftime('%Y'), filename)
 		ret = 1
 

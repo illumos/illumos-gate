@@ -33,6 +33,7 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Joyent, Inc.
 # Copyright 2023 MNX Cloud, Inc.
+# Copyright 2025 Edgecast Cloud LLC.
 #
 
 #
@@ -960,7 +961,8 @@ UTS_LABEL=	$(RELEASE)
 #
 BOOTBANNER1=	SmartOS Version ^v ^w-bit
 # XXX SmartOS: BANNER_YEAR in environment set in smartos-live's build_illumos.
-BOOTBANNER2=	Copyright 2022-$(BANNER_YEAR) MNX Cloud, Inc.
+# ALSO, starting 2026 we will need to reintroduce 2025-$(BANNER_YEAR).
+BOOTBANNER2=	Copyright $(BANNER_YEAR) Edgecast Cloud LLC.
 BOOTBANNER3=
 BOOTBANNER4=
 BOOTBANNER5=
