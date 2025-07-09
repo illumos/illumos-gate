@@ -346,6 +346,15 @@ struct pcieadm_cfgspace_print {
 	const void *pcp_arg;
 };
 
+static uint32_t
+pcieadm_cfgspace_getcap32(pcieadm_cfgspace_walk_t *walkp, uint32_t off)
+{
+	off += walkp->pcw_capoff;
+	VERIFY3U(off, <, PCIE_CONF_HDR_SIZE);
+	VERIFY0(off % 4);
+	return (walkp->pcw_data->pcb_u32[off / 4]);
+}
+
 static void
 pcieadm_field_printf(pcieadm_cfgspace_walk_t *walkp, const char *shortf,
     const char *humanf, uint64_t val, const char *fmt, ...)
@@ -2855,7 +2864,7 @@ pcieadm_cfgspace_print_tphst(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint_t nents;
-	uint32_t tphcap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t tphcap = pcieadm_cfgspace_getcap32(walkp, 4);
 
 	if (bitx32(tphcap, 10, 9) != 1) {
 		return;
@@ -3367,7 +3376,7 @@ static void
 pcieadm_cfgspace_print_dpc_rppio(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t cap = pcieadm_cfgspace_getcap32(walkp, 4);
 
 	if (bitx32(cap, 5, 5) == 0) {
 		return;
@@ -3380,7 +3389,7 @@ static void
 pcieadm_cfgspace_print_dpc_piohead(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t cap = pcieadm_cfgspace_getcap32(walkp, 4);
 	uint32_t nwords = bitx32(cap, 11, 8);
 
 	if (bitx32(cap, 5, 5) == 0 || nwords < 4) {
@@ -3394,7 +3403,7 @@ static void
 pcieadm_cfgspace_print_dpc_impspec(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t cap = pcieadm_cfgspace_getcap32(walkp, 4);
 	uint32_t nwords = bitx32(cap, 11, 8);
 
 	if (bitx32(cap, 5, 5) == 0 || nwords < 5) {
@@ -3408,7 +3417,7 @@ static void
 pcieadm_cfgspace_print_dpc_tlplog(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t cap = pcieadm_cfgspace_getcap32(walkp, 4);
 	int32_t nwords = (int32_t)bitx32(cap, 11, 8);
 
 	if (nwords == 0 || bitx32(cap, 5, 5) == 0) {
@@ -3554,7 +3563,7 @@ static void
 pcieadm_cfgspace_print_vc_rsrc(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
+	uint32_t cap = pcieadm_cfgspace_getcap32(walkp, 4);
 	uint32_t nents = bitx32(cap, 2, 0) + 1;
 
 	for (uint32_t i = 0; i < nents; i++) {
@@ -4650,7 +4659,7 @@ static void
 pcieadm_cfgspace_print_ap_sen(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	uint32_t ap_cap = walkp->pcw_data->pcb_u32[walkp->pcw_capoff + 4];
+	uint32_t ap_cap = pcieadm_cfgspace_getcap32(walkp, 4);
 	pcieadm_cfgspace_print_t p;
 
 	if (bitx32(ap_cap, 8, 8) == 0)
