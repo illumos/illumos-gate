@@ -1,0 +1,103 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object scoping must comply with the rules detailed in
+#
+#	usr/src/uts/common/mapfiles/README
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# This file contains core functions provided by the DDI and also items
+# required as part of the platform's runime ABI (think compiler
+# functions).
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	fnvlist_add_boolean		{ FLAGS = EXTERN; };
+	fnvlist_add_boolean_array	{ FLAGS = EXTERN; };
+	fnvlist_add_boolean_value	{ FLAGS = EXTERN; };
+	fnvlist_add_byte		{ FLAGS = EXTERN; };
+	fnvlist_add_byte_array		{ FLAGS = EXTERN; };
+	fnvlist_add_int16		{ FLAGS = EXTERN; };
+	fnvlist_add_int16_array		{ FLAGS = EXTERN; };
+	fnvlist_add_int32		{ FLAGS = EXTERN; };
+	fnvlist_add_int32_array		{ FLAGS = EXTERN; };
+	fnvlist_add_int64		{ FLAGS = EXTERN; };
+	fnvlist_add_int64_array		{ FLAGS = EXTERN; };
+	fnvlist_add_int8		{ FLAGS = EXTERN; };
+	fnvlist_add_int8_array		{ FLAGS = EXTERN; };
+	fnvlist_add_nvlist		{ FLAGS = EXTERN; };
+	fnvlist_add_nvlist_array	{ FLAGS = EXTERN; };
+	fnvlist_add_nvpair		{ FLAGS = EXTERN; };
+	fnvlist_add_string		{ FLAGS = EXTERN; };
+	fnvlist_add_string_array	{ FLAGS = EXTERN; };
+	fnvlist_add_uint16		{ FLAGS = EXTERN; };
+	fnvlist_add_uint16_array	{ FLAGS = EXTERN; };
+	fnvlist_add_uint32		{ FLAGS = EXTERN; };
+	fnvlist_add_uint32_array	{ FLAGS = EXTERN; };
+	fnvlist_add_uint64		{ FLAGS = EXTERN; };
+	fnvlist_add_uint64_array	{ FLAGS = EXTERN; };
+	fnvlist_add_uint8		{ FLAGS = EXTERN; };
+	fnvlist_add_uint8_array		{ FLAGS = EXTERN; };
+	fnvlist_alloc			{ FLAGS = EXTERN; };
+	fnvlist_dup			{ FLAGS = EXTERN; };
+	fnvlist_free			{ FLAGS = EXTERN; };
+	fnvlist_lookup_boolean		{ FLAGS = EXTERN; };
+	fnvlist_lookup_boolean_value	{ FLAGS = EXTERN; };
+	fnvlist_lookup_byte		{ FLAGS = EXTERN; };
+	fnvlist_lookup_int16		{ FLAGS = EXTERN; };
+	fnvlist_lookup_int32		{ FLAGS = EXTERN; };
+	fnvlist_lookup_int64		{ FLAGS = EXTERN; };
+	fnvlist_lookup_int8		{ FLAGS = EXTERN; };
+	fnvlist_lookup_nvlist		{ FLAGS = EXTERN; };
+	fnvlist_lookup_nvpair		{ FLAGS = EXTERN; };
+	fnvlist_lookup_string		{ FLAGS = EXTERN; };
+	fnvlist_lookup_uint16		{ FLAGS = EXTERN; };
+	fnvlist_lookup_uint32		{ FLAGS = EXTERN; };
+	fnvlist_lookup_uint64		{ FLAGS = EXTERN; };
+	fnvlist_lookup_uint8		{ FLAGS = EXTERN; };
+	fnvlist_merge			{ FLAGS = EXTERN; };
+	fnvlist_num_pairs		{ FLAGS = EXTERN; };
+	fnvlist_pack			{ FLAGS = EXTERN; };
+	fnvlist_pack_free		{ FLAGS = EXTERN; };
+	fnvlist_remove			{ FLAGS = EXTERN; };
+	fnvlist_remove_nvpair		{ FLAGS = EXTERN; };
+	fnvlist_size			{ FLAGS = EXTERN; };
+	fnvlist_unpack			{ FLAGS = EXTERN; };
+	fnvpair_value_boolean_value	{ FLAGS = EXTERN; };
+	fnvpair_value_byte		{ FLAGS = EXTERN; };
+	fnvpair_value_int16		{ FLAGS = EXTERN; };
+	fnvpair_value_int32		{ FLAGS = EXTERN; };
+	fnvpair_value_int64		{ FLAGS = EXTERN; };
+	fnvpair_value_int8		{ FLAGS = EXTERN; };
+	fnvpair_value_nvlist		{ FLAGS = EXTERN; };
+	fnvpair_value_string		{ FLAGS = EXTERN; };
+	fnvpair_value_uint16		{ FLAGS = EXTERN; };
+	fnvpair_value_uint32		{ FLAGS = EXTERN; };
+	fnvpair_value_uint64		{ FLAGS = EXTERN; };
+	fnvpair_value_uint8		{ FLAGS = EXTERN; };
+};
