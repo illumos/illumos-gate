@@ -29,6 +29,7 @@ OBJECTS =	libnvme.o \
 		libnvme_ns_mgmt.o \
 		libnvme_ocp.o \
 		libnvme_phison.o \
+		libnvme_samsung.o \
 		libnvme_solidigm.o \
 		libnvme_vendor.o \
 		libnvme_vuc.o \

@@ -51,6 +51,7 @@ file path=usr/include/sys/nvme/micron_9550.h
 file path=usr/include/sys/nvme/micron_x500.h
 file path=usr/include/sys/nvme/ocp.h
 file path=usr/include/sys/nvme/phison.h
+file path=usr/include/sys/nvme/samsung.h
 file path=usr/include/sys/nvme/solidigm.h
 file path=usr/include/sys/nvme/solidigm_p5xxx.h
 file path=usr/include/sys/nvme/solidigm_ps10x0.h
