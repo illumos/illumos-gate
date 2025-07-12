@@ -3428,6 +3428,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_memcmp;
 	_memcpy			{ FLAGS = NODYNSORT; };
 	_memmove;
+	#
+	# This was originally added because Sun Studio would sometimes
+	# emit _memset, _memmove, and _memcpy. We also use _memset in a
+	# few spots in the system to deal with POSIX namespacing.
+	#
 	_memset;
 	_modff			{
 				  TYPE = FUNCTION;

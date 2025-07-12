@@ -35,7 +35,8 @@
 /*
  * The SunStudio compiler may generate calls to _memmove, _memset,
  * and _memcpy; So we need to make sure that the correct symbols
- * exist for these calls.
+ * exist for these calls. We also use _memset to work around some
+ * standards namespacing challenges.
  */
 #pragma weak _memmove = memmove
 void *

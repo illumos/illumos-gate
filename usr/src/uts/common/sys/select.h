@@ -136,7 +136,8 @@ typedef	struct __fd_set {
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #define	FD_ZERO(p)	bzero((p), sizeof (*(p)))
 #else
-#define	FD_ZERO(__p)    (void) memset((__p), 0, sizeof (*(__p)))
+extern void *_memset(void *, int, size_t);
+#define	FD_ZERO(__p)    (void) _memset((__p), 0, sizeof (*(__p)))
 #endif /* _KERNEL */
 
 #if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
