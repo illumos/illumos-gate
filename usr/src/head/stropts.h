@@ -56,7 +56,8 @@ extern int putpmsg(int, const struct strbuf *, const struct strbuf *, int, int);
 
 /*
  * These three routines are duplicated in unistd.h; duplication necessitated
- * by XPG4.2 compliance/namespace issues.
+ * by XPG4.2 compliance/namespace issues. ioctl() is also duplicated in
+ * <sys/ioctl.h> for broader portability aid.
  */
 extern int ioctl(int, int, ...);
 extern int fattach(int, const char *);

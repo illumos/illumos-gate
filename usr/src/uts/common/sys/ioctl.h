@@ -65,6 +65,14 @@ extern "C" {
 #define	DIOCGETB	(DIOC|2)
 #define	DIOCSETE	(DIOC|3)
 
+/*
+ * While ioctl was at one point only defined in <stropts.h> by POSIX, it was
+ * removed in Issue 8 (2024). We also have traditionally had a definition of
+ * this in <unistd.h>, which is namespaced. We add this here without namespacing
+ * to aid broader portability.
+ */
+extern int ioctl(int, int, ...);
+
 #ifdef	__cplusplus
 }
 #endif
