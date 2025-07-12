@@ -434,3 +434,9 @@ usr/src/boot/efi/include/IndustryStandard/*.h
 usr/src/boot/efi/include/Pi/*.h
 usr/src/boot/efi/include/Protocol/*.h
 usr/src/boot/efi/include/Uefi/*.h
+
+#
+# assert.h does not have a header guard due to its need to change across
+# inclusions.
+#
+usr/src/head/assert.h

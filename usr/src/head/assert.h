@@ -32,41 +32,16 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_ASSERT_H
-#define	_ASSERT_H
-
-#include <sys/feature_tests.h>
-
-#ifdef	__cplusplus
-extern "C" {
-#endif
-
-#if __STDC_VERSION__ - 0 >= 199901L
-extern _NORETURN_KYWD void __assert_c99(const char *, const char *, int,
-    const char *) __NORETURN;
-#else
-extern _NORETURN_KYWD void __assert(const char *, const char *, int) __NORETURN;
-#endif /* __STDC_VERSION__ - 0 >= 199901L */
-
-/*
- * In C11 the static_assert macro is always defined, unlike the assert macro.
- */
-#if __STDC_VERSION__ - 0 >= 201112L && !defined(__cplusplus)
-#define	static_assert	_Static_assert
-#endif /* __STDC_VERSION - 0 >= 201112L && !defined(__cplusplus) */
-
-#ifdef	__cplusplus
-}
-#endif
-
-#endif	/* _ASSERT_H */
-
 /*
  * Note that the ANSI C Standard requires all headers to be idempotent except
  * <assert.h> which is explicitly required not to be idempotent (section 4.1.2).
- * Therefore, it is by intent that the header guards (#ifndef _ASSERT_H) do
- * not span this entire file.
+ * We split up the idempotent sections into <iso/assert_iso.h> and leave the
+ * rest of this that should be impacted by NDEBUG here. There is no header
+ * guard.  This is intentional. For more information on the split, see
+ * <iso/assert_iso.h>.
  */
+
+#include <iso/assert_iso.h>
 
 #undef	assert
 
