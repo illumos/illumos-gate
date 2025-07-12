@@ -1383,8 +1383,6 @@ nvme_ns_state_check(const nvme_namespace_t *ns, nvme_ioctl_common_t *ioc,
  * blocked locks, and sending a DDI FMA impact. This is called from a precarious
  * place where locking is suspect. The only guarantee we have is that the nvme_t
  * is valid and won't disappear until we return.
- *
- * This should only be used after attach has been called.
  */
 static void
 nvme_ctrl_mark_dead(nvme_t *nvme, boolean_t removed)
@@ -4500,14 +4498,10 @@ nvme_init(nvme_t *nvme)
 	}
 
 	/*
-	 * Post an asynchronous event command to catch errors.
-	 * We assume the asynchronous events are supported as required by
-	 * specification (Figure 40 in section 5 of NVMe 1.2).
-	 * However, since at least qemu does not follow the specification,
-	 * we need a mechanism to protect ourselves.
+	 * Initialize the failure status we should use if we mark the controller
+	 * dead. Do this ahead of issuing any commands.
 	 */
-	nvme->n_async_event_supported = B_TRUE;
-	nvme_async_event(nvme);
+	nvme->n_dead_status = NVME_IOCTL_E_CTRL_DEAD;
 
 	/*
 	 * Identify Controller
@@ -4772,15 +4766,6 @@ nvme_init(nvme_t *nvme)
 			    "!unable to create I/O qpair %d", i);
 			goto fail;
 		}
-	}
-
-	/*
-	 * Post more asynchronous events commands to reduce event reporting
-	 * latency as suggested by the spec.
-	 */
-	if (nvme->n_async_event_supported) {
-		for (i = 1; i != nvme->n_async_event_limit; i++)
-			nvme_async_event(nvme);
 	}
 
 	return (DDI_SUCCESS);
@@ -5268,7 +5253,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme_mgmt_lock_init(&nvme->n_mgmt);
 	nvme_lock_init(&nvme->n_lock);
 	nvme->n_progress |= NVME_MGMT_INIT;
-	nvme->n_dead_status = NVME_IOCTL_E_CTRL_DEAD;
 
 	/*
 	 * Identify namespaces.
@@ -5326,6 +5310,12 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ns->ns_progress |= NVME_NS_MINOR;
 	}
 
+	/*
+	 * Indicate that namespace initialization is complete and therefore
+	 * marking the controller dead can evaluate every namespace lock.
+	 */
+	nvme->n_progress |= NVME_NS_INIT;
+
 	if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
 	    NVME_MINOR(ddi_get_instance(dip), 0), DDI_NT_NVME_NEXUS, 0) !=
 	    DDI_SUCCESS) {
@@ -5355,6 +5345,29 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	nvme_mgmt_unlock(nvme);
+
+	/*
+	 * As the last thing that we do, we finally go ahead and enable
+	 * asynchronous event notifications. Currently we rely upon whatever
+	 * defaults the device has for the events that we will receive. If we
+	 * enable this earlier, it's possible that we'll get events that we
+	 * cannot handle yet because all of our data structures are not valid.
+	 * The device will queue all asynchronous events on a per-log page basis
+	 * until we submit this. If the device is totally broken, it will have
+	 * likely failed our commands already. If we add support for configuring
+	 * which asynchronous events we would like to receive via the SET
+	 * FEATURES command, then we should do that as one of the first commands
+	 * we send in nvme_init().
+	 *
+	 * We start by assuming asynchronous events are supported. However, not
+	 * all devices (e.g. some versions of QEMU) support this, so we end up
+	 * tracking whether or not we think these actually work.
+	 */
+	nvme->n_async_event_supported = B_TRUE;
+	for (uint16_t i = 0; i < nvme->n_async_event_limit; i++) {
+		nvme_async_event(nvme);
+	}
+
 
 	return (DDI_SUCCESS);
 

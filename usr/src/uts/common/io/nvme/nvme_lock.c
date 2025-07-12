@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -617,6 +617,12 @@ nvme_rwlock_ctrl_dead_cleanup_one(nvme_t *nvme, nvme_minor_lock_info_t *info)
  * The moment we grab n_minor_mutex, no other state here can change. So we can
  * go ahead and wake up all waiters with impunity. This is being called from the
  * nvme_dead_taskq.
+ *
+ * While this would ideally only be used after attach(9E) has been called, this
+ * can end up triggered at different points in attach(9E) in response to some of
+ * the different command codes that we issue. If we haven't actually gotten far
+ * enough in attach that we've indicated that we've basically finished that then
+ * we should not touch the actual namespaces (and there is likely no one there).
  */
 void
 nvme_rwlock_ctrl_dead(void *arg)
@@ -626,6 +632,11 @@ nvme_rwlock_ctrl_dead(void *arg)
 	nvme_minor_lock_info_t *info;
 
 	mutex_enter(&nvme->n_minor_mutex);
+	if ((nvme->n_progress & NVME_NS_INIT) == 0) {
+		mutex_exit(&nvme->n_minor_mutex);
+		return;
+	}
+
 	for (uint32_t i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = nvme_nsid2ns(nvme, i);
 		nvme_lock_t *ns_lock = &ns->ns_lock;

@@ -49,7 +49,8 @@ typedef enum {
 	NVME_UFM_INIT			= 1 << 6,
 	NVME_MUTEX_INIT			= 1 << 7,
 	NVME_MGMT_INIT			= 1 << 8,
-	NVME_STAT_INIT			= 1 << 9
+	NVME_STAT_INIT			= 1 << 9,
+	NVME_NS_INIT			= 1 << 10
 } nvme_progress_t;
 
 typedef enum {
