@@ -14,12 +14,14 @@
 #
 
 PROGS = \
+	tznames		\
 	tzload		\
 	zoneinfo_dump
 
 SCRIPTS = \
 	basic_tzs \
-	tz_dump
+	tz_dump \
+	tzname_17947
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64) \
