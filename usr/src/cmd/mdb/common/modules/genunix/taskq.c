@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023-2024 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_param.h>
@@ -118,6 +120,12 @@ tq_fill(uintptr_t addr, const void *ignored, tq_info_t *ti)
 	return (WALK_NEXT);
 }
 
+/*
+ * Dcmd: taskq
+ * ::taskq  :[-atT] [-m min_maxq] [-n name]
+ * With addr, display taskq details
+ * Without addr, list all, filtered
+ */
 void
 taskq_help(void)
 {
@@ -219,10 +227,16 @@ taskq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
-		tcount += (tq.tq_tcreates - tq.tq_tdeaths);
+		tcount += tq.tq_dnthreads;
 
+		/*
+		 * There are actually (tq.tq_nbuckets + 1) buckets now,
+		 * with the + 1 used as the "idle bucket".  That never
+		 * has nalloc or nbacklog, so ignoring it here.
+		 */
 		for (idx = 0; idx < tq.tq_nbuckets; idx++) {
-			tact += b[idx].tqbucket_nalloc;
+			tact   += b[idx].tqbucket_nalloc;
+			queued += b[idx].tqbucket_nbacklog;
 		}
 	}
 
@@ -281,6 +295,7 @@ taskq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
+ * Dcmd: "taskq_entry"
  * Dump a taskq_ent_t given its address.
  */
 /*ARGSUSED*/
@@ -309,79 +324,130 @@ taskq_ent(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-
 /*
+ * Walker: "taskq_entry"; taskq_ent_walk_{init,step}
+ *
  * Given the address of the (taskq_t) task queue head, walk the queue listing
- * the address of every taskq_ent_t.
+ * the address of every taskq_ent_t.  On dynamic taskq, enum. backlog.
  */
+struct mdb_tqe_walk_data {
+	taskq_ent_t tq_ent;	/* working buffer */
+	uintptr_t tq_addr;	/* taskq ptr, for debug */
+	uint_t	tq_nbuckets;	/* from taskq.tq_nbuckets */
+	int	tq_bidx;	/* index of next bucket */
+	uintptr_t tq_bucket;	/* next bucket we'll emum. */
+	uintptr_t tqent_head;	/* ptr to list head we're on */
+	uintptr_t tqent_cur;	/* ptr to current list element */
+};
+
 int
 taskq_ent_walk_init(mdb_walk_state_t *wsp)
 {
-	taskq_t	tq_head;
-
+	taskq_t	tq;
+	struct mdb_tqe_walk_data *wd;
 
 	if (wsp->walk_addr == 0) {
-		mdb_warn("start address required\n");
+		mdb_warn("start address required (taskq_t)\n");
 		return (WALK_ERR);
 	}
 
+	/*
+	 * Get our walk state storage.  Auto-GC
+	 */
+	wd = mdb_zalloc(sizeof (*wd), UM_SLEEP | UM_GC);
+	wsp->walk_data = wd;
 
 	/*
-	 * Save the address of the list head entry.  This terminates the list.
+	 * Read in taskq head, setup walk data.
 	 */
-	wsp->walk_data = (void *)
-	    ((size_t)wsp->walk_addr + OFFSETOF(taskq_t, tq_task));
-
-
-	/*
-	 * Read in taskq head, set walk_addr to point to first taskq_ent_t.
-	 */
-	if (mdb_vread((void *)&tq_head, sizeof (taskq_t), wsp->walk_addr) ==
-	    -1) {
-		mdb_warn("failed to read taskq list head at %p",
-		    wsp->walk_addr);
+	if (mdb_vread((void *)&tq, sizeof (taskq_t), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read taskq_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
 	}
-	wsp->walk_addr = (uintptr_t)tq_head.tq_task.tqent_next;
-
-
-	/*
-	 * Check for null list (next=head)
-	 */
-	if (wsp->walk_addr == (uintptr_t)wsp->walk_data) {
-		return (WALK_DONE);
-	}
+	wd->tq_addr = wsp->walk_addr;
+	wd->tq_nbuckets = tq.tq_nbuckets;
+	wd->tq_bucket = (uintptr_t)tq.tq_buckets;
+	if (wd->tq_bucket == 0)
+		wd->tq_nbuckets = 0;
+	wd->tq_bidx = -1; /* for tq_task */
 
 	return (WALK_NEXT);
 }
 
-
 int
 taskq_ent_walk_step(mdb_walk_state_t *wsp)
 {
-	taskq_ent_t	tq_ent;
+	struct mdb_tqe_walk_data *wd;
 	int		status;
 
+	wd = wsp->walk_data;
 
-	if (mdb_vread((void *)&tq_ent, sizeof (taskq_ent_t), wsp->walk_addr) ==
-	    -1) {
-		mdb_warn("failed to read taskq_ent_t at %p", wsp->walk_addr);
-		return (DCMD_ERR);
+	/*
+	 * If done in the current bucket,
+	 * move to next bucket's list head.
+	 */
+	while (wd->tqent_cur == wd->tqent_head) {
+
+		/* Terminate when no more buckets. */
+		if (wd->tq_bidx == wd->tq_nbuckets)
+			return (WALK_DONE);
+
+		/*
+		 * Setup next list head.  First bidx is -1 which
+		 * means enumerate in the tq.tq_task list.
+		 * Then bidx >= 0 are the taskq buckets.
+		 */
+		if (wd->tq_bidx == -1) {
+			/* enum. in tq_task */
+			wd->tqent_head = wd->tq_addr +
+			    OFFSETOF(taskq_t, tq_task);
+
+			/* next is bucket zero */
+			wd->tq_bidx = 0;
+		} else {
+			/* enum in tq_bucket.tqbucket_backlog */
+			wd->tqent_head = wd->tq_bucket +
+			    OFFSETOF(taskq_bucket_t, tqbucket_backlog);
+
+			/* next bucket */
+			wd->tq_bucket += sizeof (taskq_bucket_t);
+			wd->tq_bidx++;
+		}
+
+		/* read the list head, get next pointer */
+		if (mdb_vread(&wd->tq_ent, sizeof (taskq_ent_t),
+		    wd->tqent_head) == -1) {
+			mdb_warn("failed to read taskq_ent_t at %p",
+			    wd->tqent_head);
+			wd->tqent_cur = wd->tqent_head;
+		} else {
+			/* Moved to a new list head */
+			wd->tqent_cur = (uintptr_t)wd->tq_ent.tqent_next;
+		}
 	}
+	wsp->walk_addr = wd->tqent_cur;
 
-	status = wsp->walk_callback(wsp->walk_addr, (void *)&tq_ent,
-	    wsp->walk_cbdata);
-
-	wsp->walk_addr = (uintptr_t)tq_ent.tqent_next;
-
-
-	/* Check if we're at the last element (next=head) */
-	if (wsp->walk_addr == (uintptr_t)wsp->walk_data) {
-		return (WALK_DONE);
+	/* read the entry, do callback */
+	if (mdb_vread(&wd->tq_ent, sizeof (taskq_ent_t),
+	    wd->tqent_cur) == -1) {
+		mdb_warn("failed to read taskq_ent_t at %p", wd->tqent_cur);
+		status = WALK_NEXT;
+		/* finish with this bucket */
+		wd->tqent_cur = wd->tqent_head;
+	} else {
+		status = wsp->walk_callback(wd->tqent_cur, &wd->tq_ent,
+		    wsp->walk_cbdata);
+		/* next entry in this bucket */
+		wd->tqent_cur = (uintptr_t)wd->tq_ent.tqent_next;
 	}
 
 	return (status);
 }
 
+/*
+ * Walker: "taskq_thread"; taskq_thread_walk_{init,step,fini}
+ * given a taskq_t, list all of its threads
+ */
 typedef struct taskq_thread_info {
 	uintptr_t	tti_addr;
 	uintptr_t	*tti_tlist;

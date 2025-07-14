@@ -36,6 +36,7 @@
  *
  * Copyright (c) 2011 - 2013 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -517,6 +518,14 @@ out:
 
 /*
  * SMB2 query directory
+ *
+ * On success, puts qdir response payload in ctx->f_mdchain
+ * and initializes ctx->f_left, ctx->f_eofs for parsing.
+ *
+ * Returns:
+ *	zero: caller should continue reading
+ *	ENOENT: at end of directory, no records copied
+ *	other, eg EIO: something unexpected happened
  */
 static int
 smbfs_smb2_qdir(struct smbfs_fctx *ctx)
@@ -624,13 +633,6 @@ smbfs_smb2_qdir(struct smbfs_fctx *ctx)
 		error = ENOENT;
 		goto out;
 	}
-
-	/*
-	 * If this reply is shorter than requested by 1k
-	 * or more, we must have reached EOF.
-	 */
-	if ((obuf_len + 1024) < obuf_req)
-		ctx->f_flags |= SMBFS_RDD_EOF;
 
 	/*
 	 * Have data. Put the payload in ctx->f_mdchain

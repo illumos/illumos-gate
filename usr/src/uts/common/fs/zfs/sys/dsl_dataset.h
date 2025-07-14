@@ -473,7 +473,7 @@ boolean_t dsl_dataset_get_uint64_array_feature(dsl_dataset_t *ds,
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
 	char *__ds_name = kmem_alloc(ZFS_MAX_DATASET_NAME_LEN, KM_SLEEP); \
 	dsl_dataset_name(ds, __ds_name); \
-	dprintf("ds=%s " fmt, __ds_name, __VA_ARGS__); \
+	dprintf_zfs("ds=%s " fmt, __ds_name, __VA_ARGS__); \
 	kmem_free(__ds_name, ZFS_MAX_DATASET_NAME_LEN); \
 	} \
 _NOTE(CONSTCOND) } while (0)

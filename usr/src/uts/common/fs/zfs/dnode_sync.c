@@ -58,7 +58,7 @@ dnode_increase_indirection(dnode_t *dn, dmu_tx_t *tx)
 	ASSERT(db != NULL);
 
 	dn->dn_phys->dn_nlevels = new_level;
-	dprintf("os=%p obj=%llu, increase to %d\n", dn->dn_objset,
+	dprintf_zfs("os=%p obj=%llu, increase to %d\n", dn->dn_objset,
 	    dn->dn_object, dn->dn_phys->dn_nlevels);
 
 	/*
@@ -136,7 +136,7 @@ free_blocks(dnode_t *dn, blkptr_t *bp, int num, dmu_tx_t *tx)
 	dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
 	uint64_t bytesfreed = 0;
 
-	dprintf("ds=%p obj=%llx num=%d\n", ds, dn->dn_object, num);
+	dprintf_zfs("ds=%p obj=%llx num=%d\n", ds, dn->dn_object, num);
 
 	for (int i = 0; i < num; i++, bp++) {
 		if (BP_IS_HOLE(bp))

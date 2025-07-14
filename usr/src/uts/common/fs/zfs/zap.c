@@ -221,7 +221,7 @@ zap_table_grow(zap_t *zap, zap_table_phys_t *tbl,
 
 	tbl->zt_blks_copied++;
 
-	dprintf("copied block %llu of %llu\n",
+	dprintf_zfs("copied block %llu of %llu\n",
 	    tbl->zt_blks_copied, tbl->zt_numblks);
 
 	if (tbl->zt_blks_copied == tbl->zt_numblks) {
@@ -234,7 +234,7 @@ zap_table_grow(zap_t *zap, zap_table_phys_t *tbl,
 		tbl->zt_nextblk = 0;
 		tbl->zt_blks_copied = 0;
 
-		dprintf("finished; numblocks now %llu (%lluk entries)\n",
+		dprintf_zfs("finished; numblocks now %llu (%lluk entries)\n",
 		    tbl->zt_numblks, 1<<(tbl->zt_shift-10));
 	}
 
@@ -250,7 +250,7 @@ zap_table_store(zap_t *zap, zap_table_phys_t *tbl, uint64_t idx, uint64_t val,
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
 	ASSERT(tbl->zt_blk != 0);
 
-	dprintf("storing %llx at index %llx\n", val, idx);
+	dprintf_zfs("storing %llx at index %llx\n", val, idx);
 
 	uint64_t blk = idx >> (bs-3);
 	uint64_t off = idx & ((1<<(bs-3))-1);

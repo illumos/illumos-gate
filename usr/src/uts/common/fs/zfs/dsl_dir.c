@@ -459,7 +459,7 @@ dsl_dir_hold(dsl_pool_t *dp, const char *name, void *tag,
 		ASSERT(next[0] != '\0');
 		if (next[0] == '@')
 			break;
-		dprintf("looking up %s in obj%lld\n",
+		dprintf_zfs("looking up %s in obj%lld\n",
 		    buf, dsl_dir_phys(dd)->dd_child_dir_zapobj);
 
 		err = zap_lookup(dp->dp_meta_objset,
@@ -492,7 +492,8 @@ dsl_dir_hold(dsl_pool_t *dp, const char *name, void *tag,
 	    (tailp == NULL || (nextnext && nextnext[0] != '\0'))) {
 		/* bad path name */
 		dsl_dir_rele(dd, tag);
-		dprintf("next=%p (%s) tail=%p\n", next, next?next:"", tailp);
+		dprintf_zfs("next=%p (%s) tail=%p\n", next, next ? next : "",
+		    tailp);
 		err = SET_ERROR(ENOENT);
 	}
 	if (tailp != NULL)

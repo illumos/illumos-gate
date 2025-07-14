@@ -25,7 +25,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2017-2024 RackTop Systems.
  */
 
 #ifndef	_SYS_TASKQ_IMPL_H
@@ -63,13 +63,14 @@ typedef struct taskq_ent {
  * Taskq Statistics fields are not protected by any locks.
  */
 typedef struct tqstat {
-	uint_t		tqs_hits;
-	uint_t		tqs_misses;
-	uint_t		tqs_overflow;	/* no threads to allocate   */
-	uint_t		tqs_tcreates;	/* threads created 	*/
+	uint64_t	tqs_hits;
+	uint64_t	tqs_misses;
+	uint64_t	tqs_disptcreates;
+	uint64_t	tqs_overflow;	/* dispatch used backlog */
+	uint_t		tqs_maxbacklog;
+	uint_t		tqs_tcreates;	/* threads created	*/
 	uint_t		tqs_tdeaths;	/* threads died		*/
 	uint_t		tqs_maxthreads;	/* max # of alive threads */
-	uint_t		tqs_disptcreates;
 } tqstat_t;
 
 /*
@@ -78,8 +79,10 @@ typedef struct tqstat {
 struct taskq_bucket {
 	kmutex_t	tqbucket_lock;
 	taskq_t		*tqbucket_taskq;	/* Enclosing taskq */
+	taskq_ent_t	tqbucket_backlog;	/* distributed backlog */
 	taskq_ent_t	tqbucket_freelist;
 	uint_t		tqbucket_nalloc;	/* # of allocated entries */
+	uint_t		tqbucket_nbacklog;	/* # of backlog entries */
 	uint_t		tqbucket_nfree;		/* # of free entries */
 	kcondvar_t	tqbucket_cv;
 	ushort_t	tqbucket_flags;
@@ -92,6 +95,7 @@ struct taskq_bucket {
  */
 #define	TQBUCKET_CLOSE		0x01
 #define	TQBUCKET_SUSPEND	0x02
+#define	TQBUCKET_REDIRECT	0x04
 
 #define	TASKQ_INTERFACE_FLAGS	0x0000ffff	/* defined in <sys/taskq.h> */
 
@@ -126,6 +130,7 @@ struct taskq {
 	taskq_ent_t	*tq_freelist;
 	taskq_ent_t	tq_task;
 	int		tq_maxsize;
+	uint_t		tq_atpb;	/* avg. thr. per bucket */
 	taskq_bucket_t	*tq_buckets;	/* Per-cpu array of buckets */
 	int		tq_instance;
 	uint_t		tq_nbuckets;	/* # of buckets	(2^n)	    */
@@ -148,8 +153,7 @@ struct taskq {
 	uint64_t	tq_tasks;	/* Total # of tasks posted */
 	uint64_t	tq_executed;	/* Total # of tasks executed */
 	int		tq_maxtasks;	/* Max number of tasks in the queue */
-	int		tq_tcreates;
-	int		tq_tdeaths;
+	int		tq_dnthreads;	/* Dynamic N threads */
 };
 
 /* Special form of taskq dispatch that uses preallocated entries. */
