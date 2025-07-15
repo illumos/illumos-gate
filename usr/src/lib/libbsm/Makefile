@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2025 Oxide Computer Company
 #
 
 include ../Makefile.lib
@@ -123,8 +124,6 @@ AUDITXML =	auditxml
 
 install: install_dirs install_data
 
-#		$(ROOTUSRLIB) $(ROOTLIBS) $(ROOTLINKS)
-
 install_h: $(ROOTHDRDIR) $(ROOTHDRS) $(ROOTCHDRS)
 
 check:	$(CHECKHDRS) $(CHECKCHDRS)
@@ -198,6 +197,8 @@ adt_xlate.po: $(COMMONDIR)/adt_xlate.c
 	$(XGETTEXT) $(XGETFLAGS_ADT) $(COMMONDIR)/adt_xlate.c
 	$(SED) "/^domain/d" < messages.po > adt_xlate.po
 	$(RM) messages.po
+
+$(SUBDIRS):	$(GENSRCS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
