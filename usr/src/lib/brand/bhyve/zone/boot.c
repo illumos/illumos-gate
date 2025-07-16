@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 /*
@@ -455,9 +456,18 @@ add_nets(int *argc, char **argv)
 			nextpcifn++;
 		}
 
+		/*
+		 * if you look in bhyve(8) you will see that
+		 * one can append "[,network-backend-options]"
+		 * If this vnic has been marked to allow promiscuity
+		 * by using allow_mac_spoofing=true, we will want to
+		 * add ",promiscphys=true"
+		 * All other network backend options are by default true.
+		 */
 		if (snprintf(slotconf, sizeof (slotconf),
-		    "%d:%d,virtio-net-viona,%s", PCI_SLOT_NICS, pcifn, net) >=
-		    sizeof (slotconf)) {
+		    "%d:%d,virtio-net-viona,%s%s", PCI_SLOT_NICS, pcifn, net,
+		    is_env_true("net", net, "allow_mac_spoofing") ?
+		    ",promiscphys=true" : "") >= sizeof (slotconf)) {
 			(void) printf("Error: net '%s' too long\n", net);
 			return (-1);
 		}

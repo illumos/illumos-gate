@@ -19,4 +19,7 @@ typeset -A FORCED_ATTRS
 FORCED_ATTRS["zlog-mode"]=g--
 FORCED_ATTRS["zlog-name"]=platform.log
 
+# Do we support unfiltered promiscuous mode
+jst_ufpromisc="yes"
+
 . /usr/lib/brand/jcommon/statechange
