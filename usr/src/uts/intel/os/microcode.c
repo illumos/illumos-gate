@@ -37,6 +37,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
 #include <sys/ontrap.h>
+#include <sys/stdbool.h>
 #include <sys/systeminfo.h>
 #include <sys/systm.h>
 #include <sys/ucode.h>
@@ -224,7 +225,7 @@ ucode_write(xc_arg_t arg1, xc_arg_t unused2, xc_arg_t unused3)
  */
 
 ucode_errno_t
-ucode_validate(uint8_t *ucodep, int size)
+ucode_validate(uint8_t *ucodep, size_t size)
 {
 	if (ucode == NULL)
 		return (EM_NOTSUP);
@@ -232,9 +233,9 @@ ucode_validate(uint8_t *ucodep, int size)
 }
 
 ucode_errno_t
-ucode_update(uint8_t *ucodep, int size)
+ucode_update(uint8_t *ucodep, size_t size)
 {
-	int		found = 0;
+	bool		found = false;
 	ucode_update_t	cached = { 0 };
 	ucode_update_t	*cachedp = NULL;
 	ucode_errno_t	rc = EM_OK;
@@ -287,7 +288,7 @@ ucode_update(uint8_t *ucodep, int size)
 		    == EM_OK) {
 			bcopy(uusp, &cached, sizeof (cached));
 			cachedp = &cached;
-			found = 1;
+			found = true;
 		}
 
 		/* Nothing to do */

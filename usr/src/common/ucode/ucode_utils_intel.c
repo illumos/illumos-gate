@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -71,11 +71,11 @@ ucode_header_validate_intel(ucode_header_intel_t *uhp)
 	 * size of DWORD.  The total size field must be in multiples of 1K
 	 * bytes.
 	 */
-	if ((body_size % sizeof (int)) ||
-	    (total_size < (header_size + body_size)) ||
-	    (total_size % UCODE_KB(1)))
-
+	if ((body_size % sizeof (int)) != 0 ||
+	    (total_size < header_size + body_size) ||
+	    (total_size % UCODE_KB(1)) != 0) {
 		return (EM_HEADER);
+	}
 
 	/*
 	 * Sanity check to avoid reading bogus files
@@ -94,7 +94,6 @@ ucode_header_validate_intel(ucode_header_intel_t *uhp)
 	if (total_size > (header_size + body_size)) {
 		if ((total_size - body_size - header_size -
 		    UCODE_EXT_TABLE_SIZE_INTEL) % UCODE_EXT_SIG_SIZE_INTEL) {
-
 			return (EM_HEADER);
 		}
 	}
@@ -134,30 +133,26 @@ ucode_checksum_intel_extsig(ucode_header_intel_t *uhp,
 	 */
 	uint32_t diff;
 
-	diff = uesp->ues_signature +
-	    uesp->ues_proc_flags + uesp->ues_checksum;
-	diff -= uhp->uh_signature + uhp->uh_proc_flags +
-	    uhp->uh_checksum;
+	diff = uesp->ues_signature + uesp->ues_proc_flags + uesp->ues_checksum;
+	diff -= uhp->uh_signature + uhp->uh_proc_flags + uhp->uh_checksum;
 
 	return (diff);
 }
 
 ucode_errno_t
-ucode_validate_intel(uint8_t *ucodep, int size)
+ucode_validate_intel(uint8_t *ucodep, size_t size)
 {
 	uint32_t header_size = UCODE_HEADER_SIZE_INTEL;
-	int remaining;
+	size_t remaining;
 
 	if (ucodep == NULL || size <= 0)
 		return (EM_INVALIDARG);
 
 	for (remaining = size; remaining > 0; ) {
 		uint32_t total_size, body_size, ext_size;
-		ucode_header_intel_t *uhp;
 		uint8_t *curbuf = &ucodep[size - remaining];
+		ucode_header_intel_t *uhp = (ucode_header_intel_t *)curbuf;
 		ucode_errno_t rc;
-
-		uhp = (ucode_header_intel_t *)curbuf;
 
 		if ((rc = ucode_header_validate_intel(uhp)) != EM_OK)
 			return (rc);

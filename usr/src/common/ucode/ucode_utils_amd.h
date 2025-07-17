@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _COMMON_UCODE_UTILS_AMD_H
@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-extern ucode_errno_t ucode_validate_amd(uint8_t *, int);
+extern ucode_errno_t ucode_validate_amd(uint8_t *, size_t);
 
 #ifdef __cplusplus
 }

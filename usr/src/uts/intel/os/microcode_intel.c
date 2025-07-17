@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/stdbool.h>
@@ -347,11 +347,11 @@ ucode_load_intel(cpu_ucode_info_t *uinfop)
 }
 
 static ucode_errno_t
-ucode_extract_intel(ucode_update_t *uusp, uint8_t *ucodep, int size)
+ucode_extract_intel(ucode_update_t *uusp, uint8_t *ucodep, size_t size)
 {
 	uint32_t	header_size = UCODE_HEADER_SIZE_INTEL;
-	int		remaining;
-	int		found = 0;
+	size_t		remaining;
+	bool		found = false;
 	ucode_errno_t	search_rc = EM_NOMATCH; /* search result */
 
 	/*
@@ -360,8 +360,8 @@ ucode_extract_intel(ucode_update_t *uusp, uint8_t *ucodep, int size)
 	 * processor.
 	 */
 	for (remaining = size; remaining > 0; ) {
-		int	total_size, body_size, ext_size;
-		uint8_t	*curbuf = &ucodep[size - remaining];
+		uint32_t total_size, body_size, ext_size;
+		uint8_t *curbuf = &ucodep[size - remaining];
 		ucode_header_intel_t *uhp = (ucode_header_intel_t *)curbuf;
 		ucode_ext_table_intel_t *uetp = NULL;
 		ucode_errno_t tmprc;
@@ -370,9 +370,10 @@ ucode_extract_intel(ucode_update_t *uusp, uint8_t *ucodep, int size)
 		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
 		ext_size = total_size - (header_size + body_size);
 
-		if (ext_size > 0)
+		if (ext_size > 0) {
 			uetp = (ucode_ext_table_intel_t *)
 			    &curbuf[header_size + body_size];
+		}
 
 		tmprc = ucode_match_intel(uusp->sig, &uusp->info, uhp, uetp);
 
@@ -395,7 +396,7 @@ ucode_extract_intel(ucode_update_t *uusp, uint8_t *ucodep, int size)
 			uusp->usize =
 			    UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
 			uusp->expected_rev = uhp->uh_rev;
-			found = 1;
+			found = true;
 		}
 
 		remaining -= total_size;

@@ -30,12 +30,33 @@
 #ifndef	_SYS_UCODE_AMD_H
 #define	_SYS_UCODE_AMD_H
 
+#include <sys/stddef.h>
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <ucode/ucode_errno.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * AMD microcode is generally distributed in container files which start with a
+ * magic number and then contain multiple TLV-encoded sections. Typically such
+ * a file will contain an equivalence table section followed by one or more
+ * patches.
+ */
+#define	UCODE_AMD_CONTAINER_MAGIC	0x00414d44	/* "AMD\0" */
+#define	UCODE_AMD_CONTAINER_TYPE_EQUIV	0
+#define	UCODE_AMD_CONTAINER_TYPE_PATCH	1
+
+typedef struct ucode_section_amd {
+	uint32_t	usa_type;
+	uint32_t	usa_size;
+	uint8_t		usa_data[];
+} ucode_section_amd_t;
+
+CTASSERT(sizeof (ucode_section_amd_t) == 8);
+CTASSERT(offsetof(ucode_section_amd_t, usa_data) == 8);
 
 /*
  * AMD Microcode file information
