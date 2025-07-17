@@ -1026,15 +1026,25 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		next_nhdrmp = nhdrmp->b_next;
 		nhdrmp->b_next = NULL;
 		nhdrmp = mac_sw_cksum(nhdrmp, emul);
-		nhdrmp->b_next = next_nhdrmp;
-		next_nhdrmp = NULL;
-
 		/*
-		 * We may have freed the nhdrmp argument during
-		 * checksum emulation, make sure that seg_chain
-		 * references a valid mblk.
+		 * The mblk could be replaced (via pull-up) or freed (due to
+		 * failure) during mac_sw_cksum(), so we must take care with the
+		 * result here.
 		 */
-		seg_chain = nhdrmp;
+		if (nhdrmp != NULL) {
+			nhdrmp->b_next = next_nhdrmp;
+			next_nhdrmp = NULL;
+			seg_chain = nhdrmp;
+		} else {
+			freemsgchain(next_nhdrmp);
+			/*
+			 * nhdrmp referenced the head of seg_chain when it was
+			 * freed, so further clean-up there is unnecessary
+			 */
+			seg_chain = NULL;
+			mac_drop_pkt(omp, "LSO cksum emulation failed");
+			goto fail;
+		}
 	}
 
 	ASSERT3P(nhdrmp, !=, NULL);
@@ -1105,10 +1115,27 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 			next_nhdrmp = nhdrmp->b_next;
 			nhdrmp->b_next = NULL;
 			nhdrmp = mac_sw_cksum(nhdrmp, emul);
-			nhdrmp->b_next = next_nhdrmp;
-			next_nhdrmp = NULL;
-			/* We may have freed the original nhdrmp. */
-			prev_nhdrmp->b_next = nhdrmp;
+			/*
+			 * Like above, handle cases where mac_sw_cksum() does a
+			 * pull-up or drop of the mblk.
+			 */
+			if (nhdrmp != NULL) {
+				nhdrmp->b_next = next_nhdrmp;
+				next_nhdrmp = NULL;
+				prev_nhdrmp->b_next = nhdrmp;
+			} else {
+				freemsgchain(next_nhdrmp);
+				/*
+				 * Critical to de-link the now-freed nhdrmp
+				 * before freeing the rest of the preceding
+				 * chain.
+				 */
+				prev_nhdrmp->b_next = NULL;
+				freemsgchain(seg_chain);
+				seg_chain = NULL;
+				mac_drop_pkt(omp, "LSO cksum emulation failed");
+				goto fail;
+			}
 		}
 
 		DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
@@ -1156,6 +1183,12 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		/* This should be the last mblk. */
 		ASSERT3P(nhdrmp->b_next, ==, NULL);
 		nhdrmp = mac_sw_cksum(nhdrmp, emul);
+		/*
+		 * If the final mblk happens to be dropped as part of
+		 * mac_sw_cksum(), that is unfortunate, but it need not be a
+		 * show-stopper at this point.  We can just pretend that final
+		 * packet was dropped in transit.
+		 */
 		prev_nhdrmp->b_next = nhdrmp;
 	}
 

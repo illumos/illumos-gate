@@ -552,8 +552,18 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 				mblk_t *tail = NULL;
 				uint_t n_pkts = 0;
 
-				DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM |
-				    HCK_FULLCKSUM;
+				/*
+				 * Emulation of LSO requires that cksum offload
+				 * be enabled on the mblk.  Since only IPv4 is
+				 * supported by the LSO emulation, the v4 cksum
+				 * is enabled unconditionally.
+				 */
+				if ((DB_CKSUMFLAGS(mp) &
+				    (HCK_FULLCKSUM | HCK_PARTIALCKSUM)) == 0) {
+					DB_CKSUMFLAGS(mp) |= HCK_FULLCKSUM;
+				}
+				DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM;
+
 				mac_hw_emul(&mp, &tail, &n_pkts, MAC_ALL_EMULS);
 				if (mp == NULL) {
 					VIONA_RING_STAT_INCR(ring,
