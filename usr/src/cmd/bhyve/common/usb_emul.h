@@ -88,6 +88,7 @@ struct usb_hci {
 	/* controller managed fields */
 	int	hci_address;
 	int	hci_port;
+	int	hci_speed;
 };
 
 /*
