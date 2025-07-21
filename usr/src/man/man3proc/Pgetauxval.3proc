@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd July 13, 2025
 .Dt PGETAUXVAL 3PROC
 .Os
 .Sh NAME
@@ -21,7 +21,7 @@
 .Lb libproc
 .Sh SYNOPSIS
 .In libproc.h
-.Ft int
+.Ft long
 .Fo Pgetauxval
 .Fa "struct ps_prochandle *P"
 .Fa "int type"

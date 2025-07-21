@@ -904,6 +904,7 @@ NVMEHDRS=		\
 	micron_9550.h		\
 	ocp.h			\
 	phison.h		\
+	samsung.h		\
 	solidigm.h		\
 	solidigm_p5xxx.h	\
 	solidigm_ps10x0.h	\

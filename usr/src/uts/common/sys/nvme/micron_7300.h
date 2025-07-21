@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_MICRON_7300_H
@@ -25,12 +25,12 @@
  * across multiple device families.
  */
 
+#include <sys/debug.h>
+#include <sys/stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <sys/debug.h>
-#include <sys/stdint.h>
 
 #define	MICRON_7300_PRO_DID	0x51a2
 #define	MICRON_7300_MAX_DID	0x51a3

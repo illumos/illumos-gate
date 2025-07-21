@@ -1666,6 +1666,11 @@ igc_ring_tx(void *arg, mblk_t *mp)
 
 	ASSERT3P(mp->b_next, ==, NULL);
 
+	if (igc->igc_link_state != LINK_STATE_UP) {
+		freemsg(mp);
+		return (NULL);
+	}
+
 	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &tx.itx_cksum);
 	mac_lso_get(mp, &tx.itx_mss, &tx.itx_lso);
 

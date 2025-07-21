@@ -34,6 +34,9 @@ file path=opt/tz-tests/tests/tz_dump mode=0555
 file path=opt/tz-tests/tests/tzlist.64 mode=0555
 file path=opt/tz-tests/tests/tzload.32 mode=0555
 file path=opt/tz-tests/tests/tzload.64 mode=0555
+file path=opt/tz-tests/tests/tzname_17947 mode=0555
+file path=opt/tz-tests/tests/tznames.32 mode=0555
+file path=opt/tz-tests/tests/tznames.64 mode=0555
 file path=opt/tz-tests/tests/tzparams.64 mode=0555
 file path=opt/tz-tests/tests/zoneinfo_dump.32 mode=0555
 file path=opt/tz-tests/tests/zoneinfo_dump.64 mode=0555

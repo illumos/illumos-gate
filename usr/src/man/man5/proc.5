@@ -19,7 +19,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd May 8, 2023
+.Dd July 13, 2025
 .Dt PROC 5
 .Os
 .Sh NAME
@@ -407,10 +407,10 @@ typedef struct pstatus {
      int pr_flags;            /* flags (see below) */
      int pr_nlwp;             /* number of active lwps in the process */
      int pr_nzomb;            /* number of zombie lwps in the process */
-     pid_tpr_pid;             /* process id */
-     pid_tpr_ppid;            /* parent process id */
-     pid_tpr_pgid;            /* process group id */
-     pid_tpr_sid;             /* session id */
+     pid_t pr_pid;            /* process id */
+     pid_t pr_ppid;           /* parent process id */
+     pid_t pr_pgid;           /* process group id */
+     pid_t pr_sid;            /* session id */
      id_t pr_aslwpid;         /* obsolete */
      id_t pr_agentid;         /* lwp-id of the agent lwp, if any */
      sigset_t pr_sigpend;     /* set of process pending signals */
@@ -1237,7 +1237,7 @@ Each structure describes a contiguous virtual
 address region in the address space of the traced process:
 .Bd -literal -offset 2
 typedef struct prmap {
-	uintptr_tpr_vaddr;         /* virtual address of mapping */
+	uintptr_t pr_vaddr;        /* virtual address of mapping */
 	size_t pr_size;            /* size of mapping in bytes */
 	char pr_mapname[PRMAPSZ];  /* name in /proc/pid/object */
 	offset_t pr_offset;        /* offset into mapped object, if any */

@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -112,6 +113,7 @@
 #include <deflt.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <stdbool.h>
 
 /* JAN_01_1902 cast to (int) - negative number of seconds from 1970 */
 #define	JAN_01_1902		(int)0x8017E880
@@ -1064,6 +1066,12 @@ set_zone_default_context(void)
 	set_tzname(newtzname);
 }
 
+static bool
+state_is_posix(const state_t *state)
+{
+	return (state->zonerules == POSIX || state->zonerules == POSIX_USA);
+}
+
 static void
 set_zone_context(time_t t)
 {
@@ -1146,11 +1154,12 @@ set_zone_context(time_t t)
 	 */
 	ttisp = &lclzonep->ttis[lclzonep->types[tidx]];
 	prevp = &lclzonep->prev[tidx];
+	bool posix = state_is_posix(lclzonep);
 
 	if ((is_in_dst = ttisp->tt_isdst) == 0) { /* std. time */
 		timezone = -ttisp->tt_gmtoff;
 		newtzname[0] = &lclzonep->chars[ttisp->tt_abbrind];
-		if ((alt = prevp->alt) != NULL) {
+		if (!posix && (alt = prevp->alt) != NULL) {
 			altzone = -alt->tt_gmtoff;
 			newtzname[1] = &lclzonep->chars[alt->tt_abbrind];
 		} else {
@@ -1160,7 +1169,7 @@ set_zone_context(time_t t)
 	} else { /* alt. time */
 		altzone = -ttisp->tt_gmtoff;
 		newtzname[1] = &lclzonep->chars[ttisp->tt_abbrind];
-		if ((std = prevp->std) != NULL) {
+		if (!posix && (std = prevp->std) != NULL) {
 			timezone = -std->tt_gmtoff;
 			newtzname[0] = &lclzonep->chars[std->tt_abbrind];
 		} else {

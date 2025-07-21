@@ -74,7 +74,7 @@ wchar_t	*headnames[] = {
 enum hdr_type {
 	off,		/* mail header processing is off */
 	not_in_hdr,	/* not currently processing a mail header */
-	in_hdr, 	/* currently filling hdrbuf with potential hdr lines */
+	in_hdr,		/* currently filling hdrbuf with potential hdr lines */
 	flush_hdr,	/* flush hdrbuf; not a header, no special processing */
 	do_hdr		/* process hdrbuf as a mail header */
 };
@@ -82,7 +82,7 @@ enum hdr_type {
 enum hdr_type	hdr_state = not_in_hdr;
 
 wchar_t *hdrbuf[MAXLINES];	/* buffer to hold potential mail header lines */
-int 	h_lines;		/* index into lines of hdrbuf */
+int	h_lines;		/* index into lines of hdrbuf */
 
 void (*(split))(wchar_t []);
 extern int scrwidth(wchar_t);
@@ -121,7 +121,7 @@ main(int argc, char **argv)
 	outp = NOSTR;
 	setbuf(stdout, sobuf);
 	setlocale(LC_ALL, "");
-	locale = setlocale(LC_CTYPE, "");
+	locale = setlocale(LC_CTYPE, NULL);
 	if (strcmp(locale, "C") == 0) {
 		split = csplit;
 	} else {
@@ -733,8 +733,8 @@ _wckind_c_locale(wchar_t wc)
 static void
 header_chk(void)
 {
-	wchar_t  *cp; 		/* ptr to current char of line */
-	wchar_t **hp; 		/* ptr to current char of a valid */
+	wchar_t  *cp;		/* ptr to current char of line */
+	wchar_t **hp;		/* ptr to current char of a valid */
 				/* mail header string */
 	int	  l;		/* index */
 				/*

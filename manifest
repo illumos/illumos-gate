@@ -4657,6 +4657,7 @@ f usr/include/sys/nvme/micron_9550.h 0644 root bin
 f usr/include/sys/nvme/micron_x500.h 0644 root bin
 f usr/include/sys/nvme/ocp.h 0644 root bin
 f usr/include/sys/nvme/phison.h 0644 root bin
+f usr/include/sys/nvme/samsung.h 0644 root bin
 f usr/include/sys/nvme/solidigm.h 0644 root bin
 f usr/include/sys/nvme/solidigm_p5xxx.h 0644 root bin
 f usr/include/sys/nvme/solidigm_ps10x0.h 0644 root bin
