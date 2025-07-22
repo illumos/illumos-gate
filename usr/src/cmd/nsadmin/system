@@ -119,9 +119,6 @@ set noexec_user_stack=1
 set noexec_user_stack_log=1
 set rlim_fd_cur=65536
 
-* Ensure that c-states are disabled
-set idle_cpu_no_deep_c=1
-
 * 10 GbE Tuning
 set ip:ip_squeue_fanout=1
 
