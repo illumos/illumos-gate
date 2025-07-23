@@ -31,6 +31,7 @@
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2025 Edgecast Cloud LLC
  */
 
 #include <sys/elf.h>
@@ -3178,6 +3179,114 @@ cmd_bitx(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/* "DESCRIPTION" section text for ::bcmp */
+static void
+bcmp_help(void)
+{
+	mdb_printf(
+	    "-n Number of bytes to compare\n"
+	    "\n"
+	    "Both addr2 and -n arguments are required.\n"
+	    "\n"
+	    "Output is silent if both memory areas are identical. If they\n"
+	    "are not identical, the offset of the first differing byte prints\n"
+	    "on stdout or a pipe and dot is set to (addr + the offset).\n");
+}
+
+/* Actual implementation of ::bcmp */
+static int
+cmd_bcmp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uintptr_t other_addr = 0;
+	uint64_t length = 0;
+	uintptr_t high_addr, low_addr;
+
+	if (argc < 1 || argc > 3 || !(flags & DCMD_ADDRSPEC) ||
+	    argv[0].a_type != MDB_TYPE_STRING || argv[0].a_un.a_str[0] == '-') {
+		return (DCMD_USAGE);
+	}
+
+	if (dis_str2addr(argv[0].a_un.a_str, &other_addr) == -1)
+		return (DCMD_ERR);
+	argv++;
+	argc--;
+
+	if (mdb_getopts(argc, argv, 'n', MDB_OPT_UINT64, &length, NULL) !=
+	    argc) {
+		return (DCMD_USAGE);
+	}
+
+	/* Cap the length to (2 ^ 31 - 1) bytes for now. */
+	if (length > INT_MAX || length == 0) {
+		mdb_warn("Lengths not [1..0t%d]/[1..0x%x] are unsupported.\n",
+		    INT_MAX, INT_MAX);
+		return (DCMD_ERR);
+	}
+
+	if (addr > other_addr) {
+		high_addr = addr;
+		low_addr = other_addr;
+	} else {
+		high_addr = other_addr;
+		low_addr = addr;
+	}
+
+	if (high_addr - low_addr < length) {
+		mdb_warn("Segments are overlapping for length %r.\n", length);
+		return (DCMD_ERR);
+	}
+
+	/* Check for bounds at the higher address, which means wrapping? */
+	if (high_addr + length < high_addr) {
+		mdb_warn("High-address segment would wrap around\n");
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * Okay, we can finally start the comparison. Be deliberate, we can
+	 * make this faster later.
+	 *
+	 * For now, read them in 1KiB at a time.
+	 */
+	uintptr_t offset = 0;
+#define	BCMP_CHUNK_SIZE 1024
+	uint8_t *chunk = mdb_alloc(BCMP_CHUNK_SIZE, UM_SLEEP | UM_GC);
+	uint8_t *other_chunk = mdb_alloc(BCMP_CHUNK_SIZE, UM_SLEEP | UM_GC);
+	while (offset < length) {
+		size_t readsize = (length - offset > BCMP_CHUNK_SIZE) ?
+		    BCMP_CHUNK_SIZE : length - offset;
+		size_t chunk_offset = 0;
+
+		if (mdb_vread(chunk, readsize, addr + offset) == -1) {
+			mdb_warn("Read failure 0x%p, length %d\n",
+			    addr + offset, readsize);
+			return (DCMD_ERR);
+		}
+		if (mdb_vread(other_chunk, readsize, other_addr + offset) ==
+		    -1) {
+			mdb_warn("Read failure 0x%p, length %d\n",
+			    other_addr + offset, readsize);
+			return (DCMD_ERR);
+		}
+		/* Like I said, we can make this faster later. */
+		while (chunk_offset < readsize) {
+			if (chunk[chunk_offset] != other_chunk[chunk_offset])
+				break;
+			chunk_offset++;
+		}
+		offset += chunk_offset;
+		if (chunk_offset < readsize) {
+			mdb_printf("%lr\n", offset);
+			/* Set the dot so someone can utter "/B" immediately. */
+			mdb_set_dot(addr + offset);
+			break; /* out of while loop, to return DCMD_OK... */
+		}
+	}
+#undef BCMP_CHUNK_SIZE
+
+	return (DCMD_OK);
+}
+
 /*
  * Table of built-in dcmds associated with the root 'mdb' module.  Future
  * expansion of this program should be done here, or through the external
@@ -3230,6 +3339,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    "address", cmd_array },
 	{ "bitx", ":<high bit> <low bit> [new value]",
 	    "extract bits from, or set bits in, a value", cmd_bitx, bitx_help },
+	{ "bcmp", ":<addr2> <-n count>",
+	    "compare two disjoint sections of memory", cmd_bcmp, bcmp_help},
 	{ "bp", "?[+/-dDestT] [-c cmd] [-n count] sym ...", "breakpoint at the "
 	    "specified addresses or symbols", cmd_bp, bp_help },
 	{ "dcmds", "[[-n] pattern]",
