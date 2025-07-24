@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -1593,6 +1593,10 @@ pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
  * revision of the PCI express capability. The link capabilities 2 register did
  * not exist prior to version 2 of this capability. If a modern device does not
  * implement it, it is supposed to return zero for the register.
+ *
+ * Finally, we have to check whether or not the device supports the data link
+ * layer link active reporting capability. If it doesn't, there's only so much
+ * we can do here.
  */
 static void
 pcie_capture_speeds(dev_info_t *dip)
@@ -1707,6 +1711,17 @@ pcie_capture_speeds(dev_info_t *dip)
 	default:
 		bus_p->bus_cur_width = PCIE_LINK_WIDTH_UNKNOWN;
 		break;
+	}
+
+	/*
+	 * If the link is not known to be up, denote that and invalidate the
+	 * current link speed and width. If we can't know that then there's not
+	 * a whole lot that we can do.
+	 */
+	if ((cap & PCIE_LINKCAP_DLL_ACTIVE_REP_CAPABLE) != 0 &&
+	    (status & PCIE_LINKSTS_DLL_LINK_ACTIVE) == 0) {
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_UNKNOWN;
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_UNKNOWN;
 	}
 
 	switch (cap & PCIE_LINKCAP_MAX_WIDTH_MASK) {

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <err.h>
@@ -238,7 +238,7 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 	case PCIEADM_SDO_MAXWIDTH:
 		if (psdo->psdo_mwidth <= 0) {
 			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "x%u", psdo->psdo_mwidth) >=
+		} else if (snprintf(buf, buflen, "x%d", psdo->psdo_mwidth) >=
 		    buflen) {
 			return (B_FALSE);
 		}
@@ -246,7 +246,7 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 	case PCIEADM_SDO_CURWIDTH:
 		if (psdo->psdo_cwidth <= 0) {
 			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "x%u", psdo->psdo_cwidth) >=
+		} else if (snprintf(buf, buflen, "x%d", psdo->psdo_cwidth) >=
 		    buflen) {
 			return (B_FALSE);
 		}
@@ -290,17 +290,41 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		}
 		break;
 	case PCIEADM_SDO_TYPE:
-		if (pcieadm_speed2gen(psdo->psdo_cspeed) == 0 ||
-		    psdo->psdo_mwidth == -1) {
+		/*
+		 * We need to distinguish three different groups of things here:
+		 *
+		 *  - Something is a PCI device.
+		 *  - We have a PCIe device where the link is down and therefore
+		 *    have no current width or speed.
+		 *  - We have a PCIe device which is up.
+		 *
+		 * A PCIe device should always have a maximum width value. This
+		 * is required and therefore should be a good proxy for whether
+		 * or not we have a PCIe device.
+		 */
+		if (psdo->psdo_mwidth == -1) {
 			if (strlcat(buf, "PCI", buflen) >= buflen) {
 				return (B_FALSE);
 			}
-		} else {
-			if (snprintf(buf, buflen, "PCIe Gen %ux%u",
-			    pcieadm_speed2gen(psdo->psdo_cspeed),
-			    psdo->psdo_cwidth) >= buflen) {
+			break;
+		}
+
+		/*
+		 * If we don't have a valid link up, indicate we don't know.
+		 * While the link is probably down, we don't have that as a
+		 * guarantee right now.
+		 */
+		if (psdo->psdo_cspeed == -1 || psdo->psdo_cwidth == -1) {
+			if (strlcat(buf, "PCIe unknown", buflen) >= buflen) {
 				return (B_FALSE);
 			}
+			break;
+		}
+
+		if (snprintf(buf, buflen, "PCIe Gen %ux%d",
+		    pcieadm_speed2gen(psdo->psdo_cspeed),
+		    psdo->psdo_cwidth) >= buflen) {
+			return (B_FALSE);
 		}
 		break;
 	default:
