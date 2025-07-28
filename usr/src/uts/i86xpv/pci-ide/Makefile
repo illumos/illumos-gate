@@ -44,7 +44,7 @@ UTSBASE	= ../..
 MODULE		= pci-ide
 OBJECTS		= $(PCIIDE_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/pci-ide
+CONF_SRCDIR	= $(UTSBASE)/intel/io/pci-ide
 
 #
 #	Include common rules.

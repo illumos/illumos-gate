@@ -1044,10 +1044,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/overlay/plugins/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pci-ide/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcn/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

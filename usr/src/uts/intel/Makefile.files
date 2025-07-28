@@ -54,6 +54,7 @@ CORE_OBJS +=		\
 	i86_subr.o	\
 	lock_prim.o	\
 	ovbcopy.o	\
+	pic.o		\
 	polled_io.o	\
 	retpoline.o	\
 	sseblk.o	\
@@ -162,6 +163,7 @@ DADK_OBJS += dadk.o
 DCOPY_OBJS += dcopy.o
 DNET_OBJS += dnet.o dnet_mii.o
 FD_OBJS += fd.o
+FDC_OBJS += fdc.o
 GDA_OBJS += gda.o
 GHD_OBJS += ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
 	ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o

@@ -41,12 +41,19 @@ HDRS	=			\
 	cpu.h			\
 	ddi_isa.h		\
 	debugreg.h		\
+	dma_engine.h		\
+	dma_i8237A.h		\
+	ecppio.h		\
+	ecppreg.h		\
+	ecppsys.h		\
+	ecppvar.h		\
 	fasttrap_isa.h		\
 	fp.h			\
 	frame.h			\
+	hypervisor.h		\
+	i8272A.h		\
 	inline.h		\
 	iommulib.h		\
-	hypervisor.h		\
 	kdi_machimpl.h		\
 	kdi_regs.h		\
 	machlock.h		\
@@ -62,6 +69,8 @@ HDRS	=			\
 	obpdefs.h		\
 	old_procfs.h		\
 	pcb.h			\
+	pic.h			\
+	pit.h			\
 	pmem.h			\
 	privmregs.h		\
 	privregs.h		\
@@ -75,6 +84,7 @@ HDRS	=			\
 	pte.h			\
 	reg.h			\
 	regset.h		\
+	rtc.h			\
 	segment.h		\
 	segments.h		\
 	spl.h			\

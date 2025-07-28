@@ -35,14 +35,12 @@
 #
 # This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
-# common to all SunOS systems.
+# common to all illumos systems.
 
+# Common objects used by only a subset of illumos systems
 i386_CORE_OBJS += \
 		atomic.o	\
-		avintr.o	\
-		pic.o
-
-sparc_CORE_OBJS +=
+		avintr.o
 
 COMMON_CORE_OBJS +=			\
 		beep.o			\
@@ -980,8 +978,6 @@ KB8042_OBJS +=	\
 		kb8042_keytables.o
 
 MOUSE8042_OBJS += mouse8042.o
-
-FDC_OBJS +=	fdc.o
 
 ASY_OBJS +=	asy.o
 

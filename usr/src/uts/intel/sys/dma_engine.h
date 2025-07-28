@@ -36,8 +36,8 @@
 /*	Copyright (c) 1988, 1989 Intel Corp.			*/
 /*		All Rights Reserved   				*/
 
-#ifndef	_SYS_DMAENGINE_H
-#define	_SYS_DMAENGINE_H
+#ifndef	_SYS_DMA_ENGINE_H
+#define	_SYS_DMA_ENGINE_H
 
 #include <sys/types.h>
 #include <sys/dditypes.h>
@@ -275,4 +275,4 @@ int ddi_dmae_getcnt(dev_info_t *dip, int chnl, int *count);
 }
 #endif
 
-#endif	/* !_SYS_DMAENGINE_H */
+#endif	/* !_SYS_DMA_ENGINE_H */
