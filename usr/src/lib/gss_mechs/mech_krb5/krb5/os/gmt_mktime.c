@@ -52,7 +52,7 @@ time_t krb5int_gmt_mktime(struct tm *t)
    * checking for such cases.
    */
   assert_time(t->tm_year>=1);
-  assert_time(t->tm_year<=138);
+  /* assert_time(t->tm_year<=138); - see below */
 
   assert_time(t->tm_mon>=0);
   assert_time(t->tm_mon<=11);
@@ -67,6 +67,21 @@ time_t krb5int_gmt_mktime(struct tm *t)
 
 #undef assert_time
 
+  /*
+   * Some KDCs (like Windows Server 2025) now issue expiration timestamps above
+   * the maximum signed 32-bit value. For now, clamp those to 32-bit time_t.
+   * RFC4120 generally leaves it to the implementation to decide whether a
+   * stricter expiration is warranted, and all timestamps whose exact value is
+   * protocol-meaningful represent current time or time in the recent past.
+   */
+  if (t->tm_year >= 138) {
+    t->tm_year = 138;
+    t->tm_mon = 0;
+    t->tm_mday = 1;
+    t->tm_hour = 0;
+    t->tm_min = 0;
+    t->tm_sec = 0;
+  }
 
   accum = t->tm_year - 70;
   accum *= 365;			/* 365 days/normal year */
