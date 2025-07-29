@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #ifndef	INTERFACE_H
@@ -56,7 +57,8 @@ struct dhcp_pif_s {
 	dhcp_pif_t	*pif_prev;
 	dhcp_lif_t	*pif_lifs;	/* pointer to logical interface list */
 	uint32_t	pif_index;	/* interface index */
-	uint16_t	pif_max;	/* largest DHCP packet on this if */
+	uint_t		pif_mtu_orig;	/* Original interface MTU */
+	uint_t		pif_mtu;	/* Current interface MTU */
 	uchar_t		*pif_hwaddr;	/* our link-layer address */
 	uchar_t		pif_hwlen;	/* our link-layer address len */
 	uchar_t		pif_hwtype;	/* type of link-layer */
@@ -78,7 +80,7 @@ struct dhcp_lif_s {
 	uint64_t	lif_flags;	/* Interface flags (IFF_*) */
 	int		lif_sock_ip_fd;	/* Bound to addr.BOOTPC for src addr */
 	iu_event_id_t	lif_packet_id;	/* event packet id */
-	uint_t		lif_max;	/* maximum IP message size */
+	uint_t		lif_mtu;	/* Requested interface MTU */
 	uint_t		lif_hold_count;	/* reference count */
 	boolean_t	lif_dad_wait;	/* waiting for DAD resolution */
 	boolean_t	lif_removed;	/* removed from list */
@@ -183,6 +185,8 @@ dhcp_lif_t	*attach_lif(const char *, boolean_t, int *);
 int		set_lif_dhcp(dhcp_lif_t *);
 void		set_lif_deprecated(dhcp_lif_t *);
 boolean_t	clear_lif_deprecated(dhcp_lif_t *);
+void		set_lif_mtu(dhcp_lif_t *, uint_t);
+void		clear_lif_mtu(dhcp_lif_t *);
 boolean_t	open_ip_lif(dhcp_lif_t *, in_addr_t, boolean_t);
 void		close_ip_lif(dhcp_lif_t *);
 void		lif_mark_decline(dhcp_lif_t *, const char *);

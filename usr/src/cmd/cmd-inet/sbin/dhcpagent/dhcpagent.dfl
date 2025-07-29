@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
+# Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
 #
 
 #
@@ -161,16 +162,22 @@
 #
 # REQUEST_HOSTNAME=no
 
-# By default, a parameter request list requesting a subnet mask (1),
-# router (3), DNS server (6), hostname (12), DNS domain (15), broadcast
+# By default, the DHCP agent will set the MTU of the link if the MTU option
+# (26) is provided by the server.  To prevent this, uncomment the following
+# line.
+#
+# SET_MTU=no
+
+# By default, a parameter request list requesting a subnet mask (1), router
+# (3), DNS server (6), hostname (12), DNS domain (15), MTU (26), broadcast
 # address (28), and encapsulated vendor options (43), is sent to the DHCP
-# server when the DHCP agent sends requests.  However, if desired, this
-# can be changed by altering the following parameter-value pair.  The
-# numbers correspond to the values defined in the IANA bootp-dhcp-parameters
-# registry at the time of this writing.  Site and standard option names from
+# server when the DHCP agent sends requests.  However, if desired, this can be
+# changed by altering the following parameter-value pair.  The numbers
+# correspond to the values defined in the IANA bootp-dhcp-parameters registry
+# at the time of this writing.  Site and standard option names from
 # /etc/dhcp/inittab are also accepted.
 #
-PARAM_REQUEST_LIST=1,3,6,12,15,28,43
+PARAM_REQUEST_LIST=1,3,6,12,15,26,28,43
 
 # The default DHCPv6 parameter request list has preference (7), unicast (12),
 # DNS addresses (23), DNS search list (24), NIS addresses (27), and

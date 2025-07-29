@@ -478,7 +478,7 @@ dhcp_extending(dhcp_smach_t *dsmp)
 		 * max, minus the size of the udp and ip headers.
 		 */
 		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
-		    htons(lif->lif_max - sizeof (struct udpiphdr)));
+		    htons(lif->lif_pif->pif_mtu - sizeof (struct udpiphdr)));
 		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
 
 		if (class_id_len != 0) {

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  *
  * BOUND state of the DHCP client state machine.
  */
@@ -46,6 +47,7 @@
 #include "agent.h"
 #include "interface.h"
 #include "script_handler.h"
+#include "defaults.h"
 
 /*
  * Possible outcomes for IPv6 binding attempt.
@@ -319,11 +321,12 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 void
 dhcp_bound_complete(dhcp_smach_t *dsmp)
 {
-	PKT_LIST	*ack;
+	PKT_LIST	*ack = dsmp->dsm_ack;
 	DHCP_OPT	*router_list;
-	int		i;
 	DHCPSTATE	oldstate;
-	dhcp_lif_t	*lif;
+	dhcp_lif_t	*lif = dsmp->dsm_lif;
+	boolean_t	ignore_mtu = B_FALSE;
+	boolean_t	manage_mtu;
 
 	/*
 	 * Do bound state entry processing only if running IPv4.  There's no
@@ -341,6 +344,47 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 		return;
 	}
 
+	manage_mtu = df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6, DF_SET_MTU);
+
+	/*
+	 * Check to see if the default route or MTU options appear in the
+	 * ignore list.
+	 */
+	router_list = ack->opts[CD_ROUTER];
+	for (int i = 0; i < dsmp->dsm_pillen; i++) {
+		switch (dsmp->dsm_pil[i]) {
+		case CD_MTU:
+			ignore_mtu = B_TRUE;
+			break;
+		case CD_ROUTER:
+			router_list = NULL;
+			break;
+		}
+	}
+
+	/*
+	 * If the server provides a valid MTU option, and the operator has not
+	 * disabled MTU management, configure the MTU on the interface now.
+	 */
+	if (manage_mtu) {
+		DHCP_OPT *mtu;
+		uint16_t mtuval = 0;
+
+		if (!ignore_mtu && (mtu = ack->opts[CD_MTU]) != NULL &&
+		    mtu->len == sizeof (uint16_t)) {
+			(void) memcpy(&mtuval, mtu->value, sizeof (mtuval));
+			mtuval = ntohs(mtuval);
+
+			set_lif_mtu(lif, mtuval);
+		} else {
+			/*
+			 * If no MTU value is provided, clear any value that
+			 * might have been requested previously.
+			 */
+			clear_lif_mtu(lif);
+		}
+	}
+
 	/*
 	 * Add each provided router; we'll clean them up when the
 	 * state machine goes away or when our lease expires.
@@ -348,14 +392,6 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	 * Note that we do not handle default routers on IPv4 logicals;
 	 * see README for details.
 	 */
-
-	ack = dsmp->dsm_ack;
-	router_list = ack->opts[CD_ROUTER];
-	for (i = 0; i < dsmp->dsm_pillen; i++) {
-		if (dsmp->dsm_pil[i] == CD_ROUTER)
-			router_list = NULL;
-	}
-	lif = dsmp->dsm_lif;
 	if (router_list != NULL &&
 	    (router_list->len % sizeof (ipaddr_t)) == 0 &&
 	    strchr(lif->lif_name, ':') == NULL &&
@@ -369,8 +405,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 			dsmp->dsm_nrouters = 0;
 		}
 
-		for (i = 0; i < dsmp->dsm_nrouters; i++) {
-
+		for (uint_t i = 0; i < dsmp->dsm_nrouters; i++) {
 			(void) memcpy(&dsmp->dsm_routers[i].s_addr,
 			    router_list->value + (i * sizeof (ipaddr_t)),
 			    sizeof (ipaddr_t));

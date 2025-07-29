@@ -1214,6 +1214,7 @@ reset_smach(dhcp_smach_t *dsmp)
 	dsmp->dsm_dflags &= ~DHCP_IF_FAILED;
 
 	remove_default_routes(dsmp);
+	clear_lif_mtu(dsmp->dsm_lif);
 
 	free_pkt_list(&dsmp->dsm_recv_pkt_list);
 	free_pkt_entry(dsmp->dsm_ack);
