@@ -62,7 +62,7 @@ const in6_addr_t ipv6_all_dhcp_relay_and_servers = {
  */
 const in6_addr_t my_in6addr_any = IN6ADDR_ANY_INIT;
 
-static void 	retransmit(iu_tq_t *, void *);
+static void	retransmit(iu_tq_t *, void *);
 static void	next_retransmission(dhcp_smach_t *, boolean_t, boolean_t);
 static boolean_t send_pkt_internal(dhcp_smach_t *);
 
@@ -158,7 +158,7 @@ init_pkt(dhcp_smach_t *dsmp, uchar_t type)
 	dhcp_pkt_t	*dpkt = &dsmp->dsm_send_pkt;
 	dhcp_lif_t	*lif = dsmp->dsm_lif;
 	dhcp_pif_t	*pif = lif->lif_pif;
-	uint_t		mtu = lif->lif_max;
+	uint_t		mtu = pif->pif_mtu;
 	uint32_t	xid;
 	boolean_t	isv6;
 

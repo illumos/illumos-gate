@@ -71,7 +71,7 @@ dhcp_init_reboot_v4(dhcp_smach_t *dsmp)
 
 	(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
 	(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
-	    htons(dsmp->dsm_lif->lif_pif->pif_max - sizeof (struct udpiphdr)));
+	    htons(dsmp->dsm_lif->lif_pif->pif_mtu - sizeof (struct udpiphdr)));
 
 	if (class_id_len != 0)
 		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);

@@ -1,10 +1,11 @@
 '\" te
 .\"  Copyright (c) 1992-1996 Competitive Automation, Inc. Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\"  Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
+.\"  Copyright 2023 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCPAGENT 8 "Feb 13, 2020"
+.TH DHCPAGENT 8 "Oct 6, 2023"
 .SH NAME
 dhcpagent \- Dynamic Host Configuration Protocol (DHCP) client daemon
 .SH SYNOPSIS
@@ -88,10 +89,10 @@ server always has an infinite lease.
 .LP
 \fBDHCP\fR also acts as a mechanism to configure other information needed by
 the client, for example, the domain name and addresses of routers. Aside from
-the IP address, and for IPv4 alone, the netmask, broadcast address, and default
-router, the agent does not directly configure the workstation, but instead acts
-as a database which may be interrogated by other programs, and in particular by
-\fBdhcpinfo\fR(1).
+the IP address, and for IPv4 alone, the netmask, broadcast address, MTU, and
+default router, the agent does not directly configure the workstation, but
+instead acts as a database which may be interrogated by other programs, and in
+particular by \fBdhcpinfo\fR(1).
 .sp
 .LP
 On clients with a single interface, this is quite straightforward. Clients with
@@ -798,6 +799,22 @@ inet \fIhostname\fR
 .sp
 
 where \fIhostname\fR is the host name requested.
+.sp
+This option works with DHCPv4 only.
+.sp
+Default value of this option is \fIyes\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSET_MTU\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that if the DHCP server provides an MTU option, the agent should
+adjust the MTU for the link to reflect the smallest MTU requested for any
+logical interface on the link.
 .sp
 This option works with DHCPv4 only.
 .sp

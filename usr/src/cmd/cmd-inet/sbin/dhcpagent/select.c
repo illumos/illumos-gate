@@ -190,7 +190,8 @@ dhcp_selecting(dhcp_smach_t *dsmp)
 		 * MTU, minus the size of the UDP and IP headers.
 		 */
 		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
-		    htons(dsmp->dsm_lif->lif_max - sizeof (struct udpiphdr)));
+		    htons(dsmp->dsm_lif->lif_pif->pif_mtu -
+		    sizeof (struct udpiphdr)));
 		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
 
 		if (class_id_len != 0) {

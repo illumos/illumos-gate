@@ -825,7 +825,7 @@ Field Mappings
   if_dflags		dhcp_smach_t.dsm_dflags
   if_name		dhcp_smach_t.dsm_name (see text)
   if_index		dhcp_pif_t.pif_index
-  if_max		dhcp_lif_t.lif_max and dhcp_pif_t.pif_max
+  if_max		dhcp_pif_t.pif_mtu
   if_min		(was unused; removed)
   if_opt		(was unused; removed)
   if_hwaddr		dhcp_pif_t.pif_hwaddr

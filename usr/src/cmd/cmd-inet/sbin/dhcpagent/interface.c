@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #include <sys/types.h>
@@ -57,6 +58,7 @@ static uint_t cached_v4_max_mtu, cached_v6_max_mtu;
 	IFF_TEMPORARY)
 
 static void clear_lif_dhcp(dhcp_lif_t *);
+static void update_pif_mtu(dhcp_pif_t *);
 
 /*
  * insert_pif(): creates a new physical interface structure and chains it on
@@ -133,11 +135,13 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFMTU for %s", pname);
 		goto failure;
 	}
-	pif->pif_max = lifr.lifr_mtu;
+	pif->pif_mtu_orig = pif->pif_mtu = lifr.lifr_mtu;
+	dhcpmsg(MSG_DEBUG, "insert_pif: original MTU of %s is %u", pname,
+	    pif->pif_mtu_orig);
 
-	if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
+	if (pif->pif_mtu < DHCP_DEF_MAX_SIZE) {
 		dhcpmsg(MSG_ERROR, "insert_pif: MTU of %s is too small to "
-		    "support DHCP (%u < %u)", pname, pif->pif_max,
+		    "support DHCP (%u < %u)", pname, pif->pif_mtu,
 		    DHCP_DEF_MAX_SIZE);
 		*error = DHCP_IPC_E_INVIF;
 		goto failure;
@@ -287,6 +291,18 @@ release_pif(dhcp_pif_t *pif)
 		dhcpmsg(MSG_DEBUG, "release_pif: freeing PIF %s",
 		    pif->pif_name);
 
+		/*
+		 * Unplumbing the last logical interface on top of this
+		 * physical interface should have returned the MTU to its
+		 * original value.
+		 */
+		update_pif_mtu(pif);
+		if (pif->pif_mtu != pif->pif_mtu_orig) {
+			dhcpmsg(MSG_CRIT, "release_pif: PIF %s MTU is %u, "
+			    "expected %u", pif->pif_name, pif->pif_mtu,
+			    pif->pif_mtu_orig);
+		}
+
 		remque(pif);
 		free(pif->pif_hwaddr);
 		free(pif);
@@ -433,11 +449,6 @@ insert_lif(dhcp_pif_t *pif, const char *lname, int *error)
 	(void) strlcpy(lifr.lifr_name, lname, LIFNAMSIZ);
 
 	fd = pif->pif_isv6 ? v6_sock_fd : v4_sock_fd;
-
-	if (ioctl(fd, SIOCGLIFMTU, &lifr) == -1)
-		lif->lif_max = 1024;
-	else
-		lif->lif_max = lifr.lifr_mtu;
 
 	if (ioctl(fd, SIOCGLIFADDR, &lifr) == -1) {
 		if (errno == ENXIO)
@@ -1056,12 +1067,18 @@ unplumb_lif(dhcp_lif_t *lif)
 {
 	dhcp_lease_t *dlp;
 
+	/*
+	 * If we adjusted the MTU for this interface, put it back now:
+	 */
+	clear_lif_mtu(lif);
+
 	if (lif->lif_plumbed) {
 		struct lifreq lifr;
 
 		(void) memset(&lifr, 0, sizeof (lifr));
 		(void) strlcpy(lifr.lifr_name, lif->lif_name,
 		    sizeof (lifr.lifr_name));
+
 		if (ioctl(v6_sock_fd, SIOCLIFREMOVEIF, &lifr) == -1 &&
 		    errno != ENXIO) {
 			dhcpmsg(MSG_ERR, "unplumb_lif: SIOCLIFREMOVEIF %s",
@@ -1225,6 +1242,91 @@ clear_lif_dhcp(dhcp_lif_t *lif)
 
 	lif->lif_flags = lifr.lifr_flags &= ~IFF_DHCPRUNNING;
 	(void) ioctl(fd, SIOCSLIFFLAGS, &lifr);
+}
+
+static void
+update_pif_mtu(dhcp_pif_t *pif)
+{
+	/*
+	 * Find the smallest requested MTU, if any, for the logical interfaces
+	 * on this physical interface:
+	 */
+	uint_t mtu = 0;
+	for (dhcp_lif_t *lif = pif->pif_lifs; lif != NULL;
+	    lif = lif->lif_next) {
+		if (lif->lif_mtu == 0) {
+			/*
+			 * This logical interface has not requested a specific
+			 * MTU.
+			 */
+			continue;
+		}
+
+		if (mtu == 0 || mtu > lif->lif_mtu) {
+			mtu = lif->lif_mtu;
+		}
+	}
+
+	if (mtu == 0) {
+		/*
+		 * There are no remaining requests for a specific MTU.  Return
+		 * the interface to its original MTU.
+		 */
+		dhcpmsg(MSG_DEBUG2, "update_pif_mtu: restoring %s MTU to "
+		    "original %u", pif->pif_name, pif->pif_mtu_orig);
+		mtu = pif->pif_mtu_orig;
+	}
+
+	if (pif->pif_mtu == mtu) {
+		/*
+		 * The MTU is already correct.
+		 */
+		dhcpmsg(MSG_DEBUG2, "update_pif_mtu: %s MTU is already %u",
+		    pif->pif_name, mtu);
+		return;
+	}
+
+	dhcpmsg(MSG_DEBUG, "update_pif_mtu: %s MTU change: %u -> %u",
+	    pif->pif_name, pif->pif_mtu, mtu);
+
+	struct lifreq lifr;
+	(void) memset(&lifr, 0, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, pif->pif_name, LIFNAMSIZ);
+	lifr.lifr_mtu = mtu;
+
+	int fd = pif->pif_isv6 ? v6_sock_fd : v4_sock_fd;
+	if (ioctl(fd, SIOCSLIFMTU, &lifr) == -1) {
+		dhcpmsg(MSG_ERR, "update_pif_mtu: SIOCSLIFMTU (%u) failed "
+		    "for %s", mtu, pif->pif_name);
+		return;
+	}
+
+	pif->pif_mtu = mtu;
+}
+
+void
+set_lif_mtu(dhcp_lif_t *lif, uint_t mtu)
+{
+	dhcpmsg(MSG_DEBUG, "set_lif_mtu: %s requests MTU %u", lif->lif_name,
+	    mtu);
+
+	lif->lif_mtu = mtu;
+	update_pif_mtu(lif->lif_pif);
+}
+
+void
+clear_lif_mtu(dhcp_lif_t *lif)
+{
+	if (lif->lif_mtu != 0) {
+		dhcpmsg(MSG_DEBUG, "clear_lif_mtu: %s clears MTU request",
+		    lif->lif_name);
+	}
+
+	/*
+	 * Remove our prior request and update the physical interface.
+	 */
+	lif->lif_mtu = 0;
+	update_pif_mtu(lif->lif_pif);
 }
 
 /*

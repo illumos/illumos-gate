@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
 #
 
 PROG    = dhcpagent
@@ -41,6 +42,8 @@ XGETFLAGS += -a -x dhcpagent.xcl
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
+
+CSTD = $(CSTD_GNU99)
 
 # not linted
 SMATCH=off

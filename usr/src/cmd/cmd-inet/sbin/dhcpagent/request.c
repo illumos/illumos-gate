@@ -300,7 +300,8 @@ dhcp_requesting(iu_tq_t *tqp, void *arg)
 
 		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, lease);
 		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
-		    htons(dsmp->dsm_lif->lif_max - sizeof (struct udpiphdr)));
+		    htons(dsmp->dsm_lif->lif_pif->pif_mtu -
+		    sizeof (struct udpiphdr)));
 		(void) add_pkt_opt32(dpkt, CD_REQUESTED_IP_ADDR,
 		    offer->pkt->yiaddr.s_addr);
 		(void) add_pkt_opt(dpkt, CD_SERVER_ID,
@@ -1125,7 +1126,7 @@ dhcp_packet_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	uint_t		xid;
 	dhcp_smach_t	*dsmp;
 
-	if ((plp = recv_pkt(fd, lif->lif_max, B_FALSE)) == NULL)
+	if ((plp = recv_pkt(fd, lif->lif_pif->pif_mtu, B_FALSE)) == NULL)
 		return;
 
 	recv_type = pkt_recv_type(plp);
