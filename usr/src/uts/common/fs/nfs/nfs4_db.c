@@ -802,6 +802,49 @@ rfs4_dbe_walk(rfs4_table_t *table,
 	    (CE_NOTE, "Walking entries complete %s", table->dbt_name));
 }
 
+/*
+ * Search and apply @callout for each matched valid entry.
+ * @callout is called with held dbe lock.
+ */
+void
+rfs4_dbsearch_cb(rfs4_index_t *idx, void *key,
+    int maxcount, void (*callout)(rfs4_entry_t))
+{
+	rfs4_table_t *table = idx->dbi_table;
+	rfs4_bucket_t *bp;
+	rfs4_link_t *l;
+	rfs4_dbe_t *entry;
+	int i;
+
+	i = HASH(idx, key);
+	bp = &idx->dbi_buckets[i];
+
+	NFS4_DEBUG(table->dbt_debug & SEARCH_DEBUG,
+	    (CE_NOTE, "Search/callout key %p in %s by %s", key, table->dbt_name,
+	    idx->dbi_keyname));
+
+	/* Walk the buckets looking for entries to release/destroy */
+	rw_enter(bp->dbk_lock, RW_READER);
+	for (l = bp->dbk_head; l; l = l->next) {
+		if (l->entry->dbe_refcnt > 0 &&
+		    !l->entry->dbe_invalid &&
+		    (*idx->dbi_compare)(l->entry->dbe_data, key)) {
+			entry = l->entry;
+			mutex_enter(entry->dbe_lock);
+			if (l->entry->dbe_refcnt > 0)
+				(*callout)(entry->dbe_data);
+			mutex_exit(entry->dbe_lock);
+			if (--maxcount <= 0)
+				break;
+		}
+	}
+	rw_exit(bp->dbk_lock);
+
+	NFS4_DEBUG(table->dbt_debug & SEARCH_DEBUG,
+	    (CE_NOTE, "Search/callout key %p complete %s by %s", key,
+	    table->dbt_name, idx->dbi_keyname));
+}
+
 
 static void
 rfs4_dbe_reap(rfs4_table_t *table, time_t cache_time, uint32_t desired)

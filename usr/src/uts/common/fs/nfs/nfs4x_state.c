@@ -212,6 +212,38 @@ rfs4x_client_session_remove(rfs4_client_t *cp)
 	rfs4_dbe_unlock(cp->rc_dbe);
 }
 
+/*
+ * RFC5661 Section 18.36.3
+ * Definitions for ca_maxrequestsize:
+ *   The maximum size of a COMPOUND or CB_COMPOUND request that will be sent.
+ */
+#define	NFS4_MIN_COMPOUND_REQSZ (( \
+	2 + 2 +	/* credential, verifier: AUTH_NULL, Length 0 */ \
+	1 +	/* zero length tag */ \
+	3 +	/* minorversion, opcount, opcode */ \
+	(RNDUP(NFS4_SESSIONID_SIZE) / BYTES_PER_XDR_UNIT) + \
+	4) *	/* seqid, slotid, high-slotid, cachethis */ \
+	BYTES_PER_XDR_UNIT)
+/*
+ * ca_maxresponsesize:
+ *   The maximum size of a COMPOUND or CB_COMPOUND reply that the
+ *   requester will accept from the replier including RPC headers
+ *   (see the ca_maxrequestsize definition).
+ */
+#define	NFS4_MIN_COMPOUND_RESPSZ ((					\
+	2 +	/* verifier: AUTH_NULL, Length 0 */ \
+	1 +	/* status */ \
+	1 +	/* zero length tag */ \
+	3 +	/* opcount, opcode, status */ \
+	(RNDUP(NFS4_SESSIONID_SIZE) / BYTES_PER_XDR_UNIT) + \
+	4) *	/* seqid, slotid, high-slotid, target-slotid, status */ \
+	BYTES_PER_XDR_UNIT)
+
+#define	NFS4_MIN_CB_COMPOUND_REQSZ	NFS4_MIN_COMPOUND_REQSZ
+#define	NFS4_MIN_CB_COMPOUND_RESPSZ	NFS4_MIN_COMPOUND_RESPSZ
+
+#define	NFS4_SLOT_CACHED_SIZE	2048
+
 nfsstat4
 sess_chan_limits(sess_channel_t *scp)
 {
@@ -222,26 +254,29 @@ sess_chan_limits(sess_channel_t *scp)
 	if (scp->cn_back_attrs.ca_maxrequests > rfs4_back_max_slots)
 		scp->cn_back_attrs.ca_maxrequests = rfs4_back_max_slots;
 
-
 	if (scp->cn_attrs.ca_maxoperations > NFS4_COMPOUND_LIMIT)
 		scp->cn_attrs.ca_maxoperations = NFS4_COMPOUND_LIMIT;
 
-	/*
-	 * Lower limit should be set to smallest sane COMPOUND. Even
-	 * though a singleton SEQUENCE op is the very smallest COMPOUND,
-	 * it's also quite boring. For all practical purposes, the lower
-	 * limit for creating a sess is limited to:
-	 *
-	 *		[SEQUENCE + PUTROOTFH + GETFH]
-	 *
-	 *	 Can't limit READ's to a specific threshold, otherwise
-	 *	 we artificially limit the clients to perform reads of
-	 *	 AT LEAST that granularity, which is WRONG !!! Same goes
-	 *	 for READDIR's and GETATTR's.
-	 */
-	if (scp->cn_attrs.ca_maxresponsesize < (sizeof (SEQUENCE4res) +
-	    sizeof (PUTROOTFH4res) + sizeof (GETFH4res)))
+	/* maxreqsize, maxrespsize */
+	if (scp->cn_attrs.ca_maxrequestsize < NFS4_MIN_COMPOUND_REQSZ)
 		return (NFS4ERR_TOOSMALL);
+
+	if (scp->cn_attrs.ca_maxresponsesize < NFS4_MIN_COMPOUND_RESPSZ)
+		return (NFS4ERR_TOOSMALL);
+
+	if (scp->cn_back_attrs.ca_maxrequestsize < NFS4_MIN_CB_COMPOUND_REQSZ)
+		return (NFS4ERR_TOOSMALL);
+
+	if (scp->cn_back_attrs.ca_maxresponsesize < NFS4_MIN_CB_COMPOUND_RESPSZ)
+		return (NFS4ERR_TOOSMALL);
+
+	/* maxresp_cached */
+	scp->cn_attrs.ca_maxresponsesize_cached =
+	    MIN(scp->cn_attrs.ca_maxresponsesize_cached,
+	    NFS4_SLOT_CACHED_SIZE + NFS4_MIN_HDR_SEQSZ);
+
+	scp->cn_back_attrs.ca_maxresponsesize_cached = 0;
+
 	return (NFS4_OK);
 }
 

@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -186,7 +186,7 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 	}
 
 	case UCODE_UPDATE: {
-		int size;
+		size_t size;
 		uint8_t *ucodep, *uw_ucode;
 		ucode_errno_t rc = EM_OK;
 

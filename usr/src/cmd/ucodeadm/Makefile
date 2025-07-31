@@ -30,7 +30,7 @@
 PROG = ucodeadm
 
 PROG_OBJS = ucodeadm.o ucode_errno.o
-COMMON_OBJS = ucode_utils_intel.o ucode_utils_amd.o
+COMMON_OBJS = ucode_utils_intel.o ucode_utils_amd.o bitext.o
 OBJS = $(PROG_OBJS) $(COMMON_OBJS)
 COMMON_SRCDIR = ../../common/ucode
 ERROR_HEADER = $(COMMON_SRCDIR)/ucode_errno.h
@@ -64,6 +64,10 @@ _msg: ucodeadm_all.po
 
 %.o: $(COMMON_SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
 $(PROG): $(OBJS) ucode_errno.c

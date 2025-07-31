@@ -33,7 +33,9 @@
 #include <sys/disp.h>
 #include <nfs/nfs.h>
 #include <nfs/nfs4.h>
+#include <nfs/lm.h>
 #include <sys/systeminfo.h>
+#include <sys/flock.h>
 
 /* Helpers */
 
@@ -647,7 +649,7 @@ rfs4x_op_create_session(nfs_argop4 *argop, nfs_resop4 *resop,
 	rok->csr_fore_chan_attrs =
 	    crp->csr_fore_chan_attrs = sp->sn_fore->cn_attrs;
 	rok->csr_back_chan_attrs = crp->csr_back_chan_attrs =
-	    args->csa_back_chan_attrs;
+	    sp->sn_fore->cn_back_attrs;
 
 	rfs4_update_lease(cp);
 
@@ -807,6 +809,11 @@ check_slot_seqid(rfs4_slot_t *slot, sequenceid4 seqid)
 	return (status);
 }
 
+static boolean_t is_solo_sequence(const COMPOUND4res *resp)
+{
+	return (resp->array_len == 1 && resp->array[0].resop == OP_SEQUENCE);
+}
+
 /*
  * Prep stage for SEQUENCE operation.
  *
@@ -816,11 +823,12 @@ check_slot_seqid(rfs4_slot_t *slot, sequenceid4 seqid)
  */
 int
 rfs4x_sequence_prep(COMPOUND4args *args, COMPOUND4res *resp,
-    compound_state_t *cs)
+    compound_state_t *cs, SVCXPRT *xprt)
 {
 	SEQUENCE4args	*sargs;
 	nfsstat4	status;
 	rfs4_slot_t	*slot;
+	XDR		*xdrs;
 
 	if (args->array_len == 0 || args->array[0].argop != OP_SEQUENCE)
 		return (NFS4_OK);
@@ -831,8 +839,14 @@ rfs4x_sequence_prep(COMPOUND4args *args, COMPOUND4res *resp,
 	if (status != NFS4_OK)
 		return (status);
 
+	ASSERT(cs->sp != NULL);
+
 	if (args->array_len > cs->sp->sn_fore->cn_attrs.ca_maxoperations)
 		return (NFS4ERR_TOO_MANY_OPS);
+
+	xdrs = &xprt->xp_xdrin;
+	if (xdr_getpos(xdrs) > cs->sp->sn_fore->cn_attrs.ca_maxrequestsize)
+		return (NFS4ERR_REQ_TOO_BIG);
 
 	/*  have reference to session */
 	slot = &cs->sp->sn_slots[sargs->sa_slotid];
@@ -844,8 +858,15 @@ rfs4x_sequence_prep(COMPOUND4args *args, COMPOUND4res *resp,
 			slot->se_flags |= RFS4_SLOT_INUSE;
 			cs->slot = slot;
 			*resp = slot->se_buf;
+		} else if (args->array_len == 1) {
+			/*
+			 * If original request was solo 'sequence' operation,
+			 * it would be always cached. So this request differs
+			 * from the previous.
+			 */
+			status = NFS4ERR_SEQ_FALSE_RETRY;
 		} else {
-			status =  NFS4ERR_SEQ_MISORDERED;
+			status = NFS4ERR_RETRY_UNCACHED_REP;
 		}
 	} else if (status == NFS4_OK) {
 		slot->se_flags |= RFS4_SLOT_INUSE;
@@ -881,7 +902,7 @@ rfs4x_sequence_done(COMPOUND4res *resp, compound_state_t *cs)
 			add = -1;
 		}
 
-		if (*cs->statusp == NFS4_OK && cs->cachethis) {
+		if (cs->cachethis || is_solo_sequence(resp)) {
 			slot->se_flags |= RFS4_SLOT_CACHED;
 			slot->se_buf = *resp;	/* cache a reply */
 			add += 1;
@@ -911,6 +932,7 @@ rfs4x_op_sequence(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_slot_t	*slot = cs->slot;
 	nfsstat4	 status = NFS4_OK;
 	uint32_t	 cbstat = 0;
+	int buflen;
 
 	DTRACE_NFSV4_2(op__sequence__start,
 	    struct compound_state *, cs,
@@ -925,6 +947,16 @@ rfs4x_op_sequence(nfs_argop4 *argop, nfs_resop4 *resop,
 
 	if (rfs4_lease_expired(sp->sn_clnt)) {
 		status = NFS4ERR_BADSESSION;
+		goto out;
+	}
+
+	buflen = args->sa_cachethis ?
+	    sp->sn_fore->cn_attrs.ca_maxresponsesize_cached :
+	    sp->sn_fore->cn_attrs.ca_maxresponsesize;
+
+	if (buflen < NFS4_MIN_HDR_SEQSZ) {
+		status = args->sa_cachethis ?
+		    NFS4ERR_REP_TOO_BIG_TO_CACHE : NFS4ERR_REP_TOO_BIG;
 		goto out;
 	}
 
@@ -1149,4 +1181,112 @@ out:
 	DTRACE_NFSV4_2(op__secinfo__no__name__done,
 	    struct compound_state *, cs,
 	    SECINFO_NO_NAME4res *, resp);
+}
+
+/*
+ * Used to free a stateid that no longer has any associated locks.
+ * If there are valid locks, error NFS4ERR_LOCKS_HELD is returned.
+ * NB: Actual freeing of stateid will be taken care by reaper_thread().
+ */
+void
+rfs4x_op_free_stateid(nfs_argop4 *argop, nfs_resop4 *resop,
+    struct svc_req *req, compound_state_t *cs)
+{
+	FREE_STATEID4args	*args = &argop->nfs_argop4_u.opfree_stateid;
+	FREE_STATEID4res	*resp = &resop->nfs_resop4_u.opfree_stateid;
+	nfsstat4		status = NFS4ERR_BAD_STATEID;
+	stateid4		*sid;
+	stateid_t		*id;
+
+	DTRACE_NFSV4_2(op__free__stateid__start,
+	    struct compound_state *, cs,
+	    FREE_STATEID4args *, args);
+
+	/* Fetch the ARG stateid */
+	sid = &args->fsa_stateid;
+	get_stateid4(cs, sid);
+
+	id = (stateid_t *)sid;
+	switch (id->bits.type) {
+	case OPENID: {
+		rfs4_state_t *sp;
+
+		status = rfs4_get_state_nolock(sid, &sp, RFS4_DBS_VALID);
+		if (status != NFS4_OK)
+			goto final;
+
+		rfs4_update_lease(sp->rs_owner->ro_client);
+		rfs4_state_rele_nounlock(sp);
+		status = NFS4ERR_LOCKS_HELD;
+		break;
+	}
+
+	case LOCKID: {
+		sysid_t sysid;
+		rfs4_lo_state_t *lsp;
+		rfs4_lockowner_t *lo;
+
+		status = rfs4_get_lo_state(sid, &lsp, FALSE);
+		if (status != NFS4_OK)
+			goto final;
+
+		lo = lsp->rls_locker;
+		rfs4_update_lease(lo->rl_client);
+
+		rfs4_dbe_lock(lo->rl_client->rc_dbe);
+		sysid = lo->rl_client->rc_sysidt;
+		rfs4_dbe_unlock(lo->rl_client->rc_dbe);
+
+		/*
+		 * Check for ACTIVE LOCKS by this lockowner.
+		 */
+		if (sysid != LM_NOSYSID) {
+			locklist_t *llist;
+
+			llist = flk_get_active_locks(sysid, lo->rl_pid);
+			if (llist != NULL) {
+				flk_free_locklist(llist);
+				status = NFS4ERR_LOCKS_HELD;
+			}
+		}
+
+
+		/*
+		 * If the state does not have any active LOCKS,
+		 * invalidate the LOCK stateid right away.
+		 */
+		if (status != NFS4ERR_LOCKS_HELD) {
+			rfs4_dbe_lock(lsp->rls_dbe);
+			rfs4_dbe_invalidate(lsp->rls_dbe);
+			rfs4_dbe_unlock(lsp->rls_dbe);
+		}
+
+		rfs4_lo_state_rele(lsp, FALSE);
+		break;
+	}
+
+	case DELEGID: {
+		rfs4_deleg_state_t *dsp;
+
+		status = rfs4_get_deleg_state(sid, &dsp);
+		if (status != NFS4_OK)
+			goto final;
+
+		rfs4_update_lease(dsp->rds_client);
+		rfs4_deleg_state_rele(dsp);
+		status = NFS4ERR_LOCKS_HELD;
+		break;
+	}
+
+	default:
+		status = NFS4ERR_BAD_STATEID;
+		break;
+	}
+
+final:
+	*cs->statusp = resp->fsr_status = status;
+
+	DTRACE_NFSV4_2(op__free__stateid__done,
+	    struct compound_state *, cs,
+	    FREE_STATEID4res *, resp);
 }

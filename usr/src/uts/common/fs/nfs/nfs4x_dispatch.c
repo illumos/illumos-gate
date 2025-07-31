@@ -134,7 +134,7 @@ rfs4x_dispatch(struct svc_req *req, SVCXPRT *xprt, char *ap)
 		goto out_send;
 	}
 
-	error = rfs4x_sequence_prep(cap, rbp, &cs);
+	error = rfs4x_sequence_prep(cap, rbp, &cs, xprt);
 	if (error != NFS4_OK) {
 		if (error != nfserr_replay_cache)
 			rfs4_err_resp(cap, rbp, error);

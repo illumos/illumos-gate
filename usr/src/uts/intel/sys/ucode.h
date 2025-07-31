@@ -24,7 +24,7 @@
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_UCODE_H
@@ -108,8 +108,8 @@ struct ucode_write_struct32 {
 #ifdef _KERNEL
 
 extern ucode_errno_t ucode_get_rev(uint32_t *);
-extern ucode_errno_t ucode_validate(uint8_t *, int);
-extern ucode_errno_t ucode_update(uint8_t *, int);
+extern ucode_errno_t ucode_validate(uint8_t *, size_t);
+extern ucode_errno_t ucode_update(uint8_t *, size_t);
 
 /*
  * Microcode specific information per core
@@ -148,8 +148,8 @@ typedef struct ucode_source {
 	void		(*us_file_reset)(void);
 	void		(*us_read_rev)(cpu_ucode_info_t *);
 	void		(*us_load)(cpu_ucode_info_t *);
-	ucode_errno_t	(*us_validate)(uint8_t *, int);
-	ucode_errno_t	(*us_extract)(ucode_update_t *, uint8_t *, int);
+	ucode_errno_t	(*us_validate)(uint8_t *, size_t);
+	ucode_errno_t	(*us_extract)(ucode_update_t *, uint8_t *, size_t);
 	ucode_errno_t	(*us_locate)(cpu_t *, cpu_ucode_info_t *);
 } ucode_source_t;
 #define	UCODE_SOURCE(x) DATA_SET(ucode_source_set, x)

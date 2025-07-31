@@ -429,12 +429,12 @@ out:
 }
 
 static ucode_errno_t
-ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, int size)
+ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, size_t size)
 {
 	uint32_t *ptr = (uint32_t *)ucodep;
 	ucode_eqtbl_amd_t *eqtbl;
 	ucode_file_amd_t *ufp;
-	int count;
+	uint32_t count;
 	bool higher = false;
 	ucode_errno_t rc = EM_NOMATCH;
 	uint16_t eq_sig;
@@ -458,7 +458,7 @@ ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, int size)
 	do {
 		ptr += count >> 2; size -= count;
 
-		if (!size)
+		if (size == 0)
 			return (higher ? EM_HIGHERREV : EM_NOMATCH);
 
 		ptr++; size -= 4;

@@ -50,23 +50,21 @@ extern u_longlong_t nfs4_srv_caller_id;
 
 extern uint_t nfs4_srv_vkey;
 
-stateid4 special0 = {
-	0,
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+stateid4 zero_stateid;		/* all zeros */
+stateid4 one_stateid = {
+	.seqid = ~0,
+	.other = { ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0 }
+};
+stateid4 current_stateid = {
+	.seqid = 1
+};
+stateid4 invalid_stateid = {
+	.seqid = ~0
 };
 
-stateid4 special1 = {
-	0xffffffff,
-	{
-		(char)0xff, (char)0xff, (char)0xff, (char)0xff,
-		(char)0xff, (char)0xff, (char)0xff, (char)0xff,
-		(char)0xff, (char)0xff, (char)0xff, (char)0xff
-	}
-};
-
-
-#define	ISSPECIAL(id)  (stateid4_cmp(id, &special0) || \
-			stateid4_cmp(id, &special1))
+#define	ZERO_STATEID(x) (!memcmp((x), &zero_stateid, sizeof (stateid4)))
+#define	ONE_STATEID(x) (!memcmp((x), &one_stateid, sizeof (stateid4)))
+#define	CURRENT_STATEID(x) (!memcmp((x), &current_stateid, sizeof (stateid4)))
 
 /* For embedding the cluster nodeid into our clientid */
 #define	CLUSTER_NODEID_SHIFT	24
@@ -84,6 +82,23 @@ static void rfs4_ss_clid_write(nfs4_srv_t *nsrv4, rfs4_client_t *cp, char *leaf)
 static void rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dir, char *leaf);
 static void rfs4_dss_clear_oldstate(rfs4_servinst_t *sip);
 static void rfs4_ss_chkclid_sip(rfs4_client_t *cp, rfs4_servinst_t *sip);
+
+void
+put_stateid4(struct compound_state *cs, stateid4 *state)
+{
+	if (*cs->statusp == NFS4_OK && cs->minorversion) {
+		memcpy(&cs->current_stateid, state, sizeof (stateid4));
+		cs->cs_flags |= RFS4_CURRENT_STATEID;
+	}
+}
+
+void
+get_stateid4(struct compound_state *cs, stateid4 *state)
+{
+	if ((cs->cs_flags & RFS4_CURRENT_STATEID) && CURRENT_STATEID(state)) {
+		memcpy(state, &cs->current_stateid, sizeof (stateid4));
+	}
+}
 
 /*
  * Couple of simple init/destroy functions for a general waiter
@@ -390,8 +405,6 @@ static void *deleg_mkkey(rfs4_entry_t);
 static uint32_t deleg_state_hash(void *);
 static bool_t deleg_state_compare(rfs4_entry_t, void *);
 static void *deleg_state_mkkey(rfs4_entry_t);
-
-static void rfs4_state_rele_nounlock(rfs4_state_t *);
 
 static int rfs4_ss_enabled = 0;
 
@@ -3018,7 +3031,7 @@ rfs4_state_destroy(rfs4_entry_t u_entry)
 	sp->rs_owner = NULL;
 }
 
-static void
+void
 rfs4_state_rele_nounlock(rfs4_state_t *sp)
 {
 	rfs4_dbe_rele(sp->rs_dbe);
@@ -3544,6 +3557,13 @@ rfs4_get_state(stateid4 *stateid, rfs4_state_t **spp,
 	return (rfs4_get_state_lockit(stateid, spp, find_invalid, TRUE));
 }
 
+nfsstat4
+rfs4_get_state_nolock(stateid4 *stateid, rfs4_state_t **spp,
+    rfs4_dbsearch_type_t find_invalid)
+{
+	return (rfs4_get_state_lockit(stateid, spp, find_invalid, FALSE));
+}
+
 int
 rfs4_check_stateid_seqid(rfs4_state_t *sp, stateid4 *stateid,
     const compound_state_t *cs)
@@ -3815,7 +3835,7 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 		ct->cc_flags = CC_DONTBLOCK;
 	}
 
-	if (ISSPECIAL(stateid)) {
+	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid)) {
 		fp = rfs4_findfile(vp, NULL, &create);
 		if (fp == NULL)
 			return (NFS4_OK);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _COMMON_UCODE_UTILS_INTEL_H
@@ -26,7 +26,7 @@ extern ucode_errno_t ucode_header_validate_intel(ucode_header_intel_t *);
 extern uint32_t ucode_checksum_intel(uint32_t, uint32_t, uint8_t *);
 extern uint32_t ucode_checksum_intel_extsig(ucode_header_intel_t *,
     ucode_ext_sig_intel_t *);
-extern ucode_errno_t ucode_validate_intel(uint8_t *, int);
+extern ucode_errno_t ucode_validate_intel(uint8_t *, size_t);
 
 #ifdef __cplusplus
 }

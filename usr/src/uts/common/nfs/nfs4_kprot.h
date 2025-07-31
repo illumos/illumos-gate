@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2020-2025 RackTop Systems, Inc.
  */
 
 /*
@@ -185,6 +185,13 @@ enum nfsstat4 {
 	NFS4ERR_REJECT_DELEG = 10085,
 	NFS4ERR_RETURNCONFLICT = 10086,
 	NFS4ERR_DELEG_REVOKED = 10087,
+	NFS4ERR_PARTNER_NOTSUPP = 10088,
+	NFS4ERR_PARTNER_NO_AUTH = 10089,
+	NFS4ERR_UNION_NOTSUPP = 10090,
+	NFS4ERR_OFFLOAD_DENIED = 10091,
+	NFS4ERR_WRONG_LFS = 10092,
+	NFS4ERR_BADLABEL = 10093,
+	NFS4ERR_OFFLOAD_NO_REQS = 10094,
 
 	/* for internal use */
 	NFS4ERR_REPLAY_CACHE = 30000
@@ -692,7 +699,111 @@ typedef struct retention_set4 retention_set4;
 
 typedef uint32_t fs_charset_cap4;
 
-/* nfsv4.1 end */
+/* nfsv4.1 end, nfsv4.2 additions */
+
+enum netloc_type4 {
+	NL4_NAME = 1,
+	NL4_URL = 2,
+	NL4_NETADDR = 3
+};
+typedef enum netloc_type4 netloc_type4;
+
+struct netloc4 {
+	netloc_type4 nl_type;
+	union {
+		utf8str_cis nl_name;
+		utf8str_cis nl_url;
+		netaddr4 nl_addr;
+	} netloc4_u;
+};
+typedef struct netloc4 netloc4;
+
+enum change_attr_type4 {
+	NFS4_CHANGE_TYPE_IS_MONOTONIC_INCR = 0,
+	NFS4_CHANGE_TYPE_IS_VERSION_COUNTER = 1,
+	NFS4_CHANGE_TYPE_IS_VERSION_COUNTER_NOPNFS = 2,
+	NFS4_CHANGE_TYPE_IS_TIME_METADATA = 3,
+	NFS4_CHANGE_TYPE_IS_UNDEFINED = 4
+};
+typedef enum change_attr_type4 change_attr_type4;
+
+/*
+ * Note that rpcgen would have put here:
+ *	typedef struct labelformat_spec4 {...}
+ *	typedef struct sec_label4 {...}
+ * but this implementation is using a hand-coded replacment.
+ */
+
+/* nfsv4.2 by-hand version */
+struct sec_label4 {
+	uint_t slai_len;
+	char  *slai_val;
+};
+
+typedef struct sec_label4 sec_label4;
+
+/*
+ * Note that rpcgen would have put here:
+ *	typedef struct copy_from_auth_priv {...}
+ *	typedef struct copy_to_auth_priv {...}
+ *	typedef struct copy_confirm_auth_priv {...}
+ * not currently used.
+ */
+
+struct app_data_block4 {
+	offset4 adb_offset;
+	length4 adb_block_size;
+	length4 adb_block_count;
+	length4 adb_reloff_blocknum;
+	count4 adb_block_num;
+	length4 adb_reloff_pattern;
+	struct {
+		uint_t adb_pattern_len;
+		char *adb_pattern_val;
+	} adb_pattern;
+};
+typedef struct app_data_block4 app_data_block4;
+
+struct data4 {
+	offset4 d_offset;
+	struct {
+		uint_t d_data_len;
+		char *d_data_val;
+	} d_data;
+};
+typedef struct data4 data4;
+
+struct data_info4 {
+	offset4 di_offset;
+	length4 di_length;
+};
+typedef struct data_info4 data_info4;
+
+enum data_content4 {
+	NFS4_CONTENT_DATA = 0,
+	NFS4_CONTENT_HOLE = 1
+};
+typedef enum data_content4 data_content4;
+
+enum stable_how4 {
+	UNSTABLE4 = 0,
+	DATA_SYNC4 = 1,
+	FILE_SYNC4 = 2
+};
+typedef enum stable_how4 stable_how4;
+
+struct write_response4 {
+	struct {
+		uint_t wr_callback_id_len;
+		stateid4 *wr_callback_id_val;
+	} wr_callback_id;
+	length4 wr_count;
+	stable_how4 wr_committed;
+	verifier4 wr_writeverf;
+};
+typedef struct write_response4 write_response4;
+
+/* nfsv4.2 end */
 
 typedef bitmap4 fattr4_supported_attrs;
 
@@ -856,7 +967,17 @@ typedef nfsacl41 fattr4_sacl;
 
 typedef change_policy4 fattr4_change_policy;
 
-/* nfsv4.1 end */
+/* nfsv4.1 end, nfsv4.2 begin */
+
+typedef uint64_t fattr4_space_freed;
+
+typedef change_attr_type4 fattr4_change_attr_type;
+
+typedef sec_label4 fattr4_sec_label;
+
+typedef uint32_t fattr4_clone_blksize;
+
+/* nfsv4.2 end */
 
 /*
  * REQUIRED Attributes
@@ -944,10 +1065,13 @@ typedef change_policy4 fattr4_change_policy;
 #define	FATTR4_RETENTEVT_SET 72
 #define	FATTR4_RETENTION_HOLD 73
 #define	FATTR4_MODE_SET_MASKED 74
-#define	FATTR4_SUPPATTR_EXCLCREAT 75
+/*	FATTR4_SUPPATTR_EXCLCREAT (75) is required. See above. */
 #define	FATTR4_FS_CHARSET_CAP 76
 
 /* new to NFSv4.2 */
+#define	FATTR4_CLONE_BLKSIZE 77
+#define	FATTR4_SPACE_FREED 78
+#define	FATTR4_CHANGE_ATTR_TYPE 79
 #define	FATTR4_SEC_LABEL 80
 
 struct fattr4 {
@@ -1232,6 +1356,100 @@ typedef struct nfsv4_1_file_layout4 nfsv4_1_file_layout4;
  */
 
 /* nfsv4.1 end */
+
+enum nfs_opnum4 {
+	OP_ACCESS = 3,
+	OP_CLOSE = 4,
+	OP_COMMIT = 5,
+	OP_CREATE = 6,
+	OP_DELEGPURGE = 7,
+	OP_DELEGRETURN = 8,
+	OP_GETATTR = 9,
+	OP_GETFH = 10,
+	OP_LINK = 11,
+	OP_LOCK = 12,
+	OP_LOCKT = 13,
+	OP_LOCKU = 14,
+	OP_LOOKUP = 15,
+	OP_LOOKUPP = 16,
+	OP_NVERIFY = 17,
+	OP_OPEN = 18,
+	OP_OPENATTR = 19,
+	OP_OPEN_CONFIRM = 20,
+	OP_OPEN_DOWNGRADE = 21,
+	OP_PUTFH = 22,
+	OP_PUTPUBFH = 23,
+	OP_PUTROOTFH = 24,
+	OP_READ = 25,
+	OP_READDIR = 26,
+	OP_READLINK = 27,
+	OP_REMOVE = 28,
+	OP_RENAME = 29,
+	OP_RENEW = 30,
+	OP_RESTOREFH = 31,
+	OP_SAVEFH = 32,
+	OP_SECINFO = 33,
+	OP_SETATTR = 34,
+	OP_SETCLIENTID = 35,
+	OP_SETCLIENTID_CONFIRM = 36,
+	OP_VERIFY = 37,
+	OP_WRITE = 38,
+	OP_RELEASE_LOCKOWNER = 39,
+
+	/* nfsv4.1 */
+	OP_BACKCHANNEL_CTL = 40,
+	OP_BIND_CONN_TO_SESSION = 41,
+	OP_EXCHANGE_ID = 42,
+	OP_CREATE_SESSION = 43,
+	OP_DESTROY_SESSION = 44,
+	OP_FREE_STATEID = 45,
+	OP_GET_DIR_DELEGATION = 46,
+	OP_GETDEVICEINFO = 47,
+	OP_GETDEVICELIST = 48,
+	OP_LAYOUTCOMMIT = 49,
+	OP_LAYOUTGET = 50,
+	OP_LAYOUTRETURN = 51,
+	OP_SECINFO_NO_NAME = 52,
+	OP_SEQUENCE = 53,
+	OP_SET_SSV = 54,
+	OP_TEST_STATEID = 55,
+	OP_WANT_DELEGATION = 56,
+	OP_DESTROY_CLIENTID = 57,
+	OP_RECLAIM_COMPLETE = 58,
+
+	/* NFSv4.2 */
+	OP_ALLOCATE = 59,
+	OP_COPY = 60,
+	OP_COPY_NOTIFY = 61,
+	OP_DEALLOCATE = 62,
+	OP_IO_ADVISE = 63,
+	OP_LAYOUTERROR = 64,
+	OP_LAYOUTSTATS = 65,
+	OP_OFFLOAD_CANCEL = 66,
+	OP_OFFLOAD_STATUS = 67,
+	OP_READ_PLUS = 68,
+	OP_SEEK = 69,
+	OP_WRITE_SAME = 70,
+	OP_CLONE = 71,
+
+	OP_ILLEGAL = 10044,
+/*
+ * These are internal client pseudo ops that *MUST* never go over the wire
+ */
+#define	SUNW_PRIVATE_OP	0x10000000
+#define	REAL_OP4(op)	((op) & ~SUNW_PRIVATE_OP)
+	OP_CCREATE = OP_CREATE | SUNW_PRIVATE_OP,
+	OP_CLINK = OP_LINK | SUNW_PRIVATE_OP,
+	OP_CLOOKUP = OP_LOOKUP | SUNW_PRIVATE_OP,
+	OP_COPEN = OP_OPEN | SUNW_PRIVATE_OP,
+	OP_CPUTFH = OP_PUTFH | SUNW_PRIVATE_OP,
+	OP_CREMOVE = OP_REMOVE | SUNW_PRIVATE_OP,
+	OP_CRENAME = OP_RENAME | SUNW_PRIVATE_OP,
+	OP_CSECINFO = OP_SECINFO | SUNW_PRIVATE_OP
+};
+typedef enum nfs_opnum4 nfs_opnum4;
+
+/* Args & res. structs */
 
 #define	ACCESS4_READ 0x00000001
 #define	ACCESS4_LOOKUP 0x00000002
@@ -1996,13 +2214,6 @@ struct VERIFY4res {
 };
 typedef struct VERIFY4res VERIFY4res;
 
-enum stable_how4 {
-	UNSTABLE4 = 0,
-	DATA_SYNC4 = 1,
-	FILE_SYNC4 = 2
-};
-typedef enum stable_how4 stable_how4;
-
 /*
  * mblk doesn't go over the wire.  If non-NULL, it points to an mblk chain
  * for the write data.
@@ -2653,84 +2864,291 @@ struct RECLAIM_COMPLETE4res {
 };
 typedef struct RECLAIM_COMPLETE4res RECLAIM_COMPLETE4res;
 
-/* new operations for NFSv4.1 end */
-
-enum nfs_opnum4 {
-	OP_ACCESS = 3,
-	OP_CLOSE = 4,
-	OP_COMMIT = 5,
-	OP_CREATE = 6,
-	OP_DELEGPURGE = 7,
-	OP_DELEGRETURN = 8,
-	OP_GETATTR = 9,
-	OP_GETFH = 10,
-	OP_LINK = 11,
-	OP_LOCK = 12,
-	OP_LOCKT = 13,
-	OP_LOCKU = 14,
-	OP_LOOKUP = 15,
-	OP_LOOKUPP = 16,
-	OP_NVERIFY = 17,
-	OP_OPEN = 18,
-	OP_OPENATTR = 19,
-	OP_OPEN_CONFIRM = 20,
-	OP_OPEN_DOWNGRADE = 21,
-	OP_PUTFH = 22,
-	OP_PUTPUBFH = 23,
-	OP_PUTROOTFH = 24,
-	OP_READ = 25,
-	OP_READDIR = 26,
-	OP_READLINK = 27,
-	OP_REMOVE = 28,
-	OP_RENAME = 29,
-	OP_RENEW = 30,
-	OP_RESTOREFH = 31,
-	OP_SAVEFH = 32,
-	OP_SECINFO = 33,
-	OP_SETATTR = 34,
-	OP_SETCLIENTID = 35,
-	OP_SETCLIENTID_CONFIRM = 36,
-	OP_VERIFY = 37,
-	OP_WRITE = 38,
-	OP_RELEASE_LOCKOWNER = 39,
-
-	/* nfsv4.1 */
-	OP_BACKCHANNEL_CTL = 40,
-	OP_BIND_CONN_TO_SESSION = 41,
-	OP_EXCHANGE_ID = 42,
-	OP_CREATE_SESSION = 43,
-	OP_DESTROY_SESSION = 44,
-	OP_FREE_STATEID = 45,
-	OP_GET_DIR_DELEGATION = 46,
-	OP_GETDEVICEINFO = 47,
-	OP_GETDEVICELIST = 48,
-	OP_LAYOUTCOMMIT = 49,
-	OP_LAYOUTGET = 50,
-	OP_LAYOUTRETURN = 51,
-	OP_SECINFO_NO_NAME = 52,
-	OP_SEQUENCE = 53,
-	OP_SET_SSV = 54,
-	OP_TEST_STATEID = 55,
-	OP_WANT_DELEGATION = 56,
-	OP_DESTROY_CLIENTID = 57,
-	OP_RECLAIM_COMPLETE = 58,
-
-	OP_ILLEGAL = 10044,
 /*
- * These are internal client pseudo ops that *MUST* never go over the wire
+ * New operations for nfsv4.2
  */
-#define	SUNW_PRIVATE_OP	0x10000000
-#define	REAL_OP4(op)	((op) & ~SUNW_PRIVATE_OP)
-	OP_CCREATE = OP_CREATE | SUNW_PRIVATE_OP,
-	OP_CLINK = OP_LINK | SUNW_PRIVATE_OP,
-	OP_CLOOKUP = OP_LOOKUP | SUNW_PRIVATE_OP,
-	OP_COPEN = OP_OPEN | SUNW_PRIVATE_OP,
-	OP_CPUTFH = OP_PUTFH | SUNW_PRIVATE_OP,
-	OP_CREMOVE = OP_REMOVE | SUNW_PRIVATE_OP,
-	OP_CRENAME = OP_RENAME | SUNW_PRIVATE_OP,
-	OP_CSECINFO = OP_SECINFO | SUNW_PRIVATE_OP
+
+struct CLONE4args {
+	stateid4 cl_src_stateid;
+	stateid4 cl_dst_stateid;
+	offset4 cl_src_offset;
+	offset4 cl_dst_offset;
+	length4 cl_count;
 };
-typedef enum nfs_opnum4 nfs_opnum4;
+typedef struct CLONE4args CLONE4args;
+
+struct CLONE4res {
+	nfsstat4 cl_status;
+};
+typedef struct CLONE4res CLONE4res;
+
+struct COPY4args {
+	stateid4 ca_src_stateid;
+	stateid4 ca_dst_stateid;
+	offset4 ca_src_offset;
+	offset4 ca_dst_offset;
+	length4 ca_count;
+	bool_t ca_consecutive;
+	bool_t ca_synchronous;
+	struct {
+		uint_t ca_source_server_len;
+		netloc4 *ca_source_server_val;
+	} ca_source_server;
+};
+typedef struct COPY4args COPY4args;
+
+struct copy_requirements4 {
+	bool_t cr_consecutive;
+	bool_t cr_synchronous;
+};
+typedef struct copy_requirements4 copy_requirements4;
+
+struct COPY4resok {
+	write_response4 cr_response;
+	copy_requirements4 cr_requirements;
+};
+typedef struct COPY4resok COPY4resok;
+
+struct COPY4res {
+	nfsstat4 cr_status;
+	union {
+		COPY4resok cr_resok4;
+		copy_requirements4 cr_requirements;
+	} COPY4res_u;
+};
+typedef struct COPY4res COPY4res;
+
+struct COPY_NOTIFY4args {
+	stateid4 cna_src_stateid;
+	netloc4 cna_destination_server;
+};
+typedef struct COPY_NOTIFY4args COPY_NOTIFY4args;
+
+struct COPY_NOTIFY4resok {
+	nfstime4 cnr_lease_time;
+	stateid4 cnr_stateid;
+	struct {
+		uint_t cnr_source_server_len;
+		netloc4 *cnr_source_server_val;
+	} cnr_source_server;
+};
+typedef struct COPY_NOTIFY4resok COPY_NOTIFY4resok;
+
+struct COPY_NOTIFY4res {
+	nfsstat4 cnr_status;
+	union {
+		COPY_NOTIFY4resok resok4;
+	} COPY_NOTIFY4res_u;
+};
+typedef struct COPY_NOTIFY4res COPY_NOTIFY4res;
+
+struct OFFLOAD_CANCEL4args {
+	stateid4 oca_stateid;
+};
+typedef struct OFFLOAD_CANCEL4args OFFLOAD_CANCEL4args;
+
+struct OFFLOAD_CANCEL4res {
+	nfsstat4 ocr_status;
+};
+typedef struct OFFLOAD_CANCEL4res OFFLOAD_CANCEL4res;
+
+struct OFFLOAD_STATUS4args {
+	stateid4 osa_stateid;
+};
+typedef struct OFFLOAD_STATUS4args OFFLOAD_STATUS4args;
+
+struct OFFLOAD_STATUS4resok {
+	length4 osr_count;
+	struct {
+		uint_t osr_complete_len;
+		nfsstat4 *osr_complete_val;
+	} osr_complete;
+};
+typedef struct OFFLOAD_STATUS4resok OFFLOAD_STATUS4resok;
+
+struct OFFLOAD_STATUS4res {
+	nfsstat4 osr_status;
+	union {
+		OFFLOAD_STATUS4resok osr_resok4;
+	} OFFLOAD_STATUS4res_u;
+};
+typedef struct OFFLOAD_STATUS4res OFFLOAD_STATUS4res;
+
+struct ALLOCATE4args {
+	stateid4 aa_stateid;
+	offset4 aa_offset;
+	length4 aa_length;
+};
+typedef struct ALLOCATE4args ALLOCATE4args;
+
+struct ALLOCATE4res {
+	nfsstat4 ar_status;
+};
+typedef struct ALLOCATE4res ALLOCATE4res;
+
+struct DEALLOCATE4args {
+	stateid4 da_stateid;
+	offset4 da_offset;
+	length4 da_length;
+};
+typedef struct DEALLOCATE4args DEALLOCATE4args;
+
+struct DEALLOCATE4res {
+	nfsstat4 dr_status;
+};
+typedef struct DEALLOCATE4res DEALLOCATE4res;
+
+enum IO_ADVISE_type4 {
+	IO_ADVISE4_NORMAL = 0,
+	IO_ADVISE4_SEQUENTIAL = 1,
+	IO_ADVISE4_SEQUENTIAL_BACKWARDS = 2,
+	IO_ADVISE4_RANDOM = 3,
+	IO_ADVISE4_WILLNEED = 4,
+	IO_ADVISE4_WILLNEED_OPPORTUNISTIC = 5,
+	IO_ADVISE4_DONTNEED = 6,
+	IO_ADVISE4_NOREUSE = 7,
+	IO_ADVISE4_READ = 8,
+	IO_ADVISE4_WRITE = 9,
+	IO_ADVISE4_INIT_PROXIMITY = 10
+};
+typedef enum IO_ADVISE_type4 IO_ADVISE_type4;
+
+struct IO_ADVISE4args {
+	stateid4 iaa_stateid;
+	offset4 iaa_offset;
+	length4 iaa_count;
+	bitmap4 iaa_hints;
+};
+typedef struct IO_ADVISE4args IO_ADVISE4args;
+
+struct IO_ADVISE4resok {
+	bitmap4 ior_hints;
+};
+typedef struct IO_ADVISE4resok IO_ADVISE4resok;
+
+struct IO_ADVISE4res {
+	nfsstat4 ior_status;
+	union {
+		IO_ADVISE4resok resok4;
+	} IO_ADVISE4res_u;
+};
+typedef struct IO_ADVISE4res IO_ADVISE4res;
+
+struct device_error4 {
+	deviceid4 de_deviceid;
+	nfsstat4 de_status;
+	nfs_opnum4 de_opnum;
+};
+typedef struct device_error4 device_error4;
+
+struct LAYOUTERROR4args {
+	offset4 lea_offset;
+	length4 lea_length;
+	stateid4 lea_stateid;
+	struct {
+		uint_t lea_errors_len;
+		device_error4 *lea_errors_val;
+	} lea_errors;
+};
+typedef struct LAYOUTERROR4args LAYOUTERROR4args;
+
+struct LAYOUTERROR4res {
+	nfsstat4 ler_status;
+};
+typedef struct LAYOUTERROR4res LAYOUTERROR4res;
+
+struct io_info4 {
+	uint64_t ii_count;
+	uint64_t ii_bytes;
+};
+typedef struct io_info4 io_info4;
+
+struct LAYOUTSTATS4args {
+	offset4 lsa_offset;
+	length4 lsa_length;
+	stateid4 lsa_stateid;
+	io_info4 lsa_read;
+	io_info4 lsa_write;
+	deviceid4 lsa_deviceid;
+	layoutupdate4 lsa_layoutupdate;
+};
+typedef struct LAYOUTSTATS4args LAYOUTSTATS4args;
+
+struct LAYOUTSTATS4res {
+	nfsstat4 lsr_status;
+};
+typedef struct LAYOUTSTATS4res LAYOUTSTATS4res;
+
+struct READ_PLUS4args {
+	stateid4 rpa_stateid;
+	offset4 rpa_offset;
+	count4 rpa_count;
+};
+typedef struct READ_PLUS4args READ_PLUS4args;
+
+struct read_plus_content {
+	data_content4 rpc_content;
+	union {
+		data4 rpc_data;
+		data_info4 rpc_hole;
+	} read_plus_content_u;
+};
+typedef struct read_plus_content read_plus_content;
+
+struct read_plus_res4 {
+	bool_t rpr_eof;
+	struct {
+		uint_t rpr_contents_len;
+		read_plus_content *rpr_contents_val;
+	} rpr_contents;
+};
+typedef struct read_plus_res4 read_plus_res4;
+
+struct READ_PLUS4res {
+	nfsstat4 rp_status;
+	union {
+		read_plus_res4 rp_resok4;
+	} READ_PLUS4res_u;
+};
+typedef struct READ_PLUS4res READ_PLUS4res;
+
+struct SEEK4args {
+	stateid4 sa_stateid;
+	offset4 sa_offset;
+	data_content4 sa_what;
+};
+typedef struct SEEK4args SEEK4args;
+
+struct seek_res4 {
+	bool_t sr_eof;
+	offset4 sr_offset;
+};
+typedef struct seek_res4 seek_res4;
+
+struct SEEK4res {
+	nfsstat4 sa_status;
+	union {
+		seek_res4 resok4;
+	} SEEK4res_u;
+};
+typedef struct SEEK4res SEEK4res;
+
+struct WRITE_SAME4args {
+	stateid4 wsa_stateid;
+	stable_how4 wsa_stable;
+	app_data_block4 wsa_adb;
+};
+typedef struct WRITE_SAME4args WRITE_SAME4args;
+
+struct WRITE_SAME4res {
+	nfsstat4 wsr_status;
+	union {
+		write_response4 resok4;
+	} WRITE_SAME4res_u;
+};
+typedef struct WRITE_SAME4res WRITE_SAME4res;
+
+/* new operations for NFSv4.2 end */
 
 struct nfs_argop4 {
 	nfs_opnum4 argop;
@@ -2792,6 +3210,20 @@ struct nfs_argop4 {
 		WANT_DELEGATION4args opwant_delegation;
 		DESTROY_CLIENTID4args opdestroy_clientid;
 		RECLAIM_COMPLETE4args opreclaim_complete;
+		/* nfsv4.2 */
+		ALLOCATE4args opallocate;
+		COPY4args opcopy;
+		COPY_NOTIFY4args opoffload_notify;
+		DEALLOCATE4args opdeallocate;
+		IO_ADVISE4args opio_advise;
+		LAYOUTERROR4args oplayouterror;
+		LAYOUTSTATS4args oplayoutstats;
+		OFFLOAD_CANCEL4args opoffload_cancel;
+		OFFLOAD_STATUS4args opoffload_status;
+		READ_PLUS4args opread_plus;
+		SEEK4args opseek;
+		WRITE_SAME4args opwrite_same;
+		CLONE4args opclone;
 	} nfs_argop4_u;
 };
 typedef struct nfs_argop4 nfs_argop4;
@@ -2856,6 +3288,21 @@ struct nfs_resop4 {
 		WANT_DELEGATION4res opwant_delegation;
 		DESTROY_CLIENTID4res opdestroy_clientid;
 		RECLAIM_COMPLETE4res opreclaim_complete;
+		/* nfsv4.2 */
+		ALLOCATE4res opallocate;
+		COPY4res opcopy;
+		COPY_NOTIFY4res opcopy_notify;
+		DEALLOCATE4res opdeallocate;
+		IO_ADVISE4res opio_advise;
+		LAYOUTERROR4res oplayouterror;
+		LAYOUTSTATS4res oplayoutstats;
+		OFFLOAD_CANCEL4res opoffload_cancel;
+		OFFLOAD_STATUS4res opoffload_status;
+		READ_PLUS4res opread_plus;
+		SEEK4res opseek;
+		WRITE_SAME4res opwrite_same;
+		CLONE4res opclone;
+
 		ILLEGAL4res opillegal;
 	} nfs_resop4_u;
 };
@@ -3226,6 +3673,7 @@ enum nfs_cb_opnum4 {
 	OP_CB_WANTS_CANCELLED = 12,
 	OP_CB_NOTIFY_LOCK = 13,
 	OP_CB_NOTIFY_DEVICEID = 14,
+	OP_CB_OFFLOAD = 15,	/* nfsv4.2 */
 	OP_CB_ILLEGAL = 10044
 };
 typedef enum nfs_cb_opnum4 nfs_cb_opnum4;
@@ -3380,6 +3828,17 @@ extern  bool_t xdr_mdsthreshold4(XDR *, mdsthreshold4*);
 extern  bool_t xdr_retention_get4(XDR *, retention_get4*);
 extern  bool_t xdr_retention_set4(XDR *, retention_set4*);
 extern  bool_t xdr_fs_charset_cap4(XDR *, fs_charset_cap4*);
+extern  bool_t xdr_netloc_type4(XDR *, netloc_type4*);
+extern  bool_t xdr_netloc4(XDR *, netloc4*);
+extern  bool_t xdr_change_attr_type4(XDR *, change_attr_type4*);
+/* extern  bool_t xdr_labelformat_spec4(XDR *, labelformat_spec4*); */
+extern  bool_t xdr_sec_label4(XDR *, sec_label4*);
+extern  bool_t xdr_app_data_block4(XDR *, app_data_block4*);
+extern  bool_t xdr_data4(XDR *, data4*);
+extern  bool_t xdr_data_info4(XDR *, data_info4*);
+extern  bool_t xdr_data_content4(XDR *, data_content4*);
+extern  bool_t xdr_stable_how4(XDR *, stable_how4*);
+extern  bool_t xdr_write_response4(XDR *, write_response4*);
 extern  bool_t xdr_fattr4_supported_attrs(XDR *, fattr4_supported_attrs*);
 extern  bool_t xdr_fattr4_type(XDR *, fattr4_type*);
 extern  bool_t xdr_fattr4_fh_expire_type(XDR *, fattr4_fh_expire_type*);
@@ -3456,6 +3915,10 @@ extern  bool_t xdr_fattr4_retention_hold(XDR *, fattr4_retention_hold*);
 extern  bool_t xdr_fattr4_dacl(XDR *, fattr4_dacl*);
 extern  bool_t xdr_fattr4_sacl(XDR *, fattr4_sacl*);
 extern  bool_t xdr_fattr4_change_policy(XDR *, fattr4_change_policy*);
+extern  bool_t xdr_fattr4_space_freed(XDR *, fattr4_space_freed*);
+extern  bool_t xdr_fattr4_change_attr_type(XDR *, fattr4_change_attr_type*);
+extern  bool_t xdr_fattr4_sec_label(XDR *, fattr4_sec_label*);
+extern  bool_t xdr_fattr4_clone_blksize(XDR *, fattr4_clone_blksize*);
 extern  bool_t xdr_fattr4(XDR *, fattr4*);
 extern  bool_t xdr_change_info4(XDR *, change_info4*);
 extern  bool_t xdr_clientaddr4(XDR *, clientaddr4*);
@@ -3484,6 +3947,8 @@ extern  bool_t xdr_nfsv4_1_file_layout_ds_addr4(XDR *,
 	nfsv4_1_file_layout_ds_addr4*);
 extern  bool_t xdr_nfsv4_1_file_layout4(XDR *, nfsv4_1_file_layout4*);
 extern  bool_t xdr_ACCESS4args(XDR *, ACCESS4args*);
+extern  bool_t xdr_CLONE4args(XDR *, CLONE4args*);
+extern  bool_t xdr_CLONE4res(XDR *, CLONE4res*);
 extern  bool_t xdr_COMMIT4args(XDR *, COMMIT4args*);
 extern  bool_t xdr_COMMIT4res(XDR *, COMMIT4res*);
 extern  bool_t xdr_DELEGPURGE4args(XDR *, DELEGPURGE4args*);
@@ -3537,7 +4002,6 @@ extern  bool_t xdr_SETCLIENTID_CONFIRM4args(XDR *, SETCLIENTID_CONFIRM4args*);
 extern  bool_t xdr_SETCLIENTID_CONFIRM4res(XDR *, SETCLIENTID_CONFIRM4res*);
 extern  bool_t xdr_VERIFY4args(XDR *, VERIFY4args*);
 extern  bool_t xdr_VERIFY4res(XDR *, VERIFY4res*);
-extern  bool_t xdr_stable_how4(XDR *, stable_how4*);
 extern  bool_t xdr_RELEASE_LOCKOWNER4args(XDR *, RELEASE_LOCKOWNER4args*);
 extern  bool_t xdr_RELEASE_LOCKOWNER4res(XDR *, RELEASE_LOCKOWNER4res*);
 extern  bool_t xdr_ILLEGAL4res(XDR *, ILLEGAL4res*);
@@ -3616,6 +4080,43 @@ extern  bool_t xdr_DESTROY_CLIENTID4res(XDR *, DESTROY_CLIENTID4res*);
 extern  bool_t xdr_RECLAIM_COMPLETE4args(XDR *, RECLAIM_COMPLETE4args*);
 extern  bool_t xdr_RECLAIM_COMPLETE4res(XDR *, RECLAIM_COMPLETE4res*);
 extern  bool_t xdr_nfs_opnum4(XDR *, nfs_opnum4*);
+
+extern  bool_t xdr_COPY4args(XDR *, COPY4args*);
+extern  bool_t xdr_copy_requirements4(XDR *, copy_requirements4*);
+extern  bool_t xdr_COPY4resok(XDR *, COPY4resok*);
+extern  bool_t xdr_COPY4res(XDR *, COPY4res*);
+extern  bool_t xdr_COPY_NOTIFY4args(XDR *, COPY_NOTIFY4args*);
+extern  bool_t xdr_COPY_NOTIFY4resok(XDR *, COPY_NOTIFY4resok*);
+extern  bool_t xdr_COPY_NOTIFY4res(XDR *, COPY_NOTIFY4res*);
+extern  bool_t xdr_OFFLOAD_CANCEL4args(XDR *, OFFLOAD_CANCEL4args*);
+extern  bool_t xdr_OFFLOAD_CANCEL4res(XDR *, OFFLOAD_CANCEL4res*);
+extern  bool_t xdr_OFFLOAD_STATUS4args(XDR *, OFFLOAD_STATUS4args*);
+extern  bool_t xdr_OFFLOAD_STATUS4resok(XDR *, OFFLOAD_STATUS4resok*);
+extern  bool_t xdr_OFFLOAD_STATUS4res(XDR *, OFFLOAD_STATUS4res*);
+extern  bool_t xdr_ALLOCATE4args(XDR *, ALLOCATE4args*);
+extern  bool_t xdr_ALLOCATE4res(XDR *, ALLOCATE4res*);
+extern  bool_t xdr_DEALLOCATE4args(XDR *, DEALLOCATE4args*);
+extern  bool_t xdr_DEALLOCATE4res(XDR *, DEALLOCATE4res*);
+extern  bool_t xdr_IO_ADVISE_type4(XDR *, IO_ADVISE_type4*);
+extern  bool_t xdr_IO_ADVISE4args(XDR *, IO_ADVISE4args*);
+extern  bool_t xdr_IO_ADVISE4resok(XDR *, IO_ADVISE4resok*);
+extern  bool_t xdr_IO_ADVISE4res(XDR *, IO_ADVISE4res*);
+extern  bool_t xdr_device_error4(XDR *, device_error4*);
+extern  bool_t xdr_LAYOUTERROR4args(XDR *, LAYOUTERROR4args*);
+extern  bool_t xdr_LAYOUTERROR4res(XDR *, LAYOUTERROR4res*);
+extern  bool_t xdr_io_info4(XDR *, io_info4*);
+extern  bool_t xdr_LAYOUTSTATS4args(XDR *, LAYOUTSTATS4args*);
+extern  bool_t xdr_LAYOUTSTATS4res(XDR *, LAYOUTSTATS4res*);
+extern  bool_t xdr_READ_PLUS4args(XDR *, READ_PLUS4args*);
+extern  bool_t xdr_read_plus_content(XDR *, read_plus_content*);
+extern  bool_t xdr_read_plus_res4(XDR *, read_plus_res4*);
+extern  bool_t xdr_READ_PLUS4res(XDR *, READ_PLUS4res*);
+extern  bool_t xdr_SEEK4args(XDR *, SEEK4args*);
+extern  bool_t xdr_seek_res4(XDR *, seek_res4*);
+extern  bool_t xdr_SEEK4res(XDR *, SEEK4res*);
+extern  bool_t xdr_WRITE_SAME4args(XDR *, WRITE_SAME4args*);
+extern  bool_t xdr_WRITE_SAME4res(XDR *, WRITE_SAME4res*);
+
 extern  bool_t xdr_COMPOUND4args(XDR *, COMPOUND4args*);
 extern  bool_t xdr_COMPOUND4res(XDR *, COMPOUND4res*);
 extern  bool_t xdr_CB_GETATTR4args(XDR *, CB_GETATTR4args*);
@@ -3669,19 +4170,6 @@ extern  bool_t xdr_nfs_cb_argop4(XDR *, nfs_cb_argop4*);
 extern  bool_t xdr_nfs_cb_resop4(XDR *, nfs_cb_resop4*);
 extern  bool_t xdr_CB_COMPOUND4args(XDR *, CB_COMPOUND4args*);
 extern  bool_t xdr_CB_COMPOUND4res(XDR *, CB_COMPOUND4res*);
-/*  nfsv4.1 end */
-
-/* nfsv4.2 */
-struct sec_label4 {
-	uint_t slai_len;
-	char  *slai_val;
-};
-
-typedef struct sec_label4 sec_label4;
-typedef sec_label4 fattr4_sec_label;
-
-extern  bool_t xdr_fattr4_sec_label(XDR *xdrs, fattr4_sec_label *objp);
-/* nfsv4.2 end */
 
 /* NFSv4.x xdr */
 extern bool_t xdr_nfs4x_argop4(XDR *xdrs, nfs_argop4 *objp);

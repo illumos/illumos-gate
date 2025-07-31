@@ -26,9 +26,10 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
+#include <sys/bitext.h>
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <sys/sysmacros.h>
@@ -43,10 +44,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <syslog.h>
 #include <time.h>
@@ -80,22 +83,22 @@ static char	*cmdname;
 
 static bool ucode_debug = false;
 
-static int ucode_convert_amd(const char *, uint8_t *, size_t);
-static int ucode_convert_intel(const char *, uint8_t *, size_t);
+static ucode_errno_t ucode_convert_amd(const char *, uint8_t **, size_t *);
+static ucode_errno_t ucode_convert_intel(const char *, uint8_t **, size_t *);
 
-static ucode_errno_t ucode_gen_files_amd(uint8_t *, int, char *);
-static ucode_errno_t ucode_gen_files_intel(uint8_t *, int, char *);
+static ucode_errno_t ucode_gen_files_amd(uint8_t *, size_t, const char *);
+static ucode_errno_t ucode_gen_files_intel(uint8_t *, size_t, const char *);
 
-static void ucode_list_amd(uint8_t *, int);
-static void ucode_list_intel(uint8_t *, int);
+static void ucode_list_amd(uint8_t *, size_t);
+static void ucode_list_intel(uint8_t *, size_t);
 
 typedef struct ucode_source {
 	const char	*us_prefix;
 	const char	*us_vendor;
-	int		(*us_convert)(const char *, uint8_t *, size_t);
-	ucode_errno_t	(*us_gen_files)(uint8_t *, int, char *);
-	ucode_errno_t	(*us_validate)(uint8_t *, int);
-	void		(*us_list)(uint8_t *, int);
+	ucode_errno_t	(*us_convert)(const char *, uint8_t **, size_t *);
+	ucode_errno_t	(*us_gen_files)(uint8_t *, size_t, const char *);
+	ucode_errno_t	(*us_validate)(uint8_t *, size_t);
+	void		(*us_list)(uint8_t *, size_t);
 } ucode_source_t;
 
 static const ucode_source_t ucode_sources[] = {
@@ -114,7 +117,7 @@ static const ucode_source_t ucode_sources[] = {
 		.us_gen_files	= ucode_gen_files_amd,
 		.us_validate	= ucode_validate_amd,
 		.us_list	= ucode_list_amd,
-	},
+	}
 };
 
 const ucode_source_t *ucode;
@@ -174,45 +177,199 @@ ucode_perror(const char *str, ucode_errno_t rc)
 	errno = 0;
 }
 
-#define	LINESIZE	120	/* copyright line sometimes is longer than 80 */
+static int
+bcd_to_int(uint8_t b)
+{
+	int high = (b >> 4) & 0xf;
+	int low = b & 0xf;
+
+	if (high > 9 || low > 9)
+		return (-1);
+	return (high * 10 + low);
+}
 
 /*
- * Convert text format microcode release into binary format.
- * Return the number of characters read.
- *
- * AMD microcode is already in binary format.
+ * Extract the family, model and stepping values from a 32-bit CPU signature.
+ * These bit fields are defined by the Intel Application Note AP-485
+ * "Intel Processor Identification and the CPUID Instruction"
  */
-static int
-ucode_convert_amd(const char *infile, uint8_t *buf, size_t size)
+static void
+ucode_fms(uint32_t sig, uint8_t *family, uint8_t *model, uint8_t *stepping)
 {
-	int fd;
+	const uint8_t xfamily = bitx32(sig, 27, 20);
+	const uint8_t bfamily = bitx32(sig, 11, 8);
+	const uint8_t xmodel = bitx32(sig, 19, 16);
+	const uint8_t bmodel = bitx32(sig, 7, 4);
+
+	*family = bfamily == 0xf ? bfamily + xfamily : bfamily;
+	*model = bfamily == 0x6 || bfamily == 0xf ?
+	    (xmodel << 4) | bmodel : bmodel;
+	*stepping = bitx32(sig, 3, 0);
+}
+
+/*
+ * AMD microcode updates use a compressed 16-bit CPU identifier called an
+ * Equivalent Processor ID. The compression is achieved by removing the base
+ * family field, and assuming it is always 0xf, and reducing the size of the
+ * extended family field to 4 bits such that only families up to 0x1e can be
+ * represented. The structure is:
+ *
+ *    [15:12] Extended Family (i.e. family - 0xf)
+ *    [11:4]  Model
+ *    [3:0]   Stepping
+ *
+ * This function expands an AMD Equivalent Processor ID to a traditional
+ * 32-bit CPU signature.
+ */
+static uint32_t
+amd_equivcpu_to_sig(uint16_t equiv)
+{
+	uint16_t xfamily, model, stepping;
+	uint32_t sig = 0;
+
+	xfamily = bitx16(equiv, 15, 12);
+	model = bitx16(equiv, 11, 4);
+	stepping = bitx16(equiv, 3, 0);
+
+	sig = bitset32(sig, 27, 20, xfamily);			/* ext family */
+	sig = bitset32(sig, 11, 8, 0xf);			/* family */
+	sig = bitset32(sig, 19, 16, bitx16(model, 7, 4));	/* ext model */
+	sig = bitset32(sig, 7, 4, bitx16(model, 3, 0));		/* model */
+	sig = bitset32(sig, 3, 0, stepping);
+
+	return (sig);
+}
+
+/*
+ * Load a microcode release which is in AMD's binary container format. If the
+ * provided file appears to be a raw binary update, cons up a container
+ * containing just that patch.
+ */
+static ucode_errno_t
+ucode_convert_amd(const char *infile, uint8_t **bufp, size_t *sizep)
+{
+	ucode_header_amd_t *patch;
+	ucode_section_amd_t *section;
+	ucode_eqtbl_amd_t *eq;
+	int month, day, yearl, fd;
+	size_t csize;
+	ssize_t rsize;
+	uint8_t *buf = *bufp;
+	size_t size = *sizep;
 
 	if (infile == NULL || buf == NULL || size == 0)
-		return (0);
+		return (EM_INVALIDARG);
 
 	if ((fd = open(infile, O_RDONLY)) < 0)
-		return (0);
+		return (EM_SYS);
 
-	size = read(fd, buf, size);
+	rsize = read(fd, buf, size);
+	if (rsize < 0) {
+		int _errno = errno;
+		(void) close(fd);
+		errno = _errno;
+		return (EM_SYS);
+	}
 
 	(void) close(fd);
 
-	return (size);
+	if (rsize == 0)
+		return (EM_FILEFORMAT);
+
+	size = rsize;
+
+	/*
+	 * AMD microcode is distributed in two forms. As container/bundle files
+	 * or as individual binary patches. If this looks like a container,
+	 * we're done.
+	 */
+	if (ucode->us_validate(buf, size) == EM_OK) {
+		*sizep = size;
+		return (EM_OK);
+	}
+
+	/*
+	 * Otherwise, see if this looks like a binary patch. We're limited in
+	 * what we can check here but we can look at the date field to see if
+	 * it is plausible. That field is encoded as a kind of packed
+	 * BCD 0xMMDDYYYY.
+	 */
+	patch = (ucode_header_amd_t *)*bufp;
+	month = bcd_to_int(bitx32(patch->uh_date, 31, 24));
+	day = bcd_to_int(bitx32(patch->uh_date, 23, 16));
+	yearl = bcd_to_int(bitx32(patch->uh_date, 7, 0));
+	if (day < 1 || day > 31 || month < 1 || month > 12 ||
+	    yearl < 0 || yearl > 99) {
+		dbgprintf("implausible date code: 0x%x\n", patch->uh_date);
+		return (EM_FILEFORMAT);
+	}
+
+	/* It's plausibly a binary patch; cons up a container */
+	dbgprintf("creating microcode container\n");
+	csize =
+	    sizeof (uint32_t) +			/* Magic */
+	    2 * sizeof (ucode_section_amd_t) +	/* TLV headers */
+	    2 * sizeof (ucode_eqtbl_amd_t);	/* Equivalence table */
+	if (size > SIZE_MAX - csize) {
+		dbgprintf("container size too large (patch size %zu)\n", size);
+		return (EM_FILEFORMAT);
+	}
+	csize += size;				/* Patch payload */
+
+	buf = realloc(*bufp, csize);
+	if (buf == NULL)
+		return (EM_SYS);
+
+	/* Relocate the patch data */
+	patch = (ucode_header_amd_t *)(buf + csize - size);
+	bcopy(buf, patch, size);
+
+	/* Build the container */
+	*(uint32_t *)buf = UCODE_AMD_CONTAINER_MAGIC;
+
+	/* Equivalence table section */
+	section = (ucode_section_amd_t *)(buf + sizeof (uint32_t));
+	eq = (ucode_eqtbl_amd_t *)section->usa_data;
+
+	section->usa_type = UCODE_AMD_CONTAINER_TYPE_EQUIV;
+	section->usa_size = 2 * sizeof (*eq);
+	eq->ue_equiv_cpu = patch->uh_cpu_rev;
+	eq->ue_inst_cpu = amd_equivcpu_to_sig(patch->uh_cpu_rev);
+	/* Create the equivalence table terminator record */
+	bzero(eq + 1, sizeof (*eq));
+
+	/* Patch section */
+	section =
+	    (ucode_section_amd_t *)(section->usa_data + section->usa_size);
+	section->usa_type = UCODE_AMD_CONTAINER_TYPE_PATCH;
+	section->usa_size = size;
+
+	*bufp = buf;
+	*sizep = csize;
+
+	return (EM_OK);
 }
 
-static int
-ucode_convert_intel(const char *infile, uint8_t *buf, size_t size)
+/*
+ * Convert text format microcode release into binary format.
+ */
+#define	LINESIZE	120	/* copyright line sometimes is longer than 80 */
+static ucode_errno_t
+ucode_convert_intel(const char *infile, uint8_t **bufp, size_t *sizep)
 {
-	char	linebuf[LINESIZE];
-	FILE	*infd = NULL;
-	int	count = 0, firstline = 1;
+	char linebuf[LINESIZE];
+	FILE *infd = NULL;
+	bool firstline = true;
+	size_t count = 0;
+	uint8_t	*buf = *bufp;
+	size_t size = *sizep;
 	uint32_t *intbuf = (uint32_t *)(uintptr_t)buf;
 
 	if (infile == NULL || buf == NULL || size == 0)
-		return (0);
+		return (EM_INVALIDARG);
 
 	if ((infd = fopen(infile, "r")) == NULL)
-		return (0);
+		return (EM_SYS);
 
 	while (fgets(linebuf, LINESIZE, infd)) {
 
@@ -222,10 +379,15 @@ ucode_convert_intel(const char *infile, uint8_t *buf, size_t size)
 				count = fread(buf, 1, size, infd);
 
 			(void) fclose(infd);
-			return (count);
+
+			if (count == 0)
+				return (EM_FILEFORMAT);
+
+			*sizep = count;
+			return (EM_OK);
 		}
 
-		firstline = 0;
+		firstline = false;
 
 		/* Skip blank lines */
 		if (strlen(linebuf) == 1)
@@ -254,7 +416,9 @@ ucode_convert_intel(const char *infile, uint8_t *buf, size_t size)
 	 * where "count" is used to count the number of integers
 	 * read.  Convert it to number of characters read.
 	 */
-	return (count * sizeof (int));
+	*sizep = count * sizeof (int);
+
+	return (EM_OK);
 }
 
 /*
@@ -293,16 +457,20 @@ ucode_should_update_intel(char *filename, uint32_t new_rev)
  * Generate microcode binary files.  Must be called after ucode_validate().
  */
 static ucode_errno_t
-ucode_gen_files_amd(uint8_t *buf, int size, char *path)
+ucode_gen_files_amd(uint8_t *buf, size_t size, const char *path)
 {
-	uint32_t *ptr = (uint32_t *)buf;
 	char common_path[PATH_MAX];
-	int fd, count, counter = 0;
-	ucode_header_amd_t *uh;
-	int last_cpu_rev = 0;
+	int fd;
+	uint16_t last_cpu_rev = 0;
+	uint32_t counter = 0;
+	int n;
 
 	/* write container file */
-	(void) snprintf(common_path, PATH_MAX, "%s/%s", path, "container");
+	n = snprintf(common_path, sizeof (common_path), "%s/container", path);
+	if (n >= sizeof (common_path)) {
+		dbgprintf("failed to construct container path\n");
+		return (EM_FILEFORMAT);
+	}
 
 	dbgprintf("path = %s\n", common_path);
 	fd = open(common_path, O_WRONLY | O_CREAT | O_TRUNC,
@@ -321,16 +489,45 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 
 	(void) close(fd);
 
-	/* skip over magic number & equivalence table header */
-	ptr += 2; size -= 8;
+	/* skip over magic number, the file has already been validated */
+	buf += sizeof (uint32_t);
+	size -= sizeof (uint32_t);
 
-	count = *ptr++; size -= 4;
+	while (size > sizeof (ucode_section_amd_t)) {
+		ucode_section_amd_t *section = (ucode_section_amd_t *)buf;
+		int n;
 
-	/* equivalence table uses special name */
-	(void) snprintf(common_path, PATH_MAX, "%s/%s", path,
-	    UCODE_AMD_EQUIVALENCE_TABLE_NAME);
+		switch (section->usa_type) {
+		case UCODE_AMD_CONTAINER_TYPE_EQUIV:
+			n = snprintf(common_path, sizeof (common_path), "%s/%s",
+			    path, UCODE_AMD_EQUIVALENCE_TABLE_NAME);
+			break;
+		case UCODE_AMD_CONTAINER_TYPE_PATCH: {
+			ucode_header_amd_t *uh =
+			    (ucode_header_amd_t *)section->usa_data;
 
-	for (;;) {
+			if (uh->uh_cpu_rev != last_cpu_rev) {
+				last_cpu_rev = uh->uh_cpu_rev;
+				counter = 0;
+			}
+
+			n = snprintf(common_path, sizeof (common_path),
+			    "%s/%04X-%02X", path, uh->uh_cpu_rev, counter++);
+			break;
+		}
+		default:
+			/*
+			 * Since the container has already been validated, this
+			 * should never happen.
+			 */
+			return (EM_FILEFORMAT);
+		}
+
+		if (n >= sizeof (common_path)) {
+			dbgprintf("failed to construct component path\n");
+			return (EM_FILEFORMAT);
+		}
+
 		dbgprintf("path = %s\n", common_path);
 		fd = open(common_path, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IRUSR | S_IRGRP | S_IROTH);
@@ -340,44 +537,38 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 			return (EM_SYS);
 		}
 
-		if (write(fd, ptr, count) != count) {
+		if (write(fd, section->usa_data, section->usa_size) !=
+		    section->usa_size) {
 			(void) close(fd);
 			ucode_perror(common_path, EM_SYS);
 			return (EM_SYS);
 		}
 
 		(void) close(fd);
-		ptr += count >> 2; size -= count;
 
-		if (!size)
-			return (EM_OK);
-
-		ptr++; size -= 4;
-		count = *ptr++; size -= 4;
-
-		/* construct name from header information */
-		uh = (ucode_header_amd_t *)ptr;
-
-		if (uh->uh_cpu_rev != last_cpu_rev) {
-			last_cpu_rev = uh->uh_cpu_rev;
-			counter = 0;
-		}
-
-		(void) snprintf(common_path, PATH_MAX, "%s/%04X-%02X", path,
-		    uh->uh_cpu_rev, counter++);
+		size -= section->usa_size + sizeof (ucode_section_amd_t);
+		buf += section->usa_size + sizeof (ucode_section_amd_t);
 	}
+
+	return (EM_OK);
 }
 
 static ucode_errno_t
-ucode_gen_files_intel(uint8_t *buf, int size, char *path)
+ucode_gen_files_intel(uint8_t *buf, size_t size, const char *path)
 {
-	int	remaining;
+	size_t	remaining;
 	char	common_path[PATH_MAX];
 	DIR	*dirp;
 	struct dirent *dp;
+	int n;
 
-	(void) snprintf(common_path, PATH_MAX, "%s/%s", path,
+	n = snprintf(common_path, sizeof (common_path), "%s/%s", path,
 	    UCODE_INSTALL_COMMON_PATH);
+	if (n >= sizeof (common_path)) {
+		dbgprintf("failed to construct path for %s\n",
+		    UCODE_INSTALL_COMMON_PATH);
+		return (EM_FILEFORMAT);
+	}
 
 	if (mkdirp(common_path, 0755) == -1 && errno != EEXIST) {
 		ucode_perror(common_path, EM_SYS);
@@ -400,8 +591,12 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 
 		remaining -= total_size;
 
-		(void) snprintf(firstname, PATH_MAX, "%s/%08X-%02X",
+		n = snprintf(firstname, sizeof (common_path), "%s/%08X-%02X",
 		    common_path, uhp->uh_signature, uhp->uh_proc_flags);
+		if (n >= sizeof (common_path)) {
+			dbgprintf("failed to construct component path\n");
+			return (EM_FILEFORMAT);
+		}
 		dbgprintf("firstname = %s\n", firstname);
 
 		if (ucode_should_update_intel(firstname, uhp->uh_rev) != 0) {
@@ -435,8 +630,12 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 			if (platid == 0 && uhp->uh_proc_flags != 0)
 				continue;
 
-			(void) snprintf(name, PATH_MAX,
+			n = snprintf(name, sizeof (common_path),
 			    "%s/%08X-%02X", path, uhp->uh_signature, platid);
+			if (n >= sizeof (common_path)) {
+				dbgprintf("failed to construct platid path\n");
+				return (EM_FILEFORMAT);
+			}
 
 			dbgprintf("proc_flags = %x, platid = %x, name = %s\n",
 			    uhp->uh_proc_flags, platid, name);
@@ -474,9 +673,14 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 				if (id == 0 && uesp->ues_proc_flags)
 					continue;
 
-				(void) snprintf(name, PATH_MAX,
+				n = snprintf(name, sizeof (common_path),
 				    "%s/%08X-%02X", path,
 				    uesp->ues_signature, id);
+				if (n >= sizeof (common_path)) {
+					dbgprintf(
+					    "failed to construct ext path\n");
+					return (EM_FILEFORMAT);
+				}
 
 				dbgprintf("extsig: proc_flags = %x, "
 				    "platid = %x, name = %s\n",
@@ -512,9 +716,9 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 		char filename[PATH_MAX];
 		struct stat statbuf;
 
-		(void) snprintf(filename, PATH_MAX,
+		n = snprintf(filename, sizeof (common_path),
 		    "%s/%s", common_path, dp->d_name);
-		if (stat(filename, &statbuf) == -1)
+		if (n >= sizeof (common_path) || stat(filename, &statbuf) == -1)
 			continue;
 
 		if ((statbuf.st_mode & S_IFMT) == S_IFREG) {
@@ -529,17 +733,9 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 }
 
 static void
-ucode_fms(uint32_t sig, uint8_t *family, uint8_t *model, uint8_t *stepping)
+ucode_list_intel(uint8_t *buf, size_t size)
 {
-	*family = ((sig >> 8) & 0xf) + ((sig >> 20) & 0xff);
-	*model = ((sig >> 4) & 0xf) | ((sig >> 12) & 0xf0);
-	*stepping = sig & 0xf;
-}
-
-static void
-ucode_list_intel(uint8_t *buf, int size)
-{
-	int	remaining;
+	size_t remaining;
 
 	printf("Microcode patches:\n");
 	for (remaining = size; remaining > 0; ) {
@@ -592,51 +788,64 @@ ucode_list_intel(uint8_t *buf, int size)
 }
 
 static void
-ucode_list_amd(uint8_t *buf, int size)
+ucode_list_amd(uint8_t *buf, size_t size)
 {
-	ucode_eqtbl_amd_t *eq;
-	ucode_header_amd_t *uh;
-	uint32_t tsz;
+	uint32_t last_type = UINT32_MAX;
 
-	/*
-	 * The file has already been validated so we can skip straight to
-	 * the equivalence table.
-	 */
-	tsz = *(uint32_t *)(buf + 8);
-	eq = (ucode_eqtbl_amd_t *)(buf + 12);
-	size -= 12;
+	/* The file has already been validated. Skip over magic number */
+	buf += sizeof (uint32_t);
+	size -= sizeof (uint32_t);
 
-	printf("Equivalence table:\n");
-	while (size >= sizeof (ucode_eqtbl_amd_t) && eq->ue_inst_cpu != 0) {
-		uint8_t family, model, stepping;
+	while (size > sizeof (ucode_section_amd_t)) {
+		ucode_section_amd_t *section = (ucode_section_amd_t *)buf;
 
-		ucode_fms(eq->ue_inst_cpu, &family, &model, &stepping);
+		switch (section->usa_type) {
+		case UCODE_AMD_CONTAINER_TYPE_EQUIV: {
+			ucode_eqtbl_amd_t *eq =
+			    (ucode_eqtbl_amd_t *)section->usa_data;
 
-		printf(
-		    "    %08lX Family=%02x Model=%02x Stepping=%02x -> %04X\n",
-		    eq->ue_inst_cpu, family, model, stepping, eq->ue_equiv_cpu);
-		eq++;
-		size -= sizeof (*eq);
-	}
+			if (last_type != section->usa_type) {
+				printf("Equivalence table:\n");
+				last_type = section->usa_type;
+			}
+			for (uint_t i = 0; eq->ue_inst_cpu != 0 &&
+			    i < section->usa_size / sizeof (*eq); eq++, i++) {
+				uint8_t family, model, stepping;
 
-	/* Move past the equivalence table terminating record */
-	eq++;
-	size -= sizeof (*eq);
-	buf = (uint8_t *)eq;
+				ucode_fms(eq->ue_inst_cpu, &family, &model,
+				    &stepping);
 
-	printf("Microcode patches:\n");
-	while (size > sizeof (ucode_header_amd_t) + 8) {
-		tsz = *(uint32_t *)(buf + 4);
-		uh = (ucode_header_amd_t *)(buf + 8);
-
-		if (uh->uh_cpu_rev == 0)
+				printf("    %08lX Family=%02x Model=%02x "
+				    "Stepping=%02x -> %04X\n",
+				    eq->ue_inst_cpu, family, model,
+				    stepping, eq->ue_equiv_cpu);
+			}
 			break;
+		}
+		case UCODE_AMD_CONTAINER_TYPE_PATCH: {
+			ucode_header_amd_t *uh =
+			    (ucode_header_amd_t *)section->usa_data;
 
-		printf("    %4X -> Patch=%08lX Date=%08lX Bytes=%lu\n",
-		    uh->uh_cpu_rev, uh->uh_patch_id, uh->uh_date, tsz);
+			if (uh->uh_cpu_rev == 0)
+				break;
 
-		buf += (tsz + 8);
-		size -= (tsz + 8);
+			if (last_type != section->usa_type) {
+				printf("Microcode patches:\n");
+				last_type = section->usa_type;
+			}
+
+			printf("    %4X -> Patch=%08lX Date=%08lX Bytes=%lu\n",
+			    uh->uh_cpu_rev, uh->uh_patch_id, uh->uh_date,
+			    section->usa_size);
+
+			break;
+		}
+		default:
+			break;
+		}
+
+		size -= section->usa_size + sizeof (ucode_section_amd_t);
+		buf += section->usa_size + sizeof (ucode_section_amd_t);
 	}
 }
 
@@ -661,7 +870,7 @@ main(int argc, char *argv[])
 	ucode_errno_t	rc = EM_OK;
 	processorid_t	cpuid_max;
 	struct stat filestat;
-	int ucode_size = 0;
+	size_t ucode_size = 0;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -830,21 +1039,20 @@ main(int argc, char *argv[])
 			goto out;
 		}
 
-		if ((buf = malloc(filestat.st_size)) == NULL) {
+		ucode_size = filestat.st_size;
+		if ((buf = malloc(ucode_size)) == NULL) {
 			rc = EM_SYS;
 			ucode_perror(filename, rc);
 			goto out;
 		}
 
-		ucode_size = ucode->us_convert(filename, buf, filestat.st_size);
-
-		dbgprintf("ucode_size = %d\n", ucode_size);
-
-		if (ucode_size == 0) {
-			rc = EM_FILEFORMAT;
+		rc = ucode->us_convert(filename, &buf, &ucode_size);
+		if (rc != EM_OK) {
 			ucode_perror(filename, rc);
 			goto out;
 		}
+
+		dbgprintf("ucode_size = %zd\n", ucode_size);
 
 		if ((rc = ucode->us_validate(buf, ucode_size)) != EM_OK) {
 			ucode_perror(filename, rc);

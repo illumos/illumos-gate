@@ -24,12 +24,13 @@
  * Use is subject to license terms.
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
 #include <sys/ucode.h>
 #include <sys/ucode_amd.h>
+#include <sys/stdbool.h>
 #ifdef	_KERNEL
 #include <sys/systm.h>
 #else
@@ -37,65 +38,68 @@
 #endif
 
 /*
- * Perform basic validation of an AMD microcode bundle file.
+ * Perform basic validation of an AMD microcode container file.
  */
 ucode_errno_t
-ucode_validate_amd(uint8_t *ucodep, int size)
+ucode_validate_amd(uint8_t *ucodep, size_t size)
 {
-	uint32_t *ptr = (uint32_t *)ucodep;
-	uint32_t count;
+	uint8_t *ptr = ucodep;
+	bool first = true;
+	uint32_t magic;
 
 	if (ucodep == NULL || size <= 0)
 		return (EM_INVALIDARG);
 
-	/* Magic Number: "AMD\0" */
-	size -= 4;
-	if (*ptr++ != 0x00414d44)
+	/* Magic Number */
+	bcopy(ptr, &magic, sizeof (magic));
+	if (magic != UCODE_AMD_CONTAINER_MAGIC)
 		return (EM_FILEFORMAT);
+	ptr += sizeof (magic);
+	size -= sizeof (magic);
 
 	/*
-	 * There follows an equivalence table that maps processor IDs (family,
-	 * stepping, model) to a Microcode Patch Equivalent Processor ID.
-	 * The format of the equivalence table is:
-	 *    0-3 version? - always 0
-	 *    4-7 count - number of entries in table, including terminator
-	 *    < 16 byte record > * (count - 1)
-	 *    < 16 byte terminating record, all zeros >
+	 * There follow one or more TLV-encoded sections. We expect that the
+	 * first section is an equivalence table and all subsequent sections
+	 * are patches and return EM_FILEFORMAT if that is not the case.
 	 */
-	size -= 4;
-	if (*ptr++ != 0)
-		return (EM_FILEFORMAT);
+	while (size > sizeof (ucode_section_amd_t)) {
+		ucode_section_amd_t section;
 
-	size -= 4;
-	count = *ptr++;
-	if (count > size || count % 16 != 0)
-		return (EM_FILEFORMAT);
-
-	/* Skip past equivalence table and the terminating record */
-	ptr = (uint32_t *)(((uint8_t *)ptr) + count);
-	size -= count;
-
-	/*
-	 * There then follow one or more microcode patches in the following
-	 * format:
-	 *   0-3   patch type
-	 *   4-7   patch length
-	 *   < length bytes >
-	 */
-	while (size > 8) {
-		/* We only support patch type 1 */
-		size -= 4;
-		if (*ptr++ != 1)
+		bcopy(ptr, &section, sizeof (section));
+		if (section.usa_size == 0 || section.usa_size > size)
 			return (EM_FILEFORMAT);
+		ptr += sizeof (section);
+		size -= sizeof (section);
 
-		size -= 4;
-		if (((count = *ptr++) > size))
+		switch (section.usa_type) {
+		case UCODE_AMD_CONTAINER_TYPE_EQUIV:
+			if (!first)
+				return (EM_FILEFORMAT);
+			/*
+			 * The equivalence table maps processor IDs (family,
+			 * stepping, model) to a Microcode Patch Equivalent
+			 * Processor ID. We just verify that it its size is a
+			 * whole number of entries.
+			 */
+			if (section.usa_size % sizeof (ucode_eqtbl_amd_t) != 0)
+				return (EM_FILEFORMAT);
+			break;
+
+		case UCODE_AMD_CONTAINER_TYPE_PATCH:
+			if (first)
+				return (EM_FILEFORMAT);
+			break;
+
+		default:
 			return (EM_FILEFORMAT);
+		}
 
-		ptr = (uint32_t *)(((uint8_t *)ptr) + count);
-		size -= count;
+		size -= section.usa_size;
+		ptr += section.usa_size;
+		first = false;
 	}
 
+	/* We don't expect there to be any unaccounted for trailing data */
 	if (size != 0)
 		return (EM_FILEFORMAT);
 

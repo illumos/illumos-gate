@@ -4513,23 +4513,6 @@ nvme_init(nvme_t *nvme)
 	}
 
 	/*
-	 * Get the common namespace information if available. If not, we use the
-	 * information for nsid 1.
-	 */
-	if (nvme_ctrl_atleast(nvme, &nvme_vers_1v2) &&
-	    nvme->n_idctl->id_oacs.oa_nsmgmt != 0) {
-		nsid = NVME_NSID_BCAST;
-	} else {
-		nsid = 1;
-	}
-
-	if (!nvme_identify_int(nvme, nsid, NVME_IDENTIFY_NSID,
-	    (void **)&nvme->n_idcomns)) {
-		dev_err(nvme->n_dip, CE_WARN, "!failed to identify common "
-		    "namespace information");
-		goto fail;
-	}
-	/*
 	 * Process nvme-config-list (if present) in nvme.conf.
 	 */
 	nvme_config_list(nvme);
@@ -4645,6 +4628,24 @@ nvme_init(nvme_t *nvme)
 
 	nvme->n_ns = kmem_zalloc(sizeof (nvme_namespace_t) *
 	    nvme->n_namespace_count, KM_SLEEP);
+
+	/*
+	 * Get the common namespace information if available. If not, we use the
+	 * information for nsid 1.
+	 */
+	if (nvme_ctrl_atleast(nvme, &nvme_vers_1v2) &&
+	    nvme->n_idctl->id_oacs.oa_nsmgmt != 0) {
+		nsid = NVME_NSID_BCAST;
+	} else {
+		nsid = 1;
+	}
+
+	if (!nvme_identify_int(nvme, nsid, NVME_IDENTIFY_NSID,
+	    (void **)&nvme->n_idcomns)) {
+		dev_err(nvme->n_dip, CE_WARN, "!failed to identify common "
+		    "namespace information");
+		goto fail;
+	}
 
 	/*
 	 * Try to set up MSI/MSI-X interrupts.

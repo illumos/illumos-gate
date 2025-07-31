@@ -199,25 +199,6 @@ struct exportdata32 {
 
 #ifdef	_KERNEL
 
-#define	RPC_IDEMPOTENT	0x1	/* idempotent or not */
-/*
- * Be very careful about which NFS procedures get the RPC_ALLOWANON bit.
- * Right now, if this bit is on, we ignore the results of per NFS request
- * access control.
- */
-#define	RPC_ALLOWANON	0x2	/* allow anonymous access */
-#define	RPC_MAPRESP	0x4	/* use mapped response buffer */
-#define	RPC_AVOIDWORK	0x8	/* do work avoidance for dups */
-#define	RPC_PUBLICFH_OK	0x10	/* allow use of public filehandle */
-
-/*
- * RPC_ALL is an or of all above bits to be used with "don't care"
- * nfsv4 ops. The flags of an nfsv4 request is the bit-AND of the
- * per-op flags.
- */
-#define	RPC_ALL	(RPC_IDEMPOTENT|RPC_ALLOWANON|RPC_AVOIDWORK|RPC_PUBLICFH_OK)
-
-
 #ifdef VOLATILE_FH_TEST
 struct ex_vol_rename {
 	nfs_fh4_fmt_t vrn_fh_fmt;
