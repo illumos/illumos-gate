@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 /*
@@ -252,6 +253,8 @@ static void lxpr_read_sys_kernel_shmall(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_panic_on_oops(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -275,6 +278,10 @@ static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_core_rwmem_default(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf);
+static void lxpr_read_sys_net_core_rwmem_max(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf);
 
 static int lxpr_write_pid_tid_comm(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
@@ -284,6 +291,10 @@ static int lxpr_write_sys_fs_pipe_max(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
+static int lxpr_write_sys_net_core_rwmem_default(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_core_rwmem_max(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *, uio_t *,
@@ -583,6 +594,7 @@ static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_SHMMAX,	"shmmax" },
 	{ LXPR_SYS_KERNEL_SHMMNI,	"shmmni" },
 	{ LXPR_SYS_KERNEL_THREADS_MAX,	"threads-max" },
+	{ LXPR_SYS_KERNEL_PANIC_ON_OOPS,	"panic_on_oops" },
 };
 
 #define	SYS_KERNELDIRFILES (sizeof (sys_kerneldir) / sizeof (sys_kerneldir[0]))
@@ -613,6 +625,10 @@ static lxpr_dirent_t sys_netdir[] = {
  */
 static lxpr_dirent_t sys_net_coredir[] = {
 	{ LXPR_SYS_NET_CORE_SOMAXCON,	"somaxconn" },
+	{ LXPR_SYS_NET_CORE_WMEM_MAX,	"wmem_max" },
+	{ LXPR_SYS_NET_CORE_WMEM_DEFAULT,	"wmem_default" },
+	{ LXPR_SYS_NET_CORE_RMEM_MAX,	"rmem_max" },
+	{ LXPR_SYS_NET_CORE_RMEM_DEFAULT,	"rmem_default" },
 };
 
 #define	SYS_NET_COREDIRFILES \
@@ -691,6 +707,10 @@ static wftab_t wr_tab[] = {
 	{LXPR_SYS_KERNEL_SHMMAX, NULL},
 	{LXPR_SYS_FS_PIPE_MAX, lxpr_write_sys_fs_pipe_max},
 	{LXPR_SYS_NET_CORE_SOMAXCON, lxpr_write_sys_net_core_somaxc},
+	{LXPR_SYS_NET_CORE_WMEM_MAX, lxpr_write_sys_net_core_rwmem_max},
+	{LXPR_SYS_NET_CORE_WMEM_DEFAULT, lxpr_write_sys_net_core_rwmem_default},
+	{LXPR_SYS_NET_CORE_RMEM_MAX, lxpr_write_sys_net_core_rwmem_max},
+	{LXPR_SYS_NET_CORE_RMEM_DEFAULT, lxpr_write_sys_net_core_rwmem_default},
 	{LXPR_SYS_NET_IPV4_ICMP_EIB, lxpr_write_sys_net_ipv4_icmp_eib},
 	{LXPR_SYS_NET_IPV4_IP_FORWARD, NULL},
 	{LXPR_SYS_NET_IPV4_IP_LPORT_RANGE,
@@ -930,8 +950,8 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_sys_kernel_caplcap,	/* /proc/sys/kernel/cap_last_cap */
 	lxpr_read_sys_kernel_corepatt,	/* /proc/sys/kernel/core_pattern */
 	lxpr_read_sys_kernel_hostname,	/* /proc/sys/kernel/hostname */
-	lxpr_read_sys_kernel_overflowuid,	/* /proc/sys/kernel/overflowuid */
-	lxpr_read_sys_kernel_overflowgid,	/* /proc/sys/kernel/overflowgid */
+	lxpr_read_sys_kernel_overflowuid,  /* /proc/sys/kernel/overflowuid */
+	lxpr_read_sys_kernel_overflowgid,  /* /proc/sys/kernel/overflowgid */
 	lxpr_read_sys_kernel_msgmax,	/* /proc/sys/kernel/msgmax */
 	lxpr_read_sys_kernel_msgmnb,	/* /proc/sys/kernel/msgmnb */
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
@@ -947,9 +967,14 @@ static void (*lxpr_read_function[])() = {
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
 	lxpr_read_sys_kernel_shmmni,	/* /proc/sys/kernel/shmmni */
 	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
+	lxpr_read_sys_kernel_panic_on_oops, /* /proc/sys/kernel/panic_on_oops */
 	lxpr_read_invalid,		/* /proc/sys/net	*/
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
 	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
+	lxpr_read_sys_net_core_rwmem_max, /* /proc/sys/net/core/rmem_max */
+	lxpr_read_sys_net_core_rwmem_default,
+	lxpr_read_sys_net_core_rwmem_max, /* /proc/sys/net/core/wmem_max */
+	lxpr_read_sys_net_core_rwmem_default,
 	lxpr_read_invalid,		/* /proc/sys/net/ipv4	*/
 	lxpr_read_sys_net_ipv4_icmp_eib, /* .../icmp_echo_ignore_broadcasts */
 	lxpr_read_sys_net_ipv4_ip_forward, /* .../ipv4/ip_forward */
@@ -1123,9 +1148,14 @@ static vnode_t *(*lxpr_lookup_function[])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/panic_on_oops */
 	lxpr_lookup_sys_netdir,		/* /proc/sys/net */
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/rmem_default */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/rmem_max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/wmem_max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/wmem_default */
 	lxpr_lookup_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
 	lxpr_lookup_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_forward */
@@ -1299,9 +1329,14 @@ static int (*lxpr_readdir_function[])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/panic_on_oops */
 	lxpr_readdir_sys_netdir,	/* /proc/sys/net */
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/rmem_max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/rmem_default */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/wmem_max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/wmem_default */
 	lxpr_readdir_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
 	lxpr_readdir_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_forward */
@@ -4876,7 +4911,9 @@ lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uts_nodename());
 }
 
-/* 
+/*
+ * lxpr_read_sys_kernel_overflowuid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf):
+ *
  * Some programs, such as steamcmd, expect overflowuid and overflowgid
  * entries to exist. The default value for both entries is hardcoded to 65534,
  * unlike Linux, where it is a sysctl tunable.
@@ -4907,7 +4944,53 @@ lxpr_read_sys_kernel_overflowgid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
 }
 
+/*
+ * In Linux rmem_max, rmem_default, wmem_max and wmem_default are tunnables
+ * that control the default and maximum socket receive/send buffer sizes.
+ * Their values are in bytes.
+ */
+static void
+lxpr_read_sys_net_core_rwmem_default(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t	*ns;
+	tcp_stack_t	*tcps;
 
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_DEFAULT ||
+	    lxpnp->lxpr_type == LXPR_SYS_NET_CORE_WMEM_DEFAULT);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+
+	lxpr_uiobuf_printf(uiobuf, "%d\n",
+	    (lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_DEFAULT ?
+	    tcps->tcps_recv_hiwat : tcps->tcps_xmit_hiwat));
+	netstack_rele(ns);
+}
+
+static void
+lxpr_read_sys_net_core_rwmem_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t	*ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_MAX ||
+	    lxpnp->lxpr_type == LXPR_SYS_NET_CORE_WMEM_MAX);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_max_buf);
+	netstack_rele(ns);
+}
 
 static void
 lxpr_read_sys_kernel_msgmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
@@ -5154,6 +5237,20 @@ lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_THREADS_MAX);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", LXPTOZ(lxpnp)->zone_nlwps_ctl);
+}
+
+/*
+ * Some applications check /proc/sys/kernel/panic_on_oops, the purpose
+ * of setting this bit in Linux is to call panic() in case of
+ * an 'oops' (a serious non-fatal error in the kernel).
+ * So we just returned 1 as is the expected value for some applications.
+ */
+static void
+lxpr_read_sys_kernel_panic_on_oops(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	uint_t val = 1;
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_PANIC_ON_OOPS);
+	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
 }
 
 static void
@@ -7660,6 +7757,7 @@ lxpr_write_tcp_property(lxpr_node_t *lxpnp, struct uio *uio,
 	return (res);
 }
 
+
 static int
 lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
     struct cred *cr, caller_context_t *ct)
@@ -7667,6 +7765,52 @@ lxpr_write_sys_net_core_somaxc(lxpr_node_t *lxpnp, struct uio *uio,
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_SOMAXCON);
 	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
 	    "_conn_req_max_q", NULL));
+}
+
+/*
+ * In Linux rmem_default and wmem_default are the default receive
+ * and send socket buffer sizes.
+ * While rmem_max and wmem_max are the maximum receive and send
+ * socket buffer sizes.
+ *
+ * The values are mapped to:
+ *
+ *    rmem_default -> tcp_recv_hiwat
+ *    wmem_default -> tcp_xmit_hiwat
+ *    rmem_max|wmem_max-> tcp_max_buf
+ *
+ * In illumos these values are defined as:
+ *
+ *    tcp_recv_hiwat is the default TCP receive window size
+ *    tcp_xmit_hiwat is the default TCP send window size
+ *    tcp_max_buf is the maximum TCP send and receive buffer size
+ */
+static int
+lxpr_write_sys_net_core_rwmem_default(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	char *attr;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_DEFAULT ||
+	    lxpnp->lxpr_type == LXPR_SYS_NET_CORE_WMEM_DEFAULT);
+
+	attr = (lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_DEFAULT ?
+	    "recv_buf" : "send_buf");
+
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    attr, NULL));
+}
+
+static int
+lxpr_write_sys_net_core_rwmem_max(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_CORE_RMEM_MAX ||
+	    lxpnp->lxpr_type == LXPR_SYS_NET_CORE_WMEM_MAX);
+
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "max_buf", NULL));
 }
 
 static int

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 #ifndef	_LX_PROC_H
@@ -238,9 +239,14 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_SHMMAX,		/* /proc/sys/kernel/shmmax	*/
 	LXPR_SYS_KERNEL_SHMMNI,		/* /proc/sys/kernel/shmmni	*/
 	LXPR_SYS_KERNEL_THREADS_MAX,	/* /proc/sys/kernel/threads-max */
+	LXPR_SYS_KERNEL_PANIC_ON_OOPS, /* /proc/sys/kernel/panic_on_oops */
 	LXPR_SYS_NETDIR,		/* /proc/sys/net		*/
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
 	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
+	LXPR_SYS_NET_CORE_WMEM_MAX,	/* /proc/sys/net/core/wmem_max	*/
+	LXPR_SYS_NET_CORE_WMEM_DEFAULT,
+	LXPR_SYS_NET_CORE_RMEM_MAX,	/* /proc/sys/net/core/rmem_max	*/
+	LXPR_SYS_NET_CORE_RMEM_DEFAULT,
 	LXPR_SYS_NET_IPV4DIR,		/* /proc/sys/net/ipv4		*/
 	LXPR_SYS_NET_IPV4_ICMP_EIB,	/* .../icmp_echo_ignore_broadcasts */
 	LXPR_SYS_NET_IPV4_IP_FORWARD,	/* .../net/ipv4/ip_forward */
