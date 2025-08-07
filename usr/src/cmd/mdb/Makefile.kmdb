@@ -59,6 +59,8 @@ CFLAGS64 += $(STAND_FLAGS_64)
 ASFLAGS += -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
 ASFLAGS64 += -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
 
+CSTD=	$(CSTD_GNU99)
+
 #
 # kmdb has bootstrapping challenges with the stack protector.
 #

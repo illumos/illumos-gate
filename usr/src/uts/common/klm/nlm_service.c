@@ -1320,7 +1320,8 @@ static int
 nlm_vop_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
     struct flk_callback *flk_cbp, cred_t *cr, caller_context_t *ct)
 {
-	if (bfp->l_len != 0 && bfp->l_start + (bfp->l_len - 1) < bfp->l_start) {
+	if (bfp->l_len != 0 &&
+	    sum_overflows_off(bfp->l_start, bfp->l_len - 1)) {
 		return (EOVERFLOW);
 	}
 

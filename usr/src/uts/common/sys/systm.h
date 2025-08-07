@@ -26,6 +26,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_SYSTM_H
@@ -62,6 +63,7 @@ typedef uintptr_t pc_t;
  */
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#include <sys/inttypes.h>
 #include <sys/types32.h>
 #include <sys/varargs.h>
 #include <sys/uadmin.h>
@@ -321,6 +323,32 @@ extern void param_preset(void);
 extern void param_calc(int);
 extern void param_init(void);
 extern void param_check(void);
+
+/*
+ * It is easy to run afoul of integer promotion bugs when writing checks for
+ * potential overflow.  These helpers are provided to make the right thing easy.
+ *
+ * They return a "bool-y" int: non-zero for if the addition overflows
+ */
+static inline int
+sum_overflows_u16(uint16_t a, uint16_t b)
+{
+	return (((uint32_t)a + (uint32_t)b) > UINT16_MAX);
+}
+
+static inline int
+sum_overflows_hrtime(hrtime_t a, hrtime_t b)
+{
+	return (((unsigned long long)a + (unsigned long long)b) <
+	    (unsigned long long)a);
+}
+
+static inline int
+sum_overflows_off(off_t a, off_t b)
+{
+	return (((unsigned long long)a + (unsigned long long)b) <
+	    (unsigned long long)a);
+}
 
 #endif /* _KERNEL */
 

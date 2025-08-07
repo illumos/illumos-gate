@@ -208,11 +208,11 @@ vmmdev_devmem_create(vmm_softc_t *sc, struct vm_memseg *mseg, const char *name)
 		map_offset = VM_DEVMEM_START;
 	} else {
 		entry = list_tail(&sc->vmm_devmem_list);
-		map_offset = entry->vde_off + entry->vde_len;
-		if (map_offset < entry->vde_off) {
+		if (sum_overflows_off(entry->vde_off, (off_t)entry->vde_len)) {
 			/* Do not tolerate overflow */
 			return (ERANGE);
 		}
+		map_offset = entry->vde_off + (off_t)entry->vde_len;
 		/*
 		 * XXXJOY: We could choose to search the list for duplicate
 		 * names and toss an error.  Since we're using the offset
@@ -236,14 +236,14 @@ vmmdev_devmem_segid(vmm_softc_t *sc, off_t off, off_t len, int *segidp,
 {
 	list_t *dl = &sc->vmm_devmem_list;
 	vmm_devmem_entry_t *de = NULL;
-	const off_t map_end = off + len;
 
 	VERIFY(off >= VM_DEVMEM_START);
 
-	if (map_end < off) {
+	if (sum_overflows_off(off, len)) {
 		/* No match on overflow */
 		return (B_FALSE);
 	}
+	const off_t map_end = off + len;
 
 	for (de = list_head(dl); de != NULL; de = list_next(dl, de)) {
 		const off_t item_end = de->vde_off + de->vde_len;

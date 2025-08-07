@@ -32,8 +32,6 @@ CFLAGS		+= -DVMM_KEEP_STATS
 LDFLAGS		+= -N misc/pcie -N fs/dev
 LDFLAGS		+= -M $(MAPFILE)
 
-# devmem span calculations currently run afoul of overflow checks
-$(OBJS_DIR)/vmm_sol_dev.o := SMOFF += signed_integer_overflow_check
 # vmm_zsd_add_vm() failure unhandled in face of racing zone shutdown
 $(OBJS_DIR)/vmm_sol_dev.o := SMOFF += all_func_returns
 

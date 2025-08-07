@@ -39,9 +39,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET = $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-# needs work
-SMOFF += signed_integer_overflow_check
-
 .KEEP_STATE:
 
 def: $(DEF_DEPS)

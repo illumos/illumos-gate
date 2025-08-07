@@ -2124,7 +2124,7 @@ mac_mmc_parse_l3(mac_mblk_cursor_t *cursor, uint16_t l3_sap, uint8_t *ipprotop,
 			 * Protect against overflow in the case of a very
 			 * contrived packet.
 			 */
-			if ((ip_len + eh_len) < ip_len) {
+			if (sum_overflows_u16(ip_len, eh_len)) {
 				return (-1);
 			}
 

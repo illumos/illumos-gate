@@ -3455,7 +3455,8 @@ tcp_sack_rexmit(tcp_t *tcp, uint_t *flags)
 			} else {
 				usable_swnd = usable_swnd / mss;
 				tcp->tcp_cwnd = tcp->tcp_snxt - tcp->tcp_suna +
-				    MAX(usable_swnd * mss, mss);
+				    MAX((uint32_t)usable_swnd * (uint32_t)mss,
+				    (uint32_t)mss);
 				*flags |= TH_XMIT_NEEDED;
 				return;
 			}

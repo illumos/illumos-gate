@@ -187,8 +187,10 @@ smb_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
 		return (EACCES);
 
-	if (off < 0 || off + len < off || off + len > cp->c_eplen + cp->c_stlen)
+	if (off < 0 || sum_overflows_off(off, len) ||
+	    off + len > cp->c_eplen + cp->c_stlen) {
 		return (ENXIO);
+	}
 
 	as_rangelock(as);
 	map_addr(&addr, alen, 0, 1, 0);

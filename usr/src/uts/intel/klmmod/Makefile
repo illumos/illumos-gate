@@ -60,9 +60,6 @@ LDFLAGS		+= -M $(UTSBASE)/common/klm/mapfile-mod
 #
 CERRWARN	+= -_gcc=-Wno-switch
 
-# needs work
-$(OBJS_DIR)/nlm_service.o := SMOFF += signed_integer_overflow_check
-
 #
 #	Default build targets.
 #

@@ -62,9 +62,6 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 
 # needs work
 SMOFF += all_func_returns
-# suppress false-positive for an unsigned overflow
-$(OBJS_DIR)/mac_provider.o := SMOFF += signed_integer_overflow_check
-$(OBJS_DIR)/mac_util.o := SMOFF += signed
 
 #
 #	Default build targets.
