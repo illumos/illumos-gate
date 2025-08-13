@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2017 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2017 Jason King
+ * Copyright 2025 Edgecast Cloud LLC
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -34,6 +35,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/avl.h>
 #include <sys/sysmacros.h>
@@ -86,7 +88,6 @@ static size_t		name_len = PATH_MAX + 1;    /* # of chars for name */
 #define	DEV_KSHIFT	10
 #define	DEV_MSHIFT	20
 
-long	wait();
 static u_longlong_t	descend(char *curname, int curfd, int *retcode,
 			    dev_t device);
 static void		printsize(blkcnt_t blocks, char *path);
@@ -202,6 +203,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	do {
+		pid = (pid_t)-1;
 		if (optind < argc - 1) {
 			pid = fork();
 			if (pid == (pid_t)-1) {
@@ -245,7 +247,8 @@ main(int argc, char **argv)
 			}
 			(void) strcpy(base, argv[optind]);
 			(void) strcpy(name, argv[optind]);
-			if (np = strrchr(name, '/')) {
+			np = strrchr(name, '/');
+			if (np != NULL) {
 				*np++ = '\0';
 				if (chdir(*name ? name : "/") < 0) {
 					if (rflg) {
@@ -456,7 +459,7 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 		level--;
 		return (0);
 	}
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if ((strcmp(dp->d_name, ".") == 0) ||
 		    (strcmp(dp->d_name, "..") == 0))
 			continue;
