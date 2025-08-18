@@ -378,7 +378,7 @@ CHECKHDRS= $(HDRS:%.h=%.check)  \
 # Hence the trailing guard is not the last thing in the file nor can it
 # be without playing silly games.
 
-assert.check	:= HDRCHK_TAIL = | grep -v "end guard wrong" | true
+assert.check	:= HDRCHK_TAIL = 2>&1 | grep -v "header guard" | true
 
 # install rules
 
