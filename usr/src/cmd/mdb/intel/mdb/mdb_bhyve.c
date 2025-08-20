@@ -362,8 +362,12 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 
 	mdb_tgt_gregset_t gregs;
 
-	if (vcpu == -1)
+	if (vcpu == -1) {
 		vcpu = bd->bd_curcpu;
+	} else if (vcpu >= vmm_ncpu(bd->bd_vmm)) {
+		mdb_warn("no such CPU\n");
+		return (DCMD_ERR);
+	}
 
 	if (flags & DCMD_ADDRSPEC) {
 		bzero(&gregs, sizeof (gregs));
