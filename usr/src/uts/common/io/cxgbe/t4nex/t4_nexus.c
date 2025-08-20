@@ -1422,9 +1422,6 @@ get_params__pre_init(struct adapter *sc)
 		dlog->size = ntohl(cmd.memsize_devlog);
 	}
 
-	sc->sge.fwq_tmr_idx = sc->props.fwq_tmr_idx;
-	sc->sge.fwq_pktc_idx = sc->props.fwq_pktc_idx;
-
 	return (rc);
 }
 
@@ -1486,6 +1483,37 @@ get_params__post_init(struct adapter *sc)
 			sc->sge.dbq_timer_tick = 0;
 		}
 	}
+
+	/*
+	 * Now that we know if the DBQ timer is present, tune the properties for
+	 * hold-off parameter defaults.
+	 */
+	struct driver_properties *prp = &sc->props;
+	if ((sc->flags & TAF_DBQ_TIMER) != 0) {
+		/*
+		 * Choose default DBQ timer index to be closest to 100us.  With
+		 * that available, more aggressive coalescing on the FWQ is
+		 * unnecessary, so shorter hold-off parameters are fine there.
+		 */
+		prp->dbq_timer_idx = t4_choose_dbq_timer(sc, 100);
+		prp->fwq_tmr_idx = t4_choose_holdoff_timer(sc, 10);
+		prp->fwq_pktc_idx = t4_choose_holdoff_pktcnt(sc, -1);
+	} else {
+		/*
+		 * Without the DBQ timer, we fall back to the
+		 * CIDXFlushThresholdOverride mechanism for TX completions,
+		 * which can result in many more notifications, depending on the
+		 * traffic pattern.  More aggressive interrupt coalescing on the
+		 * firmware queue (where such notifications land) is recommended
+		 * to deal with it.
+		 *
+		 * Pick values closest to a hold-off of 100us and/or 32 entries.
+		 */
+		prp->fwq_tmr_idx = t4_choose_holdoff_timer(sc, 100);
+		prp->fwq_pktc_idx = t4_choose_holdoff_pktcnt(sc, 32);
+	}
+	sc->sge.fwq_tmr_idx = prp->fwq_tmr_idx;
+	sc->sge.fwq_pktc_idx = prp->fwq_pktc_idx;
 
 	rc = -t4_get_pfres(sc);
 	if (rc != 0) {
@@ -1682,12 +1710,6 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	    p->pktc_idx_1g);
 
 	/*
-	 * Holdoff parameters for FW queue
-	 */
-	p->fwq_tmr_idx = 0;
-	p->fwq_pktc_idx = -1;
-
-	/*
 	 * Size (number of entries) of each tx and rx queue.
 	 */
 	i = prop_lookup_int(sc, "qsize-txq", TX_EQ_QSIZE);
@@ -1745,9 +1767,6 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	}
 
 	(void) ddi_prop_update_int(dev, dip, "multi-rings", p->multi_rings);
-
-	/* TX (completion) DBQ Timer */
-	p->dbq_timer_idx = 0;
 
 	return (0);
 }

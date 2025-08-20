@@ -143,7 +143,7 @@ static inline void write_ulp_cpl_sgl(struct port_info *pi, struct sge_txq *txq,
 static inline void copy_to_txd(struct sge_eq *eq, caddr_t from, caddr_t *to,
     int len);
 static void t4_tx_ring_db(struct sge_txq *);
-static uint_t t4_tx_reclaim_descs(struct sge_txq *, uint_t);
+static uint_t t4_tx_reclaim_descs(struct sge_txq *, uint_t, mblk_t **);
 static int t4_eth_rx(struct sge_iq *iq, const struct rss_header *rss,
     mblk_t *m);
 static inline void ring_fl_db(struct adapter *sc, struct sge_fl *fl);
@@ -979,7 +979,7 @@ t4_eth_tx(void *arg, mblk_t *frame)
 
 	TXQ_LOCK(txq);
 	if (eq->avail < 8)
-		(void) t4_tx_reclaim_descs(txq, 8);
+		(void) t4_tx_reclaim_descs(txq, 8, NULL);
 	for (; frame; frame = next_frame) {
 
 		if (eq->avail < 8)
@@ -1039,7 +1039,7 @@ t4_eth_tx(void *arg, mblk_t *frame)
 		coalescing = 0;
 
 		if (eq->avail < 8)
-			(void) t4_tx_reclaim_descs(txq, 8);
+			(void) t4_tx_reclaim_descs(txq, 8, NULL);
 		rc = write_txpkt_wr(pi, txq, frame, &txinfo);
 		if (rc != 0) {
 
@@ -1065,7 +1065,7 @@ doorbell:
 			txq->txpkts++;
 			t4_tx_ring_db(txq);
 		}
-		(void) t4_tx_reclaim_descs(txq, 32);
+		(void) t4_tx_reclaim_descs(txq, 32, NULL);
 	}
 
 	if (txpkts.npkt > 0) {
@@ -1080,7 +1080,7 @@ doorbell:
 		eq->flags |= EQ_CORKED;
 	}
 
-	(void) t4_tx_reclaim_descs(txq, eq->qsize);
+	(void) t4_tx_reclaim_descs(txq, eq->qsize, NULL);
 	TXQ_UNLOCK(txq);
 
 	return (frame);
@@ -1446,23 +1446,33 @@ eth_eq_alloc(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 		.eqaddr = BE_64(eq->ba),
 	};
 
+	/*
+	 * The EQ is configured to send a notification for every 32 consumed
+	 * entries (X_CIDXFLUSHTHRESH_32).  In order to ensure timely
+	 * notification of entry consumption during slow periods when that
+	 * threshold may not be reached with regularity, two mechanisms exist:
+	 *
+	 * 1. The DBQ timer can be configured to fire (and send a notification)
+	 *    after a period when the EQ has gone idle.  This is available on T6
+	 *    and later adapters.
+	 *
+	 * 2. The CIDXFlushThresholdOverride flag will send a notification
+	 *    whenever a consumed entry causes CDIX==PIDX, even if the
+	 *    CIDXFlushThreshold has not been reached.
+	 *
+	 * The DBQ timer is preferred, as it results in no additional
+	 * notifications when the EQ is kept busy with small transmissions.
+	 * Comparatively, flows of many short packets (like frequent ACKs) can
+	 * cause the CIDXFlushThresholdOverride mechanism to induce a
+	 * notification for every transmitted packet.
+	 */
 	if (sc->flags & TAF_DBQ_TIMER) {
-		/*
-		 * If the DBQ timer is available, use it as a means of doing
-		 * timely alerting for TX completions.
-		 */
+		/* Configure the DBQ timer when it is available */
 		c.timeren_timerix = BE_32(
 		    F_FW_EQ_ETH_CMD_TIMEREN |
 		    V_FW_EQ_ETH_CMD_TIMERIX(pi->dbq_timer_idx));
 	} else {
-		/*
-		 * Without the DBQ timer, we want to override the CIDX flush
-		 * threshold to notify about a completion whenever CIDX == PIDX.
-		 *
-		 * While this can mean an interrupt per packet during periods of
-		 * infrequent transmissions, it prevents completions from being
-		 * deferred for an unbounded amount of time.
-		 */
+		/* Otherwise fall back to CIDXFlushThresholdOverride */
 		c.dcaen_to_eqsize |= BE_32(F_FW_EQ_ETH_CMD_CIDXFTHRESHO);
 	}
 
@@ -1569,7 +1579,8 @@ alloc_txq(struct port_info *pi, struct sge_txq *txq, int idx)
 
 	txq->port = pi;
 	txq->sdesc = kmem_zalloc(sizeof (struct tx_sdesc) * eq->cap, KM_SLEEP);
-	txq->txb_size = eq->qsize * tx_copy_threshold;
+	txq->copy_threshold = tx_copy_threshold;
+	txq->txb_size = eq->qsize * txq->copy_threshold;
 	rc = alloc_tx_copybuffer(sc, txq->txb_size, &txq->txb_dhdl,
 	    &txq->txb_ahdl, &txq->txb_ba, &txq->txb_va);
 	if (rc == 0)
@@ -1635,8 +1646,9 @@ free_txq(struct port_info *pi, struct sge_txq *txq)
 					txq->tx_dhdl_cidx = 0;
 			}
 
-			ASSERT(sd->m);
-			freemsgchain(sd->m);
+			ASSERT(sd->mp_head);
+			freemsgchain(sd->mp_head);
+			sd->mp_head = sd->mp_tail = NULL;
 
 			eq->cidx += sd->desc_used;
 			if (eq->cidx >= eq->cap)
@@ -2364,6 +2376,7 @@ add_to_txpkts(struct sge_txq *txq, struct txpkts *txpkts, mblk_t *m,
 	uint8_t flits;
 
 	TXQ_LOCK_ASSERT_OWNED(txq);
+	ASSERT(m->b_next == NULL);
 
 	if (txpkts->npkt > 0) {
 		flits = TXPKTS_PKT_HDR + txinfo->nflits;
@@ -2382,6 +2395,14 @@ add_to_txpkts(struct sge_txq *txq, struct txpkts *txpkts, mblk_t *m,
 			txsd = &txq->sdesc[eq->pidx];
 			txsd->txb_used += txinfo->txb_used;
 			txsd->hdls_used += txinfo->hdls_used;
+
+			/*
+			 * The txpkts chaining above has already placed `m` at
+			 * the end with b_next.  Keep the txsd notion of this
+			 * new tail up to date.
+			 */
+			ASSERT3P(txsd->mp_tail->b_next, ==, m);
+			txsd->mp_tail = m;
 
 			return (0);
 		}
@@ -2418,7 +2439,7 @@ add_to_txpkts(struct sge_txq *txq, struct txpkts *txpkts, mblk_t *m,
 	txpkts->plen = txinfo->len;
 
 	txsd = &txq->sdesc[eq->pidx];
-	txsd->m = m;
+	txsd->mp_head = txsd->mp_tail = m;
 	txsd->txb_used = txinfo->txb_used;
 	txsd->hdls_used = txinfo->hdls_used;
 
@@ -2712,7 +2733,7 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 
 	/* Software descriptor */
 	txsd = &txq->sdesc[eq->pidx];
-	txsd->m = m;
+	txsd->mp_head = txsd->mp_tail = m;
 	txsd->txb_used = txinfo->txb_used;
 	txsd->hdls_used = txinfo->hdls_used;
 	txsd->desc_used = ndesc;
@@ -2767,7 +2788,8 @@ t4_write_flush_wr(struct sge_txq *txq)
 	*(struct fw_eq_flush_wr *)&eq->desc[eq->pidx] = wr;
 
 	const struct tx_sdesc txsd = {
-		.m = NULL,
+		.mp_head = NULL,
+		.mp_tail = NULL,
 		.txb_used = 0,
 		.hdls_used = 0,
 		.desc_used = 1,
@@ -2939,13 +2961,21 @@ t4_tx_ring_db(struct sge_txq *txq)
 			const uint_t desc_idx =
 			    eq->pidx != 0 ? eq->pidx - 1 : eq->cap - 1;
 			uint64_t *src = (uint64_t *)&eq->desc[desc_idx];
-			uint64_t *dst =  (uint64_t *)(eq->udb + UDBS_WR_OFFSET);
+			volatile uint64_t *dst =
+			    (uint64_t *)(eq->udb + UDBS_WR_OFFSET);
 
 			/* Copy the 8 flits of the TX descriptor to the DB */
-			for (uint_t i = 0;
-			    i < (sizeof (struct tx_desc) / sizeof (uint64_t));
-			    i++) {
-				ddi_put64(sc->bar2_hdl, &dst[i], src[i]);
+			const uint_t flit_count =
+			    sizeof (struct tx_desc) / sizeof (uint64_t);
+			for (uint_t i = 0; i < flit_count; i++) {
+				/*
+				 * Perform the copy directly through the BAR
+				 * mapping, rather than using ddi_put64().
+				 *
+				 * The latter was found to impose a significant
+				 * performance burden when called in this loop.
+				 */
+				dst[i] = src[i];
 			}
 
 			membar_producer();
@@ -2969,8 +2999,16 @@ t4_tx_ring_db(struct sge_txq *txq)
 	eq->pending = 0;
 }
 
+/*
+ * Reclaim consumed descriptors from egress queue.  This will be capped at an
+ * upper bound of `howmany`.  The corresponding mblks will be freed inline,
+ * unless a non-NULL `defer_freemp` is provided, in which case the to-be-freed
+ * mblk chain will be provided to the caller.
+ *
+ * Returns the number of descriptors which underwent reclamation.
+ */
 static uint_t
-t4_tx_reclaim_descs(struct sge_txq *txq, uint_t howmany)
+t4_tx_reclaim_descs(struct sge_txq *txq, uint_t howmany, mblk_t **defer_freemp)
 {
 	struct sge_eq *eq = &txq->eq;
 
@@ -2992,13 +3030,28 @@ t4_tx_reclaim_descs(struct sge_txq *txq, uint_t howmany)
 		/* Firmware doesn't return "partial" credits. */
 		ASSERT3U(reclaimed + ndesc, <=, reclaim_avail);
 
-		if (txsd->m != NULL) {
+		if (txsd->mp_head != NULL) {
 			/*
 			 * Even when packet content fits entirely in immediate
 			 * buffer, the mblk is kept around until the
 			 * transmission completes.
 			 */
-			freemsgchain(txsd->m);
+			if (defer_freemp != NULL) {
+				/*
+				 * Append the mblk chain from this descriptor
+				 * onto the end of the defer list.
+				 *
+				 * In the case that this is the first mblk we
+				 * have processed, the below assignment will
+				 * communicate the head of the chain to the
+				 * caller.
+				 */
+				*defer_freemp = txsd->mp_head;
+				defer_freemp = &txsd->mp_tail->b_next;
+			} else {
+				freemsgchain(txsd->mp_head);
+			}
+			txsd->mp_head = txsd->mp_tail = NULL;
 		} else {
 			/*
 			 * If mblk is NULL, this has to be the software
@@ -3230,15 +3283,18 @@ t4_sge_egr_update(struct sge_iq *iq, const struct rss_header *rss)
 		return;
 	}
 
+	mblk_t *freemp = NULL;
 	bool do_mac_update = false;
+
 	TXQ_LOCK(txq);
-	(void) t4_tx_reclaim_descs(txq, eq->qsize);
+	(void) t4_tx_reclaim_descs(txq, eq->qsize, &freemp);
 	if (eq->flags & EQ_CORKED && eq->avail != 0) {
 		do_mac_update = true;
 		eq->flags &= ~EQ_CORKED;
 	}
 	TXQ_UNLOCK(txq);
 
+	freemsgchain(freemp);
 	if (do_mac_update) {
 		t4_mac_tx_update(txq->port, txq);
 	}

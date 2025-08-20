@@ -134,10 +134,12 @@ struct tx_desc {
 };
 
 struct tx_sdesc {
-	mblk_t *m;
+	mblk_t *mp_head;
+	mblk_t *mp_tail;
 	uint32_t txb_used;	/* # of bytes of tx copy buffer used */
 	uint16_t hdls_used;	/* # of dma handles used */
 	uint16_t desc_used;	/* # of hardware descriptors used */
+	uint64_t _pad;
 };
 
 typedef enum t4_iq_flags {
@@ -687,6 +689,9 @@ void t4_mac_rx(struct port_info *pi, struct sge_rxq *rxq, mblk_t *m);
 void t4_mac_tx_update(struct port_info *pi, struct sge_txq *txq);
 int t4_addmac(void *arg, const uint8_t *ucaddr);
 const char **t4_get_priv_props(struct port_info *, size_t *);
+uint8_t t4_choose_holdoff_timer(struct adapter *, uint_t);
+int8_t t4_choose_holdoff_pktcnt(struct adapter *, int);
+uint_t t4_choose_dbq_timer(struct adapter *, uint_t);
 
 /* t4_ioctl.c */
 int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);
