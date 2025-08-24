@@ -11,7 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 CONF_SRCDIR	= $(UTSBASE)/intel/io/vmm
@@ -73,6 +73,7 @@ VMM_OBJS = \
 	vmcb.o \
 	svm_support.o \
 	vmm_gpt.o \
+	vmm_gpt_indirect.o \
 	seg_vmm.o \
 	vmm_reservoir.o \
 	vmm_sol_glue.o \

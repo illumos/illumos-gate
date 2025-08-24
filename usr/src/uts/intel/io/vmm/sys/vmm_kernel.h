@@ -79,7 +79,6 @@ typedef enum {
 } freqratio_res_t;
 
 typedef int	(*vmm_init_func_t)(void);
-typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm);
 typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, uint64_t rip);
@@ -109,7 +108,6 @@ typedef freqratio_res_t	(*vmi_freqratio_t)(uint64_t guest_hz,
 
 struct vmm_ops {
 	vmm_init_func_t		init;		/* module wide initialization */
-	vmm_cleanup_func_t	cleanup;
 	vmm_resume_func_t	resume;
 
 	vmi_init_func_t		vminit;		/* vm-specific initialization */
@@ -447,7 +445,7 @@ void *vmm_contig_alloc(size_t);
 void vmm_contig_free(void *, size_t);
 
 int vmm_mod_load(void);
-int vmm_mod_unload(void);
+void vmm_mod_unload(void);
 
 bool vmm_check_iommu(void);
 

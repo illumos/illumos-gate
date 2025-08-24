@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_VMM_VM_H
@@ -25,8 +25,6 @@ typedef struct vm_client vm_client_t;
 typedef struct vm_page vm_page_t;
 typedef struct vm_object vm_object_t;
 
-struct vmm_pte_ops;
-
 typedef void (*vmc_inval_cb_t)(void *, uintptr_t, size_t);
 
 typedef enum vmspace_bit_operation {
@@ -38,8 +36,11 @@ typedef enum vmspace_bit_operation {
 	VBO_FLAG_BITMAP_OUT = (1 << 31),
 } vmspace_bit_oper_t;
 
+bool vmm_vm_init(void);
+void vmm_vm_fini(void);
+
 /* vmspace_t operations */
-vmspace_t *vmspace_alloc(size_t, struct vmm_pte_ops *, bool);
+vmspace_t *vmspace_alloc(size_t);
 void vmspace_destroy(vmspace_t *);
 int vmspace_map(vmspace_t *, vm_object_t *, uintptr_t, uintptr_t, size_t,
     uint8_t);

@@ -134,13 +134,6 @@ has_tsc_freq_ctl(void)
 }
 
 static int
-svm_cleanup(void)
-{
-	/* This is taken care of by the hma registration */
-	return (0);
-}
-
-static int
 svm_init(void)
 {
 	/* Grab a (bhyve) local copy of the SVM feature bits */
@@ -2634,7 +2627,6 @@ svm_freq_ratio(uint64_t guest_hz, uint64_t host_hz, uint64_t *mult)
 
 struct vmm_ops vmm_ops_amd = {
 	.init		= svm_init,
-	.cleanup	= svm_cleanup,
 	.resume		= svm_restore,
 
 	.vminit		= svm_vminit,

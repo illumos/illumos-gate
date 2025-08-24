@@ -12,20 +12,11 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/atomic.h>
-#include <sys/kmem.h>
-#include <sys/machsystm.h>
-#include <sys/mman.h>
-#include <sys/x86_archext.h>
-#include <vm/hat_pte.h>
-
-#include <sys/vmm_gpt.h>
-#include <sys/vmm_vm.h>
+#include <sys/vmm_gpt_impl.h>
+#include <sys/debug.h>
 
 #define	EPT_R		(1 << 0)
 #define	EPT_W		(1 << 1)
@@ -38,19 +29,12 @@
 #define	EPT_PA_MASK	(0x000ffffffffff000ull)
 
 #define	EPT_MAX_LEVELS	4
-CTASSERT(EPT_MAX_LEVELS <= MAX_GPT_LEVEL);
 
 #define	EPTP_FLAG_ACCESSED_DIRTY	(1 << 6)
 
 CTASSERT(EPT_R == PROT_READ);
 CTASSERT(EPT_W == PROT_WRITE);
 CTASSERT(EPT_X == PROT_EXEC);
-
-static uint_t
-ept_pte_prot(uint64_t pte)
-{
-	return (pte & EPT_RWX);
-}
 
 static inline uint64_t
 ept_attr_to_pat(uint8_t attr)
@@ -75,66 +59,22 @@ ept_map_page(uint64_t pfn, uint_t prot, uint8_t attr)
 	return (paddr | pat | rprot);
 }
 
-static uint64_t
-ept_pte_pfn(uint64_t pte)
-{
-	return (mmu_btop(pte & PT_PADDR));
-}
-
 static bool
-ept_pte_is_present(uint64_t pte)
+ept_pte_parse(uint64_t pte, pfn_t *pfnp, uint_t *protp)
 {
-	return ((pte & EPT_RWX) != 0);
-}
+	const uint_t prot = pte & EPT_RWX;
 
-static uint_t
-ept_reset_bits(volatile uint64_t *entry, uint64_t mask, uint64_t bits)
-{
-	uint64_t pte, newpte, oldpte = 0;
-
-	/*
-	 * We use volatile and atomic ops here because we may be
-	 * racing against hardware modifying these bits.
-	 */
-	VERIFY3P(entry, !=, NULL);
-	oldpte = *entry;
-	do {
-		pte = oldpte;
-		newpte = (pte & ~mask) | bits;
-		oldpte = atomic_cas_64(entry, pte, newpte);
-	} while (oldpte != pte);
-
-	return (oldpte & mask);
-}
-
-static uint_t
-ept_reset_dirty(uint64_t *entry, bool on)
-{
-	return (ept_reset_bits(entry, EPT_DIRTY,
-	    on ? (EPT_DIRTY | EPT_ACCESSED) : 0));
-}
-
-static uint_t
-ept_reset_accessed(uint64_t *entry, bool on)
-{
-	return (ept_reset_bits(entry, EPT_DIRTY | EPT_ACCESSED,
-	    on ? EPT_ACCESSED : 0));
-}
-
-static bool
-ept_query(uint64_t *entry, vmm_gpt_query_t query)
-{
-	ASSERT(entry != NULL);
-
-	const uint64_t pte = *entry;
-	switch (query) {
-	case VGQ_ACCESSED:
-		return ((pte & EPT_ACCESSED) != 0);
-	case VGQ_DIRTY:
-		return ((pte & EPT_DIRTY) != 0);
-	default:
-		panic("unrecognized query: %d", query);
+	if (prot == 0) {
+		return (false);
 	}
+
+	if (pfnp != NULL) {
+		*pfnp = (pte & PT_PADDR) >> PAGESHIFT;
+	}
+	if (protp != NULL) {
+		*protp = prot;
+	}
+	return (true);
 }
 
 static uint64_t
@@ -152,15 +92,13 @@ ept_hw_ad_supported(void)
 	return ((ept_caps & IA32_VMX_EPT_VPID_HW_AD) != 0);
 }
 
-vmm_pte_ops_t ept_pte_ops = {
-	.vpeo_map_table		= ept_map_table,
-	.vpeo_map_page		= ept_map_page,
-	.vpeo_pte_pfn		= ept_pte_pfn,
-	.vpeo_pte_is_present	= ept_pte_is_present,
-	.vpeo_pte_prot		= ept_pte_prot,
-	.vpeo_reset_dirty	= ept_reset_dirty,
-	.vpeo_reset_accessed	= ept_reset_accessed,
-	.vpeo_query		= ept_query,
-	.vpeo_get_pmtp		= ept_get_pmtp,
-	.vpeo_hw_ad_supported	= ept_hw_ad_supported,
+const struct vmm_pte_impl ept_pte_impl = {
+	.vpi_map_table		= ept_map_table,
+	.vpi_map_page		= ept_map_page,
+	.vpi_pte_parse		= ept_pte_parse,
+	.vpi_bit_accessed	= EPT_ACCESSED,
+	.vpi_bit_dirty		= EPT_DIRTY,
+
+	.vpi_get_pmtp		= ept_get_pmtp,
+	.vpi_hw_ad_supported	= ept_hw_ad_supported,
 };

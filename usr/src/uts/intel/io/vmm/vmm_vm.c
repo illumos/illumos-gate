@@ -37,6 +37,7 @@
 #include <sys/vmm_kernel.h>
 #include <sys/vmm_reservoir.h>
 #include <sys/vmm_gpt.h>
+#include "vmm_util.h"
 
 
 /*
@@ -223,12 +224,32 @@ static void vmc_space_invalidate(vm_client_t *, uintptr_t, size_t, uint64_t);
 static void vmc_space_unmap(vm_client_t *, uintptr_t, size_t, vm_object_t *);
 static vm_client_t *vmc_space_orphan(vm_client_t *, vmspace_t *);
 
+bool
+vmm_vm_init(void)
+{
+	if (vmm_is_intel()) {
+		extern struct vmm_pte_impl ept_pte_impl;
+		return (vmm_gpt_init(&ept_pte_impl));
+	} else if (vmm_is_svm()) {
+		extern struct vmm_pte_impl rvi_pte_impl;
+		return (vmm_gpt_init(&rvi_pte_impl));
+	} else {
+		/* Caller should have already rejected other vendors */
+		panic("Unexpected hypervisor hardware vendor");
+	}
+}
+
+void
+vmm_vm_fini(void)
+{
+	vmm_gpt_fini();
+}
 
 /*
  * Create a new vmspace with a maximum address of `end`.
  */
 vmspace_t *
-vmspace_alloc(size_t end, vmm_pte_ops_t *pte_ops, bool track_dirty)
+vmspace_alloc(size_t end)
 {
 	vmspace_t *vms;
 	const uintptr_t size = end + 1;
@@ -247,9 +268,9 @@ vmspace_alloc(size_t end, vmm_pte_ops_t *pte_ops, bool track_dirty)
 	list_create(&vms->vms_clients, sizeof (vm_client_t),
 	    offsetof(vm_client_t, vmc_node));
 
-	vms->vms_gpt = vmm_gpt_alloc(pte_ops);
+	vms->vms_gpt = vmm_gpt_alloc();
 	vms->vms_pt_gen = 1;
-	vms->vms_track_dirty = track_dirty;
+	vms->vms_track_dirty = false;
 
 	return (vms);
 }
@@ -349,7 +370,7 @@ vmspace_bits_operate(vmspace_t *vms, const uint64_t gpa, size_t len,
 
 		switch (oper_only) {
 		case VBO_GET_DIRTY:
-			value = vmm_gpt_query(gpt, ptep, VGQ_DIRTY);
+			value = vmm_gpte_query_dirty(ptep);
 			break;
 		case VBO_SET_DIRTY: {
 			uint_t prot = 0;
@@ -364,7 +385,7 @@ vmspace_bits_operate(vmspace_t *vms, const uint64_t gpa, size_t len,
 			 * Only if the page is marked both Present and Writable
 			 * will we permit the dirty bit to be set.
 			 */
-			if (!vmm_gpt_is_mapped(gpt, ptep, &pfn, &prot)) {
+			if (!vmm_gpte_is_mapped(ptep, &pfn, &prot)) {
 				int err = vmspace_ensure_mapped(vms,
 				    entry.vgie_gpa, PROT_WRITE, &pfn, ptep);
 				if (err == 0) {
@@ -375,7 +396,7 @@ vmspace_bits_operate(vmspace_t *vms, const uint64_t gpa, size_t len,
 			}
 
 			if (present_writable) {
-				value = !vmm_gpt_reset_dirty(gpt, ptep, true);
+				value = !vmm_gpte_reset_dirty(ptep, true);
 			}
 			break;
 		}
@@ -388,7 +409,7 @@ vmspace_bits_operate(vmspace_t *vms, const uint64_t gpa, size_t len,
 			 * Any PTEs with the dirty bit set will have already
 			 * been properly populated.
 			 */
-			value = vmm_gpt_reset_dirty(gpt, ptep, false);
+			value = vmm_gpte_reset_dirty(ptep, false);
 			break;
 		default:
 			panic("unrecognized operator: %d", oper_only);
@@ -922,7 +943,7 @@ vmspace_lookup_map(vmspace_t *vms, uintptr_t gpa, int req_prot, pfn_t *pfnp,
 		return (FC_NOMAP);
 	}
 
-	if (vmm_gpt_is_mapped(gpt, leaf, &pfn, &prot)) {
+	if (vmm_gpte_is_mapped(leaf, &pfn, &prot)) {
 		if ((req_prot & prot) != req_prot) {
 			return (FC_PROT);
 		}
@@ -1541,8 +1562,7 @@ vmp_release_inner(vm_page_t *vmp, vm_client_t *vmc)
 		if ((vmp->vmp_prot & PROT_WRITE) != 0 &&
 		    (vmp->vmp_flags & VPF_DEFER_DIRTY) == 0 &&
 		    vmc->vmc_track_dirty) {
-			vmm_gpt_t *gpt = vmc->vmc_space->vms_gpt;
-			(void) vmm_gpt_reset_dirty(gpt, vmp->vmp_ptep, true);
+			(void) vmm_gpte_reset_dirty(vmp->vmp_ptep, true);
 		}
 	}
 	kmem_free(vmp, sizeof (*vmp));

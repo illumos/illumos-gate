@@ -3327,7 +3327,7 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 fail:
 	if (vmm_loaded) {
-		VERIFY0(vmm_mod_unload());
+		vmm_mod_unload();
 	}
 	if (reg != NULL) {
 		hma_unregister(reg);
@@ -3379,7 +3379,7 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_remove_minor_node(dip, "ctl");
 	vmmdev_dip = NULL;
 
-	VERIFY0(vmm_mod_unload());
+	vmm_mod_unload();
 	VERIFY3U(vmmdev_hma_reg, ==, NULL);
 	vmm_sol_glue_cleanup();
 

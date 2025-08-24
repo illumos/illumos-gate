@@ -185,8 +185,6 @@ static uint64_t cr0_ones_mask, cr0_zeros_mask;
 
 static uint64_t cr4_ones_mask, cr4_zeros_mask;
 
-static int vmx_initialized;
-
 /*
  * Optional capabilities
  */
@@ -454,13 +452,6 @@ vpid_alloc(uint16_t *vpid, int num)
 	}
 }
 
-static int
-vmx_cleanup(void)
-{
-	/* This is taken care of by the hma registration */
-	return (0);
-}
-
 static void
 vmx_restore(void)
 {
@@ -680,7 +671,6 @@ vmx_init(void)
 	vmx_msr_init();
 
 	vmx_capabilities = avail_caps;
-	vmx_initialized = 1;
 
 	return (0);
 }
@@ -3871,7 +3861,6 @@ vmx_freq_ratio(uint64_t guest_hz, uint64_t host_hz, uint64_t *mult)
 
 struct vmm_ops vmm_ops_intel = {
 	.init		= vmx_init,
-	.cleanup	= vmx_cleanup,
 	.resume		= vmx_restore,
 
 	.vminit		= vmx_vminit,
