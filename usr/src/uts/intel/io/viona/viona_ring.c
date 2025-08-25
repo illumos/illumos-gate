@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 
@@ -47,7 +47,16 @@
 
 /* Layout and sizing as defined in the spec for a legacy-style virtqueue */
 
-#define	LEGACY_VQ_ALIGN		PAGESIZE
+/*
+ * Because viona is not built with MACHDEP defined, PAGESIZE and friends are not
+ * constants but rather variable references.  While viona remains x86-only, we
+ * are free to hard-code this to 4k.
+ */
+#define	VQ_PGSZ			4096UL
+#define	VQ_PGOFF		(VQ_PGSZ - 1)
+#define	VQ_PGMASK		~VQ_PGOFF
+
+#define	LEGACY_VQ_ALIGN		VQ_PGSZ
 
 #define	LEGACY_DESC_SZ(qsz)	((qsz) * sizeof (struct virtio_desc))
 /*
@@ -79,7 +88,7 @@
 #define	LEGACY_VQ_SIZE(qsz)	\
 	(LEGACY_USED_FLAGS_OFF(qsz) + \
 	P2ROUNDUP(LEGACY_USED_SZ(qsz), LEGACY_VQ_ALIGN))
-#define	LEGACY_VQ_PAGES(qsz)	(LEGACY_VQ_SIZE(qsz) / PAGESIZE)
+#define	LEGACY_VQ_PAGES(qsz)	(LEGACY_VQ_SIZE(qsz) / VQ_PGSZ)
 
 struct vq_held_region {
 	struct iovec	*vhr_iov;
@@ -122,7 +131,7 @@ vq_page_hold(viona_vring_t *ring, uint64_t gpa, bool writable)
  * stored in the iovec array supplied in `region`, along with the chain of
  * vmm_page_t entries representing the held pages.  Since guest memory
  * carries no guarantees of being physically contiguous (on the host), it is
- * assumed that an iovec entry will be required for each PAGESIZE section
+ * assumed that an iovec entry will be required for each page sized section
  * covered by the specified `gpa` and `len` range.  For each iovec entry
  * successfully populated by holding a page, `vhr_idx` will be incremented so it
  * references the next available iovec entry (or `vhr_niov`, if the iovec array
@@ -133,8 +142,8 @@ static int
 vq_region_hold(viona_vring_t *ring, uint64_t gpa, uint32_t len,
     bool writable, vq_held_region_t *region)
 {
-	const uint32_t front_offset = gpa & PAGEOFFSET;
-	const uint32_t front_len = MIN(len, PAGESIZE - front_offset);
+	const uint32_t front_offset = gpa & VQ_PGOFF;
+	const uint32_t front_len = MIN(len, VQ_PGSZ - front_offset);
 	uint_t pages = 1;
 	vmm_page_t *vmp;
 	caddr_t buf;
@@ -143,13 +152,13 @@ vq_region_hold(viona_vring_t *ring, uint64_t gpa, uint32_t len,
 
 	if (front_len < len) {
 		pages += P2ROUNDUP((uint64_t)(len - front_len),
-		    PAGESIZE) / PAGESIZE;
+		    VQ_PGSZ) / VQ_PGSZ;
 	}
 	if (pages > (region->vhr_niov - region->vhr_idx)) {
 		return (E2BIG);
 	}
 
-	vmp = vq_page_hold(ring, gpa & PAGEMASK, writable);
+	vmp = vq_page_hold(ring, gpa & VQ_PGMASK, writable);
 	if (vmp == NULL) {
 		return (EFAULT);
 	}
@@ -169,7 +178,7 @@ vq_region_hold(viona_vring_t *ring, uint64_t gpa, uint32_t len,
 	}
 
 	for (uint_t i = 1; i < pages; i++) {
-		ASSERT3U(gpa & PAGEOFFSET, ==, 0);
+		ASSERT3U(gpa & VQ_PGOFF, ==, 0);
 
 		vmp = vq_page_hold(ring, gpa, writable);
 		if (vmp == NULL) {
@@ -177,7 +186,7 @@ vq_region_hold(viona_vring_t *ring, uint64_t gpa, uint32_t len,
 		}
 		buf = (caddr_t)vmm_drv_page_readable(vmp);
 
-		const uint32_t chunk_len = MIN(len, PAGESIZE);
+		const uint32_t chunk_len = MIN(len, VQ_PGSZ);
 		region->vhr_iov[region->vhr_idx].iov_base = buf;
 		region->vhr_iov[region->vhr_idx].iov_len = chunk_len;
 		region->vhr_idx++;
@@ -441,7 +450,6 @@ viona_ring_map(viona_vring_t *ring, bool defer_dirty)
 	ASSERT3U(qsz, <=, VRING_MAX_LEN);
 	ASSERT3U(pa, !=, 0);
 	ASSERT3U(pa & (LEGACY_VQ_ALIGN - 1), ==, 0);
-	ASSERT3U(LEGACY_VQ_ALIGN, ==, PAGESIZE);
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3P(ring->vr_map_pages, ==, NULL);
 
@@ -469,7 +477,7 @@ viona_ring_map(viona_vring_t *ring, bool defer_dirty)
 	}
 
 	vmm_page_t *prev = NULL;
-	for (uint_t i = 0; i < npages; i++, pa += PAGESIZE) {
+	for (uint_t i = 0; i < npages; i++, pa += VQ_PGSZ) {
 		vmm_page_t *vmp;
 
 		vmp = vmm_drv_page_hold_ext(ring->vr_lease, pa,
@@ -531,8 +539,8 @@ viona_ring_addr(viona_vring_t *ring, uint_t off)
 	ASSERT3P(ring->vr_map_pages, !=, NULL);
 	ASSERT3U(LEGACY_VQ_SIZE(ring->vr_size), >, off);
 
-	const uint_t page_num = off / PAGESIZE;
-	const uint_t page_off = off % PAGESIZE;
+	const uint_t page_num = off / VQ_PGSZ;
+	const uint_t page_off = off % VQ_PGSZ;
 	return ((caddr_t)ring->vr_map_pages[page_num] + page_off);
 }
 
@@ -812,14 +820,18 @@ viona_create_worker(viona_vring_t *ring)
 	return (t);
 }
 
-void
+static inline void
 vq_read_desc(viona_vring_t *ring, uint16_t idx, struct virtio_desc *descp)
 {
 	const uint_t entry_off = idx * sizeof (struct virtio_desc);
 
 	ASSERT3U(idx, <, ring->vr_size);
 
-	bcopy(viona_ring_addr(ring, entry_off), descp, sizeof (*descp));
+	/*
+	 * On both legacy and 1.x VirtIO, the virtqueue descriptors are required
+	 * to be aligned to at least 16 bytes (4k for legacy).
+	 */
+	*descp = *(const struct virtio_desc *)viona_ring_addr(ring, entry_off);
 }
 
 static uint16_t
@@ -893,10 +905,9 @@ vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
 	int err = 0;
 
 	for (;;) {
-		uint64_t indir_gpa =
+		const uint64_t indir_gpa =
 		    desc->vd_addr + (indir_next * sizeof (struct virtio_desc));
-		uint64_t indir_page = indir_gpa & PAGEMASK;
-		struct virtio_desc vp;
+		const uint64_t indir_page = indir_gpa & VQ_PGMASK;
 
 		/*
 		 * Get a mapping for the page that the next indirect descriptor
@@ -922,8 +933,14 @@ vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
 		 * simply using a reference pointer.  This prevents malicious or
 		 * erroneous guest writes to the descriptor from fooling the
 		 * flags/bounds verification through a race.
+		 *
+		 * While indirect descriptors do not have the same alignment
+		 * requirements as those residing in the virtqueue itself, we
+		 * are not concerned about unaligned access while viona remains
+		 * x86-only.
 		 */
-		bcopy(buf + (indir_gpa - indir_page), &vp, sizeof (vp));
+		struct virtio_desc vp = *(const struct virtio_desc *)
+		    (buf + (indir_gpa - indir_page));
 
 		if (vp.vd_flags & VRING_DESC_F_INDIRECT) {
 			VIONA_PROBE1(indir_bad_nest, viona_vring_t *, ring);
@@ -1177,21 +1194,21 @@ viona_ring_num_avail(viona_vring_t *ring)
 	return (*avail_idx - ring->vr_cur_aidx);
 }
 
-/* Record a successfully transferred packet for the ring stats */
+/* Record successfully transferred packet(s) for the ring stats */
 void
-viona_ring_stat_accept(viona_vring_t *ring, uint32_t len)
+viona_ring_stat_accept(viona_vring_t *ring, size_t count, size_t len)
 {
-	atomic_inc_64(&ring->vr_stats.vts_packets);
+	atomic_add_64(&ring->vr_stats.vts_packets, count);
 	atomic_add_64(&ring->vr_stats.vts_bytes, len);
 }
 
 /*
- * Record a dropped packet in the ring stats
+ * Record dropped packet(s) in the ring stats
  */
 void
-viona_ring_stat_drop(viona_vring_t *ring)
+viona_ring_stat_drop(viona_vring_t *ring, size_t count)
 {
-	atomic_inc_64(&ring->vr_stats.vts_drops);
+	atomic_add_64(&ring->vr_stats.vts_drops, count);
 }
 
 /*

@@ -490,7 +490,7 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 	const boolean_t allow_gro =
 	    (link->l_features & VIRTIO_NET_F_GUEST_TSO4) != 0;
 
-	size_t nrx = 0, ndrop = 0;
+	size_t cnt_accept = 0, size_accept = 0, cnt_drop = 0;
 
 	while (mp != NULL) {
 		mblk_t *next = mp->b_next;
@@ -518,7 +518,7 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 				 * If the hook consumer (e.g. ipf) already
 				 * freed the mblk_t, update the drop count now.
 				 */
-				ndrop++;
+				cnt_drop++;
 			}
 			mp = next;
 			continue;
@@ -676,8 +676,11 @@ pad_drop:
 			/* Chain successful mblks to be freed later */
 			*mprx_prevp = mp;
 			mprx_prevp = &mp->b_next;
-			nrx++;
-			viona_ring_stat_accept(ring, size);
+			cnt_accept++;
+			size_accept += size;
+
+			VIONA_PROBE3(pkt__rx, viona_vring_t *, ring, mblk_t, mp,
+			    size_t, size)
 		}
 		mp = next;
 	}
@@ -698,10 +701,17 @@ pad_drop:
 		mp->b_next = NULL;
 		freemsg(mp);
 		mp = next;
-		ndrop++;
-		viona_ring_stat_drop(ring);
+		cnt_drop++;
 	}
-	VIONA_PROBE3(rx, viona_link_t *, link, size_t, nrx, size_t, ndrop);
+
+	if (cnt_accept != 0) {
+		viona_ring_stat_accept(ring, cnt_accept, size_accept);
+	}
+	if (cnt_drop != 0) {
+		viona_ring_stat_drop(ring, cnt_drop);
+	}
+	VIONA_PROBE3(rx, viona_link_t *, link, size_t, cnt_accept,
+	    size_t, cnt_drop);
 }
 
 static void

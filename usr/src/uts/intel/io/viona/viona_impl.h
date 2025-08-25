@@ -442,8 +442,8 @@ void viona_ring_disable_notify(viona_vring_t *);
 void viona_ring_enable_notify(viona_vring_t *);
 uint16_t viona_ring_num_avail(viona_vring_t *);
 
-void viona_ring_stat_accept(viona_vring_t *, uint32_t);
-void viona_ring_stat_drop(viona_vring_t *);
+void viona_ring_stat_accept(viona_vring_t *, size_t, size_t);
+void viona_ring_stat_drop(viona_vring_t *, size_t);
 void viona_ring_stat_error(viona_vring_t *);
 
 bool iov_bunch_copy(iov_bunch_t *, void *, uint32_t);
