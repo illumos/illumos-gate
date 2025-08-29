@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2012 Gary Mills
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -579,9 +580,20 @@ boot_fb(struct xboot_info *xbi, int console)
 	if (xbi_fb_init(xbi, &bcons_dev) == B_FALSE)
 		return (console);
 
-	/* FB address is not set, fall back to serial terminal. */
+	/*
+	 * The framebuffer address is not set; fall back to the serial console.
+	 */
 	if (fb_info.paddr == 0)
 		return (CONS_TTY);
+
+#if defined(_BOOT)
+	/*
+	 * If the firmware placed the framebuffer mapping above the 32-bit
+	 * boundary, we cannot use it from dboot.
+	 */
+	if (fb_info.paddr >= UINTPTR_MAX)
+		return (CONS_TTY);
+#endif
 
 	fb_info.terminal.x = VGA_TEXT_COLS;
 	fb_info.terminal.y = VGA_TEXT_ROWS;

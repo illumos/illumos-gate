@@ -28,7 +28,7 @@
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_TYPES_H
@@ -49,11 +49,11 @@
  * required by any standard but constitute a useful, general purpose set
  * of type definitions which is namespace clean with respect to all standards.
  */
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_BOOT)
 #include <sys/inttypes.h>
-#else	/* _KERNEL */
+#else
 #include <sys/int_types.h>
-#endif	/* _KERNEL */
+#endif
 
 #if defined(_KERNEL) || defined(_SYSCALL32)
 #include <sys/types32.h>
