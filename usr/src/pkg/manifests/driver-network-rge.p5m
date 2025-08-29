@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -43,11 +44,11 @@ dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/rge.4d
 driver name=rge perms="* 0666 root sys" clone_perms="rge 0666 root sys" \
-    alias=pci10ec,8136 \
-    alias=pci10ec,8167 \
-    alias=pci10ec,8168 \
-    alias=pci10ec,8169 \
-    alias=pci16ec,116 \
+    alias=pci10ec,8136,p \
+    alias=pci10ec,8167,p \
+    alias=pci10ec,8168,p \
+    alias=pci10ec,8169,p \
+    alias=pci16ec,116,p \
     alias=pciex10ec,8136 \
     alias=pciex10ec,8168 \
     alias=pciex10ec,8169
