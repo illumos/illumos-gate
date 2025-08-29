@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include "rge.h"
@@ -944,16 +946,6 @@ rge_chip_init(rge_t *rgep)
 		    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
 
 	/*
-	 * Set dump tally counter register
-	 */
-	val32 = rgep->dma_area_stats.cookie.dmac_laddress >> 32;
-	rge_reg_put32(rgep, DUMP_COUNTER_REG_1, val32);
-	val32 = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
-	val32 &= DUMP_COUNTER_REG_RESV;
-	val32 |= rgep->dma_area_stats.cookie.dmac_laddress;
-	rge_reg_put32(rgep, DUMP_COUNTER_REG_0, val32);
-
-	/*
 	 * Change to config register write enable mode
 	 */
 	rge_reg_set8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
@@ -1305,28 +1297,48 @@ void rge_hw_stats_dump(rge_t *rgep);
 void
 rge_hw_stats_dump(rge_t *rgep)
 {
-	int i = 0;
 	uint32_t regval = 0;
 
 	if (rgep->rge_mac_state == RGE_MAC_STOPPED)
 		return;
 
-	regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
-	while (regval & DUMP_START) {
-		drv_usecwait(100);
-		if (++i > STATS_DUMP_LOOP) {
-			RGE_DEBUG(("rge h/w statistics dump fail!"));
-			rgep->rge_chip_state = RGE_CHIP_ERROR;
-			return;
-		}
-		regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
-	}
-	DMA_SYNC(rgep->dma_area_stats, DDI_DMA_SYNC_FORKERNEL);
+	/*
+	 * Set the stats counter dump address.  First, set the high part of the
+	 * address and read it back to ensure it's flushed out.
+	 */
+	rge_reg_put32(rgep, DUMP_COUNTER_REG_1,
+	    rgep->dma_area_stats.cookie.dmac_laddress >> 32);
+	(void) rge_reg_get32(rgep, DUMP_COUNTER_REG_1);
 
 	/*
-	 * Start H/W statistics dump for RTL8169 chip
+	 * Then set the low part of the address, preserving the reserved bits:
 	 */
-	rge_reg_set32(rgep, DUMP_COUNTER_REG_0, DUMP_START);
+	regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
+	regval &= DUMP_COUNTER_REG_RESV;
+	regval |= rgep->dma_area_stats.cookie.dmac_laddress;
+	rge_reg_put32(rgep, DUMP_COUNTER_REG_0, regval);
+
+	/*
+	 * Set the command bit to start dumping statistics:
+	 */
+	regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
+	rge_reg_put32(rgep, DUMP_COUNTER_REG_0, regval | DUMP_START);
+
+	for (uint_t i = 0; i < STATS_DUMP_LOOP; i++) {
+		drv_usecwait(100);
+
+		/*
+		 * Check to see if the dump has completed:
+		 */
+		regval = rge_reg_get32(rgep, DUMP_COUNTER_REG_0);
+		if ((regval & DUMP_START) == 0) {
+			DMA_SYNC(rgep->dma_area_stats, DDI_DMA_SYNC_FORKERNEL);
+			return;
+		}
+	}
+
+	RGE_DEBUG(("rge h/w statistics dump fail!"));
+	rgep->rge_chip_state = RGE_CHIP_ERROR;
 }
 
 /*
