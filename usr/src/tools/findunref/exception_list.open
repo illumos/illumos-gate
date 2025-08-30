@@ -189,6 +189,7 @@
 ./usr/src/head/rpcsvc/THIRDPARTYLICENSE.nfs4_prot.descrip
 
 #
-# ld tests which are not currently delivered
+# tools to update CPU microcode
 #
-./usr/src/cmd/sgs/test
+./usr/src/data/ucode/update.intel
+./usr/src/data/ucode/update.amd
