@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
+#
 # cmd/stat/Makefile.stat
 
 include $(SRC)/cmd/Makefile.ctf
@@ -29,6 +31,21 @@ include $(SRC)/cmd/Makefile.ctf
 STATSRC = $(SRC)/cmd/stat
 STATCOMMONDIR = $(STATSRC)/common
 
-COMMON_OBJS = acquire.o walkers.o acquire_iodevs.o dsr.o mnt.o common.o \
-	timestamp.o
+STAT_COMMON_OBJS = timestamp.o
+STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+
+OBJS +=	$(STAT_COMMON_OBJS)
+SRCS += $(STAT_COMMON_SRCS)
+
+COMMON_OBJS = acquire.o walkers.o acquire_iodevs.o dsr.o mnt.o common.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+
+CPPFLAGS += -I$(STATCOMMONDIR)
+
+%.o:    $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.po:	$(STATCOMMONDIR)/%.c
+	$(CPPFORPO) $< > $<.i
+	$(BUILD.po)

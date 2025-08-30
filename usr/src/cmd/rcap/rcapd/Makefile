@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
 
 include ../../Makefile.cmd
 include ../../Makefile.cmd.64
@@ -65,8 +66,6 @@ CPPFLAGS			+= -I$(COMMON_DIR)
 LDLIBS			+= -lkstat -lproc -lproject -lzonecfg -lumem -lscf
 LDLIBS			+= $(EXTRA_LDLIBS)
 
-LINTFLAGS64		+= -u
-
 OBJS =			$(SRCS:%.c=%.o) rcapd_conf.o
 
 POFILES =		$(OBJS:%.o=%.po)
@@ -75,9 +74,6 @@ POFILE =		$(PROG).po
 CLOBBERFILES +=		$(POFILES) $(POFILE)
 
 include ../Makefile.com
-
-.NO_PARALLEL:
-.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -92,9 +88,6 @@ check: $(CHKMANIFEST)
 clean:
 	$(RM) $(OBJS)
 	$(RM) rcapd_conf.c
-
-lint:
-	$(LINT.c) $(LINTSRCS) $(LDLIBS)
 
 $(POFILE): $(POFILES)
 	$(RM) $@

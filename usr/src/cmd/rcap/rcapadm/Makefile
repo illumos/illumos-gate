@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2025 Hans Rosenfeld
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -30,19 +30,13 @@
 include ../../Makefile.cmd
 
 COMMON_DIR=	../common	# for Makefile.com
-SRCS = 		rcapadm.c \
+SRCS =		rcapadm.c \
 		rcapd_stat.c \
 		utils.c
 
-LINTSRCS =	$(COMMON_DIR)/utils.c \
-		$(COMMON_DIR)/rcapd_stat.c \
-		rcapadm.c
-
-$(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
-CPPFLAGS 			+= -I$(COMMON_DIR)
-LDLIBS 				+= -lumem -lscf -lzonecfg
-
-LINTFLAGS 			+= $(LDLIBS) -mnu
+$(NOT_RELEASE_BUILD)CPPFLAGS	+= -DDEBUG
+CPPFLAGS			+= -I$(COMMON_DIR)
+LDLIBS				+= -lumem -lscf -lzonecfg
 
 PROG =		rcapadm
 OBJS =		$(SRCS:%.c=%.o) rcapd_conf.o
@@ -51,9 +45,6 @@ POFILES =	$(OBJS:%.o=%.po)
 POFILE =	p$(PROG).po
 
 CLOBBERFILES +=	$(POFILES) $(POFILE)
-
-.NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
 
 all: $(PROG)
 
@@ -70,12 +61,6 @@ $(POFILE): $(POFILES)
 clean:
 	$(RM) $(OBJS)
 	$(RM) rcapd_conf.c
-
-%.ln: $(COMMON_DIR)/%.c
-	$(LINT.c) -c $<
-
-lint:
-	$(LINT.c) $(LINTSRCS)
 
 $(ROOTUSRSBIN):
 	$(MKDIR) -p $(ROOTUSRSBIN)

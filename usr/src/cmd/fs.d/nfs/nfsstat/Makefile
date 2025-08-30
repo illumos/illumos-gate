@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2025 Hans Rosenfeld
 
 PROG=		nfsstat
 
@@ -33,16 +34,10 @@ COMMON=	nfs_sec.o
 OBJS=	nfsstat.o $(COMMON)
 SRCS=	nfsstat.c ../lib/nfs_sec.c
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-SRCS += $(STAT_COMMON_SRCS)
-OBJS += $(STAT_COMMON_OBJS)
+include		$(SRC)/cmd/stat/Makefile.stat
 
 CSTD= $(CSTD_GNU99)
 
-CPPFLAGS += -I$(STATCOMMONDIR)
 CERRWARN += -_gcc=-Wno-parentheses
 
 # not linted
@@ -62,9 +57,7 @@ all:		$(PROG)
 
 nfs_sec.o:	../lib/nfs_sec.c
 		$(COMPILE.c) ../lib/nfs_sec.c
-
-%.o:    $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) $<
+		$(POST_PROCESS_O)
 
 install:	all $(ROOTPROG)
 

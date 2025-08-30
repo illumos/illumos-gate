@@ -22,51 +22,41 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
+#
 # cmd/pools/poolstat/Makefile
 
 PROG =		poolstat
 OBJS =		poolstat.o poolstat_utils.o sa_libpool.o sa_kstat.o
 SRCS =		$(OBJS:%.o=%.c) $(COMMON_SRCS)
-POFILES = 	$(OBJS:.o=.po)
+POFILES =	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
+include $(SRC)/cmd/stat/Makefile.stat
 include ../Makefile.pools
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
+OBJS += $(COMMON_OBJS)
 
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-SRCS += $(STAT_COMMON_SRCS)
-
-CFLAGS +=	-I$(POOLSCOMMONDIR) -I$(STATCOMMONDIR) $(EXTRA_CFLAGS)
-sparc_COPTFLAG=
+CFLAGS +=	-I$(POOLSCOMMONDIR) $(EXTRA_CFLAGS)
 LDLIBS +=	-lpool -lkstat
 XGETFLAGS =	-a
 CLOBBERFILES += $(POFILES)
-
-lint := LINTFLAGS += -I$(POOLSCOMMONDIR) -I$(STATCOMMONDIR)
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(COMMON_OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(COMMON_OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o : $(POOLSCOMMONDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-%.o : $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
 install: all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS) $(COMMON_OBJS) $(STAT_COMMON_OBJS) $(POFILES)
-
-lint: lint_SRCS
+	$(RM) $(OBJS) $(POFILES)
 
 include ../../Makefile.targ

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -29,48 +30,37 @@
 include ../../Makefile.cmd
 
 COMMON_DIR=	../common	# for Makefile.com
-SRCS =		rcapstat.c \
-		utils.c
+PROG =		rcapstat
+OBJS =		rcapstat.o \
+		utils.o \
+		rcapd_conf.o
+SRCS =		$(OBJS:%.o=%.c)
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+include $(SRC)/cmd/stat/Makefile.stat
 
 $(NOT_RELEASE_BUILD)CPPFLAGS	+= -DDEBUG
-CPPFLAGS			+= -I$(COMMON_DIR) -I$(STATCOMMONDIR)
+CPPFLAGS			+= -I$(COMMON_DIR)
 LDLIBS				+= -lumem -lzonecfg -lscf
-LDFLAGS				+= $(MAPFILE.NGB:%=-Wl,-M%)
-
-PROG =				rcapstat
-OBJS =				$(SRCS:%.c=%.o) rcapd_conf.o
 
 POFILES =			$(OBJS:%.o=%.po)
 POFILE =			p$(PROG).po
 
-CLOBBERFILES +=			rcapd_conf.c $(POFILES) $(POFILE)
-
-.NO_PARALLEL:
-.PARALLEL: $(OBJS)
+CLOBBERFILES +=			$(POFILES) $(POFILE)
 
 all: $(PROG) $(MAPFILE.NGB)
 
 include ../Makefile.com
 
-$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) $(OBJS) $(STAT_COMMON_OBJS) -o $@ $(LDLIBS)
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-
-%.o : $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
 clean:
-	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+	$(RM) $(OBJS)
 
 $(ROOTBIN):
 	$(MKDIR) -p $(ROOTBIN)

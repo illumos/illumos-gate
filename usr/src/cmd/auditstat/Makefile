@@ -22,24 +22,19 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
 
 PROG= auditstat
 OBJS = auditstat.o
 SRCS = $(OBJS:%.o=%.c)
 
 include $(SRC)/cmd/Makefile.cmd
-
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-SRCS += $(STAT_COMMON_SRCS)
+include $(SRC)/cmd/stat/Makefile.stat
 
 MSGFILES = $(SRCS)
 POFILE = $(PROG).po
 
 LDLIBS += -lbsm
-CPPFLAGS += -I$(STATCOMMONDIR)
 
 CERRWARN += -_gcc=-Wno-extra
 
@@ -49,23 +44,17 @@ all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 
-$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-%.o: $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
 clean:
-	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+	$(RM) $(OBJS)
 
 $(POFILE): $(MSGFILES)
 	$(BUILDPO.msgfiles)
 
 _msg: $(MSGDOMAINPOFILE)
-
-lint:	lint_SRCS
 
 include $(SRC)/cmd/Makefile.targ
 include $(SRC)/Makefile.msg.targ

@@ -22,26 +22,22 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2025 Hans Rosenfeld
 
 PROG = intrstat
 OBJS = intrstat.o
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
+include ../stat/Makefile.stat
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-
-CPPFLAGS += -I$(STATCOMMONDIR)
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 LDLIBS += -ldtrace
 
 FILEMODE = 0555
 
-CLEANFILES += $(OBJS) $(STAT_COMMON_OBJS)
+CLEANFILES += $(OBJS)
 
 ROOTLINK = $(PROG:%=$(ROOTUSRSBIN64)/%)
 
@@ -54,13 +50,9 @@ install: all $(ROOTUSRSBINPROG) $(ROOTLINK)
 $(ROOTLINK):
 	$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
 
-$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
-	$(POST_PROCESS) ; $(STRIP_STABS)
-
-%.o : $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
 clean:
 	-$(RM) $(CLEANFILES)

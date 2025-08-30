@@ -23,73 +23,42 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2025 Hans Rosenfeld
 
 .KEEP_STATE:
 .SUFFIXES:
 
-SRCS += fmstat.c
-
-OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
+OBJS += fmstat.o
+SRCS += $(OBJS:%.o=%.c)
 
 PROG = fmstat
 ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
-STAT_LINTFILES = $(STAT_COMMON_OBJS:%.o=%.ln)
-LINTFILES += $(STAT_LINTFILES)
+include $(SRC)/cmd/stat/Makefile.stat
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-CPPFLAGS += -I. -I../common -I$(STATCOMMONDIR)
+CPPFLAGS += -I. -I../common
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
 LDFLAGS += -R/usr/lib/fm
-LINTFLAGS += -mnu
 
 SMOFF += signed
 
-.NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
-
 all: $(PROG)
 
-$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) $(OBJS)  $(STAT_COMMON_OBJS) -o $@ $(LDLIBS)
-	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(STAT_COMMON_OBJS)
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o: ../common/%.c
 	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
-
-%.o: %.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
-
-%.o : $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
+	$(POST_PROCESS_O)
 
 clean:
-	$(RM) $(OBJS) $(STAT_COMMON_OBJS) $(LINTFILES)
-
-clobber: clean
-	$(RM) $(PROG)
-
-%.ln: $(STATCOMMONDIR)/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 install_h:
 
 install: all $(ROOTPROG)
+
+include $(SRC)/cmd/Makefile.targ

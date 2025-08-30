@@ -23,25 +23,24 @@
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
 # Copyright (c) 2015 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2025 Hans Rosenfeld
 #
 
 PROG= zpool
 OBJS= zpool_main.o zpool_vdev.o zpool_iter.o zpool_util.o
+SRCS= $(OBJS:%.o=%.c)
 POFILES=$(OBJS:%.o=%.po)
 POFILE= zpool.po
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
 include ../Makefile.ctf
-
-STATCOMMONDIR = $(SRC)/cmd/stat/common
-
-STAT_COMMON_OBJS = timestamp.o
+include ../stat/Makefile.stat
 
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem -lzutil \
 	-lm -lzpool
 
-INCS += -I../../common/zfs -I../../uts/common/fs/zfs -I$(STATCOMMONDIR)
+INCS += -I../../common/zfs -I../../uts/common/fs/zfs
 INCS += -I../../lib/libzutil/common
 
 CSTD=	$(CSTD_GNU99)
@@ -55,13 +54,9 @@ ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-
-%.o:    $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
 
 install: all $(ROOTSBINPROG) $(ROOTUSRSBINLINKS)
 
@@ -70,7 +65,7 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
-	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+	$(RM) $(OBJS)
 
 # Links from /usr/sbin to /sbin
 $(ROOTUSRSBINLINKS):

@@ -26,6 +26,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Hans Rosenfeld
 
 PROG=		netstat
 
@@ -43,32 +44,25 @@ include ../../Makefile.cmd-inet
 LOCALSRCS=	$(LOCALOBJS:%.o=%.c)
 COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 
-STATCOMMONDIR = $(SRC)/cmd/stat/common
+OBJS=		$(LOCALOBJS) $(COMMONOBJS)
+SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
-STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+include $(SRC)/cmd/stat/Makefile.stat
 
-OBJS=		$(LOCALOBJS) $(COMMONOBJS) $(STAT_COMMON_OBJS)
-SRCS=		$(LOCALSRCS) $(COMMONSRCS) $(STAT_COMMON_SRCS)
-
-CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR) -I$(STATCOMMONDIR)
+CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
 LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol -lproc
 
 CSTD=		$(CSTD_GNU99)
 
 .KEEP_STATE:
 
-all: $(PROG) $(NPROG)
+all: $(PROG)
 
 ROOTPROG=   $(PROG:%=$(ROOTBIN)/%)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-
-%.o : $(STATCOMMONDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 install: all $(ROOTPROG)
 
