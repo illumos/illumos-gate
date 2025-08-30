@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -530,6 +530,7 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
 	off_t skuoff;
 	smb_chassis_t ch;
+	smb_chassis_bonus_t b;
 
 	if (stp == NULL) {
 		return (-1); /* errno is set for us */
@@ -552,8 +553,8 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	bzero(chp, sizeof (smb_base_chassis_t));
 
 	/*
-	 * See the comments for the smb_chassis_pre35_t in sys/smbios_impl.h for
-	 * an explanation as to why this is here. The use of smb_strptr with
+	 * See the comments for the smb_chassis_pre35_t in <sys/smbios_impl.h>
+	 * for an explanation as to why this is here. The use of smb_strptr with
 	 * index 0 below ensures that we initialize this to an empty string.
 	 */
 	if (smb_libgteq(shp, SMB_VERSION_35)) {
@@ -563,6 +564,14 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 		bzero(p35->smbc_sku, sizeof (p35->smbc_sku));
 	}
 
+	/*
+	 * SMBIOS 3.9 added the rack type and height. Make sure to initialize
+	 * this if the library is new enough.
+	 */
+	if (smb_libgteq(shp, SMB_VERSION_39)) {
+		chp->smbc_rtype = 0;
+		chp->smbc_rheight = 0;
+	}
 	chp->smbc_oemdata = ch.smbch_oemdata;
 	chp->smbc_lock = (ch.smbch_type & SMB_CHT_LOCK) != 0;
 	chp->smbc_type = ch.smbch_type & ~SMB_CHT_LOCK;
@@ -582,26 +591,35 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	 * if there isn't space for the SKU byte. This is very common of
 	 * hypervisors.
 	 */
-	skuoff = sizeof (ch) + ch.smbch_cn * ch.smbch_cm;
-	if (!smb_gteq(shp, SMB_VERSION_27) ||
-	    stp->smbst_hdr->smbh_len < skuoff + 1) {
+	if (!smb_gteq(shp, SMB_VERSION_27)) {
 		return (0);
 	}
 
-	if (smb_libgteq(shp, SMB_VERSION_27)) {
-		uint8_t strno;
+	skuoff = sizeof (ch) + ch.smbch_cn * ch.smbch_cm;
+	smb_info_bcopy_offset(stp->smbst_hdr, &b, sizeof (b), skuoff);
+
+	/*
+	 * In the library versions between 2.7 and 3.4, we opted to embed the
+	 * SKU in the chassis structure itself, rather than include a pointer.
+	 * See the comments around the smb_chassis_pre35_t in
+	 * <sys/smbios_impl.h>.
+	 */
+	if (smb_libgteq(shp, SMB_VERSION_27) &&
+	    !smb_libgteq(shp, SMB_VERSION_34)) {
+		smb_chassis_pre35_t *p35 = (smb_chassis_pre35_t *)chp;
 		const char *str;
 
-		smb_info_bcopy_offset(stp->smbst_hdr, &strno, sizeof (strno),
-		    skuoff);
-		str = smb_strptr(stp, strno);
-		if (smb_libgteq(shp, SMB_VERSION_35)) {
-			chp->smbc_sku = str;
-		} else {
-			smb_chassis_pre35_t *p35 = (smb_chassis_pre35_t *)chp;
-			(void) strlcpy(p35->smbc_sku, str,
-			    sizeof (p35->smbc_sku));
-		}
+		str = smb_strptr(stp, b.smbcb_sku);
+		(void) strlcpy(p35->smbc_sku, str, sizeof (p35->smbc_sku));
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_35)) {
+		chp->smbc_sku = smb_strptr(stp, b.smbcb_sku);
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_39)) {
+		chp->smbc_rtype = b.smbcb_rtype;
+		chp->smbc_rheight = b.smbcb_rheight;
 	}
 
 	return (0);

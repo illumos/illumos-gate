@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -359,6 +359,8 @@ typedef struct smbios_chassis {
 	uint8_t smbc_elems;		/* number of element records (n) */
 	uint8_t smbc_elemlen;		/* length of contained element (m) */
 	const char *smbc_sku;		/* SKU number (as a string) */
+	uint8_t smbc_rtype;		/* rack type */
+	uint32_t smbc_rheight;		/* rack height */
 } smbios_chassis_t;
 
 #define	SMB_CHT_OTHER		0x01	/* other */
@@ -410,6 +412,8 @@ typedef struct smbios_chassis {
 #define	SMB_CHSC_NONE		0x03	/* none */
 #define	SMB_CHSC_EILOCK		0x04	/* external interface locked out */
 #define	SMB_CHSC_EIENAB		0x05	/* external interface enabled */
+
+#define	SMB_CRT_OU		0x01	/* OU */
 
 /*
  * Chassis element record types
@@ -1366,6 +1370,9 @@ typedef struct smbios_memdevice {
 #define	SMB_MDFF_SRIMM		0x0E	/* SRIMM */
 #define	SMB_MDFF_FBDIMM		0x0F	/* FBDIMM */
 #define	SMB_MDFF_DIE		0x10	/* die */
+#define	SMB_MDFF_CAMM		0x11	/* CAMM */
+#define	SMB_MDFF_CUDIMM		0x12	/* CUDIMM */
+#define	SMB_MDFF_CSODIMM	0x13	/* CSODIMM */
 
 #define	SMB_MDT_OTHER		0x01	/* other */
 #define	SMB_MDT_UNKNOWN		0x02	/* unknown */
@@ -1400,6 +1407,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_DDR5		0x22	/* DDR5 */
 #define	SMB_MDT_LPDDR5		0x23	/* LPDDR5 */
 #define	SMB_MDT_HBM3		0x24	/* HBM3 */
+#define	SMB_MDT_MRDIMM		0x25	/* MRDIMM */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
@@ -2060,7 +2068,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_36	0x0306		/* SMBIOS encoding for DMTF spec 3.6 */
 #define	SMB_VERSION_37	0x0307		/* SMBIOS encoding for DMTF spec 3.7 */
 #define	SMB_VERSION_38	0x0308		/* SMBIOS encoding for DMTF spec 3.8 */
-#define	SMB_VERSION	SMB_VERSION_38	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_39	0x0309		/* SMBIOS encoding for DMTF spec 3.9 */
+#define	SMB_VERSION	SMB_VERSION_39	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */
@@ -2209,6 +2218,7 @@ extern const char *smbios_cache_mode_desc(uint_t);
 
 extern const char *smbios_chassis_state_desc(uint_t);
 extern const char *smbios_chassis_type_desc(uint_t);
+extern const char *smbios_chassis_rack_type_desc(uint_t);
 
 extern const char *smbios_evlog_flag_desc(uint_t);
 extern const char *smbios_evlog_flag_name(uint_t);

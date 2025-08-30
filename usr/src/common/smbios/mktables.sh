@@ -23,7 +23,7 @@
 #
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -78,6 +78,7 @@ SMB_CAG_	smbios_cache_logical_desc	uint_t
 SMB_CAM_	smbios_cache_mode_desc		uint_t
 SMB_CHST_	smbios_chassis_state_desc	uint_t
 SMB_CHT_	smbios_chassis_type_desc	uint_t
+SMB_CRT_	smbios_chassis_rack_type_desc	uint_t
 SMB_COOLDEV_S_	smbios_cooldev_status_desc	uint_t
 SMB_COOLDEV_T_	smbios_cooldev_type_desc	uint_t
 SMB_EVFL_	smbios_evlog_flag_desc		uint_t

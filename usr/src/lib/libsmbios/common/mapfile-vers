@@ -22,7 +22,7 @@
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -70,6 +70,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_cache_loc_desc;
 	smbios_cache_logical_desc;
 	smbios_cache_mode_desc;
+	smbios_chassis_rack_type_desc;
 	smbios_chassis_state_desc;
 	smbios_chassis_type_desc;
 	smbios_checksum;

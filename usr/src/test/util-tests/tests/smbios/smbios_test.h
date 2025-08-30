@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -144,11 +144,14 @@ extern boolean_t smbios_test_chassis_mktable_part(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_comps(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_sku(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_mktable_sku_nocomps(smbios_test_table_t *);
+extern boolean_t smbios_test_chassis_mktable_39(smbios_test_table_t *);
 extern boolean_t smbios_test_chassis_verify_invlen(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_base(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_comps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku_nocomps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_sku_pre35(smbios_hdl_t *);
+extern boolean_t smbios_test_chassis_verify_39(smbios_hdl_t *);
 
 extern boolean_t smbios_test_proc_mktable_25(smbios_test_table_t *);
 extern boolean_t smbios_test_proc_mktable_36(smbios_test_table_t *);

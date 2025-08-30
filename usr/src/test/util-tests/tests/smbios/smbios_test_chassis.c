@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -127,8 +127,8 @@ smbios_test_chassis_mktable_comps(smbios_test_table_t *table)
 
 	smbios_test_chassis_mktable_fill_chassis(&ch);
 	smbios_test_chassis_mktable_fill_entries(ents);
-	ch.smbch_hdr.smbh_len += sizeof (ents);
-	ch.smbch_cn = 2;
+	ch.smbch_cn = ARRAY_SIZE(ents);
+	ch.smbch_hdr.smbh_len += ch.smbch_cn * ch.smbch_cm;
 	(void) smbios_test_table_append(table, &ch, sizeof (ch));
 	smbios_test_table_append_raw(table, ents, sizeof (ents));
 	smbios_test_chassis_mktable_append_strings(table);
@@ -156,6 +156,9 @@ smbios_test_chassis_mktable_sku_nocomps(smbios_test_table_t *table)
 	return (B_TRUE);
 }
 
+/*
+ * This is a version of the SKU with components, but none of the 3.9+ features.
+ */
 boolean_t
 smbios_test_chassis_mktable_sku(smbios_test_table_t *table)
 {
@@ -163,12 +166,13 @@ smbios_test_chassis_mktable_sku(smbios_test_table_t *table)
 	const uint8_t sku_str = 5;
 	smb_chassis_entry_t ents[2];
 
-	ch.smbch_cn = 2;
 
 	smbios_test_chassis_mktable_fill_chassis(&ch);
 	smbios_test_chassis_mktable_fill_entries(ents);
-	ch.smbch_hdr.smbh_len += sizeof (ents) + 1;
+	ch.smbch_cn = ARRAY_SIZE(ents);
+	ch.smbch_hdr.smbh_len += ch.smbch_cn * ch.smbch_cm + 1;
 	(void) smbios_test_table_append(table, &ch, sizeof (ch));
+	smbios_test_table_append_raw(table, ents, sizeof (ents));
 	smbios_test_table_append_raw(table, &sku_str, sizeof (sku_str));
 	smbios_test_chassis_mktable_append_strings(table);
 	smbios_test_table_append_string(table, smbios_chassis_sku);
@@ -177,6 +181,33 @@ smbios_test_chassis_mktable_sku(smbios_test_table_t *table)
 
 	return (B_TRUE);
 }
+
+boolean_t
+smbios_test_chassis_mktable_39(smbios_test_table_t *table)
+{
+	smb_chassis_t ch;
+	smb_chassis_entry_t ents[2];
+	smb_chassis_bonus_t b;
+
+	b.smbcb_sku = 5;
+	b.smbcb_rtype = SMB_CRT_OU;
+	b.smbcb_rheight = 0x77;
+
+	smbios_test_chassis_mktable_fill_chassis(&ch);
+	smbios_test_chassis_mktable_fill_entries(ents);
+	ch.smbch_cn = ARRAY_SIZE(ents);
+	ch.smbch_hdr.smbh_len += ch.smbch_cn * ch.smbch_cm + sizeof (b);
+	(void) smbios_test_table_append(table, &ch, sizeof (ch));
+	smbios_test_table_append_raw(table, ents, sizeof (ents));
+	smbios_test_table_append_raw(table, &b, sizeof (b));
+	smbios_test_chassis_mktable_append_strings(table);
+	smbios_test_table_append_string(table, smbios_chassis_sku);
+	smbios_test_table_str_fini(table);
+	smbios_test_table_append_eot(table);
+
+	return (B_TRUE);
+}
+
 
 boolean_t
 smbios_test_chassis_verify_invlen(smbios_hdl_t *hdl)
@@ -561,6 +592,200 @@ smbios_test_chassis_verify_sku(smbios_hdl_t *hdl)
 	if (!smbios_test_chassis_verify_common(hdl, &sp, &ch)) {
 		ret = B_FALSE;
 	}
+
+	if (ch.smbc_elems != 2) {
+		warnx("chassis state mismatch, found unexpected number of "
+		    "elements: 0x%x", ch.smbc_elems);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_elemlen != sizeof (smb_chassis_entry_t)) {
+		warnx("chassis state mismatch, found unexpected elemlen value: "
+		    "0x%x", ch.smbc_elemlen);
+		ret = B_FALSE;
+	}
+
+	if (strcmp(ch.smbc_sku, smbios_chassis_sku) != 0) {
+		warnx("chassis state mismatch, found unexpected sku: %s",
+		    ch.smbc_sku);
+		ret = B_FALSE;
+	}
+
+	if (!smbios_test_chassis_verify_common_comps(hdl, &sp)) {
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
+boolean_t
+smbios_test_chassis_verify_39(smbios_hdl_t *hdl)
+{
+	boolean_t ret = B_TRUE;
+	smbios_struct_t sp;
+	smbios_chassis_t ch;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_CHASSIS, &sp) == -1) {
+		warnx("failed to lookup SMBIOS chassis: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_chassis(hdl, sp.smbstr_id, &ch) == -1) {
+		warnx("failed to get chassis: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_chassis_verify_common(hdl, &sp, &ch)) {
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_elems != 2) {
+		warnx("chassis state mismatch, found unexpected number of "
+		    "elements: 0x%x", ch.smbc_elems);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_elemlen != sizeof (smb_chassis_entry_t)) {
+		warnx("chassis state mismatch, found unexpected elemlen value: "
+		    "0x%x", ch.smbc_elemlen);
+		ret = B_FALSE;
+	}
+
+	if (strcmp(ch.smbc_sku, smbios_chassis_sku) != 0) {
+		warnx("chassis state mismatch, found unexpected sku: %s",
+		    ch.smbc_sku);
+		ret = B_FALSE;
+	}
+
+	if (!smbios_test_chassis_verify_common_comps(hdl, &sp)) {
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_rtype != SMB_CRT_OU) {
+		warnx("chassis state mismatch, found unexpected rack type "
+		    "value: 0x%x", ch.smbc_rtype);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_rheight != 0x77) {
+		warnx("chassis state mismatch, found unexpected rack height "
+		    "value: 0x%x", ch.smbc_rheight);
+		ret = B_FALSE;
+	}
+
+	return (ret);
+}
+
+/*
+ * Verify the variant version of the table with the old embedded sku variant.
+ */
+boolean_t
+smbios_test_chassis_verify_sku_pre35(smbios_hdl_t *hdl)
+{
+	boolean_t ret = B_TRUE;
+	smbios_struct_t sp;
+	smb_chassis_pre35_t ch;
+	smbios_info_t info;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_CHASSIS, &sp) == -1) {
+		warnx("failed to lookup SMBIOS chassis: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_chassis(hdl, sp.smbstr_id,
+	    (smbios_chassis_t *)&ch) == -1) {
+		warnx("failed to get chassis: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (ch.smbc_oemdata != smbios_chassis_oem) {
+		warnx("chassis state mismatch, found unexpected oem data: 0x%x",
+		    ch.smbc_oemdata);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_lock != 0) {
+		warnx("chassis state mismatch, found unexpected lock: 0x%x",
+		    ch.smbc_lock);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_type != SMB_CHT_LUNCHBOX) {
+		warnx("chassis state mismatch, found unexpected type: 0x%x",
+		    ch.smbc_type);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_bustate != SMB_CHST_SAFE) {
+		warnx("chassis state mismatch, found unexpected boot state: "
+		    "0x%x", ch.smbc_bustate);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_psstate != SMB_CHST_NONREC) {
+		warnx("chassis state mismatch, found unexpected power state: "
+		    "0x%x", ch.smbc_psstate);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_thstate != SMB_CHST_WARNING) {
+		warnx("chassis state mismatch, found unexpected thermal state: "
+		    "0x%x", ch.smbc_thstate);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_security != SMB_CHSC_NONE) {
+		warnx("chassis state mismatch, found unexpected security "
+		    "value: 0x%x", ch.smbc_security);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_uheight != smbios_chassis_uheight) {
+		warnx("chassis state mismatch, found unexpected uheight value: "
+		    "0x%x", ch.smbc_uheight);
+		ret = B_FALSE;
+	}
+
+	if (ch.smbc_cords != smbios_chassis_uheight - 1) {
+		warnx("chassis state mismatch, found unexpected cords value: "
+		    "0x%x", ch.smbc_cords);
+		ret = B_FALSE;
+	}
+
+	if (smbios_info_common(hdl, sp.smbstr_id, &info) != 0) {
+		warnx("failed to get common chassis info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (strcmp(info.smbi_manufacturer, smbios_chassis_mfg) != 0) {
+		warnx("chassis state mismatch, found unexpected mfg: "
+		    "%s", info.smbi_manufacturer);
+		ret = B_FALSE;
+	}
+
+	if (strcmp(info.smbi_version, smbios_chassis_vers) != 0) {
+		warnx("chassis state mismatch, found unexpected version: %s",
+		    info.smbi_version);
+		ret = B_FALSE;
+	}
+
+	if (strcmp(info.smbi_serial, smbios_chassis_serial) != 0) {
+		warnx("chassis state mismatch, found unexpected serial: %s",
+		    info.smbi_serial);
+		ret = B_FALSE;
+	}
+
+	if (strcmp(info.smbi_asset, smbios_chassis_asset) != 0) {
+		warnx("chassis state mismatch, found unexpected asset: %s",
+		    info.smbi_asset);
+		ret = B_FALSE;
+	}
+
 
 	if (ch.smbc_elems != 2) {
 		warnx("chassis state mismatch, found unexpected number of "

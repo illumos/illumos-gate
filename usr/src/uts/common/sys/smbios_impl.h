@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -144,6 +144,15 @@ typedef struct smb_chassis_entry {
 	uint8_t	smbce_min;		/* minimum number of elt */
 	uint8_t	smbce_max;		/* minimum number of elt */
 } smb_chassis_entry_t;
+
+/*
+ * Bonus information that follows the variable number of elements.
+ */
+typedef struct smb_chassis_bonus {
+	uint8_t smbcb_sku;		/* chassis SKU, 2.7+ */
+	uint8_t smbcb_rtype;		/* rack type, 3.9+ */
+	uint8_t smbcb_rheight;		/* rack height, 3.9+ */
+} smb_chassis_bonus_t;
 
 #define	SMB_CHE_TYPE_IS_SMB(x)	(((x) & 0x80) ==  0x80)
 #define	SMB_CHE_TYPE_TYPE(x)	(((x) & 0x7f))

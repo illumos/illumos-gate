@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -530,10 +530,38 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 	desc_printf(smbios_chassis_state_desc(c.smbc_thstate),
 	    fp, "  Thermal State: 0x%x", c.smbc_thstate);
 
-	oprintf(fp, "  Chassis Height: %uu\n", c.smbc_uheight);
+	/*
+	 * SMBIOS 3.9 states that if the value is 0xff, that means that the
+	 * height is specified by the rack height field. This means that the
+	 * rack type also matters. We don't normalize this in the library so
+	 * that way someone can tell what unit actually is supposed to be
+	 * applied here. Otherwise in a future version of the library we could
+	 * add a height unit in addition to rack type (but would need to define
+	 * U as that doesn't exist today).
+	 */
+	const char *rtype = smbios_chassis_rack_type_desc(c.smbc_rtype);
+	if (rtype == NULL) {
+		rtype = " unknown unit";
+	}
+
+	if (c.smbc_uheight == 0xff) {
+		oprintf(fp, "  Chassis Height: %u%s\n", c.smbc_rheight, rtype);
+	} else {
+		oprintf(fp, "  Chassis Height: %uu\n", c.smbc_uheight);
+	}
 	oprintf(fp, "  Power Cords: %u\n", c.smbc_cords);
 
 	oprintf(fp, "  Element Records: %u\n", c.smbc_elems);
+
+	if (c.smbc_rtype == 0) {
+		oprintf(fp, "  Rack Type: unspecified\n");
+	} else {
+		desc_printf(smbios_chassis_rack_type_desc(c.smbc_rtype),
+		    fp, "  Rack Type: 0x%x", c.smbc_rtype);
+	}
+	if (c.smbc_rheight != 0) {
+		oprintf(fp, "  Rack Height: %u%s\n", c.smbc_rheight, rtype);
+	}
 
 	if (c.smbc_elems == 0) {
 		return;

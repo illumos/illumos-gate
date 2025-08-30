@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -539,11 +539,35 @@ static const smbios_test_t smbios_tests[] = {
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION,
-	    .st_libvers = SMB_VERSION,
-	    .st_mktable = smbios_test_chassis_mktable_sku_nocomps,
+	    .st_libvers = SMB_VERSION_38,
+	    .st_mktable = smbios_test_chassis_mktable_sku,
 	    .st_canopen = B_TRUE,
-	    .st_verify = smbios_test_chassis_verify_sku_nocomps,
-	    .st_desc = "chassis - sku + comps"
+	    .st_verify = smbios_test_chassis_verify_sku,
+	    .st_desc = "chassis - 3.8 sku + comps"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_chassis_mktable_39,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_39,
+	    .st_desc = "chassis - 3.9+ sku + comps + rack"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION_32,
+	    .st_mktable = smbios_test_chassis_mktable_39,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_sku_pre35,
+	    .st_desc = "chassis - 3.9+ sku + comps + rack, old lib (3.2)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION_36,
+	    .st_mktable = smbios_test_chassis_mktable_39,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_chassis_verify_sku,
+	    .st_desc = "chassis - 3.9+ sku + comps + rack, old lib (3.6)"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION_25,

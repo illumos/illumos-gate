@@ -40,11 +40,13 @@ OBJS32 = $(SRCS:%.c=%.32.o)
 OBJS64 = $(SRCS:%.c=%.64.o)
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
 CMDS = $(PROGS32:%=$(TESTDIR)/%) $(PROGS64:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 CSTD = $(CSTD_GNU17)
+CTF_MODE = link
 
 #
 # Since this program uses quite a number of variables declared on the
