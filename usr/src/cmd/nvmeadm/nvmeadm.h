@@ -180,6 +180,7 @@ extern void nvmeadm_dump_hex(const uint8_t *, size_t);
  */
 typedef struct {
 	const char *nloa_name;
+	di_node_t nloa_dip;
 	nvme_ctrl_info_t *nloa_ctrl;
 	nvme_ns_info_t *nloa_ns;
 	const char *nloa_disk;

@@ -343,6 +343,9 @@ nvmeadm_pass list $nt_dev,$nt_dev/1
 nvmeadm_pass list -p -o model,serial $nt_dev
 nvmeadm_pass list -p -o model,serial $nt_dev/1
 nvmeadm_pass list -p -o model,serial $nt_dev/1,$nt_dev
+nvmeadm_pass list -p -o instance,ctrlpath $nt_dev
+nvmeadm_pass list -p -o instance,ctrlpath $nt_dev/1
+nvmeadm_pass list -p -o instance,ctrlpath $nt_dev/1,$nt_dev
 nvmeadm_pass list -c
 nvmeadm_pass list -c $nt_dev
 nvmeadm_pass list -c $nt_dev/1
@@ -350,6 +353,9 @@ nvmeadm_pass list -c $nt_dev,$nt_dev/1
 nvmeadm_pass list -c -p -o model,serial $nt_dev
 nvmeadm_pass list -c -p -o model,serial $nt_dev/1
 nvmeadm_pass list -c -p -o model,serial $nt_dev/1,$nt_dev
+nvmeadm_pass list -c -p -o instance,ctrlpath $nt_dev
+nvmeadm_pass list -c -p -o instance,ctrlpath $nt_dev/1
+nvmeadm_pass list -c -p -o instance,ctrlpath $nt_dev/1,$nt_dev
 nvmeadm_pass identify $nt_dev
 nvmeadm_pass identify $nt_dev/1
 nvmeadm_pass identify $nt_dev,$nt_dev/1

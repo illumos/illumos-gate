@@ -12,7 +12,7 @@
 .\" Copyright 2025 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd April 22, 2025
+.Dd August 29, 2025
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -365,6 +365,10 @@ The controller's firmware revision.
 The version of the NVMe specification the controller supports.
 .It Sy INSTANCE
 The name of the device node and instance of it.
+.It Sy CTRLPATH
+The
+.Pa /devices
+path of the controller.
 .El
 .Pp
 In addition, the following fields can be specified when listing namespaces, not
