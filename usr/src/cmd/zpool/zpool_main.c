@@ -7362,12 +7362,14 @@ status_callback(zpool_handle_t *zhp, void *data)
 			cbp->cb_namewidth = 10;
 
 		(void) printf(gettext("config:\n\n"));
-		(void) printf(gettext("\t%-*s  %-8s %5s %5s %5s\n"),
+		(void) printf(gettext("\t%-*s  %-8s %5s %5s %5s"),
 		    cbp->cb_namewidth, "NAME", "STATE", "READ", "WRITE",
 		    "CKSUM");
 
 		if (cbp->cb_print_slow_ios)
 			(void) printf(" %5s", gettext("SLOW"));
+
+		(void) printf("\n");
 
 		print_status_config(zhp, cbp, zpool_get_name(zhp), nvroot, 0,
 		    B_FALSE);
