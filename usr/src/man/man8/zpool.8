@@ -27,8 +27,9 @@
 .\" Copyright 2021 Joyent, Inc.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
 .\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2025 Hans Rosenfeld
 .\"
-.Dd May 8, 2024
+.Dd September 6, 2025
 .Dt ZPOOL 8
 .Os
 .Sh NAME
@@ -49,7 +50,7 @@
 .Ar pool device new_device
 .Nm
 .Cm checkpoint
-.Op Fl d, -discard
+.Op Fl d , -discard
 .Ar pool
 .Nm
 .Cm clear
@@ -861,7 +862,7 @@ Multihost provides protection on import only.
 It does not protect against an
 individual device being used in multiple pools, regardless of the type of vdev.
 See the discussion under
-.Sy zpool create.
+.Sy zpool create .
 .sp
 When this property is on, periodic writes to storage occur to show the pool is
 in use.
@@ -952,7 +953,7 @@ See the
 .Sx Properties
 section for a list of valid properties that can be set.
 The only property supported at the moment is
-.Sy ashift.
+.Sy ashift .
 .El
 .It Xo
 .Nm
@@ -994,12 +995,12 @@ See the
 .Sx Properties
 section for a list of valid properties that can be set.
 The only property supported at the moment is
-.Sy ashift.
+.Sy ashift .
 .El
 .It Xo
 .Nm
 .Cm checkpoint
-.Op Fl d, -discard
+.Op Fl d , -discard
 .Ar pool
 .Xc
 Checkpoints the current state of
@@ -1026,7 +1027,7 @@ The
 .Nm zpool Cm list
 command reports how much space the checkpoint takes from the pool.
 .Bl -tag -width Ds
-.It Fl d, -discard
+.It Fl d , -discard
 Discards an existing checkpoint from
 .Ar pool
 without rewinding.
@@ -1087,7 +1088,7 @@ However this check is not robust enough
 to detect simultaneous attempts to use a new device in different pools, even if
 .Sy multihost
 is
-.Sy enabled.
+.Sy enabled .
 The
 administrator must ensure that simultaneous invocations of any combination of
 .Sy zpool replace ,
@@ -1210,7 +1211,7 @@ Sets the in-core pool name to
 while the on-disk name will be the name specified as the pool name
 .Pa pool .
 This will set the default cachefile property to
-.Sy none.
+.Sy none .
 This is intended to handle name space collisions when creating pools
 for other systems, such as virtual machines or physical machines
 whose pools live on network block devices.
@@ -1609,7 +1610,7 @@ devices, or all eligible devices in the pool if no individual devices are
 specified.
 Only leaf data or log devices may be initialized.
 .Bl -tag -width Ds
-.It Fl c, -cancel
+.It Fl c , -cancel
 Cancel initializing on the specified devices, or all eligible devices if none
 are specified.
 If one or more target devices are invalid or are not currently being
@@ -1681,8 +1682,6 @@ Specify
 for standard date format.
 See
 .Xr date 1 .
-.It Fl i
-Display vdev initialization status.
 .It Fl g
 Display vdev GUIDs instead of the normal device names.
 These GUIDs can be used in place of device names for the zpool
@@ -1929,14 +1928,14 @@ In this case, the
 command initiates the removal and returns, while the evacuation continues in
 the background.
 The removal progress can be monitored with
-.Nm zpool Cm status.
+.Nm zpool Cm status .
 This feature must be enabled to be used, see
 .Xr zpool-features 7
 .Pp
-A mirrored top-level device (log or data) can be removed by specifying the top-level mirror for the
-same.
-Non-log devices or data devices that are part of a mirrored configuration can be removed using
-the
+A mirrored top-level device (log or data) can be removed by specifying the
+top-level mirror for the same.
+Non-log devices or data devices that are part of a mirrored configuration can be
+removed using the
 .Nm zpool Cm detach
 command.
 .Bl -tag -width Ds
@@ -2171,6 +2170,8 @@ block counts and sizes by reference count.
 Display vdev GUIDs instead of the normal device names.
 These GUIDs can be used in place of device names for the zpool
 detach/offline/remove/replace commands.
+.It Fl i
+Display vdev initialization status.
 .It Fl L
 Display real paths for vdevs resolving all symbolic links.
 This can be used to look up the current block device name regardless of the
@@ -2259,7 +2260,7 @@ Controls the rate at which the TRIM operation progresses.
 Without this option TRIM is executed as quickly as possible.
 The rate, expressed in bytes per second, is applied on a per-vdev basis and
 may be set differently for each leaf vdev.
-.It Fl c, -cancel
+.It Fl c , -cancel
 Cancel trimming on the specified devices, or all eligible devices if none
 are specified.
 If one or more target devices are invalid or are not currently being
@@ -2519,7 +2520,8 @@ data        23.9G  14.6G  9.30G    48%         -    61%  1.00x  ONLINE  -
 .Bl -tag -width "ZPOOL_VDEV_NAME_GUID"
 .It Ev ZPOOL_VDEV_NAME_GUID
 Cause
-.Nm zpool subcommands to output vdev guids by default.
+.Nm zpool
+subcommands to output vdev guids by default.
 This behavior is identical to the
 .Nm zpool status -g
 command line option.
