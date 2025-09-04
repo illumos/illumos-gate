@@ -25,6 +25,7 @@
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -830,7 +831,8 @@ ip_output_cksum_v6(iaflags_t ixaflags, mblk_t *mp, ip6_t *ip6h,
 
 #define	iphs    ((uint16_t *)ip6h)
 
-	if ((ixaflags & IXAF_NO_HW_CKSUM) || !ILL_HCKSUM_CAPABLE(ill) ||
+	if ((ixaflags & (IXAF_NO_HW_CKSUM|IXAF_SET_RAW_CKSUM)) ||
+	    !ILL_HCKSUM_CAPABLE(ill) ||
 	    !dohwcksum) {
 		return (ip_output_sw_cksum_v6(mp, ip6h, ixa));
 	}
@@ -860,14 +862,6 @@ ip_output_cksum_v6(iaflags_t ixaflags, mblk_t *mp, ip6_t *ip6h,
 #endif
 			sctph->sh_chksum = sctp_cksum(mp, ip_hdr_length);
 		goto ip_hdr_cksum;
-	} else if (ixa->ixa_flags & IXAF_SET_RAW_CKSUM) {
-		/*
-		 * icmp has placed length and routing
-		 * header adjustment in the checksum field.
-		 */
-		cksump = (uint16_t *)(((uint8_t *)ip6h) + ip_hdr_length +
-		    ixa->ixa_raw_cksum_offset);
-		cksum = htons(protocol);
 	} else if (protocol == IPPROTO_ICMPV6) {
 		/*
 		 * Currently we assume no HW support for ICMP checksum calc.
