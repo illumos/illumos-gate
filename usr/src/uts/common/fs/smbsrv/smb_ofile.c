@@ -1572,7 +1572,7 @@ smb_ofile_free(smb_ofile_t *of)
 	ASSERT(of->f_state == SMB_OFILE_STATE_ALLOC);
 
 	/* Make sure it's not in the persistid hash. */
-	ASSERT(of->f_persistid == 0);
+	VERIFY(of->f_persistid == 0);
 
 	if (tree != NULL) {
 		if (of->f_fid != 0)
