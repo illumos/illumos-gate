@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -658,9 +659,10 @@ ip_verify_lso(ill_t *ill, ip_xmit_attr_t *ixa)
 
 	if (ixa->ixa_flags & IXAF_LSO_CAPAB) {
 		/*
-		 * Not unsable any more.
+		 * Not usable any more?
 		 */
-		if ((ixa->ixa_flags & IXAF_IPSEC_SECURE) ||
+		if (!dohwcksum ||
+		    (ixa->ixa_flags & IXAF_IPSEC_SECURE) ||
 		    (ixa->ixa_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) ||
 		    (ixa->ixa_ire->ire_flags & RTF_MULTIRT) ||
 		    ((ixa->ixa_flags & IXAF_IS_IPV4) ?
@@ -681,7 +683,8 @@ ip_verify_lso(ill_t *ill, ip_xmit_attr_t *ixa)
 			return (B_FALSE);
 		}
 	} else { /* Was not usable */
-		if (!(ixa->ixa_flags & IXAF_IPSEC_SECURE) &&
+		if (dohwcksum &&
+		    !(ixa->ixa_flags & IXAF_IPSEC_SECURE) &&
 		    !(ixa->ixa_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
 		    !(ixa->ixa_ire->ire_flags & RTF_MULTIRT) &&
 		    ((ixa->ixa_flags & IXAF_IS_IPV4) ?

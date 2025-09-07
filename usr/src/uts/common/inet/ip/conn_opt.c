@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2737,16 +2738,16 @@ conn_connect(conn_t *connp, iulp_t *uinfo, uint32_t flags)
 	 * We defer to do LSO check until here since now we have better idea
 	 * whether IPsec is present. If the underlying ill is LSO capable,
 	 * copy its capability in so the ULP can decide whether to enable LSO
-	 * on this connection. So far, only TCP/IPv4 is implemented, so won't
-	 * claim LSO for IPv6.
+	 * on this connection.
 	 *
 	 * Currently, won't enable LSO for IRE_LOOPBACK or IRE_LOCAL, because
-	 * the receiver can not handle it. Also not to enable LSO for MULTIRT.
+	 * the receiver can not handle it. Also won't enable LSO for MULTIRT.
 	 */
 	ixa->ixa_flags &= ~IXAF_LSO_CAPAB;
 
 	ASSERT(ixa->ixa_ire != NULL);
-	if (ixa->ixa_ipst->ips_ip_lso_outbound && (flags & IPDF_LSO) &&
+	if (dohwcksum &&
+	    ixa->ixa_ipst->ips_ip_lso_outbound && (flags & IPDF_LSO) &&
 	    !(ixa->ixa_flags & IXAF_IPSEC_SECURE) &&
 	    !(ixa->ixa_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
 	    !(ixa->ixa_ire->ire_flags & RTF_MULTIRT) &&
