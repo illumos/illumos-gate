@@ -14,12 +14,13 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Hans Rosenfeld
 #
 
 PROG =		bhyve
 
 include $(SRC)/cmd/Makefile.cmd
-include $(SRC)/cmd//Makefile.cmd.64
+include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/cmd/Makefile.ctf
 
 COMMON_OBJS = \
@@ -54,6 +55,8 @@ COMMON_OBJS = \
 	pci_virtio_console.o	\
 	pci_virtio_net.o	\
 	pci_virtio_rnd.o	\
+	pci_virtio_scsi.o	\
+	pci_virtio_scsi_uscsi.o	\
 	pci_virtio_viona.o	\
 	pci_xhci.o		\
 	privileges.o		\
@@ -74,8 +77,9 @@ COMMON_OBJS = \
 	vmgenc.o		\
 	bhyve_sol_glue.o
 
-CFLAGS +=	$(CCVERBOSE)
-CFLAGS +=	-_gcc=-Wimplicit-function-declaration
+CFLAGS64 +=	$(CCVERBOSE)
+CFLAGS64 +=	-_gcc=-Wimplicit-function-declaration
+
 CPPFLAGS =	-I../common \
 		-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
@@ -91,7 +95,9 @@ CPPFLAGS =	-I../common \
 		-DOPENSSL_API_COMPAT=10101
 
 SMOFF += all_func_returns
-rfb.o := SMOFF=
+pics/rfb.o := SMOFF=
+pics/pci_virtio_scsi_uscsi.o := SMOFF=
+pics/pci_virtio_scsi_uscsi.o := CFLAGS64 += -_gcc=-Wswitch-default
 
 CSTD=		$(CSTD_GNU99)
 
@@ -105,6 +111,7 @@ $(PROG) := LDLIBS += \
 	-lmd \
 	-lnsl \
 	-lnvpair \
+	-lscsi \
 	-lsocket \
 	-lumem \
 	-luuid \
@@ -112,6 +119,8 @@ $(PROG) := LDLIBS += \
 	-lz
 NATIVE_LIBS += libz.so libcrypto.so
 $(PROG) := LDFLAGS += $(ZASLR)
+$(PROG) := LDFLAGS += -Wl,-L$(ROOT)/usr/lib/scsi/$(MACH64)
+$(PROG) := LDFLAGS += -Wl,-R/usr/lib/scsi/$(MACH64)
 
 OBJS =		$(BHYVE_OBJS:%=pics/%)
 

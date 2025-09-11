@@ -554,6 +554,7 @@ In that case, this feature will not work as expected.
 .It
 .Oo Cm target Ns = Ns Oo ID : Oc Ar path Ns Oc
 .Oo Cm \&, Ar scsi-device-options Oc
+.Oo Cm \&, Ar backend-specific-options Oc
 .Sm on
 .El
 .Pp
@@ -581,7 +582,15 @@ All
 must be unique per instance.
 The meaning of the
 .Ar path
-argument is specific to each backend.
+argument is specific to each backend:
+.Bl -column "Backend" "/dev/cam/ctl[pp.vp]"
+.It Sy Backend Ta Sy Path Ta Sy Description
+.It uscsi Ta Pa /dev/rdsk/cXtXdX Ns Oo p0 Oc Ta
+The path to a raw whole disk node or any other SCSI target that supports the
+.Xr USCSI 4
+interface, to be configured as a target.
+There is no default path, all targets must be explicitly configured.
+.El
 .Pp
 The
 .Ar scsi-device-options
@@ -590,7 +599,9 @@ are:
 .It Cm backend= Ns Ar backend
 The virtio-scsi backend to use.
 The backend name is case-insensitive.
-There are currently no backends available.
+There is currently only one backend
+.Qq uscsi ,
+which is also the default backend.
 .It Li bootindex= Ns Ar index
 Add the device to the bootorder at
 .Ar index .
@@ -598,6 +609,12 @@ A fwcfg file is used to specify the bootorder.
 The guest firmware may ignore or doesn't support this fwcfg file.
 In that case, this feature doesn't work as expected.
 .El
+.Pp
+There are currently no
+.Ar backend-specific-options
+for the
+.Sy USCSI
+backend.
 .Pp
 .Sy 9P device backends :
 .Sm off
