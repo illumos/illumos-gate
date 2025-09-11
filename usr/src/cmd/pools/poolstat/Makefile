@@ -31,6 +31,8 @@ OBJS =		poolstat.o poolstat_utils.o sa_libpool.o sa_kstat.o
 SRCS =		$(OBJS:%.o=%.c) $(COMMON_SRCS)
 POFILES =	$(OBJS:.o=.po)
 
+CLEANFILES =	$(OBJS)
+
 include ../../Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 include ../Makefile.pools
@@ -57,6 +59,6 @@ $(PROG): $(OBJS)
 install: all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS) $(POFILES)
+	$(RM) $(CLEANFILES)
 
 include ../../Makefile.targ

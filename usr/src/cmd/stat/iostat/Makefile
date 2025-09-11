@@ -28,6 +28,8 @@ PROG = iostat
 OBJS = iostat.o
 SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 
+CLEANFILES = $(OBJS) $(COMMON_OBJS:%.o=%.c)
+
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 

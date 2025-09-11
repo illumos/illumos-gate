@@ -30,21 +30,20 @@
 include ../../Makefile.cmd
 
 COMMON_DIR=	../common	# for Makefile.com
-SRCS =		rcapadm.c \
-		rcapd_stat.c \
-		utils.c
+OBJS =		rcapadm.o $(COMMON_OBJS)
+SRCS =		$(OBJS:%.o=%.c)
+
+COMMON_OBJS =	rcapd_stat.o utils.o rcapd_conf.o
+CLEANFILES =	$(OBJS) $(COMMON_OBJS:%.o=%.c)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS	+= -DDEBUG
 CPPFLAGS			+= -I$(COMMON_DIR)
 LDLIBS				+= -lumem -lscf -lzonecfg
 
 PROG =		rcapadm
-OBJS =		$(SRCS:%.c=%.o) rcapd_conf.o
 
 POFILES =	$(OBJS:%.o=%.po)
 POFILE =	p$(PROG).po
-
-CLOBBERFILES +=	$(POFILES) $(POFILE)
 
 all: $(PROG)
 
@@ -59,8 +58,7 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
-	$(RM) $(OBJS)
-	$(RM) rcapd_conf.c
+	$(RM) $(CLEANFILES)
 
 $(ROOTUSRSBIN):
 	$(MKDIR) -p $(ROOTUSRSBIN)

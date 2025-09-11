@@ -47,6 +47,8 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 OBJS=		$(LOCALOBJS) $(COMMONOBJS)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
+CLEANFILES =	$(OBJS)
+
 include $(SRC)/cmd/stat/Makefile.stat
 
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
@@ -67,7 +69,7 @@ $(PROG): $(OBJS)
 install: all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(CLEANFILES)
 
 include ../../../Makefile.targ
 

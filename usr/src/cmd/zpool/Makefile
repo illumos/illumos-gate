@@ -31,6 +31,7 @@ OBJS= zpool_main.o zpool_vdev.o zpool_iter.o zpool_util.o
 SRCS= $(OBJS:%.o=%.c)
 POFILES=$(OBJS:%.o=%.po)
 POFILE= zpool.po
+CLEANFILES = $(OBJS)
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
@@ -65,7 +66,7 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(CLEANFILES)
 
 # Links from /usr/sbin to /sbin
 $(ROOTUSRSBINLINKS):

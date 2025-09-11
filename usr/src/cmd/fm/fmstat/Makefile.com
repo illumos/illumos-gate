@@ -34,6 +34,8 @@ SRCS += $(OBJS:%.o=%.c)
 PROG = fmstat
 ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 
+CLEANFILES = $(OBJS)
+
 include $(SRC)/cmd/stat/Makefile.stat
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
@@ -55,7 +57,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(CLEANFILES)
 
 install_h:
 

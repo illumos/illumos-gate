@@ -29,6 +29,8 @@ PROG =		cpustat
 OBJS =		$(PROG).o caps.o time.o setgrp.o strtoset.o
 SRCS =		$(OBJS:%.o=../common/%.c)
 
+CLEANFILES =	$(OBJS)
+
 include ../../Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 
@@ -51,7 +53,7 @@ $(PROG): $(OBJS)
 install: all $(ROOTUSRSBINPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(CLEANFILES)
 
 strip: all
 	$(STRIP) $(PROG)

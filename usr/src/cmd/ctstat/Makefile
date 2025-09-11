@@ -28,6 +28,8 @@ PROG= ctstat
 OBJS = ctstat.o
 SRCS = $(OBJS:%.o=%.c)
 
+CLEANFILES = $(OBJS)
+
 include ../Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 
@@ -46,6 +48,6 @@ $(PROG): $(OBJS)
 install: all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(CLEANFILES)
 
 include ../Makefile.targ

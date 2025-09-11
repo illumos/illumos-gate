@@ -41,10 +41,9 @@ CERRWARN += -_gcc=-Wno-parentheses
 
 SMOFF += strcpy_overflow
 
-%.o: $(COMMON_DIR)/%.c
+%.c:	$(COMMON_DIR)/%.c
+	$(CP) $(COMMON_DIR)/$@ $@
+
+%.o:    %.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
-
-%.po: $(COMMON_DIR)/%.c
-	$(COMPILE.cpp) $< > $<.i
-	$(BUILD.po)

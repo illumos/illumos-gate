@@ -34,6 +34,8 @@ COMMON=	nfs_sec.o
 OBJS=	nfsstat.o $(COMMON)
 SRCS=	nfsstat.c ../lib/nfs_sec.c
 
+CLEANFILES = $(OBJS)
+
 include		$(SRC)/cmd/stat/Makefile.stat
 
 CSTD= $(CSTD_GNU99)
@@ -62,6 +64,6 @@ nfs_sec.o:	../lib/nfs_sec.c
 install:	all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS)
+		$(RM) $(CLEANFILES)
 
 include ../../../Makefile.targ

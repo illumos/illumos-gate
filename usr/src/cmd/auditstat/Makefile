@@ -28,10 +28,11 @@ PROG= auditstat
 OBJS = auditstat.o
 SRCS = $(OBJS:%.o=%.c)
 
+CLEANFILES = $(OBJS)
+
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 
-MSGFILES = $(SRCS)
 POFILE = $(PROG).po
 
 LDLIBS += -lbsm
@@ -49,10 +50,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 clean:
-	$(RM) $(OBJS)
-
-$(POFILE): $(MSGFILES)
-	$(BUILDPO.msgfiles)
+	$(RM) $(CLEANFILES)
 
 _msg: $(MSGDOMAINPOFILE)
 
