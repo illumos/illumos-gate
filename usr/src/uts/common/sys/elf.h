@@ -404,9 +404,37 @@ typedef struct {
 #define	EM_MOXIE	223	/* Moxie processor family */
 #define	EM_AMDGPU	224	/* AMD GPU architecture */
 
-#define	EM_RISCV	243	/* RISC-V */
+/* 225-242 reserved */
 
-#define	EM_NUM		244
+#define	EM_RISCV	243	/* RISC-V */
+#define	EM_LANAI	244	/* Lanai processor */
+#define	EM_CEVA		245	/* CEVA Processor Architecture Family */
+#define	EM_CEVA_X2	246	/* CEVA X2 Processor Family */
+#define	EM_BPF		247	/* Linux BPF -- in-kernel virtual machine */
+#define	EM_GRAPHCORE_IPU	248 /* Graphcore Intelligent Processing Unit */
+#define	EM_IMG1		249	/* Imagination Technologies */
+#define	EM_NFP		250	/* Netronome Flow Processor */
+#define	EM_VE		251	/* NEC Vector Engine */
+#define	EM_CSKY		252	/* C-SKY processor family */
+#define	EM_ARC_COMPACT3_64	253 /* Synopsys ARCv2.3 64-bit */
+#define	EM_MCS6502	254	/* MOS Technology MCS 6502 processor */
+#define	EM_ARC_COMPACT3	255	/* Synopsys ARCv2.3 32-bit */
+#define	EM_KVX		256	/* Kalray VLIW core of the MPPA family */
+#define	EM_65816	257	/* WDC 65816/65C816 */
+#define	EM_LOONGARCH	258	/* Loongson Loongarch */
+#define	EM_KF32		259	/* ChipON KungFu32 */
+#define	EM_U16_U8CORE	260	/* LAPIS nX-U16/U8 */
+#define	EM_TACHYUM	261	/* Reserved for Tachyum processor */
+#define	EM_56800EF	262	/* NXP 56800EF Digital Signal Controller */
+#define	EM_SBF		263	/* Solana Bytecode Format */
+#define	EM_AIENGINE	264	/* AMD/Xilinx AIEngine architecture */
+#define	EM_SIMA_MLA	265	/* SiMa MLA */
+#define	EM_BANG		266	/* Cambricon BANG */
+#define	EM_LOONGGPU	267	/* Loongson LoongGPU */
+#define	EM_SW64		268	/* Wuxi Institute Of Advanced Technology SW64 */
+#define	EM_AIECTRLCODE	269	/* AMD/Xilinx AIEngine ctrlcode */
+
+#define	EM_NUM		EM_AIECTRLCODE + 1
 
 #define	EV_NONE		0		/* e_version, EI_VERSION */
 #define	EV_CURRENT	1
@@ -417,7 +445,8 @@ typedef struct {
 #define	ELFOSABI_SYSV		ELFOSABI_NONE
 #define	ELFOSABI_HPUX		1	/* Hewlett-Packard HP-UX */
 #define	ELFOSABI_NETBSD		2	/* NetBSD */
-#define	ELFOSABI_LINUX		3	/* Linux */
+#define	ELFOSABI_GNU		3	/* GNU */
+#define	ELFOSABI_LINUX		ELFOSABI_GNU	/* historical alias for GNU */
 #define	ELFOSABI_UNKNOWN4	4
 #define	ELFOSABI_UNKNOWN5	5
 #define	ELFOSABI_SOLARIS	6	/* Sun Solaris */

@@ -26,6 +26,8 @@
 #ifndef	_SGSRTCID_H
 #define	_SGSRTCID_H
 
+#include <sys/debug.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -53,12 +55,18 @@ typedef struct {
 	uchar_t	id_magic0;	/* RTC_ID_MAG0 */
 	uchar_t	id_magic1;	/* RTC_ID_MAG1 */
 	uchar_t	id_magic2;	/* RTC_ID_MAG2 */
-	uchar_t	id_magic3;	/* RTC_ID_MAG0 */
+	uchar_t	id_magic3;	/* RTC_ID_MAG3 */
 	uchar_t	id_class;	/* File class/capacity (ELFCLASS constant) */
 	uchar_t	id_data;	/* Data encoding (ELFDATA constant) */
 	uchar_t	id_machine;	/* Architecture (ELF EM_ constant) */
 	uchar_t	id_pad[9];	/* Ensure size is 16 bytes */
 } Rtc_id;
+
+/*
+ * This structure is a raw file header structured to be platform agnostic, it
+ * must always be precisely 16 bytes
+ */
+CTASSERT(sizeof (Rtc_id) == 16);
 
 #define	RTC_ID_MAG0 '\077'	/* ? */
 #define	RTC_ID_MAG1 'R'		/* Runtime */
@@ -66,12 +74,18 @@ typedef struct {
 #define	RTC_ID_MAG3 'C'		/* Configuration */
 
 /*
- * Ensure that the largest machine constant will not grow beyond
+ * Ensure that the largest relevant machine constant will not grow beyond
  * maximum value representable by an unsigned byte without our
  * being alerted to it.
+ *
+ * This is a cop out because while e_machine has grown beyond this limit, the
+ * machines illumos needs to describe have not and are unlikely to.
+ *
+ * A more complete implementation would introduce an id_machinehi into the
+ * padding, to hold the high byte.
  */
-#if EM_NUM > 256
-#error "Maximum machine constant size exceeded. Format requires revision."
+#if !defined(__x86) && !defined(__sparc__)
+#error "Ensure machine constant fits in a byte. Format may require revision."
 #endif
 
 /*

@@ -1162,10 +1162,36 @@ print_elf_machine(int machine)
 		[EM_FT32] = "FT32",
 		[EM_MOXIE] = "Moxie",
 		[EM_AMDGPU] = "AMD GPU",
-		[EM_RISCV] = "RISC-V"
+		[EM_RISCV] = "RISC-V",
+		[EM_LANAI] = "Lanai",
+		[EM_CEVA] = "CEVA",
+		[EM_CEVA_X2] = "CEVA X2",
+		[EM_BPF] = "Linux BPF",
+		[EM_GRAPHCORE_IPU] = "Graphcore IPU",
+		[EM_IMG1] = "Imagination Technologies",
+		[EM_NFP] = "Netronome Flow Processor",
+		[EM_VE] = "NEC Vector Engine",
+		[EM_CSKY] = "C-SKY",
+		[EM_ARC_COMPACT3_64] = "ARCv2.3 (64-bit)",
+		[EM_MCS6502] = "MCS6502",
+		[EM_ARC_COMPACT3] = "ARCv2.3 (32-bit)",
+		[EM_KVX] = "Kalray KVX",
+		[EM_65816] = "WDC 65816/65C816",
+		[EM_LOONGARCH] = "Loongarch",
+		[EM_KF32] = "KungFu32",
+		[EM_U16_U8CORE] = "nX-U16/U8",
+		[EM_TACHYUM] = "Tachyum",
+		[EM_56800EF] = "NXP 56800EF",
+		[EM_SBF] = "Solana Bytecode",
+		[EM_AIENGINE] = "AMD/Xilinx AIEngine",
+		[EM_SIMA_MLA] = "SiMa MLA",
+		[EM_BANG] = "BANG",
+		[EM_LOONGGPU] = "LoongGPU",
+		[EM_SW64] = "SW64",
+		[EM_AIECTRLCODE] = "AMD/Xilinx AIEngine ctrlcode",
 	};
 	/* If new machine is added, refuse to compile until we're updated */
-#if EM_NUM != 244
+#if EM_NUM != (EM_AIECTRLCODE + 1)
 #error "Number of known ELF machine constants has changed"
 #endif
 
