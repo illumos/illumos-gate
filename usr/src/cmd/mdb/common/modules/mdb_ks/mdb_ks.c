@@ -22,6 +22,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -36,6 +37,7 @@
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ks.h>
 
 #include <sys/types.h>
@@ -804,15 +806,23 @@ mdb_page2pfn(uintptr_t addr)
 	return (page.p_pagenum);
 }
 
+struct a2m_ctf_module {
+	char *text;
+	char *data;
+	size_t text_size;
+	size_t data_size;
+};
+
 static int
 a2m_walk_modctl(uintptr_t addr, const struct modctl *m, a2m_query_t *a2m)
 {
-	struct module mod;
+	struct a2m_ctf_module mod;
 
 	if (m->mod_mp == NULL)
 		return (0);
 
-	if (mdb_vread(&mod, sizeof (mod), (uintptr_t)m->mod_mp) == -1) {
+	if (mdb_ctf_vread(&mod, "struct module", "struct a2m_ctf_module",
+	    (uintptr_t)m->mod_mp, 0) == -1) {
 		mdb_warn("couldn't read modctl %p's module", addr);
 		return (0);
 	}

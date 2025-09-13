@@ -53,12 +53,14 @@
 #include <sys/dumphdr.h>
 #include <sys/dumpadm.h>
 #include <sys/uuid.h>
+#include <sys/stdbool.h>
 
 #include <dlfcn.h>
 #include <libctf.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stddef.h>
 
 #include <mdb/mdb_target_impl.h>
 #include <mdb/mdb_err.h>
@@ -115,6 +117,43 @@ kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
 	km->km_symtab = mdb_gelf_symtab_create_raw(&kt->k_file->gf_ehdr,
 	    &km->km_symtab_hdr, km->km_symbuf,
 	    &km->km_strtab_hdr, km->km_strtab, MDB_TGT_SYMTAB);
+}
+
+static bool
+kt_adjust_module(const struct modctl *ctl, struct module *kmod)
+{
+	/*
+	 * "struct module" was changed in illumos 17467 to accommodate
+	 * data from an extended ELF header. Unfortunately the new
+	 * fields were inserted into the middle of the structure
+	 * instead of the end where things would have been much easier
+	 * for us. In case we are loading a crash dump from an older
+	 * kernel everything will be misaligned from where we expect it
+	 * to be. Attempt to detect such cases and fix things up so we
+	 * can still load the module. Using CTF is not an option at
+	 * this point as we need to parse the module in order to find
+	 * its CTF data.
+	 */
+	if (kmod->text == ctl->mod_text &&
+	    kmod->text_size == ctl->mod_text_size) {
+		return (true);
+	}
+
+	bcopy(&kmod->shnum, &kmod->shdrs,
+	    sizeof (struct module) - offsetof(struct module, shdrs));
+
+	if (kmod->text != ctl->mod_text ||
+	    kmod->text_size != ctl->mod_text_size) {
+		mdb_printf("couldn't adjust old modctl %p's module",
+		    (void *)ctl->mod_mp);
+		return (false);
+	}
+
+	kmod->shnum = kmod->hdr.e_shnum;
+	kmod->phnum = kmod->hdr.e_phnum;
+	kmod->shstrndx = kmod->hdr.e_shstrndx;
+
+	return (true);
 }
 
 static void
@@ -178,6 +217,9 @@ kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 			    (void *)ctl.mod_mp);
 			continue;
 		}
+
+		if (!kt_adjust_module(&ctl, &kmod))
+			continue;
 
 		if (kmod.symspace == NULL || kmod.symhdr == NULL ||
 		    kmod.strhdr == NULL) {

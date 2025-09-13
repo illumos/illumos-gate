@@ -24,6 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Racktop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -35,6 +36,7 @@
 
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ks.h>
 #include <sys/dtrace_impl.h>
 #include <sys/vmem_impl.h>
@@ -765,15 +767,21 @@ dtracemdb_ioctl(void *varg, int cmd, void *arg)
 	}
 }
 
+struct dtrace_ctf_module {
+	char *text;
+	size_t text_size;
+};
+
 static int
 dtracemdb_modctl(uintptr_t addr, const struct modctl *m, dtracemdb_data_t *data)
 {
-	struct module mod;
+	struct dtrace_ctf_module mod;
 
 	if (m->mod_mp == NULL)
 		return (WALK_NEXT);
 
-	if (mdb_vread(&mod, sizeof (mod), (uintptr_t)m->mod_mp) == -1) {
+	if (mdb_ctf_vread(&mod, "struct module", "struct dtrace_ctf_module",
+	    (uintptr_t)m->mod_mp, 0) == -1) {
 		mdb_warn("couldn't read modctl %p's module", addr);
 		return (WALK_NEXT);
 	}

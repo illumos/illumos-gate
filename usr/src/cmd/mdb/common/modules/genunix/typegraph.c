@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2025 Oxide Computer Company
+ */
+
+/*
  * Postmortem type identification
  * ------------------------------
  *
@@ -344,6 +348,14 @@ static hrtime_t tg_start;	/* start time */
 static int tg_improved;		/* flag indicating that we have improved */
 static int tg_built;		/* flag indicating that type graph is built */
 static uint_t tg_verbose;	/* flag to increase verbosity */
+
+struct typegraph_ctf_module {
+	unsigned int nsyms;
+	char *data;
+	uintptr_t bss;
+	size_t data_size;
+	size_t bss_size;
+};
 
 static mdb_ctf_id_t typegraph_type_offset(mdb_ctf_id_t, size_t,
     tg_edge_t *, const char **);
@@ -1000,12 +1012,13 @@ typegraph_estimate(uintptr_t addr, const kmem_cache_t *c, size_t *est)
 static int
 typegraph_estimate_modctl(uintptr_t addr, const struct modctl *m, size_t *est)
 {
-	struct module mod;
+	struct typegraph_ctf_module mod;
 
 	if (m->mod_mp == NULL)
 		return (WALK_NEXT);
 
-	if (mdb_vread(&mod, sizeof (mod), (uintptr_t)m->mod_mp) == -1) {
+	if (mdb_ctf_vread(&mod, "struct module", "struct typegraph_ctf_module",
+	    (uintptr_t)m->mod_mp, 0) == -1) {
 		mdb_warn("couldn't read modctl %p's module", addr);
 		return (WALK_NEXT);
 	}
@@ -2275,14 +2288,15 @@ typegraph_allpass(int first)
 static int
 typegraph_modctl(uintptr_t addr, const struct modctl *m, int *ignored)
 {
-	struct module mod;
+	struct typegraph_ctf_module mod;
 	tg_node_t *node;
 	mdb_ctf_id_t type;
 
 	if (m->mod_mp == NULL)
 		return (WALK_NEXT);
 
-	if (mdb_vread(&mod, sizeof (mod), (uintptr_t)m->mod_mp) == -1) {
+	if (mdb_ctf_vread(&mod, "struct module", "struct typegraph_ctf_module",
+	    (uintptr_t)m->mod_mp, 0) == -1) {
 		mdb_warn("couldn't read modctl %p's module", addr);
 		return (WALK_NEXT);
 	}

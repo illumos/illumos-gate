@@ -26,7 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <mdb/mdb_param.h>
@@ -2494,17 +2494,32 @@ whatis_modctl_match(mdb_whatis_t *w, const char *name,
 		mdb_whatis_report_address(w, cur, "in %s's %s\n", name, where);
 }
 
+struct kmem_ctf_module {
+	Shdr *symhdr;
+	char *symtbl;
+	unsigned int nsyms;
+	char *symspace;
+	size_t symsize;
+	char *text;
+	char *data;
+	uintptr_t bss;
+	size_t text_size;
+	size_t data_size;
+	size_t bss_size;
+};
+
 static int
 whatis_walk_modctl(uintptr_t addr, const struct modctl *m, mdb_whatis_t *w)
 {
 	char name[MODMAXNAMELEN];
-	struct module mod;
+	struct kmem_ctf_module mod;
 	Shdr shdr;
 
 	if (m->mod_mp == NULL)
 		return (WALK_NEXT);
 
-	if (mdb_vread(&mod, sizeof (mod), (uintptr_t)m->mod_mp) == -1) {
+	if (mdb_ctf_vread(&mod, "struct module", "struct kmem_ctf_module",
+	    (uintptr_t)m->mod_mp, 0) == -1) {
 		mdb_warn("couldn't read modctl %p's module", addr);
 		return (WALK_NEXT);
 	}

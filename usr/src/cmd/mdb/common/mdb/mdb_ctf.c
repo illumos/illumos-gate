@@ -1680,7 +1680,12 @@ mdb_ctf_vread(void *modbuf, const char *target_typename,
 	mdb_module_t *mod;
 	int ret;
 
-	if ((mod = mdb_get_module()) == NULL || (mfp = mod->mod_ctfp) == NULL) {
+	if ((mod = mdb_get_module()) == NULL) {
+		mdb_ctf_warn(flags, "could not get MDB module");
+		return (set_errno(EMDB_NOCTF));
+	}
+
+	if ((mfp = mod->mod_ctfp) == NULL) {
 		mdb_ctf_warn(flags, "no ctf data found for mdb module %s\n",
 		    mod->mod_name);
 		return (set_errno(EMDB_NOCTF));
