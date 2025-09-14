@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Hans Rosenfeld
  */
 
 #include <sys/types.h>
@@ -193,6 +194,12 @@ libscsi_hdl_t *
 libscsi_init(uint_t version, libscsi_errno_t *errp)
 {
 	libscsi_hdl_t *hp;
+
+	if (version != LIBSCSI_VERSION) {
+		if (errp != NULL)
+			*errp = ESCSI_VERSION;
+		return (NULL);
+	}
 
 	if ((hp = malloc(sizeof (libscsi_hdl_t))) == NULL) {
 		if (errp != NULL)
