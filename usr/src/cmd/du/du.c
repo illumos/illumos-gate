@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * du -- summarize disk usage
@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/avl.h>
+#include <sys/sysmacros.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <limits.h>
@@ -72,23 +73,21 @@ static size_t		name_len = PATH_MAX + 1;    /* # of chars for name */
  */
 #ifdef XPG4
 #define	FORMAT1	"%s %s\n"
-#define	FORMAT2	"%lld %s\n"
+#define	FORMAT2	"%llu %s\n"
 #else
 #define	FORMAT1	"%s\t%s\n"
-#define	FORMAT2	"%lld\t%s\n"
+#define	FORMAT2	"%llu\t%s\n"
 #endif
 
 /*
- * convert DEV_BSIZE blocks to K blocks
+ * convert bytes to blocks
  */
-#define	DEV_BSIZE	512
-#define	DEV_KSHIFT	1
-#define	DEV_MSHIFT	11
-#define	kb(n)		(((u_longlong_t)(n)) >> DEV_KSHIFT)
-#define	mb(n)		(((u_longlong_t)(n)) >> DEV_MSHIFT)
+#define	DEV_BSHIFT	9
+#define	DEV_KSHIFT	10
+#define	DEV_MSHIFT	20
 
 long	wait();
-static u_longlong_t 	descend(char *curname, int curfd, int *retcode,
+static u_longlong_t	descend(char *curname, int curfd, int *retcode,
 			    dev_t device);
 static void		printsize(blkcnt_t blocks, char *path);
 static void		exitdu(int exitcode);
@@ -526,24 +525,41 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 		return (blocks);
 }
 
+static u_longlong_t
+mkb(blkcnt_t n, size_t shift)
+{
+	u_longlong_t v = (u_longlong_t)n;
+
+	/*
+	 * If hflg was not used, we need to output number of blocks
+	 * rounded up. Block sizes can be 1M, 1K or 512 bytes.
+	 * First, convert blocks to 1 byte units and then round up.
+	 */
+	if (!Aflg)
+		v <<= DEV_BSHIFT;
+
+	return (P2ROUNDUP(v, 1 << shift) >> shift);
+}
+
 static void
 printsize(blkcnt_t blocks, char *path)
 {
-	u_longlong_t bsize;
-
-	bsize = Aflg ? 1 : DEV_BSIZE;
-
 	if (hflg) {
-	char buf[NN_NUMBUF_SZ] = { 0 };
+		u_longlong_t bsize = Aflg ? 1 : (1 << DEV_BSHIFT);
 
-	nicenum_scale(blocks, bsize, buf, sizeof (buf), 0);
-	(void) printf(FORMAT1, buf, path);
-	} else if (kflg) {
-		(void) printf(FORMAT2, (long long)kb(blocks), path);
+		char buf[NN_NUMBUF_SZ] = { 0 };
+
+		nicenum_scale(blocks, bsize, buf, sizeof (buf), 0);
+		(void) printf(FORMAT1, buf, path);
+		return;
+	}
+
+	if (kflg) {
+		(void) printf(FORMAT2, mkb(blocks, DEV_KSHIFT), path);
 	} else if (mflg) {
-		(void) printf(FORMAT2, (long long)mb(blocks), path);
+		(void) printf(FORMAT2, mkb(blocks, DEV_MSHIFT), path);
 	} else {
-		(void) printf(FORMAT2, (long long)blocks, path);
+		(void) printf(FORMAT2, mkb(blocks, DEV_BSHIFT), path);
 	}
 }
 
