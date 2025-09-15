@@ -1375,6 +1375,9 @@ file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.s mode=0444
 dir  path=opt/util-tests/tests/dis/sparc
 file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0444
 file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0444
+dir  path=opt/util-tests/tests/du
+file path=opt/util-tests/tests/du/du.kshlib mode=0555
+file path=opt/util-tests/tests/du/dutest mode=0555
 dir  path=opt/util-tests/tests/files
 file path=opt/util-tests/tests/files/cout0 mode=0444
 file path=opt/util-tests/tests/files/cout1 mode=0444

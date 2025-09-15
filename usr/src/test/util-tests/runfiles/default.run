@@ -25,6 +25,8 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
+[/opt/util-tests/tests/du/dutest]
+
 [/opt/util-tests/tests/iconv_test]
 [/opt/util-tests/tests/printf_test]
 

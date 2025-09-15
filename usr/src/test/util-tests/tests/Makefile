@@ -16,6 +16,7 @@
 # Copyright 2017 Jason King
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2025 Edgecast Cloud LLC
 #
 
 SUBDIRS =		\
@@ -29,6 +30,7 @@ SUBDIRS =		\
 	demangle	\
 	dis		\
 	dladm		\
+	du		\
 	find		\
 	grep_xpg4	\
 	head		\
