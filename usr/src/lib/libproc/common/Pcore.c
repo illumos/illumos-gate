@@ -29,6 +29,7 @@
  * Copyright 2015 Gary Mills
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 #include <sys/types.h>
@@ -2711,9 +2712,17 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		goto err;
 	}
 
+	/*
+	 * Now that we can get AT_PAGESZ we can fill in the correct pr_pagesize
+	 * for each mapping.
+	 */
 	if ((pagesize = Pgetauxval(P, AT_PAGESZ)) == -1) {
 		pagesize = getpagesize();
 		Pdprintf("AT_PAGESZ missing; defaulting to %d\n", pagesize);
+	}
+
+	for (i = 0; i < P->map_count; i++) {
+		P->mappings[i].map_pmap.pr_pagesize = pagesize;
 	}
 
 	/*
