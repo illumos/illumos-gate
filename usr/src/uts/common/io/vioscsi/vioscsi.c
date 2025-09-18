@@ -13,6 +13,7 @@
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Hans Rosenfeld
  */
 
 #include "vioscsi.h"
@@ -39,6 +40,8 @@ static void vioscsi_req_fini(vioscsi_request_t *);
 static boolean_t vioscsi_req_abort(vioscsi_softc_t *, vioscsi_request_t *);
 static void vioscsi_lun_changed(vioscsi_softc_t *sc, uint8_t target);
 static void vioscsi_discover(void *);
+
+static void *vioscsi_state;
 
 /*
  * DMA attributes. We support a linked list, but most of our uses require a
@@ -110,11 +113,13 @@ vioscsi_tmf(vioscsi_softc_t *sc, uint32_t func, uint8_t target, uint16_t lun,
 	virtio_chain_clear(req.vr_vic);
 	if (virtio_chain_append(req.vr_vic, req.vr_req_pa, sizeof (*tmf),
 	    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS) {
+		virtio_chain_clear(req.vr_vic);
 		return (B_FALSE);
 	}
 
 	if (virtio_chain_append(req.vr_vic, req.vr_res_pa, sizeof (*res),
 	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
+		virtio_chain_clear(req.vr_vic);
 		return (B_FALSE);
 	}
 
@@ -393,9 +398,8 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * Add request header:
 	 */
 	if (virtio_chain_append(vic, req->vr_req_pa, sizeof (*cmd),
-	    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS) {
-		return (TRAN_BUSY);
-	}
+	    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS)
+		goto busy;
 
 	/*
 	 * Add write buffers:
@@ -405,9 +409,8 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			if (virtio_chain_append(vic,
 			    pkt->pkt_cookies[i].dmac_laddress,
 			    pkt->pkt_cookies[i].dmac_size,
-			    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS) {
-				return (TRAN_BUSY);
-			}
+			    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS)
+				goto busy;
 		}
 	}
 
@@ -415,9 +418,8 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * Add response header:
 	 */
 	if (virtio_chain_append(vic, req->vr_res_pa, sizeof (*res),
-	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
-		return (TRAN_BUSY);
-	}
+	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS)
+		goto busy;
 
 	/*
 	 * Add read buffers:
@@ -427,9 +429,8 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			if (virtio_chain_append(vic,
 			    pkt->pkt_cookies[i].dmac_laddress,
 			    pkt->pkt_cookies[i].dmac_size,
-			    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
-				return (TRAN_BUSY);
-			}
+			    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS)
+				goto busy;
 		}
 	}
 
@@ -439,8 +440,9 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	mutex_enter(&vd->vd_lock);
 	if (vd->vd_num_cmd >= vd->vd_max_cmd) {
 		mutex_exit(&vd->vd_lock);
-		return (TRAN_BUSY);
+		goto busy;
 	}
+
 	vd->vd_num_cmd++;
 
 	if (!req->vr_poll) {
@@ -480,6 +482,10 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	vioscsi_start(vd->vd_sc, req);
 	return (TRAN_ACCEPT);
+
+busy:
+	virtio_chain_clear(vic);
+	return (TRAN_BUSY);
 }
 
 static int
@@ -603,6 +609,14 @@ vioscsi_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 	switch (scsi_hba_lookup_capstr(cap)) {
 	case SCSI_CAP_CDB_LEN:
 		rval = sc->vs_cdb_size;
+		break;
+
+	case SCSI_CAP_DMA_MAX:
+		rval = sc->vs_tran->tran_dma_attr.dma_attr_maxxfer;
+		break;
+
+	case SCSI_CAP_INTERCONNECT_TYPE:
+		rval = sc->vs_tran->tran_interconnect_type;
 		break;
 
 	case SCSI_CAP_ARQ:
@@ -799,6 +813,8 @@ vioscsi_cmd_handler(caddr_t arg1, caddr_t arg2)
 		struct scsi_pkt *pkt;
 		struct virtio_scsi_cmd_resp *res;
 
+		virtio_chain_clear(vic);
+
 		if ((req = virtio_chain_data(vic)) == NULL) {
 			/*
 			 * This should never occur, it's a bug if it does.
@@ -832,6 +848,8 @@ vioscsi_cmd_handler(caddr_t arg1, caddr_t arg2)
 			mutex_exit(&vd->vd_lock);
 		}
 
+		pkt->pkt_state = STATE_GOT_BUS;
+
 		switch (res->response) {
 
 		case VIRTIO_SCSI_S_OK:
@@ -841,9 +859,8 @@ vioscsi_cmd_handler(caddr_t arg1, caddr_t arg2)
 			pkt->pkt_scbp[0] = res->status;
 			pkt->pkt_resid = 0;
 			pkt->pkt_reason = CMD_CMPLT;
-			pkt->pkt_state =
-			    STATE_GOT_BUS | STATE_GOT_TARGET |
-			    STATE_SENT_CMD | STATE_GOT_STATUS;
+			pkt->pkt_state |= STATE_GOT_TARGET | STATE_SENT_CMD |
+			    STATE_GOT_STATUS;
 			if ((pkt->pkt_numcookies > 0) &&
 			    (pkt->pkt_cookies[0].dmac_size > 0)) {
 				pkt->pkt_state |= STATE_XFERRED_DATA;
@@ -867,26 +884,32 @@ vioscsi_cmd_handler(caddr_t arg1, caddr_t arg2)
 				    STATE_GOT_STATUS | STATE_SENT_CMD |
 				    STATE_XFERRED_DATA;
 				bcopy(res->sense, &ars->sts_sensedata,
-				    res->sense_len);
+				    MIN(sizeof (ars->sts_sensedata),
+				    MIN(sc->vs_sense_size, res->sense_len)));
 			}
 			break;
 
 		case VIRTIO_SCSI_S_BAD_TARGET:
 		case VIRTIO_SCSI_S_INCORRECT_LUN:
+		case VIRTIO_SCSI_S_TRANSPORT_FAILURE:
+		case VIRTIO_SCSI_S_TARGET_FAILURE:
 			pkt->pkt_reason = CMD_DEV_GONE;
 			break;
 
 		case VIRTIO_SCSI_S_OVERRUN:
 			dev_err(sc->vs_dip, CE_WARN, "OVERRUN");
 			pkt->pkt_reason = CMD_DATA_OVR;
+			pkt->pkt_state |= STATE_GOT_TARGET | STATE_SENT_CMD;
 			break;
 
 		case VIRTIO_SCSI_S_RESET:
 			pkt->pkt_reason = CMD_RESET;
+			pkt->pkt_state |= STATE_GOT_TARGET | STATE_SENT_CMD;
 			pkt->pkt_statistics |= STAT_DEV_RESET;
 			break;
 
 		case VIRTIO_SCSI_S_ABORTED:
+			pkt->pkt_state |= STATE_GOT_TARGET | STATE_SENT_CMD;
 			if (req->vr_expired) {
 				pkt->pkt_statistics |= STAT_TIMEOUT;
 				pkt->pkt_reason = CMD_TIMEOUT;
@@ -903,13 +926,17 @@ vioscsi_cmd_handler(caddr_t arg1, caddr_t arg2)
 			pkt->pkt_reason = CMD_TRAN_ERR;
 			break;
 
+		case VIRTIO_SCSI_S_NEXUS_FAILURE:
+		case VIRTIO_SCSI_S_FAILURE:
+			pkt->pkt_reason = CMD_TRAN_ERR;
+			break;
+
 		default:
 			dev_err(sc->vs_dip, CE_WARN, "Unknown response: 0x%x",
 			    res->response);
 			pkt->pkt_reason = CMD_TRAN_ERR;
 			break;
 		}
-
 
 		if (!req->vr_poll) {
 			scsi_hba_pkt_comp(pkt);
@@ -1142,9 +1169,7 @@ vioscsi_discover(void *arg)
 static void
 vioscsi_teardown(vioscsi_softc_t *sc, boolean_t failed)
 {
-	if (sc->vs_virtio != NULL) {
-		virtio_fini(sc->vs_virtio, failed);
-	}
+	int instance = ddi_get_instance(sc->vs_dip);
 
 	/*
 	 * Free up the event resources:
@@ -1159,6 +1184,10 @@ vioscsi_teardown(vioscsi_softc_t *sc, boolean_t failed)
 		}
 	}
 
+	if (sc->vs_virtio != NULL) {
+		virtio_fini(sc->vs_virtio, failed);
+	}
+
 	if (sc->vs_tran != NULL) {
 		scsi_hba_tran_free(sc->vs_tran);
 	}
@@ -1168,7 +1197,7 @@ vioscsi_teardown(vioscsi_softc_t *sc, boolean_t failed)
 	if (sc->vs_intr_pri != NULL) {
 		mutex_destroy(&sc->vs_lock);
 	}
-	kmem_free(sc, sizeof (*sc));
+	ddi_soft_state_free(vioscsi_state, instance);
 }
 
 static int
@@ -1178,6 +1207,7 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vioscsi_softc_t *sc;
 	virtio_t *vio;
 	ddi_dma_attr_t attr;
+	int instance;
 
 	if (cmd != DDI_ATTACH) { /* no suspend/resume support */
 		return (DDI_FAILURE);
@@ -1187,7 +1217,12 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (vioscsi_iport_attach(dip));
 	}
 
-	sc = kmem_zalloc(sizeof (*sc), KM_SLEEP);
+	instance = ddi_get_instance(dip);
+
+	if (ddi_soft_state_zalloc(vioscsi_state, instance) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	sc = ddi_get_soft_state(vioscsi_state, instance);
 	sc->vs_dip = dip;
 
 	list_create(&sc->vs_devs, sizeof (vioscsi_dev_t),
@@ -1238,31 +1273,79 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	if (!virtio_features_present(vio, VIOSCSI_NEEDED_FEATURES)) {
+		dev_err(dip, CE_WARN, "need features %b, have %b",
+		    VIOSCSI_NEEDED_FEATURES, VIOSCSI_FEATURE_FORMAT,
+		    virtio_features(vio), VIOSCSI_FEATURE_FORMAT);
+		vioscsi_teardown(sc, B_TRUE);
+		return (DDI_FAILURE);
+	}
 	/*
 	 * Get virtio parameters:
 	 */
+	sc->vs_num_queues = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_NUM_QUEUES);
+	sc->vs_seg_max = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_SEG_MAX);
+	sc->vs_max_sectors = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_MAX_SECTORS);
+	sc->vs_cmd_per_lun = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_CMD_PER_LUN);
+	sc->vs_evi_size = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_EVI_SIZE);
+	sc->vs_sense_size = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_SENSE_SIZE);
+	sc->vs_cdb_size = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_CDB_SIZE);
+	sc->vs_max_channel = virtio_dev_get16(vio, VIRTIO_SCSI_CFG_MAX_CHANNEL);
 	sc->vs_max_target = virtio_dev_get16(vio, VIRTIO_SCSI_CFG_MAX_TARGET);
 	sc->vs_max_lun = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_MAX_LUN);
-	sc->vs_cdb_size = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_CDB_SIZE);
-	sc->vs_max_seg = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_SEG_MAX);
-	sc->vs_cmd_per_lun = virtio_dev_get32(vio, VIRTIO_SCSI_CFG_CMD_PER_LUN);
 
 	/*
-	 * Adjust operating parameters to functional limits:
+	 * Check virtio parameter sanity.
 	 */
-	sc->vs_max_target = min(VIOSCSI_MAX_TARGET, sc->vs_max_target);
-	sc->vs_cmd_per_lun = max(1, sc->vs_max_target);
-	sc->vs_max_seg = max(VIOSCSI_MIN_SEGS, sc->vs_max_seg);
+#define	VIOSCSI_CHECK(var, op, val)					\
+	do {								\
+		if (!(sc->vs_ ##var op val)) {				\
+			dev_err(dip, CE_WARN,				\
+			    "!device config error: "#var" = %lx "	\
+			    "(want "#op" %lx)", (uint64_t)sc->vs_ ##var,\
+			    (uint64_t)val);				\
+			sc->vs_ ##var = val;				\
+		}							\
+	} while (0)
 
 	/*
-	 * Allocate queues:
+	 * max_sectors determines the maxxfer size of our DMA attributes.
+	 * This needs to be at least PAGESIZE. The virtio spec doesn't spell
+	 * it out explicitly, but max_sectors is in units of 512 bytes.
+	 */
+	VIOSCSI_CHECK(max_sectors, >=, 1 << (PAGESHIFT - 9));
+
+	/*
+	 * seg_max is the maximum number of data segments (aka SGL entries)
+	 * the device can handle in a single command. (If we supported INOUT,
+	 * each command can have seg_max input segments and seg_max output
+	 * segments, but we don't.)
+	 *
+	 * We cap this at VIOSCSI_MAX_SEGS just in case.
+	 *
+	 * This does not include the 2 segments needed for input and output
+	 * headers, hence we add 2 in the call to virtio_queue_alloc() below.
+	 */
+	VIOSCSI_CHECK(seg_max, >=, VIOSCSI_MIN_SEGS);
+	VIOSCSI_CHECK(seg_max, <=, VIOSCSI_MAX_SEGS);
+	VIOSCSI_CHECK(cmd_per_lun, >=, 1);
+	VIOSCSI_CHECK(evi_size, <=, sizeof (vioscsi_evt_t));
+	VIOSCSI_CHECK(cdb_size, ==, VIRTIO_SCSI_CDB_SIZE);
+	VIOSCSI_CHECK(sense_size, ==, VIRTIO_SCSI_SENSE_SIZE);
+	VIOSCSI_CHECK(max_channel, ==, 0);
+	VIOSCSI_CHECK(max_target, <=, VIOSCSI_MAX_TARGET - 1);
+	VIOSCSI_CHECK(max_lun, <=, VIOSCSI_MAX_LUN - 1);
+#undef	VIOSCSI_CHECK
+
+	/*
+	 * Allocate queues
 	 */
 	sc->vs_ctl_vq = virtio_queue_alloc(vio, 0, "ctl",
-	    vioscsi_ctl_handler, sc, B_FALSE, sc->vs_max_seg);
+	    vioscsi_ctl_handler, sc, B_FALSE, sc->vs_seg_max + 2);
 	sc->vs_evt_vq = virtio_queue_alloc(vio, 1, "evt",
-	    vioscsi_evt_handler, sc, B_FALSE, sc->vs_max_seg);
+	    vioscsi_evt_handler, sc, B_FALSE, sc->vs_seg_max + 2);
 	sc->vs_cmd_vq = virtio_queue_alloc(vio, 2, "cmd",
-	    vioscsi_cmd_handler, sc, B_FALSE, sc->vs_max_seg);
+	    vioscsi_cmd_handler, sc, B_FALSE, sc->vs_seg_max + 2);
 
 	if ((sc->vs_ctl_vq == NULL) || (sc->vs_evt_vq == NULL) ||
 	    (sc->vs_cmd_vq == NULL)) {
@@ -1313,11 +1396,10 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * Maximum number of segments, subtract two needed for headers:
-	 */
+	/* Adjust DMA limits. */
 	attr = virtio_dma_attr;
-	attr.dma_attr_sgllen = sc->vs_max_seg - 2;
+	attr.dma_attr_sgllen = sc->vs_seg_max;
+	attr.dma_attr_maxxfer = (uint64_t)sc->vs_max_sectors << 9;
 
 	if (scsi_hba_attach_setup(dip, &attr, tran,
 	    SCSI_HBA_ADDR_COMPLEX | SCSI_HBA_HBA |
@@ -1554,6 +1636,10 @@ _init(void)
 	 */
 	vioscsi_hz = drv_usectohz(1000000);
 
+	err = ddi_soft_state_init(&vioscsi_state, sizeof (vioscsi_softc_t), 1);
+	if (err != DDI_SUCCESS)
+		return (err);
+
 	if ((err = scsi_hba_init(&modlinkage)) != 0) {
 		return (err);
 	}
@@ -1576,6 +1662,7 @@ _fini(void)
 	}
 
 	scsi_hba_fini(&modlinkage);
+	ddi_soft_state_fini(&vioscsi_state);
 
 	return (DDI_SUCCESS);
 }

@@ -503,7 +503,7 @@ vioblk_bd_flush(void *arg, bd_xfer_t *xfer)
 	int r;
 
 	mutex_enter(&vib->vib_mutex);
-	if (!virtio_feature_present(vib->vib_virtio, VIRTIO_BLK_F_FLUSH)) {
+	if (!virtio_features_present(vib->vib_virtio, VIRTIO_BLK_F_FLUSH)) {
 		/*
 		 * We don't really expect to get here, because if we did not
 		 * negotiate the flush feature we would not have installed this
@@ -868,7 +868,7 @@ vioblk_read_capacity(vioblk_t *vib)
 	 * This size is advisory; the protocol always deals in 512 byte blocks.
 	 */
 	vib->vib_blk_size = DEV_BSIZE;
-	if (virtio_feature_present(vio, VIRTIO_BLK_F_BLK_SIZE)) {
+	if (virtio_features_present(vio, VIRTIO_BLK_F_BLK_SIZE)) {
 		uint32_t v = virtio_dev_get32(vio, VIRTIO_BLK_CONFIG_BLK_SIZE);
 
 		if (v != 0 && v != PCI_EINVAL32)
@@ -885,7 +885,7 @@ vioblk_read_capacity(vioblk_t *vib)
 	 * The device may also provide an advisory physical block size.
 	 */
 	vib->vib_pblk_size = vib->vib_blk_size;
-	if (virtio_feature_present(vio, VIRTIO_BLK_F_TOPOLOGY)) {
+	if (virtio_features_present(vio, VIRTIO_BLK_F_TOPOLOGY)) {
 		uint8_t v = virtio_dev_get8(vio, VIRTIO_BLK_CONFIG_TOPO_PBEXP);
 
 		if (v != PCI_EINVAL8)
@@ -928,7 +928,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * request.
 	 */
 	vib->vib_seg_max = VIRTIO_BLK_DEFAULT_MAX_SEG;
-	if (virtio_feature_present(vio, VIRTIO_BLK_F_SEG_MAX)) {
+	if (virtio_features_present(vio, VIRTIO_BLK_F_SEG_MAX)) {
 		vib->vib_seg_max = virtio_dev_get32(vio,
 		    VIRTIO_BLK_CONFIG_SEG_MAX);
 
@@ -942,7 +942,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
-	if (virtio_feature_present(vio, VIRTIO_BLK_F_DISCARD)) {
+	if (virtio_features_present(vio, VIRTIO_BLK_F_DISCARD)) {
 		vib->vib_max_discard_sectors = virtio_dev_get32(vio,
 		    VIRTIO_BLK_CONFIG_MAX_DISCARD_SECT);
 		vib->vib_max_discard_seg = virtio_dev_get32(vio,
@@ -1021,7 +1021,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    "max_intr_queue", KSTAT_DATA_UINT32);
 	kstat_install(vib->vib_kstat);
 
-	vib->vib_readonly = virtio_feature_present(vio, VIRTIO_BLK_F_RO);
+	vib->vib_readonly = virtio_features_present(vio, VIRTIO_BLK_F_RO);
 
 	if (vioblk_read_capacity(vib) == DDI_FAILURE)
 		goto fail;
@@ -1030,7 +1030,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * The maximum size for a cookie in a request.
 	 */
 	vib->vib_seg_size_max = VIRTIO_BLK_DEFAULT_MAX_SIZE;
-	if (virtio_feature_present(vio, VIRTIO_BLK_F_SIZE_MAX)) {
+	if (virtio_features_present(vio, VIRTIO_BLK_F_SIZE_MAX)) {
 		uint32_t v = virtio_dev_get32(vio, VIRTIO_BLK_CONFIG_SIZE_MAX);
 
 		if (v != 0 && v != PCI_EINVAL32) {
@@ -1076,7 +1076,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		.o_write =		vioblk_bd_write,
 		.o_free_space =		vioblk_bd_free_space,
 	};
-	if (!virtio_feature_present(vio, VIRTIO_BLK_F_FLUSH)) {
+	if (!virtio_features_present(vio, VIRTIO_BLK_F_FLUSH)) {
 		vioblk_bd_ops.o_sync_cache = NULL;
 	}
 	if (!vib->vib_can_discard) {

@@ -1827,7 +1827,7 @@ vioif_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 static boolean_t
 vioif_has_feature(vioif_t *vif, uint64_t feature)
 {
-	return (virtio_feature_present(vif->vif_virtio, feature));
+	return (virtio_features_present(vif->vif_virtio, feature));
 }
 
 /*

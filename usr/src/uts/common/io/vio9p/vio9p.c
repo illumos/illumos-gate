@@ -408,7 +408,7 @@ vio9p_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	list_create(&vin->vin_req_freelist, sizeof (vio9p_req_t),
 	    offsetof(vio9p_req_t, vnr_link_free));
 
-	if (virtio_feature_present(vio, VIRTIO_9P_F_MOUNT_TAG)) {
+	if (virtio_features_present(vio, VIRTIO_9P_F_MOUNT_TAG)) {
 		uint16_t len = virtio_dev_get16(vio, VIRTIO_9P_CONFIG_TAG_SZ);
 		if (len > VIRTIO_9P_TAGLEN) {
 			len = VIRTIO_9P_TAGLEN;

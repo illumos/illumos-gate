@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2026 Hans Rosenfeld
  */
 
 #ifndef _VIOSCSI_H_
@@ -48,6 +49,17 @@ extern "C" {
 #define	VIRTIO_SCSI_F_HOTPLUG		(0x1 << 1)
 #define	VIRTIO_SCSI_F_CHANGE		(0x1 << 2)
 #define	VIRTIO_SCSI_F_T10_PI		(0x1 << 3)
+
+#define	VIOSCSI_FEATURE_FORMAT					\
+	"\020\001INOUT\002HOTPLUG\004CHANGE\010T10_PI"
+
+/*
+ * We want hotplug notification, but we can work without.
+ */
+#define	VIOSCSI_WANTED_FEATURES		(VIRTIO_SCSI_F_HOTPLUG)
+#define	VIOSCSI_NEEDED_FEATURES		0
+CTASSERT(((VIOSCSI_WANTED_FEATURES & VIOSCSI_NEEDED_FEATURES) ^
+    VIOSCSI_NEEDED_FEATURES) == 0);
 
 /*
  * Register offset in bytes:
@@ -123,13 +135,11 @@ extern "C" {
 #define	VIRTIO_SCSI_EVT_RESET_RESCAN		1
 #define	VIRTIO_SCSI_EVT_RESET_REMOVED		2
 
-/*
- * We need to support INOUT, and we want hotplug notifications:
- */
-#define	VIOSCSI_WANTED_FEATURES	(VIRTIO_SCSI_F_INOUT | VIRTIO_SCSI_F_HOTPLUG)
 
 #define	VIOSCSI_MAX_TARGET			256
+#define	VIOSCSI_MAX_LUN				16384
 #define	VIOSCSI_MIN_SEGS			3
+#define	VIOSCSI_MAX_SEGS			128
 #define	VIOSCSI_NUM_EVENTS			16
 
 /*
@@ -293,11 +303,16 @@ struct vioscsi_softc {
 	scsi_hba_tgtmap_t	*vs_tgtmap;
 	ddi_taskq_t		*vs_tq;
 
-	uint32_t		vs_max_target;
-	uint32_t		vs_max_lun;
-	uint32_t		vs_cdb_size;
-	uint32_t		vs_max_seg;
+	uint32_t		vs_num_queues;
+	uint32_t		vs_seg_max;
+	uint32_t		vs_max_sectors;
 	uint32_t		vs_cmd_per_lun;
+	uint32_t		vs_evi_size;
+	uint32_t		vs_sense_size;
+	uint32_t		vs_cdb_size;
+	uint16_t		vs_max_channel;
+	uint16_t		vs_max_target;
+	uint32_t		vs_max_lun;
 
 	vioscsi_event_t		vs_events[VIOSCSI_NUM_EVENTS];
 

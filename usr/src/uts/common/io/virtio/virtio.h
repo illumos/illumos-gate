@@ -13,6 +13,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Hans Rosenfeld
  */
 
 #ifndef _VIRTIO_H
@@ -319,7 +320,8 @@ void virtio_dev_put8(virtio_t *, uintptr_t, uint8_t);
 void virtio_dev_put16(virtio_t *, uintptr_t, uint16_t);
 void virtio_dev_put32(virtio_t *, uintptr_t, uint32_t);
 
-boolean_t virtio_feature_present(virtio_t *, uint64_t);
+boolean_t virtio_features_present(virtio_t *, uint64_t);
+uint32_t virtio_features(virtio_t *);
 boolean_t virtio_modern(virtio_t *);
 
 virtio_queue_t *virtio_queue_alloc(virtio_t *, uint16_t, const char *,
