@@ -14,6 +14,7 @@
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2025 Hans Rosenfeld
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -1958,20 +1959,20 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    "rx", vioif_rx_handler, vif, B_FALSE, VIOIF_MAX_SEGS)) == NULL ||
 	    (vif->vif_tx_vq = virtio_queue_alloc(vio, VIRTIO_NET_VIRTQ_TX,
 	    "tx", vioif_tx_handler, vif, B_FALSE, VIOIF_MAX_SEGS)) == NULL) {
-		goto fail;
+		goto fail_virtio;
 	}
 
 	if (vioif_has_feature(vif, VIRTIO_NET_F_CTRL_VQ) &&
 	    (vif->vif_ctrl_vq = virtio_queue_alloc(vio,
 	    VIRTIO_NET_VIRTQ_CONTROL, "ctrlq", NULL, vif,
 	    B_FALSE, VIOIF_MAX_SEGS)) == NULL) {
-		goto fail;
+		goto fail_virtio;
 	}
 
 	if (virtio_init_complete(vio, vioif_select_interrupt_types()) !=
 	    DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to complete Virtio init");
-		goto fail;
+		goto fail_virtio;
 	}
 
 	virtio_queue_no_interrupt(vif->vif_rx_vq, B_TRUE);
@@ -2003,19 +2004,19 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (vioif_alloc_bufs(vif) != 0) {
 		mutex_exit(&vif->vif_mutex);
 		dev_err(dip, CE_WARN, "failed to allocate memory");
-		goto fail;
+		goto fail_virtio;
 	}
 
 	mutex_exit(&vif->vif_mutex);
 
 	if (virtio_interrupts_enable(vio) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to enable interrupts");
-		goto fail;
+		goto fail_bufs;
 	}
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		dev_err(dip, CE_WARN, "failed to allocate a mac_register");
-		goto fail;
+		goto fail_bufs;
 	}
 
 	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
@@ -2030,7 +2031,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((ret = mac_register(macp, &vif->vif_mac_handle)) != 0) {
 		dev_err(dip, CE_WARN, "mac_register() failed (%d)", ret);
-		goto fail;
+		goto fail_mac;
 	}
 	mac_free(macp);
 
@@ -2038,11 +2039,13 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 
-fail:
+fail_mac:
+	mac_free(macp);
+fail_bufs:
+	mutex_enter(&vif->vif_mutex);
 	vioif_free_bufs(vif);
-	if (macp != NULL) {
-		mac_free(macp);
-	}
+	mutex_exit(&vif->vif_mutex);
+fail_virtio:
 	(void) virtio_fini(vio, B_TRUE);
 	kmem_free(vif, sizeof (*vif));
 	return (DDI_FAILURE);
