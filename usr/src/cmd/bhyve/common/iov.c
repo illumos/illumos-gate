@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2016 Jakub Klama <jceel@FreeBSD.org>.
  * Copyright (c) 2018 Alexander Motin <mav@FreeBSD.org>
+ * Copyright (c) 2026 Hans Rosenfeld
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +50,7 @@
 #include <sys/debug.h>
 #include <sys/sysmacros.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -56,41 +58,95 @@
 #include <errno.h>
 #include "iov.h"
 
-void
-seek_iov(const struct iovec *iov1, int niov1, struct iovec *iov2, int *niov2,
-    size_t seek)
+/*
+ * Given an array of iovecs iov, the number of valid iovecs niov, and an
+ * offset, truncate iov at offset. If necessary, split the final iovec,
+ * moving the remaining iovecs up by one in iov. Return a pointer to the
+ * iovec beginning at offset, and the total number of remaining iovecs.
+ *
+ * The caller must take care that iov contains enough space for at least
+ * niov+1 iovecs so the remainder of the iovec array may be moved up by one.
+ */
+struct iovec *
+split_iov(struct iovec *iov, size_t *niov, size_t offset, size_t *niov_rem)
 {
 	size_t remainder = 0;
-	size_t left = seek;
-	int i, j;
+	struct iovec *iov_rem;
+	size_t i;
 
-	for (i = 0; i < niov1; i++) {
-		size_t toseek = MIN(left, iov1[i].iov_len);
-		left -= toseek;
-
-		if (toseek == iov1[i].iov_len)
-			continue;
-
-		if (left == 0) {
-			remainder = toseek;
-			break;
-		}
+	/*
+	 * Handle the special case of offset == 0: Return the whole iovec array
+	 * as the remainder.
+	 */
+	if (offset == 0) {
+		*niov_rem = *niov;
+		*niov = 0;
+		return (iov);
 	}
 
-	for (j = i; j < niov1; j++) {
-		iov2[j - i].iov_base = (char *)iov1[j].iov_base + remainder;
-		iov2[j - i].iov_len = iov1[j].iov_len - remainder;
-		remainder = 0;
+	/* Seek to the requested offset and truncate the final iovec. */
+	for (i = 0; i < *niov && offset > iov[i].iov_len; i++) {
+		/*
+		 * We're seeking past this iovec. Adjust the offset and move on.
+		 */
+		offset -= iov[i].iov_len;
 	}
 
-	*niov2 = j - i;
+	/* We've reached the end of the array without reaching the offset. */
+	if (i == *niov) {
+		*niov_rem = 0;
+		return (NULL);
+	}
+
+	/*
+	 * We found the iovec covering offset. Calculate the remainder and
+	 * truncate at offset.
+	 */
+	remainder = iov[i].iov_len - offset;
+	iov[i].iov_len = offset;
+	*niov_rem = *niov - i - 1;
+	*niov = i + 1;
+	iov_rem = &iov[*niov];
+
+	/*
+	 * If there's no remainder in this iovec, we're done. Return the
+	 * pointer to the next iovec after the offset, or NULL if there
+	 * are no more iovecs beyond offset.
+	 */
+	if (remainder == 0) {
+		if (*niov_rem == 0)
+			iov_rem = NULL;
+
+		return (iov_rem);
+	}
+
+	/*
+	 * In the (unlikely, ideally) case where there is a remainder from the
+	 * final iovec before the split, make room for a new iovec covering the
+	 * remainder by moving all following iovecs up. It is the caller's
+	 * responsibility that there is enough spare space for this extra iovec.
+	 */
+	for (struct iovec *tmp = &iov_rem[*niov_rem];
+	    tmp != iov_rem;
+	    tmp[0] = tmp[-1], tmp--) {
+		;
+	}
+
+	/*
+	 * Fill in the new first iovec, covering the remainder from the split.
+	 */
+	iov_rem[0].iov_len = remainder;
+	iov_rem[0].iov_base = (char *)iov[i].iov_base + offset;
+	(*niov_rem)++;
+
+	return (iov_rem);
 }
 
 size_t
-count_iov(const struct iovec *iov, int niov)
+count_iov(const struct iovec *iov, size_t niov)
 {
 	size_t total = 0;
-	int i;
+	size_t i;
 
 	for (i = 0; i < niov; i++)
 		total += iov[i].iov_len;
@@ -98,29 +154,26 @@ count_iov(const struct iovec *iov, int niov)
 	return (total);
 }
 
-void
-truncate_iov(struct iovec *iov, int *niov, size_t length)
+bool
+check_iov_len(const struct iovec *iov, size_t niov, size_t len)
 {
-	size_t done = 0;
-	int i;
+	size_t total = 0;
+	size_t i;
 
-	for (i = 0; i < *niov; i++) {
-		size_t toseek = MIN(length - done, iov[i].iov_len);
-		done += toseek;
-
-		if (toseek <= iov[i].iov_len) {
-			iov[i].iov_len = toseek;
-			*niov = i + 1;
-			return;
-		}
+	for (i = 0; i < niov; i++) {
+		total += iov[i].iov_len;
+		if (total >= len)
+			return (true);
 	}
+
+	return (false);
 }
 
 ssize_t
-iov_to_buf(const struct iovec *iov, int niov, void **buf)
+iov_to_buf(const struct iovec *iov, size_t niov, void **buf)
 {
 	size_t ptr, total;
-	int i;
+	size_t i;
 
 	total = count_iov(iov, niov);
 	*buf = reallocf(*buf, total);
@@ -136,36 +189,16 @@ iov_to_buf(const struct iovec *iov, int niov, void **buf)
 }
 
 ssize_t
-buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, int niov,
-    size_t seek)
+buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, size_t niov)
 {
-	struct iovec *diov;
 	size_t off = 0, len;
-	int  i;
-
-#ifndef __FreeBSD__
-	diov = NULL;
-#endif
-
-	if (seek > 0) {
-		int ndiov;
-
-		diov = calloc(niov, sizeof (struct iovec));
-		if (diov == NULL)
-			return (0);
-		seek_iov(iov, niov, diov, &ndiov, seek);
-		iov = diov;
-		niov = ndiov;
-	}
+	size_t  i;
 
 	for (i = 0; i < niov && off < buflen; i++) {
 		len = MIN(iov[i].iov_len, buflen - off);
 		memcpy(iov[i].iov_base, (const uint8_t *)buf + off, len);
 		off += len;
 	}
-
-	if (seek > 0)
-		free(diov);
 
 	return ((ssize_t)off);
 }
