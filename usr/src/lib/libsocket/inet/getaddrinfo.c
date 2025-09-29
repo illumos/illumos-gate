@@ -373,57 +373,31 @@ _getaddrinfo(const char *hostname, const char *servname,
 		/*
 		 * Servname string can be a decimal port number.
 		 */
-		if (aip->ai_flags & AI_NUMERICSERV) {
-			ushort_t port;
+		if (str_isnumber(servname)) {
+			ushort_t port = htons(atoi(servname));
 
-			if (!str_isnumber(servname))
-				return (EAI_NONAME);
-
-			port = htons(atoi(servname));
 			if (aip->ai_socktype == ANY) {
 				/*
-				 * We cannot perform any name service lookups
-				 * here, per RFC3493, and so we return one
-				 * result for each of these types.
+				 * The socket type is not known so we return
+				 * one result for each of these types.
 				 */
 				SP_ADDX(SOCK_STREAM, IPPROTO_TCP, port);
 				SP_ADDX(SOCK_DGRAM, IPPROTO_UDP, port);
 				SP_ADDX(SOCK_STREAM, IPPROTO_SCTP, port);
 			} else {
-				SP_ADDX(aip->ai_socktype, aip->ai_protocol,
-				    port);
-			}
-		} else if (str_isnumber(servname)) {
-			ushort_t port = htons(atoi(servname));
-
-			if (aip->ai_socktype != ANY) {
 				/*
-				 * If we already know the socket type there is
-				 * no need to call getservbyport.
+				 * If we know the socket type then we can
+				 * return it.
 				 */
 				SP_ADDX(aip->ai_socktype, aip->ai_protocol,
 				    port);
-			} else {
-				do {
-					buf = reallocf(buf, bufsize);
-					if (buf == NULL)
-						return (EAI_MEMORY);
-
-					sp = getservbyport_r(port, proto,
-					    &result, buf, bufsize);
-					if (sp == NULL && errno != ERANGE) {
-						free(buf);
-						return (EAI_SERVICE);
-					}
-					/*
-					 * errno == ERANGE so our scratch
-					 * buffer space wasn't big enough.
-					 * Double it and try again.
-					 */
-					bufsize *= 2;
-				} while (sp == NULL);
-				SP_ADD(sp);
 			}
+		} else if (aip->ai_flags & AI_NUMERICSERV) {
+			/*
+			 * The AI_NUMERICSERV flag was specified, but the
+			 * servname is not a decimal number so we fail.
+			 */
+			return (EAI_NONAME);
 		} else {
 			/*
 			 * Look up the provided service name in the service
