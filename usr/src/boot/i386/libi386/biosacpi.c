@@ -24,9 +24,8 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include <stand.h>
+#include <sys/stdint.h>
 #include <machine/stdarg.h>
 #include <bootstrap.h>
 #include <btxv86.h>
@@ -34,7 +33,7 @@
 
 #include "platform/acfreebsd.h"
 #include "acconfig.h"
-#define ACPI_SYSTEM_XFACE
+#define	ACPI_SYSTEM_XFACE
 #include "actypes.h"
 #include "actbl.h"
 #include "actbl3.h"
@@ -46,47 +45,9 @@
 
 ACPI_TABLE_RSDP	*rsdp;
 static ACPI_TABLE_RSDP	*biosacpi_find_rsdp(void);
-static ACPI_TABLE_RSDP	*biosacpi_search_rsdp(char *base, int length);
+static ACPI_TABLE_RSDP	*biosacpi_search_rsdp(vm_offset_t base, size_t length);
 
-#define RSDP_CHECKSUM_LENGTH 20
-
-static ACPI_TABLE_SPCR *
-find_spcr(ACPI_TABLE_RSDP *rsdp)
-{
-	unsigned count, i;
-	ACPI_TABLE_XSDT *xsdt;
-	ACPI_TABLE_RSDT *rsdt;
-	void *ptr;
-
-	if (rsdp->Revision >= 2 && rsdp->XsdtPhysicalAddress != 0) {
-		xsdt = (ACPI_TABLE_XSDT *)
-		    PTOV((uintptr_t)rsdp->XsdtPhysicalAddress);
-
-		count = xsdt->Header.Length - sizeof (ACPI_TABLE_HEADER);
-		count /= sizeof (xsdt->TableOffsetEntry[0]);
-		for (i = 0; i < count; i++) {
-			ptr = PTOV((uintptr_t)xsdt->TableOffsetEntry[i]);
-			if (memcmp(ptr, ACPI_SIG_SPCR,
-			    sizeof (ACPI_SIG_SPCR) - 1) == 0) {
-				return (ptr);
-			}
-		}
-	}
-	if (rsdp->RsdtPhysicalAddress != 0) {
-		rsdt = (ACPI_TABLE_RSDT *)PTOV(rsdp->RsdtPhysicalAddress);
-
-		count = rsdt->Header.Length - sizeof (ACPI_TABLE_HEADER);
-		count /= sizeof (rsdt->TableOffsetEntry[0]);
-		for (i = 0; i < count; i++) {
-			ptr = PTOV(rsdt->TableOffsetEntry[i]);
-			if (memcmp(ptr, ACPI_SIG_SPCR,
-			    sizeof (ACPI_SIG_SPCR) - 1) == 0) {
-				return (ptr);
-			}
-		}
-	}
-	return (NULL);
-}
+#define	RSDP_CHECKSUM_LENGTH 20
 
 /*
  * Find and parse SPCR table to set up serial console.
@@ -195,7 +156,7 @@ biosacpi_detect(void)
 		revision = 1;
 	snprintf(buf, sizeof (buf), "%d", revision);
 	setenv("acpi.revision", buf, 1);
-	strncpy(buf, rsdp->OemId, sizeof(rsdp->OemId));
+	strncpy(buf, rsdp->OemId, sizeof (rsdp->OemId));
 	buf[sizeof (rsdp->OemId)] = '\0';
 	setenv("acpi.oem", buf, 1);
 	snprintf(buf, sizeof (buf), "0x%08x", rsdp->RsdtPhysicalAddress);
@@ -208,7 +169,27 @@ biosacpi_detect(void)
 		sprintf(buf, "%d", rsdp->Length);
 		setenv("acpi.xsdt_length", buf, 1);
 	}
-	biosacpi_setup_spcr(find_spcr(rsdp));
+	biosacpi_setup_spcr(acpi_find_table(ACPI_SIG_SPCR));
+}
+
+static void *
+acpi_map_sdt(vm_offset_t addr)
+{
+	return ((void *)PTOV(addr));
+}
+
+static uint8_t
+acpi_checksum(const void *p, size_t length)
+{
+	const uint8_t *bp;
+	uint8_t sum;
+
+	bp = p;
+	sum = 0;
+	while (length--)
+		sum += *bp++;
+
+	return (sum);
 }
 
 /*
@@ -217,43 +198,111 @@ biosacpi_detect(void)
 static ACPI_TABLE_RSDP *
 biosacpi_find_rsdp(void)
 {
-    ACPI_TABLE_RSDP	*rsdp;
-    uint16_t		*addr;
+	ACPI_TABLE_RSDP	*rsdp;
+	uint16_t	*addr;
 
-    /* EBDA is the 1 KB addressed by the 16 bit pointer at 0x40E. */
-    addr = (uint16_t *)PTOV(0x40E);
-    rsdp = biosacpi_search_rsdp((char *)(intptr_t)(*addr << 4), 0x400);
-    if (rsdp != NULL)
-	return (rsdp);
+	/* EBDA is the 1 KB addressed by the 16 bit pointer at 0x40E. */
+	addr = acpi_map_sdt(0x40E);
+	rsdp = biosacpi_search_rsdp((vm_offset_t)(*addr << 4), 0x400);
+	if (rsdp != NULL)
+		return (rsdp);
 
-    /* Check the upper memory BIOS space, 0xe0000 - 0xfffff. */
-    if ((rsdp = biosacpi_search_rsdp((char *)0xe0000, 0x20000)) != NULL)
-	return (rsdp);
+	/* Check the upper memory BIOS space, 0xe0000 - 0xfffff. */
+	if ((rsdp = biosacpi_search_rsdp(0xe0000, 0x20000)) != NULL)
+		return (rsdp);
 
-    return (NULL);
+	return (NULL);
 }
 
 static ACPI_TABLE_RSDP *
-biosacpi_search_rsdp(char *base, int length)
+biosacpi_search_rsdp(vm_offset_t base, size_t length)
 {
-    ACPI_TABLE_RSDP	*rsdp;
-    u_int8_t		*cp, sum;
-    int			ofs, idx;
+	ACPI_TABLE_RSDP	*rsdp;
+	size_t		ofs, namelen;
 
-    /* search on 16-byte boundaries */
-    for (ofs = 0; ofs < length; ofs += 16) {
-	rsdp = (ACPI_TABLE_RSDP *)PTOV(base + ofs);
+	namelen = strlen(ACPI_SIG_RSDP);
+	/* search on 16-byte boundaries */
+	for (ofs = 0; ofs < length; ofs += 16) {
+		rsdp = acpi_map_sdt(base + ofs);
 
-	/* compare signature, validate checksum */
-	if (!strncmp(rsdp->Signature, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP))) {
-	    cp = (u_int8_t *)rsdp;
-	    sum = 0;
-	    for (idx = 0; idx < RSDP_CHECKSUM_LENGTH; idx++)
-		sum += *(cp + idx);
-	    if (sum != 0)
-		continue;
-	    return(rsdp);
+		/* compare signature, validate checksum */
+		if (memcmp(rsdp->Signature, ACPI_SIG_RSDP, namelen) == 0) {
+			if (acpi_checksum(rsdp, RSDP_CHECKSUM_LENGTH))
+				continue;
+			return (rsdp);
+		}
 	}
-    }
-    return(NULL);
+	return (NULL);
+}
+
+/*
+ * We have duplication there, the same implementation is also
+ * in libefi/acpi.c. We will address this duplication later.
+ */
+void *
+acpi_find_table(const char *sig)
+{
+	uint_t entries, i;
+	ACPI_TABLE_HEADER *sdp;
+	ACPI_TABLE_RSDT *rsdt;
+	ACPI_TABLE_XSDT *xsdt;
+
+	if (rsdp == NULL)
+		return (NULL);
+
+	/*
+	 * Note, we need to check both address value and size there,
+	 * as 32-bit code can not access 64-bit address space.
+	 */
+	if (rsdp->Revision >= 2 &&
+	    rsdp->XsdtPhysicalAddress != 0 &&
+	    rsdp->XsdtPhysicalAddress < UINTPTR_MAX) {
+		xsdt = acpi_map_sdt(rsdp->XsdtPhysicalAddress);
+		sdp = (ACPI_TABLE_HEADER *)xsdt;
+		if (sdp->Length < sizeof (ACPI_TABLE_HEADER)) {
+			entries = 0;
+		} else {
+			entries = sdp->Length - sizeof (ACPI_TABLE_HEADER);
+			entries /= ACPI_XSDT_ENTRY_SIZE;
+		}
+		for (i = 0; i < entries; i++) {
+			if (xsdt->TableOffsetEntry[i] == 0 ||
+			    xsdt->TableOffsetEntry[i] >= UINTPTR_MAX)
+				continue;
+			sdp = acpi_map_sdt(xsdt->TableOffsetEntry[i]);
+			if (sdp->Length < sizeof (ACPI_TABLE_HEADER))
+				continue;
+
+			if (acpi_checksum(sdp, sdp->Length))
+				continue;
+
+			if (ACPI_COMPARE_NAME(sig, sdp->Signature))
+				return (sdp);
+		}
+	}
+
+	if (rsdp->RsdtPhysicalAddress != 0) {
+		rsdt = acpi_map_sdt(rsdp->RsdtPhysicalAddress);
+		sdp = (ACPI_TABLE_HEADER *)rsdt;
+		if (sdp->Length < sizeof (ACPI_TABLE_HEADER)) {
+			entries = 0;
+		} else {
+			entries = sdp->Length - sizeof (ACPI_TABLE_HEADER);
+			entries /= ACPI_RSDT_ENTRY_SIZE;
+		}
+		for (i = 0; i < entries; i++) {
+			if (rsdt->TableOffsetEntry[i] == 0)
+				continue;
+			sdp = acpi_map_sdt(rsdt->TableOffsetEntry[i]);
+			if (sdp->Length < sizeof (ACPI_TABLE_HEADER))
+				continue;
+
+			if (acpi_checksum(sdp, sdp->Length))
+				continue;
+
+			if (ACPI_COMPARE_NAME(sig, sdp->Signature))
+				return (sdp);
+		}
+	}
+	return (NULL);
 }

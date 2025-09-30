@@ -18,7 +18,9 @@ include $(SRC)/boot/Makefile.inc
 
 install:
 
-OBJS +=	delay.o \
+OBJS +=	\
+	acpi.o \
+	delay.o \
 	devicename.o \
 	devpath.o \
 	efi_console.o \
@@ -47,6 +49,7 @@ CPPFLAGS += -I../../../libsa
 CPPFLAGS += -I$(ZFSSRC)
 CPPFLAGS += -I../../../sys/cddl/boot/zfs
 
+acpi.o := CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi
 gfx_fb.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR) -I$(LZ4)
 pnglite.o := CPPFLAGS += -I$(ZLIB)
 gfx_fb.o pnglite.o efi_console.o := CPPFLAGS += -I$(PNGLITE)

@@ -20,7 +20,6 @@ PROG=		loader.sym
 
 # architecture-specific loader code
 OBJS=	\
-	acpi.o \
 	autoload.o \
 	bootinfo.o \
 	conf.o \

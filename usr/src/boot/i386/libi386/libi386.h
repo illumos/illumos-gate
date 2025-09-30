@@ -31,18 +31,18 @@
  * i386 fully-qualified device descriptor.
  */
 struct i386_devdesc {
-    struct devdesc	dd;	/* Must be first. */
-    union {
-	struct {
-	    int		slice;
-	    int		partition;
-	    off_t	offset;
-	} biosdisk;
-	struct {
-	    uint64_t	pool_guid;
-	    uint64_t	root_guid;
-	} zfs;
-    } d_kind;
+	struct devdesc	dd;	/* Must be first. */
+	union {
+		struct {
+			int		slice;
+			int		partition;
+			off_t		offset;
+		} biosdisk;
+		struct {
+			uint64_t	pool_guid;
+			uint64_t	root_guid;
+		} zfs;
+	} d_kind;
 };
 
 /*
@@ -83,8 +83,8 @@ int	i386_setcurrdev(struct env_var *ev, int flags, const void *value);
 
 extern struct devdesc	currdev;	/* our current device */
 
-#define MAXDEV		31		/* maximum number of distinct devices */
-#define MAXBDDEV	MAXDEV
+#define	MAXDEV		31		/* maximum number of distinct devices */
+#define	MAXBDDEV	MAXDEV
 
 /* exported devices XXX rename? */
 extern struct devsw bioscd;
@@ -108,13 +108,13 @@ void	bios_addsmapdata(struct preloaded_file *);
 void	bios_getsmap(void);
 
 void	bios_getmem(void);
-extern uint32_t		bios_basemem;	/* base memory in bytes */
-extern uint32_t		bios_extmem;	/* extended memory in bytes */
-extern vm_offset_t	memtop;		/* last address of physical memory + 1 */
-extern vm_offset_t	memtop_copyin;	/* memtop less heap size for the cases */
-					/*  when heap is at the top of         */
-					/*  extended memory; for other cases   */
-					/*  just the same as memtop            */
+extern uint32_t	bios_basemem;	/* base memory in bytes */
+extern uint32_t	bios_extmem;	/* extended memory in bytes */
+extern vm_offset_t memtop;	/* last address of physical memory + 1 */
+extern vm_offset_t memtop_copyin; /* memtop less heap size for the cases */
+				/* when heap is at the top of		*/
+				/* extended memory; for other cases	*/
+				/* just the same as memtop		*/
 extern uint32_t		high_heap_size;	/* extended memory region available */
 extern vm_offset_t	high_heap_base;	/* for use as the heap */
 
@@ -130,10 +130,11 @@ uint32_t biospci_locator(int8_t bus, uint8_t device, uint8_t function);
 int biospci_write_config(uint32_t locator, int offset, int width, uint32_t val);
 
 void	biosacpi_detect(void);
+void	*acpi_find_table(const char *);
 int	comc_getspeed(int);
 
 int	i386_autoload(void);
-vm_offset_t i386_loadaddr(u_int type, void *data, vm_offset_t addr);
+vm_offset_t i386_loadaddr(uint_t type, void *data, vm_offset_t addr);
 
 int	bi_getboothowto(char *kargs);
 void	bi_setboothowto(int howto);
