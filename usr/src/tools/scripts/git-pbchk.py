@@ -60,7 +60,7 @@ sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk, WsCheck
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
-from onbld.Checks import ShellLint, PkgFmt
+from onbld.Checks import ShellLint, PkgFmt, UTF8Check
 
 class GitError(Exception):
     pass
@@ -485,6 +485,16 @@ def symlinks(root, parent, flist, output):
     for f in flist():
         output.write("  "+f+"\n")
         ret |= 1
+    return ret
+
+
+@filechecker
+def utf8check(root, parent, flist, output):
+    "Check for non-UTF8 encodings in source files."
+    ret = 0
+    output.write("UTF-8 nits:\n")
+    for f in flist():
+            ret |= UTF8Check.utf8check(f, output=output)
     return ret
 
 def run_checks(root, parent, checklist, paths=''):

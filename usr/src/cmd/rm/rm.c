@@ -414,7 +414,7 @@ rm(const char *entry, struct dlist *caller)
  * message will appear as follows:
  *	rm: remove <filename> (y/n)?
  * For example, in German, this will appear as
- * 	rm: löschen <filename> (j/n)?
+ *	rm: lÃ¶schen <filename> (j/n)?
  * where j=ja, n=nein, <filename>=the file to be removed
  */
 				if (!confirm(stderr,

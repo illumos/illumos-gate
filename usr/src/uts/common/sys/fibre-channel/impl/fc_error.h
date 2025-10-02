@@ -73,7 +73,7 @@ extern "C" {
 #define	FC_ULP_SAMETYPE		0x19	/* FC4 module already in use */
 #define	FC_ABORTED		0x20	/* request aborted */
 #define	FC_ABORT_FAILED		0x21	/* abort request failed */
-#define	FC_BADEXCHANGE		0x22	/* exchange doesn’t exist */
+#define	FC_BADEXCHANGE		0x22	/* exchange doesn't exist */
 #define	FC_BADWWN		0x23	/* WWN not recognized */
 #define	FC_BADDEV		0x24	/* device unrecognized */
 #define	FC_BADCMD		0x25	/* invalid command issued */

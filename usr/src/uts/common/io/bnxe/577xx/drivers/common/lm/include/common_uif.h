@@ -1,8 +1,8 @@
 #ifndef _COMMON_UIF_H
 #define _COMMON_UIF_H
 
-/*  
-I M P O R T A N T 
+/*
+I M P O R T A N T
 BEFORE YOU MODIFY THESE STRUCTS:
 please make sure that DIAG was updated accordingly.
 windiag\ediag should be checked to compile and run correctly
@@ -12,7 +12,7 @@ modification is in file: tcl_driver.c,  function: driver_init_stats_object,  mac
 
 /*******************************************************************************
  * Hardware statistics structure for B10_IOC_GET_L2_CHIP_STATISTICS
- ******************************************************************************/    
+ ******************************************************************************/
 typedef struct _b10_l2_chip_statistics_t
 {
     u64_t ver_num;
@@ -62,8 +62,8 @@ typedef struct _b10_l2_chip_statistics_t
     u64_t  EtherStatsPktsTxOver1522Octets;
     u64_t  XonPauseFramesReceived;
     u64_t  XoffPauseFramesReceived;
-    u64_t  OutXonSent;                                 
-    u64_t  OutXoffSent;                             
+    u64_t  OutXonSent;
+    u64_t  OutXoffSent;
     u64_t  FlowControlDone;
     u64_t  MacControlFramesReceived;
     u64_t  XoffStateEntered;
@@ -102,7 +102,7 @@ typedef struct _b10_l2_chip_statistics_v2_t
 
     struct _v2
     {
-        u64_t Tx_lpi_count;			// This counter counts the number of timers the debounced version of EEE link idle is asserted”
+        u64_t Tx_lpi_count;			// This counter counts the number of timers the debounced version of EEE link idle is asserted.
     } v2;
 
 } b10_l2_chip_statistics_v2_t;
@@ -117,15 +117,15 @@ typedef struct _b10_l2_chip_statistics_v3_t
         u64_t   coalesced_events      /* the number of aggregations */;
         u64_t   coalesced_aborts      /* the number of exception which avoid aggregation */;
     } v3;
-    
+
 } b10_l2_chip_statistics_v3_t;
 
 
 /*******************************************************************************
  * Hardware statistics structure for B10_IOC_GET_L4_CHIP_STATISTICS
- ******************************************************************************/    
+ ******************************************************************************/
 typedef struct _b10_l4_chip_statistics_t
-{    
+{
     u64_t ver_num;
     #define L4_CHIP_STATISTISTCS_VER_NUM 1
     u64_t NoTxCqes ;
@@ -133,7 +133,7 @@ typedef struct _b10_l4_chip_statistics_t
     u64_t OutTCP4Segments ;
     u64_t RetransmittedTCP4Segments ;
     u64_t InTCP4Errors ;
-    u64_t InIP4Receives ; 
+    u64_t InIP4Receives ;
     u64_t InIP4HeaderErrors ;
     u64_t InIP4Discards ;
     u64_t InIP4Delivers ;
@@ -144,7 +144,7 @@ typedef struct _b10_l4_chip_statistics_t
     u64_t OutTCP6Segments ;
     u64_t RetransmittedTCP6Segments ;
     u64_t InTCP6Errors ;
-    u64_t InIP6Receives ; 
+    u64_t InIP6Receives ;
     u64_t InIP6HeaderErrors ;
     u64_t InIP6Discards ;
     u64_t InIP6Delivers ;
@@ -160,7 +160,7 @@ typedef struct _b10_l4_chip_statistics_t
 
 /*******************************************************************************
  * Driver statistics structure for B10_IOC_GET_L2_DRIVER_STATISTICS
- ******************************************************************************/    
+ ******************************************************************************/
 typedef struct _b10_l2_driver_statistics_t
 {
     u64_t ver_num;
@@ -182,7 +182,7 @@ typedef struct _b10_l2_driver_statistics_t
 
 /*******************************************************************************
  * Driver statistics structure for B10_IOC_GET_L4_DRIVER_STATISTICS
- ******************************************************************************/    
+ ******************************************************************************/
 
 typedef struct _b10_l4_driver_statistics_t
 {
@@ -247,12 +247,12 @@ enum
 /*******************************************************************************
  * LLDP protocol registry configuration parameters.
  ******************************************************************************/
-typedef struct _config_lldp_params_t 
+typedef struct _config_lldp_params_t
 {
     u32_t   overwrite_settings;
     u32_t   msg_tx_hold;
     u32_t   msg_fast_tx;
-    u32_t   tx_credit_max; 
+    u32_t   tx_credit_max;
     u32_t   msg_tx_interval;
     u32_t   tx_fast;
 }config_lldp_params_t;
@@ -283,7 +283,7 @@ typedef struct _b10_lldp_params_get_t
  * DCBX protocol registry configuration parameters.
  ******************************************************************************/
 
-typedef struct _admin_priority_app_table_t 
+typedef struct _admin_priority_app_table_t
 {
     u32_t valid;
     u32_t priority;
@@ -294,12 +294,12 @@ typedef struct _admin_priority_app_table_t
     u32_t app_id;
 }admin_priority_app_table_t;
 
-typedef struct _config_dcbx_params_t 
+typedef struct _config_dcbx_params_t
 {
     u32_t dcb_enable;
     u32_t admin_dcbx_enable;
     // "admin_dcbx_enable" and "dcb_enable" are stand alone registry keys(if present
-    // will always be valid and not ignored), for all other DCBX registry set only 
+    // will always be valid and not ignored), for all other DCBX registry set only
     // if the entire DCBX registry set is present and differ from 0xFFFFFFFF (invalid
     // value) the DCBX registry parameters are taken, otherwise the registry key set
     // is ignored.)(Expect "admin_dcbx_enable" and "dcb_enable")

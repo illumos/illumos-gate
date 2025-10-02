@@ -826,7 +826,7 @@ static u8_t lm_reset_device_if_undi_func_hide_helper( struct _lm_device_t       
     u8_t  b_hidden       = FALSE;
     u8_t  func_config_id = 0;
     u32_t offset         = 0;
-    u32_t mf_config      = 0;    
+    u32_t mf_config      = 0;
 
     // Macros taken from MFW .h files to have a better and correct use of the function/port matrix.
     #define E2_2P_PF_NUM(path, port, pf)            (((pf) << 1) | (path))                  /* pf: 0..3     ==> pf_num: 0..7 */
@@ -849,8 +849,8 @@ static u8_t lm_reset_device_if_undi_func_hide_helper( struct _lm_device_t       
      }
 
      offset = OFFSETOF(mf_cfg_t, func_mf_config[func_config_id].config);
-     LM_MFCFG_READ(pdev, offset, &mf_config);     
-     
+     LM_MFCFG_READ(pdev, offset, &mf_config);
+
      if( mf_config & FUNC_MF_CFG_FUNC_HIDE )
      {
          b_hidden = TRUE;
@@ -975,7 +975,7 @@ void lm_reset_device_if_undi_active(struct _lm_device_t *pdev)
 
             // Check what is the last valid vnic (non hidden one)
             for( vnic = 0; vnic < vnics_per_port; vnic++ )
-            {                
+            {
                 if( CHIP_IS_E1(pdev) )
                 {
                     // we don't have func_mf_config in E1. To prevent invalid access to shmem - break.
@@ -2011,7 +2011,7 @@ lm_status_t lm_function_start(struct _lm_device_t *pdev)
 
     /* TODO: For Modifying Ether type of Outer VLAN to SVLAN:
         To use, first set these registers to to SVLAN Ethertype (0x88a8)
-        PRS_REG_VLAN_TYPE_0 
+        PRS_REG_VLAN_TYPE_0
         PBF_REG_VLAN_TYPE_0
         NIG_REG_LLH_OUTER_VLAN_TYPE_1
         Then modify/create the function with  sd_vlan_eth_type set to SVLAN Ethertype (0x88a8)
@@ -2051,7 +2051,7 @@ lm_status_t lm_function_start(struct _lm_device_t *pdev)
         func_start_data->tunnel_mode = TUNN_MODE_NONE;
     }
     else
-    { 
+    {
         func_start_data->tunn_clss_en  = 1;
         func_start_data->tunnel_mode = TUNN_MODE_GRE;
         func_start_data->gre_tunnel_type = NVGRE_TUNNEL;
@@ -2380,7 +2380,7 @@ lm_ncsi_get_shmem_address( struct _lm_device_t *pdev)
  *
  *  No endian conversion is needed if data type is u32.  Although, MCP is big endian, basic storage unit is u32.
  *  Unless you access individual byte,  writing a 32-bit word in shmem from host DOES NOT need any endian conversion.
- *  In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn’t need to do mm_cpu_to_be32.
+ *  In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn't need to do mm_cpu_to_be32.
  *
  * @param[in] lm_device
  *
@@ -2498,7 +2498,7 @@ lm_ncsi_prev_drv_ver_is_win8_inbox( struct _lm_device_t *pdev)
  * @brief Writes FCoE capabilites to shmem (for NCSI)
  *  No endian conversion is needed if data type is u32.  Although, MCP is big endian, basic storage unit is u32.
  *  Unless you access individual byte,  writing a 32-bit word in shmem from host DOES NOT need any endian conversion.
- *  In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn’t need to do mm_cpu_to_be32.
+ *  In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn't need to do mm_cpu_to_be32.
  *
  * @param lm_device
  *
@@ -2536,7 +2536,7 @@ lm_ncsi_fcoe_cap_to_scratchpad( struct _lm_device_t *pdev)
 
     // no endian conversion is needed if data type is u32.  Although, MCP is big endian, basic storage unit is u32.
     // Unless you access individual byte,  writing a 32-bit word in shmem from host DOES NOT need any endian conversion.
-    // In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn’t need to do mm_cpu_to_be32.
+    // In other word, if host driver write 0x12345678 to a 4-byte location in shmem,  MCP will read it correctly.  eVBD doesn't need to do mm_cpu_to_be32.
     for (i = 0; i < idx_max; i++)
     {
         REG_WR(pdev,

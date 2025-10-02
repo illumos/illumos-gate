@@ -575,7 +575,7 @@ s1394_reserve_addr_blk(s1394_hal_t *hal, t1394_alloc_addr_t *addr_allocp)
  *    initial address space with the appropriate ranges, etc.  At attach,
  *    the HAL specifies not only the type and bounds for each kind of 1394
  *    address space, but also a list of the blocks that are to be marked
- *    ¨reserved".  Prior to marking the "reserved" ranges the local hosts
+ *    "reserved".  Prior to marking the "reserved" ranges the local hosts
  *    CSR registers are allocated/setup in s1394_setup_CSR_space().
  */
 int

@@ -673,7 +673,7 @@ lm_dcbx_event(lm_device_t *pdev,
 
             case DCBX_UPDATE_TASK_STATE_SCHEDULE:
                 // Schedule: We saw before that DRV_STATUS_DCBX_NEGOTIATION_RES
-                // is set before, and didn’t handle it yet
+                // is set before, and didn't handle it yet
                 break;
 
             case DCBX_UPDATE_TASK_STATE_HANDLED:
@@ -2455,7 +2455,7 @@ lm_dcbx_get_app_pri_off_tt_non_neg(
 {
     lm_dcbx_indicate_event_t *indicate_event    = &pdev->dcbx_info.indicate_event;
     // If indicate event is enabled and there is a OS configuration contained an entry
-    // with ‘TCP port’ = 3260 use that entry.
+    // with 'TCP port' = 3260 use that entry.
     if((TRUE == pdev->dcbx_info.is_indicate_event_en) &&
         (LM_DCBX_ILLEGAL_PRI != indicate_event->iscsi_tcp_pri))
     {
@@ -3681,7 +3681,7 @@ lm_dcbx_init_lpme_set_params(struct _lm_device_t *pdev)
     }
     //DbgBreakMsg(" lm_dcbx_init_lpme_set_params : DCBX timer configuration \n");
     //DbgMessage(pdev, FATAL, "lm_dcbx_init_lpme_set_params : DCBX timer configuration \n");
-    // DCBX negotiation didn’t ended normaly yet.
+    // DCBX negotiation didn't ended normaly yet.
     // No lock is needed to be taken because lm_dcbx_set_params is only called from a WI
     lm_status = lm_dcbx_set_params_and_read_mib(pdev,
                                                 FALSE,
@@ -6053,15 +6053,15 @@ lm_dcbx_ie_classif_parse_cee_arrray(
             {
                 // This is a patch:
                 // We don't assert as a request from DVT:(CQ64888 and CQ59423).
-                // A quote from Darshan (DVT) mail "Brocade expects (just like Navasota) that PFC 
-                // be enabled on the iSCSI traffic class (which, I agree, is inappropriate). If the PFC is not set on the iSCSI 
-                // traffic class then it sends the iSCSI App TLV with PRI bit map of zero irrespective of whatever PRI you have 
+                // A quote from Darshan (DVT) mail "Brocade expects (just like Navasota) that PFC
+                // be enabled on the iSCSI traffic class (which, I agree, is inappropriate). If the PFC is not set on the iSCSI
+                // traffic class then it sends the iSCSI App TLV with PRI bit map of zero irrespective of whatever PRI you have
                 // configured for iSCSI. Once PFC is enabled, it sends the correct App TLV bit map."
                 #if defined(DBG)
                 DbgMessage(pdev, FATAL, "lm_dcbx_ie_classif_parse_cee_arrray invalid pri for valid entry ");
                 #else
                 DbgBreakMsg("lm_dcbx_ie_classif_parse_cee_arrray invalid pri for valid entry ");
-                #endif 
+                #endif
             }
             else
             {

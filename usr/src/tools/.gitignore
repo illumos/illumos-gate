@@ -84,6 +84,7 @@ scripts/mapfilechk
 scripts/onu
 scripts/onu.sh
 scripts/protocmp.terse
+scripts/utf8check
 scripts/validate_flg
 scripts/validate_paths
 scripts/validate_pkg

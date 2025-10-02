@@ -1,0 +1,60 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Richard Lowe
+#
+
+syntax: glob
+
+# Obvious binaries
+*.Z
+*.au
+*.bin
+*.bz2
+*.dll
+*.gif
+*.gz
+*.iscii
+*.png
+*.snoop
+*.ucode
+
+#
+# Specific carve-outs, you would ideally add no more of these
+#
+
+usr/src/cmd/eqn/eqnchar.d/iso   # Intentionally Latin-1
+usr/src/data/hwdata/usb.ids	# One of the HID codes
+usr/src/data/perfmon/readme.txt # Loudly windows-style text from upstream
+
+# Test data
+usr/src/test/util-tests/tests/cpio/files/zero.bar
+usr/src/test/util-tests/tests/pcieadm/bridge.pci
+usr/src/test/util-tests/tests/pcieadm/igb.pci
+
+# Firmware
+usr/src/cmd/luxadm/ibfirmware
+usr/src/uts/common/io/mwl/mwl_fw/mw88W8363
+usr/src/uts/common/io/mwl/mwl_fw/mwlboot
+
+# Microcode
+usr/src/data/ucode/*
+
+# Innately latin-1 keytables
+usr/src/cmd/loadkeys/*
+
+# 3rd party sources aren't checked
+usr/src/grub/*
+usr/src/contrib/*
+
+# awk tests contain much intentionally weird data
+usr/src/test/util-tests/tests/awk/*

@@ -33,9 +33,9 @@
  * FILE NAME:       ncsi_cmds.h
  *
  * DESCRIPTION:     Note that the response definitions include the notion of
- *                  a rsp Payload consisting of the actual data returned for a 
- *                  given rsp, and the rsp frame Payload consisting of the rsp 
- *                  Payload plus all padding and checksum bytes.  The size of  
+ *                  a rsp Payload consisting of the actual data returned for a
+ *                  given rsp, and the rsp frame Payload consisting of the rsp
+ *                  Payload plus all padding and checksum bytes.  The size of
  *                  each of these must be understood independently for proper
  *                  programming of the rsp pkt header, and the actual UMP TX
  *                  operation.
@@ -46,7 +46,7 @@
  *
  * CREATION DATE:   2007
  *
- * 
+ *
  ****************************************************************************/
 
 
@@ -93,12 +93,12 @@ typedef enum NcsiGetParameterSelector
 
 NcsiRmiiControlPktHeader_t
 
-    this structure definition is for the common UMP command/response frame 
+    this structure definition is for the common UMP command/response frame
     header used in both cmd and rsp pkts.
-    
-    UMP frame header idntifies wheteher a received packet is to be processed 
+
+    UMP frame header idntifies wheteher a received packet is to be processed
     locally or forwarded for transmission.
-     
+
 *****************************************************************************/
 #define NCSI_CMD_CHANNEL_ID_MAX_VALUE       1
 
@@ -230,16 +230,16 @@ typedef NcsiRmiiControlPktHeader_t *pNcsiRmiiControlPktHeader_t;
 
 /*****************************************************************************
 
-FwTestCmdPayload_t    
+FwTestCmdPayload_t
 
     Structure definition for most basic UMP cmd Payload
-    
+
     Write command is not bounded.
-    
+
     Read command is bounded to 128 bytes, or 32 dwords.  That fits in with
     existing statistics command response payload size, and handles existing
     testing needs.
-	 
+
 *****************************************************************************/
 
 typedef struct FwTestCmdPayload
@@ -282,10 +282,10 @@ typedef enum PhyPrioritySel
 
 /*****************************************************************************
 
-SetDualMediaParametersPayload_t    
+SetDualMediaParametersPayload_t
 
     Structure definitions for Dual Media support
-	 
+
 *****************************************************************************/
 #define NCSI_CMD_SET_PHY_PRIORITY_RSP_PAYLOAD_VERSION     0
 
@@ -1690,14 +1690,14 @@ typedef DellDfltCmd_t DellEnableDisableOutOfBoxWolCmd_t;
 typedef DellRspsDefault_t DellEnableDisableOutOfBoxWolCmdRspData_t;
 
 /*MAX_TLV_COMMAND_SIZE :(i.e.  GetiSCSIBootTargetConfig)
-		connectTgt                         2+8 =10 (“Disabled”)
+		connectTgt                         2+8 =10 ("Disabled")
 		TgtIpAddress                     2+39=41 (IPv6 max size is 39)
 		TgtTcpPort                          2+5=7  (2^16 so 5 digits)
 		TgtBootLun                         2+3=5 (max support is 256)
 		TgtIscsiName                     2+128=130
 		TgtChapId                           2+128=130
 		TgtChapPwd                      2+16=18
-		TgtIpVer                              2+4= 6 (“IPv6”)
+		TgtIpVer                              2+4= 6 ("IPv6")
 
 		Total 347 *2 = 694 bytes (for 1st and 2nd target) just for TLVs
 */
@@ -1719,7 +1719,7 @@ typedef DellRspsDefault_t DellEnableDisableOutOfBoxWolCmdRspData_t;
 //  0x22  Set FC/FCoE Boot Target Config Command - send to the channel (partition) the FC/FCoE Boot Target settings to
 //  be used by the channel (Mandatory)
 //  0x23  NVRAM Commit Command - instructs the Ethernet or FC Controller to write attribute settings held in temporary
-//  storage to the controller’s NVRAM  (Mandatory)
+//  storage to the controller's NVRAM  (Mandatory)
 //  0x24  NVRAM Commit Status Command - send to the channel (partition) the iSCSI Boot Target settings to be used by
 //  the channel (Mandatory)
 */
@@ -1800,10 +1800,10 @@ typedef struct NcsiCmdOemCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdSelectPackageCmdPayload_t    
+NcsiCmdSelectPackageCmdPayload_t
 
     this structure definition is for the select package cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdSelectPackageCmdPayload
 {
@@ -1815,10 +1815,10 @@ typedef struct NcsiCmdSelectPackageCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdEnableMulticastPacketFilteringCmdPayload_t    
+NcsiCmdEnableMulticastPacketFilteringCmdPayload_t
 
     this structure definition is for the  cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdEnableMulticastPacketFilteringCmdPayload
 {
@@ -1832,10 +1832,10 @@ typedef struct NcsiCmdEnableMulticastPacketFilteringCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdSetNcsiFlowControlCmdPayload_t    
+NcsiCmdSetNcsiFlowControlCmdPayload_t
 
     this structure definition is for the set ncsi flowcontrol cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdSetNcsiFlowControlCmdPayload
 {
@@ -1847,10 +1847,10 @@ typedef struct NcsiCmdSetNcsiFlowControlCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdEnableVlanCmdPayload_t    
+NcsiCmdEnableVlanCmdPayload_t
 
     this structure definition is for the set ncsi flowcontrol cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdEnableVlanCmdPayload
 {
@@ -1864,10 +1864,10 @@ typedef struct NcsiCmdEnableVlanCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdSetVlanCmdPayload_t    
+NcsiCmdSetVlanCmdPayload_t
 
     this structure definition is for the enable VLAN cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdSetVlanCmdPayload
 #if defined (BIG_ENDIAN)
@@ -1893,10 +1893,10 @@ typedef struct NcsiCmdSetVlanCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdEnableAenCmdPayload_t    
+NcsiCmdEnableAenCmdPayload_t
 
     this structure definition is for the enable aen cmd Payload.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdEnableAenCmdPayload
 #if defined (BIG_ENDIAN)
@@ -1924,10 +1924,10 @@ typedef struct NcsiCmdEnableAenCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdSetMacAddrCmdPayload_t    
+NcsiCmdSetMacAddrCmdPayload_t
 
     this structure definition is for the set MAC addr command Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdSetMacAddrCmdPayload
 #if defined (BIG_ENDIAN)
@@ -1961,10 +1961,10 @@ typedef struct NcsiCmdSetMacAddrCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdSetLinkCmdPayload_t    
+NcsiCmdSetLinkCmdPayload_t
 
     this structure definition is for the set link command Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdSetLinkCmdPayload
 {
@@ -1977,10 +1977,10 @@ typedef struct NcsiCmdSetLinkCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdDisableResetChannelCmdPayload_t    
+NcsiCmdDisableResetChannelCmdPayload_t
 
     this structure definition is for the reset channel command Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdDisableResetChannelCmdPayload
 {
@@ -1993,10 +1993,10 @@ typedef struct NcsiCmdDisableResetChannelCmdPayload
 
 /*****************************************************************************
 
-NcsiCmdEnableBroadcastPacketFilteringCmdPayload_t    
+NcsiCmdEnableBroadcastPacketFilteringCmdPayload_t
 
     this structure definition is for the set link command Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdEnableBroadcastPacketFilteringCmdPayload
 {
@@ -2018,7 +2018,7 @@ NcsiCmdPayload_t
 
     this union definition combines the various response Payload definitions
     into a single reference.
-	 
+
 *****************************************************************************/
 typedef union NcsiCmdPayload
 {
@@ -2052,11 +2052,11 @@ typedef union NcsiCmdPayload
 NcsiRmiiCmdPkt_t
 
     this structure definition is for the the UMP command frame.
-	
+
     IMD command frames are received from iLO over the UMP interface, and are
-    either processed locally for configuration and control, or are forwarded 
-    for transmission at the primary ethernet port.    
-     
+    either processed locally for configuration and control, or are forwarded
+    for transmission at the primary ethernet port.
+
 *****************************************************************************/
 typedef struct NcsiCmdPkt
 {
@@ -2072,10 +2072,10 @@ typedef NcsiRmiiCmdPkt_t *pNcsiRmiiCmdPkt_t;
 
 /*****************************************************************************
 
-OemDefaultReturnData_t    
+OemDefaultReturnData_t
 
     Structure definition for data portion of most basic response Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdRspStatus
 #if defined (BIG_ENDIAN)
@@ -2181,12 +2181,12 @@ typedef struct NcsiCmdRspStatus
 	0x8006  Unsupported Address type    Returned when the SetAddress command failed because the specified Address Type in the command is not supported.
 	0x8007  Unsupported Passthru type   Returned when the Set Passthru Control or Get Passthru Control command failed because the specified Passthru Type in the command is not supported.
 	0x8008  Reached maximum number of allowed ports Returned when OutOfBox WOL is already configured on the maximum number of ports per channel or Device (may be implementation dependent)
-	0x8009  System reboot required for the changes to be effective  Returned when the command was executed successfully (Response code = 0) but a driver unload or system reboot is required in order for the changes to become effective. 
-	0x800A  Returned when the Ethernet or FC controller does not support the Payload Version specified in the incoming OEM command. Note: This Reason code does not apply to the Get Supported Payload Version command 
-	0x800B  Returned when the command is unable to be successfully executed because there is no OS driver loaded 
-	0x800D  Returned when there is insufficient storage to store parameters to be written to NVRAM 
-	0x800E  Returned when there is a failure in the NVRAM write operation 
-	0x800F  Returned when the NVRAM write operation is not complete 
+	0x8009  System reboot required for the changes to be effective  Returned when the command was executed successfully (Response code = 0) but a driver unload or system reboot is required in order for the changes to become effective.
+	0x800A  Returned when the Ethernet or FC controller does not support the Payload Version specified in the incoming OEM command. Note: This Reason code does not apply to the Get Supported Payload Version command
+	0x800B  Returned when the command is unable to be successfully executed because there is no OS driver loaded
+	0x800D  Returned when there is insufficient storage to store parameters to be written to NVRAM
+	0x800E  Returned when there is a failure in the NVRAM write operation
+	0x800F  Returned when the NVRAM write operation is not complete
 	*/
 #define NCSI_CMD_OEM_DELL_RSN_CODE_NP_NOT_ENABLED                   0x8000
 #define NCSI_CMD_OEM_DELL_RSN_CODE_PARTITION_ID_NOT_ENABLED         0x8001
@@ -2224,7 +2224,7 @@ typedef struct OemDefaultReturnData
 
 NcsiDefaultOemCmdRspData_t
 
-    this structure definition is for the data fields of the rsp frm Payload 
+    this structure definition is for the data fields of the rsp frm Payload
     returned in response to the OEM cmd.
 
 *****************************************************************************/
@@ -2265,7 +2265,7 @@ typedef struct OemTestReturnData
 
 NcsiCmdNcsiTestReadCmdRspData_t
 
-    this structure definition is for the data fields of the rsp frm Payload 
+    this structure definition is for the data fields of the rsp frm Payload
     returned in response to the NCSI Test OEM cmd.
 
 *****************************************************************************/
@@ -2376,7 +2376,7 @@ typedef struct NcsiOemGetDualMediaParametersReturnData
 
 NcsiOemGetNcsiParametersRspData_t
 
-    this structure definition is for the data fields of the rsp frm Payload 
+    this structure definition is for the data fields of the rsp frm Payload
     returned in response to the  OEM cmds.
 
 *****************************************************************************/
@@ -2398,7 +2398,7 @@ typedef struct NcsiOemGetNcsiParametersRspData
 
 NcsiOemGetDualMediaParametersRspData_t
 
-    this structure definition is for the data fields of the rsp frm Payload 
+    this structure definition is for the data fields of the rsp frm Payload
     returned in response to the  OEM cmds.
 
 *****************************************************************************/
@@ -2425,7 +2425,7 @@ typedef struct NcsiOemGetDualMediaParametersRspData
 
 NcsiCmdGetParametersRspData_t
 
-    this structure definition is for the data fields of the rsp frm Payload 
+    this structure definition is for the data fields of the rsp frm Payload
     returned in response to the get parameters ump cmd.
 
 *****************************************************************************/
@@ -2567,11 +2567,11 @@ typedef struct NcsiCmdGetCapabilitiesRspData
 
 /*****************************************************************************
 
-NcsiCmdGetLinkStatusRspData_t    
+NcsiCmdGetLinkStatusRspData_t
 
-    this structure definition is for the data field portion of the response 
+    this structure definition is for the data field portion of the response
     Payload returned when processing the get link status ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetLinkStatusRspData
 {
@@ -2629,9 +2629,9 @@ typedef struct NcsiCmdGetLinkStatusRspData
 
 NcsiCmdGetNcsiStatisticsRspData_t
 
-    this structure defines the data field portion of the response Payload 
+    this structure defines the data field portion of the response Payload
     returned when processing the get ncsi statistics cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetNcsiStatisticsRspData
 {
@@ -2660,9 +2660,9 @@ typedef NcsiCmdGetNcsiStatisticsRspData_t *pNcsiCmdGetNcsiStatisticsRspData_t;
 
 NcsiCmdGetNcsiPassThruStatisticsRspData_t
 
-    this structure defines the data field portion of the response Payload 
+    this structure defines the data field portion of the response Payload
     returned when processing the get ncsi pass through statistics  cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetNcsiPassThruStatisticsRspData
 {
@@ -2752,9 +2752,9 @@ typedef NcsiNicEmacStats_t *pNcsiNicEmacStats_t;
 
 NcsiCmdGetPortStatisticsRspData_t
 
-    this structure defines the data field portion of the response Payload 
+    this structure defines the data field portion of the response Payload
     returned when processing the get ump i/f statistics ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetPortStatisticsRspData
 {
@@ -2780,9 +2780,9 @@ typedef NcsiCmdGetPortStatisticsRspData_t *pNcsiCmdGetPortStatisticsRspData_t;
 
 NcsiCmdGetControllerVerIdRspData_t
 
-    this structure definition is for the data fields of the response Payload 
+    this structure definition is for the data fields of the response Payload
     returned used processing the get bcm version ID ump cmd.
-	 
+
 *****************************************************************************/
 #define GET_NIC_VER_ID_SIZE_OF_FW_NAME 12
 typedef struct NcsiCmdGetControllerVerIdRspData
@@ -2852,10 +2852,10 @@ typedef struct NcsiCmdGetControllerVerIdRspData
 
 /*****************************************************************************
 
-NcsiCmdDefaultRspPayload_t    
+NcsiCmdDefaultRspPayload_t
 
     Structure definition for most basic UMP response Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdDefaultRspPayload
 {
@@ -2871,11 +2871,11 @@ typedef NcsiCmdDefaultRspPayload_t *pNcsiCmdDefaultRspPayload_t;
 
 /*****************************************************************************
 
-NcsiDefaultOemCmdRspPayload_t    
+NcsiDefaultOemCmdRspPayload_t
 
     this structure defines the response Payload returned after processing
     the Oem cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiDefaultOemCmdRspPayload
 {
@@ -2888,11 +2888,11 @@ typedef NcsiDefaultOemCmdRspPayload_t *pNcsiDefaultOemCmdRspPayload_t;
 
 /*****************************************************************************
 
-NcsiOemGetNcsiParametersRspPayload_t    
+NcsiOemGetNcsiParametersRspPayload_t
 
     this structure defines the response Payload returned after processing
     the Oem cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiOemGetNcsiParametersRspPayload
 {
@@ -2906,11 +2906,11 @@ typedef NcsiOemGetNcsiParametersRspPayload_t *pNcsiOemGetNcsiParametersRspPayloa
 
 /*****************************************************************************
 
-NcsiOemGetDualMediaParametersRspPayload_t    
+NcsiOemGetDualMediaParametersRspPayload_t
 
     this structure defines the response Payload returned after processing
     the Oem cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiOemGetDualMediaParametersRspPayload
 {
@@ -3032,11 +3032,11 @@ typedef DellRspsDefault_t      DellRspsGetCommitNvramStatus_t;
 
 /*****************************************************************************
 
-NcsiDellOemCmdRspPayload_t    
+NcsiDellOemCmdRspPayload_t
 
     this structure defines the response Payload returned after processing
     the Oem cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiDellOemCmdRspPayload
 {
@@ -3118,11 +3118,11 @@ typedef struct NcsiCmdNcsiTestReadRspPayload
 
 /*****************************************************************************
 
-NcsiCmdGetLinkStatusRspPayload_t    
+NcsiCmdGetLinkStatusRspPayload_t
 
     this structure defines the response Payload returned after processing
     the get link status ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetLinkStatusRspPayload
 {
@@ -3136,11 +3136,11 @@ typedef NcsiCmdGetLinkStatusRspPayload_t *pNcsiCmdGetLinkStatusRspPayload_t;
 
 /*****************************************************************************
 
-NcsiCmdGetCapabilitiesRspPayload_t    
+NcsiCmdGetCapabilitiesRspPayload_t
 
     this structure defines the response Payload returned after processing
     the get link status ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetCapabilitiesRspPayload
 {
@@ -3160,7 +3160,7 @@ NcsiCmdGetPortStatisticsRspPayload_t
 
     this structure definition is for the response Payload used when processing
     the get i/f statistics ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetPortStatisticsRspPayload
 {
@@ -3176,7 +3176,7 @@ NcsiCmdGetNcsiStatisticsRspPayload_t
 
     this structure definition is for the response Payload used when processing
     the get ump i/f statistics ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetNcsiStatisticsRspPayload
 {
@@ -3189,12 +3189,12 @@ typedef NcsiCmdGetNcsiStatisticsRspPayload_t *pNcsiCmdGetNcsiStatisticsRspPayloa
 
 
 /*****************************************************************************
-		   
+
 NcsiCmdGetNcsiPassThruStatisticsRspPayload_t
 
     this structure definition is for the response Payload used when processing
     the get .
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdGetNcsiPassThruStatisticsRspPayload
 {
@@ -3211,7 +3211,7 @@ NcsiCmdGetControllerVerIdRspPayload_t
 
     this structure definition is for the response Payload used when processing
     the get bcm version ID ump cmd.
-	 
+
 *****************************************************************************/
 typedef struct  NcsiCmdGetControllerVerIdRspPayload
 {
@@ -3226,7 +3226,7 @@ NcsiCmdRspPayload_t
 
     this union definition combines the various response Payload definitions
     into a single reference.
-	 
+
 *****************************************************************************/
 typedef union NcsiCmdRspPayload
 {
@@ -3257,12 +3257,12 @@ NcsiRmiiCmdRspPkt_t
 
     this structure definition is for the command response frame that is sent
     back to the IMD for each processed UMP command.
-    
-    IMD command frames are acknowledged by copying the command frame header 
+
+    IMD command frames are acknowledged by copying the command frame header
     into received from iLO over the UMP interface, and are
-    either processed locally for configuration and control, or are forwarded 
-    for transmission at the primary ethernet port.    
-     
+    either processed locally for configuration and control, or are forwarded
+    for transmission at the primary ethernet port.
+
 *****************************************************************************/
 typedef struct NcsiRmiiCmdRspPkt
 {
@@ -3276,10 +3276,10 @@ typedef NcsiRmiiCmdRspPkt_t *pNcsiRmiiCmdRspPkt_t;
 
 /*****************************************************************************
 
-NcsiCmdDefaultAenData_t    
+NcsiCmdDefaultAenData_t
 
     Structure definition for most basic Aen data
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdDefaultAenData
 {
@@ -3292,10 +3292,10 @@ typedef struct NcsiCmdDefaultAenData
 
 /*****************************************************************************
 
-NcsiCmdLinkChangedAenData_t    
+NcsiCmdLinkChangedAenData_t
 
     Structure definition for link changed Aen data
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdLinkChangedAenData
 {
@@ -3307,10 +3307,10 @@ typedef struct NcsiCmdLinkChangedAenData
 
 /*****************************************************************************
 
-NcsiCmdOsChangedAenData_t    
+NcsiCmdOsChangedAenData_t
 
     Structure definition for os changed Aen data
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdOsChangedAenData
 {
@@ -3330,10 +3330,10 @@ typedef struct NcsiCmdOsChangedAenData
 
 /*****************************************************************************
 
-NcsiCmdDefaultAenPayload_t    
+NcsiCmdDefaultAenPayload_t
 
     Structure definition for most basic Aen Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdDefaultAenPayload
 {
@@ -3344,10 +3344,10 @@ typedef struct NcsiCmdDefaultAenPayload
 
 /*****************************************************************************
 
-NcsiCmdLinkChangedAenPayload_t    
+NcsiCmdLinkChangedAenPayload_t
 
     Structure definition for Link changed Aen Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdLinkChangedAenPayload
 {
@@ -3358,10 +3358,10 @@ typedef struct NcsiCmdLinkChangedAenPayload
 
 /*****************************************************************************
 
-NcsiCmdOsChangedAenPayload_t    
+NcsiCmdOsChangedAenPayload_t
 
     Structure definition for os chagned Aen Payload
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdOsChangedAenPayload
 {
@@ -3377,7 +3377,7 @@ NcsiCmdAenPayload_t
 
     this union definition combines the various Aen Payload definitions
     into a single reference.
-	 
+
 *****************************************************************************/
 typedef union NcsiCmdAenPayload
 {
@@ -3398,9 +3398,9 @@ typedef union NcsiCmdAenPayload
 
 NcsiCmdAenPacket_t
 
-    this structure definition is for the UMP AEN frame that is sent to the BMC 
+    this structure definition is for the UMP AEN frame that is sent to the BMC
     for to report asynchronous events.
-	 
+
 *****************************************************************************/
 typedef struct NcsiCmdAenPacket
 {
@@ -3412,10 +3412,3 @@ typedef NcsiCmdAenPacket_t *pNcsiCmdAenPacket_t;
 
 
 #endif
-
-
-
-
-
-
-

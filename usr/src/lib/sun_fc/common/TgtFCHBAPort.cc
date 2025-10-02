@@ -155,7 +155,7 @@ TgtFCHBAPort::transportError(uint32_t fctio_errno, char *message) {
 	    fcioErrorString = "abort request failed";
 	    break;
 	case FC_BADEXCHANGE:
-	    fcioErrorString = "exchange doesn’t exist";
+	    fcioErrorString = "exchange doesn't exist";
 	    break;
 	case FC_BADWWN:
 	    fcioErrorString = "WWN not recognized";
@@ -439,7 +439,7 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
 	}
 
 	fct_ioctl(FCTIO_CMD, &fctio);
-	memcpy(pRspBuffer, (uchar_t *)(uintptr_t)fctio.fctio_obuf, 
+	memcpy(pRspBuffer, (uchar_t *)(uintptr_t)fctio.fctio_obuf,
 	       *pRspBufferSize);
 	if (fctio.fctio_obuf != 0) {
 	    delete((uchar_t *)(uintptr_t)fctio.fctio_obuf);
@@ -450,7 +450,7 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
  * @memo	    Validate that the port is still present in the system
  * @exception	    UnavailableException if the port is not present
  * @version	    1.7
- * 
+ *
  * @doc		    If the port is still present on the system, the routine
  *		    will return normally.  If the port is not present
  *		    an exception will be thrown.

@@ -50,6 +50,6 @@ PYSRCS = \
 	PkgFmt.py	\
 	ShellLint.py	\
 	SpellCheck.py	\
+	UTF8Check.py	\
 	WsCheck.py	\
 	__init__.py
-

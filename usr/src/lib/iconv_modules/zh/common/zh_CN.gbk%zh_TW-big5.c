@@ -263,13 +263,24 @@ int binsearch(unsigned long x, table_t table[], int n) {
 }
 
 #ifdef DEBUG
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int
 main(int argc, char * argv[]) {
 	_iconv_st * ist;
-	char * inbuf = "以下所列的每一标题代表一个已安装并注册了联机提示的 产品系列 。";
+	char * inbuf = "\xd2\xd4\xcf\xc2\xcb\xf9\xc1\xd0\xb5\xc4\xc3\xbf\xd2"
+	    "\xbb\xb1\xea\xcc\xe2\xb4\xfa\xb1\xed\xd2\xbb\xb8\xf6\xd2\xd1\xb0"
+	    "\xb2\xd7\xb0\xb2\xa2\xd7\xa2\xb2\xe1\xc1\xcb\xc1\xaa\xbb\xfa\xcc"
+	    "\xe1\xca\xbe\xb5\xc4\x20\xb2\xfa\xc6\xb7\xcf\xb5\xc1\xd0\x20\xa1"
+	    "\xa3";
 	char * outbuf;
 	char * ib, * oub;
-	int inbyteleft;
-	int outbyteleft;
+	size_t inbyteleft;
+	size_t outbyteleft;
 
 	ist = (_iconv_st *) _icv_open();
 	inbyteleft = outbyteleft = 2 * strlen(inbuf);
@@ -279,5 +290,7 @@ main(int argc, char * argv[]) {
 	_icv_iconv(ist, &inbuf, &inbyteleft, &outbuf, &outbyteleft);
 	printf("IN -- %s\n", ib);
 	printf("OUT -- %s\n", oub);
+
+	return (0);
 }
 #endif

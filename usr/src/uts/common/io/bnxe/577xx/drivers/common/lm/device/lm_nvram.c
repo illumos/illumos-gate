@@ -54,7 +54,7 @@ acquire_nvram_lock(
     lm_status_t lm_status;
     u32_t j, cnt;
     u32_t val;
-    u8_t port_num = PORT_ID(pdev); /* TBD - E1H: nvram lock – DOES NOT scale to 8 functions! (only 4 clients)
+    u8_t port_num = PORT_ID(pdev); /* TBD - E1H: nvram lock â€“ DOES NOT scale to 8 functions! (only 4 clients)
                                     * 1. Can we assume no concurrent access by control applications?
                                     * 2. If not, the MISC lock is our backup */
 
@@ -498,7 +498,7 @@ lm_nvram_write(
     }
     // TODO what is the nvram total size
     if(offset + buf_size > pdev->hw_info.flash_spec.total_size)
-    {		
+    {
 	DbgMessage(pdev, FATAL, "lm_nvram_write failed ! buf_size %d larger than NVM total_size %d\n", buf_size, pdev->hw_info.flash_spec.total_size);
         DbgBreakMsg("Failed to write to NVM! Attemp to write to offset larger than NVM total size !\n");
 

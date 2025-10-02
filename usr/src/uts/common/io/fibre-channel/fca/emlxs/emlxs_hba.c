@@ -2247,7 +2247,7 @@ emlxs_handle_async_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case 0x0100:	/* Temp Warning */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_temp_warning_msg,
-		    "Adapter is very hot (%d °C). Take corrective action.",
+		    "Adapter is very hot (%d Â°C). Take corrective action.",
 		    iocb->ULPCONTEXT);
 
 		hba->temperature = iocb->ULPCONTEXT;
@@ -2260,7 +2260,7 @@ emlxs_handle_async_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	case 0x0101:	/* Temp Safe */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_temp_msg,
-		    "Adapter temperature now safe (%d °C).",
+		    "Adapter temperature now safe (%d Â°C).",
 		    iocb->ULPCONTEXT);
 
 		hba->temperature = iocb->ULPCONTEXT;

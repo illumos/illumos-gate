@@ -93,7 +93,7 @@
 #define CORE_SPQE_PAGE_SIZE_BYTES			4096
 
 /*
- * Usually LL2 queues are opened in pairs – TX-RX.
+ * Usually LL2 queues are opened in pairs - TX-RX.
  * There is a hard restriction on number of RX queues (limited by Tstorm RAM) and TX counters (Pstorm RAM).
  * Number of TX queues is almost unlimited.
  * The constants are different so as to allow asymmetric LL2 connections

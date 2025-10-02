@@ -100,6 +100,8 @@ file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
 file path=opt/onbld/bin/signit mode=0555
 file path=opt/onbld/bin/signproto mode=0555
+file path=opt/onbld/bin/utf8check mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|WsCheck).*
 file path=opt/onbld/bin/validate_flg mode=0555
 file path=opt/onbld/bin/validate_paths mode=0555
 file path=opt/onbld/bin/validate_pkg mode=0555
@@ -166,6 +168,8 @@ file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ShellLint.py \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/SpellCheck.py \
     mode=0444
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/UTF8Check.py \
+    mode=0444
 file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/WsCheck.py \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__init__.py \
@@ -215,6 +219,9 @@ file \
     mode=0444
 file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/SpellCheck.cpython$(PYTHON3_PKGVERS).pyc \
+    mode=0444
+file \
+    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/UTF8Check.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
 file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/WsCheck.cpython$(PYTHON3_PKGVERS).pyc \

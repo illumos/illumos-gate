@@ -4630,7 +4630,7 @@ emlxs_handle_ff_error(emlxs_hba_t *hba)
 		    ((volatile uint8_t *)hba->sli.sli3.slim_addr + 0xb0));
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_hardware_error_msg,
-		    "Maximum adapter temperature exceeded (%d °C).", status1);
+		    "Maximum adapter temperature exceeded (%d Â°C).", status1);
 
 		hba->temperature = status1;
 		hba->flag |= FC_OVERTEMP_EVENT;

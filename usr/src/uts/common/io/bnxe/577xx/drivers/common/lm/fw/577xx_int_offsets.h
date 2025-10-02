@@ -117,7 +117,7 @@
 /* Maps between VF IDs and their parent PF */
 #define XSTORM_VF_TO_PF_OFFSET(funcId)                               (IRO[48].base + ((funcId) * IRO[48].m1))
 #define XSTORM_VF_TO_PF_SIZE                                         (IRO[48].size)
-/* When set, all slow path commands for this function are recorded in Storm’s assert memory (debug feature). */
+/* When set, all slow path commands for this function are recorded in Storm's assert memory (debug feature). */
 #define XSTORM_RECORD_SLOW_PATH_OFFSET(funcId)                       (IRO[49].base + ((funcId) * IRO[49].m1))
 #define XSTORM_RECORD_SLOW_PATH_SIZE                                 (IRO[49].size)
 /* Xstorm assert list location in RAM */
@@ -220,7 +220,7 @@
 /* Maps between VF IDs and their parent PF */
 #define TSTORM_VF_TO_PF_OFFSET(funcId)                               (IRO[108].base + ((funcId) * IRO[108].m1))
 #define TSTORM_VF_TO_PF_SIZE                                         (IRO[108].size)
-/* When set, all slow path commands for this function are recorded in Storm’s assert memory (debug feature). */
+/* When set, all slow path commands for this function are recorded in Storm's assert memory (debug feature). */
 #define TSTORM_RECORD_SLOW_PATH_OFFSET(funcId)                       (IRO[109].base + ((funcId) * IRO[109].m1))
 #define TSTORM_RECORD_SLOW_PATH_SIZE                                 (IRO[109].size)
 /* Offset of per-queue statistics in Tstorm. Need to be zeroes before clients which use this statistics queue are loaded. */
@@ -398,7 +398,7 @@
 /* Maps between VF IDs and their parent PF */
 #define USTORM_VF_TO_PF_OFFSET(funcId)                               (IRO[183].base + ((funcId) * IRO[183].m1))
 #define USTORM_VF_TO_PF_SIZE                                         (IRO[183].size)
-/* When set, all slow path commands for this function are recorded in Storm’s assert memory (debug feature). */
+/* When set, all slow path commands for this function are recorded in Storm's assert memory (debug feature). */
 #define USTORM_RECORD_SLOW_PATH_OFFSET(funcId)                       (IRO[184].base + ((funcId) * IRO[184].m1))
 #define USTORM_RECORD_SLOW_PATH_SIZE                                 (IRO[184].size)
 /* Offset of per-queue statistics in Ustorm. Need to be zeroes before clients which use this statistics queue are loaded. */
@@ -413,7 +413,7 @@
 /* Enable for pause on exhausted ring feature for TOE */
 #define USTORM_TOE_PAUSE_ENABLED_OFFSET(portId)                      (IRO[188].base + ((portId) * IRO[188].m1))
 #define USTORM_TOE_PAUSE_ENABLED_SIZE                                (IRO[188].size)
-/* Timeout for stopping sending pause commands from RX firmware, in order to avoid “constant pause” in case of driver not responding. */
+/* Timeout for stopping sending pause commands from RX firmware, in order to avoid "constant pause" in case of driver not responding. */
 #define USTORM_MAX_PAUSE_TIME_USEC_OFFSET(portId)                    (IRO[189].base + ((portId) * IRO[189].m1))
 #define USTORM_MAX_PAUSE_TIME_USEC_SIZE                              (IRO[189].size)
 /* Internal statistics of error handlers in Everets2 */

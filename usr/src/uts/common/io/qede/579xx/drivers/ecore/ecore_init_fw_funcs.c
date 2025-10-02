@@ -20,16 +20,16 @@
 */
 
 /*
-* Copyright 2014-2017 Cavium, Inc. 
-* The contents of this file are subject to the terms of the Common Development 
+* Copyright 2014-2017 Cavium, Inc.
+* The contents of this file are subject to the terms of the Common Development
 * and Distribution License, v.1,  (the "License").
 
 * You may not use this file except in compliance with the License.
 
-* You can obtain a copy of the License at available 
+* You can obtain a copy of the License at available
 * at http://opensource.org/licenses/CDDL-1.0
 
-* See the License for the specific language governing permissions and 
+* See the License for the specific language governing permissions and
 * limitations under the License.
 */
 
@@ -71,7 +71,7 @@ static u16 task_region_offsets[1][E4_NUM_OF_CONNECTION_TYPES] = {
 /* WFQ constants: */
 
 /* Upper bound in MB, 10 * burst size of 1ms in 50Gbps */
-#define QM_WFQ_UPPER_BOUND		62500000 
+#define QM_WFQ_UPPER_BOUND		62500000
 
 /* Bit  of VOQ in WFQ VP PQ map */
 #define QM_WFQ_VP_PQ_VOQ_SHIFT		0
@@ -80,13 +80,13 @@ static u16 task_region_offsets[1][E4_NUM_OF_CONNECTION_TYPES] = {
 #define QM_WFQ_VP_PQ_PF_SHIFT		5
 
 /* 0x9000 = 4*9*1024 */
-#define QM_WFQ_INC_VAL(weight)		((weight) * 0x9000) 
+#define QM_WFQ_INC_VAL(weight)		((weight) * 0x9000)
 
 /* 0.7 * upper bound (62500000) */
 #define QM_WFQ_MAX_INC_VAL		43750000
 
 /* RL constants: */
- 
+
 /* Upper bound is set to 10 * burst size of 1ms in 50Gbps */
 #define QM_RL_UPPER_BOUND		62500000
 
@@ -94,7 +94,7 @@ static u16 task_region_offsets[1][E4_NUM_OF_CONNECTION_TYPES] = {
 #define QM_RL_PERIOD			5
 
 /* Period in 25MHz cycles */
-#define QM_RL_PERIOD_CLK_25M		(25 * QM_RL_PERIOD) 
+#define QM_RL_PERIOD_CLK_25M		(25 * QM_RL_PERIOD)
 
 /* 0.7 * upper bound (62500000) */
 #define QM_RL_MAX_INC_VAL		43750000
@@ -230,8 +230,8 @@ static void ecore_cmdq_lines_voq_rt_init(struct ecore_hwfn *p_hwfn,
 										 u8 voq,
 										 u16 cmdq_lines)
 {
-	u32 qm_line_crd;	
-		
+	u32 qm_line_crd;
+
 	qm_line_crd = QM_VOQ_LINE_CRD(cmdq_lines);
 
 	OVERWRITE_RT_REG(p_hwfn, PBF_CMDQ_LINES_RT_OFFSET(voq), (u32)cmdq_lines);
@@ -291,7 +291,7 @@ static void ecore_cmdq_lines_rt_init(struct ecore_hwfn *p_hwfn,
  *	 headroom.
  *    b. B = B - 38 (remainder after global headroom allocation).
  *    c. MAX(38,B/(C+0.7)) blocks are allocated for the pure LB VOQ.
- *    d. B = B – MAX(38, B/(C+0.7)) (remainder after pure LB allocation).
+ *    d. B = B - MAX(38, B/(C+0.7)) (remainder after pure LB allocation).
  *    e. B/C blocks are allocated for each physical TC.
  * Assumptions:
  * - MTU is up to 9700 bytes (38 blocks)
@@ -461,7 +461,7 @@ static void ecore_other_pq_map_rt_init(struct ecore_hwfn *p_hwfn,
 	/* Map PQ group to PF */
 	STORE_RT_REG(p_hwfn, QM_REG_PQOTHER2PF_0_RT_OFFSET + pq_group, (u32)(pf_id));
 
-	/* Set PQ sizes */       
+	/* Set PQ sizes */
 	STORE_RT_REG(p_hwfn, QM_REG_MAXPQSIZE_2_RT_OFFSET, QM_PQ_SIZE_256B(pq_size));
 
 	/* Set base address */
@@ -513,7 +513,7 @@ static int ecore_pf_rl_rt_init(struct ecore_hwfn *p_hwfn,
 							  u32 pf_rl)
 {
 	u32 inc_val;
-	
+
 	inc_val = QM_RL_INC_VAL(pf_rl);
 	if (inc_val > QM_RL_MAX_INC_VAL) {
 		DP_NOTICE(p_hwfn, true, "Invalid PF rate limit configuration\n");
@@ -753,7 +753,7 @@ int ecore_init_pf_wfq(struct ecore_hwfn *p_hwfn,
 					  u16 pf_wfq)
 {
 	u32 inc_val;
-	
+
 	inc_val = QM_WFQ_INC_VAL(pf_wfq);
 	if (!inc_val || inc_val > QM_WFQ_MAX_INC_VAL) {
 		DP_NOTICE(p_hwfn, true, "Invalid PF WFQ weight configuration\n");
@@ -771,7 +771,7 @@ int ecore_init_pf_rl(struct ecore_hwfn *p_hwfn,
 					 u32 pf_rl)
 {
 	u32 inc_val;
-	
+
 	inc_val = QM_RL_INC_VAL(pf_rl);
 	if (inc_val > QM_RL_MAX_INC_VAL) {
 		DP_NOTICE(p_hwfn, true, "Invalid PF rate limit configuration\n");
@@ -887,7 +887,7 @@ bool ecore_send_qm_stop_cmd(struct ecore_hwfn *p_hwfn,
 #define NIG_RL_PERIOD			1
 
 /* Period in 25MHz cycles */
-#define NIG_RL_PERIOD_CLK_25M		(25 * NIG_RL_PERIOD) 
+#define NIG_RL_PERIOD_CLK_25M		(25 * NIG_RL_PERIOD)
 
 /* Rate in mbps */
 #define NIG_RL_INC_VAL(rate)		(((rate) * NIG_RL_PERIOD) / 8)
@@ -930,7 +930,7 @@ void ecore_init_nig_ets(struct ecore_hwfn *p_hwfn,
 
 		/* Update WFQ map */
 		wfq_tc_map |= (1 << tc);
-                                
+
 		/* Find minimal weight */
 		if (tc_req->weight < min_weight)
 			min_weight = tc_req->weight;
@@ -1084,7 +1084,7 @@ void ecore_init_prs_ets(struct ecore_hwfn *p_hwfn,
 
 		/* Update WFQ map */
 		wfq_tc_map |= (1 << tc);
-                                
+
 		/* Find minimal weight */
 		if (tc_req->weight < min_weight)
 			min_weight = tc_req->weight;
@@ -1121,7 +1121,7 @@ void ecore_init_prs_ets(struct ecore_hwfn *p_hwfn,
 /* BRB: RAM configuration constants */
 #define BRB_TOTAL_RAM_BLOCKS_BB	4800
 #define BRB_TOTAL_RAM_BLOCKS_K2	5632
-#define BRB_BLOCK_SIZE		128 
+#define BRB_BLOCK_SIZE		128
 #define BRB_MIN_BLOCKS_PER_TC	9
 #define BRB_HYST_BYTES		10240
 #define BRB_HYST_BLOCKS		(BRB_HYST_BYTES / BRB_BLOCK_SIZE)
@@ -1318,7 +1318,7 @@ void ecore_set_geneve_enable(struct ecore_hwfn *p_hwfn,
 
 	/* Update PRS register */
 	reg_val = ecore_rd(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN);
-	SET_TUNNEL_TYPE_ENABLE_BIT(reg_val, PRS_REG_ENCAPSULATION_TYPE_EN_ETH_OVER_GENEVE_ENABLE_SHIFT, eth_geneve_enable);   
+	SET_TUNNEL_TYPE_ENABLE_BIT(reg_val, PRS_REG_ENCAPSULATION_TYPE_EN_ETH_OVER_GENEVE_ENABLE_SHIFT, eth_geneve_enable);
 	SET_TUNNEL_TYPE_ENABLE_BIT(reg_val, PRS_REG_ENCAPSULATION_TYPE_EN_IP_OVER_GENEVE_ENABLE_SHIFT, ip_geneve_enable);
 	ecore_wr(p_hwfn, p_ptt, PRS_REG_ENCAPSULATION_TYPE_EN, reg_val);
 	if (reg_val) /* TODO: handle E5 init */
@@ -1327,7 +1327,7 @@ void ecore_set_geneve_enable(struct ecore_hwfn *p_hwfn,
 	/* Update NIG register */
 	ecore_wr(p_hwfn, p_ptt, NIG_REG_NGE_ETH_ENABLE, eth_geneve_enable ? 1 : 0);
 	ecore_wr(p_hwfn, p_ptt, NIG_REG_NGE_IP_ENABLE, ip_geneve_enable ? 1 : 0);
-    
+
 	/* EDPM with geneve tunnel not supported in BB */
 	if (ECORE_IS_BB_B0(p_hwfn->p_dev))
 		return;
@@ -1344,7 +1344,7 @@ void ecore_set_geneve_enable(struct ecore_hwfn *p_hwfn,
 #define T_ETH_PACKET_MATCH_RFS_EVENTID 25
 #define PARSER_ETH_CONN_CM_HDR 0
 #define CAM_LINE_SIZE sizeof(u32)
-#define RAM_LINE_SIZE sizeof(u64) 
+#define RAM_LINE_SIZE sizeof(u64)
 #define REG_SIZE sizeof(u32)
 
 
@@ -1414,7 +1414,7 @@ void ecore_set_rfs_mode_enable(struct ecore_hwfn *p_hwfn,
 	rfs_cm_hdr_event_id |=  T_ETH_PACKET_MATCH_RFS_EVENTID << PRS_REG_CM_HDR_GFT_EVENT_ID_SHIFT;
 	rfs_cm_hdr_event_id |=  PARSER_ETH_CONN_CM_HDR << PRS_REG_CM_HDR_GFT_CM_HDR_SHIFT;
 	ecore_wr(p_hwfn, p_ptt, PRS_REG_CM_HDR_GFT, rfs_cm_hdr_event_id);
-    
+
 	/* Configure Registers for RFS mode */
 
 	/* Enable gft search */
@@ -1422,7 +1422,7 @@ void ecore_set_rfs_mode_enable(struct ecore_hwfn *p_hwfn,
 
 	/* Do not load context only cid in PRS on match. */
 	ecore_wr(p_hwfn, p_ptt, PRS_REG_LOAD_L2_FILTER, 0);
-      
+
 	/* Cam line is now valid!! */
 	cam_line.cam_line_mapped.camline = 0;
 	SET_FIELD(cam_line.cam_line_mapped.camline, GFT_CAM_LINE_MAPPED_VALID, 1);
@@ -1481,12 +1481,12 @@ void ecore_set_rfs_mode_enable(struct ecore_hwfn *p_hwfn,
 void ecore_config_vf_zone_size_mode(struct ecore_hwfn *p_hwfn, struct ecore_ptt *p_ptt, u16 mode, bool runtime_init)
 {
 	u32 msdm_vf_size_log = MSTORM_VF_ZONE_DEFAULT_SIZE_LOG;
-	u32 msdm_vf_offset_mask; 
+	u32 msdm_vf_offset_mask;
 
 	if (mode == VF_ZONE_SIZE_MODE_DOUBLE)
-		msdm_vf_size_log += 1; 
+		msdm_vf_size_log += 1;
 	else if (mode == VF_ZONE_SIZE_MODE_QUAD)
-		msdm_vf_size_log += 2; 
+		msdm_vf_size_log += 2;
 
 	msdm_vf_offset_mask = (1 << msdm_vf_size_log) - 1;
 

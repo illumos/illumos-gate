@@ -27,7 +27,7 @@
  */
 
 /*
- * Based on libixp code: ©2007-2010 Kris Maglione <maglione.k at Gmail>
+ * Based on libixp code: Â©2007-2010 Kris Maglione <maglione.k at Gmail>
  */
 
 #include <stdlib.h>

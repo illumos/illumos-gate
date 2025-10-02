@@ -68,6 +68,7 @@ PYFILES= \
 	git-pbchk \
 	hdrchk \
 	mapfilechk \
+	utf8check \
 	validate_pkg \
 	wscheck \
 	wsdiff

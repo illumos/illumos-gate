@@ -780,7 +780,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
     hdr += get_ip_hdr_len(hdr);
 
 /* GRE header
-   | Bits 0–4 | 5–7   | 8–12  | 13–15   | 16–31         |
+   | Bits 0-4 | 5-7   | 8-12  | 13-15   | 16-31         |
    | C|0|K|S  | Recur | Flags | Version | Protocol Type |
    |           Checksum (optional)      | Reserved      |
    |           Key (optional)                           |
@@ -827,7 +827,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
         if (hdr[9] == 0x06)
         {
             // create the psuedo header
-/* | Bit offset | 0–7    |    8–15  |    16–31   |
+/* | Bit offset | 0-7    |    8-15  |    16-31   |
    |     0      |    Source address              |
    |    32      |  Destination address           |
    |    64      | Zeros  | Protocol | TCP length | */
@@ -855,7 +855,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
         {
             // tcp over ipv6
             // create the psuedo header
-/* | Bit offset | 0–7 | 8–15 | 16–23 |  24–31     |
+/* | Bit offset | 0-7 | 8-15 | 16-23 |  24-31     |
    |     0      |     Source address              |
    |    32      |                                 |
    |    64      |                                 |
@@ -1280,4 +1280,3 @@ lm_return_packet_bytes( struct _lm_device_t *pdev,
         }
     }
 }
-

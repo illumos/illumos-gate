@@ -23,11 +23,11 @@
 /* STP machine instance : bridge per VLAN: 17.17 */
 /* The Clause 17.13 points: "NOTE:The operation of the Bridge as a whole can
  * be represented by the interaction between Bridge Ports specified,
- * and by parameters of the Bridge stored in ‘Port 0’. This removes the
- * need for any ‘per Bridge’ specification elements, and helps ensure
+ * and by parameters of the Bridge stored in 'Port 0'. This removes the
+ * need for any 'per Bridge' specification elements, and helps ensure
  * the minimum dependencies between Bridge Ports. This in turn supports
  * the development of implementations that scale well with increasing
- * numbers of Bridge Ports. This shift of focus to ‘per Port operation’
+ * numbers of Bridge Ports. This shift of focus to 'per Port operation'
  * for the RSTP is supported by underlying technical changes from the
  * Spanning Tree Algorithm and Protocol (Clause 8):"
  * Newetheless, it seems to me, the behaviour of of the bridge, its variables

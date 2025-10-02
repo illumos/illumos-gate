@@ -160,7 +160,7 @@ FCHBAPort::transportError(uint32_t fcio_errno, char *message) {
 	    fcioErrorString = "abort request failed";
 	    break;
 	case FC_BADEXCHANGE:
-	    fcioErrorString = "exchange doesn’t exist";
+	    fcioErrorString = "exchange doesn't exist";
 	    break;
 	case FC_BADWWN:
 	    fcioErrorString = "WWN not recognized";

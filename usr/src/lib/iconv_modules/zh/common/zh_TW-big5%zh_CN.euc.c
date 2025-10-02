@@ -212,9 +212,24 @@ int binsearch(unsigned long x, table_t table[], int n) {
 }
 
 #ifdef DEBUG
-main(int argc, char * argv[]) {
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+int
+main(int argc, char * argv[])
+{
 	_iconv_st * ist;
-	char * inbuf = "以下所列的每一標題代表一個已安裝並注冊了聯機提示的產品系列。每一標題（和圖標）是一個列出該系列提示的超鏈接。";
+	char * inbuf = "\xa5\x48\xa4\x55\xa9\xd2\xa6\x43\xaa\xba\xa8\x43\xa4"
+	    "\x40\xbc\xd0\xc3\x44\xa5\x4e\xaa\xed\xa4\x40\xad\xd3\xa4\x77"
+	    "\xa6\x77\xb8\xcb\xa8\xc3\xaa\x60\xa5\x55\xa4\x46\xc1\x70\xbe"
+	    "\xf7\xb4\xa3\xa5\xdc\xaa\xba\xb2\xa3\xab\x7e\xa8\x74\xa6\x43"
+	    "\xa1\x43\xa8\x43\xa4\x40\xbc\xd0\xc3\x44\xa1\x5d\xa9\x4d\xb9"
+	    "\xcf\xbc\xd0\xa1\x5e\xac\x4f\xa4\x40\xad\xd3\xa6\x43\xa5\x58"
+	    "\xb8\xd3\xa8\x74\xa6\x43\xb4\xa3\xa5\xdc\xaa\xba\xb6\x57\xc3"
+	    "\xec\xb1\xb5\xa1\x43";
 	char * outbuf;
 	char * ib, * oub;
 	int inbyteleft;
@@ -228,5 +243,7 @@ main(int argc, char * argv[]) {
 	_icv_iconv(ist, &inbuf, &inbyteleft, &outbuf, &outbyteleft);
 	printf("IN -- %s\n", ib);
 	printf("OUT -- %s\n", oub);
+
+	return (0);
 }
 #endif

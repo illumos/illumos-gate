@@ -1,5 +1,5 @@
 /*******************************************************************************
-* mm_l4if.h - L4 mm interface 
+* mm_l4if.h - L4 mm interface
 ******************************************************************************/
 #ifndef _MM_L4IF_H
 #define _MM_L4IF_H
@@ -13,7 +13,7 @@
 #define mm_acquire_tcp_lock(_pdev, con)  LOCK()
 #define mm_release_tcp_lock(_pdev, con)  UNLOCK()
 
-#define MM_ACQUIRE_TOE_LOCK(_pdev)      LOCK()     
+#define MM_ACQUIRE_TOE_LOCK(_pdev)      LOCK()
 #define MM_RELEASE_TOE_LOCK(_pdev)      UNLOCK()
 
 #define MM_ACQUIRE_TOE_GRQ_LOCK(_pdev, idx)  LOCK()
@@ -42,7 +42,7 @@ void MM_RELEASE_TOE_GRQ_LOCK(struct _lm_device_t *_pdev, u8_t idx);
 void MM_ACQUIRE_TOE_GRQ_LOCK_DPC(struct _lm_device_t *_pdev, u8_t idx);
 void MM_RELEASE_TOE_GRQ_LOCK_DPC(struct _lm_device_t *_pdev, u8_t idx);
 
-#elif defined(_VBD_) || defined(_VBD_CMD_) 
+#elif defined(_VBD_) || defined(_VBD_CMD_)
 
 #if USE_QUEUED_SLOCK
 
@@ -58,7 +58,7 @@ mm_release_tcp_q_lock(
     void *ql_hdl);
 
 /* MM_INIT_TCP_LOCK_HANDLE:
- * a macro for decleration of KLOCK_QUEUE_HANDLE in stack, to be declared 
+ * a macro for decleration of KLOCK_QUEUE_HANDLE in stack, to be declared
  * in stack by every lm/um caller to mm_acquire_tcp_q_lock.
  * since KLOCK_QUEUE_HANDLE is a WDM structure that can't be compiled
  * in lm, we define a size SIZEOF_QL_HDL that should be larger/equal to
@@ -104,7 +104,7 @@ __inline static void mm_acquire_tcp_lock(
 
 __inline static void mm_release_tcp_lock(
     struct _lm_device_t *pdev,
-    lm_tcp_con_t *tcp_con) 
+    lm_tcp_con_t *tcp_con)
 {
     DbgMessage(pdev, INFORMl4, "Releasing tcp lock for con %p\n", tcp_con);
 }
@@ -148,7 +148,7 @@ u32_t mm_tcp_rx_peninsula_to_rq_copy_dmae(
     u32_t                 gen_buf_offset,
     lm_tcp_buffer_t     * tcp_buf,         /* TCP buffer to copy to      */
     u32_t                 tcp_buf_offset,
-    u32_t                 nbytes           
+    u32_t                 nbytes
     );
 
 void mm_tcp_comp_slow_path_request(
@@ -157,12 +157,12 @@ void mm_tcp_comp_slow_path_request(
     lm_tcp_slow_path_request_t *sp_request);
 
 /** Description:
- *  - complete Tx and Rx application buffers towards the client 
+ *  - complete Tx and Rx application buffers towards the client
  *    (with any kind of completion status)
- *  - handle various pending ‘down stream’ tasks: post more application buffers,
+ *  - handle various pending 'down stream' tasks: post more application buffers,
  *    post graceful disconnect request (Tx only)
  * Assumptions:
- *  - in each given lm buffer with flag BUFFER_END the field ‘app_buf_xferred’ 
+ *  - in each given lm buffer with flag BUFFER_END the field 'app_buf_xferred'
  *    was correctly set by the caller */
 void mm_tcp_complete_bufs(
     struct _lm_device_t *pdev,
@@ -175,11 +175,11 @@ void mm_tcp_complete_bufs(
 
 
 /**
- * Description: 
- *        Returns TRUE if generic data OR preposted buffer is being indicated to the client 
+ * Description:
+ *        Returns TRUE if generic data OR preposted buffer is being indicated to the client
  * for the given connection and FALSE otherwise.
- * 
- */ 
+ *
+ */
 u8_t mm_tcp_indicating_bufs(
     lm_tcp_con_t * con
     );
@@ -194,26 +194,26 @@ void mm_tcp_abort_bufs (
     IN    struct _lm_device_t     * pdev,  /* device handle */
     IN    lm_tcp_state_t          * tcp,   /* L4 state handle */
     IN    lm_tcp_con_t            * con,   /* connection handle */
-    IN    lm_status_t               status /* status to abort buffers with */       
+    IN    lm_status_t               status /* status to abort buffers with */
     );
 
 /**
  * Description:
  *    Indicates toward the client reception of the remote FIN.
- * 
- */ 
+ *
+ */
 void mm_tcp_indicate_fin_received(
-    IN   struct _lm_device_t     * pdev,   /* device handle */    
+    IN   struct _lm_device_t     * pdev,   /* device handle */
     IN   lm_tcp_state_t          * tcp
     );
 
 /**
  * Description:
  *    Indicates toward the client reception of the remote RST.
- * 
- */ 
+ *
+ */
 void mm_tcp_indicate_rst_received(
-    IN   struct _lm_device_t     * pdev,          /* device handle */                        
+    IN   struct _lm_device_t     * pdev,          /* device handle */
     IN   lm_tcp_state_t          * tcp
     );
 
@@ -221,10 +221,10 @@ void mm_tcp_indicate_rst_received(
 /**
  * Description:
  *      Indicates toward the client the completion of the FIN request.
- */ 
+ */
 void mm_tcp_graceful_disconnect_done(
-    IN   struct _lm_device_t     * pdev,    /* device handle */    
-    IN   lm_tcp_state_t          * tcp,     /* L4 state handle */  
+    IN   struct _lm_device_t     * pdev,    /* device handle */
+    IN   lm_tcp_state_t          * tcp,     /* L4 state handle */
     IN   lm_status_t               status   /* May be SUCCESS, ABORTED or UPLOAD IN PROGRESS */
     );
 
@@ -233,7 +233,7 @@ void mm_tcp_graceful_disconnect_done(
 /** Description
  *  This function is called by lm when there are generic buffers that need indication
  *  - indicate received data using generic buffers to the client (client.indicate_tcp_rx_buf)
- *  - receive the buffered data by calling lm_get_buffered_data, and notify the lm of the 
+ *  - receive the buffered data by calling lm_get_buffered_data, and notify the lm of the
  *    status by calling lm_buffer_data_indicated after returning from client.indicate_tcp_rx_buf
  */
 void mm_tcp_rx_indicate_gen (
@@ -242,16 +242,16 @@ void mm_tcp_rx_indicate_gen (
     );
 
 /** Description
- *  Removes Generic Buffers from the generic buffer pool and passes them to the LM. 
- * 
+ *  Removes Generic Buffers from the generic buffer pool and passes them to the LM.
+ *
  *  Returns:
- *  - The actual number of buffers returned (may be less than required_bufs in case there are not 
+ *  - The actual number of buffers returned (may be less than required_bufs in case there are not
  *    enough buffers in the pool)
- */ 
+ */
 u32_t mm_tcp_get_gen_bufs(
     struct _lm_device_t * pdev,
     d_list_t            * gb_list,
-    u32_t                 nbufs, 
+    u32_t                 nbufs,
     u8_t                  sb_idx
     );
 
@@ -259,7 +259,7 @@ u32_t mm_tcp_get_gen_bufs(
  *  Returns a list of generic buffers to the generic buffer pool
  * Assumption:
  *  gen_buf is a list of generic buffers that ALL need to be returned to the pool
- */ 
+ */
 #define MM_TCP_RGB_COMPENSATE_GRQS      0x01
 #define MM_TCP_RGB_COLLECT_GEN_BUFS     0x02
 
@@ -268,7 +268,7 @@ u32_t mm_tcp_get_gen_bufs(
 #define NON_EXISTENT_SB_IDX             0xFF
 
 void mm_tcp_return_gen_bufs(
-    struct _lm_device_t * pdev, 
+    struct _lm_device_t * pdev,
     lm_tcp_gen_buf_t    * gen_buf,
     u32_t                 flags,
     u8_t                  grq_idx
@@ -276,7 +276,7 @@ void mm_tcp_return_gen_bufs(
 
 
 void mm_tcp_return_list_of_gen_bufs(
-    struct _lm_device_t * pdev, 
+    struct _lm_device_t * pdev,
     d_list_t            * gen_buf_list,
     u32_t                 flags,
     u8_t                  grq_idx
@@ -295,7 +295,7 @@ u32_t mm_tcp_copy_to_tcp_buf(
     lm_tcp_buffer_t     * tcp_buf,         /* TCP buffer to copy to      */
     u8_t                * mem_buf,         /* Memory buffer to copy from */
     u32_t                 tcp_buf_offset,
-    u32_t                 nbytes           
+    u32_t                 nbytes
     );
 
 void
@@ -306,13 +306,13 @@ mm_tcp_indicate_retrieve_indication(
 
 /** Description
  *  This function is used for updating the required number of generic buffer pools
- *  given an old and new mss and initial receive window. It is called as a result of an 
+ *  given an old and new mss and initial receive window. It is called as a result of an
  *  update to one of these parameters
- */ 
+ */
 void mm_tcp_update_required_gen_bufs(
-    struct _lm_device_t * pdev, 
-    u32_t  new_mss, 
-    u32_t  old_mss, 
+    struct _lm_device_t * pdev,
+    u32_t  new_mss,
+    u32_t  old_mss,
     u32_t  new_initial_rcv_wnd,
     u32_t  old_initial_rcv_wnd);
 
@@ -344,7 +344,7 @@ lm_status_t mm_tcp_post_empty_slow_path_request(
 
 /* Delete the tcp state (initiated from lm)  */
 void mm_tcp_del_tcp_state(
-    struct _lm_device_t * pdev, 
+    struct _lm_device_t * pdev,
     lm_tcp_state_t * tcp);
 
 #endif /* _MM_L4IF_H */
