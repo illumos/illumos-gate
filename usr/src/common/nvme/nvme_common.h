@@ -50,6 +50,7 @@ extern const nvme_version_t nvme_vers_1v2;
 extern const nvme_version_t nvme_vers_1v3;
 extern const nvme_version_t nvme_vers_1v4;
 extern const nvme_version_t nvme_vers_2v0;
+extern const nvme_version_t nvme_vers_2v1;
 
 extern bool nvme_vers_atleast(const nvme_version_t *, const nvme_version_t *);
 

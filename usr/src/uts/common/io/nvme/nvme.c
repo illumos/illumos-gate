@@ -797,6 +797,18 @@ static boolean_t nvme_bd_detach_ns(nvme_t *, nvme_ioctl_common_t *);
 
 static int nvme_minor_comparator(const void *, const void *);
 
+typedef struct {
+	nvme_sqe_t *ica_sqe;
+	void *ica_data;
+	uint32_t ica_data_len;
+	uint_t ica_dma_flags;
+	int ica_copy_flags;
+	uint32_t ica_timeout;
+	uint32_t ica_cdw0;
+} nvme_ioc_cmd_args_t;
+static boolean_t nvme_ioc_cmd(nvme_t *, nvme_ioctl_common_t *,
+    nvme_ioc_cmd_args_t *);
+
 static ddi_ufm_ops_t nvme_ufm_ops = {
 	NULL,
 	nvme_ufm_fill_image,
@@ -4315,6 +4327,53 @@ nvme_detect_quirks(nvme_t *nvme)
 	}
 }
 
+/*
+ * Indicate to the controller that we support various behaviors. These are
+ * things the controller needs to be proactively told. We only will do this if
+ * the controller indicates support for something that we care about, otherwise
+ * there is no need to talk to the controller and there is no separate way to
+ * know that this feature is otherwise supported. Support for most features is
+ * indicated by setting it to 1.
+ *
+ * The current behaviors we enable are:
+ *
+ *  - Extended Telemetry Data Area 4: This enables additional telemetry to be
+ *    possibly generated and depends on the DA4S bit in the log page attributes.
+ */
+static void
+nvme_enable_host_behavior(nvme_t *nvme)
+{
+	nvme_host_behavior_t *hb;
+	nvme_ioc_cmd_args_t args = { NULL };
+	nvme_sqe_t sqe = {
+		.sqe_opc = NVME_OPC_SET_FEATURES,
+		.sqe_cdw10 = NVME_FEAT_HOST_BEHAVE,
+		.sqe_nsid = 0
+	};
+	nvme_ioctl_common_t err;
+
+	if (nvme->n_idctl->id_lpa.lp_da4s == 0)
+		return;
+
+	hb = kmem_zalloc(sizeof (nvme_host_behavior_t), KM_SLEEP);
+	hb->nhb_etdas = 1;
+
+	args.ica_sqe = &sqe;
+	args.ica_data = hb;
+	args.ica_data_len = sizeof (nvme_host_behavior_t);
+	args.ica_dma_flags = DDI_DMA_WRITE;
+	args.ica_copy_flags = FKIOCTL;
+	args.ica_timeout = nvme_admin_cmd_timeout;
+
+	if (!nvme_ioc_cmd(nvme, &err, &args)) {
+		dev_err(nvme->n_dip, CE_WARN, "failed to enable host behavior "
+		    "feature: 0x%x/0x%x/0x%x", err.nioc_drv_err,
+		    err.nioc_ctrl_sct, err.nioc_ctrl_sc);
+	}
+
+	kmem_free(hb, sizeof (nvme_host_behavior_t));
+}
+
 static int
 nvme_init(nvme_t *nvme)
 {
@@ -4768,6 +4827,11 @@ nvme_init(nvme_t *nvme)
 			goto fail;
 		}
 	}
+
+	/*
+	 * Enable any host behavior features that make sense for us.
+	 */
+	nvme_enable_host_behavior(nvme);
 
 	return (DDI_SUCCESS);
 
@@ -6602,16 +6666,6 @@ copyout:
  * If this returns true then the command completed successfully. Otherwise error
  * information is returned in the nvme_ioctl_common_t arguments.
  */
-typedef struct {
-	nvme_sqe_t *ica_sqe;
-	void *ica_data;
-	uint32_t ica_data_len;
-	uint_t ica_dma_flags;
-	int ica_copy_flags;
-	uint32_t ica_timeout;
-	uint32_t ica_cdw0;
-} nvme_ioc_cmd_args_t;
-
 static boolean_t
 nvme_ioc_cmd(nvme_t *nvme, nvme_ioctl_common_t *ioc, nvme_ioc_cmd_args_t *args)
 {

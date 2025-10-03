@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -2478,6 +2478,36 @@ nvme_print_feat_progress(uint32_t cdw0, void *b, size_t s,
 	spm.r = cdw0;
 	nvme_print_uint64(4, "Pre-Boot Software Load Count",
 	    spm.b.spm_pbslc, NULL, NULL);
+}
+
+void
+nvme_print_feat_host_behavior(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
+{
+	const nvme_host_behavior_t *hb = b;
+
+	nvme_print_bit(4, "Advanced Command Retry",
+	    nvme_vers_atleast(version, &nvme_vers_1v4), hb->nhb_acre,
+	    "enabled", "disabled");
+	nvme_print_bit(4, "Extended Telemetry Data Area 4",
+	    nvme_vers_atleast(version, &nvme_vers_2v0), hb->nhb_etdas,
+	    "enabled", "disabled");
+	nvme_print_bit(4, "LBA Format Extension",
+	    nvme_vers_atleast(version, &nvme_vers_2v0), hb->nhb_lbafee,
+	    "enabled", "disabled");
+	nvme_print_bit(4, "Host Dispersed Namespace Support",
+	    nvme_vers_atleast(version, &nvme_vers_2v1), hb->nhb_lbafee,
+	    "enabled", "disabled");
+	nvme_print(4, "Copy Descriptor Formats", -1, NULL);
+	nvme_print_bit(6, "Copy Descriptor 2",
+	    nvme_vers_atleast(version, &nvme_vers_2v1), hb->nhb_cdfe & (1 << 2),
+	    "enabled", "disabled");
+	nvme_print_bit(6, "Copy Descriptor 3",
+	    nvme_vers_atleast(version, &nvme_vers_2v1), hb->nhb_cdfe & (1 << 3),
+	    "enabled", "disabled");
+	nvme_print_bit(6, "Copy Descriptor 4",
+	    nvme_vers_atleast(version, &nvme_vers_2v1), hb->nhb_cdfe & (1 << 4),
+	    "enabled", "disabled");
 }
 
 /*

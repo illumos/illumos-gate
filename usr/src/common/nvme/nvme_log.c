@@ -258,6 +258,42 @@ nvme_lpd_pev_len(uint64_t *outp, const void *data, size_t len)
 	return (true);
 }
 
+static bool
+nvme_lpd_telemetry_sup(const nvme_valid_ctrl_data_t *data,
+    const nvme_log_page_info_t *lpi)
+{
+	return (nvme_field_atleast(data, &nvme_vers_1v3) &&
+	    data->vcd_id->id_lpa.lp_telemetry != 0);
+}
+
+static bool
+nvme_lpd_telemetry_len(uint64_t *outp, const void *data, size_t len)
+{
+	nvme_telemetry_log_t telem;
+	uint64_t nblks;
+
+	if (len < sizeof (telem)) {
+		return (false);
+	}
+
+	(void) memcpy(&telem, data, sizeof (telem));
+
+	/*
+	 * See if we have section 4 information, then fall back to 3, 2, and
+	 * finally 1 to determine the size. We then have to add the header.
+	 */
+	nblks = telem.ntl_thda4lb;
+	if (nblks == 0)
+		nblks = telem.ntl_thda3lb;
+	if (nblks == 0)
+		nblks = telem.ntl_thda2lb;
+	if (nblks == 0)
+		nblks = telem.ntl_thda1lb;
+	nblks++;
+	*outp = nblks * sizeof (telem);
+	return (true);
+}
+
 /*
  * The short names here correspond to the well defined names in nvmeadm(8) and
  * libnvme(3LIB) that users expect to be able to use. Please do not change them
@@ -344,6 +380,19 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_NVM,
 	.nlpi_len = sizeof (nvme_pev_log_t),
 	.nlpi_var_func = nvme_lpd_pev_len
+}, {
+	.nlpi_short = "telemetry",
+	.nlpi_human = "telemetry host-initiated",
+	.nlpi_lid = NVME_LOGPAGE_TELMHOST,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_1v3,
+	.nlpi_sup_func = nvme_lpd_telemetry_sup,
+	.nlpi_kind = NVME_LOG_ID_OPTIONAL,
+	.nlpi_source = NVME_LOG_DISC_S_ID_CTRL,
+	.nlpi_disc = NVME_LOG_DISC_F_NEED_LSP,
+	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
+	.nlpi_len = sizeof (nvme_telemetry_log_t),
+	.nlpi_var_func = nvme_lpd_telemetry_len
 } };
 
 const size_t nvme_std_log_npages = ARRAY_SIZE(nvme_std_log_pages);

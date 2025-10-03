@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -25,6 +25,7 @@ const nvme_version_t nvme_vers_1v2 = { .v_major = 1, .v_minor = 2 };
 const nvme_version_t nvme_vers_1v3 = { .v_major = 1, .v_minor = 3 };
 const nvme_version_t nvme_vers_1v4 = { .v_major = 1, .v_minor = 4 };
 const nvme_version_t nvme_vers_2v0 = { .v_major = 2, .v_minor = 0 };
+const nvme_version_t nvme_vers_2v1 = { .v_major = 2, .v_minor = 1 };
 
 bool
 nvme_vers_atleast(const nvme_version_t *dev, const nvme_version_t *targ)

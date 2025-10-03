@@ -172,6 +172,8 @@ extern void nvme_print_feat_auto_pst(uint32_t, void *, size_t,
     const nvme_identify_ctrl_t *, const nvme_version_t *);
 extern void nvme_print_feat_progress(uint32_t, void *, size_t,
     const nvme_identify_ctrl_t *, const nvme_version_t *);
+extern void nvme_print_feat_host_behavior(uint32_t, void *, size_t,
+    const nvme_identify_ctrl_t *, const nvme_version_t *);
 
 extern void nvmeadm_dump_hex(const uint8_t *, size_t);
 
@@ -207,6 +209,11 @@ typedef struct {
 extern const char *nvmeadm_list_features_fields;
 extern const ofmt_field_t nvmeadm_list_features_ofmt[];
 
+/*
+ * Log pages that have special handling.
+ */
+extern int do_get_logpage_telemetry(const nvme_process_arg_t *,
+    const nvme_log_disc_t *, nvme_log_req_t *);
 
 /*
  * Warning and error cases. The default nvmeadm ones assume a libnvme related

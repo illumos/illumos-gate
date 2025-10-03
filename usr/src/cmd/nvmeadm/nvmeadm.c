@@ -482,6 +482,9 @@ static const nvmeadm_feature_t features[] = {
 	}, {
 		.f_feature = NVME_FEAT_PROGRESS,
 		.f_print = nvme_print_feat_progress
+	}, {
+		.f_feature = NVME_FEAT_HOST_BEHAVE,
+		.f_print = nvme_print_feat_host_behavior
 	}
 };
 
@@ -2003,6 +2006,8 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 	case NVME_LOGPAGE_PEV:
 		do_get_logpage_pev_relctx(npa, req);
 		break;
+	case NVME_LOGPAGE_TELMHOST:
+		return (do_get_logpage_telemetry(npa, disc, req));
 	default:
 		break;
 	}

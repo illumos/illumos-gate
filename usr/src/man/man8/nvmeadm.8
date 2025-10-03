@@ -12,7 +12,7 @@
 .\" Copyright 2025 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd August 29, 2025
+.Dd October 4, 2025
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -712,6 +712,12 @@ the controller itself actually supports.
 Persistent Event Log.
 An optional log page added in NVMe 1.4 that contains a series of events
 that have occurred on the device.
+.It telemetry
+Host-initiated telemetry log.
+Contains vendor-specific diagnostic information about the controller.
+This log page requires that the
+.Fl O
+option be specified.
 .El
 .Pp
 The following vendor-specific log pages are supported.
@@ -985,6 +991,7 @@ Write Atomicity:atomicity:controller
 Asynchronous Event Configuration:event:controller
 Autonomous Power State Transition:apst:controller
 Software Progress Marker:progress:controller
+Host Behavior Support:hostsup:controller
 .TE
 .Pp
 For an explanation of the individual features refer to the description

@@ -23,6 +23,7 @@ OBJS=	nvme_version.o	\
 	nvmeadm_nsmgmt.o \
 	nvmeadm_ofmt.o	\
 	nvmeadm_print.o	\
+	nvmeadm_telemetry.o \
 	nvmeadm_wdc.o	\
 	$(HEXDUMP_OBJS)
 
