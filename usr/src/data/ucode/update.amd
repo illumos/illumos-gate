@@ -10,7 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 
 # A simple update script that checks out the upstream AMD firmware
 # repository, extracts the microcode into separate files within the amd/
@@ -114,7 +114,7 @@ done
 # Copy the firmware files into place
 cp $tmp/out/*/*-?? amd/
 
-# Combine the equivalence tables from the different updates into one
+# Combine the equivalence tables from the different updates into one.
 # Each equivalence-table file is a sequence of 16-byte records with a
 # 16-byte terminator which is all zeros. To merge, we just concatenate
 # the non-terminator records and then add 16 bytes from /dev/zero.
@@ -133,11 +133,16 @@ mv $mf $mf.tmp
 egrep -v "file path=$FW" $mf.tmp > $mf
 rm -f $mf.tmp
 
-for f in amd/*; do
+for f in amd/*-*; do
+	[[ -f $f ]] || continue
 	bf=${f##*/}
-	[[ $bf = THIRDPARTYLICENSE* ]] && continue
-	[[ $bf = Makefile* ]] && continue
 	echo "file path=$FW/$bf group=sys mode=0444 reboot-needed=true" >> $mf
+done
+
+for f in amd/fallback/*-*; do
+	bf=${f##*/}
+	echo "file path=$FW/fallback/$bf"\
+           "group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
 sed -i "/pkg.fmri.*microcode\/amd@/s/@[0-9]*/@$ver/" $mf

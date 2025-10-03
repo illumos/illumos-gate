@@ -151,6 +151,7 @@ typedef struct ucode_source {
 	ucode_errno_t	(*us_validate)(uint8_t *, size_t);
 	ucode_errno_t	(*us_extract)(ucode_update_t *, uint8_t *, size_t);
 	ucode_errno_t	(*us_locate)(cpu_t *, cpu_ucode_info_t *);
+	ucode_errno_t	(*us_locate_fallback)(cpu_t *, cpu_ucode_info_t *);
 } ucode_source_t;
 #define	UCODE_SOURCE(x) DATA_SET(ucode_source_set, x)
 

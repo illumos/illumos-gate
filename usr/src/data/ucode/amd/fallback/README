@@ -1,0 +1,12 @@
+In 2025, AMD made changes to their microcode signature verification following
+publication of CVE-2024-36347.
+
+https://www.amd.com/en/resources/product-security/bulletin/amd-sb-7033.html
+
+As a result it is not possible to install the latest microcode release on
+systems which have not had their platform image (usually included with BIOS)
+updated.
+
+This directory contains older versions of microcode for affected systems,
+which is used as a fallback when the latest microcode is not accepted by
+the CPU.

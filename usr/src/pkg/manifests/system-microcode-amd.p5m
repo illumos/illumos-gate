@@ -26,7 +26,7 @@
 # Copyright 2019 Peter Tribble.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -36,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/amd@20241121,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/amd@20250729,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for AMD CPUs"
 set name=pkg.description value="Microcode for AMD CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -128,7 +128,28 @@ file path=platform/i86pc/ucode/AuthenticAMD/AA01-00 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/AA02-00 group=sys mode=0444 \
     reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/B021-00 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/B110-00 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/equivalence-table group=sys \
+    mode=0444 reboot-needed=true
+dir  path=platform/i86pc/ucode/AuthenticAMD/fallback group=sys
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/8012-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/8310-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/A011-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/A012-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/A111-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/A112-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/A612-00 group=sys \
+    mode=0444 reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/fallback/AA02-00 group=sys \
     mode=0444 reboot-needed=true
 license lic_CDDL license=lic_CDDL
 license usr/src/data/ucode/amd/THIRDPARTYLICENSE \

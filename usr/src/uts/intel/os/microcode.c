@@ -65,6 +65,8 @@ static const char ucode_failure_fmt[] =
 	"cpu%d: failed to update microcode from version 0x%x to 0x%x";
 static const char ucode_success_fmt[] =
 	"?cpu%d: microcode has been updated from version 0x%x to 0x%x\n";
+static const char ucode_fallback_fmt[] =
+	"?cpu%d: using older fallback microcode; update the system firmware";
 
 static const char ucode_path_fmt[] = "/platform/%s/ucode";
 
@@ -556,16 +558,38 @@ ucode_check_boot(void)
 	ucode->us_read_rev(uinfop);
 	if (ucode->us_locate(cp, uinfop) == EM_OK) {
 		uint32_t old_rev, new_rev;
+		bool fallback = false;
 
 		old_rev = uinfop->cui_rev;
+
+retry:
 		new_rev = uinfop->cui_pending_rev;
 		ucode->us_load(uinfop);
 		ucode->us_read_rev(uinfop);
 
 		if (uinfop->cui_rev != new_rev) {
 			ASSERT3U(uinfop->cui_rev, ==, old_rev);
+
 			cmn_err(CE_WARN, ucode_failure_fmt, cp->cpu_id,
 			    old_rev, new_rev);
+
+			/*
+			 * If the updater supports attempting a fallback
+			 * microcode version, try that.
+			 */
+			if (!fallback && ucode->us_locate_fallback != NULL) {
+				ucode->us_file_reset();
+				uinfop->cui_pending_ucode = NULL;
+				uinfop->cui_pending_size = 0;
+				uinfop->cui_pending_rev = 0;
+				if (ucode->us_locate_fallback(cp, uinfop) ==
+				    EM_OK) {
+					cmn_err(CE_WARN, ucode_fallback_fmt,
+					    cp->cpu_id);
+					fallback = true;
+					goto retry;
+				}
+			}
 		} else {
 			cmn_err(CE_CONT, ucode_success_fmt, cp->cpu_id,
 			    old_rev, new_rev);

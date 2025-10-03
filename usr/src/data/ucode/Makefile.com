@@ -12,28 +12,34 @@
 #
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include $(SRC)/data/Makefile.data
 
 ROOTINTELDIR = $(ROOTUCODEPATH)/GenuineIntel
 ROOTAMDDIR = $(ROOTUCODEPATH)/AuthenticAMD
+ROOTAMDFBDIR = $(ROOTUCODEPATH)/AuthenticAMD/fallback
 
 ROOTINTELFILES = $(INTEL_FILES:%=$(ROOTINTELDIR)/%)
 ROOTAMDFILES = $(AMD_FILES:%=$(ROOTAMDDIR)/%)
+ROOTAMDFBFILES = $(AMD_FILES:%=$(ROOTAMDFBDIR)/%)
 
 $(ROOTINTELFILES) := FILEMODE = 444
 $(ROOTAMDFILES) := FILEMODE = 444
+$(ROOTAMDFBFILES) := FILEMODE = 444
 
 $(ROOTUCODEPATH):
 	$(INS.dir)
 
-$(ROOTINTELDIR) $(ROOTAMDDIR): $(ROOTUCODEPATH)
+$(ROOTINTELDIR) $(ROOTAMDDIR) $(ROOTAMDFBDIR): $(ROOTUCODEPATH)
 	$(INS.dir)
 
 $(ROOTINTELDIR)/%: % $(ROOTINTELDIR)
 	$(INS.file)
 
 $(ROOTAMDDIR)/%: % $(ROOTAMDDIR)
+	$(INS.file)
+
+$(ROOTAMDFBDIR)/%: % $(ROOTAMDFBDIR)
 	$(INS.file)

@@ -54,6 +54,7 @@ static ucode_file_amd_t *amd_ucodef;
 static size_t amd_ucodef_len, amd_ucodef_buflen;
 static ucode_eqtbl_amd_t *ucode_eqtbl_amd;
 static uint_t ucode_eqtbl_amd_entries;
+static bool ucode_amd_fallback = false;
 
 /*
  * Check whether this module can be used for microcode updates on this
@@ -284,13 +285,13 @@ ucode_copy_amd(cpu_ucode_info_t *uinfop, const ucode_file_amd_t *ucodefp,
 }
 
 /*
- * Populate the ucode file structure from microcode file corresponding to
+ * Populate the ucode file structure from the microcode file corresponding to
  * this CPU, if exists.
  *
  * Return EM_OK on success, corresponding error code on failure.
  */
 static ucode_errno_t
-ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop)
+i_ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop, bool fallback)
 {
 	uint16_t eq_sig;
 	ucode_errno_t rc;
@@ -337,8 +338,9 @@ ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop)
 		/* This is a uint_t to match the signature of kobj_read() */
 		uint_t size;
 
-		(void) snprintf(name, MAXPATHLEN, "%s/%s/%04X-%02X",
-		    ucode_path(), cpuid_getvendorstr(cp), eq_sig, i);
+		(void) snprintf(name, MAXPATHLEN, "%s/%s/%s%04X-%02X",
+		    ucode_path(), cpuid_getvendorstr(cp),
+		    fallback ? "fallback/" : "", eq_sig, i);
 
 		if ((fd = kobj_open(name)) == -1)
 			return (EM_NOMATCH);
@@ -399,6 +401,20 @@ ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop)
 		}
 	}
 	return (EM_NOMATCH);
+}
+
+ucode_errno_t
+ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop)
+{
+	return (i_ucode_locate_amd(cp, uinfop, ucode_amd_fallback));
+}
+
+ucode_errno_t
+ucode_locate_fallback_amd(cpu_t *cp, cpu_ucode_info_t *uinfop)
+{
+	/* Once we have switched to the fallback microcode, stick with it */
+	ucode_amd_fallback = true;
+	return (i_ucode_locate_amd(cp, uinfop, ucode_amd_fallback));
 }
 
 static void
@@ -478,16 +494,17 @@ ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, size_t size)
 }
 
 static const ucode_source_t ucode_amd = {
-	.us_name	= "AMD microcode updater",
-	.us_write_msr	= MSR_AMD_PATCHLOADER,
-	.us_invalidate	= false,
-	.us_select	= ucode_select_amd,
-	.us_capable	= ucode_capable_amd,
-	.us_file_reset	= ucode_file_reset_amd,
-	.us_read_rev	= ucode_read_rev_amd,
-	.us_load	= ucode_load_amd,
-	.us_validate	= ucode_validate_amd,
-	.us_extract	= ucode_extract_amd,
-	.us_locate	= ucode_locate_amd
+	.us_name		= "AMD microcode updater",
+	.us_write_msr		= MSR_AMD_PATCHLOADER,
+	.us_invalidate		= false,
+	.us_select		= ucode_select_amd,
+	.us_capable		= ucode_capable_amd,
+	.us_file_reset		= ucode_file_reset_amd,
+	.us_read_rev		= ucode_read_rev_amd,
+	.us_load		= ucode_load_amd,
+	.us_validate		= ucode_validate_amd,
+	.us_extract		= ucode_extract_amd,
+	.us_locate		= ucode_locate_amd,
+	.us_locate_fallback	= ucode_locate_fallback_amd
 };
 UCODE_SOURCE(ucode_amd);
