@@ -36,6 +36,7 @@ driver name=amdzen
 # 1248-124f: f1ah m60-6fh df
 # 12b8-12bf: f1ah m70-77h df
 # 12c0-12c7: f1ah m00-1fh df
+# 12f8-12ff: f90h m78-7f df
 # 1440-1447: f17h m70-7fh, f19h m20-2f df
 # 1448-144f: f17h m60-6fh df
 # 1450: f17h m00-0f nb
@@ -86,6 +87,14 @@ driver name=amdzen_stub \
     alias=pci1022,12c5,p \
     alias=pci1022,12c6,p \
     alias=pci1022,12c7,p \
+    alias=pci1022,12f8,p \
+    alias=pci1022,12f9,p \
+    alias=pci1022,12fa,p \
+    alias=pci1022,12fb,p \
+    alias=pci1022,12fc,p \
+    alias=pci1022,12fd,p \
+    alias=pci1022,12fe,p \
+    alias=pci1022,12ff,p \
     alias=pci1022,1440,p \
     alias=pci1022,1441,p \
     alias=pci1022,1442,p \
