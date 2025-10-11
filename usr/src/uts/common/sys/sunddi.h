@@ -275,6 +275,14 @@ extern "C" {
 #define	DDI_NT_GPIO_DPIO	"ddi_gpio:dpio"
 
 /*
+ * Device types used for I2C
+ */
+#define	DDI_NT_I2C_CTRL		"ddi_i2c:controller"
+#define	DDI_NT_I2C_PORT		"ddi_i2c:port"
+#define	DDI_NT_I2C_DEV		"ddi_i2c:device"
+#define	DDI_NT_I2C_MUX		"ddi_i2c:mux"
+
+/*
  * DDI event definitions
  */
 #define	EC_DEVFS	"EC_devfs"	/* Event class devfs */

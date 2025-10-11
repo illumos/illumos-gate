@@ -1,0 +1,1510 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd October 4, 2025
+.Dt I2CADM 8
+.Os
+.Sh NAME
+.Nm i2cadm
+.Nd I2C administration
+.Sh SYNOPSIS
+.Nm
+.Cm controller
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm controller
+.Cm prop
+.Cm get
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar controller
+.Op Ar filter Ns ...
+.Nm
+.Cm controller
+.Cm prop
+.Cm set
+.Ar controller
+.Ar property Ns = Ns Ar value
+.Nm
+.Cm device
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm device
+.Cm addrs
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm device
+.Cm add
+.Op Fl c Ar compat
+.Ar port
+.Ar name
+.Ar address
+.Nm
+.Cm device
+.Cm remove
+.Ar path
+.Nm
+.Cm mux
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm port
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm port
+.Cm map
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar port
+.Nm
+.Cm io
+.Op Fl m Ar mode
+.Fl d Ar destination
+.Op Fl a Ar address
+.Op Fl c Ar command
+.Op Fl w Ar wlen
+.Op Fl r Ar rlen
+.Op Fl o Ar output
+.Ar data
+.Nm
+.Cm scan
+.Op Fl d Ar device
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar port
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to enumerate and manipulate I2C and SMBus controllers,
+devices, ports, and multiplexors.
+.Pp
+There are four top-level objects in
+.Nm ;
+.Bl -tag -width Ds
+.It Controllers
+These are hardware device that can perform I2C or SMBus operations that
+target devices on the bus.
+.Nm
+provides the ability to list them as well as get and set properties on
+specific controllers.
+.It Devices
+Device represent targets on the I2C bus which provide some functionality
+at a given address.
+Devices run the gamut including functions like EEPROMs, sensors, GPIO
+controllers, voltage regulators, and more.
+Many devices will have a corresponding device driver that provides
+functionality through a standard system mechanism, but there is no
+requirement for a driver.
+.It Ports
+A port is a logical point on an I2C bus under which one or more devices
+can be found.
+I2C ports are found directly under controllers and multiplexors.
+I2C ports under a controller represent the start of a unique I2C bus and
+addresses that are used are specific to that bus.
+.Nm
+provides the ability to list ports and print information about the
+addresses that are in use on the port directly or downstream of it.
+.It Multiplexors
+Multiplexors provide a means of isolating segments of an I2C bus from
+one another, which is generally used to avoid overlapping I2C addresses.
+A multiplexor provides a fixed number of ports and the system will
+transparently activate and deactivate ports based on I/O requests and
+their targets.
+At most one port will ever be active on a multiplexor at any given time.
+.Nm
+provides the ability to discover and list multiplexors.
+.El
+.Pp
+All listing operations leverage the standard illumos output format
+library
+.Po
+.Xr ofmt 3OFMT
+.Pc
+allowing the selection of specific output fields, the omission of the
+header
+.Pq Fl H ,
+and a parsable mode intended for programmatic consumption
+.Pq Fl p .
+When requesting parsable output, the colon
+.Po
+.Do
+:
+.Dc
+.Pc
+character is used as a delimiter between fields and any delimiters that
+would appear in an output field will be escaped with a backslash
+character
+.Po
+.Do
+\e
+.Dc
+.Pc .
+.Pp
+Getting information about I2C devices, controllers, ports, and muxes
+requires that a process have the
+.Brq Dv PRIV_SYS_DEVICES
+privilege.
+.Ss I2C Paths
+All of the different entities that can be found on an I2C bus are
+described through a path that indicates the route through the bus to get
+to an entity.
+Consider the following I2C devices:
+.Bd -literal
+
+
+  +------------+
+  |   dwi2c4   |
+  |   1 port   |
+  | controller |
+  +------------+     +------+
+         |           | lm75 |
+         +---------->| 0x48 |
+         |           +------+
+         v
+   +------------+
+   |  pca9548   |
+   |    0x72    |
+   | 8 port mux |
+   +------------+
+         |
+         * ... port 0, 1-7 not pictured
+         |
+         v
+   +------------+
+   |  pca9545   |
+   |    0x72    |
+   | 4 port mux |
+   +------------+
+         |
+         * ... port 2, 0-1,3 not pictured
+         |
+         v
+    +---------+
+    | at24c02 |
+    |   0x57  |
+    |  EEPROM |
+    +---------+
+.Ed
+.Pp
+The following are what different paths refer to for this:
+.Bl -tag -width Pa
+.It Pa dwi2c4
+This refers to the controller itself.
+.It Pa dwi2c4/0
+This refers to the primary port under a controller.
+This could be used for performing device scans, I/O, or manually adding
+or removing devices.
+.It Pa dwi2c4/0/0x48
+This refers to the LM75 temperature sensor that is directly attached to
+the controller's port.
+.It Pa dwi2c4/0/0x72
+This string refers to the 8-port mux directly under the controller's
+port.
+.It Pa dwi2c4/0/0x72/0/0x70/2/0x57
+This is a complex string that refers to the AT24C02 EEPROM.
+Along the way are all of the devices and ports that are used to get to
+it.
+A more verbose form of this path would be
+.Pa dwi2c4/0/pca9548@0x72/0/pca9545@0x70/2/at24c02@0x57 .
+.El
+.Pp
+When constructing paths, controllers are always referred to by their
+name and instance.
+Ports are always referred to by their name, which is usually a number
+based upon the datasheet.
+Devices can be referred to in three ways at their point in the tree.
+Using the first mux as an example:
+.Bl -enum
+.It
+Using the device's primary I2C address:
+.Ql 0x72 .
+.It
+Using the device's name and primary address:
+.Ql pca9548@0x72 .
+.It
+Using the device's driver name and instance:
+.Ql pca9454x0 .
+.El
+.Sh SUBCOMMANDS
+The following commands are supported by
+.Nm :
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm controller
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+List all of the I2C controllers in the system and provide basic
+information about them.
+.Pp
+The following fields are supported:
+.Bl -tag -width PROVIDER
+.It Sy NAME
+This is the name of the I2C controller in the system.
+All I2C paths will start with a controller name.
+.It Sy TYPE
+This is the primary type of the controller, but is not indicative of all
+I/O that they can perform.
+An SMBus controller may support directly performing I2C.
+The valid controller types are:
+.Bl -tag -width smbus
+.It i2c
+An I2C controller.
+.It i3c
+An I3C controller.
+.It smbus
+An SMBus controller.
+.El
+.It Sy SPEED
+A string that describe the speed that the bus is operating at, along
+with some of the physical capabilities.
+The valid speed values are:
+.Bl -tag -width fast-plus
+.It standard
+Standard speed operates the bus at 100 kHz.
+.It fast
+Fast speed operates the bus at 400 kHz.
+.It fast-plus
+Fast-plus speed operates the bus at 1 MHz.
+.It high
+High-speed operate the bus at 3.4 MHz.
+.It ultra
+Ultra-fast speed operate the bus at 5 MHz.
+.El
+.It Sy NPORTS
+The number of ports that are under the controller.
+.It Sy DRIVER
+The name of the driver for the controller.
+.It Sy INSTANCE
+The name of the device driver instance for the controller.
+.It Sy PROVIDER
+The
+.Pa /devices
+path to the kernel provider for this controller.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of controllers that are printed.
+Each
+.Ar filter
+may either match the name of a controller or driver.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm controller
+.Cm prop
+.Cm get
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar controller
+.Op Ar filter Ns ...
+.Xc
+List all properties, their values, and corresponding metadata on the
+specific controller
+.Ar controller .
+.Pp
+The following fields are supported:
+.Bl -tag -width PROPERTY
+.It Sy PROPERTY
+The name of the property.
+.It Sy PERM
+Indicates whether the property is readable or both readable and
+writable.
+.It Sy VALUE
+The current value of the property.
+.It Sy DEFAULT
+The default value for the property on the specific instance of the
+controller.
+This is the value the system will start with assuming no tuning has been
+performed.
+Some properties may not have a default value.
+.It Sy POSSIBLE
+A list of possible values that the property might take.
+This may be a series of numeric ranges or a list of specific values.
+Some properties may not have a set of possible values.
+.It Sy TYPE
+Indicates the type of the property.
+The system has the following I2C property types:
+.Bl -tag -width bit32
+.It Sy u32
+Indicates that the property is a 32-bit unsigned value.
+.It Sy bit32
+Indicates that the property is a 32-bit unsigned bitfield.
+The presence or absence of each bit indicates a specific feature or
+property.
+.El
+.It Sy CONTROLLER
+The name of the controller the property is being retrieved from.
+.It Sy ID
+The system's numeric identifier for the property.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of properties that are printed.
+Each
+.Ar filter
+must match the name of a property.
+For a list of properties, see the
+.Sx PROPERTIES
+section.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm controller
+.Cm prop
+.Cm set
+.Ar controller
+.Ar property Ns = Ns Ar value
+.Xc
+Set the value of a single named
+.Ar  property
+on the controller,
+.Ar controller ,
+to the indicated
+.Ar value.
+.Ar value
+will be parsed based upon the specific property and its type.
+Properties which are translated into strings, can be specified as either
+an integer value or the corresponding string.
+.Pp
+To see the list of properties on a controller use
+.Nm
+.Cm controller
+.Cm prop
+.Cm get .
+For a list of all properties, see the
+.Sx PROPERTIES
+section.
+.It Xo
+.Nm
+.Cm device
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+Lists basic information about all devices known to the system across all
+controllers.
+These are devices that have been discovered through a platform-specific
+means or explicitly added by an administrator through the
+.Nm
+.Cm device
+.Cm add
+command.
+.Pp
+The following fields are supported:
+.Bl -tag -width INSTANCE
+.It Sy NAME
+The name of the device.
+This corresponds to the device tree's node name.
+.It Sy ADDR
+The primary I2C address that this device has.
+This corresponds to the device tree's reg[0] entry.
+.It Sy INSTANCE
+The driver instance of the device, if any.
+.It Sy PATH
+The I2C path of the device.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of properties that are printed.
+Each
+.Ar filter
+may match a device's primary address, a device name, a driver name, a
+driver instance, or a portion of the device's I2C path.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm device
+.Cm addrs
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+Print the I2C addresses and their sources for device's in the system.
+A device's address may come from the platform or it may be an additional
+address that the driver itself claims and is either unique to that
+device or shared amongst all instance of a particular driver.
+.Pp
+The following fields are supported:
+.Bl -tag -width SOURCE
+.It Sy PATH
+The I2C path of the device.
+.It Sy TYPE
+The type of the address.
+This is either
+.Sy 7-bit
+or
+.Sy 10-bit .
+.It Sy ADDR
+The address in question on the device.
+.It Sy SOURCE
+Indicates how the device was assigned the address.
+One of the following values:
+.Bl -tag -width platform
+.It Sy platform
+This address came from information provided by the platform.
+This includes firmware sources or addresses assigned as part of an
+operator calling
+.Nm
+.Cm device
+.Cm add .
+.It Sy claimed
+This addresses was claimed exclusively by the device driver.
+For example, several EEPROMs require multiple I2C addresses to cover
+their entire memory map, but only the base address is often provided by
+the platform.
+.It Sy shared
+This address was claimed by a device driver and is permitted to be used
+across all instances of the device driver.
+.El
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of properties that are printed.
+Each
+.Ar filter
+may match a device's particular address, a device name, a driver name, a
+driver instance, or a portion of the device's I2C path.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm device
+.Cm add
+.Op Fl c Ar compat
+.Ar port
+.Ar name
+.Ar address
+.Xc
+Add a new device to the system.
+The system will attempt to attach a driver to this device; however, even
+if there is no driver for the device, it can be created regardless.
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl c Ar compat
+Add the specified compatibility entry
+.Ar compat
+to the newly created device node's
+.Ql compatible
+property.
+When the system considers device drivers to attach to an I2C device it
+will search for matches against the device's
+.Ql compatible
+property and then attempt to match the device's name.
+.Pp
+This property may be specified multiple times in order to add multiple
+entries.
+The order is meaningful and will reflect the order specified on the
+command line.
+The matching algorithm walks the list in order and terminates on the
+first found match.
+More specific entries should be specified first.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar port
+Specifies the I2C path to the port that the device will be created
+under.
+This may be either a port on a controller or a port under a multiplexor.
+Device's under a mux are allowed to have conflicting addresses with
+devices on other ports of a given mux.
+The mux will be implicitly activated when performing I/O to the device.
+.It Ar name
+The name of the new device.
+This generally should match something about the device itself such as
+the part number.
+.Pp
+Device name's may be at most 31 characters.
+The first character must be an upper or lower case letter.
+The remaining characters may be upper or lower case letters, numbers, or
+one of the following punctuation characters: the comma
+.Pq Sq \&, ,
+the period
+.Pq Sq \&. ,
+the hyphen
+.Pq Sq - ,
+the plus sign
+.Pq Sq + ,
+and the underscore
+.Pq Sq _ .
+.It Ar address
+The address to assign to the device.
+Only 7-bit addresses are permitted.
+The string will be parsed according to the specified base.
+It is recommended to specify addresses in hexadecimal with the leading
+.Dq 0x .
+.El
+.It Xo
+.Nm
+.Cm device
+.Cm remove
+.Ar path
+.Xc
+Attempts to remove the specified device indicated by the I2C path
+.Ar path .
+This may fail if the device is actively being used.
+.It Xo
+.Nm
+.Cm mux
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+List all multiplexors known to the system.
+.Pp
+The following fields are supported:
+.Bl -tag -width INSTANCE
+.It Sy DEVICE
+The name of the I2C device that implements the multiplexor.
+.It Sy NPORTS
+The number of ports on the multiplexor.
+.It Sy NAME
+The name of the multiplexor itself.
+.It Sy INSTANCE
+The device driver instance that powers the multiplexor.
+.It Sy PATH
+The I2C path of the multiplexor.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of multiplexors that are printed.
+Each
+.Ar filter
+may either match the multiplexor name, its device's name, or its
+device's driver.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm port
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+List all ports known to the system.
+.Pp
+The following fields are supported:
+.Bl -tag -width PORTNO
+.It Sy PATH
+The I2C path of the port.
+.It Sy TYPE
+Indicates the type of port.
+One of the following values:
+.Bl -tag -width multiplexor
+.It Sy controller
+The port belongs to a controller.
+.It Sy multiplexor
+The port belongs to a mux.
+.El
+.It Sy NAME
+The name of the port.
+Port names generally follow the datasheet and are either 0-based or
+1-based.
+.It Sy PORTNO
+The 0-based system assigned ID for this port.
+.It Sy NDEVS
+The number of devices that are directly under this port.
+This does not include devices that are under subsequent ports like a
+multiplexor.
+.It Sy TDEVS
+The total number of devices that are under this port, including all
+multiplexors.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified which are used to constrain the
+list of ports that are printed.
+Each
+.Ar filter
+may either match the port's name, its type, or its I2C path.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm port
+.Cm map
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar port
+.Xc
+Prints a map of how addresses are used directly under the specified port
+.Ar port
+by devices known to the system.
+This does not perform I/O to scan for addresses that could be used but
+are unknown to the system, instead use
+.Nm
+.Cm scan
+for that.
+By default, the command will output a human-oriented table organized
+into rows with 16 columns each.
+For machine parsable stable, output use the
+.Fl p
+and
+.Fl o
+options.
+.Pp
+The table will use the following characters to indicate specific cases:
+.Bl -tag -width Ds
+.It L
+Indicates that the address corresponds to a device
+this port.
+.It v
+Indicates that the address is used downstream of this port by a device
+under a mux port.
+The address in question could not be assigned to another device because
+of this.
+.It S
+Indicates that this address is being treated as a shared address across
+multiple instances of a device driver.
+A list of shared addresses and the corresponding major numbers and
+drivers will be printed following the table.
+.It -
+Indicates that this address is not in use.
+.It E
+An unexpected error occurred.
+.El
+.Pp
+The following fields are supported:
+.Bl -tag -width DRIVER
+.It Sy ADDR
+The I2C address in question.
+The address is printed in decimal.
+.It Sy COUNT
+The number of devices that are using this address in the port.
+.It Sy TYPE
+The type of address.
+One of the following values:
+.Bl -tag -width downstream
+.It Sy local
+Indicates that this address is in use by a device directly on the port.
+.It Sy downstream
+Indicates that this address is in use by a device downstream of the
+port.
+.It Sy shared
+Indicates that the address is being actively shared by one or more
+instances of a given device driver.
+.It Sy none
+Indicates that this address is not in use.
+.It Sy error
+Indicates that information about this addrses is not available because
+an error occurred.
+.El
+.It Sy MAJOR
+For shared addresses, indicates the major number of the driver that is
+sharing the address.
+.It Sy DRIVER
+For shared addresses, indicates the name of the device driver that is
+sharing the address.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are required:
+.Bl -tag -width Ar
+.It Ar port
+The I2C path of the port to print information about.
+.El
+.It Xo
+.Nm
+.Cm io
+.Op Fl m Ar mode
+.Fl d Ar destination
+.Op Fl a Ar address
+.Op Fl c Ar command
+.Op Fl w Ar wlen
+.Op Fl r Ar rlen
+.Op Fl o Ar output
+.Ar data
+.Xc
+Perform arbitrary I/O to a specific device or address on the I2C bus.
+This will perform a single transaction based on the type specified by
+the
+.Ar mode
+argument, which defaults to I2C.
+Transmitted data will be taken from the positional arguments and
+received data will be output in a hexdump if
+.Fl o
+is not specified.
+.Pp
+Care should be taken when performing I/O to arbitrary devices.
+If a kernel device driver is attached this can potentially confuse the
+driver.
+If the device is modified, this can potentially lead to an unbootable or
+unsable system.
+For example, modifying the EERPOM on a DRAM device could lead to DRAM
+training failures.
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl a Ar address
+A string that indicates the numeric 7-bit address to send the I/O to.
+.It Fl c Ar command
+An SMBus command to send.
+This option is only valid when using an SMBus mode with
+.Fl m
+that requires a command to be specified.
+.It Fl d Ar destination
+An I2C path that indicates where the I/O should target.
+If this is a port, then an address must be specified with the
+.Fl a
+option.
+If the path includes mux ports, they will be implicitly activated as
+part of performing this operation.
+If the path ends at a device, the device's primary address
+.Pq reg[0]
+will be used.
+.It Fl m Ar mode
+Specifies the type of I/O request that should be sent.
+The following types are supported:
+.Bl -tag -width write-block-i2c
+.It i2c
+Perform a general I2C transaction.
+One or both of
+.Fl r
+and
+.Fl w
+must be used and non-zero.
+.It quick-read
+Perform an SMBus quick read.
+No data arguments may be specified or are required.
+.It quick-write
+Perform an SMBus quick write.
+No data arguments may be specified or are required.
+.It recv-u8
+Receive a single byte.
+No data arguments may be specified or are required.
+.It read-u8
+Perform the SMBus read byte operation.
+An SMBus command must be specified with
+.Fl c .
+.It read-u16
+Perform the SMBus read word operation.
+An SMBus command must be specified with
+.Fl c .
+.It read-u32
+Perform the SMBus read u32 operation.
+An SMBus command must be specified with
+.Fl c .
+.It read-u64
+Perform the SMBus read u64 operation.
+An SMBus command must be specified with
+.Fl c .
+.It read-block-i2c
+Perform an SMBus I2C block read operation.
+An SMBus command must be specified with
+.Fl c .
+A read length must be specified with
+.Fl r .
+It will not be sent on the wire, unlike a traditional SMBus block read.
+.It send-u8
+Transmit a single byte.
+.It write-u8
+Perform the SMBus write byte operation.
+An SMBus command must be specified with
+.Fl c
+and a single data operand must be specified.
+.It write-u16
+Perform the SMBus write word operation.
+An SMBus command must be specified with
+.Fl c
+and a single data operand must be specified.
+.It write-u32
+Perform the SMBus write u32 operation.
+An SMBus command must be specified with
+.Fl c
+and a single data operand must be specified.
+.It write-u64
+Perform the SMBus write u64 operation.
+An SMBus command must be specified with
+.Fl c
+and a single data operand must be specified.
+.It write-block
+Perform an SMBus write block operation.
+SMBus block write with command and length
+An SMBus command must be specified with
+.Fl c
+and the number of byte to write must be specified with
+.Fl w .
+Both the command and the write length will be sent on the wire.
+There must be a single-byte positional argument for each byte indicated
+with
+.Fl w .
+.It write-block-i2c
+Operates as per write-block above, but the byte length is not sent on
+the wire.
+.It call
+Performs the SMBus process call operation.
+An SMBus command must be specified with
+.Fl c
+and a single positional data argument must be specified.
+Process call transmits and then reads a u16.
+.El
+.It Fl o Ar output
+Send received binary data to the file
+.Ar output
+rather than performing a hexadecimal dump to standard out.
+.It Fl r Ar rlen
+Specifies the number of bytes that should be read from the device.
+.It Fl w Ar wlen
+Specifies the number of bytes that should be transmitted to the device.
+There must be one positional argument for each byte that should be
+transmitted.
+.El
+.It Xo
+.Nm
+.Cm scan
+.Op Fl d Ar device
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar port
+.Xc
+Scan the specified I2C
+.Ar port
+for devices.
+This works by attempting to perform I/O to every non-reserved address on
+the bus.
+If the port belongs to a mux, then all of the appropriate mux segments
+will be enabled prior to performing the scan.
+The command will output a human-oriented table by default organized into
+rows with 16 columns each.
+For machine parsable, stable output use the
+.Fl p
+and
+.Fl o
+options.
+.Pp
+The table will use the following characters to indicate specific cases:
+.Bl -tag -width Ds
+.It @
+Indicates that a device was found at the address.
+.It -
+Indicates that no device was found at the address.
+.It S
+Indicates that the address was skipped as the
+.Fl d
+option was used and the address in question wasn't listed.
+.It R
+Indicates that the address is considered reserved and therefore was not
+scanned.
+.It X
+Indicates that a time out occurred.
+.It Err
+Indicates that an error occurred.
+Following the table, a list of address-specific errors will be printed.
+.El
+.Pp
+Unfortunately, the only way to determine if a device is there is by
+attempting to do I/O to it.
+The scan defaults to performing a single byte read.
+Note, there is no safe way to scan for devices and it is quite possible
+for system damage to occur from scanning!
+.Pp
+The following fields are supported when using machine parsable output:
+.Bl -tag -width RESULT
+.It Sy ADDR
+The I2C address that was scanned, printed in hexadecimal.
+.It Sy RESULT
+A string that describes the result.
+Valid strings include:
+.Dq found ,
+.Dq missing ,
+.Dq reserved ,
+.Dq timeout ,
+.Dq error ,
+and
+.Dq skipped .
+.It Sy ERROR
+A string that includes information about the error that occurred.
+This is only valid if the
+.Sy RESULT
+field is error.
+.El
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl d Ar device
+Restrict the scan to the specified I2C address.
+This may be specified multiple times to only scan a subset of devices.
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are required:
+.Bl -tag -width Ar
+.It Ar port
+An I2C path that terminates at a port.
+If the port is downstream of a multiplexor, all of the segments required
+to send to that port will be enabled, allowing the results to be
+included in the scan.
+Otherwise, multiplexors will be disabled during the scan.
+.El
+.El
+.Sh PROPERTIES
+The system supports a number of named I2C properties.
+Properties are consider either read-only or read-write.
+Some properties may be read-write on one controller and then read-only
+or possibly even unsupported on another controller.
+Whether a property is supported, is writable, and the valid values a
+property can take will vary from one controller to another.
+.Pp
+There are some properties which control timing parameters on the I2C
+bus.
+These properties often have a single instance for each speed that the
+I2C bus can operate at.
+This allows for one to set the tuning properties to the correct value
+before changing the speed without impacting the current operation.
+.Pp
+Properties have a specific type which is either the
+.Sy u32
+or
+.Sy bit32
+which are 32-bit integers that represent a single value or a bitfield
+where each bit conveys its own meaning respectively.
+A few properties such as
+.Em speed ,
+.Em type ,
+and
+.Em smbus-ops
+have well known string values that correspond to fields.
+By default the tools print the stable human-readable strings for these.
+Properties with these are called out in the property table.
+.Pp
+The following properties are supported:
+.Bl -tag -width clock-Thigh-high
+.It speed
+Describes the frequency of the bus.
+This is a
+.Sy u32
+that is translated to the following string values:
+.Bl -tag -width fast-plus
+.It Sy standard
+100 kHz standard operation.
+.It Sy fast
+400 kHz fast-mode operation.
+.It Sy fast-plus
+1 MHz fast-mode plus operation.
+.It Sy high
+3.4 MHz high-speed operation.
+.It Sy ultra
+5 MHz ultra-fast operation.
+.El
+.It ports
+A
+.Sy u32
+property that indicates the number of ports under the controller.
+This property is always read-only and generally will be 1.
+.It type
+Describes the type of controller.
+This is always read-only
+.Sy u32
+property that is translated to the following string values:
+.Bl -tag -width smbus
+.It i2c
+Indicates that this is an I2C controller.
+.It i3c
+Indicates that this is an I3C controller.
+.It smbus
+Indicates that this is an SMBus controller.
+.El
+.Pp
+Some controllers can support more than one I/O command request.
+For example, all I3C controllers support operating as an I2C controller.
+Similarly some SMBus controllers support first-class I2C operation.
+This property only indicates the primary mode of the controller.
+.It smbus-ops
+Describes the set of SMBus operations that the controller supports.
+This is a read-only
+.Sy bit32
+property that is translated to the following string values:
+.Bl -tag -width write-i2c-block
+.It Sy quick
+The controller supports the SMBus quick read and write operation.
+.It Sy send-byte
+The controller supports the SMBus send byte operation.
+.It Sy recv-byte
+The controller supports the SMBus receive byte operation.
+.It Sy write-byte
+The controller supports the SMBus write byte operation.
+.It Sy read-byte
+The controller supports the SMBus read byte operation.
+.It Sy write-word
+The controller supports the SMBus write word
+.Pq 16-bit
+operation.
+.It Sy read-word
+The controller supports the SMBus read word
+.Pq 16-bit
+operation.
+.It Sy process-call
+The controller supports the SMBus process call operation which transmits
+a 16-bit value and then reads back a 16-bit value.
+.It Sy write-block
+The controller supports the SMBus write block operation which transmits
+the SMBus command, the byte length, and all the bytes.
+.It Sy read-block
+The controller supports the SMBus read block operation which reads a
+variable number of bytes that are indicated by the target.
+.It Sy host-notify
+The controller supports sending out the host notification command.
+This is generally only used for SMBus targets and not controllers.
+.It Sy block-call
+The controller supports the SMBus block call operation which transmits
+and then receives a variable number of bytes.
+.It Sy write-u32
+The controller supports the SMBus write 32-bit operation.
+.It Sy read-u32
+The controller supports the SMBus read 32-bit operation.
+.It Sy write-u64
+The controller supports the SMBus write 64-bit operation.
+.It Sy read-u64
+The controller supports the SMBus read 64-bit operation.
+.It Sy write-i2c-block
+The controller supports a variant of the write block operation that is
+compatible with I2C by not transmitting the number of bytes that the
+controller will send.
+.It Sy read-i2c-block
+The controller supports a variant of the read block operation that is
+compatible with I2C by explicitly reading a fixed number of bytes.
+The number of bytes is not transmitted on the wire.
+.El
+.It i2c-max-read
+This is a read-only
+.Sy u32
+property that indicates the largest I2C read the controller can
+receive in one operation.
+.It i2c-max-write
+This is a read-only
+.Sy u32
+property that indicates the largest I2C write the controller can
+transmit in one operation.
+.It smbus-max-block
+This is a read-only
+.Sy u32
+property that indicates the largest SMBus block operation the controller
+can perform.
+.It clock-Thigh-std
+This property indicates the high period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at standard speed.
+.It clock-Tlow-std
+This property indicates the low period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at standard speed.
+.It clock-Thigh-fast
+This property indicates the high period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at fast-mode and
+fast-mode plus speeds.
+.It clock-Tlow-fast
+This property indicates the low period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at fast-mode and
+fast-mode plus speeds.
+.It clock-Thigh-high
+This property indicates the high period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at fast-mode and
+high speed.
+.It clock-Tlow-high
+This property indicates the low period of the I2C clock.
+It is a
+.Sy u32
+property that is counted in terms of clock cycles.
+This property only applies when the bus is operating at fast-mode and
+high speed.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success.
+If an error occurs, it exits 1, and provides additional details about
+the underlying cause of the error.
+If there was an invalid or missing command line options, then
+.Nm
+exits 2.
+.Pp
+When performing a listing operation, if no items are listed or if a filter
+is specified but is not matched, then these conditions are all treated as
+errors and
+.Nm
+exits 1.
+.Sh EXAMPLES
+.Sy Example 1
+Listing Controllers
+.Pp
+This example shows how to discover I2C and SMBus controllers in the
+system.
+.Bd -literal -offset indent
+# i2cadm controller list
+NAME        TYPE      SPEED       NPORTS  PROVIDER
+ismt0       smbus     standard    1       /pci@0,0/pci8086,7270@f/i2cnex@ismt0
+pchsmbus0   smbus     standard    1       /pci@0,0/pci8086,7270@1f,
+                                          4/i2cnex@pchsmbus0
+.Ed
+.Pp
+The controller information can be changed by requesting specific fields
+or adding a filter:
+.Bd -literal -offset indent
+# i2cadm controller list -o name,speed ismt
+NAME        SPEED
+ismt0       standard
+.Ed
+.Pp
+.Sy Example 2
+Listing Devices
+.Pp
+This example shows how to discover the I2C devices that the system knows
+about.
+.Bd -literal -offset indent
+# i2cadm device list
+NAME        ADDR        INSTANCE        PATH
+at24c32     0x50        at24c0          ismt0/0/0x50
+pca9548     0x72        pca954x0        pchsmbus0/0/0x72
+pca9548     0x73        pca954x1        pchsmbus0/0/0x73
+pca9548     0x74        pca954x2        pchsmbus0/0/0x74
+pca9548     0x75        pca954x3        pchsmbus0/0/0x75
+pca9548     0x76        pca954x4        pchsmbus0/0/0x76
+tmp431      0x4c        tmp43x0         pchsmbus0/0/0x72/6/0x4c
+lm75        0x48        lm7x0           pchsmbus0/0/0x73/1/0x48
+lm75        0x49        lm7x1           pchsmbus0/0/0x73/1/0x49
+lm75        0x4a        lm7x2           pchsmbus0/0/0x73/1/0x4a
+lm75        0x4b        lm7x3           pchsmbus0/0/0x73/1/0x4b
+lm75        0x4c        lm7x4           pchsmbus0/0/0x73/1/0x4c
+lm75        0x4d        lm7x5           pchsmbus0/0/0x73/1/0x4d
+lm75        0x4e        lm7x6           pchsmbus0/0/0x73/1/0x4e
+lm75        0x4f        lm7x7           pchsmbus0/0/0x73/1/0x4f
+.Ed
+.Pp
+One can also print out a subset of devices in a parsable form:
+.Bd -literal -offset indent
+# i2cadm device list -Hpo name,path lm75
+lm75:pchsmbus0/0/0x73/1/0x48
+lm75:pchsmbus0/0/0x73/1/0x49
+lm75:pchsmbus0/0/0x73/1/0x4a
+lm75:pchsmbus0/0/0x73/1/0x4b
+lm75:pchsmbus0/0/0x73/1/0x4c
+lm75:pchsmbus0/0/0x73/1/0x4d
+lm75:pchsmbus0/0/0x73/1/0x4e
+lm75:pchsmbus0/0/0x73/1/0x4f
+.Ed
+.Pp
+.Sy Example 3
+Adding a Device
+.Pp
+This example shows how we would add an AT24C32 EEPROM that is at
+address 0x50.
+.Bd -literal -offset indent
+# i2cadm device add ismt0/0 at24c32 0x50
+# i2cadm device list at24c32
+NAME        ADDR        INSTANCE        PATH
+at24c32     0x50        at24c0          ismt0/0/0x50
+.Ed
+.Pp
+Let's say we now wanted to add a TMP431 with 7-bit address address 0x4c
+that is under port 6 of an 8-port PCA9548 at 0x72:
+.Bd -literal -offset indent
+# i2cadm mux list pca954x0
+DEVICE      NPORTS      NAME        INSTANCE        PATH
+pca9548     8           pca954x0    pca954x0        pchsmbus0/0/0x72
+# i2cadm device add pchsmbus0/0/0x72/6 tmp431 0x4c
+# i2cadm device list tmp431
+NAME        ADDR        INSTANCE        PATH
+tmp431      0x4c        tmp43x0         pchsmbus0/0/0x72/6/0x4c
+.Ed
+.Pp
+.Sy Example 4
+Scanning an I2C bus
+.Pp
+This shows
+.Bd -literal
+# i2cadm scan pchsmbus0/0
+Device scan on pchsmbus0/0:
+
+        - = No Device      @ = Device Found
+        R = Reserved       S = Skipped
+        X = Timed Out    Err = Error
+
+ADDR    0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
+0x00      R   R   R   R   R   R   R   R   -   -   -   -   -   -   -   -
+0x10      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x20      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x30      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x40      -   -   -   -   @   -   -   -   -   -   -   -   -   -   -   -
+0x50      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x60      -   -   -   -   -   -   -   -   @   -   -   -   -   -   -   -
+0x70      -   -   @   @   @   @   @   -   R   R   R   R   R   R   R   R
+.Ed
+.Pp
+To instead scan on a port of a given mux, you would change the path to
+indicate that.
+For example:
+.Bd -literal
+# i2cadm scan pchsmbus0/0/0x72/6
+Device scan on pchsmbus0/0/0x72/6:
+
+        - = No Device      @ = Device Found
+        R = Reserved       S = Skipped
+        X = Timed Out    Err = Error
+
+ADDR    0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
+0x00      R   R   R   R   R   R   R   R   -   -   -   -   -   -   -   -
+0x10      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x20      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x30      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x40      -   -   -   -   @   -   -   -   -   -   -   -   @   -   -   -
+0x50      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x60      -   -   -   -   -   -   -   -   @   -   -   -   -   -   -   -
+0x70      -   -   @   @   @   @   @   -   R   R   R   R   R   R   R   R
+.Ed
+.Pp
+.Sy Example 5
+Printing a Port Address Map
+.Pp
+The following shows how to see a list of addresses that are in use on a
+given port according to the system.
+This may not be every device that is present on the bus as the system
+may not have been told about them.
+.Bd -literal
+# i2cadm port map pchsmbus0/0
+Address map for pchsmbus0/0:
+
+        - = No Device      L = Local Device
+        S = Shared         v = Downstream
+                           E = Error
+
+ADDR    0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
+0x00      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x10      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x20      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x30      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x40      -   -   -   -   -   -   -   -  1v  1v  1v  1v  2v  1v  1v  1v
+0x50      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x60      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x70      -   -   L   L   L   L   L   -   -   -   -   -   -   -   -   -
+.Ed
+.Pp
+In this case there are a number of downstream devices on this port that
+are below the muxes.
+If we then ask for the map of everything on a given mux port that most
+of those are on we'd instead see:
+.Bd -literal
+# i2cadm port map pchsmbus0/0/0x73/1
+Address map for pchsmbus0/0/0x73/1:
+
+        - = No Device      L = Local Device
+        S = Shared         v = Downstream
+                           E = Error
+
+ADDR    0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
+0x00      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x10      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x20      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x30      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x40      -   -   -   -   -   -   -   -   L   L   L   L   L   L   L   L
+0x50      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x60      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0x70      -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+.Ed
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Evolving .
+The output of
+.Nm
+is
+.Sy Not-An-Interface
+and may change at any time.
+.Sh SEE ALSO
+.Xr ofmt 3OFMT

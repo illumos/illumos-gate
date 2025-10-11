@@ -1,0 +1,70 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object scoping must comply with the rules detailed in
+#
+#	usr/src/uts/common/mapfiles/README
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# This contains the functions that are usable by I2C/SMBus client and
+# multiplexer devices.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	i2c_bus_lock				{ FLAGS = EXTERN };
+	i2c_bus_unlock				{ FLAGS = EXTERN };
+	i2c_client_addr				{ FLAGS = EXTERN };
+	i2c_client_claim_addr			{ FLAGS = EXTERN };
+	i2c_client_ctrl_errtostr		{ FLAGS = EXTERN };
+	i2c_client_destroy			{ FLAGS = EXTERN };
+	i2c_client_errtostr			{ FLAGS = EXTERN };
+	i2c_client_init				{ FLAGS = EXTERN };
+	i2c_client_init_by_dti			{ FLAGS = EXTERN };
+	i2c_client_ksensor_create_scalar	{ FLAGS = EXTERN };
+	i2c_io_error				{ FLAGS = EXTERN };
+	i2c_mux_mod_fini			{ FLAGS = EXTERN };
+	i2c_mux_mod_init			{ FLAGS = EXTERN };
+	i2c_mux_port_name_portno		{ FLAGS = EXTERN };
+	i2c_mux_port_name_portno_1s		{ FLAGS = EXTERN };
+	i2c_mux_register			{ FLAGS = EXTERN };
+	i2c_mux_register_alloc			{ FLAGS = EXTERN };
+	i2c_mux_register_free			{ FLAGS = EXTERN };
+	i2c_mux_unregister			{ FLAGS = EXTERN };
+	i2c_reg_get				{ FLAGS = EXTERN };
+	i2c_reg_handle_destroy			{ FLAGS = EXTERN };
+	i2c_reg_handle_init			{ FLAGS = EXTERN };
+	i2c_reg_max_read			{ FLAGS = EXTERN };
+	i2c_reg_max_write			{ FLAGS = EXTERN };
+	i2c_reg_put				{ FLAGS = EXTERN };
+	smbus_client_read_u16			{ FLAGS = EXTERN };
+	smbus_client_read_u8			{ FLAGS = EXTERN };
+	smbus_client_recv_byte			{ FLAGS = EXTERN };
+	smbus_client_send_byte			{ FLAGS = EXTERN };
+	smbus_client_write_u16			{ FLAGS = EXTERN };
+	smbus_client_write_u8			{ FLAGS = EXTERN };
+};

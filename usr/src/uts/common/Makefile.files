@@ -2362,3 +2362,10 @@ KTEST_OBJS += ktest.o
 MAC_KTEST_OBJS += mac_ktest.o
 KTEST_KTEST_OBJS += ktest_selftest.o
 STREAM_KTEST_OBJS += stream_ktest.o
+
+#
+# i2c controllers, muxes, drivers, and nexus
+#
+I2CNEX_OBJS +=	i2cnex.o i2cnex_addr.o i2cnex_client.o i2cnex_ctrl.o \
+		i2cnex_device.o i2cnex_user.o i2cnex_mux.o i2cnex_txn.o \
+		i2cnex_props.o i2cnex_util.o

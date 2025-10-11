@@ -199,6 +199,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/fm/io	\
 	$(ROOTDIR)/fs		\
 	$(ROOTDIR)/gpio		\
+	$(ROOTDIR)/i2c		\
 	$(ROOTDIR)/ib		\
 	$(ROOTDIR)/ib/adapters/tavor	\
 	$(ROOTDIR)/ib/adapters/hermon	\
@@ -257,6 +258,8 @@ ROOTAVHDRS= $(AVHDRS:%=$(ROOTDIR)/av/%)
 ROOTCRYPTOHDRS= $(CRYPTOHDRS:%=$(ROOTDIR)/crypto/%)
 
 ROOTDCAMHDRS= $(DCAMHDRS:%=$(ROOTDIR)/dcam/%)
+
+ROOTI2CHDRS= $(I2CHDRS:%=$(ROOTDIR)/i2c/%)
 
 ROOTIBHDRS= $(IBHDRS:%=$(ROOTDIR)/ib/%)
 ROOTIBDHDRS= $(IBDHDRS:%=$(ROOTDIR)/ib/clients/ibd/%)

@@ -1,0 +1,149 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+    global:
+	i2c_addr_parse;
+	i2c_addr_reserved;
+	i2c_addr_to_string;
+	i2c_ctrl_disc_devi;
+	i2c_ctrl_disc_minor;
+	i2c_ctrl_discover;
+	i2c_ctrl_discover_fini;
+	i2c_ctrl_discover_init;
+	i2c_ctrl_discover_step;
+	i2c_ctrl_err;
+	i2c_ctrl_errtostr;
+	i2c_ctrl_fini;
+	i2c_ctrl_init;
+	i2c_ctrl_init_by_path;
+	i2c_ctrl_instance;
+	i2c_ctrl_name;
+	i2c_ctrl_nprops;
+	i2c_ctrl_path;
+	i2c_device_add_req_exec;
+	i2c_device_add_req_fini;
+	i2c_device_add_req_init;
+	i2c_device_add_req_set_addr;
+	i2c_device_add_req_set_compatible;
+	i2c_device_add_req_set_name;
+	i2c_device_disc_devctl;
+	i2c_device_disc_devi;
+	i2c_device_disc_name;
+	i2c_device_disc_path;
+	i2c_device_discover;
+	i2c_device_discover_fini;
+	i2c_device_discover_init;
+	i2c_device_discover_step;
+	i2c_device_info_addr;
+	i2c_device_info_addr_primary;
+	i2c_device_info_addr_source;
+	i2c_device_info_driver;
+	i2c_device_info_instance;
+	i2c_device_info_free;
+	i2c_device_info_naddrs;
+	i2c_device_info_name;
+	i2c_device_info_path;
+	i2c_device_info_snap;
+	i2c_device_rem;
+	i2c_err;
+	i2c_errmsg;
+	i2c_errtostr;
+	i2c_fini;
+	i2c_init;
+	i2c_io_req_exec;
+	i2c_io_req_fini;
+	i2c_io_req_init;
+	i2c_io_req_set_addr;
+	i2c_io_req_set_receive_buf;
+	i2c_io_req_set_transmit_data;
+	i2c_mux_disc_devctl;
+	i2c_mux_disc_devi;
+	i2c_mux_disc_name;
+	i2c_mux_disc_nports;
+	i2c_mux_disc_path;
+	i2c_mux_discover;
+	i2c_mux_discover_fini;
+	i2c_mux_discover_init;
+	i2c_mux_discover_step;
+	i2c_port_dev_init_by_path;
+	i2c_port_disc_devi;
+	i2c_port_disc_path;
+	i2c_port_discover;
+	i2c_port_discover_fini;
+	i2c_port_discover_init;
+	i2c_port_discover_step;
+	i2c_port_fini;
+	i2c_port_init;
+	i2c_port_init_by_path;
+	i2c_port_map_addr_info;
+	i2c_port_map_free;
+	i2c_port_map_ndevs;
+	i2c_port_map_snap;
+	i2c_port_name;
+	i2c_port_path;
+	i2c_port_portno;
+	i2c_port_type;
+	i2c_prop_get;
+	i2c_prop_info;
+	i2c_prop_info_by_name;
+	i2c_prop_info_def_u32;
+	i2c_prop_info_free;
+	i2c_prop_info_id;
+	i2c_prop_info_name;
+	i2c_prop_info_perm;
+	i2c_prop_info_pos;
+	i2c_prop_info_sup;
+	i2c_prop_info_type;
+	i2c_prop_set;
+	i2c_syserr;
+	smbus_io_req_exec;
+	smbus_io_req_fini;
+	smbus_io_req_init;
+	smbus_io_req_set_addr;
+	smbus_io_req_set_addr;
+	smbus_io_req_set_process_call;
+	smbus_io_req_set_quick_cmd;
+	smbus_io_req_set_read_block_i2c;
+	smbus_io_req_set_read_u16;
+	smbus_io_req_set_read_u32;
+	smbus_io_req_set_read_u64;
+	smbus_io_req_set_read_u8;
+	smbus_io_req_set_recv_byte;
+	smbus_io_req_set_send_byte;
+	smbus_io_req_set_write_block;
+	smbus_io_req_set_write_u16;
+	smbus_io_req_set_write_u32;
+	smbus_io_req_set_write_u64;
+	smbus_io_req_set_write_u8;
+    local:
+	*;
+};

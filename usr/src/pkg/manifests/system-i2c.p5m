@@ -1,0 +1,43 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/i2c@$(PKGVERS)
+set name=pkg.summary value="I2C Framework and Utilities"
+set name=pkg.description value="I2C, I3C, SMBus Framework and Utilities"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/i2cnex
+dir  path=usr/include
+file path=usr/include/libi2c.h mode=0644
+dir  path=usr/include/sys/i2c
+file path=usr/include/sys/i2c/controller.h mode=0644
+file path=usr/include/sys/i2c/i2c.h mode=0644
+file path=usr/include/sys/i2c/ioctl.h mode=0644
+file path=usr/include/sys/i2c/mux.h mode=0644
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libi2c.so target=./libi2c.so.1
+file path=usr/lib/$(ARCH64)/libi2c.so.1
+link path=usr/lib/libi2c.so target=./libi2c.so.1
+file path=usr/lib/libi2c.so.1
+dir  path=usr/sbin
+file path=usr/sbin/i2cadm mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/i2cadm.8
+driver name=i2cnex
+license lic_CDDL license=lic_CDDL

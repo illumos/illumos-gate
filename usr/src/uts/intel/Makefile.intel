@@ -779,3 +779,9 @@ DRV_KMODS	+= ktest
 MISC_KMODS	+= mac_ktest
 MISC_KMODS	+= ktest_ktest
 MISC_KMODS	+= stream_ktest
+
+#
+#	I2C Devices and Framework
+#
+DRV_KMODS	+= i2cnex
+
