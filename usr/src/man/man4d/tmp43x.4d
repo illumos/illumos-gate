@@ -1,0 +1,57 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd September 21, 2025
+.Dt TMP43X 4D
+.Os
+.Sh NAME
+.Nm tmp43x
+.Nd tmp401, 411, 43x series I2C temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/i2c/tmp43x*
+.Sh DESCRIPTION
+The
+.Nm
+driver supports the Texas Instruments TMP401, TMP411, TMP431, TMP432,
+and TMP435 I2C temperature sensor devices.
+All devices support a
+.Dq local
+sensor
+and at least one remote sensor called
+.Dq remote1 .
+The TMP432 supports a second remote temperature sensor called
+.Dq remote2 .
+.Pp
+All of the sensors are registered with the kernel sensor framework and
+an interface to them is provied by
+.Xr ksensor 4D .
+The temperature is measured in units of 1/16th of a degree Celsius and
+the devices generally have +/-1 degree Celsius of accuracy.
+.Pp
+Temperature information is available to the system through the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+temperature sensors are considered
+.Sy volatile .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/sensors/temperature/i2c/tmp43x*
+Temperature sensor character device file.
+.It Pa /kernel/drv/amd64/tmp43x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr ksensor 4D ,
+.Xr i2cadm 8

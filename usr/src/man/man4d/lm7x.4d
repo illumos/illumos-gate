@@ -1,0 +1,49 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd September 21, 2025
+.Dt LM7X 4D
+.Os
+.Sh NAME
+.Nm lm7x
+.Nd lm75, lm76, and lm77 series I2C temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/i2c/lm7x*
+.Sh DESCRIPTION
+The
+.Nm
+driver supports devices compatible with the National Semiconductor LM75,
+LM76, and LM77 I2C temperature sensor devices.
+Each device supports a single temperature sensor that is registered with
+the kernel sensor framework and an interface to them is provided by
+.Xr ksensor 4D .
+.Pp
+The LM75 and LM77 generally measure in units of 1/2 degree Celsius while
+the LM76 measures in units of 1/16th degree Celsius.
+Temperature information is available to the system through the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+temperature sensors are considered
+.Sy volatile .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/sensors/temperature/i2c/lm7x*
+Temperature sensor character device file.
+.It Pa /kernel/drv/amd64/lm7x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr ksensor 4D ,
+.Xr i2cadm 8

@@ -1,0 +1,65 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd September 21, 2025
+.Dt TS511X 4D
+.Os
+.Sh NAME
+.Nm ts511x
+.Nd DDR5 temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/i2c/ts511x*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for the discrete DDR5 thermal sensor I2C device
+based on JEDEC standard JESD302-1A including the part numbers TS5110,
+TS5111, TS5210, and TS5211.
+DIMMs may have up to two such sensors present on them.
+The first can be found at addresses 0x10 through 0x17 and the second may
+be found at addresses 0x30 through 0x37.
+.Pp
+The temperature sensor measures in units of 0.25 degrees Celsius and its
+accuracy varies depending on the current temperature range.
+Access to the thermal sensor is provided through the
+.Xr ksensor 4D
+driver and kernel framework.
+Temperature information is available to the system through the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+temperature sensors are considered
+.Sy volatile .
+.Pp
+DDR5 modules have an additional temperature sensor commonly found in
+their hub.
+That is supported by the
+.Xr spd511x 4D
+driver.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/sensors/temperature/i2c/spd511x*
+Temperature sensor character device file.
+.It Pa /kernel/drv/amd64/ts511x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr spd511x 4D ,
+.Xr i2cadm 8
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T TS511X, TS521X Serial Bus Thermal Sensor Device Standard
+.%N JESD302-1A Revision 2.00
+.%D August 2023
+.Re

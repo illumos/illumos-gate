@@ -91,6 +91,7 @@ _MANFILES=	aac.4d		\
 		lockstat.4d	\
 		lofi.4d		\
 		log.4d		\
+		lm7x.4d		\
 		mem.4d		\
 		mpt_sas.4d	\
 		mr_sas.4d	\
@@ -133,6 +134,8 @@ _MANFILES=	aac.4d		\
 		sysmsg.4d	\
 		systrace.4d	\
 		ticlts.4d	\
+		tmp43x.4d	\
+		ts511x.4d	\
 		tty.4d		\
 		tzmon.4d	\
 		ufm.4d		\

@@ -830,6 +830,19 @@ $(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/ismt/%.c
 $(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/pchsmbus/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/lm7x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/tmp43x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/ts511x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(I2CBASE)/nexus/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
