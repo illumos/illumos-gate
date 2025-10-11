@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2025 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -447,10 +447,31 @@ print_system(smbios_hdl_t *shp, FILE *fp)
 		return;
 	}
 
+	/*
+	 * SMBIOS definition section 3.3.2.1 is clear that the first three
+	 * fields are little-endian, but this utility traditionally got this
+	 * wrong, and followed RFC 4122.  We keep this old behavior, but also
+	 * provide a corrected UUID.  The specification clarified this in
+	 * version 2.7, but this was first implemented prior to that.
+	 */
 	oprintf(fp, "  UUID: ");
-	for (i = 0; i < s.smbs_uuidlen; i++) {
+	oprintf(fp, "%02x%02x%02x%02x-%02x%02x-%02x%02x-",
+	    s.smbs_uuid[0], s.smbs_uuid[1], s.smbs_uuid[2], s.smbs_uuid[3],
+	    s.smbs_uuid[4], s.smbs_uuid[5], s.smbs_uuid[6], s.smbs_uuid[7]);
+	for (i = 8; i < s.smbs_uuidlen; i++) {
 		oprintf(fp, "%02x", s.smbs_uuid[i]);
-		if (i == 3 || i == 5 || i == 7 || i == 9)
+		if (i == 9)
+			oprintf(fp, "-");
+	}
+	oprintf(fp, "\n");
+
+	oprintf(fp, "  UUID (Endian-corrected): ");
+	oprintf(fp, "%08x-%04hx-%04hx-", *((uint_t *)&s.smbs_uuid[0]),
+	    *((ushort_t *)&s.smbs_uuid[4]),
+	    *((ushort_t *)&s.smbs_uuid[6]));
+	for (i = 8; i < s.smbs_uuidlen; i++) {
+		oprintf(fp, "%02x", s.smbs_uuid[i]);
+		if (i == 9)
 			oprintf(fp, "-");
 	}
 	oprintf(fp, "\n");

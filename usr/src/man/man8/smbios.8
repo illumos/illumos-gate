@@ -1,20 +1,18 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2018 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBIOS 8 "Aug 31, 2005"
+.TH SMBIOS 8 "March 29, 2018"
 .SH NAME
 smbios \- display the contents of a System Management BIOS image
 .SH SYNOPSIS
-.LP
 .nf
 \fBsmbios\fR [\fB-BeOsx\fR] [\fB-i\fR \fIid\fR] [\fB-t\fR \fItype\fR] [\fB-w\fR \fIfile\fR] [\fIfile\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsmbios\fR utility displays the contents of the System Management BIOS
 (SMBIOS) image exported by the current system or stored in a file. SMBIOS is an
 industry-standard mechanism for low-level system software to export hardware
@@ -37,8 +35,6 @@ applied to the resulting file to display its content.
 readable fashion. If \fBsmbios\fR does not recognize a structure's type or
 content, the raw hexadecimal data for the structure is displayed.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -131,8 +127,6 @@ human-readable output for the selected structures.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -145,8 +139,6 @@ SMBIOS image.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -178,7 +170,6 @@ Invalid command-line options were specified.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/smbios\fR \fR
@@ -189,8 +180,6 @@ snapshot of the current system SMBIOS image.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -208,8 +197,6 @@ Interface Stability	See below.
 .LP
 The command-line options are Evolving. The human-readable output is Unstable.
 .SH SEE ALSO
-.sp
-.LP
 .BR smbios (4D),
 .BR attributes (7),
 .BR prtdiag (8)
@@ -217,11 +204,15 @@ The command-line options are Evolving. The human-readable output is Unstable.
 .LP
 \fISystem Management BIOS Reference Specification\fR (see http://www.dmtf.org)
 .SH NOTES
-.sp
-.LP
 The implementation of a System Management BIOS image is entirely at the
 discretion of the system and BIOS vendors. Not all systems export an SMBIOS.
 The SMBIOS structure content varies widely between systems and BIOS vendors and
 frequently does not comply with the guidelines included in the specification.
 Some structure fields might not be filled in by the BIOS at all, and others
 might be filled inwith non-conforming values.
+.sp
+.LP
+Due to ambiguities in early revisions of the SMBIOS specification, this utility
+incorrectly interprets the first three fields of the system information UUID
+field as network-endian; the SMBIOS specification defines them as little-endian.
+The "UUID (Endian-corrected)" field has the correct value.
