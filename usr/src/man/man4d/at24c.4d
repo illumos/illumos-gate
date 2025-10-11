@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd September 21, 2025
+.Dt AT24C 4D
+.Os
+.Sh NAME
+.Nm at24c
+.Nd Atmel 24 series EEPROM driver
+.Sh SYNOPSIS
+.Pa /dev/eeprom/at24c/*/eeprom
+.Sh DESCRIPTION
+The
+.Nm
+driver provides access to various Atmel or Atemel-compatible I2C based
+serial EEPROM devices.
+A character device, powered by
+.Xr eedev 4D ,
+is created for each device and is found under
+.Pa /dev/eeprom/at24c .
+The devices all support arbitrary reads and writes, though writes are
+limited to the device's page size.
+.Pp
+The following devices are supported:
+.Bl -bullet
+.It
+at24c01 -- 128 byte EEPROM
+.It
+at24c02 -- 256 byte EEPROM
+.It
+at24c08 -- 512 byte EEPROM
+.It
+at24c08 -- 1 KiB EEPROM
+.It
+at24c16 -- 2 KiB EEPROM
+.It
+at24c32 -- 4 KiB EEPROM
+.It
+at24c128 -- 8 KiB EEPROM
+.It
+at24c256 -- 16 KiB EEPROM
+.It
+at24c512 -- 32 KiB EEPROM
+.It
+at24c1024 -- 64 KiB EEPROM
+.El
+.Pp
+Devices starting with the at24c32 and larger use a two byte addressing
+scheme, which leaves them incompatible with systems that only have an
+SMBus-compatible controller
+.Po
+e.g.
+.Xr pchsmbus 4D
+.Pc .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/eeprom/at24c/*/eeprom
+EEPROM character device file.
+.It Pa /kernel/drv/amd64/at24c
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr eedev 4D ,
+.Xr i2cadm 8

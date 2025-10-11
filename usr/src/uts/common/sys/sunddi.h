@@ -210,6 +210,7 @@ extern "C" {
 #define	DDI_NT_UGEN	"ddi_generic:usb"	/* USB generic drv */
 
 #define	DDI_NT_SMP	"ddi_sas_smp"		/* smp devcies */
+#define	DDI_NT_EEPROM	"ddi_eeprom"		/* EEPROM device */
 
 #define	DDI_NT_NEXUS	"ddi_ctl:devctl"	/* nexus drivers */
 

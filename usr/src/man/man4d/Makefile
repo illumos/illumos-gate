@@ -26,6 +26,7 @@ MANSECT=	4d
 
 _MANFILES=	aac.4d		\
 		afe.4d		\
+		at24c.4d	\
 		audio.4d	\
 		audio1575.4d	\
 		audioens.4d	\
@@ -47,6 +48,7 @@ _MANFILES=	aac.4d		\
 		dmfe.4d		\
 		dtrace.4d	\
 		e1000g.4d	\
+		ee100x.4d	\
 		ehci.4d		\
 		ena.4d		\
 		fasttrap.4d	\
@@ -129,6 +131,7 @@ _MANFILES=	aac.4d		\
 		sfe.4d		\
 		sgen.4d		\
 		smartpqi.4d	\
+		spd511x.4d	\
 		srpt.4d		\
 		st.4d		\
 		sysmsg.4d	\

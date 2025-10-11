@@ -2364,6 +2364,12 @@ KTEST_KTEST_OBJS += ktest_selftest.o
 STREAM_KTEST_OBJS += stream_ktest.o
 
 #
+# EEPROM framework driver
+#
+EEDEV_OBJS += eedev.o
+
+
+#
 # I2C controllers, muxes, drivers, and nexus
 #
 I2CNEX_OBJS +=	i2cnex.o i2cnex_addr.o i2cnex_client.o i2cnex_ctrl.o \
@@ -2371,6 +2377,9 @@ I2CNEX_OBJS +=	i2cnex.o i2cnex_addr.o i2cnex_client.o i2cnex_ctrl.o \
 		i2cnex_props.o i2cnex_util.o
 ISMT_OBJS += ismt.o
 PCHSMBUS_OBJS += pchsmbus.o
+EE100X_OBJS += ee100x.o
+SPD511X_OBJS += spd511x.o
 TS511X_OBJS += ts511x.o
 LM7X_OBJS += lm7x.o
 TMP43X_OBJS += tmp43x.o
+AT24C_OBJS += at24c.o

@@ -1,0 +1,81 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd September 21, 2025
+.Dt SPD511X 4D
+.Os
+.Sh NAME
+.Nm spd511x
+.Nd DDR5 hub and serial presence detect driver
+.Sh SYNOPSIS
+.Pa /dev/eeprom/spd511x/*/eeprom
+.Pp
+.Pa /dev/sensors/temperature/i2c/spd511x*
+.Sh DESCRIPTION
+The
+.Nm
+driver supports I2C devices compliant with JEDEC Standard JESD300-5
+which covers the hub and serial presence detect data found on DDR5
+DIMMs.
+The driver provides access to the hub's built-in temperature sensor
+through the
+.Xr ksensor 4D
+driver and provides read-only access to the SPD
+.Pq serial presence detect
+EEPROM through a character device powered by the
+.Xr eedev 4D
+driver.
+These devices are generally found at 7-bit addresses between 0x50 and
+0x57.
+The lower three bits of the address are used to indicate which DIMM the
+device is found on
+.Pq ranging from 0 to 7 .
+.Pp
+The SPD device contains 1024 bytes of memory that are organized into 16
+blocks of 64 bytes each.
+A paging mechanism provides access to 128 bytes at a time.
+Devices can be found under
+.Pa /dev/eeprom/spd511x .
+Contents of the SPD data can be decoded with
+.Xr libjedec 3LIB .
+.Pp
+The temperature sensor measures in units of 0.25 degrees Celsius and its
+accuracy varies depending on the current temperature range.
+Temperature information is available to the system through the fault
+ma management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+temperature sensors are considered
+.Sy volatile .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/eeprom/spd511x/*/eeprom
+EEPROM character device file.
+.It Pa /dev/sensors/temperature/i2c/spd511x*
+Hub temperature sensor.
+.It Pa /kernel/drv/amd64/spd511x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr libjedec 3LIB ,
+.Xr ee100x 4D ,
+.Xr eedev 4D ,
+.Xr ts511x 4D ,
+.Xr i2cadm 8
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T SPD5118 Hub and Serial Presence Detect Device Standard
+.%N JESD300-5B.01 Version 1.5.1
+.%D May 2024
+.Re

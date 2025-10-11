@@ -128,6 +128,7 @@ file path=kernel/drv/$(ARCH64)/cryptoadm group=sys
 file path=kernel/drv/$(ARCH64)/devinfo group=sys
 file path=kernel/drv/$(ARCH64)/dld group=sys
 file path=kernel/drv/$(ARCH64)/dlpistub group=sys
+file path=kernel/drv/$(ARCH64)/eedev group=sys
 file path=kernel/drv/$(ARCH64)/i8042 group=sys
 file path=kernel/drv/$(ARCH64)/icmp group=sys
 file path=kernel/drv/$(ARCH64)/icmp6 group=sys
@@ -204,6 +205,7 @@ file path=kernel/drv/cryptoadm.conf group=sys
 file path=kernel/drv/devinfo.conf group=sys
 file path=kernel/drv/dld.conf group=sys
 file path=kernel/drv/dlpistub.conf group=sys
+file path=kernel/drv/eedev.conf group=sys
 file path=kernel/drv/icmp.conf group=sys
 file path=kernel/drv/icmp6.conf group=sys
 $(i386_ONLY)file path=kernel/drv/intel_nb5000.conf group=sys
@@ -487,6 +489,7 @@ driver name=devinfo perms="devinfo 0640 root sys" \
     perms="devinfo,ro 0444 root sys"
 driver name=dld perms="* 0666 root sys"
 driver name=dlpistub perms="* 0666 root sys"
+driver name=eedev
 $(i386_ONLY)driver name=i8042
 driver name=icmp perms="icmp 0666 root sys" \
     policy="read_priv_set=net_icmpaccess write_priv_set=net_icmpaccess"

@@ -60,6 +60,7 @@ static int glvc(di_minor_t minor, di_node_t node);
 static int ses_callback(di_minor_t minor, di_node_t node);
 static int kmdrv_create(di_minor_t minor, di_node_t node);
 static int vio9p_create(di_minor_t minor, di_node_t node);
+static int eeprom_create(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "(^sad$)",
@@ -216,6 +217,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "ktest",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
+	{ "psuedo", DDI_NT_EEPROM, "eedev",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, eeprom_create
+	}
 };
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);
@@ -256,6 +260,9 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
 	},
 	{ "9p", "^9p/[0-9]+$",
+	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
+	{ "pesudo", "^eeprom/.*$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
 };
@@ -748,5 +755,39 @@ kmdrv_create(di_minor_t minor, di_node_t node)
 {
 
 	(void) devfsadm_mklink("kmdrv", node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * EEPROMs
+ *
+ * Minor nodes are named by the eedev driver as <driver>:<instance>:<name>. Our
+ * goal is to turn this into /dev/eeprom/driver/instance/name -> /devices/...
+ */
+static int
+eeprom_create(di_minor_t minor, di_node_t node)
+{
+	const char *n;
+	char *dup, *c;
+	char buf[PATH_MAX];
+
+	if ((n = di_minor_name(minor)) == NULL) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	if ((dup = strdup(n)) == NULL) {
+		return (DEVFSADM_TERMINATE);
+	}
+
+	c = dup;
+	while ((c = strchr(c, ':')) != NULL) {
+		*c = '/';
+	}
+
+	if (snprintf(buf, sizeof (buf), "eeprom/%s", dup) < sizeof (buf)) {
+		(void) devfsadm_mklink(buf, node, minor, 0);
+	}
+
+	free(dup);
 	return (DEVFSADM_CONTINUE);
 }

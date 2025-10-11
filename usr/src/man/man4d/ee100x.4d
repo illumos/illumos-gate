@@ -1,0 +1,59 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd October 4, 2025
+.Dt EE100X 4D
+.Os
+.Sh NAME
+.Nm ee100x
+.Nd DDR4 serial presence detect driver
+.Sh SYNOPSIS
+.Pa /dev/eeprom/ee100x/*/eeprom
+.Sh DESCRIPTION
+The
+.Nm
+driver supports the I2C EEPROMs found on DDR4 DIMMs.
+The driver provides read-only access to the SPD
+.Pq serial presence detect
+EEPROM through a character device powered by the
+.Xr eedev 4D
+driver.
+These devices are generally found at 7-bit addresses between 0x50 and
+0x57.
+The lower three bits of the address are used to indicate which DIMM the
+device is found on
+.Pq ranging from 0 to 7 .
+.Pp
+The SPD device contains 512 bytes of memory that are organized into two
+pages of 256 bytes each.
+Devices can be found under
+.Pa /dev/eeprom/ee100x .
+Contents of the SPD data can be decoded with
+.Xr libjedec 3LIB .
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/eeprom/spd511x/*/eeprom
+EEPROM character device file.
+.It Pa /kernel/drv/amd64/ee100x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr libjedec 3LIB ,
+.Xr eedev 4D ,
+.Xr spd511x 4D ,
+.Xr i2cadm 8
+.Rs
+.%Q JEDEC Solid State Technology Association
+.%T Definitions of the EE1004-v 4 Kbit Serial Presence Detect (SPD) EEPROM and TSE2004av 4 Kbit SPD EEPROM with Temperature Sensor (TS) for Memory Module Applications
+.%N JESD21-C Release 26
+.Re

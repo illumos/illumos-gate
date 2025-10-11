@@ -781,6 +781,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dmfe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/eedev/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/efe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -828,6 +832,18 @@ $(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/ismt/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/pchsmbus/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/eeprom/at24c/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/eeprom/ee100x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/eeprom/spd511x/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

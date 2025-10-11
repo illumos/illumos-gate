@@ -20,10 +20,13 @@ set name=pkg.description value="I2C, I3C, SMBus Framework and Utilities"
 set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/at24c
+file path=kernel/drv/$(ARCH64)/ee100x
 file path=kernel/drv/$(ARCH64)/i2cnex
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/ismt
 file path=kernel/drv/$(ARCH64)/lm7x
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/pchsmbus
+file path=kernel/drv/$(ARCH64)/spd511x
 file path=kernel/drv/$(ARCH64)/tmp43x
 file path=kernel/drv/$(ARCH64)/ts511x
 dir  path=usr/include
@@ -43,13 +46,40 @@ dir  path=usr/sbin
 file path=usr/sbin/i2cadm mode=0555
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/at24c.4d
+file path=usr/share/man/man4d/ee100x.4d
 file path=usr/share/man/man4d/ismt.4d
 file path=usr/share/man/man4d/lm7x.4d
 file path=usr/share/man/man4d/pchsmbus.4d
+file path=usr/share/man/man4d/spd511x.4d
 file path=usr/share/man/man4d/tmp43x.4d
 file path=usr/share/man/man4d/ts511x.4d
 dir  path=usr/share/man/man8
 file path=usr/share/man/man8/i2cadm.8
+driver name=at24c \
+    alias=at24c01 \
+    alias=at24c016 \
+    alias=at24c02 \
+    alias=at24c04 \
+    alias=at24c08 \
+    alias=at24c1024 \
+    alias=at24c128 \
+    alias=at24c256 \
+    alias=at24c32 \
+    alias=at24c512 \
+    alias=at24c64 \
+    alias=atmel,at24c01 \
+    alias=atmel,at24c016 \
+    alias=atmel,at24c02 \
+    alias=atmel,at24c04 \
+    alias=atmel,at24c08 \
+    alias=atmel,at24c1024 \
+    alias=atmel,at24c128 \
+    alias=atmel,at24c256 \
+    alias=atmel,at24c32 \
+    alias=atmel,at24c512 \
+    alias=atmel,at24c64
+driver name=ee100x alias=ee1004
 driver name=i2cnex
 driver name=ismt \
     alias=pci8086,c59 \
@@ -132,6 +162,7 @@ driver name=pchsmbus \
     alias=pci8086,a323 \
     alias=pci8086,e322 \
     alias=pci8086,e422
+driver name=spd511x alias=spd5118
 driver name=tmp43x \
     alias=ti,tmp401 \
     alias=ti,tmp411 \
