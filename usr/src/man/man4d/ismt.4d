@@ -1,0 +1,53 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd October 4, 2025
+.Dt ISMT 4D
+.Os
+.Sh NAME
+.Nm ismt
+.Nd Intel SMBus Message Transport driver
+.Sh DESCRIPTION
+The
+.Nm
+driver is an SMBus 3.0 controller with I2C support that is present on
+various Intel Atom and Xeon-D platforms.
+.Pp
+The
+.Nm
+driver is part of the system's I2C framework and is accessible
+through common tools such as
+.Xr i2cadm 8 .
+The controller ssupports a mixture of SMBus 2.0 and 3.0 features, but is
+still limited to a 32-byte block buffer and does not support the SMBus
+32-bit and 64-bit protocols directly in its SMBus operation.
+Unlike
+.Xr pchsmbus 4D ,
+.Nm
+also has support for I2C based operations and can use up to a 240-byte
+buffer for them.
+The
+.Nm
+driver currently only has read-only properties.
+While the controller supports a variable bus frequency, these are
+supposed to only be set by fuses by the platform implementor.
+.Sh ARCHITECTURE
+.Sy x86
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/ismt
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr pchsmbus 4D ,
+.Xr i2cadm 8

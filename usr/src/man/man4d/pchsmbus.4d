@@ -1,0 +1,52 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd October 4, 2025
+.Dt PCHSMBUS 4D
+.Os
+.Sh NAME
+.Nm pchsmbus
+.Nd Intel PCH SMBus Controller
+.Sh DESCRIPTION
+The
+.Nm
+driver is an SMBus 2.0 controller that supports many generations of
+Intel chipsets.
+Supported device families include the original Intel Controller Hub
+family
+.Pq ICH ,
+the Intel Platfrom Controller Hub family
+.Pq PCH ,
+various on-package chipsets, and a variety of Atom and other processors.
+.Pp
+The
+.Nm
+driver is part of the system's I2C framework and is accessible
+through common tools such as
+.Xr i2cadm 8 .
+The controller supports all SMBus 2.0 operations and has a 32-byte block
+buffer.
+In addition, it has compatibility options to generate I2C-based block
+reads and writes.
+The driver does not support changing any SMBus parameter timings and the
+controller generally only operates at 100 kHz.
+.Sh ARCHITECTURE
+.Sy x86
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/pchsmbus
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr ismt 4D ,
+.Xr i2cadm 8

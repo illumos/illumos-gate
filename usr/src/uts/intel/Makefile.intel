@@ -26,7 +26,7 @@
 # Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2023 Racktop Systems, Inc.
 #
 
@@ -785,3 +785,7 @@ MISC_KMODS	+= stream_ktest
 #
 DRV_KMODS	+= i2cnex
 
+#
+#	I2C Controllers
+#
+DRV_KMODS	+= ismt pchsmbus

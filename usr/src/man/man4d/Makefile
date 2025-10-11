@@ -16,7 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2023 Peter Tribble
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 # Copyright 2023 RackTop Systems, Inc.
 #
 
@@ -79,6 +79,7 @@ _MANFILES=	aac.4d		\
 		ipnet.4d	\
 		iscsi.4d	\
 		iser.4d		\
+		ismt.4d		\
 		ixgbe.4d	\
 		kgpio.4d	\
 		kmdb.4d		\
@@ -103,6 +104,7 @@ _MANFILES=	aac.4d		\
 		ohci.4d		\
 		openprom.4d	\
 		pcic.4d		\
+		pchsmbus.4d	\
 		pcmcia.4d	\
 		physmem.4d	\
 		pm.4d		\

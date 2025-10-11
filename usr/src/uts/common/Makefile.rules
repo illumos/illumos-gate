@@ -823,6 +823,13 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/hotplug/pcihp/%.c
 
 I2CBASE = $(UTSBASE)/common/io/i2c
 
+$(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/ismt/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/ctrl/pchsmbus/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 $(OBJS_DIR)/%.o:		$(I2CBASE)/nexus/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
