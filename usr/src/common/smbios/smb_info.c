@@ -2105,7 +2105,7 @@ smbios_info_fwinfo(smbios_hdl_t *shp, id_t id, smbios_fwinfo_t *fwinfo)
 	}
 
 	/*
-	 * The verion and manufacturer are part of smbios_info_common().
+	 * The version and manufacturer are part of smbios_info_common().
 	 */
 	bzero(fwinfo, sizeof (*fwinfo));
 	smb_info_bcopy(stp->smbst_hdr, &fw, sizeof (fw));
@@ -2299,5 +2299,93 @@ smbios_info_addinfo_ent(smbios_hdl_t *shp, id_t id, uint_t entno,
 	}
 
 	*entp = entry;
+	return (0);
+}
+
+int
+smbios_info_tpm(smbios_hdl_t *shp, id_t id, smbios_tpm_t *tpm)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_tpm_t t;
+
+	if (stp == NULL) {
+		return (-1); /* errno is set for us */
+	}
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_TPM) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (t)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(tpm, sizeof (*tpm));
+	smb_info_bcopy(stp->smbst_hdr, &t, sizeof (t));
+	bcopy(t.smbtpm_vid, tpm->smbtpm_vid, sizeof (t.smbtpm_vid));
+	tpm->smbtpm_major = t.smbtpm_major;
+	tpm->smbtpm_minor = t.smbtpm_minor;
+	tpm->smbtpm_fwv1 = t.smbtpm_fwv1;
+	tpm->smbtpm_fwv2 = t.smbtpm_fwv2;
+	tpm->smbtpm_desc = smb_strptr(stp, t.smbtpm_desc);
+	tpm->smbtpm_chars = t.smbtpm_chars;
+	tpm->smbtpm_oem = t.smbtpm_oem;
+
+	return (0);
+}
+
+int
+smbios_info_mgmtdev(smbios_hdl_t *shp, id_t id, smbios_mgmtdev_t *mgmt)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_mgmtdev_t md;
+
+	if (stp == NULL) {
+		return (-1); /* errno is set for us */
+	}
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_MGMTDEV) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (md)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(mgmt, sizeof (*mgmt));
+	smb_info_bcopy(stp->smbst_hdr, &md, sizeof (md));
+	mgmt->smbmd_desc = smb_strptr(stp, md.smbmgd_desc);
+	mgmt->smbmd_dtype = md.smbmgd_dtype;
+	mgmt->smbmd_atype = md.smbmgd_atype;
+	mgmt->smbmd_addr = md.smbmgd_addr;
+
+	return (0);
+}
+
+int
+smbios_info_mgmtcomp(smbios_hdl_t *shp, id_t id, smbios_mgmtcomp_t *mgmt)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_mgmtcomp_t mc;
+
+	if (stp == NULL) {
+		return (-1); /* errno is set for us */
+	}
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_MGMTDEVCP) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (mc)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(mgmt, sizeof (*mgmt));
+	smb_info_bcopy(stp->smbst_hdr, &mc, sizeof (mc));
+	mgmt->smbmc_desc = smb_strptr(stp, mc.smbmgc_desc);
+	mgmt->smbmc_mgmtdev = mc.smbmgc_mgmtdev;
+	mgmt->smbmc_comp = mc.smbmgc_comp;
+	mgmt->smbmc_thresh = mc.smbmgc_thresh;
+
 	return (0);
 }

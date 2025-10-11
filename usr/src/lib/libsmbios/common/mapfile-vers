@@ -41,12 +41,12 @@
 
 $mapfile_version 2
 
+#
+# This version should not be changed.
+#
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_smb_debug	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
-	smbios_info_addinfo_ent;
-	smbios_info_addinfo_ent_free;
-	smbios_info_addinfo_nents;
 	smbios_battery_chem_desc;
 	smbios_bboard_flag_desc;
 	smbios_bboard_flag_name;
@@ -74,9 +74,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_chassis_state_desc;
 	smbios_chassis_type_desc;
 	smbios_checksum;
+	smbios_close;
 	smbios_cooldev_status_desc;
 	smbios_cooldev_type_desc;
-	smbios_close;
 	smbios_csn;
 	smbios_errmsg;
 	smbios_errno;
@@ -85,12 +85,15 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_evlog_format_desc;
 	smbios_evlog_method_desc;
 	smbios_fdopen;
-	smbios_fwinfo_ch_name;
 	smbios_fwinfo_ch_desc;
+	smbios_fwinfo_ch_name;
 	smbios_fwinfo_id_desc;
 	smbios_fwinfo_state_desc;
 	smbios_fwinfo_vers_desc;
 	smbios_hwsec_desc;
+	smbios_info_addinfo_ent;
+	smbios_info_addinfo_ent_free;
+	smbios_info_addinfo_nents;
 	smbios_info_battery;
 	smbios_info_bboard;
 	smbios_info_bios;
@@ -99,10 +102,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_chassis;
 	smbios_info_chassis_elts;
 	smbios_info_chassis_elts_free;
-	smbios_info_cooldev;
 	smbios_info_common;
 	smbios_info_contains;
+	smbios_info_cooldev;
 	smbios_info_eventlog;
+	smbios_info_extmemarray;
+	smbios_info_extmemdevice;
+	smbios_info_extmemdevice_cs;
+	smbios_info_extmemdevice_cs_free;
+	smbios_info_extport;
+	smbios_info_extprocessor;
 	smbios_info_fwinfo;
 	smbios_info_fwinfo_comps;
 	smbios_info_fwinfo_comps_free;
@@ -111,23 +120,20 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_iprobe;
 	smbios_info_lang;
 	smbios_info_memarray;
-	smbios_info_extmemarray;
 	smbios_info_memarrmap;
 	smbios_info_memdevice;
-	smbios_info_extmemdevice;
-	smbios_info_extmemdevice_cs;
-	smbios_info_extmemdevice_cs_free;
 	smbios_info_memdevmap;
+	smbios_info_mgmtcomp;
+	smbios_info_mgmtdev;
 	smbios_info_obdevs;
 	smbios_info_obdevs_ext;
+	smbios_info_pciexrc;
 	smbios_info_pointdev;
 	smbios_info_port;
-	smbios_info_extport;
 	smbios_info_powersup;
 	smbios_info_processor;
 	smbios_info_processor_info;
 	smbios_info_processor_riscv;
-	smbios_info_extprocessor;
 	smbios_info_slot;
 	smbios_info_slot_peers;
 	smbios_info_slot_peers_free;
@@ -136,7 +142,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_strprop;
 	smbios_info_strtab;
 	smbios_info_system;
-	smbios_info_pciexrc;
+	smbios_info_tpm;
 	smbios_info_tprobe;
 	smbios_info_vprobe;
 	smbios_ipmi_flag_desc;
@@ -150,14 +156,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memarray_ecc_desc;
 	smbios_memarray_loc_desc;
 	smbios_memarray_use_desc;
-	smbios_memdevice_op_capab_desc;
-	smbios_memdevice_op_capab_name;
 	smbios_memdevice_flag_desc;
 	smbios_memdevice_flag_name;
 	smbios_memdevice_form_desc;
 	smbios_memdevice_memtech_desc;
-	smbios_memdevice_type_desc;
+	smbios_memdevice_op_capab_desc;
+	smbios_memdevice_op_capab_name;
 	smbios_memdevice_rank_desc;
+	smbios_memdevice_type_desc;
+	smbios_mgmtdev_atype_desc;
+	smbios_mgmtdev_dtype_desc;
 	smbios_onboard_ext_type_desc;
 	smbios_onboard_type_desc;
 	smbios_open;
@@ -170,13 +178,13 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_powersup_input_desc;
 	smbios_powersup_status_desc;
 	smbios_powersup_type_desc;
+	smbios_processor_core_flag_desc;
+	smbios_processor_core_flag_name;
 	smbios_processor_family_desc;
+	smbios_processor_info_type_desc;
 	smbios_processor_status_desc;
 	smbios_processor_type_desc;
 	smbios_processor_upgrade_desc;
-	smbios_processor_core_flag_desc;
-	smbios_processor_core_flag_name;
-	smbios_processor_info_type_desc;
 	smbios_psn;
 	smbios_riscv_isa_desc;
 	smbios_riscv_isa_name;
@@ -194,6 +202,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_slot_width_desc;
 	smbios_strprop_id_desc;
 	smbios_system_wakeup_desc;
+	smbios_tpm_char_desc;
+	smbios_tpm_char_name;
 	smbios_tprobe_loc_desc;
 	smbios_tprobe_status_desc;
 	smbios_truncated;

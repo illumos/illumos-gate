@@ -26,11 +26,13 @@ SRCS =	smbios.c \
 	smbios_test_extmemdevice.c \
 	smbios_test_fwinfo.c \
 	smbios_test_memdevice.c \
+	smbios_test_mgmtdev.c \
 	smbios_test_proc.c \
 	smbios_test_pinfo.c \
 	smbios_test_slot.c \
 	smbios_test_strings.c \
-	smbios_test_strprop.c
+	smbios_test_strprop.c \
+	smbios_test_tpm.c
 PROGS = smbios
 
 PROGS32 = $(PROGS:%=%.32)

@@ -183,6 +183,17 @@ extern boolean_t smbios_test_addinfo_verify_invlen_ent(smbios_hdl_t *);
 extern boolean_t smbios_test_addinfo_verify_invlen_multient(smbios_hdl_t *);
 extern boolean_t smbios_test_addinfo_verify_invlen_entdata(smbios_hdl_t *);
 
+extern boolean_t smbios_test_tpm_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_tpm_mktable_short(smbios_test_table_t *);
+extern boolean_t smbios_test_tpm_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_tpm_verify_short(smbios_hdl_t *);
+extern boolean_t smbios_test_tpm_verify_badtype(smbios_hdl_t *);
+
+extern boolean_t smbios_test_mgmtdev_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_mgmtcomp_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_mgmtdev_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_mgmtcomp_verify(smbios_hdl_t *);
+
 #ifdef __cplusplus
 }
 #endif

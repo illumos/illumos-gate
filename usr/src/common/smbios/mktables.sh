@@ -59,6 +59,7 @@ SMB_RV_PRIV_	smbios_riscv_priv_name		uint_t
 SMB_TYPE_	smbios_type_name		uint_t
 SMB_SLCH1_	smbios_slot_ch1_name		uint_t
 SMB_SLCH2_	smbios_slot_ch2_name		uint_t
+SMB_TPMC_	smbios_tpm_char_name		uint64_t
 '
 
 desc_funcs='
@@ -93,6 +94,8 @@ SMB_IPMI_F_	smbios_ipmi_flag_desc		uint_t
 SMB_IPMI_T_	smbios_ipmi_type_desc		uint_t
 SMB_IPROBE_L_	smbios_iprobe_loc_desc		uint_t
 SMB_IPROBE_S_	smbios_iprobe_status_desc	uint_t
+SMB_MGMTDEV_AT_	smbios_mgmtdev_atype_desc	uint_t
+SMB_MGMTDEV_DT_	smbios_mgmtdev_dtype_desc	uint_t
 SMB_POWERSUP_F_	smbios_powersup_flag_desc	uint_t
 SMB_POWERSUP_I_	smbios_powersup_input_desc	uint_t
 SMB_POWERSUP_S_	smbios_powersup_status_desc	uint_t
@@ -129,6 +132,7 @@ SMB_SLT_	smbios_slot_type_desc		uint_t
 SMB_SLU_	smbios_slot_usage_desc		uint_t
 SMB_SLW_	smbios_slot_width_desc		uint_t
 SMB_STRP_	smbios_strprop_id_desc		uint_t
+SMB_TPMC_	smbios_tpm_char_desc		uint64_t
 SMB_TPROBE_L_	smbios_tprobe_loc_desc		uint_t
 SMB_TPROBE_S_	smbios_tprobe_status_desc	uint_t
 SMB_TYPE_	smbios_type_desc		uint_t

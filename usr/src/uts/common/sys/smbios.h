@@ -1727,6 +1727,48 @@ typedef struct smbios_boot {
 #define	SMB_BOOT_PROD_HI	255	/* high end of product-specific range */
 
 /*
+ * SMBIOS Management Device Information (Type 34). See Section 7.35 for more
+ * information.
+ */
+typedef struct smbios_mgmtdev {
+	const char *smbmd_desc;		/* description */
+	uint16_t smbmd_dtype;		/* device type */
+	uint16_t smbmd_atype;		/* address type */
+	uint32_t smbmd_addr;		/* address */
+} smbios_mgmtdev_t;
+
+#define	SMB_MGMTDEV_DT_OTHER	0x1	/* other */
+#define	SMB_MGMTDEV_DT_UNKNOWN	0x2	/* unknown */
+#define	SMB_MGMTDEV_DT_LM75	0x3	/* National Semiconductor LM75 */
+#define	SMB_MGMTDEV_DT_LM78	0x4	/* National Semiconductor LM78 */
+#define	SMB_MGMTDEV_DT_LM79	0x5	/* National Semiconductor LM79 */
+#define	SMB_MGMTDEV_DT_LM80	0x6	/* National Semiconductor LM80 */
+#define	SMB_MGMTDEV_DT_LM81	0x7	/* National Semiconductor LM81 */
+#define	SMB_MGMTDEV_DT_ADM9240	0x8	/* Analog Devices AMD9240 */
+#define	SMB_MGMTDEV_DT_DS1780	0x9	/* Dallas Semiconductor DS1780 */
+#define	SMB_MGMTDEV_DT_MAX1617	0xa	/* Maxim 1617 */
+#define	SMB_MGMTDEV_DT_GL518SM	0xb	/* Genesys GL518SM */
+#define	SMB_MGMTDEV_DT_W83781D	0xc	/* Winbond W83781D */
+#define	SMB_MGMTDEV_DT_HT82H791	0xd	/* Holtek HT82H791 */
+
+#define	SMB_MGMTDEV_AT_OTHER	0x1	/* other */
+#define	SMB_MGMTDEV_AT_UNKNOWN	0x2	/* unknown */
+#define	SMB_MGMTDEV_AT_IO	0x3	/* I/O port */
+#define	SMB_MGMTDEV_AT_MEM	0x4	/* memory */
+#define	SMB_MGMTDEV_AT_SMBUS	0x5	/* SMBus */
+
+/*
+ * SMBIOS Management Device Component (Type 35). See Section 7.36 for more
+ * information.
+ */
+typedef struct smbios_mgmtcomp {
+	const char *smbmc_desc;		/* description */
+	id_t smbmc_mgmtdev;		/* management device handle */
+	id_t smbmc_comp;		/* component handle */
+	id_t smbmc_thresh;		/* threshold handle */
+} smbios_mgmtcomp_t;
+
+/*
  * SMBIOS IPMI Device Information.  See DSP0134 Section 7.39 and also
  * Appendix C1 of the IPMI specification for more information on this record.
  */
@@ -1840,6 +1882,30 @@ typedef struct smbios_obdev_ext {
 #define	SMB_OBET_EMMC		0x0E	/* eMMC */
 #define	SMB_OBET_NVME		0x0F	/* NVMe */
 #define	SMB_OBET_UFS		0x10	/* UFS */
+
+/*
+ * SMBIOS TPM (Type 43). See Section 7.44 for more information.
+ */
+typedef struct smbios_tpm {
+	const char *smbtpm_desc;	/* Description */
+	uint8_t smbtpm_vid[4];		/* vendor ID */
+	uint8_t smbtpm_major;		/* TPM major version */
+	uint8_t smbtpm_minor;		/* TPM minor version */
+	uint32_t smbtpm_fwv1;		/* TPM firmware version 1 */
+	uint32_t smbtpm_fwv2;		/* TPM firmware version 2 */
+	uint64_t smbtpm_chars;		/* TPM characteristics */
+	uint32_t smbtpm_oem;		/* TPM OEM-defined */
+} smbios_tpm_t;
+
+/*
+ * These lines must be on one line for the string generating code.
+ */
+/* BEGIN CSTYLED */
+#define	SMB_TPMC_NODC		(1 << 2)	/* device characteristics not supported */
+#define	SMB_TPMC_FWUPD		(1 << 3)	/* family configurable via firmware update */
+#define	SMB_TPMC_PLATSW		(1 << 4)	/* family configurable via platform software */
+#define	SMB_TPMC_OEM		(1 << 5)	/* family configurable via OEM mechanism */
+/* END CSTYLED */
 
 /*
  * SMBIOS Processor Additional Information (Type 44). See section 7.45 for more
@@ -2161,6 +2227,8 @@ extern int smbios_info_cooldev(smbios_hdl_t *, id_t, smbios_cooldev_t *);
 extern int smbios_info_tprobe(smbios_hdl_t *, id_t, smbios_tprobe_t *);
 extern int smbios_info_iprobe(smbios_hdl_t *, id_t, smbios_iprobe_t *);
 extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
+extern int smbios_info_mgmtdev(smbios_hdl_t *, id_t, smbios_mgmtdev_t *);
+extern int smbios_info_mgmtcomp(smbios_hdl_t *, id_t, smbios_mgmtcomp_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
 extern int smbios_info_powersup(smbios_hdl_t *, id_t, smbios_powersup_t *);
 extern int smbios_info_addinfo_nents(smbios_hdl_t *, id_t, uint_t *);
@@ -2173,6 +2241,7 @@ extern int smbios_info_processor_info(smbios_hdl_t *, id_t,
     smbios_processor_info_t *);
 extern int smbios_info_processor_riscv(smbios_hdl_t *, id_t,
     smbios_processor_info_riscv_t *);
+extern int smbios_info_tpm(smbios_hdl_t *, id_t, smbios_tpm_t *);
 extern int smbios_info_strprop(smbios_hdl_t *, id_t, smbios_strprop_t *);
 extern int smbios_info_fwinfo(smbios_hdl_t *, id_t, smbios_fwinfo_t *);
 extern int smbios_info_fwinfo_comps(smbios_hdl_t *, id_t, uint_t *,
@@ -2307,6 +2376,12 @@ extern const char *smbios_type_desc(uint_t);
 extern const char *smbios_type_name(uint_t);
 
 extern const char *smbios_system_wakeup_desc(uint_t);
+
+extern const char *smbios_tpm_char_desc(uint64_t);
+extern const char *smbios_tpm_char_name(uint64_t);
+
+extern const char *smbios_mgmtdev_atype_desc(uint_t);
+extern const char *smbios_mgmtdev_dtype_desc(uint_t);
 #endif /* !_KERNEL */
 
 #ifdef _KERNEL

@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
- * Tests for SMBIOS type 46 - SMB_TYPE_STRPROP.
+ * Tests for SMBIOS type 45 - SMB_TYPE_FWINFO.
  */
 
 #include "smbios_test.h"
@@ -148,7 +148,7 @@ smbios_test_fwinfo_verify_badtype(smbios_hdl_t *hdl)
 
 	if (smbios_errno(hdl) != ESMB_TYPE) {
 		warnx("encountered wrong error for fwinfo, expected: "
-		    "0x%x, found: 0x%x", ESMB_SHORT, smbios_errno(hdl));
+		    "0x%x, found: 0x%x", ESMB_TYPE, smbios_errno(hdl));
 		return (B_FALSE);
 	}
 

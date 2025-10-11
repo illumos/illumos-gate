@@ -573,6 +573,29 @@ typedef struct smb_boot {
 } smb_boot_t;
 
 /*
+ * SMBIOS implementation structure for SMB_TYPE_MGMTDEV.
+ */
+typedef struct smb_mgmtdev {
+	smb_header_t smbmgd_hdr;	/* structure header */
+	uint8_t smbmgd_desc;		/* description */
+	uint8_t smbmgd_dtype;		/* device type */
+	uint32_t smbmgd_addr;		/* device address */
+	uint8_t smbmgd_atype;		/* address type */
+} smb_mgmtdev_t;
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_MGMTDEVCP.
+ */
+typedef struct smb_mgmtcomp {
+	smb_header_t smbmgc_hdr;	/* structure header */
+	uint8_t smbmgc_desc;		/* description */
+	uint16_t smbmgc_mgmtdev;	/* management device handle */
+	uint16_t smbmgc_comp;		/* component handle */
+	uint16_t smbmgc_thresh;		/* threshold handle */
+} smb_mgmtcomp_t;
+
+
+/*
  * SMBIOS implementation structure for SMB_TYPE_IPMIDEV.
  */
 typedef struct smb_ipmi {
@@ -668,6 +691,21 @@ typedef struct smb_obdev_ext {
 	uint8_t smbobe_bus;		/* bus number */
 	uint8_t smbobe_df;		/* device/function number */
 } smb_obdev_ext_t;
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_TPM
+ */
+typedef struct smb_tpm {
+	smb_header_t smbtpm_hdr;	/* structure header */
+	uint8_t smbtpm_vid[4];		/* vendor ID */
+	uint8_t smbtpm_major;		/* major version */
+	uint8_t smbtpm_minor;		/* minor version */
+	uint32_t smbtpm_fwv1;		/* firmware version 1 */
+	uint32_t smbtpm_fwv2;		/* firmware version 2 */
+	uint8_t smbtpm_desc;		/* description */
+	uint64_t smbtpm_chars;		/* characteristics */
+	uint32_t smbtpm_oem;		/* OEM data */
+} smb_tpm_t;
 
 /*
  * SMBIOS implementation structure for SMB_TYPE_PROCESSOR_INFO
