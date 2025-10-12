@@ -896,6 +896,8 @@ GPIOHDRS=			\
 	kgpio_attr.h		\
 	kgpio_provider.h	\
 	kgpio.h			\
+	ltc4306.h		\
+	pca953x.h		\
 	zen_gpio.h
 
 NVMEHDRS=		\

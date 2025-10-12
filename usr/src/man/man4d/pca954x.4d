@@ -1,0 +1,51 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2025 Oxide Computer Company
+.\"
+.Dd October 4, 2025
+.Dt PCA954X 4D
+.Os
+.Sh NAME
+.Nm pca954x
+.Nd PCA 954X series I2C mux driver
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for the PCA 954X series I2C switches and multiplexors.
+Instances of
+.Nm
+are part of the system's I2C framework and not manipulated directly, but
+are visible with
+.Xr i2cadm 8 .
+.Pp
+The following devices are currently supported by the driver:
+.Bl -bullet
+.It
+PCA9543 -- 2 port switch
+.It
+PCA9545 -- 4 port switch
+.It
+PCA9546 -- 4 port switch
+.It
+PCA9548 -- 8 port switch
+.It
+PCA9846 -- 4 port switch
+.It
+PCA9848 -- 8 port switch
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/pca954x
+Device driver (x86)
+.El
+.Sh SEE ALSO
+.Xr i2cadm 8

@@ -847,6 +847,10 @@ $(OBJS_DIR)/%.o:		$(I2CBASE)/eeprom/spd511x/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(I2CBASE)/gpio/pca953x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/lm7x/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -856,6 +860,14 @@ $(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/tmp43x/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(I2CBASE)/sensor/ts511x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/mux/ltc430x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(I2CBASE)/mux/pca954x/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

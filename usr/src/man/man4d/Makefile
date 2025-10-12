@@ -106,6 +106,7 @@ _MANFILES=	aac.4d		\
 		nxge.4d		\
 		ohci.4d		\
 		openprom.4d	\
+		pca954x.4d	\
 		pcic.4d		\
 		pchsmbus.4d	\
 		pcmcia.4d	\

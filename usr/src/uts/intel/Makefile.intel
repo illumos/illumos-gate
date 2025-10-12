@@ -785,8 +785,10 @@ MISC_KMODS	+= stream_ktest
 #	I2C Devices and Framework
 #
 DRV_KMODS	+= i2cnex
+DRV_KMODS	+= pca954x ltc430x
 DRV_KMODS	+= ee100x spd511x at24c
 DRV_KMODS	+= lm7x tmp43x ts511x
+DRV_KMODS	+= pca953x
 
 #
 #	I2C Controllers

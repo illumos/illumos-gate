@@ -25,6 +25,8 @@
 #include <strings.h>
 #include <sys/gpio/zen_gpio.h>
 #include <sys/gpio/gpio_sim.h>
+#include <sys/gpio/pca953x.h>
+#include <sys/gpio/ltc4306.h>
 #include <sys/sysmacros.h>
 
 #include "libxpio_impl.h"
@@ -173,6 +175,44 @@ static const xpio_pair_t gpio_sim_speed_pairs[] = {
 	{ GPIO_SIM_SPEED_MEDIUM, "medium" },
 	{ GPIO_SIM_SPEED_HIGH, "high" },
 	{ GPIO_SIM_SPEED_VERY_HIGH, "very-high" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t pca953x_input_pairs[] = {
+	{ PCA953X_GPIO_INPUT_LOW, "low" },
+	{ PCA953X_GPIO_INPUT_HIGH, "high" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t pca953x_output_pairs[] = {
+	{ PCA953X_GPIO_OUTPUT_DISABLED, "disabled" },
+	{ PCA953X_GPIO_OUTPUT_LOW, "low" },
+	{ PCA953X_GPIO_OUTPUT_HIGH, "high" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t pca953x_polarity_pairs[] = {
+	{ PCA953X_GPIO_POLARITY_NORMAL, "normal" },
+	{ PCA953X_GPIO_POLARITY_INVERTED, "inverted" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t ltc4306_input_pairs[] = {
+	{ LTC4306_GPIO_INPUT_LOW, "low" },
+	{ LTC4306_GPIO_INPUT_HIGH, "high" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t ltc4306_output_pairs[] = {
+	{ LTC4306_GPIO_OUTPUT_DISABLED, "disabled" },
+	{ LTC4306_GPIO_OUTPUT_LOW, "low" },
+	{ LTC4306_GPIO_OUTPUT_HIGH, "high" },
+	{ 0x00, NULL }
+};
+
+static const xpio_pair_t ltc4306_output_mode_pairs[] = {
+	{ LTC4306_GPIO_OUTPUT_MODE_PUSH_PULL, "push-pull" },
+	{ LTC4306_GPIO_OUTPUT_MODE_OPEN_DRAIN, "open-drain" },
 	{ 0x00, NULL }
 };
 
@@ -369,6 +409,20 @@ static const xpio_translate_t xpio_attr_xlates[] = {
 	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
 	{ GPIO_SIM_ATTR_SPEED, gpio_sim_speed_pairs,
 	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	/* pca953x(4D) attrs */
+	{ PCA953X_GPIO_ATTR_INPUT, pca953x_input_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	{ PCA953X_GPIO_ATTR_OUTPUT, pca953x_output_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	{ PCA953X_GPIO_ATTR_POLARITY, pca953x_polarity_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	/* ltc4306(4D) attrs */
+	{ LTC4306_GPIO_ATTR_INPUT, ltc4306_input_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	{ LTC4306_GPIO_ATTR_OUTPUT, ltc4306_output_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct },
+	{ LTC4306_GPIO_ATTR_OUTPUT_MODE, ltc4306_output_mode_pairs,
+	    xpio_attr_xlate_tostr_direct, xpio_attr_xlate_tou32_direct }
 };
 
 bool
