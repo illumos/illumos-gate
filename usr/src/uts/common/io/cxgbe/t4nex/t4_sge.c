@@ -2114,7 +2114,7 @@ start:	txinfo->nsegs = 0;
 	}
 	m = *fp;
 
-	if (n >= TX_SGL_SEGS || (flags & HW_LSO && MBLKL(m) < 50)) {
+	if (n >= TX_SGL_SEGS || ((flags & HW_LSO) && MBLKL(m) < 50)) {
 		txq->pullup_early++;
 		m = msgpullup(*fp, -1);
 		if (m == NULL) {
@@ -2130,20 +2130,22 @@ start:	txinfo->nsegs = 0;
 		return (0);	/* nsegs = 0 tells caller to use imm. tx */
 
 	if (txinfo->len <= txq->copy_threshold &&
-	    copy_into_txb(txq, m, txinfo->len, txinfo) == 0)
+	    copy_into_txb(txq, m, txinfo->len, txinfo) == 0) {
 		goto done;
+	}
 
 	for (; m; m = m->b_cont) {
 
 		len = MBLKL(m);
 
-		/* Use tx copy buffer if this mblk is small enough */
-		if (len <= txq->copy_threshold &&
-		    copy_into_txb(txq, m, len, txinfo) == 0)
-			continue;
-
-		/* Add DMA bindings for this mblk to the SGL */
-		rc = add_mblk(txq, txinfo, m, len);
+		/*
+		 * Use tx copy buffer if this mblk is small enough and there is
+		 * room, otherwise add DMA bindings for this mblk to the SGL.
+		 */
+		if (len > txq->copy_threshold ||
+		    (rc = copy_into_txb(txq, m, len, txinfo)) != 0) {
+			rc = add_mblk(txq, txinfo, m, len);
+		}
 
 		if (rc == E2BIG ||
 		    (txinfo->nsegs == TX_SGL_SEGS && m->b_cont)) {
