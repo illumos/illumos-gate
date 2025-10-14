@@ -36,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20250512,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20251111,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -657,6 +657,12 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000A06D1-10 target=000A06D1-01
 file path=platform/i86pc/ucode/GenuineIntel/000A06D1-20 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000A06D1-80 target=000A06D1-01
+file path=platform/i86pc/ucode/GenuineIntel/000A06E1-01 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06E1-02 target=000A06E1-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06E1-04 target=000A06E1-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06E1-10 target=000A06E1-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A06E1-80 target=000A06E1-01
 file path=platform/i86pc/ucode/GenuineIntel/000A06F3-01 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000B0650-80 group=sys mode=0444 \
