@@ -1211,7 +1211,8 @@ usr/src/cmd/bhyve/common/pci_virtio_9p.c
 usr/src/cmd/bhyve/common/pci_virtio_console.c
 usr/src/cmd/bhyve/common/pci_virtio_input.c
 usr/src/cmd/bhyve/common/pci_virtio_rnd.c
-usr/src/cmd/bhyve/common/pci_virtio_scsi.c
+usr/src/cmd/bhyve/common/pci_virtio_scsi.[ch]
+usr/src/cmd/bhyve/common/pci_virtio_scsi_ctl.c
 usr/src/cmd/bhyve/common/pci_xhci.[ch]
 usr/src/cmd/bhyve/common/pctestdev.c
 usr/src/cmd/bhyve/common/privileges.c

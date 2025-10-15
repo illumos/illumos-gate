@@ -50,7 +50,6 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/queue.h>
-#include <sys/sbuf.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -63,16 +62,6 @@
 #include <pthread.h>
 #include <pthread_np.h>
 
-#include <cam/scsi/scsi_all.h>
-#include <cam/scsi/scsi_message.h>
-#include <cam/ctl/ctl.h>
-#include <cam/ctl/ctl_io.h>
-#include <cam/ctl/ctl_backend.h>
-#include <cam/ctl/ctl_ioctl.h>
-#include <cam/ctl/ctl_util.h>
-#include <cam/ctl/ctl_scsi_all.h>
-#include <camlib.h>
-
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
@@ -80,187 +69,7 @@
 #include "virtio.h"
 #include "iov.h"
 
-#define VTSCSI_RINGSZ		64
-#define	VTSCSI_REQUESTQ		1
-#define	VTSCSI_THR_PER_Q	16
-#define	VTSCSI_MAXQ		(VTSCSI_REQUESTQ + 2)
-#define	VTSCSI_MAXSEG		64
-
-#define	VTSCSI_IN_HEADER_LEN(_sc)	\
-	(sizeof(struct pci_vtscsi_req_cmd_rd) + _sc->vss_config.cdb_size)
-
-#define	VTSCSI_OUT_HEADER_LEN(_sc) 	\
-	(sizeof(struct pci_vtscsi_req_cmd_wr) + _sc->vss_config.sense_size)
-
-#define	VIRTIO_SCSI_MAX_CHANNEL	0
-#define	VIRTIO_SCSI_MAX_TARGET	255
-#define	VIRTIO_SCSI_MAX_LUN	16383
-
-#define	VIRTIO_SCSI_F_INOUT	(1 << 0)
-#define	VIRTIO_SCSI_F_HOTPLUG	(1 << 1)
-#define	VIRTIO_SCSI_F_CHANGE	(1 << 2)
-
-static int pci_vtscsi_debug = 0;
-#define	WPRINTF(msg, params...) PRINTLN("virtio-scsi: " msg, ##params)
-#define	DPRINTF(msg, params...) if (pci_vtscsi_debug) WPRINTF(msg, ##params)
-
-struct pci_vtscsi_config {
-	uint32_t num_queues;
-	uint32_t seg_max;
-	uint32_t max_sectors;
-	uint32_t cmd_per_lun;
-	uint32_t event_info_size;
-	uint32_t sense_size;
-	uint32_t cdb_size;
-	uint16_t max_channel;
-	uint16_t max_target;
-	uint32_t max_lun;
-} __attribute__((packed));
-
-STAILQ_HEAD(pci_vtscsi_req_queue, pci_vtscsi_request);
-
-struct pci_vtscsi_queue {
-	struct pci_vtscsi_softc *         vsq_sc;
-	struct vqueue_info *              vsq_vq;
-	pthread_mutex_t                   vsq_rmtx;
-	pthread_mutex_t                   vsq_fmtx;
-	pthread_mutex_t                   vsq_qmtx;
-	pthread_cond_t                    vsq_cv;
-	struct pci_vtscsi_req_queue       vsq_requests;
-	struct pci_vtscsi_req_queue       vsq_free_requests;
-	LIST_HEAD(, pci_vtscsi_worker)    vsq_workers;
-};
-
-struct pci_vtscsi_worker {
-	struct pci_vtscsi_queue *     vsw_queue;
-	pthread_t                     vsw_thread;
-	bool                          vsw_exiting;
-	LIST_ENTRY(pci_vtscsi_worker) vsw_link;
-};
-
-struct pci_vtscsi_request {
-	struct pci_vtscsi_queue * vsr_queue;
-	struct iovec              vsr_iov[VTSCSI_MAXSEG + SPLIT_IOV_ADDL_IOV];
-	struct iovec *            vsr_iov_in;
-	struct iovec *            vsr_iov_out;
-	struct iovec *            vsr_data_iov_in;
-	struct iovec *            vsr_data_iov_out;
-	struct pci_vtscsi_req_cmd_rd * vsr_cmd_rd;
-	struct pci_vtscsi_req_cmd_wr * vsr_cmd_wr;
-	union ctl_io *            vsr_ctl_io;
-	size_t                    vsr_niov_in;
-	size_t                    vsr_niov_out;
-	size_t                    vsr_data_niov_in;
-	size_t                    vsr_data_niov_out;
-	uint32_t                  vsr_idx;
-	STAILQ_ENTRY(pci_vtscsi_request) vsr_link;
-};
-
-struct pci_vtscsi_target {
-	uint8_t					vst_target;
-	int					vst_fd;
-	int					vst_max_sectors;
-};
-
-/*
- * Per-device softc
- */
-struct pci_vtscsi_softc {
-	struct virtio_softc      vss_vs;
-	struct vqueue_info       vss_vq[VTSCSI_MAXQ];
-	struct pci_vtscsi_queue  vss_queues[VTSCSI_REQUESTQ];
-	pthread_mutex_t          vss_mtx;
-	int                      vss_iid;
-	int                      vss_ctl_fd;
-	uint32_t                 vss_features;
-	size_t                   vss_num_target;
-	struct pci_vtscsi_config vss_config;
-	struct pci_vtscsi_target *vss_targets;
-};
-
-#define	VIRTIO_SCSI_T_TMF			0
-#define	VIRTIO_SCSI_T_TMF_ABORT_TASK		0
-#define	VIRTIO_SCSI_T_TMF_ABORT_TASK_SET	1
-#define	VIRTIO_SCSI_T_TMF_CLEAR_ACA		2
-#define	VIRTIO_SCSI_T_TMF_CLEAR_TASK_SET	3
-#define	VIRTIO_SCSI_T_TMF_I_T_NEXUS_RESET	4
-#define	VIRTIO_SCSI_T_TMF_LOGICAL_UNIT_RESET	5
-#define	VIRTIO_SCSI_T_TMF_QUERY_TASK		6
-#define	VIRTIO_SCSI_T_TMF_QUERY_TASK_SET 	7
-
-#define	VIRTIO_SCSI_T_TMF_MAX_FUNC		VIRTIO_SCSI_T_TMF_QUERY_TASK_SET
-
-/* command-specific response values */
-#define	VIRTIO_SCSI_S_FUNCTION_COMPLETE		0
-#define	VIRTIO_SCSI_S_FUNCTION_SUCCEEDED	10
-#define	VIRTIO_SCSI_S_FUNCTION_REJECTED		11
-
-struct pci_vtscsi_ctrl_tmf {
-	const uint32_t type;
-	const uint32_t subtype;
-	const uint8_t lun[8];
-	const uint64_t id;
-	uint8_t response;
-} __attribute__((packed));
-
-#define	VIRTIO_SCSI_T_AN_QUERY			1
-#define	VIRTIO_SCSI_EVT_ASYNC_OPERATIONAL_CHANGE 2
-#define	VIRTIO_SCSI_EVT_ASYNC_POWER_MGMT	4
-#define	VIRTIO_SCSI_EVT_ASYNC_EXTERNAL_REQUEST	8
-#define	VIRTIO_SCSI_EVT_ASYNC_MEDIA_CHANGE	16
-#define	VIRTIO_SCSI_EVT_ASYNC_MULTI_HOST	32
-#define	VIRTIO_SCSI_EVT_ASYNC_DEVICE_BUSY	64
-
-struct pci_vtscsi_ctrl_an {
-	const uint32_t type;
-	const uint8_t lun[8];
-	const uint32_t event_requested;
-	uint32_t event_actual;
-	uint8_t response;
-} __attribute__((packed));
-
-/* command-specific response values */
-#define	VIRTIO_SCSI_S_OK 			0
-#define	VIRTIO_SCSI_S_OVERRUN			1
-#define	VIRTIO_SCSI_S_ABORTED			2
-#define	VIRTIO_SCSI_S_BAD_TARGET		3
-#define	VIRTIO_SCSI_S_RESET			4
-#define	VIRTIO_SCSI_S_BUSY			5
-#define	VIRTIO_SCSI_S_TRANSPORT_FAILURE		6
-#define	VIRTIO_SCSI_S_TARGET_FAILURE		7
-#define	VIRTIO_SCSI_S_NEXUS_FAILURE		8
-#define	VIRTIO_SCSI_S_FAILURE			9
-#define	VIRTIO_SCSI_S_INCORRECT_LUN		12
-
-/* task_attr */
-#define	VIRTIO_SCSI_S_SIMPLE			0
-#define	VIRTIO_SCSI_S_ORDERED			1
-#define	VIRTIO_SCSI_S_HEAD			2
-#define	VIRTIO_SCSI_S_ACA			3
-
-struct pci_vtscsi_event {
-	uint32_t event;
-	uint8_t lun[8];
-	uint32_t reason;
-} __attribute__((packed));
-
-struct pci_vtscsi_req_cmd_rd {
-	const uint8_t lun[8];
-	const uint64_t id;
-	const uint8_t task_attr;
-	const uint8_t prio;
-	const uint8_t crn;
-	const uint8_t cdb[];
-} __attribute__((packed));
-
-struct pci_vtscsi_req_cmd_wr {
-	uint32_t sense_len;
-	uint32_t residual;
-	uint16_t status_qualifier;
-	uint8_t status;
-	uint8_t response;
-	uint8_t sense[];
-} __attribute__((packed));
+#include "pci_virtio_scsi.h"
 
 enum pci_vtscsi_walk {
 	PCI_VTSCSI_WALK_CONTINUE = 0,
@@ -271,18 +80,13 @@ typedef enum pci_vtscsi_walk pci_vtscsi_walk_t;
 typedef pci_vtscsi_walk_t pci_vtscsi_walk_request_queue_cb_t(
     struct pci_vtscsi_queue *, struct pci_vtscsi_request *, void *);
 
+static void pci_vtscsi_print_supported_backends(void);
+
 static void *pci_vtscsi_proc(void *);
 static void pci_vtscsi_reset(void *);
 static void pci_vtscsi_neg_features(void *, uint64_t *);
 static int pci_vtscsi_cfgread(void *, int, int, uint32_t *);
 static int pci_vtscsi_cfgwrite(void *, int, int, uint32_t);
-
-static inline bool pci_vtscsi_check_lun(struct pci_vtscsi_softc *,
-    const uint8_t *);
-static inline uint8_t pci_vtscsi_get_target(struct pci_vtscsi_softc *,
-    const uint8_t *);
-static inline uint16_t pci_vtscsi_get_lun(struct pci_vtscsi_softc *,
-    const uint8_t *);
 
 static pci_vtscsi_walk_request_queue_cb_t pci_vtscsi_tmf_handle_abort_task;
 static pci_vtscsi_walk_request_queue_cb_t pci_vtscsi_tmf_handle_abort_task_set;
@@ -305,7 +109,8 @@ static void pci_vtscsi_control_handle(struct pci_vtscsi_softc *, void *,
 
 static struct pci_vtscsi_request *pci_vtscsi_alloc_request(
     struct pci_vtscsi_softc *);
-static void pci_vtscsi_free_request(struct pci_vtscsi_request *);
+static void pci_vtscsi_free_request(struct pci_vtscsi_softc *,
+    struct pci_vtscsi_request *);
 static struct pci_vtscsi_request *pci_vtscsi_get_request(
     struct pci_vtscsi_req_queue *);
 static void pci_vtscsi_put_request(struct pci_vtscsi_req_queue *,
@@ -326,6 +131,8 @@ static int pci_vtscsi_init_queue(struct pci_vtscsi_softc *,
     struct pci_vtscsi_queue *, int);
 static int pci_vtscsi_init(struct pci_devinst *, nvlist_t *);
 
+SET_DECLARE(pci_vtscsi_backend_set, struct pci_vtscsi_backend);
+
 static struct virtio_consts vtscsi_vi_consts = {
 	.vc_name =		"vtscsi",
 	.vc_nvq =		VTSCSI_MAXQ,
@@ -337,6 +144,25 @@ static struct virtio_consts vtscsi_vi_consts = {
 	.vc_hv_caps_legacy =	VIRTIO_RING_F_INDIRECT_DESC,
 	.vc_hv_caps_modern =	VIRTIO_RING_F_INDIRECT_DESC,
 };
+
+int pci_vtscsi_debug = 0;
+
+
+static void
+pci_vtscsi_print_supported_backends(void)
+{
+	struct pci_vtscsi_backend **vbpp;
+
+	if (SET_COUNT(pci_vtscsi_backend_set) == 0) {
+		printf("No virtio-scsi backends available");
+		return;
+	}
+
+	SET_FOREACH(vbpp, pci_vtscsi_backend_set) {
+		struct pci_vtscsi_backend *vbp = *vbpp;
+		printf("%s\n", vbp->vsb_name);
+	}
+}
 
 static void *
 pci_vtscsi_proc(void *arg)
@@ -393,8 +219,7 @@ pci_vtscsi_reset(void *vsc)
 		.num_queues = VTSCSI_REQUESTQ,
 		/* Leave room for the request and the response. */
 		.seg_max = VTSCSI_MAXSEG - 2,
-		/* CTL apparently doesn't have a limit here */
-		.max_sectors = INT32_MAX,
+		.max_sectors = 0, /* overridden by backend reset() */
 		.cmd_per_lun = 1,
 		.event_info_size = sizeof(struct pci_vtscsi_event),
 		.sense_size = 96,
@@ -403,6 +228,8 @@ pci_vtscsi_reset(void *vsc)
 		.max_target = MAX(1, sc->vss_num_target) - 1,
 		.max_lun = VIRTIO_SCSI_MAX_LUN
 	};
+
+	sc->vss_backend->vsb_reset(sc);
 }
 
 static void
@@ -429,105 +256,6 @@ pci_vtscsi_cfgwrite(void *vsc __unused, int offset __unused, int size __unused,
     uint32_t val __unused)
 {
 	return (0);
-}
-
-/*
- * LUN address parsing
- *
- * The LUN address consists of 8 bytes. While the spec describes this as 0x01,
- * followed by the target byte, followed by a "single-level LUN structure",
- * this is actually the same as a hierarchical LUN address as defined by SAM-5,
- * consisting of four levels of addressing, where in each level the two MSB of
- * byte 0 select the address mode used in the remaining bits and bytes.
- *
- *
- * Only the first two levels are acutally used by virtio-scsi:
- *
- * Level 1: 0x01, 0xTT: Peripheral Device Addressing: Bus 1, Target 0-255
- * Level 2: 0xLL, 0xLL: Peripheral Device Addressing: Bus MBZ, LUN 0-255
- *                  or: Flat Space Addressing: LUN (0-16383)
- * Level 3 and 4: not used, MBZ
- *
- *
- * Alternatively, the first level may contain an extended LUN address to select
- * the REPORT_LUNS well-known logical unit:
- *
- * Level 1: 0xC1, 0x01: Extended LUN Adressing, Well-Known LUN 1 (REPORT_LUNS)
- * Level 2, 3, and 4: not used, MBZ
- *
- * The virtio spec says that we SHOULD implement the REPORT_LUNS well-known
- * logical unit  but we currently don't.
- *
- * According to the virtio spec, these are the only LUNS address formats to be
- * used with virtio-scsi.
- */
-
-/*
- * Check that the given LUN address conforms to the virtio spec, does not
- * address an unknown target, and especially does not address the REPORT_LUNS
- * well-known logical unit.
- */
-static inline bool
-pci_vtscsi_check_lun(struct pci_vtscsi_softc *sc, const uint8_t *lun)
-{
-	if (lun[0] == 0xC1)
-		return (false);
-
-	if (lun[0] != 0x01)
-		return (false);
-
-	if (lun[1] >= sc->vss_num_target)
-		return (false);
-
-	if (lun[1] != sc->vss_targets[lun[1]].vst_target)
-		return (false);
-
-	if (sc->vss_targets[lun[1]].vst_fd < 0)
-		return (false);
-
-	if (lun[2] != 0x00 && (lun[2] & 0xc0) != 0x40)
-		return (false);
-
-	if (lun[4] != 0 || lun[5] != 0 || lun[6] != 0 || lun[7] != 0)
-		return (false);
-
-	return (true);
-}
-
-/*
- * Get the target id from a LUN address.
- *
- * Every code path using this function must have called pci_vtscsi_check_lun()
- * before to make sure the LUN address is valid.
- */
-static inline uint8_t
-pci_vtscsi_get_target(struct pci_vtscsi_softc *sc, const uint8_t *lun)
-{
-	assert(lun[0] == 0x01);
-	assert(lun[1] < sc->vss_num_target);
-	assert(lun[1] == sc->vss_targets[lun[1]].vst_target);
-	assert(sc->vss_targets[lun[1]].vst_fd >= 0);
-	assert(lun[2] == 0x00 || (lun[2] & 0xc0) == 0x40);
-
-	return (lun[1]);
-}
-
-/*
- * Get the LUN id from a LUN address.
- *
- * Every code path using this function must have called pci_vtscsi_check_lun()
- * before to make sure the LUN address is valid.
- */
-static inline uint16_t
-pci_vtscsi_get_lun(struct pci_vtscsi_softc *sc, const uint8_t *lun)
-{
-	assert(lun[0] == 0x01);
-	assert(lun[1] < sc->vss_num_target);
-	assert(lun[1] == sc->vss_targets[lun[1]].vst_target);
-	assert(sc->vss_targets[lun[1]].vst_fd >= 0);
-	assert(lun[2] == 0x00 || (lun[2] & 0xc0) == 0x40);
-
-	return (((lun[2] << 8) | lun[3]) & 0x3fff);
 }
 
 /*
@@ -780,9 +508,7 @@ static void
 pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
     struct pci_vtscsi_ctrl_tmf *tmf)
 {
-	union ctl_io *io;
 	uint8_t target;
-	int err;
 	int fd;
 
 	if (tmf->subtype > VIRTIO_SCSI_T_TMF_MAX_FUNC) {
@@ -814,9 +540,9 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 	 * while we're processing the TMF request. This also effectively blocks
 	 * pci_vtscsi_requestq_notify() from adding any new requests to the
 	 * request queue. This does not prevent any requests currently being
-	 * processed by CTL from being completed and returned, which we must
-	 * guarantee to adhere to the ordering requirements for any TMF function
-	 * which aborts tasks.
+	 * processed by the backend from being completed and returned, which we
+	 * must guarantee to adhere to the ordering requirements for any TMF
+	 * function which aborts tasks.
 	 */
 	for (int i = 0; i < VTSCSI_REQUESTQ; i++) {
 		struct pci_vtscsi_queue *q = &sc->vss_queues[i];
@@ -825,7 +551,7 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 	}
 
 	/*
-	 * CTL may set response to FAILURE for the TMF request.
+	 * The backend may set response to FAILURE for the TMF request.
 	 *
 	 * The default response of all TMF functions is FUNCTION COMPLETE if
 	 * there was no error, regardless of whether it actually succeeded or
@@ -833,79 +559,11 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 	 * which will explicitly return FUNCTION SUCCEEDED if the specified
 	 * task or any task was active in the target/LUN, respectively.
 	 *
-	 * Thus, we will call CTL first. Only if the response we get is
-	 * FUNCTION COMPLETE we'll continue processing the TMF function
-	 * on our queues.
+	 * Thus, we will call the backend first. Only if the response we get
+	 * is FUNCTION COMPLETE we'll continue processing the TMF function on
+	 * our queues.
 	 */
-	io = ctl_scsi_alloc_io(sc->vss_iid);
-	if (io == NULL) {
-		WPRINTF("failed to allocate ctl_io: err=%d (%s)",
-		    errno, strerror(errno));
-
-		tmf->response = VIRTIO_SCSI_S_FAILURE;
-		goto out;
-	}
-
-	ctl_scsi_zero_io(io);
-
-	io->io_hdr.io_type = CTL_IO_TASK;
-	io->io_hdr.nexus.initid = sc->vss_iid;
-	io->io_hdr.nexus.targ_lun = pci_vtscsi_get_lun(sc, tmf->lun);
-	io->taskio.tag_type = CTL_TAG_SIMPLE;
-	io->taskio.tag_num = tmf->id;
-	io->io_hdr.flags |= CTL_FLAG_USER_TAG;
-
-	switch (tmf->subtype) {
-	case VIRTIO_SCSI_T_TMF_ABORT_TASK:
-		io->taskio.task_action = CTL_TASK_ABORT_TASK;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_ABORT_TASK_SET:
-		io->taskio.task_action = CTL_TASK_ABORT_TASK_SET;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_CLEAR_ACA:
-		io->taskio.task_action = CTL_TASK_CLEAR_ACA;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_CLEAR_TASK_SET:
-		io->taskio.task_action = CTL_TASK_CLEAR_TASK_SET;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_I_T_NEXUS_RESET:
-		io->taskio.task_action = CTL_TASK_I_T_NEXUS_RESET;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_LOGICAL_UNIT_RESET:
-		io->taskio.task_action = CTL_TASK_LUN_RESET;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_QUERY_TASK:
-		io->taskio.task_action = CTL_TASK_QUERY_TASK;
-		break;
-
-	case VIRTIO_SCSI_T_TMF_QUERY_TASK_SET:
-		io->taskio.task_action = CTL_TASK_QUERY_TASK_SET;
-		break;
-	}
-
-	if (pci_vtscsi_debug) {
-		struct sbuf *sb = sbuf_new_auto();
-		ctl_io_sbuf(io, sb);
-		sbuf_finish(sb);
-		DPRINTF("%s", sbuf_data(sb));
-		sbuf_delete(sb);
-	}
-
-	err = ioctl(fd, CTL_IO, io);
-	if (err != 0) {
-		WPRINTF("CTL_IO: err=%d (%s)", errno, strerror(errno));
-		tmf->response = VIRTIO_SCSI_S_FAILURE;
-	} else {
-		tmf->response = io->taskio.task_status;
-	}
-
-	ctl_scsi_free_io(io);
+	sc->vss_backend->vsb_tmf_hdl(sc, fd, tmf);
 
 	if (tmf->response != VIRTIO_SCSI_S_FUNCTION_COMPLETE) {
 		/*
@@ -923,7 +581,7 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 		    tmf->response != VIRTIO_SCSI_S_FUNCTION_REJECTED &&
 		    tmf->response != VIRTIO_SCSI_S_FUNCTION_SUCCEEDED) {
 			WPRINTF("pci_vtscsi_tmf_hdl: unexpected response from "
-			    "CTL: %d", tmf->response);
+			    "backend: %d", tmf->response);
 		}
 	} else {
 		pci_vtscsi_walk_t ret = PCI_VTSCSI_WALK_CONTINUE;
@@ -939,7 +597,6 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 		}
 	}
 
-out:
 	/* Unlock the request queues before we return. */
 	for (int i = 0; i < VTSCSI_REQUESTQ; i++) {
 		struct pci_vtscsi_queue *q = &sc->vss_queues[i];
@@ -952,6 +609,7 @@ static void
 pci_vtscsi_an_handle(struct pci_vtscsi_softc *sc, struct pci_vtscsi_ctrl_an *an)
 {
 	int target;
+	int fd;
 
 	if (pci_vtscsi_check_lun(sc, an->lun) == false) {
 		DPRINTF("AN request to invalid LUN %.2hhx%.2hhx-%.2hhx%.2hhx-"
@@ -964,10 +622,12 @@ pci_vtscsi_an_handle(struct pci_vtscsi_softc *sc, struct pci_vtscsi_ctrl_an *an)
 
 	target = pci_vtscsi_get_target(sc, an->lun);
 
+	fd = sc->vss_targets[target].vst_fd;
+
 	DPRINTF("AN request tgt %d, lun %d, event requested %x",
 	    target, pci_vtscsi_get_lun(sc, an->lun), an->event_requested);
 
-	an->response = VIRTIO_SCSI_S_FAILURE;
+	sc->vss_backend->vsb_an_hdl(sc, fd, an);
 }
 
 static void
@@ -1018,10 +678,9 @@ pci_vtscsi_alloc_request(struct pci_vtscsi_softc *sc)
 	if (req->vsr_cmd_wr == NULL)
 		goto alloc_fail;
 
-	req->vsr_ctl_io = ctl_scsi_alloc_io(sc->vss_iid);
-	if (req->vsr_ctl_io == NULL)
+	req->vsr_backend = sc->vss_backend->vsb_req_alloc(sc);
+	if (req->vsr_backend == NULL)
 		goto alloc_fail;
-	ctl_scsi_zero_io(req->vsr_ctl_io);
 
 	return (req);
 
@@ -1029,16 +688,17 @@ alloc_fail:
 	EPRINTLN("failed to allocate request: %s", strerror(errno));
 
 	if (req != NULL)
-		pci_vtscsi_free_request(req);
+		pci_vtscsi_free_request(sc, req);
 
 	return (NULL);
 }
 
 static void
-pci_vtscsi_free_request(struct pci_vtscsi_request *req)
+pci_vtscsi_free_request(struct pci_vtscsi_softc *sc,
+    struct pci_vtscsi_request *req)
 {
-	if (req->vsr_ctl_io != NULL)
-		ctl_scsi_free_io(req->vsr_ctl_io);
+	if (req->vsr_backend != NULL)
+		sc->vss_backend->vsb_req_free(req->vsr_backend);
 	if (req->vsr_cmd_rd != NULL)
 		free(req->vsr_cmd_rd);
 	if (req->vsr_cmd_wr != NULL)
@@ -1179,9 +839,10 @@ static void
 pci_vtscsi_return_request(struct pci_vtscsi_queue *q,
     struct pci_vtscsi_request *req, int iolen)
 {
+	struct pci_vtscsi_softc *sc = q->vsq_sc;
 	void *cmd_rd = req->vsr_cmd_rd;
 	void *cmd_wr = req->vsr_cmd_wr;
-	void *ctl_io = req->vsr_ctl_io;
+	void *backend = req->vsr_backend;
 	int idx = req->vsr_idx;
 
 	DPRINTF("request <idx=%d> completed, response %d", idx,
@@ -1190,7 +851,7 @@ pci_vtscsi_return_request(struct pci_vtscsi_queue *q,
 	iolen += buf_to_iov(cmd_wr, VTSCSI_OUT_HEADER_LEN(q->vsq_sc),
 	    req->vsr_iov_out, req->vsr_niov_out);
 
-	ctl_scsi_zero_io(req->vsr_ctl_io);
+	sc->vss_backend->vsb_req_clear(backend);
 
 	memset(cmd_rd, 0, VTSCSI_IN_HEADER_LEN(q->vsq_sc));
 	memset(cmd_wr, 0, VTSCSI_OUT_HEADER_LEN(q->vsq_sc));
@@ -1198,7 +859,7 @@ pci_vtscsi_return_request(struct pci_vtscsi_queue *q,
 
 	req->vsr_cmd_rd = cmd_rd;
 	req->vsr_cmd_wr = cmd_wr;
-	req->vsr_ctl_io = ctl_io;
+	req->vsr_backend = backend;
 
 	pthread_mutex_lock(&q->vsq_fmtx);
 	pci_vtscsi_put_request(&q->vsq_free_requests, req);
@@ -1214,81 +875,7 @@ static int
 pci_vtscsi_request_handle(struct pci_vtscsi_softc *sc, int fd,
     struct pci_vtscsi_request *req)
 {
-	union ctl_io *io = req->vsr_ctl_io;
-	void *ext_data_ptr = NULL;
-	uint32_t ext_data_len = 0, ext_sg_entries = 0;
-	int err, nxferred;
-
-	io->io_hdr.nexus.initid = sc->vss_iid;
-	io->io_hdr.nexus.targ_lun =
-	    pci_vtscsi_get_lun(sc, req->vsr_cmd_rd->lun);
-
-	io->io_hdr.io_type = CTL_IO_SCSI;
-
-	if (req->vsr_data_niov_in > 0) {
-		ext_data_ptr = (void *)req->vsr_data_iov_in;
-		ext_sg_entries = req->vsr_data_niov_in;
-		ext_data_len = count_iov(req->vsr_data_iov_in,
-		    req->vsr_data_niov_in);
-		io->io_hdr.flags |= CTL_FLAG_DATA_OUT;
-	} else if (req->vsr_data_niov_out > 0) {
-		ext_data_ptr = (void *)req->vsr_data_iov_out;
-		ext_sg_entries = req->vsr_data_niov_out;
-		ext_data_len = count_iov(req->vsr_data_iov_out,
-		    req->vsr_data_niov_out);
-		io->io_hdr.flags |= CTL_FLAG_DATA_IN;
-	}
-
-	io->scsiio.sense_len = sc->vss_config.sense_size;
-	io->scsiio.tag_num = req->vsr_cmd_rd->id;
-	io->io_hdr.flags |= CTL_FLAG_USER_TAG;
-	switch (req->vsr_cmd_rd->task_attr) {
-	case VIRTIO_SCSI_S_ORDERED:
-		io->scsiio.tag_type = CTL_TAG_ORDERED;
-		break;
-	case VIRTIO_SCSI_S_HEAD:
-		io->scsiio.tag_type = CTL_TAG_HEAD_OF_QUEUE;
-		break;
-	case VIRTIO_SCSI_S_ACA:
-		io->scsiio.tag_type = CTL_TAG_ACA;
-		break;
-	case VIRTIO_SCSI_S_SIMPLE:
-	default:
-		io->scsiio.tag_type = CTL_TAG_SIMPLE;
-		break;
-	}
-	io->scsiio.ext_sg_entries = ext_sg_entries;
-	io->scsiio.ext_data_ptr = ext_data_ptr;
-	io->scsiio.ext_data_len = ext_data_len;
-	io->scsiio.ext_data_filled = 0;
-	io->scsiio.cdb_len = sc->vss_config.cdb_size;
-	memcpy(io->scsiio.cdb, req->vsr_cmd_rd->cdb, sc->vss_config.cdb_size);
-
-	if (pci_vtscsi_debug) {
-		struct sbuf *sb = sbuf_new_auto();
-		ctl_io_sbuf(io, sb);
-		sbuf_finish(sb);
-		DPRINTF("%s", sbuf_data(sb));
-		sbuf_delete(sb);
-	}
-
-	err = ioctl(fd, CTL_IO, io);
-	if (err != 0) {
-		WPRINTF("CTL_IO: err=%d (%s)", errno, strerror(errno));
-		req->vsr_cmd_wr->response = VIRTIO_SCSI_S_FAILURE;
-	} else {
-		req->vsr_cmd_wr->sense_len =
-		    MIN(io->scsiio.sense_len, sc->vss_config.sense_size);
-		req->vsr_cmd_wr->residual = ext_data_len -
-		    io->scsiio.ext_data_filled;
-		req->vsr_cmd_wr->status = io->scsiio.scsi_status;
-		req->vsr_cmd_wr->response = VIRTIO_SCSI_S_OK;
-		memcpy(&req->vsr_cmd_wr->sense, &io->scsiio.sense_data,
-		    req->vsr_cmd_wr->sense_len);
-	}
-
-	nxferred = io->scsiio.ext_data_filled;
-	return (nxferred);
+	return (sc->vss_backend->vsb_req_hdl(sc, fd, req));
 }
 
 static void
@@ -1467,10 +1054,13 @@ pci_vtscsi_legacy_config(nvlist_t *nvl, const char *opts)
 
 	targets = create_relative_config_node(nvl, "target");
 
-	/* Handle legacy form (0). */
-	if (opts == NULL) {
-		pci_vtscsi_add_target_config(targets, "/dev/cam/ctl", 0);
+	/* Legacy form (0) is handled in pci_vtscsi_init(). */
+	if (opts == NULL)
 		return (0);
+
+	if (strcmp("help", opts) == 0) {
+		pci_vtscsi_print_supported_backends();
+		exit(0);
 	}
 
 	n = strcspn(opts, ",=");
@@ -1566,6 +1156,7 @@ pci_vtscsi_init_target(const char *prefix __unused, const nvlist_t *parent,
 	const char *value;
 	const char *errstr;
 	uint64_t target;
+	int ret;
 
 	assert(type == NV_TYPE_STRING);
 
@@ -1577,33 +1168,27 @@ pci_vtscsi_init_target(const char *prefix __unused, const nvlist_t *parent,
 	sc->vss_targets[target].vst_target = target;
 
 	/*
-	 * 'value' contains the CTL device node path of this target.
+	 * 'value' contains the backend path. Call the backend to open it.
 	 */
 	value = nvlist_get_string(parent, name);
-	sc->vss_targets[target].vst_fd = open(value, O_RDWR);
-	if (sc->vss_targets[target].vst_fd < 0) {
+	ret = sc->vss_backend->vsb_open(sc, value, target);
+	if (ret != 0)
 		EPRINTLN("cannot open target %lu at %s: %s", target, value,
 		    strerror(errno));
-		return (-1);
-	}
-
-	return (0);
+	return (ret);
 }
 
 static int
 pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_vtscsi_softc *sc;
+	struct pci_vtscsi_backend *backend, **vbpp;
 	const char *value;
 	int err;
 
 	sc = calloc(1, sizeof(struct pci_vtscsi_softc));
 	if (sc == NULL)
 		return (-1);
-
-	value = get_config_value_node(nvl, "iid");
-	if (value != NULL)
-		sc->vss_iid = strtoul(value, NULL, 10);
 
 	value = get_config_value_node(nvl, "bootindex");
 	if (value != NULL) {
@@ -1612,6 +1197,35 @@ pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 			errno = EINVAL;
 			goto fail;
 		}
+	}
+
+	value = get_config_value_node(nvl, "backend");
+	if (value == NULL) {
+		if (SET_COUNT(pci_vtscsi_backend_set) == 0) {
+			WPRINTF("No virtio-scsi backends available");
+			errno = EINVAL;
+			goto fail;
+		}
+		backend = SET_ITEM(pci_vtscsi_backend_set, 0);
+	} else {
+		backend = NULL;
+		SET_FOREACH(vbpp, pci_vtscsi_backend_set) {
+			if (strcasecmp(value, (*vbpp)->vsb_name) == 0) {
+				backend = *vbpp;
+				break;
+			}
+		}
+		if (backend == NULL) {
+			WPRINTF("No such virtio-scsi backend: %s", value);
+			errno = EINVAL;
+			goto fail;
+		}
+	}
+
+	err = backend->vsb_init(sc, backend, nvl);
+	if (err != 0) {
+		errno = EINVAL;
+		goto fail;
 	}
 
 	nvl = find_relative_config_node(nvl, "target");

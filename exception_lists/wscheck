@@ -12,6 +12,7 @@
 # Copyright 2025 Oxide Computer Company
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Racktop Systems, Inc.
+# Copyright 2026 Hans Rosenfeld
 #
 syntax: glob
 
@@ -63,11 +64,9 @@ usr/src/cmd/bhyve/common/pci_nvme.c
 usr/src/cmd/bhyve/common/pci_passthru.c
 usr/src/cmd/bhyve/common/pci_virtio_console.c
 usr/src/cmd/bhyve/common/pci_virtio_net.c
-usr/src/cmd/bhyve/common/pci_virtio_scsi.c
 usr/src/cmd/bhyve/common/pci_xhci.h
 usr/src/cmd/bhyve/common/qemu_fwcfg.c
 usr/src/cmd/bhyve/common/smbiostbl.c
-usr/src/cmd/bhyve/common/tpm_emul_passthru.c
 usr/src/cmd/bhyve/common/uart_emul.c
 usr/src/cmd/bhyve/common/usb_emul.h
 usr/src/cmd/bhyve/common/usb_mouse.c

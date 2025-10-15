@@ -26,6 +26,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2024 Oxide Computer Company
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Hans Rosenfeld
 #
 
 syntax: glob
@@ -462,7 +463,6 @@ usr/src/uts/sparc/nsmb/ioc_check.ref
 usr/src/cmd/bhyve/README.sync
 usr/src/cmd/bhyve/THIRDPARTYLICENSE
 usr/src/cmd/bhyve/THIRDPARTYLICENSE.descrip
-usr/src/cmd/bhyve/*
 usr/src/cmd/bhyvectl/THIRDPARTYLICENSE
 usr/src/cmd/bhyvectl/THIRDPARTYLICENSE.descrip
 usr/src/cmd/bhyvectl/bhyvectl.c

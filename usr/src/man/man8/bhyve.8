@@ -1,4 +1,5 @@
 .\" Copyright (c) 2013 Peter Grehan
+.\" Copyright (c) 2026 Hans Rosenfeld
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -25,7 +26,7 @@
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd January 28, 2026
+.Dd February 9, 2026
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -360,6 +361,8 @@ Accelerated Virtio network interface.
 Legacy Virtio network interface.
 .It Cm virtio-blk
 Virtio block storage interface.
+.It Cm virtio-scsi
+Virtio SCSI interface.
 .It Cm virtio-9p
 Virtio 9p (VirtFS) interface.
 .It Cm virtio-rnd
@@ -543,6 +546,57 @@ Add the device to the bootorder at
 A fwcfg file is used to specify the bootorder.
 The guest firmware may ignore or not have support for this fwcfg file.
 In that case, this feature will not work as expected.
+.El
+.Pp
+.Sy SCSI device backends
+.Bl -bullet
+.Sm off
+.It
+.Oo Cm target Ns = Ns Oo ID : Oc Ar path Ns Oc
+.Oo Cm \&, Ar scsi-device-options Oc
+.Sm on
+.El
+.Pp
+Multiple
+.Pa target
+parameters may be specified, each configuring a different
+.Ar path
+as a distinct SCSI target.
+If the
+.Pa target
+.Ar ID
+is not explicitly configured for a
+.Pa target ,
+the
+.Pa target
+will be assigned the next sequential
+.Ar ID
+following the highest
+.Pa target
+.Ar ID
+used at that point, or 0 if it is the first target configured.
+All
+.Pa target
+.Ar ID Ns s
+must be unique per instance.
+The meaning of the
+.Ar path
+argument is specific to each backend.
+.Pp
+The
+.Ar scsi-device-options
+are:
+.Bl -tag -width 10n
+.It Cm backend= Ns Ar backend
+The virtio-scsi backend to use.
+The backend name is case-insensitive.
+There are currently no backends available.
+.It Li bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or doesn't support this fwcfg file.
+In that case, this feature doesn't work as expected.
 .El
 .Pp
 .Sy 9P device backends :
