@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2017 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company.
  */
 /*
  * Copyright (c) 2016 by Delphix. All rights reserved.
@@ -59,10 +60,88 @@ typedef struct dls_stack {
 } dls_stack_t;
 
 static kmem_cache_t	*i_dls_devnet_cachep;
+
+/* Upcall door handle and its lock. */
 static kmutex_t		i_dls_mgmt_lock;
-static krwlock_t	i_dls_devnet_lock;
+static door_handle_t	dls_mgmt_dh = NULL;
+
+/*
+ * Any association of <macname, linkid> (set, rename) can require an upcall to
+ * the daemon for the link vanity name. We want set/rename/unset to be mutually
+ * exclusive from start to finish, but it is unsafe to hold a write on
+ * i_dls_devnet_hash_lock during an upcall. Enforce their exclusion using a
+ * separate lock from the hash tables.
+ *
+ * i_dls_devnet_hash_lock protects the hash tables themselves. Taking a write on
+ * it requires we first hold i_dls_devnet_lock. Thus, we can safely drop,
+ * reacquire, and upgrade/downgrade it so long as all table updates occur in a
+ * single write. If a write is intended i_dls_devnet_lock must be acquired
+ * before i_dls_devnet_hash_lock, leaving the valid lock patterns:
+ *  - i_dls_devnet_lock_enter -> i_dls_devnet_hashmap_write
+ *  - i_dls_devnet_lock_enter -> i_dls_devnet_hashmap_read
+ *  - i_dls_devnet_hashmap_read
+ * i_dls_devnet_hashmap_write enforces the first invariant.
+ */
+static kmutex_t		i_dls_devnet_lock;
+static kcondvar_t	i_dls_devnet_cv;
+static kthread_t	*i_dls_devnet_own;
+
+static krwlock_t	i_dls_devnet_hash_lock;
 static mod_hash_t	*i_dls_devnet_id_hash;
 static mod_hash_t	*i_dls_devnet_hash;
+
+static void
+i_dls_devnet_lock_enter(void)
+{
+	mutex_enter(&i_dls_devnet_lock);
+	while (i_dls_devnet_own != NULL) {
+		cv_wait(&i_dls_devnet_cv, &i_dls_devnet_lock);
+	}
+}
+
+static void
+i_dls_devnet_lock_exit(void)
+{
+	VERIFY3P(i_dls_devnet_own, ==, NULL);
+	cv_broadcast(&i_dls_devnet_cv);
+	mutex_exit(&i_dls_devnet_lock);
+}
+
+static void
+i_dls_devnet_lock_upcall_start(void)
+{
+	VERIFY(MUTEX_HELD(&i_dls_devnet_lock));
+	VERIFY3P(i_dls_devnet_own, ==, NULL);
+	i_dls_devnet_own = curthread;
+	mutex_exit(&i_dls_devnet_lock);
+}
+
+static void
+i_dls_devnet_lock_upcall_end(void)
+{
+	mutex_enter(&i_dls_devnet_lock);
+	VERIFY3P(i_dls_devnet_own, ==, curthread);
+	i_dls_devnet_own = NULL;
+}
+
+static void
+i_dls_devnet_hashmap_write(void)
+{
+	VERIFY(MUTEX_HELD(&i_dls_devnet_lock));
+	rw_enter(&i_dls_devnet_hash_lock, RW_WRITER);
+}
+
+static void
+i_dls_devnet_hashmap_read(void)
+{
+	rw_enter(&i_dls_devnet_hash_lock, RW_READER);
+}
+
+static void
+i_dls_devnet_hashmap_exit(void)
+{
+	rw_exit(&i_dls_devnet_hash_lock);
+}
 
 boolean_t		devnet_need_rebuild;
 
@@ -80,9 +159,6 @@ boolean_t		devnet_need_rebuild;
 #define	IS_IPTUN_LINK(name)	(					\
     IS_IPV4_TUN(name) || IS_IPV6_TUN(name) || IS_6TO4_TUN(name))
 
-/* Upcall door handle */
-static door_handle_t	dls_mgmt_dh = NULL;
-
 /* dls_devnet_t dd_flags */
 #define	DD_CONDEMNED		0x1
 #define	DD_IMPLICIT_IPTUN	0x2 /* Implicitly-created ip*.*tun* tunnel */
@@ -98,7 +174,7 @@ static door_handle_t	dls_mgmt_dh = NULL;
 /*
  * This structure is used to keep the <linkid, macname> mapping.
  * This structure itself is not protected by the mac perimeter, but is
- * protected by the dd_mutex and i_dls_devnet_lock. Thus most of the
+ * protected by the dd_mutex and i_dls_devnet_hash_lock. Thus most of the
  * functions manipulating this structure such as dls_devnet_set/unset etc.
  * may be called while not holding the mac perimeter.
  */
@@ -206,7 +282,10 @@ void
 dls_mgmt_init(void)
 {
 	mutex_init(&i_dls_mgmt_lock, NULL, MUTEX_DEFAULT, NULL);
-	rw_init(&i_dls_devnet_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&i_dls_devnet_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&i_dls_devnet_cv, NULL, CV_DEFAULT, NULL);
+	i_dls_devnet_own = NULL;
+	rw_init(&i_dls_devnet_hash_lock, NULL, RW_DEFAULT, NULL);
 
 	/*
 	 * Create a kmem_cache of dls_devnet_t structures.
@@ -242,7 +321,9 @@ dls_mgmt_fini(void)
 	mod_hash_destroy_hash(i_dls_devnet_hash);
 	mod_hash_destroy_hash(i_dls_devnet_id_hash);
 	kmem_cache_destroy(i_dls_devnet_cachep);
-	rw_destroy(&i_dls_devnet_lock);
+	rw_destroy(&i_dls_devnet_hash_lock);
+	cv_destroy(&i_dls_devnet_cv);
+	mutex_destroy(&i_dls_devnet_lock);
 	mutex_destroy(&i_dls_mgmt_lock);
 }
 
@@ -821,23 +902,37 @@ dls_devnet_set(mac_handle_t mh, datalink_id_t linkid, zoneid_t zoneid,
 	boolean_t		stat_create = B_FALSE;
 	char			linkname[MAXLINKNAMELEN];
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	i_dls_devnet_lock_enter();
 
 	/*
 	 * Don't allow callers to set a link name with a linkid that already
 	 * has a name association (that's what rename is for).
 	 */
 	if (linkid != DATALINK_INVALID_LINKID) {
+		/*
+		 * This temporary read access is valid, as no other set/rename
+		 * operation can attempt an insert on the same linkid while
+		 * i_dls_devnet_lock is held.
+		 */
+		i_dls_devnet_hashmap_read();
 		if (mod_hash_find(i_dls_devnet_id_hash,
 		    (mod_hash_key_t)(uintptr_t)linkid,
 		    (mod_hash_val_t *)&ddp) == 0) {
 			err = EEXIST;
 			goto done;
 		}
-		if ((err = dls_mgmt_get_linkinfo(linkid, linkname, &class,
-		    NULL, NULL)) != 0)
-			goto done;
+		i_dls_devnet_hashmap_exit();
+
+		i_dls_devnet_lock_upcall_start();
+		err = dls_mgmt_get_linkinfo(linkid, linkname, &class,
+		    NULL, NULL);
+		i_dls_devnet_lock_upcall_end();
+
+		if (err != 0)
+			goto done_rw_unlocked;
 	}
+
+	i_dls_devnet_hashmap_write();
 
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)macname, (mod_hash_val_t *)&ddp)) == 0) {
@@ -878,7 +973,6 @@ dls_devnet_set(mac_handle_t mh, datalink_id_t linkid, zoneid_t zoneid,
 		}
 
 		ASSERT(ddp->dd_flags & DD_INITIALIZING);
-
 	} else {
 		ddp = kmem_cache_alloc(i_dls_devnet_cachep, KM_SLEEP);
 		ddp->dd_flags = DD_INITIALIZING;
@@ -911,13 +1005,15 @@ dls_devnet_set(mac_handle_t mh, datalink_id_t linkid, zoneid_t zoneid,
 	err = 0;
 done:
 	/*
-	 * It is safe to drop the i_dls_devnet_lock at this point. In the case
-	 * of physical devices, the softmac framework will fail the device
+	 * It is safe to drop the i_dls_devnet_hash_lock at this point. In the
+	 * case of physical devices, the softmac framework will fail the device
 	 * detach based on the smac_state or smac_hold_cnt. Other cases like
 	 * vnic and aggr use their own scheme to serialize creates and deletes
 	 * and ensure that *ddp is valid.
 	 */
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
+done_rw_unlocked:
+	i_dls_devnet_lock_exit();
 
 	if (err == 0 && zoneid != GLOBAL_ZONEID) {
 		/*
@@ -943,8 +1039,8 @@ done:
 		/*
 		 * The kstat subsystem holds its own locks (rather perimeter)
 		 * before calling the ks_update (dls_devnet_stat_update) entry
-		 * point which in turn grabs the i_dls_devnet_lock. So the
-		 * lock hierarchy is kstat locks -> i_dls_devnet_lock.
+		 * point which in turn grabs the i_dls_devnet_hash_lock. So the
+		 * lock hierarchy is kstat locks -> i_dls_devnet_hash_lock.
 		 */
 		if (stat_create)
 			dls_devnet_stat_create(ddp, zoneid);
@@ -980,11 +1076,13 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 	int		err;
 	mod_hash_val_t	val;
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	i_dls_devnet_lock_enter();
+	i_dls_devnet_hashmap_write();
+
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)macname, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 
@@ -1034,7 +1132,8 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 
 		if (zstatus == 0) {
 			mutex_exit(&ddp->dd_mutex);
-			rw_exit(&i_dls_devnet_lock);
+			i_dls_devnet_hashmap_exit();
+			i_dls_devnet_lock_exit();
 			return (EBUSY);
 		}
 
@@ -1065,16 +1164,18 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 
 		devnet_need_rebuild = B_TRUE;
 	}
-	rw_exit(&i_dls_devnet_lock);
+
+	i_dls_devnet_hashmap_exit();
+	i_dls_devnet_lock_exit();
 
 	/*
 	 * It is important to call i_dls_devnet_setzid() WITHOUT the
-	 * i_dls_devnet_lock held. The setzid call grabs the MAC
+	 * i_dls_devnet_hash_lock held. The setzid call grabs the MAC
 	 * perim; thus causing DLS -> MAC lock ordering if performed
-	 * with the i_dls_devnet_lock held. This forces consumers to
+	 * with the i_dls_devnet_hash_lock held. This forces consumers to
 	 * grab the MAC perim before calling dls_devnet_unset() (the
 	 * locking rules state MAC -> DLS order). By performing the
-	 * setzid outside of the i_dls_devnet_lock consumers can
+	 * setzid outside of the i_dls_devnet_hash_lock consumers can
 	 * safely call dls_devnet_unset() outside the MAC perim.
 	 */
 	if (ddp->dd_zid != GLOBAL_ZONEID) {
@@ -1088,7 +1189,8 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 		 *
 		 * Because we've already flagged the dls_devnet_t as
 		 * DD_CONDEMNED and we still have a write lock on
-		 * i_dls_devnet_lock, we should be able to release the dd_mutex.
+		 * i_dls_devnet_hash_lock, we should be able to release the
+		 * dd_mutex.
 		 */
 		mutex_exit(&ddp->dd_mutex);
 		dls_devnet_stat_destroy(ddp, ddp->dd_zid);
@@ -1134,11 +1236,11 @@ dls_devnet_hold_tmp_by_link(dls_link_t *dlp, dls_dl_handle_t *ddhp)
 	int err;
 	dls_devnet_t *ddp = NULL;
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	i_dls_devnet_hashmap_read();
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)dlp->dl_name, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 
@@ -1146,12 +1248,12 @@ dls_devnet_hold_tmp_by_link(dls_link_t *dlp, dls_dl_handle_t *ddhp)
 	VERIFY(ddp->dd_ref > 0);
 	if (DD_NOT_VISIBLE(ddp->dd_flags)) {
 		mutex_exit(&ddp->dd_mutex);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 	ddp->dd_tref++;
 	mutex_exit(&ddp->dd_mutex);
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
 
 	*ddhp = ddp;
 	return (0);
@@ -1164,11 +1266,11 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 	dls_devnet_t		*ddp;
 	int			err;
 
-	rw_enter(&i_dls_devnet_lock, RW_READER);
+	i_dls_devnet_hashmap_read();
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)linkid, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 
@@ -1176,7 +1278,7 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 	VERIFY(ddp->dd_ref > 0);
 	if (DD_NOT_VISIBLE(ddp->dd_flags)) {
 		mutex_exit(&ddp->dd_mutex);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 	if (tmp_hold)
@@ -1184,7 +1286,7 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 	else
 		ddp->dd_ref++;
 	mutex_exit(&ddp->dd_mutex);
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
 
 	*ddpp = ddp;
 	return (0);
@@ -1233,23 +1335,23 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	(void) snprintf(name, sizeof (name), "%s%d", drv,
 	    DLS_MINOR2INST(getminor(dev)));
 
-	rw_enter(&i_dls_devnet_lock, RW_READER);
+	i_dls_devnet_hashmap_read();
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)name, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 	mutex_enter(&ddp->dd_mutex);
 	VERIFY(ddp->dd_ref > 0);
 	if (DD_NOT_VISIBLE(ddp->dd_flags)) {
 		mutex_exit(&ddp->dd_mutex);
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 	ddp->dd_ref++;
 	mutex_exit(&ddp->dd_mutex);
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
 
 	*ddhp = ddp;
 	return (0);
@@ -1362,15 +1464,15 @@ dls_devnet_macname2linkid(const char *macname, datalink_id_t *linkidp)
 {
 	dls_devnet_t	*ddp;
 
-	rw_enter(&i_dls_devnet_lock, RW_READER);
+	i_dls_devnet_hashmap_read();
 	if (mod_hash_find(i_dls_devnet_hash, (mod_hash_key_t)macname,
 	    (mod_hash_val_t *)&ddp) != 0) {
-		rw_exit(&i_dls_devnet_lock);
+		i_dls_devnet_hashmap_exit();
 		return (ENOENT);
 	}
 
 	*linkidp = ddp->dd_linkid;
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
 	return (0);
 }
 
@@ -1462,7 +1564,9 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 		return (err);
 	}
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	i_dls_devnet_lock_enter();
+	i_dls_devnet_hashmap_read();
+
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)id1, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
@@ -1526,11 +1630,23 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 		goto done;
 	}
 
+	/*
+	 * Temporarily drop the hashmap lock for the upcall -- ddp will remain
+	 * valid because we hold i_dls_devnet_lock. Taking this is a
+	 * prerequisite for dls_devnet_unset to proceed, and it is the only
+	 * pathway through which ddp can be freed.
+	 */
+	i_dls_devnet_hashmap_exit();
+	i_dls_devnet_lock_upcall_start();
 	err = dls_mgmt_get_linkinfo(id2, ddp->dd_linkname, NULL, NULL, NULL);
+	i_dls_devnet_lock_upcall_end();
+
 	if (err != 0) {
 		mac_unmark_exclusive(mh);
-		goto done;
+		goto done_rw_unlocked;
 	}
+
+	i_dls_devnet_hashmap_write();
 
 	(void) mod_hash_remove(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)id1, &val);
@@ -1549,7 +1665,9 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	mutex_exit(&ddp->dd_mutex);
 
 done:
-	rw_exit(&i_dls_devnet_lock);
+	i_dls_devnet_hashmap_exit();
+done_rw_unlocked:
+	i_dls_devnet_lock_exit();
 
 	if (err == 0)
 		dls_devnet_stat_rename(ddp);
