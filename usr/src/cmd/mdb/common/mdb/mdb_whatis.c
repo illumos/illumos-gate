@@ -32,6 +32,7 @@
 #include <mdb/mdb.h>
 #include <mdb/mdb_io.h>
 #include <mdb/mdb_module.h>
+#include <mdb/mdb_frame.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_whatis.h>
 #include <mdb/mdb_whatis_impl.h>
@@ -525,7 +526,7 @@ cmd_whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (list) {
-		mdb_printf("%<u>%-16s %-12s %4s %?s %?s %8s%</u>",
+		mdb_printf("%<u>%-16s %-12s %4s %?s %?s %8s%</u>\n",
 		    "NAME", "MODULE", "PRIO", "FUNC", "ARG", "FLAGS");
 
 		for (idx = 0; idx < whatis_cb_count; idx++) {
@@ -570,6 +571,7 @@ cmd_whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("Searching for:\n");
 		for (idx = 0; idx < w.w_naddrs; idx++)
 			mdb_printf("    %p", w.w_addrs[idx]);
+		mdb_printf("\n");
 	}
 
 	ret = 0;
@@ -577,6 +579,8 @@ cmd_whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* call in to the registered handlers */
 	for (idx = 0; idx < whatis_cb_count; idx++) {
 		whatis_callback_t *cur = whatis_cb[idx];
+		mdb_idcmd_t *dcmd = NULL;
+		mdb_module_t *mod;
 
 		/* Honor the ident flags */
 		if (w.w_flags & WHATIS_IDSPACE) {
@@ -587,12 +591,30 @@ cmd_whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				continue;
 		}
 
-		if (w.w_flags & WHATIS_VERBOSE)
+		if (w.w_flags & WHATIS_VERBOSE) {
 			mdb_printf("Searching %s`%s...\n",
 			    cur->wcb_modname, cur->wcb_name);
+		}
 
+		/*
+		 * We need to run each whatis callback in the context of the
+		 * module that added it. That means that it will be able to
+		 * access things relevant to that module such as, for example,
+		 * CTF data. We do this by updating the "whatis" command
+		 * structure in place and restoring the original module
+		 * afterwards.
+		 */
+		if (mdb.m_frame->f_cp != NULL) {
+			dcmd = mdb.m_frame->f_cp->c_dcmd;
+			if (dcmd != NULL) {
+				mod = dcmd->idc_modp;
+				dcmd->idc_modp = cur->wcb_module;
+			}
+		}
 		if (cur->wcb_func(&w, cur->wcb_arg) != 0)
 			ret = 1;
+		if (dcmd != NULL)
+			dcmd->idc_modp = mod;
 
 		/* reset the match state for the next callback */
 		w.w_match_next = 0;
