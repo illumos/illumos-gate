@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_SOFTMAC_IMPL_H
@@ -92,6 +93,7 @@ typedef struct softmac_dev_s {
 #define	SOFTMAC_NOSUPP		0x02
 #define	SOFTMAC_NEED_RECREATE	0x04
 #define	SOFTMAC_NOTIFY_QUIT	0x08
+#define	SOFTMAC_NOTIFY_DONE	0x10
 
 #define	SMAC_NONZERO_NODECNT(softmac)		\
 	((softmac->smac_softmac[0] != NULL) +	\

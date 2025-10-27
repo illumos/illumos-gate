@@ -26,6 +26,7 @@
 /*
  * Copyright 2019, Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -127,6 +128,7 @@
 #include <net/if.h>
 
 static kmutex_t		softmac_taskq_lock;
+static kthread_t	*softmac_taskq_thread;
 static kcondvar_t	softmac_taskq_cv;
 static list_t		softmac_taskq_list;	/* List of softmac_upper_t */
 boolean_t		softmac_taskq_quit;
@@ -148,8 +150,8 @@ softmac_fp_init()
 	softmac_taskq_done = B_FALSE;
 	list_create(&softmac_taskq_list, sizeof (softmac_upper_t),
 	    offsetof(softmac_upper_t, su_taskq_list_node));
-	(void) thread_create(NULL, 0, softmac_taskq_dispatch, NULL, 0,
-	    &p0, TS_RUN, minclsyspri);
+	softmac_taskq_thread = thread_create(NULL, 0, softmac_taskq_dispatch,
+	    NULL, 0, &p0, TS_RUN, minclsyspri);
 }
 
 void
@@ -164,6 +166,7 @@ softmac_fp_fini()
 	while (!softmac_taskq_done)
 		cv_wait(&softmac_taskq_cv, &softmac_taskq_lock);
 	mutex_exit(&softmac_taskq_lock);
+	thread_join(softmac_taskq_thread->t_did);
 	list_destroy(&softmac_taskq_list);
 
 	mutex_destroy(&softmac_taskq_lock);

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 #include <sys/stropts.h>
 #include <sys/strsubr.h>
@@ -292,7 +295,7 @@ softmac_notify_thread(void *arg)
 	 */
 	freemsgchain(softmac->smac_notify_head);
 	softmac->smac_notify_head = softmac->smac_notify_tail = NULL;
-	softmac->smac_notify_thread = NULL;
+	softmac->smac_flags |= SOFTMAC_NOTIFY_DONE;
 	cv_broadcast(&softmac->smac_cv);
 	CALLB_CPR_EXIT(&cprinfo);
 	thread_exit();

@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 /*
  * The softmac driver is used to "unify" non-GLDv3 drivers to the GLDv3
@@ -224,7 +227,7 @@ softmac_busy()
  * --------------------------------------------------------------------------
  * OLD STATE		EVENT					NEW STATE
  * --------------------------------------------------------------------------
- * UNINIT		attach of 1st minor node 		ATTACH_INPROG
+ * UNINIT		attach of 1st minor node		ATTACH_INPROG
  * okcnt = 0		net_postattach -> softmac_create	okcnt = 1
  *
  * ATTACH_INPROG	attach of 2nd minor node (GLDv3)	ATTACH_DONE
@@ -1042,10 +1045,13 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 			mutex_enter(&softmac->smac_mutex);
 			softmac->smac_flags |= SOFTMAC_NOTIFY_QUIT;
 			cv_broadcast(&softmac->smac_cv);
-			while (softmac->smac_notify_thread != NULL) {
+			while (
+			    (softmac->smac_flags & SOFTMAC_NOTIFY_DONE) == 0) {
 				cv_wait(&softmac->smac_cv,
 				    &softmac->smac_mutex);
 			}
+			thread_join(softmac->smac_notify_thread->t_did);
+			softmac->smac_notify_thread = NULL;
 			mutex_exit(&softmac->smac_mutex);
 			VERIFY(mac_unregister(smac_mh) == 0);
 		}
