@@ -1422,6 +1422,9 @@ static void predefined_macros(void)
 	predefine("__svr4__", 1, "1");
 #endif
 
+#if defined(__illumos__)
+	predefine("__illumos__", 1, "1");
+#endif
 }
 
 static void create_builtin_stream(void)
