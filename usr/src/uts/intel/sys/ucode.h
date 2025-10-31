@@ -118,6 +118,7 @@ typedef struct cpu_ucode_info {
 	uint32_t	cui_platid;		/* platform id */
 	uint32_t	cui_rev;		/* microcode revision */
 	uint32_t	cui_pending_rev;	/* pending microcode revision */
+	uint32_t	cui_boot_rev;		/* rev at kernel start */
 	void		*cui_pending_ucode;	/* pending microcode update */
 	size_t		cui_pending_size;	/* pending microcode size */
 } cpu_ucode_info_t;

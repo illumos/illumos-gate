@@ -850,6 +850,12 @@ extern "C" {
 #define	MSR_AMD_TOM2				0xc001001d
 #define	MSR_AMD_TOM2_MASK(x)			((x) & 0x000fffffff800000)
 
+/*
+ * Core::X86::Msr::CPUID_7_FEATURES. AMD MSR which provides control over the
+ * features advertised in %eax and %ebx for CPUID leaf 7.
+ */
+#define	MSR_AMD_CPUID7_FEATURES			0xc0011002
+#define	MSR_AMD_CPUID7_FEATURES_RDSEED		(1 << 18)
 
 #define	MCI_CTL_VALUE		0xffffffff
 

@@ -60,6 +60,7 @@ find_cmd git
 find_cmd gpg
 find_cmd pkgfmt
 find_cmd stat
+find_cmd xxd
 # Search for 'ucodeadm'. If you need to use an updated ucodeadm to handle this
 # firmware update, as is occasionally necessary, ensure it occurs earlier in
 # the path than /usr/sbin.
@@ -114,16 +115,51 @@ done
 # Copy the firmware files into place
 cp $tmp/out/*/*-?? amd/
 
+# Deal with fallback firmware files (see amd/fallback/README)
+# For some processors AMD ship two microcode versions. One that can only be
+# loaded on systems which are already at a particular firmware level and an
+# older fallback one for systems that running old firmware. They package both
+# of these in the same microcode bundle with nothing to differentiate them
+# apart from their revision number. The older version occurs first in the
+# bundle. On illumos the newer version is always tried first and the older
+# version only used if that is not accepted by the processor. This script
+# looks for instances of more than one microcode for a CPU and moves the older
+# version into the amd/fallback directory. Anyone using this tool to prepare a
+# PR is expected to make judicious use of "git" and "ucodeadm" to verify that
+# everything looks reasonable afterwards.
+
+function ucode_version {
+	printf "0x%s" $($UCODEADM -t amd -l $1 | tr -s ' ' |
+	    awk -F'[ =]' '$4 == "Patch" {print $5}')
+}
+
+echo
+echo "** Relocating fallback microcode"
+echo
+
+for f in amd/*-01; do
+	bf=$(basename $f -01)
+	[[ -f "amd/$bf-00" ]] || errexit "$f has no -00 variant"
+	mv -f amd/$bf-00 amd/fallback/
+	mv amd/$bf-{01,00}
+	# Verify that the fallback version is lower than the main just in case
+	# AMD reverse the order of the patches for any reason.
+	typeset -i fbver=$(ucode_version amd/fallback/$bf-00)
+	typeset -i mlver=$(ucode_version amd/$bf-00)
+	printf "    %s - %X / %X\n" $bf $mlver $fbver
+	(( mlver > fbver )) || errexit "$bf - fallback is newer"
+done
+
 # Combine the equivalence tables from the different updates into one.
 # Each equivalence-table file is a sequence of 16-byte records with a
 # 16-byte terminator which is all zeros. To merge, we just concatenate
-# the non-terminator records and then add 16 bytes from /dev/zero.
+# the unique non-terminator records and then add 16 bytes from /dev/zero.
 {
 	for f in $tmp/out/*/equivalence-table; do
 		size=$($STAT -c %s $f)
 		((size -= 16))
 		dd if=$f bs=1 count=$size status=none
-	done
+	done | $XXD -c16 | cut -d\  -f2- | sort -u | $XXD -r -p
 	# Add terminator
 	dd if=/dev/zero bs=1 count=16 status=none
 } > amd/equivalence-table

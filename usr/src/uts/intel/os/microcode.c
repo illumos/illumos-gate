@@ -447,7 +447,9 @@ ucode_apply(cpu_t *cp)
 	/*
 	 * Apply pending update.
 	 */
+	uinfop->cui_boot_rev = uinfop->cui_rev;
 	ucode->us_load(uinfop);
+	ucode->us_read_rev(uinfop);
 }
 
 /*
@@ -476,9 +478,8 @@ ucode_finish(cpu_t *cp)
 	if (uinfop->cui_pending_ucode == NULL)
 		return;
 
-	old_rev = uinfop->cui_rev;
+	old_rev = uinfop->cui_boot_rev;
 	new_rev = uinfop->cui_pending_rev;
-	ucode->us_read_rev(uinfop);
 
 	if (uinfop->cui_rev != new_rev) {
 		ASSERT3U(uinfop->cui_rev, ==, old_rev);
@@ -560,7 +561,7 @@ ucode_check_boot(void)
 		uint32_t old_rev, new_rev;
 		bool fallback = false;
 
-		old_rev = uinfop->cui_rev;
+		old_rev = uinfop->cui_boot_rev = uinfop->cui_rev;
 
 retry:
 		new_rev = uinfop->cui_pending_rev;
