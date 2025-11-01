@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source. A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright 2025 Oxide Computer Company
+-->
+<service_bundle type="manifest"
+                name="i2csimd">
+
+    <service name="system/i2csimd"
+             type="service"
+             version="1">
+
+        <create_default_instance enabled="false" />
+
+        <dependency name="multiuser"
+                    grouping="require_all"
+                    restart_on="none"
+                    type="service">
+            <service_fmri value="svc:/milestone/multi-user" />
+        </dependency>
+
+        <dependency name="devices"
+                    grouping="require_all"
+                    restart_on="none"
+                    type="service">
+            <service_fmri value="svc:/milestone/devices" />
+        </dependency>
+
+
+        <exec_method name="start"
+                     type="method"
+                     timeout_seconds="60"
+                     exec="/opt/i2c-tests/svc/i2csimd" />
+
+        <exec_method type="method"
+                     name="stop"
+                     exec=":kill"
+                     timeout_seconds="10" />
+
+        <template>
+          <common_name>
+            <loctext xml:lang="C">I2C Simulation Daemon</loctext>
+          </common_name>
+        </template>
+
+    </service>
+
+</service_bundle>

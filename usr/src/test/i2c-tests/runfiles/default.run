@@ -1,0 +1,75 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# I2C Test Runner. The I2C tests rely upon the i2csim driver which exposes two
+# virtual controllers, i2csim0 and smbussim1. The i2csim driver has a
+# corresponding service, i2csimd, which is used to provide basic emulation for a
+# few different classes of devices. Tests use a varying pre-secript which is
+# used to basically pre-add a bunch of virtualized devices. Different tests have
+# different expectations here. Not every test requires a pre script.
+#
+
+[DEFAULT]
+pre =
+pre_user = root
+verbose = False
+quiet = False
+timeout = 60
+post = /opt/i2c-tests/tests/i2cadm/cleanup
+post_user = root
+outputdir = /var/tmp/test_results
+
+[/opt/i2c-tests/tests/i2cadm/i2cadm]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/i2cadm/i2cadm-io]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/i2cadm/i2cadm-map]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/i2cadm/i2cadm-scan]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/i2cadm/mux-active-cleanup]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/ioctl/addresses.32]
+[/opt/i2c-tests/tests/ioctl/addresses.64]
+
+[/opt/i2c-tests/tests/ioctl/invalid-io.32]
+[/opt/i2c-tests/tests/ioctl/invalid-io.64]
+
+[/opt/i2c-tests/tests/ioctl/ioc-errnos.32]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+[/opt/i2c-tests/tests/ioctl/ioc-errnos.64]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/libi2c/addr-util.32]
+[/opt/i2c-tests/tests/libi2c/addr-util.64]
+
+[/opt/i2c-tests/tests/libi2c/claimed-addrs.32]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+[/opt/i2c-tests/tests/libi2c/claimed-addrs.64]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/libi2c/discovery.32]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+[/opt/i2c-tests/tests/libi2c/discovery.64]
+pre = /opt/i2c-tests/tests/i2cadm/setup-full
+
+[/opt/i2c-tests/tests/libi2c/missing-field.32]
+[/opt/i2c-tests/tests/libi2c/missing-field.64]

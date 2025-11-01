@@ -1,0 +1,71 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2025 Oxide Computer Company
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/test/i2ctest@$(PKGVERS)
+set name=pkg.summary value="I2C Test Suite"
+set name=pkg.description value="I2C Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/i2csim
+file path=kernel/drv/i2csim.conf
+dir  path=lib
+dir  path=lib/svc
+dir  path=lib/svc/manifest group=sys
+dir  path=lib/svc/manifest/system group=sys
+file path=lib/svc/manifest/system/i2csimd.xml mode=0444
+dir  path=opt/i2c-tests
+dir  path=opt/i2c-tests/runfiles
+file path=opt/i2c-tests/runfiles/default.run mode=0444
+dir  path=opt/i2c-tests/svc
+file path=opt/i2c-tests/svc/i2csimd mode=0555
+dir  path=opt/i2c-tests/tests
+dir  path=opt/i2c-tests/tests/i2cadm
+file path=opt/i2c-tests/tests/i2cadm/cleanup mode=0555
+file path=opt/i2c-tests/tests/i2cadm/common.ksh mode=0444
+file path=opt/i2c-tests/tests/i2cadm/i2cadm mode=0555
+file path=opt/i2c-tests/tests/i2cadm/i2cadm-io mode=0555
+file path=opt/i2c-tests/tests/i2cadm/i2cadm-map mode=0555
+file path=opt/i2c-tests/tests/i2cadm/i2cadm-scan mode=0555
+file path=opt/i2c-tests/tests/i2cadm/mux-active-cleanup mode=0555
+file path=opt/i2c-tests/tests/i2cadm/setup-full mode=0555
+dir  path=opt/i2c-tests/tests/ioctl
+file path=opt/i2c-tests/tests/ioctl/addresses.32 mode=0555
+file path=opt/i2c-tests/tests/ioctl/addresses.64 mode=0555
+file path=opt/i2c-tests/tests/ioctl/invalid-io.32 mode=0555
+file path=opt/i2c-tests/tests/ioctl/invalid-io.64 mode=0555
+file path=opt/i2c-tests/tests/ioctl/ioc-errnos.32 mode=0555
+file path=opt/i2c-tests/tests/ioctl/ioc-errnos.64 mode=0555
+dir  path=opt/i2c-tests/tests/libi2c
+file path=opt/i2c-tests/tests/libi2c/addr-util.32 mode=0555
+file path=opt/i2c-tests/tests/libi2c/addr-util.64 mode=0555
+file path=opt/i2c-tests/tests/libi2c/claimed-addrs.32 mode=0555
+file path=opt/i2c-tests/tests/libi2c/claimed-addrs.64 mode=0555
+file path=opt/i2c-tests/tests/libi2c/discovery.32 mode=0555
+file path=opt/i2c-tests/tests/libi2c/discovery.64 mode=0555
+file path=opt/i2c-tests/tests/libi2c/missing-field.32 mode=0555
+file path=opt/i2c-tests/tests/libi2c/missing-field.64 mode=0555
+driver name=i2csim
+license lic_CDDL license=lic_CDDL
+depend type=require fmri=system/i2c
+depend type=require fmri=system/test/testrunner

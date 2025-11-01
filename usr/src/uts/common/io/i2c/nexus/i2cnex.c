@@ -631,6 +631,12 @@
 
 #include "i2cnex.h"
 
+/*
+ * Extern declaration for pseudo-device related functions that aren't part of a
+ * header file.
+ */
+extern int is_pseudo_device(dev_info_t *);
+
 i2cnex_minors_t i2cnex_minors;
 
 static i2c_root_t *
@@ -882,6 +888,42 @@ i2c_port_init(i2c_ctrl_t *ctrl, dev_info_t *pdip, i2c_nexus_t *pnex,
 }
 
 /*
+ * See the DDI_CTLOPS_INITCHILD case below for an explanation of why this
+ * mimicry of pseudonex_auto_assign() is here.
+ */
+static bool
+i2c_nex_assign_instance(dev_info_t *cdip)
+{
+	const char *drv = ddi_driver_name(cdip);
+	major_t major = ddi_name_to_major(drv);
+
+	LOCK_DEV_OPS(&devnamesp[major].dn_lock);
+	for (int inst = 0; inst <= MAXMIN32; inst++) {
+		dev_info_t *tdip;
+		for (tdip = devnamesp[major].dn_head; tdip != NULL;
+		    tdip = ddi_get_next(tdip)) {
+			if (tdip == cdip)
+				continue;
+			if (inst == ddi_get_instance(tdip)) {
+				break;
+			}
+		}
+
+		if (tdip == NULL) {
+			DEVI(cdip)->devi_instance = inst;
+			UNLOCK_DEV_OPS(&devnamesp[major].dn_lock);
+			return (true);
+		}
+	}
+
+	/*
+	 * No major available, fail the initialization.
+	 */
+	UNLOCK_DEV_OPS(&devnamesp[major].dn_lock);
+	return (false);
+}
+
+/*
  * Unlike the other bus ops, this is shared by both the controller bus ops and
  * the normal i2c_nex_bus_ops.
  */
@@ -925,6 +967,23 @@ i2c_nex_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		cdip = arg;
 		if (cdip == NULL) {
 			return (DDI_FAILURE);
+		}
+
+		/*
+		 * We need to check if we're a child of pseudo. If so, we won't
+		 * get an instance number assigned to us due to the logic of how
+		 * instance assignment works. Once something is a child of
+		 * pseudo, the system expects psuedo to take charge of assigning
+		 * instances. This means that we have to basically do the same
+		 * thing that pseudonex_auto_assign() does. We can't really ask
+		 * psuedo to do this as it would want to name our child and we
+		 * can't assume that the path between us and pseudo will keep
+		 * calling all the way up to pseudo. This is unfortunate, but
+		 * not as unfortunate as instance -1! This uses the same logic
+		 * as pseudo.
+		 */
+		if (is_pseudo_device(cdip) && !i2c_nex_assign_instance(cdip)) {
+			return (NDI_FAILURE);
 		}
 
 		nex = ddi_get_parent_data(cdip);
