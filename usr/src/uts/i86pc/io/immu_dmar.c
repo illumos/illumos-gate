@@ -64,7 +64,6 @@ static dmar_table_t *dmar_table;	/* converted form of DMAR table */
 /*
  * global variables exported outside this file
  */
-boolean_t dmar_print = B_FALSE;
 kmutex_t ioapic_drhd_lock;
 list_t ioapic_drhd_list;
 
@@ -627,7 +626,7 @@ dmar_table_print(dmar_table_t *tbl)
 {
 	int i;
 
-	if (dmar_print == B_FALSE) {
+	if (immu_dmar_print == B_FALSE) {
 		return;
 	}
 
