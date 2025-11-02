@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/debug.h>
@@ -489,13 +490,23 @@ dmar_parse(dmar_table_t **tblpp, char *raw)
 		case DMAR_RHSA:
 			unmstr = "RHSA";
 			break;
+		case DMAR_ANDD:
+			unmstr = "ANDD";
+			break;
+		case DMAR_SATC:
+			unmstr = "SATC";
+			break;
+		case DMAR_SIDP:
+			unmstr = "SIDP";
+			break;
 		default:
-			unmstr = "unknown unity type";
+			unmstr = "unknown unit type";
 			break;
 		}
 		if (unmstr) {
 			ddi_err(DER_NOTE, NULL, "DMAR ACPI table: "
-			    "skipping unsupported unit type %s", unmstr);
+			    "skipping unsupported unit type %u: %s",
+			    get_uint16(uhead), unmstr);
 		}
 		uhead += get_uint16(&uhead[2]);
 	}

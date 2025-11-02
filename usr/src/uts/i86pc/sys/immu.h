@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, Intel Corporation.
  * All rights reserved.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_INTEL_IOMMU_H
@@ -86,6 +87,9 @@ typedef uint64_t hw_pdte_t;
 #define	DMAR_RMRR	1
 #define	DMAR_ATSR	2
 #define	DMAR_RHSA	3
+#define	DMAR_ANDD	4
+#define	DMAR_SATC	5
+#define	DMAR_SIDP	6
 
 /* DRHD flag values */
 #define	DMAR_INCLUDE_ALL	(0x01)
