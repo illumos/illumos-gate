@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
+
+/*
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2025 Edgecast Cloud LLC.
+ */
 
 #include "lint.h"
 #include <mtlib.h>
@@ -303,7 +304,7 @@ mntopt(char **p)
 }
 
 char *
-hasmntopt(struct mnttab *mnt, char *opt)
+hasmntopt(const struct mnttab *mnt, const char *opt)
 {
 	char tmpopts[MNT_LINE_MAX];
 	char *f, *opts = tmpopts;
