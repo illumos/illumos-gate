@@ -12,7 +12,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -56,6 +56,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	vmm_drv_page_next;
 	vmm_drv_ioport_hook;
 	vmm_drv_ioport_unhook;
+	vmm_drv_mmio_hook;
+	vmm_drv_mmio_unhook;
 	vmm_drv_msi;
 
 	# IOMMU API for PCI pass-thru

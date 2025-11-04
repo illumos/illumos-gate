@@ -871,14 +871,14 @@ passthru_cfgread_default(struct passthru_softc *sc,
 	 * MSI capability is emulated.
 	 */
 	if (msicap_access(sc, coff) || msixcap_access(sc, coff))
-		return (-1);
+		return (PE_CFGRW_DEFAULT);
 
 	/*
 	 * MSI-X is also emulated since a limit on interrupts may be imposed by
 	 * the OS, altering the perceived register state.
 	 */
 	if (msixcap_access(sc, coff))
-		return (-1);
+		return (PE_CFGRW_DEFAULT);
 
 	/*
 	 * Emulate the command register.  If a single read reads both the
@@ -887,16 +887,16 @@ passthru_cfgread_default(struct passthru_softc *sc,
 	 */
 	if (coff == PCIR_COMMAND) {
 		if (bytes <= 2)
-			return (-1);
+			return (PE_CFGRW_DEFAULT);
 		*rv = passthru_read_config(sc, PCIR_STATUS, 2) << 16 |
 		    pci_get_cfgdata16(pi, PCIR_COMMAND);
-		return (0);
+		return (PE_CFGRW_DROP);
 	}
 
 	/* Everything else just read from the device's config space */
 	*rv = passthru_read_config(sc, coff, bytes);
 
-	return (0);
+	return (PE_CFGRW_DROP);
 }
 
 int
@@ -904,7 +904,7 @@ passthru_cfgread_emulate(struct passthru_softc *sc __unused,
     struct pci_devinst *pi __unused, int coff __unused, int bytes __unused,
     uint32_t *rv __unused)
 {
-	return (-1);
+	return (PE_CFGRW_DEFAULT);
 }
 
 static int
@@ -938,7 +938,7 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 		    pi->pi_msi.addr, pi->pi_msi.msg_data, pi->pi_msi.maxmsgnum);
 		if (error != 0)
 			err(1, "vm_setup_pptdev_msi");
-		return (0);
+		return (PE_CFGRW_DROP);
 	}
 
 	if (msixcap_access(sc, coff)) {
@@ -961,7 +961,7 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 			if (error)
 				err(1, "vm_disable_pptdev_msix");
 		}
-		return (0);
+		return (PE_CFGRW_DROP);
 	}
 
 	/*
@@ -970,7 +970,7 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 	 */
 	if (coff == PCIR_COMMAND) {
 		if (bytes <= 2)
-			return (-1);
+			return (PE_CFGRW_DEFAULT);
 
 		/* Update the physical status register. */
 		passthru_write_config(sc, PCIR_STATUS, 2, val >> 16);
@@ -979,12 +979,12 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 		cmd_old = pci_get_cfgdata16(pi, PCIR_COMMAND);
 		pci_set_cfgdata16(pi, PCIR_COMMAND, val & 0xffff);
 		pci_emul_cmd_changed(pi, cmd_old);
-		return (0);
+		return (PE_CFGRW_DROP);
 	}
 
 	passthru_write_config(sc, coff, bytes, val);
 
-	return (0);
+	return (PE_CFGRW_DROP);
 }
 
 int
@@ -992,7 +992,7 @@ passthru_cfgwrite_emulate(struct passthru_softc *sc __unused,
     struct pci_devinst *pi __unused, int coff __unused, int bytes __unused,
     uint32_t val __unused)
 {
-	return (-1);
+	return (PE_CFGRW_DEFAULT);
 }
 
 static int

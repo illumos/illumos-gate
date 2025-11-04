@@ -27,6 +27,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 
 #include <sys/param.h>
@@ -227,7 +242,7 @@ struct pci_vtscsi_req_cmd_wr {
 
 static void *pci_vtscsi_proc(void *);
 static void pci_vtscsi_reset(void *);
-static void pci_vtscsi_neg_features(void *, uint64_t);
+static void pci_vtscsi_neg_features(void *, uint64_t *);
 static int pci_vtscsi_cfgread(void *, int, int, uint32_t *);
 static int pci_vtscsi_cfgwrite(void *, int, int, uint32_t);
 static inline int pci_vtscsi_get_lun(uint8_t *);
@@ -246,14 +261,15 @@ static int  pci_vtscsi_init_queue(struct pci_vtscsi_softc *,
 static int pci_vtscsi_init(struct pci_devinst *, nvlist_t *);
 
 static struct virtio_consts vtscsi_vi_consts = {
-	.vc_name =	"vtscsi",
-	.vc_nvq =	VTSCSI_MAXQ,
-	.vc_cfgsize =	sizeof(struct pci_vtscsi_config),
-	.vc_reset =	pci_vtscsi_reset,
-	.vc_cfgread =	pci_vtscsi_cfgread,
-	.vc_cfgwrite =	pci_vtscsi_cfgwrite,
-	.vc_apply_features = pci_vtscsi_neg_features,
-	.vc_hv_caps =	0,
+	.vc_name =		"vtscsi",
+	.vc_nvq =		VTSCSI_MAXQ,
+	.vc_cfgsize =		sizeof(struct pci_vtscsi_config),
+	.vc_reset =		pci_vtscsi_reset,
+	.vc_cfgread =		pci_vtscsi_cfgread,
+	.vc_cfgwrite =		pci_vtscsi_cfgwrite,
+	.vc_apply_features =	pci_vtscsi_neg_features,
+	.vc_hv_caps_legacy =	0,
+	.vc_hv_caps_modern =	0,
 };
 
 static void *
@@ -321,11 +337,11 @@ pci_vtscsi_reset(void *vsc)
 }
 
 static void
-pci_vtscsi_neg_features(void *vsc, uint64_t negotiated_features)
+pci_vtscsi_neg_features(void *vsc, uint64_t *negotiated_features)
 {
 	struct pci_vtscsi_softc *sc = vsc;
 
-	sc->vss_features = negotiated_features;
+	sc->vss_features = *negotiated_features;
 }
 
 static int
@@ -747,15 +763,13 @@ pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 	}
 
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_SCSI);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_STORAGE);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_SCSI);
-	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
+	vi_pci_init(pi, VIRTIO_MODE_LEGACY, VIRTIO_DEV_SCSI,
+	    VIRTIO_ID_SCSI, PCIC_STORAGE);
 
-	if (vi_intr_init(&sc->vss_vs, 1, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vss_vs, true, fbsdrun_virtio_msix()))
 		return (1);
-	vi_set_io_bar(&sc->vss_vs, 0);
+	if (!vi_pcibar_setup(&sc->vss_vs))
+		return (1);
 
 	return (0);
 }
@@ -765,6 +779,8 @@ static const struct pci_devemu pci_de_vscsi = {
 	.pe_emu =	"virtio-scsi",
 	.pe_init =	pci_vtscsi_init,
 	.pe_legacy_config = pci_vtscsi_legacy_config,
+	.pe_cfgwrite =	vi_pci_cfgwrite,
+	.pe_cfgread =	vi_pci_cfgread,
 	.pe_barwrite =	vi_pci_write,
 	.pe_barread =	vi_pci_read
 };

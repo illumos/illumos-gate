@@ -26,6 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 /*
  * virtio input device emulation.
@@ -157,13 +172,14 @@ static int pci_vtinput_cfgread(void *, int, int, uint32_t *);
 static int pci_vtinput_cfgwrite(void *, int, int, uint32_t);
 
 static struct virtio_consts vtinput_vi_consts = {
-	.vc_name =	"vtinput",
-	.vc_nvq =	VTINPUT_MAXQ,
-	.vc_cfgsize =	sizeof(struct vtinput_config),
-	.vc_reset =	pci_vtinput_reset,
-	.vc_cfgread =	pci_vtinput_cfgread,
-	.vc_cfgwrite =	pci_vtinput_cfgwrite,
-	.vc_hv_caps =	0,
+	.vc_name =		"vtinput",
+	.vc_nvq =		VTINPUT_MAXQ,
+	.vc_cfgsize =		sizeof(struct vtinput_config),
+	.vc_reset =		pci_vtinput_reset,
+	.vc_cfgread =		pci_vtinput_cfgread,
+	.vc_cfgwrite =		pci_vtinput_cfgwrite,
+	.vc_hv_caps_legacy =	0,
+	.vc_hv_caps_modern =	0,
 };
 
 static void
@@ -461,6 +477,9 @@ pci_vtinput_cfgwrite(void *vsc, int offset, int size, uint32_t value)
 	/* select/subsel changed, query new config on next cfgread */
 	sc->vsc_config_valid = 0;
 
+	/* notify the guest the device configuration has been changed */
+	vq_devcfg_changed(&sc->vsc_vs);
+
 	return (0);
 }
 
@@ -728,19 +747,19 @@ pci_vtinput_init(struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vsc_queues[VTINPUT_STATUSQ].vq_notify = pci_vtinput_notify_statusq;
 
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_INPUT);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_INPUTDEV);
+	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_INPUT,
+	    VIRTIO_ID_INPUT, PCIC_INPUTDEV);
 	pci_set_cfgdata8(pi, PCIR_SUBCLASS, PCIS_INPUTDEV_OTHER);
 	pci_set_cfgdata8(pi, PCIR_REVID, VIRTIO_REV_INPUT);
 	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_SUBDEV_INPUT);
 	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_SUBVEN_INPUT);
 
 	/* add MSI-X table BAR */
-	if (vi_intr_init(&sc->vsc_vs, 1, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
 		goto failed;
-	/* add virtio register */
-	vi_set_io_bar(&sc->vsc_vs, 0);
+	/* add VirtIO BARs */
+	if (!vi_pcibar_setup(&sc->vsc_vs))
+		goto failed;
 
 	return (0);
 

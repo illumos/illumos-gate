@@ -24,8 +24,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+.\" Portions Copyright 2025 Oxide Computer Company
 .\"
-.Dd November 14, 2024
+.Dd November 21, 2025
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -172,9 +173,23 @@ The universally unique identifier (UUID) to use in the guest's
 System Management BIOS System Information structure.
 If an explicit value is not set, a valid UUID is generated from
 the host's hostname and the VM name.
-.It Va virtio_msix Ta bool Ta true Ta
+.It Va virtio.msix Ta bool Ta true Ta
 Use MSI-X interrupts for PCI VirtIO devices.
 If set to false, MSI interrupts are used instead.
+.It Va virtio.legacy Ta bool Ta true Ta
+Enable legacy virtio support.
+This causes modern-capable virtio devices to be presented as
+.Dq transitional
+devices that support both the VirtIO legacy and modern interfaces.
+If this is set to false then only the modern interface will
+be presented for these devices.
+.It Va virtio.modern Ta bool Ta true Ta
+Enable modern virtio support.
+This causes modern-capable virtio devices to be presented as
+.Dq transitional
+devices that support both the VirtIO legacy and modern interfaces.
+If this is set to false then only the legacy interface will
+be presented for these devices.
 .It Va config.dump Ta bool Ta false Ta
 If this value is set to true then, after parsing command line options,
 .Xr bhyve 8
@@ -192,6 +207,10 @@ Enable debug messages relating to the RFB
 server.
 .It Va viona.debug Ta bool Ta false Ta
 Enable debug messages relating to the accelerated virtio network device.
+These messages are sent to
+.Dv stdout .
+.It Va virtio.net.debug Ta bool Ta false Ta
+Enable debug messages relating to the virtio network device.
 These messages are sent to
 .Dv stdout .
 .It Va xhci.debug Ta bool Ta false Ta

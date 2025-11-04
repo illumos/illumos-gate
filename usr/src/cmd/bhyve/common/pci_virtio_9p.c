@@ -25,6 +25,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 /*
  * VirtIO filesystem passthrough using 9p protocol.
@@ -34,6 +49,9 @@
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/uio.h>
+#ifndef __FreeBSD__
+#include <sys/sysmacros.h>
+#endif
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
 #endif
@@ -68,6 +86,9 @@
 static int pci_vt9p_debug;
 #define DPRINTF(params) if (pci_vt9p_debug) printf params
 #define WPRINTF(params) printf params
+
+/* Capability bits */
+#define	VT9P_MOUNT_TAG		(1 << 0)	/* Mount point in config var */
 
 /*
  * Per-device softc
@@ -110,17 +131,24 @@ static void pci_vt9p_drop(struct l9p_request *, const struct iovec *, size_t,
 static void pci_vt9p_reset(void *);
 static void pci_vt9p_notify(void *, struct vqueue_info *);
 static int pci_vt9p_cfgread(void *, int, int, uint32_t *);
-static void pci_vt9p_neg_features(void *, uint64_t);
+static void pci_vt9p_neg_features(void *, uint64_t *);
+
+static virtio_capstr_t vt9p_caps[] = {
+	{ VT9P_MOUNT_TAG,	"VT9P_MOUNT_TAG" },
+};
 
 static struct virtio_consts vt9p_vi_consts = {
-	.vc_name =	"vt9p",
-	.vc_nvq =	1,
-	.vc_cfgsize =	VT9P_CONFIGSPACESZ,
-	.vc_reset =	pci_vt9p_reset,
-	.vc_qnotify =	pci_vt9p_notify,
-	.vc_cfgread =	pci_vt9p_cfgread,
-	.vc_apply_features = pci_vt9p_neg_features,
-	.vc_hv_caps =	(1 << 0),
+	.vc_name =		"vt9p",
+	.vc_nvq =		1,
+	.vc_cfgsize =		VT9P_CONFIGSPACESZ,
+	.vc_reset =		pci_vt9p_reset,
+	.vc_qnotify =		pci_vt9p_notify,
+	.vc_cfgread =		pci_vt9p_cfgread,
+	.vc_apply_features =	pci_vt9p_neg_features,
+	.vc_hv_caps_legacy =	VT9P_MOUNT_TAG,
+	.vc_hv_caps_modern =	VT9P_MOUNT_TAG,
+	.vc_capstr =		vt9p_caps,
+	.vc_ncapstr =		ARRAY_SIZE(vt9p_caps),
 };
 
 static void
@@ -135,11 +163,11 @@ pci_vt9p_reset(void *vsc)
 }
 
 static void
-pci_vt9p_neg_features(void *vsc, uint64_t negotiated_features)
+pci_vt9p_neg_features(void *vsc, uint64_t *negotiated_features)
 {
 	struct pci_vt9p_softc *sc = vsc;
 
-	sc->vsc_features = negotiated_features;
+	sc->vsc_features = *negotiated_features;
 }
 
 static int
@@ -376,15 +404,13 @@ pci_vt9p_init(struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vsc_vq.vq_qsize = VT9P_RINGSZ;
 
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_9P);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_STORAGE);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_9P);
-	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
+	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_9P, VIRTIO_ID_9P,
+	    PCIC_STORAGE);
 
-	if (vi_intr_init(&sc->vsc_vs, 1, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
 		return (1);
-	vi_set_io_bar(&sc->vsc_vs, 0);
+	if (!vi_pcibar_setup(&sc->vsc_vs))
+		return (1);
 
 	return (0);
 }
@@ -393,6 +419,8 @@ static const struct pci_devemu pci_de_v9p = {
 	.pe_emu =	"virtio-9p",
 	.pe_legacy_config = pci_vt9p_legacy_config,
 	.pe_init =	pci_vt9p_init,
+	.pe_cfgwrite =	vi_pci_cfgwrite,
+	.pe_cfgread =	vi_pci_cfgread,
 	.pe_barwrite =	vi_pci_write,
 	.pe_barread =	vi_pci_read
 };

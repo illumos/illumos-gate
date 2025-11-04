@@ -208,8 +208,14 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	struct iovec iov[VTNET_MAXSEGS];
 	uint16_t cookie;
 	int n;
-	const size_t hdr_sz = sizeof (struct virtio_net_hdr);
-	struct virtio_net_hdr *hdr;
+	/*
+	 * Even though VIRTIO_NET_F_MRG_RXBUF is not negotiated the larger
+	 * header must be used if the ring is operating in modern mode.
+	 */
+	const size_t hdr_sz = ring->vr_link->l_modern ?
+	    sizeof (struct virtio_net_mrgrxhdr) :
+	    sizeof (struct virtio_net_hdr);
+	struct virtio_net_mrgrxhdr *hdr;
 	size_t len, copied = 0;
 	caddr_t buf = NULL;
 	boolean_t end = B_FALSE;
@@ -234,7 +240,7 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	}
 
 	/* Grab the address of the header before anything else */
-	hdr = (struct virtio_net_hdr *)iov[0].iov_base;
+	hdr = (struct virtio_net_mrgrxhdr *)iov[0].iov_base;
 
 	/*
 	 * If there is any space remaining in the first buffer after writing
@@ -266,6 +272,8 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	/* Populate (read: zero) the header and account for it in the size */
 	bzero(hdr, hdr_sz);
+	if (hdr_sz > offsetof(struct virtio_net_mrgrxhdr, vrh_bufs))
+		hdr->vrh_bufs = 1;
 	copied += hdr_sz;
 
 	/* Add chksum bits, if needed */

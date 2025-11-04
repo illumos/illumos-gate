@@ -267,6 +267,9 @@ be_dlpi_recv(net_backend_t *be, const struct iovec *iov, int iovcnt)
 		/* Mark the bounce buffer as empty. */
 		priv->bdp_bbuflen = 0;
 
+		if (len == 0)
+			return (-1);
+
 		return (len);
 	}
 

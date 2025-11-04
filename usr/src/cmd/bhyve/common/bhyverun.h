@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_BHYVERUN_H_
@@ -59,7 +60,7 @@ struct vcpu *fbsdrun_vcpu(int vcpuid);
 void fbsdrun_addcpu(int vcpuid, bool);
 void fbsdrun_deletecpu(int vcpuid);
 
-int  fbsdrun_virtio_msix(void);
+bool fbsdrun_virtio_msix(void);
 
 typedef int (*vmexit_handler_t)(struct vmctx *, struct vcpu *,
     struct vm_exit *);

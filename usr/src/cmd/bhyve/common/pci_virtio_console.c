@@ -29,10 +29,22 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 
@@ -47,6 +59,7 @@
 #include <sys/un.h>
 #ifndef	__FreeBSD__
 #include <sys/limits.h>
+#include <sys/sysmacros.h>
 #endif
 
 #ifndef WITHOUT_CAPSICUM
@@ -164,7 +177,7 @@ static void pci_vtcon_notify_rx(void *, struct vqueue_info *);
 static void pci_vtcon_notify_tx(void *, struct vqueue_info *);
 static int pci_vtcon_cfgread(void *, int, int, uint32_t *);
 static int pci_vtcon_cfgwrite(void *, int, int, uint32_t);
-static void pci_vtcon_neg_features(void *, uint64_t);
+static void pci_vtcon_neg_features(void *, uint64_t *);
 static void pci_vtcon_sock_accept(int, enum ev_type,  void *);
 static void pci_vtcon_sock_rx(int, enum ev_type, void *);
 static void pci_vtcon_sock_tx(struct pci_vtcon_port *, void *, struct iovec *,
@@ -174,15 +187,24 @@ static void pci_vtcon_control_send(struct pci_vtcon_softc *,
 static void pci_vtcon_announce_port(struct pci_vtcon_port *);
 static void pci_vtcon_open_port(struct pci_vtcon_port *, bool);
 
+static virtio_capstr_t vtcon_caps[] = {
+	{ VTCON_F_SIZE,		"VTCON_F_SIZE" },
+	{ VTCON_F_MULTIPORT,	"VTCON_F_MULTIPORT" },
+	{ VTCON_F_EMERG_WRITE,	"VTCON_F_EMERG_WRITE" },
+};
+
 static struct virtio_consts vtcon_vi_consts = {
-	.vc_name =	"vtcon",
-	.vc_nvq =	VTCON_MAXQ,
-	.vc_cfgsize =	sizeof(struct pci_vtcon_config),
-	.vc_reset =	pci_vtcon_reset,
-	.vc_cfgread =	pci_vtcon_cfgread,
-	.vc_cfgwrite =	pci_vtcon_cfgwrite,
-	.vc_apply_features = pci_vtcon_neg_features,
-	.vc_hv_caps =	VTCON_S_HOSTCAPS,
+	.vc_name =		"vtcon",
+	.vc_nvq =		VTCON_MAXQ,
+	.vc_cfgsize =		sizeof(struct pci_vtcon_config),
+	.vc_reset =		pci_vtcon_reset,
+	.vc_cfgread =		pci_vtcon_cfgread,
+	.vc_cfgwrite =		pci_vtcon_cfgwrite,
+	.vc_apply_features =	pci_vtcon_neg_features,
+	.vc_hv_caps_legacy =	VTCON_S_HOSTCAPS,
+	.vc_hv_caps_modern =	VTCON_S_HOSTCAPS,
+	.vc_capstr =		vtcon_caps,
+	.vc_ncapstr =		ARRAY_SIZE(vtcon_caps),
 };
 
 static void
@@ -197,11 +219,11 @@ pci_vtcon_reset(void *vsc)
 }
 
 static void
-pci_vtcon_neg_features(void *vsc, uint64_t negotiated_features)
+pci_vtcon_neg_features(void *vsc, uint64_t *negotiated_features)
 {
 	struct pci_vtcon_softc *sc = vsc;
 
-	sc->vsc_features = negotiated_features;
+	sc->vsc_features = *negotiated_features;
 }
 
 static int
@@ -748,15 +770,13 @@ pci_vtcon_init(struct pci_devinst *pi, nvlist_t *nvl)
 	}
 
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_CONSOLE);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_SIMPLECOMM);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_CONSOLE);
-	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
+	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_CONSOLE,
+	    VIRTIO_ID_CONSOLE, PCIC_SIMPLECOMM);
 
-	if (vi_intr_init(&sc->vsc_vs, 1, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
 		return (1);
-	vi_set_io_bar(&sc->vsc_vs, 0);
+	if (!vi_pcibar_setup(&sc->vsc_vs))
+		return (1);
 
 	/* create control port */
 	sc->vsc_control_port.vsp_sc = sc;
@@ -792,6 +812,8 @@ pci_vtcon_init(struct pci_devinst *pi, nvlist_t *nvl)
 static const struct pci_devemu pci_de_vcon = {
 	.pe_emu =	"virtio-console",
 	.pe_init =	pci_vtcon_init,
+	.pe_cfgwrite =	vi_pci_cfgwrite,
+	.pe_cfgread =	vi_pci_cfgread,
 	.pe_barwrite =	vi_pci_write,
 	.pe_barread =	vi_pci_read,
 	.pe_legacy_config = pci_vtcon_legacy_config,

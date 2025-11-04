@@ -14,7 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -105,6 +105,7 @@ struct vmm_hold {
 	vmm_softc_t	*vmh_sc;
 	boolean_t	vmh_release_req;
 	uint_t		vmh_ioport_hook_cnt;
+	uint_t		vmh_mmio_hook_cnt;
 };
 
 struct vmm_lease {
@@ -2216,6 +2217,7 @@ vmm_drv_rele(vmm_hold_t *hold)
 	ASSERT(hold != NULL);
 	ASSERT(hold->vmh_sc != NULL);
 	VERIFY(hold->vmh_ioport_hook_cnt == 0);
+	VERIFY(hold->vmh_mmio_hook_cnt == 0);
 
 	mutex_enter(&vmm_mtx);
 	sc = hold->vmh_sc;
@@ -2516,6 +2518,10 @@ vmm_drv_ioport_hook(vmm_hold_t *hold, uint16_t ioport, vmm_drv_iop_cb_t func,
 	 * Optimistically record an installed hook which will prevent a block
 	 * from being asserted while the mutex is dropped.
 	 */
+	if (hold->vmh_ioport_hook_cnt == UINT_MAX) {
+		mutex_exit(&vmm_mtx);
+		return (ENOSPC);
+	}
 	hold->vmh_ioport_hook_cnt++;
 	mutex_exit(&vmm_mtx);
 
@@ -2550,6 +2556,75 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 	mutex_enter(&vmm_mtx);
 	hold->vmh_ioport_hook_cnt--;
 	mutex_exit(&vmm_mtx);
+}
+
+int
+vmm_drv_mmio_hook(vmm_hold_t *hold, uint64_t address, uint32_t size,
+    vmm_drv_mmio_cb_t func, void *arg, void **cookie)
+{
+	vmm_softc_t *sc;
+	int err;
+
+	ASSERT(hold != NULL);
+	ASSERT(cookie != NULL);
+
+	if (UINT64_MAX - size < address)
+		return (EOVERFLOW);
+
+	sc = hold->vmh_sc;
+	mutex_enter(&vmm_mtx);
+	/* Confirm that hook installation is not blocked */
+	if ((sc->vmm_flags & VMM_BLOCK_HOOK) != 0) {
+		mutex_exit(&vmm_mtx);
+		return (EBUSY);
+	}
+	/*
+	 * Optimistically record an installed hook which will prevent a block
+	 * from being asserted while the mutex is dropped.
+	 */
+	if (hold->vmh_mmio_hook_cnt == UINT_MAX) {
+		mutex_exit(&vmm_mtx);
+		return (ENOSPC);
+	}
+	hold->vmh_mmio_hook_cnt++;
+	mutex_exit(&vmm_mtx);
+
+	vmm_write_lock(sc);
+	err = vm_mmio_hook(sc->vmm_vm, address, size, (mmio_handler_t)func,
+	    arg, cookie);
+	vmm_write_unlock(sc);
+
+	if (err != 0) {
+		mutex_enter(&vmm_mtx);
+		/* Walk back optimism about the hook installation */
+		hold->vmh_mmio_hook_cnt--;
+		mutex_exit(&vmm_mtx);
+	}
+	return (err);
+}
+
+int
+vmm_drv_mmio_unhook(vmm_hold_t *hold, void **cookie)
+{
+	vmm_softc_t *sc;
+	int ret;
+
+	ASSERT(hold != NULL);
+	ASSERT(cookie != NULL);
+	ASSERT(hold->vmh_mmio_hook_cnt != 0);
+
+	sc = hold->vmh_sc;
+	vmm_write_lock(sc);
+	ret = vm_mmio_unhook(sc->vmm_vm, cookie);
+	vmm_write_unlock(sc);
+
+	if (ret == 0) {
+		mutex_enter(&vmm_mtx);
+		hold->vmh_mmio_hook_cnt--;
+		mutex_exit(&vmm_mtx);
+	}
+
+	return (ret);
 }
 
 static void
@@ -2599,7 +2674,8 @@ vmm_drv_block_hook(vmm_softc_t *sc, boolean_t enable_block)
 
 		for (hold = list_head(&sc->vmm_holds); hold != NULL;
 		    hold = list_next(&sc->vmm_holds, hold)) {
-			if (hold->vmh_ioport_hook_cnt != 0) {
+			if (hold->vmh_ioport_hook_cnt != 0 ||
+			    hold->vmh_mmio_hook_cnt != 0) {
 				err = EBUSY;
 				goto done;
 			}

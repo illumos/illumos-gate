@@ -19,30 +19,32 @@
 #ifndef	_VIONA_IO_H_
 #define	_VIONA_IO_H_
 
-#define	VNA_IOC			(('V' << 16)|('C' << 8))
-#define	VNA_IOC_CREATE		(VNA_IOC | 0x01)
-#define	VNA_IOC_DELETE		(VNA_IOC | 0x02)
-#define	VNA_IOC_VERSION		(VNA_IOC | 0x03)
-#define	VNA_IOC_DEFAULT_PARAMS	(VNA_IOC | 0x04)
+#define	VNA_IOC				(('V' << 16)|('C' << 8))
+#define	VNA_IOC_CREATE			(VNA_IOC | 0x01)
+#define	VNA_IOC_DELETE			(VNA_IOC | 0x02)
+#define	VNA_IOC_VERSION			(VNA_IOC | 0x03)
+#define	VNA_IOC_DEFAULT_PARAMS		(VNA_IOC | 0x04)
 
-#define	VNA_IOC_RING_INIT	(VNA_IOC | 0x10)
-#define	VNA_IOC_RING_RESET	(VNA_IOC | 0x11)
-#define	VNA_IOC_RING_KICK	(VNA_IOC | 0x12)
-#define	VNA_IOC_RING_SET_MSI	(VNA_IOC | 0x13)
-#define	VNA_IOC_RING_INTR_CLR	(VNA_IOC | 0x14)
-#define	VNA_IOC_RING_SET_STATE	(VNA_IOC | 0x15)
-#define	VNA_IOC_RING_GET_STATE	(VNA_IOC | 0x16)
-#define	VNA_IOC_RING_PAUSE	(VNA_IOC | 0x17)
+#define	VNA_IOC_RING_INIT		(VNA_IOC | 0x10)
+#define	VNA_IOC_RING_RESET		(VNA_IOC | 0x11)
+#define	VNA_IOC_RING_KICK		(VNA_IOC | 0x12)
+#define	VNA_IOC_RING_SET_MSI		(VNA_IOC | 0x13)
+#define	VNA_IOC_RING_INTR_CLR		(VNA_IOC | 0x14)
+#define	VNA_IOC_RING_SET_STATE		(VNA_IOC | 0x15)
+#define	VNA_IOC_RING_GET_STATE		(VNA_IOC | 0x16)
+#define	VNA_IOC_RING_PAUSE		(VNA_IOC | 0x17)
+#define	VNA_IOC_RING_INIT_MODERN	(VNA_IOC | 0x18)
 
-#define	VNA_IOC_INTR_POLL	(VNA_IOC | 0x20)
-#define	VNA_IOC_SET_FEATURES	(VNA_IOC | 0x21)
-#define	VNA_IOC_GET_FEATURES	(VNA_IOC | 0x22)
-#define	VNA_IOC_SET_NOTIFY_IOP	(VNA_IOC | 0x23)
-#define	VNA_IOC_SET_PROMISC	(VNA_IOC | 0x24)
-#define	VNA_IOC_GET_PARAMS	(VNA_IOC | 0x25)
-#define	VNA_IOC_SET_PARAMS	(VNA_IOC | 0x26)
-#define	VNA_IOC_GET_MTU		(VNA_IOC | 0x27)
-#define	VNA_IOC_SET_MTU		(VNA_IOC | 0x28)
+#define	VNA_IOC_INTR_POLL		(VNA_IOC | 0x20)
+#define	VNA_IOC_SET_FEATURES		(VNA_IOC | 0x21)
+#define	VNA_IOC_GET_FEATURES		(VNA_IOC | 0x22)
+#define	VNA_IOC_SET_NOTIFY_IOP		(VNA_IOC | 0x23)
+#define	VNA_IOC_SET_PROMISC		(VNA_IOC | 0x24)
+#define	VNA_IOC_GET_PARAMS		(VNA_IOC | 0x25)
+#define	VNA_IOC_SET_PARAMS		(VNA_IOC | 0x26)
+#define	VNA_IOC_GET_MTU			(VNA_IOC | 0x27)
+#define	VNA_IOC_SET_MTU			(VNA_IOC | 0x28)
+#define	VNA_IOC_SET_NOTIFY_MMIO		(VNA_IOC | 0x29)
 
 
 /*
@@ -59,7 +61,7 @@
  * change when the version is modified.  It follows no rules like semver.
  *
  */
-#define	VIONA_CURRENT_INTERFACE_VERSION	4
+#define	VIONA_CURRENT_INTERFACE_VERSION	5
 
 typedef struct vioc_create {
 	datalink_id_t	c_linkid;
@@ -72,12 +74,22 @@ typedef struct vioc_ring_init {
 	uint64_t	ri_qaddr;
 } vioc_ring_init_t;
 
+typedef struct vioc_ring_init_modern {
+	uint16_t	rim_index;
+	uint16_t	rim_qsize;
+	uint64_t	rim_qaddr_desc;
+	uint64_t	rim_qaddr_avail;
+	uint64_t	rim_qaddr_used;
+} vioc_ring_init_modern_t;
+
 typedef struct vioc_ring_state {
 	uint16_t	vrs_index;
 	uint16_t	vrs_avail_idx;
 	uint16_t	vrs_used_idx;
 	uint16_t	vrs_qsize;
-	uint64_t	vrs_qaddr;
+	uint64_t	vrs_qaddr_desc;
+	uint64_t	vrs_qaddr_avail;
+	uint64_t	vrs_qaddr_used;
 } vioc_ring_state_t;
 
 typedef struct vioc_ring_msi {
@@ -103,6 +115,10 @@ typedef struct vioc_intr_poll {
 	uint32_t	vip_status[VIONA_VQ_MAX];
 } vioc_intr_poll_t;
 
+typedef struct vioc_notify_mmio {
+	uint64_t	vim_address;
+	uint32_t	vim_size;
+} vioc_notify_mmio_t;
 
 /*
  * Viona Parameter Interfaces

@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _VMM_DRV_H_
@@ -45,6 +45,7 @@ typedef struct vmm_page vmm_page_t;
  * counterpart in vmm_kernel.h.
  */
 typedef int (*vmm_drv_iop_cb_t)(void *, bool, uint16_t, uint8_t, uint32_t *);
+typedef int (*vmm_drv_mmio_cb_t)(void *, bool, uint64_t, int, uint64_t *);
 
 extern int vmm_drv_hold(file_t *, cred_t *, vmm_hold_t **);
 extern void vmm_drv_rele(vmm_hold_t *);
@@ -70,6 +71,10 @@ extern int vmm_drv_msi(vmm_lease_t *, uint64_t, uint64_t);
 extern int vmm_drv_ioport_hook(vmm_hold_t *, uint16_t, vmm_drv_iop_cb_t, void *,
     void **);
 extern void vmm_drv_ioport_unhook(vmm_hold_t *, void **);
+
+extern int vmm_drv_mmio_hook(vmm_hold_t *, uint64_t, uint32_t,
+    vmm_drv_mmio_cb_t, void *, void **);
+extern int vmm_drv_mmio_unhook(vmm_hold_t *, void **);
 #endif /* _KERNEL */
 
 #endif /* _VMM_DRV_H_ */

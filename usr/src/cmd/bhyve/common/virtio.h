@@ -3,6 +3,10 @@
  *
  * Copyright (c) 2013  Chris Torek <torek @ torek net>
  * All rights reserved.
+ * Copyright (c) 2021  The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Ka Ho Ng
+ * under sponsorship of the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,30 +29,44 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 #ifndef	_BHYVE_VIRTIO_H_
 #define	_BHYVE_VIRTIO_H_
 
 #include <pthread_np.h>
 #include <machine/atomic.h>
+#include <sys/ccompile.h>
 
 #include <dev/virtio/virtio.h>
-#ifdef __FreeBSD__
-#include <dev/virtio/virtio_ring.h>
-#include <dev/virtio/pci/virtio_pci_var.h>
-#endif
 
 /*
- * These are derived from several virtio specifications.
- *
- * Some useful links:
+ * Virtio legacy support is derived from several specifications below:
  *    https://github.com/rustyrussell/virtio-spec
  *    http://people.redhat.com/pbonzini/virtio-spec.pdf
+ *
+ * Virtio modern support is authored with the reference below:
+ *    https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.pdf
  */
 
 /*
  * A virtual device has zero or more "virtual queues" (virtqueue).
- * Each virtqueue uses at least two 4096-byte pages, laid out thus:
+ * For a legacy device, each virtqueue uses at least two 4096-byte pages, laid
+ * out thus:
  *
  *      +-----------------------------------------------+
  *      |    "desc":  <N> descriptors, 16 bytes each    |
@@ -128,9 +146,11 @@
  * (These are provided only for interrupt optimization and need
  * not be implemented.)
  */
-#define VRING_ALIGN	4096
+#define LEGACY_VRING_ALIGN	4096
 
 /*
+ * Virtio legacy:
+ *
  * The address of any given virtual queue is determined by a single
  * Page Frame Number register.  The guest writes the PFN into the
  * PCI config space.  However, a device that has two or more
@@ -160,7 +180,7 @@
 /*
  * PFN register shift amount
  */
-#define	VRING_PFN		12
+#define	LEGACY_VRING_PFN	12
 
 /*
  * PCI vendor/device IDs
@@ -188,13 +208,6 @@
  * PCI subdevice IDs
  */
 #define VIRTIO_SUBDEV_INPUT	0x1100
-
-/* From section 2.3, "Virtqueue Configuration", of the virtio specification */
-static inline int
-vring_size_aligned(u_int qsz)
-{
-	return (roundup2(vring_size(qsz, VRING_ALIGN), VRING_ALIGN));
-}
 
 struct pci_devinst;
 struct vqueue_info;
@@ -225,25 +238,59 @@ struct vqueue_info;
  * from a "good" config offset, hence vc_cfgsize, and on BAR #0.
  * However, the driver must verify the read or write size and offset
  * and that no one is writing a readonly register.)
- *
- * The BROKED flag ("this thing done gone and broked") is for future
- * use.
  */
-#define	VIRTIO_USE_MSIX		0x01
-#define	VIRTIO_EVENT_IDX	0x02	/* use the event-index values */
-#define	VIRTIO_BROKED		0x08	/* ??? */
+typedef enum virtio_flags {
+	VIRTIO_DEBUG		= 1 << 0,
+	VIRTIO_USE_MSIX		= 1 << 1,
+	VIRTIO_EVENT_IDX	= 1 << 2, /* use the event-index values */
+	VIRTIO_DEVCFG_CHG	= 1 << 3, /* Device configuration changed */
+	VIRTIO_BROKEN		= 1 << 4,
+} virtio_flags_t;
+
+typedef enum virtio_mode {
+	VIRTIO_MODE_UNSET = 0,
+	VIRTIO_MODE_LEGACY,
+	VIRTIO_MODE_TRANSITIONAL,
+	VIRTIO_MODE_MODERN
+} virtio_mode_t;
+
+/*
+ * This describes a Virtio PCI capability in config space.
+ */
+typedef struct virtio_pci_capcfg {
+	uint8_t		c_captype;
+	/*
+	 * The offset and length of the capability in config space.
+	 */
+	uint32_t	c_capoff;
+	uint32_t	c_caplen;
+	/*
+	 * The containing BAR, offset and length of the data to which the
+	 * capability points.
+	 */
+	uint32_t	c_barlen;
+	uint32_t	c_baroff;
+	uint8_t		c_baridx;
+} virtio_pci_capcfg_t;
 
 struct virtio_softc {
 	struct virtio_consts *vs_vc;	/* constants (see below) */
-	int	vs_flags;		/* VIRTIO_* flags from above */
+	virtio_flags_t vs_flags;	/* VIRTIO_* flags from above */
+	virtio_mode_t vs_mode;		/* VIRTIO_MODE_* values from above */
 	pthread_mutex_t *vs_mtx;	/* POSIX mutex, if any */
 	struct pci_devinst *vs_pi;	/* PCI device instance */
-	uint32_t vs_negotiated_caps;	/* negotiated capabilities */
+	uint64_t vs_negotiated_caps;	/* negotiated capabilities */
 	struct vqueue_info *vs_queues;	/* one per vc_nvq */
-	int	vs_curq;		/* current queue */
+	int vs_curq;			/* current queue */
 	uint8_t	vs_status;		/* value from last status write */
 	uint8_t	vs_isr;			/* ISR flags, if not MSI-X */
 	uint16_t vs_msix_cfg_idx;	/* MSI-X vector for config event */
+	uint32_t vs_dfselect;		/* Current DFSELECT value */
+	uint32_t vs_gfselect;		/* Current GFSELECT value */
+	uint8_t	vs_devcfg_gen;		/* Generation of device config space */
+	virtio_pci_capcfg_t vs_caps[VIRTIO_PCI_CAP_MAX]; /* PCI capabilities */
+	virtio_pci_capcfg_t *vs_pcicap;	/* PCI configuration access cap */
+	uint_t vs_ncaps;		/* Number of PCI capabilities */
 };
 
 #define	VS_LOCK(vs)							\
@@ -258,20 +305,42 @@ do {									\
 		pthread_mutex_unlock(vs->vs_mtx);			\
 } while (0)
 
+/*
+ * To aid debugging we allow drivers to provide a table to map feature bits to
+ * text.
+ */
+typedef struct virtio_capstr {
+	uint64_t	vp_flag;
+	const char	*vp_name;
+} virtio_capstr_t;
+
 struct virtio_consts {
 	const char *vc_name;		/* name of driver (for diagnostics) */
 	int	vc_nvq;			/* number of virtual queues */
 	size_t	vc_cfgsize;		/* size of dev-specific config regs */
 	void	(*vc_reset)(void *);	/* called on virtual device reset */
+	void	(*vc_qinit)(void *, uint64_t, bool);
 	void	(*vc_qnotify)(void *, struct vqueue_info *);
 					/* called on QNOTIFY if no VQ notify */
 	int	(*vc_cfgread)(void *, int, int, uint32_t *);
 					/* called to read config regs */
 	int	(*vc_cfgwrite)(void *, int, int, uint32_t);
 					/* called to write config regs */
-	void    (*vc_apply_features)(void *, uint64_t);
+	void    (*vc_apply_features)(void *, uint64_t *);
 				/* called to apply negotiated features */
-	uint64_t vc_hv_caps;		/* hypervisor-provided capabilities */
+	uint64_t (*vc_hv_features)(void *, bool);
+				/* called to read device features */
+	void (*vc_set_msix)(void *, int);
+	void (*vc_update_msix)(void *, uint64_t);
+	uint64_t vc_hv_caps_legacy;
+				/* hypervisor-provided capabilities (legacy) */
+	uint64_t vc_hv_caps_modern;
+				/* hypervisor-provided capabilities (modern) */
+	/*
+	 * Optional feature bit map.
+	 */
+	size_t vc_ncapstr;
+	virtio_capstr_t *vc_capstr;
 };
 
 /*
@@ -293,6 +362,7 @@ struct virtio_consts {
  */
 #define	VQ_ALLOC	0x01	/* set once we have a pfn */
 #define	VQ_BROKED	0x02	/* ??? */
+#define	VQ_ENABLED	0x04	/* set if the queue was enabled */
 struct vqueue_info {
 	uint16_t vq_qsize;	/* size of this queue (a power of 2) */
 	void	(*vq_notify)(void *, struct vqueue_info *);
@@ -308,13 +378,20 @@ struct vqueue_info {
 	uint16_t vq_msix_idx;	/* MSI-X index, or VIRTIO_MSI_NO_VECTOR */
 
 	uint32_t vq_pfn;	/* PFN of virt queue (not shifted!) */
+	uint64_t vq_desc_gpa;	/* PA of virtqueue descriptors ring */
+	uint64_t vq_avail_gpa;	/* PA of virtqueue avail ring */
+	uint64_t vq_used_gpa;	/* PA of virtqueue used ring */
 
 	struct vring_desc *vq_desc;	/* descriptor array */
 	struct vring_avail *vq_avail;	/* the "avail" ring */
 	struct vring_used *vq_used;	/* the "used" ring */
 
 };
-/* as noted above, these are sort of backwards, name-wise */
+/*
+ * As noted above, these are sort of backwards, name-wise.
+ *
+ * Endian helpers must be used when using the following macros.
+ */
 #define VQ_AVAIL_EVENT_IDX(vq) \
 	(*(uint16_t *)&(vq)->vq_used->ring[(vq)->vq_qsize])
 #define VQ_USED_EVENT_IDX(vq) \
@@ -326,7 +403,6 @@ struct vqueue_info {
 static inline int
 vq_ring_ready(struct vqueue_info *vq)
 {
-
 	return (vq->vq_flags & VQ_ALLOC);
 }
 
@@ -337,9 +413,7 @@ vq_ring_ready(struct vqueue_info *vq)
 static inline int
 vq_has_descs(struct vqueue_info *vq)
 {
-
-	return (vq_ring_ready(vq) && vq->vq_last_avail !=
-	    vq->vq_avail->idx);
+	return (vq_ring_ready(vq) && vq->vq_last_avail != vq->vq_avail->idx);
 }
 
 /*
@@ -349,29 +423,15 @@ vq_has_descs(struct vqueue_info *vq)
 static inline void
 vi_interrupt(struct virtio_softc *vs, uint8_t isr, uint16_t msix_idx)
 {
+	if (!(vs->vs_status & VIRTIO_CONFIG_STATUS_DRIVER_OK))
+		return;
 
-	if (pci_msix_enabled(vs->vs_pi))
+	if (pci_msix_enabled(vs->vs_pi)) {
 		pci_generate_msix(vs->vs_pi, msix_idx);
-	else {
-#ifndef __FreeBSD__
-		boolean_t unlock = B_FALSE;
-
-		if (vs->vs_mtx && !pthread_mutex_isowned_np(vs->vs_mtx)) {
-			unlock = B_TRUE;
-			pthread_mutex_lock(vs->vs_mtx);
-		}
-#else
-		VS_LOCK(vs);
-#endif
+	} else {
 		vs->vs_isr |= isr;
 		pci_generate_msi(vs->vs_pi, 0);
 		pci_lintr_assert(vs->vs_pi);
-#ifndef __FreeBSD__
-		if (unlock)
-			pthread_mutex_unlock(vs->vs_mtx);
-#else
-		VS_UNLOCK(vs);
-#endif
 	}
 }
 
@@ -382,14 +442,23 @@ vi_interrupt(struct virtio_softc *vs, uint8_t isr, uint16_t msix_idx)
 static inline void
 vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 {
-
 	vi_interrupt(vs, VIRTIO_PCI_ISR_INTR, vq->vq_msix_idx);
+}
+
+/*
+ * Deliver an interrupt to guest on device-specific configuration changes
+ * (if possible, or a generic MSI interrupt if not using MSI-X).
+ */
+static inline void
+vq_devcfg_changed(struct virtio_softc *vs)
+{
+	vs->vs_flags |= VIRTIO_DEVCFG_CHG;
+	vi_interrupt(vs, VIRTIO_PCI_ISR_CONFIG, vs->vs_msix_cfg_idx);
 }
 
 static inline void
 vq_kick_enable(struct vqueue_info *vq)
 {
-
 	vq->vq_used->flags &= ~VRING_USED_F_NO_NOTIFY;
 	/*
 	 * Full memory barrier to make sure the store to vq_used->flags
@@ -402,9 +471,12 @@ vq_kick_enable(struct vqueue_info *vq)
 static inline void
 vq_kick_disable(struct vqueue_info *vq)
 {
-
 	vq->vq_used->flags |= VRING_USED_F_NO_NOTIFY;
 }
+
+#define	VIRTIO_LEGACY_BAR	0	/* BAR for virtio legacy cfg regs */
+#define	VIRTIO_MSIX_BAR		1	/* BAR for host MSI-X tables */
+#define	VIRTIO_MODERN_BAR	2	/* BAR for virtio modern cfg regs */
 
 struct iovec;
 
@@ -422,9 +494,19 @@ struct vi_req {
 void	vi_softc_linkup(struct virtio_softc *vs, struct virtio_consts *vc,
 			void *dev_softc, struct pci_devinst *pi,
 			struct vqueue_info *queues);
-int	vi_intr_init(struct virtio_softc *vs, int barnum, int use_msix);
+bool	vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix);
+void	vi_pci_init(struct pci_devinst *, virtio_mode_t, uint16_t,
+    uint16_t, uint8_t);
+bool	vi_pcibar_setup(struct virtio_softc *);
+virtio_pci_capcfg_t *vi_pci_cfg_bytype(struct virtio_softc *, uint8_t);
+virtio_pci_capcfg_t *vi_pci_cfg_bycapaddr(struct virtio_softc *,
+    uint32_t, uint32_t);
+virtio_pci_capcfg_t *vi_pci_cfg_bybaraddr(struct virtio_softc *,
+    uint8_t, uint64_t, uint32_t);
 void	vi_reset_dev(struct virtio_softc *);
-void	vi_set_io_bar(struct virtio_softc *, int);
+void	vi_set_debug(struct virtio_softc *, bool);
+bool	vi_is_modern(struct virtio_softc *);
+void	vi_error(struct virtio_softc *, const char *, ...) __PRINTFLIKE(2);
 
 int	vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 	    struct vi_req *reqp);
@@ -435,13 +517,16 @@ void	vq_relchain_publish(struct vqueue_info *vq);
 void	vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen);
 void	vq_endchains(struct vqueue_info *vq, int used_all_avail);
 
+int	vi_pci_cfgread(struct pci_devinst *pi, int offset, int bytes,
+	    uint32_t *retval);
+int	vi_pci_cfgwrite(struct pci_devinst *pi, int offset, int bytes,
+	    uint32_t val);
 uint64_t vi_pci_read(struct pci_devinst *pi, int baridx, uint64_t offset,
 	    int size);
 void	vi_pci_write(struct pci_devinst *pi, int baridx, uint64_t offset,
 	    int size, uint64_t value);
 
-#ifndef __FreeBSD__
-void	vi_vq_init(struct virtio_softc *, uint32_t);
-#endif
+void	vi_vq_init(struct virtio_softc *);
+void	vi_legacy_vq_init(struct virtio_softc *, uint32_t);
 
 #endif	/* _BHYVE_VIRTIO_H_ */

@@ -26,6 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 /*
  * virtio entropy device emulation.
@@ -82,12 +97,13 @@ static void pci_vtrnd_reset(void *);
 static void pci_vtrnd_notify(void *, struct vqueue_info *);
 
 static struct virtio_consts vtrnd_vi_consts = {
-	.vc_name =	"vtrnd",
-	.vc_nvq =	1,
-	.vc_cfgsize =	0,
-	.vc_reset =	pci_vtrnd_reset,
-	.vc_qnotify =	pci_vtrnd_notify,
-	.vc_hv_caps =	0,
+	.vc_name =		"vtrnd",
+	.vc_nvq =		1,
+	.vc_cfgsize =		0,
+	.vc_reset =		pci_vtrnd_reset,
+	.vc_qnotify =		pci_vtrnd_notify,
+	.vc_hv_caps_legacy =	0,
+	.vc_hv_caps_modern =	0,
 };
 
 static void
@@ -184,15 +200,13 @@ pci_vtrnd_init(struct pci_devinst *pi, nvlist_t *nvl __unused)
 	sc->vrsc_fd = fd;
 
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_RANDOM);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
-	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_CRYPTO);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_ENTROPY);
-	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
+	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_RANDOM,
+	    VIRTIO_ID_ENTROPY, PCIC_CRYPTO);
 
-	if (vi_intr_init(&sc->vrsc_vs, 1, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vrsc_vs, true, fbsdrun_virtio_msix()))
 		return (1);
-	vi_set_io_bar(&sc->vrsc_vs, 0);
+	if (!vi_pcibar_setup(&sc->vrsc_vs))
+		return (1);
 
 	return (0);
 }
@@ -201,6 +215,8 @@ pci_vtrnd_init(struct pci_devinst *pi, nvlist_t *nvl __unused)
 static const struct pci_devemu pci_de_vrnd = {
 	.pe_emu =	"virtio-rnd",
 	.pe_init =	pci_vtrnd_init,
+	.pe_cfgwrite =	vi_pci_cfgwrite,
+	.pe_cfgread =	vi_pci_cfgread,
 	.pe_barwrite =	vi_pci_write,
 	.pe_barread =	vi_pci_read,
 };

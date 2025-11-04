@@ -418,10 +418,11 @@ viona_tx_offloads(viona_vring_t *ring, const struct virtio_net_mrgrxhdr *hdr,
 	const uint32_t cap_csum = link->l_cap_csum;
 
 	/*
-	 * Since viona is a "legacy device", the data stored by the driver will
-	 * be in the guest's native endian format (see sections 2.4.3 and
-	 * 5.1.6.1 of the VIRTIO 1.0 spec for more info). At this time the only
-	 * guests using viona are x86 and we can assume little-endian.
+	 * Since viona is a "transitional device", the data stored by the
+	 * driver will either be in the guest's native endian format (for the
+	 * legacy interface - see sections 2.4.3 and 5.1.6.1 of the VIRTIO 1.0
+	 * spec for more info) or little-endian. At this time the only guests
+	 * using viona are x86 and we can assume little-endian.
 	 */
 	const uint16_t gso_size = LE_16(hdr->vrh_gso_size);
 
@@ -696,8 +697,6 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	uint32_t		total_len;
 	mblk_t			*mp_head = NULL;
 	viona_desb_t		*dp = NULL;
-	const boolean_t merge_enabled =
-	    ((link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0);
 
 	ASSERT(iov != NULL);
 
@@ -717,12 +716,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	}
 
 	/*
-	 * Get setup to copy the VirtIO header from in front of the packet.
-	 *
-	 * With an eye toward supporting VirtIO 1.0 behavior in the future, we
-	 * determine the size of the header based on the device state.  This
-	 * goes a bit beyond the expectations of legacy VirtIO, where the first
-	 * buffer must cover the header and nothing else.
+	 * Get set up to copy the VirtIO header from in front of the packet.
 	 */
 	iov_bunch_t iob = {
 		.ib_iov = iov,
@@ -730,11 +724,13 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	};
 	struct virtio_net_mrgrxhdr hdr;
 	uint32_t vio_hdr_len = 0;
-	if (merge_enabled) {
+	if (ring->vr_link->l_modern ||
+	    ((link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0)) {
 		/*
-		 * Presence of the "num_bufs" member is determined by the
-		 * merge-rxbuf feature on the device, despite the fact that we
-		 * are in transmission context here.
+		 * Presence of the "num_bufs" member in legacy mode is
+		 * determined by the merge-rxbuf feature on the device, despite
+		 * the fact that we are in transmission context here. In modern
+		 * mode, the field is always present.
 		 */
 		vio_hdr_len = sizeof (struct virtio_net_mrgrxhdr);
 	} else {

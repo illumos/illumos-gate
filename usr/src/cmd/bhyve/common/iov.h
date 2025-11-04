@@ -27,9 +27,26 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 #ifndef _IOV_H_
 #define	_IOV_H_
+
+#include <sys/stdbool.h>
 
 void seek_iov(const struct iovec *iov1, int niov1, struct iovec *iov2,
     int *niov2, size_t seek);
@@ -38,5 +55,33 @@ size_t count_iov(const struct iovec *iov, int niov);
 ssize_t iov_to_buf(const struct iovec *iov, int niov, void **buf);
 ssize_t buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov,
     int niov, size_t seek);
+
+/*
+ * Helpers for performing operations on an array of iovec entries.
+ */
+typedef struct iov_bunch {
+	/*
+	 * The current head of an array of iovec entries, which have an iov_len
+	 * sum covering ib_remain bytes. This moves as the bunch is traversed.
+	 */
+	struct iovec	*ib_iov;
+	/*
+	 * Byte offset in current ib_iov entry.
+	 */
+	size_t		ib_offset;
+	/*
+	 * Bytes remaining in entries covered by ib_iov entries, not including
+	 * the offset specified by ib_offset
+	 */
+	size_t		ib_remain;
+} iov_bunch_t;
+
+extern size_t iov_bunch_init(iov_bunch_t *, struct iovec *, int);
+extern bool iov_bunch_copy(iov_bunch_t *, void *, size_t);
+extern bool iov_bunch_skip(iov_bunch_t *, size_t);
+extern bool iov_bunch_next_chunk(iov_bunch_t *, caddr_t *, size_t *);
+extern void iov_bunch_to_iov(iov_bunch_t *, struct iovec *, int *, uint_t);
+extern ssize_t iov_bunch_to_buf(iov_bunch_t *iob, void **);
+extern bool buf_to_iov_bunch(iov_bunch_t *, const void *, size_t);
 
 #endif	/* _IOV_H_ */

@@ -27,14 +27,33 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/uio.h>
+#include <sys/debug.h>
+#include <sys/sysmacros.h>
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <limits.h>
+#include <errno.h>
 #include "iov.h"
 
 void
@@ -104,7 +123,7 @@ iov_to_buf(const struct iovec *iov, int niov, void **buf)
 	int i;
 
 	total = count_iov(iov, niov);
-	*buf = realloc(*buf, total);
+	*buf = reallocf(*buf, total);
 	if (*buf == NULL)
 		return (-1);
 
@@ -131,7 +150,9 @@ buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, int niov,
 	if (seek > 0) {
 		int ndiov;
 
-		diov = malloc(sizeof(struct iovec) * niov);
+		diov = calloc(niov, sizeof (struct iovec));
+		if (diov == NULL)
+			return (0);
 		seek_iov(iov, niov, diov, &ndiov, seek);
 		iov = diov;
 		niov = ndiov;
@@ -149,3 +170,188 @@ buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, int niov,
 	return ((ssize_t)off);
 }
 
+size_t
+iov_bunch_init(iov_bunch_t *iob, struct iovec *iov, int niov)
+{
+	bzero(iob, sizeof (*iob));
+	iob->ib_iov = iov;
+	iob->ib_remain = count_iov(iov, niov);
+
+	return (iob->ib_remain);
+}
+
+/*
+ * Copy `sz` bytes from iovecs contained in `iob` to `dst`.
+ *
+ * Returns `true` if copy was successful (implying adequate data was remaining
+ * in the iov_bunch_t).
+ */
+bool
+iov_bunch_copy(iov_bunch_t *iob, void *dst, size_t sz)
+{
+	if (sz > iob->ib_remain)
+		return (false);
+	if (sz == 0)
+		return (true);
+
+	caddr_t dest = dst;
+	do {
+		struct iovec *iov = iob->ib_iov;
+
+		ASSERT3U(iov->iov_len, !=, 0);
+
+		/* ib_offset is the offset within the current head of ib_iov */
+		const size_t iov_avail = iov->iov_len - iob->ib_offset;
+		const size_t to_copy = MIN(sz, iov_avail);
+
+		if (to_copy != 0 && dest != NULL) {
+			bcopy((caddr_t)iov->iov_base + iob->ib_offset, dest,
+			    to_copy);
+			dest += to_copy;
+		}
+
+		sz -= to_copy;
+		iob->ib_remain -= to_copy;
+		iob->ib_offset += to_copy;
+
+		ASSERT3U(iob->ib_offset, <=, iov->iov_len);
+
+		if (iob->ib_offset == iov->iov_len) {
+			iob->ib_iov++;
+			iob->ib_offset = 0;
+		}
+	} while (sz > 0);
+
+	return (true);
+}
+
+/*
+ * Skip `sz` bytes from iovecs contained in `iob`.
+ *
+ * Returns `true` if the skip was successful (implying adequate data was
+ * remaining in the iov_bunch_t).
+ */
+bool
+iov_bunch_skip(iov_bunch_t *iob, size_t sz)
+{
+	return (iov_bunch_copy(iob, NULL, sz));
+}
+
+/*
+ * Get the data pointer and length of the current head iovec, less any
+ * offsetting from prior copy operations. This will advance the iov_bunch_t as
+ * if the caller had performed a copy of that chunk length.
+ *
+ * Returns `true` if the iov_bunch_t had at least one iovec (unconsumed bytes)
+ * remaining, setting `chunk` and `chunk_sz` to the chunk pointer and size,
+ * respectively.
+ */
+bool
+iov_bunch_next_chunk(iov_bunch_t *iob, caddr_t *chunk, size_t *chunk_sz)
+{
+	if (iob->ib_remain == 0) {
+		*chunk = NULL;
+		*chunk_sz = 0;
+		return (false);
+	}
+
+	*chunk_sz = iob->ib_iov->iov_len - iob->ib_offset;
+	*chunk = (caddr_t)iob->ib_iov->iov_base + iob->ib_offset;
+	iob->ib_remain -= *chunk_sz;
+	iob->ib_iov++;
+	iob->ib_offset = 0;
+	return (true);
+}
+
+/*
+ * Extract the remaining data in an iov_bunch_t into a new iovec.
+ */
+void
+iov_bunch_to_iov(iov_bunch_t *iob, struct iovec *iov, int *niov, uint_t size)
+{
+	*niov = 0;
+
+	while (size-- > 0) {
+		caddr_t chunk;
+		size_t sz;
+
+		if (!iov_bunch_next_chunk(iob, &chunk, &sz))
+			break;
+
+		iov->iov_base = chunk;
+		iov->iov_len = sz;
+		iov++;
+		(*niov)++;
+	}
+}
+
+/*
+ * Extract the remaining data in an iov_bunch_t into a buffer, reallocating it
+ * to the required size. If there are no bytes remaining in the iov_bunch_t any
+ * supplied buffer will be freed and this function will return 0.
+ */
+ssize_t
+iov_bunch_to_buf(iov_bunch_t *iob, void **buf)
+{
+	size_t total = iob->ib_remain;
+
+	if (total == 0) {
+		free(*buf);
+		*buf = NULL;
+		return (0);
+	}
+
+	*buf = reallocf(*buf, total);
+	if (*buf == NULL)
+		return (-1);
+
+	if (!iov_bunch_copy(iob, buf, total))
+		return (-1);
+
+	if (total > SSIZE_MAX) {
+		errno = EOVERFLOW;
+		return (-1);
+	}
+
+	return (total);
+}
+
+/*
+ * Copy data from a buffer into an iob_bunch_t. Returns true if there was
+ * sufficient space for the data, false otherwise.
+ */
+bool
+buf_to_iov_bunch(iov_bunch_t *iob, const void *buf, size_t len)
+{
+	const char *src = buf;
+
+	if (iob->ib_remain < len)
+		return (false);
+
+	do {
+		struct iovec *iov = iob->ib_iov;
+
+		/* ib_offset is the offset within the current head of ib_iov */
+		const size_t iov_avail = iov->iov_len - iob->ib_offset;
+		const size_t to_copy = MIN(len, iov_avail);
+
+		if (to_copy != 0) {
+			bcopy(src, (caddr_t)iov->iov_base + iob->ib_offset,
+			    to_copy);
+		}
+
+		src += to_copy;
+		len -= to_copy;
+		iob->ib_remain -= to_copy;
+		iob->ib_offset += to_copy;
+
+		ASSERT3U(iob->ib_offset, <=, iov->iov_len);
+
+		if (iob->ib_offset == iov->iov_len) {
+			iob->ib_iov++;
+			iob->ib_offset = 0;
+		}
+	} while (len > 0);
+
+	return (true);
+}

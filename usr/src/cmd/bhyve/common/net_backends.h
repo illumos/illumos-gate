@@ -24,6 +24,21 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2025 Oxide Computer Company
+ */
 
 #ifndef __NET_BACKENDS_H__
 #define __NET_BACKENDS_H__
@@ -79,6 +94,20 @@ int	netbe_get_mac(net_backend_t *, void *, size_t *);
 #define	VIRTIO_NET_F_GUEST_ANNOUNCE \
 				(1 << 21) /* guest can send gratuitous pkts */
 #define	VIRTIO_NET_F_MQ		(1 << 22) /* host supports multiple VQ pairs */
+#define	VIRTIO_F_CTRL_MAC_ADDR	(1 << 23) /* set MAC address through ctrlq */
+
+/*
+ * PCI config-space "registers"; device configuration fields.
+ */
+struct virtio_net_config {
+	uint8_t vnc_macaddr[6];
+	uint16_t vnc_status;
+	uint16_t vnc_max_qpair;
+	uint16_t vnc_mtu;
+} __packed;
+
+#define	VIRTIO_NET_S_LINK_UP	1
+#define	VIRTIO_NET_S_ANNOUNCE	2
 
 /*
  * Fixed network header size

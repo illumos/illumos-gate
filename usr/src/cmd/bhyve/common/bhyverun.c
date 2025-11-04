@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -361,11 +361,17 @@ paddr_guest2host(struct vmctx *ctx, uintptr_t gaddr, size_t len)
 	return (vm_map_gpa(ctx, gaddr, len));
 }
 
-int
+bool
 fbsdrun_virtio_msix(void)
 {
-
-	return (get_config_bool_default("virtio_msix", true));
+	/*
+	 * The configuration key used to be the non-namespaced `virtio_msix`.
+	 * Check for that too in case anyone is using the old name in a
+	 * configuration file. If either of these exists and is set to false
+	 * we'll disable MSI-X for Virtio.
+	 */
+	return (get_config_bool_default("virtio.msix", true) &&
+	    get_config_bool_default("virtio_msix", true));
 }
 
 struct vcpu *
