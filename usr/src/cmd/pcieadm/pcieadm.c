@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -186,10 +186,23 @@ pcieadm_di_walk_cb(di_node_t node, void *arg)
 	return (walk->pdw_func(node, walk->pdw_arg));
 }
 
+static di_node_t
+pcieadm_di_root(pcieadm_t *pcip)
+{
+	if (pcip->pia_root == DI_NODE_NIL) {
+		pcip->pia_root = di_init("/", DINFOCPYALL);
+		if (pcip->pia_root == DI_NODE_NIL) {
+			err(EXIT_FAILURE, "failed to initialize devinfo tree");
+		}
+	}
+
+	return (pcip->pia_root);
+}
+
 void
 pcieadm_di_walk(pcieadm_t *pcip, pcieadm_di_walk_t *arg)
 {
-	(void) di_walk_node(pcip->pia_root, DI_WALK_CLDFIRST, arg,
+	(void) di_walk_node(pcieadm_di_root(pcip), DI_WALK_CLDFIRST, arg,
 	    pcieadm_di_walk_cb);
 }
 
@@ -596,11 +609,6 @@ main(int argc, char *argv[])
 	pcieadm.pia_pcidb = pcidb_open(PCIDB_VERSION);
 	if (pcieadm.pia_pcidb == NULL) {
 		err(EXIT_FAILURE, "failed to open PCI ID database");
-	}
-
-	pcieadm.pia_root = di_init("/", DINFOCPYALL);
-	if (pcieadm.pia_root == DI_NODE_NIL) {
-		err(EXIT_FAILURE, "failed to initialize devinfo tree");
 	}
 
 	/*
