@@ -13,6 +13,11 @@
 
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2025 RackTop Systems, Inc.
 #
 
-add_drv dprov
+# Skip if the driver is already loaded
+modinfo |grep dprov >/dev/null
+if [ "$?" != 0 ]; then
+  add_drv dprov
+fi

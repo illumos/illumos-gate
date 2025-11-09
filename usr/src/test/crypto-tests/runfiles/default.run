@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2025 RackTop Systems, Inc.
 #
 
 [DEFAULT]
@@ -36,12 +37,14 @@ tests = ['aes_cbc_32', 'aes_ccm_32', 'aes_cmac_32',
 
 [/opt/crypto-tests/tests/aes/kcf]
 pre = setup
+pre_user = root
 user = root
 tests = ['aes_cbc_32', 'aes_ccm_32', 'aes_cmac_32',
          'aes_ctr_32', 'aes_ecb_32', 'aes_gcm_32',
          'aes_cbc_64', 'aes_ccm_64', 'aes_cmac_64',
          'aes_ctr_64', 'aes_ecb_64', 'aes_gcm_64']
 post = cleanup
+post_user = root
 
 [/opt/crypto-tests/tests/digest/pkcs]
 tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
@@ -51,21 +54,25 @@ tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
 
 [/opt/crypto-tests/tests/digest/kcf]
 pre = setup
+pre_user = root
 user = root
 tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
          'sha512_256_32', 'md5_32',
          'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64', 'sha512_224_64',
          'sha512_256_64', 'md5_64' ]
 post = cleanup
+post_user = root
 
 [/opt/crypto-tests/tests/hmac/pkcs]
 tests = ['hmac_sha1_32', 'hmac_sha1_64']
 
 [/opt/crypto-tests/tests/hmac/kcf]
 pre = setup
+pre_user = root
 user = root
 tests = ['hmac_sha1_32', 'hmac_sha1_64']
 post = cleanup
+post_user = root
 
 [/opt/crypto-tests/tests/longhash]
 tests = ['longhash_32', 'longhash_64']
