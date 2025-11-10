@@ -608,6 +608,18 @@ Add the device to the bootorder at
 A fwcfg file is used to specify the bootorder.
 The guest firmware may ignore or doesn't support this fwcfg file.
 In that case, this feature doesn't work as expected.
+.It Li ctl_ringsz= Ns Ar ringsz
+The ring size to use for the control queue.
+.It Li evt_ringsz= Ns Ar ringsz
+The ring size to use for the event queue.
+.It Li req_ringsz= Ns Ar ringsz
+The ring size to use for each I/O request queues.
+.It Li num_queues= Ns Ar num
+The number of I/O request queues to use.
+.It Li seg_max= Ns Ar num
+The maximum number of segments allowed in a single command.
+.It Li thr_per_q= Ns Ar num
+The number of parallel request processing threads per I/O request queue.
 .El
 .Pp
 There are currently no
