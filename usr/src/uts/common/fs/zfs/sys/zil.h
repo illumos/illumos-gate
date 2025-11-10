@@ -453,6 +453,8 @@ extern void	zil_set_sync(zilog_t *zilog, uint64_t syncval);
 
 extern void	zil_set_logbias(zilog_t *zilog, uint64_t slogval);
 
+extern void	zil_async_to_sync(zilog_t *zilog, uint64_t foid);
+
 extern int zil_replay_disable;
 
 #ifdef	__cplusplus

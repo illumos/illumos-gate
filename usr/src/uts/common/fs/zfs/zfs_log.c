@@ -479,11 +479,10 @@ ssize_t zfs_immediate_write_sz = 32768;
 
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
-    znode_t *zp, offset_t off, ssize_t resid, int ioflag)
+    znode_t *zp, offset_t off, ssize_t resid, boolean_t commit)
 {
 	uint32_t blocksize = zp->z_blksz;
 	itx_wr_state_t write_state;
-	uintptr_t fsync_cnt;
 
 	if (zil_replaying(zilog, tx) || zp->z_unlinked)
 		return;
@@ -493,14 +492,10 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	else if (!spa_has_slogs(zilog->zl_spa) &&
 	    resid >= zfs_immediate_write_sz)
 		write_state = WR_INDIRECT;
-	else if (ioflag & (FSYNC | FDSYNC))
+	else if (commit)
 		write_state = WR_COPIED;
 	else
 		write_state = WR_NEED_COPY;
-
-	if ((fsync_cnt = (uintptr_t)tsd_get(zfs_fsyncer_key)) != 0) {
-		(void) tsd_set(zfs_fsyncer_key, (void *)(fsync_cnt - 1));
-	}
 
 	while (resid) {
 		itx_t *itx;
@@ -532,10 +527,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 		BP_ZERO(&lr->lr_blkptr);
 
 		itx->itx_private = zp->z_zfsvfs;
-
-		if (!(ioflag & (FSYNC | FDSYNC)) && (zp->z_sync_cnt == 0) &&
-		    (fsync_cnt == 0))
-			itx->itx_sync = B_FALSE;
+		itx->itx_sync = (zp->z_sync_cnt != 0);
 
 		zil_itx_assign(zilog, itx, tx);
 

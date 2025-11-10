@@ -461,7 +461,6 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zfs_free_bpobj_enabled",
 		"zfs_free_leak_on_eio",
 		"zfs_free_min_time_ms",
-		"zfs_fsync_sync_cnt",
 		"zfs_immediate_write_sz",
 		"zfs_indirect_condense_obsolete_pct",
 		"zfs_lua_check_instrlimit_interval",

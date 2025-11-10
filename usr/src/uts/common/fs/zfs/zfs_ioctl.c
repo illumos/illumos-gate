@@ -230,7 +230,6 @@ extern void zfs_fini(void);
 ldi_ident_t zfs_li = NULL;
 dev_info_t *zfs_dip;
 
-uint_t zfs_fsyncer_key;
 extern uint_t rrw_tsd_key;
 static uint_t zfs_allow_log_key;
 
@@ -7495,7 +7494,6 @@ _init(void)
 		return (error);
 	}
 
-	tsd_create(&zfs_fsyncer_key, NULL);
 	tsd_create(&rrw_tsd_key, rrw_tsd_destroy);
 	tsd_create(&zfs_allow_log_key, zfs_allow_log_destroy);
 
@@ -7527,7 +7525,6 @@ _fini(void)
 	if (zfs_nfsshare_inited || zfs_smbshare_inited)
 		(void) ddi_modclose(sharefs_mod);
 
-	tsd_destroy(&zfs_fsyncer_key);
 	ldi_ident_release(zfs_li);
 	zfs_li = NULL;
 	mutex_destroy(&zfs_share_lock);
