@@ -10,14 +10,17 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
- * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2025 RackTop Systems, Inc.
  */
 
 #include <sys/crypto/ioctl.h>
-#include <sys/sha1.h>
+#include <sys/sha2.h>
 
-#include "hmac_sha1_data.h"
+#include "hmac_sha2_data.h"
+
+/*
+ * Arrays of tests.
+ */
 
 uint8_t *DATA[] = { DATA0, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6 };
 
@@ -35,12 +38,6 @@ size_t KEYLEN[] = {
 
 uint8_t *HMAC[] = { HMAC0, HMAC1, HMAC2, HMAC3, HMAC4, HMAC5, HMAC6 };
 
-/*
- * SUN_CKM_SHA1_HMAC_GENERAL is like SUN_CKM_SHA1_HMAC except that it
- * allows returning a truncated digest with length specified in the
- * parameter passed to the crypto mechanism.  The length specified
- * here is an arbitrary value less than SHA1_DIGEST_LENGTH.
- */
-char *mechname = SUN_CKM_SHA1_HMAC_GENERAL;
+char *mechname = SUN_CKM_SHA256_HMAC_GENERAL;
 size_t msgcount = 7;
-size_t hmac_len = SHA1_DIGEST_LENGTH - 5; /* truncated MAC */
+size_t hmac_len = 16;	/* truncated MAC */

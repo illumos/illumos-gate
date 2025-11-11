@@ -15,6 +15,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2023-2025 RackTop Systems, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
@@ -232,12 +233,20 @@ file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_64 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_gen_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_gen_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha2_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha2_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha2_gen_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha2_gen_64 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/setup mode=0555
 dir  path=opt/crypto-tests/tests/hmac/pkcs
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_64 mode=0555
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_gen_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_gen_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha2_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha2_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha2_gen_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha2_gen_64 mode=0555
 dir  path=opt/crypto-tests/tests/longhash
 file path=opt/crypto-tests/tests/longhash/longhash_32 mode=0555
 file path=opt/crypto-tests/tests/longhash/longhash_64 mode=0555

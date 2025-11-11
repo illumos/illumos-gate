@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2023-2025 RackTop Systems, Inc.
  */
 
 #include <sys/modctl.h>
@@ -170,6 +170,8 @@ static crypto_digest_ops_t sha2_digest_ops = {
 
 static int sha2_mac_init(crypto_ctx_t *, crypto_mechanism_t *, crypto_key_t *,
     crypto_spi_ctx_template_t, crypto_req_handle_t);
+static int sha2_mac(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+    crypto_req_handle_t);
 static int sha2_mac_update(crypto_ctx_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int sha2_mac_final(crypto_ctx_t *, crypto_data_t *, crypto_req_handle_t);
@@ -182,7 +184,7 @@ static int sha2_mac_verify_atomic(crypto_provider_handle_t, crypto_session_id_t,
 
 static crypto_mac_ops_t sha2_mac_ops = {
 	sha2_mac_init,
-	NULL,
+	sha2_mac,
 	sha2_mac_update,
 	sha2_mac_final,
 	sha2_mac_atomic,
@@ -1032,6 +1034,133 @@ bail:
 		kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
 		ctx->cc_provider_private = NULL;
 	}
+
+	return (ret);
+}
+
+static int
+sha2_mac(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *mac,
+    crypto_req_handle_t req)
+{
+	SHA2_CTX *ictx = NULL;
+	SHA2_CTX *octx = NULL;
+	uchar_t digest[SHA512_DIGEST_LENGTH];
+	uint32_t digest_len, sha_digest_len;
+	int ret = CRYPTO_SUCCESS;
+
+	ASSERT(ctx->cc_provider_private != NULL);
+
+	/* Set the digest lengths to values appropriate to the mechanism */
+	switch (PROV_SHA2_HMAC_CTX(ctx)->hc_mech_type) {
+	case SHA256_HMAC_MECH_INFO_TYPE:
+		sha_digest_len = digest_len = SHA256_DIGEST_LENGTH;
+		break;
+	case SHA384_HMAC_MECH_INFO_TYPE:
+		sha_digest_len = digest_len = SHA384_DIGEST_LENGTH;
+		break;
+	case SHA512_HMAC_MECH_INFO_TYPE:
+		sha_digest_len = digest_len = SHA512_DIGEST_LENGTH;
+		break;
+	case SHA256_HMAC_GEN_MECH_INFO_TYPE:
+		sha_digest_len = SHA256_DIGEST_LENGTH;
+		digest_len = PROV_SHA2_HMAC_CTX(ctx)->hc_digest_len;
+		break;
+	case SHA384_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA512_HMAC_GEN_MECH_INFO_TYPE:
+		sha_digest_len = SHA512_DIGEST_LENGTH;
+		digest_len = PROV_SHA2_HMAC_CTX(ctx)->hc_digest_len;
+		break;
+	}
+
+	/*
+	 * We need to just return the length needed to store the output.
+	 * We should not destroy the context for the following cases.
+	 */
+	if ((mac->cd_length == 0) || (mac->cd_length < digest_len)) {
+		mac->cd_length = digest_len;
+		return (CRYPTO_BUFFER_TOO_SMALL);
+	}
+
+	ictx = &PROV_SHA2_HMAC_CTX(ctx)->hc_icontext;
+	octx = &PROV_SHA2_HMAC_CTX(ctx)->hc_ocontext;
+
+	/*
+	 * Do a SHA2 update of the inner context using the specified
+	 * data.
+	 */
+	switch (data->cd_format) {
+	case CRYPTO_DATA_RAW:
+		SHA2Update(ictx,
+		    (uint8_t *)data->cd_raw.iov_base + data->cd_offset,
+		    data->cd_length);
+		break;
+	case CRYPTO_DATA_UIO:
+		ret = sha2_digest_update_uio(ictx, data);
+		break;
+	case CRYPTO_DATA_MBLK:
+		ret = sha2_digest_update_mblk(ictx, data);
+		break;
+	default:
+		ret = CRYPTO_ARGUMENTS_BAD;
+	}
+
+	if (ret != CRYPTO_SUCCESS) {
+		bzero(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
+		kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
+		ctx->cc_provider_private = NULL;
+		mac->cd_length = 0;
+		return (ret);
+	}
+
+	/*
+	 * Do a SHA2 final on the inner context.
+	 */
+	SHA2Final(digest, ictx);
+
+	/*
+	 * Do a SHA2 update on the outer context, feeding the inner
+	 * digest as data.
+	 */
+	SHA2Update(octx, digest, sha_digest_len);
+
+	/*
+	 * Do a SHA2 final on the outer context, storing the computing
+	 * digest in the users buffer.
+	 */
+	switch (mac->cd_format) {
+	case CRYPTO_DATA_RAW:
+		if (digest_len != sha_digest_len) {
+			/*
+			 * The caller requested a short digest. Digest
+			 * into a scratch buffer and return to
+			 * the user only what was requested.
+			 */
+			SHA2Final(digest, octx);
+			bcopy(digest, (unsigned char *)mac->cd_raw.iov_base +
+			    mac->cd_offset, digest_len);
+		} else {
+			SHA2Final((unsigned char *)mac->cd_raw.iov_base +
+			    mac->cd_offset, octx);
+		}
+		break;
+	case CRYPTO_DATA_UIO:
+		ret = sha2_digest_final_uio(octx, mac, digest_len, digest);
+		break;
+	case CRYPTO_DATA_MBLK:
+		ret = sha2_digest_final_mblk(octx, mac, digest_len, digest);
+		break;
+	default:
+		ret = CRYPTO_ARGUMENTS_BAD;
+	}
+
+	if (ret == CRYPTO_SUCCESS)
+		mac->cd_length = digest_len;
+	else
+		mac->cd_length = 0;
+
+	bzero(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
+	kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
+	ctx->cc_provider_private = NULL;
 
 	return (ret);
 }
