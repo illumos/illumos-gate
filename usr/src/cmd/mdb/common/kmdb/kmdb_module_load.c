@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 #include <sys/param.h>
@@ -56,8 +57,7 @@ kmc_free(kmdb_modctl_t *kmc)
 }
 
 /*
- * Sends a request to the driver to load the module.  If/when the load has
- * completed successfully, kmdb_module_loaded is called.
+ * Sends a request to the driver to load the module.
  */
 int
 mdb_module_load(const char *fname, int mode)
@@ -115,7 +115,11 @@ module_load_err:
 	return (-1);
 }
 
-int
+/*
+ * Module load post processing. Either clean up from error or
+ * update modctl state.
+ */
+boolean_t
 kmdb_module_loaded(kmdb_wr_load_t *dlr)
 {
 	struct modctl *modp = dlr->dlr_modctl;
@@ -145,16 +149,16 @@ kmdb_module_loaded(kmdb_wr_load_t *dlr)
 
 		if (v != NULL)
 			mdb_nv_remove(&mdb.m_dmodctl, v);
-		return (0);
+		return (B_FALSE);
 	}
 
 	if ((mp = modp->mod_mp) == NULL || mp->symhdr == NULL ||
 	    mp->strhdr == NULL || mp->symtbl == NULL || mp->strings == NULL) {
 		mdb_warn("dmod %s did not load properly\n");
-		goto module_loaded_err;
+		return (B_FALSE);
 	}
 
-	if ((v = mdb_nv_lookup(&mdb.m_dmodctl, modname)) == NULL) {
+	if (v == NULL) {
 		kmc = mdb_zalloc(sizeof (kmdb_modctl_t), UM_SLEEP);
 		kmc->kmc_loadmode = MDB_MOD_LOCAL;
 		kmc->kmc_modname = strdup(modname);
@@ -179,19 +183,18 @@ kmdb_module_loaded(kmdb_wr_load_t *dlr)
 		kmc->kmc_flags |= KMDB_MC_FL_NOUNLOAD;
 
 	if (mdb_module_create(modname, modp->mod_filename,
-	    kmc->kmc_loadmode, &kmc->kmc_mod) < 0)
-		goto module_loaded_err;
+	    kmc->kmc_loadmode, &kmc->kmc_mod) < 0) {
+		if (kmc->kmc_symtab != NULL)
+			mdb_gelf_symtab_destroy(kmc->kmc_symtab);
+
+		kmdb_module_request_unload(kmc, kmc->kmc_modname,
+		    MDB_MOD_DEFER);
+		return (B_FALSE);
+	}
 
 	kmc->kmc_state = KMDB_MC_STATE_LOADED;
 
-	return (1);
-
-module_loaded_err:
-	if (kmc->kmc_symtab != NULL)
-		mdb_gelf_symtab_destroy(kmc->kmc_symtab);
-
-	kmdb_module_request_unload(kmc, kmc->kmc_modname, MDB_MOD_DEFER);
-	return (0);
+	return (B_TRUE);
 }
 
 void
@@ -304,7 +307,7 @@ mdb_module_unload(const char *name, int mode)
 	return (0);
 }
 
-int
+boolean_t
 kmdb_module_unloaded(kmdb_wr_unload_t *dur)
 {
 	mdb_var_t *v;
@@ -312,18 +315,18 @@ kmdb_module_unloaded(kmdb_wr_unload_t *dur)
 	if ((v = mdb_nv_lookup(&mdb.m_dmodctl, dur->dur_modname)) == NULL) {
 		mdb_warn("unload for unrequested module %s\n",
 		    dur->dur_modname);
-		return (0);
+		return (B_FALSE);
 	}
 
 	if (dur->dur_errno != 0) {
 		mdb_warn("dmod %s failed to unload", dur->dur_modname);
-		return (0);
+		return (B_FALSE);
 	}
 
 	kmc_free(MDB_NV_COOKIE(v));
 	mdb_nv_remove(&mdb.m_dmodctl, v);
 
-	return (1);
+	return (B_TRUE);
 }
 
 void

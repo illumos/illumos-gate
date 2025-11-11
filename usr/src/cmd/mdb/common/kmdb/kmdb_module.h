@@ -86,10 +86,10 @@ typedef struct kmdb_modctl {
 	GElf_Ehdr kmc_ehdr;		/* Copy of ehdr in gelf format */
 } kmdb_modctl_t;
 
-extern int kmdb_module_loaded(kmdb_wr_load_t *);
+extern boolean_t kmdb_module_loaded(kmdb_wr_load_t *);
 extern void kmdb_module_load_ack(kmdb_wr_load_t *);
 extern void kmdb_module_load_all_ack(kmdb_wr_t *);
-extern int kmdb_module_unloaded(kmdb_wr_unload_t *);
+extern boolean_t kmdb_module_unloaded(kmdb_wr_unload_t *);
 extern void kmdb_module_unload_ack(kmdb_wr_unload_t *);
 
 extern void kmdb_module_path_set(const char **, size_t);
