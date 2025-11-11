@@ -22,13 +22,15 @@
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2025 Edgecast Cloud LLC.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = mdb_test.so
 MDBTGT = proc
 
 MODSRCS = mdb_test.c
+
+dmod/mdb_test.o := CERRWARN += -_gcc=-Wno-null-dereference
 
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
