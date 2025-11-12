@@ -22,8 +22,9 @@
 .\" Use is subject to license terms.
 .\"
 .\" Copyright 2018 Joyent, Inc.
+.\" Copyright 2025 Edgecast Cloud LLC.
 .\"
-.Dd September 4, 2018
+.Dd November 12, 2025
 .Dt CW 1ONBLD
 .Os
 .Sh NAME
@@ -35,6 +36,7 @@
 .Op Fl -versions
 .Op Fl -noecho
 .Op Fl -tag Ar tag
+.Op Fl -time
 .Fl -primary Ar compiler
 .Op Fl -shadow Ar compiler ...
 .Op Fl -linker Ar linker
@@ -88,6 +90,9 @@ itself arranges for this to be executed by any subprocesses.
 Do nothing.
 Used simply to tag differences in the purpose of this invocation,
 to aid debugging build problems.
+.It Fl -time
+Output user and system times spent by compilers in standard error stream.
+Both times are displayed as fractional seconds.
 .It Fl -noecho
 Do not echo the actual command line of any compilers invoked.
 .It Fl -versions
@@ -217,6 +222,15 @@ successfully.
 .It >0
 A usage error occurred, or one or more compilers returned a nonzero
 exit status.
+.El
+.Sh EXAMPLES
+.Bl -tag -width ""
+.It Sy Example 1 No Sample output with --time
+.Bd -literal
++ gcc14: user time: 3.404000 system time: 0.154000
++ gcc10: user time: 2.771000 system time: 0.146000
++ smatch: user time: 6.892000 system time: 1.415000
+.Ed
 .El
 .Sh SEE ALSO
 .Xr cc 1 ,

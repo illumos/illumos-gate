@@ -758,14 +758,18 @@ CW_LINKER=		--linker $(LD)
 CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
 NATIVE_CW=		$(ONBLD_TOOLS)/bin/$(MACH)/cw
 
-BUILD_CC=		$(CW) --tag target $(CW_LINKER) $(CW_CC_COMPILERS) --
-BUILD_CCC=		$(CW) --tag target -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
+BUILD_CC=		$(CW) $(CWOPTS) --tag target $(CW_LINKER) \
+	$(CW_CC_COMPILERS) --
+BUILD_CCC=		$(CW) $(CWOPTS) --tag target -C $(CW_LINKER) \
+	$(CW_CCC_COMPILERS) --
 BUILD_CPP=		/usr/lib/cpp
 BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH64)/ld
 BUILD_AS=		$(BUILD_CC)
 
-NATIVEBUILD_CC=		$(NATIVE_CW) --tag native $(CW_LINKER) $(CW_CC_COMPILERS) --
-NATIVEBUILD_CCC=	$(NATIVE_CW) --tag native -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
+NATIVEBUILD_CC=		$(NATIVE_CW) $(CWOPTS) --tag native $(CW_LINKER) \
+	$(CW_CC_COMPILERS) --
+NATIVEBUILD_CCC=	$(NATIVE_CW) $(CWOPTS) --tag native -C $(CW_LINKER) \
+	$(CW_CCC_COMPILERS) --
 NATIVEBUILD_CPP=	/usr/lib/cpp
 NATIVEBUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH64)/ld
 NATIVEBUILD_AS=		$(NATIVEBUILD_CC)

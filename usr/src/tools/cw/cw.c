@@ -165,6 +165,7 @@
 #define	CW_F_ECHO	0x08
 #define	CW_F_XLATE	0x10
 #define	CW_F_PROG	0x20
+#define	CW_F_TIME	0x40
 
 typedef enum cw_op {
 	CW_O_NONE = 0,
@@ -1202,6 +1203,7 @@ reap(cw_ictx_t *ctx)
 	int status, ret = 0;
 	char buf[1024];
 	struct stat s;
+	struct rusage res;
 
 	/*
 	 * Only wait for one specific child.
@@ -1210,7 +1212,7 @@ reap(cw_ictx_t *ctx)
 		return (-1);
 
 	do {
-		if (waitpid(ctx->i_pid, &status, 0) < 0) {
+		if (wait4(ctx->i_pid, &status, 0, &res) < 0) {
 			warn("cannot reap child");
 			return (-1);
 		}
@@ -1224,6 +1226,15 @@ reap(cw_ictx_t *ctx)
 			}
 		}
 	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+	if (ctx->i_flags & CW_F_TIME) {
+		(void) fprintf(stderr, "+ %s: user time: %ld.%6.6ld "
+		    "system time: %ld.%6.6ld\n",
+		    ctx->i_compiler->c_name,
+		    res.ru_utime.tv_sec,
+		    res.ru_utime.tv_usec,
+		    res.ru_stime.tv_sec,
+		    res.ru_stime.tv_usec);
+	}
 
 	if (stat(ctx->i_stderr, &s) < 0) {
 		warn("stat failed on child cleanup");
@@ -1382,6 +1393,7 @@ main(int argc, char **argv)
 	bool Cflg = false;
 	bool cflg = false;
 	bool nflg = false;
+	bool Tflg = false;
 	char *tmpdir;
 
 	cw_ictx_t *main_ctx;
@@ -1393,6 +1405,7 @@ main(int argc, char **argv)
 		{ "primary", required_argument, NULL, 'p' },
 		{ "shadow", required_argument, NULL, 's' },
 		{ "tag", required_argument, NULL, 't' },
+		{ "time", no_argument, NULL, 'T' },
 		{ "versions", no_argument, NULL, 'v' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -1434,6 +1447,9 @@ main(int argc, char **argv)
 			break;
 		case 't':	/* Ignored, a diagnostic in build logs only */
 			break;
+		case 'T':
+			Tflg = true;
+			break;
 		case 'v':
 			vflg = true;
 			break;
@@ -1464,6 +1480,8 @@ main(int argc, char **argv)
 		main_ctx->i_flags |= CW_F_EXEC;
 	if (Cflg)
 		main_ctx->i_flags |= CW_F_CXX;
+	if (Tflg)
+		main_ctx->i_flags |= CW_F_TIME;
 	main_ctx->i_compiler = &primary;
 
 	if (cflg) {
