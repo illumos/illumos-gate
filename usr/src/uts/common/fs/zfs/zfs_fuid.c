@@ -725,7 +725,7 @@ zfs_fuid_is_cruser(zfsvfs_t *zfsvfs, uint64_t fuid, cred_t *cr)
 	 * Those should never be set in cr_uid.
 	 */
 	(void) kidmap_getuidbysid(crgetzone(cr), domain, rid, &uid);
-	if (uid == (uid_t)-1 || uid != IDMAP_WK_CREATOR_OWNER_UID)
+	if (uid == (uid_t)-1 || uid == IDMAP_WK_CREATOR_OWNER_UID)
 		return (B_FALSE);
 	return (uid == crgetuid(cr));
 }
