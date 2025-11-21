@@ -51,11 +51,11 @@
 
 #else
 
-#if __STDC_VERSION__ - 0 >= 199901L
+#if (__cplusplus - 0 >= 201103L) || (__STDC_VERSION__ - 0 >= 199901L)
 #define	assert(EX) (void)((EX) || \
 	(__assert_c99(#EX, __FILE__, __LINE__, __func__), 0))
 #else
 #define	assert(EX) (void)((EX) || (__assert(#EX, __FILE__, __LINE__), 0))
-#endif /* __STDC_VERSION__ - 0 >= 199901L */
+#endif /* __cplusplus - 0 >= 201103L || __STDC_VERSION__ - 0 >= 199901L */
 
 #endif	/* NDEBUG */

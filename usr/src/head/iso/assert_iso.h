@@ -51,12 +51,18 @@
 extern "C" {
 #endif
 
-#if defined(_STDC_C99)
+/*
+ * This does not use _STDC_C99 as it must match the definition of assert in
+ * <assert.h>. Many C++ compilers on illumos have defined either a
+ * __STDC_VERSION__ or the internal definitions such as _STDC_C99 so mixing
+ * these can result in either missing the macro or the function prototype.
+ */
+#if (__cplusplus - 0 >= 201103L) || (__STDC_VERSION__ - 0 >= 199901L)
 extern _NORETURN_KYWD void __assert_c99(const char *, const char *, int,
     const char *) __NORETURN;
 #else
 extern _NORETURN_KYWD void __assert(const char *, const char *, int) __NORETURN;
-#endif /* _STDC_C99 */
+#endif /* __cplusplus - 0 >= 201103L || (__STDC_VERSION__ - 0 >= 199901L) */
 
 /*
  * In C11 the static_assert macro is always defined, unlike the assert macro.
