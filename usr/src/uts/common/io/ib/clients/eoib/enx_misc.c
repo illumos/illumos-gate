@@ -68,7 +68,10 @@ eibnx_cleanup_port_nodes(eibnx_thr_info_t *info)
 	 */
 	mutex_enter(&ss->nx_nodeq_lock);
 	prev = NULL;
-	for (node = ss->nx_nodeq; node; node = node->nc_next) {
+	node = ss->nx_nodeq;
+	while (node != NULL) {
+		eibnx_nodeq_t *next = node->nc_next;
+
 		if (node->nc_info != info) {
 			prev = node;
 		} else {
@@ -79,6 +82,7 @@ eibnx_cleanup_port_nodes(eibnx_thr_info_t *info)
 			}
 			kmem_free(node, sizeof (eibnx_nodeq_t));
 		}
+		node = next;
 	}
 	mutex_exit(&ss->nx_nodeq_lock);
 
