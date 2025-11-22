@@ -542,18 +542,18 @@ load_dev_disabled(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	offset = offsetof(crypto_load_dev_disabled_t, dd_list);
 	if (copyin(arg + offset, entries, size) != 0) {
-		kmem_free(entries, size);
+		/* use rv to check if we need to free entries in out2. */
+		rv = CRYPTO_FAILED;
 		error = EFAULT;
 		goto out2;
 	}
 
 	/* 'entries' consumed (but not freed) by crypto_load_dev_disabled() */
 	if (crypto_load_dev_disabled(dev_name, instance, count, entries) != 0) {
-		kmem_free(entries, size);
 		rv = CRYPTO_FAILED;
-		goto out;
+	} else {
+		rv = CRYPTO_SUCCESS;
 	}
-	rv = CRYPTO_SUCCESS;
 out:
 	dev_disabled.dd_return_value = rv;
 
@@ -564,6 +564,10 @@ out2:
 	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_DEV_DISABLED, dev_name, entries,
 		    count, instance, rv, error);
+
+	if (rv == CRYPTO_FAILED && entries != NULL)
+		kmem_free(entries, size);
+
 	return (error);
 }
 
@@ -623,18 +627,18 @@ load_soft_disabled(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	offset = offsetof(crypto_load_soft_disabled_t, sd_list);
 	if (copyin(arg + offset, entries, size) != 0) {
-		kmem_free(entries, size);
+		/* use rv to check if we need to free entries in out2. */
+		rv = CRYPTO_FAILED;
 		error = EFAULT;
 		goto out2;
 	}
 
-	/* 'entries' is consumed by crypto_load_soft_disabled() */
+	/* 'entries' consumed (but not freed) by crypto_load_dev_disabled() */
 	if (crypto_load_soft_disabled(name, count, entries) != 0) {
-		kmem_free(entries, size);
 		rv = CRYPTO_FAILED;
-		goto out;
+	} else {
+		rv = CRYPTO_SUCCESS;
 	}
-	rv = CRYPTO_SUCCESS;
 out:
 	soft_disabled.sd_return_value = rv;
 
@@ -645,6 +649,8 @@ out2:
 	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_DISABLED, name, entries,
 		    count, 0, rv, error);
+	if (rv == CRYPTO_FAILED && entries != NULL)
+		kmem_free(entries, size);
 	return (error);
 }
 
@@ -705,7 +711,8 @@ load_soft_config(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	offset = offsetof(crypto_load_soft_config_t, sc_list);
 	if (copyin(arg + offset, entries, size) != 0) {
-		kmem_free(entries, size);
+		/* use rv to check if we need to free entries in out2. */
+		rv = CRYPTO_FAILED;
 		error = EFAULT;
 		goto out2;
 	}
@@ -715,11 +722,10 @@ load_soft_config(dev_t dev, caddr_t arg, int mode, int *rval)
 	 * crypto_load_soft_config()
 	 */
 	if (crypto_load_soft_config(name, count, entries) != 0) {
-		kmem_free(entries, size);
 		rv = CRYPTO_FAILED;
-		goto out;
+	} else {
+		rv = CRYPTO_SUCCESS;
 	}
-	rv = CRYPTO_SUCCESS;
 out:
 	soft_config.sc_return_value = rv;
 
@@ -730,6 +736,8 @@ out2:
 	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_CONFIG, name, entries, count,
 		    0, rv, error);
+	if (rv == CRYPTO_FAILED && entries != NULL)
+		kmem_free(entries, size);
 	return (error);
 }
 
