@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -1029,19 +1030,19 @@ rpc_gss_validate(AUTH *auth, struct opaque_auth *verf)
 		if (ap->verifier == NULL) {
 			ap->verifier = kmem_zalloc(sizeof (struct opaque_auth),
 			    KM_SLEEP);
-			if (verf->oa_length > 0)
-				ap->verifier->oa_base =
-				    kmem_zalloc(verf->oa_length, KM_SLEEP);
-		} else {
-			if (ap->verifier->oa_length > 0)
-				kmem_free(ap->verifier->oa_base,
-				    ap->verifier->oa_length);
-			if (verf->oa_length > 0)
-				ap->verifier->oa_base =
-				    kmem_zalloc(verf->oa_length, KM_SLEEP);
+		} else if (ap->verifier->oa_length > 0) {
+			kmem_free(ap->verifier->oa_base,
+			    ap->verifier->oa_length);
+			ap->verifier->oa_length = 0;
+			ap->verifier->oa_base = NULL;
 		}
-		ap->verifier->oa_length = verf->oa_length;
-		bcopy(verf->oa_base, ap->verifier->oa_base, verf->oa_length);
+		if (verf->oa_length > 0) {
+			ap->verifier->oa_base =
+			    kmem_zalloc(verf->oa_length, KM_SLEEP);
+			bcopy(verf->oa_base, ap->verifier->oa_base,
+			    verf->oa_length);
+			ap->verifier->oa_length = verf->oa_length;
+		}
 		return (TRUE);
 	}
 
