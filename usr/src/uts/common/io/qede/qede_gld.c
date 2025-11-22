@@ -1086,16 +1086,14 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
 
         /* remove all multicast - as flag not set and mcaddr not specified*/
         if (!flag && (ptr_mcaddr == NULL)) {
-                QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, 
-		    &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry)
-                {
-                        if (ptr_entry != NULL) {
+		while (!QEDE_LIST_IS_EMPTY(&qede->mclist.head)) {
+			ptr_entry = QEDE_LIST_FIRST_ENTRY(&qede->mclist.head,
+			    qede_mcast_list_entry_t, mclist_entry);
                         QEDE_LIST_REMOVE(&ptr_entry->mclist_entry, 
 			    &qede->mclist.head);
                         kmem_free(ptr_entry, 
 			    sizeof (qede_mcast_list_entry_t) + ETH_ALLEN);
-                        }
-                }
+		}
 
                 ret = qede_set_rx_mac_mcast(qede, 
 		    ECORE_FILTER_REMOVE, mc_macs, 1);
@@ -1497,8 +1495,6 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			if (copy_len > bytes_to_copy) {
 				(void) memcpy(data2->uabc, tmp_buf, 
 				    bytes_to_copy);
-				kmem_free(buf, size);
-				//OSAL_FREE(edev, buf);
 				break;
 			}
 			(void) memcpy(data2->uabc, tmp_buf, copy_len);
