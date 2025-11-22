@@ -742,7 +742,7 @@ sbuf_set_len(struct sata_txlt_buf *sb, uint32_t offset, uint32_t llen,
 
 static inline size_t
 sbuf_resid(const struct sata_txlt_buf *sb, const struct buf *bp,
-    int32_t alc_len)
+    uint32_t alc_len)
 {
 	/*
 	 * There's a bit of sublety here. We have two different potential
