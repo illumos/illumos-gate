@@ -439,10 +439,11 @@ efx_nvram_validate(
 	EFSYS_ASSERT3U(type, <, EFX_NVRAM_NTYPES);
 
 
-	if ((rc = envop->envo_type_to_partn(enp, type, &partn)) != 0)
+	if (envop->envo_type_to_partn != NULL &&
+	    (rc = envop->envo_type_to_partn(enp, type, &partn)) != 0)
 		goto fail1;
 
-	if (envop->envo_type_to_partn != NULL &&
+	if (envop->envo_buffer_validate != NULL &&
 	    ((rc = envop->envo_buffer_validate(enp, partn,
 	    partn_data, partn_size)) != 0))
 		goto fail2;
