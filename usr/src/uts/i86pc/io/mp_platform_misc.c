@@ -1314,7 +1314,6 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 			if (*cptr++ == ',')
 				i++;
 		bind_cpu = stoi(&cptr);
-		kmem_free(prop_val, prop_len);
 		/* if specific CPU is bogus, then default to next cpu */
 		if (!apic_cpu_in_range(bind_cpu)) {
 			cmn_err(CE_WARN, "%s: %s=%s: CPU %d not present",
@@ -1324,6 +1323,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 			/* indicate that we are bound at user request */
 			bind_cpu |= IRQ_USER_BOUND;
 		}
+		kmem_free(prop_val, prop_len);
 		/*
 		 * no need to check apic_cpus[].aci_status, if specific CPU is
 		 * not up, then post_cpu_start will handle it.
