@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2025 Hans Rosenfeld
  */
 
 #include "mp_utils.h"
@@ -132,6 +133,17 @@ getStatus4ErrorCode(int driverError)
 			mpStatus = MP_STATUS_ACCESS_STATE_INVALID;
 			break;
 
+
+		case MP_DRVR_ILLEGAL_LOAD_BALANCING_TYPE:
+			log(LOG_INFO, "getStatus4ErrorCode()",
+			    " received mp_errno="
+			    "MP_DRVR_ILLEGAL_LOAD_BALANCING_TYPE"
+			    " from driver call.");
+			log(LOG_INFO, "getStatus4ErrorCode()",
+			    " returning MP_STATUS_INVALID_PARAMETER"
+			    " to caller.");
+			mpStatus = MP_STATUS_INVALID_PARAMETER;
+			break;
 
 		default:
 			log(LOG_INFO, "getStatus4ErrorCode()",
@@ -567,7 +579,8 @@ sysevent_handler(sysevent_t *ev)
 
 /* Registers the plugin to the sysevent framework */
 MP_STATUS
-init_sysevents(void) {
+init_sysevents(void)
+{
 
 	const char *subclass_list[] = {
 

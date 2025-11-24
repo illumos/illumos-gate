@@ -22,6 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Racktop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Hans Rosenfeld
  */
 
 /*
@@ -118,6 +119,8 @@ static int vhci_enable_path(struct scsi_vhci *, mp_iocdata_t *,
 static int vhci_disable_path(struct scsi_vhci *, mp_iocdata_t *,
     void *, void *, int);
 static int vhci_send_uscsi_cmd(dev_t dev, struct scsi_vhci *, mp_iocdata_t *,
+    void *, void *, int);
+static int vhci_set_lu_loadbalance_type(struct scsi_vhci *, mp_iocdata_t *,
     void *, void *, int);
 static int vhci_mpapi_validate(void *, mp_iocdata_t *, int, cred_t *);
 static uint64_t vhci_mpapi_create_oid(mpapi_priv_t *, uint8_t);
@@ -484,6 +487,20 @@ vhci_mpapi_validate(void *udata, mp_iocdata_t *mpioc, int mode, cred_t *credp)
 		if ((mpioc->mp_ilen != sizeof (mp_lu_tpg_pair_t)) ||
 		    (mpioc->mp_ibuf == NULL) ||
 		    (mpioc->mp_xfer !=  MP_XFER_WRITE)) {
+			rval = EINVAL;
+		}
+	}
+	break;
+
+	case MP_SET_LU_LOADBALANCE_TYPE:
+	{
+		if (drv_priv(credp) != 0) {
+			rval = EPERM;
+			break;
+		}
+		if ((mpioc->mp_ilen != sizeof (mp_set_lu_lb_type_req_t)) ||
+		    (mpioc->mp_ibuf == NULL) ||
+		    (mpioc->mp_xfer != MP_XFER_WRITE)) {
 			rval = EINVAL;
 		}
 	}
@@ -2048,6 +2065,75 @@ vhci_send_uscsi_cmd(dev_t dev, struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	return (rval);
 }
 
+static int vhci_set_lu_loadbalance_type(struct scsi_vhci *vhci,
+    mp_iocdata_t *mpioc, void *input_data, void *output_data, int mode)
+{
+	int			rval = 0, held = 0;
+	mp_set_lu_lb_type_req_t	mp_set_lu_lb_type;
+	mpapi_item_list_t	*lu_list;
+	mpapi_lu_data_t		*lu;
+	scsi_vhci_lun_t		*svl;
+	uint32_t		lb_type;
+	uint64_t		lu_oid;
+
+	lu_list =
+	    vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_MULTIPATH_LU]->head;
+
+	rval = ddi_copyin(mpioc->mp_ibuf, &mp_set_lu_lb_type, mpioc->mp_ilen,
+	    mode);
+	if (rval != DDI_SUCCESS) {
+		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_set_lu_loadbalance_type:"
+		    "Unable to copyin mpioc: %d", rval));
+		return (EFAULT);
+	}
+
+	lu_oid = mp_set_lu_lb_type.luId;
+	lb_type = mp_set_lu_lb_type.desiredType;
+
+	VHCI_DEBUG(1, (CE_NOTE, NULL, "vhci_set_lu_loadbalance_type: lu_oid: "
+	    "%lx, lb_type: %x\n", (long)lu_oid, lb_type));
+
+	while ((lu_list != NULL) && (lu_oid != lu_list->item->oid.raw_oid))
+		lu_list = lu_list->next;
+
+	if (lu_list == NULL) {
+		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_set_lu_loadbalance_type: "
+		    "OID NOT FOUND"));
+		mpioc->mp_errno = MP_DRVR_INVALID_ID;
+		return (EINVAL);
+	}
+
+	lu = (mpapi_lu_data_t *)lu_list->item->idata;
+	svl = lu->resp;
+
+	VHCI_HOLD_LUN(svl, VH_SLEEP, held);
+	if (lb_type == LOAD_BALANCE_NONE) {
+		lu->prop.currentLoadBalanceType =
+		    MP_DRVR_LOAD_BALANCE_TYPE_NONE;
+	} else if (lb_type == LOAD_BALANCE_RR) {
+		lu->prop.currentLoadBalanceType =
+		    MP_DRVR_LOAD_BALANCE_TYPE_ROUNDROBIN;
+	} else if (lb_type == LOAD_BALANCE_LBA) {
+		lu->prop.currentLoadBalanceType =
+		    MP_DRVR_LOAD_BALANCE_TYPE_LBA_REGION;
+	} else {
+		mpioc->mp_errno = MP_DRVR_ILLEGAL_LOAD_BALANCING_TYPE;
+		VHCI_RELEASE_LUN(svl);
+		return (EINVAL);
+	}
+
+	rval = mdi_set_lb_policy(svl->svl_dip, lb_type);
+	VHCI_RELEASE_LUN(svl);
+
+	if (rval != MDI_SUCCESS) {
+		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_set_lu_loadbalance_type: "
+		    "SET LOADBALANCE POLICY FAILED: %x:", rval));
+		return (EIO);
+	}
+
+	return (rval);
+}
+
 /* ARGSUSED */
 static int
 vhci_enable_path(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
@@ -2294,6 +2380,10 @@ vhci_mpapi_ioctl(dev_t dev, struct scsi_vhci *vhci, void *udata,
 	case MP_SEND_SCSI_CMD:
 		rval = vhci_send_uscsi_cmd(dev, vhci, mpioc,
 		    input_data, output_data, mode);
+		break;
+	case MP_SET_LU_LOADBALANCE_TYPE:
+		rval = vhci_set_lu_loadbalance_type(vhci, mpioc, input_data,
+		    output_data, mode);
 		break;
 	default:
 		rval = EINVAL;

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2025 Hans Rosenfeld
  */
 
 #ifndef _SYS_SCSI_ADAPTERS_MPAPI_IMPL_H
@@ -310,6 +311,15 @@ typedef struct mp_set_tpg_state_req {
 	uint32_t		reserved; /* padding for 64bit boundary */
 } mp_set_tpg_state_req_t;
 
+/*
+ * Structure used as input to
+ * MP_SET_LU_LOADBALANCE_TYPE subcmd.
+ */
+typedef struct mp_set_lu_lb_type_req {
+	uint64_t	luId;
+	uint32_t	desiredType;
+	uint32_t	reserved; /* padding for 64bit boundary */
+} mp_set_lu_lb_type_req_t;
 
 /*
  * Structure for ioctl data
@@ -420,7 +430,8 @@ typedef struct mp_iocdata32 {
 #define	MP_GET_PROPRIETARY_LOADBALANCE_PROP	(MP_SUB_CMD + 0x18)
 #define	MP_ASSIGN_LU_TO_TPG			(MP_SUB_CMD + 0x19)
 #define	MP_SEND_SCSI_CMD			(MP_SUB_CMD + 0x1a)
-#define	MP_API_SUBCMD_MAX			(MP_SEND_SCSI_CMD)
+#define	MP_SET_LU_LOADBALANCE_TYPE		(MP_SUB_CMD + 0x1b)
+#define	MP_API_SUBCMD_MAX			(MP_SET_LU_LOADBALANCE_TYPE)
 
 
 /*
@@ -436,6 +447,7 @@ typedef struct mp_iocdata32 {
 #define	MP_DRVR_IDS_NOT_ASSOCIATED		(MP_IOCTL_ERROR_START + 6)
 #define	MP_DRVR_ILLEGAL_ACCESS_STATE_REQUEST	(MP_IOCTL_ERROR_START + 7)
 #define	MP_DRVR_IO_ERROR			(MP_IOCTL_ERROR_START + 8)
+#define	MP_DRVR_ILLEGAL_LOAD_BALANCING_TYPE	(MP_IOCTL_ERROR_START + 9)
 
 /*
  * Macros for OID operations
