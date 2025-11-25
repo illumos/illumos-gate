@@ -265,7 +265,7 @@ extern void 		pt_display_init_curses(void);
 extern void		pt_display_update(void);
 extern void 		pt_display_title_bar(void);
 extern void		pt_display_status_bar(void);
-extern void		pt_display_mod_status_bar(char *);
+extern void		pt_display_mod_status_bar(const char *);
 extern void 		pt_display_states(void);
 extern void		pt_display_acpi_power(uint32_t, double, double, double,
 	uint32_t);

@@ -325,13 +325,13 @@ pt_display_status_bar(void)
  * Only one instance of an item allowed.
  */
 void
-pt_display_mod_status_bar(char *msg)
+pt_display_mod_status_bar(const char *msg)
 {
 	sb_slot_t *new, *n;
-	boolean_t found = B_FALSE, first = B_FALSE;
+	boolean_t found = B_FALSE;
 
 	if (msg == NULL) {
-		pt_error("can't add an empty status bar item\n");
+		pt_error("can't add/remove an empty status bar item\n");
 		return;
 	}
 
@@ -339,13 +339,13 @@ pt_display_mod_status_bar(char *msg)
 		/*
 		 * Non-empty status bar. Look for an entry matching this msg.
 		 */
-		for (n = status_bar; n != NULL; n = n->next) {
+		n = status_bar;
+		while (n != NULL) {
+			boolean_t first = (n == status_bar);
 
 			if (strcmp(msg, n->msg) == 0) {
 				if (n != status_bar)
 					n->prev->next = n->next;
-				else
-					first = B_TRUE;
 
 				if (n->next != NULL) {
 					n->next->prev = n->prev;
@@ -356,18 +356,21 @@ pt_display_mod_status_bar(char *msg)
 						status_bar = NULL;
 				}
 
+				free(n->msg);
 				free(n);
 				found = B_TRUE;
+				n = status_bar;
+				continue;
 			}
+			n = n->next;
 		}
 
-		/*
-		 * Found and removed at least one occurrance of msg, refresh
-		 * the bar and return.
-		 */
 		if (found) {
+			/*
+			 * Found and removed at least one occurrance of msg.
+			 */
 			return;
-		} else {
+		} else if (status_bar != NULL) {
 			/*
 			 * Inserting a new msg, walk to the end of the bar.
 			 */
@@ -380,6 +383,11 @@ pt_display_mod_status_bar(char *msg)
 		pt_error("failed to allocate a new status bar slot\n");
 	} else {
 		new->msg = strdup(msg);
+		if (new->msg == NULL) {
+			pt_error("failed to allocate status bar message\n");
+			free(new);
+			return;
+		}
 
 		/*
 		 * Check if it's the first entry.

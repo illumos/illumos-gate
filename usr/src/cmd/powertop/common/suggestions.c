@@ -134,7 +134,7 @@ pt_sugg_add(char *text, int weight, char key, char *sb_msg, sugg_func_t *func)
 				 * Ordering placed the new element at the start
 				 */
 				new->next = sugg;
-				new->prev = sugg;
+				new->prev = NULL;
 				sugg->prev = new;
 				sugg = new;
 			} else {
@@ -158,7 +158,9 @@ int
 pt_sugg_remove(sugg_func_t *func)
 {
 	sugg_t *n;
-	int ret = 0;
+
+	if (func == NULL)
+		return (0);
 
 	for (n = sugg; n != NULL; n = n->next) {
 		if (n->func == func) {
@@ -181,26 +183,32 @@ pt_sugg_remove(sugg_func_t *func)
 					n->next->prev = n->prev;
 				}
 			}
-
-			/*
-			 * If this suggestions is currently being suggested,
-			 * remove it and update the screen.
-			 */
-			if (n == g_curr_sugg) {
-				if (n->sb_msg != NULL) {
-					pt_display_mod_status_bar(n->sb_msg);
-					pt_display_status_bar();
-				}
-				if (n->text != NULL)
-					pt_display_suggestions(NULL);
-			}
-
-			free(n);
-			ret = 1;
+			break;
 		}
 	}
 
-	return (ret);
+	if (n == NULL)
+		return (0);
+
+	/*
+	 * If this suggestions is currently being suggested,
+	 * remove it and update the screen.
+	 */
+	if (n == g_curr_sugg) {
+		g_curr_sugg = NULL;
+		if (n->sb_msg != NULL) {
+			pt_display_mod_status_bar(n->sb_msg);
+			pt_display_status_bar();
+		}
+		if (n->text != NULL)
+			pt_display_suggestions(NULL);
+	}
+
+	free(n->sb_msg);
+	free(n->text);
+	free(n);
+
+	return (1);
 }
 
 /*
