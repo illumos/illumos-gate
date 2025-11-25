@@ -36,11 +36,14 @@ static size_t memchr_buflen;
 static void
 memchr_setup(void)
 {
-	size_t pgsz = getpagesize();
+	size_t pgsz;
+	int pg = getpagesize();
 	void *addr;
 
-	if (pgsz <= 0) {
+	if (pg <= 0) {
 		err(EXIT_FAILURE, "failed to get system page size");
+	} else {
+		pgsz = pg;
 	}
 
 	addr = mmap(NULL, 3 * pgsz, PROT_READ | PROT_WRITE,
