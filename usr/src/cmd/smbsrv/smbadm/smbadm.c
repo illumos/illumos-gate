@@ -107,7 +107,7 @@ static char *progname;
 
 static boolean_t smbadm_checkauth(const char *);
 
-static void smbadm_usage(boolean_t);
+static void smbadm_usage(boolean_t) __NORETURN;
 static int smbadm_join_workgroup(const char *, boolean_t);
 static int smbadm_join_domain(const char *, const char *,
     const char *, boolean_t);
