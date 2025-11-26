@@ -1157,7 +1157,7 @@ update_kcfconf(entry_t *pent, int update_mode)
  */
 int
 disable_mechs(entry_t **ppent, mechlist_t *infolist, boolean_t allflag,
-mechlist_t *dislist)
+    mechlist_t *dislist)
 {
 	entry_t		*pent;
 	mechlist_t	*plist = NULL;
@@ -1238,9 +1238,14 @@ filter_mechlist(mechlist_t **pmechlist, const char *mech)
 				free(ptr);
 				ptr = pptr;
 			} else {
-				pptr->next = ptr->next;
+				mechlist_t *next = ptr->next;
+				/*
+				 * ptr == pptr is only possible when its
+				 * first entry in list, but play safe there.
+				 */
+				pptr->next = next;
 				free(ptr);
-				ptr = pptr->next;
+				ptr = next;
 			}
 		} else {
 			pptr = ptr;
