@@ -542,7 +542,7 @@ only forth also support-functions definitions
 \ Conf file line parser:
 \ <line> ::= <spaces><name><spaces>'='<spaces><value><spaces>[<comment>] |
 \            <spaces>[<comment>]
-\ <name> ::= <letter>{<letter>|<digit>|'_'|'-'}
+\ <name> ::= <letter>{<letter>|<digit>|'_'|'-'|'/'}
 \ <vname> ::= <letter>{<letter>|<digit>|'_'|'-'|','}
 \ <value> ::= '"'{<character_set>|'\'<anything>}'"' | <vname>
 \ <character_set> ::= ASCII 32 to 126, except '\' and '"'
@@ -638,8 +638,8 @@ also parser definitions
   line_pointer
   begin
     end_of_line? if 0 else
-      letter? digit? underscore? dot? dash? comma?
-      or or or or or
+      letter? digit? underscore? dot? dash? comma? slash?
+      or or or or or or
     then
   while
     skip_character
