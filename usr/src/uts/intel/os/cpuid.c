@@ -26,6 +26,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2025 Oxide Computer Company
  * Copyright 2024 MNX Cloud, Inc.
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1830,6 +1831,8 @@ struct xsave_info {
 	size_t		zmmlo_offset;	/* AVX512: offset for zmm 256 save */
 	size_t		zmmhi_size;	/* AVX512: size of zmm hi reg save */
 	size_t		zmmhi_offset;	/* AVX512: offset for zmm hi reg save */
+	size_t		pkru_size;	/* PKRU size */
+	size_t		pkru_offset;	/* PKRU offset */
 };
 
 
@@ -5162,6 +5165,17 @@ cpuid_pass_extended(cpu_t *cpu, void *_arg __unused)
 			cpi->cpi_xsave.zmmhi_offset = cp->cp_ebx;
 		}
 
+		if (cpi->cpi_xsave.xsav_hw_features_low & XFEATURE_PKRU) {
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 9;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.pkru_size = cp->cp_eax;
+			cpi->cpi_xsave.pkru_offset = cp->cp_ebx;
+		}
+
 		if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 			xsave_state_size = 0;
 		} else if (cpuid_d_valid) {
@@ -6455,13 +6469,6 @@ cpuid_get_addrsize(cpu_t *cpu, uint_t *pabits, uint_t *vabits)
 		*vabits = cpi->cpi_vabits;
 }
 
-size_t
-cpuid_get_xsave_size(void)
-{
-	return (MAX(cpuid_info0.cpi_xsave.xsav_max_size,
-	    sizeof (struct xsave_state)));
-}
-
 /*
  * Export information about known offsets to the kernel. We only care about
  * things we have actually enabled support for in %xcr0.
@@ -6503,6 +6510,37 @@ cpuid_get_xsave_info(uint64_t bit, size_t *sizep, size_t *offp)
 	default:
 		panic("asked for unsupported xsave feature: 0x%lx", bit);
 	}
+}
+
+/*
+ * Use our supported-features indicators (xsave_bv_all) to return the XSAVE
+ * size of our supported-features that need saving. Some CPUs' maximum save
+ * size (stored in cpuid_info0.cpi_xsave.xsav_max_size) includes
+ * unsupported-by-us features (e.g. Intel AMX) which we MAY be able to safely
+ * dismiss if the supported XSAVE data's offset + length are before the
+ * unsupported feature.
+ */
+size_t
+cpuid_get_xsave_size(void)
+{
+	size_t furthest_out = sizeof (struct xsave_state);
+	uint_t shift = 0;
+
+	VERIFY(xsave_bv_all != 0);
+
+	for (uint64_t current = xsave_bv_all; current != 0;
+	    current >>= 1, shift++) {
+		uint64_t testbit = 1UL << shift;
+		size_t size, offset;
+
+		if ((testbit & xsave_bv_all) == 0)
+			continue;
+
+		cpuid_get_xsave_info(testbit, &size, &offset);
+		furthest_out = MAX(furthest_out, offset + size);
+	}
+
+	return (furthest_out);
 }
 
 /*

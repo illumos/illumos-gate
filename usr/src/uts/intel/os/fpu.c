@@ -23,6 +23,7 @@
  * Copyright 2021 Joyent, Inc.
  * Copyright 2021 RackTop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -926,6 +927,18 @@ int fp_elf = AT_386_FPINFO_FXSAVE;
  * Mechanism to save FPU state.
  */
 int fp_save_mech = FP_FXSAVE;
+
+/*
+ * See section 10.5.1 in the Intel 64 and IA-32 Architectures Software
+ * Developer's Manual, Volume 1.
+ */
+#define	FXSAVE_ALIGN	16
+
+/*
+ * See section 13.4 in the Intel 64 and IA-32 Architectures Software
+ * Developer's Manual, Volume 1.
+ */
+#define	XSAVE_ALIGN	64
 
 kmem_cache_t *fpsave_cachep;
 
@@ -1977,6 +1990,25 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 			f = FPU_KERNEL;
 		}
 		curthread->t_lwp->lwp_pcb.pcb_fpu.fpu_flags &= ~f;
+	}
+}
+
+void
+fpu_save_cache_init(void)
+{
+	switch (fp_save_mech) {
+	case FP_FXSAVE:
+		fpsave_cachep = kmem_cache_create("fxsave_cache",
+		    sizeof (struct fxsave_state), FXSAVE_ALIGN,
+		    NULL, NULL, NULL, NULL, NULL, 0);
+		break;
+	case FP_XSAVE:
+		fpsave_cachep = kmem_cache_create("xsave_cache",
+		    cpuid_get_xsave_size(), XSAVE_ALIGN,
+		    NULL, NULL, NULL, NULL, NULL, 0);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
 	}
 }
 

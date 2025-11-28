@@ -27,6 +27,7 @@
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2025 Edgecast Cloud LLC.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -2158,18 +2159,22 @@ startup_end(void)
 	 * the last pieces.
 	 */
 
-	/*
-	 * Set up the FPU save area for LWP0.
-	 */
-	lwp_fp_init(&lwp0);
-
-	/*
-	 * Set up for XSAVE.
-	 */
 	if (fp_save_mech == FP_XSAVE) {
 		PRM_POINT("xsave_setup_msr()");
 		xsave_setup_msr(CPU);
 	}
+
+	/*
+	 * Set up the kmem caches for FP saving AFTER we have determined the
+	 * final set of FPU features that we have enabled and programmed into
+	 * the CPU in xsave_setup_msr().
+	 */
+	fpu_save_cache_init();
+
+	/*
+	 * Set up the FPU save area for LWP0.
+	 */
+	lwp_fp_init(&lwp0);
 
 	/*
 	 * Set the isa_list string to the defined instruction sets we

@@ -22,6 +22,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Edgecast Cloud LLC.
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -333,6 +334,7 @@ extern uint32_t sse_mxcsr_mask;
 
 extern void fpu_probe(void);
 extern uint_t fpu_initial_probe(void);
+extern void fpu_save_cache_init(void);
 
 extern void fpu_auxv_info(int *, size_t *);
 extern boolean_t fpu_xsave_enabled(void);

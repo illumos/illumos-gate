@@ -40,18 +40,6 @@
 #define	XMM_ALIGN	16
 
 /*
- * See section 10.5.1 in the Intel 64 and IA-32 Architectures Software
- * Developer’s Manual, Volume 1.
- */
-#define	FXSAVE_ALIGN	16
-
-/*
- * See section 13.4 in the Intel 64 and IA-32 Architectures Software
- * Developer’s Manual, Volume 1.
- */
-#define	XSAVE_ALIGN	64
-
-/*
  * If fpu_exists is non-zero, fpu_probe will attempt to use any
  * hardware FPU (subject to other constraints, see below).  If
  * fpu_exists is zero, fpu_probe will report that there is no
@@ -169,14 +157,8 @@ fpu_probe(void)
 				}
 			}
 			fprestore_ctxt = xrestore_ctxt;
-			fpsave_cachep = kmem_cache_create("xsave_cache",
-			    cpuid_get_xsave_size(), XSAVE_ALIGN,
-			    NULL, NULL, NULL, NULL, NULL, 0);
 		} else {
 			/* fp_save_mech defaults to FP_FXSAVE */
-			fpsave_cachep = kmem_cache_create("fxsave_cache",
-			    sizeof (struct fxsave_state), FXSAVE_ALIGN,
-			    NULL, NULL, NULL, NULL, NULL, 0);
 			fp_elf = AT_386_FPINFO_FXSAVE;
 		}
 	}
