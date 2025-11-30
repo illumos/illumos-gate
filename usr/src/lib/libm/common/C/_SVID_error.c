@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
  */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -120,7 +121,8 @@ static const union {
 #define	Inf	HUGE_VAL
 
 double
-_SVID_libm_err(double x, double y, int type) {
+_SVID_libm_err(double x, double y, int type)
+{
 	struct exception	exc;
 	double			t, w, ieee_retval = 0;
 	enum version		lib_version = _lib_version;
@@ -172,11 +174,11 @@ _SVID_libm_err(double x, double y, int type) {
 		exc.type = DOMAIN;
 		exc.name = "atan2";
 		ieee_retval = copysign(1.0, x) == 1.0 ? y :
-			copysign(PI_RZ + DBL_MIN, y);
+		    copysign(PI_RZ + DBL_MIN, y);
 		exc.retval = 0.0;
 		if (lib_version == strict_ansi) {
 			errno = EDOM;
-		} else if (!matherr(&exc)) {
+		} else if (lib_version != libm_ieee && !matherr(&exc)) {
 			if (lib_version == c_issue_4) {
 				(void) write(2, "atan2: DOMAIN error\n", 20);
 			}
@@ -515,9 +517,9 @@ _SVID_libm_err(double x, double y, int type) {
 			/* INDENT OFF */
 			/*
 			 * determine if y is an odd int when x = -0
-			 * yisint = 0       ... y is not an integer
-			 * yisint = 1       ... y is an odd int
-			 * yisint = 2       ... y is an even int
+			 * yisint = 0	... y is not an integer
+			 * yisint = 1	... y is an odd int
+			 * yisint = 2	... y is an even int
 			 */
 			/* INDENT ON */
 			hx  = __HI(x);
@@ -856,7 +858,7 @@ _SVID_libm_err(double x, double y, int type) {
 		if (lib_version == strict_ansi) {
 			exc.retval = 1.0;
 		} else if (!matherr(&exc)) {
-			if ((lib_version == c_issue_4) || (lib_version == ansi_1))
+			if (lib_version == c_issue_4 || lib_version == ansi_1)
 				errno = EDOM;
 		}
 		break;
@@ -948,7 +950,8 @@ _SVID_libm_err(double x, double y, int type) {
 }
 
 static double
-setexception(int n, double x) {
+setexception(int n, double x)
+{
 	/*
 	 * n =
 	 * 0	division by zero
