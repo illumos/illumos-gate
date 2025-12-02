@@ -19,6 +19,8 @@
 #ifndef	_VIONA_IO_H_
 #define	_VIONA_IO_H_
 
+#include <sys/sysmacros.h>
+
 #define	VNA_IOC				(('V' << 16)|('C' << 8))
 #define	VNA_IOC_CREATE			(VNA_IOC | 0x01)
 #define	VNA_IOC_DELETE			(VNA_IOC | 0x02)
@@ -45,7 +47,18 @@
 #define	VNA_IOC_GET_MTU			(VNA_IOC | 0x27)
 #define	VNA_IOC_SET_MTU			(VNA_IOC | 0x28)
 #define	VNA_IOC_SET_NOTIFY_MMIO		(VNA_IOC | 0x29)
+#define	VNA_IOC_INTR_POLL_MQ		(VNA_IOC | 0x2a)
 
+/*
+ * While the VirtIO specification allows for up to 0x8000 queue pairs, we
+ * impose a lower limit in Viona.
+ */
+#define	VIONA_MIN_QPAIR			1
+#define	VIONA_MAX_QPAIR			0x100
+#define	VNA_IOC_GET_PAIRS		(VNA_IOC | 0x30)
+#define	VNA_IOC_SET_PAIRS		(VNA_IOC | 0x31)
+#define	VNA_IOC_GET_USEPAIRS		(VNA_IOC | 0x32)
+#define	VNA_IOC_SET_USEPAIRS		(VNA_IOC | 0x33)
 
 /*
  * Viona Interface Version
@@ -61,7 +74,7 @@
  * change when the version is modified.  It follows no rules like semver.
  *
  */
-#define	VIONA_CURRENT_INTERFACE_VERSION	5
+#define	VIONA_CURRENT_INTERFACE_VERSION	6
 
 typedef struct vioc_create {
 	datalink_id_t	c_linkid;
@@ -98,12 +111,6 @@ typedef struct vioc_ring_msi {
 	uint64_t	rm_msg;
 } vioc_ring_msi_t;
 
-enum viona_vq_id {
-	VIONA_VQ_RX = 0,
-	VIONA_VQ_TX = 1,
-	VIONA_VQ_MAX = 2
-};
-
 typedef enum {
 	VIONA_PROMISC_NONE = 0,
 	VIONA_PROMISC_MULTI,
@@ -111,9 +118,27 @@ typedef enum {
 	VIONA_PROMISC_MAX,
 } viona_promisc_t;
 
+/*
+ * The older VNA_IOC_INTR_POLL API, superseded by VNA_IOC_INTR_POLL_MQ, only
+ * polls interrupt status for the first queue pair (two rings).
+ */
 typedef struct vioc_intr_poll {
-	uint32_t	vip_status[VIONA_VQ_MAX];
+	uint32_t	vip_status[2];
 } vioc_intr_poll_t;
+
+#define	VIONA_INTR_WORD_BITS	32
+#define	VIONA_INTR_WORDS	\
+	howmany(VIONA_MAX_QPAIR * 2, VIONA_INTR_WORD_BITS)
+#define	VIONA_INTR_WORD(q)	((q) / VIONA_INTR_WORD_BITS)
+#define	VIONA_INTR_BIT(q)	(1u << ((q) % VIONA_INTR_WORD_BITS))
+#define	VIONA_INTR_SET(vipm, q) \
+	(vipm)->vipm_status[VIONA_INTR_WORD(q)] |= VIONA_INTR_BIT(q)
+#define	VIONA_INTR_TEST(vipm, q) \
+	(((vipm)->vipm_status[VIONA_INTR_WORD(q)] & VIONA_INTR_BIT(q)) != 0)
+typedef struct vioc_intr_poll_mq {
+	uint16_t	vipm_nrings;
+	uint32_t	vipm_status[VIONA_INTR_WORDS];
+} vioc_intr_poll_mq_t;
 
 typedef struct vioc_notify_mmio {
 	uint64_t	vim_address;

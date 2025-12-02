@@ -49,8 +49,6 @@
 
 #include "viona_impl.h"
 
-
-
 #define	VTNET_MAXSEGS		32
 
 /* Min. octets in an ethernet frame minus FCS */
@@ -88,7 +86,8 @@ viona_rx_fini(void)
 void
 viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 {
-	(void) thread_vsetname(curthread, "viona_rx_%p", ring);
+	(void) thread_vsetname(curthread, "viona_rx_%u_%p",
+	    ring->vr_index, ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);
@@ -730,11 +729,31 @@ pad_drop:
 	    size_t, cnt_drop);
 }
 
+static inline viona_vring_t *
+viona_rx_pick_ring(viona_link_t *link, mblk_t *mp)
+{
+	viona_vring_t *ring;
+	uint8_t r = 0;
+
+	if (link->l_usepairs > 1) {
+		r = (uint8_t)mac_pkt_hash(DL_ETHER, mp,
+		    MAC_PKT_HASH_L3 | MAC_PKT_HASH_L4, B_TRUE);
+		r %= link->l_usepairs;
+	}
+
+	ring = &link->l_vrings[r * 2];
+
+	ASSERT(VIONA_RING_ISRX(ring));
+
+	return (ring);
+}
+
 static void
 viona_rx_classified(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     boolean_t is_loopback)
 {
-	viona_vring_t *ring = (viona_vring_t *)arg;
+	viona_link_t *link = (viona_link_t *)arg;
+	viona_vring_t *ring = viona_rx_pick_ring(link, mp);
 
 	/* Drop traffic if ring is inactive or renewing its lease */
 	if (ring->vr_state != VRS_RUN ||
@@ -750,7 +769,8 @@ static void
 viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     boolean_t is_loopback)
 {
-	viona_vring_t *ring = (viona_vring_t *)arg;
+	viona_link_t *link = (viona_link_t *)arg;
+	viona_vring_t *ring = viona_rx_pick_ring(link, mp);
 	mac_handle_t mh = ring->vr_link->l_mh;
 	mblk_t *mp_mcast_only = NULL;
 	mblk_t **mpp = &mp_mcast_only;
@@ -821,7 +841,6 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 int
 viona_rx_set(viona_link_t *link, viona_promisc_t mode)
 {
-	viona_vring_t *ring = &link->l_vrings[VIONA_VQ_RX];
 	int err = 0;
 
 	if (link->l_mph != NULL) {
@@ -831,16 +850,16 @@ viona_rx_set(viona_link_t *link, viona_promisc_t mode)
 
 	switch (mode) {
 	case VIONA_PROMISC_MULTI:
-		mac_rx_set(link->l_mch, viona_rx_classified, ring);
+		mac_rx_set(link->l_mch, viona_rx_classified, link);
 		err = mac_promisc_add(link->l_mch, MAC_CLIENT_PROMISC_MULTI,
-		    viona_rx_mcast, ring, &link->l_mph,
+		    viona_rx_mcast, link, &link->l_mph,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
 		break;
 	case VIONA_PROMISC_ALL:
 		mac_rx_clear(link->l_mch);
 		err = mac_promisc_add(link->l_mch, MAC_CLIENT_PROMISC_ALL,
-		    viona_rx_classified, ring, &link->l_mph,
+		    viona_rx_classified, link, &link->l_mph,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
 		/*
@@ -849,12 +868,12 @@ viona_rx_set(viona_link_t *link, viona_promisc_t mode)
 		 * flow to the guest.
 		 */
 		if (err != 0) {
-			mac_rx_set(link->l_mch, viona_rx_classified, ring);
+			mac_rx_set(link->l_mch, viona_rx_classified, link);
 		}
 		break;
 	case VIONA_PROMISC_NONE:
 	default:
-		mac_rx_set(link->l_mch, viona_rx_classified, ring);
+		mac_rx_set(link->l_mch, viona_rx_classified, link);
 		break;
 	}
 

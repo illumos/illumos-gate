@@ -23,8 +23,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd November 14, 2024
+.Dd December 1, 2025
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -428,15 +429,37 @@ must be specified.
 .Pp
 .Sy Accelerated Virtio Network Backends :
 .Bl -tag -width 10n
-.It Oo Cm vnic Ns = Oc Ns Ar vnic Ns Oo , Ns Cm feature_mask Ns = Ns Ar mask Oc
+.It Oo Cm vnic Ns = Oc Ns Ar vnic Ns Oo , Ns Ar viona-backend-options Oc
 .Pp
 .Ar vnic
 is the name of a configured virtual NIC on the system.
+.El
+.Pp
+The
+.Ar viona-backend-options
+are:
+.Bl -tag -width 8n
+.It Cm feature_mask Ns = Ns Ar mask
 .Ar mask
 is applied to the virtio feature flags which are advertised to the guest.
 Bits set in the
 .Ar mask
 value are removed from the advertised features.
+.It Cm vqsize Ns = Ns Ar size
+Specify the size of each TX and RX ring.
+This value must be a power of 2 and in the range [2, 32768].
+.It Cm qpair Ns = Ns Ar pairs
+Specify the maximum number of queue pairs offered to the guest.
+The value must be in the range [1, 256] and defaults to 8.
+Each queue pair consists of one transmit
+.Pq TX
+and one receive
+.Pq RX
+queue.
+Note that most guests will allocate memory for all permitted queues,
+regardless of whether they are actively used.
+The default of 8 queue pairs results in 8 RX and 8 TX queues for network packet
+transfer, plus one control queue.
 .El
 .Pp
 .Sy Other Network Backends :

@@ -50,13 +50,13 @@
  * General Architecture
  * --------------------
  *
- * A single viona instance is comprised of a "link" handle and two "rings".
- * After opening the viona device, it must be associated with a MAC network
- * interface and a bhyve (vmm) instance to form its link resource.  This is
- * done with the VNA_IOC_CREATE ioctl, where the datalink ID and vmm fd are
- * passed in to perform the initialization.  With the MAC client opened, and a
- * driver handle to the vmm instance established, the device is ready to be
- * configured by the guest.
+ * A single viona instance is comprised of a "link" handle and a number of
+ * "ring" pairs. After opening the viona device, it must be associated with a
+ * MAC network interface and a bhyve (vmm) instance to form its link resource.
+ * This is done with the VNA_IOC_CREATE ioctl, where the datalink ID and vmm fd
+ * are passed in to perform the initialization.  With the MAC client opened,
+ * and a driver handle to the vmm instance established, the device is ready to
+ * be configured by the guest.
  *
  * The userspace portion of bhyve, which interfaces with the PCI device
  * emulation framework, is meant to stay out of the datapath if at all
@@ -68,14 +68,15 @@
  * Ring Basics
  * -----------
  *
- * Each viona link has two viona_vring_t entities, RX and TX, for handling data
- * transfers to and from the guest.  They represent an interface to the
- * standard virtio ring structures.  When initialized and active, each ring is
- * backed by a kernel worker thread (parented to the bhyve process for the
- * instance) which handles ring events.  The RX worker has the simple task of
- * watching for ring shutdown conditions.  The TX worker does that in addition
- * to processing all requests to transmit data.  Data destined for the guest is
- * delivered directly by MAC to viona_rx() when the ring is active.
+ * Each viona link has a number of pairs of viona_vring_t entities, each pair
+ * consisting of an RX and TX ring, for handling data transfers to and from the
+ * guest respectively. They represent an interface to the standard virtio ring
+ * structures. When initialized and active, each ring is backed by a kernel
+ * worker thread (parented to the bhyve process for the instance) which handles
+ * ring events. An RX worker has the simple task of watching for ring shutdown
+ * conditions. A TX worker does that in addition to processing all requests to
+ * transmit data. Data destined for the guest is delivered directly by MAC to
+ * viona_rx() when the ring is active.
  *
  *
  * -----------
@@ -160,6 +161,32 @@
  * has been started, only it may perform ring state transitions (still under
  * the protection of vr_lock), when requested by outside consumers via
  * vr_state_flags or when the containing bhyve process initiates an exit.
+ *
+ * Additionally, since all ioctls that affect a ring are mutually exclusive
+ * via a hold on the soft state lock, a ring cannot unexpectedly change state
+ * while this lock is held. This is relied on by the VNA_IOC_SET_PAIRS ioctl to
+ * guarantee that the ring is idle, and remains so, while the number of queue
+ * pairs is being changed.
+ *
+ *
+ * ----------------------------
+ * Multiple Rings (multi-queue)
+ * ----------------------------
+ *
+ * A link starts its life with a single pair of rings (one RX and one TX ring).
+ * The number of pairs can be varied via a call to ioctl(VNA_IOC_SET_PAIRS)
+ * providing all of the existing rings are in the VRS_RESET state. Therefore a
+ * userland consumer may only change the ring count between link creation and
+ * initialising any rings, or after issuing ioctl(VNA_IOC_RING_RESET) on
+ * all rings. The number of active rings cannot be reduced below the number of
+ * rings currently used, see below. The maximum number of rings permitted by
+ * viona (0x100) is lower than that permitted for a network device by the
+ * VirtIO specification (0x8000).
+ *
+ * Separately the number of RX rings that should be used for transmission of
+ * data to the guest can be varied at any time via ioctl(VNA_IOC_SET_USEPAIRS).
+ * The number of pairs to use can never exceed the total number of allocated
+ * pairs.
  *
  *
  * ----------------------------
@@ -324,6 +351,8 @@ static int viona_ioc_set_notify_mmio(viona_link_t *, void *, int);
 static int viona_ioc_set_promisc(viona_link_t *, viona_promisc_t);
 static int viona_ioc_get_params(viona_link_t *, void *, int);
 static int viona_ioc_set_params(viona_link_t *, void *, int);
+static int viona_ioc_link_setpairs(viona_link_t *, uint16_t);
+static int viona_ioc_link_usepairs(viona_link_t *, uint16_t);
 static int viona_ioc_ring_init(viona_link_t *, void *, int);
 static int viona_ioc_ring_init_modern(viona_link_t *, void *, int);
 static int viona_ioc_ring_set_state(viona_link_t *, void *, int);
@@ -334,6 +363,7 @@ static int viona_ioc_ring_pause(viona_link_t *, uint_t);
 static int viona_ioc_ring_set_msi(viona_link_t *, void *, int);
 static int viona_ioc_ring_intr_clear(viona_link_t *, uint_t);
 static int viona_ioc_intr_poll(viona_link_t *, void *, int, int *);
+static int viona_ioc_intr_poll_mq(viona_link_t *, void *, int, int *);
 
 static void viona_params_get_defaults(viona_link_params_t *);
 
@@ -621,6 +651,24 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 
 		link->l_features = val;
 		break;
+	case VNA_IOC_GET_PAIRS:
+		*rv = (int)link->l_npairs;
+		break;
+	case VNA_IOC_SET_PAIRS:
+		if (data > UINT16_MAX)
+			err = EINVAL;
+		else
+			err = viona_ioc_link_setpairs(link, (uint16_t)data);
+		break;
+	case VNA_IOC_GET_USEPAIRS:
+		*rv = (int)link->l_usepairs;
+		break;
+	case VNA_IOC_SET_USEPAIRS:
+		if (data > UINT16_MAX)
+			err = EINVAL;
+		else
+			err = viona_ioc_link_usepairs(link, (uint16_t)data);
+		break;
 	case VNA_IOC_RING_INIT:
 		err = viona_ioc_ring_init(link, dptr, md);
 		break;
@@ -651,6 +699,9 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 
 	case VNA_IOC_INTR_POLL:
 		err = viona_ioc_intr_poll(link, dptr, md, rv);
+		break;
+	case VNA_IOC_INTR_POLL_MQ:
+		err = viona_ioc_intr_poll_mq(link, dptr, md, rv);
 		break;
 	case VNA_IOC_SET_NOTIFY_IOP:
 		if (data < 0 || data > UINT16_MAX) {
@@ -709,7 +760,7 @@ viona_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 
 	*reventsp = 0;
 	if ((events & POLLRDBAND) != 0) {
-		for (uint_t i = 0; i < VIONA_VQ_MAX; i++) {
+		for (uint16_t i = 0; i < VIONA_USABLE_RINGS(link); i++) {
 			if (link->l_vrings[i].vr_intr_enabled != 0) {
 				*reventsp |= POLLRDBAND;
 				break;
@@ -770,30 +821,35 @@ viona_kstat_update(kstat_t *ksp, int rw)
 	 */
 	mutex_enter(&link->l_stats_lock);
 
-	const viona_transfer_stats_t *ring_stats =
-	    &link->l_vrings[VIONA_VQ_RX].vr_stats;
-	const viona_transfer_stats_t *link_stats = &link->l_stats.vls_rx;
+	for (uint16_t i = 0; i < VIONA_USABLE_RINGS(link); i++) {
+		const viona_vring_t *ring = &link->l_vrings[i];
+		const viona_transfer_stats_t *ring_stats = &ring->vr_stats;
+		const viona_transfer_stats_t *link_stats;
 
-	vk->vk_rx_packets.value.ui64 =
-	    link_stats->vts_packets + ring_stats->vts_packets;
-	vk->vk_rx_bytes.value.ui64 =
-	    link_stats->vts_bytes + ring_stats->vts_bytes;
-	vk->vk_rx_errors.value.ui64 =
-	    link_stats->vts_errors + ring_stats->vts_errors;
-	vk->vk_rx_drops.value.ui64 =
-	    link_stats->vts_drops + ring_stats->vts_drops;
+		if (VIONA_RING_ISRX(ring)) {
+			link_stats = &link->l_stats.vls_rx;
 
-	ring_stats = &link->l_vrings[VIONA_VQ_TX].vr_stats;
-	link_stats = &link->l_stats.vls_tx;
+			vk->vk_rx_packets.value.ui64 =
+			    link_stats->vts_packets + ring_stats->vts_packets;
+			vk->vk_rx_bytes.value.ui64 =
+			    link_stats->vts_bytes + ring_stats->vts_bytes;
+			vk->vk_rx_errors.value.ui64 =
+			    link_stats->vts_errors + ring_stats->vts_errors;
+			vk->vk_rx_drops.value.ui64 =
+			    link_stats->vts_drops + ring_stats->vts_drops;
+		} else if (VIONA_RING_ISTX(ring)) {
+			link_stats = &link->l_stats.vls_tx;
 
-	vk->vk_tx_packets.value.ui64 =
-	    link_stats->vts_packets + ring_stats->vts_packets;
-	vk->vk_tx_bytes.value.ui64 =
-	    link_stats->vts_bytes + ring_stats->vts_bytes;
-	vk->vk_tx_errors.value.ui64 =
-	    link_stats->vts_errors + ring_stats->vts_errors;
-	vk->vk_tx_drops.value.ui64 =
-	    link_stats->vts_drops + ring_stats->vts_drops;
+			vk->vk_tx_packets.value.ui64 =
+			    link_stats->vts_packets + ring_stats->vts_packets;
+			vk->vk_tx_bytes.value.ui64 =
+			    link_stats->vts_bytes + ring_stats->vts_bytes;
+			vk->vk_tx_errors.value.ui64 =
+			    link_stats->vts_errors + ring_stats->vts_errors;
+			vk->vk_tx_drops.value.ui64 =
+			    link_stats->vts_drops + ring_stats->vts_drops;
+		}
+	}
 
 	mutex_exit(&link->l_stats_lock);
 
@@ -858,6 +914,56 @@ viona_kstat_fini(viona_soft_state_t *ss)
 	}
 }
 
+static void
+viona_link_qfree(viona_link_t *link)
+{
+	if (link->l_vrings == NULL)
+		return;
+
+	for (uint16_t i = 0; i < VIONA_NRINGS(link); i++) {
+		ASSERT3U(link->l_vrings[i].vr_state, ==, VRS_RESET);
+		viona_ring_free(&link->l_vrings[i]);
+	}
+	kmem_free(link->l_vrings, sizeof (viona_vring_t) * VIONA_NRINGS(link));
+	link->l_vrings = NULL;
+	link->l_npairs = link->l_usepairs = 0;
+}
+
+static int
+viona_link_qalloc(viona_link_t *link, uint16_t pairs)
+{
+	const uint16_t usepairs = link->l_usepairs;
+
+	ASSERT(MUTEX_HELD(&link->l_ss->ss_lock));
+
+	if (pairs < VIONA_MIN_QPAIR || pairs > VIONA_MAX_QPAIR ||
+	    pairs < usepairs) {
+		return (EINVAL);
+	}
+
+	for (uint16_t i = 0; i < VIONA_NRINGS(link); i++) {
+		if (link->l_vrings[i].vr_state != VRS_RESET)
+			return (EBUSY);
+	}
+
+	/*
+	 * This is safe as we are holding the ss_lock, have checked that all
+	 * of the rings are in the VRS_RESET state and know that the mac RX
+	 * callback is not set at this point.
+	 */
+	viona_link_qfree(link);
+
+	link->l_npairs = pairs;
+	link->l_usepairs = usepairs;
+	link->l_vrings = kmem_zalloc(
+	    sizeof (viona_vring_t) * VIONA_NRINGS(link), KM_SLEEP);
+
+	for (uint16_t i = 0; i < VIONA_NRINGS(link); i++)
+		viona_ring_alloc(link, &link->l_vrings[i]);
+
+	return (0);
+}
+
 static int
 viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 {
@@ -870,7 +976,6 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	viona_neti_t	*nip = NULL;
 	zoneid_t	zid;
 	mac_diag_t	mac_diag = MAC_DIAG_NONE;
-	boolean_t	rings_allocd = B_FALSE;
 
 	ASSERT(MUTEX_NOT_HELD(&ss->ss_lock));
 
@@ -907,6 +1012,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	}
 
 	link = kmem_zalloc(sizeof (viona_link_t), KM_SLEEP);
+	link->l_ss = ss;
 	link->l_linkid = kvc.c_linkid;
 	link->l_vm_hold = hold;
 	link->l_mtu = VIONA_DEFAULT_MTU;
@@ -933,9 +1039,9 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 		goto bail;
 	}
 
-	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_RX]);
-	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_TX]);
-	rings_allocd = B_TRUE;
+	if (viona_link_qalloc(link, 1) != 0)
+		goto bail;
+	link->l_usepairs = 1;
 
 	/*
 	 * Default to passing up all multicast traffic in addition to
@@ -977,10 +1083,7 @@ bail:
 		if (link->l_mh != NULL) {
 			mac_close(link->l_mh);
 		}
-		if (rings_allocd) {
-			viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
-			viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
-		}
+		viona_link_qfree(link);
 		kmem_free(link, sizeof (viona_link_t));
 		ss->ss_link = NULL;
 	}
@@ -1035,8 +1138,8 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 	 * Return the rings to their reset state, ignoring any possible
 	 * interruptions from signals.
 	 */
-	VERIFY0(viona_ring_reset(&link->l_vrings[VIONA_VQ_RX], B_FALSE));
-	VERIFY0(viona_ring_reset(&link->l_vrings[VIONA_VQ_TX], B_FALSE));
+	for (uint16_t i = 0; i < VIONA_NRINGS(link); i++)
+		VERIFY0(viona_ring_reset(&link->l_vrings[i], B_FALSE));
 
 	mutex_enter(&ss->ss_lock);
 	viona_kstat_fini(ss);
@@ -1060,8 +1163,7 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 	nip = link->l_neti;
 	link->l_neti = NULL;
 
-	viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
-	viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
+	viona_link_qfree(link);
 	pollhead_clean(&link->l_pollhead);
 	ss->ss_link = NULL;
 	mutex_exit(&ss->ss_lock);
@@ -1085,6 +1187,10 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	if (ddi_copyin(udata, &kri, sizeof (kri), md) != 0) {
 		return (EFAULT);
 	}
+
+	if (!VIONA_RING_VALID(link, kri.ri_index))
+		return (EINVAL);
+
 	struct viona_ring_params params = {
 		.vrp_pa_desc = kri.ri_qaddr,
 		.vrp_pa_avail = 0,
@@ -1111,6 +1217,10 @@ viona_ioc_ring_init_modern(viona_link_t *link, void *udata, int md)
 	if (ddi_copyin(udata, &krim, sizeof (krim), md) != 0) {
 		return (EFAULT);
 	}
+
+	if (!VIONA_RING_VALID(link, krim.rim_index))
+		return (EINVAL);
+
 	const struct viona_ring_params params = {
 		.vrp_pa_desc = krim.rim_qaddr_desc,
 		.vrp_pa_avail = krim.rim_qaddr_avail,
@@ -1176,11 +1286,33 @@ viona_ioc_ring_get_state(viona_link_t *link, void *udata, int md)
 }
 
 static int
+viona_ioc_link_setpairs(viona_link_t *link, uint16_t pairs)
+{
+	int err;
+
+	/* Unhook the receive callbacks while the rings are being reallocated */
+	viona_rx_clear(link);
+	err = viona_link_qalloc(link, pairs);
+	(void) viona_rx_set(link, link->l_promisc);
+
+	return (err);
+}
+
+static int
+viona_ioc_link_usepairs(viona_link_t *link, uint16_t pairs)
+{
+	if (pairs < VIONA_MIN_QPAIR || pairs > link->l_npairs)
+		return (EINVAL);
+	link->l_usepairs = pairs;
+	return (0);
+}
+
+static int
 viona_ioc_ring_reset(viona_link_t *link, uint_t idx)
 {
 	viona_vring_t *ring;
 
-	if (idx >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, idx)) {
 		return (EINVAL);
 	}
 	ring = &link->l_vrings[idx];
@@ -1194,7 +1326,7 @@ viona_ioc_ring_kick(viona_link_t *link, uint_t idx)
 	viona_vring_t *ring;
 	int err;
 
-	if (idx >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, idx)) {
 		return (EINVAL);
 	}
 	ring = &link->l_vrings[idx];
@@ -1227,7 +1359,7 @@ viona_ioc_ring_kick(viona_link_t *link, uint_t idx)
 static int
 viona_ioc_ring_pause(viona_link_t *link, uint_t idx)
 {
-	if (idx >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, idx)) {
 		return (EINVAL);
 	}
 
@@ -1244,7 +1376,7 @@ viona_ioc_ring_set_msi(viona_link_t *link, void *data, int md)
 	if (ddi_copyin(data, &vrm, sizeof (vrm), md) != 0) {
 		return (EFAULT);
 	}
-	if (vrm.rm_index >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, vrm.rm_index)) {
 		return (EINVAL);
 	}
 
@@ -1273,7 +1405,7 @@ viona_notify_iop(void *arg, bool in, uint16_t port, uint8_t bytes,
 
 	/* Let userspace handle notifications for rings other than RX/TX. */
 	const uint16_t vq = *val;
-	if (vq >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, vq)) {
 		return (ESRCH);
 	}
 
@@ -1327,7 +1459,7 @@ viona_notify_mmio(void *arg, bool write, uint64_t address, int bytes,
 	const uint16_t vq = *val;
 
 	/* Let userspace handle notifications for rings other than RX/TX. */
-	if (vq >= VIONA_VQ_MAX)
+	if (!VIONA_RING_VALID(link, vq))
 		return (ESRCH);
 
 	viona_vring_t *ring = &link->l_vrings[vq];
@@ -1606,7 +1738,7 @@ done:
 static int
 viona_ioc_ring_intr_clear(viona_link_t *link, uint_t idx)
 {
-	if (idx >= VIONA_VQ_MAX) {
+	if (!VIONA_RING_VALID(link, idx)) {
 		return (EINVAL);
 	}
 
@@ -1617,21 +1749,54 @@ viona_ioc_ring_intr_clear(viona_link_t *link, uint_t idx)
 static int
 viona_ioc_intr_poll(viona_link_t *link, void *udata, int md, int *rv)
 {
+	vioc_intr_poll_t vip = { 0 };
 	uint_t cnt = 0;
-	vioc_intr_poll_t vip;
 
-	for (uint_t i = 0; i < VIONA_VQ_MAX; i++) {
+	for (size_t i = 0;
+	    i < ARRAY_SIZE(vip.vip_status) && i < VIONA_USABLE_RINGS(link);
+	    i++) {
 		uint_t val = link->l_vrings[i].vr_intr_enabled;
 
 		vip.vip_status[i] = val;
-		if (val != 0) {
+		if (val != 0)
+			cnt++;
+	}
+
+	if (ddi_copyout(&vip, udata, sizeof (vip), md) != 0)
+		return (EFAULT);
+
+	*rv = (int)cnt;
+	return (0);
+}
+
+static int
+viona_ioc_intr_poll_mq(viona_link_t *link, void *udata, int md, int *rv)
+{
+	vioc_intr_poll_mq_t vipm;
+	uint16_t cnt = 0;
+	int err = 0;
+
+	bzero(&vipm, sizeof (vipm));
+
+	if (ddi_copyin(udata, &vipm.vipm_nrings, sizeof (vipm.vipm_nrings),
+	    md) != 0) {
+		return (EFAULT);
+	}
+
+	if (vipm.vipm_nrings < 1 || vipm.vipm_nrings > VIONA_USABLE_RINGS(link))
+		return (EINVAL);
+
+	for (uint_t i = 0; i < vipm.vipm_nrings; i++) {
+		if (link->l_vrings[i].vr_intr_enabled) {
+			VIONA_INTR_SET(&vipm, i);
 			cnt++;
 		}
 	}
 
-	if (ddi_copyout(&vip, udata, sizeof (vip), md) != 0) {
-		return (EFAULT);
-	}
-	*rv = (int)cnt;
-	return (0);
+	if (ddi_copyout(&vipm, udata, sizeof (vipm), md) != 0)
+		err = EFAULT;
+	else
+		*rv = (int)cnt;
+
+	return (err);
 }

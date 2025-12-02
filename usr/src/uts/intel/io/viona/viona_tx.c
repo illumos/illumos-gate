@@ -209,7 +209,8 @@ viona_tx_done(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 void
 viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 {
-	(void) thread_vsetname(curthread, "viona_tx_%p", ring);
+	(void) thread_vsetname(curthread, "viona_tx_%u_%p",
+	    ring->vr_index, ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);

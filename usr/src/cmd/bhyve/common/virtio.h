@@ -316,7 +316,8 @@ typedef struct virtio_capstr {
 
 struct virtio_consts {
 	const char *vc_name;		/* name of driver (for diagnostics) */
-	int	vc_nvq;			/* number of virtual queues */
+	int	vc_nvq;			/* current number of virtual queues */
+	int	vc_max_nvq;		/* max no. queues, for multi-queue */
 	size_t	vc_cfgsize;		/* size of dev-specific config regs */
 	void	(*vc_reset)(void *);	/* called on virtual device reset */
 	void	(*vc_qinit)(void *, uint64_t, bool);
@@ -355,14 +356,14 @@ struct virtio_consts {
  * code.
  *
  * Note: the addresses of vq_desc, vq_avail, and vq_used are all
- * computable from each other, but it's a lot simpler if we just
- * keep a pointer to each one.  The event indices are similarly
- * (but more easily) computable, and this time we'll compute them:
+ * computable from each other in the legacy interface, but even
+ * there it's a lot simpler if we just keep a pointer to
+ * each one.  The event indices are similarly (but more
+ * easily) computable, and this time we'll compute them:
  * they're just XX_ring[N].
  */
 #define	VQ_ALLOC	0x01	/* set once we have a pfn */
-#define	VQ_BROKED	0x02	/* ??? */
-#define	VQ_ENABLED	0x04	/* set if the queue was enabled */
+#define	VQ_ENABLED	0x02	/* set if the queue was enabled */
 struct vqueue_info {
 	uint16_t vq_qsize;	/* size of this queue (a power of 2) */
 	void	(*vq_notify)(void *, struct vqueue_info *);
@@ -494,6 +495,7 @@ struct vi_req {
 void	vi_softc_linkup(struct virtio_softc *vs, struct virtio_consts *vc,
 			void *dev_softc, struct pci_devinst *pi,
 			struct vqueue_info *queues);
+void	vi_queue_linkup(struct virtio_softc *vc, struct vqueue_info *queues);
 bool	vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix);
 void	vi_pci_init(struct pci_devinst *, virtio_mode_t, uint16_t,
     uint16_t, uint8_t);
