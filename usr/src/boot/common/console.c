@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
+ * Copyright 2025 Edgecast Cloud LLC.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -182,10 +183,17 @@ cons_probe(void)
 	unsetenv("console");
 	cons_change(prefconsole, &list);
 
-	printf("Consoles: ");
-	for (cons = 0; consoles[cons] != NULL; cons++)
-		if (consoles[cons]->c_flags & (C_ACTIVEIN | C_ACTIVEOUT))
-			printf("%s  ", consoles[cons]->c_desc);
+	printf("Consoles:");
+	bool first = true;
+	for (cons = 0; consoles[cons] != NULL; cons++) {
+		if (consoles[cons]->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) {
+			if (first)
+				first = false;
+			else
+				putchar(',');
+			printf(" %s", consoles[cons]->c_desc);
+		}
+	}
 	printf("\n");
 
 	if (list != NULL)
