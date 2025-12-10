@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd June 14, 2022
+.Dd December 11, 2025
 .Dt VIOBLK 4D
 .Os
 .Sh NAME
@@ -27,9 +27,6 @@ driver is a
 .Xr blkdev 4D
 based device that supports the virtio para-virtualization block device
 specification which is commonly used by many hypervisors and emulators.
-The device supports what the specification calls the more commonly found
-.Sq legacy
-interface for devices.
 .Pp
 The driver supports the following features, if offered by the device:
 .Bl -dash

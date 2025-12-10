@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -175,7 +176,11 @@ extern "C" {
  * VIRTIO NETWORK HEADER
  *
  * This structure appears at the start of each transmit or receive packet
- * buffer.
+ * buffer. When using the legacy interface, the `vnh_num_buffers` field only
+ * appears when VIRTIO_NET_F_MRG_RXBUF is negotiated, whereas it is always
+ * present with the modern interface. We use a common struct since it is always
+ * constructed in a buffer of at least this size, and then only put the
+ * requisite number of bytes (VIRTIO_NET_HDR_LEN()) into the descriptor.
  */
 struct virtio_net_hdr {
 	uint8_t				vnh_flags;
@@ -184,7 +189,11 @@ struct virtio_net_hdr {
 	uint16_t			vnh_gso_size;
 	uint16_t			vnh_csum_start;
 	uint16_t			vnh_csum_offset;
+	uint16_t			vnh_num_buffers;
 } __packed;
+#define	VIRTIO_NET_HDR_LEN(modern) \
+	((modern) ? sizeof (struct virtio_net_hdr) : \
+	offsetof(struct virtio_net_hdr, vnh_num_buffers))
 
 /*
  * VIRTIO NETWORK HEADER: FLAGS (vnh_flags)
@@ -438,6 +447,7 @@ struct vioif {
 	uint_t				vif_nrxbufs_onloan_max;
 	uint_t				vif_rxbufs_capacity;
 	vioif_rxbuf_t			*vif_rxbufs_mem;
+	size_t				vif_rxbuf_hdrlen;
 
 	/*
 	 * Transmit buffer free list and accounting:

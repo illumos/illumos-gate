@@ -16,6 +16,7 @@
 #
 # Copyright (c) 2013, Nexenta Systems Inc. All rights reserved.
 # Copyright 2022 MNX Cloud, Inc.
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -39,7 +40,8 @@ dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/vioif.4d
 driver name=vioif perms="* 0666 root sys" \
     alias=pci1af4,1 \
-    alias=pci1af4,1000,p
+    alias=pci1af4,1000,p \
+    alias=pci1af4,1041,p
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/vioif/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/vioif/THIRDPARTYLICENSE

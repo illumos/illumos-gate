@@ -2124,7 +2124,7 @@ NXGE_HCALL_OBJS =	\
 #
 
 # Virtio core
-VIRTIO_OBJS = virtio_main.o virtio_dma.o
+VIRTIO_OBJS = virtio_main.o virtio_legacy.o virtio_modern.o virtio_dma.o
 
 # Virtio block driver
 VIOBLK_OBJS = vioblk.o

@@ -15,6 +15,7 @@
  * Copyright 2021 Joyent, Inc.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2025 Hans Rosenfeld
+ * Copyright 2025 Oxide Computer Company
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -809,11 +810,11 @@ vioif_add_rx(vioif_t *vif)
 		/*
 		 * For legacy devices, and those that have not negotiated
 		 * VIRTIO_F_ANY_LAYOUT, the virtio net header must appear in a
-		 * separate descriptor entry to the rest of the buffer.
+		 * separate descriptor entry to the rest of the buffer. We do
+		 * the same for modern devices too.
 		 */
 		if (virtio_chain_append(rb->rb_chain,
-		    virtio_dma_cookie_pa(rb->rb_dma, 0),
-		    sizeof (struct virtio_net_hdr),
+		    virtio_dma_cookie_pa(rb->rb_dma, 0), vif->vif_rxbuf_hdrlen,
 		    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
 			goto fail;
 		}
@@ -880,13 +881,13 @@ vioif_process_rx(vioif_t *vif)
 			continue;
 		}
 
-		if (len < sizeof (struct virtio_net_hdr)) {
+		if (len < vif->vif_rxbuf_hdrlen) {
 			vif->vif_rxfail_chain_undersize++;
 			vif->vif_ierrors++;
 			vioif_rxbuf_free(vif, rb);
 			continue;
 		}
-		len -= sizeof (struct virtio_net_hdr);
+		len -= vif->vif_rxbuf_hdrlen;
 
 		/*
 		 * We copy small packets that happen to fit into a single
@@ -1265,13 +1266,20 @@ vioif_send(vioif_t *vif, mblk_t *mp)
 	vnh = virtio_dma_va(tb->tb_dma, 0);
 	bzero(vnh, VIOIF_HEADER_SKIP);
 
+	/* We do not support VIRTIO_NET_F_MRG_RXBUF so always pass one buffer */
+	if (vif->vif_rxbuf_hdrlen >
+	    offsetof(struct virtio_net_hdr, vnh_num_buffers)) {
+		vnh->vnh_num_buffers = 1;
+	}
+
 	/*
 	 * For legacy devices, and those that have not negotiated
 	 * VIRTIO_F_ANY_LAYOUT, the virtio net header must appear in a separate
-	 * descriptor entry to the rest of the buffer.
+	 * descriptor entry to the rest of the buffer. We do that for modern
+	 * devices too.
 	 */
 	if (virtio_chain_append(tb->tb_chain,
-	    virtio_dma_cookie_pa(tb->tb_dma, 0), sizeof (struct virtio_net_hdr),
+	    virtio_dma_cookie_pa(tb->tb_dma, 0), vif->vif_rxbuf_hdrlen,
 	    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS) {
 		mutex_enter(&vif->vif_mutex);
 		vif->vif_notxbuf++;
@@ -1769,12 +1777,16 @@ vioif_get_mac(vioif_t *vif)
 	VERIFY(MUTEX_HELD(&vif->vif_mutex));
 
 	if (vioif_has_feature(vif, VIRTIO_NET_F_MAC)) {
-		for (uint_t i = 0; i < ETHERADDRL; i++) {
-			vif->vif_mac[i] = virtio_dev_get8(vif->vif_virtio,
-			    VIRTIO_NET_CONFIG_MAC + i);
-		}
-		vif->vif_mac_from_host = 1;
+		uint8_t gen = virtio_dev_getgen(vif->vif_virtio);
+		do {
+			for (uint_t i = 0; i < ETHERADDRL; i++) {
+				vif->vif_mac[i] =
+				    virtio_dev_get8(vif->vif_virtio,
+				    VIRTIO_NET_CONFIG_MAC + i);
+			}
+		} while (gen != virtio_dev_getgen(vif->vif_virtio));
 
+		vif->vif_mac_from_host = 1;
 		return;
 	}
 
@@ -1939,13 +1951,18 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vioif_t *vif;
 	virtio_t *vio;
 	mac_register_t *macp = NULL;
+	uint64_t features = VIRTIO_NET_WANTED_FEATURES;
 
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
 
-	if ((vio = virtio_init(dip, VIRTIO_NET_WANTED_FEATURES, B_TRUE)) ==
-	    NULL) {
+	if ((vio = virtio_init(dip)) == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	if (!virtio_init_features(vio, features, B_TRUE)) {
+		virtio_fini(vio, B_TRUE);
 		return (DDI_FAILURE);
 	}
 
@@ -1987,6 +2004,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	vif->vif_rxcopy_thresh = VIOIF_MACPROP_RXCOPY_THRESH_DEF;
 	vif->vif_txcopy_thresh = VIOIF_MACPROP_TXCOPY_THRESH_DEF;
+	vif->vif_rxbuf_hdrlen = VIRTIO_NET_HDR_LEN(virtio_modern(vio));
 
 	if (vioif_has_feature(vif, VIRTIO_NET_F_MTU)) {
 		vif->vif_mtu_max = virtio_dev_get16(vio, VIRTIO_NET_CONFIG_MTU);

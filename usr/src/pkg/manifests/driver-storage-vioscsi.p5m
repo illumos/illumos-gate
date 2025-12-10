@@ -12,6 +12,7 @@
 #
 # Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 # Copyright 2022 RackTop Systems, Inc.
+# Copyright 2025 Oxide Computer Company
 #
 
 #
@@ -32,5 +33,7 @@ file path=kernel/drv/$(ARCH64)/vioscsi group=sys
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/vioscsi.4d
-driver name=vioscsi class=scsi-self-identifying alias=pci1af4,1004
+driver name=vioscsi class=scsi-self-identifying \
+    alias=pci1af4,1004 \
+    alias=pci1af4,1048,p
 license lic_CDDL license=lic_CDDL

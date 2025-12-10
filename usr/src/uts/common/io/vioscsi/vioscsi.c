@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include "vioscsi.h"
@@ -1226,9 +1227,13 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * reattaching a child iport once it is removed -- the entire driver
 	 * will need to be reset for that.
 	 */
-	vio = virtio_init(dip, VIOSCSI_WANTED_FEATURES, B_TRUE);
+	vio = virtio_init(dip);
 	if ((sc->vs_virtio = vio) == NULL) {
 		dev_err(dip, CE_WARN, "failed to init virtio");
+		vioscsi_teardown(sc, B_TRUE);
+		return (DDI_FAILURE);
+	}
+	if (!virtio_init_features(vio, VIOSCSI_WANTED_FEATURES, B_TRUE)) {
 		vioscsi_teardown(sc, B_TRUE);
 		return (DDI_FAILURE);
 	}

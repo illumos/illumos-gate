@@ -24,7 +24,7 @@
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
  * Copyright 2020 Joyent Inc.
  * Copyright 2019 Western Digital Corporation.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -907,9 +907,12 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if ((vio = virtio_init(dip, VIRTIO_BLK_WANTED_FEATURES, B_TRUE)) ==
-	    NULL) {
+	if ((vio = virtio_init(dip)) == NULL) {
 		dev_err(dip, CE_WARN, "failed to start Virtio init");
+		return (DDI_FAILURE);
+	}
+	if (!virtio_init_features(vio, VIRTIO_BLK_WANTED_FEATURES, B_TRUE)) {
+		virtio_fini(vio, B_TRUE);
 		return (DDI_FAILURE);
 	}
 

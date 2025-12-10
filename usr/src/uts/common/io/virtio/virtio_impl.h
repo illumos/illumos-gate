@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _VIRTIO_IMPL_H
@@ -29,8 +30,10 @@
 #include <sys/dditypes.h>
 #include <sys/list.h>
 #include <sys/ccompile.h>
+#include <sys/stdbool.h>
 
 #include "virtio.h"
+#include "virtio_spec.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,16 +42,12 @@ extern "C" {
 extern ddi_device_acc_attr_t virtio_acc_attr;
 extern ddi_dma_attr_t virtio_dma_attr;
 
-typedef struct virtio_vq_desc virtio_vq_desc_t;
-typedef struct virtio_vq_driver virtio_vq_driver_t;
-typedef struct virtio_vq_device virtio_vq_device_t;
-typedef struct virtio_vq_elem virtio_vq_elem_t;
+extern void virtio_acquireq(virtio_t *, uint16_t);
+extern void virtio_releaseq(virtio_t *);
 
 int virtio_dma_init(virtio_t *, virtio_dma_t *, size_t, const ddi_dma_attr_t *,
     int, int);
 void virtio_dma_fini(virtio_dma_t *);
-
-
 
 typedef enum virtio_dma_level {
 	VIRTIO_DMALEVEL_HANDLE_ALLOC =	(1ULL << 0),
@@ -78,6 +77,58 @@ typedef enum virtio_initlevel {
 	VIRTIO_INITLEVEL_SHUTDOWN =	(1ULL << 5),
 } virtio_initlevel_t;
 
+typedef struct virtio_pci_cap {
+	virtio_pci_cap_type_t		vpc_type;
+	uint8_t				vpc_baridx;
+	uint64_t			vpc_offset;
+	uint64_t			vpc_size;
+
+	ddi_acc_handle_t		vpc_barh;
+	caddr_t				vpc_bar;
+} virtio_pci_cap_t;
+
+typedef enum virtio_mode {
+	VIRTIO_MODE_LEGACY		= 1,	/* A pure "legacy" device */
+	VIRTIO_MODE_TRANSITIONAL	= 2,	/* A "transitional" device */
+	VIRTIO_MODE_MODERN		= 3,	/* A pure "modern" device */
+} virtio_mode_t;
+
+typedef struct virtio_ops {
+	uint64_t	(*vop_device_get_features)(virtio_t *);
+	bool		(*vop_device_set_features)(virtio_t *, uint64_t);
+	void		(*vop_set_status_locked)(virtio_t *, uint8_t);
+	uint8_t		(*vop_get_status)(virtio_t *);
+	void		(*vop_device_reset_locked)(virtio_t *);
+	uint8_t		(*vop_isr_status)(virtio_t *);
+	void		(*vop_msix_config_set)(virtio_t *, uint16_t);
+	uint16_t	(*vop_msix_config_get)(virtio_t *);
+	void		(*vop_queue_notify)(virtio_queue_t *);
+
+	void		(*vop_queue_select)(virtio_t *, uint16_t);
+	uint16_t	(*vop_queue_size_get)(virtio_t *, uint16_t);
+	void		(*vop_queue_size_set)(virtio_t *, uint16_t, uint16_t);
+	uint64_t	(*vop_queue_noff_get)(virtio_t *, uint16_t);
+	bool		(*vop_queue_enable_get)(virtio_t *, uint16_t);
+	void		(*vop_queue_enable_set)(virtio_t *, uint16_t, bool);
+	void		(*vop_queue_addr_set)(virtio_t *, uint16_t, uint64_t,
+			    uint64_t, uint64_t);
+	void		(*vop_msix_queue_set)(virtio_t *, uint16_t, uint16_t);
+	uint16_t	(*vop_msix_queue_get)(virtio_t *, uint16_t);
+
+	uint8_t		(*vop_device_cfg_gen)(virtio_t *);
+	uint8_t		(*vop_device_cfg_get8)(virtio_t *, uintptr_t);
+	uint16_t	(*vop_device_cfg_get16)(virtio_t *, uintptr_t);
+	uint32_t	(*vop_device_cfg_get32)(virtio_t *, uintptr_t);
+	uint64_t	(*vop_device_cfg_get64)(virtio_t *, uintptr_t);
+	void		(*vop_device_cfg_put8)(virtio_t *, uintptr_t, uint8_t);
+	void		(*vop_device_cfg_put16)(virtio_t *, uintptr_t,
+			    uint16_t);
+	void		(*vop_device_cfg_put32)(virtio_t *, uintptr_t,
+			    uint32_t);
+} virtio_ops_t;
+
+extern virtio_ops_t virtio_legacy_ops, virtio_modern_ops;
+
 struct virtio {
 	dev_info_t			*vio_dip;
 
@@ -85,14 +136,27 @@ struct virtio {
 
 	virtio_initlevel_t		vio_initlevel;
 
+	virtio_mode_t			vio_mode;
+	virtio_ops_t			*vio_ops;
+
 	list_t				vio_queues;
+	kmutex_t			vio_qlock;
+	uint16_t			vio_qcur;
+
+	virtio_pci_cap_t		vio_cap_common;
+	virtio_pci_cap_t		vio_cap_notify;
+	virtio_pci_cap_t		vio_cap_isr;
+	virtio_pci_cap_t		vio_cap_device;
+
+	/* Notification multiplier used with the modern interface */
+	uint32_t			vio_multiplier;
 
 	ddi_acc_handle_t		vio_barh;
 	caddr_t				vio_bar;
-	uint_t				vio_config_offset;
+	uint_t				vio_legacy_cfg_offset;
 
-	uint32_t			vio_features;
-	uint32_t			vio_features_device;
+	uint64_t			vio_features;
+	uint64_t			vio_features_device;
 
 	ddi_intr_handle_t		*vio_interrupts;
 	int				vio_ninterrupts;
@@ -125,6 +189,13 @@ struct virtio_queue {
 	 * index 1.
 	 */
 	uint16_t			viq_index;
+
+	/*
+	 * Modern devices use a BAR region for notifications with each queue
+	 * potentially having its own offset within that region. We store the
+	 * offset for this queue here.
+	 */
+	uint64_t			viq_noff;
 
 	/*
 	 * For legacy Virtio devices, the size and shape of the queue is
@@ -180,162 +251,11 @@ struct virtio_chain {
 };
 
 /*
- * PACKED STRUCTS FOR DEVICE ACCESS
+ * When laying out queues for use over the modern interface we choose to align
+ * all queue components using the most restrictive alignment requirement, that
+ * of the descriptor part of the ring.
  */
-
-struct virtio_vq_desc {
-	/*
-	 * Buffer physical address and length.
-	 */
-	uint64_t			vqd_addr;
-	uint32_t			vqd_len;
-
-	/*
-	 * Flags.  Use with the VIRTQ_DESC_F_* family of constants.  See below.
-	 */
-	uint16_t			vqd_flags;
-
-	/*
-	 * If VIRTQ_DESC_F_NEXT is set in flags, this refers to the next
-	 * descriptor in the chain by table index.
-	 */
-	uint16_t			vqd_next;
-} __packed;
-
-/*
- * VIRTIO DESCRIPTOR FLAGS (vqd_flags)
- */
-
-/*
- * NEXT:
- *	Signals that this descriptor (direct or indirect) is part of a chain.
- *	If populated, "vqd_next" names the next descriptor in the chain by its
- *	table index.
- */
-#define	VIRTQ_DESC_F_NEXT		(1 << 0)
-
-/*
- * WRITE:
- *	Determines whether this buffer is to be written by the device (WRITE is
- *	set) or by the driver (WRITE is not set).
- */
-#define	VIRTQ_DESC_F_WRITE		(1 << 1)
-
-/*
- * INDIRECT:
- *	This bit signals that a direct descriptor refers to an indirect
- *	descriptor list, rather than directly to a buffer.  This bit may only
- *	be used in a direct descriptor; indirect descriptors are not allowed to
- *	refer to additional layers of indirect tables.  If this bit is set,
- *	NEXT must be clear; indirect descriptors may not be chained.
- */
-#define	VIRTQ_DESC_F_INDIRECT		(1 << 2)
-
-/*
- * This structure is variously known as the "available" or "avail" ring, or the
- * driver-owned portion of the queue structure.  It is used by the driver to
- * submit descriptor chains to the device.
- */
-struct virtio_vq_driver {
-	uint16_t			vqdr_flags;
-	uint16_t			vqdr_index;
-	uint16_t			vqdr_ring[];
-} __packed;
-
-#define	VIRTQ_AVAIL_F_NO_INTERRUPT	(1 << 0)
-
-/*
- * We use the sizeof operator on this packed struct to calculate the offset of
- * subsequent structs.  Ensure the compiler is not adding any padding to the
- * end of the struct.
- */
-CTASSERT(sizeof (virtio_vq_driver_t) ==
-    offsetof(virtio_vq_driver_t, vqdr_ring));
-
-struct virtio_vq_elem {
-	/*
-	 * The device returns chains of descriptors by specifying the table
-	 * index of the first descriptor in the chain.
-	 */
-	uint32_t			vqe_start;
-	uint32_t			vqe_len;
-} __packed;
-
-/*
- * This structure is variously known as the "used" ring, or the device-owned
- * portion of the queue structure.  It is used by the device to return
- * completed descriptor chains to the driver.
- */
-struct virtio_vq_device {
-	uint16_t			vqde_flags;
-	uint16_t			vqde_index;
-	virtio_vq_elem_t		vqde_ring[];
-} __packed;
-
-#define	VIRTQ_USED_F_NO_NOTIFY		(1 << 0)
-
-/*
- * BASIC CONFIGURATION
- *
- * Legacy devices expose both their generic and their device-specific
- * configuration through PCI BAR0.  This is the second entry in the register
- * address space set for these devices.
- */
-#define	VIRTIO_LEGACY_PCI_BAR0		1
-
-/*
- * These are offsets into the base configuration space available through the
- * virtio_get*() and virtio_put*() family of functions.  These offsets are for
- * what the specification describes as the "legacy" mode of device operation.
- */
-#define	VIRTIO_LEGACY_FEATURES_DEVICE	0x00	/* 32 R   */
-#define	VIRTIO_LEGACY_FEATURES_DRIVER	0x04	/* 32 R/W */
-#define	VIRTIO_LEGACY_QUEUE_ADDRESS	0x08	/* 32 R/W */
-#define	VIRTIO_LEGACY_QUEUE_SIZE	0x0C	/* 16 R   */
-#define	VIRTIO_LEGACY_QUEUE_SELECT	0x0E	/* 16 R/W */
-#define	VIRTIO_LEGACY_QUEUE_NOTIFY	0x10	/* 16 R/W */
-#define	VIRTIO_LEGACY_DEVICE_STATUS	0x12	/* 8  R/W */
-#define	VIRTIO_LEGACY_ISR_STATUS	0x13	/* 8  R   */
-
-#define	VIRTIO_LEGACY_MSIX_CONFIG	0x14	/* 16 R/W */
-#define	VIRTIO_LEGACY_MSIX_QUEUE	0x16	/* 16 R/W */
-
-#define	VIRTIO_LEGACY_CFG_OFFSET	(VIRTIO_LEGACY_ISR_STATUS + 1)
-#define	VIRTIO_LEGACY_CFG_OFFSET_MSIX	(VIRTIO_LEGACY_MSIX_QUEUE + 2)
-
-#define	VIRTIO_LEGACY_MSI_NO_VECTOR	0xFFFF
-
-/*
- * Bits in the Device Status byte (VIRTIO_LEGACY_DEVICE_STATUS):
- */
-#define	VIRTIO_STATUS_RESET		0
-#define	VIRTIO_STATUS_ACKNOWLEDGE	(1 << 0)
-#define	VIRTIO_STATUS_DRIVER		(1 << 1)
-#define	VIRTIO_STATUS_DRIVER_OK		(1 << 2)
-#define	VIRTIO_STATUS_FAILED		(1 << 7)
-
-/*
- * Bits in the Interrupt Service Routine Status byte
- * (VIRTIO_LEGACY_ISR_STATUS):
- */
-#define	VIRTIO_ISR_CHECK_QUEUES		(1 << 0)
-#define	VIRTIO_ISR_CHECK_CONFIG		(1 << 1)
-
-/*
- * Bits in the Features fields (VIRTIO_LEGACY_FEATURES_DEVICE,
- * VIRTIO_LEGACY_FEATURES_DRIVER):
- */
-#define	VIRTIO_F_RING_INDIRECT_DESC	(1ULL << 28)
-
-/*
- * For devices operating in the legacy mode, virtqueues must be aligned on a
- * "page size" of 4096 bytes; this is also called the "Queue Align" value in
- * newer versions of the specification.
- */
-#define	VIRTIO_PAGE_SHIFT		12
-#define	VIRTIO_PAGE_SIZE		(1 << VIRTIO_PAGE_SHIFT)
-CTASSERT(VIRTIO_PAGE_SIZE == 4096);
-CTASSERT(ISP2(VIRTIO_PAGE_SIZE));
+#define	MODERN_VQ_ALIGN			MODERN_VQ_ALIGN_DESC
 
 /*
  * DMA SYNCHRONISATION WRAPPERS
@@ -344,7 +264,7 @@ CTASSERT(ISP2(VIRTIO_PAGE_SIZE));
 /*
  * Synchronise the driver-owned portion of the queue so that the device can see
  * our writes.  This covers the memory accessed via the "viq_dma_descs" and
- * "viq_dma_device" members.
+ * "viq_dma_driver" members.
  */
 #define	VIRTQ_DMA_SYNC_FORDEV(viq)	VERIFY0(ddi_dma_sync( \
 					    (viq)->viq_dma.vidma_dma_handle, \

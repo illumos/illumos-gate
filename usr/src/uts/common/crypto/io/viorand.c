@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2023 Toomas Soome <tsoome@me.com>
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -303,8 +304,13 @@ viorand_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_soft_state_zalloc(viorand_statep, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	vio = virtio_init(dip, VIORAND_FEATURES, B_TRUE);
+	vio = virtio_init(dip);
 	if (vio == NULL) {
+		ddi_soft_state_free(viorand_statep, instance);
+		return (DDI_FAILURE);
+	}
+	if (!virtio_init_features(vio, VIORAND_FEATURES, B_TRUE)) {
+		virtio_fini(vio, B_TRUE);
 		ddi_soft_state_free(viorand_statep, instance);
 		return (DDI_FAILURE);
 	}

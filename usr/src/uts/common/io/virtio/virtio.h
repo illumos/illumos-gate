@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _VIRTIO_H
@@ -22,32 +23,34 @@
  *
  * This framework handles the initialisation and operation common to all Virtio
  * device types; e.g., Virtio Block (vioblk), Virtio Network (vioif), etc.  The
- * framework presently provides for what is now described as a "legacy" driver
- * in the current issue of the "Virtual I/O Device (VIRTIO) Version 1.1"
- * specification.  Though several new specifications have been released, legacy
- * devices are still the most widely available on current hypervisor platforms.
- * Legacy devices make use of the native byte order of the host system.
+ * framework provides a driver for what is known as a "legacy", "modern" or
+ * "transitional" device and will use the modern VirtIO interface when talking
+ * to modern or transitional devices.
  *
  * FRAMEWORK INITIALISATION: STARTING
  *
  * Client drivers will, in their attach(9E) routine, make an early call to
  * virtio_init().  This causes the framework to allocate some base resources
- * and begin initialising the device.  This routine confirms that the device
- * will operate in the supported legacy mode as per the specification.  A
- * failure here means that we cannot presently support this device.
+ * and begin initialising the device.  This routine determine which mode the
+ * device will operate in. A failure here means that we cannot presently
+ * support this device.
  *
  * Once virtio_init() returns, the initialisation phase has begun and the
- * driver can examine negotiated features and set up virtqueues.  The
- * initialisation phase ends when the driver calls either
+ * driver can examine the features advertised by the device and may read (but
+ * NOT write) the device-specific configuration to determine which features it
+ * wishes to advertise, or whether it wants to support the device at all. When
+ * ready, the driver will call virtio_init_features() to complete feature
+ * negotiation. The initialisation phase ends when the driver calls either
  * virtio_init_complete() or virtio_fini().
  *
  * FRAMEWORK INITIALISATION: FEATURE NEGOTIATION
  *
- * The virtio_init() call accepts a bitmask of desired features that the driver
- * supports.  The framework will negotiate the common set of features supported
- * by both the driver and the device.  The presence of any individual feature
- * can be tested after the initialisation phase has begun using
- * virtio_feature_present().
+ * The virtio_init_features() call accepts a bitmask of desired features that
+ * the driver supports.  The framework will negotiate the common set of
+ * features supported by both the driver and the device.  The presence of any
+ * individual feature can be tested after the initialisation phase has begun
+ * using virtio_feature_present(). Feature negotiation may fail, indicated by
+ * virtio_init_features() returning false.
  *
  * The framework will additionally negotiate some set of features that are not
  * specific to a device type on behalf of the client driver; e.g., support for
@@ -56,7 +59,10 @@
  * Some features allow the driver to read additional configuration values from
  * the device-specific regions of the device register space.  These can be
  * accessed via the virtio_dev_get*() and virtio_dev_put*() family of
- * functions.
+ * functions. The modern interface also provides a configuration generation
+ * number which can be retrieved via virtio_dev_getgen(). This allows drivers
+ * to check if something in the configuration space has changed while reading
+ * values in separate transactions.
  *
  * FRAMEWORK INITIALISATION: VIRTQUEUE CONFIGURATION
  *
@@ -67,9 +73,10 @@
  *
  * When configuring a queue, the driver must know the queue index number.  This
  * generally comes from the section of the specification describing the
- * specific device type; e.g., Virtio Network devices have a receive queue at
- * index 0, and a transmit queue at index 1.  The name given to the queue is
- * informational and has no impact on device operation.
+ * specific device type; e.g., Unless they negotiate multi-queue, virtio
+ * Network devices have a receive queue at index 0, and a transmit queue at
+ * index 1.  The name given to the queue is informational and has no impact on
+ * device operation.
  *
  * Most queues will require an interrupt handler function.  When a queue
  * notification interrupt is received, the provided handler will be called with
@@ -289,7 +296,8 @@ typedef enum virtio_direction {
 } virtio_direction_t;
 
 void virtio_fini(virtio_t *, boolean_t);
-virtio_t *virtio_init(dev_info_t *, uint64_t, boolean_t);
+virtio_t *virtio_init(dev_info_t *);
+boolean_t virtio_init_features(virtio_t *, uint64_t, boolean_t);
 int virtio_init_complete(virtio_t *, int);
 int virtio_quiesce(virtio_t *);
 void virtio_shutdown(virtio_t *);
@@ -301,6 +309,7 @@ void *virtio_intr_pri(virtio_t *);
 
 void virtio_device_reset(virtio_t *);
 
+uint8_t virtio_dev_getgen(virtio_t *);
 uint8_t virtio_dev_get8(virtio_t *, uintptr_t);
 uint16_t virtio_dev_get16(virtio_t *, uintptr_t);
 uint32_t virtio_dev_get32(virtio_t *, uintptr_t);
@@ -311,6 +320,7 @@ void virtio_dev_put16(virtio_t *, uintptr_t, uint16_t);
 void virtio_dev_put32(virtio_t *, uintptr_t, uint32_t);
 
 boolean_t virtio_feature_present(virtio_t *, uint64_t);
+boolean_t virtio_modern(virtio_t *);
 
 virtio_queue_t *virtio_queue_alloc(virtio_t *, uint16_t, const char *,
     ddi_intr_handler_t *, void *, boolean_t, uint_t);

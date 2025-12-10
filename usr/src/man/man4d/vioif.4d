@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd October 3, 2020
+.Dd December 11, 2025
 .Dt VIOIF 4D
 .Os
 .Sh NAME
@@ -24,9 +24,6 @@ The
 .Nm
 driver is a GLDv3 NIC driver that supports the virtio para-virtualization
 specification which is commonly used by many hypervisors and emulators.
-The device supports what the specification calls the more commonly found
-.Sq legacy
-interface for devices.
 .Pp
 The driver supports the following networking features, if offered by the
 device:

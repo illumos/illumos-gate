@@ -11,6 +11,7 @@
 
 #
 # Copyright 2023 Toomas Soome <tsoome@me.com>
+# Copyright 2025 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -24,5 +25,7 @@ dir  path=kernel group=sys
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/viorand group=sys
-driver name=viorand alias=pci1af4,1005
+driver name=viorand \
+    alias=pci1af4,1005 \
+    alias=pci1af4,1044,p
 license lic_CDDL license=lic_CDDL
