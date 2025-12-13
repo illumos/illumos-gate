@@ -71,8 +71,6 @@ EFI_GUID gEfiSmbios3TableGuid = SMBIOS3_TABLE_GUID;
 extern void acpi_detect(void);
 extern void efi_getsmap(void);
 
-static EFI_LOADED_IMAGE_PROTOCOL *img;
-
 /*
  * Number of seconds to wait for a keystroke before exiting with failure
  * in the event no currdev is found. -2 means always break, -1 means
@@ -91,13 +89,13 @@ efi_zfs_is_preferred(EFI_HANDLE *h)
 	extern UINT64 start_sector;	/* from mb_header.S */
 
 	/* This check is true for chainloader case. */
-	if (h == img->DeviceHandle)
+	if (h == boot_img->DeviceHandle)
 		return (true);
 
 	/*
 	 * Make sure the image was loaded from the hard disk.
 	 */
-	devpath = efi_lookup_devpath(img->DeviceHandle);
+	devpath = efi_lookup_devpath(boot_img->DeviceHandle);
 	if (devpath == NULL)
 		return (false);
 	node = efi_devpath_last_node(devpath);
@@ -703,10 +701,6 @@ main(int argc, CHAR16 *argv[])
 	/* Note this needs to be set before ZFS init. */
 	archsw.arch_zfs_probe = efi_zfs_probe;
 
-	/* Get our loaded image protocol interface structure. */
-	(void) OpenProtocolByHandle(IH, &gEfiLoadedImageProtocolGuid,
-	    (void **)&img);
-
 	/*
 	 * XXX Chicken-and-egg problem; we want to have console output
 	 * early, but some console attributes may depend on reading from
@@ -874,7 +868,7 @@ main(int argc, CHAR16 *argv[])
 	}
 	printf("\n");
 
-	printf("Image base: 0x%lx\n", (unsigned long)img->ImageBase);
+	printf("Image base: 0x%lx\n", (unsigned long)boot_img->ImageBase);
 	printf("EFI version: %d.%02d\n", ST->Hdr.Revision >> 16,
 	    ST->Hdr.Revision & 0xffff);
 	printf("EFI Firmware: %S (rev %d.%02d)\n", ST->FirmwareVendor,
@@ -883,14 +877,14 @@ main(int argc, CHAR16 *argv[])
 	printf("\n%s", bootprog_info);
 
 	/* Determine the devpath of our image so we can prefer it. */
-	text = efi_devpath_name(img->FilePath);
+	text = efi_devpath_name(boot_img->FilePath);
 	if (text != NULL) {
 		printf("   Load Path: %S\n", text);
 		efi_setenv_illumos_wcs("LoaderPath", text);
 		efi_free_devpath_name(text);
 	}
 
-	status = OpenProtocolByHandle(img->DeviceHandle,
+	status = OpenProtocolByHandle(boot_img->DeviceHandle,
 	    &gEfiDevicePathProtocolGuid, (void **)&imgpath);
 	if (status == EFI_SUCCESS) {
 		text = efi_devpath_name(imgpath);
@@ -932,7 +926,7 @@ main(int argc, CHAR16 *argv[])
 	 * the boot protocol and also allow an escape hatch for users wishing
 	 * to try something different.
 	 */
-	if (!find_currdev(img))
+	if (!find_currdev(boot_img))
 		if (!interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
 

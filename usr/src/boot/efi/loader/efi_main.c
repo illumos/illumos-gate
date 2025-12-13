@@ -73,7 +73,6 @@ arg_skipword(CHAR16 *argp)
 EFI_STATUS
 efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
-	EFI_LOADED_IMAGE_PROTOCOL *img;
 	CHAR16 *argp, *args, **argv;
 	EFI_STATUS status;
 	int argc, addprog;
@@ -96,7 +95,7 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	/* Use efi_exit() from here on... */
 
 	status = OpenProtocolByHandle(IH, &gEfiLoadedImageProtocolGuid,
-	    (void **)&img);
+	    (void **)&boot_img);
 	if (status != EFI_SUCCESS)
 		efi_exit(status);
 
@@ -112,14 +111,18 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	 * If the string is already in Unicode-16, we make a copy so that
 	 * we know we can always modify the string.
 	 */
-	if (img->LoadOptionsSize > 0 && img->LoadOptions != NULL) {
-		if (img->LoadOptionsSize == strlen(img->LoadOptions) + 1) {
-			args = malloc(img->LoadOptionsSize << 1);
-			for (argc = 0; argc < (int)img->LoadOptionsSize; argc++)
-				args[argc] = ((char *)img->LoadOptions)[argc];
+	if (boot_img->LoadOptionsSize > 0 && boot_img->LoadOptions != NULL) {
+		if (boot_img->LoadOptionsSize ==
+		    strlen(boot_img->LoadOptions) + 1) {
+			args = malloc(boot_img->LoadOptionsSize << 1);
+			for (argc = 0; argc < (int)boot_img->LoadOptionsSize;
+			    argc++)
+				args[argc] =
+				    ((char *)boot_img->LoadOptions)[argc];
 		} else {
-			args = malloc(img->LoadOptionsSize);
-			memcpy(args, img->LoadOptions, img->LoadOptionsSize);
+			args = malloc(boot_img->LoadOptionsSize);
+			memcpy(args, boot_img->LoadOptions,
+			    boot_img->LoadOptionsSize);
 		}
 	} else
 		args = NULL;
@@ -137,13 +140,14 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	 * for the boot manager.
 	 */
 	/* Part 1: Figure out if we need to add our program name. */
-	addprog = (args == NULL || img->ParentHandle == NULL ||
-	    img->FilePath == NULL) ? 1 : 0;
+	addprog = (args == NULL || boot_img->ParentHandle == NULL ||
+	    boot_img->FilePath == NULL) ? 1 : 0;
 	if (!addprog) {
 		addprog =
-		    (DevicePathType(img->FilePath) != MEDIA_DEVICE_PATH ||
-		    DevicePathSubType(img->FilePath) != MEDIA_FILEPATH_DP ||
-		    DevicePathNodeLength(img->FilePath) <=
+		    (DevicePathType(boot_img->FilePath) != MEDIA_DEVICE_PATH ||
+		    DevicePathSubType(boot_img->FilePath) !=
+		    MEDIA_FILEPATH_DP ||
+		    DevicePathNodeLength(boot_img->FilePath) <=
 		    sizeof (FILEPATH_DEVICE_PATH)) ? 1 : 0;
 		if (!addprog) {
 			/* XXX todo. */

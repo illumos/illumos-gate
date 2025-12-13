@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 #include <Protocol/BlockIo.h>
+#include <Protocol/LoadedImage.h>
 #include <Protocol/SerialIo.h>
 #include <Protocol/IsaIo.h>
 
@@ -39,6 +40,7 @@ extern EFI_HANDLE		IH;
 extern EFI_SYSTEM_TABLE		*ST;
 extern EFI_BOOT_SERVICES	*BS;
 extern EFI_RUNTIME_SERVICES	*RS;
+extern EFI_LOADED_IMAGE_PROTOCOL *boot_img;
 
 extern struct devsw efipart_fddev;
 extern struct devsw efipart_cddev;
