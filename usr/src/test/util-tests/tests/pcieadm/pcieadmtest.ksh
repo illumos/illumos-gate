@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 unalias -a
@@ -82,7 +82,8 @@ if [[ ! -d $pcieadm_data ]]; then
 fi
 
 #
-# First work through bad options.
+# First work through bad options. The majority of the bar read and write bad
+# options are in the privileged test.
 #
 pcieadm_bad_args
 pcieadm_bad_args -d
@@ -106,6 +107,14 @@ pcieadm_bad_args show-cfgspace -L -p -f "$pcieadm_data/igb.pci"
 pcieadm_bad_args show-cfgspace -p -f "$pcieadm_data/igb.pci"
 pcieadm_bad_args show-cfgspace -o foo -f "$pcieadm_data/igb.pci"
 pcieadm_bad_args show-cfgspace -L -o foo -f "$pcieadm_data/igb.pci"
+pcieadm_bad_args bar
+pcieadm_bad_args bar -h
+pcieadm_bad_args bar asdf
+pcieadm_bad_args bar list
+pcieadm_bad_args bar list -p -d foobar
+pcieadm_bad_args bar list -p -d foobar
+pcieadm_bad_args bar list -p -d foobar -o nope
+pcieadm_bad_args bar list -p -d foobar -o io,nope
 
 #
 # Test different output cases

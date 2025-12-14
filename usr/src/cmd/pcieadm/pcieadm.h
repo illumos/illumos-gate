@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _PCIEADM_H
@@ -23,6 +23,7 @@
 #include <libdevinfo.h>
 #include <pcidb.h>
 #include <priv.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,17 +59,24 @@ typedef struct {
  * Config space related
  */
 typedef boolean_t (*pcieadm_cfgspace_f)(uint32_t, uint8_t, void *, void *);
+typedef boolean_t (*pcieadm_bar_f)(uint8_t, uint8_t, uint64_t, void *, void *,
+    boolean_t);
+
+typedef struct {
+	pcieadm_cfgspace_f pop_cfg;
+	pcieadm_bar_f pop_bar;
+} pcieadm_ops_t;
 
 /*
  * Utilities
  */
 extern void pcieadm_di_walk(pcieadm_t *, pcieadm_di_walk_t *);
-extern void pcieadm_init_cfgspace_kernel(pcieadm_t *, pcieadm_cfgspace_f *,
+extern void pcieadm_init_ops_kernel(pcieadm_t *, const pcieadm_ops_t **,
     void **);
-extern void pcieadm_fini_cfgspace_kernel(void *);
-extern void pcieadm_init_cfgspace_file(pcieadm_t *, const char *,
-    pcieadm_cfgspace_f *, void **);
-extern void pcieadm_fini_cfgspace_file(void *);
+extern void pcieadm_fini_ops_kernel(void *);
+extern void pcieadm_init_ops_file(pcieadm_t *, const char *,
+    const pcieadm_ops_t **, void **);
+extern void pcieadm_fini_ops_file(void *);
 extern void pcieadm_find_nexus(pcieadm_t *);
 extern void pcieadm_find_dip(pcieadm_t *, const char *);
 
@@ -84,6 +92,11 @@ extern void pcieadm_ofmt_errx(const char *, ...);
 /*
  * Command tabs
  */
+extern void pcieadm_walk_usage(const pcieadm_cmdtab_t *, FILE *);
+extern int pcieadm_walk_tab(pcieadm_t *, const pcieadm_cmdtab_t *, int,
+    char *[]);
+extern int pcieadm_bar(pcieadm_t *, int, char *[]);
+extern void pcieadm_bar_usage(FILE *);
 extern int pcieadm_save_cfgspace(pcieadm_t *, int, char *[]);
 extern void pcieadm_save_cfgspace_usage(FILE *);
 extern int pcieadm_show_cfgspace(pcieadm_t *, int, char *[]);

@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2022 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -65,6 +65,16 @@ pcieadm_validate_filter()
 	else
 		printf "TEST PASSED: save-cfgspace -d $filter\n"
 	fi
+}
+
+pcieadm_bad_args()
+{
+	if $pcieadm_prog $@ 2>/dev/null 1>/dev/null; then
+		warn "should have failed with args "$@", but passed"
+		return
+	fi
+
+	printf "TEST PASSED: invalid arguments %s\n" "$*"
 }
 
 #
@@ -138,6 +148,62 @@ if ! $pcieadm_prog save-cfgspace -a "$pcieadm_tmp" > /dev/null; then
 	warn "failed to save all devices"
 else
 	printf "TEST PASSED: save-cfgspace -a\n"
+fi
+
+#
+# Test several of our invalid parsing bar related activities that want
+# to find a valid device to ensure that we're not getting thrown off by
+# the invalid device.
+#
+pcieadm_bad_args bar read
+pcieadm_bad_args bar read magicite
+pcieadm_bad_args bar read -d $pcieadm_dev
+pcieadm_bad_args bar read -d $pcieadm_dev 0x0
+pcieadm_bad_args bar read -d $pcieadm_dev -b 2
+pcieadm_bad_args bar read -d $pcieadm_dev -b 2 -l 4
+pcieadm_bad_args bar read -b 2 -l 4 0x0
+pcieadm_bad_args bar read -d $pcieadm_dev -b 2 foobar
+pcieadm_bad_args bar read -d $pcieadm_dev -b 2 0xn0p3
+pcieadm_bad_args bar read -d i-do-not-exist? -b 2 0x0
+pcieadm_bad_args bar read -d $pcieadm_dev -b 23 0x0
+pcieadm_bad_args bar read -d $pcieadm_dev -b 7777 0x0
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 0 0x00
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 1 0x00
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 9 0x00
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 16 0x00
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 23 0x00
+pcieadm_bad_args bar read -d $pcieadm_dev -b 0 -l 3 0x00
+pcieadm_bad_args bar write
+pcieadm_bad_args bar write materia
+pcieadm_bad_args bar write -d $pcieadm_dev
+pcieadm_bad_args bar write -d $pcieadm_dev 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 2
+pcieadm_bad_args bar write -d $pcieadm_dev -b 2 -l 4
+pcieadm_bad_args bar write -b 2 -l 4 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 2 foobar
+pcieadm_bad_args bar write -d $pcieadm_dev -b 2 0xn0p3
+pcieadm_bad_args bar write -d i-do-not-exist? -b 2 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 23 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 7777 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 0 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 1 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 9 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 16 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 23 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 -l 3 0x00
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 0x0
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 0x0=
+pcieadm_bad_args bar write -d $pcieadm_dev -b 0 0x0=foobar
+
+#
+# Verify we can list bars of the device we found earlier. As we don't
+# know much about it, there are a limited number of filters that we
+# could apply in an automated test.
+#
+if ! $pcieadm_prog bar list -d $pcieadm_bdf 1>/dev/null; then
+	warn "failed to list bars on $pcieadm_bdf"
+else
+	printf "TEST PASSED: listed bars on %s\n" "$pcieadm_bdf"
 fi
 
 if (( pcieadm_exit == 0 )); then

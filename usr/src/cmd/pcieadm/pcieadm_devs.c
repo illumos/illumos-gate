@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <err.h>
@@ -172,7 +172,7 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		break;
 	case PCIEADM_SDO_PATH:
 		if (strlcat(buf, psdo->psdo_path, buflen) >= buflen) {
-			return (B_TRUE);
+			return (B_FALSE);
 		}
 		break;
 	case PCIEADM_SDO_VID:

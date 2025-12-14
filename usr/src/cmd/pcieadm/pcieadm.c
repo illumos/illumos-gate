@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -65,6 +65,7 @@
 #include <sys/debug.h>
 #include <upanic.h>
 #include <libgen.h>
+#include <stdnoreturn.h>
 
 #include "pcieadm.h"
 
@@ -315,7 +316,7 @@ typedef struct pcieadm_cfgspace_file {
 } pcieadm_cfgspace_file_t;
 
 static boolean_t
-pcieadm_read_cfgspace_file(uint32_t off, uint8_t len, void *buf, void *arg)
+pcieadm_pop_cfgspace_file(uint32_t off, uint8_t len, void *buf, void *arg)
 {
 	uint32_t bufoff = 0;
 	pcieadm_cfgspace_file_t *pcfi = arg;
@@ -341,9 +342,23 @@ pcieadm_read_cfgspace_file(uint32_t off, uint8_t len, void *buf, void *arg)
 	return (B_TRUE);
 }
 
+static noreturn boolean_t
+pcieadm_pop_bar_notsup(uint8_t bar, uint8_t len, uint64_t off, void *buf,
+    void *arg, boolean_t write)
+{
+	errx(EXIT_FAILURE, "encountered unsupported request to %s %u bytes "
+	    "from BAR %u at offset %" PRIx64, write ? "write" : "read", len,
+	    bar, off);
+}
+
+static const pcieadm_ops_t pcieadm_file_ops = {
+	.pop_cfg = pcieadm_pop_cfgspace_file,
+	.pop_bar = pcieadm_pop_bar_notsup
+};
+
 void
-pcieadm_init_cfgspace_file(pcieadm_t *pcip, const char *path,
-    pcieadm_cfgspace_f *funcp, void **arg)
+pcieadm_init_ops_file(pcieadm_t *pcip, const char *path,
+    const pcieadm_ops_t **opsp, void **arg)
 {
 	int fd;
 	struct stat st;
@@ -398,11 +413,11 @@ pcieadm_init_cfgspace_file(pcieadm_t *pcip, const char *path,
 
 	pcfi->pcfi_fd = fd;
 	*arg = pcfi;
-	*funcp = pcieadm_read_cfgspace_file;
+	*opsp = &pcieadm_file_ops;
 }
 
 void
-pcieadm_fini_cfgspace_file(void *arg)
+pcieadm_fini_ops_file(void *arg)
 {
 	pcieadm_cfgspace_file_t *pcfi = arg;
 	VERIFY0(close(pcfi->pcfi_fd));
@@ -418,7 +433,8 @@ typedef struct pcieadm_cfgspace_kernel {
 } pcieadm_cfgspace_kernel_t;
 
 static boolean_t
-pcieadm_read_cfgspace_kernel(uint32_t off, uint8_t len, void *buf, void *arg)
+pcieadm_pop_kernel_common(uint8_t ptb, uint8_t len, uint64_t off, void *buf,
+    void *arg, boolean_t write)
 {
 	pcieadm_cfgspace_kernel_t *pck = arg;
 	pcieadm_t *pcip = pck->pck_pci;
@@ -429,7 +445,7 @@ pcieadm_read_cfgspace_kernel(uint32_t off, uint8_t len, void *buf, void *arg)
 	pci_reg.bus_no = pck->pck_bus;
 	pci_reg.dev_no = pck->pck_dev;
 	pci_reg.func_no = pck->pck_func;
-	pci_reg.barnum = 0;
+	pci_reg.barnum = ptb;
 	pci_reg.offset = off;
 	pci_reg.acc_attr = PCITOOL_ACC_ATTR_ENDN_LTL;
 
@@ -451,39 +467,89 @@ pcieadm_read_cfgspace_kernel(uint32_t off, uint8_t len, void *buf, void *arg)
 		    len);
 	}
 
+	if (write) {
+		switch (len) {
+		case 1:
+			pci_reg.data = *(uint8_t *)buf;
+			break;
+		case 2:
+			pci_reg.data = *(uint16_t *)buf;
+			break;
+		case 4:
+			pci_reg.data = *(uint32_t *)buf;
+			break;
+		case 8:
+			pci_reg.data = *(uint64_t *)buf;
+			break;
+		}
+	}
+
 	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pcip->pia_priv_eff) != 0) {
 		err(EXIT_FAILURE, "failed to raise privileges");
 	}
 
-	if (ioctl(pck->pck_fd, PCITOOL_DEVICE_GET_REG, &pci_reg) != 0) {
-		err(EXIT_FAILURE, "failed to read device offset 0x%x", off);
+	int cmd = write ? PCITOOL_DEVICE_SET_REG : PCITOOL_DEVICE_GET_REG;
+	if (ioctl(pck->pck_fd, cmd, &pci_reg) != 0) {
+		err(EXIT_FAILURE, "failed to read device offset 0x%" PRIx64
+		    ": 0x%x", off, pci_reg.status);
 	}
 
 	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pcip->pia_priv_min) != 0) {
 		err(EXIT_FAILURE, "failed to reduce privileges");
 	}
 
-	switch (len) {
-	case 1:
-		*(uint8_t *)buf = (uint8_t)pci_reg.data;
-		break;
-	case 2:
-		*(uint16_t *)buf = (uint16_t)pci_reg.data;
-		break;
-	case 4:
-		*(uint32_t *)buf = (uint32_t)pci_reg.data;
-		break;
-	case 8:
-		*(uint64_t *)buf = (uint64_t)pci_reg.data;
-		break;
+	if (!write) {
+		switch (len) {
+		case 1:
+			*(uint8_t *)buf = (uint8_t)pci_reg.data;
+			break;
+		case 2:
+			*(uint16_t *)buf = (uint16_t)pci_reg.data;
+			break;
+		case 4:
+			*(uint32_t *)buf = (uint32_t)pci_reg.data;
+			break;
+		case 8:
+			*(uint64_t *)buf = (uint64_t)pci_reg.data;
+			break;
+		}
 	}
 
 	return (B_TRUE);
+
 }
 
+static boolean_t
+pcieadm_pop_cfgspace_kernel(uint32_t off, uint8_t len, void *buf, void *arg)
+{
+	return (pcieadm_pop_kernel_common(PCITOOL_CONFIG, len, off, buf, arg,
+	    B_FALSE));
+}
+
+
+static boolean_t
+pcieadm_pop_bar_kernel(uint8_t bar, uint8_t len, uint64_t off, void *buf,
+    void *arg, boolean_t write)
+{
+	if (bar >= PCI_BASE_NUM) {
+		errx(EXIT_FAILURE, "requested to read %u bytes at 0x%" PRIx64
+		    " from non-existent BAR %u", len, off, bar);
+	}
+
+	/*
+	 * The ioctl interface uses 0 for configuration space and so the ioctl
+	 * number is the bar plus one.
+	 */
+	return (pcieadm_pop_kernel_common(bar + 1, len, off, buf, arg, write));
+}
+
+static const pcieadm_ops_t pcieadm_kernel_ops = {
+	.pop_cfg = pcieadm_pop_cfgspace_kernel,
+	.pop_bar = pcieadm_pop_bar_kernel
+};
+
 void
-pcieadm_init_cfgspace_kernel(pcieadm_t *pcip, pcieadm_cfgspace_f *funcp,
-    void **arg)
+pcieadm_init_ops_kernel(pcieadm_t *pcip, const pcieadm_ops_t **opsp, void **arg)
 {
 	char *nexus_base;
 	char nexus_reg[PATH_MAX];
@@ -532,12 +598,12 @@ pcieadm_init_cfgspace_kernel(pcieadm_t *pcip, pcieadm_cfgspace_f *funcp,
 	pck->pck_dev = PCI_REG_DEV_G(regs[0]);
 	pck->pck_func = PCI_REG_FUNC_G(regs[0]);
 
-	*funcp = pcieadm_read_cfgspace_kernel;
+	*opsp = &pcieadm_kernel_ops;
 	*arg = pck;
 }
 
 void
-pcieadm_fini_cfgspace_kernel(void *arg)
+pcieadm_fini_ops_kernel(void *arg)
 {
 	pcieadm_cfgspace_kernel_t *pck = arg;
 
@@ -545,18 +611,17 @@ pcieadm_fini_cfgspace_kernel(void *arg)
 	free(pck);
 }
 
-static const pcieadm_cmdtab_t pcieadm_cmds[] = {
-	{ "save-cfgspace", pcieadm_save_cfgspace, pcieadm_save_cfgspace_usage },
-	{ "show-cfgspace", pcieadm_show_cfgspace, pcieadm_show_cfgspace_usage },
-	{ "show-devs", pcieadm_show_devs, pcieadm_show_devs_usage },
-	{ NULL }
-};
+void
+pcieadm_walk_usage(const pcieadm_cmdtab_t *tab, FILE *f)
+{
+	for (; tab->pct_name != NULL; tab++) {
+		tab->pct_use(f);
+	}
+}
 
 static void
-pcieadm_usage(const char *format, ...)
+pcieadm_usage(const pcieadm_cmdtab_t *tab, const char *format, ...)
 {
-	uint_t cmd;
-
 	if (format != NULL) {
 		va_list ap;
 
@@ -567,40 +632,62 @@ pcieadm_usage(const char *format, ...)
 
 	(void) fprintf(stderr, "usage:  %s <subcommand> <args> ...\n\n",
 	    pcieadm_progname);
-
-	for (cmd = 0; pcieadm_cmds[cmd].pct_name != NULL; cmd++) {
-		if (pcieadm_cmds[cmd].pct_use != NULL) {
-			pcieadm_cmds[cmd].pct_use(stderr);
-		}
-	}
+	if (tab == NULL)
+		return;
+	pcieadm_walk_usage(tab, stderr);
 }
 
 int
-main(int argc, char *argv[])
+pcieadm_walk_tab(pcieadm_t *pcip, const pcieadm_cmdtab_t *tab, int argc,
+    char *argv[])
 {
-	uint_t cmd;
+	uint32_t cmd;
 
-	pcieadm_progname = basename(argv[0]);
-
-	if (argc < 2) {
-		pcieadm_usage("missing required sub-command");
-		exit(EXIT_USAGE);
+	if (argc == 0) {
+		pcieadm_usage(tab, "missing required sub-command");
+		return (EXIT_FAILURE);
 	}
 
-	for (cmd = 0; pcieadm_cmds[cmd].pct_name != NULL; cmd++) {
-		if (strcmp(pcieadm_cmds[cmd].pct_name, argv[1]) == 0) {
+	for (cmd = 0; tab[cmd].pct_name != NULL; cmd++) {
+		if (strcmp(argv[0], tab[cmd].pct_name) == 0) {
 			break;
 		}
 	}
 
-	if (pcieadm_cmds[cmd].pct_name == NULL) {
-		pcieadm_usage("unknown sub-command: %s", argv[1]);
+	if (tab[cmd].pct_name == NULL) {
+		pcieadm_usage(tab, "unknown subcommand %s", argv[0]);
+		return (EXIT_USAGE);
+	}
+
+	argc--;
+	argv++;
+	optind = 0;
+	pcieadm.pia_cmdtab = &tab[cmd];
+
+	return (tab[cmd].pct_func(pcip, argc, argv));
+
+}
+
+static const pcieadm_cmdtab_t pcieadm_cmds[] = {
+	{ "bar", pcieadm_bar, pcieadm_bar_usage },
+	{ "show-cfgspace", pcieadm_show_cfgspace, pcieadm_show_cfgspace_usage },
+	{ "save-cfgspace", pcieadm_save_cfgspace, pcieadm_save_cfgspace_usage },
+	{ "show-devs", pcieadm_show_devs, pcieadm_show_devs_usage },
+	{ NULL }
+};
+
+int
+main(int argc, char *argv[])
+{
+	pcieadm_progname = basename(argv[0]);
+
+	if (argc < 2) {
+		pcieadm_usage(pcieadm_cmds, "missing required sub-command");
 		exit(EXIT_USAGE);
 	}
-	argc -= 2;
-	argv += 2;
-	optind = 0;
-	pcieadm.pia_cmdtab = &pcieadm_cmds[cmd];
+
+	argc--;
+	argv++;
 
 	/*
 	 * Set up common things that all of pcieadm needs before dispatching to
@@ -655,5 +742,5 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "failed to reduce privileges");
 	}
 
-	return (pcieadm.pia_cmdtab->pct_func(&pcieadm, argc, argv));
+	return (pcieadm_walk_tab(&pcieadm, pcieadm_cmds, argc, argv));
 }
