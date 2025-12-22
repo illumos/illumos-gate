@@ -116,7 +116,7 @@ efi_serial_should_append(struct serial *port)
 	if (!IsDevicePathEnd(node) && efi_devpath_is_prefix(dev, node))
 		rv = false;
 
-	efi_close_devpath(dev);
+	efi_close_devpath(port->currdev);
 	free(buf);
 	return (rv);
 }
@@ -253,7 +253,7 @@ efi_check_and_set_condev(struct serial *port, const char *name)
 		node = efi_devpath_next_instance(node);
 	}
 
-	efi_close_devpath(dev);
+	efi_close_devpath(port->currdev);
 	free(buf);
 }
 
@@ -590,7 +590,7 @@ done:
 					port->name++;
 			}
 		}
-		efi_close_devpath(dp);
+		efi_close_devpath(port->currdev);
 	}
 
 	(void) asprintf(&tty->c_name, "tty%c", port->name);
