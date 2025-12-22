@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -63,21 +63,6 @@
 extern uint64_t mcfg_mem_base;
 extern uint_t pci_iocfg_max_offset;
 int pcitool_debug = 0;
-
-/*
- * Offsets of BARS in config space.  First entry of 0 means config space.
- * Entries here correlate to pcitool_bars_t enumerated type.
- */
-static uint8_t pci_bars[] = {
-	0x0,
-	PCI_CONF_BASE0,
-	PCI_CONF_BASE1,
-	PCI_CONF_BASE2,
-	PCI_CONF_BASE3,
-	PCI_CONF_BASE4,
-	PCI_CONF_BASE5,
-	PCI_CONF_ROM
-};
 
 /* Max offset allowed into config space for a particular device. */
 static uint64_t max_cfg_size = PCI_CONF_HDR_SIZE;
@@ -932,277 +917,368 @@ pcitool_unmap(uint64_t virt_addr, size_t num_pages)
 	vmem_free(heap_arena, base_virt_addr, ptob(num_pages));
 }
 
+static int
+pcitool_bar_find(uint8_t bar, boolean_t bridge, boolean_t cfg_io,
+    pcitool_reg_t *cfg, uint64_t *pa, boolean_t *io_bar)
+{
+	uint8_t nbar = bridge ? PCI_BCNF_BASE_NUM : PCI_BASE_NUM;
+	uint32_t raw[PCI_BASE_NUM];
 
-/* Perform register accesses on PCI leaf devices. */
-/*ARGSUSED*/
+	for (uint8_t i = 0; i < nbar; i++) {
+		cfg->acc_attr = PCITOOL_ACC_ATTR_SIZE_4 |
+		    PCITOOL_ACC_ATTR_ENDN_LTL;
+		cfg->offset = PCI_CONF_BASE0 + i * 4;
+		int ret = pcitool_cfg_access(cfg, B_FALSE, cfg_io);
+		if (ret != 0) {
+			return (ret);
+		}
+
+		raw[i] = (uint32_t)cfg->data;
+	}
+
+	for (uint8_t i = 0; i < nbar; i++) {
+		boolean_t io = (raw[i] & PCI_BASE_SPACE_M) == PCI_BASE_SPACE_IO;
+		uint8_t idx = i;
+		uint64_t addr;
+
+		/*
+		 * Skip BARs which return an invalid read. Historical versions
+		 * of this code also did the same when the BAR was 0; however,
+		 * that ignored the fact that you could have the prefetch bit or
+		 * similar things set so we defer that until we have read the
+		 * entire data.
+		 */
+		if (raw[idx] == PCI_EINVAL32)
+			continue;
+
+		/*
+		 * If we encounter a 64-bit BAR that ends up counting for two
+		 * different entries. Determine if that's the case and we need
+		 * to make sure the next loop accounts for this before we check
+		 * if this matches.
+		 */
+		if (!io && (raw[idx] & PCI_BASE_TYPE_M) == PCI_BASE_TYPE_ALL) {
+			i++;
+			if (i == nbar) {
+				cfg->status = PCITOOL_OUT_OF_RANGE;
+				return (EIO);
+			}
+		}
+
+		if (bar != idx)
+			continue;
+
+		*io_bar = io;
+		if (io) {
+			addr = raw[idx] & PCI_BASE_IO_ADDR_M;
+		} else {
+			switch (raw[idx] & PCI_BASE_TYPE_M) {
+			case PCI_BASE_TYPE_MEM:
+			case PCI_BASE_TYPE_LOW:
+				addr = raw[idx] & PCI_BASE_M_ADDR_M;
+				break;
+			case PCI_BASE_TYPE_ALL:
+				if (raw[idx + 1] == PCI_EINVAL32) {
+					cfg->status = PCITOOL_INVALID_ADDRESS;
+					return (EINVAL);
+				}
+				addr = raw[idx] & PCI_BASE_M_ADDR_M;
+				addr |= (uint64_t)(raw[idx + 1] &
+				    PCI_BASE_M_ADDR_M) << 32;
+				break;
+			case PCI_BASE_TYPE_RES:
+				cfg->status = PCITOOL_INVALID_ADDRESS;
+				return (EINVAL);
+			}
+		}
+
+		/*
+		 * A value of zero is the hardware reset value. It is also
+		 * always an invalid BAR value on x86 as on all platforms this
+		 * never refers to MMIO space. This is generally true in
+		 * practice for I/O ports, but less of a guarantee. If we find
+		 * I/O port assignments starting at 0 then we should come back
+		 * to this and revisit it.
+		 */
+		if (addr == 0) {
+			cfg->status = PCITOOL_INVALID_ADDRESS;
+			return (EINVAL);
+		}
+
+		*pa = addr;
+		return (0);
+	}
+
+	cfg->status = PCITOOL_INVALID_ADDRESS;
+	return (EINVAL);
+}
+
+typedef struct {
+	const pcitool_reg_t *pbwc_reg;
+	uint64_t pbwc_size;
+} pcitool_bar_walk_cb_t;
+
+/*
+ * Our job is to evaluate if this dip is the one that we're looking for based
+ * upon its PCI b/d/f. If it is, then we need to look at its
+ * assigned-addresses[] and bind the size of the corresponding bar. We need to
+ * be careful we don't recurse into non-PCI children. If this isn't an instance
+ * of pcieb or pci_pci, then we will not have additional PCI children and
+ * therefore must prune.
+ */
+static int
+pcitool_bar_walk_cb(dev_info_t *dip, void *arg)
+{
+	const char *drv;
+	pcitool_bar_walk_cb_t *cb = arg;
+	int *regs, ret;
+	uint_t nreg;
+
+	ret = DDI_WALK_PRUNECHILD;
+	if ((drv = ddi_driver_name(dip)) != NULL &&
+	    (strcmp(drv, "pcieb") == 0 || strcmp(drv, "pci_pci") == 0)) {
+		ret = DDI_WALK_CONTINUE;
+	}
+
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", &regs, &nreg) != DDI_PROP_SUCCESS) {
+		return (ret);
+	}
+
+	if (nreg == 0 || nreg % 5 != 0) {
+		ddi_prop_free(regs);
+		return (ret);
+	}
+	nreg /= 5;
+
+	uint32_t bdf = (uint32_t)regs[0];
+	if (PCI_REG_BUS_G(bdf) != cb->pbwc_reg->bus_no ||
+	    PCI_REG_DEV_G(bdf) != cb->pbwc_reg->dev_no ||
+	    PCI_REG_FUNC_G(bdf) != cb->pbwc_reg->func_no) {
+		ddi_prop_free(regs);
+		return (ret);
+	}
+
+	uint32_t targ = PCI_CONF_BASE0 + ((cb->pbwc_reg->barnum - 1) *
+	    sizeof (uint32_t));
+	const pci_regspec_t *rsp = (pci_regspec_t *)regs;
+	for (int i = 0; i < nreg; i++, rsp++) {
+		uint32_t check = PCI_REG_REG_G(rsp->pci_phys_hi);
+		if (check != targ)
+			continue;
+
+		cb->pbwc_size = (uint64_t)rsp->pci_size_hi << 32;
+		cb->pbwc_size |= rsp->pci_size_low;
+		ddi_prop_free(regs);
+		return (DDI_WALK_TERMINATE);
+	}
+
+	ddi_prop_free(regs);
+	return (ret);
+}
+
+/*
+ * Perform register accesses on PCI leaf devices and intermediate bridges.
+ */
 int
 pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
-	boolean_t	write_flag = B_FALSE;
-	boolean_t	io_access = B_TRUE;
-	int		rval = 0;
-	pcitool_reg_t	prg;
-	uint8_t		size;
+	boolean_t write_flag = B_FALSE;
+	boolean_t cfgspace_io = B_TRUE;
+	int rval = 0;
+	pcitool_reg_t prg;
+	uint8_t	size;
+	uint64_t base_addr;
 
-	uint64_t	base_addr;
-	uint64_t	virt_addr;
-	size_t		num_virt_pages;
+	if (cmd != PCITOOL_DEVICE_SET_REG && cmd != PCITOOL_DEVICE_GET_REG) {
+		return (ENOTTY);
+	}
 
-	switch (cmd) {
-	case (PCITOOL_DEVICE_SET_REG):
+	if (cmd == PCITOOL_DEVICE_SET_REG) {
 		write_flag = B_TRUE;
+	}
 
-	/*FALLTHRU*/
-	case (PCITOOL_DEVICE_GET_REG):
-		if (pcitool_debug)
-			prom_printf("pci_dev_reg_ops set/get reg\n");
-		if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
-		    DDI_SUCCESS) {
-			if (pcitool_debug)
-				prom_printf("Error reading arguments\n");
-			return (EFAULT);
-		}
+	if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
+	    DDI_SUCCESS) {
+		return (EFAULT);
+	}
 
-		if (prg.barnum >= (sizeof (pci_bars) / sizeof (pci_bars[0]))) {
+	/*
+	 * Initially see if this is a known argument. We'll deal with checking
+	 * the actual upper bound based on the device type later on.
+	 */
+	if (prg.barnum > PCITOOL_ROM) {
+		prg.status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+		goto copyout;
+	}
+
+	/* Validate address arguments of bus / dev / func */
+	if (((prg.bus_no & (PCI_REG_BUS_M >> PCI_REG_BUS_SHIFT)) !=
+	    prg.bus_no) ||
+	    ((prg.dev_no & (PCI_REG_DEV_M >> PCI_REG_DEV_SHIFT)) !=
+	    prg.dev_no) ||
+	    ((prg.func_no & (PCI_REG_FUNC_M >> PCI_REG_FUNC_SHIFT)) !=
+	    prg.func_no)) {
+		prg.status = PCITOOL_INVALID_ADDRESS;
+		rval = EINVAL;
+		goto copyout;
+	}
+
+	/*
+	 * If we have access to extended configuration space then we're not
+	 * going to be using I/O ports.
+	 */
+	if (max_cfg_size == PCIE_CONF_HDR_SIZE)
+		cfgspace_io = B_FALSE;
+
+	/*
+	 * First see if this is configuration space. If so, this is the simplest
+	 * case that we have.
+	 */
+	if (prg.barnum == PCITOOL_CONFIG) {
+		if (prg.offset >= max_cfg_size) {
 			prg.status = PCITOOL_OUT_OF_RANGE;
 			rval = EINVAL;
-			goto done_reg;
+			goto copyout;
 		}
 
-		if (pcitool_debug)
-			prom_printf("raw bus:0x%x, dev:0x%x, func:0x%x\n",
-			    prg.bus_no, prg.dev_no, prg.func_no);
-		/* Validate address arguments of bus / dev / func */
-		if (((prg.bus_no &
-		    (PCI_REG_BUS_M >> PCI_REG_BUS_SHIFT)) !=
-		    prg.bus_no) ||
-		    ((prg.dev_no &
-		    (PCI_REG_DEV_M >> PCI_REG_DEV_SHIFT)) !=
-		    prg.dev_no) ||
-		    ((prg.func_no &
-		    (PCI_REG_FUNC_M >> PCI_REG_FUNC_SHIFT)) !=
-		    prg.func_no)) {
-			prg.status = PCITOOL_INVALID_ADDRESS;
-			rval = EINVAL;
-			goto done_reg;
-		}
+		rval = pcitool_cfg_access(&prg, write_flag, cfgspace_io);
+		goto copyout;
+	}
 
-		size = PCITOOL_ACC_ATTR_SIZE(prg.acc_attr);
+	/*
+	 * This isn't configuration space. We must check to see what the device
+	 * type is. The device type will determine the number of BARs that are
+	 * valid and whether or not we can even begin to assume that a ROM is
+	 * present. To do this we must read from configuration space. We do this
+	 * by setting up a duplicate register access method and treating this
+	 * like a configuration space read.
+	 */
+	pcitool_reg_t cfg;
+	boolean_t bridge;
 
-		/* Proper config space desired. */
-		if (prg.barnum == 0) {
+	bcopy(&prg, &cfg, sizeof (pcitool_reg_t));
+	cfg.acc_attr = PCITOOL_ACC_ATTR_SIZE_1 | PCITOOL_ACC_ATTR_ENDN_LTL;
+	cfg.offset = PCI_CONF_HEADER;
+	rval = pcitool_cfg_access(&cfg, B_FALSE, cfgspace_io);
+	if (rval != 0) {
+		prg.status = cfg.status;
+		goto copyout;
+	}
 
-			if (pcitool_debug)
-				prom_printf(
-				    "config access: offset:0x%" PRIx64 ", "
-				    "phys_addr:0x%" PRIx64 "\n",
-				    prg.offset, prg.phys_addr);
-
-			if (prg.offset >= max_cfg_size) {
-				prg.status = PCITOOL_OUT_OF_RANGE;
-				rval = EINVAL;
-				goto done_reg;
-			}
-			if (max_cfg_size == PCIE_CONF_HDR_SIZE)
-				io_access = B_FALSE;
-
-			rval = pcitool_cfg_access(&prg, write_flag, io_access);
-			if (pcitool_debug)
-				prom_printf(
-				    "config access: data:0x%" PRIx64 "\n",
-				    prg.data);
-
-		/* IO/ MEM/ MEM64 space. */
-		} else {
-
-			pcitool_reg_t	prg2;
-			bcopy(&prg, &prg2, sizeof (pcitool_reg_t));
-
-			/*
-			 * Translate BAR number into offset of the BAR in
-			 * the device's config space.
-			 */
-			prg2.offset = pci_bars[prg2.barnum];
-			prg2.acc_attr =
-			    PCITOOL_ACC_ATTR_SIZE_4 | PCITOOL_ACC_ATTR_ENDN_LTL;
-
-			if (pcitool_debug)
-				prom_printf(
-				    "barnum:%d, bar_offset:0x%" PRIx64 "\n",
-				    prg2.barnum, prg2.offset);
-			/*
-			 * Get Bus Address Register (BAR) from config space.
-			 * prg2.offset is the offset into config space of the
-			 * BAR desired.  prg.status is modified on error.
-			 */
-			rval = pcitool_cfg_access(&prg2, B_FALSE, B_TRUE);
-			if (rval != SUCCESS) {
-				if (pcitool_debug)
-					prom_printf("BAR access failed\n");
-				prg.status = prg2.status;
-				goto done_reg;
-			}
-			/*
-			 * Reference proper PCI space based on the BAR.
-			 * If 64 bit MEM space, need to load other half of the
-			 * BAR first.
-			 */
-
-			if (pcitool_debug)
-				prom_printf("bar returned is 0x%" PRIx64 "\n",
-				    prg2.data);
-			if (!prg2.data) {
-				if (pcitool_debug)
-					prom_printf("BAR data == 0\n");
-				rval = EINVAL;
-				prg.status = PCITOOL_INVALID_ADDRESS;
-				goto done_reg;
-			}
-			if (prg2.data == 0xffffffff) {
-				if (pcitool_debug)
-					prom_printf("BAR data == -1\n");
-				rval = EINVAL;
-				prg.status = PCITOOL_INVALID_ADDRESS;
-				goto done_reg;
-			}
-
-			/*
-			 * BAR has bits saying this space is IO space, unless
-			 * this is the ROM address register.
-			 */
-			if (((PCI_BASE_SPACE_M & prg2.data) ==
-			    PCI_BASE_SPACE_IO) &&
-			    (prg2.offset != PCI_CONF_ROM)) {
-				if (pcitool_debug)
-					prom_printf("IO space\n");
-
-				prg2.data &= PCI_BASE_IO_ADDR_M;
-				prg.phys_addr = prg2.data + prg.offset;
-
-				rval = pcitool_io_access(&prg, write_flag);
-				if ((rval != SUCCESS) && (pcitool_debug))
-					prom_printf("IO access failed\n");
-
-				goto done_reg;
-
-
-			/*
-			 * BAR has bits saying this space is 64 bit memory
-			 * space, unless this is the ROM address register.
-			 *
-			 * The 64 bit address stored in two BAR cells is not
-			 * necessarily aligned on an 8-byte boundary.
-			 * Need to keep the first 4 bytes read,
-			 * and do a separate read of the high 4 bytes.
-			 */
-
-			} else if ((PCI_BASE_TYPE_ALL & prg2.data) &&
-			    (prg2.offset != PCI_CONF_ROM)) {
-
-				uint32_t low_bytes =
-				    (uint32_t)(prg2.data & ~PCI_BASE_TYPE_ALL);
-
-				/*
-				 * Don't try to read the next 4 bytes
-				 * past the end of BARs.
-				 */
-				if (prg2.offset >= PCI_CONF_BASE5) {
-					prg.status = PCITOOL_OUT_OF_RANGE;
-					rval = EIO;
-					goto done_reg;
-				}
-
-				/*
-				 * Access device.
-				 * prg2.status is modified on error.
-				 */
-				prg2.offset += 4;
-				rval = pcitool_cfg_access(&prg2,
-				    B_FALSE, B_TRUE);
-				if (rval != SUCCESS) {
-					prg.status = prg2.status;
-					goto done_reg;
-				}
-
-				if (prg2.data == 0xffffffff) {
-					prg.status = PCITOOL_INVALID_ADDRESS;
-					prg.status = EFAULT;
-					goto done_reg;
-				}
-
-				prg2.data = (prg2.data << 32) + low_bytes;
-				if (pcitool_debug)
-					prom_printf(
-					    "64 bit mem space.  "
-					    "64-bit bar is 0x%" PRIx64 "\n",
-					    prg2.data);
-
-			/* Mem32 space, including ROM */
-			} else {
-
-				if (prg2.offset == PCI_CONF_ROM) {
-					if (pcitool_debug)
-						prom_printf(
-						    "Additional ROM "
-						    "checking\n");
-					/* Can't write to ROM */
-					if (write_flag) {
-						prg.status = PCITOOL_ROM_WRITE;
-						rval = EIO;
-						goto done_reg;
-
-					/* ROM disabled for reading */
-					} else if (!(prg2.data & 0x00000001)) {
-						prg.status =
-						    PCITOOL_ROM_DISABLED;
-						rval = EIO;
-						goto done_reg;
-					}
-				}
-
-				if (pcitool_debug)
-					prom_printf("32 bit mem space\n");
-			}
-
-			/* Common code for all IO/MEM range spaces. */
-
-			base_addr = prg2.data;
-			if (pcitool_debug)
-				prom_printf(
-				    "addr portion of bar is 0x%" PRIx64 ", "
-				    "base=0x%" PRIx64 ", "
-				    "offset:0x%" PRIx64 "\n",
-				    prg2.data, base_addr, prg.offset);
-			/*
-			 * Use offset provided by caller to index into
-			 * desired space, then access.
-			 * Note that prg.status is modified on error.
-			 */
-			prg.phys_addr = base_addr + prg.offset;
-
-			virt_addr = pcitool_map(prg.phys_addr, size,
-			    &num_virt_pages);
-			if (virt_addr == 0) {
-				prg.status = PCITOOL_IO_ERROR;
-				rval = EIO;
-				goto done_reg;
-			}
-
-			rval = pcitool_mem_access(&prg, virt_addr, write_flag);
-			pcitool_unmap(virt_addr, num_virt_pages);
-		}
-done_reg:
-		prg.drvr_version = PCITOOL_VERSION;
-		if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
-		    DDI_SUCCESS) {
-			if (pcitool_debug)
-				prom_printf("Error returning arguments.\n");
-			rval = EFAULT;
-		}
+	switch (cfg.data & PCI_HEADER_TYPE_M) {
+	case PCI_HEADER_ZERO:
+		bridge = B_FALSE;
 		break;
+	case PCI_HEADER_PPB:
+		bridge = B_TRUE;
+		break;
+	case PCI_HEADER_CARDBUS:
 	default:
-		rval = ENOTTY;
+		prg.status = PCITOOL_UNKNOWN_HEADER_TYPE;
 		break;
 	}
+
+	/*
+	 * Bridges only have access to two BARs. This isn't the normal >= due to
+	 * the fact that bridge numbers are offset by one. The ioctl treats the
+	 * value zero as configuration space.
+	 */
+	if (bridge && prg.barnum > PCI_BCNF_BASE_NUM) {
+		prg.status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+		goto copyout;
+	}
+
+	/*
+	 * We need to see if this BAR number corresponds to something that
+	 * exists. To do this we must walk all of the BARs in order as we may
+	 * have a 64-bit BAR which requires two entries. If this is an expansion
+	 * ROM, while it will get treated like a 32-bit BAR, we need to check a
+	 * few additional things there such as whether it's enabled at all. In
+	 * addition, if we have been asked to write it, we must outright fail.
+	 */
+	boolean_t io_space = B_FALSE;
+	if (prg.barnum != PCITOOL_ROM) {
+		rval = pcitool_bar_find(prg.barnum - 1, bridge, cfgspace_io,
+		    &cfg, &base_addr, &io_space);
+		if (rval != 0) {
+			prg.status = cfg.status;
+			goto copyout;
+		}
+	} else {
+		cfg.acc_attr = PCITOOL_ACC_ATTR_SIZE_4 |
+		    PCITOOL_ACC_ATTR_ENDN_LTL;
+		cfg.offset = PCI_CONF_ROM;
+		rval = pcitool_cfg_access(&cfg, B_FALSE, cfgspace_io);
+		if (rval != 0) {
+			prg.status = cfg.status;
+			goto copyout;
+		}
+
+		if (write_flag) {
+			prg.status = PCITOOL_ROM_WRITE;
+			rval = EIO;
+			goto copyout;
+		}
+
+		if ((cfg.data & PCI_BASE_ROM_ENABLE) == 0) {
+			prg.status = PCITOOL_ROM_DISABLED;
+			rval = EIO;
+			goto copyout;
+		}
+
+		base_addr = cfg.data & PCI_BASE_ROM_ADDR_M;
+	}
+
+	/*
+	 * The only place that has the size information currently is the
+	 * dev_info_t through its reg[] or assigned-addresses[] property. This
+	 * is a bit unfortunate as we don't have the dev_info_t for the target
+	 * that we want to read. However, we can rely upon an assumption. If we
+	 * want to read a BAR and the kernel does not have a dev_info_t meaning
+	 * it has not assigned this address, then it's going to be quite odd.
+	 * The target device will be downstream of this nexus, meaning that we
+	 * can walk the tree here and try to find it. If we can find it, then we
+	 * can find the corresponding assigned-addresses[] entry and confirm the
+	 * size.
+	 */
+	pcitool_bar_walk_cb_t cb;
+	cb.pbwc_reg = &prg;
+	cb.pbwc_size = 0;
+	ndi_devi_enter(dip);
+	ddi_walk_devs(ddi_get_child(dip), pcitool_bar_walk_cb, &cb);
+	ndi_devi_exit(dip);
+	if (cb.pbwc_size == 0 || prg.offset >= cb.pbwc_size) {
+		prg.status = PCITOOL_INVALID_REGOFF;
+		rval = EIO;
+		goto copyout;
+	}
+
+	prg.phys_addr = base_addr + prg.offset;
+	if (io_space) {
+		rval = pcitool_io_access(&prg, write_flag);
+	} else {
+		size_t npages;
+		uint64_t va = pcitool_map(prg.phys_addr, size,
+		    &npages);
+		if (va == 0) {
+			prg.status = PCITOOL_IO_ERROR;
+			rval = EIO;
+			goto copyout;
+		}
+
+		rval = pcitool_mem_access(&prg, va, write_flag);
+		pcitool_unmap(va, npages);
+	}
+
+copyout:
+	prg.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
+	    DDI_SUCCESS) {
+		rval = EFAULT;
+	}
+
 	return (rval);
 }
