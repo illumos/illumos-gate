@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2026 RackTop Systems, Inc.
  */
 
 /*
@@ -77,7 +78,26 @@ static const char *sff_8024_id_strs[SFF_8024_NIDS] = {
 	"Shielded Mini Multilane HD 4X Fanout Cable",
 	"Shielded Mini Multilane HD 8X Fanout Cable",
 	"CDFP (Style 3)",
-	"microQSFP"
+	"microQSFP",
+	"QSFP-DD Double Density 8X Pluggable Transceiver",
+	"OSFP 8X Pluggable Transceiver",
+	"SFP-DD Double Density 2X Pluggable Transceiver with SFP-DD Management "
+	    "Interface Specification",
+	"DSFP Dual Small Form Factor Pluggable Transceiver",
+	"x4 MiniLink/OcuLink",
+	"x8 MiniLink",
+	"QSFP+ or later with Common Management Interface Specification (CMIS)",
+	"SFP-DD Double Density 2X Pluggable Transceiver with Common Management "
+	    "Interface Specification (CMIS)",
+	"SFP+ and later with Common Management Interface Specification (CMIS)",
+	"OSFP-XD with Common Management Interface Specification (CMIS)",
+	"OIF-ELSFP with Common Management Interface Specification (CMIS)",
+	"CDFP (x4 PCIe) SFF-TA-1032 with Common Management Interface "
+	    "Specification (CMIS)",
+	"CDFP (x8 PCIe) SFF-TA-1032 with Common Management Interface "
+	    "Specification (CMIS)",
+	"CDFP (x16 PCIe) SFF-TA-1032 with Common Management Interface "
+	    "Specification (CMIS)",
 };
 
 /*
@@ -112,47 +132,101 @@ static const char *sff_8024_enc_qsfp[] = {
 	"PAM4"
 };
 
-/*
- * This table is derived from SFF 8024 r3.9 Section 4.4.
- */
-#define	SFF_8024_EXT_SPEC_NENTRIES	27
-static const char *sff_8024_ext_spec[] = {
-	"Unspecified",
-	"100G AOC or 25GAUI C2M AOC",
-	"100GBASE-SR4 or 25GBASE-SR",
-	"100GBASE-LR4 or 25GBASE-LR",
-	"100GBASE-ER4 or 25GBASE-ER",
-	"100GBASE-SR10",
-	"100G CWDM4",
-	"100G PSM4 Parallel SMF",
-	"100G ACC or 25GAUI C2M ACC",
-	"Obsolete",
-	"Reserved",
-	"100GBASE-CR4 or 25GBASE-CR CA-L",
-	"25GBASE-CR CA-S",
-	"25GBASE-CR CA-N",
-	"Reserved",
-	"Reserved",
-	"40GBASE-ER4",
-	"4 x 10GBASE-SR",
-	"40G PSM4 Parallel SMF",
-	"G959.1 profile P1I1-2D1",
-	"G959.1 profile P1S1-2D2",
-	"G959.1 profile P1L1-2D2",
-	"10GBASE-T with SFI electrical interface",
-	"100G CLR4",
-	"100G AOC or 25GAUI C2M AOC",
-	"100G ACC or 25GAUI C2M ACC",
-	"100GE-DWDM2"
-};
-
 typedef struct sff_pair {
 	uint_t sp_val;
 	const char *sp_name;
 } sff_pair_t;
 
 /*
- * This table is derived from SFF 8024 r3.9 Section 4.3.
+ * This table is derived from SFF 8024 r4.13 Section 4.5 Table 4-4.
+ *
+ * The values are not entirely in numeric order, the order here matches
+ * Table 4-4.
+ */
+static sff_pair_t sff_8024_ext_spec[] = {
+	{ 0x00, "Unspecified" },
+	{ 0x01, "100G AOC or 25GAUI C2M AOC" },
+	{ 0x02, "100GBASE-SR4 or 25GBASE-SR" },
+	{ 0x03, "100GBASE-LR4 or 25GBASE-LR" },
+	{ 0x04, "100GBASE-ER4 or 25GBASE-ER" },
+	{ 0x05, "100GBASE-SR10" },
+	{ 0x06, "100G CWDM4" },
+	{ 0x07, "100G PSM4 Parallel SMF" },
+	{ 0x08, "100G ACC or 25GAUI C2M ACC" },
+	{ 0x09, "Obsolete" },
+	{ 0x0b, "100GBASE-CR4, 25GBASE-CR CA-L or 50GBASE-CR2 with RS FEC" },
+	{ 0x0c, "25GBASE-CR CA-S or 50GBASE-CR2 with BASE-R FEC" },
+	{ 0x0d, "25GBASE-CR CA-N or 50GBASE-CR2 with no FEC" },
+	{ 0x0e, "10 Mb/s Single Pair Ethernet" },
+	{ 0x10, "40GBASE-ER4" },
+	{ 0x11, "4 x 10GBASE-SR" },
+	{ 0x12, "40G PSM4 Parallel SMF" },
+	{ 0x13, "G959.1 profile P1I1-2D1" },
+	{ 0x14, "G959.1 profile P1S1-2D2" },
+	{ 0x15, "G959.1 profile P1L1-2D2" },
+	{ 0x16, "10GBASE-T with SFI electrical interface" },
+	{ 0x17, "100G CLR4" },
+	{ 0x18, "100G AOC or 25GAUI C2M AOC" },
+	{ 0x19, "100G ACC or 25GAUI C2M ACC" },
+	{ 0x1a, "100GE-DWDM2" },
+	{ 0x1b, "100G 1550nm WDM" },
+	{ 0x1c, "10GBASE-T Short Reach" },
+	{ 0x1d, "5GBASE-T" },
+	{ 0x1e, "2.5GBASE-T" },
+	{ 0x1f, "40G SWDM4" },
+	{ 0x20, "100G SWDM4" },
+	{ 0x21, "100G PAM4 BiDi" },
+	{ 0x37, "10GBASE-BR" },
+	{ 0x38, "25GBASE-BR" },
+	{ 0x39, "50GBASE-BR" },
+	{ 0x22, "4WDM-10 MSA" },
+	{ 0x23, "4WDM-20 MSA" },
+	{ 0x24, "4WDM-40 MSA" },
+	{ 0x25, "100GBASE-DR, CAUI-4" },
+	{ 0x26, "100G-FR or 100GBASE-FR1, CAUI-4" },
+	{ 0x27, "100G-LR or 100GBASE-LR1, CAUI-4" },
+	{ 0x28, "100GBASE-SR1, CAUI-4" },
+	{ 0x3a, "100GBASE-VR1, CAUI-4" },
+	{ 0x29, "100GBASE-SR1, 200GBASE-SR2 or 400GBASE-SR4" },
+	{ 0x36, "100GBASE-VR1, 200GBASE-VR2 or 400GBASE-VR4" },
+	{ 0x2a, "100GBASE-FR1 or 400GBASE-DR4-2" },
+	{ 0x2b, "100GBASE-LR1" },
+	{ 0x2c, "100G-LR1-20 MSA, CAUI-4" },
+	{ 0x2d, "100G-ER1-30 MSA, CAUI-4" },
+	{ 0x2e, "100G-ER1-40 MSA, CAUI-4" },
+	{ 0x2f, "100G-LR1-20 MSA" },
+	{ 0x34, "100G-ER1-30 MSA" },
+	{ 0x35, "100G-FR1-40 MSA" },
+	{ 0x30, "Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. "
+	    "BER 1E-06" },
+	{ 0x31, "Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. "
+	    "BER 1E-06" },
+	{ 0x32, "Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. "
+	    "ACC BER 2.6E-04, AUI BER 1E-05" },
+	{ 0x33, "Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. "
+	    "AOC BER 2.6E-04, AUI BER 1E-05" },
+	{ 0x3f, "100GBASE-CR1, 200GBASE-CR2 or 400GBASE-CR4" },
+	{ 0x40, "50GBASE-CR, 100GBASE-CR2 or 200GBASE-CR4" },
+	{ 0x41, "50GBASE-SR, 100GBASE-SR2 or 200GBASE-SR4" },
+	{ 0x42, "50GBASE-FR or 200GBASE-DR4" },
+	{ 0x4a, "50GBASE-ER" },
+	{ 0x43, "200GBASE-FR4" },
+	{ 0x44, "200G 1550nm PSM4" },
+	{ 0x45, "50GBASE-LR" },
+	{ 0x46, "200GBASE-LR4" },
+	{ 0x47, "400GBASE-DR4, 400GAUI-4 C2M" },
+	{ 0x48, "400GBASE-FR4" },
+	{ 0x49, "400GBASE-LR4-6" },
+	{ 0x4b, "400G-LR4-10" },
+	{ 0x4c, "400GBASE-ZR (obsolete)" },
+	{ 0x7f, "256GFC-SW4" },
+	{ 0x80, "64GFC" },
+	{ 0x81, "128GFC" },
+	{ 0x0, NULL }
+};
+
+/*
+ * This table is derived from SFF 8024 r4.13 Section 4.4.
  */
 static sff_pair_t sff_8024_connectors[] = {
 	{ 0x00, "Unknown" },
@@ -174,6 +248,10 @@ static sff_pair_t sff_8024_connectors[] = {
 	{ 0x22, "RJ45 (Registered Jack)" },
 	{ 0x23, "No separable connector" },
 	{ 0x24, "MXC 2x16" },
+	{ 0x25, "CS optical connector" },
+	{ 0x26, "SN (previously Mini CS) optical connector" },
+	{ 0x27, "MPO 2x12" },
+	{ 0x28, "MPO 1x16" },
 	{ 0x0, NULL }
 };
 
@@ -349,29 +427,30 @@ static sff_pair_t sff_8472_acable_comp[] = {
 	{ 0x08, "Compliant to FC-PI-4 Limiting" },
 	{ 0x04, "Compliant to SFF-8431 Limiting" },
 	{ 0x02, "Compliant to FC-PI-4 Appendix H" },
-	{ 0x01, "Compliant to SFF-8431 Appendix" },
+	{ 0x01, "Compliant to SFF-8431 Appendix E" },
 	{ 0x0, NULL }
 };
 
 /*
- * This is derived from SFF 8472 r12.2 Table 8-3.
+ * This is derived from SFF 8472 r12.5 Table 8-3.
  * Note that we combined byte 64 and 65. Byte 64 is the upper bit.
  */
 #define	SFF_8472_OPTION_MASK	0x3ffe
 static sff_pair_t sff_8472_options[] = {
-	{ 0x2000, "Power Level 3 Requirement"},
-	{ 0x1000, "Paging Implemented"},
-	{ 0x0800, "Retimer or CDR implemented"},
-	{ 0x0400, "Cooled Transceiver Implemented"},
-	{ 0x0200, "Power Level 2 Requirement"},
-	{ 0x0100, "Linear Receiver Output Implemented"},
-	{ 0x0080, "Receiver decision threshold implemented"},
-	{ 0x0040, "Tunable transmitter"},
-	{ 0x0020, "RATE_SELECT implemented"},
-	{ 0x0010, "TX_DISABLE implemented"},
-	{ 0x0008, "TX_FAULT implemented"},
-	{ 0x0004, "Rx_LOS inverted"},
-	{ 0x0002, "Rx_LOS implemented"},
+	{ 0x6000, "Power Level 4 Requirement" },
+	{ 0x2000, "Power Level 3 Requirement" },
+	{ 0x1000, "Paging Implemented" },
+	{ 0x0800, "Retimer or CDR implemented" },
+	{ 0x0400, "Cooled Transceiver Implemented" },
+	{ 0x0200, "Power Level 2 Requirement" },
+	{ 0x0100, "Linear Receiver Output Implemented" },
+	{ 0x0080, "Receiver decision threshold implemented" },
+	{ 0x0040, "Tunable transmitter" },
+	{ 0x0020, "RATE_SELECT implemented" },
+	{ 0x0010, "TX_DISABLE implemented" },
+	{ 0x0008, "TX_FAULT implemented" },
+	{ 0x0004, "Rx_LOS inverted" },
+	{ 0x0002, "Rx_LOS implemented" },
 };
 
 /*
@@ -390,9 +469,9 @@ static sff_pair_t sff_8472_extopts[] = {
 };
 
 /*
- * This is derived from SFF 8472 r12.2 Table 8-8.
+ * This is derived from SFF 8472 r12.5 Table 8-8.
  */
-#define	SFF_8472_8472_COMP_NENTRIES 9
+#define	SFF_8472_8472_COMP_NENTRIES 11
 static const char *sff_8472_8472_comp[] = {
 	"Not compliant",
 	"Rev 9.3",
@@ -402,7 +481,9 @@ static const char *sff_8472_8472_comp[] = {
 	"Rev 11.0",
 	"Rev 11.3",
 	"Rev 11.4",
-	"Rev 12.0"
+	"Rev 12.3",
+	"Rev 12.4",
+	"Rev 12.5",
 };
 
 /*
@@ -536,10 +617,11 @@ static const char *sff_8636_trans_tech[] = {
 };
 
 /*
- * This is derived from SFF 8636 r2.7 Table 6-21.
+ * This is derived from SFF 8636 r2.11 Table 6-21.
  */
-#define	SFF_8636_EXTMOD_CODES	0x1f
+#define	SFF_8636_EXTMOD_CODES	0x3f
 static sff_pair_t sff_8636_extmod_codes[] = {
+	{ 0x20, "HDR" },
 	{ 0x10, "EDR" },
 	{ 0x08, "FDR" },
 	{ 0x04, "QDR" },
@@ -552,8 +634,11 @@ static sff_pair_t sff_8636_extmod_codes[] = {
  * This is derived from SFF 8636 r2.7 Table 6-22. This combines bytes 193-195.
  * We treat byte 193 as the most significant.
  */
-#define	SFF_8636_OPTION_MASK	0x0ffffe
+#define	SFF_8636_OPTION_MASK	0x7ffffe
 static sff_pair_t sff_8636_options[] = {
+	{ 0x400000, "LPMode/TxDis Input Signal is Configurable" },
+	{ 0x200000, "IntL/RxLOSL Output Signal is Configurable" },
+	{ 0x100000, "TX Input Adaptive Equalizers Freeze Capable" },
 	{ 0x080000, "TX Input Equalization Auto Adaptive Capable" },
 	{ 0x040000, "TX Input Equalization Fixed Programmable" },
 	{ 0x020000, "RX Output Emphasis Fixed Programmable Settings" },
@@ -577,13 +662,15 @@ static sff_pair_t sff_8636_options[] = {
 };
 
 /*
- * This is derived from SFF 8636 r2.7 Table 6-25.
+ * This is derived from SFF 8636 r2.11 Table 6-25.
  */
-#define	SFF_8636_ENHANCED_OPTIONS_MASK	0x1c
+#define	SFF_8636_ENHANCED_OPTIONS_MASK	0x1e
 static sff_pair_t sff_8636_eopt[] = {
 	{ 0x10, "Initialization Complete Flag Implemented" },
 	{ 0x08, "Extended Rate Selection Supported" },
 	{ 0x04, "Application Select Table Supported" },
+	{ 0x02, "TC Readiness Flag Implemented" },
+	{ 0x01, "Software Reset Implemented" },
 	{ 0x0, NULL }
 };
 
@@ -1220,10 +1307,8 @@ sff_qsfp_parse_extcomp(uint8_t val, nvlist_t *nvl)
 {
 	const char *str;
 
-	if (val >= SFF_8024_EXT_SPEC_NENTRIES) {
+	if ((str = sff_pair_find(val, sff_8024_ext_spec)) == NULL) {
 		str = "Reserved";
-	} else {
-		str = sff_8024_ext_spec[val];
 	}
 
 	return (nvlist_add_string(nvl, LIBSFF_KEY_EXT_SPEC, str));
