@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 <contributor>
+ * Copyright 2026 <contributor>
  */
 
 /*
