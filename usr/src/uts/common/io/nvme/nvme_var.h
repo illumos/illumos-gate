@@ -13,7 +13,7 @@
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Unix Software Ltd.
- * Copyright 2025 Oxide Computer Company.
+ * Copyright 2026 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -406,6 +406,8 @@ struct nvme {
 	boolean_t n_write_cache_enabled;
 	int n_error_log_len;
 	boolean_t n_async_event_supported;
+	int n_submission_queues_supported;
+	int n_completion_queues_supported;
 	int n_submission_queues;
 	int n_completion_queues;
 

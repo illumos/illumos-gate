@@ -3450,6 +3450,38 @@ nvme_identify_int(nvme_t *nvme, uint32_t nsid, uint8_t cns, void **buf)
 	return (nvme_identify(nvme, B_FALSE, &id, buf));
 }
 
+static boolean_t
+nvme_get_current_nqueues(nvme_t *nvme, nvme_nqueues_t *nq)
+{
+	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
+	nvme_get_features_dw10_t gf_dw10 = { 0 };
+	boolean_t ret = B_FALSE;
+
+	gf_dw10.b.gt_fid = NVME_FEAT_NQUEUES;
+
+	cmd->nc_sqid = 0;
+	cmd->nc_callback = nvme_wakeup_cmd;
+	cmd->nc_sqe.sqe_opc = NVME_OPC_GET_FEATURES;
+	cmd->nc_sqe.sqe_cdw10 = gf_dw10.r;
+	cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
+
+	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
+
+	if ((ret = nvme_check_cmd_status(cmd)) != 0) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!GET FEATURES NQUEUES failed with sct = %x, sc = %x",
+		    cmd->nc_cqe.cqe_sf.sf_sct, cmd->nc_cqe.cqe_sf.sf_sc);
+		goto fail;
+	}
+
+	nq->r = cmd->nc_cqe.cqe_dw0;
+	ret = B_TRUE;
+
+fail:
+	nvme_free_cmd(cmd);
+	return (ret);
+}
+
 static int
 nvme_set_features(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t feature,
     uint32_t val, uint32_t *res)
@@ -4382,8 +4414,8 @@ nvme_init(nvme_t *nvme)
 	nvme_reg_cap_t cap;
 	nvme_reg_vs_t vs;
 	nvme_reg_csts_t csts;
+	nvme_nqueues_t nq;
 	int i = 0;
-	uint16_t nqueues;
 	uint_t tq_threads;
 	char model[sizeof (nvme->n_idctl->id_model) + 1];
 	char *vendor, *product;
@@ -4704,15 +4736,25 @@ nvme_init(nvme_t *nvme)
 		goto fail;
 	}
 
+	if (nvme_get_current_nqueues(nvme, &nq)) {
+		nvme->n_submission_queues_supported = nq.b.nq_nsq + 1;
+		nvme->n_completion_queues_supported = nq.b.nq_ncq + 1;
+	} else {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!failed to retrieve number of supported queues");
+		goto fail;
+	}
+
 	/*
 	 * Try to set up MSI/MSI-X interrupts.
 	 */
 	if ((nvme->n_intr_types & (DDI_INTR_TYPE_MSI | DDI_INTR_TYPE_MSIX))
 	    != 0) {
+		const uint16_t nqueues = MIN(
+		    nvme->n_submission_queues_supported,
+		    nvme->n_completion_queues_supported);
+
 		nvme_release_interrupts(nvme);
-
-		nqueues = MIN(UINT16_MAX, ncpus);
-
 		if ((nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSIX,
 		    nqueues) != DDI_SUCCESS) &&
 		    (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_MSI,
@@ -4773,11 +4815,17 @@ nvme_init(nvme_t *nvme)
 	    nvme->n_io_cqueue_len);
 
 	/*
-	 * Assign the equal quantity of taskq threads to each completion
-	 * queue, capping the total number of threads to the number
-	 * of CPUs.
+	 * Assign taskq threads per completion queue based on CPU budget.
+	 * Note: if n_completion_queues exceeds the number of CPUs, the
+	 * MAX(1, ...) rule will oversubscribe CPUs (one thread per CQ). If we
+	 * attach early, ncpus may be 1 even on an SMP system. In that case
+	 * max_ncpus can be used as a sizing proxy.
 	 */
-	tq_threads = MIN(UINT16_MAX, ncpus) / nvme->n_completion_queues;
+	uint_t ncpus_eff = ncpus;
+	if (ncpus_eff < 2)
+		ncpus_eff = (boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus;
+
+	tq_threads = ncpus_eff / nvme->n_completion_queues;
 
 	/*
 	 * In case the calculation above is zero, we need at least one
@@ -4856,8 +4904,9 @@ nvme_intr(caddr_t arg1, caddr_t arg2)
 
 	/*
 	 * The interrupt vector a queue uses is calculated as queue_idx %
-	 * intr_cnt in nvme_create_io_qpair(). Iterate through the queue array
-	 * in steps of n_intr_cnt to process all queues using this vector.
+	 * intr_cnt in nvme_create_completion_queue(). Iterate through the
+	 * queue array in steps of n_intr_cnt to process all queues using this
+	 * vector.
 	 */
 	for (qnum = inum;
 	    qnum < nvme->n_cq_count && nvme->n_cq[qnum] != NULL;
