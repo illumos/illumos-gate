@@ -14,7 +14,7 @@
  * Copyright 2019 Unix Software Ltd.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Racktop Systems.
- * Copyright 2025 Oxide Computer Company.
+ * Copyright 2026 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -1873,9 +1873,7 @@ nvme_submit_io_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 		return (EIO);
 	}
 
-	if (sema_tryp(&qp->nq_sema) == 0)
-		return (EAGAIN);
-
+	sema_p(&qp->nq_sema);
 	nvme_submit_cmd_common(qp, cmd, NULL);
 	return (0);
 }
