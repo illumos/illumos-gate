@@ -24,9 +24,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
-.\" Portions Copyright 2025 Oxide Computer Company
+.\" Portions Copyright 2026 Oxide Computer Company
 .\"
-.Dd December 1, 2025
+.Dd January 9, 2026
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -438,8 +438,23 @@ Viona network devices use the following settings to configure their backend.
 The VNIC to use for the network connection.
 .It feature_mask Ta integer Ta 0 Ta
 Specify a mask to apply to the virtio features advertised to the guest.
-.It vqsize Ta integer Ta 1024 Ta
+.It txvqsize Ta integer Ta 256 Ta
+Specify the size of each TX ring.
+This value must be a power of 2 and in the range [2, 32768].
+.It rxvqsize Ta integer Ta 1024 Ta
+Specify the size of each RX ring.
+This value must be a power of 2 and in the range [2, 32768].
+.It vqsize Ta integer Ta - Ta
 Specify the size of each TX and RX ring.
+These default to 256
+.Pq TX
+and 1024
+.Pq RX .
+This option sets both to the same size and the
+.Sq txvqsize
+and
+.Sq rxvqsize
+options should generally be used instead.
 This value must be a power of 2 and in the range [2, 32768].
 .It qpair Ta integer Ta 8 Ta
 Specify the maximum number of queue pairs offered to the guest.

@@ -77,11 +77,21 @@
  * This is the default number of queues allocated and advertised via the
  * multi-queue feature. It can be overridden via the `qpair` device option.
  */
-#define	VIONA_DEFAULT_MAX_QPAIR	8
+#define	VIONA_DEFAULT_MAX_QPAIR		8
 
-#define	VIONA_RINGSZ		1024
-#define	VIONA_CTLQ_SIZE		64
-#define	VIONA_CTLQ_MAXSEGS	32
+/*
+ * These are the default TX and RX ring sizes. They can be overidden with the
+ * `vqsize`, `rxvqsize` and `txvqsize` options. The first sets both values to
+ * the same while the last two allow setting different values for TX and RX.
+ *
+ * It is common to have asymmetry here as the RX queue must absorb host-side
+ * burstiness while some backpressure is desirable on the TX side.
+ */
+#define	VIONA_DEFAULT_TX_RINGSZ		256
+#define	VIONA_DEFAULT_RX_RINGSZ		1024
+
+#define	VIONA_CTLQ_SIZE			64
+#define	VIONA_CTLQ_MAXSEGS		32
 
 /*
  * These macros work in terms of TX/RX queues only, which is always what we
@@ -96,6 +106,10 @@
 #define	VIONA_RING(sc, n)	(&(sc)->vsc_queues[(n)])
 #define	VIONA_RXQ(sc, n)	(VIONA_RING(sc, (n) * 2))
 #define	VIONA_TXQ(sc, n)	(VIONA_RING(sc, (n) * 2 + 1))
+
+#define	IS_RXQ(i)		((i) % 2 == 0)
+#define	IS_TXQ(i)		((i) % 2 != 0)
+
 /*
  * The control queue is always in the last slot of allocated rings, regardless
  * of how many rings are in use.
@@ -135,7 +149,8 @@ struct pci_viona_softc {
 	char		vsc_linkname[MAXLINKNAMELEN];
 	uint64_t	vsc_feature_mask;
 	uint16_t	vsc_vq_usepairs; /* RX/TX pairs in use */
-	uint16_t	vsc_vq_size;	/* size of a TX/RX queue */
+	uint16_t	vsc_vq_rxsize;	/* size of each RX queue */
+	uint16_t	vsc_vq_txsize;	/* size of each TX queue */
 
 	bool		vsc_resetting;
 	bool		vsc_msix_active;
@@ -272,7 +287,8 @@ pci_viona_qalloc(struct pci_viona_softc *sc, int pairs)
 	vc->vc_nvq = nqueues;
 
 	for (uint_t i = 0; i < vc->vc_nvq; i++) {
-		sc->vsc_queues[i].vq_qsize = sc->vsc_vq_size;
+		sc->vsc_queues[i].vq_qsize =
+		    IS_RXQ(i) ? sc->vsc_vq_rxsize : sc->vsc_vq_txsize;
 		sc->vsc_queues[i].vq_notify = NULL;
 	}
 	VIONA_CTLQ(sc)->vq_qsize = VIONA_CTLQ_SIZE;
@@ -756,8 +772,9 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 	long long num;
 	int err = 0;
 
-	sc->vsc_vq_size = VIONA_RINGSZ;
 	sc->vsc_config.vnc_max_qpair = VIONA_DEFAULT_MAX_QPAIR;
+	sc->vsc_vq_txsize = VIONA_DEFAULT_TX_RINGSZ;
+	sc->vsc_vq_rxsize = VIONA_DEFAULT_RX_RINGSZ;
 	sc->vsc_feature_mask = 0;
 	sc->vsc_linkname[0] = '\0';
 
@@ -780,12 +797,45 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 			EPRINTLN("viona: invalid vqsize '%s': %s",
 			    value, errstr);
 			err = -1;
-		} else if ((1 << (ffs(num) - 1)) != num) {
+		} else if ((1 << (ffsll(num) - 1)) != num) {
 			EPRINTLN("viona: vqsize '%s' must be power of 2",
 			    value);
 			err = -1;
 		} else {
-			sc->vsc_vq_size = num;
+			sc->vsc_vq_txsize = num;
+			sc->vsc_vq_rxsize = num;
+		}
+	}
+
+	value = get_config_value_node(nvl, "txvqsize");
+	if (value != NULL) {
+		num = strtonumx(value, 2, 32768, &errstr, 0);
+		if (errstr != NULL) {
+			EPRINTLN("viona: invalid txvqsize '%s': %s",
+			    value, errstr);
+			err = -1;
+		} else if ((1 << (ffsll(num) - 1)) != num) {
+			EPRINTLN("viona: txvqsize '%s' must be power of 2",
+			    value);
+			err = -1;
+		} else {
+			sc->vsc_vq_txsize = num;
+		}
+	}
+
+	value = get_config_value_node(nvl, "rxvqsize");
+	if (value != NULL) {
+		num = strtonumx(value, 2, 32768, &errstr, 0);
+		if (errstr != NULL) {
+			EPRINTLN("viona: invalid rxvqsize '%s': %s",
+			    value, errstr);
+			err = -1;
+		} else if ((1 << (ffsll(num) - 1)) != num) {
+			EPRINTLN("viona: rxvqsize '%s' must be power of 2",
+			    value);
+			err = -1;
+		} else {
+			sc->vsc_vq_rxsize = num;
 		}
 	}
 
@@ -810,9 +860,9 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 		(void) strlcpy(sc->vsc_linkname, value, MAXLINKNAMELEN);
 	}
 
-	DPRINTF(
-	    "viona=%p dev=%s vqsize=0x%x qpair=0x%x feature_mask=0x%" PRIx64,
-	    sc, sc->vsc_linkname, sc->vsc_vq_size,
+	DPRINTF("viona=%p dev=%s vqsize(TX/RX)=0x%x/0x%x qpair=0x%x "
+	    "feature_mask=0x%" PRIx64,
+	    sc, sc->vsc_linkname, sc->vsc_vq_txsize, sc->vsc_vq_rxsize,
 	    sc->vsc_config.vnc_max_qpair, sc->vsc_feature_mask);
 	return (err);
 }

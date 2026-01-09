@@ -25,7 +25,7 @@
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd December 1, 2025
+.Dd January 9, 2026
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -445,9 +445,25 @@ is applied to the virtio feature flags which are advertised to the guest.
 Bits set in the
 .Ar mask
 value are removed from the advertised features.
+.It Cm txvqsize Ns = Ns Ar size
+Specify the size of each TX ring.
+This value must be a power of 2 and in the range [2, 32768].
+The default value is 256.
+.It Cm rxvqsize Ns = Ns Ar size
+Specify the size of each RX ring.
+This value must be a power of 2 and in the range [2, 32768].
+The default value is 1024.
 .It Cm vqsize Ns = Ns Ar size
 Specify the size of each TX and RX ring.
-This value must be a power of 2 and in the range [2, 32768].
+These default to 256
+.Pq TX
+and 1024
+.Pq RX .
+This option sets both to the same size and the
+.Sq txvqsize
+and
+.Sq rxvqsize
+options should generally be used instead.
 .It Cm qpair Ns = Ns Ar pairs
 Specify the maximum number of queue pairs offered to the guest.
 The value must be in the range [1, 256] and defaults to 8.
