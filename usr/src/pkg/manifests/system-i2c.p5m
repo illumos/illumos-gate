@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -176,8 +176,11 @@ driver name=pchsmbus \
     alias=pci8086,4b23 \
     alias=pci8086,4da3 \
     alias=pci8086,51a3 \
+    alias=pci8086,54a3 \
     alias=pci8086,5ad4 \
+    alias=pci8086,6e23 \
     alias=pci8086,7722 \
+    alias=pci8086,7a23 \
     alias=pci8086,7aa3 \
     alias=pci8086,7e22 \
     alias=pci8086,7f23 \

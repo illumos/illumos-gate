@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _PCHSMBUS_H
@@ -447,9 +447,12 @@ typedef enum {
 #define	PCH_SMBUS_500		0x43a3
 #define	PCH_SMBUS_500_PKG	0xa0a3
 #define	PCH_SMBUS_JASPER	0x4da3	/* Pentium/Celeron Silver (Atom) */
-/* Adler Lake */
+/* Alder Lake */
 #define	PCH_SMBUS_600		0x7aa3	/* Also 700 series */
 #define	PCH_SMBUS_600_PKG	0x51a3	/* Also 700 On-Package */
+#define	PCH_SMBUS_ALDER_N	0x54a3
+/* Raptor Lake */
+#define	PCH_SMBUS_700		0x7a23
 /* Meteor Lake */
 #define	PCH_SMBUS_800		0x7f23
 #define	PCH_SMBUS_METEOR_PS	0x7e22	/* Also -H/-E */
@@ -458,6 +461,8 @@ typedef enum {
 /* Panther Lake */
 #define	PCH_SMBUS_PANTHER_H	0xe322
 #define	PCH_SMBUS_PANTHER_P	0xe422
+/* Nova Lake */
+#define	PCH_SMBUS_900		0x6e23
 
 #ifdef __cplusplus
 }
