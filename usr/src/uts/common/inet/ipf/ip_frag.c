@@ -511,7 +511,7 @@ ipfr_t *table[];
 	/*
 	 * check the table, careful to only compare the right amount of data
 	 */
-	for (f = table[idx]; f; f = f->ipfr_hnext)
+	for (f = table[idx]; f; f = f->ipfr_hnext) {
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&f->ipfr_ifp,
 			  IPFR_CMPSZ)) {
 			u_short	off;
@@ -547,26 +547,6 @@ ipfr_t *table[];
 				f->ipfr_seen0 = 1;
 			}
 
-			if (f != table[idx]) {
-				ipfr_t **fp;
-
-				/*
-				 * Move fragment info. to the top of the list
-				 * to speed up searches.  First, delink...
-				 */
-				fp = f->ipfr_hprev;
-				(*fp) = f->ipfr_hnext;
-				if (f->ipfr_hnext != NULL)
-					f->ipfr_hnext->ipfr_hprev = fp;
-				/*
-				 * Then put back at the top of the chain.
-				 */
-				f->ipfr_hnext = table[idx];
-				table[idx]->ipfr_hprev = &f->ipfr_hnext;
-				f->ipfr_hprev = table + idx;
-				table[idx] = f;
-			}
-
 			/*
 			 * If we've follwed the fragments, and this is the
 			 * last (in order), shrink expiration time.
@@ -575,11 +555,14 @@ ipfr_t *table[];
 				if (!(fin->fin_flx & FI_MOREFRAG))
 					f->ipfr_ttl = ifs->ifs_fr_ticks + 1;
 				f->ipfr_off = fin->fin_dlen + off;
-			} else if (f->ipfr_pass & FR_FRSTRICT)
+			} else if (f->ipfr_pass & FR_FRSTRICT) {
 				continue;
+			}
 			ATOMIC_INCL(ifs->ifs_ipfr_stats.ifs_hits);
 			return f;
 		}
+	}
+
 	return NULL;
 }
 
