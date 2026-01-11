@@ -23,6 +23,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2024 MNX Cloud, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -3050,6 +3051,7 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 	grp->lg_lso = B_TRUE;
 	grp->lg_cap_lso.lso_flags = (t_uscalar_t)-1;
 	grp->lg_cap_lso.lso_basic_tcp_ipv4.lso_max = (t_uscalar_t)-1;
+	grp->lg_cap_lso.lso_basic_tcp_ipv6.lso_max = (t_uscalar_t)-1;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM, &cksum))
@@ -3066,10 +3068,22 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 		    mac_capab_get(port->lp_mh, MAC_CAPAB_LSO, &cap_lso);
 		if (grp->lg_lso) {
 			grp->lg_cap_lso.lso_flags &= cap_lso.lso_flags;
+
+			/*
+			 * Make sure the maximum LSO for the aggr is clamped to
+			 * the largest _common_ value across all the ports.
+			 */
 			if (grp->lg_cap_lso.lso_basic_tcp_ipv4.lso_max >
-			    cap_lso.lso_basic_tcp_ipv4.lso_max)
+			    cap_lso.lso_basic_tcp_ipv4.lso_max) {
 				grp->lg_cap_lso.lso_basic_tcp_ipv4.lso_max =
 				    cap_lso.lso_basic_tcp_ipv4.lso_max;
+			}
+
+			if (grp->lg_cap_lso.lso_basic_tcp_ipv6.lso_max >
+			    cap_lso.lso_basic_tcp_ipv6.lso_max) {
+				grp->lg_cap_lso.lso_basic_tcp_ipv6.lso_max =
+				    cap_lso.lso_basic_tcp_ipv6.lso_max;
+			}
 		}
 	}
 }
@@ -3108,11 +3122,20 @@ aggr_grp_capab_check(aggr_grp_t *grp, aggr_port_t *port)
 
 		if (mac_capab_get(port->lp_mh, MAC_CAPAB_LSO, &cap_lso)) {
 			if ((grp->lg_cap_lso.lso_flags & cap_lso.lso_flags) !=
-			    grp->lg_cap_lso.lso_flags)
+			    grp->lg_cap_lso.lso_flags) {
 				return (B_FALSE);
+			}
+
 			if (grp->lg_cap_lso.lso_basic_tcp_ipv4.lso_max >
-			    cap_lso.lso_basic_tcp_ipv4.lso_max)
+			    cap_lso.lso_basic_tcp_ipv4.lso_max) {
 				return (B_FALSE);
+			}
+
+			if (grp->lg_cap_lso.lso_basic_tcp_ipv6.lso_max >
+			    cap_lso.lso_basic_tcp_ipv6.lso_max) {
+				return (B_FALSE);
+			}
+
 		} else {
 			return (B_FALSE);
 		}

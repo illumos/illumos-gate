@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_SOFT_RING_H
@@ -108,9 +108,9 @@ struct mac_soft_ring_s {
 	timeout_id_t	s_ring_tid;	/* timer id of pending timeout() */
 	kthread_t	*s_ring_worker;	/* kernel thread id */
 	char		s_ring_name[S_RING_NAMELEN + 1];
-	uint32_t	s_ring_total_inpkt;
-	uint32_t	s_ring_total_rbytes;
-	uint32_t	s_ring_drops;
+	uint64_t	s_ring_total_inpkt;
+	uint64_t	s_ring_total_rbytes;
+	uint64_t	s_ring_drops;
 	struct mac_client_impl_s *s_ring_mcip;
 	kstat_t		*s_ring_ksp;
 
@@ -396,12 +396,15 @@ struct mac_soft_ring_set_s {
 #define	ST_RING_TCP		0x0004
 #define	ST_RING_UDP		0x0008
 #define	ST_RING_OTH		0x0010
-
-#define	ST_RING_BW_CTL		0x0020
 #define	ST_RING_TX		0x0040
 
 #define	ST_RING_TCP6		0x0080
 #define	ST_RING_UDP6		0x0100
+
+/*
+ * The total number of softring protocol lanes: TCP, TCP6, UDP, UDP6, OTH.
+ */
+#define	ST_RING_NUM_PROTO	5
 
 /*
  * State flags.
@@ -428,11 +431,6 @@ struct mac_soft_ring_set_s {
  */
 #define	S_RING_BIND_NONE	-1
 
-/*
- * defines for srs_type - identifies a link or a sub-flow
- * and other static characteristics of a SRS like a tx
- * srs, tcp only srs, etc.
- */
 #define	SRST_LINK		0x00000001
 #define	SRST_FLOW		0x00000002
 #define	SRST_NO_SOFT_RINGS	0x00000004
@@ -447,8 +445,10 @@ struct mac_soft_ring_set_s {
 #define	SRST_BW_CONTROL		0x00000200
 #define	SRST_DIRECT_POLL	0x00000400
 
-#define	SRST_DLS_BYPASS		0x00001000
-#define	SRST_CLIENT_POLL_ENABLED 0x00002000
+#define	SRST_DLS_BYPASS_V4	0x00001000
+#define	SRST_DLS_BYPASS_V6	0x00002000
+#define	SRST_CLIENT_POLL_V4	0x00004000
+#define	SRST_CLIENT_POLL_V6	0x00008000
 
 /*
  * soft ring set flags. These bits are dynamic in nature and get
@@ -649,7 +649,10 @@ extern void mac_soft_ring_worker_wakeup(mac_soft_ring_t *);
 extern void mac_soft_ring_blank(void *, time_t, uint_t, int);
 extern mblk_t *mac_soft_ring_poll(mac_soft_ring_t *, size_t);
 extern void mac_soft_ring_destroy(mac_soft_ring_t *);
-extern void mac_soft_ring_dls_bypass(void *, mac_direct_rx_t, void *);
+extern void mac_soft_ring_dls_bypass_enable(mac_soft_ring_t *, mac_direct_rx_t,
+    void *);
+extern void mac_soft_ring_dls_bypass_disable(mac_soft_ring_t *,
+    mac_client_impl_t *);
 
 /* Rx SRS */
 extern mac_soft_ring_set_t *mac_srs_create(struct mac_client_impl_s *,
@@ -663,9 +666,9 @@ extern void mac_tx_srs_retarget_intr(mac_soft_ring_set_t *);
 
 extern void mac_srs_quiesce_initiate(mac_soft_ring_set_t *);
 extern void mac_srs_client_poll_enable(struct mac_client_impl_s *,
-    mac_soft_ring_set_t *);
+    mac_soft_ring_set_t *, boolean_t);
 extern void mac_srs_client_poll_disable(struct mac_client_impl_s *,
-    mac_soft_ring_set_t *);
+    mac_soft_ring_set_t *, boolean_t);
 extern void mac_srs_client_poll_quiesce(struct mac_client_impl_s *,
     mac_soft_ring_set_t *);
 extern void mac_srs_client_poll_restart(struct mac_client_impl_s *,

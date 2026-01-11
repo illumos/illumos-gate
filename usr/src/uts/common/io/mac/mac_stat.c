@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1113,16 +1113,21 @@ mac_soft_ring_stat_create(mac_soft_ring_t *ringp)
 		return;
 
 	is_tx_srs = ((mac_srs->srs_type & SRST_TX) != 0);
-	if (is_tx_srs) {	/* tx side hardware lane */
+	if (is_tx_srs) {
 		ASSERT(ring != NULL);
 		(void) snprintf(statname, sizeof (statname), "mac_tx_hwlane%d",
 		    ring->mr_index);
 		i_mac_tx_hwlane_stat_create(ringp, flent->fe_flow_name,
 		    statname);
-	} else {		/* rx side fanout */
-				/* Maintain single stat for (tcp, udp, oth) */
+	} else {
+		/*
+		 * We maintain a single "fanout lane" stat per set of rx
+		 * protocol softrings. That is, each set of (TCP/TCP6, UDP/UDP6,
+		 * OTH) softrings counts as a single lane.
+		 */
 		if (ringp->s_ring_type & ST_RING_TCP) {
 			int			index;
+			int			fanout_lane;
 			mac_soft_ring_t		*softring;
 
 			for (index = 0, softring = mac_srs->srs_soft_ring_head;
@@ -1132,13 +1137,15 @@ mac_soft_ring_stat_create(mac_soft_ring_t *ringp)
 					break;
 			}
 
+			fanout_lane = index / ST_RING_NUM_PROTO;
+
 			if (mac_srs->srs_ring == NULL) {
 				(void) snprintf(statname, sizeof (statname),
-				    "mac_rx_swlane0_fanout%d", index/3);
+				    "mac_rx_swlane0_fanout%d", fanout_lane);
 			} else {
 				(void) snprintf(statname, sizeof (statname),
 				    "mac_rx_hwlane%d_fanout%d",
-				    mac_srs->srs_ring->mr_index, index/3);
+				    mac_srs->srs_ring->mr_index, fanout_lane);
 			}
 			i_mac_rx_fanout_stat_create(ringp, flent->fe_flow_name,
 			    statname);

@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -597,29 +597,42 @@ mac_soft_ring_poll(mac_soft_ring_t *ringp, size_t bytes_to_pickup)
 }
 
 /*
- * mac_soft_ring_dls_bypass
- *
  * Enable direct client (IP) callback function from the softrings.
  * Callers need to make sure they don't need any DLS layer processing
  */
 void
-mac_soft_ring_dls_bypass(void *arg, mac_direct_rx_t rx_func, void *rx_arg1)
+mac_soft_ring_dls_bypass_enable(mac_soft_ring_t *softring,
+    mac_direct_rx_t rx_func, void *rx_arg1)
 {
-	mac_soft_ring_t		*softring = arg;
-	mac_soft_ring_set_t	*srs;
-
 	VERIFY3P(rx_func, !=, NULL);
-
 	mutex_enter(&softring->s_ring_lock);
 	softring->s_ring_rx_func = rx_func;
 	softring->s_ring_rx_arg1 = rx_arg1;
 	mutex_exit(&softring->s_ring_lock);
-
-	srs = softring->s_ring_set;
-	mutex_enter(&srs->srs_lock);
-	srs->srs_type |= SRST_DLS_BYPASS;
-	mutex_exit(&srs->srs_lock);
 }
+
+/* Disable DLS bypass. */
+void
+mac_soft_ring_dls_bypass_disable(mac_soft_ring_t *softring,
+    mac_client_impl_t *mcip)
+{
+	mutex_enter(&softring->s_ring_lock);
+	/*
+	 * Before modifying the ring state we first wait for any in-progress
+	 * processing to stop.
+	 */
+	while (softring->s_ring_state & S_RING_PROC) {
+		softring->s_ring_state |= S_RING_CLIENT_WAIT;
+		cv_wait(&softring->s_ring_client_cv,
+		    &softring->s_ring_lock);
+	}
+
+	softring->s_ring_state &= ~S_RING_CLIENT_WAIT;
+	softring->s_ring_rx_func = mac_rx_deliver;
+	softring->s_ring_rx_arg1 = mcip;
+	mutex_exit(&softring->s_ring_lock);
+}
+
 
 /*
  * mac_soft_ring_signal

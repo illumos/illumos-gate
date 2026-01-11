@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1447,7 +1447,7 @@ mac_srs_fire(void *arg)
 
 #define	COMPUTE_INDEX(key, sz)	(key % sz)
 
-#define	FANOUT_ENQUEUE_MP(head, tail, cnt, bw_ctl, sz, sz0, mp) {	\
+#define	FANOUT_ENQUEUE_MP(head, tail, cnt, sz, sz0, mp) {		\
 	if ((tail) != NULL) {						\
 		ASSERT((tail)->b_next == NULL);				\
 		(tail)->b_next = (mp);					\
@@ -1457,15 +1457,13 @@ mac_srs_fire(void *arg)
 	}								\
 	(tail) = (mp);							\
 	(cnt)++;							\
-	if ((bw_ctl))							\
-		(sz) += (sz0);						\
+	(sz) += (sz0);							\
 }
 
 #define	MAC_FANOUT_DEFAULT	0
 #define	MAC_FANOUT_RND_ROBIN	1
 int mac_fanout_type = MAC_FANOUT_DEFAULT;
 
-#define	MAX_SR_TYPES	5
 /* fanout types for port based hashing */
 typedef enum pkt_type {
 	V4_TCP = 0,
@@ -1495,15 +1493,14 @@ typedef enum pkt_type {
 static void
 mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 {
-	mblk_t			*headmp[MAX_SR_TYPES] = { 0 };
-	mblk_t			*tailmp[MAX_SR_TYPES] = { 0 };
-	int			cnt[MAX_SR_TYPES] = { 0 };
-	size_t			sz[MAX_SR_TYPES] = { 0 };
+	mblk_t			*headmp[ST_RING_NUM_PROTO] = { 0 };
+	mblk_t			*tailmp[ST_RING_NUM_PROTO] = { 0 };
+	int			cnt[ST_RING_NUM_PROTO] = { 0 };
+	size_t			sz[ST_RING_NUM_PROTO] = { 0 };
 	mac_client_impl_t	*mcip = mac_srs->srs_mcip;
 
 	const boolean_t is_ether =
 	    (mcip->mci_mip->mi_info.mi_nativemedia == DL_ETHER);
-	const boolean_t bw_ctl = ((mac_srs->srs_type & SRST_BW_CONTROL) != 0);
 
 	/*
 	 * If we don't have a Rx ring, S/W classification would have done
@@ -1516,13 +1513,16 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	    mac_srs->srs_ring->mr_classify_type == MAC_HW_CLASSIFIER;
 
 	/*
-	 * Some clients, such as non-ethernet, need DLS processing in
-	 * the Rx path. Such clients clear the SRST_DLS_BYPASS flag.
-	 * DLS bypass may also be disabled via the
-	 * MCIS_RX_BYPASS_DISABLE flag.
+	 * Some clients, such as non-ethernet, need DLS processing in the Rx
+	 * path. Such clients clear the bypass flag. DLS bypass may also be
+	 * disabled via the MCIS_RX_BYPASS_DISABLE flag.
 	 */
-	const boolean_t dls_bypass =
-	    ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0) &&
+	const boolean_t dls_bypass_v4 =
+	    ((mac_srs->srs_type & SRST_DLS_BYPASS_V4) != 0) &&
+	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
+
+	const boolean_t dls_bypass_v6 =
+	    ((mac_srs->srs_type & SRST_DLS_BYPASS_V6) != 0) &&
 	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
 
 	/*
@@ -1591,12 +1591,13 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			dstaddr = non_ether_mhi.mhi_daddr;
 		}
 
-		if (!dls_bypass) {
+		if ((!dls_bypass_v4 && meoi.meoi_l3proto == ETHERTYPE_IP) ||
+		    (!dls_bypass_v6 && meoi.meoi_l3proto == ETHERTYPE_IPV6)) {
 			DTRACE_PROBE4(rx__fanout, mblk_t *, mp,
 			    mac_ether_offload_info_t *, &meoi,
 			    mac_soft_ring_set_t *, mac_srs, pkt_type_t, OTH);
-			FANOUT_ENQUEUE_MP(headmp[OTH], tailmp[OTH],
-			    cnt[OTH], bw_ctl, sz[OTH], sz1, mp);
+			FANOUT_ENQUEUE_MP(headmp[OTH], tailmp[OTH], cnt[OTH],
+			    sz[OTH], sz1, mp);
 			continue;
 		}
 
@@ -1659,8 +1660,8 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			DTRACE_PROBE4(rx__fanout, mblk_t *, mp,
 			    mac_ether_offload_info_t *, &meoi,
 			    mac_soft_ring_set_t *, mac_srs, pkt_type_t, OTH);
-			FANOUT_ENQUEUE_MP(headmp[OTH], tailmp[OTH],
-			    cnt[OTH], bw_ctl, sz[OTH], sz1, mp);
+			FANOUT_ENQUEUE_MP(headmp[OTH], tailmp[OTH], cnt[OTH],
+			    sz[OTH], sz1, mp);
 			continue;
 		}
 
@@ -1690,7 +1691,7 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		    mac_ether_offload_info_t *, &meoi, mac_soft_ring_set_t *,
 		    mac_srs, pkt_type_t, type);
 		FANOUT_ENQUEUE_MP(headmp[type], tailmp[type], cnt[type],
-		    bw_ctl, sz[type], sz1, mp);
+		    sz[type], sz1, mp);
 	}
 
 	for (pkt_type_t type = V4_TCP; type < UNDEF; type++) {
@@ -1917,15 +1918,14 @@ src_dst_based_fanout:
 static void
 mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 {
-	mblk_t				*headmp[MAX_SR_TYPES][MAX_SR_FANOUT];
-	mblk_t				*tailmp[MAX_SR_TYPES][MAX_SR_FANOUT];
-	int				cnt[MAX_SR_TYPES][MAX_SR_FANOUT];
-	size_t				sz[MAX_SR_TYPES][MAX_SR_FANOUT];
-	mac_client_impl_t		*mcip = mac_srs->srs_mcip;
+	mblk_t			*headmp[ST_RING_NUM_PROTO][MAX_SR_FANOUT];
+	mblk_t			*tailmp[ST_RING_NUM_PROTO][MAX_SR_FANOUT];
+	int			cnt[ST_RING_NUM_PROTO][MAX_SR_FANOUT];
+	size_t			sz[ST_RING_NUM_PROTO][MAX_SR_FANOUT];
+	mac_client_impl_t	*mcip = mac_srs->srs_mcip;
 
 	const boolean_t is_ether =
 	    (mcip->mci_mip->mi_info.mi_nativemedia == DL_ETHER);
-	const boolean_t bw_ctl = ((mac_srs->srs_type & SRST_BW_CONTROL) != 0);
 
 	/*
 	 * If we don't have a Rx ring, S/W classification would have done
@@ -1938,14 +1938,17 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	    mac_srs->srs_ring->mr_classify_type == MAC_HW_CLASSIFIER;
 
 	/*
-	 * Some clients, such as non Ethernet, need DLS processing in
-	 * the Rx path. Such clients clear the SRST_DLS_BYPASS flag.
-	 * DLS bypass may also be disabled via the
-	 * MCIS_RX_BYPASS_DISABLE flag, but this is only consumed by
-	 * sun4v vsw currently.
+	 * Some clients, such as non Ethernet, need DLS processing in the Rx
+	 * path. Such clients clear the bypass flag. DLS bypass may also be
+	 * disabled via the MCIS_RX_BYPASS_DISABLE flag, but this is only
+	 * consumed by sun4v vsw currently.
 	 */
-	const boolean_t dls_bypass =
-	    ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0) &&
+	const boolean_t dls_bypass_v4 =
+	    ((mac_srs->srs_type & SRST_DLS_BYPASS_V4) != 0) &&
+	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
+
+	const boolean_t dls_bypass_v6 =
+	    ((mac_srs->srs_type & SRST_DLS_BYPASS_V6) != 0) &&
 	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
 
 	/*
@@ -1958,10 +1961,10 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	 */
 	const int fanout_cnt = mac_srs->srs_tcp_ring_count;
 
-	bzero(headmp, MAX_SR_TYPES * MAX_SR_FANOUT * sizeof (mblk_t *));
-	bzero(tailmp, MAX_SR_TYPES * MAX_SR_FANOUT * sizeof (mblk_t *));
-	bzero(cnt, MAX_SR_TYPES * MAX_SR_FANOUT * sizeof (int));
-	bzero(sz, MAX_SR_TYPES * MAX_SR_FANOUT * sizeof (size_t));
+	bzero(headmp, sizeof (headmp));
+	bzero(tailmp, sizeof (tailmp));
+	bzero(cnt, sizeof (cnt));
+	bzero(sz, sizeof (sz));
 
 	/*
 	 * We got a chain from SRS that we need to send to the soft rings.
@@ -2034,7 +2037,8 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			dstaddr = non_ether_mhi.mhi_daddr;
 		}
 
-		if (!dls_bypass) {
+		if ((!dls_bypass_v4 && meoi.meoi_l3proto == ETHERTYPE_IP) ||
+		    (!dls_bypass_v6 && meoi.meoi_l3proto == ETHERTYPE_IPV6)) {
 			if (mac_rx_srs_long_fanout(mac_srs, mp,
 			    meoi.meoi_l3proto, meoi.meoi_l2hlen,
 			    &type, &indx) == -1) {
@@ -2046,8 +2050,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			    mac_ether_offload_info_t *, &meoi,
 			    mac_soft_ring_set_t *, mac_srs, pkt_type_t, type);
 			FANOUT_ENQUEUE_MP(headmp[type][indx],
-			    tailmp[type][indx],
-			    cnt[type][indx], bw_ctl,
+			    tailmp[type][indx], cnt[type][indx],
 			    sz[type][indx], sz1, mp);
 			continue;
 		}
@@ -2149,7 +2152,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			    mac_ether_offload_info_t *, &meoi,
 			    mac_soft_ring_set_t *, mac_srs, pkt_type_t, type);
 			FANOUT_ENQUEUE_MP(headmp[type][indx],
-			    tailmp[type][indx], cnt[type][indx], bw_ctl,
+			    tailmp[type][indx], cnt[type][indx],
 			    sz[type][indx], sz1, mp);
 			continue;
 		}
@@ -2224,7 +2227,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		    mac_ether_offload_info_t *, &meoi, mac_soft_ring_set_t *,
 		    mac_srs, pkt_type_t, type);
 		FANOUT_ENQUEUE_MP(headmp[type][indx], tailmp[type][indx],
-		    cnt[type][indx], bw_ctl, sz[type][indx], sz1, mp);
+		    cnt[type][indx], sz[type][indx], sz1, mp);
 	}
 
 	for (pkt_type_t type = V4_TCP; type < UNDEF; type++) {
@@ -4678,9 +4681,7 @@ mac_tx_notify(mac_impl_t *mip)
 	(ringp)->s_ring_last = (tail);					\
 	(ringp)->s_ring_count += (cnt);					\
 	ASSERT((ringp)->s_ring_count > 0);				\
-	if ((ringp)->s_ring_type & ST_RING_BW_CTL) {			\
-		(ringp)->s_ring_size += sz;				\
-	}								\
+	(ringp)->s_ring_size += sz;					\
 }
 
 /*

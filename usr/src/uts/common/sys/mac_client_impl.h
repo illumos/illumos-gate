@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 /*
  * Copyright 2018 Joyent, Inc.
@@ -150,14 +150,18 @@ struct mac_client_impl_s {			/* Protected by */
 	uint_t			mci_nvids;		/* mci_rw_lock */
 	volatile uint32_t	mci_vidcache;		/* VID cache */
 
-	/* Resource Management Functions */
-	mac_resource_add_t	mci_resource_add;	/* SL */
-	mac_resource_remove_t	mci_resource_remove;	/* SL */
-	mac_resource_quiesce_t	mci_resource_quiesce;	/* SL */
-	mac_resource_restart_t	mci_resource_restart;	/* SL */
-	mac_resource_bind_t	mci_resource_bind;	/* SL */
-	void			*mci_resource_arg;	/* SL */
-
+	/*
+	 * Resource Management Callback Functions
+	 *
+	 * A mac client may have both an IPv4 and IPv6 ill_t active on it. In
+	 * order to avoid stomping on each other we give each their own resource
+	 * callbacks. At this time resources are used solely by TCP softrings
+	 * for the purpose of IP ring/squeue creation and polling. Currently the
+	 * callbacks are identical across protocol types, save the mrc_arg,
+	 * which is used to pass the ill_t up to IP.
+	 */
+	mac_resource_cb_t	mci_rcb4;	/* SL */
+	mac_resource_cb_t	mci_rcb6;	/* SL */
 
 	/* Tx notify callback */
 	kmutex_t		mci_tx_cb_lock;

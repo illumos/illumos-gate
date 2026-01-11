@@ -24,7 +24,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -2260,20 +2260,27 @@ mac_rx_srs_quiesce(mac_soft_ring_set_t *srs, uint_t srs_quiesce_flag)
 	flow_entry_t	*flent = srs->srs_flent;
 	uint_t	mr_flag, srs_done_flag;
 
-	ASSERT(MAC_PERIM_HELD((mac_handle_t)FLENT_TO_MIP(flent)));
-	ASSERT(!(srs->srs_type & SRST_TX));
+	VERIFY(mac_perim_held((mac_handle_t)FLENT_TO_MIP(flent)));
+	VERIFY0(srs->srs_type & SRST_TX);
 
 	if (srs_quiesce_flag == SRS_CONDEMNED) {
 		mr_flag = MR_CONDEMNED;
 		srs_done_flag = SRS_CONDEMNED_DONE;
-		if (srs->srs_type & SRST_CLIENT_POLL_ENABLED)
-			mac_srs_client_poll_disable(srs->srs_mcip, srs);
+
+		if (srs->srs_type & SRST_CLIENT_POLL_V4) {
+			mac_srs_client_poll_disable(srs->srs_mcip, srs,
+			    B_FALSE);
+		}
+
+		if (srs->srs_type & SRST_CLIENT_POLL_V6) {
+			mac_srs_client_poll_disable(srs->srs_mcip, srs,
+			    B_TRUE);
+		}
 	} else {
-		ASSERT(srs_quiesce_flag == SRS_QUIESCE);
+		VERIFY3U(srs_quiesce_flag, ==, SRS_QUIESCE);
 		mr_flag = MR_QUIESCE;
 		srs_done_flag = SRS_QUIESCE_DONE;
-		if (srs->srs_type & SRST_CLIENT_POLL_ENABLED)
-			mac_srs_client_poll_quiesce(srs->srs_mcip, srs);
+		mac_srs_client_poll_quiesce(srs->srs_mcip, srs);
 	}
 
 	if (srs->srs_ring != NULL) {

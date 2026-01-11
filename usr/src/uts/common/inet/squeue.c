@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -150,12 +151,14 @@ static uint_t squeue_drain_ns = 0;
 uintptr_t squeue_drain_stack_needed = 10240;
 uint_t squeue_drain_stack_toodeep;
 
-#define	MAX_BYTES_TO_PICKUP	150000
+/*
+ * The number of bytes the squeue is allowed to poll from the softring in a
+ * single read. The accounting is done on a per-mblk basis, so the squeue may
+ * poll one mblk/MTU worth of data over the limit.
+ */
+size_t squeue_poll_budget_bytes = 150000;
 
 #define	ENQUEUE_CHAIN(sqp, mp, tail, cnt) {			\
-	/*							\
-	 * Enqueue our mblk chain.				\
-	 */							\
 	ASSERT(MUTEX_HELD(&(sqp)->sq_lock));			\
 								\
 	if ((sqp)->sq_last != NULL)				\
@@ -956,7 +959,7 @@ poll_again:
 		sq_mac_handle = sq_rx_ring->rr_rx_handle;
 		ip_accept = sq_rx_ring->rr_ip_accept;
 		sq_ill = sq_rx_ring->rr_ill;
-		bytes_to_pickup = MAX_BYTES_TO_PICKUP;
+		bytes_to_pickup = squeue_poll_budget_bytes;
 		mutex_exit(lock);
 		head = sq_get_pkts(sq_mac_handle, bytes_to_pickup);
 		mp = NULL;

@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -3945,28 +3945,29 @@ mac_notify_remove(mac_notify_handle_t mnh, boolean_t wait)
  * Associate resource management callbacks with the specified MAC
  * clients.
  */
-
 void
-mac_resource_set_common(mac_client_handle_t mch, mac_resource_add_t add,
-    mac_resource_remove_t remove, mac_resource_quiesce_t quiesce,
-    mac_resource_restart_t restart, mac_resource_bind_t bind,
-    void *arg)
+mac_resource_set(mac_client_handle_t mch, mac_resource_cb_t *rcbs,
+    boolean_t is_v6)
 {
 	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
 
-	mcip->mci_resource_add = add;
-	mcip->mci_resource_remove = remove;
-	mcip->mci_resource_quiesce = quiesce;
-	mcip->mci_resource_restart = restart;
-	mcip->mci_resource_bind = bind;
-	mcip->mci_resource_arg = arg;
+	if (is_v6) {
+		mcip->mci_rcb6 = *rcbs;
+	} else {
+		mcip->mci_rcb4 = *rcbs;
+	}
 }
 
 void
-mac_resource_set(mac_client_handle_t mch, mac_resource_add_t add, void *arg)
+mac_resource_clear(mac_client_handle_t mch, boolean_t is_v6)
 {
-	/* update the 'resource_add' callback */
-	mac_resource_set_common(mch, add, NULL, NULL, NULL, NULL, arg);
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+
+	if (is_v6) {
+		bzero(&mcip->mci_rcb6, sizeof (mcip->mci_rcb6));
+	} else {
+		bzero(&mcip->mci_rcb4, sizeof (mcip->mci_rcb4));
+	}
 }
 
 /*
@@ -3974,7 +3975,7 @@ mac_resource_set(mac_client_handle_t mch, mac_resource_add_t add, void *arg)
  * SRS's and the soft rings of the client
  */
 void
-mac_client_poll_enable(mac_client_handle_t mch)
+mac_client_poll_enable(mac_client_handle_t mch, boolean_t is_v6)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_soft_ring_set_t	*mac_srs;
@@ -3988,7 +3989,7 @@ mac_client_poll_enable(mac_client_handle_t mch)
 	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 		ASSERT(mac_srs->srs_mcip == mcip);
-		mac_srs_client_poll_enable(mcip, mac_srs);
+		mac_srs_client_poll_enable(mcip, mac_srs, is_v6);
 	}
 }
 
@@ -3997,7 +3998,7 @@ mac_client_poll_enable(mac_client_handle_t mch)
  * the SRS's and the soft rings of the client
  */
 void
-mac_client_poll_disable(mac_client_handle_t mch)
+mac_client_poll_disable(mac_client_handle_t mch, boolean_t is_v6)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_soft_ring_set_t	*mac_srs;
@@ -4011,7 +4012,7 @@ mac_client_poll_disable(mac_client_handle_t mch)
 	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 		ASSERT(mac_srs->srs_mcip == mcip);
-		mac_srs_client_poll_disable(mcip, mac_srs);
+		mac_srs_client_poll_disable(mcip, mac_srs, is_v6);
 	}
 }
 

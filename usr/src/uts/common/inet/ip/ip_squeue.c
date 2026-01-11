@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -247,9 +248,11 @@ ip_squeue_set_create(processorid_t id)
 }
 
 /*
- * Called by ill_ring_add() to find an squeue to associate with a new ring.
+ * Obtain a free squeue and set its worker and poll thread priorities, if
+ * required. A free squeue is one that is not already bound to an ill_t
+ * and that is not marked as "default". If a free squeue does not exist,
+ * then one is created.
  */
-
 squeue_t *
 ip_squeue_getfree(pri_t pri)
 {
@@ -499,8 +502,9 @@ ip_squeue_add_ring(ill_t *ill, void *mrp)
 
 	bzero(rx_ring, sizeof (ill_rx_ring_t));
 	rx_ring->rr_rx = mrfp->mrf_receive;
-	/* XXX: Hard code it to tcp accept for now */
-	rx_ring->rr_ip_accept = (ip_accept_t)ip_accept_tcp;
+	rx_ring->rr_ip_accept = (ill->ill_isv6 != 0) ?
+	    (ip_accept_t)ip_accept_tcp_v6 :
+	    (ip_accept_t)ip_accept_tcp;
 
 	rx_ring->rr_intr_handle = mrfp->mrf_intr_handle;
 	rx_ring->rr_intr_enable = (ip_mac_intr_enable_t)mrfp->mrf_intr_enable;

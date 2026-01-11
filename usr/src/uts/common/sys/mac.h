@@ -24,6 +24,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_H
@@ -497,10 +498,15 @@ typedef int			(*mac_resource_bind_t)(void *,
 typedef void			(*mac_resource_remove_t)(void *, void *);
 typedef void			(*mac_resource_quiesce_t)(void *, void *);
 typedef void			(*mac_resource_restart_t)(void *, void *);
-typedef int			(*mac_resource_modify_t)(void *, void *,
-				    mac_resource_t *);
-typedef	void			(*mac_change_upcall_t)(void *, mac_direct_rx_t,
-    void *);
+
+typedef struct mac_resource_cb_s {
+	mac_resource_add_t	mrc_add;
+	mac_resource_remove_t	mrc_remove;
+	mac_resource_quiesce_t	mrc_quiesce;
+	mac_resource_restart_t	mrc_restart;
+	mac_resource_bind_t	mrc_bind;
+	void			*mrc_arg;
+} mac_resource_cb_t;
 
 /*
  * MAC-Type plugin interfaces

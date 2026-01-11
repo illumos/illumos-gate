@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -64,7 +64,9 @@ extern void mac_stop(mac_handle_t);
 
 extern void mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
 extern link_state_t mac_link_get(mac_handle_t);
-extern void mac_resource_set(mac_client_handle_t, mac_resource_add_t, void *);
+extern void mac_resource_set(mac_client_handle_t, mac_resource_cb_t *,
+    boolean_t);
+extern void mac_resource_clear(mac_client_handle_t, boolean_t);
 extern dev_info_t *mac_devinfo_get(mac_handle_t);
 extern void *mac_driver(mac_handle_t);
 extern boolean_t mac_capab_get(mac_handle_t, mac_capab_t, void *);
@@ -76,10 +78,6 @@ extern int mac_vlan_header_info(mac_handle_t, mblk_t *, mac_header_info_t *);
 extern mblk_t *mac_header_cook(mac_handle_t, mblk_t *);
 extern mblk_t *mac_header_uncook(mac_handle_t, mblk_t *);
 
-extern void mac_resource_set_common(mac_client_handle_t,
-    mac_resource_add_t, mac_resource_remove_t, mac_resource_quiesce_t,
-    mac_resource_restart_t, mac_resource_bind_t, void *);
-
 extern	void mac_perim_enter_by_mh(mac_handle_t, mac_perim_handle_t *);
 extern	int mac_perim_enter_by_macname(const char *, mac_perim_handle_t *);
 extern	int mac_perim_enter_by_linkid(datalink_id_t, mac_perim_handle_t *);
@@ -90,8 +88,8 @@ extern	uint16_t mac_client_vid(mac_client_handle_t);
 extern int mac_vnic_unicast_set(mac_client_handle_t, const uint8_t *);
 extern boolean_t mac_client_is_vlan_vnic(mac_client_handle_t);
 
-extern void mac_client_poll_enable(mac_client_handle_t);
-extern void mac_client_poll_disable(mac_client_handle_t);
+extern void mac_client_poll_enable(mac_client_handle_t, boolean_t);
+extern void mac_client_poll_disable(mac_client_handle_t, boolean_t);
 
 /*
  * Flow-related APIs for MAC clients.

@@ -25,7 +25,7 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_INET_IP_H
@@ -3294,6 +3294,8 @@ extern int	ip_find_hdr_v4(ipha_t *, ip_pkt_t *, boolean_t);
 extern int	ip_total_hdrs_len_v4(const ip_pkt_t *);
 
 extern mblk_t	*ip_accept_tcp(ill_t *, ill_rx_ring_t *, squeue_t *,
+    mblk_t *, mblk_t **, uint_t *cnt);
+extern mblk_t	*ip_accept_tcp_v6(ill_t *, ill_rx_ring_t *, squeue_t *,
     mblk_t *, mblk_t **, uint_t *cnt);
 extern void	ip_rput_dlpi(ill_t *, mblk_t *);
 extern void	ip_rput_notdata(ill_t *, mblk_t *);

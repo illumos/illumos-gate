@@ -22,7 +22,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1432,6 +1432,8 @@ dld_capab_direct(dld_str_t *dsp, void *data, uint_t flags)
 static int
 dld_capab_poll_enable(dld_str_t *dsp, dld_capab_poll_t *poll)
 {
+	mac_resource_cb_t rcbs = { 0 };
+
 	if (dsp->ds_polling)
 		return (EINVAL);
 
@@ -1454,29 +1456,28 @@ dld_capab_poll_enable(dld_str_t *dsp, dld_capab_poll_t *poll)
 	 * the user decides to modify CPU bindings to use more CPUs for the
 	 * device in which case we will switch to fanout using soft rings.
 	 */
-	mac_resource_set_common(dsp->ds_mch,
-	    (mac_resource_add_t)poll->poll_ring_add_cf,
-	    (mac_resource_remove_t)poll->poll_ring_remove_cf,
-	    (mac_resource_quiesce_t)poll->poll_ring_quiesce_cf,
-	    (mac_resource_restart_t)poll->poll_ring_restart_cf,
-	    (mac_resource_bind_t)poll->poll_ring_bind_cf,
-	    poll->poll_ring_ch);
+	rcbs.mrc_add = (mac_resource_add_t)poll->poll_ring_add_cf;
+	rcbs.mrc_remove = (mac_resource_remove_t)poll->poll_ring_remove_cf;
+	rcbs.mrc_quiesce = (mac_resource_quiesce_t)poll->poll_ring_quiesce_cf;
+	rcbs.mrc_restart = (mac_resource_restart_t)poll->poll_ring_restart_cf;
+	rcbs.mrc_bind = (mac_resource_bind_t)poll->poll_ring_bind_cf;
+	rcbs.mrc_arg = poll->poll_ring_ch;
 
-	mac_client_poll_enable(dsp->ds_mch);
+	mac_resource_set(dsp->ds_mch, &rcbs, dsp->ds_sap == ETHERTYPE_IPV6);
+	mac_client_poll_enable(dsp->ds_mch, dsp->ds_sap == ETHERTYPE_IPV6);
 
 	dsp->ds_polling = B_TRUE;
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 dld_capab_poll_disable(dld_str_t *dsp, dld_capab_poll_t *poll)
 {
 	if (!dsp->ds_polling)
 		return (EINVAL);
 
-	mac_client_poll_disable(dsp->ds_mch);
-	mac_resource_set(dsp->ds_mch, NULL, NULL);
+	mac_client_poll_disable(dsp->ds_mch, dsp->ds_sap == ETHERTYPE_IPV6);
+	mac_resource_clear(dsp->ds_mch, dsp->ds_sap == ETHERTYPE_IPV6);
 
 	dsp->ds_polling = B_FALSE;
 	return (0);

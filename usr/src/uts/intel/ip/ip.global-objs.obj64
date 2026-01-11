@@ -22,6 +22,7 @@
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved
 # Copyright 2019 Joyent, Inc. All rights reserved
+# Copyright 2026 Oxide Computer Company
 #
 
 arp_m_tbl
@@ -253,6 +254,7 @@ squeue_drain_ms
 squeue_drain_ns
 squeue_drain_stack_needed
 squeue_drain_stack_toodeep
+squeue_poll_budget_bytes
 tcp_acceptor_rinit
 tcp_acceptor_winit
 tcp_conn_cache
