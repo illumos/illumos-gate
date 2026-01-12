@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -35,6 +35,8 @@ dir  path=lib/svc/manifest group=sys
 dir  path=lib/svc/manifest/system group=sys
 file path=lib/svc/manifest/system/i2csimd.xml mode=0444
 dir  path=opt/i2c-tests
+dir  path=opt/i2c-tests/bin
+file path=opt/i2c-tests/bin/i2c-test mode=0555
 dir  path=opt/i2c-tests/runfiles
 file path=opt/i2c-tests/runfiles/default.run mode=0444
 dir  path=opt/i2c-tests/svc

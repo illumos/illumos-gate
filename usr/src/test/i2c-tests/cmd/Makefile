@@ -13,8 +13,29 @@
 # Copyright 2026 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cmd i2csimd runfiles tests
+CMDS = \
+	i2c-test
 
-include $(SRC)/test/Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/i2c-tests
+ROOTCMDDIR = $(ROOTOPTPKG)/bin
+
+ROOTCMDS = $(CMDS:%=$(ROOTCMDDIR)/%)
+$(ROOTCMDS) := FILEMODE = 0555
+
+all:
+
+install: $(ROOTCMDS)
+
+clean:
+
+clobber:
+
+$(ROOTCMDS): $(ROOTCMDDIR)
+
+$(ROOTCMDDIR):
+	$(INS.dir)
+
+$(ROOTCMDDIR)/%: %.ksh
+	$(INS.rename)
