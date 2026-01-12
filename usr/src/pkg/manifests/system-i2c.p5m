@@ -18,6 +18,7 @@ set name=pkg.fmri value=pkg:/system/i2c@$(PKGVERS)
 set name=pkg.summary value="I2C Framework and Utilities"
 set name=pkg.description value="I2C, I3C, SMBus Framework and Utilities"
 set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/at24c
