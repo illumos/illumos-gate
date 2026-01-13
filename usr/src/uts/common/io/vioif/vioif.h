@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -37,6 +37,14 @@ extern "C" {
 #define	VIRTIO_NET_CONFIG_STATUS	0x06	/* 16 R   */
 #define	VIRTIO_NET_CONFIG_MAX_VQ_PAIRS	0x08	/* 16 R   */
 #define	VIRTIO_NET_CONFIG_MTU		0x0A	/* 16 R   */
+#define	VIRTIO_NET_CONFIG_SPEED		0x0C	/* 32 R   */
+#define	VIRTIO_NET_CONFIG_DUPLEX	0x10	/* 8  R   */
+
+#define	VIRTIO_NET_CONFIG_STATUS_LINK_UP	1
+#define	VIRTIO_NET_CONFIG_SPEED_UNKNOWN		UINT32_MAX
+#define	VIRTIO_NET_CONFIG_DUPLEX_HALF		0
+#define	VIRTIO_NET_CONFIG_DUPLEX_FULL		1
+#define	VIRTIO_NET_CONFIG_DUPLEX_UNKNOWN	0xff
 
 /*
  * VIRTIO NETWORK VIRTQUEUES
@@ -157,6 +165,14 @@ extern "C" {
 #define	VIRTIO_NET_F_CTRL_RX_EXTRA	(1ULL << 20)
 
 /*
+ * SPEED_DUPLEX:
+ *	The VIRTIO_NET_CONFIG_SPEED and VIRTIO_NET_CONFIG_DUPLEX registers are
+ *	available, which allows the driver to determine the link speed and
+ *	duplex of the device.
+ */
+#define	VIRTIO_NET_F_SPEED_DUPLEX	(1ULL << 63)
+
+/*
  * These features are supported by the driver and we will request them from the
  * device.  Note that we do not currently request GUEST_CSUM, as the driver
  * does not presently support receiving frames with any offload features from
@@ -170,7 +186,12 @@ extern "C" {
 					VIRTIO_NET_F_MAC |		\
 					VIRTIO_NET_F_MTU |		\
 					VIRTIO_NET_F_CTRL_VQ |		\
-					VIRTIO_NET_F_CTRL_RX)
+					VIRTIO_NET_F_CTRL_RX |		\
+					VIRTIO_NET_F_STATUS)
+
+/* The following features are only available with the modern interface. */
+#define	VIRTIO_NET_WANTED_FEATURES_MODERN	\
+					(VIRTIO_NET_F_SPEED_DUPLEX)
 
 /*
  * VIRTIO NETWORK HEADER
@@ -434,6 +455,9 @@ struct vioif {
 	unsigned int			vif_has_ctrlq:1;
 	unsigned int			vif_has_ctrlq_rx:1;
 
+	uint32_t			vif_speed;	/* Mb/s */
+	uint16_t			vif_status;
+	uint8_t				vif_duplex;
 	uint_t				vif_mtu;
 	uint_t				vif_mtu_max;
 	uint8_t				vif_mac[ETHERADDRL];

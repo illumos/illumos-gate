@@ -15,7 +15,7 @@
  * Copyright 2021 Joyent, Inc.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2025 Hans Rosenfeld
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -96,7 +96,7 @@ int vioif_fake_promisc_success = 1;
 static int vioif_quiesce(dev_info_t *);
 static int vioif_attach(dev_info_t *, ddi_attach_cmd_t);
 static int vioif_detach(dev_info_t *, ddi_detach_cmd_t);
-static boolean_t vioif_has_feature(vioif_t *, uint32_t);
+static boolean_t vioif_has_feature(vioif_t *, uint64_t);
 static void vioif_reclaim_restart(vioif_t *);
 static int vioif_m_stat(void *, uint_t, uint64_t *);
 static void vioif_m_stop(void *);
@@ -112,6 +112,7 @@ static void vioif_m_propinfo(void *, const char *, mac_prop_id_t,
     mac_prop_info_handle_t);
 static boolean_t vioif_m_getcapab(void *, mac_capab_t, void *);
 static uint_t vioif_add_rx(vioif_t *);
+static void vioif_get_data(vioif_t *);
 
 
 static struct cb_ops vioif_cb_ops = {
@@ -1498,8 +1499,6 @@ vioif_m_start(void *arg)
 	VERIFY3S(vif->vif_runstate, ==, VIOIF_RUNSTATE_STOPPED);
 	vif->vif_runstate = VIOIF_RUNSTATE_RUNNING;
 
-	mac_link_update(vif->vif_mac_handle, LINK_STATE_UP);
-
 	virtio_queue_no_interrupt(vif->vif_rx_vq, B_FALSE);
 
 	/*
@@ -1515,6 +1514,8 @@ vioif_m_start(void *arg)
 	 * and the descriptors are all in the queue already.
 	 */
 	(void) vioif_add_rx(vif);
+
+	vioif_get_data(vif);
 
 	mutex_exit(&vif->vif_mutex);
 	return (DDI_SUCCESS);
@@ -1537,6 +1538,28 @@ vioif_m_stop(void *arg)
 
 	vif->vif_runstate = VIOIF_RUNSTATE_STOPPED;
 	mutex_exit(&vif->vif_mutex);
+}
+
+static link_duplex_t
+vioif_spec_to_duplex(uint8_t duplex)
+{
+	switch (duplex) {
+	case VIRTIO_NET_CONFIG_DUPLEX_HALF:
+		return (LINK_DUPLEX_HALF);
+	case VIRTIO_NET_CONFIG_DUPLEX_FULL:
+		return (LINK_DUPLEX_FULL);
+	case VIRTIO_NET_CONFIG_DUPLEX_UNKNOWN:
+	default:
+		return (LINK_DUPLEX_UNKNOWN);
+	}
+}
+
+static link_state_t
+vioif_spec_to_state(uint16_t status)
+{
+	/* We don't have a way of mapping to LINK_STATE_UNKNOWN */
+	return ((status & VIRTIO_NET_CONFIG_STATUS_LINK_UP) ?
+	    LINK_STATE_UP : LINK_STATE_DOWN);
 }
 
 static int
@@ -1582,12 +1605,13 @@ vioif_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = vif->vif_notxbuf;
 		break;
 	case MAC_STAT_IFSPEED:
-		/* always 1 Gbit */
-		*val = 1000000000ULL;
+		if (vif->vif_speed == VIRTIO_NET_CONFIG_SPEED_UNKNOWN)
+			*val = 1000000000ULL;	/* 1Gb/s */
+		else
+			*val = vif->vif_speed * 1000000ULL;
 		break;
 	case ETHER_STAT_LINK_DUPLEX:
-		/* virtual device, always full-duplex */
-		*val = LINK_DUPLEX_FULL;
+		*val = vioif_spec_to_duplex(vif->vif_duplex);
 		break;
 
 	default:
@@ -1668,6 +1692,38 @@ vioif_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	vioif_t *vif = arg;
 
 	switch (pr_num) {
+	case MAC_PROP_DUPLEX: {
+		link_duplex_t duplex;
+
+		if (pr_valsize < sizeof (link_duplex_t))
+			return (EOVERFLOW);
+		duplex = vioif_spec_to_duplex(vif->vif_duplex);
+		bcopy(&duplex, pr_val, sizeof (link_duplex_t));
+		break;
+	}
+	case MAC_PROP_SPEED: {
+		uint64_t speed;
+
+		if (pr_valsize < sizeof (uint64_t))
+			return (EOVERFLOW);
+		speed = (uint64_t)vif->vif_speed * 1000000ULL;
+		bcopy(&speed, pr_val, sizeof (uint64_t));
+		break;
+	}
+	case MAC_PROP_STATUS: {
+		link_state_t state;
+
+		if (pr_valsize < sizeof (link_state_t))
+			return (EOVERFLOW);
+		state = vioif_spec_to_state(vif->vif_status);
+		bcopy(&state, pr_val, sizeof (link_state_t));
+		break;
+	}
+	case MAC_PROP_MTU:
+		if (pr_valsize < sizeof (uint32_t))
+			return (EOVERFLOW);
+		bcopy(&vif->vif_mtu, pr_val, sizeof (uint32_t));
+		break;
 	case MAC_PROP_PRIVATE: {
 		uint_t value;
 
@@ -1683,12 +1739,14 @@ vioif_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			return (EOVERFLOW);
 		}
 
-		return (0);
+		break;
 	}
 
 	default:
 		return (ENOTSUP);
 	}
+
+	return (0);
 }
 
 static void
@@ -1700,6 +1758,12 @@ vioif_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	int value;
 
 	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
 	case MAC_PROP_MTU:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
 		mac_prop_info_set_range_uint32(prh, ETHERMIN, vif->vif_mtu_max);
@@ -1761,7 +1825,7 @@ vioif_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 }
 
 static boolean_t
-vioif_has_feature(vioif_t *vif, uint32_t feature)
+vioif_has_feature(vioif_t *vif, uint64_t feature)
 {
 	return (virtio_feature_present(vif->vif_virtio, feature));
 }
@@ -1811,6 +1875,49 @@ vioif_get_mac(vioif_t *vif)
 	    (uint_t)vif->vif_mac[0], (uint_t)vif->vif_mac[1],
 	    (uint_t)vif->vif_mac[2], (uint_t)vif->vif_mac[3],
 	    (uint_t)vif->vif_mac[4], (uint_t)vif->vif_mac[5]);
+}
+
+static void
+vioif_get_data(vioif_t *vif)
+{
+	link_state_t orig_state, new_state;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+
+	orig_state = vioif_spec_to_state(vif->vif_status);
+	if (vioif_has_feature(vif, VIRTIO_NET_F_STATUS)) {
+		vif->vif_status = virtio_dev_get16(vif->vif_virtio,
+		    VIRTIO_NET_CONFIG_STATUS);
+	} else {
+		vif->vif_status = VIRTIO_NET_CONFIG_STATUS_LINK_UP;
+	}
+	new_state = vioif_spec_to_state(vif->vif_status);
+
+	if (new_state == LINK_STATE_UP) {
+		if (vioif_has_feature(vif, VIRTIO_NET_F_SPEED_DUPLEX)) {
+			vif->vif_speed = virtio_dev_get32(vif->vif_virtio,
+			    VIRTIO_NET_CONFIG_SPEED);
+			vif->vif_duplex = virtio_dev_get8(vif->vif_virtio,
+			    VIRTIO_NET_CONFIG_DUPLEX);
+		} else {
+			vif->vif_speed = VIRTIO_NET_CONFIG_SPEED_UNKNOWN;
+			vif->vif_duplex = VIRTIO_NET_CONFIG_DUPLEX_FULL;
+		}
+	} else {
+		vif->vif_speed = 0;
+		vif->vif_duplex = VIRTIO_NET_CONFIG_DUPLEX_UNKNOWN;
+	}
+
+	/*
+	 * The specification says that speed is valid from [0, INT32_MAX] with
+	 * UINT32_MAX used as the unknown value. If we get anything else we map
+	 * it to the unknown value.
+	 */
+	if (vif->vif_speed > INT32_MAX)
+		vif->vif_speed = VIRTIO_NET_CONFIG_SPEED_UNKNOWN;
+
+	if (orig_state != new_state)
+		mac_link_update(vif->vif_mac_handle, new_state);
 }
 
 /*
@@ -1944,6 +2051,22 @@ vioif_select_interrupt_types(void)
 	return (VIRTIO_ANY_INTR_TYPE);
 }
 
+static uint_t
+vioif_cfgchange(caddr_t arg0, caddr_t arg1 __unused)
+{
+	vioif_t *vif = (vioif_t *)arg0;
+
+	/*
+	 * The configuration space of the device has changed in some way;
+	 * refresh data.
+	 */
+	mutex_enter(&vif->vif_mutex);
+	vioif_get_data(vif);
+	mutex_exit(&vif->vif_mutex);
+
+	return (DDI_INTR_CLAIMED);
+}
+
 static int
 vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -1951,7 +2074,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vioif_t *vif;
 	virtio_t *vio;
 	mac_register_t *macp = NULL;
-	uint64_t features = VIRTIO_NET_WANTED_FEATURES;
+	uint64_t features;
 
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
@@ -1960,6 +2083,10 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((vio = virtio_init(dip)) == NULL) {
 		return (DDI_FAILURE);
 	}
+
+	features = VIRTIO_NET_WANTED_FEATURES;
+	if (virtio_modern(vio))
+		features |= VIRTIO_NET_WANTED_FEATURES_MODERN;
 
 	if (!virtio_init_features(vio, features, B_TRUE)) {
 		virtio_fini(vio, B_TRUE);
@@ -1986,6 +2113,8 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail_virtio;
 	}
 
+	virtio_register_cfgchange_handler(vio, vioif_cfgchange, vif);
+
 	if (virtio_init_complete(vio, vioif_select_interrupt_types()) !=
 	    DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to complete Virtio init");
@@ -2001,6 +2130,8 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&vif->vif_mutex);
 
 	vioif_get_mac(vif);
+	vif->vif_duplex = VIRTIO_NET_CONFIG_DUPLEX_UNKNOWN;
+	vif->vif_speed = VIRTIO_NET_CONFIG_SPEED_UNKNOWN;
 
 	vif->vif_rxcopy_thresh = VIOIF_MACPROP_RXCOPY_THRESH_DEF;
 	vif->vif_txcopy_thresh = VIOIF_MACPROP_TXCOPY_THRESH_DEF;
@@ -2053,7 +2184,9 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	mac_free(macp);
 
-	mac_link_update(vif->vif_mac_handle, LINK_STATE_UP);
+	mutex_enter(&vif->vif_mutex);
+	vioif_get_data(vif);
+	mutex_exit(&vif->vif_mutex);
 
 	return (DDI_SUCCESS);
 
