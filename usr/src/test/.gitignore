@@ -121,6 +121,8 @@ elf-tests/tests/tls/amd64/ie/amd64-ie-test
 elf-tests/tests/tls/amd64/ld/amd64-ld-test
 elf-tests/tests/tls/i386/ld/i386-ld-test
 
+i2c-tests/i2csimd/i2csimd
+
 libc-tests/tests/catopen/catopen
 libc-tests/tests/err/err
 libc-tests/tests/fexecve/fexecve_test
@@ -177,6 +179,7 @@ os-tests/tests/i386/ldt
 os-tests/tests/imc/imc_test
 os-tests/tests/libtopo/digraph-test
 os-tests/tests/mac/mac_cksum
+os-tests/tests/mac/mac_lso
 os-tests/tests/mac/mac_parsing
 os-tests/tests/minttl/minttl
 os-tests/tests/minttl/minttl_err

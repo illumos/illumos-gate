@@ -868,6 +868,8 @@ gettext/gettext
 
 gettxt/gettxt
 
+gpioadm/gpioadm
+
 grep/grep
 
 groups/groups
@@ -942,6 +944,8 @@ hostname/hostname
 
 hotplug/hotplug
 hotplugd/hotplugd
+
+i2cadm/i2cadm
 
 ibd_upgrade/ibd_delete_link
 ibd_upgrade/ibd_upgrade
