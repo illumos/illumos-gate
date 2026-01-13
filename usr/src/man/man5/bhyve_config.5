@@ -26,7 +26,7 @@
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\" Portions Copyright 2026 Oxide Computer Company
 .\"
-.Dd January 9, 2026
+.Dd January 28, 2026
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -468,6 +468,10 @@ Note that most guests will allocate memory for all permitted queues, regardless
 of whether they are actively used.
 The default of 8 queue pairs results in 8 RX and 8 TX queues for network packet
 transfer, plus one control queue.
+.It speed Ta integer Ta 1000 Ta
+Specify speed of the virtual network device as advertised to the guest.
+This value is specified as a number of megabits per second
+.Pq Mb/s .
 .El
 .Pp
 Viona network devices have the ability to lend out their TX buffers, which

@@ -36,7 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -92,6 +92,8 @@
 
 #define	VIONA_CTLQ_SIZE			64
 #define	VIONA_CTLQ_MAXSEGS		32
+
+#define	VIONA_DEFAULT_LINK_SPEED	1000 /* In Mb/s, so this is 1Gb/s */
 
 /*
  * These macros work in terms of TX/RX queues only, which is always what we
@@ -195,6 +197,7 @@ static virtio_capstr_t viona_caps[] = {
 	{ VIRTIO_NET_F_GUEST_ANNOUNCE,	"VIRTIO_NET_F_GUEST_ANNOUNCE" },
 	{ VIRTIO_NET_F_MQ,		"VIRTIO_NET_F_MQ" },
 	{ VIRTIO_F_CTRL_MAC_ADDR,	"VIRTIO_F_CTRL_MAC_ADDR" },
+	{ VIRTIO_NET_F_SPEED_DUPLEX,	"VIRTIO_NET_F_SPEED_DUPLEX" },
 };
 
 static struct virtio_consts viona_vi_consts = {
@@ -775,6 +778,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 	sc->vsc_config.vnc_max_qpair = VIONA_DEFAULT_MAX_QPAIR;
 	sc->vsc_vq_txsize = VIONA_DEFAULT_TX_RINGSZ;
 	sc->vsc_vq_rxsize = VIONA_DEFAULT_RX_RINGSZ;
+	sc->vsc_config.vnc_speed = VIONA_DEFAULT_LINK_SPEED;
 	sc->vsc_feature_mask = 0;
 	sc->vsc_linkname[0] = '\0';
 
@@ -849,6 +853,18 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 			err = -1;
 		} else {
 			sc->vsc_config.vnc_max_qpair = num;
+		}
+	}
+
+	value = get_config_value_node(nvl, "speed");
+	if (value != NULL) {
+		num = strtonumx(value, 0, INT32_MAX, &errstr, 0);
+		if (errstr != NULL) {
+			EPRINTLN("viona: invalid speed '%s': %s",
+			    value, errstr);
+			err = -1;
+		} else {
+			sc->vsc_config.vnc_speed = num;
 		}
 	}
 
@@ -966,6 +982,7 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 	}
 	memcpy(sc->vsc_config.vnc_macaddr, attr.va_mac_addr, ETHERADDRL);
 	sc->vsc_config.vnc_status = VIRTIO_NET_S_LINK_UP; /* link always up */
+	sc->vsc_config.vnc_duplex = VIRTIO_NET_DUPLEX_FULL;
 	sc->vsc_config.vnc_mtu = pci_viona_query_mtu(handle, sc->vsc_linkid);
 	dladm_close(handle);
 
@@ -1253,6 +1270,8 @@ pci_viona_get_hv_features(void *vsc, bool modern)
 	value |= VIRTIO_NET_F_CTRL_VQ;
 	value |= VIRTIO_NET_F_CTRL_RX;
 	value |= VIRTIO_NET_F_MQ;
+	if (modern)
+		value |= VIRTIO_NET_F_SPEED_DUPLEX;
 
 	value &= ~sc->vsc_feature_mask;
 
