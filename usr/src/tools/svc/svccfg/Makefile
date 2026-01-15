@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2026 Jason King
 #
 
 include $(SRC)/tools/Makefile.tools
@@ -37,6 +38,7 @@ CPPFLAGS +=	-I. -I$(SRC)/cmd/svc/svccfg -I$(SRC)/cmd/svc/common	\
 		-I$(LIBTECLA)						\
 		-I$(LIBUUTIL)/common
 
+LIBSCF		= $(SRC)/lib/libscf
 LIBTECLA	= $(SRC)/lib/libtecla		# just for the header
 LIBUUTIL	= $(SRC)/lib/libuutil
 
