@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2001-2017, Intel Corporation
+  Copyright (c) 2001-2020, Intel Corporation
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #ifndef _IXGBE_X550_H_
 #define _IXGBE_X550_H_
@@ -70,10 +69,6 @@ s32 ixgbe_set_fw_drv_ver_x550(struct ixgbe_hw *hw, u8 maj, u8 min,
 			      u8 build, u8 ver, u16 len, const char *str);
 s32 ixgbe_get_phy_token(struct ixgbe_hw *);
 s32 ixgbe_put_phy_token(struct ixgbe_hw *);
-s32 ixgbe_write_iosf_sb_reg_x550a(struct ixgbe_hw *hw, u32 reg_addr,
-	u32 device_type, u32 data);
-s32 ixgbe_read_iosf_sb_reg_x550a(struct ixgbe_hw *hw, u32 reg_addr,
-	u32 device_type, u32 *data);
 void ixgbe_disable_mdd_X550(struct ixgbe_hw *hw);
 void ixgbe_enable_mdd_X550(struct ixgbe_hw *hw);
 void ixgbe_mdd_event_X550(struct ixgbe_hw *hw, u32 *vf_bitmap);
@@ -108,7 +103,6 @@ s32 ixgbe_write_phy_reg_x550a(struct ixgbe_hw *hw, u32 reg_addr,
 				u32 device_type, u16 phy_data);
 s32 ixgbe_setup_fc_fiber_x550em_a(struct ixgbe_hw *hw);
 s32 ixgbe_setup_fc_backplane_x550em_a(struct ixgbe_hw *hw);
-s32 ixgbe_setup_fc_sgmii_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_fiber_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_backplane_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_sgmii_x550em_a(struct ixgbe_hw *hw);
@@ -122,4 +116,5 @@ s32 ixgbe_reset_phy_t_X550em(struct ixgbe_hw *hw);
 s32 ixgbe_identify_sfp_module_X550em(struct ixgbe_hw *hw);
 s32 ixgbe_led_on_t_X550em(struct ixgbe_hw *hw, u32 led_idx);
 s32 ixgbe_led_off_t_X550em(struct ixgbe_hw *hw, u32 led_idx);
+bool ixgbe_fw_recovery_mode_X550(struct ixgbe_hw *hw);
 #endif /* _IXGBE_X550_H_ */

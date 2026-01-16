@@ -1,197 +1,150 @@
-'\" te
-.\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\"  Copyright 2012, Nexenta Systems, Inc. All rights reserved.
-.\"  Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
+.\"
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IXGBE 4D "Jan 10, 2020"
-.SH NAME
-ixgbe \- Intel 10Gb PCI Express NIC Driver
-.SH SYNOPSIS
-.nf
-\fB/dev/ixgbe*\fR
-.fi
-
-.SH DESCRIPTION
-The \fBixgbe\fR 10 Gigabit Ethernet driver is a multi-threaded, loadable,
-clonable, GLD-based STREAMS driver supporting the Data Link Provider Interface,
-\fBdlpi\fR(4P), on Intel 10-Gigabit PCI Express Ethernet controllers.
-.sp
-.LP
-The \fBixgbe\fR driver functions include controller initialization, frame
-transmit and receive, promiscuous and multicast support, and error recovery and
-reporting.
-.sp
-.LP
-The \fBixgbe\fR driver supports the following Intel 10-Gigabit PCI Express Ethernet controllers:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Intel Ethernet Controller 82598EB Family
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Intel Ethernet Controller 82599EB (X520) Family
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Intel Ethernet Controller X540 Family
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Intel Ethernet Controller X550 Family
-.RE
-.LP
-The \fBixgbe\fR driver and hardware support auto-negotiation, a protocol
-specified by the \fIIEEE 802.3ae\fR specification.
-.SH APPLICATION PROGRAMMING INTERFACE
-The cloning character-special device, \fB/dev/ixgbe\fR, is used to access all
-Intel 10-Gigabit PCI Express Ethernet devices installed within the system.
-.sp
-.LP
-The \fBixgbe\fR driver is managed by the \fBdladm\fR(8) command line utility,
-which allows VLANs to be defined on top of \fBixgbe\fR instances and for
-\fBixgbe\fR instances to be aggregated. See \fBdladm\fR(8) for more details.
-.sp
-.LP
-You must send an explicit DL_ATTACH_REQ message to associate the opened stream
-with a particular device (PPA). The PPA ID is interpreted as an unsigned
-integer data type and indicates the corresponding device instance (unit)
-number. The driver returns an error (DL_ERROR_ACK) if the PPA field value does
-not correspond to a valid device instance number for the system. The device is
-initialized on first attach and de-initialized (stopped) at last detach.
-.sp
-.LP
-The values returned by the driver in the DL_INFO_ACK primitive in response to
-your DL_INFO_REQ are:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Dd "January 18, 2026"
+.Dt IXGBE 4
+.Os
+.Sh NAME
+.Nm ixgbe
+.Nd Intel 10Gb PCI Express NIC Driver
+.Sh SYNOPSIS
+.Pa /dev/ixgbe*
+.Pa /dev/net/ixgbe*
+.Sh DESCRIPTION
+The
+.Nm
+10 Gigabit Ethernet driver is a GLDV3 NIC driver for various Intel PCIe
+Controllers including:
+.Bl -bullet
+.It
+Intel 82598EB Ethernet Controller Family
+.It
+Intel 82599EB (X520) Ethernet Controller Family
+.It
+Intel X540 Ethernet Controller Family
+.It
+Intel X550 Ethernet Controller Family
+.It
+Intel E610 Ethernet Controller Family
+.El
+.Pp
+The
+.Nm
+driver functions include controller initialization, frame transmit and receive,
+multiple transmit and receive groups with receive side scaling
+.Pq RSS ,
+promiscuous and multicast support, transceiver management, LED control, UFM
+management, and error recovery and reporting.
+.Pp
+The supported speeds vary based on the controller.
+The 82598 and 82599 generally interface with optical transceivers.
+The X540 supports 1 and 10GBASE-T, while the X550 and the E610 support 1, 2.5,
+5, and 10GBASE-T.
+The specific supported speeds vary based on the controller.
+.Sh APPLICATION PROGRAMMING INTERFACE
+The cloning character-special device,
+.Pa /dev/ixgbe ,
+is used to access all
+.Nm
+based devices installed within the system.
+.Pp
+The
+.Nm
+driver is managed by the
+.Xr dladm 8
+command line utility, which allows VLANs to be defined on top of
+.Nm
+instances and for
+.Nm
+instances to be aggregated.
+See
+.Xr dladm 8
+for more details.
+.Pp
+You must send an explicit
+.Dv DL_ATTACH_REQ
+message to associate the opened stream with a particular device
+.Pq PPA .
+The PPA ID is interpreted as an unsigned integer data type and indicates the
+corresponding device instance
+.Pq unit
+number.
+The driver returns an error
+.Pq Dv DL_ERROR_ACK
+if the PPA field value does not correspond to a valid device instance number
+for the system.
+The device is initialized on first attach and de-initialized
+.Pq stopped
+at last detach.
+.Pp
+The values returned by the driver in the
+.Dv DL_INFO_ACK
+primitive in response to the
+.Dv DL_INFO_REQ
+are:
+.Bl -bullet -offset indent
+.It
 Maximum SDU for Intel 82598EB is 16366.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Maximum SDU for Intel 82599EB, X540 and X550 is 15500.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
+Maximum SDU for Intel E610 is 9710.
+.It
 Minimum SDU is 0.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 DLSAP address length is 8.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-MAC type is DL_ETHER.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-SAP (Service Access Point) length value is -2, meaning the physical address
-component is followed immediately by a 2-byte SAP component within the DLSAP
-address.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
+MAC type is
+.Dv DL_ETHER .
+.It
+SAP
+.Pq Service Access Point
+length value is -2, meaning the physical address component is followed
+immediately by a 2-byte SAP component within the DLSAP address.
+.It
 Broadcast address value is the Ethernet/IEEE broadcast address
-(FF:FF:FF:FF:FF:FF).
-.sp
-Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
-particular SAP with the stream.
-.RE
-.SH CONFIGURATION
-By default, the \fBixgbe\fR driver performs auto-negotiation to select the link
-speed and mode. Link speed and mode can only be 10000 Mbps full-duplex for fiber, and only 10000, 1000, or 100 Mbps full-duplex for copper. See the
-\fIIEEE802.3\fR standard for more information.
-.SH FILES
-.ne 2
-.na
-\fB\fB/dev/ixgbe*\fR\fR
-.ad
-.RS 29n
+.Pq FF:FF:FF:FF:FF:FF .
+.Pp
+Once in the
+.Dv DL_ATTACHED
+state, you must send a
+.Dv DL_BIND_REQ
+to associate a particular SAP with the stream.
+.El
+.Sh CONFIGURATION
+By default, the
+.Nm
+driver performs auto-negotiation to select the link speed and mode.
+Link speed and mode can only be 10000 Mbps full-duplex for fiber.
+For copper, supported speeds may include 100, 1000, 2500, 5000, and 10000 Mbps
+full-duplex.
+See the
+.Em IEEE802.3
+standard for more information.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/ixgbe* , Pa /dev/net/ixgbe*
 Special character device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/amd64/ixgbe\fR\fR
-.ad
-.RS 29n
-Device driver (x86)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/sparcv9/ixgbe\fR\fR
-.ad
-.RS 29n
-Device driver (SPARC)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/ixgbe.conf\fR\fR
-.ad
-.RS 29n
+.It Pa /kernel/drv/amd64/ixgbe
+Device driver
+.Pq x86
+.It Pa /kernel/drv/ixgbe.conf
 Driver configuration file
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.BR streamio (4I),
-.BR dlpi (4P),
-.BR driver.conf (5),
-.BR attributes (7),
-.BR dladm (8),
-.BR netstat (8)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
-.sp
-.LP
-\fINetwork Interfaces Programmer's Guide\fR
-.sp
-.LP
-\fIIEEE 802.3ae Specification\fR, IEEE - 2002
+.El
+.Sh SEE ALSO
+.Xr streamio 4I ,
+.Xr dlpi 4P ,
+.Xr driver.conf 5 ,
+.Xr attributes 7 ,
+.Xr dladm 8 ,
+.Xr netstat 8
+.Pp
+.Rs
+.%T Writing Device Drivers
+.%U https://www.illumos.org/books/wdd/
+.Re

@@ -28,7 +28,7 @@
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_IXGBE_SW_H
@@ -77,6 +77,8 @@ extern "C" {
 #include <sys/fm/io/ddi.h>
 #include <sys/ddi_ufm.h>
 #include "ixgbe_api.h"
+#include "ixgbe_e610.h"
+#include "ixgbe_common.h"
 
 #define	MODULE_NAME			"ixgbe"	/* module name */
 
@@ -200,23 +202,24 @@ extern "C" {
 /*
  * Bit flags for attach_progress
  */
-#define	ATTACH_PROGRESS_PCI_CONFIG	0x0001	/* PCI config setup */
-#define	ATTACH_PROGRESS_REGS_MAP	0x0002	/* Registers mapped */
-#define	ATTACH_PROGRESS_PROPS		0x0004	/* Properties initialized */
-#define	ATTACH_PROGRESS_ALLOC_INTR	0x0008	/* Interrupts allocated */
-#define	ATTACH_PROGRESS_ALLOC_RINGS	0x0010	/* Rings allocated */
-#define	ATTACH_PROGRESS_ADD_INTR	0x0020	/* Intr handlers added */
-#define	ATTACH_PROGRESS_LOCKS		0x0040	/* Locks initialized */
-#define	ATTACH_PROGRESS_INIT		0x0080	/* Device initialized */
-#define	ATTACH_PROGRESS_STATS		0x0200	/* Kstats created */
-#define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
-#define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
-#define	ATTACH_PROGRESS_FM_INIT		0x2000	/* FMA initialized */
-#define	ATTACH_PROGRESS_SFP_TASKQ	0x4000	/* SFP taskq created */
-#define	ATTACH_PROGRESS_LINK_TIMER	0x8000	/* link check timer */
-#define	ATTACH_PROGRESS_OVERTEMP_TASKQ	0x10000 /* Over-temp taskq created */
-#define	ATTACH_PROGRESS_PHY_TASKQ	0x20000 /* Ext. PHY taskq created */
-#define	ATTACH_PROGRESS_UFM		0x40000	/* UFM support */
+#define	ATTACH_PROGRESS_PCI_CONFIG	(1 << 0) /* PCI config setup */
+#define	ATTACH_PROGRESS_REGS_MAP	(1 << 1) /* Registers mapped */
+#define	ATTACH_PROGRESS_PROPS		(1 << 2) /* Properties initialized */
+#define	ATTACH_PROGRESS_ALLOC_INTR	(1 << 3) /* Interrupts allocated */
+#define	ATTACH_PROGRESS_ALLOC_RINGS	(1 << 4) /* Rings allocated */
+#define	ATTACH_PROGRESS_ADD_INTR	(1 << 5) /* Intr handlers added */
+#define	ATTACH_PROGRESS_LOCKS		(1 << 6) /* Locks initialized */
+#define	ATTACH_PROGRESS_INIT		(1 << 7) /* Device initialized */
+#define	ATTACH_PROGRESS_STATS		(1 << 8) /* Kstats created */
+#define	ATTACH_PROGRESS_MAC		(1 << 9) /* MAC registered */
+#define	ATTACH_PROGRESS_ENABLE_INTR	(1 << 10) /* DDI interrupts enabled */
+#define	ATTACH_PROGRESS_FM_INIT		(1 << 11) /* FMA initialized */
+#define	ATTACH_PROGRESS_SFP_TASKQ	(1 << 12) /* SFP taskq created */
+#define	ATTACH_PROGRESS_LINK_TIMER	(1 << 13) /* link check timer */
+#define	ATTACH_PROGRESS_OVERTEMP_TASKQ	(1 << 14) /* Over-temp taskq created */
+#define	ATTACH_PROGRESS_PHY_TASKQ	(1 << 15) /* Ext. PHY taskq created */
+#define	ATTACH_PROGRESS_UFM		(1 << 16) /* UFM support */
+#define	ATTACH_PROGRESS_ACI		(1 << 17) /* ACI support */
 
 #define	PROP_DEFAULT_MTU		"default_mtu"
 #define	PROP_FLOW_CONTROL		"flow_control"
@@ -629,6 +632,12 @@ typedef struct ixgbe_intr_vector {
 	int	other_cnt;	/* count other interrupt */
 } ixgbe_intr_vector_t;
 
+typedef enum {
+	IXGBE_ACI_WARN_MOD_POWER	= 1 << 0,
+	IXGBE_ACI_WARN_PHY_LOAD		= 1 << 1,
+	IXGBE_ACI_WARN_MOD_QUAL		= 1 << 2
+} ixgbe_aci_warn_t;
+
 /*
  * Software adapter state
  */
@@ -745,6 +754,15 @@ typedef struct ixgbe {
 	ddi_periodic_t		periodic_id; /* for link check timer func */
 
 	/*
+	 * ACI Firmware related
+	 */
+	struct ixgbe_aci_event	aci_event;
+	uint16_t		aci_intrs;
+	uint16_t		lse_mask;
+	uint32_t		aci_events;
+	ixgbe_aci_warn_t	aci_warn;
+
+	/*
 	 * LED related constants.
 	 */
 	boolean_t		ixgbe_led_active;
@@ -756,6 +774,7 @@ typedef struct ixgbe {
 	 * UFM state
 	 */
 	ddi_ufm_handle_t	*ixgbe_ufmh;
+	struct ixgbe_nvm_version	ixgbe_vers;
 
 	/*
 	 * Kstat definitions

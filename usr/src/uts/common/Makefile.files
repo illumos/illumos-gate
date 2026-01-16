@@ -28,7 +28,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 # Copyright 2023 RackTop Systems, Inc.
 #
 
@@ -2053,9 +2053,18 @@ IXGBE_OBJS =    ixgbe_buf.o ixgbe_debug.o ixgbe_gld.o ixgbe_log.o ixgbe_main.o \
 		ixgbe_tx.o
 
 # Intel-written source files
-IXGBE_INTC_OBJS	=	ixgbe_82598.o ixgbe_82599.o ixgbe_api.o ixgbe_common.o \
-			ixgbe_phy.o ixgbe_dcb.o ixgbe_dcb_82598.o \
-			ixgbe_dcb_82599.o ixgbe_mbx.o ixgbe_vf.o ixgbe_x540.o \
+IXGBE_INTC_OBJS	=	 ixgbe_82598.o \
+			ixgbe_82599.o \
+			ixgbe_api.o \
+			ixgbe_common.o \
+			ixgbe_dcb.o \
+			ixgbe_dcb_82598.o \
+			ixgbe_dcb_82599.o \
+			ixgbe_e610.o \
+			ixgbe_mbx.o \
+			ixgbe_phy.o \
+			ixgbe_vf.o \
+			ixgbe_x540.o \
 			ixgbe_x550.o
 
 #

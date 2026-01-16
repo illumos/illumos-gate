@@ -24,6 +24,7 @@
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2026 Edgecast Cloud LLC.
 #
 
 #
@@ -92,7 +93,12 @@ driver name=ixgbe perms="* 0666 root sys" clone_perms="ixgbe 0666 root sys" \
     alias=pciex8086,15ce \
     alias=pciex8086,15d1 \
     alias=pciex8086,15e4 \
-    alias=pciex8086,15e5
+    alias=pciex8086,15e5 \
+    alias=pciex8086,57ae \
+    alias=pciex8086,57af \
+    alias=pciex8086,57b0 \
+    alias=pciex8086,57b1 \
+    alias=pciex8086,57b2
 legacy pkg=SUNWixgbe desc="Intel 10GbE PCIE NIC Driver" \
     name="Intel 10GbE PCIE NIC Driver"
 license cr_Sun license=cr_Sun

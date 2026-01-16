@@ -1,10 +1,12 @@
 This directory contains the 'common code' to the ixgbe driver. This code
-comes from FreeBSD.
+comes from FreeBSD. The code is generally taken from a corresponding
+point in FreeBSD after new hardware support is used from the
+`sys/dev/ixgbe` directory. The last commit used was
+1e8c28712aafc9a3339e8a832767a70c08168bdc.
 
-The following are a subset of the current modifications that are being
-made to this common code to facilitate illumos specific features:
+The following are the modifications that we have made to this code:
 
-o IXGBE_REMOVED
+### IXGBE_REMOVED macro
 
 The IXGBE_REMOVED macro normally taks a pointer to the hardware address.
 However, that does not allow us to go through and actually do a useful
@@ -13,12 +15,37 @@ ixgbe_hw of the ixgbe_t. Importantly, we also remove the current
 definition of IXGBE_REMOVED in ixbe_common.h and instead use the
 definition in ixgbe_osdep.h.
 
-o ixgbe_get_oem_prod_version()
 
-This function has a smatch error. It checks for:
+### ixgbe_vf.c includes
 
-	if (offset == 0x0 && offset == NVM_INVALID_PTR)
+Historically ixgbe_vf.c which is part of the common code only included
+the files from the common code i.e. ixgbe_api.h, ixgbe_type.h, and
+ixgbe_vf.h. This was changed upstream to refer to the FreeBSD-specific
+overall ixgbe header file. We have reverted this.
 
-That condition can never occur. It should instead be:
 
-	if (offset == 0x0 || offset == NVM_INVALID_PTR)
+### ixgbe_e610.c misleading indentation
+
+There are a few function pointer assignments in ixgbe_init_ops_E610()
+that cause a smatch misleading indentation error since they are indented
+with a number of spaces and not tabs like the rest of the block.
+
+
+### ixgbe dynamic memory allocation
+
+ixgbe core code added a notion of dynamic memory allocation in the form
+of malloc, calloc, and free. Since we don't have that as a core kernel
+allocation primitive and a carefully designed and safe memory tagging
+implementation requires some fair amount of work, the simplest thing is
+to pass the actual size to free as these are all local in the functions
+in question.
+
+
+#### ixgbe_lock structure
+
+The E610 logic introduced a generic notion of an ixgbe lock. We want to
+be able to pass the interrupt priority to this function so we modify the
+initialization of this to also pass the ixgbe_hw structure so we can get
+to that. In theory this should all be safely below lock level, but as
+awe can't guarantee firmware isn't called from an interrupt, we want to
+be safe.

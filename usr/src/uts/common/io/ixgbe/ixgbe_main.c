@@ -30,7 +30,7 @@
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -196,7 +196,7 @@ static struct dev_ops ixgbe_dev_ops = {
 
 static struct modldrv ixgbe_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	ixgbe_ident,		/* Discription string */
+	ixgbe_ident,		/* Description string */
 	&ixgbe_dev_ops		/* driver ops */
 };
 
@@ -362,6 +362,32 @@ static adapter_info_t ixgbe_X550_cap = {
 	| IXGBE_FLAG_VMDQ_CAPABLE
 	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
 };
+
+static adapter_info_t ixgbe_E610_cap = {
+	128,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	128,		/* default number of rx queues */
+	64,		/* maximum number of rx groups */
+	1,		/* minimum number of rx groups */
+	1,		/* default number of rx groups */
+	128,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	8,		/* default number of tx queues */
+	9710,		/* maximum MTU size */
+	0xFF8,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	0x200,		/* default interrupt throttle rate */
+	64,		/* maximum total msix vectors */
+	16,		/* maximum number of ring vectors */
+	2,		/* maximum number of other vectors */
+	/* "other" interrupt types handled */
+	IXGBE_EICR_LSC | IXGBE_EICR_FW_EVENT,
+	0,		/* "other" interrupt types enable mask */
+	(IXGBE_FLAG_RSS_CAPABLE
+	| IXGBE_FLAG_VMDQ_CAPABLE
+	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
+};
+
 
 static ddi_ufm_ops_t ixgbe_ufm_ops = {
 	.ddi_ufm_op_fill_image = ixgbe_ufm_fill_image,
@@ -919,6 +945,14 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Tear down the ACI
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_ACI) {
+		ixgbe_shutdown_aci(&ixgbe->hw);
+		kmem_free(ixgbe->aci_event.msg_buf, IXGBE_ACI_MAX_BUFFER_SIZE);
+	}
+
+	/*
 	 * Free locks
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_LOCKS) {
@@ -1073,6 +1107,17 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 		}
 		break;
 
+	case ixgbe_mac_E610:
+		IXGBE_DEBUGLOG_0(ixgbe, "identify E610 adapter\n");
+		ixgbe->capab = &ixgbe_E610_cap;
+		/*
+		 * The E610 doesn't currently have part-specific features to set
+		 * as most of this is driven by the firmware right now. Notably
+		 * we don't set that this is SFP plug-capable because firmware
+		 * handles that.
+		 */
+		break;
+
 	default:
 		IXGBE_DEBUGLOG_1(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
@@ -1154,6 +1199,14 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	 */
 	if (ixgbe_init_shared_code(hw) != IXGBE_SUCCESS) {
 		return (IXGBE_FAILURE);
+	}
+
+	if (hw->mac.type == ixgbe_mac_E610) {
+		ixgbe->aci_event.buf_len = IXGBE_ACI_MAX_BUFFER_SIZE;
+		ixgbe->aci_event.msg_buf =
+		    kmem_zalloc(IXGBE_ACI_MAX_BUFFER_SIZE, KM_SLEEP);
+		ixgbe_init_aci(hw);
+		ixgbe->attach_progress |= ATTACH_PROGRESS_ACI;
 	}
 
 	/*
@@ -1292,13 +1345,21 @@ ixgbe_destroy_locks(ixgbe_t *ixgbe)
 /*
  * We need to try and determine which LED index in hardware corresponds to the
  * link/activity LED. This is the one that'll be overwritten when we perform
- * GLDv3 LED activity.
+ * GLDv3 LED activity. In the E610 this is all managed by firmware and therefore
+ * we don't do anything here.
  */
 static void
 ixgbe_led_init(ixgbe_t *ixgbe)
 {
 	uint32_t reg, i;
 	struct ixgbe_hw *hw = &ixgbe->hw;
+
+	/*
+	 * Firmware has subsumed this on the E610.
+	 */
+	if (ixgbe->hw.mac.type == ixgbe_mac_E610) {
+		return;
+	}
 
 	reg = IXGBE_READ_REG(hw, IXGBE_LEDCTL);
 	for (i = 0; i < 4; i++) {
@@ -1394,6 +1455,55 @@ ixgbe_suspend(dev_info_t *devinfo)
 }
 
 /*
+ * Beginning with the E610 family of parts, there is a firmware engine that we
+ * need to talk to which performs link configuration and related through the
+ * common code. If the major version isn't supported by this driver then we're
+ * in trouble. Intel generally asks that we warn if the minor version isn't
+ * within a specific range.
+ */
+static boolean_t
+ixgbe_check_fw_vers(ixgbe_t *ixgbe)
+{
+	uint8_t min_minor;
+
+	if (IXGBE_FW_API_VER_MINOR >= IXGBE_FW_API_VER_DIFF_ALLOWED) {
+		min_minor = IXGBE_FW_API_VER_MINOR -
+		    IXGBE_FW_API_VER_DIFF_ALLOWED;
+	} else {
+		min_minor = 0;
+	}
+
+	if (ixgbe->hw.api_maj_ver > IXGBE_FW_API_VER_MAJOR) {
+		ixgbe_error(ixgbe, "Encountered unsupported firmware major "
+		    "version %u, maximum supported revision is %u: unable to "
+		    "attach. Please ensure the latest driver is installed and "
+		    "if so, reach out about newer firmware images.",
+		    ixgbe->hw.api_maj_ver, IXGBE_FW_API_VER_MAJOR);
+		return (B_FALSE);
+	}
+
+	if (ixgbe->hw.api_maj_ver == IXGBE_FW_API_VER_MAJOR &&
+	    ixgbe->hw.api_min_ver > (IXGBE_FW_API_VER_MINOR +
+	    IXGBE_FW_API_VER_DIFF_ALLOWED)) {
+		ixgbe_error(ixgbe, "Encountered newer NVM image (%u.%u) than "
+		    "the driver supports (%u.%u). The driver will still "
+		    "attach; however, please ensure the latest driver is "
+		    "installed and if so, reach out about newer firmware "
+		    "images.", ixgbe->hw.api_maj_ver, ixgbe->hw.api_min_ver,
+		    IXGBE_FW_API_VER_MAJOR, IXGBE_FW_API_VER_MINOR);
+	} else if (ixgbe->hw.api_maj_ver < IXGBE_FW_API_VER_MAJOR ||
+	    ixgbe->hw.api_min_ver < min_minor) {
+		ixgbe_error(ixgbe, "Encountered older NVM image (%u.%u) than "
+		    "the driver expected (%u.%u). The driver will still "
+		    "attach; however, you may want to update the NVM image.",
+		    ixgbe->hw.api_maj_ver, ixgbe->hw.api_min_ver,
+		    IXGBE_FW_API_VER_MAJOR, IXGBE_FW_API_VER_MINOR);
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * ixgbe_init - Initialize the device.
  */
 static int
@@ -1414,9 +1524,9 @@ ixgbe_init(ixgbe_t *ixgbe)
 
 		/*
 		 * The first three errors are not prohibitive to us progressing
-		 * further, and are maily advisory in nature. In the case of a
+		 * further, and are mainly advisory in nature. In the case of a
 		 * SFP module not being present or not deemed supported by the
-		 * common code, we adivse the operator of this fact but carry on
+		 * common code, we advise the operator of this fact but carry on
 		 * instead of failing hard, as SFPs can be inserted or replaced
 		 * while the driver is running. In the case of a unknown error,
 		 * we fail-hard, logging the reason and emitting a FMA event.
@@ -1454,7 +1564,7 @@ ixgbe_init(ixgbe_t *ixgbe)
 	 */
 	if (ixgbe_init_eeprom_params(hw) < 0) {
 		ixgbe_error(ixgbe,
-		    "Unable to intitialize the eeprom interface.");
+		    "Unable to initialize the eeprom interface.");
 		ixgbe_fm_ereport(ixgbe, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
@@ -1492,6 +1602,28 @@ ixgbe_init(ixgbe_t *ixgbe)
 	(void) ixgbe_start_hw(hw);
 
 	/*
+	 * On the E610 we need to verify that we can talk to firmware and get
+	 * some information before we proceed.
+	 */
+	if (hw->mac.type == ixgbe_mac_E610) {
+		if (!ixgbe_check_fw_vers(ixgbe)) {
+			goto init_fail;
+		}
+
+		if ((rv = ixgbe_get_caps(hw)) != IXGBE_SUCCESS) {
+			ixgbe_error(ixgbe, "failed to get E610 device "
+			    "capabilities: 0x%x", rv);
+			goto init_fail;
+		}
+
+		if ((rv = ixgbe_init_nvm(hw)) != IXGBE_SUCCESS) {
+			ixgbe_error(ixgbe, "failed to initialize E610 "
+			    "NVM information: 0x%x", rv);
+			goto init_fail;
+		}
+	}
+
+	/*
 	 * Initialize link settings
 	 */
 	(void) ixgbe_driver_setup_link(ixgbe, B_FALSE);
@@ -1515,6 +1647,13 @@ ixgbe_init(ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Capture NVM versions. The firmware version of the E610 is already
+	 * captured.
+	 */
+	ixgbe_get_nvm_version(hw, &ixgbe->ixgbe_vers);
+	ixgbe_get_oem_prod_version(hw, &ixgbe->ixgbe_vers);
+
+	/*
 	 * Determine LED index.
 	 */
 	ixgbe_led_init(ixgbe);
@@ -1535,6 +1674,69 @@ init_fail:
 	mutex_exit(&ixgbe->gen_lock);
 	ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
 	return (IXGBE_FAILURE);
+}
+
+static void
+ixgbe_disable_fw_lse(ixgbe_t *ixgbe)
+{
+	if (ixgbe->hw.mac.type != ixgbe_mac_E610) {
+		return;
+	}
+
+	int ret = ixgbe_configure_lse(&ixgbe->hw, false, ixgbe->lse_mask);
+	if (ret != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "failed to disable firmware link status "
+		    "events: 0x%x\n", ret);
+	}
+}
+
+/*
+ * Enable link status events on the hardware. The way this works is that we need
+ * to mask off events that we don't want to receive. We store what it was we
+ * changed so we can restore the card back to its default behavior when we are
+ * done. This only applies to the E610 family with firmware events.
+ */
+static boolean_t
+ixgbe_enable_fw_lse(ixgbe_t *ixgbe)
+{
+	if (ixgbe->hw.mac.type != ixgbe_mac_E610) {
+		return (B_TRUE);
+	}
+
+	/*
+	 * Mask off everything other than things we're ready to handle. In
+	 * particular we want to make sure we capture:
+	 *
+	 *  - Link up/down events.
+	 *  - PHY overtemperature alarms
+	 *  - Module qualification failures (mostly to try to tell the user)
+	 *  - PHY firmware loading failure (mostly to try to tell the user)
+	 *
+	 * Conversely this means we're not handling:
+	 *
+	 *  - Module not present events. This will manifest as a link down and
+	 *    can be retrieved through MAC_CAPAB_TRANSCEIVER.
+	 *  - Link fault conditions
+	 *  - Excessive link errors
+	 *  - Specific signal detect events
+	 *  - Whether the module is considered qualified or not
+	 *  - Auto-negotiation completed
+	 *  - Transmit suspension events
+	 *  - Topology and Media conflicts
+	 */
+	ixgbe->lse_mask = ~(uint16_t)(IXGBE_ACI_LINK_EVENT_UPDOWN |
+	    IXGBE_ACI_LINK_EVENT_PHY_TEMP_ALARM |
+	    IXGBE_ACI_LINK_EVENT_MODULE_QUAL_FAIL |
+	    IXGBE_ACI_LINK_EVENT_PHY_FW_LOAD_FAIL);
+
+	int ret = ixgbe_configure_lse(&ixgbe->hw, true, ixgbe->lse_mask);
+	if (ret != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "failed to enable firmware link status "
+		    "events: 0x%x\n", ret);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 /*
@@ -1620,6 +1822,13 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	(void) ixgbe_set_phy_power(hw, B_TRUE);
 
 	/*
+	 * If hardware requires it, enable link status events.
+	 */
+	if (!ixgbe_enable_fw_lse(ixgbe)) {
+		return (IXGBE_FAILURE);
+	}
+
+	/*
 	 * Save the state of the PHY
 	 */
 	ixgbe_get_hw_state(ixgbe);
@@ -1678,6 +1887,12 @@ ixgbe_chip_stop(ixgbe_t *ixgbe)
 	 * Expected for health and safety reasons
 	 */
 	ixgbe_disable_tx_laser(hw);
+
+	/*
+	 * Disable any link status events from firmware. If this fails, there's
+	 * not much we can do as we're trying to shut down the device.
+	 */
+	(void) ixgbe_disable_fw_lse(ixgbe);
 
 	/*
 	 * Tell firmware driver is no longer in control
@@ -1932,6 +2147,9 @@ ixgbe_start(ixgbe_t *ixgbe, boolean_t alloc_buffer)
 	 * would already be at that state on driver attach. With X550, we must
 	 * trigger a re-negotiation of the link in order to switch from a LPLU
 	 * 1Gb link to 10Gb (cable and link partner permitting.)
+	 *
+	 * It doesn't initially appear that the E610 requires this, but this may
+	 * not hold for the 10 GbE parts.
 	 */
 	if (hw->mac.type == ixgbe_mac_X550 ||
 	    hw->mac.type == ixgbe_mac_X550EM_a ||
@@ -2467,11 +2685,7 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	}
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index), reg_val);
 
-	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540 ||
-	    hw->mac.type == ixgbe_mac_X550 ||
-	    hw->mac.type == ixgbe_mac_X550EM_x ||
-	    hw->mac.type == ixgbe_mac_X550EM_a) {
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
 		reg_val |= (IXGBE_RDRXCTL_CRCSTRIP | IXGBE_RDRXCTL_AGGDIS);
 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
@@ -2812,13 +3026,9 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 
 	/*
-	 * enable DMA for 82599, X540 and X550 parts
+	 * enable DMA for 82599, X540, X550, and E610 parts
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540 ||
-	    hw->mac.type == ixgbe_mac_X550 ||
-	    hw->mac.type == ixgbe_mac_X550EM_x ||
-	    hw->mac.type == ixgbe_mac_X550EM_a) {
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
 		/* DMATXCTL.TE must be set after all Tx config is complete */
 		reg_val = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
 		reg_val |= IXGBE_DMATXCTL_TE;
@@ -2904,6 +3114,7 @@ ixgbe_setup_vmdq(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		/*
 		 * Enable VMDq-only.
 		 */
@@ -2992,6 +3203,7 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		/*
 		 * Enable RSS & Setup RSS Hash functions
 		 */
@@ -3027,11 +3239,7 @@ ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
 
 	}
 
-	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540 ||
-	    hw->mac.type == ixgbe_mac_X550 ||
-	    hw->mac.type == ixgbe_mac_X550EM_x ||
-	    hw->mac.type == ixgbe_mac_X550EM_a) {
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
 		/*
 		 * Enable Virtualization and Replication.
 		 */
@@ -3078,7 +3286,7 @@ ixgbe_setup_rss_table(ixgbe_t *ixgbe)
 	 * RETA table sizes vary by model:
 	 *
 	 * 82598, 82599, X540: 128 table entries.
-	 * X550: 512 table entries.
+	 * X550, E610: 512 table entries.
 	 */
 	index_mult = 0x1;
 	table_size = 128;
@@ -3089,6 +3297,7 @@ ixgbe_setup_rss_table(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		table_size = 512;
 		break;
 	default:
@@ -3398,6 +3607,7 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		/*
 		 * 82599 supports the following combination:
 		 * vmdq no. x rss no.
@@ -3570,12 +3780,8 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	ixgbe->relax_order_enable = ixgbe_get_prop(ixgbe,
 	    PROP_RELAX_ORDER_ENABLE, 0, 1, DEFAULT_RELAX_ORDER_ENABLE);
 
-	/* Head Write Back not recommended for 82599, X540 and X550 */
-	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540 ||
-	    hw->mac.type == ixgbe_mac_X550 ||
-	    hw->mac.type == ixgbe_mac_X550EM_x ||
-	    hw->mac.type == ixgbe_mac_X550EM_a) {
+	/* Head Write Back not recommended for 82599, X540, X550, and E610 */
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
 		ixgbe->tx_head_wb_enable = B_FALSE;
 	}
 
@@ -3598,7 +3804,7 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * ixgbe LRO only supported by 82599, X540 and X550
+	 * ixgbe LRO only supported by 82599, X540, X550, and E610
 	 */
 	if (hw->mac.type == ixgbe_mac_82598EB) {
 		ixgbe->lro_enable = B_FALSE;
@@ -3628,15 +3834,12 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    ixgbe->capab->max_intr_throttle,
 	    ixgbe->capab->def_intr_throttle);
 	/*
-	 * 82599, X540 and X550 require the interrupt throttling rate is
+	 * 82599, X540, X550, and E610 require the interrupt throttling rate is
 	 * a multiple of 8. This is enforced by the register definiton.
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB ||
-	    hw->mac.type == ixgbe_mac_X540 ||
-	    hw->mac.type == ixgbe_mac_X550 ||
-	    hw->mac.type == ixgbe_mac_X550EM_x ||
-	    hw->mac.type == ixgbe_mac_X550EM_a)
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
 		ixgbe->intr_throttling[0] = ixgbe->intr_throttling[0] & 0xFF8;
+	}
 
 	hw->allow_unsupported_sfp = ixgbe_get_prop(ixgbe,
 	    PROP_ALLOW_UNSUPPORTED_SFP, 0, 1, DEFAULT_ALLOW_UNSUPPORTED_SFP);
@@ -3755,7 +3958,7 @@ static int
 ixgbe_get_prop(ixgbe_t *ixgbe,
     char *propname,	/* name of the property */
     int minval,		/* minimum acceptable value */
-    int maxval,		/* maximim acceptable value */
+    int maxval,		/* maximum acceptable value */
     int defval)		/* default value */
 {
 	int value;
@@ -3892,9 +4095,9 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 
 	/*
 	 * If we are in an interrupt context, need to re-enable the
-	 * interrupt, which was automasked
+	 * interrupt, which was automasked.
 	 */
-	if (servicing_interrupt() != 0) {
+	if (servicing_interrupt() != 0 && ixgbe->hw.mac.type < ixgbe_mac_E610) {
 		ixgbe->eims |= IXGBE_EICR_LSC;
 		IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 	}
@@ -3905,7 +4108,8 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 }
 
 /*
- * ixgbe_sfp_check - sfp module processing done in taskq only for 82599.
+ * ixgbe_sfp_check - sfp module processing done in taskq only for 82599. While
+ * some models of the E610 support SFPs, those are handled by module firmware.
  */
 static void
 ixgbe_sfp_check(void *arg)
@@ -3949,6 +4153,34 @@ ixgbe_sfp_check(void *arg)
 }
 
 /*
+ * Handle an overtemperature event from the PHY or ASIC.
+ */
+static void
+ixgbe_set_overtemp(ixgbe_t *ixgbe, bool phy)
+{
+	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
+
+	/*
+	 * Disable the adapter interrupts
+	 */
+	ixgbe_disable_adapter_interrupts(ixgbe);
+
+	/*
+	 * Disable Rx/Tx units
+	 */
+	(void) ixgbe_stop_adapter(&ixgbe->hw);
+
+	ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
+	ixgbe_error(ixgbe,
+	    "Problem: Network adapter has been stopped because the %s has "
+	    "overheated", phy ? "PHY" : "ASIC");
+	ixgbe_error(ixgbe,
+	    "Action: Restart the computer and check cooling. "
+	    "If the problem persists, power off the system "
+	    "and replace the adapter");
+}
+
+/*
  * ixgbe_overtemp_check - overtemp module processing done in taskq
  *
  * This routine will only be called on adapters with temperature sensor.
@@ -3973,26 +4205,7 @@ ixgbe_overtemp_check(void *arg)
 	if (((eicr & IXGBE_EICR_GPI_SDP0_BY_MAC(hw)) && (!link_up)) ||
 	    (eicr & IXGBE_EICR_LSC)) {
 		if (hw->phy.ops.check_overtemp(hw) == IXGBE_ERR_OVERTEMP) {
-			atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
-
-			/*
-			 * Disable the adapter interrupts
-			 */
-			ixgbe_disable_adapter_interrupts(ixgbe);
-
-			/*
-			 * Disable Rx/Tx units
-			 */
-			(void) ixgbe_stop_adapter(hw);
-
-			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
-			ixgbe_error(ixgbe,
-			    "Problem: Network adapter has been stopped "
-			    "because it has overheated");
-			ixgbe_error(ixgbe,
-			    "Action: Restart the computer. "
-			    "If the problem persists, power off the system "
-			    "and replace the adapter");
+			ixgbe_set_overtemp(ixgbe, true);
 		}
 	}
 
@@ -4036,26 +4249,7 @@ ixgbe_phy_check(void *arg)
 	rv = ixgbe_handle_lasi(hw);
 
 	if (rv == IXGBE_ERR_OVERTEMP) {
-		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
-
-		/*
-		 * Disable the adapter interrupts
-		 */
-		ixgbe_disable_adapter_interrupts(ixgbe);
-
-		/*
-		 * Disable Rx/Tx units
-		 */
-		(void) ixgbe_stop_adapter(hw);
-
-		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
-		ixgbe_error(ixgbe,
-		    "Problem: Network adapter has been stopped due to a "
-		    "overtemperature event being detected.");
-		ixgbe_error(ixgbe,
-		    "Action: Shut down or restart the computer. If the issue "
-		    "persists, please take action in accordance with the "
-		    "recommendations from your system vendor.");
+		ixgbe_set_overtemp(ixgbe, true);
 	}
 
 	mutex_exit(&ixgbe->gen_lock);
@@ -4434,6 +4628,7 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		gpie |= ixgbe->capab->other_gpie;
 
 		/* Enable RSC Delay 8us when LRO enabled  */
@@ -4631,6 +4826,7 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		reg = IXGBE_READ_REG(&ixgbe->hw, IXGBE_AUTOC);
 		reg |= (IXGBE_AUTOC_FLU |
 		    IXGBE_AUTOC_10G_KX4);
@@ -4688,6 +4884,159 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 	}
 }
 
+static void
+ixgbe_lsc_common(ixgbe_t *ixgbe)
+{
+	ASSERT(MUTEX_HELD(&ixgbe->gen_lock));
+	ixgbe_driver_link_check(ixgbe);
+	ixgbe_get_hw_state(ixgbe);
+}
+
+/*
+ * The firmware link status event will contain information about several
+ * different potential events. It would be nice if some of these were ereports,
+ * but that's a future world. Here is how we approach each portion of the Get
+ * Link Status command:
+ *
+ *  - Module Power Error: log to the user about it once per module.
+ *  - FW Download Error: log to the user about it once per module.
+ *  - Qualified module Error: log to the user (assuming module present) once per
+ *    module. We may be able to disable this with a Set PHY Capabilities
+ *    command. For now we just report until we encounter such a module.
+ *  - PHY Temperature Alarm: Trigger overtemp
+ *
+ * Otherwise we end up treating this like a normal link status event and call
+ * into ixgbe_lsc_common() to handle and take care of actual changes to the
+ * link. The underlying hardware copy of the E610 link status will be updated by
+ * the call to ixgbe_check_link().
+ */
+static void
+ixgbe_process_fw_lse(ixgbe_t *ixgbe,
+    const struct ixgbe_aci_cmd_get_link_status_data *msg)
+{
+	if ((msg->link_cfg_err & IXGBE_ACI_LINK_MODULE_POWER_UNSUPPORTED) !=
+	    0) {
+		if ((ixgbe->aci_warn & IXGBE_ACI_WARN_MOD_POWER) == 0) {
+			ixgbe_error(ixgbe, "pluggable transceiver requires "
+			    "more power than the device can provide to it: "
+			    "transceiver will not operate correctly");
+		}
+
+		ixgbe->aci_warn |= IXGBE_ACI_WARN_MOD_POWER;
+	} else {
+
+		ixgbe->aci_warn &= ~IXGBE_ACI_WARN_MOD_POWER;
+	}
+
+	if ((msg->link_cfg_err & IXGBE_ACI_LINK_EXTERNAL_PHY_LOAD_FAILURE) !=
+	    0) {
+		if ((ixgbe->aci_warn & IXGBE_ACI_WARN_PHY_LOAD) == 0) {
+			ixgbe_error(ixgbe, "controller failed to load PHY "
+			    "firmware: link will likely not function. Please "
+			    "try reinserting the module and if this persists, "
+			    "please contact your device manufacturer.");
+		}
+
+		ixgbe->aci_warn |= IXGBE_ACI_WARN_PHY_LOAD;
+	} else {
+		ixgbe->aci_warn &= ~IXGBE_ACI_WARN_PHY_LOAD;
+	}
+
+	if ((msg->link_info & IXGBE_ACI_MEDIA_AVAILABLE) != 0 &&
+	    (msg->an_info & IXGBE_ACI_QUALIFIED_MODULE) == 0) {
+		if ((ixgbe->aci_warn & IXGBE_ACI_WARN_MOD_QUAL) == 0) {
+			ixgbe_error(ixgbe, "transceiver failed hardware "
+			    "qualification check: either switch to a "
+			    "qualified transceiver or reach out on work "
+			    "that can be done to disable this check on the "
+			    "E610 family devices");
+		}
+
+		ixgbe->aci_warn |= IXGBE_ACI_WARN_MOD_QUAL;
+	} else {
+		ixgbe->aci_warn &= ~IXGBE_ACI_WARN_MOD_QUAL;
+	}
+
+	if ((msg->ext_info & IXGBE_ACI_LINK_PHY_TEMP_ALARM) != 0) {
+		ixgbe_set_overtemp(ixgbe, true);
+		return;
+	}
+
+	ixgbe_lsc_common(ixgbe);
+}
+
+static void
+ixgbe_process_fw_event(ixgbe_t *ixgbe)
+{
+	bool pend;
+	struct ixgbe_aci_event *event = &ixgbe->aci_event;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	ASSERT(MUTEX_HELD(&ixgbe->gen_lock));
+
+	ixgbe->aci_intrs++;
+
+	/*
+	 * Sanity check various conditions.
+	 */
+	VERIFY3P(ixgbe->aci_event.msg_buf, !=, NULL);
+	VERIFY3U(ixgbe->aci_event.buf_len, ==, IXGBE_ACI_MAX_BUFFER_SIZE);
+
+	do {
+		int ret = ixgbe_aci_get_event(hw, event, &pend);
+		if (ret != IXGBE_SUCCESS) {
+			/*
+			 * If we fail to get the event, we can't really trust
+			 * whether there is anything pending. We log this and
+			 * then ultimately move on as that's what Intel suggests
+			 * is the recovery path.
+			 */
+			ixgbe_error(ixgbe, "failed to get firmware event: 0x%x",
+			    ret);
+			break;
+		}
+
+		ixgbe->aci_events++;
+
+		/*
+		 * There are four different opcodes that we can get here
+		 * according to the datasheet. The mask that we set all shows up
+		 * as a link status event. However, the hardware says we can get
+		 * Health status events, firmware log events, and ASIC
+		 * temperature events.
+		 */
+		switch (LE_16(event->desc.opcode)) {
+		case ixgbe_aci_opc_get_link_status:
+			ixgbe_process_fw_lse(ixgbe, (void *)event->msg_buf);
+			break;
+		/*
+		 * This indicates that the ASIC has overheated. Of course, it's
+		 * not easy to actually figure out what that temperature is.
+		 * While they have a simple NC-SI command, there's nothing for
+		 * us. Similarly there is a PLDM interface but that requires us
+		 * to use MCTP and there is not a currently obvious in-band way
+		 * for us to issue that. Maybe if we were to go through the link
+		 * manager and walk their notion of topology for the device we
+		 * could maybe figure that out.
+		 */
+		case ixgbe_aci_opc_temp_tca_event:
+			ixgbe_set_overtemp(ixgbe, false);
+			break;
+		/*
+		 * These next two would give us messages and events for device
+		 * health and firmware events. The former the v1.1 datasheet
+		 * says to subscribe to, but now how to. We have opcodes in
+		 * theory for the registration, but there is no documentation in
+		 * the datasheet.
+		 */
+		case ixgbe_aci_opc_get_health_status:
+		case ixgbe_aci_opc_fw_logs_event:
+		default:
+			ixgbe_log(ixgbe, "unhandled firmware event: 0x%x",
+			    LE_16(event->desc.opcode));
+		}
+	} while (pend);
+}
+
 /*
  * ixgbe_intr_other_work - Process interrupt types other than tx/rx
  */
@@ -4702,8 +5051,14 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 * handle link status change
 	 */
 	if (eicr & IXGBE_EICR_LSC) {
-		ixgbe_driver_link_check(ixgbe);
-		ixgbe_get_hw_state(ixgbe);
+		ixgbe_lsc_common(ixgbe);
+	}
+
+	/*
+	 * Process firmware events.
+	 */
+	if (eicr & IXGBE_EICR_FW_EVENT) {
+		ixgbe_process_fw_event(ixgbe);
 	}
 
 	/*
@@ -4868,6 +5223,7 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 			case ixgbe_mac_X550:
 			case ixgbe_mac_X550EM_x:
 			case ixgbe_mac_X550EM_a:
+			case ixgbe_mac_E610:
 				ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 				IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 				break;
@@ -4965,6 +5321,7 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 		case ixgbe_mac_X550:
 		case ixgbe_mac_X550EM_x:
 		case ixgbe_mac_X550EM_a:
+		case ixgbe_mac_E610:
 			ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
 			break;
@@ -5048,6 +5405,7 @@ ixgbe_intr_msix(void *arg1, void *arg2)
 			case ixgbe_mac_X550:
 			case ixgbe_mac_X550EM_x:
 			case ixgbe_mac_X550EM_a:
+			case ixgbe_mac_E610:
 				ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
 				ixgbe_intr_other_work(ixgbe, eicr);
 				break;
@@ -5469,6 +5827,7 @@ ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		if (cause == -1) {
 			/* other causes */
 			msix_vector |= IXGBE_IVAR_ALLOC_VAL;
@@ -5526,6 +5885,7 @@ ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -5579,6 +5939,7 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		if (cause == -1) {
 			/* other causes */
 			index = (intr_alloc_entry & 1) * 8;
@@ -5625,6 +5986,7 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 		case ixgbe_mac_X550:
 		case ixgbe_mac_X550EM_x:
 		case ixgbe_mac_X550EM_a:
+		case ixgbe_mac_E610:
 			return (sw_rx_index * 2);
 
 		default:
@@ -5644,6 +6006,7 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 		case ixgbe_mac_X550:
 		case ixgbe_mac_X550EM_x:
 		case ixgbe_mac_X550EM_a:
+		case ixgbe_mac_E610:
 			if (ixgbe->num_rx_groups > 32) {
 				hw_rx_index = (sw_rx_index /
 				    rx_ring_per_group) * 2 +
@@ -5752,6 +6115,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		for (v_idx = 0; v_idx < 64; v_idx++)
 			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, 0);
@@ -6304,10 +6668,7 @@ ixgbe_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 
 		if ((ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ ||
 		    ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ_RSS) &&
-		    (hw->mac.type == ixgbe_mac_82599EB ||
-		    hw->mac.type == ixgbe_mac_X540 ||
-		    hw->mac.type == ixgbe_mac_X550 ||
-		    hw->mac.type == ixgbe_mac_X550EM_x)) {
+		    hw->mac.type >= ixgbe_mac_82599EB) {
 			infop->mgi_addvlan = ixgbe_addvlan;
 			infop->mgi_remvlan = ixgbe_remvlan;
 		} else {
@@ -6739,6 +7100,11 @@ ixgbe_remmac(void *arg, const uint8_t *mac_addr)
 	return (0);
 }
 
+/*
+ * The E610 manual suggests it actually has a secondary bank, but it's not clear
+ * how that is chosen or activated. For now we regrettably don't report anything
+ * about it, but in theory we could make it a 2 slot device.
+ */
 static int
 ixgbe_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
     ddi_ufm_image_t *imgp)
@@ -6778,24 +7144,172 @@ ixgbe_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
 	return (0);
 }
 
+/*
+ * The Intel NVM has evolved substantially since the 82598. There are different
+ * types of IDs that some cards have, but not all. The following describes the
+ * different kinds of IDs and which cards have it:
+ *
+ *  - NVM Version: This is supposed to indicate a revision of the NVM itself.
+ *    Notably all cards except for the 82599 seem to have this. Why the 82598
+ *    does but the 82599 does not is a mystery.
+ *  - NVM Image ID: This is an additional ID on the 82598 and X540.
+ *  - PHY Version: This is in the X540+ and is meant to indicate a revision of
+ *    Intel's firmware for the PHY. It is unclear if there will or won't be one
+ *    for SFP+ based devices. While common code thinks the E610 has a value
+ *    value here, it doesn't. The address it uses on the X540/X550 is actually
+ *    related to Wake on LAN controls according to the E610 datasheet.
+ *  - PHY Image ID: This is an additional ID for the PHY. Only valid on
+ *    X540/X550.
+ *  - EETrack ID: This is a unique image ID from Intel. This appears to be
+ *    present for all devices.
+ *  - Device Start Image: There appears to be some notion of a device starter
+ *    image that is used. It's not quite clear what this actually contains.
+ *    However, what we can say is that the E610 documentation swaps this and the
+ *    NVM version compared to the classical values. It's unclear who is actually
+ *    right or wrong here.
+ *  - Vendor PHY Version: This is a PHY version from a vendor that's present.
+ *    While there are partial implementations for most devices, we shouldn't
+ *    assume it's actually implemented. The general interface for this truncates
+ *    the value in the E610. It's actually an 8-byte value that we have to get
+ *    out of the admin command queue.
+ *  - OEM Product Version: This is an OEM's custom version. This has a boolean
+ *    to tell us if it's valid or not. The logic for the E610 code currently
+ *    doesn't account for the 4 KiB page pointer form and therefore should not
+ *    be trusted regardless of what the actual validity bit is.
+ *  - OEM Customization: The meaning of this field is unclear.
+ *  - Option ROM Version: This is the version of the option ROM. May not exist.
+ *  - Firmware Revisions: Starting in the E610, this is a revision of the
+ *    firmware for the card itself.
+ *  - API Version: Starting in the E610, this is the API version of the firmware
+ *    interface.
+ *
+ * With all these different values and inconsistencies it's hard to have a
+ * consistent thing to do. For everything other than the 82599 (X520) we are
+ * going to use the NVM version as the primary image ID. For the 82599 we're
+ * going to use the EETRack id. Then for all these other values we're going to
+ * include them as additional metadata. We opt to encode the firmware build id
+ * and the EETrack ID as strings just as the actual string versions have changed
+ * over time.
+ *
+ * One last wrinkle here, for invalid fields, they're going to be given to us as
+ * a value of 0xffff that is broken up. It's unclear if it's better to just
+ * include this or not. This is a mess, but we're trying at least to get
+ * something sensible out of the above which is far from simple.
+ */
 static int
 ixgbe_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
     uint_t slotno, ddi_ufm_slot_t *slotp)
 {
 	ixgbe_t *ixgbe = arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	const struct ixgbe_nvm_version *vers = &ixgbe->ixgbe_vers;
+	/* Size to be large enough for %u.%u.%u and other strings */
+	char buf[128];
 
 	if (imgno != 0 || slotno != 0) {
 		return (EINVAL);
 	}
 
-	/*
-	 * Unfortunately there is no generic versioning in the ixgbe family
-	 * eeprom parts.
-	 */
-	ddi_ufm_slot_set_version(slotp, "unknown");
+	if (hw->mac.type != ixgbe_mac_82599EB) {
+		(void) snprintf(buf, sizeof (buf), "%u.%u", vers->nvm_major,
+		    vers->nvm_minor);
+	} else {
+		(void) snprintf(buf, sizeof (buf), "%x", vers->etk_id);
+	}
+	ddi_ufm_slot_set_version(slotp, buf);
 	ddi_ufm_slot_set_attrs(slotp, DDI_UFM_ATTR_ACTIVE |
 	    DDI_UFM_ATTR_READABLE | DDI_UFM_ATTR_WRITEABLE);
+
+	/*
+	 * The default EEPROM read interface reads from the shadow ROM. This
+	 * means that in the E610 and some of the other devices this may be
+	 * smaller than we expect. We leave that as it is for now.
+	 */
 	ddi_ufm_slot_set_imgsize(slotp, ixgbe->hw.eeprom.word_size * 2);
+	nvlist_t *nvl = fnvlist_alloc();
+
+	/* Everyone gets the EETrack ID */
+	(void) snprintf(buf, sizeof (buf), "0x%08x", vers->etk_id);
+	fnvlist_add_string(nvl, "eetrack-id", buf);
+
+	/*
+	 * Everyone except the 82599EB gets an NVM image.
+	 */
+	if (hw->mac.type != ixgbe_mac_82599EB) {
+		(void) snprintf(buf, sizeof (buf), "%u.%u", vers->nvm_major,
+		    vers->nvm_minor);
+		fnvlist_add_string(nvl, "nvm-version", buf);
+	}
+
+	/*
+	 * Everything seems to have the device starter image.
+	 */
+	(void) snprintf(buf, sizeof (buf), "%u.%u", vers->devstart_major,
+	    vers->devstart_minor);
+	fnvlist_add_string(nvl, "devstart-version", buf);
+
+	/*
+	 * Everyone prior to the E610 gets an OEM version if it's valid. See
+	 * notes above on the E610 issues.
+	 */
+	if (hw->mac.type < ixgbe_mac_E610 && vers->oem_valid) {
+		(void) snprintf(buf, sizeof (buf), "%u.%u.%u", vers->oem_major,
+		    vers->oem_minor, vers->oem_release);
+		fnvlist_add_string(nvl, "oem-version", buf);
+	}
+
+	/*
+	 * Only the X540 / X550 families have a valid PHY version. See notes
+	 * above on the E610.
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_X540:
+	case ixgbe_mac_X550:
+	case ixgbe_mac_X550EM_x:
+	case ixgbe_mac_X550EM_a:
+		(void) snprintf(buf, sizeof (buf), "%u.%u", vers->phy_fw_maj,
+		    vers->phy_fw_min);
+		fnvlist_add_string(nvl, "phy-firmware-version", buf);
+		break;
+	default:
+		break;
+	}
+
+	/*
+	 * Vendor PHY Version. Most devices may not have this at which point
+	 * we'll find that we have a split up 0xffff value that we try to
+	 * manually detect. Similarly if this is the E610 it has something much
+	 * more involved in its firmware interface that we want to pull out.
+	 * Intel doesn't provide a way to decode that, so for now we leave that
+	 * out.
+	 */
+	if (hw->mac.type != ixgbe_mac_E610 && vers->phy_vend_maj != 0xff &&
+	    vers->phy_vend_min != 0xff) {
+		(void) snprintf(buf, sizeof (buf), "%u.%u",
+		    vers->phy_vend_maj, vers->phy_vend_min);
+		fnvlist_add_string(nvl, "vendor-phy-firmware-version", buf);
+	}
+
+	/*
+	 * E610 specific information about firmware.
+	 */
+	if (hw->mac.type == ixgbe_mac_E610) {
+		(void) snprintf(buf, sizeof (buf), "%u.%u.%u.%u",
+		    hw->api_branch, hw->api_maj_ver, hw->api_min_ver,
+		    hw->api_patch);
+		fnvlist_add_string(nvl, "api-version", buf);
+		(void) snprintf(buf, sizeof (buf), "%u.%u.%u.%u",
+		    hw->api_branch, hw->api_maj_ver, hw->api_min_ver,
+		    hw->api_patch);
+		fnvlist_add_string(nvl, "firmware-version", buf);
+		(void) snprintf(buf, sizeof (buf), "%x", hw->fw_build);
+		fnvlist_add_string(nvl, "firmware-build", buf);
+	}
+
+	/*
+	 * The DDI takes ownership of the nvlist_t at this point.
+	 */
+	ddi_ufm_slot_set_misc(slotp, nvl);
 
 	return (0);
 }

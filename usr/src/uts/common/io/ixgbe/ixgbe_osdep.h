@@ -29,6 +29,7 @@
 /*
  * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_IXGBE_OSDEP_H
@@ -113,6 +114,9 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #ifdef _BIG_ENDIAN
 #define	IXGBE_CPU_TO_LE16	BSWAP_16
 #define	IXGBE_CPU_TO_LE32	BSWAP_32
+#define	IXGBE_LE16_TO_CPU	BSWAP_16
+#define	IXGBE_LE32_TO_CPU	BSWAP_32
+#define	IXGBE_LE64_TO_CPU	BSWAP_64
 #define	IXGBE_LE32_TO_CPUS(x)	*(x) = BSWAP_32(*(x))
 #define	IXGBE_CPU_TO_BE16(x)	(x)
 #define	IXGBE_CPU_TO_BE32(x)	(x)
@@ -120,6 +124,9 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #else
 #define	IXGBE_CPU_TO_LE16(x)	(x)
 #define	IXGBE_CPU_TO_LE32(x)	(x)
+#define	IXGBE_LE16_TO_CPU(x)	(x)
+#define	IXGBE_LE32_TO_CPU(x)	(x)
+#define	IXGBE_LE64_TO_CPU(x)	(x)
 #define	IXGBE_LE32_TO_CPUS(x)	(x)
 #define	IXGBE_CPU_TO_BE16	BSWAP_16
 #define	IXGBE_CPU_TO_BE32	BSWAP_32
@@ -157,6 +164,26 @@ struct ixgbe_osdep {
 	ddi_acc_handle_t cfg_handle;
 	struct ixgbe *ixgbe;
 };
+
+/*
+ * The E610 family of devices uses an admin control interface to talk to
+ * firmware to perform certain operations. This requires its own lock. We
+ * effectively are going to assume this this lock is never above lock level to
+ * reduce modifications to the ixgbe common code about mutex and interrupt
+ * initialization.
+ */
+struct ixgbe_lock {
+	kmutex_t il_mutex;
+};
+
+extern void ixgbe_init_lock(struct ixgbe_hw *, struct ixgbe_lock *);
+extern void ixgbe_acquire_lock(struct ixgbe_lock *);
+extern void ixgbe_release_lock(struct ixgbe_lock *);
+extern void ixgbe_destroy_lock(struct ixgbe_lock *);
+
+extern void *ixgbe_malloc(struct ixgbe_hw *, size_t);
+extern void *ixgbe_calloc(struct ixgbe_hw *, size_t, size_t);
+extern void ixgbe_free(struct ixgbe_hw *, void *, size_t);
 
 #ifdef __cplusplus
 }

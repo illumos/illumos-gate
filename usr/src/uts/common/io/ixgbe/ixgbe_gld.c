@@ -28,6 +28,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -275,6 +276,28 @@ ixgbe_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 	return (0);
 }
 
+static int
+ixgbe_led_set_e610(void *arg, mac_led_mode_t mode, uint_t flags)
+{
+	ixgbe_t *ixgbe = arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+
+	if (flags != 0)
+		return (EINVAL);
+
+	if (mode != MAC_LED_DEFAULT &&
+	    mode != MAC_LED_IDENT)
+		return (ENOTSUP);
+
+	bool orig = mode == MAC_LED_DEFAULT;
+	if (ixgbe_aci_set_port_id_led(hw, orig) != IXGBE_SUCCESS) {
+		return (EIO);
+	}
+
+	return (0);
+}
+
+
 /*
  * Obtain the MAC's capabilities and associated data from
  * the driver.
@@ -356,9 +379,14 @@ ixgbe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mac_capab_led_t *mcl = cap_data;
 
 		mcl->mcl_flags = 0;
-		mcl->mcl_modes = MAC_LED_DEFAULT | MAC_LED_ON | MAC_LED_OFF |
-		    MAC_LED_IDENT;
-		mcl->mcl_set = ixgbe_led_set;
+		if (ixgbe->hw.mac.type != ixgbe_mac_E610) {
+			mcl->mcl_modes = MAC_LED_DEFAULT | MAC_LED_ON |
+			    MAC_LED_OFF | MAC_LED_IDENT;
+			mcl->mcl_set = ixgbe_led_set;
+		} else {
+			mcl->mcl_modes = MAC_LED_DEFAULT | MAC_LED_IDENT;
+			mcl->mcl_set = ixgbe_led_set_e610;
+		}
 		break;
 
 	}

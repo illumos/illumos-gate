@@ -28,6 +28,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -1005,6 +1006,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_X550EM_a:
+	case ixgbe_mac_E610:
 		if (ctx != NULL && ctx->lso_flag) {
 			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
 			first_tbd->read.olinfo_status |=

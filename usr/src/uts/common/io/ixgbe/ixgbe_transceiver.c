@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -96,7 +96,11 @@ const ixgbe_phys_map_t ixgbe_phys_map[] = {
 	{ IXGBE_PHYSICAL_LAYER_1000BASE_SX, SPEED_1GB,
 	    ETHER_MEDIA_1000BASE_SX },
 	{ IXGBE_PHYSICAL_LAYER_2500BASE_KX, SPEED_2_5GB,
-	    ETHER_MEDIA_2500BASE_KX }
+	    ETHER_MEDIA_2500BASE_KX },
+	{ IXGBE_PHYSICAL_LAYER_2500BASE_T, SPEED_2_5GB,
+	    ETHER_MEDIA_2500BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_5000BASE_T, SPEED_5GB,
+	    ETHER_MEDIA_5000BASE_T },
 };
 
 mac_ether_media_t
@@ -112,6 +116,7 @@ ixgbe_phy_to_media(ixgbe_t *ixgbe)
 	case ixgbe_media_type_fiber_qsfp:
 	case ixgbe_media_type_backplane:
 	case ixgbe_media_type_cx4:
+	case ixgbe_media_type_da:
 		for (size_t i = 0; i < ARRAY_SIZE(ixgbe_phys_map); i++) {
 			const ixgbe_phys_map_t *map = &ixgbe_phys_map[i];
 			if ((ixgbe->phys_supported & map->ipm_phys) != 0 &&

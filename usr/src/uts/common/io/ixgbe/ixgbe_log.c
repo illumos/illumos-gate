@@ -24,6 +24,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -45,8 +47,7 @@ ixgbe_notice(void *arg, const char *fmt, ...)
 	va_end(ap);
 
 	if (ixgbep != NULL)
-		cmn_err(CE_NOTE, "%s%d: %s", MODULE_NAME, ixgbep->instance,
-		    buf);
+		dev_err(ixgbep->dip, CE_NOTE, "%s", buf);
 	else
 		cmn_err(CE_NOTE, "%s: %s", MODULE_NAME, buf);
 }
@@ -66,8 +67,7 @@ ixgbe_log(void *arg, const char *fmt, ...)
 	va_end(ap);
 
 	if (ixgbep != NULL)
-		cmn_err(CE_NOTE, "!%s%d: %s", MODULE_NAME, ixgbep->instance,
-		    buf);
+		dev_err(ixgbep->dip, CE_NOTE, "!%s", buf);
 	else
 		cmn_err(CE_NOTE, "!%s: %s", MODULE_NAME, buf);
 }
@@ -87,8 +87,7 @@ ixgbe_error(void *arg, const char *fmt, ...)
 	va_end(ap);
 
 	if (ixgbep != NULL)
-		cmn_err(CE_WARN, "!%s%d: %s", MODULE_NAME, ixgbep->instance,
-		    buf);
+		dev_err(ixgbep->dip, CE_WARN, "!%s", buf);
 	else
 		cmn_err(CE_WARN, "!%s: %s", MODULE_NAME, buf);
 }

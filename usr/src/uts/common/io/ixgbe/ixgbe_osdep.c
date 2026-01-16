@@ -25,6 +25,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -66,4 +67,60 @@ ixgbe_removed(struct ixgbe_hw *hw)
 		return (B_TRUE);
 	}
 	return (B_FALSE);
+}
+
+void *
+ixgbe_malloc(struct ixgbe_hw *hw, size_t len)
+{
+	VERIFY3U(len, !=, 0);
+	return (kmem_alloc(len, KM_SLEEP));
+}
+
+/*
+ * Simple calloc that panics on overflow.
+ */
+void *
+ixgbe_calloc(struct ixgbe_hw *hw, size_t nelem, size_t eltsize)
+{
+	VERIFY3U(nelem, !=, 0);
+	VERIFY3U(eltsize, !=, 0);
+
+	size_t total = nelem * eltsize;
+	VERIFY3U(total / nelem, ==, eltsize);
+
+	return (kmem_zalloc(total, KM_SLEEP));
+}
+
+void
+ixgbe_free(struct ixgbe_hw *hw, void *buf, size_t len)
+{
+	VERIFY3U(len, !=, 0);
+	return (kmem_free(buf, len));
+}
+
+void
+ixgbe_init_lock(struct ixgbe_hw *hw, struct ixgbe_lock *lock)
+{
+	ixgbe_t *ixgbe = OS_DEP(hw)->ixgbe;
+
+	mutex_init(&lock->il_mutex, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(ixgbe->intr_pri));
+}
+
+void
+ixgbe_destroy_lock(struct ixgbe_lock *lock)
+{
+	mutex_destroy(&lock->il_mutex);
+}
+
+void
+ixgbe_acquire_lock(struct ixgbe_lock *lock)
+{
+	mutex_enter(&lock->il_mutex);
+}
+
+void
+ixgbe_release_lock(struct ixgbe_lock *lock)
+{
+	mutex_exit(&lock->il_mutex);
 }
