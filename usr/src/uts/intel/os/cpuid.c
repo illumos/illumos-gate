@@ -3253,37 +3253,61 @@ cpuid_enable_auto_ibrs(void)
 }
 
 /*
- *  AMD Zen 5 processors have a bug where the 16- and 32-bit forms of the
- *  RDSEED instruction can frequently return 0 despite indicating success
- *  (CF=1) - See AMD-SB-7055 / CVE-2025-62626.
+ * AMD Zen 5 processors are affected by a defect where the 16- and 32-bit
+ * forms of the RDSEED instruction may return 0 despite indicating success
+ * (CF=1) - See AMD-SB-7055 / CVE-2025-62626.
+ *
+ * This table records the minimum microcode revision for each affected CPU
+ * at which RDSEED is considered reliable and may be exposed. On all other
+ * Zen 5 parts, or when running below the listed revision, RDSEED is masked
+ * from CPUID leaf 7 feature reporting.
+ *
+ * The model field is required to distinguish between Krackan and Krackan2,
+ * which otherwise share the same chip revision identifier.
  */
+static struct cpuid_fwrev {
+	const x86_chiprev_t	cf_chiprev;
+	const uint_t		cf_model;
+	const uint32_t		cf_minfwrev;
+} cpuid_amd_zen5_rdseed_good[] = {
+	{ X86_CHIPREV_AMD_TURIN_C1,		0x02,	0x0b00215a },
+	{ X86_CHIPREV_AMD_DENSE_TURIN_B0,	0x11,	0x0b101054 },
+	{ X86_CHIPREV_AMD_STRIX_B0,		0x24,	0x0b204037 },
+	{ X86_CHIPREV_AMD_GRANITE_RIDGE_B0,	0x44,	0x0b404035 },
+	{ X86_CHIPREV_AMD_GRANITE_RIDGE_B1,	0x44,	0x0b404108 },
+	{ X86_CHIPREV_AMD_KRACKAN_A0,		0x60,	0x0b600037 },
+	{ X86_CHIPREV_AMD_KRACKAN_A0,		0x68,	0x0b608038 },
+	{ X86_CHIPREV_AMD_STRIX_HALO_A0,	0x70,	0x0b700037 },
+	{ X86_CHIPREV_AMD_SHIMADA_PEAK_C1,	0x08,	0x0b008121 },
+};
+
 static void
 cpuid_evaluate_amd_rdseed(cpu_t *cpu, uchar_t *featureset)
 {
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 	struct cpuid_regs *ecp = &cpi->cpi_std[7];
 	uint32_t rev = cpu->cpu_m.mcpu_ucode_info->cui_rev;
-	uint64_t val;
 
 	ASSERT3U(cpi->cpi_vendor, ==, X86_VENDOR_AMD);
 	ASSERT(ecp->cp_ebx & CPUID_INTC_EBX_7_0_RDSEED);
 
-	/* This erratum only applies to the Zen5 uarch */
+	/* This erratum only applies to the Zen 5 uarch */
 	if (uarchrev_uarch(cpi->cpi_uarchrev) != X86_UARCH_AMD_ZEN5)
 		return;
 
 	/*
-	 * AMD-SB-7055 specifies microcode versions that mitigate this issue on
-	 * BRH-C1 and BRHD-B0. If we're on one of those chips and the microcode
-	 * version is new enough we can leave RDSEED enabled.
+	 * If the CPU microcode is new enough then this issue is mitigated.
+	 * Unfortunately there is not a bit that indicates this so we need to
+	 * check the version explicitly against a table of known good versions.
 	 */
-	if (chiprev_matches(cpi->cpi_chiprev, X86_CHIPREV_AMD_TURIN_C1) &&
-	    rev >= 0x0b00215a) {
-		return;
-	}
-	if (chiprev_matches(cpi->cpi_chiprev, X86_CHIPREV_AMD_DENSE_TURIN_B0) &&
-	    rev >= 0x0b101054) {
-		return;
+	for (size_t i = 0; i < ARRAY_SIZE(cpuid_amd_zen5_rdseed_good); i++) {
+		const struct cpuid_fwrev *cf = &cpuid_amd_zen5_rdseed_good[i];
+
+		if (chiprev_matches(cpi->cpi_chiprev, cf->cf_chiprev) &&
+		    cpi->cpi_model == cf->cf_model && rev >= cf->cf_minfwrev) {
+			/* Mitigated, leave enabled. */
+			return;
+		}
 	}
 
 	/*
@@ -3299,9 +3323,22 @@ cpuid_evaluate_amd_rdseed(cpu_t *cpu, uchar_t *featureset)
 	remove_x86_feature(featureset, X86FSET_RDSEED);
 	ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_RDSEED;
 
-	val = rdmsr(MSR_AMD_CPUID7_FEATURES);
-	val &= ~MSR_AMD_CPUID7_FEATURES_RDSEED;
-	wrmsr(MSR_AMD_CPUID7_FEATURES, val);
+	/*
+	 * Some hypervisors that expose RDSEED do not emulate this MSR and so
+	 * we guard against a trap here.
+	 */
+#ifndef __xpv
+	on_trap_data_t otd;
+
+	if (!on_trap(&otd, OT_DATA_ACCESS)) {
+		uint64_t val;
+
+		val = rdmsr(MSR_AMD_CPUID7_FEATURES);
+		val &= ~MSR_AMD_CPUID7_FEATURES_RDSEED;
+		wrmsr(MSR_AMD_CPUID7_FEATURES, val);
+	}
+	no_trap();
+#endif
 }
 
 /*

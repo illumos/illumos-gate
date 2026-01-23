@@ -351,6 +351,7 @@ static uint32_t amd_skts[][16] = {
 		[4] = X86_SOCKET_SP5,
 		[8] = X86_SOCKET_SP6
 	},
+
 	/*
 	 * Family 0x1a models 00-1f	(Zen 5[c] - Turin)
 	 */
@@ -360,10 +361,18 @@ static uint32_t amd_skts[][16] = {
 	},
 
 	/*
+	 * Family 0x1a model 08		(Zen 5 - Shimada Peak)
+	 */
+#define	A_SKTS_SHIMADA_PEAK		31
+	{
+		[7] = X86_SOCKET_TR5
+	},
+
+	/*
 	 * Family 0x1a models 20-2f	(Zen 5 - Strix)
 	 * Family 0x1a models 60-6f	(Zen 5 - Krackan)
 	 */
-#define	A_SKTS_STRIX			31
+#define	A_SKTS_STRIX			32
 	{
 		[0] = X86_SOCKET_AM5,
 		[1] = X86_SOCKET_FP8
@@ -372,7 +381,7 @@ static uint32_t amd_skts[][16] = {
 	/*
 	 * Family 0x1a models 40-4f	(Zen 5 - Granite Ridge)
 	 */
-#define	A_SKTS_GRANITE_RIDGE		32
+#define	A_SKTS_GRANITE_RIDGE		33
 	{
 		[0] = X86_SOCKET_AM5,
 		[1] = X86_SOCKET_FL1
@@ -381,7 +390,7 @@ static uint32_t amd_skts[][16] = {
 	/*
 	 * Family 0x1a models 70-77	(Zen 5 - Strix Halo)
 	 */
-#define	A_SKTS_STRIX_HALO		33
+#define	A_SKTS_STRIX_HALO		34
 	{
 		[1] = X86_SOCKET_FP11
 	}
@@ -833,6 +842,12 @@ static const struct amd_rev_mapent {
 	    X86_UARCHREV_AMD_ZEN5_C0, A_SKTS_TURIN },
 	{ 0x1a, 0x02, 0x02, 0x1, 0x1, X86_CHIPREV_AMD_TURIN_C1, "BRH-C1",
 	    X86_UARCHREV_AMD_ZEN5_C1, A_SKTS_TURIN },
+	{ 0x1a, 0x08, 0x08, 0x0, 0x0, X86_CHIPREV_AMD_SHIMADA_PEAK_C0,
+	    "SHP-C0", X86_UARCHREV_AMD_ZEN5_C0, A_SKTS_SHIMADA_PEAK },
+	{ 0x1a, 0x08, 0x08, 0x1, 0x1, X86_CHIPREV_AMD_SHIMADA_PEAK_C1,
+	    "SHP-C1", X86_UARCHREV_AMD_ZEN5_C1, A_SKTS_SHIMADA_PEAK },
+	{ 0x1a, 0x08, 0x08, 0x0, 0xf, X86_CHIPREV_AMD_SHIMADA_PEAK_UNKNOWN,
+	    "SHP-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_SHIMADA_PEAK },
 	{ 0x1a, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_TURIN_UNKNOWN, "BRH-???",
 	    X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_TURIN },
 	{ 0x1a, 0x10, 0x10, 0x0, 0x0, X86_CHIPREV_AMD_DENSE_TURIN_A0,
@@ -852,12 +867,16 @@ static const struct amd_rev_mapent {
 	    "STX-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_STRIX },
 	{ 0x1a, 0x60, 0x60, 0x0, 0x0, X86_CHIPREV_AMD_KRACKAN_A0,
 	    "KRK-A0", X86_UARCHREV_AMD_ZEN5_A0, A_SKTS_STRIX },
+	{ 0x1a, 0x68, 0x68, 0x0, 0x0, X86_CHIPREV_AMD_KRACKAN_A0,
+	    "KRK2-A0", X86_UARCHREV_AMD_ZEN5_A0, A_SKTS_STRIX },
 	{ 0x1a, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_KRACKAN_UNKNOWN,
 	    "KRK-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_STRIX },
 
 	/* Granite Ridge */
 	{ 0x1a, 0x44, 0x44, 0x0, 0x0, X86_CHIPREV_AMD_GRANITE_RIDGE_B0,
 	    "GNR-B0", X86_UARCHREV_AMD_ZEN5_B0, A_SKTS_GRANITE_RIDGE },
+	{ 0x1a, 0x44, 0x44, 0x1, 0x1, X86_CHIPREV_AMD_GRANITE_RIDGE_B1,
+	    "GNR-B1", X86_UARCHREV_AMD_ZEN5_B1, A_SKTS_GRANITE_RIDGE },
 	{ 0x1a, 0x40, 0x4f, 0x0, 0xf, X86_CHIPREV_AMD_GRANITE_RIDGE_UNKNOWN,
 	    "GNR-???", X86_UARCHREV_AMD_ZEN5_UNKNOWN, A_SKTS_GRANITE_RIDGE },
 
