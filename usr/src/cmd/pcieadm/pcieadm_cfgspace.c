@@ -4952,6 +4952,70 @@ static const pcieadm_cfgspace_print_t pcieadm_cap_rtr[] = {
 	{ -1, -1, NULL }
 };
 
+static const pcieadm_regdef_t pcieadm_regdef_doe_cap[] = {
+	{ 0, 0, "intr", "Interrupt", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 1, 11, "inum", "Interrupt Message Number", PRDV_HEX },
+	{ 12, 12, "attn", "Attention Mechanism", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 13, 13, "async", "Async Message", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_doe_ctl[] = {
+	{ 0, 0, "abort", "Abort", PRDV_HEX },
+	{ 1, 1, "intr", "Interrupt Enable", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 2, 2, "attn", "Attention Not Needed", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 3, 3, "async", "Async Message", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 31, 31, "go", "Go", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_doe_sts[] = {
+	{ 0, 0, "busy", "Busy", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 1, 1, "intr", "Interrupt Status", PRDV_HEX },
+	{ 2, 2, "error", "Error", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 3, 3, "async", "Async Message Status", PRDV_HEX },
+	{ 4, 4, "attn", "Attention", PRDV_HEX },
+	{ 31, 31, "ready", "Data Object Ready", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ -1, -1, NULL }
+};
+
+/*
+ * PCIe Data Object Exchange (DOE). There are two wrinkles to this capability
+ * worth being aware of:
+ *
+ * 1. This capability contains two registers that we don't describe which are
+ *    the read and write data mailboxes. These registers are designed as FIFOs.
+ *    Critically reading the DOE read mailbox will consume data that a DOE
+ *    consumer expects to be able to read. This is a very bad side effect.
+ *    We do not include it (or write) at all to ensure that we can't end up
+ *    accidentally mucking things up.
+ * 2. There are two versions of the capability. Right now those are used to
+ *    indicate whether a few features are present related to asynchronous
+ *    messages and attention bits. The total number of registers and their
+ *    offsets are the same. As such we opt to print both versions the same way
+ *    right now.
+ */
+static const pcieadm_cfgspace_print_t pcieadm_cap_doe[] = {
+	{ 0x0, 4, "caphdr", "Capability Header", pcieadm_cfgspace_print_regdef,
+	    pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "cap", "DOE Capabilities", pcieadm_cfgspace_print_regdef,
+	    pcieadm_regdef_doe_cap },
+	{ 0x8, 4, "ctl", "DOE Control", pcieadm_cfgspace_print_regdef,
+	    pcieadm_regdef_doe_ctl },
+	{ 0xc, 4, "sts", "DOE Status", pcieadm_cfgspace_print_regdef,
+	    pcieadm_regdef_doe_sts },
+	{ -1, -1, NULL }
+};
+
 static const pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
@@ -5084,7 +5148,9 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	    pcieadm_cap_info_vers, { { 1, 0x14, pcieadm_cap_ap } } },
 	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
 	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
-	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange" },
+	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange",
+	    pcieadm_cap_info_vers, { { 1, 0x10, pcieadm_cap_doe },
+	    { 2, 0x10, pcieadm_cap_doe } } },
 	{ PCIE_EXT_CAP_ID_DEV3, "dev3", "Device 3" },
 	{ PCIE_EXT_CAP_ID_IDE, "ide", "Integrity and Data Encryption" },
 	{ PCIE_EXT_CAP_ID_PL64GT, "pl64g", "Physical Layer 64.0 GT/s" },
