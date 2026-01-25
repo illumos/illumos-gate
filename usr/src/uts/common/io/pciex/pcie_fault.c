@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -162,6 +162,41 @@ static void pf_reset_pfd(pf_data_t *);
 
 boolean_t pcie_full_scan = B_FALSE;	/* Force to always do a full scan */
 int pcie_disable_scan = 0;		/* Disable fabric scan */
+
+/*
+ * Cache of pf_impl_t that triggered a fatal error. This is stored before
+ * the system will likely panic. The pf_impl_t contains the scan results
+ * including all error data queues that led to the fatal error. The primary
+ * purpose of this cache is post-mortem debugging of such fatal PCIe errors.
+ * The cached data will be present and valid in crash dumps taken immediately
+ * after fatal error detection.
+ *
+ * This cache stores a shallow copy of the pf_impl_t structure which contains
+ * pointers to other structures. The validity of these pointers in a crash dump
+ * depends on their allocation:
+ *
+ * 1. pf_dq_head_p/pf_dq_tail_p (pf_data_t chain):
+ *    These point to heap-allocated pf_data_t structures that live in each
+ *    device's pcie_bus_t->bus_pfd. These are long-lived structures that
+ *    persist for the lifetime of the device node in the device tree.
+ *
+ * 2. pf_fault (pf_root_fault_t):
+ *    Points to heap-allocated structure in the root port's pf_data_t.
+ *
+ * 3. Error register structures (pf_pcie_err_regs_t, etc.):
+ *    Heap-allocated as part of each device's pf_data_t; long lived.
+ *
+ * 4. pf_derr (ddi_fm_error_t):
+ *    This points to a structure on the caller's stack. Normally this would be
+ *    invalid after the function returns, but in a crash dump the panic
+ *    preserves the stack contents.
+ *
+ * The cached pointers could theoretically become invalid if device hotplug/
+ * detach occurs between error detection and panic. However this is not a
+ * concern in practice because there is no window for this to occur between a
+ * fatal error and a system panic.
+ */
+pf_impl_t pcie_faulty_pf_impl;
 
 /* Inform interested parties that error handling is about to begin. */
 /* ARGSUSED */
@@ -331,6 +366,23 @@ done:
 	 */
 	if (scan_flag & PF_SCAN_DEADLOCK)
 		analyse_flag |= PF_ERR_PANIC_DEADLOCK;
+
+	/*
+	 * For fatal errors, cache a copy of the pf_impl_t for post-mortem
+	 * analysis (kmdb or mdb against a system crash dump). The ereports
+	 * may not make it into the crash dump (errorq_dump can fill up - its
+	 * size is 16 * ncpus, so on a 256-CPU system it holds just 4096
+	 * entries, and fatal uncorrectable errors can be lost among
+	 * correctable errors), but this cached structure will be available for
+	 * inspection via the ::pcie_fatal_errors mdb dcmd.
+	 *
+	 * Note: Whether the system actually panics depends on the caller's
+	 * configuration (e.g., the pcieb_die tunable). This cache is populated
+	 * whenever PF_ERR_FATAL_FLAGS is set, regardless of whether a panic
+	 * will actually occur.
+	 */
+	if ((analyse_flag & PF_ERR_FATAL_FLAGS) != 0)
+		pcie_faulty_pf_impl = impl;
 
 	derr->fme_status = PF_ERR2DDIFM_ERR(scan_flag);
 

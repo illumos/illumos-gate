@@ -25,7 +25,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2022 Garrett D'Amore
  * Copyright 2023 RackTop Systems, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <mdb/mdb_param.h>
@@ -4280,6 +4280,13 @@ static const mdb_dcmd_t dcmds[] = {
 	/* from fm.c */
 	{ "ereport", "[-v]", "print ereports logged in dump",
 	    ereport },
+
+	/* from pci.c */
+	{ "pcie_fatal_errors", "?[-v]",
+	    "display PCIe fabric scan info from fatal error",
+	    pcie_pf_impl_dcmd, pcie_pf_impl_help },
+	{ "bdf", ":", "decode a PCIe BDF (Bus/Device/Function) value and "
+	    "print it as b/d/f", pcie_bdf_dcmd },
 
 	/* from group.c */
 	{ "group", "?[-q]", "display a group", group},

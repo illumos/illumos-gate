@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _MDB_PCI_H
@@ -32,6 +33,10 @@ extern int pcie_bus_walk_init(mdb_walk_state_t *);
 extern int pcie_bus_walk_step(mdb_walk_state_t *);
 
 extern boolean_t pcie_bus_match(const struct dev_info *, uintptr_t *);
+
+extern int pcie_pf_impl_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void pcie_pf_impl_help(void);
+extern int pcie_bdf_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 #ifdef __cplusplus
 }
