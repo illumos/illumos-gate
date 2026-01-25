@@ -16,9 +16,7 @@
 
 # Note: BASEPROG comes from the command line
 
-# GMAC is currently only supported by KCF.
-CRYPTO		= kcf # pkcs
-CRYPTO_pkcs	= $(POUND_SIGN)
+CRYPTO		= kcf pkcs
 
 TESTROOT	= $(ROOT)/opt/crypto-tests/tests/aes
 

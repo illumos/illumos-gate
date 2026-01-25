@@ -20,9 +20,13 @@
 #include <string.h>
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
+#include <sys/ccompile.h>
 #include <sys/debug.h>
+#include <modes/modes.h>
 
 #include "cryptotest.h"
+
+boolean_t cryptotest_pkcs = B_TRUE;	/* true if PKCS */
 
 struct crypto_op {
 	CK_BYTE_PTR in;
@@ -484,6 +488,31 @@ size_t
 ccm_param_len(void)
 {
 	return (sizeof (CK_CCM_PARAMS));
+}
+
+/*
+ * The GMAC params for PKCS#11 is  just the IV[12]
+ * Details in this doc:
+ *	https://docs.oasis-open.org/pkcs11/pkcs11-curr/v2.40/
+ *	errata01/os/pkcs11-curr-v2.40-errata01-os-complete.html
+ * We have tests that on KCF can pass some AAD, but on pkcs
+ * those are skipped (when cryptotest_pkcs == B_TRUE).
+ *
+ * Some tests pass ulAADLen = 0 and non-NULL pAAD, so
+ * allow that. For PKCS, just verify ulAADLen = 0.
+ */
+void
+gmac_init_params(void *buf, uchar_t *pIv, uchar_t *pAAD __unused,
+    ulong_t ulAADLen)
+{
+	VERIFY0(ulAADLen);
+	memcpy(buf, pIv, AES_GMAC_IV_LEN);
+}
+
+size_t
+gmac_param_len(void)
+{
+	return (AES_GMAC_IV_LEN);
 }
 
 const char *

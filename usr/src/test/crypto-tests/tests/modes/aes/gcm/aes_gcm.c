@@ -35,6 +35,10 @@ main(void)
 	uint8_t N[1024];
 	size_t taglen = GCM_SPEC_TAG_LEN;
 
+	/*
+	 * For the PKCS build this is actually CK_GCM_PARAMS
+	 * but thankfully the layout is the same.
+	 */
 	CK_AES_GCM_PARAMS param = {
 		.ulTagBits = taglen * 8
 	};

@@ -42,8 +42,17 @@
 #include "softOps.h"
 
 /*
- * Check that the mechanism parameter is present and the correct size if
- * required and allocate an AES context.
+ * Check that the mechanism parameter is present (if required)
+ * and has the correct size. If so, allocate an AES context.
+ *
+ * Special handling for AES_GMAC paramters:
+ *
+ * The current PKCS#11 documentation for using AES_GMAC is:
+ *	https://docs.oasis-open.org/pkcs11/pkcs11-curr/v2.40/
+ *	errata01/os/pkcs11-curr-v2.40-errata01-os-complete.html
+ * According to that, the C_SignInit parameter for AES_GMAC is
+ * just the 12-byte Initialization Vector (IV).  The passed IV
+ * is converted to CK_AES_GMAC_PARAMS soft_aes_init_ctx().
  */
 static CK_RV
 soft_aes_check_mech_param(CK_MECHANISM_PTR mech, aes_ctx_t **ctxp)
@@ -64,6 +73,11 @@ soft_aes_check_mech_param(CK_MECHANISM_PTR mech, aes_ctx_t **ctxp)
 	case CKM_AES_CMAC_GENERAL:
 		param_len = sizeof (CK_MAC_GENERAL_PARAMS);
 		allocf = cmac_alloc_ctx;
+		break;
+	case CKM_AES_GMAC:
+		/* See comment above this function. */
+		param_len = AES_GMAC_IV_LEN;
+		allocf = gmac_alloc_ctx;
 		break;
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
@@ -213,6 +227,22 @@ soft_aes_init_ctx(aes_ctx_t *aes_ctx, CK_MECHANISM_PTR mech_p,
 	case CKM_AES_CMAC_GENERAL:
 		rc = cmac_init_ctx((cbc_ctx_t *)aes_ctx, AES_BLOCK_LEN);
 		break;
+	case CKM_AES_GMAC: {
+		/*
+		 * Given params are just the initialization vector.
+		 * See comment above soft_aes_check_mech_param.
+		 * Convert to CK_AES_GMAC_PARAMS for gmac_init_ctx.
+		 */
+		CK_AES_GMAC_PARAMS gmac_params = {
+			.pIv = mech_p->pParameter,
+			.pAAD = NULL,
+			.ulAADLen = 0
+		};
+		rc = gmac_init_ctx((gcm_ctx_t *)aes_ctx, (char *)&gmac_params,
+		    AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
+		    aes_xor_block);
+		break;
+	}
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 		rc = cbc_init_ctx((cbc_ctx_t *)aes_ctx, mech_p->pParameter,
@@ -346,7 +376,7 @@ soft_aes_encrypt(soft_session_t *session_p, CK_BYTE_PTR pData,
 	 * or CKM_AES_GMAC of the additional authenticated data (AAD).
 	 */
 	if ((pData == NULL || ulDataLen == 0) &&
-	    !(aes_ctx->ac_flags & (CCM_MODE|GCM_MODE|CMAC_MODE))) {
+	    !(aes_ctx->ac_flags & (CCM_MODE|GCM_MODE|CMAC_MODE|GMAC_MODE))) {
 		return (CKR_ARGUMENTS_BAD);
 	}
 
@@ -365,6 +395,7 @@ soft_aes_encrypt(soft_session_t *session_p, CK_BYTE_PTR pData,
 	case CKM_AES_CTR:
 	case CKM_AES_CCM:
 	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		break;
 	default:
 		if (remainder != 0) {
@@ -382,6 +413,9 @@ soft_aes_encrypt(soft_session_t *session_p, CK_BYTE_PTR pData,
 		break;
 	case CKM_AES_CMAC:
 	case CKM_AES_CMAC_GENERAL:
+		length_needed = AES_BLOCK_LEN;
+		break;
+	case CKM_AES_GMAC:
 		length_needed = AES_BLOCK_LEN;
 		break;
 	case CKM_AES_CBC_PAD:
@@ -471,6 +505,11 @@ soft_aes_encrypt(soft_session_t *session_p, CK_BYTE_PTR pData,
 		    aes_encrypt_block, aes_xor_block);
 		rv = crypto2pkcs11_error_number(rc);
 		aes_ctx->ac_remainder_len = 0;
+		break;
+	case CKM_AES_GMAC:
+		rc = gmac_mode_final((gcm_ctx_t *)aes_ctx, &out,
+		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
+		rv = crypto2pkcs11_error_number(rc);
 		break;
 	case CKM_AES_CTR:
 		/*
@@ -674,6 +713,7 @@ soft_aes_decrypt(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	case CKM_AES_CTR:
 	case CKM_AES_CCM:
 	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		break;
 	default:
 		if (remainder != 0) {
@@ -830,6 +870,9 @@ soft_aes_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pData,
 		 * so do not bother looking at the size of the output
 		 * buffer at this time.
 		 */
+		out_len = 0;
+		break;
+	case CKM_AES_GMAC:
 		out_len = 0;
 		break;
 	case CKM_AES_CTR:
@@ -1194,6 +1237,9 @@ soft_aes_encrypt_final(soft_session_t *session_p,
 	case CKM_AES_CMAC_GENERAL:
 		out_len = AES_BLOCK_LEN;
 		break;
+	case CKM_AES_GMAC:
+		out_len = AES_BLOCK_LEN;
+		break;
 	default:
 		/*
 		 * Everything other AES mechansism requires full blocks of
@@ -1248,6 +1294,10 @@ soft_aes_encrypt_final(soft_session_t *session_p,
 	case CKM_AES_CMAC_GENERAL:
 		rc = cmac_mode_final((cbc_ctx_t *)aes_ctx, &data,
 		    aes_encrypt_block, aes_xor_block);
+		break;
+	case CKM_AES_GMAC:
+		rc = gmac_mode_final((gcm_ctx_t *)aes_ctx, &data,
+		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
 		break;
 	default:
 		break;
@@ -1452,31 +1502,49 @@ soft_aes_sign_verify_init_common(soft_session_t *session_p,
     CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t sign_op)
 {
 	soft_aes_sign_ctx_t	*ctx = NULL;
-	/* For AES CMAC (the only AES MAC currently), iv is always 0 */
-	CK_BYTE		iv[AES_BLOCK_LEN] = { 0 };
-	CK_MECHANISM	encrypt_mech = {
-		.mechanism = CKM_AES_CMAC,
-		.pParameter = iv,
-		.ulParameterLen = sizeof (iv)
-	};
-	CK_RV		rv;
 	size_t		mac_len = AES_BLOCK_LEN;
 
-	if (key_p->key_type != CKK_AES)
-		return (CKR_KEY_TYPE_INCONSISTENT);
+	/* For AES CMAC the IV is always 0 */
+	CK_BYTE		iv_zero[AES_BLOCK_LEN] = { 0 };
+	CK_MECHANISM	encrypt_mech = { 0 };
+	CK_RV		rv;
 
-	/* C_{Sign,Verify}Init() validate pMechanism != NULL */
-	if (pMechanism->mechanism == CKM_AES_CMAC_GENERAL) {
+	switch (pMechanism->mechanism) {
+	case CKM_AES_CMAC_GENERAL:
 		if (pMechanism->pParameter == NULL) {
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
-
 		mac_len = *(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter;
-
 		if (mac_len > AES_BLOCK_LEN) {
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
+		encrypt_mech.mechanism = CKM_AES_CMAC;
+		encrypt_mech.pParameter = iv_zero;
+		encrypt_mech.ulParameterLen = AES_BLOCK_LEN;
+		break;
+
+	case CKM_AES_CMAC:
+		encrypt_mech.mechanism = CKM_AES_CMAC;
+		encrypt_mech.pParameter = iv_zero;
+		encrypt_mech.ulParameterLen = AES_BLOCK_LEN;
+		break;
+
+	case CKM_AES_GMAC:
+		/* See soft_aes_init_ctx */
+		if (pMechanism->pParameter == NULL ||
+		    pMechanism->ulParameterLen != AES_GMAC_IV_LEN)
+			return (CKR_MECHANISM_PARAM_INVALID);
+		encrypt_mech.mechanism = CKM_AES_GMAC;
+		encrypt_mech.pParameter = pMechanism->pParameter;
+		encrypt_mech.ulParameterLen = pMechanism->ulParameterLen;
+		break;
+
+	default:
+		return (CKR_MECHANISM_INVALID);
 	}
+
+	if (key_p->key_type != CKK_AES)
+		return (CKR_KEY_TYPE_INCONSISTENT);
 
 	ctx = calloc(1, sizeof (*ctx));
 	if (ctx == NULL) {
@@ -1489,6 +1557,7 @@ soft_aes_sign_verify_init_common(soft_session_t *session_p,
 		goto done;
 	}
 
+	/* See soft_aes_crypt_init_common */
 	if ((rv = soft_encrypt_init_internal(session_p, &encrypt_mech,
 	    key_p)) != CKR_OK) {
 		soft_aes_free_ctx(ctx->aes_ctx);
@@ -1636,6 +1705,8 @@ soft_aes_free_ctx(aes_ctx_t *ctx)
 			ccm_ctx->ccm_pt_buf = NULL;
 		}
 		len = sizeof (ccm_ctx_t);
+	} else if (ctx->ac_flags & GMAC_MODE) {
+		len = sizeof (gcm_ctx_t);
 	} else if (ctx->ac_flags & GCM_MODE) {
 		gcm_ctx_t *gcm_ctx = &ctx->acu.acu_gcm;
 		if (gcm_ctx->gcm_pt_buf != NULL) {

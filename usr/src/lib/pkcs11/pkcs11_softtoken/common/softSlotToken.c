@@ -61,6 +61,7 @@ static CK_MECHANISM_TYPE soft_mechanisms[] = {
 	CKM_AES_ECB,
 	CKM_AES_KEY_GEN,
 	CKM_AES_GCM,
+	CKM_AES_GMAC,
 	CKM_AES_CCM,
 	CKM_BLOWFISH_CBC,
 	CKM_BLOWFISH_KEY_GEN,
@@ -180,6 +181,13 @@ static CK_MECHANISM_INFO soft_mechanism_info[] = {
 	{AES_MINBYTES, AES_MAXBYTES,
 		CKF_ENCRYPT|CKF_DECRYPT|
 		CKF_WRAP|CKF_UNWRAP},		/* CKM_AES_GCM */
+	/*
+	 * CKM_AES_GMAC supports both MAC and encrypt/decrypt.
+	 * See: crypto-tests/tests/modes/aes/gmac/aes_gmac_enc.c
+	 */
+	{AES_MINBYTES, AES_MAXBYTES,
+		CKF_ENCRYPT|CKF_DECRYPT|
+		CKF_SIGN|CKF_VERIFY},		/* CKM_AES_GMAC */
 	{AES_MINBYTES, AES_MAXBYTES,
 		CKF_ENCRYPT|CKF_DECRYPT|
 		CKF_WRAP|CKF_UNWRAP},		/* CKM_AES_CCM */

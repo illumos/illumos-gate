@@ -38,6 +38,8 @@ extern "C" {
 #define	CTEST_UPDATELEN_WHOLE	SIZE_MAX
 #define	CTEST_UPDATELEN_END	0
 
+extern boolean_t cryptotest_pkcs;	/* true if PKCS */
+
 typedef struct cryptotest {
 	uint8_t *in;
 	uint8_t *out;
@@ -119,6 +121,9 @@ extern test_fg_t cryptotest_digest_fg;
 void ccm_init_params(void *, ulong_t, uchar_t *, ulong_t, uchar_t *, ulong_t,
     ulong_t);
 size_t ccm_param_len(void);
+
+void gmac_init_params(void *, uchar_t *, uchar_t *, ulong_t);
+size_t gmac_param_len(void);
 
 #ifdef __cplusplus
 }

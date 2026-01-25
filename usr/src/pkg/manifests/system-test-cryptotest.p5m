@@ -15,7 +15,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
-# Copyright 2023-2025 RackTop Systems, Inc.
+# Copyright 2023-2026 RackTop Systems, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
@@ -145,6 +145,18 @@ file opt/crypto-tests/tests/aes/pkcs/aes_gcm_32 \
 file opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 \
     path=opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 owner=root group=root \
     mode=0555
+file opt/crypto-tests/tests/aes/pkcs/aes_gmac_32 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gmac_32 owner=root group=root \
+    mode=0555
+file opt/crypto-tests/tests/aes/pkcs/aes_gmac_64 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gmac_64 owner=root group=root \
+    mode=0555
+file opt/crypto-tests/tests/aes/pkcs/aes_gmac_enc_32 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gmac_enc_32 owner=root \
+    group=root mode=0555
+file opt/crypto-tests/tests/aes/pkcs/aes_gmac_enc_64 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_gmac_enc_64 owner=root \
+    group=root mode=0555
 dir  path=opt/crypto-tests/tests/digest
 dir  path=opt/crypto-tests/tests/digest/kcf
 file opt/crypto-tests/tests/digest/kcf/cleanup \

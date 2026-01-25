@@ -25,6 +25,8 @@
 
 #include "cryptotest.h"
 
+boolean_t cryptotest_pkcs = B_FALSE;	/* true if PKCS */
+
 struct crypto_op {
 	char *in;
 	char *out;
@@ -476,6 +478,33 @@ size_t
 ccm_param_len(void)
 {
 	return (sizeof (CK_AES_CCM_PARAMS));
+}
+
+/*
+ * KCF always takes CK_AES_GMAC_PARAMS, but the caller may pass
+ * either just the IV or IV plus AAD.
+ *
+ * Some tests pass ulAADLen = 0 and non-NULL pAAD, so allow that,
+ * but require ulAADLen=0 if pAAD=NULL.
+ */
+void
+gmac_init_params(void *buf, uchar_t *pIv, uchar_t *pAAD, ulong_t ulAADLen)
+{
+	CK_AES_GMAC_PARAMS *pp = buf;
+
+	if (pAAD == NULL) {
+		VERIFY0(ulAADLen);
+	}
+
+	pp->pIv = pIv;
+	pp->pAAD = pAAD;	/* may be NULL */
+	pp->ulAADLen = ulAADLen;
+}
+
+size_t
+gmac_param_len(void)
+{
+	return (sizeof (CK_AES_GMAC_PARAMS));
 }
 
 const char *

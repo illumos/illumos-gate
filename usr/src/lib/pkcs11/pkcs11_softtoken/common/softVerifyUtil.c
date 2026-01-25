@@ -106,6 +106,7 @@ soft_verify_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	case CKM_AES_CMAC_GENERAL:
 	case CKM_AES_CMAC:
+	case CKM_AES_GMAC:
 
 		return (soft_aes_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_FALSE));
@@ -206,6 +207,7 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 	}
 	case CKM_AES_CMAC_GENERAL:
 	case CKM_AES_CMAC:
+	case CKM_AES_GMAC:
 	{
 		CK_ULONG len;
 		CK_BYTE signature[AES_BLOCK_LEN];
@@ -316,6 +318,7 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 
 	case CKM_AES_CMAC_GENERAL:
 	case CKM_AES_CMAC:
+	case CKM_AES_GMAC:
 
 		return (soft_aes_mac_sign_verify_update(session_p, pPart,
 		    ulPartLen));
@@ -429,6 +432,7 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	}
 	case CKM_AES_CMAC_GENERAL:
 	case CKM_AES_CMAC:
+	case CKM_AES_GMAC:
 	{
 		CK_ULONG len;
 		CK_BYTE signature[AES_BLOCK_LEN];

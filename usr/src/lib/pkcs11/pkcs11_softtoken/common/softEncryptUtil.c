@@ -197,6 +197,7 @@ cbc_common:
 	case CKM_AES_CTR:
 	case CKM_AES_CCM:
 	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		return (soft_aes_crypt_init_common(session_p, pMechanism,
 		    key_p, B_TRUE));
 
@@ -317,11 +318,12 @@ soft_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
+	case CKM_AES_CBC_PAD:
 	case CKM_AES_CTR:
 	case CKM_AES_CCM:
 	case CKM_AES_CMAC:
-	case CKM_AES_CBC_PAD:
 	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		if (update) {
 			return (soft_aes_encrypt_update(session_p, pData,
 			    ulDataLen, pEncrypted, pulEncryptedLen));
@@ -427,8 +429,9 @@ soft_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_CMAC:
 	case CKM_AES_CTR:
-	case CKM_AES_GCM:
 	case CKM_AES_CCM:
+	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 	case CKM_BLOWFISH_CBC:
 	case CKM_RC4:
 
@@ -573,13 +576,14 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 		break;
 	}
+	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_CMAC:
-	case CKM_AES_CBC:
 	case CKM_AES_ECB:
 	case CKM_AES_CTR:
 	case CKM_AES_CCM:
 	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		rv = soft_aes_encrypt_final(session_p, pLastEncryptedPart,
 		    pulLastEncryptedPartLen);
 		break;
@@ -682,13 +686,14 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 		break;
 	}
 
-	case CKM_AES_CBC_PAD:
 	case CKM_AES_CBC:
+	case CKM_AES_CBC_PAD:
 	case CKM_AES_CMAC:
 	case CKM_AES_ECB:
-	case CKM_AES_GCM:
-	case CKM_AES_CCM:
 	case CKM_AES_CTR:
+	case CKM_AES_CCM:
+	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
 		soft_aes_free_ctx(active_op->context);
 		active_op->context = NULL;
 		break;

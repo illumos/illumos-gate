@@ -92,7 +92,8 @@ extern "C" {
 #define	AES_MIN_KEY_BYTES	((AES_MINBITS) >> 3)
 #define	AES_MAX_KEY_BYTES	((AES_MAXBITS) >> 3)
 #define	AES_192_KEY_BYTES	24
-#define	AES_IV_LEN		16
+#define	AES_IV_LEN		16	/* CBC, ECB */
+#define	AES_GMAC_IV_LEN		12
 
 /* AES key schedule may be implemented with 32- or 64-bit elements: */
 #define	AES_32BIT_KS		32

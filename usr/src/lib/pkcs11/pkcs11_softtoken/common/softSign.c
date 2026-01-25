@@ -117,7 +117,8 @@ C_Sign(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if ((pData == NULL) || (pulSignatureLen == NULL)) {
+	if (pulSignatureLen == NULL ||
+	    ((*pulSignatureLen != 0) && (pSignature == NULL))) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;
 	}

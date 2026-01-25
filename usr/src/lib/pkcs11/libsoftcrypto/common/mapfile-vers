@@ -136,6 +136,9 @@ $endif
 	gcm_decrypt_final;
 	gcm_encrypt_final;
 	gcm_init_ctx;
+	gmac_alloc_ctx;
+	gmac_init_ctx;
+	gmac_mode_final;
 	pkcs1_decode;
 	pkcs1_encode;
 	pkcs7_decode;
