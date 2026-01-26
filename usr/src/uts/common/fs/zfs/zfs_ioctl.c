@@ -38,7 +38,7 @@
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
  * Copyright 2021 The University of Queensland
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -6566,7 +6566,7 @@ zfs_ioc_change_key(const char *dsname, nvlist_t *innvl, nvlist_t *outnvl)
 	int ret;
 	uint64_t cmd = DCP_CMD_NONE;
 	dsl_crypto_params_t *dcp = NULL;
-	nvlist_t *args = NULL, *hidden_args = NULL;
+	nvlist_t *props = NULL, *hidden_args = NULL;
 
 	if (strchr(dsname, '@') != NULL || strchr(dsname, '%') != NULL) {
 		ret = (SET_ERROR(EINVAL));
@@ -6574,14 +6574,20 @@ zfs_ioc_change_key(const char *dsname, nvlist_t *innvl, nvlist_t *outnvl)
 	}
 
 	(void) nvlist_lookup_uint64(innvl, "crypt_cmd", &cmd);
-	(void) nvlist_lookup_nvlist(innvl, "props", &args);
+	(void) nvlist_lookup_nvlist(innvl, "props", &props);
 	(void) nvlist_lookup_nvlist(innvl, ZPOOL_HIDDEN_ARGS, &hidden_args);
 
-	ret = dsl_crypto_params_create_nvlist(cmd, args, hidden_args, &dcp);
+	ret = dsl_crypto_params_create_nvlist(cmd, props, hidden_args, &dcp);
 	if (ret != 0)
 		goto error;
 
-	ret = spa_keystore_change_key(dsname, dcp);
+	/* The keylocation property is set from dcp->cp_keylocation. */
+	(void) nvlist_remove_all(props, zfs_prop_to_name(ZFS_PROP_KEYLOCATION));
+
+	if ((ret = zfs_check_userprops(dsname, props)) != 0)
+		goto error;
+
+	ret = spa_keystore_change_key(dsname, dcp, props);
 	if (ret != 0)
 		goto error;
 

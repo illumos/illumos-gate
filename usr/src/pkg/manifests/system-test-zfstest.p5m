@@ -17,6 +17,7 @@
 # Copyright (c) 2018 Datto Inc.
 # Copyright 2021 Jason King
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -620,6 +621,9 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_change-key/zfs_change-key_pbkdf2iters \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_change-key/zfs_change-key_userprop \
     mode=0555
 dir  path=opt/zfs-tests/tests/functional/cli_root/zfs_clone
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_clone/cleanup mode=0555

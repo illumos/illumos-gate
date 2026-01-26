@@ -31,6 +31,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2018 Datto Inc.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -7861,12 +7862,6 @@ zfs_do_change_key(int argc, char **argv)
 			    gettext("invalid option '%c'\n"), optopt);
 			usage(B_FALSE);
 		}
-	}
-
-	if (inheritkey && !nvlist_empty(props)) {
-		(void) fprintf(stderr,
-		    gettext("Properties not allowed for inheriting\n"));
-		usage(B_FALSE);
 	}
 
 	argc -= optind;

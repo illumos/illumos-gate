@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_DSL_CRYPT_H
@@ -167,6 +168,7 @@ typedef struct spa_keystore {
 typedef struct spa_keystore_change_key_args {
 	const char *skcka_dsname;
 	dsl_crypto_params_t *skcka_cp;
+	nvlist_t *skcka_userprops;
 } spa_keystore_change_key_args_t;
 
 int dsl_crypto_params_create_nvlist(dcp_cmd_t cmd, nvlist_t *props,
@@ -203,7 +205,8 @@ void dsl_crypto_recv_raw_key_sync(struct dsl_dataset *ds,
 int dsl_crypto_recv_raw(const char *poolname, uint64_t dsobj, uint64_t fromobj,
     dmu_objset_type_t ostype, nvlist_t *nvl, boolean_t do_key);
 
-int spa_keystore_change_key(const char *dsname, dsl_crypto_params_t *dcp);
+int spa_keystore_change_key(const char *dsname, dsl_crypto_params_t *dcp,
+    nvlist_t *userprops);
 int spa_keystore_change_key_check(void *arg, dmu_tx_t *tx);
 void spa_keystore_change_key_sync(void *arg, dmu_tx_t *tx);
 int dsl_dir_rename_crypt_check(dsl_dir_t *dd, dsl_dir_t *newparent);

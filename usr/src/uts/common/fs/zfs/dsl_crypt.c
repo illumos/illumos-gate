@@ -16,6 +16,7 @@
 /*
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
  * Copyright (c) 2018 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dsl_crypt.h>
@@ -1232,6 +1233,8 @@ spa_keystore_change_key_check(void *arg, dmu_tx_t *tx)
 	dsl_crypto_params_t *dcp = skcka->skcka_cp;
 	uint64_t rddobj;
 
+	/* we assume skcka_userprops has already been verified */
+
 	/* check for the encryption feature */
 	if (!spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_ENCRYPTION)) {
 		ret = SET_ERROR(ENOTSUP);
@@ -1516,6 +1519,10 @@ spa_keystore_change_key_sync(void *arg, dmu_tx_t *tx)
 	VERIFY0(dsl_dataset_hold(dp, skcka->skcka_dsname, FTAG, &ds));
 	ASSERT(!ds->ds_is_snapshot);
 
+	/* set user properties */
+	dsl_props_set_sync_impl(ds, ZPROP_SRC_LOCAL, skcka->skcka_userprops,
+	    tx);
+
 	if (dcp->cp_cmd == DCP_CMD_NEW_KEY ||
 	    dcp->cp_cmd == DCP_CMD_FORCE_NEW_KEY) {
 		/*
@@ -1594,14 +1601,19 @@ spa_keystore_change_key_sync(void *arg, dmu_tx_t *tx)
 	dsl_dataset_rele(ds, FTAG);
 }
 
+/*
+ * Note: assumes userprops has already been checked for validity.
+ */
 int
-spa_keystore_change_key(const char *dsname, dsl_crypto_params_t *dcp)
+spa_keystore_change_key(const char *dsname, dsl_crypto_params_t *dcp,
+    nvlist_t *userprops)
 {
 	spa_keystore_change_key_args_t skcka;
 
 	/* initialize the args struct */
 	skcka.skcka_dsname = dsname;
 	skcka.skcka_cp = dcp;
+	skcka.skcka_userprops = userprops;
 
 	/*
 	 * Perform the actual work in syncing context. The blocks modified

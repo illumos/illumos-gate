@@ -29,8 +29,9 @@
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright (c) 2018 Datto Inc.
 .\" Copyright 2023 RackTop Systems, Inc.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd November 03, 2023
+.Dd January 30, 2026
 .Dt ZFS 8
 .Os
 .Sh NAME
@@ -320,10 +321,11 @@
 .Op Fl a Ns | Ns Ar filesystem
 .Nm
 .Cm change-key
-.Op Fl l
+.Op Fl il
 .Op Fl o Sy keylocation Ns = Ns Ar value
 .Op Fl o Sy keyformat Ns = Ns Ar value
 .Op Fl o Sy pbkdf2iters Ns = Ns Ar value
+.Op Fl o Sy user:prop Ns = Ns Ar value
 .Ar filesystem
 .Sh DESCRIPTION
 The
@@ -4437,6 +4439,7 @@ encryption roots.
 .Op Fl o Sy keylocation Ns = Ns Ar value
 .Op Fl o Sy keyformat Ns = Ns Ar value
 .Op Fl o Sy pbkdf2iters Ns = Ns Ar value
+.Op Fl o Sy user:prop Ns = Ns Ar value
 .Ar filesystem
 .Xc
 Allows a user to change the encryption key used to access a dataset.
@@ -4446,7 +4449,7 @@ This command may also be used to change the
 .Sy keylocation , keyformat ,
 and
 .Sy pbkdf2iters
-properties as needed.
+properties as needed, as well as set user properties.
 If the dataset was not previously an encryption root it will become one.
 Alternatively, the
 .Fl i
@@ -4465,11 +4468,12 @@ This is effectively equivalent to
 .Qq Nm Cm load-key Ar filesystem ; Nm Cm change-key Ar filesystem .
 .It Fl o Sy property Ns = Ns Ar value
 Allows the user to set encryption key properties
-.Pq
+.Po
 .Sy keyformat , keylocation ,
 and
 .Sy pbkdf2iters
-while changing the key.
+.Pc
+and user properties while changing the key.
 This is the only way to alter
 .Sy keyformat
 and
