@@ -416,8 +416,6 @@ find_currdev(EFI_LOADED_IMAGE_PROTOCOL *img)
 					return (true);
 			}
 		}
-	} else {
-		printf("Can't find device by handle\n");
 	}
 
 	/*
