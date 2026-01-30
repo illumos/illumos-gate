@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -269,6 +269,13 @@ extern void usage_wdc_clear_assert(const char *);
 
 extern int do_wdc_inject_assert(const nvme_process_arg_t *);
 extern void usage_wdc_inject_assert(const char *);
+
+extern int do_sandisk_hwrev(const nvme_process_arg_t *);
+extern void usage_sandisk_hwrev(const char *);
+
+extern int do_sandisk_pcieye(const nvme_process_arg_t *);
+extern void optparse_sandisk_pcieye(nvme_process_arg_t *);
+extern void usage_sandisk_pcieye(const char *);
 
 #ifdef __cplusplus
 }

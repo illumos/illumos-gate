@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -677,6 +677,10 @@ nvme_errtostr(nvme_t *nvme, nvme_err_t err)
 		return ("NVME_ERR_NS_CTRL_NOT_ATTACHED");
 	case NVME_ERR_NS_UNALLOC:
 		return ("NVME_ERR_NS_UNALLOC");
+	case NVME_ERR_PCIE_LANE_RANGE:
+		return ("NVME_ERR_PCIE_LANE_RANGE");
+	case NVME_ERR_PCIE_EYE_BUF_RANGE:
+		return ("NVME_ERR_PCIE_EYE_BUF_RANGE");
 	default:
 		return ("unknown error");
 	}

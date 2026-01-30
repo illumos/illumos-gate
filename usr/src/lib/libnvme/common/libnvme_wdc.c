@@ -10,11 +10,15 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
  * libnvme pieces specific to WDC.
+ *
+ * Note: WDC spun out its SSD division into SanDisk. This has logic for the
+ * SNx40 and SNx50 generation parts. The x60 generation and onwards can be found
+ * in libnvme_sandisk.c.
  *
  * Currently this defines several common log pages that are found in a few
  * generations of WDC devices such as the SN840 and SN65x. There is also support
@@ -341,26 +345,6 @@ const nvme_vsd_t wdc_sn65x = {
 	.nvd_nvuc = ARRAY_SIZE(wdc_sn840_sn65x_vuc)
 };
 
-static const nvme_vsd_ident_t wdc_sn861_idents[] = {
-	{
-		.nvdi_vid = WDC_PCI_VID,
-		.nvdi_did = WDC_SN861_DID,
-		.nvdi_human = "WDC Ultrastar DC SN861",
-	}
-};
-
-static const nvme_log_page_info_t *wdc_sn861_log_pages[] = {
-	&ocp_log_smart, &ocp_log_errrec, &ocp_log_fwact, &ocp_log_lat,
-	&ocp_log_devcap, &ocp_log_unsup
-};
-
-const nvme_vsd_t wdc_sn861 = {
-	.nvd_ident = wdc_sn861_idents,
-	.nvd_nident = ARRAY_SIZE(wdc_sn861_idents),
-	.nvd_logs = wdc_sn861_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(wdc_sn861_log_pages),
-};
-
 static nvme_vuc_req_t *
 nvme_wdc_resize_vuc(nvme_ctrl_t *ctrl, uint8_t subcmd, uint32_t gib)
 {
@@ -458,7 +442,7 @@ nvme_wdc_e6_req_init(nvme_ctrl_t *ctrl, nvme_wdc_e6_req_t **reqp)
 
 	if (reqp == NULL) {
 		return (nvme_ctrl_error(ctrl, NVME_ERR_BAD_PTR, 0,
-		    "encountered invalid nvme_commit_req_t output pointer: %p",
+		    "encountered invalid nvme_wdc_e6_req_t output pointer: %p",
 		    reqp));
 	}
 

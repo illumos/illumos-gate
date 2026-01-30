@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_OCP_H
@@ -28,6 +28,7 @@
 #include <sys/isa_defs.h>
 #include <sys/debug.h>
 #include <sys/stdint.h>
+#include <sys/stddef.h>
 
 #ifdef __cplusplus
 extern "C" {

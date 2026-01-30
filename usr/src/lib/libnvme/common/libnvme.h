@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _LIBNVME_H
@@ -488,7 +488,16 @@ typedef enum {
 	 * Indicates that the namespace is unallocated and therefore the
 	 * operation cannot proceed.
 	 */
-	NVME_ERR_NS_UNALLOC
+	NVME_ERR_NS_UNALLOC,
+	/*
+	 * Indicates that a library function was referring to a PCIe lane number
+	 * that is not valid for the device.
+	 */
+	NVME_ERR_PCIE_LANE_RANGE,
+	/*
+	 * Indicates that a PCIe eye diagram buffer size was too small.
+	 */
+	NVME_ERR_PCIE_EYE_BUF_RANGE
 } nvme_err_t;
 
 /*
@@ -1300,6 +1309,12 @@ extern bool nvme_wdc_e6_req_exec(nvme_wdc_e6_req_t *);
  */
 extern bool nvme_wdc_assert_clear(nvme_ctrl_t *);
 extern bool nvme_wdc_assert_inject(nvme_ctrl_t *);
+
+/*
+ * Sandisk commands to get PCI eye diagrams and the hardware revision.
+ */
+extern bool nvme_sndk_pci_eye(nvme_ctrl_t *, uint8_t, void *, size_t);
+extern bool nvme_sndk_hw_rev(nvme_ctrl_t *, uint8_t *, uint8_t *);
 
 #ifdef __cplusplus
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_SOLIDIGM_P5XXX_H
@@ -36,6 +36,7 @@
 
 #include <sys/stdint.h>
 #include <sys/debug.h>
+#include <sys/stddef.h>
 
 #include <sys/nvme/ocp.h>
 

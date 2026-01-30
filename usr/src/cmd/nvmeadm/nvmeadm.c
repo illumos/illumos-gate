@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -397,6 +397,22 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NULL,
 		do_firmware_activate, usage_firmware_activate, NULL,
 		NVMEADM_C_EXCL
+	},
+	{
+		.c_name = "sandisk/hwrev",
+		.c_desc = "obtain device hardware revision",
+		.c_func = do_sandisk_hwrev,
+		.c_usage = usage_sandisk_hwrev,
+		.c_flags = 0
+	},
+	{
+		.c_name = "sandisk/pci-eye",
+		.c_desc = "get PCIe receiver eye diagram",
+		.c_flagdesc = "  -l lane\t\tspecify the PCIe lane (0-3)\n"
+		    "  -o output\tspecify output file destination\n",
+		.c_func = do_sandisk_pcieye,
+		.c_usage = usage_sandisk_pcieye,
+		.c_optparse = optparse_sandisk_pcieye
 	},
 	{
 		"wdc/e6dump",

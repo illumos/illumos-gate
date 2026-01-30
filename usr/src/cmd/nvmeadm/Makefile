@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
@@ -23,6 +23,7 @@ OBJS=	nvme_version.o	\
 	nvmeadm_nsmgmt.o \
 	nvmeadm_ofmt.o	\
 	nvmeadm_print.o	\
+	nvmeadm_sandisk.o \
 	nvmeadm_telemetry.o \
 	nvmeadm_wdc.o	\
 	$(HEXDUMP_OBJS)

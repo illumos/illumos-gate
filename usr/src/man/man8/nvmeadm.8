@@ -9,10 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2025 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd October 4, 2025
+.Dd January 30, 2026
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -134,6 +134,16 @@
 .Cm activate-firmware
 .Ar ctl
 .Ar slot
+.Nm
+.Op Fl dv
+.Cm sandisk/hwrev
+.Ar ctl
+.Nm
+.Op Fl dv
+.Cm sandisk/pci-eye
+.Fl l Ar lane
+.Fl o Ar output
+.Ar ctl
 .Nm
 .Op Fl dv
 .Cm wdc/e6dump
@@ -1308,6 +1318,29 @@ Activates the firmware in slot
 The firmware image in
 .Ar slot
 is activated at the next NVM controller reset.
+.It Xo
+.Nm
+.Cm sandisk/hwrev
+.Ar ctl
+.Xc
+This vendor-specific command prints the device hardware revision.
+.It Xo
+.Nm
+.Cm sandisk/pci-eye
+.Fl l Ar lane
+.Fl o Ar output
+.Ar ctl
+.Xc
+This vendor-specific command obtains a PCIe eye diagram for the hardware
+lane specified by
+.Ar lane
+on the NVMe device
+.Ar ctl .
+The PCIe lane will generally be between 0 and 3, though it is possible
+fewer lanes will be available depending on the drive bay and system
+board design.
+The information will be output to the file
+.Ar output .
 .It Xo
 .Nm
 .Cm wdc/e6dump

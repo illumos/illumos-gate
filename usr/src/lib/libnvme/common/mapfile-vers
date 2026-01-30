@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -229,6 +229,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_nvm_lba_fmt_rel_perf;
 	nvme_sctostr;
 	nvme_scttostr;
+	nvme_sndk_hw_rev;
+	nvme_sndk_pci_eye;
 	nvme_syserr;
 	nvme_vuc_disc_desc;
 	nvme_vuc_disc_dt;
@@ -268,8 +270,6 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_wdc_e6_req_set_output;
 	nvme_wdc_resize_get;
 	nvme_wdc_resize_set;
-
-
     local:
 	*;
 };

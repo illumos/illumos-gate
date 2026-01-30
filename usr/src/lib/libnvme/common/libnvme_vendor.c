@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -26,7 +26,7 @@
 const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&wdc_sn840,
 	&wdc_sn65x,
-	&wdc_sn861,
+	&sandisk_sn861,
 	&micron_7300,
 	&micron_74x0,
 	&micron_x500,

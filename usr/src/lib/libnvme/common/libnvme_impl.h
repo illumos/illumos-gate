@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _LIBNVME_IMPL_H
@@ -543,7 +543,7 @@ extern const nvme_log_page_info_t ocp_log_telstr;
 
 extern const nvme_vsd_t wdc_sn840;
 extern const nvme_vsd_t wdc_sn65x;
-extern const nvme_vsd_t wdc_sn861;
+extern const nvme_vsd_t sandisk_sn861;
 extern const nvme_vsd_t micron_7300;
 extern const nvme_vsd_t micron_74x0;
 extern const nvme_vsd_t micron_x500;

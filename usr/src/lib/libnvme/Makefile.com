@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 LIBRARY =	libnvme.a
@@ -30,6 +30,7 @@ OBJECTS =	libnvme.o \
 		libnvme_ocp.o \
 		libnvme_phison.o \
 		libnvme_samsung.o \
+		libnvme_sandisk.o \
 		libnvme_solidigm.o \
 		libnvme_vendor.o \
 		libnvme_vuc.o \
