@@ -27,7 +27,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2024 Hans Rosenfeld
  */
 
@@ -117,23 +117,26 @@ typedef enum {
 } async_flowc_action;
 
 #ifdef DEBUG
-#define	ASY_DEBUG_INIT	0x0001	/* Output msgs during driver initialization. */
-#define	ASY_DEBUG_INPUT	0x0002	/* Report characters received during int. */
-#define	ASY_DEBUG_EOT	0x0004	/* Output msgs when wait for xmit to finish. */
-#define	ASY_DEBUG_CLOSE	0x0008	/* Output msgs when driver open/close called */
-#define	ASY_DEBUG_HFLOW	0x0010	/* Output msgs when H/W flowcontrol is active */
-#define	ASY_DEBUG_PROCS	0x0020	/* Output each proc name as it is entered. */
-#define	ASY_DEBUG_STATE	0x0040	/* Output value of Interrupt Service Reg. */
-#define	ASY_DEBUG_INTR	0x0080	/* Output value of Interrupt Service Reg. */
-#define	ASY_DEBUG_OUT	0x0100	/* Output msgs about output events. */
-#define	ASY_DEBUG_BUSY	0x0200	/* Output msgs when xmit is enabled/disabled */
-#define	ASY_DEBUG_MODEM	0x0400	/* Output msgs about modem status & control. */
-#define	ASY_DEBUG_MODM2	0x0800	/* Output msgs about modem status & control. */
-#define	ASY_DEBUG_IOCTL	0x1000	/* Output msgs about ioctl messages. */
-#define	ASY_DEBUG_CHIP	0x2000	/* Output msgs about chip identification. */
-#define	ASY_DEBUG_SFLOW	0x4000	/* Output msgs when S/W flowcontrol is active */
 
-static	int debug  = 0;
+typedef enum {
+	ASY_DEBUG_INIT	= 1 << 0,  /* Output during driver initialization. */
+	ASY_DEBUG_INPUT	= 1 << 1,  /* Report characters received during int. */
+	ASY_DEBUG_EOT	= 1 << 2,  /* Output when wait for xmit to finish. */
+	ASY_DEBUG_CLOSE	= 1 << 3,  /* Output when driver open/close called */
+	ASY_DEBUG_HFLOW	= 1 << 4,  /* Output when H/W flowcontrol is active */
+	ASY_DEBUG_PROCS	= 1 << 5,  /* Output each proc name as it is entered. */
+	ASY_DEBUG_STATE	= 1 << 6,  /* Output value of Interrupt Service Reg. */
+	ASY_DEBUG_INTR	= 1 << 7,  /* Output value of Interrupt Service Reg. */
+	ASY_DEBUG_OUT	= 1 << 8,  /* Output about output events. */
+	ASY_DEBUG_BUSY	= 1 << 9,  /* Output when xmit is enabled/disabled */
+	ASY_DEBUG_MODEM	= 1 << 10, /* Output about modem status & control. */
+	ASY_DEBUG_MODM2	= 1 << 11, /* Output about modem status & control. */
+	ASY_DEBUG_IOCTL	= 1 << 12, /* Output about ioctl messages. */
+	ASY_DEBUG_CHIP	= 1 << 13, /* Output about chip identification. */
+	ASY_DEBUG_SFLOW	= 1 << 14, /* Output when S/W flowcontrol is active */
+} asy_debug_t;
+
+static	asy_debug_t debug = 0;
 
 #define	ASY_DEBUG(asy, x) (asy->asy_debug & (x))
 #define	ASY_DPRINTF(asy, fac, format, ...) \
@@ -1390,6 +1393,7 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		ddi_regs_map_free(&asy->asy_iohandle);
 
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "shutdown complete");
+	ddi_set_driver_private(devi, NULL);
 	asy_soft_state_free(asy);
 
 	return (DDI_SUCCESS);
@@ -1676,6 +1680,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	asy->polledio.cons_polledio_enter = NULL;
 	asy->polledio.cons_polledio_exit = NULL;
 
+	ddi_set_driver_private(devi, asy);
 	ddi_report_dev(devi);
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "done");
 	return (DDI_SUCCESS);
