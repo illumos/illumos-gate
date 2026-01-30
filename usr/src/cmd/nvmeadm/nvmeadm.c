@@ -403,6 +403,25 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NVMEADM_C_EXCL
 	},
 	{
+		.c_name = "vendor-cmd",
+		.c_desc = "run an arbitrary vendor-specific command",
+		.c_flagdesc = "  -O opcode\tcommand opcode\n"
+		    "  -n nsid\tcommand namespace identifier\n"
+		    "  --cdw12 cdw12\tcdw12 32-bit value\n"
+		    "  --cdw13 cdw13\tcdw13 32-bit value\n"
+		    "  --cdw14 cdw14\tcdw14 32-bit value\n"
+		    "  --cdw15 cdw15\tcdw15 32-bit value\n"
+		    "  -l length\tthe command data size in bytes\n"
+		    "  -i input\tthe command input data file\n"
+		    "  -o output\tthe command output data file\n"
+		    "  -L lock\trequest a controller or namespace lock\n"
+		    "  -I impact\trequest impact on the system\n"
+		    "  -t timeout\trequest timeout in seconds\n",
+		.c_func = do_vendor_cmd,
+		.c_usage = usage_vendor_cmd,
+		.c_optparse = optparse_vendor_cmd
+	},
+	{
 		.c_name = "sandisk/hwrev",
 		.c_desc = "obtain device hardware revision",
 		.c_func = do_sandisk_hwrev,
@@ -664,7 +683,7 @@ nvmeadm_cleanup_npa(nvme_process_arg_t *npa)
  * that we may be blocking for the lock so that way the user has a chance to do
  * something and can cancel it.
  */
-static void
+void
 nvmeadm_excl(const nvme_process_arg_t *npa, nvme_lock_level_t level)
 {
 	bool ret;
@@ -3432,45 +3451,4 @@ do_firmware_activate(const nvme_process_arg_t *npa)
 		(void) printf("Slot %u successfully activated.\n", slot);
 
 	return (0);
-}
-
-nvme_vuc_disc_t *
-nvmeadm_vuc_init(const nvme_process_arg_t *npa, const char *name)
-{
-	nvme_vuc_disc_t *vuc;
-	nvme_vuc_disc_lock_t lock;
-
-	if (!nvme_vuc_discover_by_name(npa->npa_ctrl, name, 0, &vuc)) {
-		nvmeadm_fatal(npa, "%s does not support operation %s: device "
-		    "does not support vendor unique command %s", npa->npa_name,
-		    npa->npa_cmd->c_name, name);
-	}
-
-	lock = nvme_vuc_disc_lock(vuc);
-	switch (lock) {
-	case NVME_VUC_DISC_LOCK_NONE:
-		break;
-	case NVME_VUC_DISC_LOCK_READ:
-		nvmeadm_excl(npa, NVME_LOCK_L_READ);
-		break;
-	case NVME_VUC_DISC_LOCK_WRITE:
-		nvmeadm_excl(npa, NVME_LOCK_L_WRITE);
-		break;
-	}
-
-	return (vuc);
-}
-
-void
-nvmeadm_vuc_fini(const nvme_process_arg_t *npa, nvme_vuc_disc_t *vuc)
-{
-	if (nvme_vuc_disc_lock(vuc) != NVME_VUC_DISC_LOCK_NONE) {
-		if (npa->npa_ns != NULL) {
-			nvme_ns_unlock(npa->npa_ns);
-		} else if (npa->npa_ctrl != NULL) {
-			nvme_ctrl_unlock(npa->npa_ctrl);
-		}
-	}
-
-	nvme_vuc_disc_free(vuc);
 }

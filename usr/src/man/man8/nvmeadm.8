@@ -136,6 +136,20 @@
 .Ar slot
 .Nm
 .Op Fl dv
+.Cm vendor-cmd
+.Fl O Ar opcode
+.Op Fl n Ar nsid
+.Op Fl -cdw12 Ar cdw12
+.Op Fl -cdw13 Ar cdw13
+.Op Fl -cdw14 Ar cdw14
+.Op Fl -cdw15 Ar cdw15
+.Op Fl l Ar length Op Fl i Ar file | Fl o Ar file
+.Op Fl L Ar lock
+.Op Fl I Ar impact Ns Op , Ns Ar ...
+.Op Fl t Ar timeout
+.Ar ctl[/ns]
+.Nm
+.Op Fl dv
 .Cm sandisk/hwrev
 .Ar ctl
 .Nm
@@ -1340,6 +1354,166 @@ Activates the firmware in slot
 The firmware image in
 .Ar slot
 is activated at the next NVM controller reset.
+.It Xo
+.Nm
+.Cm vendor-cmd
+.Fl O Ar opcode
+.Op Fl n Ar nsid
+.Op Fl -cdw12 Ar cdw12
+.Op Fl -cdw13 Ar cdw13
+.Op Fl -cdw14 Ar cdw14
+.Op Fl -cdw15 Ar cdw15
+.Op Fl l Ar length Op Fl i Ar file | Fl o Ar file
+.Op Fl L Ar lock
+.Op Fl I Ar impact Ns Op , Ns Ar ...
+.Op Fl t Ar timeout
+.Ar ctl[/ns]
+.Xc
+This allows an administrator to send a vendor-specific command to a
+device that supports the NVMe standard vendor specific command format.
+Vendor-specific commands must be used carefully.
+While the system attempts to first class many commands so that way we
+can ensure that anything that causes confusion to the device is well
+understood, this cannot be done for arbitrary commands.
+It is the user's responsibility to understand if this can cause the
+controller to lose data, interact poorly with the kernel leading to the
+driver being out of sync with reality, or worse.
+The only required argument for this is an operation code which must be in the
+vendor-specific region.
+.Pp
+The command may be run against either a controller or a namespace.
+When a namespace is specified, its namespace id is included in the
+command.
+.Pp
+A command may optionally request that data be sent to the controller as
+an input to the command
+.Pq Fl i ,
+or returned by the controller as an output from the command
+.Pq Fl o .
+There is no support in the standard protocol for both an arbitrary sized
+data input and output.
+The length of the input is specified by the
+.Fl l
+flag, which indicates a size in bytes that must be a multiple of 4
+.Po
+commands operate in units of
+.Vt uint32_t
+.Pc .
+Data is either read from or output to a file.
+The maximum input or output data size provided by the system is 16 MiB.
+.Pp
+When the command completes, it will print out the results of the command and the
+value of the completion command dword 0.
+.Pp
+The following arguments are supported:
+.Bl -tag -width Ds
+.It Fl O , -opcode Ar opcode
+Sets the numeric operation code that should be used for the command.
+This option is required.
+Valid values are in the range [0xc0, 0xff].
+.It Fl n , --nsid Ar nsid
+Sets the namespace identifier to send in the command to
+.Ar nsid .
+If the command is specified against a namespace specifically, then this
+argument is not required.
+If the
+.Ar nsid
+argument is specified and a namespace is specified as the target, they
+must agree otherwise it is an error.
+.Pp
+If no namespace ID is specified, this field will be set to 0 in the command.
+.It Fl -cdw12 , Fl 2 Ar cdw12
+Sets the 32-bit value of command dword 12 to the value
+.Ar cdw12 .
+Whether or not this is required is command specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw13 , Fl 3 Ar cdw13
+Sets the 32-bit value of command dword 13 to the value
+.Ar cdw13 .
+Whether or not this is required is command specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw14 , Fl 4 Ar cdw14
+Sets the 32-bit value of command dword 14 to the value
+.Ar cdw14 .
+Whether or not this is required is command specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw15 , Fl 5 Ar cdw15
+Sets the 32-bit value of command dword 15 to the value
+.Ar cdw15 .
+Whether or not this is required is command specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl l , -length Ar length
+Indicates the length in bytes of the desired input or output for the
+command.
+The length must be 4-byte aligned.
+If this is specified, one of
+.Fl i
+or
+.Fl o
+must be specified to indicate the direction of the data transfer and the
+source or destination of the data.
+.It Fl i , -input Ar file
+Read the input to the command from
+.Ar file .
+Requires that
+.Fl l
+is specified.
+If the input file,
+.Ar file ,
+is shorter than the length specified with
+.Fl l ,
+then the remaining data will be filled with 0s.
+.It Fl o , -output Ar file
+Write controller output to
+.Ar file .
+Requires that
+.Fl l
+is specified.
+.It Fl L , --lock Ar lock
+Allows for a read or write lock on the controller
+.Pq or namespace
+to be taken for the duration of the command.
+The following values are supported for
+.Ar lock :
+.Bl -tag -width write
+.It Sy read
+Takes a read lock on the controller
+Pq or namespace .
+I/O will still continue during this time.
+This prevents other operations from modifying the state of the
+controller or namespace such as performing a format, firmware update,
+etc.
+.It Sy write
+Takes an exclusive write lock on the controller.
+I/O will still continue during this; however, no other administrative
+actions will be allowed during this time including read-only commands.
+.El
+.It Fl I , -impact Ar impact Ns Op , Ns Ar ...
+A comma-separated list of values that describe to the system the impact
+of running this command on the system.
+By default, no impact to the system is assumed.
+The following values are accepted:
+.Bl -tag -width namespace
+.It Sy data
+Indicates that the data on the controller or namespace may be lost as a
+result of running this command.
+.It Sy namespace
+Indicates that namespaces and their attributes may be modified as a
+result of running this command.
+.El
+.It Fl t , -timeout Ar timeout
+All administrative commands are monitored by the system to ensure that
+they complete in a timely fashion.
+By default a 60 second timeout is applied to all administrative
+commands.
+This may be overridden by specifying a new
+.Ar timeout
+value which will be interpreted in seconds.
+.El
 .It Xo
 .Nm
 .Cm sandisk/hwrev

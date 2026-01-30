@@ -246,6 +246,11 @@ extern int do_detach_ns(const nvme_process_arg_t *);
 extern void usage_detach_ns(const char *);
 
 /*
+ * Locking functions
+ */
+extern void nvmeadm_excl(const nvme_process_arg_t *, nvme_lock_level_t);
+
+/*
  * Vendor specific commands.
  *
  * All vendor commands must first call nvmeadm_vuc_validate() which will
@@ -255,6 +260,9 @@ extern void usage_detach_ns(const char *);
 extern nvme_vuc_disc_t *nvmeadm_vuc_init(const nvme_process_arg_t *,
     const char *);
 extern void nvmeadm_vuc_fini(const nvme_process_arg_t *, nvme_vuc_disc_t *);
+extern int do_vendor_cmd(const nvme_process_arg_t *);
+extern void optparse_vendor_cmd(nvme_process_arg_t *);
+extern void usage_vendor_cmd(const char *);
 
 extern int do_wdc_e6dump(const nvme_process_arg_t *);
 extern void optparse_wdc_e6dump(nvme_process_arg_t *);
