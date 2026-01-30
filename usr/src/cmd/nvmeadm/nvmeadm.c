@@ -182,7 +182,11 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"  used\t\tthe namespace's bytes used\n"
 		"  disk\t\tthe name of the namespace's disk device\n"
 		"  namespace\tthe namespace's numerical value\n"
-		"  ns-state\tthe namespace's current state\n",
+		"  ns-state\tthe namespace's current state\n"
+		"  format\ta description of the namespace's format\n"
+		"  fmtid\t\tthe numerical id of the namespace's format\n"
+		"  fmtds\t\tthe data size of the namespace's format\n"
+		"  fmtms\t\tthe metadata size of the namespace's format\n",
 		do_list, usage_list, optparse_list,
 		NVMEADM_C_MULTI
 	},

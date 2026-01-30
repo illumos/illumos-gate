@@ -422,6 +422,28 @@ use the namespace with
 The namespace is exposing a block device and is actively attached to
 .Xr blkdev 4D .
 .El
+.It Sy FORMAT
+The current LBA format of the namespace printed as a string comprised of
+the data section and the metadata section generally structured as
+.Ql data+meta .
+For example, a 4K formatted namespace with no metadata sectors would be
+shown as
+.Ql 4096+0 .
+A 512-byte formatted namespace with 16 bytes of metadata
+.Pq perhaps for end-to-end data protection
+would be formatted as
+.Ql 4096+16 .
+.It Sy FMTID
+The numerical ID of the namespace's LBA format.
+This may be used as the
+.Ar lba-format
+argument to the
+.Cm format
+subcommand.
+.It Sy FMTDS
+The data size, in bytes, of the namespace's LBA format.
+.It Sy FMTMS
+The metadata size, in bytes, of the namespace's LBA format.
 .El
 .Pp
 When using the

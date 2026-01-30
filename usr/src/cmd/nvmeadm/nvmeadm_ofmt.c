@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
@@ -67,7 +67,11 @@ typedef enum nvme_list_ofmt_field {
 	NVME_LIST_DISK,
 	NVME_LIST_UNALLOC,
 	NVME_LIST_NS_STATE,
-	NVME_LIST_CTRLPATH
+	NVME_LIST_CTRLPATH,
+	NVME_LIST_NS_FORMAT,
+	NVME_LIST_NS_FMTID,
+	NVME_LIST_NS_FMTDS,
+	NVME_LIST_NS_FMTMS
 } nvme_list_ofmt_field_t;
 
 static boolean_t
@@ -161,9 +165,9 @@ nvmeadm_list_nsid_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 	nvmeadm_list_ofmt_arg_t *list = ofmt_arg->ofmt_cbarg;
 	nvme_ns_info_t *ns = list->nloa_ns;
 	const nvme_nvm_lba_fmt_t *fmt = NULL;
+	const nvme_ns_disc_level_t level = nvme_ns_info_level(ns);
 	uint64_t val;
 	size_t ret;
-
 
 	(void) nvme_ns_info_curformat(ns, &fmt);
 
@@ -205,6 +209,47 @@ nvmeadm_list_nsid_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 	case NVME_LIST_NS_STATE:
 		ret = strlcpy(buf, list->nloa_state, buflen);
 		break;
+	case NVME_LIST_NS_FORMAT:
+		if (fmt != NULL) {
+			ret = snprintf(buf, buflen, "%u+%u",
+			    nvme_nvm_lba_fmt_data_size(fmt),
+			    nvme_nvm_lba_fmt_meta_size(fmt));
+		} else if (level < NVME_NS_DISC_F_ACTIVE) {
+			ret = strlcpy(buf, "-", buflen);
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	case NVME_LIST_NS_FMTID:
+		if (fmt != NULL) {
+			ret = snprintf(buf, buflen, "%u",
+			    nvme_nvm_lba_fmt_id(fmt));
+		} else if (level < NVME_NS_DISC_F_ACTIVE) {
+			ret = strlcpy(buf, "-", buflen);
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	case NVME_LIST_NS_FMTDS:
+		if (fmt != NULL) {
+			ret = snprintf(buf, buflen, "%u",
+			    nvme_nvm_lba_fmt_data_size(fmt));
+		} else if (level < NVME_NS_DISC_F_ACTIVE) {
+			ret = strlcpy(buf, "-", buflen);
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	case NVME_LIST_NS_FMTMS:
+		if (fmt != NULL) {
+			ret = snprintf(buf, buflen, "%u",
+			    nvme_nvm_lba_fmt_meta_size(fmt));
+		} else if (level < NVME_NS_DISC_F_ACTIVE) {
+			ret = strlcpy(buf, "-", buflen);
+		} else {
+			return (B_FALSE);
+		}
+		break;
 	default:
 		warnx("internal programmer error: encountered unknown ofmt "
 		    "argument id 0x%x", ofmt_arg->ofmt_id);
@@ -242,6 +287,10 @@ const ofmt_field_t nvmeadm_list_nsid_ofmt[] = {
 	{ "DISK", 15, NVME_LIST_DISK, nvmeadm_list_nsid_ofmt_cb },
 	{ "NS-STATE", 10, NVME_LIST_NS_STATE, nvmeadm_list_nsid_ofmt_cb },
 	{ "CTRLPATH", 30, NVME_LIST_CTRLPATH, nvmeadm_list_common_ofmt_cb },
+	{ "FORMAT", 12, NVME_LIST_NS_FORMAT, nvmeadm_list_nsid_ofmt_cb },
+	{ "FMTID", 8, NVME_LIST_NS_FMTID, nvmeadm_list_nsid_ofmt_cb },
+	{ "FMTDS", 8, NVME_LIST_NS_FMTDS, nvmeadm_list_nsid_ofmt_cb },
+	{ "FMTMS", 8, NVME_LIST_NS_FMTMS, nvmeadm_list_nsid_ofmt_cb },
 	{ NULL, 0, 0, NULL }
 };
 
