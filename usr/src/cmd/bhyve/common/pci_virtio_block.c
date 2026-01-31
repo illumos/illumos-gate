@@ -35,9 +35,12 @@
  * A full copy of the text of the CDDL should have accompanied this
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
- *
+ */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -599,7 +602,7 @@ pci_vtblk_init(struct pci_devinst *pi, nvlist_t *nvl)
 	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_BLOCK,
 	    VIRTIO_ID_BLOCK, PCIC_STORAGE);
 
-	if (!vi_intr_init(&sc->vbsc_vs, true, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vbsc_vs, fbsdrun_virtio_msix()))
 		goto fail;
 	if (!vi_pcibar_setup(&sc->vbsc_vs))
 		goto fail;

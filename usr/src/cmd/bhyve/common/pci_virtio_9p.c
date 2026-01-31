@@ -38,7 +38,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -407,7 +407,7 @@ pci_vt9p_init(struct pci_devinst *pi, nvlist_t *nvl)
 	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_9P, VIRTIO_ID_9P,
 	    PCIC_STORAGE);
 
-	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, fbsdrun_virtio_msix()))
 		return (1);
 	if (!vi_pcibar_setup(&sc->vsc_vs))
 		return (1);

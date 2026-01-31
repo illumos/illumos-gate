@@ -1030,7 +1030,7 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 	pci_viona_eval_promisc(sc);
 
 	/* Viona always uses MSI-X */
-	if (!vi_intr_init(&sc->vsc_vs, false, true))
+	if (!vi_intr_init(&sc->vsc_vs, true))
 		return (pci_viona_free_softstate(sc, 1));
 
 	if (!vi_pcibar_setup(&sc->vsc_vs))

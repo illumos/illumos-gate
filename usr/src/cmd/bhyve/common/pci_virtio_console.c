@@ -44,7 +44,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -773,7 +773,7 @@ pci_vtcon_init(struct pci_devinst *pi, nvlist_t *nvl)
 	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_CONSOLE,
 	    VIRTIO_ID_CONSOLE, PCIC_SIMPLECOMM);
 
-	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, fbsdrun_virtio_msix()))
 		return (1);
 	if (!vi_pcibar_setup(&sc->vsc_vs))
 		return (1);

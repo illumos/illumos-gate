@@ -38,7 +38,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -709,7 +709,7 @@ pci_vtnet_init(struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vsc_config.vnc_status = VIRTIO_NET_S_LINK_UP;
 
 	/* use BAR 1 to map MSI-X table and PBA, if we're using MSI-X */
-	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, fbsdrun_virtio_msix()))
 		return (pci_vtnet_free_softstate(sc, EIO));
 
 	if (!vi_pcibar_setup(&sc->vsc_vs))

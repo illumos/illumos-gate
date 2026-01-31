@@ -39,7 +39,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -755,7 +755,7 @@ pci_vtinput_init(struct pci_devinst *pi, nvlist_t *nvl)
 	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_SUBVEN_INPUT);
 
 	/* add MSI-X table BAR */
-	if (!vi_intr_init(&sc->vsc_vs, true, fbsdrun_virtio_msix()))
+	if (!vi_intr_init(&sc->vsc_vs, fbsdrun_virtio_msix()))
 		goto failed;
 	/* add VirtIO BARs */
 	if (!vi_pcibar_setup(&sc->vsc_vs))

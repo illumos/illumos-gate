@@ -43,7 +43,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/stdbool.h>
@@ -593,14 +593,15 @@ vi_pcibar_setup(struct virtio_softc *vs)
 }
 
 /*
- * Initialize MSI-X vector capabilities if we're to use MSI-X,
- * or MSI capabilities if not.
+ * Configure interrupt delivery for this VirtIO device.
  *
- * We assume we want one MSI-X vector per queue, here, plus one
- * for the config vec.
+ * If requested, enable MSI-X and allocate one vector per queue plus
+ * a configuration vector. Regardless, always establish the mandatory
+ * legacy (INTx) interrupt as VirtIO devices do not support MSI and
+ * require a fixed interrupt line for compatibility.
  */
 bool
-vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix)
+vi_intr_init(struct virtio_softc *vs, bool use_msix)
 {
 	if (use_msix) {
 		struct virtio_consts *vc = vs->vs_vc;
@@ -616,10 +617,6 @@ vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix)
 	} else {
 		vs->vs_flags &= ~VIRTIO_USE_MSIX;
 	}
-
-	/* Only 1 MSI vector for bhyve */
-	if (use_msi)
-		pci_emul_add_msicap(vs->vs_pi, 1);
 
 	/* Legacy interrupts are mandatory for virtio devices */
 	pci_lintr_request(vs->vs_pi);

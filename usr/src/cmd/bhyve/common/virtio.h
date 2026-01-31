@@ -42,7 +42,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_BHYVE_VIRTIO_H_
@@ -496,7 +496,7 @@ void	vi_softc_linkup(struct virtio_softc *vs, struct virtio_consts *vc,
 			void *dev_softc, struct pci_devinst *pi,
 			struct vqueue_info *queues);
 void	vi_queue_linkup(struct virtio_softc *vc, struct vqueue_info *queues);
-bool	vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix);
+bool	vi_intr_init(struct virtio_softc *vs, bool use_msix);
 void	vi_pci_init(struct pci_devinst *, virtio_mode_t, uint16_t,
     uint16_t, uint8_t);
 bool	vi_pcibar_setup(struct virtio_softc *);
