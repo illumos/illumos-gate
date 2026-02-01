@@ -964,7 +964,7 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 	membar_producer();
 	VIRTQ_DMA_SYNC_FORDEV(viq);
 
-	const uint32_t pa = virtio_dma_cookie_pa(&viq->viq_dma, 0);
+	const uint64_t pa = virtio_dma_cookie_pa(&viq->viq_dma, 0);
 	vio->vio_ops->vop_queue_addr_set(vio, qidx,
 	    pa, pa + sz_descs, pa + sz_driver);
 
