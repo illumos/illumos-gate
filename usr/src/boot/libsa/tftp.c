@@ -434,7 +434,6 @@ tftp_open(const char *path, struct open_file *f)
 	struct tftp_handle *tftpfile;
 	struct iodesc	*io;
 	int		res;
-	size_t		pathsize;
 	const char	*extraslash;
 
 	if (netproto != NET_TFTP)
@@ -460,26 +459,31 @@ tftp_open(const char *path, struct open_file *f)
 
 	io->destip = rootip;
 	tftpfile->off = 0;
-	pathsize = (strlen(rootpath) + 1 + strlen(path) + 1) * sizeof (char);
-	tftpfile->path = malloc(pathsize);
-	if (tftpfile->path == NULL) {
-		free(tftpfile);
-		return (ENOMEM);
-	}
-	if (rootpath[strlen(rootpath) - 1] == '/' || path[0] == '/')
+
+	/*
+	 * Remove leading '/' from path, because we will append it to
+	 * rootpath.
+	 */
+	while (path[0] == '/')
+		path++;
+
+	/* tftp does not support reading directories */
+	if (path[0] == '\0' || path[strlen(path) - 1] == '/')
+		return (EPERM);
+
+	if (rootpath[strlen(rootpath) - 1] == '/') {
 		extraslash = "";
-	else
+	} else {
 		extraslash = "/";
-	res = snprintf(tftpfile->path, pathsize, "%s%s%s",
-	    rootpath, extraslash, path);
-	if (res < 0 || res > pathsize) {
-		free(tftpfile->path);
+	}
+
+	res = asprintf(&tftpfile->path, "%s%s%s", rootpath, extraslash, path);
+	if (res < 0) {
 		free(tftpfile);
 		return (ENOMEM);
 	}
 
 	res = tftp_makereq(tftpfile);
-
 	if (res) {
 		free(tftpfile->path);
 		free(tftpfile->pkt);
