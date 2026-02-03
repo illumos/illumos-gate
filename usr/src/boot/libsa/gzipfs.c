@@ -169,10 +169,16 @@ zf_open(const char *fname, struct open_file *f)
 	char		*cp;
 	int		error;
 	struct stat	sb;
+	size_t len;
 
 	/* Have to be in "just read it" mode */
 	if (f->f_flags != F_READ)
 		return (EPERM);
+
+	/* directory names are not compressed. */
+	len = strlen(fname);
+	if (len == 0 || fname[len - 1] == '/')
+		return (ENOENT);
 
 	/* If the name already ends in .gz or .bz2, ignore it */
 	if ((cp = strrchr(fname, '.')) && (strcmp(cp, ".gz") == 0 ||
