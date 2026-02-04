@@ -653,6 +653,10 @@ extern void mac_soft_ring_dls_bypass_enable(mac_soft_ring_t *, mac_direct_rx_t,
     void *);
 extern void mac_soft_ring_dls_bypass_disable(mac_soft_ring_t *,
     mac_client_impl_t *);
+extern void mac_soft_ring_poll_enable(mac_soft_ring_t *, mac_direct_rx_t,
+    void *, mac_resource_cb_t *, uint32_t);
+extern void mac_soft_ring_poll_disable(mac_soft_ring_t *, mac_resource_cb_t *,
+    mac_client_impl_t *);
 
 /* Rx SRS */
 extern mac_soft_ring_set_t *mac_srs_create(struct mac_client_impl_s *,

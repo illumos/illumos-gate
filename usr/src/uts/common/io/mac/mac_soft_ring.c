@@ -633,6 +633,64 @@ mac_soft_ring_dls_bypass_disable(mac_soft_ring_t *softring,
 	mutex_exit(&softring->s_ring_lock);
 }
 
+void
+mac_soft_ring_poll_enable(mac_soft_ring_t *sr, mac_direct_rx_t drx,
+    void *drx_arg, mac_resource_cb_t *rcb, uint32_t pri)
+{
+	mac_rx_fifo_t mrf;
+
+	/* Only TCP/IP clients are poll capable at the moment. */
+	VERIFY((sr->s_ring_type & (ST_RING_TCP | ST_RING_TCP6)) != 0);
+	/* The client resourse callback structure better be set. */
+	VERIFY3P(rcb->mrc_arg, !=, NULL);
+	/* Polling should be configured only once on a given softring. */
+	VERIFY3P(sr->s_ring_rx_arg2, ==, NULL);
+
+	/*
+	 * As polling elides DLS processing we must make sure that
+	 * softring processing (i.e. non-polling) also bypasses DLS
+	 * processing.
+	 */
+	mac_soft_ring_dls_bypass_enable(sr, drx, drx_arg);
+
+	bzero(&mrf, sizeof (mrf));
+	mrf.mrf_type = MAC_RX_FIFO;
+	mrf.mrf_receive = (mac_receive_t)mac_soft_ring_poll;
+	mrf.mrf_intr_enable =
+	    (mac_intr_enable_t)mac_soft_ring_intr_enable;
+	mrf.mrf_intr_disable =
+	    (mac_intr_disable_t)mac_soft_ring_intr_disable;
+	mrf.mrf_rx_arg = sr;
+	mrf.mrf_intr_handle = (mac_intr_handle_t)sr;
+	mrf.mrf_cpu_id = sr->s_ring_cpuid;
+	mrf.mrf_flow_priority = pri;
+
+	sr->s_ring_rx_arg2 = rcb->mrc_add(rcb->mrc_arg,
+	    (mac_resource_t *)&mrf);
+}
+
+void
+mac_soft_ring_poll_disable(mac_soft_ring_t *sr, mac_resource_cb_t *rcb,
+    mac_client_impl_t *mcip)
+{
+	/* Only TCP/IP clients are poll capable at the moment. */
+	VERIFY((sr->s_ring_type & (ST_RING_TCP | ST_RING_TCP6)) != 0);
+
+	/*
+	 * Remove the IP ring if there is one associated with this
+	 * softring. Note that IP rings are a limited resource; and
+	 * SRST_CLIENT_POLL_V4/V6 being set on the SRS is no guarantee
+	 * that all TCP softrings have an associated IP ring. This is by
+	 * design. See ip_squeue_add_ring().
+	 */
+	if (sr->s_ring_rx_arg2 != NULL) {
+		VERIFY3P(rcb->mrc_arg, !=, NULL);
+		rcb->mrc_remove(rcb->mrc_arg, sr->s_ring_rx_arg2);
+		sr->s_ring_rx_arg2 = NULL;
+	}
+
+	mac_soft_ring_dls_bypass_disable(sr, mcip);
+}
 
 /*
  * mac_soft_ring_signal

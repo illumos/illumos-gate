@@ -383,31 +383,8 @@ mac_srs_client_poll_enable_i(mac_soft_ring_set_t *srs, uint_t sr_cnt,
 	}
 
 	for (uint_t i = 0; i < sr_cnt; i++) {
-		mac_soft_ring_t *tcp_sr = tcp_rings[i];
-		mac_rx_fifo_t mrf;
-
-		/*
-		 * Polling should be configured only once on a given
-		 * softring.
-		 */
-		VERIFY3P(tcp_sr->s_ring_rx_arg2, ==, NULL);
-
-		mac_soft_ring_dls_bypass_enable(tcp_sr, drx, drx_arg);
-
-		bzero(&mrf, sizeof (mrf));
-		mrf.mrf_type = MAC_RX_FIFO;
-		mrf.mrf_receive = (mac_receive_t)mac_soft_ring_poll;
-		mrf.mrf_intr_enable =
-		    (mac_intr_enable_t)mac_soft_ring_intr_enable;
-		mrf.mrf_intr_disable =
-		    (mac_intr_disable_t)mac_soft_ring_intr_disable;
-		mrf.mrf_rx_arg = tcp_sr;
-		mrf.mrf_intr_handle = (mac_intr_handle_t)tcp_sr;
-		mrf.mrf_cpu_id = tcp_sr->s_ring_cpuid;
-		mrf.mrf_flow_priority = srs->srs_pri;
-
-		tcp_sr->s_ring_rx_arg2 = rcb->mrc_add(rcb->mrc_arg,
-		    (mac_resource_t *)&mrf);
+		mac_soft_ring_poll_enable(tcp_rings[i], drx, drx_arg, rcb,
+		    srs->srs_pri);
 	}
 }
 
@@ -434,7 +411,16 @@ mac_srs_client_poll_enable(mac_client_impl_t *mcip, mac_soft_ring_set_t *srs,
 	if (srs->srs_type & SRST_NO_SOFT_RINGS)
 		return;
 
-	if (is_v6) {
+	/*
+	 * Once mci_direct_rx is set for a given protocol (IPv4/IPv6) it is not
+	 * cleared. We probably should clear it when there is no longer a
+	 * client, but we don't. The resource callbacks in mci_rcb4/6, however,
+	 * are cleared when polling is disabled. So, even though DLS and polling
+	 * currently come as a pair, we make sure to check both mci_direct_rx
+	 * and mci_rcb4/6 before attemping to enable polling.
+	 */
+	if (is_v6 && mcip->mci_direct_rx.mdrx_v6 != NULL &&
+	    mcip->mci_rcb6.mrc_arg != NULL) {
 		mac_srs_client_poll_enable_i(srs, srs->srs_tcp_ring_count,
 		    srs->srs_udp6_soft_rings, srs->srs_tcp6_soft_rings,
 		    mcip->mci_direct_rx.mdrx_v6,
@@ -443,7 +429,8 @@ mac_srs_client_poll_enable(mac_client_impl_t *mcip, mac_soft_ring_set_t *srs,
 		mutex_enter(&srs->srs_lock);
 		srs->srs_type |= (SRST_CLIENT_POLL_V6 | SRST_DLS_BYPASS_V6);
 		mutex_exit(&srs->srs_lock);
-	} else {
+	} else if (!is_v6 && mcip->mci_direct_rx.mdrx_v4 != NULL &&
+	    mcip->mci_rcb4.mrc_arg != NULL) {
 		mac_srs_client_poll_enable_i(srs, srs->srs_tcp_ring_count,
 		    srs->srs_udp_soft_rings, srs->srs_tcp_soft_rings,
 		    mcip->mci_direct_rx.mdrx_v4,
@@ -461,21 +448,7 @@ mac_srs_client_poll_disable_i(mac_client_impl_t *mcip, uint_t sr_cnt,
     mac_resource_cb_t *rcb)
 {
 	for (uint_t i = 0; i < sr_cnt; i++) {
-		mac_soft_ring_t *tcp_sr = tcp_rings[i];
-
-		/*
-		 * Remove the IP ring if there is one associated with this
-		 * softring. Note that IP rings are a limited resource; and
-		 * SRST_CLIENT_POLL_V4/V6 being set on the SRS is no
-		 * guarantee that all TCP softrings have an associated IP
-		 * ring. This is by design. See ip_squeue_add_ring().
-		 */
-		if (tcp_sr->s_ring_rx_arg2 != NULL) {
-			VERIFY3P(rcb->mrc_arg, !=, NULL);
-			rcb->mrc_remove(rcb->mrc_arg, tcp_sr->s_ring_rx_arg2);
-			tcp_sr->s_ring_rx_arg2 = NULL;
-		}
-		mac_soft_ring_dls_bypass_disable(tcp_sr, mcip);
+		mac_soft_ring_poll_disable(tcp_rings[i], rcb, mcip);
 	}
 
 	for (uint_t i = 0; i < sr_cnt; i++) {
@@ -1774,18 +1747,9 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
     void *x_arg1, mac_resource_handle_t x_arg2, boolean_t set_bypass)
 {
 	mac_soft_ring_t	*softring;
-	mac_rx_fifo_t	mrf;
-
-	bzero(&mrf, sizeof (mac_rx_fifo_t));
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_receive = (mac_receive_t)mac_soft_ring_poll;
-	mrf.mrf_intr_enable = (mac_intr_enable_t)mac_soft_ring_intr_enable;
-	mrf.mrf_intr_disable = (mac_intr_disable_t)mac_soft_ring_intr_disable;
-	mrf.mrf_flow_priority = pri;
 
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    ST_RING_TCP, pri, mcip, mac_srs,
-	    cpuid, rx_func, x_arg1, x_arg2);
+	    ST_RING_TCP, pri, mcip, mac_srs, cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
 	/*
@@ -1794,13 +1758,6 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
 	 */
 	if (set_bypass && mcip->mci_direct_rx.mdrx_v4 != NULL &&
 	    (mcip->mci_rcb4.mrc_arg != NULL)) {
-		mac_soft_ring_dls_bypass_enable(softring,
-		    mcip->mci_direct_rx.mdrx_v4,
-		    mcip->mci_direct_rx.mdrx_arg_v4);
-
-		mrf.mrf_rx_arg = softring;
-		mrf.mrf_intr_handle = (mac_intr_handle_t)softring;
-
 		/*
 		 * Make a call in IP to get a TCP squeue assigned to
 		 * this softring to maintain full CPU locality through
@@ -1808,8 +1765,8 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
 		 * the softring so the flow control can be pushed
 		 * all the way to H/W.
 		 */
-		softring->s_ring_rx_arg2 = mcip->mci_rcb4.mrc_add(
-		    mcip->mci_rcb4.mrc_arg, (mac_resource_t *)&mrf);
+		mac_soft_ring_poll_enable(softring, mcip->mci_direct_rx.mdrx_v4,
+		    mcip->mci_direct_rx.mdrx_arg_v4, &mcip->mci_rcb4, pri);
 	}
 
 	/*
@@ -1819,8 +1776,7 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
 	 * bypass the DLS layer.
 	 */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    ST_RING_UDP, pri, mcip, mac_srs,
-	    cpuid, rx_func, x_arg1, x_arg2);
+	    ST_RING_UDP, pri, mcip, mac_srs, cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
 	if (set_bypass && mcip->mci_direct_rx.mdrx_v4 != NULL) {
@@ -1831,26 +1787,18 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
 
 	/* TCP for IPv6. */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    ST_RING_TCP6, pri, mcip, mac_srs,
-	    cpuid, rx_func, x_arg1, x_arg2);
+	    ST_RING_TCP6, pri, mcip, mac_srs, cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
 	if (set_bypass && mcip->mci_direct_rx.mdrx_v6 != NULL &&
 	    (mcip->mci_rcb6.mrc_arg != NULL)) {
-		mac_soft_ring_dls_bypass_enable(softring,
-		    mcip->mci_direct_rx.mdrx_v6,
-		    mcip->mci_direct_rx.mdrx_arg_v6);
-
-		mrf.mrf_rx_arg = softring;
-		mrf.mrf_intr_handle = (mac_intr_handle_t)softring;
-		softring->s_ring_rx_arg2 = mcip->mci_rcb6.mrc_add(
-		    mcip->mci_rcb6.mrc_arg, (mac_resource_t *)&mrf);
+		mac_soft_ring_poll_enable(softring, mcip->mci_direct_rx.mdrx_v6,
+		    mcip->mci_direct_rx.mdrx_arg_v6, &mcip->mci_rcb6, pri);
 	}
 
 	/* UDP for IPv6. */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    ST_RING_UDP6, pri, mcip, mac_srs,
-	    cpuid, rx_func, x_arg1, x_arg2);
+	    ST_RING_UDP6, pri, mcip, mac_srs, cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
 	if (set_bypass && mcip->mci_direct_rx.mdrx_v6 != NULL) {
@@ -1861,8 +1809,7 @@ mac_srs_create_proto_softrings(int id, pri_t pri, mac_client_impl_t *mcip,
 
 	/* Create the Oth softrings which has to go through the DLS. */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    ST_RING_OTH, pri, mcip, mac_srs,
-	    cpuid, rx_func, x_arg1, x_arg2);
+	    ST_RING_OTH, pri, mcip, mac_srs, cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 }
 
