@@ -195,6 +195,8 @@ static void startup_tsc(void);
 #endif
 static void startup_end(void);
 static void layout_kernel_va(void);
+static void setx86isalist(void);
+
 
 /*
  * Declare these as initialized data so we can patch them.
@@ -2098,7 +2100,6 @@ static void
 startup_end(void)
 {
 	int i;
-	extern void setx86isalist(void);
 	extern void cpu_event_init(void);
 
 	PRM_POINT("startup_end() starting...");
@@ -3085,7 +3086,7 @@ kobj_texthole_free(caddr_t addr, size_t size)
  *
  * So, we just leave this alone.
  */
-void
+static void
 setx86isalist(void)
 {
 	char *tp;

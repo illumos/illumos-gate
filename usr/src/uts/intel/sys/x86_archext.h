@@ -1832,7 +1832,6 @@ extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 
 struct cpuid_info;
 
-extern void setx86isalist(void);
 extern void cpuid_alloc_space(struct cpu *);
 extern void cpuid_free_space(struct cpu *);
 extern void cpuid_set_cpu_properties(void *, processorid_t,
