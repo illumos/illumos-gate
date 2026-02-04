@@ -1004,11 +1004,6 @@ startup_memlist(void)
 	size_t page_ctrs_size;
 	size_t pse_table_alloc_size;
 	struct memlist *current;
-	extern void startup_build_mem_nodes(struct memlist *);
-
-	/* XX64 fix these - they should be in include files */
-	extern size_t page_coloring_init(uint_t, int, int);
-	extern void page_coloring_setup(caddr_t);
 
 	PRM_POINT("startup_memlist() starting...");
 
@@ -1358,7 +1353,6 @@ startup_memlist(void)
 static void
 startup_kmem(void)
 {
-	extern void page_set_colorequiv_arr(void);
 #if !defined(__xpv)
 	extern uint64_t kpti_kbase;
 #endif

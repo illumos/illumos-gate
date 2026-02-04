@@ -752,7 +752,7 @@ void	page_vpadd(page_t **, page_t *);
 void	page_vpsub(page_t **, page_t *);
 int	page_lock(page_t *, se_t, kmutex_t *, reclaim_t);
 int	page_lock_es(page_t *, se_t, kmutex_t *, reclaim_t, int);
-void page_lock_clr_exclwanted(page_t *);
+void	page_lock_clr_exclwanted(page_t *);
 int	page_trylock(page_t *, se_t);
 int	page_try_reclaim_lock(page_t *, se_t, int);
 int	page_tryupgrade(page_t *);
@@ -1218,6 +1218,10 @@ void page_capture_unregister_callback(uint_t index);
 int page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap);
 void page_unlock_capture(page_t *pp);
 int page_capture_unretire_pp(page_t *);
+
+extern size_t page_coloring_init(uint_t, int, int);
+extern void page_coloring_setup(caddr_t);
+extern void page_set_colorequiv_arr(void);
 
 extern int memsegs_trylock(int);
 extern void memsegs_lock(int);
