@@ -435,9 +435,9 @@ static sff_pair_t sff_8472_acable_comp[] = {
  * This is derived from SFF 8472 r12.5 Table 8-3.
  * Note that we combined byte 64 and 65. Byte 64 is the upper bit.
  */
-#define	SFF_8472_OPTION_MASK	0x3ffe
+#define	SFF_8472_OPTION_MASK	0x7ffe
 static sff_pair_t sff_8472_options[] = {
-	{ 0x6000, "Power Level 4 Requirement" },
+	{ 0x4000, "Power Level 4 Requirement" },
 	{ 0x2000, "Power Level 3 Requirement" },
 	{ 0x1000, "Paging Implemented" },
 	{ 0x0800, "Retimer or CDR implemented" },
@@ -664,7 +664,7 @@ static sff_pair_t sff_8636_options[] = {
 /*
  * This is derived from SFF 8636 r2.11 Table 6-25.
  */
-#define	SFF_8636_ENHANCED_OPTIONS_MASK	0x1e
+#define	SFF_8636_ENHANCED_OPTIONS_MASK	0x1f
 static sff_pair_t sff_8636_eopt[] = {
 	{ 0x10, "Initialization Complete Flag Implemented" },
 	{ 0x08, "Extended Rate Selection Supported" },

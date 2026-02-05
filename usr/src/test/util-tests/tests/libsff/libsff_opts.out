@@ -12,6 +12,7 @@ Options
 	10	Retimer or CDR implemented
 	11	Paging Implemented
 	12	Power Level 3 Requirement
+	13	Power Level 4 Requirement
 Extended Options
 	0	Soft Rate Select Control Implemented
 	1	Application Select implemented
@@ -44,7 +45,12 @@ Options
 	16	RX Output Emphasis Fixed Programmable Settings
 	17	TX Input Equalization Fixed Programmable
 	18	TX Input Equalization Auto Adaptive Capable
+	19	TX Input Adaptive Equalizers Freeze Capable
+	20	IntL/RxLOSL Output Signal is Configurable
+	21	LPMode/TxDis Input Signal is Configurable
 Enhanced Options
-	0	Application Select Table Supported
-	1	Extended Rate Selection Supported
-	2	Initialization Complete Flag Implemented
+	0	Software Reset Implemented
+	1	TC Readiness Flag Implemented
+	2	Application Select Table Supported
+	3	Extended Rate Selection Supported
+	4	Initialization Complete Flag Implemented

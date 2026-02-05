@@ -9,10 +9,10 @@ Unspecified
 100G ACC or 25GAUI C2M ACC
 Obsolete
 Reserved
-100GBASE-CR4 or 25GBASE-CR CA-L
-25GBASE-CR CA-S
-25GBASE-CR CA-N
-Reserved
+100GBASE-CR4, 25GBASE-CR CA-L or 50GBASE-CR2 with RS FEC
+25GBASE-CR CA-S or 50GBASE-CR2 with BASE-R FEC
+25GBASE-CR CA-N or 50GBASE-CR2 with no FEC
+10 Mb/s Single Pair Ethernet
 Reserved
 40GBASE-ER4
 4 x 10GBASE-SR
@@ -25,10 +25,56 @@ G959.1 profile P1L1-2D2
 100G AOC or 25GAUI C2M AOC
 100G ACC or 25GAUI C2M ACC
 100GE-DWDM2
+100G 1550nm WDM
+10GBASE-T Short Reach
+5GBASE-T
+2.5GBASE-T
+40G SWDM4
+100G SWDM4
+100G PAM4 BiDi
+4WDM-10 MSA
+4WDM-20 MSA
+4WDM-40 MSA
+100GBASE-DR, CAUI-4
+100G-FR or 100GBASE-FR1, CAUI-4
+100G-LR or 100GBASE-LR1, CAUI-4
+100GBASE-SR1, CAUI-4
+100GBASE-SR1, 200GBASE-SR2 or 400GBASE-SR4
+100GBASE-FR1 or 400GBASE-DR4-2
+100GBASE-LR1
+100G-LR1-20 MSA, CAUI-4
+100G-ER1-30 MSA, CAUI-4
+100G-ER1-40 MSA, CAUI-4
+100G-LR1-20 MSA
+Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. BER 1E-06
+Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. BER 1E-06
+Active Copper Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. ACC BER 2.6E-04, AUI BER 1E-05
+Active Optical Cable with 50GAUI, 100GAUI-2 or 200GAUI-4 C2M. AOC BER 2.6E-04, AUI BER 1E-05
+100G-ER1-30 MSA
+100G-FR1-40 MSA
+100GBASE-VR1, 200GBASE-VR2 or 400GBASE-VR4
+10GBASE-BR
+25GBASE-BR
+50GBASE-BR
+100GBASE-VR1, CAUI-4
 Reserved
 Reserved
 Reserved
 Reserved
+100GBASE-CR1, 200GBASE-CR2 or 400GBASE-CR4
+50GBASE-CR, 100GBASE-CR2 or 200GBASE-CR4
+50GBASE-SR, 100GBASE-SR2 or 200GBASE-SR4
+50GBASE-FR or 200GBASE-DR4
+200GBASE-FR4
+200G 1550nm PSM4
+50GBASE-LR
+200GBASE-LR4
+400GBASE-DR4, 400GAUI-4 C2M
+400GBASE-FR4
+400GBASE-LR4-6
+50GBASE-ER
+400G-LR4-10
+400GBASE-ZR (obsolete)
 Reserved
 Reserved
 Reserved
@@ -79,55 +125,9 @@ Reserved
 Reserved
 Reserved
 Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
-Reserved
+256GFC-SW4
+64GFC
+128GFC
 Reserved
 Reserved
 Reserved

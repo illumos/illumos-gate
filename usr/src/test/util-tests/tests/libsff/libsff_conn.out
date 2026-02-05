@@ -35,10 +35,10 @@ Copper pigtail
 RJ45 (Registered Jack)
 No separable connector
 MXC 2x16
-Reserved
-Reserved
-Reserved
-Reserved
+CS optical connector
+SN (previously Mini CS) optical connector
+MPO 2x12
+MPO 1x16
 Reserved
 Reserved
 Reserved
@@ -294,10 +294,10 @@ Copper pigtail
 RJ45 (Registered Jack)
 No separable connector
 MXC 2x16
-Reserved
-Reserved
-Reserved
-Reserved
+CS optical connector
+SN (previously Mini CS) optical connector
+MPO 2x12
+MPO 1x16
 Reserved
 Reserved
 Reserved
