@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_AIO_IMPL_H
@@ -57,8 +58,8 @@ extern "C" {
  * done.
  */
 typedef struct aio_lio {
-	int 		lio_nent;		/* number of requests in list */
-	int 		lio_refcnt;		/* number of requests active */
+	int		lio_nent;		/* number of requests in list */
+	int		lio_refcnt;		/* number of requests active */
 	struct aio_lio	*lio_next;		/* free list pointer */
 	kcondvar_t	lio_notify;		/* list notification */
 	sigqueue_t	*lio_sigqp;		/* sigqueue_t pointer */
@@ -84,13 +85,13 @@ typedef struct aio_req_t {
 	struct aio_req_t *aio_req_next;		/* doneq and pollq pointers */
 	struct aio_req_t *aio_req_prev;		/* doubly linked list */
 	struct aio_req_t *aio_hash_next;	/* next in a hash bucket */
-	aio_lio_t 	*aio_req_lio;		/* head of list IO chain */
+	aio_lio_t	*aio_req_lio;		/* head of list IO chain */
 	struct uio	aio_req_uio;		/* uio struct */
 	struct iovec	aio_req_iov;		/* iovec struct */
 	struct buf	aio_req_buf;		/* buf struct */
 	sigqueue_t	*aio_req_sigqp;		/* sigqueue_t pointer */
 	union {
-		caddr_t 	iocb;		/* ptr to aiocb: 32-32, 64-64 */
+		caddr_t		iocb;		/* ptr to aiocb: 32-32, 64-64 */
 		caddr32_t	iocb32;		/* ptr to aiocb: 32-64 */
 	} aio_req_iocb;
 	port_kevent_t	*aio_req_portkev;	/* port event structure */
@@ -108,28 +109,29 @@ typedef struct aio {
 	int		aio_ok;			/* everything ok when set */
 	int		aio_flags;		/* flags */
 	int		aio_rqclnup;		/* cleanup request used by DR */
+	uint_t		aio_done_cnt;		/* # aio_done calls active */
 	int		aio_portpendcnt;	/* # pending req. per port */
-	aio_req_t	*aio_portq;  		/* port queue head */
+	aio_req_t	*aio_portq;		/* port queue head */
 	aio_req_t	*aio_portcleanupq;	/* port cleanup queue head */
 	aio_req_t	*aio_portpending;	/* list of pending requests */
-	aio_req_t	*aio_free;  		/* freelist of aio requests */
+	aio_req_t	*aio_free;		/* freelist of aio requests */
 	aio_lio_t	*aio_lio_free;		/* freelist of lio heads */
 	aio_req_t	*aio_doneq;		/* done queue head */
 	aio_req_t	*aio_pollq;		/* poll queue head */
 	aio_req_t	*aio_notifyq;		/* notify queue head */
 	aio_req_t	*aio_cleanupq;		/* cleanup queue head */
-	kmutex_t    	aio_mutex;		/* mutex for aio struct */
+	kmutex_t	aio_mutex;		/* mutex for aio struct */
 	kmutex_t	aio_cleanupq_mutex;	/* cleanupq processing */
-	kcondvar_t  	aio_waitcv;		/* cv for aiowait()'ers */
-	kcondvar_t  	aio_cleanupcv;		/* notify cleanup, aio_done */
-	kcondvar_t  	aio_waitncv;		/* cv for further aiowaitn() */
-	kcondvar_t  	aio_portcv;		/* cv for port events */
+	kcondvar_t	aio_waitcv;		/* cv for aiowait()'ers */
+	kcondvar_t	aio_cleanupcv;		/* notify cleanup, aio_done */
+	kcondvar_t	aio_waitncv;		/* cv for further aiowaitn() */
+	kcondvar_t	aio_portcv;		/* cv for port events */
 	aiocb_t		**aio_iocb;		/* list of 32 & 64 bit ptrs */
 	size_t		aio_iocbsz;		/* reserved space for iocbs */
 	uint_t		aio_waitncnt;		/* # requests for aiowaitn */
-	int 		aio_notifycnt;		/* # user-level notifications */
+	int		aio_notifycnt;		/* # user-level notifications */
 	kmutex_t	aio_portq_mutex;	/* mutex for aio_portq */
-	aio_req_t 	*aio_hash[AIO_HASHSZ];	/* hash list of requests */
+	aio_req_t	*aio_hash[AIO_HASHSZ];	/* hash list of requests */
 } aio_t;
 
 /*
@@ -140,7 +142,7 @@ typedef struct aio {
 #define	AIO_WAITN_PENDING	0x0004	/* aiowaitn requests pending */
 #define	AIO_REQ_BLOCK		0x0008	/* block new requests */
 #define	AIO_CLEANUP_PORT	0x0010
-#define	AIO_DONE_ACTIVE		0x0020	/* aio_done call in progress */
+	/* AIO_DONE_ACTIVE (0x0020) retired; replaced by aio_done_cnt */
 #define	AIO_SOLARIS_REQ		0x0040	/* an old solaris aio req was issued */
 
 /*

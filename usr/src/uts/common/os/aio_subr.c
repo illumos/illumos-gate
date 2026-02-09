@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -301,7 +302,7 @@ aio_done(struct buf *bp)
 			} else {
 				ASSERT(pollqflag);
 				/* block aio_cleanup_exit until we're done */
-				aiop->aio_flags |= AIO_DONE_ACTIVE;
+				aiop->aio_done_cnt++;
 				mutex_exit(&aiop->aio_mutex);
 				mutex_exit(&aiop->aio_portq_mutex);
 				/*
@@ -312,13 +313,16 @@ aio_done(struct buf *bp)
 				set_proc_ast(p);
 				mutex_exit(&p->p_lock);
 				mutex_enter(&aiop->aio_mutex);
-				/* wakeup anybody waiting in aiowait() */
+				/* wake up anybody waiting in aiowait() */
 				cv_broadcast(&aiop->aio_waitcv);
 
-				/* wakeup aio_cleanup_exit if needed */
-				if (aiop->aio_flags & AIO_CLEANUP)
+				/* wake up aio_cleanup_exit if needed */
+				ASSERT3U(aiop->aio_done_cnt, >, 0);
+				aiop->aio_done_cnt--;
+				if ((aiop->aio_flags & AIO_CLEANUP) &&
+				    aiop->aio_done_cnt == 0) {
 					cv_signal(&aiop->aio_cleanupcv);
-				aiop->aio_flags &= ~AIO_DONE_ACTIVE;
+				}
 				mutex_exit(&aiop->aio_mutex);
 			}
 			return (0);
@@ -574,8 +578,8 @@ aio_req_free_port(aio_t *aiop, aio_req_t *reqp)
  */
 #if defined(DEBUG)
 static void
-aio_verify_queue(aio_req_t *head,
-	aio_req_t *entry_present, aio_req_t *entry_missing)
+aio_verify_queue(aio_req_t *head, aio_req_t *entry_present,
+    aio_req_t *entry_missing)
 {
 	aio_req_t *reqp;
 	int found = 0;
@@ -1021,7 +1025,7 @@ aio_cleanup_exit(void)
 	 */
 	mutex_enter(&aiop->aio_mutex);
 	aiop->aio_flags |= AIO_CLEANUP;
-	while ((aiop->aio_pending != 0) || (aiop->aio_flags & AIO_DONE_ACTIVE))
+	while (aiop->aio_pending != 0 || aiop->aio_done_cnt > 0)
 		cv_wait(&aiop->aio_cleanupcv, &aiop->aio_mutex);
 	mutex_exit(&aiop->aio_mutex);
 
@@ -1179,8 +1183,8 @@ void
 aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 {
 	aio_t		*aiop;
-	aio_req_t 	*reqp;
-	aio_req_t 	*next;
+	aio_req_t	*reqp;
+	aio_req_t	*next;
 	aio_req_t	*headp;
 	int		counter;
 
