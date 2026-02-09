@@ -104,7 +104,6 @@ extern unsigned long _mdb_ks_mmu_pagemask;
 extern uintptr_t _mdb_ks_kernelbase;
 extern uintptr_t _mdb_ks_userlimit;
 extern uintptr_t _mdb_ks_userlimit32;
-extern uintptr_t _mdb_ks_argsbase;
 extern unsigned long _mdb_ks_msg_bsize;
 extern unsigned long _mdb_ks_defaultstksz;
 extern int _mdb_ks_ncpu;
@@ -128,7 +127,6 @@ extern int _mdb_ks_ncpu_p2;
 #define	KERNELBASE	_mdb_ks_kernelbase
 #define	USERLIMIT	_mdb_ks_userlimit
 #define	USERLIMIT32	_mdb_ks_userlimit32
-#define	ARGSBASE	_mdb_ks_argsbase
 #define	MSG_BSIZE	_mdb_ks_msg_bsize
 #define	DEFAULTSTKSZ	_mdb_ks_defaultstksz
 #define	NCPU		_mdb_ks_ncpu

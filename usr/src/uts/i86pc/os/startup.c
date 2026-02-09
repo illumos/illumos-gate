@@ -366,51 +366,8 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
 	((uintptr_t)P2ROUNDUP((uintptr_t)(x), mmu.level_size[mmu.max_level]))
 
 /*
- *	32-bit Kernel's Virtual memory layout.
- *		+-----------------------+
- *		|			|
- * 0xFFC00000  -|-----------------------|- ARGSBASE
- *		|	debugger	|
- * 0xFF800000  -|-----------------------|- SEGDEBUGBASE
- *		|      Kernel Data	|
- * 0xFEC00000  -|-----------------------|
- *              |      Kernel Text	|
- * 0xFE800000  -|-----------------------|- KERNEL_TEXT (0xFB400000 on Xen)
- *		|---       GDT       ---|- GDT page (GDT_VA)
- *		|---    debug info   ---|- debug info (DEBUG_INFO_VA)
- *		|			|
- *		|   page_t structures	|
- *		|   memsegs, memlists,	|
- *		|   page hash, etc.	|
- * ---	       -|-----------------------|- ekernelheap, valloc_base (floating)
- *		|			|  (segkp is just an arena in the heap)
- *		|			|
- *		|	kvseg		|
- *		|			|
- *		|			|
- * ---         -|-----------------------|- kernelheap (floating)
- *		|        Segkmap	|
- * 0xC3002000  -|-----------------------|- segmap_start (floating)
- *		|	Red Zone	|
- * 0xC3000000  -|-----------------------|- kernelbase / userlimit (floating)
- *		|			|			||
- *		|     Shared objects	|			\/
- *		|			|
- *		:			:
- *		|	user data	|
- *		|-----------------------|
- *		|	user text	|
- * 0x08048000  -|-----------------------|
- *		|	user stack	|
- *		:			:
- *		|	invalid		|
- * 0x00000000	+-----------------------+
- *
- *
  *		64-bit Kernel's Virtual memory layout. (assuming 64 bit app)
  *			+-----------------------+
- *			|			|
- * 0xFFFFFFFF.FFC00000  |-----------------------|- ARGSBASE
  *			|	debugger (?)	|
  * 0xFFFFFFFF.FF800000  |-----------------------|- SEGDEBUGBASE
  *			|      unused		|

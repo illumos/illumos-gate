@@ -87,7 +87,6 @@ unsigned long _mdb_ks_mmu_pagemask;
 uintptr_t _mdb_ks_kernelbase;
 uintptr_t _mdb_ks_userlimit;
 uintptr_t _mdb_ks_userlimit32;
-uintptr_t _mdb_ks_argsbase;
 unsigned long _mdb_ks_msg_bsize;
 unsigned long _mdb_ks_defaultstksz;
 int _mdb_ks_ncpu;
@@ -1284,7 +1283,6 @@ update_vars(void *arg)
 
 	(void) mdb_readvar(&_mdb_ks_userlimit, "_userlimit");
 	(void) mdb_readvar(&_mdb_ks_userlimit32, "_userlimit32");
-	(void) mdb_readvar(&_mdb_ks_argsbase, "_argsbase");
 	(void) mdb_readvar(&_mdb_ks_msg_bsize, "_msg_bsize");
 	(void) mdb_readvar(&_mdb_ks_defaultstksz, "_defaultstksz");
 	(void) mdb_readvar(&_mdb_ks_ncpu, "_ncpu");

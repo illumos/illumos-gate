@@ -70,15 +70,6 @@ extern "C" {
  * page_t have room for 16 nodes.
  */
 #define	MAXNODES	4
-#define	NUMA_NODEMASK	0x0f
-
-/*
- * Define the FPU symbol if we could run on a machine with an external
- * FPU (i.e. not integrated with the normal machine state like the vax).
- *
- * The fpu is defined in the architecture manual, and the kernel hides
- * its absence if it is not present, that's pretty integrated, no?
- */
 
 /* supported page sizes */
 #define	MMU_PAGE_SIZES	3
@@ -131,17 +122,6 @@ extern "C" {
  */
 #define	LL_INTR_STKSZ_NPGS	8
 #define	LL_INTR_STKSZ		(LL_INTR_STKSZ_NPGS * PAGESIZE)
-
-/*
- * During intial boot we limit heap to the top 4Gig.
- */
-#define	BOOT_KERNELHEAP_BASE	ADDRESS_C(0xffffffff00000000)
-
-/*
- * VMWare works best if we don't use the top 64Meg of memory for amd64.
- * Set KERNEL_TEXT to top_o_memory - 64Meg - 8 Meg for 8Meg of nucleus pages.
- */
-#define	PROMSTART	ADDRESS_C(0xffc00000)
 
 /*
  * Virtual address range available to the debugger
@@ -244,12 +224,6 @@ extern uintptr_t kernelbase, segmap_start, segmapsize;
 #endif
 
 /*
- * ARGSBASE is the base virtual address of the range which
- * the kernel uses to map the arguments for exec.
- */
-#define	ARGSBASE	PROMSTART
-
-/*
  * reserve space for modules
  */
 #define	MODTEXT	(1024 * 1024 * 2)
@@ -262,24 +236,10 @@ extern uintptr_t kernelbase, segmap_start, segmapsize;
 #define	HEAPTEXT_SIZE		(128 * 1024 * 1024)	/* bytes */
 
 /*
- * Size of a kernel threads stack.  It must be a whole number of pages
- * since the segment it comes from will only allocate space in pages.
- */
-#define	T_STACKSZ	2*PAGESIZE
-
-/*
- * Size of a cpu startup thread stack.  (It must be a whole number of pages
- * since the containing segment only allocates space in pages.)
- */
-
-#define	STARTUP_STKSZ	3*PAGESIZE
-
-/*
  * Bus types
  */
 #define	BTISA		1
 #define	BTEISA		2
-#define	BTMCA		3
 
 #ifdef	__cplusplus
 }

@@ -111,7 +111,6 @@ const unsigned long	_mmu_pagemask	= (unsigned long)MMU_PAGEMASK;
 uintptr_t		_kernelbase	= (uintptr_t)KERNELBASE;
 uintptr_t		_userlimit	= (uintptr_t)USERLIMIT;
 uintptr_t		_userlimit32	= (uintptr_t)USERLIMIT32;
-const uintptr_t		_argsbase	= (uintptr_t)ARGSBASE;
 const unsigned int	_diskrpm	= (unsigned int)DISKRPM;
 const unsigned long	_pgthresh	= (unsigned long)PGTHRESH;
 const unsigned int	_maxslp		= (unsigned int)MAXSLP;

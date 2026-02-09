@@ -249,7 +249,7 @@ extern "C" {
 #define	MAXBSIZE	8192
 #define	DEV_BSIZE	512
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
-#define	MAXFRAG 	8
+#define	MAXFRAG		8
 #ifdef	_SYSCALL32
 #define	MAXOFF32_T	0x7fffffff
 #endif
@@ -259,7 +259,7 @@ extern "C" {
 #else
 #define	MAXOFF_T	0x7fffffffl
 #ifdef _LONGLONG_TYPE
-#define	MAXOFFSET_T 	0x7fffffffffffffffLL
+#define	MAXOFFSET_T	0x7fffffffffffffffLL
 #else
 #define	MAXOFFSET_T	0x7fffffff
 #endif
@@ -381,7 +381,6 @@ extern const unsigned long _mmu_pagesize;
 extern const unsigned int _mmu_pageshift;
 extern const unsigned long _mmu_pageoffset;
 extern const unsigned long _mmu_pagemask;
-extern const uintptr_t _argsbase;
 extern const unsigned long _defaultstksz;
 extern const unsigned int _nbpg;
 extern const int _ncpu;
@@ -403,7 +402,6 @@ extern const int _clsize;
 #define	KERNELBASE	_kernelbase
 #define	USERLIMIT	_userlimit
 #define	USERLIMIT32	_userlimit32
-#define	ARGSBASE	_argsbase
 #define	DEFAULTSTKSZ	_defaultstksz
 #define	NCPU		_ncpu
 #define	NCPU_LOG2	_ncpu_log2

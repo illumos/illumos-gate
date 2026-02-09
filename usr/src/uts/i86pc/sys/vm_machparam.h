@@ -68,23 +68,6 @@ extern "C" {
 #endif /* __amd64 */
 #define	DFLSSIZ		(8*1024*1024 + ((USRSTACK) & 0x3FFFFF))
 
-/*
- * Size of the kernel segkmem system pte table.  This virtual
- * space is controlled by the resource map "kernelmap".
- */
-#define	SYSPTSIZE	((61*1024*1024) / MMU_PAGESIZE)
-
-/*
- * Size of the ethernet addressable kernel segkmem system pte table.
- * This virtual space is controlled by the resource map "ekernelmap".
- * The ethernet interfaces in some sun machines can address only
- * the upper 16 Megabytes of memory.  Since the ethernet
- * driver kmem_allocs its memory, we bias all kmem_allocs
- * to try ekernelmap first and if it fails try kernelmap.
- * Folks that allocate directly out of kernelmap, above,
- * get memory that is non-ethernet addressable.
- */
-#define	E_SYSPTSIZE	(0x2000000 / MMU_PAGESIZE)
 
 /*
  * The virtual address space to be used by the seg_map segment
@@ -92,7 +75,6 @@ extern "C" {
  */
 #if defined(__i386)
 #define	SEGMAPDEFAULT	(16 * 1024 * 1024)
-#define	SEGMAPMAX	(128 * 1024 * 1024)
 #else
 #define	SEGMAPDEFAULT	(64 * 1024 * 1024)
 #endif
@@ -107,21 +89,6 @@ extern "C" {
  * change over time.
  */
 #define	MAXSLP		20
-
-/*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm. Basically this says that if you are
- * swapped in you deserve some resources. We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES pages which are not
- * paged anyways so this number just means a swapped in process is
- * given around 32k bytes.
- */
-/*
- * nominal ``small'' resident set size
- * protected against replacement
- */
-#define	SAFERSS		3
 
 /*
  * DISKRPM is used to estimate the number of paging i/o operations
